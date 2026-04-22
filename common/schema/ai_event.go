@@ -42,6 +42,7 @@ const (
 	AI_REACT_LOOP_ACTION_LOAD_SKILL_RESOURCES     = "load_skill_resources"
 	AI_REACT_LOOP_ACTION_LOAD_CAPABILITY          = "load_capability"
 	AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL       = "directly_call_tool"
+	AI_REACT_LOOP_ACTION_REQUEST_VERIFICATION     = "request_verification"
 )
 
 const (

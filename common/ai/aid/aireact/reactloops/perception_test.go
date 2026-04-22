@@ -49,7 +49,7 @@ func TestTriggerPerception_SchedulesMidtermRecallSummary(t *testing.T) {
 
 	loop := NewMinimalReActLoop(invoker.GetConfig(), invoker)
 	loop.loopName = "perception-midterm-test"
-	loop.perception = newPerceptionController()
+	loop.perception = newPerceptionController(loop.periodicCheckpointInterval)
 	loop.maxIterations = 100
 	loop.actionHistory = make([]*ActionRecord, 0)
 	loop.actionHistoryMutex = new(sync.Mutex)
@@ -156,7 +156,7 @@ func TestPerceptionState_ShouldUpdate_NilNewState(t *testing.T) {
 }
 
 func TestPerceptionController_IntervalThrottling(t *testing.T) {
-	pc := newPerceptionController()
+	pc := newPerceptionController(perceptionDefaultIterationInterval)
 
 	state1 := &PerceptionState{
 		Topics:      []string{"Topic A"},
@@ -174,7 +174,7 @@ func TestPerceptionController_IntervalThrottling(t *testing.T) {
 }
 
 func TestPerceptionController_ExponentialBackoff(t *testing.T) {
-	pc := newPerceptionController()
+	pc := newPerceptionController(perceptionDefaultIterationInterval)
 	pc.currentInterval = 10 * time.Millisecond
 	pc.minInterval = 10 * time.Millisecond
 	pc.maxInterval = 100 * time.Millisecond
@@ -199,7 +199,7 @@ func TestPerceptionController_ExponentialBackoff(t *testing.T) {
 }
 
 func TestPerceptionController_IntervalResetOnChange(t *testing.T) {
-	pc := newPerceptionController()
+	pc := newPerceptionController(perceptionDefaultIterationInterval)
 	pc.currentInterval = 10 * time.Millisecond
 	pc.minInterval = 10 * time.Millisecond
 
@@ -228,7 +228,7 @@ func TestPerceptionController_IntervalResetOnChange(t *testing.T) {
 }
 
 func TestPerceptionController_ShouldTriggerOnIteration(t *testing.T) {
-	pc := newPerceptionController()
+	pc := newPerceptionController(perceptionDefaultIterationInterval)
 	pc.iterationTriggerInterval = 2
 
 	if pc.shouldTriggerOnIteration(0) {
@@ -249,7 +249,7 @@ func TestPerceptionController_ShouldTriggerOnIteration(t *testing.T) {
 }
 
 func TestPerceptionController_EpochIncrements(t *testing.T) {
-	pc := newPerceptionController()
+	pc := newPerceptionController(perceptionDefaultIterationInterval)
 	s1 := &PerceptionState{Topics: []string{"A"}, Changed: true, LastTrigger: PerceptionTriggerForced}
 	pc.applyResult(s1)
 	if pc.getCurrent().Epoch != 1 {

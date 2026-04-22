@@ -30,13 +30,13 @@ type FeedbackProviderFunc func(loop *ReActLoop, feedback *bytes.Buffer, nonce st
 
 // SatisfactionRecord 记录满意度验证的结果，包含验证状态、原因、已完成任务索引和下一步行动计划
 type SatisfactionRecord struct {
-	Satisfactory       bool                           `json:"satisfactory"`         // 是否满足用户需求
-	Reason             string                         `json:"reason"`               // 满意/不满意的原因分析
-	CompletedTaskIndex string                         `json:"completed_task_index"` // AI 判断已完成的任务索引，如 "1-1" 或 "1-1,1-2"
-	NextMovements      []aicommon.VerifyNextMovement  `json:"next_movements"`       // AI 下一步行动计划，用于任务执行中状态追踪
-	Evidence           string                         `json:"evidence"`             // 运行期新增的证据 Markdown (legacy)
-	EvidenceOps        []aicommon.EvidenceOperation   `json:"evidence_ops"`         // 结构化证据增量操作
-	OutputFiles        []string                       `json:"output_files"`         // 本轮验证识别出的交付文件
+	Satisfactory       bool                          `json:"satisfactory"`         // 是否满足用户需求
+	Reason             string                        `json:"reason"`               // 满意/不满意的原因分析
+	CompletedTaskIndex string                        `json:"completed_task_index"` // AI 判断已完成的任务索引，如 "1-1" 或 "1-1,1-2"
+	NextMovements      []aicommon.VerifyNextMovement `json:"next_movements"`       // AI 下一步行动计划，用于任务执行中状态追踪
+	Evidence           string                        `json:"evidence"`             // 运行期新增的证据 Markdown (legacy)
+	EvidenceOps        []aicommon.EvidenceOperation  `json:"evidence_ops"`         // 结构化证据增量操作
+	OutputFiles        []string                      `json:"output_files"`         // 本轮验证识别出的交付文件
 }
 
 // ActionRecord 记录每次迭代执行的 Action 信息
@@ -53,6 +53,11 @@ type ReActLoop struct {
 	emitter *aicommon.Emitter
 
 	maxIterations int
+
+	// periodicCheckpointInterval controls how often loop-level periodic
+	// checkpoint behaviors should run during iterations, such as perception
+	// and generic auto-verification.
+	periodicCheckpointInterval int
 
 	loopName string
 
@@ -339,11 +344,15 @@ func (r *ReActLoop) GetBaseFrameContext() map[string]any {
 // It sets up config, invoker, and emitter but skips full action registration.
 func NewMinimalReActLoop(cfg aicommon.AICallerConfigIf, invoker aicommon.AIInvokeRuntime) *ReActLoop {
 	return &ReActLoop{
-		config:    cfg,
-		invoker:   invoker,
-		emitter:   cfg.GetEmitter(),
-		vars:      omap.NewEmptyOrderedMap[string, any](),
-		taskMutex: new(sync.Mutex),
+		config:                     cfg,
+		invoker:                    invoker,
+		emitter:                    cfg.GetEmitter(),
+		periodicCheckpointInterval: perceptionDefaultIterationInterval,
+		vars:                       omap.NewEmptyOrderedMap[string, any](),
+		taskMutex:                  new(sync.Mutex),
+		historySatisfactionReasons: make([]*SatisfactionRecord, 0),
+		actionHistory:              make([]*ActionRecord, 0),
+		actionHistoryMutex:         new(sync.Mutex),
 	}
 }
 
@@ -360,6 +369,7 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		config:                      config,
 		emitter:                     config.GetEmitter(),
 		maxIterations:               100,
+		periodicCheckpointInterval:  perceptionDefaultIterationInterval,
 		actions:                     omap.NewEmptyOrderedMap[string, *LoopAction](),
 		loopActions:                 omap.NewEmptyOrderedMap[string, LoopActionFactory](),
 		streamFields:                omap.NewEmptyOrderedMap[string, *LoopStreamField](),
@@ -377,7 +387,7 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		sameLogicSpinThreshold:      3, // 默认连续 3 次相同逻辑触发 AI 检测
 		maxConsecutiveSpinWarnings:  3, // 默认连续 3 次 SPIN 警告后强制退出
 		extraCapabilities:           NewExtraCapabilitiesManager(),
-		perception:                  newPerceptionController(),
+		perception:                  newPerceptionController(perceptionDefaultIterationInterval),
 	}
 
 	for _, action := range []*LoopAction{
@@ -472,6 +482,12 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 	if _, ok := r.actions.Get(schema.AI_REACT_LOOP_ACTION_LOAD_CAPABILITY); !ok {
 		if loadCap, ok := GetLoopAction(schema.AI_REACT_LOOP_ACTION_LOAD_CAPABILITY); ok {
 			r.actions.Set(loadCap.ActionType, loadCap)
+		}
+	}
+
+	if _, ok := r.actions.Get(schema.AI_REACT_LOOP_ACTION_REQUEST_VERIFICATION); !ok {
+		if verifyNow, ok := GetLoopAction(schema.AI_REACT_LOOP_ACTION_REQUEST_VERIFICATION); ok {
+			r.actions.Set(verifyNow.ActionType, verifyNow)
 		}
 	}
 
