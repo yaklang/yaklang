@@ -9,8 +9,14 @@ import (
 )
 
 var loopAction_Finish = &LoopAction{
-	ActionType:  "finish",
-	Description: "Finish the task. Add 'human_readable_thought' only if a brief closing note is needed.",
+	ActionType: "finish",
+	Description: "Mark the current task as finished and exit the loop IMMEDIATELY. " +
+		"PREFERRED completion action whenever evidence/results are already present in the timeline " +
+		"(tool outputs are captured automatically and the system will synthesize a summary). " +
+		"Do NOT precede this action with bash echo/cat/tee/printf calls that only restate facts " +
+		"already produced by earlier tool calls — that wastes iterations. " +
+		"Use 'directly_answer' instead only when the user explicitly needs a structured Markdown " +
+		"answer emitted to the chat right now. Add 'human_readable_thought' only if a brief closing note is needed.",
 	ActionHandler: func(loop *ReActLoop, action *aicommon.Action, operator *LoopActionHandlerOperator) {
 		loop.invoker.AddToTimeline("finish", "AI decided mark the current Task is finished")
 		operator.Exit()

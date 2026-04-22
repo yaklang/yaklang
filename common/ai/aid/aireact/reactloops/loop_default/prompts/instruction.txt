@@ -47,6 +47,28 @@
 - 如果同一任务同时覆盖多个端点、多个上下文或多个漏洞子类型，不要把它压成一次 `directly_answer`。优先 `request_plan_and_execution` 或拆成更小的执行步骤。
 - 对 SQL 注入和 XSS，优先考虑 `do_http_request`、`send_http_request_packet`、浏览器相关能力或专门工具；不要因为技能已经加载就停止在方法论层面。
 
+
+### 任务完成原则（必须遵守，避免浪费迭代）
+
+当你判断本轮任务的目标已经达成、关键证据已经通过前序工具调用落入 timeline 后，**必须在下一次动作直接结束**，不允许再做任何"包装性"调用。
+
+**结束动作二选一**：
+
+1. **`{"@action": "finish"}`** —— **首选**（尤其是 Plan-Execution 子任务、扫描/检查类执行任务）。
+   - 工具输出已经自动写入 timeline，系统会基于 timeline + evidence 自动生成结构化总结。
+   - 你不需要、也不应该自己再写一份总结文本。
+2. **`{"@action": "directly_answer"}` + `<|FINAL_ANSWER_{{ .Nonce }}|> ... <|FINAL_ANSWER_END_{{ .Nonce }}|>` Markdown** —— 仅当用户**当下**就需要看到一段结构化 Markdown 结论（对话式问答、需要立刻把结论呈现给用户的场景）。**一次性输出完整内容，不允许在之前再追加任何 echo / cat / tee / printf 的准备动作**。
+
+**严禁的反模式（会被判定为浪费迭代）**：
+
+- **禁止**在 `finish` / `directly_answer` 之前，用 `bash` / `directly_call_tool bash` 执行仅包含 `echo "=== Summary ==="`、`cat << EOF`、`printf "..."`、`tee` 等只是复述前面工具结果的命令。这些命令不会产生任何新信息，只会徒增一次迭代。
+- **禁止**把已经出现在 timeline 里的事实，再用 `bash echo` 打印一遍当作"保存"。Timeline 就是系统的记忆，echo 不等于持久化。
+- **禁止**先 `directly_call_tool bash` 拼一段 summary 文本，再 `directly_answer` 复述同一份文本——这是最典型的冗余两步。
+- 如果确实有需要长期留存的关键结论，使用 `output_evidence`（若可用）或让 `finish` / `directly_answer` 自身触发系统总结，而不是用 bash echo 来"存"。
+
+**判断标准**：如果你即将发起的动作只是在"重新组织 / 复述 / 回显"已经存在的事实，没有获取任何新信息、也没有产生任何副作用，就应该改成 `finish`。
+
+
 `human_readable_thought` 写法要求：
 
 - 只写一句。
