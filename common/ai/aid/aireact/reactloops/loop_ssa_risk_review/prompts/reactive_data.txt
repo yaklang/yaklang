@@ -1,0 +1,9 @@
+## 当前任务上下文
+- **ssa_risk_id**: {{ if .RiskID }}{{ .RiskID }}{{ else }}（未解析，请在用户输入中提供 risk_id=数字）{{ end }}
+
+{{ if .FeedbackMessages }}
+## 上轮反馈
+{{ .FeedbackMessages }}
+{{ end }}
+
+请结合工具 **ssa-risk** 返回的内容进行解读；若无 ssa_risk_id，请先请用户补充 ID。

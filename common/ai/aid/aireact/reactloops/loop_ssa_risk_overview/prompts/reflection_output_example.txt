@@ -1,0 +1,4 @@
+* 归纳当前项目的 SSA 风险并给出优先级：
+  {"@action": "require_tool", "tool": "ssa-project-info", "params": {"program_name": "demo"}}
+* 用户改了过滤条件，需要刷新总览列表：
+  {"@action": "reload_ssa_risk_overview", "human_readable_thought": "按新的 runtime 过滤重查", "runtime_id": "550e8400-e29b-41d4-a716-446655440000", "limit": 40}
