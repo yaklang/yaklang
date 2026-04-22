@@ -123,6 +123,7 @@ func cloneEvent(event model.Event) model.Event {
 	cloned.Data = cloneAnyMap(event.Data)
 	if event.Process != nil {
 		process := *event.Process
+		process.ChildrenPIDs = cloneIntSlice(event.Process.ChildrenPIDs)
 		process.Artifact = model.CloneArtifact(event.Process.Artifact)
 		cloned.Process = &process
 	}
@@ -139,6 +140,13 @@ func cloneEvent(event model.Event) model.Event {
 		audit := *event.Audit
 		audit.RecordTypes = cloneStringSlice(event.Audit.RecordTypes)
 		cloned.Audit = &audit
+	}
+	if len(event.Users) > 0 {
+		cloned.Users = make([]model.HostUser, len(event.Users))
+		for index := range event.Users {
+			cloned.Users[index] = event.Users[index]
+			cloned.Users[index].Groups = cloneStringSlice(event.Users[index].Groups)
+		}
 	}
 	return cloned
 }
@@ -159,6 +167,15 @@ func cloneStringSlice(values []string) []string {
 		return nil
 	}
 	cloned := make([]string, len(values))
+	copy(cloned, values)
+	return cloned
+}
+
+func cloneIntSlice(values []int) []int {
+	if len(values) == 0 {
+		return nil
+	}
+	cloned := make([]int, len(values))
 	copy(cloned, values)
 	return cloned
 }

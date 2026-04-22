@@ -139,6 +139,7 @@ func TestManagerApplyReportsTemporaryRuleRuntimeSummary(t *testing.T) {
 type replayInventoryProviderStub struct {
 	processEvents []model.Event
 	networkEvents []model.Event
+	userEvents    []model.Event
 }
 
 func (s replayInventoryProviderStub) ListProcessEvents(context.Context) ([]model.Event, error) {
@@ -147,6 +148,10 @@ func (s replayInventoryProviderStub) ListProcessEvents(context.Context) ([]model
 
 func (s replayInventoryProviderStub) ListNetworkEvents(context.Context) ([]model.Event, error) {
 	return s.networkEvents, nil
+}
+
+func (s replayInventoryProviderStub) ListHostUserEvents(context.Context) ([]model.Event, error) {
+	return s.userEvents, nil
 }
 
 func TestManagerReplayInventoryReemitsCurrentSnapshots(t *testing.T) {
@@ -162,8 +167,9 @@ func TestManagerReplayInventoryReemitsCurrentSnapshots(t *testing.T) {
 		},
 		events: make(chan model.Event, 4),
 		baselineProvider: replayInventoryProviderStub{
-			processEvents: []model.Event{{Type: model.EventTypeProcessExec, Source: "inventory.process"}},
-			networkEvents: []model.Event{{Type: model.EventTypeNetworkConnect, Source: "inventory.network"}},
+			processEvents: []model.Event{{Type: model.EventTypeProcessState, Source: "inventory.process"}},
+			networkEvents: []model.Event{{Type: model.EventTypeNetworkSocket, Source: "inventory.network"}},
+			userEvents:    []model.Event{{Type: model.EventTypeHostUsers, Source: "inventory.users"}},
 		},
 	}
 	manager.instance = instance
@@ -174,8 +180,9 @@ func TestManagerReplayInventoryReemitsCurrentSnapshots(t *testing.T) {
 
 	first := <-instance.events
 	second := <-instance.events
-	if first.Source != "inventory.process" || second.Source != "inventory.network" {
-		t.Fatalf("unexpected replay sources: %s / %s", first.Source, second.Source)
+	third := <-instance.events
+	if first.Source != "inventory.process" || second.Source != "inventory.network" || third.Source != "inventory.users" {
+		t.Fatalf("unexpected replay sources: %s / %s / %s", first.Source, second.Source, third.Source)
 	}
 }
 
@@ -206,8 +213,9 @@ func TestInstanceStartRefreshesInventoryPeriodically(t *testing.T) {
 		},
 		events: make(chan model.Event, 8),
 		baselineProvider: replayInventoryProviderStub{
-			processEvents: []model.Event{{Type: model.EventTypeProcessExec, Source: "inventory.process"}},
-			networkEvents: []model.Event{{Type: model.EventTypeNetworkConnect, Source: "inventory.network"}},
+			processEvents: []model.Event{{Type: model.EventTypeProcessState, Source: "inventory.process"}},
+			networkEvents: []model.Event{{Type: model.EventTypeNetworkSocket, Source: "inventory.network"}},
+			userEvents:    []model.Event{{Type: model.EventTypeHostUsers, Source: "inventory.users"}},
 		},
 		inventoryRefreshInterval: 10 * time.Millisecond,
 	}
@@ -219,9 +227,9 @@ func TestInstanceStartRefreshesInventoryPeriodically(t *testing.T) {
 	}
 	defer func() { _ = instance.close() }()
 
-	sources := make([]string, 0, 4)
+	sources := make([]string, 0, 6)
 	deadline := time.After(150 * time.Millisecond)
-	for len(sources) < 4 {
+	for len(sources) < 6 {
 		select {
 		case event := <-instance.events:
 			sources = append(sources, event.Source)
@@ -230,10 +238,10 @@ func TestInstanceStartRefreshesInventoryPeriodically(t *testing.T) {
 		}
 	}
 
-	if sources[0] != "inventory.process" || sources[1] != "inventory.network" {
-		t.Fatalf("unexpected initial inventory sources: %v", sources[:2])
+	if sources[0] != "inventory.process" || sources[1] != "inventory.network" || sources[2] != "inventory.users" {
+		t.Fatalf("unexpected initial inventory sources: %v", sources[:3])
 	}
-	if sources[2] != "inventory.process" || sources[3] != "inventory.network" {
+	if sources[3] != "inventory.process" || sources[4] != "inventory.network" || sources[5] != "inventory.users" {
 		t.Fatalf("expected periodic inventory replay, got %v", sources)
 	}
 }
