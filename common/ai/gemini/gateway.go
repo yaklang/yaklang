@@ -434,7 +434,7 @@ func (c *Client) ChatStream(prompt string) (io.Reader, error) {
 	}
 	ctx, cancel := context.WithCancel(ctx) // Allow cancelling the stream
 
-	req := NewTextRequest(prompt) // Use helper for simple text request
+	req := applyConfigToRequest(NewTextRequest(prompt), c.config)
 	rawChunkChan, errChan := c.internalStreamGenerateContent(ctx, req)
 
 	// Create a pipe to return as io.Reader
@@ -566,7 +566,7 @@ func (c *Client) StructuredStream(prompt string, functions ...any) (chan *aispec
 	}
 	ctx, cancel := context.WithCancel(ctx)
 
-	req := NewTextRequest(prompt)
+	req := applyConfigToRequest(NewTextRequest(prompt), c.config)
 	rawChunkChan, errChan := c.internalStreamGenerateContent(ctx, req)
 	structuredDataChan := make(chan *aispec.StructuredData, 10)
 
@@ -838,6 +838,28 @@ func NewTextRequest(prompt string) GenerateContentRequest {
 			{Category: "HARM_CATEGORY_DANGEROUS_CONTENT", Threshold: "BLOCK_MEDIUM_AND_ABOVE"},
 		},
 	}
+}
+
+func applyConfigToRequest(req GenerateContentRequest, config *aispec.AIConfig) GenerateContentRequest {
+	if config == nil {
+		return req
+	}
+	if req.GenerationConfig == nil {
+		req.GenerationConfig = &GenerationConfig{}
+	}
+	if config.Temperature != nil {
+		req.GenerationConfig.Temperature = *config.Temperature
+	}
+	if config.TopP != nil {
+		req.GenerationConfig.TopP = *config.TopP
+	}
+	if config.TopK != nil {
+		req.GenerationConfig.TopK = int(*config.TopK)
+	}
+	if config.MaxTokens != nil {
+		req.GenerationConfig.MaxOutputTokens = int(*config.MaxTokens)
+	}
+	return req
 }
 
 // --- FunctionCaller Interface Implementation ---

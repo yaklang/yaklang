@@ -64,6 +64,12 @@ type AIConfig struct {
 	EnableThinking      bool
 	EnableThinkingField string
 	EnableThinkingValue any
+	Temperature         *float64
+	TopP                *float64
+	TopK                *int64
+	MaxTokens           *int64
+	PresencePenalty     *float64
+	FrequencyPenalty    *float64
 
 	// ToolCallCallback is called when the AI response contains tool_calls.
 	// If set, tool_calls will NOT be converted to <|TOOL_CALL...|> format in the output stream.
@@ -484,6 +490,48 @@ func WithDomain(domain string) AIConfigOption {
 func WithModel(model string) AIConfigOption {
 	return func(c *AIConfig) {
 		c.Model = model
+	}
+}
+
+func WithTemperature(temperature float64) AIConfigOption {
+	return func(c *AIConfig) {
+		value := temperature
+		c.Temperature = &value
+	}
+}
+
+func WithTopP(topP float64) AIConfigOption {
+	return func(c *AIConfig) {
+		value := topP
+		c.TopP = &value
+	}
+}
+
+func WithTopK(topK int64) AIConfigOption {
+	return func(c *AIConfig) {
+		value := topK
+		c.TopK = &value
+	}
+}
+
+func WithMaxTokens(maxTokens int64) AIConfigOption {
+	return func(c *AIConfig) {
+		value := maxTokens
+		c.MaxTokens = &value
+	}
+}
+
+func WithPresencePenalty(penalty float64) AIConfigOption {
+	return func(c *AIConfig) {
+		value := penalty
+		c.PresencePenalty = &value
+	}
+}
+
+func WithFrequencyPenalty(penalty float64) AIConfigOption {
+	return func(c *AIConfig) {
+		value := penalty
+		c.FrequencyPenalty = &value
 	}
 }
 

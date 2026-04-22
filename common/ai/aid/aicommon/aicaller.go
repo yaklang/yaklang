@@ -15,6 +15,41 @@ import (
 
 type AICallbackType func(i AICallerConfigIf, req *AIRequest) (*AIResponse, error)
 
+type aiGenerationConfigProvider interface {
+	GetTemperatureConfig() *float64
+	GetTopPConfig() *float64
+	GetTopKConfig() *int64
+	GetMaxTokensConfig() *int64
+	GetPresencePenaltyConfig() *float64
+	GetFrequencyPenaltyConfig() *float64
+}
+
+func appendGenerationOptionsFromConfig(opts []aispec.AIConfigOption, config any) []aispec.AIConfigOption {
+	provider, ok := config.(aiGenerationConfigProvider)
+	if !ok {
+		return opts
+	}
+	if temperature := provider.GetTemperatureConfig(); temperature != nil {
+		opts = append(opts, aispec.WithTemperature(*temperature))
+	}
+	if topP := provider.GetTopPConfig(); topP != nil {
+		opts = append(opts, aispec.WithTopP(*topP))
+	}
+	if topK := provider.GetTopKConfig(); topK != nil {
+		opts = append(opts, aispec.WithTopK(*topK))
+	}
+	if maxTokens := provider.GetMaxTokensConfig(); maxTokens != nil {
+		opts = append(opts, aispec.WithMaxTokens(*maxTokens))
+	}
+	if presencePenalty := provider.GetPresencePenaltyConfig(); presencePenalty != nil {
+		opts = append(opts, aispec.WithPresencePenalty(*presencePenalty))
+	}
+	if frequencyPenalty := provider.GetFrequencyPenaltyConfig(); frequencyPenalty != nil {
+		opts = append(opts, aispec.WithFrequencyPenalty(*frequencyPenalty))
+	}
+	return opts
+}
+
 type AICallerConfigIf interface {
 	AICaller
 	KeyValueConfigIf
@@ -88,6 +123,7 @@ func AIChatToAICallbackType(cb func(prompt string, opts ...aispec.AIConfigOption
 					optList = append(optList, aispec.WithImageRaw(data.Data))
 				}
 			}
+			optList = appendGenerationOptionsFromConfig(optList, aicf)
 			output, err := cb(
 				req.GetPrompt(),
 				optList...,

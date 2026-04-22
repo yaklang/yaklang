@@ -12,10 +12,16 @@ import (
 )
 
 type ChatMessage struct {
-	Model          string       `json:"model"`
-	Messages       []ChatDetail `json:"messages"`
-	Stream         bool         `json:"stream"`
-	EnableThinking bool         `json:"enable_thinking,omitempty"`
+	Model            string       `json:"model"`
+	Messages         []ChatDetail `json:"messages"`
+	Stream           bool         `json:"stream"`
+	EnableThinking   bool         `json:"enable_thinking,omitempty"`
+	Temperature      *float64     `json:"temperature,omitempty"`
+	TopP             *float64     `json:"top_p,omitempty"`
+	TopK             *int64       `json:"top_k,omitempty"`
+	MaxTokens        *int64       `json:"max_tokens,omitempty"`
+	PresencePenalty  *float64     `json:"presence_penalty,omitempty"`
+	FrequencyPenalty *float64     `json:"frequency_penalty,omitempty"`
 	// Tools defines the available tools that the model may call
 	Tools []Tool `json:"tools,omitempty"`
 	// ToolChoice controls which (if any) tool is called by the model

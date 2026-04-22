@@ -93,6 +93,24 @@ func ConvertYPBAIStartParamsToReActConfig(i *ypb.AIStartParams) []aicommon.Confi
 	if i.GetAICallTokenLimit() > 0 {
 		opts = append(opts, aicommon.WithAiCallTokenLimit(int64(i.GetAICallTokenLimit())))
 	}
+	if i.Temperature != nil {
+		opts = append(opts, aicommon.WithTemperature(i.GetTemperature()))
+	}
+	if i.TopP != nil {
+		opts = append(opts, aicommon.WithTopP(i.GetTopP()))
+	}
+	if i.TopK != nil {
+		opts = append(opts, aicommon.WithTopK(i.GetTopK()))
+	}
+	if i.MaxTokens != nil {
+		opts = append(opts, aicommon.WithMaxTokens(i.GetMaxTokens()))
+	}
+	if i.PresencePenalty != nil {
+		opts = append(opts, aicommon.WithPresencePenalty(i.GetPresencePenalty()))
+	}
+	if i.FrequencyPenalty != nil {
+		opts = append(opts, aicommon.WithFrequencyPenalty(i.GetFrequencyPenalty()))
+	}
 
 	if i.GetDisableToolIntervalReview() {
 		opts = append(opts, aicommon.WithDisableToolCallerIntervalReview(true))

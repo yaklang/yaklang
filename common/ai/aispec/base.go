@@ -217,6 +217,12 @@ type ChatBaseContext struct {
 	// RawHTTPRequestResponseCallback is called after the AI HTTP response is fully consumed,
 	// providing the raw request bytes and response debug data for debugging.
 	RawHTTPRequestResponseCallback RawHTTPRequestResponseCallback
+	Temperature                    *float64
+	TopP                           *float64
+	TopK                           *int64
+	MaxTokens                      *int64
+	PresencePenalty                *float64
+	FrequencyPenalty               *float64
 }
 
 type ChatBaseOption func(c *ChatBaseContext)
@@ -332,6 +338,62 @@ func WithChatBase_RawHTTPRequestResponseCallback(cb RawHTTPRequestResponseCallba
 	}
 }
 
+func WithChatBase_Temperature(temperature float64) ChatBaseOption {
+	return func(c *ChatBaseContext) {
+		value := temperature
+		c.Temperature = &value
+	}
+}
+
+func WithChatBase_TopP(topP float64) ChatBaseOption {
+	return func(c *ChatBaseContext) {
+		value := topP
+		c.TopP = &value
+	}
+}
+
+func WithChatBase_TopK(topK int64) ChatBaseOption {
+	return func(c *ChatBaseContext) {
+		value := topK
+		c.TopK = &value
+	}
+}
+
+func WithChatBase_MaxTokens(maxTokens int64) ChatBaseOption {
+	return func(c *ChatBaseContext) {
+		value := maxTokens
+		c.MaxTokens = &value
+	}
+}
+
+func WithChatBase_PresencePenalty(penalty float64) ChatBaseOption {
+	return func(c *ChatBaseContext) {
+		value := penalty
+		c.PresencePenalty = &value
+	}
+}
+
+func WithChatBase_FrequencyPenalty(penalty float64) ChatBaseOption {
+	return func(c *ChatBaseContext) {
+		value := penalty
+		c.FrequencyPenalty = &value
+	}
+}
+
+func WithChatBase_AIConfig(cfg *AIConfig) ChatBaseOption {
+	return func(c *ChatBaseContext) {
+		if cfg == nil {
+			return
+		}
+		c.Temperature = cfg.Temperature
+		c.TopP = cfg.TopP
+		c.TopK = cfg.TopK
+		c.MaxTokens = cfg.MaxTokens
+		c.PresencePenalty = cfg.PresencePenalty
+		c.FrequencyPenalty = cfg.FrequencyPenalty
+	}
+}
+
 func NewChatBaseContext(opts ...ChatBaseOption) *ChatBaseContext {
 	ctx := &ChatBaseContext{
 		EnableThinking: false,
@@ -374,6 +436,12 @@ func chatBaseChatCompletions(url string, model string, msg string, ctx *ChatBase
 	}
 	msgIns := NewChatMessage(model, msgs)
 	msgIns.Stream = !ctx.DisableStream
+	msgIns.Temperature = ctx.Temperature
+	msgIns.TopP = ctx.TopP
+	msgIns.TopK = ctx.TopK
+	msgIns.MaxTokens = ctx.MaxTokens
+	msgIns.PresencePenalty = ctx.PresencePenalty
+	msgIns.FrequencyPenalty = ctx.FrequencyPenalty
 
 	// Add tools if provided
 	if len(ctx.Tools) > 0 {
@@ -400,6 +468,15 @@ func chatBaseResponses(url string, model string, msg string, ctx *ChatBaseContex
 	}
 	if ctx.ToolChoice != nil {
 		req["tool_choice"] = convertToolChoiceToResponses(ctx.ToolChoice)
+	}
+	if ctx.Temperature != nil {
+		req["temperature"] = *ctx.Temperature
+	}
+	if ctx.TopP != nil {
+		req["top_p"] = *ctx.TopP
+	}
+	if ctx.MaxTokens != nil {
+		req["max_output_tokens"] = *ctx.MaxTokens
 	}
 
 	return executeChatBaseRequest(url, stream, req, ctx, appendResponsesStreamHandlerPoCOptionEx)

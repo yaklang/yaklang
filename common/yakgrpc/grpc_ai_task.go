@@ -199,6 +199,24 @@ func buildAIDOption(startParams *ypb.AIStartParams) []aicommon.ConfigOption {
 	if startParams.GetAICallAutoRetry() > 0 {
 		aidOption = append(aidOption, aicommon.WithAIAutoRetry(startParams.GetAICallAutoRetry()))
 	}
+	if startParams.Temperature != nil {
+		aidOption = append(aidOption, aicommon.WithTemperature(startParams.GetTemperature()))
+	}
+	if startParams.TopP != nil {
+		aidOption = append(aidOption, aicommon.WithTopP(startParams.GetTopP()))
+	}
+	if startParams.TopK != nil {
+		aidOption = append(aidOption, aicommon.WithTopK(startParams.GetTopK()))
+	}
+	if startParams.MaxTokens != nil {
+		aidOption = append(aidOption, aicommon.WithMaxTokens(startParams.GetMaxTokens()))
+	}
+	if startParams.PresencePenalty != nil {
+		aidOption = append(aidOption, aicommon.WithPresencePenalty(startParams.GetPresencePenalty()))
+	}
+	if startParams.FrequencyPenalty != nil {
+		aidOption = append(aidOption, aicommon.WithFrequencyPenalty(startParams.GetFrequencyPenalty()))
+	}
 
 	if startParams.GetDisableToolIntervalReview() {
 		aidOption = append(aidOption, aicommon.WithDisableToolCallerIntervalReview(true))

@@ -188,6 +188,12 @@ type Config struct {
 	AiCallTokenLimit       int64
 	AiAutoRetry            int64
 	AiTransactionAutoRetry int64
+	Temperature            *float64
+	TopP                   *float64
+	TopK                   *int64
+	MaxTokens              *int64
+	PresencePenalty        *float64
+	FrequencyPenalty       *float64
 	PromptHook             func(string) string
 
 	/*
@@ -245,7 +251,7 @@ type Config struct {
 	TimelineTotalContentLimit int // in tokens
 
 	// triage
-	MemoryTriage         MemoryTriage
+	MemoryTriage MemoryTriage
 
 	TimelineArchiveStore TimelineArchiveStore
 	MemoryPoolSize       int64
@@ -777,6 +783,93 @@ func WithAiCallTokenLimit(limit int64) ConfigOption {
 		c.m.Lock()
 		c.AiCallTokenLimit = limit
 		c.m.Unlock()
+		return nil
+	}
+}
+
+func WithTemperature(temperature float64) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		defer c.m.Unlock()
+		value := temperature
+		c.Temperature = &value
+		return nil
+	}
+}
+
+func WithTopP(topP float64) ConfigOption {
+	return func(c *Config) error {
+		if topP < 0 {
+			return utils.Error("top p must be >= 0")
+		}
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		defer c.m.Unlock()
+		value := topP
+		c.TopP = &value
+		return nil
+	}
+}
+
+func WithTopK(topK int64) ConfigOption {
+	return func(c *Config) error {
+		if topK < 0 {
+			return utils.Error("top k must be >= 0")
+		}
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		defer c.m.Unlock()
+		value := topK
+		c.TopK = &value
+		return nil
+	}
+}
+
+func WithMaxTokens(maxTokens int64) ConfigOption {
+	return func(c *Config) error {
+		if maxTokens < 0 {
+			return utils.Error("max tokens must be >= 0")
+		}
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		defer c.m.Unlock()
+		value := maxTokens
+		c.MaxTokens = &value
+		return nil
+	}
+}
+
+func WithPresencePenalty(penalty float64) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		defer c.m.Unlock()
+		value := penalty
+		c.PresencePenalty = &value
+		return nil
+	}
+}
+
+func WithFrequencyPenalty(penalty float64) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		defer c.m.Unlock()
+		value := penalty
+		c.FrequencyPenalty = &value
 		return nil
 	}
 }
@@ -2659,6 +2752,30 @@ func (c *Config) GetAllowUserInteraction() bool {
 	return c.AllowRequireForUserInteract
 }
 
+func (c *Config) GetTemperatureConfig() *float64 {
+	return c.Temperature
+}
+
+func (c *Config) GetTopPConfig() *float64 {
+	return c.TopP
+}
+
+func (c *Config) GetTopKConfig() *int64 {
+	return c.TopK
+}
+
+func (c *Config) GetMaxTokensConfig() *int64 {
+	return c.MaxTokens
+}
+
+func (c *Config) GetPresencePenaltyConfig() *float64 {
+	return c.PresencePenalty
+}
+
+func (c *Config) GetFrequencyPenaltyConfig() *float64 {
+	return c.FrequencyPenalty
+}
+
 func (c *Config) RetryPromptBuilder(s string, err error) string {
 	if err == nil {
 		return s
@@ -2946,6 +3063,24 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 	}
 	if i.AiCallTokenLimit > 0 {
 		opts = append(opts, WithAiCallTokenLimit(i.AiCallTokenLimit))
+	}
+	if i.Temperature != nil {
+		opts = append(opts, WithTemperature(*i.Temperature))
+	}
+	if i.TopP != nil {
+		opts = append(opts, WithTopP(*i.TopP))
+	}
+	if i.TopK != nil {
+		opts = append(opts, WithTopK(*i.TopK))
+	}
+	if i.MaxTokens != nil {
+		opts = append(opts, WithMaxTokens(*i.MaxTokens))
+	}
+	if i.PresencePenalty != nil {
+		opts = append(opts, WithPresencePenalty(*i.PresencePenalty))
+	}
+	if i.FrequencyPenalty != nil {
+		opts = append(opts, WithFrequencyPenalty(*i.FrequencyPenalty))
 	}
 	if i.MaxIterationCount > 0 {
 		opts = append(opts, WithMaxIterationCount(i.MaxIterationCount))

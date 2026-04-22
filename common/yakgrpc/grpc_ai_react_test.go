@@ -12,6 +12,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"google.golang.org/protobuf/proto"
 )
 
 func TestConvertYPBAIStartParamsToReActConfig(t *testing.T) {
@@ -31,6 +32,12 @@ func TestConvertYPBAIStartParamsToReActConfig(t *testing.T) {
 	aiService := uuid.NewString()
 	presetPrompt := uuid.New().String()
 	disableToolIntervalReview := rand.Intn(2) == 1
+	temperature := utils.RandFloat64()
+	topP := utils.RandFloat64()
+	topK := int64(rand.Intn(100) + 1)
+	maxTokens := int64(rand.Intn(4096) + 1)
+	presencePenalty := utils.RandFloat64()
+	frequencyPenalty := utils.RandFloat64()
 
 	start := &ypb.AIStartParams{
 		DisallowRequireForUserPrompt: disallowRequire,
@@ -46,6 +53,12 @@ func TestConvertYPBAIStartParamsToReActConfig(t *testing.T) {
 		AICallTokenLimit:             100 * 1024,
 		UserPresetPrompt:             presetPrompt,
 		DisableToolIntervalReview:    disableToolIntervalReview,
+		Temperature:                  proto.Float64(temperature),
+		TopP:                         proto.Float64(topP),
+		TopK:                         proto.Int64(topK),
+		MaxTokens:                    proto.Int64(maxTokens),
+		PresencePenalty:              proto.Float64(presencePenalty),
+		FrequencyPenalty:             proto.Float64(frequencyPenalty),
 	}
 
 	opts := ConvertYPBAIStartParamsToReActConfig(start)
@@ -69,6 +82,18 @@ func TestConvertYPBAIStartParamsToReActConfig(t *testing.T) {
 	require.Equal(t, start.AICallTokenLimit, cfg.AiCallTokenLimit)
 	require.Equal(t, start.UserPresetPrompt, cfg.UserPresetPrompt)
 	require.Equal(t, start.DisableToolIntervalReview, cfg.DisableIntervalReview)
+	require.NotNil(t, cfg.Temperature)
+	require.Equal(t, temperature, *cfg.Temperature)
+	require.NotNil(t, cfg.TopP)
+	require.Equal(t, topP, *cfg.TopP)
+	require.NotNil(t, cfg.TopK)
+	require.Equal(t, topK, *cfg.TopK)
+	require.NotNil(t, cfg.MaxTokens)
+	require.Equal(t, maxTokens, *cfg.MaxTokens)
+	require.NotNil(t, cfg.PresencePenalty)
+	require.Equal(t, presencePenalty, *cfg.PresencePenalty)
+	require.NotNil(t, cfg.FrequencyPenalty)
+	require.Equal(t, frequencyPenalty, *cfg.FrequencyPenalty)
 	// AiServerName is no longer set from frontend params (WithAIChatInfo deprecated),
 	// it is now auto-detected via ModelInfoCallback during actual AI gateway calls.
 }

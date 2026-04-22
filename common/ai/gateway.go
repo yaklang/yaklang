@@ -117,6 +117,7 @@ func (g *Gateway) Chat(s string, f ...any) (string, error) {
 		aispec.WithChatBase_ReasonStreamHandler(g.Config.ReasonStreamHandler),
 		aispec.WithChatBase_ErrHandler(g.Config.HTTPErrorHandler),
 		aispec.WithChatBase_ImageRawInstance(g.Config.Images...),
+		aispec.WithChatBase_AIConfig(g.Config),
 		aispec.WithChatBase_ToolCallCallback(g.Config.ToolCallCallback),
 		aispec.WithChatBase_Tools(g.Config.Tools),
 		aispec.WithChatBase_ToolChoice(g.Config.ToolChoice),

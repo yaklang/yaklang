@@ -8520,8 +8520,20 @@ type AIStartParams struct {
 	UserPresetPrompt string `protobuf:"bytes,35,opt,name=UserPresetPrompt,proto3" json:"UserPresetPrompt,omitempty"`
 	// 是否关闭工具执行期间的 interval review
 	DisableToolIntervalReview bool `protobuf:"varint,36,opt,name=DisableToolIntervalReview,proto3" json:"DisableToolIntervalReview,omitempty"`
-	unknownFields             protoimpl.UnknownFields
-	sizeCache                 protoimpl.SizeCache
+	// 控制生成随机性，数值越低越稳定
+	Temperature *float64 `protobuf:"fixed64,37,opt,name=Temperature,proto3,oneof" json:"Temperature,omitempty"`
+	// 控制候选词的累积概率范围
+	TopP *float64 `protobuf:"fixed64,38,opt,name=TopP,proto3,oneof" json:"TopP,omitempty"`
+	// 限制候选词数量
+	TopK *int64 `protobuf:"varint,39,opt,name=TopK,proto3,oneof" json:"TopK,omitempty"`
+	// 控制本次回复最多生成多少 tokens
+	MaxTokens *int64 `protobuf:"varint,40,opt,name=MaxTokens,proto3,oneof" json:"MaxTokens,omitempty"`
+	// 鼓励生成更多新内容
+	PresencePenalty *float64 `protobuf:"fixed64,41,opt,name=PresencePenalty,proto3,oneof" json:"PresencePenalty,omitempty"`
+	// 降低重复词语出现频率
+	FrequencyPenalty *float64 `protobuf:"fixed64,42,opt,name=FrequencyPenalty,proto3,oneof" json:"FrequencyPenalty,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *AIStartParams) Reset() {
@@ -8797,6 +8809,48 @@ func (x *AIStartParams) GetDisableToolIntervalReview() bool {
 		return x.DisableToolIntervalReview
 	}
 	return false
+}
+
+func (x *AIStartParams) GetTemperature() float64 {
+	if x != nil && x.Temperature != nil {
+		return *x.Temperature
+	}
+	return 0
+}
+
+func (x *AIStartParams) GetTopP() float64 {
+	if x != nil && x.TopP != nil {
+		return *x.TopP
+	}
+	return 0
+}
+
+func (x *AIStartParams) GetTopK() int64 {
+	if x != nil && x.TopK != nil {
+		return *x.TopK
+	}
+	return 0
+}
+
+func (x *AIStartParams) GetMaxTokens() int64 {
+	if x != nil && x.MaxTokens != nil {
+		return *x.MaxTokens
+	}
+	return 0
+}
+
+func (x *AIStartParams) GetPresencePenalty() float64 {
+	if x != nil && x.PresencePenalty != nil {
+		return *x.PresencePenalty
+	}
+	return 0
+}
+
+func (x *AIStartParams) GetFrequencyPenalty() float64 {
+	if x != nil && x.FrequencyPenalty != nil {
+		return *x.FrequencyPenalty
+	}
+	return 0
 }
 
 type AITaskFilter struct {
@@ -68979,7 +69033,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\tMcpConfig\x12\x12\n" +
 	"\x04Type\x18\x01 \x01(\tR\x04Type\x12\x10\n" +
 	"\x03Key\x18\x02 \x01(\tR\x03Key\x12\x10\n" +
-	"\x03Url\x18\x03 \x01(\tR\x03Url\"\xb3\r\n" +
+	"\x03Url\x18\x03 \x01(\tR\x03Url\"\xe8\x0f\n" +
 	"\rAIStartParams\x12$\n" +
 	"\rCoordinatorId\x18\x11 \x01(\tR\rCoordinatorId\x12\x1a\n" +
 	"\bSequence\x18\x12 \x01(\x03R\bSequence\x12.\n" +
@@ -69018,7 +69072,20 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x11TimelineSessionID\x18\x1f \x01(\tR\x11TimelineSessionID\x12*\n" +
 	"\x10AICallTokenLimit\x18\" \x01(\x03R\x10AICallTokenLimit\x12*\n" +
 	"\x10UserPresetPrompt\x18# \x01(\tR\x10UserPresetPrompt\x12<\n" +
-	"\x19DisableToolIntervalReview\x18$ \x01(\bR\x19DisableToolIntervalReview\"\x9e\x01\n" +
+	"\x19DisableToolIntervalReview\x18$ \x01(\bR\x19DisableToolIntervalReview\x12%\n" +
+	"\vTemperature\x18% \x01(\x01H\x00R\vTemperature\x88\x01\x01\x12\x17\n" +
+	"\x04TopP\x18& \x01(\x01H\x01R\x04TopP\x88\x01\x01\x12\x17\n" +
+	"\x04TopK\x18' \x01(\x03H\x02R\x04TopK\x88\x01\x01\x12!\n" +
+	"\tMaxTokens\x18( \x01(\x03H\x03R\tMaxTokens\x88\x01\x01\x12-\n" +
+	"\x0fPresencePenalty\x18) \x01(\x01H\x04R\x0fPresencePenalty\x88\x01\x01\x12/\n" +
+	"\x10FrequencyPenalty\x18* \x01(\x01H\x05R\x10FrequencyPenalty\x88\x01\x01B\x0e\n" +
+	"\f_TemperatureB\a\n" +
+	"\x05_TopPB\a\n" +
+	"\x05_TopKB\f\n" +
+	"\n" +
+	"_MaxTokensB\x12\n" +
+	"\x10_PresencePenaltyB\x13\n" +
+	"\x11_FrequencyPenalty\"\x9e\x01\n" +
 	"\fAITaskFilter\x12\x12\n" +
 	"\x04Name\x18\x01 \x03(\tR\x04Name\x12\x18\n" +
 	"\aKeyword\x18\x02 \x03(\tR\aKeyword\x12\x1c\n" +
@@ -77915,6 +77982,7 @@ func file_yakgrpc_proto_init() {
 	if File_yakgrpc_proto != nil {
 		return
 	}
+	file_yakgrpc_proto_msgTypes[115].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

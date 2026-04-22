@@ -1929,6 +1929,24 @@ message AIStartParams {
 
   // 是否关闭工具执行期间的 interval review
   bool DisableToolIntervalReview = 36;
+
+  // 控制生成随机性，数值越低越稳定
+  optional double Temperature = 37;
+
+  // 控制候选词的累积概率范围
+  optional double TopP = 38;
+
+  // 限制候选词数量
+  optional int64 TopK = 39;
+
+  // 控制本次回复最多生成多少 tokens
+  optional int64 MaxTokens = 40;
+
+  // 鼓励生成更多新内容
+  optional double PresencePenalty = 41;
+
+  // 降低重复词语出现频率
+  optional double FrequencyPenalty = 42;
 }
 
 message AITaskFilter {

@@ -53,6 +53,7 @@ func (g *GatewayClient) Chat(s string, function ...any) (string, error) {
 		aispec.WithChatBase_ErrHandler(g.config.HTTPErrorHandler),
 		aispec.WithChatBase_ImageRawInstance(g.config.Images...),
 		aispec.WithChatBase_EnableThinkingEx(g.config.EnableThinking, g.config.EnableThinkingField, g.config.EnableThinkingValue),
+		aispec.WithChatBase_AIConfig(g.config),
 		aispec.WithChatBase_Tools(g.config.Tools),
 		aispec.WithChatBase_ToolChoice(g.config.ToolChoice),
 		aispec.WithChatBase_ToolCallCallback(g.config.ToolCallCallback),
