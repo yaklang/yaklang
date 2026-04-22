@@ -75,6 +75,8 @@ func ExecuteDeepIntentRecognition(r aicommon.AIInvokeRuntime, loop *ReActLoop, t
 		len(result.IntentAnalysis), len(result.RecommendedTools),
 		len(result.RecommendedForges), len(result.ContextEnrichment))
 
+	writeIntentRecognitionDebugMarkdown(r, intentLoop, result)
+
 	return result
 }
 
