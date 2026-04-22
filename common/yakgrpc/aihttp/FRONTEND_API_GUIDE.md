@@ -37,11 +37,13 @@
 
 ## 2.2 CORS
 
-网关始终会返回：
+网关默认会返回：
 
 - `Access-Control-Allow-Origin: *`
 - `Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS`
-- `Access-Control-Allow-Headers: Content-Type, Authorization, X-TOTP-Code`
+- `Access-Control-Allow-Headers: Content-Type, Authorization, X-TOTP-Code, Cache-Control, Last-Event-ID`
+
+如果请求携带 `Origin`，网关会回显该 `Origin` 并返回 `Access-Control-Allow-Credentials: true`，以支持浏览器中带鉴权头或凭证的 SSE/Fetch 请求。预检请求携带 `Access-Control-Request-Headers` 时，网关会回显这些请求头。
 
 ## 2.3 错误响应格式
 

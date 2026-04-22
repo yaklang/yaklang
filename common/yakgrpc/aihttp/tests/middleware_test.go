@@ -33,8 +33,23 @@ func TestJWTAuthMiddleware(t *testing.T) {
 func TestCORSHeaders(t *testing.T) {
 	gw := newTestGateway(t)
 
-	req := httptest.NewRequest("OPTIONS", "/agent/setting", nil)
-	w := performRequest(gw, req)
+	t.Run("no origin keeps wildcard", func(t *testing.T) {
+		req := httptest.NewRequest("OPTIONS", "/agent/setting", nil)
+		w := performRequest(gw, req)
 
-	require.Equal(t, "*", w.Header().Get("Access-Control-Allow-Origin"))
+		require.Equal(t, "*", w.Header().Get("Access-Control-Allow-Origin"))
+		require.Empty(t, w.Header().Get("Access-Control-Allow-Credentials"))
+	})
+
+	t.Run("origin supports credentialed browser requests", func(t *testing.T) {
+		req := httptest.NewRequest("OPTIONS", "/agent/setting", nil)
+		req.Header.Set("Origin", "http://localhost:4173")
+		req.Header.Set("Access-Control-Request-Headers", "authorization, cache-control")
+		w := performRequest(gw, req)
+
+		require.Equal(t, "http://localhost:4173", w.Header().Get("Access-Control-Allow-Origin"))
+		require.Equal(t, "true", w.Header().Get("Access-Control-Allow-Credentials"))
+		require.Equal(t, "authorization, cache-control", w.Header().Get("Access-Control-Allow-Headers"))
+		require.Contains(t, w.Header().Values("Vary"), "Origin")
+	})
 }

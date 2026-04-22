@@ -116,10 +116,13 @@ func TestHandleSSEEventsRespondsWithAIOutputEvent(t *testing.T) {
 	session.Complete(nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/agent/run/"+runID+"/events", nil)
+	req.Header.Set("Origin", "http://localhost:4173")
 	w := httptest.NewRecorder()
 
 	gw.ServeHTTP(w, req)
 	require.Equal(t, http.StatusOK, w.Code)
+	require.Equal(t, "http://localhost:4173", w.Header().Get("Access-Control-Allow-Origin"))
+	require.Equal(t, "true", w.Header().Get("Access-Control-Allow-Credentials"))
 
 	var payloads []string
 	scanner := bufio.NewScanner(strings.NewReader(w.Body.String()))
