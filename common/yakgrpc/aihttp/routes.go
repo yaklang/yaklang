@@ -51,10 +51,7 @@ func (gw *AIAgentHTTPGateway) registerRoutes() {
 
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-TOTP-Code")
-		w.Header().Set("Access-Control-Max-Age", "86400")
+		setCORSHeaders(w, r)
 
 		if r.Method == "OPTIONS" {
 			w.WriteHeader(http.StatusNoContent)
@@ -63,4 +60,24 @@ func corsMiddleware(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+func setCORSHeaders(w http.ResponseWriter, r *http.Request) {
+	origin := r.Header.Get("Origin")
+	if origin != "" {
+		w.Header().Set("Access-Control-Allow-Origin", origin)
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+		w.Header().Add("Vary", "Origin")
+	} else {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+	}
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+
+	requestHeaders := r.Header.Get("Access-Control-Request-Headers")
+	if requestHeaders != "" {
+		w.Header().Set("Access-Control-Allow-Headers", requestHeaders)
+	} else {
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-TOTP-Code, Cache-Control, Last-Event-ID")
+	}
+	w.Header().Set("Access-Control-Max-Age", "86400")
 }
