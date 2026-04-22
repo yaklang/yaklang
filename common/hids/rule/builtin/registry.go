@@ -191,11 +191,12 @@ func loadRuleSet(ruleSet string) ([]Rule, bool) {
 				Tags:           []string{"builtin", "baseline", "process"},
 				Match:          matchShellUnderWebParent,
 				Detail: func(event model.Event) map[string]any {
-					return map[string]any{
-						"image":       event.Process.Image,
-						"command":     event.Process.Command,
-						"parent_name": event.Process.ParentName,
+					detail := map[string]any{
+						"image":   event.Process.Image,
+						"command": event.Process.Command,
 					}
+					fillParentProcessDetail(detail, event.Process)
+					return detail
 				},
 			},
 			{
@@ -315,14 +316,15 @@ func loadRuleSet(ruleSet string) ([]Rule, bool) {
 				Tags:           []string{"builtin", "baseline", "network", "web", "remote-admin"},
 				Match:          matchWebProcessRemoteAdminEgress,
 				Detail: func(event model.Event) map[string]any {
-					return map[string]any{
+					detail := map[string]any{
 						"process_name":  event.Process.Name,
 						"process_image": event.Process.Image,
-						"parent_name":   event.Process.ParentName,
 						"dest_address":  event.Network.DestAddress,
 						"dest_port":     event.Network.DestPort,
 						"dest_service":  policy.PortServiceName(event.Network.Protocol, event.Network.DestPort),
 					}
+					fillParentProcessDetail(detail, event.Process)
+					return detail
 				},
 			},
 			{
@@ -390,14 +392,15 @@ func loadRuleSet(ruleSet string) ([]Rule, bool) {
 				Tags:           []string{"builtin", "baseline", "network", "metadata"},
 				Match:          matchMetadataServiceAccess,
 				Detail: func(event model.Event) map[string]any {
-					return map[string]any{
+					detail := map[string]any{
 						"process_name":  event.Process.Name,
 						"process_image": event.Process.Image,
 						"command":       event.Process.Command,
-						"parent_name":   event.Process.ParentName,
 						"dest_address":  event.Network.DestAddress,
 						"dest_port":     event.Network.DestPort,
 					}
+					fillParentProcessDetail(detail, event.Process)
+					return detail
 				},
 			},
 			{
@@ -409,14 +412,15 @@ func loadRuleSet(ruleSet string) ([]Rule, bool) {
 				Tags:           []string{"builtin", "baseline", "network", "web", "proxy", "tor"},
 				Match:          matchWebProcessProxyTorEgress,
 				Detail: func(event model.Event) map[string]any {
-					return map[string]any{
+					detail := map[string]any{
 						"process_name":  event.Process.Name,
 						"process_image": event.Process.Image,
-						"parent_name":   event.Process.ParentName,
 						"dest_address":  event.Network.DestAddress,
 						"dest_port":     event.Network.DestPort,
 						"dest_service":  policy.PortServiceName(event.Network.Protocol, event.Network.DestPort),
 					}
+					fillParentProcessDetail(detail, event.Process)
+					return detail
 				},
 			},
 			{
@@ -466,10 +470,9 @@ func loadRuleSet(ruleSet string) ([]Rule, bool) {
 				Tags:           []string{"builtin", "baseline", "network", "remote-admin", "long-lived"},
 				Match:          matchLongLivedPublicRemoteAdminSession,
 				Detail: func(event model.Event) map[string]any {
-					return map[string]any{
+					detail := map[string]any{
 						"process_name":              event.Process.Name,
 						"process_image":             event.Process.Image,
-						"parent_name":               event.Process.ParentName,
 						"command":                   event.Process.Command,
 						"dest_address":              event.Network.DestAddress,
 						"dest_port":                 event.Network.DestPort,
@@ -477,6 +480,8 @@ func loadRuleSet(ruleSet string) ([]Rule, bool) {
 						"connection_age_seconds":    networkConnectionAgeSeconds(event),
 						"previous_connection_state": networkPreviousConnectionState(event),
 					}
+					fillParentProcessDetail(detail, event.Process)
+					return detail
 				},
 			},
 			{
@@ -860,7 +865,7 @@ func matchWebProcessRemoteAdminEgress(event model.Event) bool {
 		return false
 	}
 	return policy.HasProcessRole(event.Process.Name, event.Process.Image, event.Process.Command, "web") ||
-		policy.HasProcessRole(event.Process.ParentName, "", "", "web")
+		hasParentProcessRole(event.Process, "web")
 }
 
 func matchUnexpectedPublicAdminAccept(event model.Event) bool {
@@ -929,7 +934,7 @@ func matchMetadataServiceAccess(event model.Event) bool {
 		"interpreter",
 		"network_tool",
 		"web",
-	) || policy.HasProcessRole(event.Process.ParentName, "", "", "web")
+	) || hasParentProcessRole(event.Process, "web")
 }
 
 func matchWebProcessProxyTorEgress(event model.Event) bool {
@@ -943,7 +948,7 @@ func matchWebProcessProxyTorEgress(event model.Event) bool {
 		return false
 	}
 	return policy.HasProcessRole(event.Process.Name, event.Process.Image, event.Process.Command, "web") ||
-		policy.HasProcessRole(event.Process.ParentName, "", "", "web")
+		hasParentProcessRole(event.Process, "web")
 }
 
 func matchPublicDataServiceEgress(event model.Event) bool {
@@ -984,7 +989,7 @@ func matchPublicKubernetesAPIEgress(event model.Event) bool {
 		"interpreter",
 		"network_tool",
 		"web",
-	) || policy.HasProcessRole(event.Process.ParentName, "", "", "web")
+	) || hasParentProcessRole(event.Process, "web")
 }
 
 func matchUnexpectedPublicDataServiceAccept(event model.Event) bool {
@@ -1022,7 +1027,7 @@ func matchLongLivedPublicRemoteAdminSession(event model.Event) bool {
 		return true
 	}
 	return policy.HasProcessRole(event.Process.Name, event.Process.Image, event.Process.Command, "web") ||
-		policy.HasProcessRole(event.Process.ParentName, "", "", "web")
+		hasParentProcessRole(event.Process, "web")
 }
 
 func matchLongLivedProxyTorSession(event model.Event) bool {
@@ -1054,11 +1059,11 @@ func buildNetworkEgressDetail(event model.Event) map[string]any {
 		detail["process_name"] = event.Process.Name
 		detail["process_image"] = event.Process.Image
 		detail["command"] = event.Process.Command
-		detail["parent_name"] = event.Process.ParentName
+		fillParentProcessDetail(detail, event.Process)
 		if roles := policy.ProcessRoles(event.Process.Name, event.Process.Image, event.Process.Command); len(roles) > 0 {
 			detail["process_roles"] = cloneStringSlice(roles)
 		}
-		if parentRoles := policy.ProcessRoles(event.Process.ParentName, "", ""); len(parentRoles) > 0 {
+		if parentRoles := parentProcessRoles(event.Process); len(parentRoles) > 0 {
 			detail["parent_roles"] = cloneStringSlice(parentRoles)
 		}
 	}
@@ -1298,18 +1303,20 @@ func buildAuditCommandDetail(event model.Event) map[string]any {
 
 func buildProcessCommandDetail(event model.Event) map[string]any {
 	detail := map[string]any{
-		"command":      "",
-		"image":        "",
-		"process_name": "",
-		"username":     "",
-		"parent_name":  "",
+		"command":        "",
+		"image":          "",
+		"process_name":   "",
+		"username":       "",
+		"parent_name":    "",
+		"parent_image":   "",
+		"parent_command": "",
 	}
 	if event.Process != nil {
 		detail["command"] = event.Process.Command
 		detail["image"] = event.Process.Image
 		detail["process_name"] = event.Process.Name
 		detail["username"] = event.Process.Username
-		detail["parent_name"] = event.Process.ParentName
+		fillParentProcessDetail(detail, event.Process)
 		if artifact := buildArtifactDetail(event.Process.Artifact); artifact != nil {
 			detail["artifact"] = artifact
 		}
@@ -1560,13 +1567,15 @@ func snapshotEvent(event model.Event) map[string]any {
 		detail["timestamp"] = event.Timestamp.UTC().Format(time.RFC3339Nano)
 	}
 	if event.Process != nil {
-		detail["process"] = map[string]any{
-			"pid":         event.Process.PID,
-			"parent_pid":  event.Process.ParentPID,
-			"image":       event.Process.Image,
-			"command":     event.Process.Command,
-			"parent_name": event.Process.ParentName,
+		processDetail := map[string]any{
+			"pid":        event.Process.PID,
+			"parent_pid": event.Process.ParentPID,
+			"image":      event.Process.Image,
+			"command":    event.Process.Command,
 		}
+		fillParentProcessDetail(processDetail, event.Process)
+		detail["process"] = processDetail
+		detail["parent"] = snapshotParentProcess(event.Process)
 		if artifact := buildArtifactDetail(event.Process.Artifact); artifact != nil {
 			detail["process"].(map[string]any)["artifact"] = artifact
 		}
@@ -1678,6 +1687,54 @@ func cloneStringMap(values map[string]string) map[string]string {
 		cloned[key] = value
 	}
 	return cloned
+}
+
+func fillParentProcessDetail(detail map[string]any, process *model.Process) {
+	if detail == nil {
+		return
+	}
+	detail["parent_name"] = ""
+	detail["parent_image"] = ""
+	detail["parent_command"] = ""
+	if process == nil {
+		return
+	}
+	detail["parent_name"] = process.ParentName
+	detail["parent_image"] = process.ParentImage
+	detail["parent_command"] = process.ParentCommand
+}
+
+func snapshotParentProcess(process *model.Process) map[string]any {
+	parent := map[string]any{
+		"pid":                0,
+		"name":               "",
+		"image":              "",
+		"command":            "",
+		"start_time_unix_ms": int64(0),
+	}
+	if process == nil {
+		return parent
+	}
+	parent["pid"] = process.ParentPID
+	parent["name"] = process.ParentName
+	parent["image"] = process.ParentImage
+	parent["command"] = process.ParentCommand
+	parent["start_time_unix_ms"] = process.ParentStartTimeUnixMillis
+	return parent
+}
+
+func hasParentProcessRole(process *model.Process, role string) bool {
+	if process == nil {
+		return false
+	}
+	return policy.HasProcessRole(process.ParentName, process.ParentImage, process.ParentCommand, role)
+}
+
+func parentProcessRoles(process *model.Process) []string {
+	if process == nil {
+		return nil
+	}
+	return policy.ProcessRoles(process.ParentName, process.ParentImage, process.ParentCommand)
 }
 
 func cloneStringSlice(values []string) []string {
