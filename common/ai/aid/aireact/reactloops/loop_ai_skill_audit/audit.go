@@ -281,7 +281,7 @@ func buildPhase2StaticAnalysisLoop(r aicommon.AIInvokeRuntime, state *SkillAudit
 	// ─── complete_skill_audit: the only legal exit from Phase 2 ───
 	preset = append(preset, reactloops.WithRegisterLoopAction(
 		"complete_skill_audit",
-		"完成 AI Skill 静态安全审计，提交意图一致性审计表、风险等级和所有漏洞发现（XML 格式）。调用前必须已完成全部 6 个检测类别的扫描并写出审计笔记文件。",
+		"完成 AI Skill 静态安全审计，提交意图一致性审计表、风险等级和所有漏洞发现（Markdown 格式）。调用前必须已完成全部 6 个检测类别的扫描并写出审计笔记文件。",
 		[]aitool.ToolOption{
 			aitool.WithStringParam("skill_name",
 				aitool.WithParam_Required(false),
@@ -294,10 +294,7 @@ func buildPhase2StaticAnalysisLoop(r aicommon.AIInvokeRuntime, state *SkillAudit
 				aitool.WithParam_Description("意图一致性审计表（Markdown 表格格式），包含恶意行为、隐形行为、功能意图三个检查项")),
 			aitool.WithStringParam("findings_summary",
 				aitool.WithParam_Required(true),
-				aitool.WithParam_Description("审计结论摘要（2-4 句话），说明扫描覆盖范围和发现情况")),
-			aitool.WithStringParam("findings_xml",
-				aitool.WithParam_Required(false),
-				aitool.WithParam_Description("所有漏洞发现的 XML 格式内容（<vuln>...</vuln> 块，无发现时留空）")),
+				aitool.WithParam_Description("审计结论与漏洞详情（Markdown 格式）：先用 2-4 句话概述扫描覆盖范围，再按漏洞条目逐一列出文件位置、风险类型、技术分析、攻击路径、修复建议；无发现时只写概述即可")),
 		},
 		func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
 			if len(noteFiles) == 0 {
@@ -313,7 +310,6 @@ func buildPhase2StaticAnalysisLoop(r aicommon.AIInvokeRuntime, state *SkillAudit
 			riskLevel := action.GetString("risk_level")
 			alignmentTable := action.GetString("alignment_table")
 			findingsSummary := action.GetString("findings_summary")
-			findingsXML := action.GetString("findings_xml")
 
 			if skillName == "" {
 				skillName = state.SkillName
@@ -323,17 +319,16 @@ func buildPhase2StaticAnalysisLoop(r aicommon.AIInvokeRuntime, state *SkillAudit
 			}
 
 			state.SetProjectInfo(state.SkillPath, skillName)
-			state.SetAuditResult(riskLevel, findingsSummary, findingsXML)
+			state.SetAuditResult(riskLevel, findingsSummary)
 
 			// Persist combined audit result to a structured file for Phase 3
 			auditResultPath := filepath.Join(auditWorkDir, "audit_result.md")
 			auditContent := fmt.Sprintf("# AI Skill 安全审计结果\n\n"+
 				"**Skill 名称**: %s\n**Skill 路径**: %s\n**风险等级**: %s\n\n"+
 				"## 意图一致性审计\n\n%s\n\n"+
-				"## 审计摘要\n\n%s\n\n"+
-				"## 漏洞发现\n\n%s\n",
+				"## 审计结论与漏洞详情\n\n%s\n",
 				skillName, state.SkillPath, riskLevel,
-				alignmentTable, findingsSummary, findingsXML)
+				alignmentTable, findingsSummary)
 			if err := os.WriteFile(auditResultPath, []byte(auditContent), 0o644); err != nil {
 				log.Warnf("[SkillAudit/Phase2] Failed to persist audit result: %v", err)
 			} else {
@@ -412,11 +407,8 @@ func skillAuditDir(state *SkillAuditState) string {
 	if state.WorkDir != "" {
 		return filepath.Join(state.WorkDir, "skill_audit")
 	}
-	name := state.SkillName
-	if name == "" {
-		name = "skill"
-	}
-	return filepath.Join(os.TempDir(), "skill_audit_"+name)
+
+	return filepath.Join(os.TempDir(), "skill_audit_"+utils.RandAlphaNumStringBytes(5))
 }
 
 // newSubTask creates an independent sub-task for a child loop.
@@ -452,10 +444,7 @@ func buildReportPrompt(state *SkillAuditState, outputPath string) string {
 - **技术栈**: %s
 - **整体风险等级**: %s
 
-## 审计摘要
-%s
-
-## 漏洞发现
+## 审计结论与漏洞详情
 %s
 
 ## 报告结构要求
@@ -464,7 +453,7 @@ func buildReportPrompt(state *SkillAuditState, outputPath string) string {
 1. **Executive Summary**（执行摘要）：2-3 句话描述 Skill 声明功能、发现情况和整体风险结论
 2. **Intent Alignment Audit**（意图一致性审计）：从参考文件中提取意图一致性审计表
 3. **Project Overview**（项目概览）：Skill 名称、声明功能、文件列表、脚本清单
-4. **Findings**（发现）：每个漏洞一个 <vuln> XML 块；无发现时写 "No findings above Medium threshold detected."
+4. **Findings**（发现）：将漏洞详情整合为 Markdown 小节；无发现时写 "No findings above Medium threshold detected."
 5. **Audit Coverage**（审计覆盖范围）：按六个类别（网络/反弹Shell/后门/敏感文件/混淆/挖矿）列出检查结果
 
 ## 重要说明
@@ -476,7 +465,6 @@ func buildReportPrompt(state *SkillAuditState, outputPath string) string {
 		state.TechStack,
 		state.RiskLevel,
 		state.FindingsSummary,
-		state.FindingsXML,
 		outputPath,
 	)
 }
@@ -504,15 +492,12 @@ func generateFallbackReport(state *SkillAuditState) string {
 		riskLevel = "Unknown"
 	}
 	sb.WriteString(fmt.Sprintf("## 执行摘要\n\n**整体风险等级**: **%s**\n\n", riskLevel))
-	if state.FindingsSummary != "" {
-		sb.WriteString(state.FindingsSummary + "\n\n")
-	}
 
-	sb.WriteString("## 漏洞发现\n\n")
-	if state.FindingsXML != "" {
-		sb.WriteString(state.FindingsXML + "\n")
+	if state.FindingsSummary != "" {
+		sb.WriteString("## 审计结论与漏洞详情\n\n")
+		sb.WriteString(state.FindingsSummary + "\n")
 	} else {
-		sb.WriteString("No findings above Medium threshold detected.\n")
+		sb.WriteString("## 漏洞发现\n\nNo findings above Medium threshold detected.\n")
 	}
 
 	return sb.String()

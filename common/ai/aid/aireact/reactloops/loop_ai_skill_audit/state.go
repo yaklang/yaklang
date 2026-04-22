@@ -21,8 +21,7 @@ type SkillAuditState struct {
 	// Populated after Phase 2 (static analysis)
 	// RiskLevel is one of: "Clean", "Medium", "High", "Critical"
 	RiskLevel       string
-	FindingsSummary string
-	FindingsXML     string // raw <vuln>...</vuln> XML blocks
+	FindingsSummary string // Markdown-formatted findings detail
 	AuditNoteFiles  []string
 
 	// Populated after Phase 3 (report_generating)
@@ -78,12 +77,11 @@ func (s *SkillAuditState) AddAuditNoteFile(path string) {
 }
 
 // SetAuditResult stores the outcome of Phase 2 static analysis.
-func (s *SkillAuditState) SetAuditResult(riskLevel, findingsSummary, findingsXML string) {
+func (s *SkillAuditState) SetAuditResult(riskLevel, findingsSummary string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.RiskLevel = riskLevel
 	s.FindingsSummary = findingsSummary
-	s.FindingsXML = findingsXML
 }
 
 func (s *SkillAuditState) SetFinalReport(report string) {

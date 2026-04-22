@@ -131,38 +131,32 @@ mining.pool|supportxmr
 | 功能意图 | Pass / Warning / Critical | ... |
 ```
 
-### 漏洞条目格式（complete_skill_audit 的 findings_xml 字段，仅 Medium 及以上）
+### 漏洞条目格式（complete_skill_audit 的 findings_summary 字段，仅 Medium 及以上）
 
-```xml
-<vuln>
-  <title>[简洁标题：攻击类型 + 受影响组件]</title>
-  <desc>
-## 漏洞详情
+每个漏洞用以下 Markdown 结构单独描述，多个漏洞依次追加：
 
-**文件位置**: `scripts/example.py`，第 42–58 行
-**风险类型**: Reverse Shell / Data Exfiltration / Backdoor / Cryptominer / Arbitrary File Access
-**风险等级**: Critical / High / Medium
+```markdown
+### [漏洞标题：攻击类型 + 受影响组件]
 
-### 技术分析
+- **文件位置**: `scripts/example.py`，第 42–58 行
+- **风险类型**: Reverse Shell / Data Exfiltration / Backdoor / Cryptominer / Arbitrary File Access
+- **风险等级**: Critical / High / Medium
+
+**技术分析**
 [代码逻辑分析，引用具体代码片段和行号]
 
-### 攻击路径
+**攻击路径**
 [逐步描述攻击者如何利用此漏洞]
 
-### 影响评估
+**影响评估**
 [安全后果和影响范围]
 
-### SKILL.md 声明 vs 实际实现
-- **声明**: "..."
-- **实际**: "..."
-  </desc>
-  <risk_type>Reverse Shell</risk_type>
-  <level>Critical</level>
-  <suggestion>
-## 修复建议
+**SKILL.md 声明 vs 实际实现**
+- 声明: "..."
+- 实际: "..."
+
+**修复建议**
 [具体可操作的修复步骤]
-  </suggestion>
-</vuln>
 ```
 
 ---
