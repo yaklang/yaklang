@@ -510,3 +510,14 @@ func WithToolCallIntervalReviewExtraPrompt(prompt string) ReActLoopOption {
 		r.config.SetConfig(aicommon.ConfigKeyToolCallIntervalReviewExtraPrompt, prompt)
 	}
 }
+
+func BasicAICommonConfigOption(c *aicommon.Config) []ReActLoopOption {
+	basicOptions := []ReActLoopOption{
+		WithMemoryTriage(c.MemoryTriage),
+		WithMemoryPool(c.MemoryPool),
+		WithPeriodicVerificationInterval(int(c.PeriodicVerificationInterval)),
+		WithMemorySizeLimit(int(c.MemoryPoolSize)),
+		WithEnableSelfReflection(c.EnableSelfReflection),
+	}
+	return basicOptions
+}

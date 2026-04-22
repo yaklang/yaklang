@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aimem"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -231,4 +232,60 @@ func TestReAct_Invoker_FreeInputShouldNotSet(t *testing.T) {
 	require.True(t, ok)
 	require.True(t, reactInvoker.pureInvokerMode)
 	require.False(t, reactInvoker.config.InputEventManager.IsFreeInputCallbackSet())
+}
+
+func TestReAct_LoopCoverPeriodicVerificationIntervalOption(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	basicOption := []aicommon.ConfigOption{
+		aicommon.WithMemoryTriage(aimem.NewMockMemoryTriage()),
+		aicommon.WithEnableSelfReflection(false),
+		aicommon.WithContext(ctx),
+		aicommon.WithDisallowMCPServers(true),
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			return &aicommon.AIResponse{}, nil
+		}),
+	}
+
+	t.Run("default config", func(t *testing.T) {
+		r, err := NewReAct(basicOption...)
+		require.NoError(t, err)
+		mainloop, err := reactloops.CreateLoopByName(
+			schema.AI_REACT_LOOP_NAME_DEFAULT, r,
+			reactloops.BasicAICommonConfigOption(r.config)...,
+		)
+		require.NoError(t, err)
+		require.Equal(t, mainloop.GetPeriodicVerificationInterval(), aicommon.DefaultPeriodicVerificationInterval)
+	})
+
+	t.Run("zero config", func(t *testing.T) {
+		Option := append(basicOption,
+			aicommon.WithPeriodicVerificationInterval(0),
+		)
+
+		r, err := NewReAct(Option...)
+		require.NoError(t, err)
+		mainloop, err := reactloops.CreateLoopByName(
+			schema.AI_REACT_LOOP_NAME_DEFAULT, r,
+			reactloops.BasicAICommonConfigOption(r.config)...,
+		)
+		require.NoError(t, err)
+		require.Equal(t, mainloop.GetPeriodicVerificationInterval(), 0)
+	})
+
+	t.Run("custom config", func(t *testing.T) {
+		Option := append(basicOption,
+			aicommon.WithPeriodicVerificationInterval(10),
+		)
+
+		r, err := NewReAct(Option...)
+		require.NoError(t, err)
+		mainloop, err := reactloops.CreateLoopByName(
+			schema.AI_REACT_LOOP_NAME_DEFAULT, r,
+			reactloops.BasicAICommonConfigOption(r.config)...,
+		)
+		require.NoError(t, err)
+		require.Equal(t, mainloop.GetPeriodicVerificationInterval(), 10)
+	})
+
 }

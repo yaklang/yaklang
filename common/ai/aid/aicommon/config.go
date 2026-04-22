@@ -31,6 +31,8 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+const DefaultPeriodicVerificationInterval = 5
+
 type ConfigOption func(*Config) error
 
 var configOptionIDRegistry sync.Map
@@ -478,7 +480,7 @@ func newConfig(ctx context.Context) *Config {
 		MemoryPoolSize:                     10 * 1024, // 10k tokens
 		MemoryPool:                         omap.NewOrderedMap(make(map[string]*MemoryEntity)),
 		MaxTaskContinue:                    3,
-		PeriodicVerificationInterval:       5,
+		PeriodicVerificationInterval:       DefaultPeriodicVerificationInterval,
 		GenerateReport:                     true,
 		DisallowMCPServers:                 false, // 默认启用 MCP Servers
 		MemoryTriageId:                     "default",
