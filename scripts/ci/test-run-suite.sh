@@ -10,6 +10,7 @@ TEST_TIMEOUT="${TEST_TIMEOUT:-2m}"
 TEST_VERBOSE="${TEST_VERBOSE:-1}"
 SKIP_SYNC_EMBED_RULE_IN_GITHUB="${SKIP_SYNC_EMBED_RULE_IN_GITHUB:-true}"
 TEST_LOG_DIR="${TEST_LOG_DIR:-$TEST_BIN_DIR}"
+SUITE_TIMEOUT="${SUITE_TIMEOUT:-50m}"
 
 if [[ -z "$YAK_BINARY_PATH" || -z "$TEST_BIN_DIR" || -z "$TEST_CONFIG" ]]; then
   echo "ERROR: YAK_BINARY_PATH, TEST_BIN_DIR, and TEST_CONFIG must be set"
@@ -34,6 +35,18 @@ stop_grpc() {
   fi
 }
 
+stop_children() {
+  pkill -P $$ 2>/dev/null || true
+}
+
+terminate_suite() {
+  echo "Suite interrupted, stopping child processes..." | tee -a "${suite_log:-/dev/stderr}"
+  stop_children
+  stop_grpc
+  exit 143
+}
+
+trap terminate_suite INT TERM
 trap stop_grpc EXIT
 
 suite_log="${TEST_LOG_DIR}/suite.log"
@@ -44,6 +57,7 @@ mkdir -p "$TEST_LOG_DIR"
 rm -f "$TEST_LOG_DIR"/test_*.run.log "$grpc_log" "$suite_log"
 
 echo "=== Running suite: ${SUITE_NAME} ==="
+echo "Suite timeout: ${SUITE_TIMEOUT}"
 
 nohup env SKIP_SYNC_EMBED_RULE_IN_GITHUB="$SKIP_SYNC_EMBED_RULE_IN_GITHUB" "$YAK_BINARY_PATH" grpc >"$grpc_log" 2>&1 < /dev/null &
 grpc_pid=$!
@@ -70,4 +84,13 @@ if [[ "$SUITE_SYNC_RULE" == "1" ]]; then
 fi
 
 export TEST_LOG_DIR
-./scripts/ci/test-run.sh 2>&1 | tee -a "$suite_log"
+set +e
+timeout --signal=TERM --kill-after=30s "$SUITE_TIMEOUT" ./scripts/ci/test-run.sh 2>&1 | tee -a "$suite_log"
+suite_rc=${PIPESTATUS[0]}
+set -e
+
+if [[ "$suite_rc" -eq 124 ]]; then
+  echo "Suite timed out after ${SUITE_TIMEOUT}" | tee -a "$suite_log"
+fi
+
+exit "$suite_rc"
