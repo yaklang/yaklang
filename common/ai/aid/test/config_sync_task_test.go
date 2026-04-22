@@ -229,6 +229,7 @@ func TestCoordinator_SyncTask_Upgrade(t *testing.T) {
 
 	ins, err := aid.NewCoordinator(
 		"test-upgrade",
+		aicommon.WithPeriodicVerificationInterval(0),
 		aicommon.WithTools(aid.EchoTool(), aid.ErrorTool()),
 		aicommon.WithMemoryTriage(aimem.NewMockMemoryTriage()),
 		aicommon.WithAIAutoRetry(1),
