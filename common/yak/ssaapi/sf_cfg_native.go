@@ -186,6 +186,49 @@ func firstCfgCtxFromSymbolValues(vals sfvm.Values) (*CfgCtxValue, error) {
 	return c0, nil
 }
 
+// allCfgCtxFromSymbolValues collects every distinct cfg anchor in vals (e.g. every Sprintf in
+// `fmt.Sprint* as $unsafe`); firstCfgCtxFromSymbolValues only took the first, which made
+// cfgDominates/cfgPostDominates compare all receivers against a single Sprintf.
+func allCfgCtxFromSymbolValues(vals sfvm.Values) ([]*CfgCtxValue, error) {
+	seen := make(map[struct{ f, b, i int64 }]struct{}, 8)
+	var out []*CfgCtxValue
+	appendDistinct := func(c *CfgCtxValue) {
+		if c == nil || c.IsEmpty() {
+			return
+		}
+		k := struct{ f, b, i int64 }{c.FuncID, c.BlockID, c.InstID}
+		if _, ok := seen[k]; ok {
+			return
+		}
+		seen[k] = struct{}{}
+		out = append(out, c)
+	}
+	_ = vals.Recursive(func(operator sfvm.ValueOperator) error {
+		if c, ok := operator.(*CfgCtxValue); ok {
+			appendDistinct(c)
+		}
+		return nil
+	})
+	if len(out) > 0 {
+		return out, nil
+	}
+	outs, _, err := expandValuesToCfgCtxList(vals)
+	if err != nil {
+		return nil, err
+	}
+	for _, op := range outs {
+		c, ok := op.(*CfgCtxValue)
+		if !ok {
+			continue
+		}
+		appendDistinct(c)
+	}
+	if len(out) == 0 {
+		return nil, utils.Error("cfg*: no cfg anchor")
+	}
+	return out, nil
+}
+
 func resolveCfgTargetFromFrame(frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (*CfgCtxValue, error) {
 	if frame == nil {
 		return nil, utils.Error("cfg*: frame is nil")
@@ -209,24 +252,66 @@ func resolveCfgTargetFromFrame(frame *sfvm.SFFrame, params *sfvm.NativeCallActua
 	return first, nil
 }
 
+func resolveAllCfgTargetsFromFrame(frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) ([]*CfgCtxValue, error) {
+	if frame == nil {
+		return nil, utils.Error("cfg*: frame is nil")
+	}
+	if params == nil {
+		return nil, utils.Error("cfg*: params is nil")
+	}
+	targetVar := params.GetString(0, "target", "var", "against")
+	if targetVar == "" {
+		return nil, utils.Error("cfg*: 'target' parameter is required (e.g. target=$sinkCfg)")
+	}
+	targetVar = strings.TrimPrefix(targetVar, "$")
+	targetVals, ok := frame.GetSymbolByName(targetVar)
+	if !ok || targetVals == nil {
+		return nil, utils.Errorf("cfg*: variable '$%s' not found in current frame", targetVar)
+	}
+	all, err := allCfgCtxFromSymbolValues(targetVals)
+	if err != nil {
+		return nil, utils.Wrapf(err, "cfg*: variable '$%s' has no cfg anchor (use <getCfg> or an SSA value with func/block/inst)", targetVar)
+	}
+	return all, nil
+}
+
 // mapCfgCtxAgainstTarget resolves `target` from the frame, then evaluates fn(prog, recv, targ)
 // for each cfg ctx recv on the value stack (SyntaxFlow pipeline cfg).
+// If the target variable binds multiple cfg points, we take OR over targets in the same
+// function as the receiver (others already yield false in fn), indexed by FuncID to avoid
+// O(|recv| * |all targets|) cross-function work.
 func mapCfgCtxAgainstTarget(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams, opName string, fn func(prog *Program, recv, targ *CfgCtxValue) bool) (bool, sfvm.Values, error) {
 	pipe, prog, err := coerceCfgCallInputs(v)
 	if err != nil {
 		return false, nil, utils.Wrap(err, opName)
 	}
-	target, err := resolveCfgTargetFromFrame(frame, params)
+	targets, err := resolveAllCfgTargetsFromFrame(frame, params)
 	if err != nil {
 		return false, nil, utils.Wrap(err, opName)
 	}
+	byFunc := lo.GroupBy(targets, func(t *CfgCtxValue) int64 { return t.FuncID })
 	var out []sfvm.ValueOperator
 	_ = pipe.Recursive(func(op sfvm.ValueOperator) error {
 		receiver, ok := extractCfgCtx(op)
 		if !ok || receiver.IsEmpty() {
 			return nil
 		}
-		out = append(out, prog.NewConstValue(fn(prog, receiver, target)))
+		cands := byFunc[receiver.FuncID]
+		hit := false
+		for _, t := range cands {
+			if fn(prog, receiver, t) {
+				hit = true
+				break
+			}
+		}
+		val := prog.NewConstValue(hit)
+		// Boolean results must keep the same anchor bits as the cfg receiver so
+		// `?{ *<cfgDominates...> }` and other filter sub-expressions can buildFilterMask
+		// (see sfvm/condition_exec.go buildFilterMask).
+		if ab := op.GetAnchorBitVector(); ab != nil && !ab.IsEmpty() && val != nil {
+			val.SetAnchorBitVector(ab)
+		}
+		out = append(out, val)
 		return nil
 	})
 	if len(out) == 0 {
@@ -296,7 +381,11 @@ func nativeCallCFGReachPath(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.Nat
 
 // minimal guard extraction: detect if-in-block dominates sink block and one branch goes to exit.
 func nativeCallCFGGuards(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
-	return mapCfgCtxValues(v, "no guards found", func(prog *Program, op sfvm.ValueOperator, ctx *CfgCtxValue, out *[]sfvm.ValueOperator) {
+	pipe, _, err := coerceCfgCallInputs(v)
+	if err != nil {
+		return false, nil, utils.Wrap(err, "cfgGuards")
+	}
+	return mapCfgCtxValues(pipe, "no guards found", func(prog *Program, op sfvm.ValueOperator, ctx *CfgCtxValue, out *[]sfvm.ValueOperator) {
 		fn, err := getFunctionByID(prog, ctx.FuncID)
 		if err != nil || fn == nil {
 			return

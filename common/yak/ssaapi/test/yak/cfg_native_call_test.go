@@ -146,6 +146,21 @@ $sinkCfg<cfgGuards()> as $guards
 			WantResultContains: []string{"guard(kind=" + ssaapi.GuardKindEarlyReturn},
 		})
 	})
+	t.Run("cfgGuards_implicit_getCfg_on_chain", func(t *testing.T) {
+		// 语法糖：链上可为 SSA value，无需显式 <getCfg> 再 <cfgGuards>。
+		runSyntaxFlowExpect(t, `
+a = 1
+if (a) {
+	return
+}
+println("ok")
+`, `
+println(* #-> as $arg)
+$arg<cfgGuards()> as $guards
+`, sfExpect{
+			WantResultContains: []string{"guard(kind=" + ssaapi.GuardKindEarlyReturn},
+		})
+	})
 	t.Run("filter_guard_kind_field", func(t *testing.T) {
 		runSyntaxFlowExpect(t, `
 a = 1
@@ -371,6 +386,40 @@ $argCfg<cfgDominates(target="$condCfg")> as $dom
 			WantVarContains: map[string][]string{"dom": {"true"}},
 		})
 	})
+
+	t.Run("multiple_target_cfgs_OR_same_function_only", func(t *testing.T) {
+		// 多 target：$tCfg 同时含「异函数」与「同函数」锚点，只应就与 sink 同函数的 a、b 做 OR。
+		// 多结果：两个 println 均绑定 $sink，$sinkCfg 上 cfgDominates 应对 **两个** 接收点各出一条 bool。
+		runSyntaxFlowExpect(t, `
+func fa() {
+	x = 0
+}
+func fb() {
+	a = 1
+	b = 2
+	println(10)
+	println(20)
+}
+fa()
+fb()
+`, `
+a as $anchor
+b as $anchor
+x as $anchor
+$anchor<getCfg()> as $tCfg
+println(*?{have: "10"} #-> as $sink)
+println(*?{have: "20"} #-> as $sink)
+$sink<getCfg()> as $sinkCfg
+$sinkCfg<cfgDominates(target: "$tCfg")> as $dom
+`, sfExpect{
+			WantMinCount: map[string]int{"dom": 2},
+			PostCheck: func(t *testing.T, res *ssaapi.SyntaxFlowResult) {
+				for _, v := range res.GetValues("dom") {
+					require.Contains(t, v.String(), "true")
+				}
+			},
+		})
+	})
 }
 
 // TestNativeCall_cfgPostDominates 覆盖 NativeCall_CFGPostDom（cfgPostDominates）。
@@ -554,6 +603,40 @@ $argCfg<cfgPostDominates(target="$condCfg")> as $pd
 `, sfExpect{
 			WantMinCount:    map[string]int{"pd": 1},
 			WantVarContains: map[string][]string{"pd": {"false"}},
+		})
+	})
+
+	t.Run("multiple_target_cfgs_OR_same_function_only", func(t *testing.T) {
+		// 多 target：$tCfg 同时含 fa 的 println 与 fb 内两个 sink，仅同函数锚点参与 OR。
+		// 多结果：$r 合并 a、b 两个 receiver，应对 **两个** 位置各出一条 cfgPostDominates 结果且均为 true。
+		runSyntaxFlowExpect(t, `
+func fa() {
+	println(99)
+}
+func fb() {
+	a = 1
+	b = 2
+	println(10)
+	println(20)
+}
+fa()
+fb()
+`, `
+println(*?{have: "99"} #-> as $m)
+println(*?{have: "10"} #-> as $m)
+println(*?{have: "20"} #-> as $m)
+$m<getCfg()> as $tCfg
+a as $r
+b as $r
+$r<getCfg()> as $rCfg
+$rCfg<cfgPostDominates(target: "$tCfg")> as $pd
+`, sfExpect{
+			WantMinCount: map[string]int{"pd": 2},
+			PostCheck: func(t *testing.T, res *ssaapi.SyntaxFlowResult) {
+				for _, v := range res.GetValues("pd") {
+					require.Contains(t, v.String(), "true")
+				}
+			},
 		})
 	})
 }
