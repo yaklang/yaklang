@@ -252,6 +252,12 @@ func enrichNetworkProcess(current *model.Process, cached model.Process) *model.P
 	if strings.TrimSpace(cloned.ParentName) == "" {
 		cloned.ParentName = cached.ParentName
 	}
+	if strings.TrimSpace(cloned.ParentImage) == "" {
+		cloned.ParentImage = cached.ParentImage
+	}
+	if strings.TrimSpace(cloned.ParentCommand) == "" {
+		cloned.ParentCommand = cached.ParentCommand
+	}
 	return &cloned
 }
 

