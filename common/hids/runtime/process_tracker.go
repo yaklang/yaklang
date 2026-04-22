@@ -68,6 +68,12 @@ func (t *processTracker) enrichExec(process *model.Process) *model.Process {
 		if strings.TrimSpace(cloned.ParentName) == "" {
 			cloned.ParentName = cached.ParentName
 		}
+		if strings.TrimSpace(cloned.ParentImage) == "" {
+			cloned.ParentImage = cached.ParentImage
+		}
+		if strings.TrimSpace(cloned.ParentCommand) == "" {
+			cloned.ParentCommand = cached.ParentCommand
+		}
 	}
 	normalizeProcessContext(&cloned)
 	t.enrichParentContext(&cloned)
@@ -110,13 +116,19 @@ func (t *processTracker) enrichCached(process *model.Process) *model.Process {
 	if strings.TrimSpace(cloned.ParentName) == "" {
 		cloned.ParentName = cached.ParentName
 	}
+	if strings.TrimSpace(cloned.ParentImage) == "" {
+		cloned.ParentImage = cached.ParentImage
+	}
+	if strings.TrimSpace(cloned.ParentCommand) == "" {
+		cloned.ParentCommand = cached.ParentCommand
+	}
 	normalizeProcessContext(&cloned)
 	t.enrichParentContext(&cloned)
 	return &cloned
 }
 
 func (t *processTracker) enrichParentContext(process *model.Process) {
-	if t == nil || process == nil || process.ParentPID <= 0 || strings.TrimSpace(process.ParentName) != "" {
+	if t == nil || process == nil || process.ParentPID <= 0 {
 		return
 	}
 
@@ -124,7 +136,15 @@ func (t *processTracker) enrichParentContext(process *model.Process) {
 	if !ok {
 		return
 	}
-	process.ParentName = firstNonEmptyString(parent.Name, baseProcessName(parent.Image), baseProcessNameFromCommand(parent.Command))
+	if strings.TrimSpace(process.ParentName) == "" {
+		process.ParentName = firstNonEmptyString(parent.Name, baseProcessName(parent.Image), baseProcessNameFromCommand(parent.Command))
+	}
+	if strings.TrimSpace(process.ParentImage) == "" {
+		process.ParentImage = parent.Image
+	}
+	if strings.TrimSpace(process.ParentCommand) == "" {
+		process.ParentCommand = parent.Command
+	}
 }
 
 func (t *processTracker) forget(process *model.Process) {
@@ -143,6 +163,8 @@ func normalizeProcessContext(process *model.Process) {
 	process.Image = strings.TrimSpace(process.Image)
 	process.Command = strings.TrimSpace(process.Command)
 	process.ParentName = strings.TrimSpace(process.ParentName)
+	process.ParentImage = strings.TrimSpace(process.ParentImage)
+	process.ParentCommand = strings.TrimSpace(process.ParentCommand)
 
 	if process.Name == "" {
 		process.Name = firstNonEmptyString(baseProcessName(process.Image), baseProcessNameFromCommand(process.Command))
