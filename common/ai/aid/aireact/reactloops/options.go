@@ -492,7 +492,7 @@ func WithPeriodicCheckpointInterval(interval int) ReActLoopOption {
 		if r == nil || interval <= 0 {
 			return
 		}
-		r.periodicCheckpointInterval = interval
+		r.periodicVerificationCount = interval
 		if r.perception != nil {
 			r.perception.iterationTriggerInterval = interval
 		}

@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/mock"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/ytoken"
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
@@ -75,6 +76,7 @@ func TestGenerateLoopPrompt_RecordsObservation(t *testing.T) {
 	require.Equal(t, "prompt-observation-loop", observation.LoopName)
 	require.Equal(t, "nonce1", observation.Nonce)
 	require.Equal(t, len(prompt), observation.PromptBytes)
+	require.Equal(t, ytoken.CalcTokenCount(prompt), observation.PromptTokens)
 	require.Len(t, observation.Sections, 10)
 	require.Greater(t, observation.SectionCount, len(observation.Sections))
 
@@ -126,6 +128,7 @@ func TestGenerateLoopPrompt_RecordsObservation(t *testing.T) {
 	require.Equal(t, observation.LoopName, status.LoopName)
 	require.Equal(t, observation.Nonce, status.Nonce)
 	require.Equal(t, observation.PromptBytes, status.PromptBytes)
+	require.Equal(t, observation.PromptTokens, status.PromptTokens)
 	require.NotEmpty(t, status.Sections)
 	require.Equal(t, "background", status.Sections[0].Key)
 	require.NotEmpty(t, status.Sections[0].Children)

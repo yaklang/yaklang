@@ -493,7 +493,7 @@ func (r *ReActLoop) MaybeTriggerPerceptionAfterAction(iterationIndex int) {
 	if r.perception == nil {
 		return
 	}
-	if !r.ShouldTriggerPeriodicCheckpointOnIteration(iterationIndex) {
+	if !r.perception.shouldTriggerOnIteration(iterationIndex) {
 		return
 	}
 	go r.TriggerPerception(PerceptionTriggerPostAction, false)

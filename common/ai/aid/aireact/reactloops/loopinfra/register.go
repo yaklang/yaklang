@@ -17,5 +17,4 @@ func init() {
 	reactloops.RegisterAction(loopAction_LoadSkillResources)
 	reactloops.RegisterAction(loopAction_SearchCapabilities)
 	reactloops.RegisterAction(loopAction_LoadCapability)
-	reactloops.RegisterAction(loopAction_RequestVerification)
 }

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/ytoken"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -48,6 +49,7 @@ type PromptObservation struct {
 	Nonce                string                      `json:"nonce"`
 	GeneratedAt          time.Time                   `json:"generated_at"`
 	PromptBytes          int                         `json:"prompt_bytes"`
+	PromptTokens         int                         `json:"prompt_tokens"`
 	PromptLines          int                         `json:"prompt_lines"`
 	SectionCount         int                         `json:"section_count"`
 	IncludedSectionCount int                         `json:"included_section_count"`
@@ -71,6 +73,7 @@ type PromptObservationStatus struct {
 	LoopName             string                 `json:"loop_name"`
 	Nonce                string                 `json:"nonce"`
 	PromptBytes          int                    `json:"prompt_bytes"`
+	PromptTokens         int                    `json:"prompt_tokens"`
 	PromptLines          int                    `json:"prompt_lines"`
 	SectionCount         int                    `json:"section_count"`
 	IncludedSectionCount int                    `json:"included_section_count"`
@@ -102,12 +105,13 @@ func newPromptSectionObservation(
 
 func buildPromptObservation(loopName string, nonce string, prompt string, sections []*PromptSectionObservation) *PromptObservation {
 	observation := &PromptObservation{
-		LoopName:    loopName,
-		Nonce:       nonce,
-		GeneratedAt: time.Now(),
-		PromptBytes: len(prompt),
-		PromptLines: countPromptLines(prompt),
-		Sections:    sections,
+		LoopName:     loopName,
+		Nonce:        nonce,
+		GeneratedAt:  time.Now(),
+		PromptBytes:  len(prompt),
+		PromptTokens: ytoken.CalcTokenCount(prompt),
+		PromptLines:  countPromptLines(prompt),
+		Sections:     sections,
 	}
 
 	for _, section := range sections {
@@ -503,6 +507,7 @@ func (o *PromptObservation) BuildStatus(maxSummaryBytes int) *PromptObservationS
 		LoopName:             o.LoopName,
 		Nonce:                o.Nonce,
 		PromptBytes:          o.PromptBytes,
+		PromptTokens:         o.PromptTokens,
 		PromptLines:          o.PromptLines,
 		SectionCount:         o.SectionCount,
 		IncludedSectionCount: o.IncludedSectionCount,
