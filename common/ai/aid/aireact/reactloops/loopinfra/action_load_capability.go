@@ -129,63 +129,7 @@ func handleLoadTool(
 	}
 
 	result, directly, err := invoker.ExecuteToolRequiredAndCall(taskCtx, identifier)
-	if err != nil {
-		errMsg := fmt.Sprintf("Tool '%s' execution failed: %v.", identifier, err)
-		invoker.AddToTimeline("[LOAD_CAPABILITY_TOOL_ERROR]", errMsg)
-		op.Feedback(errMsg + " Please try a different tool or approach.")
-		op.SetReflectionLevel(reactloops.ReflectionLevel_Critical)
-		op.SetReflectionData("tool_error", err.Error())
-		op.SetReflectionData("tool_name", identifier)
-		op.Continue()
-		return
-	}
-	if directly {
-		answer, err := invoker.DirectlyAnswer(taskCtx, "在上一次工具调用中，用户中断了工具执行，要求直接回答一些问题", nil)
-		if err != nil {
-			op.Fail(utils.Error("DirectlyAnswer fail, reason: " + err.Error()))
-			return
-		}
-		invoker.AddToTimeline("directly-answer", answer)
-		op.Exit()
-		return
-	}
-	if result == nil {
-		invoker.AddToTimeline("error", fmt.Sprintf("load_capability tool[%v] returned nil result", identifier))
-		op.Continue()
-		return
-	}
-	if result.Error != "" {
-		invoker.AddToTimeline("call["+identifier+"] error", result.Error)
-	}
-
-	task = loop.GetCurrentTask()
-	if task == nil {
-		op.Continue()
-		return
-	}
-	verifyResult, err := invoker.VerifyUserSatisfaction(taskCtx, task.GetUserInput(), true, identifier)
-	if err != nil {
-		op.Fail(err)
-		return
-	}
-	loop.PushSatisfactionRecordWithCompletedTaskIndex(
-		verifyResult.Satisfied, verifyResult.Reasoning,
-		verifyResult.CompletedTaskIndex, verifyResult.NextMovements, verifyResult.Evidence, verifyResult.OutputFiles,
-		verifyResult.EvidenceOps,
-	)
-	if len(verifyResult.EvidenceOps) > 0 {
-		loop.GetConfig().ApplySessionEvidenceOps(verifyResult.EvidenceOps)
-	}
-	if verifyResult.Satisfied {
-		op.Exit()
-		return
-	}
-	feedbackMsg := fmt.Sprintf("[Verification] Task not yet satisfied.\nReasoning: %s", verifyResult.Reasoning)
-	if summary := aicommon.FormatVerifyNextMovementsSummary(verifyResult.NextMovements); summary != "" {
-		feedbackMsg += fmt.Sprintf("\nNext Steps: %s", summary)
-	}
-	op.Feedback(feedbackMsg)
-	op.Continue()
+	handleToolCallResult(loop, taskCtx, invoker, identifier, result, directly, err, op)
 }
 
 // handleLoadForgeWithSkillFallback tries loading as forge first. If forge is rejected

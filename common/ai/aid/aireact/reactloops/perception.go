@@ -117,12 +117,15 @@ type midtermTimelineRecallScheduler interface {
 	ScheduleMidtermTimelineRecallFromPerception(summary string, topics []string, keywords []string)
 }
 
-func newPerceptionController() *perceptionController {
+func newPerceptionController(iterationTriggerInterval int) *perceptionController {
+	if iterationTriggerInterval <= 0 {
+		iterationTriggerInterval = perceptionDefaultIterationInterval
+	}
 	return &perceptionController{
 		minInterval:              perceptionDefaultMinInterval,
 		maxInterval:              perceptionMaxInterval,
 		currentInterval:          perceptionDefaultMinInterval,
-		iterationTriggerInterval: perceptionDefaultIterationInterval,
+		iterationTriggerInterval: iterationTriggerInterval,
 	}
 }
 
@@ -490,7 +493,7 @@ func (r *ReActLoop) MaybeTriggerPerceptionAfterAction(iterationIndex int) {
 	if r.perception == nil {
 		return
 	}
-	if !r.perception.shouldTriggerOnIteration(iterationIndex) {
+	if !r.ShouldTriggerPeriodicCheckpointOnIteration(iterationIndex) {
 		return
 	}
 	go r.TriggerPerception(PerceptionTriggerPostAction, false)

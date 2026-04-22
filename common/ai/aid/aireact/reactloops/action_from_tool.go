@@ -199,23 +199,20 @@ func ConvertAIToolToLoopAction(tool *aitool.Tool) *LoopAction {
 				utils.Errorf("tool '%s' executed successfully", tool.GetName()).Error(),
 			)
 
-			// Verify user satisfaction
 			task := loop.GetCurrentTask()
-			if task != nil {
-				verifyResult, err := invoker.VerifyUserSatisfaction(ctx, task.GetUserInput(), true, tool.GetName())
-				if err != nil {
-					operator.Fail(err)
-					return
-				}
-				loop.PushSatisfactionRecordWithCompletedTaskIndex(verifyResult.Satisfied, verifyResult.Reasoning, verifyResult.CompletedTaskIndex, verifyResult.NextMovements, verifyResult.Evidence, verifyResult.OutputFiles, verifyResult.EvidenceOps)
-				if len(verifyResult.EvidenceOps) > 0 {
-					loop.GetConfig().ApplySessionEvidenceOps(verifyResult.EvidenceOps)
-				}
+			if task == nil {
+				operator.Continue()
+				return
+			}
 
-				if verifyResult.Satisfied {
-					operator.Exit()
-					return
-				}
+			verifyResult, triggered, err := loop.MaybeVerifyUserSatisfaction(ctx, task.GetUserInput(), true, tool.GetName())
+			if err != nil {
+				operator.Fail(err)
+				return
+			}
+			if triggered && verifyResult != nil && verifyResult.Satisfied {
+				operator.Exit()
+				return
 			}
 
 			// Continue to next action

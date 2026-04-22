@@ -71,38 +71,20 @@ func handleToolCallResult(
 	}
 
 	task := loop.GetCurrentTask()
-	verifyResult, verifyErr := invoker.VerifyUserSatisfaction(ctx, task.GetUserInput(), true, toolPayload)
+	if task == nil {
+		operator.Continue()
+		return
+	}
+
+	verifyResult, triggered, verifyErr := loop.MaybeVerifyUserSatisfaction(ctx, task.GetUserInput(), true, toolPayload)
 	if verifyErr != nil {
 		operator.Fail(verifyErr)
 		return
 	}
-
-	if len(verifyResult.OutputFiles) > 0 {
-		cfg := loop.GetConfig()
-		for _, filePath := range verifyResult.OutputFiles {
-			providerName := "output_file:" + filePath
-			cfg.GetContextProviderManager().RegisterTracedContent(
-				providerName,
-				aicommon.OutputFileContextProvider(filePath),
-			)
-			if emitter := cfg.GetEmitter(); emitter != nil {
-				emitter.EmitPinFilename(filePath)
-			}
-		}
+	if !triggered || verifyResult == nil {
+		operator.Continue()
+		return
 	}
-
-	loop.PushSatisfactionRecordWithCompletedTaskIndex(
-		verifyResult.Satisfied, verifyResult.Reasoning,
-		verifyResult.CompletedTaskIndex, verifyResult.NextMovements, verifyResult.Evidence, verifyResult.OutputFiles,
-		verifyResult.EvidenceOps,
-	)
-
-	if len(verifyResult.EvidenceOps) > 0 {
-		loop.GetConfig().ApplySessionEvidenceOps(verifyResult.EvidenceOps)
-	}
-
-	// T2: perception after verification (async, non-blocking)
-	loop.MaybeTriggerPerceptionAfterVerification()
 
 	if verifyResult.Satisfied {
 		operator.Exit()
