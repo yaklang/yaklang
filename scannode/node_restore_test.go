@@ -37,6 +37,13 @@ func (s *sessionReadyReporterStub) PublishObservation(context.Context, Capabilit
 	return nil
 }
 
+func (s *sessionReadyReporterStub) PublishResponseActionResult(
+	context.Context,
+	HIDSResponseActionResultInput,
+) error {
+	return nil
+}
+
 type sessionReadyHookStub struct {
 	called int
 }

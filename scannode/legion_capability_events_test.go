@@ -326,6 +326,102 @@ func TestCapabilityEventPublisherPublishesHIDSSnapshotObservation(t *testing.T) 
 	}
 }
 
+func TestCapabilityEventPublisherPublishesHIDSResponseActionResult(t *testing.T) {
+	t.Parallel()
+
+	session := node.SessionState{
+		NodeID:             "node-response-canonical",
+		SessionID:          "session-response",
+		SessionToken:       "token-response",
+		NATSURL:            "nats://session-response.test",
+		CommandSubject:     "legion.command.node.node-response",
+		EventSubjectPrefix: "legion.event",
+	}
+	base, err := node.NewNodeBase(node.BaseConfig{
+		NodeID:             "node-response",
+		BaseDir:            t.TempDir(),
+		EnrollmentToken:    "enroll-response",
+		PlatformAPIBaseURL: "http://platform.test",
+		TransportClient:    &bootstrapSessionTransport{session: session},
+		HeartbeatInterval:  time.Hour,
+		TickerInterval:     time.Hour,
+		RequestTimeout:     time.Second,
+	})
+	if err != nil {
+		t.Fatalf("new node base: %v", err)
+	}
+	go base.Serve()
+	t.Cleanup(func() {
+		base.Shutdown()
+	})
+	waitForNodeSession(t, base)
+
+	publisher := newCapabilityEventPublisher(base)
+	fakeJS := &fakeJetStreamContext{}
+	publisher.js = fakeJS
+	publisher.natsURL = session.NATSURL
+
+	observedAt := time.Date(2026, 4, 21, 10, 0, 0, 0, time.UTC)
+	err = publisher.PublishResponseActionResult(context.Background(), HIDSResponseActionResultInput{
+		CommandID:     "cmd-response-1",
+		CapabilityKey: "hids",
+		SpecVersion:   "2026-04-15T06:48:51.016Z",
+		ActionType:    hidsResponseActionProcessTerminate,
+		Status:        hidsResponseActionStatusSucceeded,
+		ObservedAt:    observedAt,
+		DetailJSON:    []byte(`{"strategy":["SIGTERM"],"confirmed_exit":true}`),
+		Process: hidsResponseActionProcess{
+			PID:                 4242,
+			BootID:              "boot-1",
+			StartTimeUnixMillis: 1713691199000,
+			ProcessName:         "sleep",
+			ProcessImage:        "/usr/bin/sleep",
+			ProcessCommand:      "sleep 60",
+			Username:            "root",
+		},
+	})
+	if err != nil {
+		t.Fatalf("publish response action result: %v", err)
+	}
+
+	msg := fakeJS.waitForMessage(t)
+	if msg.Subject != "legion.hids.response_action.result" {
+		t.Fatalf("unexpected subject: %s", msg.Subject)
+	}
+
+	var event hidsv1.HIDSResponseActionResult
+	if err := proto.Unmarshal(msg.Data, &event); err != nil {
+		t.Fatalf("unmarshal response action result: %v", err)
+	}
+	if event.GetMetadata() == nil {
+		t.Fatal("expected response action metadata")
+	}
+	if event.GetMetadata().GetEventType() != legionEventHIDSResponseActionResult {
+		t.Fatalf("unexpected event type: %s", event.GetMetadata().GetEventType())
+	}
+	if event.GetMetadata().GetCausationId() != "cmd-response-1" {
+		t.Fatalf("unexpected causation id: %s", event.GetMetadata().GetCausationId())
+	}
+	if event.GetMetadata().GetCorrelationId() != "node-response-canonical:hids" {
+		t.Fatalf("unexpected correlation id: %s", event.GetMetadata().GetCorrelationId())
+	}
+	if event.GetAction() != hidsResponseActionProcessTerminate {
+		t.Fatalf("unexpected action: %s", event.GetAction())
+	}
+	if event.GetStatus() != hidsResponseActionStatusSucceeded {
+		t.Fatalf("unexpected status: %s", event.GetStatus())
+	}
+	if got := event.GetObservedAt().AsTime().UTC(); !got.Equal(observedAt) {
+		t.Fatalf("unexpected observed at: %s", got)
+	}
+	if string(event.GetDetailJson()) != `{"strategy":["SIGTERM"],"confirmed_exit":true}` {
+		t.Fatalf("unexpected detail json: %s", string(event.GetDetailJson()))
+	}
+	if event.GetProcess() == nil || event.GetProcess().GetPid() != 4242 {
+		t.Fatalf("unexpected process ref: %+v", event.GetProcess())
+	}
+}
+
 func TestCapabilityEventPublisherNormalizesStoppedCapabilityStatus(t *testing.T) {
 	t.Parallel()
 

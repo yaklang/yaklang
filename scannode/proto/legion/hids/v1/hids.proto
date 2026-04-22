@@ -15,3 +15,33 @@ message HIDSObservation {
   google.protobuf.Timestamp observed_at = 4;
   bytes event_json = 5;
 }
+
+message HIDSProcessRef {
+  int32 pid = 1;
+  string boot_id = 2;
+  int64 start_time_unix_ms = 3;
+  string process_name = 4;
+  string process_image = 5;
+  string process_command = 6;
+  string username = 7;
+}
+
+message ExecuteHIDSResponseActionCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  legion.capability.v1.CapabilityRef capability = 3;
+  string action = 4;
+  HIDSProcessRef process = 5;
+}
+
+message HIDSResponseActionResult {
+  legion.node.v1.EventMetadata metadata = 1;
+  legion.capability.v1.CapabilityRef capability = 2;
+  string action = 3;
+  string status = 4;
+  string error_code = 5;
+  string error_message = 6;
+  google.protobuf.Timestamp observed_at = 7;
+  bytes detail_json = 8;
+  HIDSProcessRef process = 9;
+}

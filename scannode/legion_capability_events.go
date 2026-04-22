@@ -5,6 +5,7 @@ import (
 	"crypto/sha1"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -126,6 +127,47 @@ func (p *capabilityEventPublisher) PublishObservation(
 	})
 }
 
+func (p *capabilityEventPublisher) PublishResponseActionResult(
+	ctx context.Context,
+	input HIDSResponseActionResultInput,
+) error {
+	observedAt := input.ObservedAt.UTC()
+	if observedAt.IsZero() {
+		observedAt = time.Now().UTC()
+	}
+	ref := capabilityCommandRef{
+		CommandID:     input.CommandID,
+		NodeID:        p.node.CurrentNodeID(),
+		CapabilityKey: stringOrDefault(input.CapabilityKey, "hids"),
+		SpecVersion:   normalizeCapabilitySpecVersion(input.SpecVersion),
+	}
+	eventID := input.CommandID + ":response-action:" + strings.TrimSpace(input.Status)
+	if strings.TrimSpace(input.CommandID) == "" {
+		eventID = capabilityResponseActionEventID(input, observedAt)
+	}
+	return p.publish(ctx, legionEventHIDSResponseActionResult, ref, eventID, &hidsv1.HIDSResponseActionResult{
+		Capability: &capabilityv1.CapabilityRef{
+			CapabilityKey: ref.CapabilityKey,
+			SpecVersion:   ref.SpecVersion,
+		},
+		Action:       input.ActionType,
+		Status:       input.Status,
+		ErrorCode:    input.ErrorCode,
+		ErrorMessage: input.ErrorMessage,
+		ObservedAt:   timestamppb.New(observedAt),
+		DetailJson:   cloneBytes(input.DetailJSON),
+		Process: &hidsv1.HIDSProcessRef{
+			Pid:             int32(input.Process.PID),
+			BootId:          input.Process.BootID,
+			StartTimeUnixMs: input.Process.StartTimeUnixMillis,
+			ProcessName:     input.Process.ProcessName,
+			ProcessImage:    input.Process.ProcessImage,
+			ProcessCommand:  input.Process.ProcessCommand,
+			Username:        input.Process.Username,
+		},
+	})
+}
+
 func (p *capabilityEventPublisher) publish(
 	ctx context.Context,
 	eventType string,
@@ -230,6 +272,8 @@ func attachCapabilityEventMetadata(
 		value.Metadata = metadata
 	case *hidsv1.HIDSObservation:
 		value.Metadata = metadata
+	case *hidsv1.HIDSResponseActionResult:
+		value.Metadata = metadata
 	default:
 		return fmt.Errorf("unsupported capability event message: %T", message)
 	}
@@ -276,4 +320,15 @@ func capabilityStatusEventID(result CapabilityApplyResult) string {
 	payload := append(cloneBytes(result.StatusDetailJSON), []byte("\x00"+result.Status+"\x00"+result.Message)...)
 	sum := sha1.Sum(payload)
 	return fmt.Sprintf("%s:status:%d:%x", result.CapabilityKey, observedAt.UnixNano(), sum[:6])
+}
+
+func capabilityResponseActionEventID(input HIDSResponseActionResultInput, observedAt time.Time) string {
+	payload := append(cloneBytes(input.DetailJSON), []byte("\x00"+input.ActionType+"\x00"+input.Status)...)
+	sum := sha1.Sum(payload)
+	return fmt.Sprintf(
+		"%s:response-action:%d:%x",
+		stringOrDefault(input.CapabilityKey, "hids"),
+		observedAt.UnixNano(),
+		sum[:6],
+	)
 }

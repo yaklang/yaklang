@@ -336,13 +336,16 @@ func (p *pipeline) processDetailMap(process model.Process) map[string]any {
 	p.attachProcessArtifact(&process)
 
 	detail := map[string]any{
-		"pid":         process.PID,
-		"parent_pid":  process.ParentPID,
-		"name":        process.Name,
-		"username":    process.Username,
-		"image":       process.Image,
-		"command":     process.Command,
-		"parent_name": process.ParentName,
+		"pid":                       process.PID,
+		"parent_pid":                process.ParentPID,
+		"name":                      process.Name,
+		"username":                  process.Username,
+		"image":                     process.Image,
+		"command":                   process.Command,
+		"parent_name":               process.ParentName,
+		"parent_image":              process.ParentImage,
+		"parent_command":            process.ParentCommand,
+		"parent_start_time_unix_ms": process.ParentStartTimeUnixMillis,
 	}
 	if process.Artifact != nil {
 		detail["artifact"] = artifactDetailMap(process.Artifact)

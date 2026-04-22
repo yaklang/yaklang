@@ -9,6 +9,7 @@ const (
 	legionCommandDispatch          = "job.dispatch"
 	legionCommandCancel            = "job.cancel"
 	legionCommandCapabilityApply   = "capability.apply"
+	legionCommandHIDSResponseActionExecute = "hids.response_action.execute"
 	legionCommandSSARuleSyncExport = "ssa.rule_sync.export"
 
 	legionEventClaimed           = "job.claimed"
@@ -25,6 +26,7 @@ const (
 	legionEventCapabilityAlert   = "capability.alert"
 	legionEventCapabilityFailed  = "capability.failed"
 	legionEventHIDSObservation   = "hids.observation"
+	legionEventHIDSResponseActionResult = "hids.response_action.result"
 	legionEventSSARuleSyncReady  = "ssa.rule_sync.ready"
 	legionEventSSARuleSyncFailed = "ssa.rule_sync.failed"
 
@@ -51,6 +53,9 @@ func capabilityEventSubject(prefix, eventType string) string {
 	normalizedEventType := strings.TrimPrefix(strings.TrimSpace(eventType), ".")
 	if normalizedEventType == legionEventHIDSObservation {
 		return legionHIDSPrefix + ".observation"
+	}
+	if normalizedEventType == legionEventHIDSResponseActionResult {
+		return legionHIDSPrefix + ".response_action.result"
 	}
 	return jobEventSubject(prefix, normalizedEventType)
 }
