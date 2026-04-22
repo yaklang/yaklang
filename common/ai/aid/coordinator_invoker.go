@@ -63,12 +63,9 @@ func (c *Coordinator) ExecuteLoopTask(taskTypeName string, task aicommon.AIState
 		return fmt.Errorf("创建 AI 调用运行时失败: %v", err)
 	}
 
-	defaultOptions := []reactloops.ReActLoopOption{
-		reactloops.WithMemoryTriage(c.MemoryTriage),
-		reactloops.WithMemoryPool(c.MemoryPool),
-		reactloops.WithPeriodicVerificationInterval(int(c.PeriodicVerificationInterval)),
-		reactloops.WithMemorySizeLimit(int(c.MemoryPoolSize)),
-		reactloops.WithEnableSelfReflection(c.EnableSelfReflection),
+	defaultOptions := reactloops.BasicAICommonConfigOption(c.Config)
+
+	defaultOptions = append(defaultOptions,
 		reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any, operator *reactloops.OnPostIterationOperator) {
 			operator.DeferAfterCallbacks(func() {
 				if c.MemoryTriage == nil {
@@ -125,8 +122,7 @@ func (c *Coordinator) ExecuteLoopTask(taskTypeName string, task aicommon.AIState
 					}()
 				})
 			})
-		}),
-	}
+		}))
 
 	defaultOptions = append(defaultOptions, options...)
 

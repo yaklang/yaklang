@@ -11,7 +11,7 @@ import (
 const (
 	verificationAutoTriggerMaxSnapshotAge = 30 * time.Second
 	verificationAutoTriggerMinPromptDelta = 500
-	verificationIterationTriggerInterval  = 5
+	verificationIterationTriggerInterval  = aicommon.DefaultPeriodicVerificationInterval
 )
 
 var verificationWatchdogIdleTimeout = 2 * time.Minute

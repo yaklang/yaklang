@@ -239,12 +239,8 @@ func (r *ReAct) ExecuteLoopTaskIF(taskTypeName string, task aicommon.AIStatefulT
 func (r *ReAct) ExecuteLoopTask(taskTypeName string, task aicommon.AIStatefulTask, options ...reactloops.ReActLoopOption) (bool, error) {
 	memoryFlushBuffer := aicommon.NewMemoryFlushBuffer("react", r.config.TimelineDiffer, nil)
 	defer memoryFlushBuffer.Close()
-	defaultOptions := []reactloops.ReActLoopOption{
-		reactloops.WithMemoryTriage(r.memoryTriage),
-		reactloops.WithMemoryPool(r.config.MemoryPool),
-		reactloops.WithMemorySizeLimit(int(r.config.MemoryPoolSize)),
-		reactloops.WithEnableSelfReflection(r.config.EnableSelfReflection),
-		reactloops.WithPeriodicVerificationInterval(int(r.config.PeriodicVerificationInterval)),
+	defaultOptions := reactloops.BasicAICommonConfigOption(r.config)
+	defaultOptions = append(defaultOptions,
 		reactloops.WithOnAsyncTaskTrigger(func(i *reactloops.LoopAction, task aicommon.AIStatefulTask) {
 			r.SetCurrentPlanExecutionTask(task)
 		}),
@@ -325,7 +321,7 @@ func (r *ReAct) ExecuteLoopTask(taskTypeName string, task aicommon.AIStatefulTas
 			})
 		}),
 		reactloops.WithAllowAIForge(r.config.EnablePlanAndExec),
-	}
+	)
 
 	defaultOptions = append(defaultOptions, options...)
 

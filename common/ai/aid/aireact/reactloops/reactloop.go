@@ -218,6 +218,10 @@ func (r *ReActLoop) GetMaxIterations() int {
 	return r.maxIterations
 }
 
+func (r *ReActLoop) GetPeriodicVerificationInterval() int {
+	return r.periodicVerificationInterval
+}
+
 func (r *ReActLoop) getRenderInfo() (string, map[string]any, error) {
 	var tools []*aitool.Tool
 	if r.toolsGetter == nil {
