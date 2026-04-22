@@ -1,5 +1,8 @@
+kvHelp = "配置参与测试的认证信息。每行一条，可选择 Header 或 Cookie；如需测试整条 Cookie 头，请选择 Header 并把 Key 填为 Cookie。多个需要同时替换的认证项可设置相同分组。"
+
 args = cli.Json(
-    "kv", 
+    "kv",
+    cli.setHelp(kvHelp),
     cli.setJsonSchema(
         <<<JSON
 {
@@ -15,17 +18,17 @@ args = cli.Json(
             "title": "认证类型",
             "type": "string",
             "enum": [
-                "Header",
-                "Cookie"
+              "Header",
+              "Cookie"
             ],
             "default": "Header",
             "description": "设置认证信息，如果需要对整体 Cookie 进行测试，请使用 Header 模式，Key 填写 Cookie 即可"
-            },
+          },
           "force": {
             "type": "boolean",
             "default": true,
             "title": "强制添加",
-            "description":"默认如果源数据包不存在这个认证信息，则不测试，勾选本选项后，即使源数据包不存在这个认证信息，也会测试"
+            "description": "默认如果源数据包不存在这个认证信息，则不测试，勾选本选项后，即使源数据包不存在这个认证信息，也会测试"
           },
           "key": {
             "type": "string",
@@ -35,7 +38,7 @@ args = cli.Json(
           "value": {
             "type": "string",
             "title": "Value",
-            "description": "认证字段值（单行），如果需要多个认证，请添加新的认证信息，如果有多个关联的认证信息，请设置分组"
+            "description": "认证字段值（支持多行），如果需要多个认证，请添加新的认证信息，如果有多个关联的认证信息，请设置分组"
           },
           "group": {
             "type": "string",
@@ -66,47 +69,117 @@ args = cli.Json(
     }
   }
 }
-JSON, 
+JSON,
         cli.setUISchema(
             cli.uiGroups(cli.uiGroup(cli.uiField(
-                "kvs", 
-                1, 
-                cli.uiFieldWidget(cli.uiWidgetTable), 
+                "kvs",
+                1,
+                cli.uiFieldWidget(cli.uiWidgetTable),
                 cli.uiFieldGroups(cli.uiGroup(cli.uiField(
-                    "items", 
-                    1, 
+                    "items",
+                    1,
                     cli.uiFieldGroups(cli.uiGroup(
                         cli.uiTableField("kind", 100),
                         cli.uiTableField("key", 100),
                         cli.uiTableField("value", 260, cli.uiFieldWidget(cli.uiWidgetTextarea)),
                         cli.uiTableField("force", 86),
                         cli.uiTableField("group", 86)
-                    )), 
-                ))), 
+                    )),
+                ))),
             ))),
             cli.uiGlobalFieldPosition(cli.uiPosHorizontal),
-        ), 
-    ), 
-    cli.setRequired(true), 
+        ),
+    ),
+    cli.setRequired(true),
 )
-enableUnauth = cli.Bool("enable-unauth", cli.setRequired(true), cli.setVerboseName("未授权检测"), cli.setHelp("【开启】会测试两种场景：1) 用配置的认证信息发送请求（横向越权检测）；2) 移除认证信息发送请求（未授权访问检测）。【关闭】仅测试：用配置的认证信息发送请求（横向越权检测），不测试未授权访问。注意：此功能仅在配置了认证信息且认证Value不为空时生效"), cli.setDefault(true))
-disableDomain = cli.String("disable-domain", cli.setRequired(false), cli.setVerboseName("不检测的域名"), cli.setCliGroup("高级（可选参数）"))
-disablePath = cli.String("disable-path", cli.setRequired(false), cli.setVerboseName("不检测的路径"), cli.setCliGroup("高级（可选参数）"))
-disableTypes = cli.StringSlice("disable-types", cli.setMultipleSelect(true), cli.setSelectOption("js", "js"), cli.setSelectOption("css", "css"), cli.setSelectOption("img", "img"), cli.setSelectOption("font", "font"), cli.setDefault("js,css,img,font"), cli.setRequired(false), cli.setVerboseName("忽略静态资源类型"), cli.setCliGroup("高级（可选参数）"))
-disableSuffix = cli.StringSlice("disable-suffix", cli.setVerboseName("不检测的后缀类型"), cli.setCliGroup("高级（可选参数）"), cli.setMultipleSelect(true))
 
+enableUnauth = cli.Bool(
+    "enable-unauth",
+    cli.setRequired(true),
+    cli.setVerboseName("未授权检测"),
+    cli.setHelp("【开启】会测试两种场景：1) 用配置的认证信息发送请求（横向越权检测）；2) 移除认证信息发送请求（未授权访问检测）。【关闭】仅测试：用配置的认证信息发送请求（横向越权检测），不测试未授权访问。注意：此功能仅在配置了认证信息且认证Value不为空时生效"),
+    cli.setDefault(true),
+)
 
-enableDomain = cli.String("enable-domain", cli.setRequired(false), cli.setVerboseName("需检测域名"), cli.setCliGroup("高级（可选参数）"))
-enablePath = cli.String("enable-path", cli.setRequired(false), cli.setVerboseName("需检测路径"), cli.setCliGroup("高级（可选参数）"))
-enableResponseKeyword = cli.Text("enable-response-content", cli.setRequired(false), cli.setVerboseName("需检测响应内容标志值"), cli.setCliGroup("高级（可选参数）"))
+disableDomain = cli.StringSlice(
+    "disable-domain",
+    cli.setMultipleSelect(true),
+    cli.setRequired(false),
+    cli.setVerboseName("不检测的域名"),
+    cli.setHelp("支持多条输入，也兼容单条中使用英文逗号分隔；支持 glob 匹配"),
+    cli.setCliGroup("高级（可选参数）"),
+)
+
+disablePath = cli.StringSlice(
+    "disable-path",
+    cli.setMultipleSelect(true),
+    cli.setRequired(false),
+    cli.setVerboseName("不检测的路径"),
+    cli.setHelp("支持多条输入，也兼容单条中使用英文逗号分隔；支持 glob 匹配"),
+    cli.setCliGroup("高级（可选参数）"),
+)
+
+disableTypes = cli.StringSlice(
+    "disable-types",
+    cli.setMultipleSelect(true),
+    cli.setSelectOption("js", "js"),
+    cli.setSelectOption("css", "css"),
+    cli.setSelectOption("img", "img"),
+    cli.setSelectOption("font", "font"),
+    cli.setDefault("js,css,img,font"),
+    cli.setRequired(false),
+    cli.setVerboseName("忽略静态资源类型"),
+    cli.setCliGroup("高级（可选参数）"),
+)
+
+disableSuffix = cli.StringSlice(
+    "disable-suffix",
+    cli.setMultipleSelect(true),
+    cli.setVerboseName("不检测的后缀类型"),
+    cli.setHelp("支持多条输入，也兼容单条中使用英文逗号分隔，例如 .pdf、.zip"),
+    cli.setCliGroup("高级（可选参数）"),
+)
+
+enableDomain = cli.StringSlice(
+    "enable-domain",
+    cli.setMultipleSelect(true),
+    cli.setRequired(false),
+    cli.setVerboseName("需检测域名"),
+    cli.setHelp("支持多条输入，也兼容单条中使用英文逗号分隔；支持 glob 匹配"),
+    cli.setCliGroup("高级（可选参数）"),
+)
+
+enablePath = cli.StringSlice(
+    "enable-path",
+    cli.setMultipleSelect(true),
+    cli.setRequired(false),
+    cli.setVerboseName("需检测路径"),
+    cli.setHelp("支持多条输入，也兼容单条中使用英文逗号分隔；支持 glob 匹配"),
+    cli.setCliGroup("高级（可选参数）"),
+)
+
+enableResponseKeyword = cli.Text(
+    "enable-response-content",
+    cli.setRequired(false),
+    cli.setVerboseName("需检测响应内容标志值"),
+    cli.setHelp("按行输入需要命中的响应内容；开启正则后，每行按正则表达式处理"),
+    cli.setCliGroup("高级（可选参数）"),
+)
+
 enableResponseKeywordRegexp = cli.Bool(
     "enable-response-content-regexp",
     cli.setRequired(false),
     cli.setVerboseName("响应内容标志值开启正则"),
     cli.setCliGroup("高级（可选参数）"),
 )
-onlyCheckBody = cli.Bool("only-body", cli.setVerboseName("只检查响应体"), cli.setDefault(true), cli.setCliGroup("高级（可选参数）"))
 
+onlyCheckBody = cli.Bool(
+    "only-body",
+    cli.setVerboseName("只检查响应体"),
+    cli.setHelp("开启后仅比较响应体，可减少响应头差异造成的干扰"),
+    cli.setDefault(true),
+    cli.setCliGroup("高级（可选参数）"),
+)
 
 cli.check()
 
@@ -127,7 +200,6 @@ ruleMap = {
     ],
 }
 
-once = sync.NewOnce()
 groupMap = make(map[string][]any)
 disableRules = []
 
@@ -145,7 +217,6 @@ for _, item = range args["kvs"] {
 for _, types = range disableTypes {
     disableRules = append(disableRules, ruleMap[types]...)
 }
-
 
 func product(sli, curr) {
     ret = make([][]any, 0, len(sli)*len(curr))
@@ -168,15 +239,12 @@ func _jsonKind(v) {
         if s == "" {
             return ""
         }
-        
         if str.HasPrefix(s, "[") {
             return "array"
         }
-        
         if str.HasPrefix(s, "{") {
             return "object"
         }
-        
         if str.HasPrefix(s, "\"") {
             return "string"
         }
@@ -210,16 +278,40 @@ func Product(sli) {
     for i in len(sli[0]) {
         ret = append(ret, [sli[0][i]])
     }
-    for i =1;i<len(sli);i++ {
+    for i = 1; i < len(sli); i++ {
         ret = product(ret, sli[i])
     }
     return ret
 }
 
+func normalizeRuleSlice(values) {
+    rules = []
+    for _, raw = range values {
+        for _, part = range str.Split(raw, ",") {
+            item = str.TrimSpace(part)
+            if item != "" {
+                rules = append(rules, item)
+            }
+        }
+    }
+    return rules
+}
+
+func normalizeTextLines(raw) {
+    lines = []
+    for _, line = range str.ParseStringToLines(raw) {
+        item = str.TrimSpace(line)
+        if item != "" {
+            lines = append(lines, item)
+        }
+    }
+    return lines
+}
+
 handleReq = (https, reqBytes, baseResponse, handleTag) => {
-    // yakit.Code(reqBytes)
+    basePacket = baseResponse
     if onlyCheckBody {
-        baseResponse = poc.GetHTTPPacketBody(baseResponse)
+        basePacket = poc.GetHTTPPacketBody(baseResponse)
     }
 
     poc.HTTP(
@@ -240,7 +332,7 @@ handleReq = (https, reqBytes, baseResponse, handleTag) => {
                     response.Green()
                 }
             } else {
-                sim := str.CalcSimilarity(baseResponse, currentPacket)
+                sim := str.CalcSimilarity(basePacket, currentPacket)
                 if sim > 0.95 {
                     response.Red()
                 } elif sim <= 0.4 {
@@ -258,82 +350,82 @@ handleReq = (https, reqBytes, baseResponse, handleTag) => {
     )
 }
 
-mirrorFilteredHTTPFlow = (https, url, req, rsp, body) => {
-    replaceResults = []
-    emptyResults = []
-    originReq = req
-
-    // 判断当前是否存在认证信息（决定是否启用未授权测试）
-    hasAuth = false
+func hasConfiguredAuth() {
     for _, items = range groupMap {
         for _, item = range items {
             if str.TrimSpace(item.value) != "" {
-                hasAuth = true
-                break
+                return true
             }
         }
     }
+    return false
+}
+
+func shouldSkipCurrentFlow(url, req, rsp) {
+    skipped = false
+    host, _, _ = str.ParseStringToHostPort(url)
+    path = poc.GetHTTPRequestPath(req)
+    urlRawPath = poc.GetHTTPRequestPathWithoutQuery(req)
+
+    disableDomainRules = normalizeRuleSlice(disableDomain)
+    disablePathRules = normalizeRuleSlice(disablePath)
+    enableDomainRules = normalizeRuleSlice(enableDomain)
+    enablePathRules = normalizeRuleSlice(enablePath)
+    disableSuffixRules = normalizeRuleSlice(disableSuffix)
+
+    if len(disableDomainRules) > 0 {
+        skipped = str.MatchAnyOfGlob(host, disableDomainRules...)
+    }
+
+    if !skipped && len(disablePathRules) > 0 {
+        skipped = str.MatchAnyOfGlob(path, disablePathRules...)
+    }
+
+    if !skipped && len(enableDomainRules) > 0 {
+        skipped = !str.MatchAnyOfGlob(host, enableDomainRules...)
+    }
+
+    if !skipped && len(enablePathRules) > 0 {
+        skipped = !str.MatchAnyOfGlob(path, enablePathRules...)
+    }
+
+    respMatch = str.MatchAnyOfRegexp
+    if !enableResponseKeywordRegexp {
+        respMatch = str.MatchAnyOfSubString
+    }
+
+    enableResponseKeywordList = []
+    if !skipped && enableResponseKeyword != "" {
+        enableResponseKeywordList = normalizeTextLines(enableResponseKeyword)
+        if len(enableResponseKeywordList) > 0 {
+            skipped = !respMatch(rsp, enableResponseKeywordList...)
+        }
+    }
+
+    if !skipped && len(disableRules) > 0 {
+        skipped = str.MatchAnyOfGlob(str.Split(urlRawPath, "?")[0], disableRules...)
+    }
+
+    if !skipped && len(disableSuffixRules) > 0 {
+        skipped = str.StringSliceContains(disableSuffixRules, file.GetExt(urlRawPath))
+    }
+
+    return skipped
+}
+
+buildAuthTestCases = (req) => {
+    replaceResults = []
+    emptyResults = []
 
     for _, items = range groupMap {
         replacedTmp = []
-        emptyTmp  = []
+        emptyTmp = []
         for _, item = range items {
             key = item.key
             values = str.ParseStringToLines(item.value)
             kind = item.kind
             force = item.force
 
-            skipped = false
-            host, _, _ = str.ParseStringToHostPort(url)
-            path = poc.GetHTTPRequestPath(req)
-            urlRawPath = poc.GetHTTPRequestPathWithoutQuery(req)
-
-            if disableDomain != "" {
-                rules = disableDomain.Split(",").Map(i => i.Trim())
-                skipped = str.MatchAnyOfGlob(host, rules...)
-            }
-
-
-            if !skipped && disablePath != "" {
-                skipped = str.MatchAnyOfGlob(path, disablePath.Split(",").Map(i => i.Trim())...)
-            }
-
-
-            if !skipped && enableDomain {
-                skipped = !str.MatchAnyOfGlob(host, enableDomain.Split(",").Map(i => i.Trim())...)
-            }
-
-
-            if !skipped && enablePath {
-                skipped = !str.MatchAnyOfGlob(path, enablePath.Split(",").Map(i => i.Trim())...)
-            }
-
-
-            respMatch = str.MatchAnyOfRegexp
-            if !enableResponseKeywordRegexp {
-                respMatch = str.MatchAnyOfSubString
-            }
-
-
-            enableResponseKeywordList = []
-            if !skipped && enableResponseKeyword {
-                enableResponseKeywordList = enableResponseKeyword.Split("\n")
-                skipped = !respMatch(rsp, enableResponseKeywordList...)
-            }
-
-            if !skipped && len(disableRules) > 0 {
-                skipped = str.MatchAnyOfGlob(str.Split(urlRawPath, "?")[0], disableRules...)
-            }
-
-            if !skipped && len(disableSuffix) > 0 {
-                skipped = str.StringSliceContains(disableSuffix, file.GetExt(urlRawPath))
-            }
-
-            if skipped {
-                return
-            }
-
-            
             if !force {
                 if kind == "Cookie" {
                     if poc.GetHTTPPacketCookie(req, key) == "" {
@@ -347,12 +439,13 @@ mirrorFilteredHTTPFlow = (https, url, req, rsp, body) => {
             }
 
             if kind == "Header" || kind == "Cookie" {
-                 for v in values {
-                    replacedTmp.Append({"key": key, "kind": kind, "value": v})
+                for _, value = range values {
+                    replacedTmp.Append({"key": key, "kind": kind, "value": value})
                 }
                 emptyTmp.Append({"key": key, "kind": kind, "value": ""})
             }
         }
+
         if len(replacedTmp) == 0 {
             replacedTmp.Append({"key": "", "kind": "", "value": ""})
             replaceResults.Append(replacedTmp)
@@ -362,8 +455,14 @@ mirrorFilteredHTTPFlow = (https, url, req, rsp, body) => {
             emptyResults.Append(emptyTmp)
         }
     }
-    dump(replaceResults)
 
+    return {
+        "replaceResults": replaceResults,
+        "emptyResults": emptyResults,
+    }
+}
+
+runReplaceDetection = (https, originReq, rsp, replaceResults) => {
     for seq in Product(replaceResults) {
         replaceReq = originReq
         tags = []
@@ -379,29 +478,45 @@ mirrorFilteredHTTPFlow = (https, url, req, rsp, body) => {
         tag = f"值 ${str.Join(tags, ", ")}"
         handleReq(https, replaceReq, rsp, tag)
     }
+}
 
-    // 未授权测试：仅满足条件时才执行
-    // 1. 用户填写了认证信息
-    // 2. 勾选了未授权检测开关
-    if hasAuth && enableUnauth {
-        for seq in Product(emptyResults) {
-            emptyReq = originReq
-            tags = []
-            for m in seq {
-                kind, key, value = m.kind, m.key, m.value
-                if kind == "Header" {
-                    if poc.GetHTTPPacketHeader(emptyReq, key) {
-                        emptyReq = poc.ReplaceHTTPPacketHeader(emptyReq, key, value)
-                    }
-                } else if kind == "Cookie" {
-                    if poc.GetHTTPPacketCookie(emptyReq, key) {
-                        emptyReq = poc.ReplaceHTTPPacketCookie(emptyReq, key, value)
-                    }
+runUnauthDetection = (https, originReq, rsp, emptyResults) => {
+    for seq in Product(emptyResults) {
+        emptyReq = originReq
+        tags = []
+        for m in seq {
+            kind, key, value = m.kind, m.key, m.value
+            if kind == "Header" {
+                if poc.GetHTTPPacketHeader(emptyReq, key) {
+                    emptyReq = poc.ReplaceHTTPPacketHeader(emptyReq, key, value)
                 }
-                tags = append(tags, f"${kind}[${key}]")
+            } else if kind == "Cookie" {
+                if poc.GetHTTPPacketCookie(emptyReq, key) {
+                    emptyReq = poc.ReplaceHTTPPacketCookie(emptyReq, key, value)
+                }
             }
-            tag = f"未授权检测 | 移除 ${str.Join(tags, ", ")}"
-            handleReq(https, emptyReq, rsp, tag)
+            tags = append(tags, f"${kind}[${key}]")
         }
+        tag = f"未授权检测 | 移除 ${str.Join(tags, ", ")}"
+        handleReq(https, emptyReq, rsp, tag)
+    }
+}
+
+mirrorFilteredHTTPFlow = (https, url, req, rsp, body) => {
+    originReq = req
+
+    if shouldSkipCurrentFlow(url, req, rsp) {
+        return
+    }
+
+    hasAuth = hasConfiguredAuth()
+    testCases = buildAuthTestCases(req)
+    replaceResults = testCases["replaceResults"]
+    emptyResults = testCases["emptyResults"]
+
+    runReplaceDetection(https, originReq, rsp, replaceResults)
+
+    if hasAuth && enableUnauth {
+        runUnauthDetection(https, originReq, rsp, emptyResults)
     }
 }
