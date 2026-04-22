@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 func TestConfig_Smoking(t *testing.T) {
@@ -189,4 +190,48 @@ func TestConfig_ConvertConfigToOptions_PropagatesTimelineArchiveStore(t *testing
 	got := child.Timeline.timelineArchiveStore()
 	require.NotNil(t, got)
 	require.True(t, got == store)
+}
+
+func TestConfig_CreateOrUpdateRuntimeRecord(t *testing.T) {
+	runtimeUUID := uuid.NewString()
+	config := NewConfig(context.Background(), WithID(runtimeUUID))
+	require.NoError(t, config.GetDB().AutoMigrate(&schema.AIAgentRuntime{}).Error)
+	t.Cleanup(func() {
+		require.NoError(t, config.GetDB().Unscoped().Where("uuid = ?", runtimeUUID).Delete(&schema.AIAgentRuntime{}).Error)
+	})
+
+	runtime := &schema.AIAgentRuntime{
+		Uuid: runtimeUUID,
+		Name: "config-runtime-record-test",
+	}
+	require.NoError(t, config.CreateOrUpdateRuntimeRecord(runtime))
+	require.NotZero(t, config.DatabaseRecordID)
+	require.Equal(t, config.DatabaseRecordID, runtime.ID)
+
+	saved, err := yakit.GetAgentRuntime(config.GetDB(), runtimeUUID)
+	require.NoError(t, err)
+	require.Equal(t, runtimeUUID, saved.Uuid)
+	require.Equal(t, "config-runtime-record-test", saved.Name)
+}
+
+func TestConfig_CreateOrUpdateRuntimeRecord_Disabled(t *testing.T) {
+	runtimeUUID := uuid.NewString()
+	config := NewConfig(context.Background(), WithID(runtimeUUID))
+	require.NoError(t, config.GetDB().AutoMigrate(&schema.AIAgentRuntime{}).Error)
+	t.Cleanup(func() {
+		require.NoError(t, config.GetDB().Unscoped().Where("uuid = ?", runtimeUUID).Delete(&schema.AIAgentRuntime{}).Error)
+	})
+
+	config.DisableCreateDBRuntime = true
+	runtime := &schema.AIAgentRuntime{
+		Uuid: runtimeUUID,
+		Name: "config-runtime-record-disabled",
+	}
+	require.NoError(t, config.CreateOrUpdateRuntimeRecord(runtime))
+	require.Zero(t, config.DatabaseRecordID)
+	require.Zero(t, runtime.ID)
+
+	var count int
+	require.NoError(t, config.GetDB().Model(&schema.AIAgentRuntime{}).Where("uuid = ?", runtimeUUID).Count(&count).Error)
+	require.Zero(t, count)
 }

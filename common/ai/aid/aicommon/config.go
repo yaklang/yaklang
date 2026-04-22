@@ -245,7 +245,7 @@ type Config struct {
 	TimelineTotalContentLimit int // in tokens
 
 	// triage
-	MemoryTriage         MemoryTriage
+	MemoryTriage MemoryTriage
 
 	TimelineArchiveStore TimelineArchiveStore
 	MemoryPoolSize       int64
@@ -355,7 +355,8 @@ type Config struct {
 		Lazy WorkDir for semantic artifact directory naming
 	*/
 	// DatabaseRecordID is the gorm primary key ID from AIAgentRuntime
-	DatabaseRecordID uint
+	DisableCreateDBRuntime bool // some liteforge or async lite agent , not save runtime to database, keep persistSession data clean
+	DatabaseRecordID       uint
 	// workDir is the lazily-created working directory path (set once, never changes)
 	workDir         string
 	workDirOnce     sync.Once
@@ -555,6 +556,18 @@ func WithPersistentSessionId(sid string) ConfigOption {
 		}
 		c.m.Lock()
 		c.PersistentSessionId = sid
+		c.m.Unlock()
+		return nil
+	}
+}
+
+func WithDisableCreateDBRuntime(disable bool) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		c.DisableCreateDBRuntime = disable
 		c.m.Unlock()
 		return nil
 	}
@@ -2521,6 +2534,24 @@ func (c *Config) GetRuntimeId() string {
 	return c.Id
 }
 
+// CreateOrUpdateRuntimeRecord persists a runtime record unless DB runtime creation is disabled.
+func (c *Config) CreateOrUpdateRuntimeRecord(runtime *schema.AIAgentRuntime) error {
+	if c == nil || runtime == nil {
+		return nil
+	}
+	if c.DisableCreateDBRuntime || c.GetDB() == nil {
+		return nil
+	}
+
+	dbID, err := yakit.CreateOrUpdateAIAgentRuntime(c.GetDB(), runtime)
+	if err != nil {
+		return err
+	}
+	c.DatabaseRecordID = dbID
+	runtime.ID = dbID
+	return nil
+}
+
 // IsWorkDirReady checks if the working directory has been created
 func (c *Config) IsWorkDirReady() bool {
 	c.workDirMu.RLock()
@@ -3113,6 +3144,7 @@ func (c *Config) InvokeLiteForge(prompt string, opts ...any) (*ForgeResult, erro
 	} else {
 		opts = append(opts, WithFastAICallback(c.QualityPriorityAICallback))
 	}
+	opts = append(opts, WithDisableCreateDBRuntime(true)) // Avoid creating runtime records for lite forge calls
 	return InvokeLiteForge(prompt, opts...)
 }
 

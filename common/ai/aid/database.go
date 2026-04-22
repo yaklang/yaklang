@@ -4,7 +4,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 func (c *Coordinator) CreateDatabaseSchema(input string) *schema.AIAgentRuntime {
@@ -16,10 +15,8 @@ func (c *Coordinator) CreateDatabaseSchema(input string) *schema.AIAgentRuntime 
 		QuotedUserInput:   codec.StrConvQuote(input),
 		ForgeName:         c.Config.ForgeName,
 	}
-	dbId, err := yakit.CreateOrUpdateAIAgentRuntime(c.Config.GetDB(), rt)
-	if err != nil {
+	if err := c.Config.CreateOrUpdateRuntimeRecord(rt); err != nil {
 		log.Errorf("BUG: cannot create coordinator runtime record: %v", err)
 	}
-	c.Config.DatabaseRecordID = dbId
 	return rt
 }

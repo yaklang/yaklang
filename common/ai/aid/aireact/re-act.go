@@ -302,19 +302,15 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 	case <-done:
 	}
 
-	dbId, err := yakit.CreateOrUpdateAIAgentRuntime(
-		react.config.GetDB(), &schema.AIAgentRuntime{
-			Uuid:              cfg.GetRuntimeId(),
-			Name:              "[re-act-runtime]",
-			Seq:               cfg.Seq,
-			TypeName:          schema.AIAgentRuntimeType_ReAct,
-			PersistentSession: cfg.PersistentSessionId,
-		},
-	)
-	if err != nil {
+	if err := cfg.CreateOrUpdateRuntimeRecord(&schema.AIAgentRuntime{
+		Uuid:              cfg.GetRuntimeId(),
+		Name:              "[re-act-runtime]",
+		Seq:               cfg.Seq,
+		TypeName:          schema.AIAgentRuntimeType_ReAct,
+		PersistentSession: cfg.PersistentSessionId,
+	}); err != nil {
 		return nil, err
 	}
-	cfg.DatabaseRecordID = dbId
 	cfg.FlushRestoredSessionEvidence()
 	// EmitPinDirectory is deferred to ensureWorkDirectory when user input arrives
 
