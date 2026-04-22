@@ -261,6 +261,7 @@ func buildAIForgeFromYakCode(forgeName string, codeBytes []byte) (*schema.AIForg
 		ForgeVerboseName: scriptMetadata.VerboseName,
 		Description:      scriptMetadata.Description,
 		Tags:             strings.Join(scriptMetadata.Keywords, ","),
+		Author:           schema.AIResourceAuthorBuiltin,
 		ForgeContent:     string(codeBytes),
 		ParamsUIConfig:   uiParamsConfig,
 		ForgeType:        schema.FORGE_TYPE_YAK,
@@ -281,6 +282,7 @@ func getBuildInForgeConfig(name string) (string, *schema.AIForge, error) {
 func buildAIForgeFromConfig(name string, configBytes []byte, codeContent []byte, loadDefaultPrompt func(string) string) (string, *schema.AIForge, error) {
 	forge := &schema.AIForge{
 		ForgeType: schema.FORGE_TYPE_Config,
+		Author:    schema.AIResourceAuthorBuiltin,
 	}
 	if len(configBytes) <= 0 {
 		// If config file doesn't exist, try to read prompt files directly
@@ -326,7 +328,7 @@ func buildAIForgeFromConfig(name string, configBytes []byte, codeContent []byte,
 		forge.ToolKeywords = cfg.ToolKeywords
 		forge.Tools = cfg.Tools
 		forge.Description = cfg.Description
-		forge.Author = cfg.Author
+		forge.Author = schema.AIResourceAuthorBuiltin
 		forge.InitPrompt = cfg.InitPrompt
 		forge.PersistentPrompt = cfg.PersistentPrompt
 		forge.PlanPrompt = cfg.PlanPrompt

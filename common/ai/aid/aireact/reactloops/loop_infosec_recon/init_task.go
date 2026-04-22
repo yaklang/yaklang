@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
@@ -20,15 +21,15 @@ var embeddedJsStaticExtractAiScript string
 var embeddedCrawlJsCollectorScript string
 
 const (
-	keyWorkDir            = "infosec_workdir"
-	keyPoolPath           = "infosec_pool_path"
-	keySeedURL            = "infosec_seed_url"
-	keyScopeHosts         = "infosec_scope_hosts"
-	keyMaxCrawlDepth      = "infosec_max_crawl_depth"
-	keyProbeConcurrency   = "infosec_probe_concurrency"
-	keyLastReconSnippet   = "infosec_recon_log_tail"
-	defaultCrawlDepth     = "2"
-	defaultProbeConc      = "6"
+	keyWorkDir          = "infosec_workdir"
+	keyPoolPath         = "infosec_pool_path"
+	keySeedURL          = "infosec_seed_url"
+	keyScopeHosts       = "infosec_scope_hosts"
+	keyMaxCrawlDepth    = "infosec_max_crawl_depth"
+	keyProbeConcurrency = "infosec_probe_concurrency"
+	keyLastReconSnippet = "infosec_recon_log_tail"
+	defaultCrawlDepth   = "2"
+	defaultProbeConc    = "6"
 )
 
 func workDirFromInvoker(r aicommon.AIInvokeRuntime) string {
@@ -79,6 +80,7 @@ func ensureEmbeddedAIYakTool(name, script string) {
 		log.Warnf("infosec_recon: parse embedded %s script metadata failed", name)
 		return
 	}
+	aiTool.Author = schema.AIResourceAuthorBuiltin
 	if _, err := yakit.SaveAIYakTool(db, aiTool); err != nil {
 		log.Warnf("infosec_recon: register %s tool failed: %v", name, err)
 		return

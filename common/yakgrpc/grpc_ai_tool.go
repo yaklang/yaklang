@@ -108,7 +108,6 @@ func (s *Server) SaveAITool(ctx context.Context, req *ypb.SaveAIToolRequest) (*y
 		Content:     req.GetContent(),
 		Path:        req.GetToolPath(),
 		Keywords:    strings.Join(req.GetKeywords(), ","),
-		Author:      req.GetAuthor(),
 	}
 	tool.EnableAIOutputLog = yakscripttools.ParseAIToolEnableAIOutputLog(tool.Content)
 
@@ -135,7 +134,6 @@ func (s *Server) SaveAIToolV2(ctx context.Context, req *ypb.SaveAIToolRequest) (
 		Content:     req.GetContent(),
 		Path:        req.GetToolPath(),
 		Keywords:    strings.Join(req.GetKeywords(), ","),
-		Author:      req.GetAuthor(),
 	}
 
 	if err := fixAIToolMetadata(tool); err != nil {

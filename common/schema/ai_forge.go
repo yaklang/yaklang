@@ -84,6 +84,11 @@ var FORGE_TYPE_YAK = "yak"
 var FORGE_TYPE_Config = "config"
 var FORGE_TYPE_SkillMD = "skillmd"
 
+func (a *AIForge) BeforeCreate() error {
+	a.Author = NormalizeAIResourceAuthor(a.Author, AIResourceAuthorAnonymous)
+	return nil
+}
+
 func IsRunnableForgeType(forgeType string) bool {
 	return forgeType == FORGE_TYPE_YAK || forgeType == FORGE_TYPE_Config || forgeType == ""
 }

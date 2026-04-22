@@ -20,7 +20,7 @@ func (gw *AIAgentHTTPGateway) handleCreateAIForge(w http.ResponseWriter, r *http
 		return
 	}
 
-	var req ypb.AIForge
+	var req ypb.CreateAIForgeRequest
 	if err := readProtoJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
 		return
@@ -43,7 +43,7 @@ func (gw *AIAgentHTTPGateway) handleUpdateAIForge(w http.ResponseWriter, r *http
 		return
 	}
 
-	var req ypb.AIForge
+	var req ypb.UpdateAIForgeRequest
 	if err := readProtoJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
 		return

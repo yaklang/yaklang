@@ -41,6 +41,36 @@ func TestCreateOrUpdateAIForgeByName_CreatePreservesAuthor(t *testing.T) {
 	require.Equal(t, "alice", got.Author)
 }
 
+func TestCreateOrUpdateAIForgeByName_EmptyAuthorDefaultsToAnonymous(t *testing.T) {
+	db := newAIForgeTestDB(t)
+
+	forgeName := newAIForgeTestName("upsert-empty-author-defaults")
+	require.NoError(t, CreateOrUpdateAIForgeByName(db, forgeName, &schema.AIForge{
+		ForgeName:    forgeName,
+		ForgeType:    schema.FORGE_TYPE_YAK,
+		ForgeContent: "print('created')",
+	}))
+
+	got, err := GetAIForgeByName(db, forgeName)
+	require.NoError(t, err)
+	require.Equal(t, schema.AIResourceAuthorAnonymous, got.Author)
+}
+
+func TestCreateAIForge_EmptyAuthorDefaultsToAnonymous(t *testing.T) {
+	db := newAIForgeTestDB(t)
+
+	forgeName := newAIForgeTestName("create-empty-author-defaults")
+	require.NoError(t, CreateAIForge(db, &schema.AIForge{
+		ForgeName:    forgeName,
+		ForgeType:    schema.FORGE_TYPE_YAK,
+		ForgeContent: "print('created')",
+	}))
+
+	got, err := GetAIForgeByName(db, forgeName)
+	require.NoError(t, err)
+	require.Equal(t, schema.AIResourceAuthorAnonymous, got.Author)
+}
+
 func TestCreateOrUpdateAIForgeByName_PreservesAuthorOnUpdateAndZeroValues(t *testing.T) {
 	db := newAIForgeTestDB(t)
 
