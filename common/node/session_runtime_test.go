@@ -90,9 +90,6 @@ func TestNodeBaseBootstrapSessionIncludesHostInfo(t *testing.T) {
 	if transport.calls != 1 {
 		t.Fatalf("unexpected bootstrap call count: %d", transport.calls)
 	}
-	if transport.request.NodeID != "legacy-node-1" {
-		t.Fatalf("unexpected legacy node id: %q", transport.request.NodeID)
-	}
 	if transport.request.ClaimedName != "display-node-1" {
 		t.Fatalf("unexpected claimed name: %q", transport.request.ClaimedName)
 	}

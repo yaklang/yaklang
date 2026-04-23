@@ -1899,6 +1899,144 @@ func TestPipelineRunSkipsAlertsForInventoryObservations(t *testing.T) {
 	}
 }
 
+func TestPipelineRunDropsInvalidNetworkSocketInventoryWithoutEndpoint(t *testing.T) {
+	t.Parallel()
+
+	p := newPipeline(nil)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	events := make(chan model.Event, 1)
+	go p.Run(ctx, events)
+
+	events <- model.Event{
+		Type:      model.EventTypeNetworkSocket,
+		Source:    "inventory.network",
+		Timestamp: time.Now().UTC(),
+		Tags:      []string{"network", "inventory"},
+		Process: &model.Process{
+			PID:                 42,
+			BootID:              "boot-1",
+			StartTimeUnixMillis: 1713848400000,
+		},
+		Network: &model.Network{
+			Protocol: "tcp",
+			FD:       10,
+		},
+	}
+	close(events)
+
+	select {
+	case observation, ok := <-p.Observations():
+		if ok {
+			t.Fatalf("expected invalid network.socket inventory to be dropped, got %#v", observation)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("timed out waiting for observation channel to close")
+	}
+}
+
+func TestPipelineRunSuppressesNonInventoryObservationsWhenSnapshotExportDisabled(t *testing.T) {
+	t.Parallel()
+
+	engine, err := rule.NewEngine(model.DesiredSpec{
+		TemporaryRules: []model.TemporaryRule{
+			{
+				RuleID:         "tmp-shell-under-systemd",
+				Enabled:        true,
+				MatchEventType: model.EventTypeProcessExec,
+				Severity:       "high",
+				Condition:      "process.parent_name == 'systemd' && str.HasSuffix(process.image, 'bash')",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("new engine: %v", err)
+	}
+
+	p := newPipelineFromSpec(engine, model.DesiredSpec{
+		Reporting: model.ReportingPolicy{},
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	events := make(chan model.Event, 1)
+	go p.Run(ctx, events)
+
+	events <- model.Event{
+		Type:      model.EventTypeProcessExec,
+		Source:    "ebpf.process",
+		Timestamp: time.Now().UTC(),
+		Tags:      []string{"process", "ebpf"},
+		Process: &model.Process{
+			PID:        42,
+			ParentPID:  1,
+			Image:      "/bin/bash",
+			Command:    "/bin/bash -lc whoami",
+			ParentName: "systemd",
+		},
+	}
+	close(events)
+
+	select {
+	case observation, ok := <-p.Observations():
+		if ok {
+			t.Fatalf("expected non-inventory observation to be suppressed, got %#v", observation)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("timed out waiting for observation channel to close")
+	}
+
+	select {
+	case alert, ok := <-p.Alerts():
+		if !ok {
+			t.Fatal("expected alert before pipeline close")
+		}
+		if alert.RuleID != "tmp-shell-under-systemd" {
+			t.Fatalf("unexpected alert rule id: %s", alert.RuleID)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("timed out waiting for alert")
+	}
+}
+
+func TestPipelineRunKeepsInventoryObservationsWhenSnapshotExportDisabled(t *testing.T) {
+	t.Parallel()
+
+	p := newPipelineFromSpec(nil, model.DesiredSpec{
+		Reporting: model.ReportingPolicy{},
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	events := make(chan model.Event, 1)
+	go p.Run(ctx, events)
+
+	events <- model.Event{
+		Type:      model.EventTypeProcessState,
+		Source:    "inventory.process",
+		Timestamp: time.Now().UTC(),
+		Tags:      []string{"process", "inventory", "baseline"},
+		Process: &model.Process{
+			PID:   101,
+			Image: "/usr/bin/sshd",
+		},
+	}
+	close(events)
+
+	select {
+	case observation, ok := <-p.Observations():
+		if !ok {
+			t.Fatal("expected inventory observation before pipeline close")
+		}
+		if observation.Source != "inventory.process" {
+			t.Fatalf("unexpected inventory observation source: %s", observation.Source)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("timed out waiting for inventory observation")
+	}
+}
+
 type inventoryProviderStub struct {
 	processEvents []model.Event
 	networkEvents []model.Event

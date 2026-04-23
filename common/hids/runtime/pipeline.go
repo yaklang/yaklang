@@ -16,23 +16,59 @@ type pipeline struct {
 	scanSandbox    *yak.Sandbox
 	alerts         chan model.Alert
 	observations   chan model.Event
+	emitSnapshots  bool
 	evidencePolicy model.EvidencePolicy
 	processes      *processTracker
 	networks       *networkTracker
 	files          *fileTracker
 	artifacts      *artifactEnricher
+	baselineDrift  *baselineDriftDetector
 }
 
 func newPipeline(engine *rule.Engine) *pipeline {
-	return &pipeline{
-		engine:       engine,
-		scanSandbox:  rule.NewSandbox(),
-		alerts:       make(chan model.Alert, 64),
-		observations: make(chan model.Event, runtimeObservationBufferSize),
-		processes:    newProcessTracker(),
-		networks:     newNetworkTracker(),
-		files:        newFileTracker(),
+	return newPipelineWithConfig(engine, shortTermContextConfigFromSpec(model.DesiredSpec{}), model.BaselinePolicy{})
+}
+
+func newPipelineFromSpec(engine *rule.Engine, spec model.DesiredSpec) *pipeline {
+	pipeline := newPipelineWithConfig(engine, shortTermContextConfigFromSpec(spec), spec.BaselinePolicy)
+	pipeline.emitSnapshots = spec.Reporting.ShouldEmitSnapshotObservations()
+	if pipeline.networks != nil {
+		pipeline.networks.detailedEnrichment = shouldEnrichNetworkDetails(engine, pipeline.emitSnapshots)
 	}
+	return pipeline
+}
+
+func newPipelineWithConfig(
+	engine *rule.Engine,
+	contextConfig shortTermContextConfig,
+	baselinePolicy model.BaselinePolicy,
+) *pipeline {
+	return &pipeline{
+		engine:        engine,
+		scanSandbox:   rule.NewSandbox(),
+		alerts:        make(chan model.Alert, 64),
+		observations:  make(chan model.Event, runtimeObservationBufferSize),
+		emitSnapshots: true,
+		processes:     newProcessTrackerWithConfig(contextConfig),
+		networks:      newNetworkTrackerWithConfig(contextConfig),
+		files:         newFileTrackerWithConfig(contextConfig),
+		baselineDrift: newBaselineDriftDetector(baselinePolicy),
+	}
+}
+
+func shouldEnrichNetworkDetails(engine *rule.Engine, emitSnapshots bool) bool {
+	if emitSnapshots {
+		return true
+	}
+	if engine == nil {
+		return false
+	}
+	return engine.HasRulesForEventType(
+		model.EventTypeNetworkAccept,
+		model.EventTypeNetworkConnect,
+		model.EventTypeNetworkClose,
+		model.EventTypeNetworkState,
+	)
 }
 
 func (p *pipeline) withArtifactEnricher(enricher *artifactEnricher) *pipeline {
@@ -64,20 +100,38 @@ func (p *pipeline) Run(ctx context.Context, events <-chan model.Event) {
 				return
 			}
 			event = p.prepareEvent(event)
-			if !shouldPublishObservation(event) {
+			if !shouldProcessEvent(event) {
 				continue
 			}
-			select {
-			case p.observations <- cloneEvent(event):
-			case <-ctx.Done():
-				return
-			default:
+			if shouldPublishObservation(event, p.emitSnapshots) {
+				select {
+				case p.observations <- cloneEvent(event):
+				case <-ctx.Done():
+					return
+				default:
+				}
 			}
 			if p.engine == nil || !shouldEvaluateRules(event) {
+				for _, alert := range p.evaluateBaselineDrift(event) {
+					select {
+					case p.alerts <- alert:
+					case <-ctx.Done():
+						return
+					default:
+					}
+				}
 				continue
 			}
 			for _, alert := range p.engine.Evaluate(event) {
 				alert = p.enrichAlertEvidence(event, alert)
+				select {
+				case p.alerts <- alert:
+				case <-ctx.Done():
+					return
+				default:
+				}
+			}
+			for _, alert := range p.evaluateBaselineDrift(event) {
 				select {
 				case p.alerts <- alert:
 				case <-ctx.Done():
@@ -106,6 +160,13 @@ func (p *pipeline) prepareEvent(event model.Event) model.Event {
 		event = p.artifacts.Apply(event)
 	}
 	return event
+}
+
+func (p *pipeline) evaluateBaselineDrift(event model.Event) []model.Alert {
+	if p == nil || p.baselineDrift == nil || !shouldEvaluateRules(event) {
+		return nil
+	}
+	return p.baselineDrift.Evaluate(event)
 }
 
 func (p *pipeline) Alerts() <-chan model.Alert {
@@ -200,17 +261,38 @@ func shouldEvaluateRules(event model.Event) bool {
 	return true
 }
 
-func shouldPublishObservation(event model.Event) bool {
+func shouldProcessEvent(event model.Event) bool {
 	switch event.Type {
-	case model.EventTypeNetworkAccept, model.EventTypeNetworkClose, model.EventTypeNetworkState:
+	case model.EventTypeNetworkAccept,
+		model.EventTypeNetworkConnect,
+		model.EventTypeNetworkClose,
+		model.EventTypeNetworkState,
+		model.EventTypeNetworkSocket:
 		if event.Network == nil {
 			return false
 		}
-		if strings.TrimSpace(event.Network.Protocol) == "" &&
-			strings.TrimSpace(event.Network.DestAddress) == "" &&
-			event.Network.DestPort == 0 {
+		if strings.TrimSpace(event.Network.Protocol) == "" || !model.HasNetworkEndpoint(event.Network) {
 			return false
 		}
 	}
 	return true
+}
+
+func shouldPublishObservation(event model.Event, emitSnapshots bool) bool {
+	if !shouldProcessEvent(event) {
+		return false
+	}
+	return emitSnapshots || isInventoryObservation(event)
+}
+
+func isInventoryObservation(event model.Event) bool {
+	if strings.HasPrefix(strings.TrimSpace(event.Source), "inventory.") {
+		return true
+	}
+	for _, tag := range event.Tags {
+		if strings.EqualFold(strings.TrimSpace(tag), "inventory") {
+			return true
+		}
+	}
+	return false
 }

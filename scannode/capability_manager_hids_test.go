@@ -579,3 +579,76 @@ func TestHIDSObservationForwarderPublishesSnapshotsAndSkipsUnknownTerminalEvents
 		t.Fatal("expected unknown network close to be dropped")
 	}
 }
+
+func TestHIDSObservationForwarderStillPublishesInventoryWhenSnapshotExportDisabled(t *testing.T) {
+	t.Parallel()
+
+	hooks := &hidsCapabilityHooks{
+		observations: make(chan CapabilityRuntimeObservation, 2),
+	}
+	state := newHIDSSnapshotObservationState()
+	config := hidsAlertConfig{
+		capabilityKey:            "hids",
+		specVersion:              "2026-04-23",
+		emitSnapshotObservations: false,
+	}
+	observation, key, ok := hooks.convertObservation(
+		hidsmodel.Event{
+			Type:      hidsmodel.EventTypeHostUsers,
+			Source:    "inventory.users",
+			Timestamp: time.Date(2026, 4, 23, 9, 0, 0, 0, time.UTC),
+		},
+		config,
+		state,
+	)
+	if !ok {
+		t.Fatal("expected inventory replay observation to still be exported")
+	}
+	state.pending[key] = observation
+	hooks.flushPendingObservations(state)
+
+	select {
+	case output := <-hooks.Observations():
+		if output.HIDSEventType != hidsmodel.EventTypeHostUsers {
+			t.Fatalf("unexpected hids event type: %s", output.HIDSEventType)
+		}
+	default:
+		t.Fatal("expected flushed inventory observation")
+	}
+}
+
+func TestHIDSObservationForwarderDropsInvalidNetworkInventoryWithoutEndpoint(t *testing.T) {
+	t.Parallel()
+
+	hooks := &hidsCapabilityHooks{
+		observations: make(chan CapabilityRuntimeObservation, 1),
+	}
+	state := newHIDSSnapshotObservationState()
+	config := hidsAlertConfig{
+		capabilityKey:            "hids",
+		specVersion:              "2026-04-23",
+		emitSnapshotObservations: true,
+	}
+
+	if _, _, ok := hooks.convertObservation(
+		hidsmodel.Event{
+			Type:      hidsmodel.EventTypeNetworkSocket,
+			Source:    "inventory.network",
+			Timestamp: time.Date(2026, 4, 23, 13, 0, 0, 0, time.UTC),
+			Tags:      []string{"network", "inventory"},
+			Process: &hidsmodel.Process{
+				PID:                 101,
+				BootID:              "boot-1",
+				StartTimeUnixMillis: 1713848400000,
+			},
+			Network: &hidsmodel.Network{
+				Protocol: "tcp",
+				FD:       11,
+			},
+		},
+		config,
+		state,
+	); ok {
+		t.Fatal("expected invalid network inventory without endpoint to be dropped")
+	}
+}

@@ -192,25 +192,45 @@ func buildNetworkInventoryEvent(
 	if protocol == "" {
 		return model.Event{}, false
 	}
+	if connection.Pid <= 0 || strings.TrimSpace(bootID) == "" {
+		return model.Event{}, false
+	}
 
 	snapshot := lookupProcessInventorySnapshot(ctx, connection.Pid, bootID, processCache)
-	processValue := &model.Process{
-		PID:    int(connection.Pid),
-		BootID: bootID,
+	if snapshot == nil || snapshot.startTimeUnixMillis <= 0 {
+		return model.Event{}, false
 	}
-	if snapshot != nil {
-		processValue.ParentPID = snapshot.parentPID
-		processValue.Name = snapshot.name
-		processValue.Username = snapshot.username
-		processValue.UID = snapshot.uid
-		processValue.GID = snapshot.gid
-		processValue.Image = snapshot.image
-		processValue.Command = snapshot.command
-		processValue.ParentName = snapshot.parentName
-		processValue.ParentImage = snapshot.parentImage
-		processValue.ParentCommand = snapshot.parentCommand
-		processValue.StartTimeUnixMillis = snapshot.startTimeUnixMillis
-		processValue.ParentStartTimeUnixMillis = snapshot.parentStartTimeUnixMillis
+	processValue := &model.Process{
+		PID:                       int(connection.Pid),
+		ParentPID:                 snapshot.parentPID,
+		Name:                      snapshot.name,
+		Username:                  snapshot.username,
+		UID:                       snapshot.uid,
+		GID:                       snapshot.gid,
+		Image:                     snapshot.image,
+		Command:                   snapshot.command,
+		ParentName:                snapshot.parentName,
+		ParentImage:               snapshot.parentImage,
+		ParentCommand:             snapshot.parentCommand,
+		BootID:                    bootID,
+		StartTimeUnixMillis:       snapshot.startTimeUnixMillis,
+		ParentStartTimeUnixMillis: snapshot.parentStartTimeUnixMillis,
+	}
+
+	networkValue := &model.Network{
+		Protocol:        protocol,
+		SourceAddress:   connection.Laddr.IP,
+		DestAddress:     connection.Raddr.IP,
+		SourcePort:      int(connection.Laddr.Port),
+		DestPort:        int(connection.Raddr.Port),
+		ConnectionState: strings.TrimSpace(connection.Status),
+		Direction:       inferConnectionDirection(connection),
+		FD:              int(connection.Fd),
+		Family:          connectionFamily(connection.Family),
+		SocketType:      connectionSocketType(connection.Type),
+	}
+	if !model.HasNetworkEndpoint(networkValue) {
+		return model.Event{}, false
 	}
 
 	return model.Event{
@@ -219,18 +239,7 @@ func buildNetworkInventoryEvent(
 		Timestamp: now,
 		Tags:      []string{"network", "inventory", "baseline", "state"},
 		Process:   processValue,
-		Network: &model.Network{
-			Protocol:        protocol,
-			SourceAddress:   connection.Laddr.IP,
-			DestAddress:     connection.Raddr.IP,
-			SourcePort:      int(connection.Laddr.Port),
-			DestPort:        int(connection.Raddr.Port),
-			ConnectionState: strings.TrimSpace(connection.Status),
-			Direction:       inferConnectionDirection(connection),
-			FD:              int(connection.Fd),
-			Family:          connectionFamily(connection.Family),
-			SocketType:      connectionSocketType(connection.Type),
-		},
+		Network:   networkValue,
 		Data: map[string]any{
 			"inventory": true,
 		},

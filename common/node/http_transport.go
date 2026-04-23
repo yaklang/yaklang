@@ -29,7 +29,6 @@ type SessionTransport interface {
 // BootstrapRequest is sent once to create a short-lived node session.
 type BootstrapRequest struct {
 	EnrollmentToken          string            `json:"enrollment_token"`
-	NodeID                   string            `json:"node_id"`
 	ClaimedName              string            `json:"claimed_name"`
 	AgentInstallationID      string            `json:"agent_installation_id"`
 	HostIdentity             HostIdentity      `json:"host_identity"`

@@ -3,8 +3,11 @@
 package runtime
 
 import (
+	"context"
 	"testing"
 	"time"
+
+	gopsnet "github.com/shirou/gopsutil/v4/net"
 )
 
 func TestEnrichProcessInventoryTreeLinksParentsAndChildren(t *testing.T) {
@@ -118,5 +121,31 @@ func TestBuildProcessInventoryEventFromSnapshotIncludesParentProcessDetail(t *te
 			event.Process.ParentImage,
 			event.Process.ParentCommand,
 		)
+	}
+}
+
+func TestBuildNetworkInventoryEventSkipsConnectionsWithoutProcessIdentity(t *testing.T) {
+	t.Parallel()
+
+	_, ok := buildNetworkInventoryEvent(
+		context.Background(),
+		time.Unix(10, 0).UTC(),
+		"boot-1",
+		gopsnet.ConnectionStat{
+			Pid:  0,
+			Type: 1,
+			Laddr: gopsnet.Addr{
+				IP:   "10.0.0.5",
+				Port: 42000,
+			},
+			Raddr: gopsnet.Addr{
+				IP:   "1.1.1.1",
+				Port: 443,
+			},
+		},
+		make(map[int32]*processInventorySnapshot),
+	)
+	if ok {
+		t.Fatal("expected network inventory event without process identity to be skipped")
 	}
 }

@@ -186,7 +186,7 @@ func TestManagerReplayInventoryReemitsCurrentSnapshots(t *testing.T) {
 	}
 }
 
-func TestInstanceStartRefreshesInventoryPeriodically(t *testing.T) {
+func TestInstanceStartRefreshesInventoryPeriodicallyWhenSnapshotObservationsEnabled(t *testing.T) {
 	t.Parallel()
 
 	instance := &Instance{
@@ -194,6 +194,9 @@ func TestInstanceStartRefreshesInventoryPeriodically(t *testing.T) {
 			Collectors: model.Collectors{
 				Process: model.CollectorSpec{Enabled: true},
 				Network: model.CollectorSpec{Enabled: true},
+			},
+			Reporting: model.ReportingPolicy{
+				EmitSnapshotObservations: boolPointer(true),
 			},
 		},
 		collectors: []collectorBinding{
@@ -244,6 +247,69 @@ func TestInstanceStartRefreshesInventoryPeriodically(t *testing.T) {
 	if sources[3] != "inventory.process" || sources[4] != "inventory.network" || sources[5] != "inventory.users" {
 		t.Fatalf("expected periodic inventory replay, got %v", sources)
 	}
+}
+
+func TestInstanceStartDoesNotRefreshInventoryPeriodicallyByDefault(t *testing.T) {
+	t.Parallel()
+
+	instance := &Instance{
+		spec: model.DesiredSpec{
+			Collectors: model.Collectors{
+				Process: model.CollectorSpec{Enabled: true},
+				Network: model.CollectorSpec{Enabled: true},
+			},
+		},
+		collectors: []collectorBinding{
+			{
+				kind:    "process",
+				backend: model.CollectorBackendEBPF,
+				collector: &collectorStub{
+					name: "ebpf.process",
+					snapshot: hidscollector.HealthSnapshot{
+						Name:    "process",
+						Backend: "ebpf",
+						Status:  "running",
+						Message: "ebpf process collector is running",
+					},
+				},
+			},
+		},
+		events: make(chan model.Event, 8),
+		baselineProvider: replayInventoryProviderStub{
+			processEvents: []model.Event{{Type: model.EventTypeProcessState, Source: "inventory.process"}},
+			networkEvents: []model.Event{{Type: model.EventTypeNetworkSocket, Source: "inventory.network"}},
+			userEvents:    []model.Event{{Type: model.EventTypeHostUsers, Source: "inventory.users"}},
+		},
+		inventoryRefreshInterval: 10 * time.Millisecond,
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	if err := instance.start(ctx); err != nil {
+		t.Fatalf("start instance: %v", err)
+	}
+	defer func() { _ = instance.close() }()
+
+	for _, source := range []string{"inventory.process", "inventory.network", "inventory.users"} {
+		select {
+		case event := <-instance.events:
+			if event.Source != source {
+				t.Fatalf("unexpected initial inventory source: got %s want %s", event.Source, source)
+			}
+		case <-time.After(100 * time.Millisecond):
+			t.Fatalf("timed out waiting for initial inventory source %s", source)
+		}
+	}
+
+	select {
+	case event := <-instance.events:
+		t.Fatalf("expected no periodic inventory replay by default, got %s", event.Source)
+	case <-time.After(60 * time.Millisecond):
+	}
+}
+
+func boolPointer(value bool) *bool {
+	return &value
 }
 
 type collectorStub struct {
