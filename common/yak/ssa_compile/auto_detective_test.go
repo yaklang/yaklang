@@ -20,6 +20,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
+	"github.com/yaklang/yaklang/common/yak/yakscript"
 	"github.com/yaklang/yaklang/common/yakgrpc"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -364,7 +365,7 @@ public class ExistsTest {
 
 		for i := 1; i <= 3; i++ {
 			log.Infof("Compiling project - attempt %d/3", i)
-			err = yakgrpc.ExecScriptWithParam(context.Background(), pluginName, compileParam,
+			err = yakscript.ExecScriptWithParam(context.Background(), pluginName, compileParam,
 				"", func(exec *ypb.ExecResult) error {
 					return nil
 				},

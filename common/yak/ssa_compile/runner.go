@@ -10,7 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
-	"github.com/yaklang/yaklang/common/yakgrpc"
+	"github.com/yaklang/yaklang/common/yak/yakscript"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -102,7 +102,7 @@ func detectProject(ctx context.Context, target, language string) (*AutoDetectInf
 	}
 
 	var info *AutoDetectInfo
-	err := yakgrpc.ExecScriptWithParam(ctx, pluginName, param,
+	err := yakscript.ExecScriptWithParam(ctx, pluginName, param,
 		"", func(exec *ypb.ExecResult) error {
 			if !exec.IsMessage {
 				return nil
@@ -201,7 +201,7 @@ func compileProjectByPlugin(ctx context.Context, config *ssaconfig.Config, force
 	}
 
 	var compiledProgramName string
-	err = yakgrpc.ExecScriptWithParam(ctx, compilePluginName, compileParam,
+	err = yakscript.ExecScriptWithParam(ctx, compilePluginName, compileParam,
 		"", func(exec *ypb.ExecResult) error {
 			if !exec.IsMessage {
 				return nil
