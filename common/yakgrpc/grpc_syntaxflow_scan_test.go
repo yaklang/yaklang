@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -1471,6 +1472,7 @@ func checkGRPCIncrementalCompileTest(t *testing.T, client ypb.YakClient, config 
 
 	// 如果提供了 ExpectedTaskResults，使用详细验证模式
 	if len(config.ExpectedTaskResults) > 0 {
+		rsp.Data = reorderSyntaxFlowScanTasksByTaskIDs(rsp.Data, []string{taskIDBase, taskIDDiff}, true)
 		log.Infof("[checkGRPCIncrementalCompileTest] Using ExpectedTaskResults verification mode")
 		require.Equal(t, len(config.ExpectedTaskResults), len(rsp.Data),
 			"[checkGRPCIncrementalCompileTest] Expected %d tasks, got %d", len(config.ExpectedTaskResults), len(rsp.Data))
@@ -1685,6 +1687,30 @@ type TaskResultConfig struct {
 	NewRiskCount int64    // 预期新增总风险数量
 }
 
+func reorderSyntaxFlowScanTasksByTaskIDs(tasks []*ypb.SyntaxFlowScanTask, taskIDs []string, newestFirst bool) []*ypb.SyntaxFlowScanTask {
+	orderMap := make(map[string]int, len(taskIDs))
+	for i, taskID := range taskIDs {
+		orderMap[taskID] = i
+	}
+
+	reordered := append([]*ypb.SyntaxFlowScanTask(nil), tasks...)
+	sort.SliceStable(reordered, func(i, j int) bool {
+		leftOrder, leftOk := orderMap[reordered[i].TaskId]
+		rightOrder, rightOk := orderMap[reordered[j].TaskId]
+		if leftOk && rightOk {
+			if newestFirst {
+				return leftOrder > rightOrder
+			}
+			return leftOrder < rightOrder
+		}
+		if leftOk != rightOk {
+			return leftOk
+		}
+		return false
+	})
+	return reordered
+}
+
 // checkGRPCDiffProgScanTest 统一的多版本增量扫描测试检查函数
 func checkGRPCDiffProgScanTest(t *testing.T, client ypb.YakClient, config GRPCDiffProgScanTestConfig) {
 	ctx := context.Background()
@@ -1813,6 +1839,7 @@ func checkGRPCDiffProgScanTest(t *testing.T, client ypb.YakClient, config GRPCDi
 		ShowDiffRisk: true,
 	})
 	require.NoError(t, err, "[checkGRPCDiffProgScanTest] Failed to query scan task results")
+	rsp.Data = reorderSyntaxFlowScanTasksByTaskIDs(rsp.Data, taskIDs, true)
 	require.Equal(t, len(config.ExpectedTaskResults), len(rsp.Data),
 		"[checkGRPCDiffProgScanTest] Expected %d tasks, got %d", len(config.ExpectedTaskResults), len(rsp.Data))
 
