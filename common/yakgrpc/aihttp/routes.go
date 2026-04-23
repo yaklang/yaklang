@@ -42,6 +42,8 @@ func (gw *AIAgentHTTPGateway) registerRoutes() {
 	sub.HandleFunc("/session/all", gw.handleListAllSessions).Methods("GET", "OPTIONS")
 	sub.HandleFunc("/session/{run_id}/title", gw.handleUpdateSessionTitle).Methods("POST", "OPTIONS")
 
+	sub.HandleFunc("/event/query", gw.handleQueryAIEvent).Methods("POST", "OPTIONS")
+
 	sub.HandleFunc("/run/{run_id}", gw.handleRun).Methods("POST", "OPTIONS")
 	sub.HandleFunc("/run/{run_id}/events", gw.handleSSEEvents).Methods("GET", "OPTIONS")
 	sub.HandleFunc("/run/{run_id}/events/push", gw.handlePushEvent).Methods("POST", "OPTIONS")
