@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/yaklang/yaklang/common/hids/enrich"
 	"github.com/yaklang/yaklang/common/hids/model"
@@ -13,6 +14,10 @@ import (
 
 type artifactEnricher struct {
 	options enrich.ArtifactSnapshotOptions
+	window  time.Duration
+
+	maxEntries int
+	nextPrune  time.Time
 
 	mu    sync.RWMutex
 	cache map[string]artifactCacheEntry
@@ -21,6 +26,7 @@ type artifactEnricher struct {
 type artifactCacheEntry struct {
 	signature artifactSignature
 	artifact  *model.Artifact
+	lastUsed  time.Time
 }
 
 type artifactSignature struct {
@@ -29,12 +35,20 @@ type artifactSignature struct {
 	modUnixNs int64
 }
 
-func newArtifactEnricher(policy model.EvidencePolicy) *artifactEnricher {
+func newArtifactEnricher(policy model.EvidencePolicy, config shortTermContextConfig) *artifactEnricher {
+	if config.window <= 0 {
+		config.window = time.Duration(model.DefaultShortTermWindowMinutes) * time.Minute
+	}
+	if config.maxFiles <= 0 {
+		config.maxFiles = defaultShortTermContextMaxFiles
+	}
 	return &artifactEnricher{
 		options: enrich.ArtifactSnapshotOptions{
 			CaptureHashes: policy.CaptureFileHash,
 		},
-		cache: make(map[string]artifactCacheEntry),
+		window:     config.window,
+		maxEntries: config.maxFiles,
+		cache:      make(map[string]artifactCacheEntry),
 	}
 }
 
@@ -94,11 +108,19 @@ func (e *artifactEnricher) snapshotWithError(path string) (*model.Artifact, erro
 		return enrich.SnapshotArtifact(path, e.options)
 	}
 
+	now := time.Now().UTC()
+	e.prune(now)
 	cacheKey := artifactCacheKey(path, e.options.CaptureHashes)
 	e.mu.RLock()
 	cached, ok := e.cache[cacheKey]
 	e.mu.RUnlock()
 	if ok && cached.signature == signature {
+		e.mu.Lock()
+		if current, exists := e.cache[cacheKey]; exists && current.signature == signature {
+			current.lastUsed = now
+			e.cache[cacheKey] = current
+		}
+		e.mu.Unlock()
 		return model.CloneArtifact(cached.artifact), nil
 	}
 
@@ -111,10 +133,63 @@ func (e *artifactEnricher) snapshotWithError(path string) (*model.Artifact, erro
 		e.cache[cacheKey] = artifactCacheEntry{
 			signature: signature,
 			artifact:  model.CloneArtifact(artifact),
+			lastUsed:  now,
 		}
+		e.pruneLocked(now)
+		e.enforceCapacityLocked()
 		e.mu.Unlock()
 	}
 	return artifact, err
+}
+
+func (e *artifactEnricher) prune(observedAt time.Time) {
+	if e == nil {
+		return
+	}
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.pruneLocked(observedAt)
+	e.enforceCapacityLocked()
+}
+
+func (e *artifactEnricher) pruneLocked(observedAt time.Time) {
+	if e == nil {
+		return
+	}
+	if observedAt.IsZero() {
+		observedAt = time.Now().UTC()
+	}
+	if len(e.cache) <= e.maxEntries && !e.nextPrune.IsZero() && observedAt.Before(e.nextPrune) {
+		return
+	}
+	if e.window > 0 {
+		for key, entry := range e.cache {
+			if !entry.lastUsed.IsZero() && observedAt.Sub(entry.lastUsed) > e.window {
+				delete(e.cache, key)
+			}
+		}
+	}
+	e.nextPrune = observedAt.Add(shortTermContextPruneInterval)
+}
+
+func (e *artifactEnricher) enforceCapacityLocked() {
+	if e == nil || e.maxEntries <= 0 {
+		return
+	}
+	for len(e.cache) > e.maxEntries {
+		oldestKey := ""
+		var oldestUsed time.Time
+		for key, entry := range e.cache {
+			if oldestKey == "" || entry.lastUsed.Before(oldestUsed) {
+				oldestKey = key
+				oldestUsed = entry.lastUsed
+			}
+		}
+		if oldestKey == "" {
+			return
+		}
+		delete(e.cache, oldestKey)
+	}
 }
 
 func currentArtifactSignature(path string) (artifactSignature, bool) {

@@ -54,9 +54,6 @@ func TestHTTPTransportBootstrap(t *testing.T) {
 				if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 					t.Fatalf("decode request: %v", err)
 				}
-				if request.NodeID != "node-1" {
-					t.Fatalf("unexpected node_id: %s", request.NodeID)
-				}
 				if request.ClaimedName != "display-node-1" {
 					t.Fatalf("unexpected claimed_name: %s", request.ClaimedName)
 				}
@@ -91,7 +88,6 @@ func TestHTTPTransportBootstrap(t *testing.T) {
 
 			session, err := transport.Bootstrap(context.Background(), BootstrapRequest{
 				EnrollmentToken:          "enroll-1",
-				NodeID:                   "node-1",
 				ClaimedName:              "display-node-1",
 				AgentInstallationID:      "agent-install-1",
 				HostIdentity:             HostIdentity{MachineID: "machine-1"},

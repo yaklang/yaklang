@@ -82,6 +82,31 @@ func (e *Engine) Evaluate(event model.Event) []model.Alert {
 	return alerts
 }
 
+func (e *Engine) HasRulesForEventType(eventTypes ...string) bool {
+	if e == nil || len(eventTypes) == 0 {
+		return false
+	}
+	for _, eventType := range eventTypes {
+		if strings.TrimSpace(eventType) == "" {
+			continue
+		}
+		for _, builtinRule := range e.builtin {
+			if builtinRule.MatchEventType == "" || builtinRule.MatchEventType == eventType {
+				return true
+			}
+		}
+		for _, compiled := range e.rules {
+			if !compiled.rule.Enabled || compiled.rule.IsBlank() {
+				continue
+			}
+			if compiled.rule.MatchEventType == eventType {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func (e *Engine) validateRule(index int, rule model.TemporaryRule) error {
 	if e == nil || e.sandbox == nil {
 		return fmt.Errorf("rule sandbox is not initialized")
