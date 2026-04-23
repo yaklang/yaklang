@@ -17,12 +17,37 @@ func QuerySyntaxFlowScanTask(db *gorm.DB, params *ypb.QuerySyntaxFlowScanTaskReq
 	db = FilterSyntaxFlowScanTask(db, params.GetFilter())
 	var data []*schema.SyntaxFlowScanTask
 	paging := params.GetPagination()
-	db = bizhelper.QueryOrder(db, paging.GetOrderBy(), paging.GetOrder())
+	db = applySyntaxFlowScanTaskOrder(db, paging)
 	p, db := bizhelper.Paging(db, int(paging.GetPage()), int(paging.GetLimit()), &data)
 	if db.Error != nil {
 		return nil, nil, db.Error
 	}
 	return p, data, nil
+}
+
+func applySyntaxFlowScanTaskOrder(db *gorm.DB, paging *ypb.Paging) *gorm.DB {
+	if paging == nil {
+		return db.Order("updated_at desc").Order("id desc")
+	}
+
+	if rawOrder := strings.TrimSpace(paging.GetRawOrder()); rawOrder != "" {
+		return db.Order(rawOrder)
+	}
+
+	orderBy := strings.TrimSpace(paging.GetOrderBy())
+	order := strings.ToLower(strings.TrimSpace(paging.GetOrder()))
+	if order != "asc" {
+		order = "desc"
+	}
+
+	db = bizhelper.QueryOrder(db, orderBy, order)
+
+	switch strings.ToLower(orderBy) {
+	case "", "updated_at", "created_at":
+		db = db.Order("id " + order)
+	}
+
+	return db
 }
 
 func FilterSyntaxFlowScanTask(DB *gorm.DB, filter *ypb.SyntaxFlowScanTaskFilter) *gorm.DB {
