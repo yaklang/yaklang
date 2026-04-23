@@ -147,6 +147,6 @@ func TestSaveAIYakTool_PreservesAuthorOnUpdateAndZeroValues(t *testing.T) {
 	require.Equal(t, "", got.Usage)
 	require.Equal(t, "", got.Params)
 	require.Equal(t, "alice", got.Author)
-	require.True(t, got.IsBuiltin)
+	require.False(t, got.IsBuiltin)
 	require.Equal(t, 0, got.EnableAIOutputLog)
 }
