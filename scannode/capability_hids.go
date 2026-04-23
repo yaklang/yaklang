@@ -40,6 +40,8 @@ const (
 	hidsSnapshotObservationFlushInterval = 2 * time.Second
 	hidsSnapshotObservationMinInterval   = 2 * time.Minute
 	hidsSnapshotObservationMaxPending    = 2048
+	hidsSnapshotObservationPublishedTTL  = 10 * time.Minute
+	hidsSnapshotObservationMaxPublished  = 4096
 )
 
 func newCapabilityHIDSHooks() capabilityHIDSHooks {
@@ -237,6 +239,7 @@ func newHIDSSnapshotObservationState() *hidsSnapshotObservationState {
 type hidsSnapshotObservationState struct {
 	pending       map[string]CapabilityRuntimeObservation
 	lastPublished map[string]time.Time
+	nextPrune     time.Time
 }
 
 func (h *hidsCapabilityHooks) convertObservation(
@@ -244,11 +247,27 @@ func (h *hidsCapabilityHooks) convertObservation(
 	config hidsAlertConfig,
 	state *hidsSnapshotObservationState,
 ) (CapabilityRuntimeObservation, string, bool) {
-	if !config.emitSnapshotObservations ||
-		strings.TrimSpace(config.capabilityKey) == "" ||
-		state == nil {
+	if strings.TrimSpace(config.capabilityKey) == "" || state == nil {
 		return CapabilityRuntimeObservation{}, "", false
 	}
+	inventoryObservation := hidsSnapshotObservationIsInventory(event)
+	if !config.emitSnapshotObservations && !inventoryObservation {
+		return CapabilityRuntimeObservation{}, "", false
+	}
+
+	observedAt := event.Timestamp.UTC()
+	if observedAt.IsZero() {
+		observedAt = time.Now().UTC()
+		event.Timestamp = observedAt
+	}
+	if hidsSnapshotObservationNeedsNetworkEndpoint(event.Type) {
+		if event.Network == nil ||
+			strings.TrimSpace(event.Network.Protocol) == "" ||
+			!hidsmodel.HasNetworkEndpoint(event.Network) {
+			return CapabilityRuntimeObservation{}, "", false
+		}
+	}
+	state.prune(observedAt)
 
 	key, ok := hidsSnapshotObservationKey(event)
 	if !ok {
@@ -260,17 +279,11 @@ func (h *hidsCapabilityHooks) convertObservation(
 				return CapabilityRuntimeObservation{}, "", false
 			}
 		}
-	} else if hidsSnapshotObservationIsInventory(event) {
+	} else if inventoryObservation {
 		if lastPublished, exists := state.lastPublished[key]; exists &&
-			time.Since(lastPublished) < hidsSnapshotObservationMinInterval {
+			observedAt.Sub(lastPublished) < hidsSnapshotObservationMinInterval {
 			return CapabilityRuntimeObservation{}, "", false
 		}
-	}
-
-	observedAt := event.Timestamp.UTC()
-	if observedAt.IsZero() {
-		observedAt = time.Now().UTC()
-		event.Timestamp = observedAt
 	}
 	raw, err := json.Marshal(event)
 	if err != nil {
@@ -291,15 +304,62 @@ func (h *hidsCapabilityHooks) flushPendingObservations(state *hidsSnapshotObserv
 	if h == nil || state == nil || len(state.pending) == 0 {
 		return
 	}
+	now := time.Now().UTC()
+	state.prune(now)
 	for key, observation := range state.pending {
 		select {
 		case h.observations <- observation:
-			state.lastPublished[key] = time.Now().UTC()
+			state.rememberPublished(key, now)
 			delete(state.pending, key)
 		default:
 			return
 		}
 	}
+}
+
+func (s *hidsSnapshotObservationState) rememberPublished(key string, observedAt time.Time) {
+	if s == nil || strings.TrimSpace(key) == "" {
+		return
+	}
+	if observedAt.IsZero() {
+		observedAt = time.Now().UTC()
+	}
+	s.lastPublished[key] = observedAt
+	s.prune(observedAt)
+}
+
+func (s *hidsSnapshotObservationState) prune(observedAt time.Time) {
+	if s == nil {
+		return
+	}
+	if observedAt.IsZero() {
+		observedAt = time.Now().UTC()
+	}
+	if len(s.lastPublished) <= hidsSnapshotObservationMaxPublished &&
+		!s.nextPrune.IsZero() &&
+		observedAt.Before(s.nextPrune) {
+		return
+	}
+	for key, publishedAt := range s.lastPublished {
+		if observedAt.Sub(publishedAt) > hidsSnapshotObservationPublishedTTL {
+			delete(s.lastPublished, key)
+		}
+	}
+	for len(s.lastPublished) > hidsSnapshotObservationMaxPublished {
+		oldestKey := ""
+		var oldestPublishedAt time.Time
+		for key, publishedAt := range s.lastPublished {
+			if oldestKey == "" || publishedAt.Before(oldestPublishedAt) {
+				oldestKey = key
+				oldestPublishedAt = publishedAt
+			}
+		}
+		if oldestKey == "" {
+			break
+		}
+		delete(s.lastPublished, oldestKey)
+	}
+	s.nextPrune = observedAt.Add(time.Minute)
 }
 
 func hidsSnapshotObservationKey(event hidsmodel.Event) (string, bool) {
@@ -423,6 +483,19 @@ func hidsSnapshotObservationIsInventory(event hidsmodel.Event) bool {
 		}
 	}
 	return false
+}
+
+func hidsSnapshotObservationNeedsNetworkEndpoint(eventType string) bool {
+	switch eventType {
+	case hidsmodel.EventTypeNetworkAccept,
+		hidsmodel.EventTypeNetworkConnect,
+		hidsmodel.EventTypeNetworkClose,
+		hidsmodel.EventTypeNetworkState,
+		hidsmodel.EventTypeNetworkSocket:
+		return true
+	default:
+		return false
+	}
 }
 
 func (h *hidsCapabilityHooks) convertAlert(alert hidsmodel.Alert) (CapabilityRuntimeAlert, bool) {
