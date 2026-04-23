@@ -6,11 +6,13 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/yaklang/yaklang/common/node"
 	"github.com/yaklang/yaklang/common/spec"
 	cli "github.com/yaklang/yaklang/common/urfavecli"
+	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/scannode"
 )
 
@@ -51,12 +53,62 @@ func runNode(args []string) error {
 		node.DefaultHeartbeatInterval,
 		"Heartbeat interval",
 	)
+	pprofAddr := flags.String("pprof-addr", "", "Optional pprof HTTP listen address, e.g. 127.0.0.1:18080")
+	heapMonitorInterval := flags.Duration(
+		"heap-monitor-interval",
+		0,
+		"Optional heap monitor interval; zero disables periodic heap logging/dumps",
+	)
+	heapDumpThresholdMB := flags.Uint64(
+		"heap-dump-threshold-mb",
+		0,
+		"Heap dump/log threshold in MB; zero means log every monitor interval",
+	)
+	heapDumpDir := flags.String(
+		"heap-dump-dir",
+		"",
+		"Optional directory for periodic heap profile dumps; empty means log-only monitoring",
+	)
+	heapDumpCount := flags.Int(
+		"heap-dump-count",
+		0,
+		"Optional maximum number of periodic heap dumps; zero means unlimited while monitoring stays enabled",
+	)
+	heapMonitorRuntimeGC := flags.Bool(
+		"heap-monitor-runtime-gc",
+		true,
+		"Whether heap monitor snapshots should force runtime.GC before the second sample",
+	)
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
+
+	if addr := strings.TrimSpace(*pprofAddr); addr != "" {
+		diagnostics.StartPprofServer(addr)
+	}
+
+	var stopHeapMonitor context.CancelFunc
+	if *heapMonitorInterval > 0 {
+		options := []diagnostics.HeapDumpOption{
+			diagnostics.WithName(strings.TrimSpace(*displayName)),
+			diagnostics.WithHTTPServer(strings.TrimSpace(*pprofAddr)),
+			diagnostics.WithDumpCount(*heapDumpCount),
+			diagnostics.WithRuntimeGC(*heapMonitorRuntimeGC),
+		}
+		if *heapDumpThresholdMB > 0 {
+			options = append(options, diagnostics.WithHeapLimit(*heapDumpThresholdMB*1024*1024))
+		}
+		if dir := strings.TrimSpace(*heapDumpDir); dir != "" {
+			options = append(options, diagnostics.WithDumpDir(dir))
+		} else {
+			options = append(options, diagnostics.WithDisable(true))
+		}
+		stopHeapMonitor = diagnostics.StartHeapMonitor(*heapMonitorInterval, options...)
+		defer stopHeapMonitor()
+	}
 
 	scanNode, err := scannode.NewScanNode(node.BaseConfig{
 		NodeType:            spec.NodeType_Scanner,

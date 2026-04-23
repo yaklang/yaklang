@@ -52,8 +52,83 @@ The current HIDS desired spec is phase-1 and intentionally narrow:
 - `collectors.file.backend` must be `filewatch`
 - `collectors.file.watch_paths` must contain one or more absolute paths
 - `collectors.audit.backend` must be `auditd`
+- `context_policy.short_term_window_minutes` is optional, defaults to `5`,
+  and controls TTL for node-side short-term enrichment context
+- `baseline_policy.host_users.frozen_users` is an optional platform-derived
+  frozen host-user allowlist
+- `baseline_policy.network.frozen_allowlist` is an optional platform-derived
+  frozen network allowlist keyed by `direction + protocol + dest_cidr + dest_port`
+- `baseline_policy.drift_alerts` defaults to medium alerts with a 15-minute
+  aggregation window and a bounded aggregation map
+- blank / empty HIDS specs do not auto-enable baseline collectors anymore;
+  process/network collectors are only auto-required when rules or frozen
+  baseline drift detection actually need them
 
 Temporary rules are compiled during apply-time by the HIDS rule engine backed by YakVM expression evaluation. Rollout should treat `temporary_rules[].condition` as an engine-validated expression, not as a free-form opaque blob or a classic YARA text payload.
+
+## Runtime Performance Model
+
+The node runtime is optimized for alert-first operation:
+
+- `reporting.emit_snapshot_observations` defaults to `false`; non-inventory
+  observations are suppressed before clone/buffer costs are paid.
+- With snapshot export disabled and no enabled network rules, network events use
+  lightweight enrichment: only connection direction is computed so frozen network
+  baseline drift detection still works.
+- Detailed network enrichment (`source_scope`, `dest_scope`, service names,
+  process roles, parent roles, lifecycle age fields) is enabled when snapshot
+  export is enabled or a builtin/temporary rule consumes network events.
+- Process, network, file, artifact, and baseline-drift context are TTL-bounded
+  by `context_policy.short_term_window_minutes` and fixed entry ceilings.
+- The process and network trackers use lazy eviction order queues; network
+  tracker entries are reused after close/eviction to reduce churn-driven heap
+  allocation.
+
+Current targeted benchmark on the snapshot-disabled hot path:
+
+```text
+BenchmarkPipelinePrepareProcessExecSnapshotDisabled-24        ~0.63 µs/op    ~813 B/op    3 allocs/op
+BenchmarkPipelinePrepareNetworkLifecycleSnapshotDisabled-24   ~1.73 µs/op   ~1.85 KB/op  12 allocs/op
+```
+
+## Baseline Freeze Refresh Behavior
+
+Platform freeze actions for host-user and network baselines are expected to
+refresh node-facing HIDS desired spec immediately:
+
+- node online and advertising `hids` -> platform queues an apply command and the
+  accepted response reports `capability_status: pending_apply`
+- node offline -> platform stores the refreshed desired spec and the accepted
+  response reports `capability_status: stored`
+- `capability_error` in the accepted response means the freeze mutation itself
+  succeeded, but the follow-up desired-spec refresh/apply path needs operator
+  attention
+
+Operationally, freeze should be treated as the write path. Operators should not
+need to perform a separate manual `hids` apply just to make the new frozen
+baseline effective. When the current desired spec is empty, the platform refresh
+path is expected to inject the frozen baseline plus the matching process/network
+collector requirement automatically.
+
+## Baseline Drift Aggregation Visibility
+
+Node-emitted baseline drift detail currently carries:
+
+- `aggregation_key`
+- `aggregation_window_minutes`
+- `aggregation_window_started_at`
+- `aggregation_last_observed_at`
+- `hit_count`
+
+Emission behavior is intentionally bounded:
+
+- first hit in a window emits the alert
+- second hit in the same window emits an immediate aggregation update
+- later hits emit at most one refreshed update every 30 seconds by default
+
+The platform is expected to project those repeated hits into a single alert row
+per aggregation window, updating count and recent-hit visibility in place rather
+than inserting one row per repeated hit.
 
 ## Minimal Example Desired Spec
 
@@ -73,6 +148,36 @@ Temporary rules are compiled during apply-time by the HIDS rule engine backed by
   "reporting": {
     "emit_capability_status": true,
     "emit_capability_alert": true
+  },
+  "context_policy": {
+    "short_term_window_minutes": 5
+  },
+  "baseline_policy": {
+    "host_users": {
+      "frozen_users": [
+        {
+          "username": "root",
+          "uid": "0",
+          "groups": ["root"],
+          "privileged": true
+        }
+      ]
+    },
+    "network": {
+      "frozen_allowlist": [
+        {
+          "direction": "outbound",
+          "protocol": "tcp",
+          "dest_cidr": "10.0.0.0/8",
+          "dest_port": 443
+        }
+      ]
+    },
+    "drift_alerts": {
+      "severity": "medium",
+      "aggregation_window_minutes": 15,
+      "max_aggregation_entries": 1024
+    }
   }
 }
 ```
