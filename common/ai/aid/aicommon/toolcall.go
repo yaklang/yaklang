@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"io"
 	"os"
 	"path/filepath"
@@ -652,7 +653,11 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 	}
 
 	callToolId := t.callToolId
-	t.config.AppendRelatedRuntimeID(callToolId)
+	defer func() {
+		if useful, err := yakit.UsefulRuntimeId(consts.GetGormProjectDatabase(), callToolId); err == nil && useful {
+			t.config.AppendRelatedRuntimeID(callToolId)
+		}
+	}()
 
 	toolResult := &aitool.ToolResult{}
 	defer t.emitter.EmitToolCallSummary(t.callToolId, SummaryRank(t.task, toolResult))

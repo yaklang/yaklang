@@ -51,7 +51,7 @@ type Risk struct {
 	ReverseToken string `json:"reverse_token"`
 
 	// 设置运行时 ID 为了关联具体漏洞
-	RuntimeId      string `json:"runtime_id"`
+	RuntimeId      string `json:"runtime_id" gorm:"index"`
 	QuotedRequest  string `json:"quoted_request"`
 	QuotedResponse string `json:"quoted_response"`
 
