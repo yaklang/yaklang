@@ -375,7 +375,7 @@ HereDocIdentifierBreak: '\r'? '\n' -> popMode,pushMode(HereDoc);
 
 mode HereDoc;
 EndDoc: [ \t]* NameString {this.DocIsEnd()}? ->popMode;
-HereDocText: '\n' | (~[\n]+) { !this.DocIsEnd() }? ;
+HereDocText: '\r'? '\n' | (~[\r\n]+) { !this.DocIsEnd() }? | '\r' { !this.DocIsEnd() }? ;
 HereDocVariable: '$' Label;
 
 // fragments.
