@@ -25,7 +25,6 @@ func (n *NodeBase) bootstrapSession() error {
 
 	session, err := n.transport.Bootstrap(ctx, BootstrapRequest{
 		EnrollmentToken:          n.enrollmentToken,
-		NodeID:                   n.LegacyNodeID(),
 		ClaimedName:              n.DisplayName(),
 		AgentInstallationID:      n.AgentInstallationID(),
 		HostIdentity:             n.hostIdentitySnapshot(),
