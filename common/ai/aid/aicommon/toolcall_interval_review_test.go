@@ -311,7 +311,7 @@ func TestIntervalReviewContext(t *testing.T) {
 
 		done := make(chan struct{})
 		go func() {
-			tc.intervalReviewContext(ctx, cancel, expectedTool, expectedParams, expectedStdout, expectedStderr, nil)
+			tc.intervalReviewContext(ctx, cancel, expectedTool, expectedParams, staticSnapshot(expectedStdout), staticSnapshot(expectedStderr), nil)
 			close(done)
 		}()
 
@@ -325,6 +325,60 @@ func TestIntervalReviewContext(t *testing.T) {
 			mu.Unlock()
 		case <-time.After(testQuickTimeout):
 			t.Fatal("intervalReviewContext should complete")
+		}
+	})
+
+	t.Run("reads latest buffer snapshot on each interval", func(t *testing.T) {
+		stdoutBuffer := &toolOutputBuffer{}
+		stderrBuffer := &toolOutputBuffer{}
+		_, err := stdoutBuffer.Write([]byte("stdout-1"))
+		require.NoError(t, err)
+		_, err = stderrBuffer.Write([]byte("stderr-1"))
+		require.NoError(t, err)
+
+		var stdoutSnapshots []string
+		var stderrSnapshots []string
+		var mu sync.Mutex
+
+		tc := &ToolCaller{
+			intervalReviewDuration: testShortInterval,
+			intervalReviewHandler: func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdout, stderr []byte, callExpectations string) (bool, error) {
+				mu.Lock()
+				stdoutSnapshots = append(stdoutSnapshots, string(stdout))
+				stderrSnapshots = append(stderrSnapshots, string(stderr))
+				callCount := len(stdoutSnapshots)
+				mu.Unlock()
+
+				if callCount == 1 {
+					_, _ = stdoutBuffer.Write([]byte(" stdout-2"))
+					_, _ = stderrBuffer.Write([]byte(" stderr-2"))
+					return true, nil
+				}
+				return false, nil
+			},
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), testWaitTimeout)
+		defer cancel()
+
+		done := make(chan struct{})
+		go func() {
+			tc.intervalReviewContext(ctx, cancel, nil, nil, stdoutBuffer.Snapshot, stderrBuffer.Snapshot, nil)
+			close(done)
+		}()
+
+		select {
+		case <-done:
+			mu.Lock()
+			require.Len(t, stdoutSnapshots, 2)
+			require.Len(t, stderrSnapshots, 2)
+			require.Equal(t, "stdout-1", stdoutSnapshots[0])
+			require.Equal(t, "stderr-1", stderrSnapshots[0])
+			require.Equal(t, "stdout-1 stdout-2", stdoutSnapshots[1])
+			require.Equal(t, "stderr-1 stderr-2", stderrSnapshots[1])
+			mu.Unlock()
+		case <-time.After(testQuickTimeout):
+			t.Fatal("intervalReviewContext should observe updated buffer content")
 		}
 	})
 }
