@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
@@ -278,6 +279,96 @@ func (s *Server) ToggleAIToolFavorite(ctx context.Context, req *ypb.ToggleAITool
 		IsFavorite: isFavorite,
 		Message:    message,
 	}, nil
+}
+
+func sanitizeAIToolNames(names []string) []string {
+	if len(names) == 0 {
+		return nil
+	}
+	result := make([]string, 0, len(names))
+	seen := make(map[string]struct{}, len(names))
+	for _, name := range names {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			continue
+		}
+		if _, ok := seen[name]; ok {
+			continue
+		}
+		seen[name] = struct{}{}
+		result = append(result, name)
+	}
+	return result
+}
+
+func resolveExportAIToolFilter(toolNames []string, filter *ypb.AIToolFilter) *ypb.AIToolFilter {
+	explicitNames := sanitizeAIToolNames(toolNames)
+	if filter == nil {
+		return &ypb.AIToolFilter{
+			ToolNames: explicitNames,
+		}
+	}
+	if len(explicitNames) == 0 {
+		return filter
+	}
+
+	merged := sanitizeAIToolNames(append(append(explicitNames, filter.ToolNames...), filter.GetToolName()))
+	filter.ToolNames = merged
+	filter.ToolName = ""
+	return filter
+}
+
+func (s *Server) ExportAITool(req *ypb.ExportAIToolRequest, stream ypb.Yak_ExportAIToolServer) error {
+	progress := func(percent float64, msg string, messageType string) {
+		_ = stream.Send(&ypb.GeneralProgress{
+			Percent:     percent,
+			Message:     msg,
+			MessageType: messageType,
+		})
+	}
+
+	currentFilter := resolveExportAIToolFilter(req.GetToolNames(), req.GetFilter())
+
+	_, err := aiforge.ExportAIToolsToZip(
+		stream.Context(),
+		s.GetProfileDatabase(),
+		currentFilter,
+		req.GetTargetPath(),
+		aiforge.WithExportProgress(progress),
+		aiforge.WithExportPassword(req.GetPassword()),
+		aiforge.WithExportOutputName(req.GetOutputName()),
+	)
+	if err != nil {
+		_ = stream.Send(&ypb.GeneralProgress{
+			Percent:     0,
+			Message:     err.Error(),
+			MessageType: "error",
+		})
+		return err
+	}
+	return nil
+}
+
+func (s *Server) ImportAITool(req *ypb.ImportAIToolRequest, stream ypb.Yak_ImportAIToolServer) error {
+	progress := func(percent float64, msg string) {
+		_ = stream.Send(&ypb.GeneralProgress{
+			Percent: percent,
+			Message: msg,
+		})
+	}
+
+	_, err := aiforge.ImportAIToolsFromZip(
+		s.GetProfileDatabase(),
+		req.GetInputPath(),
+		aiforge.WithImportProgress(progress),
+		aiforge.WithImportOverwrite(req.GetOverwrite()),
+		aiforge.WithImportNewToolName(req.GetNewToolName()),
+		aiforge.WithImportPassword(req.GetPassword()),
+	)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func fixAIToolMetadata(tool *schema.AIYakTool) error {

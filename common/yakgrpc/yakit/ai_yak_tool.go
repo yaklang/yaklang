@@ -59,6 +59,25 @@ func GetAIYakToolByID(db *gorm.DB, id uint) (*schema.AIYakTool, error) {
 	return &tool, nil
 }
 
+func FilterAIYakTool(db *gorm.DB, filter *ypb.AIToolFilter) *gorm.DB {
+	db = db.Model(&schema.AIYakTool{})
+	if filter == nil {
+		return db
+	}
+	db = bizhelper.ExactQueryString(db, "name", filter.GetToolName())
+	db = bizhelper.ExactQueryStringArrayOr(db, "name", filter.GetToolNames())
+	if filter.GetID() > 0 {
+		db = bizhelper.ExactQueryInt64(db, "id", filter.GetID())
+	}
+	if filter.GetKeyword() != "" {
+		db = bizhelper.FuzzSearchEx(db, []string{"name", "keywords", "description", "path"}, filter.GetKeyword(), false)
+	}
+	if filter.GetOnlyFavorites() {
+		db = db.Where("is_favorite = ?", true)
+	}
+	return db
+}
+
 func SearchAIYakToolByPath(db *gorm.DB, path string) ([]*schema.AIYakTool, error) {
 	db = db.Model(&schema.AIYakTool{})
 	var tools []*schema.AIYakTool
@@ -79,6 +98,20 @@ func SearchAIYakTool(db *gorm.DB, keywords string) ([]*schema.AIYakTool, error) 
 		return nil, err
 	}
 	return tools, nil
+}
+
+func CountAIYakTools(db *gorm.DB, filter *ypb.AIToolFilter) (int64, error) {
+	db = FilterAIYakTool(db, filter)
+	var count int64
+	if db := db.Count(&count); db.Error != nil {
+		return 0, utils.Errorf("count AIYakTool failed: %s", db.Error)
+	}
+	return count, nil
+}
+
+func YieldAIYakTools(ctx context.Context, db *gorm.DB, filter *ypb.AIToolFilter) chan *schema.AIYakTool {
+	db = FilterAIYakTool(db, filter)
+	return bizhelper.YieldModel[*schema.AIYakTool](ctx, db)
 }
 
 func DeleteAIYakTools(db *gorm.DB, names ...string) (int64, error) {

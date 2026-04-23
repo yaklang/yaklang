@@ -1,8 +1,13 @@
 package yakgrpc
 
 import (
+	"archive/zip"
 	"context"
 	"encoding/json"
+	"errors"
+	"io"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -14,6 +19,22 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
+
+type generalProgressReceiver interface {
+	Recv() (*ypb.GeneralProgress, error)
+}
+
+func waitAIToolProgressDone(t *testing.T, stream generalProgressReceiver) {
+	t.Helper()
+
+	for {
+		_, err := stream.Recv()
+		if errors.Is(err, io.EOF) {
+			return
+		}
+		require.NoError(t, err)
+	}
+}
 
 // TestGRPCMUSTPASS_GetAIToolList 测试获取AI工具列表
 func TestGRPCMUSTPASS_GetAIToolList(t *testing.T) {
@@ -255,6 +276,136 @@ print("your code is: " + code)
 	require.NoError(t, err)
 	assert.Equal(t, rspData["description"], resp.Description)
 	assert.Equal(t, rspData["keywords"], resp.Keywords)
+}
+
+func TestGRPCMUSTPASS_AITool_ExportImport(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	name := "tool-" + uuid.NewString()
+	content := "println('hello from tool export')"
+
+	_, err = client.SaveAITool(ctx, &ypb.SaveAIToolRequest{
+		Name:        name,
+		Description: "tool export test",
+		Content:     content,
+		ToolPath:    "/tmp/" + name + ".yak",
+		Keywords:    []string{"export", "import"},
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_, _ = client.DeleteAITool(context.Background(), &ypb.DeleteAIToolRequest{
+			ToolNames: []string{name},
+		})
+	})
+
+	exportPath := filepath.Join(t.TempDir(), "aitool-export.zip")
+	exportStream, err := client.ExportAITool(ctx, &ypb.ExportAIToolRequest{
+		ToolNames:  []string{name},
+		TargetPath: exportPath,
+	})
+	require.NoError(t, err)
+	waitAIToolProgressDone(t, exportStream)
+
+	reader, err := zip.OpenReader(exportPath)
+	require.NoError(t, err)
+	defer reader.Close()
+
+	exportedRoots := make(map[string]struct{})
+	for _, file := range reader.File {
+		root := strings.SplitN(file.Name, "/", 2)[0]
+		if root == "" {
+			continue
+		}
+		exportedRoots[root] = struct{}{}
+	}
+	require.Contains(t, exportedRoots, name)
+
+	_, err = client.DeleteAITool(ctx, &ypb.DeleteAIToolRequest{
+		ToolNames: []string{name},
+	})
+	require.NoError(t, err)
+
+	importedName := "imported-" + uuid.NewString()
+	importStream, err := client.ImportAITool(ctx, &ypb.ImportAIToolRequest{
+		InputPath:   exportPath,
+		NewToolName: importedName,
+	})
+	require.NoError(t, err)
+	waitAIToolProgressDone(t, importStream)
+	t.Cleanup(func() {
+		_, _ = client.DeleteAITool(context.Background(), &ypb.DeleteAIToolRequest{
+			ToolNames: []string{importedName},
+		})
+	})
+
+	resp, err := client.GetAIToolList(ctx, &ypb.GetAIToolListRequest{
+		ToolName: importedName,
+		Pagination: &ypb.Paging{
+			Page:  1,
+			Limit: 10,
+		},
+	})
+	require.NoError(t, err)
+	require.Len(t, resp.GetTools(), 1)
+	require.Equal(t, importedName, resp.GetTools()[0].GetName())
+	require.Equal(t, content, resp.GetTools()[0].GetContent())
+}
+
+func TestGRPCMUSTPASS_AITool_ExportUsesMergedToolNamesAndFilter(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	matchName := "tool-" + uuid.NewString()
+	otherMatchName := "tool-" + uuid.NewString()
+	toolNames := []string{matchName, otherMatchName}
+
+	for _, name := range toolNames {
+		_, err = client.SaveAITool(ctx, &ypb.SaveAIToolRequest{
+			Name:        name,
+			Description: "tool export filter test",
+			Content:     "println('hello')",
+			ToolPath:    "/tmp/" + name + ".yak",
+			Keywords:    []string{"export"},
+		})
+		require.NoError(t, err)
+	}
+	t.Cleanup(func() {
+		_, _ = client.DeleteAITool(context.Background(), &ypb.DeleteAIToolRequest{
+			ToolNames: toolNames,
+		})
+	})
+
+	exportPath := filepath.Join(t.TempDir(), "aitool-filter-export.zip")
+	stream, err := client.ExportAITool(ctx, &ypb.ExportAIToolRequest{
+		ToolNames:  toolNames,
+		TargetPath: exportPath,
+		Filter: &ypb.AIToolFilter{
+			ToolName: matchName,
+		},
+	})
+	require.NoError(t, err)
+	waitAIToolProgressDone(t, stream)
+
+	reader, err := zip.OpenReader(exportPath)
+	require.NoError(t, err)
+	defer reader.Close()
+
+	exportedRoots := make(map[string]struct{})
+	for _, file := range reader.File {
+		root := strings.SplitN(file.Name, "/", 2)[0]
+		if root == "" {
+			continue
+		}
+		exportedRoots[root] = struct{}{}
+	}
+
+	require.Contains(t, exportedRoots, matchName)
+	require.Contains(t, exportedRoots, otherMatchName)
 }
 
 // TestGRPCMUSTPASS_ToggleAIToolFavorite 测试AI工具收藏功能

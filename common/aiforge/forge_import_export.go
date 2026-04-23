@@ -70,10 +70,11 @@ func applyExportOptions(opts ...ForgeExportOption) *forgeExportOptions {
 type ForgeImportOption func(*forgeImportOptions)
 
 type forgeImportOptions struct {
-	progress  func(percent float64, message string)
-	overwrite bool
-	newName   string
-	password  string
+	progress    func(percent float64, message string)
+	overwrite   bool
+	newName     string
+	newToolName string
+	password    string
 }
 
 // WithImportProgress registers a progress callback (percent 0-100) for import.
@@ -94,6 +95,12 @@ func WithImportOverwrite(overwrite bool) ForgeImportOption {
 func WithImportNewName(name string) ForgeImportOption {
 	return func(o *forgeImportOptions) {
 		o.newName = name
+	}
+}
+
+func WithImportNewToolName(name string) ForgeImportOption {
+	return func(o *forgeImportOptions) {
+		o.newToolName = name
 	}
 }
 
