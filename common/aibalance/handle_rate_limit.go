@@ -5,10 +5,17 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/schema"
 )
+
+// defaultModelStatsMinRPM is the default minimum RPM threshold used by the
+// "hot models" stats endpoint when the caller does not override it. It
+// matches the UI copy ("only show models with >= 20 RPM") so administrators
+// can focus on models actually worth tuning.
+const defaultModelStatsMinRPM int64 = 20
 
 // handleGetRateLimitConfig returns the global rate-limit configuration.
 func (c *ServerConfig) handleGetRateLimitConfig(conn net.Conn, request *http.Request) {
@@ -127,6 +134,40 @@ func (c *ServerConfig) handleGetRateLimitStatus(conn net.Conn, request *http.Req
 		"success":       true,
 		"queue_count":   queueCount,
 		"default_rpm":   defaultRPM,
+	})
+}
+
+// handleGetRateLimitModelStats returns aggregated per-model RPM across all
+// API keys for the current 60-second sliding window. Only models with
+// RPM >= min_rpm (default 20) are returned. Admin only.
+func (c *ServerConfig) handleGetRateLimitModelStats(conn net.Conn, request *http.Request) {
+	c.logInfo("processing get rate limit model stats request")
+
+	if !c.checkAuth(request) {
+		c.writeJSONResponse(conn, http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+		return
+	}
+
+	minRPM := defaultModelStatsMinRPM
+	if raw := strings.TrimSpace(request.URL.Query().Get("min_rpm")); raw != "" {
+		if parsed, err := strconv.ParseInt(raw, 10, 64); err == nil && parsed >= 1 {
+			minRPM = parsed
+		}
+	}
+
+	var models []ModelRPMStat
+	if c.chatRateLimiter != nil {
+		models = c.chatRateLimiter.GetModelRPMStats(minRPM)
+	}
+	if models == nil {
+		models = []ModelRPMStat{}
+	}
+
+	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
+		"success":        true,
+		"models":         models,
+		"min_rpm":        minRPM,
+		"window_seconds": int64(rpmWindowDuration / 1e9),
 	})
 }
 

@@ -822,6 +822,38 @@
                     </div>
                 </div>
 
+                <!-- Hot models RPM (recent 60s, cross-apiKey aggregated) -->
+                <div style="background: #fff8e1; border: 1px solid #ffe082; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 10px;">
+                        <div>
+                            <span style="font-weight: bold; color: #ef6c00;">热门模型 RPM</span>
+                            <small style="color: #888; margin-left: 8px;">
+                                最近 <strong id="rl-model-window">60</strong> 秒内跨 API Key 聚合，仅展示
+                                ≥ <strong id="rl-model-min-rpm">20</strong> RPM 的模型（用于辅助 RPM 上限设置）
+                            </small>
+                        </div>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <span id="rl-model-updated-at" style="font-size: 12px; color: #888;"></span>
+                            <button class="btn" onclick="loadRateLimitModelStats()" style="height: 32px; font-size: 12px;">刷新</button>
+                        </div>
+                    </div>
+                    <div style="overflow-x: auto;">
+                        <table id="rl-model-stats-table" style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                            <thead>
+                                <tr style="background: #fff3e0;">
+                                    <th style="text-align: left; padding: 8px 10px; border-bottom: 1px solid #ffcc80;">模型名称</th>
+                                    <th style="text-align: right; padding: 8px 10px; border-bottom: 1px solid #ffcc80;">最近 RPM</th>
+                                    <th style="text-align: right; padding: 8px 10px; border-bottom: 1px solid #ffcc80;">生效 RPM 上限</th>
+                                    <th style="text-align: right; padding: 8px 10px; border-bottom: 1px solid #ffcc80;">用量占比</th>
+                                </tr>
+                            </thead>
+                            <tbody id="rl-model-stats-tbody">
+                                <tr><td colspan="4" style="padding: 12px; text-align: center; color: #999;">加载中...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
                 <!-- Default RPM -->
                 <div style="margin-bottom: 20px;">
                     <h4 style="margin-bottom: 10px;">全局默认 RPM</h4>

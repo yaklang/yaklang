@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -183,6 +184,7 @@ func TestPortalAPIEndpointsRequireAuth(t *testing.T) {
 		{"GET", "/portal/api/amap-keys"},
 		{"GET", "/portal/api/rate-limit-config"},
 		{"GET", "/portal/api/rate-limit-status"},
+		{"GET", "/portal/api/rate-limit-model-stats"},
 		{"GET", "/portal/api/data"},
 		{"GET", "/portal/api/models"},
 		{"GET", "/portal/api/memory-stats"},
@@ -536,4 +538,183 @@ func TestMethodSpoofingDoesNotBypassAuth(t *testing.T) {
 				"%s /portal/api/data without auth should return 401, got %d", method, statusCode)
 		})
 	}
+}
+
+// extractSetCookie parses Set-Cookie headers from a raw HTTP response and
+// returns the first value found for the named cookie. Useful in tests to
+// pick up freshly issued session cookies.
+func extractSetCookie(rawResponse, cookieName string) string {
+	for _, line := range strings.Split(rawResponse, "\r\n") {
+		lower := strings.ToLower(line)
+		if !strings.HasPrefix(lower, "set-cookie:") {
+			continue
+		}
+		cookieStr := strings.TrimSpace(line[len("Set-Cookie:"):])
+		parts := strings.Split(cookieStr, ";")
+		if len(parts) == 0 {
+			continue
+		}
+		first := strings.TrimSpace(parts[0])
+		kv := strings.SplitN(first, "=", 2)
+		if len(kv) != 2 {
+			continue
+		}
+		if kv[0] == cookieName {
+			return kv[1]
+		}
+	}
+	return ""
+}
+
+// rawHTTPRoundtrip is a low-level helper that returns the full raw response
+// so tests can inspect all Set-Cookie headers (sendRawHTTPRequest collapses
+// duplicate headers).
+func rawHTTPRoundtrip(t *testing.T, addr, method, path string, headers map[string]string, body string) (int, string) {
+	t.Helper()
+
+	conn, err := net.DialTimeout("tcp", addr, 3*time.Second)
+	require.NoError(t, err)
+	defer conn.Close()
+
+	var reqBuf bytes.Buffer
+	reqBuf.WriteString(fmt.Sprintf("%s %s HTTP/1.1\r\n", method, path))
+	reqBuf.WriteString(fmt.Sprintf("Host: %s\r\n", addr))
+
+	for k, v := range headers {
+		reqBuf.WriteString(fmt.Sprintf("%s: %s\r\n", k, v))
+	}
+	if body != "" {
+		reqBuf.WriteString(fmt.Sprintf("Content-Length: %d\r\n", len(body)))
+		if _, ok := headers["Content-Type"]; !ok {
+			reqBuf.WriteString("Content-Type: application/x-www-form-urlencoded\r\n")
+		}
+	}
+	reqBuf.WriteString("Connection: close\r\n\r\n")
+	if body != "" {
+		reqBuf.WriteString(body)
+	}
+
+	conn.SetWriteDeadline(time.Now().Add(3 * time.Second))
+	_, err = conn.Write(reqBuf.Bytes())
+	require.NoError(t, err)
+
+	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+	var respBuf bytes.Buffer
+	buf := make([]byte, 4096)
+	for {
+		n, readErr := conn.Read(buf)
+		if n > 0 {
+			respBuf.Write(buf[:n])
+		}
+		if readErr != nil {
+			break
+		}
+	}
+
+	raw := respBuf.String()
+	statusCode := 0
+	if idx := strings.Index(raw, "\r\n"); idx > 0 {
+		fmt.Sscanf(raw[:idx], "HTTP/1.1 %d", &statusCode)
+	}
+	return statusCode, raw
+}
+
+// TestOpsLoginWithStaleAdminCookie is the regression test for the auth bug
+// where a leftover admin_session cookie (pointing at a non-existent DB row)
+// would prevent a freshly issued ops_session cookie from being used.
+//
+// Reproduction logic:
+//  1. Create an active OPS user.
+//  2. POST /ops/login with valid credentials AND a stale admin_session cookie.
+//  3. The login response must:
+//     - be a 303 redirect
+//     - issue ops_session
+//     - clear the stale admin_session (Set-Cookie with past Expires)
+//  4. Using BOTH cookies (the stale admin one + the new ops one), a request
+//     to /ops/api/my-keys must succeed with 200, proving that GetAuthInfo
+//     correctly falls back to ops_session when admin_session is stale.
+func TestOpsLoginWithStaleAdminCookie(t *testing.T) {
+	addr, _ := startTestPortalServer(t)
+
+	// Ensure DB migrations for ops schemas
+	setupTestDBForOps(t)
+
+	// Create an active OPS user with a known plaintext password.
+	plainPwd := "ops-stale-cookie-pw-1"
+	hashed, err := HashPassword(plainPwd)
+	require.NoError(t, err)
+	user := &schema.OpsUser{
+		Username:     fmt.Sprintf("ops-stale-%d", time.Now().UnixNano()),
+		Password:     hashed,
+		OpsKey:       GenerateOpsKey(),
+		Role:         "ops",
+		Active:       true,
+		DefaultLimit: 52428800,
+	}
+	require.NoError(t, SaveOpsUser(user))
+	t.Cleanup(func() { DeleteOpsUser(user.ID) })
+
+	staleAdminCookie := "deadbeef-cafebabe-1234-5678-stale-admin"
+	formBody := fmt.Sprintf("username=%s&password=%s", user.Username, plainPwd)
+
+	// Step 1: submit login with both stale admin_session and proper form.
+	status, rawResp := rawHTTPRoundtrip(t, addr, "POST", "/ops/login",
+		map[string]string{
+			"Cookie":       "admin_session=" + staleAdminCookie,
+			"Content-Type": "application/x-www-form-urlencoded",
+		}, formBody)
+
+	require.Equal(t, http.StatusSeeOther, status,
+		"OPS login with stale admin_session should succeed (303), got %d, raw=%s", status, rawResp)
+
+	opsSession := extractSetCookie(rawResp, "ops_session")
+	require.NotEmpty(t, opsSession, "ops_session cookie must be issued, raw=%s", rawResp)
+
+	clearedAdmin := extractSetCookie(rawResp, "admin_session")
+	assert.Equal(t, "", clearedAdmin,
+		"admin_session should be cleared by OPS login (empty value), got %q", clearedAdmin)
+	assert.Contains(t, strings.ToLower(rawResp), "admin_session=;",
+		"admin_session Set-Cookie should use empty value with past Expires, raw=%s", rawResp)
+
+	// Step 2: call an authenticated OPS API while still carrying the stale
+	// admin_session cookie alongside the fresh ops_session cookie. This is
+	// exactly what a browser with residual cookies would do.
+	cookieHeader := fmt.Sprintf("admin_session=%s; ops_session=%s", staleAdminCookie, opsSession)
+	apiStatus, apiHeaders, apiBody := sendRawHTTPRequest(t, addr, "GET", "/ops/api/my-keys",
+		map[string]string{"Cookie": cookieHeader}, "")
+	assert.Equal(t, http.StatusOK, apiStatus,
+		"GET /ops/api/my-keys with stale admin + valid ops cookies should return 200, got %d, body=%s", apiStatus, apiBody)
+	assert.Contains(t, apiHeaders["content-type"], "application/json",
+		"response should be JSON")
+
+	// Step 3: with only the stale admin_session (no ops cookie), the same
+	// endpoint must still be denied, confirming we did not accidentally
+	// loosen auth overall.
+	deniedStatus, _, _ := sendRawHTTPRequest(t, addr, "GET", "/ops/api/my-keys",
+		map[string]string{"Cookie": "admin_session=" + staleAdminCookie}, "")
+	assert.Equal(t, http.StatusUnauthorized, deniedStatus,
+		"stale admin_session alone must not authenticate OPS API, got %d", deniedStatus)
+}
+
+// TestAdminLoginClearsOpsCookie mirrors the OPS fix: logging in as admin
+// should clear any residual ops_session cookie so future requests can't
+// land on the wrong role.
+func TestAdminLoginClearsOpsCookie(t *testing.T) {
+	addr, config := startTestPortalServer(t)
+
+	formBody := "password=" + config.AdminPassword
+	status, rawResp := rawHTTPRoundtrip(t, addr, "POST", "/portal/login",
+		map[string]string{
+			"Cookie":       "ops_session=stale-ops-value",
+			"Content-Type": "application/x-www-form-urlencoded",
+		}, formBody)
+	require.Equal(t, http.StatusSeeOther, status,
+		"admin login should succeed, got %d, raw=%s", status, rawResp)
+
+	adminSession := extractSetCookie(rawResp, "admin_session")
+	require.NotEmpty(t, adminSession, "admin_session cookie must be set")
+	cleared := extractSetCookie(rawResp, "ops_session")
+	assert.Equal(t, "", cleared, "ops_session cookie must be cleared by admin login")
+	assert.Contains(t, strings.ToLower(rawResp), "ops_session=;",
+		"ops_session should be cleared with empty value + past Expires")
 }

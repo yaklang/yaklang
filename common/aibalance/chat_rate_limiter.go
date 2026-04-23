@@ -1,6 +1,8 @@
 package aibalance
 
 import (
+	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -158,6 +160,77 @@ func (rl *ChatRateLimiter) cleanupLoop() {
 			return
 		}
 	}
+}
+
+// ModelRPMStat describes the aggregated recent request count for a single
+// model across all API keys inside the current sliding window
+// (see rpmWindowDuration, currently 60 seconds).
+type ModelRPMStat struct {
+	Model        string `json:"model"`
+	RPM          int64  `json:"rpm"`
+	EffectiveRPM int64  `json:"effective_rpm"`
+}
+
+// GetModelRPMStats aggregates recent traffic across all API-key buckets
+// and returns per-model counters for models whose total request count in
+// the sliding window is >= minRPM. Result is sorted by RPM descending.
+//
+// Notes:
+//   - Internal state keys have the form "<apiKey>|<modelName>"; we use the
+//     last '|' as the separator so that API keys containing '|' (unlikely
+//     but possible) do not break aggregation.
+//   - Expired timestamps are trimmed while iterating so stats reflect the
+//     same 60s window used by CheckRateLimit.
+func (rl *ChatRateLimiter) GetModelRPMStats(minRPM int64) []ModelRPMStat {
+	if minRPM < 0 {
+		minRPM = 0
+	}
+	now := time.Now()
+	perModel := make(map[string]int64)
+
+	rl.states.Range(func(k, v any) bool {
+		key, ok := k.(string)
+		if !ok {
+			return true
+		}
+		sepIdx := strings.LastIndex(key, "|")
+		if sepIdx < 0 || sepIdx == len(key)-1 {
+			return true
+		}
+		model := key[sepIdx+1:]
+		state, ok := v.(*keyRPMState)
+		if !ok || state == nil {
+			return true
+		}
+		state.mu.Lock()
+		state.trimExpired(now)
+		count := int64(len(state.requests))
+		state.mu.Unlock()
+		if count <= 0 {
+			return true
+		}
+		perModel[model] += count
+		return true
+	})
+
+	result := make([]ModelRPMStat, 0, len(perModel))
+	for model, count := range perModel {
+		if count < minRPM {
+			continue
+		}
+		result = append(result, ModelRPMStat{
+			Model:        model,
+			RPM:          count,
+			EffectiveRPM: rl.getEffectiveRPM(model),
+		})
+	}
+	sort.Slice(result, func(i, j int) bool {
+		if result[i].RPM != result[j].RPM {
+			return result[i].RPM > result[j].RPM
+		}
+		return result[i].Model < result[j].Model
+	})
+	return result
 }
 
 // Stop stops the background cleanup goroutine.

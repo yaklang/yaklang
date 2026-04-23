@@ -243,3 +243,112 @@ func TestServerConfig_FreeUserDelayDefault(t *testing.T) {
 	cfg := NewServerConfig()
 	assert.Equal(t, int64(3), cfg.freeUserDelaySec, "default free user delay should be 3")
 }
+
+// ==================== Model RPM Stats Aggregation ====================
+
+// TestGetModelRPMStats verifies cross-apiKey aggregation, threshold
+// filtering and descending sort order for the hot-model RPM stats used
+// by the "限流配置" page.
+func TestGetModelRPMStats(t *testing.T) {
+	rl := NewChatRateLimiter()
+	defer rl.Stop()
+
+	// Lift the RPM ceiling so the fake traffic below is not rate-limited,
+	// which would cause trimExpired to run on denied requests and skew
+	// counters.
+	rl.SetDefaultRPM(10000)
+
+	// Drive traffic:
+	// model-hot:  25 reqs from key-1 + 10 reqs from key-2 = 35  -> kept
+	// model-mid:  15 reqs from key-1 +  5 reqs from key-3 = 20  -> kept (==threshold)
+	// model-cold: 5  reqs from key-1                      = 5   -> filtered out
+	fire := func(key, model string, n int) {
+		for i := 0; i < n; i++ {
+			allowed, _ := rl.CheckRateLimit(key, model)
+			require.True(t, allowed, "setup request should be allowed, key=%s model=%s i=%d", key, model, i)
+		}
+	}
+	fire("key-1", "model-hot", 25)
+	fire("key-2", "model-hot", 10)
+	fire("key-1", "model-mid", 15)
+	fire("key-3", "model-mid", 5)
+	fire("key-1", "model-cold", 5)
+
+	// Also set a model-level override so we can assert EffectiveRPM
+	// reflects per-model overrides instead of the global default.
+	rl.SetModelRPM("model-hot", 500)
+
+	stats := rl.GetModelRPMStats(20)
+	require.Len(t, stats, 2, "only model-hot and model-mid should pass the >=20 threshold, got %+v", stats)
+
+	assert.Equal(t, "model-hot", stats[0].Model, "first entry should be the model with highest RPM")
+	assert.Equal(t, int64(35), stats[0].RPM)
+	assert.Equal(t, int64(500), stats[0].EffectiveRPM,
+		"EffectiveRPM should follow the per-model override")
+
+	assert.Equal(t, "model-mid", stats[1].Model)
+	assert.Equal(t, int64(20), stats[1].RPM)
+	assert.Equal(t, int64(10000), stats[1].EffectiveRPM,
+		"EffectiveRPM without override should fall back to the global default")
+
+	// A lower threshold must include every model we drove traffic to.
+	all := rl.GetModelRPMStats(1)
+	gotModels := map[string]int64{}
+	for _, s := range all {
+		gotModels[s.Model] = s.RPM
+	}
+	assert.Equal(t, int64(35), gotModels["model-hot"])
+	assert.Equal(t, int64(20), gotModels["model-mid"])
+	assert.Equal(t, int64(5), gotModels["model-cold"])
+
+	// Zero threshold behaves like "return everything".
+	zeroAll := rl.GetModelRPMStats(0)
+	assert.Equal(t, len(all), len(zeroAll), "minRPM=0 should match minRPM=1 in this scenario")
+
+	// A very high threshold should return an empty slice (non-nil).
+	none := rl.GetModelRPMStats(1000)
+	require.NotNil(t, none)
+	assert.Len(t, none, 0)
+}
+
+// TestGetModelRPMStats_EmptyWhenNoTraffic ensures a freshly constructed
+// rate limiter returns an empty (non-nil) slice and does not panic.
+func TestGetModelRPMStats_EmptyWhenNoTraffic(t *testing.T) {
+	rl := NewChatRateLimiter()
+	defer rl.Stop()
+
+	stats := rl.GetModelRPMStats(20)
+	require.NotNil(t, stats)
+	assert.Len(t, stats, 0)
+}
+
+// TestGetModelRPMStats_SlidingWindowDrops verifies that stale requests
+// outside the 60s sliding window are excluded from the aggregation.
+func TestGetModelRPMStats_SlidingWindowDrops(t *testing.T) {
+	rl := NewChatRateLimiter()
+	defer rl.Stop()
+	rl.SetDefaultRPM(10000)
+
+	// Seed some very old timestamps directly into the internal state and
+	// mix in one fresh request to prove only the fresh one survives
+	// trimExpired. This avoids waiting 60s in tests.
+	bucketKey := "keyZ" + "|" + "model-slide"
+	old := time.Now().Add(-2 * rpmWindowDuration)
+	rl.states.Store(bucketKey, &keyRPMState{
+		requests: []time.Time{old, old, old},
+	})
+	allowed, _ := rl.CheckRateLimit("keyZ", "model-slide")
+	require.True(t, allowed)
+
+	stats := rl.GetModelRPMStats(0)
+	var found *ModelRPMStat
+	for i := range stats {
+		if stats[i].Model == "model-slide" {
+			found = &stats[i]
+			break
+		}
+	}
+	require.NotNil(t, found, "model-slide should be present")
+	assert.Equal(t, int64(1), found.RPM,
+		"expired timestamps must be trimmed before counting")
+}
