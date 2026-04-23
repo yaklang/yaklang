@@ -21,4 +21,5 @@ func TestGetBuildInForgeFromFS_DefaultAuthor(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, forge)
 	assert.Equal(t, schema.AIResourceAuthorBuiltin, forge.Author)
+	assert.Equal(t, true, forge.IsBuiltin)
 }

@@ -22,13 +22,14 @@ func TestAIYakToolToUpdateMap_OnlyMutableFieldsIncluded(t *testing.T) {
 		Params:            `{"type":"object"}`,
 		Path:              "/tmp/tool.yak",
 		Author:            "should-not-be-updated",
+		IsBuiltin:         true,
 		IsFavorite:        true,
 		EnableAIOutputLog: 2,
 	}).ToUpdateMap()
 
 	mutableFields := []string{
 		"name", "verbose_name", "description", "keywords", "usage", "content",
-		"params", "path", "hash", "is_favorite", "enable_ai_output_log",
+		"params", "path", "is_builtin", "hash", "is_favorite", "enable_ai_output_log",
 	}
 	require.Len(t, updateMap, len(mutableFields))
 	for _, field := range mutableFields {

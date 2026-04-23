@@ -24,7 +24,8 @@ type AIForge struct {
 	Actions            string
 	Tags               string
 
-	Author string
+	Author    string
+	IsBuiltin bool `gorm:"default:false;index"`
 
 	InitPrompt       string
 	PersistentPrompt string
@@ -54,6 +55,7 @@ func (a *AIForge) ToUpdateMap() map[string]interface{} {
 		"tool_keywords":        a.ToolKeywords,
 		"actions":              a.Actions,
 		"tags":                 a.Tags,
+		"is_builtin":           a.IsBuiltin,
 		"init_prompt":          a.InitPrompt,
 		"persistent_prompt":    a.PersistentPrompt,
 		"plan_prompt":          a.PlanPrompt,
@@ -135,6 +137,7 @@ func (a *AIForge) ToGRPC() *ypb.AIForge {
 		ResultPrompt:       a.ResultPrompt,
 		UpdatedAt:          a.UpdatedAt.Unix(),
 		Author:             a.Author,
+		IsBuiltin:          a.IsBuiltin,
 		SkillPath:          a.SkillPath,
 	}
 }
@@ -157,6 +160,7 @@ func GRPC2AIForge(forge *ypb.AIForge) *AIForge {
 		PlanPrompt:         forge.GetPlanPrompt(),
 		ResultPrompt:       forge.GetResultPrompt(),
 		Author:             forge.GetAuthor(),
+		IsBuiltin:          forge.GetIsBuiltin(),
 		SkillPath:          forge.GetSkillPath(),
 	}
 	forgeIns.ID = uint(forge.Id)

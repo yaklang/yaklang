@@ -81,6 +81,7 @@ func ensureEmbeddedAIYakTool(name, script string) {
 		return
 	}
 	aiTool.Author = schema.AIResourceAuthorBuiltin
+	aiTool.IsBuiltin = true
 	if _, err := yakit.SaveAIYakTool(db, aiTool); err != nil {
 		log.Warnf("infosec_recon: register %s tool failed: %v", name, err)
 		return

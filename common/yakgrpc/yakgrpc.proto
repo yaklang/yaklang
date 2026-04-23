@@ -927,8 +927,8 @@ service Yak {
   rpc StartAITriage(stream AITriageInputEvent) returns(stream AIOutputEvent);
 
   // AI forge curd
-  rpc CreateAIForge(CreateAIForgeRequest) returns (DbOperateMessage);
-  rpc UpdateAIForge(UpdateAIForgeRequest) returns (DbOperateMessage);
+  rpc CreateAIForge(AIForge) returns (DbOperateMessage);
+  rpc UpdateAIForge(AIForge) returns (DbOperateMessage);
   rpc DeleteAIForge(AIForgeFilter) returns (DbOperateMessage);
   rpc QueryAIForge(QueryAIForgeRequest) returns (QueryAIForgeResponse);
   rpc GetAIForge(GetAIForgeRequest) returns (AIForge);
@@ -1737,6 +1737,7 @@ message AITool {
   string Author = 9;
   int64 CreatedAt = 10;
   int64 UpdatedAt = 11;
+  bool IsBuiltin = 12;
 }
 
 message GetAIToolListResponse {
@@ -2078,47 +2079,7 @@ message AIForge {
   string SkillPath = 19; // local path used to import/export serialized skill filesystem
   int64 CreatedAt = 20;
   int64 UpdatedAt = 21;
-}
-
-message CreateAIForgeRequest {
-  string ForgeName = 1;
-  string ForgeContent = 2; // yak type is yak script, config type is empty
-  string ForgeType = 3; // yak, config or skillmd
-  string Description = 4;
-  string ParamsUIConfig = 5; // json config for UI
-  string Params = 6; // cli parameters
-  string UserPersistentData = 7; // for user preferences
-  repeated string ToolNames = 8;
-  repeated string ToolKeywords = 9;
-  string Action = 10;
-  repeated string Tag = 11;
-  string InitPrompt = 12; // 初始提示语
-  string PersistentPrompt = 13; // 持久化提示语
-  string PlanPrompt = 14; // 计划提示语
-  string ResultPrompt = 15; // 结果提示语
-  string ForgeVerboseName = 16; // 给用户看的展示名称
-  string SkillPath = 17; // local path used to import/export serialized skill filesystem
-}
-
-message UpdateAIForgeRequest {
-  int64 Id = 1;
-  string ForgeName = 2;
-  string ForgeContent = 3; // yak type is yak script, config type is empty
-  string ForgeType = 4; // yak, config or skillmd
-  string Description = 5;
-  string ParamsUIConfig = 6; // json config for UI
-  string Params = 7; // cli parameters
-  string UserPersistentData = 8; // for user preferences
-  repeated string ToolNames = 9;
-  repeated string ToolKeywords = 10;
-  string Action = 11;
-  repeated string Tag = 12;
-  string InitPrompt = 13; // 初始提示语
-  string PersistentPrompt = 14; // 持久化提示语
-  string PlanPrompt = 15; // 计划提示语
-  string ResultPrompt = 16; // 结果提示语
-  string ForgeVerboseName = 17; // 给用户看的展示名称
-  string SkillPath = 18; // local path used to import/export serialized skill filesystem
+  bool IsBuiltin = 22;
 }
 
 message QueryAIForgeRequest {

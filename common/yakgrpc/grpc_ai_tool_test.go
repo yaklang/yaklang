@@ -1120,6 +1120,7 @@ func TestGRPCMUSTPASS_AITool_AuthorAndTimeFields(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, createResp.GetIsSuccess())
 	require.Equal(t, author, createResp.GetAITool().GetAuthor())
+	require.False(t, createResp.GetAITool().GetIsBuiltin())
 	require.Greater(t, createResp.GetAITool().GetCreatedAt(), int64(0))
 	require.Greater(t, createResp.GetAITool().GetUpdatedAt(), int64(0))
 	defer func() {
@@ -1135,6 +1136,7 @@ func TestGRPCMUSTPASS_AITool_AuthorAndTimeFields(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, listResp.GetTools(), 1)
 	require.Equal(t, author, listResp.GetTools()[0].GetAuthor())
+	require.False(t, listResp.GetTools()[0].GetIsBuiltin())
 	require.Greater(t, listResp.GetTools()[0].GetCreatedAt(), int64(0))
 	require.Greater(t, listResp.GetTools()[0].GetUpdatedAt(), int64(0))
 
@@ -1151,6 +1153,7 @@ func TestGRPCMUSTPASS_AITool_AuthorAndTimeFields(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, updatedResp.GetTools(), 1)
 	require.Equal(t, author, updatedResp.GetTools()[0].GetAuthor())
+	require.False(t, updatedResp.GetTools()[0].GetIsBuiltin())
 	require.Equal(t, listResp.GetTools()[0].GetCreatedAt(), updatedResp.GetTools()[0].GetCreatedAt())
 	require.GreaterOrEqual(t, updatedResp.GetTools()[0].GetUpdatedAt(), listResp.GetTools()[0].GetUpdatedAt())
 }
@@ -1170,6 +1173,7 @@ func TestGRPCMUSTPASS_AITool_EmptyAuthorDefaultsToAnonymous(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, createResp.GetIsSuccess())
 	require.Equal(t, "anonymous", createResp.GetAITool().GetAuthor())
+	require.False(t, createResp.GetAITool().GetIsBuiltin())
 	defer func() {
 		_, err = client.DeleteAITool(ctx, &ypb.DeleteAIToolRequest{
 			ToolNames: []string{toolName},
@@ -1183,4 +1187,5 @@ func TestGRPCMUSTPASS_AITool_EmptyAuthorDefaultsToAnonymous(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, listResp.GetTools(), 1)
 	require.Equal(t, "anonymous", listResp.GetTools()[0].GetAuthor())
+	require.False(t, listResp.GetTools()[0].GetIsBuiltin())
 }

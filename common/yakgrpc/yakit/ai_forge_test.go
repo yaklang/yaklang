@@ -54,6 +54,7 @@ func TestCreateOrUpdateAIForgeByName_EmptyAuthorDefaultsToAnonymous(t *testing.T
 	got, err := GetAIForgeByName(db, forgeName)
 	require.NoError(t, err)
 	require.Equal(t, schema.AIResourceAuthorAnonymous, got.Author)
+	require.False(t, got.IsBuiltin)
 }
 
 func TestCreateAIForge_EmptyAuthorDefaultsToAnonymous(t *testing.T) {
@@ -69,6 +70,30 @@ func TestCreateAIForge_EmptyAuthorDefaultsToAnonymous(t *testing.T) {
 	got, err := GetAIForgeByName(db, forgeName)
 	require.NoError(t, err)
 	require.Equal(t, schema.AIResourceAuthorAnonymous, got.Author)
+	require.False(t, got.IsBuiltin)
+}
+
+func TestCreateOrUpdateAIForgeByName_BuiltinFlagUsesDirectOverwrite(t *testing.T) {
+	db := newAIForgeTestDB(t)
+
+	forgeName := newAIForgeTestName("builtin-flag-direct-overwrite")
+	require.NoError(t, CreateAIForge(db, &schema.AIForge{
+		ForgeName:    forgeName,
+		ForgeType:    schema.FORGE_TYPE_YAK,
+		ForgeContent: "print('created')",
+		IsBuiltin:    true,
+	}))
+
+	require.NoError(t, CreateOrUpdateAIForgeByName(db, forgeName, &schema.AIForge{
+		ForgeName:    forgeName,
+		ForgeType:    schema.FORGE_TYPE_YAK,
+		ForgeContent: "print('updated')",
+		IsBuiltin:    false,
+	}))
+
+	got, err := GetAIForgeByName(db, forgeName)
+	require.NoError(t, err)
+	require.False(t, got.IsBuiltin)
 }
 
 func TestCreateOrUpdateAIForgeByName_PreservesAuthorOnUpdateAndZeroValues(t *testing.T) {
@@ -83,6 +108,7 @@ func TestCreateOrUpdateAIForgeByName_PreservesAuthorOnUpdateAndZeroValues(t *tes
 		Tags:             "tag-a,tag-b",
 		PersistentPrompt: "keep-me",
 		Author:           "alice",
+		IsBuiltin:        true,
 	}))
 
 	updateForge := &schema.AIForge{
@@ -104,4 +130,5 @@ func TestCreateOrUpdateAIForgeByName_PreservesAuthorOnUpdateAndZeroValues(t *tes
 	require.Equal(t, "", got.Tags)
 	require.Equal(t, "", got.PersistentPrompt)
 	require.Equal(t, "alice", got.Author)
+	require.True(t, got.IsBuiltin)
 }

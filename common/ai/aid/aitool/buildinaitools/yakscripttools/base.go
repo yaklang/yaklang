@@ -133,6 +133,7 @@ func loadAllYakScriptFromEmbedFS() ([]*schema.AIYakTool, error) {
 			return nil
 		}
 		aiTool.Author = schema.AIResourceAuthorBuiltin
+		aiTool.IsBuiltin = true
 
 		namePath := ""
 		dirnameClean, ok := strings.CutPrefix(dirname, `yakscriptforai`)

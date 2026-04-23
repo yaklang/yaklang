@@ -76,6 +76,32 @@ func TestCreateAIYakTool_EmptyAuthorDefaultsToAnonymous(t *testing.T) {
 	got, err := GetAIYakTool(db, toolName)
 	require.NoError(t, err)
 	require.Equal(t, schema.AIResourceAuthorAnonymous, got.Author)
+	require.False(t, got.IsBuiltin)
+}
+
+func TestSaveAIYakTool_BuiltinFlagUsesDirectOverwrite(t *testing.T) {
+	db := newAIYakToolTestDB(t)
+
+	toolName := newAIYakToolTestName("builtin-flag-direct-overwrite")
+	_, err := CreateAIYakTool(db, &schema.AIYakTool{
+		Name:        toolName,
+		Content:     "print('created')",
+		Description: "created-desc",
+		IsBuiltin:   true,
+	})
+	require.NoError(t, err)
+
+	_, err = SaveAIYakTool(db, &schema.AIYakTool{
+		Name:        toolName,
+		Content:     "print('updated')",
+		Description: "updated-desc",
+		IsBuiltin:   false,
+	})
+	require.NoError(t, err)
+
+	got, err := GetAIYakTool(db, toolName)
+	require.NoError(t, err)
+	require.False(t, got.IsBuiltin)
 }
 
 func TestSaveAIYakTool_PreservesAuthorOnUpdateAndZeroValues(t *testing.T) {
@@ -91,6 +117,7 @@ func TestSaveAIYakTool_PreservesAuthorOnUpdateAndZeroValues(t *testing.T) {
 			Usage:             "usage-before",
 			Params:            `{"type":"object","properties":{"arg":{"type":"string"}}}`,
 			Author:            "alice",
+			IsBuiltin:         true,
 			EnableAIOutputLog: 2,
 		})
 		return err
@@ -120,5 +147,6 @@ func TestSaveAIYakTool_PreservesAuthorOnUpdateAndZeroValues(t *testing.T) {
 	require.Equal(t, "", got.Usage)
 	require.Equal(t, "", got.Params)
 	require.Equal(t, "alice", got.Author)
+	require.True(t, got.IsBuiltin)
 	require.Equal(t, 0, got.EnableAIOutputLog)
 }

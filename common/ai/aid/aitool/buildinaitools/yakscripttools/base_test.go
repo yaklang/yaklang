@@ -90,5 +90,6 @@ func TestLoadAllYakScriptFromEmbedFS(t *testing.T) {
 
 	for _, tool := range tools {
 		assert.Equal(t, tool.Author, schema.AIResourceAuthorBuiltin)
+		assert.Equal(t, tool.IsBuiltin, true)
 	}
 }
