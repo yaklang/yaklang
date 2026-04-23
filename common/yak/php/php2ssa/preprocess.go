@@ -1,9 +1,22 @@
 package php2ssa
 
 import (
+	"strings"
+
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
 )
+
+// findTrailingPHPCloseTag returns the rune-index of a trailing "?>"
+// (only whitespace may follow it), or -1 if not found.
+func findTrailingPHPCloseTag(runes []rune) int {
+	s := string(runes)
+	trimmed := strings.TrimRight(s, " \t\r\n")
+	if !strings.HasSuffix(trimmed, "?>") {
+		return -1
+	}
+	return len([]rune(trimmed)) - 2
+}
 
 // rewriteSingleSemicolonNamespaceUseBlock rewrites
 //
@@ -96,6 +109,14 @@ rewrite:
 			insertPos = tok.GetStart()
 		}
 		break
+	}
+	// When the last statement before ?> is } the lexer consumes PHPEnd
+	// entirely (converting it to the next HTML token), so the token-based
+	// search above misses it.  Fall back to a direct source scan.
+	if insertPos == len(runes) {
+		if idx := findTrailingPHPCloseTag(runes); idx >= 0 {
+			insertPos = idx
+		}
 	}
 	if insertPos < 0 || insertPos > len(runes) {
 		insertPos = len(runes)
