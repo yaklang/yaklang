@@ -51,25 +51,57 @@
 ```
 
 ### 完成审计（无发现）
+
 ```json
 {
   "@action": "complete_skill_audit",
   "human_readable_thought": "所有六个类别均已扫描完毕，未发现 Medium 及以上级别的安全问题",
   "skill_name": "my-skill",
   "risk_level": "Clean",
-  "alignment_table": "| 检查项 | 状态 | 简述 |\n|:---|:---|:---|\n| 恶意行为 | Pass | 未检测到恶意行为特征 |\n| 隐形行为 | Pass | 代码逻辑与 SKILL.md 声明完全一致 |\n| 功能意图 | Pass | 实现与描述相符 |",
-  "findings_summary": "扫描了 3 个脚本文件，覆盖 6 个检测类别，未发现 Medium 及以上安全问题。"
+  "alignment_table": "| 检查项 | 状态 | 简述 |\n|:---|:---|:---|\n| 恶意行为 | Pass | 未检测到恶意行为特征 |\n| 隐形行为 | Pass | 代码逻辑与 SKILL.md 声明完全一致 |\n| 功能意图 | Pass | 实现与描述相符 |"
 }
 ```
 
+<|FINDINGS_{{ .Nonce }}|>
+扫描了 3 个脚本文件，覆盖 6 个检测类别，未发现 Medium 及以上安全问题。
+<|FINDINGS_END_{{ .Nonce }}|>
+
 ### 完成审计（发现 Critical 漏洞）
+
 ```json
 {
   "@action": "complete_skill_audit",
   "human_readable_thought": "发现反弹 Shell 代码，风险等级 Critical，立即上报",
   "skill_name": "malicious-skill",
   "risk_level": "Critical",
-  "alignment_table": "| 检查项 | 状态 | 简述 |\n|:---|:---|:---|\n| 恶意行为 | Critical | scripts/helper.py 中存在反弹 Shell 代码 |\n| 隐形行为 | Critical | SKILL.md 未声明网络连接行为 |\n| 功能意图 | Critical | 声明为'生成 commit message'，实际建立反向 Shell 连接 |",
-  "findings_summary": "扫描了 2 个脚本文件，覆盖 6 个检测类别，发现 1 个 Critical 漏洞。\n\n### Reverse Shell — scripts/helper.py\n\n- **文件位置**: `scripts/helper.py`，第 15–22 行\n- **风险类型**: Reverse Shell\n- **风险等级**: Critical\n\n**技术分析**\nscripts/helper.py 使用 socket.connect 向 attacker.com:4444 建立反向连接，随后通过 os.dup2 将 stdin/stdout 重定向到该 socket，再调用 /bin/bash 建立交互式 shell。\n\n**攻击路径**\n1. 用户正常调用 Skill\n2. helper.py 在执行前自动连接外部服务器\n3. 攻击者获得当前用户权限的完整 shell 访问\n\n**影响评估**\n攻击者可完全控制用户本地环境，读取所有可访问文件。\n\n**SKILL.md 声明 vs 实际实现**\n- 声明: 生成 git commit message\n- 实际: 建立到 attacker.com:4444 的反向 shell 连接\n\n**修复建议**\n删除 scripts/helper.py 中 socket/os.dup2 相关代码，或完整替换为干净实现。"
+  "alignment_table": "| 检查项 | 状态 | 简述 |\n|:---|:---|:---|\n| 恶意行为 | Critical | scripts/helper.py 中存在反弹 Shell 代码 |\n| 隐形行为 | Critical | SKILL.md 未声明网络连接行为 |\n| 功能意图 | Critical | 声明为'生成 commit message'，实际建立反向 Shell 连接 |"
 }
 ```
+
+<|FINDINGS_{{ .Nonce }}|>
+扫描了 2 个脚本文件，覆盖 6 个检测类别，发现 1 个 Critical 漏洞。
+
+### Reverse Shell — scripts/helper.py
+
+- **文件位置**: `scripts/helper.py`，第 15–22 行
+- **风险类型**: Reverse Shell
+- **风险等级**: Critical
+
+**技术分析**
+scripts/helper.py 使用 socket.connect 向 attacker.com:4444 建立反向连接，随后通过 os.dup2 将 stdin/stdout 重定向到该 socket，再调用 /bin/bash 建立交互式 shell。
+
+**攻击路径**
+1. 用户正常调用 Skill
+2. helper.py 在执行前自动连接外部服务器
+3. 攻击者获得当前用户权限的完整 shell 访问
+
+**影响评估**
+攻击者可完全控制用户本地环境，读取所有可访问文件。
+
+**SKILL.md 声明 vs 实际实现**
+- 声明: 生成 git commit message
+- 实际: 建立到 attacker.com:4444 的反向 shell 连接
+
+**修复建议**
+删除 scripts/helper.py 中 socket/os.dup2 相关代码，或完整替换为干净实现。
+<|FINDINGS_END_{{ .Nonce }}|>
