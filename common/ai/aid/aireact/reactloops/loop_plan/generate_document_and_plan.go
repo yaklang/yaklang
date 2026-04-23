@@ -60,7 +60,7 @@ func generateGuidanceDocument(loop *reactloops.ReActLoop, task aicommon.AIStatef
 		prompt,
 		[]aitool.ToolOption{
 			aitool.WithStringParam(PlanDocumentFieldName,
-				aitool.WithParam_Description("基于控制论与科学方法论框架组织的任务执行指导性文档，Markdown 格式，包含目标定义、系统现状分析、差距分析、控制策略、执行路径、验证与反馈六个章节"),
+				aitool.WithParam_Description("基于目标导向、方法论指导、验收驱动原则组织的任务执行指导性文档，Markdown 格式，包含目标定义（五要素）、执行路径（方法论）、验收标准（覆盖率与有效性）、动态重规划与纠错纠偏四个章节"),
 				aitool.WithParam_Required(true),
 			),
 		},

@@ -376,7 +376,28 @@ func autoGenerateFacts(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask,
 - 使用 ## 标题组织内容
 - 每条事实单独一行，优先使用 bullet point
 - 只允许具体、可验证的信息
-- 禁止使用“等”“其他”“若干”“一些”“相关”“类似”这类模糊词
+- **语言跟随用户输入**：section 标题、说明语、bullet 描述的语言必须与下文"用户输入"保持一致。用户用中文就全部写中文，用户用英文就全部写英文。严禁把中文场景的事实写成 "URL discovered: ..."、"Open port discovered: ..."、"Server response header ..."、"Static file referenced: ..." 之类的英文动词短语开头的 bullet——这既是语言错位，也是下面要禁止的"重复前缀"
+- **信息密度（去重复前缀）**：同类事实集中到同一个 ## section，由 section 标题承担分类语义；bullet 里只写差异值本身，禁止在每条 bullet 里复述相同的动词短语 / 名词前缀。公共前缀（同一域名、同一 base URL、同一根目录）抽到 section 标题括号里或 section 开头一行引导语里，bullet 只写相对部分
+  - 反例（密度差，禁止）：
+    - URL discovered: http://127.0.0.1:8787/_/
+    - URL discovered: http://127.0.0.1:8787/_/submit-ai-practice
+    - URL discovered: http://127.0.0.1:8787/api/
+    - Server response header Content-Type: text/html
+    - Static CSS file referenced: /static/js/bootstrap.min.css
+  - 正例（密度高，必须）：
+    ## 已发现 URL (base: http://127.0.0.1:8787)
+    - /_/
+    - /_/submit-ai-practice
+    - /api/
+    ## HTTP 响应头
+    - Content-Type: text/html
+    ## 静态资源引用
+    - /static/js/bootstrap.min.css
+- **N 对 N 硬量化**：信息源里出现了 N 条同类条目（目录、URL、文件、端口、接口、参数等），FACTS 中就必须写出 N 行 bullet，一条都不能合并、一条都不能省略、一条都不能概括；来源有 10 个 URL 就写 10 行，有 155 个 URL 就写 155 行。信息密度规则指的是"bullet 不重复前缀"，不是"压缩 bullet 数量"
+- **严禁使用任何概括词**：不允许出现 "等"、"其他"、"相关"、"类似"、"若干"、"一些"、"多个"、"若干个"、"数个"、"部分"、"主要"，以及英文等价表达（etc. / and more / and so on / various / several / others / similar / including…）；一旦出现任一词汇本次输出视为不合格
+- 反例（严禁）：已确认存在 /_/, /api, /bruteplayground, /crypto 等目录 ； /fastjson/json-in-cookie 等 FastJSON 端点
+- 正例（必须）：为每个目录 / URL / 端点各写一行独立 bullet，把本应被"等"吞掉的条目全部展开
+- 如果担心单次输出过长，优先选择"只在本轮新增事实"这一点让输出缩短，**禁止用概括词压缩条目数**
 - 如果没有新增事实，返回空字符串
 
 本次模式：%s
