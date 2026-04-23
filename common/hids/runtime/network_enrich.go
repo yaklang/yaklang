@@ -14,7 +14,7 @@ func enrichNetworkEvent(event model.Event) model.Event {
 		return event
 	}
 
-	data := cloneAnyMap(event.Data)
+	data := event.Data
 	if data == nil {
 		data = map[string]any{}
 	}
@@ -26,7 +26,9 @@ func enrichNetworkEvent(event model.Event) model.Event {
 	processRoles := policy.ProcessRoles(processName(event.Process), processImage(event.Process), processCommand(event.Process))
 	parentRoles := policy.ProcessRoles(parentName(event.Process), "", "")
 
-	data["direction"] = inferNetworkDirection(event, sourceScope, destScope, data)
+	direction := inferNetworkDirection(event, sourceScope, destScope, data)
+	data["direction"] = direction
+	event.Network.Direction = direction
 	data["source_scope"] = sourceScope
 	data["dest_scope"] = destScope
 	if sourceService != "" {
@@ -36,13 +38,23 @@ func enrichNetworkEvent(event model.Event) model.Event {
 		data["dest_service"] = destService
 	}
 	if len(processRoles) > 0 {
-		data["process_roles"] = cloneStringSlice(processRoles)
+		data["process_roles"] = processRoles
 	}
 	if len(parentRoles) > 0 {
-		data["parent_roles"] = cloneStringSlice(parentRoles)
+		data["parent_roles"] = parentRoles
 	}
 
 	event.Data = data
+	return event
+}
+
+func enrichNetworkDirection(event model.Event) model.Event {
+	if event.Network == nil {
+		return event
+	}
+	sourceScope := policy.AddressScope(event.Network.SourceAddress)
+	destScope := policy.AddressScope(event.Network.DestAddress)
+	event.Network.Direction = inferNetworkDirection(event, sourceScope, destScope, event.Data)
 	return event
 }
 

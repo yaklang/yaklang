@@ -223,7 +223,7 @@ func (p *pipeline) resolveEvidenceProcess(event model.Event, request map[string]
 
 	if p != nil && p.processes != nil {
 		if cached, ok := p.processes.byPID[pid]; ok {
-			cloned := cached
+			cloned := cached.process
 			normalizeProcessContext(&cloned)
 			p.attachProcessArtifact(&cloned)
 			return &cloned, nil
@@ -272,10 +272,10 @@ func (p *pipeline) buildEvidenceChildren(pid int) ([]map[string]any, bool) {
 
 	children := make([]model.Process, 0)
 	for _, candidate := range p.processes.byPID {
-		if candidate.ParentPID != pid {
+		if candidate.process.ParentPID != pid {
 			continue
 		}
-		cloned := candidate
+		cloned := candidate.process
 		normalizeProcessContext(&cloned)
 		p.attachProcessArtifact(&cloned)
 		children = append(children, cloned)
@@ -308,10 +308,11 @@ func (p *pipeline) lookupTrackedProcess(pid int) (model.Process, bool) {
 	if p == nil || p.processes == nil || pid <= 0 {
 		return model.Process{}, false
 	}
-	process, ok := p.processes.byPID[pid]
+	tracked, ok := p.processes.byPID[pid]
 	if !ok {
 		return model.Process{}, false
 	}
+	process := tracked.process
 	normalizeProcessContext(&process)
 	p.attachProcessArtifact(&process)
 	return process, true
