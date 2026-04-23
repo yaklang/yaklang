@@ -834,7 +834,7 @@ jobs:
             artifact_file: "essential-tests-coreplugin.tar.gz"
             test_configs: |
               [
-                {"package": "./common/coreplugin", "timeout": "6m", "skip": "^(TestAnalyzeMustPASSCorePlugin|TestAnalyzeMustPASSCorePlugin_Debug|TestGRPCMUSTPASS_MITM|TestGRPCMUSTPASS_Fastjson|TestGRPCMUSTPASS_SQL.*|TestGRPCMUSTPASS_XSS.*|TestGRPCMUSTPASS_Shiro.*|TestGRPCMUSTPASS_SSRF.*|TestGRPCMUSTPASS_SSTI.*|TestGRPCMUSTPASS_Smuggle.*|TestGRPCMUSTPASS_Pipeline_Negative_Chunked.*|TestGRPCMUSTPASS_CSRF.*|TestGRPCMUSTPASS_OPEN_REDIRECT.*|TestGRPCMUSTPASS_SwaggerJson.*)$"}
+                {"package": "./common/coreplugin", "timeout": "6m", "skip": "^(TestAnalyzeMustPASSCorePlugin|TestAnalyzeMustPASSCorePlugin_Debug|TestGRPCMUSTPASS_MITM|TestGRPCMUSTPASS_Fastjson|TestGRPCMUSTPASS_SQL.*|TestGRPCMUSTPASS_XSS.*|TestGRPCMUSTPASS_Shiro.*|TestGRPCMUSTPASS_SSRF.*|TestGRPCMUSTPASS_SSTI.*|TestGRPCMUSTPASS_Smuggle.*|TestGRPCMUSTPASS_Pipeline_Negative_Chunked.*|TestGRPCMUSTPASS_CSRF.*|TestGRPCMUSTPASS_OPEN_REDIRECT.*|TestGRPCMUSTPASS_SwaggerJson.*|TestDEBUG_MITM|TestFastjson)$"}
               ]
     steps:
       - name: Checkout

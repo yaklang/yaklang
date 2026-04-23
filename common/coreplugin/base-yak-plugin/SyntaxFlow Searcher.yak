@@ -57,7 +57,7 @@ func getCache(k) {
     }
     resID := parseInt(value)
     // check  result id is valid
-    res, err := ssa.NewResultFromDB(resID)
+    res, err := ssa.NewResultFromDB(resID, true)
     if err == nil {
         log.info("cache resultId is valid, use it. with-key:%s" , key)
         return resID
