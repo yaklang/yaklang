@@ -468,6 +468,35 @@ func (n *Engine) SafeEvalInline(ctx context.Context, code string) (err error) {
 	return
 }
 
+func (n *Engine) SafeEvalInlineWithResult(ctx context.Context, code string) (ret *yakvm.Value, err error) {
+	defer func() {
+		if e := recover(); e != nil {
+			err = utils.Error(fmt.Sprint(e))
+		}
+	}()
+
+	compiler, err := n._compile(code, n.rootSymbol)
+	if err != nil {
+		return nil, utils.Errorf("compile error: \n%s", err)
+	}
+
+	n.vm.SetDebug(n.debug)
+	n.vm.SetDebugMode(n.debugMode, code, compiler.GetOpcodes(), n.debugInit, n.debugCallBack)
+	n.vm.SetCallFuncCallback(n.callFuncCallback)
+
+	codes := compiler.GetOpcodes()
+	err = n.vm.Exec(ctx, func(frame *yakvm.Frame) {
+		frame.SetVerbose("__yak_main__")
+		frame.SetOriginCode(code)
+		frame.Exec(codes)
+		ret = frame.GetLastStackValue()
+	}, yakvm.Inline)
+	if err != nil {
+		return nil, err
+	}
+	return ret, nil
+}
+
 func (n *Engine) FormattedAndSyntaxChecking(code string) (string, error) {
 	compiler, err := n._compile(code, n.rootSymbol)
 	if err != nil {
@@ -480,12 +509,7 @@ func (n *Engine) ExecuteAsBooleanExpression(expr string, dependencies map[string
 	if dependencies != nil {
 		n.ImportLibs(dependencies)
 	}
-	err := n.SafeEvalInline(context.Background(), expr)
-	if err != nil {
-		return false, err
-	}
-
-	val, err := n.GetLastStackValue()
+	val, err := n.SafeEvalInlineWithResult(context.Background(), expr)
 	if err != nil {
 		return false, err
 	}
@@ -505,13 +529,7 @@ func (n *Engine) ExecuteAsExpression(expr string, dependencies map[string]interf
 	if dependencies != nil {
 		n.ImportLibs(dependencies)
 	}
-
-	err := n.SafeEvalInline(context.Background(), expr)
-	if err != nil {
-		return nil, err
-	}
-
-	val, err := n.GetLastStackValue()
+	val, err := n.SafeEvalInlineWithResult(context.Background(), expr)
 	if err != nil {
 		return nil, err
 	}
