@@ -45,6 +45,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 
 		loop.LoadingStatus("开始意图识别 / Start intent recognition")
 		userInput := task.GetUserInput()
+		capabilityNameMatches := reactloops.MatchCapabilitiesByTextWithConfig(r.GetConfig(), userInput)
 
 		scale := ClassifyInputScale(userInput)
 		log.Infof("input scale classified as %s for input length %d runes", scale.String(), len([]rune(userInput)))
@@ -66,6 +67,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 			// Fast mode: rules + BM25 matching
 			result := FastIntentMatch(r, userInput)
 			if result != nil {
+				applyCapabilityMatchesToFastMatchResult(result, capabilityNameMatches)
 				applyFastMatchResult(r, loop, result)
 				if result.IsSimpleQuery {
 					log.Infof("simple query detected, skipping deep intent recognition")
@@ -88,6 +90,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 			log.Infof("invoking deep intent recognition (scale=%s)", scale.String())
 			deepResult := executeDeepIntentRecognition(r, loop, task)
 			if deepResult != nil {
+				reactloops.ApplyCapabilityMatchesToDeepIntentResult(deepResult, capabilityNameMatches)
 				applyDeepIntentResult(r, loop, deepResult)
 			} else {
 				log.Infof("deep intent recognition returned no result, proceeding with default loop")

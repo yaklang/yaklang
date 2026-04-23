@@ -56,6 +56,7 @@ var loopAction_RequireAIBlueprintForge = &reactloops.LoopAction{
 		}
 		invoker := loop.GetInvoker()
 		task := operator.GetTask()
+		recommendCapabilitiesFromForgePrompts(loop, invoker, forgeName, "AI Blueprint "+forgeName)
 
 		invoker.RequireAIForgeAndAsyncExecute(task.GetContext(), forgeName, func(err error) {
 			loop.FinishAsyncTask(task, err)

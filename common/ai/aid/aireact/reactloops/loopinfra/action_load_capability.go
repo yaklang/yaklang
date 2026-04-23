@@ -183,6 +183,7 @@ func handleLoadForge(
 	log.Infof("load_capability: dispatching '%s' as blueprint/forge", identifier)
 	invoker.AddToTimeline("[LOAD_CAPABILITY_FORGE]",
 		fmt.Sprintf("Starting AI Blueprint '%s' in async mode", identifier))
+	recommendCapabilitiesFromForgePrompts(loop, invoker, identifier, "AI Blueprint "+identifier)
 
 	op.RequestAsyncMode()
 
@@ -251,13 +252,18 @@ func handleLoadSkill(
 
 	persistLoadedSkillNames(loop, invoker)
 	emitSkillReferenceMaterial(invoker, identifier, mgr)
+	recommendationSummary := recommendCapabilitiesFromSkillContent(loop, invoker, identifier, "Skill "+identifier)
 
-	op.Feedback(fmt.Sprintf(
+	feedbackMsg := fmt.Sprintf(
 		"Skill '%s' has been loaded into the context. "+
 			"The SKILL.md content and file tree are now displayed in the SKILLS_CONTEXT section of your prompt. "+
 			"Read the skill content from your prompt's View Window and proceed with the task. "+
 			"Do NOT load this skill again.",
-		identifier))
+		identifier)
+	if recommendationSummary != "" {
+		feedbackMsg += fmt.Sprintf(" Related capabilities mentioned in SKILL.md: %s.", recommendationSummary)
+	}
+	op.Feedback(feedbackMsg)
 	op.Continue()
 }
 
