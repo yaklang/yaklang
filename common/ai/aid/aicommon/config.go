@@ -428,7 +428,6 @@ func NewConfig(ctx context.Context, opts ...ConfigOption) *Config {
 		}
 	}
 	config.loadSkillMDForgesIntoSkillLoader()
-	config.AppendRelatedRuntimeID(config.GetRuntimeId())
 
 	return config
 }
@@ -2575,6 +2574,7 @@ func (c *Config) CreateOrUpdateRuntimeRecord(runtime *schema.AIAgentRuntime) err
 	if c.DisableCreateDBRuntime || c.GetDB() == nil {
 		return nil
 	}
+	c.AppendRelatedRuntimeID(c.GetRuntimeId()) // just append self ID to related runtimes for long chain runtime
 
 	dbID, err := yakit.CreateOrUpdateAIAgentRuntime(c.GetDB(), runtime)
 	if err != nil {
