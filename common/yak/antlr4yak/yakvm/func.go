@@ -249,10 +249,10 @@ func (vm *Frame) CallYakFunction(asyncCall bool, f *Function, vs []*Value) inter
 	params := YakVMValuesToFunctionMap(f, vs, vm.vm.config.GetFunctionNumberCheck())
 
 	if asyncCall {
-		vm.vm.ExecAsyncYakFunction(vm.ctx, f, params)
+		vm.vm.ExecAsyncYakFunction(vm.ctx, vm, f, params)
 		return nil
 	}
-	v, _ := vm.vm.ExecYakFunction(vm.ctx, f, params)
+	v, _ := vm.vm.execYakFunctionWithParentFrame(vm.ctx, vm, f, params, nil)
 
 	return v
 }
@@ -265,7 +265,7 @@ func (vm *Frame) CallLuaFunction(asyncCall bool, f *Function, vs []*Value) inter
 	//	vm.vm.ExecAsyncYakFunction(f, params)
 	//	return nil
 	//}
-	v, _ := vm.vm.ExecYakFunction(vm.ctx, f, params)
+	v, _ := vm.vm.execYakFunctionWithParentFrame(vm.ctx, vm, f, params, nil)
 
 	return v
 }

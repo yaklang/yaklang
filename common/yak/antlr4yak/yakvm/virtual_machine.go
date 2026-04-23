@@ -34,11 +34,6 @@ func GetFlag(flags ...ExecFlag) ExecFlag {
 	return flag
 }
 
-// vmCurrentFrameKey is the context key for the current executing Frame.
-// Storing the frame in context makes sub-function calls goroutine-safe:
-// each call chain carries its own Frame reference instead of sharing VMStack.Peek().
-type vmCurrentFrameKey struct{}
-
 type YakitFeedbacker interface{}
 type (
 	BreakPointFactoryFun func(v *VirtualMachine) bool
@@ -47,8 +42,6 @@ type (
 		globalVar        *limitedmap.ReadOnlyMap
 		runtimeGlobalVar *limitedmap.SafeMap
 
-		VMStack       *vmstack.Stack
-		vmstackMu     sync.Mutex
 		frameStacksMu sync.RWMutex
 		frameStacks   map[int64]*vmstack.Stack
 		rootScope     *Scope
@@ -152,7 +145,6 @@ func NewWithSymbolTable(table *SymbolTable) *VirtualMachine {
 	v := &VirtualMachine{
 		// rootSymbol: table,
 		rootScope:        NewScope(table),
-		VMStack:          vmstack.New(),
 		frameStacks:      make(map[int64]*vmstack.Stack),
 		globalVar:        limitedmap.NewReadOnlyMap(map[string]any{}),
 		runtimeGlobalVar: limitedmap.NewSafeMap(map[string]any{}),
@@ -255,16 +247,20 @@ func (n *VirtualMachine) GetDebugger() *Debugger {
 }
 
 func (v *VirtualMachine) ExecYakFunction(ctx context.Context, f *Function, args map[int]*Value, flags ...ExecFlag) (interface{}, error) {
-	return v.ExecYakFunctionEx(ctx, f, args, nil, flags...)
+	return v.execYakFunctionWithParentFrame(ctx, nil, f, args, nil, flags...)
 }
 
 func (v *VirtualMachine) ExecYakFunctionEx(ctx context.Context, f *Function, args map[int]*Value, frameCallback func(*Frame), flags ...ExecFlag) (interface{}, error) {
+	return v.execYakFunctionWithParentFrame(ctx, nil, f, args, frameCallback, flags...)
+}
+
+func (v *VirtualMachine) execYakFunctionWithParentFrame(ctx context.Context, parentFrame *Frame, f *Function, args map[int]*Value, frameCallback func(*Frame), flags ...ExecFlag) (interface{}, error) {
 	var value interface{}
 	finalFlags := []ExecFlag{Sub}
 	if len(flags) > 0 {
 		finalFlags = flags
 	}
-	err := v.Exec(ctx, func(frame *Frame) {
+	err := v.exec(ctx, parentFrame, func(frame *Frame) {
 		if v.sandboxMode && f.defineFrame != nil {
 			frame = NewSubFrame(f.defineFrame)
 		}
@@ -296,15 +292,14 @@ func (v *VirtualMachine) ExecYakFunctionEx(ctx context.Context, f *Function, arg
 	return value, nil
 }
 
-func (v *VirtualMachine) ExecAsyncYakFunction(ctx context.Context, f *Function, args map[int]*Value) error {
+func (v *VirtualMachine) ExecAsyncYakFunction(ctx context.Context, parentFrame *Frame, f *Function, args map[int]*Value) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
 
-	parentFrame, _ := ctx.Value(vmCurrentFrameKey{}).(*Frame)
 	if parentFrame == nil && !(v.sandboxMode && f.defineFrame != nil) {
-		log.Errorf("BUG: VMStack is empty(Sub)")
-		return utils.Error("BUG: VMStack is empty(Sub)")
+		log.Errorf("BUG: current frame is empty(Sub)")
+		return utils.Error("BUG: current frame is empty(Sub)")
 	}
 
 	var frame *Frame
@@ -324,7 +319,6 @@ func (v *VirtualMachine) ExecAsyncYakFunction(ctx context.Context, f *Function, 
 		frame.CurrentScope().NewValueByID(id, arg)
 	}
 
-	ctx = context.WithValue(ctx, vmCurrentFrameKey{}, frame)
 	frame.ctx = ctx
 
 	go func() {
@@ -362,6 +356,10 @@ func (v *VirtualMachine) InlineExecYakCode(ctx context.Context, codes []*Code, f
 }
 
 func (v *VirtualMachine) Exec(ctx context.Context, f func(frame *Frame), flags ...ExecFlag) error {
+	return v.exec(ctx, nil, f, flags...)
+}
+
+func (v *VirtualMachine) exec(ctx context.Context, parentFrame *Frame, f func(frame *Frame), flags ...ExecFlag) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
@@ -370,24 +368,20 @@ func (v *VirtualMachine) Exec(ctx context.Context, f func(frame *Frame), flags .
 
 	var frame *Frame
 	if flag&Sub == Sub {
-		// Get parent frame from context instead of VMStack.Peek().
-		// This makes concurrent calls goroutine-safe: each call chain carries its
-		// own Frame via context rather than competing on a shared VMStack.
-		parentFrame, _ := ctx.Value(vmCurrentFrameKey{}).(*Frame)
 		if parentFrame == nil {
-			log.Errorf("BUG: VMStack is empty(Sub)")
-			return utils.Error("BUG: VMStack is empty(Sub)")
+			parentFrame = v.peekCurrentFrame()
+		}
+		if parentFrame == nil {
+			log.Errorf("BUG: current frame is empty(Sub)")
+			return utils.Error("BUG: current frame is empty(Sub)")
 		}
 		frame = NewSubFrame(parentFrame)
 	} else if flag&Inline == Inline {
-		// Inline mode reuses the current frame in-place (used by eval/debugger).
-		// It is not designed for concurrent use; keep VMStack-based lookup here.
 		topFrame := v.peekCurrentFrame()
 
 		if topFrame == nil {
 			topFrame = NewFrame(v)
-			v.pushCurrentFrame(topFrame)
-			log.Debugf("VMStack is empty(Inline), we create new frame")
+			log.Debugf("current frame is empty(Inline), create new frame")
 		}
 
 		frame = topFrame
@@ -408,14 +402,13 @@ func (v *VirtualMachine) Exec(ctx context.Context, f func(frame *Frame), flags .
 		frame.coroutine = NewCoroutine()
 	}
 
-	// Store the current frame in context so nested Sub-mode calls (child function
-	// invocations) can find their correct parent frame without touching VMStack.
-	ctx = context.WithValue(ctx, vmCurrentFrameKey{}, frame)
-	// frame.ctx propagates the updated context to child calls via
-	// frame.CallYakFunction(vm.ctx, ...) in func.go.
 	frame.ctx = ctx
 
 	v.pushCurrentFrame(frame)
+	shouldPop := flag&Trace != Trace
+	if shouldPop {
+		defer v.popCurrentFrame()
+	}
 
 	frame.debug = v.debug
 	if v.debugMode && v.debugger != nil && v.debugger.initFunc != nil {
@@ -424,9 +417,6 @@ func (v *VirtualMachine) Exec(ctx context.Context, f func(frame *Frame), flags .
 
 	f(frame)
 
-	if flag&Trace != Trace {
-		v.popCurrentFrame()
-	}
 	if flag&Asnyc != Asnyc {
 		if lastPanic := frame.recover(); lastPanic != nil {
 			lastPanic.contextInfos.Peek().(*PanicInfo).SetPositionVerbose(frame.GetVerbose())
@@ -465,7 +455,7 @@ func currentGoroutineID() int64 {
 	return id
 }
 
-func (v *VirtualMachine) getCurrentFrameStack(gid int64, create bool) *vmstack.Stack {
+func (v *VirtualMachine) getGoroutineFrameStack(gid int64, create bool) *vmstack.Stack {
 	v.frameStacksMu.Lock()
 	defer v.frameStacksMu.Unlock()
 
@@ -481,7 +471,7 @@ func (v *VirtualMachine) getCurrentFrameStack(gid int64, create bool) *vmstack.S
 
 func (v *VirtualMachine) pushCurrentFrame(frame *Frame) {
 	gid := currentGoroutineID()
-	stack := v.getCurrentFrameStack(gid, true)
+	stack := v.getGoroutineFrameStack(gid, true)
 	stack.Push(frame)
 }
 
