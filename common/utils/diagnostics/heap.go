@@ -24,6 +24,7 @@ type heapDumpConfig struct {
 	memThreshold uint64
 	name         string
 	fileName     string
+	dumpDir      string
 	disable      bool
 	maxDumps     int
 	runtimeGC    bool
@@ -61,6 +62,12 @@ func WithHeapFile(name string) HeapDumpOption {
 			name += ".pb.gz"
 		}
 		cfg.fileName = name
+	}
+}
+
+func WithDumpDir(dir string) HeapDumpOption {
+	return func(cfg *heapDumpConfig) {
+		cfg.dumpDir = strings.TrimSpace(dir)
 	}
 }
 
@@ -117,6 +124,10 @@ func startHTTPServer(addr string) {
 			}
 		}
 	}()
+}
+
+func StartPprofServer(addr string) {
+	startHTTPServer(strings.TrimSpace(addr))
 }
 
 func DumpHeap(opts ...HeapDumpOption) bool {
@@ -272,6 +283,9 @@ func resolveHeapProfileTarget(cfg heapDumpConfig, alloc uint64, phase string) st
 			name += "_" + phase
 		}
 		name += ".pb.gz"
+		if dir := strings.TrimSpace(cfg.dumpDir); dir != "" {
+			return filepath.Join(dir, name)
+		}
 		if dir := strings.TrimSpace(os.Getenv(envHeapDumpDir)); dir != "" {
 			return filepath.Join(dir, name)
 		}
