@@ -3,7 +3,6 @@ package aicommon
 import (
 	"context"
 	"errors"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -11,8 +10,68 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils/chanx"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
+
+const (
+	testAsyncTimeout = 2 * time.Second
+	testNoSignalWait = 200 * time.Millisecond
+)
+
+func waitForSignal(t *testing.T, ch <-chan struct{}, timeout time.Duration, message string) {
+	t.Helper()
+
+	select {
+	case <-ch:
+	case <-time.After(timeout):
+		t.Fatal(message)
+	}
+}
+
+func waitForSignals(t *testing.T, ch <-chan struct{}, count int, timeout time.Duration, message string) {
+	t.Helper()
+
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+
+	for i := 0; i < count; i++ {
+		select {
+		case <-ch:
+		case <-timer.C:
+			t.Fatal(message)
+		}
+	}
+}
+
+func assertNoSignal(t *testing.T, ch <-chan struct{}, timeout time.Duration, message string) {
+	t.Helper()
+
+	select {
+	case <-ch:
+		t.Fatal(message)
+	case <-time.After(timeout):
+	}
+}
+
+func startEventLoopWithSignals(c *Config, ctx context.Context) (<-chan struct{}, <-chan struct{}) {
+	started := make(chan struct{}, 1)
+	done := make(chan struct{}, 1)
+
+	c.StartEventLoopEx(ctx, func() {
+		started <- struct{}{}
+	}, func() {
+		done <- struct{}{}
+	})
+
+	return started, done
+}
+
+func newTestEventInputChan() (*chanx.UnlimitedChan[*ypb.AIInputEvent], chan *ypb.AIInputEvent) {
+	in := make(chan *ypb.AIInputEvent, 8)
+	out := make(chan *ypb.AIInputEvent, 8)
+	return chanx.NewUnlimitedChanEx(context.Background(), in, out, 8), out
+}
 
 func TestDoWaitAgreeWithPolicy_AI_ContextCancel(t *testing.T) {
 	t.Run("AI policy unblocks when RiskControl fails", func(t *testing.T) {
@@ -49,9 +108,11 @@ func TestDoWaitAgreeWithPolicy_AI_ContextCancel(t *testing.T) {
 
 	t.Run("AI policy unblocks when parent ctx cancelled externally", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
+		reviewStarted := make(chan struct{}, 1)
 		c := NewTestConfig(ctx,
 			WithAgreePolicy(AgreePolicyAI),
 			WithAiAgreeRiskControl(func(ctx context.Context, _ *Config, _ *Endpoint) (*Action, error) {
+				reviewStarted <- struct{}{}
 				<-ctx.Done()
 				return nil, ctx.Err()
 			}),
@@ -67,12 +128,12 @@ func TestDoWaitAgreeWithPolicy_AI_ContextCancel(t *testing.T) {
 			c.DoWaitAgreeWithPolicy(ctx, AgreePolicyAI, ep)
 		}()
 
-		time.Sleep(50 * time.Millisecond)
+		waitForSignal(t, reviewStarted, testAsyncTimeout, "AI review callback did not start")
 		cancel()
 
 		select {
 		case <-done:
-		case <-time.After(3 * time.Second):
+		case <-time.After(testAsyncTimeout):
 			t.Fatal("DoWaitAgreeWithPolicy should unblock when context is cancelled")
 		}
 	})
@@ -90,12 +151,11 @@ func TestDoWaitAgreeWithPolicy_AI_ContextCancel(t *testing.T) {
 			c.DoWaitAgreeWithPolicy(ctx, AgreePolicyManual, ep)
 		}()
 
-		time.Sleep(50 * time.Millisecond)
 		cancel()
 
 		select {
 		case <-done:
-		case <-time.After(3 * time.Second):
+		case <-time.After(testAsyncTimeout):
 			t.Fatal("DoWaitAgreeWithPolicy with Manual should unblock when context cancelled")
 		}
 	})
@@ -166,89 +226,117 @@ func TestDoWaitAgreeWithPolicy_AI_ContextCancel(t *testing.T) {
 func TestEventLoop_DrainPendingEvents(t *testing.T) {
 	t.Run("sync events are drained after context cancel", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
-		c := NewTestConfig(ctx)
+		eventInput, outputChan := newTestEventInputChan()
+		defer eventInput.CloseForce()
 
-		var processed int32
+		c := NewTestConfig(ctx, WithEventInputChanx(eventInput))
+
+		processed := make(chan struct{}, 2)
 		c.InputEventManager.RegisterSyncCallback("test_drain_sync", func(event *ypb.AIInputEvent) error {
-			atomic.AddInt32(&processed, 1)
+			processed <- struct{}{}
 			return nil
 		})
 
-		c.StartEventLoop(ctx)
-		time.Sleep(50 * time.Millisecond)
-
-		c.EventInputChan.SafeFeed(&ypb.AIInputEvent{
+		outputChan <- &ypb.AIInputEvent{
 			IsSyncMessage: true,
 			SyncType:      "test_drain_sync",
-		})
-		c.EventInputChan.SafeFeed(&ypb.AIInputEvent{
+		}
+		outputChan <- &ypb.AIInputEvent{
 			IsSyncMessage: true,
 			SyncType:      "test_drain_sync",
+		}
+
+		loopStarted := make(chan struct{}, 1)
+		loopDone := make(chan struct{}, 1)
+		c.StartEventLoopEx(ctx, func() {
+			loopStarted <- struct{}{}
+			cancel()
+		}, func() {
+			loopDone <- struct{}{}
 		})
 
-		time.Sleep(50 * time.Millisecond)
-		cancel()
-		time.Sleep(200 * time.Millisecond)
-
-		count := atomic.LoadInt32(&processed)
-		assert.GreaterOrEqual(t, count, int32(2),
-			"all sync events fed before cancel should be processed (got %d)", count)
+		waitForSignal(t, loopStarted, testAsyncTimeout, "event loop did not start")
+		waitForSignals(t, processed, 2, testAsyncTimeout,
+			"all sync events fed before cancel should be processed")
+		waitForSignal(t, loopDone, testAsyncTimeout, "event loop did not exit after cancel")
 	})
 
 	t.Run("events fed concurrently with cancel are handled", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
-		c := NewTestConfig(ctx)
+		eventInput, outputChan := newTestEventInputChan()
+		defer eventInput.CloseForce()
 
-		var processed int32
-		c.InputEventManager.RegisterSyncCallback("test_concurrent_cancel", func(event *ypb.AIInputEvent) error {
-			atomic.AddInt32(&processed, 1)
+		c := NewTestConfig(ctx, WithEventInputChanx(eventInput))
+
+		processed := make(chan struct{}, 2)
+		firstStarted := make(chan struct{}, 1)
+		releaseFirst := make(chan struct{})
+		c.InputEventManager.RegisterSyncCallback("test_concurrent_cancel_first", func(event *ypb.AIInputEvent) error {
+			firstStarted <- struct{}{}
+			<-releaseFirst
+			processed <- struct{}{}
+			return nil
+		})
+		c.InputEventManager.RegisterSyncCallback("test_concurrent_cancel_second", func(event *ypb.AIInputEvent) error {
+			processed <- struct{}{}
 			return nil
 		})
 
-		c.StartEventLoop(ctx)
-		time.Sleep(50 * time.Millisecond)
-
-		c.EventInputChan.SafeFeed(&ypb.AIInputEvent{
+		outputChan <- &ypb.AIInputEvent{
 			IsSyncMessage: true,
-			SyncType:      "test_concurrent_cancel",
-		})
-		cancel()
-		c.EventInputChan.SafeFeed(&ypb.AIInputEvent{
-			IsSyncMessage: true,
-			SyncType:      "test_concurrent_cancel",
+			SyncType:      "test_concurrent_cancel_first",
+		}
+
+		loopStarted := make(chan struct{}, 1)
+		loopDone := make(chan struct{}, 1)
+		c.StartEventLoopEx(ctx, func() {
+			loopStarted <- struct{}{}
+			cancel()
+		}, func() {
+			loopDone <- struct{}{}
 		})
 
-		time.Sleep(300 * time.Millisecond)
-		count := atomic.LoadInt32(&processed)
-		assert.GreaterOrEqual(t, count, int32(1),
-			"at least the event fed before cancel should be processed")
+		waitForSignal(t, loopStarted, testAsyncTimeout, "event loop did not start")
+		waitForSignal(t, firstStarted, testAsyncTimeout,
+			"the first sync event did not enter drainPendingEvents")
+
+		outputChan <- &ypb.AIInputEvent{
+			IsSyncMessage: true,
+			SyncType:      "test_concurrent_cancel_second",
+		}
+		close(releaseFirst)
+
+		waitForSignals(t, processed, 2, testAsyncTimeout,
+			"sync events queued around cancel should be processed")
+		waitForSignal(t, loopDone, testAsyncTimeout, "event loop did not exit after cancel")
 	})
 
 	t.Run("non-sync events are not drained after cancel", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
-		c := NewTestConfig(ctx)
+		eventInput, outputChan := newTestEventInputChan()
+		defer eventInput.CloseForce()
 
-		var mirrorCount int32
+		c := NewTestConfig(ctx, WithEventInputChanx(eventInput))
+
+		mirrorTriggered := make(chan struct{}, 1)
 		c.InputEventManager.RegisterMirrorOfAIInputEvent("test_drain_mirror",
 			func(event *ypb.AIInputEvent) {
-				atomic.AddInt32(&mirrorCount, 1)
+				mirrorTriggered <- struct{}{}
 			},
 		)
 
-		c.StartEventLoop(ctx)
-		time.Sleep(50 * time.Millisecond)
+		loopStarted, loopDone := startEventLoopWithSignals(c, ctx)
+		waitForSignal(t, loopStarted, testAsyncTimeout, "event loop did not start")
 
 		cancel()
-		time.Sleep(50 * time.Millisecond)
+		waitForSignal(t, loopDone, testAsyncTimeout, "event loop did not exit after cancel")
 
-		c.EventInputChan.SafeFeed(&ypb.AIInputEvent{
+		outputChan <- &ypb.AIInputEvent{
 			IsFreeInput: true,
 			FreeInput:   "should not be processed after cancel",
-		})
-		time.Sleep(200 * time.Millisecond)
+		}
 
-		count := atomic.LoadInt32(&mirrorCount)
-		assert.Equal(t, int32(0), count,
+		assertNoSignal(t, mirrorTriggered, testNoSignalWait,
 			"non-sync events should not be processed after cancel")
 	})
 }
