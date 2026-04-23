@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -227,42 +228,46 @@ func (m *AuthMiddleware) GetAuthInfo(request *http.Request) *AuthInfo {
 		log.Warnf("Invalid or inactive X-Ops-Key: %s...", opsKey[:min(20, len(opsKey))])
 	}
 
-	// Try to get session from cookie
-	cookie, err := request.Cookie("admin_session")
-	if err != nil || cookie.Value == "" {
-		// Try ops_session cookie
-		cookie, err = request.Cookie("ops_session")
-		if err != nil || cookie.Value == "" {
-			// Check fallback password authentication (for backward compatibility)
-			query := request.URL.Query()
-			password := query.Get("password")
-			if m.server.AdminPassword != "" && password == m.server.AdminPassword {
-				authInfo.Authenticated = true
-				authInfo.Username = "root"
-				authInfo.Role = RoleAdmin
-				authInfo.UserID = 0
-				log.Debugf("Auth via query password for root admin")
-				return authInfo
-			}
-			return authInfo
+	// Try to resolve a valid session from cookies.
+	// Browsers may carry both admin_session and ops_session simultaneously
+	// (e.g. stale admin cookie left over after logging in as OPS).
+	// We try each cookie and pick the FIRST one that resolves to an
+	// existing, non-expired row in the database, rather than locking onto
+	// admin_session just because it has a non-empty value.
+	candidateCookies := []string{"admin_session", "ops_session"}
+	var dbSession *schema.LoginSession
+	var resolvedSessionID string
+	for _, name := range candidateCookies {
+		ck, cerr := request.Cookie(name)
+		if cerr != nil || ck == nil || ck.Value == "" {
+			continue
 		}
+		sess := resolveSession(ck.Value)
+		if sess == nil {
+			log.Debugf("Auth: cookie %s=%s... is stale or invalid, trying next", name, safePrefix(ck.Value, 12))
+			continue
+		}
+		dbSession = sess
+		resolvedSessionID = ck.Value
+		break
 	}
 
-	sessionID := cookie.Value
-	authInfo.SessionID = sessionID
-
-	// Get session from database
-	var dbSession schema.LoginSession
-	err = GetDB().Where("session_id = ?", sessionID).First(&dbSession).Error
-	if err != nil {
-		log.Debugf("Session not found: %s", sessionID)
+	if dbSession == nil {
+		// Check fallback password authentication (for backward compatibility)
+		query := request.URL.Query()
+		password := query.Get("password")
+		if m.server.AdminPassword != "" && password == m.server.AdminPassword {
+			authInfo.Authenticated = true
+			authInfo.Username = "root"
+			authInfo.Role = RoleAdmin
+			authInfo.UserID = 0
+			log.Debugf("Auth via query password for root admin")
+			return authInfo
+		}
 		return authInfo
 	}
 
-	// Check if session has expired
-	// Note: We rely on SessionManager to clean up expired sessions
-
-	// Extract user info from session
+	authInfo.SessionID = resolvedSessionID
 	authInfo.Authenticated = true
 	authInfo.UserID = dbSession.UserID
 	authInfo.Username = dbSession.Username
@@ -275,9 +280,39 @@ func (m *AuthMiddleware) GetAuthInfo(request *http.Request) *AuthInfo {
 	}
 
 	log.Debugf("Auth info extracted: user=%s, role=%s, session=%s",
-		authInfo.Username, authInfo.Role, sessionID)
+		authInfo.Username, authInfo.Role, resolvedSessionID)
 
 	return authInfo
+}
+
+// resolveSession looks up a session by ID from the database and returns it
+// only if the session exists AND has not expired. Returns nil otherwise.
+func resolveSession(sessionID string) *schema.LoginSession {
+	if sessionID == "" {
+		return nil
+	}
+	db := GetDB()
+	if db == nil {
+		return nil
+	}
+	var dbSession schema.LoginSession
+	if err := db.Where("session_id = ?", sessionID).First(&dbSession).Error; err != nil {
+		return nil
+	}
+	// Filter expired sessions explicitly so stale rows (not yet cleaned
+	// up by the background sweeper) cannot authenticate a request.
+	if !dbSession.ExpiresAt.IsZero() && time.Now().After(dbSession.ExpiresAt) {
+		return nil
+	}
+	return &dbSession
+}
+
+// safePrefix returns up to n characters of s, useful for truncated logging.
+func safePrefix(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n]
 }
 
 // CheckPermission checks if the request has permission to access the path

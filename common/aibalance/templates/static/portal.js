@@ -822,6 +822,9 @@
             if (tabId === 'rate-limit') {
                 loadRateLimitConfig();
                 loadRateLimitStatus();
+                startRateLimitModelStatsAutoRefresh();
+            } else {
+                stopRateLimitModelStatsAutoRefresh();
             }
         }
 
@@ -1663,6 +1666,7 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
             } else if (initialTabId === 'rate-limit') {
                 loadRateLimitConfig();
                 loadRateLimitStatus();
+                startRateLimitModelStatsAutoRefresh();
             }
             // --- END: Tab Initialization Logic ---
 
@@ -5789,6 +5793,94 @@ curl '${metaApiUrl}?name=${modelName}'`;
             } catch (error) {
                 console.error('Error loading rate limit status:', error);
             }
+            // Clicking "刷新状态" should refresh hot-model stats as well.
+            loadRateLimitModelStats();
+        }
+
+        // ===== Hot-model RPM stats (cross-apiKey aggregated, recent 60s) =====
+        // NOTE: use `var` and a shared threshold helper instead of a
+        // top-level `const` to avoid any TDZ risk (observed in production
+        // when other init paths reach these functions before the declaration
+        // line is executed, e.g. via cached page state).
+        var rateLimitModelStatsTimer = null;
+        function getRateLimitModelMinRPM() { return 20; }
+
+        async function loadRateLimitModelStats() {
+            const tbody = document.getElementById('rl-model-stats-tbody');
+            if (!tbody) return;
+            const minRPM = getRateLimitModelMinRPM();
+            try {
+                const response = await fetch('/portal/api/rate-limit-model-stats?min_rpm=' + minRPM);
+                if (!response.ok) throw new Error('Failed to fetch model RPM stats');
+                const data = await response.json();
+                if (isAuthError(data)) { handleAuthError(); return; }
+                if (!data.success) {
+                    tbody.innerHTML = '<tr><td colspan="4" style="padding: 12px; text-align: center; color: #c62828;">加载失败</td></tr>';
+                    return;
+                }
+                const windowEl = document.getElementById('rl-model-window');
+                if (windowEl && data.window_seconds) windowEl.textContent = data.window_seconds;
+                const minEl = document.getElementById('rl-model-min-rpm');
+                if (minEl && (data.min_rpm || data.min_rpm === 0)) minEl.textContent = data.min_rpm;
+
+                const models = Array.isArray(data.models) ? data.models : [];
+                if (models.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" style="padding: 12px; text-align: center; color: #999;">当前没有模型 RPM ≥ ' + (data.min_rpm || minRPM) + '</td></tr>';
+                } else {
+                    tbody.innerHTML = models.map(m => {
+                        const effective = Number(m.effective_rpm) || 0;
+                        const rpm = Number(m.rpm) || 0;
+                        let ratioText = '--';
+                        let color = '#555';
+                        if (effective > 0) {
+                            const ratio = rpm / effective;
+                            ratioText = (ratio * 100).toFixed(1) + '%';
+                            if (ratio >= 0.9) color = '#c62828';
+                            else if (ratio >= 0.6) color = '#ef6c00';
+                            else color = '#2e7d32';
+                        }
+                        const modelName = String(m.model == null ? '' : m.model)
+                            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                        return '<tr>' +
+                            '<td style="padding: 8px 10px; border-bottom: 1px solid #f0e4c0; font-family: monospace;">' + modelName + '</td>' +
+                            '<td style="padding: 8px 10px; border-bottom: 1px solid #f0e4c0; text-align: right; font-family: monospace;"><strong>' + rpm + '</strong></td>' +
+                            '<td style="padding: 8px 10px; border-bottom: 1px solid #f0e4c0; text-align: right; font-family: monospace;">' + (effective > 0 ? effective : '--') + '</td>' +
+                            '<td style="padding: 8px 10px; border-bottom: 1px solid #f0e4c0; text-align: right; font-family: monospace; color: ' + color + ';">' + ratioText + '</td>' +
+                            '</tr>';
+                    }).join('');
+                }
+
+                const updatedEl = document.getElementById('rl-model-updated-at');
+                if (updatedEl) {
+                    const now = new Date();
+                    const pad = n => String(n).padStart(2, '0');
+                    updatedEl.textContent = '更新于 ' + pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
+                }
+            } catch (error) {
+                console.error('Error loading model RPM stats:', error);
+                if (tbody) {
+                    tbody.innerHTML = '<tr><td colspan="4" style="padding: 12px; text-align: center; color: #c62828;">加载异常: ' + (error.message || 'unknown') + '</td></tr>';
+                }
+            }
+        }
+
+        // Start / stop the 10s auto-refresh based on whether the rate-limit
+        // tab is the active tab. We also stop when the page is hidden so
+        // background tabs don't waste bandwidth.
+        function startRateLimitModelStatsAutoRefresh() {
+            stopRateLimitModelStatsAutoRefresh();
+            loadRateLimitModelStats();
+            rateLimitModelStatsTimer = setInterval(() => {
+                if (document.hidden) return;
+                loadRateLimitModelStats();
+            }, 10000);
+        }
+
+        function stopRateLimitModelStatsAutoRefresh() {
+            if (rateLimitModelStatsTimer) {
+                clearInterval(rateLimitModelStatsTimer);
+                rateLimitModelStatsTimer = null;
+            }
         }
 
         function renderModelRPMOverrides(overrides) {
@@ -5841,4 +5933,7 @@ curl '${metaApiUrl}?name=${modelName}'`;
         window.loadRateLimitConfig = loadRateLimitConfig;
         window.saveRateLimitConfig = saveRateLimitConfig;
         window.loadRateLimitStatus = loadRateLimitStatus;
+        window.loadRateLimitModelStats = loadRateLimitModelStats;
+        window.startRateLimitModelStatsAutoRefresh = startRateLimitModelStatsAutoRefresh;
+        window.stopRateLimitModelStatsAutoRefresh = stopRateLimitModelStatsAutoRefresh;
         window.addModelRPMOverride = addModelRPMOverride;

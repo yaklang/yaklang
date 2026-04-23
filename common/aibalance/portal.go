@@ -385,9 +385,12 @@ func (c *ServerConfig) processLogin(conn net.Conn, request *http.Request) {
 
 	session := c.SessionManager.CreateSession()
 
+	// Clear any stale ops_session cookie so the next request resolves
+	// to this fresh admin session unambiguously.
 	header := "HTTP/1.1 303 See Other\r\n" +
 		"Location: /portal\r\n" +
 		"Set-Cookie: admin_session=" + session + "; Path=/; HttpOnly; SameSite=Strict\r\n" +
+		"Set-Cookie: ops_session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Strict\r\n" +
 		"\r\n"
 	conn.Write([]byte(header))
 }
@@ -402,9 +405,11 @@ func (c *ServerConfig) handleLogout(conn net.Conn, request *http.Request) {
 		}
 	}
 
+	// Also clear ops_session to prevent cross-role residue.
 	header := "HTTP/1.1 303 See Other\r\n" +
 		"Location: /portal\r\n" +
 		"Set-Cookie: admin_session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Strict\r\n" +
+		"Set-Cookie: ops_session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Strict\r\n" +
 		"\r\n"
 	conn.Write([]byte(header))
 }
@@ -705,6 +710,8 @@ func (c *ServerConfig) HandlePortalRequest(conn net.Conn, request *http.Request,
 		c.handleSetRateLimitConfig(conn, request)
 	case uriIns.Path == "/portal/api/rate-limit-status" && request.Method == "GET":
 		c.handleGetRateLimitStatus(conn, request)
+	case uriIns.Path == "/portal/api/rate-limit-model-stats" && request.Method == "GET":
+		c.handleGetRateLimitModelStats(conn, request)
 
 	// ========== Portal Data API Routes ==========
 	case uriIns.Path == "/portal/api/data":
@@ -924,9 +931,13 @@ func (c *ServerConfig) processOpsLogin(conn net.Conn, request *http.Request) {
 
 	log.Infof("OPS user logged in successfully: %s (ID: %d)", username, user.ID)
 
+	// Clear any stale admin_session cookie so that subsequent requests
+	// carrying both cookies resolve to this ops session, not a dangling
+	// admin one.
 	header := "HTTP/1.1 303 See Other\r\n" +
 		"Location: /ops/dashboard\r\n" +
 		"Set-Cookie: ops_session=" + session + "; Path=/; HttpOnly; SameSite=Strict\r\n" +
+		"Set-Cookie: admin_session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Strict\r\n" +
 		"\r\n"
 	conn.Write([]byte(header))
 }
@@ -1008,9 +1019,11 @@ func (c *ServerConfig) handleOpsLogout(conn net.Conn, request *http.Request) {
 		}
 	}
 
+	// Clear both cookies so the browser is left in a clean state.
 	header := "HTTP/1.1 303 See Other\r\n" +
 		"Location: /ops/login\r\n" +
 		"Set-Cookie: ops_session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Strict\r\n" +
+		"Set-Cookie: admin_session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Strict\r\n" +
 		"\r\n"
 	conn.Write([]byte(header))
 }
