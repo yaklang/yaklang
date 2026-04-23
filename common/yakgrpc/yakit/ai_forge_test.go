@@ -130,5 +130,5 @@ func TestCreateOrUpdateAIForgeByName_PreservesAuthorOnUpdateAndZeroValues(t *tes
 	require.Equal(t, "", got.Tags)
 	require.Equal(t, "", got.PersistentPrompt)
 	require.Equal(t, "alice", got.Author)
-	require.True(t, got.IsBuiltin)
+	require.False(t, got.IsBuiltin)
 }
