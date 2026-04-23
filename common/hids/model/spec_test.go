@@ -118,15 +118,91 @@ func TestDesiredSpecValidateAcceptsCoveredTemporaryRuleEventType(t *testing.T) {
 	}
 }
 
-func TestReportingPolicyDefaultsSnapshotObservationsOn(t *testing.T) {
+func TestReportingPolicyDefaultsSnapshotObservationsOff(t *testing.T) {
 	t.Parallel()
 
-	if !(ReportingPolicy{}).ShouldEmitSnapshotObservations() {
-		t.Fatal("expected snapshot observation export to default on")
+	if (ReportingPolicy{}).ShouldEmitSnapshotObservations() {
+		t.Fatal("expected snapshot observation export to default off")
 	}
 
 	disabled := false
 	if (ReportingPolicy{EmitSnapshotObservations: &disabled}).ShouldEmitSnapshotObservations() {
 		t.Fatal("expected explicit false to disable snapshot observation export")
+	}
+
+	enabled := true
+	if !(ReportingPolicy{EmitSnapshotObservations: &enabled}).ShouldEmitSnapshotObservations() {
+		t.Fatal("expected explicit true to enable snapshot observation export")
+	}
+}
+
+func TestDesiredSpecParsesBaselineAndContextPolicy(t *testing.T) {
+	t.Parallel()
+
+	spec, err := ParseDesiredSpec([]byte(`{
+		"collectors": {
+			"process": {"enabled": true, "backend": "ebpf"},
+			"network": {"enabled": true, "backend": "ebpf"}
+		},
+		"context_policy": {
+			"short_term_window_minutes": 5
+		},
+		"baseline_policy": {
+			"host_users": {
+				"frozen_users": [
+					{"username": "root", "uid": "0", "groups": ["root"], "privileged": true}
+				]
+			},
+			"network": {
+				"frozen_allowlist": [
+					{"direction": "OUTBOUND", "protocol": "TCP", "dest_cidr": "10.0.0.1", "dest_port": 443}
+				]
+			},
+			"drift_alerts": {
+				"aggregation_window_minutes": 15,
+				"max_aggregation_entries": 32
+			}
+		}
+	}`))
+	if err != nil {
+		t.Fatalf("ParseDesiredSpec returned error: %v", err)
+	}
+	if spec.ContextPolicy.ShortTermWindowMinutes != 5 {
+		t.Fatalf("unexpected short term window: %d", spec.ContextPolicy.ShortTermWindowMinutes)
+	}
+	if got := len(spec.BaselinePolicy.HostUsers.FrozenUsers); got != 1 {
+		t.Fatalf("unexpected frozen user count: %d", got)
+	}
+	if got := spec.BaselinePolicy.Network.FrozenAllowlist[0].DestCIDR; got != "10.0.0.1/32" {
+		t.Fatalf("unexpected normalized dest cidr: %s", got)
+	}
+	if got := spec.BaselinePolicy.Network.FrozenAllowlist[0].Direction; got != "outbound" {
+		t.Fatalf("unexpected direction: %s", got)
+	}
+	if got := spec.BaselinePolicy.DriftAlerts.Severity; got != DefaultBaselineDriftSeverity {
+		t.Fatalf("unexpected drift severity: %s", got)
+	}
+}
+
+func TestDesiredSpecRejectsInvalidBaselinePolicy(t *testing.T) {
+	t.Parallel()
+
+	_, err := ParseDesiredSpec([]byte(`{
+		"collectors": {
+			"network": {"enabled": true, "backend": "ebpf"}
+		},
+		"baseline_policy": {
+			"network": {
+				"frozen_allowlist": [
+					{"direction": "outbound", "protocol": "tcp", "dest_cidr": "not a cidr", "dest_port": 443}
+				]
+			}
+		}
+	}`))
+	if err == nil {
+		t.Fatal("expected validation error")
+	}
+	if got := err.Error(); got != "baseline_policy.network.frozen_allowlist[0].dest_cidr: must be a valid CIDR prefix" {
+		t.Fatalf("unexpected validation error: %s", got)
 	}
 }

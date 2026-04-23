@@ -148,71 +148,41 @@ func IsKubernetesAPIPort(protocol string, port int) bool {
 }
 
 func ProcessRoles(name string, image string, command string) []string {
-	candidates := processCandidates(name, image, command)
-	if len(candidates) == 0 {
+	mask := processRoleMask(name, image, command)
+	if mask == 0 {
 		return nil
 	}
 
 	roles := make([]string, 0, 5)
-	appendRole := func(role string) {
-		for _, existing := range roles {
-			if existing == role {
-				return
-			}
-		}
-		roles = append(roles, role)
+	if mask&processRoleShell != 0 {
+		roles = append(roles, "shell")
 	}
-
-	if matchesProcessCandidatesExact(candidates,
-		"sh", "bash", "zsh", "dash", "ash", "fish", "ksh", "csh", "tcsh",
-	) {
-		appendRole("shell")
+	if mask&processRoleInterpreter != 0 {
+		roles = append(roles, "interpreter")
 	}
-	if matchesProcessCandidatesPrefix(candidates,
-		"python", "perl", "ruby", "php", "node", "lua", "java", "tclsh",
-	) {
-		appendRole("interpreter")
+	if mask&processRoleNetworkTool != 0 {
+		roles = append(roles, "network_tool")
 	}
-	if matchesProcessCandidatesExact(candidates,
-		"curl", "wget", "nc", "ncat", "netcat", "socat", "ssh", "telnet", "ftp", "tftp", "scp", "sftp", "openssl",
-	) {
-		appendRole("network_tool")
+	if mask&processRoleWeb != 0 {
+		roles = append(roles, "web")
 	}
-	if matchesProcessCandidatesPrefix(candidates,
-		"nginx", "httpd", "apache2", "caddy", "openresty", "lighttpd",
-		"php-fpm", "gunicorn", "uwsgi", "uWSGI", "tomcat", "jetty",
-	) {
-		appendRole("web")
-	}
-	if matchesProcessCandidatesExact(candidates,
-		"sshd", "dropbear", "telnetd", "in.telnetd", "xrdp", "xrdp-sesman",
-		"x11vnc", "xvnc", "vino-server", "smbd", "ksmbd",
-	) {
-		appendRole("remote_admin_service")
-	}
-
-	if len(roles) == 0 {
-		return nil
+	if mask&processRoleRemoteAdminService != 0 {
+		roles = append(roles, "remote_admin_service")
 	}
 	return roles
 }
 
 func HasProcessRole(name string, image string, command string, role string) bool {
-	role = strings.TrimSpace(role)
-	if role == "" {
-		return false
-	}
-	for _, candidate := range ProcessRoles(name, image, command) {
-		if candidate == role {
-			return true
-		}
-	}
-	return false
+	return processRoleMask(name, image, command)&processRoleBit(role) != 0
 }
 
 func HasAnyProcessRole(name string, image string, command string, roles ...string) bool {
+	mask := processRoleMask(name, image, command)
+	if mask == 0 {
+		return false
+	}
 	for _, role := range roles {
-		if HasProcessRole(name, image, command, role) {
+		if mask&processRoleBit(role) != 0 {
 			return true
 		}
 	}
@@ -220,87 +190,202 @@ func HasAnyProcessRole(name string, image string, command string, roles ...strin
 }
 
 func IsExpectedListeningProcessForPort(port int, name string, image string, command string) bool {
-	candidates := processCandidates(name, image, command)
-	if len(candidates) == 0 {
+	candidates := newProcessCandidateSet(name, image, command)
+	if candidates.empty() {
 		return false
 	}
 
 	switch PortServiceName("tcp", port) {
 	case "ssh":
-		return matchesProcessCandidatesExact(candidates, "sshd", "dropbear")
+		return candidates.matchesExact("sshd", "dropbear")
 	case "telnet":
-		return matchesProcessCandidatesExact(candidates, "telnetd", "in.telnetd")
+		return candidates.matchesExact("telnetd", "in.telnetd")
 	case "rdp":
-		return matchesProcessCandidatesPrefix(candidates, "xrdp", "freerdp")
+		return candidates.matchesPrefix("xrdp", "freerdp")
 	case "vnc":
-		return matchesProcessCandidatesExact(candidates, "x11vnc", "xvnc", "vino-server")
+		return candidates.matchesExact("x11vnc", "xvnc", "vino-server")
 	case "smb":
-		return matchesProcessCandidatesExact(candidates, "smbd", "ksmbd")
+		return candidates.matchesExact("smbd", "ksmbd")
 	case "winrm":
-		return matchesProcessCandidatesPrefix(candidates, "wsman")
+		return candidates.matchesPrefix("wsman")
 	case "mysql":
-		return matchesProcessCandidatesExact(candidates, "mysqld", "mariadbd")
+		return candidates.matchesExact("mysqld", "mariadbd")
 	case "postgres":
-		return matchesProcessCandidatesPrefix(candidates, "postgres")
+		return candidates.matchesPrefix("postgres")
 	case "redis":
-		return matchesProcessCandidatesExact(candidates, "redis-server")
+		return candidates.matchesExact("redis-server")
 	case "memcached":
-		return matchesProcessCandidatesExact(candidates, "memcached")
+		return candidates.matchesExact("memcached")
 	case "mongodb":
-		return matchesProcessCandidatesExact(candidates, "mongod", "mongos")
+		return candidates.matchesExact("mongod", "mongos")
 	default:
 		return false
 	}
 }
 
-func processCandidates(name string, image string, command string) []string {
-	seen := map[string]struct{}{}
-	values := make([]string, 0, 6)
-	appendCandidate := func(value string) {
-		value = strings.TrimSpace(strings.ToLower(value))
-		if value == "" {
-			return
-		}
-		if _, exists := seen[value]; exists {
-			return
-		}
-		seen[value] = struct{}{}
-		values = append(values, value)
+const (
+	processRoleShell uint8 = 1 << iota
+	processRoleInterpreter
+	processRoleNetworkTool
+	processRoleWeb
+	processRoleRemoteAdminService
+)
+
+type processCandidateSet struct {
+	values [4]string
+	count  int
+}
+
+func processRoleMask(name string, image string, command string) uint8 {
+	candidates := newProcessCandidateSet(name, image, command)
+	if candidates.empty() {
+		return 0
 	}
 
-	appendCandidate(name)
-	appendCandidate(filepath.Base(strings.TrimSpace(image)))
+	var mask uint8
+	if candidates.matchesExact("sh", "bash", "zsh", "dash", "ash", "fish", "ksh", "csh", "tcsh") {
+		mask |= processRoleShell
+	}
+	if candidates.matchesPrefix("python", "perl", "ruby", "php", "node", "lua", "java", "tclsh") {
+		mask |= processRoleInterpreter
+	}
+	if candidates.matchesExact(
+		"curl", "wget", "nc", "ncat", "netcat", "socat", "ssh", "telnet", "ftp", "tftp", "scp", "sftp", "openssl",
+	) {
+		mask |= processRoleNetworkTool
+	}
+	if candidates.matchesPrefix(
+		"nginx", "httpd", "apache2", "caddy", "openresty", "lighttpd",
+		"php-fpm", "gunicorn", "uwsgi", "tomcat", "jetty",
+	) {
+		mask |= processRoleWeb
+	}
+	if candidates.matchesExact(
+		"sshd", "dropbear", "telnetd", "in.telnetd", "xrdp", "xrdp-sesman",
+		"x11vnc", "xvnc", "vino-server", "smbd", "ksmbd",
+	) {
+		mask |= processRoleRemoteAdminService
+	}
+	return mask
+}
 
+func processRoleBit(role string) uint8 {
+	switch strings.TrimSpace(role) {
+	case "shell":
+		return processRoleShell
+	case "interpreter":
+		return processRoleInterpreter
+	case "network_tool":
+		return processRoleNetworkTool
+	case "web":
+		return processRoleWeb
+	case "remote_admin_service":
+		return processRoleRemoteAdminService
+	default:
+		return 0
+	}
+}
+
+func newProcessCandidateSet(name string, image string, command string) processCandidateSet {
+	var candidates processCandidateSet
+	candidates.append(name)
+	candidates.append(filepath.Base(strings.TrimSpace(image)))
 	if firstField := firstCommandField(command); firstField != "" {
-		appendCandidate(firstField)
-		appendCandidate(filepath.Base(firstField))
+		candidates.append(firstField)
+		candidates.append(filepath.Base(firstField))
+	}
+	return candidates
+}
+
+func (c *processCandidateSet) append(value string) {
+	value = strings.TrimSpace(strings.ToLower(value))
+	if value == "" {
+		return
+	}
+	for index := 0; index < c.count; index++ {
+		if c.values[index] == value {
+			return
+		}
+	}
+	if c.count >= len(c.values) {
+		return
+	}
+	c.values[c.count] = value
+	c.count++
+}
+
+func (c processCandidateSet) empty() bool {
+	return c.count == 0
+}
+
+func (c processCandidateSet) matchesExact(values ...string) bool {
+	if c.count == 0 || len(values) == 0 {
+		return false
+	}
+	for index := 0; index < c.count; index++ {
+		candidate := c.values[index]
+		for _, value := range values {
+			if candidate == value {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (c processCandidateSet) matchesPrefix(values ...string) bool {
+	if c.count == 0 || len(values) == 0 {
+		return false
+	}
+	for index := 0; index < c.count; index++ {
+		candidate := c.values[index]
+		for _, value := range values {
+			if value == "" {
+				continue
+			}
+			if strings.HasPrefix(candidate, value) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func processCandidates(name string, image string, command string) []string {
+	candidates := newProcessCandidateSet(name, image, command)
+	if candidates.empty() {
+		return nil
+	}
+	values := make([]string, 0, candidates.count)
+	for index := 0; index < candidates.count; index++ {
+		values = append(values, candidates.values[index])
 	}
 	return values
 }
 
 func firstCommandField(command string) string {
-	fields := strings.Fields(strings.TrimSpace(command))
-	if len(fields) == 0 {
+	command = strings.TrimSpace(command)
+	if command == "" {
 		return ""
 	}
-	return fields[0]
+	index := strings.IndexFunc(command, func(r rune) bool {
+		return r == ' ' || r == '\t' || r == '\n' || r == '\r' || r == '\v' || r == '\f'
+	})
+	if index < 0 {
+		return command
+	}
+	return command[:index]
 }
 
 func matchesProcessCandidatesExact(candidates []string, values ...string) bool {
 	if len(candidates) == 0 || len(values) == 0 {
 		return false
 	}
-	exact := make(map[string]struct{}, len(values))
-	for _, value := range values {
-		trimmed := strings.TrimSpace(strings.ToLower(value))
-		if trimmed == "" {
-			continue
-		}
-		exact[trimmed] = struct{}{}
-	}
 	for _, candidate := range candidates {
-		if _, exists := exact[candidate]; exists {
-			return true
+		for _, value := range values {
+			if candidate == strings.TrimSpace(strings.ToLower(value)) {
+				return true
+			}
 		}
 	}
 	return false
