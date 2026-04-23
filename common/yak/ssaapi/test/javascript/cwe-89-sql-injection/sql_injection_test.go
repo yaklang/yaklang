@@ -33,6 +33,7 @@ func runOnFile(t *testing.T, ruleContent, filename, code string) (total, high in
 	ssatest.CheckWithFS(vfs, t, func(programs ssaapi.Programs) error {
 		require.Greater(t, len(programs), 0, "SSA 编译应至少产生一个程序")
 		result, err := programs[0].SyntaxFlowWithError(ruleContent)
+		result.Show()
 		require.NoError(t, err, "规则执行不应报错")
 		for _, varName := range result.GetAlertVariables() {
 			vals := result.GetValues(varName)

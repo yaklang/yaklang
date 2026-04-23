@@ -191,7 +191,9 @@ $high + $concatHigh as $high
 // 安全：使用 $eq/$ne/$gt 等操作符包装的查询对象
 $nosqlArg?{<self><getMembers><getMembers>?{have: /^\$(eq|ne|gt|gte|lt|lte|in|nin|exists|type|not|and|or|nor|all|size|elemMatch)$/}} as $nosqlSafeByOperator
 
-$nosqlArg?{<self> #{
+$nosqlArg?{<getCfg()><cfgGuards()>.kind?{!have:"earlyReturn"}} as $nosqlData
+
+$nosqlData?{<self> #{
     include: <<<CODE
 * & $params as $__next__
 CODE,

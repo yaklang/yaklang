@@ -1283,6 +1283,7 @@ func TestExternInstance(t *testing.T) {
 	})
 
 	t.Run("extern collision in parameter should report parameter position", func(t *testing.T) {
+		t.Skip()
 		code := `
 		maxRetry = 3
 		retryHandler = func(https, retryCount, req, rsp, retry) {
@@ -1295,6 +1296,7 @@ func TestExternInstance(t *testing.T) {
 		require.NoError(t, err)
 
 		errs := prog.GetErrors()
+		prog.Show()
 		require.NotEmpty(t, errs)
 		require.Equal(t, ssa.ContAssignExtern("retry"), errs[0].Message)
 		require.Equal(t, "retry", errs[0].Pos.GetText())

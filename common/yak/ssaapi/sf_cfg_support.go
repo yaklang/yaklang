@@ -139,6 +139,93 @@ func cfgGuardsLoopBreakContinueTargets(fn *ssa.Function) (loopExits, loopLatches
 	return loopExits, loopLatches
 }
 
+// cfgGuardsAbortBranchKindFromRegion classifies abort on a branch that may span several basic blocks
+// (e.g. call + return). It BFS-follows same-function successors from branchEntry.
+// Priority: Panic → earlyPanic; Return → earlyReturn; break/continue targets → earlyBreak / earlyContinue;
+// if nothing explicit is found, falls back to earlyReturn (branch still does not reach sink).
+func cfgGuardsAbortBranchKindFromRegion(fn *ssa.Function, branchEntry int64, loopExits, loopLatches map[int64]struct{}) string {
+	if fn == nil || branchEntry <= 0 {
+		return GuardKindEarlyReturn
+	}
+	seen := make(map[int64]struct{})
+	q := []int64{branchEntry}
+	panicK, retK, breakK, contK := false, false, false, false
+	for len(q) > 0 {
+		bid := q[0]
+		q = q[1:]
+		if _, ok := seen[bid]; ok {
+			continue
+		}
+		seen[bid] = struct{}{}
+		blk, ok := fn.GetBasicBlockByID(bid)
+		if !ok || blk == nil {
+			continue
+		}
+		for _, iid := range blk.Insts {
+			ins, ok := blk.GetInstructionById(iid)
+			if !ok || ins == nil {
+				continue
+			}
+			if lz, ok := ssa.ToLazyInstruction(ins); ok && lz != nil {
+				ins = lz.Self()
+			}
+			if ins == nil {
+				continue
+			}
+			if _, ok := ins.(*ssa.Panic); ok {
+				panicK = true
+			}
+			if _, ok := ssa.ToReturn(ins); ok {
+				retK = true
+			}
+		}
+		var last ssa.Instruction
+		if len(blk.Insts) > 0 {
+			last = blk.LastInst()
+		}
+		stopExpand := false
+		if last != nil {
+			if lz, ok := ssa.ToLazyInstruction(last); ok && lz != nil {
+				last = lz.Self()
+			}
+			if j, ok := ssa.ToJump(last); ok && j != nil && j.To > 0 {
+				if _, ok := loopExits[j.To]; ok {
+					breakK = true
+					stopExpand = true
+				}
+				if _, ok := loopLatches[j.To]; ok {
+					contK = true
+					stopExpand = true
+				}
+			}
+			if _, ok := ssa.ToReturn(last); ok {
+				stopExpand = true
+			}
+		}
+		if stopExpand {
+			continue
+		}
+		for _, s := range blk.Succs {
+			if s > 0 {
+				q = append(q, s)
+			}
+		}
+	}
+	if panicK {
+		return GuardKindEarlyPanic
+	}
+	if retK {
+		return GuardKindEarlyReturn
+	}
+	if breakK {
+		return GuardKindEarlyBreak
+	}
+	if contK {
+		return GuardKindEarlyContinue
+	}
+	return GuardKindEarlyReturn
+}
+
 // cfgGuardsAbortBranchKind classifies the exiting side of an if/two-way guard for <cfgGuards>.
 // Priority: Panic → GuardKindEarlyPanic; Return → GuardKindEarlyReturn; Jump to loop exit/latch
 // → GuardKindEarlyBreak / GuardKindEarlyContinue; else GuardKindEarlyReturn.

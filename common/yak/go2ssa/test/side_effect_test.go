@@ -417,7 +417,7 @@ func Test_SideEffect_Object(t *testing.T) {
 			f1()
 			println(o.a)
 		}
-		`, []string{"ParameterMember-freeValue-o.a"}, t)
+		`, []string{"Undefined-o.a(valid)"}, t)
 	})
 }
 
@@ -685,7 +685,7 @@ func Test_SideEffect_MutiReturn(t *testing.T) {
 						f1()
 						return
 					}
-					println(a) // phi(a)[Undefined-a,FreeValue-a]
+					println(a) // phi(a)[side-effect(2, a),FreeValue-a]
 					a = 4
 					println(a) // 4
 				}
@@ -694,7 +694,7 @@ func Test_SideEffect_MutiReturn(t *testing.T) {
 			}
 			println(a) // side-effect(phi(a)[side-effect(2, a),4], a)
 		}
-		`, []string{"phi(a)[Undefined-a,FreeValue-a]", "4", "side-effect(phi(a)[side-effect(2, a),4], a)", "side-effect(phi(a)[side-effect(2, a),4], a)"}, t)
+		`, []string{"phi(a)[side-effect(2, a),FreeValue-a]", "4", "side-effect(phi(a)[side-effect(2, a),4], a)", "side-effect(phi(a)[side-effect(2, a),4], a)"}, t)
 	})
 
 	t.Run("different variable(same name) have local", func(t *testing.T) {
@@ -712,7 +712,7 @@ func Test_SideEffect_MutiReturn(t *testing.T) {
 						f1()
 						return
 					}
-					println(a) // phi(a)[Undefined-a,FreeValue-a]
+					println(a) // FreeValue-a
 					a = 4
 					println(a) // 4
 				}
@@ -721,7 +721,7 @@ func Test_SideEffect_MutiReturn(t *testing.T) {
 			}
 			println(a) // side-effect(2, a)
 		}
-		`, []string{"phi(a)[Undefined-a,FreeValue-a]", "4", "side-effect(4, a)", "side-effect(2, a)"}, t)
+		`, []string{"FreeValue-a", "4", "side-effect(4, a)", "side-effect(2, a)"}, t)
 	})
 
 	t.Run("last return", func(t *testing.T) {

@@ -379,8 +379,9 @@ func (i *IfBuilder) Build() *IfBuilder {
 				SSABuilder.CurrentBlock.SetScope(bodyScope)
 				item.Body()
 				if SSABuilder.IsReturn {
-					SSABuilder.IsReturn = false
-					return SSABuilder.HandlerReturnPhi(bodyScope)
+					// SSABuilder.IsReturn = false
+					// return SSABuilder.HandlerReturnPhi(bodyScope)
+					// return bodyScope
 				} else if SSABuilder.CurrentBlock.finish && !SSABuilder.IsReturn {
 					return nil
 				}
@@ -956,41 +957,41 @@ func (t *LabelBuilder) Finish() {
 
 undefind
 */
-func (b *FunctionBuilder) HandlerReturnPhi(s ssautil.ScopedVersionedTableIF[Value]) ssautil.ScopedVersionedTableIF[Value] {
-	parent := s.GetParent()
-	end := parent.CreateSubScope()
-	// 更新CurrentBlock.ScopeTable为空scope,避免影响后续PeekValue
-	b.CurrentBlock.ScopeTable = end
+// func (b *FunctionBuilder) HandlerReturnPhi(s ssautil.ScopedVersionedTableIF[Value]) ssautil.ScopedVersionedTableIF[Value] {
+// 	parent := s.GetParent()
+// 	end := parent.CreateSubScope()
+// 	// 更新CurrentBlock.ScopeTable为空scope,避免影响后续PeekValue
+// 	b.CurrentBlock.ScopeTable = end
 
-	names := parent.GetAllVariableNames()
-	for name, _ := range names {
-		value := b.PeekValue(name)
-		if value == nil {
-			continue
-		}
+// 	names := parent.GetAllVariableNames()
+// 	for name, _ := range names {
+// 		value := b.PeekValue(name)
+// 		if value == nil {
+// 			continue
+// 		}
 
-		if und, ok := ToUndefined(value); ok { // 忽略外部库的function
-			if und.Kind == UndefinedValueInValid {
-				continue
-			}
-		}
+// 		if und, ok := ToUndefined(value); ok { // 忽略外部库的function
+// 			if und.Kind == UndefinedValueInValid {
+// 				continue
+// 			}
+// 		}
 
-		if _, ok := ToFunction(value); ok { // 忽略function
-			continue
-		}
-		if _, ok := ToExternLib(value); ok { // 忽略import value
-			continue
-		}
-		if value.GetType().GetTypeKind() == ErrorTypeKind {
-			continue
-		}
+// 		if _, ok := ToFunction(value); ok { // 忽略function
+// 			continue
+// 		}
+// 		if _, ok := ToExternLib(value); ok { // 忽略import value
+// 			continue
+// 		}
+// 		if value.GetType().GetTypeKind() == ErrorTypeKind {
+// 			continue
+// 		}
 
-		leftv := b.CreateVariable(name)
-		und := b.EmitUndefined(name)
-		und.Kind = UndefinedValueReturn
-		und.SetType(value.GetType())
-		b.AssignVariable(leftv, und)
-	}
+// 		leftv := b.CreateVariable(name)
+// 		und := b.EmitUndefined(name)
+// 		und.Kind = UndefinedValueReturn
+// 		und.SetType(value.GetType())
+// 		b.AssignVariable(leftv, und)
+// 	}
 
-	return end
-}
+// 	return end
+// }

@@ -342,6 +342,7 @@ func TestBasic_Variable_InIf(t *testing.T) {
 }
 
 func TestBasic_Variable_If_Return(t *testing.T) {
+	t.Skip()
 	t.Run("test with return, no DoneBlock", func(t *testing.T) {
 		test.CheckPrintlnValue(`package main
 

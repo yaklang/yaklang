@@ -93,12 +93,21 @@ REFERENCE
 <include('java-write-filename-sink')> as  $sink;
 <include('java-read-filename-sink')> as  $sink;
 
+$source<getCfg()> as $sourceCfg;
+$sink?{<getCfg()><cfgGuards()>.kind?{!have:"earlyReturn"}} as $data
 
-$sink #{
+$data #{
     include:`* & $source`,
     exclude:`* ?{opcode:call}?{!<self> & $source}?{!<self> & $sink}`,
     exclude:`* ?{opcode:phi}`,
-}->as $high;
+}-> as $path;
+
+$path?{*<cfgDominates(target: "$sourceCfg")>?{have: "true"}} as $high;
+
+$sink #{
+    include:`<self> & $source`,
+}->as $low;
+
 
 alert $high for {
 	desc: <<<DESC

@@ -94,12 +94,12 @@ $entry.DB.Raw as $func;
 *.DB.Exec as $func;
 *.Raw as $func;
 
-$func(* as $param);
-$param #{
-    until:`*?{ *?{have: ".Sprintf"} || *?{opcode:add}}`,
-}-> as $unsafe;
+$func?(* #{
+    until: `/Sprintf/`,
+	until: `*?{opcode:add}`,
+    until: `*<cfgDominates(target: "$input")>?{have: "true"}`
+}-> as $high);
 
-$unsafe<getCall> *?{*#{until: "* & $input"}-> } as $high;
 
 alert $high for {
 	type: "vuln",

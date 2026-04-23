@@ -589,10 +589,10 @@ func (f *FunctionBuilder) EmitPhi(name string, vs Values) *Phi {
 		f.CurrentBlock.Phis = append(f.CurrentBlock.Phis, p.GetId())
 	})
 	for _, v := range vs {
-		if _, ok := ToFunction(v); ok {
-			continue
-		}
-		Point(p, v)
+		// if _, ok := ToFunction(v); ok {
+		// 	continue
+		// }
+		// Point(p, v)
 		v.AddOccultation(p)
 	}
 	return p

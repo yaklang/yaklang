@@ -106,10 +106,10 @@ func TestJavaBasic_Variable_InIf(t *testing.T) {
 		if (c) {
 			return ;
 		}
-		println(a); // phi(a)[Undefined-a,1]
+		println(a); // 1
 		`, []string{
 			"1",
-			"phi(a)[Undefined-a,1]",
+			"1",
 		}, t)
 	})
 
@@ -129,12 +129,12 @@ func TestJavaBasic_Variable_InIf(t *testing.T) {
 			}
 			println(a); // unreachable // phi[2, 3]
 		}
-		println(a); // phi(a)[Undefined-a,1]
+		println(a); // phi(a)[3,1]
 		`, []string{
 			"1",
 			"2",
 			"3",
-			"phi(a)[Undefined-a,1]",
+			"phi(a)[3,1]",
 		}, t)
 	})
 
@@ -174,7 +174,7 @@ class A {
 		println(filePath);		
 	}
 }
-		`, []string{"phi(filePath)[Undefined-filePath,Parameter-filePath]"}, t)
+		`, []string{"Parameter-filePath"}, t)
 	})
 
 	t.Run("test param should not be phi after normal if statement", func(t *testing.T) {

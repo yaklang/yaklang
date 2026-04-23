@@ -458,7 +458,23 @@ func nativeCallCFGGuards(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.Native
 				fExit = fExit || fBranch == exitID || reachable(prog, fCtx, exitCtx)
 			}
 
-			if tExit && fReach {
+			// Prefer sink reachability for the aborting side (JS/TS: call + return spans blocks).
+			// Keep exit-like / exit-reachable for SSA where the aborting branch still has edges
+			// that make reachable(..., sink) look true (e.g. some panic lowering).
+			switch {
+			case !tReach && fReach:
+				guards = append(guards, &GuardPredicateValue{
+					prog:         prog,
+					FuncID:       ctx.FuncID,
+					GuardBlockID: b.GetId(),
+					SinkBlockID:  ctx.BlockID,
+					CondInstID:   instID,
+					CondValueID:  condValueID,
+					Polarity:     false,
+					Kind:         cfgGuardsAbortBranchKindFromRegion(fn, tBranch, loopExits, loopLatches),
+					Text:         "",
+				})
+			case tExit && fReach && tReach:
 				guards = append(guards, &GuardPredicateValue{
 					prog:         prog,
 					FuncID:       ctx.FuncID,
@@ -470,7 +486,19 @@ func nativeCallCFGGuards(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.Native
 					Kind:         cfgGuardsAbortBranchKind(fn, tBranch, loopExits, loopLatches),
 					Text:         "",
 				})
-			} else if fExit && tReach {
+			case tReach && !fReach:
+				guards = append(guards, &GuardPredicateValue{
+					prog:         prog,
+					FuncID:       ctx.FuncID,
+					GuardBlockID: b.GetId(),
+					SinkBlockID:  ctx.BlockID,
+					CondInstID:   instID,
+					CondValueID:  condValueID,
+					Polarity:     true,
+					Kind:         cfgGuardsAbortBranchKindFromRegion(fn, fBranch, loopExits, loopLatches),
+					Text:         "",
+				})
+			case fExit && tReach:
 				guards = append(guards, &GuardPredicateValue{
 					prog:         prog,
 					FuncID:       ctx.FuncID,
@@ -483,6 +511,16 @@ func nativeCallCFGGuards(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.Native
 					Text:         "",
 				})
 			}
+		}
+		if len(guards) == 0 && ctx.FuncID > 0 && ctx.BlockID > 0 {
+			guards = append(guards, &GuardPredicateValue{
+				prog:         prog,
+				FuncID:       ctx.FuncID,
+				GuardBlockID: ctx.BlockID,
+				SinkBlockID:  ctx.BlockID,
+				Kind:         GuardKindNone,
+				Text:         "",
+			})
 		}
 		for _, g := range lo.UniqBy(guards, func(v *GuardPredicateValue) string {
 			if v == nil {

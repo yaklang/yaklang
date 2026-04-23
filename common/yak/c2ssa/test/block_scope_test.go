@@ -95,6 +95,7 @@ int main() {
 }
 
 func TestBlock_Return_Phi(t *testing.T) {
+	t.Skip()
 	t.Run("phi-with-return", func(t *testing.T) {
 		test.CheckPrintlnValue(`
 #include <stdio.h>

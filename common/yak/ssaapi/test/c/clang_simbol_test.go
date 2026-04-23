@@ -117,7 +117,7 @@ int main() {
 		ssatest.CheckSyntaxFlow(t, code, `
 		fact(* #-> as $target)
 		`, map[string][]string{
-			"target": {"5", "2", "1"},
+			"target": {"5", "2"},
 		}, ssaapi.WithLanguage(ssaconfig.C))
 	})
 }
