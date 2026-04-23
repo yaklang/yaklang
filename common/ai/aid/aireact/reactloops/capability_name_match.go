@@ -142,6 +142,15 @@ func collectForgeNameMatchCandidates(db *gorm.DB, addCandidate func(string, capa
 			continue
 		}
 		candidate := capabilityNameMatchCandidate{Forge: forge}
+		if forge.ForgeType == schema.FORGE_TYPE_SkillMD {
+			candidate = capabilityNameMatchCandidate{
+				Skill: &aiskillloader.SkillMeta{
+					Name:        forge.ForgeName,
+					Description: forge.Description,
+					Body:        forge.InitPrompt,
+				},
+			}
+		}
 		addCandidate(forgeName, candidate)
 		addCandidate(forge.ForgeVerboseName, candidate)
 	}
