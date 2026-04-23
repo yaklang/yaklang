@@ -22,31 +22,6 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-type aiForgeUpsertRequest interface {
-	GetForgeName() string
-	GetForgeContent() string
-	GetForgeType() string
-	GetDescription() string
-	GetParamsUIConfig() string
-	GetParams() string
-	GetUserPersistentData() string
-	GetToolNames() []string
-	GetToolKeywords() []string
-	GetAction() string
-	GetTag() []string
-	GetInitPrompt() string
-	GetPersistentPrompt() string
-	GetPlanPrompt() string
-	GetResultPrompt() string
-	GetForgeVerboseName() string
-	GetSkillPath() string
-}
-
-type aiForgeUpsertRequestWithID interface {
-	aiForgeUpsertRequest
-	GetId() int64
-}
-
 func (s *Server) QueryAIForge(ctx context.Context, req *ypb.QueryAIForgeRequest) (*ypb.QueryAIForgeResponse, error) {
 	paging, data, err := yakit.QueryAIForge(s.GetProfileDatabase(), req.GetFilter(), req.GetPagination())
 	if err != nil {
@@ -87,8 +62,8 @@ func (s *Server) DeleteAIForge(ctx context.Context, req *ypb.AIForgeFilter) (*yp
 	}, nil
 }
 
-func (s *Server) UpdateAIForge(ctx context.Context, req *ypb.UpdateAIForgeRequest) (*ypb.DbOperateMessage, error) {
-	forge := grpcAIForgeUpsertToSchema(req)
+func (s *Server) UpdateAIForge(ctx context.Context, req *ypb.AIForge) (*ypb.DbOperateMessage, error) {
+	forge := schema.GRPC2AIForge(req)
 	applyForgeMetadata(s.GetProfileDatabase(), forge)
 	applyForgeRequestOverrides(req, forge)
 	if err := hydrateForgeFSBytesFromSkillPath(s.GetProfileDatabase(), req, forge); err != nil {
@@ -106,8 +81,8 @@ func (s *Server) UpdateAIForge(ctx context.Context, req *ypb.UpdateAIForgeReques
 	return updateMessage, nil
 }
 
-func (s *Server) CreateAIForge(ctx context.Context, req *ypb.CreateAIForgeRequest) (*ypb.DbOperateMessage, error) {
-	forgeIns := grpcAIForgeUpsertToSchema(req)
+func (s *Server) CreateAIForge(ctx context.Context, req *ypb.AIForge) (*ypb.DbOperateMessage, error) {
+	forgeIns := schema.GRPC2AIForge(req)
 	applyForgeMetadata(s.GetProfileDatabase(), forgeIns)
 	applyForgeRequestOverrides(req, forgeIns)
 	if err := hydrateForgeFSBytesFromSkillPath(s.GetProfileDatabase(), req, forgeIns); err != nil {
@@ -352,39 +327,11 @@ func applyForgeDefaultsFromDB(db *gorm.DB, forge *schema.AIForge) {
 	}
 }
 
-func grpcAIForgeUpsertToSchema(req aiForgeUpsertRequest) *schema.AIForge {
-	if req == nil {
-		return &schema.AIForge{}
-	}
-
-	return &schema.AIForge{
-		ForgeName:          req.GetForgeName(),
-		ForgeVerboseName:   req.GetForgeVerboseName(),
-		ForgeContent:       req.GetForgeContent(),
-		ForgeType:          req.GetForgeType(),
-		ParamsUIConfig:     req.GetParamsUIConfig(),
-		Params:             req.GetParams(),
-		UserPersistentData: req.GetUserPersistentData(),
-		Description:        req.GetDescription(),
-		Tools:              strings.Join(req.GetToolNames(), ","),
-		ToolKeywords:       strings.Join(req.GetToolKeywords(), ","),
-		Actions:            req.GetAction(),
-		Tags:               strings.Join(req.GetTag(), ","),
-		InitPrompt:         req.GetInitPrompt(),
-		PersistentPrompt:   req.GetPersistentPrompt(),
-		PlanPrompt:         req.GetPlanPrompt(),
-		ResultPrompt:       req.GetResultPrompt(),
-		SkillPath:          req.GetSkillPath(),
-	}
-}
-
-func applyForgeRequestOverrides(req aiForgeUpsertRequest, forge *schema.AIForge) {
+func applyForgeRequestOverrides(req *ypb.AIForge, forge *schema.AIForge) {
 	if req == nil || forge == nil {
 		return
 	}
-	if reqWithID, ok := req.(aiForgeUpsertRequestWithID); ok {
-		forge.ID = uint(reqWithID.GetId())
-	}
+	forge.ID = uint(req.GetId())
 	forge.ForgeName = req.GetForgeName()
 	forge.ForgeVerboseName = req.GetForgeVerboseName()
 	forge.ForgeContent = req.GetForgeContent()
@@ -404,7 +351,7 @@ func applyForgeRequestOverrides(req aiForgeUpsertRequest, forge *schema.AIForge)
 	forge.SkillPath = req.GetSkillPath()
 }
 
-func hydrateForgeFSBytesFromSkillPath(db *gorm.DB, req aiForgeUpsertRequest, forge *schema.AIForge) error {
+func hydrateForgeFSBytesFromSkillPath(db *gorm.DB, req *ypb.AIForge, forge *schema.AIForge) error {
 	if req == nil || forge == nil {
 		return nil
 	}
@@ -442,12 +389,12 @@ func hydrateForgeFSBytesFromSkillPath(db *gorm.DB, req aiForgeUpsertRequest, for
 	return nil
 }
 
-func getExistingAIForgeForSkillPath(db *gorm.DB, req aiForgeUpsertRequest, forge *schema.AIForge) (*schema.AIForge, error) {
+func getExistingAIForgeForSkillPath(db *gorm.DB, req *ypb.AIForge, forge *schema.AIForge) (*schema.AIForge, error) {
 	if db == nil {
 		return nil, nil
 	}
-	if reqWithID, ok := req.(aiForgeUpsertRequestWithID); ok && reqWithID.GetId() > 0 {
-		return yakit.GetAIForgeByID(db, reqWithID.GetId())
+	if req != nil && req.GetId() > 0 {
+		return yakit.GetAIForgeByID(db, req.GetId())
 	}
 	if forge != nil && forge.ForgeName != "" {
 		return yakit.GetAIForgeByName(db, forge.ForgeName)

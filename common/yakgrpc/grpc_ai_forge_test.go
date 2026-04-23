@@ -29,53 +29,16 @@ func queryForge(ctx context.Context, client ypb.YakClient, filter *ypb.AIForgeFi
 
 func createAIForge(ctx context.Context, client ypb.YakClient, forge *ypb.AIForge) (*ypb.DbOperateMessage, error) {
 	if forge == nil {
-		return client.CreateAIForge(ctx, &ypb.CreateAIForgeRequest{})
+		return client.CreateAIForge(ctx, &ypb.AIForge{})
 	}
-	return client.CreateAIForge(ctx, &ypb.CreateAIForgeRequest{
-		ForgeName:          forge.GetForgeName(),
-		ForgeContent:       forge.GetForgeContent(),
-		ForgeType:          forge.GetForgeType(),
-		Description:        forge.GetDescription(),
-		ParamsUIConfig:     forge.GetParamsUIConfig(),
-		Params:             forge.GetParams(),
-		UserPersistentData: forge.GetUserPersistentData(),
-		ToolNames:          forge.GetToolNames(),
-		ToolKeywords:       forge.GetToolKeywords(),
-		Action:             forge.GetAction(),
-		Tag:                forge.GetTag(),
-		InitPrompt:         forge.GetInitPrompt(),
-		PersistentPrompt:   forge.GetPersistentPrompt(),
-		PlanPrompt:         forge.GetPlanPrompt(),
-		ResultPrompt:       forge.GetResultPrompt(),
-		ForgeVerboseName:   forge.GetForgeVerboseName(),
-		SkillPath:          forge.GetSkillPath(),
-	})
+	return client.CreateAIForge(ctx, forge)
 }
 
 func updateAIForge(ctx context.Context, client ypb.YakClient, forge *ypb.AIForge) (*ypb.DbOperateMessage, error) {
 	if forge == nil {
-		return client.UpdateAIForge(ctx, &ypb.UpdateAIForgeRequest{})
+		return client.UpdateAIForge(ctx, &ypb.AIForge{})
 	}
-	return client.UpdateAIForge(ctx, &ypb.UpdateAIForgeRequest{
-		Id:                 forge.GetId(),
-		ForgeName:          forge.GetForgeName(),
-		ForgeContent:       forge.GetForgeContent(),
-		ForgeType:          forge.GetForgeType(),
-		Description:        forge.GetDescription(),
-		ParamsUIConfig:     forge.GetParamsUIConfig(),
-		Params:             forge.GetParams(),
-		UserPersistentData: forge.GetUserPersistentData(),
-		ToolNames:          forge.GetToolNames(),
-		ToolKeywords:       forge.GetToolKeywords(),
-		Action:             forge.GetAction(),
-		Tag:                forge.GetTag(),
-		InitPrompt:         forge.GetInitPrompt(),
-		PersistentPrompt:   forge.GetPersistentPrompt(),
-		PlanPrompt:         forge.GetPlanPrompt(),
-		ResultPrompt:       forge.GetResultPrompt(),
-		ForgeVerboseName:   forge.GetForgeVerboseName(),
-		SkillPath:          forge.GetSkillPath(),
-	})
+	return client.UpdateAIForge(ctx, forge)
 }
 
 func waitAIForgeExportDone(t *testing.T, stream ypb.Yak_ExportAIForgeClient) {
@@ -196,6 +159,7 @@ func TestGRPCMUSTPASS_AIForge_AuthorAndTimeFields(t *testing.T) {
 	created, err := client.GetAIForge(ctx, &ypb.GetAIForgeRequest{ForgeName: name})
 	require.NoError(t, err)
 	require.Equal(t, author, created.GetAuthor())
+	require.False(t, created.GetIsBuiltin())
 	require.Greater(t, created.GetCreatedAt(), int64(0))
 	require.Greater(t, created.GetUpdatedAt(), int64(0))
 
@@ -209,6 +173,7 @@ func TestGRPCMUSTPASS_AIForge_AuthorAndTimeFields(t *testing.T) {
 	updated, err := client.GetAIForge(ctx, &ypb.GetAIForgeRequest{ForgeName: name})
 	require.NoError(t, err)
 	require.Equal(t, author, updated.GetAuthor())
+	require.False(t, updated.GetIsBuiltin())
 	require.Equal(t, created.GetCreatedAt(), updated.GetCreatedAt())
 	require.GreaterOrEqual(t, updated.GetUpdatedAt(), created.GetUpdatedAt())
 
@@ -216,6 +181,7 @@ func TestGRPCMUSTPASS_AIForge_AuthorAndTimeFields(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, list, 1)
 	require.Equal(t, author, list[0].GetAuthor())
+	require.False(t, list[0].GetIsBuiltin())
 	require.Equal(t, updated.GetCreatedAt(), list[0].GetCreatedAt())
 	require.Equal(t, updated.GetUpdatedAt(), list[0].GetUpdatedAt())
 }
@@ -243,11 +209,13 @@ func TestGRPCMUSTPASS_AIForge_EmptyAuthorDefaultsToAnonymous(t *testing.T) {
 	created, err := client.GetAIForge(ctx, &ypb.GetAIForgeRequest{ForgeName: name})
 	require.NoError(t, err)
 	require.Equal(t, "anonymous", created.GetAuthor())
+	require.False(t, created.GetIsBuiltin())
 
 	list, err := queryForge(ctx, client, &ypb.AIForgeFilter{ForgeName: name})
 	require.NoError(t, err)
 	require.Len(t, list, 1)
 	require.Equal(t, "anonymous", list[0].GetAuthor())
+	require.False(t, list[0].GetIsBuiltin())
 }
 
 func TestGRPCMUSTPASS_AIForge_GetByName(t *testing.T) {

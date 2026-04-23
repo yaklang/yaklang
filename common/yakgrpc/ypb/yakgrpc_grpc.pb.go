@@ -1305,8 +1305,8 @@ type YakClient interface {
 	CountAIMemoryEntityTags(ctx context.Context, in *CountAIMemoryEntityTagsRequest, opts ...grpc.CallOption) (*CountAIMemoryEntityTagsResponse, error)
 	StartAITriage(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[AITriageInputEvent, AIOutputEvent], error)
 	// AI forge curd
-	CreateAIForge(ctx context.Context, in *CreateAIForgeRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
-	UpdateAIForge(ctx context.Context, in *UpdateAIForgeRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
+	CreateAIForge(ctx context.Context, in *AIForge, opts ...grpc.CallOption) (*DbOperateMessage, error)
+	UpdateAIForge(ctx context.Context, in *AIForge, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	DeleteAIForge(ctx context.Context, in *AIForgeFilter, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	QueryAIForge(ctx context.Context, in *QueryAIForgeRequest, opts ...grpc.CallOption) (*QueryAIForgeResponse, error)
 	GetAIForge(ctx context.Context, in *GetAIForgeRequest, opts ...grpc.CallOption) (*AIForge, error)
@@ -7463,7 +7463,7 @@ func (c *yakClient) StartAITriage(ctx context.Context, opts ...grpc.CallOption) 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Yak_StartAITriageClient = grpc.BidiStreamingClient[AITriageInputEvent, AIOutputEvent]
 
-func (c *yakClient) CreateAIForge(ctx context.Context, in *CreateAIForgeRequest, opts ...grpc.CallOption) (*DbOperateMessage, error) {
+func (c *yakClient) CreateAIForge(ctx context.Context, in *AIForge, opts ...grpc.CallOption) (*DbOperateMessage, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(DbOperateMessage)
 	err := c.cc.Invoke(ctx, Yak_CreateAIForge_FullMethodName, in, out, cOpts...)
@@ -7473,7 +7473,7 @@ func (c *yakClient) CreateAIForge(ctx context.Context, in *CreateAIForgeRequest,
 	return out, nil
 }
 
-func (c *yakClient) UpdateAIForge(ctx context.Context, in *UpdateAIForgeRequest, opts ...grpc.CallOption) (*DbOperateMessage, error) {
+func (c *yakClient) UpdateAIForge(ctx context.Context, in *AIForge, opts ...grpc.CallOption) (*DbOperateMessage, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(DbOperateMessage)
 	err := c.cc.Invoke(ctx, Yak_UpdateAIForge_FullMethodName, in, out, cOpts...)
@@ -9058,8 +9058,8 @@ type YakServer interface {
 	CountAIMemoryEntityTags(context.Context, *CountAIMemoryEntityTagsRequest) (*CountAIMemoryEntityTagsResponse, error)
 	StartAITriage(grpc.BidiStreamingServer[AITriageInputEvent, AIOutputEvent]) error
 	// AI forge curd
-	CreateAIForge(context.Context, *CreateAIForgeRequest) (*DbOperateMessage, error)
-	UpdateAIForge(context.Context, *UpdateAIForgeRequest) (*DbOperateMessage, error)
+	CreateAIForge(context.Context, *AIForge) (*DbOperateMessage, error)
+	UpdateAIForge(context.Context, *AIForge) (*DbOperateMessage, error)
 	DeleteAIForge(context.Context, *AIForgeFilter) (*DbOperateMessage, error)
 	QueryAIForge(context.Context, *QueryAIForgeRequest) (*QueryAIForgeResponse, error)
 	GetAIForge(context.Context, *GetAIForgeRequest) (*AIForge, error)
@@ -10745,10 +10745,10 @@ func (UnimplementedYakServer) CountAIMemoryEntityTags(context.Context, *CountAIM
 func (UnimplementedYakServer) StartAITriage(grpc.BidiStreamingServer[AITriageInputEvent, AIOutputEvent]) error {
 	return status.Errorf(codes.Unimplemented, "method StartAITriage not implemented")
 }
-func (UnimplementedYakServer) CreateAIForge(context.Context, *CreateAIForgeRequest) (*DbOperateMessage, error) {
+func (UnimplementedYakServer) CreateAIForge(context.Context, *AIForge) (*DbOperateMessage, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateAIForge not implemented")
 }
-func (UnimplementedYakServer) UpdateAIForge(context.Context, *UpdateAIForgeRequest) (*DbOperateMessage, error) {
+func (UnimplementedYakServer) UpdateAIForge(context.Context, *AIForge) (*DbOperateMessage, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateAIForge not implemented")
 }
 func (UnimplementedYakServer) DeleteAIForge(context.Context, *AIForgeFilter) (*DbOperateMessage, error) {
@@ -19787,7 +19787,7 @@ func _Yak_StartAITriage_Handler(srv interface{}, stream grpc.ServerStream) error
 type Yak_StartAITriageServer = grpc.BidiStreamingServer[AITriageInputEvent, AIOutputEvent]
 
 func _Yak_CreateAIForge_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(CreateAIForgeRequest)
+	in := new(AIForge)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -19799,13 +19799,13 @@ func _Yak_CreateAIForge_Handler(srv interface{}, ctx context.Context, dec func(i
 		FullMethod: Yak_CreateAIForge_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(YakServer).CreateAIForge(ctx, req.(*CreateAIForgeRequest))
+		return srv.(YakServer).CreateAIForge(ctx, req.(*AIForge))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _Yak_UpdateAIForge_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(UpdateAIForgeRequest)
+	in := new(AIForge)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -19817,7 +19817,7 @@ func _Yak_UpdateAIForge_Handler(srv interface{}, ctx context.Context, dec func(i
 		FullMethod: Yak_UpdateAIForge_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(YakServer).UpdateAIForge(ctx, req.(*UpdateAIForgeRequest))
+		return srv.(YakServer).UpdateAIForge(ctx, req.(*AIForge))
 	}
 	return interceptor(ctx, in, info, handler)
 }

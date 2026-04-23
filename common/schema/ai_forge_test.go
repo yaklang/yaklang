@@ -26,6 +26,7 @@ func TestAIForgeToUpdateMap_OnlyMutableFieldsIncluded(t *testing.T) {
 		Actions:            "action",
 		Tags:               "tag-a,tag-b",
 		Author:             "should-not-be-updated",
+		IsBuiltin:          true,
 		InitPrompt:         "init",
 		PersistentPrompt:   "persistent",
 		PlanPrompt:         "plan",
@@ -38,7 +39,7 @@ func TestAIForgeToUpdateMap_OnlyMutableFieldsIncluded(t *testing.T) {
 	mutableFields := []string{
 		"forge_verbose_name", "forge_name", "forge_content", "forge_type", "params_ui_config",
 		"params", "user_persistent_data", "description", "tools", "tool_keywords", "actions",
-		"tags", "init_prompt", "persistent_prompt", "plan_prompt", "result_prompt", "skill_path",
+		"tags", "is_builtin", "init_prompt", "persistent_prompt", "plan_prompt", "result_prompt", "skill_path",
 		"fs_bytes", "is_temporary",
 	}
 	require.Len(t, updateMap, len(mutableFields))

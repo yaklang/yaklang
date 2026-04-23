@@ -20,6 +20,7 @@ type AIYakTool struct {
 	Params     string `json:"params" gorm:"type:text"`
 	Path       string `json:"path" gorm:"type:text;index"`
 	Author     string `json:"author"`
+	IsBuiltin  bool   `json:"is_builtin" gorm:"default:false;index"`
 	Hash       string `json:"hash"`
 	IsFavorite bool   `json:"is_favorite" gorm:"default:false;index"`
 	// 0: unset, 1: disabled, 2: enabled
@@ -40,6 +41,7 @@ func (a *AIYakTool) ToUpdateMap() map[string]interface{} {
 		"content":              a.Content,
 		"params":               a.Params,
 		"path":                 a.Path,
+		"is_builtin":           a.IsBuiltin,
 		"hash":                 a.CalcHash(),
 		"is_favorite":          a.IsFavorite,
 		"enable_ai_output_log": a.EnableAIOutputLog,
@@ -57,6 +59,7 @@ func (a *AIYakTool) ToGRPC() *ypb.AITool {
 		ID:          int64(a.ID),
 		VerboseName: a.VerboseName,
 		Author:      a.Author,
+		IsBuiltin:   a.IsBuiltin,
 		CreatedAt:   a.CreatedAt.Unix(),
 		UpdatedAt:   a.UpdatedAt.Unix(),
 	}
