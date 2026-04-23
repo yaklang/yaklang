@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools/metadata"
@@ -22,6 +23,34 @@ import (
 )
 
 var buildInForgeFS resources_monitor.ResourceMonitor
+
+// buildInForgeRegisterTrace 记录每次进入 registerBuildInForge 的名称；syncBuildInForgeInternal 开始时清空。
+// 供测试与排查与「实际注册序列」对齐，避免再维护一份硬编码列表。
+var (
+	buildInForgeRegisterMu    sync.Mutex
+	buildInForgeRegisterTrace []string
+)
+
+func resetBuildInForgeRegisterTrace() {
+	buildInForgeRegisterMu.Lock()
+	buildInForgeRegisterTrace = buildInForgeRegisterTrace[:0]
+	buildInForgeRegisterMu.Unlock()
+}
+
+func noteBuildInForgeRegistration(name string) {
+	buildInForgeRegisterMu.Lock()
+	buildInForgeRegisterTrace = append(buildInForgeRegisterTrace, name)
+	buildInForgeRegisterMu.Unlock()
+}
+
+// RegisteredBuildInForgeNames 返回最近一次 syncBuildInForgeInternal（从开头执行）以来，registerBuildInForge 收到的名称副本（顺序与注册调用一致）。
+func RegisteredBuildInForgeNames() []string {
+	buildInForgeRegisterMu.Lock()
+	defer buildInForgeRegisterMu.Unlock()
+	out := make([]string, len(buildInForgeRegisterTrace))
+	copy(out, buildInForgeRegisterTrace)
+	return out
+}
 
 var generateMetadataPrompt = `
 # AI forge 元数据生成器
@@ -174,6 +203,7 @@ const buildInForgeEmbedKey = "6ef3c850244a2b26ed0b163d1fda9600"
 
 // syncBuildInForgeInternal 将内置 AI forge 从 embed 同步到数据库，不更新 hash（由调用方决定）
 func syncBuildInForgeInternal() error {
+	resetBuildInForgeRegisterTrace()
 	registerBuildInForge("web_log_monitor")
 	registerBuildInForge("flow_report") // 流量分析报告生成
 
@@ -389,6 +419,7 @@ func getBuildInForgeFromFS(name string) (*schema.AIForge, error) {
 }
 
 func registerBuildInForge(name string) {
+	noteBuildInForgeRegistration(name)
 	forge, err := getBuildInForgeFromFS(name)
 	if err != nil {
 		log.Error(err)
