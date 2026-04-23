@@ -16,9 +16,10 @@ type DeepIntentResult struct {
 	RecommendedForges string
 	ContextEnrichment string
 
-	MatchedToolNames  string // comma-separated, e.g. "tool1,tool2"
-	MatchedForgeNames string // comma-separated, e.g. "forge1,forge2"
-	MatchedSkillNames string // comma-separated, e.g. "skill1,skill2"
+	MatchedToolNames          string // comma-separated, e.g. "tool1,tool2"
+	MatchedForgeNames         string // comma-separated, e.g. "forge1,forge2"
+	MatchedSkillNames         string // comma-separated, e.g. "skill1,skill2"
+	MatchedCapabilityMentions *CapabilityNameMatchResult
 }
 
 // ExecuteDeepIntentRecognition invokes the loop_intent sub-loop for deep
