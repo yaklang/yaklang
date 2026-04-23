@@ -40,8 +40,9 @@ SSA 与误报
 - 主 ReAct Init 后首轮：@action 字面量 scan_risk_analysis（仅此场景）。
 - 计划子任务（1-1/1-2…）：每轮须可解析 JSON；@action 为当轮提示中的合法值，禁止 scan_risk_analysis；禁止无 JSON 的纯「新发现/总结/#summary」。收尾 directly_answer：第 1 行 JSON 无 answer_payload，同轮 FINAL_ANSWER 承载全文。`
 
-forgeRiskTriageInstructionBlock = func(triageAbsPath) {
-    return sprintf(`<<<Risk_Triage_JSON_Instructions>>>
+// heredoc：正文内可安全使用反引号（若用 `...` 包裹整段，`get_full_code=true` 会截断 raw string）
+riskTriageJsonInstructionsTpl = <<<RISK_TRIAGE_JSON_INSTRUCTIONS
+<<<Risk_Triage_JSON_Instructions>>>
 
 你必须在输出最终误报结论之前，使用 **write_file** 工具写入以下绝对路径（**文件正文仅为 JSON**，UTF-8、无 BOM、不要用 Markdown 代码围栏包裹整文件）：
 
@@ -54,7 +55,10 @@ forgeRiskTriageInstructionBlock = func(triageAbsPath) {
 - items[].risk_id 必须来自 SSA 报告或任务表中的真实列；无可疑项时 "items": []。
 - priority 建议：high / medium / low。
 - 需要更多源码上下文时，对 triage 中的 risk_id 使用 **ssa-risk**（`get_full_code=true`）或 **ssa-read-file**；不要为整张表批量调用。
-`, triageAbsPath)
+RISK_TRIAGE_JSON_INSTRUCTIONS
+
+forgeRiskTriageInstructionBlock = func(triageAbsPath) {
+    return sprintf(riskTriageJsonInstructionsTpl, triageAbsPath)
 }
 
 scanRiskSSAExportHint = `<<<SSA_报告说明>>>
