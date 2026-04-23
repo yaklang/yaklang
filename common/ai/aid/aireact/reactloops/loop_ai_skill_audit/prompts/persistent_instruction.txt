@@ -131,11 +131,17 @@ mining.pool|supportxmr
 | 功能意图 | Pass / Warning / Critical | ... |
 ```
 
-### 漏洞条目格式（complete_skill_audit 的 findings_summary 字段，仅 Medium 及以上）
+### 漏洞详情（通过 FINDINGS AITag 输出，仅 Medium 及以上）
+
+调用 `complete_skill_audit` 后，在 JSON 对象之后紧接输出 FINDINGS AITag 块：
+先用 2-4 句话概述扫描覆盖范围和整体结论，再按漏洞条目逐一列出详情。无发现时只写概述即可。
 
 每个漏洞用以下 Markdown 结构单独描述，多个漏洞依次追加：
 
-```markdown
+```
+<|FINDINGS_{{ .Nonce }}|>
+[2-4 句概述扫描范围和结论]
+
 ### [漏洞标题：攻击类型 + 受影响组件]
 
 - **文件位置**: `scripts/example.py`，第 42–58 行
@@ -157,6 +163,7 @@ mining.pool|supportxmr
 
 **修复建议**
 [具体可操作的修复步骤]
+<|FINDINGS_END_{{ .Nonce }}|>
 ```
 
 ---

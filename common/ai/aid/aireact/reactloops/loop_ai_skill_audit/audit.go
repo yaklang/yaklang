@@ -227,6 +227,7 @@ func buildPhase2StaticAnalysisLoop(r aicommon.AIInvokeRuntime, state *SkillAudit
 		reactloops.WithSameActionTypeSpinThreshold(5),
 		reactloops.WithSameLogicSpinThreshold(3),
 		reactloops.WithMaxConsecutiveSpinWarnings(2),
+		reactloops.WithAITagFieldWithAINodeId("FINDINGS", "findings_summary", "skill-audit-findings", aicommon.TypeTextMarkdown),
 		reactloops.WithActionFilter(func(action *reactloops.LoopAction) bool {
 			return action.ActionType != "load_capability"
 		}),
@@ -279,9 +280,11 @@ func buildPhase2StaticAnalysisLoop(r aicommon.AIInvokeRuntime, state *SkillAudit
 	}))
 
 	// ─── complete_skill_audit: the only legal exit from Phase 2 ───
+	// findings_summary content is supplied via <FINDINGS>...</FINDINGS> AITag (loop-level
+	// registration above), which streams Markdown to the frontend without JSON escaping.
 	preset = append(preset, reactloops.WithRegisterLoopAction(
 		"complete_skill_audit",
-		"完成 AI Skill 静态安全审计，提交意图一致性审计表、风险等级和所有漏洞发现（Markdown 格式）。调用前必须已完成全部 6 个检测类别的扫描并写出审计笔记文件。",
+		"完成 AI Skill 静态安全审计，提交意图一致性审计表和风险等级（JSON 字段），漏洞详情通过 FINDINGS AITag 输出（Markdown 格式）。调用前必须已完成全部 6 个检测类别的扫描并写出审计笔记文件。",
 		[]aitool.ToolOption{
 			aitool.WithStringParam("skill_name",
 				aitool.WithParam_Required(false),
@@ -293,8 +296,8 @@ func buildPhase2StaticAnalysisLoop(r aicommon.AIInvokeRuntime, state *SkillAudit
 				aitool.WithParam_Required(true),
 				aitool.WithParam_Description("意图一致性审计表（Markdown 表格格式），包含恶意行为、隐形行为、功能意图三个检查项")),
 			aitool.WithStringParam("findings_summary",
-				aitool.WithParam_Required(true),
-				aitool.WithParam_Description("审计结论与漏洞详情（Markdown 格式）：先用 2-4 句话概述扫描覆盖范围，再按漏洞条目逐一列出文件位置、风险类型、技术分析、攻击路径、修复建议；无发现时只写概述即可")),
+				aitool.WithParam_Required(false),
+				aitool.WithParam_Description("审计结论与漏洞详情摘要")),
 		},
 		func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
 			if len(noteFiles) == 0 {
