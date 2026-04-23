@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
@@ -24,6 +25,27 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
+
+func syntaxflowFileResourceName(progName, path string) string {
+	return fmt.Sprintf("%q", "/"+progName+path)
+}
+
+func waitForProfileKey(t *testing.T, client ypb.YakClient, key string) string {
+	t.Helper()
+
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		res, err := client.GetKey(context.Background(), &ypb.GetKeyRequest{Key: key})
+		require.NoError(t, err)
+		if value := res.GetValue(); value != "" {
+			return value
+		}
+		if time.Now().After(deadline) {
+			return ""
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+}
 
 func sendSSAURL(t *testing.T, local ypb.YakClient, resultID int, programName, kind string) []*ypb.YakURLResource {
 	url := &ypb.RequestYakURLParams{
@@ -249,7 +271,7 @@ funcA(222);
 			"Undefined-funcA":          {"funcA"},
 			"Function-funcA(111)":      {"funcA(111)"},
 			"Undefined-funcA(222)":     {"funcA(222)"},
-			`"var/www/html/funcA.php"`: {code3},
+			syntaxflowFileResourceName(s.progName, "/var/www/html/funcA.php"): {code3},
 		})
 		s.SearchAndCheck(t, "all", "funcA", true, map[string][]string{
 			"Function-funcA":           {"function funcA(){}"},
@@ -259,7 +281,7 @@ funcA(222);
 			`"funcA("`:                 {"funcA("},
 			"Function-funcA(111)":      {"funcA(111)"},
 			"Undefined-funcA(222)":     {"funcA(222)"},
-			`"var/www/html/funcA.php"`: {code3},
+			syntaxflowFileResourceName(s.progName, "/var/www/html/funcA.php"): {code3},
 		})
 	})
 
@@ -293,7 +315,7 @@ funcA(222);
 
 	t.Run("check file funcA", func(t *testing.T) {
 		s.SearchAndCheck(t, "file", "funcA", false, map[string][]string{
-			`"var/www/html/funcA.php"`: {code3},
+			syntaxflowFileResourceName(s.progName, "/var/www/html/funcA.php"): {code3},
 		})
 	})
 
@@ -343,12 +365,12 @@ funcA(222);
 		`"funcA("`:                 {"funcA("},
 		"Function-funcA(111)":      {"funcA(111)"},
 		"Undefined-funcA(222)":     {"funcA(222)"},
-		`"var/www/html/funcA.php"`: {code3},
+		syntaxflowFileResourceName(s.progName, "/var/www/html/funcA.php"): {code3},
 	})
 
 	// check file
 	s.Check(t, "file", result, map[string][]string{
-		`"var/www/html/funcA.php"`: {code3},
+		syntaxflowFileResourceName(s.progName, "/var/www/html/funcA.php"): {code3},
 	})
 
 	// check function
@@ -405,11 +427,7 @@ funcA(222);
 		// check database cache
 		key := fmt.Sprint([]any{s.progName, "all", "funcA", true})
 		log.Infof("key: %s", key)
-		res, err := s.local.GetKey(context.Background(), &ypb.GetKeyRequest{
-			Key: key,
-		})
-		require.NoError(t, err)
-		got := res.GetValue()
+		got := waitForProfileKey(t, s.local, key)
 		log.Infof("got: %v", got)
 		gotResult, err := strconv.Atoi(got)
 		require.NoError(t, err)
