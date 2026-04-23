@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -25,11 +26,44 @@ const (
 	ToolCallAction_Finish        = "finish"
 )
 
+type toolOutputBuffer struct {
+	mu  sync.RWMutex
+	buf bytes.Buffer
+}
+
+func (b *toolOutputBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *toolOutputBuffer) Snapshot() []byte {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	return bytes.Clone(b.buf.Bytes())
+}
+
+func (b *toolOutputBuffer) Bytes() []byte {
+	return b.Snapshot()
+}
+
+func (b *toolOutputBuffer) Len() int {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	return b.buf.Len()
+}
+
+func staticSnapshot(snapshot []byte) func() []byte {
+	return func() []byte {
+		return snapshot
+	}
+}
+
 func (a *ToolCaller) intervalReviewContext(
 	ctx context.Context, reviewCancel func(),
 	tool *aitool.Tool,
 	params aitool.InvokeParams,
-	stdoutSnapshot, stderrSnapshot []byte,
+	stdoutSnapshot, stderrSnapshot func() []byte,
 	onAICanceled func(any),
 ) {
 	defer func() {
@@ -38,6 +72,13 @@ func (a *ToolCaller) intervalReviewContext(
 			utils.PrintCurrentGoroutineRuntimeStack()
 		}
 	}()
+
+	if stdoutSnapshot == nil {
+		stdoutSnapshot = func() []byte { return nil }
+	}
+	if stderrSnapshot == nil {
+		stderrSnapshot = func() []byte { return nil }
+	}
 
 	if utils.IsNil(a.intervalReviewHandler) {
 		return
@@ -54,7 +95,7 @@ func (a *ToolCaller) intervalReviewContext(
 			case <-ctx.Done():
 				return
 			default:
-				shouldContinue, err := a.intervalReviewHandler(ctx, tool, params, stdoutSnapshot, stderrSnapshot, a.callExpectations)
+				shouldContinue, err := a.intervalReviewHandler(ctx, tool, params, stdoutSnapshot(), stderrSnapshot(), a.callExpectations)
 				if err != nil {
 					log.Errorf("interval review handler failed: %v", err)
 					continue
@@ -80,7 +121,13 @@ func (a *ToolCaller) IntervalReviewContext(
 	stdoutSnapshot, stderrSnapshot []byte,
 	onAICanceled func(any),
 ) {
-	a.intervalReviewContext(ctx, reviewCancel, tool, params, stdoutSnapshot, stderrSnapshot, onAICanceled)
+	a.intervalReviewContext(
+		ctx, reviewCancel,
+		tool, params,
+		staticSnapshot(stdoutSnapshot),
+		staticSnapshot(stderrSnapshot),
+		onAICanceled,
+	)
 }
 
 func (a *ToolCaller) GetCallExpectations() string {
@@ -93,7 +140,7 @@ func (a *ToolCaller) invoke(
 	userCancel func(reason any),
 	reportError func(err any),
 	stdoutWriter, stderrWriter io.Writer,
-	stdoutSnapshotBuffer, stderrSnapshotBuffer *bytes.Buffer,
+	stdoutSnapshotBuffer, stderrSnapshotBuffer *toolOutputBuffer,
 ) (*aitool.ToolResult, error) {
 	c := a.config
 	e := a.emitter
@@ -196,8 +243,8 @@ func (a *ToolCaller) invoke(
 			a.intervalReviewContext(
 				ctx, cancel,
 				tool, params,
-				stdoutSnapshotBuffer.Bytes(),
-				stderrSnapshotBuffer.Bytes(),
+				stdoutSnapshotBuffer.Snapshot,
+				stderrSnapshotBuffer.Snapshot,
 				userCancel,
 			)
 		}()
