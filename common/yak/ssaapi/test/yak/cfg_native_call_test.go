@@ -143,7 +143,7 @@ println(* #-> as $arg)
 $arg<getCfg()> as $sinkCfg
 $sinkCfg<cfgGuards()> as $guards
 `, sfExpect{
-			WantResultContains: []string{"guard(kind=" + ssaapi.GuardKindEarlyReturn},
+			WantResultContains: []string{"cfgGuard(kind=" + ssaapi.GuardKindEarlyReturn},
 		})
 	})
 	t.Run("cfgGuards_implicit_getCfg_on_chain", func(t *testing.T) {
@@ -158,7 +158,42 @@ println("ok")
 println(* #-> as $arg)
 $arg<cfgGuards()> as $guards
 `, sfExpect{
-			WantResultContains: []string{"guard(kind=" + ssaapi.GuardKindEarlyReturn},
+			WantResultContains: []string{"cfgGuard(kind=" + ssaapi.GuardKindEarlyReturn},
+		})
+	})
+	t.Run("cfgGuards_emits_kind_none_when_no_branch_guard", func(t *testing.T) {
+		// 无「一侧出口、一侧到 sink」类分支时输出 kind=none，避免 mapCfgCtxValues 报错断链。
+		runSyntaxFlowExpect(t, `
+println("only")
+`, `
+println(* #-> as $arg)
+$arg<cfgGuards()> as $guards
+`, sfExpect{
+			WantResultContains: []string{"cfgGuard(kind=" + ssaapi.GuardKindNone},
+		})
+	})
+	t.Run("cfgGuards_kind_not_earlyReturn_keeps_none_and_drops_earlyReturn", func(t *testing.T) {
+		runSyntaxFlowExpect(t, `
+a = 1
+if (a) {
+	return
+}
+println("sink")
+`, `
+println(*?{have: "sink"} #-> as $arg)
+$arg?{<getCfg()><cfgGuards()>.kind?{!have:"earlyReturn"}} as $blocked
+`, sfExpect{
+			PostCheck: func(t *testing.T, res *ssaapi.SyntaxFlowResult) {
+				require.Empty(t, res.GetValues("blocked"), "earlyReturn guard 应被 !have:earlyReturn 滤掉")
+			},
+		})
+		runSyntaxFlowExpect(t, `
+println("plain")
+`, `
+println(* #-> as $arg)
+$arg?{<getCfg()><cfgGuards()>.kind?{!have:"earlyReturn"}} as $pass
+`, sfExpect{
+			WantMinCount: map[string]int{"pass": 1},
 		})
 	})
 	t.Run("filter_guard_kind_field", func(t *testing.T) {
@@ -192,7 +227,7 @@ println(* #-> as $arg)
 $arg<getCfg()> as $sinkCfg
 $sinkCfg<cfgGuards()> as $guards
 `, sfExpect{
-			WantResultContains: []string{"guard(kind=" + ssaapi.GuardKindEarlyPanic},
+			WantResultContains: []string{"cfgGuard(kind=" + ssaapi.GuardKindEarlyPanic},
 		})
 	})
 	t.Run("panic_on_false_branch_polarity_true", func(t *testing.T) {
@@ -209,7 +244,7 @@ println(*?{have: "ok"} #-> as $arg)
 $arg<getCfg()> as $sinkCfg
 $sinkCfg<cfgGuards()> as $guards
 `, sfExpect{
-			WantResultContains: []string{"guard(kind=" + ssaapi.GuardKindEarlyPanic, "polarity=true"},
+			WantResultContains: []string{"cfgGuard(kind=" + ssaapi.GuardKindEarlyPanic, "polarity=true"},
 		})
 	})
 	t.Run("lists_early_break_guard", func(t *testing.T) {
@@ -226,7 +261,7 @@ println(*?{have: "sink"} #-> as $arg)
 $arg<getCfg()> as $sinkCfg
 $sinkCfg<cfgGuards()> as $guards
 `, sfExpect{
-			WantResultContains: []string{"guard(kind=" + ssaapi.GuardKindEarlyBreak},
+			WantResultContains: []string{"cfgGuard(kind=" + ssaapi.GuardKindEarlyBreak},
 		})
 	})
 	t.Run("lists_early_continue_guard", func(t *testing.T) {
@@ -243,7 +278,7 @@ println(*?{have: "sink"} #-> as $arg)
 $arg<getCfg()> as $sinkCfg
 $sinkCfg<cfgGuards()> as $guards
 `, sfExpect{
-			WantResultContains: []string{"guard(kind=" + ssaapi.GuardKindEarlyContinue},
+			WantResultContains: []string{"cfgGuard(kind=" + ssaapi.GuardKindEarlyContinue},
 		})
 	})
 }

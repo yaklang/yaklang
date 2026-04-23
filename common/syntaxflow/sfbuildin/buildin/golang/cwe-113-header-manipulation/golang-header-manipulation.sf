@@ -73,12 +73,12 @@ SOLUTION
 REFERENCE
 )
 
-<include('golang-user-input')> as $input;
-$input.Header().Set(* as $sink)
+<include("golang-user-input")> as $input
+http.ResponseWriter as $writer;
 
-$sink #{
-	until: "*.RequestURI"
-}-> as $high
+$writer.Header().Add?(* #{until: `*?{have: /Set-Cookie|X-Custom-Header/}`}-> ) as $func
+$func<getCallee()>(* <slice(index=0)> #-> as $entry)
+$entry.Header().Set?(*<slice(index=2)> #{until: `* & $input`}-> ) as $high
 
 alert $high for {
 	type: "vuln",

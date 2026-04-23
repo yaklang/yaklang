@@ -1277,26 +1277,26 @@ func (v Values) Flat(f func(*Value) Values) Values {
 
 // ExpandPhiClosure expands values by following SSA pointer/edge closure to related phi nodes.
 // It is intentionally conservative (same-name + same-function when possible) to avoid exploding results.
-func (v Values) ExpandPhiClosure() Values {
-	if len(v) == 0 {
-		return v
-	}
-	// Group by program to preserve correct wrapping/caching/overlay behavior.
-	byProg := make(map[*Program]Values, 4)
-	var noProg Values
-	for _, val := range v {
-		if val == nil || val.ParentProgram == nil {
-			noProg = append(noProg, val)
-			continue
-		}
-		byProg[val.ParentProgram] = append(byProg[val.ParentProgram], val)
-	}
-	out := append(Values(nil), noProg...)
-	for prog, vals := range byProg {
-		out = append(out, prog.appendPointerLinkedPhisFromParameters(vals)...)
-	}
-	return out
-}
+// func (v Values) ExpandPhiClosure() Values {
+// 	if len(v) == 0 {
+// 		return v
+// 	}
+// 	// Group by program to preserve correct wrapping/caching/overlay behavior.
+// 	byProg := make(map[*Program]Values, 4)
+// 	var noProg Values
+// 	for _, val := range v {
+// 		if val == nil || val.ParentProgram == nil {
+// 			noProg = append(noProg, val)
+// 			continue
+// 		}
+// 		byProg[val.ParentProgram] = append(byProg[val.ParentProgram], val)
+// 	}
+// 	out := append(Values(nil), noProg...)
+// 	for prog, vals := range byProg {
+// 		out = append(out, prog.appendPointerLinkedPhisFromParameters(vals)...)
+// 	}
+// 	return out
+// }
 
 func (v Values) Filter(f func(*Value) bool) Values {
 	ret := make(Values, 0, len(v))

@@ -108,12 +108,11 @@ REFERENCE
 $sink.RawQuery as $func
 *.RawQuery<self()> as $func
 
-$func(* as $param);
-$param #{
-    until:`*?{ *?{have: ".Sprintf"} || *?{opcode:add}}`,
-}-> as $unsafe
-
-$unsafe<getCall> *?{*#{until: "* & $input"}-> } as $high 
+$func?(* #{
+    until: `/Sprintf/`,
+	until: `*?{opcode:add}`,
+    until: `*<cfgDominates(target: "$input")>?{have: "true"}`
+}-> as $high);
 
 alert $high for {
 	type: "vuln",

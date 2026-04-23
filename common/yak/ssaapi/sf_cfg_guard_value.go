@@ -18,6 +18,8 @@ const (
 	GuardKindEarlyPanic    = "earlyPanic"
 	GuardKindEarlyBreak    = "earlyBreak"
 	GuardKindEarlyContinue = "earlyContinue"
+	// GuardKindNone is emitted when cfgGuards finds no qualifying branch guard for the sink.
+	GuardKindNone = "none"
 )
 
 // GuardFieldValue is a synthetic member carrier used by GuardPredicateValue.GetFields().
@@ -232,19 +234,32 @@ func (g *GuardPredicateValue) String() string {
 	if g == nil {
 		return ""
 	}
+	// cfgGuard: CFG-oriented guard line; guards are cfg natives specialized on branch→sink evidence.
+	if g.Kind == GuardKindNone && g.CondInstID == 0 && g.CondValueID == 0 && g.GuardBlockID == g.SinkBlockID {
+		return fmt.Sprintf("cfgGuard(kind=%s, synthetic, fn=%d, blk=%d)", g.Kind, g.FuncID, g.SinkBlockID)
+	}
 	text := g.Text
 	if text == "" {
 		if g.CondValueID > 0 {
-			text = fmt.Sprintf("cond@%d", g.CondValueID)
+			text = fmt.Sprintf("condVal=%d", g.CondValueID)
 		} else if g.CondInstID > 0 {
-			text = fmt.Sprintf("condInst@%d", g.CondInstID)
+			text = fmt.Sprintf("condInst=%d", g.CondInstID)
 		} else {
-			text = "cond"
+			text = "cond=?"
 		}
 	}
-	return fmt.Sprintf("guard(kind=%s, func=%d, guardBlock=%d, sinkBlock=%d, polarity=%v, %s)",
+	return fmt.Sprintf("cfgGuard(kind=%s, fn=%d, guardBlk=%d, sinkBlk=%d, polarity=%v, %s)",
 		g.Kind, g.FuncID, g.GuardBlockID, g.SinkBlockID, g.Polarity, text,
 	)
+}
+
+// SFVMVerboseResultString is used by sfvm SyntaxFlow result listing to print the full cfgGuard line
+// without ShrinkString (see sfvm/showValueMap).
+func (g *GuardPredicateValue) SFVMVerboseResultString() string {
+	if g == nil {
+		return ""
+	}
+	return g.String()
 }
 
 func (g *GuardPredicateValue) Hash() (string, bool) {
