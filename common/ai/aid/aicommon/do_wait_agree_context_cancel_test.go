@@ -212,6 +212,14 @@ func TestEventLoop_DrainPendingEvents(t *testing.T) {
 			IsSyncMessage: true,
 			SyncType:      "test_concurrent_cancel",
 		})
+		// Give event1 a moment to cross the UnlimitedChan forwarding goroutine
+		// (innerIn -> innerOut) so that the event loop can pick it up before
+		// ctx cancellation races with the forwarder. Without this sync point
+		// the UnlimitedChan's internal goroutine may observe ctx.Done() before
+		// forwarding event1, which would drop it entirely. This preserves the
+		// test's intent: an event that is already in the processing pipeline
+		// when cancel fires should complete.
+		time.Sleep(50 * time.Millisecond)
 		cancel()
 		c.EventInputChan.SafeFeed(&ypb.AIInputEvent{
 			IsSyncMessage: true,
