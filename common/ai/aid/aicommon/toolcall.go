@@ -855,9 +855,9 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 	stderrReader, stderrWriter := utils.NewPipe()
 	defer stderrWriter.Close()
 
-	// Create buffers to capture stdout and stderr for file saving
-	stdoutBuffer := &bytes.Buffer{}
-	stderrBuffer := &bytes.Buffer{}
+	// Create buffers to capture stdout and stderr for interval review and file saving.
+	stdoutBuffer := &toolOutputBuffer{}
+	stderrBuffer := &toolOutputBuffer{}
 
 	// Use MultiWriter to write to both the pipe (for streaming) and the buffer (for file saving)
 	stdoutMultiWriter := io.MultiWriter(stdoutWriter, stdoutBuffer)
@@ -929,8 +929,8 @@ func (t *ToolCaller) saveToolCallFiles(
 	callToolId string,
 	destinationIdentifier string,
 	params aitool.InvokeParams,
-	stdoutBuffer *bytes.Buffer,
-	stderrBuffer *bytes.Buffer,
+	stdoutBuffer *toolOutputBuffer,
+	stderrBuffer *toolOutputBuffer,
 	toolResult *aitool.ToolResult,
 	paramGenDuration time.Duration,
 	rawAIParamResponse string,
