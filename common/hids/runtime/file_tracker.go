@@ -5,25 +5,42 @@ package runtime
 import (
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/yaklang/yaklang/common/hids/model"
 )
 
 type fileTracker struct {
-	byPath map[string]trackedFile
+	byPath     map[string]trackedFile
+	window     time.Duration
+	maxEntries int
+	nextPrune  time.Time
 }
 
 type trackedFile struct {
-	mode  string
-	uid   string
-	gid   string
-	owner string
-	group string
+	mode     string
+	uid      string
+	gid      string
+	owner    string
+	group    string
+	lastSeen time.Time
 }
 
 func newFileTracker() *fileTracker {
+	return newFileTrackerWithConfig(shortTermContextConfigFromSpec(model.DesiredSpec{}))
+}
+
+func newFileTrackerWithConfig(config shortTermContextConfig) *fileTracker {
+	if config.window <= 0 {
+		config.window = time.Duration(model.DefaultShortTermWindowMinutes) * time.Minute
+	}
+	if config.maxFiles <= 0 {
+		config.maxFiles = defaultShortTermContextMaxFiles
+	}
 	return &fileTracker{
-		byPath: make(map[string]trackedFile),
+		byPath:     make(map[string]trackedFile),
+		window:     config.window,
+		maxEntries: config.maxFiles,
 	}
 }
 
@@ -32,6 +49,8 @@ func (t *fileTracker) Apply(event model.Event) model.Event {
 		return event
 	}
 
+	observedAt := normalizedEventTimestamp(event.Timestamp)
+	t.prune(observedAt)
 	switch event.Type {
 	case model.EventTypeFileChange:
 		event = t.enrichFileChange(event)
@@ -39,14 +58,14 @@ func (t *fileTracker) Apply(event model.Event) model.Event {
 			t.forget(fileTrackerPathFromFile(event.File))
 			return event
 		}
-		t.rememberFile(event.File)
+		t.rememberFile(event.File, observedAt)
 	case model.EventTypeAudit:
 		event = t.enrichAudit(event)
 		if shouldForgetTrackedAuditFile(event.Audit, event.File) {
 			t.forget(fileTrackerPathFromFile(event.File))
 			return event
 		}
-		t.rememberAudit(event.Audit, event.File)
+		t.rememberAudit(event.Audit, event.File, observedAt)
 	}
 	return event
 }
@@ -113,7 +132,7 @@ func (t *fileTracker) enrichAudit(event model.Event) model.Event {
 	return event
 }
 
-func (t *fileTracker) rememberFile(file *model.File) {
+func (t *fileTracker) rememberFile(file *model.File, observedAt time.Time) {
 	if t == nil || file == nil {
 		return
 	}
@@ -122,19 +141,21 @@ func (t *fileTracker) rememberFile(file *model.File) {
 		return
 	}
 	current := trackedFile{
-		mode:  strings.TrimSpace(file.Mode),
-		uid:   strings.TrimSpace(file.UID),
-		gid:   strings.TrimSpace(file.GID),
-		owner: strings.TrimSpace(file.Owner),
-		group: strings.TrimSpace(file.Group),
+		mode:     strings.TrimSpace(file.Mode),
+		uid:      strings.TrimSpace(file.UID),
+		gid:      strings.TrimSpace(file.GID),
+		owner:    strings.TrimSpace(file.Owner),
+		group:    strings.TrimSpace(file.Group),
+		lastSeen: observedAt,
 	}
 	if !current.hasIdentity() {
 		return
 	}
 	t.byPath[path] = current
+	t.prune(observedAt)
 }
 
-func (t *fileTracker) rememberAudit(audit *model.Audit, file *model.File) {
+func (t *fileTracker) rememberAudit(audit *model.Audit, file *model.File, observedAt time.Time) {
 	if t == nil || audit == nil {
 		return
 	}
@@ -143,16 +164,18 @@ func (t *fileTracker) rememberAudit(audit *model.Audit, file *model.File) {
 		return
 	}
 	current := trackedFile{
-		mode:  strings.TrimSpace(fileModeFromAudit(file, audit)),
-		uid:   strings.TrimSpace(audit.FileUID),
-		gid:   strings.TrimSpace(audit.FileGID),
-		owner: strings.TrimSpace(audit.FileOwner),
-		group: strings.TrimSpace(audit.FileGroup),
+		mode:     strings.TrimSpace(fileModeFromAudit(file, audit)),
+		uid:      strings.TrimSpace(audit.FileUID),
+		gid:      strings.TrimSpace(audit.FileGID),
+		owner:    strings.TrimSpace(audit.FileOwner),
+		group:    strings.TrimSpace(audit.FileGroup),
+		lastSeen: observedAt,
 	}
 	if !current.hasIdentity() {
 		return
 	}
 	t.byPath[path] = current
+	t.prune(observedAt)
 }
 
 func (t *fileTracker) forget(path string) {
@@ -160,6 +183,40 @@ func (t *fileTracker) forget(path string) {
 		return
 	}
 	delete(t.byPath, path)
+}
+
+func (t *fileTracker) prune(observedAt time.Time) {
+	if t == nil {
+		return
+	}
+	if observedAt.IsZero() {
+		observedAt = time.Now().UTC()
+	}
+	if len(t.byPath) <= t.maxEntries && !t.nextPrune.IsZero() && observedAt.Before(t.nextPrune) {
+		return
+	}
+	if t.window > 0 {
+		for path, entry := range t.byPath {
+			if !entry.lastSeen.IsZero() && observedAt.Sub(entry.lastSeen) > t.window {
+				delete(t.byPath, path)
+			}
+		}
+	}
+	for t.maxEntries > 0 && len(t.byPath) > t.maxEntries {
+		oldestPath := ""
+		var oldestSeen time.Time
+		for path, entry := range t.byPath {
+			if oldestPath == "" || entry.lastSeen.Before(oldestSeen) {
+				oldestPath = path
+				oldestSeen = entry.lastSeen
+			}
+		}
+		if oldestPath == "" {
+			break
+		}
+		delete(t.byPath, oldestPath)
+	}
+	t.nextPrune = observedAt.Add(shortTermContextPruneInterval)
 }
 
 func (value trackedFile) hasIdentity() bool {

@@ -64,8 +64,10 @@ func newInstanceWithOptions(spec model.DesiredSpec, options instanceOptions) (*I
 	return &Instance{
 		spec:       spec,
 		collectors: collectors,
-		pipeline: newPipeline(engine).
-			withArtifactEnricher(newArtifactEnricher(spec.EvidencePolicy)).
+		pipeline: newPipelineFromSpec(engine, spec).
+			withArtifactEnricher(
+				newArtifactEnricher(spec.EvidencePolicy, shortTermContextConfigFromSpec(spec)),
+			).
 			withEvidencePolicy(spec.EvidencePolicy),
 		events:                   make(chan model.Event, 256),
 		baselineProvider:         options.baselineProvider,
@@ -106,7 +108,9 @@ func (i *Instance) start(parent context.Context) error {
 
 	if i.baselineProvider != nil {
 		go emitInventoryObservations(ctx, i.spec, i.baselineProvider, i.events)
-		go i.refreshInventoryLoop(ctx)
+		if i.spec.Reporting.ShouldEmitSnapshotObservations() {
+			go i.refreshInventoryLoop(ctx)
+		}
 	}
 
 	return nil
