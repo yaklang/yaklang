@@ -268,6 +268,174 @@ func (x *ExecuteHIDSResponseActionCommand) GetProcess() *HIDSProcessRef {
 	return nil
 }
 
+type HIDSDesiredSpecDryRunCommand struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Metadata        *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId    string                 `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	Capability      *v11.CapabilityRef     `protobuf:"bytes,3,opt,name=capability,proto3" json:"capability,omitempty"`
+	DesiredSpecJson []byte                 `protobuf:"bytes,4,opt,name=desired_spec_json,json=desiredSpecJson,proto3" json:"desired_spec_json,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *HIDSDesiredSpecDryRunCommand) Reset() {
+	*x = HIDSDesiredSpecDryRunCommand{}
+	mi := &file_legion_hids_v1_hids_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HIDSDesiredSpecDryRunCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HIDSDesiredSpecDryRunCommand) ProtoMessage() {}
+
+func (x *HIDSDesiredSpecDryRunCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_hids_v1_hids_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HIDSDesiredSpecDryRunCommand.ProtoReflect.Descriptor instead.
+func (*HIDSDesiredSpecDryRunCommand) Descriptor() ([]byte, []int) {
+	return file_legion_hids_v1_hids_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *HIDSDesiredSpecDryRunCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *HIDSDesiredSpecDryRunCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *HIDSDesiredSpecDryRunCommand) GetCapability() *v11.CapabilityRef {
+	if x != nil {
+		return x.Capability
+	}
+	return nil
+}
+
+func (x *HIDSDesiredSpecDryRunCommand) GetDesiredSpecJson() []byte {
+	if x != nil {
+		return x.DesiredSpecJson
+	}
+	return nil
+}
+
+type HIDSDesiredSpecDryRunResult struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	Capability    *v11.CapabilityRef     `protobuf:"bytes,2,opt,name=capability,proto3" json:"capability,omitempty"`
+	Status        string                 `protobuf:"bytes,3,opt,name=status,proto3" json:"status,omitempty"`
+	Message       string                 `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,5,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,6,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	ObservedAt    *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=observed_at,json=observedAt,proto3" json:"observed_at,omitempty"`
+	DetailJson    []byte                 `protobuf:"bytes,8,opt,name=detail_json,json=detailJson,proto3" json:"detail_json,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HIDSDesiredSpecDryRunResult) Reset() {
+	*x = HIDSDesiredSpecDryRunResult{}
+	mi := &file_legion_hids_v1_hids_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HIDSDesiredSpecDryRunResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HIDSDesiredSpecDryRunResult) ProtoMessage() {}
+
+func (x *HIDSDesiredSpecDryRunResult) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_hids_v1_hids_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HIDSDesiredSpecDryRunResult.ProtoReflect.Descriptor instead.
+func (*HIDSDesiredSpecDryRunResult) Descriptor() ([]byte, []int) {
+	return file_legion_hids_v1_hids_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *HIDSDesiredSpecDryRunResult) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *HIDSDesiredSpecDryRunResult) GetCapability() *v11.CapabilityRef {
+	if x != nil {
+		return x.Capability
+	}
+	return nil
+}
+
+func (x *HIDSDesiredSpecDryRunResult) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *HIDSDesiredSpecDryRunResult) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *HIDSDesiredSpecDryRunResult) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *HIDSDesiredSpecDryRunResult) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+func (x *HIDSDesiredSpecDryRunResult) GetObservedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ObservedAt
+	}
+	return nil
+}
+
+func (x *HIDSDesiredSpecDryRunResult) GetDetailJson() []byte {
+	if x != nil {
+		return x.DetailJson
+	}
+	return nil
+}
+
 type HIDSResponseActionResult struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
@@ -285,7 +453,7 @@ type HIDSResponseActionResult struct {
 
 func (x *HIDSResponseActionResult) Reset() {
 	*x = HIDSResponseActionResult{}
-	mi := &file_legion_hids_v1_hids_proto_msgTypes[3]
+	mi := &file_legion_hids_v1_hids_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -297,7 +465,7 @@ func (x *HIDSResponseActionResult) String() string {
 func (*HIDSResponseActionResult) ProtoMessage() {}
 
 func (x *HIDSResponseActionResult) ProtoReflect() protoreflect.Message {
-	mi := &file_legion_hids_v1_hids_proto_msgTypes[3]
+	mi := &file_legion_hids_v1_hids_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -310,7 +478,7 @@ func (x *HIDSResponseActionResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HIDSResponseActionResult.ProtoReflect.Descriptor instead.
 func (*HIDSResponseActionResult) Descriptor() ([]byte, []int) {
-	return file_legion_hids_v1_hids_proto_rawDescGZIP(), []int{3}
+	return file_legion_hids_v1_hids_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *HIDSResponseActionResult) GetMetadata() *v1.EventMetadata {
@@ -406,7 +574,28 @@ const file_legion_hids_v1_hids_proto_rawDesc = "" +
 	"capability\x18\x03 \x01(\v2#.legion.capability.v1.CapabilityRefR\n" +
 	"capability\x12\x16\n" +
 	"\x06action\x18\x04 \x01(\tR\x06action\x128\n" +
-	"\aprocess\x18\x05 \x01(\v2\x1e.legion.hids.v1.HIDSProcessRefR\aprocess\"\xa6\x03\n" +
+	"\aprocess\x18\x05 \x01(\v2\x1e.legion.hids.v1.HIDSProcessRefR\aprocess\"\xf2\x01\n" +
+	"\x1cHIDSDesiredSpecDryRunCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12C\n" +
+	"\n" +
+	"capability\x18\x03 \x01(\v2#.legion.capability.v1.CapabilityRefR\n" +
+	"capability\x12*\n" +
+	"\x11desired_spec_json\x18\x04 \x01(\fR\x0fdesiredSpecJson\"\xf1\x02\n" +
+	"\x1bHIDSDesiredSpecDryRunResult\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12C\n" +
+	"\n" +
+	"capability\x18\x02 \x01(\v2#.legion.capability.v1.CapabilityRefR\n" +
+	"capability\x12\x16\n" +
+	"\x06status\x18\x03 \x01(\tR\x06status\x12\x18\n" +
+	"\amessage\x18\x04 \x01(\tR\amessage\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x05 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x06 \x01(\tR\ferrorMessage\x12;\n" +
+	"\vobserved_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"observedAt\x12\x1f\n" +
+	"\vdetail_json\x18\b \x01(\fR\n" +
+	"detailJson\"\xa6\x03\n" +
 	"\x18HIDSResponseActionResult\x129\n" +
 	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12C\n" +
 	"\n" +
@@ -435,33 +624,40 @@ func file_legion_hids_v1_hids_proto_rawDescGZIP() []byte {
 	return file_legion_hids_v1_hids_proto_rawDescData
 }
 
-var file_legion_hids_v1_hids_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_legion_hids_v1_hids_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_legion_hids_v1_hids_proto_goTypes = []any{
 	(*HIDSObservation)(nil),                  // 0: legion.hids.v1.HIDSObservation
 	(*HIDSProcessRef)(nil),                   // 1: legion.hids.v1.HIDSProcessRef
 	(*ExecuteHIDSResponseActionCommand)(nil), // 2: legion.hids.v1.ExecuteHIDSResponseActionCommand
-	(*HIDSResponseActionResult)(nil),         // 3: legion.hids.v1.HIDSResponseActionResult
-	(*v1.EventMetadata)(nil),                 // 4: legion.node.v1.EventMetadata
-	(*v11.CapabilityRef)(nil),                // 5: legion.capability.v1.CapabilityRef
-	(*timestamppb.Timestamp)(nil),            // 6: google.protobuf.Timestamp
-	(*v1.CommandMetadata)(nil),               // 7: legion.node.v1.CommandMetadata
+	(*HIDSDesiredSpecDryRunCommand)(nil),     // 3: legion.hids.v1.HIDSDesiredSpecDryRunCommand
+	(*HIDSDesiredSpecDryRunResult)(nil),      // 4: legion.hids.v1.HIDSDesiredSpecDryRunResult
+	(*HIDSResponseActionResult)(nil),         // 5: legion.hids.v1.HIDSResponseActionResult
+	(*v1.EventMetadata)(nil),                 // 6: legion.node.v1.EventMetadata
+	(*v11.CapabilityRef)(nil),                // 7: legion.capability.v1.CapabilityRef
+	(*timestamppb.Timestamp)(nil),            // 8: google.protobuf.Timestamp
+	(*v1.CommandMetadata)(nil),               // 9: legion.node.v1.CommandMetadata
 }
 var file_legion_hids_v1_hids_proto_depIdxs = []int32{
-	4,  // 0: legion.hids.v1.HIDSObservation.metadata:type_name -> legion.node.v1.EventMetadata
-	5,  // 1: legion.hids.v1.HIDSObservation.capability:type_name -> legion.capability.v1.CapabilityRef
-	6,  // 2: legion.hids.v1.HIDSObservation.observed_at:type_name -> google.protobuf.Timestamp
-	7,  // 3: legion.hids.v1.ExecuteHIDSResponseActionCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	5,  // 4: legion.hids.v1.ExecuteHIDSResponseActionCommand.capability:type_name -> legion.capability.v1.CapabilityRef
+	6,  // 0: legion.hids.v1.HIDSObservation.metadata:type_name -> legion.node.v1.EventMetadata
+	7,  // 1: legion.hids.v1.HIDSObservation.capability:type_name -> legion.capability.v1.CapabilityRef
+	8,  // 2: legion.hids.v1.HIDSObservation.observed_at:type_name -> google.protobuf.Timestamp
+	9,  // 3: legion.hids.v1.ExecuteHIDSResponseActionCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	7,  // 4: legion.hids.v1.ExecuteHIDSResponseActionCommand.capability:type_name -> legion.capability.v1.CapabilityRef
 	1,  // 5: legion.hids.v1.ExecuteHIDSResponseActionCommand.process:type_name -> legion.hids.v1.HIDSProcessRef
-	4,  // 6: legion.hids.v1.HIDSResponseActionResult.metadata:type_name -> legion.node.v1.EventMetadata
-	5,  // 7: legion.hids.v1.HIDSResponseActionResult.capability:type_name -> legion.capability.v1.CapabilityRef
-	6,  // 8: legion.hids.v1.HIDSResponseActionResult.observed_at:type_name -> google.protobuf.Timestamp
-	1,  // 9: legion.hids.v1.HIDSResponseActionResult.process:type_name -> legion.hids.v1.HIDSProcessRef
-	10, // [10:10] is the sub-list for method output_type
-	10, // [10:10] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+	9,  // 6: legion.hids.v1.HIDSDesiredSpecDryRunCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	7,  // 7: legion.hids.v1.HIDSDesiredSpecDryRunCommand.capability:type_name -> legion.capability.v1.CapabilityRef
+	6,  // 8: legion.hids.v1.HIDSDesiredSpecDryRunResult.metadata:type_name -> legion.node.v1.EventMetadata
+	7,  // 9: legion.hids.v1.HIDSDesiredSpecDryRunResult.capability:type_name -> legion.capability.v1.CapabilityRef
+	8,  // 10: legion.hids.v1.HIDSDesiredSpecDryRunResult.observed_at:type_name -> google.protobuf.Timestamp
+	6,  // 11: legion.hids.v1.HIDSResponseActionResult.metadata:type_name -> legion.node.v1.EventMetadata
+	7,  // 12: legion.hids.v1.HIDSResponseActionResult.capability:type_name -> legion.capability.v1.CapabilityRef
+	8,  // 13: legion.hids.v1.HIDSResponseActionResult.observed_at:type_name -> google.protobuf.Timestamp
+	1,  // 14: legion.hids.v1.HIDSResponseActionResult.process:type_name -> legion.hids.v1.HIDSProcessRef
+	15, // [15:15] is the sub-list for method output_type
+	15, // [15:15] is the sub-list for method input_type
+	15, // [15:15] is the sub-list for extension type_name
+	15, // [15:15] is the sub-list for extension extendee
+	0,  // [0:15] is the sub-list for field type_name
 }
 
 func init() { file_legion_hids_v1_hids_proto_init() }
@@ -475,7 +671,7 @@ func file_legion_hids_v1_hids_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_legion_hids_v1_hids_proto_rawDesc), len(file_legion_hids_v1_hids_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   4,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
