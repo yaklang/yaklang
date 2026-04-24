@@ -63,6 +63,10 @@ func (s *sessionReadyHooksStub) Apply(*CapabilityManager, capabilityHIDSApplyInp
 	return CapabilityApplyResult{}, nil
 }
 
+func (s *sessionReadyHooksStub) DryRun(*CapabilityManager, capabilityHIDSApplyInput) (CapabilityDryRunResult, error) {
+	return CapabilityDryRunResult{}, nil
+}
+
 func (s *sessionReadyHooksStub) Alerts() <-chan CapabilityRuntimeAlert { return nil }
 
 func (s *sessionReadyHooksStub) Observations() <-chan CapabilityRuntimeObservation { return nil }

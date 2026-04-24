@@ -2,7 +2,10 @@
 
 package model
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 func TestDesiredSpecValidateRejectsUnknownTemporaryRuleEventType(t *testing.T) {
 	t.Parallel()
@@ -133,6 +136,100 @@ func TestReportingPolicyDefaultsSnapshotObservationsOff(t *testing.T) {
 	enabled := true
 	if !(ReportingPolicy{EmitSnapshotObservations: &enabled}).ShouldEmitSnapshotObservations() {
 		t.Fatal("expected explicit true to enable snapshot observation export")
+	}
+}
+
+func TestDesiredSpecParsesResponsePolicy(t *testing.T) {
+	t.Parallel()
+
+	spec, err := ParseDesiredSpec([]byte(`{
+		"mode": "observe",
+		"collectors": {
+			"process": {"enabled": true, "backend": "ebpf"}
+		},
+		"response_policy": {
+			"mode": "observe",
+			"allowed_actions": ["process.terminate", "process.terminate"],
+			"expires_at": "2026-04-23T20:00:00+08:00"
+		}
+	}`))
+	if err != nil {
+		t.Fatalf("ParseDesiredSpec returned error: %v", err)
+	}
+	if spec.ResponsePolicy.Mode != ModeObserve {
+		t.Fatalf("unexpected response policy mode: %s", spec.ResponsePolicy.Mode)
+	}
+	if len(spec.ResponsePolicy.AllowedActions) != 1 ||
+		spec.ResponsePolicy.AllowedActions[0] != ResponseActionProcessTerminate {
+		t.Fatalf("unexpected allowed response actions: %#v", spec.ResponsePolicy.AllowedActions)
+	}
+	if spec.ResponsePolicy.ExpiresAt != "2026-04-23T12:00:00Z" {
+		t.Fatalf("unexpected response policy expiry: %s", spec.ResponsePolicy.ExpiresAt)
+	}
+	if !spec.ResponsePolicy.AllowsAction(
+		ResponseActionProcessTerminate,
+		time.Date(2026, 4, 23, 11, 59, 59, 0, time.UTC),
+	) {
+		t.Fatal("expected response policy to allow process terminate before expiry")
+	}
+}
+
+func TestDesiredSpecRejectsUnsupportedResponsePolicyMode(t *testing.T) {
+	t.Parallel()
+
+	_, err := ParseDesiredSpec([]byte(`{
+		"mode": "observe",
+		"collectors": {
+			"process": {"enabled": true, "backend": "ebpf"}
+		},
+		"response_policy": {
+			"mode": "prevent",
+			"allowed_actions": ["process.terminate"]
+		}
+	}`))
+	if err == nil {
+		t.Fatal("expected validation error")
+	}
+	if got := err.Error(); got != "response_policy.mode: only observe mode is supported" {
+		t.Fatalf("unexpected validation error: %s", got)
+	}
+}
+
+func TestDesiredSpecRejectsUnsupportedResponsePolicyAction(t *testing.T) {
+	t.Parallel()
+
+	_, err := ParseDesiredSpec([]byte(`{
+		"mode": "observe",
+		"collectors": {
+			"process": {"enabled": true, "backend": "ebpf"}
+		},
+		"response_policy": {
+			"mode": "observe",
+			"allowed_actions": ["process.suspend"]
+		}
+	}`))
+	if err == nil {
+		t.Fatal("expected validation error")
+	}
+	if got := err.Error(); got != `response_policy.allowed_actions[0]: unsupported action "process.suspend"` {
+		t.Fatalf("unexpected validation error: %s", got)
+	}
+}
+
+func TestResponsePolicyAllowsActionRejectsExpiredPolicy(t *testing.T) {
+	t.Parallel()
+
+	policy := ResponsePolicy{
+		Mode:           ModeObserve,
+		AllowedActions: []string{ResponseActionProcessTerminate},
+		ExpiresAt:      "2026-04-23T12:00:00Z",
+	}
+
+	if policy.AllowsAction(
+		ResponseActionProcessTerminate,
+		time.Date(2026, 4, 23, 12, 0, 0, 0, time.UTC),
+	) {
+		t.Fatal("expected response policy to deny action at expiry boundary")
 	}
 }
 
