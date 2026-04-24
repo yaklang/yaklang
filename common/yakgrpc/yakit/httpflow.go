@@ -500,10 +500,12 @@ func UpdateHTTPFlowTags(db *gorm.DB, i *schema.HTTPFlow) (finErr error) {
 		if finErr == nil {
 			// 需要手动触发广播，因为要拿到id，在AfterSave/AfterUpdate中无法拿到id
 			schema.GetBroadCast_Data().Call("httpflow", map[string]any{
-				"id":     id,
-				"tags":   tags,
-				"action": "update",
+				"id":         id,
+				"tags":       tags,
+				"action":     "update",
+				"runtime_id": i.RuntimeId,
 			})
+			schema.PublishRuntimeScopedBroadcast("httpflow", i.RuntimeId, "update", uint(id))
 		}
 	}()
 	updateData := map[string]interface{}{
