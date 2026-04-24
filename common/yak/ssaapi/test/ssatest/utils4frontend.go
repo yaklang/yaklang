@@ -242,7 +242,7 @@ func CheckError(t *testing.T, tc TestCase) {
 		errs := lo.Map(prog.GetErrors(), func(e *ssa.SSAError, _ int) string { return e.Message })
 		slices.Sort(errs)
 		slices.Sort(want)
-		require.Len(t, errs, len(want), "error len not match")
+		// require.Len(t, errs, len(want), "error len not match")
 		require.Equal(t, want, errs, "error not match")
 	}
 	tc.Check = check
