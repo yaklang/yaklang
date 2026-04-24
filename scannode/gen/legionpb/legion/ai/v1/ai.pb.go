@@ -419,6 +419,90 @@ func (x *PushAISessionInputCommand) GetInputJson() []byte {
 	return nil
 }
 
+type AppendAISessionContextCommand struct {
+	state          protoimpl.MessageState    `protogen:"open.v1"`
+	Metadata       *v1.CommandMetadata       `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	Session        *AISessionRef             `protobuf:"bytes,2,opt,name=session,proto3" json:"session,omitempty"`
+	OwnerUserId    string                    `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Attachments    []*AISessionAttachmentRef `protobuf:"bytes,4,rep,name=attachments,proto3" json:"attachments,omitempty"`
+	CredentialRefs []*AISessionCredentialRef `protobuf:"bytes,5,rep,name=credential_refs,json=credentialRefs,proto3" json:"credential_refs,omitempty"`
+	Reason         string                    `protobuf:"bytes,6,opt,name=reason,proto3" json:"reason,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *AppendAISessionContextCommand) Reset() {
+	*x = AppendAISessionContextCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AppendAISessionContextCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AppendAISessionContextCommand) ProtoMessage() {}
+
+func (x *AppendAISessionContextCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AppendAISessionContextCommand.ProtoReflect.Descriptor instead.
+func (*AppendAISessionContextCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *AppendAISessionContextCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AppendAISessionContextCommand) GetSession() *AISessionRef {
+	if x != nil {
+		return x.Session
+	}
+	return nil
+}
+
+func (x *AppendAISessionContextCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AppendAISessionContextCommand) GetAttachments() []*AISessionAttachmentRef {
+	if x != nil {
+		return x.Attachments
+	}
+	return nil
+}
+
+func (x *AppendAISessionContextCommand) GetCredentialRefs() []*AISessionCredentialRef {
+	if x != nil {
+		return x.CredentialRefs
+	}
+	return nil
+}
+
+func (x *AppendAISessionContextCommand) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
 type CancelAISessionCommand struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Metadata      *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
@@ -431,7 +515,7 @@ type CancelAISessionCommand struct {
 
 func (x *CancelAISessionCommand) Reset() {
 	*x = CancelAISessionCommand{}
-	mi := &file_legion_ai_v1_ai_proto_msgTypes[5]
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -443,7 +527,7 @@ func (x *CancelAISessionCommand) String() string {
 func (*CancelAISessionCommand) ProtoMessage() {}
 
 func (x *CancelAISessionCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_legion_ai_v1_ai_proto_msgTypes[5]
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -456,7 +540,7 @@ func (x *CancelAISessionCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CancelAISessionCommand.ProtoReflect.Descriptor instead.
 func (*CancelAISessionCommand) Descriptor() ([]byte, []int) {
-	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{5}
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *CancelAISessionCommand) GetMetadata() *v1.CommandMetadata {
@@ -499,7 +583,7 @@ type CloseAISessionCommand struct {
 
 func (x *CloseAISessionCommand) Reset() {
 	*x = CloseAISessionCommand{}
-	mi := &file_legion_ai_v1_ai_proto_msgTypes[6]
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -511,7 +595,7 @@ func (x *CloseAISessionCommand) String() string {
 func (*CloseAISessionCommand) ProtoMessage() {}
 
 func (x *CloseAISessionCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_legion_ai_v1_ai_proto_msgTypes[6]
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -524,7 +608,7 @@ func (x *CloseAISessionCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CloseAISessionCommand.ProtoReflect.Descriptor instead.
 func (*CloseAISessionCommand) Descriptor() ([]byte, []int) {
-	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{6}
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *CloseAISessionCommand) GetMetadata() *v1.CommandMetadata {
@@ -568,7 +652,7 @@ type AISessionReady struct {
 
 func (x *AISessionReady) Reset() {
 	*x = AISessionReady{}
-	mi := &file_legion_ai_v1_ai_proto_msgTypes[7]
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -580,7 +664,7 @@ func (x *AISessionReady) String() string {
 func (*AISessionReady) ProtoMessage() {}
 
 func (x *AISessionReady) ProtoReflect() protoreflect.Message {
-	mi := &file_legion_ai_v1_ai_proto_msgTypes[7]
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -593,7 +677,7 @@ func (x *AISessionReady) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AISessionReady.ProtoReflect.Descriptor instead.
 func (*AISessionReady) Descriptor() ([]byte, []int) {
-	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{7}
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *AISessionReady) GetMetadata() *v1.EventMetadata {
@@ -644,7 +728,7 @@ type AISessionEvent struct {
 
 func (x *AISessionEvent) Reset() {
 	*x = AISessionEvent{}
-	mi := &file_legion_ai_v1_ai_proto_msgTypes[8]
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -656,7 +740,7 @@ func (x *AISessionEvent) String() string {
 func (*AISessionEvent) ProtoMessage() {}
 
 func (x *AISessionEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_legion_ai_v1_ai_proto_msgTypes[8]
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -669,7 +753,7 @@ func (x *AISessionEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AISessionEvent.ProtoReflect.Descriptor instead.
 func (*AISessionEvent) Descriptor() ([]byte, []int) {
-	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{8}
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *AISessionEvent) GetMetadata() *v1.EventMetadata {
@@ -719,7 +803,7 @@ type AISessionDone struct {
 
 func (x *AISessionDone) Reset() {
 	*x = AISessionDone{}
-	mi := &file_legion_ai_v1_ai_proto_msgTypes[9]
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -731,7 +815,7 @@ func (x *AISessionDone) String() string {
 func (*AISessionDone) ProtoMessage() {}
 
 func (x *AISessionDone) ProtoReflect() protoreflect.Message {
-	mi := &file_legion_ai_v1_ai_proto_msgTypes[9]
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -744,7 +828,7 @@ func (x *AISessionDone) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AISessionDone.ProtoReflect.Descriptor instead.
 func (*AISessionDone) Descriptor() ([]byte, []int) {
-	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{9}
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *AISessionDone) GetMetadata() *v1.EventMetadata {
@@ -789,7 +873,7 @@ type AISessionFailed struct {
 
 func (x *AISessionFailed) Reset() {
 	*x = AISessionFailed{}
-	mi := &file_legion_ai_v1_ai_proto_msgTypes[10]
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -801,7 +885,7 @@ func (x *AISessionFailed) String() string {
 func (*AISessionFailed) ProtoMessage() {}
 
 func (x *AISessionFailed) ProtoReflect() protoreflect.Message {
-	mi := &file_legion_ai_v1_ai_proto_msgTypes[10]
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -814,7 +898,7 @@ func (x *AISessionFailed) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AISessionFailed.ProtoReflect.Descriptor instead.
 func (*AISessionFailed) Descriptor() ([]byte, []int) {
-	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{10}
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *AISessionFailed) GetMetadata() *v1.EventMetadata {
@@ -871,7 +955,7 @@ type AISessionCancelled struct {
 
 func (x *AISessionCancelled) Reset() {
 	*x = AISessionCancelled{}
-	mi := &file_legion_ai_v1_ai_proto_msgTypes[11]
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -883,7 +967,7 @@ func (x *AISessionCancelled) String() string {
 func (*AISessionCancelled) ProtoMessage() {}
 
 func (x *AISessionCancelled) ProtoReflect() protoreflect.Message {
-	mi := &file_legion_ai_v1_ai_proto_msgTypes[11]
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -896,7 +980,7 @@ func (x *AISessionCancelled) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AISessionCancelled.ProtoReflect.Descriptor instead.
 func (*AISessionCancelled) Descriptor() ([]byte, []int) {
-	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{11}
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *AISessionCancelled) GetMetadata() *v1.EventMetadata {
@@ -970,7 +1054,14 @@ const file_legion_ai_v1_ai_proto_rawDesc = "" +
 	"\n" +
 	"input_type\x18\x04 \x01(\tR\tinputType\x12\x1d\n" +
 	"\n" +
-	"input_json\x18\x05 \x01(\fR\tinputJson\"\xc7\x01\n" +
+	"input_json\x18\x05 \x01(\fR\tinputJson\"\xe5\x02\n" +
+	"\x1dAppendAISessionContextCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x124\n" +
+	"\asession\x18\x02 \x01(\v2\x1a.legion.ai.v1.AISessionRefR\asession\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x12F\n" +
+	"\vattachments\x18\x04 \x03(\v2$.legion.ai.v1.AISessionAttachmentRefR\vattachments\x12M\n" +
+	"\x0fcredential_refs\x18\x05 \x03(\v2$.legion.ai.v1.AISessionCredentialRefR\x0ecredentialRefs\x12\x16\n" +
+	"\x06reason\x18\x06 \x01(\tR\x06reason\"\xc7\x01\n" +
 	"\x16CancelAISessionCommand\x12;\n" +
 	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x124\n" +
 	"\asession\x18\x02 \x01(\v2\x1a.legion.ai.v1.AISessionRefR\asession\x12\"\n" +
@@ -1029,54 +1120,59 @@ func file_legion_ai_v1_ai_proto_rawDescGZIP() []byte {
 	return file_legion_ai_v1_ai_proto_rawDescData
 }
 
-var file_legion_ai_v1_ai_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_legion_ai_v1_ai_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_legion_ai_v1_ai_proto_goTypes = []any{
-	(*AISessionRef)(nil),              // 0: legion.ai.v1.AISessionRef
-	(*AISessionAttachmentRef)(nil),    // 1: legion.ai.v1.AISessionAttachmentRef
-	(*AISessionCredentialRef)(nil),    // 2: legion.ai.v1.AISessionCredentialRef
-	(*BindAISessionCommand)(nil),      // 3: legion.ai.v1.BindAISessionCommand
-	(*PushAISessionInputCommand)(nil), // 4: legion.ai.v1.PushAISessionInputCommand
-	(*CancelAISessionCommand)(nil),    // 5: legion.ai.v1.CancelAISessionCommand
-	(*CloseAISessionCommand)(nil),     // 6: legion.ai.v1.CloseAISessionCommand
-	(*AISessionReady)(nil),            // 7: legion.ai.v1.AISessionReady
-	(*AISessionEvent)(nil),            // 8: legion.ai.v1.AISessionEvent
-	(*AISessionDone)(nil),             // 9: legion.ai.v1.AISessionDone
-	(*AISessionFailed)(nil),           // 10: legion.ai.v1.AISessionFailed
-	(*AISessionCancelled)(nil),        // 11: legion.ai.v1.AISessionCancelled
-	(*v1.CommandMetadata)(nil),        // 12: legion.node.v1.CommandMetadata
-	(*v1.EventMetadata)(nil),          // 13: legion.node.v1.EventMetadata
-	(*timestamppb.Timestamp)(nil),     // 14: google.protobuf.Timestamp
+	(*AISessionRef)(nil),                  // 0: legion.ai.v1.AISessionRef
+	(*AISessionAttachmentRef)(nil),        // 1: legion.ai.v1.AISessionAttachmentRef
+	(*AISessionCredentialRef)(nil),        // 2: legion.ai.v1.AISessionCredentialRef
+	(*BindAISessionCommand)(nil),          // 3: legion.ai.v1.BindAISessionCommand
+	(*PushAISessionInputCommand)(nil),     // 4: legion.ai.v1.PushAISessionInputCommand
+	(*AppendAISessionContextCommand)(nil), // 5: legion.ai.v1.AppendAISessionContextCommand
+	(*CancelAISessionCommand)(nil),        // 6: legion.ai.v1.CancelAISessionCommand
+	(*CloseAISessionCommand)(nil),         // 7: legion.ai.v1.CloseAISessionCommand
+	(*AISessionReady)(nil),                // 8: legion.ai.v1.AISessionReady
+	(*AISessionEvent)(nil),                // 9: legion.ai.v1.AISessionEvent
+	(*AISessionDone)(nil),                 // 10: legion.ai.v1.AISessionDone
+	(*AISessionFailed)(nil),               // 11: legion.ai.v1.AISessionFailed
+	(*AISessionCancelled)(nil),            // 12: legion.ai.v1.AISessionCancelled
+	(*v1.CommandMetadata)(nil),            // 13: legion.node.v1.CommandMetadata
+	(*v1.EventMetadata)(nil),              // 14: legion.node.v1.EventMetadata
+	(*timestamppb.Timestamp)(nil),         // 15: google.protobuf.Timestamp
 }
 var file_legion_ai_v1_ai_proto_depIdxs = []int32{
-	12, // 0: legion.ai.v1.BindAISessionCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	13, // 0: legion.ai.v1.BindAISessionCommand.metadata:type_name -> legion.node.v1.CommandMetadata
 	0,  // 1: legion.ai.v1.BindAISessionCommand.session:type_name -> legion.ai.v1.AISessionRef
 	1,  // 2: legion.ai.v1.BindAISessionCommand.attachments:type_name -> legion.ai.v1.AISessionAttachmentRef
 	2,  // 3: legion.ai.v1.BindAISessionCommand.credential_refs:type_name -> legion.ai.v1.AISessionCredentialRef
-	12, // 4: legion.ai.v1.PushAISessionInputCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	13, // 4: legion.ai.v1.PushAISessionInputCommand.metadata:type_name -> legion.node.v1.CommandMetadata
 	0,  // 5: legion.ai.v1.PushAISessionInputCommand.session:type_name -> legion.ai.v1.AISessionRef
-	12, // 6: legion.ai.v1.CancelAISessionCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	0,  // 7: legion.ai.v1.CancelAISessionCommand.session:type_name -> legion.ai.v1.AISessionRef
-	12, // 8: legion.ai.v1.CloseAISessionCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	0,  // 9: legion.ai.v1.CloseAISessionCommand.session:type_name -> legion.ai.v1.AISessionRef
-	13, // 10: legion.ai.v1.AISessionReady.metadata:type_name -> legion.node.v1.EventMetadata
-	0,  // 11: legion.ai.v1.AISessionReady.session:type_name -> legion.ai.v1.AISessionRef
-	14, // 12: legion.ai.v1.AISessionReady.ready_at:type_name -> google.protobuf.Timestamp
-	13, // 13: legion.ai.v1.AISessionEvent.metadata:type_name -> legion.node.v1.EventMetadata
-	0,  // 14: legion.ai.v1.AISessionEvent.session:type_name -> legion.ai.v1.AISessionRef
-	13, // 15: legion.ai.v1.AISessionDone.metadata:type_name -> legion.node.v1.EventMetadata
-	0,  // 16: legion.ai.v1.AISessionDone.session:type_name -> legion.ai.v1.AISessionRef
-	14, // 17: legion.ai.v1.AISessionDone.finished_at:type_name -> google.protobuf.Timestamp
-	13, // 18: legion.ai.v1.AISessionFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	0,  // 19: legion.ai.v1.AISessionFailed.session:type_name -> legion.ai.v1.AISessionRef
-	14, // 20: legion.ai.v1.AISessionFailed.finished_at:type_name -> google.protobuf.Timestamp
-	13, // 21: legion.ai.v1.AISessionCancelled.metadata:type_name -> legion.node.v1.EventMetadata
-	0,  // 22: legion.ai.v1.AISessionCancelled.session:type_name -> legion.ai.v1.AISessionRef
-	14, // 23: legion.ai.v1.AISessionCancelled.finished_at:type_name -> google.protobuf.Timestamp
-	24, // [24:24] is the sub-list for method output_type
-	24, // [24:24] is the sub-list for method input_type
-	24, // [24:24] is the sub-list for extension type_name
-	24, // [24:24] is the sub-list for extension extendee
-	0,  // [0:24] is the sub-list for field type_name
+	13, // 6: legion.ai.v1.AppendAISessionContextCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	0,  // 7: legion.ai.v1.AppendAISessionContextCommand.session:type_name -> legion.ai.v1.AISessionRef
+	1,  // 8: legion.ai.v1.AppendAISessionContextCommand.attachments:type_name -> legion.ai.v1.AISessionAttachmentRef
+	2,  // 9: legion.ai.v1.AppendAISessionContextCommand.credential_refs:type_name -> legion.ai.v1.AISessionCredentialRef
+	13, // 10: legion.ai.v1.CancelAISessionCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	0,  // 11: legion.ai.v1.CancelAISessionCommand.session:type_name -> legion.ai.v1.AISessionRef
+	13, // 12: legion.ai.v1.CloseAISessionCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	0,  // 13: legion.ai.v1.CloseAISessionCommand.session:type_name -> legion.ai.v1.AISessionRef
+	14, // 14: legion.ai.v1.AISessionReady.metadata:type_name -> legion.node.v1.EventMetadata
+	0,  // 15: legion.ai.v1.AISessionReady.session:type_name -> legion.ai.v1.AISessionRef
+	15, // 16: legion.ai.v1.AISessionReady.ready_at:type_name -> google.protobuf.Timestamp
+	14, // 17: legion.ai.v1.AISessionEvent.metadata:type_name -> legion.node.v1.EventMetadata
+	0,  // 18: legion.ai.v1.AISessionEvent.session:type_name -> legion.ai.v1.AISessionRef
+	14, // 19: legion.ai.v1.AISessionDone.metadata:type_name -> legion.node.v1.EventMetadata
+	0,  // 20: legion.ai.v1.AISessionDone.session:type_name -> legion.ai.v1.AISessionRef
+	15, // 21: legion.ai.v1.AISessionDone.finished_at:type_name -> google.protobuf.Timestamp
+	14, // 22: legion.ai.v1.AISessionFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	0,  // 23: legion.ai.v1.AISessionFailed.session:type_name -> legion.ai.v1.AISessionRef
+	15, // 24: legion.ai.v1.AISessionFailed.finished_at:type_name -> google.protobuf.Timestamp
+	14, // 25: legion.ai.v1.AISessionCancelled.metadata:type_name -> legion.node.v1.EventMetadata
+	0,  // 26: legion.ai.v1.AISessionCancelled.session:type_name -> legion.ai.v1.AISessionRef
+	15, // 27: legion.ai.v1.AISessionCancelled.finished_at:type_name -> google.protobuf.Timestamp
+	28, // [28:28] is the sub-list for method output_type
+	28, // [28:28] is the sub-list for method input_type
+	28, // [28:28] is the sub-list for extension type_name
+	28, // [28:28] is the sub-list for extension extendee
+	0,  // [0:28] is the sub-list for field type_name
 }
 
 func init() { file_legion_ai_v1_ai_proto_init() }
@@ -1090,7 +1186,7 @@ func file_legion_ai_v1_ai_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_legion_ai_v1_ai_proto_rawDesc), len(file_legion_ai_v1_ai_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   12,
+			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

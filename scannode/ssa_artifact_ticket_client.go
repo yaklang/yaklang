@@ -41,7 +41,7 @@ func (s *ScanNode) fetchSSAArtifactUploadTicket(ctx context.Context, taskID, obj
 		return nil, utils.Errorf("task id required")
 	}
 
-	baseURL := strings.TrimRight(strings.TrimSpace(s.getServerHTTPURL()), "/")
+	baseURL := strings.TrimRight(strings.TrimSpace(s.resolvePlatformAPIBaseURL()), "/")
 	if baseURL == "" {
 		return nil, utils.Errorf("server http url unavailable")
 	}
@@ -121,4 +121,15 @@ func (s *ScanNode) fetchSSAArtifactUploadTicket(ctx context.Context, taskID, obj
 		return nil, utils.Errorf("invalid upload ticket: missing sts credentials")
 	}
 	return cfg, nil
+}
+
+func (s *ScanNode) resolvePlatformAPIBaseURL() string {
+	if s == nil {
+		return ""
+	}
+	client, ok := s.ruleSyncClient.(*RuleSyncClient)
+	if !ok || client == nil || client.config == nil {
+		return ""
+	}
+	return strings.TrimSpace(client.config.ServerURL)
 }
