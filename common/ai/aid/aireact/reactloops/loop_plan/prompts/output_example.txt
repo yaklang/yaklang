@@ -200,12 +200,91 @@
 <|FACTS_END_{{ .Nonce }}|>
 ```
 
+**示例三：Web 爬取后记录事实（重点演示"中文标题 + 公共前缀抽取 + 不重复动词前缀"）**
+
+第 N 轮：调用 `simple_crawler`
+第 N+1 轮：立即调用 `output_facts` 记录发现的 URL
+
+```json
+{
+    "@action": "output_facts"
+}
+```
+
+```markdown
+<|FACTS_{{ .Nonce }}|>
+## 已发现 URL (base: http://127.0.0.1:8787)
+
+- /_/
+- /_/submit-ai-practice
+- /_/ws
+- /api/
+- /api/get-challenge
+- /api/pipeline/
+- /api/pipeline/docs
+- /bruteplayground/
+- /bruteplayground/by-order-id
+- /bruteplayground/by-order-id-2
+- /bruteplayground/by-order-id-3
+- /common/
+- /common/vulinbox
+- /crypto/challenge-api-docs
+- /crypto/js/basic
+- /crypto/js/lib/aes/cbc
+- /crypto/js/lib/aes/ecb
+- /crypto/js/lib/aes/ecb/sqli
+- /crypto/js/lib/aes/ecb/sqli/bypass
+- /crypto/js/rsa/fromserver
+- /crypto/js/rsa/fromserver/response
+- /crypto/js/rsa/fromserver/response/aes-gcm
+- /fastjson/json-in-cookie
+- /fastjson/json-in-authorization
+- /fastjson/jackson-in-query
+
+## HTTP 响应头
+
+- Content-Type: text/html; charset=UTF8
+- Content-Length: 36310
+- Date: Thu, 23 Apr 2026 03:48:22 GMT
+
+## 静态资源引用
+
+- /static/favicon.ico
+- /static/js/bootstrap_5.3/bootstrap.min.css
+- /static/js/bootstrap_5.3/bootstrap.min.js
+- /static/js/bootstrap_5.3/popper.min.js
+
+## 页面特征
+
+- HTML 标题: Vulinbox - Agent
+- 服务协议: HTTP/1.1
+<|FACTS_END_{{ .Nonce }}|>
+```
+
+**注意对比**（错误写法 — 禁止）：
+```markdown
+- URL discovered: http://127.0.0.1:8787/_/
+- URL discovered: http://127.0.0.1:8787/_/submit-ai-practice
+- URL discovered: http://127.0.0.1:8787/_/ws
+- Server response header Content-Type: text/html
+- Static CSS file referenced: /static/js/bootstrap_5.3/bootstrap.min.css
+```
+上面每条 bullet 都复述了 "URL discovered / Server response header / Static ... file referenced" 这样的动词前缀，以及完整域名 `http://127.0.0.1:8787`——全是冗余噪声。正确做法是把分类和公共前缀抽到 `##` 标题，bullet 只写差异部分。
+
 **关键规则**：
-- 严禁写"已扫描端口"、"发现了若干服务"、"包含认证相关文件等"——每条必须是具体数值或路径
+- **语言跟随 USER INPUT**：section 标题、说明语、bullet 描述的语言必须与用户原始输入保持一致；用户说中文就全部中文，用户说英文就全部英文。**严禁**使用 `URL discovered: ...`、`Open port discovered: ...`、`Server response header ...`、`Static file referenced: ...` 之类的固定英文动词短语作为 bullet 前缀——这既是语言错位，也是重复冗余
+- **信息密度（去重复前缀）**：同类事实要集中到同一 `##` section，section 标题承担分类语义，bullet 里只写**差异值**；公共前缀（域名、base URL、目录根）抽到 section 标题的括号里或开头一行说明里，bullet 只写相对路径
+  - 反例：40 行 `- URL discovered: http://host/xxx`（每行都复述 "URL discovered" 和完整主机名）
+  - 正例：`## 已发现 URL (base: http://host)` 下面 40 行 `- /xxx` bullet（标题定分类，前缀抽公共）
+- **N 对 N 硬量化**：来源里出现了 N 条同类条目，FACTS 就必须写 N 行 bullet。上方示例中扫描得到 5 个开放端口，FACTS 里就恰好 5 行；如果实际扫到 155 个 URL，就必须写 155 行，不允许合并、不允许省略、不允许概括。信息密度规则是"bullet 里不重复前缀"，不是"压缩 bullet 数量"
+- **严禁任何概括词**：不允许出现 "等"、"其他"、"相关"、"类似"、"若干"、"一些"、"多个"、"若干个"、"数个"、"部分"、"主要" 以及对应英文（etc. / and more / and so on / various / several / others / similar / including…）；出现任一即视为不合格
+- 反例：`已扫描端口`、`发现了若干服务`、`包含认证相关文件等`、`/_/, /api, /bruteplayground 等目录`、`/fastjson/json-in-cookie 等 FastJSON 端点`
+- 正例：每一个端口 / URL / 文件 / 目录 / 接口独占一行 bullet，把"等"后面被吞掉的条目也全部写出来
+- **过长处理**：担心输出长度？拆分为多次 `output_facts` 调用分批提交，系统会自动合并去重；**禁止用概括词压缩条目数**
 - 每次调用只需要写**本轮新增事实**，系统会自动合并到累积 FACTS 中
 - 优先使用 `{"@action": "output_facts"}` + `FACTS` AITag 输出，让界面可以直接看到 markdown
 - 如果你漏掉显式 `output_facts`，系统会在 post-action hook 中自动补一次，但你仍应主动调用
-- output_facts 记录的内容是后续自动生成指导性文档和执行计划的事实基础，精确性直接影响计划质量
+- output_facts 记录的内容是后续自动生成指导性文档和执行计划的事实基础，精确性直接影响计划质量，任何被"等"吞掉的条目都将直接导致下游覆盖率漏洞
 
 # 探索阶段输出要求：
 *. 每次信息收集后调用 `output_facts` 记录发现

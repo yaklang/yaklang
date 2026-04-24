@@ -69,12 +69,20 @@ Subtasks can contain `sub_subtasks` for finer-grained decomposition:
 
 ## Coverage Completeness (Critical)
 
-The plan MUST cover ALL targets, endpoints, parameters, and test vectors discovered in FACTS and the Guidance Document:
-- Count every distinct target/endpoint/parameter mentioned in FACTS
-- Ensure EVERY one appears in at least one subtask's or sub_subtask's goal
-- If a discovered target is omitted from the plan, the plan is INCOMPLETE
-- For security testing: each (endpoint x vulnerability_type) combination that FACTS data suggests is testable MUST have a corresponding subtask or sub_subtask
-- For development tasks: each file/module/component mentioned in FACTS that requires changes MUST appear in a subtask
+### Single Source of Truth
+
+**FACTS is the ONLY source of truth for coverage verification.** The Guidance Document does NOT enumerate subject lists (by design — it only declares methodology and acceptance rules), and it MAY contain abstractions or summaries that can miss items. **DO NOT** use the Guidance Document as your coverage checklist. **DO** read the FACTS block above line by line as your authoritative checklist.
+
+### Coverage Rules
+
+The plan MUST cover ALL subjects (targets / endpoints / files / modules / records / configuration items / any other form of "item to be processed") discovered in FACTS:
+- Count every distinct subject bullet mentioned in FACTS, regardless of its concrete form (URL, file path, function/module name, record, configuration key, component, interface contract, etc.)
+- Ensure EVERY single bullet appears in at least one subtask's or sub_subtask's goal, referenced by its exact name / path / identifier
+- If a FACTS bullet is omitted from the plan, the plan is INCOMPLETE and MUST be expanded before returning
+- **N-to-N hard quantification**: if FACTS lists N subjects, the union of all subtask_goal / sub_subtask subtask_goal strings MUST explicitly reference all N subjects by their exact identifiers. Representative sampling is forbidden — every item in a list-style FACTS block (URL list, file list, table list, directory list, etc.) must be named
+- **Mandatory verification pass before returning**: re-scan FACTS line by line; for each bullet, confirm it is literally quoted (or its exact identifier is embedded) in at least one subtask_goal. Any missing subject means the plan is incomplete — expand sub_subtasks until coverage is complete
+- For security testing: each (subject x vulnerability_type) combination that FACTS data suggests is testable MUST have a corresponding subtask or sub_subtask
+- For development tasks: each file / module / component mentioned in FACTS that requires changes MUST appear in a subtask
 
 ## Summary Task Requirement
 

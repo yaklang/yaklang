@@ -81,7 +81,50 @@
 - 每次调用只需要提供**本轮新增事实**，系统会自动与已有 FACTS 合并并累积展示
 - 使用 **Markdown 格式**，用 `##` 标题按类别组织，例如：`## 目标信息`、`## 开放端口与服务`、`## 发现的文件`、`## 技术栈`、`## URL 与入口点`
 - 每条事实以 bullet point 列出**具体值**：端口号、URL 路径、文件路径、版本号、配置项键值、函数名、类名等
-- **严禁**使用"等"、"其他"、"类似"、"若干"、"相关"、"一些"等模糊代称；每条必须精确到实际数值或路径
+- **语言跟随 USER INPUT**：FACTS 的描述语言必须与用户原始输入保持一致。用户中文提问就全部用中文描述（section 标题、说明语、单位词都用中文），用户英文提问就用英文。**不要**出现 "URL discovered: ..."、"Open port discovered: ..."、"Server response header ..."、"Static CSS file referenced: ..." 这类固定英文动词短语前缀——这既是语言错位，也是严重的冗余。
+- **信息密度硬规则（去重复前缀）**：
+  - **严禁**在每条 bullet 里重复相同的动词短语 / 名词前缀（例如把 40 条 URL 写成 40 条 `URL discovered: http://...`、把 10 条响应头写成 10 条 `Server response header Xxx: ...`）。重复前缀是纯噪声，每条多消耗 token 却不带任何新信息。
+  - **正确做法**：把重复的部分抽到 `##` section 标题或 section 的一行引导说明里，bullet 里只写**差异值**本身
+  - 能用公共前缀（同一域名 / 同一 base URL / 同一目录根）收纳的，在 section 开头声明一次公共前缀，bullet 只写相对路径
+  - 同类事实放同一 section，不要每条事实都起一行动词短语复述"这是一条 URL / 这是一条端口"
+- **N 对 N 硬量化**：信息源（crawl 结果、扫描输出、文件/目录列表、接口清单等）中列出了多少条同类主体，FACTS 中就必须写出多少条 bullet，**一条都不能合并，一条都不能省略，一条都不能概括**；来源有 10 个 URL 就写 10 行 bullet，有 155 个 URL 就写 155 行 bullet。信息密度规则是"不重复前缀"，不是"少写条目"——N 条必须写满 N 条
+- **严禁使用任何概括词**：不允许出现 "等"、"其他"、"相关"、"类似"、"若干"、"一些"、"多个"、"若干个"、"数个"、"部分"、"主要" 以及它们的英文等价表达（etc. / and more / and so on / various / several / others / similar / including ... 等）；一旦出现任一词汇，本次 FACTS 视为不合格
+- **对比示例（必读）**：
+  - 反例（语言错位 + 重复前缀，禁止写成）：
+    ```
+    - URL discovered: http://127.0.0.1:8787/_/
+    - URL discovered: http://127.0.0.1:8787/_/submit-ai-practice
+    - URL discovered: http://127.0.0.1:8787/_/ws
+    - URL discovered: http://127.0.0.1:8787/api/
+    ```
+  - 正例（中文标题 + 抽取公共前缀 + 逐条枚举）：
+    ```
+    ## 已发现 URL (base: http://127.0.0.1:8787)
+
+    - /_/
+    - /_/submit-ai-practice
+    - /_/ws
+    - /api/
+    ```
+  - 反例（禁止写成）：`已确认存在 /_/, /api, /bruteplayground, /crypto 等目录` — 用"等"吞掉了其余路径，下游必然丢失覆盖
+  - 正例（必须写成）：先在 `## 发现的目录` 下为每个目录单独一条 bullet 列出（`/_/`、`/api`、`/bruteplayground`、`/crypto`、`/fastjson`、`/misc`、`/ssrf`、`/upload`、`/sensitive` 等所有发现的条目各占一行），再在各自的子分节下把该目录里的子路径逐条展开
+  - 反例（禁止写成）：`/fastjson/json-in-cookie、/fastjson/json-in-authorization 等 FastJSON 相关端点`
+  - 正例（必须写成）：`- /fastjson/json-in-cookie` 单独一行、`- /fastjson/json-in-authorization` 单独一行、`- /fastjson/jackson-in-query` 单独一行……直至全部列完
+  - 反例（重复响应头前缀，禁止写成）：
+    ```
+    - Server response header Content-Type: text/html; charset=UTF8
+    - Server response header Date: Thu, 23 Apr 2026 03:48:22 GMT
+    - Server response header Content-Length: 36310
+    ```
+  - 正例（集中到 section，省略重复前缀）：
+    ```
+    ## 响应头
+
+    - Content-Type: text/html; charset=UTF8
+    - Date: Thu, 23 Apr 2026 03:48:22 GMT
+    - Content-Length: 36310
+    ```
+- **过长处理**：如果本轮新增事实条目特别多、担心一次输出过长，**必须采用"分多次 output_facts 调用"** 的方式分批提交（系统会自动合并去重），**严禁用概括词压缩条目数**
 - 只记录已经观察到的真实数据，不写假设和推断
 - 优先使用 AITag 形式输出，这样界面可以直接流式看到 markdown：
 
@@ -97,7 +140,7 @@
 <|FACTS_END_{{ .Nonce }}|>
 ```
 
-**示例**（scan_port 后调用）：
+**示例**（scan_port 后调用 — 注意：section 标题承担分类语义，bullet 不重复"端口:"、"服务:"等前缀）：
 ```json
 {"@action": "output_facts"}
 ```
@@ -142,6 +185,46 @@
 <|FACTS_END_{{ .Nonce }}|>
 ```
 
+**示例**（simple_crawler 后调用 — 中文标题，公共前缀抽到 section，bullet 只写相对路径，N 条一条不漏）：
+```json
+{"@action": "output_facts"}
+```
+
+```markdown
+<|FACTS_{{ .Nonce }}|>
+## 已发现 URL (base: http://127.0.0.1:8787)
+
+- /_/
+- /_/submit-ai-practice
+- /_/ws
+- /api/
+- /api/get-challenge
+- /api/pipeline/
+- /api/pipeline/docs
+- /bruteplayground/
+- /bruteplayground/by-order-id
+- /bruteplayground/by-order-id-2
+- /bruteplayground/by-order-id-3
+- /crypto/js/lib/aes/ecb/sqli/bypass
+- /fastjson/json-in-cookie
+- /fastjson/json-in-authorization
+- /fastjson/jackson-in-query
+
+## 响应头
+
+- Content-Type: text/html; charset=UTF8
+- Content-Length: 36310
+- Date: Thu, 23 Apr 2026 03:48:22 GMT
+
+## 静态资源引用
+
+- /static/js/bootstrap_5.3/bootstrap.min.css
+- /static/js/bootstrap_5.3/popper.min.js
+- /static/js/bootstrap_5.3/bootstrap.min.js
+- /static/favicon.ico
+<|FACTS_END_{{ .Nonce }}|>
+```
+
 累积的事实会通过 `FACTS` 区块在后续每个子任务执行时自动可见，并且在计划的渲染展示中也会被前置追加，是整个计划的事实基础。
 
 ## 运行证据：EVIDENCE（重要）
@@ -174,7 +257,7 @@
 
 **调用后发生什么**：
 系统会在探索结束后自动进行两个步骤：
-1. 使用高质量 AI 生成一篇基于控制论与科学方法论框架的**任务执行指导性文档**，包含目标定义、系统现状分析、差距分析、控制策略、执行路径、验证与反馈等章节，并将其以 Markdown 流式推送给用户
+1. 使用高质量 AI 生成一篇基于目标导向、方法论指导、验收驱动原则的**任务执行指导性文档**，包含目标定义（五要素）、执行路径（方法论）、验收标准（覆盖率与有效性）、动态重规划与纠错纠偏四个章节，并将其以 Markdown 流式推送给用户
 2. 基于该指导性文档和累积的 FACTS，自动生成结构化的子任务执行计划
 
 因此，你的核心职责是**充分探索并记录事实**，而非直接构造计划。探索越充分、FACTS 越精确，自动生成的计划质量就越高。
