@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -84,7 +85,7 @@ func (s *ScanNode) executeScriptTask(
 		return nil, s.handleScriptFailure(err, result, taskID)
 	}
 	logReporterEventError("final progress checkpoint", reporter.flushSuccessfulJobProgress())
-	if err := s.finalizeSSAArtifactUpload(reporter, result); err != nil {
+	if err := s.finalizeSSAArtifactUpload(taskCtx, reporter, result); err != nil {
 		return nil, err
 	}
 	return result, nil
@@ -270,6 +271,7 @@ func (s *ScanNode) executeScript(
 }
 
 func (s *ScanNode) finalizeSSAArtifactUpload(
+	ctx context.Context,
 	reporter *ScannerAgentReporter,
 	result *ScriptExecutionResult,
 ) error {
@@ -286,7 +288,11 @@ func (s *ScanNode) finalizeSSAArtifactUpload(
 		return nil
 	}
 
-	build, err := reporter.ssaCollector.FinalizeUpload(cfg)
+	provider := s.buildSSAArtifactUploadConfigProvider(ctx, reporter, cfg)
+	build, err := reporter.ssaCollector.FinalizeUploadWithProvider(
+		normalizeArtifactCodec(cfg.Codec),
+		provider,
+	)
 	if err != nil {
 		return err
 	}
@@ -317,6 +323,67 @@ func (s *ScanNode) finalizeSSAArtifactUpload(
 		event.FlowCount,
 	)
 	return nil
+}
+
+func (s *ScanNode) buildSSAArtifactUploadConfigProvider(
+	ctx context.Context,
+	reporter *ScannerAgentReporter,
+	baseCfg *SSAArtifactUploadConfig,
+) ssaUploadConfigProvider {
+	if baseCfg == nil {
+		return nil
+	}
+
+	current := *baseCfg
+	taskID := ""
+	if reporter != nil {
+		taskID = strings.TrimSpace(reporter.TaskId)
+	}
+
+	var mu sync.Mutex
+	return func(force bool) (*SSAArtifactUploadConfig, error) {
+		mu.Lock()
+		defer mu.Unlock()
+
+		if !force && !current.NeedSTSRefresh(600) {
+			cp := current
+			return &cp, nil
+		}
+
+		if s == nil {
+			return nil, utils.Errorf("scannode not ready")
+		}
+		if taskID == "" {
+			return nil, utils.Errorf("ssa artifact task id missing")
+		}
+
+		objectKey := strings.TrimSpace(current.ObjectKey)
+		if objectKey == "" {
+			return nil, utils.Errorf("ssa artifact object key missing")
+		}
+
+		refreshCtx := ctx
+		if refreshCtx == nil {
+			refreshCtx = context.Background()
+		}
+		fresh, err := s.fetchSSAArtifactUploadTicket(refreshCtx, taskID, objectKey)
+		if err != nil {
+			return nil, err
+		}
+		if fresh == nil {
+			return nil, utils.Errorf("empty upload ticket")
+		}
+		if strings.TrimSpace(fresh.ObjectKey) == "" {
+			fresh.ObjectKey = objectKey
+		}
+		if strings.TrimSpace(fresh.Codec) == "" {
+			fresh.Codec = current.Codec
+		}
+		current = *fresh
+
+		cp := current
+		return &cp, nil
+	}
 }
 
 type ssaResultMeta struct {

@@ -120,6 +120,22 @@ func TestValidateAISessionInputCommandRequiresValidJSON(t *testing.T) {
 	}
 }
 
+func TestValidateAISessionContextCommandRequiresRefs(t *testing.T) {
+	t.Parallel()
+
+	command := validAISessionContextCommand()
+	command.Attachments = nil
+	command.CredentialRefs = nil
+
+	err := validateAISessionContextCommand(command)
+	if err == nil {
+		t.Fatal("expected validation error")
+	}
+	if err.Error() != "ai session context attachments or credential_refs are required" {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestHandleAISessionBindPublishesReady(t *testing.T) {
 	t.Parallel()
 
@@ -248,6 +264,40 @@ func TestHandleAISessionInputPublishesRuntimeEvent(t *testing.T) {
 	driver.assertInput(t, 0, "hello")
 }
 
+func TestHandleAISessionAppendContextPublishesRuntimeEvent(t *testing.T) {
+	t.Parallel()
+
+	bridge, fakeJS, driver := newTestAISessionBridge(t)
+	if err := bridge.handleAISessionBind(context.Background(), mustMarshalProto(t, validAISessionBindCommand())); err != nil {
+		t.Fatalf("handle ai bind: %v", err)
+	}
+	resetPublishedMessages(fakeJS)
+
+	if err := bridge.handleAISessionAppendContext(context.Background(), mustMarshalProto(t, validAISessionContextCommand())); err != nil {
+		t.Fatalf("handle ai append context: %v", err)
+	}
+
+	msg := waitForPublishedMessage(t, fakeJS, 0)
+	if msg.Subject != "legion.event.ai.session.event" {
+		t.Fatalf("unexpected subject: %s", msg.Subject)
+	}
+
+	var event aiv1.AISessionEvent
+	if err := proto.Unmarshal(msg.Data, &event); err != nil {
+		t.Fatalf("unmarshal ai session event: %v", err)
+	}
+	if event.GetSession().GetSessionId() != "ai-session-1" {
+		t.Fatalf("unexpected session id: %s", event.GetSession().GetSessionId())
+	}
+	if event.GetSeq() != 1 {
+		t.Fatalf("unexpected seq: %d", event.GetSeq())
+	}
+	if event.GetEventType() != aiSessionRuntimeEventContextUpdated {
+		t.Fatalf("unexpected runtime event type: %s", event.GetEventType())
+	}
+	driver.assertContextReason(t, 0, "append from project context")
+}
+
 func TestHandleAISessionCancelPublishesCancelled(t *testing.T) {
 	t.Parallel()
 
@@ -351,6 +401,28 @@ func TestCommandConsumerRoutesAISessionCloseCommand(t *testing.T) {
 
 	msg := waitForPublishedMessage(t, fakeJS, 0)
 	if msg.Subject != "legion.event.ai.session.done" {
+		t.Fatalf("unexpected subject: %s", msg.Subject)
+	}
+}
+
+func TestCommandConsumerRoutesAISessionAppendContextCommand(t *testing.T) {
+	t.Parallel()
+
+	bridge, fakeJS, _ := newTestAISessionBridge(t)
+	if err := bridge.handleAISessionBind(context.Background(), mustMarshalProto(t, validAISessionBindCommand())); err != nil {
+		t.Fatalf("handle ai bind: %v", err)
+	}
+	resetPublishedMessages(fakeJS)
+
+	message := nats.NewMsg("legion.command.node.node-ai.ai.session.context.append")
+	message.Data = mustMarshalProto(t, validAISessionContextCommand())
+
+	if err := bridge.handleMessage(context.Background(), message); err != nil {
+		t.Fatalf("handle routed ai append context: %v", err)
+	}
+
+	msg := waitForPublishedMessage(t, fakeJS, 0)
+	if msg.Subject != "legion.event.ai.session.event" {
 		t.Fatalf("unexpected subject: %s", msg.Subject)
 	}
 }
@@ -483,6 +555,27 @@ func validAISessionCancelCommand() *aiv1.CancelAISessionCommand {
 	}
 }
 
+func validAISessionContextCommand() *aiv1.AppendAISessionContextCommand {
+	return &aiv1.AppendAISessionContextCommand{
+		Metadata: &nodev1.CommandMetadata{
+			CommandId: "cmd-context-1",
+		},
+		Session: &aiv1.AISessionRef{
+			SessionId: "ai-session-1",
+			RunId:     "run-1",
+		},
+		OwnerUserId: "user-1",
+		Attachments: []*aiv1.AISessionAttachmentRef{
+			{
+				AttachmentId: "aiatt_123",
+				Filename:     "targets.txt",
+				DownloadUrl:  "http://platform.test/v1/ai/attachments/aiatt_123/download?node_session_id=node-session-ai",
+			},
+		},
+		Reason: "append from project context",
+	}
+}
+
 func validAISessionCloseCommand() *aiv1.CloseAISessionCommand {
 	return &aiv1.CloseAISessionCommand{
 		Metadata: &nodev1.CommandMetadata{
@@ -550,6 +643,7 @@ type recordingAISessionRuntimeDriver struct {
 	mu       sync.Mutex
 	bindings []aiSessionBinding
 	inputs   []aiSessionInput
+	contexts []aiSessionContextUpdate
 	cancels  []string
 	closes   []string
 }
@@ -590,6 +684,29 @@ func (d *recordingAISessionRuntimeDriver) assertInput(t *testing.T, index int, c
 	t.Fatalf("timed out waiting for recorded input at index %d", index)
 }
 
+func (d *recordingAISessionRuntimeDriver) assertContextReason(t *testing.T, index int, reason string) {
+	t.Helper()
+
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		d.mu.Lock()
+		if len(d.contexts) > index {
+			update := d.contexts[index]
+			d.mu.Unlock()
+			if update.Reason != reason {
+				t.Fatalf("unexpected context reason: %s", update.Reason)
+			}
+			if len(update.AttachmentRefs) != 1 || update.AttachmentRefs[0].AttachmentID != "aiatt_123" {
+				t.Fatalf("unexpected context attachments: %#v", update.AttachmentRefs)
+			}
+			return
+		}
+		d.mu.Unlock()
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("timed out waiting for recorded context update at index %d", index)
+}
+
 func (d *recordingAISessionRuntimeDriver) assertCancel(t *testing.T, index int, reason string) {
 	t.Helper()
 
@@ -624,6 +741,13 @@ func (h *recordingAISessionRuntimeHandle) SendInput(_ context.Context, input aiS
 	h.driver.mu.Lock()
 	defer h.driver.mu.Unlock()
 	h.driver.inputs = append(h.driver.inputs, input)
+	return nil
+}
+
+func (h *recordingAISessionRuntimeHandle) AppendContext(_ context.Context, update aiSessionContextUpdate) error {
+	h.driver.mu.Lock()
+	defer h.driver.mu.Unlock()
+	h.driver.contexts = append(h.driver.contexts, update)
 	return nil
 }
 
