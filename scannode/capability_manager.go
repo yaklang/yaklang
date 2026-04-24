@@ -19,6 +19,8 @@ const (
 	capabilityStatusStored       = "stored"
 	capabilityStatusRunning      = "running"
 	capabilityStoredMessage      = "desired spec persisted locally; runtime hook is not wired yet"
+	capabilityDryRunStatusPassed = "passed"
+	capabilityDryRunStatusFailed = "failed"
 )
 
 var (
@@ -49,6 +51,17 @@ type CapabilityApplyResult struct {
 	Message          string
 	StatusDetailJSON []byte
 	ObservedAt       time.Time
+}
+
+type CapabilityDryRunResult struct {
+	CapabilityKey string
+	SpecVersion   string
+	Status        string
+	Message       string
+	DetailJSON    []byte
+	ErrorCode     string
+	ErrorMessage  string
+	ObservedAt    time.Time
 }
 
 type CapabilityRuntimeAlert struct {
@@ -104,6 +117,7 @@ type capabilityHIDSApplyInput struct {
 
 type capabilityHIDSHooks interface {
 	Apply(m *CapabilityManager, input capabilityHIDSApplyInput) (CapabilityApplyResult, error)
+	DryRun(m *CapabilityManager, input capabilityHIDSApplyInput) (CapabilityDryRunResult, error)
 	Alerts() <-chan CapabilityRuntimeAlert
 	Observations() <-chan CapabilityRuntimeObservation
 	CurrentStatus() (CapabilityRuntimeStatus, bool)
@@ -169,6 +183,30 @@ func (m *CapabilityManager) Apply(input CapabilityApplyInput) (CapabilityApplyRe
 		Message:       capabilityStoredMessage,
 		ObservedAt:    now,
 	}, nil
+}
+
+func (m *CapabilityManager) DryRun(input CapabilityApplyInput) (CapabilityDryRunResult, error) {
+	key, err := normalizeCapabilityKey(input.CapabilityKey)
+	if err != nil {
+		return CapabilityDryRunResult{}, err
+	}
+	if !isHIDSCapabilityKey(key) {
+		return CapabilityDryRunResult{}, ErrInvalidCapabilityKey
+	}
+
+	specVersion := normalizeCapabilitySpecVersion(input.SpecVersion)
+	desiredSpec, err := normalizeCapabilitySpec(input.DesiredSpecJSON)
+	if err != nil {
+		return CapabilityDryRunResult{}, err
+	}
+	if m.hidsHooks == nil {
+		return CapabilityDryRunResult{}, ErrHIDSCapabilityNotCompiled
+	}
+	return m.hidsHooks.DryRun(m, capabilityHIDSApplyInput{
+		CapabilityKey: key,
+		SpecVersion:   specVersion,
+		DesiredSpec:   desiredSpec,
+	})
 }
 
 func (m *CapabilityManager) RestorePersisted() ([]CapabilityApplyResult, error) {
