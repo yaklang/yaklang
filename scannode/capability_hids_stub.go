@@ -17,6 +17,13 @@ func (hidsCapabilityHooksStub) Apply(
 	return CapabilityApplyResult{}, ErrHIDSCapabilityNotCompiled
 }
 
+func (hidsCapabilityHooksStub) DryRun(
+	_ *CapabilityManager,
+	_ capabilityHIDSApplyInput,
+) (CapabilityDryRunResult, error) {
+	return CapabilityDryRunResult{}, ErrHIDSCapabilityNotCompiled
+}
+
 func (hidsCapabilityHooksStub) Alerts() <-chan CapabilityRuntimeAlert {
 	return nil
 }
