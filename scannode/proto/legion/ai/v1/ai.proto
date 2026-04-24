@@ -49,6 +49,15 @@ message PushAISessionInputCommand {
   bytes input_json = 5;
 }
 
+message AppendAISessionContextCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  AISessionRef session = 2;
+  string owner_user_id = 3;
+  repeated AISessionAttachmentRef attachments = 4;
+  repeated AISessionCredentialRef credential_refs = 5;
+  string reason = 6;
+}
+
 message CancelAISessionCommand {
   legion.node.v1.CommandMetadata metadata = 1;
   AISessionRef session = 2;

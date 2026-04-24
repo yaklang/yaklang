@@ -14,6 +14,7 @@ import (
 )
 
 const aiSessionRuntimeEventInput = "ai.session.input"
+const aiSessionRuntimeEventContextUpdated = "ai.session.context_updated"
 
 type aiSessionRuntimeDriver interface {
 	Bind(context.Context, aiSessionBinding, aiSessionRuntimeEmitter) (aiSessionRuntimeHandle, error)
@@ -21,6 +22,7 @@ type aiSessionRuntimeDriver interface {
 
 type aiSessionRuntimeHandle interface {
 	SendInput(context.Context, aiSessionInput) error
+	AppendContext(context.Context, aiSessionContextUpdate) error
 	Cancel(string)
 	Close(string)
 }
@@ -70,11 +72,27 @@ type aiSessionInput struct {
 	PayloadJSON []byte
 }
 
+type aiSessionContextUpdate struct {
+	Ref            aiSessionCommandRef
+	Reason         string
+	AttachmentRefs []aiSessionAttachmentRef
+	CredentialRefs []aiSessionCredentialRef
+}
+
 type acceptedAISessionInput struct {
 	ref         aiSessionCommandRef
 	seq         uint64
 	inputType   string
 	payloadJSON []byte
+	handle      aiSessionRuntimeHandle
+}
+
+type acceptedAISessionContextUpdate struct {
+	ref         aiSessionCommandRef
+	seq         uint64
+	reason      string
+	payloadJSON []byte
+	update      aiSessionContextUpdate
 	handle      aiSessionRuntimeHandle
 }
 
@@ -213,6 +231,58 @@ func (m *aiSessionRuntimeManager) AcceptInput(
 	}, nil
 }
 
+func (m *aiSessionRuntimeManager) AcceptContextUpdate(
+	command *aiv1.AppendAISessionContextCommand,
+) (acceptedAISessionContextUpdate, error) {
+	ref := aiSessionRefFromContextCommand(command)
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	session, ok := m.sessions[ref.SessionID]
+	if !ok {
+		return acceptedAISessionContextUpdate{ref: ref}, fmt.Errorf("ai session runtime is not bound: %s", ref.SessionID)
+	}
+	if session.ref.OwnerUserID != ref.OwnerUserID {
+		return acceptedAISessionContextUpdate{ref: ref}, fmt.Errorf("ai session owner mismatch: %s", session.ref.OwnerUserID)
+	}
+
+	attachments := cloneAISessionAttachmentRefs(command.GetAttachments())
+	credentials := cloneAISessionCredentialRefs(command.GetCredentialRefs())
+	reason := strings.TrimSpace(command.GetReason())
+
+	session.mu.Lock()
+	session.seq++
+	ref.RunID = session.ref.RunID
+	session.ref.CommandID = ref.CommandID
+	seq := session.seq
+	handle := session.handle
+	session.mu.Unlock()
+
+	payloadJSON, err := json.Marshal(map[string]any{
+		"reason":                 reason,
+		"added_attachment_count": len(attachments),
+		"added_credential_count": len(credentials),
+	})
+	if err != nil {
+		return acceptedAISessionContextUpdate{ref: ref}, err
+	}
+
+	return acceptedAISessionContextUpdate{
+		ref:         ref,
+		seq:         seq,
+		reason:      reason,
+		payloadJSON: payloadJSON,
+		update: aiSessionContextUpdate{
+			Ref:            ref,
+			Reason:         reason,
+			AttachmentRefs: attachments,
+			CredentialRefs: credentials,
+		},
+		handle: handle,
+	}, nil
+}
+
 func (m *aiSessionRuntimeManager) Cancel(
 	command *aiv1.CancelAISessionCommand,
 ) (cancelledAISessionRuntime, error) {
@@ -333,6 +403,39 @@ func (b *legionJobBridge) handleAISessionInput(ctx context.Context, raw []byte) 
 		PayloadJSON: accepted.payloadJSON,
 	}); err != nil {
 		return b.publishAISessionCommandFailure(ctx, accepted.ref, "ai_session_runtime_input_failed", err)
+	}
+	return nil
+}
+
+func (b *legionJobBridge) handleAISessionAppendContext(ctx context.Context, raw []byte) error {
+	var command aiv1.AppendAISessionContextCommand
+	if err := proto.Unmarshal(raw, &command); err != nil {
+		return fmt.Errorf("unmarshal ai session append context command: %w", err)
+	}
+
+	ref := aiSessionRefFromContextCommand(&command)
+	if err := validateAISessionContextCommand(&command); err != nil {
+		return b.publishAISessionCommandFailure(ctx, ref, "invalid_ai_session_context_command", err)
+	}
+
+	accepted, err := b.ensureAIRuntime().AcceptContextUpdate(&command)
+	if err != nil {
+		return b.publishAISessionCommandFailure(ctx, ref, "ai_session_context_failed", err)
+	}
+	if err := b.ensureAIPublisher().PublishEvent(
+		ctx,
+		accepted.ref,
+		accepted.seq,
+		aiSessionRuntimeEventContextUpdated,
+		accepted.payloadJSON,
+	); err != nil {
+		return err
+	}
+	if accepted.handle == nil {
+		return nil
+	}
+	if err := accepted.handle.AppendContext(ctx, accepted.update); err != nil {
+		return b.publishAISessionCommandFailure(ctx, accepted.ref, "ai_session_runtime_context_failed", err)
 	}
 	return nil
 }
@@ -503,6 +606,25 @@ func validateAISessionInputCommand(command *aiv1.PushAISessionInputCommand) erro
 	}
 }
 
+func validateAISessionContextCommand(command *aiv1.AppendAISessionContextCommand) error {
+	switch {
+	case command.GetMetadata() == nil:
+		return fmt.Errorf("ai session context metadata is required")
+	case strings.TrimSpace(command.GetMetadata().GetCommandId()) == "":
+		return fmt.Errorf("ai session context command_id is required")
+	case command.GetSession() == nil:
+		return fmt.Errorf("ai session context session reference is required")
+	case strings.TrimSpace(command.GetSession().GetSessionId()) == "":
+		return fmt.Errorf("ai session context session_id is required")
+	case strings.TrimSpace(command.GetOwnerUserId()) == "":
+		return fmt.Errorf("ai session context owner_user_id is required")
+	case len(command.GetAttachments()) == 0 && len(command.GetCredentialRefs()) == 0:
+		return fmt.Errorf("ai session context attachments or credential_refs are required")
+	default:
+		return nil
+	}
+}
+
 func validateAISessionCancelCommand(command *aiv1.CancelAISessionCommand) error {
 	switch {
 	case command.GetMetadata() == nil:
@@ -586,6 +708,15 @@ func aiSessionRefFromInputCommand(command *aiv1.PushAISessionInputCommand) aiSes
 	}
 }
 
+func aiSessionRefFromContextCommand(command *aiv1.AppendAISessionContextCommand) aiSessionCommandRef {
+	return aiSessionCommandRef{
+		CommandID:   command.GetMetadata().GetCommandId(),
+		SessionID:   command.GetSession().GetSessionId(),
+		RunID:       command.GetSession().GetRunId(),
+		OwnerUserID: strings.TrimSpace(command.GetOwnerUserId()),
+	}
+}
+
 func aiSessionRefFromCancelCommand(command *aiv1.CancelAISessionCommand) aiSessionCommandRef {
 	return aiSessionCommandRef{
 		CommandID:   command.GetMetadata().GetCommandId(),
@@ -617,6 +748,10 @@ func (noopAISessionRuntimeDriver) Bind(
 type noopAISessionRuntimeHandle struct{}
 
 func (noopAISessionRuntimeHandle) SendInput(context.Context, aiSessionInput) error {
+	return nil
+}
+
+func (noopAISessionRuntimeHandle) AppendContext(context.Context, aiSessionContextUpdate) error {
 	return nil
 }
 

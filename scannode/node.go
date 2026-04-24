@@ -15,6 +15,7 @@ type ScanNode struct {
 	capabilityManager *CapabilityManager
 	ruleSyncClient    ruleSyncer
 	httpClient        *http.Client
+	invokeLimiter     *invokeLimiter
 	maxRunningJobs    uint32
 	bridge            *legionJobBridge
 }
@@ -49,6 +50,7 @@ func NewScanNode(cfg node.BaseConfig) (*ScanNode, error) {
 		Client:      cfg.HTTPClient,
 	})
 	agent.httpClient = cfg.HTTPClient
+	agent.initInvokeLimiter()
 	agent.bridge = newLegionJobBridge(agent)
 	return agent, nil
 }
