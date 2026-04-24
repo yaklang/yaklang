@@ -17,6 +17,13 @@ func (hidsCapabilityHooksUnsupportedPlatform) Apply(
 	return CapabilityApplyResult{}, ErrHIDSCapabilityUnsupportedPlatform
 }
 
+func (hidsCapabilityHooksUnsupportedPlatform) DryRun(
+	_ *CapabilityManager,
+	_ capabilityHIDSApplyInput,
+) (CapabilityDryRunResult, error) {
+	return CapabilityDryRunResult{}, ErrHIDSCapabilityUnsupportedPlatform
+}
+
 func (hidsCapabilityHooksUnsupportedPlatform) Alerts() <-chan CapabilityRuntimeAlert {
 	return nil
 }

@@ -26,7 +26,11 @@ func (b *legionJobBridge) Run(ctx context.Context) {
 	defer b.stopConsumer()
 	defer b.publisher.Close()
 	defer b.capabilityPublisher.Close()
+	defer b.hidsDryRunPublisher.Close()
 	defer b.ruleSyncPublisher.Close()
+	if b.aiPublisher != nil {
+		defer b.aiPublisher.Close()
+	}
 
 	go b.forwardCapabilityAlerts(ctx)
 	go b.forwardCapabilityObservations(ctx)
@@ -256,10 +260,20 @@ func (b *legionJobBridge) handleMessage(
 		return b.handleCancel(message.Data)
 	case strings.HasSuffix(message.Subject, "."+legionCommandCapabilityApply):
 		return b.handleCapabilityApply(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandHIDSDesiredSpecDryRun):
+		return b.handleHIDSDesiredSpecDryRun(ctx, message.Data)
 	case strings.HasSuffix(message.Subject, "."+legionCommandHIDSResponseActionExecute):
 		return b.handleHIDSResponseActionExecute(ctx, message.Data)
 	case strings.HasSuffix(message.Subject, "."+legionCommandSSARuleSyncExport):
 		return b.handleSSARuleSyncExport(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAISessionBind):
+		return b.handleAISessionBind(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAISessionInput):
+		return b.handleAISessionInput(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAISessionCancel):
+		return b.handleAISessionCancel(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAISessionClose):
+		return b.handleAISessionClose(ctx, message.Data)
 	default:
 		return fmt.Errorf("unsupported legion command subject: %s", message.Subject)
 	}
