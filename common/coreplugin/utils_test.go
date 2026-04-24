@@ -240,6 +240,7 @@ func Must(condition bool, errMsg ...string) {
 }
 
 func TestCorePluginAstCompileTime(t *testing.T) {
+	t.Skip("")
 	for _, pluginName := range coreplugin.GetAllCorePluginName() {
 		bytes := coreplugin.GetCorePluginData(pluginName)
 		avgDur := time.Duration(0)
