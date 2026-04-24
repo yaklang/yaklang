@@ -168,6 +168,75 @@ func (p *capabilityEventPublisher) PublishResponseActionResult(
 	})
 }
 
+func (p *capabilityEventPublisher) PublishDesiredSpecDryRunResult(
+	ctx context.Context,
+	ref capabilityCommandRef,
+	result CapabilityDryRunResult,
+) error {
+	session, ok := p.node.GetSessionState()
+	if !ok {
+		return ErrNodeSessionNotReady
+	}
+	if err := p.ensureJetStream(session.NATSURL); err != nil {
+		return err
+	}
+
+	observedAt := result.ObservedAt.UTC()
+	if observedAt.IsZero() {
+		observedAt = time.Now().UTC()
+	}
+	eventID := ref.CommandID + ":desired-spec-dry-run"
+	if strings.TrimSpace(ref.CommandID) == "" {
+		eventID = capabilityDryRunEventID(result, observedAt)
+	}
+
+	message := &hidsv1.HIDSDesiredSpecDryRunResult{
+		Metadata: &nodev1.EventMetadata{
+			EventId:       eventID,
+			EventType:     legionEventHIDSDesiredSpecDryRunResult,
+			CausationId:   ref.CommandID,
+			CorrelationId: capabilityCorrelationID(ref.NodeID, ref.CapabilityKey),
+			EmittedAt:     timestamppb.New(time.Now().UTC()),
+			Node: &nodev1.NodeRef{
+				NodeId:        p.node.CurrentNodeID(),
+				NodeSessionId: session.SessionID,
+			},
+		},
+		Capability: &capabilityv1.CapabilityRef{
+			CapabilityKey: result.CapabilityKey,
+			SpecVersion:   result.SpecVersion,
+		},
+		Status:       result.Status,
+		Message:      result.Message,
+		ErrorCode:    result.ErrorCode,
+		ErrorMessage: result.ErrorMessage,
+		ObservedAt:   timestamppb.New(observedAt),
+		DetailJson:   cloneBytes(result.DetailJSON),
+	}
+	raw, err := proto.Marshal(message)
+	if err != nil {
+		return fmt.Errorf("marshal hids desired spec dry-run result: %w", err)
+	}
+
+	p.mu.Lock()
+	conn := p.conn
+	p.mu.Unlock()
+	if conn == nil {
+		return fmt.Errorf("capability event nats connection is not ready")
+	}
+	subject := hidsDesiredSpecDryRunResultSubject(ref.CommandID)
+	if err := conn.Publish(subject, raw); err != nil {
+		return fmt.Errorf("publish hids desired spec dry-run result: %w", err)
+	}
+	flushCtx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+	if err := conn.FlushWithContext(flushCtx); err != nil {
+		return fmt.Errorf("flush hids desired spec dry-run result: %w", err)
+	}
+	log.Infof("published hids desired spec dry-run result: capability=%s status=%s", ref.CapabilityKey, result.Status)
+	return nil
+}
+
 func (p *capabilityEventPublisher) publish(
 	ctx context.Context,
 	eventType string,
@@ -320,6 +389,17 @@ func capabilityStatusEventID(result CapabilityApplyResult) string {
 	payload := append(cloneBytes(result.StatusDetailJSON), []byte("\x00"+result.Status+"\x00"+result.Message)...)
 	sum := sha1.Sum(payload)
 	return fmt.Sprintf("%s:status:%d:%x", result.CapabilityKey, observedAt.UnixNano(), sum[:6])
+}
+
+func capabilityDryRunEventID(result CapabilityDryRunResult, observedAt time.Time) string {
+	payload := append(cloneBytes(result.DetailJSON), []byte("\x00"+result.Status+"\x00"+result.ErrorCode+"\x00"+result.ErrorMessage)...)
+	sum := sha1.Sum(payload)
+	return fmt.Sprintf(
+		"%s:desired-spec-dry-run:%d:%x",
+		result.CapabilityKey,
+		observedAt.UnixNano(),
+		sum[:6],
+	)
 }
 
 func capabilityResponseActionEventID(input HIDSResponseActionResultInput, observedAt time.Time) string {
