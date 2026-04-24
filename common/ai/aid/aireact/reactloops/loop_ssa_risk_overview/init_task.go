@@ -6,6 +6,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_syntaxflow_scan"
 	sfu "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/syntaxflow_utils"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -17,7 +18,12 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 	return func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, op *reactloops.InitTaskOperator) {
 		userInput := task.GetUserInput()
 		cfg := r.GetConfig()
-		db := cfg.GetDB()
+		// SSARisk 行 lives in the SSA 工程库（与 StartScanInBackground / reload_ssa_risk_overview 一致）；
+		// 优先 GetSSADB，与 cfg.GetDB() 业务库不是同一套连接。
+		db := sfu.GetSSADB()
+		if db == nil {
+			db = cfg.GetDB()
+		}
 		if db == nil {
 			r.AddToTimeline("ssa_risk_overview", "当前环境无数据库连接，无法列出 SSA Risk。请在 Yakit/IRify 连接项目数据库后重试。")
 			loop.Set("ssa_risk_overview_preface", "无 DB：仅可根据用户文字做一般性建议，勿编造 risk_id。")
@@ -26,8 +32,9 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 			return
 		}
 
-		filter := sfu.SSARisksFilterForOverview(task, loop, userInput)
-		sfu.PersistEffectiveOverviewFilter(loop, filter)
+		sfu.SyncSSARisksFilterFromIrifyToLoop(loop, task)
+		filter := sfu.BuildSSARisksFilterFromLoop(loop, userInput)
+		loop_syntaxflow_scan.PersistEffectiveOverviewFilter(loop, filter)
 
 		count, err := yakit.QuerySSARiskCount(db, filter)
 		if err != nil {
