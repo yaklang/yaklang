@@ -113,6 +113,110 @@ func TestCapabilityManagerApplyRejectsInvalidHIDSRuleConditionWhenCompiled(t *te
 	}
 }
 
+func TestCapabilityManagerDryRunCompilesHIDSWithoutPersistingOrStartingRuntime(t *testing.T) {
+	t.Parallel()
+
+	watchDir := t.TempDir()
+	baseDir := t.TempDir()
+	manager := newCapabilityManager(CapabilityManagerConfig{
+		NodeID:  "node-a",
+		BaseDir: baseDir,
+	})
+	t.Cleanup(func() {
+		_ = manager.Close()
+	})
+
+	result, err := manager.DryRun(CapabilityApplyInput{
+		CapabilityKey: "hids",
+		SpecVersion:   "2026-04-23",
+		DesiredSpecJSON: []byte(fmt.Sprintf(`{
+			"mode": "observe",
+			"collectors": {
+				"file": {
+					"enabled": true,
+					"backend": "filewatch",
+					"watch_paths": [%q]
+				}
+			},
+			"temporary_rules": [
+				{
+					"rule_id": "tmp-dry-run",
+					"enabled": true,
+					"match_event_type": "file.change",
+					"severity": "medium",
+					"condition": "file.path != ''"
+				}
+			]
+		}`, watchDir)),
+	})
+	if err != nil {
+		t.Fatalf("dry-run capability: %v", err)
+	}
+	if result.Status != capabilityDryRunStatusPassed {
+		t.Fatalf("unexpected dry-run status: %+v", result)
+	}
+	if !strings.Contains(string(result.DetailJSON), `"desired_spec_sha256"`) {
+		t.Fatalf("expected desired spec hash in dry-run detail: %s", string(result.DetailJSON))
+	}
+	if statuses := manager.RuntimeStatuses(); len(statuses) != 0 {
+		t.Fatalf("expected dry-run to avoid starting runtime, got %#v", statuses)
+	}
+	if _, err := os.Stat(filepath.Join(baseDir, "legion", "capabilities", "hids.json")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected dry-run to avoid persisting hids.json, got err=%v", err)
+	}
+}
+
+func TestCapabilityManagerDryRunReportsValidationFailureWithoutPersisting(t *testing.T) {
+	t.Parallel()
+
+	baseDir := t.TempDir()
+	manager := newCapabilityManager(CapabilityManagerConfig{
+		NodeID:  "node-a",
+		BaseDir: baseDir,
+	})
+	t.Cleanup(func() {
+		_ = manager.Close()
+	})
+
+	result, err := manager.DryRun(CapabilityApplyInput{
+		CapabilityKey: "hids",
+		SpecVersion:   "2026-04-23",
+		DesiredSpecJSON: []byte(`{
+			"mode": "observe",
+			"collectors": {
+				"process": {"enabled": true, "backend": "ebpf"}
+			},
+			"temporary_rules": [
+				{
+					"rule_id": "tmp-bad",
+					"enabled": true,
+					"match_event_type": "process.exec",
+					"severity": "high",
+					"condition": "process."
+				}
+			]
+		}`),
+	})
+	if err != nil {
+		t.Fatalf("dry-run capability: %v", err)
+	}
+	if result.Status != capabilityDryRunStatusFailed {
+		t.Fatalf("unexpected dry-run status: %+v", result)
+	}
+	if result.ErrorCode != "invalid_desired_spec" {
+		t.Fatalf("unexpected dry-run error code: %+v", result)
+	}
+	if !strings.Contains(result.ErrorMessage, "temporary_rules[0].condition") {
+		t.Fatalf("expected condition validation error, got %+v", result)
+	}
+	if statuses := manager.RuntimeStatuses(); len(statuses) != 0 {
+		t.Fatalf("expected invalid dry-run to avoid starting runtime, got %#v", statuses)
+	}
+	if _, err := os.Stat(filepath.Join(baseDir, "legion", "capabilities", "hids.json")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected invalid dry-run to avoid persisting hids.json, got err=%v", err)
+	}
+}
+
 func TestCapabilityManagerForwardsHIDSAlertsWhenReportingEnabled(t *testing.T) {
 	t.Parallel()
 
@@ -401,6 +505,99 @@ func TestCapabilityManagerApplyReusesUnchangedHIDSRuntime(t *testing.T) {
 	}
 }
 
+func TestCapabilityManagerApplyReportsAppliedSpecReceipt(t *testing.T) {
+	t.Parallel()
+
+	watchDir := t.TempDir()
+	manager := newCapabilityManager(CapabilityManagerConfig{
+		NodeID:  "node-a",
+		BaseDir: t.TempDir(),
+	})
+	t.Cleanup(func() {
+		_ = manager.Close()
+	})
+
+	spec := []byte(fmt.Sprintf(`{
+		"mode": "observe",
+		"collectors": {
+			"file": {
+				"enabled": true,
+				"backend": "filewatch",
+				"watch_paths": [%q]
+			}
+		},
+		"builtin_rule_sets": ["linux.file.integrity"],
+		"temporary_rules": [
+			{
+				"rule_id": "tmp-apply-receipt",
+				"enabled": true,
+				"match_event_type": "file.change",
+				"severity": "medium",
+				"condition": "file.path == '/etc/passwd'"
+			}
+		]
+	}`, watchDir))
+
+	result, err := manager.Apply(CapabilityApplyInput{
+		CapabilityKey:   "hids",
+		SpecVersion:     "2026-04-23",
+		DesiredSpecJSON: spec,
+	})
+	if err != nil {
+		t.Fatalf("apply capability: %v", err)
+	}
+
+	applyDetail := hidsApplyDetailForTest(t, result.StatusDetailJSON)
+	if applyDetail["desired_spec_version"] != "2026-04-23" {
+		t.Fatalf("unexpected desired spec version: %#v", applyDetail["desired_spec_version"])
+	}
+	if applyDetail["applied_spec_version"] != "2026-04-23" {
+		t.Fatalf("unexpected applied spec version: %#v", applyDetail["applied_spec_version"])
+	}
+	if hash, _ := applyDetail["desired_spec_sha256"].(string); len(hash) != 64 {
+		t.Fatalf("expected sha256 hash, got %#v", applyDetail["desired_spec_sha256"])
+	}
+	if appliedAt, _ := applyDetail["applied_at"].(string); appliedAt == "" {
+		t.Fatalf("expected applied_at timestamp, got %#v", applyDetail["applied_at"])
+	}
+	if applyDetail["reused_runtime"] != false {
+		t.Fatalf("unexpected reused runtime flag: %#v", applyDetail["reused_runtime"])
+	}
+
+	ruleEngine, ok := applyDetail["rule_engine"].(map[string]any)
+	if !ok {
+		t.Fatalf("unexpected rule engine detail: %#v", applyDetail["rule_engine"])
+	}
+	if ruleEngine["status"] != "compiled" {
+		t.Fatalf("unexpected rule engine status: %#v", ruleEngine["status"])
+	}
+	if ruleEngine["builtin_rule_set_count"] != float64(1) {
+		t.Fatalf("unexpected builtin rule-set count: %#v", ruleEngine["builtin_rule_set_count"])
+	}
+	if ruleEngine["temporary_rule_count"] != float64(1) {
+		t.Fatalf("unexpected temporary rule count: %#v", ruleEngine["temporary_rule_count"])
+	}
+	if activeCount, _ := ruleEngine["active_rule_count"].(float64); activeCount < 1 {
+		t.Fatalf("expected active rule count, got %#v", ruleEngine["active_rule_count"])
+	}
+	if ruleEngine["compile_error_count"] != float64(0) {
+		t.Fatalf("unexpected compile error count: %#v", ruleEngine["compile_error_count"])
+	}
+
+	repeated, err := manager.Apply(CapabilityApplyInput{
+		CapabilityKey:   "hids",
+		SpecVersion:     "2026-04-23",
+		DesiredSpecJSON: spec,
+	})
+	if err != nil {
+		t.Fatalf("repeat apply: %v", err)
+	}
+	repeatedApplyDetail := hidsApplyDetailForTest(t, repeated.StatusDetailJSON)
+	if repeatedApplyDetail["reused_runtime"] != true {
+		t.Fatalf("expected reused runtime receipt, got %#v", repeatedApplyDetail["reused_runtime"])
+	}
+}
+
 func TestCapabilityManagerApplyReusesUnchangedPartiallyCoveredHIDSRuntime(t *testing.T) {
 	t.Parallel()
 
@@ -454,6 +651,20 @@ func TestCapabilityManagerApplyReusesUnchangedPartiallyCoveredHIDSRuntime(t *tes
 	if !strings.Contains(string(result.StatusDetailJSON), `"reported":"degraded"`) {
 		t.Fatalf("expected normalized degraded detail on repeat apply: %s", string(result.StatusDetailJSON))
 	}
+}
+
+func hidsApplyDetailForTest(t *testing.T, raw []byte) map[string]any {
+	t.Helper()
+
+	var detail map[string]any
+	if err := json.Unmarshal(raw, &detail); err != nil {
+		t.Fatalf("unmarshal status detail: %v", err)
+	}
+	applyDetail, ok := detail["apply"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected apply status detail, got %#v", detail["apply"])
+	}
+	return applyDetail
 }
 
 func TestCapabilityManagerRuntimeStatusesExposeStructuredDetail(t *testing.T) {

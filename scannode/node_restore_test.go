@@ -51,6 +51,9 @@ type sessionReadyHookStub struct {
 func (s *sessionReadyHookStub) Apply(*CapabilityManager, capabilityHIDSApplyInput) (CapabilityApplyResult, error) {
 	return CapabilityApplyResult{}, nil
 }
+func (s *sessionReadyHookStub) DryRun(*CapabilityManager, capabilityHIDSApplyInput) (CapabilityDryRunResult, error) {
+	return CapabilityDryRunResult{}, nil
+}
 func (s *sessionReadyHookStub) Alerts() <-chan CapabilityRuntimeAlert             { return nil }
 func (s *sessionReadyHookStub) Observations() <-chan CapabilityRuntimeObservation { return nil }
 func (s *sessionReadyHookStub) CurrentStatus() (CapabilityRuntimeStatus, bool) {

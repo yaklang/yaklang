@@ -1,0 +1,103 @@
+syntax = "proto3";
+
+package legion.ai.v1;
+
+import "google/protobuf/timestamp.proto";
+import "legion/node/v1/node.proto";
+
+option go_package = "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/ai/v1;aiv1";
+
+message AISessionRef {
+  string session_id = 1;
+  string run_id = 2;
+}
+
+message AISessionAttachmentRef {
+  string attachment_id = 1;
+  string object_key = 2;
+  string filename = 3;
+  string content_type = 4;
+  uint64 size_bytes = 5;
+  string sha256 = 6;
+  string download_url = 7;
+}
+
+message AISessionCredentialRef {
+  string credential_id = 1;
+  string credential_type = 2;
+  string scope = 3;
+}
+
+message BindAISessionCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  AISessionRef session = 3;
+  string owner_user_id = 4;
+  string project_id = 5;
+  string title = 6;
+  bytes provider_policy_snapshot_json = 7;
+  bytes runtime_option_snapshot_json = 8;
+  repeated AISessionAttachmentRef attachments = 9;
+  repeated AISessionCredentialRef credential_refs = 10;
+}
+
+message PushAISessionInputCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  AISessionRef session = 2;
+  string owner_user_id = 3;
+  string input_type = 4;
+  bytes input_json = 5;
+}
+
+message CancelAISessionCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  AISessionRef session = 2;
+  string owner_user_id = 3;
+  string reason = 4;
+}
+
+message CloseAISessionCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  AISessionRef session = 2;
+  string owner_user_id = 3;
+  string reason = 4;
+}
+
+message AISessionReady {
+  legion.node.v1.EventMetadata metadata = 1;
+  AISessionRef session = 2;
+  string runtime_name = 3;
+  string runtime_version = 4;
+  google.protobuf.Timestamp ready_at = 5;
+}
+
+message AISessionEvent {
+  legion.node.v1.EventMetadata metadata = 1;
+  AISessionRef session = 2;
+  uint64 seq = 3;
+  string event_type = 4;
+  bytes payload_json = 5;
+}
+
+message AISessionDone {
+  legion.node.v1.EventMetadata metadata = 1;
+  AISessionRef session = 2;
+  google.protobuf.Timestamp finished_at = 3;
+  bytes result_json = 4;
+}
+
+message AISessionFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  AISessionRef session = 2;
+  google.protobuf.Timestamp finished_at = 3;
+  string error_code = 4;
+  string error_message = 5;
+  bytes error_detail_json = 6;
+}
+
+message AISessionCancelled {
+  legion.node.v1.EventMetadata metadata = 1;
+  AISessionRef session = 2;
+  google.protobuf.Timestamp finished_at = 3;
+  string reason = 4;
+}

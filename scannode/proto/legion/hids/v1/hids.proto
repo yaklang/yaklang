@@ -34,6 +34,24 @@ message ExecuteHIDSResponseActionCommand {
   HIDSProcessRef process = 5;
 }
 
+message HIDSDesiredSpecDryRunCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  legion.capability.v1.CapabilityRef capability = 3;
+  bytes desired_spec_json = 4;
+}
+
+message HIDSDesiredSpecDryRunResult {
+  legion.node.v1.EventMetadata metadata = 1;
+  legion.capability.v1.CapabilityRef capability = 2;
+  string status = 3;
+  string message = 4;
+  string error_code = 5;
+  string error_message = 6;
+  google.protobuf.Timestamp observed_at = 7;
+  bytes detail_json = 8;
+}
+
 message HIDSResponseActionResult {
   legion.node.v1.EventMetadata metadata = 1;
   legion.capability.v1.CapabilityRef capability = 2;

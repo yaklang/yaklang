@@ -14,6 +14,8 @@ import (
 const (
 	ModeObserve = "observe"
 
+	ResponseActionProcessTerminate = "process.terminate"
+
 	CollectorBackendEBPF      = "ebpf"
 	CollectorBackendAuditd    = "auditd"
 	CollectorBackendFileWatch = "filewatch"
@@ -28,6 +30,7 @@ type DesiredSpec struct {
 	Reporting       ReportingPolicy `json:"reporting,omitempty"`
 	ContextPolicy   ContextPolicy   `json:"context_policy,omitempty"`
 	BaselinePolicy  BaselinePolicy  `json:"baseline_policy,omitempty"`
+	ResponsePolicy  ResponsePolicy  `json:"response_policy,omitempty"`
 }
 
 type Collectors struct {
@@ -58,6 +61,12 @@ type ReportingPolicy struct {
 	EmitCapabilityStatus     bool  `json:"emit_capability_status,omitempty"`
 	EmitCapabilityAlert      bool  `json:"emit_capability_alert,omitempty"`
 	EmitSnapshotObservations *bool `json:"emit_snapshot_observations,omitempty"`
+}
+
+type ResponsePolicy struct {
+	Mode           string   `json:"mode,omitempty"`
+	AllowedActions []string `json:"allowed_actions,omitempty"`
+	ExpiresAt      string   `json:"expires_at,omitempty"`
 }
 
 type ContextPolicy struct {
@@ -166,12 +175,17 @@ func (s DesiredSpec) Normalize() DesiredSpec {
 	s.TemporaryRules = normalizeTemporaryRules(s.TemporaryRules)
 	s.ContextPolicy = s.ContextPolicy.Normalize()
 	s.BaselinePolicy = s.BaselinePolicy.Normalize()
+	s.ResponsePolicy = s.ResponsePolicy.Normalize()
 	return s
 }
 
 func (s DesiredSpec) Validate() error {
 	if s.Mode != ModeObserve {
 		return invalidField("mode", "only observe mode is supported")
+	}
+	responsePolicy := s.ResponsePolicy.Normalize()
+	if err := responsePolicy.Validate(); err != nil {
+		return err
 	}
 	if s.Collectors.Process.Enabled && s.Collectors.Process.Backend != CollectorBackendEBPF {
 		return invalidField("collectors.process.backend", "must be ebpf")
@@ -247,6 +261,65 @@ func (p ReportingPolicy) ShouldEmitSnapshotObservations() bool {
 		return false
 	}
 	return *p.EmitSnapshotObservations
+}
+
+func (p ResponsePolicy) Normalize() ResponsePolicy {
+	p.Mode = strings.ToLower(normalizeStringOrDefault(p.Mode, ModeObserve))
+	p.AllowedActions = normalizeStringList(p.AllowedActions)
+	if len(p.AllowedActions) == 0 {
+		p.AllowedActions = []string{ResponseActionProcessTerminate}
+	}
+	p.ExpiresAt = strings.TrimSpace(p.ExpiresAt)
+	if p.ExpiresAt != "" {
+		expiresAt, err := time.Parse(time.RFC3339, p.ExpiresAt)
+		if err == nil {
+			p.ExpiresAt = expiresAt.UTC().Format(time.RFC3339)
+		}
+	}
+	return p
+}
+
+func (p ResponsePolicy) Validate() error {
+	if p.Mode != ModeObserve {
+		return invalidField("response_policy.mode", "only observe mode is supported")
+	}
+	if len(p.AllowedActions) == 0 {
+		return invalidField("response_policy.allowed_actions", "must contain at least one action")
+	}
+	for index, action := range p.AllowedActions {
+		if action != ResponseActionProcessTerminate {
+			return invalidField(
+				fmt.Sprintf("response_policy.allowed_actions[%d]", index),
+				fmt.Sprintf("unsupported action %q", action),
+			)
+		}
+	}
+	if p.ExpiresAt != "" {
+		if _, err := time.Parse(time.RFC3339, p.ExpiresAt); err != nil {
+			return invalidField("response_policy.expires_at", "must be RFC3339")
+		}
+	}
+	return nil
+}
+
+func (p ResponsePolicy) AllowsAction(action string, now time.Time) bool {
+	p = p.Normalize()
+	if err := p.Validate(); err != nil {
+		return false
+	}
+	if p.ExpiresAt != "" {
+		expiresAt, err := time.Parse(time.RFC3339, p.ExpiresAt)
+		if err != nil || !expiresAt.After(now.UTC()) {
+			return false
+		}
+	}
+	action = strings.TrimSpace(action)
+	for _, allowedAction := range p.AllowedActions {
+		if allowedAction == action {
+			return true
+		}
+	}
+	return false
 }
 
 const (

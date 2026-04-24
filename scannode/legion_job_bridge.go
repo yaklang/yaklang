@@ -15,11 +15,19 @@ type capabilityEventReporter interface {
 	PublishResponseActionResult(context.Context, HIDSResponseActionResultInput) error
 }
 
+type hidsDesiredSpecDryRunReporter interface {
+	Close()
+	PublishDesiredSpecDryRunResult(context.Context, capabilityCommandRef, CapabilityDryRunResult) error
+}
+
 type legionJobBridge struct {
 	agent               *ScanNode
 	publisher           *jobEventPublisher
 	capabilityPublisher capabilityEventReporter
+	hidsDryRunPublisher hidsDesiredSpecDryRunReporter
 	ruleSyncPublisher   *ssaRuleSyncEventPublisher
+	aiPublisher         *aiSessionEventPublisher
+	aiRuntime           *aiSessionRuntimeManager
 
 	mu       sync.Mutex
 	consumer *commandConsumer
@@ -30,10 +38,14 @@ type legionJobBridge struct {
 }
 
 func newLegionJobBridge(agent *ScanNode) *legionJobBridge {
+	capabilityPublisher := newCapabilityEventPublisher(agent.node)
 	return &legionJobBridge{
 		agent:               agent,
 		publisher:           newJobEventPublisher(agent.node),
-		capabilityPublisher: newCapabilityEventPublisher(agent.node),
+		capabilityPublisher: capabilityPublisher,
+		hidsDryRunPublisher: capabilityPublisher,
 		ruleSyncPublisher:   newSSARuleSyncEventPublisher(agent.node),
+		aiPublisher:         newAISessionEventPublisher(agent.node),
+		aiRuntime:           newAISessionRuntimeManager(newYakAIEngineRuntimeDriver()),
 	}
 }
