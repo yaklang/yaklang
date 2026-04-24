@@ -1,6 +1,7 @@
 package scannode
 
 import (
+	"net/http"
 	"time"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -13,6 +14,7 @@ type ScanNode struct {
 	manager           *TaskManager
 	capabilityManager *CapabilityManager
 	ruleSyncClient    ruleSyncer
+	httpClient        *http.Client
 	maxRunningJobs    uint32
 	bridge            *legionJobBridge
 }
@@ -46,6 +48,7 @@ func NewScanNode(cfg node.BaseConfig) (*ScanNode, error) {
 		SyncEnabled: true,
 		Client:      cfg.HTTPClient,
 	})
+	agent.httpClient = cfg.HTTPClient
 	agent.bridge = newLegionJobBridge(agent)
 	return agent, nil
 }

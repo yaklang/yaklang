@@ -5,6 +5,7 @@ package scannode
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,6 +14,8 @@ import (
 	"time"
 
 	hidsmodel "github.com/yaklang/yaklang/common/hids/model"
+	hidsrule "github.com/yaklang/yaklang/common/hids/rule"
+	builtinrules "github.com/yaklang/yaklang/common/hids/rule/builtin"
 	hidsruntime "github.com/yaklang/yaklang/common/hids/runtime"
 	"github.com/yaklang/yaklang/common/log"
 )
@@ -25,7 +28,7 @@ type hidsCapabilityHooks struct {
 	alerts       chan CapabilityRuntimeAlert
 	observations chan CapabilityRuntimeObservation
 	config       hidsAlertConfig
-	appliedSpec  []byte
+	appliedSpec  hidsAppliedSpecState
 }
 
 type hidsAlertConfig struct {
@@ -34,6 +37,13 @@ type hidsAlertConfig struct {
 	emitCapabilityStatus     bool
 	emitCapabilityAlert      bool
 	emitSnapshotObservations bool
+}
+
+type hidsAppliedSpecState struct {
+	spec          []byte
+	specVersion   string
+	appliedAt     time.Time
+	reusedRuntime bool
 }
 
 const (
@@ -91,6 +101,8 @@ func (h *hidsCapabilityHooks) Apply(
 	now := result.State.UpdatedAt
 	if now.IsZero() {
 		now = time.Now().UTC()
+	} else {
+		now = now.UTC()
 	}
 	document := capabilityDocument{
 		NodeID:        m.nodeID,
@@ -102,11 +114,25 @@ func (h *hidsCapabilityHooks) Apply(
 	if err := m.save(document); err != nil {
 		return CapabilityApplyResult{}, fmt.Errorf("persist capability spec: %w", err)
 	}
-	h.setAppliedSpec(normalizedSpec)
+	h.setAppliedSpec(hidsAppliedSpecState{
+		spec:          normalizedSpec,
+		specVersion:   input.SpecVersion,
+		appliedAt:     now,
+		reusedRuntime: reused,
+	})
 
 	status, detailJSON := normalizeCapabilityEventStatus(
 		result.State.Status,
-		marshalCapabilityStatusDetail(result.State.Detail),
+		marshalCapabilityStatusDetail(enrichHIDSApplyStatusDetail(
+			result.State.Detail,
+			hidsAppliedSpecState{
+				spec:          normalizedSpec,
+				specVersion:   input.SpecVersion,
+				appliedAt:     now,
+				reusedRuntime: reused,
+			},
+			spec,
+		)),
 	)
 	message := strings.TrimSpace(result.State.Message)
 	if message == "" {
@@ -122,11 +148,62 @@ func (h *hidsCapabilityHooks) Apply(
 	}, nil
 }
 
+func (h *hidsCapabilityHooks) DryRun(
+	_ *CapabilityManager,
+	input capabilityHIDSApplyInput,
+) (CapabilityDryRunResult, error) {
+	h.applyMu.Lock()
+	defer h.applyMu.Unlock()
+
+	observedAt := time.Now().UTC()
+	spec, err := hidsmodel.ParseDesiredSpec(input.DesiredSpec)
+	if err != nil {
+		return buildCapabilityDryRunFailureResult(
+			input.CapabilityKey,
+			input.SpecVersion,
+			input.DesiredSpec,
+			hidsmodel.DesiredSpec{},
+			err,
+			observedAt,
+		), nil
+	}
+
+	normalizedSpec, err := json.Marshal(spec)
+	if err != nil {
+		return CapabilityDryRunResult{}, fmt.Errorf("marshal normalized hids desired spec: %w", err)
+	}
+	if _, err := hidsrule.NewEngine(spec); err != nil {
+		return buildCapabilityDryRunFailureResult(
+			input.CapabilityKey,
+			input.SpecVersion,
+			normalizedSpec,
+			spec,
+			err,
+			observedAt,
+		), nil
+	}
+
+	return CapabilityDryRunResult{
+		CapabilityKey: input.CapabilityKey,
+		SpecVersion:   input.SpecVersion,
+		Status:        capabilityDryRunStatusPassed,
+		Message:       "hids desired spec compiled successfully",
+		DetailJSON: marshalCapabilityStatusDetail(map[string]any{
+			"mode":                spec.Mode,
+			"desired_spec_sha256": hidsDesiredSpecSHA256(normalizedSpec),
+			"enabled_collectors":  hidsEnabledCollectorKeys(spec),
+			"response_mode":       spec.ResponsePolicy.Normalize().Mode,
+			"rule_engine":         hidsDesiredSpecDryRunRuleEngineDetail(spec, nil),
+		}),
+		ObservedAt: observedAt,
+	}, nil
+}
+
 func (h *hidsCapabilityHooks) Close() error {
 	if h == nil || h.manager == nil {
 		return nil
 	}
-	h.setAppliedSpec(nil)
+	h.setAppliedSpec(hidsAppliedSpecState{})
 	return h.manager.Close()
 }
 
@@ -554,13 +631,28 @@ func (h *hidsCapabilityHooks) setAlertConfig(config hidsAlertConfig) {
 	h.config = config
 }
 
-func (h *hidsCapabilityHooks) setAppliedSpec(spec []byte) {
+func (h *hidsCapabilityHooks) setAppliedSpec(state hidsAppliedSpecState) {
 	if h == nil {
 		return
 	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	h.appliedSpec = cloneBytes(spec)
+	state.spec = cloneBytes(state.spec)
+	if !state.appliedAt.IsZero() {
+		state.appliedAt = state.appliedAt.UTC()
+	}
+	h.appliedSpec = state
+}
+
+func (h *hidsCapabilityHooks) appliedSpecState() hidsAppliedSpecState {
+	if h == nil {
+		return hidsAppliedSpecState{}
+	}
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	state := h.appliedSpec
+	state.spec = cloneBytes(state.spec)
+	return state
 }
 
 func (h *hidsCapabilityHooks) tryReuseRunningRuntime(
@@ -570,10 +662,8 @@ func (h *hidsCapabilityHooks) tryReuseRunningRuntime(
 		return hidsruntime.ApplyResult{}, false
 	}
 
-	h.mu.RLock()
-	appliedSpec := cloneBytes(h.appliedSpec)
-	h.mu.RUnlock()
-	if !bytes.Equal(appliedSpec, normalizedSpec) {
+	appliedSpec := h.appliedSpecState()
+	if !bytes.Equal(appliedSpec.spec, normalizedSpec) {
 		return hidsruntime.ApplyResult{}, false
 	}
 
@@ -599,9 +689,15 @@ func (h *hidsCapabilityHooks) convertStatus(
 	state hidsmodel.RuntimeState,
 	config hidsAlertConfig,
 ) (CapabilityRuntimeStatus, bool) {
+	appliedSpec := h.appliedSpecState()
+	statusDetail := state.Detail
+	if len(appliedSpec.spec) > 0 {
+		desiredSpec, _ := hidsmodel.ParseDesiredSpec(appliedSpec.spec)
+		statusDetail = enrichHIDSApplyStatusDetail(statusDetail, appliedSpec, desiredSpec)
+	}
 	status, detailJSON := normalizeCapabilityEventStatus(
 		state.Status,
-		marshalCapabilityStatusDetail(state.Detail),
+		marshalCapabilityStatusDetail(statusDetail),
 	)
 
 	message := strings.TrimSpace(state.Message)
@@ -618,6 +714,206 @@ func (h *hidsCapabilityHooks) convertStatus(
 		DetailJSON:    detailJSON,
 		ObservedAt:    observedAt,
 	}, true
+}
+
+func enrichHIDSApplyStatusDetail(
+	detail map[string]any,
+	appliedSpec hidsAppliedSpecState,
+	spec hidsmodel.DesiredSpec,
+) map[string]any {
+	if len(appliedSpec.spec) == 0 && strings.TrimSpace(appliedSpec.specVersion) == "" {
+		return detail
+	}
+
+	enriched := make(map[string]any, len(detail)+1)
+	for key, value := range detail {
+		enriched[key] = value
+	}
+	if appliedSpec.appliedAt.IsZero() {
+		appliedSpec.appliedAt = time.Now().UTC()
+	}
+	appliedSpec.appliedAt = appliedSpec.appliedAt.UTC()
+
+	enriched["apply"] = map[string]any{
+		"desired_spec_version": appliedSpec.specVersion,
+		"applied_spec_version": appliedSpec.specVersion,
+		"desired_spec_sha256":  hidsDesiredSpecSHA256(appliedSpec.spec),
+		"applied_at":           appliedSpec.appliedAt,
+		"reused_runtime":       appliedSpec.reusedRuntime,
+		"rule_engine":          hidsRuleEngineApplyDetail(enriched, spec),
+	}
+	return enriched
+}
+
+func hidsDesiredSpecSHA256(spec []byte) string {
+	if len(spec) == 0 {
+		return ""
+	}
+	sum := sha256.Sum256(spec)
+	return fmt.Sprintf("%x", sum[:])
+}
+
+func buildCapabilityDryRunFailureResult(
+	capabilityKey string,
+	specVersion string,
+	rawSpec []byte,
+	spec hidsmodel.DesiredSpec,
+	err error,
+	observedAt time.Time,
+) CapabilityDryRunResult {
+	detail := map[string]any{
+		"rule_engine": hidsDesiredSpecDryRunRuleEngineDetail(spec, err),
+	}
+	if hash := hidsDesiredSpecSHA256(rawSpec); hash != "" {
+		detail["desired_spec_sha256"] = hash
+	}
+
+	errorCode := "dry_run_failed"
+	errorMessage := strings.TrimSpace(err.Error())
+	var validationErr *hidsmodel.ValidationError
+	if errors.As(err, &validationErr) {
+		errorCode = "invalid_desired_spec"
+		errorMessage = ErrInvalidHIDSCapabilitySpec.Error() + ": " + validationErr.Error()
+		detail["field"] = validationErr.Field
+		detail["reason"] = validationErr.Reason
+	}
+	if errorMessage == "" {
+		errorMessage = "hids desired spec dry-run failed"
+	}
+
+	return CapabilityDryRunResult{
+		CapabilityKey: capabilityKey,
+		SpecVersion:   specVersion,
+		Status:        capabilityDryRunStatusFailed,
+		Message:       "hids desired spec dry-run failed",
+		DetailJSON:    marshalCapabilityStatusDetail(detail),
+		ErrorCode:     errorCode,
+		ErrorMessage:  errorMessage,
+		ObservedAt:    observedAt,
+	}
+}
+
+func hidsDesiredSpecDryRunRuleEngineDetail(
+	spec hidsmodel.DesiredSpec,
+	compileErr error,
+) map[string]any {
+	builtinRuleSetCount := len(spec.BuiltinRuleSets)
+	temporaryRuleCount, activeTemporaryRuleCount, inactiveTemporaryRuleCount := hidsTemporaryRuleCounts(spec)
+	activeBuiltinRuleCount, inactiveBuiltinRuleCount := hidsBuiltinRuleCounts(spec)
+
+	status := "compiled"
+	compileErrorCount := 0
+	if compileErr != nil {
+		status = "failed"
+		compileErrorCount = 1
+	}
+
+	return map[string]any{
+		"status":                        status,
+		"builtin_rule_set_count":        builtinRuleSetCount,
+		"temporary_rule_count":          temporaryRuleCount,
+		"active_temporary_rule_count":   activeTemporaryRuleCount,
+		"inactive_temporary_rule_count": inactiveTemporaryRuleCount,
+		"active_rule_count":             activeBuiltinRuleCount + activeTemporaryRuleCount,
+		"inactive_rule_count":           inactiveBuiltinRuleCount + inactiveTemporaryRuleCount,
+		"compile_error_count":           compileErrorCount,
+	}
+}
+
+func hidsTemporaryRuleCounts(spec hidsmodel.DesiredSpec) (int, int, int) {
+	configuredCount := 0
+	activeCount := 0
+	inactiveCount := 0
+	for _, rule := range spec.TemporaryRules {
+		if rule.IsBlank() {
+			continue
+		}
+		configuredCount++
+		if rule.Enabled {
+			activeCount++
+		} else {
+			inactiveCount++
+		}
+	}
+	return configuredCount, activeCount, inactiveCount
+}
+
+func hidsBuiltinRuleCounts(spec hidsmodel.DesiredSpec) (int, int) {
+	coverage, err := builtinrules.DescribeCoverage(spec.BuiltinRuleSets, spec.CanCollectorEmit)
+	if err != nil {
+		return 0, 0
+	}
+	activeCount := 0
+	inactiveCount := 0
+	for _, item := range coverage {
+		activeCount += len(item.ActiveRules)
+		inactiveCount += len(item.InactiveRules)
+	}
+	return activeCount, inactiveCount
+}
+
+func hidsEnabledCollectorKeys(spec hidsmodel.DesiredSpec) []string {
+	collectors := make([]string, 0, 4)
+	if spec.Collectors.Process.Enabled {
+		collectors = append(collectors, "process")
+	}
+	if spec.Collectors.Network.Enabled {
+		collectors = append(collectors, "network")
+	}
+	if spec.Collectors.File.Enabled {
+		collectors = append(collectors, "file")
+	}
+	if spec.Collectors.Audit.Enabled {
+		collectors = append(collectors, "audit")
+	}
+	return collectors
+}
+
+func hidsRuleEngineApplyDetail(detail map[string]any, spec hidsmodel.DesiredSpec) map[string]any {
+	builtinRuleSetCount := len(spec.BuiltinRuleSets)
+	temporaryRuleCount := 0
+	for _, rule := range spec.TemporaryRules {
+		if !rule.IsBlank() {
+			temporaryRuleCount++
+		}
+	}
+
+	activeRuleCount, inactiveRuleCount := hidsRuntimeRuleCounts(detail)
+	return map[string]any{
+		"status":                 "compiled",
+		"builtin_rule_set_count": builtinRuleSetCount,
+		"temporary_rule_count":   temporaryRuleCount,
+		"active_rule_count":      activeRuleCount,
+		"inactive_rule_count":    inactiveRuleCount,
+		"compile_error_count":    0,
+	}
+}
+
+func hidsRuntimeRuleCounts(detail map[string]any) (int, int) {
+	rules, _ := detail["rules"].(map[string]any)
+	if len(rules) == 0 {
+		return 0, 0
+	}
+
+	activeCount := readHIDSDetailInt(rules["active_count"])
+	inactiveCount := readHIDSDetailInt(rules["inactive_count"])
+	temporaryRules, _ := rules["temporary_rules"].(map[string]any)
+	activeCount += readHIDSDetailInt(temporaryRules["active_count"])
+	inactiveCount += readHIDSDetailInt(temporaryRules["inactive_count"])
+	return activeCount, inactiveCount
+}
+
+func readHIDSDetailInt(value any) int {
+	switch typed := value.(type) {
+	case int:
+		return typed
+	case int64:
+		return int(typed)
+	case float64:
+		return int(typed)
+	default:
+		return 0
+	}
 }
 
 func marshalCapabilityStatusDetail(detail map[string]any) []byte {
