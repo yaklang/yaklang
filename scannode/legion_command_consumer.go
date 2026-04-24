@@ -270,6 +270,8 @@ func (b *legionJobBridge) handleMessage(
 		return b.handleAISessionBind(ctx, message.Data)
 	case strings.HasSuffix(message.Subject, "."+legionCommandAISessionInput):
 		return b.handleAISessionInput(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAISessionAppend):
+		return b.handleAISessionAppendContext(ctx, message.Data)
 	case strings.HasSuffix(message.Subject, "."+legionCommandAISessionCancel):
 		return b.handleAISessionCancel(ctx, message.Data)
 	case strings.HasSuffix(message.Subject, "."+legionCommandAISessionClose):

@@ -15,6 +15,7 @@ const (
 	legionCommandSSARuleSyncExport         = "ssa.rule_sync.export"
 	legionCommandAISessionBind             = "ai.session.bind"
 	legionCommandAISessionInput            = "ai.session.input"
+	legionCommandAISessionAppend           = "ai.session.context.append"
 	legionCommandAISessionCancel           = "ai.session.cancel"
 	legionCommandAISessionClose            = "ai.session.close"
 
