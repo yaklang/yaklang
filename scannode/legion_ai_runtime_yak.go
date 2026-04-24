@@ -51,12 +51,14 @@ func (yakAIEngineRuntimeDriver) Bind(
 	return &yakAIEngineRuntimeHandle{
 		engine:  engine,
 		emitter: emitter,
+		binding: binding,
 	}, nil
 }
 
 type yakAIEngineRuntimeHandle struct {
 	engine  *aiengine.AIEngine
 	emitter aiSessionRuntimeEmitter
+	binding aiSessionBinding
 
 	sendMu sync.Mutex
 	mu     sync.Mutex
@@ -86,6 +88,26 @@ func (h *yakAIEngineRuntimeHandle) SendInput(ctx context.Context, input aiSessio
 		return nil
 	}
 
+	go h.sendMessage(ctx, content)
+	return nil
+}
+
+func (h *yakAIEngineRuntimeHandle) AppendContext(ctx context.Context, update aiSessionContextUpdate) error {
+	if h == nil || h.engine == nil {
+		return fmt.Errorf("yak ai engine is not ready")
+	}
+
+	h.mu.Lock()
+	if h.closed {
+		h.mu.Unlock()
+		return fmt.Errorf("yak ai engine is closed")
+	}
+	h.mu.Unlock()
+
+	content, err := renderAISessionContextUpdate(ctx, h.binding, update)
+	if err != nil {
+		return err
+	}
 	go h.sendMessage(ctx, content)
 	return nil
 }
@@ -392,6 +414,48 @@ func renderCredentialProjection(refs []aiSessionCredentialRef) string {
 		}
 	}
 	return builder.String()
+}
+
+func renderAISessionContextUpdate(
+	ctx context.Context,
+	binding aiSessionBinding,
+	update aiSessionContextUpdate,
+) (string, error) {
+	var sections []string
+	for _, attachment := range update.AttachmentRefs {
+		if strings.TrimSpace(attachment.DownloadURL) == "" {
+			if strings.TrimSpace(attachment.AttachmentID) != "" {
+				return "", fmt.Errorf("ai attachment %s download_url is required", attachmentIdentity(attachment))
+			}
+			continue
+		}
+		content, err := downloadAISessionAttachment(ctx, binding, attachment)
+		if err != nil {
+			return "", fmt.Errorf("download ai attachment %s: %w", attachmentIdentity(attachment), err)
+		}
+		sections = append(sections, content)
+	}
+	if projection := renderCredentialProjection(update.CredentialRefs); projection != "" {
+		sections = append(sections, projection)
+	}
+	if len(sections) == 0 {
+		return "", fmt.Errorf("ai session context update is empty")
+	}
+
+	var builder strings.Builder
+	builder.WriteString("AI Session Context Update\n")
+	if reason := strings.TrimSpace(update.Reason); reason != "" {
+		builder.WriteString("Reason: ")
+		builder.WriteString(reason)
+		builder.WriteString("\n")
+	}
+	builder.WriteString("Please use the following appended context in subsequent reasoning.\n")
+	for _, section := range sections {
+		builder.WriteString("\n")
+		builder.WriteString(section)
+		builder.WriteString("\n")
+	}
+	return builder.String(), nil
 }
 
 func attachmentIdentity(attachment aiSessionAttachmentRef) string {
