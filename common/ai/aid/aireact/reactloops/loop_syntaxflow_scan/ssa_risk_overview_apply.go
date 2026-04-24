@@ -1,8 +1,10 @@
-package syntaxflow_utils
+package loop_syntaxflow_scan
 
 import (
 	"fmt"
 	"strings"
+
+	sfutil "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/syntaxflow_utils"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -17,7 +19,7 @@ import (
 const defaultOverviewPageLimit int64 = 40
 
 // PersistEffectiveOverviewFilter stores the filter used for overview queries on the loop (protojson).
-// It mirrors the same JSON into LoopVarSSARisksFilterJSON so SSARisksFilterForOverview stays aligned.
+// It mirrors the same JSON into sfutil.LoopVarSSARisksFilterJSON so BuildSSARisksFilterFromLoop stays aligned.
 func PersistEffectiveOverviewFilter(loop *reactloops.ReActLoop, filter *ypb.SSARisksFilter) {
 	if loop == nil || filter == nil {
 		return
@@ -27,8 +29,8 @@ func PersistEffectiveOverviewFilter(loop *reactloops.ReActLoop, filter *ypb.SSAR
 		return
 	}
 	s := string(b)
-	loop.Set(LoopVarSSAOverviewFilterJSON, s)
-	loop.Set(LoopVarSSARisksFilterJSON, s)
+	loop.Set(sfutil.LoopVarSSAOverviewFilterJSON, s)
+	loop.Set(sfutil.LoopVarSSARisksFilterJSON, s)
 }
 
 func appendUniqueStr(slice []string, v string) []string {
@@ -41,17 +43,18 @@ func appendUniqueStr(slice []string, v string) []string {
 }
 
 // MergeReloadSSARiskOverviewFilter builds the filter for reload_ssa_risk_overview from action params,
-// stored LoopVarSSAOverviewFilterJSON, or SSARisksFilterForOverview.
+// stored sfutil.LoopVarSSAOverviewFilterJSON, or from BuildSSARisksFilterFromLoop after sfutil.SyncSSARisksFilterFromIrifyToLoop.
 func MergeReloadSSARiskOverviewFilter(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, action *aicommon.Action) *ypb.SSARisksFilter {
 	rawFj := strings.TrimSpace(action.GetString("filter_json"))
 	var base *ypb.SSARisksFilter
 	if rawFj != "" {
 		base = &ypb.SSARisksFilter{}
 		if err := protojson.Unmarshal([]byte(rawFj), base); err != nil {
-			base = SSARisksFilterForOverview(task, loop, "")
+			sfutil.SyncSSARisksFilterFromIrifyToLoop(loop, task)
+			base = sfutil.BuildSSARisksFilterFromLoop(loop, "")
 		}
 	} else if loop != nil {
-		if s := strings.TrimSpace(loop.Get(LoopVarSSAOverviewFilterJSON)); s != "" {
+		if s := strings.TrimSpace(loop.Get(sfutil.LoopVarSSAOverviewFilterJSON)); s != "" {
 			base = &ypb.SSARisksFilter{}
 			if err := protojson.Unmarshal([]byte(s), base); err != nil {
 				base = nil
@@ -59,7 +62,10 @@ func MergeReloadSSARiskOverviewFilter(loop *reactloops.ReActLoop, task aicommon.
 		}
 	}
 	if base == nil {
-		base = SSARisksFilterForOverview(task, loop, "")
+		if loop != nil && task != nil && strings.TrimSpace(loop.Get(sfutil.LoopVarSSAOverviewFilterJSON)) == "" {
+			sfutil.SyncSSARisksFilterFromIrifyToLoop(loop, task)
+		}
+		base = sfutil.BuildSSARisksFilterFromLoop(loop, "")
 	}
 	if s := strings.TrimSpace(action.GetString("search")); s != "" {
 		base.Search = s
@@ -82,7 +88,7 @@ func ApplySSARiskOverviewDB(loop *reactloops.ReActLoop, invoker aicommon.AIInvok
 		return ""
 	}
 	if db == nil {
-		invoker.AddToTimeline("ssa_risk_overview", "当前环境无数据库连接，无法列出 SSA Risk。请在 Yakit/IRify 连接项目数据库后重试。")
+		invoker.AddToTimeline("ssa_risk_overview", "当前环境无数据库连接，无法列出 SSA Risk。请检查项目数据库与 SSA 工程库配置后重试。")
 		loop.Set("ssa_risk_overview_preface", "无 DB：仅可根据用户文字做一般性建议，勿编造 risk_id。")
 		loop.Set("ssa_risk_total_hint", "")
 		return loop.Get("ssa_risk_overview_preface")

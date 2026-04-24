@@ -1,4 +1,4 @@
-package syntaxflow_utils
+package loop_syntaxflow_scan
 
 // SFAuditCodeSearchHint is appended to SyntaxFlow code-audit rule prompts so the model greps the tree before writing rules.
 func SFAuditCodeSearchHint() string {

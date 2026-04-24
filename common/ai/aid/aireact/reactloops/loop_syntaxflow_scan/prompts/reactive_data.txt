@@ -1,10 +1,50 @@
 ## 当前模式
 - **sf_scan_session_mode**: {{ .SessionMode }}
-- **task_id**: {{ .TaskID }}
+- **task_id**（= SSA runtime_id）: {{ .TaskID }}
+- **sf_scan_config_inferred**（由引擎从输入解析出配置则为 1）: {{ .ConfigInferred }}
+- **sf_scan_final_report_due**（=1 时必须输出大总结，覆盖 pipeline 与各 risk）: {{ .FinalReportDue }}
+{{ if .CompileMeta }}
+- **sf_scan_compile_meta**（编译元数据）: {{ .CompileMeta }}
+{{ end }}
+
+{{ if .PipelineSummary }}
+## 各阶段 pipeline 累积摘要（`sf_scan_pipeline_summary`）
+<|SF_PIPELINE|>
+{{ .PipelineSummary }}
+<|SF_PIPELINE_END|>
+{{ end }}
+{{ if .ScanEndSummary }}
+## 扫描任务行终态摘要（`sf_scan_scan_end_summary`）
+<|SF_SCAN_END|>
+{{ .ScanEndSummary }}
+<|SF_SCAN_END_END|>
+{{ end }}
+
+{{ if .FindingsDoc }}
+## 中间发现（`sf_scan_findings_doc`；执行工具时由引擎追加）
+<|SF_FINDINGS_DOC|>
+{{ .FindingsDoc }}
+<|SF_FINDINGS_DOC_END|>
+{{ end }}
+
+{{ if .InterpretLog }}
+## 解读与轮询累积日志（`sf_scan_interpret_log`；终局汇总时应引用/核对，勿臆造）
+<|INTERPRET_LOG|>
+{{ .InterpretLog }}
+<|INTERPRET_LOG_END|>
+{{ end }}
 
 <|SF_SCAN_REVIEW_PREFACE|>
 {{ .Preface }}
 <|SF_SCAN_REVIEW_PREFACE_END|>
+
+{{ if .RiskListSummary }}
+## 风险列表摘要（需先通过 reload_ssa_risk_overview 拉取/更新时才会填）
+- **行数/总览提示**: {{ .RiskTotalHint }}
+<|RISK_LIST_SUMMARY|>
+{{ .RiskListSummary }}
+<|RISK_LIST_SUMMARY_END|>
+{{ end }}
 
 {{ if .FeedbackMessages }}
 ## 上轮反馈

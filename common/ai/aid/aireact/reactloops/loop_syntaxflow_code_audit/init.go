@@ -9,6 +9,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_syntaxflow_scan"
 	sfu "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/syntaxflow_utils"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -91,7 +92,7 @@ func buildEnrichedRulePrompt(original string, state *SFCodeAuditState, reconPath
 - 技术栈摘要: %s
 - 入口点摘要: %s
 - 目录探索报告路径: %s
-%s`, strings.TrimSpace(original), state.ProjectPath, state.ProjectName, state.TechStack, state.EntryPoints, recon, sfu.SFAuditCodeSearchHint())
+%s`, strings.TrimSpace(original), state.ProjectPath, state.ProjectName, state.TechStack, state.EntryPoints, recon, loop_syntaxflow_scan.SFAuditCodeSearchHint())
 }
 
 func buildRefFilesHint(files []string) string {
@@ -264,7 +265,7 @@ func buildOrchestratorInitTask(r aicommon.AIInvokeRuntime, state *SFCodeAuditSta
 
 		// Phase 3 (optional): syntaxflow_scan when task_id present (attachments / loop vars on parent task)
 		hasScanContextFile := false
-		if scanTid, ok := sfu.SyntaxFlowTaskID(task, nil); ok && scanTid != "" {
+		if scanTid, ok := sfu.ReadIrifySyntaxFlowTaskIDFromTask(task); ok && scanTid != "" {
 			scanLoop, err := reactloops.CreateLoopByName(schema.AI_REACT_LOOP_NAME_SYNTAXFLOW_SCAN, r,
 				reactloops.WithVar(sfu.LoopVarSyntaxFlowTaskID, scanTid),
 			)
