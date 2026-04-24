@@ -172,7 +172,7 @@ func TestTriggerPerception_AppliesCapabilitySearchResultsToLoop(t *testing.T) {
 
 	loop := NewMinimalReActLoop(cfg, invoker)
 	loop.loopName = "perception-capability-search-test"
-	loop.perception = newPerceptionController()
+	loop.perception = newPerceptionController(perceptionDefaultIterationInterval)
 	loop.extraCapabilities = NewExtraCapabilitiesManager()
 	loop.maxIterations = 100
 	loop.actionHistory = make([]*ActionRecord, 0)
@@ -221,7 +221,7 @@ func TestTriggerPerception_AppliesKnowledgeSearchResultsToLoop(t *testing.T) {
 
 	loop := NewMinimalReActLoop(cfg, invoker)
 	loop.loopName = "perception-knowledge-search-test"
-	loop.perception = newPerceptionController()
+	loop.perception = newPerceptionController(perceptionDefaultIterationInterval)
 	loop.allowRAG = func() bool { return true }
 	loop.maxIterations = 100
 	loop.actionHistory = make([]*ActionRecord, 0)
@@ -271,7 +271,7 @@ func TestTriggerPerception_LimitsKnowledgeContextTo15K(t *testing.T) {
 
 	loop := NewMinimalReActLoop(cfg, invoker)
 	loop.loopName = "perception-knowledge-size-limit-test"
-	loop.perception = newPerceptionController()
+	loop.perception = newPerceptionController(perceptionDefaultIterationInterval)
 	loop.allowRAG = func() bool { return true }
 	loop.maxIterations = 100
 	loop.actionHistory = make([]*ActionRecord, 0)
