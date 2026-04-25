@@ -1,0 +1,394 @@
+// test_prompt_stability.yak
+// 用法:
+//   yak test_prompt_stability.yak
+//   yak test_prompt_stability.yak --rounds 5 --concurrent 8 --ai-model "qwen3.5-27b-free"
+//   yak test_prompt_stability.yak --js-dir /path/to/verified_js_dir   # 用真实 JS 文件
+//
+// 复现 js-static-extract-ai Phase2 的真实场景：
+//   - 使用真实长度的 minified JS 代码（1500 码点 chunk）
+//   - 使用真实大小的 sensitiveCtxLite
+//   - 使用与线上相同的并发数
+//   - 统计 liteforge 成功率、Empty Response 比例、think 模式占比
+
+rounds     = cli.Int("rounds", cli.setDefault(3), cli.setHelp("每个模板调用轮数"))
+concurrent = cli.Int("concurrent", cli.setDefault(8), cli.setHelp("并发数（线上默认 8）"))
+aiModel    = cli.String("ai-model", cli.setDefault("qwen3.5-27b-free"), cli.setHelp("指定 AI 模型"))
+aiDomain   = cli.String("ai-domain", cli.setDefault(""), cli.setHelp("AI domain"))
+aiProxy    = cli.String("ai-proxy", cli.setDefault(""), cli.setHelp("AI proxy"))
+useSpeed   = cli.Bool("speed-priority", cli.setDefault(true), cli.setHelp("是否使用 speedPriority"))
+jsDir      = cli.String("js-dir", cli.setDefault(""), cli.setHelp("可选：真实 JS 目录，从中随机取 chunk；不传则用内置 minified 样本"))
+chunkSize  = cli.Int("chunk-size", cli.setDefault(1500), cli.setHelp("模拟 chunk 大小（码点）"))
+cli.check()
+
+// ==================== 模拟数据 ====================
+
+// 真实 minified JS 样本（约 1500 字符，模拟 webpack 打包产物）
+sampleMinifiedJS = `!function(e,t){"object"==typeof exports&&"undefined"!=typeof module?module.exports=t():"function"==typeof define&&define.amd?define(t):(e="undefined"!=typeof globalThis?globalThis:e||self).Vue=t()}(this,(function(){"use strict";function e(e){return null!==e&&"object"==typeof e}function t(e){return"function"==typeof e}const n=Object.prototype.toString;function o(e){return"[object Map]"===n.call(e)}function r(e,t){if(e===t)return!0;if(!e||!t)return!1;const n=Array.isArray(e),o=Array.isArray(t);if(n!==o)return!1;if(n&&o){if(e.length!==t.length)return!1;for(let n=0;n<e.length;n++)if(!r(e[n],t[n]))return!1;return!0}if(e instanceof Date&&t instanceof Date)return e.getTime()===t.getTime();if(!n&&!o){const n=Object.keys(e),o=Object.keys(t);if(n.length!==o.length)return!1;for(let o=0;o<n.length;o++){const r=n[o];if(!t.hasOwnProperty(r)||!r(e[r],t[r]))return!1}return!0}return String(e)===String(t)}function s(e,t,n){const o=document.createElement(e);for(const[r,s]of Object.entries(t||{}))o.setAttribute(r,s);if(n){const e="string"==typeof n?document.createTextNode(n):n;o.appendChild(e)}return o}const i=e=>""+e,a=e=>null==e?"":Array.isArray(e)||e&&e.toString===Object.prototype.toString?JSON.stringify(e,null,2):String(e);function c(e){const t=parseFloat(e);return isNaN(t)?e:t}const l=new Set(["key","ref","onVnodeBeforeMount","onVnodeMounted","onVnodeBeforeUpdate","onVnodeUpdated","onVnodeBeforeUnmount","onVnodeUnmounted"]);`
+
+// 额外填充到目标长度
+padToLength = (s, targetLen) => {
+    for len(s) < targetLen {
+        s = s + "\n// padding " + sprint(len(s)) + "\nvar _x" + sprint(len(s)) + "=function(){return null};"
+    }
+    if len(s) > targetLen {
+        s = s[:targetLen]
+    }
+    return s
+}
+
+// 真实 JS chunk 准备
+realChunks = []
+if jsDir != "" && file.IsDir(jsDir) {
+    log.info("从真实目录加载 JS 文件: %s", jsDir)
+    jsFiles = []
+    for _, f := range file.ReadDirInfoInDirectory(jsDir)~ {
+        name = f.Name
+        if str.HasSuffix(name, ".js") || str.HasSuffix(name, ".mjs") {
+            jsFiles = append(jsFiles, file.Join(jsDir, name))
+        }
+    }
+    for _, fp := range jsFiles {
+        try {
+            content = string(file.ReadFile(fp)~)
+            pos = 0
+            for pos < len(content) {
+                end = pos + chunkSize
+                if end > len(content) {
+                    end = len(content)
+                }
+                ch = content[pos:end]
+                if len(str.TrimSpace(ch)) > 50 {
+                    realChunks = append(realChunks, ch)
+                }
+                pos = end
+            }
+        } catch _ {}
+        if len(realChunks) >= 50 {
+            break
+        }
+    }
+    log.info("从真实文件中提取了 %d 个 chunk", len(realChunks))
+}
+
+getTestChunk = (idx) => {
+    if len(realChunks) > 0 {
+        return realChunks[idx % len(realChunks)]
+    }
+    return padToLength(sampleMinifiedJS, chunkSize)
+}
+
+// 真实大小的 sensitiveCtxLite（与线上一致）
+sampleCtxLite = json.dumps({
+    "base_urls_trusted": ["https://api.example.com/v2", "https://cdn.example.com"],
+    "base_urls_all": ["https://api.example.com/v2", "https://cdn.example.com", "/api", "/v1"],
+    "framework_signatures": ["Vue", "axios", "element-ui", "webpack"],
+    "source_file": "app.bundle.min.js",
+})
+
+// ==================== schema（与线上相同） ====================
+
+apiSchema = jsonschema.ActionObject(
+    jsonschema.paramObjectArray("apis",
+        jsonschema.title("API 列表"),
+        jsonschema.required(),
+        jsonschema.paramString("full_url", jsonschema.description("完整 URL"), jsonschema.required()),
+        jsonschema.paramString("http_method", jsonschema.description("GET POST PUT DELETE 等大写"), jsonschema.required()),
+        jsonschema.paramString("path_only", jsonschema.description("仅 path")),
+        jsonschema.paramString("request_fields", jsonschema.description("字段名逗号分隔")),
+        jsonschema.paramString("request_data_hint", jsonschema.description("请求参数说明")),
+        jsonschema.paramString("evidence", jsonschema.description("一句中文依据")),
+    ),
+)
+
+// ==================== Prompt 模板（复现线上 Phase2） ====================
+
+promptTemplates = {}
+
+// A: 线上 Phase2 当前版本
+promptTemplates["A_线上Phase2"] = (code, ctx) => {
+    return sprintf(`你是 API 挖掘智能体。下面 JS 片段来自「已删除已分析上下文」后的剩余源码，请补全可能遗漏的 HTTP API。
+
+【结构化结果落盘路径（宿主写入）】/tmp/test_output.json
+【基址上下文】%s
+【源码片段 chunk=0】
+%s
+
+若无新 API，"apis" 为 []。不要思考、不要解释，直接按系统 SCHEMA 输出 JSON，根对象必须含 "@action":"object"。`, ctx, code)
+}
+
+// B: 极简版
+promptTemplates["B_极简"] = (code, ctx) => {
+    return sprintf(`从 JS 代码提取 HTTP API。base_url: %s
+代码: %s
+无 API 输出 {"@action":"object","apis":[]}。只输出 JSON。`, ctx, code)
+}
+
+// C: 英文极简
+promptTemplates["C_英文极简"] = (code, ctx) => {
+    return sprintf(`Extract HTTP APIs from JS code. Base URLs: %s
+Code: %s
+If no APIs: {"@action":"object","apis":[]}. Output JSON only, no explanation.`, ctx, code)
+}
+
+// D: 低并发对照组（rounds 内串行）
+promptTemplates["D_串行对照"] = (code, ctx) => {
+    return sprintf(`你是 API 挖掘智能体。从下面 JS 代码中提取 HTTP API 端点。
+
+【基址上下文】%s
+【代码】
+%s
+
+若无 API，"apis" 为 []。直接输出 JSON，根对象必须含 "@action":"object"。`, ctx, code)
+}
+
+// ==================== 工具函数 ====================
+
+min = (a, b) => { if a < b { return a }; return b }
+max = (a, b) => { if a > b { return a }; return b }
+
+stripThinkTags = s => {
+    s = re.ReplaceAll(s, "(?s)<think>.*?</think>", "")
+    idx = str.Index(s, "<think>")
+    if idx >= 0 {
+        s = s[:idx]
+    }
+    return str.TrimSpace(s)
+}
+
+// ==================== 测试执行 ====================
+
+log.info("========== Phase2 真实场景复现测试 ==========")
+log.info("模板数: %d | 每模板轮数: %d | 并发: %d | chunk大小: %d | 模型: %s",
+    len(promptTemplates), rounds, concurrent, chunkSize, aiModel)
+log.info("说明: 每个模板在单轮内并发 %d 个请求（模拟 Phase2 的真实并发压力）", concurrent)
+
+var forgeOptsBase = []
+if useSpeed {
+    forgeOptsBase = append(forgeOptsBase, liteforge.speedPriority())
+}
+if aiModel != "" {
+    forgeOptsBase = append(forgeOptsBase, ai.model(aiModel))
+}
+if aiDomain != "" {
+    forgeOptsBase = append(forgeOptsBase, ai.domain(aiDomain))
+}
+if aiProxy != "" {
+    forgeOptsBase = append(forgeOptsBase, ai.proxy(aiProxy))
+}
+
+allResults = {}
+resultMu = sync.NewMutex()
+
+for tplName, _ := range promptTemplates {
+    allResults[tplName] = {
+        "success": 0,
+        "fail_action_missing": 0,
+        "fail_empty_response": 0,
+        "fail_think_mode": 0,
+        "fail_other": 0,
+        "api_counts": [],
+        "errors": [],
+        "total_calls": 0,
+    }
+}
+
+for tplName, tplFunc := range promptTemplates {
+    tplName := tplName
+    tplFunc := tplFunc
+
+    isSerial = (tplName == "D_串行对照")
+    effectiveConcurrent = concurrent
+    if isSerial {
+        effectiveConcurrent = 1
+    }
+
+    log.info("")
+    log.info("--- 测试模板: %s (%d 轮, 每轮并发 %d) ---", tplName, rounds, effectiveConcurrent)
+
+    for round := 0; round < rounds; round++ {
+        round := round
+        log.info("  轮次 %d/%d 开始...", round+1, rounds)
+
+        swg = sync.NewSizedWaitGroup(effectiveConcurrent)
+        batchSize = effectiveConcurrent
+        for i := 0; i < batchSize; i++ {
+            i := i
+            swg.Add()
+            go func {
+                defer swg.Done()
+
+                code = getTestChunk(round * batchSize + i)
+                prompt = tplFunc(code, sampleCtxLite)
+
+                opts = [liteforge.output(apiSchema), liteforge.id(sprintf("test-%s-%d-%d", tplName, round, i))]
+                for _, o := range forgeOptsBase {
+                    opts = append(opts, o)
+                }
+
+                var liteforgeOk = false
+                var apiCount = 0
+                var errMsg = ""
+                var errCategory = ""
+
+                try {
+                    res = liteforge.Execute(prompt, opts...)~
+                    apisOut = res.GetInvokeParamsArray("apis")
+                    if apisOut == nil {
+                        apisOut = []
+                    }
+                    liteforgeOk = true
+                    apiCount = len(apisOut)
+                } catch e {
+                    errMsg = sprint(e)
+                    if str.Contains(errMsg, "Empty Response") || str.Contains(errMsg, "0 output tokens") {
+                        errCategory = "empty_response"
+                    } elif str.Contains(errMsg, "@action not found") || str.Contains(errMsg, "action @action") {
+                        errCategory = "action_missing"
+                    } else {
+                        errCategory = "other"
+                    }
+
+                    // 如果是 action_missing，用 ai.Chat 拿原始输出看看模型到底返回了什么
+                    if errCategory == "action_missing" {
+                        try {
+                            chatOpts = []
+                            if aiModel != "" { chatOpts = append(chatOpts, ai.model(aiModel)) }
+                            if aiDomain != "" { chatOpts = append(chatOpts, ai.domain(aiDomain)) }
+                            raw = ai.Chat(prompt, chatOpts...)~
+                            rawStr = string(raw)
+                            hasThink = str.Contains(rawStr, "<think>") || str.Contains(rawStr, "Thinking")
+                            if hasThink {
+                                errCategory = "think_mode"
+                            }
+                            if len(rawStr) == 0 {
+                                errCategory = "empty_response"
+                            }
+                        } catch _ {}
+                    }
+                }
+
+                resultMu.Lock()
+                r = allResults[tplName]
+                r["total_calls"] = r["total_calls"] + 1
+                if liteforgeOk {
+                    r["success"] = r["success"] + 1
+                    r["api_counts"] = append(r["api_counts"], apiCount)
+                } else {
+                    if errCategory == "empty_response" {
+                        r["fail_empty_response"] = r["fail_empty_response"] + 1
+                    } elif errCategory == "action_missing" {
+                        r["fail_action_missing"] = r["fail_action_missing"] + 1
+                    } elif errCategory == "think_mode" {
+                        r["fail_think_mode"] = r["fail_think_mode"] + 1
+                    } else {
+                        r["fail_other"] = r["fail_other"] + 1
+                    }
+                    shortErr = errMsg
+                    if len(shortErr) > 150 {
+                        shortErr = shortErr[:150]
+                    }
+                    r["errors"] = append(r["errors"], sprintf("[round=%d i=%d] %s: %s", round, i, errCategory, shortErr))
+                }
+                resultMu.Unlock()
+            }
+        }
+        swg.Wait()
+
+        // 每轮之间等 2 秒，减轻限流
+        sleep(2)
+    }
+}
+
+// ==================== 汇总报告 ====================
+
+log.info("")
+log.info("╔══════════════════════════════════════════════════════════════╗")
+log.info("║         Phase2 真实场景复现测试报告                          ║")
+log.info("╚══════════════════════════════════════════════════════════════╝")
+log.info("")
+log.info("模型: %s | chunk大小: %d | 并发: %d | 每模板轮数: %d", aiModel, chunkSize, concurrent, rounds)
+log.info("")
+
+bestName = ""
+bestRate = -1.0
+
+for tplName, r := range allResults {
+    total = r["total_calls"]
+    if total == 0 {
+        total = 1
+    }
+    rate = float(r["success"]) / float(total) * 100.0
+
+    avgApi = 0.0
+    if len(r["api_counts"]) > 0 {
+        s = 0
+        for _, c := range r["api_counts"] {
+            s = s + c
+        }
+        avgApi = float(s) / float(len(r["api_counts"]))
+    }
+
+    log.info("【%s】 (共 %d 次调用)", tplName, total)
+    log.info("  成功: %d/%d (%.1f%%)", r["success"], total, rate)
+    log.info("  失败明细:")
+    log.info("    Empty Response (模型返回空): %d", r["fail_empty_response"])
+    log.info("    Think 模式 (模型输出思考): %d", r["fail_think_mode"])
+    log.info("    @action 缺失 (格式不对):    %d", r["fail_action_missing"])
+    log.info("    其它:                       %d", r["fail_other"])
+    log.info("  成功时平均 API 数: %.1f", avgApi)
+
+    if len(r["errors"]) > 0 {
+        showN = min(len(r["errors"]), 3)
+        log.info("  前 %d 条错误:", showN)
+        for i := 0; i < showN; i++ {
+            log.info("    %s", r["errors"][i])
+        }
+    }
+    log.info("")
+
+    if rate > bestRate {
+        bestRate = rate
+        bestName = tplName
+    }
+}
+
+log.info("════════════════════════════════════════")
+log.info("  最佳模板: %s (成功率 %.1f%%)", bestName, bestRate)
+log.info("════════════════════════════════════════")
+log.info("")
+log.info("诊断建议:")
+totalEmpty = 0
+totalThink = 0
+totalAction = 0
+totalAll = 0
+for _, r := range allResults {
+    totalEmpty = totalEmpty + r["fail_empty_response"]
+    totalThink = totalThink + r["fail_think_mode"]
+    totalAction = totalAction + r["fail_action_missing"]
+    totalAll = totalAll + r["total_calls"]
+}
+if totalEmpty > totalAll / 4 {
+    log.info("  [!] Empty Response 占比过高（%d/%d）→ 模型限流严重，建议: 降低 --concurrent / 换非免费模型 / 加请求间隔", totalEmpty, totalAll)
+}
+if totalThink > 0 {
+    log.info("  [!] 模型启用了 Think 模式（%d 次）→ 建议: 换不带 thinking 的模型 / 提示词加 'Do not think'", totalThink)
+}
+if totalAction > totalAll / 4 {
+    log.info("  [!] @action 缺失占比高（%d/%d）→ 提示词格式约束不够强 / 模型不遵守 schema", totalAction, totalAll)
+}
+if totalEmpty == 0 && totalThink == 0 && totalAction == 0 {
+    log.info("  全部通过，当前配置稳定。")
+}
+
+outPath = file.Join(os.TempDir(), sprintf("phase2_stability_report_%d.json", time.Now().Unix()))
+file.SaveJson(outPath, {
+    "model": aiModel,
+    "chunk_size": chunkSize,
+    "concurrent": concurrent,
+    "rounds": rounds,
+    "speed_priority": useSpeed,
+    "results": allResults,
+    "best_template": bestName,
+    "best_success_rate": bestRate,
+})
+log.info("完整报告已保存: %s", outPath)
