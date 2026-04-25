@@ -15,7 +15,18 @@ __VERBOSE_NAME__ = "crawl_js_collector"
 __KEYWORDS__ = "recon,爬虫,javascript,静态资源,ai.FunctionCall,信息搜集,crawl_js_collector,deep-js,infosec_recon"
 __USAGE__ = "在专注模式 infosec_recon 中通过已注册工具 crawl_js_collector 调用（与 js_static_extract_ai 同为工具链路）。输出见 workdir 下 crawl-js-collector-result.json 与 artifacts.verified_js_dir。"
 
-log.setLevel("warn")
+// 轨迹：[AI推理-…] 模型研判；[请求发送] HTTP；[报错] 异常
+log.setLevel("info")
+
+logAi = (action, msg) => {
+    log.info("[AI推理-%s] %s", action, msg)
+}
+logReq = msg => {
+    log.info("[请求发送] %s", msg)
+}
+logErr = (where, err) => {
+    log.warn("[报错] %s: %v", where, err)
+}
 
 targetUrl = cli.String("url", cli.setRequired(true), cli.setHelp("起始 URL（https?://）"))
 maxDepth = cli.Int("max-depth", cli.setDefault(2), cli.setHelp("爬虫深度"))
@@ -373,8 +384,10 @@ buildDeepJsPrompt = (rootUrl, fromJsUrl, halfCtx, snippet) => {
 deepJsAiResolveSnippetAndFetch = (rootUrl, fromURL, snippet, halfCtx, verifyTO, aiOpts) => {
     pr = buildDeepJsPrompt(rootUrl, fromURL, halfCtx, snippet)
     aiUsed = 0
+    snLen = len(snippet)
     for in 2 {
         try {
+            logAi("deep-js 片段研判与 URL 拼接", sprintf("来源脚本=%s 上下文窗口≈%d 字 snippet_len=%d（判定是否独立 .js/.mjs 并输出完整 URL）", fromURL, halfCtx*2, snLen))
             vr = ai.FunctionCall(pr, deepJsHitSchema, aiOpts...)~
             aiUsed++
             if vr == nil || vr["is_independent_js"] != true {
@@ -391,8 +404,10 @@ deepJsAiResolveSnippetAndFetch = (rootUrl, fromURL, snippet, halfCtx, verifyTO, 
             if absU == "" || !isLikelyJSURL(absU) {
                 return {"ok": false, "url": "", "ai_used": aiUsed, "status": 0, "err": "bad_url"}
             }
+            logReq(sprintf("HTTP GET 校验 AI 解析出的脚本 url=%s timeout=%ds", absU, verifyTO))
             rsp, _, e = poc.Get(absU, poc.timeout(verifyTO))
             if e != nil {
+                logErr(sprintf("HTTP GET 校验脚本失败 url=%s", absU), e)
                 return {"ok": false, "url": absU, "ai_used": aiUsed, "status": 0, "err": sprint(e)}
             }
             code = poc.GetStatusCodeFromResponse(rsp.RawPacket)
@@ -409,6 +424,9 @@ deepJsAiResolveSnippetAndFetch = (rootUrl, fromURL, snippet, halfCtx, verifyTO, 
 // 返回本批新验证通过的 URL 列表（targets 建议已去重；已存在于 verifiedSet 的会跳过）
 verifyUrlList = (targets, verifyTO, verifiedOut, failedOut, verifiedSet) => {
     newly = []
+    if len(targets) > 0 {
+        logReq(sprintf("并发 HTTP 校验 JS URL（去重后本批最多 %d 条）timeout=%ds 并发=%d", len(targets), verifyTO, verifyConcurrent))
+    }
     lwg = sync.NewSizedWaitGroup(verifyConcurrent)
     lMu = sync.NewMutex()
     for _, ju := range targets {
@@ -420,8 +438,10 @@ verifyUrlList = (targets, verifyTO, verifiedOut, failedOut, verifiedSet) => {
         go func(target) {
             defer lwg.Done()
             try {
+                logReq(sprintf("HTTP GET 验证候选 JS url=%s", target))
                 rsp, _, e = poc.Get(target, poc.timeout(verifyTO))
                 if e != nil {
+                    logErr(sprintf("校验候选 JS 网络错误 url=%s", target), e)
                     lMu.Lock()
                     failedOut.Push({"url": target, "status": 0, "error": sprint(e)})
                     lMu.Unlock()
@@ -435,11 +455,13 @@ verifyUrlList = (targets, verifyTO, verifiedOut, failedOut, verifiedSet) => {
                     newly.Push(target)
                     lMu.Unlock()
                 } else {
+                    logErr(sprintf("校验候选 JS 非 2xx url=%s", target), sprintf("HTTP %v", code))
                     lMu.Lock()
                     failedOut.Push({"url": target, "status": code, "error": sprintf("HTTP %v", code)})
                     lMu.Unlock()
                 }
             } catch ex {
+                logErr(sprintf("校验候选 JS 异常 url=%s", target), ex)
                 lMu.Lock()
                 failedOut.Push({"url": target, "status": 0, "error": sprint(ex)})
                 lMu.Unlock()
@@ -506,10 +528,11 @@ saveVerifiedJsFilesToDir = (urls, destDir, verifyTO, conc) => {
     if destDir == "" || urls == nil || len(urls) == 0 {
         return
     }
+    logReq(sprintf("批量下载已验证 JS 到目录（共 %d 条）dest=%s 并发=%d", len(urls), destDir, conc))
     try {
         file.MkdirAll(destDir)
     } catch emk {
-        log.warn("workdir 创建 JS 目录失败: %v", emk)
+        logErr(sprintf("workdir 创建保存 JS 子目录 path=%s", destDir), emk)
         return
     }
     if conc <= 0 {
@@ -523,8 +546,10 @@ saveVerifiedJsFilesToDir = (urls, destDir, verifyTO, conc) => {
         go func(u, seq) {
             defer wg.Done()
             try {
+                logReq(sprintf("HTTP GET 下载已验证脚本到 workdir url=%s", u))
                 rsp, _, e = poc.Get(u, poc.timeout(verifyTO))
                 if e != nil {
+                    logErr(sprintf("下载已验证 JS 失败 url=%s", u), e)
                     return
                 }
                 code = poc.GetStatusCodeFromResponse(rsp.RawPacket)
@@ -540,6 +565,7 @@ saveVerifiedJsFilesToDir = (urls, destDir, verifyTO, conc) => {
                     file.Save(outP, rawB)
                 }
             } catch exs {
+                logErr(sprintf("保存 JS 文件异常 url=%s", u), exs)
             }
         }(uOne, nseq)
     }
@@ -619,8 +645,10 @@ crawlOpts = append(crawlOpts, crawler.disallowSuffix(
     [".css", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".webp", ".woff", ".woff2", ".ttf", ".eot", ".map", ".mp4", ".pdf"],
 ))
 
+logReq(sprintf("启动站点爬虫 root=%s depth=%d maxUrls=%d（后续为爬虫内部 HTTP 轨迹）", rootUrl, maxDepth, urlsMax))
 reqCh, err := crawler.Start(rootUrl, crawlOpts...)
 if err != nil {
+    logErr("crawler.Start", err)
     die(sprintf("crawler.Start: %v", err))
 }
 
@@ -683,6 +711,8 @@ if len(allChunks) > maxTotalChunks {
     chunkMeta = chunkMeta[:maxTotalChunks]
 }
 
+logReq(sprintf("爬虫阶段结束：处理响应=%d 过滤资源类=%d 送入 AI 的文本块=%d", crawledCount, filteredResources, len(allChunks)))
+
 candidateSeen = {}
 candidateList = []
 candidateMu = sync.NewMutex()
@@ -739,6 +769,7 @@ if !skipAI && len(allChunks) > 0 {
             prompt = buildChunkPrompt(rootUrl, purl, idx, nchunk, ct)
             for in 3 {
                 try {
+                    logAi("HTML 分块提取可加载的 JS URL", sprintf("chunk %d/%d page=%s（识别 script src / modulepreload 等并拼绝对 URL）", idx+1, nchunk, purl))
                     v = ai.FunctionCall(prompt, chunkSchema, aiOpts...)~
                     if validateChunkAI(v) && v["js_urls"] != nil {
                         arr = v["js_urls"]
@@ -746,6 +777,7 @@ if !skipAI && len(allChunks) > 0 {
                         return
                     }
                 } catch e {
+                    logErr(sprintf("AI FunctionCall 提取 JS URL 失败 chunk=%d page=%s", idx, purl), e)
                 }
             }
         }(chText, ci, pu)
@@ -756,12 +788,17 @@ if !skipAI && len(allChunks) > 0 {
 verified = []
 failed = []
 
-vwg = sync.NewSizedWaitGroup(verifyConcurrent)
-vMu = sync.NewMutex()
 verifyTO = verifyTimeoutSec
 if verifyTO <= 0 {
     verifyTO = 15
 }
+
+if len(candidateList) > 0 {
+    logReq(sprintf("首轮并发验证候选 JS URL 共 %d 条 timeout=%ds 并发=%d", len(candidateList), verifyTO, verifyConcurrent))
+}
+
+vwg = sync.NewSizedWaitGroup(verifyConcurrent)
+vMu = sync.NewMutex()
 
 for _, ju := range candidateList {
     u = ju
@@ -769,8 +806,10 @@ for _, ju := range candidateList {
     go func(target) {
         defer vwg.Done()
         try {
+            logReq(sprintf("HTTP GET 首轮验证候选 JS url=%s", target))
             rsp, _, e = poc.Get(target, poc.timeout(verifyTO))
             if e != nil {
+                logErr(sprintf("首轮验证 JS 网络错误 url=%s", target), e)
                 vMu.Lock()
                 failed.Push({"url": target, "status": 0, "error": sprint(e)})
                 vMu.Unlock()
@@ -782,11 +821,13 @@ for _, ju := range candidateList {
                 verified.Push(target)
                 vMu.Unlock()
             } else {
+                logErr(sprintf("首轮验证 JS 非 2xx url=%s", target), sprintf("HTTP %v", code))
                 vMu.Lock()
                 failed.Push({"url": target, "status": code, "error": sprintf("HTTP %v", code)})
                 vMu.Unlock()
             }
         } catch ex {
+            logErr(sprintf("首轮验证 JS 异常 url=%s", target), ex)
             vMu.Lock()
             failed.Push({"url": target, "status": 0, "error": sprint(ex)})
             vMu.Unlock()
@@ -814,6 +855,7 @@ deepAiCalls = 0
 internallyScanned = {}
 deepQueue = []
 if deepJs {
+    logAi("deep-js 递归发现", sprintf("将在已验证的 %d 个脚本内扫描 .js/.mjs 锚点并继续 AI 研判", len(verified)))
     for _, xu := range verified {
         deepQueue.Push(xu)
     }
@@ -823,6 +865,7 @@ for deepJs && deepRoundsRun < deepJsMaxRounds && len(deepQueue) > 0 && deepFiles
     deepRoundsRun++
     thisRound = deepQueue
     deepQueue = []
+    logReq(sprintf("deep-js 第 %d 轮：本批待拉取脚本数=%d", deepRoundsRun, len(thisRound)))
     allJobs = []
     jobsMu = sync.NewMutex()
     fetchWg = sync.NewSizedWaitGroup(deepFetchConcurrent)
@@ -848,16 +891,20 @@ for deepJs && deepRoundsRun < deepJsMaxRounds && len(deepQueue) > 0 && deepFiles
 
             bd = ""
             try {
+                logReq(sprintf("HTTP GET 拉取 JS 正文（deep-js 扫描引用）url=%s", fromURL))
                 rsp2, _, e2 = poc.Get(fromURL, poc.timeout(verifyTO))
                 if e2 != nil {
+                    logErr(sprintf("deep-js 拉取正文失败 url=%s", fromURL), e2)
                     return
                 }
                 c2 = poc.GetStatusCodeFromResponse(rsp2.RawPacket)
                 if c2 < 200 || c2 >= 300 {
+                    logErr(sprintf("deep-js 拉取正文非 2xx url=%s", fromURL), sprintf("HTTP %v", c2))
                     return
                 }
                 bd = string(rsp2.GetBody())
             } catch ex2 {
+                logErr(sprintf("deep-js 拉取正文异常 url=%s", fromURL), ex2)
                 return
             }
             if len(bd) > deepJsMaxBodyBytes {
@@ -865,7 +912,7 @@ for deepJs && deepRoundsRun < deepJsMaxRounds && len(deepQueue) > 0 && deepFiles
             }
             fjobs = extractDeepJsSnippetJobs(bd, fromURL, halfDeepCtx, deepJsAiMaxPerFile)
             if debugDeep {
-                println(sprintf("[deep-js-debug] fromURL=%v snippet_jobs=%v body_len=%v", fromURL, len(fjobs), len(bd)))
+                log.info("[轨迹-deep-js-debug] fromURL=%v snippet_jobs=%v body_len=%v", fromURL, len(fjobs), len(bd))
             }
             jobsMu.Lock()
             for _, fj := range fjobs {
@@ -887,7 +934,7 @@ for deepJs && deepRoundsRun < deepJsMaxRounds && len(deepQueue) > 0 && deepFiles
         dedupJobs.Push(jb)
     }
     if debugDeep {
-        println(sprintf("[deep-js-debug] round=%v jobs_raw=%v jobs_dedup=%v", deepRoundsRun, len(allJobs), len(dedupJobs)))
+        log.info("[轨迹-deep-js-debug] round=%v jobs_raw=%v jobs_dedup=%v", deepRoundsRun, len(allJobs), len(dedupJobs))
     }
     if len(dedupJobs) == 0 {
         break
@@ -936,6 +983,7 @@ for deepJs && deepRoundsRun < deepJsMaxRounds && len(deepQueue) > 0 && deepFiles
                 }
                 resultMu.Unlock()
             } catch exJob {
+                logErr(sprintf("deep-js AI 任务异常 from=%s", sprint(jref["from_url"])), exJob)
             }
         }(jB)
     }
@@ -980,7 +1028,7 @@ if workDirTrim != "" {
         file.SaveJson(jsonOut, report)
         saveVerifiedJsFilesToDir(verified, jsSub, verifyTO, verifyConcurrent)
     } catch ew {
-        log.warn("workdir 输出失败: %v", ew)
+        logErr("workdir 写入结果 JSON 或 artifacts", ew)
     }
 }
 
@@ -988,7 +1036,7 @@ if outputPath != "" {
     try {
         file.SaveJson(outputPath, report)
     } catch e2 {
-        log.warn("save output: %v", e2)
+        logErr(sprintf("写入 --output 路径 path=%s", outputPath), e2)
     }
 }
 
