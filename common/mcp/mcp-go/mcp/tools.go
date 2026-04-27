@@ -447,6 +447,12 @@ func WithAnyOfStruct(name string, opts []PropertyOption, itemsOpt ...[]ToolOptio
 }
 
 func WithPaging(name string, fieldNames []string, opts ...PropertyOption) ToolOption {
+	orderBySchema := map[string]any{
+		"type": "string",
+	}
+	if len(fieldNames) > 0 {
+		orderBySchema["enum"] = fieldNames
+	}
 	schema := map[string]any{
 		"type": "object",
 		"properties": map[string]any{
@@ -460,10 +466,7 @@ func WithPaging(name string, fieldNames []string, opts ...PropertyOption) ToolOp
 				"type": "string",
 				"enum": []string{"asc", "desc"},
 			},
-			"orderby": map[string]any{
-				"type": "string",
-				"enum": fieldNames,
-			},
+			"orderby": orderBySchema,
 		},
 	}
 	return WithRaw(name, schema, opts...)

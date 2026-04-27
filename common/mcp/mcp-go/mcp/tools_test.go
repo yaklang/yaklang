@@ -270,3 +270,57 @@ func TestWithPagingSchema(t *testing.T) {
 	require.True(t, ok, "orderby enum should be array")
 	require.ElementsMatch(t, []any{"id", "created_at", "updated_at"}, orderByEnum)
 }
+
+func TestWithPagingSchema_NilFieldNamesOmitsEnum(t *testing.T) {
+	tool := NewTool("query_test",
+		WithPaging("pagination", nil),
+	)
+
+	raw, err := json.Marshal(tool.InputSchema)
+	require.NoError(t, err)
+	require.NotContains(t, string(raw), `"enum":null`)
+
+	var parsed map[string]any
+	require.NoError(t, json.Unmarshal(raw, &parsed))
+
+	rootProperties, ok := parsed["properties"].(map[string]any)
+	require.True(t, ok, "root properties should be object")
+
+	paginationSchema, ok := rootProperties["pagination"].(map[string]any)
+	require.True(t, ok, "pagination should be object schema")
+
+	paginationProperties, ok := paginationSchema["properties"].(map[string]any)
+	require.True(t, ok, "pagination.properties should be object")
+
+	orderBySchema, ok := paginationProperties["orderby"].(map[string]any)
+	require.True(t, ok, "orderby should be object schema")
+	_, hasOrderByEnum := orderBySchema["enum"]
+	require.False(t, hasOrderByEnum, "orderby.enum should be omitted when fieldNames is nil")
+}
+
+func TestWithPagingSchema_EmptyFieldNamesOmitsEnum(t *testing.T) {
+	tool := NewTool("query_test",
+		WithPaging("pagination", []string{}),
+	)
+
+	raw, err := json.Marshal(tool.InputSchema)
+	require.NoError(t, err)
+	require.NotContains(t, string(raw), `"enum":null`)
+
+	var parsed map[string]any
+	require.NoError(t, json.Unmarshal(raw, &parsed))
+
+	rootProperties, ok := parsed["properties"].(map[string]any)
+	require.True(t, ok, "root properties should be object")
+
+	paginationSchema, ok := rootProperties["pagination"].(map[string]any)
+	require.True(t, ok, "pagination should be object schema")
+
+	paginationProperties, ok := paginationSchema["properties"].(map[string]any)
+	require.True(t, ok, "pagination.properties should be object")
+
+	orderBySchema, ok := paginationProperties["orderby"].(map[string]any)
+	require.True(t, ok, "orderby should be object schema")
+	_, hasOrderByEnum := orderBySchema["enum"]
+	require.False(t, hasOrderByEnum, "orderby.enum should be omitted when fieldNames is empty")
+}
