@@ -829,7 +829,7 @@
                             <span style="font-weight: bold; color: #ef6c00;">热门模型 RPM</span>
                             <small style="color: #888; margin-left: 8px;">
                                 最近 <strong id="rl-model-window">60</strong> 秒内跨 API Key 聚合，仅展示
-                                ≥ <strong id="rl-model-min-rpm">20</strong> RPM 的模型（用于辅助 RPM 上限设置）
+                                ≥ <strong id="rl-model-min-rpm">3</strong> RPM 的模型（用于辅助限流上限设置）
                             </small>
                         </div>
                         <div style="display: flex; gap: 8px; align-items: center;">
@@ -875,7 +875,7 @@
 
                 <!-- Free user delay -->
                 <div style="margin-bottom: 20px;">
-                    <h4 style="margin-bottom: 10px;">免费用户冷却延迟</h4>
+                    <h4 style="margin-bottom: 10px;">免费用户调用前延迟</h4>
                     <div style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
                         <div class="form-group" style="margin-bottom: 0; flex: 0 0 200px;">
                             <label>延迟基础值 (秒):</label>
@@ -883,16 +883,17 @@
                         </div>
                     </div>
                     <small style="color: #888; margin-top: 8px; display: block;">
-                        免费用户每次请求结束后，服务端会 sleep N~2N 秒（N 为配置值）。设为 0 则不延迟。
-                        <br>Sleep 期间不占用并发容量，会及时释放给其他 API Key 使用。
+                        免费用户每次请求<strong>转发到上游之前</strong>，服务端会 sleep N~2N 秒（N 为配置值）。设为 0 则不延迟。
+                        <br>调用前延迟可有效降低客户端的实际请求频率（客户端会被强制等待）。
                     </small>
                 </div>
 
-                <!-- Model RPM overrides -->
+                <!-- Model rate-limit overrides (RPM + free-user delay) -->
                 <div style="margin-bottom: 20px;">
-                    <h4 style="margin-bottom: 10px;">模型级 RPM 覆盖</h4>
+                    <h4 style="margin-bottom: 10px;">模型级限流覆盖</h4>
                     <small style="color: #888; margin-bottom: 10px; display: block;">
-                        为特定模型单独配置 RPM 限制，优先级高于全局默认值。留空则使用全局默认。
+                        为特定模型单独配置 RPM 上限和免费用户调用前延迟，优先级高于全局默认值。
+                        <br>RPM 留空使用全局默认；延迟留空使用全局默认（明确填 0 表示对该模型不延迟）。
                         <br><strong style="color: #d84315;">模型名称请填写对外名称（如 memfit-standard-free），而非转发后的内部名称。</strong>
                     </small>
                     <div id="rl-model-overrides-list" style="margin-bottom: 10px;">

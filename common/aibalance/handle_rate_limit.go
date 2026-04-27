@@ -12,10 +12,10 @@ import (
 )
 
 // defaultModelStatsMinRPM is the default minimum RPM threshold used by the
-// "hot models" stats endpoint when the caller does not override it. It
-// matches the UI copy ("only show models with >= 20 RPM") so administrators
-// can focus on models actually worth tuning.
-const defaultModelStatsMinRPM int64 = 20
+// "hot models" stats endpoint when the caller does not override it. The
+// previous value of 20 was too high to surface most tuning candidates, so
+// the threshold was lowered to 3 to expose anything beyond trivial traffic.
+const defaultModelStatsMinRPM int64 = 3
 
 // handleGetRateLimitConfig returns the global rate-limit configuration.
 func (c *ServerConfig) handleGetRateLimitConfig(conn net.Conn, request *http.Request) {
@@ -41,12 +41,21 @@ func (c *ServerConfig) handleGetRateLimitConfig(conn net.Conn, request *http.Req
 		modelOverrides = make(map[string]int64)
 	}
 
+	var modelDelayOverrides map[string]int64
+	if config.ModelDelayOverrides != "" {
+		json.Unmarshal([]byte(config.ModelDelayOverrides), &modelDelayOverrides)
+	}
+	if modelDelayOverrides == nil {
+		modelDelayOverrides = make(map[string]int64)
+	}
+
 	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
 		"success": true,
 		"config": map[string]interface{}{
-			"default_rpm":         config.DefaultRPM,
-			"free_user_delay_sec": config.FreeUserDelaySec,
-			"model_rpm_overrides": modelOverrides,
+			"default_rpm":           config.DefaultRPM,
+			"free_user_delay_sec":   config.FreeUserDelaySec,
+			"model_rpm_overrides":   modelOverrides,
+			"model_delay_overrides": modelDelayOverrides,
 		},
 	})
 }
@@ -69,9 +78,10 @@ func (c *ServerConfig) handleSetRateLimitConfig(conn net.Conn, request *http.Req
 	defer request.Body.Close()
 
 	var reqBody struct {
-		DefaultRPM        *int64            `json:"default_rpm,omitempty"`
-		FreeUserDelaySec  *int64            `json:"free_user_delay_sec,omitempty"`
-		ModelRPMOverrides map[string]int64  `json:"model_rpm_overrides,omitempty"`
+		DefaultRPM          *int64           `json:"default_rpm,omitempty"`
+		FreeUserDelaySec    *int64           `json:"free_user_delay_sec,omitempty"`
+		ModelRPMOverrides   map[string]int64 `json:"model_rpm_overrides,omitempty"`
+		ModelDelayOverrides map[string]int64 `json:"model_delay_overrides,omitempty"`
 	}
 	if err := json.Unmarshal(bodyBytes, &reqBody); err != nil {
 		c.logError("failed to parse request body: %v", err)
@@ -95,6 +105,10 @@ func (c *ServerConfig) handleSetRateLimitConfig(conn net.Conn, request *http.Req
 	if reqBody.ModelRPMOverrides != nil {
 		overridesJSON, _ := json.Marshal(reqBody.ModelRPMOverrides)
 		config.ModelRPMOverrides = string(overridesJSON)
+	}
+	if reqBody.ModelDelayOverrides != nil {
+		delayJSON, _ := json.Marshal(reqBody.ModelDelayOverrides)
+		config.ModelDelayOverrides = string(delayJSON)
 	}
 
 	if err := SaveRateLimitConfig(config); err != nil {
@@ -186,6 +200,18 @@ func (c *ServerConfig) applyRateLimitConfig(cfg *schema.AiBalanceRateLimitConfig
 					model = strings.TrimSpace(model)
 					if model != "" && rpm > 0 {
 						c.chatRateLimiter.SetModelRPM(model, rpm)
+					}
+				}
+			}
+		}
+		c.chatRateLimiter.ClearModelDelay()
+		if cfg.ModelDelayOverrides != "" {
+			var delayOverrides map[string]int64
+			if err := json.Unmarshal([]byte(cfg.ModelDelayOverrides), &delayOverrides); err == nil {
+				for model, delay := range delayOverrides {
+					model = strings.TrimSpace(model)
+					if model != "" && delay >= 0 {
+						c.chatRateLimiter.SetModelDelay(model, delay)
 					}
 				}
 			}

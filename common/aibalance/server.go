@@ -695,6 +695,20 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 		}
 	}
 
+	// Free user pre-call delay: applied BEFORE forwarding to providers so
+	// the client perceives the throttle (post-call sleep was ineffective
+	// because the response had already been delivered). Per-model delay
+	// overrides win over the global free-user delay.
+	if isFreeModel && c.chatRateLimiter != nil {
+		delaySec := c.chatRateLimiter.GetEffectiveDelay(modelName, c.freeUserDelaySec)
+		if delaySec > 0 {
+			base := delaySec
+			jitter := time.Duration(base+(time.Now().UnixNano()%base+base)%base) * time.Second
+			c.logInfo("free user pre-call delay: sleeping %v before forwarding model %s", jitter, modelName)
+			time.Sleep(jitter)
+		}
+	}
+
 	var prompt bytes.Buffer
 	var imageContent []*aispec.ChatContent
 	for _, message := range bodyIns.Messages {
@@ -1072,16 +1086,6 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 		runtime.ReadMemStats(&ms)
 		log.Warnf("[REQUEST_SUCCESS] model=%s provider=%s bytes=%d duration=%v goroutines=%d heap_mb=%d",
 			modelName, successfulProvider.TypeName, total, endDuration, runtime.NumGoroutine(), ms.HeapAlloc/1024/1024)
-
-		// Free user cooldown: release concurrent capacity first, then sleep
-		// so other API keys are not blocked during the cooldown period.
-		if isFreeModel && c.freeUserDelaySec > 0 {
-			releaseConcurrent()
-			base := c.freeUserDelaySec
-			jitter := time.Duration(base+int64(time.Now().UnixNano()%base)) * time.Second
-			c.logInfo("free user cooldown: sleeping %v for model %s (concurrent slot released)", jitter, modelName)
-			time.Sleep(jitter)
-		}
 
 		break // 成功处理，退出循环
 	}

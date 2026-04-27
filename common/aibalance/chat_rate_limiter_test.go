@@ -231,6 +231,51 @@ func TestChatRateLimiter_SetModelRPM_ZeroRemoves(t *testing.T) {
 	assert.Equal(t, rl.defaultRPM.Load(), rl.getEffectiveRPM("model-x"), "zero RPM should remove override")
 }
 
+// ==================== ChatRateLimiter Model Delay Override ====================
+
+// TestChatRateLimiter_ModelDelayOverride verifies that per-model delay
+// overrides take precedence over the global free-user delay fallback,
+// while models without an override still see the fallback.
+func TestChatRateLimiter_ModelDelayOverride(t *testing.T) {
+	rl := NewChatRateLimiter()
+	defer rl.Stop()
+
+	const fallback int64 = 5
+
+	assert.Equal(t, fallback, rl.GetEffectiveDelay("any-model", fallback),
+		"without override the fallback should be returned")
+
+	rl.SetModelDelay("slow-free", 30)
+	assert.Equal(t, int64(30), rl.GetEffectiveDelay("slow-free", fallback),
+		"override should win over fallback")
+
+	rl.SetModelDelay("fast-free", 0)
+	assert.Equal(t, int64(0), rl.GetEffectiveDelay("fast-free", fallback),
+		"explicit 0 override means no delay (overrides fallback)")
+
+	rl.SetModelDelay("slow-free", -1)
+	assert.Equal(t, fallback, rl.GetEffectiveDelay("slow-free", fallback),
+		"negative value should remove override")
+}
+
+// TestChatRateLimiter_ClearModelDelay verifies that ClearModelDelay wipes
+// every per-model delay override.
+func TestChatRateLimiter_ClearModelDelay(t *testing.T) {
+	rl := NewChatRateLimiter()
+	defer rl.Stop()
+
+	rl.SetModelDelay("a-free", 10)
+	rl.SetModelDelay("b-free", 20)
+	assert.Equal(t, int64(10), rl.GetEffectiveDelay("a-free", 1))
+	assert.Equal(t, int64(20), rl.GetEffectiveDelay("b-free", 1))
+
+	rl.ClearModelDelay()
+	assert.Equal(t, int64(1), rl.GetEffectiveDelay("a-free", 1),
+		"after clear, fallback should be returned")
+	assert.Equal(t, int64(1), rl.GetEffectiveDelay("b-free", 1),
+		"after clear, fallback should be returned")
+}
+
 // ==================== Integration: ChatRateLimiter + ServerConfig ====================
 
 func TestServerConfig_ChatRateLimiterInitialized(t *testing.T) {
