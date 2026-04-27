@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"sync"
 	"testing"
@@ -555,5 +556,59 @@ func TestSSEServer(t *testing.T) {
 		if !strings.Contains(response.Error.Message, "legacy SSE transport") {
 			t.Fatalf("Expected legacy SSE rejection, got %q", response.Error.Message)
 		}
+	})
+
+	t.Run("SendEvent concurrent with SSE disconnect does not panic", func(t *testing.T) {
+		mcpServer := NewMCPServer("test", "1.0.0", WithResourceCapabilities(true, true))
+		sseServer := &SSEServer{
+			server:       mcpServer,
+			dispatchDone: make(chan struct{}),
+		}
+		sseServer.startNotificationDispatcher()
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.URL.Path {
+			case "/sse":
+				sseServer.handleSSE(w, r)
+			case "/message":
+				sseServer.handleMessage(w, r)
+			default:
+				http.NotFound(w, r)
+			}
+		}))
+		defer ts.Close()
+		sseServer.baseURL = ts.URL
+
+		sseResp, messageURL := openSSESession(t, ts)
+		u, err := url.Parse(messageURL)
+		if err != nil {
+			t.Fatalf("parse message url: %v", err)
+		}
+		sessionID := u.Query().Get("sessionId")
+		if sessionID == "" {
+			t.Fatal("missing sessionId in message url")
+		}
+
+		stop := make(chan struct{})
+		var wg sync.WaitGroup
+		for i := 0; i < 8; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				for {
+					select {
+					case <-stop:
+						return
+					default:
+						_ = sseServer.SendEventToSession(sessionID, map[string]string{"k": "v"})
+					}
+				}
+			}()
+		}
+
+		time.Sleep(20 * time.Millisecond)
+		_ = sseResp.Body.Close()
+		time.Sleep(150 * time.Millisecond)
+		close(stop)
+		wg.Wait()
 	})
 }

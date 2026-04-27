@@ -28,6 +28,7 @@ type SSEServer struct {
 
 // sseSession represents an active SSE connection.
 type sseSession struct {
+	mu        sync.Mutex
 	writer    http.ResponseWriter
 	flusher   http.Flusher
 	closeOnce sync.Once
@@ -48,8 +49,33 @@ var allowedMessageOriginLocalHosts = map[string]struct{}{
 
 func (s *sseSession) Close() {
 	s.closeOnce.Do(func() {
+		s.mu.Lock()
+		defer s.mu.Unlock()
 		close(s.done)
 	})
+}
+
+func (sess *sseSession) writeMessageEvent(eventData []byte) (err error) {
+	sess.mu.Lock()
+	defer sess.mu.Unlock()
+
+	select {
+	case <-sess.done:
+		return fmt.Errorf("session closed")
+	default:
+	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("sse write: %v", r)
+		}
+	}()
+	_, werr := fmt.Fprintf(sess.writer, "event: message\ndata: %s\n\n", eventData)
+	if werr != nil {
+		return werr
+	}
+	sess.flusher.Flush()
+	return nil
 }
 
 // NewSSEServer creates a new SSE server instance with the given MCP server and base URL.
@@ -188,9 +214,6 @@ func (s *SSEServer) handleSSE(w http.ResponseWriter, r *http.Request) {
 		closeOnce: sync.Once{},
 	}
 
-	s.sessions.Store(sessionID, session)
-	defer s.sessions.Delete(sessionID)
-
 	messageEndpoint := fmt.Sprintf(
 		"%s/message?sessionId=%s",
 		s.baseURL,
@@ -198,6 +221,9 @@ func (s *SSEServer) handleSSE(w http.ResponseWriter, r *http.Request) {
 	)
 	fmt.Fprintf(w, "event: endpoint\ndata: %s\r\n\r\n", messageEndpoint)
 	flusher.Flush()
+
+	s.sessions.Store(sessionID, session)
+	defer s.sessions.Delete(sessionID)
 
 	<-r.Context().Done()
 	session.Close()
@@ -261,8 +287,7 @@ func (s *SSEServer) handleMessage(w http.ResponseWriter, r *http.Request) {
 	// Only send response if there is one (not for notifications)
 	if response != nil {
 		eventData, _ := json.Marshal(response)
-		fmt.Fprintf(session.writer, "event: message\ndata: %s\n\n", eventData)
-		session.flusher.Flush()
+		_ = session.writeMessageEvent(eventData)
 
 		// Send HTTP response
 		w.Header().Set("Content-Type", "application/json")
@@ -360,12 +385,5 @@ func (s *SSEServer) SendEventToSession(
 		return err
 	}
 
-	select {
-	case <-session.done:
-		return fmt.Errorf("session closed")
-	default:
-		fmt.Fprintf(session.writer, "event: message\ndata: %s\n\n", eventData)
-		session.flusher.Flush()
-		return nil
-	}
+	return session.writeMessageEvent(eventData)
 }
