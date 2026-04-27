@@ -23,9 +23,10 @@ func GetRateLimitConfig() (*schema.AiBalanceRateLimitConfig, error) {
 			return nil, fmt.Errorf("failed to query rate limit config: %v", err)
 		}
 		config = schema.AiBalanceRateLimitConfig{
-			DefaultRPM:        600,
-			FreeUserDelaySec:  3,
-			ModelRPMOverrides: "{}",
+			DefaultRPM:          600,
+			FreeUserDelaySec:    3,
+			ModelRPMOverrides:   "{}",
+			ModelDelayOverrides: "{}",
 		}
 		config.ID = 1
 		if createErr := db.Create(&config).Error; createErr != nil {

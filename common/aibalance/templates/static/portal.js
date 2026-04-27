@@ -5742,7 +5742,7 @@ curl '${metaApiUrl}?name=${modelName}'`;
                     if (rpmInput) rpmInput.value = cfg.default_rpm || 600;
                     const delayInput = document.getElementById('rl-free-user-delay');
                     if (delayInput) delayInput.value = cfg.free_user_delay_sec || 0;
-                    renderModelRPMOverrides(cfg.model_rpm_overrides || {});
+                    renderModelRPMOverrides(cfg.model_rpm_overrides || {}, cfg.model_delay_overrides || {});
                 }
             } catch (error) {
                 console.error('Error loading rate limit config:', error);
@@ -5752,7 +5752,7 @@ curl '${metaApiUrl}?name=${modelName}'`;
         async function saveRateLimitConfig() {
             const defaultRPM = parseInt(document.getElementById('rl-default-rpm').value) || 600;
             const freeDelay = parseInt(document.getElementById('rl-free-user-delay').value) || 0;
-            const overrides = collectModelRPMOverrides();
+            const collected = collectModelRPMOverrides();
 
             try {
                 const response = await fetch('/portal/api/rate-limit-config', {
@@ -5761,7 +5761,8 @@ curl '${metaApiUrl}?name=${modelName}'`;
                     body: JSON.stringify({
                         default_rpm: defaultRPM,
                         free_user_delay_sec: freeDelay,
-                        model_rpm_overrides: overrides
+                        model_rpm_overrides: collected.rpm,
+                        model_delay_overrides: collected.delay
                     })
                 });
                 const data = await response.json();
@@ -5803,7 +5804,7 @@ curl '${metaApiUrl}?name=${modelName}'`;
         // when other init paths reach these functions before the declaration
         // line is executed, e.g. via cached page state).
         var rateLimitModelStatsTimer = null;
-        function getRateLimitModelMinRPM() { return 20; }
+        function getRateLimitModelMinRPM() { return 3; }
 
         async function loadRateLimitModelStats() {
             const tbody = document.getElementById('rl-model-stats-tbody');
@@ -5883,27 +5884,38 @@ curl '${metaApiUrl}?name=${modelName}'`;
             }
         }
 
-        function renderModelRPMOverrides(overrides) {
+        function renderModelRPMOverrides(rpmOverrides, delayOverrides) {
             const container = document.getElementById('rl-model-overrides-list');
             if (!container) return;
             container.innerHTML = '';
-            const entries = Object.entries(overrides);
-            if (entries.length === 0) {
+            rpmOverrides = rpmOverrides || {};
+            delayOverrides = delayOverrides || {};
+            const modelSet = new Set([
+                ...Object.keys(rpmOverrides),
+                ...Object.keys(delayOverrides)
+            ]);
+            if (modelSet.size === 0) {
                 container.innerHTML = '<p style="color: #999; font-size: 13px;">暂无模型级覆盖配置。</p>';
                 return;
             }
-            entries.forEach(([model, rpm], idx) => {
-                appendModelRPMRow(container, model, rpm, idx);
+            Array.from(modelSet).sort().forEach((model, idx) => {
+                const rpm = rpmOverrides[model];
+                const hasDelay = Object.prototype.hasOwnProperty.call(delayOverrides, model);
+                const delay = hasDelay ? delayOverrides[model] : '';
+                appendModelRPMRow(container, model, rpm, delay, idx);
             });
         }
 
-        function appendModelRPMRow(container, model, rpm, idx) {
+        function appendModelRPMRow(container, model, rpm, delay, idx) {
             const row = document.createElement('div');
             row.style.cssText = 'display: flex; gap: 10px; align-items: center; margin-bottom: 8px;';
             row.className = 'rl-model-row';
+            const rpmVal = (rpm === undefined || rpm === null || rpm === '') ? '' : rpm;
+            const delayVal = (delay === undefined || delay === null || delay === '') ? '' : delay;
             row.innerHTML = `
-                <input type="text" class="form-control rl-model-name" value="${model || ''}" placeholder="模型名称" style="flex: 1; font-family: monospace; font-size: 13px; padding: 6px 10px;">
-                <input type="number" class="form-control rl-model-rpm" value="${rpm || ''}" placeholder="RPM" min="1" style="width: 120px; font-family: monospace; font-size: 13px; padding: 6px 10px;">
+                <input type="text" class="form-control rl-model-name" value="${model || ''}" placeholder="模型名称（对外）" style="flex: 1; font-family: monospace; font-size: 13px; padding: 6px 10px;">
+                <input type="number" class="form-control rl-model-rpm" value="${rpmVal}" placeholder="RPM" min="1" title="模型 RPM 上限（留空使用全局默认）" style="width: 110px; font-family: monospace; font-size: 13px; padding: 6px 10px;">
+                <input type="number" class="form-control rl-model-delay" value="${delayVal}" placeholder="免费延迟(秒)" min="0" title="免费用户调用前延迟基础值（秒），实际为 N~2N 随机；留空使用全局默认；填 0 表示该模型不延迟" style="width: 130px; font-family: monospace; font-size: 13px; padding: 6px 10px;">
                 <button class="btn btn-danger" onclick="this.parentElement.remove()" style="height: 32px; font-size: 12px; padding: 4px 10px;">删除</button>
             `;
             container.appendChild(row);
@@ -5914,19 +5926,27 @@ curl '${metaApiUrl}?name=${modelName}'`;
             if (!container) return;
             const placeholder = container.querySelector('p');
             if (placeholder) placeholder.remove();
-            appendModelRPMRow(container, '', '', container.children.length);
+            appendModelRPMRow(container, '', '', '', container.children.length);
         }
 
         function collectModelRPMOverrides() {
-            const overrides = {};
+            const rpm = {};
+            const delay = {};
             document.querySelectorAll('.rl-model-row').forEach(row => {
                 const name = row.querySelector('.rl-model-name').value.trim();
-                const rpm = parseInt(row.querySelector('.rl-model-rpm').value);
-                if (name && rpm > 0) {
-                    overrides[name] = rpm;
+                if (!name) return;
+                const rpmRaw = row.querySelector('.rl-model-rpm').value;
+                const delayRaw = row.querySelector('.rl-model-delay').value;
+                const rpmVal = parseInt(rpmRaw);
+                if (rpmRaw !== '' && !isNaN(rpmVal) && rpmVal > 0) {
+                    rpm[name] = rpmVal;
+                }
+                const delayVal = parseInt(delayRaw);
+                if (delayRaw !== '' && !isNaN(delayVal) && delayVal >= 0) {
+                    delay[name] = delayVal;
                 }
             });
-            return overrides;
+            return { rpm: rpm, delay: delay };
         }
 
         // Rate Limit exports
