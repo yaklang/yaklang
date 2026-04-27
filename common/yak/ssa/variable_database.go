@@ -6,9 +6,9 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
-func GetVariableFromDB(id int64, name string, programName ...string) *Variable {
+func GetVariableFromDB(id int64, name string, programName string) *Variable {
 	v := NewVariable(0, name, false, nil).(*Variable)
-	offset := ssadb.GetOffsetByVariable(name, id, programName...)
+	offset := ssadb.GetOffsetByVariable(name, id, programName)
 	for _, o := range offset {
 		editor, start, end, err := o.GetStartAndEndPositions()
 		if err != nil {
