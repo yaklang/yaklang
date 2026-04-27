@@ -129,7 +129,9 @@ const (
 
 	EVENT_TYPE_YAKIT_EXEC_RESULT                  = "yak_exec_result" // yakit exec result event, used to emit the yakit exec result information
 	EVENT_TYPE_YAKIT_RISK                         = "yak_risk"        // yakit risk event, used to emit the yakit risk information
-	EVENT_TYPE_YAKIT_HTTPFLOW                     = "yak_httpflow"    // yakit httpflow event, used to emit saved httpflow identity information
+	EVENT_TYPE_YAKIT_RISK_COUNT                   = "yak_risk_count"
+	EVENT_TYPE_YAKIT_HTTPFLOW                     = "yak_httpflow" // yakit httpflow event, used to emit saved httpflow identity information
+	EVENT_TYPE_YAKIT_HTTPFLOW_COUNT               = "yak_httpflow_count"
 	EVENT_TYPE_HTTP_FUZZ_REQUEST_CHANGE EventType = "http_fuzz_request_change"
 
 	// AI 推理过程通用事件类型

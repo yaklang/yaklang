@@ -252,11 +252,25 @@ func (r *Emitter) EmitSyncEventError(id string, err error, syncID string) (*sche
 	}, syncID)
 }
 
+func (r *Emitter) EmitYakitRiskCount(runtimeID string, count int) (*schema.AiOutputEvent, error) {
+	return r.EmitJSON(schema.EVENT_TYPE_YAKIT_RISK_COUNT, "yakit", map[string]any{
+		"runtime_id": runtimeID,
+		"risk_count": count,
+	})
+}
+
 func (r *Emitter) EmitYakitRisk(id uint, title string, runtimeID string) (*schema.AiOutputEvent, error) {
 	return r.EmitJSON(schema.EVENT_TYPE_YAKIT_RISK, "yakit", map[string]any{
 		"risk_id":    id,
 		"title":      title,
 		"runtime_id": runtimeID,
+	})
+}
+
+func (r *Emitter) EmitYakitHTTPFlowCount(runtimeID string, count int) (*schema.AiOutputEvent, error) {
+	return r.EmitJSON(schema.EVENT_TYPE_YAKIT_HTTPFLOW_COUNT, "yakit", map[string]any{
+		"runtime_id":      runtimeID,
+		"http_flow_count": count,
 	})
 }
 

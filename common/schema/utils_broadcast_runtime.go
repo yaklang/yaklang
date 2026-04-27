@@ -11,6 +11,11 @@ import (
 
 var runtimeScopedBroadcastThrottleInterval = 1.0
 
+var (
+	RuntimeScopedBroadcastTypeHTTPFlow = "httpflow"
+	RuntimeScopedBroadcastTypeRisk     = "risk"
+)
+
 type RuntimeScopedBroadcastEvent struct {
 	Type      string `json:"type"`
 	RuntimeID string `json:"runtime_id"`
@@ -26,10 +31,9 @@ type runtimeScopedBroadcastCenter struct {
 }
 
 type runtimeScopedBroadcastRoute struct {
-	key        string
-	typeString string
-	runtimeID  string
-	center     *runtimeScopedBroadcastCenter
+	key       string
+	runtimeID string
+	center    *runtimeScopedBroadcastCenter
 
 	mu           sync.Mutex
 	subscribers  map[uint64]func(*RuntimeScopedBroadcastEvent)
@@ -44,24 +48,24 @@ func newRuntimeScopedBroadcastCenter() *runtimeScopedBroadcastCenter {
 	}
 }
 
-func runtimeScopedBroadcastKey(typeString, runtimeID string) string {
-	return typeString + "\x00" + runtimeID
+func runtimeScopedBroadcastKey(runtimeID string) string {
+	return runtimeID
 }
 
-func SubscribeRuntimeScopedBroadcast(typeString, runtimeID string, handler func(*RuntimeScopedBroadcastEvent)) func() {
-	return runtimeBroadcastData.Subscribe(typeString, runtimeID, handler)
+func SubscribeRuntimeScopedBroadcast(runtimeID string, handler func(*RuntimeScopedBroadcastEvent)) func() {
+	return runtimeBroadcastData.Subscribe(runtimeID, handler)
 }
 
 func PublishRuntimeScopedBroadcast(typeString, runtimeID, action string, ids ...uint) {
 	runtimeBroadcastData.Publish(typeString, runtimeID, action, ids...)
 }
 
-func (c *runtimeScopedBroadcastCenter) Subscribe(typeString, runtimeID string, handler func(*RuntimeScopedBroadcastEvent)) func() {
-	if c == nil || typeString == "" || runtimeID == "" || handler == nil {
+func (c *runtimeScopedBroadcastCenter) Subscribe(runtimeID string, handler func(*RuntimeScopedBroadcastEvent)) func() {
+	if c == nil || runtimeID == "" || handler == nil {
 		return func() {}
 	}
 
-	route := c.getOrCreateRoute(typeString, runtimeID)
+	route := c.getOrCreateRoute(runtimeID)
 	subscriberID := atomic.AddUint64(&c.subscriberSeq, 1)
 
 	route.mu.Lock()
@@ -78,7 +82,7 @@ func (c *runtimeScopedBroadcastCenter) Publish(typeString, runtimeID, action str
 		return
 	}
 
-	route := c.getRoute(typeString, runtimeID)
+	route := c.getRoute(runtimeID)
 	if route == nil {
 		return
 	}
@@ -102,8 +106,8 @@ func (c *runtimeScopedBroadcastCenter) Publish(typeString, runtimeID, action str
 	}
 }
 
-func (c *runtimeScopedBroadcastCenter) getRoute(typeString, runtimeID string) *runtimeScopedBroadcastRoute {
-	key := runtimeScopedBroadcastKey(typeString, runtimeID)
+func (c *runtimeScopedBroadcastCenter) getRoute(runtimeID string) *runtimeScopedBroadcastRoute {
+	key := runtimeScopedBroadcastKey(runtimeID)
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -111,8 +115,8 @@ func (c *runtimeScopedBroadcastCenter) getRoute(typeString, runtimeID string) *r
 	return c.routes[key]
 }
 
-func (c *runtimeScopedBroadcastCenter) getOrCreateRoute(typeString, runtimeID string) *runtimeScopedBroadcastRoute {
-	key := runtimeScopedBroadcastKey(typeString, runtimeID)
+func (c *runtimeScopedBroadcastCenter) getOrCreateRoute(runtimeID string) *runtimeScopedBroadcastRoute {
+	key := runtimeScopedBroadcastKey(runtimeID)
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -123,7 +127,6 @@ func (c *runtimeScopedBroadcastCenter) getOrCreateRoute(typeString, runtimeID st
 
 	route := &runtimeScopedBroadcastRoute{
 		key:          key,
-		typeString:   typeString,
 		runtimeID:    runtimeID,
 		center:       c,
 		subscribers:  make(map[uint64]func(*RuntimeScopedBroadcastEvent)),

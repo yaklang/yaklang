@@ -228,18 +228,18 @@ func (f *HTTPFlow) fixURL() {
 
 func (f *HTTPFlow) AfterCreate(tx *gorm.DB) (err error) {
 	broadcastData.Call("httpflow", "create")
-	PublishRuntimeScopedBroadcast("httpflow", f.RuntimeId, "create", f.ID)
+	PublishRuntimeScopedBroadcast(RuntimeScopedBroadcastTypeHTTPFlow, f.RuntimeId, "create", f.ID)
 	return nil
 }
 
 func (f *HTTPFlow) AfterUpdate(tx *gorm.DB) (err error) {
 	broadcastData.Call("httpflow", "update")
-	PublishRuntimeScopedBroadcast("httpflow", f.RuntimeId, "update", f.ID)
+	PublishRuntimeScopedBroadcast(RuntimeScopedBroadcastTypeHTTPFlow, f.RuntimeId, "update", f.ID)
 	return nil
 }
 
 func (f *HTTPFlow) AfterDelete(tx *gorm.DB) (err error) {
 	broadcastData.Call("httpflow", "delete")
-	PublishRuntimeScopedBroadcast("httpflow", f.RuntimeId, "delete", f.ID)
+	PublishRuntimeScopedBroadcast(RuntimeScopedBroadcastTypeHTTPFlow, f.RuntimeId, "delete", f.ID)
 	return nil
 }

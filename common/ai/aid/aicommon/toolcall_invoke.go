@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/consts"
 	"io"
 	"sync"
 	"time"
@@ -250,6 +251,35 @@ func (a *ToolCaller) invoke(
 		}()
 		<-intervalStart
 	}
+
+	refreshHTTPFlowCount := func() {
+		count := yakit.CountHTTPFlowByRuntimeID(consts.GetGormProjectDatabase(), a.callToolId)
+		if count > 0 {
+			e.EmitYakitHTTPFlowCount(a.callToolId, count)
+		}
+	}
+
+	refreshRiskCount := func() {
+		count, _ := yakit.CountRiskByRuntimeId(consts.GetGormProjectDatabase(), a.callToolId)
+		if count > 0 {
+			e.EmitYakitRiskCount(a.callToolId, count)
+		}
+	}
+
+	unsubscribe := schema.SubscribeRuntimeScopedBroadcast(a.callToolId, func(event *schema.RuntimeScopedBroadcastEvent) {
+		if event.Type == schema.RuntimeScopedBroadcastTypeHTTPFlow {
+			refreshHTTPFlowCount()
+		}
+
+		if event.Type == schema.RuntimeScopedBroadcastTypeRisk {
+			refreshRiskCount()
+		}
+	})
+	defer func() {
+		unsubscribe()
+		refreshHTTPFlowCount()
+		refreshRiskCount()
+	}()
 
 	execResult, execErr := tool.InvokeWithParams(
 		params,
