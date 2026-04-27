@@ -1,8 +1,8 @@
-﻿package ssaapi
+package ssaapi
 
 // 本文件用 SyntaxFlow 覆盖以下 native call（与 sf_native_call 常量名对应）：
 //   getCfg, cfgGuards, cfgDominates, cfgPostDominates, cfgReachable, cfgReachPath,
-//   cfgCondition, cfgConditionValues, cfgBlock, cfgInst
+//   cfgCondition, cfgConditionValues, cfgBlock, cfgInst, reachabilityGuard
 // 每个 native 对应独立测试；cfgGuards / cfgDominates / cfgPostDominates / cfgReachable / cfgReachPath 含多个 t.Run 子场景。
 // cfgDominates：从入口到「当前 cfg」是否必经 target（图论 target 支配当前）。cfgPostDominates：从「当前 cfg」到出口是否必经 target（图论 target 后支配当前）。
 
@@ -19,11 +19,14 @@ import (
 )
 
 type sfExpect struct {
-	WantEqual          map[string][]string
-	WantVarContains    map[string][]string
-	WantResultContains []string
-	WantMinCount       map[string]int
-	PostCheck          func(t *testing.T, res *ssaapi.SyntaxFlowResult)
+	WantEqual       map[string][]string
+	WantVarContains map[string][]string
+	// WantVarContainsExact：为 true 时，对该变量将 WantVarContains[var] 与各结果 v.String() 做多重集合精确匹配（排序后 Equal），
+	// 即每条为一条 SSA 反汇编行全文，而非 Values.String() 大段里的子串。
+	WantVarContainsExact map[string]bool
+	WantResultContains   []string
+	WantMinCount         map[string]int
+	PostCheck            func(t *testing.T, res *ssaapi.SyntaxFlowResult)
 }
 
 func runSyntaxFlowExpect(t *testing.T, yakCode, sfRule string, exp sfExpect) {
@@ -41,7 +44,16 @@ func runSyntaxFlowExpect(t *testing.T, yakCode, sfRule string, exp sfExpect) {
 			require.Equal(t, expS, got, "variable %q", varName)
 		}
 		for varName, needles := range exp.WantVarContains {
-			hay := res.GetValues(varName).String()
+			vs := res.GetValues(varName)
+			if exp.WantVarContainsExact != nil && exp.WantVarContainsExact[varName] {
+				got := lo.Map(vs, func(v *ssaapi.Value, _ int) string { return v.String() })
+				sort.Strings(got)
+				want := append([]string(nil), needles...)
+				sort.Strings(want)
+				require.Equal(t, want, got, "variable %q exact per-value SSA String()", varName)
+				continue
+			}
+			hay := vs.String()
 			for _, sub := range needles {
 				require.Contains(t, hay, sub, "variable %q", varName)
 			}
@@ -1080,5 +1092,323 @@ $cfg<cfgConditionValues()> as $v
 			require.Empty(t, res.GetValues("v"), "cfgConditionValues should not bind SSA values without a branch condition")
 			return nil
 		}, ssaapi.WithLanguage(ssaconfig.Yak))
+	})
+}
+
+// TestNativeCall_reachabilityGuard covers NativeCall_ReachabilityGuard（reachabilityGuard）。
+// 语义：mustExecute 下返回 true / false 或若干条条件 SSA；断言用 runSyntaxFlowExpect + WantVarContainsExact（每条 WantVarContains 为 v.String() 全文，排序后与结果多重集相等）。
+func TestNativeCall_reachabilityGuard(t *testing.T) {
+	sf := `
+cc as $to;
+a as $from;
+$from<reachabilityGuard(target="$to", mode="mustExecute")> as $guard;
+`
+	exact := map[string]bool{"guard": true}
+	t.Run("if_else_merge_cc_true_or_condition_values", func(t *testing.T) {
+		runSyntaxFlowExpect(t, `
+f = () => {
+	a = 1
+	if a > 0 {
+		b = 1
+	} else {
+		b = 2
+	}
+	cc = 3
+}
+`, sf, sfExpect{
+			WantVarContainsExact: exact,
+			WantVarContains:      map[string][]string{"guard": {"true"}},
+		})
+	})
+	t.Run("const_fold_unreachable_cc_branch_or_bool", func(t *testing.T) {
+		runSyntaxFlowExpect(t, `
+f = () => {
+	a = 1
+	if a > 0 {
+		b = 1
+		return
+	}
+	cc = 3
+}
+`, sf, sfExpect{
+			WantVarContainsExact: exact,
+			WantVarContains:      map[string][]string{"guard": {"false"}},
+		})
+	})
+	t.Run("const_fold_false_then_branch_cc_always_reachable", func(t *testing.T) {
+		runSyntaxFlowExpect(t, `
+f = () => {
+	a = 1
+	if a < 0 {
+		b = 1
+		return
+	}
+	cc = 3
+}
+`, sf, sfExpect{
+			WantVarContainsExact: exact,
+			WantVarContains:      map[string][]string{"guard": {"true"}},
+		})
+	})
+	// 或 / 且：Yak 将 a||b、a&&b 降为 or_expression/and_expression 上的 phi；对 if 条件可短路常量折叠
+	// 时 constFoldFiltered 能判定 cc 边是否可达，故 guard 为字面 "true"/"false"（与上一组用例一致）。
+	t.Run("const_fold_or_true_then_return_cc_unreachable", func(t *testing.T) {
+		// a<0 假、b>0 真 => || 为真 => return，cc 不可达，guard 为 false
+		runSyntaxFlowExpect(t, `
+f = () => {
+	a = 1
+	b = 2
+	if a < 0 || b > 0 {
+		b = 1
+		return
+	}
+	cc = 3
+}
+`, sf, sfExpect{
+			WantVarContainsExact: exact,
+			WantVarContains:      map[string][]string{"guard": {"false"}},
+		})
+	})
+	t.Run("const_fold_or_both_false_cc_always_reachable", func(t *testing.T) {
+		runSyntaxFlowExpect(t, `
+f = () => {
+	a = 1
+	b = -1
+	if a < 0 || b > 0 {
+		return
+	}
+	cc = 3
+}
+`, sf, sfExpect{
+			WantVarContainsExact: exact,
+			WantVarContains:      map[string][]string{"guard": {"true"}},
+		})
+	})
+	t.Run("const_fold_or_left_true_short_circuit_return_cc_unreachable", func(t *testing.T) {
+		// a<0 真 => || 短路为真 => return，cc 不可达，guard 为 false
+		runSyntaxFlowExpect(t, `
+f = () => {
+	a = -1
+	b = 0
+	if a < 0 || b > 0 {
+		return
+	}
+	cc = 3
+}
+`, sf, sfExpect{
+			WantVarContainsExact: exact,
+			WantVarContains:      map[string][]string{"guard": {"false"}},
+		})
+	})
+	t.Run("const_fold_and_first_false_short_circuit_cc_always_reachable", func(t *testing.T) {
+		// a<0 假 => && 短路为假，then 不执行，cc 必达；整式可折为假，谓词被滤空后 guard 为 "true"
+		runSyntaxFlowExpect(t, `
+f = () => {
+	a = 1
+	b = 1
+	if a < 0 && b > 0 {
+		return
+	}
+	cc = 3
+}
+`, sf, sfExpect{
+			WantVarContainsExact: exact,
+			WantVarContains:      map[string][]string{"guard": {"true"}},
+		})
+	})
+	t.Run("const_fold_and_both_true_then_return_cc_unreachable", func(t *testing.T) {
+		runSyntaxFlowExpect(t, `
+f = () => {
+	a = -1
+	b = 1
+	if a < 0 && b > 0 {
+		return
+	}
+	cc = 3
+}
+`, sf, sfExpect{
+			WantVarContainsExact: exact,
+			WantVarContains:      map[string][]string{"guard": {"false"}},
+		})
+	})
+	t.Run("const_fold_and_left_true_right_false_cc_always_reachable", func(t *testing.T) {
+		// a>0 真、b>0 假 => && 为假 => 不到 then，cc 必达；与上一则同理，谓词折假被滤后 guard 为 "true"
+		runSyntaxFlowExpect(t, `
+f = () => {
+	a = 1
+	b = -1
+	if a > 0 && b > 0 {
+		return
+	}
+	cc = 3
+}
+`, sf, sfExpect{
+			WantVarContainsExact: exact,
+			WantVarContains:      map[string][]string{"guard": {"true"}},
+		})
+	})
+	t.Run("param_if_return_then_cc_branch_condition", func(t *testing.T) {
+		runSyntaxFlowExpect(t, `
+f = (a) => {
+	if a > 0 {
+		b = 1
+		return
+	}
+	cc = 3
+}
+`, sf, sfExpect{
+			WantVarContainsExact: exact,
+			WantVarContains:      map[string][]string{"guard": {"gt(Parameter-a, 0)"}},
+		})
+	})
+	t.Run("early_return_after_check_input_then_vuln_conditions", func(t *testing.T) {
+		runSyntaxFlowExpect(t, `
+check = (x) => x > 0
+vuln = () => {
+	z = 1
+}
+f = (input) => {
+	if check(input) {
+		return
+	}
+	vuln()
+}
+`, `
+vuln() as $to;
+input as $from;
+$from<reachabilityGuard(target="$to", mode="mustExecute")> as $guard;
+`, sfExpect{
+			WantVarContainsExact: exact,
+			WantVarContains:      map[string][]string{"guard": {"FreeValue-check(Parameter-input)"}},
+		})
+	})
+	t.Run("nested_if_two_levels_conditions", func(t *testing.T) {
+		runSyntaxFlowExpect(t, `
+f = (aa, bb) => {
+	if aa > 0 {
+		x = 1
+	}
+	if bb > 0 {
+		return
+	}
+	sink_ni()
+}
+`, `
+sink_ni() as $to;
+aa as $from;
+$from<reachabilityGuard(target="$to", mode="mustExecute")> as $guard;
+`, sfExpect{
+			WantVarContainsExact: exact,
+			WantVarContains:      map[string][]string{"guard": {"gt(Parameter-bb, 0)"}},
+		})
+	})
+	t.Run("two_sequential_if_return_sink_two_condition_values", func(t *testing.T) {
+		runSyntaxFlowExpect(t, `
+f = (p1, p2) => {
+	if p1 > 0 {
+		return
+	}
+	if p2 > 0 {
+		return
+	}
+	sink_two_ifret()
+}
+`, `
+sink_two_ifret() as $to;
+p1 as $from;
+$from<reachabilityGuard(target="$to", mode="mustExecute")> as $guard;
+`, sfExpect{
+			WantMinCount:         map[string]int{"guard": 2},
+			WantVarContainsExact: exact,
+			WantVarContains: map[string][]string{"guard": {
+				"gt(Parameter-p1, 0)",
+				"gt(Parameter-p2, 0)",
+			}},
+		})
+	})
+	t.Run("two_if_return_with_stmt_between_sink_two_condition_values", func(t *testing.T) {
+		runSyntaxFlowExpect(t, `
+f = (u, v) => {
+	if u > 0 {
+		return
+	}
+	w = 1
+	if v > 0 {
+		return
+	}
+	sink_uv()
+}
+`, `
+sink_uv() as $to;
+u as $from;
+$from<reachabilityGuard(target="$to", mode="mustExecute")> as $guard;
+`, sfExpect{
+			WantMinCount:         map[string]int{"guard": 2},
+			WantVarContainsExact: exact,
+			WantVarContains: map[string][]string{"guard": {
+				"gt(Parameter-u, 0)",
+				"gt(Parameter-v, 0)",
+			}},
+		})
+	})
+	t.Run("nested_loop_break_sink_conditions", func(t *testing.T) {
+		runSyntaxFlowExpect(t, `
+f = (n) => {
+	for i := 0; i < n; i++ {
+		for j := 0; j < n; j++ {
+			if j > 0 {
+				break
+			}
+		}
+		sink_lp()
+	}
+}
+`, `
+sink_lp() as $to;
+n as $from;
+$from<reachabilityGuard(target="$to", mode="mustExecute")> as $guard;
+`, sfExpect{
+			WantVarContainsExact: exact,
+			WantMinCount:         map[string]int{"guard": 3},
+			WantVarContains:      map[string][]string{"guard": {"gt(phi(j)[0,add(j, 1)], 0)", "lt(0, Parameter-n)", "lt(0, Parameter-n)"}},
+		})
+	})
+	t.Run("loop_continue_then_sink_conditions", func(t *testing.T) {
+		runSyntaxFlowExpect(t, `
+f = (n) => {
+	for i := 0; i < n; i++ {
+		if i > 0 {
+			continue
+		}
+		sink_cont()
+	}
+}
+`, `
+sink_cont() as $to;
+n as $from;
+$from<reachabilityGuard(target="$to", mode="mustExecute")> as $guard;
+`, sfExpect{
+			WantVarContainsExact: exact,
+			WantMinCount:         map[string]int{"guard": 1},
+			WantVarContains:      map[string][]string{"guard": {"lt(0, Parameter-n)"}},
+		})
+	})
+	t.Run("switch_early_return_sink_conditions", func(t *testing.T) {
+		runSyntaxFlowExpect(t, `
+f = (aa) => {
+	switch aa {
+	case 99:
+		return
+	}
+	sink_sw()
+}
+`, `
+sink_sw() as $to;
+aa as $from;
+$from<reachabilityGuard(target="$to", mode="mustExecute")> as $guard;
+`, sfExpect{
+			WantVarContainsExact: exact,
+			WantVarContains:      map[string][]string{"guard": {"Parameter-aa"}},
+		})
 	})
 }
