@@ -16,32 +16,32 @@ func TestRuntimeScopedBroadcast_MultiSubscriberAndThrottle(t *testing.T) {
 	secondCh := make(chan *RuntimeScopedBroadcastEvent, 4)
 	otherRuntimeCh := make(chan *RuntimeScopedBroadcastEvent, 1)
 
-	unsubscribeFirst := SubscribeRuntimeScopedBroadcast("httpflow", "runtime-a", func(event *RuntimeScopedBroadcastEvent) {
+	unsubscribeFirst := SubscribeRuntimeScopedBroadcast("runtime-a", func(event *RuntimeScopedBroadcastEvent) {
 		firstCh <- event
 	})
 	defer unsubscribeFirst()
 
-	unsubscribeSecond := SubscribeRuntimeScopedBroadcast("httpflow", "runtime-a", func(event *RuntimeScopedBroadcastEvent) {
+	unsubscribeSecond := SubscribeRuntimeScopedBroadcast("runtime-a", func(event *RuntimeScopedBroadcastEvent) {
 		secondCh <- event
 	})
 	defer unsubscribeSecond()
 
-	unsubscribeOther := SubscribeRuntimeScopedBroadcast("httpflow", "runtime-b", func(event *RuntimeScopedBroadcastEvent) {
+	unsubscribeOther := SubscribeRuntimeScopedBroadcast("runtime-b", func(event *RuntimeScopedBroadcastEvent) {
 		otherRuntimeCh <- event
 	})
 	defer unsubscribeOther()
 
-	PublishRuntimeScopedBroadcast("httpflow", "runtime-a", "update", 1)
-	PublishRuntimeScopedBroadcast("httpflow", "runtime-a", "update", 1)
-	PublishRuntimeScopedBroadcast("httpflow", "runtime-a", "create", 2)
+	PublishRuntimeScopedBroadcast(RuntimeScopedBroadcastTypeHTTPFlow, "runtime-a", "update", 1)
+	PublishRuntimeScopedBroadcast(RuntimeScopedBroadcastTypeHTTPFlow, "runtime-a", "update", 1)
+	PublishRuntimeScopedBroadcast(RuntimeScopedBroadcastTypeHTTPFlow, "runtime-a", "create", 2)
 
 	firstEventA := waitRuntimeScopedBroadcastEvent(t, firstCh)
 	firstEventB := waitRuntimeScopedBroadcastEvent(t, firstCh)
 	secondEventA := waitRuntimeScopedBroadcastEvent(t, secondCh)
 	secondEventB := waitRuntimeScopedBroadcastEvent(t, secondCh)
 
-	require.Equal(t, "httpflow", firstEventA.Type)
-	require.Equal(t, "httpflow", firstEventB.Type)
+	require.Equal(t, RuntimeScopedBroadcastTypeHTTPFlow, firstEventA.Type)
+	require.Equal(t, RuntimeScopedBroadcastTypeHTTPFlow, firstEventB.Type)
 	require.Equal(t, "runtime-a", firstEventA.RuntimeID)
 	require.Equal(t, "runtime-a", firstEventB.RuntimeID)
 	require.Equal(t, firstEventA.Type, secondEventA.Type)
@@ -84,7 +84,7 @@ func TestRuntimeScopedBroadcast_HTTPFlowHooks(t *testing.T) {
 	defer restore()
 
 	events := make(chan *RuntimeScopedBroadcastEvent, 4)
-	unsubscribe := SubscribeRuntimeScopedBroadcast("httpflow", "runtime-httpflow", func(event *RuntimeScopedBroadcastEvent) {
+	unsubscribe := SubscribeRuntimeScopedBroadcast("runtime-httpflow", func(event *RuntimeScopedBroadcastEvent) {
 		events <- event
 	})
 	defer unsubscribe()
@@ -113,7 +113,7 @@ func TestRuntimeScopedBroadcast_RiskHooksAndUnsubscribe(t *testing.T) {
 	defer restore()
 
 	events := make(chan *RuntimeScopedBroadcastEvent, 4)
-	unsubscribe := SubscribeRuntimeScopedBroadcast("risk", "runtime-risk", func(event *RuntimeScopedBroadcastEvent) {
+	unsubscribe := SubscribeRuntimeScopedBroadcast("runtime-risk", func(event *RuntimeScopedBroadcastEvent) {
 		events <- event
 	})
 
@@ -126,8 +126,8 @@ func TestRuntimeScopedBroadcast_RiskHooksAndUnsubscribe(t *testing.T) {
 
 	first := waitRuntimeScopedBroadcastEvent(t, events)
 	second := waitRuntimeScopedBroadcastEvent(t, events)
-	require.Equal(t, "risk", first.Type)
-	require.Equal(t, "risk", second.Type)
+	require.Equal(t, RuntimeScopedBroadcastTypeRisk, first.Type)
+	require.Equal(t, RuntimeScopedBroadcastTypeRisk, second.Type)
 	got := map[string]uint{
 		first.Action:  first.ID,
 		second.Action: second.ID,
@@ -138,7 +138,7 @@ func TestRuntimeScopedBroadcast_RiskHooksAndUnsubscribe(t *testing.T) {
 	}, got)
 
 	unsubscribe()
-	PublishRuntimeScopedBroadcast("risk", "runtime-risk", "update", 11)
+	PublishRuntimeScopedBroadcast(RuntimeScopedBroadcastTypeRisk, "runtime-risk", "update", 11)
 
 	select {
 	case got := <-events:

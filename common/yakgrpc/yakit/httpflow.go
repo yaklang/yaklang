@@ -505,7 +505,7 @@ func UpdateHTTPFlowTags(db *gorm.DB, i *schema.HTTPFlow) (finErr error) {
 				"action":     "update",
 				"runtime_id": i.RuntimeId,
 			})
-			schema.PublishRuntimeScopedBroadcast("httpflow", i.RuntimeId, "update", uint(id))
+			schema.PublishRuntimeScopedBroadcast(schema.RuntimeScopedBroadcastTypeHTTPFlow, i.RuntimeId, "update", uint(id))
 		}
 	}()
 	updateData := map[string]interface{}{

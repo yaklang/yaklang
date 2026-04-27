@@ -250,18 +250,18 @@ func (p *Risk) BeforeSave() error {
 
 func (r *Risk) AfterCreate(tx *gorm.DB) (err error) {
 	broadcastData.Call("risk", "create")
-	PublishRuntimeScopedBroadcast("risk", r.RuntimeId, "create", r.ID)
+	PublishRuntimeScopedBroadcast(RuntimeScopedBroadcastTypeRisk, r.RuntimeId, "create", r.ID)
 	return nil
 }
 
 func (r *Risk) AfterUpdate(tx *gorm.DB) (err error) {
 	broadcastData.Call("risk", "update")
-	PublishRuntimeScopedBroadcast("risk", r.RuntimeId, "update", r.ID)
+	PublishRuntimeScopedBroadcast(RuntimeScopedBroadcastTypeRisk, r.RuntimeId, "update", r.ID)
 	return nil
 }
 
 func (r *Risk) AfterDelete(tx *gorm.DB) (err error) {
 	broadcastData.Call("risk", "delete")
-	PublishRuntimeScopedBroadcast("risk", r.RuntimeId, "delete", r.ID)
+	PublishRuntimeScopedBroadcast(RuntimeScopedBroadcastTypeRisk, r.RuntimeId, "delete", r.ID)
 	return nil
 }
