@@ -1892,6 +1892,7 @@ func checkGRPCDiffProgScanTest(t *testing.T, client ypb.YakClient, config GRPCDi
 }
 
 func TestGRPCMUSTPASS_SyntaxFlow_Scan_With_DiffProg(t *testing.T) {
+	// for i := 0; i < 100; i++ {
 	client, err := yakgrpc.NewLocalClient(true)
 	require.NoError(t, err)
 
@@ -2004,4 +2005,5 @@ alert $low for {
 	t.Run(config.Name, func(t *testing.T) {
 		checkGRPCDiffProgScanTest(t, client, config)
 	})
+	// }
 }
