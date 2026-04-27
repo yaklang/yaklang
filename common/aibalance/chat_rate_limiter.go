@@ -36,12 +36,14 @@ func (s *keyRPMState) trimExpired(now time.Time) {
 }
 
 // ChatRateLimiter implements per-API-key RPM rate limiting for chat completions,
-// with optional per-model RPM overrides and a global queue counter.
+// with optional per-model RPM overrides, per-model delay overrides for free
+// users, and a global queue counter.
 type ChatRateLimiter struct {
-	states     sync.Map   // map[apiKey]*keyRPMState
+	states     sync.Map // map[apiKey]*keyRPMState
 	queueCount atomic.Int64
 	defaultRPM atomic.Int64
-	modelRPM   sync.Map // map[modelName]int64
+	modelRPM   sync.Map // map[modelName]int64 RPM override
+	modelDelay sync.Map // map[modelName]int64 free-user pre-call delay override (seconds)
 	stopCh     chan struct{}
 	stopOnce   sync.Once
 }
@@ -78,6 +80,39 @@ func (rl *ChatRateLimiter) ClearModelRPM() {
 		rl.modelRPM.Delete(key)
 		return true
 	})
+}
+
+// SetModelDelay sets a free-user pre-call delay override (in seconds) for a
+// specific model. Passing a negative value removes the override so the
+// model falls back to the global free-user delay. Passing 0 stores an
+// explicit "no delay" override that wins over the global default.
+func (rl *ChatRateLimiter) SetModelDelay(model string, delaySec int64) {
+	if delaySec < 0 {
+		rl.modelDelay.Delete(model)
+		return
+	}
+	rl.modelDelay.Store(model, delaySec)
+}
+
+// ClearModelDelay removes all per-model delay overrides.
+func (rl *ChatRateLimiter) ClearModelDelay() {
+	rl.modelDelay.Range(func(key, _ any) bool {
+		rl.modelDelay.Delete(key)
+		return true
+	})
+}
+
+// GetEffectiveDelay returns the pre-call delay (in seconds) for a free-user
+// request to modelName, falling back to the provided global default if no
+// per-model override is configured. A configured override of 0 is also
+// honored as "no delay" because SetModelDelay deletes zero entries.
+func (rl *ChatRateLimiter) GetEffectiveDelay(modelName string, fallbackSec int64) int64 {
+	if v, ok := rl.modelDelay.Load(modelName); ok {
+		if delay, ok2 := v.(int64); ok2 {
+			return delay
+		}
+	}
+	return fallbackSec
 }
 
 // GetQueueCount returns the current number of rate-limited (queued) requests.

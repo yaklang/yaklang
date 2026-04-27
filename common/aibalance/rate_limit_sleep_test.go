@@ -65,65 +65,84 @@ func TestConcurrentRelease_DeferSafe(t *testing.T) {
 		"counter should still be 0 after defer runs")
 }
 
-// TestFreeUserSleep_ConcurrentCounterReleased verifies that the free user
-// cooldown sleep does not hold the concurrentChatRequests counter.
-func TestFreeUserSleep_ConcurrentCounterReleased(t *testing.T) {
+// TestFreeUserPreCallDelay_DelaysBeforeProvider verifies that when a free
+// model has a positive effective delay, serveChatCompletions sleeps BEFORE
+// dispatching to providers, so the client perceives the throttle (the
+// previous post-call sleep was ineffective because the response had
+// already been delivered).
+//
+// Implementation notes:
+//   - We use a free model (-free suffix) so no API key is required.
+//   - There are no providers configured, so the request will eventually
+//     return a 5xx after passing through auth, RPM check, and pre-call
+//     delay. The total elapsed time of the call is what we assert on.
+func TestFreeUserPreCallDelay_DelaysBeforeProvider(t *testing.T) {
+	persistDBRateLimitRPM(t, 100)
+	defer resetDBRateLimitRPM(t)
+
 	cfg := NewServerConfig()
 	defer cfg.Close()
-	cfg.freeUserDelaySec = 1
+	cfg.chatRateLimiter.SetDefaultRPM(100)
+	cfg.freeUserDelaySec = 1 // global fallback: 1s base, jitter to 1~2s
 
-	// Simulate the pattern used in serveChatCompletions
-	atomic.AddInt64(&cfg.concurrentChatRequests, 1)
-	assert.Equal(t, int64(1), atomic.LoadInt64(&cfg.concurrentChatRequests))
+	raw := buildFreeModelRawHTTP("delay-precall-free")
 
-	concurrentReleased := false
-	releaseConcurrent := func() {
-		if !concurrentReleased {
-			concurrentReleased = true
-			atomic.AddInt64(&cfg.concurrentChatRequests, -1)
-		}
-	}
-	defer releaseConcurrent()
+	start := time.Now()
+	resp := sendChatCompletionDirect(t, cfg, raw)
+	elapsed := time.Since(start)
 
-	// Simulate: response sent, now entering free user cooldown
-	isFreeModel := true
-	if isFreeModel && cfg.freeUserDelaySec > 0 {
-		releaseConcurrent()
-	}
-
-	// During "sleep" period, counter should already be 0
-	assert.Equal(t, int64(0), atomic.LoadInt64(&cfg.concurrentChatRequests),
-		"concurrent counter should be 0 during free user cooldown sleep")
+	assert.GreaterOrEqual(t, elapsed, 900*time.Millisecond,
+		"pre-call delay should make the call take at least the base delay")
+	assert.NotContains(t, resp, "429",
+		"request must pass the RPM check before being delayed")
 }
 
-// TestFreeUserSleep_OtherKeysNotBlocked verifies that during free user cooldown,
-// other API keys can proceed without the concurrent counter being inflated.
-func TestFreeUserSleep_OtherKeysNotBlocked(t *testing.T) {
+// TestFreeUserPreCallDelay_PerModelOverride verifies that a per-model delay
+// override of 0 disables the pre-call delay for that model even when the
+// global free-user delay is non-zero.
+func TestFreeUserPreCallDelay_PerModelOverride(t *testing.T) {
+	persistDBRateLimitRPM(t, 100)
+	defer resetDBRateLimitRPM(t)
+
 	cfg := NewServerConfig()
 	defer cfg.Close()
-	cfg.freeUserDelaySec = 2
+	cfg.chatRateLimiter.SetDefaultRPM(100)
+	cfg.freeUserDelaySec = 5 // global is 5s; would be very slow without override
+	cfg.chatRateLimiter.SetModelDelay("instant-free", 0)
 
-	// Simulate 3 concurrent free user requests that have finished sending
-	// response but are in cooldown sleep
-	for i := 0; i < 3; i++ {
-		go func() {
-			atomic.AddInt64(&cfg.concurrentChatRequests, 1)
-			// Simulate response completion
-			time.Sleep(10 * time.Millisecond)
-			// Release concurrent before sleep (the fix)
-			atomic.AddInt64(&cfg.concurrentChatRequests, -1)
-			// Simulate cooldown sleep
-			time.Sleep(time.Duration(cfg.freeUserDelaySec) * time.Second)
-		}()
-	}
+	raw := buildFreeModelRawHTTP("instant-free")
 
-	// Wait for all 3 to finish their "response" phase
-	time.Sleep(50 * time.Millisecond)
+	start := time.Now()
+	resp := sendChatCompletionDirect(t, cfg, raw)
+	elapsed := time.Since(start)
 
-	// During cooldown, concurrent counter should be 0 (not 3)
-	concurrentDuringSleep := atomic.LoadInt64(&cfg.concurrentChatRequests)
-	assert.Equal(t, int64(0), concurrentDuringSleep,
-		"concurrent counter should be 0 during cooldown, got %d", concurrentDuringSleep)
+	assert.Less(t, elapsed, 2*time.Second,
+		"per-model override of 0 must disable the pre-call delay; elapsed=%v", elapsed)
+	assert.NotContains(t, resp, "429",
+		"request must pass the RPM check")
+}
+
+// TestFreeUserPreCallDelay_PerModelOverrideHigher verifies that a per-model
+// delay override greater than the global takes effect.
+func TestFreeUserPreCallDelay_PerModelOverrideHigher(t *testing.T) {
+	persistDBRateLimitRPM(t, 100)
+	defer resetDBRateLimitRPM(t)
+
+	cfg := NewServerConfig()
+	defer cfg.Close()
+	cfg.chatRateLimiter.SetDefaultRPM(100)
+	cfg.freeUserDelaySec = 0 // disable global
+	cfg.chatRateLimiter.SetModelDelay("slow-free", 1)
+
+	raw := buildFreeModelRawHTTP("slow-free")
+
+	start := time.Now()
+	resp := sendChatCompletionDirect(t, cfg, raw)
+	elapsed := time.Since(start)
+
+	assert.GreaterOrEqual(t, elapsed, 900*time.Millisecond,
+		"per-model override should override the global default")
+	assert.NotContains(t, resp, "429")
 }
 
 // TestRPM_UsesExternalModelName verifies that RPM rate limiting uses
