@@ -138,11 +138,32 @@ func buildOrchestratorInitTask(r aicommon.AIInvokeRuntime, state *AuditState) fu
 		r.AddToTimeline("[PHASE1_START]", "开始 Phase 1：项目探索（使用 dir_explore loop）")
 
 		reconFilePath := filepath.Join(auditDirPath, "recon_notes.md")
+		exploreOpts := []reactloops.ReActLoopOption{
+			reactloops.WithVar("output_report_path", reconFilePath),
+			reactloops.WithVar("explore_work_dir", auditDirPath),
+		}
+		if scanPath := scanTargetPathFromTask(task); scanPath != "" {
+			if st, err := os.Stat(scanPath); err != nil {
+				log.Warnf("[CodeAudit] attached target path not accessible: %q: %v", scanPath, err)
+				op.Failed(fmt.Sprintf(
+					"[CodeAudit] 附件指定的扫描目录无效: %q（%v）。请确认 Type=%q、Key=%q、Value 为存在的目录绝对路径。",
+					scanPath, err, AttachedResourceTypeFile, AttachedResourceKeyCodeAuditTargetPath))
+				return
+			} else if !st.IsDir() {
+				log.Warnf("[CodeAudit] attached target path is not a directory: %q", scanPath)
+				op.Failed(fmt.Sprintf(
+					"[CodeAudit] 附件指定的路径不是目录: %q。请为 Key=%q 提供项目根目录。",
+					scanPath, AttachedResourceKeyCodeAuditTargetPath))
+				return
+			}
+			exploreOpts = append(exploreOpts, reactloops.WithVar("target_path", scanPath))
+			log.Infof("[CodeAudit] Phase1 using attached scan target: %s", scanPath)
+			r.AddToTimeline("[CODE_AUDIT_TARGET]", "扫描目标目录(附件): "+scanPath)
+		}
 		exploreLoop, err := reactloops.CreateLoopByName(
 			schema.AI_REACT_LOOP_NAME_DIR_EXPLORE,
 			r,
-			reactloops.WithVar("output_report_path", reconFilePath),
-			reactloops.WithVar("explore_work_dir", auditDirPath),
+			exploreOpts...,
 		)
 		if err != nil {
 			log.Errorf("[CodeAudit] Failed to create dir_explore loop: %v", err)
