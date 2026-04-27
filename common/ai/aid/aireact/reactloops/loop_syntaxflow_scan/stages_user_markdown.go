@@ -3,7 +3,6 @@
 package loop_syntaxflow_scan
 
 import (
-	"context"
 	"fmt"
 	"sort"
 	"strings"
@@ -297,33 +296,4 @@ func buildRiskSampleTableAndRules(res *ScanSessionResult, maxRows int) (rulesLin
 		fmt.Fprintf(&b, "| %s | %s | %s |\n", escapeMDCell(string(rk.Severity)), escapeMDCell(fr), escapeMDCell(tit))
 	}
 	return rulesLine, b.String()
-}
-
-// WaitForSyntaxFlowReportGate 在 P4 前阻塞，直到 `sf_scan_risk_converged=1` 或 ctx 取消/或超时。超时后返回（P4 仍由上游调用，可另打 timeline 提示）。
-func WaitForSyntaxFlowReportGate(ctx context.Context, loop *reactloops.ReActLoop) {
-	if loop == nil {
-		return
-	}
-	if strings.TrimSpace(loop.Get(sfutil.LoopVarSFRiskConverged)) == "1" {
-		return
-	}
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	deadline := time.Now().Add(45 * time.Minute)
-	tick := time.NewTicker(2 * time.Second)
-	defer tick.Stop()
-	for {
-		if strings.TrimSpace(loop.Get(sfutil.LoopVarSFRiskConverged)) == "1" {
-			return
-		}
-		if time.Now().After(deadline) {
-			return
-		}
-		select {
-		case <-ctx.Done():
-			return
-		case <-tick.C:
-		}
-	}
 }
