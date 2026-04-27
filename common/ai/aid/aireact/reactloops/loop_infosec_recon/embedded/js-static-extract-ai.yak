@@ -16,8 +16,8 @@ __VERBOSE_NAME__ = "js_static_extract_ai"
 __KEYWORDS__ = "javascript,静态分析,API,接口,liteforge,recon,安全,js_static_extract_ai,信息搜集,infosec_recon"
 __USAGE__ = "专注模式 infosec_recon：已注册工具 js_static_extract_ai；参数可用 --dir（单目录）、--files 或 --paths（逗号分隔多条目，与提示词中的 paths 一致）、--file。完整管线含多轮 AI，大目录可能耗时数十分钟。"
 
-// 轨迹日志：[AI推理-…] 模型研判；[请求发送] HTTP；[报错] 失败（需可见请保持 info）
-log.setLevel("info")
+// 轨迹日志：[AI推理-…] 模型研判；[请求发送] HTTP；[报错] 失败
+// 注意：不强制 setLevel，遵循全局日志配置；默认 info 已足够可见这些轨迹。
 
 logAi = (action, msg) => {
     log.info("[AI推理-%s] %s", action, msg)
@@ -25,7 +25,7 @@ logAi = (action, msg) => {
 logReq = msg => {
     log.info("[请求发送] %s", msg)
 }
-logErr = (where, err) => {
+logWarn = (where, err) => {
     log.warn("[报错] %s: %v", where, err)
 }
 
@@ -64,7 +64,7 @@ loadRawFromRef = (ref) => {
         logReq(sprintf("HTTP GET 拉取远端源码 url=%s timeout=120s", s))
         rsp, _, err = poc.Get(s, poc.timeout(120))
         if err != nil {
-            logErr("HTTP GET 远端源码", sprintf("%v url=%s", err, s))
+            logWarn("HTTP GET 远端源码", sprintf("%v url=%s", err, s))
             die(sprintf("HTTP GET %v failed: %v", s, err))
         }
         return string(rsp.GetBody())
@@ -127,7 +127,7 @@ collectJsFilesUnderDir = root => {
             }
         }
     } catch e {
-        logErr(sprintf("收集目录下 JS 文件 path=%s", root), e)
+        logWarn(sprintf("收集目录下 JS 文件 path=%s", root), e)
     }
     return out
 }
@@ -153,7 +153,7 @@ expandInputsToItems = rawInputs => {
             continue
         }
         if !file.IsExisted(x) {
-            logErr(sprintf("输入路径不存在，已跳过 path=%s", x), "路径不存在")
+            logWarn(sprintf("输入路径不存在，已跳过 path=%s", x), "路径不存在")
             continue
         }
         if file.IsDir(x) {
@@ -219,7 +219,7 @@ buildWorkUnits = items => {
             try {
                 sz = len(string(file.ReadFile(p)~))
             } catch e {
-                logErr(sprintf("读取文件大小失败 path=%s", p), e)
+                logWarn(sprintf("读取文件大小失败 path=%s", p), e)
                 continue
             }
         }
@@ -239,7 +239,7 @@ buildWorkUnits = items => {
         try {
             raw = string(file.ReadFile(p)~)
         } catch e2 {
-            logErr(sprintf("读取本地文件失败 path=%s", p), e2)
+            logWarn(sprintf("读取本地文件失败 path=%s", p), e2)
             continue
         }
         n = len(raw)
@@ -334,8 +334,6 @@ contextWindowByByte = byteCenter => {
     if hi > lo {
         txt = content[lo:hi]
     }
-    var lnLo = 1
-    var lnHi = 1
     lnLo = lineFromByte(lo)
     lnHi = lnLo
     if hi > lo {
@@ -374,7 +372,7 @@ applyPattern = (arr, kind, pattern, groupValue) => {
     rows = re.FindSubmatchAll(content, pattern)
     idxs = re.FindSubmatchAllIndex(content, pattern)
     if len(rows) != len(idxs) {
-        logErr(sprintf("正则行列不一致 kind=%s", kind), sprintf("rows=%d idxs=%d", len(rows), len(idxs)))
+        logWarn(sprintf("正则行列不一致 kind=%s", kind), sprintf("rows=%d idxs=%d", len(rows), len(idxs)))
     }
     for idx, row := range rows {
         if idx >= len(idxs) {
@@ -536,7 +534,7 @@ credCheckOne = finding => {
                 return true
             }
         } catch e {
-            logErr(sprintf("AI FunctionCall 敏感条目可信度 kind=%s line=%d", finding.kind, finding.line), e)
+            logWarn(sprintf("AI FunctionCall 敏感条目可信度 kind=%s line=%d", finding.kind, finding.line), e)
         }
     }
     return false
@@ -657,7 +655,7 @@ if !skipJsRefAI && len(jsRefs) > 0 {
                         break
                     }
                 } catch e {
-                    logErr(sprintf("AI FunctionCall JS 路径拆解 line=%d", jff.line), e)
+                    logWarn(sprintf("AI FunctionCall JS 路径拆解 line=%d", jff.line), e)
                 }
                 verdict = nil
             }
@@ -733,7 +731,7 @@ if tmpRoot == "" {
 try {
     file.MkdirAll(tmpRoot)
 } catch e {
-    logErr(sprintf("创建工作目录 path=%s", tmpRoot), e)
+    logWarn(sprintf("创建工作目录 path=%s", tmpRoot), e)
     die(sprintf("无法创建工作目录: %v %v", tmpRoot, e))
 }
 
@@ -858,12 +856,12 @@ fallbackChat = (codeChunk, baseCtxJson) => {
             rawStr = string(rawText)
             showLen = min(len(rawStr), 200)
             if showLen > 0 {
-                logErr("fallback stripAndExtractApis 返回 nil", sprintf("rawText 前 %d 字: %s", showLen, rawStr[:showLen]))
+                logWarn("fallback stripAndExtractApis 返回 nil", sprintf("rawText 前 %d 字: %s", showLen, rawStr[:showLen]))
             } else {
-                logErr("fallback stripAndExtractApis 返回 nil", "rawText 为空")
+                logWarn("fallback stripAndExtractApis 返回 nil", "rawText 为空")
             }
         } catch _ {
-            logErr("fallback stripAndExtractApis 返回 nil", "无法打印 rawText")
+            logWarn("fallback stripAndExtractApis 返回 nil", "无法打印 rawText")
         }
     }
     return result
@@ -950,7 +948,7 @@ runPhase1Worker = (idx, cand) => {
         }
     } catch e {
         errText = sprint(e)
-        logErr(sprintf("liteforge Phase1 idx=%d", idx), e)
+        logWarn(sprintf("liteforge Phase1 idx=%d", idx), e)
         try {
             rescued = fallbackChat(cand.context, json.dumps(sensitiveCtxLite))
             if rescued != nil && rescued["apis"] != nil {
@@ -959,7 +957,7 @@ runPhase1Worker = (idx, cand) => {
                 logAi("Phase1 fallback 修复成功", sprintf("idx=%d 通过外部 JSON 剥离恢复", idx))
             }
         } catch e2 {
-            logErr(sprintf("Phase1 fallback idx=%d", idx), e2)
+            logWarn(sprintf("Phase1 fallback idx=%d", idx), e2)
         }
     }
     rec = {
@@ -995,8 +993,6 @@ swg1.Wait()
 stripSet = {}
 for _, cand := range apiCandidates {
     // map 字段读出为 interface{}，先 sprint 再 parseInt（勿用 codec.Atoi，CodecExports 未包含）
-    var lnLo = 0
-    var lnHi = 0
     lnLo = parseInt(sprint(cand["line_lo"]))
     lnHi = parseInt(sprint(cand["line_hi"]))
     for l := lnLo; l <= lnHi; l++ {
@@ -1076,7 +1072,7 @@ if !skipPhase2 {
                 }
             } catch e {
                 errText = sprint(e)
-                logErr(sprintf("liteforge Phase2 chunk=%d", ci), e)
+                logWarn(sprintf("liteforge Phase2 chunk=%d", ci), e)
                 try {
                     rescued = fallbackChat(ch, json.dumps(sensitiveCtxLite))
                     if rescued != nil && rescued["apis"] != nil {
@@ -1085,7 +1081,7 @@ if !skipPhase2 {
                         logAi("Phase2 fallback 修复成功", sprintf("chunk=%d 通过外部 JSON 剥离恢复", ci))
                     }
                 } catch e2 {
-                    logErr(sprintf("Phase2 fallback chunk=%d", ci), e2)
+                    logWarn(sprintf("Phase2 fallback chunk=%d", ci), e2)
                 }
             }
             rec = {
@@ -1174,7 +1170,7 @@ if len(workUnits) == 1 {
                 perResults.Push(one)
                 resultMu.Unlock()
             } catch e {
-                logErr(sprintf("单单元管线失败 label=%s", lab), e)
+                logWarn(sprintf("单单元管线失败 label=%s", lab), e)
             }
         }(uLab, uPre)
     }
@@ -1233,7 +1229,7 @@ if len(workUnits) == 1 {
     try {
         file.SaveJson(mergedReportPath, finalMerged)
     } catch e3 {
-        logErr("写入多源合并报告 merged_final_report.json", e3)
+        logWarn("写入多源合并报告 merged_final_report.json", e3)
     }
 }
 
