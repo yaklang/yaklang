@@ -16,7 +16,7 @@ __KEYWORDS__ = "recon,爬虫,javascript,静态资源,ai.FunctionCall,信息搜�
 __USAGE__ = "在专注模式 infosec_recon 中通过已注册工具 crawl_js_collector 调用（与 js_static_extract_ai 同为工具链路）。输出见 workdir 下 crawl-js-collector-result.json 与 artifacts.verified_js_dir。"
 
 // 轨迹：[AI推理-…] 模型研判；[请求发送] HTTP；[报错] 异常
-log.setLevel("info")
+// 注意：不强制 setLevel，遵循全局日志配置；默认 info 已足够可见这些轨迹。
 
 logAi = (action, msg) => {
     log.info("[AI推理-%s] %s", action, msg)
@@ -24,7 +24,7 @@ logAi = (action, msg) => {
 logReq = msg => {
     log.info("[请求发送] %s", msg)
 }
-logErr = (where, err) => {
+logWarn = (where, err) => {
     log.warn("[报错] %s: %v", where, err)
 }
 
@@ -407,7 +407,7 @@ deepJsAiResolveSnippetAndFetch = (rootUrl, fromURL, snippet, halfCtx, verifyTO, 
             logReq(sprintf("HTTP GET 校验 AI 解析出的脚本 url=%s timeout=%ds", absU, verifyTO))
             rsp, _, e = poc.Get(absU, poc.timeout(verifyTO))
             if e != nil {
-                logErr(sprintf("HTTP GET 校验脚本失败 url=%s", absU), e)
+                logWarn(sprintf("HTTP GET 校验脚本失败 url=%s", absU), e)
                 return {"ok": false, "url": absU, "ai_used": aiUsed, "status": 0, "err": sprint(e)}
             }
             code = poc.GetStatusCodeFromResponse(rsp.RawPacket)
@@ -441,7 +441,7 @@ verifyUrlList = (targets, verifyTO, verifiedOut, failedOut, verifiedSet) => {
                 logReq(sprintf("HTTP GET 验证候选 JS url=%s", target))
                 rsp, _, e = poc.Get(target, poc.timeout(verifyTO))
                 if e != nil {
-                    logErr(sprintf("校验候选 JS 网络错误 url=%s", target), e)
+                    logWarn(sprintf("校验候选 JS 网络错误 url=%s", target), e)
                     lMu.Lock()
                     failedOut.Push({"url": target, "status": 0, "error": sprint(e)})
                     lMu.Unlock()
@@ -455,13 +455,13 @@ verifyUrlList = (targets, verifyTO, verifiedOut, failedOut, verifiedSet) => {
                     newly.Push(target)
                     lMu.Unlock()
                 } else {
-                    logErr(sprintf("校验候选 JS 非 2xx url=%s", target), sprintf("HTTP %v", code))
+                    logWarn(sprintf("校验候选 JS 非 2xx url=%s", target), sprintf("HTTP %v", code))
                     lMu.Lock()
                     failedOut.Push({"url": target, "status": code, "error": sprintf("HTTP %v", code)})
                     lMu.Unlock()
                 }
             } catch ex {
-                logErr(sprintf("校验候选 JS 异常 url=%s", target), ex)
+                logWarn(sprintf("校验候选 JS 异常 url=%s", target), ex)
                 lMu.Lock()
                 failedOut.Push({"url": target, "status": 0, "error": sprint(ex)})
                 lMu.Unlock()
@@ -532,7 +532,7 @@ saveVerifiedJsFilesToDir = (urls, destDir, verifyTO, conc) => {
     try {
         file.MkdirAll(destDir)
     } catch emk {
-        logErr(sprintf("workdir 创建保存 JS 子目录 path=%s", destDir), emk)
+        logWarn(sprintf("workdir 创建保存 JS 子目录 path=%s", destDir), emk)
         return
     }
     if conc <= 0 {
@@ -549,7 +549,7 @@ saveVerifiedJsFilesToDir = (urls, destDir, verifyTO, conc) => {
                 logReq(sprintf("HTTP GET 下载已验证脚本到 workdir url=%s", u))
                 rsp, _, e = poc.Get(u, poc.timeout(verifyTO))
                 if e != nil {
-                    logErr(sprintf("下载已验证 JS 失败 url=%s", u), e)
+                    logWarn(sprintf("下载已验证 JS 失败 url=%s", u), e)
                     return
                 }
                 code = poc.GetStatusCodeFromResponse(rsp.RawPacket)
@@ -565,7 +565,7 @@ saveVerifiedJsFilesToDir = (urls, destDir, verifyTO, conc) => {
                     file.Save(outP, rawB)
                 }
             } catch exs {
-                logErr(sprintf("保存 JS 文件异常 url=%s", u), exs)
+                logWarn(sprintf("保存 JS 文件异常 url=%s", u), exs)
             }
         }(uOne, nseq)
     }
@@ -648,7 +648,7 @@ crawlOpts = append(crawlOpts, crawler.disallowSuffix(
 logReq(sprintf("启动站点爬虫 root=%s depth=%d maxUrls=%d（后续为爬虫内部 HTTP 轨迹）", rootUrl, maxDepth, urlsMax))
 reqCh, err := crawler.Start(rootUrl, crawlOpts...)
 if err != nil {
-    logErr("crawler.Start", err)
+    logWarn("crawler.Start", err)
     die(sprintf("crawler.Start: %v", err))
 }
 
@@ -777,7 +777,7 @@ if !skipAI && len(allChunks) > 0 {
                         return
                     }
                 } catch e {
-                    logErr(sprintf("AI FunctionCall 提取 JS URL 失败 chunk=%d page=%s", idx, purl), e)
+                    logWarn(sprintf("AI FunctionCall 提取 JS URL 失败 chunk=%d page=%s", idx, purl), e)
                 }
             }
         }(chText, ci, pu)
@@ -809,7 +809,7 @@ for _, ju := range candidateList {
             logReq(sprintf("HTTP GET 首轮验证候选 JS url=%s", target))
             rsp, _, e = poc.Get(target, poc.timeout(verifyTO))
             if e != nil {
-                logErr(sprintf("首轮验证 JS 网络错误 url=%s", target), e)
+                logWarn(sprintf("首轮验证 JS 网络错误 url=%s", target), e)
                 vMu.Lock()
                 failed.Push({"url": target, "status": 0, "error": sprint(e)})
                 vMu.Unlock()
@@ -821,13 +821,13 @@ for _, ju := range candidateList {
                 verified.Push(target)
                 vMu.Unlock()
             } else {
-                logErr(sprintf("首轮验证 JS 非 2xx url=%s", target), sprintf("HTTP %v", code))
+                logWarn(sprintf("首轮验证 JS 非 2xx url=%s", target), sprintf("HTTP %v", code))
                 vMu.Lock()
                 failed.Push({"url": target, "status": code, "error": sprintf("HTTP %v", code)})
                 vMu.Unlock()
             }
         } catch ex {
-            logErr(sprintf("首轮验证 JS 异常 url=%s", target), ex)
+            logWarn(sprintf("首轮验证 JS 异常 url=%s", target), ex)
             vMu.Lock()
             failed.Push({"url": target, "status": 0, "error": sprint(ex)})
             vMu.Unlock()
@@ -894,17 +894,17 @@ for deepJs && deepRoundsRun < deepJsMaxRounds && len(deepQueue) > 0 && deepFiles
                 logReq(sprintf("HTTP GET 拉取 JS 正文（deep-js 扫描引用）url=%s", fromURL))
                 rsp2, _, e2 = poc.Get(fromURL, poc.timeout(verifyTO))
                 if e2 != nil {
-                    logErr(sprintf("deep-js 拉取正文失败 url=%s", fromURL), e2)
+                    logWarn(sprintf("deep-js 拉取正文失败 url=%s", fromURL), e2)
                     return
                 }
                 c2 = poc.GetStatusCodeFromResponse(rsp2.RawPacket)
                 if c2 < 200 || c2 >= 300 {
-                    logErr(sprintf("deep-js 拉取正文非 2xx url=%s", fromURL), sprintf("HTTP %v", c2))
+                    logWarn(sprintf("deep-js 拉取正文非 2xx url=%s", fromURL), sprintf("HTTP %v", c2))
                     return
                 }
                 bd = string(rsp2.GetBody())
             } catch ex2 {
-                logErr(sprintf("deep-js 拉取正文异常 url=%s", fromURL), ex2)
+                logWarn(sprintf("deep-js 拉取正文异常 url=%s", fromURL), ex2)
                 return
             }
             if len(bd) > deepJsMaxBodyBytes {
@@ -983,7 +983,7 @@ for deepJs && deepRoundsRun < deepJsMaxRounds && len(deepQueue) > 0 && deepFiles
                 }
                 resultMu.Unlock()
             } catch exJob {
-                logErr(sprintf("deep-js AI 任务异常 from=%s", sprint(jref["from_url"])), exJob)
+                logWarn(sprintf("deep-js AI 任务异常 from=%s", sprint(jref["from_url"])), exJob)
             }
         }(jB)
     }
@@ -1028,7 +1028,7 @@ if workDirTrim != "" {
         file.SaveJson(jsonOut, report)
         saveVerifiedJsFilesToDir(verified, jsSub, verifyTO, verifyConcurrent)
     } catch ew {
-        logErr("workdir 写入结果 JSON 或 artifacts", ew)
+        logWarn("workdir 写入结果 JSON 或 artifacts", ew)
     }
 }
 
@@ -1036,7 +1036,7 @@ if outputPath != "" {
     try {
         file.SaveJson(outputPath, report)
     } catch e2 {
-        logErr(sprintf("写入 --output 路径 path=%s", outputPath), e2)
+        logWarn(sprintf("写入 --output 路径 path=%s", outputPath), e2)
     }
 }
 

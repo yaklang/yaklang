@@ -1,29 +1,26 @@
 // test_prompt_stability.yak
+// 手动诊断脚本：复现 js-static-extract-ai Phase2 的 prompt 稳定性问题。
 // 用法:
 //   yak test_prompt_stability.yak
-//   yak test_prompt_stability.yak --rounds 5 --concurrent 8 --ai-model "qwen3.5-27b-free"
+//   yak test_prompt_stability.yak --rounds 5 --concurrent 2 --ai-model "qwen3.5-27b-free"
 //   yak test_prompt_stability.yak --js-dir /path/to/verified_js_dir   # 用真实 JS 文件
 //
-// 复现 js-static-extract-ai Phase2 的真实场景：
-//   - 使用真实长度的 minified JS 代码（1500 码点 chunk）
-//   - 使用真实大小的 sensitiveCtxLite
-//   - 使用与线上相同的并发数
-//   - 统计 liteforge 成功率、Empty Response 比例、think 模式占比
+// 注意: 本脚本需要可用的 AI 配置（模型/API Key），默认在 CI 中不自动运行。
 
 rounds     = cli.Int("rounds", cli.setDefault(3), cli.setHelp("每个模板调用轮数"))
-concurrent = cli.Int("concurrent", cli.setDefault(8), cli.setHelp("并发数（线上默认 8）"))
+concurrent = cli.Int("concurrent", cli.setDefault(2), cli.setHelp("并发数（线上默认 2）"))
 aiModel    = cli.String("ai-model", cli.setDefault("qwen3.5-27b-free"), cli.setHelp("指定 AI 模型"))
 aiDomain   = cli.String("ai-domain", cli.setDefault(""), cli.setHelp("AI domain"))
 aiProxy    = cli.String("ai-proxy", cli.setDefault(""), cli.setHelp("AI proxy"))
 useSpeed   = cli.Bool("speed-priority", cli.setDefault(true), cli.setHelp("是否使用 speedPriority"))
-jsDir      = cli.String("js-dir", cli.setDefault(""), cli.setHelp("可选：真实 JS 目录，从中随机取 chunk；不传则用内置 minified 样本"))
+jsDir      = cli.String("js-dir", cli.setDefault(""), cli.setHelp("可选：真实 JS 目录，从中随机取 chunk；不传则用内置合成样本"))
 chunkSize  = cli.Int("chunk-size", cli.setDefault(1500), cli.setHelp("模拟 chunk 大小（码点）"))
 cli.check()
 
 // ==================== 模拟数据 ====================
 
-// 真实 minified JS 样本（约 1500 字符，模拟 webpack 打包产物）
-sampleMinifiedJS = `!function(e,t){"object"==typeof exports&&"undefined"!=typeof module?module.exports=t():"function"==typeof define&&define.amd?define(t):(e="undefined"!=typeof globalThis?globalThis:e||self).Vue=t()}(this,(function(){"use strict";function e(e){return null!==e&&"object"==typeof e}function t(e){return"function"==typeof e}const n=Object.prototype.toString;function o(e){return"[object Map]"===n.call(e)}function r(e,t){if(e===t)return!0;if(!e||!t)return!1;const n=Array.isArray(e),o=Array.isArray(t);if(n!==o)return!1;if(n&&o){if(e.length!==t.length)return!1;for(let n=0;n<e.length;n++)if(!r(e[n],t[n]))return!1;return!0}if(e instanceof Date&&t instanceof Date)return e.getTime()===t.getTime();if(!n&&!o){const n=Object.keys(e),o=Object.keys(t);if(n.length!==o.length)return!1;for(let o=0;o<n.length;o++){const r=n[o];if(!t.hasOwnProperty(r)||!r(e[r],t[r]))return!1}return!0}return String(e)===String(t)}function s(e,t,n){const o=document.createElement(e);for(const[r,s]of Object.entries(t||{}))o.setAttribute(r,s);if(n){const e="string"==typeof n?document.createTextNode(n):n;o.appendChild(e)}return o}const i=e=>""+e,a=e=>null==e?"":Array.isArray(e)||e&&e.toString===Object.prototype.toString?JSON.stringify(e,null,2):String(e);function c(e){const t=parseFloat(e);return isNaN(t)?e:t}const l=new Set(["key","ref","onVnodeBeforeMount","onVnodeMounted","onVnodeBeforeUpdate","onVnodeUpdated","onVnodeBeforeUnmount","onVnodeUnmounted"]);`
+// 合成 JS 样本（模拟 webpack 打包产物，不含第三方真实代码）
+sampleMinifiedJS = `!function(e,t){e.API=t()}(this,function(){"use strict";function apiCall(url,method,data){return fetch(url,{method:method,body:JSON.stringify(data),headers:{"Content-Type":"application/json"}}).then(r=>r.json())}function handleError(err){console.error("API Error:",err);return null}const endpoints={users:"/api/v1/users",auth:"/api/v1/auth",config:"/api/v1/config",orders:"/api/v1/orders",payments:"/api/v1/payments"};function getBaseUrl(){return window.BASE_URL||"https://api.example.com"}function makeRequest(endpoint,payload){const url=getBaseUrl()+endpoint;return apiCall(url,"POST",payload).catch(handleError)}var app={init:function(){this.loadConfig().then(()=>this.fetchUsers())},loadConfig:function(){return makeRequest(endpoints.config,{version:"2.1"})},fetchUsers:function(){return makeRequest(endpoints.users,{page:1,limit:10})},login:function(creds){return makeRequest(endpoints.auth,creds)},getOrders:function(uid){return makeRequest(endpoints.orders,{user_id:uid})},pay:function(orderId){return makeRequest(endpoints.payments,{order_id:orderId})}};return app});`
 
 // 额外填充到目标长度
 padToLength = (s, targetLen) => {

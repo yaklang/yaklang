@@ -134,6 +134,13 @@ func ensureEmbeddedAIYakTool(name, script string) {
 	}
 	aiTool.Author = schema.AIResourceAuthorBuiltin
 	aiTool.IsBuiltin = true
+
+	// Sync only when not exists or hash changed, avoiding meaningless DB writes on every startup.
+	existing, err := yakit.GetAIYakTool(db, name)
+	if err == nil && existing.Hash == aiTool.CalcHash() {
+		return
+	}
+
 	if _, err := yakit.SaveAIYakTool(db, aiTool); err != nil {
 		log.Warnf("infosec_recon: register/update %s tool failed: %v", name, err)
 		return
