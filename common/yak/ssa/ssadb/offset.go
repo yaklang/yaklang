@@ -41,10 +41,16 @@ func SaveIrOffset(db *gorm.DB, idx *IrOffset) {
 	_ = db.Save(idx).Error
 }
 
-func GetOffsetByVariable(name string, valueID int64) []*IrOffset {
+func GetOffsetByVariable(name string, valueID int64, programName ...string) []*IrOffset {
 	db := GetDB()
 	var ir []*IrOffset
-	if err := db.Model(&IrOffset{}).Where("variable_name = ? and value_id = ?", name, valueID).Find(&ir).Error; err != nil {
+	query := db.Model(&IrOffset{}).Where("variable_name = ? and value_id = ?", name, valueID)
+	if len(programName) > 0 {
+		if p := strings.TrimSpace(programName[0]); p != "" {
+			query = query.Where("program_name = ?", p)
+		}
+	}
+	if err := query.Find(&ir).Error; err != nil {
 		return nil
 	}
 	return ir
