@@ -458,10 +458,11 @@ func WithPaging(name string, fieldNames []string, opts ...PropertyOption) ToolOp
 			},
 			"order": map[string]any{
 				"type": "string",
-				"enum": fieldNames,
+				"enum": []string{"asc", "desc"},
 			},
 			"orderby": map[string]any{
 				"type": "string",
+				"enum": fieldNames,
 			},
 		},
 	}

@@ -233,3 +233,40 @@ func TestMarshalInputSchema_StructArrayOptionalRequiredOmitted(t *testing.T) {
 	_, hasRequired := itemSchema["required"]
 	require.False(t, hasRequired, "array item required should be omitted when empty")
 }
+
+func TestWithPagingSchema(t *testing.T) {
+	tool := NewTool("query_test",
+		WithPaging("pagination", []string{"id", "created_at", "updated_at"}),
+	)
+
+	raw, err := json.Marshal(tool.InputSchema)
+	require.NoError(t, err)
+
+	var parsed map[string]any
+	require.NoError(t, json.Unmarshal(raw, &parsed))
+
+	rootProperties, ok := parsed["properties"].(map[string]any)
+	require.True(t, ok, "root properties should be object")
+
+	paginationSchema, ok := rootProperties["pagination"].(map[string]any)
+	require.True(t, ok, "pagination should be object schema")
+
+	paginationProperties, ok := paginationSchema["properties"].(map[string]any)
+	require.True(t, ok, "pagination.properties should be object")
+
+	// order should be asc/desc
+	orderSchema, ok := paginationProperties["order"].(map[string]any)
+	require.True(t, ok, "order should be object schema")
+	require.Equal(t, "string", orderSchema["type"])
+	orderEnum, ok := orderSchema["enum"].([]any)
+	require.True(t, ok, "order enum should be array")
+	require.ElementsMatch(t, []any{"asc", "desc"}, orderEnum)
+
+	// orderby should be field names
+	orderBySchema, ok := paginationProperties["orderby"].(map[string]any)
+	require.True(t, ok, "orderby should be object schema")
+	require.Equal(t, "string", orderBySchema["type"])
+	orderByEnum, ok := orderBySchema["enum"].([]any)
+	require.True(t, ok, "orderby enum should be array")
+	require.ElementsMatch(t, []any{"id", "created_at", "updated_at"}, orderByEnum)
+}
