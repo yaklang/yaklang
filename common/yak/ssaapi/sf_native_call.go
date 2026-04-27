@@ -136,21 +136,21 @@ const (
 	NativeCall_DataFlow = "dataflow"
 
 	// NativeCall_DataflowParam* are actual-parameter keys for <dataflow(...)> and matching keys on scan-style natives.
-	NativeCall_DataflowParamCode        = "code"
-	NativeCall_DataflowParamInclude     = "include"
-	NativeCall_DataflowParamExclude     = "exclude"
-	NativeCall_DataflowParamHook        = "hook"
-	NativeCall_DataflowParamUntil       = "until"
-	NativeCall_DataflowParamEnd         = "end"
-	NativeCall_DataflowParamDest        = "dest"
-	NativeCall_DataflowParamDestination = "destination"
-	NativeCall_DataflowParamOnlyReachable      = "only_reachable"
-	NativeCall_DataflowParamOnlyReachableCamel = "onlyReachable"
-	NativeCall_DataflowParamOnlyReachableKebab = "only-reachable"
-	NativeCall_DataflowParamOnlyReachableMode       = "only_reachable_mode"
+	NativeCall_DataflowParamCode                   = "code"
+	NativeCall_DataflowParamInclude                = "include"
+	NativeCall_DataflowParamExclude                = "exclude"
+	NativeCall_DataflowParamHook                   = "hook"
+	NativeCall_DataflowParamUntil                  = "until"
+	NativeCall_DataflowParamEnd                    = "end"
+	NativeCall_DataflowParamDest                   = "dest"
+	NativeCall_DataflowParamDestination            = "destination"
+	NativeCall_DataflowParamOnlyReachable          = "only_reachable"
+	NativeCall_DataflowParamOnlyReachableCamel     = "onlyReachable"
+	NativeCall_DataflowParamOnlyReachableKebab     = "only-reachable"
+	NativeCall_DataflowParamOnlyReachableMode      = "only_reachable_mode"
 	NativeCall_DataflowParamOnlyReachableModeCamel = "onlyReachableMode"
-	NativeCall_DataflowParamStrict = "strict"
-	NativeCall_DataflowParamIcfg   = "icfg"
+	NativeCall_DataflowParamStrict                 = "strict"
+	NativeCall_DataflowParamIcfg                   = "icfg"
 
 	// CFG native calls
 	NativeCall_GetCFG             = "getCfg"
@@ -163,6 +163,9 @@ const (
 	NativeCall_CFGConditionValues = "cfgConditionValues"
 	NativeCall_CFGBlockInfo       = "cfgBlock"
 	NativeCall_CFGInstInfo        = "cfgInst"
+
+	// NativeCall_ReachabilityGuard reports mustExecute(from-entry) for a target point and optional predicates.
+	NativeCall_ReachabilityGuard = "reachabilityGuard"
 
 	// NativeCall_Const is used to search const value
 	NativeCall_Const = "const"
@@ -1520,6 +1523,7 @@ func init() {
 	registerNativeCall(NativeCall_CFGConditionValues, nc_func(nativeCallCFGConditionValues), nc_desc(`CFG 条件 value 集：返回当前 block 条件关联的 value 列表。config 参数：无。`))
 	registerNativeCall(NativeCall_CFGBlockInfo, nc_func(nativeCallCFGBlock), nc_desc(`CFG block 信息：输出 cfg 的函数/基本块定位信息（用于证据与调试）。config 参数：无。`))
 	registerNativeCall(NativeCall_CFGInstInfo, nc_func(nativeCallCFGInst), nc_desc(`CFG inst 信息：输出 cfg 的函数/基本块/指令定位信息（用于证据与调试）。config 参数：无。`))
+	registerNativeCall(NativeCall_ReachabilityGuard, nc_func(nativeCallReachabilityGuard), nc_desc(`可达性守卫（mustExecute）：从函数入口起 target 是否在每条出路上必执行。返回值（可多项）：入口全路径必达且 cfgPostDominates 成立时仅返回布尔常量 true；入口 CFG 不可达 target 时返回 false；否则返回到达 target 时路径上的条件 SSA value 列表（CondValueID 顺序，嵌套 if/loop/switch 等可能对应多项）。跨 Program/跨函数/无入口信息时返回 false。必达判定依赖后支配，merge 块上可能保守。管道上可选同函数 SSA 作锚；必填 target="$to"。mode 仅 mustExecute。`))
 }
 
 func fetchProgram(v any) (*Program, error) {
