@@ -342,7 +342,11 @@ func (c *ProgramCache) valueFromIrCode(cache *ProgramCache, inst Instruction, ir
 
 	// variable
 	for _, name := range ir.Variable {
-		value.AddVariable(GetVariableFromDB(ir.GetIdInt64(), name))
+		progName := ""
+		if cache != nil && cache.program != nil {
+			progName = cache.program.GetProgramName()
+		}
+		value.AddVariable(GetVariableFromDB(ir.GetIdInt64(), name, progName))
 	}
 
 	// mask

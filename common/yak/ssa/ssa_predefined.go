@@ -797,7 +797,11 @@ func (a *anValue) GetVariable(name string) *Variable {
 		}
 	}
 	if a.IsFromDB() {
-		v := GetVariableFromDB(a.GetId(), name)
+		programName := ""
+		if prog := a.GetProgram(); prog != nil {
+			programName = prog.GetProgramName()
+		}
+		v := GetVariableFromDB(a.GetId(), name, programName)
 		a.AddVariable(v)
 		return v
 	}

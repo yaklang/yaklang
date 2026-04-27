@@ -459,8 +459,12 @@ func unmarshalExtraInformation(cache *ProgramCache, inst Instruction, ir *ssadb.
 		if ret.FreeValues == nil {
 			ret.FreeValues = make(map[*Variable]int64)
 		}
+		progName := ""
+		if cache != nil && cache.program != nil {
+			progName = cache.program.GetProgramName()
+		}
 		for k, v := range free_values {
-			variable := GetVariableFromDB(v, k)
+			variable := GetVariableFromDB(v, k, progName)
 			ret.FreeValues[variable] = v
 		}
 		ret.ParameterMembers = utils.MapGetInt64Slice(params, "parameter_members")
