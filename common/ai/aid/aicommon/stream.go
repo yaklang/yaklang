@@ -33,6 +33,11 @@ type streamEvent struct {
 	// When > 0, ThrottledCopy is used instead of io.Copy, accumulating data and flushing
 	// at this interval. This is used for tool stdout/stderr to avoid overwhelming gRPC.
 	throttleInterval time.Duration
+
+	// disableRecoveryBlock keeps stream events inside another recovery block
+	// (for example tool stdout/stderr under a tool call) from creating their own
+	// stream-level recovery index.
+	disableRecoveryBlock bool
 }
 
 func newStreamAIOutputEventWriter(
@@ -48,30 +53,32 @@ func newStreamAIOutputEventWriter(
 	disableMarkdown := event.disableMarkdown
 	taskIndex := event.taskIndex
 	return &streamAIOutputEventWriter{
-		coordinatorId:   id,
-		nodeId:          nodeId,
-		disableMarkdown: disableMarkdown,
-		isSystem:        system,
-		isReason:        reason,
-		handler:         emit,
-		timeStamp:       timeStamp,
-		eventWriterID:   eventWriterID,
-		taskIndex:       taskIndex,
-		contentType:     event.contentType,
+		coordinatorId:        id,
+		nodeId:               nodeId,
+		disableMarkdown:      disableMarkdown,
+		isSystem:             system,
+		isReason:             reason,
+		handler:              emit,
+		timeStamp:            timeStamp,
+		eventWriterID:        eventWriterID,
+		taskIndex:            taskIndex,
+		contentType:          event.contentType,
+		disableRecoveryBlock: event.disableRecoveryBlock,
 	}
 }
 
 type streamAIOutputEventWriter struct {
-	isReason        bool
-	isSystem        bool
-	disableMarkdown bool
-	coordinatorId   string
-	nodeId          string
-	contentType     string
-	taskIndex       string
-	handler         BaseEmitter
-	timeStamp       int64
-	eventWriterID   string
+	isReason             bool
+	isSystem             bool
+	disableMarkdown      bool
+	disableRecoveryBlock bool
+	coordinatorId        string
+	nodeId               string
+	contentType          string
+	taskIndex            string
+	handler              BaseEmitter
+	timeStamp            int64
+	eventWriterID        string
 }
 
 func (e *streamAIOutputEventWriter) Write(b []byte) (int, error) {
@@ -97,6 +104,9 @@ func (e *streamAIOutputEventWriter) Write(b []byte) (int, error) {
 		TaskIndex:       e.taskIndex,
 		DisableMarkdown: e.disableMarkdown,
 		ContentType:     e.contentType,
+	}
+	if !e.disableRecoveryBlock {
+		event.RecoveryIndexID = e.eventWriterID
 	}
 	e.handler(event)
 	return len(b), nil

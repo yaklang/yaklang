@@ -33,6 +33,7 @@ func CreateOrUpdateAIOutputEvent(db *gorm.DB, event *schema.AiOutputEvent) error
 	if event == nil {
 		return nil
 	}
+	event.NormalizeRecoveryBlock()
 	db = db.Model(event)
 
 	// stream-finished is a structured event emitted by the AI emitter to mark the end of a stream.
