@@ -71,7 +71,12 @@ func init() {
 					if !isDone {
 						return
 					}
-					if loop.GetLastValidAction().ActionType == schema.AI_REACT_LOOP_ACTION_DIRECTLY_ANSWER {
+					lastAction := loop.GetLastAction()
+					if lastAction == nil {
+						log.Warnf("iteration %d: skip final summary because last action is empty", iteration)
+						return
+					}
+					if lastAction.ActionType == schema.AI_REACT_LOOP_ACTION_DIRECTLY_ANSWER {
 						log.Infof("iteration %d: action is directly answer, exiting loop and returning final answer", iteration)
 						return
 					}
