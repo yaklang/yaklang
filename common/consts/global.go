@@ -325,6 +325,22 @@ func GetDefaultAISkillsDir() string {
 	return pt
 }
 
+// GetDefaultYakitAIFocusDir returns the default directory for user-defined
+// yak focus modes. Each subdirectory under this path that contains a
+// *.ai-focus.yak entry file is treated as one focus mode and is registered
+// lazily (with cooldown) when the focus mode list is queried.
+//
+// Path: ~/yakit-projects/ai-focus  (or $YAKIT_HOME/ai-focus)
+//
+// 关键词: yak focus mode user dir, ai-focus directory, lazy registration
+func GetDefaultYakitAIFocusDir() string {
+	pt := filepath.Join(GetDefaultYakitBaseDir(), "ai-focus")
+	if !utils.IsDir(pt) {
+		os.MkdirAll(pt, 0o777)
+	}
+	return pt
+}
+
 // aiSkillSubDirs lists the well-known sub-paths checked for AI skills.
 // Each entry is either user-level (rooted at $HOME) or project-level (rooted at $CWD).
 var aiSkillSubDirs = []struct {

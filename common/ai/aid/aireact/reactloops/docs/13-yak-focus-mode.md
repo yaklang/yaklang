@@ -417,13 +417,144 @@ A：不会。`reactloops` 通过 `WithOnLoopRelease`（[../options.go](../option
 
 写自己的 yak focus mode 测试时，强烈推荐复制 `e2e_test.go` 的 `mockAIScript` 模式。
 
-## 13.10 进一步阅读
+## 13.10 三种调试模式
+
+写完一个 yak focus mode 之后，按推荐顺序用以下三档手段调试：
+
+### 调试模式 1：CLI 直跑（最快）
+
+最简单：
+
+```bash
+yak ai-focus \
+  --file ~/yakit-projects/ai-focus/my_first_focus/my_first_focus.ai-focus.yak \
+  --query "say hi to alice"
+```
+
+常用 flag：
+
+| flag | 用途 |
+|---|---|
+| `--debug` | 打印 ReActLoop 内部事件（解析、verifier、handler、感知、自旋检测） |
+| `--json` | 事件以 JSON 行式输出，方便接 `jq` / 自动化脚本 |
+| `--max-iter N` | 临时覆盖 `__MAX_ITERATIONS__`，快速 timeout 验证 |
+| `--ai-type chatglm/openai/...` | 切换 AI 提供方做对照实验 |
+
+配合 [12-debugging-and-observability.md](12-debugging-and-observability.md) 的 `YAKIT_AI_WORKSPACE_DEBUG=1`：
+
+```bash
+YAKIT_AI_WORKSPACE_DEBUG=1 yak ai-focus --file ... --query "..."
+```
+
+工作台会把每一轮 prompt / action / perception / intent 快照写入磁盘，路径在引擎日志中以 `workspace_debug ... saved to ...` 形式可见。读 prompt 比读事件更直观。
+
+### 调试模式 2：Memfit UI 内调试（用户视角验收）
+
+CLI 跑通之后，用 Memfit 桌面端再跑一遍验证 UI 流式渲染：
+
+1. **放置文件**：`~/yakit-projects/ai-focus/<name>/<name>.ai-focus.yak`（必须严格按命名约定）
+2. **冷却窗口**：默认 5 秒；新 focus mode 不会立刻出现，等 5 秒或者重启引擎；想加速就 `export YAK_AI_FOCUS_RELOAD_INTERVAL=2s` 再启动 yak grpc
+3. **启动 Memfit 桌面端**，等连上本机 yak gRPC（默认 `127.0.0.1:8087`）
+4. **拉取列表**：在「专注模式」下拉中应能看到你 focus mode 的 `__VERBOSE_NAME_ZH__` / `__VERBOSE_NAME__`
+5. **选中 + 发问**：右侧事件 timeline 会显示 `verifier` 接收 → `handler` 调用 → `op.Feedback(...)` → 后续轮次
+6. **看落盘的 prompt**：与 CLI 一样，启动引擎前 `export YAKIT_AI_WORKSPACE_DEBUG=1`，UI 触发的会话会同样落盘
+
+UI 侧入口（仅供查代码定位）：
+
+- 列表组件：`yakit/app/renderer/src/main/src/pages/ai-re-act/aiFocusMode/AIFocusMode.tsx`
+- 提及面板：`yakit/app/renderer/src/main/src/pages/ai-agent/components/aiChatMention/AIChatMention.tsx`
+- IPC 封装：`yakit/app/renderer/src/main/src/pages/ai-agent/grpc.ts` 的 `grpcQueryAIFocus`
+- gRPC 入口：[grpc_ai_focus.go](../../../../../yakgrpc/grpc_ai_focus.go) 的 `Server.QueryAIFocus`
+
+> Memfit UI **不需要**额外加调试面板；现有的「专注模式下拉 + 自由提问 + 事件 timeline」就是最自然的端到端调试入口。`YAKIT_AI_WORKSPACE_DEBUG=1` 是观察"模型看到了什么 prompt / 选了哪个 action"的官方手段。
+
+### 调试模式 3：单元测试（回归保障）
+
+CLI / UI 都跑通之后，写一份 e2e 测试锁住关键路径，防回归：
+
+参考 [../reactloops_yak/e2e_test.go](../reactloops_yak/e2e_test.go) 中 `mockAIScript` 模式，骨架：
+
+```go
+mock := &mockAIScript{
+    responses: []mockAIResponse{
+        {body: `{"@action":"say_hello","name":"alice"}`},
+        {body: `{"@action":"finish"}`},
+    },
+    fallback: `{"@action":"finish"}`,
+}
+// ... 注册 focus mode + 构造 ReAct + WithAICallback(mock) + loop.Execute ...
+require.Equal(t, "alice", loop.GetVariable("current_target"),
+    "verifier must set current_target")
+require.Greater(t, utils.InterfaceToInt(loop.GetVariable("greet_count")), 0,
+    "handler must increment greet_count")
+```
+
+要点：
+- 用 `loop.GetVariable` 而非 `loop.Get` 取原生类型断言
+- mock 用 `{"@action":"finish"}` 干净退出，不要用 `directly_answer`（需要 `answer_payload`）
+- 测试入口加 `_ "github.com/yaklang/yaklang/common/yak"` 空白 import 触发标准库注册（否则 `str.HasPrefix` / `log.info` 等会 panic）
+
+## 13.11 用户扩展目录 `~/yakit-projects/ai-focus/`
+
+除了仓库内嵌的 [reactloops_yak/focus_modes/](../reactloops_yak/focus_modes/)，yak 引擎还会自动发现你写在 `~/yakit-projects/ai-focus/` 下的 user-defined yak focus mode，与 `ai-skills/` 平级。
+
+### 目录约定
+
+```
+~/yakit-projects/
+├── ai-skills/                    # 既有：AutoSkillLoader 自动发现 SKILL.md
+└── ai-focus/                     # 本特性：user yak focus mode
+    └── <name>/
+        ├── <name>.ai-focus.yak   # 主入口（必需，文件名 = 文件夹名）
+        ├── *.yak                 # 任意 sidekick（可选，自动加载）
+        └── README.md             # 任意非 yak 文件（被忽略）
+```
+
+### 发现机制
+
+| 触发点 | 实现 |
+|---|---|
+| `QueryAIFocus` gRPC 调用（UI 拉列表） | [grpc_ai_focus.go](../../../../../yakgrpc/grpc_ai_focus.go) 入口调 `EnsureUserFocusModesLoaded` |
+| `StartAIReAct` gRPC 调用（开新会话） | [grpc_ai_re-act.go](../../../../../yakgrpc/grpc_ai_re-act.go) 入口调 `EnsureUserFocusModesLoaded` |
+| `yak ai-focus --file ...` CLI | 不依赖目录扫描，CLI 显式注册 `--file` 指向的文件 |
+
+### 行为约定
+
+- **懒扫描**：绝不在 `init()` 触发，不会拖慢 yak 启动
+- **冷却窗口**：默认 5 秒（可被 env `YAK_AI_FOCUS_RELOAD_INTERVAL=2s` 覆盖），同一 5 秒窗口内多次调用 `EnsureUserFocusModesLoaded` 等价 no-op
+- **加性注册**：扫到的新 focus mode 注册到全局表；同名（含已被内置注册的）跳过；删除磁盘文件不会反注册（重启进程清理）
+- **错误隔离**：单个 focus mode 编译/注册失败只 `log.Warn`，不影响其它 focus mode 与主流程
+- **并发安全**：多 goroutine 同时调用只有一次实际扫盘
+- **零侵入**：用户 focus mode 不进入主仓库 git；不需要 PR 到 yaklang，不需要重新编译
+
+### 实现入口
+
+[../reactloops_yak/user_dir_loader.go](../reactloops_yak/user_dir_loader.go) — 公开 1 个 API：
+
+```go
+func EnsureUserFocusModesLoaded() error
+```
+
+测试 hook：`SetUserFocusDirForTest(dir string)` / `ResetUserFocusLoaderForTest()` / `SnapshotUserFocusLoadedForTest()`，仅供 Go 测试覆盖根目录与状态重置。
+
+### 上线 checklist
+
+- [ ] 文件路径符合 `~/yakit-projects/ai-focus/<name>/<name>.ai-focus.yak`
+- [ ] `yak <name>.ai-focus.yak` 能纯解析通过（声明 only，无运行期错误）
+- [ ] `yak ai-focus --file ... --query "..."` 能跑通一轮
+- [ ] 重启 yak grpc 引擎（或等 5 秒）后，curl/gRPC 调 `QueryAIFocus` 能看到 `Name` 字段是你 focus mode name
+- [ ] Memfit UI 下拉里出现，选中后能正常发问
+
+## 13.12 进一步阅读
 
 - 源码入口：[../yak_focus_mode_register.go](../yak_focus_mode_register.go)
 - 常量约定：[../yak_focus_mode_constants.go](../yak_focus_mode_constants.go)
 - Caller 实现：[../yak_focus_mode_caller.go](../yak_focus_mode_caller.go)
 - Loader（embed + dir 双模）：[../reactloops_yak/loader.go](../reactloops_yak/loader.go)
+- 用户目录懒扫描：[../reactloops_yak/user_dir_loader.go](../reactloops_yak/user_dir_loader.go)
 - CLI：[common/yak/cmd/yakcmds/ai_focus.go](../../../../../yak/cmd/yakcmds/ai_focus.go)
+- gRPC 入口：[grpc_ai_focus.go](../../../../../yakgrpc/grpc_ai_focus.go) / [grpc_ai_re-act.go](../../../../../yakgrpc/grpc_ai_re-act.go)
+- Memfit AI ↔ yaklang AI 关系总览：[../../../../MEMFIT_RELATIONSHIP.md](../../../../MEMFIT_RELATIONSHIP.md)
 
 ---
 

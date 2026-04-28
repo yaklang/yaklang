@@ -493,6 +493,7 @@ desc(loop.GetInvoker())  // 看 invoker
 - [03-prompt-system.md](03-prompt-system.md)：prompt observation 详解
 - [05-hooks-and-lifecycle.md](05-hooks-and-lifecycle.md)：怎么在 hook 里加调试
 - [08-determinism-mechanisms.md](08-determinism-mechanisms.md)：感知 / 反思 / 自旋的产物在 debug 目录哪里
+- [13-yak-focus-mode.md](13-yak-focus-mode.md) §13.10 / §13.11：yak 专注模式专属的三种调试模式（CLI / Memfit UI / 单元测试）+ `~/yakit-projects/ai-focus/` 用户扩展目录
 - 源码：
   - [workspace_debug.go](../workspace_debug.go)
   - [prompt_observation.go](../prompt_observation.go)

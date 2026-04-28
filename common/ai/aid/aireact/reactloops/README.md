@@ -95,7 +95,7 @@ flowchart TD
 | [docs/10-build-your-own-loop.md](docs/10-build-your-own-loop.md) | **重头戏**：12 步端到端教程 + checklist，所有样板代码 |
 | [docs/11-case-studies.md](docs/11-case-studies.md) | 17 个 loop_xxx 横向对比表 + 5 个重点细讲 |
 | [docs/12-debugging-and-observability.md](docs/12-debugging-and-observability.md) | `YAKIT_AI_WORKSPACE_DEBUG`、调试产物、prompt observation、timeline、测试基建 |
-| [docs/13-yak-focus-mode.md](docs/13-yak-focus-mode.md) | **进阶**：用 Yak 脚本（`*.ai-focus.yak`）写专注模式 + sidekick 自动加载 + `yak ai-focus` CLI |
+| [docs/13-yak-focus-mode.md](docs/13-yak-focus-mode.md) | **进阶**：用 Yak 脚本（`*.ai-focus.yak`）写专注模式 + sidekick 自动加载 + `yak ai-focus` CLI + 三种调试模式 + `~/yakit-projects/ai-focus/` 用户扩展目录 |
 
 ## 最小上手样板
 
