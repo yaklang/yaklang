@@ -242,8 +242,8 @@
   {
     "rule_id": "085048db-7a44-4478-a3e7-64872486f239",
     "rule_name": "检测Golang JSON注入漏洞",
-    "hash": "152654f950b18b16269e64abf3fe814efa972bfcc214d8e2c759994e26ead1f7",
-    "version": "20251230.0001"
+    "hash": "71f6d04d802df08aa8890673c5348bea852410724ecb717d8e508f867f4cb4d5",
+    "version": "20260428.0001"
   },
   {
     "rule_id": "34545e88-e64d-4534-9e96-261ff984b6ba",
