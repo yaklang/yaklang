@@ -474,6 +474,38 @@ func TestChatPreferredTierOverridesGlobalPolicy(t *testing.T) {
 	})
 }
 
+func TestChat_DefaultsToAIGlobalConfigWhenNoTypeSpecified(t *testing.T) {
+	original := consts.GetTieredAIConfig()
+	defer consts.SetTieredAIConfig(original)
+
+	const provider = "test-global-default"
+	aispec.Register(provider, func() aispec.AIClient { return &TestGateway{} })
+
+	consts.SetTieredAIConfig(&consts.TieredAIConfig{
+		Enabled: false,
+		IntelligentConfigs: []*ypb.AIModelConfig{{
+			Provider:  &ypb.ThirdPartyApplicationConfig{Type: provider, APIKey: "global-key"},
+			ModelName: "global-model",
+		}},
+	})
+
+	var gotProvider, gotModel string
+	_, err := Chat("hello",
+		aispec.WithModelInfoCallback(func(p, m string) {
+			gotProvider = p
+			gotModel = m
+		}),
+		aispec.WithStreamAndConfigHandler(func(reader io.Reader, cfg *aispec.AIConfig) {
+			assert.Equal(t, provider, cfg.Type)
+			assert.Equal(t, "global-model", cfg.Model)
+			assert.Equal(t, "global-key", cfg.APIKey)
+		}),
+	)
+	assert.NoError(t, err)
+	assert.Equal(t, provider, gotProvider)
+	assert.Equal(t, "global-model", gotModel)
+}
+
 func TestFunctionCallSupportsPreferredTier(t *testing.T) {
 	original := consts.GetTieredAIConfig()
 	defer consts.SetTieredAIConfig(original)

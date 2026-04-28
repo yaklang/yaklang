@@ -2847,6 +2847,7 @@ message ThirdPartyApplicationConfig {
   string Endpoint = 14;
   bool EnableEndpoint = 15;
   repeated KVPair Headers = 16;
+  bool EnableThinking = 17;
 }
 
 message DiagnoseNetworkRequest {

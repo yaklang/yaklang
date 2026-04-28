@@ -31,6 +31,27 @@ func TestBuildOptionsFromConfig_AppliesAPIType(t *testing.T) {
 	assert.Equal(t, "test-value", resolved.Headers[0].GetValue())
 }
 
+func TestBuildOptionsFromConfig_AppliesEnableThinking(t *testing.T) {
+	config := &ypb.AIModelConfig{
+		ModelName: "deepseek-ai/DeepSeek-V4-Flash",
+		Provider: &ypb.ThirdPartyApplicationConfig{
+			Type:           "siliconflow",
+			APIKey:         "test-key",
+			Domain:         "api.siliconflow.cn",
+			EnableThinking: true,
+		},
+	}
+
+	resolved := NewDefaultAIConfig(BuildOptionsFromConfig(config)...)
+	assert.Equal(t, "siliconflow", resolved.Type)
+	assert.Equal(t, "deepseek-ai/DeepSeek-V4-Flash", resolved.Model)
+	assert.True(t, resolved.EnableThinking)
+	assert.Equal(t, "enable_thinking", resolved.EnableThinkingField)
+	val, ok := resolved.EnableThinkingValue.(bool)
+	assert.True(t, ok)
+	assert.True(t, val)
+}
+
 func TestGetBaseURLFromConfig_UsesResponsesAPIType(t *testing.T) {
 	config := NewDefaultAIConfig(
 		WithType("openai"),

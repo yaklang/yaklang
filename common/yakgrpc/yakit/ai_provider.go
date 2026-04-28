@@ -344,6 +344,7 @@ func providerSignature(cfg *ypb.ThirdPartyApplicationConfig) string {
 		cfg.GetProxy(),
 		cfg.GetNoHttps(),
 		cfg.GetEnableEndpoint(),
+		cfg.GetEnableThinking(),
 	)
 }
 

@@ -284,6 +284,10 @@ func buildOptionsFromProviderAndModel(provider *ypb.ThirdPartyApplicationConfig,
 		opts = append(opts, WithAPIType(provider.APIType))
 	}
 
+	if provider.GetEnableThinking() {
+		opts = append(opts, WithEnableThinking(provider.GetEnableThinking()))
+	}
+
 	if modelName != "" {
 		opts = append(opts, WithModel(modelName))
 		return opts
