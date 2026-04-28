@@ -3,6 +3,7 @@ package scannode
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -21,6 +22,11 @@ type aiSessionCommandRef struct {
 	CommandID   string
 	SessionID   string
 	RunID       string
+	OwnerUserID string
+}
+
+type aiProviderCommandRef struct {
+	CommandID   string
 	OwnerUserID string
 }
 
@@ -63,7 +69,11 @@ func (p *aiSessionEventPublisher) PublishEvent(
 	if eventType == "" {
 		eventType = legionEventAISessionEvent
 	}
-	return p.publish(ctx, legionEventAISessionEvent, ref, eventIDWithSuffix(ref.CommandID, ref.SessionID, "event"), &aiv1.AISessionEvent{
+	suffix := "event"
+	if seq > 0 {
+		suffix = fmt.Sprintf("event-%d", seq)
+	}
+	return p.publish(ctx, legionEventAISessionEvent, ref, eventIDWithSuffix(ref.CommandID, ref.SessionID, suffix), &aiv1.AISessionEvent{
 		Session:     aiSessionProtoRef(ref),
 		Seq:         seq,
 		EventType:   eventType,
@@ -140,7 +150,7 @@ func (p *aiSessionEventPublisher) publish(
 			NodeSessionId: session.SessionID,
 		},
 	}
-	if err := attachAISessionEventMetadata(message, metadata); err != nil {
+	if err := attachAIEventMetadata(message, metadata); err != nil {
 		return err
 	}
 
@@ -160,7 +170,129 @@ func (p *aiSessionEventPublisher) publish(
 	if _, err := js.PublishMsg(msg, nats.MsgId(eventID)); err != nil {
 		return fmt.Errorf("publish ai session event %s: %w", eventType, err)
 	}
-	log.Infof("published legion ai session event: type=%s session_id=%s", eventType, ref.SessionID)
+	logPublishedAISessionEvent(eventType, ref.SessionID, message)
+	return nil
+}
+
+func (p *aiSessionEventPublisher) PublishProviderModelsListed(
+	ctx context.Context,
+	ref aiProviderCommandRef,
+	items []*aiv1.AIProviderPreviewModel,
+) error {
+	return p.publishProvider(
+		ctx,
+		legionEventAIProviderModelsListed,
+		ref,
+		providerEventIDWithSuffix(ref.CommandID, ref.OwnerUserID, "models-listed"),
+		&aiv1.AIProviderModelsListed{
+			OwnerUserId: strings.TrimSpace(ref.OwnerUserID),
+			Items:       items,
+		},
+	)
+}
+
+func (p *aiSessionEventPublisher) PublishProviderModelsFailed(
+	ctx context.Context,
+	ref aiProviderCommandRef,
+	errorCode string,
+	errorMessage string,
+) error {
+	return p.publishProvider(
+		ctx,
+		legionEventAIProviderModelsFailed,
+		ref,
+		providerEventIDWithSuffix(ref.CommandID, ref.OwnerUserID, "models-failed"),
+		&aiv1.AIProviderModelsFailed{
+			OwnerUserId:  strings.TrimSpace(ref.OwnerUserID),
+			ErrorCode:    strings.TrimSpace(errorCode),
+			ErrorMessage: strings.TrimSpace(errorMessage),
+		},
+	)
+}
+
+func (p *aiSessionEventPublisher) PublishProviderHealthCheckCompleted(
+	ctx context.Context,
+	ref aiProviderCommandRef,
+	result *aiv1.AIProviderHealthCheckCompleted,
+) error {
+	if result == nil {
+		result = &aiv1.AIProviderHealthCheckCompleted{}
+	}
+	result.OwnerUserId = strings.TrimSpace(ref.OwnerUserID)
+	return p.publishProvider(
+		ctx,
+		legionEventAIProviderHealthCheckCompleted,
+		ref,
+		providerEventIDWithSuffix(ref.CommandID, ref.OwnerUserID, "health-check-completed"),
+		result,
+	)
+}
+
+func (p *aiSessionEventPublisher) PublishProviderHealthCheckFailed(
+	ctx context.Context,
+	ref aiProviderCommandRef,
+	errorCode string,
+	errorMessage string,
+) error {
+	return p.publishProvider(
+		ctx,
+		legionEventAIProviderHealthCheckFailed,
+		ref,
+		providerEventIDWithSuffix(ref.CommandID, ref.OwnerUserID, "health-check-failed"),
+		&aiv1.AIProviderHealthCheckFailed{
+			OwnerUserId:  strings.TrimSpace(ref.OwnerUserID),
+			ErrorCode:    strings.TrimSpace(errorCode),
+			ErrorMessage: strings.TrimSpace(errorMessage),
+		},
+	)
+}
+
+func (p *aiSessionEventPublisher) publishProvider(
+	ctx context.Context,
+	eventType string,
+	ref aiProviderCommandRef,
+	eventID string,
+	message proto.Message,
+) error {
+	session, ok := p.node.GetSessionState()
+	if !ok {
+		return ErrNodeSessionNotReady
+	}
+	if err := p.ensureJetStream(session.NATSURL); err != nil {
+		return err
+	}
+
+	metadata := &nodev1.EventMetadata{
+		EventId:       eventID,
+		EventType:     eventType,
+		CausationId:   ref.CommandID,
+		CorrelationId: ref.OwnerUserID,
+		EmittedAt:     timestamppb.New(time.Now().UTC()),
+		Node: &nodev1.NodeRef{
+			NodeId:        p.node.CurrentNodeID(),
+			NodeSessionId: session.SessionID,
+		},
+	}
+	if err := attachAIEventMetadata(message, metadata); err != nil {
+		return err
+	}
+
+	raw, err := proto.Marshal(message)
+	if err != nil {
+		return fmt.Errorf("marshal ai provider event: %w", err)
+	}
+	msg := nats.NewMsg(jobEventSubject(session.EventSubjectPrefix, eventType))
+	msg.Data = raw
+
+	p.mu.Lock()
+	js := p.js
+	p.mu.Unlock()
+	if js == nil {
+		return fmt.Errorf("jetstream context is not ready")
+	}
+	if _, err := js.PublishMsg(msg, nats.MsgId(eventID)); err != nil {
+		return fmt.Errorf("publish ai provider event %s: %w", eventType, err)
+	}
 	return nil
 }
 
@@ -197,7 +329,7 @@ func (p *aiSessionEventPublisher) closeLocked() {
 	p.natsURL = ""
 }
 
-func attachAISessionEventMetadata(message proto.Message, metadata *nodev1.EventMetadata) error {
+func attachAIEventMetadata(message proto.Message, metadata *nodev1.EventMetadata) error {
 	switch value := message.(type) {
 	case *aiv1.AISessionReady:
 		value.Metadata = metadata
@@ -209,8 +341,16 @@ func attachAISessionEventMetadata(message proto.Message, metadata *nodev1.EventM
 		value.Metadata = metadata
 	case *aiv1.AISessionCancelled:
 		value.Metadata = metadata
+	case *aiv1.AIProviderModelsListed:
+		value.Metadata = metadata
+	case *aiv1.AIProviderModelsFailed:
+		value.Metadata = metadata
+	case *aiv1.AIProviderHealthCheckCompleted:
+		value.Metadata = metadata
+	case *aiv1.AIProviderHealthCheckFailed:
+		value.Metadata = metadata
 	default:
-		return fmt.Errorf("unsupported ai session event message: %T", message)
+		return fmt.Errorf("unsupported ai event message: %T", message)
 	}
 	return nil
 }
@@ -230,4 +370,59 @@ func eventIDWithSuffix(commandID string, sessionID string, suffix string) string
 		return sessionID + ":" + suffix + ":" + uuid.NewString()
 	}
 	return uuid.NewString()
+}
+
+func providerEventIDWithSuffix(commandID string, ownerUserID string, suffix string) string {
+	base := strings.TrimSpace(ownerUserID)
+	if base == "" {
+		base = "provider"
+	}
+	return eventIDWithSuffix(commandID, base, suffix)
+}
+
+func logPublishedAISessionEvent(eventType string, sessionID string, message proto.Message) {
+	runtimeType, seq := extractAISessionRuntimeLogFields(message)
+	if shouldDebugAISessionRuntimeEvent(runtimeType) {
+		log.Debugf(
+			"published legion ai session event: type=%s runtime_type=%s seq=%d session_id=%s",
+			eventType,
+			runtimeType,
+			seq,
+			sessionID,
+		)
+		return
+	}
+	if runtimeType != "" {
+		log.Infof(
+			"published legion ai session event: type=%s runtime_type=%s seq=%d session_id=%s",
+			eventType,
+			runtimeType,
+			seq,
+			sessionID,
+		)
+		return
+	}
+	log.Infof("published legion ai session event: type=%s session_id=%s", eventType, sessionID)
+}
+
+func extractAISessionRuntimeLogFields(message proto.Message) (string, uint64) {
+	event, ok := message.(*aiv1.AISessionEvent)
+	if !ok {
+		return "", 0
+	}
+	return strings.TrimSpace(event.GetEventType()), event.GetSeq()
+}
+
+func shouldDebugAISessionRuntimeEvent(runtimeType string) bool {
+	switch strings.TrimSpace(runtimeType) {
+	case aiSessionRuntimeEventDelta,
+		aiSessionRuntimeEventThought,
+		aiSessionRuntimeEventMessage,
+		aiSessionRuntimeEventToolCall,
+		aiSessionRuntimeEventToolResult,
+		"consumption":
+		return true
+	default:
+		return false
+	}
 }
