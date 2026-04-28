@@ -638,6 +638,10 @@ func (r *ReActLoop) applyPerceptionKnowledgeSearchResult(query string, knowledge
 		r.Set("perception_selected_knowledge_bases", strings.Join(knowledgeBases, ","))
 	}
 	r.Set("perception_knowledge_context", content)
+
+	if emitter := r.GetEmitter(); emitter != nil {
+		_, _ = emitter.EmitPerceptionKnowledge("perception-knowledge", query, knowledgeBases, content)
+	}
 }
 
 func (r *ReActLoop) refreshKnowledgeFromPerception(state *PerceptionState) {
@@ -726,6 +730,18 @@ func (r *ReActLoop) refreshCapabilitiesFromPerception(state *PerceptionState) {
 		invoker.AddToTimeline("perception_capabilities",
 			fmt.Sprintf("Perception capability search (epoch=%d): tools=%d, forges=%d, skills=%d, focus_modes=%d",
 				state.Epoch, len(searchResult.MatchedToolNames), len(searchResult.MatchedForgeNames), len(searchResult.MatchedSkillNames), len(searchResult.MatchedFocusModeNames)))
+	}
+
+	if emitter := r.GetEmitter(); emitter != nil {
+		_, _ = emitter.EmitPerceptionCapabilities(
+			"perception-capabilities",
+			input.Query,
+			searchResult.MatchedToolNames,
+			searchResult.MatchedForgeNames,
+			searchResult.MatchedSkillNames,
+			searchResult.MatchedFocusModeNames,
+			searchResult.RecommendedCapabilities,
+		)
 	}
 }
 
@@ -821,6 +837,19 @@ func (r *ReActLoop) TriggerPerception(reason string, force bool) *PerceptionStat
 	if updated {
 		r.refreshCapabilitiesFromPerception(currentState)
 		r.refreshKnowledgeFromPerception(currentState)
+	}
+
+	if emitter := r.GetEmitter(); emitter != nil && currentState != nil {
+		_, _ = emitter.EmitPerception(
+			"perception",
+			currentState.OneLinerSummary,
+			currentState.Topics,
+			currentState.Keywords,
+			currentState.Changed,
+			currentState.ConfidenceLevel,
+			currentState.LastTrigger,
+			currentState.Epoch,
+		)
 	}
 
 	if scheduler, ok := invoker.(midtermTimelineRecallScheduler); ok {

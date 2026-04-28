@@ -165,6 +165,11 @@ const (
 	EVENT_TYPE_REFERENCE_MATERIAL EventType = "reference_material" // 引用材料
 
 	EVENT_TYPE_PROMPT_PROFILE EventType = "prompt_profile" // prompt profile event, used to emit the prompt profile information
+
+	EVENT_TYPE_INTENT_RECOGNITION    EventType = "intent_recognition"
+	EVENT_TYPE_PERCEPTION            EventType = "perception"
+	EVENT_TYPE_PERCEPTION_CAPABILITY EventType = "perception_capabilities"
+	EVENT_TYPE_PERCEPTION_KNOWLEDGE  EventType = "perception_knowledge"
 )
 
 type AiOutputEvent struct {
@@ -314,6 +319,14 @@ func (e *AiOutputEvent) String() string {
 			typeStr = "[stream]"
 		case EVENT_TYPE_STRUCTURED:
 			typeStr = "[structured]"
+		case EVENT_TYPE_INTENT_RECOGNITION:
+			typeStr = "[intent_recognition]"
+		case EVENT_TYPE_PERCEPTION:
+			typeStr = "[perception]"
+		case EVENT_TYPE_PERCEPTION_CAPABILITY:
+			typeStr = "[perception_capabilities]"
+		case EVENT_TYPE_PERCEPTION_KNOWLEDGE:
+			typeStr = "[perception_knowledge]"
 		}
 		parts = append(parts, fmt.Sprintf("[type:%s]", typeStr))
 	}

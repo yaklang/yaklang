@@ -116,6 +116,19 @@ func ApplyDeepIntentResult(r aicommon.AIInvokeRuntime, loop *ReActLoop, result *
 			"建议使用 web_search，避免重复知识增强重试。")
 	}
 
+	if emitter := loop.GetEmitter(); emitter != nil {
+		_, _ = emitter.EmitIntentRecognition(
+			"intent-recognition",
+			result.IntentAnalysis,
+			result.RecommendedTools,
+			result.RecommendedForges,
+			result.MatchedToolNames,
+			result.MatchedForgeNames,
+			result.MatchedSkillNames,
+			result.ContextEnrichment,
+		)
+	}
+
 	log.Infof("deep intent results applied to loop context")
 }
 

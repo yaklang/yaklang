@@ -918,6 +918,84 @@ func (e *Emitter) EmitResultAfterStream(nodeId string, result interface{}, succe
 	})
 }
 
+func (e *Emitter) EmitIntentRecognition(
+	nodeId string,
+	intent string,
+	recommendedTools string,
+	recommendedForges string,
+	matchedToolNames string,
+	matchedForgeNames string,
+	matchedSkillNames string,
+	contextEnrichment string,
+) (*schema.AiOutputEvent, error) {
+	return e.EmitJSON(schema.EVENT_TYPE_INTENT_RECOGNITION, nodeId, map[string]any{
+		"intent":              intent,
+		"recommended_tools":   recommendedTools,
+		"recommended_forges":  recommendedForges,
+		"matched_tool_names":  matchedToolNames,
+		"matched_forge_names": matchedForgeNames,
+		"matched_skill_names": matchedSkillNames,
+		"context_enrichment":  contextEnrichment,
+		"timestamp":           time.Now().Unix(),
+	})
+}
+
+func (e *Emitter) EmitPerception(
+	nodeId string,
+	summary string,
+	topics []string,
+	keywords []string,
+	changed bool,
+	confidence float64,
+	trigger string,
+	epoch int,
+) (*schema.AiOutputEvent, error) {
+	return e.EmitJSON(schema.EVENT_TYPE_PERCEPTION, nodeId, map[string]any{
+		"summary":    summary,
+		"topics":     topics,
+		"keywords":   keywords,
+		"changed":    changed,
+		"confidence": confidence,
+		"trigger":    trigger,
+		"epoch":      epoch,
+		"timestamp":  time.Now().Unix(),
+	})
+}
+
+func (e *Emitter) EmitPerceptionCapabilities(
+	nodeId string,
+	query string,
+	matchedToolNames []string,
+	matchedForgeNames []string,
+	matchedSkillNames []string,
+	matchedFocusModeNames []string,
+	recommendedCapabilities []string,
+) (*schema.AiOutputEvent, error) {
+	return e.EmitJSON(schema.EVENT_TYPE_PERCEPTION_CAPABILITY, nodeId, map[string]any{
+		"query":                    query,
+		"matched_tool_names":       matchedToolNames,
+		"matched_forge_names":      matchedForgeNames,
+		"matched_skill_names":      matchedSkillNames,
+		"matched_focus_mode_names": matchedFocusModeNames,
+		"recommended_capabilities": recommendedCapabilities,
+		"timestamp":                time.Now().Unix(),
+	})
+}
+
+func (e *Emitter) EmitPerceptionKnowledge(
+	nodeId string,
+	query string,
+	knowledgeBases []string,
+	content string,
+) (*schema.AiOutputEvent, error) {
+	return e.EmitJSON(schema.EVENT_TYPE_PERCEPTION_KNOWLEDGE, nodeId, map[string]any{
+		"query":           query,
+		"knowledge_bases": knowledgeBases,
+		"content":         content,
+		"timestamp":       time.Now().Unix(),
+	})
+}
+
 // EmitKnowledge emits a knowledge enhancement data for AI processes
 func (e *Emitter) EmitKnowledge(nodeId string, enhanceID string, result EnhanceKnowledge) (*schema.AiOutputEvent, error) {
 	knowledgeMap := map[string]any{
