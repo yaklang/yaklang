@@ -220,6 +220,7 @@ func buildPromptSections(
 	outputExample string,
 	extraCapabilities string,
 	sessionEvidence string,
+	sessionReasoning string,
 ) []*PromptSectionObservation {
 	return []*PromptSectionObservation{
 		buildBackgroundPromptSection(infos),
@@ -250,6 +251,13 @@ func buildPromptSections(
 			PromptSectionRoleRuntimeCtx,
 			true,
 			sessionEvidence,
+		),
+		newPromptSectionObservation(
+			"session_reasoning",
+			"Session Reasoning",
+			PromptSectionRoleRuntimeCtx,
+			true,
+			sessionReasoning,
 		),
 		newPromptSectionObservation(
 			"skills_context",

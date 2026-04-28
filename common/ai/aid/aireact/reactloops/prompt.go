@@ -193,6 +193,11 @@ func (r *ReActLoop) generateLoopPrompt(
 		}
 	}
 
+	var sessionReasoning string
+	if reasoningContent := r.config.GetSessionReasoningRendered(); reasoningContent != "" {
+		sessionReasoning = reasoningContent
+	}
+
 	// Append CACHE_TOOL_CALL block only when summary is non-empty
 	if tm := r.config.GetAiToolManager(); tm != nil && tm.HasRecentlyUsedTools() {
 		r.syncRecentToolParamAITagFields(tm.GetRecentToolParamNames())
@@ -218,6 +223,7 @@ func (r *ReActLoop) generateLoopPrompt(
 	infos["SkillsContext"] = skillsContext
 	infos["ExtraCapabilities"] = extraCapabilities
 	infos["SessionEvidence"] = sessionEvidence
+	infos["SessionReasoning"] = sessionReasoning
 	infos["Nonce"] = nonce
 	infos["UserQuery"] = userInput
 	infos["Schema"] = schema
@@ -233,6 +239,7 @@ func (r *ReActLoop) generateLoopPrompt(
 		outputExample,
 		extraCapabilities,
 		sessionEvidence,
+		sessionReasoning,
 	)
 	prompt, err := utils.RenderTemplate(coreTemplate, infos)
 	if err != nil {

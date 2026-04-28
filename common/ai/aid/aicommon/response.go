@@ -5,6 +5,7 @@ import (
 	"context"
 	"io"
 	"os"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -41,6 +42,7 @@ type AIResponse struct {
 	enableDebug         bool
 	consumptionCallback func(current int)
 	onOutputFinished    func(string)
+	onReasonFinished    func(string)
 
 	respStartTime time.Time
 	reqStartTime  time.Time
@@ -449,7 +451,8 @@ func (r *AIResponse) EmitOutputStream(reader io.Reader) {
 }
 
 func (r *AIResponse) EmitReasonStream(reader io.Reader) {
-	counted := &byteCountingReader{reader: reader, counter: &r.totalOutputBytes}
+	captured := createReasoningCaptureReader(reader, 6000, r.onReasonFinished)
+	counted := &byteCountingReader{reader: captured, counter: &r.totalOutputBytes}
 	r.ch.SafeFeed(&AIResponseOutputStream{
 		IsReason: true,
 		out:      CreateConsumptionReader(counted, r.consumptionCallback, &r.totalOutputTokens),
@@ -502,6 +505,12 @@ func NewAIResponse(caller AICallerConfigIf) *AIResponse {
 				return
 			}
 			caller.CallAIResponseOutputFinishedCallback(s)
+		},
+		onReasonFinished: func(s string) {
+			if utils.IsNil(caller) {
+				return
+			}
+			caller.CallAIResponseReasoningFinishedCallback(s)
 		},
 		httpHeaderReady: make(chan struct{}),
 	}
@@ -607,6 +616,44 @@ func newUnboundAIResponse() *AIResponse {
 		ch:                  chanx.NewUnlimitedChan[*AIResponseOutputStream](context.TODO(), 2),
 		consumptionCallback: func(current int) {},
 		onOutputFinished:    func(s string) {},
+		onReasonFinished:    func(s string) {},
 		httpHeaderReady:     make(chan struct{}),
 	}
+}
+
+type reasoningCaptureReader struct {
+	reader     io.Reader
+	limitRunes int
+	buf        strings.Builder
+	finish     func(string)
+	done       sync.Once
+}
+
+func createReasoningCaptureReader(reader io.Reader, limitRunes int, finish func(string)) io.Reader {
+	if reader == nil || finish == nil {
+		return reader
+	}
+	return &reasoningCaptureReader{
+		reader:     reader,
+		limitRunes: limitRunes,
+		finish:     finish,
+	}
+}
+
+func (r *reasoningCaptureReader) Read(p []byte) (n int, err error) {
+	n, err = r.reader.Read(p)
+	if n > 0 {
+		r.buf.Write(p[:n])
+		if r.limitRunes > 0 {
+			content := trimReasoningPromptText(r.buf.String(), r.limitRunes)
+			r.buf.Reset()
+			r.buf.WriteString(content)
+		}
+	}
+	if err != nil {
+		r.done.Do(func() {
+			r.finish(strings.TrimSpace(r.buf.String()))
+		})
+	}
+	return n, err
 }

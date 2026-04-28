@@ -40,12 +40,14 @@ type AICallerConfigIf interface {
 	GetEmitter() *Emitter
 	NewAIResponse() *AIResponse
 	CallAIResponseOutputFinishedCallback(string)
+	CallAIResponseReasoningFinishedCallback(string)
 	GetAiToolManager() *buildinaitools.AiToolManager
 	OriginOptions() []ConfigOption
 	GetOrCreateWorkDir() string
 	GetContextProviderManager() *ContextProviderManager
 	AppendRelatedRuntimeID(runtimeID string)
 	GetSessionEvidenceRendered() string
+	GetSessionReasoningRendered() string
 	ApplySessionEvidenceOps(ops []EvidenceOperation)
 }
 

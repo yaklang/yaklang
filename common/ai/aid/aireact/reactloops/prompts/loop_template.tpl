@@ -18,6 +18,13 @@
 {{/*----------------------------------------  Session Evidence（Config 级持久化观测）-----------------------------------*/}}
 {{ if .SessionEvidence }}{{ .SessionEvidence }}{{ end }}
 
+{{/*----------------------------------------  Session Reasoning（AI 思考内容缓存，5k）-----------------------------------*/}}
+{{ if .SessionReasoning }}<|SESSION_REASONING_{{ .Nonce }}|>
+# AI Reasoning Context
+Recent AI reasoning content captured from previous model responses. Old content is trimmed when size exceeds 5k.
+{{ .SessionReasoning }}
+<|SESSION_REASONING_END_{{ .Nonce }}|>{{ end }}
+
 {{/*----------------------------------------  Skills Context（按需加载的技能上下文）-------------------------------------*/}}
 {{ if .SkillsContext }}{{ .SkillsContext }}{{ end }}
 

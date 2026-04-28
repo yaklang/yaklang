@@ -2473,6 +2473,10 @@ func (c *Config) GetSessionEvidenceRendered() string {
 	return c.GetSessionPromptState().GetSessionEvidenceRendered()
 }
 
+func (c *Config) GetSessionReasoningRendered() string {
+	return c.GetSessionPromptState().GetSessionReasoningRendered()
+}
+
 func (c *Config) ApplySessionEvidenceOps(ops []EvidenceOperation) {
 	if len(ops) == 0 {
 		return
@@ -2770,6 +2774,13 @@ func (c *Config) NewAIResponse() *AIResponse {
 func (c *Config) CallAIResponseOutputFinishedCallback(s string) {
 	// Minimal hook: no-op. Implementers can override by setting callbacks or using emitter.
 	_ = s
+}
+
+func (c *Config) CallAIResponseReasoningFinishedCallback(s string) {
+	if strings.TrimSpace(s) == "" {
+		return
+	}
+	c.GetSessionPromptState().AppendReasoningText(s)
 }
 
 func (c *Config) UpdateAIModelInfo(provider, model string) {

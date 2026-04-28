@@ -1,6 +1,7 @@
 package aicommon
 
 import (
+	"strings"
 	"sync"
 	"time"
 
@@ -9,6 +10,7 @@ import (
 )
 
 const sessionEvidenceTokenBudget = 15000
+const sessionReasoningRuneBudget = 5000
 
 // SessionPromptState holds session-scoped prompt rendering data that must stay
 // consistent across configs sharing the same conversation.
@@ -20,6 +22,8 @@ type SessionPromptState struct {
 	// evidenceJSON stores the serialized EvidenceStore JSON for session-level evidence.
 	// Persisted to DB alongside UserInputHistory under the same persistent session.
 	evidenceJSON string
+
+	reasoningText string
 }
 
 func NewSessionPromptState() *SessionPromptState {
@@ -99,6 +103,46 @@ func (s *SessionPromptState) SetSessionEvidence(evidenceJSON string) {
 	s.m.Lock()
 	defer s.m.Unlock()
 	s.evidenceJSON = evidenceJSON
+}
+
+func (s *SessionPromptState) AppendReasoningText(content string) {
+	if s == nil {
+		return
+	}
+	content = strings.TrimSpace(content)
+	if content == "" {
+		return
+	}
+
+	s.m.Lock()
+	defer s.m.Unlock()
+
+	if s.reasoningText != "" {
+		s.reasoningText += "\n\n---\n\n"
+	}
+	s.reasoningText += content
+	s.reasoningText = trimReasoningPromptText(s.reasoningText, sessionReasoningRuneBudget)
+}
+
+func (s *SessionPromptState) GetSessionReasoningRendered() string {
+	if s == nil {
+		return ""
+	}
+	s.m.RLock()
+	defer s.m.RUnlock()
+	return strings.TrimSpace(s.reasoningText)
+}
+
+func trimReasoningPromptText(content string, limit int) string {
+	content = strings.TrimSpace(content)
+	if limit <= 0 || content == "" {
+		return content
+	}
+	runes := []rune(content)
+	if len(runes) <= limit {
+		return content
+	}
+	return strings.TrimSpace(string(runes[len(runes)-limit:]))
 }
 
 // ApplySessionEvidenceOps deserializes the current evidence store, applies

@@ -76,6 +76,7 @@ func (t *transactionTestConfig) RetryPromptBuilder(prompt string, err error) str
 func (t *transactionTestConfig) GetEmitter() *Emitter                            { return t.emitter }
 func (t *transactionTestConfig) NewAIResponse() *AIResponse                      { return NewAIResponse(t) }
 func (t *transactionTestConfig) CallAIResponseOutputFinishedCallback(string)     {}
+func (t *transactionTestConfig) CallAIResponseReasoningFinishedCallback(string)  {}
 func (t *transactionTestConfig) GetAiToolManager() *buildinaitools.AiToolManager { return nil }
 func (t *transactionTestConfig) OriginOptions() []ConfigOption                   { return nil }
 func (t *transactionTestConfig) GetOrCreateWorkDir() string                      { return "" }
@@ -84,6 +85,7 @@ func (t *transactionTestConfig) GetContextProviderManager() *ContextProviderMana
 	return NewContextProviderManager()
 }
 func (t *transactionTestConfig) GetSessionEvidenceRendered() string          { return "" }
+func (t *transactionTestConfig) GetSessionReasoningRendered() string         { return "" }
 func (t *transactionTestConfig) ApplySessionEvidenceOps([]EvidenceOperation) {}
 
 // --- tests ---

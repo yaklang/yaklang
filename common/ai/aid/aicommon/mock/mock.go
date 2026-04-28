@@ -96,6 +96,10 @@ func (m *MockedAIConfig) GetSessionEvidenceRendered() string {
 	return ""
 }
 
+func (m *MockedAIConfig) GetSessionReasoningRendered() string {
+	return ""
+}
+
 func (m *MockedAIConfig) ApplySessionEvidenceOps(ops []aicommon.EvidenceOperation) {
 }
 
@@ -140,6 +144,10 @@ func (m *MockedAIConfig) NewAIResponse() *aicommon.AIResponse {
 }
 
 func (m *MockedAIConfig) CallAIResponseOutputFinishedCallback(s string) {
+	// Mock implementation - do nothing
+}
+
+func (m *MockedAIConfig) CallAIResponseReasoningFinishedCallback(s string) {
 	// Mock implementation - do nothing
 }
 
