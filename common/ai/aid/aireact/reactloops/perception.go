@@ -15,7 +15,9 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
@@ -444,6 +446,8 @@ func (r *ReActLoop) resolvePerceptionKnowledgeBases(
 	invoker aicommon.AIInvokeRuntime,
 	searchQuery string,
 ) []string {
+	_ = ctx
+	_ = searchQuery
 	if r == nil || utils.IsNil(invoker) {
 		return nil
 	}
@@ -498,16 +502,91 @@ func (r *ReActLoop) resolvePerceptionKnowledgeBases(
 	if len(knowledgeBases) > 0 {
 		return knowledgeBases
 	}
+	return nil
+}
 
-	selectResult, err := invoker.SelectKnowledgeBase(ctx, searchQuery)
-	if err != nil {
-		log.Warnf("perception knowledge: select knowledge bases failed: %v", err)
+func (r *ReActLoop) buildPerceptionKnowledgeLikeKeywords(state *PerceptionState) []string {
+	if state == nil {
 		return nil
 	}
-	if selectResult == nil {
+
+	keywords := normalizeCapabilityStrings(append(append([]string{}, state.Keywords...), state.Topics...))
+	if len(keywords) > 0 {
+		return keywords
+	}
+
+	query := r.buildPerceptionKnowledgeSearchQuery(state)
+	if query == "" {
 		return nil
 	}
-	return normalizeCapabilityStrings(selectResult.KnowledgeBases)
+	return normalizeCapabilityStrings(strings.Fields(query))
+}
+
+func (r *ReActLoop) searchPerceptionKnowledgeByLike(knowledgeBases []string, keywords []string) string {
+	if len(knowledgeBases) == 0 || len(keywords) == 0 {
+		return ""
+	}
+
+	db := consts.GetGormProfileDatabase()
+	if db == nil {
+		return ""
+	}
+
+	var kbInfos []*schema.KnowledgeBaseInfo
+	if err := db.Model(&schema.KnowledgeBaseInfo{}).
+		Select("id, knowledge_base_name").
+		Where("knowledge_base_name IN (?)", knowledgeBases).
+		Find(&kbInfos).Error; err != nil {
+		log.Warnf("perception knowledge: load knowledge base infos failed: %v", err)
+		return ""
+	}
+	if len(kbInfos) == 0 {
+		return ""
+	}
+
+	kbNameByID := make(map[int64]string, len(kbInfos))
+	var kbIDs []int64
+	for _, kb := range kbInfos {
+		if kb == nil {
+			continue
+		}
+		kbIDs = append(kbIDs, int64(kb.ID))
+		kbNameByID[int64(kb.ID)] = kb.KnowledgeBaseName
+	}
+	if len(kbIDs) == 0 {
+		return ""
+	}
+
+	var entries []*schema.KnowledgeBaseEntry
+	query := db.Model(&schema.KnowledgeBaseEntry{}).Where("knowledge_base_id IN (?)", kbIDs)
+	query = bizhelper.FuzzSearchWithStringArrayOrEx(query, []string{"knowledge_title", "knowledge_details", "keywords"}, keywords, false)
+	query = query.Order("importance_score desc").Order("updated_at desc").Limit(10)
+	if err := query.Find(&entries).Error; err != nil {
+		log.Warnf("perception knowledge: keyword LIKE search failed: %v", err)
+		return ""
+	}
+	if len(entries) == 0 {
+		return ""
+	}
+
+	var buf strings.Builder
+	for index, entry := range entries {
+		if entry == nil {
+			continue
+		}
+		buf.WriteString(fmt.Sprintf("%d. [%s] %s\n", index+1, kbNameByID[entry.KnowledgeBaseID], entry.KnowledgeTitle))
+		if entry.KnowledgeDetails != "" {
+			buf.WriteString(utils.ShrinkString(entry.KnowledgeDetails, 800))
+			buf.WriteString("\n")
+		}
+		if len(entry.Keywords) > 0 {
+			buf.WriteString("关键词: ")
+			buf.WriteString(strings.Join(entry.Keywords, ", "))
+			buf.WriteString("\n")
+		}
+		buf.WriteString("\n")
+	}
+	return strings.TrimSpace(buf.String())
 }
 
 func formatPerceptionKnowledgeContext(query string, knowledgeBases []string, content string) string {
@@ -598,40 +677,16 @@ func (r *ReActLoop) refreshKnowledgeFromPerception(state *PerceptionState) {
 	}
 
 	usedQuery := searchQuery
-	enhancePlans := []string{"hypothetical_answer", "generalize_query", "split_query"}
-	enhanceData, err := invoker.EnhanceKnowledgeGetterEx(ctx, usedQuery, enhancePlans, knowledgeBases...)
-	if err != nil {
-		log.Warnf("perception knowledge search failed: %v", err)
-		return
+	keywordList := r.buildPerceptionKnowledgeLikeKeywords(state)
+	if len(keywordList) > 0 {
+		usedQuery = strings.Join(keywordList, " ")
 	}
-
-	if strings.TrimSpace(enhanceData) == "" {
-		if keywordQuery := r.buildPerceptionKnowledgeKeywordQuery(state); keywordQuery != "" && keywordQuery != usedQuery {
-			usedQuery = keywordQuery
-			enhanceData, err = invoker.EnhanceKnowledgeGetterEx(ctx, usedQuery, []string{"exact_keyword_search"}, knowledgeBases...)
-			if err != nil {
-				log.Warnf("perception knowledge keyword fallback failed: %v", err)
-				return
-			}
-		}
-	}
-
-	enhanceData = strings.TrimSpace(enhanceData)
+	enhanceData := strings.TrimSpace(r.searchPerceptionKnowledgeByLike(knowledgeBases, keywordList))
 	if enhanceData == "" {
 		return
 	}
 
-	compressed, err := invoker.CompressLongTextWithDestination(ctx, enhanceData, usedQuery, perceptionKnowledgeMaxContextTokens)
-	if err != nil {
-		log.Warnf("perception knowledge compression failed: %v", err)
-		compressed = enhanceData
-	}
-	compressed = strings.TrimSpace(compressed)
-	if compressed == "" {
-		compressed = enhanceData
-	}
-
-	contextBlock := formatPerceptionKnowledgeContext(usedQuery, knowledgeBases, compressed)
+	contextBlock := formatPerceptionKnowledgeContext(usedQuery, knowledgeBases, enhanceData)
 	if contextBlock == "" {
 		return
 	}
