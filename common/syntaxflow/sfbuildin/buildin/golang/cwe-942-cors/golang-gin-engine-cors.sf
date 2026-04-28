@@ -1,0 +1,152 @@
+desc(
+	title: "Detect Golang Gin CORS AllowAllOrigins Misconfiguration"
+	title_zh: "检测Golang Gin框架CORS AllowAllOrigins配置不当漏洞"
+	type: vuln
+	level: high
+	risk: ""
+	desc: <<<DESC
+在Golang Web开发中，使用gin-contrib/cors中间件时，如果将`AllowAllOrigins`设置为`true`，则表示允许来自任何域名的跨域请求。这种配置极大地增加了安全风险，可能导致跨站请求伪造（CSRF）攻击或敏感数据泄露。攻击者可以利用此配置，诱导用户浏览器向受害服务器发送恶意请求，从而执行非授权操作。特别是在处理敏感业务逻辑或未实施严格身份验证的接口时，宽松的CORS策略会使应用暴露在严重的威胁之下。因此，必须明确指定允许的源列表，避免使用通配符或全选配置。
+DESC
+	rule_id: "178748e2-febb-43ad-8716-e38590f63590"
+	reference: <<<REFERENCE
+https://github.com/gin-contrib/cors
+REFERENCE
+	solution: <<<SOLUTION
+修复此漏洞的关键是限制跨域请求的来源。在初始化`cors.Config`时，应将`AllowAllOrigins`设置为`false`，并通过`AllowOrigins`字段明确列出受信任的域名列表。例如：`config.AllowOrigins = []string{"https://example.com"}`。如果确实需要支持多个动态域名，建议实现一个白名单校验机制，在运行时检查请求的Origin头是否在允许的列表中。此外，还应合理配置`AllowCredentials`，如果设置为`true`，则`AllowOrigins`不能包含通配符`*`，必须指定具体域名。通过严格的源头控制，可以有效防止恶意的跨域访问和数据窃取行为。
+SOLUTION
+)
+
+gin.Engine as $entry
+cors?{<fullTypeName()>?{have: "github.com/gin-contrib/cors"}} as $cors
+
+$cors.New as $new
+$entry.Use(* #{until: `* & $new`}-> as $func)
+$func?(* #{until: `*.AllowAllOrigins?{have:"true"}`}->) as $high
+
+
+alert $high for {
+	type: "vuln",
+	title: "Insecure CORS Configuration: AllowAllOrigins Enabled",
+	title_zh: "不安全的 CORS 配置：启用了 AllowAllOrigins",
+	level: "high",
+	risk: "安全配置错误",
+	desc: <<<DESC
+代码中使用了 gin-contrib/cors 中间件，并将 Config.AllowAllOrigins 设置为 true。这允许来自任何域的跨域请求访问服务器资源，可能导致敏感信息泄露或遭受跨站请求伪造（CSRF）等攻击。在生产环境中，应明确指定允许的源列表，而不是允许所有来源。
+DESC
+	name: "high",
+	message: "检测到 CORS 配置中 AllowAllOrigins 被设置为 true，存在安全风险。",
+	solution: <<<SOLUTION
+建议将 Config.AllowAllOrigins 设置为 false，并通过 Config.AllowOrigins 字段明确指定受信任的域名列表。例如：config.AllowOrigins = []string{"https://example.com"}。避免在生产环境中使用 AllowAllOrigins = true。
+SOLUTION
+}
+
+desc(
+	lang: golang
+	alert_high: 1
+	'file://unsafe.go': <<<UNSAFE
+package api
+
+import (
+	"context"
+	"errors"
+	"log"
+	"net/http"
+	"time"
+
+	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/gin"
+
+	"go-monorepo/appmodule/counter"
+	"go-monorepo/logging"
+)
+
+// Server is a HTTP server.
+type Server struct {
+	service *counter.Service
+}
+
+// RegisterMiddleware registers middleware for all endpoints.
+func (s *Server) RegisterMiddleware(r *gin.Engine) {
+	r.Use(gin.Logger())
+	r.Use(gin.Recovery())
+
+	config := cors.Config{
+		AllowMethods: []string{
+			"GET",
+			"POST",
+			"PUT",
+			"PATCH",
+			"DELETE",
+			"HEAD",
+			"OPTIONS",
+		},
+		AllowHeaders: []string{
+			"Origin",
+			"Content-Length",
+			"Content-Type",
+			"Authorization",
+		},
+		AllowCredentials: false,
+		MaxAge:           12 * time.Hour,
+	}
+	config.AllowAllOrigins = true
+
+	r.Use(cors.New(config))
+	r.Use(RateLimit())
+}
+
+UNSAFE
+	'safefile://safe.go': <<<SAFE
+package api
+
+import (
+	"context"
+	"errors"
+	"log"
+	"net/http"
+	"time"
+
+	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/gin"
+
+	"go-monorepo/appmodule/counter"
+	"go-monorepo/logging"
+)
+
+// Server is a HTTP server.
+type Server struct {
+	service *counter.Service
+}
+
+// RegisterMiddleware registers middleware for all endpoints.
+func (s *Server) RegisterMiddleware(r *gin.Engine) {
+	r.Use(gin.Logger())
+	r.Use(gin.Recovery())
+
+	config := cors.Config{
+		AllowMethods: []string{
+			"GET",
+			"POST",
+			"PUT",
+			"PATCH",
+			"DELETE",
+			"HEAD",
+			"OPTIONS",
+		},
+		AllowHeaders: []string{
+			"Origin",
+			"Content-Length",
+			"Content-Type",
+			"Authorization",
+		},
+		AllowCredentials: false,
+		MaxAge:           12 * time.Hour,
+	}
+	config.AllowAllOrigins = false
+
+	r.Use(cors.New(config))
+	r.Use(RateLimit())
+}
+
+SAFE
+)

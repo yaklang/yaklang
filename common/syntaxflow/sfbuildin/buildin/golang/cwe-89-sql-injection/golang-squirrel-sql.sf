@@ -1,0 +1,108 @@
+desc(
+	title: "Check Golang Squirrel SQL Injection Vulnerability"
+	type: audit
+	level: high
+	risk: ""
+	desc: <<<DESC
+该规则旨在检测在使用 Go 语言的 Squirrel SQL 构建器库时，开发者可能因未正确参数化查询而导致的 SQL 注入漏洞。当用户输入（如 `username` 或 `order`）直接拼接到 Squirrel 的 `Where`、`OrderBy` 等子句中的非参数化部分时，攻击者可构造恶意输入绕过安全限制，执行任意 SQL 命令。此漏洞可能导致数据泄露、数据篡改甚至服务器被完全控制。Squirrel 虽然提供了参数化查询功能，但若开发者错误地将动态字段（尤其是排序字段）作为字符串拼接而非参数传递，仍会引发注入风险。因此，必须严格验证所有用户输入，并仅使用参数化方式处理动态条件。
+
+触发场景包括：
+1. 将用户输入的字段名直接用于 `OrderBy` 方法；
+2. 在 `Where` 条件中使用非参数化的字符串拼接；
+3. 未对输入进行白名单校验即传递给 Squirrel 表达式。
+
+潜在影响极为严重，攻击者可通过注入恶意 SQL 语句读取敏感数据、修改数据库内容或删除关键信息，进而破坏系统完整性与可用性。
+DESC
+	rule_id: "a7352dfe-feb6-47f9-96d1-5b48a2757ce8"
+	risk: ""
+	solution: <<<SOLUTION
+"修复此类 SQL 注入漏洞的关键在于确保所有用户输入都通过参数化查询进行处理，避免任何形式的字符串拼接。具体建议如下：\n\n1. **禁止直接拼接用户输入**：不要将用户提供的字段名（如排序字段）直接传入 `OrderBy` 方法。应维护一个白名单列表，仅允许预定义的合法字段名通过，并在代码中显式映射到实际列名。\n\n2. **使用参数化查询**：对于 `Where` 条件中的用户输入值，务必使用 Squirrel 的参数化语法（如 `sq.Eq{"username": username
+SOLUTION
+	reference: <<<REFERENCE
+https://cwe.mitre.org/data/definitions/89.html
+REFERENCE
+	title_zh: "检测Golang Squirrel SQL注入漏洞"
+)
+
+sq?{<fullTypeName()>?{have:"github.com/Masterminds/squirrel"}} as $entry
+squirrel?{<fullTypeName()>?{have:"github.com/Masterminds/squirrel"}} as $entry
+
+$entry.Select().From().Where?(* <slice(index=1)> #{
+    until: `*?{<fullTypeName()>?{have:"github.com/Masterminds/squirrel"}}`,
+}->) as $sink
+$sink.OrderBy as $high
+
+alert $high for {
+	title: "SQL Injection in Squirrel Query Construction",
+	risk: "SQL 注入",
+	title_zh: "Squirrel 查询构建中的 SQL 注入漏洞",
+	solution: <<<SOLUTION
+应使用参数化查询（如 Squirrel 的 `Eq`、`Gt` 等方法自动转义）或预编译语句；避免将用户输入直接拼接到 SQL 字符串中；对所有外部输入进行严格的白名单校验和长度限制；建议采用 ORM 框架的内置安全机制或显式调用参数化绑定接口。
+SOLUTION
+	desc: <<<DESC
+在 Go 语言中使用 Squirrel 库构造数据库查询时，未对用户输入进行充分的参数化处理或转义，直接拼接用户可控数据到 SQL 语句中，导致攻击者可注入恶意 SQL 语句，从而执行任意数据库操作。该漏洞位于 `SqlInjectionVuln4Controller.Get()` 方法中，`username` 和 `order` 参数被直接用于生成 SQL 查询，存在高危 SQL 注入风险。
+DESC
+	level: "high",
+	type: "vuln",
+	message: "用户输入未经过滤直接拼接到 SQL 查询中，易受 SQL 注入攻击",
+	name: "$high",
+}
+
+desc(
+	lang: golang
+	alert_high: 1
+	'file://unsafe.go': <<<UNSAFE
+package controllers
+
+import (
+	"database/sql"
+	"encoding/json"
+	"fmt"
+	"go-sec-code/models"
+
+	sq "github.com/Masterminds/squirrel"
+	"github.com/beego/beego/v2/client/orm"
+	beego "github.com/beego/beego/v2/server/web"
+	_ "github.com/go-sql-driver/mysql"
+	"xorm.io/xorm"
+)
+
+const source = "root:password@tcp(127.0.0.1:3306)/goseccode"
+
+func init() {
+	orm.RegisterDriver("mysql", orm.DRMySQL)
+	orm.RegisterDataBase("default", "mysql", source)
+	orm.Debug = true
+}
+
+func (c *SqlInjectionVuln4Controller) Get() {
+	username := c.GetString("username")
+	order := c.GetString("order")
+	db, err := sql.Open("mysql", source)
+	if err != nil {
+		panic(err)
+	}
+	err = db.Ping()
+	if err != nil {
+		panic(err)
+	}
+	defer db.Close()
+	expression := sq.Select("*").From("user").Where(sq.Eq{"username": username}).OrderBy(order)
+	sqlStr, args, err := expression.ToSql()
+	fmt.Println(sqlStr)
+	if err != nil {
+		panic(err)
+	}
+	user := models.User{}
+	err = db.QueryRow(sqlStr, args...).Scan(&user.Id, &user.Username, &user.Password)
+	if err != nil {
+		panic(err)
+	}
+	output, err := json.Marshal(user)
+	if err != nil {
+		panic(err)
+	}
+	c.Ctx.ResponseWriter.Write(output)
+}
+UNSAFE
+)

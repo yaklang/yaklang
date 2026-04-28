@@ -1,0 +1,77 @@
+desc(
+    title: "Detect Golang Environment Variables Exposure"
+    title_zh: "检测Golang环境变量泄露（os.Environ 输出到HTTP响应）"
+    type: vuln
+    level: low
+    risk: "信息泄露"
+    desc: <<<DESC
+检测 `os.Environ()` 结果流向 HTTP 输出点（Gin / net/http）的数据流路径，可能导致敏感配置（密钥、令牌、内部地址等）泄露。
+DESC
+    solution: <<<SOLUTION
+- 禁止直接输出环境变量；仅输出必要字段并脱敏。
+- 敏感配置使用环境变量/密钥管理服务时也要避免回显到响应。
+SOLUTION
+    reference: <<<REFERENCE
+- https://cwe.mitre.org/data/definitions/200.html
+REFERENCE
+)
+
+<include('golang-user-input')> as $sink;
+
+os.Environ() as $env;
+$sink.JSON?(* <slice(index=2)> #{until: `* & $env`}->)  as $low
+
+alert $low for {
+    type: "vuln"
+    level: "low"
+    risk: "信息泄露"
+    title: "Environment variables exposure"
+    title_zh: "环境变量泄露"
+    message: "检测到 os.Environ() 的结果流向 HTTP 输出，可能导致敏感信息泄露。"
+}
+
+desc(
+	lang: golang
+	alert_low: 1
+	'file://unsafe.go': <<<UNSAFE
+package api
+
+import (
+	"os"
+
+	"github.com/gin-gonic/gin"
+)
+
+func GetEnv(c *gin.Context) {
+	var env []string
+	env = append(env, os.Environ()...)
+	c.JSON(200, gin.H{"code": 200, "data": env})
+}
+
+func GetEnv2(c *gin.Context) {
+	c.JSON(403, gin.H{"code": 403, "msg": "It's a Forbidden API in /v2 ."})
+}
+
+UNSAFE
+	'safefile://safe.go': <<<SAFE
+package api
+
+import (
+	"os"
+
+	"github.com/gin-gonic/gin"
+)
+
+func GetEnv(c *gin.Context) {
+	// 不输出环境变量（示意）
+	env := make([]string, 0)
+	_ = os.Getenv("PATH")
+	c.JSON(200, gin.H{"code": 200, "data": env})
+}
+
+func GetEnv2(c *gin.Context) {
+	c.JSON(403, gin.H{"code": 403, "msg": "It's a Forbidden API in /v2 ."})
+}
+
+SAFE
+)

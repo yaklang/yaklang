@@ -1,0 +1,163 @@
+desc(
+	title: "Check Go Reflected JSONP Vulnerability in Beego Framework"
+	title_zh: "检测Beego框架中反射式JSONP漏洞"
+	type: vuln
+	level: mid
+	risk: ""
+	desc: <<<DESC
+该规则用于检测Go语言Beego框架中存在反射式JSONP（JavaScript Object Notation Padding）注入漏洞。当应用通过`c.GetString("callback")`获取用户可控的回调函数名，并直接将其拼接到JSON数据前，构造为`callback + "(" + string(data) + ")"`格式输出时，若未对回调函数名进行严格校验或过滤，攻击者可构造恶意回调函数，导致跨站脚本（XSS）攻击。具体场景包括：1）未验证`callback`参数是否为合法标识符；2）在设置`Content-Type: application/javascript`后直接将用户输入作为JS代码执行；3）缺乏对`referer`等上下文信息的校验，使得攻击者可通过伪造Referer绕过安全检查。此漏洞属于CWE-79：跨站脚本（XSS），可能导致用户会话劫持、页面篡改、恶意重定向等严重后果。
+DESC
+	rule_id: "b0d84b76-7188-45e2-a8f9-5b11082093cf"
+	solution: <<<SOLUTION
+1. 严格校验`callback`参数：仅允许预定义的白名单回调函数名，禁止使用用户输入作为JS函数名；
+2. 避免直接拼接用户输入到JS代码中：应使用`html.EscapeString()`对输出内容进行转义，防止HTML/JS注入；
+3. 增强上下文校验：结合`Referer`、`Origin`等HTTP头进行访问控制，确保请求来源可信；
+4. 推荐使用安全的JSON序列化方式：如使用`json.Marshal()`配合`json.RawMessage`包装数据，避免手动拼接；
+5. 定期审计代码逻辑：对所有涉及`c.Ctx.ResponseWriter.Write()`和`c.Ctx.ResponseWriter.Header().Set()`的路径进行安全审查，确保无反射性JS代码生成。
+SOLUTION
+	reference: <<<REFERENCE
+https://github.com/beego/beego/v2/blob/master/server/web/context.go#L100
+https://owasp.org/www-community/attacks/xss/
+https://cwe.mitre.org/data/definitions/79.html
+REFERENCE
+)
+
+.Ctx.ResponseWriter.Header().Set?(*<slice(index=1)>?{have: "Content-Type"} ) as $header
+$header<getCallee()>?(* <slice(index=2)>?{have: "application/javascript"}) as $jsonp
+
+html.EscapeString(* #{until: `*.GetString`}-> as $safeOutput);
+
+$jsonp<getCallee()>(*<slice(index=0)> as $sink );
+$sink<getCallee()> -{until: "*.Write"}-> as $func
+$func.Write?(* <slice(index=1)> #{
+    exclude: `$safeOutput`,
+    until: `*.GetString?{<fullTypeName>?{have: "github.com/beego/beego/v2/server/web"}}`
+}->) as $mid
+
+
+alert $mid for {
+	title: "Reflected JSONP Cross-Site Scripting Vulnerability in Beego Application",
+	title_zh: "Beego 应用中反射型 JSONP 跨站脚本漏洞",
+	level: "mid",
+	risk: "跨站脚本（XSS）",
+	type: "vuln",
+	message: "检测到未过滤的 JSONP 回调参数直接写入响应，存在 XSS 风险。",
+	solution: <<<SOLUTION
+1. 实施严格的白名单机制：仅允许预定义的、安全的回调函数名称通过。
+2. 对所有用户输入数据进行严格的验证和过滤，拒绝任何包含特殊字符或非预期模式的输入。
+3. 如果必须动态设置回调名，确保在使用前将其作为纯文本处理，严禁直接拼接到 JavaScript 代码块中。
+4. 即使设置了 Content-Type 为 application/javascript，也应考虑使用 Content Security Policy (CSP) 头来限制脚本执行来源。
+5. 避免将敏感数据（如密码、Token）直接暴露在不安全的 JSONP 响应中。
+SOLUTION
+	desc: <<<DESC
+在 Go 语言的 Beego Web 框架中，应用程序未对用户输入的回调函数参数（callback）进行充分的白名单校验或转义处理，直接将用户控制的输入与敏感数据拼接后作为 JSONP 响应返回。攻击者可以构造恶意 URL，诱导受害者在浏览器中执行，从而注入并执行任意 JavaScript 代码，窃取 Cookie、会话令牌或其他敏感信息。该漏洞主要发生在 Content-Type 被设置为 application/javascript 且未对输出进行 HTML 实体编码的场景下。
+DESC
+	name: "mid",
+}
+
+desc(
+	lang: golang
+	alert_mid: 1
+	'file://unsafe.go': <<<UNSAFE
+package controllers
+
+import (
+	"encoding/json"
+	"go-sec-code/utils"
+
+	beego "github.com/beego/beego/v2/server/web"
+)
+
+type JsonpVuln1Controller struct {
+	beego.Controller
+}
+
+type JsonpVuln2Controller struct {
+	beego.Controller
+}
+
+type JsonpSafe1Controller struct {
+	beego.Controller
+}
+
+func (c *JsonpVuln1Controller) Get() {
+	callback := c.GetString("callback")
+	c.Ctx.ResponseWriter.Header().Set("Content-Type", "application/javascript")
+	jsonp := make(map[string]interface{})
+	jsonp["username"] = "admin"
+	jsonp["password"] = "admin@123"
+	data, err := json.Marshal(jsonp)
+	output := callback + "(" + string(data) + ")"
+	if err != nil {
+		panic(err)
+	}
+	c.Ctx.ResponseWriter.Write([]byte(output))
+}
+
+func (c *JsonpVuln2Controller) Get() {
+	callback := c.GetString("callback")
+	referer := c.Ctx.Request.Header.Get("referer")
+	jsonpFilter := utils.JsonpFilter{}
+	whitelists := []string{"localhost:233", "example.com"}
+	if referer == "" || jsonpFilter.DoFilter(referer, whitelists) {
+		c.Ctx.ResponseWriter.Header().Set("Content-Type", "application/javascript")
+		jsonp := make(map[string]interface{})
+		jsonp["username"] = "admin"
+		jsonp["password"] = "admin@123"
+		data, err := json.Marshal(jsonp)
+		output := callback + "(" + string(data) + ")"
+		if err != nil {
+			panic(err)
+		}
+		c.Ctx.ResponseWriter.Write([]byte(output))
+	} else {
+		c.Ctx.ResponseWriter.Write([]byte("evil input"))
+	}
+}
+
+UNSAFE
+	'safefile://safe.go': <<<SAFE
+package controllers
+
+import (
+	"encoding/json"
+	"go-sec-code/utils"
+
+	beego "github.com/beego/beego/v2/server/web"
+)
+
+type JsonpVuln1Controller struct {
+	beego.Controller
+}
+
+type JsonpVuln2Controller struct {
+	beego.Controller
+}
+
+type JsonpSafe1Controller struct {
+	beego.Controller
+}
+
+func (c *JsonpSafe1Controller) Get() {
+	callback := c.GetString("callback")
+	referer := c.Ctx.Request.Header.Get("referer")
+	jsonpFilter := utils.JsonpFilter{}
+	whitelists := []string{"localhost:233", "example.com"}
+	if referer != "" && jsonpFilter.DoFilter(referer, whitelists) {
+		c.Ctx.ResponseWriter.Header().Set("Content-Type", "application/javascript")
+		jsonp := make(map[string]interface{})
+		jsonp["username"] = "admin"
+		jsonp["password"] = "admin@123"
+		data, err := json.Marshal(jsonp)
+		output := callback + "(" + string(data) + ")"
+		if err != nil {
+			panic(err)
+		}
+		c.Ctx.ResponseWriter.Write([]byte(output))
+	} else {
+		c.Ctx.ResponseWriter.Write([]byte("evil input"))
+	}
+}
+
+SAFE
+)

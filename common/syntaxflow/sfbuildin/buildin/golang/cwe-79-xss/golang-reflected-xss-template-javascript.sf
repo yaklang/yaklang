@@ -1,0 +1,173 @@
+desc(
+	title: "Check Go Template HTML XSS Vulnerability"
+	type: audit
+	level: high
+	risk: ""
+	desc: <<<DESC
+该规则用于检测Go语言中`template.HTML`函数的误用导致的跨站脚本攻击（XSS）漏洞。在Go的`html/template`和`text/template`包中，`template.HTML`函数会将字符串标记为可安全渲染的HTML内容，绕过模板的自动转义机制。
+
+漏洞原理：当开发者使用`template.HTML`包装用户可控的输入数据时，如果该数据未经过充分的过滤和编码，攻击者可以注入恶意JavaScript代码（如`<script>`标签），这些代码将在受害者浏览器中执行。
+
+触发场景：常见于以下代码模式：
+1. 使用`fmt.Sprintf`格式化包含`<script>`标签的字符串
+2. 将格式化后的字符串直接传递给`template.HTML`函数
+3. 在HTTP响应中渲染该HTML内容
+
+潜在影响：攻击者可窃取用户会话Cookie、执行钓鱼攻击、篡改页面内容或发起进一步的攻击。在示例代码中，`xss2Handler`函数将用户输入的`uid`直接嵌入JavaScript代码块并通过`template.HTML`渲染，构成了典型的存储型XSS漏洞。
+DESC
+	rule_id: "b8e0b5dc-91de-4bb8-b683-e24d2fe4f2d2"
+	solution: <<<SOLUTION
+1. **避免使用`template.HTML`**：尽可能不使用`template.HTML`函数，让Go模板引擎自动对所有输出进行HTML转义。
+
+2. **输入验证与过滤**：对所有用户输入进行严格的验证，使用白名单机制限制允许的字符和格式。对于必须接受HTML内容的场景，使用成熟的HTML净化库（如`bluemonday`）过滤危险标签和属性。
+
+3. **上下文敏感编码**：如果必须在特定上下文中使用原始HTML，确保使用正确的编码函数：
+   - 使用`html.EscapeString`对HTML内容进行编码
+   - 使用`template.JSEscapeString`对JavaScript上下文中的内容进行编码
+   - 使用`template.URLQueryEscaper`对URL参数进行编码
+
+4. **内容安全策略（CSP）**：配置HTTP响应头`Content-Security-Policy`限制页面可执行的脚本来源，作为纵深防御措施。
+
+5. **代码审计**：定期审查使用`template.HTML`的代码位置，确保每个使用点都经过安全评估。
+SOLUTION
+	reference: <<<REFERENCE
+https://pkg.go.dev/html/template#HTML
+https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html
+https://cwe.mitre.org/data/definitions/79.html
+REFERENCE
+	title_zh: "检测Go模板HTML函数跨站脚本漏洞"
+)
+
+template?{<fullTypeName>?{have: 'text/template'}} as $template;
+template?{<fullTypeName>?{have: 'html/template'}} as $template;
+
+fmt.Sprintf?(*<slice(index=0)> #{until: `*?{have: /<script>.*?<\/script>/}`}->) as $unsafe
+
+$template.HTML?(* #{until: `* & $unsafe`}->) as $high
+
+alert $high for {
+	solution: <<<SOLUTION
+1. 避免使用template.HTML函数，改用template.HTMLEscapeString或html.EscapeString对用户输入进行转义；2. 若必须使用template.HTML，确保输入经过严格的白名单过滤或HTML净化处理；3. 对于JavaScript上下文，使用template.JSEscapeString进行转义；4. 实施内容安全策略（CSP）限制脚本执行；5. 对所有用户输入进行验证，拒绝包含<script>等危险标签的内容；6. 考虑使用更安全的模板引擎或自动转义的模板包。
+SOLUTION
+	desc: <<<DESC
+检测到危险函数template.HTML被调用，其参数来源于用户可控输入（r.FormValue），且经过fmt.Sprintf格式化后包含<script>标签内容。该漏洞允许攻击者注入恶意JavaScript代码，当其他用户浏览页面时执行，可导致会话劫持、钓鱼攻击或恶意操作。在xss1Handler中，term参数未经充分过滤直接传入template.HTML；在xss2Handler中，uid等数据库查询结果被直接嵌入JavaScript代码块并通过template.HTML渲染，存在严重的反射型/存储型XSS风险。
+DESC
+	level: "high",
+	type: "vuln",
+	title: "XSS via template.HTML with Unescaped User Input",
+	title_zh: "使用template.HTML导致的XSS漏洞（未转义用户输入）",
+	name: "high",
+	message: "发现template.HTML调用存在XSS漏洞，用户输入未经过滤直接渲染到页面",
+	risk: "跨站脚本（XSS）",
+}
+
+desc(
+	lang: golang
+	alert_high: 1
+	'file://unsafe.go': <<<UNSAFE
+package xss
+
+import (
+	"fmt"
+	"log"
+	"html"
+	"regexp"
+	"net/http"
+	"html/template"
+
+	"github.com/julienschmidt/httprouter"
+
+	"github.com/govwa/util"
+	"github.com/govwa/util/middleware"
+	"github.com/govwa/vulnerability/sqli"
+)
+
+type XSS struct{
+	Name string
+}
+func New()XSS{
+	return XSS{}
+}
+func (self XSS)SetRouter(r *httprouter.Router){
+	mw := middleware.New()
+	r.GET("/xss1", mw.LoggingMiddleware(mw.CapturePanic(mw.AuthCheck(xss1Handler))))
+	r.POST("/xss1", mw.LoggingMiddleware(mw.CapturePanic(mw.AuthCheck(xss1Handler))))
+	r.GET("/xss2", mw.LoggingMiddleware(mw.CapturePanic(mw.AuthCheck(xss2Handler))))
+}
+
+func xss1Handler(w http.ResponseWriter, r *http.Request, _ httprouter.Params){
+	
+	/* template.HTML is a vulnerable function */
+	
+	data := make(map[string]interface{})
+
+	if r.Method == "GET"{
+		
+		term := r.FormValue("term")
+
+		if(util.CheckLevel(r)){ //level = high
+			term = HTMLEscapeString(term)
+		}
+
+		if term == "sql injection"{
+			term = "sqli"
+		}
+		
+		term = removeScriptTag(term)
+		vulnDetails := GetExp(term)
+
+		notFound := fmt.Sprintf("<b><i>%s</i></b> not found",term)
+		value := fmt.Sprintf("%s", term)
+
+		if term == ""{
+			data["term"] = ""
+		}else if vulnDetails == ""{
+			data["value"] = template.HTML(value)
+			data["term"] = template.HTML(notFound) //vulnerable function
+		}else{
+			vuln := fmt.Sprintf("<b>%s</b>",term)
+			data["value"] = template.HTML(value)
+			data["term"] = template.HTML(vuln)
+			data["details"] = vulnDetails
+		}
+
+	}
+	data["title"] = "Cross Site Scripting"
+	util.SafeRender(w,r, "template.xss1", data)
+}
+
+func xss2Handler(w http.ResponseWriter, r *http.Request, _ httprouter.Params){
+
+	uid := r.FormValue("uid")
+
+	if(util.CheckLevel(r)){ //level = high
+		uid = HTMLEscapeString(uid)
+	}
+
+	p := sqli.NewProfile() //using sqli get profile module instead of create new function
+	err := p.SafeQueryGetData(uid)
+
+	if err != nil{
+		log.Println(err.Error())
+	}
+
+	data := make(map[string]interface{})
+
+	js := ` <script>
+			var id = %s
+			var name = "%s"
+			var city = "%s"
+			var number = "%s"
+			</script>` //here is the mistake, render value to a javascript that came from client request
+
+	inlineJS := fmt.Sprintf(js,uid, p.Name, p.City, p.PhoneNumber)
+
+	data["title"] = "Cross Site Scripting"
+
+	data["inlineJS"] = template.HTML(inlineJS) //this will render the javascript on client browser
+
+	util.SafeRender(w, r, "template.xss2", data)
+
+}
+UNSAFE
+)

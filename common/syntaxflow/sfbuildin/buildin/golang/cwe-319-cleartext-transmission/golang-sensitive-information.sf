@@ -1,0 +1,393 @@
+desc(
+	title: "Check Golang PostgreSQL SSL Mode Configuration Vulnerability"
+	title_zh: "检测Golang PostgreSQL SSL模式配置漏洞"
+	type: audit
+	level: high
+	risk: ""
+	desc: <<<DESC
+在Golang应用中使用GORM连接PostgreSQL数据库时，如果连接字符串（DSN）中显式设置了`sslmode=disable`，将导致客户端与数据库服务器之间的通信未加密。这会使敏感数据（如用户凭证、个人身份信息或业务数据）在传输过程中以明文形式存在，极易受到中间人攻击（MITM）的窃听或篡改。特别是在生产环境或公共网络中，禁用SSL严重违反了安全最佳实践，可能导致数据泄露合规风险。本规则旨在识别那些通过`fmt.Sprintf`或其他字符串拼接方式构建DSN，并硬编码或动态传入`sslmode=disable`参数的代码路径。
+DESC
+	rule_id: "c2343563-d269-4624-89b9-fe85cf201fa9"
+	title_zh: "检测Golang PostgreSQL SSL模式配置漏洞"
+	solution: <<<SOLUTION
+建议在构建PostgreSQL连接字符串时，始终启用SSL加密。应将`sslmode`参数设置为`require`、`verify-ca`或`verify-full`，具体取决于对证书验证的需求。
+
+1. **强制启用SSL**：将连接字符串中的`sslmode=disable`修改为`sslmode=require`。这将确保数据传输是加密的，但不会验证服务器证书的真实性。
+2. **增强验证（推荐）**：对于高安全要求的场景，使用`sslmode=verify-full`或`sslmode=verify-ca`，并提供有效的CA证书路径，以防止中间人攻击。
+3. **配置管理**：避免在代码中硬编码连接字符串。建议通过环境变量或安全的配置管理中心注入DSN，并确保默认配置启用了SSL。
+
+示例修复：
+```go
+// 不安全
+fmt.Sprintf("host=%v ... sslmode=disable", ...)
+
+// 安全
+fmt.Sprintf("host=%v ... sslmode=require", ...)
+```
+SOLUTION
+	reference: <<<REFERENCE
+https://www.postgresql.org/docs/current/libpq-ssl.html
+REFERENCE
+)
+
+sqlite?{<fullTypeName()>?{have: "gorm.io/driver/sqlite"}} as $entry;
+
+$entry.Open?(* #{
+    until: `*?{have: ".Sprintf"}`,
+    until: `*?{opcode:add}`
+}-> as $sink);
+
+$sink<getCallee()>?(* #{until: `*?{have: /(?i)sslmode=disable/}`}-> ) as $high
+
+alert $high for {
+	type: "vuln",
+	title: "PostgreSQL SSL Mode Disabled",
+	title_zh: "PostgreSQL SSL 模式被禁用",
+	level: "high",
+	message: "检测到 PostgreSQL 连接配置中禁用了 SSL 加密 (sslmode=disable)。",
+	solution: <<<SOLUTION
+建议将 `sslmode` 设置为 `require`、`verify-ca` 或 `verify-full` 以启用 SSL 加密连接。例如：`fmt.Sprintf("... sslmode=require", ...)`。在生产环境中，强烈建议使用证书验证模式以确保连接的安全性。
+SOLUTION
+	desc: <<<DESC
+在构建 PostgreSQL 数据库连接字符串时，代码显式设置了 `sslmode=disable`。这将导致客户端与数据库服务器之间的通信未加密，敏感数据（如用户名、密码及查询数据）可能在传输过程中以明文形式暴露，易遭受中间人攻击或网络嗅探。
+DESC
+	name: "high",
+	risk: "不安全加密",
+}
+
+desc(
+	lang: golang
+	alert_high: 1
+	'file://unsafe.go': <<<UNSAFE
+package database
+
+import (
+	"fmt"
+	"log"
+
+	"github.com/sky-mirror/boot"
+	"github.com/urfave/cli/v2"
+	"gorm.io/driver/mysql"
+	"gorm.io/driver/postgres"
+	"gorm.io/driver/sqlite"
+	"gorm.io/driver/sqlserver"
+	"gorm.io/gorm"
+)
+
+var defaultOption ConnectOption
+
+func init() {
+	boot.Register(&defaultOption)
+}
+
+var _ boot.Beforer = &ConnectOption{}
+var _ boot.Afterer = &ConnectOption{}
+
+// ConnectOption defines a generic connect option for all dialects.
+type ConnectOption struct {
+	Dialect string
+	Host    string
+	Port    int // optional, if you append port in host, this option is unnecessary.
+	DBName  string
+	User    string
+	Pass    string
+	Config  gorm.Config
+	Silence bool
+
+	Testing bool
+}
+
+// ConnStr generates connection string.
+func (opt *ConnectOption) ConnStr() string {
+	switch opt.Dialect {
+	case "sqlite3":
+		return opt.Host
+	case "mysql":
+		return fmt.Sprintf(
+			"%s:%s@(%s)/%s?charset=utf8&parseTime=True&loc=Local",
+			opt.User, opt.Pass, opt.Host, opt.DBName)
+	case "postgres":
+		return fmt.Sprintf("host=%v port=%v user=%v "+
+			"dbname=%v password=%v sslmode=disable",
+			opt.Host, opt.Port, opt.User, opt.DBName, opt.Pass)
+	case "mssql":
+		return fmt.Sprintf(
+			"server=%v;user id=%v;password=%v;port=%v;database=%v;",
+			opt.Host,
+			opt.User,
+			opt.Pass,
+			opt.Port,
+			opt.DBName,
+		)
+	default:
+		log.Panicln("bad dialect: " + opt.Dialect)
+	}
+
+	return ""
+}
+
+// Dialector generates gorm Dialector.
+func (opt *ConnectOption) Dialector() gorm.Dialector {
+	dsn := opt.ConnStr()
+	switch opt.Dialect {
+	case "sqlite3":
+		return sqlite.Open(dsn)
+	case "mysql":
+		return mysql.Open(dsn)
+	case "postgres":
+		return postgres.Open(dsn)
+	case "mssql":
+		return sqlserver.Open(dsn)
+	default:
+		log.Panicln("bad dialect: " + opt.Dialect)
+	}
+
+	return nil
+}
+
+// CliFlags returns cli flag list.
+func (opt *ConnectOption) CliFlags() []cli.Flag {
+	var flags []cli.Flag
+	flags = append(flags, &cli.StringFlag{
+		Name:        "db-dialect",
+		Usage:       "[mysql|sqlite3|postgres|mssql]",
+		EnvVars:     []string{"DB_DIALECT"},
+		Required:    true,
+		Destination: &opt.Dialect,
+	})
+	flags = append(flags, &cli.StringFlag{
+		Name:        "db-host",
+		Usage:       "mysql -> host, sqlite3 -> filepath",
+		EnvVars:     []string{"DB_HOST"},
+		Destination: &opt.Host,
+	})
+	flags = append(flags, &cli.IntFlag{
+		Name:        "db-port",
+		EnvVars:     []string{"DB_PORT"},
+		Destination: &opt.Port,
+	})
+	flags = append(flags, &cli.StringFlag{
+		Name:        "db-name",
+		EnvVars:     []string{"DB_NAME"},
+		Destination: &opt.DBName,
+	})
+	flags = append(flags, &cli.StringFlag{
+		Name:        "db-user",
+		EnvVars:     []string{"DB_USER"},
+		Destination: &opt.User,
+	})
+	flags = append(flags, &cli.StringFlag{
+		Name:        "db-password",
+		EnvVars:     []string{"DB_PASSWORD"},
+		Destination: &opt.Pass,
+	})
+	flags = append(flags, &cli.BoolFlag{
+		Name:        "db-silence-logger",
+		EnvVars:     []string{"DB_SILENCE_LOGGER"},
+		Destination: &opt.Silence,
+	})
+
+	return flags
+}
+
+// Before checks config and initializes.
+func (opt *ConnectOption) Before(c *cli.Context) error {
+	switch opt.Dialect {
+	case "sqlite3":
+	case "mysql", "postgres", "mssql":
+		if opt.Host == "" {
+			panic("bad conn setting, host")
+		}
+
+		if opt.DBName == "" {
+			panic("bad conn setting, name")
+		}
+
+		if opt.User == "" {
+			panic("bad conn setting, user")
+		}
+
+		if opt.Pass == "" {
+			panic("bad conn setting, pass")
+		}
+	default:
+		panic("bad dialect value:" + opt.Dialect)
+	}
+
+	Initialize(Default, *opt)
+	return nil
+}
+
+// After closes connection.
+func (opt *ConnectOption) After() {
+	Finalize()
+}
+
+UNSAFE
+	'safefile://safe.go': <<<SAFE
+package database
+
+import (
+	"fmt"
+	"log"
+
+	"github.com/sky-mirror/boot"
+	"github.com/urfave/cli/v2"
+	"gorm.io/driver/mysql"
+	"gorm.io/driver/postgres"
+	"gorm.io/driver/sqlite"
+	"gorm.io/driver/sqlserver"
+	"gorm.io/gorm"
+)
+
+var defaultOption ConnectOption
+
+func init() {
+	boot.Register(&defaultOption)
+}
+
+var _ boot.Beforer = &ConnectOption{}
+var _ boot.Afterer = &ConnectOption{}
+
+// ConnectOption defines a generic connect option for all dialects.
+type ConnectOption struct {
+	Dialect string
+	Host    string
+	Port    int // optional, if you append port in host, this option is unnecessary.
+	DBName  string
+	User    string
+	Pass    string
+	Config  gorm.Config
+	Silence bool
+
+	Testing bool
+}
+
+// ConnStr generates connection string.
+func (opt *ConnectOption) ConnStr() string {
+	switch opt.Dialect {
+	case "sqlite3":
+		return opt.Host
+	case "mysql":
+		return fmt.Sprintf(
+			"%s:%s@(%s)/%s?charset=utf8&parseTime=True&loc=Local",
+			opt.User, opt.Pass, opt.Host, opt.DBName)
+	case "postgres":
+		return fmt.Sprintf("host=%v port=%v user=%v "+
+			"dbname=%v password=%v sslmode=require",
+			opt.Host, opt.Port, opt.User, opt.DBName, opt.Pass)
+	case "mssql":
+		return fmt.Sprintf(
+			"server=%v;user id=%v;password=%v;port=%v;database=%v;",
+			opt.Host,
+			opt.User,
+			opt.Pass,
+			opt.Port,
+			opt.DBName,
+		)
+	default:
+		log.Panicln("bad dialect: " + opt.Dialect)
+	}
+
+	return ""
+}
+
+// Dialector generates gorm Dialector.
+func (opt *ConnectOption) Dialector() gorm.Dialector {
+	dsn := opt.ConnStr()
+	switch opt.Dialect {
+	case "sqlite3":
+		return sqlite.Open(dsn)
+	case "mysql":
+		return mysql.Open(dsn)
+	case "postgres":
+		return postgres.Open(dsn)
+	case "mssql":
+		return sqlserver.Open(dsn)
+	default:
+		log.Panicln("bad dialect: " + opt.Dialect)
+	}
+
+	return nil
+}
+
+// CliFlags returns cli flag list.
+func (opt *ConnectOption) CliFlags() []cli.Flag {
+	var flags []cli.Flag
+	flags = append(flags, &cli.StringFlag{
+		Name:        "db-dialect",
+		Usage:       "[mysql|sqlite3|postgres|mssql]",
+		EnvVars:     []string{"DB_DIALECT"},
+		Required:    true,
+		Destination: &opt.Dialect,
+	})
+	flags = append(flags, &cli.StringFlag{
+		Name:        "db-host",
+		Usage:       "mysql -> host, sqlite3 -> filepath",
+		EnvVars:     []string{"DB_HOST"},
+		Destination: &opt.Host,
+	})
+	flags = append(flags, &cli.IntFlag{
+		Name:        "db-port",
+		EnvVars:     []string{"DB_PORT"},
+		Destination: &opt.Port,
+	})
+	flags = append(flags, &cli.StringFlag{
+		Name:        "db-name",
+		EnvVars:     []string{"DB_NAME"},
+		Destination: &opt.DBName,
+	})
+	flags = append(flags, &cli.StringFlag{
+		Name:        "db-user",
+		EnvVars:     []string{"DB_USER"},
+		Destination: &opt.User,
+	})
+	flags = append(flags, &cli.StringFlag{
+		Name:        "db-password",
+		EnvVars:     []string{"DB_PASSWORD"},
+		Destination: &opt.Pass,
+	})
+	flags = append(flags, &cli.BoolFlag{
+		Name:        "db-silence-logger",
+		EnvVars:     []string{"DB_SILENCE_LOGGER"},
+		Destination: &opt.Silence,
+	})
+
+	return flags
+}
+
+// Before checks config and initializes.
+func (opt *ConnectOption) Before(c *cli.Context) error {
+	switch opt.Dialect {
+	case "sqlite3":
+	case "mysql", "postgres", "mssql":
+		if opt.Host == "" {
+			panic("bad conn setting, host")
+		}
+
+		if opt.DBName == "" {
+			panic("bad conn setting, name")
+		}
+
+		if opt.User == "" {
+			panic("bad conn setting, user")
+		}
+
+		if opt.Pass == "" {
+			panic("bad conn setting, pass")
+		}
+	default:
+		panic("bad dialect value:" + opt.Dialect)
+	}
+
+	Initialize(Default, *opt)
+	return nil
+}
+
+// After closes connection.
+func (opt *ConnectOption) After() {
+	Finalize()
+}
+
+SAFE
+)

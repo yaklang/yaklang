@@ -1,0 +1,189 @@
+desc(
+	title: "Check Golang Path Traversal via PostForm"
+	title_zh: "检测Golang通过PostForm导致的路径遍历漏洞"
+	type: vuln
+	level: mid
+	risk: ""
+	desc: <<<DESC
+该规则用于检测Golang Web应用中通过`gin.Context.PostForm`获取用户输入并直接传递给`os.ReadDir`等文件系统操作函数导致的路径遍历（Path Traversal）漏洞。
+
+### 漏洞原理
+路径遍历漏洞（CWE-22）允许攻击者通过构造包含`../`等序列的恶意输入，访问或操作服务器上预期之外的文件或目录。在本场景中，攻击者可通过HTTP POST请求中的`dir`参数注入恶意路径，导致应用读取任意目录内容。
+
+### 触发场景
+1. 使用Gin框架的`c.PostForm("dir")`获取用户输入的目录路径
+2. 未对输入进行验证或过滤，直接传递给`os.ReadDir(path)`等函数
+3. 攻击者提交`dir=../../../etc`等payload，遍历服务器敏感目录
+
+### 潜在影响
+- 信息泄露：读取服务器配置文件、源代码、数据库备份等敏感文件
+- 目录枚举：获取服务器目录结构，为后续攻击提供情报
+- 在配合文件下载功能时可能导致任意文件下载漏洞
+DESC
+	rule_id: "4514dadf-577d-4479-a72b-045eb32f2d24"
+	solution: <<<SOLUTION
+### 修复建议
+
+1. **输入验证与过滤**
+   - 使用白名单机制限制允许的目录范围
+   - 对输入路径进行规范化处理，移除`../`等遍历序列
+   - 使用`filepath.Clean()`清理路径后，验证是否在允许范围内
+
+2. **路径拼接控制**
+   - 避免直接使用用户输入作为文件系统路径
+   - 将用户输入作为相对路径的最后一部分，拼接至固定的安全基础目录
+   - 示例：
+   ```go
+   baseDir := "/safe/backup/dir"
+   userInput := c.PostForm("dir")
+   safePath := filepath.Join(baseDir, filepath.Clean(userInput))
+   if !strings.HasPrefix(safePath, baseDir) {
+       // 拒绝访问
+   }
+   ```
+
+3. **使用chroot或容器隔离**
+   - 在受限环境中运行应用，限制文件系统访问范围
+   - 使用Docker等容器技术隔离应用文件系统
+
+4. **安全编码规范**
+   - 建立安全编码规范，对所有文件系统操作进行审计
+   - 使用静态代码分析工具持续检测此类漏洞
+SOLUTION
+	reference: <<<REFERENCE
+https://cwe.mitre.org/data/definitions/22.html
+https://owasp.org/www-community/attacks/Path_Traversal
+https://pkg.go.dev/path/filepath#Clean
+REFERENCE
+)
+
+<include("golang-os-sink")> as $os;
+gin.Context?{<fullTypeName>?{have: "github.com/gin-gonic/gin"}} as $entry
+
+$entry.PostForm as $sink
+$os?(* #{until: `* & $sink`}-> ) as $mid
+
+alert $mid for {
+	type: "vuln",
+	level: "middle",
+	name: "mid",
+	title: "Path Traversal via User-Controlled Directory Input",
+	title_zh: "用户可控目录输入导致的路径遍历漏洞",
+	message: "检测到用户输入直接用于文件系统操作，存在路径遍历风险",
+	risk: "路径遍历",
+	desc: <<<DESC
+该漏洞存在于使用Gin框架处理HTTP请求时，攻击者可通过PostForm提交的dir参数控制文件系统路径。代码将用户输入直接传递给os.ReadDir函数，未进行任何路径校验或过滤，导致攻击者可构造恶意路径（如../../../etc/passwd）读取服务器敏感目录内容，造成信息泄露或系统文件访问。
+DESC
+	solution: <<<SOLUTION
+1. 对用户输入的路径参数进行严格校验，使用filepath.Clean清理路径，并检查是否包含../等目录遍历字符；2. 采用白名单机制，限制可访问的目录范围，确保路径在预设的安全目录内；3. 使用chroot或容器化技术隔离文件系统访问权限；4. 避免直接使用用户输入作为文件系统路径，优先使用索引映射或预定义路径列表。
+SOLUTION
+}
+
+desc(
+	lang: golang
+	alert_mid: 1
+	'file://unsafe.go': <<<UNSAFE
+package helper
+
+import (
+	"Go_server/config"
+	"Go_server/define"
+	"archive/zip"
+	"errors"
+	"io"
+	"mime/multipart"
+	"net/http"
+	"net/mail"
+	"os"
+	"path"
+	"path/filepath"
+	"regexp"
+	"strings"
+
+	"github.com/dgrijalva/jwt-go"
+	"github.com/gin-gonic/gin"
+)
+
+// 获取当前目录下所有文件
+func GetAllFile(path string) ([]string, error) {
+	// 存放文件名
+	filename := []string{}
+	// 读取当前目录中的所有文件和子目录
+	files, err := os.ReadDir(path)
+	if err != nil {
+		return nil, err
+	}
+	// 获取文件，并输出它们的名字
+	for _, file := range files {
+		fd, err := file.Info()
+		if err != nil {
+			continue
+		}
+		filename = append(filename, fd.Name())
+	}
+	return filename, nil
+}
+
+func GetBackupsDb(c *gin.Context) {
+	dir := c.PostForm("dir")
+	dbNames, err := GetAllFile(dir)
+	if err != nil {
+		helper.ErrorResponse(c, "获取备份数据库列表", err)
+		return
+	}
+	helper.SuccessResponse(c, "获取备份数据库列表", dbNames)
+}
+UNSAFE
+	'safefile://safe.go': <<<SAFE
+package helper
+
+import (
+	"Go_server/config"
+	"Go_server/define"
+	"archive/zip"
+	"errors"
+	"io"
+	"mime/multipart"
+	"net/http"
+	"net/mail"
+	"os"
+	"path"
+	"path/filepath"
+	"regexp"
+	"strings"
+
+	"github.com/dgrijalva/jwt-go"
+	"github.com/gin-gonic/gin"
+)
+
+// 获取当前目录下所有文件
+func GetAllFile(path string) ([]string, error) {
+	// 存放文件名
+	filename := []string{}
+	// 读取当前目录中的所有文件和子目录
+	files, err := os.ReadDir("")
+	if err != nil {
+		return nil, err
+	}
+	// 获取文件，并输出它们的名字
+	for _, file := range files {
+		fd, err := file.Info()
+		if err != nil {
+			continue
+		}
+		filename = append(filename, fd.Name())
+	}
+	return filename, nil
+}
+
+func GetBackupsDb(c *gin.Context) {
+	dir := c.PostForm("dir")
+	dbNames, err := GetAllFile(dir)
+	if err != nil {
+		helper.ErrorResponse(c, "获取备份数据库列表", err)
+		return
+	}
+	helper.SuccessResponse(c, "获取备份数据库列表", dbNames)
+}
+SAFE
+)

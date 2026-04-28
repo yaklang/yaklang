@@ -1,0 +1,146 @@
+desc(
+	title: "Check Gin Context Session Data Exposure Vulnerability"
+	title_zh: "检测Gin框架上下文会话数据泄露漏洞"
+	type: audit
+	level: low
+	risk: ""
+	desc: <<<DESC
+该规则用于检测Gin Web框架中`gin.Context`会话数据的不安全访问模式。Gin框架的`Context.Next()`方法用于执行后续中间件或处理器，但在调用`Next`之前或之后，开发者可能通过`Set`/`Get`方法存储或读取敏感会话数据（如userID、roleID、userName、token等）。
+
+漏洞原理：当`Next`方法被调用时，如果存在未经验证的调用链，攻击者可能通过构造特定的请求流程，绕过正常的权限检查逻辑，导致敏感信息泄露或未授权访问。特别是在中间件链中，如果敏感数据的设置和读取顺序不当，或者存在不安全的`Next`调用，可能使后续处理器在错误的上下文中执行。
+
+触发场景：常见于自定义中间件实现中，开发者在`Set`/`Get`敏感数据后调用`Next`，但未对调用来源进行有效校验；或在`Next`之后读取的数据未经过滤直接用于权限判断。
+
+潜在影响：可能导致用户身份伪造、权限提升、敏感令牌泄露等安全问题，进而引发未授权数据访问或账户接管攻击。
+DESC
+	rule_id: "06df5f33-98fc-41ea-8ed3-bbe8607ae94d"
+	solution: <<<SOLUTION
+1. **严格校验调用来源**：在使用`gin.Context`的`Set`/`Get`方法处理敏感数据时，确保仅在受信任的内部中间件或处理器中执行，避免外部可控的调用链影响会话数据。
+
+2. **实施最小权限原则**：敏感数据（如token、userID）的读取和写入应集中在专门的认证中间件中，避免分散在多个中间件中处理，减少攻击面。
+
+3. **添加调用链白名单**：对于`Next()`方法的调用，应通过`getCallee()`等方式获取调用者信息，建立安全的调用来源白名单，排除不可信的调用路径。
+
+4. **强化会话管理**：使用Gin的官方session中间件或JWT等标准方案替代自定义的`Set`/`Get`会话管理机制，确保会话数据的安全性和完整性。
+
+5. **代码审计与测试**：定期审查中间件链的执行顺序和数据流，结合单元测试和集成测试验证权限控制逻辑的正确性。
+SOLUTION
+	reference: <<<REFERENCE
+https://gin-gonic.com/docs/
+https://cwe.mitre.org/data/definitions/200.html
+REFERENCE
+)
+
+gin.Context?{<fullTypeName>?{have: "github.com/gin-gonic/gin"}} as $entry
+
+$entry?{.Next} as $sink
+
+$sink.Set?(*<slice(index=1)> #{until: `*?{opcode:const}?{have: /userID|roleID|userName|token/}`}->) as $func
+$sink.Get?(*<slice(index=1)> #{until: `*?{opcode:const}?{have: /userID|roleID|userName|token/}`}->) as $func
+
+$func<getCallee()>(*<slice(index=0)> as $safe)
+
+$sink.Next?(* <slice(index=0)> #{exclude: `$safe`}-> ) as $low
+
+alert $low for {
+	solution: <<<SOLUTION
+1. 确保 c.Next() 调用位于正确的中间件执行顺序中，特别是在身份验证和授权中间件之后；2. 对 c.Set() 设置的敏感键值进行严格的类型校验和范围验证；3. 使用受控的包装函数处理上下文传递，避免直接暴露 c.Next() 给不可信代码；4. 在中间件链中明确区分前置处理（before Next）和后置处理（after Next）的逻辑边界；5. 考虑使用 Gin 的 Abort() 机制在验证失败时提前终止请求处理链。
+SOLUTION
+	desc: <<<DESC
+检测到 Gin 框架中 c.Next() 方法的不安全调用。该规则识别在调用 c.Set() 或 c.Get() 设置用户身份相关键值（userID、roleID、userName、token）后，未通过受控函数安全处理而直接调用 c.Next() 的情况。攻击者可能利用中间件执行顺序漏洞，在身份验证中间件之前或之后注入恶意逻辑，导致权限绕过或身份伪造。
+DESC
+	level: "low",
+	type: "vuln",
+	title: "Gin Context Next Unsafe Usage",
+	title_zh: "Gin Context Next 方法不安全使用",
+	message: "发现 Gin Context Next 方法存在潜在不安全调用，建议审查中间件执行顺序和身份验证逻辑",
+	risk: "访问控制缺陷",
+	name: "low",
+}
+
+desc(
+	lang: golang
+	alert_low: 1
+	'file://unsafe.go': <<<UNSAFE
+package middleware
+
+import (
+	"Go_server/helper"
+	"strings"
+
+	"github.com/gin-gonic/gin"
+)
+
+// 鉴权中间件
+func Auth() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// 获取请求头中的Authorization
+		authHeader := c.Request.Header.Get("Authorization")
+		if authHeader == "" {
+			helper.ErrorResponse(c, "未登录系统", nil)
+			// 终止访问
+			c.Abort()
+			return
+		}
+		parts := strings.SplitN(authHeader, " ", 2)
+		if !(len(parts) == 2 && parts[0] == "Bearer") {
+			helper.ErrorResponse(c, "当前登录已失效请重新登录", nil)
+			c.Abort()
+			return
+		}
+		// 验证token
+		tokenClaims, err := helper.ValidateToken(parts[1])
+		if tokenClaims == nil || err != nil {
+			helper.ErrorResponse(c, "当前登录已失效请重新登录", nil)
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
+UNSAFE
+	'safefile://safe.go': <<<SAFE
+package middleware
+
+import (
+	"Go_server/helper"
+	"strings"
+
+	"github.com/gin-gonic/gin"
+)
+
+// 鉴权中间件
+func Auth() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// 获取请求头中的Authorization
+		authHeader := c.Request.Header.Get("Authorization")
+		if authHeader == "" {
+			helper.ErrorResponse(c, "未登录系统", nil)
+			// 终止访问
+			c.Abort()
+			return
+		}
+		parts := strings.SplitN(authHeader, " ", 2)
+		if !(len(parts) == 2 && parts[0] == "Bearer") {
+			helper.ErrorResponse(c, "当前登录已失效请重新登录", nil)
+			c.Abort()
+			return
+		}
+		// 验证token
+		tokenClaims, err := helper.ValidateToken(parts[1])
+		if tokenClaims == nil || err != nil {
+			helper.ErrorResponse(c, "当前登录已失效请重新登录", nil)
+			c.Abort()
+			return
+		}
+        c.Set("userID", tokenClaims.UID)
+		c.Set("roleID", tokenClaims.RID)
+		c.Set("userName", tokenClaims.UserName)
+		c.Set("token", parts[1])
+		c.Next()
+	}
+}
+
+SAFE
+)

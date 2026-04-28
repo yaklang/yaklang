@@ -1,0 +1,101 @@
+desc(
+	title: "Check Go xorm SQL Injection Vulnerability"
+	type: audit
+	level: high
+	risk: ""
+	desc: <<<DESC
+该规则用于检测使用xorm框架时存在SQL注入风险的代码模式。在示例中，程序通过`fmt.Sprintf`动态拼接SQL查询条件，且未对用户输入（如`field`和`username`）进行充分校验与转义，导致攻击者可构造恶意输入绕过安全检查，执行任意SQL语句。此漏洞属于CWE-89：Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection')。当应用从HTTP请求参数中直接拼接SQL语句并传入数据库查询时，若未使用预编译语句或参数化查询，将可能被利用实施数据泄露、篡改或删除等攻击行为。
+DESC
+	rule_id: "024e3b62-374a-4efd-b9e9-71be3a4d6d92"
+	risk: ""
+	solution: <<<SOLUTION
+1. 所有用户可控输入必须经过严格的白名单校验与长度限制；
+2. 避免使用`fmt.Sprintf`拼接SQL语句，应优先采用预编译语句（如`xorm`的`Where`、`In`、`Like`等方法）；
+3. 若必须动态构建SQL，请确保所有变量均作为参数传递给数据库驱动，而非字符串拼接；
+4. 在生产环境中启用SQL日志审计，监控异常查询语句；
+5. 参考官方文档：https://github.com/go-xorm/xorm/blob/master/README.md#querying
+6. 检查项目是否已引入ORM安全增强库，如`sqlx`配合`sql.NamedArg`或`database/sql`的`QueryContext`参数化方式。
+SOLUTION
+	reference: <<<REFERENCE
+https://cwe.mitre.org/data/definitions/89.html, https://github.com/go-xorm/xorm/blob/master/README.md#querying
+REFERENCE
+	title_zh: "检测Go语言xorm SQL注入漏洞"
+)
+
+xorm?{* <fullTypeName()>?{have: "xorm.io/xorm"}} as $entry
+
+$entry.NewEngine()<getMembers()> as $engine
+$engine.Prepare().And?(*<slice(index=1)> #{
+    until: `*?{ *?{have: ".Sprintf"} || *?{opcode:add}}`}-> 
+) as $high
+
+alert $high for {
+	title: "SQL Injection in Xorm Query Construction",
+	risk: "SQL 注入",
+	title_zh: "Xorm 查询构建中的 SQL 注入漏洞",
+	solution: <<<SOLUTION
+1. 禁止直接使用 fmt.Sprintf 或类似函数拼接 SQL 语句。
+2. 始终使用预编译语句（Prepared Statements）和参数化查询。
+3. 如果必须动态指定列名，应先校验列名是否在白名单内，严禁直接拼接用户输入。
+4. 对 xorm 的 And() 方法，应确保传入的参数是安全的变量，而不是经过格式化的字符串。
+5. 修复后的代码示例：session.Prepare().And(field, username) 是错误的；应改为 session.Prepare().And(orm.Eq(field).String(), username) 或者更安全的做法是避免动态列名，若必须动态列名，需严格白名单校验后使用原生 SQL 并配合参数化查询。
+SOLUTION
+	desc: <<<DESC
+在 Go 语言代码中，使用 xorm 框架进行数据库查询时，开发者直接使用了 fmt.Sprintf 将用户输入的字段名和值拼接进 SQL 语句中。具体表现为：session.Prepare().And(fmt.Sprintf("%s like ?", field), username)。这种动态拼接 SQL 语句的方式允许攻击者通过构造恶意输入（如包含单引号、注释符等）来改变原始 SQL 的逻辑结构，从而执行任意 SQL 命令，导致数据泄露、篡改或删除。
+DESC
+	level: "high",
+	type: "vuln",
+	message: "检测到使用字符串格式化函数拼接 SQL 语句，存在 SQL 注入风险。",
+	name: "high",
+}
+
+desc(
+	lang: golang
+	alert_high: 1
+	'file://unsafe.go': <<<UNSAFE
+package controllers
+
+import (
+	"database/sql"
+	"encoding/json"
+	"fmt"
+	"go-sec-code/models"
+
+	sq "github.com/Masterminds/squirrel"
+	"github.com/beego/beego/v2/client/orm"
+	beego "github.com/beego/beego/v2/server/web"
+	_ "github.com/go-sql-driver/mysql"
+	"xorm.io/xorm"
+)
+
+const source = "root:password@tcp(127.0.0.1:3306)/goseccode"
+
+func init() {
+	orm.RegisterDriver("mysql", orm.DRMySQL)
+	orm.RegisterDataBase("default", "mysql", source)
+	orm.Debug = true
+}
+
+func (c *SqlInjectionVuln3Controller) Get() {
+	username := c.GetString("username")
+	field := c.GetString("field")
+	engine, err := xorm.NewEngine("mysql", source)
+	if err != nil {
+		panic(err)
+	}
+	engine.ShowSQL(true)
+	user := models.User{}
+	session := engine.Prepare().And(fmt.Sprintf("%s like ?", field), username)
+	ok, err := session.Get(&user)
+	if !ok && err != nil {
+		panic(err)
+	}
+	output, err := json.Marshal(user)
+	if err != nil {
+		panic(err)
+	}
+	c.Ctx.ResponseWriter.Write(output)
+}
+
+UNSAFE
+)
