@@ -24,6 +24,7 @@ type thirdPartyApplicationConfig struct {
 	BaseURL        string `app:"name:base_url"`
 	Endpoint       string `app:"name:endpoint"`
 	EnableEndpoint bool   `app:"name:enable_endpoint"`
+	EnableThinking bool   `app:"name:enable_thinking"`
 	WebhookURL     string `app:"name:webhook_url"`
 	Proxy          string `app:"name:proxy"`
 	NoHttps        bool   `app:"name:no_https"`
@@ -43,6 +44,7 @@ func ConvertCompatibleConfig(config *ypb.ThirdPartyApplicationConfig) {
 		BaseURL:        config.BaseURL,
 		Endpoint:       config.Endpoint,
 		EnableEndpoint: config.EnableEndpoint,
+		EnableThinking: config.EnableThinking,
 		WebhookURL:     config.WebhookURL,
 		Proxy:          config.Proxy,
 		NoHttps:        config.NoHttps,
@@ -77,6 +79,7 @@ func ConvertCompatibleConfig(config *ypb.ThirdPartyApplicationConfig) {
 	config.BaseURL = c.BaseURL
 	config.Endpoint = c.Endpoint
 	config.EnableEndpoint = c.EnableEndpoint
+	config.EnableThinking = c.EnableThinking
 	config.WebhookURL = c.WebhookURL
 	config.Proxy = c.Proxy
 	config.NoHttps = c.NoHttps
@@ -122,6 +125,7 @@ func GetCommonThirdPartyApplicationConfig(t string) (*ypb.ThirdPartyApplicationC
 		config.BaseURL = rawCfg.BaseURL
 		config.Endpoint = rawCfg.Endpoint
 		config.EnableEndpoint = rawCfg.EnableEndpoint
+		config.EnableThinking = rawCfg.EnableThinking
 		config.WebhookURL = rawCfg.WebhookURL
 		config.Proxy = rawCfg.Proxy
 		config.NoHttps = rawCfg.NoHttps
@@ -171,6 +175,7 @@ func AllThirdPartyApplicationConfig() []*ypb.ThirdPartyApplicationConfig {
 			BaseURL:        rawConfig.BaseURL,
 			Endpoint:       rawConfig.Endpoint,
 			EnableEndpoint: rawConfig.EnableEndpoint,
+			EnableThinking: rawConfig.EnableThinking,
 			WebhookURL:     rawConfig.WebhookURL,
 			Proxy:          rawConfig.Proxy,
 			NoHttps:        rawConfig.NoHttps,
@@ -210,6 +215,7 @@ func UpdateThirdPartyApplicationConfig(config *ypb.ThirdPartyApplicationConfig) 
 		BaseURL:        config.BaseURL,
 		Endpoint:       config.Endpoint,
 		EnableEndpoint: config.EnableEndpoint,
+		EnableThinking: config.EnableThinking,
 		WebhookURL:     config.WebhookURL,
 		Proxy:          config.Proxy,
 		NoHttps:        config.NoHttps,
@@ -256,6 +262,10 @@ func applyThirdPartyNonAppFields(target any, source *thirdPartyApplicationConfig
 	field := elem.FieldByName("Headers")
 	if field.IsValid() && field.CanSet() && field.Type() == reflect.TypeOf([]*ypb.KVPair(nil)) {
 		field.Set(reflect.ValueOf(cloneHTTPHeaders(source.Headers)))
+	}
+	field = elem.FieldByName("EnableThinking")
+	if field.IsValid() && field.CanSet() && field.Kind() == reflect.Bool {
+		field.SetBool(source.EnableThinking)
 	}
 	return nil
 }

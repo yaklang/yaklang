@@ -100,6 +100,44 @@ func TestEnableThinkingConfig_Tongyi(t *testing.T) {
 	})
 }
 
+func TestEnableThinkingConfig_GenericDefault(t *testing.T) {
+	t.Run("no type still sets enable_thinking", func(t *testing.T) {
+		config := aispec.NewDefaultAIConfig(
+			aispec.WithEnableThinking(true),
+		)
+
+		if config.EnableThinkingField != "enable_thinking" {
+			t.Fatalf("expected EnableThinkingField='enable_thinking', got '%s'", config.EnableThinkingField)
+		}
+		val, ok := config.EnableThinkingValue.(bool)
+		if !ok {
+			t.Fatalf("expected EnableThinkingValue to be bool, got %T", config.EnableThinkingValue)
+		}
+		if !val {
+			t.Fatalf("expected EnableThinkingValue=true, got false")
+		}
+	})
+
+	t.Run("openai type also sets enable_thinking", func(t *testing.T) {
+		config := aispec.NewDefaultAIConfig(
+			aispec.WithType("openai"),
+			aispec.WithAPIKey("test-key"),
+			aispec.WithEnableThinking(true),
+		)
+
+		if config.EnableThinkingField != "enable_thinking" {
+			t.Fatalf("expected EnableThinkingField='enable_thinking', got '%s'", config.EnableThinkingField)
+		}
+		val, ok := config.EnableThinkingValue.(bool)
+		if !ok {
+			t.Fatalf("expected EnableThinkingValue to be bool, got %T", config.EnableThinkingValue)
+		}
+		if !val {
+			t.Fatalf("expected EnableThinkingValue=true, got false")
+		}
+	})
+}
+
 func TestEnableThinkingConfig_Volcengine(t *testing.T) {
 	t.Run("volcengine thinking true", func(t *testing.T) {
 		config := aispec.NewDefaultAIConfig(
@@ -117,6 +155,26 @@ func TestEnableThinkingConfig_Volcengine(t *testing.T) {
 		}
 		if valMap["type"] != "enabled" {
 			t.Fatalf("expected thinking type='enabled', got '%v'", valMap["type"])
+		}
+	})
+
+	t.Run("siliconflow thinking true", func(t *testing.T) {
+		config := aispec.NewDefaultAIConfig(
+			aispec.WithType("siliconflow"),
+			aispec.WithAPIKey("test-key"),
+			aispec.WithModel("deepseek-ai/DeepSeek-V4-Flash"),
+			aispec.WithEnableThinking(true),
+		)
+
+		if config.EnableThinkingField != "enable_thinking" {
+			t.Fatalf("expected EnableThinkingField='enable_thinking', got '%s'", config.EnableThinkingField)
+		}
+		val, ok := config.EnableThinkingValue.(bool)
+		if !ok {
+			t.Fatalf("expected EnableThinkingValue to be bool, got %T", config.EnableThinkingValue)
+		}
+		if !val {
+			t.Fatalf("expected EnableThinkingValue=true, got false")
 		}
 	})
 }

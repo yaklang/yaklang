@@ -27,6 +27,7 @@ type AIThirdPartyConfig struct {
 	BaseURL        string          `json:"base_url"`
 	Endpoint       string          `json:"endpoint"`
 	EnableEndpoint bool            `json:"enable_endpoint" gorm:"default:false"`
+	EnableThinking bool            `json:"enable_thinking" gorm:"default:false"`
 	WebhookURL     string          `json:"webhook_url"`
 	ExtraParams    MapStringString `json:"extra_params" gorm:"type:text"`
 	APIType        string          `json:"api_type"`
@@ -65,6 +66,7 @@ func (c *AIThirdPartyConfig) CalcHash() string {
 		c.Proxy,
 		c.NoHttps,
 		c.EnableEndpoint,
+		c.EnableThinking,
 	)
 }
 
@@ -91,6 +93,7 @@ func (c *AIThirdPartyConfig) ToThirdPartyConfig() *ypb.ThirdPartyApplicationConf
 		BaseURL:        c.BaseURL,
 		Endpoint:       c.Endpoint,
 		EnableEndpoint: c.EnableEndpoint,
+		EnableThinking: c.EnableThinking,
 		WebhookURL:     c.WebhookURL,
 		Disabled:       c.Disabled,
 		Proxy:          c.Proxy,
@@ -140,6 +143,7 @@ func AIThirdPartyConfigFromGRPC(cfg *ypb.ThirdPartyApplicationConfig) *AIThirdPa
 		BaseURL:        cfg.GetBaseURL(),
 		Endpoint:       cfg.GetEndpoint(),
 		EnableEndpoint: cfg.GetEnableEndpoint(),
+		EnableThinking: cfg.GetEnableThinking(),
 		WebhookURL:     cfg.GetWebhookURL(),
 		ExtraParams:    extra,
 		Disabled:       cfg.GetDisabled(),
