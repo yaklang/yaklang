@@ -1,0 +1,25 @@
+// tool-in-my-focus: yak_scan_demo 的扫描工具 sidekick。
+// 关键词: yak focus mode sidekick, scan helper, reachability check
+
+isLikelyURL = func(s) {
+    if s == "" {
+        return false
+    }
+    // 简单的协议前缀判断，避免引入完整的 URL 解析依赖。
+    return str.HasPrefix(s, "http://") || str.HasPrefix(s, "https://")
+}
+
+runReachabilityCheck = func(target) {
+    // 演示用：不真的发请求，仅做声明式 finding 构造。
+    finding = {
+        "target":  target,
+        "status":  "unreachable_unknown",
+        "checked": "mock",
+    }
+    if str.HasPrefix(target, "https://") {
+        finding["status"] = "reachable_assumed_https"
+    } else if str.HasPrefix(target, "http://") {
+        finding["status"] = "reachable_assumed_http"
+    }
+    return finding
+}

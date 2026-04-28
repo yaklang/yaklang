@@ -1,0 +1,12 @@
+// utils-prompt: comprehensive_showcase 的 prompt 文本辅助 sidekick。
+// 关键词: yak focus mode sidekick, prompt utilities, showcase
+
+buildShowcasePrompt = func(stage, ctx) {
+    return sprintf("## Stage: %v\n\nContext:\n%v\n", stage, ctx)
+}
+
+renderShowcaseStatus = func(stepsDone, totalSteps) {
+    if stepsDone == nil { stepsDone = 0 }
+    if totalSteps == nil { totalSteps = 0 }
+    return sprintf("steps_done=%v / total=%v", stepsDone, totalSteps)
+}

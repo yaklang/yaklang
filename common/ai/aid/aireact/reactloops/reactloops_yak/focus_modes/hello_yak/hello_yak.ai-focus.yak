@@ -1,0 +1,34 @@
+// hello_yak: 最小可运行的 yak 专注模式范例。
+// 关键词: yak focus mode minimal demo, hello_yak
+
+__VERBOSE_NAME__    = "Hello Yak Focus"
+__VERBOSE_NAME_ZH__ = "Yak 专注模式 Hello 范例"
+__DESCRIPTION__     = "minimal yak focus mode example for smoke testing"
+__DESCRIPTION_ZH__  = "最小可运行的 yak 专注模式范例，用于冒烟验证"
+__USAGE_PROMPT__    = "Use this when the user wants a hello-world style demo"
+__OUTPUT_EXAMPLE__  = `{"@action":"directly_answer","payload":"hello"}`
+__IS_HIDDEN__       = false
+
+__MAX_ITERATIONS__       = 4
+__ALLOW_USER_INTERACT__  = false
+
+__VARS__ = {
+    "hello_iter_count": 0,
+}
+
+// focusInitTask 在专注模式接管 task 之后第一时间触发，
+// 用来做一次性的初始化。
+focusInitTask = func(loop, task, op) {
+    log.info("hello_yak focus init: query=%v", task.GetUserInput())
+    op.Continue()
+}
+
+// focusPostIteration 每轮迭代结束都会触发，可在此做轻度兜底。
+focusPostIteration = func(loop, iter, task, isDone, reason, op) {
+    n = loop.Get("hello_iter_count")
+    if n == nil { n = 0 }
+    loop.Set("hello_iter_count", n + 1)
+    if isDone {
+        log.info("hello_yak finished after %v iterations", n+1)
+    }
+}

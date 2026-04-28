@@ -401,6 +401,7 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) (finalE
 	if !r.noEndLoadingStatus {
 		defer r.loadingStatus("end")
 	}
+	defer r.Release()
 
 	if utils.IsNil(task) {
 		return errors.New("re-act loop task is nil")

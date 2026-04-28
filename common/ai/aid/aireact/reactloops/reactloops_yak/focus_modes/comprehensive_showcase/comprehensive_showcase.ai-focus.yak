@@ -1,0 +1,143 @@
+// comprehensive_showcase: 尽量包含 yak 专注模式全部元素的范例。
+// 关键词: yak focus mode showcase, comprehensive demo, all dunder hooks actions
+
+// === 1. Metadata（boot 期读取） ===
+__VERBOSE_NAME__    = "Comprehensive Showcase"
+__VERBOSE_NAME_ZH__ = "完整能力展示专注模式"
+__DESCRIPTION__     = "demonstrates every feature of yak focus mode in one file"
+__DESCRIPTION_ZH__  = "在一个文件中演示 yak 专注模式的所有能力"
+__USAGE_PROMPT__    = "Use this when user wants a feature showcase or guided tour"
+__OUTPUT_EXAMPLE__  = `{"@action":"showcase_step","step":"intro"}`
+__IS_HIDDEN__       = false
+
+// === 2. Prompt 文本 ===
+__PERSISTENT_INSTRUCTION__ = `
+You are the comprehensive showcase. Available actions: showcase_step, summarize_findings, directly_answer.
+Walk the user through the showcase steps: intro -> demo -> advanced -> wrap.
+`
+
+__REFLECTION_OUTPUT_EXAMPLE__ = `Example: {"@action":"showcase_step","step":"two"}`
+
+// === 3. 数值阈值与开关 ===
+__MAX_ITERATIONS__                  = 8
+__PERIODIC_VERIFICATION_INTERVAL__  = 3
+__ENABLE_SELF_REFLECTION__          = true
+__SAME_ACTION_TYPE_SPIN_THRESHOLD__ = 3
+__MAX_CONSECUTIVE_SPIN_WARNINGS__   = 2
+__MEMORY_SIZE_LIMIT__               = 8192
+
+// 静态能力开关
+__ALLOW_RAG__           = true
+__ALLOW_TOOL_CALL__     = true
+__ALLOW_USER_INTERACT__ = false
+
+// === 4. 初始变量 ===
+__VARS__ = {
+    "showcase_steps_done": 0,
+    "showcase_findings":   [],
+}
+
+// === 5. Loop 级 AITag 流式字段 ===
+__AI_TAG_FIELDS__ = [
+    {"tagName": "SHOWCASE_NOTE", "variableName": "showcase_note",
+     "aiNodeId": "showcase_note_stream", "contentType": "text_markdown"},
+]
+
+// === 6. focusXxx 钩子 ===
+focusInitTask = func(loop, task, op) {
+    log.info("comprehensive showcase init: query=%v", task.GetUserInput())
+    op.Continue()
+}
+
+focusOnLoopInstanceCreated = func(loop) {
+    log.info("comprehensive showcase loop instance created")
+}
+
+focusPostIteration = func(loop, iter, task, isDone, reason, op) {
+    if isDone {
+        // 调用 sidekick 提供的 helper
+        summary = formatShowcaseSummary(loop)
+        log.info("showcase finished: %v", summary)
+        return
+    }
+    if iter >= 6 {
+        op.EndIteration("safety stop after 6 iterations")
+    }
+}
+
+focusReactiveDataBuilder = func(loop, feedback, nonce) {
+    done    = loop.GetVariable("showcase_steps_done")
+    if done == nil { done = 0 }
+    history = sprint(feedback)
+    return sprintf("## Showcase Status\nSteps done: %v\n\nFeedback:\n%v", done, history), nil
+}
+
+focusPersistentContextProvider = func(loop, nonce) {
+    return sprintf("Showcase nonce=%v", nonce), nil
+}
+
+// === 7. 自定义 Actions ===
+__ACTIONS__ = [
+    {
+        "type":           "showcase_step",
+        "description":    "advance the showcase to the next step",
+        "outputExamples": `{"@action":"showcase_step","step":"<name>"}`,
+        "options": [
+            {"name": "step", "type": "string", "required": true,
+             "help": "The step name (intro / demo / advanced / wrap)"},
+            {"name": "note", "type": "string",
+             "help": "Optional human-readable note"},
+        ],
+        "verifier": func(loop, action) {
+            step = action.GetString("step")
+            if step == "" {
+                return error("step is required")
+            }
+            valid = ["intro", "demo", "advanced", "wrap"]
+            ok = false
+            for v in valid {
+                if v == step {
+                    ok = true
+                    break
+                }
+            }
+            if !ok {
+                return error(sprintf("invalid step: %v", step))
+            }
+            loop.Set("current_step", step)
+            return nil
+        },
+        "handler": func(loop, action, op) {
+            // 关键：取出原始变量必须用 loop.GetVariable；loop.Get 会返回字符串化的结果。
+            step = loop.GetVariable("current_step")
+            note = action.GetString("note")
+            done = loop.GetVariable("showcase_steps_done")
+            if done == nil { done = 0 }
+            loop.Set("showcase_steps_done", done + 1)
+
+            findings = loop.GetVariable("showcase_findings")
+            if findings == nil { findings = [] }
+            findings = append(findings, {"step": step, "note": note})
+            loop.Set("showcase_findings", findings)
+
+            // 使用 sidekick 函数
+            emoji = pickStepEmoji(step)
+            op.Feedback(sprintf("step %v done %v, total %v", step, emoji, done+1))
+            op.Continue()
+        },
+    },
+    {
+        "type":        "summarize_findings",
+        "description": "summarize all showcase findings collected so far",
+        "options":     [],
+        "verifier": func(loop, action) {
+            return nil
+        },
+        "handler": func(loop, action, op) {
+            // 使用 sidekick 函数
+            summary = formatShowcaseSummary(loop)
+            op.Feedback(summary)
+            op.Continue()
+        },
+    },
+]

@@ -100,6 +100,12 @@ type ReActLoop struct {
 	onPostIteration       []func(loop *ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any, operator *OnPostIterationOperator)
 	onLoopInstanceCreated func(loop *ReActLoop)
 
+	// onRelease 在 loop 任务执行结束时（无论成功失败）按注册顺序调用，
+	// 用于回收 caller / engine / 文件句柄等资源
+	onReleaseMutex sync.Mutex
+	onRelease      []func()
+	released       bool
+
 	// 启动这个 loop 的时候马上要执行的事情
 	// operator 用于控制 init 后的行为：Done/Failed/Continue/NextAction/RemoveNextAction
 	initHandler func(loop *ReActLoop, task aicommon.AIStatefulTask, operator *InitTaskOperator)
@@ -156,6 +162,44 @@ type ReActLoop struct {
 	// producing Topics/Keywords/Summary that dynamically adjust the
 	// possibility space throughout the loop lifecycle.
 	perception *perceptionController
+}
+
+// AddOnReleaseHook 添加 loop 释放阶段的清理回调。多次调用按注册顺序执行。
+// 关键词: loop release hook, cleanup callback
+func (r *ReActLoop) AddOnReleaseHook(fn func()) {
+	if fn == nil {
+		return
+	}
+	r.onReleaseMutex.Lock()
+	defer r.onReleaseMutex.Unlock()
+	r.onRelease = append(r.onRelease, fn)
+}
+
+// Release 触发所有 onRelease 回调，仅生效一次。后续重复调用是 no-op。
+// 关键词: loop release execution
+func (r *ReActLoop) Release() {
+	if r == nil {
+		return
+	}
+	r.onReleaseMutex.Lock()
+	if r.released {
+		r.onReleaseMutex.Unlock()
+		return
+	}
+	r.released = true
+	hooks := append([]func(){}, r.onRelease...)
+	r.onReleaseMutex.Unlock()
+
+	for _, h := range hooks {
+		func() {
+			defer func() {
+				if rec := recover(); rec != nil {
+					log.Errorf("react loop[%v] on-release hook panic: %v", r.loopName, rec)
+				}
+			}()
+			h()
+		}()
+	}
 }
 
 func (r *ReActLoop) IncrementSpinWarning() {

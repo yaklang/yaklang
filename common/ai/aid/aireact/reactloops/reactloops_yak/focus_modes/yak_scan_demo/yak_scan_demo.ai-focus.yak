@@ -1,0 +1,93 @@
+// yak_scan_demo: 演示 __ACTIONS__ 自定义动作 + sidekick 工具复用。
+// 关键词: yak focus mode actions demo, sidekick demo
+
+__VERBOSE_NAME__    = "Yak Scan Demo"
+__VERBOSE_NAME_ZH__ = "Yak 扫描专注模式演示"
+__DESCRIPTION__     = "demonstrates custom __ACTIONS__ with sidekick helpers"
+__DESCRIPTION_ZH__  = "演示自定义 __ACTIONS__ 与 sidekick 工具函数的协作"
+__USAGE_PROMPT__    = "Use this when the user wants to scan a target with simple checks"
+__OUTPUT_EXAMPLE__  = `{"@action":"scan_target","target":"https://example.com"}`
+__IS_HIDDEN__       = false
+
+__MAX_ITERATIONS__       = 6
+__ALLOW_TOOL_CALL__      = true
+__ALLOW_USER_INTERACT__  = false
+
+__VARS__ = {
+    "scan_findings": [],
+}
+
+__PERSISTENT_INSTRUCTION__ = `
+You are the yak_scan_demo focus. Available actions:
+- scan_target: run a lightweight reachability check on a URL
+- summarize_scan: summarize all collected findings then call directly_answer
+`
+
+// 初始化时记录 query
+focusInitTask = func(loop, task, op) {
+    log.info("yak_scan_demo init: query=%v", task.GetUserInput())
+    op.Continue()
+}
+
+// 每轮迭代，超过 4 轮强制收尾
+focusPostIteration = func(loop, iter, task, isDone, reason, op) {
+    if isDone {
+        log.info("yak_scan_demo finished: reason=%v", sprint(reason))
+        return
+    }
+    if iter >= 4 {
+        op.EndIteration("safety stop after 4 iterations")
+    }
+}
+
+__ACTIONS__ = [
+    {
+        "type":           "scan_target",
+        "description":    "run a lightweight reachability check on the given URL",
+        "outputExamples": `{"@action":"scan_target","target":"https://example.com"}`,
+        "options": [
+            {"name": "target", "type": "string", "required": true,
+             "help": "Target URL to scan (must include scheme)"},
+        ],
+        "verifier": func(loop, action) {
+            target = action.GetString("target")
+            if target == "" {
+                return error("target is required")
+            }
+            if !isLikelyURL(target) {
+                return error(sprintf("invalid url: %s", target))
+            }
+            loop.Set("current_target", target)
+            return nil
+        },
+        // 注意：所有 loop.Get/Set 走的是 ReActLoop 的 vars，loop.Get 返回字符串。
+        // 取原始值请用 loop.GetVariable(name)。
+        "handler": func(loop, action, op) {
+            // 注意：loop.GetVariable 返回原始值；loop.Get 返回字符串化结果。
+            target = loop.GetVariable("current_target")
+            finding = runReachabilityCheck(target)
+
+            findings = loop.GetVariable("scan_findings")
+            if findings == nil { findings = [] }
+            findings = append(findings, finding)
+            loop.Set("scan_findings", findings)
+
+            op.Feedback(formatFindingLine(finding))
+            op.Continue()
+        },
+    },
+    {
+        "type":        "summarize_scan",
+        "description": "summarize all collected findings",
+        "options":     [],
+        "verifier": func(loop, action) {
+            return nil
+        },
+        "handler": func(loop, action, op) {
+            findings = loop.GetVariable("scan_findings")
+            summary = formatScanSummary(findings)
+            op.Feedback(summary)
+            op.Continue()
+        },
+    },
+]
