@@ -1,6 +1,6 @@
 # 12. 调试与可观测性
 
-> 回到 [README](../README.md) | 上一章：[11-case-studies.md](11-case-studies.md)
+> 回到 [README](../README.md) | 上一章：[11-case-studies.md](11-case-studies.md) | 下一章：[13-yak-focus-mode.md](13-yak-focus-mode.md)
 
 reactloops 内置了多层调试基础设施，让你可以**事后**查看每一轮的 prompt、action、感知、意图识别快照。本章梳理：
 
