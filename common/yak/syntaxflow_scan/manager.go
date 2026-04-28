@@ -187,22 +187,27 @@ func (m *scanManager) SaveTask() error {
 	// m.taskRecorder.RuleNames, _ = json.Marshal(m.ruleNames)
 	m.taskRecorder.ProjectId = m.Config.GetProjectID()
 	if m.status == schema.SYNTAXFLOWSCAN_DONE || m.status == schema.SYNTAXFLOWSCAN_PAUSED {
-		levelCounts, _ := yakit.GetSSARiskLevelCount(ssadb.GetDB(), &ypb.SSARisksFilter{
+		levelCounts, errLC := yakit.GetSSARiskLevelCount(ssadb.GetDB(), &ypb.SSARisksFilter{
 			RuntimeID: []string{m.TaskId()},
 		})
-		for _, c := range levelCounts {
-			switch c.Severity {
-			case string(schema.SFR_SEVERITY_INFO):
-				m.taskRecorder.InfoCount = c.Count
-			case string(schema.SFR_SEVERITY_WARNING):
-				m.taskRecorder.WarningCount = c.Count
-			case string(schema.SFR_SEVERITY_CRITICAL):
-				m.taskRecorder.CriticalCount = c.Count
-			case string(schema.SFR_SEVERITY_HIGH):
-				m.taskRecorder.HighCount = c.Count
-			case string(schema.SFR_SEVERITY_LOW):
-				m.taskRecorder.LowCount = c.Count
+		if errLC == nil {
+			var riskTotal int64
+			for _, c := range levelCounts {
+				riskTotal += c.Count
+				switch c.Severity {
+				case string(schema.SFR_SEVERITY_INFO):
+					m.taskRecorder.InfoCount = c.Count
+				case string(schema.SFR_SEVERITY_WARNING):
+					m.taskRecorder.WarningCount = c.Count
+				case string(schema.SFR_SEVERITY_CRITICAL):
+					m.taskRecorder.CriticalCount = c.Count
+				case string(schema.SFR_SEVERITY_HIGH):
+					m.taskRecorder.HighCount = c.Count
+				case string(schema.SFR_SEVERITY_LOW):
+					m.taskRecorder.LowCount = c.Count
+				}
 			}
+			m.taskRecorder.RiskCount = riskTotal
 		}
 	}
 	err := schema.SaveSyntaxFlowScanTask(ssadb.GetDB(), m.taskRecorder)
@@ -216,7 +221,6 @@ func (m *scanManager) RestoreTask() error {
 		return utils.Wrapf(err, "Resume SyntaxFlow task by [%s] is failed", m.TaskId())
 	}
 	m.taskRecorder = task
-	m.status = task.Status
 	m.status = task.Status
 	// m.programs = strings.Split(task.Programs, schema.SYNTAXFLOWSCAN_PROGRAM_SPLIT)
 
