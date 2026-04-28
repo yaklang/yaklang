@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"time"
 
 	"github.com/yaklang/yaklang/common/schema"
@@ -122,15 +122,8 @@ func (c *Config) emitRecoveryHistoryEvent(event *schema.AiOutputEvent) {
 	if event == nil {
 		return
 	}
-	if c.EventHandler == nil {
-		if c.DebugEvent {
-			log.Info(event.String())
-		}
-		return
-	}
-
-	cloned := *event
-	c.EventHandler(&cloned)
+	event.IsSync = true
+	c.emit(event)
 }
 
 func (c *Config) HandleSyncRecoveryHistoryEvent(event *ypb.AIInputEvent) error {
@@ -141,7 +134,6 @@ func (c *Config) HandleSyncRecoveryHistoryEvent(event *ypb.AIInputEvent) error {
 	}
 
 	sessionID := c.PersistentSessionId
-	coordinatorID := c.Id
 	startID := int64(0)
 	limit := defaultRecoveryHistoryBlockLimit
 
@@ -154,9 +146,6 @@ func (c *Config) HandleSyncRecoveryHistoryEvent(event *ypb.AIInputEvent) error {
 		if sid := utils.InterfaceToString(params["session_id"]); sid != "" {
 			sessionID = sid
 		}
-		if cid := utils.InterfaceToString(params["coordinator_id"]); cid != "" {
-			coordinatorID = cid
-		}
 		if rawStartID, ok := params["start_id"]; ok {
 			startID = int64(utils.InterfaceToInt(rawStartID))
 		}
@@ -167,89 +156,31 @@ func (c *Config) HandleSyncRecoveryHistoryEvent(event *ypb.AIInputEvent) error {
 		}
 	}
 
-	if sessionID == "" && coordinatorID == "" {
-		c.EmitSyncEventError("recovery_history", fmt.Errorf("session_id and coordinator_id are both empty"), event.SyncID)
+	if sessionID == "" {
+		c.EmitSyncEventError("recovery_history", fmt.Errorf("session_id is empty"), event.SyncID)
 		return nil
 	}
 
-	query := db.Model(&schema.AiOutputEvent{}).Where("is_recovery_block = ?", true)
-	if sessionID != "" {
-		query = query.Where("session_id = ?", sessionID)
-	} else {
-		query = query.Where("coordinator_id = ?", coordinatorID)
-	}
-	if startID > 0 {
-		query = query.Where("id < ?", startID)
-	}
-
-	var anchors []*schema.AiOutputEvent
-	if err := query.Order("id desc").Limit(limit).Find(&anchors).Error; err != nil {
+	eventCh, result, err := yakit.YieldAIEventRecoveryHistory(c.Ctx, db, sessionID, startID, limit)
+	if err != nil {
 		c.EmitSyncEventError("recovery_history", err, event.SyncID)
 		return nil
 	}
 
-	emittedEventCount := 0
-	nextStartID := int64(0)
-	if len(anchors) > 0 {
-		nextStartID = int64(anchors[len(anchors)-1].ID)
-	}
-
-	for i := len(anchors) - 1; i >= 0; i-- {
-		anchor := anchors[i]
-		if anchor == nil {
+	for recoveredEvent := range eventCh {
+		if recoveredEvent == nil {
 			continue
 		}
-
-		if anchor.RecoveryIndexID == "" {
-			c.emitRecoveryHistoryEvent(anchor)
-			emittedEventCount++
-			continue
-		}
-
-		blockQuery := db.Model(&schema.AiOutputEvent{}).Where("recovery_index_id = ?", anchor.RecoveryIndexID)
-		if sessionID != "" {
-			blockQuery = blockQuery.Where("session_id = ?", sessionID)
-		} else {
-			blockQuery = blockQuery.Where("coordinator_id = ?", coordinatorID)
-		}
-
-		var blockEvents []*schema.AiOutputEvent
-		if err := blockQuery.Order("id asc").Find(&blockEvents).Error; err != nil {
-			c.EmitSyncEventError("recovery_history", err, event.SyncID)
-			return nil
-		}
-
-		for _, blockEvent := range blockEvents {
-			if blockEvent == nil {
-				continue
-			}
-			c.emitRecoveryHistoryEvent(blockEvent)
-			emittedEventCount++
-		}
-	}
-
-	hasMore := false
-	if len(anchors) > 0 {
-		moreQuery := db.Model(&schema.AiOutputEvent{}).Where("is_recovery_block = ?", true).Where("id < ?", nextStartID)
-		if sessionID != "" {
-			moreQuery = moreQuery.Where("session_id = ?", sessionID)
-		} else {
-			moreQuery = moreQuery.Where("coordinator_id = ?", coordinatorID)
-		}
-		var count int64
-		if err := moreQuery.Count(&count).Error; err == nil {
-			hasMore = count > 0
-		}
+		c.emitRecoveryHistoryEvent(recoveredEvent)
 	}
 
 	c.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, "recovery_history", map[string]interface{}{
 		"session_id":         sessionID,
-		"coordinator_id":     coordinatorID,
 		"requested_start_id": startID,
-		"block_count":        len(anchors),
-		"event_count":        emittedEventCount,
-		"next_start_id":      nextStartID,
-		"has_more":           hasMore,
+		"block_count":        result.BlockCount,
+		"event_count":        result.EventCount,
+		"next_start_id":      result.NextStartID,
+		"has_more":           result.HasMore,
 	}, event.SyncID)
 	return nil
 }

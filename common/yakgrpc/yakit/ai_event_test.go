@@ -309,3 +309,96 @@ func TestAiOutputEvent_NormalizeRecoveryBlock(t *testing.T) {
 		})
 	}
 }
+
+func TestYieldAIEventRecoveryHistory(t *testing.T) {
+	db, err := utils.CreateTempTestDatabaseInMemory()
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&schema.AiOutputEvent{}).Error)
+
+	create := func(event *schema.AiOutputEvent) uint {
+		t.Helper()
+		require.NoError(t, db.Create(event).Error)
+		return event.ID
+	}
+
+	blockAID := create(&schema.AiOutputEvent{
+		CoordinatorId:   "coord-1",
+		SessionId:       "session-1",
+		Type:            schema.EVENT_TYPE_STRUCTURED,
+		NodeId:          "artifact",
+		IsJson:          true,
+		Content:         utils.Jsonify(map[string]any{"label": "block-a"}),
+		Timestamp:       time.Now().Unix(),
+		IsRecoveryBlock: true,
+	})
+	blockBStartID := create(&schema.AiOutputEvent{
+		CoordinatorId:   "coord-1",
+		SessionId:       "session-1",
+		Type:            schema.EVENT_TOOL_CALL_START,
+		NodeId:          "tool",
+		IsJson:          true,
+		Content:         utils.Jsonify(map[string]any{"label": "block-b-start"}),
+		Timestamp:       time.Now().Unix(),
+		IsRecoveryBlock: true,
+		RecoveryIndexID: "tool-1",
+	})
+	blockBResultID := create(&schema.AiOutputEvent{
+		CoordinatorId:   "coord-2",
+		SessionId:       "session-1",
+		Type:            schema.EVENT_TOOL_CALL_RESULT,
+		NodeId:          "tool",
+		IsJson:          true,
+		Content:         utils.Jsonify(map[string]any{"label": "block-b-result"}),
+		Timestamp:       time.Now().Unix(),
+		RecoveryIndexID: "tool-1",
+	})
+	blockCID := create(&schema.AiOutputEvent{
+		CoordinatorId:   "coord-3",
+		SessionId:       "session-1",
+		Type:            schema.EVENT_TYPE_STRUCTURED,
+		NodeId:          "artifact",
+		IsJson:          true,
+		Content:         utils.Jsonify(map[string]any{"label": "block-c"}),
+		Timestamp:       time.Now().Unix(),
+		IsRecoveryBlock: true,
+	})
+
+	require.NoError(t, db.Create(&schema.AiOutputEvent{
+		CoordinatorId:   "coord-9",
+		SessionId:       "session-2",
+		Type:            schema.EVENT_TOOL_CALL_RESULT,
+		NodeId:          "tool",
+		IsJson:          true,
+		Content:         utils.Jsonify(map[string]any{"label": "other-session-result"}),
+		Timestamp:       time.Now().Unix(),
+		RecoveryIndexID: "tool-1",
+	}).Error)
+
+	stream, result, err := YieldAIEventRecoveryHistory(context.Background(), db, "session-1", 0, 2)
+	require.NoError(t, err)
+	var events []*schema.AiOutputEvent
+	for event := range stream {
+		events = append(events, event)
+	}
+	require.Equal(t, 2, result.BlockCount)
+	require.Equal(t, 3, result.EventCount)
+	require.Equal(t, int64(blockBStartID), result.NextStartID)
+	require.True(t, result.HasMore)
+	require.Len(t, events, 3)
+	require.Equal(t, blockCID, events[0].ID)
+	require.Equal(t, blockBStartID, events[1].ID)
+	require.Equal(t, blockBResultID, events[2].ID)
+
+	stream, result, err = YieldAIEventRecoveryHistory(context.Background(), db, "session-1", int64(blockBStartID), 2)
+	require.NoError(t, err)
+	events = events[:0]
+	for event := range stream {
+		events = append(events, event)
+	}
+	require.Equal(t, 1, result.BlockCount)
+	require.Equal(t, 1, result.EventCount)
+	require.Equal(t, int64(blockAID), result.NextStartID)
+	require.False(t, result.HasMore)
+	require.Len(t, events, 1)
+	require.Equal(t, blockAID, events[0].ID)
+}
