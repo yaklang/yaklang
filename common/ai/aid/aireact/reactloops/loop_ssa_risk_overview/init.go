@@ -7,7 +7,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
-	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_syntaxflow_scan"
+	sfa "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/syntaxflow_actions"
 	sfu "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/syntaxflow_utils"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -37,7 +37,7 @@ func init() {
 				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
 				reactloops.WithPersistentInstruction(persistentInstruction),
 				reactloops.WithReflectionOutputExample(outputExample + sfu.ReflectionOutputSharedAppendix),
-				loop_syntaxflow_scan.WithReloadSSARiskOverviewAction(r),
+				sfa.WithReloadSSARiskOverviewAction(r),
 				reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer, nonce string) (string, error) {
 					fb := strings.TrimSpace(feedbacker.String())
 					return utils.RenderTemplate(reactiveData, map[string]any{

@@ -263,8 +263,52 @@ func buildOrchestratorInitTask(r aicommon.AIInvokeRuntime, state *SFCodeAuditSta
 			state.SetRulePath(sfPath)
 		}
 
-		// Phase 3 (optional): syntaxflow_scan when task_id present (attachments / loop vars on parent task)
+		// Phase 2a: syntaxflow_audit_analyst — SSA-backed triage after rule drafting (before optional new scan / attach).
+		analystInput := fmt.Sprintf(
+			"SyntaxFlow code audit — analyst pass.\nProject path: %s\nProject name: %s\nTech: %s\nEntry: %s\n\nUser goal:\n%s",
+			state.ProjectPath, state.ProjectName, state.TechStack, state.EntryPoints, strings.TrimSpace(userInput),
+		)
+		analystLoop, aerr := reactloops.CreateLoopByName(schema.AI_REACT_LOOP_NAME_SYNTAXFLOW_AUDIT_ANALYST, r)
+		if aerr != nil {
+			log.Warnf("[SFCodeAudit] create syntaxflow_audit_analyst: %v", aerr)
+		} else {
+			subAnalyst := newSubTaskWithInput(task, "phase2a_audit_analyst", analystInput)
+			if err := analystLoop.ExecuteWithExistedTask(subAnalyst); err != nil {
+				log.Warnf("[SFCodeAudit] Phase 2a syntaxflow_audit_analyst: %v (continuing)", err)
+			}
+		}
+
+		// Phase 2b (optional): when no irify task attachment but we have an explored project path, run syntaxflow_scan (new scan).
 		hasScanContextFile := false
+		autoCtxPath := filepath.Join(auditDirPath, "syntaxflow_scan_context_auto.md")
+		scanTid, haveIrifyTask := sfu.ReadIrifySyntaxFlowTaskIDFromTask(task)
+		if (!haveIrifyTask || strings.TrimSpace(scanTid) == "") && strings.TrimSpace(state.ProjectPath) != "" {
+			scanLoopAuto, err := reactloops.CreateLoopByName(schema.AI_REACT_LOOP_NAME_SYNTAXFLOW_SCAN, r,
+				reactloops.WithVar(sfu.LoopVarProjectPath, state.ProjectPath),
+				reactloops.WithVar(sfu.LoopVarSyntaxFlowScanSessionMode, sfu.SessionModeStart),
+			)
+			if err != nil {
+				log.Warnf("[SFCodeAudit] auto syntaxflow_scan (project path): %v", err)
+			} else {
+				subAuto := newSubTask(task, "phase2b_scan")
+				if err := scanLoopAuto.ExecuteWithExistedTask(subAuto); err != nil {
+					log.Warnf("[SFCodeAudit] Phase 2b syntaxflow_scan: %v (continuing)", err)
+				} else {
+					summary := scanLoopAuto.Get("sf_scan_review_preface")
+					state.SetScanReviewSummary(summary)
+					if strings.TrimSpace(summary) != "" {
+						ctxPath := autoCtxPath
+						if err := os.WriteFile(ctxPath, []byte(summary), 0o644); err != nil {
+							log.Warnf("[SFCodeAudit] write auto scan context: %v", err)
+						} else {
+							hasScanContextFile = true
+						}
+					}
+				}
+			}
+		}
+
+		// Phase 3 (optional): syntaxflow_scan when task_id present (attachments / loop vars on parent task)
 		if scanTid, ok := sfu.ReadIrifySyntaxFlowTaskIDFromTask(task); ok && scanTid != "" {
 			scanLoop, err := reactloops.CreateLoopByName(schema.AI_REACT_LOOP_NAME_SYNTAXFLOW_SCAN, r,
 				reactloops.WithVar(sfu.LoopVarSyntaxFlowTaskID, scanTid),
@@ -305,7 +349,12 @@ func buildOrchestratorInitTask(r aicommon.AIInvokeRuntime, state *SFCodeAuditSta
 			refFiles = append(refFiles, p)
 		}
 		if hasScanContextFile {
-			refFiles = append(refFiles, filepath.Join(auditDirPath, "syntaxflow_scan_context.md"))
+			if _, err := os.Stat(filepath.Join(auditDirPath, "syntaxflow_scan_context.md")); err == nil {
+				refFiles = append(refFiles, filepath.Join(auditDirPath, "syntaxflow_scan_context.md"))
+			}
+			if _, err := os.Stat(autoCtxPath); err == nil {
+				refFiles = append(refFiles, autoCtxPath)
+			}
 		}
 
 		writePrompt := buildSFCodeAuditReportPrompt(userInput, state, refFiles, hasScanContextFile)

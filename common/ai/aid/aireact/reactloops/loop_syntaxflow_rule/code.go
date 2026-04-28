@@ -12,6 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loopinfra"
+	sfa "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/syntaxflow_actions"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/thirdparty_bin"
@@ -127,6 +128,8 @@ func init() {
 				reactloops.WithOverrideLoopAction(loopAction_DirectlyAnswerSyntaxFlow),
 				reactloops.WithAllowRAG(true),
 				reactloops.WithAllowToolCall(true),
+				sfa.WithRunSyntaxFlowRuleOnProjectAction(r),
+				sfa.WithOpenCampaignFromRuleAction(r),
 				reactloops.WithInitTask(buildInitTask(r, docSearcher, docSearcherByRag)),
 				reactloops.WithMaxIterations(int(r.GetConfig().GetMaxIterationCount())),
 				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),

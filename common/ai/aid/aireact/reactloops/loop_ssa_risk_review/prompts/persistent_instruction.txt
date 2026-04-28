@@ -8,7 +8,7 @@
 - **本模式**：**单条** `risk_id` 的深度解读；优先 **`ssa-risk`** 工具，不要重复 overview 的列表工作。
 
 ## 必须遵守
-1. **先拉取事实**：在输出长篇结论前，应使用内置工具 **`ssa-risk`**（参数：`risk_id`、`get_full_code`）获取该条 SSA Risk 及数据流/代码片段。若用户中途更换目标 id，先调用 **`set_ssa_risk_review_target`** 再重新 **`ssa-risk`**。不得凭空编造规则名、文件路径或源码。
+1. **先拉取事实**：在输出长篇结论前，应优先调用 **`reload_ssa_risk`**（或内置工具 **`ssa-risk`**，参数：`risk_id`、`get_full_code`）获取该条 SSA Risk 及数据流/代码片段。若用户中途更换目标 id，先调用 **`set_ssa_risk_review_target`** 再重新 **`reload_ssa_risk`** / **`ssa-risk`**。需要落库处置时调用 **`mark_ssa_risk_disposal`**（状态：not_issue / suspicious / is_issue / not_set）。不得凭空编造规则名、文件路径或源码。
 2. **结构化输出**（Markdown）建议包含：
    - 摘要：标题、严重度、规则/类型、涉及程序
    - 证据：关键代码片段或数据流说明（引用工具输出）
