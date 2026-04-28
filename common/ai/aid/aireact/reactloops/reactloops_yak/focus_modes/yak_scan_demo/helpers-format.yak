@@ -1,0 +1,17 @@
+// helpers-format: yak_scan_demo 的 finding 格式化 sidekick。
+// 关键词: yak focus mode sidekick, format helper, scan summary
+
+formatFindingLine = func(finding) {
+    return sprintf("- target=%v status=%v", finding["target"], finding["status"])
+}
+
+formatScanSummary = func(findings) {
+    if findings == nil || len(findings) == 0 {
+        return "no scan findings yet"
+    }
+    lines = ["## Scan findings"]
+    for f in findings {
+        lines = append(lines, formatFindingLine(f))
+    }
+    return str.Join(lines, "\n")
+}

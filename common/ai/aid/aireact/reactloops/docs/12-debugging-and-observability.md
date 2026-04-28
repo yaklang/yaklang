@@ -1,6 +1,6 @@
 # 12. 调试与可观测性
 
-> 回到 [README](../README.md) | 上一章：[11-case-studies.md](11-case-studies.md)
+> 回到 [README](../README.md) | 上一章：[11-case-studies.md](11-case-studies.md) | 下一章：[13-yak-focus-mode.md](13-yak-focus-mode.md)
 
 reactloops 内置了多层调试基础设施，让你可以**事后**查看每一轮的 prompt、action、感知、意图识别快照。本章梳理：
 
@@ -493,6 +493,7 @@ desc(loop.GetInvoker())  // 看 invoker
 - [03-prompt-system.md](03-prompt-system.md)：prompt observation 详解
 - [05-hooks-and-lifecycle.md](05-hooks-and-lifecycle.md)：怎么在 hook 里加调试
 - [08-determinism-mechanisms.md](08-determinism-mechanisms.md)：感知 / 反思 / 自旋的产物在 debug 目录哪里
+- [13-yak-focus-mode.md](13-yak-focus-mode.md) §13.10 / §13.11：yak 专注模式专属的三种调试模式（CLI / Memfit UI / 单元测试）+ `~/yakit-projects/ai-focus/` 用户扩展目录
 - 源码：
   - [workspace_debug.go](../workspace_debug.go)
   - [prompt_observation.go](../prompt_observation.go)

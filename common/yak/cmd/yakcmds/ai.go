@@ -34,4 +34,5 @@ var AICommands = []*cli.Command{
 func init() {
 	AICommands = append(AICommands, LocalModelCommands...)
 	AICommands = append(AICommands, TieredAIConfigCommands...)
+	AICommands = append(AICommands, AIFocusCommand)
 }

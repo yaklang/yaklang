@@ -18,6 +18,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/reactloops_yak"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -115,6 +116,14 @@ func (s *Server) StartAIReAct(stream ypb.Yak_StartAIReActServer) error {
 	if !firstMsg.IsStart {
 		log.Errorf("recv re-act first config msg is invalid: %v", firstMsg)
 		return utils.Error("first msg is not a start/config message, set IsStart to true")
+	}
+
+	// 启动 ReAct 之前懒扫描用户的 ~/yakit-projects/ai-focus/，
+	// 防止客户端跳过 QueryAIFocus 直接发带 FocusModeLoop 的 free input 时
+	// 找不到注册项。冷却由 EnsureUserFocusModesLoaded 内部控制，失败只 log。
+	// 关键词: start ai re-act ensure user focus modes
+	if err := reactloops_yak.EnsureUserFocusModesLoaded(); err != nil {
+		log.Warnf("ensure user yak focus modes failed: %v", err)
 	}
 
 	startParams := firstMsg.Params

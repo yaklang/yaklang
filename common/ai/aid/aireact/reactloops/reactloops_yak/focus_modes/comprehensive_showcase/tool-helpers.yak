@@ -1,0 +1,37 @@
+// tool-helpers: comprehensive_showcase 的工具函数 sidekick。
+// 关键词: yak focus mode sidekick, helper functions, showcase
+
+pickStepEmoji = func(step) {
+    mapping = {
+        "intro":    "[i]",
+        "demo":     "[d]",
+        "advanced": "[a]",
+        "wrap":     "[w]",
+    }
+    v = mapping[step]
+    if v != nil {
+        return v
+    }
+    return "[?]"
+}
+
+formatShowcaseSummary = func(loop) {
+    // 注意：loop.GetVariable 才能拿到原始 slice/dict；loop.Get 返回字符串。
+    findings = loop.GetVariable("showcase_findings")
+    if findings == nil || len(findings) == 0 {
+        return "no findings yet"
+    }
+    lines = ["## Findings"]
+    for f in findings {
+        lines = append(lines, sprintf("- %v: %v", f["step"], f["note"]))
+    }
+    return str.Join(lines, "\n")
+}
+
+persistShowcase = func(findings) {
+    if findings == nil {
+        log.info("persist 0 findings (mock)")
+        return
+    }
+    log.info("persist %d findings (mock)", len(findings))
+}

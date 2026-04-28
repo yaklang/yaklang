@@ -303,6 +303,20 @@ func WithOnAsyncTaskFinished(fn func(task aicommon.AIStatefulTask)) ReActLoopOpt
 	}
 }
 
+// WithOnLoopRelease 注册一个 loop 释放阶段的清理回调，用于回收
+// 由 With* 选项注入的外部资源（例如 yak focus mode 的 caller 引擎）。
+// 多次调用会累积，按注册顺序执行。
+//
+// 关键词: loop release hook option, resource cleanup option
+func WithOnLoopRelease(fn func()) ReActLoopOption {
+	return func(r *ReActLoop) {
+		if fn == nil {
+			return
+		}
+		r.AddOnReleaseHook(fn)
+	}
+}
+
 // WithOnPostIteraction sets a callback function that is called after each iteration of the ReAct loop.
 // The operator parameter allows the callback to control whether the loop should end by calling operator.EndIteration().
 func WithOnPostIteraction(fn ...func(loop *ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any, operator *OnPostIterationOperator)) ReActLoopOption {

@@ -95,6 +95,8 @@ flowchart TD
 | [docs/10-build-your-own-loop.md](docs/10-build-your-own-loop.md) | **重头戏**：12 步端到端教程 + checklist，所有样板代码 |
 | [docs/11-case-studies.md](docs/11-case-studies.md) | 17 个 loop_xxx 横向对比表 + 5 个重点细讲 |
 | [docs/12-debugging-and-observability.md](docs/12-debugging-and-observability.md) | `YAKIT_AI_WORKSPACE_DEBUG`、调试产物、prompt observation、timeline、测试基建 |
+| [docs/13-yak-focus-mode.md](docs/13-yak-focus-mode.md) | **进阶**：用 Yak 脚本（`*.ai-focus.yak`）写专注模式 + sidekick 自动加载 + `yak ai-focus` CLI + 三种调试模式 + `~/yakit-projects/ai-focus/` 用户扩展目录 |
+| [docs/14-streaming-ux.md](docs/14-streaming-ux.md) | **UX 实战**：让用户感知到「专注模式在思考、在生成」 —— yak / Go 双侧 emitter 用法、`stream_fields` / `__AI_TAG_FIELDS__` 精确字段、ContentType / NodeId 命名规范、终局三连、八条踩坑总结 |
 
 ## 最小上手样板
 
@@ -190,9 +192,11 @@ import (
 | 想让模型在执行后自检 | [08-determinism-mechanisms.md](docs/08-determinism-mechanisms.md) Reflection / Verification |
 | 想防止模型重复调用同一个 action | [08-determinism-mechanisms.md](docs/08-determinism-mechanisms.md) Spin Detection |
 | 想让 UI 实时显示思考过程 | [06-emitter-and-streaming.md](docs/06-emitter-and-streaming.md) |
+| 想让用户感知到「在写、在流、马上好了」 | [14-streaming-ux.md](docs/14-streaming-ux.md) |
 | 想从零写一个新专注模式 | [10-build-your-own-loop.md](docs/10-build-your-own-loop.md) |
 | 想知道某个具体 loop 怎么实现的 | [11-case-studies.md](docs/11-case-studies.md) |
 | 出问题想调试 | [12-debugging-and-observability.md](docs/12-debugging-and-observability.md) |
+| 想用 yak 脚本写专注模式（不重新编译） | [13-yak-focus-mode.md](docs/13-yak-focus-mode.md) |
 
 ## 核心约定
 
