@@ -18,6 +18,25 @@ func is429Response(ctx context.Context, rsp *AIResponse) bool {
 	return rsp.GetHTTPStatusCode() == 429
 }
 
+func normalizeTransactionPostHandlerError(rsp *AIResponse, err error) error {
+	if err == nil || rsp == nil {
+		return err
+	}
+	lower := strings.ToLower(err.Error())
+	if rsp.GetTotalOutputBytes() != 0 {
+		return err
+	}
+	if strings.Contains(lower, "action type is empty") || strings.Contains(lower, "action @action not found or invalid") {
+		provider := strings.TrimSpace(rsp.GetProviderName())
+		model := strings.TrimSpace(rsp.GetModelName())
+		if provider != "" || model != "" {
+			return utils.Errorf("ai model returned empty response (provider=%s model=%s)", provider, model)
+		}
+		return utils.Error("ai model returned empty response")
+	}
+	return err
+}
+
 func CallAITransaction(
 	c AICallerConfigIf,
 	prompt string,
@@ -128,6 +147,7 @@ func callAITransaction(
 		}
 		lastRsp = rsp
 		postHandlerErr = postHandler(rsp)
+		postHandlerErr = normalizeTransactionPostHandlerError(rsp, postHandlerErr)
 		if postHandlerErr != nil {
 			lastErr = postHandlerErr
 			i++
