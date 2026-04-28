@@ -367,14 +367,16 @@ func (m *scanManager) GetRiskCount() int64 {
 
 func (m *scanManager) AddFinishedQuery(num int64) {
 	m.processMonitor.FinishedQuery.Add(num)
-	if m.processMonitor.FinishedQuery.Load() >= m.processMonitor.TotalQuery.Load() {
+	tq := m.processMonitor.TotalQuery.Load()
+	if tq > 0 && m.processMonitor.FinishedQuery.Load() >= tq {
 		m.status = schema.SYNTAXFLOWSCAN_DONE
 	}
 }
 
 func (m *scanManager) SetFinishedQuery(num int64) {
 	m.processMonitor.FinishedQuery.Store(num)
-	if m.processMonitor.FinishedQuery.Load() >= m.processMonitor.TotalQuery.Load() {
+	tq := m.processMonitor.TotalQuery.Load()
+	if tq > 0 && m.processMonitor.FinishedQuery.Load() >= tq {
 		m.status = schema.SYNTAXFLOWSCAN_DONE
 	}
 }
