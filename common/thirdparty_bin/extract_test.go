@@ -99,7 +99,14 @@ func TestExtractFile_PickModes(t *testing.T) {
 						targetPath = filepath.Join(tempDir, archiveTest.name+"_"+pickTest.expectDir)
 					}
 
-					err := ExtractFile(archivePath, targetPath, "", pickTest.pick, true)
+					// .gz 是单文件压缩，目标必须是文件 (isDir=false)
+					// 关键词: gz isDir false, 单文件解压, .gz target must be file
+					isDir := true
+					if archiveTest.archiveExt == ".gz" {
+						isDir = false
+					}
+
+					err := ExtractFile(archivePath, targetPath, "", pickTest.pick, isDir)
 					if err != nil {
 						t.Errorf("ExtractFile failed for %s with pick '%s': %v", archiveTest.name, pickTest.pick, err)
 						return

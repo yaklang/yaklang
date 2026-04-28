@@ -137,14 +137,21 @@ func TestInstaller_IsInstalled_AnchorFile(t *testing.T) {
 
 // 端到端：用本地 httptest 起一个返回 AES-256 加密 zip 的服务器，走真实 Install 链路，
 // 验证 password 字段从 DownloadInfo 透传到 ExtractFileWithPassword 后能成功解密落盘
-// 关键词: archive install with password, ExtractFileWithPassword 透传, 加密 zip 安装链路
+// 这是 hack-skills 包发布到 OSS 后会经历的全链路的离线副本（结构 + 密码完全等价）
+// 关键词: archive install with password, ExtractFileWithPassword 透传, 加密 zip 安装链路, hack-skills 离线 fixture
 func TestInstaller_ArchiveInstall_PasswordPassthrough(t *testing.T) {
+	// 模拟 cybersecurity-skills/scripts/build-hack-skills-zip.yak 产出的 zip 结构:
+	//   - 根级 version.txt manifest（IsInstalled anchor）
+	//   - skills/<topic>/SKILL.md 入口
+	//   - skills/<topic>/notes/<extra>.md 辅助 markdown
 	files := map[string]string{
 		"version.txt":               "20260428-cafebab\n",
 		"skills/api-sec/SKILL.md":   "# API Security skill",
 		"skills/recon/SKILL.md":     "# Recon skill",
 		"skills/recon/notes/raw.md": "private notes",
 	}
+	// 公开常量密码 - 与 bin_cfg.yml 中 hack-skills.download_info_map["*"].password 一致
+	// 关键词: 公开密码常量, anti-AV-only, 与 bin_cfg.yml 同步
 	password := "hack-skills"
 	zipData := makeEncryptedZip(t, files, password)
 

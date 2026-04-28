@@ -5,8 +5,9 @@ import (
 )
 
 func TestTagsSupport(t *testing.T) {
-	// 创建一个Manager进行测试
-	manager, err := NewManager("", "/tmp/test_install")
+	// 用临时目录避免 MkdirAll("") 失败和并发跑测试时的目录竞争
+	// 关键词: NewManager 临时目录, 并发安全测试 setup
+	manager, err := NewManager(t.TempDir(), t.TempDir())
 	if err != nil {
 		t.Fatalf("创建manager失败: %v", err)
 	}
@@ -124,14 +125,17 @@ func TestTagsSupport(t *testing.T) {
 }
 
 func TestConfigParsingWithTags(t *testing.T) {
-	// 测试配置解析是否正确处理tags字段
+	// 注意: ConfigBinaryDescriptor.Tags 是 string 类型 (yaml:"tags"),
+	// 实际生产 bin_cfg.yml 也用逗号分隔字符串 (例如: tags: "skill,ai-skills,security"),
+	// ParseConfig 内部按 "," 切片. 不要写成 yaml list ["scanner", "security"].
+	// 关键词: tags string with comma, ParseConfig tags split, bin_cfg.yml tags 风格
 	yamlContent := `
 version: "1.0"
 description: "测试配置"
 binaries:
   - name: "test_tool"
     description: "测试工具"
-    tags: ["scanner", "security"]
+    tags: "scanner,security"
     version: "1.0.0"
     install_type: "bin"
     download_info_map:

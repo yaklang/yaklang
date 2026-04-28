@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strconv"
 	"time"
 
@@ -103,14 +104,28 @@ func (bi *BaseInstaller) Uninstall(descriptor *BinaryDescriptor, options *Instal
 }
 
 // findMatchingPlatform 查找匹配当前平台的下载信息
+// 优先级:
+//  1. 精确匹配 (例如 platformKey="darwin-amd64" 命中 "darwin-amd64")
+//  2. glob 模式匹配, 按 pattern 字典序降序遍历, 保证结果稳定
+//     字典序降序使前缀已知 + 后缀通配的 pattern (如 "darwin-*") 优先于
+//     前缀通配的 pattern (如 "*-arm64"), 与既有用例期望一致
+//
+// 关键词: 平台匹配优先级, glob pattern 排序, deterministic platform resolve
 func (bi *BaseInstaller) findMatchingPlatform(downloadInfoMap map[string]*DownloadInfo, platformKey string) (*DownloadInfo, string, error) {
 	// 首先尝试精确匹配
 	if downloadInfo, exists := downloadInfoMap[platformKey]; exists {
 		return downloadInfo, platformKey, nil
 	}
 
-	// 然后尝试glob模式匹配
-	for pattern, downloadInfo := range downloadInfoMap {
+	// 然后按 pattern 字典序降序遍历, 保证 glob 匹配结果稳定 (避免 map 遍历无序导致的 flaky)
+	patterns := make([]string, 0, len(downloadInfoMap))
+	for pattern := range downloadInfoMap {
+		patterns = append(patterns, pattern)
+	}
+	sort.Sort(sort.Reverse(sort.StringSlice(patterns)))
+
+	for _, pattern := range patterns {
+		downloadInfo := downloadInfoMap[pattern]
 		// 编译glob模式
 		g, err := glob.Compile(pattern)
 		if err != nil {
