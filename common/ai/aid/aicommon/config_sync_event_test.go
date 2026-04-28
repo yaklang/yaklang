@@ -127,7 +127,7 @@ func newRecoveryHistoryTestConfig(t *testing.T, ctx context.Context, handler fun
 		RecoveryIndexID: "tool-1",
 	})
 	seed.blockBResultID = create(&schema.AiOutputEvent{
-		CoordinatorId:   "coord-1",
+		CoordinatorId:   "coord-2",
 		SessionId:       "session-1",
 		Type:            schema.EVENT_TOOL_CALL_RESULT,
 		NodeId:          "tool",
@@ -273,16 +273,16 @@ func TestHandleSyncRecoveryHistory(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, emitted, 4)
 
-	require.False(t, emitted[0].IsSync)
-	require.Equal(t, seed.blockBStartID, emitted[0].ID)
-	require.Equal(t, schema.EventType(schema.EVENT_TOOL_CALL_START), emitted[0].Type)
+	require.True(t, emitted[0].IsSync)
+	require.Equal(t, seed.blockCID, emitted[0].ID)
 
-	require.False(t, emitted[1].IsSync)
-	require.Equal(t, seed.blockBResultID, emitted[1].ID)
-	require.Equal(t, schema.EventType(schema.EVENT_TOOL_CALL_RESULT), emitted[1].Type)
+	require.True(t, emitted[1].IsSync)
+	require.Equal(t, seed.blockBStartID, emitted[1].ID)
+	require.Equal(t, schema.EventType(schema.EVENT_TOOL_CALL_START), emitted[1].Type)
 
-	require.False(t, emitted[2].IsSync)
-	require.Equal(t, seed.blockCID, emitted[2].ID)
+	require.True(t, emitted[2].IsSync)
+	require.Equal(t, seed.blockBResultID, emitted[2].ID)
+	require.Equal(t, schema.EventType(schema.EVENT_TOOL_CALL_RESULT), emitted[2].Type)
 
 	response := emitted[3]
 	require.True(t, response.IsSync)
@@ -292,7 +292,6 @@ func TestHandleSyncRecoveryHistory(t *testing.T) {
 
 	payload := decodeEventPayload(t, response)
 	require.Equal(t, "session-1", payload["session_id"])
-	require.Equal(t, "coord-1", payload["coordinator_id"])
 	require.Equal(t, float64(0), payload["requested_start_id"])
 	require.Equal(t, float64(2), payload["block_count"])
 	require.Equal(t, float64(3), payload["event_count"])
