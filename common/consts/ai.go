@@ -200,6 +200,7 @@ func thirdPartyConfigToModelConfig(cfg *ypb.ThirdPartyApplicationConfig) *ypb.AI
 		BaseURL:        cfg.GetBaseURL(),
 		Endpoint:       cfg.GetEndpoint(),
 		EnableEndpoint: cfg.GetEnableEndpoint(),
+		EnableThinking: cfg.GetEnableThinking(),
 		WebhookURL:     cfg.GetWebhookURL(),
 		Disabled:       cfg.GetDisabled(),
 		Proxy:          cfg.GetProxy(),

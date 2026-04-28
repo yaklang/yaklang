@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/ai/aibalance"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/dashscopebase"
@@ -117,6 +118,7 @@ func (g *Gateway) Chat(s string, f ...any) (string, error) {
 		aispec.WithChatBase_ReasonStreamHandler(g.Config.ReasonStreamHandler),
 		aispec.WithChatBase_ErrHandler(g.Config.HTTPErrorHandler),
 		aispec.WithChatBase_ImageRawInstance(g.Config.Images...),
+		aispec.WithChatBase_EnableThinkingEx(g.Config.EnableThinking, g.Config.EnableThinkingField, g.Config.EnableThinkingValue),
 		aispec.WithChatBase_ToolCallCallback(g.Config.ToolCallCallback),
 		aispec.WithChatBase_Tools(g.Config.Tools),
 		aispec.WithChatBase_ToolChoice(g.Config.ToolChoice),
@@ -138,6 +140,7 @@ func (g *Gateway) ChatStream(s string) (io.Reader, error) {
 		g.Config.HTTPErrorHandler,
 		g.Config.StreamHandler,
 		g.AIClient.BuildHTTPOptions,
+		aispec.WithChatBase_EnableThinkingEx(g.Config.EnableThinking, g.Config.EnableThinkingField, g.Config.EnableThinkingValue),
 		aispec.WithChatBase_RawHTTPResponseHeaderCallback(g.Config.RawHTTPResponseHeaderCallback),
 		aispec.WithChatBase_RawHTTPResponseCallback(g.Config.RawHTTPResponseCallback),
 		aispec.WithChatBase_RawHTTPRequestResponseCallback(g.Config.RawHTTPRequestResponseCallback),
@@ -179,6 +182,34 @@ func tryCreateAIGateway(t string, disableProviderFallback bool, cb func(string, 
 	if t != "" {
 		log.Warnf("unsupported ai type: %s, use default config ai type", t)
 	}
+
+	if tiered := consts.GetTieredAIConfig(); tiered != nil {
+		priorityOrders := [][]*ypb.AIModelConfig{
+			consts.GetIntelligentAIConfigs(),
+			consts.GetLightweightAIConfigs(),
+			consts.GetVisionAIConfigs(),
+		}
+		for _, configs := range priorityOrders {
+			for _, modelCfg := range configs {
+				if modelCfg == nil || modelCfg.GetProvider() == nil {
+					continue
+				}
+				providerType := strings.TrimSpace(modelCfg.GetProvider().GetType())
+				if providerType == "" {
+					continue
+				}
+				agent := createAIGatewayByType(providerType)
+				if agent == nil {
+					continue
+				}
+				ok, _ := cb(providerType, agent)
+				if ok {
+					return nil
+				}
+			}
+		}
+	}
+
 	cfg := yakit.GetNetworkConfig()
 	if cfg == nil {
 		return nil

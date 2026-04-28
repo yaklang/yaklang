@@ -213,6 +213,9 @@ func WithEnableThinking(t any) AIConfigOption {
 			}
 		}
 
+		config.EnableThinkingField = "enable_thinking"
+		config.EnableThinkingValue = config.EnableThinking
+
 		switch config.Type {
 		case "volcengine":
 			config.EnableThinkingField = "thinking"
@@ -225,9 +228,6 @@ func WithEnableThinking(t any) AIConfigOption {
 					"type": "disabled",
 				}
 			}
-		case "tongyi", "aibalance":
-			config.EnableThinkingField = "enable_thinking"
-			config.EnableThinkingValue = config.EnableThinking
 		}
 	}
 }
@@ -265,9 +265,29 @@ func NewDefaultAIConfig(opts ...AIConfigOption) *AIConfig {
 
 	// 加载默认参数
 	if c.Type != "" {
-		err := consts.GetThirdPartyApplicationConfig(c.Type, c)
-		if err != nil {
-			log.Debug(err)
+		loaded := false
+		if tiered := consts.GetTieredAIConfig(); tiered != nil {
+			candidates := append(append([]*ypb.AIModelConfig{}, tiered.IntelligentConfigs...), tiered.LightweightConfigs...)
+			candidates = append(candidates, tiered.VisionConfigs...)
+			for _, modelCfg := range candidates {
+				if modelCfg == nil || modelCfg.GetProvider() == nil {
+					continue
+				}
+				if !strings.EqualFold(strings.TrimSpace(modelCfg.GetProvider().GetType()), strings.TrimSpace(c.Type)) {
+					continue
+				}
+				for _, opt := range BuildOptionsFromConfig(modelCfg) {
+					opt(c)
+				}
+				loaded = true
+				break
+			}
+		}
+		if !loaded {
+			err := consts.GetThirdPartyApplicationConfig(c.Type, c)
+			if err != nil {
+				log.Debug(err)
+			}
 		}
 	}
 
