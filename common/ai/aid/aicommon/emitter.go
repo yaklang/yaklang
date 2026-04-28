@@ -109,6 +109,7 @@ func (i *Emitter) AssociativeAIProcess(newProcess *schema.AiProcess) *Emitter {
 	callBack := func(event *schema.AiOutputEvent) *schema.AiOutputEvent {
 		if newProcess.ProcessType == schema.AI_Call_Tool {
 			event.CallToolID = newProcess.ProcessId
+			event.RecoveryIndexID = newProcess.ProcessId
 		}
 		event.ProcessesId = append(event.ProcessesId, newProcess.ProcessId)
 		return event
@@ -524,10 +525,19 @@ func (r *Emitter) EmitToolCallUserCancel(callToolId string, endTime time.Time, s
 }
 
 func (r *Emitter) EmitToolCallSummary(callToolId string, summary string) (*schema.AiOutputEvent, error) {
-	return r.EmitJSON(schema.EVENT_TOOL_CALL_SUMMARY, callToolId, map[string]any{
-		"call_tool_id": callToolId,
-		"summary":      summary,
-	})
+	event := &schema.AiOutputEvent{
+		CoordinatorId: r.id,
+		Type:          schema.EVENT_TOOL_CALL_SUMMARY,
+		NodeId:        callToolId,
+		IsJson:        true,
+		Content:       utils.Jsonify(map[string]any{
+			"call_tool_id": callToolId,
+			"summary":      summary,
+		}),
+		Timestamp:     time.Now().Unix(),
+		CallToolID:    callToolId,
+	}
+	return r.emit(event)
 }
 
 func (r *Emitter) EmitToolCallDecision(callToolId string, action string, summary string) (*schema.AiOutputEvent, error) {
@@ -583,24 +593,26 @@ func (r *Emitter) EmitToolCallStd(toolName string, stdOut, stdErr io.Reader, tas
 	stderrDone := make(chan struct{})
 
 	_, _ = r.emitStreamEvent(&streamEvent{
-		disableMarkdown:    true,
-		startTime:          time.Now(),
-		reader:             stdOut,
-		nodeId:             fmt.Sprintf("tool-%v-stdout", toolName),
-		contentType:        TypeLogTool,
-		taskIndex:          taskIndex,
-		throttleInterval:   DefaultToolStdThrottleInterval,
-		emitFinishCallback: []func(){func() { close(stdoutDone) }},
+		disableMarkdown:      true,
+		startTime:            time.Now(),
+		reader:               stdOut,
+		nodeId:               fmt.Sprintf("tool-%v-stdout", toolName),
+		contentType:          TypeLogTool,
+		taskIndex:            taskIndex,
+		throttleInterval:     DefaultToolStdThrottleInterval,
+		disableRecoveryBlock: true,
+		emitFinishCallback:   []func(){func() { close(stdoutDone) }},
 	})
 	_, _ = r.emitStreamEvent(&streamEvent{
-		disableMarkdown:    true,
-		startTime:          time.Now(),
-		reader:             stdErr,
-		nodeId:             fmt.Sprintf("tool-%v-stderr", toolName),
-		contentType:        TypeLogToolErrorOutput,
-		taskIndex:          taskIndex,
-		throttleInterval:   DefaultToolStdThrottleInterval,
-		emitFinishCallback: []func(){func() { close(stderrDone) }},
+		disableMarkdown:      true,
+		startTime:            time.Now(),
+		reader:               stdErr,
+		nodeId:               fmt.Sprintf("tool-%v-stderr", toolName),
+		contentType:          TypeLogToolErrorOutput,
+		taskIndex:            taskIndex,
+		throttleInterval:     DefaultToolStdThrottleInterval,
+		disableRecoveryBlock: true,
+		emitFinishCallback:   []func(){func() { close(stderrDone) }},
 	})
 
 	return func() {
@@ -719,7 +731,7 @@ func (r *Emitter) EmitReasonStreamEvent(nodeId string, startTime time.Time, read
 }
 
 func (r *Emitter) emitStartStreamEvent(ts int64, er *streamAIOutputEventWriter) (*schema.AiOutputEvent, error) {
-	return r.emit(&schema.AiOutputEvent{
+	event := &schema.AiOutputEvent{
 		CoordinatorId: er.coordinatorId,
 		Type:          schema.EVENT_TYPE_STREAM_START,
 		NodeId:        er.nodeId,
@@ -736,7 +748,12 @@ func (r *Emitter) emitStartStreamEvent(ts int64, er *streamAIOutputEventWriter) 
 		TaskIndex:       er.taskIndex,
 		DisableMarkdown: true,
 		ContentType:     er.contentType,
-	})
+	}
+	if !er.disableRecoveryBlock {
+		event.IsRecoveryBlock = true
+		event.RecoveryIndexID = er.eventWriterID
+	}
+	return r.emit(event)
 }
 
 func (r *Emitter) emitStreamEvent(e *streamEvent) (*schema.AiOutputEvent, error) {
@@ -788,16 +805,28 @@ func (r *Emitter) emitStreamEvent(e *streamEvent) (*schema.AiOutputEvent, error)
 		}
 		if n > 0 {
 			du := time.Since(e.startTime)
-			r.EmitStructured("stream-finished", map[string]any{
-				"node_id":         e.nodeId,
-				"coordinator_id":  r.id,
-				"is_system":       e.isSystem,
-				"is_reason":       e.isReason,
-				"start_timestamp": startTS,
-				"task_index":      e.taskIndex,
-				"event_writer_id": ewid,
-				"duration_ms":     du.Milliseconds(),
-			})
+			streamFinished := &schema.AiOutputEvent{
+				CoordinatorId: r.id,
+				Type:          schema.EVENT_TYPE_STRUCTURED,
+				NodeId:        "stream-finished",
+				IsJson:        true,
+				Content: utils.Jsonify(map[string]any{
+					"node_id":         e.nodeId,
+					"coordinator_id":  r.id,
+					"is_system":       e.isSystem,
+					"is_reason":       e.isReason,
+					"start_timestamp": startTS,
+					"task_index":      e.taskIndex,
+					"event_writer_id": ewid,
+					"duration_ms":     du.Milliseconds(),
+				}),
+				Timestamp: time.Now().Unix(),
+				TaskIndex: e.taskIndex,
+			}
+			if !e.disableRecoveryBlock {
+				streamFinished.RecoveryIndexID = ewid
+			}
+			r.emit(streamFinished)
 		}
 	}()
 
@@ -966,6 +995,7 @@ func (e *Emitter) EmitReferenceMaterial(typeName string, eventId string, content
 		"event_uuid": eventId,
 		"type":       typeName, // text / file / url / other
 		"payload":    utils.InterfaceToString(content),
+		"event_writer_id": eventId, // filled in stream event writer if emitted from stream
 	})
 }
 

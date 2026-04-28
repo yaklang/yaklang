@@ -164,12 +164,27 @@ func TestYieldAIEvent(t *testing.T) {
 	})
 }
 
-func TestAiOutputEvent_ShouldSave_StructuredNodeIdBlacklist(t *testing.T) {
+func TestAiOutputEvent_ShouldSave(t *testing.T) {
 	cases := []struct {
 		name  string
 		event *schema.AiOutputEvent
 		want  bool
 	}{
+		{
+			name:  "system event should not save",
+			event: &schema.AiOutputEvent{IsSystem: true},
+			want:  false,
+		},
+		{
+			name:  "sync event should not save",
+			event: &schema.AiOutputEvent{IsSync: true},
+			want:  false,
+		},
+		{
+			name:  "transient event type should not save",
+			event: &schema.AiOutputEvent{Type: schema.EVENT_TYPE_CONSUMPTION},
+			want:  false,
+		},
 		{
 			name:  "structured status should not save",
 			event: &schema.AiOutputEvent{Type: schema.EVENT_TYPE_STRUCTURED, NodeId: "status"},
@@ -195,6 +210,11 @@ func TestAiOutputEvent_ShouldSave_StructuredNodeIdBlacklist(t *testing.T) {
 			event: &schema.AiOutputEvent{Type: schema.EVENT_TYPE_STREAM, NodeId: "status"},
 			want:  true,
 		},
+		{
+			name:  "regular structured event should save",
+			event: &schema.AiOutputEvent{Type: schema.EVENT_TYPE_STRUCTURED, NodeId: "artifact"},
+			want:  true,
+		},
 	}
 
 	for _, tc := range cases {
@@ -202,6 +222,90 @@ func TestAiOutputEvent_ShouldSave_StructuredNodeIdBlacklist(t *testing.T) {
 			if got := tc.event.ShouldSave(); got != tc.want {
 				t.Fatalf("ShouldSave() = %v, want %v", got, tc.want)
 			}
+		})
+	}
+}
+
+func TestAiOutputEvent_NormalizeRecoveryBlock(t *testing.T) {
+	cases := []struct {
+		name              string
+		event             *schema.AiOutputEvent
+		wantRecoveryBlock bool
+		wantRecoveryID    string
+	}{
+		{
+			name:              "plain structured event is its own recovery block",
+			event:             &schema.AiOutputEvent{Type: schema.EVENT_TYPE_STRUCTURED, NodeId: "user"},
+			wantRecoveryBlock: true,
+			wantRecoveryID:    "",
+		},
+		{
+			name: "tool call start anchors the tool block",
+			event: &schema.AiOutputEvent{
+				Type:       schema.EVENT_TOOL_CALL_START,
+				CallToolID: "call-tool-1",
+			},
+			wantRecoveryBlock: true,
+			wantRecoveryID:    "call-tool-1",
+		},
+		{
+			name: "tool call update belongs to tool block but is not anchor",
+			event: &schema.AiOutputEvent{
+				Type:       schema.EVENT_TOOL_CALL_RESULT,
+				CallToolID: "call-tool-1",
+			},
+			wantRecoveryBlock: false,
+			wantRecoveryID:    "call-tool-1",
+		},
+		{
+			name: "stream start anchors stream block by writer id",
+			event: &schema.AiOutputEvent{
+				Type:    schema.EVENT_TYPE_STREAM_START,
+				IsJson:  true,
+				Content: utils.Jsonify(map[string]any{"event_writer_id": "writer-1"}),
+			},
+			wantRecoveryBlock: true,
+			wantRecoveryID:    "writer-1",
+		},
+		{
+			name: "stream delta without explicit recovery id falls back to standalone block",
+			event: &schema.AiOutputEvent{
+				Type:      schema.EVENT_TYPE_STREAM,
+				IsStream:  true,
+				EventUUID: "writer-1",
+			},
+			wantRecoveryBlock: true,
+			wantRecoveryID:    "",
+		},
+		{
+			name: "tool call owned stream prefers tool block over stream writer",
+			event: &schema.AiOutputEvent{
+				Type:       schema.EVENT_TYPE_STREAM,
+				IsStream:   true,
+				EventUUID:  "writer-1",
+				CallToolID: "call-tool-1",
+			},
+			wantRecoveryBlock: false,
+			wantRecoveryID:    "call-tool-1",
+		},
+		{
+			name: "stream finished stays inside stream block",
+			event: &schema.AiOutputEvent{
+				Type:    schema.EVENT_TYPE_STRUCTURED,
+				NodeId:  "stream-finished",
+				IsJson:  true,
+				Content: utils.Jsonify(map[string]any{"event_writer_id": "writer-1"}),
+			},
+			wantRecoveryBlock: false,
+			wantRecoveryID:    "writer-1",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			tc.event.NormalizeRecoveryBlock()
+			require.Equal(t, tc.wantRecoveryBlock, tc.event.IsRecoveryBlock)
+			require.Equal(t, tc.wantRecoveryID, tc.event.RecoveryIndexID)
 		})
 	}
 }

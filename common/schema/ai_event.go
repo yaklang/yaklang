@@ -28,6 +28,32 @@ const (
 
 type EventType string
 
+var eventTypeNotSaveBlackList = []EventType{
+	EVENT_TYPE_CONSUMPTION,
+	EVENT_TYPE_PONG,
+	EVENT_TYPE_PRESSURE,
+	EVENT_TYPE_AI_FIRST_BYTE_COST_MS,
+	EVENT_TYPE_AI_TOTAL_COST_MS,
+	EVENT_TYPE_AI_CALL_SUMMARY,
+	EVENT_TYPE_MEMORY_SEARCH_QUICKLY,
+	EVENT_TYPE_MEMORY_SEARCH_SPECIFIC,
+	EVENT_TYPE_MEMORY_BUILD,
+	EVENT_TYPE_MEMORY_SAVE,
+	EVENT_TYPE_MEMORY_ADD_CONTEXT,
+	EVENT_TYPE_MEMORY_REMOVE_CONTEXT,
+	EVENT_TYPE_MEMORY_CONTEXT,
+}
+
+var structuredNodeIDNotSaveBlackList = []string{
+	"status",
+	"system",
+	"react_task_cancelled",
+	"react_task_enqueue",
+	"react_task_dequeue",
+	"react_task_cleared",
+	"react_task_status_changed",
+}
+
 const (
 	AI_REACT_LOOP_ACTION_REQUIRE_TOOL             = "require_tool"
 	AI_REACT_LOOP_ACTION_SEARCH_CAPABILITIES      = "search_capabilities"
@@ -205,6 +231,55 @@ type AiOutputEvent struct {
 
 	// semantic label for the task associated with this event
 	TaskSemanticLabel string `json:"task_semantic_label"`
+
+	// Recovery block metadata is used to rebuild UI blocks from persisted events.
+	// Single renderable events are anchors themselves, while multi-event blocks
+	// (tool calls, streams) share a RecoveryIndexID and only the anchor/start
+	// event is marked as IsRecoveryBlock.
+	IsRecoveryBlock bool   `gorm:"index"`
+	RecoveryIndexID string `gorm:"index"`
+}
+
+// NormalizeRecoveryBlock derives recovery-block metadata for persisted events.
+// Priority is:
+//  1. Tool-call related events belong to the tool-call block keyed by CallToolID,
+//     and only tool_call_start is the recovery anchor.
+//  2. Stream related events belong to the stream block keyed by event_writer_id
+//     (stream_start / stream-finished) or EventUUID (stream delta rows), and only
+//     stream_start is the recovery anchor.
+//  3. All other events are treated as standalone renderable blocks and therefore
+//     act as their own recovery anchor.
+func (e *AiOutputEvent) NormalizeRecoveryBlock() {
+	if e == nil {
+		return
+	}
+
+	if e.CallToolID != "" {
+		e.RecoveryIndexID = e.CallToolID
+		e.IsRecoveryBlock = e.Type == EVENT_TOOL_CALL_START
+		return
+	}
+
+	if e.Type == EVENT_TYPE_STREAM_START {
+		if writerID := e.GetStreamEventWriterId(); writerID != "" {
+			e.RecoveryIndexID = writerID
+			e.IsRecoveryBlock = true
+			return
+		}
+	}
+
+	if e.Type == EVENT_TYPE_REFERENCE_MATERIAL ||
+		(e.Type == EVENT_TYPE_STRUCTURED && e.NodeId == "stream-finished") {
+		if writerID := e.GetStreamEventWriterId(); writerID != "" {
+			e.RecoveryIndexID = writerID
+			e.IsRecoveryBlock = false
+			return
+		}
+	}
+
+	if e.RecoveryIndexID == "" { // standalone event, use EventUUID as RecoveryIndexID to allow idempotent recovery
+		e.IsRecoveryBlock = true
+	}
 }
 
 func (e *AiOutputEvent) GetContentJSONPath(p string) string {
@@ -220,32 +295,29 @@ func (e *AiOutputEvent) GetStreamEventWriterId() string {
 }
 
 func (e *AiOutputEvent) ShouldSave() bool {
-	if e.IsSystem {
-		return false
-	}
-	if e.IsSync {
-		return false
-	}
-	if e.Type == EVENT_TYPE_CONSUMPTION || e.Type == EVENT_TYPE_PONG || e.Type == EVENT_TYPE_PRESSURE ||
-		e.Type == EVENT_TYPE_AI_FIRST_BYTE_COST_MS || e.Type == EVENT_TYPE_AI_TOTAL_COST_MS ||
-		e.Type == EVENT_TYPE_AI_CALL_SUMMARY {
-		return false
-	}
-	if e.structTypeNodeIdNotSave() {
-		return false
-	}
-	return true
+	return e != nil &&
+		e.saveAllowedByFlags() &&
+		e.saveAllowedByType() &&
+		e.saveAllowedByNodeID()
 }
 
-func (e *AiOutputEvent) structTypeNodeIdNotSave() bool {
+func (e *AiOutputEvent) saveAllowedByFlags() bool {
+	return !e.IsSystem && !e.IsSync
+}
+
+// saveAllowedByType uses a blacklist instead of a whitelist because most event
+// types are useful for persistence, timeline reconstruction, or UI recovery.
+// New event types should default to "save", and only high-frequency transient
+// telemetry should be added to the blacklist.
+func (e *AiOutputEvent) saveAllowedByType() bool {
+	return !lo.Contains(eventTypeNotSaveBlackList, e.Type)
+}
+
+func (e *AiOutputEvent) saveAllowedByNodeID() bool {
 	if e.Type != EVENT_TYPE_STRUCTURED {
-		return false
+		return true
 	}
-	blackList := []string{
-		"status",
-		"system",
-	}
-	return lo.Contains(blackList, e.NodeId)
+	return !lo.Contains(structuredNodeIDNotSaveBlackList, e.NodeId)
 }
 
 func (e *AiOutputEvent) IsInteractive() bool {
