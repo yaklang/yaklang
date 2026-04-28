@@ -264,6 +264,62 @@ func TestHandleAISessionInputPublishesRuntimeEvent(t *testing.T) {
 	driver.assertInput(t, 0, "hello")
 }
 
+func TestAISessionPublisherUsesDistinctEventIDPerSequence(t *testing.T) {
+	t.Parallel()
+
+	bridge, fakeJS, _ := newTestAISessionBridge(t)
+
+	ref := aiSessionCommandRef{
+		CommandID:   "cmd-input-1",
+		SessionID:   "ai-session-1",
+		RunID:       "run-1",
+		OwnerUserID: "user-1",
+	}
+
+	if err := bridge.aiPublisher.PublishEvent(
+		context.Background(),
+		ref,
+		1,
+		aiSessionRuntimeEventMessage,
+		[]byte(`{"content":"first"}`),
+	); err != nil {
+		t.Fatalf("publish first ai session event: %v", err)
+	}
+	if err := bridge.aiPublisher.PublishEvent(
+		context.Background(),
+		ref,
+		2,
+		aiSessionRuntimeEventMessage,
+		[]byte(`{"content":"second"}`),
+	); err != nil {
+		t.Fatalf("publish second ai session event: %v", err)
+	}
+
+	firstMsg := waitForPublishedMessage(t, fakeJS, 0)
+	secondMsg := waitForPublishedMessage(t, fakeJS, 1)
+
+	var firstEvent aiv1.AISessionEvent
+	if err := proto.Unmarshal(firstMsg.Data, &firstEvent); err != nil {
+		t.Fatalf("unmarshal first ai session event: %v", err)
+	}
+	var secondEvent aiv1.AISessionEvent
+	if err := proto.Unmarshal(secondMsg.Data, &secondEvent); err != nil {
+		t.Fatalf("unmarshal second ai session event: %v", err)
+	}
+
+	firstEventID := firstEvent.GetMetadata().GetEventId()
+	secondEventID := secondEvent.GetMetadata().GetEventId()
+	if firstEventID == "" || secondEventID == "" {
+		t.Fatalf("expected non-empty event ids, got first=%q second=%q", firstEventID, secondEventID)
+	}
+	if firstEventID == secondEventID {
+		t.Fatalf("expected distinct event ids, got duplicated id %q", firstEventID)
+	}
+	if firstEvent.GetSeq() != 1 || secondEvent.GetSeq() != 2 {
+		t.Fatalf("unexpected seq values: first=%d second=%d", firstEvent.GetSeq(), secondEvent.GetSeq())
+	}
+}
+
 func TestHandleAISessionAppendContextPublishesRuntimeEvent(t *testing.T) {
 	t.Parallel()
 

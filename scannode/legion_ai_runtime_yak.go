@@ -13,8 +13,10 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	_ "github.com/yaklang/yaklang/common/ai/aid/aireact"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/aiengine"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 )
@@ -163,23 +165,40 @@ func (h *yakAIEngineRuntimeHandle) sendMessage(ctx context.Context, content stri
 }
 
 type yakRuntimeOptions struct {
-	AIService                    string `json:"ai_service"`
-	AIModelName                  string `json:"ai_model_name"`
-	MaxIteration                 int    `json:"max_iteration"`
-	ReActMaxIteration            int64  `json:"react_max_iteration"`
-	ReviewPolicy                 string `json:"review_policy"`
-	DisableToolUse               *bool  `json:"disable_tool_use"`
-	EnableAISearchTool           *bool  `json:"enable_ai_search_tool"`
-	DisallowRequireForUserPrompt *bool  `json:"disallow_require_for_user_prompt"`
-	AllowUserInteract            *bool  `json:"allow_user_interact"`
-	AllowPlanUserInteract        *bool  `json:"allow_plan_user_interact"`
-	UserInteractLimit            int64  `json:"user_interact_limit"`
-	PlanUserInteractMaxCount     int64  `json:"plan_user_interact_max_count"`
-	TimelineContentSizeLimit     int64  `json:"timeline_content_size_limit"`
-	Focus                        string `json:"focus"`
-	FocusModeLoop                string `json:"focus_mode_loop"`
-	Workdir                      string `json:"workdir"`
-	Language                     string `json:"language"`
+	UseDefaultAIConfig             *bool             `json:"use_default_ai_config"`
+	AIService                      string            `json:"ai_service"`
+	AIModelName                    string            `json:"ai_model_name"`
+	APIKey                         string            `json:"api_key"`
+	BaseURL                        string            `json:"base_url"`
+	APIType                        string            `json:"api_type"`
+	Domain                         string            `json:"domain"`
+	Proxy                          string            `json:"proxy"`
+	Endpoint                       string            `json:"endpoint"`
+	EnableEndpoint                 *bool             `json:"enable_endpoint"`
+	NoHTTPS                        *bool             `json:"no_https"`
+	Headers                        map[string]string `json:"headers"`
+	MaxIteration                   int               `json:"max_iteration"`
+	ReActMaxIteration              int64             `json:"react_max_iteration"`
+	ReviewPolicy                   string            `json:"review_policy"`
+	EnableSystemFileSystemOperator *bool             `json:"enable_system_file_system_operator"`
+	DisableToolUse                 *bool             `json:"disable_tool_use"`
+	EnableAISearchTool             *bool             `json:"enable_ai_search_tool"`
+	DisallowRequireForUserPrompt   *bool             `json:"disallow_require_for_user_prompt"`
+	AllowUserInteract              *bool             `json:"allow_user_interact"`
+	AllowPlanUserInteract          *bool             `json:"allow_plan_user_interact"`
+	DisableToolIntervalReview      *bool             `json:"disable_tool_interval_review"`
+	AIReviewRiskControlScore       *float64          `json:"ai_review_risk_control_score"`
+	AICallAutoRetry                *int64            `json:"ai_call_auto_retry"`
+	AITransactionRetry             *int64            `json:"ai_transaction_retry"`
+	TimelineItemLimit              *int64            `json:"timeline_item_limit"`
+	AICallTokenLimit               *int64            `json:"ai_call_token_limit"`
+	UserInteractLimit              int64             `json:"user_interact_limit"`
+	PlanUserInteractMaxCount       int64             `json:"plan_user_interact_max_count"`
+	TimelineContentSizeLimit       int64             `json:"timeline_content_size_limit"`
+	Focus                          string            `json:"focus"`
+	FocusModeLoop                  string            `json:"focus_mode_loop"`
+	Workdir                        string            `json:"workdir"`
+	Language                       string            `json:"language"`
 }
 
 func buildYakAIEngineOptions(
@@ -222,23 +241,17 @@ func buildYakAIEngineOptions(
 	if options.EnableAISearchTool != nil {
 		config = append(config, aiengine.WithEnableAISearchTool(*options.EnableAISearchTool))
 	}
-	if options.DisallowRequireForUserPrompt != nil && *options.DisallowRequireForUserPrompt {
-		config = append(config, aiengine.WithAllowUserInteract(false))
-	}
 	if options.AllowUserInteract != nil {
 		config = append(config, aiengine.WithAllowUserInteract(*options.AllowUserInteract))
-	}
-	if options.AllowPlanUserInteract != nil {
-		config = append(config, aiengine.WithAllowUserInteract(*options.AllowPlanUserInteract))
 	}
 	if options.UserInteractLimit > 0 {
 		config = append(config, aiengine.WithUserInteractLimit(options.UserInteractLimit))
 	}
-	if options.PlanUserInteractMaxCount > 0 {
-		config = append(config, aiengine.WithUserInteractLimit(options.PlanUserInteractMaxCount))
-	}
 	if options.TimelineContentSizeLimit > 0 {
 		config = append(config, aiengine.WithTimelineContentLimit(int(options.TimelineContentSizeLimit)))
+	}
+	if extOptions := buildYakAICommonExtOptions(options); len(extOptions) > 0 {
+		config = append(config, aiengine.WithExtOptions(extOptions...))
 	}
 	if strings.TrimSpace(options.Focus) != "" {
 		config = append(config, aiengine.WithFocus(strings.TrimSpace(options.Focus)))
@@ -259,20 +272,129 @@ func buildYakAIEngineOptions(
 	if projection := renderCredentialProjection(binding.CredentialRefs); projection != "" {
 		config = append(config, aiengine.WithAttachedFileContent(projection))
 	}
+	callback, err := loadYakAICallback(options)
+	if err != nil {
+		return nil, err
+	}
+	if callback != nil {
+		config = append(config, aiengine.WithAICallback(callback))
+	}
+	return config, nil
+}
+
+func buildYakAICommonExtOptions(options yakRuntimeOptions) []aicommon.ConfigOption {
+	extOptions := make([]aicommon.ConfigOption, 0, 10)
+	if options.EnableSystemFileSystemOperator != nil && *options.EnableSystemFileSystemOperator {
+		extOptions = append(extOptions, aicommon.WithSystemFileOperator(), aicommon.WithJarOperator())
+	}
+	if options.DisallowRequireForUserPrompt != nil && *options.DisallowRequireForUserPrompt {
+		extOptions = append(extOptions, aicommon.WithDisallowRequireForUserPrompt())
+	}
+	if options.AllowPlanUserInteract != nil {
+		extOptions = append(extOptions, aicommon.WithAllowPlanUserInteract(*options.AllowPlanUserInteract))
+	}
+	if options.PlanUserInteractMaxCount > 0 {
+		extOptions = append(extOptions, aicommon.WithPlanUserInteractMaxCount(options.PlanUserInteractMaxCount))
+	}
+	if options.AIReviewRiskControlScore != nil {
+		extOptions = append(extOptions, aicommon.WithAgreeAIRiskCtrlScore(*options.AIReviewRiskControlScore))
+	}
+	if options.AICallAutoRetry != nil {
+		extOptions = append(extOptions, aicommon.WithAIAutoRetry(*options.AICallAutoRetry))
+	}
+	if options.AITransactionRetry != nil {
+		extOptions = append(extOptions, aicommon.WithAITransactionRetry(*options.AITransactionRetry))
+	}
+	if options.DisableToolIntervalReview != nil && *options.DisableToolIntervalReview {
+		extOptions = append(extOptions, aicommon.WithDisableToolCallerIntervalReview(true))
+	}
+	if options.AICallTokenLimit != nil {
+		extOptions = append(extOptions, aicommon.WithAiCallTokenLimit(*options.AICallTokenLimit))
+	}
+	return extOptions
+}
+
+func loadYakAICallback(options yakRuntimeOptions) (aicommon.AICallbackType, error) {
 	aiService := strings.TrimSpace(options.AIService)
 	aiModelName := strings.TrimSpace(options.AIModelName)
 	if aiService != "" {
-		aiConfigOptions := make([]aispec.AIConfigOption, 0, 1)
-		if aiModelName != "" {
-			aiConfigOptions = append(aiConfigOptions, aispec.WithModel(aiModelName))
+		aiConfigOptions := buildYakExplicitAIConfigOptions(options)
+		if len(aiConfigOptions) > 0 {
+			chat, loadErr := ai.LoadChater(aiService, aiConfigOptions...)
+			if loadErr == nil {
+				return aicommon.AIChatToAICallbackType(chat), nil
+			}
+			callback, err := aicommon.GetAIModelCallbackByTierAndProviderAndModel(
+				consts.TierIntelligent,
+				aiService,
+				aiModelName,
+			)
+			if err == nil {
+				return callback, nil
+			}
+			return nil, fmt.Errorf("load ai service %s: direct=%v tiered=%w", aiService, loadErr, err)
 		}
-		chat, err := ai.LoadChater(aiService, aiConfigOptions...)
-		if err != nil {
-			return nil, fmt.Errorf("load ai service %s: %w", aiService, err)
+
+		callback, err := aicommon.GetAIModelCallbackByTierAndProviderAndModel(
+			consts.TierIntelligent,
+			aiService,
+			aiModelName,
+		)
+		if err == nil {
+			return callback, nil
 		}
-		config = append(config, aiengine.WithAICallback(aicommon.AIChatToAICallbackType(chat)))
+
+		chat, loadErr := ai.LoadChater(aiService, aiConfigOptions...)
+		if loadErr != nil {
+			return nil, fmt.Errorf("load ai service %s: tiered=%v fallback=%w", aiService, err, loadErr)
+		}
+		return aicommon.AIChatToAICallbackType(chat), nil
 	}
-	return config, nil
+
+	if options.UseDefaultAIConfig != nil && *options.UseDefaultAIConfig {
+		callback, err := aicommon.GetIntelligentAIModelCallback()
+		if err != nil {
+			return nil, fmt.Errorf("load default ai config: %w", err)
+		}
+		return callback, nil
+	}
+
+	return nil, nil
+}
+
+func buildYakExplicitAIConfigOptions(options yakRuntimeOptions) []aispec.AIConfigOption {
+	aiConfigOptions := make([]aispec.AIConfigOption, 0, 8)
+	if modelName := strings.TrimSpace(options.AIModelName); modelName != "" {
+		aiConfigOptions = append(aiConfigOptions, aispec.WithModel(modelName))
+	}
+	if apiKey := strings.TrimSpace(options.APIKey); apiKey != "" {
+		aiConfigOptions = append(aiConfigOptions, aispec.WithAPIKey(apiKey))
+	}
+	if baseURL := strings.TrimSpace(options.BaseURL); baseURL != "" {
+		aiConfigOptions = append(aiConfigOptions, aispec.WithBaseURL(baseURL))
+	}
+	if apiType := strings.TrimSpace(options.APIType); apiType != "" {
+		aiConfigOptions = append(aiConfigOptions, aispec.WithAPIType(apiType))
+	}
+	if domain := strings.TrimSpace(options.Domain); domain != "" {
+		aiConfigOptions = append(aiConfigOptions, aispec.WithDomain(domain))
+	}
+	if proxy := strings.TrimSpace(options.Proxy); proxy != "" {
+		aiConfigOptions = append(aiConfigOptions, aispec.WithProxy(proxy))
+	}
+	if endpoint := strings.TrimSpace(options.Endpoint); endpoint != "" {
+		aiConfigOptions = append(aiConfigOptions, aispec.WithEndpoint(endpoint))
+	}
+	if options.EnableEndpoint != nil {
+		aiConfigOptions = append(aiConfigOptions, aispec.WithEnableEndpoint(*options.EnableEndpoint))
+	}
+	if options.NoHTTPS != nil {
+		aiConfigOptions = append(aiConfigOptions, aispec.WithNoHttps(*options.NoHTTPS))
+	}
+	if len(options.Headers) > 0 {
+		aiConfigOptions = append(aiConfigOptions, aispec.WithExtraHeader(options.Headers))
+	}
+	return aiConfigOptions
 }
 
 func appendYakAttachmentOptions(
@@ -483,11 +605,35 @@ func decodeYakRuntimeOptions(raw []byte) (yakRuntimeOptions, error) {
 }
 
 func mergeYakRuntimeOptions(base yakRuntimeOptions, overlay yakRuntimeOptions) yakRuntimeOptions {
+	if overlay.UseDefaultAIConfig != nil {
+		base.UseDefaultAIConfig = overlay.UseDefaultAIConfig
+	}
 	if overlay.AIService != "" {
 		base.AIService = overlay.AIService
 	}
 	if overlay.AIModelName != "" {
 		base.AIModelName = overlay.AIModelName
+	}
+	if overlay.APIType != "" {
+		base.APIType = overlay.APIType
+	}
+	if overlay.Domain != "" {
+		base.Domain = overlay.Domain
+	}
+	if overlay.Proxy != "" {
+		base.Proxy = overlay.Proxy
+	}
+	if overlay.Endpoint != "" {
+		base.Endpoint = overlay.Endpoint
+	}
+	if overlay.EnableEndpoint != nil {
+		base.EnableEndpoint = overlay.EnableEndpoint
+	}
+	if overlay.NoHTTPS != nil {
+		base.NoHTTPS = overlay.NoHTTPS
+	}
+	if len(overlay.Headers) > 0 {
+		base.Headers = overlay.Headers
 	}
 	if overlay.MaxIteration > 0 {
 		base.MaxIteration = overlay.MaxIteration
@@ -497,6 +643,9 @@ func mergeYakRuntimeOptions(base yakRuntimeOptions, overlay yakRuntimeOptions) y
 	}
 	if overlay.ReviewPolicy != "" {
 		base.ReviewPolicy = overlay.ReviewPolicy
+	}
+	if overlay.EnableSystemFileSystemOperator != nil {
+		base.EnableSystemFileSystemOperator = overlay.EnableSystemFileSystemOperator
 	}
 	if overlay.DisableToolUse != nil {
 		base.DisableToolUse = overlay.DisableToolUse
@@ -512,6 +661,24 @@ func mergeYakRuntimeOptions(base yakRuntimeOptions, overlay yakRuntimeOptions) y
 	}
 	if overlay.AllowPlanUserInteract != nil {
 		base.AllowPlanUserInteract = overlay.AllowPlanUserInteract
+	}
+	if overlay.DisableToolIntervalReview != nil {
+		base.DisableToolIntervalReview = overlay.DisableToolIntervalReview
+	}
+	if overlay.AIReviewRiskControlScore != nil {
+		base.AIReviewRiskControlScore = overlay.AIReviewRiskControlScore
+	}
+	if overlay.AICallAutoRetry != nil {
+		base.AICallAutoRetry = overlay.AICallAutoRetry
+	}
+	if overlay.AITransactionRetry != nil {
+		base.AITransactionRetry = overlay.AITransactionRetry
+	}
+	if overlay.TimelineItemLimit != nil {
+		base.TimelineItemLimit = overlay.TimelineItemLimit
+	}
+	if overlay.AICallTokenLimit != nil {
+		base.AICallTokenLimit = overlay.AICallTokenLimit
 	}
 	if overlay.UserInteractLimit > 0 {
 		base.UserInteractLimit = overlay.UserInteractLimit

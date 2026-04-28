@@ -72,6 +72,74 @@ message CloseAISessionCommand {
   string reason = 4;
 }
 
+message AIProviderPreviewConfigSnapshot {
+  string provider_type = 1;
+  string base_url = 2;
+  string api_type = 3;
+  string domain = 4;
+  string proxy = 5;
+  string endpoint = 6;
+  bool enable_endpoint = 7;
+  bool no_https = 8;
+  string api_key = 9;
+  string default_model = 10;
+  map<string, string> headers = 11;
+}
+
+message ListAIProviderModelsCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+  AIProviderPreviewConfigSnapshot provider = 4;
+}
+
+message AIProviderPreviewModel {
+  string model_id = 1;
+  string label = 2;
+}
+
+message AIProviderModelsListed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  repeated AIProviderPreviewModel items = 3;
+}
+
+message AIProviderModelsFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string error_code = 3;
+  string error_message = 4;
+}
+
+message HealthCheckAIProviderCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+  AIProviderPreviewConfigSnapshot provider = 4;
+  string content = 5;
+}
+
+message AIProviderHealthCheckCompleted {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  int64 first_byte_cost_ms = 3;
+  int64 total_cost_ms = 4;
+  string raw_request = 5;
+  int32 response_status_code = 6;
+  string response_content = 7;
+  string error_message = 8;
+  string raw_response = 9;
+  AIProviderPreviewConfigSnapshot recommend_config = 10;
+  bool success = 11;
+}
+
+message AIProviderHealthCheckFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string error_code = 3;
+  string error_message = 4;
+}
+
 message AISessionReady {
   legion.node.v1.EventMetadata metadata = 1;
   AISessionRef session = 2;
