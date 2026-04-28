@@ -14,6 +14,13 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+type AIEventRecoveryHistoryResult struct {
+	BlockCount  int
+	EventCount  int
+	NextStartID int64
+	HasMore     bool
+}
+
 func AssociateAIEventToProcess(db *gorm.DB, eventId string, processIds []string) error {
 	return utils.GormTransactionReturnDb(db, func(tx *gorm.DB) {
 		for _, processId := range processIds {
@@ -33,6 +40,7 @@ func CreateOrUpdateAIOutputEvent(db *gorm.DB, event *schema.AiOutputEvent) error
 	if event == nil {
 		return nil
 	}
+	event.NormalizeRecoveryBlock()
 	db = db.Model(event)
 
 	// stream-finished is a structured event emitted by the AI emitter to mark the end of a stream.
@@ -148,6 +156,90 @@ func QueryAIEvent(db *gorm.DB, filter *ypb.AIEventFilter) ([]*schema.AiOutputEve
 		return nil, db.Error
 	}
 	return event, nil
+}
+
+func filterRecoveryHistoryEventsBySession(db *gorm.DB, sessionID string) *gorm.DB {
+	return FilterEvent(db, &ypb.AIEventFilter{SessionID: sessionID})
+}
+
+func YieldAIEventRecoveryHistory(ctx context.Context, db *gorm.DB, sessionID string, startID int64, limit int) (chan *schema.AiOutputEvent, *AIEventRecoveryHistoryResult, error) {
+	if db == nil {
+		return nil, nil, utils.Errorf("database is nil")
+	}
+	if sessionID == "" {
+		return nil, nil, utils.Errorf("session_id is empty")
+	}
+	if limit <= 0 {
+		return nil, nil, utils.Errorf("limit must be greater than 0")
+	}
+
+	outC := make(chan *schema.AiOutputEvent)
+	result := &AIEventRecoveryHistoryResult{}
+
+	go func() {
+		defer close(outC)
+
+		query := filterRecoveryHistoryEventsBySession(db, sessionID).Where("is_recovery_block = ?", true)
+		if startID > 0 {
+			query = query.Where("id < ?", startID)
+		}
+
+		for anchor := range bizhelper.YieldModel[*schema.AiOutputEvent](
+			ctx,
+			query.Order("id desc"),
+			bizhelper.WithYieldModel_Limit(limit),
+		) {
+			if anchor == nil {
+				continue
+			}
+
+			result.BlockCount++
+			result.NextStartID = int64(anchor.ID)
+
+			if anchor.RecoveryIndexID == "" {
+				select {
+				case <-ctx.Done():
+					return
+				case outC <- anchor:
+					result.EventCount++
+				}
+				continue
+			}
+
+			blockQuery := filterRecoveryHistoryEventsBySession(db, sessionID).
+				Where("recovery_index_id = ?", anchor.RecoveryIndexID).
+				Order("id asc")
+
+			for blockEvent := range bizhelper.YieldModel[*schema.AiOutputEvent](ctx, blockQuery) {
+				if blockEvent == nil {
+					continue
+				}
+				select {
+				case <-ctx.Done():
+					return
+				case outC <- blockEvent:
+					result.EventCount++
+				}
+			}
+		}
+
+		if result.NextStartID <= 0 {
+			return
+		}
+
+		var count int64
+		err := filterRecoveryHistoryEventsBySession(db, sessionID).
+			Where("is_recovery_block = ?", true).
+			Where("id < ?", result.NextStartID).
+			Count(&count).Error
+		if err != nil {
+			log.Errorf("count recovery history anchors failed: %v", err)
+			return
+		}
+		result.HasMore = count > 0
+	}()
+
+	return outC, result, nil
 }
 
 func GetRandomAIMaterials(db *gorm.DB, limit int) ([]*schema.AIYakTool, []*schema.KnowledgeBaseEntry, []*schema.AIForge, error) {

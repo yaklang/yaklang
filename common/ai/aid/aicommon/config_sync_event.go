@@ -2,7 +2,10 @@ package aicommon
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"time"
 
 	"github.com/yaklang/yaklang/common/schema"
@@ -21,10 +24,13 @@ const (
 	SYNC_TYPE_REDO_SUBTASK_IN_PLAN        = "redo_subtask_in_plan"
 	SYNC_TYPE_PLAN_EXEC_TASKS             = "plan_exec_tasks"
 	SYNC_TYPE_USER_INTERVENTION           = "user_intervention"
+	SYNC_TYPE_RECOVERY_HISTORY            = "recovery_history"
 
 	ProcessID           string = "process_id"
 	SyncProcessEeventID        = "sync_process_event_id"
 )
+
+const defaultRecoveryHistoryBlockLimit = 20
 
 func (c *Config) HandleSyncConsumptionEvent(e *ypb.AIInputEvent) error {
 	c.EmitSyncJSON(
@@ -109,6 +115,73 @@ func (c *Config) HandleSyncTimelineEvent(event *ypb.AIInputEvent) error {
 	},
 		event.SyncID,
 	)
+	return nil
+}
+
+func (c *Config) emitRecoveryHistoryEvent(event *schema.AiOutputEvent) {
+	if event == nil {
+		return
+	}
+	event.IsSync = true
+	c.emit(event)
+}
+
+func (c *Config) HandleSyncRecoveryHistoryEvent(event *ypb.AIInputEvent) error {
+	db := c.GetDB()
+	if db == nil {
+		c.EmitSyncEventError("recovery_history", fmt.Errorf("db is nil"), event.SyncID)
+		return nil
+	}
+
+	sessionID := c.PersistentSessionId
+	startID := int64(0)
+	limit := defaultRecoveryHistoryBlockLimit
+
+	if event.SyncJsonInput != "" {
+		var params map[string]interface{}
+		if err := json.Unmarshal([]byte(event.SyncJsonInput), &params); err != nil {
+			c.EmitSyncEventError("recovery_history", fmt.Errorf("failed to parse recovery history params: %v", err), event.SyncID)
+			return nil
+		}
+		if sid := utils.InterfaceToString(params["session_id"]); sid != "" {
+			sessionID = sid
+		}
+		if rawStartID, ok := params["start_id"]; ok {
+			startID = int64(utils.InterfaceToInt(rawStartID))
+		}
+		if rawLimit, ok := params["limit"]; ok {
+			if parsedLimit := utils.InterfaceToInt(rawLimit); parsedLimit > 0 {
+				limit = parsedLimit
+			}
+		}
+	}
+
+	if sessionID == "" {
+		c.EmitSyncEventError("recovery_history", fmt.Errorf("session_id is empty"), event.SyncID)
+		return nil
+	}
+
+	eventCh, result, err := yakit.YieldAIEventRecoveryHistory(c.Ctx, db, sessionID, startID, limit)
+	if err != nil {
+		c.EmitSyncEventError("recovery_history", err, event.SyncID)
+		return nil
+	}
+
+	for recoveredEvent := range eventCh {
+		if recoveredEvent == nil {
+			continue
+		}
+		c.emitRecoveryHistoryEvent(recoveredEvent)
+	}
+
+	c.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, "recovery_history", map[string]interface{}{
+		"session_id":         sessionID,
+		"requested_start_id": startID,
+		"block_count":        result.BlockCount,
+		"event_count":        result.EventCount,
+		"next_start_id":      result.NextStartID,
+		"has_more":           result.HasMore,
+	}, event.SyncID)
 	return nil
 }
 
@@ -326,4 +399,5 @@ func (c *Config) RegisterBasicSyncHandlers() {
 	c.InputEventManager.RegisterSyncCallback(SYNC_TYPE_UPDATE_CONFIG, c.HandleSyncUpdataConfigEvent)
 	c.InputEventManager.RegisterSyncCallback(SYNC_TYPE_MEMORY_CONTEXT, c.HandleSyncMemoryContextEvent)
 	c.InputEventManager.RegisterSyncCallback(SYNC_TYPE_PLAN_EXEC_TASKS, c.HandleSyncPlanExecTasksEvent)
+	c.InputEventManager.RegisterSyncCallback(SYNC_TYPE_RECOVERY_HISTORY, c.HandleSyncRecoveryHistoryEvent)
 }
