@@ -207,9 +207,7 @@ func (m *scanManager) SaveTask() error {
 					m.taskRecorder.LowCount = c.Count
 				}
 			}
-			if riskTotal > 0 {
-				m.taskRecorder.RiskCount = riskTotal
-			}
+			m.taskRecorder.RiskCount = riskTotal
 		}
 	}
 	err := schema.SaveSyntaxFlowScanTask(ssadb.GetDB(), m.taskRecorder)
