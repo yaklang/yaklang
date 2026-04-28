@@ -1,13 +1,13 @@
 package yaklib
 
 import (
-	"archive/zip"
 	"bytes"
 	"os"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
+	zip "github.com/yaklang/yaklang/common/utils/zipx"
 	"github.com/yaklang/yaklang/common/utils/ziputil"
 )
 
@@ -19,6 +19,12 @@ var ZipExports = map[string]interface{}{
 	"CompressRaw":      CompressRaw,
 	"Recursive":        Recursive,
 	"RecursiveFromRaw": RecursiveFromRaw,
+
+	// 带密码的压缩 / 解压便捷接口
+	// 关键词: zip 密码压缩, zip 密码解压, AES zip
+	"DecompressWithPassword": DecompressWithPassword,
+	"CompressWithPassword":   CompressWithPassword,
+	"CompressRawWithPassword": CompressRawWithPassword,
 
 	// Grep 功能
 	"GrepRegexp":       ziputil.GrepRegexp,
@@ -36,6 +42,7 @@ var ZipExports = map[string]interface{}{
 	"grepLimit":         ziputil.WithGrepLimit,
 	"grepContextLine":   ziputil.WithContext,
 	"grepCaseSensitive": ziputil.WithGrepCaseSensitive,
+	"grepPassword":      ziputil.WithGrepPassword,
 
 	// 路径过滤选项
 	"grepIncludePathSubString": ziputil.WithIncludePathSubString,
@@ -50,6 +57,32 @@ var ZipExports = map[string]interface{}{
 	"ExtractFilesFromRaw":     ziputil.ExtractFilesFromRaw,
 	"ExtractByPattern":        ziputil.ExtractByPattern,
 	"ExtractByPatternFromRaw": ziputil.ExtractByPatternFromRaw,
+
+	// 带 options 的提取（可携带密码）
+	// 关键词: 加密 zip 提取
+	"ExtractFileWithOptions":             ziputil.ExtractFileWithOptions,
+	"ExtractFileFromRawWithOptions":      ziputil.ExtractFileFromRawWithOptions,
+	"ExtractFilesWithOptions":            ziputil.ExtractFilesWithOptions,
+	"ExtractFilesFromRawWithOptions":     ziputil.ExtractFilesFromRawWithOptions,
+	"ExtractByPatternWithOptions":        ziputil.ExtractByPatternWithOptions,
+	"ExtractByPatternFromRawWithOptions": ziputil.ExtractByPatternFromRawWithOptions,
+	"extractPassword":                    ziputil.WithExtractPassword,
+
+	// 带 options 的压缩 / 解压（可携带密码与加密方法）
+	// 关键词: 加密 zip 压缩, 加密 zip 解压
+	"CompressByNameWithOptions":     ziputil.CompressByNameWithOptions,
+	"DecompressWithOptions":         ziputil.DeCompressWithOptions,
+	"DecompressFromRawWithOptions":  ziputil.DeCompressFromRawWithOptions,
+	"compressPassword":              ziputil.WithCompressPassword,
+	"compressEncryption":            ziputil.WithCompressEncryption,
+	"decompressPassword":            ziputil.WithDecompressPassword,
+
+	// 加密方法常量
+	// 关键词: zip 加密方法常量
+	"StandardEncryption": ziputil.StandardEncryption,
+	"AES128":             ziputil.AES128Encryption,
+	"AES192":             ziputil.AES192Encryption,
+	"AES256":             ziputil.AES256Encryption,
 
 	// GrepResult 处理功能
 	"MergeGrepResults": ziputil.MergeGrepResults,
@@ -145,6 +178,64 @@ func CompressRaw(i any) ([]byte, error) {
 	zipFp.Flush()
 	zipFp.Close()
 	return buf.Bytes(), nil
+}
+
+// CompressRawWithPassword 与 CompressRaw 类似，但生成 AES-256 加密的 zip。
+// 关键词: 内存加密 zip, AES256 zip 创建
+//
+// Example:
+// ```
+//
+//	zipBytes = zip.CompressRawWithPassword({"a.txt": "hello"}, "123456")~
+//
+// ```
+func CompressRawWithPassword(i any, password string, encryption ...ziputil.EncryptionMethod) ([]byte, error) {
+	if !utils.IsMap(i) {
+		return nil, utils.Error("input must be a map")
+	}
+	method := ziputil.AES256Encryption
+	if len(encryption) > 0 {
+		method = encryption[0]
+	}
+	files := make(map[string]interface{})
+	for k, v := range utils.InterfaceToGeneralMap(i) {
+		files[k] = v
+	}
+	return ziputil.CompressRawMapWithOptions(files,
+		ziputil.WithCompressPassword(password),
+		ziputil.WithCompressEncryption(method),
+	)
+}
+
+// CompressWithPassword 把若干文件压缩成带密码的 zip。
+// 关键词: 文件加密压缩, AES zip 压缩
+//
+// Example:
+// ```
+//
+//	zip.CompressWithPassword("/tmp/out.zip", "123456", "/tmp/a.txt", "/tmp/b.txt")~
+//
+// ```
+func CompressWithPassword(zipName, password string, filenames ...string) error {
+	return ziputil.CompressByNameWithOptions(filenames, zipName,
+		ziputil.WithCompressPassword(password),
+		ziputil.WithCompressEncryption(ziputil.AES256Encryption),
+	)
+}
+
+// DecompressWithPassword 解压带密码的 zip 到目标目录。
+// 关键词: 加密 zip 解压, AES zip 解压
+//
+// Example:
+// ```
+//
+//	zip.DecompressWithPassword("/tmp/out.zip", "/tmp/dest", "123456")~
+//
+// ```
+func DecompressWithPassword(zipFile, dest, password string) error {
+	return ziputil.DeCompressWithOptions(zipFile, dest,
+		ziputil.WithDecompressPassword(password),
+	)
 }
 
 // RRFRankGrepResults 使用 RRF 算法对 GrepResult 进行排序

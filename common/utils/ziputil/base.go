@@ -1,7 +1,6 @@
 package ziputil
 
 import (
-	"archive/zip"
 	"io"
 	"io/ioutil"
 	"os"
@@ -12,6 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memfile"
+	zip "github.com/yaklang/yaklang/common/utils/zipx"
 )
 
 // 压缩文件

@@ -1,7 +1,6 @@
 package ziputil
 
 import (
-	"archive/zip"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -12,6 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memfile"
+	zip "github.com/yaklang/yaklang/common/utils/zipx"
 )
 
 // ZipGrepSearcher 是一个带缓存的 ZIP 文件搜索器
@@ -23,6 +23,10 @@ type ZipGrepSearcher struct {
 	fileCache map[string]*fileContent // 文件内容缓存
 	cacheMu   sync.RWMutex
 	cacheAll  bool // 是否缓存所有文件内容
+
+	// 加密 zip 解密密码
+	// 关键词: zip 搜索器密码
+	password string
 }
 
 // fileContent 缓存的文件内容
@@ -90,6 +94,13 @@ func (s *ZipGrepSearcher) WithCacheAll(cacheAll bool) *ZipGrepSearcher {
 	return s
 }
 
+// SetPassword 设置加密 zip 的解密密码
+// 关键词: zip 搜索器密码, SetPassword
+func (s *ZipGrepSearcher) SetPassword(password string) *ZipGrepSearcher {
+	s.password = password
+	return s
+}
+
 // preloadAllFiles 预加载所有文件内容
 func (s *ZipGrepSearcher) preloadAllFiles() {
 	s.cacheMu.Lock()
@@ -104,6 +115,10 @@ func (s *ZipGrepSearcher) preloadAllFiles() {
 		if _, exists := s.fileCache[file.Name]; exists {
 			continue
 		}
+
+		// 加密 zip 条目设置密码
+		// 关键词: zip 搜索器加密预加载
+		applyZipPassword(file, s.password)
 
 		// 读取文件内容
 		rc, err := file.Open()
@@ -154,6 +169,10 @@ func (s *ZipGrepSearcher) getFileContent(fileName string) (*fileContent, error) 
 	if targetFile == nil {
 		return nil, utils.Errorf("file %s not found in zip", fileName)
 	}
+
+	// 加密 zip 条目设置密码
+	// 关键词: zip 搜索器加密读
+	applyZipPassword(targetFile, s.password)
 
 	rc, err := targetFile.Open()
 	if err != nil {

@@ -1,7 +1,6 @@
 package ziputil
 
 import (
-	"archive/zip"
 	"bytes"
 	"os"
 	"path/filepath"
@@ -11,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils"
+	zip "github.com/yaklang/yaklang/common/utils/zipx"
 )
 
 // createTestZip 创建测试用的 ZIP 文件

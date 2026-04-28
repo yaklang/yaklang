@@ -2,7 +2,6 @@ package thirdparty_bin
 
 import (
 	"archive/tar"
-	"archive/zip"
 	"compress/gzip"
 	"io"
 	"io/fs"
@@ -13,6 +12,7 @@ import (
 	// "github.com/ulikunitz/xz"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	zip "github.com/yaklang/yaklang/common/utils/zipx"
 )
 
 // ExtractFile 提取文件的统一入口函数
@@ -27,7 +27,14 @@ import (
 //   - "": 提取第一个可执行文件到targetPath
 //
 // isDir: 如果为true，targetPath是目录路径；否则是文件路径
+// 关键词: 提取压缩包入口, ExtractFile
 func ExtractFile(archivePath, targetPath, archiveType, pick string, isDir bool) error {
+	return ExtractFileWithPassword(archivePath, targetPath, archiveType, pick, isDir, "")
+}
+
+// ExtractFileWithPassword 与 ExtractFile 行为一致，但允许传入解压密码（仅 zip 生效）。
+// 关键词: 加密 zip 安装, ExtractFileWithPassword
+func ExtractFileWithPassword(archivePath, targetPath, archiveType, pick string, isDir bool, password string) error {
 	// 根据文件扩展名选择解压方法
 	// 增加详细日志用于调试IO流程
 	log.Infof("start extracting archive: %s, target: %s, archiveType: %s, pick: %s, isDir: %v", archivePath, targetPath, archiveType, pick, isDir)
@@ -47,7 +54,7 @@ func ExtractFile(archivePath, targetPath, archiveType, pick string, isDir bool) 
 	switch ext {
 	case ".zip":
 		log.Infof("extracting zip archive: %s", archivePath)
-		return extractZip(archivePath, targetPath, pick, isDir)
+		return extractZip(archivePath, targetPath, pick, isDir, password)
 	case ".gz":
 		if strings.HasSuffix(strings.ToLower(archivePath), ".tar.gz") {
 			log.Infof("extracting tar.gz archive: %s", archivePath)
@@ -71,9 +78,10 @@ func ExtractFile(archivePath, targetPath, archiveType, pick string, isDir bool) 
 	}
 }
 
-// extractZip 解压ZIP文件
-func extractZip(zipPath, targetPath, pick string, isDir bool) error {
-	log.Infof("extractZip called, zipPath: %s, targetPath: %s, pick: %s, isDir: %v", zipPath, targetPath, pick, isDir)
+// extractZip 解压ZIP文件，支持可选的解压密码（password=""表示无密码）
+// 关键词: 安装解压, extractZip, 加密 zip 安装
+func extractZip(zipPath, targetPath, pick string, isDir bool, password string) error {
+	log.Infof("extractZip called, zipPath: %s, targetPath: %s, pick: %s, isDir: %v, encrypted: %v", zipPath, targetPath, pick, isDir, password != "")
 	reader, err := zip.OpenReader(zipPath)
 	if err != nil {
 		log.Infof("failed to open zip file: %s, error: %v", zipPath, err)
@@ -87,21 +95,21 @@ func extractZip(zipPath, targetPath, pick string, isDir bool) error {
 		// 检查是否是全部文件模式 (*)
 		if pick == "*" {
 			log.Infof("pick is '*', extracting all files to: %s", targetPath)
-			return extractZipAll(reader, targetPath, isDir)
+			return extractZipAll(reader, targetPath, isDir, password)
 		}
 
 		// 检查是否是通配符模式 (如 build/*)
 		if strings.HasSuffix(pick, "/*") {
 			dirPath := strings.TrimSuffix(pick, "/*")
 			log.Infof("pick is directory contents: %s/*, extracting all contents to: %s", dirPath, targetPath)
-			return extractZipDirectory(reader, targetPath, dirPath, true, isDir)
+			return extractZipDirectory(reader, targetPath, dirPath, true, isDir, password)
 		}
 
 		// 检查是否是目录模式 (如 build/)
 		if strings.HasSuffix(pick, "/") {
 			dirPath := strings.TrimSuffix(pick, "/")
 			log.Infof("pick is directory: %s/, extracting directory to: %s", dirPath, targetPath)
-			return extractZipDirectory(reader, targetPath, dirPath, false, isDir)
+			return extractZipDirectory(reader, targetPath, dirPath, false, isDir, password)
 		}
 
 		// 提取单个文件
@@ -110,7 +118,7 @@ func extractZip(zipPath, targetPath, pick string, isDir bool) error {
 			log.Infof("checking file in archive: %s", file.Name)
 			if file.Name == pick || strings.HasSuffix(file.Name, pick) {
 				log.Infof("found file: %s, extracting to: %s", file.Name, targetPath)
-				return extractZipFile(file, targetPath, isDir)
+				return extractZipFile(file, targetPath, isDir, password)
 			}
 		}
 		log.Infof("file not found in archive: %s", pick)
@@ -123,7 +131,7 @@ func extractZip(zipPath, targetPath, pick string, isDir bool) error {
 		log.Infof("checking file for executable: %s", file.Name)
 		if !file.FileInfo().IsDir() && (file.FileInfo().Mode()&0111) != 0 {
 			log.Infof("found executable file: %s, extracting to: %s", file.Name, targetPath)
-			return extractZipFile(file, targetPath, isDir)
+			return extractZipFile(file, targetPath, isDir, password)
 		}
 	}
 
@@ -131,8 +139,22 @@ func extractZip(zipPath, targetPath, pick string, isDir bool) error {
 	return utils.Error("no executable file found in archive")
 }
 
+// applyZipEntryPassword 在 thirdparty_bin 包内对加密条目应用密码
+// 关键词: 安装解压加密
+func applyZipEntryPassword(f *zip.File, password string) error {
+	if !f.IsEncrypted() {
+		return nil
+	}
+	if password == "" {
+		return utils.Errorf("zip entry %s is encrypted but no password supplied", f.Name)
+	}
+	f.SetPassword(password)
+	return nil
+}
+
 // extractZipAll 提取ZIP中的所有文件
-func extractZipAll(reader *zip.ReadCloser, targetPath string, isDir bool) error {
+// 关键词: extractZipAll, 加密 zip 全量解压
+func extractZipAll(reader *zip.ReadCloser, targetPath string, isDir bool, password string) error {
 	log.Infof("extractZipAll called, targetPath: %s, isDir: %v", targetPath, isDir)
 	if !isDir {
 		log.Infof("cannot extract all files to a single file path, isDir must be true when pick is '*'")
@@ -146,6 +168,9 @@ func extractZipAll(reader *zip.ReadCloser, targetPath string, isDir bool) error 
 		switch {
 		case mode&fs.ModeSymlink != 0:
 			log.Infof("creating sym link: %s", itemTargetPath)
+			if err := applyZipEntryPassword(file, password); err != nil {
+				return err
+			}
 			rc, err := file.Open()
 			if err != nil {
 				return err
@@ -170,7 +195,7 @@ func extractZipAll(reader *zip.ReadCloser, targetPath string, isDir bool) error 
 				log.Infof("create file directory failed: %v", err)
 				return utils.Errorf("create file directory failed: %v", err)
 			}
-			if err := extractZipFile(file, itemTargetPath, false); err != nil {
+			if err := extractZipFile(file, itemTargetPath, false, password); err != nil {
 				log.Infof("extract file failed: %v", err)
 				return err
 			}
@@ -184,7 +209,8 @@ func extractZipAll(reader *zip.ReadCloser, targetPath string, isDir bool) error 
 }
 
 // extractZipDirectory 提取ZIP中的目录
-func extractZipDirectory(reader *zip.ReadCloser, targetPath, dirPath string, contentsOnly bool, isDir bool) error {
+// 关键词: extractZipDirectory, 加密 zip 目录解压
+func extractZipDirectory(reader *zip.ReadCloser, targetPath, dirPath string, contentsOnly bool, isDir bool, password string) error {
 	log.Infof("extractZipDirectory called, targetPath: %s, dirPath: %s, contentsOnly: %v, isDir: %v", targetPath, dirPath, contentsOnly, isDir)
 	var extracted bool
 	var files []extractItem
@@ -228,7 +254,7 @@ func extractZipDirectory(reader *zip.ReadCloser, targetPath, dirPath string, con
 	// 如果是文件路径且只有一个文件，直接提取到targetPath
 	if !isDir && len(files) == 1 && !files[0].isDir {
 		log.Infof("single file in directory, extracting to: %s", targetPath)
-		return extractZipFile(files[0].zipFile, targetPath, false)
+		return extractZipFile(files[0].zipFile, targetPath, false, password)
 	}
 
 	// 如果是文件路径但有多个文件，返回错误
@@ -266,7 +292,7 @@ func extractZipDirectory(reader *zip.ReadCloser, targetPath, dirPath string, con
 				log.Infof("create file directory failed: %v", err)
 				return utils.Errorf("create file directory failed: %v", err)
 			}
-			if err := extractZipFile(item.zipFile, itemTargetPath, false); err != nil {
+			if err := extractZipFile(item.zipFile, itemTargetPath, false, password); err != nil {
 				log.Infof("extract file failed: %v", err)
 				return err
 			}
@@ -286,7 +312,8 @@ type extractItem struct {
 }
 
 // extractZipFile 提取ZIP中的单个文件
-func extractZipFile(file *zip.File, targetPath string, isDir bool) error {
+// 关键词: extractZipFile, 加密 zip 单文件解压
+func extractZipFile(file *zip.File, targetPath string, isDir bool, password string) error {
 	log.Infof("extractZipFile called, file: %s, targetPath: %s, isDir: %v", file.Name, targetPath, isDir)
 
 	// 检查 targetPath 是否为目录
@@ -298,6 +325,10 @@ func extractZipFile(file *zip.File, targetPath string, isDir bool) error {
 	} else if err != nil && !os.IsNotExist(err) {
 		log.Infof("failed to stat targetPath: %v", err)
 		return utils.Errorf("failed to stat targetPath: %v", err)
+	}
+
+	if err := applyZipEntryPassword(file, password); err != nil {
+		return err
 	}
 
 	reader, err := file.Open()

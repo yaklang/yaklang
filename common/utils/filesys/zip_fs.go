@@ -1,7 +1,6 @@
 package filesys
 
 import (
-	"archive/zip"
 	"io"
 	"io/fs"
 	"os"
@@ -13,12 +12,51 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/utils/memfile"
+	zip "github.com/yaklang/yaklang/common/utils/zipx"
 )
+
+// ZipFSOption 用于 NewZipFS*WithOptions 的可选参数
+// 关键词: ZipFS 选项, ZipFS 密码
+type ZipFSOption func(*zipFSConfig)
+
+// zipFSConfig ZipFS 构造选项
+// 关键词: ZipFS 配置, 加密 zip 读
+type zipFSConfig struct {
+	Password string
+}
+
+// WithZipFSPassword 设置加密 zip 的解密密码
+// 关键词: ZipFS 密码, 加密 zip 文件系统
+func WithZipFSPassword(password string) ZipFSOption {
+	return func(c *zipFSConfig) {
+		c.Password = password
+	}
+}
+
+// newZipFSConfig 应用 ZipFSOption，返回最终配置
+func newZipFSConfig(opts ...ZipFSOption) *zipFSConfig {
+	cfg := &zipFSConfig{}
+	for _, opt := range opts {
+		opt(cfg)
+	}
+	return cfg
+}
 
 type ZipFS struct {
 	r      *zip.Reader
 	forest *utils.PathForest
 	closer io.Closer // 用于关闭文件句柄（仅在 NewZipFSFromLocal 时设置）
+
+	// 加密 zip 解密密码
+	// 关键词: ZipFS 密码字段
+	password string
+}
+
+// SetPassword 后置设置 ZipFS 解密密码
+// 关键词: ZipFS 密码运行时设置
+func (z *ZipFS) SetPassword(password string) *ZipFS {
+	z.password = password
+	return z
 }
 
 func (z *ZipFS) IsAbs(s string) bool {
@@ -192,6 +230,14 @@ func (z *ZipFS) ReadFile(name string) ([]byte, error) {
 	if f.FileInfo().IsDir() {
 		return nil, utils.Wrapf(os.ErrNotExist, "%v is dir", name)
 	}
+	// 加密 zip 条目设置密码
+	// 关键词: ZipFS 加密读, SetPassword
+	if f.IsEncrypted() {
+		if z.password == "" {
+			return nil, utils.Errorf("zip entry %s is encrypted but no password supplied", f.Name)
+		}
+		f.SetPassword(z.password)
+	}
 	rc, err := f.Open()
 	if err != nil {
 		return nil, err
@@ -267,6 +313,61 @@ func NewZipFSRaw(i io.ReaderAt, size int64) (*ZipFS, error) {
 
 // NewZipFSRawWithCloser 创建一个 ZipFS，并保存一个可选的 closer 用于关闭文件句柄
 func NewZipFSRawWithCloser(i io.ReaderAt, size int64, closer io.Closer) (*ZipFS, error) {
+	return buildZipFS(i, size, closer, nil)
+}
+
+func NewZipFSFromString(i string) (*ZipFS, error) {
+	mf := memfile.New([]byte(i))
+	return NewZipFSRaw(mf, int64(len([]byte(i))))
+}
+
+func NewZipFSFromLocal(i string) (*ZipFS, error) {
+	return NewZipFSFromLocalWithOptions(i)
+}
+
+// NewZipFSRawWithOptions 创建带选项（含密码）的 ZipFS
+// 关键词: ZipFS 密码构造, NewZipFSRawWithOptions
+func NewZipFSRawWithOptions(i io.ReaderAt, size int64, opts ...ZipFSOption) (*ZipFS, error) {
+	return buildZipFS(i, size, nil, newZipFSConfig(opts...))
+}
+
+// NewZipFSRawWithCloserAndOptions 同 NewZipFSRawWithCloser，但接受 ZipFSOption
+// 关键词: ZipFS 密码构造, NewZipFSRawWithCloserAndOptions
+func NewZipFSRawWithCloserAndOptions(i io.ReaderAt, size int64, closer io.Closer, opts ...ZipFSOption) (*ZipFS, error) {
+	return buildZipFS(i, size, closer, newZipFSConfig(opts...))
+}
+
+// NewZipFSFromStringWithOptions 从字符串/字节构造带密码 ZipFS
+// 关键词: ZipFS 密码构造, NewZipFSFromStringWithOptions
+func NewZipFSFromStringWithOptions(i string, opts ...ZipFSOption) (*ZipFS, error) {
+	mf := memfile.New([]byte(i))
+	return NewZipFSRawWithOptions(mf, int64(len([]byte(i))), opts...)
+}
+
+// NewZipFSFromLocalWithOptions 从本地文件构造带密码 ZipFS
+// 关键词: ZipFS 密码构造, NewZipFSFromLocalWithOptions
+func NewZipFSFromLocalWithOptions(i string, opts ...ZipFSOption) (*ZipFS, error) {
+	local := NewLocalFs()
+	f, err := local.Open(i)
+	if err != nil {
+		return nil, err
+	}
+	ra, ok := f.(io.ReaderAt)
+	if !ok {
+		f.Close()
+		return nil, utils.Errorf("local file %s does not support io.ReaderAt", i)
+	}
+	info, err := f.Stat()
+	if err != nil {
+		f.Close()
+		return nil, err
+	}
+	return NewZipFSRawWithCloserAndOptions(ra, info.Size(), f, opts...)
+}
+
+// buildZipFS 是 ZipFS 构造的内部统一入口
+// 关键词: ZipFS 内部构造
+func buildZipFS(i io.ReaderAt, size int64, closer io.Closer, cfg *zipFSConfig) (*ZipFS, error) {
 	reader, err := zip.NewReader(i, size)
 	if err != nil {
 		return nil, err
@@ -286,30 +387,10 @@ func NewZipFSRawWithCloser(i io.ReaderAt, size int64, closer io.Closer) (*ZipFS,
 		}
 	}
 	forest.ReadOnly()
-	return &ZipFS{r: reader, forest: forest, closer: closer}, nil
-}
 
-func NewZipFSFromString(i string) (*ZipFS, error) {
-	mf := memfile.New([]byte(i))
-	return NewZipFSRaw(mf, int64(len([]byte(i))))
-}
-
-func NewZipFSFromLocal(i string) (*ZipFS, error) {
-	local := NewLocalFs()
-	f, err := local.Open(i)
-	if err != nil {
-		return nil, err
+	zfs := &ZipFS{r: reader, forest: forest, closer: closer}
+	if cfg != nil {
+		zfs.password = cfg.Password
 	}
-	ra, ok := f.(io.ReaderAt)
-	if !ok {
-		f.Close() // 如果类型转换失败，关闭文件句柄
-		return nil, err
-	}
-	info, err := f.Stat()
-	if err != nil {
-		f.Close() // 如果 Stat 失败，关闭文件句柄
-		return nil, err
-	}
-	// 保存文件句柄引用，以便后续关闭
-	return NewZipFSRawWithCloser(ra, info.Size(), f)
+	return zfs, nil
 }

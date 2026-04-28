@@ -1,7 +1,6 @@
 package ziputil
 
 import (
-	"archive/zip"
 	"bufio"
 	"fmt"
 	"io"
@@ -15,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memfile"
+	zip "github.com/yaklang/yaklang/common/utils/zipx"
 )
 
 type GrepConfig struct {
@@ -27,6 +27,10 @@ type GrepConfig struct {
 	ExcludePathSubString []string // 排除路径子串（任一匹配即排除）
 	IncludePathRegexp    []string // 包含路径正则（任一匹配即可）
 	ExcludePathRegexp    []string // 排除路径正则（任一匹配即排除）
+
+	// 加密 zip 读取
+	// 关键词: zip 密码, 加密 zip grep
+	Password string // 解密密码（仅在条目为加密条目时使用）
 }
 
 type GrepOption func(*GrepConfig)
@@ -50,6 +54,14 @@ func WithGrepCaseSensitive(i ...bool) GrepOption {
 			return
 		}
 		c.CaseSensitive = true
+	}
+}
+
+// WithGrepPassword 在 zip 中执行 grep 时设置解密密码
+// 关键词: zip grep 密码, 加密 zip 搜索
+func WithGrepPassword(password string) GrepOption {
+	return func(c *GrepConfig) {
+		c.Password = password
 	}
 }
 
@@ -274,6 +286,10 @@ func grepZipContent(raw interface{}, matcher func(string) bool, config *GrepConf
 			// 获取信号量
 			semaphore <- struct{}{}
 			defer func() { <-semaphore }()
+
+			// 加密 zip 条目设置密码
+			// 关键词: zip 加密 grep, SetPassword
+			applyZipPassword(f, config.Password)
 
 			rc, err := f.Open()
 			if err != nil {
