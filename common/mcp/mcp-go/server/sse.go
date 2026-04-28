@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
@@ -225,8 +226,31 @@ func (s *SSEServer) handleSSE(w http.ResponseWriter, r *http.Request) {
 	s.sessions.Store(sessionID, session)
 	defer s.sessions.Delete(sessionID)
 
-	<-r.Context().Done()
-	session.Close()
+	// Send periodic SSE keep-alive comments to prevent client body timeouts.
+	// Many HTTP clients (Node.js fetch/undici, etc.) close idle SSE streams
+	// after ~5 min without data, resulting in "Body Timeout Error".
+	ticker := time.NewTicker(15 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-r.Context().Done():
+			session.Close()
+			return
+		case <-ticker.C:
+			session.mu.Lock()
+			select {
+			case <-session.done:
+				session.mu.Unlock()
+				session.Close()
+				return
+			default:
+				fmt.Fprintf(session.writer, ":keepalive\n\n")
+				session.flusher.Flush()
+				session.mu.Unlock()
+			}
+		}
+	}
 }
 
 // handleMessage processes incoming JSON-RPC messages from clients and sends responses
