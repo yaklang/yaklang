@@ -130,14 +130,8 @@ $json.Unmarshal(* as $unmarshal)
     until: "* & $unmarshal"
 }-> as $sink
 
-json.Marshal(* #-> as $marshal_param);
+$json.Marshal(* #-> as $marshal_param);
 $unmarshal & $sink as $high;
-
-$json.NewDecoder(* as $sink2);
-$sink2 #{
-    until: "* & $user_input"
-}-> as $high;
-
 
 alert $high for {
 	type: "vuln",
@@ -206,6 +200,85 @@ SOLUTION
    - 数据污染导致业务逻辑异常。
    - 权限绕过导致敏感信息泄露。
    - 解析器差异性攻击导致服务崩溃或拒绝服务。
+DESC
+}
+
+json?{<fullTypeName>?{have: "encoding/json"}} as $json
+$json.NewDecoder(* as $sink2);
+$sink2?{* #{until: "* & $user_input"}->} as $mid;
+
+alert $mid for {
+	type: "vuln",
+	title: "Golang JSON Injection (Streaming Decode / NewDecoder)",
+	title_zh: "检测到Golang JSON注入风险（流式 Decode / NewDecoder）",
+	level: "mid",
+	risk: "JSON注入",
+	name: "mid",
+	message: "检测到 json.NewDecoder 接入了不可信输入并继续 Decode：若未限制目标类型、未校验 JSON 合法性或未启用严格解码，攻击者可能构造负载造成数据污染、业务逻辑绕过或与解析器相关的异常行为。",
+	solution: <<<SOLUTION
+### 修复建议（针对 NewDecoder + Decode）
+
+#### 1. 绑定到强类型结构体
+避免将不可信 JSON 直接 `Decode` 到 `map[string]interface{}` 等动态容器；使用明确字段类型的结构体接收数据。
+```go
+type SafePayload struct {
+	Name string `json:"name"`
+	Age  int    `json:"age"`
+}
+
+dec := json.NewDecoder(bytes.NewReader(body))
+dec.DisallowUnknownFields()
+var out SafePayload
+if err := dec.Decode(&out); err != nil {
+    return err
+}
+```
+
+#### 2. 先校验再解码
+对整块输入先做长度与格式校验，再交给 `NewDecoder`，降低畸形或超大 JSON 带来的风险。
+```go
+if len(body) > maxJSONBytes {
+    return errors.New("payload too large")
+}
+if !json.Valid(body) {
+    return errors.New("invalid json")
+}
+dec := json.NewDecoder(bytes.NewReader(body))
+```
+
+#### 3. 流式解析时的严格模式
+对同一 decoder 调用 `DisallowUnknownFields()`，并在业务层拒绝多余或嵌套过深的结构（可结合 `json.Decoder.Token` 或第三方库做深度限制）。
+```go
+dec := json.NewDecoder(bytes.NewReader(body))
+dec.DisallowUnknownFields()
+if err := dec.Decode(&out); err != nil {
+    return err
+}
+```
+SOLUTION
+	desc: <<<DESC
+### 漏洞描述（Mid：NewDecoder + 不可信输入）
+
+本规则匹配：`encoding/json` 的 **`NewDecoder` 入参与不可信数据源存在数据流关联**，后续链上对接 `Decode` 等操作。
+
+1. **漏洞原理**
+   流式解码与一次性 `Unmarshal` 类似：若攻击者控制 JSON 文本且服务端使用弱类型目标（如 `map[string]interface{}`）、未校验合法性或未限制未知字段，则可能篡改解析结果、放大注入面，或与标准库解析行为差异被利用。
+
+2. **典型触发场景**
+   ```go
+   body, _ := io.ReadAll(r.Body)
+   dec := json.NewDecoder(bytes.NewReader(body))
+   var data map[string]interface{}
+   if err := dec.Decode(&data); err != nil {
+       log.Fatal(err)
+   }
+   ```
+   请求体、查询参数经 io 读入后进入 `NewDecoder` 再 `Decode`，且未配合强类型与严格解码时，风险与中危 JSON 注入场景一致。
+
+3. **潜在影响**
+   - 不可信字段进入业务模型，造成数据污染或策略绕过。
+   - 超大或畸形 JSON 消耗资源，引发拒绝服务。
+   - 与解析选项（未知字段、嵌套深度）相关的非预期行为。
 DESC
 }
 
