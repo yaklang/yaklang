@@ -20,6 +20,10 @@ type DownloadInfo struct {
 	Pick string `json:"pick,omitempty"`
 	// 安装类型
 	InstallType string `json:"install_type,omitempty"`
+	// 解压密码（仅 zip archive 生效），用于 AES 加密包的解压
+	// 注意: 在当前用例中（如 hack-skills），密码是公开常量，仅用于绕过 AV 启发式扫描，并非访问控制
+	// 关键词: 解压密码, 加密 zip 安装, anti-AV public password
+	Password string `json:"password,omitempty"`
 }
 
 // BinaryDescriptor 描述一个二进制文件的信息
@@ -40,6 +44,11 @@ type BinaryDescriptor struct {
 	ArchiveType string `json:"archive_type,omitempty"`
 	// 依赖的其他二进制文件
 	Dependencies []string `json:"dependencies,omitempty"`
+	// InstallRoot 覆盖默认安装根目录
+	// 取值 "ai-skills" 安装到 consts.GetDefaultAISkillsDir() (~/yakit-projects/ai-skills/)
+	// 取值 "libs" 或空字符串安装到默认 libs 目录 (~/yakit-projects/libs/)
+	// 关键词: install_root, ai-skills, libs, 安装根目录覆盖
+	InstallRoot string `json:"install_root,omitempty"`
 }
 
 // ProgressCallback 下载进度回调函数

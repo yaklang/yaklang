@@ -30,6 +30,9 @@ type ConfigDownloadInfo struct {
 	BinPath     string `yaml:"bin_path,omitempty"`
 	BinDir      string `yaml:"bin_dir,omitempty"`
 	Pick        string `yaml:"pick,omitempty"`
+	// 解压密码（仅 zip archive 生效）。当前用例中是公开常量，仅用于绕过 AV 启发式扫描
+	// 关键词: yaml password, 加密 zip 配置, anti-AV
+	Password string `yaml:"password,omitempty"`
 }
 
 // ConfigBinaryDescriptor YAML中的二进制描述符结构
@@ -42,6 +45,9 @@ type ConfigBinaryDescriptor struct {
 	ArchiveType     string                         `yaml:"archive_type,omitempty"`
 	DownloadInfoMap map[string]*ConfigDownloadInfo `yaml:"download_info_map"`
 	Dependencies    []string                       `yaml:"dependencies,omitempty"`
+	// 安装根目录覆盖："ai-skills" / "libs"（空字符串等价于 "libs"）
+	// 关键词: install_root, ai-skills, libs
+	InstallRoot string `yaml:"install_root,omitempty"`
 }
 
 // LoadConfigFromEmbedded 从嵌入的配置文件加载配置
@@ -114,6 +120,7 @@ func ParseConfig(data []byte) (*ConfigFile, error) {
 			ArchiveType:     configBinary.ArchiveType,
 			DownloadInfoMap: make(map[string]*DownloadInfo),
 			Dependencies:    configBinary.Dependencies,
+			InstallRoot:     configBinary.InstallRoot,
 		}
 
 		// 转换下载信息并验证pick和BinDir的一致性
@@ -138,6 +145,7 @@ func ParseConfig(data []byte) (*ConfigFile, error) {
 				BinPath:     configDownloadInfo.BinPath,
 				Pick:        configDownloadInfo.Pick,
 				InstallType: configDownloadInfo.InstallType,
+				Password:    configDownloadInfo.Password,
 			}
 		}
 

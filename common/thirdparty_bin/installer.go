@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/gobwas/glob"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
@@ -52,6 +53,25 @@ func NewInstaller(defaultInstallDir, downloadDir string) Installer {
 	}
 }
 
+// resolveInstallDir 根据 descriptor.InstallRoot 决定使用哪个安装根目录
+// 取值 "ai-skills" 落到 ~/yakit-projects/ai-skills/，便于 AutoSkillLoader 自动发现
+// 取值 "libs" 或空字符串保持现有 yakit-projects/libs/ 默认行为
+// 关键词: install_root, ai-skills, libs, 安装根目录覆盖, resolveInstallDir
+func (bi *BaseInstaller) resolveInstallDir(descriptor *BinaryDescriptor) string {
+	if descriptor == nil {
+		return bi.defaultInstallDir
+	}
+	switch descriptor.InstallRoot {
+	case "ai-skills":
+		return consts.GetDefaultAISkillsDir()
+	case "libs", "":
+		return bi.defaultInstallDir
+	default:
+		log.Warnf("unknown install_root %q for %s, falling back to default libs dir", descriptor.InstallRoot, descriptor.Name)
+		return bi.defaultInstallDir
+	}
+}
+
 // Uninstall 卸载二进制文件
 func (bi *BaseInstaller) Uninstall(descriptor *BinaryDescriptor, options *InstallOptions) error {
 	if options == nil {
@@ -76,7 +96,7 @@ func (bi *BaseInstaller) Uninstall(descriptor *BinaryDescriptor, options *Instal
 		return err
 	}
 	if downloadInfo.BinDir != "" {
-		return os.RemoveAll(filepath.Join(bi.defaultInstallDir, downloadInfo.BinDir))
+		return os.RemoveAll(filepath.Join(bi.resolveInstallDir(descriptor), downloadInfo.BinDir))
 	}
 
 	return os.Remove(installPath)
@@ -214,10 +234,13 @@ func (bi *BaseInstaller) Install(descriptor *BinaryDescriptor, options *InstallO
 	var installErr error
 	switch installType {
 	case "archive":
+		// 默认空 password = 无密码，向后兼容；非空时走 ExtractFileWithPassword
+		// 关键词: archive install with password, ExtractFileWithPassword, 加密 zip 安装
+		password := downloadInfo.Password
 		if isDir {
-			installErr = ExtractFile(filePath, installDir, descriptor.ArchiveType, pick, true)
+			installErr = ExtractFileWithPassword(filePath, installDir, descriptor.ArchiveType, pick, true, password)
 		} else {
-			installErr = ExtractFile(filePath, installPath, descriptor.ArchiveType, pick, false)
+			installErr = ExtractFileWithPassword(filePath, installPath, descriptor.ArchiveType, pick, false, password)
 		}
 	case "bin":
 		installErr = os.Rename(filePath, installPath)
@@ -249,7 +272,7 @@ func (bi *BaseInstaller) GetInstallDir(descriptor *BinaryDescriptor, options *In
 		return ""
 	}
 	if downloadInfo.BinDir != "" {
-		return filepath.Join(bi.defaultInstallDir, downloadInfo.BinDir)
+		return filepath.Join(bi.resolveInstallDir(descriptor), downloadInfo.BinDir)
 	}
 	return ""
 }
@@ -271,11 +294,12 @@ func (bi *BaseInstaller) GetTargetPath(descriptor *BinaryDescriptor, options *In
 	if err != nil {
 		return ""
 	}
+	installRoot := bi.resolveInstallDir(descriptor)
 	var targetPath string
 	if downloadInfo.BinPath != "" {
-		targetPath = filepath.Join(bi.defaultInstallDir, downloadInfo.BinPath)
+		targetPath = filepath.Join(installRoot, downloadInfo.BinPath)
 	} else {
-		targetPath = filepath.Join(bi.defaultInstallDir, descriptor.Name)
+		targetPath = filepath.Join(installRoot, descriptor.Name)
 	}
 	return targetPath
 }

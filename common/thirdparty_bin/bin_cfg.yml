@@ -180,3 +180,22 @@ binaries:
       "*":
         url: "/gguf/Qwen3-Embedding-0.6B-Q4_K_M.gguf"
         bin_path: "aimodel/Qwen3-Embedding-0.6B-Q4_K_M.gguf"
+  # hack-skills: red-team / bug-bounty SKILL pack from yaklang/cybersecurity-skills
+  # 关键词: hack-skills, ai-skills, AutoSkillLoader, cybersecurity-skills, AES256 encrypted zip
+  # 注意: 此 zip 使用 AES-256 加密, 但密码 "hack-skills" 是 *公开常量*,
+  #       目的仅为在传输/落盘环节绕过 AV / EDR 对明文 .md 的内容启发式扫描,
+  #       而不是访问控制. 解压后由现有 AutoSkillLoader 自动递归发现 SKILL.md.
+  - name: "hack-skills"
+    description: "Hack Skills - red-team / bug-bounty SKILL pack from yaklang/cybersecurity-skills"
+    tags: "skill,ai-skills,security"
+    version: "latest"
+    install_type: "archive"
+    archive_type: ".zip"
+    install_root: "ai-skills"
+    download_info_map:
+      "*":
+        url: "/hack-skills/latest/hack-skills.zip"
+        password: "hack-skills"
+        pick: "*"
+        bin_dir: "hack-skills"
+        bin_path: "hack-skills/version.txt"
