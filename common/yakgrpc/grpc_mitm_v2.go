@@ -1558,14 +1558,16 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		}
 
 		flow.Hash = flow.CalcHash()
-		if isViewed {
-			if isModified {
+		if isModified {
+			if isViewed {
 				flow.AddTagToFirst("[手动修改]")
-				flow.Orange()
 			} else {
-				flow.AddTagToFirst("[手动劫持]")
-				flow.Yellow()
+				flow.AddTagToFirst("[规则修改]")
 			}
+			flow.Orange()
+		} else if isViewed {
+			flow.AddTagToFirst("[手动劫持]")
+			flow.Yellow()
 		}
 		if isResponseDropped {
 			flow.AddTagToFirst("[响应被丢弃]")

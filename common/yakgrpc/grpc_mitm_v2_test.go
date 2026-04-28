@@ -1514,3 +1514,87 @@ Host: %s
 		}
 	})
 }
+
+func TestGRPCMUSTPASS_MITMV2_Replacer_AutoForward_BarePacket(t *testing.T) {
+	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(30))
+	defer cancel()
+
+	mockHost, mockPort := utils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
+		writer.Write([]byte("Hello-Original-Response"))
+	})
+
+	mitmPort := utils.GetRandomAvailableTCPPort()
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	token := utils.RandStringBytes(16)
+
+	RunMITMV2TestServerEx(client, ctx, func(stream ypb.Yak_MITMV2Client) {
+		stream.Send(&ypb.MITMV2Request{
+			Host: "127.0.0.1",
+			Port: uint32(mitmPort),
+		})
+	}, func(stream ypb.Yak_MITMV2Client) {
+		stream.Send(&ypb.MITMV2Request{
+			SetAutoForward:   true,
+			AutoForwardValue: true, // 自动转发，不触发手动劫持弹窗
+		})
+		stream.Send(&ypb.MITMV2Request{
+			SetContentReplacers: true,
+			Replacers: []*ypb.MITMContentReplacer{
+				{
+					Result:            token,
+					Rule:              "Hello-Original-Response",
+					EnableForResponse: true,
+					EnableForBody:     true,
+				},
+			},
+		})
+
+		go func() {
+			time.Sleep(500 * time.Millisecond)
+			_, err := yak.Execute(`
+				url = f"${target}"
+				rsp, req, _ = poc.Get(url, poc.proxy(mitmProxy), poc.save(false))
+			`, map[string]any{
+				"mitmProxy": `http://` + utils.HostPort("127.0.0.1", mitmPort),
+				"target":    `http://` + utils.HostPort(mockHost, mockPort),
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			time.Sleep(1 * time.Second)
+			cancel()
+		}()
+	}, func(stream ypb.Yak_MITMV2Client, msg *ypb.MITMV2Response) {
+		_ = msg
+	})
+
+	// 查询 HTTPFlow
+	flows, err := QueryHTTPFlows(utils.TimeoutContextSeconds(5), client, &ypb.QueryHTTPFlowRequest{
+		Keyword:    token,
+		SourceType: "mitm",
+	}, 1)
+	require.NoError(t, err)
+	require.Len(t, flows.GetData(), 1)
+
+	flow := flows.GetData()[0]
+	t.Logf("flow tags: %s", flow.GetTags())
+
+	// 检查标签：应该是 [规则修改] 而不是 [手动修改] 或 [手动劫持]
+	require.Contains(t, flow.GetTags(), "[规则修改]")
+	require.NotContains(t, flow.GetTags(), "[手动修改]")
+	require.NotContains(t, flow.GetTags(), "[手动劫持]")
+
+	// 检查 Bare Response 是否保存成功
+	bareCtx := utils.TimeoutContextSeconds(5)
+	bareRsp, err := client.GetHTTPFlowBare(bareCtx, &ypb.HTTPFlowBareRequest{
+		Id:       int64(flow.GetId()),
+		BareType: "response",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, bareRsp)
+	require.True(t, bytes.Contains(bareRsp.GetData(), []byte("Hello-Original-Response")), "bare response should contain original content")
+	require.False(t, bytes.Contains(bareRsp.GetData(), []byte(token)), "bare response should NOT contain replaced token")
+}
