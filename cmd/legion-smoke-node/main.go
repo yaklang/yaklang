@@ -16,6 +16,14 @@ import (
 	"github.com/yaklang/yaklang/scannode"
 )
 
+type staticHostIdentityProvider struct {
+	identity node.HostIdentity
+}
+
+func (p staticHostIdentityProvider) Snapshot() node.HostIdentity {
+	return p.identity
+}
+
 func main() {
 	if err := run(os.Args); err != nil {
 		log.Fatal(err)
@@ -79,6 +87,21 @@ func runNode(args []string) error {
 		true,
 		"Whether heap monitor snapshots should force runtime.GC before the second sample",
 	)
+	hostMachineID := flags.String(
+		"host-machine-id",
+		"",
+		"Optional host identity machine_id override for isolated local testing",
+	)
+	hostSystemUUID := flags.String(
+		"host-system-uuid",
+		"",
+		"Optional host identity system_uuid override for isolated local testing",
+	)
+	hostInstanceID := flags.String(
+		"host-instance-id",
+		"",
+		"Optional host identity instance_id override for isolated local testing",
+	)
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
@@ -110,6 +133,19 @@ func runNode(args []string) error {
 		defer stopHeapMonitor()
 	}
 
+	var hostIdentityProvider node.HostIdentityProvider
+	if strings.TrimSpace(*hostMachineID) != "" ||
+		strings.TrimSpace(*hostSystemUUID) != "" ||
+		strings.TrimSpace(*hostInstanceID) != "" {
+		hostIdentityProvider = staticHostIdentityProvider{
+			identity: node.HostIdentity{
+				MachineID:  strings.TrimSpace(*hostMachineID),
+				SystemUUID: strings.TrimSpace(*hostSystemUUID),
+				InstanceID: strings.TrimSpace(*hostInstanceID),
+			},
+		}
+	}
+
 	scanNode, err := scannode.NewScanNode(node.BaseConfig{
 		NodeType:            spec.NodeType_Scanner,
 		NodeID:              *nodeID,
@@ -120,6 +156,7 @@ func runNode(args []string) error {
 		PlatformAPIBaseURL:  *apiURL,
 		Version:             *version,
 		HeartbeatInterval:   *heartbeatInterval,
+		HostIdentityProvider: hostIdentityProvider,
 	})
 	if err != nil {
 		return err

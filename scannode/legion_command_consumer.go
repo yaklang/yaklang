@@ -276,6 +276,10 @@ func (b *legionJobBridge) handleMessage(
 		return b.handleAISessionCancel(ctx, message.Data)
 	case strings.HasSuffix(message.Subject, "."+legionCommandAISessionClose):
 		return b.handleAISessionClose(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAIProviderModelsList):
+		return b.handleAIProviderModelsList(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAIProviderHealthCheck):
+		return b.handleAIProviderHealthCheck(ctx, message.Data)
 	default:
 		return fmt.Errorf("unsupported legion command subject: %s", message.Subject)
 	}
