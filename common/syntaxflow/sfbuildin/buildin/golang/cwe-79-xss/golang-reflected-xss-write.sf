@@ -1,7 +1,7 @@
 desc(
 	title: "Check Golang Reflected XSS Vulnerability"
 	type: audit
-	level: high
+	level: mid
 	risk: "跨站脚本（XSS）"
 	desc: <<<DESC
 ### 漏洞描述
@@ -96,20 +96,20 @@ REFERENCE
 )
 
 <include('golang-user-input')> as $input;
-<include('golang-http-sink')> as $output;
-$output.Write(*<slice(index=1)>?{opcode: make} as $sink)
+http.ResponseWriter as $write;
 
-$sink #{
-    until: "HTMLEscapeString",
-}-> as $key
+template.HTMLEscapeString() as $safe
 
-$key(* #-> as $unsafe)
+fmt.Sprintf() as $unsafe
+$write.Write()?{*<cfgDominates(target: "$unsafe")>?{have: "true"}} as $func
 
-$sink #{
-    until: "* & $input - $unsafe",
-}-> as $high
+$func<getCallee()>?(* #{
+    until: `* & $input`,
+    exclude_reachable: `$safe`,
+}-> )  as $mid
 
-alert $high for {
+
+alert $mid for {
 	title: "Golang Reflected XSS Vulnerability Was Detected",
 	risk: "跨站脚本（XSS）",
 	title_zh: "检测到Golang反射型XSS漏洞",
@@ -198,15 +198,55 @@ http.ListenAndServe(":8080", nil);
 - 攻击者可以对用户进行钓鱼攻击，获取敏感信息。
 - 攻击者可以篡改网页内容，进行恶意植入或传播恶意软件。
 DESC
-	level: "high",
+	level: "mid",
 	type: "vuln",
 	message: "检测到Golang反射型XSS漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
-	name: "high",
+	name: "mid",
 }
+
+
+<include('golang-user-input')> as $input;
+http.ResponseWriter as $write;
+
+$write.Write?(*<slice(index=1)> #{until: `* & $input`}->) as $low
+
+alert $low for {
+	title: "User-Controlled Data May Reach HTTP Response (Low Confidence, XSS Context to Be Confirmed)",
+	risk: "跨站脚本（XSS）",
+	title_zh: "用户输入可能经 ResponseWriter 写出（低，需结合 HTML 上下文再确认）",
+	solution: <<<SOLUTION
+### 修复与排查建议（本告警为低等级）
+1. **先确认是否处于 HTML/浏览器可执行上下文**  
+   本规则仅基于控制流：判定「用户相关输入」在 CFG 上可到达 `http.ResponseWriter.Write`，**不**表示一定构成反射型 XSS；若实际输出为纯文本、JSON 或非 `text/html`，风险可能不成立或显著降低。
+
+2. **在确有 HTML 输出时，统一转义**  
+   对将写入响应的字符串使用 `html/template` 渲染，或对用户可控片段调用 `html.EscapeString` / `template.HTMLEscapeString` 后再拼接或写入。
+
+3. **加 CSP 等纵深防御**  
+   在确认存在 HTML 输出后，可配合 `Content-Security-Policy` 等响应头，降低脚本注入后的执行面。
+
+4. **需要更高置信的检测时**  
+   可结合同规则组中的 **mid** 等更严格条件（例如经 `fmt.Sprintf` 等构造后再写出且未过转义/过滤）做交叉确认。
+SOLUTION
+	desc: <<<DESC
+### 说明（**低** 等级命中）
+- **本命中含义**：在 `golang-user-input` 所标识的数据源与 `http.ResponseWriter.Write` 之间，从 CFG 上观察存在**支配/可达**关系，即不可信数据**可能**被写入 HTTP 响应体。  
+- **为何标为低**：该路径**未**单独证明输出被当作 HTML/脚本解析，也未要求经过 `Sprintf` 拼 HTML 等更强证据，因此**误报/需人工确认**空间较大。  
+- **与 mid 等更高等级的区别**：更高等级通常对「如何构造并写出内容」有更强约束；此处仅作**候选线索**，便于你优先审计「任何写入响应的、与用户输入相关的 `Write`」。
+
+### 若确认存在 HTML 中的反射输出
+在确认响应为 `text/html` 且将用户数据嵌入 HTML 时，再按 **反射型 XSS（CWE-79）** 处置：转义、模板化、输入校验、以及最小化在 HTML/属性/脚本上下文中的原样输出。
+DESC
+	level: "low",
+	type: "vuln",
+	message: "低置信度：仅 CFG 上用户相关输入可到达 `ResponseWriter.Write`；请结合内容类型、是否 HTML/脚本上下文及转义情况再判断是否存在 XSS。",
+	name: "low",
+}
+
 
 desc(
 	lang: golang
-	alert_high: 1
+	alert_low: 1
 	'file://unsafe.go': <<<UNSAFE
 package main
 

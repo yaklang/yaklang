@@ -507,7 +507,7 @@ var tests = []TestCaseSimple{
         return modelMap;
     }
 `},
-	{"aTaintCase0152", true, []string{"Parameter-cmd", "Undefined-Runtime", "nil"}, `    /**
+	{"aTaintCase0152", true, []string{"Parameter-cmd", "Undefined-Runtime"}, `    /**
      * 其他对象 String 作为污点源
      *
      * @param cmd
@@ -528,14 +528,14 @@ var tests = []TestCaseSimple{
         }
         return modelMap;
     }`},
-	{"aTaintCase0153", true, []string{"Parameter-cmd", "Undefined-Runtime", "nil"}, `    /**
+	{"aTaintCase0153", true, []string{"Parameter-cmd", "Undefined-Runtime"}, `    /**
      * 其他对象 String 作为污点源
      *
      * @param cmd
      * @return
      */
     @PostMapping("case0152")
-    public Map<String, Object> aTaintCase0152(@RequestBody String cmd) {
+    public Map<String, Object> aTaintCase0153(@RequestBody String cmd) {
         Map<String, Object> modelMap = new HashMap<>();
         if (cmd == null) {
             modelMap.put("status", "error");
@@ -765,7 +765,7 @@ func Test_Simple_Exec_Case(t *testing.T) {
 }
 
 func Test_Simple_Exec_Case_Debug(t *testing.T) {
-	target := "aTaintCase0150"
+	target := "aTaintCase0152"
 
 	for _, tt := range tests {
 		if tt.name != target {

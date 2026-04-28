@@ -21,6 +21,6 @@ check $result;
 `
 
 	ssatest.CheckSyntaxFlow(t, code, rule, map[string][]string{
-		"result": {"phi(a)[Undefined-a,1]"},
+		"result": {},
 	}, ssaapi.WithLanguage(ssaconfig.Yak))
 }

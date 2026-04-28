@@ -116,9 +116,9 @@ func SpinHandle(name string, phiValue, header, latch Value) map[string]Value {
 				for name, v := range ReplaceMemberCall(phiValue, phi2) {
 					ret[name] = v
 				}
-				for _, ptr := range phi.GetPointer() {
-					Point(phi2, ptr)
-				}
+				// for _, ptr := range phi.GetPointer() {
+				// 	Point(phi2, ptr)
+				// }
 				DeleteInst(phiValue)
 				return
 			}
@@ -127,15 +127,15 @@ func SpinHandle(name string, phiValue, header, latch Value) map[string]Value {
 		// step 3
 		if headerID := header.GetId(); !slices.Contains(phi.Edge, headerID) {
 			phi.Edge = append(phi.Edge, headerID)
-			if _, ok := ToFunction(header); !ok {
-				Point(phi, header)
-			}
+			// if _, ok := ToFunction(header); !ok {
+			// 	Point(phi, header)
+			// }
 		}
 		if latchID := latch.GetId(); !slices.Contains(phi.Edge, latchID) {
 			phi.Edge = append(phi.Edge, latchID)
-			if _, ok := ToFunction(latch); !ok {
-				Point(phi, latch)
-			}
+			// if _, ok := ToFunction(latch); !ok {
+			// 	Point(phi, latch)
+			// }
 		}
 		phi.SetName(name)
 		phi.GetProgram().SetVirtualRegister(phi)

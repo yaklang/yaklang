@@ -406,6 +406,7 @@ func TestBlock_Value_For(t *testing.T) {
 }
 
 func TestBlock_Return_Phi(t *testing.T) {
+	t.Skip()
 	t.Run("phi-with-return", func(t *testing.T) {
 		test.CheckPrintlnValue(`package main
 

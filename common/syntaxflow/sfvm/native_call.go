@@ -9,41 +9,56 @@ import (
 )
 
 type NativeCallActualParams struct {
-	m map[string]any
+	// m stores values per key in source order. Duplicate keys (e.g. two exclude_reachable
+	// in native$call) must append, not overwrite.
+	m map[string][]any
 }
 
 func NewNativeCallActualParams(items ...*RecursiveConfigItem) *NativeCallActualParams {
 	n := &NativeCallActualParams{
-		m: make(map[string]any),
+		m: make(map[string][]any),
 	}
 	for _, i := range items {
-		n.m[i.Key] = i.Value
+		if i == nil {
+			continue
+		}
+		k := i.Key
+		n.m[k] = append(n.m[k], i.Value)
 	}
 	return n
 }
 
 func (n *NativeCallActualParams) Existed(index any) bool {
-	_, ok := n.m[codec.AnyToString(index)]
-	return ok
+	if n == nil {
+		return false
+	}
+	vs, ok := n.m[codec.AnyToString(index)]
+	return ok && len(vs) > 0
+}
+
+func (n *NativeCallActualParams) getLastStringForKeys(keys ...any) (string, bool) {
+	if n == nil {
+		return "", false
+	}
+	for _, key := range keys {
+		ks := codec.AnyToString(key)
+		vs, ok := n.m[ks]
+		if !ok || len(vs) == 0 {
+			continue
+		}
+		// Last element matches old map "last write wins" when duplicates existed.
+		return codec.AnyToString(vs[len(vs)-1]), true
+	}
+	return "", false
 }
 
 func (n *NativeCallActualParams) GetString(index any, extra ...any) string {
 	if n == nil {
 		return ""
 	}
-
-	raw, ok := n.m[codec.AnyToString(index)]
-	if ok {
-		return codec.AnyToString(raw)
+	if s, ok := n.getLastStringForKeys(append([]any{index}, extra...)...); ok {
+		return s
 	}
-
-	for _, name := range extra {
-		raw, ok = n.m[codec.AnyToString(name)]
-		if ok {
-			return codec.AnyToString(raw)
-		}
-	}
-
 	return ""
 }
 
@@ -51,16 +66,8 @@ func (n *NativeCallActualParams) GetInt(index any, extra ...any) int {
 	if n == nil {
 		return -1
 	}
-	raw, ok := n.m[codec.AnyToString(index)]
-	if ok {
-		return codec.Atoi(codec.AnyToString(raw))
-	}
-
-	for _, name := range extra {
-		raw, ok := n.m[codec.AnyToString(name)]
-		if ok {
-			return codec.Atoi(codec.AnyToString(raw))
-		}
+	if s, ok := n.getLastStringForKeys(append([]any{index}, extra...)...); ok {
+		return codec.Atoi(s)
 	}
 	return -1
 }

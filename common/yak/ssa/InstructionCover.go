@@ -135,6 +135,14 @@ func ToUnOp(v Instruction) (*UnOp, bool) {
 	return c, ok
 }
 
+func ToTypeCast(v Instruction) (*TypeCast, bool) {
+	if lz, isLZ := ToLazyInstruction(v); isLZ {
+		return ToTypeCast(lz.Self())
+	}
+	c, ok := v.(*TypeCast)
+	return c, ok
+}
+
 func ToCall(v Instruction) (*Call, bool) {
 	if lz, isLZ := ToLazyInstruction(v); isLZ {
 		return ToCall(lz.Self())

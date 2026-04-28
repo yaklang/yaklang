@@ -1,13 +1,15 @@
 package syntaxflow
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"testing"
 )
 
 func checkDirectlyConnect(t *testing.T, v1 ssaapi.Values, v2 *ssaapi.Value) {
+	t.Helper()
 	for _, v := range v1 {
 		v.ForEachEffectOn(func(value *ssaapi.Value) {
 			require.NotEqual(t, value.GetId(), v2.GetId())
@@ -16,6 +18,24 @@ func checkDirectlyConnect(t *testing.T, v1 ssaapi.Values, v2 *ssaapi.Value) {
 			require.NotEqual(t, value.GetId(), v2.GetId())
 		})
 	}
+}
+
+func requireDirectDataflowEdge(t *testing.T, starts ssaapi.Values, end *ssaapi.Value) {
+	t.Helper()
+	var linked bool
+	for _, v := range starts {
+		v.ForEachDependOn(func(other *ssaapi.Value) {
+			if other != nil && end != nil && other.GetId() == end.GetId() {
+				linked = true
+			}
+		})
+		v.ForEachEffectOn(func(other *ssaapi.Value) {
+			if other != nil && end != nil && other.GetId() == end.GetId() {
+				linked = true
+			}
+		})
+	}
+	require.True(t, linked, "expected direct dataflow edge between $start and $end")
 }
 
 func Test_TopDef_UD_Relationship(t *testing.T) {
@@ -52,11 +72,11 @@ CODE
 			require.NotNil(t, end)
 			require.Contains(t, end.String(), "Parameter-param1")
 
-			//start.ShowDot()
-			checkDirectlyConnect(t, start, end[0])
+			requireDirectDataflowEdge(t, start, end[0])
 			return nil
 		})
 	})
+	// t.Skip()
 
 	t.Run("test topdef ud chain: from formal parma-member to actual param", func(t *testing.T) {
 		code := `

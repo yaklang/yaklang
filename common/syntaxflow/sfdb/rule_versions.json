@@ -188,8 +188,8 @@
   {
     "rule_id": "c7d8e9f0-a1b2-3456-cdef-789012345678",
     "rule_name": "用户可控输入构建的数据库查询（SQL/NoSQL 注入）",
-    "hash": "fde98bb7f2e96b2ee454d1e04b820d1bd78b035d4eaeee8536b76b2388219786",
-    "version": "20260415.0001"
+    "hash": "c7a0b0e273bd28bb54391eb2850881ae2e2f762e4f7a9f265d1d4ac9958b5d41",
+    "version": "20260427.0001"
   },
   {
     "rule_id": "d4e5f6a7-b8c9-0123-defa-918000000002",
@@ -248,8 +248,8 @@
   {
     "rule_id": "34545e88-e64d-4534-9e96-261ff984b6ba",
     "rule_name": "检测Golang头部操纵漏洞",
-    "hash": "5f7b8458545121a86d0b8ceb25c6c5789cdeefa7a8671915462096d891eb12d4",
-    "version": "20260326.0001"
+    "hash": "a112db1acc2982b8639421bbcfaafe3255433922cb0d23931d4fd0e4d61a3fe1",
+    "version": "20260427.0001"
   },
   {
     "rule_id": "017cae33-9b73-4470-9e98-adbdd10dbc3a",
@@ -530,8 +530,8 @@
   {
     "rule_id": "155bfb0e-379f-485a-a10c-cfec1109de1e",
     "rule_name": "检测到Golang反射型XSS漏洞",
-    "hash": "fce27131a1ec3633c90c2d938c56cd12d13dd3c4ba2f8a97a811369cb8314598",
-    "version": "20260326.0001"
+    "hash": "70fba9e7352a7e6f8778505b221900389edfbdd892135b305f37f9653a0c501f",
+    "version": "20260427.0001"
   },
   {
     "rule_id": "4cd207df-132f-483f-ac89-328d466a5d3e",
@@ -578,14 +578,14 @@
   {
     "rule_id": "b89f27b3-35ee-48ae-ba75-415da669f60d",
     "rule_name": "检测Golang SQL注入漏洞(Models)",
-    "hash": "bbb41826a39d771b467baa14255cb052a0cbea78089af47a8e10094cbf7d1a88",
-    "version": "20260127.0001"
+    "hash": "52b360be8b5562f3af4ad8880f373be5b3826d03969f82a47a7d457a4a56be9d",
+    "version": "20260427.0001"
   },
   {
     "rule_id": "56f41530-4175-41ec-96ac-198315171c10",
     "rule_name": "检测Golang SQL注入漏洞(Pop)",
-    "hash": "a1183416ffbe63971820b56f2acffacdc9d5ff2315f779c0ad375e9a392073c3",
-    "version": "20260127.0001"
+    "hash": "6c412e16a527e7bda733560cf763acaf5f68550c6694d05b82cdb590cc8cb8cb",
+    "version": "20260427.0001"
   },
   {
     "rule_id": "b06e92a2-0ff3-40a0-966e-7f0e4fe05480",
@@ -998,8 +998,8 @@
   {
     "rule_id": "7b798768-13e1-4dcd-8ab5-99a6f9635605",
     "rule_name": "检测Java路径穿越漏洞",
-    "hash": "8096d0653ba60d8753366bd14eaf8e8e5976bd9173fa89e644ae5ff47ef7e389",
-    "version": "20260326.0001"
+    "hash": "a08cd90de8e291bae2d390abdb447388d48f63dbc143b2c05ae8e7801b9d2378",
+    "version": "20260427.0001"
   },
   {
     "rule_id": "7501f545-a313-4bb7-b6bb-48aab80cb284",

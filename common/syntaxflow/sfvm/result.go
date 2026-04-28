@@ -169,7 +169,13 @@ func showValueMap(buf *bytes.Buffer, varName string, value Values, cfg *showConf
 		if raw, ok := v.(interface{ GetId() int64 }); ok {
 			idx = fmt.Sprintf("t%v", raw.GetId())
 		}
-		buf.WriteString(fmt.Sprintf(prefixVariableResult+"%v: %v\n", idx, utils.ShrinkString(v.String(), 64)))
+		line := v.String()
+		if vv, ok := v.(interface{ SFVMVerboseResultString() string }); ok {
+			line = vv.SFVMVerboseResultString()
+			buf.WriteString(fmt.Sprintf(prefixVariableResult+"%v: %v\n", idx, line))
+		} else {
+			buf.WriteString(fmt.Sprintf(prefixVariableResult+"%v: %v\n", idx, utils.ShrinkString(line, 64)))
+		}
 		rangeIns, ok := v.(interface{ GetRange() *memedit.Range })
 		if !ok {
 			continue

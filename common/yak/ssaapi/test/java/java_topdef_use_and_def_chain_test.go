@@ -47,24 +47,27 @@ public class CommonController
 			sfRule := `
 File(,* as $sink);
 fileName?{opcode:param} as $source;
+
 $sink #{until: <<<UNTIL
 	<self> & $source;
 UNTIL,
 exclude: <<<EXCLUDE
-	<self>?{opcode:call||opcode:phi}
+	<self>?{opcode:call}
 EXCLUDE,
-			}-> as $result`
+}-> as $data
+
+$data?{<getCfg()><cfgGuards()>.kind?{!have:"earlyReturn"}} as $result
+`
 			vals, err := prog.SyntaxFlowWithError(sfRule)
 			require.NoError(t, err)
 			res := vals.GetValues("result")
-			//res.Show()
 			//res.ShowDot()
-			require.Nil(t, res)
+			require.Len(t, res, 1)
 			return nil
 		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 
-	t.Run("test exclude filter from sink to source", func(t *testing.T) {
+	t.Run("test exclude filter from sink to source ex", func(t *testing.T) {
 		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
 			sfRule := `
 fileName?{opcode:param} as $source;
