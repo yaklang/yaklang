@@ -158,9 +158,10 @@ Boot 与 Run 双相执行：
         op.Feedback(f"scanning ${target}")
         op.Continue()
     },
-    "aiTagFields": [
-        {"tagName": "...", "variableName": "...",
-         "aiNodeId": "...", "contentType": "text_markdown"},
+    "stream_fields": [
+        // 让 LLM 输出 JSON 中的 "summary" 字段在生成时实时流到指定 UI 节点
+        {"field": "summary", "node_id": "scan-summary",
+         "content_type": "text_markdown"},
     ],
 }
 ```
@@ -176,7 +177,9 @@ Boot 与 Run 双相执行：
 | `handler` | `WithRegisterLoopAction` 的 handler 闭包 |
 | `asyncMode` | `WithRegisterLoopActionAsync(true)` |
 | `outputExamples` | action 输出示例 |
-| `aiTagFields` | `WithRegisterLoopActionWithStreamField` |
+| `stream_fields` | `WithRegisterLoopActionWithStreamField`（每个 entry 用 `field` / `node_id` / `content_type` / `prefix` 键） |
+
+> **流式字段命名细节**：`stream_fields` 是 **action 级**配置（让 LLM 输出 JSON 里的某字段实时变流）；与之对应的 **loop 级** `__AI_TAG_FIELDS__`（见 13.3.2）则用 `tag` / `var` / `node_id` / `content_type` 键，专门用于 `<\|TAG_xxx\|>...<\|/TAG_xxx\|>` 长内容（不受 JSON escape 限制）。**完整 UX 实战与字段对照见 [14-streaming-ux.md](14-streaming-ux.md)**。
 
 `__OVERRIDE_ACTIONS__` 与 `__ACTIONS__` 同结构，作用是**替换**已注册的同名 action（例如自定义 `directly_answer` 的校验）。`__ACTIONS_FROM_TOOLS__` / `__ACTIONS_FROM_LOOPS__` 是字符串列表，用于把已有工具或子 loop 包装成 action。
 
@@ -547,6 +550,7 @@ func EnsureUserFocusModesLoaded() error
 
 ## 13.12 进一步阅读
 
+- **下一章 [14-streaming-ux.md](14-streaming-ux.md)**：流式输出与 UX 实战（专门针对 yak / Go 双侧的 emitter 用法、ContentType / NodeId 命名规范、终局三连）
 - 源码入口：[../yak_focus_mode_register.go](../yak_focus_mode_register.go)
 - 常量约定：[../yak_focus_mode_constants.go](../yak_focus_mode_constants.go)
 - Caller 实现：[../yak_focus_mode_caller.go](../yak_focus_mode_caller.go)
@@ -558,4 +562,4 @@ func EnsureUserFocusModesLoaded() error
 
 ---
 
-> 上一章：[12-debugging-and-observability.md](12-debugging-and-observability.md) | 回到 [README](../README.md)
+> 上一章：[12-debugging-and-observability.md](12-debugging-and-observability.md) | 下一章：[14-streaming-ux.md](14-streaming-ux.md) | 回到 [README](../README.md)
