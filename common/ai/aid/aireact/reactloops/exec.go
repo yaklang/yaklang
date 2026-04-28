@@ -87,6 +87,65 @@ func (r *ReActLoop) buildActionTagOption(emitter *aicommon.Emitter, streamWG *sy
 	return actionOptions
 }
 
+func inferActionTypeFromPayload(action *aicommon.Action, finalAnswer string) string {
+	if action == nil {
+		return ""
+	}
+
+	candidates := []string{
+		strings.TrimSpace(action.ActionType()),
+		strings.TrimSpace(action.GetString("next_action.type")),
+		strings.TrimSpace(action.GetString("type")),
+	}
+	for _, candidate := range candidates {
+		if candidate != "" && candidate != "object" {
+			return candidate
+		}
+	}
+
+	hasField := func(key string) bool {
+		if strings.TrimSpace(action.GetString(key)) != "" {
+			return true
+		}
+		if strings.TrimSpace(action.GetInvokeParams("next_action").GetString(key)) != "" {
+			return true
+		}
+		return false
+	}
+
+	if strings.TrimSpace(finalAnswer) != "" || hasField("answer_payload") {
+		return "directly_answer"
+	}
+	if hasField("tool_require_payload") {
+		return "require_tool"
+	}
+	if hasField("directly_call_tool_name") || hasField("directly_call_identifier") {
+		return "directly_call_tool"
+	}
+	if hasField("tool_compose_payload") {
+		return "tool_compose"
+	}
+	if hasField("capability_identifier") {
+		return "load_capability"
+	}
+	if hasField("rewrite_user_query_for_knowledge_enhance") {
+		return "knowledge_enhance_answer"
+	}
+	if hasField("blueprint_payload") {
+		return "require_ai_blueprint"
+	}
+	if hasField("plan_request_payload") {
+		return "request_plan_and_execution"
+	}
+	if hasField("skill_name") || hasField("skill_names") {
+		return "loading_skills"
+	}
+	if hasField("resource_path") || hasField("pattern") {
+		return "load_skill_resources"
+	}
+	return ""
+}
+
 func (r *ReActLoop) Execute(taskId string, ctx context.Context, userInput string) error {
 	task := aicommon.NewStatefulTaskBase(
 		taskId,
@@ -124,11 +183,7 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 	var actionNames = r.GetAllActionNames()
 
 	getNextActionType := func(a *aicommon.Action) string { //legacy support
-		actionType := action.ActionType()
-		if actionType == "object" || actionType == "" {
-			actionType = action.GetString("next_action.type")
-		}
-		return actionType
+		return inferActionTypeFromPayload(a, r.Get("tag_final_answer"))
 	}
 
 	ctxCanceled := utils.NewBool(false)

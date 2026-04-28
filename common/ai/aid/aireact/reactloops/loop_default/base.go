@@ -62,14 +62,19 @@ func init() {
 				reactloops.WithInitTask(buildInitTask(r)),
 				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
 				reactloops.WithMaxIterations(int(r.GetConfig().GetMaxIterationCount())),
-				reactloops.WithPersistentInstruction(instruction),
-			reactloops.WithReflectionOutputExample(outputExample),
-			buildDefaultReactiveDataBuilder(),
-			reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any, operator *reactloops.OnPostIterationOperator) {
+			reactloops.WithPersistentInstruction(instruction),
+				reactloops.WithReflectionOutputExample(outputExample),
+				buildDefaultReactiveDataBuilder(),
+				reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any, operator *reactloops.OnPostIterationOperator) {
 					if !isDone {
 						return
 					}
-					if loop.GetLastAction().ActionType == schema.AI_REACT_LOOP_ACTION_DIRECTLY_ANSWER {
+					lastAction := loop.GetLastAction()
+					if lastAction == nil {
+						log.Warnf("iteration %d: skip final summary because last action is empty", iteration)
+						return
+					}
+					if lastAction.ActionType == schema.AI_REACT_LOOP_ACTION_DIRECTLY_ANSWER {
 						log.Infof("iteration %d: action is directly answer, exiting loop and returning final answer", iteration)
 						return
 					}
