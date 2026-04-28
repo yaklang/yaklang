@@ -639,6 +639,646 @@ func (x *CloseAISessionCommand) GetReason() string {
 	return ""
 }
 
+type AIProviderPreviewConfigSnapshot struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	ProviderType   string                 `protobuf:"bytes,1,opt,name=provider_type,json=providerType,proto3" json:"provider_type,omitempty"`
+	BaseUrl        string                 `protobuf:"bytes,2,opt,name=base_url,json=baseUrl,proto3" json:"base_url,omitempty"`
+	ApiType        string                 `protobuf:"bytes,3,opt,name=api_type,json=apiType,proto3" json:"api_type,omitempty"`
+	Domain         string                 `protobuf:"bytes,4,opt,name=domain,proto3" json:"domain,omitempty"`
+	Proxy          string                 `protobuf:"bytes,5,opt,name=proxy,proto3" json:"proxy,omitempty"`
+	Endpoint       string                 `protobuf:"bytes,6,opt,name=endpoint,proto3" json:"endpoint,omitempty"`
+	EnableEndpoint bool                   `protobuf:"varint,7,opt,name=enable_endpoint,json=enableEndpoint,proto3" json:"enable_endpoint,omitempty"`
+	NoHttps        bool                   `protobuf:"varint,8,opt,name=no_https,json=noHttps,proto3" json:"no_https,omitempty"`
+	ApiKey         string                 `protobuf:"bytes,9,opt,name=api_key,json=apiKey,proto3" json:"api_key,omitempty"`
+	DefaultModel   string                 `protobuf:"bytes,10,opt,name=default_model,json=defaultModel,proto3" json:"default_model,omitempty"`
+	Headers        map[string]string      `protobuf:"bytes,11,rep,name=headers,proto3" json:"headers,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *AIProviderPreviewConfigSnapshot) Reset() {
+	*x = AIProviderPreviewConfigSnapshot{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIProviderPreviewConfigSnapshot) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIProviderPreviewConfigSnapshot) ProtoMessage() {}
+
+func (x *AIProviderPreviewConfigSnapshot) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIProviderPreviewConfigSnapshot.ProtoReflect.Descriptor instead.
+func (*AIProviderPreviewConfigSnapshot) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *AIProviderPreviewConfigSnapshot) GetProviderType() string {
+	if x != nil {
+		return x.ProviderType
+	}
+	return ""
+}
+
+func (x *AIProviderPreviewConfigSnapshot) GetBaseUrl() string {
+	if x != nil {
+		return x.BaseUrl
+	}
+	return ""
+}
+
+func (x *AIProviderPreviewConfigSnapshot) GetApiType() string {
+	if x != nil {
+		return x.ApiType
+	}
+	return ""
+}
+
+func (x *AIProviderPreviewConfigSnapshot) GetDomain() string {
+	if x != nil {
+		return x.Domain
+	}
+	return ""
+}
+
+func (x *AIProviderPreviewConfigSnapshot) GetProxy() string {
+	if x != nil {
+		return x.Proxy
+	}
+	return ""
+}
+
+func (x *AIProviderPreviewConfigSnapshot) GetEndpoint() string {
+	if x != nil {
+		return x.Endpoint
+	}
+	return ""
+}
+
+func (x *AIProviderPreviewConfigSnapshot) GetEnableEndpoint() bool {
+	if x != nil {
+		return x.EnableEndpoint
+	}
+	return false
+}
+
+func (x *AIProviderPreviewConfigSnapshot) GetNoHttps() bool {
+	if x != nil {
+		return x.NoHttps
+	}
+	return false
+}
+
+func (x *AIProviderPreviewConfigSnapshot) GetApiKey() string {
+	if x != nil {
+		return x.ApiKey
+	}
+	return ""
+}
+
+func (x *AIProviderPreviewConfigSnapshot) GetDefaultModel() string {
+	if x != nil {
+		return x.DefaultModel
+	}
+	return ""
+}
+
+func (x *AIProviderPreviewConfigSnapshot) GetHeaders() map[string]string {
+	if x != nil {
+		return x.Headers
+	}
+	return nil
+}
+
+type ListAIProviderModelsCommand struct {
+	state         protoimpl.MessageState           `protogen:"open.v1"`
+	Metadata      *v1.CommandMetadata              `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId  string                           `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId   string                           `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Provider      *AIProviderPreviewConfigSnapshot `protobuf:"bytes,4,opt,name=provider,proto3" json:"provider,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAIProviderModelsCommand) Reset() {
+	*x = ListAIProviderModelsCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAIProviderModelsCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAIProviderModelsCommand) ProtoMessage() {}
+
+func (x *ListAIProviderModelsCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAIProviderModelsCommand.ProtoReflect.Descriptor instead.
+func (*ListAIProviderModelsCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *ListAIProviderModelsCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *ListAIProviderModelsCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *ListAIProviderModelsCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *ListAIProviderModelsCommand) GetProvider() *AIProviderPreviewConfigSnapshot {
+	if x != nil {
+		return x.Provider
+	}
+	return nil
+}
+
+type AIProviderPreviewModel struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ModelId       string                 `protobuf:"bytes,1,opt,name=model_id,json=modelId,proto3" json:"model_id,omitempty"`
+	Label         string                 `protobuf:"bytes,2,opt,name=label,proto3" json:"label,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIProviderPreviewModel) Reset() {
+	*x = AIProviderPreviewModel{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIProviderPreviewModel) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIProviderPreviewModel) ProtoMessage() {}
+
+func (x *AIProviderPreviewModel) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIProviderPreviewModel.ProtoReflect.Descriptor instead.
+func (*AIProviderPreviewModel) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *AIProviderPreviewModel) GetModelId() string {
+	if x != nil {
+		return x.ModelId
+	}
+	return ""
+}
+
+func (x *AIProviderPreviewModel) GetLabel() string {
+	if x != nil {
+		return x.Label
+	}
+	return ""
+}
+
+type AIProviderModelsListed struct {
+	state         protoimpl.MessageState    `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata         `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                    `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Items         []*AIProviderPreviewModel `protobuf:"bytes,3,rep,name=items,proto3" json:"items,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIProviderModelsListed) Reset() {
+	*x = AIProviderModelsListed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIProviderModelsListed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIProviderModelsListed) ProtoMessage() {}
+
+func (x *AIProviderModelsListed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIProviderModelsListed.ProtoReflect.Descriptor instead.
+func (*AIProviderModelsListed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *AIProviderModelsListed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIProviderModelsListed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIProviderModelsListed) GetItems() []*AIProviderPreviewModel {
+	if x != nil {
+		return x.Items
+	}
+	return nil
+}
+
+type AIProviderModelsFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,3,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIProviderModelsFailed) Reset() {
+	*x = AIProviderModelsFailed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIProviderModelsFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIProviderModelsFailed) ProtoMessage() {}
+
+func (x *AIProviderModelsFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIProviderModelsFailed.ProtoReflect.Descriptor instead.
+func (*AIProviderModelsFailed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *AIProviderModelsFailed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIProviderModelsFailed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIProviderModelsFailed) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AIProviderModelsFailed) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+type HealthCheckAIProviderCommand struct {
+	state         protoimpl.MessageState           `protogen:"open.v1"`
+	Metadata      *v1.CommandMetadata              `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId  string                           `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId   string                           `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Provider      *AIProviderPreviewConfigSnapshot `protobuf:"bytes,4,opt,name=provider,proto3" json:"provider,omitempty"`
+	Content       string                           `protobuf:"bytes,5,opt,name=content,proto3" json:"content,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HealthCheckAIProviderCommand) Reset() {
+	*x = HealthCheckAIProviderCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HealthCheckAIProviderCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HealthCheckAIProviderCommand) ProtoMessage() {}
+
+func (x *HealthCheckAIProviderCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HealthCheckAIProviderCommand.ProtoReflect.Descriptor instead.
+func (*HealthCheckAIProviderCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *HealthCheckAIProviderCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *HealthCheckAIProviderCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *HealthCheckAIProviderCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *HealthCheckAIProviderCommand) GetProvider() *AIProviderPreviewConfigSnapshot {
+	if x != nil {
+		return x.Provider
+	}
+	return nil
+}
+
+func (x *HealthCheckAIProviderCommand) GetContent() string {
+	if x != nil {
+		return x.Content
+	}
+	return ""
+}
+
+type AIProviderHealthCheckCompleted struct {
+	state              protoimpl.MessageState           `protogen:"open.v1"`
+	Metadata           *v1.EventMetadata                `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId        string                           `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	FirstByteCostMs    int64                            `protobuf:"varint,3,opt,name=first_byte_cost_ms,json=firstByteCostMs,proto3" json:"first_byte_cost_ms,omitempty"`
+	TotalCostMs        int64                            `protobuf:"varint,4,opt,name=total_cost_ms,json=totalCostMs,proto3" json:"total_cost_ms,omitempty"`
+	RawRequest         string                           `protobuf:"bytes,5,opt,name=raw_request,json=rawRequest,proto3" json:"raw_request,omitempty"`
+	ResponseStatusCode int32                            `protobuf:"varint,6,opt,name=response_status_code,json=responseStatusCode,proto3" json:"response_status_code,omitempty"`
+	ResponseContent    string                           `protobuf:"bytes,7,opt,name=response_content,json=responseContent,proto3" json:"response_content,omitempty"`
+	ErrorMessage       string                           `protobuf:"bytes,8,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	RawResponse        string                           `protobuf:"bytes,9,opt,name=raw_response,json=rawResponse,proto3" json:"raw_response,omitempty"`
+	RecommendConfig    *AIProviderPreviewConfigSnapshot `protobuf:"bytes,10,opt,name=recommend_config,json=recommendConfig,proto3" json:"recommend_config,omitempty"`
+	Success            bool                             `protobuf:"varint,11,opt,name=success,proto3" json:"success,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *AIProviderHealthCheckCompleted) Reset() {
+	*x = AIProviderHealthCheckCompleted{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIProviderHealthCheckCompleted) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIProviderHealthCheckCompleted) ProtoMessage() {}
+
+func (x *AIProviderHealthCheckCompleted) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIProviderHealthCheckCompleted.ProtoReflect.Descriptor instead.
+func (*AIProviderHealthCheckCompleted) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *AIProviderHealthCheckCompleted) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIProviderHealthCheckCompleted) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIProviderHealthCheckCompleted) GetFirstByteCostMs() int64 {
+	if x != nil {
+		return x.FirstByteCostMs
+	}
+	return 0
+}
+
+func (x *AIProviderHealthCheckCompleted) GetTotalCostMs() int64 {
+	if x != nil {
+		return x.TotalCostMs
+	}
+	return 0
+}
+
+func (x *AIProviderHealthCheckCompleted) GetRawRequest() string {
+	if x != nil {
+		return x.RawRequest
+	}
+	return ""
+}
+
+func (x *AIProviderHealthCheckCompleted) GetResponseStatusCode() int32 {
+	if x != nil {
+		return x.ResponseStatusCode
+	}
+	return 0
+}
+
+func (x *AIProviderHealthCheckCompleted) GetResponseContent() string {
+	if x != nil {
+		return x.ResponseContent
+	}
+	return ""
+}
+
+func (x *AIProviderHealthCheckCompleted) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+func (x *AIProviderHealthCheckCompleted) GetRawResponse() string {
+	if x != nil {
+		return x.RawResponse
+	}
+	return ""
+}
+
+func (x *AIProviderHealthCheckCompleted) GetRecommendConfig() *AIProviderPreviewConfigSnapshot {
+	if x != nil {
+		return x.RecommendConfig
+	}
+	return nil
+}
+
+func (x *AIProviderHealthCheckCompleted) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+type AIProviderHealthCheckFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,3,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIProviderHealthCheckFailed) Reset() {
+	*x = AIProviderHealthCheckFailed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIProviderHealthCheckFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIProviderHealthCheckFailed) ProtoMessage() {}
+
+func (x *AIProviderHealthCheckFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIProviderHealthCheckFailed.ProtoReflect.Descriptor instead.
+func (*AIProviderHealthCheckFailed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *AIProviderHealthCheckFailed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIProviderHealthCheckFailed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIProviderHealthCheckFailed) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AIProviderHealthCheckFailed) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
 type AISessionReady struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	Metadata       *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
@@ -652,7 +1292,7 @@ type AISessionReady struct {
 
 func (x *AISessionReady) Reset() {
 	*x = AISessionReady{}
-	mi := &file_legion_ai_v1_ai_proto_msgTypes[8]
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -664,7 +1304,7 @@ func (x *AISessionReady) String() string {
 func (*AISessionReady) ProtoMessage() {}
 
 func (x *AISessionReady) ProtoReflect() protoreflect.Message {
-	mi := &file_legion_ai_v1_ai_proto_msgTypes[8]
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -677,7 +1317,7 @@ func (x *AISessionReady) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AISessionReady.ProtoReflect.Descriptor instead.
 func (*AISessionReady) Descriptor() ([]byte, []int) {
-	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{8}
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *AISessionReady) GetMetadata() *v1.EventMetadata {
@@ -728,7 +1368,7 @@ type AISessionEvent struct {
 
 func (x *AISessionEvent) Reset() {
 	*x = AISessionEvent{}
-	mi := &file_legion_ai_v1_ai_proto_msgTypes[9]
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -740,7 +1380,7 @@ func (x *AISessionEvent) String() string {
 func (*AISessionEvent) ProtoMessage() {}
 
 func (x *AISessionEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_legion_ai_v1_ai_proto_msgTypes[9]
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -753,7 +1393,7 @@ func (x *AISessionEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AISessionEvent.ProtoReflect.Descriptor instead.
 func (*AISessionEvent) Descriptor() ([]byte, []int) {
-	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{9}
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *AISessionEvent) GetMetadata() *v1.EventMetadata {
@@ -803,7 +1443,7 @@ type AISessionDone struct {
 
 func (x *AISessionDone) Reset() {
 	*x = AISessionDone{}
-	mi := &file_legion_ai_v1_ai_proto_msgTypes[10]
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -815,7 +1455,7 @@ func (x *AISessionDone) String() string {
 func (*AISessionDone) ProtoMessage() {}
 
 func (x *AISessionDone) ProtoReflect() protoreflect.Message {
-	mi := &file_legion_ai_v1_ai_proto_msgTypes[10]
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -828,7 +1468,7 @@ func (x *AISessionDone) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AISessionDone.ProtoReflect.Descriptor instead.
 func (*AISessionDone) Descriptor() ([]byte, []int) {
-	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{10}
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *AISessionDone) GetMetadata() *v1.EventMetadata {
@@ -873,7 +1513,7 @@ type AISessionFailed struct {
 
 func (x *AISessionFailed) Reset() {
 	*x = AISessionFailed{}
-	mi := &file_legion_ai_v1_ai_proto_msgTypes[11]
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -885,7 +1525,7 @@ func (x *AISessionFailed) String() string {
 func (*AISessionFailed) ProtoMessage() {}
 
 func (x *AISessionFailed) ProtoReflect() protoreflect.Message {
-	mi := &file_legion_ai_v1_ai_proto_msgTypes[11]
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -898,7 +1538,7 @@ func (x *AISessionFailed) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AISessionFailed.ProtoReflect.Descriptor instead.
 func (*AISessionFailed) Descriptor() ([]byte, []int) {
-	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{11}
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *AISessionFailed) GetMetadata() *v1.EventMetadata {
@@ -955,7 +1595,7 @@ type AISessionCancelled struct {
 
 func (x *AISessionCancelled) Reset() {
 	*x = AISessionCancelled{}
-	mi := &file_legion_ai_v1_ai_proto_msgTypes[12]
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -967,7 +1607,7 @@ func (x *AISessionCancelled) String() string {
 func (*AISessionCancelled) ProtoMessage() {}
 
 func (x *AISessionCancelled) ProtoReflect() protoreflect.Message {
-	mi := &file_legion_ai_v1_ai_proto_msgTypes[12]
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -980,7 +1620,7 @@ func (x *AISessionCancelled) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AISessionCancelled.ProtoReflect.Descriptor instead.
 func (*AISessionCancelled) Descriptor() ([]byte, []int) {
-	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{12}
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *AISessionCancelled) GetMetadata() *v1.EventMetadata {
@@ -1071,7 +1711,67 @@ const file_legion_ai_v1_ai_proto_rawDesc = "" +
 	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x124\n" +
 	"\asession\x18\x02 \x01(\v2\x1a.legion.ai.v1.AISessionRefR\asession\x12\"\n" +
 	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x12\x16\n" +
-	"\x06reason\x18\x04 \x01(\tR\x06reason\"\x84\x02\n" +
+	"\x06reason\x18\x04 \x01(\tR\x06reason\"\xda\x03\n" +
+	"\x1fAIProviderPreviewConfigSnapshot\x12#\n" +
+	"\rprovider_type\x18\x01 \x01(\tR\fproviderType\x12\x19\n" +
+	"\bbase_url\x18\x02 \x01(\tR\abaseUrl\x12\x19\n" +
+	"\bapi_type\x18\x03 \x01(\tR\aapiType\x12\x16\n" +
+	"\x06domain\x18\x04 \x01(\tR\x06domain\x12\x14\n" +
+	"\x05proxy\x18\x05 \x01(\tR\x05proxy\x12\x1a\n" +
+	"\bendpoint\x18\x06 \x01(\tR\bendpoint\x12'\n" +
+	"\x0fenable_endpoint\x18\a \x01(\bR\x0eenableEndpoint\x12\x19\n" +
+	"\bno_https\x18\b \x01(\bR\anoHttps\x12\x17\n" +
+	"\aapi_key\x18\t \x01(\tR\x06apiKey\x12#\n" +
+	"\rdefault_model\x18\n" +
+	" \x01(\tR\fdefaultModel\x12T\n" +
+	"\aheaders\x18\v \x03(\v2:.legion.ai.v1.AIProviderPreviewConfigSnapshot.HeadersEntryR\aheaders\x1a:\n" +
+	"\fHeadersEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xef\x01\n" +
+	"\x1bListAIProviderModelsCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x12I\n" +
+	"\bprovider\x18\x04 \x01(\v2-.legion.ai.v1.AIProviderPreviewConfigSnapshotR\bprovider\"I\n" +
+	"\x16AIProviderPreviewModel\x12\x19\n" +
+	"\bmodel_id\x18\x01 \x01(\tR\amodelId\x12\x14\n" +
+	"\x05label\x18\x02 \x01(\tR\x05label\"\xb3\x01\n" +
+	"\x16AIProviderModelsListed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12:\n" +
+	"\x05items\x18\x03 \x03(\v2$.legion.ai.v1.AIProviderPreviewModelR\x05items\"\xbb\x01\n" +
+	"\x16AIProviderModelsFailed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x03 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"\x8a\x02\n" +
+	"\x1cHealthCheckAIProviderCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x12I\n" +
+	"\bprovider\x18\x04 \x01(\v2-.legion.ai.v1.AIProviderPreviewConfigSnapshotR\bprovider\x12\x18\n" +
+	"\acontent\x18\x05 \x01(\tR\acontent\"\x8a\x04\n" +
+	"\x1eAIProviderHealthCheckCompleted\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12+\n" +
+	"\x12first_byte_cost_ms\x18\x03 \x01(\x03R\x0ffirstByteCostMs\x12\"\n" +
+	"\rtotal_cost_ms\x18\x04 \x01(\x03R\vtotalCostMs\x12\x1f\n" +
+	"\vraw_request\x18\x05 \x01(\tR\n" +
+	"rawRequest\x120\n" +
+	"\x14response_status_code\x18\x06 \x01(\x05R\x12responseStatusCode\x12)\n" +
+	"\x10response_content\x18\a \x01(\tR\x0fresponseContent\x12#\n" +
+	"\rerror_message\x18\b \x01(\tR\ferrorMessage\x12!\n" +
+	"\fraw_response\x18\t \x01(\tR\vrawResponse\x12X\n" +
+	"\x10recommend_config\x18\n" +
+	" \x01(\v2-.legion.ai.v1.AIProviderPreviewConfigSnapshotR\x0frecommendConfig\x12\x18\n" +
+	"\asuccess\x18\v \x01(\bR\asuccess\"\xc0\x01\n" +
+	"\x1bAIProviderHealthCheckFailed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x03 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"\x84\x02\n" +
 	"\x0eAISessionReady\x129\n" +
 	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x124\n" +
 	"\asession\x18\x02 \x01(\v2\x1a.legion.ai.v1.AISessionRefR\asession\x12!\n" +
@@ -1120,59 +1820,79 @@ func file_legion_ai_v1_ai_proto_rawDescGZIP() []byte {
 	return file_legion_ai_v1_ai_proto_rawDescData
 }
 
-var file_legion_ai_v1_ai_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_legion_ai_v1_ai_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
 var file_legion_ai_v1_ai_proto_goTypes = []any{
-	(*AISessionRef)(nil),                  // 0: legion.ai.v1.AISessionRef
-	(*AISessionAttachmentRef)(nil),        // 1: legion.ai.v1.AISessionAttachmentRef
-	(*AISessionCredentialRef)(nil),        // 2: legion.ai.v1.AISessionCredentialRef
-	(*BindAISessionCommand)(nil),          // 3: legion.ai.v1.BindAISessionCommand
-	(*PushAISessionInputCommand)(nil),     // 4: legion.ai.v1.PushAISessionInputCommand
-	(*AppendAISessionContextCommand)(nil), // 5: legion.ai.v1.AppendAISessionContextCommand
-	(*CancelAISessionCommand)(nil),        // 6: legion.ai.v1.CancelAISessionCommand
-	(*CloseAISessionCommand)(nil),         // 7: legion.ai.v1.CloseAISessionCommand
-	(*AISessionReady)(nil),                // 8: legion.ai.v1.AISessionReady
-	(*AISessionEvent)(nil),                // 9: legion.ai.v1.AISessionEvent
-	(*AISessionDone)(nil),                 // 10: legion.ai.v1.AISessionDone
-	(*AISessionFailed)(nil),               // 11: legion.ai.v1.AISessionFailed
-	(*AISessionCancelled)(nil),            // 12: legion.ai.v1.AISessionCancelled
-	(*v1.CommandMetadata)(nil),            // 13: legion.node.v1.CommandMetadata
-	(*v1.EventMetadata)(nil),              // 14: legion.node.v1.EventMetadata
-	(*timestamppb.Timestamp)(nil),         // 15: google.protobuf.Timestamp
+	(*AISessionRef)(nil),                    // 0: legion.ai.v1.AISessionRef
+	(*AISessionAttachmentRef)(nil),          // 1: legion.ai.v1.AISessionAttachmentRef
+	(*AISessionCredentialRef)(nil),          // 2: legion.ai.v1.AISessionCredentialRef
+	(*BindAISessionCommand)(nil),            // 3: legion.ai.v1.BindAISessionCommand
+	(*PushAISessionInputCommand)(nil),       // 4: legion.ai.v1.PushAISessionInputCommand
+	(*AppendAISessionContextCommand)(nil),   // 5: legion.ai.v1.AppendAISessionContextCommand
+	(*CancelAISessionCommand)(nil),          // 6: legion.ai.v1.CancelAISessionCommand
+	(*CloseAISessionCommand)(nil),           // 7: legion.ai.v1.CloseAISessionCommand
+	(*AIProviderPreviewConfigSnapshot)(nil), // 8: legion.ai.v1.AIProviderPreviewConfigSnapshot
+	(*ListAIProviderModelsCommand)(nil),     // 9: legion.ai.v1.ListAIProviderModelsCommand
+	(*AIProviderPreviewModel)(nil),          // 10: legion.ai.v1.AIProviderPreviewModel
+	(*AIProviderModelsListed)(nil),          // 11: legion.ai.v1.AIProviderModelsListed
+	(*AIProviderModelsFailed)(nil),          // 12: legion.ai.v1.AIProviderModelsFailed
+	(*HealthCheckAIProviderCommand)(nil),    // 13: legion.ai.v1.HealthCheckAIProviderCommand
+	(*AIProviderHealthCheckCompleted)(nil),  // 14: legion.ai.v1.AIProviderHealthCheckCompleted
+	(*AIProviderHealthCheckFailed)(nil),     // 15: legion.ai.v1.AIProviderHealthCheckFailed
+	(*AISessionReady)(nil),                  // 16: legion.ai.v1.AISessionReady
+	(*AISessionEvent)(nil),                  // 17: legion.ai.v1.AISessionEvent
+	(*AISessionDone)(nil),                   // 18: legion.ai.v1.AISessionDone
+	(*AISessionFailed)(nil),                 // 19: legion.ai.v1.AISessionFailed
+	(*AISessionCancelled)(nil),              // 20: legion.ai.v1.AISessionCancelled
+	nil,                                     // 21: legion.ai.v1.AIProviderPreviewConfigSnapshot.HeadersEntry
+	(*v1.CommandMetadata)(nil),              // 22: legion.node.v1.CommandMetadata
+	(*v1.EventMetadata)(nil),                // 23: legion.node.v1.EventMetadata
+	(*timestamppb.Timestamp)(nil),           // 24: google.protobuf.Timestamp
 }
 var file_legion_ai_v1_ai_proto_depIdxs = []int32{
-	13, // 0: legion.ai.v1.BindAISessionCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	22, // 0: legion.ai.v1.BindAISessionCommand.metadata:type_name -> legion.node.v1.CommandMetadata
 	0,  // 1: legion.ai.v1.BindAISessionCommand.session:type_name -> legion.ai.v1.AISessionRef
 	1,  // 2: legion.ai.v1.BindAISessionCommand.attachments:type_name -> legion.ai.v1.AISessionAttachmentRef
 	2,  // 3: legion.ai.v1.BindAISessionCommand.credential_refs:type_name -> legion.ai.v1.AISessionCredentialRef
-	13, // 4: legion.ai.v1.PushAISessionInputCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	22, // 4: legion.ai.v1.PushAISessionInputCommand.metadata:type_name -> legion.node.v1.CommandMetadata
 	0,  // 5: legion.ai.v1.PushAISessionInputCommand.session:type_name -> legion.ai.v1.AISessionRef
-	13, // 6: legion.ai.v1.AppendAISessionContextCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	22, // 6: legion.ai.v1.AppendAISessionContextCommand.metadata:type_name -> legion.node.v1.CommandMetadata
 	0,  // 7: legion.ai.v1.AppendAISessionContextCommand.session:type_name -> legion.ai.v1.AISessionRef
 	1,  // 8: legion.ai.v1.AppendAISessionContextCommand.attachments:type_name -> legion.ai.v1.AISessionAttachmentRef
 	2,  // 9: legion.ai.v1.AppendAISessionContextCommand.credential_refs:type_name -> legion.ai.v1.AISessionCredentialRef
-	13, // 10: legion.ai.v1.CancelAISessionCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	22, // 10: legion.ai.v1.CancelAISessionCommand.metadata:type_name -> legion.node.v1.CommandMetadata
 	0,  // 11: legion.ai.v1.CancelAISessionCommand.session:type_name -> legion.ai.v1.AISessionRef
-	13, // 12: legion.ai.v1.CloseAISessionCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	22, // 12: legion.ai.v1.CloseAISessionCommand.metadata:type_name -> legion.node.v1.CommandMetadata
 	0,  // 13: legion.ai.v1.CloseAISessionCommand.session:type_name -> legion.ai.v1.AISessionRef
-	14, // 14: legion.ai.v1.AISessionReady.metadata:type_name -> legion.node.v1.EventMetadata
-	0,  // 15: legion.ai.v1.AISessionReady.session:type_name -> legion.ai.v1.AISessionRef
-	15, // 16: legion.ai.v1.AISessionReady.ready_at:type_name -> google.protobuf.Timestamp
-	14, // 17: legion.ai.v1.AISessionEvent.metadata:type_name -> legion.node.v1.EventMetadata
-	0,  // 18: legion.ai.v1.AISessionEvent.session:type_name -> legion.ai.v1.AISessionRef
-	14, // 19: legion.ai.v1.AISessionDone.metadata:type_name -> legion.node.v1.EventMetadata
-	0,  // 20: legion.ai.v1.AISessionDone.session:type_name -> legion.ai.v1.AISessionRef
-	15, // 21: legion.ai.v1.AISessionDone.finished_at:type_name -> google.protobuf.Timestamp
-	14, // 22: legion.ai.v1.AISessionFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	0,  // 23: legion.ai.v1.AISessionFailed.session:type_name -> legion.ai.v1.AISessionRef
-	15, // 24: legion.ai.v1.AISessionFailed.finished_at:type_name -> google.protobuf.Timestamp
-	14, // 25: legion.ai.v1.AISessionCancelled.metadata:type_name -> legion.node.v1.EventMetadata
-	0,  // 26: legion.ai.v1.AISessionCancelled.session:type_name -> legion.ai.v1.AISessionRef
-	15, // 27: legion.ai.v1.AISessionCancelled.finished_at:type_name -> google.protobuf.Timestamp
-	28, // [28:28] is the sub-list for method output_type
-	28, // [28:28] is the sub-list for method input_type
-	28, // [28:28] is the sub-list for extension type_name
-	28, // [28:28] is the sub-list for extension extendee
-	0,  // [0:28] is the sub-list for field type_name
+	21, // 14: legion.ai.v1.AIProviderPreviewConfigSnapshot.headers:type_name -> legion.ai.v1.AIProviderPreviewConfigSnapshot.HeadersEntry
+	22, // 15: legion.ai.v1.ListAIProviderModelsCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	8,  // 16: legion.ai.v1.ListAIProviderModelsCommand.provider:type_name -> legion.ai.v1.AIProviderPreviewConfigSnapshot
+	23, // 17: legion.ai.v1.AIProviderModelsListed.metadata:type_name -> legion.node.v1.EventMetadata
+	10, // 18: legion.ai.v1.AIProviderModelsListed.items:type_name -> legion.ai.v1.AIProviderPreviewModel
+	23, // 19: legion.ai.v1.AIProviderModelsFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	22, // 20: legion.ai.v1.HealthCheckAIProviderCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	8,  // 21: legion.ai.v1.HealthCheckAIProviderCommand.provider:type_name -> legion.ai.v1.AIProviderPreviewConfigSnapshot
+	23, // 22: legion.ai.v1.AIProviderHealthCheckCompleted.metadata:type_name -> legion.node.v1.EventMetadata
+	8,  // 23: legion.ai.v1.AIProviderHealthCheckCompleted.recommend_config:type_name -> legion.ai.v1.AIProviderPreviewConfigSnapshot
+	23, // 24: legion.ai.v1.AIProviderHealthCheckFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	23, // 25: legion.ai.v1.AISessionReady.metadata:type_name -> legion.node.v1.EventMetadata
+	0,  // 26: legion.ai.v1.AISessionReady.session:type_name -> legion.ai.v1.AISessionRef
+	24, // 27: legion.ai.v1.AISessionReady.ready_at:type_name -> google.protobuf.Timestamp
+	23, // 28: legion.ai.v1.AISessionEvent.metadata:type_name -> legion.node.v1.EventMetadata
+	0,  // 29: legion.ai.v1.AISessionEvent.session:type_name -> legion.ai.v1.AISessionRef
+	23, // 30: legion.ai.v1.AISessionDone.metadata:type_name -> legion.node.v1.EventMetadata
+	0,  // 31: legion.ai.v1.AISessionDone.session:type_name -> legion.ai.v1.AISessionRef
+	24, // 32: legion.ai.v1.AISessionDone.finished_at:type_name -> google.protobuf.Timestamp
+	23, // 33: legion.ai.v1.AISessionFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	0,  // 34: legion.ai.v1.AISessionFailed.session:type_name -> legion.ai.v1.AISessionRef
+	24, // 35: legion.ai.v1.AISessionFailed.finished_at:type_name -> google.protobuf.Timestamp
+	23, // 36: legion.ai.v1.AISessionCancelled.metadata:type_name -> legion.node.v1.EventMetadata
+	0,  // 37: legion.ai.v1.AISessionCancelled.session:type_name -> legion.ai.v1.AISessionRef
+	24, // 38: legion.ai.v1.AISessionCancelled.finished_at:type_name -> google.protobuf.Timestamp
+	39, // [39:39] is the sub-list for method output_type
+	39, // [39:39] is the sub-list for method input_type
+	39, // [39:39] is the sub-list for extension type_name
+	39, // [39:39] is the sub-list for extension extendee
+	0,  // [0:39] is the sub-list for field type_name
 }
 
 func init() { file_legion_ai_v1_ai_proto_init() }
@@ -1186,7 +1906,7 @@ func file_legion_ai_v1_ai_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_legion_ai_v1_ai_proto_rawDesc), len(file_legion_ai_v1_ai_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   13,
+			NumMessages:   22,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
