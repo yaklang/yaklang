@@ -279,6 +279,14 @@ func TestTriggerPerception_LimitsKnowledgeContextTo15K(t *testing.T) {
 	loop.actionHistoryMutex = new(sync.Mutex)
 	loop.SetCurrentTask(aicommon.NewStatefulTaskBase("perception-knowledge-limit-task", "help me fuzz this endpoint", context.Background(), cfg.GetEmitter(), true))
 
+	originalKBLister := perceptionKnowledgeBaseNameLister
+	perceptionKnowledgeBaseNameLister = func() ([]string, error) {
+		return []string{"security_kb", "yaklang_docs"}, nil
+	}
+	defer func() {
+		perceptionKnowledgeBaseNameLister = originalKBLister
+	}()
+
 	state := loop.TriggerPerception(PerceptionTriggerForced, true)
 	require.NotNil(t, state)
 
