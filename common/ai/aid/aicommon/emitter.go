@@ -530,12 +530,12 @@ func (r *Emitter) EmitToolCallSummary(callToolId string, summary string) (*schem
 		Type:          schema.EVENT_TOOL_CALL_SUMMARY,
 		NodeId:        callToolId,
 		IsJson:        true,
-		Content:       utils.Jsonify(map[string]any{
+		Content: utils.Jsonify(map[string]any{
 			"call_tool_id": callToolId,
 			"summary":      summary,
 		}),
-		Timestamp:     time.Now().Unix(),
-		CallToolID:    callToolId,
+		Timestamp:  time.Now().Unix(),
+		CallToolID: callToolId,
 	}
 	return r.emit(event)
 }
@@ -820,6 +820,7 @@ func (r *Emitter) emitStreamEvent(e *streamEvent) (*schema.AiOutputEvent, error)
 					"event_writer_id": ewid,
 					"duration_ms":     du.Milliseconds(),
 				}),
+				IsSystem:  producer.isSystem,
 				Timestamp: time.Now().Unix(),
 				TaskIndex: e.taskIndex,
 			}
@@ -1078,9 +1079,9 @@ func (e *Emitter) EmitKnowledgeListAboutTask(nodeId string, taskID string, resul
 func (e *Emitter) EmitReferenceMaterial(typeName string, eventId string, content any) (*schema.AiOutputEvent, error) {
 	log.Infof("emit reference material: [%v]-[to:%v] content: %v", typeName, eventId, utils.ShrinkTextBlock(utils.InterfaceToString(content), 256))
 	return e.EmitJSON(schema.EVENT_TYPE_REFERENCE_MATERIAL, "reference_material", map[string]any{
-		"event_uuid": eventId,
-		"type":       typeName, // text / file / url / other
-		"payload":    utils.InterfaceToString(content),
+		"event_uuid":      eventId,
+		"type":            typeName, // text / file / url / other
+		"payload":         utils.InterfaceToString(content),
 		"event_writer_id": eventId, // filled in stream event writer if emitted from stream
 	})
 }

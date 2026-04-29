@@ -52,6 +52,8 @@ var structuredNodeIDNotSaveBlackList = []string{
 	"react_task_dequeue",
 	"react_task_cleared",
 	"react_task_status_changed",
+	"react_task_created",
+	"session_title",
 }
 
 const (

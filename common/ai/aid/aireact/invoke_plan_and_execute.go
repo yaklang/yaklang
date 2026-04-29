@@ -352,8 +352,8 @@ func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Cont
 			case SYNC_TYPE_QUEUE_INFO:
 				log.Infof("Received queue info sync event, ignoring in plan execution mode")
 				return
-			case aicommon.SYNC_TYPE_USER_INTERVENTION: // 临时方案
-				log.Infof("Received user intervention event: %v", event)
+			case aicommon.SYNC_TYPE_USER_INTERVENTION, aicommon.SYNC_TYPE_RECOVERY_HISTORY: // 临时方案
+				log.Infof("Received user covery history or intervention event: %v", event)
 				// warning not mirror user intervention events to timeline to avoid confusion
 				return
 			default:
