@@ -64,6 +64,7 @@ const (
 	AI_REACT_LOOP_NAME_DIR_EXPLORE         = "dir_explore"
 	AI_REACT_LOOP_NAME_INFOSEC_RECON       = "infosec_recon"
 	AI_REACT_LOOP_NAME_AI_SKILL_AUDIT      = "ai_skill_audit"
+	AI_REACT_LOOP_NAME_VULN_VERIFY         = "vuln_verify"
 )
 
 const (

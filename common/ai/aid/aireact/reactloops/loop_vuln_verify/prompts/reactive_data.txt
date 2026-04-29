@@ -1,0 +1,47 @@
+<|REACTIVE_DATA_{{.Nonce}}|>
+
+# 验证会话状态
+
+## 待验证发现
+{{ if .FindingDescription }}{{ .FindingDescription }}{{ else }}（尚未从用户输入中提取）{{ end }}
+
+## 目标
+{{ if .TargetInfo }}{{ .TargetInfo }}{{ else }}（尚未识别）{{ end }}
+
+{{ if .SSARiskIDOnly }}
+## [阻断] 检测到 SSA Risk ID — 必须先获取完整详情
+
+用户提供了 SSA Risk ID **{{ .SSARiskID }}**。在获取完整风险报告之前，禁止探测目标或猜测漏洞类型。
+
+**必须执行的第一个动作：**
+```
+require_tool → ssa-risk   （risk_id: {{ .SSARiskID }}）
+```
+
+获取报告后，按阶段 0（源代码检查）→ 阶段 1 的顺序继续。
+{{ end }}
+
+## 阶段进度
+- 可复现性：{{ if .ReproducibilityVerdict }}**{{ .ReproducibilityVerdict }}**{{ else }}未评估{{ end }}
+- 目标可达性：{{ if .ReachabilityStatus }}**{{ .ReachabilityStatus }}**{{ else }}未检查{{ end }}
+- 当前阶段：{{ if .VerificationPhase }}{{ .VerificationPhase }}{{ else }}初始化中{{ end }}
+
+## 已收集证据（{{ .EvidenceCount }} 条）
+{{ if .RecentEvidence }}### 最新证据
+{{ .RecentEvidence }}
+{{ else }}（暂无）{{ end }}
+{{ if and (eq .VerificationPhase "phase3_execute") (eq .EvidenceCount "0") }}
+> [提醒] **工具调用纪律**：当前处于阶段 3 执行中，但已记录证据为 0 条。
+> 首次 HTTP 请求：`require_tool → do_http_request`（加载工具并发送第一次请求）。
+> 后续 HTTP 请求（工具已在 CACHE_TOOL_CALL）：`directly_call_tool → do_http_request` 携带内联 `directly_call_tool_params`。
+> 每次工具调用返回结果后，必须立即调用 `record_evidence`——在此之前不得进行任何其他工具调用。
+> 如果结果包含命令执行输出（uid=、root、报错信息、未授权数据），调用 record_evidence(significance=high) 后立即调用 directly_answer(CONFIRMED)。
+{{ end }}
+
+## 上一个动作的反馈
+{{ if .FeedbackMessages }}{{ .FeedbackMessages }}{{ else }}（无）{{ end }}
+
+## 退出提醒
+循环尚未退出。`directly_answer` 是唯一的退出方式。当前阶段完成后，若已有足够信息，立即调用 `directly_answer` 给出结论，不要等待更多迭代。
+
+<|REACTIVE_DATA_END_{{.Nonce}}|>
