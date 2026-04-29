@@ -39,29 +39,96 @@ type ExtraCapabilitiesManager struct {
 	skills     []ExtraSkillInfo
 	focusModes []ExtraFocusModeInfo
 
-	// MaxExtraTools limits the number of extra tools. Default: 50.
-	MaxExtraTools int
-
-	// track seen names for deduplication
-	seenTools      map[string]bool
-	seenForges     map[string]bool
-	seenSkills     map[string]bool
-	seenFocusModes map[string]bool
+	MaxExtraTools      int
+	MaxExtraForges     int
+	MaxExtraSkills     int
+	MaxExtraFocusModes int
 }
 
 // NewExtraCapabilitiesManager creates a new ExtraCapabilitiesManager with default limits.
 func NewExtraCapabilitiesManager() *ExtraCapabilitiesManager {
 	return &ExtraCapabilitiesManager{
-		MaxExtraTools:  50,
-		seenTools:      make(map[string]bool),
-		seenForges:     make(map[string]bool),
-		seenSkills:     make(map[string]bool),
-		seenFocusModes: make(map[string]bool),
+		MaxExtraTools:      10,
+		MaxExtraForges:     10,
+		MaxExtraSkills:     10,
+		MaxExtraFocusModes: 10,
 	}
 }
 
-// AddTools adds tools to the extra capabilities, deduplicating by name
-// and respecting MaxExtraTools limit.
+func indexToolByName(tools []*aitool.Tool, name string) int {
+	for idx, tool := range tools {
+		if tool != nil && tool.Name == name {
+			return idx
+		}
+	}
+	return -1
+}
+
+func indexForgeByName(forges []ExtraForgeInfo, name string) int {
+	for idx, forge := range forges {
+		if forge.Name == name {
+			return idx
+		}
+	}
+	return -1
+}
+
+func indexSkillByName(skills []ExtraSkillInfo, name string) int {
+	for idx, skill := range skills {
+		if skill.Name == name {
+			return idx
+		}
+	}
+	return -1
+}
+
+func indexFocusModeByName(modes []ExtraFocusModeInfo, name string) int {
+	for idx, mode := range modes {
+		if mode.Name == name {
+			return idx
+		}
+	}
+	return -1
+}
+
+func moveToolToLatest(tools []*aitool.Tool, idx int, tool *aitool.Tool) []*aitool.Tool {
+	if idx < 0 || idx >= len(tools) {
+		return append(tools, tool)
+	}
+	copy(tools[idx:], tools[idx+1:])
+	tools[len(tools)-1] = tool
+	return tools
+}
+
+func moveForgeToLatest(forges []ExtraForgeInfo, idx int, forge ExtraForgeInfo) []ExtraForgeInfo {
+	if idx < 0 || idx >= len(forges) {
+		return append(forges, forge)
+	}
+	copy(forges[idx:], forges[idx+1:])
+	forges[len(forges)-1] = forge
+	return forges
+}
+
+func moveSkillToLatest(skills []ExtraSkillInfo, idx int, skill ExtraSkillInfo) []ExtraSkillInfo {
+	if idx < 0 || idx >= len(skills) {
+		return append(skills, skill)
+	}
+	copy(skills[idx:], skills[idx+1:])
+	skills[len(skills)-1] = skill
+	return skills
+}
+
+func moveFocusModeToLatest(modes []ExtraFocusModeInfo, idx int, mode ExtraFocusModeInfo) []ExtraFocusModeInfo {
+	if idx < 0 || idx >= len(modes) {
+		return append(modes, mode)
+	}
+	copy(modes[idx:], modes[idx+1:])
+	modes[len(modes)-1] = mode
+	return modes
+}
+
+// AddTools adds tools to the extra capabilities, keeping the newest items and
+// moving duplicate names to the newest position.
 func (ecm *ExtraCapabilitiesManager) AddTools(tools ...*aitool.Tool) {
 	ecm.mu.Lock()
 	defer ecm.mu.Unlock()
@@ -70,19 +137,23 @@ func (ecm *ExtraCapabilitiesManager) AddTools(tools ...*aitool.Tool) {
 		if t == nil || t.Name == "" {
 			continue
 		}
-		if ecm.seenTools[t.Name] {
+		if idx := indexToolByName(ecm.tools, t.Name); idx >= 0 {
+			ecm.tools = moveToolToLatest(ecm.tools, idx, t)
 			continue
 		}
-		if len(ecm.tools) >= ecm.MaxExtraTools {
-			log.Infof("extra capabilities: max tool limit (%d) reached, skipping tool: %s", ecm.MaxExtraTools, t.Name)
-			break
-		}
-		ecm.seenTools[t.Name] = true
 		ecm.tools = append(ecm.tools, t)
+		if ecm.MaxExtraTools > 0 && len(ecm.tools) > ecm.MaxExtraTools {
+			evicted := ecm.tools[0]
+			ecm.tools = ecm.tools[1:]
+			if evicted != nil {
+				log.Infof("extra capabilities: max tool limit (%d) reached, evict oldest tool: %s, keep newest: %s", ecm.MaxExtraTools, evicted.Name, t.Name)
+			}
+		}
 	}
 }
 
-// AddForges adds forges to the extra capabilities, deduplicating by name.
+// AddForges adds forges to the extra capabilities, keeping the newest items and
+// moving duplicate names to the newest position.
 func (ecm *ExtraCapabilitiesManager) AddForges(forges ...ExtraForgeInfo) {
 	ecm.mu.Lock()
 	defer ecm.mu.Unlock()
@@ -91,15 +162,21 @@ func (ecm *ExtraCapabilitiesManager) AddForges(forges ...ExtraForgeInfo) {
 		if f.Name == "" {
 			continue
 		}
-		if ecm.seenForges[f.Name] {
+		if idx := indexForgeByName(ecm.forges, f.Name); idx >= 0 {
+			ecm.forges = moveForgeToLatest(ecm.forges, idx, f)
 			continue
 		}
-		ecm.seenForges[f.Name] = true
 		ecm.forges = append(ecm.forges, f)
+		if ecm.MaxExtraForges > 0 && len(ecm.forges) > ecm.MaxExtraForges {
+			evicted := ecm.forges[0]
+			ecm.forges = ecm.forges[1:]
+			log.Infof("extra capabilities: max forge limit (%d) reached, evict oldest forge: %s, keep newest: %s", ecm.MaxExtraForges, evicted.Name, f.Name)
+		}
 	}
 }
 
-// AddSkills adds skills to the extra capabilities, deduplicating by name.
+// AddSkills adds skills to the extra capabilities, keeping the newest items and
+// moving duplicate names to the newest position.
 func (ecm *ExtraCapabilitiesManager) AddSkills(skills ...ExtraSkillInfo) {
 	ecm.mu.Lock()
 	defer ecm.mu.Unlock()
@@ -108,15 +185,21 @@ func (ecm *ExtraCapabilitiesManager) AddSkills(skills ...ExtraSkillInfo) {
 		if s.Name == "" {
 			continue
 		}
-		if ecm.seenSkills[s.Name] {
+		if idx := indexSkillByName(ecm.skills, s.Name); idx >= 0 {
+			ecm.skills = moveSkillToLatest(ecm.skills, idx, s)
 			continue
 		}
-		ecm.seenSkills[s.Name] = true
 		ecm.skills = append(ecm.skills, s)
+		if ecm.MaxExtraSkills > 0 && len(ecm.skills) > ecm.MaxExtraSkills {
+			evicted := ecm.skills[0]
+			ecm.skills = ecm.skills[1:]
+			log.Infof("extra capabilities: max skill limit (%d) reached, evict oldest skill: %s, keep newest: %s", ecm.MaxExtraSkills, evicted.Name, s.Name)
+		}
 	}
 }
 
-// AddFocusModes adds focus modes to the extra capabilities, deduplicating by name.
+// AddFocusModes adds focus modes to the extra capabilities, keeping the newest
+// items and moving duplicate names to the newest position.
 func (ecm *ExtraCapabilitiesManager) AddFocusModes(modes ...ExtraFocusModeInfo) {
 	ecm.mu.Lock()
 	defer ecm.mu.Unlock()
@@ -125,11 +208,16 @@ func (ecm *ExtraCapabilitiesManager) AddFocusModes(modes ...ExtraFocusModeInfo) 
 		if m.Name == "" {
 			continue
 		}
-		if ecm.seenFocusModes[m.Name] {
+		if idx := indexFocusModeByName(ecm.focusModes, m.Name); idx >= 0 {
+			ecm.focusModes = moveFocusModeToLatest(ecm.focusModes, idx, m)
 			continue
 		}
-		ecm.seenFocusModes[m.Name] = true
 		ecm.focusModes = append(ecm.focusModes, m)
+		if ecm.MaxExtraFocusModes > 0 && len(ecm.focusModes) > ecm.MaxExtraFocusModes {
+			evicted := ecm.focusModes[0]
+			ecm.focusModes = ecm.focusModes[1:]
+			log.Infof("extra capabilities: max focus mode limit (%d) reached, evict oldest focus mode: %s, keep newest: %s", ecm.MaxExtraFocusModes, evicted.Name, m.Name)
+		}
 	}
 }
 
@@ -147,6 +235,14 @@ func (ecm *ExtraCapabilitiesManager) ToolCount() int {
 	ecm.mu.RLock()
 	defer ecm.mu.RUnlock()
 	return len(ecm.tools)
+}
+
+func (ecm *ExtraCapabilitiesManager) ListTools() []*aitool.Tool {
+	ecm.mu.RLock()
+	defer ecm.mu.RUnlock()
+	result := make([]*aitool.Tool, len(ecm.tools))
+	copy(result, ecm.tools)
+	return result
 }
 
 // ListForges returns a copy of the current extra forges.
@@ -212,7 +308,7 @@ func (ecm *ExtraCapabilitiesManager) Render(nonce string) string {
 
 	// Forges / Blueprints
 	if len(ecm.forges) > 0 {
-		sb.WriteString("## Blueprints / AI Forges / 蓝图\n")
+		sb.WriteString(fmt.Sprintf("## Blueprints / AI Forges / 蓝图 (%d/%d)\n", len(ecm.forges), ecm.MaxExtraForges))
 		for _, f := range ecm.forges {
 			desc := f.Description
 			if len(desc) > 150 {
@@ -229,7 +325,7 @@ func (ecm *ExtraCapabilitiesManager) Render(nonce string) string {
 
 	// Skills
 	if len(ecm.skills) > 0 {
-		sb.WriteString("## Skills / 技能\n")
+		sb.WriteString(fmt.Sprintf("## Skills / 技能 (%d/%d)\n", len(ecm.skills), ecm.MaxExtraSkills))
 		for _, s := range ecm.skills {
 			desc := s.Description
 			if len(desc) > 150 {
@@ -242,7 +338,7 @@ func (ecm *ExtraCapabilitiesManager) Render(nonce string) string {
 
 	// Focus Modes
 	if len(ecm.focusModes) > 0 {
-		sb.WriteString("## Focus Modes / 专注模式\n")
+		sb.WriteString(fmt.Sprintf("## Focus Modes / 专注模式 (%d/%d)\n", len(ecm.focusModes), ecm.MaxExtraFocusModes))
 		for _, m := range ecm.focusModes {
 			desc := m.Description
 			if len(desc) > 150 {

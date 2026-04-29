@@ -2,6 +2,7 @@ package aireact
 
 import (
 	"bytes"
+	"fmt"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -352,20 +353,54 @@ func TestReAct_ExtraCapabilities_Render(t *testing.T) {
 	if len(forges) != 1 {
 		t.Fatalf("expected 1 forge after dedup, got %d", len(forges))
 	}
+	if forges[0].VerboseName != "Duplicate" {
+		t.Fatalf("expected duplicate forge metadata to refresh, got %+v", forges[0])
+	}
 
-	// Test MaxExtraTools limit
+	// Test recency-based limit for forges
 	ecm2 := reactloops.NewExtraCapabilitiesManager()
-	ecm2.MaxExtraTools = 2
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 12; i++ {
 		ecm2.AddForges(reactloops.ExtraForgeInfo{
-			Name:        utils.RandStringBytes(10),
+			Name:        fmt.Sprintf("forge_%02d", i),
 			Description: "forge",
 		})
 	}
-	// Forges don't have a limit (only tools do), so all 5 should be added
-	if len(ecm2.ListForges()) != 5 {
-		t.Fatalf("expected 5 forges (no limit on forges), got %d", len(ecm2.ListForges()))
+	forges2 := ecm2.ListForges()
+	if len(forges2) != 10 {
+		t.Fatalf("expected 10 forges after limit eviction, got %d", len(forges2))
+	}
+	if forges2[0].Name != "forge_02" || forges2[9].Name != "forge_11" {
+		t.Fatalf("expected oldest forges evicted and newest kept, got first=%s last=%s", forges2[0].Name, forges2[9].Name)
+	}
+	ecm2.AddForges(reactloops.ExtraForgeInfo{Name: "forge_05", Description: "refreshed"})
+	forges2 = ecm2.ListForges()
+	if forges2[9].Name != "forge_05" {
+		t.Fatalf("expected duplicate forge to move to newest position, got last=%s", forges2[9].Name)
 	}
 
-	t.Log("ExtraCapabilities render test passed: all sections and deduplication verified")
+	// Test recency-based limit for tools
+	ecm3 := reactloops.NewExtraCapabilitiesManager()
+	for i := 0; i < 12; i++ {
+		ecm3.AddTools(aitool.NewWithoutCallback(
+			fmt.Sprintf("tool_%02d", i),
+			aitool.WithDescription("tool"),
+		))
+	}
+	tools3 := ecm3.ListTools()
+	if len(tools3) != 10 {
+		t.Fatalf("expected 10 tools after limit eviction, got %d", len(tools3))
+	}
+	if tools3[0].Name != "tool_02" || tools3[9].Name != "tool_11" {
+		t.Fatalf("expected oldest tools evicted and newest kept, got first=%s last=%s", tools3[0].Name, tools3[9].Name)
+	}
+	ecm3.AddTools(aitool.NewWithoutCallback(
+		"tool_05",
+		aitool.WithDescription("refreshed tool"),
+	))
+	tools3 = ecm3.ListTools()
+	if tools3[9].Name != "tool_05" {
+		t.Fatalf("expected duplicate tool to move to newest position, got last=%s", tools3[9].Name)
+	}
+
+	t.Log("ExtraCapabilities render test passed: sections, recency ordering, and eviction verified")
 }
