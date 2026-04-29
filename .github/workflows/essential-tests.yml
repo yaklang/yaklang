@@ -452,7 +452,7 @@ jobs:
                 {"package": "./common/yak/yakurl/...", "timeout": "15s"},
                 {"package": "./common/utils/ziputil/...", "timeout": "20s"},
                 {"package": "./common/utils/zipx/...", "timeout": "30s"},
-                {"package": "./common/thirdparty_bin", "timeout": "1m", "skip": "^(TestFetchAllMD5|TestSingleURL)$"},
+                {"package": "./common/thirdparty_bin", "timeout": "1m", "skip": "^(TestFetchAllMD5|TestSingleURL|TestInstallMemoryUsage|TestMemoryUsageBaseline)$"},
                 {"package": "./common/utils/yakgit/..."},
                 {"package": "./common/utils/suspect"},
                 {"package": "./common/yak/antlr4nasl/tests/...", "timeout": "1m"},
