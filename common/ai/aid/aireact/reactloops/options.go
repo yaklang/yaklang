@@ -221,7 +221,7 @@ func WithPersistentContextProvider(provider ContextProviderFunc) ReActLoopOption
 
 func WithReflectionOutputExample(example string) ReActLoopOption {
 	return WithReflectionOutputExampleContextProvider(func(loop *ReActLoop, nonce string) (string, error) {
-		_, result, err := loop.getRenderInfo()
+		_, result, err := loop.getRenderValues()
 		if err != nil {
 			return "", utils.Errorf("get basic prompt info failed: %v", err)
 		}
@@ -258,7 +258,7 @@ func WithReflectionOutputExample(example string) ReActLoopOption {
 
 func WithPersistentInstruction(instruction string) ReActLoopOption {
 	return WithPersistentContextProvider(func(loop *ReActLoop, nonce string) (string, error) {
-		_, result, err := loop.getRenderInfo()
+		_, result, err := loop.getRenderValues()
 		if err != nil {
 			return "", utils.Errorf("get basic prompt info failed: %v", err)
 		}

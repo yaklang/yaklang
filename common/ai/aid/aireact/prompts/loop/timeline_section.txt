@@ -1,0 +1,12 @@
+{{ if .Timeline }}# Timeline Memory
+{{ .Timeline }}{{ end }}
+{{ if .CurrentTime }}{{ if .Timeline }}
+
+{{ end }}# Current Time
+{{ .CurrentTime }}{{ end }}
+{{ if .Workspace }}{{ if or .Timeline .CurrentTime }}
+
+{{ end }}# Workspace Context
+OS/Arch: {{ .OSArch }}
+{{ if .WorkingDir }}working dir: {{ .WorkingDir }}
+{{ end }}{{ if .WorkingDirGlance }}working dir glance: {{ .WorkingDirGlance }}{{ end }}{{ end }}

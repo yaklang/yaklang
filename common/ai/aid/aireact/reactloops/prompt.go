@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -129,10 +130,13 @@ func (r *ReActLoop) generateLoopPrompt(
 	memory string,
 	operator *LoopActionHandlerOperator,
 ) (string, error) {
-	background, infos, err := r.getRenderInfo()
-	if err != nil {
-		return "", utils.Wrap(err, "get basic prompt info failed")
+	var tools []*aitool.Tool
+	if r.toolsGetter == nil {
+		tools = []*aitool.Tool{}
+	} else {
+		tools = r.toolsGetter()
 	}
+
 	schema, err := r.generateSchemaString(operator.disallowLoopExit)
 	if err != nil {
 		return "", err
@@ -172,7 +176,7 @@ func (r *ReActLoop) generateLoopPrompt(
 	// Render skills context if the manager is available
 	var skillsContext string
 	if r.skillsContextManager != nil {
-		skillsContext = r.skillsContextManager.Render(nonce)
+		skillsContext = r.skillsContextManager.RenderStable()
 	}
 
 	// Render extra capabilities discovered via intent recognition
@@ -208,6 +212,38 @@ func (r *ReActLoop) generateLoopPrompt(
 			})
 			reactiveData += cacheBlock
 		}
+	}
+
+	if assembler, ok := r.invoker.(loopPromptAssembler); ok {
+		result, err := assembler.AssembleLoopPrompt(tools, &LoopPromptAssemblyInput{
+			Nonce:             nonce,
+			UserQuery:         userInput,
+			TaskInstruction:   persistent,
+			OutputExample:     outputExample,
+			Schema:            schema,
+			SkillsContext:     skillsContext,
+			ExtraCapabilities: extraCapabilities,
+			SessionEvidence:   sessionEvidence,
+			ReactiveData:      reactiveData,
+			InjectedMemory:    memory,
+		})
+		if err != nil {
+			return "", utils.Wrap(err, "assemble loop prompt failed")
+		}
+		observation := BuildPromptObservation(r.loopName, nonce, result.Prompt, result.Sections)
+		r.SetLastPromptObservation(observation)
+		status := observation.BuildStatus(1 * 1024)
+		r.SetLastPromptObservationStatus(status)
+		r.emitPromptObservationStatus(status)
+		if r.isDebugModeEnabled() {
+			log.Infof("prompt section build report:\n%s", observation.RenderCLIReport(120))
+		}
+		return result.Prompt, nil
+	}
+
+	background, infos, err := r.getRenderInfo()
+	if err != nil {
+		return "", utils.Wrap(err, "get basic prompt info failed")
 	}
 
 	infos["InjectedMemory"] = memory

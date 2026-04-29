@@ -266,7 +266,40 @@ func (r *ReActLoop) GetPeriodicVerificationInterval() int {
 	return r.periodicVerificationInterval
 }
 
+func (r *ReActLoop) AllowPlanAndExec() func() bool {
+	if r == nil {
+		return nil
+	}
+	return r.allowPlanAndExec
+}
+
+func (r *ReActLoop) AllowToolCall() func() bool {
+	if r == nil {
+		return nil
+	}
+	return r.allowToolCall
+}
+
+func (r *ReActLoop) Actions() *omap.OrderedMap[string, *LoopAction] {
+	if r == nil {
+		return nil
+	}
+	return r.actions
+}
+
 func (r *ReActLoop) getRenderInfo() (string, map[string]any, error) {
+	temp, info, err := r.getRenderValues()
+	if err != nil {
+		return "", nil, err
+	}
+	result, err := utils.RenderTemplate(temp, info)
+	if err != nil {
+		return "", nil, err
+	}
+	return result, info, nil
+}
+
+func (r *ReActLoop) getRenderValues() (string, map[string]any, error) {
 	var tools []*aitool.Tool
 	if r.toolsGetter == nil {
 		tools = []*aitool.Tool{}
@@ -313,11 +346,7 @@ func (r *ReActLoop) getRenderInfo() (string, map[string]any, error) {
 		info["HasLoadCapability"] = hasLoadCap
 	}
 
-	result, err := utils.RenderTemplate(temp, info)
-	if err != nil {
-		return "", nil, err
-	}
-	return result, info, nil
+	return temp, info, nil
 }
 
 func (r *ReActLoop) DisallowAskForClarification() {

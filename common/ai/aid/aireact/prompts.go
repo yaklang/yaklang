@@ -706,8 +706,8 @@ func (pm *PromptManager) timelineDumpForPrompt() string {
 }
 
 func (pm *PromptManager) DynamicContext() string {
-	baseContext := pm.cpm.Execute(pm.react.config, pm.react.config.Emitter)
-	historyContext := pm.react.config.FormatUserInputHistory()
+	baseContext := pm.AutoContext()
+	historyContext := pm.UserHistoryContext()
 	if baseContext == "" {
 		return historyContext
 	}
@@ -718,8 +718,8 @@ func (pm *PromptManager) DynamicContext() string {
 }
 
 func (pm *PromptManager) DynamicContextWithNonce(nonce string) string {
-	baseContext := pm.cpm.Execute(pm.react.config, pm.react.config.Emitter)
-	historyContext := pm.react.config.FormatUserInputHistoryAITag(nonce, prevUserInputTagMaxTokens)
+	baseContext := pm.AutoContextWithNonce(nonce)
+	historyContext := pm.UserHistoryContextWithNonce(nonce)
 	switch {
 	case strings.TrimSpace(baseContext) == "":
 		return historyContext

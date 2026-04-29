@@ -103,6 +103,16 @@ func newPromptSectionObservation(
 	return section
 }
 
+func NewPromptSectionObservation(
+	key string,
+	label string,
+	role PromptSectionRole,
+	compressible bool,
+	content string,
+) *PromptSectionObservation {
+	return newPromptSectionObservation(key, label, role, compressible, content)
+}
+
 func buildPromptObservation(loopName string, nonce string, prompt string, sections []*PromptSectionObservation) *PromptObservation {
 	observation := &PromptObservation{
 		LoopName:     loopName,
@@ -119,6 +129,10 @@ func buildPromptObservation(loopName string, nonce string, prompt string, sectio
 		collectPromptObservationStats(section, observation)
 	}
 	return observation
+}
+
+func BuildPromptObservation(loopName string, nonce string, prompt string, sections []*PromptSectionObservation) *PromptObservation {
+	return buildPromptObservation(loopName, nonce, prompt, sections)
 }
 
 func countPromptSections(section *PromptSectionObservation) int {
@@ -451,11 +465,23 @@ func newPromptContainerSection(
 	return section
 }
 
+func NewPromptContainerSection(
+	key string,
+	label string,
+	role PromptSectionRole,
+) *PromptSectionObservation {
+	return newPromptContainerSection(key, label, role)
+}
+
 func finalizePromptContainerSection(section *PromptSectionObservation) *PromptSectionObservation {
 	if section != nil {
 		section.refreshMetrics()
 	}
 	return section
+}
+
+func FinalizePromptContainerSection(section *PromptSectionObservation) *PromptSectionObservation {
+	return finalizePromptContainerSection(section)
 }
 
 // RenderCLIReport renders a human-readable prompt observation report for logs.

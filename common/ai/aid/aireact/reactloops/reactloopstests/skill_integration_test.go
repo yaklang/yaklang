@@ -25,7 +25,7 @@ import (
 //   1. verify-satisfaction  — "verify-satisfaction" + "user_satisfied" + "reasoning"
 //   2. self-reflection      — "SELF_REFLECTION_TASK"
 //   3. call-tool params     — "Generate appropriate parameters for this tool call based on the context above" + "call-tool"
-//   4. main ReAct prompt    — "directly_answer" + "SCHEMA_" + "USER_QUERY"
+//   4. main ReAct prompt    — "directly_answer" + "SCHEMA" + "USER_QUERY"
 //   5. unknown / fallback
 //
 // The main ReAct prompt is the only one that contains the action schema
@@ -33,7 +33,7 @@ import (
 //
 // Markers were chosen by observing actual prompt content:
 //   - "directly_answer": always in the main prompt action schema
-//   - "SCHEMA_":         nonce-tagged <|SCHEMA_{nonce}|> block, main prompt only
+//   - "SCHEMA":          schema block <|SCHEMA|>, main prompt only
 //   - "USER_QUERY":      nonce-tagged <|USER_QUERY_{nonce}|> block, main prompt only
 //   (Note: verify-satisfaction uses "USER_ORIGINAL_QUERY_" instead of "USER_QUERY")
 
@@ -68,9 +68,9 @@ func classifyPrompt(prompt string) promptType {
 
 	// 4. main ReAct prompt: three markers that uniquely and stably identify it
 	//    - "directly_answer": always present as an action type in the schema
-	//    - "SCHEMA_": nonce-tagged schema block unique to main prompt
+	//    - "SCHEMA": static schema block unique to main prompt
 	//    - "USER_QUERY": nonce-tagged user query block unique to main prompt
-	if utils.MatchAllOfSubString(prompt, "directly_answer", "SCHEMA_", "USER_QUERY") {
+	if utils.MatchAllOfSubString(prompt, "directly_answer", "SCHEMA", "USER_QUERY") {
 		return promptMainReAct
 	}
 

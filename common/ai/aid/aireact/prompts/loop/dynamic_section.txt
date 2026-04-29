@@ -1,0 +1,29 @@
+<|USER_QUERY_{{ .Nonce }}|>
+{{ .UserQuery }}
+<|USER_QUERY_END_{{ .Nonce }}|>
+{{ if .AutoContext }}
+
+{{ .AutoContext }}{{ end }}
+{{ if .UserHistory }}{{ if or .UserQuery .AutoContext }}
+
+{{ end }}{{ .UserHistory }}{{ end }}
+{{ if .ExtraCapabilities }}{{ if or .UserQuery .AutoContext .UserHistory }}
+
+{{ end }}<|EXTRA_CAPABILITIES_{{ .Nonce }}|>
+{{ .ExtraCapabilities }}
+<|EXTRA_CAPABILITIES_END_{{ .Nonce }}|>{{ end }}
+{{ if .SessionEvidence }}{{ if or .UserQuery .AutoContext .UserHistory .ExtraCapabilities }}
+
+{{ end }}{{ .SessionEvidence }}{{ end }}
+{{ if .ReactiveData }}{{ if or .UserQuery .AutoContext .UserHistory .ExtraCapabilities .SessionEvidence }}
+
+{{ end }}<|REFLECTION_{{ .Nonce }}|>
+{{ .ReactiveData }}
+<|REFLECTION_END_{{ .Nonce }}|>{{ end }}
+{{ if .InjectedMemory }}{{ if or .UserQuery .AutoContext .UserHistory .ExtraCapabilities .SessionEvidence .ReactiveData }}
+
+{{ end }}<|INJECTED_MEMORY_{{ .Nonce }}|>
+# Memory Context
+These are the memories automatically retrieved by the system that are most relevant to the current input.
+{{ .InjectedMemory }}
+<|INJECTED_MEMORY_END_{{ .Nonce }}|>{{ end }}
