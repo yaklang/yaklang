@@ -3,6 +3,7 @@ package sfvm
 import (
 	"context"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -68,6 +69,37 @@ type RecursiveConfigItem struct {
 	Key            string `json:"key"`
 	Value          string `json:"value"`
 	SyntaxFlowRule bool   `json:"syntax_flow_rule"`
+}
+
+// FormatRecursiveConfigSummary renders recursive #-> / #-< config for UI progress logs
+// (avoids Go's default slice-of-pointers formatting like [0xc0…]).
+func FormatRecursiveConfigSummary(cfg []*RecursiveConfigItem) string {
+	if len(cfg) == 0 {
+		return ""
+	}
+	const maxValRunes = 120
+	var b strings.Builder
+	for i, item := range cfg {
+		if i > 0 {
+			b.WriteString(", ")
+		}
+		if item == nil {
+			b.WriteString("<nil>")
+			continue
+		}
+		b.WriteString(item.Key)
+		b.WriteString("=")
+		val := item.Value
+		if utf8.RuneCountInString(val) > maxValRunes {
+			rs := []rune(val)
+			val = string(rs[:maxValRunes]) + "..."
+		}
+		b.WriteString(val)
+		if item.SyntaxFlowRule {
+			b.WriteString(" [sf]")
+		}
+	}
+	return b.String()
 }
 
 type AnalysisContext struct {

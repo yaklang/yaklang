@@ -888,7 +888,12 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 			return true, utils.Wrap(CriticalError, "BUG: get top defs failed, empty stack")
 		}
 		s.debugSubLog("- call TopDefs")
-		s.ProcessCallback("get topdef %v(%v)", ValuesLen(value), i.SyntaxFlowConfig)
+		n := ValuesLen(value)
+		if summary := FormatRecursiveConfigSummary(i.SyntaxFlowConfig); summary != "" {
+			s.ProcessCallback("get topdef: %d values, {%s}", n, summary)
+		} else {
+			s.ProcessCallback("get topdef: %d values", n)
+		}
 
 		// diagnostics: track value operation timing
 		var vals Values
