@@ -328,6 +328,54 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 	return params
 }
 
+// parseSwitchLabelsFromExtra unmarshals switch_label from DB/JSON where the slice
+// element type may be map[string]any (JSON) rather than []map[string]int64.
+func parseSwitchLabelsFromExtra(labels any) []SwitchLabel {
+	if labels == nil {
+		return nil
+	}
+	toLabel := func(m map[string]any) (SwitchLabel, bool) {
+		if m == nil {
+			return SwitchLabel{}, false
+		}
+		return SwitchLabel{
+			Value: int64(utils.InterfaceToInt(m["value"])),
+			Dest:  int64(utils.InterfaceToInt(m["dest"])),
+		}, true
+	}
+	switch sl := labels.(type) {
+	case []map[string]int64:
+		out := make([]SwitchLabel, len(sl))
+		for i, label := range sl {
+			out[i] = SwitchLabel{Value: label["value"], Dest: label["dest"]}
+		}
+		return out
+	case []map[string]any:
+		out := make([]SwitchLabel, 0, len(sl))
+		for _, m := range sl {
+			if l, ok := toLabel(m); ok {
+				out = append(out, l)
+			}
+		}
+		return out
+	case []any:
+		out := make([]SwitchLabel, 0, len(sl))
+		for _, item := range sl {
+			switch m := item.(type) {
+			case map[string]any:
+				if l, ok := toLabel(m); ok {
+					out = append(out, l)
+				}
+			case map[string]int64:
+				out = append(out, SwitchLabel{Value: m["value"], Dest: m["dest"]})
+			}
+		}
+		return out
+	default:
+		return nil
+	}
+}
+
 func unmarshalExtraInformation(cache *ProgramCache, inst Instruction, ir *ssadb.IrCode) {
 	params := ir.GetExtraInfo()
 	switch ret := inst.(type) {
@@ -433,16 +481,11 @@ func unmarshalExtraInformation(cache *ProgramCache, inst Instruction, ir *ssadb.
 	case *Switch:
 		ret.Cond = utils.MapGetInt64(params, "switch_cond")
 		if labels, ok := params["switch_label"]; ok {
-			if _, isMap := labels.([]map[string]int64); !isMap {
-				log.Errorf("BUG: switch label should be map[string]int64, %v", labels)
-				return
+			parsed := parseSwitchLabelsFromExtra(labels)
+			if len(parsed) == 0 && labels != nil {
+				log.Warnf("switch_label could not be parsed (type %T): %v", labels, labels)
 			}
-			for _, label := range labels.([]map[string]int64) {
-				ret.Label = append(ret.Label, SwitchLabel{
-					Value: int64(utils.InterfaceToInt(label["value"])),
-					Dest:  int64(utils.InterfaceToInt(label["dest"])),
-				})
-			}
+			ret.Label = parsed
 		}
 	case *Make:
 		ret.low = utils.MapGetInt64(params, "make_low")

@@ -88,6 +88,9 @@ func (i *Value) visitedDefs(actx *AnalyzeContext, opt ...OperationOption) (resul
 			shadow = i.NewValue(i.getValue())
 		}
 		for _, def := range maskable.GetMask() {
+			if utils.IsNil(def) {
+				continue
+			}
 			if ret := shadow.NewValue(def).getTopDefs(actx, opt...); len(ret) > 0 {
 				vals = append(vals, ret...)
 			}
@@ -218,6 +221,9 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 		conds := inst.GetControlFlowConditions()
 		result := getMemberCall(i, inst, actx)
 		for _, cond := range conds {
+			if utils.IsNil(cond) {
+				continue
+			}
 			ret := i.NewValue(cond).getTopDefs(actx, opt...)
 			result = append(result, ret...)
 		}
@@ -391,6 +397,9 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 					continue
 				}
 				for _, subVal := range retInst.GetValues() {
+					if utils.IsNil(subVal) {
+						continue
+					}
 					if ret := value.NewValue(subVal).getTopDefs(actx, opt...); len(ret) > 0 {
 						vals = append(vals, ret...)
 					}
@@ -404,6 +413,9 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 		}
 		// handler child-class function
 		for _, child := range inst.GetPointer() {
+			if utils.IsNil(child) {
+				continue
+			}
 			handlerReturn(i.NewValue(child))
 		}
 		return vals
@@ -428,7 +440,11 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 			if !ok {
 				memberKey = nil
 			}
-			actx.pushObject(i.NewValue(para), i.NewValue(memberKey), i.NewValue(ssa.NewConst("")))
+			keyVal := i.NewValue(memberKey)
+			if keyVal == nil {
+				keyVal = i.NewValue(ssa.NewConst(""))
+			}
+			actx.pushObject(i.NewValue(para), keyVal, i.NewValue(ssa.NewConst("")))
 			return i.NewValue(para).getTopDefs(actx, opt...)
 		}
 		getActualValueByCall := func(called *Value) Values {
@@ -443,7 +459,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 
 			// 获取实际传入的参数值
 			actualParam, ok := inst.GetActualCallParam(calledInstance)
-			if !ok {
+			if !ok || utils.IsNil(actualParam) {
 				return Values{}
 			}
 			traced := i.NewValue(actualParam)
@@ -534,6 +550,9 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 					}
 				}
 			}
+			if utils.IsNil(actualParam) {
+				return getMemberCall(i, i.getValue(), actx)
+			}
 			traced := i.NewValue(actualParam)
 			if !actx.needCrossProcess(i, traced) {
 				return Values{}
@@ -580,8 +599,8 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 		callIns := inst.CallSite
 		if callIns >= 0 {
 			v, ok := inst.GetValueById(inst.Value)
-			if !ok {
-				v = nil
+			if !ok || utils.IsNil(v) {
+				return getMemberCall(i, i.getValue(), actx)
 			}
 			topDefValue := i.NewValue(v)
 			return topDefValue.getTopDefs(actx, opt...)
@@ -594,8 +613,15 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 		var allmember map[ssa.Value]ssa.Value
 		allmember = inst.GetAllMember()
 		for key, member := range allmember {
+			if utils.IsNil(key) || utils.IsNil(member) {
+				continue
+			}
 			value := i.NewValue(member)
-			if err := actx.pushObject(i, i.NewValue(key), value); err != nil {
+			keyVal := i.NewValue(key)
+			if value == nil || keyVal == nil {
+				continue
+			}
+			if err := actx.pushObject(i, keyVal, value); err != nil {
 				//log.Errorf("push object failed: %v", err)
 				// continue
 			} else {
