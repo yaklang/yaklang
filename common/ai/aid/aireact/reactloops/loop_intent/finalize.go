@@ -3,6 +3,7 @@ package loop_intent
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
@@ -120,6 +121,7 @@ Skills: {{ .MatchedSkillNames }}
 		return
 	}
 
+	aiStart := time.Now()
 	forgeResult, err := invoker.InvokeSpeedPriorityLiteForge(
 		ctx,
 		"intent-finalize-summary",
@@ -150,6 +152,7 @@ Skills: {{ .MatchedSkillNames }}
 			recommendedCapabilitiesStreamCallback(invoker),
 		),
 	)
+	reactloops.SetWorkspaceDebugDuration(loop, reactloops.IntentDebugFinalizeAIDurationKey, time.Since(aiStart))
 	if err != nil {
 		log.Errorf("intent finalize: LiteForge invocation failed: %v", err)
 		buildFallbackIntentAnalysis(loop)

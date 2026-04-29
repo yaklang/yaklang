@@ -2,6 +2,7 @@ package reactloops
 
 import (
 	"strings"
+	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiskillloader"
@@ -26,6 +27,7 @@ type DeepIntentResult struct {
 // intent analysis. It creates a sub-task, runs the intent loop, and extracts
 // structured results. Returns nil on any failure (non-fatal).
 func ExecuteDeepIntentRecognition(r aicommon.AIInvokeRuntime, loop *ReActLoop, task aicommon.AIStatefulTask) *DeepIntentResult {
+	totalStart := time.Now()
 	userInput := task.GetUserInput()
 
 	intentTask := aicommon.NewStatefulTaskBase(
@@ -46,6 +48,7 @@ func ExecuteDeepIntentRecognition(r aicommon.AIInvokeRuntime, loop *ReActLoop, t
 		intentLoop = l
 	}), WithNoEndLoadingStatus(true), WithUseSpeedPriorityAICallback(true))
 
+	executeLoopStart := time.Now()
 	_, err := r.ExecuteLoopTaskIF(schema.AI_REACT_LOOP_NAME_INTENT, intentTask, opts...)
 	if err != nil {
 		log.Warnf("deep intent recognition failed: %v", err)
@@ -55,6 +58,8 @@ func ExecuteDeepIntentRecognition(r aicommon.AIInvokeRuntime, loop *ReActLoop, t
 		log.Warnf("deep intent recognition: intent loop reference is nil")
 		return nil
 	}
+	setWorkspaceDebugDuration(intentLoop, intentDebugExecuteLoopDurationKey, time.Since(executeLoopStart))
+	setWorkspaceDebugDuration(intentLoop, intentDebugTotalDurationKey, time.Since(totalStart))
 
 	result := &DeepIntentResult{
 		IntentAnalysis:    intentLoop.Get("intent_analysis"),

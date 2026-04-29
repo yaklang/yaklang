@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
@@ -63,6 +64,10 @@ func makeFinalizeEnrichmentAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 		},
 		// Handler
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
+			start := time.Now()
+			defer func() {
+				reactloops.SetWorkspaceDebugDuration(loop, reactloops.IntentDebugFinalizeDurationKey, time.Since(start))
+			}()
 			intentSummary := reactloops.CompactIntentSummary(action.GetString("intent_summary"))
 			tags := action.GetStringSlice("tags")
 			questions := action.GetStringSlice("questions")

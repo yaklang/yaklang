@@ -579,6 +579,10 @@ func (r *ReActLoop) refreshKnowledgeFromPerception(state *PerceptionState) {
 	if r == nil || state == nil {
 		return
 	}
+	stageStart := time.Now()
+	defer func() {
+		setWorkspaceDebugDuration(r, perceptionDebugKnowledgeDurationKey, time.Since(stageStart))
+	}()
 
 	r.clearPerceptionKnowledgeSearchResult()
 	if !r.allowPerceptionKnowledgeRefresh() {
@@ -605,7 +609,9 @@ func (r *ReActLoop) refreshKnowledgeFromPerception(state *PerceptionState) {
 		return
 	}
 
+	resolveStart := time.Now()
 	knowledgeBases := r.resolvePerceptionKnowledgeBases(ctx, invoker, searchQuery)
+	setWorkspaceDebugDuration(r, perceptionDebugKnowledgeResolveDurationKey, time.Since(resolveStart))
 	if len(knowledgeBases) == 0 {
 		log.Debugf("perception knowledge: no knowledge bases available for query: %s", utils.ShrinkString(searchQuery, 120))
 		return
@@ -616,7 +622,9 @@ func (r *ReActLoop) refreshKnowledgeFromPerception(state *PerceptionState) {
 	if len(keywordList) > 0 {
 		usedQuery = strings.Join(keywordList, " ")
 	}
+	quickSearchStart := time.Now()
 	enhanceData, err := invoker.QuickKnowledgeSearch(ctx, searchQuery, keywordList, knowledgeBases...)
+	setWorkspaceDebugDuration(r, perceptionDebugKnowledgeSearchDurationKey, time.Since(quickSearchStart))
 	if err != nil {
 		log.Warnf("perception knowledge: quick search failed: %v", err)
 		return
@@ -625,7 +633,9 @@ func (r *ReActLoop) refreshKnowledgeFromPerception(state *PerceptionState) {
 	if enhanceData == "" {
 		return
 	}
+	compressStart := time.Now()
 	compressed, compressErr := invoker.CompressLongTextWithDestination(ctx, enhanceData, usedQuery, int64(perceptionKnowledgeMaxContextTokens))
+	setWorkspaceDebugDuration(r, perceptionDebugKnowledgeCompressDurationKey, time.Since(compressStart))
 	if compressErr != nil {
 		log.Warnf("perception knowledge: compress failed: %v", compressErr)
 	} else if trimmed := strings.TrimSpace(compressed); trimmed != "" {
@@ -644,6 +654,10 @@ func (r *ReActLoop) refreshCapabilitiesFromPerception(state *PerceptionState) {
 	if r == nil || state == nil {
 		return
 	}
+	stageStart := time.Now()
+	defer func() {
+		setWorkspaceDebugDuration(r, perceptionDebugCapabilityDurationKey, time.Since(stageStart))
+	}()
 
 	invoker := r.GetInvoker()
 	if utils.IsNil(invoker) {
@@ -720,6 +734,10 @@ func (r *ReActLoop) TriggerPerception(reason string, force bool) *PerceptionStat
 	if r.perception == nil {
 		return nil
 	}
+	totalStart := time.Now()
+	defer func() {
+		setWorkspaceDebugDuration(r, perceptionDebugTotalDurationKey, time.Since(totalStart))
+	}()
 
 	if !atomic.CompareAndSwapInt32(&r.perception.running, 0, 1) {
 		log.Debugf("perception skipped: another perception call is already running (trigger=%s)", reason)
@@ -750,12 +768,14 @@ func (r *ReActLoop) TriggerPerception(reason string, force bool) *PerceptionStat
 		ctx = task.GetContext()
 	}
 
+	aiStart := time.Now()
 	action, err := invoker.InvokeSpeedPriorityLiteForge(
 		ctx, "perception", prompt, perceptionOutputSchema,
 		aicommon.WithGeneralConfigStreamableFieldWithNodeId("perception", "summary"),
 		aicommon.WithGeneralConfigStreamableFieldWithNodeId("perception", "topics"),
 		aicommon.WithGeneralConfigStreamableFieldWithNodeId("perception", "keywords"),
 	)
+	setWorkspaceDebugDuration(r, perceptionDebugAIDurationKey, time.Since(aiStart))
 	if err != nil {
 		log.Warnf("perception liteforge call failed (trigger=%s): %v", reason, err)
 		return r.perception.getCurrent()

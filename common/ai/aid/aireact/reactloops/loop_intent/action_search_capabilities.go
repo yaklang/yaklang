@@ -3,6 +3,7 @@ package loop_intent
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiskillloader"
@@ -74,6 +75,10 @@ func makeSearchCapabilitiesAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 		},
 		// Handler
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
+			totalStart := time.Now()
+			defer func() {
+				reactloops.SetWorkspaceDebugDuration(loop, reactloops.IntentDebugCapabilityDurationKey, time.Since(totalStart))
+			}()
 			// if the intent_summary is provided by the intent analysis step, store it for context , can reduce the step of intent analysis in finalize_enrichment
 			if summary := action.GetString("intent_summary"); summary != "" {
 				loop.Set("intent_summary", reactloops.CompactIntentSummary(summary))
@@ -99,6 +104,7 @@ func makeSearchCapabilitiesAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 			db := consts.GetGormProfileDatabase()
 			if db != nil {
 				loop.LoadingStatus("Start to load bm25+keyword search results for tools and AI forges... / 开始加载工具和AI蓝图的BM25+关键词搜索结果...")
+				dbSearchStart := time.Now()
 
 				toolSeen := make(map[string]bool)
 				var allTools []*schema.AIYakTool
@@ -218,15 +224,20 @@ func makeSearchCapabilitiesAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 				} else {
 					results.WriteString("### AI Forges\nNo matching forges found.\n\n")
 				}
+				reactloops.SetWorkspaceDebugDuration(loop, reactloops.IntentDebugCapabilityDBDurationKey, time.Since(dbSearchStart))
 			} else {
 				results.WriteString("### Tools & Forges\nDatabase not available.\n\n")
 			}
 
 			// 3. Search Skills via SkillLoader (if available)
+			skillSearchStart := time.Now()
 			searchSkillsFromLoader(r, query, &results, loop, &capDetails)
+			reactloops.SetWorkspaceDebugDuration(loop, reactloops.IntentDebugSkillSearchDurationKey, time.Since(skillSearchStart))
 
 			// 4. Search registered loop metadata
+			focusModeSearchStart := time.Now()
 			matchedLoops := searchLoopMetadata(query)
+			reactloops.SetWorkspaceDebugDuration(loop, reactloops.IntentDebugFocusModeSearchDurationKey, time.Since(focusModeSearchStart))
 			if len(matchedLoops) > 0 {
 				results.WriteString("### Matched Focus Modes\n")
 				for _, meta := range matchedLoops {

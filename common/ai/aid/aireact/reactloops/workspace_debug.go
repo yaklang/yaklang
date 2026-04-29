@@ -15,6 +15,32 @@ import (
 const (
 	envAIWorkspaceDebugPrimary   = "YAKIT_AI_WORKSPACE_DEBUG"
 	envAIWorkspaceDebugSecondary = "AI_WORKSPACE_DEBUG"
+
+	perceptionDebugTotalDurationKey             = "debug_perception_total_duration"
+	perceptionDebugAIDurationKey                = "debug_perception_ai_duration"
+	perceptionDebugCapabilityDurationKey        = "debug_perception_capability_duration"
+	perceptionDebugKnowledgeDurationKey         = "debug_perception_knowledge_duration"
+	perceptionDebugKnowledgeResolveDurationKey  = "debug_perception_knowledge_resolve_duration"
+	perceptionDebugKnowledgeSearchDurationKey   = "debug_perception_knowledge_search_duration"
+	perceptionDebugKnowledgeCompressDurationKey = "debug_perception_knowledge_compress_duration"
+
+	intentDebugTotalDurationKey           = "debug_intent_total_duration"
+	intentDebugExecuteLoopDurationKey     = "debug_intent_execute_loop_duration"
+	intentDebugCapabilityDurationKey      = "debug_intent_capability_duration"
+	intentDebugCapabilityDBDurationKey    = "debug_intent_capability_db_duration"
+	intentDebugSkillSearchDurationKey     = "debug_intent_skill_search_duration"
+	intentDebugFocusModeSearchDurationKey = "debug_intent_focus_mode_search_duration"
+	intentDebugFinalizeDurationKey        = "debug_intent_finalize_duration"
+	intentDebugFinalizeAIDurationKey      = "debug_intent_finalize_ai_duration"
+)
+
+const (
+	IntentDebugCapabilityDurationKey      = intentDebugCapabilityDurationKey
+	IntentDebugCapabilityDBDurationKey    = intentDebugCapabilityDBDurationKey
+	IntentDebugSkillSearchDurationKey     = intentDebugSkillSearchDurationKey
+	IntentDebugFocusModeSearchDurationKey = intentDebugFocusModeSearchDurationKey
+	IntentDebugFinalizeDurationKey        = intentDebugFinalizeDurationKey
+	IntentDebugFinalizeAIDurationKey      = intentDebugFinalizeAIDurationKey
 )
 
 func IsAIWorkspaceDebugEnabled() bool {
@@ -109,6 +135,48 @@ func appendWorkspaceDebugSection(buf *strings.Builder, title, content string) {
 	buf.WriteString("\n\n")
 }
 
+func formatWorkspaceDebugDuration(d time.Duration) string {
+	if d <= 0 {
+		return "0 ms"
+	}
+	if d < time.Millisecond {
+		return "<1 ms"
+	}
+	return fmt.Sprintf("%d ms", d.Milliseconds())
+}
+
+func setWorkspaceDebugDuration(loop *ReActLoop, key string, d time.Duration) {
+	if loop == nil || strings.TrimSpace(key) == "" {
+		return
+	}
+	loop.Set(key, formatWorkspaceDebugDuration(d))
+}
+
+func SetWorkspaceDebugDuration(loop *ReActLoop, key string, d time.Duration) {
+	setWorkspaceDebugDuration(loop, key, d)
+}
+
+func buildWorkspaceDebugTimingSection(loop *ReActLoop, items [][2]string) string {
+	if loop == nil || len(items) == 0 {
+		return ""
+	}
+
+	var buf strings.Builder
+	for _, item := range items {
+		label := strings.TrimSpace(item[0])
+		value := strings.TrimSpace(loop.Get(item[1]))
+		if label == "" || value == "" {
+			continue
+		}
+		buf.WriteString("- ")
+		buf.WriteString(label)
+		buf.WriteString(": ")
+		buf.WriteString(value)
+		buf.WriteString("\n")
+	}
+	return strings.TrimSpace(buf.String())
+}
+
 func writeIntentRecognitionDebugMarkdown(r aicommon.AIInvokeRuntime, loop *ReActLoop, result *DeepIntentResult) string {
 	if r == nil || loop == nil || result == nil {
 		return ""
@@ -118,6 +186,17 @@ func writeIntentRecognitionDebugMarkdown(r aicommon.AIInvokeRuntime, loop *ReAct
 	buf.WriteString("# Intent Recognition Debug\n\n")
 	buf.WriteString(fmt.Sprintf("- Generated At: %s\n", time.Now().Format("2006-01-02 15:04:05")))
 	buf.WriteString(fmt.Sprintf("- Loop Name: %s\n\n", loop.loopName))
+
+	appendWorkspaceDebugSection(&buf, "Timing", buildWorkspaceDebugTimingSection(loop, [][2]string{
+		{"Total", intentDebugTotalDurationKey},
+		{"Deep Intent Loop", intentDebugExecuteLoopDurationKey},
+		{"Capability Search", intentDebugCapabilityDurationKey},
+		{"Capability DB Search", intentDebugCapabilityDBDurationKey},
+		{"Skill Search", intentDebugSkillSearchDurationKey},
+		{"Focus Mode Search", intentDebugFocusModeSearchDurationKey},
+		{"Finalize Enrichment", intentDebugFinalizeDurationKey},
+		{"Finalize AI", intentDebugFinalizeAIDurationKey},
+	}))
 
 	appendWorkspaceDebugSection(&buf, "Intent Analysis", result.IntentAnalysis)
 	appendWorkspaceDebugSection(&buf, "Recommended Tools", result.RecommendedTools)
@@ -172,6 +251,16 @@ func writePerceptionDebugMarkdown(loop *ReActLoop, state *PerceptionState, input
 	buf.WriteString(fmt.Sprintf("- Trigger: %s\n", state.LastTrigger))
 	buf.WriteString(fmt.Sprintf("- Changed: %v\n", state.Changed))
 	buf.WriteString(fmt.Sprintf("- Confidence: %.4f\n\n", state.ConfidenceLevel))
+
+	appendWorkspaceDebugSection(&buf, "Timing", buildWorkspaceDebugTimingSection(loop, [][2]string{
+		{"Total", perceptionDebugTotalDurationKey},
+		{"Perception AI", perceptionDebugAIDurationKey},
+		{"Capability Search", perceptionDebugCapabilityDurationKey},
+		{"Knowledge Refresh", perceptionDebugKnowledgeDurationKey},
+		{"Knowledge Base Resolve", perceptionDebugKnowledgeResolveDurationKey},
+		{"Knowledge Search", perceptionDebugKnowledgeSearchDurationKey},
+		{"Knowledge Compress", perceptionDebugKnowledgeCompressDurationKey},
+	}))
 
 	appendWorkspaceDebugSection(&buf, "Summary", state.OneLinerSummary)
 	appendWorkspaceDebugSection(&buf, "Topics", strings.Join(state.Topics, ", "))

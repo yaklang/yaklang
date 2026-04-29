@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -55,6 +56,10 @@ func TestWriteIntentRecognitionDebugMarkdown(t *testing.T) {
 	loop.SetCurrentTask(task)
 	loop.Set("search_results", "### Matched Tools\n- tool1")
 	loop.Set("matched_capabilities_details", `[{"capability_name":"tool1","capability_type":"tool","description":"demo tool"}]`)
+	SetWorkspaceDebugDuration(loop, intentDebugTotalDurationKey, 250*time.Millisecond)
+	SetWorkspaceDebugDuration(loop, intentDebugExecuteLoopDurationKey, 200*time.Millisecond)
+	SetWorkspaceDebugDuration(loop, intentDebugCapabilityDurationKey, 80*time.Millisecond)
+	SetWorkspaceDebugDuration(loop, intentDebugFinalizeAIDurationKey, 25*time.Millisecond)
 
 	result := &DeepIntentResult{
 		IntentAnalysis:    "用户想找合适的工具和蓝图",
@@ -79,6 +84,9 @@ func TestWriteIntentRecognitionDebugMarkdown(t *testing.T) {
 	require.Contains(t, content, "tool1,tool2")
 	require.Contains(t, content, "target-repo")
 	require.Contains(t, content, "### Matched Tools")
+	require.Contains(t, content, "## Timing")
+	require.Contains(t, content, "Total: 250 ms")
+	require.Contains(t, content, "Finalize AI: 25 ms")
 }
 
 func TestWritePerceptionDebugMarkdown(t *testing.T) {
@@ -111,6 +119,10 @@ func TestWritePerceptionDebugMarkdown(t *testing.T) {
 		MatchedFocusModeNames:   []string{"internet_research"},
 		RecommendedCapabilities: []string{"web_search"},
 	}
+	SetWorkspaceDebugDuration(loop, perceptionDebugTotalDurationKey, 220*time.Millisecond)
+	SetWorkspaceDebugDuration(loop, perceptionDebugAIDurationKey, 90*time.Millisecond)
+	SetWorkspaceDebugDuration(loop, perceptionDebugKnowledgeDurationKey, 60*time.Millisecond)
+	SetWorkspaceDebugDuration(loop, perceptionDebugKnowledgeCompressDurationKey, 20*time.Millisecond)
 
 	filePath := writePerceptionDebugMarkdown(loop, state, input, result, nil)
 	require.NotEmpty(t, filePath)
@@ -125,4 +137,7 @@ func TestWritePerceptionDebugMarkdown(t *testing.T) {
 	require.Contains(t, content, strings.Join(state.Topics, ", "))
 	require.Contains(t, content, "web_search")
 	require.Contains(t, content, "internet_research")
+	require.Contains(t, content, "## Timing")
+	require.Contains(t, content, "Perception AI: 90 ms")
+	require.Contains(t, content, "Knowledge Compress: 20 ms")
 }
