@@ -419,8 +419,8 @@ func TestNewContextProviderManager(t *testing.T) {
 
 func TestContextProviderManager_MaxTokensConfiguration(t *testing.T) {
 	testCases := []struct {
-		name      string
-		maxTokens int
+		name         string
+		maxTokens    int
 		input        string
 		expectShrink bool
 	}{
@@ -532,6 +532,59 @@ func TestContextProviderManager_MultipleExecutions(t *testing.T) {
 
 	if !strings.Contains(result3, "call_3") {
 		t.Fatalf("Third result should contain call_3: %s", result3)
+	}
+}
+
+func TestContextProviderManager_ExecuteStable_UsesDeterministicTags(t *testing.T) {
+	cpm := NewContextProviderManager()
+	cpm.Register("provider-one", func(config AICallerConfigIf, emitter *Emitter, key string) (string, error) {
+		return "stable-content", nil
+	})
+
+	result1 := cpm.ExecuteStable(nil, nil)
+	result2 := cpm.ExecuteStable(nil, nil)
+
+	if result1 != result2 {
+		t.Fatalf("stable execution should be byte-stable when content is unchanged\nresult1=%s\nresult2=%s", result1, result2)
+	}
+	if !strings.Contains(result1, "<|AUTO_PROVIDE_CTX_[provider_one]_START key=provider-one|>") {
+		t.Fatalf("stable execution should use deterministic provider tag: %s", result1)
+	}
+}
+
+func TestContextProviderManager_ExecuteWithNonce_UsesProvidedNonceAcrossTags(t *testing.T) {
+	cpm := NewContextProviderManager()
+	callCount := 0
+	cpm.RegisterTracedContent("provider-one", func(config AICallerConfigIf, emitter *Emitter, key string) (string, error) {
+		callCount++
+		return fmt.Sprintf("content_version_%d", callCount), nil
+	})
+
+	_ = cpm.ExecuteWithNonce(nil, nil, "loopN1")
+	result := cpm.ExecuteWithNonce(nil, nil, "loopN1")
+
+	if !strings.Contains(result, "<|AUTO_PROVIDE_CTX_[loopN1_provider_one]_START key=provider-one|>") {
+		t.Fatalf("nonce execution should use provided nonce in provider tag: %s", result)
+	}
+	if !strings.Contains(result, "<|CHANGES_DIFF_loopN1_provider_one|>") {
+		t.Fatalf("nonce execution should normalize diff tags with the same nonce flag: %s", result)
+	}
+}
+
+func TestContextProviderManager_RegisterTracedContent_NoDiffNoExtraTag(t *testing.T) {
+	cpm := NewContextProviderManager()
+	cpm.RegisterTracedContent("traced_same", func(config AICallerConfigIf, emitter *Emitter, key string) (string, error) {
+		return "same-content", nil
+	})
+
+	result1 := cpm.ExecuteStable(nil, nil)
+	result2 := cpm.ExecuteStable(nil, nil)
+
+	if strings.Contains(result2, "CHANGES_DIFF_") {
+		t.Fatalf("unchanged traced content should not emit diff tags: %s", result2)
+	}
+	if result1 != result2 {
+		t.Fatalf("stable execution should remain byte-stable for unchanged traced content\nresult1=%s\nresult2=%s", result1, result2)
 	}
 }
 

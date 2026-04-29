@@ -222,6 +222,65 @@ func TestSkillsContextManager_SearchSkills(t *testing.T) {
 	}
 }
 
+func TestSkillsContextManager_RenderStable_SortsAvailableSkills(t *testing.T) {
+	vfs := buildTestVFS()
+	loader, err := NewFSSkillLoader(vfs)
+	if err != nil {
+		t.Fatalf("NewFSSkillLoader failed: %v", err)
+	}
+
+	mgr := NewSkillsContextManager(loader)
+	rendered := mgr.RenderStable()
+
+	codeReviewIdx := strings.Index(rendered, "  - code-review:")
+	deployAppIdx := strings.Index(rendered, "  - deploy-app:")
+	if codeReviewIdx == -1 || deployAppIdx == -1 {
+		t.Fatalf("stable render should list both available skills. Got:\n%s", rendered)
+	}
+	if codeReviewIdx > deployAppIdx {
+		t.Fatalf("available skills should be rendered in stable alphabetical order. Got:\n%s", rendered)
+	}
+}
+
+func TestSkillsContextManager_RenderStable_SortsLoadedSkillsAndViews(t *testing.T) {
+	vfs := buildTestVFS()
+	loader, err := NewFSSkillLoader(vfs)
+	if err != nil {
+		t.Fatalf("NewFSSkillLoader failed: %v", err)
+	}
+
+	mgr := NewSkillsContextManager(loader)
+	if err := mgr.LoadSkill("deploy-app"); err != nil {
+		t.Fatalf("LoadSkill deploy-app failed: %v", err)
+	}
+	if err := mgr.LoadSkill("code-review"); err != nil {
+		t.Fatalf("LoadSkill code-review failed: %v", err)
+	}
+	if err := mgr.ChangeViewOffset("deploy-app", "scripts/deploy.sh", 1); err != nil {
+		t.Fatalf("ChangeViewOffset failed: %v", err)
+	}
+
+	rendered := mgr.RenderStable()
+
+	codeReviewSkillIdx := strings.Index(rendered, "=== Skill: code-review ===")
+	deployAppSkillIdx := strings.Index(rendered, "=== Skill: deploy-app ===")
+	if codeReviewSkillIdx == -1 || deployAppSkillIdx == -1 {
+		t.Fatalf("stable render should contain both loaded skills. Got:\n%s", rendered)
+	}
+	if codeReviewSkillIdx > deployAppSkillIdx {
+		t.Fatalf("loaded skills should be rendered in stable alphabetical order. Got:\n%s", rendered)
+	}
+
+	skillMDIdx := strings.Index(rendered, "File: SKILL.md (Skill: deploy-app)")
+	deployScriptIdx := strings.Index(rendered, "File: scripts/deploy.sh (Skill: deploy-app)")
+	if skillMDIdx == -1 || deployScriptIdx == -1 {
+		t.Fatalf("stable render should contain both deploy-app view windows. Got:\n%s", rendered)
+	}
+	if skillMDIdx > deployScriptIdx {
+		t.Fatalf("deploy-app view windows should be rendered in stable path order. Got:\n%s", rendered)
+	}
+}
+
 func TestFSSkillLoader_GetFileSystem(t *testing.T) {
 	vfs := buildTestVFS()
 	loader, err := NewFSSkillLoader(vfs)

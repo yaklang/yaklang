@@ -6,10 +6,12 @@ import (
 	"mime"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/consts"
@@ -630,6 +632,13 @@ func (r *ContextProviderManager) RegisterTracedContent(name string, cb ContextPr
 				diffResult += fmt.Sprintf("\n[Error changed from: %v to: %v]", lastErr, newErr)
 			}
 
+			if strings.TrimSpace(diffResult) == "" {
+				lastContent = content
+				lastErr = newErr
+				buf.Reset()
+				return
+			}
+
 			diff, err := utils.RenderTemplate(`<|CHANGES_DIFF_{{ .nonce }}|>
 {{ .diff }}
 <|CHANGES_DIFF_{{ .nonce }}|>`, map[string]any{
@@ -694,6 +703,28 @@ func (r *ContextProviderManager) Unregister(name string) {
 }
 
 func (r *ContextProviderManager) Execute(config AICallerConfigIf, emitter *Emitter) string {
+	return r.executeWithTagStrategy(config, emitter, func(name string) string {
+		return utils.RandStringBytes(4)
+	})
+}
+
+func (r *ContextProviderManager) ExecuteStable(config AICallerConfigIf, emitter *Emitter) string {
+	return r.executeWithTagStrategy(config, emitter, func(name string) string {
+		return stableContextProviderTag(name)
+	})
+}
+
+func (r *ContextProviderManager) ExecuteWithNonce(config AICallerConfigIf, emitter *Emitter, nonce string) string {
+	return r.executeWithTagStrategy(config, emitter, func(name string) string {
+		return contextProviderTagWithNonce(nonce, name)
+	})
+}
+
+func (r *ContextProviderManager) executeWithTagStrategy(
+	config AICallerConfigIf,
+	emitter *Emitter,
+	tagStrategy func(name string) string,
+) string {
 	r.m.RLock()
 	defer r.m.RUnlock()
 
@@ -707,7 +738,14 @@ func (r *ContextProviderManager) Execute(config AICallerConfigIf, emitter *Emitt
 		if err != nil {
 			result = `[Error getting context: ` + err.Error() + `]`
 		}
-		flag := utils.RandStringBytes(4)
+		flag := ""
+		if tagStrategy != nil {
+			flag = tagStrategy(name)
+		}
+		if strings.TrimSpace(flag) == "" {
+			flag = "ctx"
+		}
+		result = normalizeContextProviderDynamicTags(result, flag)
 		buf.WriteString(fmt.Sprintf("<|AUTO_PROVIDE_CTX_[%v]_START key=%v|>\n", flag, name))
 		buf.WriteString(result)
 		buf.WriteString(fmt.Sprintf("\n<|AUTO_PROVIDE_CTX_[%v]_END|>", flag))
@@ -722,4 +760,50 @@ func (r *ContextProviderManager) Execute(config AICallerConfigIf, emitter *Emitt
 	}
 
 	return result
+}
+
+func stableContextProviderTag(name string) string {
+	result := sanitizeContextProviderTag(name, true)
+	if result == "" {
+		return "ctx"
+	}
+	return result
+}
+
+func contextProviderTagWithNonce(nonce string, name string) string {
+	nameTag := stableContextProviderTag(name)
+	nonceTag := sanitizeContextProviderTag(nonce, false)
+	if nonceTag == "" {
+		return nameTag
+	}
+	return nonceTag + "_" + nameTag
+}
+
+func sanitizeContextProviderTag(name string, lower bool) string {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return ""
+	}
+	if lower {
+		name = strings.ToLower(name)
+	}
+	var buf strings.Builder
+	for _, r := range name {
+		switch {
+		case unicode.IsLetter(r), unicode.IsDigit(r):
+			buf.WriteRune(r)
+		default:
+			buf.WriteByte('_')
+		}
+	}
+	return strings.Trim(buf.String(), "_")
+}
+
+var changesDiffTagRegexp = regexp.MustCompile(`<\|CHANGES_DIFF_[^\s\|\n>]+\|>`)
+
+func normalizeContextProviderDynamicTags(result string, flag string) string {
+	if strings.TrimSpace(result) == "" || strings.TrimSpace(flag) == "" {
+		return result
+	}
+	return changesDiffTagRegexp.ReplaceAllString(result, "<|CHANGES_DIFF_"+flag+"|>")
 }

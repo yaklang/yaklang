@@ -367,7 +367,8 @@ func (m *SkillsContextManager) GetSkillViewSummary(skillName string) string {
 
 	buf.WriteString(fmt.Sprintf("Skill '%s' is loaded and ACTIVE in the SKILLS_CONTEXT section of your prompt. ", skillName))
 	buf.WriteString("View Windows:\n")
-	for filePath, vw := range state.ViewWindows {
+	for _, vw := range sortedViewWindows(state.ViewWindows) {
+		filePath := vw.FilePath
 		totalLines := vw.TotalLines()
 		offset := vw.GetOffset()
 		truncInfo := ""
@@ -386,24 +387,37 @@ func (m *SkillsContextManager) GetLoader() SkillLoader {
 
 // Render generates the full skills context string for injection into the prompt.
 func (m *SkillsContextManager) Render(nonce string) string {
+	if strings.TrimSpace(nonce) == "" {
+		nonce = "skills_context"
+	}
+	return m.renderWithTag(nonce)
+}
+
+// RenderStable generates a deterministic skills context block so unchanged skill
+// state can participate in prompt prefix caching.
+func (m *SkillsContextManager) RenderStable() string {
+	return m.renderWithTag("skills_context")
+}
+
+func (m *SkillsContextManager) renderWithTag(tag string) string {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
 	if m.loadedSkills.Len() == 0 {
 		if m.HasRegisteredSkills() {
-			skills := m.loader.AllSkillMetas()
+			skills := sortSkillMetasByName(m.loader.AllSkillMetas())
 			stats := GetSkillSourceStats(m.loader)
 			if len(skills) == 0 {
 				if stats.DatabaseCount > 0 {
 					return fmt.Sprintf(
 						"<|SKILLS_CONTEXT_%s|>\nAvailable database-backed skills: %d. Use search_capabilities or loading_skills with an exact skill name to access them.\n<|SKILLS_CONTEXT_END_%s|>",
-						nonce, stats.DatabaseCount, nonce,
+						tag, stats.DatabaseCount, tag,
 					)
 				}
 				return ""
 			}
 			var buf bytes.Buffer
-			buf.WriteString(fmt.Sprintf("<|SKILLS_CONTEXT_%s|>\n", nonce))
+			buf.WriteString(fmt.Sprintf("<|SKILLS_CONTEXT_%s|>\n", tag))
 			buf.WriteString("Available Skills (use loading_skills action to load):\n")
 			listed := 0
 			for _, s := range skills {
@@ -419,26 +433,26 @@ func (m *SkillsContextManager) Render(nonce string) string {
 			if stats.DatabaseCount > 0 {
 				buf.WriteString(fmt.Sprintf("  ... plus %d database-backed skills available via search.\n", stats.DatabaseCount))
 			}
-			buf.WriteString(fmt.Sprintf("<|SKILLS_CONTEXT_END_%s|>", nonce))
+			buf.WriteString(fmt.Sprintf("<|SKILLS_CONTEXT_END_%s|>", tag))
 			return buf.String()
 		}
 		return ""
 	}
 
 	var buf bytes.Buffer
-	buf.WriteString(fmt.Sprintf("<|SKILLS_CONTEXT_%s|>\n", nonce))
+	buf.WriteString(fmt.Sprintf("<|SKILLS_CONTEXT_%s|>\n", tag))
 
-	m.loadedSkills.ForEach(func(name string, state *skillContextState) bool {
+	for _, item := range m.sortedLoadedSkillStates() {
+		state := item.state
 		if state.IsFolded {
 			buf.WriteString(m.renderFolded(state))
 		} else {
 			buf.WriteString(m.renderFull(state))
 		}
 		buf.WriteString("\n")
-		return true
-	})
+	}
 
-	buf.WriteString(fmt.Sprintf("<|SKILLS_CONTEXT_END_%s|>", nonce))
+	buf.WriteString(fmt.Sprintf("<|SKILLS_CONTEXT_END_%s|>", tag))
 	return buf.String()
 }
 
@@ -469,12 +483,89 @@ func (m *SkillsContextManager) renderFull(state *skillContextState) string {
 	buf.WriteString(RenderFileSystemTreeFull(state.Skill.FileSystem))
 
 	// Render all active view windows
-	for _, vw := range state.ViewWindows {
+	for _, vw := range sortedViewWindows(state.ViewWindows) {
 		buf.WriteString("\n")
 		buf.WriteString(vw.RenderWithInfo())
 	}
 
 	return buf.String()
+}
+
+type namedSkillState struct {
+	name  string
+	state *skillContextState
+}
+
+func (m *SkillsContextManager) sortedLoadedSkillStates() []namedSkillState {
+	items := make([]namedSkillState, 0, m.loadedSkills.Len())
+	m.loadedSkills.ForEach(func(name string, state *skillContextState) bool {
+		items = append(items, namedSkillState{name: name, state: state})
+		return true
+	})
+	sort.Slice(items, func(i, j int) bool {
+		left := items[i].name
+		right := items[j].name
+		if items[i].state != nil && items[i].state.Skill != nil && items[i].state.Skill.Meta != nil && items[i].state.Skill.Meta.Name != "" {
+			left = items[i].state.Skill.Meta.Name
+		}
+		if items[j].state != nil && items[j].state.Skill != nil && items[j].state.Skill.Meta != nil && items[j].state.Skill.Meta.Name != "" {
+			right = items[j].state.Skill.Meta.Name
+		}
+		if left == right {
+			return items[i].name < items[j].name
+		}
+		return left < right
+	})
+	return items
+}
+
+func sortSkillMetasByName(metas []*SkillMeta) []*SkillMeta {
+	if len(metas) <= 1 {
+		return metas
+	}
+	sorted := append([]*SkillMeta(nil), metas...)
+	sort.Slice(sorted, func(i, j int) bool {
+		leftName := ""
+		rightName := ""
+		if sorted[i] != nil {
+			leftName = sorted[i].Name
+		}
+		if sorted[j] != nil {
+			rightName = sorted[j].Name
+		}
+		if leftName == rightName {
+			leftDesc := ""
+			rightDesc := ""
+			if sorted[i] != nil {
+				leftDesc = sorted[i].Description
+			}
+			if sorted[j] != nil {
+				rightDesc = sorted[j].Description
+			}
+			return leftDesc < rightDesc
+		}
+		return leftName < rightName
+	})
+	return sorted
+}
+
+func sortedViewWindows(viewWindows map[string]*ViewWindow) []*ViewWindow {
+	if len(viewWindows) == 0 {
+		return nil
+	}
+	keys := make([]string, 0, len(viewWindows))
+	for key := range viewWindows {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	result := make([]*ViewWindow, 0, len(keys))
+	for _, key := range keys {
+		if vw := viewWindows[key]; vw != nil {
+			result = append(result, vw)
+		}
+	}
+	return result
 }
 
 var crossSkillRefRegexp = regexp.MustCompile(`\.\.\/([a-zA-Z0-9][a-zA-Z0-9_-]*)\/`)
