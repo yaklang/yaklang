@@ -71,15 +71,15 @@ func (i *perceptionCapabilitySearchTestInvoker) InvokeSpeedPriorityLiteForge(ctx
 
 type perceptionKnowledgeSearchTestInvoker struct {
 	*mockcfg.MockInvoker
-	cfg                    aicommon.AICallerConfigIf
-	selectedKnowledgeBase  []string
-	enhanceResult          string
-	compressedResult       string
-	lastEnhanceQuery       string
-	lastEnhancePlans       []string
-	lastEnhanceCollections []string
-	lastCompressTarget     int64
-	selectCalls            int
+	cfg                        aicommon.AICallerConfigIf
+	selectedKnowledgeBase      []string
+	quickSearchResult          string
+	compressedResult           string
+	lastQuickSearchQuery       string
+	lastQuickSearchKeywords    []string
+	lastQuickSearchCollections []string
+	lastCompressTarget         int64
+	selectCalls                int
 }
 
 func (i *perceptionKnowledgeSearchTestInvoker) GetConfig() aicommon.AICallerConfigIf {
@@ -109,12 +109,12 @@ func (i *perceptionKnowledgeSearchTestInvoker) SelectKnowledgeBase(ctx context.C
 	return aicommon.NewSelectedKnowledgeBaseResult("test selection", append([]string{}, i.selectedKnowledgeBase...)), nil
 }
 
-func (i *perceptionKnowledgeSearchTestInvoker) EnhanceKnowledgeGetterEx(ctx context.Context, userQuery string, enhancePlans []string, collections ...string) (string, error) {
+func (i *perceptionKnowledgeSearchTestInvoker) QuickKnowledgeSearch(ctx context.Context, userQuery string, keywords []string, collections ...string) (string, error) {
 	_ = ctx
-	i.lastEnhanceQuery = userQuery
-	i.lastEnhancePlans = append([]string{}, enhancePlans...)
-	i.lastEnhanceCollections = append([]string{}, collections...)
-	return i.enhanceResult, nil
+	i.lastQuickSearchQuery = userQuery
+	i.lastQuickSearchKeywords = append([]string{}, keywords...)
+	i.lastQuickSearchCollections = append([]string{}, collections...)
+	return i.quickSearchResult, nil
 }
 
 func (i *perceptionKnowledgeSearchTestInvoker) CompressLongTextWithDestination(ctx context.Context, input any, destination string, targetByteSize int64) (string, error) {
@@ -215,7 +215,7 @@ func TestTriggerPerception_AppliesKnowledgeSearchResultsToLoop(t *testing.T) {
 		MockInvoker:           mockcfg.NewMockInvoker(context.Background()),
 		cfg:                   cfg,
 		selectedKnowledgeBase: []string{"security_kb"},
-		enhanceResult:         "raw knowledge result",
+		quickSearchResult:     "raw knowledge result",
 		compressedResult:      "compressed knowledge result",
 	}
 
@@ -240,11 +240,12 @@ func TestTriggerPerception_AppliesKnowledgeSearchResultsToLoop(t *testing.T) {
 	state := loop.TriggerPerception(PerceptionTriggerForced, true)
 	require.NotNil(t, state)
 	require.Equal(t, "security_kb,yaklang_docs", loop.Get("perception_selected_knowledge_bases"))
-	require.Contains(t, loop.Get("perception_knowledge_query"), "focused summary from perception")
+	require.Equal(t, "header malformed http fuzzing", loop.Get("perception_knowledge_query"))
 	require.Contains(t, loop.Get("perception_knowledge_context"), "compressed knowledge result")
 	require.Equal(t, int64(perceptionKnowledgeMaxContextTokens), invoker.lastCompressTarget)
-	require.Equal(t, []string{"security_kb", "yaklang_docs"}, invoker.lastEnhanceCollections)
-	require.Equal(t, []string{"hypothetical_answer", "generalize_query", "split_query"}, invoker.lastEnhancePlans)
+	require.Contains(t, invoker.lastQuickSearchQuery, "focused summary from perception")
+	require.Equal(t, []string{"header", "malformed", "http fuzzing"}, invoker.lastQuickSearchKeywords)
+	require.Equal(t, []string{"security_kb", "yaklang_docs"}, invoker.lastQuickSearchCollections)
 	require.Equal(t, 0, invoker.selectCalls)
 
 	renderedDynamicContext := cfg.ContextProviderManager.Execute(cfg, cfg.GetEmitter())
@@ -265,7 +266,7 @@ func TestTriggerPerception_LimitsKnowledgeContextTo15K(t *testing.T) {
 		MockInvoker:           mockcfg.NewMockInvoker(context.Background()),
 		cfg:                   cfg,
 		selectedKnowledgeBase: []string{"security_kb"},
-		enhanceResult:         "raw knowledge result",
+		quickSearchResult:     "raw knowledge result",
 		compressedResult:      oversizedKnowledge,
 	}
 

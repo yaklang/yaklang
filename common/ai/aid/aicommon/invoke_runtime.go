@@ -213,6 +213,8 @@ type AIInvokeRuntime interface {
 	AskForClarification(ctx context.Context, question string, payloads []string) string
 	DirectlyAnswer(ctx context.Context, query string, tools []*aitool.Tool, opts ...any) (string, error)
 	CompressLongTextWithDestination(ctx context.Context, i any, destination string, targetByteSize int64) (string, error)
+	// QuickKnowledgeSearch performs a fast local knowledge-base search using LIKE + BM25.
+	QuickKnowledgeSearch(ctx context.Context, query string, keywords []string, collections ...string) (string, error)
 	// EnhanceKnowledgeGetterEx 支持多种 EnhancePlan 的知识增强获取器
 	// enhancePlans 参数可选，支持：
 	//   - nil 或空切片：使用默认完整增强流程

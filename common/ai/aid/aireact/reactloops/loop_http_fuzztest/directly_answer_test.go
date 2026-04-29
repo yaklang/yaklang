@@ -94,6 +94,10 @@ func (i *httpFuzztestTestInvoker) EnhanceKnowledgeGetterEx(ctx context.Context, 
 	return i.base.EnhanceKnowledgeGetterEx(ctx, userQuery, enhancePlans, collections...)
 }
 
+func (i *httpFuzztestTestInvoker) QuickKnowledgeSearch(ctx context.Context, query string, keywords []string, collections ...string) (string, error) {
+	return i.base.QuickKnowledgeSearch(ctx, query, keywords, collections...)
+}
+
 func (i *httpFuzztestTestInvoker) VerifyUserSatisfaction(ctx context.Context, query string, isToolCall bool, payload string) (*aicommon.VerifySatisfactionResult, error) {
 	return i.base.VerifyUserSatisfaction(ctx, query, isToolCall, payload)
 }

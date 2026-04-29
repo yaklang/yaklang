@@ -418,6 +418,10 @@ func (r *testRuntime) EnhanceKnowledgeGetterEx(ctx context.Context, userQuery st
 	return "", nil
 }
 
+func (r *testRuntime) QuickKnowledgeSearch(ctx context.Context, query string, keywords []string, collections ...string) (string, error) {
+	return "", nil
+}
+
 func (r *testRuntime) EnhanceKnowledgeGetRandomN(ctx context.Context, n int, collections ...string) (string, error) {
 	return "", nil
 }

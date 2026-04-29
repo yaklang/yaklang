@@ -375,6 +375,14 @@ func (m *MockInvoker) CompressLongTextWithDestination(ctx context.Context, i any
 	return "", nil
 }
 
+func (m *MockInvoker) QuickKnowledgeSearch(ctx context.Context, query string, keywords []string, collections ...string) (string, error) {
+	_ = ctx
+	_ = query
+	_ = keywords
+	_ = collections
+	return "", nil
+}
+
 func (m *MockInvoker) EnhanceKnowledgeAnswer(ctx context.Context, s string) (string, error) {
 	return "", nil
 }

@@ -192,6 +192,9 @@ func (m *AdvancedMockInvoker) EnhanceKnowledgeGetter(ctx context.Context, userQu
 func (m *AdvancedMockInvoker) EnhanceKnowledgeGetterEx(ctx context.Context, userQuery string, enhancePlans []string, collections ...string) (string, error) {
 	return "", nil
 }
+func (m *AdvancedMockInvoker) QuickKnowledgeSearch(ctx context.Context, query string, keywords []string, collections ...string) (string, error) {
+	return "", nil
+}
 func (m *AdvancedMockInvoker) EnhanceKnowledgeGetRandomN(ctx context.Context, n int, collections ...string) (string, error) {
 	return "", nil
 }

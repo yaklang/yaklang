@@ -551,6 +551,10 @@ func (m *mockInvokerForMemoryTest) EnhanceKnowledgeGetterEx(ctx context.Context,
 	return "", nil
 }
 
+func (m *mockInvokerForMemoryTest) QuickKnowledgeSearch(ctx context.Context, query string, keywords []string, collections ...string) (string, error) {
+	return "", nil
+}
+
 func (m *mockInvokerForMemoryTest) EnhanceKnowledgeGetRandomN(ctx context.Context, n int, collections ...string) (string, error) {
 	return "", nil
 }
