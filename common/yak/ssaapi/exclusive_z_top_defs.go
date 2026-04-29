@@ -525,9 +525,14 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 				if tmp := inst.GetDefault(); tmp != nil && !isInner {
 					actualParam = tmp
 				} else if binding, ok := calledInstance.Binding[inst.GetName()]; ok && isInner {
-					actualParam, ok = inst.GetValueById(binding)
+					// Prefer call-site scope (same as formal parameters): binding id refers to
+					// the actual SSA value at the call, which may not resolve on inst alone.
+					actualParam, ok = calledInstance.GetValueById(binding)
 					if !ok {
-						actualParam = nil
+						actualParam, ok = inst.GetValueById(binding)
+						if !ok {
+							actualParam = nil
+						}
 					}
 				} else {
 					log.Errorf("free value: %v is not found in binding", inst.GetName())
@@ -548,6 +553,12 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 					if !ok {
 						actualParam = nil
 					}
+				}
+			}
+			// After DB reload, Binding id lookup may fail while Parameter.defaultValue still resolves.
+			if utils.IsNil(actualParam) && inst.IsFreeValue {
+				if d := inst.GetDefault(); !utils.IsNil(d) {
+					actualParam = d
 				}
 			}
 			if utils.IsNil(actualParam) {
