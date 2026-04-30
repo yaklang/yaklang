@@ -2338,16 +2338,16 @@ func CodecTag() []*FuzzTagDescription {
 				}
 
 				var result []rune
-				for _, b := range []byte(text) {
-					asciiCode := int(b)
+				for _, r := range text {
+					asciiCode := int(r)
 					// 保留空白字符和斜杠
 					if asciiCode == 9 || asciiCode == 10 || asciiCode == 13 || asciiCode == 32 || asciiCode == 47 {
-						result = append(result, rune(b))
+						result = append(result, r)
 					} else if asciiCode >= 0 && asciiCode <= 127 {
 						codePoint := highByte*256 + asciiCode
 						result = append(result, rune(codePoint))
 					} else {
-						result = append(result, rune(b))
+						result = append(result, r)
 					}
 				}
 				return []string{string(result)}

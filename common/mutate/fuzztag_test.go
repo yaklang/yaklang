@@ -582,3 +582,99 @@ line3)}}`)
 		require.Equal(t, "singleline", results[0])
 	})
 }
+
+// verifyGhostBitsTruncation 验证 Ghost Bits 编码的数学正确性：
+// 对每个编码后的 rune，截断高 8 位（& 0xFF）应等于原始字符的 ASCII 值。
+// 保留字符（空白、斜杠）和非 ASCII 字符应保持不变。
+func verifyGhostBitsTruncation(t *testing.T, original string, encoded string) {
+	origRunes := []rune(original)
+	encRunes := []rune(encoded)
+	require.Equal(t, len(origRunes), len(encRunes), "编码前后字符数应一致")
+
+	for i, origR := range origRunes {
+		encR := encRunes[i]
+		asciiCode := int(origR)
+
+		// 保留字符：空白和斜杠应保持不变
+		if asciiCode == 9 || asciiCode == 10 || asciiCode == 13 || asciiCode == 32 || asciiCode == 47 {
+			require.Equal(t, origR, encR, "保留字符(空白/斜杠)不应被编码")
+			continue
+		}
+
+		// 非 ASCII 直接透传
+		if asciiCode > 127 {
+			require.Equal(t, origR, encR, "非 ASCII 字符应直接透传")
+			continue
+		}
+
+		// ASCII 字符应被编码：截断后低 8 位等于原始 ASCII
+		truncated := int(encR) & 0xFF
+		require.Equal(t, asciiCode, truncated, "编码后截断低 8 位应等于原始 ASCII 值")
+	}
+}
+
+func TestGhostBitsFuzzTag(t *testing.T) {
+	t.Run("default highByte encodes correctly", func(t *testing.T) {
+		results, err := FuzzTagExec(`{{ghostbits(../../etc/passwd)}}`, Fuzz_WithEnableDangerousTag())
+		require.NoError(t, err)
+		require.Len(t, results, 1)
+		verifyGhostBitsTruncation(t, "../../etc/passwd", results[0])
+	})
+
+	t.Run("custom highByte encodes correctly", func(t *testing.T) {
+		results, err := FuzzTagExec(`{{ghostbits(../../etc/passwd|0x5B)}}`, Fuzz_WithEnableDangerousTag())
+		require.NoError(t, err)
+		require.Len(t, results, 1)
+		verifyGhostBitsTruncation(t, "../../etc/passwd", results[0])
+	})
+
+	t.Run("custom highByte produces different unicode", func(t *testing.T) {
+		res1, _ := FuzzTagExec(`{{ghostbits(abc)}}`, Fuzz_WithEnableDangerousTag())
+		res2, _ := FuzzTagExec(`{{ghostbits(abc|0x5B)}}`, Fuzz_WithEnableDangerousTag())
+		// 不同 highByte 应产生不同的 Unicode 字符串，但截断后都是 abc
+		require.NotEqual(t, res1[0], res2[0], "不同 highByte 应产生不同 Unicode")
+		verifyGhostBitsTruncation(t, "abc", res1[0])
+		verifyGhostBitsTruncation(t, "abc", res2[0])
+	})
+
+	t.Run("single char", func(t *testing.T) {
+		results, err := FuzzTagExec(`{{ghostbits(.)}}`, Fuzz_WithEnableDangerousTag())
+		require.NoError(t, err)
+		require.Len(t, results, 1)
+		verifyGhostBitsTruncation(t, ".", results[0])
+		require.Equal(t, 1, len([]rune(results[0])), "单字符编码后应为单个 rune")
+	})
+
+	t.Run("preserve whitespace and slash", func(t *testing.T) {
+		results, err := FuzzTagExec(`{{ghostbits(a / b)}}`, Fuzz_WithEnableDangerousTag())
+		require.NoError(t, err)
+		require.Len(t, results, 1)
+		verifyGhostBitsTruncation(t, "a / b", results[0])
+	})
+
+	t.Run("non-ascii passthrough", func(t *testing.T) {
+		results, err := FuzzTagExec(`{{ghostbits(中文字符)}}`, Fuzz_WithEnableDangerousTag())
+		require.NoError(t, err)
+		require.Len(t, results, 1)
+		// 非 ASCII 直接保留，字符串应完全一致
+		require.Equal(t, "中文字符", results[0])
+	})
+
+	t.Run("classic CVE-2025-41242 payload", func(t *testing.T) {
+		// CVE-2025-41242 经典 payload：.%u002e
+		// Spring 路径规范化检查 .. 但不会识别 Unicode，
+		// 截断后 . + %u002e(解码为.) 组合成 .. 绕过安全检查
+		results, err := FuzzTagExec(`{{ghostbits(.%u002e)}}`, Fuzz_WithEnableDangerousTag())
+		require.NoError(t, err)
+		require.Len(t, results, 1)
+		verifyGhostBitsTruncation(t, ".%u002e", results[0])
+	})
+
+	t.Run("invalid highByte falls back to default", func(t *testing.T) {
+		results, err := FuzzTagExec(`{{ghostbits(.|0xFFFF)}}`, Fuzz_WithEnableDangerousTag())
+		require.NoError(t, err)
+		require.Len(t, results, 1)
+		verifyGhostBitsTruncation(t, ".", results[0])
+		require.Equal(t, 1, len([]rune(results[0])), "单字符编码后应为单个 rune")
+	})
+}
