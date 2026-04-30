@@ -302,6 +302,56 @@ func TestPromptManager_DynamicContextWithNonce_TruncatesPrevUserInputHistoryTo20
 	}
 }
 
+func TestPromptManager_GenerateToolParamsPromptWithMeta_UsesPromptSections(t *testing.T) {
+	react, err := NewTestReAct(
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "test"}, "cumulative_summary": "test summary", "human_readable_thought": "test thought"}`))
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create ReAct instance: %v", err)
+	}
+
+	tool := aitool.NewWithoutCallback("query-file",
+		aitool.WithDescription("Read a target file"),
+		aitool.WithStringParam("path",
+			aitool.WithParam_Description("target path"),
+			aitool.WithParam_Required(true),
+		),
+	)
+	tool.Usage = "Read a file from the workspace."
+	react.AddToTimeline("test", "timeline content")
+
+	result, err := react.promptManager.GenerateToolParamsPromptWithMeta(tool)
+	if err != nil {
+		t.Fatalf("GenerateToolParamsPromptWithMeta failed: %v", err)
+	}
+	if result == nil {
+		t.Fatal("GenerateToolParamsPromptWithMeta returned nil result")
+	}
+
+	prompt := result.Prompt
+	if !utils.MatchAllOfSubString(prompt,
+		"<|PROMPT_SECTION_high-static|>",
+		"<|PROMPT_SECTION_semi-dynamic|>",
+		"<|PROMPT_SECTION_timeline|>",
+		"<|PROMPT_SECTION_dynamic|>",
+		"<|SCHEMA|>",
+		"<|TOOL_DESC|>",
+		"<|TOOL_USAGE|>",
+		"target path",
+		"<|TOOL_PARAM_path_"+result.Nonce+"|>",
+	) {
+		t.Fatalf("tool params prompt should be composed by prompt sections. Got:\n%s", prompt)
+	}
+	if strings.Contains(prompt, "<|TOOL_PARAM_SCHEMA|>") {
+		t.Fatalf("tool schema should now be rendered in static schema block instead of dynamic tags. Got:\n%s", prompt)
+	}
+}
+
 func TestPromptManager_WithTracedDynamicContextProvider(t *testing.T) {
 	callCount := 0
 	var countMutex sync.Mutex

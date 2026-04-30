@@ -1,0 +1,48 @@
+{{ if .DynamicContext }}{{ .DynamicContext }}
+
+{{ end }}# Tool Context
+需要为 `{{ .ToolName }}` 生成参数，以下是当前工具上下文：
+
+<|TOOL_DESC|>
+{{ .ToolDescription }}
+<|TOOL_DESC_END|>
+
+{{ if .ToolUsage }}<|TOOL_USAGE|>
+{{ .ToolUsage }}
+<|TOOL_USAGE_END|>
+{{ end }}
+
+{{ if .ParamNames }}### Available Parameters
+{{- range .ParamNames }}
+- {{ . }}
+{{- end }}
+{{ end }}
+
+{{ if .OriginalQuery }}# Original User Query
+User's original request: {{ .OriginalQuery }}
+{{ end }}
+
+# Task Progress
+Current iteration: {{ .CurrentIteration }}/{{ .MaxIterations }}
+This tool call is part of a multi-step ReAct process. Generate parameters that help the overall task continue to converge.
+
+# Current Response Contract
+- 如果参数足够简单，直接返回符合上方 schema 的 JSON
+- 如果参数需要多行块内容或复杂转义，使用当前 nonce 对应的 AITAG
+- AITAG 内的内容按原样写入，不需要 JSON 转义
+- 绝不能复用历史 nonce、示例 nonce、timeline nonce 或其它旧 nonce
+
+当前 nonce:
+
+`{{ .Nonce }}`
+
+当前 AITAG 规则：
+- Start tag: `<|TOOL_PARAM_{param_name}_{{ .Nonce }}|>`
+- End tag: `<|TOOL_PARAM_{param_name}_END_{{ .Nonce }}|>`
+- Start / End tag 的参数名必须一致
+
+{{ if .ParamNames }}### Available Parameter AITAG Forms
+{{- range .ParamNames }}
+- {{ . }}: `<|TOOL_PARAM_{{ . }}_{{ $.Nonce }}|>...<|TOOL_PARAM_{{ . }}_END_{{ $.Nonce }}|>`
+{{- end }}
+{{ end }}

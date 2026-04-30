@@ -11,6 +11,14 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 )
 
+const (
+	promptSectionTagName     = "PROMPT_SECTION"
+	promptSectionHighStatic  = "high-static"
+	promptSectionSemiDynamic = "semi-dynamic"
+	promptSectionTimeline    = "timeline"
+	promptSectionDynamic     = "dynamic"
+)
+
 //go:embed prompts/loop/high_static_section.txt
 var loopHighStaticSectionTemplate string
 
@@ -129,26 +137,19 @@ func (pm *PromptManager) AssembleLoopPrompt(tools []*aitool.Tool, input *reactlo
 	timelineData := pm.buildLoopPromptSectionData(base, input)
 	dynamicData := pm.buildLoopPromptSectionData(base, input)
 
-	highStatic, err := pm.executeTemplate("loop-high-static", loopHighStaticSectionTemplate, highStaticData)
-	if err != nil {
-		return nil, err
-	}
-	semiDynamic, err := pm.executeTemplate("loop-semi-dynamic", loopSemiDynamicSectionTemplate, semiDynamicData)
-	if err != nil {
-		return nil, err
-	}
-	timeline, err := pm.executeTemplate("loop-timeline", loopTimelineSectionTemplate, timelineData)
-	if err != nil {
-		return nil, err
-	}
-	dynamic, err := pm.executeTemplate("loop-dynamic", loopDynamicSectionTemplate, dynamicData)
+	highStatic, semiDynamic, timeline, dynamic, err := pm.renderLoopPromptSections(
+		highStaticData,
+		semiDynamicData,
+		timelineData,
+		dynamicData,
+	)
 	if err != nil {
 		return nil, err
 	}
 
 	sections := pm.buildLoopPromptObservations(base, input, highStatic, semiDynamic, timeline, dynamic)
 
-	prompt := joinPromptSections(highStatic, semiDynamic, timeline, dynamic)
+	prompt := buildTaggedPromptSections(highStatic, semiDynamic, timeline, dynamic)
 	return &reactloops.LoopPromptAssemblyResult{
 		Prompt:   prompt,
 		Sections: sections,
@@ -279,13 +280,6 @@ func (pm *PromptManager) buildHighStaticObservation(
 			false,
 			renderStaticTaggedBlock("OUTPUT_EXAMPLE", input.OutputExample),
 		),
-		reactloops.NewPromptSectionObservation(
-			"section.high_static.schema",
-			"Highly Static / Schema",
-			reactloops.PromptSectionRoleSystemPrompt,
-			false,
-			renderSchemaBlock(input.Schema),
-		),
 	}
 	section.Children = filterIncludedPromptSections(children)
 	if strings.TrimSpace(rendered) != "" {
@@ -306,13 +300,6 @@ func (pm *PromptManager) buildSemiDynamicObservation(
 	)
 	children := []*reactloops.PromptSectionObservation{
 		reactloops.NewPromptSectionObservation(
-			"section.semi_dynamic.skills_context",
-			"Semi Dynamic / Skills Context",
-			reactloops.PromptSectionRoleRuntimeCtx,
-			true,
-			input.SkillsContext,
-		),
-		reactloops.NewPromptSectionObservation(
 			"section.semi_dynamic.tool_inventory",
 			"Semi Dynamic / Tool Inventory",
 			reactloops.PromptSectionRoleRuntimeCtx,
@@ -325,6 +312,20 @@ func (pm *PromptManager) buildSemiDynamicObservation(
 			reactloops.PromptSectionRoleRuntimeCtx,
 			true,
 			renderForgeInventoryBlock(base),
+		),
+		reactloops.NewPromptSectionObservation(
+			"section.semi_dynamic.skills_context",
+			"Semi Dynamic / Skills Context",
+			reactloops.PromptSectionRoleRuntimeCtx,
+			true,
+			input.SkillsContext,
+		),
+		reactloops.NewPromptSectionObservation(
+			"section.semi_dynamic.schema",
+			"Semi Dynamic / Schema",
+			reactloops.PromptSectionRoleRuntimeCtx,
+			true,
+			renderSchemaBlock(input.Schema),
 		),
 	}
 	section.Children = filterIncludedPromptSections(children)
@@ -589,6 +590,61 @@ func renderInjectedMemoryBlock(nonce string, memory string) string {
 		return ""
 	}
 	return fmt.Sprintf("<|INJECTED_MEMORY_%s|>\n# Memory Context\nThese are the memories automatically retrieved by the system that are most relevant to the current input.\n%s\n<|INJECTED_MEMORY_END_%s|>", nonce, memory, nonce)
+}
+
+func (pm *PromptManager) renderLoopPromptSections(
+	highStaticData map[string]any,
+	semiDynamicData map[string]any,
+	timelineData map[string]any,
+	dynamicData map[string]any,
+) (string, string, string, string, error) {
+	highStatic, err := pm.renderLoopHighStaticSection(highStaticData)
+	if err != nil {
+		return "", "", "", "", err
+	}
+	semiDynamic, err := pm.renderLoopSemiDynamicSection(semiDynamicData)
+	if err != nil {
+		return "", "", "", "", err
+	}
+	timeline, err := pm.renderLoopTimelineSection(timelineData)
+	if err != nil {
+		return "", "", "", "", err
+	}
+	dynamic, err := pm.renderLoopDynamicSection(dynamicData)
+	if err != nil {
+		return "", "", "", "", err
+	}
+	return highStatic, semiDynamic, timeline, dynamic, nil
+}
+
+func (pm *PromptManager) renderLoopHighStaticSection(data map[string]any) (string, error) {
+	return pm.executeTemplate("loop-high-static", loopHighStaticSectionTemplate, data)
+}
+
+func (pm *PromptManager) renderLoopSemiDynamicSection(data map[string]any) (string, error) {
+	return pm.executeTemplate("loop-semi-dynamic", loopSemiDynamicSectionTemplate, data)
+}
+
+func (pm *PromptManager) renderLoopTimelineSection(data map[string]any) (string, error) {
+	return pm.executeTemplate("loop-timeline", loopTimelineSectionTemplate, data)
+}
+
+func (pm *PromptManager) renderLoopDynamicSection(data map[string]any) (string, error) {
+	return pm.executeTemplate("loop-dynamic", loopDynamicSectionTemplate, data)
+}
+
+func buildTaggedPromptSections(highStatic string, semiDynamic string, timeline string, dynamic string) string {
+	return joinPromptSections(
+		wrapPromptMessageSection(promptSectionHighStatic, highStatic),
+		wrapPromptMessageSection(promptSectionSemiDynamic, semiDynamic),
+		wrapPromptMessageSection(promptSectionTimeline, timeline),
+		wrapPromptMessageSection(promptSectionDynamic, dynamic),
+	)
+}
+
+func wrapPromptMessageSection(sectionName string, content string) string {
+	content = strings.TrimSpace(content)
+	return fmt.Sprintf("<|%s_%s|>\n%s\n<|%s_END_%s|>", promptSectionTagName, sectionName, content, promptSectionTagName, sectionName)
 }
 
 func joinPromptSections(parts ...string) string {

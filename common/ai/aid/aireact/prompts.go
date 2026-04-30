@@ -5,11 +5,13 @@ import (
 	_ "embed"
 	"fmt"
 	"runtime"
+	"sort"
 	"strings"
 	"text/template"
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 
@@ -25,8 +27,11 @@ func nonce() string {
 	return utils.RandAlphaNumStringBytes(5)
 }
 
-//go:embed prompts/tool-params/tool-params.txt
-var toolParamsPromptTemplate string
+//go:embed prompts/tool-params/instruction.txt
+var toolParamsInstructionText string
+
+//go:embed prompts/tool-params/dynamic.txt
+var toolParamsDynamicTemplate string
 
 //go:embed prompts/verification/verification.txt
 var verificationPromptTemplate string
@@ -393,6 +398,7 @@ func (pm *PromptManager) GenerateToolParamsPromptWithMeta(tool *aitool.Tool) (*T
 				data.ParamNames = append(data.ParamNames, name)
 				return true
 			})
+			sort.Strings(data.ParamNames)
 		}
 	}
 
@@ -406,10 +412,51 @@ func (pm *PromptManager) GenerateToolParamsPromptWithMeta(tool *aitool.Tool) (*T
 	data.CurrentIteration = pm.react.currentIteration
 	data.MaxIterations = int(pm.react.config.GetMaxIterations())
 
-	prompt, err := pm.executeTemplate("tool-params", toolParamsPromptTemplate, data)
+	base, err := pm.GetLoopPromptBaseMaterials(nil, generatedNonce)
 	if err != nil {
 		return nil, err
 	}
+	highStaticData := pm.buildLoopPromptSectionData(base, &reactloops.LoopPromptAssemblyInput{Nonce: generatedNonce})
+	highStaticData["AllowToolCall"] = false
+	highStaticData["AllowPlanAndExec"] = false
+	highStaticData["HasLoadCapability"] = false
+	highStaticData["TaskInstruction"] = strings.TrimSpace(toolParamsInstructionText)
+	highStaticData["OutputExample"] = ""
+	highStaticData["Schema"] = ""
+	highStatic, err := pm.renderLoopHighStaticSection(highStaticData)
+	if err != nil {
+		return nil, err
+	}
+
+	timelineData := pm.buildLoopPromptSectionData(base, &reactloops.LoopPromptAssemblyInput{Nonce: generatedNonce})
+	semiDynamicData := pm.buildLoopPromptSectionData(base, &reactloops.LoopPromptAssemblyInput{
+		Nonce:  generatedNonce,
+		Schema: strings.TrimSpace(data.ToolSchema),
+	})
+	semiDynamicData["AllowToolCall"] = false
+	semiDynamicData["ToolInventory"] = false
+	semiDynamicData["ToolsCount"] = 0
+	semiDynamicData["TopToolsCount"] = 0
+	semiDynamicData["TopTools"] = []*aitool.Tool{}
+	semiDynamicData["HasMoreTools"] = false
+	semiDynamicData["ShowForgeInventory"] = false
+	semiDynamicData["ForgeInventory"] = false
+	semiDynamicData["AIForgeList"] = ""
+	semiDynamicData["SkillsContext"] = ""
+	semiDynamicSection, err := pm.renderLoopSemiDynamicSection(semiDynamicData)
+	if err != nil {
+		return nil, err
+	}
+	timelineSection, err := pm.renderLoopTimelineSection(timelineData)
+	if err != nil {
+		return nil, err
+	}
+	dynamicSection, err := pm.executeTemplate("tool-params-dynamic", toolParamsDynamicTemplate, data)
+	if err != nil {
+		return nil, err
+	}
+
+	prompt := buildTaggedPromptSections(highStatic, semiDynamicSection, timelineSection, dynamicSection)
 
 	return &ToolParamsPromptResult{
 		Prompt:     prompt,
