@@ -70,7 +70,8 @@ func makeFinalSummaryAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpti
 				iteration = 1
 			}
 
-			// 构建最终报告
+			// 关键词: knowledge enhance, final summary report
+			// 构建最终报告（仅作为 artifact 与 DirectlyAnswer 的素材，不再直接当 AI 终答推给用户）
 			finalReport := fmt.Sprintf(`# 知识收集最终报告
 
 ## 用户问题
@@ -103,17 +104,25 @@ func makeFinalSummaryAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpti
 				time.Now().Format("2006-01-02 15:04:05"),
 			)
 
-			// 保存到 loop 上下文
 			loop.Set("final_summary", finalReport)
 
-			emitter := loop.GetEmitter()
-			_ = emitter
-			loop.GetInvoker().EmitFileArtifactWithExt(
+			invoker := loop.GetInvoker()
+			// 关键词: knowledge enhance, artifact file, EmitFileArtifactWithExt
+			// 拼装报告仅作为 artifact 文件保留，UI 通过 pin filename 入口访问完整原文
+			artifactFilename := invoker.EmitFileArtifactWithExt(
 				fmt.Sprintf("knowledge_final_report_%s_%s", utils.DatetimePretty2(), utils.RandStringBytes(4)),
 				".md",
 				finalReport,
 			)
-			loop.GetInvoker().EmitResultAfterStream(finalReport)
+			if emitter := loop.GetEmitter(); emitter != nil && artifactFilename != "" {
+				emitter.EmitPinFilename(artifactFilename)
+			}
+
+			// 关键词: knowledge enhance, summary stream field, EmitResultAfterStream
+			// AI 输出 final_summary 时，summary 字段已经通过 stream field 直播到 re-act-loop-answer-payload。
+			// 这里只需要 commit 一次 result-after-stream 把已直播的 summary 落定为最终答复，
+			// 并 mark 已投递避免 BuildOnPostIterationHook 再次触发 DirectlyAnswer。
+			invoker.EmitResultAfterStream(summary)
 			markFinalSummaryDirectAnswered(loop)
 			op.Exit()
 		},

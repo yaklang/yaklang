@@ -110,6 +110,16 @@
 - **主题贴合**：查询语句必须紧贴样本中的真实主题，不要用“知识库的核心主题/内容分类”等泛化描述。示例：样本显示两大主题为“WebFuzzer测试流程”和“Cursor Pro服务账单”，查询应围绕这两个主题构造。
   - 示例查询：`WebFuzzer 测试流程 步骤说明`、`Cursor Pro 服务账单 计费规则/对账`
 
+- **Yaklang 库函数命名规律**（仅在样本/知识库与 Yaklang 相关时启用）：当用户问 Yaklang 内置库相关问题时，自然语言描述往往无法命中文档原文，应**优先尝试库内常见函数前缀作为 keyword 搜索**。这些前缀是知识库内 .mdx 与 .yak 文件中真实出现的函数名片段，命中率显著高于自然语言描述：
+  - HTTP 数据包修改类：`ReplaceHTTPPacket`、`AppendHTTPPacket`、`DeleteHTTPPacket`、`GetHTTPPacket`、`InsertHTTPPacket`
+  - poc 库请求发送：`poc.HTTP`、`poc.Get`、`poc.Post`、`poc.Do`、`poc.HTTPEx`
+  - codec 编解码：`codec.Encode`、`codec.Decode`、`codec.Sm`、`codec.Hmac`、`codec.AES`
+  - fuzz 测试：`fuzz.HTTPRequest`、`fuzz.Strings`、`fuzz.MutateRequest`
+  - 网络扫描：`servicescan.Scan`、`synscan.Scan`、`subdomain.Scan`
+  - 字符串处理：`str.Split`、`str.Replace`、`str.Contains`
+  - 示例：用户问“怎么修改 HTTP 请求 Header”，**首选 keyword 搜索** `ReplaceHTTPPacketHeader`、`AppendHTTPPacketHeader`，而不是搜“修改请求 Header 方法”。
+  - 同时配合一条**语义搜索**保留召回多样性，覆盖文档中以自然语言描述功能的小段落。
+
 ## 信息收集原则
 
 1. **全面性**：尽可能收集所有可能相关的信息

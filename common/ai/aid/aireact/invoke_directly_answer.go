@@ -13,29 +13,24 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-// DirectlyAnswerOption configures DirectlyAnswer behavior
-type DirectlyAnswerOption func(*directlyAnswerConfig)
+// DirectlyAnswerOption is a deprecated alias kept for backward compatibility.
+// 新代码请使用 aicommon.DirectlyAnswerOption 与 aicommon.WithDirectlyAnswerReferenceMaterial / aicommon.WithDirectlyAnswerSkipEmitResult。
+//
+// Deprecated: use aicommon.DirectlyAnswerOption.
+type DirectlyAnswerOption = aicommon.DirectlyAnswerOption
 
-type directlyAnswerConfig struct {
-	referenceMaterial       string
-	referenceMaterialIdx    int
-	skipEmitResultAfterDone bool // If true, skip emitting result after stream is done
-}
-
-// WithReferenceMaterial sets reference material to emit with the stream output
+// WithReferenceMaterial 是 aicommon.WithDirectlyAnswerReferenceMaterial 的别名，仅为兼容旧调用方而保留。
+//
+// Deprecated: use aicommon.WithDirectlyAnswerReferenceMaterial.
 func WithReferenceMaterial(material string, idx int) DirectlyAnswerOption {
-	return func(c *directlyAnswerConfig) {
-		c.referenceMaterial = material
-		c.referenceMaterialIdx = idx
-	}
+	return aicommon.WithDirectlyAnswerReferenceMaterial(material, idx)
 }
 
-// WithSkipEmitResult skips emitting result after stream is done
-// Use this when the caller will emit the result themselves
+// WithSkipEmitResult 是 aicommon.WithDirectlyAnswerSkipEmitResult 的别名，仅为兼容旧调用方而保留。
+//
+// Deprecated: use aicommon.WithDirectlyAnswerSkipEmitResult.
 func WithSkipEmitResult() DirectlyAnswerOption {
-	return func(c *directlyAnswerConfig) {
-		c.skipEmitResultAfterDone = true
-	}
+	return aicommon.WithDirectlyAnswerSkipEmitResult()
 }
 
 func (r *ReAct) DirectlyAnswer(ctx context.Context, query string, tools []*aitool.Tool, opts ...any) (string, error) {
@@ -43,13 +38,7 @@ func (r *ReAct) DirectlyAnswer(ctx context.Context, query string, tools []*aitoo
 		ctx = r.config.GetContext()
 	}
 
-	// Apply options
-	config := &directlyAnswerConfig{}
-	for _, opt := range opts {
-		if fn, ok := opt.(DirectlyAnswerOption); ok {
-			fn(config)
-		}
-	}
+	config := aicommon.ApplyDirectlyAnswerOptions(opts)
 
 	// Check context cancellation early
 	select {
@@ -79,9 +68,8 @@ func (r *ReAct) DirectlyAnswer(ctx context.Context, query string, tools []*aitoo
 	var finalResult string
 	var referenceOnce = new(sync.Once)
 
-	// Helper to emit reference material when stream event is emitted
 	emitReferenceMaterial := func(event *schema.AiOutputEvent) {
-		if config.referenceMaterial == "" {
+		if config.ReferenceMaterial == "" {
 			return
 		}
 		streamId := event.GetContentJSONPath(`$.event_writer_id`)
@@ -93,15 +81,13 @@ func (r *ReAct) DirectlyAnswer(ctx context.Context, query string, tools []*aitoo
 			if r.GetCurrentTask() != nil {
 				taskIndex = r.GetCurrentTask().GetIndex()
 			}
-			// Get workdir from config
 			workdir := r.config.Workdir
-			// Emit reference material with file
 			r.Emitter.EmitTextReferenceMaterialWithFile(
 				streamId,
-				config.referenceMaterial,
+				config.ReferenceMaterial,
 				workdir,
 				taskIndex,
-				config.referenceMaterialIdx,
+				config.ReferenceMaterialIdx,
 			)
 		})
 	}
@@ -134,8 +120,7 @@ func (r *ReAct) DirectlyAnswer(ctx context.Context, query string, tools []*aitoo
 							reader,
 							rsp.GetTaskIndex(),
 							func() {
-								// Only emit result if not skipped (caller will handle it)
-								if !config.skipEmitResultAfterDone {
+								if !config.SkipEmitResultAfterDone {
 									r.EmitResultAfterStream(out.String())
 								}
 								if event != nil {

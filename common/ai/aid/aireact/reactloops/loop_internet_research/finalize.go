@@ -25,6 +25,11 @@ func hasFinalResearchReportDelivered(loop *reactloops.ReActLoop) bool {
 	return utils.InterfaceToBoolean(loop.Get(finalResearchReportDeliveredKey))
 }
 
+// emitFinalResearchReport 把已生成的调研报告以「参考资料 + DirectlyAnswer 对话答复」方式投递给用户。
+// 行为：
+//  1. 将报告原文压缩后注入 timeline，作为 DirectlyAnswer 的对话上下文。
+//  2. 调用 DirectlyAnswer 让模型基于素材生成对话式回答；报告作为 reference material 挂在答复事件上。
+//  3. DirectlyAnswer 失败/为空 → 回退到「直接 emit markdown 报告」的旧路径，保证不退化。
 func emitFinalResearchReport(loop *reactloops.ReActLoop, invoker aicommon.AIInvokeRuntime, finalContent string) bool {
 	finalContent = strings.TrimSpace(finalContent)
 	if finalContent == "" {
@@ -37,6 +42,54 @@ func emitFinalResearchReport(loop *reactloops.ReActLoop, invoker aicommon.AIInvo
 		return false
 	}
 
+	userQuery := strings.TrimSpace(loop.Get("user_query"))
+	if userQuery == "" {
+		if task := loop.GetCurrentTask(); task != nil {
+			userQuery = task.GetUserInput()
+		}
+	}
+
+	ctx := loop.GetConfig().GetContext()
+
+	// 关键词: internet research, timeline injection, DirectlyAnswer
+	// 把报告内容压缩后注入 timeline，作为 DirectlyAnswer 的对话上下文
+	timelineMaterial := finalContent
+	if compressed, err := invoker.CompressLongTextWithDestination(ctx, finalContent, userQuery, 10*1024); err == nil && strings.TrimSpace(compressed) != "" {
+		timelineMaterial = compressed
+	} else if err != nil {
+		log.Warnf("internet research finalize: compress final report failed, fallback to raw content: %v", err)
+	}
+	invoker.AddToTimeline("internet_research_content", timelineMaterial)
+
+	// 关键词: internet research, DirectlyAnswer, WithReferenceMaterial
+	// 优先尝试让模型基于素材生成对话式答复，报告以参考资料形式挂在答复事件上
+	if userQuery != "" {
+		answer, err := invoker.DirectlyAnswer(
+			ctx,
+			userQuery,
+			nil,
+			aicommon.WithDirectlyAnswerReferenceMaterial(finalContent, 0),
+		)
+		if err == nil && strings.TrimSpace(answer) != "" {
+			markFinalResearchReportDelivered(loop)
+			log.Infof("internet research finalize: delivered conversational answer via DirectlyAnswer (%d bytes)", len(answer))
+			return true
+		}
+		if err != nil {
+			log.Warnf("internet research finalize: DirectlyAnswer failed, falling back to raw report: %v", err)
+		} else {
+			log.Warnf("internet research finalize: DirectlyAnswer returned empty answer, falling back to raw report")
+		}
+	} else {
+		log.Warnf("internet research finalize: empty user query, skip DirectlyAnswer and fallback to raw report")
+	}
+
+	return emitRawReportFallback(loop, invoker, finalContent)
+}
+
+// emitRawReportFallback 在 DirectlyAnswer 不可用时仍然以原始报告 markdown 形式投递。
+// 仅由 emitFinalResearchReport 在 DirectlyAnswer 失败时调用。
+func emitRawReportFallback(loop *reactloops.ReActLoop, invoker aicommon.AIInvokeRuntime, finalContent string) bool {
 	taskIndex := ""
 	if task := loop.GetCurrentTask(); task != nil {
 		taskIndex = task.GetId()

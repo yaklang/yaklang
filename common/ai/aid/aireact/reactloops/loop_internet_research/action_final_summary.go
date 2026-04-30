@@ -101,12 +101,23 @@ Report Generated: %s
 
 			loop.Set("final_summary", finalReport)
 
-			loop.GetInvoker().EmitFileArtifactWithExt(
+			invoker := loop.GetInvoker()
+			// 关键词: internet research, artifact file, EmitFileArtifactWithExt
+			// 拼装报告仅作为 artifact 文件保留，UI 通过 pin filename 入口访问完整原文
+			artifactFilename := invoker.EmitFileArtifactWithExt(
 				fmt.Sprintf("internet_research_final_report_%s_%s", utils.DatetimePretty2(), utils.RandStringBytes(4)),
 				".md",
 				finalReport,
 			)
-			loop.GetInvoker().EmitResultAfterStream(finalReport)
+			if emitter := loop.GetEmitter(); emitter != nil && artifactFilename != "" {
+				emitter.EmitPinFilename(artifactFilename)
+			}
+
+			// 关键词: internet research, summary stream field, EmitResultAfterStream
+			// AI 输出 final_summary 时，summary 字段已经通过 stream field 直播到 re-act-loop-answer-payload。
+			// 这里只需要 commit 一次 result-after-stream 把已直播的 summary 落定为最终答复，
+			// 并 mark 已投递避免 BuildOnPostIterationHook 再次触发 DirectlyAnswer。
+			invoker.EmitResultAfterStream(summary)
 			markFinalResearchReportDelivered(loop)
 			op.Exit()
 		},

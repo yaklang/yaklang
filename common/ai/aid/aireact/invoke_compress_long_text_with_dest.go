@@ -32,6 +32,18 @@ type ScoredRange struct {
 	Text      string
 }
 
+// 关键词: compression score threshold, knowledge filter, central constant
+// 集中管理压缩评分阈值，确保流式回调与 forge 最终结果两处口径一致。
+// 阈值由 0.4 下调到 0.3 以覆盖「弱相关但有线索价值」的片段（如知识库中
+// 仅出现 inline 用法示例的 API 名匹配）；prompt 中的评分语义同步对齐。
+const compressionScoreThreshold = 0.3
+
+// passesCompressionScore 是压缩阶段的相关性评分准入判断：
+// 严格小于 compressionScoreThreshold 则视为弱相关/无关，被过滤。
+func passesCompressionScore(score float64) bool {
+	return score >= compressionScoreThreshold
+}
+
 // deduplicateScoredRanges removes overlapping ranges, keeping higher scored ones
 func deduplicateScoredRanges(ranges []ScoredRange) []ScoredRange {
 	if len(ranges) <= 1 {
@@ -84,10 +96,11 @@ func (r *ReAct) CompressLongTextWithDestination(
 	var emergencyLimit = targetTokenSize / 2
 	fallbackResult := utils.ShrinkTextBlock(rawText, int(emergencyLimit))
 
-	// For large content (>30KB), use chunked processing
-	const maxChunkSize = 30 * 1024 // 40KB per chunk
-	const overlapLines = 20        // 20 lines overlap
-	const maxChunks = 20           // max 10 chunks
+	// 关键词: compress chunk, maxChunkSize, ~20K tokens
+	// 大文本分片处理：单分片 80KB（约 20K tokens），LiteForge 速度优先模型一次可吃掉
+	// 真实生效的分片重叠由后续 chunk.DumpWithOverlap(128) 控制
+	const maxChunkSize = 80 * 1024 // 80KB per chunk, ~20K tokens
+	const maxChunks = 20           // max 20 chunks
 
 	editor := memedit.NewMemEditor(rawText)
 
@@ -253,7 +266,8 @@ ALREADY_EXTRACTED 部分包含了之前已经提取过的内容。请注意：
 - 0.80-1.00: 直接回答用户问题的核心内容（且未被提取过）
 - 0.60-0.80: 相关背景/技术细节（且未被提取过）
 - 0.40-0.60: 补充性信息（或与已提取内容部分重复但有新信息）
-- 0.00-0.40: 弱相关、无关内容、或与已提取内容完全重复（不输出）
+- 0.30-0.40: 弱相关但有线索价值（如包含目标库/函数名片段、用户可据此追问）
+- 0.00-0.30: 无关内容或与已提取内容完全重复（不输出）
 
 尽量使用，精确到小数点后两位来表示
 
@@ -297,7 +311,7 @@ ALREADY_EXTRACTED 部分包含了之前已经提取过的内容。请注意：
 			jsonextractor.ExtractStructuredJSONFromStream(r, jsonextractor.WithObjectCallback(func(data map[string]interface{}) {
 				score := 0.0
 				score = utils.MapGetFloat64(data, "score")
-				if score < 0.4 {
+				if !passesCompressionScore(score) {
 					return
 				}
 				rangeStr := utils.MapGetString(data, "range")
@@ -370,8 +384,7 @@ ALREADY_EXTRACTED 部分包含了之前已经提取过的内容。请注意：
 			continue
 		}
 
-		// Filter out low score items (< 0.4)
-		if score < 0.4 {
+		if !passesCompressionScore(score) {
 			continue
 		}
 

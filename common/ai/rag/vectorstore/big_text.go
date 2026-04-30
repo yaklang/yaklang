@@ -17,11 +17,18 @@ func processBigText(embeddingsClient EmbeddingClient, doc *Document, maxChunkSiz
 	log.Infof("processing big text for document %s using plan: %s", doc.ID, bigTextPlan)
 
 	// 根据元数据调整分块参数
-	if chunkSize, ok := doc.Metadata["chunk_size"].(int); ok && chunkSize > 0 {
-		maxChunkSize = chunkSize
+	// 关键词: chunk_size metadata, type lenient, int int64 float64
+	// Yak 脚本调用 docMetadata("chunk_size", 2000) 时，2000 在反射层可能是 int / int64 / float64，
+	// 这里统一通过 utils.InterfaceToInt 转换以兼容所有数值类型。
+	if rawChunkSize, ok := doc.Metadata["chunk_size"]; ok {
+		if chunkSize := utils.InterfaceToInt(rawChunkSize); chunkSize > 0 {
+			maxChunkSize = chunkSize
+		}
 	}
-	if chunkOverlap, ok := doc.Metadata["chunk_overlap"].(int); ok && chunkOverlap >= 0 {
-		overlap = chunkOverlap
+	if rawChunkOverlap, ok := doc.Metadata["chunk_overlap"]; ok {
+		if chunkOverlap := utils.InterfaceToInt(rawChunkOverlap); chunkOverlap >= 0 {
+			overlap = chunkOverlap
+		}
 	}
 
 	// 分割文本
