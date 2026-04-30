@@ -1,0 +1,20 @@
+# Example 1: Short Direct Answer
+```json
+{
+  "@action": "directly_answer",
+  "answer_payload": "short plain answer"
+}
+```
+
+# Example 2: Long Markdown Answer
+```json
+{
+  "@action": "directly_answer"
+}
+```
+
+```text
+<|FINAL_ANSWER_{current_nonce}|>
+# markdown answer
+<|FINAL_ANSWER_END_{current_nonce}|>
+```

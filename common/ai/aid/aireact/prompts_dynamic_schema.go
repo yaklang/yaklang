@@ -65,3 +65,23 @@ func getDirectlyAnswer() string {
 		),
 	)
 }
+
+func getChangeAIBlueprintSchema() string {
+	return aitool.NewObjectSchema(
+		aitool.WithStringParam(
+			"@action",
+			aitool.WithParam_Const("change-ai-blueprint"),
+			aitool.WithParam_Required(true),
+		),
+		aitool.WithStringParam(
+			"reasoning",
+			aitool.WithParam_Description("切换这个新的 Blueprint/Forge 的原因"),
+			aitool.WithParam_Required(true),
+		),
+		aitool.WithStringParam(
+			"new_blueprint",
+			aitool.WithParam_Description("切换成新的 Blueprint 的名称"),
+			aitool.WithParam_Required(true),
+		),
+	)
+}

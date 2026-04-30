@@ -1,0 +1,27 @@
+# Example 1: Simple JSON Params
+```json
+{
+  "@action": "call-tool",
+  "identifier": "retry_with_valid_timeout",
+  "params": {
+    "timeout": 30
+  }
+}
+```
+
+# Example 2: JSON + AITAG Hybrid
+```json
+{
+  "@action": "call-tool",
+  "identifier": "rerun_script",
+  "params": {
+    "timeout": 30
+  }
+}
+```
+
+```text
+<|TOOL_PARAM_script_{current_nonce}|>
+... raw block content ...
+<|TOOL_PARAM_script_END_{current_nonce}|>
+```

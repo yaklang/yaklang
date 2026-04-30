@@ -42,14 +42,32 @@ var verificationSchemaJSON string
 //go:embed prompts/review/ai-review-tool-call.txt
 var aiReviewPromptTemplate string
 
-//go:embed prompts/answer/directly.txt
-var directlyAnswerPromptTemplate string
+//go:embed prompts/answer/instruction.txt
+var directlyAnswerInstructionText string
 
-//go:embed prompts/tool/wrong-tool.txt
-var wrongToolPromptTemplate string
+//go:embed prompts/answer/output_example.txt
+var directlyAnswerOutputExampleText string
 
-//go:embed prompts/tool/wrong-params.txt
-var wrongParamsPromptTemplate string
+//go:embed prompts/answer/dynamic.txt
+var directlyAnswerDynamicTemplate string
+
+//go:embed prompts/tool/wrong-tool_instruction.txt
+var wrongToolInstructionText string
+
+//go:embed prompts/tool/wrong-tool_output_example.txt
+var wrongToolOutputExampleText string
+
+//go:embed prompts/tool/wrong-tool_dynamic.txt
+var wrongToolDynamicTemplate string
+
+//go:embed prompts/tool/wrong-params_instruction.txt
+var wrongParamsInstructionText string
+
+//go:embed prompts/tool/wrong-params_output_example.txt
+var wrongParamsOutputExampleText string
+
+//go:embed prompts/tool/wrong-params_dynamic.txt
+var wrongParamsDynamicTemplate string
 
 //go:embed prompts/tool/interval-review.txt
 var intervalReviewPromptTemplate string
@@ -57,11 +75,23 @@ var intervalReviewPromptTemplate string
 //go:embed prompts/tool/interval-review.json
 var intervalReviewSchemaJSON string
 
-//go:embed prompts/tool-params/blueprint-params.txt
-var blueprintParamsPromptTemplate string
+//go:embed prompts/tool-params/blueprint-params_instruction.txt
+var blueprintParamsInstructionText string
 
-//go:embed prompts/change-blueprint/change-blueprint.txt
-var changeBlueprintPromptTemplate string
+//go:embed prompts/tool-params/blueprint-params_output_example.txt
+var blueprintParamsOutputExampleText string
+
+//go:embed prompts/tool-params/blueprint-params_dynamic.txt
+var blueprintParamsDynamicTemplate string
+
+//go:embed prompts/change-blueprint/instruction.txt
+var changeBlueprintInstructionText string
+
+//go:embed prompts/change-blueprint/output_example.txt
+var changeBlueprintOutputExampleText string
+
+//go:embed prompts/change-blueprint/dynamic.txt
+var changeBlueprintDynamicTemplate string
 
 //go:embed prompts/base/base.txt
 var basePrompt string
@@ -160,88 +190,6 @@ type AIReviewPromptData struct {
 	Title            string
 	Details          string
 	Language         string
-}
-
-// DirectlyAnswerPromptData contains data for directly answer prompt template
-type DirectlyAnswerPromptData struct {
-	AllowPlan        bool
-	CurrentTime      string
-	OSArch           string
-	WorkingDir       string
-	WorkingDirGlance string
-	Tools            []*aitool.Tool
-	ToolsCount       int
-	TopTools         []*aitool.Tool
-	TopToolsCount    int
-	HasMoreTools     bool
-	Timeline         string
-	UserQuery        string
-	Nonce            string
-	Language         string
-	Schema           string
-	DynamicContext   string
-}
-
-// ToolReSelectPromptData contains data for tool reselection prompt template
-type ToolReSelectPromptData struct {
-	CurrentTime      string
-	OSArch           string
-	WorkingDir       string
-	WorkingDirGlance string
-	Timeline         string
-	UserQuery        string
-	Nonce            string
-	OldTool          *aitool.Tool
-	ToolList         []*aitool.Tool
-	Schema           string
-	DynamicContext   string
-}
-
-// ReGenerateToolParamsPromptData contains data for tool parameter regeneration prompt template
-type ReGenerateToolParamsPromptData struct {
-	CurrentTime      string
-	OSArch           string
-	WorkingDir       string
-	WorkingDirGlance string
-	Timeline         string
-	UserQuery        string
-	Nonce            string
-	OldParams        string
-	Schema           string
-	DynamicContext   string
-	ParamNames       []string // List of parameter names for AITAG hints
-}
-
-// AIBlueprintForgeParamsPromptData contains data for AI blueprint forge parameter generation prompt
-type AIBlueprintForgeParamsPromptData struct {
-	BlueprintName        string
-	BlueprintDescription string
-	BlueprintSchema      string
-	OriginalQuery        string
-	CurrentIteration     int
-	MaxIterations        int
-	Timeline             string
-	DynamicContext       string
-	OldParams            string
-	ExtraPrompt          string
-	Nonce                string
-}
-
-// ChangeAIBlueprintPromptData contains data for changing AI blueprint prompt template
-type ChangeAIBlueprintPromptData struct {
-	CurrentTime      string
-	OSArch           string
-	WorkingDir       string
-	WorkingDirGlance string
-	Timeline         string
-	Nonce            string
-	UserQuery        string
-	CurrentBlueprint *schema.AIForge
-	ForgeList        string
-	OldParams        string
-	ExtraPrompt      string
-	Language         string
-	DynamicContext   string
 }
 
 // YaklangCodeActionLoopPromptData contains data for Yaklang code generation action loop prompt
@@ -361,6 +309,38 @@ func (pm *PromptManager) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[s
 	return basePrompt, result, nil
 }
 
+func (pm *PromptManager) preparePromptPrefixMaterials(
+	tools []*aitool.Tool,
+	input *reactloops.LoopPromptAssemblyInput,
+) (*reactloops.LoopPromptBaseMaterials, *reactloops.PromptPrefixMaterials, error) {
+	if input == nil {
+		return nil, nil, fmt.Errorf("prompt assembly input is nil")
+	}
+
+	base, err := pm.GetLoopPromptBaseMaterials(tools, input.Nonce)
+	if err != nil {
+		return nil, nil, err
+	}
+	return base, pm.NewPromptPrefixMaterials(base, input), nil
+}
+
+func (pm *PromptManager) assemblePromptWithDynamicSection(
+	materials *reactloops.PromptPrefixMaterials,
+	dynamicTemplateName string,
+	dynamicTemplate string,
+	dynamicData any,
+) (string, error) {
+	prefix, err := pm.AssemblePromptPrefix(materials)
+	if err != nil {
+		return "", err
+	}
+	dynamicSection, err := pm.executeTemplate(dynamicTemplateName, dynamicTemplate, dynamicData)
+	if err != nil {
+		return "", err
+	}
+	return buildTaggedPromptSections(prefix.HighStatic, prefix.SemiDynamic, prefix.Timeline, dynamicSection), nil
+}
+
 // ToolParamsPromptResult contains the generated prompt and metadata for AITAG parsing
 type ToolParamsPromptResult struct {
 	Prompt     string
@@ -412,14 +392,13 @@ func (pm *PromptManager) GenerateToolParamsPromptWithMeta(tool *aitool.Tool) (*T
 	data.CurrentIteration = pm.react.currentIteration
 	data.MaxIterations = int(pm.react.config.GetMaxIterations())
 
-	base, err := pm.GetLoopPromptBaseMaterials(nil, generatedNonce)
-	if err != nil {
-		return nil, err
-	}
-	prefixMaterials := pm.NewPromptPrefixMaterials(base, &reactloops.LoopPromptAssemblyInput{
+	_, prefixMaterials, err := pm.preparePromptPrefixMaterials(nil, &reactloops.LoopPromptAssemblyInput{
 		Nonce:  generatedNonce,
 		Schema: strings.TrimSpace(data.ToolSchema),
 	})
+	if err != nil {
+		return nil, err
+	}
 	prefixMaterials.AllowToolCall = false
 	prefixMaterials.AllowPlanAndExec = false
 	prefixMaterials.HasLoadCapability = false
@@ -434,16 +413,15 @@ func (pm *PromptManager) GenerateToolParamsPromptWithMeta(tool *aitool.Tool) (*T
 	prefixMaterials.AIForgeList = ""
 	prefixMaterials.SkillsContext = ""
 
-	prefix, err := pm.AssemblePromptPrefix(prefixMaterials)
+	prompt, err := pm.assemblePromptWithDynamicSection(
+		prefixMaterials,
+		"tool-params-dynamic",
+		toolParamsDynamicTemplate,
+		data,
+	)
 	if err != nil {
 		return nil, err
 	}
-	dynamicSection, err := pm.executeTemplate("tool-params-dynamic", toolParamsDynamicTemplate, data)
-	if err != nil {
-		return nil, err
-	}
-
-	prompt := buildTaggedPromptSections(prefix.HighStatic, prefix.SemiDynamic, prefix.Timeline, dynamicSection)
 
 	return &ToolParamsPromptResult{
 		Prompt:     prompt,
@@ -509,68 +487,90 @@ func (pm *PromptManager) GenerateDirectlyAnswerPrompt(userQuery string, tools []
 	var directlyAnswerSchema = getDirectlyAnswer()
 
 	nonceString := utils.RandStringBytes(4)
-	// Build template data
-	data := &DirectlyAnswerPromptData{
-		AllowPlan:      false,
-		CurrentTime:    time.Now().Format("2006-01-02 15:04:05"),
-		OSArch:         fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
-		UserQuery:      userQuery,
-		Nonce:          nonceString,
-		Language:       pm.react.config.GetLanguage(),
-		Schema:         directlyAnswerSchema,
-		Tools:          tools,
-		ToolsCount:     len(tools),
-		TopToolsCount:  pm.react.config.GetTopToolsCount(),
-		DynamicContext: pm.DynamicContextWithNonce(nonceString),
+	base, prefixMaterials, err := pm.preparePromptPrefixMaterials(tools, &reactloops.LoopPromptAssemblyInput{
+		Nonce:  nonceString,
+		Schema: directlyAnswerSchema,
+	})
+	if err != nil {
+		return "", "", err
 	}
+	prefixMaterials.AllowToolCall = false
+	prefixMaterials.AllowPlanAndExec = false
+	prefixMaterials.HasLoadCapability = false
+	prefixMaterials.TaskInstruction = strings.TrimSpace(directlyAnswerInstructionText)
+	prefixMaterials.OutputExample = strings.TrimSpace(directlyAnswerOutputExampleText)
+	prefixMaterials.ToolInventory = false
+	prefixMaterials.ToolsCount = 0
+	prefixMaterials.TopToolsCount = 0
+	prefixMaterials.TopTools = nil
+	prefixMaterials.HasMoreTools = false
+	prefixMaterials.ForgeInventory = false
+	prefixMaterials.AIForgeList = ""
+	prefixMaterials.SkillsContext = ""
 
-	// Set working directory
-	data.WorkingDir = pm.workdir
-	if data.WorkingDir != "" {
-		data.WorkingDirGlance = pm.GetGlanceWorkdir(data.WorkingDir)
-	}
+	dynamicData := pm.buildLoopPromptSectionData(base, &reactloops.LoopPromptAssemblyInput{
+		Nonce:     nonceString,
+		UserQuery: userQuery,
+	})
+	dynamicData["Language"] = pm.react.config.GetLanguage()
 
-	// Get prioritized tools
-	if len(tools) > 0 {
-		data.TopTools = pm.react.getPrioritizedTools(tools, pm.react.config.GetTopToolsCount())
-		data.HasMoreTools = len(tools) > len(data.TopTools)
-	}
-
-	// Set timeline memory
-	data.Timeline = pm.timelineDumpForPrompt()
-
-	result, err := pm.executeTemplate("directly-answer", directlyAnswerPromptTemplate, data)
+	result, err := pm.assemblePromptWithDynamicSection(
+		prefixMaterials,
+		"directly-answer-dynamic",
+		directlyAnswerDynamicTemplate,
+		dynamicData,
+	)
 	return result, nonceString, err
 }
 
 // GenerateToolReSelectPrompt generates tool reselection prompt using template
 func (pm *PromptManager) GenerateToolReSelectPrompt(noUserInteract bool, oldTool *aitool.Tool, toolList []*aitool.Tool) (string, error) {
-	data := &ToolReSelectPromptData{
-		CurrentTime:    time.Now().Format("2006-01-02 15:04:05"),
-		OSArch:         fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
-		UserQuery:      "",
-		Nonce:          utils.RandStringBytes(4),
-		OldTool:        oldTool,
-		ToolList:       toolList,
-		Schema:         getReSelectTool(noUserInteract),
-		DynamicContext: "",
-	}
-	data.DynamicContext = pm.DynamicContextWithNonce(data.Nonce)
-
+	nonceString := utils.RandStringBytes(4)
+	userQuery := ""
 	if r := pm.react.GetCurrentTask(); r != nil {
-		data.UserQuery = r.GetUserInput()
+		userQuery = r.GetUserInput()
 	}
 
-	// Set working directory
-	data.WorkingDir = pm.workdir
-	if data.WorkingDir != "" {
-		data.WorkingDirGlance = pm.GetGlanceWorkdir(data.WorkingDir)
+	base, prefixMaterials, err := pm.preparePromptPrefixMaterials(toolList, &reactloops.LoopPromptAssemblyInput{
+		Nonce:     nonceString,
+		UserQuery: userQuery,
+		Schema:    getReSelectTool(noUserInteract),
+	})
+	if err != nil {
+		return "", err
+	}
+	prefixMaterials.AllowToolCall = true
+	prefixMaterials.AllowPlanAndExec = false
+	prefixMaterials.HasLoadCapability = false
+	prefixMaterials.TaskInstruction = strings.TrimSpace(wrongToolInstructionText)
+	prefixMaterials.OutputExample = strings.TrimSpace(wrongToolOutputExampleText)
+	prefixMaterials.ToolInventory = len(toolList) > 0
+	prefixMaterials.ToolsCount = len(toolList)
+	prefixMaterials.TopToolsCount = len(toolList)
+	prefixMaterials.TopTools = append([]*aitool.Tool{}, toolList...)
+	prefixMaterials.HasMoreTools = false
+	prefixMaterials.ForgeInventory = false
+	prefixMaterials.AIForgeList = ""
+	prefixMaterials.SkillsContext = ""
+
+	dynamicData := pm.buildLoopPromptSectionData(base, &reactloops.LoopPromptAssemblyInput{
+		Nonce:     nonceString,
+		UserQuery: userQuery,
+	})
+	if oldTool != nil {
+		dynamicData["OldToolName"] = oldTool.Name
+		dynamicData["OldToolDescription"] = oldTool.Description
+	} else {
+		dynamicData["OldToolName"] = ""
+		dynamicData["OldToolDescription"] = ""
 	}
 
-	// Set timeline memory
-	data.Timeline = pm.timelineDumpForPrompt()
-
-	return pm.executeTemplate("wrong-tool", wrongToolPromptTemplate, data)
+	return pm.assemblePromptWithDynamicSection(
+		prefixMaterials,
+		"wrong-tool-dynamic",
+		wrongToolDynamicTemplate,
+		dynamicData,
+	)
 }
 
 // GenerateReGenerateToolParamsPrompt generates tool parameter regeneration prompt using template
@@ -585,34 +585,56 @@ func (pm *PromptManager) GenerateReGenerateToolParamsPrompt(userQuery string, ol
 // GenerateReGenerateToolParamsPromptWithMeta generates tool parameter regeneration prompt with AITAG metadata
 func (pm *PromptManager) GenerateReGenerateToolParamsPromptWithMeta(userQuery string, oldParams aitool.InvokeParams, oldTool *aitool.Tool) (*ToolParamsPromptResult, error) {
 	generatedNonce := nonce()
-	data := &ReGenerateToolParamsPromptData{
-		CurrentTime:    time.Now().Format("2006-01-02 15:04:05"),
-		OSArch:         fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
-		UserQuery:      userQuery,
-		Nonce:          generatedNonce,
-		OldParams:      oldParams.Dump(),
-		Schema:         oldTool.ToJSONSchemaString(),
-		DynamicContext: pm.DynamicContextWithNonce(generatedNonce),
-	}
+	schemaString := oldTool.ToJSONSchemaString()
+	oldParamsDump := oldParams.Dump()
+	paramNames := []string{}
 
 	// Extract parameter names for AITAG hints
 	if oldTool.Tool != nil && oldTool.Tool.InputSchema.Properties != nil {
 		oldTool.Tool.InputSchema.Properties.ForEach(func(name string, _ any) bool {
-			data.ParamNames = append(data.ParamNames, name)
+			paramNames = append(paramNames, name)
 			return true
 		})
+		sort.Strings(paramNames)
 	}
 
-	// Set working directory
-	data.WorkingDir = pm.workdir
-	if data.WorkingDir != "" {
-		data.WorkingDirGlance = pm.GetGlanceWorkdir(data.WorkingDir)
+	base, prefixMaterials, err := pm.preparePromptPrefixMaterials(nil, &reactloops.LoopPromptAssemblyInput{
+		Nonce:  generatedNonce,
+		Schema: schemaString,
+	})
+	if err != nil {
+		return nil, err
 	}
+	prefixMaterials.AllowToolCall = false
+	prefixMaterials.AllowPlanAndExec = false
+	prefixMaterials.HasLoadCapability = false
+	prefixMaterials.TaskInstruction = strings.TrimSpace(wrongParamsInstructionText)
+	prefixMaterials.OutputExample = strings.TrimSpace(wrongParamsOutputExampleText)
+	prefixMaterials.ToolInventory = false
+	prefixMaterials.ToolsCount = 0
+	prefixMaterials.TopToolsCount = 0
+	prefixMaterials.TopTools = nil
+	prefixMaterials.HasMoreTools = false
+	prefixMaterials.ForgeInventory = false
+	prefixMaterials.AIForgeList = ""
+	prefixMaterials.SkillsContext = ""
 
-	// Set timeline memory
-	data.Timeline = pm.timelineDumpForPrompt()
+	dynamicData := pm.buildLoopPromptSectionData(base, &reactloops.LoopPromptAssemblyInput{
+		Nonce:     generatedNonce,
+		UserQuery: userQuery,
+	})
+	dynamicData["ToolName"] = oldTool.Name
+	dynamicData["ToolDescription"] = oldTool.Description
+	dynamicData["ToolUsage"] = oldTool.Usage
+	dynamicData["OldParams"] = oldParamsDump
+	dynamicData["ParamNames"] = paramNames
 
-	prompt, err := pm.executeTemplate("wrong-params", wrongParamsPromptTemplate, data)
+	prompt, err := pm.assemblePromptWithDynamicSection(
+		prefixMaterials,
+		"wrong-params-dynamic",
+		wrongParamsDynamicTemplate,
+		dynamicData,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -620,7 +642,7 @@ func (pm *PromptManager) GenerateReGenerateToolParamsPromptWithMeta(userQuery st
 	return &ToolParamsPromptResult{
 		Prompt:     prompt,
 		Nonce:      generatedNonce,
-		ParamNames: data.ParamNames,
+		ParamNames: paramNames,
 	}, nil
 }
 
@@ -630,39 +652,60 @@ func (pm *PromptManager) GenerateChangeAIBlueprintPrompt(
 	oldParams aitool.InvokeParams,
 	extraPrompt string,
 ) (string, error) {
-	data := &ChangeAIBlueprintPromptData{
-		CurrentTime:      time.Now().Format("2006-01-02 15:04:05"),
-		OSArch:           fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
-		CurrentBlueprint: ins,
-		ForgeList:        forgeList,
-		ExtraPrompt:      extraPrompt,
-		Nonce:            utils.RandStringBytes(4),
-		Language:         pm.react.config.GetLanguage(),
-		DynamicContext:   "",
-	}
-	data.DynamicContext = pm.DynamicContextWithNonce(data.Nonce)
-
+	nonceString := utils.RandStringBytes(4)
 	if utils.IsNil(oldParams) || len(oldParams) <= 0 {
-		data.OldParams = ""
-	} else {
-		data.OldParams = oldParams.Dump()
+		oldParams = nil
 	}
 
-	// Set working directory
-	data.WorkingDir = pm.workdir
-	if data.WorkingDir != "" {
-		data.WorkingDirGlance = pm.GetGlanceWorkdir(data.WorkingDir)
-	}
-
-	// Set timeline memory
+	userQuery := ""
 	if pm.react.config.GetTimeline() != nil {
-		data.Timeline = pm.timelineDumpForPrompt()
 		if task := pm.react.GetCurrentTask(); task != nil {
-			data.UserQuery = task.GetUserInput()
+			userQuery = task.GetUserInput()
 		}
 	}
 
-	return pm.executeTemplate("change-blueprint", changeBlueprintPromptTemplate, data)
+	base, prefixMaterials, err := pm.preparePromptPrefixMaterials(nil, &reactloops.LoopPromptAssemblyInput{
+		Nonce:     nonceString,
+		UserQuery: userQuery,
+		Schema:    getChangeAIBlueprintSchema(),
+	})
+	if err != nil {
+		return "", err
+	}
+	prefixMaterials.AllowToolCall = false
+	prefixMaterials.AllowPlanAndExec = true
+	prefixMaterials.HasLoadCapability = false
+	prefixMaterials.TaskInstruction = strings.TrimSpace(changeBlueprintInstructionText)
+	prefixMaterials.OutputExample = strings.TrimSpace(changeBlueprintOutputExampleText)
+	prefixMaterials.ToolInventory = false
+	prefixMaterials.ToolsCount = 0
+	prefixMaterials.TopToolsCount = 0
+	prefixMaterials.TopTools = nil
+	prefixMaterials.HasMoreTools = false
+	prefixMaterials.ForgeInventory = strings.TrimSpace(forgeList) != ""
+	prefixMaterials.AIForgeList = forgeList
+	prefixMaterials.SkillsContext = ""
+
+	dynamicData := pm.buildLoopPromptSectionData(base, &reactloops.LoopPromptAssemblyInput{
+		Nonce:     nonceString,
+		UserQuery: userQuery,
+	})
+	dynamicData["CurrentBlueprintName"] = ins.ForgeName
+	dynamicData["CurrentBlueprintDescription"] = ins.Description
+	dynamicData["ExtraPrompt"] = extraPrompt
+	dynamicData["Language"] = pm.react.config.GetLanguage()
+	if utils.IsNil(oldParams) || len(oldParams) <= 0 {
+		dynamicData["OldParams"] = ""
+	} else {
+		dynamicData["OldParams"] = oldParams.Dump()
+	}
+
+	return pm.assemblePromptWithDynamicSection(
+		prefixMaterials,
+		"change-blueprint-dynamic",
+		changeBlueprintDynamicTemplate,
+		dynamicData,
+	)
 }
 
 func (pm *PromptManager) GenerateAIBlueprintForgeParamsPromptEx(
@@ -671,32 +714,63 @@ func (pm *PromptManager) GenerateAIBlueprintForgeParamsPromptEx(
 	oldParams aitool.InvokeParams,
 	extraPrompt string,
 ) (string, error) {
-
-	data := &AIBlueprintForgeParamsPromptData{
-		BlueprintName:        ins.ForgeName,
-		BlueprintDescription: ins.Description,
-		BlueprintSchema:      blueprintSchema,
-		DynamicContext:       "",
-		ExtraPrompt:          extraPrompt,
-		Nonce:                utils.RandStringBytes(4),
-	}
-	data.DynamicContext = pm.DynamicContextWithNonce(data.Nonce)
+	nonceString := utils.RandStringBytes(4)
+	originalQuery := ""
 	if utils.IsNil(oldParams) || len(oldParams) <= 0 {
-		data.OldParams = ""
+		oldParams = nil
 	} else {
-		data.OldParams = oldParams.Dump()
+		// keep oldParams for dynamic rendering below
 	}
 
 	// Extract context data from memory without lock (assume caller already holds lock)
 	if pm.react.config.GetTimeline() != nil {
 		if task := pm.react.GetCurrentTask(); task != nil {
-			data.OriginalQuery = task.GetUserInput()
+			originalQuery = task.GetUserInput()
 		}
-		data.Timeline = pm.timelineDumpForPrompt()
 	}
-	data.CurrentIteration = pm.react.currentIteration
-	data.MaxIterations = int(pm.react.config.GetMaxIterations())
-	return pm.executeTemplate("blueprint-params", blueprintParamsPromptTemplate, data)
+
+	base, prefixMaterials, err := pm.preparePromptPrefixMaterials(nil, &reactloops.LoopPromptAssemblyInput{
+		Nonce:     nonceString,
+		UserQuery: originalQuery,
+		Schema:    blueprintSchema,
+	})
+	if err != nil {
+		return "", err
+	}
+	prefixMaterials.AllowToolCall = false
+	prefixMaterials.AllowPlanAndExec = true
+	prefixMaterials.HasLoadCapability = false
+	prefixMaterials.TaskInstruction = strings.TrimSpace(blueprintParamsInstructionText)
+	prefixMaterials.OutputExample = strings.TrimSpace(blueprintParamsOutputExampleText)
+	prefixMaterials.ToolInventory = false
+	prefixMaterials.ToolsCount = 0
+	prefixMaterials.TopToolsCount = 0
+	prefixMaterials.TopTools = nil
+	prefixMaterials.HasMoreTools = false
+	prefixMaterials.ForgeInventory = false
+	prefixMaterials.AIForgeList = ""
+	prefixMaterials.SkillsContext = ""
+
+	dynamicData := pm.buildLoopPromptSectionData(base, &reactloops.LoopPromptAssemblyInput{
+		Nonce:     nonceString,
+		UserQuery: originalQuery,
+	})
+	dynamicData["BlueprintName"] = ins.ForgeName
+	dynamicData["BlueprintDescription"] = ins.Description
+	dynamicData["OldParams"] = ""
+	if !utils.IsNil(oldParams) && len(oldParams) > 0 {
+		dynamicData["OldParams"] = oldParams.Dump()
+	}
+	dynamicData["ExtraPrompt"] = extraPrompt
+	dynamicData["CurrentIteration"] = pm.react.currentIteration
+	dynamicData["MaxIterations"] = int(pm.react.config.GetMaxIterations())
+
+	return pm.assemblePromptWithDynamicSection(
+		prefixMaterials,
+		"blueprint-params-dynamic",
+		blueprintParamsDynamicTemplate,
+		dynamicData,
+	)
 }
 
 // GenerateAIBlueprintForgeParamsPrompt generates AI blueprint forge parameter generation prompt using template

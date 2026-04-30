@@ -352,6 +352,193 @@ func TestPromptManager_GenerateToolParamsPromptWithMeta_UsesPromptSections(t *te
 	}
 }
 
+func TestPromptManager_GenerateDirectlyAnswerPrompt_UsesPromptSections(t *testing.T) {
+	react, err := NewTestReAct(
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "test"}, "cumulative_summary": "test summary", "human_readable_thought": "test thought"}`))
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create ReAct instance: %v", err)
+	}
+
+	prompt, nonce, err := react.promptManager.GenerateDirectlyAnswerPrompt("reply to this", nil)
+	if err != nil {
+		t.Fatalf("GenerateDirectlyAnswerPrompt failed: %v", err)
+	}
+
+	if !utils.MatchAllOfSubString(prompt,
+		"<|PROMPT_SECTION_high-static|>",
+		"<|PROMPT_SECTION_semi-dynamic|>",
+		"<|PROMPT_SECTION_timeline|>",
+		"<|PROMPT_SECTION_dynamic|>",
+		"<|SCHEMA|>",
+		"<|USER_QUERY_"+nonce+"|>",
+		"<|FINAL_ANSWER_"+nonce+"|>",
+	) {
+		t.Fatalf("directly answer prompt should be composed by prompt sections. Got:\n%s", prompt)
+	}
+}
+
+func TestPromptManager_GenerateToolReSelectPrompt_UsesPromptSections(t *testing.T) {
+	react, err := NewTestReAct(
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "test"}, "cumulative_summary": "test summary", "human_readable_thought": "test thought"}`))
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create ReAct instance: %v", err)
+	}
+
+	oldTool := aitool.NewWithoutCallback("sleep", aitool.WithDescription("sleep for a while"))
+	toolList := []*aitool.Tool{
+		oldTool,
+		aitool.NewWithoutCallback("echo", aitool.WithDescription("echo some text")),
+	}
+
+	prompt, err := react.promptManager.GenerateToolReSelectPrompt(true, oldTool, toolList)
+	if err != nil {
+		t.Fatalf("GenerateToolReSelectPrompt failed: %v", err)
+	}
+
+	if !utils.MatchAllOfSubString(prompt,
+		"<|PROMPT_SECTION_high-static|>",
+		"<|PROMPT_SECTION_semi-dynamic|>",
+		"<|PROMPT_SECTION_timeline|>",
+		"<|PROMPT_SECTION_dynamic|>",
+		"# Tool Inventory",
+		"<|SCHEMA|>",
+		"你在此前选择了工具",
+		"`sleep`",
+		"`echo`",
+	) {
+		t.Fatalf("tool re-select prompt should be composed by prompt sections. Got:\n%s", prompt)
+	}
+}
+
+func TestPromptManager_GenerateReGenerateToolParamsPromptWithMeta_UsesPromptSections(t *testing.T) {
+	react, err := NewTestReAct(
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "test"}, "cumulative_summary": "test summary", "human_readable_thought": "test thought"}`))
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create ReAct instance: %v", err)
+	}
+
+	tool := aitool.NewWithoutCallback("bash-tool",
+		aitool.WithDescription("Run bash"),
+		aitool.WithStringParam("command", aitool.WithParam_Description("command text")),
+	)
+
+	result, err := react.promptManager.GenerateReGenerateToolParamsPromptWithMeta(
+		"retry with valid command",
+		aitool.InvokeParams{"command": "bad value"},
+		tool,
+	)
+	if err != nil {
+		t.Fatalf("GenerateReGenerateToolParamsPromptWithMeta failed: %v", err)
+	}
+
+	if !utils.MatchAllOfSubString(result.Prompt,
+		"<|PROMPT_SECTION_high-static|>",
+		"<|PROMPT_SECTION_semi-dynamic|>",
+		"<|PROMPT_SECTION_timeline|>",
+		"<|PROMPT_SECTION_dynamic|>",
+		"<|SCHEMA|>",
+		"<|OLD_PARAMS_"+result.Nonce+"|>",
+		"<|TOOL_DESC|>",
+		"<|TOOL_PARAM_command_"+result.Nonce+"|>",
+	) {
+		t.Fatalf("re-generate tool params prompt should be composed by prompt sections. Got:\n%s", result.Prompt)
+	}
+}
+
+func TestPromptManager_GenerateChangeAIBlueprintPrompt_UsesPromptSections(t *testing.T) {
+	react, err := NewTestReAct(
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "test"}, "cumulative_summary": "test summary", "human_readable_thought": "test thought"}`))
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create ReAct instance: %v", err)
+	}
+
+	forge := &schema.AIForge{ForgeName: "forge-alpha", Description: "alpha desc"}
+	prompt, err := react.promptManager.GenerateChangeAIBlueprintPrompt(
+		forge,
+		"* `forge-beta`: beta desc",
+		aitool.InvokeParams{"target": "example.com"},
+		"switch to a better blueprint",
+	)
+	if err != nil {
+		t.Fatalf("GenerateChangeAIBlueprintPrompt failed: %v", err)
+	}
+
+	if !utils.MatchAllOfSubString(prompt,
+		"<|PROMPT_SECTION_high-static|>",
+		"<|PROMPT_SECTION_semi-dynamic|>",
+		"<|PROMPT_SECTION_timeline|>",
+		"<|PROMPT_SECTION_dynamic|>",
+		"# AI Blueprint Inventory",
+		"<|SCHEMA|>",
+		"Current AI Blueprint",
+		"forge-alpha",
+		"forge-beta",
+		"<|OLD_PARAMS_",
+	) {
+		t.Fatalf("change blueprint prompt should be composed by prompt sections. Got:\n%s", prompt)
+	}
+}
+
+func TestPromptManager_GenerateAIBlueprintForgeParamsPrompt_UsesPromptSections(t *testing.T) {
+	react, err := NewTestReAct(
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "test"}, "cumulative_summary": "test summary", "human_readable_thought": "test thought"}`))
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create ReAct instance: %v", err)
+	}
+
+	forge := &schema.AIForge{ForgeName: "test-forge", Description: "Test AI Forge for unit testing"}
+	prompt, err := react.promptManager.GenerateAIBlueprintForgeParamsPrompt(forge, `{"type":"object","properties":{"host":{"type":"string","description":"目标主机地址"}}}`)
+	if err != nil {
+		t.Fatalf("GenerateAIBlueprintForgeParamsPrompt failed: %v", err)
+	}
+
+	if !utils.MatchAllOfSubString(prompt,
+		"<|PROMPT_SECTION_high-static|>",
+		"<|PROMPT_SECTION_semi-dynamic|>",
+		"<|PROMPT_SECTION_timeline|>",
+		"<|PROMPT_SECTION_dynamic|>",
+		"<|SCHEMA|>",
+		"AI Blueprint Parameter Generation",
+		"Blueprint Description:",
+		"Blueprint Schema:",
+		"call-ai-blueprint",
+		"目标主机地址",
+		"test-forge",
+	) {
+		t.Fatalf("blueprint params prompt should be composed by prompt sections. Got:\n%s", prompt)
+	}
+}
+
 func TestPromptManager_WithTracedDynamicContextProvider(t *testing.T) {
 	callCount := 0
 	var countMutex sync.Mutex

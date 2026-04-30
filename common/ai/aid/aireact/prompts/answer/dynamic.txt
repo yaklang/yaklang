@@ -1,0 +1,15 @@
+{{ if .UserQuery }}<|USER_QUERY_{{ .Nonce }}|>
+{{ .UserQuery }}
+<|USER_QUERY_END_{{ .Nonce }}|>{{ end }}
+
+{{ if .AutoContext }}{{ .AutoContext }}{{ end }}{{ if and .AutoContext .UserHistory }}
+
+{{ end }}{{ if .UserHistory }}{{ .UserHistory }}{{ end }}
+
+# Current Response Contract
+{{ if eq .Language "zh" }}LANGUAGE: Please respond in Chinese (中文) unless specifically asked otherwise.{{ else }}LANGUAGE: Please respond in English unless specifically asked otherwise.{{ end }}
+- 只返回符合 schema 的 JSON 对象
+- 如果使用 AITAG，必须使用当前 nonce `{{ .Nonce }}`
+- 当前 FINAL_ANSWER Start tag: `<|FINAL_ANSWER_{{ .Nonce }}|>`
+- 当前 FINAL_ANSWER End tag: `<|FINAL_ANSWER_END_{{ .Nonce }}|>`
+- 不要复用历史 nonce、示例 nonce、timeline nonce 或其它旧 nonce

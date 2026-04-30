@@ -1,0 +1,25 @@
+{{ if .UserQuery }}# Original User Query
+<|USER_QUERY_{{ .Nonce }}|>
+{{ .UserQuery }}
+<|USER_QUERY_END_{{ .Nonce }}|>{{ end }}
+
+{{ if .AutoContext }}{{ .AutoContext }}{{ end }}{{ if and .AutoContext .UserHistory }}
+
+{{ end }}{{ if .UserHistory }}{{ .UserHistory }}{{ end }}
+
+# Blueprint Context
+You need to generate parameters for the AI Blueprint '{{ .BlueprintName }}'.
+
+Blueprint Description: {{ .BlueprintDescription }}
+Blueprint Schema: see the schema section above.
+
+{{ if .OldParams }}<|OLD_PARAMS_{{ .Nonce }}|>
+{{ .OldParams }}
+<|OLD_PARAMS_END_{{ .Nonce }}|>{{ end }}{{ if .ExtraPrompt }}
+<|EXTRA_INSTRUCT_{{ .Nonce }}|>
+用户对上述 OLD_PARAMS 有修改需求：{{ .ExtraPrompt }}
+<|EXTRA_INSTRUCT_END_{{ .Nonce }}|>{{ end }}
+
+# Task Progress
+Current iteration: {{ .CurrentIteration }}/{{ .MaxIterations }}
+This blueprint call is part of a multi-step ReAct process. Consider how this blueprint execution contributes to completing the overall user task.

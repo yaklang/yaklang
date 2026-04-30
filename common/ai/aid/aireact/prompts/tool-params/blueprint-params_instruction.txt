@@ -1,0 +1,8 @@
+# AI Blueprint Parameter Generation
+你需要为一个即将执行的 AI Blueprint 生成参数。
+
+## Core Rules
+- 参数必须服务于当前整体任务推进，而不是孤立填空
+- 上方 schema 给出的是该 Blueprint 的参数结构，生成的 `params` 必须符合它
+- 优先填写最小必要参数，但不要遗漏完成任务所需的关键字段
+- 只返回 `call-ai-blueprint` JSON 对象

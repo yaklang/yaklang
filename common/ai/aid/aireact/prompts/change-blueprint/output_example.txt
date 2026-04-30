@@ -1,0 +1,8 @@
+# Example
+```json
+{
+  "@action": "change-ai-blueprint",
+  "reasoning": "the current blueprint does not fit the task scope",
+  "new_blueprint": "better_blueprint_name"
+}
+```

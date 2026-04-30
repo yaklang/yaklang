@@ -1,0 +1,16 @@
+# Example 1: Re-Select A Better Tool
+```json
+{
+  "@action": "require-tool",
+  "tool": "query_file"
+}
+```
+
+# Example 2: Abandon Tool Usage
+```json
+{
+  "@action": "abandon",
+  "tool": "",
+  "abandon_reason": "the task can be answered directly"
+}
+```

@@ -1,0 +1,44 @@
+{{ if .UserQuery }}<|USER_QUERY_{{ .Nonce }}|>
+{{ .UserQuery }}
+<|USER_QUERY_END_{{ .Nonce }}|>{{ end }}
+
+{{ if .AutoContext }}{{ .AutoContext }}{{ end }}{{ if and .AutoContext .UserHistory }}
+
+{{ end }}{{ if .UserHistory }}{{ .UserHistory }}{{ end }}
+
+# Tool Context
+需要为 `{{ .ToolName }}` 重新生成参数。
+
+<|TOOL_DESC|>
+{{ .ToolDescription }}
+<|TOOL_DESC_END|>
+
+{{ if .ToolUsage }}<|TOOL_USAGE|>
+{{ .ToolUsage }}
+<|TOOL_USAGE_END|>
+{{ end }}
+
+{{ if .OldParams }}# 上下文
+此前你生成的旧的不合适的参数为
+
+<|OLD_PARAMS_{{ .Nonce }}|>
+{{ .OldParams }}
+<|OLD_PARAMS_END_{{ .Nonce }}|>
+{{ end }}
+
+# Current Response Contract
+- 按 schema 为当前工具生成一套新的、可执行的参数
+- 简单参数直接返回 JSON `params`
+- 多行或复杂参数使用当前 nonce 的 AITAG
+- 绝不能复用历史 nonce、示例 nonce、timeline nonce 或其它旧 nonce
+- 如果使用 AITAG，开始和结束标签的参数名必须一致
+
+当前 nonce:
+
+`{{ .Nonce }}`
+
+{{ if .ParamNames }}### Available Parameter AITAG Forms
+{{- range .ParamNames }}
+- {{ . }}: `<|TOOL_PARAM_{{ . }}_{{ $.Nonce }}|>...<|TOOL_PARAM_{{ . }}_END_{{ $.Nonce }}|>`
+{{- end }}
+{{ end }}

@@ -1,0 +1,8 @@
+# Change AI Blueprint
+你需要基于当前任务上下文，重新选择一个更适合继续执行的 AI Blueprint。
+
+## Core Rules
+- 优先从上方的 AI Blueprint Inventory 中选择更匹配当前任务的 Blueprint
+- 需要结合当前 Blueprint、旧参数、执行结果和用户原始诉求做判断
+- 必须输出 `change-ai-blueprint` JSON 对象
+- 不要输出 JSON 之外的其它文字
