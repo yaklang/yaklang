@@ -21,6 +21,14 @@ type ChatMessage struct {
 	// ToolChoice controls which (if any) tool is called by the model
 	// Can be "none", "auto", "required", or {"type": "function", "function": {"name": "my_function"}}
 	ToolChoice any `json:"tool_choice,omitempty"`
+	// Modalities 用于 Qwen Omni 等多模态模型声明输出模态，
+	// 例如 ["text"] 或 ["text","audio"]；非 omni 模型可不设置（omitempty）。
+	// 关键词: modalities, omni 输出模态
+	Modalities []string `json:"modalities,omitempty"`
+	// StreamOptions 用于 omni 模型必填项 stream_options.include_usage=true，
+	// 非 omni 模型可不设置（omitempty）。
+	// 关键词: stream_options, include_usage
+	StreamOptions map[string]any `json:"stream_options,omitempty"`
 }
 
 // Tool represents a tool that the model may call
@@ -47,9 +55,12 @@ type ChatDetail struct {
 }
 
 type ChatContent struct {
-	Type     string `json:"type"` // text / image_url
+	Type     string `json:"type"` // text / image_url / video_url
 	Text     string `json:"text,omitempty"`
 	ImageUrl any    `json:"image_url,omitempty"`
+	// VideoUrl 用于 Qwen Omni 等多模态模型直接喂入视频文件
+	// 关键词: video_url, omni 视频输入
+	VideoUrl any `json:"video_url,omitempty"`
 }
 
 type ChatDetails []ChatDetail
@@ -148,6 +159,17 @@ func NewUserChatContentImageUrl(u string) *ChatContent {
 	return &ChatContent{
 		Type: "image_url",
 		ImageUrl: map[string]any{
+			"url": u,
+		},
+	}
+}
+
+// NewUserChatContentVideoUrl 构造 video_url 类型的 ChatContent，用于 Qwen Omni 等模型。
+// 关键词: video_url, omni 视频输入
+func NewUserChatContentVideoUrl(u string) *ChatContent {
+	return &ChatContent{
+		Type: "video_url",
+		VideoUrl: map[string]any{
 			"url": u,
 		},
 	}

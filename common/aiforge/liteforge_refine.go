@@ -412,3 +412,28 @@ func BuildKnowledgeFromEntityReposByName(name string, option ...any) (<-chan *sc
 
 	return BuildKnowledgeFromEntityRepository(er, ragSystem, append(option, WithAllowMultiHopAIRefine(true))...)
 }
+
+// BuildVideoKnowledgeFromOmni 复用 _buildKnowledge 的 RAG/ERM 入库链路，
+// 但分析阶段切换为 omni 端到端视频理解（AnalyzeVideoOmni），与既有
+// BuildKnowledgeFromFile 等保持完全独立，纯增量。
+//
+// 关键词: BuildVideoKnowledgeFromOmni, omni 视频建知识库
+//
+// example:
+//
+//	ch, err := aiforge.BuildVideoKnowledgeFromOmni(
+//	    "xss-learn-omni-flash", "/path/to/xss-learn.mp4",
+//	    aiforge.VideoOmniPresetFlash(),
+//	    aiforge.WithVideoOmniAPIKey(key),
+//	)
+func BuildVideoKnowledgeFromOmni(kbName string, video string, options ...any) (<-chan *schema.KnowledgeBaseEntry, error) {
+	// 自动透传 kb 名给 omni 视频管线，配合 zip 归档自动文件名
+	// 关键词: BuildVideoKnowledgeFromOmni 注入 kbName, omni archive auto naming
+	options = append(options, withVideoOmniKBName(kbName))
+	analyzeResult, err := AnalyzeVideoOmni(video, options...)
+	if err != nil {
+		return nil, utils.Errorf("failed to start analyze video by omni: %v", err)
+	}
+	options = append(options, RefineWithKnowledgeBaseName(kbName))
+	return _buildKnowledge(analyzeResult, options...)
+}

@@ -48,6 +48,31 @@ var LiteForgeExport = map[string]interface{}{
 	"knowledgeEntryLength": RefineWithKnowledgeEntryLength,
 	"refinePrompt":         _refine_WithRefinePrompt,
 	"strictRefine":         _refine_WithStrict,
+
+	// 视频 omni 知识构建关键词: BuildVideoKnowledgeFromOmni, AnalyzeVideoOmni, omniPreset
+	"BuildVideoKnowledgeFromOmni": BuildVideoKnowledgeFromOmni,
+	"AnalyzeVideoOmni":            AnalyzeVideoOmni,
+	"omniPresetTurbo":             VideoOmniPresetTurbo,
+	"omniPresetFlash":             VideoOmniPresetFlash,
+	"omniPresetPlus":              VideoOmniPresetPlus,
+	"omniType":                    WithVideoOmniType,
+	"omniModel":                   WithVideoOmniModel,
+	"omniAPIKey":                  WithVideoOmniAPIKey,
+	"omniBaseURL":                 WithVideoOmniBaseURL,
+	"omniSystemPrompt":            WithVideoOmniSystemPrompt,
+	"omniQueryPrompt":             WithVideoOmniQueryPrompt,
+	"omniContext":                 WithVideoOmniContext,
+	"omniTimeout":                 WithVideoOmniTimeout,
+	"omniSegmentSeconds":          WithVideoOmniSegmentSeconds,
+	"omniReencode":                WithVideoOmniReencode,
+	"omniMaxHeight":               WithVideoOmniMaxHeight,
+	"omniTargetFPS":               WithVideoOmniTargetFPS,
+	"omniMaxBase64Bytes":          WithVideoOmniMaxBase64Bytes,
+	"omniMaxSegments":             WithVideoOmniMaxSegments,
+	"omniProgressCallback":        WithVideoOmniProgressCallback,
+	// 关键词: omni zip 归档导出, omniZipFile, omniZipDir
+	"omniZipFile": WithVideoOmniZipFile,
+	"omniZipDir":  WithVideoOmniZipDir,
 }
 
 type liteforgeConfig struct {

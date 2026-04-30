@@ -42,6 +42,8 @@ func (g *GatewayClient) Chat(s string, function ...any) (string, error) {
 		aispec.WithChatBase_ReasonStreamHandler(g.config.ReasonStreamHandler),
 		aispec.WithChatBase_ErrHandler(g.config.HTTPErrorHandler),
 		aispec.WithChatBase_ImageRawInstance(g.config.Images...),
+		// 视频输入接入关键词: tongyi omni 视频通道
+		aispec.WithChatBase_VideoRawInstance(g.config.Videos...),
 		aispec.WithChatBase_EnableThinkingEx(g.config.EnableThinking, g.config.EnableThinkingField, g.config.EnableThinkingValue),
 		aispec.WithChatBase_Tools(g.config.Tools),
 		aispec.WithChatBase_ToolChoice(g.config.ToolChoice),

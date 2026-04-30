@@ -59,6 +59,9 @@ type AIConfig struct {
 	HTTPErrorHandler func(error)
 
 	Images []*ImageDescription
+	// Videos 视频输入列表，用于 Qwen Omni 等多模态模型的 video_url 通路
+	// 关键词: AIConfig.Videos, 视频输入承载
+	Videos []*VideoDescription
 
 	Headers             []*ypb.KVPair
 	EnableThinking      bool
@@ -872,6 +875,60 @@ func WithImageRaw(raw []byte) AIConfigOption {
 		config.Images = append(config.Images, &ImageDescription{
 			Url: buf.String(),
 		})
+	}
+}
+
+// 视频输入关键词: WithVideoUrl, WithVideoBase64, WithVideoRaw, omni 视频输入
+
+// WithVideoUrl 传入视频 URL（http(s) 或 data:video/...;base64,...），用于 Qwen Omni 类模型。
+// 关键词: ai.videoUrl, omni 视频 URL 输入
+func WithVideoUrl(u string) AIConfigOption {
+	return func(config *AIConfig) {
+		if u == "" {
+			return
+		}
+		log.Infof("add video_url with: %v", utils.ShrinkString(u, 200))
+		config.Videos = append(config.Videos, &VideoDescription{
+			Url: u,
+		})
+	}
+}
+
+// WithVideoBase64 传入 Base64 编码的视频数据，自动包装为 data URI。
+// 注意阿里云百炼 omni 模型的 base64 上限为 10MB，调用方需自行控制。
+// omni 模型 video_url 的 base64 要求 data URI 不携带 mime type，
+// 即 data:;base64,xxxx 形式。
+// 关键词: ai.videoBase64, omni base64 视频输入
+func WithVideoBase64(b64 string) AIConfigOption {
+	return func(config *AIConfig) {
+		if b64 == "" {
+			return
+		}
+		// 已是 data URI 直接放进去
+		if strings.HasPrefix(b64, "data:") {
+			config.Videos = append(config.Videos, &VideoDescription{Url: b64})
+			return
+		}
+		var buf bytes.Buffer
+		buf.WriteString("data:;base64,")
+		buf.WriteString(b64)
+		config.Videos = append(config.Videos, &VideoDescription{Url: buf.String()})
+	}
+}
+
+// WithVideoRaw 传入视频原始字节，自动 base64 包装为 data URI。
+// omni 模型 video_url 的 base64 要求 data URI 不携带 mime type。
+// 关键词: ai.videoRaw, omni 视频原始字节输入
+func WithVideoRaw(raw []byte) AIConfigOption {
+	return func(config *AIConfig) {
+		if len(raw) == 0 {
+			return
+		}
+		b64 := codec.EncodeBase64(raw)
+		var buf bytes.Buffer
+		buf.WriteString("data:;base64,")
+		buf.WriteString(b64)
+		config.Videos = append(config.Videos, &VideoDescription{Url: buf.String()})
 	}
 }
 

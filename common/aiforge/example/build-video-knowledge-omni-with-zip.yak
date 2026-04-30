@@ -1,0 +1,200 @@
+/*
+build-video-knowledge-omni-with-zip.yak
+基于 ffmpeg.ExtractVideoSliceFromVideo + Qwen Omni 端到端视频理解构建知识库，
+并把每个分片的全部原始素材（流复制 mp4 / 重编码 mp4 / omni raw 返回 / 解析 JSON / dump.md）
+归档到一个 zip，方便后续离线蒸馏 skills 等再加工。
+关键词: omni 视频归档, omniZipDir, omniZipFile, video knowledge zip
+
+zip 内部结构：
+  manifest.json
+  README.md
+  segments/
+    slice_00000/
+      streamcopy.mp4         流复制原始切片，最适合再加工
+      reencoded.mp4          实际送给 omni 的 720p 2fps 重编码切片
+      omni_raw_response.txt  模型原始返回
+      analysis.json          解析后的 VideoOmniSegmentResult
+      dump.md                人类可读概览（同 RAG 入库 dump）
+    slice_00001/...
+
+API key 优先级（从高到低）：
+  1. --apikey '<key>'              直接传 key
+  2. $DASHSCOPE_API_KEY            环境变量
+  3. --apikey-file <path>          读本地文件，默认 ~/yakit-projects/tongyi-apikey.txt
+注意：仓库内任何脚本/文档/测试均不允许出现真实 key。
+
+使用方式（默认 plus + 1 段，约 1 分钟内完成）：
+  export DASHSCOPE_API_KEY=sk-***
+  yak build-video-knowledge-omni-with-zip.yak \
+    --video /path/to/lecture.mp4 \
+    --model plus \
+    --max-segments 1 \
+    --zip-dir /tmp/video-omni-zips
+*/
+
+cli.SetCliName("build-video-knowledge-omni-with-zip")
+
+// 解析参数
+// 关键词: cli 参数读取, omni zip 脚本入参
+videoPath = cli.String("video", cli.setDefault(""), cli.setHelp("source video path (required)"))
+modelPreset = cli.String("model", cli.setDefault("plus"), cli.setHelp("omni preset: turbo / flash / plus"))
+modelName = cli.String("model-name", cli.setDefault(""), cli.setHelp("override model name (optional)"))
+kbName = cli.String("kb-name", cli.setDefault(""), cli.setHelp("knowledge base name; default depends on model"))
+apikey = cli.String("apikey", cli.setDefault(""), cli.setHelp("dashscope api key (overrides env / file)"))
+apikeyFile = cli.String("apikey-file", cli.setDefault("~/yakit-projects/tongyi-apikey.txt"), cli.setHelp("path to local api key file (used when --apikey and $DASHSCOPE_API_KEY are empty)"))
+maxSegments = cli.Int("max-segments", cli.setDefault(1), cli.setHelp("max segments to analyze (0 = no limit)"))
+zipDir = cli.String("zip-dir", cli.setDefault("/tmp/video-omni-zips"), cli.setHelp("output dir for zip; ignored when --zip-file is set"))
+zipFile = cli.String("zip-file", cli.setDefault(""), cli.setHelp("explicit zip file path (overrides zip-dir)"))
+cli.check()
+
+assert videoPath != "", "--video is required"
+
+if kbName == "" {
+    kbName = f"video-omni-${modelPreset}-zip"
+}
+
+// 加载 api key：cli > env > 本地文件
+// 关键词: api key 加载顺序, DASHSCOPE_API_KEY env
+if apikey == "" {
+    apikey = os.Getenv("DASHSCOPE_API_KEY")
+}
+if apikey == "" {
+    homeDir = os.Getenv("HOME")
+    if homeDir != "" && str.HasPrefix(apikeyFile, "~/") {
+        apikeyFile = homeDir + apikeyFile[1:]
+    }
+    if file.IsExisted(apikeyFile) {
+        keyBytes = file.ReadFile(apikeyFile)~
+        apikey = str.TrimSpace(string(keyBytes))
+        log.info("apikey loaded from file: %v (length=%v)", apikeyFile, len(apikey))
+    }
+} else {
+    log.info("apikey loaded from --apikey or $DASHSCOPE_API_KEY (length=%v)", len(apikey))
+}
+assert apikey != "", "dashscope api key is empty: pass --apikey, or set $DASHSCOPE_API_KEY, or put it into --apikey-file"
+
+log.info("video path: %v", videoPath)
+log.info("model preset: %v", modelPreset)
+log.info("kb name: %v", kbName)
+log.info("max segments: %v", maxSegments)
+log.info("zip dir: %v", zipDir)
+log.info("zip file (explicit): %v", zipFile)
+
+// 视频文件存在性
+// 关键词: 视频文件检查
+exists = file.IsExisted(videoPath)
+assert exists, f"video file not found: ${videoPath}"
+
+// 自检导出
+// 关键词: liteforge.omniZipDir 自检, exports check
+desc(liteforge.omniZipDir)
+desc(liteforge.omniZipFile)
+
+// 选择预设
+// 关键词: omniPreset 选择
+presetOpt = liteforge.omniPresetPlus()
+if modelPreset == "turbo" {
+    presetOpt = liteforge.omniPresetTurbo()
+} else if modelPreset == "flash" {
+    presetOpt = liteforge.omniPresetFlash()
+}
+
+omniOpts = [
+    presetOpt,
+    liteforge.omniAPIKey(apikey),
+]
+
+if modelName != "" {
+    omniOpts = append(omniOpts, liteforge.omniModel(modelName))
+    log.info("model name overridden to: %v", modelName)
+}
+if maxSegments > 0 {
+    omniOpts = append(omniOpts, liteforge.omniMaxSegments(maxSegments))
+}
+
+// 注入 zip 选项；优先 zipFile，没设置则脚本自己生成精确路径再传 omniZipFile，
+// 这样脚本能 100% 知道 zip 位置用于校验。同时也覆盖到 omniZipDir 的等价行为。
+// 关键词: omniZipFile 注入, omniZipDir 注入
+if zipFile == "" {
+    file.MkdirAll(zipDir)
+    ts = time.Now().Format("20060102_150405")
+    zipFile = zipDir + "/" + kbName + "-" + modelPreset + "-" + ts + ".zip"
+}
+log.info("planned zip file: %v", zipFile)
+omniOpts = append(omniOpts, liteforge.omniZipFile(zipFile))
+
+// 进度回调，打印每段产出
+// 关键词: omni 段进度回调, omniProgressCallback
+segmentCount = 0
+omniOpts = append(omniOpts, liteforge.omniProgressCallback(func(seg) {
+    segmentCount++
+    log.info("[omni-segment] idx=%v latency=%vms title=%v err=%v",
+        seg.SegmentIndex, seg.LatencyMs, seg.Title, seg.ErrMsg)
+    if seg.Storyline != "" {
+        log.info("  storyline preview: %v", str.ShrinkString(seg.Storyline, 200))
+    }
+    if len(seg.KeyKnowledge) > 0 {
+        log.info("  key_knowledge count: %v", len(seg.KeyKnowledge))
+    }
+}))
+
+log.info("== running BuildVideoKnowledgeFromOmni with zip archive ==")
+buildStart = time.Now()
+entryChan, kbErr = liteforge.BuildVideoKnowledgeFromOmni(kbName, videoPath, omniOpts...)
+assert kbErr == nil, f"BuildVideoKnowledgeFromOmni failed: ${kbErr}"
+
+entryCount = 0
+for entry in entryChan {
+    if entry == nil {
+        continue
+    }
+    entryCount++
+    title = entry.KnowledgeTitle
+    summary = entry.Summary
+    log.info("[kb-entry] #%v title=%v summary=%v", entryCount, title, str.ShrinkString(summary, 200))
+}
+buildElapsed = time.Now().Sub(buildStart)
+log.info("== build done. entries=%v, segments=%v, elapsed=%v ==", entryCount, segmentCount, buildElapsed)
+
+assert segmentCount >= 1, "expected at least 1 segment processed by omni"
+
+// 校验 zip 结构
+// 关键词: zip 结构校验, manifest 校验
+log.info("== verifying zip archive ==")
+finalZip = zipFile
+assert file.IsExisted(finalZip), f"zip file should exist: ${finalZip}"
+log.info("final zip path: %v", finalZip)
+
+zipStat = file.Stat(finalZip)~
+assert zipStat.Size() > 0, "zip size should be > 0"
+log.info("zip size: %v bytes", zipStat.Size())
+
+// 用 zip.GrepPathRegexp 列举内部文件路径
+// 关键词: zip 内文件路径列举
+mustHave = [
+    "manifest.json",
+    "README.md",
+    "segments/slice_00000/streamcopy.mp4",
+    "segments/slice_00000/reencoded.mp4",
+    "segments/slice_00000/analysis.json",
+    "segments/slice_00000/dump.md",
+    "segments/slice_00000/omni_raw_response.txt",
+]
+
+for needPath in mustHave {
+    results, gErr = zip.GrepPathSubString(finalZip, needPath)
+    assert gErr == nil, f"GrepPathSubString failed for ${needPath}: ${gErr}"
+    found = false
+    for r in results {
+        if r.FileName == needPath || str.HasSuffix(r.FileName, needPath) {
+            found = true
+            break
+        }
+    }
+    assert found, f"zip should contain file: ${needPath}"
+    log.info("zip contains: %v", needPath)
+}
+
+log.info("== zip archive verification passed ==")
+log.info("==> all artifacts saved at: %v", finalZip)
+log.info("==> use this zip to redistill skills via aiforge.AnalyzeVideoOmni on streamcopy.mp4")

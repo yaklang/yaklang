@@ -177,6 +177,12 @@ type ImageDescription struct {
 	Url string `json:"url"`
 }
 
+// VideoDescription 视频输入承载体，用于 Qwen Omni 等多模态模型 video_url 通路
+// 关键词: VideoDescription, video_url, omni 视频输入
+type VideoDescription struct {
+	Url string `json:"url"`
+}
+
 type ChatBaseInterfaceType string
 
 const (
@@ -199,6 +205,12 @@ type ChatBaseContext struct {
 	// Default is chat_completions for backward compatibility.
 	InterfaceType ChatBaseInterfaceType
 	ImageUrls     []*ImageDescription
+	// VideoUrls 视频输入列表，用于 Qwen Omni 等多模态模型
+	// 关键词: VideoUrls, omni 视频输入通道
+	VideoUrls []*VideoDescription
+	// Modalities 输出模态，omni 模型必填（如 ["text"]）；其他模型可留空
+	// 关键词: modalities, omni 模态
+	Modalities    []string
 	DisableStream bool
 	// ToolCallCallback is called when the AI response contains tool_calls.
 	// If set, tool_calls will NOT be converted to <|TOOL_CALL...|> format in the output stream.
@@ -304,6 +316,28 @@ func WithChatBase_ImageRawInstance(images ...*ImageDescription) ChatBaseOption {
 	}
 }
 
+// WithChatBase_VideoRawInstance 把 VideoDescription 添加到 ChatBaseContext，
+// 用于把视频文件（http(s) URL 或 data:video/mp4;base64,... 形式）喂给 omni 类模型。
+// 关键词: WithChatBase_VideoRawInstance, video_url 注入
+func WithChatBase_VideoRawInstance(videos ...*VideoDescription) ChatBaseOption {
+	return func(c *ChatBaseContext) {
+		for _, v := range videos {
+			if v == nil || v.Url == "" {
+				continue
+			}
+			c.VideoUrls = append(c.VideoUrls, v)
+		}
+	}
+}
+
+// WithChatBase_Modalities 设置输出模态（omni 模型必填，例如 ["text"]）。
+// 关键词: WithChatBase_Modalities, omni 输出模态
+func WithChatBase_Modalities(modalities ...string) ChatBaseOption {
+	return func(c *ChatBaseContext) {
+		c.Modalities = append(c.Modalities, modalities...)
+	}
+}
+
 // WithChatBase_ToolCallCallback sets a callback function that will be called when the AI response contains tool_calls.
 // If set, tool_calls will NOT be converted to <|TOOL_CALL...|> format in the output stream.
 // Instead, the callback will be invoked with the parsed ToolCall objects.
@@ -359,16 +393,64 @@ func ChatBase(url string, model string, msg string, chatOpts ...ChatBaseOption) 
 
 func chatBaseChatCompletions(url string, model string, msg string, ctx *ChatBaseContext) (string, error) {
 	var msgs []ChatDetail
-	if len(ctx.ImageUrls) <= 0 {
+	hasImages := len(ctx.ImageUrls) > 0
+	hasVideos := len(ctx.VideoUrls) > 0
+	if !hasImages && !hasVideos {
 		msgs = append(msgs, NewUserChatDetail(msg))
 	} else {
 		var contents []*ChatContent
 		if msg == "" {
-			msg = "请描述图片内容"
+			if hasVideos {
+				// 视频默认提示，用户可通过 query 自行覆盖
+				// 关键词: omni 视频默认提示
+				msg = "请描述视频内容"
+			} else {
+				msg = "请描述图片内容"
+			}
 		}
-		contents = append(contents, NewUserChatContentText(msg))
-		for _, image := range ctx.ImageUrls {
-			contents = append(contents, NewUserChatContentImageUrl(image.Url))
+		// 拼装顺序: 通义 omni 官方示例要求 video_url 出现在 text 之前，
+		// 否则会报 "Multiple inputs of the same modality or mixed modality inputs are currently not applicable to the omni model"。
+		// image_url 路径保持原"text 在前"的顺序，避免影响既有图像通路行为。
+		// 关键词: 多模态 content 拼装顺序, omni video_url 顺序
+		// 注意: NewDefaultAIConfig 内部会对 opts 应用两次（先 type 后 user opts），
+		// 加上 ai.Chat -> legacyChat -> gateway.LoadOption 三层各调一次，
+		// 同一个 video/image 可能被 append 多次，会触发 omni 模型 "Multiple inputs of the same modality" 报错。
+		// 这里在拼装 content 时按 URL 去重，确保单视频单图像的稳定输出。
+		// 关键词: omni 多模态去重, multimodal dedup
+		seenVideo := map[string]bool{}
+		seenImage := map[string]bool{}
+		uniqVideos := make([]*VideoDescription, 0, len(ctx.VideoUrls))
+		for _, v := range ctx.VideoUrls {
+			if v == nil || v.Url == "" || seenVideo[v.Url] {
+				continue
+			}
+			seenVideo[v.Url] = true
+			uniqVideos = append(uniqVideos, v)
+		}
+		uniqImages := make([]*ImageDescription, 0, len(ctx.ImageUrls))
+		for _, im := range ctx.ImageUrls {
+			if im == nil || im.Url == "" || seenImage[im.Url] {
+				continue
+			}
+			seenImage[im.Url] = true
+			uniqImages = append(uniqImages, im)
+		}
+		hasVideos = len(uniqVideos) > 0
+		hasImages = len(uniqImages) > 0
+
+		if hasVideos {
+			for _, video := range uniqVideos {
+				contents = append(contents, NewUserChatContentVideoUrl(video.Url))
+			}
+			for _, image := range uniqImages {
+				contents = append(contents, NewUserChatContentImageUrl(image.Url))
+			}
+			contents = append(contents, NewUserChatContentText(msg))
+		} else {
+			contents = append(contents, NewUserChatContentText(msg))
+			for _, image := range uniqImages {
+				contents = append(contents, NewUserChatContentImageUrl(image.Url))
+			}
 		}
 		msgs = append(msgs, NewUserChatDetailEx(contents))
 	}
@@ -381,6 +463,20 @@ func chatBaseChatCompletions(url string, model string, msg string, ctx *ChatBase
 	}
 	if ctx.ToolChoice != nil {
 		msgIns.ToolChoice = ctx.ToolChoice
+	}
+
+	// 透传 modalities；视频通路下若用户未显式设置，自动补 ["text"]
+	// 关键词: omni modalities 默认值, video_url 自动 modalities
+	if len(ctx.Modalities) > 0 {
+		msgIns.Modalities = ctx.Modalities
+	} else if hasVideos {
+		msgIns.Modalities = []string{"text"}
+	}
+
+	// 视频通路自动补 stream_options.include_usage=true（dashscope omni 要求）
+	// 关键词: stream_options, include_usage 自动注入
+	if hasVideos && msgIns.Stream {
+		msgIns.StreamOptions = map[string]any{"include_usage": true}
 	}
 
 	return executeChatBaseRequest(url, msgIns.Stream, msgIns, ctx, appendStreamHandlerPoCOptionEx)
@@ -530,6 +626,9 @@ func executeChatBaseRequest(
 	raw, err = json.Marshal(payload)
 	if err != nil {
 		return "", utils.Errorf("build msg[%v] to json failed: %s", string(raw), err)
+	}
+	if log.GetLevel() <= log.DebugLevel {
+		log.Debugf("ChatBase request body preview: %s", utils.ShrinkString(string(raw), 600))
 	}
 	// Set default options BEFORE user options, so user can override
 	defaultOpts := []poc.PocConfigOption{

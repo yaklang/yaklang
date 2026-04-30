@@ -1,0 +1,185 @@
+/*
+build-video-knowledge-omni.yak
+基于 ffmpeg.ExtractVideoSliceFromVideo + Qwen Omni 端到端视频理解构建知识库的样例脚本。
+关键词: omni 视频, 视频切片, 知识库构建, qwen omni, RAG
+
+token 估算（来自百炼官方文档摘录）：
+- 视觉 token ≈ ceil(actual_frames × resized_h × resized_w / (32×32))
+  其中 actual_frames = min(time_sec × 2, model_max_frames)
+- 音频 token：plus 7/s, flash 12.5/s, turbo 25/s
+- 1080p 10fps 源做 stream copy 时单段体积大；为了控制 base64 ≤ 10MB
+  脚本默认走 omniReencode + 720p + 2fps，单段 100~300 秒都安全
+- omni 模型单视频时长上限：turbo 40s / flash 150s / plus 1h；
+  base64 一律 ≤ 10MB（URL 限额可放宽）。
+
+API key 优先级（从高到低）：
+  1. --apikey '<key>'              直接传 key
+  2. $DASHSCOPE_API_KEY            环境变量
+  3. --apikey-file <path>          读本地文件，默认 ~/yakit-projects/tongyi-apikey.txt
+注意：仓库内任何脚本/文档/测试均不允许出现真实 key，请使用上述任一方式注入。
+
+使用方式：
+  export DASHSCOPE_API_KEY=sk-***
+  yak build-video-knowledge-omni.yak \
+    --video /path/to/lecture.mp4 \
+    --model flash \
+    --kb-name my-lecture-flash \
+    --max-segments 1
+*/
+
+cli.SetCliName("build-video-knowledge-omni")
+
+// 解析参数
+// 关键词: cli 参数读取, omni 视频脚本入参
+videoPath = cli.String("video", cli.setDefault(""), cli.setHelp("source video path (required)"))
+modelPreset = cli.String("model", cli.setDefault("flash"), cli.setHelp("omni preset: turbo / flash / plus"))
+modelName = cli.String("model-name", cli.setDefault(""), cli.setHelp("override model name (optional)"))
+kbName = cli.String("kb-name", cli.setDefault(""), cli.setHelp("knowledge base name; default depends on model"))
+apikey = cli.String("apikey", cli.setDefault(""), cli.setHelp("dashscope api key (overrides env / file)"))
+apikeyFile = cli.String("apikey-file", cli.setDefault("~/yakit-projects/tongyi-apikey.txt"), cli.setHelp("path to local api key file (used when --apikey and $DASHSCOPE_API_KEY are empty)"))
+maxSegments = cli.Int("max-segments", cli.setDefault(1), cli.setHelp("max segments to analyze (0 = no limit)"))
+segmentSecondsOverride = cli.Float("segment-seconds", cli.setDefault(0.0), cli.setHelp("override segment length seconds; 0 means use preset"))
+onlySlice = cli.Bool("only-slice", cli.setDefault(false), cli.setHelp("only run slice self-check, skip omni call"))
+noReencode = cli.Bool("no-reencode", cli.setDefault(false), cli.setHelp("disable reencode (rely on stream copy; risky for large bitrate sources)"))
+cli.check()
+
+assert videoPath != "", "--video is required"
+
+if kbName == "" {
+    kbName = f"video-omni-${modelPreset}"
+}
+
+// 加载 api key：cli > env > 本地文件
+// 关键词: api key 加载顺序, DASHSCOPE_API_KEY env
+if apikey == "" {
+    apikey = os.Getenv("DASHSCOPE_API_KEY")
+}
+if apikey == "" {
+    homeDir = os.Getenv("HOME")
+    if homeDir != "" && str.HasPrefix(apikeyFile, "~/") {
+        apikeyFile = homeDir + apikeyFile[1:]
+    }
+    if file.IsExisted(apikeyFile) {
+        keyBytes = file.ReadFile(apikeyFile)~
+        apikey = str.TrimSpace(string(keyBytes))
+        log.info("apikey loaded from file: %v (length=%v)", apikeyFile, len(apikey))
+    }
+} else {
+    log.info("apikey loaded from --apikey or $DASHSCOPE_API_KEY (length=%v)", len(apikey))
+}
+assert apikey != "", "dashscope api key is empty: pass --apikey, or set $DASHSCOPE_API_KEY, or put it into --apikey-file"
+
+log.info("video path: %v", videoPath)
+log.info("model preset: %v", modelPreset)
+log.info("kb name: %v", kbName)
+log.info("max segments: %v", maxSegments)
+log.info("only slice mode: %v", onlySlice)
+
+// 视频文件存在性
+// 关键词: 视频文件检查
+exists = file.IsExisted(videoPath)
+assert exists, f"video file not found: ${videoPath}"
+
+// 1. 切片 API 自检
+// 关键词: ExtractVideoSliceFromVideo 自检, slice self-check
+log.info("== step 1: slice self-check (stream copy, 30s) ==")
+sliceSelfCheckOpts = [
+    ffmpeg.withSliceDurationSeconds(30),
+]
+sliceSelfChan, sliceSelfErr = ffmpeg.ExtractVideoSliceFromVideo(videoPath, sliceSelfCheckOpts...)
+assert sliceSelfErr == nil, f"ExtractVideoSliceFromVideo init failed: ${sliceSelfErr}"
+
+selfCount = 0
+for slice in sliceSelfChan {
+    if slice.Error != nil {
+        log.error("slice self-check error: %v", slice.Error)
+        continue
+    }
+    selfCount++
+    log.info("slice self-check #%v: path=%v size=%v bytes start=%v end=%v",
+        slice.Index, slice.FilePath, slice.SizeBytes, slice.StartTime, slice.EndTime)
+    if selfCount >= 1 {
+        log.info("self-check got first slice, breaking out (rest will still be produced in temp dir)")
+        break
+    }
+}
+assert selfCount >= 1, "slice self-check should produce at least 1 slice"
+log.info("slice self-check passed")
+
+if onlySlice {
+    log.info("only-slice mode, exit before omni call")
+    return
+}
+
+// 2. 调用 omni 视频知识构建管线
+// 关键词: BuildVideoKnowledgeFromOmni, omni 端到端建库
+log.info("== step 2: omni knowledge build (preset=%v, kb=%v) ==", modelPreset, kbName)
+
+// 选择预设
+// 关键词: omniPreset 选择
+presetOpt = liteforge.omniPresetFlash()
+if modelPreset == "turbo" {
+    presetOpt = liteforge.omniPresetTurbo()
+} else if modelPreset == "plus" {
+    presetOpt = liteforge.omniPresetPlus()
+}
+
+omniOpts = [
+    presetOpt,
+    liteforge.omniAPIKey(apikey),
+]
+
+if modelName != "" {
+    omniOpts = append(omniOpts, liteforge.omniModel(modelName))
+    log.info("model name overridden to: %v", modelName)
+}
+if maxSegments > 0 {
+    omniOpts = append(omniOpts, liteforge.omniMaxSegments(maxSegments))
+}
+if segmentSecondsOverride > 0 {
+    omniOpts = append(omniOpts, liteforge.omniSegmentSeconds(segmentSecondsOverride))
+}
+if noReencode {
+    omniOpts = append(omniOpts, liteforge.omniReencode(false))
+    log.warn("reencode disabled; ensure source bitrate is small enough for base64 <= 10MB")
+}
+
+// 进度回调，打印每段产出
+// 关键词: omni 段进度回调, omniProgressCallback
+segmentCount = 0
+omniOpts = append(omniOpts, liteforge.omniProgressCallback(func(seg) {
+    segmentCount++
+    log.info("[omni-segment] idx=%v latency=%vms title=%v err=%v",
+        seg.SegmentIndex, seg.LatencyMs, seg.Title, seg.ErrMsg)
+    if seg.Storyline != "" {
+        log.info("  storyline preview: %v", str.ShrinkString(seg.Storyline, 200))
+    }
+    if len(seg.KeyKnowledge) > 0 {
+        log.info("  key_knowledge count: %v", len(seg.KeyKnowledge))
+        for i, k := range seg.KeyKnowledge {
+            log.info("    - [%v] %v", i, k)
+        }
+    }
+}))
+
+entryChan, kbErr = liteforge.BuildVideoKnowledgeFromOmni(kbName, videoPath, omniOpts...)
+assert kbErr == nil, f"BuildVideoKnowledgeFromOmni failed: ${kbErr}"
+
+entryCount = 0
+buildStart = time.Now()
+for entry in entryChan {
+    if entry == nil {
+        continue
+    }
+    entryCount++
+    title = entry.KnowledgeTitle
+    summary = entry.Summary
+    log.info("[kb-entry] #%v title=%v summary=%v", entryCount, title, str.ShrinkString(summary, 200))
+}
+buildElapsed = time.Now().Sub(buildStart)
+log.info("== knowledge base build done. entries=%v, segments=%v, elapsed=%v ==", entryCount, segmentCount, buildElapsed)
+
+// 验证至少有切片被分析
+// 关键词: omni 测试断言, omni final assertion
+assert segmentCount >= 1, "expected at least 1 segment processed by omni"
+log.info("omni knowledge build smoke test passed")

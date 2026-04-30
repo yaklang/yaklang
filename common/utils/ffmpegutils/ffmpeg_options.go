@@ -60,6 +60,16 @@ type options struct {
 	recordInput     string // e.g., "1" for screen, "desktop", "video=Integrated Camera"
 	recordFramerate int
 	captureCursor   bool
+
+	// Video slicing options (segment muxer based, time-based slicing)
+	// 用于按时间段把长视频切成若干段独立 mp4，配合 omni 模型做端到端理解
+	sliceDurationSeconds float64                       // 每段时长（秒），默认 120
+	sliceReencode        bool                          // 是否重编码（默认 false：流复制最快）
+	sliceMaxHeight       int                           // 重编码模式下最大高度，默认 720
+	sliceTargetFPS       float64                       // 重编码模式下目标 FPS，默认 2
+	sliceLoadRawData     bool                          // 是否随 channel 回吐字节内容，默认 false
+	sliceCallback        func(*VideoSliceResult)       // 实时回调，与 channel 双轨
+	sliceOutputDir       string                        // 切片输出目录（不指定则用临时目录）
 }
 
 // frameExtractionMode defines the method for frame extraction.
@@ -87,6 +97,13 @@ func newDefaultOptions() *options {
 		targetImageSize:    200 * 1024, // Default 200KB
 		recordFramerate:    10,
 		captureCursor:      true,
+
+		// Video slicing defaults: stream copy, 120 秒/段，与 omni Flash 安全限制兼容
+		sliceDurationSeconds: 120,
+		sliceReencode:        false,
+		sliceMaxHeight:       720,
+		sliceTargetFPS:       2,
+		sliceLoadRawData:     false,
 	}
 }
 
@@ -384,7 +401,116 @@ func WithScreenCaptureQuality(quality ScreenCaptureQuality) Option {
 	}
 }
 
+// --- Video Slicing Options ---
+// 视频切片关键词: ExtractVideoSliceFromVideo, segment muxer, omni preset
+
+// WithSliceDurationSeconds 设置每段切片时长（秒），默认 120 秒。
+// 关键词: 切片段长, segment_time
+func WithSliceDurationSeconds(seconds float64) Option {
+	return func(o *options) {
+		if seconds > 0 {
+			o.sliceDurationSeconds = seconds
+		}
+	}
+}
+
+// WithSliceReencode 切换是否重编码模式。
+// false（默认）：使用 -c copy 做流复制，速度极快，分辨率与 FPS 保持源；
+// true：重编码到指定分辨率与 FPS（适合统一 base64 体积/控制 token 开销）。
+// 关键词: 流复制 stream copy, 重编码 reencode
+func WithSliceReencode(enable bool) Option {
+	return func(o *options) {
+		o.sliceReencode = enable
+	}
+}
+
+// WithSliceMaxHeight 重编码模式下设置最大高度（保持宽高比），默认 720。
+// 关键词: 切片分辨率, scale
+func WithSliceMaxHeight(h int) Option {
+	return func(o *options) {
+		if h > 0 {
+			o.sliceMaxHeight = h
+		}
+	}
+}
+
+// WithSliceTargetFPS 重编码模式下设置目标 FPS，默认 2（贴合 omni 默认抽样率）。
+// 关键词: 切片帧率, target fps
+func WithSliceTargetFPS(fps float64) Option {
+	return func(o *options) {
+		if fps > 0 {
+			o.sliceTargetFPS = fps
+		}
+	}
+}
+
+// WithSliceLoadRawData 控制是否在 channel 中携带分片字节，默认 false（仅返回路径）。
+// 启用会显著增加内存与 IO 开销，建议在确实需要 base64 推送时再开启。
+// 关键词: 携带原始字节, raw data
+func WithSliceLoadRawData(enable bool) Option {
+	return func(o *options) {
+		o.sliceLoadRawData = enable
+	}
+}
+
+// WithSliceCallback 注册实时回调，每个分片落盘后立即触发，与 channel 同时发送。
+// 关键词: 切片回调, slice callback
+func WithSliceCallback(cb func(*VideoSliceResult)) Option {
+	return func(o *options) {
+		o.sliceCallback = cb
+	}
+}
+
+// WithSliceOutputDir 指定切片输出目录，不指定则使用临时目录。
+// 关键词: 切片输出目录, slice output dir
+func WithSliceOutputDir(dir string) Option {
+	return func(o *options) {
+		o.sliceOutputDir = dir
+	}
+}
+
+// WithSlicePresetForOmni 一键预设：根据目标 omni 模型设定段长。
+// turbo => 30 秒（模型上限 40s），flash => 120 秒（上限 150s），plus => 120 秒
+// （文档上限 1h，但 base64 实测 300s 会触发 "video file is too long"，
+// 故保守设为 120 秒；如需要更长可手动 WithSliceDurationSeconds）。
+// 关键词: omni 预设, slice preset
+func WithSlicePresetForOmni(preset string) Option {
+	return func(o *options) {
+		switch preset {
+		case "turbo":
+			o.sliceDurationSeconds = 30
+		case "flash":
+			o.sliceDurationSeconds = 120
+		case "plus":
+			o.sliceDurationSeconds = 120
+		default:
+			// 未知预设保持默认值，仅记录
+		}
+	}
+}
+
 // --- Result Types ---
+
+// VideoSliceResult 描述一段时间维度切片的产物。
+// 关键词: 视频切片结果, VideoSliceResult
+type VideoSliceResult struct {
+	// FilePath 切片文件路径
+	FilePath string
+	// Index 切片序号（从 0 开始）
+	Index int
+	// StartTime 切片起始时间（基于段长估算，因流复制按 keyframe 实际可能略有偏差）
+	StartTime time.Duration
+	// EndTime 切片结束时间（估算）
+	EndTime time.Duration
+	// SizeBytes 文件字节数
+	SizeBytes int64
+	// MIMEType 一般是 "video/mp4"
+	MIMEType string
+	// RawData 仅当 WithSliceLoadRawData(true) 时填充
+	RawData []byte
+	// Error 处理过程中产生的错误（不致命错误也会通过该字段传出）
+	Error error
+}
 
 // FfmpegStreamResult holds the result of a single data unit from a stream,
 // typically an image frame.

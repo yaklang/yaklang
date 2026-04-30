@@ -157,12 +157,36 @@ func _extractUserScreenShot(opts ...ffmpegutils.Option) (*ffmpegutils.FfmpegStre
 	return ffmpegutils.ExtractUserScreenShot(opts...)
 }
 
+// ffmpeg.ExtractVideoSliceFromVideo can split a long video into time-based mp4 slices.
+// 默认流复制（不重编码、保持源分辨率与 FPS）；通过 ffmpeg.withSliceReencode(true) 启用重编码。
+// 切片实时通过 channel 与可选回调 ffmpeg.withSliceCallback(cb) 下发。
+//
+// example:
+// ```
+//
+//	ch, err = ffmpeg.ExtractVideoSliceFromVideo("video.mp4",
+//	    ffmpeg.withSlicePresetForOmni("flash"),
+//	    ffmpeg.withSliceCallback(r => log.info("slice ready: %v", r.FilePath)),
+//	)
+//	for slice in ch {
+//	    if slice.Error != nil { continue }
+//	    // upload slice.FilePath to omni model
+//	}
+//
+// ```
+//
+// 关键词: ffmpeg 切片, segment muxer, omni 视频切片
+func _extractVideoSliceFromVideo(i string, opts ...ffmpegutils.Option) (<-chan *ffmpegutils.VideoSliceResult, error) {
+	return ffmpegutils.ExtractVideoSliceFromVideo(i, opts...)
+}
+
 var FfmpegExports = map[string]any{
 	"ExtractAudioFromVideo":              _extractAudioFromVideo,
 	"ExtractFineGrainedFramesFromVideo":  _extractFineGrainedFramesFromVideo,
 	"ExtractBroadGrainedFramesFromVideo": _extractBroadGrainedFramesFromVideo,
 	"BurnSRTIntoVideo":                   _burnInSubtitles,
 	"ExtractUserScreenshot":              _extractUserScreenShot,
+	"ExtractVideoSliceFromVideo":         _extractVideoSliceFromVideo,
 
 	"withStartEnd":                            ffmpegutils.WithStartEndSeconds,
 	"withTimestampOverlay":                    ffmpegutils.WithTimestampOverlay,
@@ -174,4 +198,15 @@ var FfmpegExports = map[string]any{
 	"QualityLow":                              ffmpegutils.QualityLow,
 	"QualityNormal":                           ffmpegutils.QualityNormal,
 	"QualityHigh":                             ffmpegutils.QualityHigh,
+
+	// 视频切片关键词: ExtractVideoSliceFromVideo, withSlice
+	"withSliceDurationSeconds": ffmpegutils.WithSliceDurationSeconds,
+	"withSliceReencode":        ffmpegutils.WithSliceReencode,
+	"withSliceMaxHeight":       ffmpegutils.WithSliceMaxHeight,
+	"withSliceTargetFPS":       ffmpegutils.WithSliceTargetFPS,
+	"withSliceLoadRawData":     ffmpegutils.WithSliceLoadRawData,
+	"withSliceCallback":        ffmpegutils.WithSliceCallback,
+	"withSliceOutputDir":       ffmpegutils.WithSliceOutputDir,
+	"withSlicePresetForOmni":   ffmpegutils.WithSlicePresetForOmni,
+	"withDebug":                ffmpegutils.WithDebug,
 }
