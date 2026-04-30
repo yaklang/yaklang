@@ -2323,6 +2323,39 @@ func CodecTag() []*FuzzTagDescription {
 			TagNameVerbose:      "调用Codec插件，结果按行解析",
 			ArgumentDescription: "{{string_split(name:插件名)}}{{string(params:参数)}}",
 		},
+		{
+			TagName: "ghostbits",
+			Handler: func(s string) []string {
+				s = strings.Trim(s, " ()")
+				text, highByteStr := sepToEnd(s, "|")
+
+				highByte := 0x4E // 默认中文优先 highByte
+				if highByteStr != "" {
+					hb, err := strconv.ParseInt(strings.TrimSpace(highByteStr), 0, 64)
+					if err == nil && hb > 0 && hb <= 0xFF {
+						highByte = int(hb)
+					}
+				}
+
+				var result []rune
+				for _, b := range []byte(text) {
+					asciiCode := int(b)
+					// 保留空白字符和斜杠
+					if asciiCode == 9 || asciiCode == 10 || asciiCode == 13 || asciiCode == 32 || asciiCode == 47 {
+						result = append(result, rune(b))
+					} else if asciiCode >= 0 && asciiCode <= 127 {
+						codePoint := highByte*256 + asciiCode
+						result = append(result, rune(codePoint))
+					} else {
+						result = append(result, rune(b))
+					}
+				}
+				return []string{string(result)}
+			},
+			Description:         "Ghost Bits 编码：将 ASCII 字符编码为 Unicode，利用 Java 截断高 8 位特性。支持参数 {{ghostbits(../../etc/passwd)}} 或 {{ghostbits(../../etc/passwd|0x4E)}} 指定 highByte",
+			TagNameVerbose:      "GhostBits编码",
+			ArgumentDescription: "{{string(params:待编码文本)}}{{optional(string(highByte:highByte值，如0x4E))}}",
+		},
 	}
 }
 
