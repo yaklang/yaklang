@@ -416,38 +416,25 @@ func (pm *PromptManager) GenerateToolParamsPromptWithMeta(tool *aitool.Tool) (*T
 	if err != nil {
 		return nil, err
 	}
-	highStaticData := pm.buildLoopPromptSectionData(base, &reactloops.LoopPromptAssemblyInput{Nonce: generatedNonce})
-	highStaticData["AllowToolCall"] = false
-	highStaticData["AllowPlanAndExec"] = false
-	highStaticData["HasLoadCapability"] = false
-	highStaticData["TaskInstruction"] = strings.TrimSpace(toolParamsInstructionText)
-	highStaticData["OutputExample"] = ""
-	highStaticData["Schema"] = ""
-	highStatic, err := pm.renderLoopHighStaticSection(highStaticData)
-	if err != nil {
-		return nil, err
-	}
-
-	timelineData := pm.buildLoopPromptSectionData(base, &reactloops.LoopPromptAssemblyInput{Nonce: generatedNonce})
-	semiDynamicData := pm.buildLoopPromptSectionData(base, &reactloops.LoopPromptAssemblyInput{
+	prefixMaterials := pm.NewPromptPrefixMaterials(base, &reactloops.LoopPromptAssemblyInput{
 		Nonce:  generatedNonce,
 		Schema: strings.TrimSpace(data.ToolSchema),
 	})
-	semiDynamicData["AllowToolCall"] = false
-	semiDynamicData["ToolInventory"] = false
-	semiDynamicData["ToolsCount"] = 0
-	semiDynamicData["TopToolsCount"] = 0
-	semiDynamicData["TopTools"] = []*aitool.Tool{}
-	semiDynamicData["HasMoreTools"] = false
-	semiDynamicData["ShowForgeInventory"] = false
-	semiDynamicData["ForgeInventory"] = false
-	semiDynamicData["AIForgeList"] = ""
-	semiDynamicData["SkillsContext"] = ""
-	semiDynamicSection, err := pm.renderLoopSemiDynamicSection(semiDynamicData)
-	if err != nil {
-		return nil, err
-	}
-	timelineSection, err := pm.renderLoopTimelineSection(timelineData)
+	prefixMaterials.AllowToolCall = false
+	prefixMaterials.AllowPlanAndExec = false
+	prefixMaterials.HasLoadCapability = false
+	prefixMaterials.TaskInstruction = strings.TrimSpace(toolParamsInstructionText)
+	prefixMaterials.OutputExample = ""
+	prefixMaterials.ToolInventory = false
+	prefixMaterials.ToolsCount = 0
+	prefixMaterials.TopToolsCount = 0
+	prefixMaterials.TopTools = nil
+	prefixMaterials.HasMoreTools = false
+	prefixMaterials.ForgeInventory = false
+	prefixMaterials.AIForgeList = ""
+	prefixMaterials.SkillsContext = ""
+
+	prefix, err := pm.AssemblePromptPrefix(prefixMaterials)
 	if err != nil {
 		return nil, err
 	}
@@ -456,7 +443,7 @@ func (pm *PromptManager) GenerateToolParamsPromptWithMeta(tool *aitool.Tool) (*T
 		return nil, err
 	}
 
-	prompt := buildTaggedPromptSections(highStatic, semiDynamicSection, timelineSection, dynamicSection)
+	prompt := buildTaggedPromptSections(prefix.HighStatic, prefix.SemiDynamic, prefix.Timeline, dynamicSection)
 
 	return &ToolParamsPromptResult{
 		Prompt:     prompt,

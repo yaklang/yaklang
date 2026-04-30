@@ -114,16 +114,16 @@ func TestPromptManager_RenderLoopSemiDynamicSection_Order(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	rendered, err := react.promptManager.renderLoopSemiDynamicSection(map[string]any{
-		"ToolInventory":  true,
-		"ToolsCount":     2,
-		"TopToolsCount":  1,
-		"TopTools":       []*aitool.Tool{aitool.NewWithoutCallback("tool-a", aitool.WithDescription("tool a desc"))},
-		"HasMoreTools":   true,
-		"ForgeInventory": true,
-		"AIForgeList":    "* `forge-a`: forge a desc",
-		"SkillsContext":  "<|SKILLS_CONTEXT_demo|>\nskill body\n<|SKILLS_CONTEXT_END_demo|>",
-		"Schema":         `{"type":"object","properties":{"@action":{"type":"string"}}}`,
+	rendered, err := react.promptManager.renderLoopSemiDynamicSection(&reactloops.PromptPrefixMaterials{
+		ToolInventory:  true,
+		ToolsCount:     2,
+		TopToolsCount:  1,
+		TopTools:       []*aitool.Tool{aitool.NewWithoutCallback("tool-a", aitool.WithDescription("tool a desc"))},
+		HasMoreTools:   true,
+		ForgeInventory: true,
+		AIForgeList:    "* `forge-a`: forge a desc",
+		SkillsContext:  "<|SKILLS_CONTEXT_demo|>\nskill body\n<|SKILLS_CONTEXT_END_demo|>",
+		Schema:         `{"type":"object","properties":{"@action":{"type":"string"}}}`,
 	})
 	require.NoError(t, err)
 
@@ -138,4 +138,37 @@ func TestPromptManager_RenderLoopSemiDynamicSection_Order(t *testing.T) {
 	require.Less(t, toolIdx, forgeIdx)
 	require.Less(t, forgeIdx, skillsIdx)
 	require.Less(t, skillsIdx, schemaIdx)
+}
+
+func TestPromptManager_AssemblePromptPrefix(t *testing.T) {
+	react, err := NewTestReAct(
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action":"object","next_action":{"type":"directly_answer","answer_payload":"ok"},"cumulative_summary":"ok","human_readable_thought":"ok"}`))
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+	require.NoError(t, err)
+
+	tool := aitool.NewWithoutCallback("tool-a", aitool.WithDescription("tool a desc"))
+	base, err := react.promptManager.GetLoopPromptBaseMaterials([]*aitool.Tool{tool}, "pfx123")
+	require.NoError(t, err)
+
+	prefix, err := react.promptManager.AssemblePromptPrefix(
+		react.promptManager.NewPromptPrefixMaterials(base, &reactloops.LoopPromptAssemblyInput{
+			Nonce:           "pfx123",
+			TaskInstruction: "follow task rules",
+			OutputExample:   "example output",
+			Schema:          `{"type":"object","properties":{"@action":{"type":"string"}}}`,
+		}),
+	)
+	require.NoError(t, err)
+	require.NotNil(t, prefix)
+	require.Len(t, prefix.Sections, 3)
+	require.Contains(t, prefix.Prompt, "<|TRAITS|>")
+	require.Contains(t, prefix.Prompt, "<|SCHEMA|>")
+	require.Equal(t, "section.high_static", prefix.Sections[0].Key)
+	require.Equal(t, "section.semi_dynamic", prefix.Sections[1].Key)
+	require.Equal(t, "section.timeline", prefix.Sections[2].Key)
 }

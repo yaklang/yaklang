@@ -45,6 +45,20 @@ func (r *ReAct) AssembleLoopPrompt(tools []*aitool.Tool, input *reactloops.LoopP
 	return r.promptManager.AssembleLoopPrompt(tools, input)
 }
 
+func (r *ReAct) NewPromptPrefixMaterials(base *reactloops.LoopPromptBaseMaterials, input *reactloops.LoopPromptAssemblyInput) *reactloops.PromptPrefixMaterials {
+	if r == nil || r.promptManager == nil {
+		return nil
+	}
+	return r.promptManager.NewPromptPrefixMaterials(base, input)
+}
+
+func (r *ReAct) AssemblePromptPrefix(materials *reactloops.PromptPrefixMaterials) (*reactloops.PromptPrefixAssemblyResult, error) {
+	if r == nil || r.promptManager == nil {
+		return nil, fmt.Errorf("prompt manager is nil")
+	}
+	return r.promptManager.AssemblePromptPrefix(materials)
+}
+
 func (pm *PromptManager) GetLoopPromptBaseMaterials(tools []*aitool.Tool, nonce string) (*reactloops.LoopPromptBaseMaterials, error) {
 	if pm == nil || pm.react == nil || pm.react.config == nil {
 		return nil, fmt.Errorf("prompt manager is not initialized")
@@ -132,27 +146,102 @@ func (pm *PromptManager) AssembleLoopPrompt(tools []*aitool.Tool, input *reactlo
 		return nil, err
 	}
 
-	highStaticData := pm.buildLoopPromptSectionData(base, input)
-	semiDynamicData := pm.buildLoopPromptSectionData(base, input)
-	timelineData := pm.buildLoopPromptSectionData(base, input)
+	prefixMaterials := pm.NewPromptPrefixMaterials(base, input)
+	prefix, err := pm.AssemblePromptPrefix(prefixMaterials)
+	if err != nil {
+		return nil, err
+	}
 	dynamicData := pm.buildLoopPromptSectionData(base, input)
-
-	highStatic, semiDynamic, timeline, dynamic, err := pm.renderLoopPromptSections(
-		highStaticData,
-		semiDynamicData,
-		timelineData,
-		dynamicData,
-	)
+	dynamic, err := pm.renderLoopDynamicSection(dynamicData)
 	if err != nil {
 		return nil, err
 	}
 
-	sections := pm.buildLoopPromptObservations(base, input, highStatic, semiDynamic, timeline, dynamic)
+	sections := append([]*reactloops.PromptSectionObservation{}, prefix.Sections...)
+	if dynamicSection := pm.buildDynamicObservation(base, input, dynamic); dynamicSection != nil {
+		sections = append(sections, dynamicSection)
+	}
 
-	prompt := buildTaggedPromptSections(highStatic, semiDynamic, timeline, dynamic)
+	prompt := buildTaggedPromptSections(prefix.HighStatic, prefix.SemiDynamic, prefix.Timeline, dynamic)
 	return &reactloops.LoopPromptAssemblyResult{
 		Prompt:   prompt,
 		Sections: sections,
+	}, nil
+}
+
+func (pm *PromptManager) NewPromptPrefixMaterials(base *reactloops.LoopPromptBaseMaterials, input *reactloops.LoopPromptAssemblyInput) *reactloops.PromptPrefixMaterials {
+	materials := &reactloops.PromptPrefixMaterials{}
+
+	if base != nil {
+		materials.AllowToolCall = base.AllowToolCall
+		materials.AllowPlanAndExec = base.AllowPlanAndExec
+		materials.HasLoadCapability = base.HasLoadCapability
+
+		materials.ToolInventory = base.AllowToolCall && base.ToolsCount > 0
+		materials.ToolsCount = base.ToolsCount
+		materials.TopToolsCount = base.TopToolsCount
+		materials.TopTools = append([]*aitool.Tool{}, base.TopTools...)
+		materials.HasMoreTools = base.HasMoreTools
+		materials.ForgeInventory = base.ShowForgeInventory && strings.TrimSpace(base.AIForgeList) != ""
+		materials.AIForgeList = base.AIForgeList
+
+		materials.Timeline = base.Timeline
+		materials.CurrentTime = base.CurrentTime
+		materials.OSArch = base.OSArch
+		materials.WorkingDir = base.WorkingDir
+		materials.WorkingDirGlance = base.WorkingDirGlance
+		materials.Workspace = strings.TrimSpace(base.OSArch+base.WorkingDir+base.WorkingDirGlance) != ""
+	}
+
+	if input != nil {
+		materials.TaskInstruction = input.TaskInstruction
+		materials.OutputExample = input.OutputExample
+		materials.SkillsContext = input.SkillsContext
+		materials.Schema = input.Schema
+	}
+
+	return materials
+}
+
+func (pm *PromptManager) AssemblePromptPrefix(materials *reactloops.PromptPrefixMaterials) (*reactloops.PromptPrefixAssemblyResult, error) {
+	if pm == nil {
+		return nil, fmt.Errorf("prompt manager is nil")
+	}
+	if materials == nil {
+		return nil, fmt.Errorf("prompt prefix materials is nil")
+	}
+
+	highStatic, err := pm.renderLoopHighStaticSection(materials)
+	if err != nil {
+		return nil, err
+	}
+	semiDynamic, err := pm.renderLoopSemiDynamicSection(materials)
+	if err != nil {
+		return nil, err
+	}
+	timeline, err := pm.renderLoopTimelineSection(materials)
+	if err != nil {
+		return nil, err
+	}
+
+	sections := []*reactloops.PromptSectionObservation{
+		pm.buildHighStaticObservation(materials, highStatic),
+		pm.buildSemiDynamicObservation(materials, semiDynamic),
+		pm.buildTimelineObservation(materials, timeline),
+	}
+	var filtered []*reactloops.PromptSectionObservation
+	for _, section := range sections {
+		if section != nil {
+			filtered = append(filtered, section)
+		}
+	}
+
+	return &reactloops.PromptPrefixAssemblyResult{
+		Prompt:      joinPromptSections(highStatic, semiDynamic, timeline),
+		HighStatic:  highStatic,
+		SemiDynamic: semiDynamic,
+		Timeline:    timeline,
+		Sections:    filtered,
 	}, nil
 }
 
@@ -225,32 +314,8 @@ func (pm *PromptManager) buildLoopPromptSectionData(base *reactloops.LoopPromptB
 	return data
 }
 
-func (pm *PromptManager) buildLoopPromptObservations(
-	base *reactloops.LoopPromptBaseMaterials,
-	input *reactloops.LoopPromptAssemblyInput,
-	highStatic string,
-	semiDynamic string,
-	timeline string,
-	dynamic string,
-) []*reactloops.PromptSectionObservation {
-	sections := []*reactloops.PromptSectionObservation{
-		pm.buildHighStaticObservation(base, input, highStatic),
-		pm.buildSemiDynamicObservation(base, input, semiDynamic),
-		pm.buildTimelineObservation(base, timeline),
-		pm.buildDynamicObservation(base, input, dynamic),
-	}
-	var result []*reactloops.PromptSectionObservation
-	for _, section := range sections {
-		if section != nil {
-			result = append(result, section)
-		}
-	}
-	return result
-}
-
 func (pm *PromptManager) buildHighStaticObservation(
-	base *reactloops.LoopPromptBaseMaterials,
-	input *reactloops.LoopPromptAssemblyInput,
+	materials *reactloops.PromptPrefixMaterials,
 	rendered string,
 ) *reactloops.PromptSectionObservation {
 	section := reactloops.NewPromptContainerSection(
@@ -264,21 +329,21 @@ func (pm *PromptManager) buildHighStaticObservation(
 			"Highly Static / Traits & Agent Systems",
 			reactloops.PromptSectionRoleSystemPrompt,
 			false,
-			pm.renderHighStaticPreamble(base, input),
+			pm.renderHighStaticPreamble(materials),
 		),
 		reactloops.NewPromptSectionObservation(
 			"section.high_static.task_instruction",
 			"Highly Static / Task Instruction",
 			reactloops.PromptSectionRoleSystemPrompt,
 			false,
-			renderStaticTaggedBlock("PERSISTENT", input.TaskInstruction),
+			renderStaticTaggedBlock("PERSISTENT", materials.TaskInstruction),
 		),
 		reactloops.NewPromptSectionObservation(
 			"section.high_static.output_example",
 			"Highly Static / Output Example",
 			reactloops.PromptSectionRoleSystemPrompt,
 			false,
-			renderStaticTaggedBlock("OUTPUT_EXAMPLE", input.OutputExample),
+			renderStaticTaggedBlock("OUTPUT_EXAMPLE", materials.OutputExample),
 		),
 	}
 	section.Children = filterIncludedPromptSections(children)
@@ -289,8 +354,7 @@ func (pm *PromptManager) buildHighStaticObservation(
 }
 
 func (pm *PromptManager) buildSemiDynamicObservation(
-	base *reactloops.LoopPromptBaseMaterials,
-	input *reactloops.LoopPromptAssemblyInput,
+	materials *reactloops.PromptPrefixMaterials,
 	rendered string,
 ) *reactloops.PromptSectionObservation {
 	section := reactloops.NewPromptContainerSection(
@@ -304,28 +368,28 @@ func (pm *PromptManager) buildSemiDynamicObservation(
 			"Semi Dynamic / Tool Inventory",
 			reactloops.PromptSectionRoleRuntimeCtx,
 			true,
-			renderToolInventoryBlock(base),
+			renderToolInventoryBlock(materials),
 		),
 		reactloops.NewPromptSectionObservation(
 			"section.semi_dynamic.forge_inventory",
 			"Semi Dynamic / Forge Inventory",
 			reactloops.PromptSectionRoleRuntimeCtx,
 			true,
-			renderForgeInventoryBlock(base),
+			renderForgeInventoryBlock(materials),
 		),
 		reactloops.NewPromptSectionObservation(
 			"section.semi_dynamic.skills_context",
 			"Semi Dynamic / Skills Context",
 			reactloops.PromptSectionRoleRuntimeCtx,
 			true,
-			input.SkillsContext,
+			materials.SkillsContext,
 		),
 		reactloops.NewPromptSectionObservation(
 			"section.semi_dynamic.schema",
 			"Semi Dynamic / Schema",
 			reactloops.PromptSectionRoleRuntimeCtx,
 			true,
-			renderSchemaBlock(input.Schema),
+			renderSchemaBlock(materials.Schema),
 		),
 	}
 	section.Children = filterIncludedPromptSections(children)
@@ -336,7 +400,7 @@ func (pm *PromptManager) buildSemiDynamicObservation(
 }
 
 func (pm *PromptManager) buildTimelineObservation(
-	base *reactloops.LoopPromptBaseMaterials,
+	materials *reactloops.PromptPrefixMaterials,
 	rendered string,
 ) *reactloops.PromptSectionObservation {
 	section := reactloops.NewPromptContainerSection(
@@ -350,21 +414,21 @@ func (pm *PromptManager) buildTimelineObservation(
 			"Timeline / Timeline Memory",
 			reactloops.PromptSectionRoleRuntimeCtx,
 			true,
-			renderTimelineBlock(base),
+			renderTimelineBlock(materials),
 		),
 		reactloops.NewPromptSectionObservation(
 			"section.timeline.current_time",
 			"Timeline / Current Time",
 			reactloops.PromptSectionRoleRuntimeCtx,
 			false,
-			renderCurrentTimeBlock(base),
+			renderCurrentTimeBlock(materials),
 		),
 		reactloops.NewPromptSectionObservation(
 			"section.timeline.workspace",
 			"Timeline / Workspace",
 			reactloops.PromptSectionRoleRuntimeCtx,
 			true,
-			renderWorkspaceBlock(base),
+			renderWorkspaceBlock(materials),
 		),
 	}
 	section.Children = filterIncludedPromptSections(children)
@@ -442,12 +506,14 @@ func (pm *PromptManager) buildDynamicObservation(
 	return reactloops.FinalizePromptContainerSection(section)
 }
 
-func (pm *PromptManager) renderHighStaticPreamble(base *reactloops.LoopPromptBaseMaterials, input *reactloops.LoopPromptAssemblyInput) string {
-	data := pm.buildLoopPromptSectionData(base, &reactloops.LoopPromptAssemblyInput{Nonce: input.Nonce})
-	data["TaskInstruction"] = ""
-	data["OutputExample"] = ""
-	data["Schema"] = ""
-	rendered, err := pm.executeTemplate("loop-high-static-preamble", loopHighStaticSectionTemplate, data)
+func (pm *PromptManager) renderHighStaticPreamble(materials *reactloops.PromptPrefixMaterials) string {
+	if materials == nil {
+		return ""
+	}
+	preamble := materials.HighStaticData()
+	preamble["TaskInstruction"] = ""
+	preamble["OutputExample"] = ""
+	rendered, err := pm.executeTemplate("loop-high-static-preamble", loopHighStaticSectionTemplate, preamble)
 	if err != nil {
 		return ""
 	}
@@ -516,64 +582,64 @@ func renderSchemaBlock(schema string) string {
 	return fmt.Sprintf("响应格式输出JSON和<|TAG...|>，请遵守如下Schema ：\n\n<|SCHEMA|>\n```jsonschema\n%s\n```\n<|SCHEMA|>", schema)
 }
 
-func renderWorkspaceBlock(base *reactloops.LoopPromptBaseMaterials) string {
-	if base == nil {
+func renderWorkspaceBlock(materials *reactloops.PromptPrefixMaterials) string {
+	if materials == nil {
 		return ""
 	}
 	var lines []string
-	if strings.TrimSpace(base.OSArch) == "" && strings.TrimSpace(base.WorkingDir) == "" && strings.TrimSpace(base.WorkingDirGlance) == "" {
+	if !materials.Workspace || (strings.TrimSpace(materials.OSArch) == "" && strings.TrimSpace(materials.WorkingDir) == "" && strings.TrimSpace(materials.WorkingDirGlance) == "") {
 		return ""
 	}
 	lines = append(lines, "# Workspace Context")
-	if base.OSArch != "" {
-		lines = append(lines, "OS/Arch: "+base.OSArch)
+	if materials.OSArch != "" {
+		lines = append(lines, "OS/Arch: "+materials.OSArch)
 	}
-	if base.WorkingDir != "" {
-		lines = append(lines, "working dir: "+base.WorkingDir)
+	if materials.WorkingDir != "" {
+		lines = append(lines, "working dir: "+materials.WorkingDir)
 	}
-	if base.WorkingDirGlance != "" {
-		lines = append(lines, "working dir glance: "+base.WorkingDirGlance)
+	if materials.WorkingDirGlance != "" {
+		lines = append(lines, "working dir glance: "+materials.WorkingDirGlance)
 	}
 	return strings.Join(lines, "\n")
 }
 
-func renderToolInventoryBlock(base *reactloops.LoopPromptBaseMaterials) string {
-	if base == nil || !base.AllowToolCall || base.ToolsCount <= 0 || len(base.TopTools) == 0 {
+func renderToolInventoryBlock(materials *reactloops.PromptPrefixMaterials) string {
+	if materials == nil || !materials.ToolInventory || materials.ToolsCount <= 0 || len(materials.TopTools) == 0 {
 		return ""
 	}
 	var lines []string
-	lines = append(lines, fmt.Sprintf("# Tool Inventory\nYou have access to %d built-in tools. Top %d tools:", base.ToolsCount, base.TopToolsCount))
-	for _, tool := range base.TopTools {
+	lines = append(lines, fmt.Sprintf("# Tool Inventory\nYou have access to %d built-in tools. Top %d tools:", materials.ToolsCount, materials.TopToolsCount))
+	for _, tool := range materials.TopTools {
 		if tool == nil {
 			continue
 		}
 		lines = append(lines, fmt.Sprintf("* `%s`: %s", tool.Name, tool.Description))
 	}
-	if base.HasMoreTools {
+	if materials.HasMoreTools {
 		lines = append(lines, "... use `search_capabilities` to discover more tools and related capabilities.")
 	}
 	return strings.Join(lines, "\n")
 }
 
-func renderForgeInventoryBlock(base *reactloops.LoopPromptBaseMaterials) string {
-	if base == nil || !base.ShowForgeInventory || strings.TrimSpace(base.AIForgeList) == "" {
+func renderForgeInventoryBlock(materials *reactloops.PromptPrefixMaterials) string {
+	if materials == nil || !materials.ForgeInventory || strings.TrimSpace(materials.AIForgeList) == "" {
 		return ""
 	}
-	return "# AI Blueprint Inventory\n以下是当前可直接调用的 AI 蓝图列表：\n" + base.AIForgeList
+	return "# AI Blueprint Inventory\n以下是当前可直接调用的 AI 蓝图列表：\n" + materials.AIForgeList
 }
 
-func renderTimelineBlock(base *reactloops.LoopPromptBaseMaterials) string {
-	if base == nil || strings.TrimSpace(base.Timeline) == "" {
+func renderTimelineBlock(materials *reactloops.PromptPrefixMaterials) string {
+	if materials == nil || strings.TrimSpace(materials.Timeline) == "" {
 		return ""
 	}
-	return "# Timeline Memory\n" + base.Timeline
+	return "# Timeline Memory\n" + materials.Timeline
 }
 
-func renderCurrentTimeBlock(base *reactloops.LoopPromptBaseMaterials) string {
-	if base == nil || strings.TrimSpace(base.CurrentTime) == "" {
+func renderCurrentTimeBlock(materials *reactloops.PromptPrefixMaterials) string {
+	if materials == nil || strings.TrimSpace(materials.CurrentTime) == "" {
 		return ""
 	}
-	return "# Current Time\n" + base.CurrentTime
+	return "# Current Time\n" + materials.CurrentTime
 }
 
 func renderUserQueryBlock(nonce string, userQuery string) string {
@@ -592,41 +658,16 @@ func renderInjectedMemoryBlock(nonce string, memory string) string {
 	return fmt.Sprintf("<|INJECTED_MEMORY_%s|>\n# Memory Context\nThese are the memories automatically retrieved by the system that are most relevant to the current input.\n%s\n<|INJECTED_MEMORY_END_%s|>", nonce, memory, nonce)
 }
 
-func (pm *PromptManager) renderLoopPromptSections(
-	highStaticData map[string]any,
-	semiDynamicData map[string]any,
-	timelineData map[string]any,
-	dynamicData map[string]any,
-) (string, string, string, string, error) {
-	highStatic, err := pm.renderLoopHighStaticSection(highStaticData)
-	if err != nil {
-		return "", "", "", "", err
-	}
-	semiDynamic, err := pm.renderLoopSemiDynamicSection(semiDynamicData)
-	if err != nil {
-		return "", "", "", "", err
-	}
-	timeline, err := pm.renderLoopTimelineSection(timelineData)
-	if err != nil {
-		return "", "", "", "", err
-	}
-	dynamic, err := pm.renderLoopDynamicSection(dynamicData)
-	if err != nil {
-		return "", "", "", "", err
-	}
-	return highStatic, semiDynamic, timeline, dynamic, nil
+func (pm *PromptManager) renderLoopHighStaticSection(materials *reactloops.PromptPrefixMaterials) (string, error) {
+	return pm.executeTemplate("loop-high-static", loopHighStaticSectionTemplate, materials.HighStaticData())
 }
 
-func (pm *PromptManager) renderLoopHighStaticSection(data map[string]any) (string, error) {
-	return pm.executeTemplate("loop-high-static", loopHighStaticSectionTemplate, data)
+func (pm *PromptManager) renderLoopSemiDynamicSection(materials *reactloops.PromptPrefixMaterials) (string, error) {
+	return pm.executeTemplate("loop-semi-dynamic", loopSemiDynamicSectionTemplate, materials.SemiDynamicData())
 }
 
-func (pm *PromptManager) renderLoopSemiDynamicSection(data map[string]any) (string, error) {
-	return pm.executeTemplate("loop-semi-dynamic", loopSemiDynamicSectionTemplate, data)
-}
-
-func (pm *PromptManager) renderLoopTimelineSection(data map[string]any) (string, error) {
-	return pm.executeTemplate("loop-timeline", loopTimelineSectionTemplate, data)
+func (pm *PromptManager) renderLoopTimelineSection(materials *reactloops.PromptPrefixMaterials) (string, error) {
+	return pm.executeTemplate("loop-timeline", loopTimelineSectionTemplate, materials.TimelineData())
 }
 
 func (pm *PromptManager) renderLoopDynamicSection(data map[string]any) (string, error) {

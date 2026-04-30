@@ -144,7 +144,7 @@ func (r *ReActLoop) generateLoopPrompt(
 
 	var persistent string
 	if r.persistentInstructionProvider != nil {
-		persistent, err = r.persistentInstructionProvider(r, "")
+		persistent, err = r.persistentInstructionProvider(r, "") // persistent context not use nonce
 		if err != nil {
 			return "", utils.Wrap(err, "build persistent context failed")
 		}
@@ -152,7 +152,7 @@ func (r *ReActLoop) generateLoopPrompt(
 
 	var outputExample string
 	if r.reflectionOutputExampleProvider != nil {
-		outputExample, err = r.reflectionOutputExampleProvider(r, "")
+		outputExample, err = r.reflectionOutputExampleProvider(r, "") // persistent context not use nonce
 		if err != nil {
 			return "", utils.Wrap(err, "build output example failed")
 		}
