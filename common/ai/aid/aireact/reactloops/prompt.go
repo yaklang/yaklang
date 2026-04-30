@@ -28,9 +28,6 @@ func renderRecentToolRoutingHint(nonce string) string {
 	})
 }
 
-//go:embed prompts/loop_template.tpl
-var coreTemplate string
-
 //go:embed prompts/session_evidence.txt
 var sessionEvidenceTemplate string
 
@@ -214,67 +211,29 @@ func (r *ReActLoop) generateLoopPrompt(
 		}
 	}
 
-	if assembler, ok := r.invoker.(loopPromptAssembler); ok {
-		result, err := assembler.AssembleLoopPrompt(tools, &LoopPromptAssemblyInput{
-			Nonce:             nonce,
-			UserQuery:         userInput,
-			TaskInstruction:   persistent,
-			OutputExample:     outputExample,
-			Schema:            schema,
-			SkillsContext:     skillsContext,
-			ExtraCapabilities: extraCapabilities,
-			SessionEvidence:   sessionEvidence,
-			ReactiveData:      reactiveData,
-			InjectedMemory:    memory,
-		})
-		if err != nil {
-			return "", utils.Wrap(err, "assemble loop prompt failed")
-		}
-		observation := BuildPromptObservation(r.loopName, nonce, result.Prompt, result.Sections)
-		r.SetLastPromptObservation(observation)
-		status := observation.BuildStatus(1 * 1024)
-		r.SetLastPromptObservationStatus(status)
-		r.emitPromptObservationStatus(status)
-		if r.isDebugModeEnabled() {
-			log.Infof("prompt section build report:\n%s", observation.RenderCLIReport(120))
-		}
-		return result.Prompt, nil
+	if r.invoker == nil {
+		return "", utils.Error("invoker is nil in ReActLoop.generateLoopPrompt")
 	}
 
-	background, infos, err := r.getRenderInfo()
+	result, err := r.invoker.AssembleLoopPrompt(tools, &LoopPromptAssemblyInput{
+		Nonce:             nonce,
+		UserQuery:         userInput,
+		TaskInstruction:   persistent,
+		OutputExample:     outputExample,
+		Schema:            schema,
+		SkillsContext:     skillsContext,
+		ExtraCapabilities: extraCapabilities,
+		SessionEvidence:   sessionEvidence,
+		ReactiveData:      reactiveData,
+		InjectedMemory:    memory,
+	})
 	if err != nil {
-		return "", utils.Wrap(err, "get basic prompt info failed")
+		return "", utils.Wrap(err, "assemble loop prompt failed")
 	}
-
-	infos["InjectedMemory"] = memory
-	infos["ReactiveData"] = reactiveData
-	infos["Background"] = background
-	infos["PersistentContext"] = persistent
-	infos["OutputExample"] = outputExample
-	infos["SkillsContext"] = skillsContext
-	infos["ExtraCapabilities"] = extraCapabilities
-	infos["SessionEvidence"] = sessionEvidence
-	infos["Nonce"] = nonce
-	infos["UserQuery"] = userInput
-	infos["Schema"] = schema
-
-	sections := buildPromptSections(
-		infos,
-		userInput,
-		persistent,
-		skillsContext,
-		reactiveData,
-		memory,
-		schema,
-		outputExample,
-		extraCapabilities,
-		sessionEvidence,
-	)
-	prompt, err := utils.RenderTemplate(coreTemplate, infos)
-	if err != nil {
-		return "", utils.Wrap(err, "render loop prompt template failed")
+	if result == nil {
+		return "", utils.Error("assemble loop prompt returned nil result")
 	}
-	observation := buildPromptObservation(r.loopName, nonce, prompt, sections)
+	observation := BuildPromptObservation(r.loopName, nonce, result.Prompt, getLoopPromptObservationSections(result))
 	r.SetLastPromptObservation(observation)
 	status := observation.BuildStatus(1 * 1024)
 	r.SetLastPromptObservationStatus(status)
@@ -282,7 +241,17 @@ func (r *ReActLoop) generateLoopPrompt(
 	if r.isDebugModeEnabled() {
 		log.Infof("prompt section build report:\n%s", observation.RenderCLIReport(120))
 	}
-	return prompt, nil
+	return result.Prompt, nil
+}
+
+func getLoopPromptObservationSections(result *LoopPromptAssemblyResult) []*PromptSectionObservation {
+	if result == nil {
+		return nil
+	}
+	if sections, ok := result.Sections.([]*PromptSectionObservation); ok {
+		return sections
+	}
+	return nil
 }
 
 func (r *ReActLoop) syncRecentToolParamAITagFields(paramNames []string) {

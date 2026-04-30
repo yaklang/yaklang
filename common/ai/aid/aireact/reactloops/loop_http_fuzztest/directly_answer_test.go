@@ -47,6 +47,10 @@ func (i *httpFuzztestTestInvoker) GetBasicPromptInfo(tools []*aitool.Tool) (stri
 	return i.base.GetBasicPromptInfo(tools)
 }
 
+func (i *httpFuzztestTestInvoker) AssembleLoopPrompt(tools []*aitool.Tool, input *aicommon.LoopPromptAssemblyInput) (*aicommon.LoopPromptAssemblyResult, error) {
+	return i.base.AssembleLoopPrompt(tools, input)
+}
+
 func (i *httpFuzztestTestInvoker) SetCurrentTask(task aicommon.AIStatefulTask) {
 	i.currentTask = task
 }

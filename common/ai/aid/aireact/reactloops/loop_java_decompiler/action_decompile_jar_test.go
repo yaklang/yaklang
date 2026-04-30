@@ -367,6 +367,15 @@ func (r *testRuntime) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[stri
 	return "", nil, nil
 }
 
+func (r *testRuntime) AssembleLoopPrompt(tools []*aitool.Tool, input *aicommon.LoopPromptAssemblyInput) (*aicommon.LoopPromptAssemblyResult, error) {
+	_ = tools
+	_ = input
+	return &aicommon.LoopPromptAssemblyResult{
+		Prompt:   "java decompiler test prompt",
+		Sections: nil,
+	}, nil
+}
+
 func (r *testRuntime) ExecuteLoopTaskIF(taskTypeName string, task aicommon.AIStatefulTask, options ...any) (bool, error) {
 	return false, nil
 }

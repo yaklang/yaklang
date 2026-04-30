@@ -69,6 +69,15 @@ func (m *AdvancedMockInvoker) GetBasicPromptInfo(tools []*aitool.Tool) (string, 
 	}, nil
 }
 
+func (m *AdvancedMockInvoker) AssembleLoopPrompt(tools []*aitool.Tool, input *aicommon.LoopPromptAssemblyInput) (*aicommon.LoopPromptAssemblyResult, error) {
+	_ = tools
+	_ = input
+	return &aicommon.LoopPromptAssemblyResult{
+		Prompt:   "advanced mock loop prompt",
+		Sections: nil,
+	}, nil
+}
+
 func (m *AdvancedMockInvoker) InvokeSpeedPriorityLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption) (*aicommon.Action, error) {
 	return m.InvokeLiteForge(ctx, actionName, prompt, outputs, opts...)
 }

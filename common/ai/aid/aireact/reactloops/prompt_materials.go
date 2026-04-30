@@ -1,6 +1,9 @@
 package reactloops
 
-import "github.com/yaklang/yaklang/common/ai/aid/aitool"
+import (
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+)
 
 // LoopPromptBaseMaterials contains pre-rendered prompt ingredients supplied by
 // the runtime so the loop can assemble prompt sections without reverse-parsing
@@ -28,23 +31,9 @@ type LoopPromptBaseMaterials struct {
 	Timeline           string
 }
 
-type LoopPromptAssemblyInput struct {
-	Nonce             string
-	UserQuery         string
-	TaskInstruction   string
-	OutputExample     string
-	Schema            string
-	SkillsContext     string
-	ExtraCapabilities string
-	SessionEvidence   string
-	ReactiveData      string
-	InjectedMemory    string
-}
+type LoopPromptAssemblyInput = aicommon.LoopPromptAssemblyInput
 
-type LoopPromptAssemblyResult struct {
-	Prompt   string
-	Sections []*PromptSectionObservation
-}
+type LoopPromptAssemblyResult = aicommon.LoopPromptAssemblyResult
 
 type PromptPrefixMaterials struct {
 	AllowToolCall     bool
@@ -121,12 +110,4 @@ type PromptPrefixAssemblyResult struct {
 	SemiDynamic string
 	Timeline    string
 	Sections    []*PromptSectionObservation
-}
-
-type loopPromptBaseMaterialProvider interface {
-	GetLoopPromptBaseMaterials(tools []*aitool.Tool, nonce string) (*LoopPromptBaseMaterials, error)
-}
-
-type loopPromptAssembler interface {
-	AssembleLoopPrompt(tools []*aitool.Tool, input *LoopPromptAssemblyInput) (*LoopPromptAssemblyResult, error)
 }

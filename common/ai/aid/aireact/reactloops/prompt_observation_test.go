@@ -3,6 +3,7 @@ package reactloops
 import (
 	"bytes"
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -17,26 +18,47 @@ type promptObservationTestInvoker struct {
 	*mock.MockInvoker
 }
 
-func (i *promptObservationTestInvoker) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[string]any, error) {
-	topTool := aitool.NewWithoutCallback("tool-a", aitool.WithDescription("run tool a"))
-	return "Mock Basic Prompt Template: {{ .Query }}", map[string]any{
-		"Query":            "test query",
-		"CurrentTime":      "2026-04-01 12:00:00",
-		"OSArch":           "darwin/arm64",
-		"WorkingDir":       "/tmp/test-project",
-		"WorkingDirGlance": "tree:/tmp/test-project",
-		"DynamicContext": "<|AUTO_PROVIDE_CTX_[abcd]_START key=test_ctx|>\ncurrent file: main.go\n<|AUTO_PROVIDE_CTX_[abcd]_END|>\n\n" +
-			"<|PREV_USER_INPUT_nonceX|>\n# Session User Input History\n- Round 1 | Time: 2026-04-01 11:59:00 | User Input: previous input\n<|PREV_USER_INPUT_END_nonceX|>",
-		"AllowPlan":         true,
-		"ShowForgeList":     true,
-		"AIForgeList":       "- forge-a\n- forge-b",
-		"AllowToolCall":     true,
-		"ToolsCount":        2,
-		"TopToolsCount":     1,
-		"TopTools":          []*aitool.Tool{topTool},
-		"HasMoreTools":      true,
-		"HasLoadCapability": true,
-		"Timeline":          "step1\nstep2",
+func (i *promptObservationTestInvoker) AssembleLoopPrompt(tools []*aitool.Tool, input *aicommon.LoopPromptAssemblyInput) (*aicommon.LoopPromptAssemblyResult, error) {
+	_ = tools
+	highStatic := NewPromptContainerSection("section.high_static", "Highly Static", PromptSectionRoleSystemPrompt)
+	highStatic.Children = []*PromptSectionObservation{
+		NewPromptSectionObservation("section.high_static.task_instruction", "Task Instruction", PromptSectionRoleSystemPrompt, false, "# Task Instruction\npersistent instruction"),
+		NewPromptSectionObservation("section.high_static.output_example", "Output Example", PromptSectionRoleSystemPrompt, false, "# Output Example\nexample output"),
+	}
+	highStatic = FinalizePromptContainerSection(highStatic)
+
+	semiDynamic := NewPromptContainerSection("section.semi_dynamic", "Semi Dynamic", PromptSectionRoleMixed)
+	semiDynamic.Children = []*PromptSectionObservation{
+		NewPromptSectionObservation("section.semi_dynamic.skills_context", "Skills Context", PromptSectionRoleRuntimeCtx, true, "# Skills Context\nloaded skill-a"),
+		NewPromptSectionObservation("section.semi_dynamic.schema", "Schema", PromptSectionRoleSystemPrompt, false, "# Schema\n{\"type\":\"object\"}"),
+	}
+	semiDynamic = FinalizePromptContainerSection(semiDynamic)
+
+	timeline := NewPromptContainerSection("section.timeline", "Timeline", PromptSectionRoleMixed)
+	timeline.Children = []*PromptSectionObservation{
+		NewPromptSectionObservation("section.timeline.timeline", "Timeline Memory", PromptSectionRoleRuntimeCtx, true, "# Timeline Memory\nstep1\nstep2"),
+		NewPromptSectionObservation("section.timeline.current_time", "Current Time", PromptSectionRoleRuntimeCtx, false, "# Current Time\n2026-04-01 12:00:00"),
+	}
+	timeline = FinalizePromptContainerSection(timeline)
+
+	dynamic := NewPromptContainerSection("section.dynamic", "Pure Dynamic", PromptSectionRoleMixed)
+	dynamic.Children = []*PromptSectionObservation{
+		NewPromptSectionObservation("section.dynamic.user_query", "User Query", PromptSectionRoleUserInput, false, "<|USER_QUERY_"+input.Nonce+"|>\nraw user input\n<|USER_QUERY_END_"+input.Nonce+"|>"),
+		NewPromptSectionObservation("section.dynamic.reactive_data", "Reactive Data", PromptSectionRoleRuntimeCtx, true, "<|REFLECTION_"+input.Nonce+"|>\nreactive context\n<|REFLECTION_END_"+input.Nonce+"|>"),
+		NewPromptSectionObservation("section.dynamic.injected_memory", "Injected Memory", PromptSectionRoleRuntimeCtx, true, "<|INJECTED_MEMORY_"+input.Nonce+"|>\nmemory content\n<|INJECTED_MEMORY_END_"+input.Nonce+"|>"),
+	}
+	dynamic = FinalizePromptContainerSection(dynamic)
+
+	sections := []*PromptSectionObservation{highStatic, semiDynamic, timeline, dynamic}
+	prompt := strings.Join([]string{
+		"<|PROMPT_SECTION_high-static|>\n" + strings.TrimSpace(highStatic.Children[0].Content+"\n\n"+highStatic.Children[1].Content) + "\n<|PROMPT_SECTION_END_high-static|>",
+		"<|PROMPT_SECTION_semi-dynamic|>\n" + strings.TrimSpace(semiDynamic.Children[0].Content+"\n\n"+semiDynamic.Children[1].Content) + "\n<|PROMPT_SECTION_END_semi-dynamic|>",
+		"<|PROMPT_SECTION_timeline|>\n" + strings.TrimSpace(timeline.Children[0].Content+"\n\n"+timeline.Children[1].Content) + "\n<|PROMPT_SECTION_END_timeline|>",
+		"<|PROMPT_SECTION_dynamic|>\n" + strings.TrimSpace(dynamic.Children[0].Content+"\n\n"+dynamic.Children[1].Content+"\n\n"+dynamic.Children[2].Content) + "\n<|PROMPT_SECTION_END_dynamic|>",
+	}, "\n\n")
+	return &aicommon.LoopPromptAssemblyResult{
+		Prompt:   prompt,
+		Sections: sections,
 	}, nil
 }
 
@@ -77,37 +99,22 @@ func TestGenerateLoopPrompt_RecordsObservation(t *testing.T) {
 	require.Equal(t, "nonce1", observation.Nonce)
 	require.Equal(t, len(prompt), observation.PromptBytes)
 	require.Equal(t, ytoken.CalcTokenCount(prompt), observation.PromptTokens)
-	require.Len(t, observation.Sections, 10)
+	require.Len(t, observation.Sections, 4)
 	require.Greater(t, observation.SectionCount, len(observation.Sections))
 
-	require.Equal(t, "background", observation.Sections[0].Key)
-	require.Equal(t, PromptSectionRoleMixed, observation.Sections[0].Role)
+	require.Equal(t, "section.high_static", observation.Sections[0].Key)
+	require.Equal(t, PromptSectionRoleSystemPrompt, observation.Sections[0].Role)
 	require.NotEmpty(t, observation.Sections[0].Children)
-	require.Equal(t, "background.environment", observation.Sections[0].Children[0].Key)
+	require.Equal(t, "section.high_static.task_instruction", observation.Sections[0].Children[0].Key)
 	require.Greater(t, observation.Sections[0].ContentBytes(), 0)
 	require.Greater(t, observation.Sections[0].LineCount(), 0)
 	require.Empty(t, observation.Sections[0].Content)
-	require.Equal(t, "background.dynamic_context", observation.Sections[0].Children[1].Key)
-	require.Equal(t, "background.ai_forge_list", observation.Sections[0].Children[2].Key)
-	require.Equal(t, "background.tool_inventory", observation.Sections[0].Children[3].Key)
-	require.Equal(t, "background.timeline", observation.Sections[0].Children[4].Key)
-	require.Equal(t, "background.dynamic_context.auto_provided", observation.Sections[0].Children[1].Children[0].Key)
-	require.Equal(t, "background.dynamic_context.prev_user_input", observation.Sections[0].Children[1].Children[1].Key)
-
-	require.Equal(t, "user_query", observation.Sections[1].Key)
-	require.Equal(t, PromptSectionRoleUserInput, observation.Sections[1].Role)
-	require.False(t, observation.Sections[1].Compressible)
-	require.Equal(t, "raw user input", observation.Sections[1].Content)
-
-	require.Equal(t, "session_evidence", observation.Sections[4].Key)
-	require.True(t, observation.Sections[4].Compressible)
-
-	require.Equal(t, "reactive_data", observation.Sections[6].Key)
-	require.True(t, observation.Sections[6].IsIncluded())
-	require.True(t, observation.Sections[6].Compressible)
-
-	require.Equal(t, "schema", observation.Sections[8].Key)
-	require.False(t, observation.Sections[8].Compressible)
+	require.Equal(t, "section.semi_dynamic", observation.Sections[1].Key)
+	require.Equal(t, "section.timeline", observation.Sections[2].Key)
+	require.Equal(t, "section.dynamic", observation.Sections[3].Key)
+	require.Equal(t, "section.dynamic.user_query", observation.Sections[3].Children[0].Key)
+	require.True(t, observation.Sections[3].Children[1].Compressible)
+	require.True(t, observation.Sections[3].Children[2].Compressible)
 	require.NotZero(t, observation.Stats.UserInputBytes)
 	require.NotZero(t, observation.Stats.RuntimeCtxBytes)
 	require.NotZero(t, observation.Stats.SystemPromptBytes)
@@ -116,11 +123,10 @@ func TestGenerateLoopPrompt_RecordsObservation(t *testing.T) {
 	t.Logf("prompt observation cli report:\n%s", report)
 	require.Contains(t, report, "Prompt Bytes:")
 	require.Contains(t, report, "Section Tree")
-	require.Contains(t, report, "Background / Environment")
-	require.Contains(t, report, "key: background.environment")
-	require.Contains(t, report, "key: background.tool_inventory")
+	require.Contains(t, report, "Task Instruction")
+	require.Contains(t, report, "key: section.dynamic.user_query")
 	require.Contains(t, report, "meta: role=user_input, mode=fixed, included=yes")
-	require.Contains(t, report, "summary: raw user input")
+	require.Contains(t, report, "raw user input")
 	require.NotContains(t, report, "Unified Capability Loading")
 
 	status := loop.GetLastPromptObservationStatus()
@@ -130,15 +136,15 @@ func TestGenerateLoopPrompt_RecordsObservation(t *testing.T) {
 	require.Equal(t, observation.PromptBytes, status.PromptBytes)
 	require.Equal(t, observation.PromptTokens, status.PromptTokens)
 	require.NotEmpty(t, status.Sections)
-	require.Equal(t, "background", status.Sections[0].Key)
+	require.Equal(t, "section.high_static", status.Sections[0].Key)
 	require.NotEmpty(t, status.Sections[0].Children)
 	require.Greater(t, status.Sections[0].Bytes, 0)
 	require.Greater(t, status.Sections[0].Lines, 0)
 	require.Empty(t, status.Sections[0].Summary)
-	require.Equal(t, "background.tool_inventory", status.Sections[0].Children[3].Key)
-	require.Contains(t, status.Sections[0].Children[3].Summary, "enabled_tools=2")
-	require.Equal(t, "user_query", status.Sections[1].Key)
-	require.Equal(t, "raw user input", status.Sections[1].Summary)
+	require.Equal(t, "section.high_static.task_instruction", status.Sections[0].Children[0].Key)
+	require.Equal(t, "section.dynamic", status.Sections[3].Key)
+	require.Equal(t, "section.dynamic.user_query", status.Sections[3].Children[0].Key)
+	require.Contains(t, status.Sections[3].Children[0].Summary, "raw user input")
 
 	loop.Set("prompt_observation_log", true)
 }

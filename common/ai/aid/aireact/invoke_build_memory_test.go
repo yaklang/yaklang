@@ -471,6 +471,15 @@ func (m *mockInvokerForMemoryTest) GetBasicPromptInfo(tools []*aitool.Tool) (str
 	return "Basic system prompt for testing", map[string]any{}, nil
 }
 
+func (m *mockInvokerForMemoryTest) AssembleLoopPrompt(tools []*aitool.Tool, input *aicommon.LoopPromptAssemblyInput) (*aicommon.LoopPromptAssemblyResult, error) {
+	_ = tools
+	_ = input
+	return &aicommon.LoopPromptAssemblyResult{
+		Prompt:   "memory test loop prompt",
+		Sections: nil,
+	}, nil
+}
+
 func (m *mockInvokerForMemoryTest) InvokeSpeedPriorityLiteForge(ctx context.Context, name string, prompt string, params []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption) (*aicommon.Action, error) {
 	return m.InvokeLiteForge(ctx, name, prompt, params, opts...)
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -170,6 +171,99 @@ func NewMockInvoker(ctx context.Context) *MockInvoker {
 		ctx:    ctx,
 		config: NewMockedAIConfig(ctx),
 	}
+}
+
+func (m *MockInvoker) AssembleLoopPrompt(tools []*aitool.Tool, input *aicommon.LoopPromptAssemblyInput) (*aicommon.LoopPromptAssemblyResult, error) {
+	_ = tools
+	if input == nil {
+		return nil, utils.Error("loop prompt assembly input is nil")
+	}
+
+	highStatic := wrapMockPromptSection("high-static", joinMockPromptParts(
+		renderMockTitledBlock("Task Instruction", input.TaskInstruction),
+		renderMockTitledBlock("Output Example", input.OutputExample),
+	))
+	semiDynamic := wrapMockPromptSection("semi-dynamic", joinMockPromptParts(
+		renderMockTitledBlock("Skills Context", input.SkillsContext),
+		renderMockSchemaBlock(input.Schema),
+	))
+	dynamic := wrapMockPromptSection("dynamic", joinMockPromptParts(
+		renderMockUserQueryBlock(input.Nonce, input.UserQuery),
+		renderMockTaggedBlock("EXTRA_CAPABILITIES", input.Nonce, input.ExtraCapabilities),
+		input.SessionEvidence,
+		renderMockTaggedBlock("REFLECTION", input.Nonce, input.ReactiveData),
+		renderMockInjectedMemoryBlock(input.Nonce, input.InjectedMemory),
+	))
+
+	return &aicommon.LoopPromptAssemblyResult{
+		Prompt:   joinMockPromptParts(highStatic, semiDynamic, dynamic),
+		Sections: nil,
+	}, nil
+}
+
+func wrapMockPromptSection(sectionName string, content string) string {
+	content = strings.TrimSpace(content)
+	if content == "" {
+		return ""
+	}
+	return fmt.Sprintf("<|PROMPT_SECTION_%s|>\n%s\n<|PROMPT_SECTION_END_%s|>", sectionName, content, sectionName)
+}
+
+func renderMockTitledBlock(title string, body string) string {
+	body = strings.TrimSpace(body)
+	if body == "" {
+		return ""
+	}
+	return "# " + title + "\n" + body
+}
+
+func renderMockTaggedBlock(tag string, nonce string, body string) string {
+	body = strings.TrimSpace(body)
+	if body == "" {
+		return ""
+	}
+	if strings.TrimSpace(nonce) == "" {
+		return fmt.Sprintf("<|%s|>\n%s\n<|%s_END|>", tag, body, tag)
+	}
+	return fmt.Sprintf("<|%s_%s|>\n%s\n<|%s_END_%s|>", tag, nonce, body, tag, nonce)
+}
+
+func renderMockSchemaBlock(schema string) string {
+	schema = strings.TrimSpace(schema)
+	if schema == "" {
+		return ""
+	}
+	return "# Response Schema\n```jsonschema\n" + schema + "\n```"
+}
+
+func renderMockUserQueryBlock(nonce string, userQuery string) string {
+	userQuery = strings.TrimSpace(userQuery)
+	if userQuery == "" {
+		return ""
+	}
+	if strings.TrimSpace(nonce) == "" {
+		return "# User Query\n" + userQuery
+	}
+	return fmt.Sprintf("<|USER_QUERY_%s|>\n%s\n<|USER_QUERY_END_%s|>", nonce, userQuery, nonce)
+}
+
+func renderMockInjectedMemoryBlock(nonce string, memory string) string {
+	memory = strings.TrimSpace(memory)
+	if memory == "" {
+		return ""
+	}
+	return renderMockTaggedBlock("INJECTED_MEMORY", nonce, "# Memory Context\n"+memory)
+}
+
+func joinMockPromptParts(parts ...string) string {
+	var filtered []string
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			filtered = append(filtered, part)
+		}
+	}
+	return strings.Join(filtered, "\n\n")
 }
 
 func (m *MockInvoker) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[string]any, error) {

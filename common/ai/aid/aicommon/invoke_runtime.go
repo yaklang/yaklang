@@ -174,8 +174,27 @@ func NewSelectedKnowledgeBaseResult(reason string, knowledgeBases []string) *Sel
 	}
 }
 
+type LoopPromptAssemblyInput struct {
+	Nonce             string
+	UserQuery         string
+	TaskInstruction   string
+	OutputExample     string
+	Schema            string
+	SkillsContext     string
+	ExtraCapabilities string
+	SessionEvidence   string
+	ReactiveData      string
+	InjectedMemory    string
+}
+
+type LoopPromptAssemblyResult struct {
+	Prompt   string
+	Sections any
+}
+
 type AIInvokeRuntime interface {
 	GetBasicPromptInfo(tools []*aitool.Tool) (string, map[string]any, error)
+	AssembleLoopPrompt(tools []*aitool.Tool, input *LoopPromptAssemblyInput) (*LoopPromptAssemblyResult, error)
 	SetCurrentTask(task AIStatefulTask)
 	GetCurrentTask() AIStatefulTask
 	GetCurrentTaskId() string
