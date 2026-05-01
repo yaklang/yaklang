@@ -116,7 +116,26 @@ func mergeReasonIntoOutputStream(reason io.Reader, out io.Reader) io.Reader {
 // processAIResponse 处理流式响应
 // If toolCallCallback is not nil, tool_calls will be passed to the callback instead of being
 // converted to <|TOOL_CALL...|> format in the output stream.
-func processAIResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, reasonWriter io.Writer, toolCallCallback func([]*ToolCall), rawResponseHeaderCallback RawHTTPResponseHeaderCallback, rawResponseCallback func([]byte, []byte)) {
+// If usageCallback is not nil, it will be invoked exactly once after the
+// stream is fully drained, carrying the last non-empty `usage` block parsed
+// from the SSE stream (Qwen Omni stream_options.include_usage=true). It is
+// called with nil when no usage block was observed.
+// 关键词: processAIResponse, SSE usage 抽取, 视频 token 用量解析
+func processAIResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, reasonWriter io.Writer, toolCallCallback func([]*ToolCall), rawResponseHeaderCallback RawHTTPResponseHeaderCallback, rawResponseCallback func([]byte, []byte), usageCallback func(*ChatUsage)) {
+	// lastUsage 始终持有 SSE 流中最后一次非空 usage 字段，dashscope omni
+	// 在最后一帧返回真实 token 数，前面的 chunk usage=null。
+	// 关键词: lastUsage, SSE 末帧 usage
+	var lastUsage *ChatUsage
+	defer func() {
+		if usageCallback != nil {
+			defer func() {
+				if rec := recover(); rec != nil {
+					log.Warnf("usageCallback panic: %v", rec)
+				}
+			}()
+			usageCallback(lastUsage)
+		}
+	}()
 	defer func() {
 		utils.CallGeneralClose(reasonWriter)
 		utils.CallGeneralClose(outWriter)
@@ -294,6 +313,16 @@ func processAIResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, reas
 		lineStr := string(line)
 		jsonIdentifiers := jsonextractor.ExtractStandardJSON(lineStr)
 		for _, j := range jsonIdentifiers {
+			// 关键词: SSE chunk usage 解析, dashscope omni token 用量
+			// dashscope omni 在最后一帧 chunk 中返回 usage:{prompt_tokens,...}，
+			// 前面 chunk 多为 usage:null。这里只保留最后一次非空值。
+			var usageProbe struct {
+				Usage *ChatUsage `json:"usage"`
+			}
+			if err := json.Unmarshal([]byte(j), &usageProbe); err == nil && usageProbe.Usage != nil && (usageProbe.Usage.PromptTokens > 0 || usageProbe.Usage.CompletionTokens > 0 || usageProbe.Usage.TotalTokens > 0) {
+				lastUsage = usageProbe.Usage
+			}
+
 			var reasonDelta string
 			if !reasonFinished {
 				reasonContent := jsonpath.Find(j, `$..choices[*].delta.reasoning_content`)
@@ -426,7 +455,7 @@ func processAIResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, reas
 	}
 }
 
-func appendStreamHandlerPoCOptionEx(isStream bool, opts []poc.PocConfigOption, toolCallCallback func([]*ToolCall), rawResponseHeaderCallback RawHTTPResponseHeaderCallback, rawResponseCallback func([]byte, []byte)) (io.Reader, io.Reader, []poc.PocConfigOption, func()) {
+func appendStreamHandlerPoCOptionEx(isStream bool, opts []poc.PocConfigOption, toolCallCallback func([]*ToolCall), rawResponseHeaderCallback RawHTTPResponseHeaderCallback, rawResponseCallback func([]byte, []byte), usageCallback func(*ChatUsage)) (io.Reader, io.Reader, []poc.PocConfigOption, func()) {
 	outReader, outWriter := utils.NewBufPipe(nil)
 	reasonReader, reasonWriter := utils.NewBufPipe(nil)
 
@@ -436,7 +465,7 @@ func appendStreamHandlerPoCOptionEx(isStream bool, opts []poc.PocConfigOption, t
 	}
 
 	opts = append(opts, poc.WithBodyStreamReaderHandler(func(r []byte, closer io.ReadCloser) {
-		processAIResponse(r, closer, outWriter, reasonWriter, toolCallCallback, rawResponseHeaderCallback, rawResponseCallback)
+		processAIResponse(r, closer, outWriter, reasonWriter, toolCallCallback, rawResponseHeaderCallback, rawResponseCallback, usageCallback)
 	}))
 
 	opts = append(opts, poc.WithReplaceHttpPacketHeader("Content-Type", "application/json"))
@@ -451,7 +480,7 @@ func appendStreamHandlerPoCOptionEx(isStream bool, opts []poc.PocConfigOption, t
 	return outReader, reasonReader, opts, cancelFunc
 }
 
-func appendResponsesStreamHandlerPoCOptionEx(isStream bool, opts []poc.PocConfigOption, toolCallCallback func([]*ToolCall), rawResponseHeaderCallback RawHTTPResponseHeaderCallback, rawResponseCallback func([]byte, []byte)) (io.Reader, io.Reader, []poc.PocConfigOption, func()) {
+func appendResponsesStreamHandlerPoCOptionEx(isStream bool, opts []poc.PocConfigOption, toolCallCallback func([]*ToolCall), rawResponseHeaderCallback RawHTTPResponseHeaderCallback, rawResponseCallback func([]byte, []byte), usageCallback func(*ChatUsage)) (io.Reader, io.Reader, []poc.PocConfigOption, func()) {
 	outReader, outWriter := utils.NewBufPipe(nil)
 	reasonReader, reasonWriter := utils.NewBufPipe(nil)
 
@@ -470,13 +499,26 @@ func appendResponsesStreamHandlerPoCOptionEx(isStream bool, opts []poc.PocConfig
 	}
 
 	opts = append(opts, poc.WithBodyStreamReaderHandler(func(r []byte, closer io.ReadCloser) {
-		processAIResponseForResponses(r, closer, outWriter, reasonWriter, toolCallCallback, rawResponseHeaderCallback, rawResponseCallback)
+		processAIResponseForResponses(r, closer, outWriter, reasonWriter, toolCallCallback, rawResponseHeaderCallback, rawResponseCallback, usageCallback)
 	}))
 
 	return outReader, reasonReader, opts, cancelFunc
 }
 
-func processAIResponseForResponses(r []byte, closer io.ReadCloser, outWriter io.Writer, reasonWriter io.Writer, toolCallCallback func([]*ToolCall), rawResponseHeaderCallback RawHTTPResponseHeaderCallback, rawResponseCallback func([]byte, []byte)) {
+func processAIResponseForResponses(r []byte, closer io.ReadCloser, outWriter io.Writer, reasonWriter io.Writer, toolCallCallback func([]*ToolCall), rawResponseHeaderCallback RawHTTPResponseHeaderCallback, rawResponseCallback func([]byte, []byte), usageCallback func(*ChatUsage)) {
+	// usage 在 /responses 接口的形态目前我们未使用，仅占位保持签名一致。
+	// 关键词: responses 接口 usage 占位
+	var lastUsage *ChatUsage
+	defer func() {
+		if usageCallback != nil {
+			defer func() {
+				if rec := recover(); rec != nil {
+					log.Warnf("usageCallback panic: %v", rec)
+				}
+			}()
+			usageCallback(lastUsage)
+		}
+	}()
 	defer func() {
 		utils.CallGeneralClose(closer)
 		utils.CallGeneralClose(reasonWriter)

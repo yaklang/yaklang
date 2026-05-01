@@ -73,6 +73,9 @@ var LiteForgeExport = map[string]interface{}{
 	// 关键词: omni zip 归档导出, omniZipFile, omniZipDir
 	"omniZipFile": WithVideoOmniZipFile,
 	"omniZipDir":  WithVideoOmniZipDir,
+	// 关键词: omni 限速重试 / 段间节流导出
+	"omniRateLimitRetry":  WithVideoOmniRateLimitRetry,
+	"omniSegmentInterval": WithVideoOmniSegmentInterval,
 }
 
 type liteforgeConfig struct {

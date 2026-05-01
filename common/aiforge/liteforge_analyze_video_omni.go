@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -57,6 +58,12 @@ type VideoOmniSegmentResult struct {
 	RawText string `json:"raw_text"`
 	// LatencyMs 调用延迟
 	LatencyMs int64 `json:"latency_ms"`
+	// PromptTokens / CompletionTokens / TotalTokens 实测 token 用量，
+	// 来自 dashscope omni SSE 末帧 usage 字段。仅在请求成功时非零。
+	// 关键词: 视频段实测 token 用量
+	PromptTokens     int `json:"prompt_tokens,omitempty"`
+	CompletionTokens int `json:"completion_tokens,omitempty"`
+	TotalTokens      int `json:"total_tokens,omitempty"`
 	// ErrMsg 不致命错误说明
 	ErrMsg string `json:"err_msg,omitempty"`
 }
@@ -162,6 +169,15 @@ type VideoOmniConfig struct {
 	// Timeout 单段调用超时
 	Timeout time.Duration
 
+	// 关键词: omni 视频 429 退避重试配置
+	// RateLimitRetryMax 单段最多尝试次数（含首次），<=0 取默认 3。
+	RateLimitRetryMax int
+	// RateLimitBackoffBase 退避基数（指数退避：base * 2^attempt），<=0 取 30s。
+	RateLimitBackoffBase time.Duration
+	// SegmentInterval 段间静默节流；非 0 时分析端在主循环每段开始前等待该时长，
+	// 用于绕开 dashscope omni 较低的 TPM 限制。<=0 表示不节流。
+	SegmentInterval time.Duration
+
 	// 关键词: omni 视频 zip 归档参数
 	// ZipFile 完整 zip 文件路径（优先级最高，存在则忽略 ZipDir）
 	ZipFile string
@@ -233,6 +249,29 @@ func WithVideoOmniMaxSegments(n int) VideoOmniOption {
 }
 func WithVideoOmniProgressCallback(cb func(*VideoOmniSegmentResult)) VideoOmniOption {
 	return func(c *VideoOmniConfig) { c.ProgressCallback = cb }
+}
+
+// WithVideoOmniRateLimitRetry 设定 429 / 限速退避重试次数与基数。
+// 关键词: WithVideoOmniRateLimitRetry, omni 视频限速重试
+func WithVideoOmniRateLimitRetry(maxAttempts int, backoffBase time.Duration) VideoOmniOption {
+	return func(c *VideoOmniConfig) {
+		if maxAttempts > 0 {
+			c.RateLimitRetryMax = maxAttempts
+		}
+		if backoffBase > 0 {
+			c.RateLimitBackoffBase = backoffBase
+		}
+	}
+}
+
+// WithVideoOmniSegmentInterval 设置段间静默节流，<=0 表示不节流。
+// 关键词: WithVideoOmniSegmentInterval, omni 视频段间节流
+func WithVideoOmniSegmentInterval(d time.Duration) VideoOmniOption {
+	return func(c *VideoOmniConfig) {
+		if d > 0 {
+			c.SegmentInterval = d
+		}
+	}
 }
 
 // 关键词: omni 视频 zip 选项, omniZipFile, omniZipDir
@@ -423,6 +462,19 @@ func AnalyzeVideoOmni(video string, options ...any) (<-chan AnalysisResult, erro
 				// 继续 drain channel 但不再处理，直到 ffmpeg 退出 + channel close
 				continue
 			}
+
+			// 段间节流：从第二段起，每段开始前等待 SegmentInterval，
+			// 用于绕开 dashscope omni 较低的 TPM 限制。
+			// 关键词: omni 段间节流, TPM throttle
+			if processed > 0 && cfg.SegmentInterval > 0 {
+				log.Infof("segment interval throttle: sleeping %v before segment idx=%d", cfg.SegmentInterval, slice.Index)
+				select {
+				case <-time.After(cfg.SegmentInterval):
+				case <-ctxDone(cfg.Ctx):
+					log.Warnf("AnalyzeVideoOmni canceled while throttling: %v", cfg.Ctx.Err())
+					return
+				}
+			}
 			processed++
 
 			// 主路切片在送 omni 之前先入 zip（reencoded.mp4）
@@ -581,31 +633,119 @@ func analyzeSingleOmniSegment(video string, slice *ffmpegutils.VideoSliceResult,
 	// 否则会报 "Multiple inputs of the same modality or mixed modality inputs..." 错误。
 	dataURI := "data:;base64," + b64
 
-	startCall := time.Now()
 	prompt := cfg.SystemPrompt + "\n\n" + cfg.QueryPrompt
 
-	chatOpts := []aispec.AIConfigOption{
-		aispec.WithType(cfg.AIType),
-		aispec.WithModel(cfg.Model),
-		aispec.WithAPIKey(cfg.APIKey),
-		aispec.WithVideoUrl(dataURI),
+	// 关键词: omni 视频 429 退避重试, TPM/RPM 限速恢复
+	// dashscope omni 视频接口对单分钟 token 数（TPM）有较低上限，单段动辄
+	// 100K input token，连续提交极易触发 429（错误体多为 token-limit/insufficient_quota），
+	// 此处加入指数退避重试 (默认 30s, 60s, 120s)，让 TPM 滑动窗口过期。
+	maxAttempts := cfg.RateLimitRetryMax
+	if maxAttempts <= 0 {
+		maxAttempts = 3
 	}
-	if cfg.BaseURL != "" {
-		chatOpts = append(chatOpts, aispec.WithBaseURL(cfg.BaseURL))
-	}
-	if cfg.Ctx != nil {
-		// timeout context
-		callCtx, cancel := context.WithTimeout(cfg.Ctx, cfg.Timeout)
-		defer cancel()
-		chatOpts = append(chatOpts, aispec.WithContext(callCtx))
+	baseBackoff := cfg.RateLimitBackoffBase
+	if baseBackoff <= 0 {
+		baseBackoff = 30 * time.Second
 	}
 
-	log.Infof("calling omni model %s for segment idx=%d size=%d", cfg.Model, slice.Index, slice.SizeBytes)
-	resp, err := ai.Chat(prompt, chatOpts...)
+	var resp string
+	var lastStatus int
+	var lastErrBody []byte
+	var callErr error
+	startCall := time.Now()
+
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		lastStatus = 0
+		lastErrBody = nil
+		// 关键词: omni 单次 chat 选项
+		chatOpts := []aispec.AIConfigOption{
+			aispec.WithType(cfg.AIType),
+			aispec.WithModel(cfg.Model),
+			aispec.WithAPIKey(cfg.APIKey),
+			aispec.WithVideoUrl(dataURI),
+		}
+		chatOpts = append(chatOpts, aispec.WithUsageCallback(func(u *aispec.ChatUsage) {
+			if u == nil {
+				return
+			}
+			r.PromptTokens = u.PromptTokens
+			r.CompletionTokens = u.CompletionTokens
+			r.TotalTokens = u.TotalTokens
+		}))
+		// 关键词: omni 响应头回调, HTTP status 抓取
+		chatOpts = append(chatOpts, aispec.WithRawHTTPResponseHeaderCallback(func(headerBytes []byte) {
+			lastStatus = parseHTTPStatusCode(headerBytes)
+		}))
+		// 关键词: omni 响应体回调, 失败时保留 body 供日志
+		chatOpts = append(chatOpts, aispec.WithRawHTTPResponseCallback(func(headerBytes []byte, bodyPreview []byte) {
+			if lastStatus == 0 {
+				lastStatus = parseHTTPStatusCode(headerBytes)
+			}
+			if lastStatus >= 400 {
+				lastErrBody = append([]byte(nil), bodyPreview...)
+			}
+		}))
+		if cfg.BaseURL != "" {
+			chatOpts = append(chatOpts, aispec.WithBaseURL(cfg.BaseURL))
+		}
+		if cfg.Ctx != nil {
+			// timeout context
+			callCtx, cancel := context.WithTimeout(cfg.Ctx, cfg.Timeout)
+			chatOpts = append(chatOpts, aispec.WithContext(callCtx))
+			log.Infof("calling omni model %s for segment idx=%d size=%d (attempt=%d/%d)", cfg.Model, slice.Index, slice.SizeBytes, attempt+1, maxAttempts)
+			resp, callErr = ai.Chat(prompt, chatOpts...)
+			cancel()
+		} else {
+			log.Infof("calling omni model %s for segment idx=%d size=%d (attempt=%d/%d)", cfg.Model, slice.Index, slice.SizeBytes, attempt+1, maxAttempts)
+			resp, callErr = ai.Chat(prompt, chatOpts...)
+		}
+
+		// 已经成功（HTTP 2xx 且 resp 非空 且 callErr 为 nil）
+		if callErr == nil && lastStatus >= 200 && lastStatus < 300 && resp != "" {
+			break
+		}
+
+		// 判定是否需要退避重试
+		// 关键词: omni 429 限速判定
+		isRateLimited := lastStatus == 429
+		if !isRateLimited && callErr != nil {
+			// 兜底：error 文案中包含限速关键字
+			lower := strings.ToLower(callErr.Error())
+			if strings.Contains(lower, "429") || strings.Contains(lower, "rate") || strings.Contains(lower, "throttl") || strings.Contains(lower, "quota") {
+				isRateLimited = true
+			}
+		}
+		// 即使 ai.Chat 没报错，但状态码 429 + body 空 也判定为限速
+		if isRateLimited && attempt < maxAttempts-1 {
+			backoff := time.Duration(1<<uint(attempt)) * baseBackoff
+			log.Warnf("omni segment idx=%d rate-limited (status=%d body=%s), backoff %v then retry (attempt %d/%d)",
+				slice.Index, lastStatus, utils.ShrinkString(string(lastErrBody), 200), backoff, attempt+1, maxAttempts)
+			select {
+			case <-time.After(backoff):
+			case <-ctxDone(cfg.Ctx):
+				r.ErrMsg = "omni chat canceled while waiting backoff"
+				r.LatencyMs = time.Since(startCall).Milliseconds()
+				return r
+			}
+			continue
+		}
+		// 不可恢复：跳出循环
+		break
+	}
+
 	r.LatencyMs = time.Since(startCall).Milliseconds()
-	if err != nil {
-		r.ErrMsg = fmt.Sprintf("omni chat failed: %v", err)
-		log.Errorf("omni chat failed for segment idx=%d: %v", slice.Index, err)
+	if callErr != nil {
+		r.ErrMsg = fmt.Sprintf("omni chat failed (status=%d): %v body=%s", lastStatus, callErr, utils.ShrinkString(string(lastErrBody), 200))
+		log.Errorf("omni chat failed for segment idx=%d: %v", slice.Index, callErr)
+		return r
+	}
+	if lastStatus != 0 && (lastStatus < 200 || lastStatus >= 300) {
+		r.ErrMsg = fmt.Sprintf("omni chat http %d: %s", lastStatus, utils.ShrinkString(string(lastErrBody), 200))
+		log.Errorf("omni chat http %d for segment idx=%d body=%s", lastStatus, slice.Index, utils.ShrinkString(string(lastErrBody), 200))
+		return r
+	}
+	if resp == "" {
+		r.ErrMsg = fmt.Sprintf("omni chat returned empty body (status=%d)", lastStatus)
 		return r
 	}
 	r.RawText = resp
@@ -638,6 +778,37 @@ func analyzeSingleOmniSegment(video string, slice *ffmpegutils.VideoSliceResult,
 		r.Storyline = resp
 	}
 	return r
+}
+
+// parseHTTPStatusCode 从原始 HTTP 响应头字节中解析状态码（"HTTP/1.1 429 Too Many ..."）。
+// 关键词: HTTP status 解析, 429 识别
+func parseHTTPStatusCode(headerBytes []byte) int {
+	if len(headerBytes) == 0 {
+		return 0
+	}
+	// 找第一行
+	endOfLine := -1
+	for i := 0; i < len(headerBytes); i++ {
+		if headerBytes[i] == '\r' || headerBytes[i] == '\n' {
+			endOfLine = i
+			break
+		}
+	}
+	var firstLine string
+	if endOfLine > 0 {
+		firstLine = string(headerBytes[:endOfLine])
+	} else {
+		firstLine = string(headerBytes)
+	}
+	parts := strings.SplitN(firstLine, " ", 3)
+	if len(parts) < 2 {
+		return 0
+	}
+	code, err := strconv.Atoi(parts[1])
+	if err != nil {
+		return 0
+	}
+	return code
 }
 
 func extractFirstJSON(text string) string {

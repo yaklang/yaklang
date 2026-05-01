@@ -94,6 +94,13 @@ type AIConfig struct {
 	// RawHTTPRequestResponseCallback is called with the raw HTTP request bytes and
 	// response debug data when an AI response completes.
 	RawHTTPRequestResponseCallback RawHTTPRequestResponseCallback
+
+	// UsageCallback is invoked once after the AI streaming response finishes,
+	// carrying the final ChatUsage parsed from the OpenAI-compatible
+	// stream_options.include_usage payload (Qwen Omni etc.). Cb may be called
+	// with nil if the upstream did not return any usage block.
+	// 关键词: AIConfig.UsageCallback, token usage callback
+	UsageCallback func(*ChatUsage)
 }
 
 func WithExtraHeader(headers map[string]string) AIConfigOption {
@@ -1053,5 +1060,17 @@ func WithRawHTTPResponseHeaderCallback(cb RawHTTPResponseHeaderCallback) AIConfi
 func WithRawHTTPRequestResponseCallback(cb RawHTTPRequestResponseCallback) AIConfigOption {
 	return func(c *AIConfig) {
 		c.RawHTTPRequestResponseCallback = cb
+	}
+}
+
+// WithUsageCallback registers a callback that receives the final token usage
+// (prompt/completion/total) parsed from the streaming response. Useful for
+// downstream cost accounting. The callback may receive nil if the upstream
+// did not surface a usage block.
+//
+// 关键词: AIConfig WithUsageCallback, 视频蒸馏 token 用量回调
+func WithUsageCallback(cb func(*ChatUsage)) AIConfigOption {
+	return func(c *AIConfig) {
+		c.UsageCallback = cb
 	}
 }

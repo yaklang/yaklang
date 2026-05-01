@@ -229,6 +229,12 @@ type ChatBaseContext struct {
 	// RawHTTPRequestResponseCallback is called after the AI HTTP response is fully consumed,
 	// providing the raw request bytes and response debug data for debugging.
 	RawHTTPRequestResponseCallback RawHTTPRequestResponseCallback
+	// UsageCallback is invoked exactly once after the streaming response is
+	// fully consumed, carrying the last non-empty `usage` block from the SSE
+	// stream (OpenAI-compatible stream_options.include_usage=true). The
+	// callback may receive nil if no usage block was observed.
+	// 关键词: ChatBaseContext.UsageCallback, token 用量回调
+	UsageCallback func(*ChatUsage)
 }
 
 type ChatBaseOption func(c *ChatBaseContext)
@@ -363,6 +369,18 @@ func WithChatBase_RawHTTPResponseHeaderCallback(cb RawHTTPResponseHeaderCallback
 func WithChatBase_RawHTTPRequestResponseCallback(cb RawHTTPRequestResponseCallback) ChatBaseOption {
 	return func(c *ChatBaseContext) {
 		c.RawHTTPRequestResponseCallback = cb
+	}
+}
+
+// WithChatBase_UsageCallback registers a callback that fires once after the
+// AI streaming response is fully consumed, carrying the last `usage` block
+// observed in the OpenAI-compatible SSE stream. nil is delivered if the
+// upstream did not return a usage block at all.
+//
+// 关键词: WithChatBase_UsageCallback, ChatBase token 用量回调
+func WithChatBase_UsageCallback(cb func(*ChatUsage)) ChatBaseOption {
+	return func(c *ChatBaseContext) {
+		c.UsageCallback = cb
 	}
 }
 
@@ -590,6 +608,7 @@ type chatBaseStreamHandlerAppender func(
 	toolCallCallback func([]*ToolCall),
 	rawResponseHeaderCallback RawHTTPResponseHeaderCallback,
 	rawResponseCallback func([]byte, []byte),
+	usageCallback func(*ChatUsage),
 ) (io.Reader, io.Reader, []poc.PocConfigOption, func())
 
 func executeChatBaseRequest(
@@ -653,7 +672,7 @@ func executeChatBaseRequest(
 			ctx.RawHTTPRequestResponseCallback(requestPacket, headerBytes, bodyPreview)
 		}
 	}
-	pr, reasonPr, opts, cancel = appendHandler(handleStream, opts, ctx.ToolCallCallback, ctx.RawHTTPResponseHeaderCallback, rawResponseCallback)
+	pr, reasonPr, opts, cancel = appendHandler(handleStream, opts, ctx.ToolCallCallback, ctx.RawHTTPResponseHeaderCallback, rawResponseCallback, ctx.UsageCallback)
 	requestPacket = poc.BuildRequest(
 		lowhttp.UrlToRequestPacket(
 			"POST",

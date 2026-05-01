@@ -52,21 +52,28 @@ type archiveManifest struct {
 // archiveSegmentEntry 单个分片在 manifest 中的条目
 // 关键词: archive segment entry
 type archiveSegmentEntry struct {
-	Index            int      `json:"index"`
-	StartSeconds     float64  `json:"start_seconds"`
-	EndSeconds       float64  `json:"end_seconds"`
-	StreamCopyMP4    string   `json:"stream_copy_mp4,omitempty"`
-	StreamCopyBytes  int64    `json:"stream_copy_bytes,omitempty"`
-	ReencodedMP4     string   `json:"reencoded_mp4,omitempty"`
-	ReencodedBytes   int64    `json:"reencoded_bytes,omitempty"`
-	AnalysisJSON     string   `json:"analysis_json,omitempty"`
-	OmniRawResponse  string   `json:"omni_raw_response,omitempty"`
-	DumpMarkdown     string   `json:"dump_md,omitempty"`
-	Title            string   `json:"title,omitempty"`
-	LatencyMs        int64    `json:"latency_ms,omitempty"`
-	Tags             []string `json:"tags,omitempty"`
-	HasError         bool     `json:"has_error,omitempty"`
-	ErrorMessage     string   `json:"error_message,omitempty"`
+	Index           int      `json:"index"`
+	StartSeconds    float64  `json:"start_seconds"`
+	EndSeconds      float64  `json:"end_seconds"`
+	StreamCopyMP4   string   `json:"stream_copy_mp4,omitempty"`
+	StreamCopyBytes int64    `json:"stream_copy_bytes,omitempty"`
+	ReencodedMP4    string   `json:"reencoded_mp4,omitempty"`
+	ReencodedBytes  int64    `json:"reencoded_bytes,omitempty"`
+	AnalysisJSON    string   `json:"analysis_json,omitempty"`
+	OmniRawResponse string   `json:"omni_raw_response,omitempty"`
+	DumpMarkdown    string   `json:"dump_md,omitempty"`
+	Title           string   `json:"title,omitempty"`
+	LatencyMs       int64    `json:"latency_ms,omitempty"`
+	Tags            []string `json:"tags,omitempty"`
+	HasError        bool     `json:"has_error,omitempty"`
+	ErrorMessage    string   `json:"error_message,omitempty"`
+	// PromptTokens / CompletionTokens / TotalTokens 来自模型 SSE 末帧
+	// usage 字段（dashscope omni 在 stream_options.include_usage=true 时返回）。
+	// 仅在调用成功时非零；用于离线对账与成本核算。
+	// 关键词: 视频 token 用量, manifest 实测 usage
+	PromptTokens     int `json:"prompt_tokens,omitempty"`
+	CompletionTokens int `json:"completion_tokens,omitempty"`
+	TotalTokens      int `json:"total_tokens,omitempty"`
 }
 
 // newVideoSegmentArchiver 创建并打开一个流式 zip 归档器。
@@ -257,6 +264,10 @@ func (a *videoSegmentArchiver) WriteAnalysis(seg *VideoOmniSegmentResult) error 
 	entry.Title = seg.Title
 	entry.LatencyMs = seg.LatencyMs
 	entry.Tags = append([]string{}, seg.Tags...)
+	// 关键词: manifest 写入实测 token 用量
+	entry.PromptTokens = seg.PromptTokens
+	entry.CompletionTokens = seg.CompletionTokens
+	entry.TotalTokens = seg.TotalTokens
 	if seg.ErrMsg != "" {
 		entry.HasError = true
 		entry.ErrorMessage = seg.ErrMsg
@@ -371,8 +382,8 @@ func buildArchiveReadme(m *archiveManifest) string {
 
 	if len(m.Segments) > 0 {
 		sb.WriteString("## Segment index\n\n")
-		sb.WriteString("| idx | seconds | title | latency_ms | error |\n")
-		sb.WriteString("| --- | --- | --- | --- | --- |\n")
+		sb.WriteString("| idx | seconds | title | latency_ms | tokens (in/out/total) | error |\n")
+		sb.WriteString("| --- | --- | --- | --- | --- | --- |\n")
 		for _, s := range m.Segments {
 			title := s.Title
 			if title == "" {
@@ -382,8 +393,12 @@ func buildArchiveReadme(m *archiveManifest) string {
 			if s.HasError {
 				errCol = "yes"
 			}
-			sb.WriteString(fmt.Sprintf("| %d | %.0f - %.0f | %s | %d | %s |\n",
-				s.Index, s.StartSeconds, s.EndSeconds, title, s.LatencyMs, errCol))
+			tokenCol := "-"
+			if s.TotalTokens > 0 {
+				tokenCol = fmt.Sprintf("%d/%d/%d", s.PromptTokens, s.CompletionTokens, s.TotalTokens)
+			}
+			sb.WriteString(fmt.Sprintf("| %d | %.0f - %.0f | %s | %d | %s | %s |\n",
+				s.Index, s.StartSeconds, s.EndSeconds, title, s.LatencyMs, tokenCol, errCol))
 		}
 	}
 
