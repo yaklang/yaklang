@@ -95,6 +95,23 @@ type ChatUsage struct {
 	PromptTokens     int `json:"prompt_tokens"`
 	CompletionTokens int `json:"completion_tokens"`
 	TotalTokens      int `json:"total_tokens"`
+
+	// PromptTokensDetails 来自 dashscope omni 在 SSE 末帧 usage 字段附带的多模态拆分。
+	// dashscope qwen3.5-omni-plus 输入按"文本/图片/视频帧"与"音频"两类不同价格计费，
+	// 因此把这里的 audio_tokens 与 video/image_tokens 单独保留以做精确成本核算。
+	// 关键词: 多模态 token 拆分, prompt_tokens_details, dashscope omni 计费
+	PromptTokensDetails *PromptTokensDetails `json:"prompt_tokens_details,omitempty"`
+}
+
+// PromptTokensDetails 多模态输入 token 拆分（仅 dashscope omni / openai 多模态返回）。
+// 字段名沿用 dashscope SSE 帧里的下划线命名 (text_tokens / audio_tokens / image_tokens / video_tokens)。
+// 关键词: 多模态 token 拆分明细
+type PromptTokensDetails struct {
+	TextTokens   int `json:"text_tokens,omitempty"`
+	AudioTokens  int `json:"audio_tokens,omitempty"`
+	ImageTokens  int `json:"image_tokens,omitempty"`
+	VideoTokens  int `json:"video_tokens,omitempty"`
+	CachedTokens int `json:"cached_tokens,omitempty"`
 }
 
 type ToolCall struct {

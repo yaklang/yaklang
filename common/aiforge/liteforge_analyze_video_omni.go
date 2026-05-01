@@ -64,6 +64,14 @@ type VideoOmniSegmentResult struct {
 	PromptTokens     int `json:"prompt_tokens,omitempty"`
 	CompletionTokens int `json:"completion_tokens,omitempty"`
 	TotalTokens      int `json:"total_tokens,omitempty"`
+	// 多模态输入 token 拆分（dashscope omni 在 SSE 末帧 usage.prompt_tokens_details 给出），
+	// 用于音频/视频帧分价计费精确核算。
+	// 关键词: 视频段音频视频 token 拆分
+	TextTokens   int `json:"text_tokens,omitempty"`
+	AudioTokens  int `json:"audio_tokens,omitempty"`
+	ImageTokens  int `json:"image_tokens,omitempty"`
+	VideoTokens  int `json:"video_tokens,omitempty"`
+	CachedTokens int `json:"cached_tokens,omitempty"`
 	// ErrMsg 不致命错误说明
 	ErrMsg string `json:"err_msg,omitempty"`
 }
@@ -671,6 +679,13 @@ func analyzeSingleOmniSegment(video string, slice *ffmpegutils.VideoSliceResult,
 			r.PromptTokens = u.PromptTokens
 			r.CompletionTokens = u.CompletionTokens
 			r.TotalTokens = u.TotalTokens
+			if u.PromptTokensDetails != nil {
+				r.TextTokens = u.PromptTokensDetails.TextTokens
+				r.AudioTokens = u.PromptTokensDetails.AudioTokens
+				r.ImageTokens = u.PromptTokensDetails.ImageTokens
+				r.VideoTokens = u.PromptTokensDetails.VideoTokens
+				r.CachedTokens = u.PromptTokensDetails.CachedTokens
+			}
 		}))
 		// 关键词: omni 响应头回调, HTTP status 抓取
 		chatOpts = append(chatOpts, aispec.WithRawHTTPResponseHeaderCallback(func(headerBytes []byte) {

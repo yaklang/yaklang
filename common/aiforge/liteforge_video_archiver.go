@@ -74,6 +74,15 @@ type archiveSegmentEntry struct {
 	PromptTokens     int `json:"prompt_tokens,omitempty"`
 	CompletionTokens int `json:"completion_tokens,omitempty"`
 	TotalTokens      int `json:"total_tokens,omitempty"`
+	// 多模态输入 token 拆分（dashscope omni / openai 多模态在 SSE 末帧
+	// usage.prompt_tokens_details 返回）。omni-plus 文本/图片/视频帧 与 音频
+	// 不同价格，此拆分用于精确成本核算。
+	// 关键词: manifest 多模态 token 拆分
+	TextTokens   int `json:"text_tokens,omitempty"`
+	AudioTokens  int `json:"audio_tokens,omitempty"`
+	ImageTokens  int `json:"image_tokens,omitempty"`
+	VideoTokens  int `json:"video_tokens,omitempty"`
+	CachedTokens int `json:"cached_tokens,omitempty"`
 }
 
 // newVideoSegmentArchiver 创建并打开一个流式 zip 归档器。
@@ -268,6 +277,11 @@ func (a *videoSegmentArchiver) WriteAnalysis(seg *VideoOmniSegmentResult) error 
 	entry.PromptTokens = seg.PromptTokens
 	entry.CompletionTokens = seg.CompletionTokens
 	entry.TotalTokens = seg.TotalTokens
+	entry.TextTokens = seg.TextTokens
+	entry.AudioTokens = seg.AudioTokens
+	entry.ImageTokens = seg.ImageTokens
+	entry.VideoTokens = seg.VideoTokens
+	entry.CachedTokens = seg.CachedTokens
 	if seg.ErrMsg != "" {
 		entry.HasError = true
 		entry.ErrorMessage = seg.ErrMsg
