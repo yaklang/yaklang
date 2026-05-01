@@ -141,10 +141,10 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 			switch bootstrapResult {
 			case "raw":
 				loop.Set("bootstrap_source", "user_input_raw")
-				emitter.EmitThoughtStream(task.GetIndex(), "Initialized fuzz request from extracted HTTP packet in user input.")
+				emitter.EmitThoughtStream(task.GetIndex(), "Reused the raw HTTP packet provided in user input as the current fuzz target. Skipped re-emitting the packet to avoid duplication.")
 			case "url":
 				loop.Set("bootstrap_source", "user_input_url")
-				emitter.EmitThoughtStream(task.GetIndex(), "No raw packet found. Initialized fuzz request from extracted URL.")
+				emitter.EmitThoughtStream(task.GetIndex(), "Constructed the current fuzz target HTTP packet from the URL provided in user input.")
 			default:
 				if restoreLoopHTTPFuzzSessionContext(loop, r) {
 					emitter.EmitThoughtStream(task.GetIndex(), "Restored the original HTTP packet and latest vulnerability analysis from the current session.")
@@ -267,6 +267,9 @@ func tryBootstrapFuzzRequestFromUserInput(r aicommon.AIInvokeRuntime, loop *reac
 }
 
 func initFuzzRequestFromRaw(loop *reactloops.ReActLoop, runtime aicommon.AIInvokeRuntime, rawPacket string, isHTTPS bool) bool {
+	// 用户输入里已经包含了完整的原始 HTTP 数据包，前端可以直接看到，
+	// 这里不再通过 EmitHTTPRequestStreamEvent 把同一个包再发一遍，避免重复展示。
+	// 关键词: bootstrap, EmitEditablePacket, raw_packet, 避免重复输出
 	_, err := applyLoopHTTPFuzzRequestChange(loop, runtime, &loopHTTPFuzzRequestChange{
 		RawRequest:          rawPacket,
 		IsHTTPS:             isHTTPS,
@@ -275,7 +278,7 @@ func initFuzzRequestFromRaw(loop *reactloops.ReActLoop, runtime aicommon.AIInvok
 		ResetBaseline:       true,
 		ClearActionTracking: true,
 		EmitEvent:           true,
-		EmitEditablePacket:  true,
+		EmitEditablePacket:  false,
 		PersistSession:      true,
 		Task:                loop.GetCurrentTask(),
 	})
@@ -291,6 +294,28 @@ func initFuzzRequestFromURL(loop *reactloops.ReActLoop, runtime aicommon.AIInvok
 	if err != nil {
 		log.Warnf("failed to build request from URL %s: %v", urlStr, err)
 		return false
+	}
+
+	// 这是"第一次构造数据包"的场景：用户没有给出完整 HTTP 数据包，
+	// 系统根据 URL 生成了新的请求。先发一段来源说明，再 emit 完整包，
+	// 让用户清楚这个数据包从哪儿来。
+	// 关键词: bootstrap, EmitEditablePacket, url_to_packet, 来源说明
+	if loop != nil && loop.GetEmitter() != nil {
+		task := loop.GetCurrentTask()
+		taskID := ""
+		if task != nil {
+			taskID = task.GetIndex()
+		}
+		if taskID != "" {
+			methodLabel := strings.TrimSpace(method)
+			if methodLabel == "" {
+				methodLabel = "GET"
+			}
+			loop.GetEmitter().EmitThoughtStream(
+				taskID,
+				fmt.Sprintf("Constructed the current fuzz target HTTP packet from URL: %s (method=%s).", strings.TrimSpace(urlStr), methodLabel),
+			)
+		}
 	}
 
 	_, err = applyLoopHTTPFuzzRequestChange(loop, runtime, &loopHTTPFuzzRequestChange{
