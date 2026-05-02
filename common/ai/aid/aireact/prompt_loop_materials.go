@@ -162,7 +162,7 @@ func (pm *PromptManager) AssembleLoopPrompt(tools []*aitool.Tool, input *reactlo
 		sections = append(sections, dynamicSection)
 	}
 
-	prompt := buildTaggedPromptSections(prefix.HighStatic, prefix.SemiDynamic, prefix.Timeline, dynamic)
+	prompt := buildTaggedPromptSections(prefix.HighStatic, prefix.SemiDynamic, prefix.Timeline, dynamic, base.Nonce)
 	return &reactloops.LoopPromptAssemblyResult{
 		Prompt:   prompt,
 		Sections: sections,
@@ -173,6 +173,7 @@ func (pm *PromptManager) NewPromptPrefixMaterials(base *reactloops.LoopPromptBas
 	materials := &reactloops.PromptPrefixMaterials{}
 
 	if base != nil {
+		materials.Nonce = base.Nonce
 		materials.AllowToolCall = base.AllowToolCall
 		materials.AllowPlanAndExec = base.AllowPlanAndExec
 		materials.HasLoadCapability = base.HasLoadCapability
@@ -674,17 +675,21 @@ func (pm *PromptManager) renderLoopDynamicSection(data map[string]any) (string, 
 	return pm.executeTemplate("loop-dynamic", loopDynamicSectionTemplate, data)
 }
 
-func buildTaggedPromptSections(highStatic string, semiDynamic string, timeline string, dynamic string) string {
+func buildTaggedPromptSections(highStatic string, semiDynamic string, timeline string, dynamic string, dynamicNonce string) string {
 	return joinPromptSections(
-		wrapPromptMessageSection(promptSectionHighStatic, highStatic),
-		wrapPromptMessageSection(promptSectionSemiDynamic, semiDynamic),
-		wrapPromptMessageSection(promptSectionTimeline, timeline),
-		wrapPromptMessageSection(promptSectionDynamic, dynamic),
+		wrapPromptMessageSection(promptSectionHighStatic, highStatic, ""),
+		wrapPromptMessageSection(promptSectionSemiDynamic, semiDynamic, ""),
+		wrapPromptMessageSection(promptSectionTimeline, timeline, ""),
+		wrapPromptMessageSection(promptSectionDynamic, dynamic, dynamicNonce),
 	)
 }
 
-func wrapPromptMessageSection(sectionName string, content string) string {
+func wrapPromptMessageSection(sectionName string, content string, nonce string) string {
 	content = strings.TrimSpace(content)
+	if sectionName == promptSectionDynamic && nonce != "" {
+		tagName := fmt.Sprintf("%s_%s", promptSectionTagName, sectionName)
+		return fmt.Sprintf("<|%s_%s|>\n%s\n<|%s_END_%s|>", tagName, nonce, content, tagName, nonce)
+	}
 	return fmt.Sprintf("<|%s_%s|>\n%s\n<|%s_END_%s|>", promptSectionTagName, sectionName, content, promptSectionTagName, sectionName)
 }
 

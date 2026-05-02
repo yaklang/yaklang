@@ -34,7 +34,7 @@ func TestLoopHTTPFuzztestOutputExample_CoversStructuredDirectAnswerFewShot(t *te
 		"下一步建议：",
 		"IDOR 或权限校验缺失",
 		"信息泄漏线索",
-		"<|FINAL_ANSWER_{{ .Nonce }}|>",
+		"<|FINAL_ANSWER_CURRENT_NONCE|>",
 		"| 观察项 | 当前结论 | 对后续测试的价值 |",
 		"{{fuzz:password(admin)}}",
 		"{{fuzz:username(admin)}}",

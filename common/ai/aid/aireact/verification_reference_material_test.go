@@ -94,7 +94,7 @@ func TestVerifyUserSatisfaction_EmitsRequestAndResponseReferenceMaterials(t *tes
 func TestVerifyUserSatisfaction_AcceptsEvidenceAITag(t *testing.T) {
 	ins, err := NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			nonce := mustExtractPromptNonce(t, req.GetPrompt(), "INPUT")
+			nonce := aicommon.MustExtractPromptNonce(t, req.GetPrompt(), "INPUT")
 			rawResponse := `{"@action":"verify-satisfaction","user_satisfied":false,"reasoning":"still verifying","evidence":[]}
 
 <|EVIDENCE_` + nonce + `|>

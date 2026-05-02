@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -76,7 +75,7 @@ type mockStats_forGrepSamples struct {
 	codeWritten     bool
 }
 
-func mockedYaklangGrepSamples(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, stat *mockStats_forGrepSamples) (*aicommon.AIResponse, error) {
+func mockedYaklangGrepSamples(t *testing.T, i aicommon.AICallerConfigIf, req *aicommon.AIRequest, stat *mockStats_forGrepSamples) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
 
 	if utils.MatchAllOfSubString(prompt, "analyze-requirement-and-search", "create_new_file", "search_patterns") {
@@ -105,12 +104,7 @@ func mockedYaklangGrepSamples(i aicommon.AICallerConfigIf, req *aicommon.AIReque
 	}
 
 	if utils.MatchAllOfSubString(prompt, `"grep_yaklang_samples"`, `"require_tool"`, `"write_code"`, `"@action"`) {
-		re := regexp.MustCompile(`<\|GEN_CODE_([^|]+)\|>`)
-		matches := re.FindStringSubmatch(prompt)
-		var nonceStr string
-		if len(matches) > 1 {
-			nonceStr = matches[1]
-		}
+		nonceStr := aicommon.MustExtractDynamicSectionNonce(t, prompt)
 
 		rsp := i.NewAIResponse()
 
@@ -216,7 +210,7 @@ println(parts)
 
 	ins, err := aireact.NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			return mockedYaklangGrepSamples(i, r, stat)
+			return mockedYaklangGrepSamples(t, i, r, stat)
 		}),
 		aicommon.WithEventInputChan(in),
 		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
@@ -589,7 +583,7 @@ type mockStats_forSemanticSearch struct {
 	compressFlag                 string
 }
 
-func mockedYaklangSemanticSearch(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, stat *mockStats_forSemanticSearch) (*aicommon.AIResponse, error) {
+func mockedYaklangSemanticSearch(t *testing.T, i aicommon.AICallerConfigIf, req *aicommon.AIRequest, stat *mockStats_forSemanticSearch) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
 
 	if utils.MatchAllOfSubString(prompt, "KNOWLEDGE_CHUNK", "ranges", "score") {
@@ -639,12 +633,7 @@ func mockedYaklangSemanticSearch(i aicommon.AICallerConfigIf, req *aicommon.AIRe
 	}
 
 	if utils.MatchAllOfSubString(prompt, `"semantic_search_yaklang_samples"`, `"require_tool"`, `"write_code"`, `"@action"`) {
-		re := regexp.MustCompile(`<\|GEN_CODE_([^|]+)\|>`)
-		matches := re.FindStringSubmatch(prompt)
-		var nonceStr string
-		if len(matches) > 1 {
-			nonceStr = matches[1]
-		}
+		nonceStr := aicommon.MustExtractDynamicSectionNonce(t, prompt)
 
 		rsp := i.NewAIResponse()
 
@@ -752,7 +741,7 @@ func TestFocusMode_SemanticSearchYaklangSamples_BasicSearch(t *testing.T) {
 
 	ins, err := aireact.NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			return mockedYaklangSemanticSearch(i, r, stat)
+			return mockedYaklangSemanticSearch(t, i, r, stat)
 		}),
 		aicommon.WithEventInputChan(in),
 		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {

@@ -36,6 +36,7 @@ type LoopPromptAssemblyInput = aicommon.LoopPromptAssemblyInput
 type LoopPromptAssemblyResult = aicommon.LoopPromptAssemblyResult
 
 type PromptPrefixMaterials struct {
+	Nonce             string
 	AllowToolCall     bool
 	AllowPlanAndExec  bool
 	HasLoadCapability bool

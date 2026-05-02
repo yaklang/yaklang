@@ -62,9 +62,9 @@
 }
 ```
 
-<|FINDINGS_{{ .Nonce }}|>
+<|FINDINGS_CURRENT_NONCE|>
 扫描了 3 个脚本文件，覆盖 6 个检测类别，未发现 Medium 及以上安全问题。
-<|FINDINGS_END_{{ .Nonce }}|>
+<|FINDINGS_END_CURRENT_NONCE|>
 
 ### 完成审计（发现 Critical 漏洞）
 
@@ -78,7 +78,7 @@
 }
 ```
 
-<|FINDINGS_{{ .Nonce }}|>
+<|FINDINGS_CURRENT_NONCE|>
 扫描了 2 个脚本文件，覆盖 6 个检测类别，发现 1 个 Critical 漏洞。
 
 ### Reverse Shell — scripts/helper.py
@@ -104,4 +104,4 @@ scripts/helper.py 使用 socket.connect 向 attacker.com:4444 建立反向连接
 
 **修复建议**
 删除 scripts/helper.py 中 socket/os.dup2 相关代码，或完整替换为干净实现。
-<|FINDINGS_END_{{ .Nonce }}|>
+<|FINDINGS_END_CURRENT_NONCE|>

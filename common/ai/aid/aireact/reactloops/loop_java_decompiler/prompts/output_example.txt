@@ -17,7 +17,7 @@ Your response should be in JSON format with the following structure:
 
 **ABSOLUTELY CRITICAL when using `rewrite_java_file`:**
 
-1. [MUST] You MUST ALWAYS include `<|JAVA_CODE_{{ .Nonce }}|>` code block in your response
+1. [MUST] You MUST ALWAYS include `<|JAVA_CODE_CURRENT_NONCE|>` code block in your response
 2. [MUST] You CANNOT put Java code in JSON! Must output: JSON line + code block
 3. [FORBIDDEN] Never include line number prefixes (like `45 |`, `46 |`, `47 |`) in generated code
 4. [FORBIDDEN] Never include any `|` separator in generated code
@@ -29,9 +29,9 @@ Your response should be in JSON format with the following structure:
 ```
 {"@action": "rewrite_java_file", "file_path": "...", "rewrite_reason": "..."}
 
-<|JAVA_CODE_{{ .Nonce }}|>
+<|JAVA_CODE_CURRENT_NONCE|>
 Your Java code
-<|JAVA_CODE_END_{{ .Nonce }}|>
+<|JAVA_CODE_END_CURRENT_NONCE|>
 ```
 
 **WRONG Example (Absolutely Forbidden!):**
@@ -90,13 +90,13 @@ private List<String> items = new ArrayList<>();
 }
 ```
 
-<|JAVA_CODE_{{ .Nonce }}|>
+<|JAVA_CODE_CURRENT_NONCE|>
     private List<String> items = new ArrayList<>();
     
     public List<String> getItems() {
         return items;
     }
-<|JAVA_CODE_END_{{ .Nonce }}|>
+<|JAVA_CODE_END_CURRENT_NONCE|>
 
 ### Example 4b: Fixing a Java file (Full Rewrite)
 ```json
@@ -108,7 +108,7 @@ private List<String> items = new ArrayList<>();
 }
 ```
 
-<|JAVA_CODE_{{ .Nonce }}|>
+<|JAVA_CODE_CURRENT_NONCE|>
 package com.example;
 
 import java.util.*;
@@ -124,7 +124,7 @@ public class Class {
         items.forEach(item -> System.out.println(item));
     }
 }
-<|JAVA_CODE_END_{{ .Nonce }}|>
+<|JAVA_CODE_END_CURRENT_NONCE|>
 
 ### Example 5: Checking syntax
 ```json
@@ -149,7 +149,7 @@ public class Class {
 - Always include `human_readable_thought` to explain your reasoning
 - Use `@action` to specify which action to take
 - Provide all required parameters for the chosen action in JSON
-- **CRITICAL**: When using `rewrite_java_file`, you MUST include the `<|JAVA_CODE_{{ .Nonce }}|>` code block
+- **CRITICAL**: When using `rewrite_java_file`, you MUST include the `<|JAVA_CODE_CURRENT_NONCE|>` code block
 - **DO NOT** put Java code in JSON! Use the AITAG format: JSON line + JAVA_CODE block
 - Always explain why you're making changes in `rewrite_reason` parameter
 - For `rewrite_java_file`: Use partial rewrite for localized fixes, full rewrite for extensive changes
@@ -160,8 +160,8 @@ public class Class {
 ```
 {"@action": "rewrite_java_file", ...}
 
-<|JAVA_CODE_{{ .Nonce }}|>
+<|JAVA_CODE_CURRENT_NONCE|>
 Your Java code here
-<|JAVA_CODE_END_{{ .Nonce }}|>
+<|JAVA_CODE_END_CURRENT_NONCE|>
 ```
 

@@ -187,18 +187,27 @@ func (m *MockInvoker) AssembleLoopPrompt(tools []*aitool.Tool, input *aicommon.L
 		renderMockTitledBlock("Skills Context", input.SkillsContext),
 		renderMockSchemaBlock(input.Schema),
 	))
-	dynamic := wrapMockPromptSection("dynamic", joinMockPromptParts(
+	dynamic := wrapMockPromptSectionWithNonce("dynamic", joinMockPromptParts(
 		renderMockUserQueryBlock(input.Nonce, input.UserQuery),
 		renderMockTaggedBlock("EXTRA_CAPABILITIES", input.Nonce, input.ExtraCapabilities),
 		input.SessionEvidence,
 		renderMockTaggedBlock("REFLECTION", input.Nonce, input.ReactiveData),
 		renderMockInjectedMemoryBlock(input.Nonce, input.InjectedMemory),
-	))
+	), input.Nonce)
 
 	return &aicommon.LoopPromptAssemblyResult{
 		Prompt:   joinMockPromptParts(highStatic, semiDynamic, dynamic),
 		Sections: nil,
 	}, nil
+}
+
+func wrapMockPromptSectionWithNonce(sectionName string, content string, nonce string) string {
+	content = strings.TrimSpace(content)
+	if content == "" {
+		return ""
+	}
+	sectionName = fmt.Sprintf("%s_%s", sectionName, nonce)
+	return fmt.Sprintf("<|PROMPT_SECTION_%s|>\n%s\n<|PROMPT_SECTION_END_%s|>", sectionName, content, sectionName)
 }
 
 func wrapMockPromptSection(sectionName string, content string) string {

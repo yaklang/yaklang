@@ -338,7 +338,7 @@ func TestPromptManager_GenerateToolParamsPromptWithMeta_UsesPromptSections(t *te
 		"<|PROMPT_SECTION_high-static|>",
 		"<|PROMPT_SECTION_semi-dynamic|>",
 		"<|PROMPT_SECTION_timeline|>",
-		"<|PROMPT_SECTION_dynamic|>",
+		"<|PROMPT_SECTION_dynamic_",
 		"<|SCHEMA|>",
 		"<|TOOL_DESC|>",
 		"<|TOOL_USAGE|>",
@@ -374,7 +374,7 @@ func TestPromptManager_GenerateDirectlyAnswerPrompt_UsesPromptSections(t *testin
 		"<|PROMPT_SECTION_high-static|>",
 		"<|PROMPT_SECTION_semi-dynamic|>",
 		"<|PROMPT_SECTION_timeline|>",
-		"<|PROMPT_SECTION_dynamic|>",
+		"<|PROMPT_SECTION_dynamic_"+nonce+"|>",
 		"<|SCHEMA|>",
 		"<|USER_QUERY_"+nonce+"|>",
 		"<|FINAL_ANSWER_"+nonce+"|>",
@@ -411,7 +411,7 @@ func TestPromptManager_GenerateToolReSelectPrompt_UsesPromptSections(t *testing.
 		"<|PROMPT_SECTION_high-static|>",
 		"<|PROMPT_SECTION_semi-dynamic|>",
 		"<|PROMPT_SECTION_timeline|>",
-		"<|PROMPT_SECTION_dynamic|>",
+		"<|PROMPT_SECTION_dynamic_",
 		"# Tool Inventory",
 		"<|SCHEMA|>",
 		"你在此前选择了工具",
@@ -453,7 +453,7 @@ func TestPromptManager_GenerateReGenerateToolParamsPromptWithMeta_UsesPromptSect
 		"<|PROMPT_SECTION_high-static|>",
 		"<|PROMPT_SECTION_semi-dynamic|>",
 		"<|PROMPT_SECTION_timeline|>",
-		"<|PROMPT_SECTION_dynamic|>",
+		"<|PROMPT_SECTION_dynamic_",
 		"<|SCHEMA|>",
 		"<|OLD_PARAMS_"+result.Nonce+"|>",
 		"<|TOOL_DESC|>",
@@ -491,7 +491,7 @@ func TestPromptManager_GenerateChangeAIBlueprintPrompt_UsesPromptSections(t *tes
 		"<|PROMPT_SECTION_high-static|>",
 		"<|PROMPT_SECTION_semi-dynamic|>",
 		"<|PROMPT_SECTION_timeline|>",
-		"<|PROMPT_SECTION_dynamic|>",
+		"<|PROMPT_SECTION_dynamic_",
 		"# AI Blueprint Inventory",
 		"<|SCHEMA|>",
 		"Current AI Blueprint",
@@ -526,7 +526,7 @@ func TestPromptManager_GenerateAIBlueprintForgeParamsPrompt_UsesPromptSections(t
 		"<|PROMPT_SECTION_high-static|>",
 		"<|PROMPT_SECTION_semi-dynamic|>",
 		"<|PROMPT_SECTION_timeline|>",
-		"<|PROMPT_SECTION_dynamic|>",
+		"<|PROMPT_SECTION_dynamic_",
 		"<|SCHEMA|>",
 		"AI Blueprint Parameter Generation",
 		"Blueprint Description:",
@@ -1096,7 +1096,7 @@ func TestGenerateIntervalReviewPrompt_WithExtraPrompt(t *testing.T) {
 		t.Fatalf("Failed to generate interval review prompt: %v", err)
 	}
 
-	extraPromptBlock := mustExtractAITagBlock(t, prompt, "EXTRA_PROMPT")
+	extraPromptBlock := aicommon.MustExtractAITagBlock(t, prompt, "EXTRA_PROMPT")
 	if extraPromptBlock.Body != extraPrompt {
 		t.Fatalf("interval review prompt should wrap extra prompt in EXTRA_PROMPT AITAG. Got:\n%s", prompt)
 	}

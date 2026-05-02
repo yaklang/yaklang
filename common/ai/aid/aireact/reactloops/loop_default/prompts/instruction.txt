@@ -57,7 +57,7 @@
 1. **`{"@action": "finish"}`** —— **首选**（尤其是 Plan-Execution 子任务、扫描/检查类执行任务）。
    - 工具输出已经自动写入 timeline，系统会基于 timeline + evidence 自动生成结构化总结。
    - 你不需要、也不应该自己再写一份总结文本。
-2. **`{"@action": "directly_answer"}` + `<|FINAL_ANSWER_{{ .Nonce }}|> ... <|FINAL_ANSWER_END_{{ .Nonce }}|>` Markdown** —— 仅当用户**当下**就需要看到一段结构化 Markdown 结论（对话式问答、需要立刻把结论呈现给用户的场景）。**一次性输出完整内容，不允许在之前再追加任何 echo / cat / tee / printf 的准备动作**。
+2. **`{"@action": "directly_answer"}` + `<|FINAL_ANSWER_CURRENT_NONCE|> ... <|FINAL_ANSWER_END_CURRENT_NONCE|>` Markdown** —— 仅当用户**当下**就需要看到一段结构化 Markdown 结论（对话式问答、需要立刻把结论呈现给用户的场景）。**一次性输出完整内容，不允许在之前再追加任何 echo / cat / tee / printf 的准备动作**。
 
 **严禁的反模式（会被判定为浪费迭代）**：
 

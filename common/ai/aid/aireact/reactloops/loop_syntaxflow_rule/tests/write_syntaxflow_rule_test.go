@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"os"
-	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -19,7 +18,7 @@ import (
 )
 
 // mockedSyntaxFlowWriting mocks AI responses for Write SyntaxFlow ReAct loop.
-func mockedSyntaxFlowWriting(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+func mockedSyntaxFlowWriting(t *testing.T, i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
 
 	// Match analyze-requirement-and-search init step
@@ -44,12 +43,7 @@ func mockedSyntaxFlowWriting(i aicommon.AICallerConfigIf, req *aicommon.AIReques
 
 	// Match main loop prompt asking for write_rule with GEN_RULE tag
 	if utils.MatchAnyOfSubString(prompt, "write_rule", "GEN_RULE", "sf_rule") {
-		re := regexp.MustCompile(`<\|GEN_RULE_([^|]+)\|>`)
-		matches := re.FindStringSubmatch(prompt)
-		var nonceStr string
-		if len(matches) > 1 {
-			nonceStr = matches[1]
-		}
+		nonceStr := aicommon.MustExtractDynamicSectionNonce(t, prompt)
 		rsp := i.NewAIResponse()
 		// Valid SyntaxFlow rule: rule("test") with desc block
 		ruleContent := `rule("test-rule")
@@ -80,7 +74,7 @@ func TestFocusMode_WriteSyntaxFlowRule(t *testing.T) {
 
 	ins, err := aireact.NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			return mockedSyntaxFlowWriting(i, r)
+			return mockedSyntaxFlowWriting(t, i, r)
 		}),
 		aicommon.WithEventInputChan(in),
 		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
@@ -127,7 +121,7 @@ type mockStats_forWriteAndModify struct {
 	writeDone bool
 }
 
-func mockedSyntaxFlowWritingAndModify(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, stat *mockStats_forWriteAndModify) (*aicommon.AIResponse, error) {
+func mockedSyntaxFlowWritingAndModify(t *testing.T, i aicommon.AICallerConfigIf, req *aicommon.AIRequest, stat *mockStats_forWriteAndModify) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
 
 	// Match analyze-requirement-and-search init step
@@ -153,12 +147,7 @@ func mockedSyntaxFlowWritingAndModify(i aicommon.AICallerConfigIf, req *aicommon
 	// Match prompts that ask for rule generation (write or modify)
 	hasRulePrompt := utils.MatchAnyOfSubString(prompt, "write_rule", "modify_rule", "GEN_RULE", "sf_rule")
 	if hasRulePrompt {
-		re := regexp.MustCompile(`<\|GEN_RULE_([^|]+)\|>`)
-		matches := re.FindStringSubmatch(prompt)
-		var nonceStr string
-		if len(matches) > 1 {
-			nonceStr = matches[1]
-		}
+		nonceStr := aicommon.MustExtractDynamicSectionNonce(t, prompt)
 		rsp := i.NewAIResponse()
 		if !stat.writeDone {
 			// 第一次写：故意返回有语法错误的规则（缺少 desc 的闭合括号），
@@ -209,7 +198,7 @@ func TestFocusMode_WriteSyntaxFlowRuleAndThenModify(t *testing.T) {
 	stat := &mockStats_forWriteAndModify{writeDone: false}
 	ins, err := aireact.NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			return mockedSyntaxFlowWritingAndModify(i, r, stat)
+			return mockedSyntaxFlowWritingAndModify(t, i, r, stat)
 		}),
 		aicommon.WithEventInputChan(in),
 		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {

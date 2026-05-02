@@ -22,7 +22,7 @@
 {"@action": "write_code", "human_readable_thought": "创建一个简单的端口扫描脚本"}
 ```
 
-<|GEN_CODE_{{ .Nonce }}|>
+<|GEN_CODE_CURRENT_NONCE|>
 yakit.AutoInitYakit()
 
 target := cli.String("target", cli.setRequired(true))
@@ -35,14 +35,14 @@ die(err)
 for result in results {
     yakit.Info("Found: %v", result.String())
 }
-<|GEN_CODE_END_{{ .Nonce }}|>
+<|GEN_CODE_END_CURRENT_NONCE|>
 
 ### 正确示例 2: `modify_code` 动作（修改现有代码）
 ```json
 {"@action": "modify_code", "modify_start_line": 18, "modify_end_line": 25, "modify_code_reason": "修正ZIP文件打开方式 ..."}
 ```
 
-<|GEN_CODE_{{ .Nonce }}|>
+<|GEN_CODE_CURRENT_NONCE|>
 // 打开ZIP文件
 reader, err := zip.OpenReader(zipFilePath)
 if err != nil {
@@ -50,7 +50,7 @@ if err != nil {
     return
 }
 defer reader.Close()
-<|GEN_CODE_END_{{ .Nonce }}|>
+<|GEN_CODE_END_CURRENT_NONCE|>
 
 ### 示例 3: `grep_yaklang_samples` 动作（当 API 不存在时）- 推荐
 
@@ -148,10 +148,10 @@ defer reader.Close()
 {"@action": "modify_code", "modify_start_line": 18, "modify_end_line": 25}
 ```
 
-<|GEN_CODE_{{ .Nonce }}|>
+<|GEN_CODE_CURRENT_NONCE|>
 18 | // 打开ZIP文件
 19 | reader, err := zip.OpenReader(zipFilePath)
-<|GEN_CODE_END_{{ .Nonce }}|>
+<|GEN_CODE_END_CURRENT_NONCE|>
 
 **这种格式是错误的！包含行号会导致语法解析失败！**
 
@@ -175,7 +175,7 @@ defer reader.Close()
  "human_readable_thought": "根据 grep 结果，我知道了 servicescan.Scan 的正确用法：target, ports, 加上选项如 concurrent, probeTimeout, onOpen"}
 ```
 
-<|GEN_CODE_{{ .Nonce }}|>
+<|GEN_CODE_CURRENT_NONCE|>
 yakit.AutoInitYakit()
 
 target := cli.String("target", cli.setRequired(true))
@@ -196,7 +196,7 @@ die(err)
 for result in results {
     yakit.Info("扫描结果: %v", result.String())
 }
-<|GEN_CODE_END_{{ .Nonce }}|>
+<|GEN_CODE_END_CURRENT_NONCE|>
 
 **结果**: [成功] 代码一次成功，没有任何错误！
 
@@ -257,14 +257,14 @@ for result in results {
  "modify_code_reason": "根据 grep 结果，synscan 不支持 timeout，改用正确的实现"}
 ```
 
-<|GEN_CODE_{{ .Nonce }}|>
+<|GEN_CODE_CURRENT_NONCE|>
 // synscan 返回 channel，没有 timeout 选项
 synChan, err := synscan.Scan(target, ports)
 die(err)
 for result := range synChan {
     yakit.Info("发现: %v", result.String())
 }
-<|GEN_CODE_END_{{ .Nonce }}|>
+<|GEN_CODE_END_CURRENT_NONCE|>
 
 **结果**: [成功] 修改成功，一次通过！
 

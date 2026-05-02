@@ -1,6 +1,6 @@
 # AI Skill 安全审计任务（Phase 2 — 静态分析）
 
-<|AUDIT_INSTRUCTION_{{ .Nonce }}|>
+<|AUDIT_INSTRUCTION_CURRENT_NONCE|>
 
 ## 审计目标
 
@@ -139,7 +139,7 @@ mining.pool|supportxmr
 每个漏洞用以下 Markdown 结构单独描述，多个漏洞依次追加：
 
 ```
-<|FINDINGS_{{ .Nonce }}|>
+<|FINDINGS_CURRENT_NONCE|>
 [2-4 句概述扫描范围和结论]
 
 ### [漏洞标题：攻击类型 + 受影响组件]
@@ -163,7 +163,7 @@ mining.pool|supportxmr
 
 **修复建议**
 [具体可操作的修复步骤]
-<|FINDINGS_END_{{ .Nonce }}|>
+<|FINDINGS_END_CURRENT_NONCE|>
 ```
 
 ---
@@ -188,4 +188,4 @@ mining.pool|supportxmr
 - SKILL.md 明确声明且代码完全对应的行为不作为发现
 - complete_skill_audit 是本 loop 退出的**唯一合法方式**，调用前必须已完成全部六步
 
-<|AUDIT_INSTRUCTION_END_{{ .Nonce }}|>
+<|AUDIT_INSTRUCTION_END_CURRENT_NONCE|>

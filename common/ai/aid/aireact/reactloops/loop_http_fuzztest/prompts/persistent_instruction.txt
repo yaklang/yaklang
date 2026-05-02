@@ -68,9 +68,9 @@
 
 当使用 generate_and_send_packet 时，必须输出完整原始 HTTP 数据包，并使用以下格式：
 
-<|GEN_PACKET_{{ .Nonce }}|>
+<|GEN_PACKET_CURRENT_NONCE|>
 完整原始 HTTP 请求
-<|GEN_PACKET_END_{{ .Nonce }}|>
+<|GEN_PACKET_END_CURRENT_NONCE|>
 
 要求：
 1. 必须是完整、合法的 HTTP 请求格式。
@@ -82,9 +82,9 @@
 
 当需要修改当前数据包时，优先使用 modify_http_request，并通过以下格式输出修改后的完整原始 HTTP 数据包：
 
-<|GEN_MODIFIED_PACKET_{{ .Nonce }}|>
+<|GEN_MODIFIED_PACKET_CURRENT_NONCE|>
 修改后的完整原始 HTTP 请求
-<|GEN_MODIFIED_PACKET_END_{{ .Nonce }}|>
+<|GEN_MODIFIED_PACKET_END_CURRENT_NONCE|>
 
 要求：
 1. 必须保留当前请求上下文，不能凭空丢失 Host、路径、协议和关键鉴权头，除非 reason 明确说明为什么要删改。

@@ -28,7 +28,7 @@ func extractCurrentTaskContentFromPrompt(t *testing.T, prompt string) string {
 			return strings.TrimSpace(rest[:end])
 		}
 	}
-	block := mustExtractAITagBlock(t, prompt, "CURRENT_TASK")
+	block := aicommon.MustExtractAITagBlock(t, prompt, "CURRENT_TASK")
 	return strings.TrimSpace(block.Body)
 }
 

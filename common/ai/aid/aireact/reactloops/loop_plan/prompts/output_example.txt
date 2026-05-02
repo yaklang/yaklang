@@ -155,7 +155,7 @@
 ```
 
 ```markdown
-<|FACTS_{{ .Nonce }}|>
+<|FACTS_CURRENT_NONCE|>
 ## 目标信息
 
 - IP: 10.0.0.50
@@ -168,7 +168,7 @@
 - 443/TCP: Apache httpd 2.4.29 (TLS 1.2, 证书 CN=shop.example.com)
 - 3306/TCP: MySQL 5.7.38 (本地绑定, 仅允许 127.0.0.1)
 - 8080/TCP: Apache Tomcat 9.0.65
-<|FACTS_END_{{ .Nonce }}|>
+<|FACTS_END_CURRENT_NONCE|>
 ```
 
 **示例二：文件搜索后记录事实**
@@ -180,7 +180,7 @@
 ```
 
 ```markdown
-<|FACTS_{{ .Nonce }}|>
+<|FACTS_CURRENT_NONCE|>
 ## 项目根目录
 
 - 路径: /Users/dev/myproject
@@ -197,7 +197,7 @@
 - gin v1.9.1: HTTP 框架
 - gorm v1.25.4: ORM
 - redis v9.0.5: 缓存客户端
-<|FACTS_END_{{ .Nonce }}|>
+<|FACTS_END_CURRENT_NONCE|>
 ```
 
 **示例三：Web 爬取后记录事实（重点演示"中文标题 + 公共前缀抽取 + 不重复动词前缀"）**
@@ -212,7 +212,7 @@
 ```
 
 ```markdown
-<|FACTS_{{ .Nonce }}|>
+<|FACTS_CURRENT_NONCE|>
 ## 已发现 URL (base: http://127.0.0.1:8787)
 
 - /_/
@@ -258,7 +258,7 @@
 
 - HTML 标题: Vulinbox - Agent
 - 服务协议: HTTP/1.1
-<|FACTS_END_{{ .Nonce }}|>
+<|FACTS_END_CURRENT_NONCE|>
 ```
 
 **注意对比**（错误写法 — 禁止）：

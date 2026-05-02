@@ -237,7 +237,7 @@ func TestReAct_ToolUse_IntervalReviewExtraPrompt(t *testing.T) {
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := r.GetPrompt()
 			if utils.MatchAllOfSubString(prompt, "Interval Review") {
-				nonce := extractPromptNonce(prompt, "EXTRA_PROMPT")
+				nonce := aicommon.ExtractPromptNonce(prompt, "EXTRA_PROMPT")
 				if nonce != "" {
 					startMarker := "<|EXTRA_PROMPT_" + nonce + "|>"
 					endMarker := "<|EXTRA_PROMPT_END_" + nonce + "|>"

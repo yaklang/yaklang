@@ -1,7 +1,7 @@
 ### 报告生成核心原则 - 必须遵守
 
 **ABSOLUTELY CRITICAL - 生成报告时的必须事项：**
-1. [必须] 当使用 'write_section' 时，你必须ALWAYS在响应中包含 <|GEN_REPORT_{{ .Nonce }}|> 标签块
+1. [必须] 当使用 'write_section' 时，你必须ALWAYS在响应中包含 <|GEN_REPORT_CURRENT_NONCE|> 标签块
 2. [必须] 不能只输出 JSON！必须输出：JSON行 + 标签块
 3. [禁止] 禁止只输出 JSON 而不输出标签块
 4. [禁止] 禁止使用 markdown 代码块（```markdown）代替 AITAG
@@ -11,9 +11,9 @@
 ```
 {"@action": "write_section", "human_readable_thought": "..."}
 
-<|GEN_REPORT_{{ .Nonce }}|>
+<|GEN_REPORT_CURRENT_NONCE|>
 你的报告内容（Markdown格式）
-<|GEN_REPORT_END_{{ .Nonce }}|>
+<|GEN_REPORT_END_CURRENT_NONCE|>
 ```
 
 **错误示例（绝对禁止）：**
@@ -35,11 +35,11 @@
 ```
 {"@action": "write_section", "human_readable_thought": "创建报告"}
 
-<|GEN_REPORT_{{ .Nonce }}|>
+<|GEN_REPORT_CURRENT_NONCE|>
 # 报告标题
 
 报告内容...
-<|GEN_REPORT_END_{{ .Nonce }}|>
+<|GEN_REPORT_END_CURRENT_NONCE|>
 ```
 
 ---

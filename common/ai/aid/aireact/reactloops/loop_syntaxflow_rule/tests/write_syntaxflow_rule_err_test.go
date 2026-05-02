@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"os"
-	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -18,7 +17,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func mockedSyntaxFlowWritingCauseError(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, stat *mockStats_forWriteAndModify) (*aicommon.AIResponse, error) {
+func mockedSyntaxFlowWritingCauseError(t *testing.T, i aicommon.AICallerConfigIf, req *aicommon.AIRequest, stat *mockStats_forWriteAndModify) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
 
 	// Match analyze-requirement-and-search init step
@@ -43,12 +42,7 @@ func mockedSyntaxFlowWritingCauseError(i aicommon.AICallerConfigIf, req *aicommo
 
 	hasRulePrompt := utils.MatchAnyOfSubString(prompt, "write_rule", "modify_rule", "GEN_RULE", "sf_rule")
 	if hasRulePrompt {
-		re := regexp.MustCompile(`<\|GEN_RULE_([^|]+)\|>`)
-		matches := re.FindStringSubmatch(prompt)
-		nonceStr := ""
-		if len(matches) > 1 {
-			nonceStr = matches[1]
-		}
+		nonceStr := aicommon.MustExtractDynamicSectionNonce(t, prompt)
 		rsp := i.NewAIResponse()
 		if !stat.writeDone {
 			invalidRule := "rule(\"test\")\ndesc(\n\ttitle: \"Test\"\n\ttype: audit\n"
@@ -82,7 +76,7 @@ func TestFocusMode_WriteSyntaxFlowRuleCauseErrorAndThenModify(t *testing.T) {
 			if strings.Contains(r.GetPrompt(), "编译错误") {
 				haveError = true
 			}
-			return mockedSyntaxFlowWritingCauseError(i, r, stat)
+			return mockedSyntaxFlowWritingCauseError(t, i, r, stat)
 		}),
 		aicommon.WithEventInputChan(in),
 		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {

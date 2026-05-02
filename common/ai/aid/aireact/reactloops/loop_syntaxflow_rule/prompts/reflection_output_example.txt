@@ -11,7 +11,7 @@
 {"@action": "write_rule", "human_readable_thought": "创建漏洞检测规则"}
 ```
 
-<|GEN_RULE_{{ .Nonce }}|>
+<|GEN_RULE_CURRENT_NONCE|>
 desc(
 	title: "Test"
 	type: audit
@@ -19,7 +19,7 @@ desc(
 )
 .methodName(* #-> as $source);
 alert $source for { message: "检测到风险", level: high };
-<|GEN_RULE_END_{{ .Nonce }}|>
+<|GEN_RULE_END_CURRENT_NONCE|>
 
 ### 完成时: directly_answer 展示结果（验证通过后立即执行，禁止再做其他操作）
 

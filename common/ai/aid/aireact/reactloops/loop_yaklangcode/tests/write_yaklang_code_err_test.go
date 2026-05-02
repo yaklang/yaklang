@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"os"
-	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -18,7 +17,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func mockedYaklangWritingAndModifyCauseError(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, code string, stat *mockStats_forWriteAndModify) (*aicommon.AIResponse, error) {
+func mockedYaklangWritingAndModifyCauseError(t *testing.T, i aicommon.AICallerConfigIf, req *aicommon.AIRequest, code string, stat *mockStats_forWriteAndModify) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
 
 	if utils.MatchAllOfSubString(prompt, "analyze-requirement-and-search", "create_new_file") {
@@ -65,12 +64,7 @@ func mockedYaklangWritingAndModifyCauseError(i aicommon.AICallerConfigIf, req *a
 	}
 
 	if utils.MatchAllOfSubString(prompt, `"grep_yaklang_samples"`, `"require_tool"`, `"write_code"`, `"@action"`) {
-		re := regexp.MustCompile(`<\|GEN_CODE_([^|]+)\|>`)
-		matches := re.FindStringSubmatch(prompt)
-		var nonceStr string
-		if len(matches) > 1 {
-			nonceStr = matches[1]
-		}
+		nonceStr := aicommon.MustExtractDynamicSectionNonce(t, prompt)
 		rsp := i.NewAIResponse()
 		if !stat.writeDone {
 			rsp.EmitOutputStream(bytes.NewBufferString(utils.MustRenderTemplate(`{"@action": "write_code"}
@@ -128,7 +122,7 @@ func TestFocusMode_WriteYaklangCodeCauseErrorAndThenModify(t *testing.T) {
 					haveError = true
 				}
 			}
-			return mockedYaklangWritingAndModifyCauseError(i, r, "demo", stat)
+			return mockedYaklangWritingAndModifyCauseError(t, i, r, "demo", stat)
 		}),
 		aicommon.WithEventInputChan(in),
 		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {

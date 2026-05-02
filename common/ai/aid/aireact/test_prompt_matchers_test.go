@@ -37,7 +37,7 @@ func isPrimaryDecisionPrompt(prompt string) bool {
 	}
 
 	if strings.Contains(prompt, "<|PROMPT_SECTION_high-static|>") &&
-		strings.Contains(prompt, "<|PROMPT_SECTION_dynamic|>") &&
+		strings.Contains(prompt, "<|PROMPT_SECTION_dynamic_") &&
 		strings.Contains(prompt, "<|TRAITS|>") &&
 		strings.Contains(prompt, `"require_tool"`) &&
 		strings.Contains(prompt, `"tool_require_payload"`) {

@@ -59,7 +59,7 @@ func TestReAct_AnswerWithKnowledge_FullFlow_AITAG_ANSWER(t *testing.T) {
 			if !utils.MatchAllOfSubString(prompt, token) {
 				return nil, utils.Errorf("knowledge token should not appear in the final answer prompt")
 			}
-			aitagNonce := mustExtractPromptNonce(t, prompt, "FINAL_ANSWER")
+			aitagNonce := aicommon.MustExtractPromptNonce(t, prompt, "FINAL_ANSWER")
 
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`

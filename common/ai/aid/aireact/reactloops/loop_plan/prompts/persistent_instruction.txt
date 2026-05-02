@@ -133,11 +133,11 @@
 ```
 
 ```markdown
-<|FACTS_{{ .Nonce }}|>
+<|FACTS_CURRENT_NONCE|>
 ## 本轮新增事实
 
 - ...
-<|FACTS_END_{{ .Nonce }}|>
+<|FACTS_END_CURRENT_NONCE|>
 ```
 
 **示例**（scan_port 后调用 — 注意：section 标题承担分类语义，bullet 不重复"端口:"、"服务:"等前缀）：
@@ -146,7 +146,7 @@
 ```
 
 ```markdown
-<|FACTS_{{ .Nonce }}|>
+<|FACTS_CURRENT_NONCE|>
 ## 目标主机
 
 - IP: 192.168.1.100
@@ -159,7 +159,7 @@
 - 443/TCP: nginx/1.18.0 (HTTPS, 证书域名: example.com)
 - 3306/TCP: MySQL 8.0.32
 - 6379/TCP: Redis 7.0.5 (无认证)
-<|FACTS_END_{{ .Nonce }}|>
+<|FACTS_END_CURRENT_NONCE|>
 ```
 
 **示例**（find_files + read_file 后调用）：
@@ -168,7 +168,7 @@
 ```
 
 ```markdown
-<|FACTS_{{ .Nonce }}|>
+<|FACTS_CURRENT_NONCE|>
 ## 项目结构
 
 - 根目录: /app
@@ -182,7 +182,7 @@
 - 框架: Express 4.18.2
 - ORM: Prisma 5.1.0, 数据库适配: PostgreSQL
 - 测试框架: Jest 29.5.0
-<|FACTS_END_{{ .Nonce }}|>
+<|FACTS_END_CURRENT_NONCE|>
 ```
 
 **示例**（simple_crawler 后调用 — 中文标题，公共前缀抽到 section，bullet 只写相对路径，N 条一条不漏）：
@@ -191,7 +191,7 @@
 ```
 
 ```markdown
-<|FACTS_{{ .Nonce }}|>
+<|FACTS_CURRENT_NONCE|>
 ## 已发现 URL (base: http://127.0.0.1:8787)
 
 - /_/
@@ -222,7 +222,7 @@
 - /static/js/bootstrap_5.3/popper.min.js
 - /static/js/bootstrap_5.3/bootstrap.min.js
 - /static/favicon.ico
-<|FACTS_END_{{ .Nonce }}|>
+<|FACTS_END_CURRENT_NONCE|>
 ```
 
 累积的事实会通过 `FACTS` 区块在后续每个子任务执行时自动可见，并且在计划的渲染展示中也会被前置追加，是整个计划的事实基础。
@@ -273,13 +273,13 @@
 *. 如果到最后一轮迭代仍未调用 `finish_exploration`，系统会自动结束并基于已有信息生成计划
 
 # 用户诉求
-<|USER_REQUIRE_{{ .Nonce }}|>
+<|USER_REQUIRE_CURRENT_NONCE|>
 {{ .UserInput }}
-<|USER_REQUIRE_END_{{ .Nonce }}|>
+<|USER_REQUIRE_END_CURRENT_NONCE|>
 {{ if .PlanPrompt }}
 # 规划补充说明
-<|PLAN_CONTEXT_{{ .Nonce }}|>
+<|PLAN_CONTEXT_CURRENT_NONCE|>
 {{ .PlanPrompt }}
-<|PLAN_CONTEXT_END_{{ .Nonce }}|>
+<|PLAN_CONTEXT_END_CURRENT_NONCE|>
 {{ end }}
 仔细分析用户需求，综合运用 SMART 原则、六顶帽子思考法和 SWOT 分析框架，充分利用信息收集工具获取事实数据。你的目标是通过探索收集尽可能多的精确事实，为后续自动生成的指导性文档和执行计划提供坚实的数据基础。

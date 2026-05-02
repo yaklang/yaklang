@@ -74,7 +74,7 @@
 - 调用 `write_rule` 或 `modify_rule` 后，语法验证会**自动执行**；若有错误会通过 Feedback 返回，需迭代修复。
 - **【关键】每次 write_rule 或 modify_rule 后必须主动调用 `check-syntaxflow-syntax` 验证**：无论语法是否通过，修改规则后都应立即调用该工具确认结果。有错误时获取完整错误信息（含行号）再决定如何 modify_rule；无错误时完成正例自检（若有样例）。**禁止在未调用验证工具的情况下进行下一次 modify_rule 或 directly_answer**。
 - **当用户提供了漏洞样例（代码块）时**：用户样例为正例（file://、UNSAFE）。生成规则后必须调用 `check-syntaxflow-syntax` 并传入 path、sample_code、filename、language 进行正例自检。若 matched=false，工具会返回 result_vars_diagnostic，据此 modify_rule 修复；修改后先等语法自动验证通过，再重新调用 check-syntaxflow-syntax 直至 matched=true。**若用户未提供漏洞样例，则只需调用 check-syntaxflow-syntax 做语法检查，不必传 sample 参数。**
-- 当使用 `write_rule` 或 `modify_rule` 时，必须在响应中包含 <|GEN_RULE_{{ .Nonce }}|> 代码块包裹规则内容。
+- 当使用 `write_rule` 或 `modify_rule` 时，必须在响应中包含 <|GEN_RULE_CURRENT_NONCE|> 代码块包裹规则内容。
 - **生成完毕并验证通过后，必须使用 `directly_answer` 主动将结果展示给用户**：直接说明规则文件路径即可；或引用 CURRENT_SF_RULE 中的内容。
 - **directly_answer 时**：**禁止输出任何规则代码**。系统将自动从规则文件路径读取并展示。你只需输出 1-3 句话的简要总结（检测目标、数据流要点）。验证通过后仅 directly_answer 并结束。
 
@@ -99,7 +99,7 @@
 - **禁止**在验证通过后执行以下任何操作：load_capability、load_skill、调用其他工具、继续探索。验证通过后唯一动作就是 directly_answer。任务完成后禁止再次 load_capability write_syntaxflow_rule。
 - 若 directly_answer 被系统拒绝（如有样例未 verify、或规则含非法语法），请按提示修复后重试。
 
-<|GEN_RULE_{{ .Nonce }}|>
+<|GEN_RULE_CURRENT_NONCE|>
 desc(
 	title: "规则标题"
 	type: audit
@@ -107,4 +107,4 @@ desc(
 )
 .methodName(* #-> as $source);
 alert $source for { message: "检测到风险", level: high };
-<|GEN_RULE_END_{{ .Nonce }}|>
+<|GEN_RULE_END_CURRENT_NONCE|>

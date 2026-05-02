@@ -32,7 +32,7 @@ func TestReAct_DirectlyAnswer_RetryIncludesLastErrorAndAITAGHint(t *testing.T) {
 			case 1, 2:
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action":"directly_answer"}`))
 			case 3:
-				nonce := mustExtractPromptNonce(t, req.GetPrompt(), "FINAL_ANSWER")
+				nonce := aicommon.MustExtractPromptNonce(t, req.GetPrompt(), "FINAL_ANSWER")
 				rsp.EmitOutputStream(bytes.NewBufferString(
 					`{"@action":"directly_answer"}` + "\n" +
 						"<|FINAL_ANSWER_" + nonce + "|>third time lucky<|FINAL_ANSWER_END_" + nonce + "|>",

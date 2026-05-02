@@ -22,7 +22,7 @@
 ---
 
 **ABSOLUTELY CRITICAL - 生成代码时的必须事项：**
-1. [必须] 当使用 'write_code' 或 'modify_code' 时，你必须ALWAYS在响应中包含 <|GEN_CODE_{{ .Nonce }}|> 代码块
+1. [必须] 当使用 'write_code' 或 'modify_code' 时，你必须ALWAYS在响应中包含 <|GEN_CODE_CURRENT_NONCE|> 代码块
 2. [必须] 不能只输出 JSON！必须输出：JSON行 + 代码块
 3. [禁止] 禁止在生成的代码中包含任何行号前缀（如 `18 |`, `19 |`, `20 |` 等）
 4. [禁止] 禁止在生成的代码中包含任何 `|` 分隔符
@@ -34,9 +34,9 @@
 ```
 {"@action": "write_code", ...}
 
-<|GEN_CODE_{{ .Nonce }}|>
+<|GEN_CODE_CURRENT_NONCE|>
 你的Yaklang代码
-<|GEN_CODE_END_{{ .Nonce }}|>
+<|GEN_CODE_END_CURRENT_NONCE|>
 ```
 
 **错误示例（绝对禁止）：**

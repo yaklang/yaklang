@@ -32,7 +32,7 @@ func mockedSelfReflectionToolCalling(i aicommon.AICallerConfigIf, req *aicommon.
 	prompt := req.GetPrompt()
 
 	// Extract nonce from prompt (if available)
-	nonce := extractPromptNonce(
+	nonce := aicommon.ExtractPromptNonce(
 		prompt,
 		"background",
 		"schema",

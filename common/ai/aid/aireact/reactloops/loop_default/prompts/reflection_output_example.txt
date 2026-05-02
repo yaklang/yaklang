@@ -6,9 +6,9 @@
 * 在 directly_answer 的 Action 中，如果 answer_payload 的内容较大，设计到代码等多样化内容，请使用 AI Tag 回答
 
 {"@action": "directly_answer"}
-<|FINAL_ANSWER_{{ .Nonce }}|>
+<|FINAL_ANSWER_CURRENT_NONCE|>
 # markdown in mass
-<|FINAL_ANSWER_END_{{ .Nonce }}|>
+<|FINAL_ANSWER_END_CURRENT_NONCE|>
 
 *. 如果你想要使用工具：
     * `{"@action": "require_tool", "tool_require_payload": "..[your-toolname]..", "human_readable_thought": "先读取配置"}`

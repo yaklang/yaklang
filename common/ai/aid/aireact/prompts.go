@@ -338,7 +338,7 @@ func (pm *PromptManager) assemblePromptWithDynamicSection(
 	if err != nil {
 		return "", err
 	}
-	return buildTaggedPromptSections(prefix.HighStatic, prefix.SemiDynamic, prefix.Timeline, dynamicSection), nil
+	return buildTaggedPromptSections(prefix.HighStatic, prefix.SemiDynamic, prefix.Timeline, dynamicSection, materials.Nonce), nil
 }
 
 // ToolParamsPromptResult contains the generated prompt and metadata for AITAG parsing

@@ -75,7 +75,7 @@ func mockedDirectlyCallToolWithAITag(i aicommon.AICallerConfigIf, req *aicommon.
 	prompt := req.GetPrompt()
 
 	if isPrimaryDecisionPrompt(prompt) {
-		nonce := extractPromptNonce(prompt, "CACHE_TOOL_CALL")
+		nonce := aicommon.ExtractPromptNonce(prompt, "CACHE_TOOL_CALL")
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "directly_call_tool", "directly_call_tool_name": "` + toolName + `", "directly_call_identifier": "run_script", "directly_call_expectations": "~0.1s, instant", "directly_call_tool_params": {"timeout": 20} },

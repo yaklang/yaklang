@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"os"
-	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -18,7 +17,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func mockedYaklangWriting(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, code string) (*aicommon.AIResponse, error) {
+func mockedYaklangWriting(t *testing.T, i aicommon.AICallerConfigIf, req *aicommon.AIRequest, code string) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
 
 	if utils.MatchAllOfSubString(prompt, "analyze-requirement-and-search", "create_new_file") {
@@ -53,12 +52,7 @@ func mockedYaklangWriting(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, 
 	}
 
 	if utils.MatchAllOfSubString(prompt, `"grep_yaklang_samples"`, `"require_tool"`, `"write_code"`, `"@action"`) {
-		re := regexp.MustCompile(`<\|GEN_CODE_([^|]+)\|>`)
-		matches := re.FindStringSubmatch(prompt)
-		var nonceStr string
-		if len(matches) > 1 {
-			nonceStr = matches[1]
-		}
+		nonceStr := aicommon.MustExtractDynamicSectionNonce(t, prompt)
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(utils.MustRenderTemplate(`{"@action": "write_code"}
 
@@ -90,7 +84,7 @@ func TestFocusMode_WriteYaklangCode(t *testing.T) {
 
 	ins, err := aireact.NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			return mockedYaklangWriting(i, r, "sleep")
+			return mockedYaklangWriting(t, i, r, "sleep")
 		}),
 		aicommon.WithEventInputChan(in),
 		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
@@ -139,7 +133,7 @@ type mockStats_forWriteAndModify struct {
 	verifyCalled bool
 }
 
-func mockedYaklangWritingAndModify(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, code string, stat *mockStats_forWriteAndModify) (*aicommon.AIResponse, error) {
+func mockedYaklangWritingAndModify(t *testing.T, i aicommon.AICallerConfigIf, req *aicommon.AIRequest, code string, stat *mockStats_forWriteAndModify) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
 
 	if utils.MatchAllOfSubString(prompt, "analyze-requirement-and-search", "create_new_file") {
@@ -186,12 +180,7 @@ func mockedYaklangWritingAndModify(i aicommon.AICallerConfigIf, req *aicommon.AI
 	}
 
 	if utils.MatchAllOfSubString(prompt, `"grep_yaklang_samples"`, `"require_tool"`, `"write_code"`, `"@action"`) {
-		re := regexp.MustCompile(`<\|GEN_CODE_([^|]+)\|>`)
-		matches := re.FindStringSubmatch(prompt)
-		var nonceStr string
-		if len(matches) > 1 {
-			nonceStr = matches[1]
-		}
+		nonceStr := aicommon.MustExtractDynamicSectionNonce(t, prompt)
 		rsp := i.NewAIResponse()
 		if !stat.writeDone {
 			rsp.EmitOutputStream(bytes.NewBufferString(utils.MustRenderTemplate(`{"@action": "write_code"}
@@ -240,7 +229,7 @@ func TestFocusMode_WriteYaklangCodeAndThenModify(t *testing.T) {
 	}
 	ins, err := aireact.NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			return mockedYaklangWritingAndModify(i, r, "demo", stat)
+			return mockedYaklangWritingAndModify(t, i, r, "demo", stat)
 		}),
 		aicommon.WithEventInputChan(in),
 		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {

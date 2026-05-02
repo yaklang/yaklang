@@ -21,7 +21,7 @@ Use `write_script` to create the initial Python script (only once):
 {"@action": "write_script", "human_readable_thought": "Creating Python script"}
 ```
 
-<|GEN_PYTHON_SCRIPT_{{ .Nonce }}|>
+<|GEN_PYTHON_SCRIPT_CURRENT_NONCE|>
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import argparse
@@ -33,7 +33,7 @@ def main():
 
 if __name__ == "__main__":
     main()
-<|GEN_PYTHON_SCRIPT_END_{{ .Nonce }}|>
+<|GEN_PYTHON_SCRIPT_END_CURRENT_NONCE|>
 
 ### Step 2: Fix Syntax Errors (automatic)
 
