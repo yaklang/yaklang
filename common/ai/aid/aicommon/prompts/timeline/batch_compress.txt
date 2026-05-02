@@ -1,35 +1,59 @@
 # 角色与核心目标
 
 你是一个专门的 **AI 记忆优化模块**。当前的核心任务是 **Timeline 批量精炼与浓缩**。
-背景：随着任务的进展，整体 Timeline 可能会变得过长。为了保持效率并减少上下文负担，你需要对指定的多个 Timeline 项目进行批量再总结，目标是显著减少其长度，同时**绝对保留所有关键数据、决策和核心成果**。
 
-你 **必须** 基于提供的 `<CONTEXT>`、`<ITEMS_TO_COMPRESS>` 来操作。
+输入分两段：
+- `<|RECENT_KEEP_*|>`：当前 agent 正在进行的最近活跃步骤，**仅供你判断"什么是有价值"的参考**，绝对不要修改它，也绝对不要把它的内容复制到输出中。
+- `<|ITEMS_TO_COMPRESS_*|>`：需要你浓缩的过去步骤。你的输出 **只针对这一段**。
+
+判断价值的根本原则：**基于 RECENT_KEEP 中 agent 正在做什么，反推 ITEMS_TO_COMPRESS 里哪些细节仍对"现在"有意义，必须保留；与"现在"无关的过程性记录可以聚合或丢弃。**
+
 <|CONTEXT_{{ .NONCE }}|>
 {{ if .ExtraMetaInfo }}
 {{ .ExtraMetaInfo }}
 {{ end }}
 <|CONTEXT_END_{{ .NONCE }}|>
 
+{{ if .HasRecentKept }}
+# 当前正在进行的最近活跃步骤（仅供参考，不要修改、不要复制到输出）
+<|RECENT_KEEP_{{ .NONCE }}|>
+{{ .RecentKept }}
+<|RECENT_KEEP_END_{{ .NONCE }}|>
+{{ end }}
+
+# 需要你压缩的过去步骤
 <|ITEMS_TO_COMPRESS_{{ .NONCE }}|>
 {{ .ItemsToCompress }}
 <|ITEMS_TO_COMPRESS_END_{{ .NONCE }}|>
 
-请仔细分析 `<|ITEMS_TO_COMPRESS...|>` 中指定的 {{ .ItemCount }} 个 Timeline 项目。基于 `<CONTEXT>` 的理解，执行以下操作：
+请基于 `<CONTEXT>` 与 `<RECENT_KEEP>` 的理解，对 `<ITEMS_TO_COMPRESS>` 中的 {{ .ItemCount }} 个过去步骤进行浓缩：
 
-1.  **识别核心价值**：从所有项目中提取出绝对关键的信息，例如：
-    *   重要的决策及其理由。
-    *   关键的量化数据、参数或配置。
-    *   已达成的里程碑或子任务的最终结果。
-    *   对后续步骤有直接影响的发现或约束。
-2.  **剔除冗余与过程性信息**：移除以下内容：
-    *   不影响核心结论的纯粹对话性、过程性或探索性描述。
-    *   已被后续信息更新或替代的旧数据。
-    *   不必要的细节、重复说明或过长的解释。
-    *   已完成且结果已明确的工具调用的中间步骤（除非这些步骤本身包含关键参数）。
+## A. 必须保留（与 RECENT_KEEP 强相关或具有持续价值）
 
-# **输出格式：JSON**
+- 直接被 RECENT_KEEP 引用、依赖或可能再次复用的工具产物：文件路径、产物名、配置、变量、凭据、token、cookie。
+- 关键发现与确认事实：发现的端点 / 漏洞 / 服务版本 / 拓扑结论 / 鉴权方式 / 速率限制 / 黑白名单等。
+- 对 RECENT_KEEP 当前决策仍有约束力的边界条件：禁用规则、权限范围、规模上限、超时阈值。
+- 已被采纳并持续生效的关键参数与策略（"并发=20"、"模式=smart"、"代理=127.0.0.1:8080"）。
+- 失败 → 成功的转折性结论：保留"用 X 方式绕过成功"，并记录决定性原因。
 
-你 **必须** 将你的处理结果输出一个严格遵守以下 Schema 的 JSON 对象。
+## B. 强烈建议丢弃或聚合（与 RECENT_KEEP 主题无关或已被覆盖）
+
+- 已被新结果覆盖、推翻或替代的旧探索数据。
+- 已完成且不再被 RECENT_KEEP 引用的中间过程性步骤。
+- 反复尝试-失败的过程性记录：聚合为统计数字（如"超时 12 次 / 拒绝 3 次"），不要逐条列举。
+- 与 RECENT_KEEP 主题完全无关的早期探索：可总结成一句"前期完成 X 调查，结果已归档，本阶段不再依赖"。
+
+## C. 输出风格
+
+- 信息密度优先：不强制 100 字符上限，但避免冗长解释；保持每一句都有信息含量。
+- 关键事件标时间锚点（如 14:23、第 3 步），但不要每行都加。
+- 同类错误聚合（"扫描超时 12 次，最终成功"），不要逐次列举。
+- 严禁 emoji，严禁主观情绪词。
+- 严禁在输出中出现 RECENT_KEEP 的内容片段（防止信息污染与重复）。
+
+# 输出格式：JSON
+
+你 **必须** 将处理结果输出为一个严格遵守以下 Schema 的 JSON 对象。
 
 ```schema
 {
@@ -44,53 +68,48 @@
     "reducer_memory": {
       "type": "string",
       "note": "如果 memory 内有很多需要转义的内容，请你使用 <|REDUCER_MEMORY_{{ .NONCE }}|> 来输出文本块，可以避免转义问题。",
-      "description": "短回答，对<ITEMS_TO_COMPRESS>中指定的所有项目进行压缩后的文本。此文本应显著缩短原始长度，只保留最核心的关键数据、决策、成果和逻辑，去除所有不必要的上下文和冗余信息，以减少后续处理的 Token 消耗。"
+      "description": "对 ITEMS_TO_COMPRESS 中所有过去步骤的浓缩文本，输出风格遵循 C 节，价值判断依据 A/B 节与 RECENT_KEEP。绝不能包含 RECENT_KEEP 内容。"
     }
   }
 }
 ```
 
-# **风格限制**
+# Good Cases
 
-- **极简原则**：压缩后的内容严格不超过 100 字符，即使有大量错误也要高度浓缩
-- **时间锚点**：重要事件必须标注时间点（如：14:23、第3步）
-- **零试错**：移除所有无意义的尝试、试错、探索过程
-- **结果导向**：只保留最终决策、关键数据、核心成果
-- **无冗余**：不要重复说明，不要过度解释
-- **错误聚合**：多个错误用统计数字表示（如：失败3次），不要逐一列举
+## Good Case 1: 与 RECENT_KEEP 强相关，保留细节
 
-输出案例：
-
-## Good Case 1: 单一关键事件
+(RECENT_KEEP: agent 正在对 /api/user 注入 SQLi 测试)
+(ITEMS_TO_COMPRESS: 历史扫描结果 + 50 次 payload 试错)
 
 {"@action": "timeline-reducer"}
 <|REDUCER_MEMORY_{{ .NONCE }}|>
-14:23 配置代理为 http://127.0.0.1:8080，超时30s，启用TLS验证
+扫描发现 /api/user, /api/admin, /api/order；/api/user 已确认 SQL 注入（payload `' OR 1=1--`，列数=4），/api/admin 待测，/api/order 无注入点。前期 50 次 payload 试错主要由 WAF 关键字过滤导致，编码绕过有效。
 <|REDUCER_MEMORY_END_{{ .NONCE }}|>
 
-## Good Case 2: 多个关键决策
+## Good Case 2: 与 RECENT_KEEP 主题无关，聚合丢弃细节
+
+(RECENT_KEEP: agent 正在编写 SyntaxFlow rule)
+(ITEMS_TO_COMPRESS: 30 条 nuclei 扫描历史 + 端口扫描 + 子域枚举)
 
 {"@action": "timeline-reducer"}
 <|REDUCER_MEMORY_{{ .NONCE }}|>
-步骤1: 设置并发数=50，步骤2: 过滤规则status=200且size>1KB，步骤3: 发现3个有效端点
+前期资产侦察完成（nuclei 扫描 30 项、端口扫描、子域枚举），结果已归档至 artifacts/recon/，本阶段（SyntaxFlow rule 编写）不直接依赖，需要时再回查。
 <|REDUCER_MEMORY_END_{{ .NONCE }}|>
 
-## Good Case 3: 简短JSON格式
+## Good Case 3: 关键参数与配置必须保留（即使是过去发生的）
 
-{"@action": "timeline-reducer", "reducer_memory": "15:40 漏洞确认：SQL注入于/api/user，payload: ' OR 1=1--"}
+(RECENT_KEEP: agent 正在对同一目标的下一阶段 fuzz)
+(ITEMS_TO_COMPRESS: 早期建立的代理、token、并发配置)
 
-## Good Case 4: 关键参数记录
+{"@action": "timeline-reducer", "reducer_memory": "代理=127.0.0.1:8080；Authorization Bearer=eyJhbGc... (有效，仍在用)；并发=20；速率限制=每秒5请求；目标根域=example.com。"}
 
-{"@action": "timeline-reducer", "reducer_memory": "fuzzer配置: mode=smart, dict=common.txt, threads=20, 成功率18%"}
+## Good Case 4: 错误聚合 + 决定性结论
 
-## Good Case 5: 里程碑事件
+(RECENT_KEEP: agent 正在使用编码绕过策略)
+(ITEMS_TO_COMPRESS: 大量 401/403 重试日志)
 
-{"@action": "timeline-reducer", "reducer_memory": "16:15 完成目标扫描，发现5个C段存活主机，已导出结果至/tmp/scan.txt"}
+{"@action": "timeline-reducer", "reducer_memory": "10:30-11:45 直接请求被拦截 401 共 12 次、403 共 3 次，根因为 WAF 关键字过滤；切换 URL 编码 + Header 改写后绕过成功。"}
 
-## Good Case 6: 大量错误的压缩
+## Good Case 5: 失败到成功的转折保留
 
-{"@action": "timeline-reducer", "reducer_memory": "10:30-11:45 连接失败15次(超时12次,拒绝3次)，最终成功，根因：防火墙规则"}
-
-## Good Case 7: 多次试错的浓缩
-
-{"@action": "timeline-reducer", "reducer_memory": "尝试4种payload均失败，改用编码绕过成功，最终利用点：/admin?id=1%27"}
+{"@action": "timeline-reducer", "reducer_memory": "尝试 4 种 payload 均失败（被 WAF 关键字过滤），最终用 hex 编码 + 大小写混淆绕过成功，最终利用点：/admin?id=1%27。"}

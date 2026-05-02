@@ -231,8 +231,11 @@ looks good
 
 ### 5.2 触发批量压缩
 
-`Timeline.batchCompressByTargetSize` 把前 5 条 ToolResult（ID 101..105）作为一批
-喂给 AI，要求生成一条 `reducer_memory`，比如：
+当活跃区 token 超过 `totalDumpContentLimit` 时，`compressForSizeLimit` 触发：
+- `keepTokens = currentSize / 4`，按 token 反向累加从最新端切分；
+- `[0, splitIdx)` 进入 `toCompress`（最旧的 ~3/4 token），`[splitIdx, end]` 进入 `recentKeep`（最新的 ~1/4 token）；
+- `Timeline.batchCompressOldestWithRecent(toCompress, recentKeep)` 把前 5 条 ToolResult（ID 101..105）作为一批
+  喂给 AI，**同时把 recentKeep 段一并塞入 prompt 的 RECENT_KEEP 块**，让 AI 基于"现在 agent 在做什么"判断"过去"哪些细节有价值需保留。AI 输出一条 `reducer_memory`，比如：
 
 ```text
 "5 scan invocations between 09:50 and 09:55 against host X, all returned port 80 open, no other anomaly"
