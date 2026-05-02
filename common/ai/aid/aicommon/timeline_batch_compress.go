@@ -286,9 +286,8 @@ func (m *Timeline) batchCompressOldestWithRecent(toCompress []*TimelineItem, rec
 				func(key string, reader io.Reader) {
 					var out bytes.Buffer
 					reducerMem := io.TeeReader(utils.JSONStringReader(reader), &out)
-					boundEmitter.EmitSystemStreamEvent(
+					boundEmitter.EmitDefaultStreamEvent(
 						"memory-timeline",
-						time.Now(),
 						reducerMem,
 						response.GetTaskIndex(),
 						func() {
