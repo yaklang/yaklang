@@ -185,6 +185,18 @@ func (m *Timeline) SoftDelete(id ...int64) {
 	}
 }
 
+// CreateSubTimeline 用入参 ids 限定活跃 item 集合，构造一个新的 sub-timeline
+// 关键词: CreateSubTimeline, 子 timeline 构造, reducer 继承
+//
+// reducer 继承语义:
+//
+//	reducers 代表的是主 timeline 的历史压缩快照，其 key 是 reducerKeyID（已被批量压缩
+//	并从活跃区移除的旧 item id），与入参 ids（活跃 item id 子集）属于不同命名空间，
+//	用 ids 去 m.reducers.Get(id) 必然 miss——这是历史死代码。
+//	为保持 sub-timeline 与主 timeline 历史视图一致（任何派生 sub.Dump() 都应包含完整压缩
+//	记忆），这里始终全量复制 reducers 与 reducerTs，与 ids 解耦。
+//	历史 bug: DumpBefore / TimelineWithout / CurrentTaskTimeline 全部经此路径，旧实现使
+//	它们在 prompt 中丢失全部 reducer block，破坏 LLM 记忆连续性，源头此处修复。
 func (m *Timeline) CreateSubTimeline(ids ...int64) *Timeline {
 	tl := NewTimeline(m.ai, m.extraMetaInfo)
 	if m.config != nil {
@@ -206,13 +218,24 @@ func (m *Timeline) CreateSubTimeline(ids ...int64) *Timeline {
 		if ret, ok := m.tsToTimelineItem.Get(ts); ok {
 			tl.OrderInsertTs(ts, ret)
 		}
-		if ret, ok := m.reducers.Get(id); ok {
-			tl.reducers.Set(id, ret)
-			if ts, tsOk := m.reducerTs.Get(id); tsOk {
-				tl.reducerTs.Set(id, ts)
-			}
-		}
 	}
+
+	// 全量继承 reducer 历史快照（与 ids 解耦）
+	if m.reducers != nil && m.reducers.Len() > 0 {
+		m.reducers.ForEach(func(reducerKeyID int64, lt *linktable.LinkTable[string]) bool {
+			if lt == nil {
+				return true
+			}
+			tl.reducers.Set(reducerKeyID, lt)
+			if m.reducerTs != nil {
+				if ts, ok := m.reducerTs.Get(reducerKeyID); ok {
+					tl.reducerTs.Set(reducerKeyID, ts)
+				}
+			}
+			return true
+		})
+	}
+
 	return tl
 }
 
@@ -936,7 +959,9 @@ func (m *Timeline) String() string {
 
 // DumpBefore 输出 ID <= beforeId 的部分 timeline，结构与 Dump 一致
 // 通过 CreateSubTimeline 限定上界，再走 Dump 公共路径，避免修改 GroupByMinutes 签名
-// 关键词: Timeline.DumpBefore, 子 timeline 上界, GroupByMinutes 复用
+// 关键词: Timeline.DumpBefore, 子 timeline 上界, GroupByMinutes 复用, reducer 继承
+//
+// 注意: reducer 由 CreateSubTimeline 在源头全量继承，这里无需重复迁移。
 func (m *Timeline) DumpBefore(beforeId int64) string {
 	if m == nil {
 		return ""
@@ -954,6 +979,9 @@ func (m *Timeline) DumpBefore(beforeId int64) string {
 		return true
 	})
 	if len(ids) == 0 {
+		// 无活跃 item 时与 Dump() 在 idToTimelineItem 空时的行为对齐：返回空。
+		// GroupByMinutes 在活跃 item 为空时即便有 reducer 也不会渲染 reducer block，
+		// 这里不做特例化，以保持 Dump / DumpBefore 的语义对称。
 		return ""
 	}
 
