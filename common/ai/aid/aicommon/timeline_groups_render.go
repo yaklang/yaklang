@@ -11,6 +11,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/linktable"
 )
 
 // TimelineIntervalBlock 表示一个绝对时间对齐的固定时间桶
@@ -29,9 +30,12 @@ type TimelineIntervalBlocks []*TimelineIntervalBlock
 
 // TimelineGroups 是 GroupByMinutes 的结果，包含若干 block
 // 持有 intervalMinutes 元信息以便外层校验/调试
+// reducerBlocks 持有由 Timeline.reducers 派生出的稳定可渲染 reducer 块，按 ReducerKeyID 升序
+// 关键词: TimelineGroups, reducerBlocks
 type TimelineGroups struct {
 	intervalMinutes int
 	blocks          TimelineIntervalBlocks
+	reducerBlocks   []*TimelineReducerBlock
 }
 
 // GetBlocks 返回当前分组的 block 切片，多次调用返回同一切片引用，避免复制开销
@@ -40,6 +44,39 @@ func (g *TimelineGroups) GetBlocks() TimelineIntervalBlocks {
 		return nil
 	}
 	return g.blocks
+}
+
+// GetReducerBlocks 返回当前分组中由 Timeline.reducers 派生出的 reducer block
+// 不复制底层切片，调用方不应修改返回值
+// 关键词: TimelineGroups.GetReducerBlocks
+func (g *TimelineGroups) GetReducerBlocks() []*TimelineReducerBlock {
+	if g == nil {
+		return nil
+	}
+	return g.reducerBlocks
+}
+
+// GetAllRenderable 返回 reducer blocks 在前、interval blocks 在后的统一可渲染列表
+// 该顺序与 DumpBefore 一致：先输出 reducer，再输出活跃 timeline item 的时间桶
+// 关键词: TimelineGroups.GetAllRenderable, reducer 优先, 与 Dump 一致
+func (g *TimelineGroups) GetAllRenderable() TimelineRenderableBlocks {
+	if g == nil {
+		return nil
+	}
+	out := make(TimelineRenderableBlocks, 0, len(g.reducerBlocks)+len(g.blocks))
+	for _, rb := range g.reducerBlocks {
+		if rb == nil {
+			continue
+		}
+		out = append(out, rb)
+	}
+	for _, blk := range g.blocks {
+		if blk == nil {
+			continue
+		}
+		out = append(out, blk)
+	}
+	return out
 }
 
 // IntervalMinutes 返回分桶时使用的分钟数
@@ -125,9 +162,41 @@ func (m *Timeline) GroupByMinutes(minutes int) *TimelineGroups {
 		orderedBuckets[len(orderedBuckets)-1].Open = true
 	}
 
+	// 收集 reducer blocks（已压缩条目）
+	// 关键词: GroupByMinutes, reducerBlocks 填充, reducer 渲染
+	var reducerBlocks []*TimelineReducerBlock
+	if m.reducers != nil && m.reducers.Len() > 0 {
+		m.reducers.ForEach(func(reducerKeyID int64, lt *linktable.LinkTable[string]) bool {
+			if lt == nil {
+				return true
+			}
+			text := lt.Value()
+			if strings.TrimSpace(text) == "" {
+				return true
+			}
+			var ts time.Time
+			if m.reducerTs != nil {
+				if msTs, ok := m.reducerTs.Get(reducerKeyID); ok && msTs > 0 {
+					ts = time.Unix(0, msTs*int64(time.Millisecond))
+				}
+			}
+			reducerBlocks = append(reducerBlocks, &TimelineReducerBlock{
+				ReducerKeyID: reducerKeyID,
+				Ts:           ts,
+				Text:         text,
+			})
+			return true
+		})
+		// 按 ReducerKeyID 升序排序，保证渲染顺序稳定
+		sort.SliceStable(reducerBlocks, func(i, j int) bool {
+			return reducerBlocks[i].ReducerKeyID < reducerBlocks[j].ReducerKeyID
+		})
+	}
+
 	return &TimelineGroups{
 		intervalMinutes: minutes,
 		blocks:          TimelineIntervalBlocks(orderedBuckets),
+		reducerBlocks:   reducerBlocks,
 	}
 }
 
@@ -368,4 +437,138 @@ func selectShrunkContent(item *TimelineItem) string {
 		return s
 	}
 	return strings.TrimSpace(item.value.String())
+}
+
+// TimelineRenderableBlock 是 timeline 中"可被 aitag 包裹渲染"的统一抽象
+// 任何实现该接口的类型都可以被 TimelineRenderableBlocks 拼装为 aitag 包裹的连续段
+// IsOpen 用于上层缓存策略：true 表示当前仍可能变化、不建议缓存；false 表示已冻结
+// 关键词: TimelineRenderableBlock, aitag 包裹, frozen/open
+type TimelineRenderableBlock interface {
+	Render() string
+	StableNonce() string
+	IsOpen() bool
+}
+
+// IsOpen 实现 TimelineRenderableBlock 接口
+// 仅时间桶最末一个产生 item 的桶为 Open，其他全部为 false（已冻结）
+// 关键词: TimelineIntervalBlock.IsOpen
+func (b *TimelineIntervalBlock) IsOpen() bool {
+	if b == nil {
+		return false
+	}
+	return b.Open
+}
+
+// TimelineReducerBlock 表示一个由 Timeline.reducers 中已压缩条目派生出的可渲染块
+// 始终为 frozen（IsOpen 恒为 false），渲染内容稳定可缓存
+// 关键词: TimelineReducerBlock, reducer 渲染, 缓存稳定
+type TimelineReducerBlock struct {
+	ReducerKeyID int64
+	Ts           time.Time // 来自 Timeline.reducerTs；为零时表示老数据无稳定时间戳
+	Text         string
+}
+
+// Render 渲染单个 reducer block 的内部内容（不含 aitag 包裹）
+// 输出格式（与 TimelineIntervalBlock.Render 风格对齐，无前导缩进）：
+//
+//	# reducer key=<id> ts=<seconds since epoch or 0>
+//	HH:MM:SS [reducer/memory]
+//	${reducer text line 1}
+//	${reducer text line 2}
+//
+// 关键词: TimelineReducerBlock.Render, 缓存稳定, 无缩进
+func (r *TimelineReducerBlock) Render() string {
+	if r == nil {
+		return ""
+	}
+	var sec int64
+	hh, mm, ss := 0, 0, 0
+	if !r.Ts.IsZero() {
+		sec = r.Ts.Unix()
+		hh, mm, ss = r.Ts.Clock()
+	}
+	var buf bytes.Buffer
+	buf.WriteString(fmt.Sprintf("# reducer key=%d ts=%d\n", r.ReducerKeyID, sec))
+	buf.WriteString(fmt.Sprintf("%02d:%02d:%02d [reducer/memory]", hh, mm, ss))
+
+	text := strings.TrimSpace(r.Text)
+	if text != "" {
+		var prevBlank bool
+		for _, line := range utils.ParseStringToRawLines(text) {
+			line = strings.TrimRight(line, " \t\r")
+			if strings.TrimSpace(line) == "" {
+				if prevBlank {
+					continue
+				}
+				prevBlank = true
+				buf.WriteByte('\n')
+				continue
+			}
+			prevBlank = false
+			buf.WriteByte('\n')
+			buf.WriteString(line)
+		}
+	}
+	return strings.TrimRight(buf.String(), "\n")
+}
+
+// StableNonce 基于 ReducerKeyID 与稳定时间戳派生的 aitag-兼容 nonce
+// 形如 "r{ReducerKeyID}t{unixSec}"，无下划线、字母数字组合
+// 同一 reducer key + ts 永远产生相同 nonce，可被前缀缓存复用
+// 关键词: TimelineReducerBlock.StableNonce, aitag nonce
+func (r *TimelineReducerBlock) StableNonce() string {
+	if r == nil {
+		return ""
+	}
+	var sec int64
+	if !r.Ts.IsZero() {
+		sec = r.Ts.Unix()
+	}
+	return fmt.Sprintf("r%dt%d", r.ReducerKeyID, sec)
+}
+
+// IsOpen 恒为 false，reducer 一旦写入即视为冻结
+// 关键词: TimelineReducerBlock.IsOpen
+func (r *TimelineReducerBlock) IsOpen() bool {
+	return false
+}
+
+// TimelineRenderableBlocks 是任意可渲染块的有序集合（可混合 IntervalBlock + ReducerBlock）
+// 关键词: TimelineRenderableBlocks
+type TimelineRenderableBlocks []TimelineRenderableBlock
+
+// Render 将所有 renderable block 按 aitag 兼容格式拼接：
+//
+//	<|TAGNAME_<nonce>|>
+//	${block body}
+//	<|TAGNAME_END_<nonce>|>
+//
+// 同一个 aitagName 下不同 block 通过各自稳定 nonce 区分；
+// frozen block 的标签与内容均字节级稳定，可被 LLM 前缀缓存命中
+// 关键词: TimelineRenderableBlocks.Render, aitag 兼容, 前缀缓存
+func (bs TimelineRenderableBlocks) Render(aitagName string) string {
+	if len(bs) == 0 {
+		return ""
+	}
+	tag := normalizeAITagName(aitagName)
+	var buf bytes.Buffer
+	emitted := 0
+	for _, blk := range bs {
+		if blk == nil {
+			continue
+		}
+		nonce := blk.StableNonce()
+		if emitted > 0 {
+			buf.WriteByte('\n')
+		}
+		buf.WriteString(fmt.Sprintf("<|%s_%s|>\n", tag, nonce))
+		body := blk.Render()
+		if body != "" {
+			buf.WriteString(body)
+			buf.WriteByte('\n')
+		}
+		buf.WriteString(fmt.Sprintf("<|%s_END_%s|>", tag, nonce))
+		emitted++
+	}
+	return buf.String()
 }

@@ -212,8 +212,11 @@ func TestTimelineConfigurationMethods(t *testing.T) {
 	require.Equal(t, "", metaInfoNil)
 }
 
-// TestTimelineRenderSummaryPrompt 测试renderSummaryPrompt方法
-func TestTimelineRenderSummaryPrompt(t *testing.T) {
+// TestTimelineReducerTsInitialized 测试 NewTimeline 后 reducerTs 已初始化
+// 关键词: reducerTs 初始化校验
+// 历史说明：原 TestTimelineRenderSummaryPrompt 仅断言 memoryTimeline.summary 非 nil，
+// summary 字段已被识别为 dead code 并移除；这里改为校验新增的 reducerTs 字段
+func TestTimelineReducerTsInitialized(t *testing.T) {
 	memoryTimeline := NewTimeline(&mockedAI{}, nil)
 
 	// Add items
@@ -229,9 +232,8 @@ func TestTimelineRenderSummaryPrompt(t *testing.T) {
 		})
 	}
 
-	// Test renderSummaryPrompt indirectly by checking if summary works
-	// This method is called internally by compression, but we can test the summary field
-	require.NotNil(t, memoryTimeline.summary)
+	require.NotNil(t, memoryTimeline.reducerTs)
+	require.Equal(t, 0, memoryTimeline.reducerTs.Len())
 }
 
 // TestTimelineItemOutputString 测试TimelineItemOutput的String方法

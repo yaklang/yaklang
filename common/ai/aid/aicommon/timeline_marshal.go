@@ -11,12 +11,17 @@ import (
 )
 
 // timelineSerializable 用于序列化的 Timeline 结构体
+// 关键词: timelineSerializable, summary 向后兼容, reducerTs 序列化
+// 历史说明：
+//   - Summary 字段已废弃（dead code），新数据不再写入；仅在反序列化老数据时容忍其存在并静默忽略。
+//   - ReducerTs 字段是新增的稳定时间戳，对应 reducers 中每个 key 的原始 unix 毫秒时间。
 type timelineSerializable struct {
 	IdToTs                map[string]int64               `json:"id_to_ts"`
 	TsToTimelineItem      map[string]*TimelineItem       `json:"ts_to_timeline_item"`
 	IdToTimelineItem      map[string]*TimelineItem       `json:"id_to_timeline_item"`
-	Summary               map[string]*TimelineItem       `json:"summary"`  // 只保留最后一个值
-	Reducers              map[string]string              `json:"reducers"` // 只保留最后一个值
+	Summary               map[string]*TimelineItem       `json:"summary,omitempty"` // deprecated: 仅做向后兼容反序列化
+	Reducers              map[string]string              `json:"reducers"`          // 只保留最后一个值
+	ReducerTs             map[string]int64               `json:"reducer_ts,omitempty"`
 	ArchiveRefs           map[string]*TimelineArchiveRef `json:"archive_refs"`
 	PerDumpContentLimit   int64                          `json:"per_dump_content_limit"`
 	TotalDumpContentLimit int64                          `json:"total_dump_content_limit"`
@@ -48,18 +53,21 @@ func MarshalTimeline(i *Timeline) (string, error) {
 		return true
 	})
 
-	// 转换 summary 和 reducers 为可序列化的格式，只保留最后一个值
-	summaryMap := make(map[string]*TimelineItem)
-	i.summary.ForEach(func(id int64, lt *linktable.LinkTable[*TimelineItem]) bool {
-		summaryMap[fmt.Sprintf("%d", id)] = lt.Value() // 只保留最后一个值
-		return true
-	})
-
+	// 转换 reducers 为可序列化的格式，只保留最后一个值
 	reducersMap := make(map[string]string)
 	i.reducers.ForEach(func(id int64, lt *linktable.LinkTable[string]) bool {
 		reducersMap[fmt.Sprintf("%d", id)] = lt.Value() // 只保留最后一个值
 		return true
 	})
+
+	// 关键词: MarshalTimeline, reducerTs 序列化
+	reducerTsMap := make(map[string]int64)
+	if i.reducerTs != nil {
+		i.reducerTs.ForEach(func(id int64, ts int64) bool {
+			reducerTsMap[fmt.Sprintf("%d", id)] = ts
+			return true
+		})
+	}
 
 	archiveRefsMap := make(map[string]*TimelineArchiveRef)
 	i.archiveRefs.ForEach(func(id int64, ref *TimelineArchiveRef) bool {
@@ -71,8 +79,8 @@ func MarshalTimeline(i *Timeline) (string, error) {
 		IdToTs:                idToTsMap,
 		TsToTimelineItem:      tsToTimelineItemMap,
 		IdToTimelineItem:      idToTimelineItemMap,
-		Summary:               summaryMap,
 		Reducers:              reducersMap,
+		ReducerTs:             reducerTsMap,
 		ArchiveRefs:           archiveRefsMap,
 		PerDumpContentLimit:   i.perDumpContentLimit,
 		TotalDumpContentLimit: i.totalDumpContentLimit,
@@ -134,17 +142,10 @@ func UnmarshalTimeline(s string) (*Timeline, error) {
 		timeline.OrderInsertId(id, value)
 	}
 
-	// 恢复 summary
-	timeline.summary = omap.NewOrderedMap(map[int64]*linktable.LinkTable[*TimelineItem]{})
-	for key, item := range serializable.Summary {
-		id, err := strconv.ParseInt(key, 10, 64)
-		if err != nil || item == nil {
-			continue
-		}
-		// 从单个值重建 LinkTable
-		lt := linktable.NewUnlimitedLinkTable(item)
-		timeline.summary.Set(id, lt)
-	}
+	// 关键词: UnmarshalTimeline, summary 向后兼容
+	// summary 字段已弃用：读到老数据中的 summary 内容时直接忽略，不再写入 Timeline
+	// （此处不需要解析 serializable.Summary，json.Unmarshal 已经把内容放到 serializable 里了，但我们不消费它）
+	_ = serializable.Summary
 
 	// 恢复 reducers
 	timeline.reducers = omap.NewOrderedMap(map[int64]*linktable.LinkTable[string]{})
@@ -156,6 +157,16 @@ func UnmarshalTimeline(s string) (*Timeline, error) {
 		// 从单个值重建 LinkTable
 		lt := linktable.NewUnlimitedStringLinkTable(value)
 		timeline.reducers.Set(id, lt)
+	}
+
+	// 关键词: UnmarshalTimeline, reducerTs 反序列化
+	timeline.reducerTs = omap.NewOrderedMap(map[int64]int64{})
+	for key, value := range serializable.ReducerTs {
+		id, err := strconv.ParseInt(key, 10, 64)
+		if err != nil || value <= 0 {
+			continue
+		}
+		timeline.reducerTs.Set(id, value)
 	}
 
 	timeline.archiveRefs = omap.NewOrderedMap(map[int64]*TimelineArchiveRef{})

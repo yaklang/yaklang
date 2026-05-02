@@ -2,7 +2,6 @@ package aicommon
 
 import (
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -84,8 +83,11 @@ func TestTimelineMarshalUnmarshal(t *testing.T) {
 	t.Log("Timeline marshal/unmarshal test passed")
 }
 
-func TestTimelineMarshalWithSummaryAndReducers(t *testing.T) {
-	// 创建 Timeline 并添加一些数据来生成 summary 和 reducers
+// TestTimelineMarshalWithReducers 测试 Timeline 序列化时 reducers 与 reducerTs 的往返一致性
+// 关键词: MarshalTimeline, reducerTs 序列化往返
+// 历史说明：原 TestTimelineMarshalWithSummaryAndReducers 同时验证 summary 与 reducers，
+// 由于 summary 已被识别为 dead code 并移除，此处仅保留并扩展 reducers 验证 + 新增 reducerTs 校验
+func TestTimelineMarshalWithReducers(t *testing.T) {
 	originalTimeline := NewTimeline(nil, nil)
 
 	// 添加一些工具结果
@@ -101,50 +103,37 @@ func TestTimelineMarshalWithSummaryAndReducers(t *testing.T) {
 		})
 	}
 
-	// 手动添加一些 summary 数据（模拟压缩后的数据）
-	testItem := &TimelineItem{
-		createdAt: time.Now(),
-		value: &TextTimelineItem{
-			ID:   150,
-			Text: "compressed content",
-		},
-	}
-	originalTimeline.summary.Set(int64(150), linktable.NewUnlimitedLinkTable(testItem))
-
-	// 手动添加一些 reducers 数据
+	// 手动添加一些 reducers 数据并配对写入 reducerTs
+	// 关键词: reducers + reducerTs 同步写入
 	originalTimeline.reducers.Set(int64(200), linktable.NewUnlimitedStringLinkTable("compressed memory"))
+	originalTimeline.reducerTs.Set(int64(200), int64(1700000000000))
 
-	// 序列化
 	jsonStr, err := MarshalTimeline(originalTimeline)
 	require.NoError(t, err)
 	require.NotEmpty(t, jsonStr)
 
-	// 反序列化
 	restoredTimeline, err := UnmarshalTimeline(jsonStr)
 	require.NoError(t, err)
 	require.NotNil(t, restoredTimeline)
 
-	// 验证 summary - 只应该有最后一个值
-	originalTimeline.summary.ForEach(func(id int64, originalLt *linktable.LinkTable[*TimelineItem]) bool {
-		restoredLt, ok := restoredTimeline.summary.Get(id)
-		require.True(t, ok, "Summary for id %d not found", id)
-
-		// 验证只保留了最后一个值
-		require.Equal(t, originalLt.Value().String(), restoredLt.Value().String())
-		return true
-	})
-
-	// 验证 reducers - 只应该有最后一个值
+	// 验证 reducers
 	originalTimeline.reducers.ForEach(func(id int64, originalLt *linktable.LinkTable[string]) bool {
 		restoredLt, ok := restoredTimeline.reducers.Get(id)
 		require.True(t, ok, "Reducer for id %d not found", id)
-
-		// 验证只保留了最后一个值
 		require.Equal(t, originalLt.Value(), restoredLt.Value())
 		return true
 	})
 
-	t.Log("Timeline marshal with summary and reducers test passed")
+	// 验证 reducerTs（关键词: reducerTs 反序列化）
+	require.Equal(t, originalTimeline.reducerTs.Len(), restoredTimeline.reducerTs.Len())
+	originalTimeline.reducerTs.ForEach(func(id int64, ts int64) bool {
+		got, ok := restoredTimeline.reducerTs.Get(id)
+		require.True(t, ok, "ReducerTs for id %d not found", id)
+		require.Equal(t, ts, got)
+		return true
+	})
+
+	t.Log("Timeline marshal with reducers/reducerTs test passed")
 }
 
 func TestTimelineMarshalEmpty(t *testing.T) {
@@ -162,8 +151,8 @@ func TestTimelineMarshalEmpty(t *testing.T) {
 
 	// 验证为空
 	require.Equal(t, 0, restoredTimeline.idToTimelineItem.Len())
-	require.Equal(t, 0, restoredTimeline.summary.Len())
 	require.Equal(t, 0, restoredTimeline.reducers.Len())
+	require.Equal(t, 0, restoredTimeline.reducerTs.Len())
 
 	t.Log("Empty timeline marshal/unmarshal test passed")
 }

@@ -34,9 +34,12 @@ type Timeline struct {
 	idToTs           *omap.OrderedMap[int64, int64]
 	tsToTimelineItem *omap.OrderedMap[int64, *TimelineItem]
 	idToTimelineItem *omap.OrderedMap[int64, *TimelineItem]
-	summary          *omap.OrderedMap[int64, *linktable.LinkTable[*TimelineItem]]
 	reducers         *omap.OrderedMap[int64, *linktable.LinkTable[string]]
-	archiveRefs      *omap.OrderedMap[int64, *TimelineArchiveRef]
+	// reducerTs 与 reducers 一一对应，记录 reducer 的稳定时间戳（毫秒，UnixMilli）
+	// 用于 DumpBefore / GroupByMinutes 渲染 reducer 行的时间字段，避免使用 time.Now() 破坏缓存稳定性
+	// 关键词: reducerTs, reducer 稳定时间戳, 缓存稳定
+	reducerTs   *omap.OrderedMap[int64, int64]
+	archiveRefs *omap.OrderedMap[int64, *TimelineArchiveRef]
 
 	// this limit is used to limit the timeline dump content size (in tokens).
 	perDumpContentLimit   int64
@@ -164,8 +167,8 @@ func (m *Timeline) CopyReducibleTimelineWithMemory() *Timeline {
 		idToTs:                m.idToTs.Copy(),
 		tsToTimelineItem:      m.tsToTimelineItem.Copy(),
 		idToTimelineItem:      m.idToTimelineItem.Copy(),
-		summary:               m.summary.Copy(),
 		reducers:              m.reducers.Copy(),
+		reducerTs:             m.reducerTs.Copy(),
 		archiveRefs:           m.archiveRefs.Copy(),
 		perDumpContentLimit:   m.perDumpContentLimit,
 		totalDumpContentLimit: m.totalDumpContentLimit,
@@ -178,13 +181,6 @@ func (m *Timeline) SoftDelete(id ...int64) {
 	for _, i := range id {
 		if v, ok := m.idToTimelineItem.Get(i); ok {
 			v.deleted = true
-		}
-		if v, ok := m.summary.Get(i); ok {
-			v.Push(&TimelineItem{
-				createdAt: v.Value().createdAt,
-				deleted:   true,
-				value:     v.Value().value,
-			})
 		}
 	}
 }
@@ -210,11 +206,11 @@ func (m *Timeline) CreateSubTimeline(ids ...int64) *Timeline {
 		if ret, ok := m.tsToTimelineItem.Get(ts); ok {
 			tl.OrderInsertTs(ts, ret)
 		}
-		if ret, ok := m.summary.Get(id); ok {
-			tl.summary.Set(id, ret)
-		}
 		if ret, ok := m.reducers.Get(id); ok {
 			tl.reducers.Set(id, ret)
+			if ts, tsOk := m.reducerTs.Get(id); tsOk {
+				tl.reducerTs.Set(id, ts)
+			}
 		}
 	}
 	return tl
@@ -237,8 +233,8 @@ func NewTimeline(ai AICaller, extraMetaInfo func() string) *Timeline {
 		tsToTimelineItem: omap.NewOrderedMap(map[int64]*TimelineItem{}),
 		idToTimelineItem: omap.NewOrderedMap(map[int64]*TimelineItem{}),
 		idToTs:           omap.NewOrderedMap(map[int64]int64{}),
-		summary:          omap.NewOrderedMap(map[int64]*linktable.LinkTable[*TimelineItem]{}),
 		reducers:         omap.NewOrderedMap(map[int64]*linktable.LinkTable[string]{}),
+		reducerTs:        omap.NewOrderedMap(map[int64]int64{}),
 		archiveRefs:      omap.NewOrderedMap(map[int64]*TimelineArchiveRef{}),
 		compressing:      utils.NewOnce(),
 	}
@@ -491,10 +487,20 @@ func (m *Timeline) batchCompressByTargetSize(targetSize int) {
 
 	// 存储压缩结果
 	lastCompressedId := idsToRemove[len(idsToRemove)-1]
+	// 关键词: batchCompressByTargetSize, reducerTs, 缓存稳定
+	// 在删除 idToTs 之前先获取最末压缩 item 的原始 ts，写入 reducerTs
+	// 这样 DumpBefore / GroupByMinutes 渲染 reducer 行时能拿到稳定时间，避免 time.Now() 漂移
+	var lastCompressedTs int64
+	if ts, ok := m.idToTs.Get(lastCompressedId); ok {
+		lastCompressedTs = ts
+	}
 	if lt, ok := m.reducers.Get(lastCompressedId); ok {
 		lt.Push(compressedMemory)
 	} else {
 		m.reducers.Set(lastCompressedId, linktable.NewUnlimitedStringLinkTable(compressedMemory))
+	}
+	if lastCompressedTs > 0 {
+		m.reducerTs.Set(lastCompressedId, lastCompressedTs)
 	}
 	m.attachArchiveRef(lastCompressedId, m.archiveForgottenBatch(
 		TimelineArchiveReasonBatchCompress,
@@ -520,8 +526,6 @@ func (m *Timeline) calculateActualContentSize() int64 {
 	initOnce := sync.Once{}
 	count := 0
 
-	shrinkStartId, _, _ := m.summary.Last()
-
 	m.idToTimelineItem.ForEach(func(id int64, item *TimelineItem) bool {
 		initOnce.Do(func() {
 			buf.WriteString("timeline:\n")
@@ -533,14 +537,6 @@ func (m *Timeline) calculateActualContentSize() int64 {
 		}
 		t := time.Unix(0, ts*int64(time.Millisecond))
 		timeStr := t.Format(utils.DefaultTimeFormat3)
-
-		if shrinkStartId > 0 && item.GetID() <= shrinkStartId {
-			val, ok := m.summary.Get(shrinkStartId)
-			if ok && !val.Value().deleted {
-				buf.WriteString(fmt.Sprintf("--[%s] id: %v memory: %v\n", timeStr, item.GetID(), val.Value().GetShrinkResult()))
-			}
-			return true
-		}
 
 		if item.deleted {
 			return true
@@ -644,13 +640,15 @@ func (m *Timeline) emergencyCompress(targetSize int) {
 		}
 		lastRemovedID = oldestID
 
-		// Remove from all maps
+		// 在删除 idToTs 之前先取出 ts，写入 reducerTs 用于稳定渲染
+		// 关键词: emergencyCompress, reducerTs, 稳定时间戳
+		var origTs int64
 		if ts, ok := m.idToTs.Get(oldestID); ok {
+			origTs = ts
 			m.tsToTimelineItem.Delete(ts)
 			m.idToTs.Delete(oldestID)
 		}
 		m.idToTimelineItem.Delete(oldestID)
-		m.summary.Delete(oldestID)
 
 		// Store the emergency summary in reducers
 		if briefSummary != "" {
@@ -658,6 +656,10 @@ func (m *Timeline) emergencyCompress(targetSize int) {
 				lt.Push(briefSummary)
 			} else {
 				m.reducers.Set(oldestID, linktable.NewUnlimitedStringLinkTable(briefSummary))
+			}
+			// 同步写入 reducerTs（关键词: emergencyCompress, reducer 稳定时间戳）
+			if origTs > 0 {
+				m.reducerTs.Set(oldestID, origTs)
 			}
 		}
 
@@ -923,7 +925,6 @@ func (m *Timeline) DumpBefore(beforeId int64) string {
 	initOnce := sync.Once{}
 	count := 0
 
-	shrinkStartId, _, _ := m.summary.Last()
 	reduceredStartId, _, _ := m.reducers.Last()
 	archiveStartId, archiveRef, _ := m.archiveRefs.Last()
 
@@ -946,8 +947,17 @@ func (m *Timeline) DumpBefore(beforeId int64) string {
 				buf.WriteString("timeline:\n")
 			})
 			buf.WriteString(fmt.Sprint("  ...\n"))
-			// Use a fixed timestamp for reducer display
-			reducerTimeStr := time.Now().Format(utils.DefaultTimeFormat3)
+			// 关键词: DumpBefore reducer 稳定时间戳, reducerTs
+			// 优先用 reducerTs 中存储的稳定时间戳来渲染 reducer 行
+			// 旧代码使用 time.Now() 会导致 Dump 每次输出不同，破坏 LLM 前缀缓存
+			var reducerTimeStr string
+			if ts, tsOk := m.reducerTs.Get(reduceredStartId); tsOk && ts > 0 {
+				reducerTimeStr = time.Unix(0, ts*int64(time.Millisecond)).Format(utils.DefaultTimeFormat3)
+			} else {
+				// 兼容老数据：没有 reducerTs 时退回到一个固定的占位（用 reduceredStartId 推算的稳定串）
+				// 注意这里不再使用 time.Now()，保证字节级稳定
+				reducerTimeStr = "1970/01/01 00:00:00"
+			}
 			buf.WriteString(fmt.Sprintf("--[%s] id: %v reducer-memory: %v\n", reducerTimeStr, reduceredStartId, val.Value()))
 		}
 	}
@@ -967,15 +977,6 @@ func (m *Timeline) DumpBefore(beforeId int64) string {
 		}
 		t := time.Unix(0, ts*int64(time.Millisecond))
 		timeStr := t.Format(utils.DefaultTimeFormat3)
-
-		if shrinkStartId > 0 && item.GetID() <= shrinkStartId {
-			val, ok := m.summary.Get(shrinkStartId)
-			if ok && !val.Value().deleted {
-				//buf.WriteString(fmt.Sprintf("├─[%s] id: %v memory: %v\n", timeStr, item.GetID(), val.Value().GetShrinkResult()))
-				buf.WriteString(fmt.Sprintf("--[%s] id: %v memory: %v\n", timeStr, item.GetID(), val.Value().GetShrinkResult()))
-			}
-			return true
-		}
 
 		if item.deleted {
 			return true
@@ -1283,10 +1284,11 @@ func (m *Timeline) ReassignIDs(idGenerator func() int64) int64 {
 	// Create new mappings
 	newIdToTs := omap.NewOrderedMap(map[int64]int64{})
 	newIdToTimelineItem := omap.NewOrderedMap(map[int64]*TimelineItem{})
-	newSummary := omap.NewOrderedMap(map[int64]*linktable.LinkTable[*TimelineItem]{})
 	newReducers := omap.NewOrderedMap(map[int64]*linktable.LinkTable[string]{})
+	// 关键词: ReassignIDs, reducerTs 重映射
+	newReducerTs := omap.NewOrderedMap(map[int64]int64{})
 
-	// Track old ID to new ID mapping for summary and reducers
+	// Track old ID to new ID mapping for reducers
 	oldToNewID := make(map[int64]int64)
 
 	var lastID int64
@@ -1317,22 +1319,25 @@ func (m *Timeline) ReassignIDs(idGenerator func() int64) int64 {
 		newIdToTs.Set(newID, ts)
 		newIdToTimelineItem.Set(newID, item)
 
-		// Update summary if exists for this old ID
-		if summaryLt, ok := m.summary.Get(oldID); ok {
-			newSummary.Set(newID, summaryLt)
-		}
-
 		// Update reducers if exists for this old ID
 		if reducerLt, ok := m.reducers.Get(oldID); ok {
 			newReducers.Set(newID, reducerLt)
+			// 同步重映射 reducerTs
+			if origTs, tsOk := m.reducerTs.Get(oldID); tsOk {
+				newReducerTs.Set(newID, origTs)
+			}
 		}
 	}
+
+	// 注意：保持 ReassignIDs 原有语义——只重映射 idToTimelineItem 中存在的 ID 对应的 reducers，
+	// 不为孤立 reducer key（idToTimelineItem 里已不存在）单独再分配新 ID
+	_ = oldToNewID
 
 	// Replace old mappings with new ones
 	m.idToTs = newIdToTs
 	m.idToTimelineItem = newIdToTimelineItem
-	m.summary = newSummary
 	m.reducers = newReducers
+	m.reducerTs = newReducerTs
 
 	log.Infof("reassigned IDs for %d timeline items, last ID: %d", len(orderedItems), lastID)
 	return lastID

@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/utils/linktable"
 )
 
 // TestTimelineReassignIDs_Basic 测试基本的 ID 重新分配功能
@@ -101,11 +102,13 @@ func TestTimelineReassignIDs_Empty(t *testing.T) {
 	require.Equal(t, 0, timeline.idToTimelineItem.Len())
 }
 
-// TestTimelineReassignIDs_WithSummary 测试包含 summary 的 timeline
-func TestTimelineReassignIDs_WithSummary(t *testing.T) {
+// TestTimelineReassignIDs_WithReducerTs 测试 ReassignIDs 同步重映射 reducerTs
+// 关键词: ReassignIDs, reducerTs 重映射
+// 历史说明：原 TestTimelineReassignIDs_WithSummary 使用 summary 字段，
+// 该字段已识别为 dead code 并移除，本测试替换为 reducers + reducerTs 同步重映射的等价覆盖
+func TestTimelineReassignIDs_WithReducerTs(t *testing.T) {
 	timeline := NewTimeline(nil, nil)
 
-	// 添加数据
 	for i := 1; i <= 5; i++ {
 		timeline.PushToolResult(&aitool.ToolResult{
 			ID:          int64(1000 + i),
@@ -116,17 +119,13 @@ func TestTimelineReassignIDs_WithSummary(t *testing.T) {
 		})
 	}
 
-	// 模拟添加 summary
-	item := &TimelineItem{
-		value: &aitool.ToolResult{
-			ID:           1003,
-			ShrinkResult: "summarized content",
-		},
-	}
-	timeline.summary.Set(1003, nil) // 简化测试，不需要完整的 LinkTable
+	// 模拟批量压缩后产生的 reducer 与稳定时间戳
+	timeline.reducers.Set(1003, linktable.NewUnlimitedStringLinkTable("reducer-memory-1003"))
+	timeline.reducerTs.Set(1003, int64(1700000000000))
 
 	require.Equal(t, 5, timeline.idToTimelineItem.Len())
-	require.Equal(t, 1, timeline.summary.Len())
+	require.Equal(t, 1, timeline.reducers.Len())
+	require.Equal(t, 1, timeline.reducerTs.Len())
 
 	var idCounter int64 = 100
 	generator := func() int64 {
@@ -138,13 +137,19 @@ func TestTimelineReassignIDs_WithSummary(t *testing.T) {
 	require.Equal(t, int64(105), lastID)
 	require.Equal(t, 5, timeline.idToTimelineItem.Len())
 
-	// 验证 summary 被正确更新
-	require.Equal(t, 1, timeline.summary.Len())
-	// 旧的 ID 1003 应该不存在了
-	_, exists := timeline.summary.Get(1003)
-	require.False(t, exists, "Old summary ID should not exist")
+	require.Equal(t, 1, timeline.reducers.Len())
+	require.Equal(t, 1, timeline.reducerTs.Len())
 
-	_ = item // 避免未使用变量警告
+	// 旧 ID 1003 不应存在
+	_, exists := timeline.reducers.Get(1003)
+	require.False(t, exists, "Old reducer ID should not exist")
+	_, exists = timeline.reducerTs.Get(1003)
+	require.False(t, exists, "Old reducerTs ID should not exist")
+
+	// 新 ID 应映射到 103（idCounter 从 100 起，第 3 个 item 即 1003 → 103）
+	got, ok := timeline.reducerTs.Get(int64(103))
+	require.True(t, ok, "ReducerTs should be remapped to new id 103")
+	require.Equal(t, int64(1700000000000), got)
 }
 
 // TestTimelineReassignIDs_WithReducers 测试包含 reducers 的 timeline

@@ -208,33 +208,57 @@ This skill was added via WithSkillsFS, not auto-loaded.
 	t.Logf("Correctly loaded %d skill(s) (manual only, auto disabled)", len(skills))
 }
 
+// isolateAISkillsLookup 把当前测试中所有 well-known AI skills 扫描目录都隔离到 tempDir
+//
+// 背景：consts.GetAllAISkillsDirs 不仅返回 $YAKIT_HOME/ai-skills，还会扫描：
+//   - $HOME/.cursor/skills、$HOME/.claude/skills、$HOME/.copilot/skills、$HOME/.opencode/skills
+//   - $CWD/.cursor/skills、$CWD/.claude/skills、$CWD/.github/skills、$CWD/.opencode/skills
+//
+// 任意一个目录在开发者机器上存在（典型场景：Cursor / Claude 用户）就会让"empty/nonexistent
+// ai-skills"测试发现非零 skill，造成 CI 通过、本地失败的不稳定行为。
+//
+// 这里用 t.Setenv 覆盖 YAKIT_HOME 与 HOME 指向 tempDir，并 chdir 到 tempDir，
+// 让所有 well-known 子路径都解析到 tempDir 下不存在的位置。
+//
+// 关键词: 测试隔离, GetAllAISkillsDirs, $HOME / $CWD / YAKIT_HOME 隔离
+func isolateAISkillsLookup(t *testing.T, tempDir string) {
+	t.Helper()
+	t.Setenv("YAKIT_HOME", tempDir)
+	t.Setenv("HOME", tempDir)
+
+	origCwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get cwd: %v", err)
+	}
+	if err := os.Chdir(tempDir); err != nil {
+		t.Fatalf("failed to chdir to tempDir: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(origCwd)
+	})
+
+	consts.ResetYakitHomeOnce()
+}
+
 // TestConfig_AutoLoadEmptyDirectory tests that auto-loading works gracefully
 // when the ai-skills directory exists but is empty.
+//
+// 关键词: AutoSkillLoader 空目录, 测试稳定性, ai-skills 隔离
 func TestConfig_AutoLoadEmptyDirectory(t *testing.T) {
-	// Create a temporary directory with an empty ai-skills directory
 	tempDir := t.TempDir()
 	aiSkillsDir := filepath.Join(tempDir, "ai-skills")
 
-	err := os.MkdirAll(aiSkillsDir, 0755)
-	if err != nil {
+	if err := os.MkdirAll(aiSkillsDir, 0755); err != nil {
 		t.Fatalf("failed to create empty ai-skills directory: %v", err)
 	}
 
-	// Set YAKIT_HOME environment variable
-	originalYakitHome := os.Getenv("YAKIT_HOME")
-	os.Setenv("YAKIT_HOME", tempDir)
-	defer os.Setenv("YAKIT_HOME", originalYakitHome)
+	isolateAISkillsLookup(t, tempDir)
 
-	// Reset the yakit home cache
-	consts.ResetYakitHomeOnce()
-
-	// Create Config without WithDisableAutoSkills(true)
 	config := NewConfig(context.Background())
 
 	// Verify that skillLoader is nil when no skills are found
 	loader := config.GetSkillLoader()
 	if loader != nil {
-		// If loader is not nil, it should have no skills
 		skills := loader.AllSkillMetas()
 		if len(skills) > 0 {
 			t.Errorf("Expected no skills in empty directory, got %d", len(skills))
@@ -246,25 +270,17 @@ func TestConfig_AutoLoadEmptyDirectory(t *testing.T) {
 
 // TestConfig_AutoLoadNonexistentDirectory tests that auto-loading works gracefully
 // when the ai-skills directory does not exist.
+//
+// 关键词: AutoSkillLoader 不存在目录, 测试稳定性, ai-skills 隔离
 func TestConfig_AutoLoadNonexistentDirectory(t *testing.T) {
-	// Create a temporary directory WITHOUT ai-skills
 	tempDir := t.TempDir()
 
-	// Set YAKIT_HOME environment variable
-	originalYakitHome := os.Getenv("YAKIT_HOME")
-	os.Setenv("YAKIT_HOME", tempDir)
-	defer os.Setenv("YAKIT_HOME", originalYakitHome)
+	isolateAISkillsLookup(t, tempDir)
 
-	// Reset the yakit home cache
-	consts.ResetYakitHomeOnce()
-
-	// Create Config without WithDisableAutoSkills(true)
 	config := NewConfig(context.Background())
 
-	// Verify that skillLoader is nil when directory doesn't exist
 	loader := config.GetSkillLoader()
 	if loader != nil {
-		// If loader is not nil, it should have no skills
 		skills := loader.AllSkillMetas()
 		if len(skills) > 0 {
 			t.Errorf("Expected no skills when directory doesn't exist, got %d", len(skills))
