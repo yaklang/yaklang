@@ -597,13 +597,6 @@ func (m *Timeline) dumpSizeCheck() {
 	m.compressForSizeLimit()
 }
 
-// EmergencyCompress performs non-AI compression by removing oldest items
-// This is the public API that can be called from outside
-// Use this when timeline is too large and needs to be compressed without AI assistance
-func (m *Timeline) EmergencyCompress() {
-	m.emergencyCompress(MaxTimelineSaveSize)
-}
-
 // emergencyCompress performs non-AI compression by removing oldest items
 // This is used when timeline is too large and needs to be compressed without AI assistance
 func (m *Timeline) emergencyCompress(targetSize int) {
@@ -770,7 +763,7 @@ func (m *Timeline) compressForSizeLimit() {
 	}
 
 	// 当内容大小超过限制时，压缩到原来的一半大小
-	targetSize := int(total / 2)
+	targetSize := int(total / 4)
 	if targetSize < 1 {
 		targetSize = 1
 	}

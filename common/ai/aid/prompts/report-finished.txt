@@ -11,5 +11,5 @@
 # 工具调用信息
 
 <tool-call-timeline>
-{{ .ContextProvider.Timeline }}
+{{ .ContextProvider.TimelineDump }}
 </tool-call-timeline>

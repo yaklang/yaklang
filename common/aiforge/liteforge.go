@@ -248,8 +248,8 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 {{ .PROMPT }}
 </background_{{ .NONCE }}>{{end}}
 
-{{ if .ContextProvider.Timeline }}<timeline_{{ .NONCE }}>
-{{ .ContextProvider.Timeline }}
+{{ if .ContextProvider.TimelineDump }}<timeline_{{ .NONCE }}>
+{{ .ContextProvider.TimelineDump }}
 </timeline_{{ .NONCE }}>{{ end }}
 
 {{ if .ContextProvider.PersistentMemory }}# 牢记

@@ -4,7 +4,7 @@
 
 ## 任务状态与进度
 {{ .ContextProvider.CurrentTaskInfo }}
-{{ .ContextProvider.Timeline }}
+{{ .ContextProvider.TimelineDump }}
 
 {{ if .ContextProvider.PersistentMemory }}# 牢记
 {{ .ContextProvider.PersistentMemory}}

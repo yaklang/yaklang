@@ -38,7 +38,7 @@
 • 仅输出JSON对象即可，不需要输出解释/执行流程/注意事项等
 
 # History
-{{ .ContextProvider.Timeline }}
+{{ .ContextProvider.TimelineDump }}
 
 ```schema
 {{ .ToolJSONSchema }}
