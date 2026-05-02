@@ -287,10 +287,6 @@ func (m *PromptContextProvider) PushUserInteraction(stage aicommon.UserInteracti
 	m.timeline.PushUserInteraction(stage, seq, question, userInput)
 }
 
-func (m *PromptContextProvider) Timeline() string {
-	return m.timeline.Dump()
-}
-
 func (m *PromptContextProvider) GetTimelineInstance() *aicommon.Timeline {
 	return m.timeline
 }
@@ -336,7 +332,7 @@ func (m *PromptContextProvider) CurrentTaskTimeline() string {
 		}
 	}()
 	if m.CurrentTask == nil {
-		return m.Timeline()
+		return m.TimelineDump()
 	}
 	stl := m.timeline.CreateSubTimeline(m.CurrentTask.ToolCallResultsID()...)
 	if stl == nil {

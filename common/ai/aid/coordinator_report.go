@@ -64,7 +64,7 @@ func (c *Coordinator) buildReportGenerationPrompt() string {
 	}
 
 	if c.ContextProvider != nil {
-		timeline := c.ContextProvider.Timeline()
+		timeline := c.ContextProvider.TimelineDump()
 		if timeline != "" {
 			builder.WriteString("## Execution Timeline\n\n")
 			if len(timeline) > 50000 {
