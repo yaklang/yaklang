@@ -21,7 +21,7 @@ func extractPromptNonce(prompt string, tagNames ...string) string {
 		if nonce := extractPipeTagNonce(prompt, tagName); nonce != "" {
 			return nonce
 		}
-		if nonce := extractAngleTagNonce(prompt, tagName); nonce != "" {
+		if nonce := extractAngleTagNonce(prompt, tagName); nonce != "" && strings.ToLower(nonce) != "end" {
 			return nonce
 		}
 	}
@@ -36,22 +36,40 @@ func mustExtractPromptNonce(t *testing.T, prompt string, tagNames ...string) str
 	return nonce
 }
 
+func LegalNonce(data string) bool {
+	return data != "" && strings.ToLower(data) != "end"
+}
+
 func extractPipeTagNonce(prompt string, tagName string) string {
 	startRe := regexp.MustCompile(fmt.Sprintf(`<\|%s_([^\s\|\n>]+)(?:\s*\|>|\s*>)`, regexp.QuoteMeta(tagName)))
-	matches := startRe.FindStringSubmatch(prompt)
-	if len(matches) != 2 {
-		return ""
+	matches := startRe.FindAllStringSubmatch(prompt, -1)
+	if len(matches) > 0 {
+		for _, match := range matches {
+			if len(match) <= 1 {
+				continue
+			}
+			if LegalNonce(match[1]) {
+				return match[1]
+			}
+		}
 	}
-	return matches[1]
+	return ""
 }
 
 func extractAngleTagNonce(prompt string, tagName string) string {
 	startRe := regexp.MustCompile(fmt.Sprintf(`<%s_([^\s>\n]+)>`, regexp.QuoteMeta(tagName)))
-	matches := startRe.FindStringSubmatch(prompt)
-	if len(matches) != 2 {
-		return ""
+	matches := startRe.FindAllStringSubmatch(prompt, -1)
+	if len(matches) > 0 {
+		for _, match := range matches {
+			if len(match) <= 1 {
+				continue
+			}
+			if LegalNonce(match[1]) {
+				return match[1]
+			}
+		}
 	}
-	return matches[1]
+	return ""
 }
 
 func mustExtractAITagBlock(t *testing.T, prompt string, tagName string) aiTagBlock {

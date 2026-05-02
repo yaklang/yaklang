@@ -300,7 +300,7 @@ func TestReAct_CancelTask_InLoop(t *testing.T) {
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := r.GetPrompt()
 
-			if !utils.MatchAllOfSubString(prompt, "call-tool", "toolname_yet") {
+			if !utils.MatchAllOfSubString(prompt, "call-tool", mockToolName) {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "require_tool", "tool_require_payload": "` + mockToolName + `", 
@@ -310,7 +310,7 @@ func TestReAct_CancelTask_InLoop(t *testing.T) {
 				return rsp, nil
 			}
 
-			if utils.MatchAllOfSubString(prompt, "call-tool", "toolname_yet") {
+			if utils.MatchAllOfSubString(prompt, "call-tool", mockToolName) {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`
 {

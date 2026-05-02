@@ -14,7 +14,7 @@
 ```
 
 ```text
-<|FINAL_ANSWER_{current_nonce}|>
+<|FINAL_ANSWER|>
 # markdown answer
-<|FINAL_ANSWER_END_{current_nonce}|>
+<|FINAL_ANSWER_END|>
 ```

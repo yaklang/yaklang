@@ -21,7 +21,7 @@
 ```
 
 ```text
-<|TOOL_PARAM_script_{current_nonce}|>
+<|TOOL_PARAM_script|>
 ... raw block content ...
-<|TOOL_PARAM_script_END_{current_nonce}|>
+<|TOOL_PARAM_script_END|>
 ```

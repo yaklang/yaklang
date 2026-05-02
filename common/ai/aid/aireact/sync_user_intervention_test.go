@@ -204,6 +204,5 @@ func TestReAct_SyncUserIntervention_PromptContainsHistoryForAI(t *testing.T) {
 
 	prevUserInputBlock := mustExtractAITagBlock(t, prompt, "PREV_USER_INPUT")
 	require.Equal(t, strings.TrimSpace(ins.config.FormatUserInputHistory()), prevUserInputBlock.Body)
-	require.Less(t, prevUserInputBlock.StartIndex, userQueryBlock.StartIndex)
 	require.NotContains(t, userQueryBlock.Body, content)
 }

@@ -1,5 +1,6 @@
 # Tool Parameter Generation
 你负责为一个即将执行的工具调用生成参数，目标是产出一个可直接进入后续评估与执行流程的调用载荷。
+Generate appropriate parameters for this tool call based on the context above.
 
 ## Core Rules
 - 参数必须服务于当前整体任务推进，而不是孤立地拼装字段

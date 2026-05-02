@@ -10,4 +10,4 @@
 你在此前选择了工具 `{{ .OldToolName }}`，这个工具用途是 `{{ .OldToolDescription }}`，但是在执行过程中发现这个工具不适合当前的任务。你需要重新选择一个工具来完成任务。
 
 # 你需要选择的工具列表
-候选工具已经在上面的 Tool Inventory 中给出；请从这些工具里重新选择，或按 schema 选择 `abandon` / `ask-for-clarification`。
+候选工具已经在上面的 Tool Inventory 中给出；请从这些工具里重新选择
