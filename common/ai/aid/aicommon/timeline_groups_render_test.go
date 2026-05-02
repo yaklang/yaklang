@@ -284,9 +284,10 @@ func TestGroupByMinutes_ShrinkResultPreferred(t *testing.T) {
 	require.NotContains(t, rendered, "verylongtooldatacontent", "raw long content should not appear")
 }
 
-// TestGroupByMinutes_RenderShorterThanDump 设置 ShrinkResult 后 Render(tag) 应明显短于 Dump
-// 关键词: GroupByMinutes 体积优化, vs Dump
-func TestGroupByMinutes_RenderShorterThanDump(t *testing.T) {
+// TestGroupByMinutes_DumpEqualsAllRenderable 验证 Dump 现在就是 GroupByMinutes(3).GetAllRenderable().Render("TIMELINE") 的别名
+// 关键词: Dump 等价于 GroupByMinutes, 行为一致, aitag 格式
+// 历史背景: 旧 Dump 是行式文本（"--[time]"），与 GroupByMinutes 输出不一致；本次将 Dump 内部统一为 GroupByMinutes
+func TestGroupByMinutes_DumpEqualsAllRenderable(t *testing.T) {
 	tl := NewTimeline(nil, nil)
 	base := time.Date(2026, 5, 2, 10, 0, 0, 0, time.UTC)
 	for i := 1; i <= 5; i++ {
@@ -294,9 +295,10 @@ func TestGroupByMinutes_RenderShorterThanDump(t *testing.T) {
 		tr.SetShrinkResult("S")
 		injectTimelineItem(tl, int64(i), base.Add(time.Duration(i*10)*time.Second), tr)
 	}
-	groupRender := tl.GroupByMinutes(3).GetBlocks().Render("TIMELINE_INTERVAL_GROUP")
 	dumpRender := tl.Dump()
-	require.Greater(t, len(dumpRender), len(groupRender), "group-render should be shorter than dump when shrunk")
+	groupRender := tl.GroupByMinutes(TimelineDumpDefaultIntervalMinutes).GetAllRenderable().Render(TimelineDumpDefaultAITagName)
+	require.Equal(t, groupRender, dumpRender, "Dump must be byte-equal to GroupByMinutes(N).GetAllRenderable().Render(tag)")
+	require.NotEmpty(t, dumpRender)
 }
 
 // TestGroupByMinutes_PrefixStabilityForCacheHit frozen block 在追加新条目后 Render 文本必须字节级不变

@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/utils/linktable"
 )
 
 func TestMemoryTimelineOrdinary(t *testing.T) {
@@ -25,7 +26,10 @@ func TestMemoryTimelineOrdinary(t *testing.T) {
 	result := memoryTimeline.Dump()
 	t.Log(result)
 	require.True(t, strings.Contains(result, "test"))
-	require.True(t, strings.Contains(result, "--["))
+	// Dump 现在走 GroupByMinutes(3).GetAllRenderable().Render("TIMELINE")，输出 aitag 包裹格式
+	// 关键词: TestMemoryTimelineOrdinary, aitag 包裹断言
+	require.True(t, strings.Contains(result, "<|TIMELINE_"))
+	require.True(t, strings.Contains(result, "<|TIMELINE_END_"))
 }
 
 type mockedAI struct {
@@ -311,4 +315,39 @@ func TestTimelineEdgeCases(t *testing.T) {
 	// Test ToTimelineItemOutputLastN with empty timeline
 	lastN := emptyTimeline.ToTimelineItemOutputLastN(5)
 	require.Len(t, lastN, 0)
+}
+
+// TestDump_ByteStability 验证 Dump 在不变 timeline 上字节级稳定
+// 这是 prompt cache 命中的核心保证：同一个未变化的 timeline 反复调用 Dump 必须产出相同字节流
+// 关键词: TestDump_ByteStability, prompt cache 命中保护, Dump 字节稳定
+func TestDump_ByteStability(t *testing.T) {
+	tl := NewTimeline(nil, nil)
+	baseTs := time.Date(2026, 5, 1, 10, 0, 0, 0, time.UTC)
+
+	// 跨多个 3 分钟桶注入活跃条目
+	injectTimelineItem(tl, int64(101), baseTs.Add(30*time.Second), makeToolResult(101, "scan", true, "scan-result-A"))
+	injectTimelineItem(tl, int64(102), baseTs.Add(2*time.Minute+10*time.Second), makeToolResult(102, "ls", true, "ls-output"))
+	injectTimelineItem(tl, int64(103), baseTs.Add(5*time.Minute), makeToolResult(103, "cat", true, "cat-output"))
+	injectTimelineItem(tl, int64(104), baseTs.Add(8*time.Minute+45*time.Second), makeToolResult(104, "echo", true, "echo-output"))
+
+	// 注入 reducer 模拟之前已批量压缩
+	tl.reducers.Set(int64(50), linktable.NewUnlimitedStringLinkTable("compressed batch memory alpha"))
+	tl.reducerTs.Set(int64(50), baseTs.Add(-5*time.Minute).UnixMilli())
+	tl.reducers.Set(int64(60), linktable.NewUnlimitedStringLinkTable("compressed batch memory beta"))
+	tl.reducerTs.Set(int64(60), baseTs.Add(-2*time.Minute).UnixMilli())
+
+	dump1 := tl.Dump()
+	require.NotEmpty(t, dump1, "Dump should not be empty for non-empty timeline")
+	require.Contains(t, dump1, "<|TIMELINE_", "Dump must use aitag-wrapped format")
+	require.Contains(t, dump1, "<|TIMELINE_END_", "Dump must include aitag end markers")
+
+	// 多次重复调用应字节级一致
+	for i := 0; i < 5; i++ {
+		time.Sleep(20 * time.Millisecond)
+		dump := tl.Dump()
+		require.Equal(t, dump1, dump, "Dump must be byte-identical across consecutive calls (iteration %d)", i)
+	}
+
+	// 同样断言 String() 与 Dump() 一致
+	require.Equal(t, dump1, tl.String(), "String() must equal Dump()")
 }

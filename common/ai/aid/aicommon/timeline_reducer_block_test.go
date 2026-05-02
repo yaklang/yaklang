@@ -1,6 +1,7 @@
 package aicommon
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -11,9 +12,11 @@ import (
 	"github.com/yaklang/yaklang/common/utils/linktable"
 )
 
-// TestDumpBefore_ReducerTimeStable 验证 DumpBefore 中 reducer 行使用稳定时间戳，多次调用字节级一致
-// 关键词: DumpBefore reducer 稳定时间戳, 缓存稳定
-// 历史背景: 旧实现 reducer 行用 time.Now() 渲染，导致 Dump 每次输出不同，破坏 LLM 前缀缓存
+// TestDumpBefore_ReducerTimeStable 验证 Dump 中 reducer block 使用稳定时间戳，多次调用字节级一致
+// 关键词: Dump reducer 稳定时间戳, 缓存稳定, aitag 格式
+// 历史背景: 旧实现 reducer 行用 time.Now() 渲染，导致 Dump 每次输出不同，破坏 LLM 前缀缓存。
+// 新格式: Dump 走 GroupByMinutes，reducer block 渲染为 <|TIMELINE_r<id>t<unixSec>|> 包裹的 aitag 块，
+// 内部首行 `# reducer key=<id> ts=<unixSec>`，时间字段使用 unixSec 而非 YYYY/MM/DD 字符串。
 func TestDumpBefore_ReducerTimeStable(t *testing.T) {
 	tl := NewTimeline(nil, nil)
 
@@ -35,16 +38,19 @@ func TestDumpBefore_ReducerTimeStable(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 
 	dump2 := tl.Dump()
-	require.Equal(t, dump1, dump2, "DumpBefore reducer line MUST be byte-identical across consecutive calls")
+	require.Equal(t, dump1, dump2, "Dump reducer block MUST be byte-identical across consecutive calls")
 
-	// 必须包含基于 reducerTs 渲染的稳定时间字段
-	expectedTimeStr := time.Unix(0, reducerTs*int64(time.Millisecond)).Format("2006/01/02 15:04:05")
-	require.Contains(t, dump1, expectedTimeStr, "reducer line should use stable timestamp from reducerTs")
-	require.Contains(t, dump1, "reducer-memory: compressed batch memory")
+	// 必须使用基于 reducerTs 派生的稳定 unix 秒戳作为 nonce 与首行 ts
+	expectedNonce := fmt.Sprintf("r%dt%d", reducerKey, reducerTs/1000)
+	require.Contains(t, dump1, "<|TIMELINE_"+expectedNonce+"|>", "reducer block aitag wrapper should use stable nonce derived from reducerTs")
+	require.Contains(t, dump1, fmt.Sprintf("# reducer key=%d ts=%d", reducerKey, reducerTs/1000), "reducer block first line should include stable unix timestamp")
+	require.Contains(t, dump1, "[reducer/memory]")
+	require.Contains(t, dump1, "compressed batch memory")
 }
 
 // TestDumpBefore_ReducerNoLegacyNow 验证当 reducerTs 缺失时也使用稳定占位，不再用 time.Now()
-// 关键词: DumpBefore reducer fallback, 老数据稳定渲染
+// 关键词: Dump reducer fallback, 老数据稳定渲染, aitag 格式
+// 新格式: 老数据 reducerTs 缺失 → unix 秒戳为 0、行头 00:00:00、aitag nonce r<id>t0
 func TestDumpBefore_ReducerNoLegacyNow(t *testing.T) {
 	tl := NewTimeline(nil, nil)
 
@@ -52,15 +58,19 @@ func TestDumpBefore_ReducerNoLegacyNow(t *testing.T) {
 	injectTimelineItem(tl, int64(1), baseTs, makeToolResult(1, "tool", true, "data"))
 
 	// 仅设置 reducers，不设置 reducerTs（模拟老数据）
-	tl.reducers.Set(int64(1), linktable.NewUnlimitedStringLinkTable("legacy memory"))
+	reducerKey := int64(1)
+	tl.reducers.Set(reducerKey, linktable.NewUnlimitedStringLinkTable("legacy memory"))
 
 	dump1 := tl.Dump()
 	time.Sleep(50 * time.Millisecond)
 	dump2 := tl.Dump()
 
-	require.Equal(t, dump1, dump2, "DumpBefore must remain stable even when reducerTs is missing")
-	// 老数据 fallback：使用 1970 epoch 占位，确保稳定
-	require.Contains(t, dump1, "1970/01/01 00:00:00")
+	require.Equal(t, dump1, dump2, "Dump must remain stable even when reducerTs is missing")
+	// 老数据 fallback：使用 ts=0 占位，aitag nonce 为 r<id>t0，行头时间为 00:00:00
+	require.Contains(t, dump1, fmt.Sprintf("<|TIMELINE_r%dt0|>", reducerKey))
+	require.Contains(t, dump1, fmt.Sprintf("# reducer key=%d ts=0", reducerKey))
+	require.Contains(t, dump1, "00:00:00 [reducer/memory]")
+	require.Contains(t, dump1, "legacy memory")
 }
 
 // TestGroupByMinutes_ReducerBlock_Basic 验证 GroupByMinutes 输出 reducer block

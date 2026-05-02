@@ -325,19 +325,37 @@ looks good
 
 ## 7. 与 Dump 的差异
 
-| 维度                  | `Timeline.Dump()`                | `GroupByMinutes(...).GetAllRenderable().Render(...)` |
-| --------------------- | -------------------------------- | ---------------------------------------------------- |
-| 包含 reducer          | 是                               | 是（独立 reducer block）                             |
-| 包含 archive          | 是                               | 否（archive 是更上层概念，本接口只关心 timeline 内部）|
-| 时间格式              | `YYYY/MM/DD HH:MM:SS`            | block 内 entry 用 `HH:MM:SS`；首行包含完整桶时间     |
-| 条目内容              | `item.String()` 完整              | 优先 `GetShrinkResult()` / `GetShrinkSimilarResult()` |
-| 输出大小              | 大（人类可读）                    | 小（token 友好）                                     |
-| aitag 包裹            | 否                                | 是                                                   |
-| 缓存稳定性            | 无保证（旧版 reducer 行用 `time.Now()`） | 强保证（reducer 用 `reducerTs`，interval 用绝对桶时间） |
+> **注意**：自 2026-05 起，`Timeline.Dump()` / `Timeline.DumpBefore()` / `Timeline.String()`
+> 已经被实现为 `GroupByMinutes(3).GetAllRenderable().Render("TIMELINE")` 的便捷别名。
+> 这意味着两者的输出**已经完全一致**，aitag 包裹、reducer/interval block 拆分、
+> 字节级稳定都自动适用。
 
-> 本次改动也修复了 `DumpBefore` 中 reducer 行原本使用 `time.Now()` 渲染的问题。
-> 现在 `DumpBefore` 与 `GroupByMinutes` 共享同一份 `Timeline.reducerTs`，二者
-> 输出在重复调用之间都字节级一致。
+```go
+// 这两行等价
+prompt := timeline.Dump()
+prompt := timeline.GroupByMinutes(3).GetAllRenderable().Render("TIMELINE")
+```
+
+简明总结当前 `Dump` 的输出特征：
+
+- **包含 reducer**：是（以独立的 `<|TIMELINE_r<id>t<sec>|>...<|TIMELINE_END_...|>` 块出现）
+- **包含 interval**：是（以独立的 `<|TIMELINE_b<N>t<sec>|>...<|TIMELINE_END_...|>` 块出现）
+- **包含 archive**：**否**。`Timeline.archiveRefs` 字段仍照常写入与序列化，但**不再渲染到 Dump**。
+  如果上层需要展示归档信息，请：
+  1. 通过 `Timeline.archiveRefs` 直接访问，或
+  2. 走 midterm 检索（详见 `aireact/midterm_context_provider.go`）
+- **时间格式**：每个 entry 的行头使用 `HH:MM:SS`；block 首行 `# bucket=YYYY/MM/DD ...` 或
+  `# reducer key=<id> ts=<unixSec>` 提供完整时间。
+- **条目内容**：优先使用 `GetShrinkResult()` / `GetShrinkSimilarResult()`；缺失时回退 `item.String()`。
+- **缓存稳定性**：与 `GroupByMinutes` 完全一致，前面的 frozen block 字节级不变。
+
+### 已知瑕疵（待后续处理）
+
+- **Midterm prefix 与 Dump 输出格式混合**：
+  `aireact/midterm_context_provider.go` 中的 `buildTimelineDumpWithMidtermMemory`
+  仍按旧字符串拼接生成 `--[time] midterm-memory:` 行式前缀，再直接拼上 aitag 风格的
+  `Timeline.Dump()`。Prompt 整体仍可读，但格式不统一。本次改动**未触及**该函数，
+  留作下一轮独立处理。
 
 ---
 
@@ -350,6 +368,10 @@ looks good
 - 边界点（`t == bucketEnd`）落入下一个桶。
 - 对同一 timeline 反复调用 `GroupByMinutes(N)` 必产出 byte-equal 的渲染串。
 - 反序列化老数据（含 `summary` 字段）：`summary` 内容被忽略，其余字段照常恢复。
+- `Timeline.Dump()` / `DumpBefore(beforeId)` / `String()` 输出与
+  `GroupByMinutes(3).GetAllRenderable().Render("TIMELINE")` 完全一致；
+  `DumpBefore(beforeId)` 内部通过 `CreateSubTimeline` 把 `id <= beforeId` 的条目
+  筛出后再走同一渲染路径，因此 archive ref 同样不会出现在 `DumpBefore` 输出中。
 
 详细见 [`timeline_groups_render_test.go`](timeline_groups_render_test.go) /
 [`timeline_groups_render_aitag_test.go`](timeline_groups_render_aitag_test.go) /

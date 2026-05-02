@@ -908,96 +908,60 @@ func (m *Timeline) renderSummaryPrompt(result *TimelineItem) string {
 	return buf.String()
 }
 
+// TimelineDumpDefaultIntervalMinutes 是 Dump / String / DumpBefore 默认使用的分桶分钟数
+// 关键词: TimelineDumpDefaultIntervalMinutes, Dump 默认 interval
+const TimelineDumpDefaultIntervalMinutes = 3
+
+// TimelineDumpDefaultAITagName 是 Dump / String / DumpBefore 默认使用的 aitag tag 名
+// 关键词: TimelineDumpDefaultAITagName, Dump aitag tag
+const TimelineDumpDefaultAITagName = "TIMELINE"
+
+// Dump 输出 timeline 的 aitag-wrapped 渲染串。
+// 等价于 GroupByMinutes(TimelineDumpDefaultIntervalMinutes).GetAllRenderable().Render(TimelineDumpDefaultAITagName)
+// 仅包含 reducer block + interval block，不包含 archive block（archive 暂时不展示在 Dump 中）
+// 关键词: Timeline.Dump, GroupByMinutes 别名, aitag 包裹, 前缀缓存
 func (m *Timeline) Dump() string {
-	k, _, ok := m.idToTimelineItem.Last()
-	if ok {
-		return m.DumpBefore(k)
+	if m == nil {
+		return ""
 	}
-	return ""
+	return m.GroupByMinutes(TimelineDumpDefaultIntervalMinutes).
+		GetAllRenderable().
+		Render(TimelineDumpDefaultAITagName)
 }
 
+// String 是 Dump 的别名，为了兼容 fmt.Stringer 接口
 func (m *Timeline) String() string {
 	return m.Dump()
 }
 
+// DumpBefore 输出 ID <= beforeId 的部分 timeline，结构与 Dump 一致
+// 通过 CreateSubTimeline 限定上界，再走 Dump 公共路径，避免修改 GroupByMinutes 签名
+// 关键词: Timeline.DumpBefore, 子 timeline 上界, GroupByMinutes 复用
 func (m *Timeline) DumpBefore(beforeId int64) string {
-	buf := bytes.NewBuffer(nil)
-	initOnce := sync.Once{}
-	count := 0
-
-	reduceredStartId, _, _ := m.reducers.Last()
-	archiveStartId, archiveRef, _ := m.archiveRefs.Last()
-
-	if archiveStartId > 0 && archiveRef != nil {
-		initOnce.Do(func() {
-			buf.WriteString("timeline:\n")
-		})
-		archiveTimeStr := archiveRef.CreatedAt.Format(utils.DefaultTimeFormat3)
-		if archiveTimeStr == "" || archiveRef.CreatedAt.IsZero() {
-			archiveTimeStr = time.Now().Format(utils.DefaultTimeFormat3)
-		}
-		buf.WriteString(fmt.Sprintf("--[%s] id: %v archive-memory: %s\n", archiveTimeStr, archiveStartId, archiveRef.String()))
+	if m == nil {
+		return ""
+	}
+	if m.idToTimelineItem == nil {
+		return ""
 	}
 
-	// If we have reducers, show them first
-	if reduceredStartId > 0 {
-		val, ok := m.reducers.Get(reduceredStartId)
-		if ok {
-			initOnce.Do(func() {
-				buf.WriteString("timeline:\n")
-			})
-			buf.WriteString(fmt.Sprint("  ...\n"))
-			// 关键词: DumpBefore reducer 稳定时间戳, reducerTs
-			// 优先用 reducerTs 中存储的稳定时间戳来渲染 reducer 行
-			// 旧代码使用 time.Now() 会导致 Dump 每次输出不同，破坏 LLM 前缀缓存
-			var reducerTimeStr string
-			if ts, tsOk := m.reducerTs.Get(reduceredStartId); tsOk && ts > 0 {
-				reducerTimeStr = time.Unix(0, ts*int64(time.Millisecond)).Format(utils.DefaultTimeFormat3)
-			} else {
-				// 兼容老数据：没有 reducerTs 时退回到一个固定的占位（用 reduceredStartId 推算的稳定串）
-				// 注意这里不再使用 time.Now()，保证字节级稳定
-				reducerTimeStr = "1970/01/01 00:00:00"
-			}
-			buf.WriteString(fmt.Sprintf("--[%s] id: %v reducer-memory: %v\n", reducerTimeStr, reduceredStartId, val.Value()))
+	// 收集 ID <= beforeId 的活跃条目 ID
+	var ids []int64
+	m.idToTimelineItem.ForEach(func(id int64, _ *TimelineItem) bool {
+		if id <= beforeId {
+			ids = append(ids, id)
 		}
-	}
-
-	m.idToTimelineItem.ForEach(func(id int64, item *TimelineItem) bool {
-		initOnce.Do(func() {
-			buf.WriteString("timeline:\n")
-		})
-
-		if item.GetID() > beforeId {
-			return true
-		}
-
-		ts, ok := m.idToTs.Get(item.GetID())
-		if !ok {
-			log.Warnf("BUG: timeline id %v not found", item.GetID())
-		}
-		t := time.Unix(0, ts*int64(time.Millisecond))
-		timeStr := t.Format(utils.DefaultTimeFormat3)
-
-		if item.deleted {
-			return true
-		}
-
-		//buf.WriteString(fmt.Sprintf("├─[%s]\n", timeStr))
-		buf.WriteString(fmt.Sprintf("--[%s]\n", timeStr))
-		raw := item.String()
-		for _, line := range utils.ParseStringToRawLines(raw) {
-			//buf.WriteString(fmt.Sprintf("│    %s\n", line))
-			buf.WriteString(fmt.Sprintf("     %s\n", line))
-		}
-		count++
 		return true
 	})
-	if count > 0 {
-		return buf.String()
+	if len(ids) == 0 {
+		return ""
 	}
 
-	buf.WriteString("no timeline generated in DumpBefore\n")
-	return buf.String()
+	sub := m.CreateSubTimeline(ids...)
+	if sub == nil {
+		return ""
+	}
+	return sub.Dump()
 }
 
 func (m *Timeline) attachArchiveRef(reducerKeyID int64, ref *TimelineArchiveRef) {
