@@ -101,6 +101,17 @@ type AIConfig struct {
 	// with nil if the upstream did not return any usage block.
 	// 关键词: AIConfig.UsageCallback, token usage callback
 	UsageCallback func(*ChatUsage)
+
+	// RawMessages 用于完整透传客户端原始 messages 数组到上游 LLM，
+	// 而不是只透传一个 prompt 字符串。设置后，gateway 的 Chat(s) 会把这
+	// 个数组带入 ChatBaseContext.RawMessages，chatBaseChatCompletions 会
+	// 跳过"单 user 包装+ImageUrls/VideoUrls 合并"逻辑，直接使用本字段。
+	//
+	// 主要使用场景: aibalance 等中转层希望保留客户端 messages 的 role 顺
+	// 序与 content 结构，最大化上游隐式缓存的前缀命中率。
+	//
+	// 关键词: AIConfig.RawMessages, messages 完整透传, 隐式缓存前缀稳定
+	RawMessages []ChatDetail
 }
 
 func WithExtraHeader(headers map[string]string) AIConfigOption {
@@ -1072,5 +1083,22 @@ func WithRawHTTPRequestResponseCallback(cb RawHTTPRequestResponseCallback) AICon
 func WithUsageCallback(cb func(*ChatUsage)) AIConfigOption {
 	return func(c *AIConfig) {
 		c.UsageCallback = cb
+	}
+}
+
+// WithRawMessages 让上层把客户端原始的 messages 数组完整透传到上游 LLM，
+// 不再被 gateway 拍平为单条 user 消息。
+//
+// 行为：当 RawMessages 非空时，gateway 的 Chat(s) 会把它带入
+// ChatBaseContext.RawMessages，chatBaseChatCompletions 跳过单 user 包装，
+// 直接以 RawMessages 作为最终请求体的 messages 字段。
+//
+// 主要使用场景: aibalance 等中转层希望保留客户端 messages 的 role 顺序与
+// content 结构，最大化上游隐式缓存的前缀命中率。
+//
+// 关键词: WithRawMessages, messages 完整透传, 隐式缓存前缀稳定
+func WithRawMessages(msgs []ChatDetail) AIConfigOption {
+	return func(c *AIConfig) {
+		c.RawMessages = msgs
 	}
 }

@@ -241,6 +241,93 @@ func (p *Provider) GetAIClientWithImages(imageContents []*aispec.ChatContent, en
 	return p.GetAIClientWithImagesAndTools(imageContents, nil, nil, enableThinking, onStream, onReasonStream, onToolCall)
 }
 
+// GetAIClientWithRawMessages 构造一个携带"完整原始 messages 数组"的 AI 客户端，
+// 用于 aibalance 中转层把客户端 messages 一字不差地透传到上游 LLM，最大化
+// 隐式缓存的前缀字节命中率。
+//
+// 与 GetAIClientWithImagesAndTools 的区别：
+//   - 不再单独提取 image_url 注入 WithChatImageContent —— 因为 image_url 已经
+//     直接放在 messages 内的 content 数组中，由 RawMessages 统一携带；
+//   - 通过 aispec.WithRawMessages(messages) 把整个 messages 数组写入 AIConfig，
+//     gateway.Chat(s) 会再透传到 ChatBaseContext.RawMessages，
+//     由 chatBaseChatCompletions 直接使用，跳过单 user 包装。
+//
+// 旧的 GetAIClientWithImagesAndTools/GetAIClientWithImages 保留不变，便于
+// 不需要 messages 完整透传的旧调用方继续使用。
+//
+// 关键词: GetAIClientWithRawMessages, aibalance messages 透传, 隐式缓存前缀稳定
+func (p *Provider) GetAIClientWithRawMessages(messages []aispec.ChatDetail, tools []aispec.Tool, toolChoice any, enableThinking bool, onStream, onReasonStream func(reader io.Reader), onToolCall func([]*aispec.ToolCall)) (aispec.AIClient, error) {
+	log.Infof("GetAIClientWithRawMessages: type: %s, domain: %s, key: %s, model: %s, no_https: %v, messages: %d, tools: %d", p.TypeName, p.DomainOrURL, utils.ShrinkString(p.APIKey, 8), p.ModelName, p.NoHTTPS, len(messages), len(tools))
+
+	var opts []aispec.AIConfigOption
+	opts = append(
+		opts,
+		aispec.WithType(p.TypeName),
+		aispec.WithTimeout(10),
+		aispec.WithNoHTTPS(p.NoHTTPS),
+		aispec.WithAPIKey(p.APIKey),
+		aispec.WithModel(p.ModelName),
+		// RawMessages 透传：让 gateway.Chat(s) 把整个 messages 数组带到 ChatBase
+		aispec.WithRawMessages(messages),
+		aispec.WithStreamHandler(func(reader io.Reader) {
+			if onStream != nil {
+				onStream(reader)
+			} else {
+				io.Copy(os.Stdout, reader)
+			}
+		}),
+		aispec.WithReasonStreamHandler(func(reader io.Reader) {
+			if onReasonStream != nil {
+				onReasonStream(reader)
+			} else {
+				io.Copy(os.Stdout, reader)
+			}
+		}),
+	)
+
+	shouldEnableThinking := enableThinking
+	forceDisableThinking := false
+	if p.OptionalAllowReason != "" {
+		switch strings.ToLower(strings.TrimSpace(p.OptionalAllowReason)) {
+		case "true", "yes", "1", "enable", "on":
+			shouldEnableThinking = true
+		case "false", "no", "0", "disable", "off":
+			shouldEnableThinking = false
+			forceDisableThinking = true
+		}
+	}
+	if shouldEnableThinking {
+		log.Infof("GetAIClientWithRawMessages: enable_thinking=true for type=%s (OptionalAllowReason=%q, clientRequest=%v)", p.TypeName, p.OptionalAllowReason, enableThinking)
+		opts = append(opts, aispec.WithEnableThinking(true))
+	} else if forceDisableThinking {
+		log.Infof("GetAIClientWithRawMessages: enable_thinking=false (force disabled) for type=%s (OptionalAllowReason=%q)", p.TypeName, p.OptionalAllowReason)
+		opts = append(opts, aispec.WithEnableThinking(false))
+	}
+
+	if onToolCall != nil {
+		opts = append(opts, aispec.WithToolCallCallback(onToolCall))
+	}
+	if len(tools) > 0 {
+		opts = append(opts, aispec.WithTools(tools))
+	}
+	if toolChoice != nil {
+		opts = append(opts, aispec.WithToolChoice(toolChoice))
+	}
+
+	if target := strings.TrimSpace(p.DomainOrURL); target != "" {
+		if utils.IsHttpOrHttpsUrl(target) {
+			opts = append(opts, aispec.WithBaseURL(target))
+		} else {
+			opts = append(opts, aispec.WithDomain(target))
+		}
+	}
+	client := ai.GetAI(p.TypeName, opts...)
+	if utils.IsNil(client) || client == nil {
+		return nil, errors.New("failed to get ai client, no such type: " + p.TypeName)
+	}
+	return client, nil
+}
+
 // GetAIClient gets the AI client
 func (p *Provider) GetAIClient(enableThinking bool, onStream, onReasonStream func(reader io.Reader)) (aispec.AIClient, error) {
 	return p.GetAIClientWithImages(nil, enableThinking, onStream, onReasonStream, nil)

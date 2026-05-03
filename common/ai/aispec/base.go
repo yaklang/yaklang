@@ -235,6 +235,15 @@ type ChatBaseContext struct {
 	// callback may receive nil if no usage block was observed.
 	// 关键词: ChatBaseContext.UsageCallback, token 用量回调
 	UsageCallback func(*ChatUsage)
+
+	// RawMessages 用于完整透传客户端原始 messages 数组到上游 LLM。
+	// 当 len(RawMessages) > 0 时，chatBaseChatCompletions 会跳过
+	// "单 user 包装+ImageUrls/VideoUrls 合并"逻辑，直接以本字段作为
+	// 最终请求体的 messages 数组；同时 ImageUrls/VideoUrls 会被忽略，
+	// 因为 RawMessages 已经原样携带了客户端的 image_url/video_url content。
+	//
+	// 关键词: ChatBaseContext.RawMessages, messages 完整透传
+	RawMessages []ChatDetail
 }
 
 type ChatBaseOption func(c *ChatBaseContext)
@@ -384,6 +393,17 @@ func WithChatBase_UsageCallback(cb func(*ChatUsage)) ChatBaseOption {
 	}
 }
 
+// WithChatBase_RawMessages 让 chatBaseChatCompletions 跳过"单 user 包装"，
+// 直接使用调用方提供的 messages 数组作为最终请求体的 messages 字段。
+// 配合 gateway.Chat(s) 中的 g.config.RawMessages 透传使用。
+//
+// 关键词: WithChatBase_RawMessages, messages 完整透传
+func WithChatBase_RawMessages(msgs []ChatDetail) ChatBaseOption {
+	return func(c *ChatBaseContext) {
+		c.RawMessages = msgs
+	}
+}
+
 func NewChatBaseContext(opts ...ChatBaseOption) *ChatBaseContext {
 	ctx := &ChatBaseContext{
 		EnableThinking: false,
@@ -396,8 +416,16 @@ func NewChatBaseContext(opts ...ChatBaseOption) *ChatBaseContext {
 }
 
 func ChatBase(url string, model string, msg string, chatOpts ...ChatBaseOption) (string, error) {
-	dispatchChatBaseMirror(model, msg)
 	ctx := NewChatBaseContext(chatOpts...)
+	// RawMessages 非空时，让 mirror observer 收到稳定的 messages 序列化字符串
+	// 而不是 prompt 拍平字符串，保持 aicache 等观测者的前缀字节序与上游 LLM
+	// 实际收到的 messages 数组一致，提升缓存命中率统计准确性。
+	// 关键词: ChatBase mirror RawMessages 序列化, 镜像观测前缀对齐
+	mirrorMsg := msg
+	if len(ctx.RawMessages) > 0 {
+		mirrorMsg = serializeRawMessagesForMirror(ctx.RawMessages)
+	}
+	dispatchChatBaseMirror(model, mirrorMsg)
 	interfaceType := ctx.InterfaceType
 	if interfaceType == ChatBaseInterfaceTypeChatCompletions && strings.HasSuffix(strings.TrimRight(strings.ToLower(url), "/"), "/responses") {
 		interfaceType = ChatBaseInterfaceTypeResponses
@@ -410,11 +438,41 @@ func ChatBase(url string, model string, msg string, chatOpts ...ChatBaseOption) 
 	}
 }
 
+// serializeRawMessagesForMirror 将 RawMessages 稳定序列化为 JSON 字符串，
+// 用于 dispatchChatBaseMirror 的 msg 参数。失败时回退为空字符串。
+//
+// 实现选择 encoding/json：默认使用结构体 JSON tag 的字段顺序，多次序列化
+// 同一输入产生相同字节序，满足 aicache 等观测者基于字符串前缀做 LCP 计算
+// 的稳定性要求。
+//
+// 关键词: serializeRawMessagesForMirror, RawMessages JSON 序列化, mirror 前缀稳定
+func serializeRawMessagesForMirror(msgs []ChatDetail) string {
+	if len(msgs) == 0 {
+		return ""
+	}
+	b, err := json.Marshal(msgs)
+	if err != nil {
+		return ""
+	}
+	return string(b)
+}
+
 func chatBaseChatCompletions(url string, model string, msg string, ctx *ChatBaseContext) (string, error) {
 	var msgs []ChatDetail
 	hasImages := len(ctx.ImageUrls) > 0
 	hasVideos := len(ctx.VideoUrls) > 0
-	if !hasImages && !hasVideos {
+	// RawMessages 优先：完全尊重客户端原始 messages 数组，
+	// 跳过单 user 包装与 ImageUrls/VideoUrls 合并，让上游隐式缓存
+	// 的前缀字节序列保持与客户端一致。
+	// 关键词: chatBaseChatCompletions RawMessages 分支, messages 完整透传
+	if len(ctx.RawMessages) > 0 {
+		msgs = append(msgs, ctx.RawMessages...)
+		// RawMessages 模式下忽略 ImageUrls/VideoUrls：客户端
+		// 应将 image_url/video_url 直接放在 messages 内的 content 数组
+		// 中携带，gateway 不再代为合并。
+		hasImages = false
+		hasVideos = false
+	} else if !hasImages && !hasVideos {
 		msgs = append(msgs, NewUserChatDetail(msg))
 	} else {
 		var contents []*ChatContent

@@ -437,6 +437,53 @@ func BuildPromptAffinityKey(prompt, apiKey, model string, prefixLen int) string 
 	return utils.CalcSha1(prompt[:end], apiKey, model)
 }
 
+// serializeMessagesForAffinity 把 messages 数组按稳定 JSON 字节序列化，
+// 用于 affinity key 计算与统计。json.Marshal 在结构体 tag 顺序固定的情况下
+// 会输出确定字节序（map[string]any 有运行时排序保证），满足"逻辑相同 ->
+// 字节相同 -> 路由相同"的稳定性需求。
+//
+// 关键词: serializeMessagesForAffinity, messages 稳定序列化
+func serializeMessagesForAffinity(msgs []aispec.ChatDetail) string {
+	if len(msgs) == 0 {
+		return ""
+	}
+	b, err := json.Marshal(msgs)
+	if err != nil {
+		return ""
+	}
+	return string(b)
+}
+
+// BuildMessagesAffinityKey 基于 messages 数组前缀 + apiKey + model 计算稳定 affinityKey。
+// 与 BuildPromptAffinityKey 不同的是，它不再依赖被拍平的 prompt 字符串，
+// 而是用 messages 数组的 JSON 序列化前缀作为"逻辑请求指纹"。这样更贴近
+// 上游 LLM 实际看到的请求体字节序，有利于：
+//   - aibalance 把同一 messages 路由到同一上游 provider（亲和性）
+//   - 上游隐式缓存按 messages JSON 字节前缀做 LCP 匹配 -> 命中率提升
+//
+// 关键词: 亲和性路由, BuildMessagesAffinityKey, messages 前缀
+func BuildMessagesAffinityKey(msgs []aispec.ChatDetail, apiKey, model string, prefixLen int) string {
+	return BuildPromptAffinityKey(serializeMessagesForAffinity(msgs), apiKey, model, prefixLen)
+}
+
+// aibalanceLegacyFlattenEnv 是回滚开关的环境变量名。
+// 设置为 "1" 时，serveChatCompletions 退回到旧的"拍平 messages 为单条
+// prompt 字符串"路径，丢失 role 边界与 content 结构。仅用于线上紧急回滚，
+// 默认关闭。
+//
+// 关键词: aibalanceLegacyFlattenEnv, 回滚开关, 拍平 messages
+const aibalanceLegacyFlattenEnv = "AIBALANCE_LEGACY_FLATTEN_MESSAGES"
+
+// legacyFlattenMessagesEnabled 是 aibalance 的拍平回滚开关。
+// 默认 false，即走新的"messages 完整透传"路径；运维侧可通过环境变量
+// AIBALANCE_LEGACY_FLATTEN_MESSAGES=1 强制退回旧路径。
+//
+// 关键词: legacyFlattenMessagesEnabled, 紧急回滚, 透传降级
+func legacyFlattenMessagesEnabled() bool {
+	v := strings.TrimSpace(os.Getenv(aibalanceLegacyFlattenEnv))
+	return v == "1" || strings.EqualFold(v, "true") || strings.EqualFold(v, "yes")
+}
+
 // GetAllProviders returns all providers for the given model
 func (e *Entrypoints) GetAllProviders(model string) []*Provider {
 	return e.providers[model]
@@ -805,6 +852,17 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 		}
 	}
 
+	// messages 处理：
+	// - 默认（新路径）: 完整尊重 bodyIns.Messages 的顺序与 role/content 结构，
+	//   交给 GetAIClientWithRawMessages 透传给上游 LLM，用以最大化隐式缓存
+	//   前缀命中率；
+	// - legacy 模式（AIBALANCE_LEGACY_FLATTEN_MESSAGES=1）: 退回旧的"messages
+	//   拍平为单条 prompt 字符串 + 单独提取 image_url"路径，仅用于线上紧急
+	//   回滚；
+	// 无论哪种模式都构建 prompt buffer，用作 emptiness 校验、日志展示、
+	// 输入字节统计的辅助容器。
+	// 关键词: aibalance messages 透传, AIBALANCE_LEGACY_FLATTEN_MESSAGES
+	legacyFlatten := legacyFlattenMessagesEnabled()
 	var prompt bytes.Buffer
 	var imageContent []*aispec.ChatContent
 	for _, message := range bodyIns.Messages {
@@ -812,11 +870,9 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 		case string:
 			log.Infof("Received text content: %s", utils.ShrinkString(ret, 200))
 			prompt.Write([]byte(ret))
-			//contents = append(contents, aispec.NewUserChatContentText(ret))
 		default:
 			handleItem := func(element any) {
 				if utils.IsMap(element) {
-					// handle images
 					generalMap := utils.InterfaceToGeneralMap(element)
 					typeName := utils.MapGetString(generalMap, `type`)
 					switch typeName {
@@ -847,13 +903,14 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 		}
 	}
 
-	if len(imageContent) == 0 && prompt.Len() <= 0 {
+	if len(imageContent) == 0 && prompt.Len() <= 0 && len(bodyIns.Messages) == 0 {
 		c.logError("Prompt is empty")
 		conn.Write([]byte("HTTP/1.1 400 Bad Request\r\nX-Reason: empty prompt\r\n\r\n"))
 		return
 	}
 
-	c.logInfo("Built prompt length: %d with image content: %d", prompt.Len(), len(imageContent))
+	c.logInfo("Built prompt length: %d with image content: %d (messages=%d, legacy_flatten=%v)",
+		prompt.Len(), len(imageContent), len(bodyIns.Messages), legacyFlatten)
 
 	// Log at WARN level for production visibility when processing large requests
 	if len(imageContent) > 0 || prompt.Len() > 10000 {
@@ -873,10 +930,17 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 	// c.logInfo("Key[%v] requesting model %s, starting to forward request", apiKeyForStat, modelName)
 	// _ = model
 
-	// 亲和性路由：使用 prompt 前缀 + apiKey + model 计算稳定的 affinityKey，
-	// 优先把同一逻辑请求路由到同一 provider，让上游隐式缓存有机会被复用。
-	// 关键词: 亲和性路由, 隐式缓存, BuildPromptAffinityKey
-	affinityKey := BuildPromptAffinityKey(prompt.String(), apiKeyForStat, modelName, 2048)
+	// 亲和性路由：把同一逻辑请求路由到同一 provider，让上游隐式缓存有机会被复用。
+	// - 新路径（默认）: 用 messages 数组的 JSON 序列化前缀作为指纹，
+	//   与上游 LLM 实际看到的请求体字节序对齐；
+	// - legacy 路径: 用拍平后的 prompt 字符串前缀，保持旧行为以便对比。
+	// 关键词: 亲和性路由, 隐式缓存, BuildMessagesAffinityKey, BuildPromptAffinityKey
+	var affinityKey string
+	if legacyFlatten {
+		affinityKey = BuildPromptAffinityKey(prompt.String(), apiKeyForStat, modelName, 2048)
+	} else {
+		affinityKey = BuildMessagesAffinityKey(bodyIns.Messages, apiKeyForStat, modelName, 2048)
+	}
 
 	// 使用 PeekOrderedProvidersWithAffinity 获取按亲和性 + 负载均衡排序的提供者列表
 	providers := c.Entrypoints.PeekOrderedProvidersWithAffinity(modelName, affinityKey)
@@ -942,38 +1006,63 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 				provider.TypeName, runtime.NumGoroutine(), ms.HeapAlloc/1024/1024, ms.HeapObjects)
 		}
 
-		client, err := provider.GetAIClientWithImagesAndTools(
-			imageContent,
-			bodyIns.Tools,      // Forward tools from client request
-			bodyIns.ToolChoice, // Forward tool_choice from client request
-			bodyIns.EnableThinking,
-			func(reader io.Reader) {
-				defer func() {
-					pw.Close()
-					c.logInfo("Finished handling AI response stream(output)")
-				}()
-				c.logInfo("Start to handle AI response stream")
-				sendHeaderOnce.Do(sendHeader)
-				io.Copy(pw, reader)
-			}, func(reader io.Reader) {
-				defer func() {
-					rw.Close()
-					c.logInfo("Finished handling AI response stream(reason)")
-				}()
-				c.logInfo("Start to handle AI response stream(reason)")
-				sendHeaderOnce.Do(sendHeader)
-				io.Copy(rw, reader)
-				utils.FlushWriter(writer.writerClose)
-			},
-			// Tool call callback: forward tool_calls from AI provider to client
-			func(toolCalls []*aispec.ToolCall) {
-				c.logInfo("Received %d tool calls from AI provider, forwarding to client", len(toolCalls))
-				sendHeaderOnce.Do(sendHeader)
-				if err := writer.WriteToolCalls(toolCalls); err != nil {
-					c.logError("Failed to write tool calls to client: %v", err)
-				}
-			},
-		)
+		// 选择 client 构造方式：
+		// - 新路径: GetAIClientWithRawMessages 透传完整 messages 数组，
+		//   image_url 已经在 messages 内的 content 数组里携带，
+		//   不再单独提取 imageContent；
+		// - legacy 路径: GetAIClientWithImagesAndTools 沿用旧的 imageContent
+		//   单独提取 + prompt 字符串拼装的方式。
+		// 关键词: aibalance client 构造分支, GetAIClientWithRawMessages
+		onOutputStream := func(reader io.Reader) {
+			defer func() {
+				pw.Close()
+				c.logInfo("Finished handling AI response stream(output)")
+			}()
+			c.logInfo("Start to handle AI response stream")
+			sendHeaderOnce.Do(sendHeader)
+			io.Copy(pw, reader)
+		}
+		onReasonStream := func(reader io.Reader) {
+			defer func() {
+				rw.Close()
+				c.logInfo("Finished handling AI response stream(reason)")
+			}()
+			c.logInfo("Start to handle AI response stream(reason)")
+			sendHeaderOnce.Do(sendHeader)
+			io.Copy(rw, reader)
+			utils.FlushWriter(writer.writerClose)
+		}
+		onToolCallForward := func(toolCalls []*aispec.ToolCall) {
+			c.logInfo("Received %d tool calls from AI provider, forwarding to client", len(toolCalls))
+			sendHeaderOnce.Do(sendHeader)
+			if err := writer.WriteToolCalls(toolCalls); err != nil {
+				c.logError("Failed to write tool calls to client: %v", err)
+			}
+		}
+
+		var client aispec.AIClient
+		var err error
+		if legacyFlatten {
+			client, err = provider.GetAIClientWithImagesAndTools(
+				imageContent,
+				bodyIns.Tools,
+				bodyIns.ToolChoice,
+				bodyIns.EnableThinking,
+				onOutputStream,
+				onReasonStream,
+				onToolCallForward,
+			)
+		} else {
+			client, err = provider.GetAIClientWithRawMessages(
+				bodyIns.Messages,
+				bodyIns.Tools,
+				bodyIns.ToolChoice,
+				bodyIns.EnableThinking,
+				onOutputStream,
+				onReasonStream,
+				onToolCallForward,
+			)
+		}
 		if err != nil {
 			c.logError("Failed to get AI client from provider %s: %v", provider.TypeName, err)
 			lastError = err
@@ -981,11 +1070,20 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 			continue           // 尝试下一个提供者
 		}
 
-		// 启动 AI 聊天请求
+		// 启动 AI 聊天请求：
+		// - 新路径: client.Chat("") —— messages 已通过 RawMessages 携带，
+		//   底层 chatBaseChatCompletions 直接使用，prompt string 参数被忽略；
+		// - legacy 路径: client.Chat(prompt.String()) —— 沿用旧拍平字符串。
+		// 关键词: aibalance Chat 分支, RawMessages 透传
 		chatCompleted := make(chan error, 1)
 		go func() {
-			c.logInfo("start to call ai chat interface with prompt len: %d", prompt.Len())
-			finalMsg, err := client.Chat(prompt.String())
+			var chatInput string
+			if legacyFlatten {
+				chatInput = prompt.String()
+			}
+			c.logInfo("start to call ai chat interface (legacy_flatten=%v, prompt_len=%d, messages=%d)",
+				legacyFlatten, prompt.Len(), len(bodyIns.Messages))
+			finalMsg, err := client.Chat(chatInput)
 			if err != nil {
 				c.logError("AI chat interface call failed: %v", err)
 				chatCompleted <- err
@@ -1131,8 +1229,19 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 			}
 		}()
 
-		// Update API Key statistics using actual success
-		inputBytes := int64(prompt.Len())
+		// Update API Key statistics using actual success.
+		// 输入字节统计：新路径下用 messages 序列化字节数，与上游 LLM 实际收到
+		// 的请求体字节量更接近；legacy 路径沿用拍平后的 prompt 字符串字节数。
+		// 关键词: aibalance inputBytes 统计源, RawMessages 字节统计
+		var inputBytes int64
+		if legacyFlatten {
+			inputBytes = int64(prompt.Len())
+		} else {
+			inputBytes = int64(len(serializeMessagesForAffinity(bodyIns.Messages)))
+			if inputBytes <= 0 {
+				inputBytes = int64(prompt.Len())
+			}
+		}
 		outputBytes := total
 		if isFreeModel {
 			// 免费模型使用特殊的 free-user 统计

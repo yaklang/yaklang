@@ -145,6 +145,7 @@ func (g *GLMClient) Chat(s string, f ...any) (string, error) {
 		aispec.WithChatBase_RawHTTPResponseHeaderCallback(g.config.RawHTTPResponseHeaderCallback),
 		aispec.WithChatBase_RawHTTPResponseCallback(g.config.RawHTTPResponseCallback),
 		aispec.WithChatBase_RawHTTPRequestResponseCallback(g.config.RawHTTPRequestResponseCallback),
+		aispec.WithChatBase_RawMessages(g.config.RawMessages),
 	)
 }
 

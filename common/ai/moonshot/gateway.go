@@ -71,6 +71,7 @@ func (g *GatewayClient) Chat(s string, function ...any) (string, error) {
 		aispec.WithChatBase_RawHTTPResponseHeaderCallback(g.config.RawHTTPResponseHeaderCallback),
 		aispec.WithChatBase_RawHTTPResponseCallback(g.config.RawHTTPResponseCallback),
 		aispec.WithChatBase_RawHTTPRequestResponseCallback(g.config.RawHTTPRequestResponseCallback),
+		aispec.WithChatBase_RawMessages(g.config.RawMessages),
 	)
 }
 

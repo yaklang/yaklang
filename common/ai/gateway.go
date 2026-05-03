@@ -125,6 +125,7 @@ func (g *Gateway) Chat(s string, f ...any) (string, error) {
 		aispec.WithChatBase_RawHTTPResponseHeaderCallback(g.Config.RawHTTPResponseHeaderCallback),
 		aispec.WithChatBase_RawHTTPResponseCallback(g.Config.RawHTTPResponseCallback),
 		aispec.WithChatBase_RawHTTPRequestResponseCallback(g.Config.RawHTTPRequestResponseCallback),
+		aispec.WithChatBase_RawMessages(g.Config.RawMessages),
 	)
 }
 
@@ -1067,6 +1068,7 @@ var Exports = map[string]any{
 	"rawHTTPResponseHeaderCallback":  aispec.WithRawHTTPResponseHeaderCallback,
 	"rawHTTPResponseCallback":        aispec.WithRawHTTPResponseCallback,
 	"rawHTTPRequestResponseCallback": aispec.WithRawHTTPRequestResponseCallback,
+	"rawMessages":                    aispec.WithRawMessages,
 }
 
 // CreateChatterFromConfig creates a chat function from AIModelConfig.
