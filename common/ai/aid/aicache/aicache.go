@@ -1,9 +1,15 @@
-// Package aicache 在 aispec.ChatBase 入口做镜像观测，
-// 把每次 prompt 按 PROMPT_SECTION 外层标签切片，统计前缀缓存命中率，
-// 节流打印诊断行；DEBUG 模式下把每次 prompt 完整落盘，
-// 便于事后分析"哪儿污染了缓存"。
+// Package aicache 在 aispec.ChatBase 入口做镜像观测 + 可选 messages 改写。
 //
-// 关键词: aicache, 镜像观测, 缓存命中率, prompt 落盘
+// Observe 是合并后的入口：
+//  1. 缓存分析（Split → Record → buildAdvices → 节流打印 → DEBUG 落盘）保持
+//     与原 mirror 行为一致
+//  2. 在结尾尝试 hijackHighStatic：如果 prompt 包含 high-static 段，则把它
+//     拆出来包成 <|AI_CACHE_SYSTEM_high-static|>...<|AI_CACHE_SYSTEM_END_high-static|>
+//     作为 role:system 单独消息，剩余内容作为 user 消息；返回的
+//     ChatBaseMirrorResult{IsHijacked:true} 由 ChatBase 灌入 ctx.RawMessages
+//     走现有 RawMessages 透传通道
+//
+// 关键词: aicache, Observe, mirror, hijack 合一, role:system 注入
 package aicache
 
 import (
@@ -19,34 +25,36 @@ var gCache = newGlobalCache(defaultMaxRequests)
 // 关键词: aicache, gPrinter
 var gPrinter = newThrottlePrinter(minPrintInterval)
 
-// init 在 aicache 包加载时把 Observe 注册到 aispec 的 ChatBase 镜像 hook
+// init 在 aicache 包加载时把 Observe 注册到 aispec 的 mirror observer 链
 // 关键词: aicache, init, RegisterChatBaseMirrorObserver
 func init() {
 	aispec.RegisterChatBaseMirrorObserver(Observe)
 }
 
-// Observe 是 aicache 的核心入口，对每次 ChatBase 调用做镜像观测
-// 不返回错误、不阻塞主流程；observer 自身的所有错误都内部消化
+// Observe 是 aicache 合并后的核心入口：
+//  1. 同步完成缓存分析（Split / Record / Advice / Trigger）
+//  2. dumpDebug 文件 I/O 用独立 goroutine 调度，避免阻塞 mirror 同步分发
+//  3. 在结尾返回 hijack 决策：若 prompt 中有 high-static 段，则返回
+//     IsHijacked=true 让 ChatBase 把切出来的 messages 走 RawMessages 透传
 //
-// 处理流程：
-//  1. Split: 按 PROMPT_SECTION 外层标签切片
-//  2. Record: 全局缓存表登记 + LCP 前缀命中率计算
-//  3. Advice: 生成测算建议
-//  4. Trigger: 节流打印
-//  5. Dump: DEBUG 模式下落盘完整 prompt
+// observer 自身的所有错误均内部消化，不向上抛。
 //
-// 关键词: aicache, Observe, 镜像入口
-func Observe(model, msg string) {
+// 关键词: aicache, Observe, mirror 入口, hijack 决策
+func Observe(model, msg string) *aispec.ChatBaseMirrorResult {
 	if msg == "" {
-		return
+		return nil
 	}
 	split := Split(msg)
 	rep := gCache.Record(split, model)
 	rep.Advices = buildAdvices(rep, split)
 	gPrinter.Trigger(rep)
 	utils.Debug(func() {
-		dumpDebug(rep, split, gCache)
+		// dumpDebug 是文件 I/O，放后台 goroutine 调度；不阻塞 mirror 同步分发
+		// 关键词: aicache, dumpDebug 异步, mirror 同步分发
+		go dumpDebug(rep, split, gCache)
 	})
+
+	return hijackHighStatic(msg)
 }
 
 // ResetForTest 仅供测试使用：重置全局状态

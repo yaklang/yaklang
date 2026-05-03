@@ -207,12 +207,13 @@ func TestChatBase_MirrorReceivesSerializedMessages(t *testing.T) {
 		obsMu  sync.Mutex
 		obsMsg string
 	)
-	RegisterChatBaseMirrorObserver(func(model string, msg string) {
+	RegisterChatBaseMirrorObserver(func(model string, msg string) *ChatBaseMirrorResult {
 		obsMu.Lock()
 		defer obsMu.Unlock()
 		if obsMsg == "" { // 取第一条即可
 			obsMsg = msg
 		}
+		return nil
 	})
 
 	input := []ChatDetail{

@@ -126,6 +126,10 @@ func (g *Gateway) Chat(s string, f ...any) (string, error) {
 		aispec.WithChatBase_RawHTTPResponseCallback(g.Config.RawHTTPResponseCallback),
 		aispec.WithChatBase_RawHTTPRequestResponseCallback(g.Config.RawHTTPRequestResponseCallback),
 		aispec.WithChatBase_RawMessages(g.Config.RawMessages),
+		// UsageCallback 透传：让 yak 用户层 ai.usageCallback(...) 注册的回调
+		// 能拿到上游 LLM SSE 末帧的 token 用量（包含 cached_tokens 等隐式缓存命中信息）。
+		// 关键词: Gateway.Chat UsageCallback 透传, cached_tokens 暴露给 yak
+		aispec.WithChatBase_UsageCallback(g.Config.UsageCallback),
 	)
 }
 
@@ -1069,6 +1073,14 @@ var Exports = map[string]any{
 	"rawHTTPResponseCallback":        aispec.WithRawHTTPResponseCallback,
 	"rawHTTPRequestResponseCallback": aispec.WithRawHTTPRequestResponseCallback,
 	"rawMessages":                    aispec.WithRawMessages,
+
+	// usageCallback 让 yak 脚本可以接收上游 LLM 在 SSE 末帧返回的 token 用量
+	// （含 prompt_tokens_details.cached_tokens 隐式缓存命中信息）。
+	// 使用方法：ai.usageCallback(func(usage){ println(usage.PromptTokens, usage.PromptTokensDetails.CachedTokens) })
+	// 注：触发该回调依赖上游开启 stream_options.include_usage=true，
+	// aispec 会在检测到 ctx.UsageCallback 时自动注入这一参数。
+	// 关键词: yak ai usageCallback, 隐式缓存可见, cached_tokens 暴露给脚本
+	"usageCallback": aispec.WithUsageCallback,
 }
 
 // CreateChatterFromConfig creates a chat function from AIModelConfig.

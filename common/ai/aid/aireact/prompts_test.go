@@ -335,7 +335,7 @@ func TestPromptManager_GenerateToolParamsPromptWithMeta_UsesPromptSections(t *te
 
 	prompt := result.Prompt
 	if !utils.MatchAllOfSubString(prompt,
-		"<|PROMPT_SECTION_high-static|>",
+		"<|AI_CACHE_SYSTEM_high-static|>",
 		"<|PROMPT_SECTION_semi-dynamic|>",
 		"<|PROMPT_SECTION_timeline|>",
 		"<|PROMPT_SECTION_dynamic_",
@@ -371,7 +371,7 @@ func TestPromptManager_GenerateDirectlyAnswerPrompt_UsesPromptSections(t *testin
 	}
 
 	if !utils.MatchAllOfSubString(prompt,
-		"<|PROMPT_SECTION_high-static|>",
+		"<|AI_CACHE_SYSTEM_high-static|>",
 		"<|PROMPT_SECTION_semi-dynamic|>",
 		"<|PROMPT_SECTION_timeline|>",
 		"<|PROMPT_SECTION_dynamic_"+nonce+"|>",
@@ -408,7 +408,7 @@ func TestPromptManager_GenerateToolReSelectPrompt_UsesPromptSections(t *testing.
 	}
 
 	if !utils.MatchAllOfSubString(prompt,
-		"<|PROMPT_SECTION_high-static|>",
+		"<|AI_CACHE_SYSTEM_high-static|>",
 		"<|PROMPT_SECTION_semi-dynamic|>",
 		"<|PROMPT_SECTION_timeline|>",
 		"<|PROMPT_SECTION_dynamic_",
@@ -450,7 +450,7 @@ func TestPromptManager_GenerateReGenerateToolParamsPromptWithMeta_UsesPromptSect
 	}
 
 	if !utils.MatchAllOfSubString(result.Prompt,
-		"<|PROMPT_SECTION_high-static|>",
+		"<|AI_CACHE_SYSTEM_high-static|>",
 		"<|PROMPT_SECTION_semi-dynamic|>",
 		"<|PROMPT_SECTION_timeline|>",
 		"<|PROMPT_SECTION_dynamic_",
@@ -488,7 +488,7 @@ func TestPromptManager_GenerateChangeAIBlueprintPrompt_UsesPromptSections(t *tes
 	}
 
 	if !utils.MatchAllOfSubString(prompt,
-		"<|PROMPT_SECTION_high-static|>",
+		"<|AI_CACHE_SYSTEM_high-static|>",
 		"<|PROMPT_SECTION_semi-dynamic|>",
 		"<|PROMPT_SECTION_timeline|>",
 		"<|PROMPT_SECTION_dynamic_",
@@ -523,7 +523,7 @@ func TestPromptManager_GenerateAIBlueprintForgeParamsPrompt_UsesPromptSections(t
 	}
 
 	if !utils.MatchAllOfSubString(prompt,
-		"<|PROMPT_SECTION_high-static|>",
+		"<|AI_CACHE_SYSTEM_high-static|>",
 		"<|PROMPT_SECTION_semi-dynamic|>",
 		"<|PROMPT_SECTION_timeline|>",
 		"<|PROMPT_SECTION_dynamic_",

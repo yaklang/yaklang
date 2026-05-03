@@ -150,7 +150,13 @@ func (cp *ConfigProvider) GetAllKeys() []string {
 	return allKeys
 }
 
-// GetAIClientWithImagesAndTools is the full-featured version that supports images and tools
+// GetAIClientWithImagesAndTools 旧路径，构造时把 prompt 拍成单条 user 消息 + image content 数组。
+// 仍保留用于 healthy check / handle_providers 等"无 messages 数组"的连通性测试。
+// 正式 chat completions 转发路径已统一改用 GetAIClientWithRawMessages，请勿在
+// 新代码中调用此函数承载用户 prompt。
+//
+// Deprecated: 优先使用 GetAIClientWithRawMessages 透传完整 messages 数组。
+// 关键词: GetAIClientWithImagesAndTools, deprecated, 仅 healthy check 使用
 func (p *Provider) GetAIClientWithImagesAndTools(imageContents []*aispec.ChatContent, tools []aispec.Tool, toolChoice any, enableThinking bool, onStream, onReasonStream func(reader io.Reader), onToolCall func([]*aispec.ToolCall)) (aispec.AIClient, error) {
 	log.Infof("GetAIClient: type: %s, domain: %s, key: %s, model: %s, no_https: %v, tools: %d", p.TypeName, p.DomainOrURL, utils.ShrinkString(p.APIKey, 8), p.ModelName, p.NoHTTPS, len(tools))
 
@@ -236,7 +242,9 @@ func (p *Provider) GetAIClientWithImagesAndTools(imageContents []*aispec.ChatCon
 	return client, nil
 }
 
-// GetAIClientWithImages is kept for backward compatibility
+// GetAIClientWithImages 仅保留以兼容旧测试与 healthy check。
+// Deprecated: 优先使用 GetAIClientWithRawMessages 透传完整 messages 数组。
+// 关键词: GetAIClientWithImages, deprecated
 func (p *Provider) GetAIClientWithImages(imageContents []*aispec.ChatContent, enableThinking bool, onStream, onReasonStream func(reader io.Reader), onToolCall func([]*aispec.ToolCall)) (aispec.AIClient, error) {
 	return p.GetAIClientWithImagesAndTools(imageContents, nil, nil, enableThinking, onStream, onReasonStream, onToolCall)
 }
@@ -255,8 +263,14 @@ func (p *Provider) GetAIClientWithImages(imageContents []*aispec.ChatContent, en
 // 旧的 GetAIClientWithImagesAndTools/GetAIClientWithImages 保留不变，便于
 // 不需要 messages 完整透传的旧调用方继续使用。
 //
-// 关键词: GetAIClientWithRawMessages, aibalance messages 透传, 隐式缓存前缀稳定
-func (p *Provider) GetAIClientWithRawMessages(messages []aispec.ChatDetail, tools []aispec.Tool, toolChoice any, enableThinking bool, onStream, onReasonStream func(reader io.Reader), onToolCall func([]*aispec.ToolCall)) (aispec.AIClient, error) {
+// 关键词: GetAIClientWithRawMessages, aibalance messages 透传, 隐式缓存前缀稳定, usage 回调
+//
+// onUsage 是新增参数：当上游 LLM 的 SSE 末帧带 usage 字段时（例如
+// stream_options.include_usage=true 触发的 token 用量帧），aispec 会回调 onUsage。
+// aibalance server 把它接到 chatJSONChunkWriter.WriteUsage，再由 writer.Close
+// 在 [DONE] 帧之前往下游客户端发一帧 choices=[] + usage={...}，达成
+// "上游 cached_tokens -> 下游客户端可见"的端到端透传。
+func (p *Provider) GetAIClientWithRawMessages(messages []aispec.ChatDetail, tools []aispec.Tool, toolChoice any, enableThinking bool, onStream, onReasonStream func(reader io.Reader), onToolCall func([]*aispec.ToolCall), onUsage func(*aispec.ChatUsage)) (aispec.AIClient, error) {
 	log.Infof("GetAIClientWithRawMessages: type: %s, domain: %s, key: %s, model: %s, no_https: %v, messages: %d, tools: %d", p.TypeName, p.DomainOrURL, utils.ShrinkString(p.APIKey, 8), p.ModelName, p.NoHTTPS, len(messages), len(tools))
 
 	var opts []aispec.AIConfigOption
@@ -284,6 +298,9 @@ func (p *Provider) GetAIClientWithRawMessages(messages []aispec.ChatDetail, tool
 			}
 		}),
 	)
+	if onUsage != nil {
+		opts = append(opts, aispec.WithUsageCallback(onUsage))
+	}
 
 	shouldEnableThinking := enableThinking
 	forceDisableThinking := false

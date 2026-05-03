@@ -17,6 +17,11 @@ const (
 	promptSectionSemiDynamic = "semi-dynamic"
 	promptSectionTimeline    = "timeline"
 	promptSectionDynamic     = "dynamic"
+	// aiCacheSystemTagName 仅用于 high-static 段：把"跨调用稳定的系统级指令"
+	// 用独立 tagName 标记，让 aicache splitter / hijacker 与上游隐式缓存的
+	// system 边界对齐；其他段保持 PROMPT_SECTION。
+	// 关键词: aicache, AI_CACHE_SYSTEM, high-static system 边界
+	aiCacheSystemTagName = "AI_CACHE_SYSTEM"
 )
 
 //go:embed prompts/loop/high_static_section.txt
@@ -689,6 +694,11 @@ func wrapPromptMessageSection(sectionName string, content string, nonce string) 
 	if sectionName == promptSectionDynamic && nonce != "" {
 		tagName := fmt.Sprintf("%s_%s", promptSectionTagName, sectionName)
 		return fmt.Sprintf("<|%s_%s|>\n%s\n<|%s_END_%s|>", tagName, nonce, content, tagName, nonce)
+	}
+	// high-static 段使用 AI_CACHE_SYSTEM tagName，让 aicache 与上游识别为系统级缓存边界
+	// 关键词: AI_CACHE_SYSTEM_high-static, aicache hijack
+	if sectionName == promptSectionHighStatic {
+		return fmt.Sprintf("<|%s_%s|>\n%s\n<|%s_END_%s|>", aiCacheSystemTagName, sectionName, content, aiCacheSystemTagName, sectionName)
 	}
 	return fmt.Sprintf("<|%s_%s|>\n%s\n<|%s_END_%s|>", promptSectionTagName, sectionName, content, promptSectionTagName, sectionName)
 }

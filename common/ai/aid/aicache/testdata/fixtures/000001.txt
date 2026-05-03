@@ -1,0 +1,146 @@
+# aicache prompt dump
+seq:    000001
+time:   2026-05-03T11:35:29+08:00
+model:  memfit-light-free
+total:  4788 bytes / 3 chunks
+
+## sections
+[1] section=high-static   nonce=high-static              bytes=3109 hash=c1b566f2a696dcff seen=1 first=2026-05-03T11:35:29+08:00
+[2] section=semi-dynamic  nonce=semi-dynamic             bytes=108 hash=23363ef7a4a21de8 seen=1 first=2026-05-03T11:35:29+08:00
+[3] section=dynamic       nonce=dynamic_lqdqyw           bytes=1360 hash=a6fb47a734b2d513 seen=1 first=2026-05-03T11:35:29+08:00
+
+## hit report
+prefix_hit_chunks: 0
+prefix_hit_bytes:  0
+prefix_hit_ratio:  0.0%
+global_uniq_chunks: 3
+global_cache_bytes: 4577
+total_requests:    1
+section_hash_count:
+  - high-static: 1
+  - semi-dynamic: 1
+  - dynamic: 1
+
+## advices
+- only 3/4 sections present; missing: [timeline]
+
+## raw prompt (4788 bytes)
+<|PROMPT_SECTION_high-static|>
+# Preset
+你现在在一个任务引擎中，是一个输出JSON的数据处理和总结提示小助手，我会为你提供一些基本信息和输入材料，你需要按照我的Schema生成一个JSON数据直接返回。
+
+作为系统的一部分你应该直接返回JSON，避免多余的解释。
+
+# Output Formatter
+
+请你根据下面 SCHEMA 构建数据 , 注意事项：
+1. 你必须严格按照 SCHEMA 格式生成数据，不能缺少任何字段，不能多余任何字段。
+2. 所有字符串类型的数据必须使用双引号括起来，数字类型的数据不能使用引号括起来，布尔类型的数据必须使用 true 或 false 。
+3. 如果某个字段是可选的，你可以选择不返回该字段，但如果返回了该字段，必须符合 SCHEMA 的要求。
+4. 不要添加任何多余的解释或文本，只返回符合 SCHEMA 的 JSON 数据。
+5. 不要输出压缩成一行的 JSON，请保持良好的可读性和缩进。
+
+# SCHEMA
+
+<schema>
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": [
+    "@action",
+    "folder_name",
+    "session_title"
+  ],
+  "properties": {
+    "@action": {
+      "const": "session-init-generator",
+      "description": "set '@action' can help the AI identify the output json object",
+      "type": "string"
+    },
+    "folder_name": {
+      "description": "Short filesystem-safe folder name in snake_case English, describing the task purpose, e.g. sql_injection_scan, http_flow_analysis",
+      "maxLength": 30,
+      "type": "string"
+    },
+    "session_title": {
+      "description": "Concise session title for display",
+      "maxLength": 50,
+      "type": "string"
+    }
+  },
+  "additionalProperties": true
+}
+</schema>
+
+# Instruction
+
+<background>
+# Role
+你是一个专业的内容摘要专家，负责为当前对话生成一个精准、简练且具有辨识度的标题（Conversation Title）。
+
+# Context
+为了生成高质量标题，你需要参考以下信息：
+## 1. Timeline Memory (历史脉络)
+这是对话演进的过程和已讨论的核心点：
+<|TIMELINE_b3t1777779180|>
+# bucket=2026/05/03 11:33:00-11:36:00 interval=3m
+11:35:29 [user/free_input]
+<- [id:278] when free_input
+   system-question:
+       user-answer: hostscan
+<|TIMELINE_END_b3t1777779180|>
+
+## 2. Current Input (当前输入)
+这是用户最新的发言，代表了对话的最新走向：
+hostscan
+
+# Task Rules
+请根据上述背景信息，遵循以下规则生成标题：
+1. **核心驱动**：标题应优先反映用户的核心诉求或最新的讨论主题。
+2. **长度限制**：标题字数控制在 10 个字符以内（中英文皆可），避免使用长句。
+3. **风格要求**：
+   - 严谨、专业，避免使用“关于...的对话”这种废话前缀。
+   - 使用“动宾短语”或“核心名词+特征”的形式（例如：“Go 混淆加密方案”、“优化 K8s 网络策略”）。
+4. **排除干扰**：忽略无意义的寒暄（如“你好”、“在吗”），如果当前输入信息量极低，请参考 Timeline 维持原标题逻辑。
+</background>
+<|PROMPT_SECTION_END_high-static|>
+
+<|PROMPT_SECTION_semi-dynamic|>
+# 牢记
+# Now 2026-05-03 11:35:29.86381 +0800 CST m=+38.950614376
+<persistent_memory>
+</persistent_memory>
+
+<|PROMPT_SECTION_END_semi-dynamic|>
+
+<|PROMPT_SECTION_dynamic_lqdqyw|>
+<params_lqdqyw>
+# Role
+你是一个专业的内容摘要专家，负责为当前对话生成一个精准、简练且具有辨识度的标题（Conversation Title）。
+
+# Context
+为了生成高质量标题，你需要参考以下信息：
+## 1. Timeline Memory (历史脉络)
+这是对话演进的过程和已讨论的核心点：
+<|TIMELINE_b3t1777779180|>
+# bucket=2026/05/03 11:33:00-11:36:00 interval=3m
+11:35:29 [user/free_input]
+<- [id:278] when free_input
+   system-question:
+       user-answer: hostscan
+<|TIMELINE_END_b3t1777779180|>
+
+## 2. Current Input (当前输入)
+这是用户最新的发言，代表了对话的最新走向：
+hostscan
+
+# Task Rules
+请根据上述背景信息，遵循以下规则生成标题：
+1. **核心驱动**：标题应优先反映用户的核心诉求或最新的讨论主题。
+2. **长度限制**：标题字数控制在 10 个字符以内（中英文皆可），避免使用长句。
+3. **风格要求**：
+   - 严谨、专业，避免使用“关于...的对话”这种废话前缀。
+   - 使用“动宾短语”或“核心名词+特征”的形式（例如：“Go 混淆加密方案”、“优化 K8s 网络策略”）。
+4. **排除干扰**：忽略无意义的寒暄（如“你好”、“在吗”），如果当前输入信息量极低，请参考 Timeline 维持原标题逻辑。
+</params_lqdqyw>
+<|PROMPT_SECTION_dynamic_END_lqdqyw|>

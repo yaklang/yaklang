@@ -29,6 +29,14 @@ type chatJSONChunkWriter struct {
 	uid     string    // Unique identifier for the chat session
 	created time.Time // Timestamp when the chat session was created
 	model   string    // Name of the AI model being used
+
+	// lastUsage 由 WriteUsage 写入，保存上游 LLM 在 SSE 末帧返回的 token 用量
+	// （prompt_tokens / completion_tokens / total_tokens / prompt_tokens_details）。
+	// Close 时会按 OpenAI stream_options.include_usage=true 规范在 finish_reason="stop"
+	// 帧之后、[DONE] 之前单独发一帧 choices=[] + usage={...} 给客户端，
+	// 让客户端能感知隐式缓存命中（cached_tokens 等关键计费指标）。
+	// 关键词: aibalance writer usage 透传, cached_tokens, include_usage 末帧
+	lastUsage *aispec.ChatUsage
 }
 
 // NewChatJSONChunkWriter creates a new chat JSON chunk writer
@@ -235,6 +243,23 @@ func (w *chatJSONChunkWriter) buildToolCallsDelta(toolCalls []*aispec.ToolCall) 
 	return json.Marshal(result)
 }
 
+// WriteUsage 由上游 UsageCallback 触发，把上游 LLM 返回的 token 用量
+// （包含隐式缓存命中 cached_tokens）保存下来。Close 时会按 OpenAI
+// stream_options.include_usage=true 规范，在 finish_reason="stop" 帧之后、
+// [DONE] 帧之前单独发一帧 choices=[] + usage={...}，把 usage 透传给客户端。
+// 这是修复"aibalance 不返回 usage / cached_tokens 导致客户端无法计算缓存命中率"
+// 这一问题的关键链路终点。
+//
+// 关键词: aibalance WriteUsage, usage 透传, cached_tokens 透传, include_usage 末帧
+func (w *chatJSONChunkWriter) WriteUsage(usage *aispec.ChatUsage) {
+	if usage == nil {
+		return
+	}
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.lastUsage = usage
+}
+
 // WriteToolCalls writes tool calls to the streaming response
 // toolCalls: The tool calls received from AI provider to be forwarded to client
 func (w *chatJSONChunkWriter) WriteToolCalls(toolCalls []*aispec.ToolCall) error {
@@ -333,6 +358,31 @@ func (w *chatJSONChunkWriter) Close() error {
 	if _, err := w.writerClose.Write([]byte(chunk)); err != nil {
 		w.writerClose.Close()
 		return err
+	}
+
+	// 按 OpenAI stream_options.include_usage=true 规范：在 finish_reason="stop" 帧之后、
+	// [DONE] 帧之前，单独发一帧 choices=[] + usage={...}，把上游返回的 token 用量
+	// （包含 prompt_tokens / completion_tokens / total_tokens / prompt_tokens_details
+	// 即 cached_tokens 等隐式缓存命中信息）透传给客户端。
+	// 关键词: aibalance Close usage 帧, include_usage, cached_tokens 透传
+	if w.lastUsage != nil {
+		usageMsg := map[string]any{
+			"id":      "chat-ai-balance-" + w.uid,
+			"object":  "chat.completion.chunk",
+			"created": w.created.Unix(),
+			"model":   w.model,
+			"choices": []map[string]any{},
+			"usage":   w.lastUsage,
+		}
+		if usageBytes, jerr := json.Marshal(usageMsg); jerr == nil {
+			usageData := fmt.Sprintf("data: %s\n\n", string(usageBytes))
+			usageChunk := fmt.Sprintf("%x\r\n%s\r\n", len(usageData), usageData)
+			if _, werr := w.writerClose.Write([]byte(usageChunk)); werr != nil {
+				log.Warnf("write usage chunk failed: %v", werr)
+			}
+		} else {
+			log.Warnf("marshal usage chunk failed: %v", jerr)
+		}
 	}
 
 	// write data: [DONE]

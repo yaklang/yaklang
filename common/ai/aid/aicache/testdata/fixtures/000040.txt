@@ -1,0 +1,264 @@
+# aicache prompt dump
+seq:    000040
+time:   2026-05-03T11:36:28+08:00
+model:  memfit-light-free
+total:  20606 bytes / 4 chunks
+
+## sections
+[1] section=high-static   nonce=high-static              bytes=10985 hash=340e2b04fbf29c93 seen=1 first=2026-05-03T11:36:28+08:00
+[2] section=semi-dynamic  nonce=semi-dynamic             bytes=109 hash=2439c2c639a9cbaf seen=1 first=2026-05-03T11:36:28+08:00
+[3] section=timeline      nonce=timeline                 bytes=264 hash=d338353fdcd6a326 seen=1 first=2026-05-03T11:36:28+08:00
+[4] section=dynamic       nonce=dynamic_hcpbog           bytes=8975 hash=5b5d67ed5c5ee31e seen=1 first=2026-05-03T11:36:28+08:00
+
+## hit report
+prefix_hit_chunks: 0
+prefix_hit_bytes:  0
+prefix_hit_ratio:  0.0%
+global_uniq_chunks: 132
+global_cache_bytes: 1388669
+total_requests:    40
+section_hash_count:
+  - high-static: 29
+  - semi-dynamic: 31
+  - timeline: 32
+  - dynamic: 35
+  - raw: 5
+
+## advices
+- prefix not aligned at all; first section hash changed - check if static section template was polluted
+- high-static section unstable: 29 distinct hashes seen, check template variables polluting it
+- semi-dynamic section drifts more than expected: 31 distinct hashes, tool/forge/schema list may be churning
+
+## raw prompt (20606 bytes)
+<|PROMPT_SECTION_high-static|>
+# Preset
+你现在在一个任务引擎中，是一个输出JSON的数据处理和总结提示小助手，我会为你提供一些基本信息和输入材料，你需要按照我的Schema生成一个JSON数据直接返回。
+
+作为系统的一部分你应该直接返回JSON，避免多余的解释。
+
+# Output Formatter
+
+请你根据下面 SCHEMA 构建数据 , 注意事项：
+1. 你必须严格按照 SCHEMA 格式生成数据，不能缺少任何字段，不能多余任何字段。
+2. 所有字符串类型的数据必须使用双引号括起来，数字类型的数据不能使用引号括起来，布尔类型的数据必须使用 true 或 false 。
+3. 如果某个字段是可选的，你可以选择不返回该字段，但如果返回了该字段，必须符合 SCHEMA 的要求。
+4. 不要添加任何多余的解释或文本，只返回符合 SCHEMA 的 JSON 数据。
+5. 不要输出压缩成一行的 JSON，请保持良好的可读性和缩进。
+
+# SCHEMA
+
+<schema>
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": [
+    "@action",
+    "intent_summary"
+  ],
+  "properties": {
+    "@action": {
+      "const": "intent-finalize-summary",
+      "description": "set '@action' can help the AI identify the output json object",
+      "type": "string"
+    },
+    "intent_summary": {
+      "description": "Concise structured summary of user intent following the template",
+      "type": "string"
+    },
+    "tags": {
+      "description": "Task tags for downstream retrieval",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "questions": {
+      "description": "Key retrieval questions for downstream search",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "recommended_capabilities": {
+      "description": "List of recommended capability names",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    }
+  },
+  "additionalProperties": true
+}
+</schema>
+
+# Instruction
+
+<background>
+<|INSTRUCTION_VwXwTCoB|>
+You are an intent analysis expert. The intent recognition loop has ended (reached iteration limit)
+before the AI could produce a final analysis. Based on the search results collected so far,
+generate a concise intent analysis for the user's query.
+
+Requirements:
+1. Summarize only the core user intent
+2. intent_summary should stay concise, preferably around 20-24 Chinese characters or similarly brief in English, but complete meaning is more important than strict length
+3. Do NOT repeat the user's full request
+4. Do NOT describe the search process
+5. Do NOT include tools, forges, skills, or focus modes in intent_summary; put them only in recommended_capabilities
+6. Output should be concise and actionable
+<|INSTRUCTION_END_VwXwTCoB|>
+
+<|USER_QUERY_VwXwTCoB|>
+hostscan
+<|PARENT_TASK_zdujqv|>
+<|EVIDENCE_uEecex|>
+- [summary-1-1] [子任务 1-1 获取操作系统类型] 总结: ### 关键结果
+- 使用 `ostype` 工具成功识别目标主机操作系统类型为 **darwin**（macOS）。
+### 结论 / 风险
+- 操作系统类型已确认，为后续系统配置检查、进程检查等任务提供基础环境信息。当前任务执行正常，无异常发现。
+- [summary-1-2] [子任务 1-2 系统配置检查] 总结: ### 关键结果
+- **操作系统**: macOS 14.1.2 (Build 23B92)，Darwin Kernel 23.1.0
+- **架构**: arm64 (Apple Silicon)，设备型号 MacBookPro18,4
+- **主机名**: v1ll4ndeMacBook-Pro.local
+- **运行时间**: 13天18小时27分钟，当前负载 9.93/9.09/9.04（偏高）
+- **时区**: CST（中国标准时间）
+- **启动时间**: 2024-04-19 17:08
+
+### 结论 / 风险
+- 基础系统配置正常，macOS 14.1.2 为较新版本（2023年11月发布），安全补丁状态良好。
+- **注意点**: 系统负载持续偏高（>9），3用户同时在线，需关注后续进程检查中是否存在资源占用异常进程。
+- 整体系统健康状态良好，无配置异常或版本过旧风险。
+<|EVIDENCE_END_uEecex|>
+
+任务名称: 执行全面的主机体检扫描，发现系统健康问题、安全风险和性能瓶颈。
+任务目标: 通过系统化的检查方法，全面评估主机系统的健康状态，识别潜在问题并提供修复建议。
+<|PARENT_TASK_END_zdujqv|>
+
+<|CURRENT_TASK_zdujqv|>
+任务名称: 进程检查
+任务目标: 检查系统当前运行的进程状态，包括进程ID、进程名称、CPU和内存占用、启动时间、用户权限、进程状态等，识别异常进程、僵尸进程、高资源占用进程、可疑进程和未授权服务，评估进程安全性和系统性能影响。
+<|CURRENT_TASK_END_zdujqv|>
+
+<|INSTRUCTION_zdujqv|>
+## 任务执行原则
+
+**核心要求**：请专注于完成 <|CURRENT_TASK_zdujqv|> 中定义的任务目标。
+
+**父任务的作用**：<|PARENT_TASK_zdujqv|> 中的信息仅作为上下文参考，帮助你理解当前任务在整个任务体系中的位置和背景。这些信息不应成为你的执行目标。
+
+**执行边界**：
+- 执行当前任务定义的具体目标和步骤
+- 参考父任务信息以更好地理解上下文
+- 不要尝试执行或修改父任务
+- 不要越界处理不属于当前任务范围的工作
+
+**行动指南**：始终以当前任务的目标为导向，将父任务信息视为辅助理解的背景材料，而非待执行的任务清单。
+<|INSTRUCTION_END_zdujqv|>
+<|USER_QUERY_END_VwXwTCoB|>
+
+<|SEARCH_RESULTS_VwXwTCoB|>
+## Capability Search Results for: 进程检查 进程扫描 process check ps top htop  ### Pre-matched from Capability Catalog recon-planning  ### Matched Tools - **多格式文本解码 (decode)**: 一个多功能的解码工具，支持对多种编码格式（如base64, url编码, double url编码, base32, hex, ascii, html实体, unicode等）的文本进行解码，并输出解码结果。 [keywords: 数据处理,格式转换,base64解码,数据解码,解码工具,base32解码,decode,double url,encoding schemes,data transformation,text processing,hex解码,编码转换,文本解码,url解码,base64,url encoding,base32,format conversion,decoding tools] - **大文件分块读取 (read_file_chunk)**: 一个用于安全读取大文件的工具，通过指定文件路径、分块大小和偏移量，可以按块读取文件特定位置的数据。尤其适用于处理内存受限或需要流式处理的场景。 [keywords: memory management,文件读取,大文件处理,file handling,reading,data processing,buffer,performance,内存安全,偏移读取,chunk size,offset,streaming,文件分块,数据块,文件处理,流式读取,large file] - **Line-Based File Reader (read_file_lines)**: A line-based text file (Absolute File Path) reader with pagination support. Automatically detects bi... tools (read_excel_info, read_word_structure, parse_office_to_text, zip_viewer, analyze_pcap, etc.). [keywords: file reading,line reading,log analysis,text processing,large file,line by line,pagination,streaming read,binary detection,mimetype,read_excel_info,parse_office_to_text] - **HTTP请求数据包发送与响应分析 (send_http_request_packet)**: 发送原始HTTP请求数据包，并接收完整的HTTP响应。工具支持设置HTTPS、重定向次数、请求超时时间，同时提供基于关键字或正则表达式匹配请求和响应内容的功能，并可选保存请求/响应到临时文件，显示网络连接和响应时间信息。 [keywords: http请求,网络探测,数据包发送,流量分析,web工具,请求响应,内容匹配,网络测试,抓包] - **已识别服务弱口令爆破 (brute)**: Brute force weak password testing for KNOWN and IDENTIFIED network service protocols. This tool is p...ed logins. For web login pages use: use_browser (form fill+click) or do_http_request (POST request). [keywords: brute force,service,weak password,ssh,ftp,mysql,rdp,postgres,tomcat,smb,vnc,redis,mongodb] - **命令可用性检测 (check_command_availability)**: 检测环境变量PATH中是否存在指定的命令，用于确认系统工具的可用性。支持检测单个命令或多个命令的存在状态，可指定是否显示详细的PATH信息。适用于脚本执行前的环境检查、依赖工具验证和自动化部署。 [keywords: command availability,path检测,环境变量,命令存在性,系统工具,dependency check,依赖检查,环境检查,工具验证,command validation,executable check,PATH环境变量,系统命令,which命令,where命令] - **Windows PowerSh...d js_static_extract_ai; optional HTTP probing. - internet_research: Internet research mode: collect, read, analyze, and synthesize information from internet search engines to produce comprehensive research reports. - java_decompiler: Enter Java decompiler expert mode: automatically decompile JAR files, analyze exported Java source code, detect and repair syntax or compilation errors, and support single-file or batch incremental fixes for JAR binary analysis and source reconstruction. - knowledge_enhance: Supplementary resource collection mode: gather relevant information from attached resources such as knowledge bases, files, AI tools, and AI forges based on the user's question for subsequent answering. - plan: Loop for generating and refining plans based on user requirements, with multi-source information gathering (knowledge base, file system, internet) and structured thinking frameworks (SMART, Six Thinking Hats, SWOT). - report_generating: Report generation mode: the AI researches while writing investigation reports or analytical articles, with support for iterative drafting and revision. - write_python_script: Enter focused mode for Python script generation. Creates production-quality Python scripts with CLI entry points, dependency management, and syntax validation. - http_fuzztest: HTTP request fuzzing and response diff analysis for security testing - write_syntaxflow_rule: Enter focused mode for SyntaxFlow rule generation and modification with real-time syntax validation - write_yaklang_code: Enter focused mode for Yaklang code generation and modification with access to code samples and syntax checking - smart_qa: Smart Q&A mode: an intelligent question-answering assistant that helps users learn and understand topics by leveraging knowledge bases, web search, local files, and persistent memory. - http_flow_analyze: Analyze captured HTTP flows from Yakit by querying, inspecting details, and applying matchers to highlight interesting traffic. - my_first_focus: minimal user-defined yak focus mode for testing
+<|SEARCH_RESULTS_END_VwXwTCoB|>
+
+<|MATCHED_CAPABILITIES_VwXwTCoB|>
+Tools: decode,read_file_chunk,read_file_lines,send_http_request_packet,brute,check_command_availability,powershell,tls_inspect,query_document,check_yaklang_syntax,开放 URL 重定向漏洞,Swagger JSON 泄漏,CSRF 表单保护与 CORS 配置不当检测
+Forges: scan_risk_analysis_project,sf_project_scan_check
+Skills: fund-analysis
+<|MATCHED_CAPABILITIES_END_VwXwTCoB|>
+</background>
+<|PROMPT_SECTION_END_high-static|>
+
+<|PROMPT_SECTION_semi-dynamic|>
+# 牢记
+# Now 2026-05-03 11:36:28.528004 +0800 CST m=+97.614650460
+<persistent_memory>
+</persistent_memory>
+
+<|PROMPT_SECTION_END_semi-dynamic|>
+
+<|PROMPT_SECTION_timeline|>
+<timeline_hcpbog>
+<|TIMELINE_b3t1777779180|>
+# bucket=2026/05/03 11:33:00-11:36:00 interval=3m
+11:35:48 [text/iteration]
+[iteration] [task:1-1]:
+  [default]ReAct Iteration Done[2] max:100 continue to next iteration
+<|TIMELINE_END_b3t1777779180|>
+</timeline_hcpbog>
+<|PROMPT_SECTION_END_timeline|>
+
+<|PROMPT_SECTION_dynamic_hcpbog|>
+<params_hcpbog>
+<|INSTRUCTION_VwXwTCoB|>
+You are an intent analysis expert. The intent recognition loop has ended (reached iteration limit)
+before the AI could produce a final analysis. Based on the search results collected so far,
+generate a concise intent analysis for the user's query.
+
+Requirements:
+1. Summarize only the core user intent
+2. intent_summary should stay concise, preferably around 20-24 Chinese characters or similarly brief in English, but complete meaning is more important than strict length
+3. Do NOT repeat the user's full request
+4. Do NOT describe the search process
+5. Do NOT include tools, forges, skills, or focus modes in intent_summary; put them only in recommended_capabilities
+6. Output should be concise and actionable
+<|INSTRUCTION_END_VwXwTCoB|>
+
+<|USER_QUERY_VwXwTCoB|>
+hostscan
+<|PARENT_TASK_zdujqv|>
+<|EVIDENCE_uEecex|>
+- [summary-1-1] [子任务 1-1 获取操作系统类型] 总结: ### 关键结果
+- 使用 `ostype` 工具成功识别目标主机操作系统类型为 **darwin**（macOS）。
+### 结论 / 风险
+- 操作系统类型已确认，为后续系统配置检查、进程检查等任务提供基础环境信息。当前任务执行正常，无异常发现。
+- [summary-1-2] [子任务 1-2 系统配置检查] 总结: ### 关键结果
+- **操作系统**: macOS 14.1.2 (Build 23B92)，Darwin Kernel 23.1.0
+- **架构**: arm64 (Apple Silicon)，设备型号 MacBookPro18,4
+- **主机名**: v1ll4ndeMacBook-Pro.local
+- **运行时间**: 13天18小时27分钟，当前负载 9.93/9.09/9.04（偏高）
+- **时区**: CST（中国标准时间）
+- **启动时间**: 2024-04-19 17:08
+
+### 结论 / 风险
+- 基础系统配置正常，macOS 14.1.2 为较新版本（2023年11月发布），安全补丁状态良好。
+- **注意点**: 系统负载持续偏高（>9），3用户同时在线，需关注后续进程检查中是否存在资源占用异常进程。
+- 整体系统健康状态良好，无配置异常或版本过旧风险。
+<|EVIDENCE_END_uEecex|>
+
+任务名称: 执行全面的主机体检扫描，发现系统健康问题、安全风险和性能瓶颈。
+任务目标: 通过系统化的检查方法，全面评估主机系统的健康状态，识别潜在问题并提供修复建议。
+<|PARENT_TASK_END_zdujqv|>
+
+<|CURRENT_TASK_zdujqv|>
+任务名称: 进程检查
+任务目标: 检查系统当前运行的进程状态，包括进程ID、进程名称、CPU和内存占用、启动时间、用户权限、进程状态等，识别异常进程、僵尸进程、高资源占用进程、可疑进程和未授权服务，评估进程安全性和系统性能影响。
+<|CURRENT_TASK_END_zdujqv|>
+
+<|INSTRUCTION_zdujqv|>
+## 任务执行原则
+
+**核心要求**：请专注于完成 <|CURRENT_TASK_zdujqv|> 中定义的任务目标。
+
+**父任务的作用**：<|PARENT_TASK_zdujqv|> 中的信息仅作为上下文参考，帮助你理解当前任务在整个任务体系中的位置和背景。这些信息不应成为你的执行目标。
+
+**执行边界**：
+- 执行当前任务定义的具体目标和步骤
+- 参考父任务信息以更好地理解上下文
+- 不要尝试执行或修改父任务
+- 不要越界处理不属于当前任务范围的工作
+
+**行动指南**：始终以当前任务的目标为导向，将父任务信息视为辅助理解的背景材料，而非待执行的任务清单。
+<|INSTRUCTION_END_zdujqv|>
+<|USER_QUERY_END_VwXwTCoB|>
+
+<|SEARCH_RESULTS_VwXwTCoB|>
+## Capability Search Results for: 进程检查 进程扫描 process check ps top htop  ### Pre-matched from Capability Catalog recon-planning  ### Matched Tools - **多格式文本解码 (decode)**: 一个多功能的解码工具，支持对多种编码格式（如base64, url编码, double url编码, base32, hex, ascii, html实体, unicode等）的文本进行解码，并输出解码结果。 [keywords: 数据处理,格式转换,base64解码,数据解码,解码工具,base32解码,decode,double url,encoding schemes,data transformation,text processing,hex解码,编码转换,文本解码,url解码,base64,url encoding,base32,format conversion,decoding tools] - **大文件分块读取 (read_file_chunk)**: 一个用于安全读取大文件的工具，通过指定文件路径、分块大小和偏移量，可以按块读取文件特定位置的数据。尤其适用于处理内存受限或需要流式处理的场景。 [keywords: memory management,文件读取,大文件处理,file handling,reading,data processing,buffer,performance,内存安全,偏移读取,chunk size,offset,streaming,文件分块,数据块,文件处理,流式读取,large file] - **Line-Based File Reader (read_file_lines)**: A line-based text file (Absolute File Path) reader with pagination support. Automatically detects bi... tools (read_excel_info, read_word_structure, parse_office_to_text, zip_viewer, analyze_pcap, etc.). [keywords: file reading,line reading,log analysis,text processing,large file,line by line,pagination,streaming read,binary detection,mimetype,read_excel_info,parse_office_to_text] - **HTTP请求数据包发送与响应分析 (send_http_request_packet)**: 发送原始HTTP请求数据包，并接收完整的HTTP响应。工具支持设置HTTPS、重定向次数、请求超时时间，同时提供基于关键字或正则表达式匹配请求和响应内容的功能，并可选保存请求/响应到临时文件，显示网络连接和响应时间信息。 [keywords: http请求,网络探测,数据包发送,流量分析,web工具,请求响应,内容匹配,网络测试,抓包] - **已识别服务弱口令爆破 (brute)**: Brute force weak password testing for KNOWN and IDENTIFIED network service protocols. This tool is p...ed logins. For web login pages use: use_browser (form fill+click) or do_http_request (POST request). [keywords: brute force,service,weak password,ssh,ftp,mysql,rdp,postgres,tomcat,smb,vnc,redis,mongodb] - **命令可用性检测 (check_command_availability)**: 检测环境变量PATH中是否存在指定的命令，用于确认系统工具的可用性。支持检测单个命令或多个命令的存在状态，可指定是否显示详细的PATH信息。适用于脚本执行前的环境检查、依赖工具验证和自动化部署。 [keywords: command availability,path检测,环境变量,命令存在性,系统工具,dependency check,依赖检查,环境检查,工具验证,command validation,executable check,PATH环境变量,系统命令,which命令,where命令] - **Windows PowerSh...d js_static_extract_ai; optional HTTP probing. - internet_research: Internet research mode: collect, read, analyze, and synthesize information from internet search engines to produce comprehensive research reports. - java_decompiler: Enter Java decompiler expert mode: automatically decompile JAR files, analyze exported Java source code, detect and repair syntax or compilation errors, and support single-file or batch incremental fixes for JAR binary analysis and source reconstruction. - knowledge_enhance: Supplementary resource collection mode: gather relevant information from attached resources such as knowledge bases, files, AI tools, and AI forges based on the user's question for subsequent answering. - plan: Loop for generating and refining plans based on user requirements, with multi-source information gathering (knowledge base, file system, internet) and structured thinking frameworks (SMART, Six Thinking Hats, SWOT). - report_generating: Report generation mode: the AI researches while writing investigation reports or analytical articles, with support for iterative drafting and revision. - write_python_script: Enter focused mode for Python script generation. Creates production-quality Python scripts with CLI entry points, dependency management, and syntax validation. - http_fuzztest: HTTP request fuzzing and response diff analysis for security testing - write_syntaxflow_rule: Enter focused mode for SyntaxFlow rule generation and modification with real-time syntax validation - write_yaklang_code: Enter focused mode for Yaklang code generation and modification with access to code samples and syntax checking - smart_qa: Smart Q&A mode: an intelligent question-answering assistant that helps users learn and understand topics by leveraging knowledge bases, web search, local files, and persistent memory. - http_flow_analyze: Analyze captured HTTP flows from Yakit by querying, inspecting details, and applying matchers to highlight interesting traffic. - my_first_focus: minimal user-defined yak focus mode for testing
+<|SEARCH_RESULTS_END_VwXwTCoB|>
+
+<|MATCHED_CAPABILITIES_VwXwTCoB|>
+Tools: decode,read_file_chunk,read_file_lines,send_http_request_packet,brute,check_command_availability,powershell,tls_inspect,query_document,check_yaklang_syntax,开放 URL 重定向漏洞,Swagger JSON 泄漏,CSRF 表单保护与 CORS 配置不当检测
+Forges: scan_risk_analysis_project,sf_project_scan_check
+Skills: fund-analysis
+<|MATCHED_CAPABILITIES_END_VwXwTCoB|>
+</params_hcpbog>
+<|PROMPT_SECTION_dynamic_END_hcpbog|>

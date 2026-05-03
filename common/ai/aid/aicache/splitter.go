@@ -9,17 +9,23 @@ import (
 )
 
 // 与 prompt_loop_materials.go 里的 wrapPromptMessageSection 对齐
-// 三段静态标签 tagName 为 PROMPT_SECTION，dynamic 段 tagName 为 PROMPT_SECTION_dynamic
-// （aitag 解析器在最后一个下划线处分 tagName/nonce，所以必须同时声明两个 tag name）
-// 关键词: aicache, PROMPT_SECTION, 外层标签
+// - high-static 段 tagName 为 AI_CACHE_SYSTEM（升级后形态，let 上游识别 system 边界）
+// - 其它三段 tagName 为 PROMPT_SECTION
+// - dynamic 段 tagName 为 PROMPT_SECTION_dynamic（带 nonce 防 prompt injection）
+// 兼容性：旧 PROMPT_SECTION_high-static 仍然识别（向后兼容过渡期），
+// 切片归类时与 AI_CACHE_SYSTEM_high-static 等价，使老服务器产生的 prompt
+// 与新服务器产生的 prompt 在 aicache 缓存表里能复用同一份 chunk hash 序列。
+// （aitag 解析器在最后一个下划线处分 tagName/nonce，所以三个 tag name 都要声明）
+// 关键词: aicache, AI_CACHE_SYSTEM, PROMPT_SECTION, 外层标签, 双标签兼容
 const (
 	tagPromptSection        = "PROMPT_SECTION"
 	tagPromptSectionDynamic = "PROMPT_SECTION_dynamic"
+	tagAICacheSystem        = "AI_CACHE_SYSTEM"
 )
 
 // acceptedTagNames 是 SplitViaTAG 接受的所有外层标签
 // 关键词: aicache, acceptedTagNames
-var acceptedTagNames = []string{tagPromptSection, tagPromptSectionDynamic}
+var acceptedTagNames = []string{tagPromptSection, tagPromptSectionDynamic, tagAICacheSystem}
 
 // Split 把 prompt 按外层 PROMPT_SECTION 系列标签切成有序 Chunk 列表
 // 切片规则参考 plan 第 4 节：
@@ -73,7 +79,9 @@ func Split(prompt string) *PromptSplit {
 }
 
 // classifyTagged 根据原始 tagName/nonce 推断 (Section, Nonce)
-// 关键词: aicache, classifyTagged, section 识别
+// AI_CACHE_SYSTEM 与 PROMPT_SECTION 在归类上等价（仅 section 含义来自 nonce），
+// 这样新老两种 tagName 写出来的 high-static 段可以归到同一个 chunk hash 序列。
+// 关键词: aicache, classifyTagged, section 识别, 双标签兼容
 func classifyTagged(tagName, rawNonce string) (string, string) {
 	tagName = strings.TrimSpace(tagName)
 	rawNonce = strings.TrimSpace(rawNonce)
@@ -85,7 +93,7 @@ func classifyTagged(tagName, rawNonce string) (string, string) {
 			nonce = SectionDynamic + "_" + rawNonce
 		}
 		return SectionDynamic, nonce
-	case tagPromptSection:
+	case tagPromptSection, tagAICacheSystem:
 		// nonce 即 section 名（high-static / semi-dynamic / timeline / 其它扩展）
 		if rawNonce == "" {
 			return "unknown", "unknown"

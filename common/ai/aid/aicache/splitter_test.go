@@ -34,7 +34,7 @@ func TestSplit_FourSections(t *testing.T) {
 	}
 }
 
-// 关键词: aicache, splitter, 仅含一段
+// 关键词: aicache, splitter, 仅含一段, 老 PROMPT_SECTION 兼容
 func TestSplit_OnlyHighStatic(t *testing.T) {
 	prompt := "<|PROMPT_SECTION_high-static|>\nstatic body\n<|PROMPT_SECTION_END_high-static|>"
 
@@ -42,6 +42,37 @@ func TestSplit_OnlyHighStatic(t *testing.T) {
 	require.Len(t, split.Chunks, 1)
 	assert.Equal(t, SectionHighStatic, split.Chunks[0].Section)
 	assert.Equal(t, "static body", split.Chunks[0].Content)
+}
+
+// TestSplit_OnlyHighStatic_AICacheSystemTag 验证新形态
+// <|AI_CACHE_SYSTEM_high-static|> 也能被切到 high-static section。
+// 关键词: aicache, splitter, AI_CACHE_SYSTEM, 新标签形态
+func TestSplit_OnlyHighStatic_AICacheSystemTag(t *testing.T) {
+	prompt := "<|AI_CACHE_SYSTEM_high-static|>\nstatic body\n<|AI_CACHE_SYSTEM_END_high-static|>"
+
+	split := Split(prompt)
+	require.Len(t, split.Chunks, 1)
+	assert.Equal(t, SectionHighStatic, split.Chunks[0].Section)
+	assert.Equal(t, SectionHighStatic, split.Chunks[0].Nonce)
+	assert.Equal(t, "static body", split.Chunks[0].Content)
+}
+
+// TestSplit_HighStaticTagEquivalence 验证新老两种 high-static tagName
+// 切出来的 chunk hash 完全一致（同 Section + 同 Content => 同 Hash），
+// 这是"老服务器 dump 与新服务器 dump 在 aicache 表里复用同一缓存槽位"
+// 这一关键属性的回归测试。
+// 关键词: aicache, splitter, AI_CACHE_SYSTEM, PROMPT_SECTION 等价 hash
+func TestSplit_HighStaticTagEquivalence(t *testing.T) {
+	body := "static body"
+	oldStyle := "<|PROMPT_SECTION_high-static|>\n" + body + "\n<|PROMPT_SECTION_END_high-static|>"
+	newStyle := "<|AI_CACHE_SYSTEM_high-static|>\n" + body + "\n<|AI_CACHE_SYSTEM_END_high-static|>"
+
+	a := Split(oldStyle)
+	b := Split(newStyle)
+	require.Len(t, a.Chunks, 1)
+	require.Len(t, b.Chunks, 1)
+	assert.Equal(t, a.Chunks[0].Section, b.Chunks[0].Section)
+	assert.Equal(t, a.Chunks[0].Hash, b.Chunks[0].Hash, "old and new high-static tags must hash to same value")
 }
 
 // 关键词: aicache, splitter, 无标签退化为 raw

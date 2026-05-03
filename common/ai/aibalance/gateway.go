@@ -145,6 +145,11 @@ func (g *GatewayClient) Chat(s string, function ...any) (string, error) {
 		aispec.WithChatBase_RawHTTPResponseCallback(g.config.RawHTTPResponseCallback),
 		aispec.WithChatBase_RawHTTPRequestResponseCallback(g.config.RawHTTPRequestResponseCallback),
 		aispec.WithChatBase_RawMessages(g.config.RawMessages),
+		// UsageCallback 透传：yak 用户脚本通过 ai.type("aibalance") + ai.usageCallback(...)
+		// 注册的回调，需要这里透传到 ChatBase，才能在 SSE 末帧解析出 usage 时被回调，
+		// 从而读取 aibalance server 端 WriteUsage 发回来的 cached_tokens 等隐式缓存信息。
+		// 关键词: aibalance GatewayClient UsageCallback 透传, cached_tokens 端到端
+		aispec.WithChatBase_UsageCallback(g.config.UsageCallback),
 	)
 
 	// 检查是否是 TOTP 认证失败（需要刷新密钥并重试）
@@ -174,6 +179,7 @@ func (g *GatewayClient) Chat(s string, function ...any) (string, error) {
 			aispec.WithChatBase_RawHTTPResponseCallback(g.config.RawHTTPResponseCallback),
 			aispec.WithChatBase_RawHTTPRequestResponseCallback(g.config.RawHTTPRequestResponseCallback),
 			aispec.WithChatBase_RawMessages(g.config.RawMessages),
+			aispec.WithChatBase_UsageCallback(g.config.UsageCallback),
 		)
 	}
 

@@ -360,8 +360,11 @@ type liteForgePromptParams struct {
 //
 // high-static 段内 <schema>/<instruction> 不带 nonce，确保同 forge 跨调用的 hash 真正稳定
 // Prompt 字段从 high-static 段挪到 dynamic 段，调用方传入的"动态内容"不再污染 high-static 段的 hash
-// 关键词: aicache, PROMPT_SECTION, LiteForge 模板, liteForgePromptTemplate
-const liteForgePromptTemplate = `<|PROMPT_SECTION_high-static|>
+// high-static 段使用 AI_CACHE_SYSTEM 标签：与 aireact 的 wrapPromptMessageSection 对齐，
+// 让 aicache splitter / hijacker 与上游隐式缓存的 system 边界保持一致；
+// 其他段仍沿用 PROMPT_SECTION 标签
+// 关键词: aicache, AI_CACHE_SYSTEM, PROMPT_SECTION, LiteForge 模板, liteForgePromptTemplate
+const liteForgePromptTemplate = `<|AI_CACHE_SYSTEM_high-static|>
 # Preset
 你现在在一个任务引擎中，是一个输出JSON的数据处理和总结提示小助手，我会为你提供一些基本信息和输入材料，你需要按照我的Schema生成一个JSON数据直接返回。
 
@@ -387,7 +390,7 @@ const liteForgePromptTemplate = `<|PROMPT_SECTION_high-static|>
 <instruction>
 {{ .StaticInstruction }}
 </instruction>
-{{ end }}<|PROMPT_SECTION_END_high-static|>
+{{ end }}<|AI_CACHE_SYSTEM_END_high-static|>
 
 <|PROMPT_SECTION_semi-dynamic|>
 {{ if .PersistentMemory }}# 牢记

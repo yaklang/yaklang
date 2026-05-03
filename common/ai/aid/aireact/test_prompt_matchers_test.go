@@ -36,7 +36,12 @@ func isPrimaryDecisionPrompt(prompt string) bool {
 		return true
 	}
 
-	if strings.Contains(prompt, "<|PROMPT_SECTION_high-static|>") &&
+	// 兼容新老两种 high-static 标签：AI_CACHE_SYSTEM_high-static（新形态）与
+	// PROMPT_SECTION_high-static（老形态）任意命中即视为 primary decision prompt。
+	// 关键词: AI_CACHE_SYSTEM_high-static, PROMPT_SECTION_high-static 双标签兼容
+	hasHighStatic := strings.Contains(prompt, "<|AI_CACHE_SYSTEM_high-static|>") ||
+		strings.Contains(prompt, "<|PROMPT_SECTION_high-static|>")
+	if hasHighStatic &&
 		strings.Contains(prompt, "<|PROMPT_SECTION_dynamic_") &&
 		strings.Contains(prompt, "<|TRAITS|>") &&
 		strings.Contains(prompt, `"require_tool"`) &&

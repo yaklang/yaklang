@@ -80,6 +80,7 @@ func invokeChatViaRawMessages(t *testing.T, p *Provider, msgs []aispec.ChatDetai
 			_, _ = io.Copy(io.Discard, reader)
 		},
 		nil,
+		nil,
 	)
 	if err != nil {
 		t.Fatalf("GetAIClientWithRawMessages failed: %v", err)
@@ -245,35 +246,6 @@ func TestServeChatCompletions_AffinityKeyStable(t *testing.T) {
 	}, "key-A", "qwen-max", 2048)
 	if other == first {
 		t.Fatalf("different messages must produce different affinity key, got both %q", first)
-	}
-}
-
-// TestServeChatCompletions_LegacyFallbackEnv 验证回滚开关：
-// AIBALANCE_LEGACY_FLATTEN_MESSAGES=1 时 legacyFlattenMessagesEnabled 返回 true，
-// 否则返回 false。
-// 关键词: aibalance 回滚开关测试, AIBALANCE_LEGACY_FLATTEN_MESSAGES
-func TestServeChatCompletions_LegacyFallbackEnv(t *testing.T) {
-	cases := []struct {
-		val  string
-		want bool
-	}{
-		{"", false},
-		{"0", false},
-		{"false", false},
-		{"1", true},
-		{"true", true},
-		{"True", true},
-		{"yes", true},
-		{"YES", true},
-	}
-	for _, tc := range cases {
-		t.Run("env="+tc.val, func(t *testing.T) {
-			t.Setenv(aibalanceLegacyFlattenEnv, tc.val)
-			got := legacyFlattenMessagesEnabled()
-			if got != tc.want {
-				t.Fatalf("legacyFlattenMessagesEnabled with env=%q: got %v want %v", tc.val, got, tc.want)
-			}
-		})
 	}
 }
 

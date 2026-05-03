@@ -425,7 +425,14 @@ func ChatBase(url string, model string, msg string, chatOpts ...ChatBaseOption) 
 	if len(ctx.RawMessages) > 0 {
 		mirrorMsg = serializeRawMessagesForMirror(ctx.RawMessages)
 	}
-	dispatchChatBaseMirror(model, mirrorMsg)
+	// 同步分发 mirror observer，可能拿到 hijack 决策。仅当 caller 没显式
+	// 给 RawMessages 时才允许 hijack 接管：caller 已构造好 messages 时尊
+	// 重其意图，不二次猜测。
+	// 关键词: ChatBase mirror hijack apply, RawMessages 优先级
+	mirrorResult := dispatchChatBaseMirror(model, mirrorMsg)
+	if len(ctx.RawMessages) == 0 && mirrorResult != nil && mirrorResult.IsHijacked && len(mirrorResult.Messages) > 0 {
+		ctx.RawMessages = mirrorResult.Messages
+	}
 	interfaceType := ctx.InterfaceType
 	if interfaceType == ChatBaseInterfaceTypeChatCompletions && strings.HasSuffix(strings.TrimRight(strings.ToLower(url), "/"), "/responses") {
 		interfaceType = ChatBaseInterfaceTypeResponses
@@ -550,10 +557,18 @@ func chatBaseChatCompletions(url string, model string, msg string, ctx *ChatBase
 		msgIns.Modalities = []string{"text"}
 	}
 
-	// 视频通路自动补 stream_options.include_usage=true（dashscope omni 要求）
-	// 关键词: stream_options, include_usage 自动注入
-	if hasVideos && msgIns.Stream {
-		msgIns.StreamOptions = map[string]any{"include_usage": true}
+	// stream_options.include_usage=true 自动注入条件（OpenAI / dashscope omni 规范）：
+	//   1) 视频通路（dashscope omni 强制要求）
+	//   2) 上层注册了 ctx.UsageCallback —— 调用方明确想要 token 用量
+	//      （包括 prompt_tokens、cached_tokens 等隐式缓存命中信息）
+	// 任一条件满足且当前为流式请求时即注入；保持已设的 StreamOptions 不被覆盖。
+	// 关键词: stream_options, include_usage 自动注入, UsageCallback 触发, cached_tokens 暴露
+	if msgIns.Stream && (hasVideos || ctx.UsageCallback != nil) {
+		if msgIns.StreamOptions == nil {
+			msgIns.StreamOptions = map[string]any{"include_usage": true}
+		} else if _, ok := msgIns.StreamOptions["include_usage"]; !ok {
+			msgIns.StreamOptions["include_usage"] = true
+		}
 	}
 
 	return executeChatBaseRequest(url, msgIns.Stream, msgIns, ctx, appendStreamHandlerPoCOptionEx)
@@ -561,9 +576,20 @@ func chatBaseChatCompletions(url string, model string, msg string, ctx *ChatBase
 
 func chatBaseResponses(url string, model string, msg string, ctx *ChatBaseContext) (string, error) {
 	stream := !ctx.DisableStream
+	// RawMessages 优先：当 caller 或上游 hijack 已经构造好结构化 messages 时，
+	// 走 RawMessages 透传分支，把 OpenAI chat-completions 风格 ChatDetail
+	// 列表映射为 OpenAI responses 协议的 input 数组，保持 role 边界，
+	// 让上游隐式缓存可识别 system/user 边界。
+	// 关键词: chatBaseResponses RawMessages 透传, system/user 边界保留
+	var input any
+	if len(ctx.RawMessages) > 0 {
+		input = convertChatDetailsToResponsesInput(ctx.RawMessages)
+	} else {
+		input = buildResponsesInput(msg, ctx.ImageUrls)
+	}
 	req := map[string]any{
 		"model":  model,
-		"input":  buildResponsesInput(msg, ctx.ImageUrls),
+		"input":  input,
 		"stream": stream,
 	}
 
@@ -576,6 +602,77 @@ func chatBaseResponses(url string, model string, msg string, ctx *ChatBaseContex
 	}
 
 	return executeChatBaseRequest(url, stream, req, ctx, appendResponsesStreamHandlerPoCOptionEx)
+}
+
+// convertChatDetailsToResponsesInput 把 OpenAI chat-completions 风格的
+// []ChatDetail 转成 OpenAI responses 协议的 input 数组。
+//
+// 字符串 content 渲染成 [{type:"input_text", text:...}]；[]*ChatContent
+// 类型按各自 type 字段分别映射为 input_text / input_image / input_video。
+//
+// 关键词: convertChatDetailsToResponsesInput, ChatDetail 转 responses input
+func convertChatDetailsToResponsesInput(msgs []ChatDetail) []map[string]any {
+	out := make([]map[string]any, 0, len(msgs))
+	for _, m := range msgs {
+		role := m.Role
+		if role == "" {
+			role = "user"
+		}
+		var content []map[string]any
+		switch v := m.Content.(type) {
+		case string:
+			content = append(content, map[string]any{
+				"type": "input_text",
+				"text": v,
+			})
+		case []*ChatContent:
+			for _, c := range v {
+				if c == nil {
+					continue
+				}
+				switch c.Type {
+				case "text":
+					content = append(content, map[string]any{
+						"type": "input_text",
+						"text": c.Text,
+					})
+				case "image_url":
+					content = append(content, map[string]any{
+						"type":      "input_image",
+						"image_url": c.ImageUrl,
+					})
+				case "video_url":
+					content = append(content, map[string]any{
+						"type":      "input_video",
+						"video_url": c.VideoUrl,
+					})
+				default:
+					if c.Text != "" {
+						content = append(content, map[string]any{
+							"type": "input_text",
+							"text": c.Text,
+						})
+					}
+				}
+			}
+		default:
+			content = append(content, map[string]any{
+				"type": "input_text",
+				"text": utils.InterfaceToString(m.Content),
+			})
+		}
+		if len(content) == 0 {
+			content = append(content, map[string]any{
+				"type": "input_text",
+				"text": "",
+			})
+		}
+		out = append(out, map[string]any{
+			"role":    role,
+			"content": content,
+		})
+	}
+	return out
 }
 
 func buildResponsesInput(msg string, images []*ImageDescription) []map[string]any {

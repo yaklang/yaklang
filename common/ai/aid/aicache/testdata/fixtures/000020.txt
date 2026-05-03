@@ -1,0 +1,266 @@
+# aicache prompt dump
+seq:    000020
+time:   2026-05-03T11:35:53+08:00
+model:  memfit-light-free
+total:  20259 bytes / 4 chunks
+
+## sections
+[1] section=high-static   nonce=high-static              bytes=10543 hash=d4f3b55936e1bcc5 seen=1 first=2026-05-03T11:35:53+08:00
+[2] section=semi-dynamic  nonce=semi-dynamic             bytes=109 hash=223e23000672f725 seen=1 first=2026-05-03T11:35:53+08:00
+[3] section=timeline      nonce=timeline                 bytes=418 hash=9254d27cadaf519a seen=1 first=2026-05-03T11:35:53+08:00
+[4] section=dynamic       nonce=dynamic_junwpi           bytes=8916 hash=f84df4da968752b5 seen=1 first=2026-05-03T11:35:53+08:00
+
+## hit report
+prefix_hit_chunks: 0
+prefix_hit_bytes:  0
+prefix_hit_ratio:  0.0%
+global_uniq_chunks: 67
+global_cache_bytes: 612978
+total_requests:    20
+section_hash_count:
+  - high-static: 16
+  - semi-dynamic: 17
+  - timeline: 14
+  - dynamic: 17
+  - raw: 3
+
+## advices
+- prefix not aligned at all; first section hash changed - check if static section template was polluted
+- semi-dynamic section drifts more than expected: 17 distinct hashes, tool/forge/schema list may be churning
+- high-static section unstable: 16 distinct hashes seen, check template variables polluting it
+
+## raw prompt (20259 bytes)
+<|PROMPT_SECTION_high-static|>
+# Preset
+你现在在一个任务引擎中，是一个输出JSON的数据处理和总结提示小助手，我会为你提供一些基本信息和输入材料，你需要按照我的Schema生成一个JSON数据直接返回。
+
+作为系统的一部分你应该直接返回JSON，避免多余的解释。
+
+# Output Formatter
+
+请你根据下面 SCHEMA 构建数据 , 注意事项：
+1. 你必须严格按照 SCHEMA 格式生成数据，不能缺少任何字段，不能多余任何字段。
+2. 所有字符串类型的数据必须使用双引号括起来，数字类型的数据不能使用引号括起来，布尔类型的数据必须使用 true 或 false 。
+3. 如果某个字段是可选的，你可以选择不返回该字段，但如果返回了该字段，必须符合 SCHEMA 的要求。
+4. 不要添加任何多余的解释或文本，只返回符合 SCHEMA 的 JSON 数据。
+5. 不要输出压缩成一行的 JSON，请保持良好的可读性和缩进。
+
+# SCHEMA
+
+<schema>
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": [
+    "@action",
+    "matched_identifiers"
+  ],
+  "properties": {
+    "@action": {
+      "const": "capability-catalog-match",
+      "description": "set '@action' can help the AI identify the output json object",
+      "type": "string"
+    },
+    "matched_identifiers": {
+      "description": "List of matched capability identifiers from the catalog. Only include identifiers that actually exist in the catalog.",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    }
+  },
+  "additionalProperties": true
+}
+</schema>
+
+# Instruction
+
+<background>
+<|INSTRUCTION_ztbzxS|>
+You are a capability matcher. Given a user query and a catalog of available capabilities,
+select ALL capabilities that are relevant to the user's intent.
+
+CRITICAL RULES:
+- You MUST ONLY select identifiers that appear in the catalog below. Do NOT invent or fabricate any identifier.
+- If the user's input directly contains a capability identifier (e.g., user says "run hostscan"), that identifier MUST be included.
+- Consider both Chinese and English meanings when matching.
+- Select capabilities that could help accomplish the user's goal, even indirectly.
+- Return ONLY the identifier part (the text after the type prefix, e.g., "web_search" from "[tool:web_search]").
+<|INSTRUCTION_END_ztbzxS|>
+
+<|USER_QUERY_ztbzxS|>
+hostscan
+<|PARENT_TASK_jyudyg|>
+<|EVIDENCE_YjdUob|>
+- [summary-1-1] [子任务 1-1 获取操作系统类型] 总结: ### 关键结果
+- 使用 `ostype` 工具成功识别目标主机操作系统类型为 **darwin**（macOS）。
+
+### 结论 / 风险
+- 操作系统类型已确认，为后续系统配置检查、进程检查等任务提供基础环境信息。当前任务执行正常，无异常发现。
+<|EVIDENCE_END_YjdUob|>
+
+任务名称: 执行全面的主机体检扫描，发现系统健康问题、安全风险和性能瓶颈。
+任务目标: 通过系统化的检查方法，全面评估主机系统的健康状态，识别潜在问题并提供修复建议。
+<|PARENT_TASK_END_jyudyg|>
+
+<|CURRENT_TASK_jyudyg|>
+任务名称: 系统配置检查
+任务目标: 检查目标主机的基本系统配置，包括操作系统类型、版本、架构、主机名、运行时间等基础信息，识别系统配置异常、版本过旧、架构不匹配等问题，为后续检查提供基础数据。
+<|CURRENT_TASK_END_jyudyg|>
+
+<|INSTRUCTION_jyudyg|>
+## 任务执行原则
+
+**核心要求**：请专注于完成 <|CURRENT_TASK_jyudyg|> 中定义的任务目标。
+
+**父任务的作用**：<|PARENT_TASK_jyudyg|> 中的信息仅作为上下文参考，帮助你理解当前任务在整个任务体系中的位置和背景。这些信息不应成为你的执行目标。
+
+**执行边界**：
+- 执行当前任务定义的具体目标和步骤
+- 参考父任务信息以更好地理解上下文
+- 不要尝试执行或修改父任务
+- 不要越界处理不属于当前任务范围的工作
+
+**行动指南**：始终以当前任务的目标为导向，将父任务信息视为辅助理解的背景材料，而非待执行的任务清单。
+<|INSTRUCTION_END_jyudyg|>
+<|USER_QUERY_END_ztbzxS|>
+
+<|CAPABILITY_CATALOG_ztbzxS|>
+[forge:sf_project_scan_check]: SSA项目检查 - 先向会话推送扫描任务表与最新任务标识，再由 AI 协助解读表格、核对参数，并在无匹配时给出可操作的排查建议。适合「只想确认有哪些扫描任务、哪一条是最新」的场景；完整误报与 SSA 深度分析请用扫描风险分析蓝图。. keywords: SyntaxFlow,扫描任务,项目扫描,任务列表,最新任务,项目标识
+[skill:sql-injection]: sql-injection - SQL 注入漏洞测试技能。覆盖联合注入、布尔盲注、时间盲注、报错注入、堆叠查询等攻击向量， 提供 MySQL/Postg...库的特征 Payload， 包含 WAF 绕过策略和系统化测试流程，适用于 Web 应用 SQL 注入漏洞的发现与确认。
+[skill:template-injection]: template-injection - 服务端模版注入(SSTI)漏洞测试技能。提供模版引擎指纹识别决策树，覆盖 Jinja2/Twig/Freemarker/.../Mako 等主流引擎的 PoC 探测与 RCE Payload，包含沙箱逃逸技术和系统化测试流程(CWE-1336)。
+[skill:web-crawler]: web-crawler - Web 爬虫与目标发现技能。定义渗透测试中 Web 爬虫的使用方法论，覆盖爬取策略、 URL/参数/表单/API 端点的...、JavaScript 渲染页面处理、爬取结果分析， 以及与后续漏洞测试的衔接。是侦查(Recon)阶段的核心技能之一。
+[skill:xss-testing]: xss-testing - 跨站脚本(XSS)漏洞测试技能。覆盖反射型、存储型、DOM型 XSS 的识别与验证方法， 提供分层 Payload 集合、WAF 绕过策略、编码变换技巧和系统化测试流程， 适用于 Web 应用安全评估中的 XSS 漏洞发现与确认。
+[skill:control-theory]: control-theory - Control theory methodology for AI Agent design. Maps cyberne...m design. Based on"控制论与科学方法论" by Jin Guantao and Hua Guofan.
+[skill:recon-planning]: recon-planning - 渗透测试侦查与任务规划技能。定义渗透测试的完整工作流程：从信息收集(Recon)到 范围确定、任务规划和漏洞测试执行。覆盖端口扫描、子域名枚举、Web 搜索、 服务识别等侦查手段，提供 OWASP Top 10 检查矩阵和任务编排策略。
+[skill:authorization-bypass]: authorization-bypass - Web 应用越权漏洞测试技能。覆盖水平越权(IDOR)、垂直越权(权限提升)、业务逻辑绕过 三大类测试场景。提供基于 H... 可以自动化执行越权测试。参考 OWASP WSTG-ATHZ-02/03/04 和 OWASP Top 10 A01。
+[skill:code-review]: code-review - 基于 grep 文本搜索和文件读写的代码安全审计技能。通过正则表达式模式匹配在项目源码中 定位危险函数调用、敏感数据流和...漏洞类型， 支持 Java、Golang、PHP、Python、C/C++、JavaScript 等多种语言的安全审计。
+[skill:command-injection]: command-injection - 操作系统命令注入漏洞测试技能。覆盖 Linux 和 Windows 环境下的命令注入检测与验证， 提供多种注入操作符、盲...检测方法、编码绕过策略和分步测试流程， 适用于 Web 应用中命令执行类漏洞的发现与确认(CWE-77/CWE-78)。
+[skill:how-to-use-browser]: how-to-use-browser - Browser automation skill for web page interaction. Two strat..., DO NOT retry -- switch to JavaScript strategy immediately.
+[skill:pentest-task-design]: pentest-task-design - 渗透测试安全测试任务设计与执行总指导。作为渗透测试的顶层编排技能，将抽象的安全测试方法论 映射到可直接调用的工具链，定义...n、code-review 等全部子技能。 当用户要求进行渗透测试、安全测试或安全评估时，应首先参考此技能进行任务设计。
+[focus_mode:ai_skill_audit]: ai_skill_audit - AI Skill security audit mode: a three-phase pipeline (direct...es between SKILL.md declarations and script implementations.
+[focus_mode:code_security_audit]: code_security_audit - Code security audit mode: a four-phase pipeline (project rec...an -> finding-by-finding verification -> report generation).
+[focus_mode:dir_explore]: dir_explore - Directory exploration mode: AI autonomously explores a targe...e structure, then generates a structured exploration report.
+[focus_mode:infosec_recon]: infosec_recon - Focused information gathering and API endpoint discovery for...s_collector and js_static_extract_ai; optional HTTP probing.
+[focus_mode:internet_research]: internet_research - Internet research mode: collect, read, analyze, and synthesi...et search engines to produce comprehensive research reports.
+[focus_mode:java_decompiler]: java_decompiler - Enter Java decompiler expert mode: automatically decompile J...tal fixes for JAR binary analysis and source reconstruction.
+[focus_mode:knowledge_enhance]: knowledge_enhance - Supplementary resource collection mode: gather relevant info...orges based on the user's question for subsequent answering.
+[focus_mode:plan]: plan - Loop for generating and refining plans based on user require...ctured thinking frameworks (SMART, Six Thinking Hats, SWOT).
+[focus_mode:report_generating]: report_generating - Report generation mode: the AI researches while writing inve... articles, with support for iterative drafting and revision.
+[focus_mode:write_python_script]: write_python_script - Enter focused mode for Python script generation. Creates pro... entry points, dependency management, and syntax validation.
+[focus_mode:http_fuzztest]: http_fuzztest - HTTP request fuzzing and response diff analysis for security testing
+[focus_mode:write_syntaxflow_rule]: write_syntaxflow_rule - Enter focused mode for SyntaxFlow rule generation and modification with real-time syntax validation
+[focus_mode:write_yaklang_code]: write_yaklang_code - Enter focused mode for Yaklang code generation and modification with access to code samples and syntax checking
+[focus_mode:smart_qa]: smart_qa - Smart Q&A mode: an intelligent question-answering assistant ...ledge bases, web search, local files, and persistent memory.
+[focus_mode:http_flow_analyze]: http_flow_analyze - Analyze captured HTTP flows from Yakit by querying, inspecti...ils, and applying matchers to highlight interesting traffic.
+[focus_mode:my_first_focus]: my_first_focus - minimal user-defined yak focus mode for testing
+
+
+<|CAPABILITY_CATALOG_END_ztbzxS|>
+</background>
+<|PROMPT_SECTION_END_high-static|>
+
+<|PROMPT_SECTION_semi-dynamic|>
+# 牢记
+# Now 2026-05-03 11:35:53.757712 +0800 CST m=+62.844451293
+<persistent_memory>
+</persistent_memory>
+
+<|PROMPT_SECTION_END_semi-dynamic|>
+
+<|PROMPT_SECTION_timeline|>
+<timeline_junwpi>
+<|TIMELINE_b3t1777779180|>
+# bucket=2026/05/03 11:33:00-11:36:00 interval=3m
+11:35:32 [text/[BLUEPRINT_ACTION_VERIFIED]]
+[[BLUEPRINT_ACTION_VERIFIED]] [task:react-hostscan-3DCHrQmk]:
+  Verified require_ai_blueprint action with blueprint_payload: 'hostscan'. The action passed ActionVerifier and is ready for execution with the specified AI Blueprint.
+<|TIMELINE_END_b3t1777779180|>
+</timeline_junwpi>
+<|PROMPT_SECTION_END_timeline|>
+
+<|PROMPT_SECTION_dynamic_junwpi|>
+<params_junwpi>
+<|INSTRUCTION_ztbzxS|>
+You are a capability matcher. Given a user query and a catalog of available capabilities,
+select ALL capabilities that are relevant to the user's intent.
+
+CRITICAL RULES:
+- You MUST ONLY select identifiers that appear in the catalog below. Do NOT invent or fabricate any identifier.
+- If the user's input directly contains a capability identifier (e.g., user says "run hostscan"), that identifier MUST be included.
+- Consider both Chinese and English meanings when matching.
+- Select capabilities that could help accomplish the user's goal, even indirectly.
+- Return ONLY the identifier part (the text after the type prefix, e.g., "web_search" from "[tool:web_search]").
+<|INSTRUCTION_END_ztbzxS|>
+
+<|USER_QUERY_ztbzxS|>
+hostscan
+<|PARENT_TASK_jyudyg|>
+<|EVIDENCE_YjdUob|>
+- [summary-1-1] [子任务 1-1 获取操作系统类型] 总结: ### 关键结果
+- 使用 `ostype` 工具成功识别目标主机操作系统类型为 **darwin**（macOS）。
+
+### 结论 / 风险
+- 操作系统类型已确认，为后续系统配置检查、进程检查等任务提供基础环境信息。当前任务执行正常，无异常发现。
+<|EVIDENCE_END_YjdUob|>
+
+任务名称: 执行全面的主机体检扫描，发现系统健康问题、安全风险和性能瓶颈。
+任务目标: 通过系统化的检查方法，全面评估主机系统的健康状态，识别潜在问题并提供修复建议。
+<|PARENT_TASK_END_jyudyg|>
+
+<|CURRENT_TASK_jyudyg|>
+任务名称: 系统配置检查
+任务目标: 检查目标主机的基本系统配置，包括操作系统类型、版本、架构、主机名、运行时间等基础信息，识别系统配置异常、版本过旧、架构不匹配等问题，为后续检查提供基础数据。
+<|CURRENT_TASK_END_jyudyg|>
+
+<|INSTRUCTION_jyudyg|>
+## 任务执行原则
+
+**核心要求**：请专注于完成 <|CURRENT_TASK_jyudyg|> 中定义的任务目标。
+
+**父任务的作用**：<|PARENT_TASK_jyudyg|> 中的信息仅作为上下文参考，帮助你理解当前任务在整个任务体系中的位置和背景。这些信息不应成为你的执行目标。
+
+**执行边界**：
+- 执行当前任务定义的具体目标和步骤
+- 参考父任务信息以更好地理解上下文
+- 不要尝试执行或修改父任务
+- 不要越界处理不属于当前任务范围的工作
+
+**行动指南**：始终以当前任务的目标为导向，将父任务信息视为辅助理解的背景材料，而非待执行的任务清单。
+<|INSTRUCTION_END_jyudyg|>
+<|USER_QUERY_END_ztbzxS|>
+
+<|CAPABILITY_CATALOG_ztbzxS|>
+[forge:sf_project_scan_check]: SSA项目检查 - 先向会话推送扫描任务表与最新任务标识，再由 AI 协助解读表格、核对参数，并在无匹配时给出可操作的排查建议。适合「只想确认有哪些扫描任务、哪一条是最新」的场景；完整误报与 SSA 深度分析请用扫描风险分析蓝图。. keywords: SyntaxFlow,扫描任务,项目扫描,任务列表,最新任务,项目标识
+[skill:sql-injection]: sql-injection - SQL 注入漏洞测试技能。覆盖联合注入、布尔盲注、时间盲注、报错注入、堆叠查询等攻击向量， 提供 MySQL/Postg...库的特征 Payload， 包含 WAF 绕过策略和系统化测试流程，适用于 Web 应用 SQL 注入漏洞的发现与确认。
+[skill:template-injection]: template-injection - 服务端模版注入(SSTI)漏洞测试技能。提供模版引擎指纹识别决策树，覆盖 Jinja2/Twig/Freemarker/.../Mako 等主流引擎的 PoC 探测与 RCE Payload，包含沙箱逃逸技术和系统化测试流程(CWE-1336)。
+[skill:web-crawler]: web-crawler - Web 爬虫与目标发现技能。定义渗透测试中 Web 爬虫的使用方法论，覆盖爬取策略、 URL/参数/表单/API 端点的...、JavaScript 渲染页面处理、爬取结果分析， 以及与后续漏洞测试的衔接。是侦查(Recon)阶段的核心技能之一。
+[skill:xss-testing]: xss-testing - 跨站脚本(XSS)漏洞测试技能。覆盖反射型、存储型、DOM型 XSS 的识别与验证方法， 提供分层 Payload 集合、WAF 绕过策略、编码变换技巧和系统化测试流程， 适用于 Web 应用安全评估中的 XSS 漏洞发现与确认。
+[skill:control-theory]: control-theory - Control theory methodology for AI Agent design. Maps cyberne...m design. Based on"控制论与科学方法论" by Jin Guantao and Hua Guofan.
+[skill:recon-planning]: recon-planning - 渗透测试侦查与任务规划技能。定义渗透测试的完整工作流程：从信息收集(Recon)到 范围确定、任务规划和漏洞测试执行。覆盖端口扫描、子域名枚举、Web 搜索、 服务识别等侦查手段，提供 OWASP Top 10 检查矩阵和任务编排策略。
+[skill:authorization-bypass]: authorization-bypass - Web 应用越权漏洞测试技能。覆盖水平越权(IDOR)、垂直越权(权限提升)、业务逻辑绕过 三大类测试场景。提供基于 H... 可以自动化执行越权测试。参考 OWASP WSTG-ATHZ-02/03/04 和 OWASP Top 10 A01。
+[skill:code-review]: code-review - 基于 grep 文本搜索和文件读写的代码安全审计技能。通过正则表达式模式匹配在项目源码中 定位危险函数调用、敏感数据流和...漏洞类型， 支持 Java、Golang、PHP、Python、C/C++、JavaScript 等多种语言的安全审计。
+[skill:command-injection]: command-injection - 操作系统命令注入漏洞测试技能。覆盖 Linux 和 Windows 环境下的命令注入检测与验证， 提供多种注入操作符、盲...检测方法、编码绕过策略和分步测试流程， 适用于 Web 应用中命令执行类漏洞的发现与确认(CWE-77/CWE-78)。
+[skill:how-to-use-browser]: how-to-use-browser - Browser automation skill for web page interaction. Two strat..., DO NOT retry -- switch to JavaScript strategy immediately.
+[skill:pentest-task-design]: pentest-task-design - 渗透测试安全测试任务设计与执行总指导。作为渗透测试的顶层编排技能，将抽象的安全测试方法论 映射到可直接调用的工具链，定义...n、code-review 等全部子技能。 当用户要求进行渗透测试、安全测试或安全评估时，应首先参考此技能进行任务设计。
+[focus_mode:ai_skill_audit]: ai_skill_audit - AI Skill security audit mode: a three-phase pipeline (direct...es between SKILL.md declarations and script implementations.
+[focus_mode:code_security_audit]: code_security_audit - Code security audit mode: a four-phase pipeline (project rec...an -> finding-by-finding verification -> report generation).
+[focus_mode:dir_explore]: dir_explore - Directory exploration mode: AI autonomously explores a targe...e structure, then generates a structured exploration report.
+[focus_mode:infosec_recon]: infosec_recon - Focused information gathering and API endpoint discovery for...s_collector and js_static_extract_ai; optional HTTP probing.
+[focus_mode:internet_research]: internet_research - Internet research mode: collect, read, analyze, and synthesi...et search engines to produce comprehensive research reports.
+[focus_mode:java_decompiler]: java_decompiler - Enter Java decompiler expert mode: automatically decompile J...tal fixes for JAR binary analysis and source reconstruction.
+[focus_mode:knowledge_enhance]: knowledge_enhance - Supplementary resource collection mode: gather relevant info...orges based on the user's question for subsequent answering.
+[focus_mode:plan]: plan - Loop for generating and refining plans based on user require...ctured thinking frameworks (SMART, Six Thinking Hats, SWOT).
+[focus_mode:report_generating]: report_generating - Report generation mode: the AI researches while writing inve... articles, with support for iterative drafting and revision.
+[focus_mode:write_python_script]: write_python_script - Enter focused mode for Python script generation. Creates pro... entry points, dependency management, and syntax validation.
+[focus_mode:http_fuzztest]: http_fuzztest - HTTP request fuzzing and response diff analysis for security testing
+[focus_mode:write_syntaxflow_rule]: write_syntaxflow_rule - Enter focused mode for SyntaxFlow rule generation and modification with real-time syntax validation
+[focus_mode:write_yaklang_code]: write_yaklang_code - Enter focused mode for Yaklang code generation and modification with access to code samples and syntax checking
+[focus_mode:smart_qa]: smart_qa - Smart Q&A mode: an intelligent question-answering assistant ...ledge bases, web search, local files, and persistent memory.
+[focus_mode:http_flow_analyze]: http_flow_analyze - Analyze captured HTTP flows from Yakit by querying, inspecti...ils, and applying matchers to highlight interesting traffic.
+[focus_mode:my_first_focus]: my_first_focus - minimal user-defined yak focus mode for testing
+
+
+<|CAPABILITY_CATALOG_END_ztbzxS|>
+</params_junwpi>
+<|PROMPT_SECTION_dynamic_END_junwpi|>
