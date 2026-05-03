@@ -321,6 +321,10 @@ func processAIResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, reas
 			}
 			if err := json.Unmarshal([]byte(j), &usageProbe); err == nil && usageProbe.Usage != nil && (usageProbe.Usage.PromptTokens > 0 || usageProbe.Usage.CompletionTokens > 0 || usageProbe.Usage.TotalTokens > 0) {
 				lastUsage = usageProbe.Usage
+				// 把上游 SSE 末帧带 usage 的原始 chunk 字节打到 debug，
+				// 便于排查 prompt_tokens_details.cached_tokens 字段是缺失、为 0 还是 > 0。
+				// 关键词: aispec stream lastUsage debug, cached_tokens raw
+				log.Debugf("aispec stream lastUsage updated: %s", utils.ShrinkString(j, 1024))
 			}
 
 			var reasonDelta string

@@ -601,6 +601,23 @@ func chatBaseResponses(url string, model string, msg string, ctx *ChatBaseContex
 		req["tool_choice"] = convertToolChoiceToResponses(ctx.ToolChoice)
 	}
 
+	// stream_options.include_usage=true 自动注入：与 chatBaseChatCompletions 保持一致，
+	// 当上层注册了 ctx.UsageCallback 且当前为流式请求时注入，让上游 /responses 端点
+	// 在末帧返回 usage（含 prompt_tokens_details.cached_tokens）。
+	// dashscope OpenAI /responses 兼容端点与 OpenAI 官方均识别该字段，未识别的上游
+	// 会忽略该字段不影响请求。
+	// 关键词: chatBaseResponses include_usage 注入, /responses cached_tokens 一致性
+	if stream && ctx.UsageCallback != nil {
+		streamOpts, _ := req["stream_options"].(map[string]any)
+		if streamOpts == nil {
+			streamOpts = map[string]any{}
+		}
+		if _, ok := streamOpts["include_usage"]; !ok {
+			streamOpts["include_usage"] = true
+		}
+		req["stream_options"] = streamOpts
+	}
+
 	return executeChatBaseRequest(url, stream, req, ctx, appendResponsesStreamHandlerPoCOptionEx)
 }
 

@@ -929,6 +929,16 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 	var lastError error
 	for i, provider := range providers {
 		c.logInfo("Trying provider %d/%d for model %s: %s", i+1, len(providers), modelName, provider.TypeName)
+		// selected provider 详细身份日志：在调用 GetAIClientWithRawMessages 之前打印
+		// type/model/domain/key shrink + affinityKey shrink，便于跨多轮请求肉眼判断
+		// affinity 路由是否稳定到同一 dashscope key（dashscope implicit cache 是
+		// per-API-key 的，路由跳变会显著拉低 cached_tokens 命中率）。
+		// 关键词: aibalance selected provider 日志, affinity 路由稳定性, dashscope per-key cache
+		c.logInfo("selected provider %d/%d: type=%s model=%s domain=%s key=%s (affinityKey=%s)",
+			i+1, len(providers),
+			provider.TypeName, provider.ModelName, provider.DomainOrURL,
+			utils.ShrinkString(provider.APIKey, 8),
+			utils.ShrinkString(affinityKey, 8))
 
 		sendHeaderOnce := sync.Once{}
 		sendHeader := func() {
@@ -1001,20 +1011,31 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 		// onUsageForward 把上游 LLM 在 SSE 末帧返回的 token 用量
 		// （含 prompt_tokens_details.cached_tokens 隐式缓存命中）传给 writer，
 		// writer.Close 会按 OpenAI include_usage 规范在 [DONE] 之前发一帧给客户端。
-		// 关键词: aibalance onUsageForward, cached_tokens 透传
+		//
+		// 日志策略：把 provider 身份（type/model/domain/key shrink）和上游 raw usage JSON
+		// 一起 log 出来，方便定位 cached_tokens=0 的真因：
+		//   - usage=nil  -> 上游根本没返 usage 帧（可能 stream_options 注入失败或上游不支持）
+		//   - cached=0 且 raw 中无 prompt_tokens_details.cached_tokens 字段 -> 上游账号未触发 implicit cache
+		//   - cached>0 -> 命中，writer.WriteUsage 会透传给客户端
+		//
+		// 关键词: aibalance onUsageForward, cached_tokens 透传, 上游 provider 身份, raw usage JSON
 		onUsageForward := func(usage *aispec.ChatUsage) {
 			if usage == nil {
+				c.logInfo("upstream usage: <nil> (provider=%s model=%s domain=%s key=%s)",
+					provider.TypeName, provider.ModelName, provider.DomainOrURL,
+					utils.ShrinkString(provider.APIKey, 8))
 				return
 			}
-			c.logInfo("upstream usage: prompt_tokens=%d, completion_tokens=%d, total_tokens=%d, cached_tokens=%d",
-				usage.PromptTokens, usage.CompletionTokens, usage.TotalTokens,
-				func() int {
-					if usage.PromptTokensDetails != nil {
-						return usage.PromptTokensDetails.CachedTokens
-					}
-					return 0
-				}(),
-			)
+			cached := 0
+			if usage.PromptTokensDetails != nil {
+				cached = usage.PromptTokensDetails.CachedTokens
+			}
+			rawUsage, _ := json.Marshal(usage)
+			c.logInfo("upstream usage: provider=%s model=%s domain=%s key=%s prompt=%d completion=%d total=%d cached=%d raw=%s",
+				provider.TypeName, provider.ModelName, provider.DomainOrURL,
+				utils.ShrinkString(provider.APIKey, 8),
+				usage.PromptTokens, usage.CompletionTokens, usage.TotalTokens, cached,
+				string(rawUsage))
 			writer.WriteUsage(usage)
 		}
 
