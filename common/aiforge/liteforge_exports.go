@@ -79,14 +79,15 @@ var LiteForgeExport = map[string]interface{}{
 }
 
 type liteforgeConfig struct {
-	query      string
-	output     string
-	action     string
-	id         string
-	ctx        context.Context
-	images     []*aicommon.ImageData
-	forceImage bool
-	speedPriority bool
+	query             string
+	output            string
+	action            string
+	id                string
+	ctx               context.Context
+	images            []*aicommon.ImageData
+	forceImage        bool
+	speedPriority     bool
+	staticInstruction string
 
 	aidOptions []aicommon.ConfigOption
 
@@ -257,6 +258,10 @@ func _executeLiteForgeTemp(query string, opts ...any) (*ForgeResult, error) {
 			// Collect aispec options to extract Type and Model
 			opt(&aiSpecConfig)
 			hasAiSpecOpts = true
+		case aicommon.LiteForgeStaticInstruction:
+			// 关键词: aicache, PROMPT_SECTION, StaticInstruction, LiteForgeStaticInstruction, B 档无循环依赖
+			// 下游包（如 enhancesearch）通过此 marker 类型携带系统侧静态指令，避免 import aiforge 造成循环依赖
+			cfg.staticInstruction = string(opt)
 		}
 	}
 
@@ -287,6 +292,12 @@ func _executeLiteForgeTemp(query string, opts ...any) (*ForgeResult, error) {
 	}
 	if cfg.speedPriority {
 		liteForgeOpts = append(liteForgeOpts, WithLiteForge_SpeedPriority(true))
+	}
+	// 关键词: aicache, PROMPT_SECTION, StaticInstruction, _executeLiteForgeTemp, B 档
+	// 调用方可以通过 LiteForgeExecWithStaticInstruction 携带系统侧静态指令
+	// 该指令进入 high-static 段，跨调用稳定哈希
+	if cfg.staticInstruction != "" {
+		liteForgeOpts = append(liteForgeOpts, WithLiteForge_StaticInstruction(cfg.staticInstruction))
 	}
 	liteforgeIns, err := NewLiteForge(cfg.id, liteForgeOpts...)
 	if err != nil {
@@ -360,5 +371,15 @@ func _withSpeedPriority(b ...bool) LiteForgeExecOption {
 		if len(b) == 0 || b[0] {
 			cfg.speedPriority = true
 		}
+	}
+}
+
+// LiteForgeExecWithStaticInstruction 是 B 档新增 LiteForgeExecOption
+// 携带系统侧静态指令到 _executeLiteForgeTemp 路径，最终通过 WithLiteForge_StaticInstruction
+// 进入 LiteForge 的 high-static 段，跨调用稳定哈希
+// 关键词: aicache, PROMPT_SECTION, StaticInstruction, LiteForgeExecWithStaticInstruction, B 档
+func LiteForgeExecWithStaticInstruction(s string) LiteForgeExecOption {
+	return func(cfg *liteforgeConfig) {
+		cfg.staticInstruction = s
 	}
 }

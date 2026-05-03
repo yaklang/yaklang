@@ -25,6 +25,16 @@ func WithGeneralConfigStreamableField(fieldKey string) GeneralKVConfigOption {
 	return WithGeneralConfigStreamableFieldWithNodeId("re-act-loop-thought", fieldKey)
 }
 
+// WithLiteForgeStaticInstruction 携带 LiteForge 的系统侧静态指令到 GeneralKVConfig
+// 该指令最终会被 invoke_liteforge.go 解析并通过 aiforge.WithLiteForge_StaticInstruction 传给 LiteForge
+// 进入 high-static 段，跨调用稳定哈希
+// 关键词: aicache, PROMPT_SECTION, StaticInstruction, WithLiteForgeStaticInstruction
+func WithLiteForgeStaticInstruction(s string) GeneralKVConfigOption {
+	return func(c *GeneralKVConfig) {
+		c.config.Set("liteForgeStaticInstruction", s)
+	}
+}
+
 // StreamableFieldCallback is a callback function that handles streaming field data during LiteForge execution.
 // key: the field key that matches one of the monitored fields
 // r: io.Reader containing the streaming data for that field

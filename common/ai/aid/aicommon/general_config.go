@@ -69,3 +69,17 @@ func (g *GeneralKVConfig) GetStreamableFieldCallbacks() []*StreamableFieldCallba
 	}
 	return callbacks
 }
+
+// GetLiteForgeStaticInstruction 读取调用方通过 WithLiteForgeStaticInstruction 注入的系统侧静态指令
+// 关键词: aicache, PROMPT_SECTION, StaticInstruction, GetLiteForgeStaticInstruction
+func (g *GeneralKVConfig) GetLiteForgeStaticInstruction() string {
+	result, ok := g.config.Get("liteForgeStaticInstruction")
+	if !ok {
+		return ""
+	}
+	s, ok := result.(string)
+	if !ok {
+		return ""
+	}
+	return s
+}

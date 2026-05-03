@@ -26,6 +26,12 @@ func (r *ReAct) invokeLiteForgeWithCallback(cb aicommon.AICallbackType, ctx cont
 			aitool.NewObjectSchemaWithActionName(actionName, rawOutputs...),
 		),
 	}
+	// 关键词: aicache, PROMPT_SECTION, StaticInstruction, invokeLiteForgeWithCallback
+	// 调用方可以通过 aicommon.WithLiteForgeStaticInstruction 携带系统侧静态指令
+	// 这部分内容进入 high-static 段，跨调用稳定哈希
+	if staticInstruction := gconfig.GetLiteForgeStaticInstruction(); staticInstruction != "" {
+		fopts = append(fopts, aiforge.WithLiteForge_StaticInstruction(staticInstruction))
+	}
 	for _, i := range gconfig.GetStreamableFields() {
 		fopts = append(fopts, aiforge.WithLiteForge_StreamableFieldWithAINodeId(i.AINodeId(), i.FieldKey()))
 	}

@@ -78,58 +78,72 @@ var indexBuildSchema = aitool.NewObjectSchemaWithAction(
 		questionSchema...,
 	))
 
-var queryPrompt = `{{.PROMPT}}
-
-{{ if .EXTRA }}
-<|EXTRA_{{ .Nonce }}|>
+// queryPrompt 是本包的"动态内容"模板（包级私有副本）
+// B 档改造：去掉 INPUT/EXTRA/OVERLAP 的内层 nonce
+// 安全性：返回内容塞给 LiteForge.Params/Prompt 进 dynamic 段，外层 PROMPT_SECTION_dynamic_NONCE 已防 prompt-injection
+// 关键词: aicache, PROMPT_SECTION, queryPrompt, B 档, 去 nonce
+var queryPrompt = `{{ if .EXTRA }}<extra>
 {{.EXTRA}}
-<|EXTRA_END_{{ .Nonce }}|>
-{{ end }}
+</extra>
 
-{{ if .OVERLAP }}
-<|OVERLAP_{{ .Nonce }}|>
+{{ end }}{{ if .OVERLAP }}<overlap>
 {{.OVERLAP}}
-<|OVERLAP_END_{{ .Nonce }}|>
-{{ end }}
+</overlap>
 
-
-<|INPUT_{{ .Nonce }}|>
+{{ end }}<input>
 {{.INPUT}}
-<|INPUT_END_{{ .Nonce }}|>
+</input>
 `
 
+// LiteForgeQueryFromChunk 包级兼容函数：B 档改造把模板拆为"调用方稳定指令头部"+"动态内容"
+// 此函数仅返回拼接版（兼容老调用方）；新调用方应使用 BuildLiteForgeStaticAndDynamic 拆开传给 LiteForge
+// 关键词: aicache, PROMPT_SECTION, LiteForgeQueryFromChunk, B 档兼容
 func LiteForgeQueryFromChunk(prompt string, extraPrompt string, chunk chunkmaker.Chunk, overlapSize int) (string, error) {
-	param := map[string]interface{}{
-		"PROMPT": prompt,
-		"INPUT":  string(chunk.Data()),
-		"EXTRA":  extraPrompt,
-		"Nonce":  utils.RandStringBytes(4),
+	_, dynamic, err := BuildLiteForgeStaticAndDynamic(extraPrompt, chunk, overlapSize)
+	if err != nil {
+		return "", err
 	}
+	return prompt + "\n" + dynamic, nil
+}
 
+// BuildLiteForgeStaticAndDynamic 拆分 chunk 内容为静态/动态两段（B 档新增）
+// 静态部分（调用方稳定指令头部）由调用方自己保管，传给 LiteForge.StaticInstruction 进 high-static 段
+// 动态部分（INPUT/EXTRA/OVERLAP）传给 LiteForge.Prompt 进 dynamic 段
+// 关键词: aicache, PROMPT_SECTION, BuildLiteForgeStaticAndDynamic, B 档拆分
+func BuildLiteForgeStaticAndDynamic(extraPrompt string, chunk chunkmaker.Chunk, overlapSize int) (static string, dynamic string, err error) {
+	param := map[string]interface{}{
+		"INPUT": string(chunk.Data()),
+		"EXTRA": extraPrompt,
+	}
 	if overlapSize > 0 || chunk.HaveLastChunk() {
 		param["OVERLAP"] = string(chunk.PrevNBytes(overlapSize))
 	}
-	queryTemplate, err := template.New("query").Parse(queryPrompt)
-	if err != nil {
-		return "", err
+
+	queryTemplate, parseErr := template.New("query").Parse(queryPrompt)
+	if parseErr != nil {
+		return "", "", parseErr
 	}
 	var buf bytes.Buffer
-	err = queryTemplate.ExecuteTemplate(&buf, "query", param)
-	if err != nil {
-		return "", err
+	if execErr := queryTemplate.ExecuteTemplate(&buf, "query", param); execErr != nil {
+		return "", "", execErr
 	}
-	return buf.String(), nil
+	return "", buf.String(), nil
 }
 
 func BuildIndexQuestions(rawInput []string, aiService aicommon.AICallbackType) (map[string][]string, error) {
 	linedInput := utils.PrefixLinesWithLineNumbers(rawInput)
-	query, err := LiteForgeQueryFromChunk(indexBuildPrompt, "", chunkmaker.NewBufferChunk([]byte(linedInput)), 200)
+
+	// 关键词: aicache, PROMPT_SECTION, StaticInstruction, BuildIndexQuestions, B 档
+	// indexBuildPrompt 是稳定指令，通过 StaticInstruction 进入 high-static 段，跨调用稳定哈希
+	// 动态内容（INPUT 等）通过 query 走 Params/dynamic 段
+	_, dynamic, err := BuildLiteForgeStaticAndDynamic("", chunkmaker.NewBufferChunk([]byte(linedInput)), 200)
 	if err != nil {
 		return nil, err
 	}
 
 	forgeOpts := []any{
 		aicommon.WithLiteForgeOutputSchema(indexBuildSchema),
+		aicommon.LiteForgeStaticInstruction(indexBuildPrompt),
 	}
 	if aiService != nil {
 		forgeOpts = append(forgeOpts, aicommon.WithAICallback(aiService))
@@ -137,7 +151,7 @@ func BuildIndexQuestions(rawInput []string, aiService aicommon.AICallbackType) (
 		forgeOpts = append(forgeOpts, aicommon.WithAICallback(aicommon.MustGetSpeedPriorityAIModelCallback()))
 	}
 
-	result, err := aicommon.InvokeLiteForge(query, forgeOpts...)
+	result, err := aicommon.InvokeLiteForge(dynamic, forgeOpts...)
 	if err != nil {
 		return nil, err
 	}

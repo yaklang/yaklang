@@ -47,9 +47,14 @@ type streamableField struct {
 }
 
 // LiteForge 被设计只允许提取数据，生成结构化（单步），如果需要多步拆解，不能使用 LiteForge
+//
+// 字段语义（关键词: aicache, PROMPT_SECTION, LiteForge 字段语义）：
+//   - StaticInstruction: 系统侧稳定指令（不含用户输入/动态内容），渲染进 high-static 段，跨调用稳定哈希
+//   - Prompt: 调用方动态上下文（可含用户输入、变化标签、动态参数等），渲染进 dynamic 段，外层 PROMPT_SECTION_dynamic_NONCE 已防 prompt-injection
 type LiteForge struct {
 	ForgeName           string
 	Prompt              string
+	StaticInstruction   string
 	RequireSchema       string
 	OutputSchema        string
 	OutputActionName    string
@@ -190,6 +195,16 @@ func WithLiteForge_Prompt(i string) LiteForgeOption {
 	}
 }
 
+// WithLiteForge_StaticInstruction 设置 LiteForge 的系统侧静态指令
+// 该指令进入 high-static 段，跨调用稳定哈希
+// 关键词: aicache, PROMPT_SECTION, StaticInstruction, WithLiteForge_StaticInstruction
+func WithLiteForge_StaticInstruction(i string) LiteForgeOption {
+	return func(forge *LiteForge) error {
+		forge.StaticInstruction = i
+		return nil
+	}
+}
+
 func NewLiteForge(i string, opts ...LiteForgeOption) (*LiteForge, error) {
 	lf := &LiteForge{
 		ForgeName:    i,
@@ -240,12 +255,13 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 	call := callBuffer.String()
 
 	rendered, err := renderLiteForgePrompt(liteForgePromptParams{
-		Nonce:            nonce,
-		Prompt:           string(l.Prompt),
-		Params:           call,
-		Schema:           string(l.OutputSchema),
-		PersistentMemory: cod.ContextProvider.PersistentMemory(),
-		TimelineDump:     cod.ContextProvider.TimelineDump(),
+		Nonce:             nonce,
+		Prompt:            string(l.Prompt),
+		StaticInstruction: string(l.StaticInstruction),
+		Params:            call,
+		Schema:            string(l.OutputSchema),
+		PersistentMemory:  cod.ContextProvider.PersistentMemory(),
+		TimelineDump:      cod.ContextProvider.TimelineDump(),
 	})
 	if err != nil {
 		return nil, err
@@ -326,21 +342,24 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 // liteForgePromptParams 是 LiteForge prompt 渲染时传入模板的字段集合
 // 关键词: aicache, PROMPT_SECTION, LiteForge 模板, liteForgePromptParams
 type liteForgePromptParams struct {
-	Nonce            string
-	Prompt           string
-	Params           string
-	Schema           string
-	PersistentMemory string
-	TimelineDump     string
+	Nonce             string
+	Prompt            string
+	StaticInstruction string
+	Params            string
+	Schema            string
+	PersistentMemory  string
+	TimelineDump      string
 }
 
 // liteForgePromptTemplate 是 LiteForge 的 prompt 模板，按 aicache 4 段 PROMPT_SECTION 框架包装：
 //   - high-static 段：# Preset / # Output Formatter / # SCHEMA / # Instruction（系统侧静态指令，跨调用稳定）
 //   - semi-dynamic 段：# 牢记（PersistentMemory，半动态）
 //   - timeline 段：<timeline_NONCE>...</timeline_NONCE>（每次变化）
-//   - dynamic 段：<params_NONCE>...</params_NONCE>（用户参数；外层 PROMPT_SECTION_dynamic_NONCE 屏蔽 prompt-injection）
+//   - dynamic 段：<context_NONCE>...</context_NONCE>（调用方动态上下文）+ <params_NONCE>...</params_NONCE>（用户参数）；
+//     外层 PROMPT_SECTION_dynamic_NONCE 屏蔽 prompt-injection
 //
-// high-static 段内 <schema>/<background> 不带 nonce，确保同 forge 跨调用的 hash 真正稳定
+// high-static 段内 <schema>/<instruction> 不带 nonce，确保同 forge 跨调用的 hash 真正稳定
+// Prompt 字段从 high-static 段挪到 dynamic 段，调用方传入的"动态内容"不再污染 high-static 段的 hash
 // 关键词: aicache, PROMPT_SECTION, LiteForge 模板, liteForgePromptTemplate
 const liteForgePromptTemplate = `<|PROMPT_SECTION_high-static|>
 # Preset
@@ -362,12 +381,12 @@ const liteForgePromptTemplate = `<|PROMPT_SECTION_high-static|>
 <schema>
 {{ .Schema }}
 </schema>
-{{ end }}{{ if .Prompt }}
+{{ end }}{{ if .StaticInstruction }}
 # Instruction
 
-<background>
-{{ .Prompt }}
-</background>
+<instruction>
+{{ .StaticInstruction }}
+</instruction>
 {{ end }}<|PROMPT_SECTION_END_high-static|>
 
 <|PROMPT_SECTION_semi-dynamic|>
@@ -382,7 +401,10 @@ const liteForgePromptTemplate = `<|PROMPT_SECTION_high-static|>
 <|PROMPT_SECTION_END_timeline|>
 {{ end }}
 <|PROMPT_SECTION_dynamic_{{ .Nonce }}|>
-{{ if .Params }}<params_{{ .Nonce }}>
+{{ if .Prompt }}<context_{{ .Nonce }}>
+{{ .Prompt }}
+</context_{{ .Nonce }}>
+{{ end }}{{ if .Params }}<params_{{ .Nonce }}>
 {{ .Params }}
 </params_{{ .Nonce }}>{{ end }}
 <|PROMPT_SECTION_dynamic_END_{{ .Nonce }}|>
