@@ -93,6 +93,13 @@ func GetBaseURLFromConfigEx(config *AIConfig, defaultRootUrl, defaultUri string,
 					return s
 				}
 			}
+			// 当用户已经在 BaseURL/Domain 中显式提供了非空、非根路径，且该路径与 default URI 任何
+			// segment 都不重叠时，认为用户给的是完整 endpoint URL（典型如反代、网关自定义路径），
+			// 不再追加默认 URI，避免拼成 `/userPath/v1/chat/completions` 这种重复路径。
+			// 关键词: keepDefaultSuffix 显式路径尊重, BaseURL 完整 endpoint, 反代路径透传
+			if u, err := url.Parse(trimSlash); err == nil && u.Path != "" && u.Path != "/" {
+				return s
+			}
 			s = trimSlash + normalizedDefaultURI
 		}
 		return s
