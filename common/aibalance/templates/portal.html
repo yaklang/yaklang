@@ -55,6 +55,10 @@
             <h3>高德请求数</h3>
             <div class="value" id="stat-amap-count">--</div>
         </div>
+        <div class="stat-card" id="dau-cache-card" style="cursor: pointer;" onclick="switchTab('dau-cache')">
+            <h3>日活与缓存</h3>
+            <div class="value" id="stat-today-dau">--</div>
+        </div>
         <div class="stat-card" id="memory-card" style="cursor: pointer;" onclick="showMemoryDialog()">
             <h3>内存状态</h3>
             <div class="value" id="memory-display">点击查看</div>
@@ -92,6 +96,7 @@
                 <div class="tab" data-tab="ops-users">运营用户</div>
                 <div class="tab" data-tab="ops-logs">操作日志</div>
                 <div class="tab" data-tab="rate-limit">限流配置</div>
+                <div class="tab" data-tab="dau-cache">日活与缓存</div>
             </div>
         </div>
         
@@ -906,6 +911,86 @@
                     <button class="btn btn-primary" onclick="saveRateLimitConfig()" style="height: 36px;">
                         保存配置
                     </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- DAU & Cache Stats Tab -->
+        <div id="dau-cache" class="tab-content">
+            <div class="card">
+                <h3>今日聚合 <span style="color: #888; font-weight: normal; font-size: 14px;">(date=<span id="dc-date">--</span>)</span></h3>
+                <p style="color: #666; margin-bottom: 15px;">
+                    所有数字均来自上游 LLM provider 在 SSE 末帧返回的 <code>usage</code>（含 <code>prompt_tokens_details.cached_tokens</code> 隐式缓存命中）。
+                    日活按 <code>(api_key | free_trace | free_ip)</code> 三类指纹去重，每天 0:00 重新开始计数；
+                    100 天前的数据由后台任务自动清理。
+                </p>
+
+                <div class="dc-kpi-row" style="display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 25px;">
+                    <div class="dc-kpi" style="flex: 1 1 150px; background: #f5faff; border: 1px solid #d6e9ff; border-radius: 8px; padding: 12px;">
+                        <div style="color: #666; font-size: 12px;">总日活</div>
+                        <div style="font-size: 26px; font-weight: bold; color: #1565c0;" id="dc-dau-total">--</div>
+                    </div>
+                    <div class="dc-kpi" style="flex: 1 1 150px; background: #f1f8e9; border: 1px solid #c5e1a5; border-radius: 8px; padding: 12px;">
+                        <div style="color: #666; font-size: 12px;">API Key 日活</div>
+                        <div style="font-size: 26px; font-weight: bold; color: #558b2f;" id="dc-dau-apikey">--</div>
+                    </div>
+                    <div class="dc-kpi" style="flex: 1 1 150px; background: #fff3e0; border: 1px solid #ffcc80; border-radius: 8px; padding: 12px;">
+                        <div style="color: #666; font-size: 12px;">Free Trace 日活</div>
+                        <div style="font-size: 26px; font-weight: bold; color: #ef6c00;" id="dc-dau-trace">--</div>
+                    </div>
+                    <div class="dc-kpi" style="flex: 1 1 150px; background: #fce4ec; border: 1px solid #f8bbd0; border-radius: 8px; padding: 12px;">
+                        <div style="color: #666; font-size: 12px;">Free IP 日活</div>
+                        <div style="font-size: 26px; font-weight: bold; color: #c2185b;" id="dc-dau-ip">--</div>
+                    </div>
+                    <div class="dc-kpi" style="flex: 1 1 150px; background: #ede7f6; border: 1px solid #b39ddb; border-radius: 8px; padding: 12px;">
+                        <div style="color: #666; font-size: 12px;">总请求 (今日)</div>
+                        <div style="font-size: 26px; font-weight: bold; color: #4527a0;" id="dc-req-total">--</div>
+                    </div>
+                    <div class="dc-kpi" style="flex: 1 1 150px; background: #e0f2f1; border: 1px solid #80cbc4; border-radius: 8px; padding: 12px;">
+                        <div style="color: #666; font-size: 12px;">单用户平均请求</div>
+                        <div style="font-size: 26px; font-weight: bold; color: #00695c;" id="dc-avg-per-user">--</div>
+                    </div>
+                    <div class="dc-kpi" style="flex: 1 1 150px; background: #fffde7; border: 1px solid #fff176; border-radius: 8px; padding: 12px;">
+                        <div style="color: #666; font-size: 12px;">缓存命中比例</div>
+                        <div style="font-size: 26px; font-weight: bold; color: #f9a825;" id="dc-cache-ratio">--</div>
+                    </div>
+                </div>
+
+                <h3>近 60 天日活折线 <small style="color: #888; font-weight: normal;">(api_key / free_trace / free_ip / total)</small></h3>
+                <div style="background: #fafafa; border: 1px solid #e0e0e0; border-radius: 6px; padding: 8px; margin-bottom: 25px;">
+                    <svg id="dc-chart-dau" width="100%" height="240" viewBox="0 0 1200 240" preserveAspectRatio="none"></svg>
+                </div>
+
+                <h3>近 60 天单用户平均请求折线 <small style="color: #888; font-weight: normal;">(total_requests / total_dau)</small></h3>
+                <div style="background: #fafafa; border: 1px solid #e0e0e0; border-radius: 6px; padding: 8px; margin-bottom: 25px;">
+                    <svg id="dc-chart-avg" width="100%" height="180" viewBox="0 0 1200 180" preserveAspectRatio="none"></svg>
+                </div>
+
+                <h3>近 60 天缓存命中比例折线 <small style="color: #888; font-weight: normal;">(cached_tokens / prompt_tokens)</small></h3>
+                <div style="background: #fafafa; border: 1px solid #e0e0e0; border-radius: 6px; padding: 8px; margin-bottom: 25px;">
+                    <svg id="dc-chart-cache" width="100%" height="180" viewBox="0 0 1200 180" preserveAspectRatio="none"></svg>
+                </div>
+
+                <h3>今日 (model, provider, key) 拆分</h3>
+                <div style="overflow-x: auto;">
+                    <table id="dc-breakdown" style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                        <thead>
+                            <tr style="background: #f5f5f5;">
+                                <th style="text-align: left; padding: 8px 10px; border-bottom: 1px solid #ddd;">对外模型</th>
+                                <th style="text-align: left; padding: 8px 10px; border-bottom: 1px solid #ddd;">上游模型</th>
+                                <th style="text-align: left; padding: 8px 10px; border-bottom: 1px solid #ddd;">上游类型</th>
+                                <th style="text-align: left; padding: 8px 10px; border-bottom: 1px solid #ddd;">domain</th>
+                                <th style="text-align: left; padding: 8px 10px; border-bottom: 1px solid #ddd;">key</th>
+                                <th style="text-align: right; padding: 8px 10px; border-bottom: 1px solid #ddd;">请求数</th>
+                                <th style="text-align: right; padding: 8px 10px; border-bottom: 1px solid #ddd;">prompt</th>
+                                <th style="text-align: right; padding: 8px 10px; border-bottom: 1px solid #ddd;">cached</th>
+                                <th style="text-align: right; padding: 8px 10px; border-bottom: 1px solid #ddd;">命中比例</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dc-breakdown-body">
+                            <tr><td colspan="9" style="padding: 12px; text-align: center; color: #999;">--</td></tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>

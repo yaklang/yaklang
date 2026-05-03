@@ -114,6 +114,13 @@
                 document.getElementById('stat-concurrent-requests').textContent = data.concurrent_requests || 0;
                 document.getElementById('stat-web-search-count').textContent = data.web_search_count || 0;
                 document.getElementById('stat-amap-count').textContent = data.amap_count || 0;
+                var todayDauEl = document.getElementById('stat-today-dau');
+                if (todayDauEl) {
+                    todayDauEl.textContent = (data.today_dau || 0).toLocaleString();
+                }
+                if (typeof renderDauCacheTab === 'function') {
+                    renderDauCacheTab(data);
+                }
             },
             
             // 渲染供应商表格
@@ -825,6 +832,12 @@
                 startRateLimitModelStatsAutoRefresh();
             } else {
                 stopRateLimitModelStatsAutoRefresh();
+            }
+
+            if (tabId === 'dau-cache') {
+                if (typeof refreshDauCacheTab === 'function') {
+                    refreshDauCacheTab();
+                }
             }
         }
 
@@ -5957,3 +5970,265 @@ curl '${metaApiUrl}?name=${modelName}'`;
         window.startRateLimitModelStatsAutoRefresh = startRateLimitModelStatsAutoRefresh;
         window.stopRateLimitModelStatsAutoRefresh = stopRateLimitModelStatsAutoRefresh;
         window.addModelRPMOverride = addModelRPMOverride;
+
+        // ==================== DAU & Cache Stats ====================
+        // 关键词: DAU 与缓存 tab 渲染, 纯 SVG 折线, 无外部库依赖
+
+        function dauCacheFormatNumber(n) {
+            if (n === null || n === undefined || isNaN(n)) return '0';
+            return Number(n).toLocaleString();
+        }
+
+        function dauCacheFormatRatio(r) {
+            if (r === null || r === undefined || isNaN(r)) return '0.00%';
+            return (r * 100).toFixed(2) + '%';
+        }
+
+        function dauCacheEscapeHtml(s) {
+            if (s === null || s === undefined) return '';
+            return String(s)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        // drawLineChart 在指定 SVG 节点里绘制多条折线。
+        // series: [{label, color, points:[number,...]}]，所有 series 必须等长。
+        // labels: x 轴对应的字符串（一般为 date），与 points 等长。
+        // 关键词: drawLineChart, 纯 SVG 折线, 自适应坐标
+        function drawLineChart(svgId, series, labels, options) {
+            const svg = document.getElementById(svgId);
+            if (!svg) return;
+            options = options || {};
+            const formatY = options.formatY || dauCacheFormatNumber;
+
+            // 清空旧内容
+            while (svg.firstChild) svg.removeChild(svg.firstChild);
+
+            const vbParts = (svg.getAttribute('viewBox') || '0 0 1200 240').split(/\s+/).map(Number);
+            const W = vbParts[2] || 1200;
+            const H = vbParts[3] || 240;
+            const padL = 60, padR = 140, padT = 20, padB = 30;
+            const innerW = W - padL - padR;
+            const innerH = H - padT - padB;
+
+            const cleanSeries = (series || []).filter(s => s && s.points && s.points.length > 0);
+            if (cleanSeries.length === 0 || (labels || []).length === 0) {
+                const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                t.setAttribute('x', W / 2);
+                t.setAttribute('y', H / 2);
+                t.setAttribute('text-anchor', 'middle');
+                t.setAttribute('fill', '#999');
+                t.setAttribute('font-size', '14');
+                t.textContent = '暂无数据';
+                svg.appendChild(t);
+                return;
+            }
+
+            const n = labels.length;
+            let maxY = 0;
+            cleanSeries.forEach(s => {
+                s.points.forEach(v => {
+                    const num = Number(v) || 0;
+                    if (num > maxY) maxY = num;
+                });
+            });
+            if (maxY <= 0) maxY = 1;
+            // 留 10% 顶部空间
+            const yMax = maxY * 1.1;
+
+            // axis frame
+            const ns = 'http://www.w3.org/2000/svg';
+            const frame = document.createElementNS(ns, 'rect');
+            frame.setAttribute('x', padL);
+            frame.setAttribute('y', padT);
+            frame.setAttribute('width', innerW);
+            frame.setAttribute('height', innerH);
+            frame.setAttribute('fill', 'none');
+            frame.setAttribute('stroke', '#ddd');
+            frame.setAttribute('stroke-width', '1');
+            svg.appendChild(frame);
+
+            // y grid + labels (5 段)
+            for (let i = 0; i <= 4; i++) {
+                const yVal = yMax * (1 - i / 4);
+                const yPos = padT + (innerH * i / 4);
+                const grid = document.createElementNS(ns, 'line');
+                grid.setAttribute('x1', padL);
+                grid.setAttribute('x2', padL + innerW);
+                grid.setAttribute('y1', yPos);
+                grid.setAttribute('y2', yPos);
+                grid.setAttribute('stroke', '#eee');
+                grid.setAttribute('stroke-width', '1');
+                svg.appendChild(grid);
+
+                const lbl = document.createElementNS(ns, 'text');
+                lbl.setAttribute('x', padL - 6);
+                lbl.setAttribute('y', yPos + 4);
+                lbl.setAttribute('text-anchor', 'end');
+                lbl.setAttribute('fill', '#666');
+                lbl.setAttribute('font-size', '11');
+                lbl.textContent = formatY(yVal);
+                svg.appendChild(lbl);
+            }
+
+            // x labels: 首/中/尾 三个
+            const xIdxs = n === 1 ? [0] : [0, Math.floor((n - 1) / 2), n - 1];
+            xIdxs.forEach(idx => {
+                const xPos = n === 1 ? padL + innerW / 2 : padL + (innerW * idx / (n - 1));
+                const t = document.createElementNS(ns, 'text');
+                t.setAttribute('x', xPos);
+                t.setAttribute('y', padT + innerH + 18);
+                t.setAttribute('text-anchor', 'middle');
+                t.setAttribute('fill', '#666');
+                t.setAttribute('font-size', '11');
+                t.textContent = labels[idx] || '';
+                svg.appendChild(t);
+            });
+
+            const xPosOf = (idx) => n === 1 ? padL + innerW / 2 : padL + (innerW * idx / (n - 1));
+            const yPosOf = (val) => padT + innerH * (1 - (Number(val) || 0) / yMax);
+
+            // 折线 + 图例
+            cleanSeries.forEach((s, sIdx) => {
+                const color = s.color || '#4285f4';
+                const points = s.points;
+                let d = '';
+                for (let i = 0; i < points.length; i++) {
+                    const x = xPosOf(i);
+                    const y = yPosOf(points[i]);
+                    d += (i === 0 ? 'M' : 'L') + x.toFixed(2) + ',' + y.toFixed(2) + ' ';
+                }
+                const path = document.createElementNS(ns, 'path');
+                path.setAttribute('d', d.trim());
+                path.setAttribute('fill', 'none');
+                path.setAttribute('stroke', color);
+                path.setAttribute('stroke-width', '1.6');
+                path.setAttribute('stroke-linejoin', 'round');
+                svg.appendChild(path);
+
+                const legendY = padT + 14 + sIdx * 18;
+                const swatch = document.createElementNS(ns, 'rect');
+                swatch.setAttribute('x', padL + innerW + 14);
+                swatch.setAttribute('y', legendY - 8);
+                swatch.setAttribute('width', 12);
+                swatch.setAttribute('height', 12);
+                swatch.setAttribute('fill', color);
+                svg.appendChild(swatch);
+
+                const legendText = document.createElementNS(ns, 'text');
+                legendText.setAttribute('x', padL + innerW + 32);
+                legendText.setAttribute('y', legendY + 2);
+                legendText.setAttribute('fill', '#333');
+                legendText.setAttribute('font-size', '11');
+                legendText.textContent = s.label || ('series ' + (sIdx + 1));
+                svg.appendChild(legendText);
+            });
+        }
+
+        // renderDauCacheTab 把后端 portal data 一次性渲染到 dau-cache tab 的所有节点。
+        // 关键词: renderDauCacheTab, KPI 数字 + 三张折线 + 拆分表
+        function renderDauCacheTab(data) {
+            if (!data) return;
+            const setText = (id, text) => {
+                const el = document.getElementById(id);
+                if (el) el.textContent = text;
+            };
+
+            const todayDate = data.today_date || '';
+            setText('dc-date', todayDate);
+
+            const breakdown = data.today_dau_breakdown || {api_key:0, free_trace:0, free_ip:0, total:0};
+            setText('dc-dau-total', dauCacheFormatNumber(breakdown.total || data.today_dau || 0));
+            setText('dc-dau-apikey', dauCacheFormatNumber(breakdown.api_key || 0));
+            setText('dc-dau-trace', dauCacheFormatNumber(breakdown.free_trace || 0));
+            setText('dc-dau-ip', dauCacheFormatNumber(breakdown.free_ip || 0));
+
+            const summaries = data.daily_summary_60_days || [];
+            const todaySummary = summaries.find(s => s.date === todayDate) || {};
+            const todayReqs = todaySummary.total_requests || 0;
+            const totalDauNum = breakdown.total || data.today_dau || 0;
+            setText('dc-req-total', dauCacheFormatNumber(todayReqs));
+            const avg = totalDauNum > 0 ? (todayReqs / totalDauNum) : 0;
+            setText('dc-avg-per-user', avg.toFixed(2));
+
+            const cacheStats = data.today_cache_stats || {};
+            setText('dc-cache-ratio', dauCacheFormatRatio(cacheStats.hit_ratio || 0));
+
+            // 60 天日活折线
+            const dauList = data.dau_60_days || [];
+            const dauLabels = dauList.map(d => d.date);
+            drawLineChart('dc-chart-dau', [
+                {label: 'API Key', color: '#558b2f', points: dauList.map(d => d.api_key || 0)},
+                {label: 'Free Trace', color: '#ef6c00', points: dauList.map(d => d.free_trace || 0)},
+                {label: 'Free IP', color: '#c2185b', points: dauList.map(d => d.free_ip || 0)},
+                {label: 'Total', color: '#1565c0', points: dauList.map(d => d.total || 0)},
+            ], dauLabels);
+
+            // 60 天单用户平均请求折线（需 join summary + dau）
+            const dauByDate = {};
+            dauList.forEach(d => { dauByDate[d.date] = d.total || 0; });
+            const summaryLabels = summaries.map(s => s.date);
+            const avgPoints = summaries.map(s => {
+                const tot = dauByDate[s.date] || 0;
+                return tot > 0 ? ((s.total_requests || 0) / tot) : 0;
+            });
+            drawLineChart('dc-chart-avg', [
+                {label: 'requests / user', color: '#00695c', points: avgPoints},
+            ], summaryLabels, {formatY: v => Number(v).toFixed(2)});
+
+            // 60 天缓存命中比例折线
+            const trend = data.cache_trend_60_days || [];
+            const trendLabels = trend.map(t => t.date);
+            drawLineChart('dc-chart-cache', [
+                {label: 'cache hit ratio', color: '#f9a825', points: trend.map(t => t.hit_ratio || 0)},
+            ], trendLabels, {formatY: v => (v * 100).toFixed(2) + '%'});
+
+            // 今日拆分表
+            const tbody = document.getElementById('dc-breakdown-body');
+            if (tbody) {
+                const rows = data.today_cache_breakdown || [];
+                if (rows.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="9" style="padding: 12px; text-align: center; color: #999;">今日尚无 usage 数据</td></tr>';
+                } else {
+                    tbody.innerHTML = rows.map(r => `
+                        <tr>
+                            <td style="padding: 6px 10px; border-bottom: 1px solid #f0f0f0;">${dauCacheEscapeHtml(r.wrapper_name)}</td>
+                            <td style="padding: 6px 10px; border-bottom: 1px solid #f0f0f0;">${dauCacheEscapeHtml(r.model_name)}</td>
+                            <td style="padding: 6px 10px; border-bottom: 1px solid #f0f0f0;">${dauCacheEscapeHtml(r.provider_type_name)}</td>
+                            <td style="padding: 6px 10px; border-bottom: 1px solid #f0f0f0;">${dauCacheEscapeHtml(r.provider_domain)}</td>
+                            <td style="padding: 6px 10px; border-bottom: 1px solid #f0f0f0; font-family: monospace;">${dauCacheEscapeHtml(r.api_key_shrink)}</td>
+                            <td style="padding: 6px 10px; border-bottom: 1px solid #f0f0f0; text-align: right;">${dauCacheFormatNumber(r.request_count)}</td>
+                            <td style="padding: 6px 10px; border-bottom: 1px solid #f0f0f0; text-align: right;">${dauCacheFormatNumber(r.prompt_tokens)}</td>
+                            <td style="padding: 6px 10px; border-bottom: 1px solid #f0f0f0; text-align: right;">${dauCacheFormatNumber(r.cached_tokens)}</td>
+                            <td style="padding: 6px 10px; border-bottom: 1px solid #f0f0f0; text-align: right;">${dauCacheFormatRatio(r.hit_ratio)}</td>
+                        </tr>
+                    `).join('');
+                }
+            }
+        }
+
+        // refreshDauCacheTab 主动重新拉一次 portal data 并仅刷新 dau-cache 视图。
+        // 关键词: refreshDauCacheTab, tab 切到日活与缓存时主动拉新
+        async function refreshDauCacheTab() {
+            try {
+                const response = await authFetch('/portal/api/data');
+                if (!response) return;
+                const data = await response.json();
+                if (checkAuthInResponse(data)) return;
+                portalData = data;
+                renderDauCacheTab(data);
+                const todayDauEl = document.getElementById('stat-today-dau');
+                if (todayDauEl) {
+                    todayDauEl.textContent = (data.today_dau || 0).toLocaleString();
+                }
+            } catch (e) {
+                console.error('refreshDauCacheTab failed:', e);
+            }
+        }
+
+        window.drawLineChart = drawLineChart;
+        window.renderDauCacheTab = renderDauCacheTab;
+        window.refreshDauCacheTab = refreshDauCacheTab;

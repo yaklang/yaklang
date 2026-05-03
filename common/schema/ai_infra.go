@@ -384,6 +384,71 @@ func (a *AiProviderHealthRecord) TableName() string {
 	return "ai_provider_health_records"
 }
 
+// AiDailyCacheStat 是 aibalance 每日「细粒度上游 token 用量与缓存命中」聚合行。
+// 主键唯一约束 (date + wrapper_name + model_name + provider_type + provider_domain + api_key_hash)
+// 由 RecordDailyCacheStats 用 UPSERT (gorm.Expr + ?) 累加。
+// 100 天前的记录由 cleanup_scheduler 每天 0:01 删除，避免 SQLite 膨胀。
+// 关键词: ai_daily_cache_stats, cached_tokens 持久化, aibalance 缓存命中比例
+type AiDailyCacheStat struct {
+	gorm.Model
+
+	Date             string `json:"date" gorm:"size:10;unique_index:idx_cache_unique;index:idx_cache_date;not null"`
+	WrapperName      string `json:"wrapper_name" gorm:"size:128;unique_index:idx_cache_unique;not null"`
+	ModelName        string `json:"model_name" gorm:"size:128;unique_index:idx_cache_unique;not null"`
+	ProviderTypeName string `json:"provider_type_name" gorm:"size:64;unique_index:idx_cache_unique;not null"`
+	ProviderDomain   string `json:"provider_domain" gorm:"size:255;unique_index:idx_cache_unique;not null"`
+	APIKeyHash       string `json:"api_key_hash" gorm:"size:32;unique_index:idx_cache_unique;not null"`
+	APIKeyShrink     string `json:"api_key_shrink" gorm:"size:32;not null"`
+
+	RequestCount     int64 `json:"request_count"`
+	PromptTokens     int64 `json:"prompt_tokens"`
+	CompletionTokens int64 `json:"completion_tokens"`
+	TotalTokens      int64 `json:"total_tokens"`
+	CachedTokens     int64 `json:"cached_tokens"`
+}
+
+func (a *AiDailyCacheStat) TableName() string {
+	return "ai_daily_cache_stats"
+}
+
+// AiDailyUserSeen 是 aibalance 每日「客户端身份指纹去重」表。
+// 一行 = 当天某 source_kind 下首次出现的 user_hash 指纹（INSERT IGNORE 重复不增行）。
+// source_kind 取 "api_key" / "free_trace" / "free_ip" 三类。
+// QueryDAU60Days 用 GROUP BY date,source_kind 统计 COUNT(DISTINCT user_hash)。
+// 100 天前记录由 cleanup_scheduler 删除；同时 RecordDailyUserSeen 内置
+// 1,000,000 行/天/source_kind 的硬上限做 DB 防爆。
+// 关键词: ai_daily_user_seen, DAU 去重指纹, 防爆 cap
+type AiDailyUserSeen struct {
+	gorm.Model
+
+	Date       string    `json:"date" gorm:"size:10;unique_index:idx_seen_unique;index:idx_seen_date;not null"`
+	SourceKind string    `json:"source_kind" gorm:"size:16;unique_index:idx_seen_unique;not null"`
+	UserHash   string    `json:"user_hash" gorm:"size:32;unique_index:idx_seen_unique;not null"`
+	LastSeenAt time.Time `json:"last_seen_at"`
+}
+
+func (a *AiDailyUserSeen) TableName() string {
+	return "ai_daily_user_seen"
+}
+
+// AiDailySummary 是 aibalance 每日「极轻量聚合快照」表。
+// 一天一行（Date 唯一），由内存 atomic 累加 + 后台 30s tick flush，
+// 永久保留（每天 1 行，年增长 365 行，长期可忽略）。
+// 关键词: ai_daily_summary, 每日聚合快照, 内存 atomic flush
+type AiDailySummary struct {
+	gorm.Model
+
+	Date             string `json:"date" gorm:"size:10;unique_index;not null"`
+	TotalRequests    int64  `json:"total_requests"`
+	PromptTokens     int64  `json:"prompt_tokens"`
+	CompletionTokens int64  `json:"completion_tokens"`
+	CachedTokens     int64  `json:"cached_tokens"`
+}
+
+func (a *AiDailySummary) TableName() string {
+	return "ai_daily_summary"
+}
+
 // AIMemoryEntity 存储AI记忆条目
 type AIMemoryEntity struct {
 	gorm.Model

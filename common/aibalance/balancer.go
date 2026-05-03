@@ -21,6 +21,15 @@ var healthCheckSchedulerStarted sync.Once
 // Used to ensure the latency watcher is started only once
 var latencyWatcherStarted sync.Once
 
+// statsSchedulerOnce 保证 daily cleanup + summary flusher 只启动一次。
+// 进程级单例：多个 ServerConfig 共享同一份 stats 后台任务。
+// 关键词: statsSchedulerOnce, daily cleanup goroutine 单例
+var (
+	statsSchedulerOnce   sync.Once
+	statsSchedulerCtx    context.Context
+	statsSchedulerCancel context.CancelFunc
+)
+
 type Balancer struct {
 	config   *ServerConfig
 	listener net.Listener
@@ -199,6 +208,25 @@ func LoadProvidersFromDatabase(config *ServerConfig) error {
 		config.applyRateLimitConfig(rlConfig)
 		log.Infof("Loaded rate limit config: default_rpm=%d, free_user_delay=%ds", rlConfig.DefaultRPM, rlConfig.FreeUserDelaySec)
 	}
+
+	// Ensure DAU & cache stats tables exist and start daily cleanup + summary flusher.
+	// 这三张表 + 后台任务支撑 portal "日活与缓存" 卡片与 tab 数据。
+	// 关键词: ai_daily_cache_stats, ai_daily_user_seen, ai_daily_summary, daily cleanup, summary flusher
+	if err := EnsureCacheStatsTable(); err != nil {
+		log.Warnf("Failed to ensure ai_daily_cache_stats table exists: %v", err)
+	}
+	if err := EnsureUserSeenTable(); err != nil {
+		log.Warnf("Failed to ensure ai_daily_user_seen table exists: %v", err)
+	}
+	if err := EnsureSummaryTable(); err != nil {
+		log.Warnf("Failed to ensure ai_daily_summary table exists: %v", err)
+	}
+	statsSchedulerOnce.Do(func() {
+		statsSchedulerCtx, statsSchedulerCancel = context.WithCancel(context.Background())
+		StartDailyCleanupScheduler(statsSchedulerCtx)
+		StartDailySummaryFlusher(statsSchedulerCtx, 30*time.Second)
+		log.Infof("DAU & cache stats schedulers started: cleanup=daily@0:01 flusher=30s")
+	})
 
 	// Start amap health check scheduler (checks every 1 hour)
 	StartAmapHealthCheckScheduler(config.amapHealthCheckStopCh)

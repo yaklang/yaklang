@@ -29,6 +29,82 @@ type PortalDataResponse struct {
 	TOTPSecret         string             `json:"totp_secret"`
 	TOTPWrapped        string             `json:"totp_wrapped"`
 	TOTPCode           string             `json:"totp_code"`
+
+	// 日活与缓存统计：portal 顶部「日活与缓存」单数字卡 + 同名 tab 的 60 天折线图所需。
+	// 关键词: PortalDataResponse 日活缓存扩展, today_dau, daily_summary_60_days, dau_60_days, today_cache_stats
+	TodayDate           string                 `json:"today_date"`
+	TodayDAU            int64                  `json:"today_dau"`
+	TodayDAUBreakdown   DAUBreakdownJSON       `json:"today_dau_breakdown"`
+	DailySummary60Days  []DailySummaryJSON     `json:"daily_summary_60_days"`
+	DAU60Days           []DAUDailyJSON         `json:"dau_60_days"`
+	TodayCacheStats     TodayCacheStatsJSON    `json:"today_cache_stats"`
+	TodayCacheBreakdown []CacheBreakdownJSON   `json:"today_cache_breakdown"`
+	CacheTrend60Days    []CacheTrendDayJSON    `json:"cache_trend_60_days"`
+}
+
+// DAUBreakdownJSON 是「今日日活按 source_kind 拆分」结构。
+// 关键词: today_dau_breakdown, source_kind 拆分
+type DAUBreakdownJSON struct {
+	APIKey    int64 `json:"api_key"`
+	FreeTrace int64 `json:"free_trace"`
+	FreeIP    int64 `json:"free_ip"`
+	Total     int64 `json:"total"`
+}
+
+// DailySummaryJSON 是「日聚合快照」单日 JSON 结构。
+// 关键词: daily_summary_60_days, prompt_tokens / completion_tokens / cached_tokens
+type DailySummaryJSON struct {
+	Date             string `json:"date"`
+	TotalRequests    int64  `json:"total_requests"`
+	PromptTokens     int64  `json:"prompt_tokens"`
+	CompletionTokens int64  `json:"completion_tokens"`
+	CachedTokens     int64  `json:"cached_tokens"`
+}
+
+// DAUDailyJSON 是「日活 60 天折线」单日点结构。
+// 关键词: dau_60_days, api_key/free_trace/free_ip/total 折线
+type DAUDailyJSON struct {
+	Date      string `json:"date"`
+	APIKey    int64  `json:"api_key"`
+	FreeTrace int64  `json:"free_trace"`
+	FreeIP    int64  `json:"free_ip"`
+	Total     int64  `json:"total"`
+}
+
+// TodayCacheStatsJSON 是「今日缓存命中聚合」单数字 KPI 结构。
+// 关键词: today_cache_stats, hit_ratio
+type TodayCacheStatsJSON struct {
+	RequestCount     int64   `json:"request_count"`
+	PromptTokens     int64   `json:"prompt_tokens"`
+	CompletionTokens int64   `json:"completion_tokens"`
+	TotalTokens      int64   `json:"total_tokens"`
+	CachedTokens     int64   `json:"cached_tokens"`
+	HitRatio         float64 `json:"hit_ratio"`
+}
+
+// CacheBreakdownJSON 是「今日 (model, provider, key) 拆分」表行 JSON 结构。
+// 关键词: today_cache_breakdown, 模型 + provider + key 拆分明细
+type CacheBreakdownJSON struct {
+	WrapperName      string  `json:"wrapper_name"`
+	ModelName        string  `json:"model_name"`
+	ProviderTypeName string  `json:"provider_type_name"`
+	ProviderDomain   string  `json:"provider_domain"`
+	APIKeyShrink     string  `json:"api_key_shrink"`
+	RequestCount     int64   `json:"request_count"`
+	PromptTokens     int64   `json:"prompt_tokens"`
+	CompletionTokens int64   `json:"completion_tokens"`
+	TotalTokens      int64   `json:"total_tokens"`
+	CachedTokens     int64   `json:"cached_tokens"`
+	HitRatio         float64 `json:"hit_ratio"`
+}
+
+// CacheTrendDayJSON 是「缓存命中比例 60 天折线」单点结构。
+// 关键词: cache_trend_60_days, hit_ratio 折线点
+type CacheTrendDayJSON struct {
+	Date         string  `json:"date"`
+	PromptTokens int64   `json:"prompt_tokens"`
+	CachedTokens int64   `json:"cached_tokens"`
+	HitRatio     float64 `json:"hit_ratio"`
 }
 
 // ProviderDataJSON is the JSON representation of provider data
@@ -247,7 +323,128 @@ func (c *ServerConfig) servePortalDataAPI(conn net.Conn, request *http.Request) 
 	data.TOTPWrapped = GetWrappedTOTPUUID()
 	data.TOTPCode = GetCurrentTOTPCode()
 
+	// 日活与缓存统计填充：先把内存 acc 强制 flush 一次，
+	// 让 portal 读到的 60 天折线包含「最近 30 秒内还没 flush」的请求。
+	// 失败仅 logWarn，不阻塞 portal 数据返回。
+	// 关键词: portal data 日活与缓存填充, flushSummaryAccumulator before query
+	if err := flushSummaryAccumulator(); err != nil {
+		log.Warnf("flush summary accumulator before portal data failed: %v", err)
+	}
+	c.fillDAUAndCacheStats(&data)
+
 	c.writeJSONResponse(conn, 200, data)
+}
+
+// fillDAUAndCacheStats 把 4 类持久化统计批量填充进 PortalDataResponse。
+// 任何子查询失败都会被 Warn 日志吞掉，不影响其他字段返回。
+// 关键词: fillDAUAndCacheStats, portal 一次性填充 4 类统计
+func (c *ServerConfig) fillDAUAndCacheStats(data *PortalDataResponse) {
+	today := time.Now().Format("2006-01-02")
+	data.TodayDate = today
+
+	if total, err := QueryTodayDAUTotal(); err != nil {
+		log.Warnf("portal QueryTodayDAUTotal failed: %v", err)
+	} else {
+		data.TodayDAU = total
+	}
+
+	if dauList, err := QueryDAU60Days(); err != nil {
+		log.Warnf("portal QueryDAU60Days failed: %v", err)
+		data.DAU60Days = make([]DAUDailyJSON, 0)
+	} else {
+		data.DAU60Days = make([]DAUDailyJSON, 0, len(dauList))
+		for _, d := range dauList {
+			data.DAU60Days = append(data.DAU60Days, DAUDailyJSON{
+				Date:      d.Date,
+				APIKey:    d.APIKey,
+				FreeTrace: d.FreeTrace,
+				FreeIP:    d.FreeIP,
+				Total:     d.Total,
+			})
+			if d.Date == today {
+				data.TodayDAUBreakdown = DAUBreakdownJSON{
+					APIKey:    d.APIKey,
+					FreeTrace: d.FreeTrace,
+					FreeIP:    d.FreeIP,
+					Total:     d.Total,
+				}
+			}
+		}
+	}
+
+	if summaries, err := QuerySummary60Days(); err != nil {
+		log.Warnf("portal QuerySummary60Days failed: %v", err)
+		data.DailySummary60Days = make([]DailySummaryJSON, 0)
+	} else {
+		data.DailySummary60Days = make([]DailySummaryJSON, 0, len(summaries))
+		for _, s := range summaries {
+			data.DailySummary60Days = append(data.DailySummary60Days, DailySummaryJSON{
+				Date:             s.Date,
+				TotalRequests:    s.TotalRequests,
+				PromptTokens:     s.PromptTokens,
+				CompletionTokens: s.CompletionTokens,
+				CachedTokens:     s.CachedTokens,
+			})
+		}
+	}
+
+	if total, err := QueryTodayCacheStatsTotal(); err != nil {
+		log.Warnf("portal QueryTodayCacheStatsTotal failed: %v", err)
+	} else {
+		hit := 0.0
+		if total.PromptTokens > 0 {
+			hit = float64(total.CachedTokens) / float64(total.PromptTokens)
+		}
+		data.TodayCacheStats = TodayCacheStatsJSON{
+			RequestCount:     total.RequestCount,
+			PromptTokens:     total.PromptTokens,
+			CompletionTokens: total.CompletionTokens,
+			TotalTokens:      total.TotalTokens,
+			CachedTokens:     total.CachedTokens,
+			HitRatio:         hit,
+		}
+	}
+
+	if rows, err := QueryTodayCacheBreakdown(); err != nil {
+		log.Warnf("portal QueryTodayCacheBreakdown failed: %v", err)
+		data.TodayCacheBreakdown = make([]CacheBreakdownJSON, 0)
+	} else {
+		data.TodayCacheBreakdown = make([]CacheBreakdownJSON, 0, len(rows))
+		for _, r := range rows {
+			hit := 0.0
+			if r.PromptTokens > 0 {
+				hit = float64(r.CachedTokens) / float64(r.PromptTokens)
+			}
+			data.TodayCacheBreakdown = append(data.TodayCacheBreakdown, CacheBreakdownJSON{
+				WrapperName:      r.WrapperName,
+				ModelName:        r.ModelName,
+				ProviderTypeName: r.ProviderTypeName,
+				ProviderDomain:   r.ProviderDomain,
+				APIKeyShrink:     r.APIKeyShrink,
+				RequestCount:     r.RequestCount,
+				PromptTokens:     r.PromptTokens,
+				CompletionTokens: r.CompletionTokens,
+				TotalTokens:      r.TotalTokens,
+				CachedTokens:     r.CachedTokens,
+				HitRatio:         hit,
+			})
+		}
+	}
+
+	if trend, err := QueryCacheTrend60Days(); err != nil {
+		log.Warnf("portal QueryCacheTrend60Days failed: %v", err)
+		data.CacheTrend60Days = make([]CacheTrendDayJSON, 0)
+	} else {
+		data.CacheTrend60Days = make([]CacheTrendDayJSON, 0, len(trend))
+		for _, t := range trend {
+			data.CacheTrend60Days = append(data.CacheTrend60Days, CacheTrendDayJSON{
+				Date:         t.Date,
+				PromptTokens: t.PromptTokens,
+				CachedTokens: t.CachedTokens,
+				HitRatio:     t.HitRatio,
+			})
+		}
+	}
 }
 
 // serveAvailableModelsAPI returns list of unique model wrapper names for dropdowns

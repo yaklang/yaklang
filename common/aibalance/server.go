@@ -809,6 +809,17 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 		}
 	}
 
+	// 日活记录：在 apiKeyForStat 已经定型、且本次请求确认会进入下游处理（限流前）后，
+	// 把客户端身份指纹去重落到 ai_daily_user_seen。
+	// 任何失败都仅 logWarn，绝不阻塞用户请求。
+	// 关键词: aibalance DAU, RecordDailyUserSeen, hot path 不阻塞
+	{
+		sourceKind, userHash := extractUserIdentity(rawPacket, conn, key, isFreeModel)
+		if err := RecordDailyUserSeen(time.Now().Format("2006-01-02"), sourceKind, userHash); err != nil {
+			c.logWarn("RecordDailyUserSeen failed (source_kind=%s): %v", sourceKind, err)
+		}
+	}
+
 	// RPM rate limit check (per API key, with per-model overrides)
 	if c.chatRateLimiter != nil {
 		allowed, queueLen := c.chatRateLimiter.CheckRateLimit(apiKeyForStat, modelName)
@@ -1036,6 +1047,16 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 				utils.ShrinkString(provider.APIKey, 8),
 				usage.PromptTokens, usage.CompletionTokens, usage.TotalTokens, cached,
 				string(rawUsage))
+
+			// 把上游真实返回的 usage 同时落到「细粒度日 cache stats」与「日聚合快照」，
+			// 用以驱动 portal 的"日活与缓存" tab。任何失败仅 logWarn，绝不阻塞响应。
+			// 关键词: RecordDailyCacheStats, RecordDailySummaryDelta, onUsageForward 落库
+			if err := RecordDailyCacheStats(provider, modelName, usage); err != nil {
+				c.logWarn("RecordDailyCacheStats failed (model=%s provider=%s): %v",
+					modelName, provider.TypeName, err)
+			}
+			RecordDailySummaryDelta(usage)
+
 			writer.WriteUsage(usage)
 		}
 
