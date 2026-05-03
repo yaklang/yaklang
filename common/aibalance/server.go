@@ -815,6 +815,21 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 	// 关键词: aibalance DAU, RecordDailyUserSeen, hot path 不阻塞
 	{
 		sourceKind, userHash := extractUserIdentity(rawPacket, conn, key, isFreeModel)
+		// 部署在 nginx / Cloudflare 反代后, free_ip 桶必须依赖 X-Forwarded-For /
+		// CF-Connecting-IP / X-Real-IP 等头才能拿到真实客户端 IP, 否则所有 free
+		// 用户被收敛成 1 个 nginx 内网 IP, free_ip DAU 永远 = 1。这里把识别出的
+		// 真实 IP 与 conn.RemoteAddr 一起 logInfo, 部署后能立即在日志里核对反代
+		// 头是否生效, 比 portal 上看 DAU 数字反馈更快。
+		// 关键词: free_ip 真实 IP 可观测性, nginx 反代 IP 修复 部署验证
+		if sourceKind == SourceKindFreeIP {
+			realIP := extractClientIP(rawPacket, conn)
+			rawAddr := ""
+			if conn != nil && conn.RemoteAddr() != nil {
+				rawAddr = conn.RemoteAddr().String()
+			}
+			c.logInfo("DAU free_ip identity: real_ip=%q conn_remote=%q user_hash=%s",
+				realIP, rawAddr, userHash)
+		}
 		if err := RecordDailyUserSeen(time.Now().Format("2006-01-02"), sourceKind, userHash); err != nil {
 			c.logWarn("RecordDailyUserSeen failed (source_kind=%s): %v", sourceKind, err)
 		}
