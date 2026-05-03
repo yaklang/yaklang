@@ -239,63 +239,23 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 	}
 	call := callBuffer.String()
 
-	temp := `# Preset
-你现在在一个任务引擎中，是一个输出JSON的数据处理和总结提示小助手，我会为你提供一些基本信息和输入材料，你需要按照我的Schema生成一个JSON数据直接返回。
-
-作为系统的一部分你应该直接返回JSON，避免多余的解释。
-
-{{ if .PROMPT }}<background_{{ .NONCE }}>
-{{ .PROMPT }}
-</background_{{ .NONCE }}>{{end}}
-
-{{ if .ContextProvider.TimelineDump }}<timeline_{{ .NONCE }}>
-{{ .ContextProvider.TimelineDump }}
-</timeline_{{ .NONCE }}>{{ end }}
-
-{{ if .ContextProvider.PersistentMemory }}# 牢记
-{{ .ContextProvider.PersistentMemory}}{{end}}
-
-{{ if .PARAMS }}<params_{{ .NONCE }}>
-{{ .PARAMS }}
-</params_{{ .NONCE }}>{{end}}
-
-# Output Formatter
-
-请你根据下面 SCHEMA 构建数据 , 注意事项：
-1. 你必须严格按照 SCHEMA 格式生成数据，不能缺少任何字段，不能多余任何字段。
-2. 所有字符串类型的数据必须使用双引号括起来，数字类型的数据不能使用引号括起来，布尔类型的数据必须使用 true 或 false 。
-3. 如果某个字段是可选的，你可以选择不返回该字段，但如果返回了该字段，必须符合 SCHEMA 的要求。
-4. 不要添加任何多余的解释或文本，只返回符合 SCHEMA 的 JSON 数据。
-5. 不要输出压缩成一行的 JSON，请保持良好的可读性和缩进。
-
-# SCHEMA
-
-<schema_{{ .NONCE }}>
-{{ .SCHEMA }}
-</schema_{{ .NONCE }}>
-`
-	var promptParam = map[string]interface{}{
-		"NONCE":           nonce,
-		"PROMPT":          string(l.Prompt),
-		"PARAMS":          string(call),
-		"SCHEMA":          string(l.OutputSchema),
-		"ContextProvider": cod.ContextProvider,
-	}
-	tmp, err := template.New("liteforge").Parse(temp)
+	rendered, err := renderLiteForgePrompt(liteForgePromptParams{
+		Nonce:            nonce,
+		Prompt:           string(l.Prompt),
+		Params:           call,
+		Schema:           string(l.OutputSchema),
+		PersistentMemory: cod.ContextProvider.PersistentMemory(),
+		TimelineDump:     cod.ContextProvider.TimelineDump(),
+	})
 	if err != nil {
-		return nil, utils.Errorf("template parse failed: %v", err)
-	}
-	var buf bytes.Buffer
-	err = tmp.Execute(&buf, promptParam)
-	if err != nil {
-		return nil, utils.Errorf("template execute failed: %v", err)
+		return nil, err
 	}
 	var action *aicommon.Action
 	aiCallback := cod.CallAI
 	if l.PreferSpeedPriority {
 		aiCallback = cod.CallSpeedPriorityAI
 	}
-	transactionErr := aicommon.CallAITransaction(cod, buf.String(), aiCallback,
+	transactionErr := aicommon.CallAITransaction(cod, rendered, aiCallback,
 		func(response *aicommon.AIResponse) error {
 			boundEmitter := response.BindEmitter(l.emitter)
 			if l.ForgeName == "" {
@@ -361,4 +321,83 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 	}
 	result := &ForgeResult{Action: action}
 	return result, nil
+}
+
+// liteForgePromptParams 是 LiteForge prompt 渲染时传入模板的字段集合
+// 关键词: aicache, PROMPT_SECTION, LiteForge 模板, liteForgePromptParams
+type liteForgePromptParams struct {
+	Nonce            string
+	Prompt           string
+	Params           string
+	Schema           string
+	PersistentMemory string
+	TimelineDump     string
+}
+
+// liteForgePromptTemplate 是 LiteForge 的 prompt 模板，按 aicache 4 段 PROMPT_SECTION 框架包装：
+//   - high-static 段：# Preset / # Output Formatter / # SCHEMA / # Instruction（系统侧静态指令，跨调用稳定）
+//   - semi-dynamic 段：# 牢记（PersistentMemory，半动态）
+//   - timeline 段：<timeline_NONCE>...</timeline_NONCE>（每次变化）
+//   - dynamic 段：<params_NONCE>...</params_NONCE>（用户参数；外层 PROMPT_SECTION_dynamic_NONCE 屏蔽 prompt-injection）
+//
+// high-static 段内 <schema>/<background> 不带 nonce，确保同 forge 跨调用的 hash 真正稳定
+// 关键词: aicache, PROMPT_SECTION, LiteForge 模板, liteForgePromptTemplate
+const liteForgePromptTemplate = `<|PROMPT_SECTION_high-static|>
+# Preset
+你现在在一个任务引擎中，是一个输出JSON的数据处理和总结提示小助手，我会为你提供一些基本信息和输入材料，你需要按照我的Schema生成一个JSON数据直接返回。
+
+作为系统的一部分你应该直接返回JSON，避免多余的解释。
+
+# Output Formatter
+
+请你根据下面 SCHEMA 构建数据 , 注意事项：
+1. 你必须严格按照 SCHEMA 格式生成数据，不能缺少任何字段，不能多余任何字段。
+2. 所有字符串类型的数据必须使用双引号括起来，数字类型的数据不能使用引号括起来，布尔类型的数据必须使用 true 或 false 。
+3. 如果某个字段是可选的，你可以选择不返回该字段，但如果返回了该字段，必须符合 SCHEMA 的要求。
+4. 不要添加任何多余的解释或文本，只返回符合 SCHEMA 的 JSON 数据。
+5. 不要输出压缩成一行的 JSON，请保持良好的可读性和缩进。
+{{ if .Schema }}
+# SCHEMA
+
+<schema>
+{{ .Schema }}
+</schema>
+{{ end }}{{ if .Prompt }}
+# Instruction
+
+<background>
+{{ .Prompt }}
+</background>
+{{ end }}<|PROMPT_SECTION_END_high-static|>
+
+<|PROMPT_SECTION_semi-dynamic|>
+{{ if .PersistentMemory }}# 牢记
+{{ .PersistentMemory }}{{ end }}
+<|PROMPT_SECTION_END_semi-dynamic|>
+{{ if .TimelineDump }}
+<|PROMPT_SECTION_timeline|>
+<timeline_{{ .Nonce }}>
+{{ .TimelineDump }}
+</timeline_{{ .Nonce }}>
+<|PROMPT_SECTION_END_timeline|>
+{{ end }}
+<|PROMPT_SECTION_dynamic_{{ .Nonce }}|>
+{{ if .Params }}<params_{{ .Nonce }}>
+{{ .Params }}
+</params_{{ .Nonce }}>{{ end }}
+<|PROMPT_SECTION_dynamic_END_{{ .Nonce }}|>
+`
+
+// renderLiteForgePrompt 按 4 段 PROMPT_SECTION 框架渲染 LiteForge prompt
+// 关键词: aicache, PROMPT_SECTION, LiteForge 模板, renderLiteForgePrompt
+func renderLiteForgePrompt(p liteForgePromptParams) (string, error) {
+	tmp, err := template.New("liteforge").Parse(liteForgePromptTemplate)
+	if err != nil {
+		return "", utils.Errorf("template parse failed: %v", err)
+	}
+	var buf bytes.Buffer
+	if err := tmp.Execute(&buf, p); err != nil {
+		return "", utils.Errorf("template execute failed: %v", err)
+	}
+	return buf.String(), nil
 }
