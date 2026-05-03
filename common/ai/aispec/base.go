@@ -396,6 +396,7 @@ func NewChatBaseContext(opts ...ChatBaseOption) *ChatBaseContext {
 }
 
 func ChatBase(url string, model string, msg string, chatOpts ...ChatBaseOption) (string, error) {
+	dispatchChatBaseMirror(model, msg)
 	ctx := NewChatBaseContext(chatOpts...)
 	interfaceType := ctx.InterfaceType
 	if interfaceType == ChatBaseInterfaceTypeChatCompletions && strings.HasSuffix(strings.TrimRight(strings.ToLower(url), "/"), "/responses") {
