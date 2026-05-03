@@ -61,6 +61,22 @@ type ChatContent struct {
 	// VideoUrl 用于 Qwen Omni 等多模态模型直接喂入视频文件
 	// 关键词: video_url, omni 视频输入
 	VideoUrl any `json:"video_url,omitempty"`
+	// CacheControl 用于 dashscope 显式上下文缓存（context cache, 当前仅
+	// dashscope/tongyi 系列若干 model 支持）。当上层(aibalance/客户端)在
+	// 某条 ChatContent 上挂载 cache_control: {"type":"ephemeral"} 时，
+	// dashscope 会从 messages 数组开头一直回溯到该 content 处，
+	// 把这一段提示词作为命名缓存块（5 分钟 TTL）；后续相同前缀请求会
+	// 命中并按 input_token 单价的 10% 计费。
+	//
+	// 注意：
+	//   1. 仅当 type=="text" 时生效（OpenAI 兼容协议规范要求）；
+	//   2. 上游若不识别该字段会原样忽略，对其它 provider 完全无副作用；
+	//   3. 此字段保持 any 类型方便上层直接传入 OpenAI 兼容协议中常用的
+	//      map 字面量 {"type":"ephemeral"}, 无需引入额外类型；
+	//   4. omitempty 保证默认序列化结果与改造前一致, 不破坏既有调用方。
+	//
+	// 关键词: cache_control, ephemeral, dashscope 显式缓存, context cache, 上下文缓存
+	CacheControl any `json:"cache_control,omitempty"`
 }
 
 type ChatDetails []ChatDetail
@@ -112,6 +128,18 @@ type PromptTokensDetails struct {
 	ImageTokens  int `json:"image_tokens,omitempty"`
 	VideoTokens  int `json:"video_tokens,omitempty"`
 	CachedTokens int `json:"cached_tokens,omitempty"`
+
+	// CacheCreationInputTokens 是 dashscope 显式缓存(cache_control:{"type":"ephemeral"})
+	// 在「本次请求新创建/扩展的缓存块大小」字段。第一次请求该值非 0
+	// （等于本次创建的缓存块 token 数，按 input_token 单价的 125% 计费），
+	// 命中已有缓存的后续请求该值为 0、cached_tokens 为命中数。
+	// 仅 dashscope 显式缓存路径返回，其它 provider 默认缺失（保持 omitempty）。
+	// 关键词: cache_creation_input_tokens, dashscope 显式缓存创建计费
+	CacheCreationInputTokens int `json:"cache_creation_input_tokens,omitempty"`
+	// CacheType 是 dashscope 显式缓存返回的缓存类型字段，目前固定为 "ephemeral"。
+	// 仅作可观测性记录，对成本核算不参与计算。
+	// 关键词: cache_type, ephemeral
+	CacheType string `json:"cache_type,omitempty"`
 }
 
 type ToolCall struct {

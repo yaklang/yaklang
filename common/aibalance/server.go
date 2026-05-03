@@ -1060,8 +1060,28 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 			writer.WriteUsage(usage)
 		}
 
+		// dashscope (tongyi) 显式上下文缓存自动注入: 对在 dashscope
+		// 「显式缓存白名单」内的 model (qwen3.5-flash / qwen3.6-plus /
+		// qwen3-vl-flash / qwen3.x-coder / deepseek-v3.2 / kimi-k2.* /
+		// glm-5.1 等), 在最末 system 消息 content 上挂 cache_control:
+		// {"type":"ephemeral"} 标记。dashscope 会把对应 prefix 作为命名
+		// 缓存块保留 5 分钟, 后续相同前缀请求按 input_token 单价 10% 计费,
+		// cached_tokens 字段也会真实回填(走 onUsageForward 入库)。
+		// 不在白名单内的 (provider type, model) 组合 messagesForUpstream
+		// 与 bodyIns.Messages 完全相同(零副作用)。
+		// 关键词: aibalance dashscope 显式缓存自动注入,
+		//        RewriteMessagesForExplicitCache 接入点
+		messagesForUpstream := RewriteMessagesForExplicitCache(
+			bodyIns.Messages, provider.TypeName, provider.ModelName,
+		)
+		if len(messagesForUpstream) > 0 && len(messagesForUpstream) == len(bodyIns.Messages) &&
+			IsTongyiExplicitCacheModel(provider.TypeName, provider.ModelName) {
+			c.logInfo("explicit cache_control injected: provider=%s model=%s msgs=%d",
+				provider.TypeName, provider.ModelName, len(messagesForUpstream))
+		}
+
 		client, err := provider.GetAIClientWithRawMessages(
-			bodyIns.Messages,
+			messagesForUpstream,
 			bodyIns.Tools,
 			bodyIns.ToolChoice,
 			bodyIns.EnableThinking,
