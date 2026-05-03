@@ -253,14 +253,32 @@ func (e *Entrypoints) PeekProvider(model string) *Provider {
 // PeekOrderedProviders returns providers for the given model in random order
 // Only returns providers with latency < 10s, randomly shuffled
 // If no low-latency providers are available but providers exist, triggers immediate health check
+//
+// 关键词: aibalance, PeekOrderedProviders, 随机洗牌
+// 等价于 PeekOrderedProvidersWithAffinity(model, "")，保留向后兼容
 func (e *Entrypoints) PeekOrderedProviders(model string) []*Provider {
+	return e.PeekOrderedProvidersWithAffinity(model, "")
+}
+
+// PeekOrderedProvidersWithAffinity returns providers for the given model with optional affinity routing.
+//
+// affinityKey 不为空时，启用"亲和性路由"：
+//   - 在健康 provider 集合中根据 hash(affinityKey) mod len(healthy) 选出"主 provider"，置于第一位
+//   - 其余 provider 仍然随机洗牌后跟随，保留失败重试时的负载均衡能力
+//   - 同一 affinityKey 在健康集合不变时稳定路由到同一 provider，让上游隐式缓存有机会被复用
+//
+// affinityKey 为空时，行为与原 PeekOrderedProviders 一致（完全随机洗牌）。
+//
+// 关键词: aibalance, 亲和性路由, 隐式缓存, sticky routing
+func (e *Entrypoints) PeekOrderedProvidersWithAffinity(model string, affinityKey string) []*Provider {
 	providers, ok := e.providers[model]
 	if !ok || len(providers) == 0 {
 		log.Debugf("No providers found for model: %s", model)
 		return nil
 	}
 
-	log.Infof("PeekOrderedProviders for model %s: found %d providers", model, len(providers))
+	log.Infof("PeekOrderedProviders for model %s: found %d providers (affinity=%v)",
+		model, len(providers), affinityKey != "")
 
 	// 如果只有一个提供者，无论其健康状况如何，都直接返回
 	if len(providers) == 1 {
@@ -322,6 +340,27 @@ func (e *Entrypoints) PeekOrderedProviders(model string) []*Provider {
 
 	log.Debugf("Found %d valid providers (latency < 10s) for model %s", len(validProviders), model)
 
+	// 选取主 provider 的索引：亲和性路由时由 affinityKey 决定，否则随机
+	// 关键词: 隐式缓存, 亲和性路由, 主 provider 选择
+	primaryIdx := -1
+	if affinityKey != "" && len(validProviders) >= 2 {
+		// 为了在健康集合内稳定选取，对集合做一次确定性排序后再 hash mod
+		// 排序键 = TypeName + DomainOrURL + APIKey 的 sha1，跨进程稳定
+		// 关键词: 亲和性路由, 健康集合稳定排序
+		stableSorted := make([]*Provider, len(validProviders))
+		copy(stableSorted, validProviders)
+		sortProvidersStably(stableSorted)
+		// 把 sorted 后的索引映射回 validProviders 的位置
+		picked := stableSorted[hashAffinityKey(affinityKey)%uint32(len(stableSorted))]
+		for i, p := range validProviders {
+			if p == picked {
+				primaryIdx = i
+				break
+			}
+		}
+		log.Debugf("Affinity routing: affinityKey=%s primary=%s", affinityKey, picked.TypeName)
+	}
+
 	// 使用 Fisher-Yates 洗牌算法完全随机打乱
 	shuffledProviders := make([]*Provider, len(validProviders))
 	copy(shuffledProviders, validProviders)
@@ -331,14 +370,71 @@ func (e *Entrypoints) PeekOrderedProviders(model string) []*Provider {
 		shuffledProviders[i], shuffledProviders[j] = shuffledProviders[j], shuffledProviders[i]
 	}
 
-	// 输出随机排序结果
-	log.Debugf("Randomly shuffled providers for model %s:", model)
+	// 亲和性路由：把"主 provider"提到第一位，其余顺序保持洗牌后的随机
+	// 这样既保证缓存命中（首选确定），又保留了失败重试时的负载分散
+	// 关键词: 亲和性路由, 主 provider 置顶
+	if primaryIdx >= 0 {
+		// 在 shuffled 中找到 validProviders[primaryIdx] 对应的实例
+		target := validProviders[primaryIdx]
+		for i, p := range shuffledProviders {
+			if p == target {
+				if i != 0 {
+					shuffledProviders[0], shuffledProviders[i] = shuffledProviders[i], shuffledProviders[0]
+				}
+				break
+			}
+		}
+	}
+
+	// 输出排序结果
+	log.Debugf("Ordered providers for model %s (affinity=%v):", model, affinityKey != "")
 	for i, p := range shuffledProviders {
 		log.Debugf("  %d. %s (latency: %dms, healthy: %v)",
 			i+1, p.TypeName, p.DbProvider.LastLatency, p.DbProvider.IsHealthy)
 	}
 
 	return shuffledProviders
+}
+
+// sortProvidersStably 按 TypeName+DomainOrURL+APIKey 字典序排序，跨进程稳定
+// 关键词: 亲和性路由, 稳定排序
+func sortProvidersStably(in []*Provider) {
+	sort.Slice(in, func(i, j int) bool {
+		ki := in[i].TypeName + "|" + in[i].DomainOrURL + "|" + in[i].APIKey
+		kj := in[j].TypeName + "|" + in[j].DomainOrURL + "|" + in[j].APIKey
+		return ki < kj
+	})
+}
+
+// hashAffinityKey 将 affinityKey 哈希为 uint32，用于稳定的 mod 选择
+// 使用 FNV-1a 64-bit 后截断，速度快、分布均匀
+// 关键词: 亲和性路由, FNV hash
+func hashAffinityKey(key string) uint32 {
+	var h uint64 = 14695981039346656037
+	for i := 0; i < len(key); i++ {
+		h ^= uint64(key[i])
+		h *= 1099511628211
+	}
+	return uint32(h)
+}
+
+// BuildPromptAffinityKey 把 prompt 前缀 + apiKey + model 拼成稳定的 affinityKey
+// prompt 取前 prefixLen 字节足以代表"逻辑请求"的稳定特征：
+//   - 隐式缓存依赖前缀字节匹配，prompt 后段差异不影响 provider 选择
+//   - apiKey 不同 → 上游账号级隔离，必须分桶
+//   - model 不同 → 上游模型级隔离，必须分桶
+//
+// 关键词: 亲和性路由, prompt 前缀, BuildPromptAffinityKey
+func BuildPromptAffinityKey(prompt, apiKey, model string, prefixLen int) string {
+	if prefixLen <= 0 {
+		prefixLen = 2048
+	}
+	end := prefixLen
+	if end > len(prompt) {
+		end = len(prompt)
+	}
+	// 使用 sha1 16 位，足够抗碰撞且短
+	return utils.CalcSha1(prompt[:end], apiKey, model)
 }
 
 // GetAllProviders returns all providers for the given model
@@ -777,8 +873,13 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 	// c.logInfo("Key[%v] requesting model %s, starting to forward request", apiKeyForStat, modelName)
 	// _ = model
 
-	// 使用 PeekOrderedProviders 获取按优先级排序的提供者列表
-	providers := c.Entrypoints.PeekOrderedProviders(modelName)
+	// 亲和性路由：使用 prompt 前缀 + apiKey + model 计算稳定的 affinityKey，
+	// 优先把同一逻辑请求路由到同一 provider，让上游隐式缓存有机会被复用。
+	// 关键词: 亲和性路由, 隐式缓存, BuildPromptAffinityKey
+	affinityKey := BuildPromptAffinityKey(prompt.String(), apiKeyForStat, modelName, 2048)
+
+	// 使用 PeekOrderedProvidersWithAffinity 获取按亲和性 + 负载均衡排序的提供者列表
+	providers := c.Entrypoints.PeekOrderedProvidersWithAffinity(modelName, affinityKey)
 	if len(providers) == 0 {
 		// 如果找不到，尝试从数据库重新加载
 		c.logWarn("No valid providers found for model %s, trying to reload from database...", modelName)
@@ -786,7 +887,7 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 			c.logError("Failed to reload providers from database: %v", err)
 		} else {
 			c.logInfo("Successfully reloaded providers from database, retrying to find providers.")
-			providers = c.Entrypoints.PeekOrderedProviders(modelName)
+			providers = c.Entrypoints.PeekOrderedProvidersWithAffinity(modelName, affinityKey)
 		}
 	}
 
