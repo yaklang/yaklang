@@ -296,3 +296,57 @@ raw/noise 主要由 6 个无 wrapper 模板贡献:
 > **真实上游 hit_ratio_token_real 数据**: 改造后建议在 aibalance 部署完整可用
 > 时再跑一次 `cachebench --max-prompts 50`, 配合 `bottleneck-prompts/` 进一步
 > 收紧剩余瓶颈。
+
+### 9.7 P2-E2 实测 (aibalance memfit-standard-free + memfit-light-free, 50 prompt)
+
+跑法 (Tiered: Intelligent=memfit-standard-free, Lightweight=memfit-light-free):
+
+```
+go run common/yak/cmd/yak.go \
+    common/ai/aid/aicache/cachebench/run_react.yak \
+    --max-prompts 50 --max-iteration 25 --ai-type aibalance
+```
+
+报告: `common/ai/aid/aicache/cachebench/reports/cachebench-20260504-184837.{md,json}`
+
+| 维度 | Baseline (老 hostscan, 1.10%) | 本轮 (P0-A/P0-B/P1-C/P1-D 全部上线后) |
+| --- | --- | --- |
+| total LLM calls | 130 | 55 (max-prompts=50, +5 收尾事件) |
+| missing usage callbacks | **80 (61.5%)** | **5 (9.1%)** |
+| hit_ratio_token_real (上游 cached_tokens / prompt_tokens) | **1.10%** | **6.27%** (5.7x) |
+| hit_ratio_lcp_client (客户端字节级 LCP) | 未采集 | 11.97% |
+| sum prompt_tokens | - | 851,099 |
+| sum cached_tokens | - | 53,384 |
+| sum cache_creation_input_tokens | - | 121,369 |
+| upstream creation cost (1.25x) | - | 151,711 tokens |
+| cache_hit_count (cached>0) | - | 19 |
+| cache_create_count (creation>0) | - | 24 |
+
+**核心成果:**
+
+1. **usage 触达率 38.5% -> 90.9%**: P1-D 修复彻底见效, 仅剩 5 次 missing
+   (主要是上游 SSE 末帧异常时未带 usage block, 非 client 漏接).
+2. **真实命中率 5.7x 提升**: 1.10% -> 6.27%, 但距 35% 目标仍有差距,
+   主要瓶颈仍在前 20 次 prompt 的 prefix_misalign / lcp_hit_but_upstream_miss.
+
+**剩余瓶颈 (供下一轮 P3 使用):**
+
+| tag | 出现次数 | 含义 / 推测原因 |
+| --- | --- | --- |
+| `lcp_hit_but_upstream_miss` | 26 | 客户端 LCP 已对齐 (最高 40%), 但 vllm 侧未返回 cached_tokens; 推测: (a) memfit-standard-free 侧 KV cache 预热阶段, 前几次新建; (b) hijacker 字节边界未稳定到上游 block 粒度 (vllm 默认 16 token block); (c) 部分 prompt 4 段不全 (`only 3/4 sections present; missing: [timeline]` 出现 6 次), 前缀被破坏 |
+| `prefix_misalign` | 9 | 主要在 seq 2-19, 即首批 prompt: high-static 段每次都换 hash. 报告里 "high-static section unstable: 10 distinct hashes" 出现 37 次 |
+| `cache_create` | 6 | 首次新建块, 预期出现, 不算瓶颈 |
+| `unknown` | 13 | tag 兜底 |
+
+| section | distinct_hashes | 期望 |
+| --- | --- | --- |
+| high-static | **10** (期望 1) | 仍有动态污染源, 预计来自前 10 次 prompt 是 LiteForge 跨不同 forge (task-analyst / task-summary / verification / ai-review-* 各发 1 次, 模板各异); 主 React loop 内 high-static 已稳定 |
+| semi-dynamic | 30 | 预期会随 forge / tool 列表变化, 当前数与 noise 历史 91 相比已 67% 降低 |
+| timeline-open | 48 | 预期, 每次累加 |
+| dynamic | 54 | 预期, 完全可变 |
+
+**下一轮 (P3) 建议:**
+
+- P3-A: 把 `high-static` distinct=10 进一步压到 ≤3. 思路: LiteForge 模板里 `# Preset` 块加入 forge name, 让所有 forge 共享一段更短的统一 high-static 头, forge 特异内容下沉到 semi-dynamic.
+- P3-B: 修 `only 3/4 sections present; missing: [timeline]` (6 次). 检查哪些 prompt 没渲染 timeline section, 补一段空 `<|PROMPT_SECTION_timeline-open|><|PROMPT_SECTION_timeline-open_END|>` 占位, 保证 4 段对齐.
+- P3-C: 与 aibalance 后端对齐字节边界 / cache block size, 把 `lcp_hit_but_upstream_miss` 转化为真实 cached_tokens.
