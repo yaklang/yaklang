@@ -3,9 +3,34 @@ package aicommon
 import (
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiconfig"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 )
+
+// extractUserUsageCallbackOpts 从 wrapper 后的 i 取出 user 端注册的 UsageCallback,
+// 包成 aispec.WithUsageCallback 返回. wrapper 把 *Config 包成
+// *tierAwareConsumptionCaller, 也兼容直接传入 *Config 的场景 (CallAI 等).
+// 关键词: extractUserUsageCallbackOpts, Tiered AI usageCallback 透传
+func extractUserUsageCallbackOpts(i AICallerConfigIf) []aispec.AIConfigOption {
+	if i == nil {
+		return nil
+	}
+	var cfg *Config
+	if t, ok := i.(*tierAwareConsumptionCaller); ok && t != nil {
+		cfg = t.Config
+	} else if c, ok := i.(*Config); ok {
+		cfg = c
+	}
+	if cfg == nil {
+		return nil
+	}
+	cb := cfg.GetUserUsageCallback()
+	if cb == nil {
+		return nil
+	}
+	return []aispec.AIConfigOption{aispec.WithUsageCallback(cb)}
+}
 
 func MustGetIntelligentAIModelCallback() AICallbackType {
 	callback, err := GetIntelligentAIModelCallback()
@@ -74,7 +99,10 @@ func GetIntelligentAIModelCallback() (AICallbackType, error) {
 			return nil, aiconfig.ErrNoConfigAvailable
 		}
 
-		callback, err := CreateCallbackFromConfig(config)
+		// 把用户脚本通过 ai.usageCallback(...) 注册的 UsageCallback 重新注入,
+		// 让上游 LLM 末帧 token usage (含 cached_tokens) 可以触达用户脚本.
+		extra := extractUserUsageCallbackOpts(i)
+		callback, err := CreateCallbackFromConfigWithExtraOpts(config, extra...)
 		if err != nil {
 			return nil, err
 		}
@@ -110,7 +138,8 @@ func GetLightweightAIModelCallback() (AICallbackType, error) {
 			return nil, aiconfig.ErrNoConfigAvailable
 		}
 
-		callback, err := CreateCallbackFromConfig(config)
+		extra := extractUserUsageCallbackOpts(i)
+		callback, err := CreateCallbackFromConfigWithExtraOpts(config, extra...)
 		if err != nil {
 			return nil, err
 		}
@@ -132,7 +161,8 @@ func GetVisionAIModelCallback() (AICallbackType, error) {
 			return nil, aiconfig.ErrNoConfigAvailable
 		}
 
-		callback, err := CreateCallbackFromConfig(config)
+		extra := extractUserUsageCallbackOpts(i)
+		callback, err := CreateCallbackFromConfigWithExtraOpts(config, extra...)
 		if err != nil {
 			return nil, err
 		}
@@ -157,7 +187,8 @@ func GetDefaultAIModelCallback() (AICallbackType, error) {
 			return nil, err
 		}
 
-		callback, err := CreateCallbackFromConfig(config)
+		extra := extractUserUsageCallbackOpts(i)
+		callback, err := CreateCallbackFromConfigWithExtraOpts(config, extra...)
 		if err != nil {
 			return nil, err
 		}
@@ -179,7 +210,8 @@ func GetAIModelCallbackByTierAndProviderAndModel(tier consts.ModelTier, provider
 			return nil, aiconfig.ErrNoConfigAvailable
 		}
 
-		callback, err := CreateCallbackFromConfig(config)
+		extra := extractUserUsageCallbackOpts(i)
+		callback, err := CreateCallbackFromConfigWithExtraOpts(config, extra...)
 		if err != nil {
 			return nil, err
 		}

@@ -16,6 +16,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiskillloader"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/fstools"
@@ -180,6 +181,15 @@ type Config struct {
 	OriginalAICallback        AICallbackType // 原始 ai 回调, 用于 异步任务，不占用id
 	QualityPriorityAICallback AICallbackType // 质量优先 ai 回调
 	SpeedPriorityAICallback   AICallbackType // 速度优先 ai 回调
+
+	// userUsageCallback 由用户脚本通过 ai.usageCallback(...) 注册并经
+	// aiengine.WithAIConfig 透传. Tiered AI 路径
+	// (GetXxxAIModelCallback -> CreateCallbackFromConfig) 重新构造 callback 时
+	// 不会读取 aispec.AIConfig.UsageCallback, 因此独立保存在这里,
+	// 各 tier callback 在调用 LoadAIService 之前再注入到 opts,
+	// 从而让上游 LLM 末帧的 token usage (cached_tokens 等) 触达用户脚本.
+	// 关键词: usageCallback Tiered 透传, cached_tokens 客户端可见
+	userUsageCallback func(*aispec.ChatUsage)
 
 	//aiServiceName
 	AiServerName string
@@ -755,6 +765,42 @@ func WithInheritTieredAICallback(parentConfig *Config, force bool) ConfigOption 
 			c.m.Unlock()
 		}
 
+		return nil
+	}
+}
+
+// GetUserUsageCallback 返回用户脚本通过 ai.usageCallback(...) 注册的 callback,
+// 由 Tiered AI 路径 (GetXxxAIModelCallback) 在创建 LoadAIService 时再次注入到 opts
+// 中, 修复 React loop 内 chat 不触发用户 callback 的 bug.
+// 关键词: GetUserUsageCallback, Tiered AI usage 透传
+func (c *Config) GetUserUsageCallback() func(*aispec.ChatUsage) {
+	if c == nil {
+		return nil
+	}
+	return c.userUsageCallback
+}
+
+// SetUserUsageCallback 设置 user 端的 UsageCallback. 一般由 aiengine.WithAIConfig
+// 在解析 ai.usageCallback(cb) 时调用. nil 表示禁用.
+// 关键词: SetUserUsageCallback
+func (c *Config) SetUserUsageCallback(cb func(*aispec.ChatUsage)) {
+	if c == nil {
+		return
+	}
+	if c.m == nil {
+		c.m = &sync.Mutex{}
+	}
+	c.m.Lock()
+	defer c.m.Unlock()
+	c.userUsageCallback = cb
+}
+
+// WithUserUsageCallback 把 user 端 UsageCallback 写入 Config, 供 Tiered AI 路径
+// 在重新构造 chat opts 时注入 aispec.WithUsageCallback.
+// 关键词: WithUserUsageCallback, ai.usageCallback 透传
+func WithUserUsageCallback(cb func(*aispec.ChatUsage)) ConfigOption {
+	return func(c *Config) error {
+		c.SetUserUsageCallback(cb)
 		return nil
 	}
 }

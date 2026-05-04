@@ -23,6 +23,13 @@ type AIEngineConfig struct {
 	AIService  string // AI 服务名称，如 "openai", "deepseek" 等
 	AICallback aicommon.AICallbackType
 
+	// UserUsageCallback 是用户脚本通过 ai.usageCallback(...) 注册的 token usage 回调.
+	// 由 WithAIConfig 从 aispec.AIConfigOption 列表中探测出来, 经 buildReActOptions
+	// 透传到 aicommon.Config, 让 Tiered AI 路径在重新构造 chat opts 时再次注入,
+	// 从而修复 React loop 内 chat 不触发用户 callback 的 bug.
+	// 关键词: AIEngineConfig UsageCallback 透传
+	UserUsageCallback func(*aispec.ChatUsage)
+
 	// 执行配置
 	MaxIteration int    // 最大迭代次数，默认 10
 	SessionID    string // 会话 ID，用于持久化
@@ -393,6 +400,14 @@ func WithAIConfig(typeName string, opts ...aispec.AIConfigOption) AIEngineConfig
 			log.Errorf("load ai service failed: %v", err)
 		}
 		c.AICallback = aicommon.AIChatToAICallbackType(chatter)
+
+		// 探测 opts 中的 UsageCallback, 透传给 React Config 让 Tiered AI 路径
+		// (GetXxxAIModelCallback) 重新构造 chat opts 时能再次注入, 修复
+		// ai.usageCallback(...) 在 React loop 内不触发的 bug.
+		// 关键词: WithAIConfig UsageCallback 探测透传
+		if probe := aispec.NewDefaultAIConfig(opts...); probe != nil && probe.UsageCallback != nil {
+			c.UserUsageCallback = probe.UsageCallback
+		}
 	}
 }
 

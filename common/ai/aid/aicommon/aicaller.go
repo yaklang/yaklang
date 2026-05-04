@@ -151,6 +151,16 @@ func LoadAIService(typeName string, opts ...aispec.AIConfigOption) (AICallbackTy
 
 // CreateCallbackFromConfig creates an AICallbackType from an AIModelConfig.
 func CreateCallbackFromConfig(config *ypb.AIModelConfig) (AICallbackType, error) {
+	return CreateCallbackFromConfigWithExtraOpts(config)
+}
+
+// CreateCallbackFromConfigWithExtraOpts 与 CreateCallbackFromConfig 相同,
+// 但允许调用方追加 aispec.AIConfigOption (例如 aispec.WithUsageCallback),
+// 这些 opt 会拼接在 aispec.BuildOptionsFromConfig(config) 之后, 因此 Tiered AI
+// 路径 (GetXxxAIModelCallback) 可以把用户脚本端注册的 UsageCallback 重新注入,
+// 修复 ai.usageCallback 在 React loop 内不触发的问题.
+// 关键词: CreateCallbackFromConfigWithExtraOpts, Tiered usageCallback 注入
+func CreateCallbackFromConfigWithExtraOpts(config *ypb.AIModelConfig, extraOpts ...aispec.AIConfigOption) (AICallbackType, error) {
 	if config == nil {
 		return nil, utils.Error("config is nil")
 	}
@@ -159,5 +169,8 @@ func CreateCallbackFromConfig(config *ypb.AIModelConfig) (AICallbackType, error)
 	}
 
 	opts := aispec.BuildOptionsFromConfig(config)
+	if len(extraOpts) > 0 {
+		opts = append(opts, extraOpts...)
+	}
 	return LoadAIService(config.GetProvider().GetType(), opts...)
 }

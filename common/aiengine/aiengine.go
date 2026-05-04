@@ -537,6 +537,13 @@ func buildReActOptions(ctx context.Context, config *AIEngineConfig, outputChan c
 		}
 	}
 
+	// 把 user 端 ai.usageCallback(...) 透传到 React Config 上, Tiered AI
+	// 路径会从 Config.GetUserUsageCallback() 取出再注入到上游 chat opts.
+	// 关键词: buildReActOptions UsageCallback 透传
+	if config.UserUsageCallback != nil {
+		options = append(options, aicommon.WithUserUsageCallback(config.UserUsageCallback))
+	}
+
 	// 高级配置
 
 	if config.Focus != "" {
