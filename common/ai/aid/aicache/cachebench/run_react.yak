@@ -223,7 +223,7 @@ sessionDir = ai.aicacheSession()
 log.info("analyzing dumps in: %s", sessionDir)
 log.info("usage callbacks captured: %d", len(usageList))
 
-benchReport = analyzeBenchmark(sessionDir, usageList, events, err, inputText)
+benchReport = analyzeBenchmark(sessionDir, usageList, events, err, inputText, maxPromptsTriggered)
 benchReport["durationSec"] = durationSec
 benchReport["aiType"] = aiType
 benchReport["aiModel"] = aiModel

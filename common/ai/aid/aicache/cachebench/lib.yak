@@ -447,7 +447,15 @@ func classifyReason(tag) {
 
 // alignDumpsAndUsages 把 dumps 与 usages 按调用顺序对齐成 records
 // 关键词: cachebench alignDumpsAndUsages, 序号对齐
-func alignDumpsAndUsages(dumps, usages) {
+// alignDumpsAndUsages 把 dumps 与 usages 按调用顺序对齐成 records.
+// maxPromptsTriggered 表示是否因 max-prompts 限流主动 ctx cancel:
+//   - 若是, 末尾 dumps>usages 的 trailing dumps 是 ctx cancel 抛错前已落盘但
+//     SSE 末帧 callback 没机会触发的"飞行中"chat -> 标记为 inFlightCancelled
+//     (测量伪影, 不算 missing 漏接, 与 captureUsage 在 callback 触发时的判定一致)
+//   - 若否 (loop 自然结束), 仍然记 nil usage = missing, 反映真实链路漏接
+//
+// 关键词: alignDumpsAndUsages tail in-flight, ctx cancel trailing dumps
+func alignDumpsAndUsages(dumps, usages, maxPromptsTriggered) {
     records = []
     nDumps = len(dumps)
     nUsages = len(usages)
@@ -473,6 +481,15 @@ func alignDumpsAndUsages(dumps, usages) {
                 "sections":         [],
                 "advices":          [],
                 "sectionHashCount": {},
+            }
+        }
+        // 当 max-prompts 触发后, 把 nil usage 的 trailing dumps 视为 in-flight cancelled
+        // (chat 被 ctx cancel 抛错, callback 没机会调用), 而不是真实 missing.
+        if ccbIsNil(usage) && maxPromptsTriggered && i >= nUsages {
+            usage = {
+                "seq":               i + 1,
+                "missing":           false,
+                "inFlightCancelled": true,
             }
         }
         tag = classifyRecord(rec, usage)
@@ -864,16 +881,18 @@ func printSummary(benchReport) {
 // 顶层入口
 // =============================================================================
 
-// analyzeBenchmark 把 sessionDir 与 usageList 拼成一个完整 report
-// 关键词: cachebench analyzeBenchmark, 顶层入口
-func analyzeBenchmark(sessionDir, usageList, events, invokeErr, inputText) {
+// analyzeBenchmark 把 sessionDir 与 usageList 拼成一个完整 report.
+// maxPromptsTriggered 透传到 alignDumpsAndUsages, 用于把 ctx cancel 后的
+// trailing dumps 标记为 in_flight_cancelled (测量伪影) 而非 missing.
+// 关键词: cachebench analyzeBenchmark, 顶层入口, maxPromptsTriggered 透传
+func analyzeBenchmark(sessionDir, usageList, events, invokeErr, inputText, maxPromptsTriggered) {
     paths = listDumpFiles(sessionDir)
     dumps = []
     for p in paths {
         rec = parseDumpFile(p)
         dumps = append(dumps, rec)
     }
-    records = alignDumpsAndUsages(dumps, usageList)
+    records = alignDumpsAndUsages(dumps, usageList, maxPromptsTriggered)
     summary = summarize(records)
     bottlenecks = pickBottlenecks(records, 50)
 

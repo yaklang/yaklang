@@ -48,7 +48,7 @@ log.info("offline analyze session dir: %s", sessionDir)
 usageList = []
 events = []
 
-benchReport = analyzeBenchmark(sessionDir, usageList, events, nil, inputText)
+benchReport = analyzeBenchmark(sessionDir, usageList, events, nil, inputText, false)
 benchReport["mode"] = "offline-analyze"
 
 jsonPath, mdPath, botDir = saveReport(outputDir, benchReport)

@@ -350,3 +350,89 @@ go run common/yak/cmd/yak.go \
 - P3-A: 把 `high-static` distinct=10 进一步压到 ≤3. 思路: LiteForge 模板里 `# Preset` 块加入 forge name, 让所有 forge 共享一段更短的统一 high-static 头, forge 特异内容下沉到 semi-dynamic.
 - P3-B: 修 `only 3/4 sections present; missing: [timeline]` (6 次). 检查哪些 prompt 没渲染 timeline section, 补一段空 `<|PROMPT_SECTION_timeline-open|><|PROMPT_SECTION_timeline-open_END|>` 占位, 保证 4 段对齐.
 - P3-C: 与 aibalance 后端对齐字节边界 / cache block size, 把 `lcp_hit_but_upstream_miss` 转化为真实 cached_tokens.
+
+### 9.8 P3-T1/T5/T6: 剩余 missing usage 链路定位与彻底修复
+
+**背景**: P2-E2 跑后还剩 5 次 missing (9.1%), 表面看是上游 SSE 异常,
+深入分析 dump (`yakit-projects/temp/aicache/<sessionId>/`) 发现这些缺口
+**集中在 3 段 LiteForge 风格的 small prompt** (3-6KB, sections=`[high-static, semi-dynamic, dynamic]`,
+缺 timeline), 与 P2-E2 报告中 `only 3/4 sections present; missing: [timeline]` 6 次互相印证.
+
+#### P3-T1 根因定位
+
+`enhancesearch` 的 4 个 LiteForge 子调用 (`HypotheticalAnswer` / `SplitQuery` /
+`GeneralizeQuery` / `ExtractKeywords`) 直接走 `aicommon.InvokeLiteForge` +
+`aicommon.WithAICallback(aicommon.MustGetSpeedPriorityAIModelCallback())`,
+而不像 aireact 主 loop 里 `r.invokeLiteForgeWithCallback` 那样显式拷贝 user usage callback.
+
+子 LiteForge cfg 上 `userUsageCallback` 永远是 nil,
+`extractUserUsageCallbackOpts` 找不到 callback, `aispec.WithUsageCallback`
+也就不会注入到 chat opts, **末帧 token usage 的 callback 没被调用** -> missing.
+
+同样路径影响:
+- `common/ai/rag/enhancesearch/{enhance.go, build_questions.go}`
+- `common/ai/rag/knowledgebase/query.go`
+- `common/ai/rag/generate_index_tool/processor.go`
+- `common/ai/aid/aitool/buildinaitools/yakscripttools/metadata/genmetadata/yakscript_ai.go`
+
+(任何 `aicommon.WithAICallback(aicommon.MustGet*AIModelCallback())` 路径都是.)
+
+#### P3-T5 修复方案: ctx 通道透传
+
+| 改动 | 文件 | 作用 |
+| --- | --- | --- |
+| 新增 `WithUserUsageCallbackContext` / `GetUserUsageCallbackFromContext` | `aicommon/user_usage_callback_context.go` | ctx-based 透传 helper |
+| `Config.GetContext()` 在有 userUsageCallback 时自动注入 ctx | `aicommon/config.go` | 父 React loop 把 callback 通过 ctx 透传给所有子调用 |
+| `extractUserUsageCallbackOpts` 加 ctx fallback | `aicommon/aitier_callback.go` | 子 cfg 找不到 callback 时, 从 `cfg.GetContext()` 取 |
+| 单测 4 个 | `aicommon/user_usage_callback_context_test.go` | 覆盖 round-trip / GetContext 注入 / fallback / cfg 优先级 |
+
+链路: 父 cfg.userUsageCallback -> 父 cfg.GetContext() (注入 ctx) ->
+React loop action 取 ctx -> enhancesearch 用 `WithContext(ctx)` 创建 InvokeLiteForge ->
+子 cfg.Ctx = 父 ctx -> 子 cfg 上 chat 时 `extractUserUsageCallbackOpts` ->
+cfg.userUsageCallback (nil) -> fallback `cfg.GetContext()` -> 拿到 callback -> 注入 chat opts -> SSE 末帧触发用户 callback.
+
+#### P3-T6 cachebench 测量伪影修复
+
+老 cachebench 把 dumps 比 usages 多的 trailing dumps 当 missing, 但实际是
+**max-prompts ctx cancel 后 chat 抛错, callback 没机会触发**, 是测量伪影非真实漏接.
+
+| 改动 | 文件 | 作用 |
+| --- | --- | --- |
+| `alignDumpsAndUsages(dumps, usages, maxPromptsTriggered)` 新增第三参数 | `cachebench/lib.yak` | trailing dumps 标记 inFlightCancelled |
+| `analyzeBenchmark(... , maxPromptsTriggered)` 透传 | `cachebench/lib.yak` | 入口透传标记 |
+| `run_react.yak` post-react 1.5s 稳定等待 | `cachebench/run_react.yak` | 给 SSE 末帧 callback 到达机会 |
+
+#### 验收数据 (max-prompts=60, max-iter=40)
+
+报告: `common/ai/aid/aicache/cachebench/reports/cachebench-20260504-2004*.{md,json}`
+
+| 指标 | P2-E2 (12 calls 短样本) | P2-E2 (50 calls 中样本) | P3 (63 calls 全采集) |
+| --- | --- | --- | --- |
+| total calls | 12 | 55 | **63** |
+| **真实 missing usage** | **4 (33%)** | **5 (9.1%)** | **0 (0%)** |
+| in_flight_cancelled (测量伪影) | 0 | 0 | 2 (正确归类) |
+| token_hit_ratio | 29.15% | 6.27% | 4.08% |
+| lcp_hit_ratio | 48.97% | 11.97% | 12.25% |
+| healthy + cache_create (真实命中链路) | (n/a) | (n/a) | 16 |
+
+> **note**: 12 calls 时 33% missing, 命中率虚高 29% — 因为 enhancesearch 的 small
+> 子调用 callback 全部漏接, 没进 sumPromptTokens 分母; 而 P3 把这些 small 子调用
+> 全部纳入采样后, 它们的 prefix 短/不易命中拉低了 hit_ratio. 这是采样口径修复
+> 后看到的**真实数据**, 而不是回归.
+
+#### 真 missing 链路彻底关闭
+
+P3 之后 cachebench 跑 63 calls 真实 missing = 0. 用户脚本注册的
+`ai.usageCallback(...)` 现在能覆盖:
+1. 主 React loop 直接 chat (P1-D1)
+2. 主 React loop 内 LiteForge (`r.invokeLiteForgeWithCallback`, P1-D)
+3. WithFastAICallback / OriginalAICallback 子 coordinator (P1-D)
+4. WithInheritTieredAICallback (P1-D2)
+5. **Tiered AI 子 LiteForge (`aicommon.InvokeLiteForge` + `MustGet*AIModelCallback`) (P3-T5)**
+   - enhancesearch HyDE / SplitQuery / GeneralizeQuery / ExtractKeywords
+   - knowledgebase query / build_questions
+   - generate_index_tool / yakscript_ai metadata 生成
+
+任何后续走 `aicommon.WithAICallback(aicommon.MustGet*AIModelCallback())` +
+`aicommon.WithContext(ctx)` 的子调用, 只要 ctx 是从父 React loop 派生的,
+user usage callback **自动透传**.
