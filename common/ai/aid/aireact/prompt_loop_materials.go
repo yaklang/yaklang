@@ -229,6 +229,12 @@ func (pm *PromptManager) NewPromptPrefixMaterials(base *reactloops.LoopPromptBas
 		materials.OutputExample = input.OutputExample
 		materials.SkillsContext = input.SkillsContext
 		materials.Schema = input.Schema
+		// P1-C2: SessionEvidence / UserHistory 从 dynamic 段上移到 timeline-open 段
+		materials.SessionEvidence = input.SessionEvidence
+	}
+	if base != nil {
+		// UserHistory 来自 LoopPromptBaseMaterials (config.FormatUserInputHistoryAITag)
+		materials.UserHistory = base.UserHistory
 	}
 
 	return materials
@@ -525,6 +531,22 @@ func (pm *PromptManager) buildTimelineOpenObservation(
 			true,
 			renderWorkspaceBlock(materials),
 		),
+		// P1-C2: SessionEvidence (SESSION_ARTIFACTS) 上移到 timeline-open
+		reactloops.NewPromptSectionObservation(
+			"section.timeline_open.session_evidence",
+			"Timeline Open / Session Evidence",
+			reactloops.PromptSectionRoleRuntimeCtx,
+			true,
+			materials.SessionEvidence,
+		),
+		// P1-C2: UserHistory (PREV_USER_INPUT) 上移到 timeline-open
+		reactloops.NewPromptSectionObservation(
+			"section.timeline_open.user_history",
+			"Timeline Open / User History",
+			reactloops.PromptSectionRoleUserInput,
+			false,
+			materials.UserHistory,
+		),
 	}
 	section.Children = filterIncludedPromptSections(children)
 	if strings.TrimSpace(rendered) != "" {
@@ -558,13 +580,8 @@ func (pm *PromptManager) buildDynamicObservation(
 			true,
 			base.AutoContext,
 		),
-		reactloops.NewPromptSectionObservation(
-			"section.dynamic.user_history",
-			"Pure Dynamic / User History",
-			reactloops.PromptSectionRoleUserInput,
-			false,
-			base.UserHistory,
-		),
+		// P1-C2: user_history 已上移到 section.timeline_open.user_history,
+		// 此处 dynamic 段不再渲染 PREV_USER_INPUT.
 		reactloops.NewPromptSectionObservation(
 			"section.dynamic.extra_capabilities",
 			"Pure Dynamic / Extra Capabilities",
@@ -572,13 +589,8 @@ func (pm *PromptManager) buildDynamicObservation(
 			true,
 			renderTaggedBlock("EXTRA_CAPABILITIES", input.Nonce, input.ExtraCapabilities),
 		),
-		reactloops.NewPromptSectionObservation(
-			"section.dynamic.session_evidence",
-			"Pure Dynamic / Session Evidence",
-			reactloops.PromptSectionRoleRuntimeCtx,
-			true,
-			input.SessionEvidence,
-		),
+		// P1-C2: session_evidence 已上移到 section.timeline_open.session_evidence,
+		// 此处 dynamic 段不再渲染 SESSION_ARTIFACTS.
 		reactloops.NewPromptSectionObservation(
 			"section.dynamic.reactive_data",
 			"Pure Dynamic / Reactive Data",

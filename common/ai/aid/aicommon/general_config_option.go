@@ -25,10 +25,14 @@ func WithGeneralConfigStreamableField(fieldKey string) GeneralKVConfigOption {
 	return WithGeneralConfigStreamableFieldWithNodeId("re-act-loop-thought", fieldKey)
 }
 
-// WithLiteForgeStaticInstruction 携带 LiteForge 的系统侧静态指令到 GeneralKVConfig
-// 该指令最终会被 invoke_liteforge.go 解析并通过 aiforge.WithLiteForge_StaticInstruction 传给 LiteForge
-// 进入 high-static 段，跨调用稳定哈希
-// 关键词: aicache, PROMPT_SECTION, StaticInstruction, WithLiteForgeStaticInstruction
+// WithLiteForgeStaticInstruction 携带 LiteForge 的系统侧静态指令到 GeneralKVConfig.
+// 该指令最终会被 invoke_liteforge.go 解析并通过 aiforge.WithLiteForge_StaticInstruction
+// 传给 LiteForge. P0-B1 之后进入 semi-dynamic 段 (历史曾在 high-static 段, 因
+// schema/instruction 按 forge 维度变化导致跨 forge cache miss, 已下移),
+// 跨同一 forge 多次调用稳定哈希.
+// 关键词: aicache, PROMPT_SECTION_semi-dynamic, StaticInstruction,
+//
+//	WithLiteForgeStaticInstruction
 func WithLiteForgeStaticInstruction(s string) GeneralKVConfigOption {
 	return func(c *GeneralKVConfig) {
 		c.config.Set("liteForgeStaticInstruction", s)

@@ -663,7 +663,10 @@ func invokeLiteForgeForPaths(ctx context.Context, cfg *AIJSExtractConfig, payloa
 
 	forge, err := aiforge.NewLiteForge(
 		"crawler-js-path-extract",
-		aiforge.WithLiteForge_Prompt(aiJSExtractPromptTpl),
+		// P0-B4: aiJSExtractPromptTpl 是 100% 静态角色 + 任务 + 拼接规则,
+		// 真正的动态内容 (REQUEST CONTEXT + candidate 窗口) 通过 payload 传入,
+		// 上移到 StaticInstruction 让 semi-dynamic 段跨 slice 调用 byte-stable.
+		aiforge.WithLiteForge_StaticInstruction(aiJSExtractPromptTpl),
 		aiforge.WithLiteForge_SpeedPriority(true),
 		aiforge.WithLiteForge_OutputSchema(
 			aitool.WithStructArrayParam(

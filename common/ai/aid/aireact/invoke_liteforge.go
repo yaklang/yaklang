@@ -27,8 +27,9 @@ func (r *ReAct) invokeLiteForgeWithCallback(cb aicommon.AICallbackType, ctx cont
 		),
 	}
 	// 关键词: aicache, PROMPT_SECTION, StaticInstruction, invokeLiteForgeWithCallback
-	// 调用方可以通过 aicommon.WithLiteForgeStaticInstruction 携带系统侧静态指令
-	// 这部分内容进入 high-static 段，跨调用稳定哈希
+	// 调用方可以通过 aicommon.WithLiteForgeStaticInstruction 携带系统侧静态指令.
+	// P0-B1 之后该字段进入 semi-dynamic 段 (而非 high-static), 跨同一 forge
+	// 调用稳定哈希; 真正动态的内容应由 prompt 参数 (进入 dynamic 段) 承载.
 	if staticInstruction := gconfig.GetLiteForgeStaticInstruction(); staticInstruction != "" {
 		fopts = append(fopts, aiforge.WithLiteForge_StaticInstruction(staticInstruction))
 	}
@@ -55,13 +56,22 @@ func (r *ReAct) invokeLiteForgeWithCallback(cb aicommon.AICallbackType, ctx cont
 	if utils.IsNil(execCb) {
 		execCb = r.config.OriginalAICallback
 	}
-	forgeResult, err := f.Execute(ctx, []*ypb.ExecParamItem{
-		{Key: "query", Value: prompt},
-	},
+	// 关键词: invokeLiteForgeWithCallback, ai.usageCallback 透传, WithUserUsageCallback
+	// 子 coordinator 走 WithFastAICallback path, 必须把父 ReAct 的 user UsageCallback
+	// 一并继承, 否则 raw chat 末帧 token usage 不会触达 ai.usageCallback(...).
+	execOpts := []aicommon.ConfigOption{
 		aicommon.WithAgreeYOLO(),
 		aicommon.WithFastAICallback(execCb),
 		aicommon.WithPersistentSessionId(r.config.PersistentSessionId),
-		aicommon.WithDisableCreateDBRuntime(true)) // disable create db runtime because ReAct loop will create it before invoking liteforge, and creating it again in liteforge may
+		aicommon.WithDisableCreateDBRuntime(true), // disable create db runtime because ReAct loop will create it before invoking liteforge, and creating it again in liteforge may
+	}
+	if userUsageCb := r.config.GetUserUsageCallback(); userUsageCb != nil {
+		execOpts = append(execOpts, aicommon.WithUserUsageCallback(userUsageCb))
+	}
+	forgeResult, err := f.Execute(ctx, []*ypb.ExecParamItem{
+		{Key: "query", Value: prompt},
+	},
+		execOpts...)
 	if err != nil {
 		return nil, utils.Wrap(err, "invoke liteforge failed")
 	}

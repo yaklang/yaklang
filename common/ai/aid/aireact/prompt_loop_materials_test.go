@@ -100,9 +100,11 @@ func TestPromptManager_AssembleLoopPrompt_SectionOrder(t *testing.T) {
 	require.NotEqual(t, -1, autoCtxIdx)
 	require.NotEqual(t, -1, prevUserInputIdx)
 
-	// 段顺序: TRAITS -> AI_CACHE_FROZEN(START) -> Tool/Forge/Timeline-frozen ->
-	// AI_CACHE_FROZEN(END) -> PROMPT_SECTION_semi-dynamic(Skills + Schema) ->
-	// PROMPT_SECTION_timeline-open(Timeline open + Time + Workspace) -> Dynamic
+	// 段顺序 (P1-C2 调整后): TRAITS -> AI_CACHE_FROZEN(START) ->
+	// Tool/Forge/Timeline-frozen -> AI_CACHE_FROZEN(END) ->
+	// PROMPT_SECTION_semi-dynamic(Skills + Schema) ->
+	// PROMPT_SECTION_timeline-open(Timeline open + Time + Workspace +
+	// SessionEvidence + PREV_USER_INPUT) -> Dynamic(UserQuery + AutoCtx + ...)
 	require.Less(t, traitsIdx, frozenStartIdx)
 	require.Less(t, frozenStartIdx, toolInventoryIdx)
 	require.Less(t, toolInventoryIdx, frozenEndIdx)
@@ -115,9 +117,11 @@ func TestPromptManager_AssembleLoopPrompt_SectionOrder(t *testing.T) {
 	require.Less(t, timelineOpenSectionIdx, timelineIdx)
 	require.Less(t, timelineIdx, currentTimeIdx)
 	require.Less(t, currentTimeIdx, workspaceIdx)
-	require.Less(t, workspaceIdx, userQueryIdx)
+	// P1-C2: PREV_USER_INPUT 已上移到 timeline-open 段, 排在 workspace 之后,
+	// userQuery (dynamic 段) 之前.
+	require.Less(t, workspaceIdx, prevUserInputIdx)
+	require.Less(t, prevUserInputIdx, userQueryIdx)
 	require.Less(t, userQueryIdx, autoCtxIdx)
-	require.Less(t, autoCtxIdx, prevUserInputIdx)
 	require.Contains(t, prompt, "<|PERSISTENT|>")
 	require.Contains(t, prompt, "<|OUTPUT_EXAMPLE|>")
 	require.Contains(t, prompt, "<|SCHEMA|>")
@@ -134,16 +138,18 @@ func TestPromptManager_AssembleLoopPrompt_SectionOrder(t *testing.T) {
 	require.Equal(t, "section.semi_dynamic.skills_context", sections[2].Children[0].Key)
 	require.Equal(t, "section.semi_dynamic.schema", sections[2].Children[1].Key)
 
-	// timeline_open 段子结构: timeline_open + current_time + workspace。
-	require.GreaterOrEqual(t, len(sections[3].Children), 3)
+	// timeline_open 段子结构 (P1-C2): timeline_open + current_time + workspace +
+	// session_evidence (本用例无 SessionEvidence -> 不出现) + user_history.
+	require.GreaterOrEqual(t, len(sections[3].Children), 4)
 	require.Equal(t, "section.timeline_open.timeline_open", sections[3].Children[0].Key)
 	require.Equal(t, "section.timeline_open.current_time", sections[3].Children[1].Key)
 	require.Equal(t, "section.timeline_open.workspace", sections[3].Children[2].Key)
+	// P1-C2: user_history 现在挂在 timeline_open 之下而非 dynamic 之下.
+	require.Equal(t, "section.timeline_open.user_history", sections[3].Children[3].Key)
 
-	require.GreaterOrEqual(t, len(sections[4].Children), 3)
+	require.GreaterOrEqual(t, len(sections[4].Children), 2)
 	require.Equal(t, "section.dynamic.user_query", sections[4].Children[0].Key)
 	require.Equal(t, "section.dynamic.auto_context", sections[4].Children[1].Key)
-	require.Equal(t, "section.dynamic.user_history", sections[4].Children[2].Key)
 }
 
 // TestPromptManager_RenderLoopSemiDynamicSection_Order 验证 SEMI 残留段

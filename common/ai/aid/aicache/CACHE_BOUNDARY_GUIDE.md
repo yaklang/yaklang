@@ -364,12 +364,68 @@ func IsTongyiExplicitCacheModel(providerType, model string) bool  // tongyi + wh
 | --- | --- | --- |
 | `aicommon` | `TestRenderWithFrozenBoundary_*` | RenderWithFrozenBoundary 5 种边界场景 |
 | `aicommon` | `TestTimelineDump_*FrozenBoundary*` | Timeline.Dump 端到端边界注入 |
+| `aicommon` | `TestAIChatToAICallbackType_*` | user UsageCallback 透传 (P1-D1) |
+| `aicommon` | `TestWithInheritTieredAICallback_*` | 子 Config 继承父 userUsageCallback (P1-D2) |
 | `aicache` | `TestHijack_FrozenBoundary_*` | hijacker 边界切割 6 种场景 (用户案例 + 退化 + 字节稳定) |
 | `aicache` | `TestHijack_3SegSplit_*` | 退化路径 (timeline 内部解析) 7 种场景 |
 | `aicache` | `TestHijack_FixtureFourSection` | 真实生产 fixture 兼容 (000005 / 000010 / 000060) |
+| `aicache` | `TestSplit_*` | splitter 4 段切片 + hash 稳定性 |
+| `aiforge` | `TestLiteForgePrompt_*` | LiteForge 模板 4 段切片 + 跨调用 high-static 稳定 |
+| `aireact` | `TestSplit_VerificationPrompt_*` | verification.txt 4 段包装回归 (P0-A1) |
+| `aireact` | `TestSplit_IntervalReviewPrompt_*` | interval-review.txt 4 段包装回归 (P0-A3) |
+| `aireact` | `TestSplit_AIReviewToolCallPrompt_*` | ai-review-tool-call.txt 4 段包装回归 (P0-A4) |
+| `aid` | `TestSplit_TaskSummaryPrompt_*` | task-summary.txt 4 段包装回归 (P0-A2) |
+| `aicommon` | `TestSplit_PlanReviewPrompt_*` | ai-review-plan.txt 4 段包装回归 (P0-A4) |
+| `aicommon` | `TestSplit_TaskReviewPrompt_*` | ai-review-task.txt 4 段包装回归 (P0-A4) |
 | `aibalance` | `TestRewriteForProvider_*` | provider-aware 分发 |
 | `aibalance` | `TestStripCacheControl_*` | strip 行为 + 零副作用 |
 | `aibalance` | `TestIsCacheControlAwareProvider` | provider 白名单 |
+
+---
+
+## 6.4 新增 prompt 模板 checklist (P0-A 经验沉淀)
+
+> 本项目曾因 6 个大模板 (verification / task-summary / interval-review /
+> ai-review-{plan,task,tool-call}) 没有用 PROMPT_SECTION 包装, 在 cachebench
+> 中产出 1.5 MB raw/noise 字节, 把上游真实命中率压到 1.10%。所有新增模板
+> 必须按下表对齐分段, 否则 splitter 把整段判为 raw, 缓存全部失效。
+
+### 6.4.1 必做项
+
+- [ ] **不允许整段散文**: 模板根节点必须由 `<|AI_CACHE_SYSTEM_high-static|>` 或
+      `<|PROMPT_SECTION_xxx|>` 之一包裹, 没有 wrapper 的内容会被识别为 raw/noise
+- [ ] **不允许自定义外层 tag**: `<|BACKGROUND_xxx|>` / `<|INSTRUCTIONS_xxx|>`
+      等私有 tagName 不会被 splitter 识别为 section, 必须放在 4 段 wrapper 内
+- [ ] **段内禁止跨段污染**: high-static 段内不允许出现任何模板变量 (`{{ . }}`),
+      schema/instructions/系统时间等都属于 semi-dynamic 或 dynamic
+- [ ] **dynamic 段必须带 nonce**: `<|PROMPT_SECTION_dynamic_{{.Nonce}}|>` 形式,
+      避免 splitter 把 dynamic 当作可缓存
+- [ ] **timeline 必须拆 frozen + open**: 用 `TimelineDumpFrozenOpen` 接口拿到
+      frozen / open 字符串, 分别送进 `<|AI_CACHE_FROZEN_semi-dynamic|>` 与
+      `<|PROMPT_SECTION_timeline-open|>`, 不要再用单一 `<|PROMPT_SECTION_timeline|>`
+- [ ] **时间戳必须分钟粒度**: `time.Now().Format("2006-01-02 15:04")`, 严禁用
+      `time.Now().String()` (会带纳秒, 必然击穿 high-static / semi-dynamic 缓存)
+- [ ] **加 splitter 单测**: 至少 1 条 `TestSplit_<TemplateName>_*`, 断言
+      - `aicache.Split(rendered)` 输出多段 chunk
+      - 不出现 `aicache.SectionRaw`
+      - 跨调用 (不同 nonce / 不同 dynamic 输入) 下 high-static 段 hash 稳定
+
+### 6.4.2 4 段段落语义对照表 (写新模板时按此分配内容)
+
+| 段名 | 语义 | 典型内容 |
+| --- | --- | --- |
+| `high-static` | byte-stable 跨调用 (会话级) | 角色设定 / TRAITS / Execution Protocol / Output Schema 通用文案 |
+| `semi-dynamic` | 跨同一上下文稳定, 跨上下文变化 | per-forge SCHEMA / 加载的 SkillsContext / Instruction / 持久记忆 / 当前时间 (分钟级) / OS / WorkingDir |
+| `timeline` (frozen) | timeline 末桶之前的字节冻结块 | 由 `RenderWithFrozenBoundary` 自动产出 |
+| `timeline-open` | timeline 末桶 + 历史 PREV_USER_INPUT + SESSION_ARTIFACTS 列表 | 渐增数据, 不进 frozen |
+| `dynamic` | 单次调用变化 | USER_QUERY / 当前 task / iteration index / TodoSnapshot / payload / nonce |
+
+### 6.4.3 LiteForge 调用方约定 (P0-B4)
+
+写 LiteForge 调用时优先使用对应 ConfigOption, 不要把所有内容都塞 `WithLiteForge_Prompt`:
+
+- `WithLiteForge_StaticInstruction(s)` -> 进 semi-dynamic 段 (静态指令、CRITICAL RULES)
+- `WithLiteForge_DynamicInstruction(s)` (`WithLiteForge_Prompt` 别名) -> 进 dynamic 段 (用户输入、本次特有上下文)
 
 ---
 

@@ -10,3 +10,9 @@
 OS/Arch: {{ .OSArch }}
 {{ if .WorkingDir }}working dir: {{ .WorkingDir }}
 {{ end }}{{ if .WorkingDirGlance }}working dir glance: {{ .WorkingDirGlance }}{{ end }}{{ end }}
+{{ if .SessionEvidence }}{{ if or .TimelineOpen .CurrentTime .Workspace }}
+
+{{ end }}{{ .SessionEvidence }}{{ end }}
+{{ if .UserHistory }}{{ if or .TimelineOpen .CurrentTime .Workspace .SessionEvidence }}
+
+{{ end }}{{ .UserHistory }}{{ end }}

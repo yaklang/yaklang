@@ -39,24 +39,35 @@ func TestLiteForgePrompt_SplitsIntoFourSections(t *testing.T) {
 	require.Contains(t, sections, aicache.SectionTimeline)
 	require.Contains(t, sections, aicache.SectionDynamic)
 
-	// high-static 段：含 Preset / Output Formatter / SCHEMA / Instruction(StaticInstruction)
+	// high-static 段：仅含 Preset / Output Formatter 通用文案 (P0-B1: SCHEMA 与
+	// Instruction 已下移到 semi-dynamic 段, 让 high-static 跨 forge byte-stable)
 	hs := sections[aicache.SectionHighStatic]
 	require.Contains(t, hs.Content, "# Preset")
 	require.Contains(t, hs.Content, "# Output Formatter")
-	require.Contains(t, hs.Content, "# SCHEMA")
-	require.Contains(t, hs.Content, "<schema>")
-	require.Contains(t, hs.Content, "# Instruction")
-	require.Contains(t, hs.Content, "<instruction>")
-	require.Contains(t, hs.Content, "you are a capability matcher.",
-		"StaticInstruction content must appear inside high-static section")
-	// high-static 段不应含 Prompt 内容（已经移到 dynamic 段）
+	require.NotContains(t, hs.Content, "# SCHEMA",
+		"P0-B1: SCHEMA must NOT appear in high-static anymore (moved to semi-dynamic)")
+	require.NotContains(t, hs.Content, "<schema>",
+		"P0-B1: <schema> tag must NOT appear in high-static anymore")
+	require.NotContains(t, hs.Content, "# Instruction",
+		"P0-B1: # Instruction must NOT appear in high-static anymore")
+	require.NotContains(t, hs.Content, "<instruction>",
+		"P0-B1: <instruction> tag must NOT appear in high-static anymore")
+	require.NotContains(t, hs.Content, "you are a capability matcher.",
+		"P0-B1: StaticInstruction content must NOT appear in high-static anymore")
 	require.NotContains(t, hs.Content, "user_query=hostscan",
-		"Prompt content must NOT appear in high-static section anymore (B-tier moved Prompt to dynamic)")
-	// high-static 段内不应出现任何 nonce 字符串
+		"Prompt content must NOT appear in high-static section (B-tier moved Prompt to dynamic)")
 	require.NotContains(t, hs.Content, nonce, "high-static section MUST NOT contain nonce")
 
-	// semi-dynamic 段：persistent memory
+	// semi-dynamic 段：含 SCHEMA + Instruction (P0-B1 下移) + persistent memory
 	sd := sections[aicache.SectionSemiDynamic]
+	require.Contains(t, sd.Content, "# SCHEMA",
+		"P0-B1: SCHEMA must appear in semi-dynamic now")
+	require.Contains(t, sd.Content, "<schema>")
+	require.Contains(t, sd.Content, "# Instruction",
+		"P0-B1: # Instruction must appear in semi-dynamic now")
+	require.Contains(t, sd.Content, "<instruction>")
+	require.Contains(t, sd.Content, "you are a capability matcher.",
+		"P0-B1: StaticInstruction content must appear in semi-dynamic")
 	require.Contains(t, sd.Content, "# 牢记")
 	require.Contains(t, sd.Content, "remember: prefer chinese keywords")
 
@@ -194,7 +205,8 @@ func TestLiteForgePrompt_OnlyStaticInstructionEmpty(t *testing.T) {
 
 	hs := pickSection(t, split, aicache.SectionHighStatic)
 	require.Contains(t, hs.Content, "# Preset")
-	require.Contains(t, hs.Content, "<schema>")
+	require.NotContains(t, hs.Content, "<schema>",
+		"P0-B1: <schema> moved to semi-dynamic, must NOT appear in high-static")
 	require.NotContains(t, hs.Content, "# Instruction",
 		"# Instruction block should be omitted when StaticInstruction is empty")
 	require.NotContains(t, hs.Content, "<instruction>",
@@ -202,9 +214,134 @@ func TestLiteForgePrompt_OnlyStaticInstructionEmpty(t *testing.T) {
 	require.NotContains(t, hs.Content, "old caller pattern: everything in Prompt",
 		"Prompt content must NOT leak into high-static when StaticInstruction is empty")
 
+	// P0-B1: schema 现在在 semi-dynamic 段
+	sd := pickSection(t, split, aicache.SectionSemiDynamic)
+	require.Contains(t, sd.Content, "<schema>",
+		"P0-B1: schema must appear in semi-dynamic when present")
+	require.NotContains(t, sd.Content, "# Instruction",
+		"# Instruction block must remain omitted when StaticInstruction is empty")
+	require.NotContains(t, sd.Content, "<instruction>",
+		"<instruction> tag must remain omitted when StaticInstruction is empty")
+
 	// 老调用方传入的 Prompt 现在出现在 dynamic 段
 	dy := pickSection(t, split, aicache.SectionDynamic)
 	require.Contains(t, dy.Content, "old caller pattern: everything in Prompt")
+}
+
+// TestLiteForgePrompt_TimelineFrozenOpen_RendersBothSections 验证 P0-B3 改动:
+// LiteForge 模板支持 TimelineFrozenBlock + TimelineOpen 两段独立渲染, frozen 段
+// 进 <|AI_CACHE_FROZEN_semi-dynamic|> 块, open 段进 <|PROMPT_SECTION_timeline-open|> 块。
+//
+// 跨调用稳定性: 仅 TimelineOpen 内容变化时, frozen 段输出必须 byte-stable。
+//
+// 关键词: aicache, LiteForge timeline 拆分, AI_CACHE_FROZEN_semi-dynamic,
+//
+//	PROMPT_SECTION_timeline-open, P0-B3
+func TestLiteForgePrompt_TimelineFrozenOpen_RendersBothSections(t *testing.T) {
+	nonceA := strings.ToLower(utils.RandStringBytes(6))
+	nonceB := strings.ToLower(utils.RandStringBytes(6))
+
+	frozen := "<|TIMELINE_frozen-1|>reducer summary L1<|TIMELINE_END_frozen-1|>"
+	openA := "<|TIMELINE_open-1|>tool result A<|TIMELINE_END_open-1|>"
+	openB := "<|TIMELINE_open-2|>tool result B (different)<|TIMELINE_END_open-2|>"
+
+	renderA, err := renderLiteForgePrompt(liteForgePromptParams{
+		Nonce:               nonceA,
+		Prompt:              "p1",
+		StaticInstruction:   "instr",
+		Schema:              `{"type":"object"}`,
+		Params:              "x",
+		TimelineFrozenBlock: frozen,
+		TimelineOpen:        openA,
+	})
+	require.NoError(t, err)
+	renderB, err := renderLiteForgePrompt(liteForgePromptParams{
+		Nonce:               nonceB,
+		Prompt:              "p2",
+		StaticInstruction:   "instr",
+		Schema:              `{"type":"object"}`,
+		Params:              "y",
+		TimelineFrozenBlock: frozen,
+		TimelineOpen:        openB,
+	})
+	require.NoError(t, err)
+
+	require.Contains(t, renderA, "<|AI_CACHE_FROZEN_semi-dynamic|>",
+		"timeline frozen wrap tag must appear when TimelineFrozenBlock is non-empty")
+	require.Contains(t, renderA, "<|AI_CACHE_FROZEN_END_semi-dynamic|>")
+	require.Contains(t, renderA, "<|PROMPT_SECTION_timeline-open|>",
+		"timeline-open section tag must appear when TimelineOpen is non-empty")
+	require.Contains(t, renderA, "<|PROMPT_SECTION_END_timeline-open|>")
+	require.NotContains(t, renderA, "<|PROMPT_SECTION_timeline|>",
+		"legacy single-timeline tag must NOT appear when frozen+open path is used")
+
+	splitA := aicache.Split(renderA)
+	splitB := aicache.Split(renderB)
+	require.NotNil(t, splitA)
+	require.NotNil(t, splitB)
+
+	tlOpenA := pickSection(t, splitA, aicache.SectionTimelineOpen)
+	tlOpenB := pickSection(t, splitB, aicache.SectionTimelineOpen)
+	require.Contains(t, tlOpenA.Content, "tool result A")
+	require.Contains(t, tlOpenB.Content, "tool result B (different)")
+	require.NotEqual(t, tlOpenA.Hash, tlOpenB.Hash,
+		"timeline-open hash should differ when open content differs")
+
+	// frozen 段被 splitter 归类到 semi-dynamic / timeline 等 cacheable 前缀段中:
+	// 跨调用 frozen 内容相同时, 至少有一个 cacheable section chunk 的 hash 字节稳定。
+	stableSectionFound := false
+	for _, secName := range []string{aicache.SectionSemiDynamic, aicache.SectionTimeline} {
+		var hashesA, hashesB []string
+		for _, c := range splitA.Chunks {
+			if c.Section == secName {
+				hashesA = append(hashesA, c.Hash)
+			}
+		}
+		for _, c := range splitB.Chunks {
+			if c.Section == secName {
+				hashesB = append(hashesB, c.Hash)
+			}
+		}
+		if len(hashesA) > 0 && len(hashesA) == len(hashesB) {
+			same := true
+			for i := range hashesA {
+				if hashesA[i] != hashesB[i] {
+					same = false
+					break
+				}
+			}
+			if same {
+				stableSectionFound = true
+				break
+			}
+		}
+	}
+	require.True(t, stableSectionFound,
+		"at least one cacheable section (semi-dynamic / timeline) must be byte-stable when only TimelineOpen differs")
+}
+
+// TestLiteForgePrompt_TimelineLegacyDumpFallback 验证当只填 TimelineDump (兼容字段)
+// 时仍走老 PROMPT_SECTION_timeline 路径, 与历史调用方保持兼容。
+//
+// 关键词: aicache, LiteForge legacy timeline, TimelineDump 兼容, P0-B3
+func TestLiteForgePrompt_TimelineLegacyDumpFallback(t *testing.T) {
+	nonce := strings.ToLower(utils.RandStringBytes(6))
+	rendered, err := renderLiteForgePrompt(liteForgePromptParams{
+		Nonce:        nonce,
+		Prompt:       "p",
+		Schema:       `{"type":"object"}`,
+		Params:       "x",
+		TimelineDump: "legacy timeline dump body",
+	})
+	require.NoError(t, err)
+
+	require.Contains(t, rendered, "<|PROMPT_SECTION_timeline|>",
+		"legacy TimelineDump fallback must render PROMPT_SECTION_timeline tag")
+	require.Contains(t, rendered, "legacy timeline dump body")
+	require.NotContains(t, rendered, "<|AI_CACHE_FROZEN_semi-dynamic|>",
+		"frozen wrap must not appear when TimelineFrozenBlock is empty")
+	require.NotContains(t, rendered, "<|PROMPT_SECTION_timeline-open|>",
+		"timeline-open section must not appear when TimelineOpen is empty")
 }
 
 func pickSection(t *testing.T, split *aicache.PromptSplit, section string) *aicache.Chunk {

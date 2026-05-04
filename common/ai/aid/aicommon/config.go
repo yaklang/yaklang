@@ -765,6 +765,14 @@ func WithInheritTieredAICallback(parentConfig *Config, force bool) ConfigOption 
 			c.m.Unlock()
 		}
 
+		// 子 Config 继承父 Config 注册的 user UsageCallback, 否则子 coordinator
+		// 通过 OriginalAICallback path 调用 raw chat 时, extractUserUsageCallbackOpts
+		// 会从子 Config 取不到 callback, ai.usageCallback(...) 不会被触发.
+		// 关键词: WithInheritTieredAICallback, userUsageCallback 继承, ai.usageCallback 透传
+		if cb := parentConfig.GetUserUsageCallback(); cb != nil {
+			c.SetUserUsageCallback(cb)
+		}
+
 		return nil
 	}
 }

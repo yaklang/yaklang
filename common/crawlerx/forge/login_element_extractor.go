@@ -76,9 +76,11 @@ func NewLoginElementExtractor() (*LoginElementExtractor, error) {
   "additionalProperties": false
 }`
 
-	// 创建 LiteForge 实例
+	// P0-B4: prompt 是 100% 静态指令 (角色 + 任务 + 输出规则), 真正的动态内容
+	// (html_content) 通过 params 传入. 上移到 StaticInstruction 以让 semi-dynamic
+	// 段在跨调用时 byte-stable.
 	lf, err := aiforge.NewLiteForge("LoginElementExtractor",
-		aiforge.WithLiteForge_Prompt(getLoginExtractionPrompt()),
+		aiforge.WithLiteForge_StaticInstruction(getLoginExtractionPrompt()),
 		aiforge.WithLiteForge_OutputSchemaRaw("extract_login_elements", outputSchema),
 	)
 	if err != nil {

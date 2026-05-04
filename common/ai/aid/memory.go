@@ -186,6 +186,24 @@ func (m *PromptContextProvider) TimelineDump() string {
 	return ""
 }
 
+// TimelineDumpFrozenOpen 把 timeline 拆成 frozen / open 两半返回,
+// 提供给 LiteForge 等 5 段稳定性分层模板把 frozen 段塞进
+// <|AI_CACHE_FROZEN_semi-dynamic|> 块, open 段塞进
+// <|PROMPT_SECTION_timeline-open|> 块。
+//
+// timeline 为空 / 全 open / 全 frozen 等退化场景由 Timeline.DumpFrozenOpen
+// 内部处理, 调用方仅需根据返回值是否为空来决定是否渲染对应 PROMPT_SECTION 块。
+//
+// 关键词: PromptContextProvider.TimelineDumpFrozenOpen, 5 段稳定性分层,
+//
+//	LiteForge timeline 拆分, frozen open
+func (m *PromptContextProvider) TimelineDumpFrozenOpen() (frozen string, open string) {
+	if m == nil || m.timeline == nil {
+		return "", ""
+	}
+	return m.timeline.DumpFrozenOpen()
+}
+
 // set tools list
 func (m *PromptContextProvider) StoreToolsKeywords(keywords func() []string) {
 	m.toolsKeywordsCallback = keywords
@@ -392,9 +410,25 @@ func (m *PromptContextProvider) SharedEvidenceContext() string {
 	return string(runes[:maxEvidenceRunes]) + "\n\n..."
 }
 
+// PersistentMemory 渲染"持久记忆"段, 进 LiteForge / aireact 模板的 semi-dynamic
+// 区。时间字段使用分钟粒度 (2006-01-02 15:04), 避免 time.Now().String() 自带的
+// 纳秒精度导致每次调用都不同, 进而把 semi-dynamic 段的 byte hash 打散 (B2 修复
+// 对应的 91 distinct hash 主因)。
+//
+// 设计取舍:
+//   - 单台机器多次 LiteForge / Forge 调用通常间隔毫秒到秒级, 分钟粒度足够标识
+//     "现在的大致时刻", LLM 不需要纳秒
+//   - 真正需要细粒度时间的调用方应该把时间戳放进 dynamic 段单独维护
+//     (例如 <current_time>...</current_time>), 而不是污染 semi-dynamic
+//   - prefix cache TTL 通常 ~10 min 量级, 分钟粒度让同一会话内绝大多数调用
+//     PersistentMemory 字节稳定, 配合 B1 让整个 semi-dynamic 段稳定下来
+//
+// 关键词: PromptContextProvider.PersistentMemory, 分钟粒度时间戳, semi-dynamic
+//
+//	byte 稳定, aicache 91 hash 修复
 func (m *PromptContextProvider) PersistentMemory() string {
 	var buf bytes.Buffer
-	buf.WriteString("# Now " + time.Now().String() + "\n")
+	buf.WriteString("# Now " + time.Now().Format("2006-01-02 15:04") + "\n")
 	buf.WriteString("<persistent_memory>\n")
 	m.PersistentData.ForEach(func(i string, v *PersistentDataRecord) bool {
 		if v.Variable {

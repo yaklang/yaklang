@@ -84,6 +84,12 @@ func AIChatToAICallbackType(cb func(prompt string, opts ...aispec.AIConfigOption
 					optList = append(optList, aispec.WithImageRaw(data.Data))
 				}
 			}
+			// 从 caller config 读取 user 注册的 UsageCallback,
+			// 把 ai.usageCallback(...) 透传到 OriginalAICallback / WithAICallback /
+			// WithFastAICallback 路径, 让 raw ai.Chat 末帧 token usage (含 cached_tokens)
+			// 也能触达用户脚本.
+			// 关键词: AIChatToAICallbackType, OriginalAICallback usage 透传, ai.usageCallback
+			optList = append(optList, extractUserUsageCallbackOpts(aicf)...)
 			output, err := cb(
 				req.GetPrompt(),
 				optList...,

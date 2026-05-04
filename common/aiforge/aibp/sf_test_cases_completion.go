@@ -13,7 +13,8 @@ var sf_test_cases_completion_prompt string
 
 func init() {
 	err := aiforge.RegisterLiteForge("sf_test_cases_completion",
-		aiforge.WithLiteForge_Prompt(sf_test_cases_completion_prompt),
+		// P0-B4: 嵌入式 prompt 是 100% 静态指令, 上移到 StaticInstruction
+		aiforge.WithLiteForge_StaticInstruction(sf_test_cases_completion_prompt),
 		aiforge.WithLiteForge_OutputSchema(
 			aitool.WithStructArrayParam("positive_test_cases", []aitool.PropertyOption{
 				aitool.WithParam_Description("正向测试用例列表"),

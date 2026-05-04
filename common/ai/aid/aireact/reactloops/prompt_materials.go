@@ -75,6 +75,16 @@ type PromptPrefixMaterials struct {
 	OSArch           string
 	WorkingDir       string
 	WorkingDirGlance string
+
+	// P1-C2: SessionEvidence (SESSION_ARTIFACTS) 与 UserHistory (PREV_USER_INPUT)
+	// 是会话内"渐增列表", 历史进 dynamic 段会被 nonce 打散, 现已上移到
+	// timeline-open 段 — 让最末几条变化时只刷新 timeline-open 段, 历史前缀仍可通
+	// 过 frozen 边界跨调用命中。
+	//
+	// 关键词: PromptPrefixMaterials, SessionEvidence/UserHistory 上移 timeline-open,
+	//        SESSION_ARTIFACTS frozen, PREV_USER_INPUT frozen, P1-C2
+	SessionEvidence string
+	UserHistory     string
 }
 
 func (m *PromptPrefixMaterials) HighStaticData() map[string]any {
@@ -125,9 +135,12 @@ func (m *PromptPrefixMaterials) FrozenBlockData() map[string]any {
 }
 
 // TimelineOpenData 供 timeline_open_section.txt 模板消费, 包含 Timeline 末桶 +
-// Current Time + Workspace。midterm 内容 (若有) 已并入 TimelineOpen。
+// Current Time + Workspace + (P1-C2: SessionEvidence / UserHistory 上移)。midterm
+// 内容 (若有) 已并入 TimelineOpen。
 //
-// 关键词: TimelineOpenData, Timeline 末桶, Current Time, Workspace
+// 关键词: TimelineOpenData, Timeline 末桶, Current Time, Workspace,
+//
+//	SessionEvidence, UserHistory, P1-C2
 func (m *PromptPrefixMaterials) TimelineOpenData() map[string]any {
 	if m == nil {
 		return map[string]any{}
@@ -139,6 +152,8 @@ func (m *PromptPrefixMaterials) TimelineOpenData() map[string]any {
 		"OSArch":           m.OSArch,
 		"WorkingDir":       m.WorkingDir,
 		"WorkingDirGlance": m.WorkingDirGlance,
+		"SessionEvidence":  m.SessionEvidence,
+		"UserHistory":      m.UserHistory,
 	}
 }
 

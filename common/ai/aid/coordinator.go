@@ -154,7 +154,16 @@ func (c *Coordinator) enableTaskAnalyze() {
 				},
 			}
 
-			action, err := ExecuteAIForge(c.Ctx, "task-analyst", param, aicommon.WithFastAICallback(c.OriginalAICallback))
+			// 关键词: enableTaskAnalyze, ai.usageCallback 透传, WithUserUsageCallback
+			// task-analyst 子 coordinator 走 WithFastAICallback path, 需把父 Coordinator
+			// 注册的 user UsageCallback 一并继承, 否则 token usage 不会触达 ai.usageCallback.
+			analystOpts := []aicommon.ConfigOption{
+				aicommon.WithFastAICallback(c.OriginalAICallback),
+			}
+			if userUsageCb := c.Config.GetUserUsageCallback(); userUsageCb != nil {
+				analystOpts = append(analystOpts, aicommon.WithUserUsageCallback(userUsageCb))
+			}
+			action, err := ExecuteAIForge(c.Ctx, "task-analyst", param, analystOpts...)
 			if err != nil {
 				return
 			}

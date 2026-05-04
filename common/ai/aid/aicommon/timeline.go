@@ -649,6 +649,34 @@ func (m *Timeline) String() string {
 	return m.Dump()
 }
 
+// DumpFrozenOpen 把 timeline 拆成 frozen 前缀 + open 尾段两段独立返回,
+// 不带任何 frozen 边界标签外壳。调用方 (例如 LiteForge / aireact 模板)
+// 自行决定如何拼接, 通常 frozen 段进 <|AI_CACHE_FROZEN_semi-dynamic|>
+// 块, open 段进 <|PROMPT_SECTION_timeline-open|> 块, 实现 5 段稳定性
+// 分层与 hijacker 双 cc 切片的精确边界。
+//
+// 等价于:
+//
+//	rb := m.GroupByMinutes(TimelineDumpDefaultIntervalMinutes).GetAllRenderable()
+//	frozen = rb.RenderFrozenOnly(TimelineDumpDefaultAITagName)
+//	open   = rb.RenderOpenOnly(TimelineDumpDefaultAITagName)
+//
+// 字节稳定性: frozen 段只受 frozen blocks (reducer + 非末 interval) 影响,
+// open 段独立。两段拼接的字面量与 Dump() 在带 frozen 边界场景下完全等价
+// (除掉 <|AI_CACHE_FROZEN_*|> wrap)。
+//
+// 关键词: Timeline.DumpFrozenOpen, frozen open 拆分, 5 段稳定性分层,
+//
+//	LiteForge timeline 拆分, hijacker 双 cc 切片
+func (m *Timeline) DumpFrozenOpen() (frozen string, open string) {
+	if m == nil {
+		return "", ""
+	}
+	rb := m.GroupByMinutes(TimelineDumpDefaultIntervalMinutes).GetAllRenderable()
+	return rb.RenderFrozenOnly(TimelineDumpDefaultAITagName),
+		rb.RenderOpenOnly(TimelineDumpDefaultAITagName)
+}
+
 // DumpBefore 输出 ID <= beforeId 的部分 timeline，结构与 Dump 一致
 // 通过 CreateSubTimeline 限定上界，再走 Dump 公共路径，避免修改 GroupByMinutes 签名
 // 关键词: Timeline.DumpBefore, 子 timeline 上界, GroupByMinutes 复用, reducer 继承

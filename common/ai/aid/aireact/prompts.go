@@ -163,12 +163,21 @@ type ToolParamsPromptData struct {
 }
 
 // VerificationPromptData contains data for verification prompt
+//
+// 关键词: VerificationPromptData, aicache 4 段切分, TimelineFrozen, TimelineOpen
+//
+// Timeline 字段保留以保证向后兼容; 模板内部已切换到使用 TimelineFrozen +
+// TimelineOpen 两个字段, 让 verification prompt 也按 5 段稳定性分层 (high-static
+// / semi-dynamic / frozen-block / timeline-open / dynamic) 走 aicache splitter,
+// 与 React 主 loop 的 buildTaggedPromptSections 输出对齐。
 type VerificationPromptData struct {
 	Nonce          string
 	OriginalQuery  string
 	IsToolCall     bool
 	Payload        string
-	Timeline       string
+	Timeline       string // 兼容字段: frozen + open 拼接, 老观测路径用
+	TimelineFrozen string // 渐稳定前缀, 进 AI_CACHE_FROZEN 块
+	TimelineOpen   string // 末段 + midterm, 进 PROMPT_SECTION_timeline-open
 	TodoSnapshot   string
 	Language       string
 	Schema         string
@@ -242,7 +251,10 @@ func (pm *PromptManager) GetAvailableAIForgeBlueprints() string {
 
 func (pm *PromptManager) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[string]any, error) {
 	result := make(map[string]any)
-	result["CurrentTime"] = time.Now().Format("2006-01-02 15:04:05")
+	// P1-C1: CurrentTime 改为分钟粒度, 让 base.txt 渲染产物在同一分钟内 byte-stable.
+	// 历史使用 "2006-01-02 15:04:05" 秒级粒度会让 ReActLoop / aimemory 路径下的
+	// .Background 段每秒变化, 直接打散 PROMPT_SECTION_semi-dynamic 段命中率.
+	result["CurrentTime"] = time.Now().Format("2006-01-02 15:04")
 	result["OSArch"] = fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)
 	result["WorkingDir"] = pm.workdir
 	result["WorkingDirGlance"] = pm.GetGlanceWorkdir(pm.workdir)
@@ -430,7 +442,16 @@ func (pm *PromptManager) GenerateToolParamsPromptWithMeta(tool *aitool.Tool) (*T
 	}, nil
 }
 
-// GenerateVerificationPrompt generates verification prompt using template
+// GenerateVerificationPrompt generates verification prompt using template.
+//
+// aicache 命中率优化 (P0-A1):
+//   - 模板已重构为 5 段稳定性分层结构 (high-static / semi-dynamic /
+//     frozen-block / timeline-open / dynamic)
+//   - Timeline 拆成 TimelineFrozen + TimelineOpen 两段, frozen 前缀与
+//     最末 interval 分别落到不同的 PROMPT_SECTION 包装中, 让 splitter
+//     能按 chunk 分别命中缓存
+//
+// 关键词: GenerateVerificationPrompt, aicache 4 段切分, TimelineFrozen, TimelineOpen
 func (pm *PromptManager) GenerateVerificationPrompt(originalQuery string, isToolResult bool, payload string, enhanceData ...string) (string, string, error) {
 	nonce := nonce()
 	data := &VerificationPromptData{
@@ -438,7 +459,6 @@ func (pm *PromptManager) GenerateVerificationPrompt(originalQuery string, isTool
 		OriginalQuery:  originalQuery,
 		IsToolCall:     isToolResult,
 		Payload:        payload,
-		Timeline:       "",
 		TodoSnapshot:   pm.react.RenderVerificationTodoSnapshot(),
 		Language:       pm.react.config.GetLanguage(),
 		Schema:         verificationSchemaJSON,
@@ -451,17 +471,26 @@ func (pm *PromptManager) GenerateVerificationPrompt(originalQuery string, isTool
 		data.MaxIterations = currentLoop.GetMaxIterations()
 	}
 
-	// Get timeline for context (without lock, assume caller handles it)
+	// 同时填充 frozen / open 两段 timeline 以及 legacy Timeline 字段。
+	// 模板内部只读 frozen + open; Timeline 字段保留兼容老调用站点。
+	// 关键词: timeline frozen/open 双段填充, aicache 段稳定哈希
+	timeline := pm.react.config.GetTimeline()
+	data.TimelineFrozen = buildTimelineFrozenForPrompt(timeline)
+	data.TimelineOpen = buildTimelineOpenWithMidtermForPrompt(pm.react, timeline)
 	data.Timeline = pm.timelineDumpForPrompt()
 
 	promptResult, err := pm.executeTemplate("verification", verificationPromptTemplate, data)
 	return promptResult, nonce, err
 }
 
-// GenerateAIReviewPrompt generates AI tool call review prompt using template
+// GenerateAIReviewPrompt generates AI tool call review prompt using template.
+//
+// CurrentTime 用分钟粒度: 让 BACKGROUND 段在分钟内多次调用时字节稳定,
+// 配合 PROMPT_SECTION_semi-dynamic 包装使 prefix cache 能命中。
+// 关键词: aicache 分钟粒度时间戳, semi-dynamic 稳定哈希
 func (pm *PromptManager) GenerateAIReviewPrompt(userQuery, toolOrTitle, params string) (string, error) {
 	data := &AIReviewPromptData{
-		CurrentTime: time.Now().Format("2006-01-02 15:04:05"),
+		CurrentTime: time.Now().Format("2006-01-02 15:04"),
 		OSArch:      fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
 		UserQuery:   userQuery,
 		Title:       toolOrTitle,

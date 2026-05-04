@@ -1,13 +1,4 @@
-{{ .Basic }}
-
-{{ if .HaveDynamicContext }}<|DynamicContext_{{ .Nonce }}|>
-{{ .DynamicContext }}
-<|DynamicContext_END_{{ .Nonce }}|>{{ end }}
-
-<|QUERY_{{ .Nonce }}|>
-{{ .Query }}
-<|QUERY_END_{{ .Nonce }}|>
-
+<|AI_CACHE_SYSTEM_high-static|>
 <|Instruct|>
 You are an AI Memory Triage System. Your task is to analyze user input and generate structured memory entities using the C.O.R.E. P.A.C.T. framework.
 
@@ -89,3 +80,18 @@ You are an AI Memory Triage System. Your task is to analyze user input and gener
   ]
 }
 <|Output_Example_END|>
+<|AI_CACHE_SYSTEM_END_high-static|>
+
+<|PROMPT_SECTION_semi-dynamic|>
+{{ .Basic }}
+<|PROMPT_SECTION_END_semi-dynamic|>
+
+<|PROMPT_SECTION_dynamic_{{ .Nonce }}|>
+{{ if .HaveDynamicContext }}<|DynamicContext_{{ .Nonce }}|>
+{{ .DynamicContext }}
+<|DynamicContext_END_{{ .Nonce }}|>{{ end }}
+
+<|QUERY_{{ .Nonce }}|>
+{{ .Query }}
+<|QUERY_END_{{ .Nonce }}|>
+<|PROMPT_SECTION_dynamic_END_{{ .Nonce }}|>

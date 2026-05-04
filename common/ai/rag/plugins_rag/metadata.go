@@ -17,7 +17,9 @@ var generateMetadataPrompt string
 func GenerateYakScriptMetadata(forgeContent string) (*GenerateResult, error) {
 	var lfopts []aiforge.LiteForgeOption
 	lfopts = append(lfopts,
-		aiforge.WithLiteForge_Prompt(generateMetadataPrompt))
+		// P0-B4: prompt/init.txt 是 100% 静态指令, 用 StaticInstruction 上移到
+		// semi-dynamic 段以让多次调用时 byte-stable.
+		aiforge.WithLiteForge_StaticInstruction(generateMetadataPrompt))
 	lfopts = append(lfopts, aiforge.WithLiteForge_OutputSchema(
 		aitool.WithStringParam("language", aitool.WithParam_Required(true), aitool.WithParam_Description("语言，固定为chinese")),
 		aitool.WithStringParam("description", aitool.WithParam_Required(true), aitool.WithParam_Description("脚本功能描述")),

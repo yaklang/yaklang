@@ -77,7 +77,8 @@ func GenerateForgeMetadata(forgeContent string) (*GenerateMetadataResult, error)
 
 	var lfopts []LiteForgeOption
 	lfopts = append(lfopts,
-		WithLiteForge_Prompt(generateMetadataPrompt))
+		// P0-B4: prompt 是 100% 静态指令, 实际 forgeContent 通过 params 传入
+		WithLiteForge_StaticInstruction(generateMetadataPrompt))
 	lfopts = append(lfopts, WithLiteForge_OutputSchema(
 		aitool.WithStringParam("language", aitool.WithParam_Required(true), aitool.WithParam_Description("语言，固定为chinese")),
 		aitool.WithStringParam("description", aitool.WithParam_Required(true), aitool.WithParam_Description("forge功能描述")),

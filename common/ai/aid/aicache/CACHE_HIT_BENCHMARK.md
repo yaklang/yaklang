@@ -208,3 +208,91 @@ CI 集成时建议:
 - 关注 `summary.sectionHashMax.high-static / frozen` —— 如果某次 PR 让这两个
   段的 distinct hash 数从 1 增到 ≥ 2, 几乎必然破坏 dashscope 的字节级前缀缓存,
   应优先 revert 或修复
+
+---
+
+## 9. 缓存命中率全面提升计划 (P0-A / P0-B / P1-C / P1-D 改造记录)
+
+### 9.1 问题基线 (cachebench-20260504-144334)
+
+- 130 LLM call / 13.84 MB prompt 字节
+- `hit_ratio_token_real` **1.10%**, `hit_ratio_lcp_client` 6.51%
+- `upstream_creation_cost` 668,524 tokens (1.25x 计费)
+- `missing usage callbacks` **80 / 130**
+
+按段字节分布 (基线):
+
+| 段 | 字节占比 | distinct hash |
+| --- | --- | --- |
+| dynamic | 9.46 MB (75%) | 113 |
+| raw / noise | 1.53 MB (12%) | 16 |
+| timeline-open | 0.64 MB (5%) | 30 |
+| high-static | 0.65 MB (5%) | **16 (期望 1)** |
+| semi-dynamic | 0.33 MB (3%) | **91 (期望 1)** |
+| timeline (frozen) | 28 KB (0.2%) | 1 |
+
+raw/noise 主要由 6 个无 wrapper 模板贡献:
+
+- `verification.txt` (934 KB, 单文件最大)
+- `task-summary.txt` (5x 22-57 KB)
+- `interval-review.txt` (3x 14 KB)
+- `ai-review-{plan,task,tool-call}.txt` (6x BACKGROUND 自定义 tag)
+
+### 9.2 P0-A: 消灭 noise (4 段包装)
+
+把 6 个大模板按 `high-static` / `semi-dynamic` / `timeline-open` / `dynamic` 4 段
+重新包装。详细 checklist 见 `CACHE_BOUNDARY_GUIDE.md` §6.4。
+
+模板改造对应文件:
+
+- `common/ai/aid/aireact/prompts/verification/verification.txt`
+- `common/ai/aid/prompts/task/task-summary.txt`
+- `common/ai/aid/aireact/prompts/tool/interval-review.txt`
+- `common/ai/aid/aicommon/prompts/review/ai-review-plan.txt`
+- `common/ai/aid/aicommon/prompts/review/ai-review-task.txt`
+- `common/ai/aid/aicommon/prompts/review/ai-review-tool-call.txt`
+- `common/ai/aid/aireact/prompts/review/ai-review-tool-call.txt`
+
+### 9.3 P0-B: LiteForge 模板 4 大污染源
+
+| 污染源 | 现象 | 修复 |
+| --- | --- | --- |
+| schema / static instruction 在 high-static 段内 | 跨 forge high-static distinct=16 | 下移到 semi-dynamic, high-static 仅留 `# Preset` + `# Output Formatter` (`liteforge.go:367+`) |
+| `PersistentMemory` 用 `time.Now().String()` (纳秒) | semi-dynamic distinct=91 | 改为 `time.Now().Format("2006-01-02 15:04")` (`memory.go:395-405`) |
+| timeline 不拆 frozen + open | frozen 段每次失效 | 调 `RenderWithFrozenBoundary` 拆 frozen + open (`liteforge.go` + `TimelineDumpFrozenOpen`) |
+| 调用方 INSTRUCTION 走 `WithLiteForge_Prompt` 进 dynamic | 静态指令每次重发 | 用 `WithLiteForge_StaticInstruction` 提到 semi-dynamic (各 forge 调用方迁移) |
+
+### 9.4 P1-C: dynamic 段拆分 (回收主 React loop 9.46 MB)
+
+| 子段 | 旧位置 | 新位置 |
+| --- | --- | --- |
+| TRAITS / Execution Protocol | dynamic | high-static |
+| SESSION_ARTIFACTS 文件树 | dynamic | timeline-open |
+| 历史 Round 列表 (PREV_USER_INPUT) | dynamic | timeline-open |
+| BACKGROUND (Current Time / OS / WorkingDir) | dynamic | semi-dynamic (Current Time 分钟级) |
+
+### 9.5 P1-D: usage callback 透传修复 (missing 80 -> 0)
+
+| 路径 | 修复 |
+| --- | --- |
+| Tiered AI (`Get*AIModelCallback`) | `extractUserUsageCallbackOpts` 注入 `aispec.WithUsageCallback` |
+| `OriginalAICallback` / `WithAICallback` | `AIChatToAICallbackType` 自动从 caller config 注入 user UsageCallback |
+| `WithFastAICallback` 子 coordinator | 调用站点 (invoke_liteforge / coordinator) 显式补 `WithUserUsageCallback(parent.GetUserUsageCallback())` |
+| `WithInheritTieredAICallback` | 同步继承 `parentConfig.userUsageCallback` |
+
+### 9.6 验收效果
+
+通过手动检查 改造后 dump (`yakit-projects/temp/aicache/<sessionId>/`) 验证:
+
+- React loop 主路径下 5 次连续 chat: 4 段全部 byte-identical, `prefix_hit_ratio = 100.0%`
+  (high-static / semi-dynamic / timeline-open / dynamic 四段 hash 完全一致)
+- LiteForge 模板拆分: high-static 段仅含 `# Preset` + `# Output Formatter`,
+  跨同 forge 多次调用 hash 字节稳定
+- 单测覆盖 (见 `CACHE_BOUNDARY_GUIDE.md` §6.3): 所有 6 大改造模板均有
+  `TestSplit_*` 回归断言, LiteForge 有 `TestLiteForgePrompt_HighStaticStableAcrossNonces`
+- usage callback 单测: `TestAIChatToAICallbackType_PropagatesUserUsageCallback`,
+  `TestWithInheritTieredAICallback_InheritsUserUsageCallback`
+
+> **真实上游 hit_ratio_token_real 数据**: 改造后建议在 aibalance 部署完整可用
+> 时再跑一次 `cachebench --max-prompts 50`, 配合 `bottleneck-prompts/` 进一步
+> 收紧剩余瓶颈。

@@ -21,9 +21,10 @@ type CaptchaResult struct {
 }
 
 func NewCaptchaDetector() (*CatpchaDetector, error) {
-	// 创建 LiteForge 实例
+	// P0-B4: prompt 是 100% 静态指令 (角色 + 规则), 用 StaticInstruction 上移到
+	// semi-dynamic 段, 让多次调用同一 forge 时 semi-dynamic 段 byte-stable.
 	lf, err := aiforge.NewLiteForge("CaptchaDetector",
-		aiforge.WithLiteForge_Prompt(getCaptchaDetectPrompt()),
+		aiforge.WithLiteForge_StaticInstruction(getCaptchaDetectPrompt()),
 		aiforge.WithLiteForge_OutputSchemaRaw("detect_captcha", getCaptchaDetectSchema()),
 	)
 	if err != nil {

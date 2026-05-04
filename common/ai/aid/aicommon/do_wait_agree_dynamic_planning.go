@@ -57,8 +57,11 @@ type TaskReviewPromptData struct {
 }
 
 func generatePlanReviewPrompt(config *Config, materials aitool.InvokeParams) (string, error) {
+	// CurrentTime 用分钟粒度: 让 BACKGROUND 段在分钟内多次调用时字节稳定,
+	// 配合 PROMPT_SECTION_semi-dynamic 包装使 prefix cache 能命中。
+	// 关键词: aicache 分钟粒度时间戳, semi-dynamic 稳定哈希
 	data := &PlanReviewPromptData{
-		CurrentTime: time.Now().Format("2006-01-02 15:04:05"),
+		CurrentTime: time.Now().Format("2006-01-02 15:04"),
 		OSArch:      fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
 		Nonce:       utils.RandStringBytes(4),
 		Language:    config.Language,
@@ -102,8 +105,11 @@ func generatePlanReviewPrompt(config *Config, materials aitool.InvokeParams) (st
 }
 
 func generateTaskReviewPrompt(config *Config, materials aitool.InvokeParams) (string, error) {
+	// CurrentTime 用分钟粒度: 让 BACKGROUND 段在分钟内多次调用时字节稳定,
+	// 配合 PROMPT_SECTION_semi-dynamic 包装使 prefix cache 能命中。
+	// 关键词: aicache 分钟粒度时间戳, semi-dynamic 稳定哈希
 	data := &TaskReviewPromptData{
-		CurrentTime: time.Now().Format("2006-01-02 15:04:05"),
+		CurrentTime: time.Now().Format("2006-01-02 15:04"),
 		OSArch:      fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
 		Nonce:       utils.RandStringBytes(4),
 		Language:    config.Language,

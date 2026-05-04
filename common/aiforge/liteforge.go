@@ -188,6 +188,22 @@ func WithExtendLiteForge_AIOption(opts ...aicommon.ConfigOption) LiteForgeOption
 	}
 }
 
+// WithLiteForge_Prompt 设置 LiteForge 的"上下文/动态" prompt 文本。
+//
+// 渲染后该字段被包在 <|PROMPT_SECTION_dynamic_<nonce>|>...<|PROMPT_SECTION_dynamic_END_<nonce>|>
+// 内的 <context_<nonce>>...</context_<nonce>> 子标签里, 即 dynamic 段。dynamic
+// 段每次请求都包含 nonce 因此 byte-hash 必定不同, 没有跨调用 prefix cache 命中
+// 价值, **不要把任何静态指令** (例如 INSTRUCTION / CRITICAL RULES / Selection
+// rules) 塞进这里。
+//
+// 调用约定 (P0-B4):
+//   - 真正动态的内容 (USER_QUERY / PARENT_TASK / CURRENT_TASK / 当次具体输入) ->
+//     WithLiteForge_Prompt
+//   - 跨调用稳定的指令文本 (规则 / Schema / 角色定义) ->
+//     WithLiteForge_StaticInstruction (进 semi-dynamic 段) 或写到调用方传给
+//     NewLiteForge 的 schema 里
+//
+// 关键词: WithLiteForge_Prompt, dynamic 段, 调用方约定
 func WithLiteForge_Prompt(i string) LiteForgeOption {
 	return func(forge *LiteForge) error {
 		forge.Prompt = i
@@ -195,14 +211,38 @@ func WithLiteForge_Prompt(i string) LiteForgeOption {
 	}
 }
 
-// WithLiteForge_StaticInstruction 设置 LiteForge 的系统侧静态指令
-// 该指令进入 high-static 段，跨调用稳定哈希
-// 关键词: aicache, PROMPT_SECTION, StaticInstruction, WithLiteForge_StaticInstruction
+// WithLiteForge_StaticInstruction 设置 LiteForge 的系统侧"静态指令"。
+//
+// 渲染后该字段进入 <|PROMPT_SECTION_semi-dynamic|> 段 (P0-B1: 历史上曾在
+// high-static 段, 但因 schema / instruction 通常按 forge 维度变化, 留在
+// high-static 会让该段跨 forge 永远 miss; 下移后高频调用同一 forge 时
+// semi-dynamic 段 byte 稳定可命中前缀缓存)。
+//
+// 跨同一 forge 多次调用时该字段必须保持 byte 一致 (相同 schema / 相同规则),
+// 才能让 semi-dynamic 段 hash 稳定。任何动态拼接 (例如附加用户 query / 当次
+// 任务 ID) 必须改用 WithLiteForge_Prompt。
+//
+// 关键词: aicache, PROMPT_SECTION_semi-dynamic, StaticInstruction,
+//
+//	WithLiteForge_StaticInstruction
 func WithLiteForge_StaticInstruction(i string) LiteForgeOption {
 	return func(forge *LiteForge) error {
 		forge.StaticInstruction = i
 		return nil
 	}
+}
+
+// WithLiteForge_DynamicInstruction 是 WithLiteForge_Prompt 的语义别名,
+// 显式表达"该 instruction 是 dynamic 段, 进 dynamic 而非 semi-dynamic"。
+// 调用方在重构时 (P0-B4) 把 prompt 字符串拆成静态 + 动态两部分时,
+// 推荐用 WithLiteForge_StaticInstruction + WithLiteForge_DynamicInstruction
+// 这一对来代替单一 WithLiteForge_Prompt, 让调用点读起来更清晰。
+//
+// 关键词: WithLiteForge_DynamicInstruction, dynamic 段语义别名,
+//
+//	WithLiteForge_Prompt 同义
+func WithLiteForge_DynamicInstruction(i string) LiteForgeOption {
+	return WithLiteForge_Prompt(i)
 }
 
 func NewLiteForge(i string, opts ...LiteForgeOption) (*LiteForge, error) {
@@ -254,14 +294,16 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 	}
 	call := callBuffer.String()
 
+	timelineFrozen, timelineOpen := cod.ContextProvider.TimelineDumpFrozenOpen()
 	rendered, err := renderLiteForgePrompt(liteForgePromptParams{
-		Nonce:             nonce,
-		Prompt:            string(l.Prompt),
-		StaticInstruction: string(l.StaticInstruction),
-		Params:            call,
-		Schema:            string(l.OutputSchema),
-		PersistentMemory:  cod.ContextProvider.PersistentMemory(),
-		TimelineDump:      cod.ContextProvider.TimelineDump(),
+		Nonce:               nonce,
+		Prompt:              string(l.Prompt),
+		StaticInstruction:   string(l.StaticInstruction),
+		Params:              call,
+		Schema:              string(l.OutputSchema),
+		PersistentMemory:    cod.ContextProvider.PersistentMemory(),
+		TimelineFrozenBlock: timelineFrozen,
+		TimelineOpen:        timelineOpen,
 	})
 	if err != nil {
 		return nil, err
@@ -339,31 +381,48 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 	return result, nil
 }
 
-// liteForgePromptParams 是 LiteForge prompt 渲染时传入模板的字段集合
-// 关键词: aicache, PROMPT_SECTION, LiteForge 模板, liteForgePromptParams
+// liteForgePromptParams 是 LiteForge prompt 渲染时传入模板的字段集合。
+//
+// aicache 5 段稳定性分层 (P0-B1 / P0-B3) 必填字段:
+//   - TimelineFrozenBlock: timeline 的 reducer + 非末 interval (frozen 前缀, 字节稳定)
+//   - TimelineOpen: timeline 的最末 interval + midterm (易变尾段)
+//   - TimelineDump: 兼容字段, 仅当 TimelineFrozenBlock + TimelineOpen 全为空
+//     时回退到 legacy 渲染路径
+//
+// 关键词: aicache, PROMPT_SECTION, LiteForge 模板, liteForgePromptParams,
+//
+//	TimelineFrozenBlock, TimelineOpen
 type liteForgePromptParams struct {
-	Nonce             string
-	Prompt            string
-	StaticInstruction string
-	Params            string
-	Schema            string
-	PersistentMemory  string
-	TimelineDump      string
+	Nonce               string
+	Prompt              string
+	StaticInstruction   string
+	Params              string
+	Schema              string
+	PersistentMemory    string
+	TimelineDump        string // legacy 兼容字段
+	TimelineFrozenBlock string // frozen 前缀, 进 AI_CACHE_FROZEN 块
+	TimelineOpen        string // 易变尾段, 进 PROMPT_SECTION_timeline-open
 }
 
-// liteForgePromptTemplate 是 LiteForge 的 prompt 模板，按 aicache 4 段 PROMPT_SECTION 框架包装：
-//   - high-static 段：# Preset / # Output Formatter / # SCHEMA / # Instruction（系统侧静态指令，跨调用稳定）
-//   - semi-dynamic 段：# 牢记（PersistentMemory，半动态）
-//   - timeline 段：<timeline_NONCE>...</timeline_NONCE>（每次变化）
+// liteForgePromptTemplate 是 LiteForge 的 prompt 模板，按 aicache 5 段稳定性
+// 分层框架包装：
+//   - high-static 段：# Preset / # Output Formatter（仅放真正系统级、跨 forge 字节稳定的内容）
+//   - semi-dynamic 段：# SCHEMA / # Instruction / # 牢记 (PersistentMemory)
+//     这三个字段都是"按 forge 维度稳定但跨 forge 不同"，不放高静态段，避免污染
+//     不同 forge 调用之间的 high-static hash
+//   - frozen-block 段：TimelineFrozenBlock (RenderWithFrozenBoundary 的 frozen 前缀)
+//   - timeline-open 段：TimelineOpen (RenderWithFrozenBoundary 的 open 尾段)
 //   - dynamic 段：<context_NONCE>...</context_NONCE>（调用方动态上下文）+ <params_NONCE>...</params_NONCE>（用户参数）；
 //     外层 PROMPT_SECTION_dynamic_NONCE 屏蔽 prompt-injection
 //
-// high-static 段内 <schema>/<instruction> 不带 nonce，确保同 forge 跨调用的 hash 真正稳定
-// Prompt 字段从 high-static 段挪到 dynamic 段，调用方传入的"动态内容"不再污染 high-static 段的 hash
-// high-static 段使用 AI_CACHE_SYSTEM 标签：与 aireact 的 wrapPromptMessageSection 对齐，
-// 让 aicache splitter / hijacker 与上游隐式缓存的 system 边界保持一致；
-// 其他段仍沿用 PROMPT_SECTION 标签
-// 关键词: aicache, AI_CACHE_SYSTEM, PROMPT_SECTION, LiteForge 模板, liteForgePromptTemplate
+// 之前的实现把 .Schema 与 .StaticInstruction 放进 high-static 段, 导致每个 forge
+// 都创建一份新的 high-static hash (cachebench 实测 16 个不同 hash, 应当为 1)，
+// P0-B1 把它们下移到 semi-dynamic, 让真正系统级的 # Preset / # Output Formatter
+// 段 hash 在所有 forge / 跨调用中保持完全一致。
+//
+// 关键词: aicache, P0-B1, AI_CACHE_SYSTEM, PROMPT_SECTION, LiteForge 模板,
+//
+//	liteForgePromptTemplate, schema 下移 semi-dynamic, instruction 下移
 const liteForgePromptTemplate = `<|AI_CACHE_SYSTEM_high-static|>
 # Preset
 你现在在一个任务引擎中，是一个输出JSON的数据处理和总结提示小助手，我会为你提供一些基本信息和输入材料，你需要按照我的Schema生成一个JSON数据直接返回。
@@ -378,25 +437,33 @@ const liteForgePromptTemplate = `<|AI_CACHE_SYSTEM_high-static|>
 3. 如果某个字段是可选的，你可以选择不返回该字段，但如果返回了该字段，必须符合 SCHEMA 的要求。
 4. 不要添加任何多余的解释或文本，只返回符合 SCHEMA 的 JSON 数据。
 5. 不要输出压缩成一行的 JSON，请保持良好的可读性和缩进。
-{{ if .Schema }}
-# SCHEMA
+<|AI_CACHE_SYSTEM_END_high-static|>
+
+<|PROMPT_SECTION_semi-dynamic|>
+{{ if .Schema }}# SCHEMA
 
 <schema>
 {{ .Schema }}
 </schema>
-{{ end }}{{ if .StaticInstruction }}
-# Instruction
+{{ end }}{{ if .StaticInstruction }}# Instruction
 
 <instruction>
 {{ .StaticInstruction }}
 </instruction>
-{{ end }}<|AI_CACHE_SYSTEM_END_high-static|>
-
-<|PROMPT_SECTION_semi-dynamic|>
-{{ if .PersistentMemory }}# 牢记
+{{ end }}{{ if .PersistentMemory }}# 牢记
 {{ .PersistentMemory }}{{ end }}
 <|PROMPT_SECTION_END_semi-dynamic|>
-{{ if .TimelineDump }}
+{{ if .TimelineFrozenBlock }}
+<|AI_CACHE_FROZEN_semi-dynamic|>
+{{ .TimelineFrozenBlock }}
+<|AI_CACHE_FROZEN_END_semi-dynamic|>
+{{ end }}{{ if .TimelineOpen }}
+<|PROMPT_SECTION_timeline-open|>
+<timeline_{{ .Nonce }}>
+{{ .TimelineOpen }}
+</timeline_{{ .Nonce }}>
+<|PROMPT_SECTION_END_timeline-open|>
+{{ end }}{{ if and (not .TimelineFrozenBlock) (not .TimelineOpen) .TimelineDump }}
 <|PROMPT_SECTION_timeline|>
 <timeline_{{ .Nonce }}>
 {{ .TimelineDump }}
