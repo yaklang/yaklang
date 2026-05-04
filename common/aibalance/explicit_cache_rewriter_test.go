@@ -323,147 +323,346 @@ func jsonEq(t *testing.T, a, b any) bool {
 }
 
 // ---------------------------------------------------------------------------
-// 双 cc 注入测试 (§7.7 配套: aicache hijacker 3 段拆分时给 user1 也打 cc)
+// 客户端自带 cc 退让测试 (§7.7.7 职责重排: aibalance 默认只给最末 system 单 cc;
+// 客户端任何位置自带 cc 时整体 pass-through, 由客户端自管缓存策略)
 // ---------------------------------------------------------------------------
 
-// TestRewriteMessages_DualCC_SystemUserUser 验证 [system, user1, user2] 形态下
-// system + user1 都被注入 cc, user2 不被注入。这正是 aicache hijacker
-// 3 段拆分后送到这里的标准形态。
-// 关键词: 双 cc 注入, system + user1, §7.7
-func TestRewriteMessages_DualCC_SystemUserUser(t *testing.T) {
+// TestRewriteMessages_RespectClientCC_OnSystem 客户端 system 已自带 cc,
+// aibalance 必须完全退让, 一字不动 (返回原切片)。
+// 关键词: 客户端自带 cc, 整体 pass-through, system 自带
+func TestRewriteMessages_RespectClientCC_OnSystem(t *testing.T) {
 	in := []aispec.ChatDetail{
-		{Role: "system", Content: "system-prefix"},
-		{Role: "user", Content: "frozen-user-1"},
-		{Role: "user", Content: "open-user-2"},
-	}
-	out := RewriteMessagesForExplicitCache(in, "tongyi", "qwen3.6-plus")
-	if len(out) != 3 {
-		t.Fatalf("len mismatch: got %d want 3", len(out))
-	}
-
-	sysContents, ok := out[0].Content.([]*aispec.ChatContent)
-	if !ok {
-		t.Fatalf("system content type mismatch: %T", out[0].Content)
-	}
-	if cc, ok := sysContents[0].CacheControl.(map[string]any); !ok || cc["type"] != "ephemeral" {
-		t.Fatalf("system cache_control mismatch: %+v", sysContents[0].CacheControl)
-	}
-
-	user1Contents, ok := out[1].Content.([]*aispec.ChatContent)
-	if !ok {
-		t.Fatalf("user1 content should be rewritten to []*ChatContent, got %T", out[1].Content)
-	}
-	if cc, ok := user1Contents[0].CacheControl.(map[string]any); !ok || cc["type"] != "ephemeral" {
-		t.Fatalf("user1 cache_control mismatch: %+v", user1Contents[0].CacheControl)
-	}
-
-	if s, ok := out[2].Content.(string); !ok || s != "open-user-2" {
-		t.Fatalf("user2 (last) must NOT be rewritten, got %T %v", out[2].Content, out[2].Content)
-	}
-}
-
-// TestRewriteMessages_DualCC_SerializeBothInJSON 验证最终 JSON 中
-// system + user1 都序列化出 cache_control 字段。
-// 关键词: 双 cc 注入, JSON 字节断言
-func TestRewriteMessages_DualCC_SerializeBothInJSON(t *testing.T) {
-	in := []aispec.ChatDetail{
-		{Role: "system", Content: "S"},
+		{Role: "system", Content: []*aispec.ChatContent{
+			{Type: "text", Text: "client-cc-system", CacheControl: map[string]any{"type": "ephemeral"}},
+		}},
 		{Role: "user", Content: "U1"},
-		{Role: "user", Content: "U2"},
-	}
-	out := RewriteMessagesForExplicitCache(in, "tongyi", "qwen3.6-plus")
-	js, err := json.Marshal(out)
-	if err != nil {
-		t.Fatalf("marshal failed: %v", err)
-	}
-	count := strings.Count(string(js), `"cache_control":{"type":"ephemeral"}`)
-	if count != 2 {
-		t.Fatalf("expected 2 cache_control occurrences in JSON, got %d, body=%s", count, js)
-	}
-}
-
-// TestRewriteMessages_DualCC_SingleUserOnlySystemCC 单 user 场景 (旧形态),
-// 只注入 system cc, 不强行给唯一的 user 注入 (与现有 TestRewriteMessages_StringContent
-// 行为完全一致, 这里再加显式断言避免回归)。
-// 关键词: 双 cc 注入, 单 user 退化为单 cc
-func TestRewriteMessages_DualCC_SingleUserOnlySystemCC(t *testing.T) {
-	in := []aispec.ChatDetail{
-		{Role: "system", Content: "S"},
-		{Role: "user", Content: "U-only"},
-	}
-	out := RewriteMessagesForExplicitCache(in, "tongyi", "qwen3.6-plus")
-	if _, ok := out[0].Content.([]*aispec.ChatContent); !ok {
-		t.Fatalf("system should be rewritten, got %T", out[0].Content)
-	}
-	if s, ok := out[1].Content.(string); !ok || s != "U-only" {
-		t.Fatalf("single user must NOT be rewritten, got %T %v", out[1].Content, out[1].Content)
-	}
-}
-
-// TestRewriteMessages_DualCC_AssistantBetweenUsers multi-turn 历史:
-// [system, user, assistant, user, assistant, user] —— 末位 user 是当前轮,
-// 末位之前最近的 user (倒数第 2 个 user) 是上一轮的提问; 该上一轮 user 应
-// 被注入 cc (这能让"system + 上一轮 user"作为前缀缓存)。
-// 关键词: 双 cc 注入, multi-turn 历史, assistant 间隔
-func TestRewriteMessages_DualCC_AssistantBetweenUsers(t *testing.T) {
-	in := []aispec.ChatDetail{
-		{Role: "system", Content: "S"},
-		{Role: "user", Content: "U1"},
-		{Role: "assistant", Content: "A1"},
-		{Role: "user", Content: "U2"},
-		{Role: "assistant", Content: "A2"},
-		{Role: "user", Content: "U3-current"},
-	}
-	out := RewriteMessagesForExplicitCache(in, "tongyi", "qwen3.6-plus")
-	// 期望: out[0] (system) 改写, out[3] (U2 = 末位之前最近 user) 改写,
-	// 其它 (U1, A1, A2, U3) 全部保持 string 不变
-	if _, ok := out[0].Content.([]*aispec.ChatContent); !ok {
-		t.Fatalf("system (idx 0) should be rewritten, got %T", out[0].Content)
-	}
-	if s, ok := out[1].Content.(string); !ok || s != "U1" {
-		t.Fatalf("U1 (idx 1) should be untouched, got %T %v", out[1].Content, out[1].Content)
-	}
-	if s, ok := out[2].Content.(string); !ok || s != "A1" {
-		t.Fatalf("A1 (idx 2) should be untouched, got %T %v", out[2].Content, out[2].Content)
-	}
-	if _, ok := out[3].Content.([]*aispec.ChatContent); !ok {
-		t.Fatalf("U2 (idx 3) should be rewritten as penultimate user, got %T", out[3].Content)
-	}
-	if s, ok := out[4].Content.(string); !ok || s != "A2" {
-		t.Fatalf("A2 (idx 4) should be untouched, got %T %v", out[4].Content, out[4].Content)
-	}
-	if s, ok := out[5].Content.(string); !ok || s != "U3-current" {
-		t.Fatalf("U3-current (idx 5, last) should be untouched, got %T %v", out[5].Content, out[5].Content)
-	}
-}
-
-// TestRewriteMessages_DualCC_NoSystemPassThrough 维持旧契约: 没有 system
-// 时即使存在多个 user 也完全不动。
-// 关键词: 双 cc 注入, 无 system 绝对 pass-through
-func TestRewriteMessages_DualCC_NoSystemPassThrough(t *testing.T) {
-	in := []aispec.ChatDetail{
-		{Role: "user", Content: "U1"},
-		{Role: "user", Content: "U2"},
-		{Role: "user", Content: "U3"},
 	}
 	out := RewriteMessagesForExplicitCache(in, "tongyi", "qwen3.6-plus")
 	if !jsonEq(t, in, out) {
-		t.Fatalf("no-system multi-user must be untouched, in=%v out=%v", in, out)
+		t.Fatalf("client-cc on system: aibalance must pass-through, in=%v out=%v", in, out)
+	}
+	// 同切片返回 (零浅复制)
+	if len(out) != len(in) || (len(in) > 0 && &out[0] != &in[0]) {
+		t.Fatalf("client-cc pass-through must return same slice header (zero-alloc)")
 	}
 }
 
-// TestRewriteMessages_DualCC_DoesNotMutateInput 验证双 cc 注入仍然零副作用。
-// 关键词: 双 cc 注入, 零副作用
-func TestRewriteMessages_DualCC_DoesNotMutateInput(t *testing.T) {
+// TestRewriteMessages_RespectClientCC_OnUser 客户端 user 自带 cc (例如
+// aicache hijacker 3 段路径下的 user1), aibalance 不再给 system 注入,
+// 整体 pass-through 让客户端自管。
+// 关键词: 客户端自带 cc, user 自带, system 不再覆盖注入
+func TestRewriteMessages_RespectClientCC_OnUser(t *testing.T) {
 	in := []aispec.ChatDetail{
-		{Role: "system", Content: "S"},
-		{Role: "user", Content: "U1"},
+		{Role: "system", Content: "S-no-cc"},
+		{Role: "user", Content: []*aispec.ChatContent{
+			{Type: "text", Text: "client-cc-user", CacheControl: map[string]any{"type": "ephemeral"}},
+		}},
+		{Role: "user", Content: "U-open"},
+	}
+	out := RewriteMessagesForExplicitCache(in, "tongyi", "qwen3.6-plus")
+	if !jsonEq(t, in, out) {
+		t.Fatalf("client-cc on user: aibalance must pass-through, in=%v out=%v", in, out)
+	}
+	// system 必须仍是原 string (没被注入 cc)
+	if s, ok := out[0].Content.(string); !ok || s != "S-no-cc" {
+		t.Fatalf("system must remain untouched string when client cc on user, got %T %v",
+			out[0].Content, out[0].Content)
+	}
+}
+
+// TestRewriteMessages_RespectClientCC_DeepInArray cc 在 []*ChatContent 中
+// 间元素上 (不是末元素), 也要被识别为"客户端自带 cc"。
+// 关键词: 客户端自带 cc, 中间元素 cc 识别
+func TestRewriteMessages_RespectClientCC_DeepInArray(t *testing.T) {
+	in := []aispec.ChatDetail{
+		{Role: "system", Content: []*aispec.ChatContent{
+			{Type: "text", Text: "first-no-cc"},
+			{Type: "text", Text: "middle-with-cc", CacheControl: map[string]any{"type": "ephemeral"}},
+			{Type: "text", Text: "last-no-cc"},
+		}},
+		{Role: "user", Content: "U"},
+	}
+	out := RewriteMessagesForExplicitCache(in, "tongyi", "qwen3.6-plus")
+	if !jsonEq(t, in, out) {
+		t.Fatalf("client-cc deep in array: aibalance must pass-through, in=%v out=%v", in, out)
+	}
+}
+
+// TestRewriteMessages_RespectClientCC_InMapForm cc 以 map[string]any 形态
+// 出现 (例如 OpenAI 兼容 raw 直传), 也要被识别。
+// 关键词: 客户端自带 cc, map 形态识别
+func TestRewriteMessages_RespectClientCC_InMapForm(t *testing.T) {
+	in := []aispec.ChatDetail{
+		{Role: "system", Content: []map[string]any{
+			{"type": "text", "text": "raw-system", "cache_control": map[string]any{"type": "ephemeral"}},
+		}},
+		{Role: "user", Content: "U"},
+	}
+	out := RewriteMessagesForExplicitCache(in, "tongyi", "qwen3.6-plus")
+	if !jsonEq(t, in, out) {
+		t.Fatalf("client-cc in map form: aibalance must pass-through, in=%v out=%v", in, out)
+	}
+}
+
+// TestRewriteMessages_RespectClientCC_ReturnsSameSlice 客户端自带 cc 时
+// 应当直接返回**原切片头**, 不做任何浅复制 (零分配)。这是性能契约。
+// 关键词: 客户端自带 cc, 零浅复制契约, 返回同切片
+func TestRewriteMessages_RespectClientCC_ReturnsSameSlice(t *testing.T) {
+	in := []aispec.ChatDetail{
+		{Role: "system", Content: []*aispec.ChatContent{
+			{Type: "text", Text: "S", CacheControl: map[string]any{"type": "ephemeral"}},
+		}},
+		{Role: "user", Content: "U"},
+	}
+	out := RewriteMessagesForExplicitCache(in, "tongyi", "qwen3.6-plus")
+	// 切片底层数组与长度都必须一致 (即同一切片头)
+	if len(out) != len(in) {
+		t.Fatalf("len mismatch: got %d want %d", len(out), len(in))
+	}
+	for i := range in {
+		if &out[i] != &in[i] {
+			t.Fatalf("client-cc pass-through must return same backing array, idx %d differs", i)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// provider-aware cc 处理测试 (RewriteMessagesForProvider 主入口分发)
+// 行为契约:
+//   - tongyi          -> 走 RewriteMessagesForExplicitCache (保留 cc + 单 cc 兜底)
+//   - 其他所有 provider -> 走 StripCacheControlFromMessages (强制移除所有 cc)
+// ---------------------------------------------------------------------------
+
+// TestIsCacheControlAwareProvider 验证 provider 白名单严格只放 tongyi.
+// 关键词: provider-aware, IsCacheControlAwareProvider 白名单
+func TestIsCacheControlAwareProvider(t *testing.T) {
+	cases := []struct {
+		name string
+		typ  string
+		want bool
+	}{
+		{"tongyi", "tongyi", true},
+		{"TONGYI uppercase", "TONGYI", true},
+		{"tongyi with space", "  tongyi  ", true},
+		{"openai", "openai", false},
+		{"siliconflow", "siliconflow", false},
+		{"openrouter", "openrouter", false},
+		{"anthropic", "anthropic", false},
+		{"deepseek", "deepseek", false},
+		{"kimi", "kimi", false},
+		{"azure", "azure", false},
+		{"empty", "", false},
+		{"random", "some-provider", false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := IsCacheControlAwareProvider(c.typ); got != c.want {
+				t.Fatalf("IsCacheControlAwareProvider(%q) = %v, want %v", c.typ, got, c.want)
+			}
+		})
+	}
+}
+
+// TestRewriteForProvider_TongyiKeepsClientCC tongyi provider 路径下,
+// 客户端自带 cc 应当被完整保留 (走 explicit cache rewriter pass-through 分支)。
+// 关键词: provider-aware, tongyi 保留 cc
+func TestRewriteForProvider_TongyiKeepsClientCC(t *testing.T) {
+	in := []aispec.ChatDetail{
+		{Role: "system", Content: []*aispec.ChatContent{
+			{Type: "text", Text: "S", CacheControl: map[string]any{"type": "ephemeral"}},
+		}},
+		{Role: "user", Content: []*aispec.ChatContent{
+			{Type: "text", Text: "U1", CacheControl: map[string]any{"type": "ephemeral"}},
+		}},
 		{Role: "user", Content: "U2"},
 	}
+	out := RewriteMessagesForProvider(in, "tongyi", "qwen3.6-plus")
+	if !jsonEq(t, in, out) {
+		t.Fatalf("tongyi provider should keep client cc verbatim, in=%v out=%v", in, out)
+	}
+}
+
+// TestRewriteForProvider_TongyiInjectsBaselineCC tongyi provider + 显式缓存
+// 白名单 model + 客户端无 cc 时, 应当在最末 system 注入 baseline 单 cc.
+// 关键词: provider-aware, tongyi baseline 兜底
+func TestRewriteForProvider_TongyiInjectsBaselineCC(t *testing.T) {
+	in := []aispec.ChatDetail{
+		{Role: "system", Content: "S-no-cc"},
+		{Role: "user", Content: "U"},
+	}
+	out := RewriteMessagesForProvider(in, "tongyi", "qwen3.6-plus")
+	contents, ok := out[0].Content.([]*aispec.ChatContent)
+	if !ok {
+		t.Fatalf("tongyi baseline: system content should be []*ChatContent, got %T", out[0].Content)
+	}
+	if cc, _ := contents[0].CacheControl.(map[string]any); cc == nil || cc["type"] != "ephemeral" {
+		t.Fatalf("tongyi baseline: system should carry ephemeral cc, got %+v", contents[0].CacheControl)
+	}
+}
+
+// TestRewriteForProvider_SiliconflowStripsAllCC siliconflow provider 路径下,
+// 客户端自带的所有位置 cc 必须被强制 strip (兼容性硬约束)。
+// 关键词: provider-aware, siliconflow strip cc, 跨 provider 安全
+func TestRewriteForProvider_SiliconflowStripsAllCC(t *testing.T) {
+	in := []aispec.ChatDetail{
+		{Role: "system", Content: []*aispec.ChatContent{
+			{Type: "text", Text: "S", CacheControl: map[string]any{"type": "ephemeral"}},
+		}},
+		{Role: "user", Content: []*aispec.ChatContent{
+			{Type: "text", Text: "U1", CacheControl: map[string]any{"type": "ephemeral"}},
+		}},
+		{Role: "user", Content: "U2"},
+	}
+	out := RewriteMessagesForProvider(in, "siliconflow", "any-model")
+
+	if cc := out[0].Content.([]*aispec.ChatContent)[0].CacheControl; cc != nil {
+		t.Fatalf("siliconflow: system cc must be stripped, got %v", cc)
+	}
+	if cc := out[1].Content.([]*aispec.ChatContent)[0].CacheControl; cc != nil {
+		t.Fatalf("siliconflow: user1 cc must be stripped, got %v", cc)
+	}
+	if s, ok := out[2].Content.(string); !ok || s != "U2" {
+		t.Fatalf("siliconflow: user2 (string) must be unchanged, got %T %v", out[2].Content, out[2].Content)
+	}
+
+	// 入参 messages 必须未被原地修改
+	if cc := in[0].Content.([]*aispec.ChatContent)[0].CacheControl; cc == nil {
+		t.Fatalf("input must not be mutated: original system cc disappeared")
+	}
+}
+
+// TestRewriteForProvider_OpenAIStripsCC openai provider 路径下也必须 strip
+// 所有 cc 字段 (避免被 OpenAI 兼容层因未知字段 400)。
+// 关键词: provider-aware, openai strip cc
+func TestRewriteForProvider_OpenAIStripsCC(t *testing.T) {
+	in := []aispec.ChatDetail{
+		{Role: "system", Content: []*aispec.ChatContent{
+			{Type: "text", Text: "S", CacheControl: map[string]any{"type": "ephemeral"}},
+		}},
+		{Role: "user", Content: "U"},
+	}
+	out := RewriteMessagesForProvider(in, "openai", "gpt-4o")
+	if cc := out[0].Content.([]*aispec.ChatContent)[0].CacheControl; cc != nil {
+		t.Fatalf("openai: cc must be stripped, got %v", cc)
+	}
+}
+
+// TestRewriteForProvider_AnthropicStripsMapCC anthropic provider 路径下,
+// map 形态的 cc 也必须被剥离 (避免和 anthropic 自家不同语义的 cc 混淆)。
+// 关键词: provider-aware, anthropic strip cc, map 形态
+func TestRewriteForProvider_AnthropicStripsMapCC(t *testing.T) {
+	in := []aispec.ChatDetail{
+		{Role: "system", Content: []map[string]any{
+			{"type": "text", "text": "S", "cache_control": map[string]any{"type": "ephemeral"}},
+		}},
+		{Role: "user", Content: "U"},
+	}
+	out := RewriteMessagesForProvider(in, "anthropic", "claude-3-5-sonnet")
+	maps, ok := out[0].Content.([]map[string]any)
+	if !ok {
+		t.Fatalf("anthropic strip: system content should remain []map[string]any, got %T", out[0].Content)
+	}
+	if _, hasCC := maps[0]["cache_control"]; hasCC {
+		t.Fatalf("anthropic: cache_control key must be removed from map, got %v", maps[0])
+	}
+	if maps[0]["text"] != "S" {
+		t.Fatalf("anthropic: other map fields must be preserved, got %v", maps[0])
+	}
+}
+
+// TestRewriteForProvider_NoCC_ReturnsSameSlice 任何 provider 在 messages
+// 不含 cc 时都应返回同一切片头 (零分配性能契约)。
+// 关键词: provider-aware, 零分配契约
+func TestRewriteForProvider_NoCC_ReturnsSameSlice(t *testing.T) {
+	in := []aispec.ChatDetail{
+		{Role: "user", Content: "no system, no cc"},
+		{Role: "user", Content: "another user"},
+	}
+	for _, providerType := range []string{"openai", "siliconflow", "anthropic"} {
+		t.Run(providerType, func(t *testing.T) {
+			out := RewriteMessagesForProvider(in, providerType, "any")
+			if len(out) != len(in) {
+				t.Fatalf("len mismatch: got %d want %d", len(out), len(in))
+			}
+			for i := range in {
+				if &out[i] != &in[i] {
+					t.Fatalf("no-cc + non-tongyi: must return same slice header, idx %d differs", i)
+				}
+			}
+		})
+	}
+}
+
+// TestStripCacheControl_DoesNotMutateInput strip 路径必须零副作用 (浅复制).
+// 关键词: provider-aware, strip 零副作用
+func TestStripCacheControl_DoesNotMutateInput(t *testing.T) {
+	in := []aispec.ChatDetail{
+		{Role: "system", Content: []*aispec.ChatContent{
+			{Type: "text", Text: "S", CacheControl: map[string]any{"type": "ephemeral"}},
+		}},
+		{Role: "user", Content: "U"},
+	}
 	snapshot, _ := json.Marshal(in)
-	_ = RewriteMessagesForExplicitCache(in, "tongyi", "qwen3.6-plus")
+	_ = StripCacheControlFromMessages(in)
 	after, _ := json.Marshal(in)
 	if string(snapshot) != string(after) {
-		t.Fatalf("input mutated\nbefore=%s\nafter =%s", snapshot, after)
+		t.Fatalf("strip mutated input\nbefore=%s\nafter =%s", snapshot, after)
+	}
+}
+
+// TestStripCacheControl_HijackerOutputBecomesPlain 验证 aicache hijacker
+// 双 cc 输出 (system+user1 都带 cc, user2 string) 经 strip 后:
+//   - cc 字段全部清空
+//   - text 内容完整保留
+//   - 切片结构与 message 顺序不变
+// 这是"hijacker 一律打 cc + aibalance 跨 provider strip"分工的端到端验证。
+// 关键词: provider-aware, hijacker dual cc + non-tongyi strip 端到端
+func TestStripCacheControl_HijackerOutputBecomesPlain(t *testing.T) {
+	in := []aispec.ChatDetail{
+		{Role: "system", Content: []*aispec.ChatContent{
+			{Type: "text", Text: "system-text", CacheControl: map[string]any{"type": "ephemeral"}},
+		}},
+		{Role: "user", Content: []*aispec.ChatContent{
+			{Type: "text", Text: "user1-frozen-prefix", CacheControl: map[string]any{"type": "ephemeral"}},
+		}},
+		{Role: "user", Content: "user2-open-tail"},
+	}
+	out := RewriteMessagesForProvider(in, "siliconflow", "any-model")
+
+	if len(out) != 3 {
+		t.Fatalf("len mismatch: got %d want 3", len(out))
+	}
+	if cc := out[0].Content.([]*aispec.ChatContent)[0].CacheControl; cc != nil {
+		t.Fatalf("siliconflow: system cc must be nil after strip, got %v", cc)
+	}
+	if txt := out[0].Content.([]*aispec.ChatContent)[0].Text; txt != "system-text" {
+		t.Fatalf("system text must be preserved, got %q", txt)
+	}
+	if cc := out[1].Content.([]*aispec.ChatContent)[0].CacheControl; cc != nil {
+		t.Fatalf("siliconflow: user1 cc must be nil after strip, got %v", cc)
+	}
+	if txt := out[1].Content.([]*aispec.ChatContent)[0].Text; txt != "user1-frozen-prefix" {
+		t.Fatalf("user1 text must be preserved, got %q", txt)
+	}
+	if s, _ := out[2].Content.(string); s != "user2-open-tail" {
+		t.Fatalf("user2 string must be unchanged, got %v", out[2].Content)
+	}
+}
+
+// TestStripCacheControl_NoCCReturnsSameSlice messages 不含 cc 时直接返回原切片头.
+// 关键词: provider-aware, strip 零分配
+func TestStripCacheControl_NoCCReturnsSameSlice(t *testing.T) {
+	in := []aispec.ChatDetail{
+		{Role: "system", Content: "S-no-cc"},
+		{Role: "user", Content: "U"},
+	}
+	out := StripCacheControlFromMessages(in)
+	if len(out) != len(in) {
+		t.Fatalf("len mismatch: got %d want %d", len(out), len(in))
+	}
+	for i := range in {
+		if &out[i] != &in[i] {
+			t.Fatalf("no-cc strip must return same slice header, idx %d differs", i)
+		}
 	}
 }

@@ -1075,30 +1075,43 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 			writer.WriteUsage(usage)
 		}
 
-		// dashscope (tongyi) 显式上下文缓存自动注入: 对在 dashscope
-		// 「显式缓存白名单」内的 model (qwen3.5-flash / qwen3.6-plus /
-		// qwen3-vl-flash / qwen3.x-coder / deepseek-v3.2 / kimi-k2.* /
-		// glm-5.1 等), 在以下两个位置挂 cache_control:{"type":"ephemeral"}:
-		//   1. 最末一条 role=system 消息 (恒注入, 缓存 system 前缀)
-		//   2. 末位之前最近的 role=user 消息 (3 段拆分场景配套, §7.7)
-		// dashscope 会把每个 cc 标记对应的 prefix 作为命名缓存块保留 5 分钟,
-		// 后续相同前缀请求按 input_token 单价 10% 计费, cached_tokens 字段
-		// 也会真实回填(走 onUsageForward 入库)。aicache hijacker 把 prompt
-		// 切成 [system, user1=frozen, user2=open] 时, system+user1 都拿到
-		// cc, 形成"短前缀+长前缀"两层缓存, E14 实测命中率从 32% → 70%。
-		// 不在白名单内的 (provider type, model) 组合 messagesForUpstream
-		// 与 bodyIns.Messages 完全相同(零副作用)。
-		// 关键词: aibalance dashscope 显式缓存自动注入,
-		//        RewriteMessagesForExplicitCache 接入点, 双 cc, §7.7
-		messagesForUpstream := RewriteMessagesForExplicitCache(
+		// provider-aware cache_control 处理 (RewriteMessagesForProvider):
+		//
+		//   - **tongyi** (dashscope 兼容): 走 RewriteMessagesForExplicitCache
+		//     - 客户端任意位置自带 cc -> 完全 pass-through (尊重客户端缓存策略,
+		//       例如 aicache hijacker 3 段路径主动打的 system+user1 双 cc)
+		//     - 客户端无 cc + 显式缓存白名单 model (qwen3.5-flash / qwen3.6-plus /
+		//       qwen3-vl-flash / qwen3.x-coder / deepseek-v3.2 / kimi-k2.* /
+		//       glm-5.1 等) -> 给最末 system 注入 baseline 单 cc, 让 dashscope
+		//       把 system 前缀作为命名缓存块缓存 5 分钟 (后续相同前缀请求按
+		//       input_token 单价 10% 计费; cached_tokens 走 onUsageForward 入库)
+		//     - 客户端无 cc + 不在白名单 model -> pass-through (零副作用)
+		//
+		//   - **其他所有 provider** (siliconflow / openai / openrouter /
+		//     anthropic / azure / 等等): 走 StripCacheControlFromMessages
+		//     强制移除所有位置的 cc 字段, 兼容性 + 安全性硬约束:
+		//     - 部分 OpenAI 兼容层会因为 cache_control 未知字段直接 400
+		//     - 避免 dashscope 风格 cc 透传到其他 provider 引发意料外计费/路由
+		//     这是无条件的 strip, 无论 cc 来自客户端 SDK 还是来自 aicache hijacker.
+		//
+		// 这个分发让 aicache hijacker 可以"无脑给 system+user1 打双 cc",
+		// 跨 provider 安全由 aibalance 兜底剥离, 不需要 hijacker 知道下游
+		// 是不是 tongyi。
+		//
+		// 关键词: aibalance provider-aware cc 路由, RewriteMessagesForProvider,
+		//        tongyi 保留 / 其他 strip, dashscope 显式缓存兜底,
+		//        跨 provider 安全, §7.7.7 职责重排
+		messagesForUpstream := RewriteMessagesForProvider(
 			bodyIns.Messages, provider.TypeName, provider.ModelName,
 		)
-		if len(messagesForUpstream) > 0 && len(messagesForUpstream) == len(bodyIns.Messages) &&
-			IsTongyiExplicitCacheModel(provider.TypeName, provider.ModelName) {
-			ccMarks := len(pickCacheControlTargets(bodyIns.Messages))
-			if ccMarks > 0 {
-				c.logInfo("explicit cache_control injected: provider=%s model=%s msgs=%d cc_marks=%d",
-					provider.TypeName, provider.ModelName, len(messagesForUpstream), ccMarks)
+		if len(messagesForUpstream) > 0 && len(messagesForUpstream) == len(bodyIns.Messages) {
+			switch {
+			case IsTongyiExplicitCacheModel(provider.TypeName, provider.ModelName):
+				c.logInfo("explicit cache_control baseline injected: provider=%s model=%s msgs=%d",
+					provider.TypeName, provider.ModelName, len(messagesForUpstream))
+			case !IsCacheControlAwareProvider(provider.TypeName) && messagesAlreadyHaveCacheControl(bodyIns.Messages):
+				c.logInfo("cache_control stripped (non-tongyi provider): provider=%s model=%s msgs=%d",
+					provider.TypeName, provider.ModelName, len(messagesForUpstream))
 			}
 		}
 

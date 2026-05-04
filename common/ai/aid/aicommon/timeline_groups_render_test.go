@@ -415,3 +415,176 @@ func TestGroupByMinutes_NoLeadingIndentInContent(t *testing.T) {
 			"no rendered line should start with a tab (got %q)", line)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// frozen boundary 专项测试 (RenderWithFrozenBoundary + Timeline.Dump 集成)
+// 验证 §7.7.7 hijacker 切割锚点所依赖的 <|AI_CACHE_FROZEN_semi-dynamic|>
+// 边界标签按规则正确插入。
+// ---------------------------------------------------------------------------
+
+// frozenStartTag / frozenEndTag 是测试断言用的边界字面量
+const (
+	frozenStartTag = "<|" + TimelineFrozenBoundaryTagName + "_" + TimelineFrozenBoundaryNonce + "|>"
+	frozenEndTag   = "<|" + TimelineFrozenBoundaryTagName + "_END_" + TimelineFrozenBoundaryNonce + "|>"
+)
+
+// TestRenderWithFrozenBoundary_AllOpen_NoBoundary 全 open (单个时间桶, 无 reducer)
+// 不应当输出 frozen 边界标签, 退化为原 Render 输出。
+// 关键词: RenderWithFrozenBoundary, 全 open 退化, 无边界
+func TestRenderWithFrozenBoundary_AllOpen_NoBoundary(t *testing.T) {
+	tl := NewTimeline(nil, nil)
+	base := time.Date(2026, 5, 2, 10, 0, 0, 0, time.UTC)
+	injectTimelineItem(tl, 1, base.Add(30*time.Second), makeToolResult(1, "a", true, "data-a"))
+	injectTimelineItem(tl, 2, base.Add(60*time.Second), makeToolResult(2, "b", true, "data-b"))
+
+	bs := tl.GroupByMinutes(3).GetAllRenderable()
+	out := bs.RenderWithFrozenBoundary("TIMELINE", "", "")
+	plain := bs.Render("TIMELINE")
+
+	require.NotContains(t, out, frozenStartTag, "all-open should NOT carry frozen boundary")
+	require.NotContains(t, out, frozenEndTag, "all-open should NOT carry frozen boundary END")
+	require.Equal(t, plain, out, "all-open: RenderWithFrozenBoundary must equal plain Render")
+}
+
+// TestRenderWithFrozenBoundary_AllFrozenReducerOnly 全 frozen (仅 reducer 没有
+// interval) 也不加边界 — 整段都是 frozen, 不需要切, hijacker 走退化路径。
+// 关键词: RenderWithFrozenBoundary, 全 reducer 退化, 无边界
+func TestRenderWithFrozenBoundary_AllFrozenReducerOnly(t *testing.T) {
+	bs := TimelineRenderableBlocks{
+		&TimelineReducerBlock{ReducerKeyID: 1, Text: "reducer-A"},
+		&TimelineReducerBlock{ReducerKeyID: 2, Text: "reducer-B"},
+	}
+	out := bs.RenderWithFrozenBoundary("TL", "", "")
+	plain := bs.Render("TL")
+
+	require.NotContains(t, out, frozenStartTag, "all-frozen should NOT carry boundary")
+	require.Equal(t, plain, out, "all-frozen: RenderWithFrozenBoundary must equal plain Render")
+}
+
+// TestRenderWithFrozenBoundary_MixFrozenOpen_HasBoundary frozen + open 混合时
+// 必须把所有 frozen block 包在 boundary 内, open block 保持在 boundary 外。
+// 关键词: RenderWithFrozenBoundary, 混合段, frozen 包裹 + open 在外
+func TestRenderWithFrozenBoundary_MixFrozenOpen_HasBoundary(t *testing.T) {
+	bs := TimelineRenderableBlocks{
+		&TimelineReducerBlock{ReducerKeyID: 1, Text: "reducer-frozen"},
+		&fakeFrozenInterval{nonce: "b3t100", body: "frozen-A"},
+		&fakeFrozenInterval{nonce: "b3t200", body: "frozen-B"},
+		&fakeOpenInterval{nonce: "b3t300", body: "open-tail"},
+	}
+	out := bs.RenderWithFrozenBoundary("TL", "", "")
+
+	startIdx := strings.Index(out, frozenStartTag)
+	endIdx := strings.Index(out, frozenEndTag)
+	require.True(t, startIdx >= 0, "must contain frozen boundary START")
+	require.True(t, endIdx > startIdx, "frozen boundary END must follow START")
+
+	// frozen 段内必须含 reducer-frozen / frozen-A / frozen-B
+	frozenPart := out[startIdx:endIdx]
+	require.Contains(t, frozenPart, "reducer-frozen")
+	require.Contains(t, frozenPart, "frozen-A")
+	require.Contains(t, frozenPart, "frozen-B")
+	require.NotContains(t, frozenPart, "open-tail", "open must NOT be inside frozen boundary")
+
+	// boundary END 之后必须含 open-tail
+	tailPart := out[endIdx:]
+	require.Contains(t, tailPart, "open-tail")
+}
+
+// TestRenderWithFrozenBoundary_ByteStableOnFrozenChange frozen 段内容不变时,
+// open 段变化不影响 boundary 内字节序列 (这是 prefix cache 命中的核心前置)。
+// 关键词: RenderWithFrozenBoundary, 字节稳定, frozen 不受 open 变化影响
+func TestRenderWithFrozenBoundary_ByteStableOnFrozenChange(t *testing.T) {
+	frozen := []TimelineRenderableBlock{
+		&TimelineReducerBlock{ReducerKeyID: 1, Text: "stable-reducer"},
+		&fakeFrozenInterval{nonce: "b3t100", body: "stable-frozen"},
+	}
+	r1 := append(append(TimelineRenderableBlocks{}, frozen...),
+		&fakeOpenInterval{nonce: "b3t999", body: "open-r1"}).
+		RenderWithFrozenBoundary("TL", "", "")
+	r2 := append(append(TimelineRenderableBlocks{}, frozen...),
+		&fakeOpenInterval{nonce: "b3t999", body: "open-r2-different"}).
+		RenderWithFrozenBoundary("TL", "", "")
+
+	r1Frozen := r1[strings.Index(r1, frozenStartTag):strings.Index(r1, frozenEndTag)+len(frozenEndTag)]
+	r2Frozen := r2[strings.Index(r2, frozenStartTag):strings.Index(r2, frozenEndTag)+len(frozenEndTag)]
+	require.Equal(t, r1Frozen, r2Frozen,
+		"frozen boundary content must be byte-stable when frozen blocks unchanged")
+	require.NotEqual(t, r1, r2, "overall output should differ on open change")
+}
+
+// TestRenderWithFrozenBoundary_CustomBoundaryName 自定义 boundary tag/nonce
+// 应当被尊重, 不强制使用包级默认。
+// 关键词: RenderWithFrozenBoundary, 自定义 boundary 标签
+func TestRenderWithFrozenBoundary_CustomBoundaryName(t *testing.T) {
+	bs := TimelineRenderableBlocks{
+		&TimelineReducerBlock{ReducerKeyID: 1, Text: "R"},
+		&fakeOpenInterval{nonce: "b3t1", body: "O"},
+	}
+	out := bs.RenderWithFrozenBoundary("TL", "MY_FROZEN", "test-segment")
+	require.Contains(t, out, "<|MY_FROZEN_test-segment|>")
+	require.Contains(t, out, "<|MY_FROZEN_END_test-segment|>")
+	require.NotContains(t, out, frozenStartTag, "must not use default boundary tag when custom provided")
+}
+
+// TestTimelineDump_HasFrozenBoundary_OnMixedTimeline 用 Timeline.Dump 端到端
+// 验证: timeline 含多个时间桶 (frozen + open) 时, Dump 输出必须自带 frozen
+// 边界标签, 这是 hijacker 3 段拆分的核心前提。
+// 关键词: Timeline.Dump, frozen boundary 端到端, 多时间桶
+func TestTimelineDump_HasFrozenBoundary_OnMixedTimeline(t *testing.T) {
+	tl := NewTimeline(nil, nil)
+	base := time.Date(2026, 5, 2, 10, 0, 0, 0, time.UTC)
+	// bucket 1: 10:00-10:03 (frozen 后续)
+	injectTimelineItem(tl, 1, base.Add(30*time.Second), makeToolResult(1, "a", true, "data-a"))
+	injectTimelineItem(tl, 2, base.Add(60*time.Second), makeToolResult(2, "b", true, "data-b"))
+	// bucket 2: 10:03-10:06 (frozen)
+	injectTimelineItem(tl, 3, base.Add(4*time.Minute), makeToolResult(3, "c", true, "data-c"))
+	// bucket 3: 10:06-10:09 (open, 末桶)
+	injectTimelineItem(tl, 4, base.Add(7*time.Minute), makeToolResult(4, "d", true, "data-d"))
+
+	dump := tl.Dump()
+	require.Contains(t, dump, frozenStartTag, "Dump with multi-bucket timeline must inject frozen boundary")
+	require.Contains(t, dump, frozenEndTag, "Dump must inject frozen boundary END")
+
+	startIdx := strings.Index(dump, frozenStartTag)
+	endIdx := strings.Index(dump, frozenEndTag)
+	frozenPart := dump[startIdx:endIdx]
+	require.Contains(t, frozenPart, "data-a")
+	require.Contains(t, frozenPart, "data-b")
+	require.Contains(t, frozenPart, "data-c")
+	require.NotContains(t, frozenPart, "data-d", "data-d (open bucket) must be outside frozen boundary")
+
+	tailPart := dump[endIdx+len(frozenEndTag):]
+	require.Contains(t, tailPart, "data-d")
+}
+
+// TestTimelineDump_NoFrozenBoundary_OnSingleBucket 单时间桶 (全 open) 场景
+// Timeline.Dump 应当退化为原 Render 输出, 不带 frozen 边界。
+// 关键词: Timeline.Dump, 全 open 退化, 无边界
+func TestTimelineDump_NoFrozenBoundary_OnSingleBucket(t *testing.T) {
+	tl := NewTimeline(nil, nil)
+	base := time.Date(2026, 5, 2, 10, 0, 0, 0, time.UTC)
+	injectTimelineItem(tl, 1, base.Add(30*time.Second), makeToolResult(1, "a", true, "data-a"))
+	injectTimelineItem(tl, 2, base.Add(60*time.Second), makeToolResult(2, "b", true, "data-b"))
+
+	dump := tl.Dump()
+	require.NotContains(t, dump, frozenStartTag,
+		"single-bucket (all-open) Dump should NOT inject frozen boundary")
+}
+
+// fakeFrozenInterval / fakeOpenInterval 是测试用的最小 RenderableBlock 实现,
+// 用来在不依赖完整 Timeline 构造的情况下精确控制 IsOpen 与 body 字面量。
+type fakeFrozenInterval struct {
+	nonce, body string
+}
+
+func (f *fakeFrozenInterval) Render() string      { return f.body }
+func (f *fakeFrozenInterval) StableNonce() string { return f.nonce }
+func (f *fakeFrozenInterval) IsOpen() bool        { return false }
+
+type fakeOpenInterval struct {
+	nonce, body string
+}
+
+func (f *fakeOpenInterval) Render() string      { return f.body }
+func (f *fakeOpenInterval) StableNonce() string { return f.nonce }
+func (f *fakeOpenInterval) IsOpen() bool        { return true }

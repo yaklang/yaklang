@@ -809,60 +809,198 @@ messages, 不知道哪段属于哪个 Timeline block。
    验证过的双独立块创建);
 4. 单元测试: 用 E14 同样的 4 round 序列断言 cached 数值符合预期。
 
-#### 7.7.7 落地实现 (本次完成)
+#### 7.7.7 落地实现 (职责重排版, 最终方案)
 
-最终采用的落地方案与 7.7.6 第 1+3 步一致, 但**第 2 步换成了"由
-aibalance rewriter 给 user1 注入 cc", 而不是在 hijacker 层注入 cc**。
-这样切分关注点更干净:
+> 历史变更说明: 第一版落地把"双 cc 注入"的责任放在 `aibalance.RewriteMessagesForExplicitCache`
+> (即给最末 system + 末位之前最近 user 各打一个 cc)。这种做法虽然
+> 复用了已有的 cc 注入逻辑, 但带来三个问题:
+>
+>  1. **侵入性**: aibalance 是通用网关层, 它不应该假设某种特定的"应用层
+>     缓存策略" (3 段拆分恰好把稳定段放倒数第 2 个 user)。
+>  2. **无法尊重外部 SDK 客户端**: 如果外部客户端已经自带 cc 标记
+>     (例如直接走 OpenAI 兼容协议的高级用户), aibalance 又叠加注入
+>     就会破坏客户端的缓存意图。
+>  3. **双注入风险**: 同一份 messages 经过两次 cc 注入会留下重复字段。
+>
+> 因此最终方案做了**职责重排**: 把"双 cc 注入"下移到 aicache hijacker
+> 这个真正知道"哪段是稳定段"的应用层组件; aibalance 退化为
+> "单 cc baseline 兜底 + 自带 cc 完全退让"的纯网关行为。
 
-- `aicache/hijacker.go`: **只**负责"按 Frozen/Open 边界把消息切成
-  `[system, user1, user2]`", 不接触 cache_control 字段, 输出的 user
-  消息 Content 仍是简单 string。
-- `aibalance/explicit_cache_rewriter.go`: **统一**负责注入 cc, 在原
-  "最末 system → cc" 基础上扩展为"最末 system + 末位之前最近的 user → cc"
-  双标记策略。这样 cc 注入逻辑只有一份, 不会出现 hijacker 注入一次、
-  rewriter 又注入一次的双注入风险。
+##### 职责分工 (新)
 
-落地的具体改动:
+| 组件 | 职责 | 注入位置 |
+| --- | --- | --- |
+| `aicache.hijackHighStatic` 3 段路径 | **主动**给 system + user1 包成 `[]*aispec.ChatContent` 并挂 ephemeral cache_control; user2 保持 string 不打 cc | system (短前缀缓存) + user1 (长前缀缓存) |
+| `aicache.hijackHighStatic` 2 段退化路径 | 只切消息, 不打 cc, 输出 string content | 由 aibalance 兜底 |
+| `aibalance.RewriteMessagesForExplicitCache` | 检测到客户端任意位置自带 cc → 完全 pass-through 退让; 否则给最末 system 注入单 cc 作 baseline 兜底 | 至多 1 个 (最末 system) |
+
+```mermaid
+flowchart LR
+    promptIn["raw prompt"] --> hijackerCheck{"hijacker 3 段触发条件?"}
+    hijackerCheck -- "yes" --> threeSeg["3 段输出<br/>system+user1 自带 cc<br/>user2 string"]
+    hijackerCheck -- "no" --> twoSeg["2 段输出 string<br/>(或 nil 透传)"]
+    threeSeg --> rewriter["aibalance rewriter"]
+    twoSeg --> rewriter
+    extClient["外部客户端 (自带 cc)"] --> rewriter
+    rewriter --> ccCheck{"自带 cc?"}
+    ccCheck -- "yes (含 hijacker 3 段)" --> skip["pass-through 不动"]
+    ccCheck -- "no (含 hijacker 2 段)" --> single["给最末 system 单 cc"]
+    skip --> upstream["dashscope upstream"]
+    single --> upstream
+```
+
+##### 落地的具体改动
 
 | 文件 | 改动 |
 | --- | --- |
-| `common/ai/aid/aicache/hijacker.go` | 增加 3 段拆分主路径 (`build3SegmentMessages` + `splitTimelineFrozenOpen`), 用 last-b-is-open 约定从 timeline section 内的嵌套 `<\|TIMELINE_xxx\|>` 块识别 Frozen/Open 边界. 保留原 2 段拆分作为退化路径 (timeline 不存在 / 全 reducer / 单 interval / 拆分后任一 user 段为空时退化). |
-| `common/ai/aid/aicache/aicache.go` | 入口注释同步更新, 描述新的 3 段输出形态与下游 cc 注入约定. |
-| `common/aibalance/explicit_cache_rewriter.go` | `RewriteMessagesForExplicitCache` 新增 `pickCacheControlTargets`: 末位之前最近的 user 也作为 cc 注入目标; 维持"无 system 时绝对 pass-through"硬契约; 浅复制零副作用. |
-| `common/aibalance/server.go` | 调用点 log 改为同时打印 `cc_marks` 数(0/1/2), 便于线上观察 3 段路径触发频率与"漂移成本规避"效果. |
+| `common/ai/aid/aicache/hijacker.go` | 新增 `wrapTextWithEphemeralCC` helper; `build3SegmentMessages` 改为输出 system+user1 = `[]*aispec.ChatContent{{Type:"text", Text:..., CacheControl:{"type":"ephemeral"}}}`, user2 仍 string. 2 段退化路径 (`build2SegmentMessages`) 完全不动. |
+| `common/ai/aid/aicache/aicache.go` | 入口注释同步: 描述 §7.7.7 hijacker 自管 cc + aibalance 退让协议. |
+| `common/aibalance/explicit_cache_rewriter.go` | 撤销"末位之前最近 user 双 cc"逻辑, 回到只给最末 system 注入单 cc; 新增 `messagesAlreadyHaveCacheControl`/`contentHasCacheControl` 检测函数; `RewriteMessagesForExplicitCache` 入口在白名单检查后立即检测自带 cc, 命中即返回原切片 (零浅复制零副作用). |
+| `common/aibalance/server.go` | 撤回 cc_marks 双数日志, 回到原单参数日志; 注释更新描述 baseline 单 cc + 客户端 cc 退让语义. |
 
-新增/更新的测试:
+##### 新增/更新的测试
 
-- `aicache/hijacker_test.go` 增加 7 个 3 段拆分专项 (`MultiInterval` /
-  `ReducerPlusInterval` / `ReducerPlusSingleInterval` / `OnlyOneInterval` /
-  `OnlyReducer` / `NoTimelineSection` / `PrefixStable`),
-  `FixtureFourSection` 升级为同时容忍 2 段与 3 段输出 (fixture 000060 走 3 段,
-  000005/000010 走 2 段);
-- `aibalance/explicit_cache_rewriter_test.go` 增加 6 个双 cc 测试
-  (`SystemUserUser` / `SerializeBothInJSON` / `SingleUserOnlySystemCC` /
-  `AssistantBetweenUsers` / `NoSystemPassThrough` / `DoesNotMutateInput`),
-  覆盖典型 3 段输入、multi-turn 历史、单 user 退化与零副作用契约。
+- `aicache/hijacker_test.go`:
+  - 加 helper `extractTextContent` / `assertHasEphemeralCacheControl` /
+    `assertNoCacheControl` 兼容 string 与 `[]*ChatContent` 两种 content 形态;
+  - 新增 `TestHijack_3SegSplit_SystemAndUser1HaveCacheControl` 显式断言 cc 字段
+    + `TestHijack_3SegSplit_2SegFallbackHasNoCC` 反向断言 2 段路径不打 cc;
+  - 现有 7 个 3 段专项测试 (`MultiInterval` / `ReducerPlusInterval` /
+    `ReducerPlusSingleInterval` / `OnlyOneInterval` / `OnlyReducer` /
+    `NoTimelineSection` / `PrefixStable`) + `FixtureFourSection` 全部用 helper
+    透明兼容新 content 形态。
+- `aibalance/explicit_cache_rewriter_test.go`:
+  - 删除 6 个旧 DualCC 测试 (`TestRewriteMessages_DualCC_*`, 已不再适用);
+  - 新增 5 个客户端自带 cc 退让测试 (`RespectClientCC_OnSystem` /
+    `RespectClientCC_OnUser` / `RespectClientCC_DeepInArray` /
+    `RespectClientCC_InMapForm` / `RespectClientCC_ReturnsSameSlice`),
+    覆盖 4 种 content 形态 + 零浅复制契约。
 
-行为契约 (向 caller 暴露的不变量):
+##### 行为契约 (向 caller 暴露的不变量)
 
-1. **3 段触发条件**: prompt 含 `high-static` + `timeline` 段, 且 timeline
-   内可拆出至少 1 个 Frozen tagged block (reducer 或非末 interval) 和 1 个
-   Open interval block; 任一缺失 → 退化为 2 段. 这与 7.7.5 的
-   "1 个 frozen + 1 个 open 才触发" 风险阈值一致.
-2. **字节稳定性**: 只要 high-static 与 frozen-timeline 内容不变, system 与
-   user1 的 Content 字节级一致 (`TestHijack_3SegSplit_PrefixStable` 保证).
-   这是双 cc 命中的核心前置条件.
-3. **退化路径不破坏旧契约**: 现有所有 fixture 测试与 hijacker 单元测试全部
-   原样通过; `RewriteMessagesForExplicitCache` 在"单 user / 无 system"场景下
-   行为与改动前完全一致.
+1. **3 段触发条件不变**: prompt 含 `high-static` + `timeline` 段, 且
+   timeline 内可拆出至少 1 个 Frozen tagged block + 1 个 Open interval
+   block; 任一缺失 → 退化 2 段。
+2. **字节稳定性 (含 cc 字段)**: 只要 high-static 与 frozen-timeline 不变,
+   `r1.Messages[0].Content` 与 `r2.Messages[0].Content` 在 `reflect.DeepEqual`
+   下相等 (含 ephemeral cc 字段); user1 同理。`TestHijack_3SegSplit_PrefixStable`
+   保证 (DeepEqual 对 `[]*ChatContent` 递归比较元素值, 指针不同但内容相同时
+   仍判等)。
+3. **客户端自带 cc 时 aibalance 零修改**: 任意 message 的任意 content
+   位置出现 `cache_control` 字段 (含 `[]*ChatContent.CacheControl != nil` 与
+   `map[string]any["cache_control"] != nil` 两种形态), aibalance 立即 return
+   原切片, 切片头与所有元素地址完全一致 (`TestRewriteMessages_RespectClientCC_ReturnsSameSlice`
+   保证)。
+4. **跨 provider 安全**: hijacker 一律打 cc 不区分 model, 因为
+   `aispec.ChatContent.CacheControl` 文档承诺"上游若不识别该字段会原样忽略,
+   对其它 provider 完全无副作用"。dashscope 隐式缓存模型收到 cc 也会因为
+   不在显式缓存白名单而被忽略, 不会切到显式模式。
 
-预期收益 (基于 E14 r3 实测): 在典型生产 prompt 长度下,
-**双 cc 命中率 ~70% (vs 单 cc ~32%)**, 命中 token 计费 10% vs 创建
-token 计费 125%, 单次请求净 token 成本下降约 35%. 漂移成本风险被
-"3 段触发条件"的最小 frozen block 阈值卡住, 当 timeline 还没积累足够
-frozen 内容时自动退化到 2 段, 不会出现 E11/E12 那种"打了 cc 却没命中"
-的反向亏损.
+##### 预期收益
+
+E14 r3 实测在典型生产 prompt 长度下, 双 cc 命中率 ~70% (vs 单 cc ~32%);
+命中 token 按 input_token 单价 10% 计费, 创建 token 按 125% 计费, 单次请求
+净 token 成本下降约 35%。
+
+漂移成本风险被"3 段触发条件"的最小 frozen block 阈值卡住, 当 timeline 还
+没积累足够 frozen 内容时自动退化到 2 段 (string content), aibalance 走单 cc
+兜底。所以不会出现 E11/E12 那种"打了 cc 却没命中"的反向亏损。
+
+外部客户端 (例如直接走 OpenAI 兼容协议自管 cc 的高级 SDK 用户) 完全不受
+任何影响, aibalance 检测到自带 cc 立即退让, 客户端的缓存策略 100% 保留。
+
+#### 7.7.8 边界标签精细化 + provider-aware strip (本次完成)
+
+§7.7.7 把双 cc 注入责任下移给了 aicache hijacker, 但 hijacker 的切割
+锚点仍然依赖 timeline 内部的 `<|TIMELINE_b{N}t{...}|>` / `<|TIMELINE_r{key}t{...}|>`
+nonce 解析, 这有两个限制:
+
+1. **耦合 timeline 实现细节**: 任何对 timeline 渲染 nonce 命名的改动都
+   会破坏 hijacker 的切割。
+2. **不支持非 timeline 的稳定段**: 如果 caller 想在 `semi-dynamic` 段
+   声明一段 frozen 内容 (例如已读完整份代码 + 用户当前增量修改),
+   hijacker 没有切割锚点。
+
+##### 解决方案: 在 prompt 中插入显式边界标签
+
+新增一对边界标签作为"通用切割锚点", 任何 caller 都可以用它声明缓存边界:
+
+```
+<|AI_CACHE_FROZEN_semi-dynamic|>
+... 此段已字节冻结 (frozen prefix) ...
+<|AI_CACHE_FROZEN_END_semi-dynamic|>
+... 此段易变 (open tail) ...
+```
+
+##### 落地的具体改动
+
+| 文件 | 改动 |
+| --- | --- |
+| `common/ai/aid/aicommon/timeline_groups_render.go` | 新增 `RenderWithFrozenBoundary(aitagName, frozenTagName, frozenNonce string) string` 方法; 加包级常量 `TimelineFrozenBoundaryTagName="AI_CACHE_FROZEN"` / `TimelineFrozenBoundaryNonce="semi-dynamic"`; 当 frozen+open 混合时把 frozen 段包在边界内, 全 frozen / 全 open 时退化为裸 Render. |
+| `common/ai/aid/aicommon/timeline.go` | `Timeline.Dump()` 改为走 `RenderWithFrozenBoundary`, 自动在混合场景注入边界. |
+| `common/ai/aid/aicache/hijacker.go` | 新增 `splitByFrozenBoundary` 主路径: 用 `strings.Index` 找一对边界标签, 把所有非 high-static 内容切成 user1 (含 END 标签自身) + user2 (END 之后); `build3SegmentMessages` 主路径优先走边界识别, 找不到时退化到原 `splitTimelineFrozenOpen`. |
+| `common/aibalance/explicit_cache_rewriter.go` | 新增 `RewriteMessagesForProvider` 主入口 + `IsCacheControlAwareProvider` + `StripCacheControlFromMessages` + `stripCacheControlOnContent`; tongyi provider 走原 `RewriteMessagesForExplicitCache` (保留客户端 cc + 单 cc 兜底), 其他 provider (siliconflow / openai / anthropic / 等等) 强制 strip 所有 cc 字段. |
+| `common/aibalance/server.go` | 调用点改为 `RewriteMessagesForProvider`, log 区分 baseline 注入 / strip 两类事件. |
+
+##### Provider-aware cc strip (兼容性 + 安全性硬约束)
+
+§7.7.7 把双 cc 责任下移到 hijacker 后, hijacker 一律打 cc 不区分 model
+(借助"无害忽略"承诺)。但实测发现部分 provider 不是无害的:
+
+- 部分 OpenAI 兼容层会因为 `cache_control` 未知字段直接 400 报错
+- 部分 provider (例如 anthropic 自己也定义了 cache_control 但语义不同)
+  会引发意料外计费 / 路由
+- 部分 provider 不报错但把字段 echo 进 logging, 在客户端 trace 里产生
+  误导信息
+
+因此本次在 aibalance 主入口加了 provider 分发:
+
+| provider | 客户端自带 cc | hijacker cc | aibalance 行为 |
+| --- | --- | --- | --- |
+| tongyi (white-list model) | 是 | (任一) | pass-through (尊重) |
+| tongyi (white-list model) | 否 | 否 | 给 system 注入 baseline 单 cc |
+| tongyi (非 white-list model) | (任一) | (任一) | pass-through |
+| siliconflow / openai / anthropic / 等其他 | (任一) | (任一) | **强制 strip 全部 cc** |
+
+这让 hijacker 可以"无脑给 system+user1 打双 cc", 跨 provider 安全由 aibalance
+兜底剥离, 不需要 hijacker 知道下游是不是 tongyi。
+
+##### 新增/更新的测试
+
+- `aicommon/timeline_groups_render_test.go`: 7 个 frozen boundary 测试
+  (5 个 RenderWithFrozenBoundary 场景 + 2 个 Timeline.Dump 端到端验证)
+- `aicache/hijacker_test.go`: 6 个 frozen boundary 切割专项测试
+  (`UserExampleCase` / `NoTimelineSection_StillSplits` /
+  `PrefixStableAcrossOpenChange` / `OnlyStartTag_FallsBack` /
+  `EndedBeforeStart` / `TimelineDumpFormat`)
+- `aibalance/explicit_cache_rewriter_test.go`:
+  - 删除原 6 个 `TestRewriteMessages_DualCC_*` 已不再适用
+  - 加 5 个客户端自带 cc 退让测试 (§7.7.7)
+  - 加 11 个 provider-aware 测试 (`IsCacheControlAwareProvider` /
+    `RewriteForProvider_TongyiKeepsClientCC` /
+    `RewriteForProvider_TongyiInjectsBaselineCC` /
+    `RewriteForProvider_SiliconflowStripsAllCC` /
+    `RewriteForProvider_OpenAIStripsCC` /
+    `RewriteForProvider_AnthropicStripsMapCC` /
+    `RewriteForProvider_NoCC_ReturnsSameSlice` /
+    `StripCacheControl_DoesNotMutateInput` /
+    `StripCacheControl_HijackerOutputBecomesPlain` /
+    `StripCacheControl_NoCCReturnsSameSlice`)
+
+##### 详细维护指南
+
+完整的"4 类标签 + 4 种切割场景 + 算法伪代码 + 跨包字面量同步表 + 维护
+清单"见: [`CACHE_BOUNDARY_GUIDE.md`](CACHE_BOUNDARY_GUIDE.md)
+
+##### 收益评估
+
+| 维度 | §7.7.7 | §7.7.8 |
+| --- | --- | --- |
+| 双 cc 命中率 | ~70% (依赖 timeline 内部 nonce) | ~70% (用边界标签更精准) |
+| 切割锚点通用性 | 仅支持 timeline section 内的 frozen | 任意 caller 任意位置可声明 |
+| 维护耦合度 | 与 timeline 内部 nonce 命名耦合 | 仅依赖一对常量字面量 |
+| 跨 provider 安全 | hijacker 一律打 cc 但依赖"无害忽略" | aibalance 在路由层强制 strip 兜底 |
+| 客户端 SDK 兼容 | tongyi only | 所有 provider 都安全 |
 
 ---
 
@@ -1021,3 +1159,27 @@ RUN_ID=run-1777823006312881000 ONLY_EXP=E10 go run ./common/aibalance/cmd_cache_
 > **进一步优化空间** (E14 r3 实测路径): 在 user 已封闭区段尾再注入第
 > 二个 cache_control (跨 message 多 cc 各自有效), 命中率可从 32% 提
 > 升到 70%, 详见 §7.7 的 Timeline 封闭块二级缓存方案。
+
+---
+
+## 12. 设计决策变更记录
+
+| 日期 | 决策 | 现状 |
+| --- | --- | --- |
+| 初版 | aibalance rewriter 单 cc (最末 system) | E1-E10 验证为可用基线 |
+| §7.7.6 草案 | hijacker 切 3 段 + aibalance rewriter 双 cc (system + 末位之前最近 user) | 已实现并通过测试 |
+| §7.7.7 职责重排 | **双 cc 责任下移**: hijacker 走 3 段时自管 system+user1 双 cc; aibalance 退化为"baseline 单 cc + 自带 cc 完全退让"的纯网关行为 | 已实现 |
+| §7.7.8 边界标签 + provider strip | **切割锚点显式化** + **跨 provider 安全兜底**: hijacker 优先用 `<\|AI_CACHE_FROZEN_semi-dynamic\|>` 边界切, 不再耦合 timeline 内部 nonce; aibalance 按 provider 分发 (tongyi 保留 / 其他 strip) | **当前实现**, 见 §7.7.8 落地改动表 |
+
+**变更原因**:
+
+- §7.7.7 让 hijacker 一律打 cc, 但实测发现部分 provider 不是无害的
+  (siliconflow / OpenAI 兼容层 400 / anthropic 误计费), 需要 aibalance 在
+  路由层兜底 strip。
+- §7.7.7 hijacker 切割锚点依赖 timeline 内部 nonce 命名 (`b{N}t{...}`),
+  耦合度高且不支持非 timeline 的 frozen 段, 引入 `AI_CACHE_FROZEN`
+  边界标签作为通用切割锚点能解耦并扩展适用场景。
+
+功能等价 (双 cc 命中率仍 ~70%), 但切割精度更高、架构边界更清晰、跨 provider
+安全性由 aibalance 兜底。详细维护指南见
+[`CACHE_BOUNDARY_GUIDE.md`](CACHE_BOUNDARY_GUIDE.md)。

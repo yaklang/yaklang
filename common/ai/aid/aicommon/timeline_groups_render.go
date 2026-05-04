@@ -537,6 +537,24 @@ func (r *TimelineReducerBlock) IsOpen() bool {
 // 关键词: TimelineRenderableBlocks
 type TimelineRenderableBlocks []TimelineRenderableBlock
 
+// TimelineFrozenBoundaryTagName 是 RenderWithFrozenBoundary 默认使用的
+// "frozen 段外包"标签名。配合 TimelineFrozenBoundaryNonce 一起组成
+// <|AI_CACHE_FROZEN_semi-dynamic|>...<|AI_CACHE_FROZEN_END_semi-dynamic|>,
+// 让下游 aicache hijacker 通过简单字符串 IndexOf 就能精准切到 frozen
+// 与 open 的边界, 无需再深入解析 timeline 内部嵌套 TIMELINE 子标签结构。
+//
+// 命名说明:
+//   - "AI_CACHE_FROZEN" 表明这是 aicache 体系约定的"该段内容已字节冻结、
+//     适合作为 prefix cache 命中"的边界标签
+//   - "semi-dynamic" 是边界 nonce, 表达"这一段的稳定性介于 high-static 与
+//     完全 open 之间", 与 PROMPT_SECTION_semi-dynamic 是不同 tagName, 互不冲突
+//
+// 关键词: TimelineFrozenBoundaryTagName, AI_CACHE_FROZEN, frozen 边界标签
+const (
+	TimelineFrozenBoundaryTagName = "AI_CACHE_FROZEN"
+	TimelineFrozenBoundaryNonce   = "semi-dynamic"
+)
+
 // Render 将所有 renderable block 按 aitag 兼容格式拼接：
 //
 //	<|TAGNAME_<nonce>|>
@@ -545,7 +563,13 @@ type TimelineRenderableBlocks []TimelineRenderableBlock
 //
 // 同一个 aitagName 下不同 block 通过各自稳定 nonce 区分；
 // frozen block 的标签与内容均字节级稳定，可被 LLM 前缀缓存命中
-// 关键词: TimelineRenderableBlocks.Render, aitag 兼容, 前缀缓存
+//
+// 注意: 这是不带 frozen boundary 的"裸"渲染, 主要用于不需要切缓存边界的
+// 场景 (例如调试 dump、测试断言)。生产 prompt 路径建议走
+// RenderWithFrozenBoundary, 它在外层加上 AI_CACHE_FROZEN 边界让 hijacker
+// 能精准识别可缓存前缀。
+//
+// 关键词: TimelineRenderableBlocks.Render, aitag 兼容, 前缀缓存, 裸渲染
 func (bs TimelineRenderableBlocks) Render(aitagName string) string {
 	if len(bs) == 0 {
 		return ""
@@ -570,5 +594,90 @@ func (bs TimelineRenderableBlocks) Render(aitagName string) string {
 		buf.WriteString(fmt.Sprintf("<|%s_END_%s|>", tag, nonce))
 		emitted++
 	}
+	return buf.String()
+}
+
+// RenderWithFrozenBoundary 在 Render 的基础上, 把"已冻结"前缀段外面再
+// 包一层 <|frozenTagName_frozenNonce|>...<|frozenTagName_END_frozenNonce|>
+// 边界标签, 让下游缓存切割逻辑 (aicache hijacker) 通过简单字符串 IndexOf
+// 就能精准定位到 frozen 与 open 的边界, 无需再深入解析每个 TIMELINE 子块。
+//
+// 输出形态 (frozenTagName=AI_CACHE_FROZEN, frozenNonce=semi-dynamic 时):
+//
+//	<|AI_CACHE_FROZEN_semi-dynamic|>
+//	<|TAGNAME_<nonce-of-reducer-1>|>...<|TAGNAME_END_<nonce-of-reducer-1>|>
+//	<|TAGNAME_<nonce-of-frozen-interval-1>|>...<|TAGNAME_END_<nonce-of-frozen-interval-1>|>
+//	...
+//	<|AI_CACHE_FROZEN_END_semi-dynamic|>
+//	<|TAGNAME_<nonce-of-open-interval>|>...<|TAGNAME_END_<nonce-of-open-interval>|>
+//
+// 边界判定: 走列表 + IsOpen() 看尾部 — frozen 段 = 所有 IsOpen()==false 的连续前缀,
+// open 段 = 第一个 IsOpen()==true 之后的所有 block。这个判定与
+// TimelineGroups.GetAllRenderable() 输出顺序 (reducer 在前 + interval 按时间升序)
+// 完全一致, reducer 恒 frozen, 仅最末时间桶 IsOpen()=true。
+//
+// 边界**只在确实存在 frozen 段时**才包裹:
+//   - 全 open (没有任何 frozen block) -> 不包裹, 直接 Render(aitagName)
+//   - 全 frozen (没有 open block) -> 不包裹, 直接 Render(aitagName)
+//     (整段都是 frozen, 不需要切边界, 可整体作为 prefix cache)
+//   - 一个 frozen + 一个 open -> 包裹 frozen, open 留在边界外
+//
+// 这避免了"边界标签存在但实际无 open 段"的歧义场景, 让 hijacker 看到边界
+// 标签时可以确信"边界后必有易变内容, 需要切到独立 user 消息"。
+//
+// 字节稳定性保证 (与 prefix cache 命中前提对齐):
+//   - frozen 段内部的 block.Render() 已字节稳定 (reducer / 非末时间桶)
+//   - 边界标签字面量恒定 (不含动态值, 仅常量 frozenTagName_frozenNonce)
+//   - 因此只要 frozen 段 block 列表内容不变, 整段输出 (含边界) 字节级一致
+//   - open 段内容变化不影响 frozen 段输出 (它们位于边界 END 之后)
+//
+// frozenTagName / frozenNonce 留空时使用包级默认 TimelineFrozenBoundaryTagName /
+// TimelineFrozenBoundaryNonce。
+//
+// 关键词: TimelineRenderableBlocks.RenderWithFrozenBoundary, AI_CACHE_FROZEN,
+//        frozen open 边界标签, hijacker 切割锚点, 前缀缓存
+func (bs TimelineRenderableBlocks) RenderWithFrozenBoundary(aitagName, frozenTagName, frozenNonce string) string {
+	if len(bs) == 0 {
+		return ""
+	}
+
+	// 过滤 nil 并区分 frozen / open
+	frozen := make(TimelineRenderableBlocks, 0, len(bs))
+	open := make(TimelineRenderableBlocks, 0, len(bs))
+	for _, blk := range bs {
+		if blk == nil {
+			continue
+		}
+		if blk.IsOpen() {
+			open = append(open, blk)
+		} else {
+			frozen = append(frozen, blk)
+		}
+	}
+
+	// 全 open 或全 frozen -> 不包边界, 直接走原 Render
+	if len(frozen) == 0 || len(open) == 0 {
+		return bs.Render(aitagName)
+	}
+
+	bTag := normalizeAITagName(frozenTagName)
+	if bTag == "TIMELINE_INTERVAL_GROUP" && strings.TrimSpace(frozenTagName) == "" {
+		// 调用方未指定时回退到包级默认
+		bTag = normalizeAITagName(TimelineFrozenBoundaryTagName)
+	}
+	bNonce := strings.TrimSpace(frozenNonce)
+	if bNonce == "" {
+		bNonce = TimelineFrozenBoundaryNonce
+	}
+
+	frozenBody := frozen.Render(aitagName)
+	openBody := open.Render(aitagName)
+
+	var buf bytes.Buffer
+	buf.WriteString(fmt.Sprintf("<|%s_%s|>\n", bTag, bNonce))
+	buf.WriteString(frozenBody)
+	buf.WriteByte('\n')
+	buf.WriteString(fmt.Sprintf("<|%s_END_%s|>\n", bTag, bNonce))
+	buf.WriteString(openBody)
 	return buf.String()
 }

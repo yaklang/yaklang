@@ -6,7 +6,83 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 )
+
+// extractTextContent 把 hijacker 输出的 message.Content 提取成 string,
+// 兼容两种形态:
+//   - string (2 段退化路径 / 3 段路径下的 user2)
+//   - []*aispec.ChatContent (3 段路径下的 system / user1, 带 cache_control)
+//
+// §7.7.7 后 hijacker 在 3 段路径下会把 system+user1 包成 ChatContent 数组
+// 加 ephemeral cache_control 标记, 测试断言 user 内容时需要先用此 helper
+// 提取出底层文本再做 contains/equal 判断。
+//
+// 关键词: aicache, hijacker test helper, extractTextContent, content 形态兼容
+func extractTextContent(t *testing.T, content any) string {
+	t.Helper()
+	switch v := content.(type) {
+	case string:
+		return v
+	case []*aispec.ChatContent:
+		var sb strings.Builder
+		for _, c := range v {
+			if c != nil {
+				sb.WriteString(c.Text)
+			}
+		}
+		return sb.String()
+	default:
+		t.Fatalf("unexpected message.Content type: %T", content)
+		return ""
+	}
+}
+
+// assertHasEphemeralCacheControl 断言 content 是 []*aispec.ChatContent 形态
+// 且至少有一个非 nil 元素的 CacheControl == map[string]any{"type":"ephemeral"}.
+// 用于验证 3 段路径下 hijacker 主动打的 cc 字段。
+//
+// 关键词: aicache, hijacker test helper, ephemeral cc 断言
+func assertHasEphemeralCacheControl(t *testing.T, content any, label string) {
+	t.Helper()
+	contents, ok := content.([]*aispec.ChatContent)
+	require.True(t, ok, "%s: expected []*aispec.ChatContent, got %T", label, content)
+	require.NotEmpty(t, contents, "%s: ChatContent slice must not be empty", label)
+	found := false
+	for _, c := range contents {
+		if c == nil {
+			continue
+		}
+		if cc, ok := c.CacheControl.(map[string]any); ok && cc["type"] == "ephemeral" {
+			found = true
+			break
+		}
+	}
+	require.True(t, found, "%s: must contain at least one ephemeral cache_control marker", label)
+}
+
+// assertNoCacheControl 断言 content 完全不带 cache_control:
+// 要么是 string, 要么是 []*ChatContent 但所有元素的 CacheControl 都为 nil.
+// 用于验证 user2 (open 段) 不被 hijacker 打 cc。
+//
+// 关键词: aicache, hijacker test helper, 无 cc 断言
+func assertNoCacheControl(t *testing.T, content any, label string) {
+	t.Helper()
+	switch v := content.(type) {
+	case string:
+		return
+	case []*aispec.ChatContent:
+		for i, c := range v {
+			if c == nil {
+				continue
+			}
+			require.Nil(t, c.CacheControl,
+				"%s: element[%d] must NOT carry cache_control, got %v", label, i, c.CacheControl)
+		}
+	default:
+		t.Fatalf("%s: unexpected content type: %T", label, content)
+	}
+}
 
 // TestHijack_FourSectionPrompt 验证 4 段完整 prompt 被切成 [system, user]，
 // system 包含 AI_CACHE_SYSTEM 包装，user 含其余 3 段且能被 Split 重新识别。
@@ -203,17 +279,28 @@ func TestHijack_FixtureFourSection(t *testing.T) {
 				"fixture %s should produce 2 or 3 messages, got %d", name, len(res.Messages))
 
 			// system 中必须包含完整的 high-static 内容
+			// 2 段路径下 system 是 string, 3 段路径下是 []*ChatContent (带 cc)
 			systemMsg := res.Messages[0]
 			assert.Equal(t, "system", systemMsg.Role)
-			systemContent := systemMsg.Content.(string)
+			systemContent := extractTextContent(t, systemMsg.Content)
 			assert.Contains(t, systemContent, "<|AI_CACHE_SYSTEM_high-static|>")
 			assert.Contains(t, systemContent, "<|AI_CACHE_SYSTEM_END_high-static|>")
+
+			// 3 段路径下 system 必须自带 ephemeral cc (§7.7.7 hijacker 自管 cc)
+			if len(res.Messages) == 3 {
+				assertHasEphemeralCacheControl(t, systemMsg.Content,
+					"fixture "+name+" system (3-segment)")
+				assertHasEphemeralCacheControl(t, res.Messages[1].Content,
+					"fixture "+name+" user1 (3-segment)")
+				assertNoCacheControl(t, res.Messages[2].Content,
+					"fixture "+name+" user2 (3-segment, open part)")
+			}
 
 			// 把所有 user 消息内容拼起来再 round-trip 检查 section 完整性
 			var allUser strings.Builder
 			for i := 1; i < len(res.Messages); i++ {
 				assert.Equal(t, "user", res.Messages[i].Role)
-				allUser.WriteString(res.Messages[i].Content.(string))
+				allUser.WriteString(extractTextContent(t, res.Messages[i].Content))
 				allUser.WriteString("\n")
 			}
 			combined := allUser.String()
@@ -320,9 +407,9 @@ func TestHijack_3SegSplit_MultiInterval(t *testing.T) {
 	assert.Equal(t, "user", res.Messages[1].Role)
 	assert.Equal(t, "user", res.Messages[2].Role)
 
-	system := res.Messages[0].Content.(string)
-	user1 := res.Messages[1].Content.(string)
-	user2 := res.Messages[2].Content.(string)
+	system := extractTextContent(t, res.Messages[0].Content)
+	user1 := extractTextContent(t, res.Messages[1].Content)
+	user2 := extractTextContent(t, res.Messages[2].Content)
 
 	assert.Contains(t, system, "static-CONTENT")
 	assert.NotContains(t, user1, "static-CONTENT")
@@ -359,8 +446,8 @@ func TestHijack_3SegSplit_ReducerPlusInterval(t *testing.T) {
 	require.NotNil(t, res)
 	require.Len(t, res.Messages, 3)
 
-	user1 := res.Messages[1].Content.(string)
-	user2 := res.Messages[2].Content.(string)
+	user1 := extractTextContent(t, res.Messages[1].Content)
+	user2 := extractTextContent(t, res.Messages[2].Content)
 
 	assert.Contains(t, user1, "compressed-summary", "reducer is frozen, should be in user1")
 	assert.Contains(t, user1, "bucket-D-content", "non-last interval is frozen, should be in user1")
@@ -384,8 +471,8 @@ func TestHijack_3SegSplit_ReducerPlusSingleInterval(t *testing.T) {
 	require.Len(t, res.Messages, 3,
 		"reducer (frozen) + 1 interval (open) should still split to 3 segments")
 
-	user1 := res.Messages[1].Content.(string)
-	user2 := res.Messages[2].Content.(string)
+	user1 := extractTextContent(t, res.Messages[1].Content)
+	user2 := extractTextContent(t, res.Messages[2].Content)
 	assert.Contains(t, user1, "reducer-only")
 	assert.NotContains(t, user1, "single-interval")
 	assert.Contains(t, user2, "single-interval")
@@ -440,9 +527,76 @@ func TestHijack_3SegSplit_NoTimelineSection(t *testing.T) {
 	require.Len(t, res.Messages, 2, "no timeline section should produce 2 segments")
 }
 
+// TestHijack_3SegSplit_SystemAndUser1HaveCacheControl 验证 §7.7.7 hijacker
+// 自管双 cc: 3 段路径下 system + user1 主动包成 []*aispec.ChatContent 并
+// 挂 ephemeral cache_control; user2 (open 段) 保持 string 不打 cc。
+// 这是 aibalance 退让协议 (messagesAlreadyHaveCacheControl) 的触发前提。
+// 关键词: aicache, hijacker, 双 cc 自管, ephemeral cache_control, §7.7.7
+func TestHijack_3SegSplit_SystemAndUser1HaveCacheControl(t *testing.T) {
+	prompt := buildPromptWithTimelineInner(
+		tlReducer("9", "reducer-frozen"),
+		tlInterval("100", "frozen-A"),
+		tlInterval("200", "frozen-B"),
+		tlInterval("300", "open-tail"),
+	)
+	res := hijackHighStatic(prompt)
+	require.NotNil(t, res)
+	require.True(t, res.IsHijacked)
+	require.Len(t, res.Messages, 3, "hijacker self-managed dual cc requires 3-segment path")
+
+	// system: 必须是 []*ChatContent 形态, 末元素 (本场景下唯一) 带 ephemeral cc
+	sysContents, ok := res.Messages[0].Content.([]*aispec.ChatContent)
+	require.True(t, ok, "system content must be []*ChatContent in 3-segment path, got %T", res.Messages[0].Content)
+	require.Len(t, sysContents, 1, "hijacker wraps system into single-element ChatContent slice")
+	require.Equal(t, "text", sysContents[0].Type)
+	require.NotEmpty(t, sysContents[0].Text)
+	cc, ok := sysContents[0].CacheControl.(map[string]any)
+	require.True(t, ok, "system CacheControl must be map[string]any, got %T", sysContents[0].CacheControl)
+	require.Equal(t, "ephemeral", cc["type"], "system cc must be ephemeral")
+
+	// user1: 同上
+	user1Contents, ok := res.Messages[1].Content.([]*aispec.ChatContent)
+	require.True(t, ok, "user1 content must be []*ChatContent in 3-segment path, got %T", res.Messages[1].Content)
+	require.Len(t, user1Contents, 1)
+	require.Equal(t, "text", user1Contents[0].Type)
+	require.NotEmpty(t, user1Contents[0].Text)
+	cc1, ok := user1Contents[0].CacheControl.(map[string]any)
+	require.True(t, ok, "user1 CacheControl must be map[string]any, got %T", user1Contents[0].CacheControl)
+	require.Equal(t, "ephemeral", cc1["type"], "user1 cc must be ephemeral")
+
+	// user2: 必须是 string, 不带任何 cc 字段 (open 段易变, 不缓存)
+	user2Str, ok := res.Messages[2].Content.(string)
+	require.True(t, ok, "user2 (open) content must be string, got %T", res.Messages[2].Content)
+	require.NotEmpty(t, user2Str)
+	require.Contains(t, user2Str, "open-tail", "user2 should carry the open timeline tail")
+}
+
+// TestHijack_3SegSplit_2SegFallbackHasNoCC 退化到 2 段时, hijacker 不打 cc
+// (system + user 都是 string), 由 aibalance 走"baseline 单 cc 兜底"路径
+// 给最末 system 注入 cc。这保证退化路径不破坏 aibalance 现有行为。
+// 关键词: aicache, hijacker, 2 段退化路径, 不打 cc, aibalance 兜底
+func TestHijack_3SegSplit_2SegFallbackHasNoCC(t *testing.T) {
+	// timeline 只有 1 个 interval → 退化 2 段
+	prompt := buildPromptWithTimelineInner(
+		tlInterval("777", "lone-interval"),
+	)
+	res := hijackHighStatic(prompt)
+	require.NotNil(t, res)
+	require.Len(t, res.Messages, 2, "single interval should fallback to 2 segments")
+
+	// 2 段路径下 system 与 user 都应该是简单 string, 不带 cc
+	sysStr, ok := res.Messages[0].Content.(string)
+	require.True(t, ok, "2-seg fallback system must be string, got %T", res.Messages[0].Content)
+	require.NotEmpty(t, sysStr)
+	userStr, ok := res.Messages[1].Content.(string)
+	require.True(t, ok, "2-seg fallback user must be string, got %T", res.Messages[1].Content)
+	require.NotEmpty(t, userStr)
+}
+
 // TestHijack_3SegSplit_PrefixStable 同一 system + 同一 frozen-timeline 段在 2 次
 // hijack 中, system 消息与 user1 消息字节级一致 (open 段不同), 这是双 cc 命中
-// 的核心前置条件。
+// 的核心前置条件。注意: r1/r2 之间 ChatContent 指针虽不同但 reflect.DeepEqual
+// 仍通过 (DeepEqual 对指针递归比较指向的值)。
 // 关键词: aicache, hijacker, 字节稳定, 3 段拆分前缀稳定
 func TestHijack_3SegSplit_PrefixStable(t *testing.T) {
 	frozen := []string{
@@ -466,4 +620,259 @@ func TestHijack_3SegSplit_PrefixStable(t *testing.T) {
 		"user1 (frozen prefix) must be byte-identical when frozen timeline is unchanged")
 	assert.NotEqual(t, r1.Messages[2].Content, r2.Messages[2].Content,
 		"user2 (open part) should differ across rounds when open bucket grows")
+}
+
+// ---------------------------------------------------------------------------
+// frozen boundary 切割专项测试 (§7.7.8 主路径)
+// 验证 hijacker 优先用 <|AI_CACHE_FROZEN_semi-dynamic|>...
+// <|AI_CACHE_FROZEN_END_semi-dynamic|> 边界标签做切割, 当边界存在时不再
+// 进入 timeline 内部解析的退化路径。
+// ---------------------------------------------------------------------------
+
+// TestHijack_FrozenBoundary_UserExampleCase 用户给的 4-block 切割期望:
+//
+//	A-system  (high-static)
+//	B-semi-static
+//	<|AI_CACHE_FROZEN_semi-dynamic|>
+//	<Timeline-Reducer>
+//	<Timeline-ITEM1>
+//	<Timeline-ITEM2>
+//	<|AI_CACHE_FROZEN_END_semi-dynamic|>
+//	<Timeline-ITEM3-Open>
+//	D
+//	E
+//	F
+//
+// 期望切分:
+//
+//	system: A-system + cc
+//	user1:  B-semi-static + frozen-block-content (含 START + END 标签自身) + cc
+//	user2:  Timeline-ITEM3-Open + DEF
+//
+// 关键词: hijacker, frozen boundary, 用户案例, §7.7.8 主路径
+func TestHijack_FrozenBoundary_UserExampleCase(t *testing.T) {
+	prompt := strings.Join([]string{
+		"<|AI_CACHE_SYSTEM_high-static|>\nA-system\n<|AI_CACHE_SYSTEM_END_high-static|>",
+		"<|PROMPT_SECTION_semi-dynamic|>\nB-semi-static\n<|PROMPT_SECTION_END_semi-dynamic|>",
+		"<|PROMPT_SECTION_timeline|>\n" +
+			"<|AI_CACHE_FROZEN_semi-dynamic|>\n" +
+			"<|TIMELINE_r1t1|>\nTimeline-Reducer-content\n<|TIMELINE_END_r1t1|>\n" +
+			"<|TIMELINE_b3t100|>\nTimeline-ITEM1-content\n<|TIMELINE_END_b3t100|>\n" +
+			"<|TIMELINE_b3t200|>\nTimeline-ITEM2-content\n<|TIMELINE_END_b3t200|>\n" +
+			"<|AI_CACHE_FROZEN_END_semi-dynamic|>\n" +
+			"<|TIMELINE_b3t300|>\nTimeline-ITEM3-Open-content\n<|TIMELINE_END_b3t300|>\n" +
+			"<|PROMPT_SECTION_END_timeline|>",
+		"<|PROMPT_SECTION_dynamic_userQuery|>\nD-E-F-content\n<|PROMPT_SECTION_dynamic_END_userQuery|>",
+	}, "\n\n")
+
+	res := hijackHighStatic(prompt)
+	require.NotNil(t, res, "user-case should hijack")
+	require.True(t, res.IsHijacked)
+	require.Len(t, res.Messages, 3, "user-case should split into 3 segments via frozen boundary")
+
+	system := extractTextContent(t, res.Messages[0].Content)
+	user1 := extractTextContent(t, res.Messages[1].Content)
+	user2 := extractTextContent(t, res.Messages[2].Content)
+
+	// system 必须含 A-system, 不含 user 段任何内容
+	require.Contains(t, system, "A-system", "system must contain high-static body")
+	require.NotContains(t, system, "B-semi-static")
+	require.NotContains(t, system, "Timeline-")
+	require.NotContains(t, system, "D-E-F")
+
+	// user1 必须含 B-semi-static + frozen 段所有内容 + 边界标签自身
+	// (user1 包含 END 标签是字节边界稳定性的关键, 见 splitByFrozenBoundary 文档)
+	require.Contains(t, user1, "B-semi-static", "user1 should carry semi-static prefix")
+	require.Contains(t, user1, "Timeline-Reducer-content", "user1 should carry frozen reducer")
+	require.Contains(t, user1, "Timeline-ITEM1-content")
+	require.Contains(t, user1, "Timeline-ITEM2-content")
+	require.Contains(t, user1, "<|AI_CACHE_FROZEN_END_semi-dynamic|>",
+		"user1 must INCLUDE the boundary END tag itself for byte-stable prefix")
+	require.NotContains(t, user1, "Timeline-ITEM3-Open-content",
+		"open bucket must NOT be in user1")
+	require.NotContains(t, user1, "D-E-F-content", "dynamic must NOT be in user1")
+
+	// user2 必须含 open + dynamic, 不含 frozen 任何内容
+	require.Contains(t, user2, "Timeline-ITEM3-Open-content", "user2 should carry open bucket")
+	require.Contains(t, user2, "D-E-F-content", "user2 should carry dynamic")
+	require.NotContains(t, user2, "Timeline-Reducer-content")
+	require.NotContains(t, user2, "Timeline-ITEM1-content")
+	require.NotContains(t, user2, "<|AI_CACHE_FROZEN_semi-dynamic|>",
+		"user2 must NOT carry the boundary START tag (it belongs to user1)")
+
+	// system + user1 必须自带 ephemeral cc (§7.7.7 hijacker 自管双 cc)
+	assertHasEphemeralCacheControl(t, res.Messages[0].Content, "user-case system")
+	assertHasEphemeralCacheControl(t, res.Messages[1].Content, "user-case user1")
+	assertNoCacheControl(t, res.Messages[2].Content, "user-case user2")
+}
+
+// TestHijack_FrozenBoundary_NoTimelineSection_StillSplits frozen boundary
+// 不依赖 PROMPT_SECTION_timeline 包装, 直接出现在 user 区块的任意位置都能切割。
+// 这验证了边界标签的"通用切割锚点"语义 — 任何 caller 都能用它声明缓存边界,
+// 不需要走 timeline 渲染。
+// 关键词: hijacker, frozen boundary, 无 timeline section, 通用切割锚点
+func TestHijack_FrozenBoundary_NoTimelineSection_StillSplits(t *testing.T) {
+	prompt := strings.Join([]string{
+		"<|AI_CACHE_SYSTEM_high-static|>\nstatic-system\n<|AI_CACHE_SYSTEM_END_high-static|>",
+		"<|PROMPT_SECTION_semi-dynamic|>\nsemi-content\n" +
+			"<|AI_CACHE_FROZEN_semi-dynamic|>\n" +
+			"frozen-prefix-block\n" +
+			"<|AI_CACHE_FROZEN_END_semi-dynamic|>\n" +
+			"open-tail-after-boundary\n" +
+			"<|PROMPT_SECTION_END_semi-dynamic|>",
+	}, "\n\n")
+
+	res := hijackHighStatic(prompt)
+	require.NotNil(t, res)
+	require.Len(t, res.Messages, 3,
+		"frozen boundary inside semi-dynamic (no timeline) should still split to 3 segments")
+
+	user1 := extractTextContent(t, res.Messages[1].Content)
+	user2 := extractTextContent(t, res.Messages[2].Content)
+
+	require.Contains(t, user1, "semi-content")
+	require.Contains(t, user1, "frozen-prefix-block")
+	require.Contains(t, user1, "<|AI_CACHE_FROZEN_END_semi-dynamic|>")
+	require.NotContains(t, user1, "open-tail-after-boundary")
+
+	require.Contains(t, user2, "open-tail-after-boundary")
+	require.NotContains(t, user2, "frozen-prefix-block")
+}
+
+// TestHijack_FrozenBoundary_PrefixStableAcrossOpenChange 前缀稳定: open
+// 段内容变化不影响 user1 字节序列 (与 §7.7.7 双 cc 命中前提对齐)。
+// 关键词: hijacker, frozen boundary, 前缀字节稳定
+func TestHijack_FrozenBoundary_PrefixStableAcrossOpenChange(t *testing.T) {
+	mk := func(openContent string) string {
+		return strings.Join([]string{
+			"<|AI_CACHE_SYSTEM_high-static|>\nfixed-system\n<|AI_CACHE_SYSTEM_END_high-static|>",
+			"<|PROMPT_SECTION_semi-dynamic|>\nsd-content\n<|PROMPT_SECTION_END_semi-dynamic|>",
+			"<|PROMPT_SECTION_timeline|>\n" +
+				"<|AI_CACHE_FROZEN_semi-dynamic|>\n" +
+				"<|TIMELINE_b3t100|>\nfrozen-A\n<|TIMELINE_END_b3t100|>\n" +
+				"<|TIMELINE_b3t200|>\nfrozen-B\n<|TIMELINE_END_b3t200|>\n" +
+				"<|AI_CACHE_FROZEN_END_semi-dynamic|>\n" +
+				"<|TIMELINE_b3t999|>\n" + openContent + "\n<|TIMELINE_END_b3t999|>\n" +
+				"<|PROMPT_SECTION_END_timeline|>",
+		}, "\n\n")
+	}
+	r1 := hijackHighStatic(mk("open-r1-payload"))
+	r2 := hijackHighStatic(mk("open-r2-completely-different"))
+	require.NotNil(t, r1)
+	require.NotNil(t, r2)
+	require.Len(t, r1.Messages, 3)
+	require.Len(t, r2.Messages, 3)
+
+	assert.Equal(t, r1.Messages[0].Content, r2.Messages[0].Content,
+		"system must be byte-stable when high-static unchanged")
+	assert.Equal(t, r1.Messages[1].Content, r2.Messages[1].Content,
+		"user1 must be byte-stable when frozen prefix unchanged (boundary cut)")
+	assert.NotEqual(t, r1.Messages[2].Content, r2.Messages[2].Content,
+		"user2 should differ when open bucket changes")
+}
+
+// TestHijack_FrozenBoundary_OnlyStartTag_FallsBack 只有 START 没有 END 的
+// 残缺边界 -> hijacker 应当退化到 timeline 内部解析路径, 不在残缺位置乱切。
+// 关键词: hijacker, frozen boundary, 残缺边界退化
+func TestHijack_FrozenBoundary_OnlyStartTag_FallsBack(t *testing.T) {
+	prompt := strings.Join([]string{
+		"<|AI_CACHE_SYSTEM_high-static|>\nstatic\n<|AI_CACHE_SYSTEM_END_high-static|>",
+		"<|PROMPT_SECTION_timeline|>\n" +
+			"<|AI_CACHE_FROZEN_semi-dynamic|>\n" + // 只有 START 没有 END
+			"<|TIMELINE_r1t1|>\nreducer-X\n<|TIMELINE_END_r1t1|>\n" +
+			"<|TIMELINE_b3t100|>\nfrozen-A\n<|TIMELINE_END_b3t100|>\n" +
+			"<|TIMELINE_b3t200|>\nopen-tail\n<|TIMELINE_END_b3t200|>\n" +
+			"<|PROMPT_SECTION_END_timeline|>",
+	}, "\n\n")
+
+	res := hijackHighStatic(prompt)
+	require.NotNil(t, res, "should still hijack via fallback timeline parse")
+	require.Len(t, res.Messages, 3,
+		"residual START-only boundary should NOT trigger boundary split, must fall back to timeline parse (which still gives 3 segments)")
+
+	// 退化路径走 timeline 内部解析: 末 b* 是 open, 前面 reducer + 非末 b* 是 frozen
+	user1 := extractTextContent(t, res.Messages[1].Content)
+	user2 := extractTextContent(t, res.Messages[2].Content)
+	require.Contains(t, user1, "reducer-X")
+	require.Contains(t, user1, "frozen-A")
+	require.Contains(t, user2, "open-tail")
+	require.NotContains(t, user1, "open-tail")
+}
+
+// TestHijack_FrozenBoundary_EndedBeforeStart 出现 END 但 START 在 END 之后
+// (病态顺序) -> hijacker 退化到 timeline 内部解析。
+// 关键词: hijacker, frozen boundary, START 在 END 之后退化
+func TestHijack_FrozenBoundary_EndedBeforeStart(t *testing.T) {
+	// 注意: splitByFrozenBoundary 用 strings.Index 找第一个 START, 然后从 START 后
+	// 找第一个 END。此处构造的是"END 在前, START 在后", 第一个 START 后没有 END,
+	// 所以应当退化。
+	prompt := strings.Join([]string{
+		"<|AI_CACHE_SYSTEM_high-static|>\nstatic\n<|AI_CACHE_SYSTEM_END_high-static|>",
+		"<|PROMPT_SECTION_timeline|>\n" +
+			"<|AI_CACHE_FROZEN_END_semi-dynamic|>\n" + // END 在前
+			"<|TIMELINE_r1t1|>\nreducer-Y\n<|TIMELINE_END_r1t1|>\n" +
+			"<|TIMELINE_b3t100|>\nfrozen-A2\n<|TIMELINE_END_b3t100|>\n" +
+			"<|TIMELINE_b3t200|>\nopen-tail2\n<|TIMELINE_END_b3t200|>\n" +
+			"<|AI_CACHE_FROZEN_semi-dynamic|>\n" + // START 在后
+			"<|PROMPT_SECTION_END_timeline|>",
+	}, "\n\n")
+
+	res := hijackHighStatic(prompt)
+	require.NotNil(t, res, "should fall back gracefully")
+	require.Len(t, res.Messages, 3, "fall back to timeline parse should still yield 3 segments")
+}
+
+// TestHijack_FrozenBoundary_TimelineDumpFormat 端到端格式验证: 用 aicommon
+// Timeline.Dump 实际输出格式构造 prompt (手写复刻 Dump 输出, 不依赖真实
+// Timeline 时间戳), 验证 hijacker 可以正确切割。
+// 关键词: hijacker, frozen boundary, Timeline.Dump 输出格式兼容
+func TestHijack_FrozenBoundary_TimelineDumpFormat(t *testing.T) {
+	// 复刻 aicommon Timeline.Dump 在 frozen+open 混合场景下的输出格式:
+	//   <|AI_CACHE_FROZEN_semi-dynamic|>
+	//   <|TIMELINE_b3tXXXX|>...<|TIMELINE_END_b3tXXXX|>   (frozen 桶)
+	//   <|TIMELINE_b3tYYYY|>...<|TIMELINE_END_b3tYYYY|>   (frozen 桶)
+	//   <|AI_CACHE_FROZEN_END_semi-dynamic|>
+	//   <|TIMELINE_b3tZZZZ|>...<|TIMELINE_END_b3tZZZZ|>   (open 末桶)
+	timelineDump := strings.Join([]string{
+		"<|AI_CACHE_FROZEN_semi-dynamic|>",
+		"<|TIMELINE_b3t1746180000|>",
+		"# bucket=2026/05/02 10:00:00-10:03:00 interval=3m",
+		"10:00:30 [tool/scan ok]",
+		"data-A",
+		"<|TIMELINE_END_b3t1746180000|>",
+		"<|TIMELINE_b3t1746180180|>",
+		"# bucket=2026/05/02 10:03:00-10:06:00 interval=3m",
+		"10:04:00 [tool/scan ok]",
+		"data-B",
+		"<|TIMELINE_END_b3t1746180180|>",
+		"<|AI_CACHE_FROZEN_END_semi-dynamic|>",
+		"<|TIMELINE_b3t1746180360|>",
+		"# bucket=2026/05/02 10:06:00-10:09:00 interval=3m",
+		"10:07:00 [tool/scan ok]",
+		"data-C-OPEN",
+		"<|TIMELINE_END_b3t1746180360|>",
+	}, "\n")
+
+	prompt := strings.Join([]string{
+		"<|AI_CACHE_SYSTEM_high-static|>\nfixed-static\n<|AI_CACHE_SYSTEM_END_high-static|>",
+		"<|PROMPT_SECTION_timeline|>\n" + timelineDump + "\n<|PROMPT_SECTION_END_timeline|>",
+		"<|PROMPT_SECTION_dynamic_q|>\nfinal-user-question\n<|PROMPT_SECTION_dynamic_END_q|>",
+	}, "\n\n")
+
+	res := hijackHighStatic(prompt)
+	require.NotNil(t, res)
+	require.Len(t, res.Messages, 3, "Timeline.Dump-format prompt should split via boundary")
+
+	user1 := extractTextContent(t, res.Messages[1].Content)
+	user2 := extractTextContent(t, res.Messages[2].Content)
+	require.Contains(t, user1, "<|AI_CACHE_FROZEN_END_semi-dynamic|>",
+		"user1 must include END tag for byte-stable prefix")
+	require.Contains(t, user1, "data-A")
+	require.Contains(t, user1, "data-B")
+	require.NotContains(t, user1, "data-C-OPEN", "open bucket data must NOT be in user1")
+	require.NotContains(t, user1, "final-user-question")
+
+	require.Contains(t, user2, "data-C-OPEN", "open bucket should be in user2")
+	require.Contains(t, user2, "final-user-question",
+		"dynamic question must end up in user2 (open tail)")
 }

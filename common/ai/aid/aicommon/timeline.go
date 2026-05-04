@@ -607,16 +607,41 @@ const TimelineDumpDefaultIntervalMinutes = 3
 const TimelineDumpDefaultAITagName = "TIMELINE"
 
 // Dump 输出 timeline 的 aitag-wrapped 渲染串。
-// 等价于 GroupByMinutes(TimelineDumpDefaultIntervalMinutes).GetAllRenderable().Render(TimelineDumpDefaultAITagName)
-// 仅包含 reducer block + interval block，不包含 archive block（archive 暂时不展示在 Dump 中）
-// 关键词: Timeline.Dump, GroupByMinutes 别名, aitag 包裹, 前缀缓存
+//
+// 等价于:
+//
+//	GroupByMinutes(TimelineDumpDefaultIntervalMinutes).
+//	    GetAllRenderable().
+//	    RenderWithFrozenBoundary(
+//	        TimelineDumpDefaultAITagName,
+//	        TimelineFrozenBoundaryTagName,
+//	        TimelineFrozenBoundaryNonce,
+//	    )
+//
+// 仅包含 reducer block + interval block，不包含 archive block（archive 暂时不展示在 Dump 中）。
+//
+// 输出在含混合 frozen+open 的场景下会自动加上
+// <|AI_CACHE_FROZEN_semi-dynamic|>...<|AI_CACHE_FROZEN_END_semi-dynamic|>
+// 边界标签把已冻结前缀包起来, 让下游 aicache hijacker 能用简单字符串
+// IndexOf 精准定位到 frozen 与 open 的边界, 实现 §7.7.7 双 cc 命中所需
+// 的 user1 (frozen prefix) / user2 (open tail) 切分。
+//
+// 全 frozen / 全 open 场景下不加边界, 保持与原 Render 字节一致, 退化路径
+// 让 hijacker 走 2 段拼接 + aibalance 单 cc 兜底。
+//
+// 关键词: Timeline.Dump, GroupByMinutes 别名, aitag 包裹, 前缀缓存,
+//        AI_CACHE_FROZEN 边界, hijacker 切割锚点, §7.7.7
 func (m *Timeline) Dump() string {
 	if m == nil {
 		return ""
 	}
 	return m.GroupByMinutes(TimelineDumpDefaultIntervalMinutes).
 		GetAllRenderable().
-		Render(TimelineDumpDefaultAITagName)
+		RenderWithFrozenBoundary(
+			TimelineDumpDefaultAITagName,
+			TimelineFrozenBoundaryTagName,
+			TimelineFrozenBoundaryNonce,
+		)
 }
 
 // String 是 Dump 的别名，为了兼容 fmt.Stringer 接口

@@ -79,7 +79,24 @@ type TimelineRenderableBlock interface {
 }
 
 type TimelineRenderableBlocks []TimelineRenderableBlock
+
+// 裸渲染: 把所有 block 顺序拼接, 每个 block 用 aitagName_<nonce> 包裹.
 func (bs TimelineRenderableBlocks) Render(aitagName string) string
+
+// 带 frozen 边界渲染: 在裸渲染基础上, 把所有 IsOpen()==false 的连续前缀 block
+// 包在一对 <|frozenTagName_frozenNonce|>...<|frozenTagName_END_frozenNonce|>
+// 边界标签内, 让下游 aicache hijacker 能用简单字符串 IndexOf 精准切到
+// frozen 与 open 的边界 (§7.7.7 双 cc 命中前提). 全 frozen / 全 open 时
+// 不加边界, 与裸 Render 字节一致.
+func (bs TimelineRenderableBlocks) RenderWithFrozenBoundary(
+    aitagName, frozenTagName, frozenNonce string,
+) string
+
+// 包级默认: aicache hijacker 与 Timeline.Dump 一致使用此默认值.
+const (
+    TimelineFrozenBoundaryTagName = "AI_CACHE_FROZEN"
+    TimelineFrozenBoundaryNonce   = "semi-dynamic"
+)
 ```
 
 ### 单个 block
@@ -131,7 +148,7 @@ batch-compress summary line 1
 batch-compress summary line 2
 ```
 
-### 整体 Render 输出（`groups.GetAllRenderable().Render("TL")`）
+### 整体 Render 输出（`groups.GetAllRenderable().Render("TL")` 裸渲染）
 
 ```
 <|TL_r42t1746179400|>
@@ -152,6 +169,41 @@ user-answer
 noted-content
 <|TL_END_b3t1746180180|>
 ```
+
+### 整体 Render 输出（`groups.GetAllRenderable().RenderWithFrozenBoundary("TL", "", "")` 带 frozen 边界）
+
+```
+<|AI_CACHE_FROZEN_semi-dynamic|>
+<|TL_r42t1746179400|>
+# reducer key=42 ts=1746179400
+09:50:00 [reducer/memory]
+compressed-batch-summary
+<|TL_END_r42t1746179400|>
+<|TL_b3t1746180000|>
+# bucket=2026/05/02 10:00:00-10:03:00 interval=3m
+10:00:30 [tool/scan ok]
+result-line-1
+10:01:45 [user/review]
+user-answer
+<|TL_END_b3t1746180000|>
+<|AI_CACHE_FROZEN_END_semi-dynamic|>
+<|TL_b3t1746180180|>
+# bucket=2026/05/02 10:03:00-10:06:00 interval=3m
+10:04:00 [text/note]
+noted-content
+<|TL_END_b3t1746180180|>
+```
+
+> reducer + 第一个时间桶被框入 `<|AI_CACHE_FROZEN_semi-dynamic|>...<|AI_CACHE_FROZEN_END_semi-dynamic|>`,
+> 因为它们 `IsOpen()==false` (frozen 段); 末尾时间桶 `b3t1746180180` 是 `Open=true`,
+> 留在边界外。下游 aicache hijacker 会按这对边界把 prompt 切成 `[high-static, frozen-prefix, open-tail]`
+> 三段, 给 system + frozen-prefix 各自打一个 `cache_control:{"type":"ephemeral"}`,
+> 实现 §7.7.7 双 cc 命中。
+
+> 退化场景:
+>   - 全 open (单时间桶 + 无 reducer): 不输出 boundary, 与裸 Render 字节一致
+>   - 全 frozen (无 interval, 仅 reducer): 不输出 boundary (整段 frozen 不需要切)
+>   - 这两种场景下 hijacker 走 2 段拼接, 由 aibalance 的"baseline 单 cc"路径兜底
 
 > 注意：content 行**不加任何前导缩进**。LLM 凭 `HH:MM:SS [type/verbose]` 行头模式识别 entry 边界，
 > 缩进只是 token 浪费。

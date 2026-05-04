@@ -10,12 +10,17 @@
 //     从 §7.7 起进一步把剩余 user 段按 timeline 的 Frozen/Open 边界拆成
 //     两条 user 消息（高命中前缀 user1 + 易变 user2）；不可拆分时退化到
 //     原 2 段 [system, user] 形态。返回的 ChatBaseMirrorResult{IsHijacked:true}
-//     由 ChatBase 灌入 ctx.RawMessages 走现有 RawMessages 透传通道，
-//     下游 aibalance/explicit_cache_rewriter 在双 user 形态下会给 system
-//     与 user1 各打一个 cache_control 标记 (跨消息双 cc, 见 §7.7)。
+//     由 ChatBase 灌入 ctx.RawMessages 走现有 RawMessages 透传通道。
+//
+//     §7.7.7 职责重排：3 段路径下 hijacker 自己给 system + user1 主动打
+//     ephemeral cache_control（包成 []*aispec.ChatContent 形态），实现
+//     "system 短前缀 + system+user1 长前缀" 的双 cc 命中（E14 实测 70%）。
+//     下游 aibalance.RewriteMessagesForExplicitCache 检测到客户端自带 cc 后
+//     完全 pass-through，避免双注入风险。2 段退化路径仍由 hijacker 输出
+//     string content，让 aibalance 走 baseline 单 cc 兜底。
 //
 // 关键词: aicache, Observe, mirror, hijack 合一, role:system 注入,
-//        3 段拆分, frozen/open 边界, §7.7
+//        3 段拆分, frozen/open 边界, §7.7, §7.7.7 hijacker 自管双 cc
 package aicache
 
 import (
