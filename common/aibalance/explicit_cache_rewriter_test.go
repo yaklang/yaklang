@@ -321,3 +321,149 @@ func jsonEq(t *testing.T, a, b any) bool {
 	jb, _ := json.Marshal(b)
 	return string(ja) == string(jb)
 }
+
+// ---------------------------------------------------------------------------
+// 双 cc 注入测试 (§7.7 配套: aicache hijacker 3 段拆分时给 user1 也打 cc)
+// ---------------------------------------------------------------------------
+
+// TestRewriteMessages_DualCC_SystemUserUser 验证 [system, user1, user2] 形态下
+// system + user1 都被注入 cc, user2 不被注入。这正是 aicache hijacker
+// 3 段拆分后送到这里的标准形态。
+// 关键词: 双 cc 注入, system + user1, §7.7
+func TestRewriteMessages_DualCC_SystemUserUser(t *testing.T) {
+	in := []aispec.ChatDetail{
+		{Role: "system", Content: "system-prefix"},
+		{Role: "user", Content: "frozen-user-1"},
+		{Role: "user", Content: "open-user-2"},
+	}
+	out := RewriteMessagesForExplicitCache(in, "tongyi", "qwen3.6-plus")
+	if len(out) != 3 {
+		t.Fatalf("len mismatch: got %d want 3", len(out))
+	}
+
+	sysContents, ok := out[0].Content.([]*aispec.ChatContent)
+	if !ok {
+		t.Fatalf("system content type mismatch: %T", out[0].Content)
+	}
+	if cc, ok := sysContents[0].CacheControl.(map[string]any); !ok || cc["type"] != "ephemeral" {
+		t.Fatalf("system cache_control mismatch: %+v", sysContents[0].CacheControl)
+	}
+
+	user1Contents, ok := out[1].Content.([]*aispec.ChatContent)
+	if !ok {
+		t.Fatalf("user1 content should be rewritten to []*ChatContent, got %T", out[1].Content)
+	}
+	if cc, ok := user1Contents[0].CacheControl.(map[string]any); !ok || cc["type"] != "ephemeral" {
+		t.Fatalf("user1 cache_control mismatch: %+v", user1Contents[0].CacheControl)
+	}
+
+	if s, ok := out[2].Content.(string); !ok || s != "open-user-2" {
+		t.Fatalf("user2 (last) must NOT be rewritten, got %T %v", out[2].Content, out[2].Content)
+	}
+}
+
+// TestRewriteMessages_DualCC_SerializeBothInJSON 验证最终 JSON 中
+// system + user1 都序列化出 cache_control 字段。
+// 关键词: 双 cc 注入, JSON 字节断言
+func TestRewriteMessages_DualCC_SerializeBothInJSON(t *testing.T) {
+	in := []aispec.ChatDetail{
+		{Role: "system", Content: "S"},
+		{Role: "user", Content: "U1"},
+		{Role: "user", Content: "U2"},
+	}
+	out := RewriteMessagesForExplicitCache(in, "tongyi", "qwen3.6-plus")
+	js, err := json.Marshal(out)
+	if err != nil {
+		t.Fatalf("marshal failed: %v", err)
+	}
+	count := strings.Count(string(js), `"cache_control":{"type":"ephemeral"}`)
+	if count != 2 {
+		t.Fatalf("expected 2 cache_control occurrences in JSON, got %d, body=%s", count, js)
+	}
+}
+
+// TestRewriteMessages_DualCC_SingleUserOnlySystemCC 单 user 场景 (旧形态),
+// 只注入 system cc, 不强行给唯一的 user 注入 (与现有 TestRewriteMessages_StringContent
+// 行为完全一致, 这里再加显式断言避免回归)。
+// 关键词: 双 cc 注入, 单 user 退化为单 cc
+func TestRewriteMessages_DualCC_SingleUserOnlySystemCC(t *testing.T) {
+	in := []aispec.ChatDetail{
+		{Role: "system", Content: "S"},
+		{Role: "user", Content: "U-only"},
+	}
+	out := RewriteMessagesForExplicitCache(in, "tongyi", "qwen3.6-plus")
+	if _, ok := out[0].Content.([]*aispec.ChatContent); !ok {
+		t.Fatalf("system should be rewritten, got %T", out[0].Content)
+	}
+	if s, ok := out[1].Content.(string); !ok || s != "U-only" {
+		t.Fatalf("single user must NOT be rewritten, got %T %v", out[1].Content, out[1].Content)
+	}
+}
+
+// TestRewriteMessages_DualCC_AssistantBetweenUsers multi-turn 历史:
+// [system, user, assistant, user, assistant, user] —— 末位 user 是当前轮,
+// 末位之前最近的 user (倒数第 2 个 user) 是上一轮的提问; 该上一轮 user 应
+// 被注入 cc (这能让"system + 上一轮 user"作为前缀缓存)。
+// 关键词: 双 cc 注入, multi-turn 历史, assistant 间隔
+func TestRewriteMessages_DualCC_AssistantBetweenUsers(t *testing.T) {
+	in := []aispec.ChatDetail{
+		{Role: "system", Content: "S"},
+		{Role: "user", Content: "U1"},
+		{Role: "assistant", Content: "A1"},
+		{Role: "user", Content: "U2"},
+		{Role: "assistant", Content: "A2"},
+		{Role: "user", Content: "U3-current"},
+	}
+	out := RewriteMessagesForExplicitCache(in, "tongyi", "qwen3.6-plus")
+	// 期望: out[0] (system) 改写, out[3] (U2 = 末位之前最近 user) 改写,
+	// 其它 (U1, A1, A2, U3) 全部保持 string 不变
+	if _, ok := out[0].Content.([]*aispec.ChatContent); !ok {
+		t.Fatalf("system (idx 0) should be rewritten, got %T", out[0].Content)
+	}
+	if s, ok := out[1].Content.(string); !ok || s != "U1" {
+		t.Fatalf("U1 (idx 1) should be untouched, got %T %v", out[1].Content, out[1].Content)
+	}
+	if s, ok := out[2].Content.(string); !ok || s != "A1" {
+		t.Fatalf("A1 (idx 2) should be untouched, got %T %v", out[2].Content, out[2].Content)
+	}
+	if _, ok := out[3].Content.([]*aispec.ChatContent); !ok {
+		t.Fatalf("U2 (idx 3) should be rewritten as penultimate user, got %T", out[3].Content)
+	}
+	if s, ok := out[4].Content.(string); !ok || s != "A2" {
+		t.Fatalf("A2 (idx 4) should be untouched, got %T %v", out[4].Content, out[4].Content)
+	}
+	if s, ok := out[5].Content.(string); !ok || s != "U3-current" {
+		t.Fatalf("U3-current (idx 5, last) should be untouched, got %T %v", out[5].Content, out[5].Content)
+	}
+}
+
+// TestRewriteMessages_DualCC_NoSystemPassThrough 维持旧契约: 没有 system
+// 时即使存在多个 user 也完全不动。
+// 关键词: 双 cc 注入, 无 system 绝对 pass-through
+func TestRewriteMessages_DualCC_NoSystemPassThrough(t *testing.T) {
+	in := []aispec.ChatDetail{
+		{Role: "user", Content: "U1"},
+		{Role: "user", Content: "U2"},
+		{Role: "user", Content: "U3"},
+	}
+	out := RewriteMessagesForExplicitCache(in, "tongyi", "qwen3.6-plus")
+	if !jsonEq(t, in, out) {
+		t.Fatalf("no-system multi-user must be untouched, in=%v out=%v", in, out)
+	}
+}
+
+// TestRewriteMessages_DualCC_DoesNotMutateInput 验证双 cc 注入仍然零副作用。
+// 关键词: 双 cc 注入, 零副作用
+func TestRewriteMessages_DualCC_DoesNotMutateInput(t *testing.T) {
+	in := []aispec.ChatDetail{
+		{Role: "system", Content: "S"},
+		{Role: "user", Content: "U1"},
+		{Role: "user", Content: "U2"},
+	}
+	snapshot, _ := json.Marshal(in)
+	_ = RewriteMessagesForExplicitCache(in, "tongyi", "qwen3.6-plus")
+	after, _ := json.Marshal(in)
+	if string(snapshot) != string(after) {
+		t.Fatalf("input mutated\nbefore=%s\nafter =%s", snapshot, after)
+	}
+}

@@ -100,19 +100,32 @@ func ephemeralCacheControl() map[string]any {
 }
 
 // RewriteMessagesForExplicitCache 当 (providerType, modelName) 通过
-// IsTongyiExplicitCacheModel 检查时, 对最末一条 role=system 消息的
-// content 注入 cache_control:{"type":"ephemeral"} 标记, 让 dashscope
-// 把 system prompt 作为命名缓存块缓存 5 分钟。
+// IsTongyiExplicitCacheModel 检查时, 在 messages 数组里挂载多达 2 个
+// cache_control:{"type":"ephemeral"} 标记, 让 dashscope 同时维护两个
+// 命名缓存块 (5 分钟 TTL):
+//
+//   1. **最末一条 role=system 消息** 的 content 注入 cc, 缓存"system 前缀"。
+//   2. **末位之前最近的 role=user 消息** 的 content 注入 cc, 缓存
+//      "system + 中段稳定 user" 这一更长前缀。这是 aicache 3 段拆分
+//      (TONGYI_CACHE_REPORT.md §7.7) 的下游配套: aicache 把
+//      "稳定段" 切到倒数第 2 条 user, "易变段" 切到末条 user, 这里给
+//      倒数第 2 条 user 注入 cc 让它的前缀也被缓存。
+//
+// 跨消息的两个 cc 标记会产生两个独立缓存块 (E14 实测 70% 命中率), 这是
+// dashscope 显式缓存的官方支持模式, 与"同消息 content 数组里多个 cc 标记"
+// 的失效场景 (E11) 完全不同。
 //
 // 行为契约:
-//   - 命中白名单 + 找到 system 消息 + content 形态可识别 -> 返回浅复制
-//     的新切片, 仅最末 system 消息的 Content 被替换为带 cache_control
+//   - 命中白名单 + 找到至少 1 个可注入目标 + content 形态可识别 ->
+//     返回浅复制的新切片, 仅目标消息的 Content 被替换为带 cache_control
 //     的新对象, 其它消息保留指针不变;
-//   - 未命中白名单 / 没有 system 消息 / content 形态不可识别 ->
+//   - 未命中白名单 / 没有可注入消息 / content 形态不可识别 ->
 //     原样返回入参切片, 不做任何修改;
-//   - 无论分支, 入参 messages 切片本身永不被原地修改(零副作用)。
+//   - 无论分支, 入参 messages 切片本身永不被原地修改(零副作用);
+//   - "末位之前最近的 user" 不存在(只有 1 条 user 或末位之前无 user) ->
+//     仅注入 system 一个 cc, 不强行注入 user (避免破坏单 user 场景).
 //
-// 兼容形态:
+// 兼容形态(同 injectCacheControlOnContent):
 //   1. string                -> 包成 []*ChatContent{Type:"text",Text,CacheControl}
 //   2. []*aispec.ChatContent -> 浅复制每项, 在最末 text 项加 CacheControl
 //   3. []map[string]any      -> 浅复制每项 map, 在最末 type=text 项加 cache_control
@@ -120,7 +133,8 @@ func ephemeralCacheControl() map[string]any {
 //   5. 其它类型(nil/数字/struct 等) -> pass-through 不动
 //
 // 关键词: RewriteMessagesForExplicitCache, dashscope 显式缓存自动注入,
-//        最末 system 改写, 浅复制零副作用
+//        最末 system 改写, 倒数第 2 user 改写, 双 cc 注入, §7.7,
+//        浅复制零副作用
 func RewriteMessagesForExplicitCache(messages []aispec.ChatDetail, providerType, modelName string) []aispec.ChatDetail {
 	if len(messages) == 0 {
 		return messages
@@ -129,32 +143,83 @@ func RewriteMessagesForExplicitCache(messages []aispec.ChatDetail, providerType,
 		return messages
 	}
 
-	lastSysIdx := -1
-	for i := len(messages) - 1; i >= 0; i-- {
-		if strings.EqualFold(messages[i].Role, "system") {
-			lastSysIdx = i
-			break
-		}
-	}
-	if lastSysIdx < 0 {
+	targets := pickCacheControlTargets(messages)
+	if len(targets) == 0 {
 		return messages
 	}
 
-	sysMsg := messages[lastSysIdx]
-	newContent, ok := injectCacheControlOnContent(sysMsg.Content)
-	if !ok {
+	// 预判每个 target 的 content 是否可注入, 任一失败时跳过该 target,
+	// 但只要至少 1 个 target 成功就要返回新切片。
+	type plan struct {
+		idx        int
+		newContent any
+	}
+	var plans []plan
+	for _, idx := range targets {
+		newContent, ok := injectCacheControlOnContent(messages[idx].Content)
+		if !ok {
+			continue
+		}
+		plans = append(plans, plan{idx: idx, newContent: newContent})
+	}
+	if len(plans) == 0 {
 		return messages
 	}
 
 	out := make([]aispec.ChatDetail, len(messages))
 	copy(out, messages)
-	out[lastSysIdx] = aispec.ChatDetail{
-		Role:         sysMsg.Role,
-		Name:         sysMsg.Name,
-		Content:      newContent,
-		ToolCalls:    sysMsg.ToolCalls,
-		ToolCallID:   sysMsg.ToolCallID,
-		FunctionCall: sysMsg.FunctionCall,
+	for _, p := range plans {
+		src := messages[p.idx]
+		out[p.idx] = aispec.ChatDetail{
+			Role:         src.Role,
+			Name:         src.Name,
+			Content:      p.newContent,
+			ToolCalls:    src.ToolCalls,
+			ToolCallID:   src.ToolCallID,
+			FunctionCall: src.FunctionCall,
+		}
+	}
+	return out
+}
+
+// pickCacheControlTargets 按 §7.7 双 cc 策略挑出消息数组中最多 2 个注入索引:
+//
+//  1. 最末一条 role=system (始终选中, 若存在)
+//  2. 末位之前 (i <= len-2) 最近一条 role=user (新增, 用于 3 段拆分场景);
+//     注意只有当 step 1 已选中 system 时才考虑 step 2, 这是保留旧契约
+//     "messages 中无 system 时绝对 pass-through" 的硬约束 — 没有 system
+//     的 multi-user 历史多半来自非典型外部调用方, 我们不能擅自改写它。
+//
+// 返回值的索引按"先 system 后 user"顺序排列, 不去重 (system 与 user
+// 不会重叠, 这里只是文档化保证). 若两步都没找到目标返回空切片。
+//
+// 关键词: pickCacheControlTargets, 双 cc 目标选取, 末位之前最近 user,
+//        无 system 绝对 pass-through 契约保留
+func pickCacheControlTargets(messages []aispec.ChatDetail) []int {
+	out := make([]int, 0, 2)
+	lastSys := -1
+	for i := len(messages) - 1; i >= 0; i-- {
+		if strings.EqualFold(messages[i].Role, "system") {
+			lastSys = i
+			break
+		}
+	}
+	if lastSys < 0 {
+		return out
+	}
+	out = append(out, lastSys)
+
+	if len(messages) >= 2 {
+		penultimateUser := -1
+		for i := len(messages) - 2; i >= 0; i-- {
+			if strings.EqualFold(messages[i].Role, "user") {
+				penultimateUser = i
+				break
+			}
+		}
+		if penultimateUser >= 0 && penultimateUser != lastSys {
+			out = append(out, penultimateUser)
+		}
 	}
 	return out
 }

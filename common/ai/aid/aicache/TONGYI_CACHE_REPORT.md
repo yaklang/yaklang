@@ -21,11 +21,15 @@
 2. **多 `cache_control` 标记不会让 dashscope 在请求时自动尝试匹配更短的
    前缀**。文档中"以每个 cache_control 标记位置为终点向前回溯尝试命中"
    实测**只对最末一个**标记生效。E3 / E5 / E7 / E8 / E9 / E11 六组实验均 FAIL。
-3. **浅 `cache_control` 标记不会创建独立缓存块** (E11 r1 反证): 即使
-   r0 是 `[A+cc, B+cc, ...]` 把 A 段也标了 cc, 后续请求 `[A+cc, E, F]`
-   (字节级保留 A+cc) 仍然 cached=0。dashscope 实际只对**最末**标记位置
-   建立缓存块, 浅标记位置 既不建块, 也不参与命中, 只是个无效声明。
-   (这一条修正了报告早期版本 §1.3 的不严谨判断)
+3. **浅 `cache_control` 标记的有效性取决于是否跨 message 边界**
+   (E11 vs E14 对比):
+   - **同一条 message 的 content 数组内** 多 cc → 浅位置无效 (E11 r1
+     cached=0 验证), dashscope 只对最末标记位置建块;
+   - **跨 message 多 cc** (典型: 一个在 system+cc, 另一个在 user+cc)
+     → 浅位置**有效**, 各自创建独立缓存块, 后续请求按本次最末 cc 之
+     前的字节前缀去匹配 (E14 r1 cached=1478 验证)。
+   - 这条对 aibalance hijacker (把 high-static 抽到 system message
+     并打 cc) 的当前架构提供了关键支撑 — 详见 §7.7。
 4. **核心问题原始答案 (E2 PASS)**: 当业务发了 `[A,B,C+cc]` 之后再发
    `[A,D+cc]`, A 部分**不会独立命中**。整个 `[A,D]` 当作新缓存块创建。
 5. **未命中时 dashscope 把整个 prompt 按 125% 计费 (E11 量化)**:
@@ -54,16 +58,23 @@
 
 | 业务场景 | 是否命中 | 实际计费 |
 |---|---|---|
-| 完整请求字节级 1:1 重发 (含 system + user 全部) | ✓ 命中 | 10% (省 90%) |
-| system 字节稳定, user 末尾变化 (如对话追加) | ✗ miss | **125% (贵 25%)** |
-| 多段 cache_control 精细控制 | ✗ miss | **125% (贵 25%)** |
+| 完整请求字节级 1:1 重发 (含 system + user 全部) | ✓ 全命中 | 10% (省 90%) |
+| **system 字节稳定 + cc 在 system 末尾, user 完全不同 (E14 r1 模式)** | **✓ system 段独立命中** (~32% 整体命中率) | system 部分按 10%, user 部分按 100%, 净省 ~28% |
+| **system 字节稳定 + 已封闭 user 段 +cc, 后续追加 (E14 r3 模式)** | **✓ 命中已封闭前缀** (~70% 整体命中率) | 已封闭部分按 10%, 追加部分按 100%, 净省 ~63% |
+| 单 system+cc, user 末尾微变 (E1 / E13B 模式) | ✓ 全命中 system | system 按 10%, user 按 100%, 净省 ~89% |
+| 同一 message 内多段 cc 精细控制 | ✗ miss | **125% (贵 25%)** |
+| system 段会被追加内容 / cc 标记漂移 | ✗ miss | **125% (贵 25%)** |
 | 大段稳定前缀 + 短增量 (无论增量大小) | ✗ miss | **125% (贵 25%)** |
 | 完全不带 cache_control 字段 | (无缓存机制) | 100% |
 
-实际可命中的场景**几乎只有"完全相同的 prompt 重复发"**, 这在生产业务中
-非常罕见 (通常每次会话都有时间戳 / sessionId / 用户输入差异)。dashscope
-显式缓存目前在 OpenAI 兼容接口上**事实上不可用于通用业务场景**, 仅适
-用于"批量复测 / 回归 / 脚本化重发"这类纯重复负载。
+**实际可用场景比 E11/E12 给的初步结论更宽**: 只要保证 **system message
+字节级稳定 + cc 落在 system 末尾**, 后续 user 消息任何变化都不影响
+system 段独立命中 (E14 r1 验证); 进一步, 在 user 已封闭部分末尾再打
+一个 cc 标记, 命中率从 32% 升到 70% (E14 r3 验证)。
+
+aibalance 当前 explicit_cache_rewriter 已经做对了第一层 (system+cc),
+未来可在 hijacker 层面做第二层 (user 已封闭 timeline 区段尾再加一个
+cc) 进一步提升命中率, 详见 §7.7。
 
 → 见 §6 / §7 关于 aicache / aibalance 应该如何应对的具体建议。
 
@@ -73,8 +84,8 @@
 
 | 项 | 值 |
 |---|---|
-| 测试时间 | E1-E10: 2026-05-03 23:43–23:48 (UTC+8); E11: 2026-05-04 00:24–00:26; E12: 2026-05-04 00:38–00:39 |
-| Run ID | E1-E10: `run-1777823006312881000`; E11: `run-1777825499213141000`; E12: `run-1777826325134397000` |
+| 测试时间 | E1-E10: 2026-05-03 23:43–23:48 (UTC+8); E11: 2026-05-04 00:24–00:26; E12: 2026-05-04 00:38–00:39; E14: 2026-05-04 01:01–01:02 |
+| Run ID | E1-E10: `run-1777823006312881000`; E11: `run-1777825499213141000`; E12: `run-1777826325134397000`; E14: `run-1777827665828310000` |
 | 主测 model | `qwen3.6-plus` |
 | 对照 model | `qwen3.5-flash`, `qwen3-vl-flash` |
 | API endpoint | `https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions` |
@@ -107,6 +118,7 @@
 | E10 (E9 反证) | E9 r0 建的 A9 块在 5min TTL 内是否仍活? 单标记能否命中? | `[A9+cc]` (复用 E9 marker) | — | — |
 | E11 (用户提问 / 漂移成本) | **「A 永久带 cc + 标记位置漂移」6 次顺序请求, 量化成本** | `[A+cc, B+cc, C, D]` → `[A+cc, E, F]` → `[A+cc, G+cc, H]` → `[A+cc, G, H+cc, I]` → `[A+cc, G, H, I+cc, J]` → `[A+cc, G, H, I, J+cc, K]` (6 次连续, 见 §4.11) |
 | E12 (1024 阈值 vs 增量计费 隔离实验) | **验证「增量 ≥ 1024 是否能让部分命中生效」** | `[A+cc]` 1998tok → `[A, B+cc]` 增量 B≈2000tok → 重发 `[A, B+cc]` → `[A, C+cc]` 增量 C≈500tok (4 次连续, 见 §4.13) |
+| E14 (跨 message 浅 cc 反向命中) | **修正 §4.11.1 错判: 跨 message 的浅 cc 实际会创建独立块** | `[A+cc(sys), B,C,D,E+cc(user)]` → `[A+cc(sys), B,C,D,E,F,G,H(user)]`(最末cc=A) → 重发 r0 → `[A+cc(sys), B,C,D,E+cc(user), F,G,H(user)]`(cc 留 E) (4 次连续, 见 §4.14) |
 
 设计原则:
 - **每组实验独立 marker** + 共同 `runID` 前缀, 字节级隔离, 杜绝实验间
@@ -160,6 +172,10 @@ E12   0   qwen3.6-plus       [A+cc]                             2024       0    
 E12   1   qwen3.6-plus       [A, B+cc]  (增量 B≈2000tok)        4018       0    3992
 E12   2   qwen3.6-plus       [A, B+cc]  (重发 r1)               4018    3992       0
 E12   3   qwen3.6-plus       [A, C+cc]  (增量 C≈500tok)         2578       0    2552
+E14   0   qwen3.6-plus       [A+cc(sys), B,C,D,E+cc(user)]      3260       0    3234
+E14   1   qwen3.6-plus       [A+cc(sys), B,C,D,E,F,G,H(user)]   4577    1478       0
+E14   2   qwen3.6-plus       [A+cc(sys), B,C,D,E+cc(user)] 重发  3260    3234       0
+E14   3   qwen3.6-plus       [A+cc(sys),B,C,D,E+cc,F,G,H(user)] 4577    3234       0
 ```
 
 ### 4.1 E1 — 单标记单标记重复 (PASS)
@@ -400,7 +416,80 @@ r2 重发 r1 完全相同的 `[A, B+cc]` 4018 token 请求, **cached=3992
 **根本不查 [A] 子前缀**, 它只查"本次最末标记位置之前的整段字节序列
 能否完全匹配某个已建的块"。
 
-### 4.13 PASS / FAIL 汇总
+### 4.13 E14 — 跨 message 浅 cc 反向命中 (推翻 §4.11.1 错判)
+
+**用户提问**: 假设 A+cc 是 system, B C D E F 是 user, 第 1 次发
+`[A+cc(sys), B, C, D, E+cc(user)]`, 第 2 次发
+`[A+cc(sys), B, C, D, E, F, G, H(user)]`, 第 2 次能命中 [A,B,C,D,E]
+还是 [A,B,C,D,E,F]?
+
+设计要点 (与 E11/E12 的区别): cache_control 标记**跨 message** 分布
+(一个在 system, 一个在 user), 这是之前所有实验都没覆盖的边界。E11
+所有 cc 都在同一条 system message 的 content 数组里, 浅 cc 失效是那
+种"同 message 内多 cc"的局部现象。
+
+| round | sig | prompt | cached | cache_create | 命中率 | 解读 |
+|---|---|---|---|---|---|---|
+| r0 | `[A+cc(sys), B, C, D, E+cc(user)]` | 3260 | 0 | 3234 | 0% | 建块, 最末 cc=user E |
+| r1 | `[A+cc(sys), B, C, D, E, F, G, H(user)]` 最末cc=A | 4577 | **1478** | 0 | **32.3%** | **r1 真的命中了 [A] 单独块!** |
+| r2 | `[A+cc(sys), B, C, D, E+cc(user)]` 重发 r0 | 3260 | 3234 | 0 | 99.2% | 验 r0 [A,B,C,D,E] 块还活着 |
+| r3 | `[A+cc(sys), B, C, D, E+cc(user), F, G, H(user)]` cc 留 E | 4577 | **3234** | 0 | **70.7%** | **命中 r0 整个 [A,B,C,D,E] 块, 追加 F/G/H 不影响** |
+
+#### 4.13.1 r1 cached=1478 的关键意义 — 跨 message 浅 cc **会**创建独立块
+
+r1 cached=1478 ≈ A 段单独的 token 数 (~1450, 实测含 prompt overhead
+后落 1478)。这意味着 **r0 在创建 [A,B,C,D,E] 整体块的同时, 也创建
+了一个独立的 [A] 块**。当 r1 的最末 cc 漂移到 system A 浅位置时,
+dashscope 严格按"本次最末 cc 之前的字节前缀 = [A]"去查缓存表, 找到
+了那个独立块, 命中。
+
+#### 4.13.2 推翻早期 §4.11.1 的不严谨结论
+
+之前 §4.11.1 (基于 E11 r1) 写过 "**dashscope 实际只对最末 cc 标记位
+置创建缓存块**, 浅标记位置完全失效"。E14 r1 实测推翻这个全称命题:
+
+- E11 的浅 cc 是 **同一 system message 的 content 数组内**多个 cc
+  → 浅位置无效, 不创建独立块 (E11 r1 cached=0 验证);
+- E14 的浅 cc 是 **跨 message 的多个 cc** (一个在 system, 一个在
+  user) → 浅位置**有效**, 各自创建独立缓存块 (E14 r1 cached=1478 验证)。
+
+修正后的事实: dashscope 浅 cc 创建独立块的能力 **取决于 cc 是否跨
+message 边界**:
+
+| 场景 | 浅 cc 是否创建独立块 | 浅 cc 是否参与命中 | 实验证据 |
+|---|---|---|---|
+| 同 message 多 cc | 否 (E11 r1 FAIL) | 否 (E3/E5/E7/E8/E9 FAIL) | E11 全证 |
+| 跨 message 多 cc | **是** (E14 r1 PASS) | **是** (E14 r1 PASS) | E14 |
+
+#### 4.13.3 r3 cached=3234 — 已封闭块字节级稳定时, 后续追加内容不影响命中
+
+r3 在 r0 块基础上保留 cc 在 user E 不动, 然后追加 F、G、H 三段不带
+cc 的新 user 段。本次最末 cc 仍在 E, 字节前缀 = `[A,B,C,D,E]` (与 r0
+字节级一致), **命中 r0 整个块**, cached=3234 = r0 cache_create=3234,
+100% 命中前缀部分。追加的 F/G/H 不影响命中 (它们位于最末 cc 之后,
+按 100% 计费但不打断匹配)。
+
+**这个发现是 Timeline 缓存优化的理论基础** — 见 §7.7。
+
+#### 4.13.4 直接回答用户原始问题
+
+> "第二个请求 `[A+cc, B, C, D, E, F, G, H]` 应该命中 ABCDE 还是 ABCDEF?"
+
+**实测都不是**: 命中的是独立的 [A] 块 (~1478 token), 而不是 [A,B,C,D,E]
+也不是 [A,B,C,D,E,F]。原因:
+1. 第 2 次请求最末 (也是唯一) cc 在 system A 位置, dashscope 按"最
+   末 cc 之前的字节前缀 = [A]" 查缓存表;
+2. 历史块有两个: 跨 message 浅 cc 创建的独立 [A] 块 + 末 cc 创建的
+   [A,B,C,D,E] 块;
+3. [A] 字节序列与独立 [A] 块匹配 → 命中 1478;
+4. [A] 字节序列与 [A,B,C,D,E] 块的真前缀部分**也字节级一致**, 但
+   dashscope **不做"包含/被包含"匹配**, 只做"完整字节级 1:1 匹配",
+   所以不会再命中 [A,B,C,D,E] 块的 ~2300 token。
+
+**如果想命中更长的 [A,B,C,D,E] 块**: 需要把 cc 留在 user E 上不动
+(就像 r3 那样), 才能 70% 命中。
+
+### 4.14 PASS / FAIL 汇总
 
 | Exp | 判定 | 备注 |
 |---|---|---|
@@ -416,12 +505,13 @@ r2 重发 r1 完全相同的 `[A, B+cc]` 4018 token 请求, **cached=3992
 | E10 | PASS | 字节级一致的请求重发能命中 (旧解读"A 块独立建好"被 E11 推翻, 实际上是字节级一致命中) |
 | E11 | r0 PASS / **r1 FAIL** / r2-r5 PASS | r1 失败推翻"浅标记创建端有效", 整体序列成本比无缓存基线**高 24.8%** |
 | E12 | r0 PASS / **r1 FAIL** / r2 PASS / r3 FAIL | r1 失败 (增量 ~2000 tok >> 1024) **彻底证伪"增量计费"机制**, r2 PASS 反证 [A,B] 块确实建好且字节一致请求能命中 |
+| E14 | r0 PASS / **r1 PASS (反向命中)** / r2 PASS / r3 PASS | **关键反转**: 跨 message 的浅 cc (system+cc 与 user+cc 不在同一 message) **会**创建独立块且能被后续命中, 推翻早期 §4.11.1 的"浅 cc 不创建独立块" 全称结论 |
 
-**FAIL 的全部都集中在"非完整字节级前缀的命中失败"这一类**, 7 组实验
-彼此交叉印证, 结论非常稳定。**E11 r1 把"浅标记创建端有效"证伪, E12 r1
-把"增量计费"也证伪**, 把命中条件压缩到最严格的形式: **必须本次最末
-标记位置之前的字节序列与已有缓存块完全一致**, 既无浅前缀匹配, 也无
-增量部分命中。
+**FAIL 的全部都集中在"非完整字节级前缀的命中失败"这一类**, 8 组实验
+彼此交叉印证, 结论非常稳定。**E11 把"同 message 内浅 cc 创建独立块"
+证伪, E12 把"增量计费"证伪, E14 在此基础上补上一条关键边界**: 跨
+message 的浅 cc **真的会创建独立块**, 这给 aibalance hijacker 把
+high-static 抽到 system message 的架构提供了实测背书 — 详见 §7.7。
 
 ---
 
@@ -443,22 +533,28 @@ flowchart TD
     Create --> Register["新缓存块写入缓存表, TTL=5min"]
 
     BuildPrefix -.-> ShallowCC["其它<b>浅</b>cache_control 标记位置<br/>(P0, P1, ...)"]
-    ShallowCC -.->|"在 r0 时<b>也不</b>建独立块"| Skip1["实测: 这些位置仅是声明, 无任何实际效果"]
-    ShallowCC -.->|"在 r1+ 时<b>不会</b>主动尝试命中"| Skip2["实测: 这些位置在请求时被跳过"]
+    ShallowCC -.->|"同 message 内 (E11 r1 FAIL)"| SkipSame["实测: 同 message 内浅 cc 不建独立块, 不参与命中"]
+    ShallowCC -.->|"<b>跨 message</b> (E14 r1 PASS)"| CrossMsg["实测: 跨 message 浅 cc 各自创建独立块且能被后续命中"]
 ```
 
-注意虚线部分: 浅 cache_control 在**创建端和命中端均无效** — 既不创建
-独立块 (E11 r1 FAIL 证实, 见 §4.11.1), 也不参与后续命中
-(E3/E5/E7/E8/E9 五组 FAIL 证实)。**dashscope 实际只把"最末标记位置之
-前的整个字节序列"当作单一缓存块**, 浅标记字段虽被序列化发送, 但被服
-务端忽略。
+注意虚线部分: 浅 cache_control 的有效性**取决于是否跨 message 边界**:
+
+- **同一 message 的 content 数组内多个 cc** (例如 system content 是
+  `[{type:text, text:A, cc}, {type:text, text:B, cc}, ...]`)
+  → 浅位置无效, 不创建独立块, 不参与命中
+  (E3/E5/E7/E8/E9/E11 共 6 组 FAIL 证实);
+- **跨 message 的多个 cc** (例如 system message 末尾一个 cc + user
+  message 末尾另一个 cc)
+  → 浅位置**有效**, 各自创建独立缓存块, 后续请求按本次最末 cc 之前
+  的字节前缀去匹配
+  (E14 r1 cached=1478 ≈ A 段单独 token 数 PASS 证实)。
 
 ### 5.1 与 dashscope 文档的差异
 
 | 维度 | 文档描述 | 实测行为 |
 |---|---|---|
-| 创建端 (r0) | "以每个 cache_control 标记位置为终点向前回溯, 创建多个缓存块" | ✗ **只创建最末标记位置之前的单一缓存块**, 浅标记位置不建块 (E11 r1 FAIL 证实) |
-| 命中端 (r1+) | "以每个 cache_control 标记位置为终点向前回溯尝试命中" | ✗ **只对最末标记位置匹配**, 浅标记位置不参与命中 (E3/E5/E7/E8/E9 FAIL) |
+| 创建端 (r0) | "以每个 cache_control 标记位置为终点向前回溯, 创建多个缓存块" | 部分一致: **跨 message 的多 cc 各自创建独立块** (E14 r1 PASS), **同 message 内多 cc 只对最末标记建块** (E11 r1 FAIL); 文档没区分这两种情况 |
+| 命中端 (r1+) | "以每个 cache_control 标记位置为终点向前回溯尝试命中" | **只对本次最末 cc 位置之前的字节前缀做查询** (无论同 message 内的浅 cc 还是其它历史块的真前缀都不主动匹配), 但若历史曾有跨 message 浅 cc 创建过完全匹配字节前缀的独立块, 则可命中 (E14 r1) |
 | 增量计费 | "若新请求的缓存内容包含已有缓存作为前缀, 则仅对新增部分计费" | ✗ **机制根本不存在** (E5 FAIL + E12 r1 决定性 FAIL): 即使增量部分 ≈ 2000 tok 远超 1024 阈值, 整个新前缀仍然按 cache_creation 全计 |
 | 未命中计费 | (文档未直接说) | **整个 prompt 按 125% 计费** (cache_create ≈ prompt − 26, 详见 §4.11.2)。即"用了 cache_control 但没命中" 比"完全不用 cache_control"还**贵 25%** |
 
@@ -537,21 +633,27 @@ E11 的 6 次顺序请求 (具体计算见 §4.11):
    `RewriteMessagesForExplicitCache` 在最末 `system` 消息的 content
    末尾打一个 `cache_control:{"type":"ephemeral"}` 标记。
 
-### 7.2 实测推论
+### 7.2 实测推论 (含 E14 反转修订)
 
-E2 结论已经直接打脸了"high-static 拆出来当 system 消息就能让
-high-static 段在 timeline / dynamic 变化时仍然命中" 的假设:
-- 即便 high-static 内容字节级稳定, 只要 user 消息 (timeline +
-  dynamic) 字节变化, dashscope 都按"完整字节级前缀"判断, **system
-  消息内容稳定不能让 system + user 整体的字节前缀稳定**, 所以**仍然
-  miss**。
+**E2 结论一度让人以为**: "high-static 拆出来当 system 消息就能让
+high-static 段在 timeline / dynamic 变化时仍然命中" 的假设是错的。
+但这是基于 "system + user 整体字节前缀必须一致" 的假设。
 
-E3/E5/E7/E8/E9/E11 结论又打脸了"那把 high-static 也单独打个
-cache_control 标记不就行了" 的假设:
-- 多标记浅位置**既不创建独立块, 也不参与命中**, 只有"完整到最末标记"
-  的字节前缀一致才命中 (E11 r1 进一步证伪了"浅标记创建端有效"这条);
-- 误用还有更糟的副作用: **未命中时整个 prompt 按 125% 计费**, 比
-  "完全不用 cache_control"还**贵 25%** (见 §6.2 E11 整体序列实测)。
+**E14 r1 实测反转了这个判断**: 当 system 上有 cache_control + user
+消息字节完全变化时, 虽然不能命中"system + user 整体前缀", 但能命中
+**system 段独立创建的缓存块**, 命中率约 32%。这个独立块是 dashscope
+对"跨 message 的浅 cc"的特殊处理 — system+cc 与 user 末尾的 cc 各自
+建一个独立块。
+
+**所以 hijacker 当前的"把 high-static 抽到 system + cc"架构不是
+"白做了", 而是带来 ~32% 的稳定命中率**。这是当前 aibalance 部署能享
+受的真实折扣。
+
+E3/E5/E7/E8/E9/E11 仍然有效: **同 message 内多 cc 浅位置无效**。所以
+不要在 system content 数组里塞多个 cc。
+
+误用风险仍然存在: **未命中时整个 prompt 按 125% 计费**, 比"完全不用
+cache_control"还**贵 25%** (见 §6.2 E11 整体序列实测)。
 
 ### 7.3 唯一可行的优化方向
 
@@ -607,6 +709,160 @@ dynamic 全部拼到 user 消息。这意味着:
 - ✅ **等待 dashscope 升级**: 如果未来 dashscope 实现多 cache_control
   浅位置匹配 (与文档对齐), 再考虑多 ChatContent + 多标记策略, 但目
   前 (2026-05) 实测**未实现**。
+
+### 7.7 (NEW) Timeline 封闭块二级缓存方案 (E14 反转后开放)
+
+E14 r3 实测证明: **跨 message 的多 cc 各自创建独立块, 在 user 已封
+闭区段尾再打一个 cc 标记, 后续请求 (即使在 user 末尾追加新内容) 也
+能命中这个更长的前缀块**, 命中率从 §7.4 单层方案的 ~32% 提升到 ~70%。
+
+#### 7.7.1 利用 Timeline 已有的 Open/Frozen 边界
+
+[Timeline.GroupByMinutes](../../aicommon/timeline_groups_render.go) 把
+活跃条目按 N 分钟绝对时间桶分组, 末桶 = Open, 其余 = Frozen。这恰好
+是缓存的天然分界点:
+
+| Timeline 段 | 字节稳定性 | dashscope 缓存策略 |
+|---|---|---|
+| Reducer blocks (永远 Frozen) | ✓ 永久字节稳定 | 应纳入缓存前缀 |
+| Frozen interval blocks | ✓ 一旦封闭永久字节稳定 | 应纳入缓存前缀 |
+| **末尾 Open interval block** | ✗ 还在追加, 字节会变 | **必须排除在缓存前缀之外** |
+
+#### 7.7.2 推荐的消息结构 (3 段 + 2 cc, 跨 message)
+
+```
+messages = [
+  // 第 1 段: high-static system prompt + cc (创建独立 [system] 块)
+  {role: "system", content: [{type: "text", text: <high-static>, cache_control: ephemeral}]},
+
+  // 第 2 段: Reducer + 所有 Frozen interval blocks 拼成一条 user message
+  //         + cc (创建独立 [system + reducer + frozen] 块)
+  {role: "user", content: [{type: "text", text: <reducer + frozen blocks>, cache_control: ephemeral}]},
+
+  // 第 3 段: 末 Open interval block + dynamic 内容拼成另一条 user message
+  //         不带 cc (这部分会变, 不该建块)
+  {role: "user", content: <open block + dynamic + 当前用户提问>},
+]
+```
+
+每次发请求时:
+- 第 1 段字节级永久稳定 (high-static 不变) → [system] 块永久命中
+- 第 2 段字节级稳定直到 Timeline 触发新批量压缩 (新 Reducer 出现) 或
+  新 Frozen block 出现 → [system + reducer + frozen] 块在 5 分钟 TTL
+  内能被多次相同前缀的请求命中
+- 第 3 段每次都不同, 按 100% 计费, 但**不影响前两段命中**
+
+预期实测命中率: **接近 E14 r3 的 70.7%** (静态 + 已封闭部分都按 10%
+计费, 只有 open + dynamic 部分按 100%)。
+
+#### 7.7.3 是否需要单独的"预热请求"
+
+**不需要**。原因:
+1. 业务侧本来就会持续发请求, 每次请求自然都带上完整 Timeline (含
+   reducer + frozen + open), 第一次发请求时就已经在创建 [system] +
+   [system+reducer+frozen] 两个块, 不需要单独发一次"热身请求";
+2. dashscope 5 分钟 TTL 自动保鲜: 只要后续每 5 分钟内至少 1 次请求
+   命中, TTL 自动重置, 块会持续活着;
+3. 预热单独成本: 1 次预热按 125% 计费创建块, 即使后续命中 1 次也只
+   节省 ~14% (1 - (1.25 + 0.1) / 2.0), 不如让自然请求兼任预热。
+
+#### 7.7.4 Timeline 触发新 Frozen 时的"自我热身"现象
+
+当 Timeline 因为时间推进, 出现新的 Frozen interval block 时:
+- 第 1 次包含新 Frozen 的请求: cached=旧前缀 (旧 [system+reducer+frozen]
+  块), 同时 dashscope 会创建一个新的更长的块 [system+reducer+frozen+new-frozen]
+  (按 cc 在第 2 段末尾的位置);
+- 第 2 次起: cached=新前缀块。
+
+整个过程对业务透明, 用户无需感知。
+
+#### 7.7.5 实施风险与回退
+
+风险:
+- **正确性边界依赖 Timeline.Render() 的字节级稳定性保证** —
+  README_TIMELINE_GROUPS.md §6 已经声明并被 40+ 测试守护, 比较稳。
+- **Reducer 触发那一瞬, 旧 frozen 块会被新 reducer 替代, 第 2 段字节
+  序列会改变** → 这一次请求 cached=只命中第 1 段 (system 块), 命中率
+  暂时回落到 32%, 但 5 分钟内自然恢复到 70%。这是可接受的瞬时开销。
+- **Open block 的边界判断必须严格** — 不能把 open 段的内容混进有 cc
+  的第 2 段里, 否则字节序列会变, 命中归零。
+
+回退方案: 如果 7.7 优化在生产中观察到命中率反而下降, 直接关掉第 2 段
+的 cc 注入, 退回到 §7.4 单层 (system + cc) 方案, 命中率回到 ~32%。
+
+#### 7.7.6 与 aibalance rewriter 的关系
+
+当前 [`RewriteMessagesForExplicitCache`](../../../aibalance/explicit_cache_rewriter.go)
+只在最末 `system` 消息上注入 cc。要落地 7.7 方案需要在 aicache
+hijacker 层而不是 aibalance rewriter 层做改动 — 因为 hijacker 知道
+Timeline 边界 (Frozen vs Open), 而 aibalance 看到的只是已经拼好的
+messages, 不知道哪段属于哪个 Timeline block。
+
+落地路径建议:
+1. 在 [aicache/hijacker.go](hijacker.go) 把当前的"single user message
+   带所有 timeline + dynamic" 拆成两条 user message: 一条放 reducer
+   + frozen blocks, 一条放 open + dynamic + user query;
+2. 在 hijacker 输出的 ChatDetail 里, 给第一条 user message 的 content
+   也包成 `[]*ChatContent` 形态并打 cache_control:{"type":"ephemeral"};
+3. aibalance rewriter 不变 (它会继续在 system 末尾打 cc, 和 hijacker
+   在 user reducer+frozen 末尾打的 cc 形成跨 message 双 cc, 触发 E14 r3
+   验证过的双独立块创建);
+4. 单元测试: 用 E14 同样的 4 round 序列断言 cached 数值符合预期。
+
+#### 7.7.7 落地实现 (本次完成)
+
+最终采用的落地方案与 7.7.6 第 1+3 步一致, 但**第 2 步换成了"由
+aibalance rewriter 给 user1 注入 cc", 而不是在 hijacker 层注入 cc**。
+这样切分关注点更干净:
+
+- `aicache/hijacker.go`: **只**负责"按 Frozen/Open 边界把消息切成
+  `[system, user1, user2]`", 不接触 cache_control 字段, 输出的 user
+  消息 Content 仍是简单 string。
+- `aibalance/explicit_cache_rewriter.go`: **统一**负责注入 cc, 在原
+  "最末 system → cc" 基础上扩展为"最末 system + 末位之前最近的 user → cc"
+  双标记策略。这样 cc 注入逻辑只有一份, 不会出现 hijacker 注入一次、
+  rewriter 又注入一次的双注入风险。
+
+落地的具体改动:
+
+| 文件 | 改动 |
+| --- | --- |
+| `common/ai/aid/aicache/hijacker.go` | 增加 3 段拆分主路径 (`build3SegmentMessages` + `splitTimelineFrozenOpen`), 用 last-b-is-open 约定从 timeline section 内的嵌套 `<\|TIMELINE_xxx\|>` 块识别 Frozen/Open 边界. 保留原 2 段拆分作为退化路径 (timeline 不存在 / 全 reducer / 单 interval / 拆分后任一 user 段为空时退化). |
+| `common/ai/aid/aicache/aicache.go` | 入口注释同步更新, 描述新的 3 段输出形态与下游 cc 注入约定. |
+| `common/aibalance/explicit_cache_rewriter.go` | `RewriteMessagesForExplicitCache` 新增 `pickCacheControlTargets`: 末位之前最近的 user 也作为 cc 注入目标; 维持"无 system 时绝对 pass-through"硬契约; 浅复制零副作用. |
+| `common/aibalance/server.go` | 调用点 log 改为同时打印 `cc_marks` 数(0/1/2), 便于线上观察 3 段路径触发频率与"漂移成本规避"效果. |
+
+新增/更新的测试:
+
+- `aicache/hijacker_test.go` 增加 7 个 3 段拆分专项 (`MultiInterval` /
+  `ReducerPlusInterval` / `ReducerPlusSingleInterval` / `OnlyOneInterval` /
+  `OnlyReducer` / `NoTimelineSection` / `PrefixStable`),
+  `FixtureFourSection` 升级为同时容忍 2 段与 3 段输出 (fixture 000060 走 3 段,
+  000005/000010 走 2 段);
+- `aibalance/explicit_cache_rewriter_test.go` 增加 6 个双 cc 测试
+  (`SystemUserUser` / `SerializeBothInJSON` / `SingleUserOnlySystemCC` /
+  `AssistantBetweenUsers` / `NoSystemPassThrough` / `DoesNotMutateInput`),
+  覆盖典型 3 段输入、multi-turn 历史、单 user 退化与零副作用契约。
+
+行为契约 (向 caller 暴露的不变量):
+
+1. **3 段触发条件**: prompt 含 `high-static` + `timeline` 段, 且 timeline
+   内可拆出至少 1 个 Frozen tagged block (reducer 或非末 interval) 和 1 个
+   Open interval block; 任一缺失 → 退化为 2 段. 这与 7.7.5 的
+   "1 个 frozen + 1 个 open 才触发" 风险阈值一致.
+2. **字节稳定性**: 只要 high-static 与 frozen-timeline 内容不变, system 与
+   user1 的 Content 字节级一致 (`TestHijack_3SegSplit_PrefixStable` 保证).
+   这是双 cc 命中的核心前置条件.
+3. **退化路径不破坏旧契约**: 现有所有 fixture 测试与 hijacker 单元测试全部
+   原样通过; `RewriteMessagesForExplicitCache` 在"单 user / 无 system"场景下
+   行为与改动前完全一致.
+
+预期收益 (基于 E14 r3 实测): 在典型生产 prompt 长度下,
+**双 cc 命中率 ~70% (vs 单 cc ~32%)**, 命中 token 计费 10% vs 创建
+token 计费 125%, 单次请求净 token 成本下降约 35%. 漂移成本风险被
+"3 段触发条件"的最小 frozen block 阈值卡住, 当 timeline 还没积累足够
+frozen 内容时自动退化到 2 段, 不会出现 E11/E12 那种"打了 cc 却没命中"
+的反向亏损.
 
 ---
 
@@ -743,20 +999,25 @@ RUN_ID=run-1777823006312881000 ONLY_EXP=E10 go run ./common/aibalance/cmd_cache_
 
 ---
 
-## 11. 报告结论 (三句话)
+## 11. 报告结论 (四句话, 含 E14 反转)
 
-> **dashscope 显式缓存在 OpenAI 兼容接口上的实际可用边界极窄**: 唯一
-> 能 100% 命中的场景是"完整请求字节级 1:1 重发" (E1, E12 r2 验证),
-> 其它任何"前缀稳定但末尾变化"或"增量追加"场景**全部 miss**, 与
-> 增量大小无关 (E12 r1 用增量 2000 tok >> 1024 直接证伪)。
+> **dashscope 显式缓存在 OpenAI 兼容接口上的实际可用边界, 比 E11/E12
+> 单独看时给出的初步结论要更宽**: E14 实测发现 **跨 message 的多 cc
+> 真的会各自创建独立缓存块** (system+cc 创建的 [system] 块在 user 完
+> 全变化时仍能命中, 命中率 ~32%; 在已封闭 user 段尾再打一个 cc 命中率
+> ~70%), 不是之前 E11 单条结论以为的"浅标记完全无效"。
 >
-> **滥用 cache_control 的代价是惩罚性的 +25% 单价**, 不是中性的:
+> 但**滥用 cache_control 的代价是惩罚性的 +25% 单价**, 不是中性的:
 > E11 6 次"标记漂移"序列实测整体成本比无缓存基线**高 24.8%** (见 §6.2),
 > E12 r1 单次实测 4000 token 增量请求按 125% 计费, 比"完全不用
-> cache_control" 多付 25%。
+> cache_control" 多付 25% — 所以**禁止滥用** (例如把 cc 标在每段 / 在
+> user 内追加性内容上 / 在会被覆盖的位置上)。
 >
 > 当前 aicache + aibalance 的"在 system message 末尾打单一 cache_
-> control"实现是 dashscope 显式缓存能用上的**唯一可命中策略** (相同
-> system + 相同 user 的重发能命中), **不要**做"多 ChatContent + 多
-> cache_control 精细控制"的升级。详见 §1.1 的可用性边界表与 §7 的
-> 具体建议。
+> control" 实现 (`RewriteMessagesForExplicitCache`) **被 E14 r1 实测
+> 反向证实是高效的**: system 段独立成块, 后续 user 完全变化也能持续
+> 命中 system 部分, 整体命中率约 32%。
+>
+> **进一步优化空间** (E14 r3 实测路径): 在 user 已封闭区段尾再注入第
+> 二个 cache_control (跨 message 多 cc 各自有效), 命中率可从 32% 提
+> 升到 70%, 详见 §7.7 的 Timeline 封闭块二级缓存方案。

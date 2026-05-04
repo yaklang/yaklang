@@ -1078,21 +1078,28 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 		// dashscope (tongyi) 显式上下文缓存自动注入: 对在 dashscope
 		// 「显式缓存白名单」内的 model (qwen3.5-flash / qwen3.6-plus /
 		// qwen3-vl-flash / qwen3.x-coder / deepseek-v3.2 / kimi-k2.* /
-		// glm-5.1 等), 在最末 system 消息 content 上挂 cache_control:
-		// {"type":"ephemeral"} 标记。dashscope 会把对应 prefix 作为命名
-		// 缓存块保留 5 分钟, 后续相同前缀请求按 input_token 单价 10% 计费,
-		// cached_tokens 字段也会真实回填(走 onUsageForward 入库)。
+		// glm-5.1 等), 在以下两个位置挂 cache_control:{"type":"ephemeral"}:
+		//   1. 最末一条 role=system 消息 (恒注入, 缓存 system 前缀)
+		//   2. 末位之前最近的 role=user 消息 (3 段拆分场景配套, §7.7)
+		// dashscope 会把每个 cc 标记对应的 prefix 作为命名缓存块保留 5 分钟,
+		// 后续相同前缀请求按 input_token 单价 10% 计费, cached_tokens 字段
+		// 也会真实回填(走 onUsageForward 入库)。aicache hijacker 把 prompt
+		// 切成 [system, user1=frozen, user2=open] 时, system+user1 都拿到
+		// cc, 形成"短前缀+长前缀"两层缓存, E14 实测命中率从 32% → 70%。
 		// 不在白名单内的 (provider type, model) 组合 messagesForUpstream
 		// 与 bodyIns.Messages 完全相同(零副作用)。
 		// 关键词: aibalance dashscope 显式缓存自动注入,
-		//        RewriteMessagesForExplicitCache 接入点
+		//        RewriteMessagesForExplicitCache 接入点, 双 cc, §7.7
 		messagesForUpstream := RewriteMessagesForExplicitCache(
 			bodyIns.Messages, provider.TypeName, provider.ModelName,
 		)
 		if len(messagesForUpstream) > 0 && len(messagesForUpstream) == len(bodyIns.Messages) &&
 			IsTongyiExplicitCacheModel(provider.TypeName, provider.ModelName) {
-			c.logInfo("explicit cache_control injected: provider=%s model=%s msgs=%d",
-				provider.TypeName, provider.ModelName, len(messagesForUpstream))
+			ccMarks := len(pickCacheControlTargets(bodyIns.Messages))
+			if ccMarks > 0 {
+				c.logInfo("explicit cache_control injected: provider=%s model=%s msgs=%d cc_marks=%d",
+					provider.TypeName, provider.ModelName, len(messagesForUpstream), ccMarks)
+			}
 		}
 
 		client, err := provider.GetAIClientWithRawMessages(
