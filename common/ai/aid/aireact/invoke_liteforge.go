@@ -68,10 +68,15 @@ func (r *ReAct) invokeLiteForgeWithCallback(cb aicommon.AICallbackType, ctx cont
 	if userUsageCb := r.config.GetUserUsageCallback(); userUsageCb != nil {
 		execOpts = append(execOpts, aicommon.WithUserUsageCallback(userUsageCb))
 	}
-	forgeResult, err := f.Execute(ctx, []*ypb.ExecParamItem{
-		{Key: "query", Value: prompt},
-	},
-		execOpts...)
+	// P0-B4 (round2): 之前同时把 prompt 通过 WithLiteForge_Prompt 注入 dynamic 段
+	// <context_NONCE>, 又在这里再以 ExecParamItem(key="query") 的形式注入 dynamic
+	// 段 <params_NONCE>, 同一份内容被写入 2 次, 直接让 dynamic 段字节翻倍, 上游
+	// prefix cache 命中比例被稀释一半. WithLiteForge_Prompt 已经覆盖了 prompt
+	// 在 dynamic 段的暴露需求, 这里改成空 ExecParamItem, 让 LiteForge.Execute 内部
+	// callBuffer 拿到空字符串, liteForgePromptTemplate 中的 {{ if .Params }} 整段
+	// 自动省略, dynamic 段只剩 <context_NONCE>{prompt}</context_NONCE>.
+	// 关键词: invokeLiteForgeWithCallback dedup, dynamic 段字节减半, P0-B4
+	forgeResult, err := f.Execute(ctx, []*ypb.ExecParamItem{}, execOpts...)
 	if err != nil {
 		return nil, utils.Wrap(err, "invoke liteforge failed")
 	}

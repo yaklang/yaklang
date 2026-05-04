@@ -411,24 +411,26 @@ func (m *PromptContextProvider) SharedEvidenceContext() string {
 }
 
 // PersistentMemory 渲染"持久记忆"段, 进 LiteForge / aireact 模板的 semi-dynamic
-// 区。时间字段使用分钟粒度 (2006-01-02 15:04), 避免 time.Now().String() 自带的
-// 纳秒精度导致每次调用都不同, 进而把 semi-dynamic 段的 byte hash 打散 (B2 修复
-// 对应的 91 distinct hash 主因)。
+// 区。本段不再写入任何 time.Now() 派生字符串, 时间提示职责完全交给:
+//   - aireact 主循环 timeline-open 段 (renderCurrentTimeBlock,
+//     prompt_loop_materials.go: "# Current Time")
+//   - 各类 review / verification / summary prompt 的 {{ .CurrentTime }} 字段
+//   - 真正需要细粒度时间的调用方在 dynamic 段自己维护 (例如
+//     <current_time>...</current_time>)
 //
-// 设计取舍:
-//   - 单台机器多次 LiteForge / Forge 调用通常间隔毫秒到秒级, 分钟粒度足够标识
-//     "现在的大致时刻", LLM 不需要纳秒
-//   - 真正需要细粒度时间的调用方应该把时间戳放进 dynamic 段单独维护
-//     (例如 <current_time>...</current_time>), 而不是污染 semi-dynamic
-//   - prefix cache TTL 通常 ~10 min 量级, 分钟粒度让同一会话内绝大多数调用
-//     PersistentMemory 字节稳定, 配合 B1 让整个 semi-dynamic 段稳定下来
+// 设计取舍 (B3 修复):
+//   - 之前 B2 把 time.Now().String() (纳秒) 收敛到分钟粒度避免 91 distinct hash,
+//     但 timeline-open 段早就有 # Current Time, semi-dynamic 段的 # Now 是纯
+//     冗余, 每分钟翻一次仍会让整个 semi-dynamic 段在分钟边界 byte hash 变动,
+//     击穿上游 prefix cache
+//   - 直接删除 # Now 后, semi-dynamic 段在同一会话内可保持完全 byte 稳定,
+//     LLM 仍能从 timeline-open / dynamic 段拿到当前时间, 信息无损
 //
-// 关键词: PromptContextProvider.PersistentMemory, 分钟粒度时间戳, semi-dynamic
+// 关键词: PromptContextProvider.PersistentMemory, semi-dynamic byte 稳定,
 //
-//	byte 稳定, aicache 91 hash 修复
+//	aicache 时间抖动移除, 时间源解耦
 func (m *PromptContextProvider) PersistentMemory() string {
 	var buf bytes.Buffer
-	buf.WriteString("# Now " + time.Now().Format("2006-01-02 15:04") + "\n")
 	buf.WriteString("<persistent_memory>\n")
 	m.PersistentData.ForEach(func(i string, v *PersistentDataRecord) bool {
 		if v.Variable {

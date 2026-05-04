@@ -138,8 +138,10 @@ func TestLiteForgePrompt_HighStaticStableAcrossNonces(t *testing.T) {
 		"dynamic hash should differ when nonce / Prompt / Params differ (anti-injection by design)")
 }
 
-// TestLiteForgePrompt_TimelineEmptyOmitsSection 验证 timeline 段为空时整段被省略
-// 关键词: aicache, timeline, 空段省略
+// TestLiteForgePrompt_TimelineEmptyOmitsSection 验证 timeline 内容为空时
+// 仍按 4 段对齐, 输出空 timeline-open 占位, 防止 LiteForge 路径在 timeline
+// 缺失时让 dynamic 段紧贴 semi-dynamic, 破坏 4 段哈希对齐.
+// 关键词: aicache, timeline-open empty placeholder, 4 段对齐
 func TestLiteForgePrompt_TimelineEmptyOmitsSection(t *testing.T) {
 	nonce := strings.ToLower(utils.RandStringBytes(6))
 	rendered, err := renderLiteForgePrompt(liteForgePromptParams{
@@ -151,15 +153,26 @@ func TestLiteForgePrompt_TimelineEmptyOmitsSection(t *testing.T) {
 		TimelineDump:      "",
 	})
 	require.NoError(t, err)
-	require.NotContains(t, rendered, "<|PROMPT_SECTION_timeline|>")
+	require.NotContains(t, rendered, "<|PROMPT_SECTION_timeline|>",
+		"老 timeline 段在没有 frozen / dump 时不应出现")
+	require.Contains(t, rendered, "<|PROMPT_SECTION_timeline-open|>",
+		"timeline-open 段必须无条件输出 (即便为空), 保证 4 段对齐")
+	require.Contains(t, rendered, "<|PROMPT_SECTION_END_timeline-open|>")
 
 	split := aicache.Split(rendered)
 	require.NotNil(t, split)
-	require.Len(t, split.Chunks, 3, "expect 3 sections when timeline is empty")
+	require.Len(t, split.Chunks, 4,
+		"expect 4 sections (high-static, semi-dynamic, timeline-open empty placeholder, dynamic) when timeline content is empty")
 
 	for _, c := range split.Chunks {
-		require.NotEqual(t, aicache.SectionTimeline, c.Section)
+		require.NotEqual(t, aicache.SectionTimeline, c.Section,
+			"老 timeline 段不应出现在 chunks 中")
 	}
+
+	tlOpen := pickSection(t, split, aicache.SectionTimelineOpen)
+	require.NotNil(t, tlOpen, "timeline-open 段应作为空占位存在")
+	require.Empty(t, strings.TrimSpace(tlOpen.Content),
+		"timeline-open 占位 chunk 内容应为空 (仅含起止标签之间的空内容)")
 }
 
 // TestLiteForgePrompt_DynamicNonceConsistent 验证 dynamic 段外层 nonce 与内部 wrapper nonce 一致

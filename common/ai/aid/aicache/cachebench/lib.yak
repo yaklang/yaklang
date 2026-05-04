@@ -12,6 +12,7 @@
 // classify tags 列表 - 用来标注每条 prompt 在两路口径下的健康程度
 // 关键词: cachebench tag, prompt 健康分类
 TAG_HEALTHY                  = "healthy"
+TAG_PARTIAL_HIT              = "partial_hit"
 TAG_CACHE_CREATE             = "cache_create"
 TAG_PREFIX_MISALIGN          = "prefix_misalign"
 TAG_LCP_HIT_UPSTREAM_MISS    = "lcp_hit_but_upstream_miss"
@@ -19,8 +20,14 @@ TAG_IN_FLIGHT_CANCELLED      = "in_flight_cancelled"
 TAG_NOISE                    = "noise"
 TAG_UNKNOWN                  = "unknown"
 
-// 命中率阈值 (与 TONGYI_CACHE_REPORT.md E14 的双 cc 命中实测 70% 对齐)
+// 命中率阈值
 // 关键词: cachebench threshold
+//
+// HEALTHY_TOKEN_RATIO_MIN: cachedTokens / promptTokens >= 该值 视为 healthy.
+//   取 0.10 是因为 memfit-standard-free 的高静态/语义动态段约占整 prompt 10-20%,
+//   只要上游真把这段 prefix cache 起来, 比例自然落在 0.10+ 区间.
+// HEALTHY_LCP_RATIO_MIN: 客户端 LCP 比例阈值, 仍保留作为参考但不再是 healthy 唯一门槛.
+HEALTHY_TOKEN_RATIO_MIN      = 0.10
 HEALTHY_LCP_RATIO_MIN        = 0.5
 
 // =============================================================================
@@ -413,18 +420,35 @@ func classifyRecord(rec, usage) {
     // 关键词: classifyRecord nil-safe, ccbAsInt 兜底
     cachedTokens = 0
     cacheCreation = 0
+    promptTokens = 0
     if !ccbIsNil(usage) {
         cachedTokens = ccbAsInt(usage["cachedTokens"])
         cacheCreation = ccbAsInt(usage["cacheCreation"])
+        promptTokens = ccbAsInt(usage["promptTokens"])
     }
 
     prefixHitChunks = ccbAsInt(rec["prefixHitChunks"])
     prefixHitRatio = ccbAsFloat(rec["prefixHitRatio"])
     totalRequests = ccbAsInt(rec["totalRequests"])
 
-    // healthy: 上游真命中 + 客户端 LCP 也对齐
-    if cachedTokens > 0 && prefixHitRatio >= HEALTHY_LCP_RATIO_MIN {
+    // 上游 cached_tokens / prompt_tokens 比例: 这才是真实命中率口径
+    // 关键词: classifyRecord upstream token ratio, partial_hit, healthy
+    tokenHitRatio = 0.0
+    if cachedTokens > 0 && promptTokens > 0 {
+        tokenHitRatio = float(cachedTokens) / float(promptTokens)
+    }
+
+    // healthy: 上游 token 比例命中达标 (不再要求客户端 LCP 同步, 因为 LCP 受
+    // dynamic 段尾抖动影响很大, 与上游 prefix cache 是否真命中并不强相关)
+    if tokenHitRatio >= HEALTHY_TOKEN_RATIO_MIN {
         return TAG_HEALTHY
+    }
+
+    // partial_hit: 上游有少量 cached_tokens 但比例不足 healthy 门槛.
+    // 通常发生在 prompt 体积偏大、prefix cache 命中段落只占小头 (例如只命中
+    // high-static), 已经"开始有缓存"但没用满, 算亚健康而非瓶颈.
+    if cachedTokens > 0 {
+        return TAG_PARTIAL_HIT
     }
 
     // lcp_hit_but_upstream_miss: 客户端 LCP 看到命中但 dashscope 没命中
@@ -450,7 +474,9 @@ func classifyRecord(rec, usage) {
 // 关键词: cachebench classifyReason
 func classifyReason(tag) {
     if tag == TAG_HEALTHY {
-        return "上游 cached_tokens > 0 且客户端 LCP ratio 足够高"
+        return "上游 cached_tokens / prompt_tokens >= HEALTHY_TOKEN_RATIO_MIN, prefix cache 真正落地"
+    } else if tag == TAG_PARTIAL_HIT {
+        return "上游 cached_tokens > 0 但比例不足门槛, 通常是 dynamic 段过大稀释了 prefix 命中比例"
     } else if tag == TAG_CACHE_CREATE {
         return "上游本次新建缓存块, 首次/字节边界变化时预期出现"
     } else if tag == TAG_PREFIX_MISALIGN {
@@ -662,7 +688,7 @@ func pickBottlenecks(records, topN) {
     seenHash = {}
     for item in records {
         tag = item["tag"]
-        if tag == TAG_HEALTHY || tag == TAG_NOISE || tag == TAG_UNKNOWN || tag == TAG_IN_FLIGHT_CANCELLED {
+        if tag == TAG_HEALTHY || tag == TAG_PARTIAL_HIT || tag == TAG_NOISE || tag == TAG_UNKNOWN || tag == TAG_IN_FLIGHT_CANCELLED {
             continue
         }
         // 去重: 同 prefix 哈希签名只保留一次
@@ -797,7 +823,7 @@ func renderMarkdown(benchReport) {
 
     md += "## tag distribution\n\n"
     md += "| tag | count |\n| --- | --- |\n"
-    tagOrder = [TAG_HEALTHY, TAG_CACHE_CREATE, TAG_PREFIX_MISALIGN, TAG_LCP_HIT_UPSTREAM_MISS, TAG_IN_FLIGHT_CANCELLED, TAG_NOISE, TAG_UNKNOWN]
+    tagOrder = [TAG_HEALTHY, TAG_PARTIAL_HIT, TAG_CACHE_CREATE, TAG_PREFIX_MISALIGN, TAG_LCP_HIT_UPSTREAM_MISS, TAG_IN_FLIGHT_CANCELLED, TAG_NOISE, TAG_UNKNOWN]
     for tag in tagOrder {
         cnt = 0
         if !ccbIsNil(summary["tagCount"][tag]) {
@@ -956,7 +982,7 @@ func analyzeBenchmark(sessionDir, usageList, events, invokeErr, inputText, maxPr
         "sessionDir":      sessionDir,
         "invokeError":     invokeErrText,
         "summary":         summary,
-        "tagOrder":        [TAG_HEALTHY, TAG_CACHE_CREATE, TAG_PREFIX_MISALIGN, TAG_LCP_HIT_UPSTREAM_MISS, TAG_IN_FLIGHT_CANCELLED, TAG_NOISE, TAG_UNKNOWN],
+        "tagOrder":        [TAG_HEALTHY, TAG_PARTIAL_HIT, TAG_CACHE_CREATE, TAG_PREFIX_MISALIGN, TAG_LCP_HIT_UPSTREAM_MISS, TAG_IN_FLIGHT_CANCELLED, TAG_NOISE, TAG_UNKNOWN],
         "records":         records,
         "bottlenecks":     bottlenecks,
         "eventCount":      len(events),

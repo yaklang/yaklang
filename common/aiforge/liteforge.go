@@ -463,12 +463,15 @@ const liteForgePromptTemplate = `<|AI_CACHE_SYSTEM_high-static|>
 {{ .TimelineOpen }}
 </timeline_{{ .Nonce }}>
 <|PROMPT_SECTION_END_timeline-open|>
-{{ end }}{{ if and (not .TimelineFrozenBlock) (not .TimelineOpen) .TimelineDump }}
+{{ else if and (not .TimelineFrozenBlock) .TimelineDump }}
 <|PROMPT_SECTION_timeline|>
 <timeline_{{ .Nonce }}>
 {{ .TimelineDump }}
 </timeline_{{ .Nonce }}>
 <|PROMPT_SECTION_END_timeline|>
+{{ else }}
+<|PROMPT_SECTION_timeline-open|>
+<|PROMPT_SECTION_END_timeline-open|>
 {{ end }}
 <|PROMPT_SECTION_dynamic_{{ .Nonce }}|>
 {{ if .Prompt }}<context_{{ .Nonce }}>

@@ -41,6 +41,8 @@ maxIter    = cli.Int("max-iteration", cli.setDefault(15),
     cli.setHelp("React 循环最大迭代次数"))
 maxPrompts = cli.Int("max-prompts", cli.setDefault(0),
     cli.setHelp("收集到 N 次 LLM prompt usage 后立即 cancel context 提前退出 (0 = 不限制)"))
+maxDuration = cli.Int("max-duration", cli.setDefault(0),
+    cli.setHelp("benchmark hard cap in seconds, 0 = unlimited; cancel ctx after duration, 与 max-prompts 互不干扰"))
 language   = cli.String("language", cli.setDefault("zh"),
     cli.setHelp("传给 aim.language 的语言, 默认中文"))
 outputDir  = cli.String("output-dir",
@@ -48,17 +50,33 @@ outputDir  = cli.String("output-dir",
     cli.setHelp("报告产物根目录, 内部会自动建立 bottleneck-prompts 子目录"))
 cli.check()
 
-log.info("aicache cachebench - input=%s ai-type=%s max-iteration=%d max-prompts=%d", inputText, aiType, maxIter, maxPrompts)
+log.info("aicache cachebench - input=%s ai-type=%s max-iteration=%d max-prompts=%d max-duration=%ds", inputText, aiType, maxIter, maxPrompts, maxDuration)
 
 // =============================================================================
-// 取消上下文 (用于 max-prompts 限流)
+// 取消上下文 (用于 max-prompts 限流 / max-duration 时间硬截断)
 // =============================================================================
 // 当 maxPrompts > 0, 在 captureUsage 第 N 次回调时 cancel 这个 ctx;
+// 当 maxDuration > 0, 后台 goroutine 在 N 秒后 cancel 这个 ctx;
+// 两条路径互不干扰, 谁先到谁触发, 第二个触发时 cancel 已是 no-op.
 // aim.InvokeReAct 收到 ctx.Done() 会停掉 React loop 并返回 context canceled.
-// 关键词: cachebench max-prompts, ctx cancel
+// 关键词: cachebench max-prompts, max-duration, ctx cancel
 benchCtx, benchCancel = context.WithCancel(context.Background())
 defer benchCancel()
 maxPromptsTriggered = false
+maxDurationTriggered = false
+
+// 后台计时器: maxDuration 秒后强制取消 ctx (与 max-prompts 互不干扰)
+// 关键词: cachebench max-duration trigger, hard cap
+if maxDuration > 0 {
+    go func {
+        time.sleep(maxDuration)
+        if !maxPromptsTriggered {
+            maxDurationTriggered = true
+            log.info("max-duration(%ds) reached, cancelling context to stop React loop", maxDuration)
+            benchCancel()
+        }
+    }
+}
 
 // =============================================================================
 // usage 收集器
@@ -187,6 +205,8 @@ durationSec = invokeEnd.Unix() - invokeStart.Unix()
 if err != nil {
     if maxPromptsTriggered {
         log.info("aim.InvokeReAct stopped by max-prompts after %d seconds (expected): %v", durationSec, err)
+    } else if maxDurationTriggered {
+        log.info("aim.InvokeReAct stopped by max-duration after %d seconds (expected): %v", durationSec, err)
     } else {
         log.warn("aim.InvokeReAct returned error: %v", err)
     }
@@ -223,13 +243,19 @@ sessionDir = ai.aicacheSession()
 log.info("analyzing dumps in: %s", sessionDir)
 log.info("usage callbacks captured: %d", len(usageList))
 
-benchReport = analyzeBenchmark(sessionDir, usageList, events, err, inputText, maxPromptsTriggered)
+// 任何 ctx cancel 路径 (max-prompts / max-duration) 触发的 trailing dumps 都视为
+// in_flight_cancelled 测量伪影, 而不是 missing usage 漏接.
+// 关键词: run_react ctxCancelled, trailing dumps 归类
+ctxCancelled = maxPromptsTriggered || maxDurationTriggered
+benchReport = analyzeBenchmark(sessionDir, usageList, events, err, inputText, ctxCancelled)
 benchReport["durationSec"] = durationSec
 benchReport["aiType"] = aiType
 benchReport["aiModel"] = aiModel
 benchReport["maxIteration"] = maxIter
 benchReport["maxPrompts"] = maxPrompts
 benchReport["maxPromptsTriggered"] = maxPromptsTriggered
+benchReport["maxDuration"] = maxDuration
+benchReport["maxDurationTriggered"] = maxDurationTriggered
 
 jsonPath, mdPath, botDir = saveReport(outputDir, benchReport)
 
@@ -253,6 +279,6 @@ if summary["totalCalls"] >= 30 {
     }
 }
 
-if err != nil && !maxPromptsTriggered {
+if err != nil && !maxPromptsTriggered && !maxDurationTriggered {
     die(sprintf("aim.InvokeReAct failed: %v", err))
 }
