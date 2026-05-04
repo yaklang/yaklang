@@ -15,6 +15,7 @@ TAG_HEALTHY                  = "healthy"
 TAG_CACHE_CREATE             = "cache_create"
 TAG_PREFIX_MISALIGN          = "prefix_misalign"
 TAG_LCP_HIT_UPSTREAM_MISS    = "lcp_hit_but_upstream_miss"
+TAG_IN_FLIGHT_CANCELLED      = "in_flight_cancelled"
 TAG_NOISE                    = "noise"
 TAG_UNKNOWN                  = "unknown"
 
@@ -153,6 +154,8 @@ func parseDumpFile(filePath) {
         "globalCacheBytes":  0,
         "totalRequests":     0,
         "sectionHashCount":  {},
+        "sectionTotalUses":  {},
+        "sectionReuseRate":  {},
         "advices":           [],
         "rawPromptBytes":    0,
         "parseError":        "",
@@ -170,27 +173,32 @@ func parseDumpFile(filePath) {
     // 状态机: 默认 header, 进入 ## sections / ## hit report / ## advices / ## raw prompt
     state = "header"
     inSectionHashCount = false
+    inSectionTotalUses = false
 
     for line in lines {
         trimmed = str.TrimSpace(line)
         if str.HasPrefix(trimmed, "## sections") {
             state = "sections"
             inSectionHashCount = false
+            inSectionTotalUses = false
             continue
         }
         if str.HasPrefix(trimmed, "## hit report") {
             state = "hit"
             inSectionHashCount = false
+            inSectionTotalUses = false
             continue
         }
         if str.HasPrefix(trimmed, "## advices") {
             state = "advices"
             inSectionHashCount = false
+            inSectionTotalUses = false
             continue
         }
         if str.HasPrefix(trimmed, "## raw prompt") {
             state = "raw"
             inSectionHashCount = false
+            inSectionTotalUses = false
             // 同时抽出 raw prompt 的 bytes 数
             // 形如: "## raw prompt (4788 bytes)"
             lp = str.Index(trimmed, "(")
@@ -245,6 +253,43 @@ func parseDumpFile(filePath) {
                 record["totalRequests"] = ccbAtoi(str.TrimSpace(trimmed[len("total_requests:"):]))
             } else if str.HasPrefix(trimmed, "section_hash_count:") {
                 inSectionHashCount = true
+                inSectionTotalUses = false
+            } else if str.HasPrefix(trimmed, "section_total_uses:") {
+                // section_total_uses 块每行形如 "- high-static: total=10 distinct=3 reuse_rate=70%"
+                // 解析后写入 sectionTotalUses / sectionReuseRate, 让 cachebench 报告
+                // 用 reuse_rate 替代单纯 distinct 判定 (修 high-static distinct 误报).
+                // 关键词: cachebench parser section_total_uses, reuse_rate
+                inSectionHashCount = false
+                inSectionTotalUses = true
+            } else if inSectionTotalUses && str.HasPrefix(trimmed, "- ") {
+                payload = str.TrimSpace(trimmed[2:])
+                parts = str.SplitN(payload, ":", 2)
+                if len(parts) == 2 {
+                    sectionName = str.TrimSpace(parts[0])
+                    rest = str.TrimSpace(parts[1])
+                    fields = str.Fields(rest)
+                    stu = record["sectionTotalUses"]
+                    if ccbIsNil(stu) {
+                        stu = {}
+                    }
+                    srr = record["sectionReuseRate"]
+                    if ccbIsNil(srr) {
+                        srr = {}
+                    }
+                    for f in fields {
+                        if str.HasPrefix(f, "total=") {
+                            stu[sectionName] = ccbAtoi(f[len("total="):])
+                        } else if str.HasPrefix(f, "reuse_rate=") {
+                            v = f[len("reuse_rate="):]
+                            if str.HasSuffix(v, "%") {
+                                v = v[:len(v)-1]
+                            }
+                            srr[sectionName] = ccbAtof(v) / 100.0
+                        }
+                    }
+                    record["sectionTotalUses"] = stu
+                    record["sectionReuseRate"] = srr
+                }
             } else if inSectionHashCount && str.HasPrefix(trimmed, "- ") {
                 // 形如 "- high-static: 1"
                 payload = str.TrimSpace(trimmed[2:])
@@ -336,6 +381,13 @@ func classifyRecord(rec, usage) {
         return TAG_NOISE
     }
 
+    // in_flight_cancelled: max-prompts 触发后还在飞的 chat 被 ctx cancel
+    // SSE 末帧 usage 没读到, 仅是测量伪影 - 不算瓶颈也不算 missing
+    // 关键词: classifyRecord in_flight_cancelled, ctx cancel SSE truncate
+    if !ccbIsNil(usage) && usage["inFlightCancelled"] == true {
+        return TAG_IN_FLIGHT_CANCELLED
+    }
+
     cachedTokens = 0
     cacheCreation = 0
     if !ccbIsNil(usage) {
@@ -381,6 +433,8 @@ func classifyReason(tag) {
         return "客户端 LCP 完全未对齐 - 检查 high-static/frozen 段是否被污染"
     } else if tag == TAG_LCP_HIT_UPSTREAM_MISS {
         return "客户端 LCP 命中但上游未命中 - 检查 hijacker 字节边界与 cache_control 标记位置"
+    } else if tag == TAG_IN_FLIGHT_CANCELLED {
+        return "max-prompts 触发后被 ctx cancel 中断, SSE 末帧 usage 未读到 (测量伪影)"
     } else if tag == TAG_NOISE {
         return "单 raw chunk, 无 PROMPT_SECTION 包装, 不参与段缓存"
     }
@@ -443,6 +497,7 @@ func summarize(records) {
         "cacheCreateCount":      0,
         "cacheHitCount":         0,
         "missingUsageCount":     0,
+        "inFlightCancelledCount": 0,
         "tagCount":              {},
         "sumPromptTokens":       0,
         "sumCachedTokens":       0,
@@ -453,6 +508,8 @@ func summarize(records) {
         "hitRatioLcpClient":     0.0,
         "upstreamCreationCost":  0.0,
         "sectionHashMax":        {},
+        "sectionTotalMax":       {},
+        "sectionReuseRateMin":   {},
     }
 
     for item in records {
@@ -465,10 +522,17 @@ func summarize(records) {
         summary["tagCount"] = tagCount
 
         usage = item["usage"]
+        // missing 与 in_flight_cancelled 区分:
+        //   inFlightCancelled = max-prompts 触发后还在飞的 chat 被 ctx cancel,
+        //     SSE 末帧 usage 没拿到 -> 测量伪影, 不算 missing 漏接
+        //   missing = max-prompts 触发前的 nil callback -> 真实链路问题
+        // 关键词: summarize inFlightCancelled, missing usage 真实诊断
         if ccbIsNil(usage) {
             summary["missingUsageCount"]++
         } else {
-            if usage["missing"] == true {
+            if usage["inFlightCancelled"] == true {
+                summary["inFlightCancelledCount"]++
+            } else if usage["missing"] == true {
                 summary["missingUsageCount"]++
             } else {
                 summary["sumPromptTokens"] += usage["promptTokens"]
@@ -495,6 +559,26 @@ func summarize(records) {
                     summary["sectionHashMax"][sectionName] = cnt
                 }
             }
+            // 同步累计 totalUses / reuse_rate (取最大 total / 最低 reuse_rate)
+            // 关键词: summarize sectionTotalMax, sectionReuseRateMin
+            stu = dumpRec["sectionTotalUses"]
+            if !ccbIsNil(stu) {
+                for sectionName, total in stu {
+                    cur = summary["sectionTotalMax"][sectionName]
+                    if ccbIsNil(cur) || total > cur {
+                        summary["sectionTotalMax"][sectionName] = total
+                    }
+                }
+            }
+            srr = dumpRec["sectionReuseRate"]
+            if !ccbIsNil(srr) {
+                for sectionName, rate in srr {
+                    cur = summary["sectionReuseRateMin"][sectionName]
+                    if ccbIsNil(cur) || rate < cur {
+                        summary["sectionReuseRateMin"][sectionName] = rate
+                    }
+                }
+            }
         }
     }
 
@@ -512,7 +596,7 @@ func pickBottlenecks(records, topN) {
     seenHash = {}
     for item in records {
         tag = item["tag"]
-        if tag == TAG_HEALTHY || tag == TAG_NOISE || tag == TAG_UNKNOWN {
+        if tag == TAG_HEALTHY || tag == TAG_NOISE || tag == TAG_UNKNOWN || tag == TAG_IN_FLIGHT_CANCELLED {
             continue
         }
         // 去重: 同 prefix 哈希签名只保留一次
@@ -636,6 +720,7 @@ func renderMarkdown(benchReport) {
     md += sprintf("- cache_create_count (creation>0):  %d\n", summary["cacheCreateCount"])
     md += sprintf("- cache_hit_count    (cached>0):    %d\n", summary["cacheHitCount"])
     md += sprintf("- missing usage callbacks:          %d\n", summary["missingUsageCount"])
+    md += sprintf("- in_flight cancelled (max-prompts): %d\n", summary["inFlightCancelledCount"])
     md += sprintf("- sum prompt_tokens:                %d\n", summary["sumPromptTokens"])
     md += sprintf("- sum cached_tokens:                %d\n", summary["sumCachedTokens"])
     md += sprintf("- sum cache_creation_input_tokens:  %d\n", summary["sumCacheCreation"])
@@ -646,7 +731,7 @@ func renderMarkdown(benchReport) {
 
     md += "## tag distribution\n\n"
     md += "| tag | count |\n| --- | --- |\n"
-    tagOrder = [TAG_HEALTHY, TAG_CACHE_CREATE, TAG_PREFIX_MISALIGN, TAG_LCP_HIT_UPSTREAM_MISS, TAG_NOISE, TAG_UNKNOWN]
+    tagOrder = [TAG_HEALTHY, TAG_CACHE_CREATE, TAG_PREFIX_MISALIGN, TAG_LCP_HIT_UPSTREAM_MISS, TAG_IN_FLIGHT_CANCELLED, TAG_NOISE, TAG_UNKNOWN]
     for tag in tagOrder {
         cnt = 0
         if !ccbIsNil(summary["tagCount"][tag]) {
@@ -656,15 +741,25 @@ func renderMarkdown(benchReport) {
     }
     md += "\n"
 
-    md += "## section hash drift (max distinct hashes per section)\n\n"
-    md += "| section | distinct_hashes |\n| --- | --- |\n"
+    md += "## section hash drift (distinct + total uses + reuse_rate)\n\n"
+    md += "_reuse_rate = 1 - distinct/total. 高 reuse_rate 表示同一 hash 被多次复用 (健康); 低 reuse_rate 表示几乎每次都换新 hash (污染或入口分散)._\n\n"
+    md += "| section | distinct | total_uses | reuse_rate_min |\n| --- | --- | --- | --- |\n"
     knownSections = ["high-static", "semi-dynamic", "timeline", "timeline-open", "dynamic", "raw"]
     for s in knownSections {
         v = summary["sectionHashMax"][s]
         if ccbIsNil(v) {
             continue
         }
-        md += sprintf("| %s | %d |\n", s, v)
+        total = summary["sectionTotalMax"][s]
+        if ccbIsNil(total) {
+            total = 0
+        }
+        rateMin = summary["sectionReuseRateMin"][s]
+        rateStr = "-"
+        if !ccbIsNil(rateMin) {
+            rateStr = sprintf("%.0f%%", rateMin*100)
+        }
+        md += sprintf("| %s | %d | %d | %s |\n", s, v, total, rateStr)
     }
     md += "\n"
 
@@ -744,6 +839,7 @@ func printSummary(benchReport) {
     printf("cache create:    %d\n", summary["cacheCreateCount"])
     printf("cache hit:       %d\n", summary["cacheHitCount"])
     printf("missing usage:   %d\n", summary["missingUsageCount"])
+    printf("in-flight cancelled: %d\n", summary["inFlightCancelledCount"])
     printf("token hit ratio: %.2f%% (upstream)\n", summary["hitRatioTokenReal"]*100.0)
     printf("lcp  hit ratio:  %.2f%% (in-proc)\n", summary["hitRatioLcpClient"]*100.0)
     printf("creation cost:   %.0f tokens (1.25x)\n", summary["upstreamCreationCost"])
@@ -792,7 +888,7 @@ func analyzeBenchmark(sessionDir, usageList, events, invokeErr, inputText) {
         "sessionDir":      sessionDir,
         "invokeError":     invokeErrText,
         "summary":         summary,
-        "tagOrder":        [TAG_HEALTHY, TAG_CACHE_CREATE, TAG_PREFIX_MISALIGN, TAG_LCP_HIT_UPSTREAM_MISS, TAG_NOISE, TAG_UNKNOWN],
+        "tagOrder":        [TAG_HEALTHY, TAG_CACHE_CREATE, TAG_PREFIX_MISALIGN, TAG_LCP_HIT_UPSTREAM_MISS, TAG_IN_FLIGHT_CANCELLED, TAG_NOISE, TAG_UNKNOWN],
         "records":         records,
         "bottlenecks":     bottlenecks,
         "eventCount":      len(events),

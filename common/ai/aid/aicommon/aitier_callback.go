@@ -11,7 +11,13 @@ import (
 // extractUserUsageCallbackOpts 从 wrapper 后的 i 取出 user 端注册的 UsageCallback,
 // 包成 aispec.WithUsageCallback 返回. wrapper 把 *Config 包成
 // *tierAwareConsumptionCaller, 也兼容直接传入 *Config 的场景 (CallAI 等).
-// 关键词: extractUserUsageCallbackOpts, Tiered AI usageCallback 透传
+//
+// 取 callback 的优先级:
+//  1. cfg.userUsageCallback (P1-D / P1-D2 已修复的同 Config / inherit 链路);
+//  2. cfg.GetContext() 中 ctx-based 透传 (P3-T5 新增, 修复 aicommon.InvokeLiteForge
+//     -> MustGetSpeedPriorityAIModelCallback 创建的子 Config 没继承 user callback 的 BUG).
+//
+// 关键词: extractUserUsageCallbackOpts, Tiered AI usageCallback 透传, ctx fallback
 func extractUserUsageCallbackOpts(i AICallerConfigIf) []aispec.AIConfigOption {
 	if i == nil {
 		return nil
@@ -22,10 +28,20 @@ func extractUserUsageCallbackOpts(i AICallerConfigIf) []aispec.AIConfigOption {
 	} else if c, ok := i.(*Config); ok {
 		cfg = c
 	}
-	if cfg == nil {
-		return nil
+	var cb func(*aispec.ChatUsage)
+	if cfg != nil {
+		cb = cfg.GetUserUsageCallback()
 	}
-	cb := cfg.GetUserUsageCallback()
+	if cb == nil {
+		// 走 ctx-based fallback, 兼容 enhancesearch 等子调用场景:
+		// 子 Config 自身没显式继承 userUsageCallback, 但父 React loop 的 ctx 里携带了
+		// user callback (Config.GetContext 自动注入), aicommon.InvokeLiteForge 通过
+		// aicommon.WithContext(ctx) 把 ctx 复制到子 Config 上, 此处再取出.
+		ctx := i.GetContext()
+		if ctx != nil {
+			cb = GetUserUsageCallbackFromContext(ctx)
+		}
+	}
 	if cb == nil {
 		return nil
 	}

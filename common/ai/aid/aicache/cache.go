@@ -28,6 +28,12 @@ type globalCache struct {
 	chunks map[string]*ChunkInfo
 	// sectionHashes section -> set(hash) 用于统计每个 section 的稳定性
 	sectionHashes map[string]map[string]struct{}
+	// sectionTotalUses section -> 累计使用次数 (含重复, 用来配合 distinct 算
+	// reuse_rate = 1 - distinct/total). distinct 大不一定 = "污染", 跨多个
+	// 不同 forge 入口本来就会出现多个 high-static hash; 但每个入口内部稳定
+	// 时, total >> distinct, reuse_rate 会很高, advice 不再误报.
+	// 关键词: aicache, sectionTotalUses, reuse_rate
+	sectionTotalUses map[string]int
 	// requests 是环形历史
 	requests   []*requestRecord
 	requestPos int
@@ -48,10 +54,11 @@ func newGlobalCache(maxRequests int) *globalCache {
 		maxRequests = defaultMaxRequests
 	}
 	return &globalCache{
-		chunks:        make(map[string]*ChunkInfo),
-		sectionHashes: make(map[string]map[string]struct{}),
-		requests:      make([]*requestRecord, 0, maxRequests),
-		maxRequests:   maxRequests,
+		chunks:           make(map[string]*ChunkInfo),
+		sectionHashes:    make(map[string]map[string]struct{}),
+		sectionTotalUses: make(map[string]int),
+		requests:         make([]*requestRecord, 0, maxRequests),
+		maxRequests:      maxRequests,
 	}
 }
 
@@ -109,6 +116,7 @@ func (g *globalCache) Record(split *PromptSplit, model string) *HitReport {
 		GlobalCacheBytes:   g.totalCacheBytes,
 		TotalRequests:      g.totalRequests,
 		SectionHashCount:   g.snapshotSectionHashCount(),
+		SectionTotalUses:   g.snapshotSectionTotalUses(),
 	}
 
 	// 写入新 record，环形覆盖
@@ -135,6 +143,10 @@ func (g *globalCache) upsertChunk(ch *Chunk, now time.Time) {
 	if ch == nil {
 		return
 	}
+	// 累计 section 使用次数 (含重复) - 用来配合 distinct hash 算 reuse_rate
+	// 关键词: upsertChunk sectionTotalUses, reuse_rate 数据源
+	g.sectionTotalUses[ch.Section]++
+
 	info, ok := g.chunks[ch.Hash]
 	if !ok {
 		info = &ChunkInfo{
@@ -165,6 +177,18 @@ func (g *globalCache) snapshotSectionHashCount() map[string]int {
 	out := make(map[string]int, len(g.sectionHashes))
 	for section, set := range g.sectionHashes {
 		out[section] = len(set)
+	}
+	return out
+}
+
+// snapshotSectionTotalUses 拷贝当前 section -> 累计使用次数映射
+// 与 snapshotSectionHashCount 配合, advice 用 distinct/total 判定真稳定性,
+// 避免把"跨多个不同 forge 入口"误判为 high-static 污染.
+// 关键词: aicache, snapshotSectionTotalUses
+func (g *globalCache) snapshotSectionTotalUses() map[string]int {
+	out := make(map[string]int, len(g.sectionTotalUses))
+	for section, total := range g.sectionTotalUses {
+		out[section] = total
 	}
 	return out
 }

@@ -71,6 +71,28 @@ func TestCache_SectionHashCount(t *testing.T) {
 	assert.Equal(t, 2, rep.SectionHashCount[SectionTimeline])
 }
 
+// TestCache_SectionTotalUses 验证 distinct + total 同时记录, 用来算 reuse_rate
+// 5 次同 high-static + 5 个不同 timeline 时:
+//
+//	high-static: distinct=1, total=5, reuse_rate=80% (稳定)
+//	timeline:    distinct=5, total=5, reuse_rate=0%  (每次都新, 但符合 timeline 性质)
+//
+// 关键词: cache, SectionTotalUses, reuse_rate
+func TestCache_SectionTotalUses(t *testing.T) {
+	gc := newGlobalCache(16)
+
+	for i := 0; i < 5; i++ {
+		p := buildFourSectionPrompt("n", "q", "tools", "static-FIXED", "timeline-"+string(rune('A'+i)), "mem")
+		_ = gc.Record(Split(p), "m")
+	}
+	rep := gc.Record(Split(buildFourSectionPrompt("n", "q", "tools", "static-FIXED", "timeline-Z", "mem")), "m")
+
+	assert.Equal(t, 1, rep.SectionHashCount[SectionHighStatic], "high-static distinct should stay at 1")
+	assert.Equal(t, 6, rep.SectionTotalUses[SectionHighStatic], "high-static used 6 times across 6 prompts")
+	assert.Equal(t, 6, rep.SectionHashCount[SectionTimeline], "6 different timelines")
+	assert.Equal(t, 6, rep.SectionTotalUses[SectionTimeline], "timeline used 6 times")
+}
+
 // 关键词: aicache, cache, 环形历史
 func TestCache_RingBufferEviction(t *testing.T) {
 	gc := newGlobalCache(2)

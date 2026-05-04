@@ -78,12 +78,25 @@ func captureUsage(usage) {
     defer usageMu.Unlock()
     usageCount++
     if usage == nil {
-        usageList = append(usageList, {
+        // 区分两种 nil callback:
+        //   1) max-prompts 触发后到达的 nil = 测量伪影 (ctx cancel 中断 SSE 末帧),
+        //      不计入 missing 链路诊断
+        //   2) max-prompts 触发前的 nil = 真实"上游没回 usage 或 callback 链路漏接",
+        //      需要 P1-D 类继续排查
+        // 关键词: captureUsage in_flight_cancelled, missing usage 测量伪影
+        cancelled = maxPromptsTriggered
+        record = {
             "seq":     usageCount,
-            "missing": true,
+            "missing": !cancelled,
+            "inFlightCancelled": cancelled,
             "ts":      time.Now().Unix(),
-        })
-        log.warn("usage callback fired with nil (provider did not return usage block)")
+        }
+        usageList = append(usageList, record)
+        if cancelled {
+            log.info("usage callback nil after max-prompts cancel (in-flight, expected): seq=%d", usageCount)
+        } else {
+            log.warn("usage callback fired with nil (provider did not return usage block): seq=%d", usageCount)
+        }
         return
     }
 
@@ -182,6 +195,28 @@ if err != nil {
 }
 
 // =============================================================================
+// 等待末帧到达, 避免 ReAct loop 自然结束时 last-iteration chat 的 SSE 末帧
+// (token usage block) 还没到达就开始对齐, 导致最后 1-2 条 dump 被误判 missing.
+// 关键词: cachebench tail_in_flight, SSE 末帧等待
+// =============================================================================
+prevUsageCount = -1
+stableMs = 0
+maxWaitMs = 3000
+stepMs = 200
+for stableMs < 1500 && maxWaitMs > 0 {
+    time.sleep(stepMs / 1000.0)
+    maxWaitMs -= stepMs
+    cur = len(usageList)
+    if cur == prevUsageCount {
+        stableMs += stepMs
+    } else {
+        stableMs = 0
+        prevUsageCount = cur
+    }
+}
+log.info("post-react drain done, final usage count = %d", len(usageList))
+
+// =============================================================================
 // 拉取 aicache dump 目录, 做对齐分析
 // =============================================================================
 sessionDir = ai.aicacheSession()
@@ -206,8 +241,12 @@ log.info("  bottleneck-prompts: %s", botDir)
 printSummary(benchReport)
 
 // 与上游真实命中口径双口径都太低时退出码非 0, 便于 CI 卡线
+// 需要至少 30 个样本才判, 否则冷启动 (前几次 chat) 必然命中率 0% 直接 die,
+// 测量结果就丢了. 30 是经验阈值: 真实 hostscan 一般 40-130 prompt, 30 之前
+// 主要是前几个 forge 的 cold start, 数据无代表性.
+// 关键词: cachebench die threshold, 冷启动样本豁免
 summary = benchReport["summary"]
-if summary["totalCalls"] > 1 {
+if summary["totalCalls"] >= 30 {
     if summary["hitRatioTokenReal"] < 0.05 && summary["hitRatioLcpClient"] < 0.05 {
         log.warn("both hit ratios below 5%%, exiting with code 1")
         die("cache hit ratio below threshold")

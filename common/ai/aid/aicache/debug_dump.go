@@ -136,6 +136,22 @@ func renderDebugDump(rep *HitReport, split *PromptSplit, gc *globalCache) string
 			fmt.Fprintf(&sb, "  - %s: %d\n", section, rep.SectionHashCount[section])
 		}
 	}
+	if len(rep.SectionTotalUses) > 0 {
+		// total_uses 与 hash_count 配套, 用来算 reuse_rate, 帮诊断 distinct 多
+		// 但每个 forge 入口内部其实稳定的"伪不稳定"场景.
+		// 关键词: renderDebugDump section_total_uses, reuse_rate 数据源
+		sb.WriteString("section_total_uses:\n")
+		for _, section := range orderedSections(rep.SectionTotalUses) {
+			total := rep.SectionTotalUses[section]
+			distinct := rep.SectionHashCount[section]
+			reuseRate := 0.0
+			if total > 0 {
+				reuseRate = 1.0 - float64(distinct)/float64(total)
+			}
+			fmt.Fprintf(&sb, "  - %s: total=%d distinct=%d reuse_rate=%.0f%%\n",
+				section, total, distinct, reuseRate*100)
+		}
+	}
 	sb.WriteString("\n")
 
 	sb.WriteString("## advices\n")

@@ -2761,7 +2761,21 @@ func (c *Config) IsCtxDone() bool {
 }
 
 func (c *Config) GetContext() context.Context {
-	return c.Ctx
+	if c == nil {
+		return context.Background()
+	}
+	ctx := c.Ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	// 把 c.userUsageCallback 注入 ctx, 让子调用 (aicommon.InvokeLiteForge / enhancesearch
+	// HyDE 等走 MustGetSpeedPriorityAIModelCallback 路径的链路) 能从 ctx 拿到
+	// user 端 ai.usageCallback, 修复 LLM 末帧 token usage 在子 LiteForge 调用上漏接的 BUG.
+	// 关键词: GetContext, ctx 透传 user usage callback, P3-T5
+	if cb := c.GetUserUsageCallback(); cb != nil {
+		ctx = WithUserUsageCallbackContext(ctx, cb)
+	}
+	return ctx
 }
 
 func (c *Config) CallAIResponseConsumptionCallback(i int) {

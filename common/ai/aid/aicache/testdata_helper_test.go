@@ -152,6 +152,13 @@ func parseFixtureMeta(content string, meta *FixtureMeta) (string, error) {
 				state = "section_hash_count"
 				continue
 			}
+			if line == "section_total_uses:" {
+				// section_total_uses 是 advice reuse_rate 用的诊断信息,
+				// 当前 fixture 校验无关 - 只需吞掉直到下一个标题
+				// 关键词: parseFixtureMeta section_total_uses skip
+				state = "section_total_uses"
+				continue
+			}
 			if line == "## advices" {
 				state = "advices"
 				continue
@@ -181,6 +188,10 @@ func parseFixtureMeta(content string, meta *FixtureMeta) (string, error) {
 				continue
 			}
 		case "section_hash_count":
+			if line == "section_total_uses:" {
+				state = "section_total_uses"
+				continue
+			}
 			if line == "## advices" {
 				state = "advices"
 				continue
@@ -188,6 +199,13 @@ func parseFixtureMeta(content string, meta *FixtureMeta) (string, error) {
 			if m := reFixtureSecHash.FindStringSubmatch(line); m != nil {
 				count, _ := strconv.Atoi(m[2])
 				meta.Hit.SectionHashCount[m[1]] = count
+			}
+		case "section_total_uses":
+			// 只吞行, 等待 ## advices 标题切换. 若未来需要解析具体 total/distinct,
+			// 在这里加正则即可.
+			if line == "## advices" {
+				state = "advices"
+				continue
 			}
 		case "advices":
 			if reFixtureRawHead.MatchString(line) {

@@ -30,15 +30,36 @@ func buildAdvices(rep *HitReport, split *PromptSplit) []string {
 	}
 
 	// 4. 段稳定性诊断
-	for section, count := range rep.SectionHashCount {
+	// 用 reuse_rate = 1 - distinct/total 替代单纯 distinct 判定:
+	//   distinct=10 但 total=55 (主 React loop 复用 34 次, 其余 forge 各 1-8 次)
+	//   reuse_rate=82% -> 实际很稳定, 不应报 unstable.
+	//   只有 distinct ≈ total (每次都换新 hash) 时才是真"污染".
+	// 关键词: buildAdvices reuse_rate, high-static distinct 误报修复
+	for section, distinct := range rep.SectionHashCount {
+		total := rep.SectionTotalUses[section]
+		if total <= 0 {
+			total = distinct
+		}
+		// reuse_rate < 30% (大量新 hash 没复用) 才报 unstable; 同时要求 total > 3
+		// 否则启动期 prompt 数 < 3 时易触发误报
 		switch section {
 		case SectionHighStatic:
-			if count > 1 {
-				advices = append(advices, fmt.Sprintf("high-static section unstable: %d distinct hashes seen, check template variables polluting it", count))
+			if total > 3 && distinct > 1 {
+				reuseRate := 1.0 - float64(distinct)/float64(total)
+				if reuseRate < 0.3 {
+					advices = append(advices,
+						fmt.Sprintf("high-static section unstable: %d distinct / %d total uses (reuse_rate=%.0f%%), template variables likely polluting it",
+							distinct, total, reuseRate*100))
+				}
 			}
 		case SectionSemiDynamic:
-			if count > 3 {
-				advices = append(advices, fmt.Sprintf("semi-dynamic section drifts more than expected: %d distinct hashes, tool/forge/schema list may be churning", count))
+			if total > 5 && distinct > 3 {
+				reuseRate := 1.0 - float64(distinct)/float64(total)
+				if reuseRate < 0.4 {
+					advices = append(advices,
+						fmt.Sprintf("semi-dynamic section drifts more than expected: %d distinct / %d total uses (reuse_rate=%.0f%%), tool/forge/schema list may be churning",
+							distinct, total, reuseRate*100))
+				}
 			}
 		}
 	}

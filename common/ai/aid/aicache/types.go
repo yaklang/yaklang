@@ -82,6 +82,11 @@ type HitReport struct {
 	// 例如 high-static -> 3 表示 high-static 段已经漂移 3 次
 	// 关键词: aicache, SectionHashCount, 段稳定性
 	SectionHashCount map[string]int
+	// SectionTotalUses 描述当前全局每个 section 累计被 prompt 使用的次数 (含重复)
+	// 与 SectionHashCount 配合, advice 用 reuse_rate = 1 - distinct/total 判定真稳定性,
+	// 避免把"跨多个不同 forge 入口"误判为 high-static 污染.
+	// 关键词: aicache, SectionTotalUses, reuse_rate
+	SectionTotalUses map[string]int
 	// Advices 由 advice.go 生成
 	Advices []string
 }
@@ -107,6 +112,14 @@ func (r *HitReport) Equal(other *HitReport) bool {
 	}
 	for k, v := range r.SectionHashCount {
 		if other.SectionHashCount[k] != v {
+			return false
+		}
+	}
+	if len(r.SectionTotalUses) != len(other.SectionTotalUses) {
+		return false
+	}
+	for k, v := range r.SectionTotalUses {
+		if other.SectionTotalUses[k] != v {
 			return false
 		}
 	}
