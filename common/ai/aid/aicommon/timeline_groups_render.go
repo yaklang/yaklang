@@ -681,3 +681,56 @@ func (bs TimelineRenderableBlocks) RenderWithFrozenBoundary(aitagName, frozenTag
 	buf.WriteString(openBody)
 	return buf.String()
 }
+
+// RenderFrozenOnly 只渲染所有 IsOpen()==false 的 block (reducer + 非末 interval),
+// 不带任何 frozen 边界标签外壳。这是 Render 在"按稳定性分层"路径下的 frozen 半区
+// 等价物: 调用方自行决定边界 wrap 时机 (例如 prompt builder 把多种来源的 frozen
+// 内容合并到单一 AI_CACHE_FROZEN 块时, 不希望 timeline 自带一对 wrap 标签)。
+//
+// 全 open / 无 frozen 时返回空串; 仅有 1 个 frozen 时也照常输出 (没有"必须配 open"约束)。
+//
+// 关键词: TimelineRenderableBlocks.RenderFrozenOnly, frozen-only 渲染, 分层 prompt
+func (bs TimelineRenderableBlocks) RenderFrozenOnly(aitagName string) string {
+	if len(bs) == 0 {
+		return ""
+	}
+	frozen := make(TimelineRenderableBlocks, 0, len(bs))
+	for _, blk := range bs {
+		if blk == nil {
+			continue
+		}
+		if !blk.IsOpen() {
+			frozen = append(frozen, blk)
+		}
+	}
+	if len(frozen) == 0 {
+		return ""
+	}
+	return frozen.Render(aitagName)
+}
+
+// RenderOpenOnly 只渲染所有 IsOpen()==true 的 block (即最末 interval 桶),
+// 不带任何边界标签外壳。配合 RenderFrozenOnly 完成"按稳定性分层"渲染:
+// frozen 段塞进 AI_CACHE_FROZEN 块, open 段单独放到 cc 点之后。
+//
+// 全 frozen / 无 open 时返回空串。
+//
+// 关键词: TimelineRenderableBlocks.RenderOpenOnly, open-only 渲染, 分层 prompt
+func (bs TimelineRenderableBlocks) RenderOpenOnly(aitagName string) string {
+	if len(bs) == 0 {
+		return ""
+	}
+	open := make(TimelineRenderableBlocks, 0, len(bs))
+	for _, blk := range bs {
+		if blk == nil {
+			continue
+		}
+		if blk.IsOpen() {
+			open = append(open, blk)
+		}
+	}
+	if len(open) == 0 {
+		return ""
+	}
+	return open.Render(aitagName)
+}

@@ -147,10 +147,11 @@ func renderDebugDump(rep *HitReport, split *PromptSplit, gc *globalCache) string
 	return sb.String()
 }
 
-// orderedSections 按固定顺序输出 section 名，未知 section 字典序追加
-// 关键词: aicache, orderedSections
+// orderedSections 按固定顺序输出 section 名，未知 section 字典序追加。
+// SectionTimelineOpen 紧随 SectionTimeline, 两者并列展示时视觉相邻便于人工核对。
+// 关键词: aicache, orderedSections, timeline / timeline-open 排序
 func orderedSections(m map[string]int) []string {
-	known := []string{SectionHighStatic, SectionSemiDynamic, SectionTimeline, SectionDynamic, SectionRaw}
+	known := []string{SectionHighStatic, SectionSemiDynamic, SectionTimeline, SectionTimelineOpen, SectionDynamic, SectionRaw}
 	seen := make(map[string]bool, len(known))
 	var out []string
 	for _, s := range known {

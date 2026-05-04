@@ -242,6 +242,68 @@ func TestSkillsContextManager_RenderStable_SortsAvailableSkills(t *testing.T) {
 	}
 }
 
+// TestSkillsContextManager_RenderStable_DualSectionStructure 验证 RenderStable
+// 输出始终为"Currently Loaded / Available Skills"双段结构, 即使零加载时也保留双段头。
+// 这是 Prompt 按稳定性分层路径下进入 AI_CACHE_FROZEN 块的字节稳定前置。
+// 关键词: SkillsContext renderWithTag, dual-section, 字节稳定
+func TestSkillsContextManager_RenderStable_DualSectionStructure(t *testing.T) {
+	vfs := buildTestVFS()
+	loader, err := NewFSSkillLoader(vfs)
+	if err != nil {
+		t.Fatalf("NewFSSkillLoader failed: %v", err)
+	}
+
+	mgr := NewSkillsContextManager(loader)
+
+	zeroLoadedRendered := mgr.RenderStable()
+	if !strings.Contains(zeroLoadedRendered, "== Currently Loaded Skills ==") {
+		t.Fatalf("zero-loaded render should contain 'Currently Loaded Skills' header. Got:\n%s", zeroLoadedRendered)
+	}
+	if !strings.Contains(zeroLoadedRendered, "(none)") {
+		t.Fatalf("zero-loaded render should contain '(none)' under Currently Loaded. Got:\n%s", zeroLoadedRendered)
+	}
+	if !strings.Contains(zeroLoadedRendered, "== Available Skills (use loading_skills action to load) ==") {
+		t.Fatalf("zero-loaded render should contain 'Available Skills' header. Got:\n%s", zeroLoadedRendered)
+	}
+}
+
+// TestSkillsContextManager_RenderStable_AvailableSectionByteStable 验证 0->1
+// 加载技能时, "Available Skills"下半段保持字节稳定, 仅"Currently Loaded"上半段
+// 发生变化。这是前缀缓存命中率提升的关键: 零加载与有加载共享同一段 registry 字节。
+// 关键词: SkillsContext, 字节稳定, registry listing 不变
+func TestSkillsContextManager_RenderStable_AvailableSectionByteStable(t *testing.T) {
+	vfs := buildTestVFS()
+	loader, err := NewFSSkillLoader(vfs)
+	if err != nil {
+		t.Fatalf("NewFSSkillLoader failed: %v", err)
+	}
+
+	mgr := NewSkillsContextManager(loader)
+	zeroLoaded := mgr.RenderStable()
+
+	if err := mgr.LoadSkill("deploy-app"); err != nil {
+		t.Fatalf("LoadSkill deploy-app failed: %v", err)
+	}
+	withLoaded := mgr.RenderStable()
+
+	availableHeader := "== Available Skills (use loading_skills action to load) =="
+	zeroAvailableIdx := strings.Index(zeroLoaded, availableHeader)
+	withLoadedAvailableIdx := strings.Index(withLoaded, availableHeader)
+	if zeroAvailableIdx == -1 || withLoadedAvailableIdx == -1 {
+		t.Fatalf("both renders should contain Available Skills header. zero=%q with=%q",
+			zeroLoaded, withLoaded)
+	}
+
+	endTag := "<|SKILLS_CONTEXT_END_skills_context|>"
+	zeroAvailableSection := zeroLoaded[zeroAvailableIdx : strings.Index(zeroLoaded, endTag)]
+	withLoadedAvailableSection := withLoaded[withLoadedAvailableIdx : strings.Index(withLoaded, endTag)]
+
+	if zeroAvailableSection != withLoadedAvailableSection {
+		t.Fatalf("Available Skills section must be byte-stable across 0->1 load.\nzero:\n%s\nwith:\n%s",
+			zeroAvailableSection, withLoadedAvailableSection)
+	}
+}
+
 func TestSkillsContextManager_RenderStable_SortsLoadedSkillsAndViews(t *testing.T) {
 	vfs := buildTestVFS()
 	loader, err := NewFSSkillLoader(vfs)

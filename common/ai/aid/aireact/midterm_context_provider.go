@@ -47,6 +47,50 @@ func buildTimelineDumpWithMidtermMemory(react *ReAct, timeline *aicommon.Timelin
 	return "timeline:\n" + midtermPrefix + body
 }
 
+// buildTimelineFrozenForPrompt 渲染 timeline 的冻结前缀 (reducer + 非末 interval),
+// 不含 midterm 检索结果, 不含 frozen 边界 tag。供"按稳定性分层"路径下塞进
+// AI_CACHE_FROZEN 块使用; 全 open / timeline 为空时返回空串。
+//
+// 关键词: buildTimelineFrozenForPrompt, RenderFrozenOnly, frozen 前缀
+func buildTimelineFrozenForPrompt(timeline *aicommon.Timeline) string {
+	if timeline == nil {
+		return ""
+	}
+	return timeline.GroupByMinutes(aicommon.TimelineDumpDefaultIntervalMinutes).
+		GetAllRenderable().
+		RenderFrozenOnly(aicommon.TimelineDumpDefaultAITagName)
+}
+
+// buildTimelineOpenWithMidtermForPrompt 渲染 timeline 的开放尾段 (最末 interval),
+// 并把 midterm 检索结果以 prefix 形式拼到前面。配合 buildTimelineFrozenForPrompt
+// 完成"frozen / open"两半渲染。midterm 是 turn 级易变内容, 与最末 interval 同等不稳,
+// 因此一并放在 open 段。
+//
+// 全 timeline 为空且无 midterm 时返回空串。
+//
+// 关键词: buildTimelineOpenWithMidtermForPrompt, RenderOpenOnly, midterm 前缀, open 尾段
+func buildTimelineOpenWithMidtermForPrompt(react *ReAct, timeline *aicommon.Timeline) string {
+	openBody := ""
+	if timeline != nil {
+		openBody = timeline.GroupByMinutes(aicommon.TimelineDumpDefaultIntervalMinutes).
+			GetAllRenderable().
+			RenderOpenOnly(aicommon.TimelineDumpDefaultAITagName)
+	}
+	queries := react.consumePendingMidtermTimelineQueries()
+	if len(queries) == 0 {
+		return openBody
+	}
+
+	midtermPrefix, err := buildMidtermTimelinePrefix(react, queries)
+	if err != nil || midtermPrefix == "" {
+		return openBody
+	}
+	if strings.TrimSpace(openBody) == "" {
+		return "timeline:\n" + midtermPrefix
+	}
+	return "timeline:\n" + midtermPrefix + openBody
+}
+
 func (r *ReAct) ScheduleMidtermTimelineRecall(summary string) {
 	r.ScheduleMidtermTimelineRecallFromPerception(summary, nil, nil)
 }

@@ -60,16 +60,28 @@ func buildAdvices(rep *HitReport, split *PromptSplit) []string {
 	return advices
 }
 
-// missingSections 返回当前切片中缺失的标准 section 列表
-// 关键词: aicache, missingSections
+// missingSections 返回当前切片中缺失的标准 section 列表。
+//
+// timeline 段同时识别 SectionTimeline 与 SectionTimelineOpen: 两者出现任一即认为
+// "timeline 段已存在", 不会误报缺失。对应 aireact 新"按稳定性分层"路径下
+// 老 timeline 段被拆为 frozen 块 (不算 timeline section) + timeline-open 段。
+//
+// 关键词: aicache, missingSections, timeline / timeline-open 等价识别
 func missingSections(split *PromptSplit) []string {
 	have := make(map[string]bool, len(split.Chunks))
 	for _, ch := range split.Chunks {
 		have[ch.Section] = true
 	}
+	hasTimeline := have[SectionTimeline] || have[SectionTimelineOpen]
 	expected := []string{SectionHighStatic, SectionSemiDynamic, SectionTimeline, SectionDynamic}
 	var missing []string
 	for _, s := range expected {
+		if s == SectionTimeline {
+			if !hasTimeline {
+				missing = append(missing, s)
+			}
+			continue
+		}
 		if !have[s] {
 			missing = append(missing, s)
 		}

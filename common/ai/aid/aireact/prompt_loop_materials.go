@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 )
@@ -15,8 +16,15 @@ const (
 	promptSectionTagName     = "PROMPT_SECTION"
 	promptSectionHighStatic  = "high-static"
 	promptSectionSemiDynamic = "semi-dynamic"
-	promptSectionTimeline    = "timeline"
-	promptSectionDynamic     = "dynamic"
+	// promptSectionTimeline 是老段名 (合并 frozen + open + workspace), 现保留但
+	// 主路径不再使用。新路径用 promptSectionTimelineOpen 表示"易变尾段"。
+	// 关键词: promptSectionTimeline, 老 timeline 段名, 兼容
+	promptSectionTimeline = "timeline"
+	// promptSectionTimelineOpen 是 "按稳定性分层" 拆分后的 timeline 易变尾段:
+	// 仅含最末 interval 桶 + 当前时间 + 工作目录 + (可选) midterm 检索结果。
+	// 关键词: promptSectionTimelineOpen, timeline open, midterm
+	promptSectionTimelineOpen = "timeline-open"
+	promptSectionDynamic      = "dynamic"
 	// aiCacheSystemTagName 仅用于 high-static 段：把"跨调用稳定的系统级指令"
 	// 用独立 tagName 标记，让 aicache splitter / hijacker 与上游隐式缓存的
 	// system 边界对齐；其他段保持 PROMPT_SECTION。
@@ -32,6 +40,12 @@ var loopSemiDynamicSectionTemplate string
 
 //go:embed prompts/loop/timeline_section.txt
 var loopTimelineSectionTemplate string
+
+//go:embed prompts/loop/frozen_block_section.txt
+var loopFrozenBlockSectionTemplate string
+
+//go:embed prompts/loop/timeline_open_section.txt
+var loopTimelineOpenSectionTemplate string
 
 //go:embed prompts/loop/dynamic_section.txt
 var loopDynamicSectionTemplate string
@@ -88,7 +102,16 @@ func (pm *PromptManager) GetLoopPromptBaseMaterials(tools []*aitool.Tool, nonce 
 	materials.TaskType = taskType
 	materials.AutoContext = pm.AutoContextWithNonce(nonce)
 	materials.UserHistory = pm.UserHistoryContextWithNonce(nonce)
-	materials.Timeline = pm.timelineDumpForPrompt()
+
+	// 按稳定性分层渲染 timeline:
+	//   TimelineFrozen: reducer + 非末 interval, 字节稳定, 进 AI_CACHE_FROZEN 块
+	//   TimelineOpen: 最末 interval (+ midterm 检索结果, midterm 在此处一次性消费)
+	//   Timeline: frozen + open 的拼接, 仅供老观测路径作 fallback 使用
+	// 关键词: GetLoopPromptBaseMaterials, timeline frozen/open 拆分, midterm 一次消费
+	timeline := pm.react.config.GetTimeline()
+	materials.TimelineFrozen = buildTimelineFrozenForPrompt(timeline)
+	materials.TimelineOpen = buildTimelineOpenWithMidtermForPrompt(pm.react, timeline)
+	materials.Timeline = joinTimelineFrozenOpen(materials.TimelineFrozen, materials.TimelineOpen)
 
 	allowPlanAndExec := pm.react.config.GetEnablePlanAndExec() && pm.react.GetCurrentPlanExecutionTask() == nil
 	allowToolCall := true
@@ -167,7 +190,7 @@ func (pm *PromptManager) AssembleLoopPrompt(tools []*aitool.Tool, input *reactlo
 		sections = append(sections, dynamicSection)
 	}
 
-	prompt := buildTaggedPromptSections(prefix.HighStatic, prefix.SemiDynamic, prefix.Timeline, dynamic, base.Nonce)
+	prompt := buildTaggedPromptSections(prefix.HighStatic, prefix.FrozenBlock, prefix.SemiDynamic, prefix.TimelineOpen, dynamic, base.Nonce)
 	return &reactloops.LoopPromptAssemblyResult{
 		Prompt:   prompt,
 		Sections: sections,
@@ -192,6 +215,8 @@ func (pm *PromptManager) NewPromptPrefixMaterials(base *reactloops.LoopPromptBas
 		materials.AIForgeList = base.AIForgeList
 
 		materials.Timeline = base.Timeline
+		materials.TimelineFrozen = base.TimelineFrozen
+		materials.TimelineOpen = base.TimelineOpen
 		materials.CurrentTime = base.CurrentTime
 		materials.OSArch = base.OSArch
 		materials.WorkingDir = base.WorkingDir
@@ -209,6 +234,19 @@ func (pm *PromptManager) NewPromptPrefixMaterials(base *reactloops.LoopPromptBas
 	return materials
 }
 
+// AssemblePromptPrefix 按"稳定性分层"路径输出 4 段: HighStatic | FrozenBlock |
+// SemiDynamic (Skills + Schema 残留) | TimelineOpen。Prompt 字段是 4 段拼接结果,
+// 调用方拼上 Dynamic 段后形成完整 prompt。
+//
+// FrozenBlock 段 (Tool Inventory + Forge Inventory + Timeline-frozen) 整体字节稳定,
+// 由 buildTaggedPromptSections 用 <|AI_CACHE_FROZEN_semi-dynamic|>...
+// <|AI_CACHE_FROZEN_END_semi-dynamic|> 标签包裹, 供 aicache hijacker
+// splitByFrozenBoundary 精准切片 user1 (frozen prefix) / user2 (open tail)。
+//
+// 兼容字段 Timeline: 等于老 timeline 段 (frozen + open + workspace + current time)
+// 的合并渲染, 仅供老 caller / 测试断言使用; 新路径不读取它。
+//
+// 关键词: AssemblePromptPrefix, 4 段拼接, 按稳定性分层, AI_CACHE_FROZEN
 func (pm *PromptManager) AssemblePromptPrefix(materials *reactloops.PromptPrefixMaterials) (*reactloops.PromptPrefixAssemblyResult, error) {
 	if pm == nil {
 		return nil, fmt.Errorf("prompt manager is nil")
@@ -221,19 +259,31 @@ func (pm *PromptManager) AssemblePromptPrefix(materials *reactloops.PromptPrefix
 	if err != nil {
 		return nil, err
 	}
+	frozenBlock, err := pm.renderLoopFrozenBlockSection(materials)
+	if err != nil {
+		return nil, err
+	}
 	semiDynamic, err := pm.renderLoopSemiDynamicSection(materials)
 	if err != nil {
 		return nil, err
 	}
-	timeline, err := pm.renderLoopTimelineSection(materials)
+	timelineOpen, err := pm.renderLoopTimelineOpenSection(materials)
+	if err != nil {
+		return nil, err
+	}
+
+	// 老 Timeline 段渲染保留, 仅写入 PromptPrefixAssemblyResult.Timeline 供观测/兼容;
+	// 不进入新路径的 Prompt 拼接。
+	legacyTimeline, err := pm.renderLoopTimelineSection(materials)
 	if err != nil {
 		return nil, err
 	}
 
 	sections := []*reactloops.PromptSectionObservation{
 		pm.buildHighStaticObservation(materials, highStatic),
-		pm.buildSemiDynamicObservation(materials, semiDynamic),
-		pm.buildTimelineObservation(materials, timeline),
+		pm.buildFrozenBlockObservation(materials, frozenBlock),
+		pm.buildSemiDynamicResidualObservation(materials, semiDynamic),
+		pm.buildTimelineOpenObservation(materials, timelineOpen),
 	}
 	var filtered []*reactloops.PromptSectionObservation
 	for _, section := range sections {
@@ -243,11 +293,13 @@ func (pm *PromptManager) AssemblePromptPrefix(materials *reactloops.PromptPrefix
 	}
 
 	return &reactloops.PromptPrefixAssemblyResult{
-		Prompt:      joinPromptSections(highStatic, semiDynamic, timeline),
-		HighStatic:  highStatic,
-		SemiDynamic: semiDynamic,
-		Timeline:    timeline,
-		Sections:    filtered,
+		Prompt:       joinPromptSections(highStatic, frozenBlock, semiDynamic, timelineOpen),
+		HighStatic:   highStatic,
+		FrozenBlock:  frozenBlock,
+		SemiDynamic:  semiDynamic,
+		TimelineOpen: timelineOpen,
+		Timeline:     legacyTimeline,
+		Sections:     filtered,
 	}, nil
 }
 
@@ -359,7 +411,54 @@ func (pm *PromptManager) buildHighStaticObservation(
 	return reactloops.FinalizePromptContainerSection(section)
 }
 
-func (pm *PromptManager) buildSemiDynamicObservation(
+// buildFrozenBlockObservation 给"AI_CACHE_FROZEN 块"做观测树:
+// Tool Inventory + Forge Inventory + Timeline-frozen (reducer + 非末 interval)。
+//
+// 关键词: buildFrozenBlockObservation, Tool/Forge/Timeline-frozen, AI_CACHE_FROZEN
+func (pm *PromptManager) buildFrozenBlockObservation(
+	materials *reactloops.PromptPrefixMaterials,
+	rendered string,
+) *reactloops.PromptSectionObservation {
+	section := reactloops.NewPromptContainerSection(
+		"section.frozen_block",
+		"Frozen Block",
+		reactloops.PromptSectionRoleRuntimeCtx,
+	)
+	children := []*reactloops.PromptSectionObservation{
+		reactloops.NewPromptSectionObservation(
+			"section.frozen_block.tool_inventory",
+			"Frozen Block / Tool Inventory",
+			reactloops.PromptSectionRoleRuntimeCtx,
+			true,
+			renderToolInventoryBlock(materials),
+		),
+		reactloops.NewPromptSectionObservation(
+			"section.frozen_block.forge_inventory",
+			"Frozen Block / Forge Inventory",
+			reactloops.PromptSectionRoleRuntimeCtx,
+			true,
+			renderForgeInventoryBlock(materials),
+		),
+		reactloops.NewPromptSectionObservation(
+			"section.frozen_block.timeline_frozen",
+			"Frozen Block / Timeline (Frozen Prefix)",
+			reactloops.PromptSectionRoleRuntimeCtx,
+			true,
+			renderTimelineFrozenBlock(materials),
+		),
+	}
+	section.Children = filterIncludedPromptSections(children)
+	if strings.TrimSpace(rendered) != "" {
+		section.Content = ""
+	}
+	return reactloops.FinalizePromptContainerSection(section)
+}
+
+// buildSemiDynamicResidualObservation 给"PROMPT_SECTION_semi-dynamic 残留段"做观测树:
+// Skills Context + Schema。Tool/Forge 已迁出到 FrozenBlock。
+//
+// 关键词: buildSemiDynamicResidualObservation, Skills Context, Schema
+func (pm *PromptManager) buildSemiDynamicResidualObservation(
 	materials *reactloops.PromptPrefixMaterials,
 	rendered string,
 ) *reactloops.PromptSectionObservation {
@@ -369,20 +468,6 @@ func (pm *PromptManager) buildSemiDynamicObservation(
 		reactloops.PromptSectionRoleRuntimeCtx,
 	)
 	children := []*reactloops.PromptSectionObservation{
-		reactloops.NewPromptSectionObservation(
-			"section.semi_dynamic.tool_inventory",
-			"Semi Dynamic / Tool Inventory",
-			reactloops.PromptSectionRoleRuntimeCtx,
-			true,
-			renderToolInventoryBlock(materials),
-		),
-		reactloops.NewPromptSectionObservation(
-			"section.semi_dynamic.forge_inventory",
-			"Semi Dynamic / Forge Inventory",
-			reactloops.PromptSectionRoleRuntimeCtx,
-			true,
-			renderForgeInventoryBlock(materials),
-		),
 		reactloops.NewPromptSectionObservation(
 			"section.semi_dynamic.skills_context",
 			"Semi Dynamic / Skills Context",
@@ -405,33 +490,37 @@ func (pm *PromptManager) buildSemiDynamicObservation(
 	return reactloops.FinalizePromptContainerSection(section)
 }
 
-func (pm *PromptManager) buildTimelineObservation(
+// buildTimelineOpenObservation 给"PROMPT_SECTION_timeline-open 段"做观测树:
+// Timeline 末桶 (+ midterm 检索结果) + Current Time + Workspace。
+//
+// 关键词: buildTimelineOpenObservation, Timeline 末桶, Current Time, Workspace
+func (pm *PromptManager) buildTimelineOpenObservation(
 	materials *reactloops.PromptPrefixMaterials,
 	rendered string,
 ) *reactloops.PromptSectionObservation {
 	section := reactloops.NewPromptContainerSection(
-		"section.timeline",
-		"Timeline & Workspace",
+		"section.timeline_open",
+		"Timeline Open & Workspace",
 		reactloops.PromptSectionRoleRuntimeCtx,
 	)
 	children := []*reactloops.PromptSectionObservation{
 		reactloops.NewPromptSectionObservation(
-			"section.timeline.timeline",
-			"Timeline / Timeline Memory",
+			"section.timeline_open.timeline_open",
+			"Timeline Open / Timeline (Open Tail)",
 			reactloops.PromptSectionRoleRuntimeCtx,
 			true,
-			renderTimelineBlock(materials),
+			renderTimelineOpenBlock(materials),
 		),
 		reactloops.NewPromptSectionObservation(
-			"section.timeline.current_time",
-			"Timeline / Current Time",
+			"section.timeline_open.current_time",
+			"Timeline Open / Current Time",
 			reactloops.PromptSectionRoleRuntimeCtx,
 			false,
 			renderCurrentTimeBlock(materials),
 		),
 		reactloops.NewPromptSectionObservation(
-			"section.timeline.workspace",
-			"Timeline / Workspace",
+			"section.timeline_open.workspace",
+			"Timeline Open / Workspace",
 			reactloops.PromptSectionRoleRuntimeCtx,
 			true,
 			renderWorkspaceBlock(materials),
@@ -641,6 +730,51 @@ func renderTimelineBlock(materials *reactloops.PromptPrefixMaterials) string {
 	return "# Timeline Memory\n" + materials.Timeline
 }
 
+// renderTimelineFrozenBlock 渲染 timeline 冻结前缀 (reducer + 非末 interval)。
+// 用于 FrozenBlock 段的观测树, 不带 frozen 边界 tag (边界由 wrapAICacheFrozen 统一加)。
+//
+// 关键词: renderTimelineFrozenBlock, Timeline frozen, FrozenBlock 观测
+func renderTimelineFrozenBlock(materials *reactloops.PromptPrefixMaterials) string {
+	if materials == nil || strings.TrimSpace(materials.TimelineFrozen) == "" {
+		return ""
+	}
+	return "# Timeline Memory (Frozen Prefix)\n" + materials.TimelineFrozen
+}
+
+// renderTimelineOpenBlock 渲染 timeline 开放尾段 (最末 interval + midterm prefix)。
+// 用于 TimelineOpen 段的观测树。
+//
+// 关键词: renderTimelineOpenBlock, Timeline open, midterm
+func renderTimelineOpenBlock(materials *reactloops.PromptPrefixMaterials) string {
+	if materials == nil || strings.TrimSpace(materials.TimelineOpen) == "" {
+		return ""
+	}
+	return "# Timeline Memory (Open Tail)\n" + materials.TimelineOpen
+}
+
+// joinTimelineFrozenOpen 把 frozen + open 两半 timeline 合成一条字符串, 仅供老
+// 观测路径作 fallback。两半都非空时以单空行分隔, 任一半为空则返回另一半。
+//
+// 注意: 此函数不再向输出中注入 AI_CACHE_FROZEN 边界标签 (边界由 wrapAICacheFrozen
+// 在更高层用统一 tag 包裹)。如果有外部代码期望旧 Dump() 风格 (含 boundary tag),
+// 请改用 timeline.Dump()。
+//
+// 关键词: joinTimelineFrozenOpen, Timeline frozen + open 合并, 兼容字段
+func joinTimelineFrozenOpen(frozen, open string) string {
+	frozen = strings.TrimRight(frozen, "\n")
+	open = strings.TrimLeft(open, "\n")
+	switch {
+	case frozen == "" && open == "":
+		return ""
+	case frozen == "":
+		return open
+	case open == "":
+		return frozen
+	default:
+		return frozen + "\n" + open
+	}
+}
+
 func renderCurrentTimeBlock(materials *reactloops.PromptPrefixMaterials) string {
 	if materials == nil || strings.TrimSpace(materials.CurrentTime) == "" {
 		return ""
@@ -672,6 +806,26 @@ func (pm *PromptManager) renderLoopSemiDynamicSection(materials *reactloops.Prom
 	return pm.executeTemplate("loop-semi-dynamic", loopSemiDynamicSectionTemplate, materials.SemiDynamicData())
 }
 
+// renderLoopFrozenBlockSection 渲染"按稳定性分层"路径下的 FrozenBlock 段
+// (Tool Inventory + Forge Inventory + Timeline-frozen)。模板中只引用稳定字段。
+//
+// 关键词: renderLoopFrozenBlockSection, frozen_block_section.txt
+func (pm *PromptManager) renderLoopFrozenBlockSection(materials *reactloops.PromptPrefixMaterials) (string, error) {
+	return pm.executeTemplate("loop-frozen-block", loopFrozenBlockSectionTemplate, materials.FrozenBlockData())
+}
+
+// renderLoopTimelineOpenSection 渲染"按稳定性分层"路径下的 TimelineOpen 段
+// (Timeline 末桶 + Current Time + Workspace)。
+//
+// 关键词: renderLoopTimelineOpenSection, timeline_open_section.txt
+func (pm *PromptManager) renderLoopTimelineOpenSection(materials *reactloops.PromptPrefixMaterials) (string, error) {
+	return pm.executeTemplate("loop-timeline-open", loopTimelineOpenSectionTemplate, materials.TimelineOpenData())
+}
+
+// renderLoopTimelineSection 是老路径的 Timeline 段渲染 (frozen + open + workspace
+// 合并)。仅供 PromptPrefixAssemblyResult.Timeline 字段填充, 主路径不再消费。
+//
+// 关键词: renderLoopTimelineSection, 老 timeline 段, 兼容
 func (pm *PromptManager) renderLoopTimelineSection(materials *reactloops.PromptPrefixMaterials) (string, error) {
 	return pm.executeTemplate("loop-timeline", loopTimelineSectionTemplate, materials.TimelineData())
 }
@@ -680,13 +834,42 @@ func (pm *PromptManager) renderLoopDynamicSection(data map[string]any) (string, 
 	return pm.executeTemplate("loop-dynamic", loopDynamicSectionTemplate, data)
 }
 
-func buildTaggedPromptSections(highStatic string, semiDynamic string, timeline string, dynamic string, dynamicNonce string) string {
+// buildTaggedPromptSections 按"按稳定性分层"路径拼接 5 段:
+//   SYSTEM (high-static) | FROZEN (frozen-block) | SEMI (semi-dynamic 残留) |
+//   OPEN (timeline-open) | DYNAMIC
+//
+// 各段之间空行分隔, 空段省略。frozen-block 段使用 AI_CACHE_FROZEN_semi-dynamic
+// 标签 (与 aicommon.TimelineFrozenBoundaryTagName / TimelineFrozenBoundaryNonce
+// 对齐), 让 aicache hijacker 在用户消息中以字符串 IndexOf 精准切片 user1
+// (frozen prefix) / user2 (open tail), 拿到双 cc 命中。
+//
+// 关键词: buildTaggedPromptSections, 5 段拼接, AI_CACHE_FROZEN, aicache hijacker
+func buildTaggedPromptSections(highStatic string, frozenBlock string, semiDynamic string, timelineOpen string, dynamic string, dynamicNonce string) string {
 	return joinPromptSections(
 		wrapPromptMessageSection(promptSectionHighStatic, highStatic, ""),
+		wrapAICacheFrozen(frozenBlock),
 		wrapPromptMessageSection(promptSectionSemiDynamic, semiDynamic, ""),
-		wrapPromptMessageSection(promptSectionTimeline, timeline, ""),
+		wrapPromptMessageSection(promptSectionTimelineOpen, timelineOpen, ""),
 		wrapPromptMessageSection(promptSectionDynamic, dynamic, dynamicNonce),
 	)
+}
+
+// wrapAICacheFrozen 用 <|AI_CACHE_FROZEN_semi-dynamic|>...
+// <|AI_CACHE_FROZEN_END_semi-dynamic|> 包裹 frozen-block 内容, 与
+// aicommon.TimelineFrozenBoundaryTagName / TimelineFrozenBoundaryNonce 一致,
+// 复用 aicache hijacker 既有的 splitByFrozenBoundary 锚点。
+//
+// 内容为空时返回空串, 调用方 joinPromptSections 会自动跳过空段。
+//
+// 关键词: wrapAICacheFrozen, AI_CACHE_FROZEN, frozen 边界标签
+func wrapAICacheFrozen(content string) string {
+	content = strings.TrimSpace(content)
+	if content == "" {
+		return ""
+	}
+	tagName := aicommon.TimelineFrozenBoundaryTagName
+	nonce := aicommon.TimelineFrozenBoundaryNonce
+	return fmt.Sprintf("<|%s_%s|>\n%s\n<|%s_END_%s|>", tagName, nonce, content, tagName, nonce)
 }
 
 func wrapPromptMessageSection(sectionName string, content string, nonce string) string {

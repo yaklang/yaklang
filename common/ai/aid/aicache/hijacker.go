@@ -455,14 +455,28 @@ func isHighStaticBlock(blk *aitag.Block) bool {
 	return blk.TagName == tagAICacheSystem || blk.TagName == tagPromptSection
 }
 
-// isTimelineSectionBlock 判断一个顶层 aitag block 是否是 timeline section
-// (PROMPT_SECTION_timeline 包裹整段 timeline 渲染输出)
-// 关键词: aicache, isTimelineSectionBlock, PROMPT_SECTION_timeline 识别
+// isTimelineSectionBlock 判断一个顶层 aitag block 是否是 timeline section。
+// 同时识别两种 section 包装:
+//   - <|PROMPT_SECTION_timeline|>...      老路径合并 timeline 段
+//   - <|PROMPT_SECTION_timeline-open|>... 新路径仅含 open 尾段 (frozen 部分被
+//     单独迁到 <|AI_CACHE_FROZEN_semi-dynamic|> 块, 不再走 timeline section)
+//
+// 两种 nonce 都纳入 timeline 识别, 是为了 build3SegmentMessages 退化路径
+// (splitByFrozenBoundary 没找到 frozen 边界时) 能够回到 splitTimelineFrozenOpen
+// 通过解析 inner <|TIMELINE_xxx|> 子块按 last-b-is-open 切分。新路径下若出现
+// 这种退化 (frozen 块为空), 实际 timeline-open 内只有一个 b 桶 + workspace,
+// 切分会自然退化到 2 段, 安全无副作用。
+//
+// 关键词: aicache, isTimelineSectionBlock, PROMPT_SECTION_timeline 识别,
+//        PROMPT_SECTION_timeline-open 识别
 func isTimelineSectionBlock(blk *aitag.Block) bool {
 	if blk == nil || !blk.IsTagged() {
 		return false
 	}
-	return blk.TagName == tagPromptSection && blk.Nonce == SectionTimeline
+	if blk.TagName != tagPromptSection {
+		return false
+	}
+	return blk.Nonce == SectionTimeline || blk.Nonce == SectionTimelineOpen
 }
 
 // wrapAICacheSystem 把多段 high-static 原文按出现顺序拼接，再用

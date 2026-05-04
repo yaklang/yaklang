@@ -3,13 +3,26 @@ package aicache
 import "time"
 
 // SectionName 列举切片识别到的 section 类型
-// 关键词: aicache, section, 切片类型
+//
+// SectionTimeline 与 SectionTimelineOpen 同时存在:
+//   - SectionTimeline ("timeline"): 老路径 (liteforge / 部分老 caller) 仍使用
+//     的合并 timeline 段, 同时承载 frozen reducer + interval + open last bucket。
+//   - SectionTimelineOpen ("timeline-open"): aireact 新路径 "按稳定性分层" 拆分
+//     后的 timeline 易变尾段 (仅含最末 interval 桶 + Current Time + Workspace +
+//     midterm prefix)。frozen 部分被迁到 AI_CACHE_FROZEN 块中, 不再走 timeline
+//     section 包装。
+//
+// 两段都被 splitter 与 hijacker 识别为 "timeline 类" section, 从而 SectionHashCount
+// 分别独立计数, 命中率分析能区分两条路径的稳定性。
+//
+// 关键词: aicache, section, 切片类型, timeline / timeline-open 双段
 const (
-	SectionHighStatic  = "high-static"
-	SectionSemiDynamic = "semi-dynamic"
-	SectionTimeline    = "timeline"
-	SectionDynamic     = "dynamic"
-	SectionRaw         = "raw"
+	SectionHighStatic   = "high-static"
+	SectionSemiDynamic  = "semi-dynamic"
+	SectionTimeline     = "timeline"
+	SectionTimelineOpen = "timeline-open"
+	SectionDynamic      = "dynamic"
+	SectionRaw          = "raw"
 )
 
 // Chunk 表示 prompt 切片后的一个最小单元

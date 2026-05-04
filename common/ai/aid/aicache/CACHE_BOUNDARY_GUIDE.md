@@ -13,8 +13,13 @@
 | 标签 | 形态 | 角色 | 谁负责写 |
 | --- | --- | --- | --- |
 | `<\|AI_CACHE_SYSTEM_high-static\|>` | 外层 (顶级) | 标记"此段属于 system prompt, 极少变" | prompt builder (例如 reactloops, aireduce) |
-| `<\|PROMPT_SECTION_xxx\|>` | 外层 (顶级) | 标记 4 段 (high-static / semi-dynamic / timeline / dynamic) 的归属 | prompt builder |
-| `<\|AI_CACHE_FROZEN_semi-dynamic\|>` | **内嵌 / 跨段** | 在 user 区任意位置标记"此段已字节冻结, 适合作 prefix cache" | `aicommon.TimelineRenderableBlocks.RenderWithFrozenBoundary` 等 |
+| `<\|PROMPT_SECTION_xxx\|>` | 外层 (顶级) | 标记非 system 段的归属 (`semi-dynamic` / `timeline` / `timeline-open` / `dynamic`) | prompt builder |
+| `<\|AI_CACHE_FROZEN_semi-dynamic\|>` | **顶级 / 跨段** | 标记"此段已字节冻结, 适合作 prefix cache" | aireact 主路径直接由 prompt builder 写; 老路径 (liteforge 等) 仍由 `aicommon.TimelineRenderableBlocks.RenderWithFrozenBoundary` 内嵌写 |
+
+> 说明: `PROMPT_SECTION_timeline-open` 是 aireact "按稳定性分层" 路径下新增段名,
+> 仅含 timeline 末桶 + Current Time + Workspace + (可选) midterm prefix; 与老
+> `PROMPT_SECTION_timeline` 段名共存, 由 splitter / hijacker 同时识别为 "timeline 类"
+> section, SectionHashCount 各自独立计数。
 
 ### 1.2 边界标签字面量
 
@@ -46,10 +51,12 @@
 ```mermaid
 flowchart LR
     subgraph layerA[Prompt builder 层]
-        a1["reactloops / aireduce<br/>组装 4 段"]
-        a2["Timeline.Dump<br/>注入 AI_CACHE_FROZEN 边界"]
-        a1 -- "拼接" --> a3["raw prompt"]
-        a2 -- "嵌入到 timeline 段内" --> a3
+        a1["aireact reactloops 主路径<br/>按稳定性分 5 段"]
+        a2["aireact wrapAICacheFrozen<br/>包 Tool/Forge/Timeline-frozen"]
+        a3["liteforge / aireduce 老路径<br/>仍走 timeline 4 段 + 内嵌边界"]
+        a1 -- "拼接" --> raw["raw prompt"]
+        a2 -- "提供 frozen 块" --> a1
+        a3 -- "拼接" --> raw
     end
     subgraph layerB[aicache hijacker]
         b1["hijackHighStatic"]
@@ -67,6 +74,47 @@ flowchart LR
     end
     layerA --> layerB --> layerC --> upstream["dashscope / siliconflow / openai / ..."]
 ```
+
+#### 2.1.1 aireact 主路径的 5 段拼接顺序
+
+aireact "按稳定性分层" 路径产出的 raw prompt 顺序是固定的:
+
+```
+SYSTEM     <|AI_CACHE_SYSTEM_high-static|>...<|AI_CACHE_SYSTEM_END_high-static|>
+FROZEN     <|AI_CACHE_FROZEN_semi-dynamic|>
+             # Tool Inventory (top N tools)
+             # AI Blueprint Inventory (forge list, 可选)
+             # Timeline Memory (Frozen Prefix)   reducer + 非末 interval
+           <|AI_CACHE_FROZEN_END_semi-dynamic|>
+SEMI       <|PROMPT_SECTION_semi-dynamic|>
+             <|SKILLS_CONTEXT_skills_context|>...<|SKILLS_CONTEXT_END_skills_context|>
+             <|SCHEMA|>...
+           <|PROMPT_SECTION_END_semi-dynamic|>
+OPEN       <|PROMPT_SECTION_timeline-open|>
+             # Timeline Memory (Open Tail)        最末 interval + midterm prefix
+             # Current Time
+             # Workspace Context
+           <|PROMPT_SECTION_END_timeline-open|>
+DYNAMIC    <|PROMPT_SECTION_dynamic_<nonce>|>
+             <|USER_QUERY_<nonce>|>...<|USER_QUERY_END_<nonce>|>
+             AutoContext / UserHistory / ExtraCapabilities / SessionEvidence /
+             ReactiveData / InjectedMemory
+           <|PROMPT_SECTION_dynamic_END_<nonce>|>
+```
+
+设计意图:
+
+- **FROZEN 块字节稳定**: Tool / Forge / Timeline-frozen 三类内容跨 turn 几乎不变,
+  整体被 `<|AI_CACHE_FROZEN_semi-dynamic|>...<|AI_CACHE_FROZEN_END_semi-dynamic|>`
+  包裹, 让 hijacker 用单次 IndexOf 就能精准切到 user1 的字节边界。
+- **SkillsContext 不进 FROZEN 块**: skill 的 0->1 加载 / 焦点切换会改写
+  "Currently Loaded Skills" 上半段, 字节级不稳。它仍然字节稳定到 "registry listing
+  下半段恒定", 但 cache 边界放在它之后才能保证命中率。SEMI 段就承担 SkillsContext +
+  Schema 这两部分中等稳定内容。
+- **Schema 在 SEMI 末位**: schema 跨 react loop 切换会变化, 把它和 SkillsContext
+  归为同一中等稳定段, 不污染 FROZEN 字节边界。
+- **Timeline 末桶在 OPEN**: 最末 interval 桶仍在写入, midterm 检索结果也只在
+  perception 触发时出现 — 全部归到 OPEN 段, hijacker 不缓存这段。
 
 ### 2.2 三层职责分工
 
@@ -126,30 +174,40 @@ function splitByFrozenBoundary(splitResult):
 
 ## 4. 4 种典型场景
 
-### 4.1 场景 A — 用户给的标准例子 (含完整 4 类 block)
+### 4.1 场景 A — aireact 主路径 (按稳定性分 5 段)
 
-**输入 prompt**:
+**输入 prompt** (aireact reactloops 产出):
 
 ```
 <|AI_CACHE_SYSTEM_high-static|>
 A-system
 <|AI_CACHE_SYSTEM_END_high-static|>
 
-<|PROMPT_SECTION_semi-dynamic|>
-B-semi-static
-<|PROMPT_SECTION_END_semi-dynamic|>
-
-<|PROMPT_SECTION_timeline|>
 <|AI_CACHE_FROZEN_semi-dynamic|>
+# Tool Inventory ...
+# AI Blueprint Inventory ...
+# Timeline Memory (Frozen Prefix)
 <|TIMELINE_r1t1|>Timeline-Reducer<|TIMELINE_END_r1t1|>
 <|TIMELINE_b3t100|>Timeline-ITEM1<|TIMELINE_END_b3t100|>
 <|TIMELINE_b3t200|>Timeline-ITEM2<|TIMELINE_END_b3t200|>
 <|AI_CACHE_FROZEN_END_semi-dynamic|>
+
+<|PROMPT_SECTION_semi-dynamic|>
+<|SKILLS_CONTEXT_skills_context|>...<|SKILLS_CONTEXT_END_skills_context|>
+<|SCHEMA|>...
+<|PROMPT_SECTION_END_semi-dynamic|>
+
+<|PROMPT_SECTION_timeline-open|>
+# Timeline Memory (Open Tail)
 <|TIMELINE_b3t300|>Timeline-ITEM3-Open<|TIMELINE_END_b3t300|>
-<|PROMPT_SECTION_END_timeline|>
+# Current Time
+2026-05-04 11:00:00
+# Workspace Context
+OS/Arch: darwin/arm64
+<|PROMPT_SECTION_END_timeline-open|>
 
 <|PROMPT_SECTION_dynamic_q|>
-DEF
+<|USER_QUERY_q|>DEF<|USER_QUERY_END_q|>
 <|PROMPT_SECTION_dynamic_END_q|>
 ```
 
@@ -158,10 +216,35 @@ DEF
 | 角色 | 内容 (示意) | cache_control | 缓存语义 |
 | --- | --- | --- | --- |
 | system | `<|AI_CACHE_SYSTEM_high-static|>A-system<|AI_CACHE_SYSTEM_END_high-static|>` | `{"type":"ephemeral"}` | 短前缀缓存 (system 段) |
-| user1 | `<|PROMPT_SECTION_semi-dynamic|>B-semi-static...<|PROMPT_SECTION_END_semi-dynamic|>`<br/>`<|PROMPT_SECTION_timeline|>`<br/>`<|AI_CACHE_FROZEN_semi-dynamic|>`<br/>`<|TIMELINE_r1t1|>...<|TIMELINE_b3t100|>...<|TIMELINE_b3t200|>...`<br/>`<|AI_CACHE_FROZEN_END_semi-dynamic|>` | `{"type":"ephemeral"}` | 长前缀缓存 (system + frozen 段) |
-| user2 | `<|TIMELINE_b3t300|>Timeline-ITEM3-Open<|TIMELINE_END_b3t300|>`<br/>`<|PROMPT_SECTION_END_timeline|>`<br/>`<|PROMPT_SECTION_dynamic_q|>DEF<|PROMPT_SECTION_dynamic_END_q|>` | (无) | 易变段, 不缓存 |
+| user1 | `<|AI_CACHE_FROZEN_semi-dynamic|>`<br/>`# Tool Inventory ...`<br/>`# AI Blueprint Inventory ...`<br/>`# Timeline Memory (Frozen Prefix)`<br/>`<|TIMELINE_r1t1|>...<|TIMELINE_b3t100|>...<|TIMELINE_b3t200|>...`<br/>`<|AI_CACHE_FROZEN_END_semi-dynamic|>` | `{"type":"ephemeral"}` | 长前缀缓存 (system + frozen 段) |
+| user2 | `<|PROMPT_SECTION_semi-dynamic|>...SkillsContext + Schema...<|PROMPT_SECTION_END_semi-dynamic|>`<br/>`<|PROMPT_SECTION_timeline-open|>...Timeline 末桶 + Time + Workspace...<|PROMPT_SECTION_END_timeline-open|>`<br/>`<|PROMPT_SECTION_dynamic_q|>...<|PROMPT_SECTION_dynamic_END_q|>` | (无) | 易变段, 不缓存 |
 
 预期命中率: 双 cc ~70% (E14 实测), 单 cc ~32%。
+
+**与老路径对比**: aireact 主路径把 frozen 块从原来的"嵌入 timeline 段内"提到顶级,
+hijacker 不再需要解析 timeline 内嵌 nonce 即可切割; SkillsContext 与 Schema 被
+迁出 frozen 块, 它们的 turn 级变化不会污染 user1 字节边界。
+
+### 4.1.1 场景 A' — 老路径 (liteforge / aireduce 4 段)
+
+老 caller 仍用 4 段拼接, frozen 边界内嵌在 timeline 段中:
+
+```
+<|AI_CACHE_SYSTEM_high-static|>...<|AI_CACHE_SYSTEM_END_high-static|>
+<|PROMPT_SECTION_semi-dynamic|>B-semi-static<|PROMPT_SECTION_END_semi-dynamic|>
+<|PROMPT_SECTION_timeline|>
+<|AI_CACHE_FROZEN_semi-dynamic|>
+<|TIMELINE_r1t1|>...<|TIMELINE_b3t200|>...
+<|AI_CACHE_FROZEN_END_semi-dynamic|>
+<|TIMELINE_b3t300|>Timeline-ITEM3-Open<|TIMELINE_END_b3t300|>
+<|PROMPT_SECTION_END_timeline|>
+<|PROMPT_SECTION_dynamic_q|>DEF<|PROMPT_SECTION_dynamic_END_q|>
+```
+
+hijacker 切割结果与场景 A 等价 (user1 仍以 frozen END 标签结束); 区别仅在 user1
+里 Tool / Forge 被夹带在 PROMPT_SECTION_semi-dynamic 内, frozen 段只含 timeline
+内容。两条路径在缓存友好性上一致, 但主路径把更多 Tool/Forge 字节稳定内容也纳入
+frozen 块, 长 prefix 缓存收益略大。
 
 ### 4.2 场景 B — 边界存在但 frozen 段在 PROMPT_SECTION_semi-dynamic 内 (无 timeline)
 
@@ -254,21 +337,25 @@ func IsTongyiExplicitCacheModel(providerType, model string) bool  // tongyi + wh
 
 | 改动 | 必须同步更新的位置 |
 | --- | --- |
-| 改边界 tag name / nonce | `aicommon.TimelineFrozenBoundaryTagName` + `aicache.frozenBoundaryTagName` (两处常量必须字节一致) |
+| 改边界 tag name / nonce | `aicommon.TimelineFrozenBoundaryTagName` + `aicache.frozenBoundaryTagName` (两处常量必须字节一致) + `aireact.wrapAICacheFrozen` 字面量 |
 | 加新 cc-aware provider | `aibalance.IsCacheControlAwareProvider` (注意可能要调整 strip 行为) |
 | 加新 dashscope 显式缓存 model | `aibalance.dashscopeExplicitCacheModels` map |
 | 加新切割锚点策略 | `aicache.build3SegmentMessages` 主路径分支 + 测试 |
-| Timeline 渲染加新 frozen 类型 block | `TimelineRenderableBlocks.RenderWithFrozenBoundary` 的 frozen / open 判定逻辑 |
+| Timeline 渲染加新 frozen 类型 block | `TimelineRenderableBlocks.RenderWithFrozenBoundary` / `RenderFrozenOnly` / `RenderOpenOnly` 的 frozen / open 判定逻辑 |
+| 改 aireact 段顺序 / 段内容分配 | `aireact/prompt_loop_materials.go` 的 `buildTaggedPromptSections` + 三个 observation builder + `prompts/loop/*.txt` 模板 |
+| 改 SkillsContext 结构 | `aicommon.aiskillloader.SkillsContextManager.renderWithTag` 必须保持 "Currently Loaded + Available" 双段结构, registry listing 字节稳定 |
 
 ### 6.2 跨包字面量同步表
 
 | 字面量 | 包 / 文件 |
 | --- | --- |
-| `AI_CACHE_FROZEN` | `aicommon.TimelineFrozenBoundaryTagName` + `aicache.frozenBoundaryTagName` |
+| `AI_CACHE_FROZEN` | `aicommon.TimelineFrozenBoundaryTagName` + `aicache.frozenBoundaryTagName` + `aireact.wrapAICacheFrozen` 引用 |
 | `semi-dynamic` (作为 frozen boundary nonce) | `aicommon.TimelineFrozenBoundaryNonce` + `aicache.frozenBoundaryNonce` |
 | `AI_CACHE_SYSTEM` | `aicache.tagAICacheSystem` + `aicache.aicacheSystemTagName` |
 | `high-static` | `aicache.SectionHighStatic` + `aicache.aicacheSystemNonce` |
 | `PROMPT_SECTION` | `aicache.tagPromptSection` |
+| `timeline` (老段名) | `aicache.SectionTimeline` |
+| `timeline-open` (aireact 主路径段名) | `aicache.SectionTimelineOpen` + `aireact.promptSectionTimelineOpen` |
 | `TIMELINE` | `aicache.timelineInnerTagName` + `aicommon.TimelineDumpDefaultAITagName` |
 
 ### 6.3 测试覆盖

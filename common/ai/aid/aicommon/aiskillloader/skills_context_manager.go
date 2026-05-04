@@ -399,61 +399,97 @@ func (m *SkillsContextManager) RenderStable() string {
 	return m.renderWithTag("skills_context")
 }
 
+// renderWithTag 输出固定双段结构, 让 0->1 加载只增量改"Currently Loaded"上半段,
+// "Available Skills" registry listing 字节稳定。这是 Prompt 按稳定性分层路径下
+// SkillsContext 进入 AI_CACHE_FROZEN 块时保持前缀缓存命中的核心前置:
+//
+//	<|SKILLS_CONTEXT_<tag>|>
+//	== Currently Loaded Skills ==
+//	(none)                               // 或 sortedLoadedSkillStates 渲染输出
+//
+//	== Available Skills (use loading_skills action to load) ==
+//	  - skill-a: ...
+//	  - skill-b: ...
+//	  ... and N more skills.             // 大列表时尾段提示
+//	  ... plus N database-backed skills.
+//	<|SKILLS_CONTEXT_END_<tag>|>
+//
+// 注意: 上半段在零加载时仅一行 "(none)"; 加载后包含具体内容。这样无论加载与否,
+// 整体段落结构 (header / 上半段 / 分隔空行 / 下半段) 都保持。
+//
+// 关键词: SkillsContext renderWithTag, dual-section, 字节稳定, prefix cache
 func (m *SkillsContextManager) renderWithTag(tag string) string {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	if m.loadedSkills.Len() == 0 {
-		if m.HasRegisteredSkills() {
-			skills := sortSkillMetasByName(m.loader.AllSkillMetas())
-			stats := GetSkillSourceStats(m.loader)
-			if len(skills) == 0 {
-				if stats.DatabaseCount > 0 {
-					return fmt.Sprintf(
-						"<|SKILLS_CONTEXT_%s|>\nAvailable database-backed skills: %d. Use search_capabilities or loading_skills with an exact skill name to access them.\n<|SKILLS_CONTEXT_END_%s|>",
-						tag, stats.DatabaseCount, tag,
-					)
-				}
-				return ""
-			}
-			var buf bytes.Buffer
-			buf.WriteString(fmt.Sprintf("<|SKILLS_CONTEXT_%s|>\n", tag))
-			buf.WriteString("Available Skills (use loading_skills action to load):\n")
-			listed := 0
-			for _, s := range skills {
-				line := fmt.Sprintf("  - %s: %s\n", s.Name, s.Description)
-				if m.measureSize(buf.String())+m.measureSize(line) > MetadataListMaxTokens {
-					remaining := len(skills) - listed
-					buf.WriteString(fmt.Sprintf("  ... and %d more skills. Use search_capabilities to find specific skills.\n", remaining))
-					break
-				}
-				buf.WriteString(line)
-				listed++
-			}
-			if stats.DatabaseCount > 0 {
-				buf.WriteString(fmt.Sprintf("  ... plus %d database-backed skills available via search.\n", stats.DatabaseCount))
-			}
-			buf.WriteString(fmt.Sprintf("<|SKILLS_CONTEXT_END_%s|>", tag))
-			return buf.String()
-		}
+	hasRegistered := m.HasRegisteredSkills()
+	hasLoaded := m.loadedSkills.Len() > 0
+
+	if !hasRegistered && !hasLoaded {
 		return ""
 	}
 
 	var buf bytes.Buffer
 	buf.WriteString(fmt.Sprintf("<|SKILLS_CONTEXT_%s|>\n", tag))
 
-	for _, item := range m.sortedLoadedSkillStates() {
-		state := item.state
-		if state.IsFolded {
-			buf.WriteString(m.renderFolded(state))
-		} else {
-			buf.WriteString(m.renderFull(state))
+	buf.WriteString("== Currently Loaded Skills ==\n")
+	if hasLoaded {
+		for _, item := range m.sortedLoadedSkillStates() {
+			state := item.state
+			if state.IsFolded {
+				buf.WriteString(m.renderFolded(state))
+			} else {
+				buf.WriteString(m.renderFull(state))
+			}
+			buf.WriteString("\n")
 		}
+	} else {
+		buf.WriteString("(none)\n")
+	}
+
+	if hasRegistered {
 		buf.WriteString("\n")
+		m.appendAvailableSkillsSection(&buf)
 	}
 
 	buf.WriteString(fmt.Sprintf("<|SKILLS_CONTEXT_END_%s|>", tag))
 	return buf.String()
+}
+
+// appendAvailableSkillsSection 写入"Available Skills"下半段。
+// 内容仅依赖 loader.AllSkillMetas() + GetSkillSourceStats(loader), 不读 loadedSkills,
+// 保证字节稳定性 (registry 不变 -> 输出不变)。
+//
+// 关键词: SkillsContext appendAvailableSkillsSection, registry listing 稳定
+func (m *SkillsContextManager) appendAvailableSkillsSection(buf *bytes.Buffer) {
+	skills := sortSkillMetasByName(m.loader.AllSkillMetas())
+	stats := GetSkillSourceStats(m.loader)
+
+	if len(skills) == 0 {
+		buf.WriteString("== Available Skills ==\n")
+		if stats.DatabaseCount > 0 {
+			buf.WriteString(fmt.Sprintf("Available database-backed skills: %d. Use search_capabilities or loading_skills with an exact skill name to access them.\n", stats.DatabaseCount))
+		} else {
+			buf.WriteString("(none)\n")
+		}
+		return
+	}
+
+	buf.WriteString("== Available Skills (use loading_skills action to load) ==\n")
+	listed := 0
+	for _, s := range skills {
+		line := fmt.Sprintf("  - %s: %s\n", s.Name, s.Description)
+		if m.measureSize(buf.String())+m.measureSize(line) > MetadataListMaxTokens {
+			remaining := len(skills) - listed
+			buf.WriteString(fmt.Sprintf("  ... and %d more skills. Use search_capabilities to find specific skills.\n", remaining))
+			break
+		}
+		buf.WriteString(line)
+		listed++
+	}
+	if stats.DatabaseCount > 0 {
+		buf.WriteString(fmt.Sprintf("  ... plus %d database-backed skills available via search.\n", stats.DatabaseCount))
+	}
 }
 
 // renderFolded renders a skill in folded mode (metadata + compact file tree).

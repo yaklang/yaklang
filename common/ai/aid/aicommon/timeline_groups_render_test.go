@@ -571,6 +571,136 @@ func TestTimelineDump_NoFrozenBoundary_OnSingleBucket(t *testing.T) {
 		"single-bucket (all-open) Dump should NOT inject frozen boundary")
 }
 
+// ---------------------------------------------------------------------------
+// RenderFrozenOnly / RenderOpenOnly 专项测试 (按稳定性分层 prompt 路径)
+// 验证不带边界 wrap 的 frozen-only / open-only 渲染。
+// ---------------------------------------------------------------------------
+
+// TestRenderFrozenOnly_Empty 空集合 / 全 nil 应返回空串
+// 关键词: RenderFrozenOnly, 空集合
+func TestRenderFrozenOnly_Empty(t *testing.T) {
+	require.Equal(t, "", TimelineRenderableBlocks{}.RenderFrozenOnly("TL"))
+	require.Equal(t, "", TimelineRenderableBlocks{nil, nil}.RenderFrozenOnly("TL"))
+}
+
+// TestRenderFrozenOnly_AllOpen 全 open block 时 frozen-only 必须返回空串
+// 关键词: RenderFrozenOnly, 全 open, 空输出
+func TestRenderFrozenOnly_AllOpen(t *testing.T) {
+	bs := TimelineRenderableBlocks{
+		&fakeOpenInterval{nonce: "b3t1", body: "open-1"},
+		&fakeOpenInterval{nonce: "b3t2", body: "open-2"},
+	}
+	out := bs.RenderFrozenOnly("TL")
+	require.Equal(t, "", out, "all-open should yield empty frozen-only output")
+}
+
+// TestRenderFrozenOnly_AllFrozen 全 frozen 时 frozen-only 应等价于 plain Render
+// 关键词: RenderFrozenOnly, 全 frozen, 等价 Render
+func TestRenderFrozenOnly_AllFrozen(t *testing.T) {
+	bs := TimelineRenderableBlocks{
+		&TimelineReducerBlock{ReducerKeyID: 1, Text: "reducer-A"},
+		&TimelineReducerBlock{ReducerKeyID: 2, Text: "reducer-B"},
+		&fakeFrozenInterval{nonce: "b3t100", body: "frozen-A"},
+	}
+	out := bs.RenderFrozenOnly("TL")
+	plain := bs.Render("TL")
+	require.Equal(t, plain, out, "all-frozen RenderFrozenOnly must equal plain Render")
+	require.NotContains(t, out, frozenStartTag, "frozen-only must NOT carry boundary tag")
+	require.NotContains(t, out, frozenEndTag, "frozen-only must NOT carry boundary tag")
+}
+
+// TestRenderFrozenOnly_MixDropsOpen 混合场景下 frozen-only 仅保留 frozen block,
+// 输出不含 open block 内容, 也不含 boundary tag。
+// 关键词: RenderFrozenOnly, 混合段, 丢弃 open
+func TestRenderFrozenOnly_MixDropsOpen(t *testing.T) {
+	bs := TimelineRenderableBlocks{
+		&TimelineReducerBlock{ReducerKeyID: 1, Text: "reducer-frozen"},
+		&fakeFrozenInterval{nonce: "b3t100", body: "frozen-A"},
+		&fakeOpenInterval{nonce: "b3t300", body: "open-tail"},
+	}
+	out := bs.RenderFrozenOnly("TL")
+	require.Contains(t, out, "reducer-frozen")
+	require.Contains(t, out, "frozen-A")
+	require.NotContains(t, out, "open-tail", "open block must be dropped from frozen-only output")
+	require.NotContains(t, out, frozenStartTag, "frozen-only must NOT carry boundary tag")
+}
+
+// TestRenderFrozenOnly_ByteStableOnOpenChange open 内容变化时 frozen-only 字节级稳定
+// 关键词: RenderFrozenOnly, 字节稳定, 不受 open 干扰
+func TestRenderFrozenOnly_ByteStableOnOpenChange(t *testing.T) {
+	frozen := []TimelineRenderableBlock{
+		&TimelineReducerBlock{ReducerKeyID: 1, Text: "stable-reducer"},
+		&fakeFrozenInterval{nonce: "b3t100", body: "stable-frozen"},
+	}
+	r1 := append(append(TimelineRenderableBlocks{}, frozen...),
+		&fakeOpenInterval{nonce: "b3t999", body: "open-r1"}).
+		RenderFrozenOnly("TL")
+	r2 := append(append(TimelineRenderableBlocks{}, frozen...),
+		&fakeOpenInterval{nonce: "b3t999", body: "open-r2-different"}).
+		RenderFrozenOnly("TL")
+	require.Equal(t, r1, r2, "frozen-only output must be byte-stable across open changes")
+}
+
+// TestRenderOpenOnly_Empty 空集合 / 全 nil 应返回空串
+// 关键词: RenderOpenOnly, 空集合
+func TestRenderOpenOnly_Empty(t *testing.T) {
+	require.Equal(t, "", TimelineRenderableBlocks{}.RenderOpenOnly("TL"))
+	require.Equal(t, "", TimelineRenderableBlocks{nil, nil}.RenderOpenOnly("TL"))
+}
+
+// TestRenderOpenOnly_AllFrozen 全 frozen 时 open-only 必须返回空串
+// 关键词: RenderOpenOnly, 全 frozen, 空输出
+func TestRenderOpenOnly_AllFrozen(t *testing.T) {
+	bs := TimelineRenderableBlocks{
+		&TimelineReducerBlock{ReducerKeyID: 1, Text: "reducer-A"},
+		&fakeFrozenInterval{nonce: "b3t100", body: "frozen-A"},
+	}
+	out := bs.RenderOpenOnly("TL")
+	require.Equal(t, "", out, "all-frozen should yield empty open-only output")
+}
+
+// TestRenderOpenOnly_AllOpen 全 open 时 open-only 应等价于 plain Render
+// 关键词: RenderOpenOnly, 全 open, 等价 Render
+func TestRenderOpenOnly_AllOpen(t *testing.T) {
+	bs := TimelineRenderableBlocks{
+		&fakeOpenInterval{nonce: "b3t1", body: "open-1"},
+		&fakeOpenInterval{nonce: "b3t2", body: "open-2"},
+	}
+	out := bs.RenderOpenOnly("TL")
+	plain := bs.Render("TL")
+	require.Equal(t, plain, out, "all-open RenderOpenOnly must equal plain Render")
+}
+
+// TestRenderOpenOnly_MixDropsFrozen 混合场景下 open-only 仅保留 open block
+// 关键词: RenderOpenOnly, 混合段, 丢弃 frozen
+func TestRenderOpenOnly_MixDropsFrozen(t *testing.T) {
+	bs := TimelineRenderableBlocks{
+		&TimelineReducerBlock{ReducerKeyID: 1, Text: "reducer-frozen"},
+		&fakeFrozenInterval{nonce: "b3t100", body: "frozen-A"},
+		&fakeOpenInterval{nonce: "b3t300", body: "open-tail"},
+	}
+	out := bs.RenderOpenOnly("TL")
+	require.Contains(t, out, "open-tail")
+	require.NotContains(t, out, "reducer-frozen", "frozen reducer must be dropped from open-only output")
+	require.NotContains(t, out, "frozen-A", "frozen interval must be dropped from open-only output")
+}
+
+// TestRenderFrozenOpen_Recombines frozen + open 两半渲染拼起来 (中间加换行)
+// 应当与 plain Render 输出等价 (顺序保持)。
+// 关键词: RenderFrozenOnly, RenderOpenOnly, 与 Render 一致
+func TestRenderFrozenOpen_Recombines(t *testing.T) {
+	bs := TimelineRenderableBlocks{
+		&TimelineReducerBlock{ReducerKeyID: 1, Text: "R"},
+		&fakeFrozenInterval{nonce: "b3t100", body: "F"},
+		&fakeOpenInterval{nonce: "b3t999", body: "O"},
+	}
+	frozenOut := bs.RenderFrozenOnly("TL")
+	openOut := bs.RenderOpenOnly("TL")
+	plain := bs.Render("TL")
+	require.Equal(t, plain, frozenOut+"\n"+openOut,
+		"frozen-only + open-only should reconstitute plain Render order")
+}
+
 // fakeFrozenInterval / fakeOpenInterval 是测试用的最小 RenderableBlock 实现,
 // 用来在不依赖完整 Timeline 构造的情况下精确控制 IsOpen 与 body 字面量。
 type fakeFrozenInterval struct {
