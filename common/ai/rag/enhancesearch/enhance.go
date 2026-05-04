@@ -2,9 +2,9 @@ package enhancesearch
 
 import (
 	"context"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/utils"
 )
 
 type SearchHandler interface {
@@ -25,9 +25,28 @@ func NewSearchHandler() *LiteForgeSearchHandler {
 	return &LiteForgeSearchHandler{}
 }
 
-// ExtractKeywords 从问题中提取核心关键词，用于精确的词条搜索。
-func (h *LiteForgeSearchHandler) ExtractKeywords(ctx context.Context, query string) ([]string, error) {
-	prompt := `# 角色
+// ====================================================================================
+// P3-X1: 4 个 LiteForge 子调用的静态指令独立抽出, 跨调用 byte-identical.
+//
+// 这些指令不含任何 nonce / query 拼接, 通过 aicommon.LiteForgeStaticInstruction
+// marker 进入 LiteForge 模板的 semi-dynamic 段; 调用方传入的 query 通过
+// aicommon.InvokeLiteForge 第 1 参数 (cfg.query) 进入 dynamic <params_NONCE> 段,
+// LiteForge 模板自带 dynamic 段 nonce 包装防 prompt-injection.
+//
+// 改造前: 这些指令文本 + nonce + query 全部塞给 InvokeLiteForge 第 1 参数,
+//        最终被当作 cfg.query 拼进 dynamic <params_NONCE>, 1-3KB 静态文本
+//        每次随 nonce/query 变化重发, 客户端 LCP / 上游 KV cache 都无法命中.
+// 改造后: 静态部分进 semi-dynamic (跨同一 method 调用 byte-identical), 仅 query
+//        每次变化, 让 4 个子调用都能享受 system + semi-dynamic 段的缓存命中.
+//
+// 关键词: aicache, P3-X1, enhancesearch StaticInstruction 下沉, semi-dynamic 段稳定
+// ====================================================================================
+
+// extractKeywordsStaticInstruction 是 ExtractKeywords 的稳定指令头,
+// query 由 LiteForge 自动包到 dynamic <params_NONCE> 段, 此处不再嵌入.
+//
+// 关键词: extractKeywordsStaticInstruction, ExtractKeywords semi-dynamic 段
+const extractKeywordsStaticInstruction = `# 角色
 你是一位精通各领域知识的首席信息检索专家（Chief Information Retrieval Expert）。
 # 任务
 你的任务是分析用户的【问题】，并从中提炼出一组约10个**高价值、高信噪比**的核心搜索关键词。这组关键词将用于精准的、基于词条的检索引擎，目的是快速定位到最相关的专业文档。
@@ -82,23 +101,81 @@ func (h *LiteForgeSearchHandler) ExtractKeywords(ctx context.Context, query stri
 **错误关键词：** NoSQL, 数据库安全, 中间件漏洞, 配置不当
 **原因：** 关键词应聚焦于 Redis 漏洞的具体利用方式，而非泛化到中间件或数据库安全。
 
----
-<|问题_{{ .nonce }}_START|>
-{{ .query }}
-<|问题_{{ .nonce }}_END|>
----
-请立即开始分析，严格遵循"聚焦主体，禁止扩散"原则，生成最终的关键词列表。`
-	prompt, err := utils.RenderTemplate(prompt, map[string]any{
-		"nonce": utils.RandStringBytes(4),
-		"query": query,
-	})
-	if err != nil {
-		return nil, err
-	}
-	inputPrompt := prompt
+# 输入与输出
+- 用户的【问题】将以系统包装的 dynamic 段 (<params_*> 容器) 形式提供, 你需要按照 schema 仅返回关键词数组.
+- 严格遵循"聚焦主体, 禁止扩散"原则.`
+
+// hydeStaticInstruction 是 HypotheticalAnswer 的稳定指令头.
+// 关键词: hydeStaticInstruction, HypotheticalAnswer semi-dynamic 段
+const hydeStaticInstruction = `你是一个精通信息检索的AI助手。
+# 任务
+根据用户提出的【问题】，精准地提炼出其核心概念，并生成一段**信息密度极高**的"理想答案摘要"。这段摘要将作为搜索引擎的最佳查询依据，以找到最相关的知识。
+# 核心指令
+1.  **高度浓缩**: 抛弃所有不必要的背景描述和过渡性语言，直接切入主题。
+2.  **关键词聚焦**: 围绕问题的核心实体、技术原理、关键特性和应用场景，组合成一个连贯的句子或短段落。
+3.  **全称优先**: 如果问题中包含缩写，应在摘要中包含其全称，以增加检索覆盖面。
+4.  **严格简短**: **最终输出严格控制在100字以内。**
+
+# 输入与输出
+- 用户的【问题】将以系统包装的 dynamic 段 (<params_*> 容器) 形式提供, 请按照 schema 仅返回 hypothetical_answer 字段.`
+
+// splitQueryStaticInstruction 是 SplitQuery 的稳定指令头.
+// 关键词: splitQueryStaticInstruction, SplitQuery semi-dynamic 段
+const splitQueryStaticInstruction = `# 角色
+你是一位顶级的首席信息分析师和搜索策略师。
+# 任务
+你的核心任务是将一个复杂的探寻，分解为一系列可以**并行执行**、**精准检索**的独立子问题，以实现最高效、最全面的信息获取。
+# 行动准则
+**1.  守真原则 (Principle of Fidelity) [最高优先级]:**
+    -   如果【问题】本身已经是一个清晰、原子化且可直接检索的简单问题（例如："什么是Transformer模型？"），则**不应进行拆分**。直接将原问题作为唯一的子问题返回。
+**2.  拆分策略 (Decomposition Strategy):**
+    -   **多主题拆分:** 如果【问题】明显包含多个领域或主题（例如："比较一下React和Vue的优缺点，并分析它们在移动端的应用场景"），请按这些自然边界进行拆分。
+    -   **多维度拆分:** 如果【问题】是单一主题的复杂问题（例如："分析一下大型语言模型（LLM）的风险"），请从不同维度进行深入细化，形成有代表性的子问题。**强烈建议参考以下维度：**
+        -   核心定义 (What): "什么是大型语言模型（LLM）？"
+        -   工作原理 (How): "大型语言模型（LLM）的工作原理是什么？"
+        -   关键风险 (Risk): "使用大型语言模型（LLM）存在哪些主要风险？"
+        -   应对策略 (Solution): "如何缓解或管理大型语言模型（LLM）的风险？"
+        -   实际案例 (Example): "有哪些关于大型语言模型（LLM）风险的真实案例？"
+        -   未来趋势 (Trend): "大型语言模型（LLM）风险未来的发展趋势是什么？"
+**3.  质量与数量 (Quality & Quantity):**
+    -   **质量优先:** 追求子问题的**实质性价值**，而非数量。每个子问题都应是一个有意义的、值得独立检索的探寻点。
+    -   **数量适中:** 理想的子问题数量在 **2-5 个**之间。避免生成过于琐碎或高度重叠的子问题。
+**4.  格式规范:**
+    -   子问题必须是完整、清晰的句子。
+    -   如果涉及缩写，应优先使用全称，或在首次出现时采用"**全称（简称）**"的格式。
+
+# 输入与输出
+- 用户的【问题】将以系统包装的 dynamic 段 (<params_*> 容器) 形式提供, 请按照 schema 返回 sub_questions 数组.`
+
+// generalizeQueryStaticInstruction 是 GeneralizeQuery 的稳定指令头.
+// 关键词: generalizeQueryStaticInstruction, GeneralizeQuery semi-dynamic 段
+const generalizeQueryStaticInstruction = `# 角色
+你是一位专业的知识架构师和信息检索策略师。
+# 任务
+你的任务是将一个具体、细节性的【问题】，通过"**概念升维**"操作，转化为多个更具概括性的主题级问题。
+战略目标是：打破原问题的关键词限制，从而能检索到关于该主题的**宏观论述、原理介绍、领域综述或对比分析**类的文档，为用户提供更广阔的视角。
+# 行动准则
+**1.  天花板原则 (Ceiling Principle) [最高优先级]:**
+    -   如果【问题】本身已经是一个广泛、抽象的主题（例如："什么是计算机科学？"），它已经触及了泛化的"天花板"，则**无需泛化**。在这种情况下，直接返回原问题。
+**2.  概念升维操作 (Conceptual Ascension):**
+    -   **第一步：识别核心。** 找出【问题】中的核心实体、技术或概念。
+    -   **第二步：升维一级。** 确定该核心概念的**直接上层类别**或所属的宏观主题。
+        -   *示例：* 'gRPC' 的上层是 '远程过程调用（RPC）框架'；'React useState Hook' 的上层是 'React状态管理'。
+    -   **第三步：重构问题。** 围绕这个更高维度的"上层类别"重新构建一个完整、专业的问题。
+**3.  质量标准:**
+    -   泛化后的问题必须逻辑清晰，仍然是一个有意义的、可被回答的问题。
+    -   如果涉及缩写，应优先使用全称，或在首次出现时采用"**全称（简称）**"的格式。
+
+# 输入与输出
+- 用户的【问题】将以系统包装的 dynamic 段 (<params_*> 容器) 形式提供, 请按照 schema 返回 generalized_query 数组.`
+
+// ExtractKeywords 从问题中提取核心关键词，用于精确的词条搜索。
+// 关键词: ExtractKeywords, LiteForgeStaticInstruction, P3-X1 静态下沉
+func (h *LiteForgeSearchHandler) ExtractKeywords(ctx context.Context, query string) ([]string, error) {
 	result, err := aicommon.InvokeLiteForge(
-		inputPrompt,
+		query,
 		aicommon.WithContext(ctx),
+		aicommon.LiteForgeStaticInstruction(extractKeywordsStaticInstruction),
 		aicommon.WithLiteForgeOutputSchemaFromAIToolOptions(
 			aitool.WithStringArrayParam(
 				"search_keywords",
@@ -114,35 +191,13 @@ func (h *LiteForgeSearchHandler) ExtractKeywords(ctx context.Context, query stri
 	return keywords, nil
 }
 
-// HypotheticalAnswer 生成详细的假设回答，有助于搜索到更多相关结果
+// HypotheticalAnswer 生成详细的假设回答，有助于搜索到更多相关结果.
+// 关键词: HypotheticalAnswer, LiteForgeStaticInstruction, P3-X1 静态下沉
 func (h *LiteForgeSearchHandler) HypotheticalAnswer(ctx context.Context, query string) (string, error) {
-	prompt, err := utils.RenderTemplate(`
-你是一个精通信息检索的AI助手。
-# 任务
-根据用户提出的【问题】，精准地提炼出其核心概念，并生成一段**信息密度极高**的“理想答案摘要”。这段摘要将作为搜索引擎的最佳查询依据，以找到最相关的知识。
-# 核心指令
-1.  **高度浓缩**: 抛弃所有不必要的背景描述和过渡性语言，直接切入主题。
-2.  **关键词聚焦**: 围绕问题的核心实体、技术原理、关键特性和应用场景，组合成一个连贯的句子或短段落。
-3.  **全称优先**: 如果问题中包含缩写，应在摘要中包含其全称，以增加检索覆盖面。
-4.  **严格简短**: **最终输出严格控制在100字以内。**
----
-<|问题_{{ .nonce }}_START|>
-{{ .query }}
-<|问题_{{ .nonce }}_END|>
----
-请立即开始生成这段高度浓缩的“理想答案摘要”。
-`, map[string]any{
-		"nonce": utils.RandStringBytes(4),
-		"query": query,
-	})
-	if err != nil {
-		return "", err
-	}
-
-	inputPrompt := prompt
 	result, err := aicommon.InvokeLiteForge(
-		inputPrompt,
+		query,
 		aicommon.WithContext(ctx),
+		aicommon.LiteForgeStaticInstruction(hydeStaticInstruction),
 		aicommon.WithLiteForgeOutputSchemaFromAIToolOptions(
 			aitool.WithStringParam(
 				"hypothetical_answer",
@@ -159,46 +214,13 @@ func (h *LiteForgeSearchHandler) HypotheticalAnswer(ctx context.Context, query s
 	return document_paragraph, nil
 }
 
-// SplitQuery 将复杂问题拆分为多个子问题，有助于精确搜索多个领域的问题
+// SplitQuery 将复杂问题拆分为多个子问题，有助于精确搜索多个领域的问题.
+// 关键词: SplitQuery, LiteForgeStaticInstruction, P3-X1 静态下沉
 func (h *LiteForgeSearchHandler) SplitQuery(ctx context.Context, query string) ([]string, error) {
-	prompt := `# 角色
-你是一位顶级的首席信息分析师和搜索策略师。
-# 任务
-你的核心任务是将一个复杂的探寻，分解为一系列可以**并行执行**、**精准检索**的独立子问题，以实现最高效、最全面的信息获取。
-# 行动准则
-**1.  守真原则 (Principle of Fidelity) [最高优先级]:**
-    -   如果【问题】本身已经是一个清晰、原子化且可直接检索的简单问题（例如：“什么是Transformer模型？”），则**不应进行拆分**。直接将原问题作为唯一的子问题返回。
-**2.  拆分策略 (Decomposition Strategy):**
-    -   **多主题拆分:** 如果【问题】明显包含多个领域或主题（例如：“比较一下React和Vue的优缺点，并分析它们在移动端的应用场景”），请按这些自然边界进行拆分。
-    -   **多维度拆分:** 如果【问题】是单一主题的复杂问题（例如：“分析一下大型语言模型（LLM）的风险”），请从不同维度进行深入细化，形成有代表性的子问题。**强烈建议参考以下维度：**
-        -   核心定义 (What): “什么是大型语言模型（LLM）？”
-        -   工作原理 (How): “大型语言模型（LLM）的工作原理是什么？”
-        -   关键风险 (Risk): “使用大型语言模型（LLM）存在哪些主要风险？”
-        -   应对策略 (Solution): “如何缓解或管理大型语言模型（LLM）的风险？”
-        -   实际案例 (Example): “有哪些关于大型语言模型（LLM）风险的真实案例？”
-        -   未来趋势 (Trend): “大型语言模型（LLM）风险未来的发展趋势是什么？”
-**3.  质量与数量 (Quality & Quantity):**
-    -   **质量优先:** 追求子问题的**实质性价值**，而非数量。每个子问题都应是一个有意义的、值得独立检索的探寻点。
-    -   **数量适中:** 理想的子问题数量在 **2-5 个**之间。避免生成过于琐碎或高度重叠的子问题。
-**4.  格式规范:**
-    -   子问题必须是完整、清晰的句子。
-    -   如果涉及缩写，应优先使用全称，或在首次出现时采用“**全称（简称）**”的格式。
----
-<|问题_{{ .nonce }}_START|>
-{{ .query }}
-<|问题_{{ .nonce }}_END|>
----
-请根据上述准则，开始你的分析和拆分工作。
-`
-	prompt, err := utils.RenderTemplate(prompt, map[string]any{
-		"nonce": utils.RandStringBytes(4),
-		"query": query,
-	})
-
-	inputPrompt := prompt
 	result, err := aicommon.InvokeLiteForge(
-		inputPrompt,
+		query,
 		aicommon.WithContext(ctx),
+		aicommon.LiteForgeStaticInstruction(splitQueryStaticInstruction),
 		aicommon.WithLiteForgeOutputSchemaFromAIToolOptions(
 			aitool.WithStringArrayParam(
 				"sub_questions",
@@ -215,44 +237,19 @@ func (h *LiteForgeSearchHandler) SplitQuery(ctx context.Context, query string) (
 	return sub_questions, nil
 }
 
-// GeneralizeQuery 把问题泛化，有助于扩大搜索范围
+// GeneralizeQuery 把问题泛化，有助于扩大搜索范围.
+// 关键词: GeneralizeQuery, LiteForgeStaticInstruction, P3-X1 静态下沉
 func (h *LiteForgeSearchHandler) GeneralizeQuery(ctx context.Context, query string) ([]string, error) {
-	prompt := `# 角色
-你是一位专业的知识架构师和信息检索策略师。
-# 任务
-你的任务是将一个具体、细节性的【问题】，通过“**概念升维**”操作，转化为多个更具概括性的主题级问题。
-战略目标是：打破原问题的关键词限制，从而能检索到关于该主题的**宏观论述、原理介绍、领域综述或对比分析**类的文档，为用户提供更广阔的视角。
-# 行动准则
-**1.  天花板原则 (Ceiling Principle) [最高优先级]:**
-    -   如果【问题】本身已经是一个广泛、抽象的主题（例如：“什么是计算机科学？”），它已经触及了泛化的“天花板”，则**无需泛化**。在这种情况下，直接返回原问题。
-**2.  概念升维操作 (Conceptual Ascension):**
-    -   **第一步：识别核心。** 找出【问题】中的核心实体、技术或概念。
-    -   **第二步：升维一级。** 确定该核心概念的**直接上层类别**或所属的宏观主题。
-        -   *示例：* 'gRPC' 的上层是 '远程过程调用（RPC）框架'；'React useState Hook' 的上层是 'React状态管理'。
-    -   **第三步：重构问题。** 围绕这个更高维度的“上层类别”重新构建一个完整、专业的问题。
-**3.  质量标准:**
-    -   泛化后的问题必须逻辑清晰，仍然是一个有意义的、可被回答的问题。
-    -   如果涉及缩写，应优先使用全称，或在首次出现时采用“**全称（简称）**”的格式。
----
-<|问题_{{ .nonce }}_START|>
-{{ .query }}
-<|问题_{{ .nonce }}_END|>
----
-请以知识架构师的身份，执行“概念升维”任务。`
-	prompt, err := utils.RenderTemplate(prompt, map[string]any{
-		"nonce": utils.RandStringBytes(4),
-		"query": query,
-	})
-	inputPrompt := prompt
 	result, err := aicommon.InvokeLiteForge(
-		inputPrompt,
+		query,
+		aicommon.WithContext(ctx),
+		aicommon.LiteForgeStaticInstruction(generalizeQueryStaticInstruction),
 		aicommon.WithLiteForgeOutputSchemaFromAIToolOptions(
 			aitool.WithStringArrayParam(
 				"generalized_query",
 				aitool.WithParam_Description("泛化后的主题级问题，若无法泛化则返回原问题"),
 			),
 		),
-		aicommon.WithContext(ctx),
 		aicommon.WithAICallback(aicommon.MustGetSpeedPriorityAIModelCallback()),
 	)
 	if err != nil {
