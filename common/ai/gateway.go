@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/yaklang/yaklang/common/ai/aibalance"
+	"github.com/yaklang/yaklang/common/ai/aid/aicache"
 	"io"
 	"strings"
 	"time"
@@ -1081,6 +1082,13 @@ var Exports = map[string]any{
 	// aispec 会在检测到 ctx.UsageCallback 时自动注入这一参数。
 	// 关键词: yak ai usageCallback, 隐式缓存可见, cached_tokens 暴露给脚本
 	"usageCallback": aispec.WithUsageCallback,
+
+	// aicacheSession 暴露当前进程的 aicache 调试落盘根目录绝对路径。
+	// 用法：sessionDir = ai.aicacheSession()
+	// 触发条件：仅在 utils.InDebugMode()（DEBUG / PALMDEBUG / YAKLANGDEBUG 任一非空）
+	// 或测试场景下，aicache.Observe 才会异步落盘 000XXX.txt；返回路径稳定可复用。
+	// 关键词: yak ai aicacheSession, dump 目录暴露, cachebench
+	"aicacheSession": aicache.SessionDir,
 }
 
 // CreateChatterFromConfig creates a chat function from AIModelConfig.

@@ -1,0 +1,61 @@
+// aicache cache hit benchmark - analyze.yak
+//
+// 离线再分析: 给定一个已经存在的 aicache dump 目录 (000XXX.txt 列表),
+// 直接产出与 run_react.yak 一致的报告。
+// 适用场景:
+//   1. 已经跑过 run_react.yak, 想换分析口径或聚合更多 dump (跨 session)
+//   2. 别人的环境跑出来的 dump 目录拿过来诊断
+//   3. CI 上把 dump 目录作为 artifact 上传后再分析
+//
+// 用法 (必须从 yaklang 仓库根目录运行, 因为 include 走 cwd 相对路径):
+//   cd /path/to/yaklang
+//   go run common/yak/cmd/yak.go \
+//       common/ai/aid/aicache/cachebench/analyze.yak \
+//       --session-dir ~/yakit-projects/temp/aicache/20260504-153000-12345
+//
+// 注意: 离线模式没有 usage 回调, 所以 hit_ratio_token_real 与
+// upstream_creation_cost 都为 0; 仅 LCP 客户端口径与 section 漂移分析有效。
+//
+// 关键词: aicache cachebench, analyze, 离线分析
+
+// include 路径相对当前工作目录 (yak 编译器行为), 因此约定必须从仓库根目录调用。
+include "common/ai/aid/aicache/cachebench/lib.yak"
+
+sessionDir = cli.String("session-dir", cli.setDefault(""),
+    cli.setHelp("aicache dump 目录绝对路径, 比如 ~/yakit-projects/temp/aicache/<sessionId>"))
+outputDir = cli.String("output-dir",
+    cli.setDefault("./common/ai/aid/aicache/cachebench/reports"),
+    cli.setHelp("报告产物根目录"))
+inputText = cli.String("input", cli.setDefault(""),
+    cli.setHelp("可选, 当时跑 InvokeReAct 用的 user input, 仅用于报告标注"))
+cli.check()
+
+if sessionDir == "" {
+    die("Please provide --session-dir <path>")
+}
+
+exists = file.IsExisted(sessionDir)
+if !exists {
+    die(sprintf("session dir not exist: %s", sessionDir))
+}
+if !file.IsDir(sessionDir) {
+    die(sprintf("session dir is not a directory: %s", sessionDir))
+}
+
+log.info("offline analyze session dir: %s", sessionDir)
+
+// 离线模式没有 usage 回调, 用空列表占位; analyzeBenchmark 内部会按 dump 数量补 nil。
+usageList = []
+events = []
+
+benchReport = analyzeBenchmark(sessionDir, usageList, events, nil, inputText)
+benchReport["mode"] = "offline-analyze"
+
+jsonPath, mdPath, botDir = saveReport(outputDir, benchReport)
+
+log.info("offline analysis report saved:")
+log.info("  json:               %s", jsonPath)
+log.info("  markdown:           %s", mdPath)
+log.info("  bottleneck-prompts: %s", botDir)
+
+printSummary(benchReport)

@@ -51,6 +51,15 @@ func SessionId() string {
 	return dumpSessionId
 }
 
+// SessionDir 返回当前进程 aicache 调试落盘根目录的绝对路径，
+// 供脚本侧（cachebench / 离线分析等）一行直接拿到 dump 目录路径，无需重做 mtime 扫描。
+// 第一次调用时会触发懒初始化（与 SessionId 共享 sync.Once），之后稳定返回同一路径。
+// 关键词: aicache, SessionDir, 脚本可读 dump 路径
+func SessionDir() string {
+	dir, _ := resolveDumpBaseDir()
+	return dir
+}
+
 // dumpDebug 把一次镜像观测的完整快照落盘
 // 仅在 utils.InDebugMode() 或测试中触发
 // 关键词: aicache, dumpDebug, DEBUG 落盘
