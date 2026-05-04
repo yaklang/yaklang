@@ -436,3 +436,125 @@ P3 之后 cachebench 跑 63 calls 真实 missing = 0. 用户脚本注册的
 任何后续走 `aicommon.WithAICallback(aicommon.MustGet*AIModelCallback())` +
 `aicommon.WithContext(ctx)` 的子调用, 只要 ctx 是从父 React loop 派生的,
 user usage callback **自动透传**.
+
+### 9.9 P3-X1: enhancesearch LiteForge 子调用静态指令下沉
+
+**背景**: P3 (63 calls) baseline 数据 `lcp_hit_but_upstream_miss = 18` +
+`prefix_misalign = 9`, dump 分析定位主要污染源是 `enhancesearch` 4 个 LiteForge
+子调用 (`HypotheticalAnswer` / `SplitQuery` / `GeneralizeQuery` / `ExtractKeywords`)
+全部按"反模式"调用: 1-3KB 静态指令 + nonce + query 整段塞给 `InvokeLiteForge`
+第 1 参数, 在 `_executeLiteForgeTemp` 内被当作 `cfg.query` -> LiteForge 模板
+`.Params` -> dynamic `<params_NONCE>` 段. dynamic 段每次 nonce / query 不同必然
+misalign, 1-3KB 静态文本被一起污染.
+
+#### P3-X1 改造方案
+
+参考已经做对的 `enhancesearch/build_questions.go::BuildIndexQuestions`:
+静态指令通过 `aicommon.LiteForgeStaticInstruction(...)` 进入 LiteForge 模板的
+semi-dynamic 段, query 仍然是 `InvokeLiteForge` 第 1 参数 (走 dynamic 段, 自带
+NONCE 包装防 prompt-injection).
+
+| 文件 | 改动 |
+| --- | --- |
+| `common/ai/rag/enhancesearch/enhance.go` | 4 个方法每个抽出独立 `xxxStaticInstruction` 常量 (角色/任务/行动准则/few-shot, 不含 nonce / query); query 作为 `InvokeLiteForge` 第 1 参数, 加 `aicommon.LiteForgeStaticInstruction(constant)` option, 去掉模板里 `<\|问题_{{ .nonce }}_START\|>{{ .query }}<\|问题_{{ .nonce }}_END\|>` 这层冗余 nonce |
+| `common/ai/rag/enhancesearch/enhance_section_test.go` (new) | 静态指令稳定性 + dynamic 段位置回归 (3 组测试 / 9 sub-test) |
+
+**4 个新增 staticInstruction 常量**:
+- `hydeStaticInstruction` (HypotheticalAnswer)
+- `splitQueryStaticInstruction` (SplitQuery)
+- `generalizeQueryStaticInstruction` (GeneralizeQuery)
+- `extractKeywordsStaticInstruction` (ExtractKeywords)
+
+#### P3-X1 单测验证 (代码级正确性证明)
+
+`enhance_section_test.go` 通过 `aicommon.RegisterLiteForgeExecuteCallback` hook
+全局 callback 抓 `cfg`, 严格断言:
+
+| 测试 | 断言 |
+| --- | --- |
+| `TestEnhanceSearch_StaticInstructionStableAcrossNonces` | 同一 method 用 5 个不同 query 调用, `cfg.staticInstruction` 跨调用 **byte-identical** (sha256 一致); query 仅出现在 `cfg.query` 第 1 参数 |
+| `TestEnhanceSearch_StaticInstructionHasNoNonceTemplate` | 4 个 staticInstruction 常量不含 `{{ .nonce }}` / `{{ .query }}` / `<\|问题_` 模板残留 |
+| `TestEnhanceSearch_QueryGoesThroughDynamicNotStatic` | query 进入 `cfg.query` (-> dynamic `<params_NONCE>`); 不出现在 `cfg.staticInstruction` (-> semi-dynamic) |
+
+9 个 sub-test 全过, 证明 P3-X1 改造在 byte 层正确.
+
+#### P3-X3 cachebench 实测 (受限样本)
+
+100 prompt 目标因 aibalance 上游模型间歇性不稳定 (`401 Unauthorized` retry +
+`max retry count[5] reached, last error: action type is empty`), React loop 在
+第 9-10 个 prompt 持续早夭, 采样到 9-10 个 dump.
+
+```
+session: 20260504-212511-42586  (memfit-standard-free + 简化英文 input)
+total calls: 10  cache create: 1  cache hit: 1  missing usage: 6
+token_hit_ratio: 5.24% (upstream)
+lcp_hit_ratio:  43.13% (in-proc)
+```
+
+**dump 分布**:
+- dump 1, 2 = capability-catalog-match (memfit-light-free)
+- dump 3 = tag-selection (memory tagging)
+- dump 4 = intent recognition forge
+- dump 5 = memory-triage forge
+- dump 6-9 = **主 React loop (deepseek-v3)** -- dump 7,8,9 全部 `prefix_hit_chunks: 4 / 100%`, semi-dynamic + high-static + timeline + dynamic 段 byte-identical 复用
+
+**没有采集到 enhancesearch 4 个子调用的 dump** (search-deep 阶段未到达).
+但出现 1 次 upstream cache hit (主 React loop), 证明 P3-T5 修后的
+cache 链路在主 loop 工作正常.
+
+#### P3-X1 阻塞分析: 100 prompt 不达原因与 X1 改造无关
+
+| 现象 | 根因 | 影响层级 |
+| --- | --- | --- |
+| React loop 在第 9-10 prompt 早夭 | aibalance `memfit-standard-free` 在 retry 路径被路由到 `deepseek-v3` / `memfit-light-free`, 这两个 model key 间歇性 401 | 上游模型路由 |
+| `lcp_hit_but_upstream_miss = 7` | 客户端 LCP 命中 (in-proc 43%), 但 `memfit-light-free` 上游可能未启用 explicit cache | aibalance 配置 |
+| `missing usage: 6` | React loop ctx cancel 后 SSE 末帧 callback 没机会触发, P3-T6 已分类为 `inFlightCancelled` (但本次小样本未触发分类逻辑) | 测量伪影 |
+
+这些都是上游 / 模型路由层的问题, 与 P3-X1 (enhancesearch 4 个 method 静态指令
+下沉到 semi-dynamic 段) 改造的字节布局无关.
+
+#### P3-X1 验收结论
+
+| 验收项 | 状态 | 证据 |
+| --- | --- | --- |
+| 静态指令跨 nonce / query byte-identical | **PASS** | `TestEnhanceSearch_StaticInstructionStableAcrossNonces` (sha256 校验) |
+| 静态指令不含 nonce / query 模板残留 | **PASS** | `TestEnhanceSearch_StaticInstructionHasNoNonceTemplate` |
+| query 进 dynamic 段, 不污染 static | **PASS** | `TestEnhanceSearch_QueryGoesThroughDynamicNotStatic` |
+| `enhancesearch` / `aicache` / `aicommon` / `aiforge` 全套件无回归 | **PASS** | `go test ./...` 全过 |
+| cachebench 100 prompt 命中率提升 | **DEFERRED** | 当前 aibalance 环境无法稳定跑到 100 prompt, 需上游模型修复后复测 |
+
+#### P3-X2 是否启动 (备选)
+
+P3-X1 已经在代码层和单测层证明 enhancesearch 子调用 prompt 段布局正确.
+若后续 aibalance 修复后 100 prompt 复测仍出现 `lcp_hit_but_upstream_miss > 8`,
+说明剩余瓶颈是 hijacker 字节边界问题 (client LCP 命中但上游 KV cache block
+boundary 不对齐), 升级到 P3-X2 (enhancesearch 子调用主动注入
+`<|AI_CACHE_FROZEN_semi-dynamic|>` boundary 让 hijacker 走 3 段切分路径).
+
+**当前不启动 P3-X2**: 现有 aibalance 数据不足以判断瓶颈是否在 hijacker 边界,
+盲启动会引入额外风险.
+
+#### cachebench `lib.yak` 健壮性增强 (附带修复)
+
+P3-X3 跑 cachebench 时发现 `lib.yak` 在分析 dump 时偶发
+`YakVM Panic: cannot support op1[undefined] > op2[int]` (placeholder rec
+缺数值字段). 同步修复:
+
+| 改动 | 文件 | 作用 |
+| --- | --- | --- |
+| 新增 `ccbAsInt(v)` / `ccbAsFloat(v)` nil-safe 转换 | `cachebench/lib.yak` | nil / undefined 归 0, 防 op1[undefined] > op2[int] panic |
+| `classifyRecord` / `summarize` 内所有数值字段过 `ccbAs*` | `cachebench/lib.yak` | 兜底防御性强转 |
+| `alignDumpsAndUsages` placeholder rec 补全 numeric 字段 | `cachebench/lib.yak` | dumps 缺失场景全字段 0 默认 |
+| `classifyRecord` 调用包 try-catch | `cachebench/lib.yak` | 单 dump 异常不再 crash 整个 benchmark, 标记 `unknown` 继续跑 |
+
+修复后 cachebench 在小样本 (10 prompt) 也能产出完整 summary, 不再因部分 dump
+缺字段中断分析.
+
+#### 文件清单
+
+| 文件 | 改动类型 |
+| --- | --- |
+| `common/ai/rag/enhancesearch/enhance.go` | 重构 4 个方法, 新增 4 个 static instruction const |
+| `common/ai/rag/enhancesearch/enhance_section_test.go` | 新增 (3 组 / 9 sub-test) |
+| `common/ai/aid/aicache/cachebench/lib.yak` | 健壮性增强 (ccbAsInt/ccbAsFloat + try-catch + placeholder 全字段) |
+| `common/ai/aid/aicache/CACHE_HIT_BENCHMARK.md` | 9.9 节 (本节) |

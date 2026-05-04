@@ -31,6 +31,25 @@ func ccbIsNil(v) {
     return v == nil || v == undefined
 }
 
+// ccbAsInt 强制把任意 v 归一成 int, nil / undefined / 非法都归 0.
+// yak 里 undefined > int 会直接 panic, 所有数值比较前都要先过这层兜底.
+// 关键词: ccbAsInt nil-safe, undefined > int panic 拦截
+func ccbAsInt(v) {
+    if ccbIsNil(v) {
+        return 0
+    }
+    return ccbAtoi(v)
+}
+
+// ccbAsFloat 强制把任意 v 归一成 float, nil / undefined / 非法都归 0.0.
+// 关键词: ccbAsFloat nil-safe, 数值比较兜底
+func ccbAsFloat(v) {
+    if ccbIsNil(v) {
+        return 0.0
+    }
+    return ccbAtof(v)
+}
+
 func ccbToString(v) {
     if ccbIsNil(v) {
         return ""
@@ -388,15 +407,20 @@ func classifyRecord(rec, usage) {
         return TAG_IN_FLIGHT_CANCELLED
     }
 
+    // 字段兜底: dump placeholder / 残缺 dump / yak undefined 比较都会 panic.
+    // 用 ccbAsInt / ccbAsFloat 强转一遍, nil/undefined 都归 0, 彻底拦死
+    // "op1[undefined] > op2[int]" 这类 panic.
+    // 关键词: classifyRecord nil-safe, ccbAsInt 兜底
     cachedTokens = 0
     cacheCreation = 0
     if !ccbIsNil(usage) {
-        cachedTokens = usage["cachedTokens"]
-        cacheCreation = usage["cacheCreation"]
+        cachedTokens = ccbAsInt(usage["cachedTokens"])
+        cacheCreation = ccbAsInt(usage["cacheCreation"])
     }
 
-    prefixHitChunks = rec["prefixHitChunks"]
-    prefixHitRatio = rec["prefixHitRatio"]
+    prefixHitChunks = ccbAsInt(rec["prefixHitChunks"])
+    prefixHitRatio = ccbAsFloat(rec["prefixHitRatio"])
+    totalRequests = ccbAsInt(rec["totalRequests"])
 
     // healthy: 上游真命中 + 客户端 LCP 也对齐
     if cachedTokens > 0 && prefixHitRatio >= HEALTHY_LCP_RATIO_MIN {
@@ -405,12 +429,12 @@ func classifyRecord(rec, usage) {
 
     // lcp_hit_but_upstream_miss: 客户端 LCP 看到命中但 dashscope 没命中
     // (意味着 hijacker 切的字节边界与 cache_control 标记位置不一致, 或 cache 还没建好)
-    if prefixHitChunks > 0 && cachedTokens == 0 && rec["totalRequests"] > 1 {
+    if prefixHitChunks > 0 && cachedTokens == 0 && totalRequests > 1 {
         return TAG_LCP_HIT_UPSTREAM_MISS
     }
 
     // prefix_misalign: 客户端就没对齐前缀 (totalRequests > 1 才能判, 第一次必然 0)
-    if prefixHitChunks == 0 && rec["totalRequests"] > 1 {
+    if prefixHitChunks == 0 && totalRequests > 1 {
         return TAG_PREFIX_MISALIGN
     }
 
@@ -475,12 +499,23 @@ func alignDumpsAndUsages(dumps, usages, maxPromptsTriggered) {
         }
         if ccbIsNil(rec) {
             // dump 缺失 -> 用 placeholder
+            // 字段必须填全 (totalRequests/prefixHitChunks/...), 否则下游
+            // classifyRecord/summarize 走 op1[undefined] > op2[int] 直接 panic.
+            // 关键词: cachebench placeholder 兜底字段
             rec = {
                 "seqId":            i + 1,
                 "missing":          true,
                 "sections":         [],
                 "advices":          [],
                 "sectionHashCount": {},
+                "sectionTotalUses": {},
+                "totalRequests":    0,
+                "totalChunks":      0,
+                "prefixHitChunks":  0,
+                "prefixHitRatio":   0.0,
+                "totalBytes":       0,
+                "prefixHitBytes":   0,
+                "rawText":          "",
             }
         }
         // 当 max-prompts 触发后, 把 nil usage 的 trailing dumps 视为 in-flight cancelled
@@ -492,7 +527,16 @@ func alignDumpsAndUsages(dumps, usages, maxPromptsTriggered) {
                 "inFlightCancelled": true,
             }
         }
-        tag = classifyRecord(rec, usage)
+        // try-catch 包住 classifyRecord, 避免单条 dump 字段异常拖垮整次报告.
+        // 出 panic 直接降级到 unknown tag, 后续 bottleneck/summary 仍然正常出.
+        // 关键词: alignDumpsAndUsages classifyRecord 兜底, panic 降级
+        tag = TAG_UNKNOWN
+        try {
+            tag = classifyRecord(rec, usage)
+        } catch e {
+            log.warn("classifyRecord panicked at seq=%d: %v", i+1, e)
+            tag = TAG_UNKNOWN
+        }
         item = {
             "seq":     i + 1,
             "dump":    rec,
@@ -552,13 +596,18 @@ func summarize(records) {
             } else if usage["missing"] == true {
                 summary["missingUsageCount"]++
             } else {
-                summary["sumPromptTokens"] += usage["promptTokens"]
-                summary["sumCachedTokens"] += usage["cachedTokens"]
-                summary["sumCacheCreation"] += usage["cacheCreation"]
-                if usage["cacheCreation"] > 0 {
+                // ccbAsInt 兜底: 部分 provider 返回的 usage 字段可能缺失,
+                // 直接 += undefined 会 panic; 关键词: summarize nil-safe usage
+                pt = ccbAsInt(usage["promptTokens"])
+                ct = ccbAsInt(usage["cachedTokens"])
+                cc = ccbAsInt(usage["cacheCreation"])
+                summary["sumPromptTokens"] += pt
+                summary["sumCachedTokens"] += ct
+                summary["sumCacheCreation"] += cc
+                if cc > 0 {
                     summary["cacheCreateCount"]++
                 }
-                if usage["cachedTokens"] > 0 {
+                if ct > 0 {
                     summary["cacheHitCount"]++
                 }
             }
@@ -566,8 +615,8 @@ func summarize(records) {
 
         dumpRec = item["dump"]
         if !ccbIsNil(dumpRec) && dumpRec["missing"] != true {
-            summary["sumRequestBytes"] += dumpRec["totalBytes"]
-            summary["sumPrefixHitBytes"] += dumpRec["prefixHitBytes"]
+            summary["sumRequestBytes"] += ccbAsInt(dumpRec["totalBytes"])
+            summary["sumPrefixHitBytes"] += ccbAsInt(dumpRec["prefixHitBytes"])
 
             shc = dumpRec["sectionHashCount"]
             for sectionName, cnt in shc {
