@@ -163,12 +163,49 @@ func captureUsage(usage) {
 events = []
 maxEventsKept = 200
 
+// modelList 记录每次 AI 调用的目标 model_name (来自 ai_first_byte_cost_ms 事件).
+// React loop 中 chat 顺序触发, 一次 AI 请求会先 emit AI_FIRST_BYTE_COST_MS (含 model_name),
+// 再调用 ai.usageCallback (captureUsage), 因此 modelList 与 usageList 按到达顺序一一对应.
+// 上游路由的 model_tier (intelligent / lightweight) 也一并记录, 便于对比 standard / light tier.
+// 关键词: cachebench modelList, ai_first_byte_cost_ms, model_tier, standard vs light
+modelMu     = sync.NewMutex()
+modelList   = []
+modelEventCount = 0
+
 func captureEvent(react, event) {
+    eventType = string(event.Type)
+    contentText = string(event.Content)
+    if eventType == "ai_first_byte_cost_ms" {
+        modelMu.Lock()
+        modelEventCount++
+        seq = modelEventCount
+        // content 是 JSON, 字段: model_name / provider_name / model_tier / ms / second
+        // 关键词: ai_first_byte_cost_ms parse, model_name 提取
+        modelName = ""
+        modelTier = ""
+        providerName = ""
+        try {
+            obj = json.loads(contentText)
+            if obj != nil {
+                modelName = ccbToString(obj["model_name"])
+                modelTier = ccbToString(obj["model_tier"])
+                providerName = ccbToString(obj["provider_name"])
+            }
+        } catch e {
+            log.warn("captureEvent parse ai_first_byte_cost_ms failed: %v", e)
+        }
+        modelList = append(modelList, {
+            "seq":          seq,
+            "modelName":    modelName,
+            "modelTier":    modelTier,
+            "providerName": providerName,
+            "ts":           time.Now().Unix(),
+        })
+        modelMu.Unlock()
+    }
     if len(events) >= maxEventsKept {
         return
     }
-    eventType = string(event.Type)
-    contentText = string(event.Content)
     events = append(events, {
         "type":           eventType,
         "ts":             time.Now().Unix(),
@@ -234,7 +271,7 @@ for stableMs < 1500 && maxWaitMs > 0 {
         prevUsageCount = cur
     }
 }
-log.info("post-react drain done, final usage count = %d", len(usageList))
+log.info("post-react drain done, final usage count = %d, model events = %d", len(usageList), len(modelList))
 
 // =============================================================================
 // 拉取 aicache dump 目录, 做对齐分析
@@ -242,12 +279,13 @@ log.info("post-react drain done, final usage count = %d", len(usageList))
 sessionDir = ai.aicacheSession()
 log.info("analyzing dumps in: %s", sessionDir)
 log.info("usage callbacks captured: %d", len(usageList))
+log.info("model events captured: %d", len(modelList))
 
 // 任何 ctx cancel 路径 (max-prompts / max-duration) 触发的 trailing dumps 都视为
 // in_flight_cancelled 测量伪影, 而不是 missing usage 漏接.
 // 关键词: run_react ctxCancelled, trailing dumps 归类
 ctxCancelled = maxPromptsTriggered || maxDurationTriggered
-benchReport = analyzeBenchmark(sessionDir, usageList, events, err, inputText, ctxCancelled)
+benchReport = analyzeBenchmarkWithModels(sessionDir, usageList, modelList, events, err, inputText, ctxCancelled)
 benchReport["durationSec"] = durationSec
 benchReport["aiType"] = aiType
 benchReport["aiModel"] = aiModel

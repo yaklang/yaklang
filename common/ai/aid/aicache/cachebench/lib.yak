@@ -833,6 +833,49 @@ func renderMarkdown(benchReport) {
     }
     md += "\n"
 
+    // 按 model_name 分组 (standard / light) 的命中率对比.
+    // 关键词: renderMarkdown perModel hit rate, standard vs light tier
+    byModel = summary["byModel"]
+    if !ccbIsNil(byModel) && len(byModel) > 0 {
+        md += "## per-model hit rate (standard vs light tier)\n\n"
+        md += "_aireact 内部按调用类型自动 routing: intelligent (memfit-standard-free) 承载 plan/reasoning, lightweight (memfit-light-free) 承载 verification/quick judge._\n\n"
+        md += "| model_name | tier | calls | sum_prompt | sum_cached | sum_creation | token_hit_ratio | lcp_hit_ratio | hit_count | create_count |\n"
+        md += "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n"
+        for mname, v in byModel {
+            md += sprintf("| %s | %s | %d | %d | %d | %d | %.2f%% | %.2f%% | %d | %d |\n",
+                mname, ccbToString(v["modelTier"]), v["totalCalls"],
+                v["sumPromptTokens"], v["sumCachedTokens"], v["sumCacheCreation"],
+                v["hitRatioTokenReal"]*100.0, v["hitRatioLcpClient"]*100.0,
+                v["cacheHitCount"], v["cacheCreateCount"],
+            )
+        }
+        md += "\n"
+        md += "### per-model tag distribution\n\n"
+        md += "| model_name |"
+        for tag in tagOrder {
+            md += sprintf(" %s |", tag)
+        }
+        md += "\n| --- |"
+        for tag in tagOrder {
+            tag = tag
+            md += " --- |"
+        }
+        md += "\n"
+        for mname, v in byModel {
+            md += sprintf("| %s |", mname)
+            tc = v["tagCount"]
+            for tag in tagOrder {
+                cnt = 0
+                if !ccbIsNil(tc[tag]) {
+                    cnt = tc[tag]
+                }
+                md += sprintf(" %d |", cnt)
+            }
+            md += "\n"
+        }
+        md += "\n"
+    }
+
     md += "## section hash drift (distinct + total uses + reuse_rate)\n\n"
     md += "_reuse_rate = 1 - distinct/total. 高 reuse_rate 表示同一 hash 被多次复用 (健康); 低 reuse_rate 表示几乎每次都换新 hash (污染或入口分散)._\n\n"
     md += "| section | distinct | total_uses | reuse_rate_min |\n| --- | --- | --- | --- |\n"
@@ -938,6 +981,19 @@ func printSummary(benchReport) {
     println("----------------------------------------------------------")
     printf("tag distribution: %v\n", summary["tagCount"])
     printf("section drift:    %v\n", summary["sectionHashMax"])
+    byModel = summary["byModel"]
+    if !ccbIsNil(byModel) && len(byModel) > 0 {
+        println("----------------------------------------------------------")
+        println("per-model hit rate (standard vs light):")
+        for mname, v in byModel {
+            printf("  %s [%s]: calls=%d  token_hit=%.2f%%  lcp_hit=%.2f%%  hit_cnt=%d  create_cnt=%d  prompt=%d cached=%d creation=%d\n",
+                mname, ccbToString(v["modelTier"]), v["totalCalls"],
+                v["hitRatioTokenReal"]*100.0, v["hitRatioLcpClient"]*100.0,
+                v["cacheHitCount"], v["cacheCreateCount"],
+                v["sumPromptTokens"], v["sumCachedTokens"], v["sumCacheCreation"],
+            )
+        }
+    }
     println("----------------------------------------------------------")
     bottlenecks = benchReport["bottlenecks"]
     printf("bottlenecks:     %d (see reports/bottleneck-prompts/)\n", len(bottlenecks))
@@ -987,5 +1043,177 @@ func analyzeBenchmark(sessionDir, usageList, events, invokeErr, inputText, maxPr
         "bottlenecks":     bottlenecks,
         "eventCount":      len(events),
     }
+    return benchReport
+}
+
+// summarizeByModel 按 model_name 分组重新汇总命中指标.
+// 用于对比 aireact 内部 tier 调度 (intelligent=memfit-standard-free / lightweight=memfit-light-free)
+// 各自的缓存命中率, 因为 standard 通常承载 plan/reasoning, 是核心缓存,
+// light 主要承载 verification/quick judge.
+// 关键词: cachebench summarizeByModel, standard vs light, model_tier, intelligent / lightweight
+func summarizeByModel(records) {
+    grouped = {}
+    for item in records {
+        model = ccbToString(item["modelName"])
+        tier  = ccbToString(item["modelTier"])
+        if model == "" {
+            model = "(unknown)"
+        }
+        if ccbIsNil(grouped[model]) {
+            grouped[model] = {
+                "modelName":          model,
+                "modelTier":          tier,
+                "totalCalls":         0,
+                "cacheCreateCount":   0,
+                "cacheHitCount":      0,
+                "sumPromptTokens":    0,
+                "sumCachedTokens":    0,
+                "sumCacheCreation":   0,
+                "sumRequestBytes":    0,
+                "sumPrefixHitBytes":  0,
+                "tagCount":           {},
+                "hitRatioTokenReal": 0.0,
+                "hitRatioLcpClient": 0.0,
+            }
+        }
+        g = grouped[model]
+        g["totalCalls"]++
+        tag = item["tag"]
+        if ccbIsNil(g["tagCount"][tag]) {
+            g["tagCount"][tag] = 0
+        }
+        g["tagCount"][tag]++
+
+        usage = item["usage"]
+        if !ccbIsNil(usage) && usage["missing"] != true && usage["inFlightCancelled"] != true {
+            pt = ccbAsInt(usage["promptTokens"])
+            ct = ccbAsInt(usage["cachedTokens"])
+            cc = ccbAsInt(usage["cacheCreation"])
+            g["sumPromptTokens"]  += pt
+            g["sumCachedTokens"]  += ct
+            g["sumCacheCreation"] += cc
+            if cc > 0 {
+                g["cacheCreateCount"]++
+            }
+            if ct > 0 {
+                g["cacheHitCount"]++
+            }
+        }
+        dumpRec = item["dump"]
+        if !ccbIsNil(dumpRec) && dumpRec["missing"] != true {
+            g["sumRequestBytes"]   += ccbAsInt(dumpRec["totalBytes"])
+            g["sumPrefixHitBytes"] += ccbAsInt(dumpRec["prefixHitBytes"])
+        }
+        if g["modelTier"] == "" && tier != "" {
+            g["modelTier"] = tier
+        }
+        grouped[model] = g
+    }
+    for k, v in grouped {
+        v["hitRatioTokenReal"] = ccbSafeRatio(v["sumCachedTokens"], v["sumPromptTokens"])
+        v["hitRatioLcpClient"] = ccbSafeRatio(v["sumPrefixHitBytes"], v["sumRequestBytes"])
+        grouped[k] = v
+    }
+    return grouped
+}
+
+// analyzeBenchmarkWithModels 在 analyzeBenchmark 基础上额外接受 modelList,
+// 为每条 record 注入 modelName / modelTier, 并在 summary 中产出 byModel 子表.
+// modelList 来自 captureEvent 解析 ai_first_byte_cost_ms 事件, 与 usageList
+// 同源 (一次 chat 先 first-byte 后 SSE 末帧 usageCallback).
+//
+// 对齐策略: 不能简单按 index 对齐, 因为某些 LiteForge/RAG 路径不发 first_byte
+// (走 TeeAIResponse wrapper 路径才 emit), 导致 modelList 数量可能 < usageList.
+// 这里按时间戳就近匹配: 对每个 usage[i], 在 modelList 里找 ts <= usage.ts 且
+// 时间差最小的未消费 entry, 匹配上就标记已消费, 没匹配上就标 (unknown).
+// 关键词: cachebench analyzeBenchmarkWithModels, ts 就近对齐, modelList 短缺兜底
+func analyzeBenchmarkWithModels(sessionDir, usageList, modelList, events, invokeErr, inputText, maxPromptsTriggered) {
+    benchReport = analyzeBenchmark(sessionDir, usageList, events, invokeErr, inputText, maxPromptsTriggered)
+    records = benchReport["records"]
+    n = len(records)
+    nModel = len(modelList)
+
+    // 准备 modelList 的可消费拷贝, 加入 consumed 标志
+    pool = []
+    j = 0
+    for j < nModel {
+        entry = modelList[j]
+        ts = ccbAsInt(entry["ts"])
+        pool = append(pool, {
+            "modelName": ccbToString(entry["modelName"]),
+            "modelTier": ccbToString(entry["modelTier"]),
+            "ts":        ts,
+            "consumed":  false,
+        })
+        j++
+    }
+
+    // 第一轮: 严格按 ts <= usage.ts 就近匹配
+    i = 0
+    for i < n {
+        rec = records[i]
+        usage = rec["usage"]
+        usageTs = 0
+        if !ccbIsNil(usage) {
+            usageTs = ccbAsInt(usage["ts"])
+        }
+        bestIdx = -1
+        bestDelta = 99999999
+        if usageTs > 0 {
+            k = 0
+            for k < len(pool) {
+                p = pool[k]
+                if p["consumed"] != true && p["ts"] <= usageTs {
+                    delta = usageTs - p["ts"]
+                    if delta < bestDelta {
+                        bestDelta = delta
+                        bestIdx = k
+                    }
+                }
+                k++
+            }
+        }
+        if bestIdx >= 0 {
+            picked = pool[bestIdx]
+            rec["modelName"] = picked["modelName"]
+            rec["modelTier"] = picked["modelTier"]
+            picked["consumed"] = true
+            pool[bestIdx] = picked
+        } else {
+            rec["modelName"] = ""
+            rec["modelTier"] = ""
+        }
+        records[i] = rec
+        i++
+    }
+
+    // 第二轮: 给仍未匹配的 record 顺序填补未消费 entry (兜底)
+    fillIdx = 0
+    i = 0
+    for i < n {
+        rec = records[i]
+        if rec["modelName"] == "" {
+            for fillIdx < len(pool) && pool[fillIdx]["consumed"] == true {
+                fillIdx++
+            }
+            if fillIdx < len(pool) {
+                p = pool[fillIdx]
+                rec["modelName"] = p["modelName"]
+                rec["modelTier"] = p["modelTier"]
+                p["consumed"] = true
+                pool[fillIdx] = p
+                records[i] = rec
+            }
+        }
+        i++
+    }
+    benchReport["records"] = records
+
+    byModel = summarizeByModel(records)
+    summary = benchReport["summary"]
+    summary["byModel"] = byModel
+    benchReport["summary"] = summary
+
+    benchReport["modelEventCount"] = nModel
     return benchReport
 }
