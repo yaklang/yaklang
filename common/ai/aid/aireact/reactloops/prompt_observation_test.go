@@ -146,5 +146,87 @@ func TestGenerateLoopPrompt_RecordsObservation(t *testing.T) {
 	require.Equal(t, "section.dynamic.user_query", status.Sections[3].Children[0].Key)
 	require.Contains(t, status.Sections[3].Children[0].Summary, "raw user input")
 
+	// 新增字段验证: bytes_percent / estimated_tokens / content_hash / summary_truncated
+	// 关键词: prompt_profile 新字段, BytesPercent, EstimatedTokens, ContentHash, SummaryTruncated
+	for _, top := range status.Sections {
+		require.GreaterOrEqual(t, top.BytesPercent, 0.0)
+		require.LessOrEqual(t, top.BytesPercent, 100.0)
+		// 容器段 ContentHash 取自 (空) Content -> 仍允许为空, 子段必非空 hash
+		for _, child := range top.Children {
+			if child.Bytes > 0 {
+				require.Len(t, child.ContentHash, 8, "child content_hash should be 8 hex chars")
+				require.Greater(t, child.EstimatedTokens, 0)
+			}
+		}
+	}
+	// timeline 段子段 "Timeline Memory" 内容含两行 step1 / step2, summary 必须保留换行
+	timelineMemory := status.Sections[2].Children[0]
+	require.Equal(t, "section.timeline.timeline", timelineMemory.Key)
+	require.Contains(t, timelineMemory.Summary, "step1")
+	require.Contains(t, timelineMemory.Summary, "step2")
+	require.True(t, strings.Contains(timelineMemory.Summary, "\n"),
+		"summary must keep newlines (no longer flattened to single line)")
+
 	loop.Set("prompt_observation_log", true)
+}
+
+// TestPreviewSectionContent_KeepNewlinesAndTruncate 单测 previewSectionContent
+// 1. 内容小于上限 -> 原样返回, truncated=false
+// 2. 内容超过上限 -> 头部前缀截断 + 末尾追加 "... (truncated, total N bytes)" + truncated=true
+// 3. 换行不被压平 (老的 renderPromptSectionPreview 会把 \n 替成空格, 这里禁止该行为)
+// 关键词: previewSectionContent test, 保留换行, 头部截断, truncated 提示
+func TestPreviewSectionContent_KeepNewlinesAndTruncate(t *testing.T) {
+	short := "line1\nline2\nline3"
+	preview, truncated := previewSectionContent(short, 1024)
+	require.False(t, truncated)
+	require.Equal(t, short, preview)
+	require.Contains(t, preview, "\n")
+
+	long := strings.Repeat("abcdefgh\n", 200) // 9 * 200 = 1800 bytes
+	preview, truncated = previewSectionContent(long, 256)
+	require.True(t, truncated)
+	require.Contains(t, preview, "\n")
+	require.Contains(t, preview, "(truncated, total")
+	require.LessOrEqual(t, len(preview), 256+64,
+		"截断后 preview 字节数应接近上限 + 注释长度")
+
+	// 空内容路径
+	preview, truncated = previewSectionContent("   \n  ", 100)
+	require.False(t, truncated)
+	require.Equal(t, "", preview)
+}
+
+// TestPromptSectionStatus_BytesPercentAndHash 单测新字段 BytesPercent / ContentHash
+// 关键词: prompt_profile new fields test, BytesPercent, ContentHash, EstimatedTokens
+func TestPromptSectionStatus_BytesPercentAndHash(t *testing.T) {
+	a := NewPromptSectionObservation("k1", "L1", PromptSectionRoleSystemPrompt, false, "alpha\nbeta")
+	b := NewPromptSectionObservation("k2", "L2", PromptSectionRoleRuntimeCtx, true, strings.Repeat("x", 4096))
+
+	prompt := a.Content + "\n\n" + b.Content
+	obs := BuildPromptObservation("loopX", "nonceX", prompt, []*PromptSectionObservation{a, b})
+	status := obs.BuildStatus(0) // 0 -> 默认 4 KiB
+	require.NotNil(t, status)
+	require.Len(t, status.Sections, 2)
+
+	s1 := status.Sections[0]
+	s2 := status.Sections[1]
+	require.Equal(t, "k1", s1.Key)
+	require.Equal(t, "k2", s2.Key)
+
+	// hash 必须 8 字符
+	require.Len(t, s1.ContentHash, 8)
+	require.Len(t, s2.ContentHash, 8)
+	require.NotEqual(t, s1.ContentHash, s2.ContentHash)
+
+	// EstimatedTokens 大于 0
+	require.Greater(t, s1.EstimatedTokens, 0)
+	require.Greater(t, s2.EstimatedTokens, 0)
+
+	// BytesPercent 加起来近似 100 (考虑分隔符 "\n\n" = 2 字节, 不计入任何段)
+	totalPct := s1.BytesPercent + s2.BytesPercent
+	require.InDelta(t, 100, totalPct, 1.0,
+		"两段字节占比之和应接近 100 (允许 1pp 抖动来源是 prompt 拼接分隔符)")
+
+	// b 是 4KiB 占绝对多数
+	require.Greater(t, s2.BytesPercent, s1.BytesPercent)
 }

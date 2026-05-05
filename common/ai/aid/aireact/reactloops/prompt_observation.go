@@ -1,6 +1,8 @@
 package reactloops
 
 import (
+	"crypto/sha1"
+	"encoding/hex"
 	"fmt"
 	"strings"
 	"time"
@@ -9,6 +11,12 @@ import (
 	"github.com/yaklang/yaklang/common/ai/ytoken"
 	"github.com/yaklang/yaklang/common/utils"
 )
+
+// 前端 "上下文成分" 面板默认 summary 上限. 老值是 120 (压平空格之后), 抑制了
+// 用户排查"哪一段在炸 prompt 体积"的能力. 4096 字节足以展示一段头部 + 中段
+// 关键样例, 同时控制 EmitPromptProfile event 的传输成本在合理范围.
+// 关键词: defaultPromptSummaryBytes, prompt_profile summary 上限, 上下文成分展示
+const defaultPromptSummaryBytes = 4 * 1024
 
 const lastPromptObservationLoopKey = "last_ai_decision_prompt_observation"
 const lastPromptObservationStatusLoopKey = "last_ai_decision_prompt_observation_status"
@@ -57,6 +65,18 @@ type PromptObservation struct {
 	Sections             []*PromptSectionObservation `json:"sections"`
 }
 
+// PromptSectionStatus 是发往前端 (yakit "上下文成分" 面板 / EmitPromptProfile)
+// 的单段状态, 是 PromptSectionObservation 的可序列化快照.
+//
+// 老字段 (key/label/role/included/can_compress/bytes/lines/summary/children)
+// 保持向后兼容. 新增字段 (BytesPercent / EstimatedTokens / ContentHash /
+// SummaryTruncated) 给前端展示提供"占比 / 成本估算 / 一致性指纹 / 是否被截断"
+// 四类信号, 方便用户判断哪些段在拖累命中率与体积.
+//
+// JSON 命名沿用 snake_case (与 grpcApi.ts AIContextSections 接口一致).
+//
+// 关键词: PromptSectionStatus, EmitPromptProfile, 上下文成分, bytes_percent,
+// estimated_tokens, content_hash, summary_truncated
 type PromptSectionStatus struct {
 	Key         string                 `json:"key"`
 	Label       string                 `json:"label"`
@@ -67,6 +87,20 @@ type PromptSectionStatus struct {
 	Lines       int                    `json:"lines"`
 	Summary     string                 `json:"summary,omitempty"`
 	Children    []*PromptSectionStatus `json:"children,omitempty"`
+
+	// BytesPercent 该段 (含 children) 字节占整 prompt 的百分比, 0-100, 保留两位小数.
+	// 前端可直接用作进度条 / 排序依据, 帮用户找到"哪段最大".
+	BytesPercent float64 `json:"bytes_percent,omitempty"`
+	// EstimatedTokens 按 4 byte ≈ 1 token 估算的 token 数. 与上游真实 prompt_tokens
+	// 不严格相等, 但同一 prompt 内段间相对量级可比, 可作为成本占比参考.
+	EstimatedTokens int `json:"estimated_tokens,omitempty"`
+	// ContentHash 本段 (含 children 渲染后) 内容的 sha1 前 8 字符 (16 hex chars).
+	// 跨多次 prompt_profile 比对同 key 段的 hash 即可判断段内容是否抖动 -
+	// 用于诊断 cache prefix 漂移 (同 key 不同 hash = prefix 不稳定).
+	ContentHash string `json:"content_hash,omitempty"`
+	// SummaryTruncated 当段实际字节超过 maxSummaryBytes 而 summary 被前缀截断时为 true.
+	// 前端可据此判断要不要展示"展开" / "查看完整内容" 按钮.
+	SummaryTruncated bool `json:"summary_truncated,omitempty"`
 }
 
 type PromptObservationStatus struct {
@@ -522,12 +556,20 @@ func (o *PromptObservation) RenderCLIReport(maxPreviewBytes int) string {
 	return strings.TrimRight(buf.String(), "\n")
 }
 
+// BuildStatus 把 PromptObservation 转为可发往前端的 PromptObservationStatus.
+//
+// maxSummaryBytes 控制每段 Summary 的截断上限 (按字节, 头部前缀截断保留换行,
+// 不再压平空格). 传 <= 0 时用 defaultPromptSummaryBytes (4 KiB), 让前端
+// 真正能展示一段头部+中段做诊断, 而不是被截到一行 120 字符.
+//
+// 关键词: BuildStatus, maxSummaryBytes, defaultPromptSummaryBytes,
+// 上下文成分前端展示
 func (o *PromptObservation) BuildStatus(maxSummaryBytes int) *PromptObservationStatus {
 	if o == nil {
 		return nil
 	}
 	if maxSummaryBytes <= 0 {
-		maxSummaryBytes = 120
+		maxSummaryBytes = defaultPromptSummaryBytes
 	}
 	status := &PromptObservationStatus{
 		LoopName:             o.LoopName,
@@ -544,33 +586,109 @@ func (o *PromptObservation) BuildStatus(maxSummaryBytes int) *PromptObservationS
 		FixedBytes:           o.Stats.FixedBytes,
 	}
 	for _, section := range o.Sections {
-		if item := buildPromptSectionStatus(section, maxSummaryBytes); item != nil {
+		if item := buildPromptSectionStatus(section, maxSummaryBytes, o.PromptBytes); item != nil {
 			status.Sections = append(status.Sections, item)
 		}
 	}
 	return status
 }
 
-func buildPromptSectionStatus(section *PromptSectionObservation, maxSummaryBytes int) *PromptSectionStatus {
+func buildPromptSectionStatus(section *PromptSectionObservation, maxSummaryBytes int, totalPromptBytes int) *PromptSectionStatus {
 	if section == nil {
 		return nil
 	}
+	bytesValue := section.ContentBytes()
+	preview, truncated := previewSectionContent(section.Content, maxSummaryBytes)
 	status := &PromptSectionStatus{
-		Key:         section.Key,
-		Label:       section.Label,
-		Role:        section.Role,
-		Included:    section.IsIncluded(),
-		CanCompress: section.Compressible,
-		Bytes:       section.ContentBytes(),
-		Lines:       section.LineCount(),
-		Summary:     renderPromptSectionPreview(section.Content, maxSummaryBytes),
+		Key:              section.Key,
+		Label:            section.Label,
+		Role:             section.Role,
+		Included:         section.IsIncluded(),
+		CanCompress:      section.Compressible,
+		Bytes:            bytesValue,
+		Lines:            section.LineCount(),
+		Summary:          preview,
+		SummaryTruncated: truncated,
+		BytesPercent:     bytesPercentOfTotal(bytesValue, totalPromptBytes),
+		EstimatedTokens:  estimateTokensFromBytes(bytesValue),
+		ContentHash:      contentHash8(section.Content),
 	}
 	for _, child := range section.Children {
-		if childStatus := buildPromptSectionStatus(child, maxSummaryBytes); childStatus != nil {
+		if childStatus := buildPromptSectionStatus(child, maxSummaryBytes, totalPromptBytes); childStatus != nil {
 			status.Children = append(status.Children, childStatus)
 		}
 	}
 	return status
+}
+
+// previewSectionContent 给前端 "上下文成分" 面板生成段内容预览.
+//
+// 对比老的 renderPromptSectionPreview:
+//   - 不再把 \n / \r / \t 替换成空格, 也不再用 strings.Fields 压缩多空格,
+//     原文换行 / 缩进全部保留, 让前端能用 monospace 直接 <pre> 出来.
+//   - 不再 head + tail 截断, 而是头部前缀截断, 因为 prompt 段头部通常是
+//     "## 标题" + "字段说明" + "首批样例", 头部信息密度最高.
+//   - 截断时在末尾追加 "\n... (truncated, total N bytes)" 提示, 用户一眼能看到
+//     完整段大小, 配合 SummaryTruncated 标志位可触发"查看完整内容"按钮.
+//
+// maxBytes <= 0 时直接返回 trim 后的原文.
+//
+// 关键词: previewSectionContent, summary 保留换行, head 截断, truncated 提示
+func previewSectionContent(content string, maxBytes int) (string, bool) {
+	trimmed := strings.TrimSpace(content)
+	if trimmed == "" {
+		return "", false
+	}
+	if maxBytes <= 0 || len(trimmed) <= maxBytes {
+		return trimmed, false
+	}
+	// 头部截断, 在最后一个换行处对齐, 避免行被切两半;
+	// 找不到合适换行就硬截.
+	cut := maxBytes
+	if newline := strings.LastIndexByte(trimmed[:maxBytes], '\n'); newline > maxBytes/2 {
+		cut = newline
+	}
+	preview := trimmed[:cut]
+	preview = strings.TrimRight(preview, "\n")
+	preview += fmt.Sprintf("\n... (truncated, total %d bytes)", len(trimmed))
+	return preview, true
+}
+
+// bytesPercentOfTotal 计算占总字节百分比, 保留两位小数, 0-100 区间.
+// 关键词: bytesPercentOfTotal, BytesPercent
+func bytesPercentOfTotal(bytes, total int) float64 {
+	if total <= 0 || bytes <= 0 {
+		return 0
+	}
+	pct := float64(bytes) * 100.0 / float64(total)
+	if pct > 100 {
+		pct = 100
+	}
+	// 保留两位小数, 避免 NaN / Inf
+	return float64(int(pct*100+0.5)) / 100.0
+}
+
+// estimateTokensFromBytes 按 ASCII / 拉丁字符约 4 byte ≈ 1 token 的经验估算
+// 给出段 token 量级. 不替代上游真实 token 计数, 只用于段间相对量级排序.
+// 关键词: estimateTokensFromBytes, EstimatedTokens
+func estimateTokensFromBytes(bytes int) int {
+	if bytes <= 0 {
+		return 0
+	}
+	// 向上取整, 让 < 4 字节的段也至少给 1 token, 避免前端误以为 0 成本.
+	return (bytes + 3) / 4
+}
+
+// contentHash8 取段原文 sha1 前 8 字符作为内容指纹, 给前端跨调用比对用.
+// 同 key 不同 hash = 该段内容抖动 = 缓存 prefix 失稳, 用户可据此定位优化点.
+// 空内容返回空串, 不浪费 16 字符传输.
+// 关键词: contentHash8, ContentHash, cache prefix 抖动诊断
+func contentHash8(content string) string {
+	if content == "" {
+		return ""
+	}
+	sum := sha1.Sum([]byte(content))
+	return hex.EncodeToString(sum[:])[:8]
 }
 
 func appendPromptSectionCLI(buf *strings.Builder, section *PromptSectionObservation, prefix string, isLast bool, maxPreviewBytes int) {

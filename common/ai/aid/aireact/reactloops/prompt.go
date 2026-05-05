@@ -235,7 +235,10 @@ func (r *ReActLoop) generateLoopPrompt(
 	}
 	observation := BuildPromptObservation(r.loopName, nonce, result.Prompt, getLoopPromptObservationSections(result))
 	r.SetLastPromptObservation(observation)
-	status := observation.BuildStatus(1 * 1024)
+	// 传 0 表示使用 defaultPromptSummaryBytes (4 KiB),
+	// 让前端 "上下文成分" 面板能展示一段头部+中段做诊断而不是被截到 120 字符一行.
+	// 关键词: BuildStatus default summary bytes, 上下文成分前端展示
+	status := observation.BuildStatus(0)
 	r.SetLastPromptObservationStatus(status)
 	r.emitPromptObservationStatus(status)
 	if r.isDebugModeEnabled() {
