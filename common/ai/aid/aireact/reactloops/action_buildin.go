@@ -60,7 +60,11 @@ var loopAction_DirectlyAnswer = &LoopAction{
 			}
 		}
 		if payload == "" {
-			return utils.Error("answer_payload is required for ActionDirectlyAnswer but empty")
+			// 用 WrapDirectlyAnswerError 把纯文字错误升级为带 nonce AITAG 示例的
+			// 复合错误, 让 RetryPromptBuilder 把 hint 注入下一轮 prompt, AI 在 1-2 次
+			// 重试内就能用 FINAL_ANSWER tag 自纠正, 避免 5 次重试黑洞 + fatal abort.
+			// 关键词: directly_answer ActionVerifier AITAG hint, 5 次重试黑洞修复
+			return WrapDirectlyAnswerError(loop, utils.Error("answer_payload is required for ActionDirectlyAnswer but empty"))
 		}
 		loop.Set("directly_answer_payload", payload)
 		return nil

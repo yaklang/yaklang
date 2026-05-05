@@ -52,7 +52,10 @@ func directlyAnswerSyntaxFlowVerifier(loop *reactloops.ReActLoop, action *aicomm
 		}
 	}
 	if payload == "" {
-		return utils.Error("answer_payload is required for ActionDirectlyAnswer but empty")
+		// 用 WrapDirectlyAnswerError 升级为带 nonce 的 AITAG 提示, 让 AI 重试时能
+		// 用 FINAL_ANSWER tag 自纠正, 避免 5 次重试黑洞 + fatal abort.
+		// 关键词: directly_answer ActionVerifier AITAG hint, 5 次重试黑洞修复
+		return reactloops.WrapDirectlyAnswerError(loop, utils.Error("answer_payload is required for ActionDirectlyAnswer but empty"))
 	}
 
 	// 1. When user provided code sample, verify must have been called and matched=true

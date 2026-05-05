@@ -1,6 +1,7 @@
 package aicache
 
 import (
+	"strconv"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -102,15 +103,49 @@ func TestObserve_HijackPathStillRecords(t *testing.T) {
 	assert.Equal(t, 4, len(gCache.chunks), "second call should reuse hashes; chunk count unchanged")
 }
 
-// TestObserve_NoHighStaticReturnsNil 没 high-static 时 Observe 仍记录缓存
-// 但 hijack 决策为 nil（透传）
-// 关键词: aicache, Observe, 无 high-static 透传
-func TestObserve_NoHighStaticReturnsNil(t *testing.T) {
+// TestObserve_NoHighStaticReturnsCorrelationOnly 没 high-static 时 Observe 不再
+// 返回纯 nil, 而是返回一个仅带 MirrorCorrelationID 的 result, 让 ChatBase 仍能
+// 把 SeqId 透传到 SSE 末帧 ChatUsage.MirrorCorrelationID, 与 dump 文件名精确 join.
+// IsHijacked 必为 false, Messages 必为空, 不影响默认拼装路径.
+// 关键词: aicache, Observe, 无 high-static 透传 MirrorCorrelationID
+func TestObserve_NoHighStaticReturnsCorrelationOnly(t *testing.T) {
 	ResetForTest()
 	prompt := "<|PROMPT_SECTION_semi-dynamic|>\nsd\n<|PROMPT_SECTION_END_semi-dynamic|>\n\n" +
 		"<|PROMPT_SECTION_dynamic_xx|>\nuq\n<|PROMPT_SECTION_dynamic_END_xx|>"
 
 	res := Observe("nh-model", prompt)
-	assert.Nil(t, res, "no high-static should return nil hijack result")
+	require.NotNil(t, res, "Observe should still return result so MirrorCorrelationID can be carried")
+	assert.False(t, res.IsHijacked, "no high-static should not hijack")
+	assert.Empty(t, res.Messages, "no hijack means no Messages")
 	assert.Equal(t, int64(1), gCache.totalRequests, "cache analysis should still record the request")
+	assert.NotEmpty(t, res.MirrorCorrelationID, "MirrorCorrelationID must be set")
+	// ID 必须等于本次 Record 的 SeqId 字符串, 让 dump (000XXX.txt 名为 SeqId)
+	// 与 cachebench 抓到的 ChatUsage.MirrorCorrelationID 直接对齐.
+	assert.Equal(t, strconv.FormatInt(int64(gCache.totalRequests), 10), res.MirrorCorrelationID,
+		"MirrorCorrelationID must equal current seqId")
+}
+
+// TestObserve_HijackResultCarriesCorrelationID 验证 hijack 路径返回的 result
+// 也带 MirrorCorrelationID = 当前 seqId 字符串, 让 dump 文件与 ChatUsage 上的
+// ID 一一对齐. 同一 prompt 第二次调用时 ID 必须递增, 反映新一次 Record.
+// 关键词: aicache, Observe hijack 路径 MirrorCorrelationID, dump 与 usage 对齐
+func TestObserve_HijackResultCarriesCorrelationID(t *testing.T) {
+	ResetForTest()
+	prompt := buildFourSectionPrompt("seq", "uu", "tools", "static-body", "tl", "mem")
+
+	res1 := Observe("seq-model", prompt)
+	require.NotNil(t, res1)
+	require.True(t, res1.IsHijacked)
+	require.NotEmpty(t, res1.MirrorCorrelationID)
+	id1, err := strconv.ParseInt(res1.MirrorCorrelationID, 10, 64)
+	require.NoError(t, err, "MirrorCorrelationID must be a numeric seqId string")
+	assert.Greater(t, id1, int64(0))
+
+	// 同 prompt 再来一发, 缓存 chunks 应复用, 但 SeqId 必递增, 即 ID 不同.
+	res2 := Observe("seq-model", prompt)
+	require.NotNil(t, res2)
+	require.NotEmpty(t, res2.MirrorCorrelationID)
+	id2, err := strconv.ParseInt(res2.MirrorCorrelationID, 10, 64)
+	require.NoError(t, err)
+	assert.Greater(t, id2, id1, "second call must produce strictly larger seqId")
 }

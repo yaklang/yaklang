@@ -495,39 +495,87 @@ func classifyReason(tag) {
 // 报告聚合
 // =============================================================================
 
-// alignDumpsAndUsages 把 dumps 与 usages 按调用顺序对齐成 records
-// 关键词: cachebench alignDumpsAndUsages, 序号对齐
-// alignDumpsAndUsages 把 dumps 与 usages 按调用顺序对齐成 records.
-// maxPromptsTriggered 表示是否因 max-prompts 限流主动 ctx cancel:
-//   - 若是, 末尾 dumps>usages 的 trailing dumps 是 ctx cancel 抛错前已落盘但
-//     SSE 末帧 callback 没机会触发的"飞行中"chat -> 标记为 inFlightCancelled
-//     (测量伪影, 不算 missing 漏接, 与 captureUsage 在 callback 触发时的判定一致)
-//   - 若否 (loop 自然结束), 仍然记 nil usage = missing, 反映真实链路漏接
+// alignDumpsAndUsages 把 dumps 与 usages 对齐成 records.
 //
-// 关键词: alignDumpsAndUsages tail in-flight, ctx cancel trailing dumps
+// 对齐策略 (修 cachebench 归因 bug):
+//   1. 第一优先按 correlationID join. usage["correlationID"] 来自
+//      ChatUsage.MirrorCorrelationID, aicache.Observe 把本次 SeqId 写到上面,
+//      ChatBase 透传到 SSE 末帧 callback. dump 文件名 (000XXX.txt) 同名 SeqId,
+//      所以 dump.seqId.toString() 就能直接 join.
+//   2. 没 ID 的 usage (老 yak 二进制 / 异常 callback) 退化成"按 usages 列表
+//      顺序消费 + 跳过已被 ID 命中的"兜底, 兼容性安全.
+//   3. 这样即便中途漏 callback, 也不会让后续 dump 与 usage 累计错位
+//      (这是上一轮 hostscan 长跑里 28% 记录归因错位的根因).
+//
+// maxPromptsTriggered 透传"末尾 trailing dumps 是否 ctx cancel 飞行中"语义,
+// 标 inFlightCancelled 避免误判 missing.
+//
+// 关键词: alignDumpsAndUsages correlationID join, 归因 bug 修复, 下标兜底
 func alignDumpsAndUsages(dumps, usages, maxPromptsTriggered) {
     records = []
     nDumps = len(dumps)
     nUsages = len(usages)
-    maxN = nDumps
-    if nUsages > maxN {
-        maxN = nUsages
+
+    // 第一遍: 建 correlationID -> usage 索引, 同时统计带/不带 ID 的 usage 数,
+    // 让上层一眼看出新旧二进制的部署状态 (启动期就能分辨"还在跑老 binary").
+    // 关键词: cachebench correlationID stats, ID 部署可观测
+    usageByID = {}
+    usagesWithID = 0
+    usagesNoID = 0
+    j = 0
+    for j < nUsages {
+        u = usages[j]
+        cid = ""
+        if !ccbIsNil(u) {
+            cid = ccbToString(u["correlationID"])
+        }
+        if cid != "" {
+            usageByID[cid] = u
+            usagesWithID++
+        } else {
+            usagesNoID++
+        }
+        j++
     }
+    log.info("cachebench align: nDumps=%d nUsages=%d usagesWithID=%d usagesNoID=%d",
+        nDumps, nUsages, usagesWithID, usagesNoID)
+
+    // 第二遍: 按 dump 顺序产 records. 优先 ID 匹配, 否则下标兜底游标取下一条
+    // 还没被 ID 路径消费掉的 usage.
+    consumedByID = {}
+    nextUsagePtr = 0
+
     i = 0
-    for i < maxN {
-        rec = nil
-        if i < nDumps {
-            rec = dumps[i]
-        }
+    for i < nDumps {
+        rec = dumps[i]
         usage = nil
-        if i < nUsages {
-            usage = usages[i]
+        seqStr = ""
+        if !ccbIsNil(rec) {
+            seqStr = sprintf("%d", ccbAsInt(rec["seqId"]))
         }
+        if seqStr != "" && seqStr != "0" && !ccbIsNil(usageByID[seqStr]) && consumedByID[seqStr] != true {
+            usage = usageByID[seqStr]
+            consumedByID[seqStr] = true
+        } else {
+            for nextUsagePtr < nUsages {
+                u = usages[nextUsagePtr]
+                nextUsagePtr++
+                cid = ""
+                if !ccbIsNil(u) {
+                    cid = ccbToString(u["correlationID"])
+                }
+                if cid != "" && consumedByID[cid] == true {
+                    continue
+                }
+                usage = u
+                if cid != "" {
+                    consumedByID[cid] = true
+                }
+                break
+            }
+        }
+
         if ccbIsNil(rec) {
-            // dump 缺失 -> 用 placeholder
-            // 字段必须填全 (totalRequests/prefixHitChunks/...), 否则下游
-            // classifyRecord/summarize 走 op1[undefined] > op2[int] 直接 panic.
-            // 关键词: cachebench placeholder 兜底字段
             rec = {
                 "seqId":            i + 1,
                 "missing":          true,
@@ -544,8 +592,8 @@ func alignDumpsAndUsages(dumps, usages, maxPromptsTriggered) {
                 "rawText":          "",
             }
         }
-        // 当 max-prompts 触发后, 把 nil usage 的 trailing dumps 视为 in-flight cancelled
-        // (chat 被 ctx cancel 抛错, callback 没机会调用), 而不是真实 missing.
+        // max-prompts 触发后, 没 usage 的 trailing dump 视为 in-flight cancelled
+        // 而非真实 missing (chat 被 ctx cancel 抛错, callback 没机会触发).
         if ccbIsNil(usage) && maxPromptsTriggered && i >= nUsages {
             usage = {
                 "seq":               i + 1,
@@ -553,9 +601,7 @@ func alignDumpsAndUsages(dumps, usages, maxPromptsTriggered) {
                 "inFlightCancelled": true,
             }
         }
-        // try-catch 包住 classifyRecord, 避免单条 dump 字段异常拖垮整次报告.
-        // 出 panic 直接降级到 unknown tag, 后续 bottleneck/summary 仍然正常出.
-        // 关键词: alignDumpsAndUsages classifyRecord 兜底, panic 降级
+
         tag = TAG_UNKNOWN
         try {
             tag = classifyRecord(rec, usage)
@@ -564,15 +610,62 @@ func alignDumpsAndUsages(dumps, usages, maxPromptsTriggered) {
             tag = TAG_UNKNOWN
         }
         item = {
-            "seq":     i + 1,
-            "dump":    rec,
-            "usage":   usage,
-            "tag":     tag,
-            "reason":  classifyReason(tag),
+            "seq":    i + 1,
+            "dump":   rec,
+            "usage":  usage,
+            "tag":    tag,
+            "reason": classifyReason(tag),
         }
         records = append(records, item)
         i++
     }
+
+    // 第三遍: 兜底处理 trailing usages (dump 落盘失败但 callback 跑过的边界场景),
+    // 用 placeholder dump 反映真实情况, 不让任何 usage 被静默吞掉.
+    // 关键词: alignDumpsAndUsages trailing usages placeholder
+    for nextUsagePtr < nUsages {
+        u = usages[nextUsagePtr]
+        nextUsagePtr++
+        cid = ""
+        if !ccbIsNil(u) {
+            cid = ccbToString(u["correlationID"])
+        }
+        if cid != "" && consumedByID[cid] == true {
+            continue
+        }
+        idx = len(records)
+        rec = {
+            "seqId":            idx + 1,
+            "missing":          true,
+            "sections":         [],
+            "advices":          [],
+            "sectionHashCount": {},
+            "sectionTotalUses": {},
+            "totalRequests":    0,
+            "totalChunks":      0,
+            "prefixHitChunks":  0,
+            "prefixHitRatio":   0.0,
+            "totalBytes":       0,
+            "prefixHitBytes":   0,
+            "rawText":          "",
+        }
+        tag = TAG_UNKNOWN
+        try {
+            tag = classifyRecord(rec, u)
+        } catch e {
+            log.warn("classifyRecord panicked at trailing seq=%d: %v", idx+1, e)
+            tag = TAG_UNKNOWN
+        }
+        item = {
+            "seq":    idx + 1,
+            "dump":   rec,
+            "usage":  u,
+            "tag":    tag,
+            "reason": classifyReason(tag),
+        }
+        records = append(records, item)
+    }
+
     return records
 }
 
@@ -968,6 +1061,25 @@ func printSummary(benchReport) {
     println("==========================================================")
     println("aicache cache hit benchmark - summary")
     println("==========================================================")
+    // 抢占式 abort 元数据展示 (放最显眼位置)
+    // 关键词: printSummary abort metadata, fast-fail visible
+    abortReason = ccbToString(benchReport["abortReason"])
+    if abortReason != "" {
+        printf("ABORTED:         reason=%s detail=%s at=+%ds\n",
+            abortReason,
+            ccbTruncate(ccbToString(benchReport["abortDetail"]), 200),
+            ccbAsInt(benchReport["abortAtSec"]))
+        thr = ccbAsInt(benchReport["throttleEventCount"])
+        ftl = ccbAsInt(benchReport["fatalErrorCount"])
+        if thr > 0 {
+            printf("throttle events: %d (limit=%d)\n",
+                thr, ccbAsInt(benchReport["maxThrottleEvents"]))
+        }
+        if ftl > 0 {
+            printf("fatal events:    %d\n", ftl)
+        }
+        println("----------------------------------------------------------")
+    }
     printf("input:           %s\n", ccbTruncate(benchReport["input"], 80))
     printf("session dir:     %s\n", benchReport["sessionDir"])
     printf("total calls:     %d\n", summary["totalCalls"])
@@ -1050,11 +1162,29 @@ func analyzeBenchmark(sessionDir, usageList, events, invokeErr, inputText, maxPr
 // 用于对比 aireact 内部 tier 调度 (intelligent=memfit-standard-free / lightweight=memfit-light-free)
 // 各自的缓存命中率, 因为 standard 通常承载 plan/reasoning, 是核心缓存,
 // light 主要承载 verification/quick judge.
-// 关键词: cachebench summarizeByModel, standard vs light, model_tier, intelligent / lightweight
+//
+// 模型名优先取 dump.model: dump 文件由 aicache 在 ChatBase 入口直接记录,
+// 永远等于实际请求的 model 名, 不受 SSE 末帧 callback 错位/缺失影响.
+// 之前按 ts 就近匹配 modelName 在 hostscan 长跑里被 stream-finished 漏 callback
+// 引发的累计错位污染, 出现"242KB prompt 配 830 tokens"等离谱 join, 是 cachebench
+// 归因 bug 的根因之一. 切到 dump.model 后, per-tier 命中率才真实可信.
+// modelTier 仍来自 record["modelTier"] (analyzeBenchmarkWithModels 按 ts 匹配
+// ai_first_byte_cost_ms 事件), tier 信息只用于展示, 不再决定 group key.
+//
+// 关键词: cachebench summarizeByModel 直读 dump.model, 修复跨记录归因错位
 func summarizeByModel(records) {
     grouped = {}
     for item in records {
-        model = ccbToString(item["modelName"])
+        // 直读 dump.model: 这是 aicache 在 ChatBase 入口直接记录的真值.
+        model = ""
+        dumpRecOuter = item["dump"]
+        if !ccbIsNil(dumpRecOuter) && dumpRecOuter["missing"] != true {
+            model = ccbToString(dumpRecOuter["model"])
+        }
+        // 兜底: dump 缺失或无 model 字段时回退到 ts 匹配出的 modelName.
+        if model == "" {
+            model = ccbToString(item["modelName"])
+        }
         tier  = ccbToString(item["modelTier"])
         if model == "" {
             model = "(unknown)"

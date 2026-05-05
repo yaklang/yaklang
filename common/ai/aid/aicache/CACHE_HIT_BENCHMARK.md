@@ -558,3 +558,83 @@ P3-X3 跑 cachebench 时发现 `lib.yak` 在分析 dump 时偶发
 | `common/ai/rag/enhancesearch/enhance_section_test.go` | 新增 (3 组 / 9 sub-test) |
 | `common/ai/aid/aicache/cachebench/lib.yak` | 健壮性增强 (ccbAsInt/ccbAsFloat + try-catch + placeholder 全字段) |
 | `common/ai/aid/aicache/CACHE_HIT_BENCHMARK.md` | 9.9 节 (本节) |
+
+---
+
+### 9.10 P3-X2 排障 — cachebench 卡顿真因: persistent session 污染 (run_react.yak session 隔离)
+
+#### 现象
+
+跑 `run_react.yak --max-duration 300` 复测时, 标准客户端 (yakit GUI / yak ai) 跑同样
+hostscan 任务 90~150 秒可走完, cachebench 却在 5 分钟硬截止时只走了 68 个 prompt
+就被 `--max-duration` 切掉, 大量"安静的空白时段". 抓 round2 日志的 first-byte
+时间戳, AI 调用本身都在 3~9 秒内返回 (`memfit-standard-free`),
+两次 LLM 调用之间却有最长 41 秒的空白 (17:11:27 -> 17:12:08), 还有多次 5~15s 间隙.
+
+#### 排障路径
+
+1. 先怀疑 LLM 慢: `usageList` 里相邻 first-byte cost 全部 < 10s → **不是 LLM 慢**.
+2. 怀疑 aicache 命中差: round2 数据 `lcp_hit_but_upstream_miss` 已经从 89% 降到 7%, 命中率 11.33% → **不是 aicache 慢**.
+3. 抓空白窗口里的日志:
+    - `[timeline:1054] reassigned IDs for 2363+ timeline items` — **35 次**
+    - `restored timeline instance from persistent session [default] with 2363 items` — **38 次**
+    - `restored 1 user input history entries from session [default]`
+    - `[re-act:209] loading ReAct config took 2.89s, too long, maybe some events happened`
+4. 看 timeline.go:1004-1055, ReassignIDs 里对全量 items 做 O(N) 三个 OrderedMap 重建,
+   N=2363 时单次约几十~上百毫秒, 35 次叠加再加上 hnsw collection load /
+   intent recognition init, 累积**几十秒卡顿假象**.
+
+#### 真相
+
+[`common/aiengine/config.go:88`](../../../aiengine/config.go) 默认 `SessionID = "default"`.
+`run_react.yak` 此前没有显式传 `aim.sessionID(...)`, 因此 cachebench 历次跑都共享
+同一个 `default` session, 数据库 `ai_memory_*` 表里的 timeline 持续累积. 每次
+React loop init / subtask invoke / forge 调用都触发 `restoreTimeline`,
+3 个内部 OrderedMap 全量 reassign + reducer 重映射, 这是非常昂贵的初始化.
+
+标准客户端为什么没事: yakit 每个 chat session 用的是 GUI 生成的独立 session id,
+新会话 timeline = 0, 自然不会触发这条慢路径.
+
+| 跑次 | 加载 timeline 时打印 | 结论 |
+| --- | --- | --- |
+| `--session-id` 留空 (走 `default`) | `restored timeline instance ... with 2363 items` | 每次 React loop init 都全量 reassign 2363 项 |
+| `--session-id` 自动生成 (本次修复) | `restored timeline instance ... with 0 items` | timeline 完全干净, 走与标准客户端同样的快路径 |
+
+(后者用 `cachebench-<unix-ts>-<pid>` 作为 session id, 让 aiengine 自己建一份新表)
+
+#### 修复
+
+1. [`run_react.yak`](cachebench/run_react.yak) 新增 `--session-id` flag, 默认空 ⇒ 自动生成
+   `cachebench-<unix-ts>-<pid>`. 在 `aim.InvokeReAct(...)` 选项链里追加 `aim.sessionID(...)`.
+2. 启动日志打印当前 session id, 方便排查时确认是否真的隔离了.
+3. 如果用户显式传 `--session-id default` (回归到老行为), 仍然支持, 但需明知道在做什么.
+
+#### 验收 (smoke)
+
+跑 `/tmp/yak-bench common/ai/aid/aicache/cachebench/run_react.yak --max-duration 1`,
+启动日志:
+
+```
+[INFO] aicache cachebench - session-id=cachebench-1777973016-73993 ...
+[WARN] failed to fetch AI runtime for session [cachebench-1777973016-73993]: record not found  // 预期: 新 session
+[INFO] [config:2990] successfully restored timeline instance from persistent session [cachebench-1777973016-73993] with 0 items
+```
+
+`with 0 items` 即为隔离生效信号. 后续 `--max-duration 300` 复测预期会跑出更多
+prompt (timeline init 不再是瓶颈, AI 调用本身才是节奏决定因素).
+
+#### 副作用 / 注意事项
+
+- 每次 cachebench 跑都会在 `ai_memory_collections_v1` / `ai_memory_entities_v1` /
+  `ai_sessions_v1` 留一份新 session 记录, 不主动清理. 长期跑攒下来的话可以用
+  `sqlite3 ~/yakit-projects/default-yakit.db "DELETE FROM ai_sessions_v1 WHERE session_id LIKE 'cachebench-%'"` 整理.
+- 跑同一个 session id 多次复用是合法做法, 适合"想观察 timeline 累积对命中率的影响"
+  这种特殊场景, 但不能拿来当默认值, 否则后续 cachebench 会再次掉进同一个坑.
+
+#### 文件清单
+
+| 文件 | 改动类型 |
+| --- | --- |
+| `common/ai/aid/aicache/cachebench/run_react.yak` | 新增 `--session-id` flag + 自动隔离 + 调用链注入 `aim.sessionID` |
+| `common/ai/aid/aicache/CACHE_HIT_BENCHMARK.md` | 9.10 节 (本节) |
+

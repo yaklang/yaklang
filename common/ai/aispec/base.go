@@ -244,6 +244,12 @@ type ChatBaseContext struct {
 	//
 	// 关键词: ChatBaseContext.RawMessages, messages 完整透传
 	RawMessages []ChatDetail
+
+	// MirrorCorrelationID 由 ChatBase 在 dispatchChatBaseMirror 后填充,
+	// 取自 mirrorResult.MirrorCorrelationID. processAIResponse 在调用
+	// UsageCallback 前会通过本字段把 ID 复制到 ChatUsage.MirrorCorrelationID.
+	// 关键词: ChatBaseContext.MirrorCorrelationID, mirror dump usage 关联
+	MirrorCorrelationID string
 }
 
 type ChatBaseOption func(c *ChatBaseContext)
@@ -432,6 +438,23 @@ func ChatBase(url string, model string, msg string, chatOpts ...ChatBaseOption) 
 	mirrorResult := dispatchChatBaseMirror(model, mirrorMsg)
 	if len(ctx.RawMessages) == 0 && mirrorResult != nil && mirrorResult.IsHijacked && len(mirrorResult.Messages) > 0 {
 		ctx.RawMessages = mirrorResult.Messages
+	}
+	// 把 mirror observer 自定义的关联 ID 透传到 ctx, 并用闭包包装 UsageCallback,
+	// 让 SSE 末帧 usage 在抵达上层订阅者前自动盖上同一个 ID, 离线分析就能
+	// 用 ID 在 mirror 落盘 (例如 aicache dump) 与 token usage 之间做精确 join.
+	// 关键词: ChatBase mirror correlation plumb, UsageCallback wrap, dump usage 对齐
+	if mirrorResult != nil && mirrorResult.MirrorCorrelationID != "" {
+		ctx.MirrorCorrelationID = mirrorResult.MirrorCorrelationID
+		correlationID := ctx.MirrorCorrelationID
+		origUsageCallback := ctx.UsageCallback
+		ctx.UsageCallback = func(usage *ChatUsage) {
+			if usage != nil {
+				usage.MirrorCorrelationID = correlationID
+			}
+			if origUsageCallback != nil {
+				origUsageCallback(usage)
+			}
+		}
 	}
 	interfaceType := ctx.InterfaceType
 	if interfaceType == ChatBaseInterfaceTypeChatCompletions && strings.HasSuffix(strings.TrimRight(strings.ToLower(url), "/"), "/responses") {

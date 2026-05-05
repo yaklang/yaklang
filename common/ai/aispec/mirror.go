@@ -18,6 +18,12 @@ type ChatBaseMirrorResult struct {
 	IsHijacked bool
 	// Messages 仅在 IsHijacked==true 时有效，是 hijack 后用于上游 LLM 的最终 messages 数组
 	Messages []ChatDetail
+	// MirrorCorrelationID 是 observer 自定义的本次调用关联 ID，
+	// 由 ChatBase 透传到同次调用的 SSE 末帧 usageCallback 上的
+	// ChatUsage.MirrorCorrelationID, 让离线分析按 ID 精确 join 镜像
+	// 落盘 (例如 aicache dump) 与上游 token usage. 留空 = 不参与关联.
+	// 关键词: aispec mirror correlation id, aicache dump usage 对齐
+	MirrorCorrelationID string
 }
 
 // ChatBaseMirrorObserver 是合并后的 mirror observer 函数签名
@@ -67,7 +73,12 @@ func ResetChatBaseMirrorObserversForTest() {
 // observer 场景下退化为"它说了算"。任何 observer panic 都被 recover 吞掉，
 // 不影响后续 observer 与主流程。
 //
-// 关键词: aispec, dispatchChatBaseMirror, mirror 同步分发, hijack 决策
+// MirrorCorrelationID 透传规则: 即便 observer 只观测不 hijack, 只要它写了
+// MirrorCorrelationID, 也保留下来传回给 ChatBase, 让 ChatBase 把 ID 盖到
+// SSE 末帧 ChatUsage 上, 满足"dump 与 usage 精确 join"的归因需求.
+// 取值优先级: 1) hijack 胜出方自己的 ID 2) 否则取最后一个非空观测 ID.
+//
+// 关键词: aispec, dispatchChatBaseMirror, mirror 同步分发, hijack 决策, MirrorCorrelationID 透传
 func dispatchChatBaseMirror(model, msg string) *ChatBaseMirrorResult {
 	chatBaseMirrorObserversMu.RLock()
 	if len(chatBaseMirrorObservers) == 0 {
@@ -79,13 +90,31 @@ func dispatchChatBaseMirror(model, msg string) *ChatBaseMirrorResult {
 	chatBaseMirrorObserversMu.RUnlock()
 
 	var hijack *ChatBaseMirrorResult
+	var lastObserverID string
 	for _, fn := range obs {
 		res := safeInvokeMirrorObserver(fn, model, msg)
-		if res != nil && res.IsHijacked && len(res.Messages) > 0 {
+		if res == nil {
+			continue
+		}
+		if res.IsHijacked && len(res.Messages) > 0 {
 			hijack = res
 		}
+		if res.MirrorCorrelationID != "" {
+			lastObserverID = res.MirrorCorrelationID
+		}
 	}
-	return hijack
+	if hijack != nil {
+		// 若 hijack 胜出方没自带 ID, 则补上其它观测者的 ID, 保证可关联.
+		if hijack.MirrorCorrelationID == "" && lastObserverID != "" {
+			hijack.MirrorCorrelationID = lastObserverID
+		}
+		return hijack
+	}
+	if lastObserverID != "" {
+		// 纯观测路径也允许仅返 ID, 让 ChatBase 走非 hijack 默认拼装 + 标 ID.
+		return &ChatBaseMirrorResult{MirrorCorrelationID: lastObserverID}
+	}
+	return nil
 }
 
 // safeInvokeMirrorObserver 调用单个 observer 并 recover panic

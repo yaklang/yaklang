@@ -47,7 +47,10 @@ var loopActionDirectlyAnswerHTTPFuzztest = &reactloops.LoopAction{
 			payload = tagPayload
 		}
 		if payload == "" {
-			return utils.Error("directly_answer requires answer_payload or FINAL_ANSWER tag, but both are empty")
+			// 用 WrapDirectlyAnswerError 升级为带 nonce 的 AITAG 提示, 让 AI 重试时能
+			// 用 FINAL_ANSWER tag 自纠正, 避免 5 次重试黑洞 + fatal abort.
+			// 关键词: directly_answer ActionVerifier AITAG hint, 5 次重试黑洞修复
+			return reactloops.WrapDirectlyAnswerError(loop, utils.Error("directly_answer requires answer_payload or FINAL_ANSWER tag, but both are empty"))
 		}
 		loop.Set("directly_answer_payload", payload)
 		return nil

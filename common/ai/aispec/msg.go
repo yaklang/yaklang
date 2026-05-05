@@ -117,6 +117,14 @@ type ChatUsage struct {
 	// 因此把这里的 audio_tokens 与 video/image_tokens 单独保留以做精确成本核算。
 	// 关键词: 多模态 token 拆分, prompt_tokens_details, dashscope omni 计费
 	PromptTokensDetails *PromptTokensDetails `json:"prompt_tokens_details,omitempty"`
+
+	// MirrorCorrelationID 由 mirror observer (例如 aicache) 通过
+	// ChatBaseMirrorResult.MirrorCorrelationID 写入, ChatBase 在调用
+	// UsageCallback 前会把该 ID 复制到 usage 上, 让上层订阅者能用稳定 ID
+	// 把本次 SSE 末帧 usage 与 mirror 落盘 (aicache dump) 对齐.
+	// 不会下发到上游 LLM, 仅在进程内部 plumbing 与 cachebench 等订阅方使用.
+	// 关键词: ChatUsage MirrorCorrelationID, aicache dump usage 对齐
+	MirrorCorrelationID string `json:"mirror_correlation_id,omitempty"`
 }
 
 // PromptTokensDetails 多模态输入 token 拆分（仅 dashscope omni / openai 多模态返回）。

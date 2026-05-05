@@ -48,9 +48,37 @@ language   = cli.String("language", cli.setDefault("zh"),
 outputDir  = cli.String("output-dir",
     cli.setDefault("./common/ai/aid/aicache/cachebench/reports"),
     cli.setHelp("报告产物根目录, 内部会自动建立 bottleneck-prompts 子目录"))
+// 关键词: cachebench session isolation, persistent timeline pollution, default session
+// 不传或留空 = 用 cachebench-<unix-ts>-<pid> 形式自动隔离, 避免和默认 session 共享 timeline
+// 标准客户端每次会话都会建独立 sessionID, 不会污染. cachebench 历史用过 default,
+// 一旦累积上千条 timeline 条目, 每次 subtask 切换 / React loop init 都会
+// reload + reassign 所有条目, 造成多分钟"卡顿"假象 (见 P3-X2 排障).
+sessionID = cli.String("session-id", cli.setDefault(""),
+    cli.setHelp("传给 aim.sessionID 的会话 ID, 留空 = 自动生成独立 cachebench session 避免污染默认 session"))
+
+// =============================================================================
+// 失速 / 限流 / 错误的"立即退出"开关 (P3-A1: fast-fail switches)
+// 关键词: cachebench fast fail, stall watchdog, rate limit abort, error abort
+// =============================================================================
+// stall-timeout: 多少秒内没有新 usage 回调到达就视为卡死, 主动取消 ctx 并保存部分报告
+stallTimeout = cli.Int("stall-timeout", cli.setDefault(120),
+    cli.setHelp("无新 usage 回调达 N 秒视为失速, 立即取消并保存部分报告 (0 = 不启用)"))
+// max-throttle-events: 上游 429 / rate-limit 类提示累计达到 N 次就主动退出, 防止"假装在跑"
+maxThrottleEvents = cli.Int("max-throttle-events", cli.setDefault(3),
+    cli.setHelp("上游 429 / rate-limit 类事件累计 >= N 次后立即退出 (0 = 不启用)"))
+// abort-on-fatal-error: 收到 max retry / 401 / 严重 error 事件立刻退出
+abortOnFatalError = cli.Bool("abort-on-fatal-error",
+    cli.setHelp("命中 max retry / 401 / Unauthorized / fail_react_task 等致命事件立即退出 (默认开)"))
 cli.check()
 
-log.info("aicache cachebench - input=%s ai-type=%s max-iteration=%d max-prompts=%d max-duration=%ds", inputText, aiType, maxIter, maxPrompts, maxDuration)
+// 自动生成独立 session 防止默认 session timeline 污染
+// 关键词: cachebench session-id auto, persistent timeline isolation
+if sessionID == "" {
+    sessionID = sprintf("cachebench-%d-%d", time.Now().Unix(), os.Getpid())
+}
+
+log.info("aicache cachebench - input=%s ai-type=%s session-id=%s max-iteration=%d max-prompts=%d max-duration=%ds stall-timeout=%ds max-throttle-events=%d abort-on-fatal-error=%v",
+    inputText, aiType, sessionID, maxIter, maxPrompts, maxDuration, stallTimeout, maxThrottleEvents, abortOnFatalError)
 
 // =============================================================================
 // 取消上下文 (用于 max-prompts 限流 / max-duration 时间硬截断)
@@ -64,16 +92,43 @@ benchCtx, benchCancel = context.WithCancel(context.Background())
 defer benchCancel()
 maxPromptsTriggered = false
 maxDurationTriggered = false
+stallTriggered      = false
+throttleTriggered   = false
+fatalErrorTriggered = false
 
-// 后台计时器: maxDuration 秒后强制取消 ctx (与 max-prompts 互不干扰)
+// 抢占式触发原因记录, 第一个 set 的胜出, 后续无视 (避免覆盖). 用 mutex 保护一致性.
+// 关键词: cachebench abortReason, first-trigger-wins
+triggerMu     = sync.NewMutex()
+abortReason   = ""           // 文字形式 abort 原因, 留空 = 正常完成
+abortDetail   = ""           // 详细信息 (具体事件内容 / 命中关键词)
+abortAtSec    = 0            // 触发时距离启动的秒数
+
+func setAbortReason(reason, detail) {
+    triggerMu.Lock()
+    defer triggerMu.Unlock()
+    if abortReason != "" {
+        return
+    }
+    abortReason = reason
+    abortDetail = detail
+    abortAtSec = time.Now().Unix() - invokeStartUnix
+    log.warn("ABORT trigger fired: reason=%s detail=%s at +%ds", reason, detail, abortAtSec)
+    benchCancel()
+}
+
+// invokeStartUnix 在 InvokeReAct 调用前赋值, 但 captureEvent / 后台 goroutine 可能在它赋值
+// 之前就引用. 给一个安全的初值, 防 setAbortReason 在那之前触发时取负.
+// 关键词: cachebench invokeStartUnix init
+invokeStartUnix = time.Now().Unix()
+
+// 后台计时器: maxDuration 秒后强制取消 ctx
 // 关键词: cachebench max-duration trigger, hard cap
 if maxDuration > 0 {
     go func {
         time.sleep(maxDuration)
         if !maxPromptsTriggered {
             maxDurationTriggered = true
-            log.info("max-duration(%ds) reached, cancelling context to stop React loop", maxDuration)
-            benchCancel()
+            setAbortReason("max-duration", sprintf("%ds hard cap reached", maxDuration))
         }
     }
 }
@@ -90,6 +145,45 @@ usageMu     = sync.NewMutex()
 usageList   = []
 usageCount  = 0
 firstUsage  = nil
+// usageWithIDCount / usageNoIDCount 统计 SSE 末帧 usage 是否带 MirrorCorrelationID.
+// 部署完整链路 (新 yak binary + 新 aicache) 后, withID 应当 ~= usageCount, noID ~= 0.
+// 若 noID > 0, 说明跑的还是旧 binary 或途中走了不带 mirror 的 ChatBase 通路.
+// 关键词: cachebench correlationID stats, ID 部署可观测
+usageWithIDCount = 0
+usageNoIDCount   = 0
+
+// 后台失速看门狗: 必须放在 usageList 声明之后, 否则 goroutine 闭包捕获不到变量.
+// 每 5 秒检查一次, 若 usage 回调数量在 stallTimeout 秒内没有任何增长,
+// 视为底层卡死 (上游不响应 / network hang / aibalance 内部死循环), 主动退出并保存部分报告.
+// 关键词: cachebench stall watchdog, no-progress detector
+if stallTimeout > 0 {
+    go func {
+        prevCount = 0
+        prevTs    = time.Now().Unix()
+        for true {
+            time.sleep(5)
+            if abortReason != "" {
+                return
+            }
+            cur = len(usageList)
+            now = time.Now().Unix()
+            if cur > prevCount {
+                prevCount = cur
+                prevTs    = now
+                continue
+            }
+            // 没增长: 看是否超过 stallTimeout 秒
+            // 注意: 当 cur == 0 时也启动看门狗, 避免完全没出第一个回调时永远卡住
+            elapsed = now - prevTs
+            if elapsed >= stallTimeout {
+                stallTriggered = true
+                setAbortReason("stall",
+                    sprintf("no new usage callback in %ds (last count=%d)", elapsed, cur))
+                return
+            }
+        }
+    }
+}
 
 func captureUsage(usage) {
     usageMu.Lock()
@@ -129,6 +223,14 @@ func captureUsage(usage) {
         textTok   = usage.PromptTokensDetails.TextTokens
     }
 
+    // correlationID 来自 ChatUsage.MirrorCorrelationID, 由 ChatBase 在
+    // dispatchChatBaseMirror 后从 mirrorResult.MirrorCorrelationID 透传上来.
+    // aicache.Observe 把当次 SeqId 字符串写到 mirrorResult, 所以这里的 ID 等于
+    // 落盘 dump 的 000XXX.txt 文件名前缀, 让 lib.yak 的 alignDumpsAndUsages 按
+    // ID 精确 join, 修掉中途漏 callback 引发的累计错位归因 bug.
+    // 关键词: captureUsage MirrorCorrelationID, dump usage 精确 join
+    correlationID = usage.MirrorCorrelationID
+
     record = {
         "seq":              usageCount,
         "missing":          false,
@@ -140,12 +242,19 @@ func captureUsage(usage) {
         "cacheType":        cacheType,
         "textTokens":       textTok,
         "ts":               time.Now().Unix(),
+        "correlationID":    correlationID,
     }
     usageList = append(usageList, record)
+    if correlationID != "" {
+        usageWithIDCount++
+    } else {
+        usageNoIDCount++
+    }
 
     if firstUsage == nil {
         firstUsage = record
-        log.info("first usage callback received: prompt=%d cached=%d creation=%d", usage.PromptTokens, cached, creation)
+        log.info("first usage callback received: prompt=%d cached=%d creation=%d correlationID=%s",
+            usage.PromptTokens, cached, creation, correlationID)
     }
 
     // 限流: 收满 maxPrompts 次就 cancel context, 让 aim.InvokeReAct 优雅停止
@@ -172,9 +281,103 @@ modelMu     = sync.NewMutex()
 modelList   = []
 modelEventCount = 0
 
+// 限流 / 错误事件计数器, 供 fast-fail 触发使用.
+// 关键词: cachebench throttleCount, fatalErrorCount
+throttleEventCount = 0
+fatalErrorCount    = 0
+throttleSamples    = []  // 最近 5 条 throttle 命中预览, 给报告用
+fatalSamples       = []  // 最近 5 条 fatal 命中预览, 给报告用
+
+// detectThrottleHit: 若 content 命中 429 / rate-limit / queue 等关键词, 返回非空 reason
+// 关键词: cachebench detectThrottleHit, 429, rate-limit, queue
+func detectThrottleHit(eventType, contentText) {
+    // aibalance 在 EmitDefaultStreamEvent 用 nodeName="rate-limit" / "notify"
+    // 但 nodeName 不直接暴露, 改抓 content 文本特征. 命中任一即认为 throttle.
+    if str.Contains(contentText, "rate_limit_exceeded") {
+        return "rate_limit_exceeded payload"
+    }
+    if str.Contains(contentText, "队列位置") || str.Contains(contentText, "Rate limit exceeded") {
+        return "rate-limit message"
+    }
+    if str.Contains(contentText, "HTTP 429") || str.Contains(contentText, "429 Too Many Requests") {
+        return "HTTP 429"
+    }
+    if str.Contains(contentText, "AIBalance 429") {
+        return "AIBalance 429"
+    }
+    if str.Contains(contentText, "rate-limited") {
+        return "rate-limited"
+    }
+    if str.Contains(contentText, "稍后自动重试") && str.Contains(contentText, "429") {
+        return "auto-retry on 429"
+    }
+    return ""
+}
+
+// detectFatalHit: 命中 max retry / 401 / fail_react_task 等致命模式
+// 关键词: cachebench detectFatalHit, max retry count, 401, Unauthorized, fail_react_task
+func detectFatalHit(eventType, contentText) {
+    if eventType == "fail_react_task" {
+        return "fail_react_task event"
+    }
+    if eventType == "fail_plan_and_execution" {
+        return "fail_plan_and_execution event"
+    }
+    if str.Contains(contentText, "max retry count") && str.Contains(contentText, "reached") {
+        return "max retry count reached"
+    }
+    if str.Contains(contentText, "401 Unauthorized") {
+        return "HTTP 401"
+    }
+    if str.Contains(contentText, "Unauthorized") && str.Contains(contentText, "api_key") {
+        return "auth failed"
+    }
+    if str.Contains(contentText, "context deadline exceeded") && str.Contains(contentText, "ChatBase") {
+        return "ChatBase deadline"
+    }
+    return ""
+}
+
 func captureEvent(react, event) {
     eventType = string(event.Type)
     contentText = string(event.Content)
+
+    // P3-A1: 限流 / 致命错误 fast-fail 检测
+    // 关键词: captureEvent fast fail, throttle abort, fatal abort
+    if maxThrottleEvents > 0 {
+        throttleHit = detectThrottleHit(eventType, contentText)
+        if throttleHit != "" {
+            throttleEventCount++
+            preview = ccbTruncate(contentText, 200)
+            if len(throttleSamples) < 5 {
+                throttleSamples = append(throttleSamples, sprintf("[%s] %s :: %s", eventType, throttleHit, preview))
+            }
+            log.warn("throttle event #%d: type=%s reason=%s preview=%s",
+                throttleEventCount, eventType, throttleHit, preview)
+            if throttleEventCount >= maxThrottleEvents {
+                throttleTriggered = true
+                setAbortReason("throttle",
+                    sprintf("upstream throttle hit %d times (limit=%d), last=%s", throttleEventCount, maxThrottleEvents, throttleHit))
+            }
+        }
+    }
+    if abortOnFatalError {
+        fatalHit = detectFatalHit(eventType, contentText)
+        if fatalHit != "" {
+            fatalErrorCount++
+            preview = ccbTruncate(contentText, 200)
+            if len(fatalSamples) < 5 {
+                fatalSamples = append(fatalSamples, sprintf("[%s] %s :: %s", eventType, fatalHit, preview))
+            }
+            log.warn("fatal-error event #%d: type=%s reason=%s preview=%s",
+                fatalErrorCount, eventType, fatalHit, preview)
+            // fatal 事件只要命中一次就退出, 与 throttle 多次累计不同
+            fatalErrorTriggered = true
+            setAbortReason("fatal-error",
+                sprintf("fatal pattern matched: %s (event=%s)", fatalHit, eventType))
+        }
+    }
+
     if eventType == "ai_first_byte_cost_ms" {
         modelMu.Lock()
         modelEventCount++
@@ -222,12 +425,14 @@ if aiModel != "" {
 }
 
 invokeStart = time.Now()
+invokeStartUnix = invokeStart.Unix()
 log.info("invoking aim.InvokeReAct, dump dir will be: %s", ai.aicacheSession())
 
 err = aim.InvokeReAct(
     inputText,
     aim.context(benchCtx),
     aim.aiConfig(aiType, aiOpts...),
+    aim.sessionID(sessionID),
     aim.timeout(timeoutSec),
     aim.maxIteration(maxIter),
     aim.language(language),
@@ -239,8 +444,15 @@ err = aim.InvokeReAct(
 invokeEnd = time.Now()
 durationSec = invokeEnd.Unix() - invokeStart.Unix()
 
+// abort 路径覆盖原来的 if/else 链, 任意 trigger 都视为预期退出, 不以 die() 收场.
+// 关键词: cachebench abort summary, expected vs unexpected error
+ctxCancelled = (abortReason != "") || maxPromptsTriggered || maxDurationTriggered
+
 if err != nil {
-    if maxPromptsTriggered {
+    if abortReason != "" {
+        log.info("aim.InvokeReAct stopped by [%s] after %d seconds (expected): detail=%s err=%v",
+            abortReason, durationSec, abortDetail, err)
+    } else if maxPromptsTriggered {
         log.info("aim.InvokeReAct stopped by max-prompts after %d seconds (expected): %v", durationSec, err)
     } else if maxDurationTriggered {
         log.info("aim.InvokeReAct stopped by max-duration after %d seconds (expected): %v", durationSec, err)
@@ -279,12 +491,13 @@ log.info("post-react drain done, final usage count = %d, model events = %d", len
 sessionDir = ai.aicacheSession()
 log.info("analyzing dumps in: %s", sessionDir)
 log.info("usage callbacks captured: %d", len(usageList))
+log.info("usage with correlationID: %d, without correlationID: %d (旧 binary 或非 mirror 通路 = 0)",
+    usageWithIDCount, usageNoIDCount)
 log.info("model events captured: %d", len(modelList))
 
-// 任何 ctx cancel 路径 (max-prompts / max-duration) 触发的 trailing dumps 都视为
-// in_flight_cancelled 测量伪影, 而不是 missing usage 漏接.
+// 任何 ctx cancel 路径 (max-prompts / max-duration / stall / throttle / fatal) 触发的
+// trailing dumps 都视为 in_flight_cancelled 测量伪影, 而不是 missing usage 漏接.
 // 关键词: run_react ctxCancelled, trailing dumps 归类
-ctxCancelled = maxPromptsTriggered || maxDurationTriggered
 benchReport = analyzeBenchmarkWithModels(sessionDir, usageList, modelList, events, err, inputText, ctxCancelled)
 benchReport["durationSec"] = durationSec
 benchReport["aiType"] = aiType
@@ -294,6 +507,21 @@ benchReport["maxPrompts"] = maxPrompts
 benchReport["maxPromptsTriggered"] = maxPromptsTriggered
 benchReport["maxDuration"] = maxDuration
 benchReport["maxDurationTriggered"] = maxDurationTriggered
+// 抢占式 abort 元数据: 让报告读者一眼看清是否被强制退出 / 因什么退出
+// 关键词: cachebench report abort metadata
+benchReport["abortReason"] = abortReason
+benchReport["abortDetail"] = abortDetail
+benchReport["abortAtSec"]  = abortAtSec
+benchReport["stallTimeout"] = stallTimeout
+benchReport["stallTriggered"] = stallTriggered
+benchReport["maxThrottleEvents"] = maxThrottleEvents
+benchReport["throttleTriggered"] = throttleTriggered
+benchReport["throttleEventCount"] = throttleEventCount
+benchReport["throttleSamples"] = throttleSamples
+benchReport["abortOnFatalError"] = abortOnFatalError
+benchReport["fatalErrorTriggered"] = fatalErrorTriggered
+benchReport["fatalErrorCount"] = fatalErrorCount
+benchReport["fatalSamples"] = fatalSamples
 
 jsonPath, mdPath, botDir = saveReport(outputDir, benchReport)
 
@@ -301,8 +529,34 @@ log.info("benchmark report saved:")
 log.info("  json:               %s", jsonPath)
 log.info("  markdown:           %s", mdPath)
 log.info("  bottleneck-prompts: %s", botDir)
+log.info("  session dump dir:   %s", sessionDir)
 
 printSummary(benchReport)
+
+// 输出 abort 总结到 stdout / log, 帮助快速定位
+// 关键词: cachebench abort summary block, fast-fail visible
+if abortReason != "" {
+    log.warn("=========== ABORT SUMMARY ===========")
+    log.warn("reason:          %s", abortReason)
+    log.warn("detail:          %s", abortDetail)
+    log.warn("at:              +%ds", abortAtSec)
+    log.warn("dumps captured:  %d", len(usageList))
+    log.warn("throttle events: %d", throttleEventCount)
+    log.warn("fatal events:    %d", fatalErrorCount)
+    log.warn("=====================================")
+}
+
+// 任意 fast-fail 触发: 立即非零退出, 让 CI / 调用方明确感知到测试被中断
+// (报告已落盘, 可正常分析). 关键词: cachebench fast-fail exit code
+if throttleTriggered {
+    die(sprintf("aborted: upstream throttle x%d (limit=%d)", throttleEventCount, maxThrottleEvents))
+}
+if fatalErrorTriggered {
+    die(sprintf("aborted: fatal error event detected (count=%d)", fatalErrorCount))
+}
+if stallTriggered {
+    die(sprintf("aborted: no usage callback for >= %ds (stall)", stallTimeout))
+}
 
 // 与上游真实命中口径双口径都太低时退出码非 0, 便于 CI 卡线
 // 需要至少 30 个样本才判, 否则冷启动 (前几次 chat) 必然命中率 0% 直接 die,

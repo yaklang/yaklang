@@ -24,6 +24,8 @@
 package aicache
 
 import (
+	"strconv"
+
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -65,7 +67,19 @@ func Observe(model, msg string) *aispec.ChatBaseMirrorResult {
 		go dumpDebug(rep, split, gCache)
 	})
 
-	return hijackHighStatic(msg)
+	// 把本次观测的 SeqId 作为关联 ID 透传给 ChatBase, ChatBase 会把它复制到
+	// SSE 末帧 ChatUsage.MirrorCorrelationID 上, 让上层 (例如 cachebench)
+	// 用稳定 ID 把 dump 文件 (000XXX.txt 名为 SeqId) 与 token usage 精确 join,
+	// 避免之前按数组下标对齐时因 stream-finished 漏 callback 累计错位的归因 bug.
+	// 关键词: aicache Observe MirrorCorrelationID, dump usage 精确 join
+	result := hijackHighStatic(msg)
+	if result == nil {
+		result = &aispec.ChatBaseMirrorResult{}
+	}
+	if rep != nil && rep.SeqId > 0 {
+		result.MirrorCorrelationID = strconv.FormatInt(rep.SeqId, 10)
+	}
+	return result
 }
 
 // ResetForTest 仅供测试使用：重置全局状态

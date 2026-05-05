@@ -271,6 +271,109 @@ func TestChatBase_HijackSkippedWhenRawMessagesPresent(t *testing.T) {
 	assert.Equal(t, "caller-user", gotMsg.Messages[1].Content)
 }
 
+// TestChatBase_MirrorCorrelationIDPlumb 验证 mirror observer 写入的
+// MirrorCorrelationID 能被 ChatBase 透传到 SSE 末帧 ChatUsage.MirrorCorrelationID,
+// 让上层订阅者用稳定 ID 把 mirror 落盘 (如 aicache dump) 与 token usage 精确 join,
+// 修掉之前按数组下标对齐时遇到漏 callback 全部错位的归因 bug.
+// 关键词: aispec ChatBase mirror correlation id plumb, dump usage 精确对齐
+func TestChatBase_MirrorCorrelationIDPlumb(t *testing.T) {
+	ResetChatBaseMirrorObserversForTest()
+	t.Cleanup(ResetChatBaseMirrorObserversForTest)
+
+	// 模拟一个吐 SSE 末帧 usage 的上游
+	streamBody := `data: {"id":"a","choices":[{"delta":{"content":"hello"}}],"usage":null}
+
+data: {"id":"a","choices":[{"delta":{}}],"usage":{"prompt_tokens":12,"completion_tokens":3,"total_tokens":15}}
+
+data: [DONE]
+`
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		_, _ = io.WriteString(w, streamBody)
+	}))
+	defer srv.Close()
+
+	const wantID = "seq-000123"
+	RegisterChatBaseMirrorObserver(func(model, msg string) *ChatBaseMirrorResult {
+		return &ChatBaseMirrorResult{MirrorCorrelationID: wantID}
+	})
+
+	var (
+		mu       sync.Mutex
+		captured *ChatUsage
+		called   bool
+	)
+	_, err := ChatBase(srv.URL, "test-model", "ping",
+		WithChatBase_StreamHandler(func(reader io.Reader) {
+			_, _ = io.Copy(io.Discard, reader)
+		}),
+		WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) { return nil, nil }),
+		WithChatBase_UsageCallback(func(u *ChatUsage) {
+			mu.Lock()
+			defer mu.Unlock()
+			called = true
+			captured = u
+		}),
+	)
+	require.NoError(t, err)
+
+	mu.Lock()
+	defer mu.Unlock()
+	require.True(t, called, "UsageCallback must be invoked when SSE末帧带 usage")
+	require.NotNil(t, captured)
+	assert.Equal(t, wantID, captured.MirrorCorrelationID,
+		"mirror result MirrorCorrelationID 必须被 ChatBase 透传到 ChatUsage")
+	assert.Equal(t, 12, captured.PromptTokens, "原 usage 字段不能被透传逻辑破坏")
+}
+
+// TestChatBase_MirrorCorrelationID_NoIDLeavesUsageUntouched mirror observer 不写
+// MirrorCorrelationID 时, ChatBase 不应包装 callback, ChatUsage.MirrorCorrelationID
+// 保持空, 调用方原回调原样收到 usage.
+// 关键词: aispec ChatBase mirror correlation id 无 ID 不包装
+func TestChatBase_MirrorCorrelationID_NoIDLeavesUsageUntouched(t *testing.T) {
+	ResetChatBaseMirrorObserversForTest()
+	t.Cleanup(ResetChatBaseMirrorObserversForTest)
+
+	streamBody := `data: {"id":"a","choices":[{"delta":{"content":"x"}}],"usage":null}
+
+data: {"id":"a","choices":[{"delta":{}}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}
+
+data: [DONE]
+`
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		_, _ = io.WriteString(w, streamBody)
+	}))
+	defer srv.Close()
+
+	// 纯观测 observer (返回 nil 等价于"不参与改写也没 ID")
+	RegisterChatBaseMirrorObserver(func(model, msg string) *ChatBaseMirrorResult {
+		return nil
+	})
+
+	var (
+		mu       sync.Mutex
+		captured *ChatUsage
+	)
+	_, err := ChatBase(srv.URL, "test-model", "ping",
+		WithChatBase_StreamHandler(func(reader io.Reader) { _, _ = io.Copy(io.Discard, reader) }),
+		WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) { return nil, nil }),
+		WithChatBase_UsageCallback(func(u *ChatUsage) {
+			mu.Lock()
+			defer mu.Unlock()
+			captured = u
+		}),
+	)
+	require.NoError(t, err)
+
+	mu.Lock()
+	defer mu.Unlock()
+	require.NotNil(t, captured)
+	assert.Equal(t, "", captured.MirrorCorrelationID, "无 mirror ID 时 usage 字段应保持空")
+}
+
 // TestConvertChatDetailsToResponsesInput 字符串/数组/未知类型都能正确映射
 // 关键词: aispec, convertChatDetailsToResponsesInput
 func TestConvertChatDetailsToResponsesInput(t *testing.T) {

@@ -5,6 +5,7 @@ import (
 	"context"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -226,6 +227,99 @@ func TestLoopHTTPFuzztestDirectlyAnswerVerifier_RejectsPayloadAndTagTogether(t *
 	}
 	if !strings.Contains(err.Error(), "exactly one of answer_payload or FINAL_ANSWER") {
 		t.Fatalf("unexpected verifier error: %v", err)
+	}
+}
+
+// TestLoopHTTPFuzztestExecute_DirectlyAnswerEmptyPayloadRetryWithAITAGHint
+// 回归: directly_answer ActionVerifier 报错 (空 payload 且无 FINAL_ANSWER tag)
+// 时, reactloops.WrapDirectlyAnswerError 必须把当前 nonce 化的 AITAG 模板注入
+// 错误信息, 让 CallAITransaction 重试时把 hint 喂给 AI 的下一轮 prompt, AI
+// 才有依据用 FINAL_ANSWER tag 自纠正, 避免上一轮 hostscan 长跑里 5 次同款空
+// payload 重试黑洞 + fatal abort.
+//
+// 这是上一轮归因里 P0 修复的关键回归点: 之前 reactloops 内置 directly_answer
+// 的 ActionVerifier 只抛纯文字 "answer_payload is required for ActionDirectlyAnswer
+// but empty", 5 次重试都同样错下去 -> fatal abort, 浪费 14% 时间 + ~1.2MB token.
+// 本测试主要验证"hint 已被注入到下一轮 prompt 里", AI 是否真自纠正属于上游策略,
+// 此处不强求 (loop 内部状态机/stream 处理顺序在 retry 路径下有自身复杂度).
+//
+// 关键词: directly_answer 5 次重试黑洞修复 回归测试, AITAG retry hint 注入,
+// CallAITransaction 重试, ReAct Loop directly_answer
+func TestLoopHTTPFuzztestExecute_DirectlyAnswerEmptyPayloadRetryWithAITAGHint(t *testing.T) {
+	var (
+		prompts  []string
+		promptMu sync.Mutex
+		attempts int32
+	)
+
+	invoker := newHTTPFuzztestAICallbackInvoker(t, func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		prompt := req.GetPrompt()
+		promptMu.Lock()
+		prompts = append(prompts, prompt)
+		promptMu.Unlock()
+		atomic.AddInt32(&attempts, 1)
+
+		// 始终返回空 payload 让 verifier 持续失败, 这样可以严格抓到"第二轮 prompt
+		// 必须包含 AITAG retry hint"这一关键回归点. 即便 retry 全部用尽, 测试只关心
+		// hint 是否被注入到下一轮 prompt, 不关心最终是否成功 (那是上游 AI 行为).
+		rsp := i.NewAIResponse()
+		rsp.EmitOutputStream(bytes.NewBufferString(
+			`{"@action":"directly_answer","identifier":"phase_status"}`,
+		))
+		rsp.Close()
+		return rsp, nil
+	})
+
+	loop, err := reactloops.CreateLoopByName(
+		LoopHTTPFuzztestName,
+		invoker,
+		reactloops.WithAllowRAG(false),
+		reactloops.WithAllowAIForge(false),
+		reactloops.WithAllowPlanAndExec(false),
+		reactloops.WithAllowUserInteract(false),
+		reactloops.WithInitTask(func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
+			operator.Continue()
+		}),
+	)
+	if err != nil {
+		t.Fatalf("create http_fuzztest loop: %v", err)
+	}
+
+	// 故意忽略 Execute 返回值: 全部 attempts 都失败时它会返回 error, 这里关心
+	// 的是 retry 链路是否正确把 hint 注入下一轮 prompt, 不关心最终是否成功.
+	_ = loop.Execute("http-fuzztest-direct-answer-retry", context.Background(), "总结一下当前阶段进展")
+
+	got := atomic.LoadInt32(&attempts)
+	if got < 2 {
+		t.Fatalf("expected at least 2 AI attempts (1 fail + 1 retry with hint), got %d", got)
+	}
+
+	promptMu.Lock()
+	captured := append([]string(nil), prompts...)
+	promptMu.Unlock()
+
+	if len(captured) < 2 {
+		t.Fatalf("expected at least 2 captured prompts, got %d", len(captured))
+	}
+	// 第一条 prompt 是干净的 (没有任何重试 hint 注入).
+	if strings.Contains(captured[0], "AITAG retry hint") {
+		t.Fatalf("first prompt should not contain retry hint, got: %s", captured[0])
+	}
+	// 第二条 prompt 必须包含我们注入的 AITAG retry hint, 且包含 nonce 化模板,
+	// AI 才能照抄正确格式. 这是修 5 次重试黑洞的核心修复点.
+	nonce := aicommon.MustExtractDynamicSectionNonce(t, captured[1])
+	if !strings.Contains(captured[1], "AITAG retry hint") {
+		t.Fatalf("second prompt MUST contain 'AITAG retry hint' (no hint = no self-correction), got prompt[1]: %s", captured[1])
+	}
+	if !strings.Contains(captured[1], "<|FINAL_ANSWER_"+nonce+"|>") {
+		t.Fatalf("second prompt MUST contain nonce-tagged FINAL_ANSWER template (nonce=%s), got prompt[1]: %s", nonce, captured[1])
+	}
+	if !strings.Contains(captured[1], "MUST emit AITAG block") {
+		t.Fatalf("second prompt MUST instruct AI to emit AITAG block, got prompt[1]: %s", captured[1])
+	}
+	if !strings.Contains(captured[1], "answer_payload is required for ActionDirectlyAnswer but empty") &&
+		!strings.Contains(captured[1], "directly_answer requires answer_payload or FINAL_ANSWER tag") {
+		t.Fatalf("second prompt MUST preserve original ActionVerifier error text for diagnosability, got prompt[1]: %s", captured[1])
 	}
 }
 
