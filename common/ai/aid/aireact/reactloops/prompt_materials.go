@@ -85,6 +85,14 @@ type PromptPrefixMaterials struct {
 	//        SESSION_ARTIFACTS frozen, PREV_USER_INPUT frozen, P1-C2
 	SessionEvidence string
 	UserHistory     string
+
+	// RecentToolsCache 是 CACHE_TOOL_CALL 块 (directly_call_tool routing hint +
+	// 最近工具 schema/footer) 的渲染输出, 用稳定 nonce 渲染, 字节级跨 turn 稳定.
+	// 物理位置已从 dynamic 段 (REFLECTION) 迁到 semi-dynamic 段, 与 Skills + Schema
+	// 一起被新增的 AI_CACHE_SEMI 边界包裹, 进入 prefix cache.
+	//
+	// 关键词: PromptPrefixMaterials, RecentToolsCache, semi-dynamic 段迁移
+	RecentToolsCache string
 }
 
 func (m *PromptPrefixMaterials) HighStaticData() map[string]any {
@@ -100,17 +108,23 @@ func (m *PromptPrefixMaterials) HighStaticData() map[string]any {
 	}
 }
 
-// SemiDynamicData 仅供 semi_dynamic_section.txt 模板消费, 现裁剪为
-// Skills Context + Schema 两项 (Tool/Forge/Timeline frozen 已迁出到 FrozenBlock)。
+// SemiDynamicData 仅供 semi_dynamic_section.txt 模板消费, 当前包含:
+//   - SkillsContext: 已加载的 skills 上下文 (字节稳定)
+//   - Schema: 当前 react loop 的 action schema (字节稳定 across turn)
+//   - RecentToolsCache: CACHE_TOOL_CALL 块 (directly_call_tool routing hint +
+//     最近工具 schema/footer), 用稳定 nonce 渲染, 字节稳定
 //
-// 关键词: SemiDynamicData, Skills Context + Schema, 重排后裁剪
+// (Tool/Forge/Timeline frozen 已迁出到 FrozenBlock; CACHE_TOOL_CALL 已迁入此段)
+//
+// 关键词: SemiDynamicData, Skills Context + Schema + CacheToolCall, 迁移
 func (m *PromptPrefixMaterials) SemiDynamicData() map[string]any {
 	if m == nil {
 		return map[string]any{}
 	}
 	return map[string]any{
-		"SkillsContext": m.SkillsContext,
-		"Schema":        m.Schema,
+		"SkillsContext":    m.SkillsContext,
+		"Schema":           m.Schema,
+		"RecentToolsCache": m.RecentToolsCache,
 	}
 }
 

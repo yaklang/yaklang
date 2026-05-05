@@ -231,6 +231,9 @@ func (pm *PromptManager) NewPromptPrefixMaterials(base *reactloops.LoopPromptBas
 		materials.Schema = input.Schema
 		// P1-C2: SessionEvidence / UserHistory 从 dynamic 段上移到 timeline-open 段
 		materials.SessionEvidence = input.SessionEvidence
+		// CACHE_TOOL_CALL 块从 dynamic/REFLECTION 迁到 semi-dynamic 段
+		// 关键词: RecentToolsCache 透传, semi-dynamic 段
+		materials.RecentToolsCache = input.RecentToolsCache
 	}
 	if base != nil {
 		// UserHistory 来自 LoopPromptBaseMaterials (config.FormatUserInputHistoryAITag)
@@ -461,9 +464,10 @@ func (pm *PromptManager) buildFrozenBlockObservation(
 }
 
 // buildSemiDynamicResidualObservation 给"PROMPT_SECTION_semi-dynamic 残留段"做观测树:
-// Skills Context + Schema。Tool/Forge 已迁出到 FrozenBlock。
+// Skills Context + Schema + Cache Tool Call. Tool/Forge 已迁出到 FrozenBlock,
+// CACHE_TOOL_CALL 从 dynamic/REFLECTION 迁入此段 (用稳定 nonce 渲染, 字节稳定).
 //
-// 关键词: buildSemiDynamicResidualObservation, Skills Context, Schema
+// 关键词: buildSemiDynamicResidualObservation, Skills Context, Schema, Cache Tool Call
 func (pm *PromptManager) buildSemiDynamicResidualObservation(
 	materials *reactloops.PromptPrefixMaterials,
 	rendered string,
@@ -487,6 +491,15 @@ func (pm *PromptManager) buildSemiDynamicResidualObservation(
 			reactloops.PromptSectionRoleRuntimeCtx,
 			true,
 			renderSchemaBlock(materials.Schema),
+		),
+		// CACHE_TOOL_CALL 块从 dynamic/REFLECTION 迁到此处, 用稳定 nonce 渲染.
+		// 关键词: Semi Dynamic / Cache Tool Call, RecentToolsCache 观测节点
+		reactloops.NewPromptSectionObservation(
+			"section.semi_dynamic.cache_tool_call",
+			"Semi Dynamic / Cache Tool Call",
+			reactloops.PromptSectionRoleRuntimeCtx,
+			true,
+			materials.RecentToolsCache,
 		),
 	}
 	section.Children = filterIncludedPromptSections(children)
@@ -850,17 +863,26 @@ func (pm *PromptManager) renderLoopDynamicSection(data map[string]any) (string, 
 //   SYSTEM (high-static) | FROZEN (frozen-block) | SEMI (semi-dynamic 残留) |
 //   OPEN (timeline-open) | DYNAMIC
 //
-// 各段之间空行分隔, 空段省略。frozen-block 段使用 AI_CACHE_FROZEN_semi-dynamic
-// 标签 (与 aicommon.TimelineFrozenBoundaryTagName / TimelineFrozenBoundaryNonce
-// 对齐), 让 aicache hijacker 在用户消息中以字符串 IndexOf 精准切片 user1
-// (frozen prefix) / user2 (open tail), 拿到双 cc 命中。
+// 各段之间空行分隔, 空段省略。
 //
-// 关键词: buildTaggedPromptSections, 5 段拼接, AI_CACHE_FROZEN, aicache hijacker
+// 双 cache 边界 (P1):
+//   - frozen-block 段: <|AI_CACHE_FROZEN_semi-dynamic|>...<|AI_CACHE_FROZEN_END_semi-dynamic|>
+//     由 wrapAICacheFrozen 注入, hijacker 切到 user1, 主动打 ephemeral cc
+//   - semi-dynamic 段: <|AI_CACHE_SEMI_semi|>...<|AI_CACHE_SEMI_END_semi|>
+//     由 wrapAICacheSemi 注入 (覆盖 PROMPT_SECTION_semi-dynamic 整段),
+//     hijacker 切到 user2, 主动打 ephemeral cc
+//
+// 内层 PROMPT_SECTION_semi-dynamic 标签保留 (不会与 AI_CACHE_SEMI 冲突, tagName
+// 不同), 让 splitter 4 段切片仍能识别 semi-dynamic 段. 字面量必须与
+// aicache.semiBoundaryTagName / semiBoundaryNonce 严格一致.
+//
+// 关键词: buildTaggedPromptSections, 5 段拼接, AI_CACHE_FROZEN, AI_CACHE_SEMI,
+//        aicache hijacker, 4 段切分, 双 cc, P1 双 cache 边界
 func buildTaggedPromptSections(highStatic string, frozenBlock string, semiDynamic string, timelineOpen string, dynamic string, dynamicNonce string) string {
 	return joinPromptSections(
 		wrapPromptMessageSection(promptSectionHighStatic, highStatic, ""),
 		wrapAICacheFrozen(frozenBlock),
-		wrapPromptMessageSection(promptSectionSemiDynamic, semiDynamic, ""),
+		wrapAICacheSemi(wrapPromptMessageSection(promptSectionSemiDynamic, semiDynamic, "")),
 		wrapPromptMessageSection(promptSectionTimelineOpen, timelineOpen, ""),
 		wrapPromptMessageSection(promptSectionDynamic, dynamic, dynamicNonce),
 	)
@@ -881,6 +903,30 @@ func wrapAICacheFrozen(content string) string {
 	}
 	tagName := aicommon.TimelineFrozenBoundaryTagName
 	nonce := aicommon.TimelineFrozenBoundaryNonce
+	return fmt.Sprintf("<|%s_%s|>\n%s\n<|%s_END_%s|>", tagName, nonce, content, tagName, nonce)
+}
+
+// wrapAICacheSemi 用 <|AI_CACHE_SEMI_semi|>...<|AI_CACHE_SEMI_END_semi|> 包裹
+// 已经包了 PROMPT_SECTION_semi-dynamic 标签的 semi-dynamic 段内容, 字面量与
+// aicommon.SemiDynamicCacheBoundaryTagName / SemiDynamicCacheBoundaryNonce 一致,
+// 让 aicache hijacker 在 frozen 边界 END 之后通过字符串 IndexOf 精准切到 user2,
+// 形成 4 段消息 (system+cc, user1+cc=frozen, user2+cc=semi, user3=open+dynamic).
+//
+// 注意: 该函数包的是 wrapPromptMessageSection 已经产出的"PROMPT_SECTION_
+// semi-dynamic 完整段". 双层 tag 嵌套是有意为之: 内层 PROMPT_SECTION 让 splitter
+// 仍能识别段归属, 外层 AI_CACHE_SEMI 给 hijacker 一对字节恒定的边界.
+//
+// 内容为空时返回空串, 调用方 joinPromptSections 会自动跳过空段.
+//
+// 关键词: wrapAICacheSemi, AI_CACHE_SEMI, semi cache boundary, 4 段拆分,
+//        与 PROMPT_SECTION_semi-dynamic 双层嵌套
+func wrapAICacheSemi(content string) string {
+	content = strings.TrimSpace(content)
+	if content == "" {
+		return ""
+	}
+	tagName := aicommon.SemiDynamicCacheBoundaryTagName
+	nonce := aicommon.SemiDynamicCacheBoundaryNonce
 	return fmt.Sprintf("<|%s_%s|>\n%s\n<|%s_END_%s|>", tagName, nonce, content, tagName, nonce)
 }
 

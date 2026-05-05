@@ -269,19 +269,23 @@ func TestPromptManager_AssemblePromptPrefix(t *testing.T) {
 	require.Equal(t, "section.timeline_open", prefix.Sections[3].Key)
 }
 
-// TestPromptManager_AssembleLoopPrompt_HijackThreeSegment 验证 aireact 新路径
-// 产出的 prompt 经 aicache.Observe 后被 hijacker 切成 3 段:
+// TestPromptManager_AssembleLoopPrompt_HijackFourSegment 验证 aireact 主路径
+// 产出的 prompt (SYSTEM + FROZEN + SEMI + OPEN + DYNAMIC, 双 cache 边界齐全)
+// 经 aicache.Observe 后被 hijacker 切成 4 段:
 //   - system: 含 AI_CACHE_SYSTEM_high-static 包装, 主动 cc
 //   - user1: 含 AI_CACHE_FROZEN_semi-dynamic 完整闭合块 (Tool/Forge/Timeline-frozen),
 //     字节边界稳定, 主动 cc
-//   - user2: 含 PROMPT_SECTION_semi-dynamic + PROMPT_SECTION_timeline-open + Dynamic
-//     段, 不打 cc
+//   - user2: 含 AI_CACHE_SEMI_semi 完整闭合块 (PROMPT_SECTION_semi-dynamic +
+//     Skills + Schema + CacheToolCall), 字节边界稳定, 主动 cc
+//   - user3: 含 PROMPT_SECTION_timeline-open + Dynamic 段, 不打 cc
 //
-// 这是按稳定性分层后的核心收益: dashscope 双 cc 同时命中 system 短前缀和
-// system + frozen 长前缀, 显著提升复用率 (CACHE_BOUNDARY_GUIDE.md §7.7.7)。
+// 这是 P1 双 cache 边界的核心收益: dashscope 同时命中 system 短前缀、
+// system+frozen 长前缀、system+frozen+semi 更长前缀三档候选 (实际命中前 N 档
+// 由 dashscope 决定), 比单 frozen 边界 (P0) 多一档.
 //
-// 关键词: aicache hijack 3 段, AI_CACHE_FROZEN 边界切片, 双 cc 命中
-func TestPromptManager_AssembleLoopPrompt_HijackThreeSegment(t *testing.T) {
+// 关键词: aicache hijack 4 段, AI_CACHE_FROZEN + AI_CACHE_SEMI 双边界,
+//        三 cc 主路径, P1 双 cache 边界
+func TestPromptManager_AssembleLoopPrompt_HijackFourSegment(t *testing.T) {
 	react, err := NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
@@ -306,9 +310,9 @@ func TestPromptManager_AssembleLoopPrompt_HijackThreeSegment(t *testing.T) {
 	require.NoError(t, err)
 
 	hijack := aicache.Observe("test-model", result.Prompt)
-	require.NotNil(t, hijack, "loop prompt with high-static + frozen block should be hijacked")
+	require.NotNil(t, hijack, "loop prompt with high-static + frozen + semi block should be hijacked")
 	require.True(t, hijack.IsHijacked)
-	require.Len(t, hijack.Messages, 3, "expect 3-segment hijack (system + user1 + user2)")
+	require.Len(t, hijack.Messages, 4, "expect 4-segment hijack (system + user1 + user2 + user3)")
 
 	systemMsg := hijack.Messages[0]
 	require.Equal(t, "system", systemMsg.Role)
@@ -329,11 +333,186 @@ func TestPromptManager_AssembleLoopPrompt_HijackThreeSegment(t *testing.T) {
 	user2 := hijack.Messages[2]
 	require.Equal(t, "user", user2.Role)
 	user2Content := chatDetailContentString(user2)
-	require.Contains(t, user2Content, "<|PROMPT_SECTION_semi-dynamic|>")
-	require.Contains(t, user2Content, "<|PROMPT_SECTION_timeline-open|>")
-	require.Contains(t, user2Content, "<|USER_QUERY_hj01|>")
-	require.NotContains(t, user2Content, "<|AI_CACHE_FROZEN_semi-dynamic|>",
-		"user2 must not contain frozen START tag")
+	require.Contains(t, user2Content, "<|AI_CACHE_SEMI_semi|>",
+		"user2 must contain AI_CACHE_SEMI START tag")
+	require.Contains(t, user2Content, "<|AI_CACHE_SEMI_END_semi|>",
+		"user2 must contain AI_CACHE_SEMI END tag")
+	require.Contains(t, user2Content, "<|PROMPT_SECTION_semi-dynamic|>",
+		"user2 must contain inner PROMPT_SECTION_semi-dynamic wrapper")
+	require.Contains(t, user2Content, "<|SKILLS_CONTEXT_skills_context|>",
+		"user2 must contain SkillsContext")
+	require.Contains(t, user2Content, "<|SCHEMA|>",
+		"user2 must contain Schema")
+	require.True(t, strings.HasSuffix(strings.TrimSpace(user2Content), "<|AI_CACHE_SEMI_END_semi|>"),
+		"user2 should end at semi boundary END tag, got: %q", user2Content)
+	require.NotContains(t, user2Content, "<|PROMPT_SECTION_timeline-open|>",
+		"user2 must NOT contain timeline-open section (belongs to user3)")
+	require.NotContains(t, user2Content, "<|USER_QUERY_hj01|>",
+		"user2 must NOT contain dynamic user query (belongs to user3)")
+
+	user3 := hijack.Messages[3]
+	require.Equal(t, "user", user3.Role)
+	user3Content := chatDetailContentString(user3)
+	require.Contains(t, user3Content, "<|PROMPT_SECTION_timeline-open|>")
+	require.Contains(t, user3Content, "<|USER_QUERY_hj01|>")
+	require.NotContains(t, user3Content, "<|AI_CACHE_FROZEN_semi-dynamic|>",
+		"user3 must NOT contain frozen START tag")
+	require.NotContains(t, user3Content, "<|AI_CACHE_SEMI_semi|>",
+		"user3 must NOT contain semi START tag")
+}
+
+// TestPromptManager_AssembleLoopPrompt_RecentToolsCacheInSemiSegment 验证
+// CACHE_TOOL_CALL 块 (经 LoopPromptAssemblyInput.RecentToolsCache 透传) 物理位置
+// 在 semi-dynamic 段 (而不再在 dynamic 段), 经 hijacker 切割后位于 user2.
+//
+// 关键词: TestPromptManager, CACHE_TOOL_CALL 物理迁移, semi-dynamic 段, P1 主路径
+func TestPromptManager_AssembleLoopPrompt_RecentToolsCacheInSemiSegment(t *testing.T) {
+	react, err := NewTestReAct(
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action":"object","next_action":{"type":"directly_answer","answer_payload":"ok"},"cumulative_summary":"ok","human_readable_thought":"ok"}`))
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+	require.NoError(t, err)
+
+	tool := aitool.NewWithoutCallback("tool-a", aitool.WithDescription("tool a desc"))
+
+	// 模拟 reactloops/prompt.go 中给 RecentToolsCache 注入的 CACHE_TOOL_CALL 块,
+	// 用占位符字面量 nonce "[current-nonce]" 渲染, 跨轮字节稳定.
+	// 关键词: CACHE_TOOL_CALL 物理迁移, [current-nonce] 占位符 nonce
+	cacheBlock := strings.Join([]string{
+		"<|DIRECT_TOOL_ROUTING_[current-nonce]|>",
+		"# Fast Tool Routing",
+		"Recent tools available via directly_call_tool.",
+		"<|DIRECT_TOOL_ROUTING_END_[current-nonce]|>",
+		"",
+		"<|CACHE_TOOL_CALL_[current-nonce]|>",
+		"<|TOOL_bash_[current-nonce]|>",
+		"## Tool: bash",
+		"<|TOOL_bash_END_[current-nonce]|>",
+		"<|CACHE_TOOL_CALL_END_[current-nonce]|>",
+	}, "\n")
+
+	result, err := react.promptManager.AssembleLoopPrompt([]*aitool.Tool{tool}, &reactloops.LoopPromptAssemblyInput{
+		Nonce:            "turnA",
+		UserQuery:        "user query",
+		TaskInstruction:  "task rules",
+		Schema:           `{"type":"object"}`,
+		SkillsContext:    "<|SKILLS_CONTEXT_demo|>\nskill\n<|SKILLS_CONTEXT_END_demo|>",
+		RecentToolsCache: cacheBlock,
+	})
+	require.NoError(t, err)
+
+	prompt := result.Prompt
+
+	// 1. CACHE_TOOL_CALL 必须出现在 prompt 中 (经过模板渲染)
+	cacheStartIdx := strings.Index(prompt, "<|CACHE_TOOL_CALL_[current-nonce]|>")
+	cacheEndIdx := strings.Index(prompt, "<|CACHE_TOOL_CALL_END_[current-nonce]|>")
+	require.NotEqual(t, -1, cacheStartIdx, "CACHE_TOOL_CALL must appear in prompt")
+	require.NotEqual(t, -1, cacheEndIdx)
+
+	// 2. 必须位于 PROMPT_SECTION_semi-dynamic 段内 (而不在 dynamic 段)
+	semiStart := strings.Index(prompt, "<|PROMPT_SECTION_semi-dynamic|>")
+	semiEnd := strings.Index(prompt, "<|PROMPT_SECTION_END_semi-dynamic|>")
+	require.NotEqual(t, -1, semiStart)
+	require.NotEqual(t, -1, semiEnd)
+	require.Greater(t, cacheStartIdx, semiStart, "CACHE_TOOL_CALL must start AFTER semi-dynamic START")
+	require.Less(t, cacheEndIdx, semiEnd, "CACHE_TOOL_CALL must end BEFORE semi-dynamic END")
+
+	// 3. dynamic 段不应该再含 CACHE_TOOL_CALL (历史位置)
+	dynamicStart := strings.Index(prompt, "<|PROMPT_SECTION_dynamic_turnA|>")
+	require.NotEqual(t, -1, dynamicStart)
+	dynamicTail := prompt[dynamicStart:]
+	require.NotContains(t, dynamicTail, "<|CACHE_TOOL_CALL_[current-nonce]|>",
+		"CACHE_TOOL_CALL must NOT remain in dynamic section after physical migration")
+
+	// 4. semi 段必须被 AI_CACHE_SEMI_semi 边界包裹 (P1)
+	aiCacheSemiStart := strings.Index(prompt, "<|AI_CACHE_SEMI_semi|>")
+	aiCacheSemiEnd := strings.Index(prompt, "<|AI_CACHE_SEMI_END_semi|>")
+	require.NotEqual(t, -1, aiCacheSemiStart, "P1: prompt must contain AI_CACHE_SEMI_semi START")
+	require.NotEqual(t, -1, aiCacheSemiEnd, "P1: prompt must contain AI_CACHE_SEMI_semi END")
+	require.Less(t, aiCacheSemiStart, semiStart,
+		"AI_CACHE_SEMI START must wrap PROMPT_SECTION_semi-dynamic")
+	require.Greater(t, aiCacheSemiEnd, semiEnd,
+		"AI_CACHE_SEMI END must wrap PROMPT_SECTION_semi-dynamic")
+}
+
+// TestPromptManager_AssembleLoopPrompt_SemiSegmentByteStableAcrossTurns 验证
+// 在 turn nonce 不同的两次 AssembleLoopPrompt 调用中, semi-dynamic 段
+// (含 SkillsContext + Schema + CACHE_TOOL_CALL) 字节稳定 (因为 CACHE_TOOL_CALL
+// 已用稳定字面量 nonce 渲染).
+//
+// 这是 P1 双 cache 边界生效的前提: hijacker 切到 user2 的字节流必须跨 turn
+// 一致, 才能命中 dashscope prefix cache.
+//
+// 关键词: TestPromptManager, semi-dynamic 字节稳定, 跨 turn 一致, P1 cache 命中
+func TestPromptManager_AssembleLoopPrompt_SemiSegmentByteStableAcrossTurns(t *testing.T) {
+	react, err := NewTestReAct(
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action":"object","next_action":{"type":"directly_answer","answer_payload":"ok"},"cumulative_summary":"ok","human_readable_thought":"ok"}`))
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+	require.NoError(t, err)
+
+	tool := aitool.NewWithoutCallback("tool-a", aitool.WithDescription("tool a desc"))
+
+	cacheBlock := strings.Join([]string{
+		"<|DIRECT_TOOL_ROUTING_[current-nonce]|>",
+		"# Fast Tool Routing",
+		"<|DIRECT_TOOL_ROUTING_END_[current-nonce]|>",
+		"<|CACHE_TOOL_CALL_[current-nonce]|>",
+		"<|TOOL_bash_[current-nonce]|>",
+		"## Tool: bash",
+		"<|TOOL_bash_END_[current-nonce]|>",
+		"<|CACHE_TOOL_CALL_END_[current-nonce]|>",
+	}, "\n")
+
+	mk := func(turnNonce string, userQuery string) string {
+		result, err := react.promptManager.AssembleLoopPrompt([]*aitool.Tool{tool}, &reactloops.LoopPromptAssemblyInput{
+			Nonce:            turnNonce,
+			UserQuery:        userQuery,
+			TaskInstruction:  "task rules",
+			Schema:           `{"type":"object"}`,
+			SkillsContext:    "<|SKILLS_CONTEXT_demo|>\nskill\n<|SKILLS_CONTEXT_END_demo|>",
+			RecentToolsCache: cacheBlock,
+		})
+		require.NoError(t, err)
+		return result.Prompt
+	}
+
+	prompt1 := mk("nonce_round1", "first query")
+	prompt2 := mk("nonce_round2_completely_different", "second very different query")
+
+	// 提取每次 prompt 的 semi-dynamic 段 (从 AI_CACHE_SEMI START 到 END)
+	extractSemiSegment := func(t *testing.T, p string) string {
+		t.Helper()
+		startTag := "<|AI_CACHE_SEMI_semi|>"
+		endTag := "<|AI_CACHE_SEMI_END_semi|>"
+		startIdx := strings.Index(p, startTag)
+		require.NotEqual(t, -1, startIdx, "must contain AI_CACHE_SEMI START")
+		endIdx := strings.Index(p, endTag)
+		require.NotEqual(t, -1, endIdx, "must contain AI_CACHE_SEMI END")
+		return p[startIdx : endIdx+len(endTag)]
+	}
+
+	semi1 := extractSemiSegment(t, prompt1)
+	semi2 := extractSemiSegment(t, prompt2)
+
+	require.Equal(t, semi1, semi2,
+		"semi-dynamic segment must be byte-stable across different turn nonces (P1 cache prerequisite)")
+
+	// 双重保险: semi 段内绝对不能含两个 turn nonce 任意一个
+	require.NotContains(t, semi1, "nonce_round1",
+		"semi segment must NOT contain turn nonce (would break byte stability)")
+	require.NotContains(t, semi1, "nonce_round2_completely_different")
+	// 但应该含占位符字面量 nonce
+	require.Contains(t, semi1, "[current-nonce]",
+		"semi segment must use placeholder stable nonce '[current-nonce]'")
 }
 
 // chatDetailContentString 把 ChatDetail.Content (string 或 []*ChatContent)

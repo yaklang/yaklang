@@ -24,9 +24,33 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-var toolParamAITagStartRegexp = regexp.MustCompile(`<\|TOOL_PARAM_([A-Za-z0-9_]+)_([A-Za-z0-9]+)\|>`)
+// toolParamAITagStartRegexp nonce 段允许 [a-zA-Z0-9_\-\[\]], 既支持历史
+// turn nonce (uuid 风格 a-f0-9-), 又支持新引入的占位符字面量 nonce
+// "[current-nonce]" (含方括号). 包含 `[` `]` 是正则字符类内字面量,
+// 已用 `[A-Za-z0-9_\[\]\-]+` 写法明确表达.
+//
+// 关键词: toolParamAITagStartRegexp, nonce 占位符, [current-nonce]
+var toolParamAITagStartRegexp = regexp.MustCompile(`<\|TOOL_PARAM_([A-Za-z0-9_]+)_([A-Za-z0-9_\[\]\-]+)\|>`)
 
 const toolParamAITagActionKeyPrefix = "__aitag__"
+
+// RecentToolCacheStableNonce 是 CACHE_TOOL_CALL 块及其内部所有 AITAG (TOOL_xxx /
+// TOOL_PARAM_xxx) 渲染时使用的稳定 nonce 字面量. 跨 react turn 不变, 让承载
+// 该块的 prompt 段保持字节级稳定, 进入 prefix cache.
+//
+// 字面量选 "[current-nonce]" 带方括号占位符语义, 用意:
+//   - 让 LLM 一眼看出"这是个占位符, 应该替换为 prompt 上下文里的 current nonce
+//     (USER_QUERY 等其他 AITAG 用的 turn nonce)"
+//   - 即使 LLM 不替换、直接照抄字面量输出, ActionMaker 端通过 ExtraNonces
+//     双注册也能命中 (turn nonce + [current-nonce] 同时注册 callback)
+//
+// 必须与渲染侧 (buildinaitools.GetRecentToolsSummary) 与解析侧
+// (reactloops.syncRecentToolParamAITagFields 注册的 LoopAITagField.ExtraNonces)
+// 保持一致, 否则字面量被改变后任一侧落后都会导致解析丢失.
+//
+// 关键词: RecentToolCacheStableNonce, [current-nonce], 占位符语义,
+//        prefix cache 字节稳定, 双注册兜底
+const RecentToolCacheStableNonce = "[current-nonce]"
 
 func GetToolParamAITagActionKey(paramName string) string {
 	return toolParamAITagActionKeyPrefix + paramName

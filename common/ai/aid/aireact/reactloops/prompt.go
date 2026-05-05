@@ -15,7 +15,18 @@ import (
 
 const directlyCallToolParamsNodeID = "directly_call_tool_params"
 
-func renderRecentToolRoutingHint(nonce string) string {
+// renderRecentToolRoutingHint 渲染"快速工具路由提示", 整体使用占位符字面量
+// nonce (aicommon.RecentToolCacheStableNonce, "[current-nonce]"), 跨 turn
+// 字节稳定, 让该段进入 prefix cache. 占位符语义可让 LLM 自然把它关联到
+// 当前 turn nonce.
+//
+// 历史: 该提示曾使用 turn nonce 渲染, 与 CACHE_TOOL_CALL 一并位于 dynamic 段
+// REFLECTION 内, 每轮变化无法缓存. 现已与 CACHE_TOOL_CALL 一起迁到 semi-dynamic
+// 段并用稳定 nonce 渲染.
+//
+// 关键词: renderRecentToolRoutingHint, DIRECT_TOOL_ROUTING, stable nonce,
+//        semi-dynamic 段
+func renderRecentToolRoutingHint() string {
 	return utils.MustRenderTemplate(`
 <|DIRECT_TOOL_ROUTING_{{ .Nonce }}|>
 # Fast Tool Routing
@@ -24,7 +35,7 @@ func renderRecentToolRoutingHint(nonce string) string {
 - Use require_tool only when the needed tool is not in the recent cache, or when you still need normal tool discovery.
 <|DIRECT_TOOL_ROUTING_END_{{ .Nonce }}|>
 	`, map[string]any{
-		"Nonce": nonce,
+		"Nonce": aicommon.RecentToolCacheStableNonce,
 	})
 }
 
@@ -194,21 +205,31 @@ func (r *ReActLoop) generateLoopPrompt(
 		}
 	}
 
-	// Append CACHE_TOOL_CALL block only when summary is non-empty
+	// CACHE_TOOL_CALL 块的渲染. 整段都用稳定 nonce
+	// aicommon.RecentToolCacheStableNonce, 让该段跨 turn 字节稳定; 物理位置从
+	// dynamic/REFLECTION 迁到 semi-dynamic 段 (经 LoopPromptAssemblyInput.
+	// RecentToolsCache 字段透传, 由 semi_dynamic_section.txt 模板渲染).
+	//
+	// 关键词: CACHE_TOOL_CALL 物理迁移, semi-dynamic 段, 稳定 nonce 渲染
+	var recentToolsCacheBlock string
 	if tm := r.config.GetAiToolManager(); tm != nil && tm.HasRecentlyUsedTools() {
 		r.syncRecentToolParamAITagFields(tm.GetRecentToolParamNames())
-		reactiveData += renderRecentToolRoutingHint(nonce)
+		var sb strings.Builder
+		sb.WriteString(renderRecentToolRoutingHint())
+		// nonce 参数已被 GetRecentToolsSummary 内部忽略, 实际渲染使用稳定 nonce.
+		// 这里仍然传 nonce 仅为了不破坏老接口签名.
 		if summary := tm.GetRecentToolsSummary(tm.GetRecentToolCacheMaxTokens(), nonce); summary != "" {
 			cacheBlock := utils.MustRenderTemplate(`
 <|CACHE_TOOL_CALL_{{ .Nonce }}>
 {{ .Summary }}
 <|CACHE_TOOL_CALL_END_{{ .Nonce }}>
 			`, map[string]interface{}{
-				"Nonce":   nonce,
+				"Nonce":   aicommon.RecentToolCacheStableNonce,
 				"Summary": summary,
 			})
-			reactiveData += cacheBlock
+			sb.WriteString(cacheBlock)
 		}
+		recentToolsCacheBlock = sb.String()
 	}
 
 	if r.invoker == nil {
@@ -226,6 +247,7 @@ func (r *ReActLoop) generateLoopPrompt(
 		SessionEvidence:   sessionEvidence,
 		ReactiveData:      reactiveData,
 		InjectedMemory:    memory,
+		RecentToolsCache:  recentToolsCacheBlock,
 	})
 	if err != nil {
 		return "", utils.Wrap(err, "assemble loop prompt failed")
@@ -258,6 +280,21 @@ func getLoopPromptObservationSections(result *LoopPromptAssemblyResult) []*Promp
 	return nil
 }
 
+// syncRecentToolParamAITagFields 给当前 react loop 的 aiTagFields 注册
+// CACHE_TOOL_CALL 提示用的 TOOL_PARAM_xxx AITAG 字段 (按近期工具的参数名).
+//
+// 关键设计: 这些字段把字面量稳定常量 aicommon.RecentToolCacheStableNonce
+// ("[current-nonce]") 加进 ExtraNonces, 与 turn nonce 并列双注册:
+//   - 渲染侧 (tool_manager.go) 用 "[current-nonce]" 占位符字面量, 让承载该
+//     CACHE_TOOL_CALL 块的 prompt 段保持字节稳定, 进入 prefix cache.
+//   - 解析侧给 turn nonce + "[current-nonce]" 都注册 callback. LLM 既可能
+//     照抄占位符字面量输出, 也可能识破替换为 turn nonce 输出, 任一都能命中.
+//
+// nonce 候选追加是字段级精准的, 仅作用于 TOOL_PARAM_xxx (本函数注册的字段),
+// 不会扩散到其他 aiTagFields (USER_QUERY 等仍只走 turn nonce).
+//
+// 关键词: syncRecentToolParamAITagFields, ExtraNonces 双注册,
+//        [current-nonce] 占位符, 精准覆盖工具缓存
 func (r *ReActLoop) syncRecentToolParamAITagFields(paramNames []string) {
 	if r.aiTagFields == nil {
 		return
@@ -273,6 +310,7 @@ func (r *ReActLoop) syncRecentToolParamAITagFields(paramNames []string) {
 			VariableName: aicommon.GetToolParamAITagActionKey(paramName),
 			AINodeId:     directlyCallToolParamsNodeID,
 			ContentType:  "default",
+			ExtraNonces:  []string{aicommon.RecentToolCacheStableNonce},
 		})
 	}
 }

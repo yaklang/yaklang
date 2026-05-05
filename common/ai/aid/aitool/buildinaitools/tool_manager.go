@@ -504,6 +504,18 @@ func (m *AiToolManager) HasRecentlyUsedTools() bool {
 	return len(m.recentToolsCache) > 0
 }
 
+// RecentToolCacheStableNonce 是 CACHE_TOOL_CALL 块及其内部所有 AITAG (TOOL_xxx /
+// TOOL_PARAM_xxx) 渲染时使用的稳定 nonce 字面量. 跨 react turn 不变, 让承载
+// 该块的 prompt 段保持字节级稳定, 进入 prefix cache.
+//
+// 字面量必须与 aicommon.RecentToolCacheStableNonce 严格一致 (两边互不 import,
+// 各自定义本地副本; 不一致会导致渲染端写一种, 解析端注册另一种, callback
+// 不命中, 内容丢失). 当前两边都是 "[current-nonce]".
+//
+// 关键词: RecentToolCacheStableNonce, [current-nonce], 占位符语义,
+//        与 aicommon.RecentToolCacheStableNonce 字面量严格一致
+const RecentToolCacheStableNonce = "[current-nonce]"
+
 const recentToolEntryTemplate = `<|TOOL_{{ .Name }}_{{ .Nonce }}|>
 ## Tool: {{ .Name }}
 Description: {{ .Description }}
@@ -524,7 +536,7 @@ Pass it directly as directly_call_tool_params. Do not wrap it with @action, tool
 ### Hybrid mode for block parameters
 Use JSON for simple fields and AITAG blocks for multi-line or escape-heavy fields such as command, body, packet, headers, script, content, query.
 
-Example:
+Example (the literal "{{ .Nonce }}" below is a placeholder; replace it with the SAME nonce that other AITAG blocks in this prompt are using, e.g. the nonce from <|USER_QUERY_xxxx|>):
 {"@action": "directly_call_tool", "directly_call_tool_name": "<name>", "directly_call_identifier": "<snake_case_intent>", "directly_call_expectations": "<timing and fallback>", "directly_call_tool_params": {"timeout": 20}}
 <|TOOL_PARAM_command_{{ .Nonce }}|>
 #!/bin/bash
@@ -532,9 +544,10 @@ echo "hello"
 <|TOOL_PARAM_command_END_{{ .Nonce }}|>
 
 AITAG rules:
-- Start tag: <|TOOL_PARAM_{param_name}_{{ .Nonce }}|>
-- End tag: <|TOOL_PARAM_{param_name}_END_{{ .Nonce }}|>
-- Copy the current nonce {{ .Nonce }} exactly. Do not reuse any old nonce.
+- Start tag: <|TOOL_PARAM_{param_name}_{nonce}|>
+- End tag:   <|TOOL_PARAM_{param_name}_END_{nonce}|>
+- The token "{{ .Nonce }}" written above in this prompt is a PLACEHOLDER for "the current per-turn nonce". When you emit your AITAG blocks, prefer to substitute it with the same nonce that is used by other AITAG blocks in this prompt (look at <|USER_QUERY_xxxx|> for the exact value).
+- If unsure, you may also keep the literal "{{ .Nonce }}" verbatim; the parser accepts both forms.
 - AITAG block values override same-named JSON params.
 - If all params are block-style, directly_call_tool_params may be omitted or left as an empty object.
 {{ if .ParamNames }}
@@ -602,7 +615,7 @@ func renderDirectlyCallParamsSchema(schemaSnippet string) string {
 	rendered := omap.NewEmptyOrderedMap[string, any]()
 	rendered.Set("$schema", "http://json-schema.org/draft-07/schema#")
 	rendered.Set("type", "object")
-	rendered.Set("description", "Only for directly_call_tool. Pass this object directly as directly_call_tool_params. Do not include @action, tool, or params wrapper. For multi-line content, use TOOL_PARAM_* AITAG blocks with the current nonce from CACHE_TOOL_CALL.")
+	rendered.Set("description", "Only for directly_call_tool. Pass this object directly as directly_call_tool_params. Do not include @action, tool, or params wrapper. For multi-line content, use TOOL_PARAM_* AITAG blocks with the literal nonce \""+RecentToolCacheStableNonce+"\" (a fixed string, NOT the per-turn nonce that other tags in this prompt use).")
 	if properties, ok := paramsSchema["properties"]; ok {
 		rendered.Set("properties", properties)
 	}
@@ -716,9 +729,17 @@ func (m *AiToolManager) ImportRecentToolCache(jsonStr string) {
 
 // GetRecentToolsSummary builds a prompt-friendly summary of cached tools within maxTokens.
 // Each tool is wrapped in AITAG boundaries <|TOOL_{name}_{nonce}|> to prevent confusion.
+//
+// 注意: 自从 CACHE_TOOL_CALL 块迁到 semi-dynamic 段并加上 AI_CACHE_SEMI 缓存边界后,
+// 块内所有 AITAG (TOOL_xxx 包装 / TOOL_PARAM_xxx 示例) 的 nonce 一律使用字面量稳定
+// 常量 RecentToolCacheStableNonce, 让该段跨 turn 字节稳定、可命中 prefix cache.
+// 参数 nonce 保留是为了向后兼容旧调用方, 但不再参与渲染.
+//
+// 关键词: GetRecentToolsSummary, RecentToolCacheStableNonce, prefix cache
 func (m *AiToolManager) GetRecentToolsSummary(maxTokens int, nonce string) string {
 	m.recentToolsMu.Lock()
 	defer m.recentToolsMu.Unlock()
+	_ = nonce // 保留参数兼容旧调用; 真正用于渲染的是稳定 nonce.
 
 	if len(m.recentToolsCache) == 0 {
 		return ""
@@ -732,7 +753,7 @@ func (m *AiToolManager) GetRecentToolsSummary(maxTokens int, nonce string) strin
 		entry := m.recentToolsCache[reverseIndex]
 		block := utils.MustRenderTemplate(recentToolEntryTemplate, map[string]interface{}{
 			"Name":                 entry.Name,
-			"Nonce":                nonce,
+			"Nonce":                RecentToolCacheStableNonce,
 			"Description":          entry.Description,
 			"DisplaySchemaSnippet": renderDirectlyCallParamsSchema(entry.SchemaSnippet),
 			"Usage":                entry.Usage,
@@ -748,6 +769,6 @@ func (m *AiToolManager) GetRecentToolsSummary(maxTokens int, nonce string) strin
 	if !entryWritten {
 		return ""
 	}
-	sb.WriteString(renderRecentToolSummaryFooter(nonce, m.getRecentToolParamNamesLocked()))
+	sb.WriteString(renderRecentToolSummaryFooter(RecentToolCacheStableNonce, m.getRecentToolParamNamesLocked()))
 	return sb.String()
 }

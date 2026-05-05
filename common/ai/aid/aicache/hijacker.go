@@ -117,7 +117,14 @@ func hijackHighStatic(msg string) *aispec.ChatBaseMirrorResult {
 
 	systemContent := wrapAICacheSystem(staticParts)
 
-	// 优先走 3 段拆分；若 timeline 不存在或不可拆分，退化到 2 段。
+	// 切分优先级 (高到低):
+	//   1. 4 段 (frozen + semi 两条边界都齐): build4SegmentMessages
+	//   2. 3 段 (仅 frozen 边界, 或 timeline 内部解析): build3SegmentMessages
+	//   3. 2 段 (兼容退化): build2SegmentMessages
+	// 关键词: hijack 切分优先级, 4 段优先, 3 段 frozen-only, 2 段兼容
+	if four := build4SegmentMessages(res, systemContent); four != nil {
+		return four
+	}
 	if three := build3SegmentMessages(res, systemContent, timelineBlk); three != nil {
 		return three
 	}
@@ -242,10 +249,34 @@ func build3SegmentMessages(res *aitag.SplitResult, systemContent string, timelin
 // 关键词: aicache, frozen boundary 字面量, AI_CACHE_FROZEN, semi-dynamic,
 //        与 aicommon.TimelineFrozenBoundaryTagName 同步
 const (
-	frozenBoundaryTagName = "AI_CACHE_FROZEN"
-	frozenBoundaryNonce   = "semi-dynamic"
+	frozenBoundaryTagName  = "AI_CACHE_FROZEN"
+	frozenBoundaryNonce    = "semi-dynamic"
 	frozenBoundaryStartTag = "<|" + frozenBoundaryTagName + "_" + frozenBoundaryNonce + "|>"
 	frozenBoundaryEndTag   = "<|" + frozenBoundaryTagName + "_END_" + frozenBoundaryNonce + "|>"
+)
+
+// semiBoundaryTagName / semiBoundaryNonce / semiBoundaryStartTag /
+// semiBoundaryEndTag 是 aicache hijacker 用来识别 aireact 主路径在
+// "semi-dynamic 段外层"插入的二级 cache 边界字面量, 形成
+// <|AI_CACHE_SEMI_semi|>...<|AI_CACHE_SEMI_END_semi|>.
+//
+// 与 aicommon.SemiDynamicCacheBoundaryTagName / SemiDynamicCacheBoundaryNonce
+// 严格一致 (本地副本, 避免反向 import cycle).
+//
+// 命中时 hijacker 切成 4 段:
+//   - system (high-static, ephemeral cc)
+//   - user1 (frozen 段, ephemeral cc)
+//   - user2 (semi 段, ephemeral cc)
+//   - user3 (open + dynamic, 无 cc)
+// frozen 边界缺失时只能切 3 段 (走 build3SegmentMessages 老路径), 不影响
+// semi 边界存在的退化能力.
+//
+// 关键词: aicache, semi boundary 字面量, AI_CACHE_SEMI, 4 段切分, 双 cc
+const (
+	semiBoundaryTagName  = "AI_CACHE_SEMI"
+	semiBoundaryNonce    = "semi"
+	semiBoundaryStartTag = "<|" + semiBoundaryTagName + "_" + semiBoundaryNonce + "|>"
+	semiBoundaryEndTag   = "<|" + semiBoundaryTagName + "_END_" + semiBoundaryNonce + "|>"
 )
 
 // splitByFrozenBoundary 在所有非 high-static block.Raw 顺序拼接后的字符串中,
@@ -321,6 +352,116 @@ func splitByFrozenBoundary(res *aitag.SplitResult) (user1, user2 string, ok bool
 		return "", "", false
 	}
 	return user1, user2, true
+}
+
+// splitBySemiBoundary 在所有非 high-static block.Raw 顺序拼接后的字符串中,
+// 同时找到 frozen 边界 + semi 边界两对完整标签, 切成 3 段:
+//
+//   - user1: 开头 ~ frozen END 标签 (含)               -> 给 build4 的 user1
+//   - user2: frozen END 后 ~ semi END 标签 (含)        -> 给 build4 的 user2
+//   - user3: semi END 之后到末尾                       -> 给 build4 的 user3
+//
+// 必要条件:
+//   - frozen START / END 都存在, frozen END 在 frozen START 之后
+//   - semi START / END 都存在, semi START 在 frozen END 之后, semi END 在
+//     semi START 之后
+//   - user1 / user2 / user3 三段都非空 (TrimSpace 后)
+// 任一条件不满足 -> ok=false 让上游退化到 3 段或 2 段.
+//
+// 用户给出的典型 prompt 形态 (CACHE_BOUNDARY_GUIDE.md §4.5 双 cache 边界场景):
+//
+//	A-system  -> system + cc
+//	<|AI_CACHE_FROZEN_semi-dynamic|>
+//	<Tool/Forge/Timeline-Frozen>
+//	<|AI_CACHE_FROZEN_END_semi-dynamic|>
+//	<|AI_CACHE_SEMI_semi|>
+//	<Skills + Schema + CacheToolCall>
+//	<|AI_CACHE_SEMI_END_semi|>
+//	<Timeline-Open>
+//	<Dynamic>
+//
+// 切完:
+//
+//	user1 = "<|AI_CACHE_FROZEN_semi-dynamic|>\n<frozen body>
+//	         \n<|AI_CACHE_FROZEN_END_semi-dynamic|>"             + cc
+//	user2 = "<|AI_CACHE_SEMI_semi|>\n<semi body>
+//	         \n<|AI_CACHE_SEMI_END_semi|>"                       + cc
+//	user3 = "<Timeline-Open>\n<Dynamic>"
+//
+// 关键词: aicache, splitBySemiBoundary, AI_CACHE_SEMI, 4 段 prefix 字节边界
+func splitBySemiBoundary(res *aitag.SplitResult) (user1, user2, user3 string, ok bool) {
+	if res == nil {
+		return "", "", "", false
+	}
+
+	var allBuf strings.Builder
+	for _, blk := range res.GetOrderedBlocks() {
+		if blk == nil || isHighStaticBlock(blk) {
+			continue
+		}
+		allBuf.WriteString(blk.Raw)
+	}
+	all := allBuf.String()
+	if all == "" {
+		return "", "", "", false
+	}
+
+	frozenStart := strings.Index(all, frozenBoundaryStartTag)
+	if frozenStart < 0 {
+		return "", "", "", false
+	}
+	frozenEndRel := strings.Index(all[frozenStart+len(frozenBoundaryStartTag):], frozenBoundaryEndTag)
+	if frozenEndRel < 0 {
+		return "", "", "", false
+	}
+	frozenEnd := frozenStart + len(frozenBoundaryStartTag) + frozenEndRel + len(frozenBoundaryEndTag)
+
+	semiStart := strings.Index(all[frozenEnd:], semiBoundaryStartTag)
+	if semiStart < 0 {
+		return "", "", "", false
+	}
+	semiStart += frozenEnd
+	semiEndRel := strings.Index(all[semiStart+len(semiBoundaryStartTag):], semiBoundaryEndTag)
+	if semiEndRel < 0 {
+		return "", "", "", false
+	}
+	semiEnd := semiStart + len(semiBoundaryStartTag) + semiEndRel + len(semiBoundaryEndTag)
+
+	user1 = strings.TrimSpace(all[:frozenEnd])
+	user2 = strings.TrimSpace(all[frozenEnd:semiEnd])
+	user3 = strings.TrimSpace(all[semiEnd:])
+	if user1 == "" || user2 == "" || user3 == "" {
+		return "", "", "", false
+	}
+	return user1, user2, user3, true
+}
+
+// build4SegmentMessages 试图走"4 段缓存友好拆分路径":
+//
+//   - system = high-static 包装后内容, 主动打 ephemeral cc
+//   - user1 = 开头 ~ frozen END (含), 主动打 ephemeral cc (frozen prefix 缓存)
+//   - user2 = frozen END 后 ~ semi END (含), 主动打 ephemeral cc (semi 段缓存)
+//   - user3 = semi END 之后到末尾, string content 不打 cc (易变尾段)
+//
+// 切割锚点: frozen 边界 + semi 边界两对完整标签都存在. 任一缺失 -> 返回 nil
+// 让上游退化到 build3SegmentMessages.
+//
+// 关键词: aicache, hijacker, 4 段拆分, build4SegmentMessages, 双 cc 自管,
+//        frozen + semi 双边界, P1 双 cache 边界
+func build4SegmentMessages(res *aitag.SplitResult, systemContent string) *aispec.ChatBaseMirrorResult {
+	user1, user2, user3, ok := splitBySemiBoundary(res)
+	if !ok {
+		return nil
+	}
+	return &aispec.ChatBaseMirrorResult{
+		IsHijacked: true,
+		Messages: []aispec.ChatDetail{
+			{Role: "system", Content: wrapTextWithEphemeralCC(systemContent)},
+			{Role: "user", Content: wrapTextWithEphemeralCC(user1)},
+			{Role: "user", Content: wrapTextWithEphemeralCC(user2)},
+			aispec.NewUserChatDetail(user3),
+		},
+	}
 }
 
 // wrapTextWithEphemeralCC 把一段文本包成单元素 []*aispec.ChatContent,

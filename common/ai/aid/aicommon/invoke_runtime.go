@@ -185,6 +185,15 @@ type LoopPromptAssemblyInput struct {
 	SessionEvidence   string
 	ReactiveData      string
 	InjectedMemory    string
+
+	// RecentToolsCache 是 CACHE_TOOL_CALL 块的渲染输出 (含 directly_call_tool
+	// routing hint + 最近工具的 schema/footer), 用稳定 nonce 渲染, 字节级跨 turn
+	// 稳定. 物理位置在 semi-dynamic 段, 让其与 Skills + Schema 一起被
+	// AI_CACHE_SEMI 边界包裹进入 prefix cache. 空字符串时模板自动跳过.
+	//
+	// 关键词: LoopPromptAssemblyInput, RecentToolsCache, semi-dynamic 段,
+	//        AI_CACHE_SEMI prefix cache
+	RecentToolsCache string
 }
 
 type LoopPromptAssemblyResult struct {

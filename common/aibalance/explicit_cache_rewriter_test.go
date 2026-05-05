@@ -666,3 +666,73 @@ func TestStripCacheControl_NoCCReturnsSameSlice(t *testing.T) {
 		}
 	}
 }
+
+// TestRewriteMessages_FourSegmentClientCCPassThrough 验证 aicache hijacker
+// 4 段输出形态 (system+cc / user1+cc / user2+cc / user3 string) 在 tongyi
+// 显式缓存路径下能整体 pass-through 不被 cap 在 2 个 cc 或被某条 cc 抹掉.
+//
+// 这是 P1 双 cache 边界 (frozen + semi) 的端到端契约: 三条带 cc 消息都必须
+// 原样到达 dashscope, 由其上游决定命中前 N 个 cache 锚点.
+//
+// 关键词: 4 段 hijacker 输出, P1 双 cache 边界, 客户端自带 3 cc pass-through,
+//        AI_CACHE_FROZEN + AI_CACHE_SEMI
+func TestRewriteMessages_FourSegmentClientCCPassThrough(t *testing.T) {
+	in := []aispec.ChatDetail{
+		{Role: "system", Content: []*aispec.ChatContent{
+			{Type: "text", Text: "system-text", CacheControl: map[string]any{"type": "ephemeral"}},
+		}},
+		{Role: "user", Content: []*aispec.ChatContent{
+			{Type: "text", Text: "user1-frozen-prefix", CacheControl: map[string]any{"type": "ephemeral"}},
+		}},
+		{Role: "user", Content: []*aispec.ChatContent{
+			{Type: "text", Text: "user2-semi-prefix", CacheControl: map[string]any{"type": "ephemeral"}},
+		}},
+		{Role: "user", Content: "user3-open-and-dynamic"},
+	}
+	out := RewriteMessagesForProvider(in, "tongyi", "qwen3.6-plus")
+	if !jsonEq(t, in, out) {
+		t.Fatalf("4-segment client cc must be passed through verbatim, in=%v out=%v", in, out)
+	}
+	// 序列化后必须含 3 个 cache_control 字段
+	bs, err := json.Marshal(out)
+	if err != nil {
+		t.Fatalf("marshal failed: %v", err)
+	}
+	if cnt := strings.Count(string(bs), `"cache_control":{"type":"ephemeral"}`); cnt != 3 {
+		t.Fatalf("expected 3 cache_control entries in JSON, got %d. body=%s", cnt, bs)
+	}
+}
+
+// TestRewriteMessages_FourSegmentStripsForNonTongyi 验证 4 段输出在非 tongyi
+// provider (如 siliconflow / openai) 下三条 cc 都被强制 strip, text 完整保留.
+// 关键词: 4 段 hijacker 输出, 非 tongyi provider strip 全量 cc
+func TestRewriteMessages_FourSegmentStripsForNonTongyi(t *testing.T) {
+	in := []aispec.ChatDetail{
+		{Role: "system", Content: []*aispec.ChatContent{
+			{Type: "text", Text: "system-text", CacheControl: map[string]any{"type": "ephemeral"}},
+		}},
+		{Role: "user", Content: []*aispec.ChatContent{
+			{Type: "text", Text: "user1-frozen-prefix", CacheControl: map[string]any{"type": "ephemeral"}},
+		}},
+		{Role: "user", Content: []*aispec.ChatContent{
+			{Type: "text", Text: "user2-semi-prefix", CacheControl: map[string]any{"type": "ephemeral"}},
+		}},
+		{Role: "user", Content: "user3-open-and-dynamic"},
+	}
+	out := RewriteMessagesForProvider(in, "siliconflow", "any-model")
+	if len(out) != 4 {
+		t.Fatalf("len mismatch: got %d want 4", len(out))
+	}
+	for i := 0; i < 3; i++ {
+		arr, ok := out[i].Content.([]*aispec.ChatContent)
+		if !ok || len(arr) == 0 {
+			t.Fatalf("idx %d: content shape mismatch %T", i, out[i].Content)
+		}
+		if arr[0].CacheControl != nil {
+			t.Fatalf("idx %d: cc must be stripped, got %v", i, arr[0].CacheControl)
+		}
+	}
+	if s, _ := out[3].Content.(string); s != "user3-open-and-dynamic" {
+		t.Fatalf("user3 string must be unchanged, got %v", out[3].Content)
+	}
+}

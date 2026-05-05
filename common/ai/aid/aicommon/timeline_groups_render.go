@@ -555,6 +555,34 @@ const (
 	TimelineFrozenBoundaryNonce   = "semi-dynamic"
 )
 
+// SemiDynamicCacheBoundaryTagName / SemiDynamicCacheBoundaryNonce 是给
+// "semi-dynamic 段"再加一层 cache 边界的标签字面量, 形成
+// <|AI_CACHE_SEMI_semi|>...<|AI_CACHE_SEMI_END_semi|>.
+//
+// 设计意图 (P1: 双 cache 边界 4 段切分):
+//   - SYSTEM (high-static)  -> ephemeral cc, role:system 单消息
+//   - AI_CACHE_FROZEN      -> ephemeral cc, user1 (Tool/Forge/Timeline-frozen)
+//   - AI_CACHE_SEMI        -> ephemeral cc, user2 (Skills + Schema + CacheToolCall)
+//   - timeline-open + dynamic -> 无 cc, user3 (易变尾段)
+//
+// 命名说明:
+//   - tagName "AI_CACHE_SEMI": aicache 体系约定的"该段已字节冻结但稳定性弱于
+//     frozen, 仍适合作 prefix cache" 标识
+//   - nonce "semi": 与 PROMPT_SECTION_semi-dynamic 是不同 tagName, 不冲突;
+//     选 "semi" 而非 "semi-dynamic" 是为了避免视觉上与 frozen 边界 nonce
+//     "semi-dynamic" 混淆 (frozen 是 cache 边界 nonce, semi-dynamic 是
+//     PROMPT_SECTION 段名 nonce, 两者历史上已经分开)
+//
+// 字面量必须与 aicache.semiBoundaryTagName / semiBoundaryNonce 严格一致 (两
+// 包互不 import 各自定义本地副本).
+//
+// 关键词: SemiDynamicCacheBoundaryTagName, AI_CACHE_SEMI, semi cache boundary,
+//        4 段切分, 双 cc, P1
+const (
+	SemiDynamicCacheBoundaryTagName = "AI_CACHE_SEMI"
+	SemiDynamicCacheBoundaryNonce   = "semi"
+)
+
 // Render 将所有 renderable block 按 aitag 兼容格式拼接：
 //
 //	<|TAGNAME_<nonce>|>

@@ -7,3 +7,5 @@
 {{ .Schema }}
 ```
 <|SCHEMA|>{{ end }}
+{{ if .RecentToolsCache }}
+{{ .RecentToolsCache }}{{ end }}

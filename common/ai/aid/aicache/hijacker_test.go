@@ -876,3 +876,206 @@ func TestHijack_FrozenBoundary_TimelineDumpFormat(t *testing.T) {
 	require.Contains(t, user2, "final-user-question",
 		"dynamic question must end up in user2 (open tail)")
 }
+
+// ---------------------------------------------------------------------------
+// Semi boundary 测试 (P1 双 cache 边界 4 段切分)
+// ---------------------------------------------------------------------------
+
+// TestHijack_SemiBoundary_HappyPath4Segments 验证 frozen + semi 双边界齐全时
+// hijacker 切成 4 段消息: [system+cc, user1+cc, user2+cc, user3].
+//
+// 端到端 prompt 形态:
+//   SYSTEM (high-static)        -> system + cc
+//   AI_CACHE_FROZEN ... END     -> user1 + cc
+//   AI_CACHE_SEMI   ... END     -> user2 + cc (内含 PROMPT_SECTION_semi-dynamic + 内容)
+//   timeline-open + dynamic     -> user3 (无 cc)
+//
+// 关键词: TestHijack_SemiBoundary, 4 段切分, P1 双 cache 边界, 双 cc 主路径
+func TestHijack_SemiBoundary_HappyPath4Segments(t *testing.T) {
+	prompt := strings.Join([]string{
+		"<|AI_CACHE_SYSTEM_high-static|>\nA-system\n<|AI_CACHE_SYSTEM_END_high-static|>",
+		"<|AI_CACHE_FROZEN_semi-dynamic|>\n" +
+			"frozen-tool-inventory\n" +
+			"<|TIMELINE_r1t1|>\nfrozen-reducer\n<|TIMELINE_END_r1t1|>\n" +
+			"<|AI_CACHE_FROZEN_END_semi-dynamic|>",
+		"<|AI_CACHE_SEMI_semi|>\n" +
+			"<|PROMPT_SECTION_semi-dynamic|>\n" +
+			"skills-context-block\n" +
+			"<|SCHEMA|>\nschema-content\n<|SCHEMA|>\n" +
+			"<|CACHE_TOOL_CALL_[current-nonce]|>\ncache-tool-call-content\n<|CACHE_TOOL_CALL_END_[current-nonce]|>\n" +
+			"<|PROMPT_SECTION_END_semi-dynamic|>\n" +
+			"<|AI_CACHE_SEMI_END_semi|>",
+		"<|PROMPT_SECTION_timeline-open|>\nopen-timeline-bucket\n<|PROMPT_SECTION_END_timeline-open|>",
+		"<|PROMPT_SECTION_dynamic_q|>\nuser-query-and-dynamic\n<|PROMPT_SECTION_dynamic_END_q|>",
+	}, "\n\n")
+
+	res := hijackHighStatic(prompt)
+	require.NotNil(t, res, "happy-path should hijack")
+	require.True(t, res.IsHijacked)
+	require.Len(t, res.Messages, 4, "double-boundary prompt should split into 4 segments")
+
+	system := extractTextContent(t, res.Messages[0].Content)
+	user1 := extractTextContent(t, res.Messages[1].Content)
+	user2 := extractTextContent(t, res.Messages[2].Content)
+	user3 := extractTextContent(t, res.Messages[3].Content)
+
+	require.Contains(t, system, "A-system")
+	require.NotContains(t, system, "frozen-tool-inventory")
+
+	// user1: frozen 段, 含 frozen END 标签自身, 不含 semi 任何内容
+	require.Contains(t, user1, "frozen-tool-inventory")
+	require.Contains(t, user1, "frozen-reducer")
+	require.Contains(t, user1, "<|AI_CACHE_FROZEN_END_semi-dynamic|>",
+		"user1 must include frozen END tag for byte-stable prefix")
+	require.NotContains(t, user1, "skills-context-block")
+	require.NotContains(t, user1, "cache-tool-call-content")
+	require.NotContains(t, user1, "open-timeline-bucket")
+
+	// user2: semi 段, 必须包含 START 与 END 边界, 含 SkillsContext + Schema + CacheToolCall
+	require.Contains(t, user2, "<|AI_CACHE_SEMI_semi|>",
+		"user2 must include semi START tag")
+	require.Contains(t, user2, "<|AI_CACHE_SEMI_END_semi|>",
+		"user2 must include semi END tag for byte-stable prefix")
+	require.Contains(t, user2, "skills-context-block")
+	require.Contains(t, user2, "schema-content")
+	require.Contains(t, user2, "cache-tool-call-content")
+	require.NotContains(t, user2, "open-timeline-bucket")
+	require.NotContains(t, user2, "user-query-and-dynamic")
+
+	// user3: open + dynamic, 不含 semi 边界与内容
+	require.Contains(t, user3, "open-timeline-bucket")
+	require.Contains(t, user3, "user-query-and-dynamic")
+	require.NotContains(t, user3, "<|AI_CACHE_SEMI_semi|>")
+	require.NotContains(t, user3, "skills-context-block")
+
+	// system + user1 + user2 都必须自带 ephemeral cc, user3 不带
+	assertHasEphemeralCacheControl(t, res.Messages[0].Content, "4seg system")
+	assertHasEphemeralCacheControl(t, res.Messages[1].Content, "4seg user1")
+	assertHasEphemeralCacheControl(t, res.Messages[2].Content, "4seg user2")
+	assertNoCacheControl(t, res.Messages[3].Content, "4seg user3")
+}
+
+// TestHijack_SemiBoundary_MissingSemi_FallsBackTo3Segments 验证仅有 frozen
+// 边界, 没有 semi 边界时, hijacker 退化到 3 段 (与场景 A 等价).
+// 关键词: TestHijack_SemiBoundary, 缺 semi 边界退化 3 段
+func TestHijack_SemiBoundary_MissingSemi_FallsBackTo3Segments(t *testing.T) {
+	prompt := strings.Join([]string{
+		"<|AI_CACHE_SYSTEM_high-static|>\nA-system\n<|AI_CACHE_SYSTEM_END_high-static|>",
+		"<|AI_CACHE_FROZEN_semi-dynamic|>\n" +
+			"frozen-tool-inventory\n" +
+			"<|AI_CACHE_FROZEN_END_semi-dynamic|>",
+		"<|PROMPT_SECTION_semi-dynamic|>\n" +
+			"skills-no-semi-boundary\n" +
+			"<|PROMPT_SECTION_END_semi-dynamic|>",
+		"<|PROMPT_SECTION_dynamic_q|>\ndynamic-q\n<|PROMPT_SECTION_dynamic_END_q|>",
+	}, "\n\n")
+
+	res := hijackHighStatic(prompt)
+	require.NotNil(t, res)
+	require.Len(t, res.Messages, 3,
+		"missing semi boundary should fall back to 3-segment frozen-only path")
+
+	user1 := extractTextContent(t, res.Messages[1].Content)
+	user2 := extractTextContent(t, res.Messages[2].Content)
+	require.Contains(t, user1, "frozen-tool-inventory")
+	require.Contains(t, user1, "<|AI_CACHE_FROZEN_END_semi-dynamic|>")
+	require.Contains(t, user2, "skills-no-semi-boundary")
+	require.Contains(t, user2, "dynamic-q")
+
+	// 3 段路径下: system + user1 自带 cc, user2 不带 cc
+	assertHasEphemeralCacheControl(t, res.Messages[0].Content, "3seg fallback system")
+	assertHasEphemeralCacheControl(t, res.Messages[1].Content, "3seg fallback user1")
+	assertNoCacheControl(t, res.Messages[2].Content, "3seg fallback user2")
+}
+
+// TestHijack_SemiBoundary_SemiBeforeFrozen_FallsBack 病态顺序: semi 边界
+// 出现在 frozen END 之前. splitBySemiBoundary 从 frozenEnd 之后找 semi START,
+// 找不到就退化, hijacker 仍能切 3 段.
+// 关键词: TestHijack_SemiBoundary, 病态顺序 semi 在前 frozen 在后退化
+func TestHijack_SemiBoundary_SemiBeforeFrozen_FallsBack(t *testing.T) {
+	prompt := strings.Join([]string{
+		"<|AI_CACHE_SYSTEM_high-static|>\nA-system\n<|AI_CACHE_SYSTEM_END_high-static|>",
+		// semi 在前 (异常)
+		"<|AI_CACHE_SEMI_semi|>\nillegal-semi\n<|AI_CACHE_SEMI_END_semi|>",
+		"<|AI_CACHE_FROZEN_semi-dynamic|>\nfrozen-content\n<|AI_CACHE_FROZEN_END_semi-dynamic|>",
+		"<|PROMPT_SECTION_dynamic_q|>\nq\n<|PROMPT_SECTION_dynamic_END_q|>",
+	}, "\n\n")
+
+	res := hijackHighStatic(prompt)
+	require.NotNil(t, res)
+	require.Len(t, res.Messages, 3,
+		"semi-before-frozen should NOT trigger 4-segment split, must fall back to 3-segment frozen-only path")
+}
+
+// TestHijack_SemiBoundary_SemiNestedInsideFrozen_FallsBack semi 边界完全嵌套
+// 在 frozen 边界内 (frozen END 在 semi END 之后). splitBySemiBoundary 从
+// frozenEnd 后找 semi START, 找不到就退化. 这与"semi 必须在 frozen END 之后"
+// 的契约对齐.
+// 关键词: TestHijack_SemiBoundary, semi 嵌套于 frozen 内退化
+func TestHijack_SemiBoundary_SemiNestedInsideFrozen_FallsBack(t *testing.T) {
+	prompt := strings.Join([]string{
+		"<|AI_CACHE_SYSTEM_high-static|>\nA-system\n<|AI_CACHE_SYSTEM_END_high-static|>",
+		"<|AI_CACHE_FROZEN_semi-dynamic|>\n" +
+			"frozen-prefix\n" +
+			"<|AI_CACHE_SEMI_semi|>\nnested-semi\n<|AI_CACHE_SEMI_END_semi|>\n" +
+			"frozen-suffix\n" +
+			"<|AI_CACHE_FROZEN_END_semi-dynamic|>",
+		"<|PROMPT_SECTION_dynamic_q|>\nq\n<|PROMPT_SECTION_dynamic_END_q|>",
+	}, "\n\n")
+
+	res := hijackHighStatic(prompt)
+	require.NotNil(t, res)
+	require.Len(t, res.Messages, 3,
+		"semi nested inside frozen should NOT trigger 4-segment split (semi START is before frozen END), must fall back")
+}
+
+// TestHijack_SemiBoundary_User3Empty_FallsBack 4 段切分要求 user3 (semi END
+// 之后到末尾) 非空; 否则退化到 3 段 (避免空消息).
+// 关键词: TestHijack_SemiBoundary, user3 空退化 3 段
+func TestHijack_SemiBoundary_User3Empty_FallsBack(t *testing.T) {
+	prompt := strings.Join([]string{
+		"<|AI_CACHE_SYSTEM_high-static|>\nA-system\n<|AI_CACHE_SYSTEM_END_high-static|>",
+		"<|AI_CACHE_FROZEN_semi-dynamic|>\nfrozen-content\n<|AI_CACHE_FROZEN_END_semi-dynamic|>",
+		"<|AI_CACHE_SEMI_semi|>\nsemi-content\n<|AI_CACHE_SEMI_END_semi|>",
+		// 故意没有任何 user3 内容
+	}, "\n\n")
+
+	res := hijackHighStatic(prompt)
+	require.NotNil(t, res)
+	// user3 为空时不应该走 4 段, 退化到 3 段或 2 段都可
+	require.NotEqual(t, 4, len(res.Messages),
+		"empty user3 must NOT trigger 4-segment split")
+}
+
+// TestHijack_SemiBoundary_PrefixStableAcrossDynamicChange 4 段切分下,
+// 改变 user3 (open + dynamic) 内容时, system / user1 / user2 必须字节稳定
+// (这是 P1 双 cache 边界双 cc 命中前提).
+// 关键词: TestHijack_SemiBoundary, 字节稳定, system/user1/user2 跨调用一致
+func TestHijack_SemiBoundary_PrefixStableAcrossDynamicChange(t *testing.T) {
+	mk := func(dyn string) string {
+		return strings.Join([]string{
+			"<|AI_CACHE_SYSTEM_high-static|>\nfixed-system\n<|AI_CACHE_SYSTEM_END_high-static|>",
+			"<|AI_CACHE_FROZEN_semi-dynamic|>\nfixed-frozen\n<|AI_CACHE_FROZEN_END_semi-dynamic|>",
+			"<|AI_CACHE_SEMI_semi|>\n" +
+				"<|PROMPT_SECTION_semi-dynamic|>\nfixed-semi-content\n<|PROMPT_SECTION_END_semi-dynamic|>\n" +
+				"<|AI_CACHE_SEMI_END_semi|>",
+			"<|PROMPT_SECTION_dynamic_q|>\n" + dyn + "\n<|PROMPT_SECTION_dynamic_END_q|>",
+		}, "\n\n")
+	}
+
+	r1 := hijackHighStatic(mk("dynamic-r1-payload"))
+	r2 := hijackHighStatic(mk("dynamic-r2-completely-different"))
+	require.NotNil(t, r1)
+	require.NotNil(t, r2)
+	require.Len(t, r1.Messages, 4)
+	require.Len(t, r2.Messages, 4)
+
+	assert.Equal(t, r1.Messages[0].Content, r2.Messages[0].Content,
+		"system must be byte-stable when high-static unchanged")
+	assert.Equal(t, r1.Messages[1].Content, r2.Messages[1].Content,
+		"user1 must be byte-stable when frozen prefix unchanged")
+	assert.Equal(t, r1.Messages[2].Content, r2.Messages[2].Content,
+		"user2 must be byte-stable when semi prefix unchanged (P1 二级 cache 边界)")
+	assert.NotEqual(t, r1.Messages[3].Content, r2.Messages[3].Content,
+		"user3 should differ when dynamic content changes")
+}

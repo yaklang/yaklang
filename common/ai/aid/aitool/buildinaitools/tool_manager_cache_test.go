@@ -106,7 +106,11 @@ func TestRecentToolCache_Summary(t *testing.T) {
 	mgr.AddRecentlyUsedTool(t1)
 	mgr.AddRecentlyUsedTool(t2)
 
+	// CACHE_TOOL_CALL 块固定使用占位符字面量 nonce, 与传入的 nonce 参数解耦,
+	// 让 prompt 段跨 turn 字节稳定可被 prefix cache 命中.
+	// 关键词: TestRecentToolCache_Summary, [current-nonce] 占位符断言
 	summary := mgr.GetRecentToolsSummary(10240, "testnonce")
+	stableNonce := RecentToolCacheStableNonce
 	assert.Check(t, summary != "", "summary should not be empty")
 	assert.Check(t, strings.Contains(summary, "sleep_test"), "summary should contain sleep_test")
 	assert.Check(t, strings.Contains(summary, "read_file"), "summary should contain read_file")
@@ -116,11 +120,14 @@ func TestRecentToolCache_Summary(t *testing.T) {
 	assert.Check(t, !strings.Contains(summary, `"tool": {`), "summary should not include wrapped tool schema")
 	assert.Check(t, !strings.Contains(summary, `"params": {`), "summary should not include wrapped params shell")
 
-	// AITAG boundaries
-	assert.Check(t, strings.Contains(summary, "<|TOOL_sleep_test_testnonce|>"), "summary should have AITAG open boundary")
-	assert.Check(t, strings.Contains(summary, "<|TOOL_sleep_test_END_testnonce|>"), "summary should have AITAG close boundary")
-	assert.Check(t, strings.Contains(summary, "<|TOOL_read_file_testnonce|>"), "read_file should have AITAG open boundary")
-	assert.Check(t, strings.Contains(summary, "<|TOOL_read_file_END_testnonce|>"), "read_file should have AITAG close boundary")
+	// 渲染应忽略传入的 testnonce, 一律使用 stableNonce
+	assert.Check(t, !strings.Contains(summary, "testnonce"), "summary must not leak passed-in nonce; should be byte-stable across turns")
+
+	// AITAG boundaries: stableNonce 占位符字面量
+	assert.Check(t, strings.Contains(summary, "<|TOOL_sleep_test_"+stableNonce+"|>"), "summary should have AITAG open boundary with stable nonce")
+	assert.Check(t, strings.Contains(summary, "<|TOOL_sleep_test_END_"+stableNonce+"|>"), "summary should have AITAG close boundary with stable nonce")
+	assert.Check(t, strings.Contains(summary, "<|TOOL_read_file_"+stableNonce+"|>"), "read_file should have AITAG open boundary with stable nonce")
+	assert.Check(t, strings.Contains(summary, "<|TOOL_read_file_END_"+stableNonce+"|>"), "read_file should have AITAG close boundary with stable nonce")
 
 	// __USAGE__ only appears for tools that have it
 	assert.Check(t, strings.Contains(summary, "__USAGE__: pass seconds as a float"), "sleep_test should show __USAGE__")
@@ -132,8 +139,10 @@ func TestRecentToolCache_Summary(t *testing.T) {
 	assert.Check(t, strings.Contains(summary, "directly_call_expectations"), "footer should reference directly_call_expectations")
 	assert.Check(t, strings.Contains(summary, "Do not wrap it with @action, tool, or params."), "footer should clarify params-only usage")
 	assert.Check(t, strings.Contains(summary, "Hybrid mode for block parameters"), "footer should describe hybrid block-param mode")
-	assert.Check(t, strings.Contains(summary, "<|TOOL_PARAM_command_testnonce|>"), "footer should include nonce-aware AITAG example")
+	assert.Check(t, strings.Contains(summary, "<|TOOL_PARAM_command_"+stableNonce+"|>"), "footer should include stable-nonce AITAG example")
 	assert.Check(t, strings.Contains(summary, "AITAG block values override same-named JSON params."), "footer should explain AITAG precedence")
+	// 占位符语义: footer 应明确告知 LLM 这个 nonce 是占位符, 可替换为真实 turn nonce
+	assert.Check(t, strings.Contains(summary, "PLACEHOLDER"), "footer should document placeholder semantics for stable nonce")
 }
 
 func TestRecentToolCache_SummaryMaxTokens(t *testing.T) {

@@ -42,8 +42,27 @@ func (r *ReActLoop) buildActionTagOption(emitter *aicommon.Emitter, streamWG *sy
 
 		v := _tagInstance
 
+		// 字段级双注册: 默认走 turn nonce; 如果 LoopAITagField.ExtraNonces 非空,
+		// 给该 tag 追加 extra nonce 候选, ActionMaker 会同时给 turn nonce + 每个
+		// extra nonce 都注册 callback, LLM 用任一 nonce 输出 AITAG 都能命中.
+		//
+		// 用例: CACHE_TOOL_CALL 块内 TOOL_PARAM_xxx 在 prompt 中用占位符字面量
+		// nonce "[current-nonce]" 渲染保持字节稳定; LLM 既可能照抄字面量,
+		// 也可能识破替换为 turn nonce. 双注册兼容两种行为.
+		//
+		// nonce 覆盖只精准作用在显式声明 ExtraNonces 的字段上, 不会扩散到其他
+		// LoopAITagField (USER_QUERY 等仍只走 turn nonce).
+		// 关键词: buildActionTagOption, ExtraNonces 双注册, [current-nonce]
+		if len(v.ExtraNonces) == 0 {
+			actionOptions = append(actionOptions,
+				aicommon.WithActionTagToKey(v.TagName, v.VariableName),
+			)
+		} else {
+			actionOptions = append(actionOptions,
+				aicommon.WithActionTagToKeyAndExtraNonces(v.TagName, v.VariableName, v.ExtraNonces...),
+			)
+		}
 		actionOptions = append(actionOptions,
-			aicommon.WithActionTagToKey(v.TagName, v.VariableName),
 			aicommon.WithActionFieldStreamHandler([]string{v.VariableName}, func(key string, fieldReader io.Reader) {
 				nodeId := v.AINodeId
 				contentType := v.ContentType
