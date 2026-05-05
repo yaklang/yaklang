@@ -361,7 +361,13 @@ func (r *ReAct) AddToTimeline(entryType, content string) {
 	} else {
 		msg.WriteString(":\n")
 	}
-	msg.WriteString(utils.PrefixLines(content, "  "))
+	// 旧实现给 body 整体加过 '  ' 缩进, 当时是为了让人类阅读 dump 时一眼区分
+	// 'header line' 与 'body lines'. timeline 渲染 (TimelineIntervalBlock.Render)
+	// 现在已经为每个 item 输出独立的 'HH:MM:SS [type/...]' 行头, 缩进对 LLM 不再
+	// 提供任何信息, 只消耗 token. 直接拼 body 即可, humanReadable parser 端的
+	// removeIndent 在新数据无前缀时是 no-op, 向后兼容历史持久化.
+	// 关键词: ReAct.AddToTimeline 去掉 body 缩进, prompt token 节省
+	msg.WriteString(content)
 	r.config.Timeline.PushText(r.config.AcquireId(), msg.String())
 	r.SaveTimeline()
 }

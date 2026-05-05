@@ -98,8 +98,21 @@ func ParseTimelineItemHumanReadable(item *TimelineItem) *TimelineItemHumanReadab
 }
 
 // parseTextTimelineItem 解析 TextTimelineItem 的 Text 字段
-// 格式: [entryType] [task:taskId]:\n  content
-// 或:   [entryType]:\n  content
+//
+// 当前格式 (re-act.go:AddToTimeline 修复后): [entryType] [task:taskId]:\nbody
+//
+//	或 [entryType]:\nbody
+//
+// 历史格式 (修复前): [entryType] [task:taskId]:\n  body
+// 后者 body 整体多缩 2 空格, 是早期 utils.PrefixLines(content, "  ") 注入的
+// "为人类阅读 dump 而打的视觉嵌套". 现在 timeline render 已经为每条 item 单
+// 独输出 'HH:MM:SS [type/...]' 行头, 缩进对 LLM 不再有信息量, 已从源头去掉.
+//
+// 解析时统一调 removeIndent 把"可能存在的"两空格前缀消掉, 让两种格式产出
+// 一致 Content; 新数据没有前缀, removeIndent 退化成 no-op (TrimPrefix 找不
+// 到时返回原行), 安全幂等, 兼容历史持久化的 timeline 回放.
+//
+// 关键词: parseTextTimelineItem 历史兼容, removeIndent 安全 no-op
 func parseTextTimelineItem(result *TimelineItemHumanReadable, text string) {
 	if text == "" {
 		return
@@ -118,7 +131,8 @@ func parseTextTimelineItem(result *TimelineItemHumanReadable, text string) {
 	colonIndex := strings.Index(text, ":\n")
 	if colonIndex != -1 {
 		content := text[colonIndex+2:] // 跳过 ":\n"
-		// 移除每行开头的两个空格缩进 (utils.PrefixLines 添加的 "  ")
+		// 兼容历史持久化 timeline: 旧格式 body 整体多缩 "  ", 这里消除回去;
+		// 新格式 (修复后) body 顶头无前缀, removeIndent 是 no-op, 不影响.
 		result.Content = removeIndent(content, "  ")
 	} else {
 		// 如果没有找到 ":\n"，尝试找 ":" 后的内容

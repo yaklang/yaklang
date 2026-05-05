@@ -348,3 +348,59 @@ func TestParseTextTimelineItem_WithSpecialEntryType(t *testing.T) {
 	require.Equal(t, "Special entry type", result.Content)
 	require.Equal(t, "user_input", result.Type)
 }
+
+// TestParseTimelineItemHumanReadable_TextTimelineItem_NewFormatNoIndent 验证修复
+// 后 (re-act.go:AddToTimeline 不再 PrefixLines("  ")) 的新格式: body 顶头, 无 2
+// 空格前缀; parser 仍能正确解析出与历史格式一致的 Content.
+//
+// 关键词: parseTextTimelineItem 新格式 兼容, removeIndent no-op, timeline render dedent
+func TestParseTimelineItemHumanReadable_TextTimelineItem_NewFormatNoIndent(t *testing.T) {
+	// 新格式: body 顶头无前缀
+	text := "[action] [task:task-007]:\nLine 1\nLine 2\nLine 3"
+	item := &TimelineItem{
+		createdAt: time.Now(),
+		value: &TextTimelineItem{
+			ID:   600,
+			Text: text,
+		},
+	}
+
+	result := ParseTimelineItemHumanReadable(item)
+	require.NotNil(t, result)
+	require.Equal(t, "text", result.Type)
+	require.Equal(t, int64(600), result.ID)
+	require.Equal(t, "action", result.EntryType)
+	require.Equal(t, "task-007", result.TaskID)
+	// removeIndent 在 body 没有 "  " 前缀时退化成 no-op, Content 维持原样
+	require.Equal(t, "Line 1\nLine 2\nLine 3", result.Content)
+	require.Equal(t, text, result.RawText)
+}
+
+// TestParseTextTimelineItem_NewFormatNoIndent_NoTask 验证无 task 的新格式 body 顶头
+//
+// 关键词: parseTextTimelineItem 新格式 无任务, 兼容
+func TestParseTextTimelineItem_NewFormatNoIndent_NoTask(t *testing.T) {
+	text := "[note]:\nflush left line 1\nflush left line 2"
+	result := &TimelineItemHumanReadable{}
+	parseTextTimelineItem(result, text)
+
+	require.Equal(t, "note", result.EntryType)
+	require.Empty(t, result.TaskID)
+	require.Equal(t, "flush left line 1\nflush left line 2", result.Content)
+}
+
+// TestParseTextTimelineItem_HistoricalFormatStillWorks 守护历史持久化兼容: body 整
+// 体多缩 "  " 的旧格式, 解析时 removeIndent 会消掉, Content 与新格式产出一致.
+//
+// 关键词: parseTextTimelineItem 历史兼容, removeIndent 旧数据回放
+func TestParseTextTimelineItem_HistoricalFormatStillWorks(t *testing.T) {
+	// 历史格式: body 整体多缩 "  "
+	text := "[action] [task:task-008]:\n  legacy line 1\n  legacy line 2"
+	result := &TimelineItemHumanReadable{}
+	parseTextTimelineItem(result, text)
+
+	require.Equal(t, "action", result.EntryType)
+	require.Equal(t, "task-008", result.TaskID)
+	// removeIndent 把每行 "  " 前缀消掉, 让历史数据与新数据产出一致 Content
+	require.Equal(t, "legacy line 1\nlegacy line 2", result.Content)
+}

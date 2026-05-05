@@ -68,16 +68,25 @@ func (t *ToolResult) String() string {
 
 	paramParsed := utils.InterfaceToGeneralMap(t.Param)
 	if len(paramParsed) > 0 {
-		buf.WriteString("param: \n")
+		buf.WriteString("param:\n")
 		out, err := yaml.Marshal(paramParsed)
 		if err != nil {
+			// 旧实现给 fallback 行加 '  - ' 前缀, 配合 yaml-marshal 路径的统一
+			// 缩进逻辑. 现在统一拍平不再外加 '  ', 顶头 '- key: value' 仍然
+			// 是合法 yaml.
+			// 关键词: ToolResult.String fallback 去外层缩进
 			for k, v := range paramParsed {
-				buf.WriteString(fmt.Sprintf("  - %v: %s\n", k, v))
+				buf.WriteString(fmt.Sprintf("- %v: %s\n", k, v))
 			}
 		} else {
-			for _, line := range utils.ParseStringToRawLines(string(out)) {
-				buf.WriteString(fmt.Sprintf("  %s\n", string(line)))
-			}
+			// yaml.Marshal 自身已经产生合法相对缩进 (顶层 key 顶头, 嵌套 value
+			// 缩 2/4). 历史上这里再外套一层 '  ' 是为了把 'param:' 与其下的
+			// yaml body 在文本上看起来"嵌套"得更明显, 但对 LLM 而言纯属冗余
+			// token, 还会让 'command: |-' 块的命令行多出一层视觉 6 空格缩
+			// 进 (yaml 4 + 外套 2). 直接拼 yaml 原文, 既减 token 又仍可被
+			// yaml.Unmarshal 正确解析. yaml.Marshal 输出末尾自带 '\n'.
+			// 关键词: ToolResult.String yaml 顶层不再外套 '  ', timeline prompt 紧凑
+			buf.Write(out)
 		}
 	} else {
 		buf.WriteString(fmt.Sprintf("param: %s\n", utils.Jsonify(t.Param)))
