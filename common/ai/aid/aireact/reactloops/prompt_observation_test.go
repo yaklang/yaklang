@@ -196,6 +196,47 @@ func TestPreviewSectionContent_KeepNewlinesAndTruncate(t *testing.T) {
 	require.Equal(t, "", preview)
 }
 
+// TestBuildStatus_DefaultNoTruncate 验证 BuildStatus(0) 默认走"不截断"路径,
+// 即使段内容达到 8 KiB / 32 KiB 量级, summary 也完整透传,
+// summary_truncated 恒为 false. 这是用户明确要求的"全部展示, 不要 truncated".
+//
+// 同时验证显式传正数 maxBytes 仍按预期截断, 给未来需要带宽控制的场景留出口子.
+//
+// 关键词: BuildStatus 默认不截断, summary_truncated false, 完整展示
+func TestBuildStatus_DefaultNoTruncate(t *testing.T) {
+	bigContent := strings.Repeat("hostscan-evidence-line\n", 400) // ~9.2 KiB, 仿真 8K 段
+	veryBig := strings.Repeat("frozen-timeline-row\n", 1600)      // ~32 KiB, 仿真 timeline frozen 段
+	a := NewPromptSectionObservation("k1", "small", PromptSectionRoleSystemPrompt, false, "alpha\nbeta")
+	b := NewPromptSectionObservation("k2", "big-8k", PromptSectionRoleRuntimeCtx, true, bigContent)
+	c := NewPromptSectionObservation("k3", "very-big-32k", PromptSectionRoleRuntimeCtx, true, veryBig)
+
+	prompt := a.Content + "\n\n" + b.Content + "\n\n" + c.Content
+	obs := BuildPromptObservation("loop-no-trunc", "n1", prompt, []*PromptSectionObservation{a, b, c})
+
+	// 默认路径: maxSummaryBytes=0 -> 不截断
+	defStatus := obs.BuildStatus(0)
+	require.NotNil(t, defStatus)
+	require.Len(t, defStatus.Sections, 3)
+	for _, s := range defStatus.Sections {
+		require.False(t, s.SummaryTruncated,
+			"默认 BuildStatus(0) 必须不截断, 段 %s 报告了 truncated", s.Key)
+		require.Equal(t, strings.TrimSpace(s.Summary)+"", strings.TrimSpace(s.Summary),
+			"summary 必须保留原文换行")
+		require.NotContains(t, s.Summary, "(truncated, total",
+			"默认路径 summary 不能出现 truncated 提示, 段 %s", s.Key)
+	}
+	// 8K / 32K 段的 summary 长度应接近原文字节数 (允许 trim 微小差异)
+	require.GreaterOrEqual(t, len(defStatus.Sections[1].Summary), len(bigContent)-2)
+	require.GreaterOrEqual(t, len(defStatus.Sections[2].Summary), len(veryBig)-2)
+
+	// 显式截断路径: 用户后续如果要给前端做带宽控制, 仍可显式传正数
+	cutStatus := obs.BuildStatus(1024)
+	require.NotNil(t, cutStatus)
+	require.False(t, cutStatus.Sections[0].SummaryTruncated, "小段不应被截")
+	require.True(t, cutStatus.Sections[1].SummaryTruncated, "8K 段超过 1KiB 上限应截断")
+	require.Contains(t, cutStatus.Sections[1].Summary, "(truncated, total")
+}
+
 // TestPromptSectionStatus_BytesPercentAndHash 单测新字段 BytesPercent / ContentHash
 // 关键词: prompt_profile new fields test, BytesPercent, ContentHash, EstimatedTokens
 func TestPromptSectionStatus_BytesPercentAndHash(t *testing.T) {

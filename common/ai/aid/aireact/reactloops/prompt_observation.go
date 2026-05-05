@@ -12,11 +12,18 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-// 前端 "上下文成分" 面板默认 summary 上限. 老值是 120 (压平空格之后), 抑制了
-// 用户排查"哪一段在炸 prompt 体积"的能力. 4096 字节足以展示一段头部 + 中段
-// 关键样例, 同时控制 EmitPromptProfile event 的传输成本在合理范围.
-// 关键词: defaultPromptSummaryBytes, prompt_profile summary 上限, 上下文成分展示
-const defaultPromptSummaryBytes = 4 * 1024
+// defaultPromptSummaryBytes 给前端 "上下文成分" 面板的 summary 默认上限.
+//
+// 历史值: 120 (老路径, 还把空格 / 换行压平, 用户基本看不到任何有效内容).
+// 中间方案: 4096 (升 34x, 但 8K 量级的段仍被截, 用户看到 "(truncated, total 8693 bytes)"
+// 反而想了解段细节的诉求被打断).
+//
+// 当前值: 0 (无上限, 完整透传段内容). 用户实测段体量在数 KB ~ 数十 KB 量级,
+// EmitPromptProfile event 走本地 ipc, 这个量级 payload 完全可承受;
+// 调用方如果出于带宽 / 渲染成本想强制截断, 可以显式给 BuildStatus 传正数 maxBytes.
+//
+// 关键词: defaultPromptSummaryBytes, prompt_profile summary 不截断, 上下文成分完整展示
+const defaultPromptSummaryBytes = 0
 
 const lastPromptObservationLoopKey = "last_ai_decision_prompt_observation"
 const lastPromptObservationStatusLoopKey = "last_ai_decision_prompt_observation_status"
@@ -98,8 +105,9 @@ type PromptSectionStatus struct {
 	// 跨多次 prompt_profile 比对同 key 段的 hash 即可判断段内容是否抖动 -
 	// 用于诊断 cache prefix 漂移 (同 key 不同 hash = prefix 不稳定).
 	ContentHash string `json:"content_hash,omitempty"`
-	// SummaryTruncated 当段实际字节超过 maxSummaryBytes 而 summary 被前缀截断时为 true.
-	// 前端可据此判断要不要展示"展开" / "查看完整内容" 按钮.
+	// SummaryTruncated 仅当调用方显式给 BuildStatus 传正数 maxSummaryBytes,
+	// 且段实际字节超过该上限时为 true. 默认 0 (无上限) 路径下 summary 全量,
+	// 该字段恒为 false. 保留字段是为了向后兼容 + 未来可恢复显式截断场景.
 	SummaryTruncated bool `json:"summary_truncated,omitempty"`
 }
 
@@ -559,11 +567,12 @@ func (o *PromptObservation) RenderCLIReport(maxPreviewBytes int) string {
 // BuildStatus 把 PromptObservation 转为可发往前端的 PromptObservationStatus.
 //
 // maxSummaryBytes 控制每段 Summary 的截断上限 (按字节, 头部前缀截断保留换行,
-// 不再压平空格). 传 <= 0 时用 defaultPromptSummaryBytes (4 KiB), 让前端
-// 真正能展示一段头部+中段做诊断, 而不是被截到一行 120 字符.
+// 不压平空格). 传 <= 0 时用 defaultPromptSummaryBytes;
+// 当前默认 = 0 = 不截断, 段内容完整透传给前端 "上下文成分" 面板.
+// 仅当调用方明确出于带宽 / 渲染成本考虑想截断时才传正数.
 //
 // 关键词: BuildStatus, maxSummaryBytes, defaultPromptSummaryBytes,
-// 上下文成分前端展示
+// 上下文成分完整展示
 func (o *PromptObservation) BuildStatus(maxSummaryBytes int) *PromptObservationStatus {
 	if o == nil {
 		return nil

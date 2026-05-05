@@ -235,9 +235,10 @@ func (r *ReActLoop) generateLoopPrompt(
 	}
 	observation := BuildPromptObservation(r.loopName, nonce, result.Prompt, getLoopPromptObservationSections(result))
 	r.SetLastPromptObservation(observation)
-	// 传 0 表示使用 defaultPromptSummaryBytes (4 KiB),
-	// 让前端 "上下文成分" 面板能展示一段头部+中段做诊断而不是被截到 120 字符一行.
-	// 关键词: BuildStatus default summary bytes, 上下文成分前端展示
+	// 传 0 走 defaultPromptSummaryBytes; 当前默认 = 0 = 段内容完整透传.
+	// 用户实测段体量在数 KB ~ 数十 KB 量级, 本地 ipc 完全可承受;
+	// 想换成截断模式时改成显式正数即可.
+	// 关键词: BuildStatus 不截断, 上下文成分完整展示
 	status := observation.BuildStatus(0)
 	r.SetLastPromptObservationStatus(status)
 	r.emitPromptObservationStatus(status)
