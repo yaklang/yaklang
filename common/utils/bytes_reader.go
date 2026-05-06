@@ -582,10 +582,13 @@ func (f *TriggerWriter) GetCount() int64 {
 }
 
 func (f *TriggerWriter) initTimeTrigger() {
-	f.timeTrigger = time.NewTimer(f.timeTriggerDuration)
+	// time.NewTimer(0) fires immediately; combined with select in Write that
+	// races default vs time branch, size-only triggers become flaky. Skip timer
+	// when time-based triggering is disabled (duration <= 0).
 	if f.timeTriggerDuration <= 0 {
-		f.timeTrigger.Stop()
+		return
 	}
+	f.timeTrigger = time.NewTimer(f.timeTriggerDuration)
 }
 
 func (f *TriggerWriter) Write(p []byte) (n int, err error) {
@@ -593,8 +596,12 @@ func (f *TriggerWriter) Write(p []byte) (n int, err error) {
 	f.writeFirstOnce.Do(func() {
 		f.initTimeTrigger()
 	})
+	var timerC <-chan time.Time
+	if f.timeTrigger != nil {
+		timerC = f.timeTrigger.C
+	}
 	select {
-	case <-f.timeTrigger.C:
+	case <-timerC:
 		f.once.Do(func() {
 			f.h(f.r, httpctx.REQUEST_CONTEXT_KEY_ResponseTooSlow)
 		})
