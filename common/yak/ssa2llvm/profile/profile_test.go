@@ -18,10 +18,11 @@ func ptrInt(v int) *int           { return &v }
 
 func TestBuiltinProfilesExist(t *testing.T) {
 	names := profile.Names()
-	require.GreaterOrEqual(t, len(names), 3)
+	require.GreaterOrEqual(t, len(names), 4)
 	assert.Contains(t, names, "resilience-lite")
 	assert.Contains(t, names, "resilience-hybrid")
 	assert.Contains(t, names, "resilience-max")
+	assert.Contains(t, names, "debug-stable-runtime")
 }
 
 func TestGetProfile(t *testing.T) {
@@ -47,12 +48,20 @@ func TestGetProfile(t *testing.T) {
 	}
 }
 
+func assertLinkPrepDisablesRuntimeRandomization(t *testing.T, p *profile.Profile) {
+	t.Helper()
+	require.NotNil(t, p.LinkPrep)
+	require.NotNil(t, p.LinkPrep.RandomizeRuntimeSymbols)
+	assert.False(t, *p.LinkPrep.RandomizeRuntimeSymbols)
+}
+
 func TestLiteProfileProperties(t *testing.T) {
 	p, ok := profile.Get("resilience-lite")
 	require.True(t, ok)
 
 	assert.Equal(t, profile.SeedNone, p.NormalizedSeedPolicy())
 	assert.Equal(t, []string{"addsub", "xor", "callret"}, p.ObfuscatorNames())
+	assertLinkPrepDisablesRuntimeRandomization(t, p)
 	require.NoError(t, p.Validate())
 }
 
@@ -73,6 +82,7 @@ func TestHybridProfileProperties(t *testing.T) {
 	assert.Equal(t, profile.CategoryBodyReplace, virtualize.EffectiveCategory())
 	require.NotNil(t, virtualize.Selector.Ratio)
 	assert.InDelta(t, 0.3, *virtualize.Selector.Ratio, 0.001)
+	assertLinkPrepDisablesRuntimeRandomization(t, p)
 	require.NoError(t, p.Validate())
 }
 
@@ -82,6 +92,15 @@ func TestMaxProfileProperties(t *testing.T) {
 
 	assert.Equal(t, profile.SeedPerBuild, p.NormalizedSeedPolicy())
 	assert.Equal(t, []string{"addsub", "xor", "callret", "mba", "opaque", "virtualize"}, p.ObfuscatorNames())
+	assertLinkPrepDisablesRuntimeRandomization(t, p)
+	require.NoError(t, p.Validate())
+}
+
+func TestDebugStableRuntimeProfile(t *testing.T) {
+	p, ok := profile.Get("debug-stable-runtime")
+	require.True(t, ok)
+	assert.Empty(t, p.ObfuscatorNames())
+	assertLinkPrepDisablesRuntimeRandomization(t, p)
 	require.NoError(t, p.Validate())
 }
 

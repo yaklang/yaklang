@@ -50,6 +50,13 @@ type ObfEntry struct {
 	Selector Selector    `json:"selector,omitempty"`
 }
 
+// LinkPrepConfig holds link-time hardening options. It is separate from
+// Obfuscators: the compiler applies it in a dedicated pre-link stage.
+type LinkPrepConfig struct {
+	RandomizeRuntimeSymbols *bool `json:"randomize_runtime_symbols,omitempty"`
+	ObfuscateABIConstants   *bool `json:"obfuscate_abi_constants,omitempty"`
+}
+
 // EffectiveCategory returns the configured category or the default category for
 // known built-in obfuscators.
 func (e ObfEntry) EffectiveCategory() ObfCategory {
@@ -68,8 +75,9 @@ type Profile struct {
 	SeedPolicy    SeedPolicy `json:"seed_policy,omitempty"`
 	SelectionSeed int64      `json:"selection_seed,omitempty"`
 	BuildSeedHex  string     `json:"build_seed_hex,omitempty"`
-	LLVMPacks     []string   `json:"llvm_packs,omitempty"`
-	Obfuscators   []ObfEntry `json:"obfuscators,omitempty"`
+	LLVMPacks     []string        `json:"llvm_packs,omitempty"`
+	Obfuscators   []ObfEntry      `json:"obfuscators,omitempty"`
+	LinkPrep      *LinkPrepConfig `json:"link_prep,omitempty"`
 }
 
 // Clone returns a deep copy so callers can safely derive a profile without
@@ -98,6 +106,18 @@ func (p *Profile) Clone() *Profile {
 			}
 			clone.Obfuscators[i] = entryClone
 		}
+	}
+	if p.LinkPrep != nil {
+		lp := *p.LinkPrep
+		if p.LinkPrep.RandomizeRuntimeSymbols != nil {
+			v := *p.LinkPrep.RandomizeRuntimeSymbols
+			lp.RandomizeRuntimeSymbols = &v
+		}
+		if p.LinkPrep.ObfuscateABIConstants != nil {
+			v := *p.LinkPrep.ObfuscateABIConstants
+			lp.ObfuscateABIConstants = &v
+		}
+		clone.LinkPrep = &lp
 	}
 	return &clone
 }
@@ -264,11 +284,17 @@ func DefaultCategoryForObfuscator(name string) ObfCategory {
 	}
 }
 
+func linkPrepStableRuntimeSyms() *LinkPrepConfig {
+	f := false
+	return &LinkPrepConfig{RandomizeRuntimeSymbols: &f}
+}
+
 var (
 	ResilienceLite = &Profile{
 		Name:        "resilience-lite",
 		Description: "Lightweight native-only obfuscation (addsub + xor + callret)",
 		SeedPolicy:  SeedNone,
+		LinkPrep:    linkPrepStableRuntimeSyms(),
 		Obfuscators: []ObfEntry{
 			{Name: "addsub", Category: CategoryLocal, Selector: Selector{AllowEntry: true}},
 			{Name: "xor", Category: CategoryLocal, Selector: Selector{AllowEntry: true}},
@@ -280,6 +306,7 @@ var (
 		Name:        "resilience-hybrid",
 		Description: "Native passes + MBA + opaque + partial virtualize + per-build diversification",
 		SeedPolicy:  SeedPerBuild,
+		LinkPrep:    linkPrepStableRuntimeSyms(),
 		Obfuscators: []ObfEntry{
 			{Name: "addsub", Category: CategoryLocal, Selector: Selector{AllowEntry: true}},
 			{Name: "xor", Category: CategoryLocal, Selector: Selector{AllowEntry: true}},
@@ -301,6 +328,7 @@ var (
 		Name:        "resilience-max",
 		Description: "All current passes + full virtualize + per-build diversification",
 		SeedPolicy:  SeedPerBuild,
+		LinkPrep:    linkPrepStableRuntimeSyms(),
 		Obfuscators: []ObfEntry{
 			{Name: "addsub", Category: CategoryLocal, Selector: Selector{AllowEntry: true}},
 			{Name: "xor", Category: CategoryLocal, Selector: Selector{AllowEntry: true}},
@@ -317,6 +345,15 @@ var (
 			},
 		},
 	}
+
+	// DebugStableRuntime keeps stable libyak symbol names (nm-friendly) and performs no obfuscation.
+	DebugStableRuntime = &Profile{
+		Name:        "debug-stable-runtime",
+		Description: "Stable runtime symbols for debugging; no obfuscators",
+		SeedPolicy:  SeedNone,
+		LinkPrep:    linkPrepStableRuntimeSyms(),
+		Obfuscators: nil,
+	}
 )
 
 var registry = map[string]*Profile{}
@@ -325,6 +362,7 @@ func init() {
 	Register(ResilienceLite)
 	Register(ResilienceHybrid)
 	Register(ResilienceMax)
+	Register(DebugStableRuntime)
 }
 
 // Register adds a built-in profile to the registry.
