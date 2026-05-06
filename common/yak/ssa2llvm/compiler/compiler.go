@@ -3,6 +3,7 @@ package compiler
 import (
 	"context"
 	"fmt"
+	"maps"
 
 	"github.com/yaklang/go-llvm"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -45,6 +46,9 @@ type Compiler struct {
 	// compiling the SSA function body.
 	functionWrappers map[string]*obfuscation.FunctionWrapper
 
+	// runtimeSym maps canonical runtime symbol → link symbol (linkprep).
+	runtimeSym map[string]string
+
 	function *functionCompileContext
 }
 
@@ -80,6 +84,26 @@ func WithFunctionWrappers(wrappers map[string]*obfuscation.FunctionWrapper) Comp
 		}
 		c.functionWrappers = wrappers
 	}
+}
+
+// WithRuntimeSymManifest sets per-build names for runtime symbols (linkprep).
+func WithRuntimeSymManifest(m map[string]string) CompilerOption {
+	return func(c *Compiler) {
+		if len(m) == 0 {
+			return
+		}
+		c.runtimeSym = maps.Clone(m)
+	}
+}
+
+func (c *Compiler) runtimeSymName(canonical string) string {
+	if c == nil || len(c.runtimeSym) == 0 {
+		return canonical
+	}
+	if v, ok := c.runtimeSym[canonical]; ok && v != "" {
+		return v
+	}
+	return canonical
 }
 
 // NewCompiler initializes a new Compiler instance.

@@ -53,7 +53,7 @@ func (c *Compiler) storeContextReturn(val llvm.Value) error {
 }
 
 func (c *Compiler) getOrInsertRuntimeLoadPanicValue() (llvm.Value, llvm.Type) {
-	name := "yak_runtime_load_panic_value"
+	name := c.runtimeSymName("yak_runtime_load_panic_value")
 	fn := c.Mod.NamedFunction(name)
 	i8Ptr := llvm.PointerType(c.LLVMCtx.Int8Type(), 0)
 	fnType := llvm.FunctionType(c.LLVMCtx.Int64Type(), []llvm.Type{i8Ptr}, false)

@@ -73,6 +73,18 @@ func cachedWorkKeyFromConfig(cfg *CompileConfig) (string, error) {
 			write("profileConfig=" + string(data))
 		}
 	}
+	if len(cfg.RuntimeSymManifest) > 0 {
+		keys := make([]string, 0, len(cfg.RuntimeSymManifest))
+		for k := range cfg.RuntimeSymManifest {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			write("rtSym:" + k + "=" + cfg.RuntimeSymManifest[k])
+		}
+	} else {
+		write("rtSym=<off>")
+	}
 	write("llvmPlugin=" + strings.TrimSpace(cfg.LLVMPluginPath))
 	write("llvmPluginKind=" + strings.TrimSpace(cfg.LLVMPluginKind))
 	write("llvmPasses=" + strings.Join(cfg.LLVMPasses, ","))

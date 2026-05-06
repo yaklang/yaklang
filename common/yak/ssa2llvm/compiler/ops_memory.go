@@ -31,7 +31,7 @@ func (c *Compiler) compileMake(inst *ssa.Make) error {
 }
 
 func (c *Compiler) getOrInsertRuntimeMakeSlice() (llvm.Value, llvm.Type) {
-	name := abi.MakeSliceSymbol
+	name := c.runtimeSymName(abi.MakeSliceSymbol)
 	fn := c.Mod.NamedFunction(name)
 	i64 := c.LLVMCtx.Int64Type()
 	fnType := llvm.FunctionType(i64, []llvm.Type{i64, i64, i64}, false)
@@ -132,7 +132,7 @@ func (c *Compiler) compileMakeStruct(inst *ssa.Make, typ ssa.Type) error {
 }
 
 func (c *Compiler) getOrInsertMalloc() (llvm.Value, llvm.Type) {
-	name := "yak_internal_malloc"
+	name := c.runtimeSymName("yak_internal_malloc")
 	fn := c.Mod.NamedFunction(name)
 
 	// Define type: i64 yak_internal_malloc(int64)
@@ -211,7 +211,7 @@ func (c *Compiler) compileMemberCall(val ssa.Value, mc ssa.MemberCall) error {
 }
 
 func (c *Compiler) getOrInsertRuntimeGetField() (llvm.Value, llvm.Type) {
-	name := "yak_runtime_get_field"
+	name := c.runtimeSymName("yak_runtime_get_field")
 	fn := c.Mod.NamedFunction(name)
 
 	retType := c.LLVMCtx.Int64Type()
@@ -225,7 +225,7 @@ func (c *Compiler) getOrInsertRuntimeGetField() (llvm.Value, llvm.Type) {
 }
 
 func (c *Compiler) getOrInsertRuntimeSetField() (llvm.Value, llvm.Type) {
-	name := "yak_runtime_set_field"
+	name := c.runtimeSymName("yak_runtime_set_field")
 	fn := c.Mod.NamedFunction(name)
 
 	i8Ptr := llvm.PointerType(c.LLVMCtx.Int8Type(), 0)
@@ -238,7 +238,7 @@ func (c *Compiler) getOrInsertRuntimeSetField() (llvm.Value, llvm.Type) {
 }
 
 func (c *Compiler) getOrInsertRuntimeToCString() (llvm.Value, llvm.Type) {
-	name := "yak_runtime_to_cstring"
+	name := c.runtimeSymName("yak_runtime_to_cstring")
 	fn := c.Mod.NamedFunction(name)
 
 	i8Ptr := llvm.PointerType(c.LLVMCtx.Int8Type(), 0)

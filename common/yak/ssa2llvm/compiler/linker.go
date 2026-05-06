@@ -106,6 +106,15 @@ func resolveRuntimeLinkArgs(runtimeArchive string) ([]string, error) {
 
 	sourceDir, ok := runtimeSourceDirForArchive(runtimeArchive)
 	if !ok {
+		if root, okMod := goModuleRootDir(); okMod {
+			fallback := filepath.Join(root, "common", "yak", "ssa2llvm", "runtime", "runtime_go")
+			if st, err := os.Stat(fallback); err == nil && st.IsDir() {
+				sourceDir = fallback
+				ok = true
+			}
+		}
+	}
+	if !ok {
 		return nil, nil
 	}
 
@@ -115,6 +124,22 @@ func resolveRuntimeLinkArgs(runtimeArchive string) ([]string, error) {
 	}
 	runtimeLinkArgsCache.Store(runtimeArchive, append([]string{}, flags...))
 	return flags, nil
+}
+
+func goModuleRootDir() (string, bool) {
+	goPath, err := exec.LookPath("go")
+	if err != nil {
+		return "", false
+	}
+	out, err := exec.Command(goPath, "env", "GOMOD").Output()
+	if err != nil {
+		return "", false
+	}
+	mod := strings.TrimSpace(string(out))
+	if mod == "" || mod == os.DevNull {
+		return "", false
+	}
+	return filepath.Dir(mod), true
 }
 
 func readRuntimeLinkArgsFile(runtimeArchive string) ([]string, bool, error) {

@@ -28,11 +28,12 @@ type contextCallArg struct {
 }
 
 func (c *Compiler) getOrInsertRuntimeInvoke() (llvm.Value, llvm.Type) {
-	fn := c.Mod.NamedFunction(abi.InvokeSymbol)
+	sym := c.runtimeSymName(abi.InvokeSymbol)
+	fn := c.Mod.NamedFunction(sym)
 	i8Ptr := llvm.PointerType(c.LLVMCtx.Int8Type(), 0)
 	fnType := llvm.FunctionType(c.LLVMCtx.VoidType(), []llvm.Type{i8Ptr}, false)
 	if fn.IsNil() {
-		fn = llvm.AddFunction(c.Mod, abi.InvokeSymbol, fnType)
+		fn = llvm.AddFunction(c.Mod, sym, fnType)
 	}
 	return fn, fnType
 }

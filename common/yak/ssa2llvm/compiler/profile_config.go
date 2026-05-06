@@ -18,7 +18,7 @@ func prepareCompileConfig(cfg *CompileConfig) error {
 	if err := applyCompileProfile(cfg); err != nil {
 		return err
 	}
-	return nil
+	return finalizeRuntimeSymManifest(cfg)
 }
 
 func applyCompileProfile(cfg *CompileConfig) error {

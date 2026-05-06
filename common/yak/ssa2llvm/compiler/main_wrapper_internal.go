@@ -25,24 +25,27 @@ func (c *Compiler) addMainWrapperToModule(entryFunc string, printEntryResult boo
 		return fmt.Errorf("addMainWrapperToModule: entry function %q not found in module", entryFunc)
 	}
 
-	gcFn := mod.NamedFunction("yak_runtime_gc")
+	gcName := c.runtimeSymName("yak_runtime_gc")
+	gcFn := mod.NamedFunction(gcName)
 	if gcFn.IsNil() {
 		gcType := llvm.FunctionType(c.LLVMCtx.VoidType(), nil, false)
-		gcFn = llvm.AddFunction(mod, "yak_runtime_gc", gcType)
+		gcFn = llvm.AddFunction(mod, gcName, gcType)
 	}
-	waitAsyncFn := mod.NamedFunction("yak_runtime_wait_async")
+	waitName := c.runtimeSymName("yak_runtime_wait_async")
+	waitAsyncFn := mod.NamedFunction(waitName)
 	if waitAsyncFn.IsNil() {
 		waitType := llvm.FunctionType(c.LLVMCtx.VoidType(), nil, false)
-		waitAsyncFn = llvm.AddFunction(mod, "yak_runtime_wait_async", waitType)
+		waitAsyncFn = llvm.AddFunction(mod, waitName, waitType)
 	}
 
 	var printFn llvm.Value
 	var printType llvm.Type
 	if printEntryResult {
-		printFn = mod.NamedFunction("yak_internal_print_int")
+		printName := c.runtimeSymName("yak_internal_print_int")
+		printFn = mod.NamedFunction(printName)
 		printType = llvm.FunctionType(c.LLVMCtx.VoidType(), []llvm.Type{c.LLVMCtx.Int64Type()}, false)
 		if printFn.IsNil() {
-			printFn = llvm.AddFunction(mod, "yak_internal_print_int", printType)
+			printFn = llvm.AddFunction(mod, printName, printType)
 		}
 	}
 

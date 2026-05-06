@@ -11,6 +11,7 @@ import (
 	"github.com/yaklang/go-llvm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssa2llvm/linkprep"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/obfuscation"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/profile"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/embed"
@@ -58,6 +59,10 @@ type CompileConfig struct {
 	// When set, obfuscators may use it to vary their output per build.
 	// Derived from the profile's SeedPolicy or supplied by the user.
 	BuildSeed []byte
+
+	// RuntimeSymManifest maps canonical runtime symbol names to per-build link
+	// names when link_prep.randomize_runtime_symbols is enabled.
+	RuntimeSymManifest map[string]string
 
 	// resolvedProfile is populated by prepareCompileConfig from the --profile ref.
 	// It drives function selection and cache keys.
@@ -241,6 +246,12 @@ func WithCompileConfig(cfg CompileConfig) CompileOption {
 		c.Force = cfg.Force
 		c.Trace = cfg.Trace
 		c.BuildSeed = append([]byte{}, cfg.BuildSeed...)
+		if len(cfg.RuntimeSymManifest) > 0 {
+			c.RuntimeSymManifest = make(map[string]string, len(cfg.RuntimeSymManifest))
+			for k, v := range cfg.RuntimeSymManifest {
+				c.RuntimeSymManifest[k] = v
+			}
+		}
 		if cfg.resolvedProfile != nil {
 			c.resolvedProfile = cfg.resolvedProfile.Clone()
 		}
@@ -319,6 +330,8 @@ func compileInputWithConfig(cfg *CompileConfig) (*ssaapi.Program, *Compiler, str
 		return nil, nil, "", utils.Errorf("SSA post-obfuscation failed: %v", err)
 	}
 
+	patchObfuscationRuntimeSymbols(obfCtx, cfg.RuntimeSymManifest)
+
 	llvm.InitializeNativeTarget()
 	llvm.InitializeNativeAsmPrinter()
 
@@ -328,6 +341,7 @@ func compileInputWithConfig(cfg *CompileConfig) (*ssaapi.Program, *Compiler, str
 	compilerOpts = append(compilerOpts,
 		WithExternBindings(cfg.ExternBindings),
 		WithInstructionTags(obfCtx.InstrTags),
+		WithRuntimeSymManifest(cfg.RuntimeSymManifest),
 	)
 	if len(obfCtx.FunctionWrappers) > 0 {
 		compilerOpts = append(compilerOpts, WithFunctionWrappers(obfCtx.FunctionWrappers))
@@ -555,6 +569,18 @@ func compileWithConfig(cfg *CompileConfig) (CompileResult, error) {
 	}
 	cfg.ExtraLinkArgs = extraLinkArgs
 
+	// When embedding is disabled, ExtractLibyakToDir leaves RuntimeArchive empty and
+	// CompileLLVMToBinary falls back to findRuntimeArchive() at link time. Linkprep
+	// must see the same path up front so archives are rewritten before clang runs.
+	if linking && strings.TrimSpace(cfg.RuntimeArchive) == "" {
+		p, err := findRuntimeArchive()
+		if err != nil {
+			return CompileResult{}, err
+		}
+		cfg.RuntimeArchive = p
+		runtimeArchive = p
+	}
+
 	_, comp, ir, err := compileInputWithConfig(cfg)
 	if err != nil {
 		return CompileResult{}, err
@@ -679,6 +705,33 @@ func compileWithConfig(cfg *CompileConfig) (CompileResult, error) {
 			}
 		}
 		return CompileResult{WorkDir: cfg.WorkDir, Artifact: outputFile, CacheHit: false}, nil
+	}
+
+	linkingNative := !cfg.SkipRuntimeLink
+	var linkprepCleanup func()
+	if linkingNative && len(cfg.RuntimeSymManifest) > 0 && strings.TrimSpace(cfg.RuntimeArchive) != "" {
+		archives := []string{filepath.Clean(cfg.RuntimeArchive)}
+		for _, o := range cfg.ObfArchives {
+			o = strings.TrimSpace(o)
+			if o != "" {
+				archives = append(archives, filepath.Clean(o))
+			}
+		}
+		out, cleanup, lpErr := linkprep.PrepareForLink(linkprep.PrepareInput{
+			Archives: archives,
+			Manifest: cfg.RuntimeSymManifest,
+			WorkDir:  cfg.WorkDir,
+			Trace:    cfg.Trace,
+		})
+		if lpErr != nil {
+			return CompileResult{}, utils.Errorf("linkprep: %v", lpErr)
+		}
+		linkprepCleanup = cleanup
+		defer linkprepCleanup()
+		cfg.RuntimeArchive = out[0]
+		if len(out) > 1 {
+			cfg.ObfArchives = append([]string{}, out[1:]...)
+		}
 	}
 
 	if err := CompileLLVMToBinary(finalLL, outputFile, !cfg.SkipRuntimeLink, cfg.RuntimeArchive, cfg.ObfArchives, cfg.ExtraLinkArgs...); err != nil {
