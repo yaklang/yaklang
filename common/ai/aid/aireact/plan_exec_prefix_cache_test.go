@@ -741,7 +741,21 @@ func buildPlanExecMockToolStdout(stageID, summary string, checkpoints, artifacts
 	for i, artifact := range artifacts {
 		lines = append(lines, fmt.Sprintf("artifact[%d]: %s", i+1, artifact))
 	}
-	return strings.Join(lines, "\n")
+	base := strings.Join(lines, "\n")
+
+	const targetStdoutBytes = 1024
+	if len(base) >= targetStdoutBytes {
+		return base
+	}
+
+	var stdout strings.Builder
+	stdout.WriteString(base)
+	fillerTemplate := "payload_fill[%02d]: deterministic-prefix-cache-regression timeline-fixture block=abcdefghijklmnopqrstuvwxyz0123456789 repeated-content-for-mock-stdout-padding"
+	for i := 1; stdout.Len() < targetStdoutBytes; i++ {
+		stdout.WriteString("\n")
+		stdout.WriteString(fmt.Sprintf(fillerTemplate, i))
+	}
+	return stdout.String()
 }
 
 func buildPlanExecMockToolResult(stageID, summary string, evidence, checkpoints, artifacts []string, deliverable string) map[string]any {
