@@ -69,6 +69,10 @@ func (c *Config) GetDisableIntentRecognition() bool {
 	return c.DisableIntentRecognition
 }
 
+func (c *Config) GetSyncPerceptionTrigger() bool {
+	return c.SyncPerceptionTrigger
+}
+
 func (c *Config) GetAiToolManager() *buildinaitools.AiToolManager {
 	return c.AiToolManager
 }

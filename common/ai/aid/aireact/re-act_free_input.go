@@ -157,6 +157,29 @@ func sanitizeForTaskId(input string) string {
 
 // enqueueReTask 将输入事件转换为任务并添加到队列
 func (r *ReAct) enqueueReTask(event *ypb.AIInputEvent) error {
+	task := r.buildReTaskFromEvent(event)
+	if task == nil {
+		return fmt.Errorf("failed to build task from event")
+	}
+	log.Infof("Task enqueue started processing: %s", task.GetId())
+	// 任务不相关，进入排队状态
+	task.SetFocusMode(event.GetFocusModeLoop())
+	task.SetStatus(aicommon.AITaskState_Queueing)
+	err := r.taskQueue.Append(task)
+	if err != nil {
+		log.Errorf("Failed to add task to queue: %v", err)
+		return fmt.Errorf("failed to enqueue task: %v", err)
+	}
+	if r.config.DebugEvent {
+		log.Infof("Task enqueued: %s with input: %s", task.GetId(), event.FreeInput)
+	}
+	return nil
+}
+
+func (r *ReAct) buildReTaskFromEvent(event *ypb.AIInputEvent) aicommon.AIStatefulTask {
+	if event == nil {
+		return nil
+	}
 	// 创建基于aireact.Task的任务（初始状态为created）
 	sanitizedInput := sanitizeForTaskId(event.FreeInput)
 	shortId := ksuid.New().String()
@@ -180,18 +203,5 @@ func (r *ReAct) enqueueReTask(event *ypb.AIInputEvent) error {
 		}
 	}
 	task.SetAttachedDatas(attachedDatas)
-
-	log.Infof("Task enqueue started processing: %s", task.GetId())
-	// 任务不相关，进入排队状态
-	task.SetFocusMode(event.GetFocusModeLoop())
-	task.SetStatus(aicommon.AITaskState_Queueing)
-	err := r.taskQueue.Append(task)
-	if err != nil {
-		log.Errorf("Failed to add task to queue: %v", err)
-		return fmt.Errorf("failed to enqueue task: %v", err)
-	}
-	if r.config.DebugEvent {
-		log.Infof("Task enqueued: %s with input: %s", task.GetId(), event.FreeInput)
-	}
-	return nil
+	return task
 }

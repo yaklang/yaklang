@@ -1936,6 +1936,10 @@ message AIStartParams {
 
   // 是否关闭工具执行期间的 interval review
   bool DisableToolIntervalReview = 36;
+
+  // 为 true 时，MaybeTriggerPerceptionAfterAction / MaybeTriggerPerceptionAfterVerification /
+  // TriggerPerceptionOnSpin 内直接同步调用 TriggerPerception；默认 false 时为异步 goroutine 调用
+  bool SyncPerceptionTrigger = 37;
 }
 
 message AITaskFilter {

@@ -31,6 +31,7 @@ func TestConvertYPBAIStartParamsToReActConfig(t *testing.T) {
 	aiService := uuid.NewString()
 	presetPrompt := uuid.New().String()
 	disableToolIntervalReview := rand.Intn(2) == 1
+	syncPerceptionTrigger := rand.Intn(2) == 1
 
 	start := &ypb.AIStartParams{
 		DisallowRequireForUserPrompt: disallowRequire,
@@ -46,6 +47,7 @@ func TestConvertYPBAIStartParamsToReActConfig(t *testing.T) {
 		AICallTokenLimit:             100 * 1024,
 		UserPresetPrompt:             presetPrompt,
 		DisableToolIntervalReview:    disableToolIntervalReview,
+		SyncPerceptionTrigger: syncPerceptionTrigger,
 	}
 
 	opts := ConvertYPBAIStartParamsToReActConfig(start)
@@ -69,6 +71,7 @@ func TestConvertYPBAIStartParamsToReActConfig(t *testing.T) {
 	require.Equal(t, start.AICallTokenLimit, cfg.AiCallTokenLimit)
 	require.Equal(t, start.UserPresetPrompt, cfg.UserPresetPrompt)
 	require.Equal(t, start.DisableToolIntervalReview, cfg.DisableIntervalReview)
+	require.Equal(t, start.SyncPerceptionTrigger, cfg.GetSyncPerceptionTrigger())
 	// AiServerName is no longer set from frontend params (WithAIChatInfo deprecated),
 	// it is now auto-detected via ModelInfoCallback during actual AI gateway calls.
 }

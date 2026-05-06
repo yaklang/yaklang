@@ -914,6 +914,14 @@ func (r *ReActLoop) RegisterPerceptionContextProvider() {
 	log.Infof("perception context provider registered for loop %s", r.loopName)
 }
 
+func (r *ReActLoop) invokePerceptionTrigger(reason string, force bool) {
+	if r.config != nil && r.config.GetConfigBool("SyncPerceptionTrigger") {
+		r.TriggerPerception(reason, force)
+		return
+	}
+	go r.TriggerPerception(reason, force)
+}
+
 // MaybeTriggerPerceptionAfterAction conditionally triggers perception after an
 // action completes. Respects iteration interval and time-based throttling.
 func (r *ReActLoop) MaybeTriggerPerceptionAfterAction(iterationIndex int) {
@@ -923,16 +931,16 @@ func (r *ReActLoop) MaybeTriggerPerceptionAfterAction(iterationIndex int) {
 	if !r.perception.shouldTriggerOnIteration(iterationIndex) {
 		return
 	}
-	go r.TriggerPerception(PerceptionTriggerPostAction, false)
+	r.invokePerceptionTrigger(PerceptionTriggerPostAction, false)
 }
 
 // MaybeTriggerPerceptionAfterVerification triggers perception after a verification
-// result, running in a goroutine to avoid blocking the main loop.
+// result. Async by default; synchronous when SyncPerceptionTrigger is enabled on config.
 func (r *ReActLoop) MaybeTriggerPerceptionAfterVerification() {
 	if r.perception == nil {
 		return
 	}
-	go r.TriggerPerception(PerceptionTriggerVerification, false)
+	r.invokePerceptionTrigger(PerceptionTriggerVerification, false)
 }
 
 // TriggerPerceptionOnSpin forces a perception update when SPIN is detected,
@@ -941,5 +949,5 @@ func (r *ReActLoop) TriggerPerceptionOnSpin() {
 	if r.perception == nil {
 		return
 	}
-	go r.TriggerPerception(PerceptionTriggerSpinDetected, true)
+	r.invokePerceptionTrigger(PerceptionTriggerSpinDetected, true)
 }

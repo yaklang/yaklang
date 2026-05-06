@@ -8560,8 +8560,11 @@ type AIStartParams struct {
 	UserPresetPrompt string `protobuf:"bytes,35,opt,name=UserPresetPrompt,proto3" json:"UserPresetPrompt,omitempty"`
 	// 是否关闭工具执行期间的 interval review
 	DisableToolIntervalReview bool `protobuf:"varint,36,opt,name=DisableToolIntervalReview,proto3" json:"DisableToolIntervalReview,omitempty"`
-	unknownFields             protoimpl.UnknownFields
-	sizeCache                 protoimpl.SizeCache
+	// 为 true 时，MaybeTriggerPerceptionAfterAction / MaybeTriggerPerceptionAfterVerification /
+	// TriggerPerceptionOnSpin 内直接同步调用 TriggerPerception；默认 false 时为异步 goroutine 调用
+	SyncPerceptionTrigger bool `protobuf:"varint,37,opt,name=SyncPerceptionTrigger,proto3" json:"SyncPerceptionTrigger,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *AIStartParams) Reset() {
@@ -8835,6 +8838,13 @@ func (x *AIStartParams) GetUserPresetPrompt() string {
 func (x *AIStartParams) GetDisableToolIntervalReview() bool {
 	if x != nil {
 		return x.DisableToolIntervalReview
+	}
+	return false
+}
+
+func (x *AIStartParams) GetSyncPerceptionTrigger() bool {
+	if x != nil {
+		return x.SyncPerceptionTrigger
 	}
 	return false
 }
@@ -69402,7 +69412,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\tMcpConfig\x12\x12\n" +
 	"\x04Type\x18\x01 \x01(\tR\x04Type\x12\x10\n" +
 	"\x03Key\x18\x02 \x01(\tR\x03Key\x12\x10\n" +
-	"\x03Url\x18\x03 \x01(\tR\x03Url\"\xb3\r\n" +
+	"\x03Url\x18\x03 \x01(\tR\x03Url\"\xe9\r\n" +
 	"\rAIStartParams\x12$\n" +
 	"\rCoordinatorId\x18\x11 \x01(\tR\rCoordinatorId\x12\x1a\n" +
 	"\bSequence\x18\x12 \x01(\x03R\bSequence\x12.\n" +
@@ -69441,7 +69451,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x11TimelineSessionID\x18\x1f \x01(\tR\x11TimelineSessionID\x12*\n" +
 	"\x10AICallTokenLimit\x18\" \x01(\x03R\x10AICallTokenLimit\x12*\n" +
 	"\x10UserPresetPrompt\x18# \x01(\tR\x10UserPresetPrompt\x12<\n" +
-	"\x19DisableToolIntervalReview\x18$ \x01(\bR\x19DisableToolIntervalReview\"\x9e\x01\n" +
+	"\x19DisableToolIntervalReview\x18$ \x01(\bR\x19DisableToolIntervalReview\x124\n" +
+	"\x15SyncPerceptionTrigger\x18% \x01(\bR\x15SyncPerceptionTrigger\"\x9e\x01\n" +
 	"\fAITaskFilter\x12\x12\n" +
 	"\x04Name\x18\x01 \x03(\tR\x04Name\x12\x18\n" +
 	"\aKeyword\x18\x02 \x03(\tR\aKeyword\x12\x1c\n" +

@@ -545,3 +545,21 @@ func TestPerceptionState_FormatForContext_TokenLimit(t *testing.T) {
 		t.Fatal("expected non-empty output even when truncated")
 	}
 }
+
+func TestMaybeTriggerPerceptionAfterAction_SyncPerceptionTriggerRunsInline(t *testing.T) {
+	invoker := &perceptionMidtermSchedulerTestInvoker{
+		MockInvoker: mockcfg.NewMockInvoker(context.Background()),
+	}
+	cfg := invoker.GetConfig()
+	cfg.SetConfig("SyncPerceptionTrigger", true)
+
+	loop := NewMinimalReActLoop(cfg, invoker)
+	loop.loopName = "perception-sync-trigger-test"
+	loop.perception = newPerceptionController(loop.periodicVerificationInterval)
+	loop.maxIterations = 100
+	loop.actionHistory = make([]*ActionRecord, 0)
+	loop.actionHistoryMutex = new(sync.Mutex)
+
+	loop.MaybeTriggerPerceptionAfterAction(2)
+	require.Equal(t, "focused summary from perception", invoker.scheduledSummary)
+}

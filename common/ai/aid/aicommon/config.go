@@ -311,6 +311,7 @@ type Config struct {
 	EnhanceKnowledgeManager            *EnhanceKnowledgeManager
 	DisableEnhanceDirectlyAnswer       bool
 	DisableIntentRecognition           bool // 禁用意图识别（用于测试环境，避免子循环消耗 mock 响应）
+	SyncPerceptionTrigger              bool // 感知调度处同步调用 TriggerPerception（否则 goroutine 异步）
 	DisablePerception                  bool // 禁用感知层（用于测试环境，避免异步 AI 调用干扰 mock 回调）
 	PerTaskUserInteractiveLimitedTimes int64
 
@@ -1859,6 +1860,22 @@ func WithDisableIntentRecognition(disable bool) ConfigOption {
 	}
 }
 
+// WithSyncPerceptionTrigger when true, MaybeTriggerPerceptionAfterAction,
+// MaybeTriggerPerceptionAfterVerification, and TriggerPerceptionOnSpin invoke
+// TriggerPerception on the caller goroutine; when false (default), they spawn a goroutine.
+func WithSyncPerceptionTrigger(enable bool) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		c.SyncPerceptionTrigger = enable
+		c.m.Unlock()
+		c.SetConfig("SyncPerceptionTrigger", enable)
+		return nil
+	}
+}
+
 // WithDisablePerception disables the perception layer in all loops created from this config.
 // When disabled, no perception AI evaluations are triggered and the perception ContextProvider
 // is not registered. This is primarily used in test environments where async perception calls
@@ -3233,6 +3250,9 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 	// do not accidentally run deep intent recognition in test environments.
 	if i.DisableIntentRecognition {
 		opts = append(opts, WithDisableIntentRecognition(true))
+	}
+	if i.SyncPerceptionTrigger {
+		opts = append(opts, WithSyncPerceptionTrigger(true))
 	}
 
 	// Propagate perception disable flag so sub-loops inherit the setting.
