@@ -31,6 +31,12 @@
 
 - `common/yak/ssa2llvm/runtime/libyak.a`
 
+带 **`ssa2llvm_runtime_debug`** 的诊断版（`GCLOG`、`[yak-runtime]` 等，见「三条独立轨道」）：
+
+```bash
+SSA2LLVM_RUNTIME_DEBUG=1 ./common/yak/ssa2llvm/scripts/build_runtime_go.sh
+```
+
 ## 构建 CLI
 
 ```bash
@@ -73,6 +79,16 @@ go build -tags ssa2llvm_gzip_embed -o ./ssa2llvm ./common/yak/ssa2llvm/cmd
 
 该模式会释放 `ssa2llvm-runtime-src.tar.gz`，再执行 `go build -buildmode=c-archive` 生成临时 `libyak.a`，最后进入 clang 链接阶段。
 
+## Profile、混淆与链接预处理（三条独立轨道）
+
+三者正交，语义分开配置：
+
+1. **Go 运行时诊断**：仅当使用构建标签 **`ssa2llvm_runtime_debug`** 编译 `runtime_go` 时，才启用 `GCLOG` 与 `[yak-runtime]` 等诊断输出；默认静态库/嵌入构建不包含这些路径。
+2. **LLVM obfuscators**：写在 profile 的 **`obfuscators`** 里（addsub、virtualize 等），走 SSA/LLVM 混淆管线。
+3. **`link_prep`**：链接前对 **`libyak.a` / obf 归档** 做符号级处理（当前为 C 链接可见运行时符号重命名）。**不属于** obfuscator，也不挂 `KindLLVM`。
+
+未传 `--profile` 时保持历史行为：**不重命名**运行时符号。加载 profile 后若省略 `link_prep` 整节，则 **默认开启** 符号随机化；内置 `resilience-*` 与 `debug-stable-runtime` 通过 `link_prep.randomize_runtime_symbols: false` 固定稳定导出名。细节、工具链（`ar` / `nm` / `objcopy`）与 ELF 注意点见 **`docs/link-prep.md`**。
+
 ## 当前覆盖的关键能力
 
 - 普通函数调用、递归调用、`go` 异步调用
@@ -97,6 +113,7 @@ go test ./common/yak/ssa2llvm/... -count=1
 
 ## 机制文档
 
+- `link_prep`、运行时符号重命名与 profile 默认：`common/yak/ssa2llvm/docs/link-prep.md`
 - builtin ID、stdlib 与 runtime shadow method：`common/yak/ssa2llvm/docs/dispatch-and-stdlib.md`
 - `InvokeContext`、函数调用、closure binding 与 goroutine：`common/yak/ssa2llvm/docs/context-call-and-goroutine.md`
 - `defer` / `panic` / `recover` / `try-catch-finally`：`common/yak/ssa2llvm/docs/error-handling.md`
