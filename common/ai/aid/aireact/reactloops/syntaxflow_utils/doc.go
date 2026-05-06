@@ -43,7 +43,7 @@
 //
 //	loop	多轮 AI ReAct，适合边判断边调用工具（如规则编写、单条风险解读）。
 //	orchestrator	Go 固定编排（多阶段 WithInitTask），有明确步骤与产物；例如 syntaxflow_scan、`syntaxflow_code_audit`。
-//	action	loop 内可调用的确定性 Go 能力（查库、起扫、读写处置等），实现在包 syntaxflow_actions。
+//	action	loop 内可调用的确定性 Go 能力（查库、起扫、读写处置等），实现在各 `loop_*` 包（如 [loop_ssa_risk_review]、[loop_syntaxflow_scan]）；底层查库/编译/起扫等纯 Go 能力在 [syntaxflow_utils]。
 //	forge（LiteForge）	Go 单次调模型做结构化抽取；不串多步、不替代 orchestrator。
 //
 // # Orchestrator 验收提示

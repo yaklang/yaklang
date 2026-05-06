@@ -6,7 +6,9 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
-	sfa "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/syntaxflow_actions"
+	ssaovw "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_ssa_risk_overview"
+	ssarev "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_ssa_risk_review"
+	sfscan "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_syntaxflow_scan"
 	sfu "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/syntaxflow_utils"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -39,10 +41,10 @@ func init() {
 				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
 				reactloops.WithPersistentInstruction(persistentInstruction),
 				reactloops.WithReflectionOutputExample(outputExample + sfu.ReflectionOutputSharedAppendix),
-				sfa.WithReloadSSARiskOverviewAction(r),
-				sfa.WithReloadSSARiskAction(r),
-				sfa.WithReadSSAProjectFileAction(r),
-				sfa.WithDeriveRuleSeedFromRiskAction(r),
+				ssaovw.WithReloadSSARiskOverviewAction(r),
+				ssarev.WithReloadSSARiskAction(r),
+				sfscan.WithReadSSAProjectFileAction(r),
+				ssarev.WithDeriveRuleSeedFromRiskAction(r),
 				reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer, nonce string) (string, error) {
 					return utils.RenderTemplate(reactiveData, map[string]any{
 						"Overview":         loop.Get("ssa_risk_overview_preface"),

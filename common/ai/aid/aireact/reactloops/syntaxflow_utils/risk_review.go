@@ -1,4 +1,4 @@
-package syntaxflow_services
+package syntaxflow_utils
 
 import (
 	"encoding/json"
@@ -69,7 +69,7 @@ func RiskReloadText(risk *schema.SSARisk, disposals []schema.SSARiskDisposals, c
 	return sb.String()
 }
 
-// RiskToRuleSeed builds a JSON-able map for write_syntaxflow_rule / campaigns.
+// RiskToRuleSeed builds a JSON-able map for write_syntaxflow_rule.
 func RiskToRuleSeed(risk *schema.SSARisk) map[string]any {
 	if risk == nil {
 		return nil

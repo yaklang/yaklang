@@ -1,4 +1,4 @@
-package syntaxflow_services
+package syntaxflow_utils
 
 import (
 	"fmt"
@@ -7,7 +7,6 @@ import (
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
-	sfu "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/syntaxflow_utils"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -18,7 +17,7 @@ import (
 const DefaultOverviewPageLimit int64 = 40
 
 // PersistEffectiveOverviewFilter stores the filter used for overview queries on the loop (protojson).
-// It mirrors the same JSON into sfu.LoopVarSSARisksFilterJSON so BuildSSARisksFilterFromLoop stays aligned.
+// It mirrors the same JSON into LoopVarSSARisksFilterJSON so BuildSSARisksFilterFromLoop stays aligned.
 func PersistEffectiveOverviewFilter(loop *reactloops.ReActLoop, filter *ypb.SSARisksFilter) {
 	if loop == nil || filter == nil {
 		return
@@ -28,8 +27,8 @@ func PersistEffectiveOverviewFilter(loop *reactloops.ReActLoop, filter *ypb.SSAR
 		return
 	}
 	s := string(b)
-	loop.Set(sfu.LoopVarSSAOverviewFilterJSON, s)
-	loop.Set(sfu.LoopVarSSARisksFilterJSON, s)
+	loop.Set(LoopVarSSAOverviewFilterJSON, s)
+	loop.Set(LoopVarSSARisksFilterJSON, s)
 }
 
 func appendUniqueStr(slice []string, v string) []string {
@@ -42,18 +41,18 @@ func appendUniqueStr(slice []string, v string) []string {
 }
 
 // MergeReloadSSARiskOverviewFilter builds the filter for reload_ssa_risk_overview from action params,
-// stored sfu.LoopVarSSAOverviewFilterJSON, or from BuildSSARisksFilterFromLoop after sfu.SyncSSARisksFilterFromIrifyToLoop.
+// stored LoopVarSSAOverviewFilterJSON, or from BuildSSARisksFilterFromLoop after SyncSSARisksFilterFromIrifyToLoop.
 func MergeReloadSSARiskOverviewFilter(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, action *aicommon.Action) *ypb.SSARisksFilter {
 	rawFj := strings.TrimSpace(action.GetString("filter_json"))
 	var base *ypb.SSARisksFilter
 	if rawFj != "" {
 		base = &ypb.SSARisksFilter{}
 		if err := protojson.Unmarshal([]byte(rawFj), base); err != nil {
-			sfu.SyncSSARisksFilterFromIrifyToLoop(loop, task)
-			base = sfu.BuildSSARisksFilterFromLoop(loop, "")
+			SyncSSARisksFilterFromIrifyToLoop(loop, task)
+			base = BuildSSARisksFilterFromLoop(loop, "")
 		}
 	} else if loop != nil {
-		if s := strings.TrimSpace(loop.Get(sfu.LoopVarSSAOverviewFilterJSON)); s != "" {
+		if s := strings.TrimSpace(loop.Get(LoopVarSSAOverviewFilterJSON)); s != "" {
 			base = &ypb.SSARisksFilter{}
 			if err := protojson.Unmarshal([]byte(s), base); err != nil {
 				base = nil
@@ -61,10 +60,10 @@ func MergeReloadSSARiskOverviewFilter(loop *reactloops.ReActLoop, task aicommon.
 		}
 	}
 	if base == nil {
-		if loop != nil && task != nil && strings.TrimSpace(loop.Get(sfu.LoopVarSSAOverviewFilterJSON)) == "" {
-			sfu.SyncSSARisksFilterFromIrifyToLoop(loop, task)
+		if loop != nil && task != nil && strings.TrimSpace(loop.Get(LoopVarSSAOverviewFilterJSON)) == "" {
+			SyncSSARisksFilterFromIrifyToLoop(loop, task)
 		}
-		base = sfu.BuildSSARisksFilterFromLoop(loop, "")
+		base = BuildSSARisksFilterFromLoop(loop, "")
 	}
 	if s := strings.TrimSpace(action.GetString("search")); s != "" {
 		base.Search = s

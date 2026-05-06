@@ -1,4 +1,4 @@
-package syntaxflow_services
+package syntaxflow_utils
 
 import (
 	"fmt"

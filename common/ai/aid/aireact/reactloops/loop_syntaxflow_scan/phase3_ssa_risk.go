@@ -11,7 +11,6 @@ import (
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
-	sfs "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/syntaxflow_services"
 	sfu "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/syntaxflow_utils"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -20,11 +19,11 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-// Re-export syntaxflow_services risk-overview helpers so existing imports of loop_syntaxflow_scan keep compiling.
+// Re-export syntaxflow_utils risk-overview helpers so existing imports of loop_syntaxflow_scan keep compiling.
 var (
-	PersistEffectiveOverviewFilter   = sfs.PersistEffectiveOverviewFilter
-	MergeReloadSSARiskOverviewFilter = sfs.MergeReloadSSARiskOverviewFilter
-	ApplySSARiskOverviewDB           = sfs.ApplySSARiskOverviewDB
+	PersistEffectiveOverviewFilter   = sfu.PersistEffectiveOverviewFilter
+	MergeReloadSSARiskOverviewFilter = sfu.MergeReloadSSARiskOverviewFilter
+	ApplySSARiskOverviewDB           = sfu.ApplySSARiskOverviewDB
 )
 
 // StartScanTaskStatusPoll starts a light poll until the SyntaxFlow scan task is no longer

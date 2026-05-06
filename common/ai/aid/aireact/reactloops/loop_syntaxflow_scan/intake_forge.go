@@ -1,4 +1,4 @@
-package syntaxflow_forges
+package loop_syntaxflow_scan
 
 import (
 	"context"
@@ -73,7 +73,7 @@ Return structured fields.`
 		RuleHint:    strings.TrimSpace(result.GetString("rule_hint")),
 		Reason:      result.GetString("reason"),
 	}
-	log.Infof("[syntaxflow_forges] LiteForge intake: task_id=%q project_path=%q rule_hint=%q reason=%q",
+	log.Infof("[syntaxflow_scan] LiteForge intake: task_id=%q project_path=%q rule_hint=%q reason=%q",
 		out.TaskID, out.ProjectPath, out.RuleHint, out.Reason)
 	return out, nil
 }

@@ -1,4 +1,4 @@
-package syntaxflow_actions
+package loop_syntaxflow_scan
 
 import (
 	"fmt"

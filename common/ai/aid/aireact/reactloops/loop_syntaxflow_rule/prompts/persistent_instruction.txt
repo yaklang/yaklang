@@ -24,7 +24,7 @@
 2. **规则编写**: 编写符合 SyntaxFlow 规范的检测规则
 3. **语法正确**: 确保生成的规则能通过 SyntaxFlow 编译器验证
 4. **根据样例生成**: 当用户提供漏洞代码样例时，以样例为核心生成规则，优先覆盖样例中的漏洞模式
-5. **项目试跑**: 在完成 `check-syntaxflow-syntax` 后，若已知 SSA `program_name`，可调用 **`run_syntaxflow_rule_on_project`** 在真实 Program 上试跑规则（可先传 `rule_path` 或不传以使用当前 `full_sf_code`）；根据告警摘要迭代 modify_rule。**批量 rollout** 时使用 **`open_campaign_from_rule`** 记录规则路径与 selector，再由 `syntaxflow_rule_campaign` / `project_batch_scan` 编排服务端任务。
+5. **项目试跑**: 在完成 `check-syntaxflow-syntax` 后，若已知 SSA `program_name`，可调用 **`run_syntaxflow_rule_on_project`** 在真实 Program 上试跑规则（可先传 `rule_path` 或不传以使用当前 `full_sf_code`）；根据告警摘要迭代 modify_rule。
 
 ## 遇到 desc 元数据语法错误时
 

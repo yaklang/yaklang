@@ -6,7 +6,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
-	sfs "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/syntaxflow_services"
 	sfu "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/syntaxflow_utils"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -34,7 +33,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 
 		sfu.SyncSSARisksFilterFromIrifyToLoop(loop, task)
 		filter := sfu.BuildSSARisksFilterFromLoop(loop, userInput)
-		sfs.PersistEffectiveOverviewFilter(loop, filter)
+		sfu.PersistEffectiveOverviewFilter(loop, filter)
 
 		count, err := yakit.QuerySSARiskCount(db, filter)
 		if err != nil {

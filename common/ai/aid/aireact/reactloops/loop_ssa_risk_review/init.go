@@ -7,7 +7,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
-	sfa "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/syntaxflow_actions"
 	sfu "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/syntaxflow_utils"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -37,10 +36,10 @@ func init() {
 				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
 				reactloops.WithPersistentInstruction(persistentInstruction),
 				reactloops.WithReflectionOutputExample(outputExample + sfu.ReflectionOutputSharedAppendix),
-				sfa.WithReloadSSARiskAction(r),
-				sfa.WithSetSSARiskReviewTargetAction(r),
-				sfa.WithMarkSSARiskDisposalAction(r),
-				sfa.WithDeriveRuleSeedFromRiskAction(r),
+				WithReloadSSARiskAction(r),
+				WithSetSSARiskReviewTargetAction(r),
+				WithMarkSSARiskDisposalAction(r),
+				WithDeriveRuleSeedFromRiskAction(r),
 				reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer, nonce string) (string, error) {
 					fb := strings.TrimSpace(feedbacker.String())
 					rid := loop.Get("ssa_risk_id")

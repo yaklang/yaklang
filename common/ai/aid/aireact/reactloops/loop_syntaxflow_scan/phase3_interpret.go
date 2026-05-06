@@ -10,7 +10,8 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
-	sfa "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/syntaxflow_actions"
+	ssaovw "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_ssa_risk_overview"
+	ssarev "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_ssa_risk_review"
 	sfu "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/syntaxflow_utils"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
@@ -250,11 +251,10 @@ func directlyAnswerSyntaxflowScanHandler(loop *reactloops.ReActLoop, action *aic
 	operator.Exit()
 }
 
-// Re-export shared SyntaxFlow/SSA actions from syntaxflow_actions for packages that still import loop_syntaxflow_scan.
+// Re-export SSA overview / risk-review actions under loop_syntaxflow_scan for packages that import this package only.
 var (
-	WithReloadSSARiskOverviewAction    = sfa.WithReloadSSARiskOverviewAction
-	WithReloadSyntaxFlowScanSessionAction = sfa.WithReloadSyntaxFlowScanSessionAction
-	WithSetSSARiskReviewTargetAction   = sfa.WithSetSSARiskReviewTargetAction
+	WithReloadSSARiskOverviewAction      = ssaovw.WithReloadSSARiskOverviewAction
+	WithSetSSARiskReviewTargetAction     = ssarev.WithSetSSARiskReviewTargetAction
 )
 
 // SFAuditCodeSearchHint is appended to SyntaxFlow code-audit rule prompts so the model greps the tree before writing rules.
@@ -317,17 +317,17 @@ func buildPhaseInterpretLoop(r aicommon.AIInvokeRuntime, extra ...reactloops.ReA
 		reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
 		reactloops.WithPersistentInstruction(persistentInstruction),
 		reactloops.WithReflectionOutputExample(outputExample + sfu.ReflectionOutputSharedAppendix),
-		sfa.WithReloadSyntaxFlowScanSessionAction(r),
-		sfa.WithReloadSSARiskOverviewAction(r),
-		sfa.WithReloadSSARiskAction(r),
-		sfa.WithSetSSARiskReviewTargetAction(r),
-		sfa.WithMarkSSARiskDisposalAction(r),
-		sfa.WithDeriveRuleSeedFromRiskAction(r),
-		sfa.WithOpenReviewForRiskAction(r),
-		sfa.WithOpenRuleWriterFromScanAction(r),
-		sfa.WithOpenCodeAuditFromScanAction(r),
-		sfa.WithReadSSAProjectFileAction(r),
-		sfa.WithHandoffSyntaxFlowAuditAnalystAction(r),
+		WithReloadSyntaxFlowScanSessionAction(r),
+		ssaovw.WithReloadSSARiskOverviewAction(r),
+		ssarev.WithReloadSSARiskAction(r),
+		ssarev.WithSetSSARiskReviewTargetAction(r),
+		ssarev.WithMarkSSARiskDisposalAction(r),
+		ssarev.WithDeriveRuleSeedFromRiskAction(r),
+		WithOpenReviewForRiskAction(r),
+		WithOpenRuleWriterFromScanAction(r),
+		WithOpenCodeAuditFromScanAction(r),
+		WithReadSSAProjectFileAction(r),
+		WithHandoffSyntaxFlowAuditAnalystAction(r),
 		reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer, nonce string) (string, error) {
 			fb := strings.TrimSpace(feedbacker.String())
 			return utils.RenderTemplate(reactiveData, map[string]any{

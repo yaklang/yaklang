@@ -9,8 +9,6 @@ import (
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
-	sff "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/syntaxflow_forges"
-	sfs "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/syntaxflow_services"
 	sfu "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/syntaxflow_utils"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -76,7 +74,7 @@ func runPhase1Intake(
 		return nil
 	}
 
-	ex, err := sff.ExtractSyntaxFlowScanIntake(task.GetContext(), r, userInput)
+	ex, err := ExtractSyntaxFlowScanIntake(task.GetContext(), r, userInput)
 	if err != nil {
 		log.Warnf("[syntaxflow_scan] LiteForge intake failed: %v", err)
 	} else {
@@ -128,20 +126,20 @@ func pathMustExistForScan(p string) error {
 
 // --- scan session (DB + formatting) ---
 
-// DefaultRiskSampleLimit is re-exported from syntaxflow_services.
-const DefaultRiskSampleLimit = sfs.DefaultRiskSampleLimit
+// DefaultRiskSampleLimit is re-exported from syntaxflow_utils.
+const DefaultRiskSampleLimit = sfu.DefaultRiskSampleLimit
 
-// ScanSessionResult is re-exported from syntaxflow_services.
-type ScanSessionResult = sfs.ScanSessionResult
+// ScanSessionResult is re-exported from syntaxflow_utils.
+type ScanSessionResult = sfu.ScanSessionResult
 
 // LoadScanSessionResult loads task row + risk count + up to riskSampleLimit risks for AI preface.
 func LoadScanSessionResult(db *gorm.DB, taskID string, riskSampleLimit int) (*ScanSessionResult, error) {
-	return sfs.LoadScanSessionResult(db, taskID, riskSampleLimit)
+	return sfu.LoadScanSessionResult(db, taskID, riskSampleLimit)
 }
 
 // FormatScanTaskProgressLine summarizes query progress from the task row.
 func FormatScanTaskProgressLine(st *schema.SyntaxFlowScanTask) string {
-	return sfs.FormatScanTaskProgressLine(st)
+	return sfu.FormatScanTaskProgressLine(st)
 }
 
 // FormatSyntaxFlowScanEndReport is a one-line scan-end summary for pipeline / logs.
