@@ -14,6 +14,7 @@
 
 # Generated headers
 runtime/libyak.h
+runtime/libyak.debug.h
 runtime/runtime_go/libyak.h
 
 # Test binaries

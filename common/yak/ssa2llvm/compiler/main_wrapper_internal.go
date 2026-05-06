@@ -25,13 +25,13 @@ func (c *Compiler) addMainWrapperToModule(entryFunc string, printEntryResult boo
 		return fmt.Errorf("addMainWrapperToModule: entry function %q not found in module", entryFunc)
 	}
 
-	gcName := c.runtimeSymName("yak_runtime_gc")
+	gcName := c.runtimeSymName(abi.RuntimeGCSymbol)
 	gcFn := mod.NamedFunction(gcName)
 	if gcFn.IsNil() {
 		gcType := llvm.FunctionType(c.LLVMCtx.VoidType(), nil, false)
 		gcFn = llvm.AddFunction(mod, gcName, gcType)
 	}
-	waitName := c.runtimeSymName("yak_runtime_wait_async")
+	waitName := c.runtimeSymName(abi.RuntimeWaitAsyncSymbol)
 	waitAsyncFn := mod.NamedFunction(waitName)
 	if waitAsyncFn.IsNil() {
 		waitType := llvm.FunctionType(c.LLVMCtx.VoidType(), nil, false)
@@ -41,7 +41,7 @@ func (c *Compiler) addMainWrapperToModule(entryFunc string, printEntryResult boo
 	var printFn llvm.Value
 	var printType llvm.Type
 	if printEntryResult {
-		printName := c.runtimeSymName("yak_internal_print_int")
+		printName := c.runtimeSymName(abi.InternalPrintIntSymbol)
 		printFn = mod.NamedFunction(printName)
 		printType = llvm.FunctionType(c.LLVMCtx.VoidType(), []llvm.Type{c.LLVMCtx.Int64Type()}, false)
 		if printFn.IsNil() {

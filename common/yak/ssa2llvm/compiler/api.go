@@ -14,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/linkprep"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/obfuscation"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/profile"
+	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/abi"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/embed"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/trace"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -441,17 +442,17 @@ func entryFunctionCandidates(requested string) []string {
 func renameConflictingMainFunctions(mod llvm.Module, entryFunc string) string {
 	atMain := mod.NamedFunction("@main")
 	if !atMain.IsNil() {
-		atMain.SetName("yak_internal_atmain")
+		atMain.SetName(abi.InternalAtMainSymbol)
 		if entryFunc == "@main" {
-			entryFunc = "yak_internal_atmain"
+			entryFunc = abi.InternalAtMainSymbol
 		}
 	}
 
 	plainMain := mod.NamedFunction("main")
 	if !plainMain.IsNil() {
-		plainMain.SetName("yak_internal_main")
+		plainMain.SetName(abi.InternalMainSymbol)
 		if entryFunc == "main" {
-			entryFunc = "yak_internal_main"
+			entryFunc = abi.InternalMainSymbol
 		}
 	}
 
@@ -788,28 +789,31 @@ func addMainWrapper(ir, entryFunc string, printEntryResult bool) string {
 		callTarget = "@\"@main\""
 	}
 
+	atGC := "@" + abi.RuntimeGCSymbol
+	atPrint := "@" + abi.InternalPrintIntSymbol
+
 	gcDecl := ""
-	if !strings.Contains(ir, "@yak_runtime_gc") {
-		gcDecl = "\ndeclare void @yak_runtime_gc()\n"
+	if !strings.Contains(ir, atGC) {
+		gcDecl = "\ndeclare void @" + abi.RuntimeGCSymbol + "()\n"
 	}
 	printDecl := ""
 	printCall := ""
 	if printEntryResult {
-		if !strings.Contains(ir, "@yak_internal_print_int") {
-			printDecl = "declare void @yak_internal_print_int(i64)\n"
+		if !strings.Contains(ir, atPrint) {
+			printDecl = "declare void @" + abi.InternalPrintIntSymbol + "(i64)\n"
 		}
-		printCall = "  call void @yak_internal_print_int(i64 %result)\n"
+		printCall = "  call void @" + abi.InternalPrintIntSymbol + "(i64 %result)\n"
 	}
 
 	mainWrapper := fmt.Sprintf(`%s%s
 define i32 @main() {
 entry:
   %%result = call i64 %s()
-%s  call void @yak_runtime_gc()
+%s  call void @%s()
   %%exit_code = trunc i64 %%result to i32
   ret i32 %%exit_code
 }
-`, gcDecl, printDecl, callTarget, printCall)
+`, gcDecl, printDecl, callTarget, printCall, abi.RuntimeGCSymbol)
 	return ir + mainWrapper
 }
 

@@ -34,6 +34,27 @@ const (
 const (
 	InvokeSymbol    = "yak_runtime_invoke"
 	MakeSliceSymbol = "yak_runtime_make_slice"
+
+	// C-archive symbols exported by runtime_go (keep in sync with //export names).
+	InternalPrintIntSymbol      = "yak_internal_print_int"
+	InternalMallocSymbol        = "yak_internal_malloc"
+	RuntimeToCStringSymbol      = "yak_runtime_to_cstring"
+	HostReleaseHandleSymbol     = "yak_host_release_handle"
+	InternalReleaseShadowSymbol = "yak_internal_release_shadow"
+	RuntimeNewShadowSymbol      = "yak_runtime_new_shadow"
+	RuntimeGetFieldSymbol       = "yak_runtime_get_field"
+	RuntimeSetFieldSymbol       = "yak_runtime_set_field"
+	RuntimeDumpSymbol           = "yak_runtime_dump"
+	RuntimeDumpHandleSymbol     = "yak_runtime_dump_handle"
+	RuntimeGCSymbol             = "yak_runtime_gc"
+	RuntimeWaitAsyncSymbol      = "yak_runtime_wait_async"
+	RuntimeLoadPanicValueSymbol = "yak_runtime_load_panic_value"
+	RuntimeInvokeVMSymbol       = "yak_runtime_invoke_vm"
+	RuntimeTestAdd1CtxSymbol    = "yak_runtime_test_add1_ctx"
+
+	// Compiler renames clashing user main/@main (not part of linkprep manifest).
+	InternalAtMainSymbol = "yak_internal_atmain"
+	InternalMainSymbol   = "yak_internal_main"
 )
 
 const (

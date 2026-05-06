@@ -92,6 +92,67 @@ func EnsureRuntimeArchive(t *testing.T, repoRoot string) {
 	}
 }
 
+// EnsureDebugRuntimeArchive builds runtime/libyak.debug.a with the
+// ssa2llvm_runtime_debug build tag (GCLOG output, stderr panic diagnostics).
+// Release tests continue to use EnsureRuntimeArchive / libyak.a.
+func EnsureDebugRuntimeArchive(t *testing.T, repoRoot string) {
+	t.Helper()
+
+	archiveFile := filepath.Join(repoRoot, "common", "yak", "ssa2llvm", "runtime", "libyak.debug.a")
+	runtimeSrcDir := filepath.Join(repoRoot, "common", "yak", "ssa2llvm", "runtime", "runtime_go")
+
+	archiveInfo, err := os.Stat(archiveFile)
+	if err == nil {
+		rebuild := false
+		if walkErr := filepath.WalkDir(runtimeSrcDir, func(path string, d os.DirEntry, walkErr error) error {
+			if walkErr != nil {
+				return walkErr
+			}
+			if d.IsDir() {
+				return nil
+			}
+			ext := strings.ToLower(filepath.Ext(path))
+			switch ext {
+			case ".go", ".c", ".h":
+			default:
+				return nil
+			}
+			info, statErr := d.Info()
+			if statErr != nil {
+				return statErr
+			}
+			if info.ModTime().After(archiveInfo.ModTime()) {
+				rebuild = true
+				return filepath.SkipAll
+			}
+			return nil
+		}); walkErr != nil {
+			t.Fatalf("failed to inspect runtime sources: %v", walkErr)
+		}
+		if !rebuild {
+			return
+		}
+	}
+
+	cmd := exec.Command("go", "build",
+		"-tags=ssa2llvm_runtime_debug",
+		"-buildmode=c-archive",
+		"-o", archiveFile,
+		"./common/yak/ssa2llvm/runtime/runtime_go",
+	)
+	cmd.Dir = repoRoot
+	cmd.Env = append([]string{}, os.Environ()...)
+	cmd.Env = append(cmd.Env, "CGO_ENABLED=1")
+
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("failed to build debug runtime archive: %v\n%s", err, output)
+	}
+
+	if _, err := os.Stat(archiveFile); err != nil {
+		t.Fatalf("debug runtime archive not found at %s: %v", archiveFile, err)
+	}
+}
+
 // ListYakScripts returns absolute paths of *.yak scripts under the given directory.
 func ListYakScripts(t *testing.T, scriptDir string) []string {
 	t.Helper()

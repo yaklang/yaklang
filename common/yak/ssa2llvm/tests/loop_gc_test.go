@@ -15,6 +15,5 @@ func main() {
 }
 `
 
-	// GC handle release tracing requires libyak built with -tags ssa2llvm_runtime_debug.
-	checkRunBinary(t, code, "main", nil, []string{"999"})
+	checkRunBinary(t, code, "main", map[string]string{"GCLOG": "1"}, []string{"999", "[Yak GC] Finalizer triggered"}, withDebugRuntimeLib())
 }

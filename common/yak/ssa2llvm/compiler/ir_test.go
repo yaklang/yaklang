@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/abi"
 )
 
 func testInteropExternBindings() map[string]ExternBinding {
@@ -54,7 +55,7 @@ func TestIR_LocalFunctionCallUsesUnifiedInvoke(t *testing.T) {
 		`
 	_, _, ir, err := compileToIRFromCodeWithExternBindings(code, "yak", nil)
 	require.NoError(t, err)
-	require.GreaterOrEqual(t, strings.Count(ir, "call void @yak_runtime_invoke"), 2)
+	require.GreaterOrEqual(t, strings.Count(ir, "call void @"+abi.InvokeSymbol), 2)
 	require.Contains(t, ir, "@add")
 	require.NotContains(t, ir, "call void @add")
 	requireIRAvoidsLegacyCallEntrypoints(t, ir)
@@ -72,9 +73,9 @@ func TestIR_ObjectInteropCalls(t *testing.T) {
 	require.NoError(t, err)
 	requireIRContainsInOrder(t, ir,
 		"@yak_runtime_get_object",
-		"call void @yak_runtime_invoke",
-		"call i64 @yak_runtime_get_field",
-		"call void @yak_runtime_invoke",
+		"call void @"+abi.InvokeSymbol,
+		"call i64 @"+abi.RuntimeGetFieldSymbol,
+		"call void @"+abi.InvokeSymbol,
 	)
 	requireIRAvoidsLegacyCallEntrypoints(t, ir)
 }
@@ -96,8 +97,8 @@ func TestIR_LoopEmitsBranchesAndCalls(t *testing.T) {
 	requireIRContainsInOrder(t, ir,
 		"br i1",
 		"@yak_runtime_get_object",
-		"call void @yak_runtime_invoke",
-		"call void @yak_runtime_invoke",
+		"call void @"+abi.InvokeSymbol,
+		"call void @"+abi.InvokeSymbol,
 	)
 	requireIRAvoidsLegacyCallEntrypoints(t, ir)
 }
@@ -120,9 +121,9 @@ func TestIR_CustomExternBindingPointerReturn(t *testing.T) {
 	require.NoError(t, err)
 	requireIRContainsInOrder(t, ir,
 		"@yak_runtime_get_object",
-		"call void @yak_runtime_invoke",
-		"call i64 @yak_runtime_get_field",
-		"call void @yak_runtime_invoke",
+		"call void @"+abi.InvokeSymbol,
+		"call i64 @"+abi.RuntimeGetFieldSymbol,
+		"call void @"+abi.InvokeSymbol,
 	)
 	requireIRAvoidsLegacyCallEntrypoints(t, ir)
 }
@@ -144,8 +145,8 @@ func TestIR_CustomExternBindingOverrideGetObject(t *testing.T) {
 	require.NoError(t, err)
 	requireIRContainsInOrder(t, ir,
 		"@yak_hook_get_object",
-		"call void @yak_runtime_invoke",
-		"call void @yak_runtime_invoke",
+		"call void @"+abi.InvokeSymbol,
+		"call void @"+abi.InvokeSymbol,
 	)
 	requireIRAvoidsLegacyCallEntrypoints(t, ir)
 }
@@ -179,7 +180,7 @@ func TestIR_GoStmtUsesAsyncInvoke(t *testing.T) {
 	require.NoError(t, err)
 	requireIRContainsInOrder(t, ir,
 		"store i64 1",
-		"call void @yak_runtime_invoke",
+		"call void @"+abi.InvokeSymbol,
 	)
 	requireIRAvoidsLegacyCallEntrypoints(t, ir)
 }
@@ -199,7 +200,7 @@ func TestIR_GoStmtCallableUsesAsyncInvoke(t *testing.T) {
 	requireIRContainsInOrder(t, ir,
 		"@f",
 		"store i64 1",
-		"call void @yak_runtime_invoke",
+		"call void @"+abi.InvokeSymbol,
 	)
 	requireIRAvoidsLegacyCallEntrypoints(t, ir)
 }
@@ -219,8 +220,8 @@ func TestIR_InternalCallDoesNotMaterializeShadowMethodsAsFields(t *testing.T) {
 		`
 	_, _, ir, err := compileToIRFromCodeWithExternBindings(code, "yak", nil)
 	require.NoError(t, err)
-	require.NotContains(t, ir, "@yak_runtime_get_field")
-	require.GreaterOrEqual(t, strings.Count(ir, "call void @yak_runtime_invoke"), 3)
+	require.NotContains(t, ir, "@"+abi.RuntimeGetFieldSymbol)
+	require.GreaterOrEqual(t, strings.Count(ir, "call void @"+abi.InvokeSymbol), 3)
 	requireIRAvoidsLegacyCallEntrypoints(t, ir)
 }
 
@@ -235,9 +236,9 @@ func TestIR_MainWrapperUsesUnifiedInvoke(t *testing.T) {
 	ir := comp.Mod.String()
 	requireIRContainsInOrder(t, ir,
 		"define i32 @main()",
-		"call void @yak_runtime_invoke",
-		"call void @yak_runtime_wait_async",
-		"call void @yak_runtime_gc",
+		"call void @"+abi.InvokeSymbol,
+		"call void @"+abi.RuntimeWaitAsyncSymbol,
+		"call void @"+abi.RuntimeGCSymbol,
 	)
 	requireIRAvoidsLegacyCallEntrypoints(t, ir)
 }
@@ -253,8 +254,8 @@ func TestIR_SyncWaitGroupUsesDispatch(t *testing.T) {
 		`
 	_, _, ir, err := compileToIRFromCodeWithExternBindings(code, "yak", nil)
 	require.NoError(t, err)
-	require.GreaterOrEqual(t, strings.Count(ir, "call void @yak_runtime_invoke"), 4)
-	require.Contains(t, ir, "@yak_runtime_invoke")
+	require.GreaterOrEqual(t, strings.Count(ir, "call void @"+abi.InvokeSymbol), 4)
+	require.Contains(t, ir, "@"+abi.InvokeSymbol)
 	requireIRAvoidsLegacyCallEntrypoints(t, ir)
 }
 
@@ -267,8 +268,8 @@ func TestIR_MakeSliceUsesRuntimeHelper(t *testing.T) {
 		`
 	_, _, ir, err := compileToIRFromCodeWithExternBindings(code, "yak", nil)
 	require.NoError(t, err)
-	require.Contains(t, ir, "@yak_runtime_make_slice")
-	require.Contains(t, ir, "@yak_runtime_get_field")
+	require.Contains(t, ir, "@"+abi.MakeSliceSymbol)
+	require.Contains(t, ir, "@"+abi.RuntimeGetFieldSymbol)
 }
 
 func TestIR_AppendUsesDispatch(t *testing.T) {
@@ -281,7 +282,7 @@ func TestIR_AppendUsesDispatch(t *testing.T) {
 		`
 	_, _, ir, err := compileToIRFromCodeWithExternBindings(code, "yak", nil)
 	require.NoError(t, err)
-	require.Contains(t, ir, "@yak_runtime_make_slice")
-	require.GreaterOrEqual(t, strings.Count(ir, "call void @yak_runtime_invoke"), 2)
+	require.Contains(t, ir, "@"+abi.MakeSliceSymbol)
+	require.GreaterOrEqual(t, strings.Count(ir, "call void @"+abi.InvokeSymbol), 2)
 	requireIRAvoidsLegacyCallEntrypoints(t, ir)
 }
