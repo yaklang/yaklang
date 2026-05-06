@@ -82,9 +82,29 @@ func Observe(model, msg string) *aispec.ChatBaseMirrorResult {
 	return result
 }
 
-// ResetForTest 仅供测试使用：重置全局状态
+// ResetForTest 仅测试使用: 重置全局状态
 // 关键词: aicache, ResetForTest
 func ResetForTest() {
 	gCache = newGlobalCache(defaultMaxRequests)
 	gPrinter = newThrottlePrinter(minPrintInterval)
+}
+
+// SetMinCachableUserSegmentBytesForTest 仅测试使用: 临时覆盖 P2.1 短 prompt
+// 阈值合并阈值 (minCachableUserSegmentBytes), 返回 restore 函数恢复原值.
+//
+// 跨包测试需要走 4/3 段 happy path 但 fixture 内容很短 (低于默认 1024 byte)
+// 时使用; 同包测试可直接用本文件 hijacker_test.go 的 disableHijackerThresholdMerge.
+//
+// 用法:
+//
+//	restore := aicache.SetMinCachableUserSegmentBytesForTest(0)
+//	defer restore()
+//
+// 关键词: aicache, P2.1, 阈值合并, 测试 helper, 跨包覆盖
+func SetMinCachableUserSegmentBytesForTest(threshold int) (restore func()) {
+	saved := minCachableUserSegmentBytes
+	minCachableUserSegmentBytes = threshold
+	return func() {
+		minCachableUserSegmentBytes = saved
+	}
 }

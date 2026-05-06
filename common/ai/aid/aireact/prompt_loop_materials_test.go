@@ -286,6 +286,13 @@ func TestPromptManager_AssemblePromptPrefix(t *testing.T) {
 // 关键词: aicache hijack 4 段, AI_CACHE_FROZEN + AI_CACHE_SEMI 双边界,
 //        三 cc 主路径, P1 双 cache 边界
 func TestPromptManager_AssembleLoopPrompt_HijackFourSegment(t *testing.T) {
+	// P2.1 阈值合并默认 1024 byte 会把本测试的短 fixture (Tool Inventory 仅
+	// 一个 tool, 总字节数 << 1KB) 合并降级到 2 段, 与本测试断言的 4 段 happy
+	// path 不符. 显式关闭阈值合并以验证字节边界结构.
+	// 关键词: P2.1 阈值合并跨包关闭, aicache test helper, 4 段结构验证
+	restore := aicache.SetMinCachableUserSegmentBytesForTest(0)
+	defer restore()
+
 	react, err := NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
