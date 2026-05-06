@@ -583,3 +583,160 @@ func IsTongyiExplicitCacheModel(providerType, model string) bool  // tongyi + wh
 frozen boundary 是双 cc 命中率从 32% 提升到 70% 的关键: 它让 hijacker 拿到精准
 切割锚点, 不再依赖 timeline 内部 nonce 解析, 因此可以在更宽泛的 prompt 形态
 (不限于 timeline) 也能切出"system + frozen + open" 三段。
+
+---
+
+## 8. P2.1 短 prompt 阈值合并 (2026-05 增订)
+
+### 8.1 问题
+
+`cachebench-20260505-235343` 实测发现"辅助路径"(output / hyde / forge 等不带
+timeline 的小 prompt) 形态如下:
+
+| section | bytes | 跨 turn 行为 |
+| --- | --- | --- |
+| `high-static` | 964 | 多次 hash 复用 |
+| `semi-dynamic` | 1754 | 跨 turn 同 hash 稳定 |
+| `timeline-open` | 0 | 无 timeline |
+| `dynamic` | 170-339 | per-turn |
+
+总 prompt ≈ 3KB ≈ 750 token, **远低于 `TONGYI_CACHE_REPORT.md` §4.4 实测的
+dashscope 1024 token 建块阈值** (E4 实测: 733 token < 1024 token →
+`cache_creation=0`)。客户端 `prefix_hit_ratio` 88-94%, 但上游 `cached_tokens=0`,
+是典型的"白打 cc"。
+
+### 8.2 阈值合并 / 旁路策略
+
+`aicache.minCachableUserSegmentBytes` (默认 1024 byte, 用户给定的保守阈值,
+约等于 256 token, 远低于上游 1024 token 阈值; 用 byte 而非 token 是为了
+零依赖 / 字节边界精确):
+
+```
+4 段 happy path  : sys+cc, u1+cc, u2+cc, u3 (无 cc)
+                   触发: u1, u2 都 >= 1KB
+
+4 段 → 3 段降级  : sys+cc, u12+cc, u3 (无 cc)
+                   触发: u1 < 1KB, u1+u2 >= 1KB
+                   含义: frozen 段太短单独打 cc 触不到上游建块, 合并到 semi 让 semi 独占 cc
+
+4 段 → 2 段降级  : sys+cc, all_user (无 cc)
+                   触发: u1+u2 < 1KB
+                   含义: 全 user 段太短打 cc 也无法建块, 仅 system 缓存
+
+3 段 → 2 段降级  : sys (string, 无 cc), all_user (string, 无 cc)
+                   触发: 仅 frozen 边界, u1 < 1KB
+                   含义: 让 aibalance 走 baseline 单 cc 兜底, hijacker 不主动打 cc
+```
+
+### 8.3 落点
+
+- 阈值常量: [`common/ai/aid/aicache/hijacker.go`](hijacker.go) `minCachableUserSegmentBytes`
+- 4 段降级: `build4SegmentMessages` 拆完 user1/user2/user3 后做阈值检查
+- 3 段降级: `build3SegmentMessages` 拼完 user1/user2 后做阈值检查 (返回 nil 让上游降级)
+- 单测覆盖: `TestHijack_P2_FourSegment_FallbackToThree_*` / `FallbackToTwo_*` /
+  `TestHijack_P2_ThreeSegment_FallbackToTwo_*` / `HappyPathPreserved_*` /
+  `BoundaryEdge_AtThreshold` (5 个用例, 见 [`hijacker_test.go`](hijacker_test.go))
+
+### 8.4 测试设施
+
+`hijacker_test.go` 引入 `TestMain` 在测试入口把 `minCachableUserSegmentBytes`
+默认设为 0, 让既有 happy-path 测试 (16+ 个用 ~100-300 byte 短 fixture 的用例)
+不受阈值合并影响; 新增 P2.1 降级用例显式调用 `setHijackerThresholdMerge(t, 1024)`
+打开默认阈值。这是最低成本的兼容方案。
+
+> 注意: `minCachableUserSegmentBytes` 是包级 var (而非 const) 仅为测试覆盖,
+> 生产代码绝对不能改写。
+
+---
+
+## 9. P2.1 Schema 字节稳定化 (2026-05 增订)
+
+### 9.1 问题
+
+`generateSchemaString` ([`aireact/reactloops/prompt.go`](../aireact/reactloops/prompt.go))
+跨 turn schema 字节漂移源:
+
+| 跳变源 | 频率 | 影响 |
+| --- | --- | --- |
+| **`HasRecentlyUsedTools` 0->1** | 高 (每会话首次工具调用) | `directly_call_tool` 进出 enum + actionDesc |
+| `operator.disallowLoopExit` true | 偶发 (hook 主动调) | `finish` 进出 enum |
+| `allowAIForge` / `allowPlanAndExec` / `allowToolCall` | 启动时一次 | 多个 actions 进出 |
+| `initActionDisabled` / `initActionMustUse` | 一次性 (`initActionApplied` 控制) | 不影响稳态 |
+
+主因是 `HasRecentlyUsedTools` 0->1 跳变: 第一轮无 recent tools, schema 不含
+`directly_call_tool`; 首次 `require_tool` 调用后, schema 多出该 action,
+**semi-dynamic 段 hash 翻转, prefix cache 必然失效一次**。
+
+### 9.2 修复
+
+P2.1 改成永远保留 `directly_call_tool` 在 schema 中 (除非 toolManager 完全 nil),
+依赖 `ActionVerifier` 在 LLM 误选时报错触发 `aiTransaction` retry:
+
+```go
+// before
+toolManager := r.config.GetAiToolManager()
+if toolManager == nil || !toolManager.HasRecentlyUsedTools() {
+    disableActionList = append(disableActionList, schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL)
+}
+
+// after (P2.1)
+toolManager := r.config.GetAiToolManager()
+if toolManager == nil {
+    disableActionList = append(disableActionList, schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL)
+}
+```
+
+ActionVerifier 兜底 ([`loopinfra/action_directly_call_tool.go`](../aireact/reactloops/loopinfra/action_directly_call_tool.go)):
+
+```go
+mgr := loop.GetConfig().GetAiToolManager()
+if mgr == nil || !mgr.IsRecentlyUsedTool(toolName) {
+    return utils.Errorf("tool '%s' is not in the recently-used cache; use require_tool instead", toolName)
+}
+```
+
+LLM 在无 recent tools 时若选 `directly_call_tool`, verifier 报错 → transaction
+retry → LLM 改选 `require_tool`, 行为与原 disable 等价但 schema 字节稳定。
+
+action description 同步加强约束:
+
+```
+"Use this ONLY when the exact tool you need is already listed in the
+CACHE_TOOL_CALL block. If CACHE_TOOL_CALL is empty or does not contain a
+matching tool, choose require_tool instead; selecting directly_call_tool
+without a cached match will be rejected by the verifier and force a retry."
+```
+
+### 9.3 单测
+
+[`aireact/reactloops/schema_stability_test.go`](../aireact/reactloops/schema_stability_test.go):
+
+- `TestGenerateSchema_StableAcrossHasRecentlyUsedTools`: 同一 ReActLoop 在
+  toolManager 0->1 recent tools 跳变前后 schema 字节完全相等
+- `TestGenerateSchema_DirectlyCallToolDisabledWhenNoToolManager`: toolManager
+  为 nil 时 directly_call_tool 仍被 disable (NPE 兜底)
+- `TestGenerateSchema_StableAcrossMultipleAdds`: 多次 AddRecentlyUsedTool 后
+  schema 字节仍与初始空 schema 相等
+
+### 9.4 SkillsContext 调研结论 (无代码变更)
+
+`SkillsContextManager.RenderStable` ([`aiskillloader/skills_context_manager.go`](../aicommon/aiskillloader/skills_context_manager.go))
+实测已字节稳定:
+
+- 固定 nonce `"skills_context"` (`renderWithTag` hard-code)
+- 双段结构 (Currently Loaded + Available) 永远存在, 零加载时上半段是 `(none)`
+- `appendAvailableSkillsSection` 仅依赖 `loader.AllSkillMetas()` (已 sortByName)
+- `sortedLoadedSkillStates` / `sortedViewWindows` 都按 name 排序
+
+`semi-dynamic` 段 churn 主要来自 schema 而不是 SkillsContext, 故 SkillsContext
+**不需要改**。后续若新增 skill view window 渲染必须保持 `sortedViewWindows` +
+`RenderWithInfo` 的稳定输出契约 (见 §6.1 表格)。
+
+### 9.5 后置项 (P2.2)
+
+- `disallowLoopExit` 跳变: `finish` 进出 schema. 频率低于 HasRecentlyUsedTools,
+  本次 P2.1 不动; 若 cachebench 仍发现 finish 跳变是主要 churn 源, 再考虑
+  把 `finish` 也保留 + ReactiveData 段加 "[do not use finish in this turn]"
+  约束转移。先观察 P2.1 单点改动收益再决定。
+
+

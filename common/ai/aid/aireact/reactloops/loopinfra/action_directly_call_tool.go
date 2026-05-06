@@ -276,7 +276,9 @@ func directlyCallParamKeys(params aitool.InvokeParams) []string {
 var loopAction_directlyCallTool = &reactloops.LoopAction{
 	ActionType: schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL,
 	Description: "directly call a recently used tool (skip require & param-generation phases). " +
-		"Only tools listed in the CACHE_TOOL_CALL block are eligible. " +
+		"Use this ONLY when the exact tool you need is already listed in the CACHE_TOOL_CALL block. " +
+		"If CACHE_TOOL_CALL is empty or does not contain a matching tool, choose require_tool instead; " +
+		"selecting directly_call_tool without a cached match will be rejected by the verifier and force a retry. " +
 		"Provide directly_call_tool_name AND directly_call_tool_params together.",
 	Options: []aitool.ToolOption{
 		aitool.WithStringParam(

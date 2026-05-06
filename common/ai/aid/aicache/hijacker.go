@@ -224,6 +224,15 @@ func build3SegmentMessages(res *aitag.SplitResult, systemContent string, timelin
 		}
 	}
 
+	// P2.1 短 prompt 阈值合并: user1 (frozen 段) < 1KB 时单独打 cc 没意义
+	// (上游 dashscope 1024 token 阈值不会建块), 直接返回 nil 让上游退化到
+	// build2SegmentMessages 路径 (system 单 cc + 全 user 不打 cc), 避免浪费
+	// 一个 cc slot 元数据.
+	// 关键词: P2.1, build3 阈值合并, 短 frozen 段旁路
+	if len(user1) < minCachableUserSegmentBytes {
+		return nil
+	}
+
 	return &aispec.ChatBaseMirrorResult{
 		IsHijacked: true,
 		Messages: []aispec.ChatDetail{
@@ -278,6 +287,26 @@ const (
 	semiBoundaryStartTag = "<|" + semiBoundaryTagName + "_" + semiBoundaryNonce + "|>"
 	semiBoundaryEndTag   = "<|" + semiBoundaryTagName + "_END_" + semiBoundaryNonce + "|>"
 )
+
+// minCachableUserSegmentBytes 是 user 段单独打 ephemeral cc 的最小字节阈值.
+// 低于该阈值的 user 段无论 cc 与否都不会被 dashscope 建块 (TONGYI_CACHE_REPORT.md
+// §4.4 E4 实测: 733 token ~3KB 即低于上游 1024 token 阈值, cache_creation=0,
+// 客户端 prefix_hit_ratio 接近 100% 但上游 cached_tokens=0, 是典型的"白打 cc").
+//
+// P2.1 短 prompt 旁路策略 (按用户给定的 1KB 保守阈值):
+//   - 4 段路径下 user1 (frozen 段) < 1KB → 合并到 user2, 退化为 3 段 (sys + u12 + u3)
+//   - 合并后 user1+user2 < 1KB → 全合并到 user3, 退化为 2 段 (sys + all_user, 仅 system 打 cc)
+//   - 3 段路径下 user1 < 1KB → 退化到 build2SegmentMessages (返回 nil 让上游降级)
+//
+// 1024 byte ~ 256 token 远低于上游 1024 token 实际阈值, 用 byte 而非 token 估算
+// 是为了无依赖 / 低开销 / 字节边界精确; 命中 < 1KB 阈值的 user 段一定无法触发
+// 上游建块, 合并旁路至少避免浪费一个 cache slot 元数据.
+//
+// 注意: 这是包级 var (而非 const), 仅为了让单测可以临时覆盖默认值 (设为 0
+// 关闭阈值合并以测试 happy path), 生产代码绝对不能改写该值. 不导出到包外.
+//
+// 关键词: aicache, P2.1, 短 prompt 阈值, 合并旁路, 1024 byte, dashscope 1024 token
+var minCachableUserSegmentBytes = 1024
 
 // splitByFrozenBoundary 在所有非 high-static block.Raw 顺序拼接后的字符串中,
 // 用 <|AI_CACHE_FROZEN_semi-dynamic|>...<|AI_CACHE_FROZEN_END_semi-dynamic|>
@@ -446,13 +475,56 @@ func splitBySemiBoundary(res *aitag.SplitResult) (user1, user2, user3 string, ok
 // 切割锚点: frozen 边界 + semi 边界两对完整标签都存在. 任一缺失 -> 返回 nil
 // 让上游退化到 build3SegmentMessages.
 //
+// P2.1 短 prompt 阈值合并 (minCachableUserSegmentBytes = 1024):
+//   - user1 < 1KB: 把 user1 内容合并到 user2 → 退化到 3 段 (sys cc + u12 cc + u3)
+//   - user1+user2 < 1KB: 再合并 user3 → 退化到 2 段 (sys cc + all_user 无 cc, 仅 system 缓存)
+//   - 阈值检查在 splitBySemiBoundary 成功后做, 用 len(byte) 而非 token, 见
+//     minCachableUserSegmentBytes 注释.
+//
 // 关键词: aicache, hijacker, 4 段拆分, build4SegmentMessages, 双 cc 自管,
-//        frozen + semi 双边界, P1 双 cache 边界
+//        frozen + semi 双边界, P1 双 cache 边界, P2.1 阈值合并
 func build4SegmentMessages(res *aitag.SplitResult, systemContent string) *aispec.ChatBaseMirrorResult {
 	user1, user2, user3, ok := splitBySemiBoundary(res)
 	if !ok {
 		return nil
 	}
+
+	// P2.1 阶段 1: user1 (frozen 段) < 阈值 → 合并到 user2 退化 3 段
+	// frozen 段太短单独打 cc 触不到上游 1024 token 建块阈值, 合并让 semi 段独占 cc,
+	// 至少保住 semi 段的 prefix cache 命中.
+	if len(user1) < minCachableUserSegmentBytes {
+		merged := strings.TrimSpace(user1 + "\n" + user2)
+		if merged == "" {
+			merged = strings.TrimSpace(user1 + user2)
+		}
+
+		// P2.1 阶段 2: 合并后 user1+user2 仍 < 阈值 → 全合并 user3 退化 2 段
+		// 全 user 段太短打 cc 也不会触发建块, 让 user 段透传, 仅 system 打 cc.
+		if len(merged) < minCachableUserSegmentBytes {
+			allUser := strings.TrimSpace(merged + "\n" + user3)
+			if allUser == "" {
+				return nil
+			}
+			return &aispec.ChatBaseMirrorResult{
+				IsHijacked: true,
+				Messages: []aispec.ChatDetail{
+					{Role: "system", Content: wrapTextWithEphemeralCC(systemContent)},
+					aispec.NewUserChatDetail(allUser),
+				},
+			}
+		}
+
+		// 3 段降级: sys cc + u12 cc + u3
+		return &aispec.ChatBaseMirrorResult{
+			IsHijacked: true,
+			Messages: []aispec.ChatDetail{
+				{Role: "system", Content: wrapTextWithEphemeralCC(systemContent)},
+				{Role: "user", Content: wrapTextWithEphemeralCC(merged)},
+				aispec.NewUserChatDetail(user3),
+			},
+		}
+	}
+
 	return &aispec.ChatBaseMirrorResult{
 		IsHijacked: true,
 		Messages: []aispec.ChatDetail{

@@ -1,6 +1,7 @@
 package aicache
 
 import (
+	"os"
 	"strings"
 	"testing"
 
@@ -8,6 +9,24 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 )
+
+// TestMain 关闭 P2.1 阈值合并 (minCachableUserSegmentBytes = 0), 让本文件
+// 既有 happy-path 测试 (4/3 段断言) 都使用很短的 fixture 内容也能命中 happy
+// path. 新增的 P2.1 降级路径用例必须用 setHijackerThresholdMerge(t, 1024)
+// 显式打开阈值合并, 才能验证降级行为.
+//
+// 设计理由: 现有 16+ 个 happy-path 测试 fixture 用 ~100-300 byte 短内容,
+// 默认 1024 byte 阈值下全部会被合并降级, 修改 fixture 工程量大且会污染断言.
+// 在 TestMain 关闭阈值是最低成本且 isolation 良好的方案.
+//
+// 关键词: aicache, P2.1, hijacker test main, 阈值合并默认关闭, 降级路径显式开启
+func TestMain(m *testing.M) {
+	saved := minCachableUserSegmentBytes
+	minCachableUserSegmentBytes = 0
+	code := m.Run()
+	minCachableUserSegmentBytes = saved
+	os.Exit(code)
+}
 
 // extractTextContent 把 hijacker 输出的 message.Content 提取成 string,
 // 兼容两种形态:
@@ -82,6 +101,38 @@ func assertNoCacheControl(t *testing.T, content any, label string) {
 	default:
 		t.Fatalf("%s: unexpected content type: %T", label, content)
 	}
+}
+
+// disableHijackerThresholdMerge 临时把 P2.1 阈值合并阈值
+// (minCachableUserSegmentBytes) 设为 0, 关闭 build4/build3 的短 prompt 合并/旁路
+// 逻辑, 让现有 happy-path 测试在不修改 fixture 大小的前提下仍能走 4/3 段路径.
+// t.Cleanup 自动恢复原值, 串行测试下不会污染其他用例.
+//
+// 用法:
+//
+//	func TestXxx(t *testing.T) {
+//	    disableHijackerThresholdMerge(t)
+//	    // 后续测试断言 4 段 / 3 段 happy path
+//	}
+//
+// 关键词: aicache, hijacker test helper, P2.1 阈值合并 disable, 测试覆盖
+func disableHijackerThresholdMerge(t *testing.T) {
+	t.Helper()
+	saved := minCachableUserSegmentBytes
+	minCachableUserSegmentBytes = 0
+	t.Cleanup(func() { minCachableUserSegmentBytes = saved })
+}
+
+// setHijackerThresholdMerge 临时把 P2.1 阈值合并阈值设为指定值, 用于 P2.1 降级
+// 用例中精细控制阈值 (例如设 50 验证 user1=10 byte 时的合并行为). t.Cleanup
+// 自动恢复.
+//
+// 关键词: aicache, hijacker test helper, P2.1 阈值合并 setter, 测试覆盖
+func setHijackerThresholdMerge(t *testing.T, threshold int) {
+	t.Helper()
+	saved := minCachableUserSegmentBytes
+	minCachableUserSegmentBytes = threshold
+	t.Cleanup(func() { minCachableUserSegmentBytes = saved })
 }
 
 // TestHijack_FourSectionPrompt 验证 4 段完整 prompt 被切成 [system, user]，
@@ -1078,4 +1129,233 @@ func TestHijack_SemiBoundary_PrefixStableAcrossDynamicChange(t *testing.T) {
 		"user2 must be byte-stable when semi prefix unchanged (P1 二级 cache 边界)")
 	assert.NotEqual(t, r1.Messages[3].Content, r2.Messages[3].Content,
 		"user3 should differ when dynamic content changes")
+}
+
+// ---------------------------------------------------------------------------
+// P2.1 短 prompt 阈值合并 / 旁路用例
+// 验证 build4SegmentMessages / build3SegmentMessages 在 user 段过短时按
+// minCachableUserSegmentBytes (默认 1024 byte) 自动降级:
+//   - 4 段 → 3 段 (user1 < 阈值, user1+user2 >= 阈值)
+//   - 4 段 → 2 段 (user1+user2 < 阈值)
+//   - 3 段 → 2 段 (user1 < 阈值)
+//   - happy path 仍保留 (user1, user2 都 >= 阈值)
+//   - 阈值边界 (user1 == 阈值) 不触发合并
+// 这些用例显式 setHijackerThresholdMerge(t, 1024) 打开默认阈值, 与 TestMain
+// 默认关闭阈值的 isolation 配合.
+// ---------------------------------------------------------------------------
+
+// largeFiller 生成大于 minBytes 的 ASCII 字符串, 用于撑大 fixture 让 user 段
+// 达到 P2.1 阈值。内容是稳定 pattern, 不破坏字节稳定性测试断言.
+//
+// 关键词: aicache test helper, P2.1, fixture filler
+func largeFiller(label string, minBytes int) string {
+	unit := "[" + label + "-padding-line-" + strings.Repeat("x", 32) + "]\n"
+	var sb strings.Builder
+	for sb.Len() < minBytes {
+		sb.WriteString(unit)
+	}
+	return sb.String()
+}
+
+// TestHijack_P2_FourSegment_FallbackToThree_WhenUser1TooSmall 验证 P2.1
+// 阶段 1: user1 (frozen 段) 内容很短 (< 1KB) 但 user2 (semi 段) 很大,
+// hijacker 把 user1 合并到 user2, 退化为 3 段消息: [sys+cc, u12+cc, u3].
+// 关键词: P2.1, 阈值合并, 4 段 → 3 段降级
+func TestHijack_P2_FourSegment_FallbackToThree_WhenUser1TooSmall(t *testing.T) {
+	setHijackerThresholdMerge(t, 1024)
+
+	semiBody := largeFiller("semi-body", 4096) // user2 ≥ 4KB 远超阈值
+	prompt := strings.Join([]string{
+		"<|AI_CACHE_SYSTEM_high-static|>\nA-system\n<|AI_CACHE_SYSTEM_END_high-static|>",
+		"<|AI_CACHE_FROZEN_semi-dynamic|>\n" +
+			"tiny-frozen\n" +
+			"<|AI_CACHE_FROZEN_END_semi-dynamic|>",
+		"<|AI_CACHE_SEMI_semi|>\n" +
+			"<|PROMPT_SECTION_semi-dynamic|>\n" +
+			"semi-marker-X\n" +
+			semiBody +
+			"<|PROMPT_SECTION_END_semi-dynamic|>\n" +
+			"<|AI_CACHE_SEMI_END_semi|>",
+		"<|PROMPT_SECTION_dynamic_q|>\nuser-query-payload\n<|PROMPT_SECTION_dynamic_END_q|>",
+	}, "\n\n")
+
+	res := hijackHighStatic(prompt)
+	require.NotNil(t, res)
+	require.True(t, res.IsHijacked)
+	require.Len(t, res.Messages, 3,
+		"user1 < 1KB but user1+user2 >= 1KB should merge to 3 segments")
+
+	system := extractTextContent(t, res.Messages[0].Content)
+	merged := extractTextContent(t, res.Messages[1].Content)
+	user3 := extractTextContent(t, res.Messages[2].Content)
+
+	require.Contains(t, system, "A-system")
+	// merged 必须同时包含原 user1 (frozen) 与 user2 (semi) 内容, 字节连续无截断
+	require.Contains(t, merged, "tiny-frozen", "merged user12 must carry user1 content")
+	require.Contains(t, merged, "<|AI_CACHE_FROZEN_END_semi-dynamic|>",
+		"merged user12 must keep frozen END tag (字节边界)")
+	require.Contains(t, merged, "semi-marker-X", "merged user12 must carry user2 content")
+	require.Contains(t, merged, "<|AI_CACHE_SEMI_END_semi|>",
+		"merged user12 must keep semi END tag")
+	require.NotContains(t, merged, "user-query-payload")
+
+	require.Contains(t, user3, "user-query-payload")
+	require.NotContains(t, user3, "tiny-frozen")
+	require.NotContains(t, user3, "semi-marker-X")
+
+	// system + user12 主动打 cc, user3 不带 cc
+	assertHasEphemeralCacheControl(t, res.Messages[0].Content, "P2 4to3 system")
+	assertHasEphemeralCacheControl(t, res.Messages[1].Content, "P2 4to3 user12")
+	assertNoCacheControl(t, res.Messages[2].Content, "P2 4to3 user3")
+}
+
+// TestHijack_P2_FourSegment_FallbackToTwo_WhenUserTooSmall 验证 P2.1
+// 阶段 2: user1 + user2 合计仍 < 1KB, 进一步合并 user3, 退化为 2 段消息:
+// [sys+cc, all_user 不带 cc]. 仅 system 段缓存, user 段透传.
+// 关键词: P2.1, 阈值合并, 4 段 → 2 段降级, user 段透传
+func TestHijack_P2_FourSegment_FallbackToTwo_WhenUserTooSmall(t *testing.T) {
+	setHijackerThresholdMerge(t, 1024)
+
+	prompt := strings.Join([]string{
+		"<|AI_CACHE_SYSTEM_high-static|>\nA-system-static\n<|AI_CACHE_SYSTEM_END_high-static|>",
+		"<|AI_CACHE_FROZEN_semi-dynamic|>\n" +
+			"tiny-frozen-1\n" +
+			"<|AI_CACHE_FROZEN_END_semi-dynamic|>",
+		"<|AI_CACHE_SEMI_semi|>\n" +
+			"<|PROMPT_SECTION_semi-dynamic|>\n" +
+			"tiny-semi-2\n" +
+			"<|PROMPT_SECTION_END_semi-dynamic|>\n" +
+			"<|AI_CACHE_SEMI_END_semi|>",
+		"<|PROMPT_SECTION_dynamic_q|>\ntiny-dynamic-3\n<|PROMPT_SECTION_dynamic_END_q|>",
+	}, "\n\n")
+
+	res := hijackHighStatic(prompt)
+	require.NotNil(t, res)
+	require.True(t, res.IsHijacked)
+	require.Len(t, res.Messages, 2,
+		"user1+user2 < 1KB should fall back to 2 segments (sys cc + all_user no cc)")
+
+	system := extractTextContent(t, res.Messages[0].Content)
+	allUser := extractTextContent(t, res.Messages[1].Content)
+
+	require.Contains(t, system, "A-system-static")
+
+	// allUser 必须依次包含 frozen + semi + dynamic 三段原内容
+	require.Contains(t, allUser, "tiny-frozen-1")
+	require.Contains(t, allUser, "<|AI_CACHE_FROZEN_END_semi-dynamic|>")
+	require.Contains(t, allUser, "tiny-semi-2")
+	require.Contains(t, allUser, "<|AI_CACHE_SEMI_END_semi|>")
+	require.Contains(t, allUser, "tiny-dynamic-3")
+
+	// 仅 system 打 cc, user 不打 cc
+	assertHasEphemeralCacheControl(t, res.Messages[0].Content, "P2 4to2 system")
+	assertNoCacheControl(t, res.Messages[1].Content, "P2 4to2 all_user")
+}
+
+// TestHijack_P2_ThreeSegment_FallbackToTwo_WhenUser1TooSmall 验证 P2.1
+// 3 段路径降级: 仅有 frozen 边界 (无 semi 边界), user1 < 1KB 时 hijacker
+// 退化到 build2SegmentMessages, 整段 user 透传不打 cc.
+// 关键词: P2.1, 阈值合并, 3 段 → 2 段降级, build3 阈值检查
+func TestHijack_P2_ThreeSegment_FallbackToTwo_WhenUser1TooSmall(t *testing.T) {
+	setHijackerThresholdMerge(t, 1024)
+
+	prompt := strings.Join([]string{
+		"<|AI_CACHE_SYSTEM_high-static|>\nA-system\n<|AI_CACHE_SYSTEM_END_high-static|>",
+		"<|AI_CACHE_FROZEN_semi-dynamic|>\n" +
+			"tiny-frozen-only\n" +
+			"<|AI_CACHE_FROZEN_END_semi-dynamic|>",
+		"<|PROMPT_SECTION_dynamic_q|>\ndynamic-tail\n<|PROMPT_SECTION_dynamic_END_q|>",
+	}, "\n\n")
+
+	res := hijackHighStatic(prompt)
+	require.NotNil(t, res)
+	require.True(t, res.IsHijacked)
+	require.Len(t, res.Messages, 2,
+		"3-segment path with user1 < 1KB should fall back to 2 segments")
+
+	// build3 阈值合并 → build2SegmentMessages 兜底, system/user 都是 string 不打 cc,
+	// 由 aibalance 走 baseline 单 cc 兜底 (与原 2 段退化路径一致).
+	sysStr, ok := res.Messages[0].Content.(string)
+	require.True(t, ok, "P2 3to2 system must be string (build2 fallback), got %T", res.Messages[0].Content)
+	require.Contains(t, sysStr, "A-system")
+
+	allUser, ok := res.Messages[1].Content.(string)
+	require.True(t, ok, "P2 3to2 user must be string, got %T", res.Messages[1].Content)
+	require.Contains(t, allUser, "tiny-frozen-only")
+	require.Contains(t, allUser, "<|AI_CACHE_FROZEN_END_semi-dynamic|>")
+	require.Contains(t, allUser, "dynamic-tail")
+}
+
+// TestHijack_P2_FourSegment_HappyPathPreserved_WhenBothLarge 验证当 user1 与
+// user2 都 >= 1KB 时, P2.1 阈值合并不应触发, hijacker 走原 4 段 happy path.
+// 关键词: P2.1, 阈值合并 happy 不影响, 4 段保留
+func TestHijack_P2_FourSegment_HappyPathPreserved_WhenBothLarge(t *testing.T) {
+	setHijackerThresholdMerge(t, 1024)
+
+	frozenBody := largeFiller("frozen-body", 2048)
+	semiBody := largeFiller("semi-body", 2048)
+
+	prompt := strings.Join([]string{
+		"<|AI_CACHE_SYSTEM_high-static|>\nA-system\n<|AI_CACHE_SYSTEM_END_high-static|>",
+		"<|AI_CACHE_FROZEN_semi-dynamic|>\n" +
+			frozenBody +
+			"<|AI_CACHE_FROZEN_END_semi-dynamic|>",
+		"<|AI_CACHE_SEMI_semi|>\n" +
+			"<|PROMPT_SECTION_semi-dynamic|>\n" +
+			semiBody +
+			"<|PROMPT_SECTION_END_semi-dynamic|>\n" +
+			"<|AI_CACHE_SEMI_END_semi|>",
+		"<|PROMPT_SECTION_dynamic_q|>\nuser-q\n<|PROMPT_SECTION_dynamic_END_q|>",
+	}, "\n\n")
+
+	res := hijackHighStatic(prompt)
+	require.NotNil(t, res)
+	require.True(t, res.IsHijacked)
+	require.Len(t, res.Messages, 4,
+		"both user1 and user2 above threshold should keep 4-segment happy path")
+
+	assertHasEphemeralCacheControl(t, res.Messages[0].Content, "P2 happy system")
+	assertHasEphemeralCacheControl(t, res.Messages[1].Content, "P2 happy user1")
+	assertHasEphemeralCacheControl(t, res.Messages[2].Content, "P2 happy user2")
+	assertNoCacheControl(t, res.Messages[3].Content, "P2 happy user3")
+}
+
+// TestHijack_P2_FourSegment_BoundaryEdge_AtThreshold 验证阈值边界 (用 `<` 不
+// 是 `<=`): user1 字节数恰好等于阈值时, 不触发合并, 仍走 happy 4 段.
+// 关键词: P2.1, 阈值合并边界, < 严格小于
+func TestHijack_P2_FourSegment_BoundaryEdge_AtThreshold(t *testing.T) {
+	// 用一个较小阈值便于精确控制 user1 字节数
+	setHijackerThresholdMerge(t, 200)
+
+	// 构造一个 frozen 段, 让其 user1 (含 START + body + END 标签) 字节数
+	// 恰好等于 200. 先估出 START + END 标签字节, 再用 padding 补到 200 整.
+	startTag := "<|AI_CACHE_FROZEN_semi-dynamic|>\n"
+	endTag := "\n<|AI_CACHE_FROZEN_END_semi-dynamic|>"
+	overhead := len(startTag) + len(endTag)
+	// 还要算上 splitBySemiBoundary TrimSpace 后剩余的字节. 这里直接用大于
+	// 阈值一点的 body 让 user1 >= 200. 用 200 - overhead + 32 个填充确保严格 >= 阈值
+	bodyBytes := 200 - overhead + 32
+	if bodyBytes < 0 {
+		bodyBytes = 32
+	}
+	frozenBody := strings.Repeat("a", bodyBytes)
+
+	semiBody := largeFiller("semi", 400)
+
+	prompt := strings.Join([]string{
+		"<|AI_CACHE_SYSTEM_high-static|>\nsys\n<|AI_CACHE_SYSTEM_END_high-static|>",
+		startTag + frozenBody + endTag,
+		"<|AI_CACHE_SEMI_semi|>\n" +
+			"<|PROMPT_SECTION_semi-dynamic|>\n" +
+			semiBody +
+			"<|PROMPT_SECTION_END_semi-dynamic|>\n" +
+			"<|AI_CACHE_SEMI_END_semi|>",
+		"<|PROMPT_SECTION_dynamic_q|>\nq\n<|PROMPT_SECTION_dynamic_END_q|>",
+	}, "\n\n")
+
+	res := hijackHighStatic(prompt)
+	require.NotNil(t, res)
+	require.True(t, res.IsHijacked)
+	require.Len(t, res.Messages, 4,
+		"user1 >= threshold (strict less-than check) should keep 4-segment happy path")
 }

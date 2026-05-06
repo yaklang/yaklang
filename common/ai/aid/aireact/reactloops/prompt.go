@@ -63,9 +63,20 @@ func (r *ReActLoop) generateSchemaString(disallowExit bool) (string, error) {
 		disableActionList = append(disableActionList, schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL)
 	}
 
-	// directly_call_tool is only available when there are recently-used tools in cache
+	// directly_call_tool 只要 toolManager 存在就保留在 schema 中, 不再依赖
+	// HasRecentlyUsedTools 的 0->1 跳变. 这是 P2.1 schema 字节稳定化的核心:
+	// 第一次工具调用前后 schema enum / desc 都不变, semi-dynamic 段 hash 跨 turn
+	// 一致, 让 dashscope prefix 缓存能持续命中.
+	//
+	// 安全兜底: 当 LLM 在没有 recent tools 时选 directly_call_tool, 该 action
+	// 的 ActionVerifier (loopinfra/action_directly_call_tool.go) 会通过
+	// IsRecentlyUsedTool 检查报错 "tool 'xxx' is not in the recently-used cache;
+	// use require_tool instead", 触发 aiTransaction 重试, 让 LLM 改选 require_tool,
+	// 行为与原 disable 路径等价.
+	//
+	// 关键词: P2.1, schema 字节稳定, HasRecentlyUsedTools 跳变消除, verifier 兜底
 	toolManager := r.config.GetAiToolManager()
-	if toolManager == nil || !toolManager.HasRecentlyUsedTools() {
+	if toolManager == nil {
 		disableActionList = append(disableActionList, schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL)
 	}
 
