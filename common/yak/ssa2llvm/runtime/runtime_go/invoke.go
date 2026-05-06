@@ -13,7 +13,6 @@ import "C"
 
 import (
 	"fmt"
-	"os"
 	"sync"
 	"unsafe"
 
@@ -24,10 +23,7 @@ var yakAsyncMu sync.Mutex
 var yakAsyncWaitGroup sync.WaitGroup
 
 func logRecoveredRuntimePanic(kind string, recovered any) {
-	if recovered == nil {
-		return
-	}
-	_, _ = fmt.Fprintf(os.Stderr, "[yak-runtime] %s: %v\n", kind, recovered)
+	runtimeLogPanicRecovery(kind, recovered)
 }
 
 func recoveredPanicValue(recovered any) (uint64, uint64) {

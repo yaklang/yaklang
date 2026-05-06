@@ -12,7 +12,6 @@ void yak_finalizer_proxy(void* obj, void* client_data);
 import "C"
 import (
 	"fmt"
-	"os"
 	"reflect"
 	"runtime"
 	"runtime/cgo"
@@ -102,8 +101,8 @@ func yak_runtime_to_cstring(ptr unsafe.Pointer) *C.char {
 func yak_host_release_handle(id C.uintptr_t) {
 	defer recoverRuntimePanic()
 	h := cgo.Handle(id)
-	if gcLogEnabled() {
-		fmt.Printf("[Go] Releasing handle %d\n", id)
+	if runtimeGCLogEnabled() {
+		runtimeDiagPrintf("[Go] Releasing handle %d\n", id)
 	}
 	h.Delete()
 }
@@ -126,9 +125,9 @@ func yak_internal_release_shadow(ptr unsafe.Pointer) {
 	}
 	handleID := C.uintptr_t(handleRaw)
 
-	if gcLogEnabled() {
-		fmt.Printf("[Yak GC] Finalizer triggered\n")
-		fmt.Printf("[Yak GC] Releasing shadow %p -> Handle %d\n", ptr, handleID)
+	if runtimeGCLogEnabled() {
+		runtimeDiagPrintf("[Yak GC] Finalizer triggered\n")
+		runtimeDiagPrintf("[Yak GC] Releasing shadow %p -> Handle %d\n", ptr, handleID)
 	}
 
 	// Release the Go handle
@@ -157,8 +156,8 @@ func yak_runtime_new_shadow(handleID C.uintptr_t) (ret unsafe.Pointer) {
 		nil, nil, nil,
 	)
 
-	if gcLogEnabled() {
-		fmt.Printf("[Yak] GC_malloc shadow %p for Handle %d\n", ptr, handleID)
+	if runtimeGCLogEnabled() {
+		runtimeDiagPrintf("[Yak] GC_malloc shadow %p for Handle %d\n", ptr, handleID)
 	}
 
 	return ptr
@@ -436,7 +435,7 @@ func yak_runtime_dump(objPtr unsafe.Pointer) {
 	if !ok {
 		return
 	}
-	fmt.Printf("[Go] Dump: %+v\n", h.Value())
+	runtimeDiagPrintf("[Go] Dump: %+v\n", h.Value())
 }
 
 //export yak_runtime_dump_handle
@@ -454,7 +453,3 @@ func yak_runtime_gc() {
 	time.Sleep(10 * time.Millisecond)
 }
 
-func gcLogEnabled() bool {
-	v := os.Getenv("GCLOG")
-	return v != "" && v != "0"
-}
