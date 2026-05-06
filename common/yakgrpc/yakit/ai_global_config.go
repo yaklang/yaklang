@@ -12,6 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -219,26 +220,9 @@ func mergeProviderAndModel(provider *ypb.ThirdPartyApplicationConfig, model *ypb
 	if provider == nil {
 		return nil
 	}
-	merged := &ypb.ThirdPartyApplicationConfig{
-		Type:           provider.GetType(),
-		APIKey:         provider.GetAPIKey(),
-		UserIdentifier: provider.GetUserIdentifier(),
-		UserSecret:     provider.GetUserSecret(),
-		Namespace:      provider.GetNamespace(),
-		Domain:         provider.GetDomain(),
-		BaseURL:        provider.GetBaseURL(),
-		Endpoint:       provider.GetEndpoint(),
-		EnableEndpoint: provider.GetEnableEndpoint(),
-		EnableThinking: provider.GetEnableThinking(),
-		WebhookURL:     provider.GetWebhookURL(),
-		Disabled:       provider.GetDisabled(),
-		Proxy:          provider.GetProxy(),
-		NoHttps:        provider.GetNoHttps(),
-		APIType:        provider.GetAPIType(),
-		Headers:        cloneHTTPHeaders(provider.GetHeaders()),
-	}
+	merged := proto.Clone(provider).(*ypb.ThirdPartyApplicationConfig)
 
-	extra := mapFromKVPairs(provider.GetExtraParams())
+	extra := mapFromKVPairs(merged.GetExtraParams())
 	if model != nil {
 		if model.GetModelName() != "" {
 			extra[modelExtraParamKey] = model.GetModelName()
@@ -310,25 +294,7 @@ func cloneThirdPartyConfig(cfg *ypb.ThirdPartyApplicationConfig) *ypb.ThirdParty
 	if cfg == nil {
 		return nil
 	}
-	return &ypb.ThirdPartyApplicationConfig{
-		Type:           cfg.GetType(),
-		APIKey:         cfg.GetAPIKey(),
-		UserIdentifier: cfg.GetUserIdentifier(),
-		UserSecret:     cfg.GetUserSecret(),
-		Namespace:      cfg.GetNamespace(),
-		Domain:         cfg.GetDomain(),
-		BaseURL:        cfg.GetBaseURL(),
-		Endpoint:       cfg.GetEndpoint(),
-		EnableEndpoint: cfg.GetEnableEndpoint(),
-		EnableThinking: cfg.GetEnableThinking(),
-		WebhookURL:     cfg.GetWebhookURL(),
-		Disabled:       cfg.GetDisabled(),
-		Proxy:          cfg.GetProxy(),
-		NoHttps:        cfg.GetNoHttps(),
-		APIType:        cfg.GetAPIType(),
-		Headers:        cloneHTTPHeaders(cfg.GetHeaders()),
-		ExtraParams:    cloneKVPairs(cfg.GetExtraParams()),
-	}
+	return proto.Clone(cfg).(*ypb.ThirdPartyApplicationConfig)
 }
 
 func modelNeedsLegacyRecovery(model *ypb.AIModelConfig) bool {

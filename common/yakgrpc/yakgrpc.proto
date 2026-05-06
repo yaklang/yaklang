@@ -2852,6 +2852,13 @@ message ThirdPartyApplicationConfig {
   bool EnableEndpoint = 15;
   repeated KVPair Headers = 16;
   bool EnableThinking = 17;
+  // 以下为模型采样/推理相关可选参数；未设置时不写入上游请求（由模型或网关默认行为决定）
+  optional int64 MaxTokens = 18;
+  optional double Temperature = 19;
+  optional double TopP = 20;
+  optional int64 TopK = 21;
+  optional double FrequencyPenalty = 22;
+  optional string ReasoningEffort = 23;
 }
 
 message DiagnoseNetworkRequest {

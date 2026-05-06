@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -50,6 +51,41 @@ func TestBuildOptionsFromConfig_AppliesEnableThinking(t *testing.T) {
 	val, ok := resolved.EnableThinkingValue.(bool)
 	assert.True(t, ok)
 	assert.True(t, val)
+}
+
+func TestBuildOptionsFromConfig_AppliesModelSamplingParams(t *testing.T) {
+	maxT := int64(8192)
+	temp := 0.7
+	topP := 0.7
+	topK := int64(50)
+	freq := 0.0
+	reason := "high"
+	config := &ypb.AIModelConfig{
+		ModelName: "gpt-4o",
+		Provider: &ypb.ThirdPartyApplicationConfig{
+			Type:               "openai",
+			APIKey:             "test-key",
+			MaxTokens:          &maxT,
+			Temperature:        &temp,
+			TopP:               &topP,
+			TopK:               &topK,
+			FrequencyPenalty:   &freq,
+			ReasoningEffort:    &reason,
+		},
+	}
+
+	resolved := NewDefaultAIConfig(BuildOptionsFromConfig(config)...)
+	require.NotNil(t, resolved.MaxTokens)
+	assert.Equal(t, int64(8192), *resolved.MaxTokens)
+	require.NotNil(t, resolved.Temperature)
+	assert.InDelta(t, 0.7, *resolved.Temperature, 1e-9)
+	require.NotNil(t, resolved.TopP)
+	assert.InDelta(t, 0.7, *resolved.TopP, 1e-9)
+	require.NotNil(t, resolved.TopK)
+	assert.Equal(t, int64(50), *resolved.TopK)
+	require.NotNil(t, resolved.FrequencyPenalty)
+	assert.InDelta(t, 0.0, *resolved.FrequencyPenalty, 1e-9)
+	assert.Equal(t, "high", resolved.ReasoningEffort)
 }
 
 func TestGetBaseURLFromConfig_UsesResponsesAPIType(t *testing.T) {

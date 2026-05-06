@@ -16029,8 +16029,15 @@ type ThirdPartyApplicationConfig struct {
 	EnableEndpoint bool      `protobuf:"varint,15,opt,name=EnableEndpoint,proto3" json:"EnableEndpoint,omitempty"`
 	Headers        []*KVPair `protobuf:"bytes,16,rep,name=Headers,proto3" json:"Headers,omitempty"`
 	EnableThinking bool      `protobuf:"varint,17,opt,name=EnableThinking,proto3" json:"EnableThinking,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// 以下为模型采样/推理相关可选参数；未设置时不写入上游请求（由模型或网关默认行为决定）
+	MaxTokens        *int64   `protobuf:"varint,18,opt,name=MaxTokens,proto3,oneof" json:"MaxTokens,omitempty"`
+	Temperature      *float64 `protobuf:"fixed64,19,opt,name=Temperature,proto3,oneof" json:"Temperature,omitempty"`
+	TopP             *float64 `protobuf:"fixed64,20,opt,name=TopP,proto3,oneof" json:"TopP,omitempty"`
+	TopK             *int64   `protobuf:"varint,21,opt,name=TopK,proto3,oneof" json:"TopK,omitempty"`
+	FrequencyPenalty *float64 `protobuf:"fixed64,22,opt,name=FrequencyPenalty,proto3,oneof" json:"FrequencyPenalty,omitempty"`
+	ReasoningEffort  *string  `protobuf:"bytes,23,opt,name=ReasoningEffort,proto3,oneof" json:"ReasoningEffort,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *ThirdPartyApplicationConfig) Reset() {
@@ -16180,6 +16187,48 @@ func (x *ThirdPartyApplicationConfig) GetEnableThinking() bool {
 		return x.EnableThinking
 	}
 	return false
+}
+
+func (x *ThirdPartyApplicationConfig) GetMaxTokens() int64 {
+	if x != nil && x.MaxTokens != nil {
+		return *x.MaxTokens
+	}
+	return 0
+}
+
+func (x *ThirdPartyApplicationConfig) GetTemperature() float64 {
+	if x != nil && x.Temperature != nil {
+		return *x.Temperature
+	}
+	return 0
+}
+
+func (x *ThirdPartyApplicationConfig) GetTopP() float64 {
+	if x != nil && x.TopP != nil {
+		return *x.TopP
+	}
+	return 0
+}
+
+func (x *ThirdPartyApplicationConfig) GetTopK() int64 {
+	if x != nil && x.TopK != nil {
+		return *x.TopK
+	}
+	return 0
+}
+
+func (x *ThirdPartyApplicationConfig) GetFrequencyPenalty() float64 {
+	if x != nil && x.FrequencyPenalty != nil {
+		return *x.FrequencyPenalty
+	}
+	return 0
+}
+
+func (x *ThirdPartyApplicationConfig) GetReasoningEffort() string {
+	if x != nil && x.ReasoningEffort != nil {
+		return *x.ReasoningEffort
+	}
+	return ""
 }
 
 type DiagnoseNetworkRequest struct {
@@ -70109,7 +70158,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\fAuthPassword\x18\x02 \x01(\tR\fAuthPassword\x12\x1a\n" +
 	"\bAuthType\x18\x03 \x01(\tR\bAuthType\x12\x12\n" +
 	"\x04Host\x18\x04 \x01(\tR\x04Host\x12\x1c\n" +
-	"\tForbidden\x18\x05 \x01(\bR\tForbidden\"\xa9\x04\n" +
+	"\tForbidden\x18\x05 \x01(\bR\tForbidden\"\xde\x06\n" +
 	"\x1bThirdPartyApplicationConfig\x12\x12\n" +
 	"\x04Type\x18\x01 \x01(\tR\x04Type\x12\x16\n" +
 	"\x06APIKey\x18\x02 \x01(\tR\x06APIKey\x12&\n" +
@@ -70132,7 +70181,20 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\bEndpoint\x18\x0e \x01(\tR\bEndpoint\x12&\n" +
 	"\x0eEnableEndpoint\x18\x0f \x01(\bR\x0eEnableEndpoint\x12%\n" +
 	"\aHeaders\x18\x10 \x03(\v2\v.ypb.KVPairR\aHeaders\x12&\n" +
-	"\x0eEnableThinking\x18\x11 \x01(\bR\x0eEnableThinking\"\xb2\x02\n" +
+	"\x0eEnableThinking\x18\x11 \x01(\bR\x0eEnableThinking\x12!\n" +
+	"\tMaxTokens\x18\x12 \x01(\x03H\x00R\tMaxTokens\x88\x01\x01\x12%\n" +
+	"\vTemperature\x18\x13 \x01(\x01H\x01R\vTemperature\x88\x01\x01\x12\x17\n" +
+	"\x04TopP\x18\x14 \x01(\x01H\x02R\x04TopP\x88\x01\x01\x12\x17\n" +
+	"\x04TopK\x18\x15 \x01(\x03H\x03R\x04TopK\x88\x01\x01\x12/\n" +
+	"\x10FrequencyPenalty\x18\x16 \x01(\x01H\x04R\x10FrequencyPenalty\x88\x01\x01\x12-\n" +
+	"\x0fReasoningEffort\x18\x17 \x01(\tH\x05R\x0fReasoningEffort\x88\x01\x01B\f\n" +
+	"\n" +
+	"_MaxTokensB\x0e\n" +
+	"\f_TemperatureB\a\n" +
+	"\x05_TopPB\a\n" +
+	"\x05_TopKB\x13\n" +
+	"\x11_FrequencyPenaltyB\x12\n" +
+	"\x10_ReasoningEffort\"\xb2\x02\n" +
 	"\x16DiagnoseNetworkRequest\x12&\n" +
 	"\x0eNetworkTimeout\x18\x01 \x01(\x01R\x0eNetworkTimeout\x12$\n" +
 	"\rConnectTarget\x18\x02 \x01(\tR\rConnectTarget\x12\x14\n" +
@@ -78399,6 +78461,7 @@ func file_yakgrpc_proto_init() {
 	if File_yakgrpc_proto != nil {
 		return
 	}
+	file_yakgrpc_proto_msgTypes[209].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

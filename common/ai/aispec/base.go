@@ -198,6 +198,13 @@ type ChatBaseContext struct {
 	EnableThinkingField string
 	EnableThinkingValue any
 	ThinkingBudget      int64
+	// 模型采样/推理参数（来自 ThirdPartyApplicationConfig / AIConfig，未设置则不写入请求体）
+	MaxTokens          *int64
+	Temperature        *float64
+	TopP               *float64
+	TopK               *int64
+	FrequencyPenalty   *float64
+	ReasoningEffort    string
 	StreamHandler       func(io.Reader)
 	ReasonStreamHandler func(reader io.Reader)
 	ErrHandler          func(err error)
@@ -284,6 +291,40 @@ func WithChatBase_EnableThinkingEx(b bool, key string, value any) ChatBaseOption
 		c.EnableThinkingField = key
 		c.EnableThinkingValue = value
 	}
+}
+
+// WithChatBase_AISamplingFromConfig copies optional model sampling fields from AIConfig
+// into the chat request context (chat/completions JSON and responses API where applicable).
+func WithChatBase_AISamplingFromConfig(cfg *AIConfig) ChatBaseOption {
+	return func(c *ChatBaseContext) {
+		if cfg == nil {
+			return
+		}
+		c.MaxTokens = cloneInt64Ptr(cfg.MaxTokens)
+		c.Temperature = cloneFloat64Ptr(cfg.Temperature)
+		c.TopP = cloneFloat64Ptr(cfg.TopP)
+		c.TopK = cloneInt64Ptr(cfg.TopK)
+		c.FrequencyPenalty = cloneFloat64Ptr(cfg.FrequencyPenalty)
+		if s := strings.TrimSpace(cfg.ReasoningEffort); s != "" {
+			c.ReasoningEffort = s
+		}
+	}
+}
+
+func cloneInt64Ptr(p *int64) *int64 {
+	if p == nil {
+		return nil
+	}
+	v := *p
+	return &v
+}
+
+func cloneFloat64Ptr(p *float64) *float64 {
+	if p == nil {
+		return nil
+	}
+	v := *p
+	return &v
 }
 
 func WithChatBase_Function(b []any) ChatBaseOption {
@@ -563,6 +604,14 @@ func chatBaseChatCompletions(url string, model string, msg string, ctx *ChatBase
 	}
 	msgIns := NewChatMessage(model, msgs)
 	msgIns.Stream = !ctx.DisableStream
+	msgIns.MaxTokens = ctx.MaxTokens
+	msgIns.Temperature = ctx.Temperature
+	msgIns.TopP = ctx.TopP
+	msgIns.TopK = ctx.TopK
+	msgIns.FrequencyPenalty = ctx.FrequencyPenalty
+	if ctx.ReasoningEffort != "" {
+		msgIns.ReasoningEffort = ctx.ReasoningEffort
+	}
 
 	// Add tools if provided
 	if len(ctx.Tools) > 0 {
@@ -614,6 +663,18 @@ func chatBaseResponses(url string, model string, msg string, ctx *ChatBaseContex
 		"model":  model,
 		"input":  input,
 		"stream": stream,
+	}
+	if ctx.MaxTokens != nil {
+		req["max_output_tokens"] = *ctx.MaxTokens
+	}
+	if ctx.Temperature != nil {
+		req["temperature"] = *ctx.Temperature
+	}
+	if ctx.TopP != nil {
+		req["top_p"] = *ctx.TopP
+	}
+	if strings.TrimSpace(ctx.ReasoningEffort) != "" {
+		req["reasoning"] = map[string]any{"effort": strings.TrimSpace(ctx.ReasoningEffort)}
 	}
 
 	tools := convertToolsToResponses(ctx.Tools)

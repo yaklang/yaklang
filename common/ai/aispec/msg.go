@@ -16,6 +16,13 @@ type ChatMessage struct {
 	Messages       []ChatDetail `json:"messages"`
 	Stream         bool         `json:"stream"`
 	EnableThinking bool         `json:"enable_thinking,omitempty"`
+	// 以下字段与 OpenAI-compatible chat/completions 对齐；指针/空串配合 omitempty，未配置则不序列化
+	MaxTokens          *int64   `json:"max_tokens,omitempty"`
+	Temperature        *float64 `json:"temperature,omitempty"`
+	TopP               *float64 `json:"top_p,omitempty"`
+	TopK               *int64   `json:"top_k,omitempty"`
+	FrequencyPenalty   *float64 `json:"frequency_penalty,omitempty"`
+	ReasoningEffort    string   `json:"reasoning_effort,omitempty"`
 	// Tools defines the available tools that the model may call
 	Tools []Tool `json:"tools,omitempty"`
 	// ToolChoice controls which (if any) tool is called by the model

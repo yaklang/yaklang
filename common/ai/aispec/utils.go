@@ -295,6 +295,27 @@ func buildOptionsFromProviderAndModel(provider *ypb.ThirdPartyApplicationConfig,
 		opts = append(opts, WithEnableThinking(provider.GetEnableThinking()))
 	}
 
+	if provider.MaxTokens != nil {
+		opts = append(opts, WithMaxTokens(*provider.MaxTokens))
+	}
+	if provider.Temperature != nil {
+		opts = append(opts, WithTemperature(*provider.Temperature))
+	}
+	if provider.TopP != nil {
+		opts = append(opts, WithTopP(*provider.TopP))
+	}
+	if provider.TopK != nil {
+		opts = append(opts, WithTopK(*provider.TopK))
+	}
+	if provider.FrequencyPenalty != nil {
+		opts = append(opts, WithFrequencyPenalty(*provider.FrequencyPenalty))
+	}
+	if provider.ReasoningEffort != nil {
+		if s := strings.TrimSpace(*provider.ReasoningEffort); s != "" {
+			opts = append(opts, WithReasoningEffort(s))
+		}
+	}
+
 	if modelName != "" {
 		opts = append(opts, WithModel(modelName))
 		return opts

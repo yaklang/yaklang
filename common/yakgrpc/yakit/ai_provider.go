@@ -1,6 +1,7 @@
 package yakit
 
 import (
+	"fmt"
 	"hash/fnv"
 	"math"
 	"sort"
@@ -345,7 +346,34 @@ func providerSignature(cfg *ypb.ThirdPartyApplicationConfig) string {
 		cfg.GetNoHttps(),
 		cfg.GetEnableEndpoint(),
 		cfg.GetEnableThinking(),
+		optionalInt64Sig(cfg.MaxTokens),
+		optionalFloat64Sig(cfg.Temperature),
+		optionalFloat64Sig(cfg.TopP),
+		optionalInt64Sig(cfg.TopK),
+		optionalFloat64Sig(cfg.FrequencyPenalty),
+		reasoningEffortSig(cfg.ReasoningEffort),
 	)
+}
+
+func optionalInt64Sig(p *int64) string {
+	if p == nil {
+		return ""
+	}
+	return fmt.Sprintf("%d", *p)
+}
+
+func optionalFloat64Sig(p *float64) string {
+	if p == nil {
+		return ""
+	}
+	return fmt.Sprintf("%g", *p)
+}
+
+func reasoningEffortSig(p *string) string {
+	if p == nil {
+		return ""
+	}
+	return strings.TrimSpace(*p)
 }
 
 func providerIDFromHash(hash string) int64 {

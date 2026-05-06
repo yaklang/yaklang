@@ -68,6 +68,13 @@ type AIConfig struct {
 	EnableThinking      bool
 	EnableThinkingField string
 	EnableThinkingValue any
+	// 以下为可选模型采样/推理参数（与 ypb.ThirdPartyApplicationConfig 对齐）；nil 或空串表示不写入上游请求
+	MaxTokens          *int64   `json:"max_tokens,omitempty"`
+	Temperature        *float64 `json:"temperature,omitempty"`
+	TopP               *float64 `json:"top_p,omitempty"`
+	TopK               *int64   `json:"top_k,omitempty"`
+	FrequencyPenalty   *float64 `json:"frequency_penalty,omitempty"`
+	ReasoningEffort    string   `json:"reasoning_effort,omitempty"`
 
 	// ToolCallCallback is called when the AI response contains tool_calls.
 	// If set, tool_calls will NOT be converted to <|TOOL_CALL...|> format in the output stream.
@@ -251,6 +258,47 @@ func WithEnableThinking(t any) AIConfigOption {
 				}
 			}
 		}
+	}
+}
+
+func WithMaxTokens(n int64) AIConfigOption {
+	return func(c *AIConfig) {
+		v := n
+		c.MaxTokens = &v
+	}
+}
+
+func WithTemperature(v float64) AIConfigOption {
+	return func(c *AIConfig) {
+		x := v
+		c.Temperature = &x
+	}
+}
+
+func WithTopP(v float64) AIConfigOption {
+	return func(c *AIConfig) {
+		x := v
+		c.TopP = &x
+	}
+}
+
+func WithTopK(n int64) AIConfigOption {
+	return func(c *AIConfig) {
+		v := n
+		c.TopK = &v
+	}
+}
+
+func WithFrequencyPenalty(v float64) AIConfigOption {
+	return func(c *AIConfig) {
+		x := v
+		c.FrequencyPenalty = &x
+	}
+}
+
+func WithReasoningEffort(s string) AIConfigOption {
+	return func(c *AIConfig) {
+		c.ReasoningEffort = strings.TrimSpace(s)
 	}
 }
 

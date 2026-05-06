@@ -18,6 +18,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"google.golang.org/protobuf/proto"
 )
 
 func (s *Server) ListAiModel(ctx context.Context, req *ypb.ListAiModelRequest) (*ypb.ListAiModelResponse, error) {
@@ -489,24 +490,7 @@ func cloneThirdPartyApplicationConfig(config *ypb.ThirdPartyApplicationConfig) *
 	if config == nil {
 		return nil
 	}
-	return &ypb.ThirdPartyApplicationConfig{
-		Type:           config.GetType(),
-		APIKey:         config.GetAPIKey(),
-		UserIdentifier: config.GetUserIdentifier(),
-		UserSecret:     config.GetUserSecret(),
-		Namespace:      config.GetNamespace(),
-		Domain:         config.GetDomain(),
-		WebhookURL:     config.GetWebhookURL(),
-		ExtraParams:    append([]*ypb.KVPair(nil), config.GetExtraParams()...),
-		Disabled:       config.GetDisabled(),
-		Proxy:          config.GetProxy(),
-		NoHttps:        config.GetNoHttps(),
-		APIType:        config.GetAPIType(),
-		BaseURL:        config.GetBaseURL(),
-		Endpoint:       config.GetEndpoint(),
-		EnableEndpoint: config.GetEnableEndpoint(),
-		Headers:        cloneHTTPHeaders(config.GetHeaders()),
-	}
+	return proto.Clone(config).(*ypb.ThirdPartyApplicationConfig)
 }
 
 func cloneHTTPHeaders(headers []*ypb.KVPair) []*ypb.KVPair {

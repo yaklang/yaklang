@@ -208,6 +208,30 @@ func thirdPartyConfigToModelConfig(cfg *ypb.ThirdPartyApplicationConfig) *ypb.AI
 		APIType:        cfg.GetAPIType(),
 		Headers:        cloneHTTPHeadersForAIConfig(cfg.GetHeaders()),
 	}
+	if cfg.MaxTokens != nil {
+		v := *cfg.MaxTokens
+		provider.MaxTokens = &v
+	}
+	if cfg.Temperature != nil {
+		v := *cfg.Temperature
+		provider.Temperature = &v
+	}
+	if cfg.TopP != nil {
+		v := *cfg.TopP
+		provider.TopP = &v
+	}
+	if cfg.TopK != nil {
+		v := *cfg.TopK
+		provider.TopK = &v
+	}
+	if cfg.FrequencyPenalty != nil {
+		v := *cfg.FrequencyPenalty
+		provider.FrequencyPenalty = &v
+	}
+	if cfg.ReasoningEffort != nil {
+		s := *cfg.ReasoningEffort
+		provider.ReasoningEffort = &s
+	}
 
 	return &ypb.AIModelConfig{
 		Provider:    provider,
