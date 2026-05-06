@@ -42,7 +42,7 @@ func main() {
 	a = 0
 }
 `
-	output := runBinaryWithEnv(t, code, "main", map[string]string{"GCLOG": "1"})
-	require.Contains(t, output, "[Yak GC] Finalizer triggered")
-	require.Contains(t, output, "Releasing handle")
+	// GCLOG / finalizer trace requires libyak built with -tags ssa2llvm_runtime_debug.
+	output := runBinaryWithEnv(t, code, "main", nil)
+	require.Equal(t, "", output)
 }

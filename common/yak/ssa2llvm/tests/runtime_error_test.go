@@ -6,7 +6,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestRuntimeError_MakeSliceIndexPanicLogged(t *testing.T) {
+// Default libyak is built without ssa2llvm_runtime_debug: recovered panics do not
+// print [yak-runtime] lines to stderr. These tests only assert recovery + stdout.
+//
+// To assert stderr diagnostics, rebuild with: SSA2LLVM_RUNTIME_DEBUG=1 ./common/yak/ssa2llvm/scripts/build_runtime_go.sh
+// and run tests with: go test -tags ssa2llvm_runtime_debug ./...
+func TestRuntimeError_MakeSliceIndexPanicRecovered(t *testing.T) {
 	code := `
 func main() {
 	println("Hello Yak World!")
@@ -17,11 +22,10 @@ func main() {
 `
 	output := runBinaryWithEnv(t, code, "main", nil)
 	require.Contains(t, output, "Hello Yak World!\n")
-	require.Contains(t, output, `[yak-runtime] panic: index "1" out of range`)
 	require.Contains(t, output, "1\n")
 }
 
-func TestRuntimeError_ShadowMethodPanicLogged(t *testing.T) {
+func TestRuntimeError_ShadowMethodPanicRecovered(t *testing.T) {
 	code := `
 func main() {
 	l = sync.NewLock()
@@ -30,6 +34,5 @@ func main() {
 }
 `
 	output := runBinaryWithEnv(t, code, "main", nil)
-	require.Contains(t, output, `method "aaaUndefine" not found`)
 	require.Contains(t, output, "1\n")
 }
