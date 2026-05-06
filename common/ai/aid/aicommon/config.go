@@ -16,10 +16,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiskillloader"
-	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/fstools"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/ai/ytoken"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -3088,9 +3088,7 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 	opts = append(opts, WithAllowRequireForUserInteract(i.AllowRequireForUserInteract))
 	opts = append(opts, WithAllowPlanUserInteract(i.AllowPlanUserInteract))
 	opts = append(opts, WithEnablePlanAndExec(i.EnablePlanAndExec))
-	if i.GenerateReport {
-		opts = append(opts, WithGenerateReport(true))
-	}
+	opts = append(opts, WithGenerateReport(i.GenerateReport))
 
 	// Retry / limits
 	if i.AiTransactionAutoRetry > 0 {

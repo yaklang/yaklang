@@ -106,6 +106,20 @@ func TestConfig_IntervalReviewConfigPropagation(t *testing.T) {
 	)
 }
 
+func TestConfig_GenerateReportPropagation(t *testing.T) {
+	t.Run("false", func(t *testing.T) {
+		parent := NewConfig(context.Background(), WithGenerateReport(false))
+		child := NewConfig(context.Background(), ConvertConfigToOptions(parent)...)
+		require.False(t, child.GenerateReport)
+	})
+
+	t.Run("true", func(t *testing.T) {
+		parent := NewConfig(context.Background(), WithGenerateReport(true))
+		child := NewConfig(context.Background(), ConvertConfigToOptions(parent)...)
+		require.True(t, child.GenerateReport)
+	})
+}
+
 func TestConfig_ToolManagerPropagation(t *testing.T) {
 	parent := NewConfig(context.Background())
 	require.NotNil(t, parent.GetAiToolManager())

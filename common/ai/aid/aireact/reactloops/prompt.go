@@ -3,14 +3,13 @@ package reactloops
 import (
 	_ "embed"
 	"fmt"
-	"slices"
-	"strings"
-
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"slices"
+	"strings"
 )
 
 const directlyCallToolParamsNodeID = "directly_call_tool_params"
@@ -25,7 +24,8 @@ const directlyCallToolParamsNodeID = "directly_call_tool_params"
 // 段并用稳定 nonce 渲染.
 //
 // 关键词: renderRecentToolRoutingHint, DIRECT_TOOL_ROUTING, stable nonce,
-//        semi-dynamic 段
+//
+//	semi-dynamic 段
 func renderRecentToolRoutingHint() string {
 	return utils.MustRenderTemplate(`
 <|DIRECT_TOOL_ROUTING_{{ .Nonce }}|>
@@ -305,7 +305,8 @@ func getLoopPromptObservationSections(result *LoopPromptAssemblyResult) []*Promp
 // 不会扩散到其他 aiTagFields (USER_QUERY 等仍只走 turn nonce).
 //
 // 关键词: syncRecentToolParamAITagFields, ExtraNonces 双注册,
-//        [current-nonce] 占位符, 精准覆盖工具缓存
+//
+//	[current-nonce] 占位符, 精准覆盖工具缓存
 func (r *ReActLoop) syncRecentToolParamAITagFields(paramNames []string) {
 	if r.aiTagFields == nil {
 		return

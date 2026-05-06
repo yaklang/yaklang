@@ -49,7 +49,8 @@ const toolParamAITagActionKeyPrefix = "__aitag__"
 // 保持一致, 否则字面量被改变后任一侧落后都会导致解析丢失.
 //
 // 关键词: RecentToolCacheStableNonce, [current-nonce], 占位符语义,
-//        prefix cache 字节稳定, 双注册兜底
+//
+//	prefix cache 字节稳定, 双注册兜底
 const RecentToolCacheStableNonce = "[current-nonce]"
 
 func GetToolParamAITagActionKey(paramName string) string {
