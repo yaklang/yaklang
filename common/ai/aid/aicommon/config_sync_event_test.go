@@ -323,7 +323,7 @@ func TestProcessInputEvent_SyncRecoveryHistory(t *testing.T) {
 	emitted := collectUntilSyncResponse(t, events, syncID)
 	require.Len(t, emitted, 2)
 
-	require.False(t, emitted[0].IsSync)
+	require.True(t, emitted[0].IsSync)
 	require.Equal(t, seed.blockAID, emitted[0].ID)
 
 	response := emitted[1]
