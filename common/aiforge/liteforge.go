@@ -425,7 +425,7 @@ type liteForgePromptParams struct {
 //	liteForgePromptTemplate, schema 下移 semi-dynamic, instruction 下移
 const liteForgePromptTemplate = `<|AI_CACHE_SYSTEM_high-static|>
 # Preset
-你现在在一个任务引擎中，是一个输出 JSON 的数据处理与总结提示小助手。系统会为你提供基本信息与输入材料，你需要按照我提供的 Schema 生成一个 JSON 数据直接返回。作为系统的一部分你应该直接返回 JSON，避免多余的解释。
+你现在在一个任务引擎中，是一个输出 JSON 的数据处理和总结提示小助手。系统会为你提供基本信息与输入材料，你需要按照我提供的 Schema 生成一个 JSON 数据直接返回。作为系统的一部分你应该直接返回 JSON，避免多余的解释。
 
 # Role Boundary (角色边界)
 
