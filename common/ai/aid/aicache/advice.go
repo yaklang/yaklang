@@ -1,11 +1,42 @@
 package aicache
 
-import "fmt"
+import (
+	"fmt"
+	"sort"
+)
+
+// dynamicSectionOversizeThreshold 是 dynamic 段告警阈值。
+// 单次 prompt 的 dynamic 段超过该阈值时, advice 会提示 "dynamic 段过大", 引导
+// 开发者把里面跨 turn 字节稳定的子标签 (PARENT_TASK / FACTS / DOCUMENT 等)
+// 迁到 frozen-block 段以提升缓存命中率。
+//
+// 阈值参考 DashScope explicit cache 最低创建大小 (≈ 1024 tokens ≈ 4 KB),
+// 上调到 8 KB 是为了避免对正常 reactive_data + injected_memory 误报。
+//
+// 关键词: dynamicSectionOversizeThreshold, 缓存阈值, advice
+const dynamicSectionOversizeThreshold = 8 * 1024
+
+// reusableAITagMinOccurrences 是 reusable_aitag_in_dynamic 告警的最小出现
+// 次数门槛。低于该值时, 跨 turn 的样本量不够, 不报警以避免误报。
+// 关键词: reusableAITagMinOccurrences
+const reusableAITagMinOccurrences = 3
 
 // buildAdvices 根据 HitReport 与切片结构推断缓存优化建议
-// 这些建议是给开发者看的诊断字符串，先写死，后续按真实数据再调
+// 这些建议是给开发者看的诊断字符串
+//
 // 关键词: aicache, buildAdvices, 测算建议
 func buildAdvices(rep *HitReport, split *PromptSplit) []string {
+	return buildAdvicesWithCache(rep, split, nil)
+}
+
+// buildAdvicesWithCache 在 buildAdvices 基础上, 当传入 globalCache 时多产出
+// 一类跨 turn 状态相关的诊断 (例如 reusable_aitag_in_dynamic), 用于检测
+// "body 字节稳定但 nonce 漂移" 的 RandStringBytes 反模式。
+//
+// gc 为 nil 时只输出与 (rep, split) 相关的无状态 advice。
+//
+// 关键词: aicache, buildAdvicesWithCache, 跨 turn 诊断, AITag 漂移
+func buildAdvicesWithCache(rep *HitReport, split *PromptSplit, gc *globalCache) []string {
 	if rep == nil || split == nil {
 		return nil
 	}
@@ -61,6 +92,49 @@ func buildAdvices(rep *HitReport, split *PromptSplit) []string {
 							distinct, total, reuseRate*100))
 				}
 			}
+		}
+	}
+
+	// 5.0 dynamic 段过大告警: 单次 prompt 的 dynamic chunk 字节超过阈值时, 提示
+	// 开发者考虑把内部跨 turn 字节稳定的子 AITag (PARENT_TASK / FACTS /
+	// DOCUMENT / CURRENT_TASK / INSTRUCTION 等) 迁到 frozen-block 段以提升
+	// 缓存命中率。
+	//
+	// 关键词: advice, dynamic_section_oversized, frozen-block 迁移建议
+	for _, ch := range split.Chunks {
+		if ch == nil || ch.Section != SectionDynamic {
+			continue
+		}
+		if ch.Bytes > dynamicSectionOversizeThreshold {
+			advices = append(advices, fmt.Sprintf(
+				"[dynamic_section_oversized] dynamic section is %d bytes (> %d threshold); "+
+					"consider hoisting plan-scoped subtags (PARENT_TASK / FACTS / DOCUMENT / CURRENT_TASK / INSTRUCTION) into frozen-block",
+				ch.Bytes, dynamicSectionOversizeThreshold,
+			))
+		}
+	}
+
+	// 5.1 reusable_aitag_in_dynamic: 跨 turn 检测 dynamic 段内"body 字节稳定
+	// 但 nonce 漂移"的子 AITag, 是 RandStringBytes 反模式的典型表现。
+	//
+	// 仅在 gc 非 nil 且观测窗口已积累足够样本时输出, 避免初期误报。
+	// 关键词: advice, reusable_aitag_in_dynamic, AITag 漂移, RandStringBytes
+	if gc != nil {
+		drifts := gc.GetReusableDynamicSubtagDrifts(reusableAITagMinOccurrences)
+		// 按 BodyBytes 降序限制最多 5 条, 避免 advice 过于冗长
+		if len(drifts) > 5 {
+			sort.SliceStable(drifts, func(i, j int) bool {
+				wi := drifts[i].BodyBytes * drifts[i].Occurrences
+				wj := drifts[j].BodyBytes * drifts[j].Occurrences
+				return wi > wj
+			})
+			drifts = drifts[:5]
+		}
+		for _, d := range drifts {
+			advices = append(advices, fmt.Sprintf(
+				"[reusable_aitag_in_dynamic] tag=%s body=%dB seen %dx with %d distinct nonces -> body-stable but nonce drifts (RandStringBytes anti-pattern); use stable nonce or hoist to frozen-block",
+				d.TagName, d.BodyBytes, d.Occurrences, d.DistinctNonce,
+			))
 		}
 	}
 

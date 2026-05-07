@@ -1,9 +1,9 @@
-<|USER_QUERY_{{ .Nonce }}|>
+{{ if .UserQuery }}<|USER_QUERY_{{ .Nonce }}|>
 {{ .UserQuery }}
 <|USER_QUERY_END_{{ .Nonce }}|>
-{{ if .AutoContext }}
+{{ end }}{{ if .AutoContext }}{{ if .UserQuery }}
 
-{{ .AutoContext }}{{ end }}
+{{ end }}{{ .AutoContext }}{{ end }}
 {{ if .ExtraCapabilities }}{{ if or .UserQuery .AutoContext }}
 
 {{ end }}<|EXTRA_CAPABILITIES_{{ .Nonce }}|>

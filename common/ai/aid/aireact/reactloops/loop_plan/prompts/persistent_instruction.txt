@@ -140,6 +140,32 @@
 <|FACTS_END_CURRENT_NONCE|>
 ```
 
+**关于 `CURRENT_NONCE` 占位符**：上面示例里的 `CURRENT_NONCE` 是**示意性占位符**。系统对该字面量做了等价兜底：你既可以照抄 `<|FACTS_CURRENT_NONCE|>...<|FACTS_END_CURRENT_NONCE|>`，也可以替换为本 turn 真实的 nonce，两种写法都能被正确解析，**不会因为没替换而报错**。所以不要因为不确定 nonce 是什么就把 AITag 包裹塞进 JSON 字符串里求稳——直接照抄就好。
+
+**JSON `facts` 字段与 AITag 块互斥（关键，违反会导致前端事实事件重复显示）**：
+- 形式 A（推荐）：JSON 里**不写** `facts` 字段，markdown 内容放进 AITag 块
+  ```
+  {"@action": "output_facts"}
+  <|FACTS_CURRENT_NONCE|>
+  ## 已发现 URL
+  - /api/foo
+  <|FACTS_END_CURRENT_NONCE|>
+  ```
+- 形式 B（短文本备用）：直接把 markdown 字符串塞进 JSON `facts` 字段，**完全不输出 AITag 块**
+  ```
+  {"@action": "output_facts", "facts": "## 已发现 URL\n- /api/foo"}
+  ```
+- **严禁**（错误用法 1）：把 `<|FACTS_xxx|>...<|FACTS_END_xxx|>` 包裹**塞到 JSON `facts` 字符串值里**——这会让 JSON 字段流和 AITag 流重复 emit
+  ```
+  {"@action": "output_facts", "facts": "<|FACTS_CURRENT_NONCE|>\n## 已发现 URL...\n<|FACTS_END_CURRENT_NONCE|>"}   // 严禁
+  ```
+- **严禁**（错误用法 2）：JSON 写 `facts` 字段同时又另起一段 AITag 块，等于把同一份事实输出两次
+  ```
+  {"@action": "output_facts", "facts": "## 已发现 URL\n- /api/foo"}
+  <|FACTS_CURRENT_NONCE|>...<|FACTS_END_CURRENT_NONCE|>   // 严禁: 与上面 JSON 重复
+  ```
+- 二选一原则：要么 JSON 字段，要么 AITag 块，**不要混用**
+
 **示例**（scan_port 后调用 — 注意：section 标题承担分类语义，bullet 不重复"端口:"、"服务:"等前缀）：
 ```json
 {"@action": "output_facts"}

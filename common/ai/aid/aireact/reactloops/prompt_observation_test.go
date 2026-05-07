@@ -89,7 +89,7 @@ func TestGenerateLoopPrompt_RecordsObservation(t *testing.T) {
 	task := &mockSimpleTask{id: "test-task", index: "test-index"}
 	operator := NewActionHandlerOperator(task)
 
-	prompt, err := loop.generateLoopPrompt("nonce1", "raw user input", "memory content", operator)
+	prompt, err := loop.generateLoopPrompt("nonce1", "raw user input", "", "memory content", operator)
 	require.NoError(t, err)
 	require.NotEmpty(t, prompt)
 

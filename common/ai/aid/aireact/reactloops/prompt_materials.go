@@ -93,6 +93,21 @@ type PromptPrefixMaterials struct {
 	//
 	// 关键词: PromptPrefixMaterials, RecentToolsCache, semi-dynamic 段迁移
 	RecentToolsCache string
+
+	// FrozenUserContext 来自 LoopPromptAssemblyInput.FrozenUserContext, 承载
+	// PE-TASK 的 PARENT_TASK + CURRENT_TASK + INSTRUCTION 三联块等 plan 周期内
+	// 字节稳定的"用户级上下文"。
+	//
+	// 物理位置: 包装为 <|PLAN_CONTEXT_<plan-scoped-nonce>|>...<|PLAN_CONTEXT_END_
+	// <plan-scoped-nonce>|> 后注入 frozen-block 段, 紧跟 Tool/Forge Inventory
+	// 之后、Timeline-frozen 之前。整个 frozen-block 仍然由 AI_CACHE_FROZEN 边界
+	// 包裹, hijacker 切到 user1 段, 进入 prefix cache。
+	//
+	// 老路径 (普通 ReAct loop / focus mode) 此字段为空, frozen-block 行为不变。
+	//
+	// 关键词: PromptPrefixMaterials, FrozenUserContext, PLAN_CONTEXT 段,
+	//        PE-TASK frozen-block 注入, prefix cache
+	FrozenUserContext string
 }
 
 func (m *PromptPrefixMaterials) HighStaticData() map[string]any {
@@ -128,10 +143,17 @@ func (m *PromptPrefixMaterials) SemiDynamicData() map[string]any {
 	}
 }
 
-// FrozenBlockData 供 frozen_block_section.txt 模板消费, 包含 Tool Inventory +
-// Forge Inventory + Timeline-frozen 三块字节稳定内容。
+// FrozenBlockData 供 frozen_block_section.txt 模板消费, 当前包含:
+//   - ToolInventory + ForgeInventory: 系统级工具/forge 清单, 字节稳定
+//   - PlanContext: PE-TASK 的 PLAN 阶段产物 (PARENT_TASK + CURRENT_TASK +
+//     INSTRUCTION + 父链 FACTS/DOCUMENT), 跨同一 plan 周期所有子任务字节稳定,
+//     物理位置紧跟 Tool/Forge 之后, Timeline-frozen 之前
+//   - TimelineFrozen: 时间轴 reducer + 非末 interval, 字节稳定
 //
-// 关键词: FrozenBlockData, Tool/Forge/Timeline-frozen, AI_CACHE_FROZEN 块
+// 整个段被 AI_CACHE_FROZEN 边界包裹, hijacker 切到 user1 段进入 prefix cache.
+//
+// 关键词: FrozenBlockData, Tool/Forge/PlanContext/Timeline-frozen,
+//        AI_CACHE_FROZEN 块, PE-TASK frozen 注入
 func (m *PromptPrefixMaterials) FrozenBlockData() map[string]any {
 	if m == nil {
 		return map[string]any{}
@@ -144,6 +166,7 @@ func (m *PromptPrefixMaterials) FrozenBlockData() map[string]any {
 		"HasMoreTools":   m.HasMoreTools,
 		"ForgeInventory": m.ForgeInventory,
 		"AIForgeList":    m.AIForgeList,
+		"PlanContext":    m.FrozenUserContext,
 		"TimelineFrozen": m.TimelineFrozen,
 	}
 }

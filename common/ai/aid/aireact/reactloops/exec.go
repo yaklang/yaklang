@@ -1,6 +1,7 @@
 package reactloops
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"errors"
@@ -19,6 +20,29 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
+
+// isJSONEmbeddedAITagPrefix 判断字段流的首批 peek 字节是否以 `<|TagName_` 开头,
+// 兼容 JSON 字段流推过来的 raw bytes 通常带外层 `"` 与零宽空白. 命中即视为 AI 把
+// AITag 块塞进了 JSON 字符串值, 触发 JSON / AITag 双 emit 重复, 让调用方静默
+// drain 该路径以让 AITag 流单独负责干净 emit.
+//
+// 关键词: JSON-embedded AITag prefix detect, peek 跳过 quote/whitespace, 字段流去重
+func isJSONEmbeddedAITagPrefix(peeked []byte, wrapperToken string) bool {
+	if len(peeked) == 0 || wrapperToken == "" {
+		return false
+	}
+	// 跳过 JSON 字符串外层可能的 leading `"` 与若干空白 (包含全角 BOM 安全裕度).
+	i := 0
+	for i < len(peeked) {
+		switch peeked[i] {
+		case '"', ' ', '\t', '\r', '\n':
+			i++
+			continue
+		}
+		break
+	}
+	return bytes.HasPrefix(peeked[i:], []byte(wrapperToken))
+}
 
 func (r *ReActLoop) buildActionTagOption(emitter *aicommon.Emitter, streamWG *sync.WaitGroup, taskIndex string, nonce string) []aicommon.ActionMakerOption {
 	tagFields := r.aiTagFields.Copy()
@@ -79,13 +103,46 @@ func (r *ReActLoop) buildActionTagOption(emitter *aicommon.Emitter, streamWG *sy
 					contentType = "text/plain"
 				}
 
+				// JSON-embedded AITag wrapper de-dup:
+				// 同一个字段 (例如 facts) 会被 ActionMaker 同时通过 JSON 字段流和 AITag
+				// 流两条路径推到当前 handler 里, 各 emit 一次, 导致前端"事实"事件重复.
+				//
+				// 实测中, 如果 AI 把 `<|FACTS_<nonce>|>...<|FACTS_END_<nonce>|>` 整段
+				// 塞进 JSON `facts` 字符串值 (不论是把 wrappers 当字面量包进去, 还是
+				// 同时又在 JSON 外再写一遍 AITag 块), JSON 路径会带着 wrappers 推到这
+				// 里, 而 AITag 路径会另起一路推干净的内层. 用户看到一条带 `<|...|>` 字
+				// 面量+反斜杠 n 的丑文本, 一条干净的 markdown, 极差体验.
+				//
+				// 修法: peek 流首批字节, 若 (跳过 JSON token 边界字符如外层 `"` 与
+				// 空白后) 以本 tag 的起始 token `<|TagName_` 开头, 判定这是 JSON 路径
+				// 误报的重复, 静默 drain 不再 emit, 让 AITag 路径专心输出干净版本.
+				// 注意 JSON 字段流推过来的 raw bytes 通常包含外层引号 (例如
+				// `"<|FACTS_...<|FACTS_END_..."`), 这是和 AITag 路径推过来的纯内层
+				// 内容的关键区分点; 不能只匹配 `<|TagName_` 而要兼容前置 `"` /
+				// whitespace.
+				//
+				// 关键词: 字段流去重, JSON-embedded AITag, FACTS 重复 emit 修复,
+				//        peek 检测 <|TagName_ 前缀, 兼容 JSON 外层引号, drain 静默丢弃
+				peekedReader := bufio.NewReaderSize(utils.UTF8Reader(fieldReader), 4096)
+				wrapperToken := "<|" + v.TagName + "_"
+				const peekWindow = 32
+				peeked, _ := peekedReader.Peek(peekWindow)
+				if isJSONEmbeddedAITagPrefix(peeked, wrapperToken) {
+					drained, _ := io.Copy(io.Discard, peekedReader)
+					log.Debugf("field stream handler[%s]: detected JSON-embedded AITag wrapper "+
+						"(token %q in peek %q), dropped duplicate stream (%d bytes drained); "+
+						"AITag stream path will emit the clean inner content",
+						v.TagName, wrapperToken, string(peeked), drained)
+					return
+				}
+
 				callbackStart := time.Now()
 				var result bytes.Buffer
-				fieldReader = io.TeeReader(utils.UTF8Reader(fieldReader), &result)
+				teedReader := io.TeeReader(peekedReader, &result)
 				wg := sync.WaitGroup{}
 				wg.Add(1)
 				emitter.EmitStreamEventWithContentType(
-					nodeId, fieldReader, taskIndex, contentType,
+					nodeId, teedReader, taskIndex, contentType,
 					func() {
 						defer wg.Done()
 						// Use parseStart instead of callbackStart to measure the whole streaming process
@@ -651,9 +708,20 @@ LOOP:
 
 		r.loadingStatus("执行中... / executing...")
 		var prompt string
+		// PE-TASK 缓存优化: 当 task 实现 CacheableUserInputProvider 接口时,
+		// 把 PARENT_TASK + CURRENT_TASK + INSTRUCTION 整块当作 frozenUserContext
+		// 注入 frozen-block, 让 dynamic 段不再承载 PLAN 阶段的产物。
+		// 普通 ReAct loop 的 task 不实现该接口, fallback 走老路径。
+		// 关键词: CacheableUserInputProvider, frozenUserContext, PLAN_CONTEXT
+		userInputForDynamic := task.GetUserInput()
+		var frozenUserContext string
+		if provider, ok := task.(aicommon.CacheableUserInputProvider); ok {
+			userInputForDynamic, frozenUserContext = provider.GetUserInputSplitForCache()
+		}
 		prompt, finalError = r.generateLoopPrompt(
 			nonce,
-			task.GetUserInput(),
+			userInputForDynamic,
+			frozenUserContext,
 			r.GetCurrentMemoriesContent(),
 			operator,
 		)

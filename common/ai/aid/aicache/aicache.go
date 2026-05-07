@@ -59,7 +59,10 @@ func Observe(model, msg string) *aispec.ChatBaseMirrorResult {
 	}
 	split := Split(msg)
 	rep := gCache.Record(split, model)
-	rep.Advices = buildAdvices(rep, split)
+	// 传 gCache 让 advice 多输出 reusable_aitag_in_dynamic 跨 turn 诊断;
+	// gCache 自身已经更新了 dynamicSubtagSightings。
+	// 关键词: Observe advice 跨 turn 状态, AITag 漂移诊断
+	rep.Advices = buildAdvicesWithCache(rep, split, gCache)
 	gPrinter.Trigger(rep)
 	utils.Debug(func() {
 		// dumpDebug 是文件 I/O，放后台 goroutine 调度；不阻塞 mirror 同步分发

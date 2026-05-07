@@ -194,6 +194,21 @@ type LoopPromptAssemblyInput struct {
 	// 关键词: LoopPromptAssemblyInput, RecentToolsCache, semi-dynamic 段,
 	//        AI_CACHE_SEMI prefix cache
 	RecentToolsCache string
+
+	// FrozenUserContext 用于承载 PE-TASK 等场景下"PLAN 阶段产出 + 用户原始
+	// 输入"两类只读上下文，跨同一 plan 周期的所有子任务执行字节稳定。
+	//
+	// 物理位置: 包装为 <|PLAN_CONTEXT_<stable-nonce>|>...<|PLAN_CONTEXT_END_
+	// <stable-nonce>|> 后, 注入到 frozen-block 段的 Tool/Forge Inventory 之后、
+	// Timeline-frozen 之前, 整个段被 AI_CACHE_FROZEN 边界包裹, 由 hijacker
+	// 切片成单独 cacheable user 段, 进入上游 prefix cache。
+	//
+	// 老路径 (普通 ReAct loop / focus mode 等没有 PLAN 上下文的场景): 此字段
+	// 为空, frozen-block 行为完全保持不变。
+	//
+	// 关键词: FrozenUserContext, PLAN_CONTEXT 段, frozen-block 注入,
+	//        PE-TASK PLAN 产物冻结, prefix cache
+	FrozenUserContext string
 }
 
 type LoopPromptAssemblyResult struct {

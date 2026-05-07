@@ -83,7 +83,6 @@ func (t *AiTask) GetUserInput() string {
 		}
 		return t.AIStatefulTaskBase.GetUserInput()
 	}
-	nonce := strings.ToLower(utils.RandStringBytes(6))
 
 	// 收集父任务链的输入（不包括当前任务）
 	var collectParentInputs func(task *AiTask, depth int) []string
@@ -127,6 +126,23 @@ func (t *AiTask) GetUserInput() string {
 	}
 
 	parentInputsJoined := strings.Join(parentInputs, "\n")
+
+	// nonce 反模式修复:
+	// 老实现是 nonce := strings.ToLower(utils.RandStringBytes(6))，每次调用
+	// PE-TASK 重新随机生成一次 nonce，让 <|PARENT_TASK_<nonce>|> /
+	// <|CURRENT_TASK_<nonce>|> / <|INSTRUCTION_<nonce>|> 三对标签每次都不同，
+	// 即使父任务链 + 当前任务 body 字节完全相同，整个 user-input 段也无法
+	// 被上游 prefix cache 命中。
+	//
+	// 新实现: 用 (rawUserInput, parentInputsJoined) 派生稳定 nonce，
+	// 让同一个 plan 周期内的所有 PE-TASK 子任务共用同一个 nonce。plan 重新
+	// 生成 / facts/document 演化时, parentInputsJoined 自然变化, nonce 随之
+	// 变化, 不会污染新 plan 的缓存。
+	//
+	// 关键词: task user input nonce, plan scoped nonce, prefix cache,
+	//        反 RandStringBytes 反模式
+	nonce := aicommon.PlanScopedNonce(rawUserInput+"\n"+parentInputsJoined, "task_user_input")
+
 	parentBlock := ""
 	if parentInputsJoined != "" {
 		parentBlock = utils.MustRenderTemplate(`<|PARENT_TASK_{{ .nonce }}|>
@@ -165,6 +181,36 @@ func (t *AiTask) GetUserInput() string {
 		"ParentBlock":  parentBlock,
 		"CurrentInput": currentInput,
 	})
+}
+
+// GetUserInputSplitForCache 实现 aicommon.CacheableUserInputProvider, 把
+// PE-TASK 子任务的"完整 user input 块"全部归类为 frozenUserContext, rawQuery
+// 留空。
+//
+// 为什么 rawQuery 留空 (而非按用户原话拆出来):
+//   - PE-TASK 子任务执行时, 真正"本 turn 可变" 的内容在 dynamic 段的
+//     ReactiveData (PROGRESS_TASK + iter info + feedback) 里, USER_QUERY
+//     段对子任务执行不再增量提供信息。
+//   - 把用户原话也包进 frozenUserContext 一并冻结后, dynamic 段只剩
+//     reactive_data + injected_memory + extra_capabilities, 体积大幅下降,
+//     缓存边界更清晰。
+//
+// 普通 ReAct 路径 (ParentTask == nil): 用户原话不属于"可冻结历史", 让 task
+// 走老语义即可, 这里返回 (root user input, "")。
+//
+// 关键词: GetUserInputSplitForCache, PE-TASK frozen user context,
+//        rawQuery 留空, prefix cache
+func (t *AiTask) GetUserInputSplitForCache() (rawQuery, frozenUserContext string) {
+	if utils.IsNil(t.ParentTask) {
+		// 普通 ReAct / root 任务: 用户原话保留在 dynamic 段, 不冻结
+		if t.AIStatefulTaskBase == nil {
+			return "", ""
+		}
+		return t.AIStatefulTaskBase.GetUserInput(), ""
+	}
+	// PE-TASK 子任务路径: 整个组合块 (RawUserInput + PARENT_TASK +
+	// CURRENT_TASK + INSTRUCTION) 一并冻结, dynamic 段不再渲染 USER_QUERY.
+	return "", t.GetUserInput()
 }
 
 func (t *AiTask) executed() bool {

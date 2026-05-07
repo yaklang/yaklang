@@ -10,5 +10,7 @@ You have access to {{ .ToolsCount }} built-in tools. Top {{ .TopToolsCount }} to
 以下是当前可直接调用的 AI 蓝图列表：
 {{ .AIForgeList }}{{ end }}
 
+{{ if .PlanContext }}{{ .PlanContext }}{{ end }}
+
 {{ if .TimelineFrozen }}# Timeline Memory (Frozen Prefix)
 {{ .TimelineFrozen }}{{ end }}

@@ -11,7 +11,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aitag"
-	"github.com/yaklang/yaklang/common/utils"
 )
 
 const (
@@ -47,12 +46,24 @@ func buildDocumentBlock(document string) string {
 	return buildPlanContextBlock("DOCUMENT", document)
 }
 
+// buildPlanContextBlock 构造 <|TAG_<nonce>|>...<|TAG_END_<nonce>|> 块。
+//
+// 缓存优化: nonce 由 (tag, content) 通过 aicommon.StablePromptNonce 派生，
+// 同样的 content 跨多次调用必产出相同 nonce，避免老反模式
+// utils.RandStringBytes(6) 让相同 FACTS/DOCUMENT/EVIDENCE body 在每次重渲染
+// 时都换 nonce，从而打破上游的 prefix cache。
+//
+// content 一旦变化 (例如 plan 演化新增 facts), nonce 自然变化, 这是预期
+// 行为, 让旧缓存自然失效。
+//
+// 关键词: buildPlanContextBlock, plan facts/document/evidence nonce 稳定,
+//        反 RandStringBytes 反模式, prefix cache
 func buildPlanContextBlock(tag string, content string) string {
 	content = strings.TrimSpace(content)
 	if content == "" {
 		return ""
 	}
-	nonce := utils.RandStringBytes(6)
+	nonce := aicommon.StablePromptNonce("plan-context", tag, content)
 	return fmt.Sprintf("<|%s_%s|>\n%s\n<|%s_END_%s|>", tag, nonce, content, tag, nonce)
 }
 

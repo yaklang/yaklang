@@ -234,6 +234,10 @@ func (pm *PromptManager) NewPromptPrefixMaterials(base *reactloops.LoopPromptBas
 		// CACHE_TOOL_CALL 块从 dynamic/REFLECTION 迁到 semi-dynamic 段
 		// 关键词: RecentToolsCache 透传, semi-dynamic 段
 		materials.RecentToolsCache = input.RecentToolsCache
+		// PE-TASK 缓存优化: PLAN 产物 (PARENT_TASK + CURRENT_TASK + INSTRUCTION)
+		// 通过 FrozenUserContext 字段从 dynamic 段迁到 frozen-block.
+		// 关键词: FrozenUserContext 透传, PLAN_CONTEXT, frozen-block
+		materials.FrozenUserContext = input.FrozenUserContext
 	}
 	if base != nil {
 		// UserHistory 来自 LoopPromptBaseMaterials (config.FormatUserInputHistoryAITag)
@@ -421,9 +425,16 @@ func (pm *PromptManager) buildHighStaticObservation(
 }
 
 // buildFrozenBlockObservation 给"AI_CACHE_FROZEN 块"做观测树:
-// Tool Inventory + Forge Inventory + Timeline-frozen (reducer + 非末 interval)。
+// Tool Inventory + Forge Inventory + (PE-TASK only) Plan Context +
+// Timeline-frozen (reducer + 非末 interval)。
 //
-// 关键词: buildFrozenBlockObservation, Tool/Forge/Timeline-frozen, AI_CACHE_FROZEN
+// Plan Context 段位置在 Tool/Forge 之后、Timeline-frozen 之前: Tool/Forge 是
+// 整个 root 任务生命周期都不变的"系统级"内容, 应当排在最前; Plan Context
+// 在同一 plan 周期内字节稳定, 排在中间; Timeline-frozen 随时间轴增长可能
+// 间歇性扩展 (新一段 reducer 块产生时), 排在最后, 让前两段的前缀缓存更稳定。
+//
+// 关键词: buildFrozenBlockObservation, Tool/Forge/PlanContext/Timeline-frozen,
+//        AI_CACHE_FROZEN, PE-TASK frozen 注入位置
 func (pm *PromptManager) buildFrozenBlockObservation(
 	materials *reactloops.PromptPrefixMaterials,
 	rendered string,
@@ -448,6 +459,17 @@ func (pm *PromptManager) buildFrozenBlockObservation(
 			true,
 			renderForgeInventoryBlock(materials),
 		),
+		// PE-TASK 缓存优化: PLAN 产物 (PARENT_TASK + CURRENT_TASK +
+		// INSTRUCTION + 父链 FACTS/DOCUMENT) 从 dynamic 段迁到 frozen-block,
+		// 用 plan-scoped stable nonce 包装, 跨同一 plan 周期字节稳定。
+		// 关键词: section.frozen_block.plan_context, PLAN_CONTEXT 段
+		reactloops.NewPromptSectionObservation(
+			"section.frozen_block.plan_context",
+			"Frozen Block / Plan Context (PE-TASK PLAN Output)",
+			reactloops.PromptSectionRoleUserInput,
+			true,
+			renderPlanContextBlock(materials),
+		),
 		reactloops.NewPromptSectionObservation(
 			"section.frozen_block.timeline_frozen",
 			"Frozen Block / Timeline (Frozen Prefix)",
@@ -461,6 +483,28 @@ func (pm *PromptManager) buildFrozenBlockObservation(
 		section.Content = ""
 	}
 	return reactloops.FinalizePromptContainerSection(section)
+}
+
+// renderPlanContextBlock 渲染 PE-TASK 的 PLAN_CONTEXT 段。
+//
+// FrozenUserContext 的 nonce 由 (rootIdentifier, "plan_context") 派生, 与
+// task.GetUserInput 内部使用的 (rawUserInput+parentInputs, "task_user_input")
+// nonce 不同, 这是有意为之: 内层 PARENT_TASK / CURRENT_TASK / INSTRUCTION
+// 三个标签已经用 plan-scoped 稳定 nonce 渲染好了, 外层 PLAN_CONTEXT 包装只
+// 需要给 frozen-block splitter 一个稳定的边界标记, 与内层标签命名空间互不冲突。
+//
+// 关键词: renderPlanContextBlock, PLAN_CONTEXT, plan-scoped nonce,
+//        frozen-block 边界
+func renderPlanContextBlock(materials *reactloops.PromptPrefixMaterials) string {
+	if materials == nil {
+		return ""
+	}
+	body := strings.TrimSpace(materials.FrozenUserContext)
+	if body == "" {
+		return ""
+	}
+	nonce := aicommon.PlanScopedNonce(body, "plan_context")
+	return fmt.Sprintf("<|PLAN_CONTEXT_%s|>\n%s\n<|PLAN_CONTEXT_END_%s|>", nonce, body, nonce)
 }
 
 // buildSemiDynamicResidualObservation 给"PROMPT_SECTION_semi-dynamic 残留段"做观测树:

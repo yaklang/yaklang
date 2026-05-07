@@ -4,16 +4,20 @@
 // 抓上游 LLM 在 SSE 末帧返回的 token 用量 (含 cached_tokens / cache_creation_input_tokens),
 // 配合 aicache 自动落盘的 dump 文件, 输出"客户端 LCP 命中" + "上游真实命中"双路对齐报告。
 //
-// 默认 input 为 "hostscan", 与 plan 中的目标命令一致:
-//   go run common/yak/cmd/yak.go -c 'aim.InvokeReAct("hostscan", aim.onEvent(...), aim.yoloMode())~'
+// 默认 input 改为可自动触发 loop_plan -> pe-task 链路的渗透测试目标,
+// 旧的 "hostscan" 单 forge 入口命中率已被优化到很高, 不能反映 plan / pe-task
+// 二段流水线的真实缓存表现. 新默认会先进入普通模式判定意图, 自动启动 loop_plan
+// 收集 facts, 再生成执行计划进入 pe-task 子任务执行, 是当前缓存命中瓶颈的主路径.
 //
 // 用法 (必须从 yaklang 仓库根目录运行, 因为 include 走 cwd 相对路径):
 //   cd /path/to/yaklang
 //   go run common/yak/cmd/yak.go \
 //       common/ai/aid/aicache/cachebench/run_react.yak \
-//       --input hostscan --ai-type aibalance --max-iteration 15
+//       --ai-type aibalance --max-iteration 20
+//   # 想换 input 直接传 --input "..." 覆盖默认
 //
-// 关键词: aicache cachebench, run_react, usageCallback, dump alignment
+// 关键词: aicache cachebench, run_react, usageCallback, dump alignment,
+//         loop_plan, pe-task, plan-execution chain benchmark
 
 // include 路径相对当前工作目录 (yak 编译器行为), 因此约定必须从仓库根目录调用。
 include "common/ai/aid/aicache/cachebench/lib.yak"
@@ -29,8 +33,13 @@ os.Setenv("YAKLANGDEBUG", "1")
 // =============================================================================
 // CLI 参数
 // =============================================================================
-inputText  = cli.String("input", cli.setDefault("hostscan"),
-    cli.setHelp("传给 aim.InvokeReAct 的初始 user input, 默认 hostscan"))
+// 关键词: cachebench default input, loop_plan + pe-task 触发, 渗透测试 18080
+// 默认 input 是一个能触发普通模式 -> loop_plan -> pe-task 全链路的渗透测试请求,
+// 命中当前 cache miss 主战场 (PE Task 子任务跨 turn 的 reactive_data / facts /
+// document 在 dynamic 段每轮 nonce 漂移). 旧默认 "hostscan" 走单 forge 路径,
+// 命中率已经压到极高, 反而无法暴露 plan-exec 链上的命中率塌陷.
+inputText  = cli.String("input", cli.setDefault("渗透测试，http://127.0.0.1:18080"),
+    cli.setHelp("传给 aim.InvokeReAct 的初始 user input, 默认会触发 loop_plan + pe-task 链路"))
 aiType     = cli.String("ai-type", cli.setDefault("aibalance"),
     cli.setHelp("aim.aiConfig 的第一个参数, 选 aispec 注册的 provider 名 (aibalance/openai/...)"))
 aiModel    = cli.String("ai-model", cli.setDefault(""),

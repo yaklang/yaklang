@@ -143,9 +143,25 @@ func (r *ReActLoop) generateSchemaString(disallowExit bool) (string, error) {
 	return schema, nil
 }
 
+// generateLoopPrompt 生成 ReActLoop 一轮的完整 prompt。
+//
+// 参数:
+//   - nonce: 当前 turn 的 nonce, 用于动态段标签
+//   - userInput: 进入 dynamic 段 USER_QUERY 块的用户原始输入 / 当前任务 query
+//     (跨 turn 不必稳定, 例如普通 ReAct 的用户当前轮次输入)
+//   - frozenUserContext: 跨同一 plan 周期所有子任务字节稳定的"用户上下文块"
+//     (例如 PE-TASK 的 PARENT_TASK + CURRENT_TASK + INSTRUCTION 三联块),
+//     注入 frozen-block (Tool/Forge 之后, Timeline 之前), 进入 prefix cache.
+//     普通场景传空串即可, 此时 frozen-block 行为完全不变.
+//   - memory: 注入 memory 段
+//   - operator: loop 运行时操作句柄
+//
+// 关键词: generateLoopPrompt, frozenUserContext, PLAN_CONTEXT 段,
+//        prefix cache, PE-TASK 缓存优化
 func (r *ReActLoop) generateLoopPrompt(
 	nonce string,
 	userInput string,
+	frozenUserContext string,
 	memory string,
 	operator *LoopActionHandlerOperator,
 ) (string, error) {
@@ -250,6 +266,7 @@ func (r *ReActLoop) generateLoopPrompt(
 	result, err := r.invoker.AssembleLoopPrompt(tools, &LoopPromptAssemblyInput{
 		Nonce:             nonce,
 		UserQuery:         userInput,
+		FrozenUserContext: frozenUserContext,
 		TaskInstruction:   persistent,
 		OutputExample:     outputExample,
 		Schema:            schema,
