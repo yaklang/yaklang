@@ -789,10 +789,14 @@ func convertChatDetailsToResponsesInput(msgs []ChatDetail) []map[string]any {
 				"text": "",
 			})
 		}
-		out = append(out, map[string]any{
+		item := map[string]any{
 			"role":    role,
 			"content": content,
-		})
+		}
+		if rc := strings.TrimSpace(m.ReasoningContent); rc != "" {
+			item["reasoning_content"] = rc
+		}
+		out = append(out, item)
 	}
 	return out
 }

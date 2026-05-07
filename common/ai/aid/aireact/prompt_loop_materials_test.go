@@ -893,3 +893,44 @@ func TestPromptManager_HighStaticSection_TokenBudget(t *testing.T) {
 		"high-static section must keep >= 1500 tokens to survive dashscope prefix cache window; got %d tokens (%d bytes)",
 		tokenCount, len(rendered))
 }
+
+// TestPromptManager_AssembleLoopPrompt_PriorModelThinkingOrder 验证 PriorModelThinking
+// 出现在 AI_CACHE_FROZEN_END 之后、AI_CACHE_SEMI / PROMPT_SECTION_semi-dynamic 之前。
+func TestPromptManager_AssembleLoopPrompt_PriorModelThinkingOrder(t *testing.T) {
+	react, err := NewTestReAct(
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action":"object","next_action":{"type":"directly_answer","answer_payload":"ok"},"cumulative_summary":"ok","human_readable_thought":"ok"}`))
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+	require.NoError(t, err)
+
+	tool := aitool.NewWithoutCallback("tool-a", aitool.WithDescription("tool a desc"))
+	result, err := react.promptManager.AssembleLoopPrompt([]*aitool.Tool{tool}, &reactloops.LoopPromptAssemblyInput{
+		Nonce:              "mt01",
+		UserQuery:          "q",
+		TaskInstruction:    "ti",
+		PriorModelThinking: "merged thought line 1\nline 2",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	prompt := result.Prompt
+	frozenEnd := strings.Index(prompt, "<|AI_CACHE_FROZEN_END_semi-dynamic|>")
+	mt := strings.Index(prompt, "<|PROMPT_SECTION_model-thinking|>")
+	semi := strings.Index(prompt, "<|PROMPT_SECTION_semi-dynamic|>")
+	semiCache := strings.Index(prompt, "<|AI_CACHE_SEMI_semi|>")
+	require.NotEqual(t, -1, frozenEnd)
+	require.NotEqual(t, -1, mt)
+	require.NotEqual(t, -1, semi)
+	require.NotEqual(t, -1, semiCache)
+	require.Less(t, frozenEnd, mt)
+	require.Less(t, mt, semiCache)
+	require.Less(t, mt, semi)
+
+	sections := mustLoopPromptSections(t, result.Sections)
+	require.Len(t, sections, 6)
+	require.Equal(t, "section.model_thinking", sections[2].Key)
+}

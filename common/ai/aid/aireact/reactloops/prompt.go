@@ -267,18 +267,19 @@ func (r *ReActLoop) generateLoopPrompt(
 	}
 
 	result, err := r.invoker.AssembleLoopPrompt(tools, &LoopPromptAssemblyInput{
-		Nonce:             nonce,
-		UserQuery:         userInput,
-		FrozenUserContext: frozenUserContext,
-		TaskInstruction:   persistent,
-		OutputExample:     outputExample,
-		Schema:            schema,
-		SkillsContext:     skillsContext,
-		ExtraCapabilities: extraCapabilities,
-		SessionEvidence:   sessionEvidence,
-		ReactiveData:      reactiveData,
-		InjectedMemory:    memory,
-		RecentToolsCache:  recentToolsCacheBlock,
+		Nonce:                nonce,
+		UserQuery:            userInput,
+		FrozenUserContext:    frozenUserContext,
+		TaskInstruction:      persistent,
+		OutputExample:        outputExample,
+		Schema:               schema,
+		SkillsContext:        skillsContext,
+		ExtraCapabilities:    extraCapabilities,
+		SessionEvidence:      sessionEvidence,
+		ReactiveData:         reactiveData,
+		InjectedMemory:       memory,
+		RecentToolsCache:     recentToolsCacheBlock,
+		PriorModelThinking:   r.PriorModelThinkingForPrompt(),
 	})
 	if err != nil {
 		return "", utils.Wrap(err, "assemble loop prompt failed")

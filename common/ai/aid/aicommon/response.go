@@ -64,6 +64,35 @@ type AIResponse struct {
 	httpHeaderReadyOnce sync.Once
 
 	usageInfo *aispec.ChatUsage
+
+	onReasonChunk   func([]byte)
+	onReasonChunkMu sync.Mutex
+}
+
+// SetOnReasonChunk registers a callback invoked for each completed reason/thinking
+// payload from the upstream (after ReadAll per channel chunk). Optional.
+func (a *AIResponse) SetOnReasonChunk(fn func([]byte)) {
+	if a == nil {
+		return
+	}
+	a.onReasonChunkMu.Lock()
+	a.onReasonChunk = fn
+	a.onReasonChunkMu.Unlock()
+}
+
+func (a *AIResponse) invokeReasonChunk(b []byte) {
+	if a == nil || len(b) == 0 {
+		return
+	}
+	a.onReasonChunkMu.Lock()
+	fn := a.onReasonChunk
+	a.onReasonChunkMu.Unlock()
+	if fn == nil {
+		return
+	}
+	cp := make([]byte, len(b))
+	copy(cp, b)
+	fn(cp)
 }
 
 func (a *AIResponse) SetHeaderReady() {
@@ -450,18 +479,23 @@ func (a *AIResponse) GetOutputStreamReader(nodeId string, system bool, emitter *
 			if i == nil {
 				continue
 			}
-			targetStream := io.TeeReader(i.out, cbBuffer)
-			if a.enableDebug {
-				targetStream = io.TeeReader(targetStream, os.Stdout)
-			}
 			if i.IsReason {
 				wg.Add(1)
-				emitter.EmitDefaultStreamEvent("thought", targetStream, a.GetTaskIndex(), func() {
+				reasonBytes, readErr := io.ReadAll(i.out)
+				if readErr != nil {
+					log.Warnf("read model reason stream: %v", readErr)
+				}
+				a.invokeReasonChunk(reasonBytes)
+				emitter.EmitDefaultStreamEvent("thought", bytes.NewReader(reasonBytes), a.GetTaskIndex(), func() {
 					wg.Done()
 				})
 				continue
 			}
 
+			targetStream := io.TeeReader(i.out, cbBuffer)
+			if a.enableDebug {
+				targetStream = io.TeeReader(targetStream, os.Stdout)
+			}
 			targetStream = io.TeeReader(targetStream, pw)
 			if system {
 				wg.Add(1)

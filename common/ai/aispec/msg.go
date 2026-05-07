@@ -56,9 +56,12 @@ type ChatDetail struct {
 	Role         string        `json:"role"`
 	Name         string        `json:"name,omitempty"`
 	Content      any           `json:"content"`
-	ToolCalls    []*ToolCall   `json:"tool_calls,omitempty"`
-	ToolCallID   string        `json:"tool_call_id,omitempty"`
-	FunctionCall *FunctionCall `json:"function_call,omitempty"`
+	// ReasoningContent 用于上游兼容 OpenAI/DeepSeek 等协议的 assistant 消息
+	// 与可见 content 分离（如 R1 风格）；序列化为 reasoning_content。
+	ReasoningContent string      `json:"reasoning_content,omitempty"`
+	ToolCalls        []*ToolCall `json:"tool_calls,omitempty"`
+	ToolCallID       string      `json:"tool_call_id,omitempty"`
+	FunctionCall     *FunctionCall `json:"function_call,omitempty"`
 }
 
 type ChatContent struct {
@@ -260,6 +263,16 @@ func NewAIChatDetail(content string) ChatDetail {
 	}
 }
 
+// NewAssistantChatDetailWithReasoningContent 构造带 reasoning_content 的 assistant
+// 消息（content 为对用户的可见摘要，reasoning 为模型思考过程）。
+func NewAssistantChatDetailWithReasoningContent(content string, reasoning string) ChatDetail {
+	return ChatDetail{
+		Role:             "assistant",
+		Content:          content,
+		ReasoningContent: strings.TrimSpace(reasoning),
+	}
+}
+
 // systemMessage 根据传入的内容构造并返回一个 OpenAI 系统信息
 // Example:
 // ```
@@ -351,12 +364,13 @@ func (f *FunctionCall) Clone() *FunctionCall {
 
 func (detail ChatDetail) Clone() ChatDetail {
 	return ChatDetail{
-		Role:         detail.Role,
-		Name:         detail.Name,
-		Content:      detail.Content,
-		ToolCalls:    lo.Map(detail.ToolCalls, func(tool *ToolCall, _ int) *ToolCall { return tool.Clone() }),
-		ToolCallID:   detail.ToolCallID,
-		FunctionCall: detail.FunctionCall.Clone(),
+		Role:              detail.Role,
+		Name:              detail.Name,
+		Content:           detail.Content,
+		ReasoningContent:  detail.ReasoningContent,
+		ToolCalls:         lo.Map(detail.ToolCalls, func(tool *ToolCall, _ int) *ToolCall { return tool.Clone() }),
+		ToolCallID:        detail.ToolCallID,
+		FunctionCall:      detail.FunctionCall.Clone(),
 	}
 }
 

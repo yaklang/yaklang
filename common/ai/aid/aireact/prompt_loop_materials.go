@@ -179,7 +179,8 @@ func (pm *PromptManager) AssembleLoopPrompt(tools []*aitool.Tool, input *reactlo
 		return nil, err
 	}
 
-	sections := append([]*reactloops.PromptSectionObservation{}, prefix.Sections...)
+	sections := make([]*reactloops.PromptSectionObservation, 0, len(prefix.Sections))
+	sections = append(sections, prefix.Sections...)
 	if dynamicSection := pm.buildDynamicObservation(base, input, dynamic); dynamicSection != nil {
 		sections = append(sections, dynamicSection)
 	}

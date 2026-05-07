@@ -242,6 +242,9 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 			if ctxCanceled.IsSet() {
 				return nil
 			}
+			resp.SetOnReasonChunk(func(b []byte) {
+				r.appendModelThinkingChunk(b)
+			})
 			boundEmitter := resp.BindEmitter(r.config.GetEmitter())
 			stream := resp.GetOutputStreamReader(
 				r.loopName,

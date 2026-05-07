@@ -151,13 +151,16 @@ func build2SegmentMessages(res *aitag.SplitResult, systemContent string) *aispec
 	if userContent == "" {
 		return nil
 	}
-	return &aispec.ChatBaseMirrorResult{
-		IsHijacked: true,
-		Messages: []aispec.ChatDetail{
-			aispec.NewSystemChatDetail(systemContent),
-			aispec.NewUserChatDetail(userContent),
-		},
+	userContent, think2 := stripPriorModelThinkingBlock(userContent)
+	if strings.TrimSpace(userContent) == "" {
+		return nil
 	}
+	msgs2 := []aispec.ChatDetail{
+		aispec.NewSystemChatDetail(systemContent),
+	}
+	msgs2 = appendAssistantThinkingIfAny(msgs2, think2)
+	msgs2 = append(msgs2, aispec.NewUserChatDetail(userContent))
+	return &aispec.ChatBaseMirrorResult{IsHijacked: true, Messages: msgs2}
 }
 
 // build3SegmentMessages 试图走"3 段"缓存友好拆分路径:
@@ -193,7 +196,7 @@ func build3SegmentMessages(res *aitag.SplitResult, systemContent string, timelin
 	// 主路径: 先把所有非 high-static block.Raw 顺序拼接, 再用 frozen
 	// boundary 标签切割。这样不依赖 timeline 是否被识别为 PROMPT_SECTION,
 	// 任何 caller 通过插入边界标签都能触发缓存友好切分。
-	user1, user2, ok := splitByFrozenBoundary(res)
+	user1, user2, think3, ok := splitByFrozenBoundary(res)
 	if !ok {
 		// 退化路径: timeline 内部解析
 		if timelineBlk == nil {
@@ -226,6 +229,10 @@ func build3SegmentMessages(res *aitag.SplitResult, systemContent string, timelin
 		if user1 == "" || user2 == "" {
 			return nil
 		}
+		user2, think3 = stripPriorModelThinkingBlock(user2)
+		if strings.TrimSpace(user2) == "" {
+			return nil
+		}
 	}
 
 	// P2.1 短 prompt 阈值合并: user1 (frozen 段) < 1KB 时单独打 cc 没意义
@@ -237,14 +244,16 @@ func build3SegmentMessages(res *aitag.SplitResult, systemContent string, timelin
 		return nil
 	}
 
-	return &aispec.ChatBaseMirrorResult{
-		IsHijacked: true,
-		Messages: []aispec.ChatDetail{
-			{Role: "system", Content: wrapTextWithEphemeralCC(systemContent)},
-			{Role: "user", Content: wrapTextWithEphemeralCC(user1)},
-			aispec.NewUserChatDetail(user2),
-		},
+	if strings.TrimSpace(user2) == "" {
+		return nil
 	}
+	msgs3 := []aispec.ChatDetail{
+		{Role: "system", Content: wrapTextWithEphemeralCC(systemContent)},
+		{Role: "user", Content: wrapTextWithEphemeralCC(user1)},
+	}
+	msgs3 = appendAssistantThinkingIfAny(msgs3, think3)
+	msgs3 = append(msgs3, aispec.NewUserChatDetail(user2))
+	return &aispec.ChatBaseMirrorResult{IsHijacked: true, Messages: msgs3}
 }
 
 // frozenBoundaryTagName / frozenBoundaryNonce / frozenBoundaryStartTag /
@@ -343,7 +352,9 @@ var minCachableUserSegmentBytes = 1024
 //
 //   - user1 = startIdx==0 时整个 frozen 段 (含 START + 内容 + END 标签自身),
 //     startIdx>0 时还包含从开头到 START 标签之前的所有内容 (如 semi-dynamic)
-//   - user2 = END 标签之后的所有内容 (open + dynamic + 散文)
+//   - user2 = END 标签之后、已移除 PROMPT_SECTION_model-thinking 的剩余内容
+//     (semi + open + dynamic + 散文)
+//   - priorThinking = 从 user2 前缀剥出的 model-thinking 块正文 (可能为空)
 //
 // 必要条件:
 //   - 同时找到 START 与 END 标签 (一对完整)
@@ -377,9 +388,9 @@ var minCachableUserSegmentBytes = 1024
 //
 // 关键词: aicache, splitByFrozenBoundary, AI_CACHE_FROZEN 字符串 IndexOf 切割,
 //        prefix 字节边界, hijacker §7.7.8 主路径
-func splitByFrozenBoundary(res *aitag.SplitResult) (user1, user2 string, ok bool) {
+func splitByFrozenBoundary(res *aitag.SplitResult) (user1, user2, priorThinking string, ok bool) {
 	if res == nil {
-		return "", "", false
+		return "", "", "", false
 	}
 
 	var allBuf strings.Builder
@@ -391,33 +402,36 @@ func splitByFrozenBoundary(res *aitag.SplitResult) (user1, user2 string, ok bool
 	}
 	all := allBuf.String()
 	if all == "" {
-		return "", "", false
+		return "", "", "", false
 	}
 
 	startIdx := strings.Index(all, frozenBoundaryStartTag)
 	if startIdx < 0 {
-		return "", "", false
+		return "", "", "", false
 	}
 	endRel := strings.Index(all[startIdx+len(frozenBoundaryStartTag):], frozenBoundaryEndTag)
 	if endRel < 0 {
-		return "", "", false
+		return "", "", "", false
 	}
 	endIdx := startIdx + len(frozenBoundaryStartTag) + endRel + len(frozenBoundaryEndTag)
 
 	user1 = strings.TrimSpace(all[:endIdx])
-	user2 = strings.TrimSpace(all[endIdx:])
+	user2, priorThinking = stripPriorModelThinkingBlock(all[endIdx:])
+	user2 = strings.TrimSpace(user2)
 	if user1 == "" || user2 == "" {
-		return "", "", false
+		return "", "", "", false
 	}
-	return user1, user2, true
+	return user1, user2, priorThinking, true
 }
 
 // splitBySemiBoundary 在所有非 high-static block.Raw 顺序拼接后的字符串中,
 // 同时找到 frozen 边界 + semi 边界两对完整标签, 切成 3 段:
 //
 //   - user1: 开头 ~ frozen END 标签 (含)               -> 给 build4 的 user1
-//   - user2: frozen END 后 ~ semi END 标签 (含)        -> 给 build4 的 user2
+//   - user2: frozen END 与 semi START 间隙 (去掉 model-thinking 后) + semi 块
+//            至 semi END (含)                           -> 给 build4 的 user2
 //   - user3: semi END 之后到末尾                       -> 给 build4 的 user3
+//   - priorThinking: 间隙内 PROMPT_SECTION_model-thinking 正文 (可能为空)
 //
 // 必要条件:
 //   - frozen START / END 都存在, frozen END 在 frozen START 之后
@@ -447,9 +461,9 @@ func splitByFrozenBoundary(res *aitag.SplitResult) (user1, user2 string, ok bool
 //	user3 = "<Timeline-Open>\n<Dynamic>"
 //
 // 关键词: aicache, splitBySemiBoundary, AI_CACHE_SEMI, 4 段 prefix 字节边界
-func splitBySemiBoundary(res *aitag.SplitResult) (user1, user2, user3 string, ok bool) {
+func splitBySemiBoundary(res *aitag.SplitResult) (user1, user2, user3, priorThinking string, ok bool) {
 	if res == nil {
-		return "", "", "", false
+		return "", "", "", "", false
 	}
 
 	var allBuf strings.Builder
@@ -461,37 +475,40 @@ func splitBySemiBoundary(res *aitag.SplitResult) (user1, user2, user3 string, ok
 	}
 	all := allBuf.String()
 	if all == "" {
-		return "", "", "", false
+		return "", "", "", "", false
 	}
 
 	frozenStart := strings.Index(all, frozenBoundaryStartTag)
 	if frozenStart < 0 {
-		return "", "", "", false
+		return "", "", "", "", false
 	}
 	frozenEndRel := strings.Index(all[frozenStart+len(frozenBoundaryStartTag):], frozenBoundaryEndTag)
 	if frozenEndRel < 0 {
-		return "", "", "", false
+		return "", "", "", "", false
 	}
 	frozenEnd := frozenStart + len(frozenBoundaryStartTag) + frozenEndRel + len(frozenBoundaryEndTag)
 
 	semiStart := strings.Index(all[frozenEnd:], semiBoundaryStartTag)
 	if semiStart < 0 {
-		return "", "", "", false
+		return "", "", "", "", false
 	}
 	semiStart += frozenEnd
 	semiEndRel := strings.Index(all[semiStart+len(semiBoundaryStartTag):], semiBoundaryEndTag)
 	if semiEndRel < 0 {
-		return "", "", "", false
+		return "", "", "", "", false
 	}
 	semiEnd := semiStart + len(semiBoundaryStartTag) + semiEndRel + len(semiBoundaryEndTag)
 
+	gap := all[frozenEnd:semiStart]
+	semiBlock := all[semiStart:semiEnd]
+	gapRest, priorThinking := stripPriorModelThinkingBlock(gap)
 	user1 = strings.TrimSpace(all[:frozenEnd])
-	user2 = strings.TrimSpace(all[frozenEnd:semiEnd])
+	user2 = strings.TrimSpace(gapRest + semiBlock)
 	user3 = strings.TrimSpace(all[semiEnd:])
 	if user1 == "" || user2 == "" || user3 == "" {
-		return "", "", "", false
+		return "", "", "", "", false
 	}
-	return user1, user2, user3, true
+	return user1, user2, user3, priorThinking, true
 }
 
 // splitBySemi2Boundary 在所有非 high-static block.Raw 顺序拼接后的字符串中,
@@ -648,7 +665,7 @@ func build5SegmentMessages(res *aitag.SplitResult, systemContent string) *aispec
 // 关键词: aicache, hijacker, 4 段拆分, build4SegmentMessages, 双 cc 自管,
 //        frozen + semi 双边界, P1 双 cache 边界, P2.1 阈值合并
 func build4SegmentMessages(res *aitag.SplitResult, systemContent string) *aispec.ChatBaseMirrorResult {
-	user1, user2, user3, ok := splitBySemiBoundary(res)
+	user1, user2, user3, priorThinking, ok := splitBySemiBoundary(res)
 	if !ok {
 		return nil
 	}
@@ -657,10 +674,12 @@ func build4SegmentMessages(res *aitag.SplitResult, systemContent string) *aispec
 	// frozen 段太短单独打 cc 触不到上游 1024 token 建块阈值, 合并让 semi 段独占 cc,
 	// 至少保住 semi 段的 prefix cache 命中.
 	if len(user1) < minCachableUserSegmentBytes {
-		merged := strings.TrimSpace(user1 + "\n" + user2)
-		if merged == "" {
-			merged = strings.TrimSpace(user1 + user2)
+		mergedRaw := strings.TrimSpace(user1 + "\n" + user2)
+		if mergedRaw == "" {
+			mergedRaw = strings.TrimSpace(user1 + user2)
 		}
+		merged := mergedRaw
+		thinkMerged := priorThinking
 
 		// P2.1 阶段 2: 合并后 user1+user2 仍 < 阈值 → 全合并 user3 退化 2 段
 		// 全 user 段太短打 cc 也不会触发建块, 让 user 段透传, 仅 system 打 cc.
@@ -669,35 +688,39 @@ func build4SegmentMessages(res *aitag.SplitResult, systemContent string) *aispec
 			if allUser == "" {
 				return nil
 			}
-			return &aispec.ChatBaseMirrorResult{
-				IsHijacked: true,
-				Messages: []aispec.ChatDetail{
-					{Role: "system", Content: wrapTextWithEphemeralCC(systemContent)},
-					aispec.NewUserChatDetail(allUser),
-				},
+			msgs := []aispec.ChatDetail{
+				{Role: "system", Content: wrapTextWithEphemeralCC(systemContent)},
 			}
+			msgs = appendAssistantThinkingIfAny(msgs, thinkMerged)
+			msgs = append(msgs, aispec.NewUserChatDetail(allUser))
+			return &aispec.ChatBaseMirrorResult{IsHijacked: true, Messages: msgs}
 		}
 
 		// 3 段降级: sys cc + u12 cc + u3
-		return &aispec.ChatBaseMirrorResult{
-			IsHijacked: true,
-			Messages: []aispec.ChatDetail{
-				{Role: "system", Content: wrapTextWithEphemeralCC(systemContent)},
-				{Role: "user", Content: wrapTextWithEphemeralCC(merged)},
-				aispec.NewUserChatDetail(user3),
-			},
+		msgs := []aispec.ChatDetail{
+			{Role: "system", Content: wrapTextWithEphemeralCC(systemContent)},
 		}
+		msgs = appendAssistantThinkingIfAny(msgs, thinkMerged)
+		msgs = append(msgs,
+			aispec.ChatDetail{Role: "user", Content: wrapTextWithEphemeralCC(merged)},
+			aispec.NewUserChatDetail(user3),
+		)
+		return &aispec.ChatBaseMirrorResult{IsHijacked: true, Messages: msgs}
 	}
 
-	return &aispec.ChatBaseMirrorResult{
-		IsHijacked: true,
-		Messages: []aispec.ChatDetail{
-			{Role: "system", Content: wrapTextWithEphemeralCC(systemContent)},
-			{Role: "user", Content: wrapTextWithEphemeralCC(user1)},
-			{Role: "user", Content: wrapTextWithEphemeralCC(user2)},
-			aispec.NewUserChatDetail(user3),
-		},
+	if strings.TrimSpace(user2) == "" {
+		return nil
 	}
+	msgs4 := []aispec.ChatDetail{
+		{Role: "system", Content: wrapTextWithEphemeralCC(systemContent)},
+		{Role: "user", Content: wrapTextWithEphemeralCC(user1)},
+	}
+	msgs4 = appendAssistantThinkingIfAny(msgs4, priorThinking)
+	msgs4 = append(msgs4,
+		aispec.ChatDetail{Role: "user", Content: wrapTextWithEphemeralCC(user2)},
+		aispec.NewUserChatDetail(user3),
+	)
+	return &aispec.ChatBaseMirrorResult{IsHijacked: true, Messages: msgs4}
 }
 
 // wrapTextWithEphemeralCC 把一段文本包成单元素 []*aispec.ChatContent,
