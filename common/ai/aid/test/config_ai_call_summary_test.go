@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aispec"
@@ -19,6 +20,9 @@ import (
 )
 
 func TestCoordinator_AICallSummaryEvent(t *testing.T) {
+	const expectedProviderName = "test-provider"
+	const expectedModelName = "test-model-v1"
+
 	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10)
 	outChan := chanx.NewUnlimitedChan[*schema.AiOutputEvent](context.Background(), 100)
 
@@ -166,6 +170,10 @@ LOOP:
 						t.Fatalf("ai_total_cost_ms missing '%s' field", field)
 					}
 				}
+				if utils.InterfaceToString(data["provider_name"]) != expectedProviderName ||
+					utils.InterfaceToString(data["model_name"]) != expectedModelName {
+					continue
+				}
 				require.Equal(t, 45, utils.InterfaceToInt(data["estimated_output_tokens"]))
 				require.Equal(t, 45, utils.InterfaceToInt(data["output_tokens"]))
 				require.Equal(t, 123, utils.InterfaceToInt(data["input_tokens"]))
@@ -196,6 +204,10 @@ LOOP:
 					if _, ok := data[field]; !ok {
 						t.Fatalf("ai_call_summary missing required field '%s', got: %v", field, data)
 					}
+				}
+				if utils.InterfaceToString(data["provider_name"]) != expectedProviderName ||
+					utils.InterfaceToString(data["model_name"]) != expectedModelName {
+					continue
 				}
 
 				totalCostMs := utils.InterfaceToFloat64(data["total_cost_ms"])

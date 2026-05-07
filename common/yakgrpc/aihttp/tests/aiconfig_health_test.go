@@ -31,6 +31,7 @@ func (c *fakeHealthCheckAIClient) Chat(string, ...any) (string, error) {
 				[]byte("POST /v1/chat/completions HTTP/1.1\r\n\r\n"),
 				[]byte("HTTP/1.1 200 OK\r\n"),
 				[]byte(`{"ok":true}`),
+				nil,
 			)
 		}
 	}
