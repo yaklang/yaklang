@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicache"
+	"github.com/yaklang/yaklang/common/ai/ytoken"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -355,6 +356,35 @@ func TestLiteForgePrompt_TimelineLegacyDumpFallback(t *testing.T) {
 		"frozen wrap must not appear when TimelineFrozenBlock is empty")
 	require.NotContains(t, rendered, "<|PROMPT_SECTION_timeline-open|>",
 		"timeline-open section must not appear when TimelineOpen is empty")
+}
+
+// TestLiteForgePrompt_HighStaticTokenBudget 防止 LiteForge high-static 段后续被
+// 误改瘦身, 跌破 dashscope/qwen 显式 prefix cache 的最小窗口。
+//
+// 关键词: aicache, LiteForge high-static, token budget, ytoken, prefix cache 阈值
+//
+// 历史背景: cachebench-20260507-221527.md 报告里, [high_static_too_short] advice
+// 在 50-prompt 跑里告警 28 次, 全部来自 LiteForge 调用 (基线 199 token, 远低于
+// dashscope 显式 prefix cache 的最小窗口 ~1500 token). 阈值取 1200 token 作为
+// 硬下限 (用户调研值), 实际渲染应稳定在 1500+ token 一档, 双倍冗余防退化.
+func TestLiteForgePrompt_HighStaticTokenBudget(t *testing.T) {
+	const minTokens = 1200
+	rendered, err := renderLiteForgePrompt(liteForgePromptParams{
+		Nonce:             "fixed1",
+		StaticInstruction: "instr",
+		Prompt:            "p",
+		Schema:            `{"type":"object"}`,
+		Params:            "x",
+	})
+	require.NoError(t, err)
+
+	split := aicache.Split(rendered)
+	require.NotNil(t, split)
+	hs := pickSection(t, split, aicache.SectionHighStatic)
+	got := ytoken.CalcTokenCount(hs.Content)
+	require.GreaterOrEqual(t, got, minTokens,
+		"LiteForge high-static section must keep >= %d tokens to be cacheable by dashscope/qwen explicit prefix cache; got %d",
+		minTokens, got)
 }
 
 func pickSection(t *testing.T, split *aicache.PromptSplit, section string) *aicache.Chunk {
