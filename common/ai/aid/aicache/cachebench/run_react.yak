@@ -50,6 +50,12 @@ maxIter    = cli.Int("max-iteration", cli.setDefault(15),
     cli.setHelp("React 循环最大迭代次数"))
 maxPrompts = cli.Int("max-prompts", cli.setDefault(0),
     cli.setHelp("收集到 N 次 LLM prompt usage 后立即 cancel context 提前退出 (0 = 不限制)"))
+// 关键词: cachebench max-intelligent-prompts, intelligent-only sample 截断
+// 主指标 (intelligent-only token_hit / high-static distinct) 是 cachebench 的验收口径;
+// 单纯按全量 max-prompts 截断, 当 lightweight 占比偏大时 intelligent 样本不够无法稳定判定
+// 高静态命中率. 该参数让长跑可按 intelligent calls 数精确截断, 例如 80 个高智能样本.
+maxIntelligentPrompts = cli.Int("max-intelligent-prompts", cli.setDefault(0),
+    cli.setHelp("收集到 N 次 modelTier=intelligent 的 usage 回调后立即 cancel ctx 提前退出 (0 = 不限制)"))
 maxDuration = cli.Int("max-duration", cli.setDefault(0),
     cli.setHelp("benchmark hard cap in seconds, 0 = unlimited; cancel ctx after duration, 与 max-prompts 互不干扰"))
 language   = cli.String("language", cli.setDefault("zh"),
@@ -78,6 +84,12 @@ maxThrottleEvents = cli.Int("max-throttle-events", cli.setDefault(3),
 // abort-on-fatal-error: 收到 max retry / 401 / 严重 error 事件立刻退出
 abortOnFatalError = cli.Bool("abort-on-fatal-error",
     cli.setHelp("命中 max retry / 401 / Unauthorized / fail_react_task 等致命事件立即退出 (默认开)"))
+// 关键词: cachebench fatal-error-threshold, 弱模型 LiteForge schema 重试爆量保护
+// 默认 1 (兼容旧行为, 单次命中即退); 跑 cachebench 长跑想容忍 LiteForge 局部失败
+// 但仍能在累计 N 次 fatal 后退出, 把这个值调到 5-10. 设为 0 = 完全不因 fatal 退出
+// (仅记录, 由 max-prompts / max-intelligent-prompts / max-duration 决定何时收尾).
+fatalErrorThreshold = cli.Int("fatal-error-threshold", cli.setDefault(1),
+    cli.setHelp("fatal 类事件累计 >= 该阈值才触发退出, 1 = 单次即退 (旧行为), 0 = 仅记录不退出"))
 cli.check()
 
 // 自动生成独立 session 防止默认 session timeline 污染
@@ -86,8 +98,8 @@ if sessionID == "" {
     sessionID = sprintf("cachebench-%d-%d", time.Now().Unix(), os.Getpid())
 }
 
-log.info("aicache cachebench - input=%s ai-type=%s session-id=%s max-iteration=%d max-prompts=%d max-duration=%ds stall-timeout=%ds max-throttle-events=%d abort-on-fatal-error=%v",
-    inputText, aiType, sessionID, maxIter, maxPrompts, maxDuration, stallTimeout, maxThrottleEvents, abortOnFatalError)
+log.info("aicache cachebench - input=%s ai-type=%s session-id=%s max-iteration=%d max-prompts=%d max-intelligent-prompts=%d max-duration=%ds stall-timeout=%ds max-throttle-events=%d abort-on-fatal-error=%v fatal-error-threshold=%d",
+    inputText, aiType, sessionID, maxIter, maxPrompts, maxIntelligentPrompts, maxDuration, stallTimeout, maxThrottleEvents, abortOnFatalError, fatalErrorThreshold)
 
 // =============================================================================
 // 取消上下文 (用于 max-prompts 限流 / max-duration 时间硬截断)
@@ -100,6 +112,7 @@ log.info("aicache cachebench - input=%s ai-type=%s session-id=%s max-iteration=%
 benchCtx, benchCancel = context.WithCancel(context.Background())
 defer benchCancel()
 maxPromptsTriggered = false
+maxIntelligentPromptsTriggered = false
 maxDurationTriggered = false
 stallTriggered      = false
 throttleTriggered   = false
@@ -154,6 +167,10 @@ usageMu     = sync.NewMutex()
 usageList   = []
 usageCount  = 0
 firstUsage  = nil
+// intelligentUsageCount: 仅统计 modelTier == intelligent 的 usage 回调数, 用于
+// max-intelligent-prompts 截断. 与 modelList 配套使用, 取 modelList[usageCount-1].modelTier.
+// 关键词: cachebench intelligentUsageCount, max-intelligent-prompts trigger
+intelligentUsageCount = 0
 // usageWithIDCount / usageNoIDCount 统计 SSE 末帧 usage 是否带 MirrorCorrelationID.
 // 部署完整链路 (新 yak binary + 新 aicache) 后, withID 应当 ~= usageCount, noID ~= 0.
 // 若 noID > 0, 说明跑的还是旧 binary 或途中走了不带 mirror 的 ChatBase 通路.
@@ -273,6 +290,13 @@ func captureUsage(usage) {
         log.info("max-prompts(%d) reached, cancelling context to stop React loop", maxPrompts)
         benchCancel()
     }
+
+    // P1-MS-IUC: 不再在 captureUsage 中按 modelList[usageCount-1] 取 tier 计数.
+    // 实测 model events captured (ai_first_byte_cost_ms) 与 usage callback 不严格 1:1
+    // 对齐 (qwen 跑里 270 usage / 206 model events, 缺口 64 来自 checkpoint 命中等
+    // 不真发请求的路径), 按 usageCount-1 索引会让 intelligent 计数严重低估, 阈值永
+    // 远不触发. 改为在 captureEvent 里识别 ai_first_byte_cost_ms 时直接累加并判定退出.
+    // 关键词: cachebench intelligent counting fix, first-byte-driven, P1-MS-IUC
 }
 
 // =============================================================================
@@ -378,12 +402,17 @@ func captureEvent(react, event) {
             if len(fatalSamples) < 5 {
                 fatalSamples = append(fatalSamples, sprintf("[%s] %s :: %s", eventType, fatalHit, preview))
             }
-            log.warn("fatal-error event #%d: type=%s reason=%s preview=%s",
-                fatalErrorCount, eventType, fatalHit, preview)
-            // fatal 事件只要命中一次就退出, 与 throttle 多次累计不同
-            fatalErrorTriggered = true
-            setAbortReason("fatal-error",
-                sprintf("fatal pattern matched: %s (event=%s)", fatalHit, eventType))
+            log.warn("fatal-error event #%d: type=%s reason=%s preview=%s (threshold=%d)",
+                fatalErrorCount, eventType, fatalHit, preview, fatalErrorThreshold)
+            // 阈值化退出: fatalErrorThreshold == 0 -> 仅记录, 永不因 fatal 退出;
+            // fatalErrorThreshold >= 1 -> 累计达到阈值才退出 (1 = 兼容旧行为, 单次即退).
+            // 关键词: cachebench fatal-error 阈值化, 弱模型 LiteForge 重试容错
+            if fatalErrorThreshold > 0 && fatalErrorCount >= fatalErrorThreshold {
+                fatalErrorTriggered = true
+                setAbortReason("fatal-error",
+                    sprintf("fatal pattern matched: %s (event=%s, count=%d/%d)",
+                        fatalHit, eventType, fatalErrorCount, fatalErrorThreshold))
+            }
         }
     }
 
@@ -413,7 +442,30 @@ func captureEvent(react, event) {
             "providerName": providerName,
             "ts":           time.Now().Unix(),
         })
+        // intelligent-only 截断 (P1-MS-IUC): 由 first-byte 事件直接驱动, 计数准确.
+        // captureEvent 在 ai_first_byte_cost_ms 时拿到 modelTier 即可累加, 不依赖
+        // usage callback 末帧到达, 也不受 checkpoint 短路 / wrapper 跳过等导致的
+        // model-events vs usage-callbacks 数量差异影响. 计数本身在锁内累加,
+        // setAbortReason 在锁外触发以避免与 triggerMu 嵌套.
+        // 关键词: cachebench max-intelligent-prompts first-byte trigger, P1-MS-IUC
+        shouldAbortIntelligent = false
+        intelligentSnapshot    = 0
+        if maxIntelligentPrompts > 0 && !maxIntelligentPromptsTriggered && modelTier == "intelligent" {
+            intelligentUsageCount++
+            if intelligentUsageCount >= maxIntelligentPrompts {
+                maxIntelligentPromptsTriggered = true
+                shouldAbortIntelligent = true
+                intelligentSnapshot    = intelligentUsageCount
+            }
+        }
         modelMu.Unlock()
+        if shouldAbortIntelligent {
+            log.info("max-intelligent-prompts(%d) reached at first-byte (intelligent first-byte events = %d), cancelling context",
+                maxIntelligentPrompts, intelligentSnapshot)
+            setAbortReason("max-intelligent-prompts",
+                sprintf("intelligent first-byte events reached %d (limit=%d)",
+                    intelligentSnapshot, maxIntelligentPrompts))
+        }
     }
     if len(events) >= maxEventsKept {
         return
@@ -455,7 +507,7 @@ durationSec = invokeEnd.Unix() - invokeStart.Unix()
 
 // abort 路径覆盖原来的 if/else 链, 任意 trigger 都视为预期退出, 不以 die() 收场.
 // 关键词: cachebench abort summary, expected vs unexpected error
-ctxCancelled = (abortReason != "") || maxPromptsTriggered || maxDurationTriggered
+ctxCancelled = (abortReason != "") || maxPromptsTriggered || maxIntelligentPromptsTriggered || maxDurationTriggered
 
 if err != nil {
     if abortReason != "" {
@@ -463,6 +515,8 @@ if err != nil {
             abortReason, durationSec, abortDetail, err)
     } else if maxPromptsTriggered {
         log.info("aim.InvokeReAct stopped by max-prompts after %d seconds (expected): %v", durationSec, err)
+    } else if maxIntelligentPromptsTriggered {
+        log.info("aim.InvokeReAct stopped by max-intelligent-prompts after %d seconds (expected): %v", durationSec, err)
     } else if maxDurationTriggered {
         log.info("aim.InvokeReAct stopped by max-duration after %d seconds (expected): %v", durationSec, err)
     } else {
@@ -514,6 +568,9 @@ benchReport["aiModel"] = aiModel
 benchReport["maxIteration"] = maxIter
 benchReport["maxPrompts"] = maxPrompts
 benchReport["maxPromptsTriggered"] = maxPromptsTriggered
+benchReport["maxIntelligentPrompts"] = maxIntelligentPrompts
+benchReport["maxIntelligentPromptsTriggered"] = maxIntelligentPromptsTriggered
+benchReport["intelligentUsageCount"] = intelligentUsageCount
 benchReport["maxDuration"] = maxDuration
 benchReport["maxDurationTriggered"] = maxDurationTriggered
 // 抢占式 abort 元数据: 让报告读者一眼看清是否被强制退出 / 因什么退出
@@ -528,6 +585,7 @@ benchReport["throttleTriggered"] = throttleTriggered
 benchReport["throttleEventCount"] = throttleEventCount
 benchReport["throttleSamples"] = throttleSamples
 benchReport["abortOnFatalError"] = abortOnFatalError
+benchReport["fatalErrorThreshold"] = fatalErrorThreshold
 benchReport["fatalErrorTriggered"] = fatalErrorTriggered
 benchReport["fatalErrorCount"] = fatalErrorCount
 benchReport["fatalSamples"] = fatalSamples
@@ -573,9 +631,19 @@ if stallTriggered {
 // 结果就丢了. 同时验收 high-static distinct hash <= 3 的硬条件.
 // 关键词: cachebench die threshold intelligent-only, high-static distinct gate,
 //        冷启动样本豁免
+//
+// 受控对比例外 (P1-MS-IUC 续): max-intelligent-prompts 已显式指定截断目标时,
+// 跑出来的样本就是用来 *观察当前现状* 的, 不应被 distinct/hit 阈值再次否决.
+// 否则 cachebench 会在 standard / kimi 等"低命中" backend 上永远拿不到完整报告.
+// 关键词: cachebench die threshold bypass when max-intelligent-prompts triggered
 summary = benchReport["summary"]
 intelOnly = summary["intelligentOnly"]
-if !ccbIsNil(intelOnly) && ccbAsInt(intelOnly["totalCalls"]) >= 20 {
+skipIntelDieGate = maxIntelligentPromptsTriggered
+if skipIntelDieGate {
+    log.info("die-threshold bypassed because max-intelligent-prompts(%d) reached intentionally; report saved without die()",
+        maxIntelligentPrompts)
+}
+if !skipIntelDieGate && !ccbIsNil(intelOnly) && ccbAsInt(intelOnly["totalCalls"]) >= 20 {
     intelHit = ccbAsFloat(intelOnly["hitRatioTokenReal"])
     intelHsDistinct = ccbAsInt(intelOnly["highStaticDistinct"])
     if intelHit < 0.05 && ccbAsFloat(intelOnly["hitRatioLcpClient"]) < 0.05 {
@@ -588,6 +656,6 @@ if !ccbIsNil(intelOnly) && ccbAsInt(intelOnly["totalCalls"]) >= 20 {
     }
 }
 
-if err != nil && !maxPromptsTriggered && !maxDurationTriggered {
+if err != nil && !maxPromptsTriggered && !maxIntelligentPromptsTriggered && !maxDurationTriggered {
     die(sprintf("aim.InvokeReAct failed: %v", err))
 }
