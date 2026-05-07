@@ -76,6 +76,9 @@ func AIChatToAICallbackType(cb func(prompt string, opts ...aispec.AIConfigOption
 				aispec.WithRawHTTPResponseCallback(func(headerBytes []byte, bodyPreview []byte) {
 					resp.SetRawHTTPResponseData(headerBytes, bodyPreview)
 				}),
+				aispec.WithRawHTTPRequestResponseCallback(func(requestBytes []byte, responseHeaderBytes []byte, bodyPreview []byte, usageInfo *aispec.ChatUsage) {
+					resp.SetUsageInfo(usageInfo)
+				}),
 			}
 			for _, data := range req.GetImageList() {
 				if data.IsBase64 {

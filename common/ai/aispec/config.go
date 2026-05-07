@@ -22,10 +22,11 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 )
 
-// RawHTTPRequestResponseCallback captures the raw request bytes and response debug data.
+// RawHTTPRequestResponseCallback captures the raw request bytes, response debug data,
+// and the final usage info parsed from the response body/stream.
 // The response is exposed as header bytes plus a body preview because streaming responses
 // may not be fully buffered in memory.
-type RawHTTPRequestResponseCallback func(requestBytes []byte, responseHeaderBytes []byte, bodyPreview []byte)
+type RawHTTPRequestResponseCallback func(requestBytes []byte, responseHeaderBytes []byte, bodyPreview []byte, usageInfo *ChatUsage)
 type RawHTTPResponseHeaderCallback func(headerBytes []byte)
 
 type AIConfig struct {
@@ -91,8 +92,8 @@ type AIConfig struct {
 	// RawHTTPResponseHeaderCallback is called as soon as the raw HTTP response header
 	// has been fully received, before the response body is consumed.
 	RawHTTPResponseHeaderCallback RawHTTPResponseHeaderCallback
-	// RawHTTPRequestResponseCallback is called with the raw HTTP request bytes and
-	// response debug data when an AI response completes.
+	// RawHTTPRequestResponseCallback is called with the raw HTTP request bytes,
+	// response debug data, and final usage info when an AI response completes.
 	RawHTTPRequestResponseCallback RawHTTPRequestResponseCallback
 
 	// UsageCallback is invoked once after the AI streaming response finishes,

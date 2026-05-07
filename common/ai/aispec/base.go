@@ -227,7 +227,7 @@ type ChatBaseContext struct {
 	// is fully available, before the response body is consumed.
 	RawHTTPResponseHeaderCallback RawHTTPResponseHeaderCallback
 	// RawHTTPRequestResponseCallback is called after the AI HTTP response is fully consumed,
-	// providing the raw request bytes and response debug data for debugging.
+	// providing the raw request bytes, response debug data, and final usage info.
 	RawHTTPRequestResponseCallback RawHTTPRequestResponseCallback
 	// UsageCallback is invoked exactly once after the streaming response is
 	// fully consumed, carrying the last non-empty `usage` block from the SSE
@@ -803,7 +803,7 @@ type chatBaseStreamHandlerAppender func(
 	opts []poc.PocConfigOption,
 	toolCallCallback func([]*ToolCall),
 	rawResponseHeaderCallback RawHTTPResponseHeaderCallback,
-	rawResponseCallback func([]byte, []byte),
+	rawResponseCallback func([]byte, []byte, *ChatUsage),
 	usageCallback func(*ChatUsage),
 ) (io.Reader, io.Reader, []poc.PocConfigOption, func())
 
@@ -860,12 +860,15 @@ func executeChatBaseRequest(
 	var pr, reasonPr io.Reader
 	var cancel func()
 	var requestPacket []byte
-	rawResponseCallback := func(headerBytes []byte, bodyPreview []byte) {
+	rawResponseCallback := func(headerBytes []byte, bodyPreview []byte, usageInfo *ChatUsage) {
 		if ctx.RawHTTPResponseCallback != nil {
 			ctx.RawHTTPResponseCallback(headerBytes, bodyPreview)
 		}
 		if ctx.RawHTTPRequestResponseCallback != nil {
-			ctx.RawHTTPRequestResponseCallback(requestPacket, headerBytes, bodyPreview)
+			if usageInfo != nil && ctx.MirrorCorrelationID != "" {
+				usageInfo.MirrorCorrelationID = ctx.MirrorCorrelationID
+			}
+			ctx.RawHTTPRequestResponseCallback(requestPacket, headerBytes, bodyPreview, usageInfo)
 		}
 	}
 	pr, reasonPr, opts, cancel = appendHandler(handleStream, opts, ctx.ToolCallCallback, ctx.RawHTTPResponseHeaderCallback, rawResponseCallback, ctx.UsageCallback)

@@ -58,8 +58,12 @@ type AIResponse struct {
 	rawHTTPResponseHeader   []byte
 	rawHTTPResponseBody     []byte
 
+	usageInfoMu sync.RWMutex
+
 	httpHeaderReady     chan struct{}
 	httpHeaderReadyOnce sync.Once
+
+	usageInfo *aispec.ChatUsage
 }
 
 func (a *AIResponse) SetHeaderReady() {
@@ -222,6 +226,41 @@ func (a *AIResponse) GetRawHTTPResponseDump() string {
 		buf.Write(a.rawHTTPResponseBody)
 	}
 	return buf.String()
+}
+
+func (a *AIResponse) SetUsageInfo(usage *aispec.ChatUsage) {
+	if a == nil {
+		return
+	}
+	a.usageInfoMu.Lock()
+	defer a.usageInfoMu.Unlock()
+	if usage == nil {
+		a.usageInfo = nil
+		return
+	}
+	usageCopy := *usage
+	if usage.PromptTokensDetails != nil {
+		detailsCopy := *usage.PromptTokensDetails
+		usageCopy.PromptTokensDetails = &detailsCopy
+	}
+	a.usageInfo = &usageCopy
+}
+
+func (a *AIResponse) GetUsageInfo() *aispec.ChatUsage {
+	if a == nil {
+		return nil
+	}
+	a.usageInfoMu.RLock()
+	defer a.usageInfoMu.RUnlock()
+	if a.usageInfo == nil {
+		return nil
+	}
+	usageCopy := *a.usageInfo
+	if a.usageInfo.PromptTokensDetails != nil {
+		detailsCopy := *a.usageInfo.PromptTokensDetails
+		usageCopy.PromptTokensDetails = &detailsCopy
+	}
+	return &usageCopy
 }
 
 // GetHTTPStatusCode extracts the HTTP status code from the raw response header.
@@ -539,6 +578,9 @@ func TeeAIResponse(
 		srcTokens := src.totalOutputTokens.Load()
 		first.totalOutputTokens.Store(srcTokens)
 		second.totalOutputTokens.Store(srcTokens)
+		srcUsage := src.GetUsageInfo()
+		first.SetUsageInfo(srcUsage)
+		second.SetUsageInfo(srcUsage)
 	}
 
 	reasonReader, outputReader := src.GetUnboundStreamReaderEx(func() {

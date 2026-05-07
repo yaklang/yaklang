@@ -21,13 +21,14 @@ func TestChatBase_RawHTTPRequestResponseCallback(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"hello from callback"}}]}`))
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"hello from callback"}}],"usage":{"prompt_tokens":11,"completion_tokens":7,"total_tokens":18}}`))
 	}))
 	defer server.Close()
 
 	var gotRequest []byte
 	var gotResponseHeader []byte
 	var gotBodyPreview []byte
+	var gotUsage *ChatUsage
 
 	result, err := ChatBase(
 		server.URL,
@@ -40,10 +41,11 @@ func TestChatBase_RawHTTPRequestResponseCallback(t *testing.T) {
 		WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) {
 			return nil, nil
 		}),
-		WithChatBase_RawHTTPRequestResponseCallback(func(requestBytes []byte, responseHeaderBytes []byte, bodyPreview []byte) {
+		WithChatBase_RawHTTPRequestResponseCallback(func(requestBytes []byte, responseHeaderBytes []byte, bodyPreview []byte, usageInfo *ChatUsage) {
 			gotRequest = append([]byte(nil), requestBytes...)
 			gotResponseHeader = append([]byte(nil), responseHeaderBytes...)
 			gotBodyPreview = append([]byte(nil), bodyPreview...)
+			gotUsage = usageInfo
 		}),
 	)
 	if err != nil {
@@ -64,5 +66,11 @@ func TestChatBase_RawHTTPRequestResponseCallback(t *testing.T) {
 	}
 	if !bytes.Contains(gotBodyPreview, []byte(`"hello from callback"`)) {
 		t.Fatalf("response body preview not captured: %q", string(gotBodyPreview))
+	}
+	if gotUsage == nil {
+		t.Fatal("usage should be captured for non-stream response")
+	}
+	if gotUsage.PromptTokens != 11 || gotUsage.CompletionTokens != 7 || gotUsage.TotalTokens != 18 {
+		t.Fatalf("unexpected usage captured: %+v", gotUsage)
 	}
 }
