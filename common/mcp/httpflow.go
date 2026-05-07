@@ -121,7 +121,7 @@ func init() {
 		WithTool(mcp.NewTool("query_http_flow",
 			append([]mcp.ToolOption{
 				mcp.WithDescription("Query HTTP flow data with flexible filters"),
-			}, filterYakScriptToolOptions...)...,
+			}, filterHTTPFlowToolOptions...)...,
 		), handleQueryHTTPFlows),
 		WithTool(mcp.NewTool(string("set_tag_for_http_flow"),
 			mcp.WithDescription("Sets tags for an HTTP flow"),
