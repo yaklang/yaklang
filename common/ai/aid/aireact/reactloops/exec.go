@@ -42,26 +42,31 @@ func (r *ReActLoop) buildActionTagOption(emitter *aicommon.Emitter, streamWG *sy
 
 		v := _tagInstance
 
-		// 字段级双注册: 默认走 turn nonce; 如果 LoopAITagField.ExtraNonces 非空,
-		// 给该 tag 追加 extra nonce 候选, ActionMaker 会同时给 turn nonce + 每个
-		// extra nonce 都注册 callback, LLM 用任一 nonce 输出 AITAG 都能命中.
+		// 字段级双注册: 默认走 turn nonce; 同时无条件追加
+		// aicommon.LiteralCurrentNoncePlaceholder ("CURRENT_NONCE") 作为兜底
+		// nonce 候选. 如果 LoopAITagField.ExtraNonces 还显式声明了其他候选
+		// (例如 [current-nonce]), 也会一并注册.
+		//
+		// 兜底 CURRENT_NONCE 的原因: 各 loop 的 persistent_instruction /
+		// output_example 等示例 prompt 普遍写成 `<|FACTS_CURRENT_NONCE|>` /
+		// `<|FINAL_ANSWER_CURRENT_NONCE|>` 等占位符形式, 设计本意是让 AI 替换
+		// 为本 turn 实际 nonce. 但实测部分模型会把 CURRENT_NONCE 当作字面量
+		// 直接照抄输出, 此时只用 turn nonce 注册 callback 会匹配失败, 内容
+		// 丢失, 触发 verifier 5 次重试黑洞 (典型: output_facts: facts content
+		// is required). 双注册让两种输出格式都能命中.
 		//
 		// 用例: CACHE_TOOL_CALL 块内 TOOL_PARAM_xxx 在 prompt 中用占位符字面量
 		// nonce "[current-nonce]" 渲染保持字节稳定; LLM 既可能照抄字面量,
-		// 也可能识破替换为 turn nonce. 双注册兼容两种行为.
+		// 也可能识破替换为 turn nonce. 显式 ExtraNonces 兼容这种行为.
 		//
-		// nonce 覆盖只精准作用在显式声明 ExtraNonces 的字段上, 不会扩散到其他
-		// LoopAITagField (USER_QUERY 等仍只走 turn nonce).
-		// 关键词: buildActionTagOption, ExtraNonces 双注册, [current-nonce]
-		if len(v.ExtraNonces) == 0 {
-			actionOptions = append(actionOptions,
-				aicommon.WithActionTagToKey(v.TagName, v.VariableName),
-			)
-		} else {
-			actionOptions = append(actionOptions,
-				aicommon.WithActionTagToKeyAndExtraNonces(v.TagName, v.VariableName, v.ExtraNonces...),
-			)
-		}
+		// 关键词: buildActionTagOption, ExtraNonces 双注册, CURRENT_NONCE 兜底,
+		//
+		//	AI 占位符照抄, [current-nonce]
+		extraNonceCandidates := []string{aicommon.LiteralCurrentNoncePlaceholder}
+		extraNonceCandidates = append(extraNonceCandidates, v.ExtraNonces...)
+		actionOptions = append(actionOptions,
+			aicommon.WithActionTagToKeyAndExtraNonces(v.TagName, v.VariableName, extraNonceCandidates...),
+		)
 		actionOptions = append(actionOptions,
 			aicommon.WithActionFieldStreamHandler([]string{v.VariableName}, func(key string, fieldReader io.Reader) {
 				nodeId := v.AINodeId

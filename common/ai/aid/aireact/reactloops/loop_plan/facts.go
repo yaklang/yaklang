@@ -71,6 +71,115 @@ func extractEvidenceDocument(content string) string {
 	return ""
 }
 
+// extractFactsAITagFromRawResponse 兜底从 AI 原始响应里把所有 FACTS AITag 块
+// 提取并拼接出来. 与 ExtraNonces 双注册路径互为冗余:
+//   - 主路径: ReActLoop.buildActionTagOption 已默认注册 turn nonce + CURRENT_NONCE
+//     字面量 (LiteralCurrentNoncePlaceholder), 应当能直接把 facts 写到
+//     action.params, action.GetString(facts) 即可拿到内容.
+//   - 兜底路径: 万一 AI 输出了既非 turn nonce 也非 CURRENT_NONCE 的随机 nonce
+//     (例如旧 turn nonce、示例 nonce、模型自创的字符串等), 双注册仍命中不到.
+//     此时直接扫一遍原始响应里的所有 `<|FACTS_xxx|>...<|FACTS_END_xxx|>` 块,
+//     把全部能识别出来的 FACTS 拼接返回, 仍然能保证 facts 不丢.
+//
+// 返回值是把所有匹配块用空行隔开拼接的 markdown 文本, 上层再走 mergeFactsDocuments
+// 与历史 FACTS 合并去重.
+//
+// 关键词: extractFactsAITagFromRawResponse, FACTS AITag 兜底提取,
+//
+//	任意 nonce 兼容, 双保险, output_facts 容错
+func extractFactsAITagFromRawResponse(content string) string {
+	content = strings.TrimSpace(content)
+	if content == "" {
+		return ""
+	}
+	blocks := discoverFactsAITagBlocks(content)
+	if len(blocks) == 0 {
+		return ""
+	}
+
+	results := make([]string, 0, len(blocks))
+	for _, block := range blocks {
+		// 直接基于 (start, end) 切片即可, 不再走 aitag.Parse, 因为 aitag 库的
+		// 解析依赖 tagName/nonce 严格切分, 当 nonce 本身包含下划线 (例如
+		// "CURRENT_NONCE") 时, LastIndex 风格的拆分会把 nonce 误吃成
+		// "FACTS_CURRENT" + "NONCE" 这种错误组合, 导致 callback 永远不命中.
+		// 我们已经在 discoverFactsAITagBlocks 里拿到了精确的 body 偏移区间,
+		// 直接 substring trim 比再绕一遍 aitag 解析器更可靠也更快.
+		// 关键词: extractFactsAITagFromRawResponse 直接切片, 绕开 aitag 解析,
+		//        nonce 含下划线兼容 (CURRENT_NONCE)
+		body := strings.TrimSpace(content[block.BodyStart:block.BodyEnd])
+		if body != "" {
+			results = append(results, body)
+		}
+	}
+	if len(results) == 0 {
+		return ""
+	}
+	return normalizeFactsDocument(strings.Join(results, "\n\n"))
+}
+
+// discoveredFactsAITagBlock 描述一个原始响应里识别出来的 FACTS AITag 块的
+// 物理偏移区间 (body 不含起止 tag).
+//
+// 关键词: discoveredFactsAITagBlock, FACTS AITag 偏移
+type discoveredFactsAITagBlock struct {
+	Nonce     string
+	BodyStart int
+	BodyEnd   int
+}
+
+// discoverFactsAITagBlocks 扫描 content, 识别所有形如
+// `<|FACTS_<nonce>|>...<|FACTS_END_<nonce>|>` 的块, 返回每个块的 body 偏移.
+// 与通用 discoverEvidenceAITagBlocks 的关键差异: 这里把 tagName 锁死为
+// `FACTS_`, nonce 直接取剩余部分, 因此能正确处理 nonce 本身含下划线的
+// 字面量占位符 (例如 `CURRENT_NONCE`), 不会被误拆成 `FACTS_CURRENT` + `NONCE`.
+//
+// 关键词: discoverFactsAITagBlocks, FACTS_ 前缀锁定, nonce 含下划线兼容,
+//
+//	CURRENT_NONCE 字面量
+func discoverFactsAITagBlocks(content string) []discoveredFactsAITagBlock {
+	if content == "" {
+		return nil
+	}
+	const startPrefix = "<|" + PlanFactsAITagName + "_"
+	const startSuffix = "|>"
+	blocks := make([]discoveredFactsAITagBlock, 0, 2)
+	for offset := 0; offset < len(content); {
+		startIdx := strings.Index(content[offset:], startPrefix)
+		if startIdx < 0 {
+			break
+		}
+		startIdx += offset
+		afterPrefix := startIdx + len(startPrefix)
+		closeIdx := strings.Index(content[afterPrefix:], startSuffix)
+		if closeIdx < 0 {
+			break
+		}
+		closeIdx += afterPrefix
+		nonce := content[afterPrefix:closeIdx]
+		// 起始 tag 内不允许 `_END_` 子串, 否则会和结束 tag 混淆 (例如多嵌套或畸形输出).
+		if nonce == "" || strings.Contains(nonce, "_END_") || strings.ContainsAny(nonce, "<>|") {
+			offset = closeIdx + len(startSuffix)
+			continue
+		}
+		bodyStart := closeIdx + len(startSuffix)
+		endTag := "<|" + PlanFactsAITagName + "_END_" + nonce + "|>"
+		endRel := strings.Index(content[bodyStart:], endTag)
+		if endRel < 0 {
+			offset = bodyStart
+			continue
+		}
+		bodyEnd := bodyStart + endRel
+		blocks = append(blocks, discoveredFactsAITagBlock{
+			Nonce:     nonce,
+			BodyStart: bodyStart,
+			BodyEnd:   bodyEnd,
+		})
+		offset = bodyEnd + len(endTag)
+	}
+	return blocks
+}
+
 type discoveredEvidenceAITagBlock struct {
 	TagName string
 	Nonce   string

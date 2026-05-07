@@ -53,6 +53,26 @@ const toolParamAITagActionKeyPrefix = "__aitag__"
 //	prefix cache 字节稳定, 双注册兜底
 const RecentToolCacheStableNonce = "[current-nonce]"
 
+// LiteralCurrentNoncePlaceholder 是各 react loop 在 persistent_instruction /
+// output_example 等示例 prompt 里使用的 nonce 占位符字面量, 例如
+// `<|FACTS_CURRENT_NONCE|>` / `<|FINAL_ANSWER_CURRENT_NONCE|>` /
+// `<|GEN_CODE_CURRENT_NONCE|>` 等.
+//
+// 设计本意是让 AI 把 `CURRENT_NONCE` 替换为本 turn 实际生效的 nonce. 但实测
+// 部分模型会把这个占位符当作字面量直接照抄输出, 导致 AITag 解析器只用 turn
+// nonce 注册 callback 时根本匹配不到, 内容丢失, verifier 误判为"AI 没提供
+// 内容", 触发 5 次重试黑洞甚至致命中断 (实例: output_facts: facts content
+// is required).
+//
+// 为了兼容这种照抄行为, ReActLoop.buildActionTagOption 会默认把这个字面量
+// 作为 ExtraNonces 候选注册, 与 turn nonce 并列双注册, AI 用任一格式输出
+// AITag 块都能被正确捕获到 action 字段.
+//
+// 关键词: LiteralCurrentNoncePlaceholder, CURRENT_NONCE 字面量兼容,
+//
+//	AI 占位符照抄, AITag 双注册兜底
+const LiteralCurrentNoncePlaceholder = "CURRENT_NONCE"
+
 func GetToolParamAITagActionKey(paramName string) string {
 	return toolParamAITagActionKeyPrefix + paramName
 }

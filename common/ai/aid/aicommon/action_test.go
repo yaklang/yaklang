@@ -399,6 +399,49 @@ func TestActionMaker_ExtraNonces_EmptyExtrasFallsBackToTurn(t *testing.T) {
 	require.Equal(t, tagData, action.GetString("answer"))
 }
 
+// TestActionMaker_LiteralCurrentNoncePlaceholder_FactsCase 验证: 当 AI 把
+// prompt 示例里的 "CURRENT_NONCE" 占位符当字面量直接照抄输出时, ActionMaker
+// 通过 ExtraNonces 注册 LiteralCurrentNoncePlaceholder 仍能命中, 把 FACTS
+// 内容写入 action.params[facts]. 这是 reactloops/exec.go buildActionTagOption
+// 默认追加 LiteralCurrentNoncePlaceholder 后的端到端兜底验证.
+//
+// 这个 case 模拟生产中实际观察到的 AI 输出:
+//
+//	{"@action": "output_facts"}
+//	<|FACTS_CURRENT_NONCE|>
+//	## 目标
+//	- id.redhaze.top: 198.18.0.53
+//	<|FACTS_END_CURRENT_NONCE|>
+//
+// 旧实现下只注册 turn nonce, callback 永远命中不到, action.facts 为空,
+// verifier 触发 5 次重试黑洞 + [AI Transaction Failed] 致命中断. 新实现
+// 默认双注册 turn nonce + LiteralCurrentNoncePlaceholder, 两种 AI 输出
+// 行为都能正确抽出内容.
+//
+// 关键词: LiteralCurrentNoncePlaceholder, CURRENT_NONCE 字面量兼容,
+//
+//	output_facts FACTS 抽取, 5 次重试黑洞修复
+func TestActionMaker_LiteralCurrentNoncePlaceholder_FactsCase(t *testing.T) {
+	turnNonce := uuid.NewString()
+	factsBody := "## 目标\n- id.redhaze.top: 198.18.0.53"
+	input := fmt.Sprintf(`
+{ "@action": "output_facts" }
+<|FACTS_%s|>
+%s
+<|FACTS_END_%s|>
+`, LiteralCurrentNoncePlaceholder, factsBody, LiteralCurrentNoncePlaceholder)
+
+	ctx := context.Background()
+	maker := NewActionMaker("output_facts",
+		WithActionNonce(turnNonce),
+		WithActionTagToKeyAndExtraNonces("FACTS", "facts", LiteralCurrentNoncePlaceholder),
+	)
+	action := maker.ReadFromReader(ctx, strings.NewReader(input))
+	action.WaitParse(ctx)
+	require.Equal(t, factsBody, strings.TrimSpace(action.GetString("facts")),
+		"AI 把 CURRENT_NONCE 当字面量照抄时, ExtraNonces 双注册必须命中并把 FACTS 抽到 action.facts")
+}
+
 // TestActionMaker_ExtraNonces_DeprecatedSingleAlias 验证已 deprecated 的
 // WithActionTagToKeyAndNonce 选项被 redirect 到 ExtraNonces 之后, 旧调用路径
 // 仍然兼容 (单 nonce 作为额外候选追加, m.nonce 始终保留).
