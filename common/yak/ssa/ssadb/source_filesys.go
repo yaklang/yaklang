@@ -216,6 +216,51 @@ func (f *irSourceFS) String() string {
 	return builder.String()
 }
 
+// mergeExtraFileEntriesIntoVF ensures paths recorded only in IrProgram.extra_file appear in the
+// audit / ssadb virtual tree (e.g. duplicate content hash kept a single IrSource row, or legacy rows).
+func mergeExtraFileEntriesIntoVF(progName string, vf *filesys.VirtualFS) {
+	if progName == "" || vf == nil {
+		return
+	}
+	prog, err := GetApplicationProgram(progName)
+	if err != nil || prog == nil || len(prog.ExtraFile) == 0 {
+		return
+	}
+	db := GetDB()
+	for fileURL, hash := range prog.ExtraFile {
+		if hash == "" || fileURL == "" {
+			continue
+		}
+		vfPath := strings.ReplaceAll(strings.TrimSpace(fileURL), "\\", "/")
+		if !strings.HasPrefix(vfPath, "/") {
+			vfPath = "/" + vfPath
+		}
+		vfPath = path.Clean(vfPath)
+		segs := strings.Split(strings.Trim(vfPath, "/"), "/")
+		if len(segs) == 0 || segs[0] != progName {
+			vfPath = path.Join("/", progName, strings.Trim(strings.TrimPrefix(vfPath, "/"), "/"))
+		}
+		if ok, err := vf.Exists(vfPath); err == nil && ok {
+			continue
+		}
+		var source IrSource
+		if err := db.Where("program_name = ? AND source_code_hash = ?", progName, hash).First(&source).Error; err != nil {
+			continue
+		}
+		if source.QuotedCode == "" {
+			continue
+		}
+		code, e := strconv.Unquote(source.QuotedCode)
+		if e != nil || code == "" {
+			code = source.QuotedCode
+		}
+		if code == "" {
+			continue
+		}
+		vf.AddFile(vfPath, code)
+	}
+}
+
 func (fs *irSourceFS) checkPath(path string, isDirs ...bool) (*filesys.VirtualFS, error) {
 	progName, isProgram := fs.getProgram(path)
 	vf, ok := fs.virtual[progName]
@@ -265,6 +310,7 @@ func loadIrSourceFS(path, progName string, isDir bool, irfs *irSourceFS, vf *fil
 							return nil
 						}))
 					if err == nil {
+						mergeExtraFileEntriesIntoVF(progName, vf)
 						// 成功加载聚合文件系统，直接返回
 						return
 					}
@@ -308,6 +354,7 @@ func loadIrSourceFS(path, progName string, isDir bool, irfs *irSourceFS, vf *fil
 
 	if isDir {
 		addDir(path)
+		mergeExtraFileEntriesIntoVF(progName, vf)
 		return
 	}
 
@@ -318,6 +365,7 @@ func loadIrSourceFS(path, progName string, isDir bool, irfs *irSourceFS, vf *fil
 		// directory
 		sources, err := GetIrSourceByPath(path)
 		if err != nil {
+			mergeExtraFileEntriesIntoVF(progName, vf)
 			return
 		}
 		for _, source := range sources {
@@ -327,10 +375,12 @@ func loadIrSourceFS(path, progName string, isDir bool, irfs *irSourceFS, vf *fil
 		// file
 		source, err := GetIrSourceByPathAndName(path, name)
 		if err != nil {
+			mergeExtraFileEntriesIntoVF(progName, vf)
 			return
 		}
 		add2FS(source)
 	}
+	mergeExtraFileEntriesIntoVF(progName, vf)
 }
 
 func irSourceJoin(element ...string) string {
