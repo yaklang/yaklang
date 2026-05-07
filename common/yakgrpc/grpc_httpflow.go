@@ -896,6 +896,34 @@ func (s *Server) DoHTTPFlowsSync(ctx context.Context, db *gorm.DB, toOnlineReq *
 	return success, failed, nil
 }
 
+// harExtractedItemsForHTTPFlow loads MITM extracted_data rows for HAR metaData (trace_id omitted in items; import rebinds).
+func harExtractedItemsForHTTPFlow(db *gorm.DB, hiddenIndex string) []har.HARExtractedDataItem {
+	if hiddenIndex == "" {
+		return nil
+	}
+	var rows []schema.ExtractedData
+	if err := db.Model(&schema.ExtractedData{}).Where("trace_id = ?", hiddenIndex).Find(&rows).Error; err != nil {
+		log.Errorf("har export: list extracted_data(trace_id=%s): %v", hiddenIndex, err)
+		return nil
+	}
+	if len(rows) == 0 {
+		return nil
+	}
+	out := make([]har.HARExtractedDataItem, 0, len(rows))
+	for i := range rows {
+		out = append(out, har.HARExtractedDataItem{
+			SourceType:     rows[i].SourceType,
+			RuleVerbose:    rows[i].RuleVerbose,
+			Data:           rows[i].Data,
+			Regexp:         rows[i].Regexp,
+			DataIndex:      rows[i].DataIndex,
+			Length:         rows[i].Length,
+			IsMatchRequest: rows[i].IsMatchRequest,
+		})
+	}
+	return out
+}
+
 func (s *Server) QueryHTTPFlowsProcessNames(ctx context.Context, req *ypb.QueryHTTPFlowRequest) (*ypb.QueryHTTPFlowsProcessNamesResponse, error) {
 	db := s.GetProjectDatabase()
 	processNames, err := yakit.QueryHTTPFlowsProcessNames(db, req)
@@ -980,13 +1008,8 @@ func (s *Server) ExportHTTPFlowStream(req *ypb.ExportHTTPFlowStreamRequest, stre
 			})
 		}
 	case "har":
-		// HAR 导出支持字段选择，如果未提供字段则包含所有字段
-		var harOptions *har.HTTPFlow2HarEntryOptions
-		if len(fieldNames) > 0 {
-			harOptions = &har.HTTPFlow2HarEntryOptions{
-				SelectedFields: fieldNames,
-			}
-		}
+		// HAR 导出支持字段选择，如果未提供字段则包含所有字段；metaData.extracted_data 携带 MITM 规则提取行
+		dbExport := s.GetProjectDatabase()
 		flowCh := yakit.YieldHTTPFlowsEx(queryDB, stream.Context(), totalCallback)
 		sendPercent := func() {
 			percent := 0.0
@@ -1003,7 +1026,13 @@ func (s *Server) ExportHTTPFlowStream(req *ypb.ExportHTTPFlowStreamRequest, stre
 		entryCh := make(chan *har.HAREntry, 8)
 		go func() {
 			for flow := range flowCh {
-				entry, err := har.HTTPFlow2HarEntry(flow, harOptions)
+				opts := &har.HTTPFlow2HarEntryOptions{
+					ExtractedItems: harExtractedItemsForHTTPFlow(dbExport, flow.HiddenIndex),
+				}
+				if len(fieldNames) > 0 {
+					opts.SelectedFields = fieldNames
+				}
+				entry, err := har.HTTPFlow2HarEntry(flow, opts)
 				if err != nil {
 					log.Errorf("HTTPFlow2HarEntry failed: %s", err)
 					stream.Send(&ypb.ExportHTTPFlowStreamResponse{
@@ -1076,6 +1105,28 @@ func (s *Server) ImportHTTPFlowStream(req *ypb.ImportHTTPFlowStreamRequest, stre
 			err = yakit.SaveHTTPFlow(tx, flow)
 			if err != nil {
 				return err
+			}
+			if e.MetaData != nil && len(e.MetaData.ExtractedData) > 0 {
+				for i := range e.MetaData.ExtractedData {
+					item := e.MetaData.ExtractedData[i]
+					st := item.SourceType
+					if st == "" {
+						st = "httpflow"
+					}
+					ed := &schema.ExtractedData{
+						SourceType:     st,
+						TraceId:        flow.HiddenIndex,
+						Regexp:         item.Regexp,
+						RuleVerbose:    item.RuleVerbose,
+						Data:           item.Data,
+						DataIndex:      item.DataIndex,
+						Length:         item.Length,
+						IsMatchRequest: item.IsMatchRequest,
+					}
+					if err := yakit.CreateOrUpdateExtractedData(tx, 0, ed); err != nil {
+						return err
+					}
+				}
 			}
 			count++
 			percent := 0.0

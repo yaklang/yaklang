@@ -20,6 +20,8 @@ import (
 type HTTPFlow2HarEntryOptions struct {
 	// 选择的字段列表，如果为空则包含所有字段
 	SelectedFields []string
+	// ExtractedItems optional MITM extracted_data rows (trace_id stripped; import assigns new hidden_index).
+	ExtractedItems []HARExtractedDataItem
 }
 
 // HTTPFlow2HarEntry 将 HTTPFlow 转换为 HAREntry
@@ -407,6 +409,17 @@ func HTTPFlow2HarEntry(flow *schema.HTTPFlow, options ...*HTTPFlow2HarEntryOptio
 		if hasField("updated_at") {
 			metadata.UpdatedAt = flow.UpdatedAt
 		}
+	}
+
+	// Yak: embed MITM extracted_data in metaData for HAR round-trip (independent of SelectedFields).
+	if opts != nil && len(opts.ExtractedItems) > 0 {
+		if metadata == nil {
+			metadata = &HTTPFlowMetaData{
+				NoFixContentLength: flow.NoFixContentLength,
+				IsHTTPS:            flow.IsHTTPS,
+			}
+		}
+		metadata.ExtractedData = opts.ExtractedItems
 	}
 
 	entry := &HAREntry{

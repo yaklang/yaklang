@@ -1286,6 +1286,83 @@ func TestGRPCMUSTPASS_Export_And_ImportHAR(t *testing.T) {
 	require.Equal(t, wantCount, len(flows))
 }
 
+func TestGRPCMUSTPASS_ExportImportHAR_WithExtractedData(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	db := consts.GetGormProjectDatabase()
+	wantURL := "http://har-extract-rule.test/"
+	token, ids := generateTestHTTPFlowData(db, 1, wantURL)
+	require.Len(t, ids, 1)
+
+	var flow schema.HTTPFlow
+	require.NoError(t, db.Where("id = ?", ids[0]).First(&flow).Error)
+	require.NoError(t, yakit.CreateOrUpdateExtractedData(db, 0, &schema.ExtractedData{
+		SourceType:  "httpflow",
+		TraceId:     flow.HiddenIndex,
+		RuleVerbose: "TestRuleGroup / test-rule",
+		Data:        "extracted-value-" + token,
+		Regexp:      `.*`,
+		DataIndex:   1,
+		Length:      10,
+	}))
+	t.Cleanup(func() {
+		var hs []string
+		_ = db.Model(&schema.HTTPFlow{}).Where("response LIKE ?", "%"+token+"%").Pluck("hidden_index", &hs).Error
+		if len(hs) > 0 {
+			_ = yakit.DeleteExtractedDataByTraceIds(db, hs)
+		}
+		_ = yakit.DeleteHTTPFlow(db, &ypb.DeleteHTTPFlowRequest{
+			Filter: &ypb.QueryHTTPFlowRequest{Keyword: token},
+		})
+	})
+
+	fn := filepath.Join(t.TempDir(), "test-extract.har")
+	stream, err := client.ExportHTTPFlowStream(utils.TimeoutContextSeconds(30), &ypb.ExportHTTPFlowStreamRequest{
+		Filter: &ypb.QueryHTTPFlowRequest{
+			Keyword: token,
+		},
+		FieldName: []string{
+			"request", "response",
+		},
+		ExportType: "har",
+		TargetPath: fn,
+	})
+	require.NoError(t, err)
+	for {
+		_, err := stream.Recv()
+		if err != nil {
+			break
+		}
+	}
+
+	harBytes, err := os.ReadFile(fn)
+	require.NoError(t, err)
+	require.Contains(t, string(harBytes), "extracted_data")
+	require.Contains(t, string(harBytes), "extracted-value-"+token)
+
+	require.NoError(t, yakit.DeleteHTTPFlow(db, &ypb.DeleteHTTPFlowRequest{Id: ids}))
+
+	importStream, err := client.ImportHTTPFlowStream(utils.TimeoutContextSeconds(30), &ypb.ImportHTTPFlowStreamRequest{
+		InputPath: fn,
+	})
+	require.NoError(t, err)
+	for {
+		_, err := importStream.Recv()
+		if err != nil {
+			break
+		}
+	}
+
+	_, flows, err := yakit.QueryHTTPFlow(db, &ypb.QueryHTTPFlowRequest{Keyword: token})
+	require.NoError(t, err)
+	require.Len(t, flows, 1)
+	var rows []schema.ExtractedData
+	require.NoError(t, db.Model(&schema.ExtractedData{}).Where("trace_id = ?", flows[0].HiddenIndex).Find(&rows).Error)
+	require.Len(t, rows, 1)
+	require.Equal(t, "TestRuleGroup / test-rule", rows[0].RuleVerbose)
+	require.Equal(t, "extracted-value-"+token, rows[0].Data)
+}
+
 func TestGRPCMUSTPASS_Export_CSV(t *testing.T) {
 	client, err := NewLocalClient()
 	require.NoError(t, err)

@@ -5,7 +5,6 @@ package har
 import (
 	sql "database/sql"
 	json "encoding/json"
-
 	easyjson "github.com/mailru/easyjson"
 	jlexer "github.com/mailru/easyjson/jlexer"
 	jwriter "github.com/mailru/easyjson/jwriter"
@@ -506,7 +505,7 @@ func easyjson46e2e00bDecodeGithubComYaklangYaklangCommonHar4(in *jlexer.Lexer, o
 		}
 		switch key {
 		case "id":
-			out.ID = uint(in.Uint64())
+			out.ID = uint(in.Uint())
 		case "no_fix_content_length":
 			out.NoFixContentLength = bool(in.Bool())
 		case "is_https":
@@ -547,6 +546,29 @@ func easyjson46e2e00bDecodeGithubComYaklangYaklangCommonHar4(in *jlexer.Lexer, o
 			if data := in.Raw(); in.Ok() {
 				in.AddError((out.UpdatedAt).UnmarshalJSON(data))
 			}
+		case "extracted_data":
+			if in.IsNull() {
+				in.Skip()
+				out.ExtractedData = nil
+			} else {
+				in.Delim('[')
+				if out.ExtractedData == nil {
+					if !in.IsDelim(']') {
+						out.ExtractedData = make([]HARExtractedDataItem, 0, 0)
+					} else {
+						out.ExtractedData = []HARExtractedDataItem{}
+					}
+				} else {
+					out.ExtractedData = (out.ExtractedData)[:0]
+				}
+				for !in.IsDelim(']') {
+					var v4 HARExtractedDataItem
+					(v4).UnmarshalEasyJSON(in)
+					out.ExtractedData = append(out.ExtractedData, v4)
+					in.WantComma()
+				}
+				in.Delim(']')
+			}
 		default:
 			in.SkipRecursive()
 		}
@@ -563,15 +585,11 @@ func easyjson46e2e00bEncodeGithubComYaklangYaklangCommonHar4(out *jwriter.Writer
 	_ = first
 	if in.ID != 0 {
 		const prefix string = ",\"id\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
-		out.Uint64(uint64(in.ID))
+		first = false
+		out.RawString(prefix[1:])
+		out.Uint(uint(in.ID))
 	}
-	{
+	if in.NoFixContentLength {
 		const prefix string = ",\"no_fix_content_length\":"
 		if first {
 			first = false
@@ -583,93 +601,202 @@ func easyjson46e2e00bEncodeGithubComYaklangYaklangCommonHar4(out *jwriter.Writer
 	}
 	if in.IsHTTPS {
 		const prefix string = ",\"is_https\":"
-		out.RawString(prefix)
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
 		out.Bool(bool(in.IsHTTPS))
 	}
 	if in.Path != "" {
 		const prefix string = ",\"path\":"
-		out.RawString(prefix)
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
 		out.String(string(in.Path))
 	}
 	if in.Host != "" {
 		const prefix string = ",\"host\":"
-		out.RawString(prefix)
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
 		out.String(string(in.Host))
 	}
 	if in.SourceType != "" {
 		const prefix string = ",\"source_type\":"
-		out.RawString(prefix)
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
 		out.String(string(in.SourceType))
 	}
 	if in.Duration != 0 {
 		const prefix string = ",\"duration\":"
-		out.RawString(prefix)
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
 		out.Int64(int64(in.Duration))
 	}
 	if in.GetParamsTotal != 0 {
 		const prefix string = ",\"get_params_total\":"
-		out.RawString(prefix)
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
 		out.Int(int(in.GetParamsTotal))
 	}
 	if in.PostParamsTotal != 0 {
 		const prefix string = ",\"post_params_total\":"
-		out.RawString(prefix)
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
 		out.Int(int(in.PostParamsTotal))
 	}
 	if in.CookieParamsTotal != 0 {
 		const prefix string = ",\"cookie_params_total\":"
-		out.RawString(prefix)
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
 		out.Int(int(in.CookieParamsTotal))
 	}
 	if in.IPAddress != "" {
 		const prefix string = ",\"ip_address\":"
-		out.RawString(prefix)
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
 		out.String(string(in.IPAddress))
 	}
 	if in.IPInteger != 0 {
 		const prefix string = ",\"ip_integer\":"
-		out.RawString(prefix)
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
 		out.Int(int(in.IPInteger))
 	}
 	if in.Tags != "" {
 		const prefix string = ",\"tags\":"
-		out.RawString(prefix)
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
 		out.String(string(in.Tags))
 	}
 	if in.Payload != "" {
 		const prefix string = ",\"payload\":"
-		out.RawString(prefix)
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
 		out.String(string(in.Payload))
 	}
 	if in.ContentType != "" {
 		const prefix string = ",\"content_type\":"
-		out.RawString(prefix)
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
 		out.String(string(in.ContentType))
 	}
 	if in.IsWebsocket {
 		const prefix string = ",\"is_websocket\":"
-		out.RawString(prefix)
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
 		out.Bool(bool(in.IsWebsocket))
 	}
 	if in.FromPlugin != "" {
 		const prefix string = ",\"from_plugin\":"
-		out.RawString(prefix)
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
 		out.String(string(in.FromPlugin))
 	}
 	if true {
 		const prefix string = ",\"process_name\":"
-		out.RawString(prefix)
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
 		easyjson46e2e00bEncodeDatabaseSql(out, in.ProcessName)
 	}
 	if in.UploadOnline {
 		const prefix string = ",\"upload_online\":"
-		out.RawString(prefix)
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
 		out.Bool(bool(in.UploadOnline))
 	}
-	if !in.UpdatedAt.IsZero() {
+	if true {
 		const prefix string = ",\"updated_at\":"
-		out.RawString(prefix)
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
 		out.Raw((in.UpdatedAt).MarshalJSON())
+	}
+	if len(in.ExtractedData) != 0 {
+		const prefix string = ",\"extracted_data\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		{
+			out.RawByte('[')
+			for v5, v6 := range in.ExtractedData {
+				if v5 > 0 {
+					out.RawByte(',')
+				}
+				(v6).MarshalEasyJSON(out)
+			}
+			out.RawByte(']')
+		}
 	}
 	out.RawByte('}')
 }
@@ -865,17 +992,17 @@ func easyjson46e2e00bDecodeGithubComYaklangYaklangCommonHar6(in *jlexer.Lexer, o
 					out.Headers = (out.Headers)[:0]
 				}
 				for !in.IsDelim(']') {
-					var v4 *HARKVPair
+					var v7 *HARKVPair
 					if in.IsNull() {
 						in.Skip()
-						v4 = nil
+						v7 = nil
 					} else {
-						if v4 == nil {
-							v4 = new(HARKVPair)
+						if v7 == nil {
+							v7 = new(HARKVPair)
 						}
-						(*v4).UnmarshalEasyJSON(in)
+						(*v7).UnmarshalEasyJSON(in)
 					}
-					out.Headers = append(out.Headers, v4)
+					out.Headers = append(out.Headers, v7)
 					in.WantComma()
 				}
 				in.Delim(']')
@@ -896,17 +1023,17 @@ func easyjson46e2e00bDecodeGithubComYaklangYaklangCommonHar6(in *jlexer.Lexer, o
 					out.Cookies = (out.Cookies)[:0]
 				}
 				for !in.IsDelim(']') {
-					var v5 *HARKVPair
+					var v8 *HARKVPair
 					if in.IsNull() {
 						in.Skip()
-						v5 = nil
+						v8 = nil
 					} else {
-						if v5 == nil {
-							v5 = new(HARKVPair)
+						if v8 == nil {
+							v8 = new(HARKVPair)
 						}
-						(*v5).UnmarshalEasyJSON(in)
+						(*v8).UnmarshalEasyJSON(in)
 					}
-					out.Cookies = append(out.Cookies, v5)
+					out.Cookies = append(out.Cookies, v8)
 					in.WantComma()
 				}
 				in.Delim(']')
@@ -961,14 +1088,14 @@ func easyjson46e2e00bEncodeGithubComYaklangYaklangCommonHar6(out *jwriter.Writer
 			out.RawString("null")
 		} else {
 			out.RawByte('[')
-			for v6, v7 := range in.Headers {
-				if v6 > 0 {
+			for v9, v10 := range in.Headers {
+				if v9 > 0 {
 					out.RawByte(',')
 				}
-				if v7 == nil {
+				if v10 == nil {
 					out.RawString("null")
 				} else {
-					(*v7).MarshalEasyJSON(out)
+					(*v10).MarshalEasyJSON(out)
 				}
 			}
 			out.RawByte(']')
@@ -981,14 +1108,14 @@ func easyjson46e2e00bEncodeGithubComYaklangYaklangCommonHar6(out *jwriter.Writer
 			out.RawString("null")
 		} else {
 			out.RawByte('[')
-			for v8, v9 := range in.Cookies {
-				if v8 > 0 {
+			for v11, v12 := range in.Cookies {
+				if v11 > 0 {
 					out.RawByte(',')
 				}
-				if v9 == nil {
+				if v12 == nil {
 					out.RawString("null")
 				} else {
-					(*v9).MarshalEasyJSON(out)
+					(*v12).MarshalEasyJSON(out)
 				}
 			}
 			out.RawByte(']')
@@ -1080,17 +1207,17 @@ func easyjson46e2e00bDecodeGithubComYaklangYaklangCommonHar7(in *jlexer.Lexer, o
 					out.QueryString = (out.QueryString)[:0]
 				}
 				for !in.IsDelim(']') {
-					var v10 *HARKVPair
+					var v13 *HARKVPair
 					if in.IsNull() {
 						in.Skip()
-						v10 = nil
+						v13 = nil
 					} else {
-						if v10 == nil {
-							v10 = new(HARKVPair)
+						if v13 == nil {
+							v13 = new(HARKVPair)
 						}
-						(*v10).UnmarshalEasyJSON(in)
+						(*v13).UnmarshalEasyJSON(in)
 					}
-					out.QueryString = append(out.QueryString, v10)
+					out.QueryString = append(out.QueryString, v13)
 					in.WantComma()
 				}
 				in.Delim(']')
@@ -1111,17 +1238,17 @@ func easyjson46e2e00bDecodeGithubComYaklangYaklangCommonHar7(in *jlexer.Lexer, o
 					out.Headers = (out.Headers)[:0]
 				}
 				for !in.IsDelim(']') {
-					var v11 *HARKVPair
+					var v14 *HARKVPair
 					if in.IsNull() {
 						in.Skip()
-						v11 = nil
+						v14 = nil
 					} else {
-						if v11 == nil {
-							v11 = new(HARKVPair)
+						if v14 == nil {
+							v14 = new(HARKVPair)
 						}
-						(*v11).UnmarshalEasyJSON(in)
+						(*v14).UnmarshalEasyJSON(in)
 					}
-					out.Headers = append(out.Headers, v11)
+					out.Headers = append(out.Headers, v14)
 					in.WantComma()
 				}
 				in.Delim(']')
@@ -1186,14 +1313,14 @@ func easyjson46e2e00bEncodeGithubComYaklangYaklangCommonHar7(out *jwriter.Writer
 			out.RawString("null")
 		} else {
 			out.RawByte('[')
-			for v12, v13 := range in.QueryString {
-				if v12 > 0 {
+			for v15, v16 := range in.QueryString {
+				if v15 > 0 {
 					out.RawByte(',')
 				}
-				if v13 == nil {
+				if v16 == nil {
 					out.RawString("null")
 				} else {
-					(*v13).MarshalEasyJSON(out)
+					(*v16).MarshalEasyJSON(out)
 				}
 			}
 			out.RawByte(']')
@@ -1206,14 +1333,14 @@ func easyjson46e2e00bEncodeGithubComYaklangYaklangCommonHar7(out *jwriter.Writer
 			out.RawString("null")
 		} else {
 			out.RawByte('[')
-			for v14, v15 := range in.Headers {
-				if v14 > 0 {
+			for v17, v18 := range in.Headers {
+				if v17 > 0 {
 					out.RawByte(',')
 				}
-				if v15 == nil {
+				if v18 == nil {
 					out.RawString("null")
 				} else {
-					(*v15).MarshalEasyJSON(out)
+					(*v18).MarshalEasyJSON(out)
 				}
 			}
 			out.RawByte(']')
@@ -1379,17 +1506,17 @@ func easyjson46e2e00bDecodeGithubComYaklangYaklangCommonHar9(in *jlexer.Lexer, o
 					out.Params = (out.Params)[:0]
 				}
 				for !in.IsDelim(']') {
-					var v16 *HARHTTPParam
+					var v19 *HARHTTPParam
 					if in.IsNull() {
 						in.Skip()
-						v16 = nil
+						v19 = nil
 					} else {
-						if v16 == nil {
-							v16 = new(HARHTTPParam)
+						if v19 == nil {
+							v19 = new(HARHTTPParam)
 						}
-						(*v16).UnmarshalEasyJSON(in)
+						(*v19).UnmarshalEasyJSON(in)
 					}
-					out.Params = append(out.Params, v16)
+					out.Params = append(out.Params, v19)
 					in.WantComma()
 				}
 				in.Delim(']')
@@ -1422,14 +1549,14 @@ func easyjson46e2e00bEncodeGithubComYaklangYaklangCommonHar9(out *jwriter.Writer
 			out.RawString("null")
 		} else {
 			out.RawByte('[')
-			for v17, v18 := range in.Params {
-				if v17 > 0 {
+			for v20, v21 := range in.Params {
+				if v20 > 0 {
 					out.RawByte(',')
 				}
-				if v18 == nil {
+				if v21 == nil {
 					out.RawString("null")
 				} else {
-					(*v18).MarshalEasyJSON(out)
+					(*v21).MarshalEasyJSON(out)
 				}
 			}
 			out.RawByte(']')
@@ -1640,7 +1767,146 @@ func (v *HARHTTPContent) UnmarshalJSON(data []byte) error {
 func (v *HARHTTPContent) UnmarshalEasyJSON(l *jlexer.Lexer) {
 	easyjson46e2e00bDecodeGithubComYaklangYaklangCommonHar11(l, v)
 }
-func easyjson46e2e00bDecodeGithubComYaklangYaklangCommonHar12(in *jlexer.Lexer, out *HAREntry) {
+func easyjson46e2e00bDecodeGithubComYaklangYaklangCommonHar12(in *jlexer.Lexer, out *HARExtractedDataItem) {
+	isTopLevel := in.IsStart()
+	if in.IsNull() {
+		if isTopLevel {
+			in.Consumed()
+		}
+		in.Skip()
+		return
+	}
+	in.Delim('{')
+	for !in.IsDelim('}') {
+		key := in.UnsafeFieldName(false)
+		in.WantColon()
+		if in.IsNull() {
+			in.Skip()
+			in.WantComma()
+			continue
+		}
+		switch key {
+		case "source_type":
+			out.SourceType = string(in.String())
+		case "rule_verbose":
+			out.RuleVerbose = string(in.String())
+		case "data":
+			out.Data = string(in.String())
+		case "regexp":
+			out.Regexp = string(in.String())
+		case "data_index":
+			out.DataIndex = int(in.Int())
+		case "length":
+			out.Length = int(in.Int())
+		case "is_match_request":
+			out.IsMatchRequest = bool(in.Bool())
+		default:
+			in.SkipRecursive()
+		}
+		in.WantComma()
+	}
+	in.Delim('}')
+	if isTopLevel {
+		in.Consumed()
+	}
+}
+func easyjson46e2e00bEncodeGithubComYaklangYaklangCommonHar12(out *jwriter.Writer, in HARExtractedDataItem) {
+	out.RawByte('{')
+	first := true
+	_ = first
+	if in.SourceType != "" {
+		const prefix string = ",\"source_type\":"
+		first = false
+		out.RawString(prefix[1:])
+		out.String(string(in.SourceType))
+	}
+	if in.RuleVerbose != "" {
+		const prefix string = ",\"rule_verbose\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.String(string(in.RuleVerbose))
+	}
+	if in.Data != "" {
+		const prefix string = ",\"data\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.String(string(in.Data))
+	}
+	if in.Regexp != "" {
+		const prefix string = ",\"regexp\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.String(string(in.Regexp))
+	}
+	if in.DataIndex != 0 {
+		const prefix string = ",\"data_index\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.Int(int(in.DataIndex))
+	}
+	if in.Length != 0 {
+		const prefix string = ",\"length\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.Int(int(in.Length))
+	}
+	if in.IsMatchRequest {
+		const prefix string = ",\"is_match_request\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.Bool(bool(in.IsMatchRequest))
+	}
+	out.RawByte('}')
+}
+
+// MarshalJSON supports json.Marshaler interface
+func (v HARExtractedDataItem) MarshalJSON() ([]byte, error) {
+	w := jwriter.Writer{}
+	easyjson46e2e00bEncodeGithubComYaklangYaklangCommonHar12(&w, v)
+	return w.Buffer.BuildBytes(), w.Error
+}
+
+// MarshalEasyJSON supports easyjson.Marshaler interface
+func (v HARExtractedDataItem) MarshalEasyJSON(w *jwriter.Writer) {
+	easyjson46e2e00bEncodeGithubComYaklangYaklangCommonHar12(w, v)
+}
+
+// UnmarshalJSON supports json.Unmarshaler interface
+func (v *HARExtractedDataItem) UnmarshalJSON(data []byte) error {
+	r := jlexer.Lexer{Data: data}
+	easyjson46e2e00bDecodeGithubComYaklangYaklangCommonHar12(&r, v)
+	return r.Error()
+}
+
+// UnmarshalEasyJSON supports easyjson.Unmarshaler interface
+func (v *HARExtractedDataItem) UnmarshalEasyJSON(l *jlexer.Lexer) {
+	easyjson46e2e00bDecodeGithubComYaklangYaklangCommonHar12(l, v)
+}
+func easyjson46e2e00bDecodeGithubComYaklangYaklangCommonHar13(in *jlexer.Lexer, out *HAREntry) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -1701,7 +1967,7 @@ func easyjson46e2e00bDecodeGithubComYaklangYaklangCommonHar12(in *jlexer.Lexer, 
 		in.Consumed()
 	}
 }
-func easyjson46e2e00bEncodeGithubComYaklangYaklangCommonHar12(out *jwriter.Writer, in HAREntry) {
+func easyjson46e2e00bEncodeGithubComYaklangYaklangCommonHar13(out *jwriter.Writer, in HAREntry) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -1739,51 +2005,51 @@ func easyjson46e2e00bEncodeGithubComYaklangYaklangCommonHar12(out *jwriter.Write
 // MarshalJSON supports json.Marshaler interface
 func (v HAREntry) MarshalJSON() ([]byte, error) {
 	w := jwriter.Writer{}
-	easyjson46e2e00bEncodeGithubComYaklangYaklangCommonHar12(&w, v)
-	return w.Buffer.BuildBytes(), w.Error
-}
-
-// MarshalEasyJSON supports easyjson.Marshaler interface
-func (v HAREntry) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjson46e2e00bEncodeGithubComYaklangYaklangCommonHar12(w, v)
-}
-
-// UnmarshalJSON supports json.Unmarshaler interface
-func (v *HAREntry) UnmarshalJSON(data []byte) error {
-	r := jlexer.Lexer{Data: data}
-	easyjson46e2e00bDecodeGithubComYaklangYaklangCommonHar12(&r, v)
-	return r.Error()
-}
-
-// UnmarshalEasyJSON supports easyjson.Unmarshaler interface
-func (v *HAREntry) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjson46e2e00bDecodeGithubComYaklangYaklangCommonHar12(l, v)
-}
-
-// MarshalJSON supports json.Marshaler interface
-func (v Entries) MarshalJSON() ([]byte, error) {
-	w := jwriter.Writer{}
 	easyjson46e2e00bEncodeGithubComYaklangYaklangCommonHar13(&w, v)
 	return w.Buffer.BuildBytes(), w.Error
 }
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
-func (v Entries) MarshalEasyJSON(w *jwriter.Writer) {
+func (v HAREntry) MarshalEasyJSON(w *jwriter.Writer) {
 	easyjson46e2e00bEncodeGithubComYaklangYaklangCommonHar13(w, v)
 }
 
 // UnmarshalJSON supports json.Unmarshaler interface
-func (v *Entries) UnmarshalJSON(data []byte) error {
+func (v *HAREntry) UnmarshalJSON(data []byte) error {
 	r := jlexer.Lexer{Data: data}
 	easyjson46e2e00bDecodeGithubComYaklangYaklangCommonHar13(&r, v)
 	return r.Error()
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
-func (v *Entries) UnmarshalEasyJSON(l *jlexer.Lexer) {
+func (v *HAREntry) UnmarshalEasyJSON(l *jlexer.Lexer) {
 	easyjson46e2e00bDecodeGithubComYaklangYaklangCommonHar13(l, v)
 }
-func easyjson46e2e00bDecodeGithubComYaklangYaklangCommonHar14(in *jlexer.Lexer, out *Creator) {
+
+// MarshalJSON supports json.Marshaler interface
+func (v Entries) MarshalJSON() ([]byte, error) {
+	w := jwriter.Writer{}
+	easyjson46e2e00bEncodeGithubComYaklangYaklangCommonHar14(&w, v)
+	return w.Buffer.BuildBytes(), w.Error
+}
+
+// MarshalEasyJSON supports easyjson.Marshaler interface
+func (v Entries) MarshalEasyJSON(w *jwriter.Writer) {
+	easyjson46e2e00bEncodeGithubComYaklangYaklangCommonHar14(w, v)
+}
+
+// UnmarshalJSON supports json.Unmarshaler interface
+func (v *Entries) UnmarshalJSON(data []byte) error {
+	r := jlexer.Lexer{Data: data}
+	easyjson46e2e00bDecodeGithubComYaklangYaklangCommonHar14(&r, v)
+	return r.Error()
+}
+
+// UnmarshalEasyJSON supports easyjson.Unmarshaler interface
+func (v *Entries) UnmarshalEasyJSON(l *jlexer.Lexer) {
+	easyjson46e2e00bDecodeGithubComYaklangYaklangCommonHar14(l, v)
+}
+func easyjson46e2e00bDecodeGithubComYaklangYaklangCommonHar15(in *jlexer.Lexer, out *Creator) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -1816,7 +2082,7 @@ func easyjson46e2e00bDecodeGithubComYaklangYaklangCommonHar14(in *jlexer.Lexer, 
 		in.Consumed()
 	}
 }
-func easyjson46e2e00bEncodeGithubComYaklangYaklangCommonHar14(out *jwriter.Writer, in Creator) {
+func easyjson46e2e00bEncodeGithubComYaklangYaklangCommonHar15(out *jwriter.Writer, in Creator) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -1836,23 +2102,23 @@ func easyjson46e2e00bEncodeGithubComYaklangYaklangCommonHar14(out *jwriter.Write
 // MarshalJSON supports json.Marshaler interface
 func (v Creator) MarshalJSON() ([]byte, error) {
 	w := jwriter.Writer{}
-	easyjson46e2e00bEncodeGithubComYaklangYaklangCommonHar14(&w, v)
+	easyjson46e2e00bEncodeGithubComYaklangYaklangCommonHar15(&w, v)
 	return w.Buffer.BuildBytes(), w.Error
 }
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
 func (v Creator) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjson46e2e00bEncodeGithubComYaklangYaklangCommonHar14(w, v)
+	easyjson46e2e00bEncodeGithubComYaklangYaklangCommonHar15(w, v)
 }
 
 // UnmarshalJSON supports json.Unmarshaler interface
 func (v *Creator) UnmarshalJSON(data []byte) error {
 	r := jlexer.Lexer{Data: data}
-	easyjson46e2e00bDecodeGithubComYaklangYaklangCommonHar14(&r, v)
+	easyjson46e2e00bDecodeGithubComYaklangYaklangCommonHar15(&r, v)
 	return r.Error()
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *Creator) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjson46e2e00bDecodeGithubComYaklangYaklangCommonHar14(l, v)
+	easyjson46e2e00bDecodeGithubComYaklangYaklangCommonHar15(l, v)
 }

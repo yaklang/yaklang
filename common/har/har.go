@@ -118,6 +118,18 @@ type Timings struct {
 	WorkerRespondWithSettled int     `json:"_workerRespondWithSettled"`
 }
 
+// HARExtractedDataItem is a portable subset of schema.ExtractedData for HAR metaData (Yak extension).
+// TraceId is omitted here: on import it is set to the new flow's hidden_index.
+type HARExtractedDataItem struct {
+	SourceType     string `json:"source_type,omitempty"`
+	RuleVerbose    string `json:"rule_verbose,omitempty"`
+	Data           string `json:"data,omitempty"`
+	Regexp         string `json:"regexp,omitempty"`
+	DataIndex      int    `json:"data_index,omitempty"`
+	Length         int    `json:"length,omitempty"`
+	IsMatchRequest bool   `json:"is_match_request,omitempty"`
+}
+
 type HTTPFlowMetaData struct {
 	ID                 uint           `json:"id,omitempty"`
 	NoFixContentLength bool           `json:"no_fix_content_length,omitempty"`
@@ -139,4 +151,6 @@ type HTTPFlowMetaData struct {
 	ProcessName        sql.NullString `json:"process_name,omitempty"`
 	UploadOnline       bool           `json:"upload_online,omitempty"`
 	UpdatedAt          time.Time      `json:"updated_at,omitempty"`
+	// ExtractedData carries MITM rule extract rows for HAR export/import round-trip (Yak extension).
+	ExtractedData []HARExtractedDataItem `json:"extracted_data,omitempty"`
 }
