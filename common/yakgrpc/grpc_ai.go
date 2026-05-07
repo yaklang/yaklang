@@ -111,7 +111,7 @@ func executeAIConfigHealthCheck(ctx context.Context, config *ypb.ThirdPartyAppli
 		aispec.WithDisableProviderFallback(true),
 		aispec.WithStreamHandler(markFirstByte),
 		aispec.WithReasonStreamHandler(markFirstByte),
-		aispec.WithRawHTTPRequestResponseCallback(func(requestBytes []byte, responseHeaderBytes []byte, bodyPreview []byte) {
+		aispec.WithRawHTTPRequestResponseCallback(func(requestBytes []byte, responseHeaderBytes []byte, bodyPreview []byte, _ *aispec.ChatUsage) {
 			resp.RawRequest = string(requestBytes)
 			resp.RawResponse = string(responseHeaderBytes) + string(bodyPreview)
 			resp.ResponseStatusCode = int32(lowhttp.GetStatusCodeFromResponse(responseHeaderBytes))

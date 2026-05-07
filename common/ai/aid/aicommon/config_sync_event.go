@@ -33,6 +33,7 @@ func (c *Config) HandleSyncConsumptionEvent(e *ypb.AIInputEvent) error {
 		map[string]any{
 			"input_consumption":  c.GetInputConsumption(),
 			"output_consumption": c.GetOutputConsumption(),
+			"cache_hit_token":    c.GetCacheHitToken(),
 			"consumption_uuid":   c.GetConsumptionUUID(),
 			"tier_consumption":   c.GetTierConsumptionSnapshot(),
 		},

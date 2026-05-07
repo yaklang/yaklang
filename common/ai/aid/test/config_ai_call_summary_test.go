@@ -10,6 +10,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -42,6 +43,14 @@ func TestCoordinator_AICallSummaryEvent(t *testing.T) {
 
 			rsp := config.NewAIResponse()
 			rsp.SetModelInfo("test-provider", "test-model-v1")
+			rsp.SetUsageInfo(&aispec.ChatUsage{
+				PromptTokens:     123,
+				CompletionTokens: 45,
+				TotalTokens:      168,
+				PromptTokensDetails: &aispec.PromptTokensDetails{
+					CachedTokens: 11,
+				},
+			})
 
 			if isSummaryPrompt(prompt) {
 				rsp.EmitOutputStream(strings.NewReader(`{
@@ -157,6 +166,12 @@ LOOP:
 						t.Fatalf("ai_total_cost_ms missing '%s' field", field)
 					}
 				}
+				require.Equal(t, 45, utils.InterfaceToInt(data["estimated_output_tokens"]))
+				require.Equal(t, 45, utils.InterfaceToInt(data["output_tokens"]))
+				require.Equal(t, 123, utils.InterfaceToInt(data["input_tokens"]))
+				require.Equal(t, 168, utils.InterfaceToInt(data["total_tokens"]))
+				require.Equal(t, 11, utils.InterfaceToInt(data["cache_hit_token"]))
+				require.Equal(t, "usage", utils.InterfaceToString(data["token_source"]))
 				totalCostCheck = true
 				log.Infof("ai_total_cost_ms enriched fields verified: model=%v, provider=%v, token_rate=%v",
 					data["model_name"], data["provider_name"], data["token_rate"])
@@ -174,7 +189,8 @@ LOOP:
 					"first_byte_cost_ms", "total_cost_ms",
 					"output_bytes", "estimated_output_tokens",
 					"token_rate", "output_duration_ms",
-					"input_token_size",
+					"input_token_size", "output_tokens", "input_tokens",
+					"total_tokens", "cache_hit_token", "token_source",
 				}
 				for _, field := range requiredFields {
 					if _, ok := data[field]; !ok {
@@ -188,9 +204,13 @@ LOOP:
 				}
 
 				inputTokenSize := utils.InterfaceToInt(data["input_token_size"])
-				if inputTokenSize <= 0 {
-					t.Fatalf("ai_call_summary input_token_size should be > 0, got: %v", inputTokenSize)
-				}
+				require.Equal(t, 123, inputTokenSize)
+				require.Equal(t, 45, utils.InterfaceToInt(data["estimated_output_tokens"]))
+				require.Equal(t, 45, utils.InterfaceToInt(data["output_tokens"]))
+				require.Equal(t, 123, utils.InterfaceToInt(data["input_tokens"]))
+				require.Equal(t, 168, utils.InterfaceToInt(data["total_tokens"]))
+				require.Equal(t, 11, utils.InterfaceToInt(data["cache_hit_token"]))
+				require.Equal(t, "usage", utils.InterfaceToString(data["token_source"]))
 
 				summaryCheck = true
 				log.Infof("ai_call_summary verified: model=%v, provider=%v, total_cost_ms=%v, token_rate=%v, input_tokens=%v",

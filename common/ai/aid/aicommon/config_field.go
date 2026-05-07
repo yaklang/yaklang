@@ -41,6 +41,18 @@ func (c *Config) GetOutputConsumption() int64 {
 	return atomic.LoadInt64(output)
 }
 
+func (c *Config) GetCacheHitToken() int64 {
+	state := c.ensureConsumptionState()
+	if state == nil {
+		return 0
+	}
+	cacheHit := state.GetCacheHitTokenPointer()
+	if cacheHit == nil {
+		return 0
+	}
+	return atomic.LoadInt64(cacheHit)
+}
+
 func (c *Config) GetSequenceStart() int64 {
 	return c.Seq
 }

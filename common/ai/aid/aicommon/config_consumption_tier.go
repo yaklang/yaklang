@@ -11,6 +11,7 @@ import (
 type ConsumptionStats struct {
 	InputConsumption  int64 `json:"input_consumption"`
 	OutputConsumption int64 `json:"output_consumption"`
+	CacheHitToken     int64 `json:"cache_hit_token"`
 }
 
 func newConsumptionStats() *ConsumptionStats {
@@ -29,22 +30,34 @@ func (s *ConsumptionStats) Add(inputDelta, outputDelta int64) {
 	}
 }
 
+func (s *ConsumptionStats) AddCacheHit(cacheHitDelta int64) {
+	if s == nil {
+		return
+	}
+	if cacheHitDelta != 0 {
+		atomic.AddInt64(&s.CacheHitToken, cacheHitDelta)
+	}
+}
+
 func (s *ConsumptionStats) Snapshot() map[string]int64 {
 	if s == nil {
 		return map[string]int64{
 			"input_consumption":  0,
 			"output_consumption": 0,
+			"cache_hit_token":    0,
 		}
 	}
 	return map[string]int64{
 		"input_consumption":  atomic.LoadInt64(&s.InputConsumption),
 		"output_consumption": atomic.LoadInt64(&s.OutputConsumption),
+		"cache_hit_token":    atomic.LoadInt64(&s.CacheHitToken),
 	}
 }
 
 type ConfigConsumptionState struct {
 	InputConsumption    *int64
 	OutputConsumption   *int64
+	CacheHitToken       *int64
 	ConsumptionUUID     string
 	TierConsumptionStat *omap.OrderedMap[consts.ModelTier, *ConsumptionStats]
 	m                   *sync.Mutex
@@ -54,6 +67,7 @@ func NewConfigConsumptionState() *ConfigConsumptionState {
 	return (&ConfigConsumptionState{
 		InputConsumption:    new(int64),
 		OutputConsumption:   new(int64),
+		CacheHitToken:       new(int64),
 		TierConsumptionStat: omap.NewOrderedMap(map[consts.ModelTier]*ConsumptionStats{}),
 		m:                   &sync.Mutex{},
 	}).ensure()
@@ -71,6 +85,9 @@ func (s *ConfigConsumptionState) ensure() *ConfigConsumptionState {
 	}
 	if s.OutputConsumption == nil {
 		s.OutputConsumption = new(int64)
+	}
+	if s.CacheHitToken == nil {
+		s.CacheHitToken = new(int64)
 	}
 	if s.TierConsumptionStat == nil {
 		s.TierConsumptionStat = omap.NewOrderedMap(map[consts.ModelTier]*ConsumptionStats{})
@@ -103,6 +120,16 @@ func (s *ConfigConsumptionState) GetConsumptionPointers() (*int64, *int64) {
 	s.m.Lock()
 	defer s.m.Unlock()
 	return s.InputConsumption, s.OutputConsumption
+}
+
+func (s *ConfigConsumptionState) GetCacheHitTokenPointer() *int64 {
+	if s == nil {
+		return nil
+	}
+	s.ensure()
+	s.m.Lock()
+	defer s.m.Unlock()
+	return s.CacheHitToken
 }
 
 func (s *ConfigConsumptionState) SetConsumptionUUID(uuid string) {
@@ -179,6 +206,23 @@ func (s *ConfigConsumptionState) AddTierOutputConsumption(tier consts.ModelTier,
 	atomic.AddInt64(s.OutputConsumption, outputDelta)
 }
 
+func (s *ConfigConsumptionState) AddTierCacheHitToken(tier consts.ModelTier, cacheHitDelta int64) {
+	if s == nil || cacheHitDelta == 0 {
+		return
+	}
+	s.ensure()
+	normalizedTier := normalizeConsumptionTier(tier)
+	s.m.Lock()
+	stats, _ := s.TierConsumptionStat.Get(normalizedTier)
+	if stats == nil {
+		stats = newConsumptionStats()
+		s.TierConsumptionStat.Set(normalizedTier, stats)
+	}
+	s.m.Unlock()
+	stats.AddCacheHit(cacheHitDelta)
+	atomic.AddInt64(s.CacheHitToken, cacheHitDelta)
+}
+
 func normalizeConsumptionTier(tier consts.ModelTier) consts.ModelTier {
 	if tier == "" {
 		return consts.TierIntelligent
@@ -242,6 +286,17 @@ func (c *Config) OutputConsumptionCallback(tier consts.ModelTier, current int) {
 		return
 	}
 	state.AddTierOutputConsumption(tier, int64(current))
+}
+
+func (c *Config) AddTierCacheHitToken(tier consts.ModelTier, cacheHitDelta int64) {
+	if cacheHitDelta == 0 {
+		return
+	}
+	state := c.ensureConsumptionState()
+	if state == nil {
+		return
+	}
+	state.AddTierCacheHitToken(tier, cacheHitDelta)
 }
 
 func (c *Config) GetTierConsumptionSnapshot() map[string]map[string]int64 {

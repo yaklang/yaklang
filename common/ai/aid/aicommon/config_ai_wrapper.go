@@ -23,15 +23,22 @@ type tierAwareConsumptionCaller struct {
 	tier consts.ModelTier
 }
 
+type tierUsageMetrics struct {
+	InputTokens    int64
+	OutputTokens   int64
+	TotalTokens    int64
+	CacheHitTokens int64
+	TokenSource    string
+	HaveRealUsage  bool
+}
+
 func (c *tierAwareConsumptionCaller) NewAIResponse() *AIResponse {
 	return NewAIResponse(c)
 }
 
 func (c *tierAwareConsumptionCaller) CallAIResponseConsumptionCallback(current int) {
-	if c == nil {
-		return
-	}
-	c.Config.OutputConsumptionCallback(c.tier, current)
+	// Token accounting is finalized once after the full answer completes in
+	// Config.wrapper. Do not accumulate streaming estimates here.
 }
 
 func wrapCallerWithTierConsumption(owner *Config, tier consts.ModelTier) AICallerConfigIf {
@@ -39,6 +46,51 @@ func wrapCallerWithTierConsumption(owner *Config, tier consts.ModelTier) AICalle
 		Config: owner,
 		tier:   tier,
 	}
+}
+
+func (c *Config) resolveTierUsageMetrics(estimatedInputTokens int64, rsp *AIResponse) tierUsageMetrics {
+	metrics := tierUsageMetrics{
+		InputTokens: estimatedInputTokens,
+		TokenSource: "estimated",
+	}
+	if rsp == nil {
+		return metrics
+	}
+	metrics.OutputTokens = rsp.GetTotalOutputTokens()
+	metrics.TotalTokens = metrics.InputTokens + metrics.OutputTokens
+
+	usageInfo := rsp.GetUsageInfo()
+	if usageInfo == nil {
+		return metrics
+	}
+	metrics.HaveRealUsage = true
+	metrics.TokenSource = "usage"
+	metrics.InputTokens = int64(usageInfo.PromptTokens)
+	metrics.OutputTokens = int64(usageInfo.CompletionTokens)
+	metrics.TotalTokens = int64(usageInfo.TotalTokens)
+	if metrics.TotalTokens <= 0 {
+		metrics.TotalTokens = metrics.InputTokens + metrics.OutputTokens
+	}
+	if usageInfo.PromptTokensDetails != nil {
+		metrics.CacheHitTokens = int64(usageInfo.PromptTokensDetails.CachedTokens)
+	}
+	return metrics
+}
+
+func (c *Config) finalizeTierConsumption(tier consts.ModelTier, estimatedInputTokens int64, rsp *AIResponse) tierUsageMetrics {
+	metrics := c.resolveTierUsageMetrics(estimatedInputTokens, rsp)
+	if c == nil || rsp == nil {
+		return metrics
+	}
+	c.AddTierConsumption(
+		tier,
+		metrics.InputTokens,
+		metrics.OutputTokens,
+	)
+	if metrics.CacheHitTokens > 0 {
+		c.AddTierCacheHitToken(tier, metrics.CacheHitTokens)
+	}
+	return metrics
 }
 
 func appendPresetPrompt(request *AIRequest, tagName, description, prompt string) {
@@ -159,34 +211,39 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 		if c.DebugPrompt {
 			log.Infof(strings.Repeat("=", 20)+"AIRequest"+strings.Repeat("=", 20)+"\n%v\n", request.GetPrompt())
 		}
+		tokenSize := ytoken.CalcTokenCount(request.GetPrompt())
 
 		// 不需要 checkpoint 的请求直接执行就好
 		if request.IsDetachedCheckpoint() {
-		if c.AiAutoRetry <= 0 {
-			c.AiAutoRetry = 1
-		}
-		for _idx := 0; _idx < int(c.AiAutoRetry); {
-			rsp, err = i(wrapCallerWithTierConsumption(outConfig, tier), request)
-			if is429, done := c.handle429RateLimit(rsp); is429 {
-				if done {
-					return nil, c.Ctx.Err()
-				}
-				continue
+			if c.AiAutoRetry <= 0 {
+				c.AiAutoRetry = 1
 			}
-			if err != nil || rsp == nil {
-				_idx++
-				c.EmitWarning("ai request err: %v, retry auto time: [%v]", err, _idx)
-				select {
-				case <-c.Ctx.Done():
-					return nil, c.Ctx.Err()
-				case <-time.After(500 * time.Millisecond):
+			for _idx := 0; _idx < int(c.AiAutoRetry); {
+				rsp, err = i(wrapCallerWithTierConsumption(outConfig, tier), request)
+				if is429, done := c.handle429RateLimit(rsp); is429 {
+					if done {
+						return nil, c.Ctx.Err()
+					}
+					continue
 				}
-				continue
+				if err != nil || rsp == nil {
+					_idx++
+					c.EmitWarning("ai request err: %v, retry auto time: [%v]", err, _idx)
+					select {
+					case <-c.Ctx.Done():
+						return nil, c.Ctx.Err()
+					case <-time.After(500 * time.Millisecond):
+					}
+					continue
+				}
+				rsp.SetTaskIndex(request.GetTaskIndex())
+				origRsp := rsp
+				rsp = TeeAIResponse(config, rsp, nil, func() {
+					c.finalizeTierConsumption(tier, int64(tokenSize), origRsp)
+				})
+				return rsp, err
 			}
-			rsp.SetTaskIndex(request.GetTaskIndex())
-			return rsp, err
-		}
-		return nil, utils.Errorf("ai request err with max retry: %v", err)
+			return nil, utils.Errorf("ai request err with max retry: %v", err)
 		}
 
 		var seq = request.GetSeqId()
@@ -223,11 +280,9 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 		if c.AiAutoRetry <= 0 {
 			c.AiAutoRetry = 1
 		}
-		tokenSize := ytoken.CalcTokenCount(request.GetPrompt())
 
 		start := time.Now()
 		for _idx := 0; _idx < int(c.AiAutoRetry); {
-			c.InputConsumptionCallback(tier, tokenSize)
 			rsp, err = i(wrapCallerWithTierConsumption(outConfig, tier), request)
 			if is429, done := c.handle429RateLimit(rsp); is429 {
 				if done {
@@ -247,7 +302,6 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 			}
 			rsp.SetTaskIndex(request.GetTaskIndex())
 
-			var haveFirstByte = utils.NewBool(false)
 			saveHandler := func(tee *AIResponse) {
 				reasonReader, outputReader := tee.GetUnboundStreamReaderEx(nil, nil, nil)
 				reason, _ := io.ReadAll(reasonReader)
@@ -286,7 +340,6 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 					saveHandler(teeResp)
 				}()
 
-				haveFirstByte.SetTo(true)
 				c.EmitJSON(schema.EVENT_TYPE_AI_FIRST_BYTE_COST_MS, "system", map[string]any{
 					"ms":            du.Milliseconds(),
 					"second":        du.Seconds(),
@@ -294,19 +347,16 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 					"provider_name": origRsp.GetProviderName(),
 					"model_tier":    string(tier),
 				})
-				c.EmitJSON(schema.EVENT_TYPE_PRESSURE, "system", map[string]any{
-					"current_cost_token_size": tokenSize,
-					"pressure_token_size":     c.AiCallTokenLimit,
-					"model_tier":              string(tier),
-					"model_name":              rsp.GetModelName(),
-					"provider_name":           rsp.GetProviderName(),
-				})
 			}, func() {
+				usageMetrics := c.finalizeTierConsumption(tier, int64(tokenSize), origRsp)
 				du := time.Since(start)
 				provider := origRsp.GetProviderName()
 				model := origRsp.GetModelName()
 				outputBytes := origRsp.GetTotalOutputBytes()
-				outputTokens := origRsp.GetTotalOutputTokens()
+				outputTokens := usageMetrics.OutputTokens
+				inputTokens := usageMetrics.InputTokens
+				totalTokens := usageMetrics.TotalTokens
+				cacheHitTokens := usageMetrics.CacheHitTokens
 				firstByteTime := origRsp.GetFirstOutputByteTime()
 				var outputDuration time.Duration
 				if !firstByteTime.IsZero() {
@@ -318,6 +368,15 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 				}
 				c.EmitInfo("ai response from %v:%v cost: %v, output duration: %v, %.1f token/s",
 					provider, model, du, outputDuration, tokenRate)
+				c.EmitJSON(schema.EVENT_TYPE_PRESSURE, "system", map[string]any{
+					"current_cost_token_size": inputTokens,
+					"pressure_token_size":     c.AiCallTokenLimit,
+					"model_tier":              string(tier),
+					"model_name":              model,
+					"provider_name":           provider,
+					"cache_hit_token":         cacheHitTokens,
+					"token_source":            usageMetrics.TokenSource,
+				})
 				c.EmitJSON(schema.EVENT_TYPE_AI_TOTAL_COST_MS, "system", map[string]any{
 					"ms":                      du.Milliseconds(),
 					"second":                  du.Seconds(),
@@ -327,6 +386,11 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 					"token_rate":              tokenRate,
 					"output_bytes":            outputBytes,
 					"estimated_output_tokens": outputTokens,
+					"output_tokens":           outputTokens,
+					"input_tokens":            inputTokens,
+					"total_tokens":            totalTokens,
+					"cache_hit_token":         cacheHitTokens,
+					"token_source":            usageMetrics.TokenSource,
 					"output_duration_ms":      outputDuration.Milliseconds(),
 				})
 				firstByteCostMs := int64(0)
@@ -341,9 +405,14 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 					"total_cost_ms":           du.Milliseconds(),
 					"output_bytes":            outputBytes,
 					"estimated_output_tokens": outputTokens,
+					"output_tokens":           outputTokens,
 					"token_rate":              tokenRate,
 					"output_duration_ms":      outputDuration.Milliseconds(),
-					"input_token_size":        tokenSize,
+					"input_token_size":        inputTokens,
+					"input_tokens":            inputTokens,
+					"total_tokens":            totalTokens,
+					"cache_hit_token":         cacheHitTokens,
+					"token_source":            usageMetrics.TokenSource,
 				})
 				if outputBytes == 0 {
 					rawDump := origRsp.GetRawHTTPResponseDump()
@@ -353,12 +422,12 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 							"The AI model returned HTTP 200 but generated 0 output tokens "+
 							"(finish_reason: stop without delta.content). "+
 							"This is typically a transient model-side issue and will be retried automatically.",
-							provider, model, du, tokenSize,
+							provider, model, du, inputTokens,
 						)
 					} else {
 						c.EmitWarning("[AI Empty Response] model=%v:%v, cost=%v, input_tokens~%d. "+
 							"The AI model returned an empty response. (no raw HTTP response available)",
-							provider, model, du, tokenSize,
+							provider, model, du, inputTokens,
 						)
 					}
 				}

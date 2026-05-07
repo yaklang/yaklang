@@ -41,13 +41,14 @@ func (c *Config) StartEventLoopEx(ctx context.Context, startCall func(), doneCal
 			}
 
 			consumptionNotification := func() {
-				if c.GetInputConsumption() > 0 || c.GetOutputConsumption() > 0 {
+				if c.GetInputConsumption() > 0 || c.GetOutputConsumption() > 0 || c.GetCacheHitToken() > 0 {
 					c.EmitJSON(
 						schema.EVENT_TYPE_CONSUMPTION,
 						"system",
 						map[string]any{
 							"input_consumption":  c.GetInputConsumption(),
 							"output_consumption": c.GetOutputConsumption(),
+							"cache_hit_token":    c.GetCacheHitToken(),
 							"consumption_uuid":   c.GetConsumptionUUID(),
 							"tier_consumption":   c.GetTierConsumptionSnapshot(),
 						},

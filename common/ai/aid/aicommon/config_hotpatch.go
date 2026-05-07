@@ -66,6 +66,7 @@ func (c *Config) SimpleInfoMap() map[string]interface{} {
 		"AgreeAIScoreMiddle":          c.AgreeAIScoreMiddle,
 		"InputConsumption":            input,
 		"OutputConsumption":           output,
+		"CacheHitToken":               c.GetCacheHitToken(),
 		"AICallTokenLimit":            c.AiCallTokenLimit,
 		"AIAutoRetry":                 c.AiAutoRetry,
 		"AIAutoTransactionRetry":      c.AiTransactionAutoRetry,
