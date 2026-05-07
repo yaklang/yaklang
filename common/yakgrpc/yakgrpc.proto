@@ -2859,6 +2859,7 @@ message ThirdPartyApplicationConfig {
   optional int64 TopK = 21;
   optional double FrequencyPenalty = 22;
   optional string ReasoningEffort = 23;
+  optional bool EnableThinkingOpt = 24;
 }
 
 message DiagnoseNetworkRequest {

@@ -43,7 +43,11 @@ func TestBuildOptionsFromConfig_AppliesEnableThinking(t *testing.T) {
 		},
 	}
 
-	resolved := NewDefaultAIConfig(BuildOptionsFromConfig(config)...)
+	// 仅应用 BuildOptionsFromConfig，避免 NewDefaultAIConfig 命中环境里的 tiered 配置并覆盖 thinking 相关字段。
+	resolved := &AIConfig{}
+	for _, opt := range BuildOptionsFromConfig(config) {
+		opt(resolved)
+	}
 	assert.Equal(t, "siliconflow", resolved.Type)
 	assert.Equal(t, "deepseek-ai/DeepSeek-V4-Flash", resolved.Model)
 	assert.True(t, resolved.EnableThinking)
@@ -51,6 +55,48 @@ func TestBuildOptionsFromConfig_AppliesEnableThinking(t *testing.T) {
 	val, ok := resolved.EnableThinkingValue.(bool)
 	assert.True(t, ok)
 	assert.True(t, val)
+}
+
+func TestBuildOptionsFromConfig_EnableThinkingOptOverridesEnableThinking(t *testing.T) {
+	disabled := false
+	config := &ypb.AIModelConfig{
+		ModelName: "doubao-pro",
+		Provider: &ypb.ThirdPartyApplicationConfig{
+			Type:               "openai",
+			APIKey:             "test-key",
+			EnableThinking:     true,
+			EnableThinkingOpt:  &disabled,
+		},
+	}
+	resolved := &AIConfig{}
+	for _, opt := range BuildOptionsFromConfig(config) {
+		opt(resolved)
+	}
+	assert.Equal(t, "thinking", resolved.EnableThinkingField)
+	m, ok := resolved.EnableThinkingValue.(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "disabled", m["type"])
+	assert.False(t, resolved.EnableThinking)
+}
+
+func TestBuildOptionsFromConfig_EnableThinkingOptTrue(t *testing.T) {
+	enabled := true
+	config := &ypb.AIModelConfig{
+		ModelName: "some-model",
+		Provider: &ypb.ThirdPartyApplicationConfig{
+			Type:              "siliconflow",
+			APIKey:            "k",
+			EnableThinkingOpt: &enabled,
+		},
+	}
+	resolved := &AIConfig{}
+	for _, opt := range BuildOptionsFromConfig(config) {
+		opt(resolved)
+	}
+	assert.Equal(t, "thinking", resolved.EnableThinkingField)
+	m, ok := resolved.EnableThinkingValue.(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "enabled", m["type"])
 }
 
 func TestBuildOptionsFromConfig_AppliesModelSamplingParams(t *testing.T) {

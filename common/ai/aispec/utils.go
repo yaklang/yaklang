@@ -291,7 +291,9 @@ func buildOptionsFromProviderAndModel(provider *ypb.ThirdPartyApplicationConfig,
 		opts = append(opts, WithAPIType(provider.APIType))
 	}
 
-	if provider.GetEnableThinking() {
+	if provider.EnableThinkingOpt != nil {
+		opts = append(opts, WithExplicitThinkingBody(*provider.EnableThinkingOpt))
+	} else if provider.GetEnableThinking() {
 		opts = append(opts, WithEnableThinking(provider.GetEnableThinking()))
 	}
 

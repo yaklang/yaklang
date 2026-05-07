@@ -196,6 +196,25 @@ func WithEnableThinkingEx(thinkField string, thinkValue any) AIConfigOption {
 	}
 }
 
+// WithExplicitThinkingBody 对应 ypb.ThirdPartyApplicationConfig 的 optional EnableThinkingOpt：
+// 仅在显式配置时由 BuildOptionsFromConfig 注入，在请求 JSON 根上写入
+// "thinking": {"type":"enabled"} 或 {"type":"disabled"}，与按厂商分支的 EnableThinking 行为解耦。
+func WithExplicitThinkingBody(enabled bool) AIConfigOption {
+	return func(config *AIConfig) {
+		config.EnableThinking = enabled
+		config.EnableThinkingField = "thinking"
+		if enabled {
+			config.EnableThinkingValue = map[string]any{
+				"type": "enabled",
+			}
+		} else {
+			config.EnableThinkingValue = map[string]any{
+				"type": "disabled",
+			}
+		}
+	}
+}
+
 // WithEnableThinking 启用think模式，目前只有当ai模型类型为`volcengine`类型也就是豆包相关模型时此配置才生效。
 //
 // 参数：

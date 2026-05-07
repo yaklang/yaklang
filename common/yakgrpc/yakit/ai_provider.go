@@ -346,6 +346,7 @@ func providerSignature(cfg *ypb.ThirdPartyApplicationConfig) string {
 		cfg.GetNoHttps(),
 		cfg.GetEnableEndpoint(),
 		cfg.GetEnableThinking(),
+		optionalBoolSig(cfg.EnableThinkingOpt),
 		optionalInt64Sig(cfg.MaxTokens),
 		optionalFloat64Sig(cfg.Temperature),
 		optionalFloat64Sig(cfg.TopP),
@@ -353,6 +354,16 @@ func providerSignature(cfg *ypb.ThirdPartyApplicationConfig) string {
 		optionalFloat64Sig(cfg.FrequencyPenalty),
 		reasoningEffortSig(cfg.ReasoningEffort),
 	)
+}
+
+func optionalBoolSig(p *bool) string {
+	if p == nil {
+		return ""
+	}
+	if *p {
+		return "1"
+	}
+	return "0"
 }
 
 func optionalInt64Sig(p *int64) string {
