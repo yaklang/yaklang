@@ -69,6 +69,12 @@ func TestPromptManager_AssembleLoopPrompt_SectionOrder(t *testing.T) {
 	require.Equal(t, "section.semi_dynamic", sections[2].Key)
 	require.Equal(t, "section.timeline_open", sections[3].Key)
 	require.Equal(t, "section.dynamic", sections[4].Key)
+	require.Equal(t, reactloops.PromptSectionRoleHighStatic, sections[0].Role)
+	require.Equal(t, reactloops.PromptSectionRoleZHHighStatic, sections[0].RoleZh)
+	require.Equal(t, reactloops.PromptSectionRoleFrozenBlock, sections[1].Role)
+	require.Equal(t, reactloops.PromptSectionRoleSemiDynamic, sections[2].Role)
+	require.Equal(t, reactloops.PromptSectionRoleTimelineOpen, sections[3].Role)
+	require.Equal(t, reactloops.PromptSectionRoleDynamic, sections[4].Role)
 
 	prompt := result.Prompt
 	traitsIdx := strings.Index(prompt, "<|TRAITS|>")
@@ -141,6 +147,7 @@ func TestPromptManager_AssembleLoopPrompt_SectionOrder(t *testing.T) {
 	// 故实际只剩 tool_inventory 一个 child。
 	require.NotEmpty(t, sections[1].Children)
 	require.Equal(t, "section.frozen_block.tool_inventory", sections[1].Children[0].Key)
+	require.Equal(t, reactloops.PromptSectionRoleFrozenBlock, sections[1].Children[0].Role)
 
 	// semi_dynamic 段子结构: skills_context + schema + output_example
 	// (Tool/Forge 已迁出, OutputExample 从 high_static 迁入并紧跟 Schema 之后)。
@@ -148,6 +155,8 @@ func TestPromptManager_AssembleLoopPrompt_SectionOrder(t *testing.T) {
 	require.Len(t, sections[2].Children, 3)
 	require.Equal(t, "section.semi_dynamic.skills_context", sections[2].Children[0].Key)
 	require.Equal(t, "section.semi_dynamic.schema", sections[2].Children[1].Key)
+	require.Equal(t, reactloops.PromptSectionRoleSemiDynamic, sections[2].Children[0].Role)
+	require.Equal(t, reactloops.PromptSectionRoleSemiDynamic, sections[2].Children[1].Role)
 	require.Equal(t, "section.semi_dynamic.output_example", sections[2].Children[2].Key)
 
 	// timeline_open 段子结构 (P1-C2): timeline_open + current_time + workspace +
@@ -158,10 +167,13 @@ func TestPromptManager_AssembleLoopPrompt_SectionOrder(t *testing.T) {
 	require.Equal(t, "section.timeline_open.workspace", sections[3].Children[2].Key)
 	// P1-C2: user_history 现在挂在 timeline_open 之下而非 dynamic 之下.
 	require.Equal(t, "section.timeline_open.user_history", sections[3].Children[3].Key)
+	require.Equal(t, reactloops.PromptSectionRoleTimelineOpen, sections[3].Children[3].Role)
 
 	require.GreaterOrEqual(t, len(sections[4].Children), 2)
 	require.Equal(t, "section.dynamic.user_query", sections[4].Children[0].Key)
 	require.Equal(t, "section.dynamic.auto_context", sections[4].Children[1].Key)
+	require.Equal(t, reactloops.PromptSectionRoleDynamic, sections[4].Children[0].Role)
+	require.Equal(t, reactloops.PromptSectionRoleZHDynamic, sections[4].Children[0].RoleZh)
 }
 
 // TestPromptManager_RenderLoopSemiDynamicSection_Order 验证 SEMI 残留段
@@ -296,7 +308,8 @@ func TestPromptManager_AssemblePromptPrefix(t *testing.T) {
 // 由 dashscope 决定), 比单 frozen 边界 (P0) 多一档.
 //
 // 关键词: aicache hijack 4 段, AI_CACHE_FROZEN + AI_CACHE_SEMI 双边界,
-//        三 cc 主路径, P1 双 cache 边界
+//
+//	三 cc 主路径, P1 双 cache 边界
 func TestPromptManager_AssembleLoopPrompt_HijackFourSegment(t *testing.T) {
 	// P2.1 阈值合并默认 1024 byte 会把本测试的短 fixture (Tool Inventory 仅
 	// 一个 tool, 总字节数 << 1KB) 合并降级到 2 段, 与本测试断言的 4 段 happy

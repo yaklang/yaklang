@@ -392,7 +392,7 @@ func (pm *PromptManager) buildHighStaticObservation(
 	section := reactloops.NewPromptContainerSection(
 		"section.high_static",
 		"Highly Static",
-		reactloops.PromptSectionRoleSystemPrompt,
+		reactloops.PromptSectionRoleHighStatic,
 	)
 	// section.high_static.output_example 已迁出: caller-specific 的 OutputExample
 	// 若进入 high-static 段会让 high-static chunk hash 跨 caller 漂移, 阻断
@@ -404,14 +404,14 @@ func (pm *PromptManager) buildHighStaticObservation(
 		reactloops.NewPromptSectionObservation(
 			"section.high_static.static_preamble",
 			"Highly Static / Traits & Agent Systems",
-			reactloops.PromptSectionRoleSystemPrompt,
+			reactloops.PromptSectionRoleHighStatic,
 			false,
 			pm.renderHighStaticPreamble(materials),
 		),
 		reactloops.NewPromptSectionObservation(
 			"section.high_static.task_instruction",
 			"Highly Static / Task Instruction",
-			reactloops.PromptSectionRoleSystemPrompt,
+			reactloops.PromptSectionRoleHighStatic,
 			false,
 			renderStaticTaggedBlock("PERSISTENT", materials.TaskInstruction),
 		),
@@ -441,20 +441,20 @@ func (pm *PromptManager) buildFrozenBlockObservation(
 	section := reactloops.NewPromptContainerSection(
 		"section.frozen_block",
 		"Frozen Block",
-		reactloops.PromptSectionRoleRuntimeCtx,
+		reactloops.PromptSectionRoleFrozenBlock,
 	)
 	children := []*reactloops.PromptSectionObservation{
 		reactloops.NewPromptSectionObservation(
 			"section.frozen_block.tool_inventory",
 			"Frozen Block / Tool Inventory",
-			reactloops.PromptSectionRoleRuntimeCtx,
+			reactloops.PromptSectionRoleFrozenBlock,
 			true,
 			renderToolInventoryBlock(materials),
 		),
 		reactloops.NewPromptSectionObservation(
 			"section.frozen_block.forge_inventory",
 			"Frozen Block / Forge Inventory",
-			reactloops.PromptSectionRoleRuntimeCtx,
+			reactloops.PromptSectionRoleFrozenBlock,
 			true,
 			renderForgeInventoryBlock(materials),
 		),
@@ -472,7 +472,7 @@ func (pm *PromptManager) buildFrozenBlockObservation(
 		reactloops.NewPromptSectionObservation(
 			"section.frozen_block.timeline_frozen",
 			"Frozen Block / Timeline (Frozen Prefix)",
-			reactloops.PromptSectionRoleRuntimeCtx,
+			reactloops.PromptSectionRoleFrozenBlock,
 			true,
 			renderTimelineFrozenBlock(materials),
 		),
@@ -518,20 +518,20 @@ func (pm *PromptManager) buildSemiDynamicResidualObservation(
 	section := reactloops.NewPromptContainerSection(
 		"section.semi_dynamic",
 		"Semi Dynamic",
-		reactloops.PromptSectionRoleRuntimeCtx,
+		reactloops.PromptSectionRoleSemiDynamic,
 	)
 	children := []*reactloops.PromptSectionObservation{
 		reactloops.NewPromptSectionObservation(
 			"section.semi_dynamic.skills_context",
 			"Semi Dynamic / Skills Context",
-			reactloops.PromptSectionRoleRuntimeCtx,
+			reactloops.PromptSectionRoleSemiDynamic,
 			true,
 			materials.SkillsContext,
 		),
 		reactloops.NewPromptSectionObservation(
 			"section.semi_dynamic.schema",
 			"Semi Dynamic / Schema",
-			reactloops.PromptSectionRoleRuntimeCtx,
+			reactloops.PromptSectionRoleSemiDynamic,
 			true,
 			renderSchemaBlock(materials.Schema),
 		),
@@ -554,7 +554,7 @@ func (pm *PromptManager) buildSemiDynamicResidualObservation(
 		reactloops.NewPromptSectionObservation(
 			"section.semi_dynamic.cache_tool_call",
 			"Semi Dynamic / Cache Tool Call",
-			reactloops.PromptSectionRoleRuntimeCtx,
+			reactloops.PromptSectionRoleSemiDynamic,
 			true,
 			materials.RecentToolsCache,
 		),
@@ -577,27 +577,27 @@ func (pm *PromptManager) buildTimelineOpenObservation(
 	section := reactloops.NewPromptContainerSection(
 		"section.timeline_open",
 		"Timeline Open & Workspace",
-		reactloops.PromptSectionRoleRuntimeCtx,
+		reactloops.PromptSectionRoleTimelineOpen,
 	)
 	children := []*reactloops.PromptSectionObservation{
 		reactloops.NewPromptSectionObservation(
 			"section.timeline_open.timeline_open",
 			"Timeline Open / Timeline (Open Tail)",
-			reactloops.PromptSectionRoleRuntimeCtx,
+			reactloops.PromptSectionRoleTimelineOpen,
 			true,
 			renderTimelineOpenBlock(materials),
 		),
 		reactloops.NewPromptSectionObservation(
 			"section.timeline_open.current_time",
 			"Timeline Open / Current Time",
-			reactloops.PromptSectionRoleRuntimeCtx,
+			reactloops.PromptSectionRoleTimelineOpen,
 			false,
 			renderCurrentTimeBlock(materials),
 		),
 		reactloops.NewPromptSectionObservation(
 			"section.timeline_open.workspace",
 			"Timeline Open / Workspace",
-			reactloops.PromptSectionRoleRuntimeCtx,
+			reactloops.PromptSectionRoleTimelineOpen,
 			true,
 			renderWorkspaceBlock(materials),
 		),
@@ -605,7 +605,7 @@ func (pm *PromptManager) buildTimelineOpenObservation(
 		reactloops.NewPromptSectionObservation(
 			"section.timeline_open.session_evidence",
 			"Timeline Open / Session Evidence",
-			reactloops.PromptSectionRoleRuntimeCtx,
+			reactloops.PromptSectionRoleTimelineOpen,
 			true,
 			materials.SessionEvidence,
 		),
@@ -613,7 +613,7 @@ func (pm *PromptManager) buildTimelineOpenObservation(
 		reactloops.NewPromptSectionObservation(
 			"section.timeline_open.user_history",
 			"Timeline Open / User History",
-			reactloops.PromptSectionRoleUserInput,
+			reactloops.PromptSectionRoleTimelineOpen,
 			false,
 			materials.UserHistory,
 		),
@@ -633,20 +633,20 @@ func (pm *PromptManager) buildDynamicObservation(
 	section := reactloops.NewPromptContainerSection(
 		"section.dynamic",
 		"Pure Dynamic",
-		reactloops.PromptSectionRoleMixed,
+		reactloops.PromptSectionRoleDynamic,
 	)
 	children := []*reactloops.PromptSectionObservation{
 		reactloops.NewPromptSectionObservation(
 			"section.dynamic.user_query",
 			"Pure Dynamic / User Query",
-			reactloops.PromptSectionRoleUserInput,
+			reactloops.PromptSectionRoleDynamic,
 			false,
 			renderUserQueryBlock(input.Nonce, input.UserQuery),
 		),
 		reactloops.NewPromptSectionObservation(
 			"section.dynamic.auto_context",
 			"Pure Dynamic / Auto Context",
-			reactloops.PromptSectionRoleRuntimeCtx,
+			reactloops.PromptSectionRoleDynamic,
 			true,
 			base.AutoContext,
 		),
@@ -655,7 +655,7 @@ func (pm *PromptManager) buildDynamicObservation(
 		reactloops.NewPromptSectionObservation(
 			"section.dynamic.extra_capabilities",
 			"Pure Dynamic / Extra Capabilities",
-			reactloops.PromptSectionRoleRuntimeCtx,
+			reactloops.PromptSectionRoleDynamic,
 			true,
 			renderTaggedBlock("EXTRA_CAPABILITIES", input.Nonce, input.ExtraCapabilities),
 		),
@@ -664,14 +664,14 @@ func (pm *PromptManager) buildDynamicObservation(
 		reactloops.NewPromptSectionObservation(
 			"section.dynamic.reactive_data",
 			"Pure Dynamic / Reactive Data",
-			reactloops.PromptSectionRoleRuntimeCtx,
+			reactloops.PromptSectionRoleDynamic,
 			true,
 			renderTaggedBlock("REFLECTION", input.Nonce, input.ReactiveData),
 		),
 		reactloops.NewPromptSectionObservation(
 			"section.dynamic.injected_memory",
 			"Pure Dynamic / Injected Memory",
-			reactloops.PromptSectionRoleRuntimeCtx,
+			reactloops.PromptSectionRoleDynamic,
 			true,
 			renderInjectedMemoryBlock(input.Nonce, input.InjectedMemory),
 		),
@@ -925,8 +925,9 @@ func (pm *PromptManager) renderLoopDynamicSection(data map[string]any) (string, 
 }
 
 // buildTaggedPromptSections 按"按稳定性分层"路径拼接 5 段:
-//   SYSTEM (high-static) | FROZEN (frozen-block) | SEMI (semi-dynamic 残留) |
-//   OPEN (timeline-open) | DYNAMIC
+//
+//	SYSTEM (high-static) | FROZEN (frozen-block) | SEMI (semi-dynamic 残留) |
+//	OPEN (timeline-open) | DYNAMIC
 //
 // 各段之间空行分隔, 空段省略。
 //
@@ -942,7 +943,8 @@ func (pm *PromptManager) renderLoopDynamicSection(data map[string]any) (string, 
 // aicache.semiBoundaryTagName / semiBoundaryNonce 严格一致.
 //
 // 关键词: buildTaggedPromptSections, 5 段拼接, AI_CACHE_FROZEN, AI_CACHE_SEMI,
-//        aicache hijacker, 4 段切分, 双 cc, P1 双 cache 边界
+//
+//	aicache hijacker, 4 段切分, 双 cc, P1 双 cache 边界
 func buildTaggedPromptSections(highStatic string, frozenBlock string, semiDynamic string, timelineOpen string, dynamic string, dynamicNonce string) string {
 	return joinPromptSections(
 		wrapPromptMessageSection(promptSectionHighStatic, highStatic, ""),
@@ -984,7 +986,8 @@ func wrapAICacheFrozen(content string) string {
 // 内容为空时返回空串, 调用方 joinPromptSections 会自动跳过空段.
 //
 // 关键词: wrapAICacheSemi, AI_CACHE_SEMI, semi cache boundary, 4 段拆分,
-//        与 PROMPT_SECTION_semi-dynamic 双层嵌套
+//
+//	与 PROMPT_SECTION_semi-dynamic 双层嵌套
 func wrapAICacheSemi(content string) string {
 	content = strings.TrimSpace(content)
 	if content == "" {

@@ -32,16 +32,28 @@ const ReActPromptObservationStatusKey = "re-act-prompt-observation-status"
 type PromptSectionRole string
 
 const (
-	PromptSectionRoleSystemPrompt PromptSectionRole = "system_prompt"
-	PromptSectionRoleRuntimeCtx   PromptSectionRole = "runtime_context"
-	PromptSectionRoleUserInput    PromptSectionRole = "user_input"
-	PromptSectionRoleMixed        PromptSectionRole = "mixed"
+	PromptSectionRoleHighStatic   PromptSectionRole = "high_static"
+	PromptSectionRoleFrozenBlock  PromptSectionRole = "frozen_block"
+	PromptSectionRoleSemiDynamic  PromptSectionRole = "semi_dynamic"
+	PromptSectionRoleTimelineOpen PromptSectionRole = "timelineOpen"
+	PromptSectionRoleDynamic      PromptSectionRole = "dynamic"
+)
+
+type PromptSectionRoleZH string
+
+const (
+	PromptSectionRoleZHHighStatic   PromptSectionRoleZH = "高静态段"
+	PromptSectionRoleZHFrozenBlock  PromptSectionRoleZH = "冻结块"
+	PromptSectionRoleZHSemiDynamic  PromptSectionRoleZH = "半动态段"
+	PromptSectionRoleZHTimelineOpen PromptSectionRoleZH = "时间线开放段"
+	PromptSectionRoleZHDynamic      PromptSectionRoleZH = "动态段"
 )
 
 type PromptSectionObservation struct {
 	Key          string                      `json:"key"`
 	Label        string                      `json:"label"`
 	Role         PromptSectionRole           `json:"role"`
+	RoleZh       PromptSectionRoleZH         `json:"role_zh"`
 	Included     bool                        `json:"included"`
 	Compressible bool                        `json:"compressible"`
 	Bytes        int                         `json:"bytes"`
@@ -50,13 +62,16 @@ type PromptSectionObservation struct {
 	Children     []*PromptSectionObservation `json:"children,omitempty"`
 }
 
+type PromptObservationRoleStat struct {
+	RoleName   PromptSectionRole   `json:"role_name"`
+	RoleNameZh PromptSectionRoleZH `json:"role_name_zh"`
+	RoleBytes  int                 `json:"role_bytes"`
+}
+
 type PromptObservationStats struct {
-	SystemPromptBytes int `json:"system_prompt_bytes"`
-	RuntimeCtxBytes   int `json:"runtime_context_bytes"`
-	UserInputBytes    int `json:"user_input_bytes"`
-	MixedBytes        int `json:"mixed_bytes"`
-	CompressibleBytes int `json:"compressible_bytes"`
-	FixedBytes        int `json:"fixed_bytes"`
+	RoleStats         []PromptObservationRoleStat `json:"role_stats"`
+	CompressibleBytes int                         `json:"compressible_bytes"`
+	FixedBytes        int                         `json:"fixed_bytes"`
 }
 
 type PromptObservation struct {
@@ -77,17 +92,18 @@ type PromptObservation struct {
 //
 // 老字段 (key/label/role/included/can_compress/bytes/lines/summary/children)
 // 保持向后兼容. 新增字段 (BytesPercent / EstimatedTokens / ContentHash /
-// SummaryTruncated) 给前端展示提供"占比 / 成本估算 / 一致性指纹 / 是否被截断"
-// 四类信号, 方便用户判断哪些段在拖累命中率与体积.
+// SummaryTruncated / RoleZh) 给前端展示提供"占比 / 成本估算 / 一致性指纹 /
+// 是否被截断 / 中文角色名"五类信号, 方便用户判断哪些段在拖累命中率与体积.
 //
 // JSON 命名沿用 snake_case (与 grpcApi.ts AIContextSections 接口一致).
 //
 // 关键词: PromptSectionStatus, EmitPromptProfile, 上下文成分, bytes_percent,
-// estimated_tokens, content_hash, summary_truncated
+// estimated_tokens, content_hash, summary_truncated, role_zh
 type PromptSectionStatus struct {
 	Key         string                 `json:"key"`
 	Label       string                 `json:"label"`
 	Role        PromptSectionRole      `json:"role"`
+	RoleZh      PromptSectionRoleZH    `json:"role_zh"`
 	Included    bool                   `json:"included"`
 	CanCompress bool                   `json:"can_compress"`
 	Bytes       int                    `json:"bytes"`
@@ -112,19 +128,17 @@ type PromptSectionStatus struct {
 }
 
 type PromptObservationStatus struct {
-	LoopName             string                 `json:"loop_name"`
-	Nonce                string                 `json:"nonce"`
-	PromptBytes          int                    `json:"prompt_bytes"`
-	PromptTokens         int                    `json:"prompt_tokens"`
-	PromptLines          int                    `json:"prompt_lines"`
-	SectionCount         int                    `json:"section_count"`
-	IncludedSectionCount int                    `json:"included_section_count"`
-	SystemPromptBytes    int                    `json:"system_prompt_bytes"`
-	RuntimeCtxBytes      int                    `json:"runtime_context_bytes"`
-	UserInputBytes       int                    `json:"user_input_bytes"`
-	CompressibleBytes    int                    `json:"compressible_bytes"`
-	FixedBytes           int                    `json:"fixed_bytes"`
-	Sections             []*PromptSectionStatus `json:"sections"`
+	LoopName             string                      `json:"loop_name"`
+	Nonce                string                      `json:"nonce"`
+	PromptBytes          int                         `json:"prompt_bytes"`
+	PromptTokens         int                         `json:"prompt_tokens"`
+	PromptLines          int                         `json:"prompt_lines"`
+	SectionCount         int                         `json:"section_count"`
+	IncludedSectionCount int                         `json:"included_section_count"`
+	RoleStats            []PromptObservationRoleStat `json:"role_stats"`
+	CompressibleBytes    int                         `json:"compressible_bytes"`
+	FixedBytes           int                         `json:"fixed_bytes"`
+	Sections             []*PromptSectionStatus      `json:"sections"`
 }
 
 func newPromptSectionObservation(
@@ -138,6 +152,7 @@ func newPromptSectionObservation(
 		Key:          key,
 		Label:        label,
 		Role:         role,
+		RoleZh:       promptSectionRoleZH(role),
 		Compressible: compressible,
 		Content:      content,
 	}
@@ -163,6 +178,7 @@ func buildPromptObservation(loopName string, nonce string, prompt string, sectio
 		PromptBytes:  len(prompt),
 		PromptTokens: ytoken.CalcTokenCount(prompt),
 		PromptLines:  countPromptLines(prompt),
+		Stats:        newPromptObservationStats(),
 		Sections:     sections,
 	}
 
@@ -200,16 +216,7 @@ func collectPromptObservationStats(section *PromptSectionObservation, observatio
 	}
 	observation.IncludedSectionCount++
 	bytes := section.ContentBytes()
-	switch section.Role {
-	case PromptSectionRoleSystemPrompt:
-		observation.Stats.SystemPromptBytes += bytes
-	case PromptSectionRoleRuntimeCtx:
-		observation.Stats.RuntimeCtxBytes += bytes
-	case PromptSectionRoleUserInput:
-		observation.Stats.UserInputBytes += bytes
-	case PromptSectionRoleMixed:
-		observation.Stats.MixedBytes += bytes
-	}
+	observation.Stats.RoleStats = addPromptObservationRoleBytes(observation.Stats.RoleStats, section.Role, bytes)
 	if section.Compressible {
 		observation.Stats.CompressibleBytes += bytes
 	} else {
@@ -282,63 +289,63 @@ func buildPromptSections(
 		newPromptSectionObservation(
 			"user_query",
 			"User Query",
-			PromptSectionRoleUserInput,
+			PromptSectionRoleDynamic,
 			false,
 			userInput,
 		),
 		newPromptSectionObservation(
 			"extra_capabilities",
 			"Extra Capabilities",
-			PromptSectionRoleRuntimeCtx,
+			PromptSectionRoleDynamic,
 			true,
 			extraCapabilities,
 		),
 		newPromptSectionObservation(
 			"persistent_context",
 			"Persistent Context",
-			PromptSectionRoleSystemPrompt,
+			PromptSectionRoleHighStatic,
 			false,
 			persistent,
 		),
 		newPromptSectionObservation(
 			"session_evidence",
 			"Session Evidence",
-			PromptSectionRoleRuntimeCtx,
+			PromptSectionRoleTimelineOpen,
 			true,
 			sessionEvidence,
 		),
 		newPromptSectionObservation(
 			"skills_context",
 			"Skills Context",
-			PromptSectionRoleRuntimeCtx,
+			PromptSectionRoleSemiDynamic,
 			true,
 			skillsContext,
 		),
 		newPromptSectionObservation(
 			"reactive_data",
 			"Reactive Data",
-			PromptSectionRoleRuntimeCtx,
+			PromptSectionRoleDynamic,
 			true,
 			reactiveData,
 		),
 		newPromptSectionObservation(
 			"injected_memory",
 			"Injected Memory",
-			PromptSectionRoleRuntimeCtx,
+			PromptSectionRoleDynamic,
 			true,
 			memory,
 		),
 		newPromptSectionObservation(
 			"schema",
 			"Schema",
-			PromptSectionRoleSystemPrompt,
+			PromptSectionRoleSemiDynamic,
 			false,
 			schema,
 		),
 		newPromptSectionObservation(
 			"output_example",
 			"Output Example",
-			PromptSectionRoleSystemPrompt,
+			PromptSectionRoleHighStatic,
 			true,
 			outputExample,
 		),
@@ -349,7 +356,7 @@ func buildBackgroundPromptSection(infos map[string]any) *PromptSectionObservatio
 	backgroundSection := newPromptContainerSection(
 		"background",
 		"Background",
-		PromptSectionRoleMixed,
+		PromptSectionRoleTimelineOpen,
 	)
 
 	var children []*PromptSectionObservation
@@ -357,7 +364,7 @@ func buildBackgroundPromptSection(infos map[string]any) *PromptSectionObservatio
 		children = append(children, newPromptSectionObservation(
 			"background.environment",
 			"Background / Environment",
-			PromptSectionRoleRuntimeCtx,
+			PromptSectionRoleTimelineOpen,
 			true,
 			envContent,
 		))
@@ -371,7 +378,7 @@ func buildBackgroundPromptSection(infos map[string]any) *PromptSectionObservatio
 		children = append(children, newPromptSectionObservation(
 			"background.ai_forge_list",
 			"Background / AI Forge List",
-			PromptSectionRoleRuntimeCtx,
+			PromptSectionRoleFrozenBlock,
 			true,
 			aiForgeList,
 		))
@@ -380,7 +387,7 @@ func buildBackgroundPromptSection(infos map[string]any) *PromptSectionObservatio
 		children = append(children, newPromptSectionObservation(
 			"background.tool_inventory",
 			"Background / Tool Inventory",
-			PromptSectionRoleRuntimeCtx,
+			PromptSectionRoleFrozenBlock,
 			true,
 			toolInventory,
 		))
@@ -389,7 +396,7 @@ func buildBackgroundPromptSection(infos map[string]any) *PromptSectionObservatio
 		children = append(children, newPromptSectionObservation(
 			"background.timeline",
 			"Background / Timeline",
-			PromptSectionRoleRuntimeCtx,
+			PromptSectionRoleTimelineOpen,
 			true,
 			timelineContent,
 		))
@@ -422,7 +429,7 @@ func buildBackgroundDynamicContextSection(infos map[string]any) *PromptSectionOb
 	section := newPromptContainerSection(
 		"background.dynamic_context",
 		"Background / Dynamic Context",
-		PromptSectionRoleMixed,
+		PromptSectionRoleDynamic,
 	)
 
 	prevTagIdx := strings.Index(dynamicContext, "<|PREV_USER_INPUT_")
@@ -438,7 +445,7 @@ func buildBackgroundDynamicContextSection(infos map[string]any) *PromptSectionOb
 		children = append(children, newPromptSectionObservation(
 			"background.dynamic_context.auto_provided",
 			"Background / Dynamic Context / Auto Provided",
-			PromptSectionRoleRuntimeCtx,
+			PromptSectionRoleDynamic,
 			true,
 			autoProvided,
 		))
@@ -447,7 +454,7 @@ func buildBackgroundDynamicContextSection(infos map[string]any) *PromptSectionOb
 		children = append(children, newPromptSectionObservation(
 			"background.dynamic_context.prev_user_input",
 			"Background / Dynamic Context / Previous User Input",
-			PromptSectionRoleUserInput,
+			PromptSectionRoleTimelineOpen,
 			false,
 			prevUserInput,
 		))
@@ -498,6 +505,7 @@ func newPromptContainerSection(
 		Key:          key,
 		Label:        label,
 		Role:         role,
+		RoleZh:       promptSectionRoleZH(role),
 		Included:     false,
 		Compressible: false,
 		Bytes:        0,
@@ -526,6 +534,59 @@ func FinalizePromptContainerSection(section *PromptSectionObservation) *PromptSe
 	return finalizePromptContainerSection(section)
 }
 
+func newPromptObservationStats() PromptObservationStats {
+	return PromptObservationStats{
+		RoleStats: newPromptObservationRoleStats(),
+	}
+}
+
+func newPromptObservationRoleStats() []PromptObservationRoleStat {
+	roles := promptSectionRolesInOrder()
+	stats := make([]PromptObservationRoleStat, 0, len(roles))
+	for _, role := range roles {
+		stats = append(stats, PromptObservationRoleStat{
+			RoleName:   role,
+			RoleNameZh: promptSectionRoleZH(role),
+			RoleBytes:  0,
+		})
+	}
+	return stats
+}
+
+func clonePromptObservationRoleStats(stats []PromptObservationRoleStat) []PromptObservationRoleStat {
+	if len(stats) == 0 {
+		return nil
+	}
+	cloned := make([]PromptObservationRoleStat, len(stats))
+	copy(cloned, stats)
+	return cloned
+}
+
+func addPromptObservationRoleBytes(stats []PromptObservationRoleStat, role PromptSectionRole, bytes int) []PromptObservationRoleStat {
+	if bytes == 0 {
+		return stats
+	}
+	idx := promptObservationRoleStatIndex(stats, role)
+	if idx >= 0 {
+		stats[idx].RoleBytes += bytes
+		return stats
+	}
+	return append(stats, PromptObservationRoleStat{
+		RoleName:   role,
+		RoleNameZh: promptSectionRoleZH(role),
+		RoleBytes:  bytes,
+	})
+}
+
+func promptObservationRoleStatIndex(stats []PromptObservationRoleStat, role PromptSectionRole) int {
+	for i := range stats {
+		if stats[i].RoleName == role {
+			return i
+		}
+	}
+	return -1
+}
+
 // RenderCLIReport renders a human-readable prompt observation report for logs.
 // It favors readability over compactness so engineers can quickly inspect:
 // 1. Overall prompt volume and role split.
@@ -551,10 +612,9 @@ func (o *PromptObservation) RenderCLIReport(maxPreviewBytes int) string {
 	buf.WriteString(fmt.Sprintf("| Compressible Bytes: %-42d |\n", o.Stats.CompressibleBytes))
 	buf.WriteString("+---------------------------------------------------------------+\n")
 	buf.WriteString("| Role Summary                                                   |\n")
-	buf.WriteString(fmt.Sprintf("|   SYSTEM: %-52d |\n", o.Stats.SystemPromptBytes))
-	buf.WriteString(fmt.Sprintf("|   CTX   : %-52d |\n", o.Stats.RuntimeCtxBytes))
-	buf.WriteString(fmt.Sprintf("|   USER  : %-52d |\n", o.Stats.UserInputBytes))
-	buf.WriteString(fmt.Sprintf("|   MIXED : %-52d |\n", o.Stats.MixedBytes))
+	for _, stat := range o.Stats.RoleStats {
+		buf.WriteString(fmt.Sprintf("|   %-14s: %-45d |\n", stat.RoleName, stat.RoleBytes))
+	}
 	buf.WriteString("+---------------------------------------------------------------+\n")
 	buf.WriteString("| Section Tree (label / key / meta / summary)                   |\n")
 	buf.WriteString("+---------------------------------------------------------------+\n")
@@ -588,9 +648,7 @@ func (o *PromptObservation) BuildStatus(maxSummaryBytes int) *PromptObservationS
 		PromptLines:          o.PromptLines,
 		SectionCount:         o.SectionCount,
 		IncludedSectionCount: o.IncludedSectionCount,
-		SystemPromptBytes:    o.Stats.SystemPromptBytes,
-		RuntimeCtxBytes:      o.Stats.RuntimeCtxBytes,
-		UserInputBytes:       o.Stats.UserInputBytes,
+		RoleStats:            clonePromptObservationRoleStats(o.Stats.RoleStats),
 		CompressibleBytes:    o.Stats.CompressibleBytes,
 		FixedBytes:           o.Stats.FixedBytes,
 	}
@@ -612,6 +670,7 @@ func buildPromptSectionStatus(section *PromptSectionObservation, maxSummaryBytes
 		Key:              section.Key,
 		Label:            section.Label,
 		Role:             section.Role,
+		RoleZh:           section.RoleZh,
 		Included:         section.IsIncluded(),
 		CanCompress:      section.Compressible,
 		Bytes:            bytesValue,
@@ -749,16 +808,45 @@ func renderPromptSectionPreview(content string, maxPreviewBytes int) string {
 
 func sectionRoleLabel(role PromptSectionRole) string {
 	switch role {
-	case PromptSectionRoleSystemPrompt:
-		return "system_prompt"
-	case PromptSectionRoleRuntimeCtx:
-		return "runtime_context"
-	case PromptSectionRoleUserInput:
-		return "user_input"
-	case PromptSectionRoleMixed:
-		return "mixed"
+	case PromptSectionRoleHighStatic:
+		return "high_static"
+	case PromptSectionRoleFrozenBlock:
+		return "frozen_block"
+	case PromptSectionRoleSemiDynamic:
+		return "semi_dynamic"
+	case PromptSectionRoleTimelineOpen:
+		return "timelineOpen"
+	case PromptSectionRoleDynamic:
+		return "dynamic"
 	default:
 		return "unknown"
+	}
+}
+
+func promptSectionRoleZH(role PromptSectionRole) PromptSectionRoleZH {
+	switch role {
+	case PromptSectionRoleHighStatic:
+		return PromptSectionRoleZHHighStatic
+	case PromptSectionRoleFrozenBlock:
+		return PromptSectionRoleZHFrozenBlock
+	case PromptSectionRoleSemiDynamic:
+		return PromptSectionRoleZHSemiDynamic
+	case PromptSectionRoleTimelineOpen:
+		return PromptSectionRoleZHTimelineOpen
+	case PromptSectionRoleDynamic:
+		return PromptSectionRoleZHDynamic
+	default:
+		return ""
+	}
+}
+
+func promptSectionRolesInOrder() []PromptSectionRole {
+	return []PromptSectionRole{
+		PromptSectionRoleHighStatic,
+		PromptSectionRoleFrozenBlock,
+		PromptSectionRoleSemiDynamic,
+		PromptSectionRoleTimelineOpen,
+		PromptSectionRoleDynamic,
 	}
 }
 
