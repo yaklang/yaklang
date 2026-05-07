@@ -63,7 +63,8 @@ func TestQueryMITMExtractedAggregate(t *testing.T) {
 		}
 	}
 	require.NotNil(t, hit, "expected aggregate row")
-	require.GreaterOrEqual(t, hit.HitCount, int64(2))
+	// Two extracted_data rows for the same flow: traffic count is still one.
+	require.Equal(t, int64(1), hit.HitCount)
 	require.Contains(t, hit.SampleTraceIds, trace)
 }
 
