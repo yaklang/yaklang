@@ -3,6 +3,8 @@ package aicache
 import (
 	"fmt"
 	"sort"
+
+	"github.com/yaklang/yaklang/common/ai/ytoken"
 )
 
 // dynamicSectionOversizeThreshold 是 dynamic 段告警阈值。
@@ -20,6 +22,21 @@ const dynamicSectionOversizeThreshold = 8 * 1024
 // 次数门槛。低于该值时, 跨 turn 的样本量不够, 不报警以避免误报。
 // 关键词: reusableAITagMinOccurrences
 const reusableAITagMinOccurrences = 3
+
+// highStaticRecommendedTokens 是 high-static 段最小 token 数推荐阈值, 单位是
+// Qwen BPE token. dashscope / qwen 系列模型的显式 prefix cache 创建窗口实测
+// 落在 1024-1500 token 区间, 段太短上游会直接放弃缓存, 即便 hash 字节稳定
+// 也无法转化为真实计费节省。低于该阈值时 aicache 输出 high_static_too_short
+// advice 帮助开发者及时发现"模板被砍" / "TRAITS 被换" 等回归。
+//
+// 阈值与 prompt_loop_materials_test.go::TestPromptManager_HighStaticSection_TokenBudget
+// 严格保持一致, 双向卡死: 一头是渲染器自己跑回归, 一头是运行时 advice 把单
+// 条 prompt 的退化也暴露出来。
+//
+// 关键词: highStaticRecommendedTokens, dashscope prefix cache 最小窗口,
+//
+//	high_static_too_short advice
+const highStaticRecommendedTokens = 1500
 
 // buildAdvices 根据 HitReport 与切片结构推断缓存优化建议
 // 这些建议是给开发者看的诊断字符串
@@ -58,6 +75,28 @@ func buildAdvicesWithCache(rep *HitReport, split *PromptSplit, gc *globalCache) 
 	// 3. 前缀完全未对齐
 	if rep.RequestChunks > 1 && rep.PrefixHitChunks == 0 && rep.TotalRequests > 1 {
 		advices = append(advices, "prefix not aligned at all; first section hash changed - check if static section template was polluted")
+	}
+
+	// 3.1 high-static 段过短: 即便 hash 完全稳定, 段长不足 dashscope 显式
+	// prefix cache 最小窗口时上游会直接放弃缓存. 用 ytoken.CalcTokenCount
+	// 测算实际 Qwen BPE token 数, 不足 highStaticRecommendedTokens 时报警.
+	// 关键词: advice, high_static_too_short, ytoken token budget
+	for _, ch := range split.Chunks {
+		if ch == nil || ch.Section != SectionHighStatic {
+			continue
+		}
+		if ch.Content == "" {
+			continue
+		}
+		tok := ytoken.CalcTokenCount(ch.Content)
+		if tok < highStaticRecommendedTokens {
+			advices = append(advices, fmt.Sprintf(
+				"[high_static_too_short] high-static section is %d tokens (< %d recommended); "+
+					"dashscope / qwen explicit prefix cache requires roughly %d+ tokens to be created, "+
+					"consider augmenting TRAITS / methodology blocks until the section reliably exceeds the threshold",
+				tok, highStaticRecommendedTokens, highStaticRecommendedTokens,
+			))
+		}
 	}
 
 	// 4. 段稳定性诊断

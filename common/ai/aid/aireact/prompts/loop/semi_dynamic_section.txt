@@ -7,5 +7,10 @@
 {{ .Schema }}
 ```
 <|SCHEMA|>{{ end }}
+{{ if .OutputExample }}
+
+<|OUTPUT_EXAMPLE|>
+{{ .OutputExample }}
+<|OUTPUT_EXAMPLE_END|>{{ end }}
 {{ if .RecentToolsCache }}
 {{ .RecentToolsCache }}{{ end }}

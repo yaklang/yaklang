@@ -12,6 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aispec"
+	"github.com/yaklang/yaklang/common/ai/ytoken"
 	"github.com/yaklang/yaklang/common/schema"
 )
 
@@ -127,16 +128,27 @@ func TestPromptManager_AssembleLoopPrompt_SectionOrder(t *testing.T) {
 	require.Contains(t, prompt, "<|SCHEMA|>")
 	require.NotContains(t, prompt, "<|SCHEMA_n123|>")
 
+	// OUTPUT_EXAMPLE 必须出现在 semi-dynamic 段 (schema 之后, timeline-open 之前),
+	// 不允许再回到 high-static 段污染缓存边界.
+	// 关键词: OUTPUT_EXAMPLE 段位置断言, high-static 反污染验证
+	outputExampleIdx := strings.Index(prompt, "<|OUTPUT_EXAMPLE|>")
+	require.NotEqual(t, -1, outputExampleIdx)
+	require.Less(t, schemaIdx, outputExampleIdx)
+	require.Less(t, outputExampleIdx, timelineOpenSectionIdx)
+
 	// frozen_block 段子结构: tool_inventory + forge_inventory (本用例 forge 关闭) +
 	// timeline_frozen (本用例为空)。filterIncludedPromptSections 会过滤空段,
 	// 故实际只剩 tool_inventory 一个 child。
 	require.NotEmpty(t, sections[1].Children)
 	require.Equal(t, "section.frozen_block.tool_inventory", sections[1].Children[0].Key)
 
-	// semi_dynamic 段子结构: skills_context + schema (Tool/Forge 已迁出)。
-	require.Len(t, sections[2].Children, 2)
+	// semi_dynamic 段子结构: skills_context + schema + output_example
+	// (Tool/Forge 已迁出, OutputExample 从 high_static 迁入并紧跟 Schema 之后)。
+	// 关键词: semi_dynamic children, output_example 迁入断言
+	require.Len(t, sections[2].Children, 3)
 	require.Equal(t, "section.semi_dynamic.skills_context", sections[2].Children[0].Key)
 	require.Equal(t, "section.semi_dynamic.schema", sections[2].Children[1].Key)
+	require.Equal(t, "section.semi_dynamic.output_example", sections[2].Children[2].Key)
 
 	// timeline_open 段子结构 (P1-C2): timeline_open + current_time + workspace +
 	// session_evidence (本用例无 SessionEvidence -> 不出现) + user_history.
@@ -594,4 +606,43 @@ func TestPromptManager_AssembleLoopPrompt_AicacheSplitClassification(t *testing.
 	// 老 timeline 段名不应该出现 (新路径已迁移到 timeline-open)
 	require.Zero(t, sectionsBySection[aicache.SectionTimeline],
 		"new path should not emit legacy timeline section, got: %v", sectionsBySection)
+}
+
+// TestPromptManager_HighStaticSection_TokenBudget 校验 high-static 段渲染后
+// token 数 >= 1500. 该阈值来自 dashscope / qwen 系列实测的"显式 prefix cache
+// 创建最小窗口", 高静态段 < 1500 token 容易被上游直接放弃缓存, 让 high-static
+// 这一对 chunk hash 即便稳定也无法转化为真实计费节省。
+//
+// 该测试覆盖最坏情况 (4 个条件块全为 false / TaskInstruction 为空), 是否任何
+// 后续改动都让高静态段降到 1500 token 以下的回归门闸.
+//
+// 关键词: high-static token budget, dashscope cache 最小窗口, 1500 阈值,
+//        TestPromptManager_HighStaticSection_TokenBudget
+func TestPromptManager_HighStaticSection_TokenBudget(t *testing.T) {
+	react, err := NewTestReAct(
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action":"object","next_action":{"type":"directly_answer","answer_payload":"ok"},"cumulative_summary":"ok","human_readable_thought":"ok"}`))
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+	require.NoError(t, err)
+
+	// 最坏情况: AllowToolCall / AllowPlanAndExec / HasLoadCapability 全 false,
+	// TaskInstruction 为空. 这种 caller 下 high-static 模板只渲染 TRAITS +
+	// 方法论协议三段, 对应当前 prompt 模板的最小尺寸.
+	rendered, err := react.promptManager.renderLoopHighStaticSection(&reactloops.PromptPrefixMaterials{
+		AllowToolCall:     false,
+		AllowPlanAndExec:  false,
+		HasLoadCapability: false,
+		TaskInstruction:   "",
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, rendered)
+
+	tokenCount := ytoken.CalcTokenCount(rendered)
+	require.GreaterOrEqual(t, tokenCount, 1500,
+		"high-static section must keep >= 1500 tokens to survive dashscope prefix cache window; got %d tokens (%d bytes)",
+		tokenCount, len(rendered))
 }

@@ -119,19 +119,20 @@ func (m *PromptPrefixMaterials) HighStaticData() map[string]any {
 		"AllowPlanAndExec":  m.AllowPlanAndExec,
 		"HasLoadCapability": m.HasLoadCapability,
 		"TaskInstruction":   m.TaskInstruction,
-		"OutputExample":     m.OutputExample,
 	}
 }
 
 // SemiDynamicData 仅供 semi_dynamic_section.txt 模板消费, 当前包含:
 //   - SkillsContext: 已加载的 skills 上下文 (字节稳定)
 //   - Schema: 当前 react loop 的 action schema (字节稳定 across turn)
+//   - OutputExample: 当前 react loop 的输出示例, caller-specific, 不应污染
+//     high-static 段; 放在 Schema 后作为半动态 prefix cache 候选
 //   - RecentToolsCache: CACHE_TOOL_CALL 块 (directly_call_tool routing hint +
 //     最近工具 schema/footer), 用稳定 nonce 渲染, 字节稳定
 //
 // (Tool/Forge/Timeline frozen 已迁出到 FrozenBlock; CACHE_TOOL_CALL 已迁入此段)
 //
-// 关键词: SemiDynamicData, Skills Context + Schema + CacheToolCall, 迁移
+// 关键词: SemiDynamicData, Skills Context + Schema + OutputExample + CacheToolCall, 迁移
 func (m *PromptPrefixMaterials) SemiDynamicData() map[string]any {
 	if m == nil {
 		return map[string]any{}
@@ -139,6 +140,7 @@ func (m *PromptPrefixMaterials) SemiDynamicData() map[string]any {
 	return map[string]any{
 		"SkillsContext":    m.SkillsContext,
 		"Schema":           m.Schema,
+		"OutputExample":    m.OutputExample,
 		"RecentToolsCache": m.RecentToolsCache,
 	}
 }

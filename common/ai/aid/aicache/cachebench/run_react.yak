@@ -567,16 +567,24 @@ if stallTriggered {
     die(sprintf("aborted: no usage callback for >= %ds (stall)", stallTimeout))
 }
 
-// 与上游真实命中口径双口径都太低时退出码非 0, 便于 CI 卡线
-// 需要至少 30 个样本才判, 否则冷启动 (前几次 chat) 必然命中率 0% 直接 die,
-// 测量结果就丢了. 30 是经验阈值: 真实 hostscan 一般 40-130 prompt, 30 之前
-// 主要是前几个 forge 的 cold start, 数据无代表性.
-// 关键词: cachebench die threshold, 冷启动样本豁免
+// die-threshold 评判口径切到 intelligent-only 视图 (lightweight tier 单价低,
+// 即便 0% 命中也不影响整体成本, 不应作为门闸). 至少 20 次 intelligent 调用才判,
+// 否则冷启动期 (前几次 plan / reasoning chat) 必然命中率 0% 直接 die, 测量
+// 结果就丢了. 同时验收 high-static distinct hash <= 3 的硬条件.
+// 关键词: cachebench die threshold intelligent-only, high-static distinct gate,
+//        冷启动样本豁免
 summary = benchReport["summary"]
-if summary["totalCalls"] >= 30 {
-    if summary["hitRatioTokenReal"] < 0.05 && summary["hitRatioLcpClient"] < 0.05 {
-        log.warn("both hit ratios below 5%%, exiting with code 1")
-        die("cache hit ratio below threshold")
+intelOnly = summary["intelligentOnly"]
+if !ccbIsNil(intelOnly) && ccbAsInt(intelOnly["totalCalls"]) >= 20 {
+    intelHit = ccbAsFloat(intelOnly["hitRatioTokenReal"])
+    intelHsDistinct = ccbAsInt(intelOnly["highStaticDistinct"])
+    if intelHit < 0.05 && ccbAsFloat(intelOnly["hitRatioLcpClient"]) < 0.05 {
+        log.warn("intelligent-only token_hit %.2f%% < 5%%, exiting with code 1", intelHit*100.0)
+        die("intelligent-only cache hit ratio below threshold")
+    }
+    if intelHsDistinct > 3 {
+        log.warn("intelligent high-static distinct = %d > 3 (acceptance breach)", intelHsDistinct)
+        die(sprintf("high-static distinct hash %d exceeds acceptance threshold (<=3)", intelHsDistinct))
     }
 }
 

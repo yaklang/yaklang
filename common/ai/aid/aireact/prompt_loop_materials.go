@@ -394,6 +394,12 @@ func (pm *PromptManager) buildHighStaticObservation(
 		"Highly Static",
 		reactloops.PromptSectionRoleSystemPrompt,
 	)
+	// section.high_static.output_example 已迁出: caller-specific 的 OutputExample
+	// 若进入 high-static 段会让 high-static chunk hash 跨 caller 漂移, 阻断
+	// AI_CACHE_SYSTEM 段的字节级前缀缓存。新位置在 semi-dynamic 段 (Schema 之后),
+	// 见 buildSemiDynamicResidualObservation。
+	// 关键词: section.high_static.output_example 迁出, high-static 反污染,
+	//        OutputExample 迁到 semi-dynamic
 	children := []*reactloops.PromptSectionObservation{
 		reactloops.NewPromptSectionObservation(
 			"section.high_static.static_preamble",
@@ -408,13 +414,6 @@ func (pm *PromptManager) buildHighStaticObservation(
 			reactloops.PromptSectionRoleSystemPrompt,
 			false,
 			renderStaticTaggedBlock("PERSISTENT", materials.TaskInstruction),
-		),
-		reactloops.NewPromptSectionObservation(
-			"section.high_static.output_example",
-			"Highly Static / Output Example",
-			reactloops.PromptSectionRoleSystemPrompt,
-			false,
-			renderStaticTaggedBlock("OUTPUT_EXAMPLE", materials.OutputExample),
 		),
 	}
 	section.Children = filterIncludedPromptSections(children)
@@ -535,6 +534,20 @@ func (pm *PromptManager) buildSemiDynamicResidualObservation(
 			reactloops.PromptSectionRoleRuntimeCtx,
 			true,
 			renderSchemaBlock(materials.Schema),
+		),
+		// section.semi_dynamic.output_example 从 high-static 段迁入: OutputExample
+		// 是 caller-specific 字段, 不同 forge / loop 注入的内容差异较大, 留在
+		// high-static 段会破坏 AI_CACHE_SYSTEM 段的 hash 稳定性。Schema 同样是
+		// caller-specific, 因此把 OutputExample 紧跟 Schema 之后放在 semi-dynamic
+		// 段, 与 Schema 一起作为 caller 维度稳定的 prefix cache 候选.
+		// 关键词: section.semi_dynamic.output_example, OutputExample 迁入,
+		//        high-static 反污染, Schema 同段对齐
+		reactloops.NewPromptSectionObservation(
+			"section.semi_dynamic.output_example",
+			"Semi Dynamic / Output Example",
+			reactloops.PromptSectionRoleRuntimeCtx,
+			true,
+			renderStaticTaggedBlock("OUTPUT_EXAMPLE", materials.OutputExample),
 		),
 		// CACHE_TOOL_CALL 块从 dynamic/REFLECTION 迁到此处, 用稳定 nonce 渲染.
 		// 关键词: Semi Dynamic / Cache Tool Call, RecentToolsCache 观测节点
@@ -670,13 +683,21 @@ func (pm *PromptManager) buildDynamicObservation(
 	return reactloops.FinalizePromptContainerSection(section)
 }
 
+// renderHighStaticPreamble 单独渲染 high-static 段的"前导文" (TRAITS + 方法论
+// 协议块), 强制把 TaskInstruction 置空, 这样观测树里 static_preamble 与
+// task_instruction 两个子节点的内容不会重复出现 PERSISTENT 块。
+//
+// OutputExample 已不再出现在 HighStaticData 里 (见 SemiDynamicData), 这里也无需
+// 再覆盖。若以后 HighStaticData 又新增 caller-specific 字段, 需要在此一并清空,
+// 否则会污染高静态段。
+//
+// 关键词: renderHighStaticPreamble, TaskInstruction 清空, high-static 反污染
 func (pm *PromptManager) renderHighStaticPreamble(materials *reactloops.PromptPrefixMaterials) string {
 	if materials == nil {
 		return ""
 	}
 	preamble := materials.HighStaticData()
 	preamble["TaskInstruction"] = ""
-	preamble["OutputExample"] = ""
 	rendered, err := pm.executeTemplate("loop-high-static-preamble", loopHighStaticSectionTemplate, preamble)
 	if err != nil {
 		return ""

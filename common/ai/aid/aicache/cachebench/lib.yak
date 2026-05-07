@@ -900,7 +900,34 @@ func renderMarkdown(benchReport) {
     }
     md += "\n"
 
-    md += "## Q1: hit/creation summary\n\n"
+    // intelligent-only 视图先于全局聚合: 这是 cachebench 真正衡量的主指标,
+    // 排除 lightweight 模型 (低成本路径) 的稀释, 让 high-cost 智能模型的命中率
+    // 与 high-static distinct 验收基线一目了然.
+    // 关键词: renderMarkdown intelligent-only 主指标段, high-static distinct 验收
+    intelOnly = summary["intelligentOnly"]
+    if !ccbIsNil(intelOnly) {
+        md += "## intelligent-only summary (主指标, 验收基线)\n\n"
+        md += "_仅统计 modelTier == intelligent 的高推理成本调用, 排除 lightweight (verification / quick judge) 干扰._\n\n"
+        md += sprintf("- intelligent calls:                 %d\n", intelOnly["totalCalls"])
+        md += sprintf("- intelligent prompt_tokens:         %d\n", intelOnly["sumPromptTokens"])
+        md += sprintf("- intelligent cached_tokens:         %d\n", intelOnly["sumCachedTokens"])
+        md += sprintf("- intelligent cache_creation_tokens: %d\n", intelOnly["sumCacheCreation"])
+        md += sprintf("- intelligent token_hit_ratio:       %.2f%% (upstream)\n", intelOnly["hitRatioTokenReal"]*100.0)
+        md += sprintf("- intelligent lcp_hit_ratio:         %.2f%% (in-proc)\n", intelOnly["hitRatioLcpClient"]*100.0)
+        md += sprintf("- intelligent cache_hit_count:       %d\n", intelOnly["cacheHitCount"])
+        md += sprintf("- intelligent cache_create_count:    %d\n", intelOnly["cacheCreateCount"])
+        md += sprintf("- intelligent upstream_creation_cost (1.25x): %.0f tokens\n", intelOnly["upstreamCreationCost"])
+        hsDistinct = ccbAsInt(intelOnly["highStaticDistinct"])
+        passLine = "PASS"
+        if hsDistinct > 3 {
+            passLine = "FAIL"
+        }
+        md += sprintf("- intelligent high_static_distinct:  %d (acceptance: <= 3, %s)\n",
+            hsDistinct, passLine)
+        md += "\n"
+    }
+
+    md += "## Q1: hit/creation summary (全量, 含 lightweight)\n\n"
     md += sprintf("- total LLM calls:                  %d\n", summary["totalCalls"])
     md += sprintf("- cache_create_count (creation>0):  %d\n", summary["cacheCreateCount"])
     md += sprintf("- cache_hit_count    (cached>0):    %d\n", summary["cacheHitCount"])
@@ -1082,13 +1109,33 @@ func printSummary(benchReport) {
     }
     printf("input:           %s\n", ccbTruncate(benchReport["input"], 80))
     printf("session dir:     %s\n", benchReport["sessionDir"])
+    // intelligent-only 主指标先打印 (验收口径), 全量聚合放后面参考用.
+    // 关键词: printSummary intelligent-only first, high-static distinct acceptance
+    intelOnly = summary["intelligentOnly"]
+    if !ccbIsNil(intelOnly) {
+        println("--------- INTELLIGENT-ONLY (主指标) ---------")
+        printf("intelligent calls:    %d\n", intelOnly["totalCalls"])
+        printf("intelligent prompt:   %d  cached: %d  creation: %d\n",
+            intelOnly["sumPromptTokens"], intelOnly["sumCachedTokens"], intelOnly["sumCacheCreation"])
+        printf("intelligent token_hit:  %.2f%% (upstream)\n", intelOnly["hitRatioTokenReal"]*100.0)
+        printf("intelligent lcp_hit:    %.2f%% (in-proc)\n", intelOnly["hitRatioLcpClient"]*100.0)
+        printf("intelligent hit_cnt:    %d  create_cnt: %d\n",
+            intelOnly["cacheHitCount"], intelOnly["cacheCreateCount"])
+        hsDistinct = ccbAsInt(intelOnly["highStaticDistinct"])
+        verdict = "PASS"
+        if hsDistinct > 3 {
+            verdict = "FAIL"
+        }
+        printf("high-static distinct (intelligent): %d (acceptance <=3, %s)\n", hsDistinct, verdict)
+        println("---------------------------------------------")
+    }
     printf("total calls:     %d\n", summary["totalCalls"])
     printf("cache create:    %d\n", summary["cacheCreateCount"])
     printf("cache hit:       %d\n", summary["cacheHitCount"])
     printf("missing usage:   %d\n", summary["missingUsageCount"])
     printf("in-flight cancelled: %d\n", summary["inFlightCancelledCount"])
-    printf("token hit ratio: %.2f%% (upstream)\n", summary["hitRatioTokenReal"]*100.0)
-    printf("lcp  hit ratio:  %.2f%% (in-proc)\n", summary["hitRatioLcpClient"]*100.0)
+    printf("token hit ratio: %.2f%% (upstream, all tiers)\n", summary["hitRatioTokenReal"]*100.0)
+    printf("lcp  hit ratio:  %.2f%% (in-proc, all tiers)\n", summary["hitRatioLcpClient"]*100.0)
     printf("creation cost:   %.0f tokens (1.25x)\n", summary["upstreamCreationCost"])
     println("----------------------------------------------------------")
     printf("tag distribution: %v\n", summary["tagCount"])
@@ -1247,6 +1294,130 @@ func summarizeByModel(records) {
     return grouped
 }
 
+// summarizeIntelligentOnly 仅汇总 modelTier == "intelligent" 的高推理成本调用,
+// 排除 lightweight (verification / quick judge) 的低成本干扰。这是 cachebench
+// 的"主指标视图": 我们关心的真正成本来自 intelligent 模型的 prompt_tokens, 而
+// lightweight 模型即便命中率 0% 影响也极小.
+//
+// 输出字段:
+//   - totalCalls / sumPromptTokens / sumCachedTokens / sumCacheCreation: 仅 intelligent
+//   - hitRatioTokenReal: cached / prompt, 即"上游真命中率"
+//   - hitRatioLcpClient: 客户端 LCP 命中率 (bytes 维度)
+//   - cacheHitCount / cacheCreateCount: intelligent 调用里命中 / 新建的次数
+//   - highStaticDistinct: intelligent 调用中观察到的 high-static distinct hash 最大值
+//     (验收基线: <= 3 视为已对齐到稳定 system 前缀)
+//   - sectionHashMax / sectionTotalMax / sectionReuseRateMin: 仅取自 intelligent 调用
+//
+// 关键词: summarizeIntelligentOnly, intelligent-only 主指标, high-static distinct,
+//
+//	cachebench 验收基线
+func summarizeIntelligentOnly(records) {
+	view = {
+		"totalCalls":           0,
+		"cacheCreateCount":     0,
+		"cacheHitCount":        0,
+		"sumPromptTokens":      0,
+		"sumCachedTokens":      0,
+		"sumCacheCreation":     0,
+		"sumRequestBytes":      0,
+		"sumPrefixHitBytes":    0,
+		"hitRatioTokenReal":    0.0,
+		"hitRatioLcpClient":    0.0,
+		"upstreamCreationCost": 0.0,
+		"highStaticDistinct":   0,
+		"tagCount":             {},
+		"sectionHashMax":       {},
+		"sectionTotalMax":      {},
+		"sectionReuseRateMin":  {},
+		"modelNames":           {},
+	}
+
+    for item in records {
+        tier = ccbToString(item["modelTier"])
+        if tier != "intelligent" {
+            continue
+        }
+        view["totalCalls"]++
+
+        modelName = ccbToString(item["modelName"])
+        dumpRecForModel = item["dump"]
+        if !ccbIsNil(dumpRecForModel) && dumpRecForModel["missing"] != true {
+            dumpModel = ccbToString(dumpRecForModel["model"])
+            if dumpModel != "" {
+                modelName = dumpModel
+            }
+        }
+        if modelName != "" {
+            view["modelNames"][modelName] = true
+        }
+
+        tag = item["tag"]
+        if ccbIsNil(view["tagCount"][tag]) {
+            view["tagCount"][tag] = 0
+        }
+        view["tagCount"][tag]++
+
+        usage = item["usage"]
+        if !ccbIsNil(usage) && usage["missing"] != true && usage["inFlightCancelled"] != true {
+            pt = ccbAsInt(usage["promptTokens"])
+            ct = ccbAsInt(usage["cachedTokens"])
+            cc = ccbAsInt(usage["cacheCreation"])
+            view["sumPromptTokens"] += pt
+            view["sumCachedTokens"] += ct
+            view["sumCacheCreation"] += cc
+            if cc > 0 {
+                view["cacheCreateCount"]++
+            }
+            if ct > 0 {
+                view["cacheHitCount"]++
+            }
+        }
+
+        dumpRec = item["dump"]
+        if !ccbIsNil(dumpRec) && dumpRec["missing"] != true {
+            view["sumRequestBytes"] += ccbAsInt(dumpRec["totalBytes"])
+            view["sumPrefixHitBytes"] += ccbAsInt(dumpRec["prefixHitBytes"])
+
+            shc = dumpRec["sectionHashCount"]
+            if !ccbIsNil(shc) {
+                for sectionName, cnt in shc {
+                    cur = view["sectionHashMax"][sectionName]
+                    if ccbIsNil(cur) || cnt > cur {
+                        view["sectionHashMax"][sectionName] = cnt
+                    }
+                }
+                hsCnt = ccbAsInt(shc["high-static"])
+                if hsCnt > view["highStaticDistinct"] {
+                    view["highStaticDistinct"] = hsCnt
+                }
+            }
+            stu = dumpRec["sectionTotalUses"]
+            if !ccbIsNil(stu) {
+                for sectionName, total in stu {
+                    cur = view["sectionTotalMax"][sectionName]
+                    if ccbIsNil(cur) || total > cur {
+                        view["sectionTotalMax"][sectionName] = total
+                    }
+                }
+            }
+            srr = dumpRec["sectionReuseRate"]
+            if !ccbIsNil(srr) {
+                for sectionName, rate in srr {
+                    cur = view["sectionReuseRateMin"][sectionName]
+                    if ccbIsNil(cur) || rate < cur {
+                        view["sectionReuseRateMin"][sectionName] = rate
+                    }
+                }
+            }
+        }
+    }
+
+	view["hitRatioTokenReal"] = ccbSafeRatio(view["sumCachedTokens"], view["sumPromptTokens"])
+	view["hitRatioLcpClient"] = ccbSafeRatio(view["sumPrefixHitBytes"], view["sumRequestBytes"])
+	view["upstreamCreationCost"] = float(view["sumCacheCreation"]) * 1.25
+	return view
+}
+
 // analyzeBenchmarkWithModels 在 analyzeBenchmark 基础上额外接受 modelList,
 // 为每条 record 注入 modelName / modelTier, 并在 summary 中产出 byModel 子表.
 // modelList 来自 captureEvent 解析 ai_first_byte_cost_ms 事件, 与 usageList
@@ -1342,6 +1513,10 @@ func analyzeBenchmarkWithModels(sessionDir, usageList, modelList, events, invoke
     byModel = summarizeByModel(records)
     summary = benchReport["summary"]
     summary["byModel"] = byModel
+    // intelligent-only 视图: 这是真正用来评判 cachebench 验收是否通过的"主指标".
+    // lightweight tier 单价低、绝大多数路径用不到, 不应稀释总命中率口径.
+    // 关键词: analyzeBenchmarkWithModels intelligentOnly 注入, 主指标视图
+    summary["intelligentOnly"] = summarizeIntelligentOnly(records)
     benchReport["summary"] = summary
 
     benchReport["modelEventCount"] = nModel
