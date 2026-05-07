@@ -48,14 +48,14 @@ func TestGRPC_Ai_List_Model(t *testing.T) {
 }
 
 type testAIModelClient struct {
-	config      *aispec.AIConfig
-	response    string
-	rawRequest  []byte
-	rawResponse []byte
-	bodyPreview []byte
-	chatErr     error
-	noToolCall  bool
-	onChat      func()
+	config        *aispec.AIConfig
+	response      string
+	rawRequest    []byte
+	rawResponse   []byte
+	bodyPreview   []byte
+	chatErr       error
+	noToolCall    bool
+	onChat        func()
 	onRawCallback func()
 }
 
@@ -104,6 +104,7 @@ func (c *testAIModelClient) Chat(prompt string, _ ...any) (string, error) {
 			rawRequest,
 			rawResponse,
 			bodyPreview,
+			nil,
 		)
 	}
 	if c.config.ReasonStreamHandler != nil {
