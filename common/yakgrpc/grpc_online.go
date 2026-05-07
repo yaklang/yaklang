@@ -3,6 +3,8 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/go-funk"
@@ -14,7 +16,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"time"
 )
 
 func (s *Server) GetOnlineProfile(ctx context.Context, req *ypb.Empty) (*ypb.OnlineProfile, error) {
@@ -416,10 +417,13 @@ func (s *Server) DownloadOnlinePluginByUUID(ctx context.Context, req *ypb.Downlo
 		return nil, utils.Errorf("download failed: %s", err.Error())
 	}
 	if req.UUID == "" {
-		return nil, utils.Errorf("params is empty: %s", err.Error())
+		return nil, utils.Error("params is empty: uuid is required")
 	}
 	client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
 	plugin, err := client.DownloadOnlinePluginByUUID(req.GetToken(), req.UUID)
+	if err != nil {
+		return nil, utils.Errorf("download plugin[%s] failed: %v", req.UUID, err)
+	}
 	err = client.Save(s.GetProfileDatabase(), plugin)
 	if err != nil {
 		return nil, utils.Errorf("save plugin[%s] to database failed: %v", plugin.ScriptName, err)
