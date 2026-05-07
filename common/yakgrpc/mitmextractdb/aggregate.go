@@ -165,6 +165,7 @@ func splitTraceConcat(s string, maxN int) []string {
 }
 
 // QueryMITMExtractedAggregate groups extracted_data by (rule_verbose, data) with http_flows join.
+// HitCount is the number of distinct HTTP flows (traffic rows), not raw extracted_data rows.
 // When req.IncludeDistinctRuleGroups is set, the third return value lists distinct rule group names (same scope as tabs: Host/Runtime/Keyword/Time only).
 func QueryMITMExtractedAggregate(db *gorm.DB, req *ypb.QueryMITMExtractedAggregateRequest) (*bizhelper.Paginator, []*ypb.MITMExtractedAggregateRow, []string, error) {
 	if req == nil {
@@ -182,7 +183,7 @@ func QueryMITMExtractedAggregate(db *gorm.DB, req *ypb.QueryMITMExtractedAggrega
 	}
 
 	dataSub := mitmExtractAggregateBaseDB(db, req).
-		Select(`ed.rule_verbose AS rule_verbose, ed.data AS data, COUNT(*) AS hit_count,
+		Select(`ed.rule_verbose AS rule_verbose, ed.data AS data, COUNT(DISTINCT hf.id) AS hit_count,
 			CAST(strftime('%s', MAX(ed.updated_at)) AS INTEGER) AS latest_unix,
 			SUBSTR(GROUP_CONCAT(DISTINCT ed.trace_id), 1, ?) AS trace_concat`, mitmAggregateTraceConcatMaxLen).
 		Group("ed.rule_verbose, ed.data")
