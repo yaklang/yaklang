@@ -131,7 +131,7 @@
                 tbody.innerHTML = '';
                 
                 if (!data.providers || data.providers.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="10" class="text-center">No providers found</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="11" class="text-center">No providers found</td></tr>';
                     return;
                 }
                 
@@ -139,6 +139,7 @@
                     const row = document.createElement('tr');
                     row.dataset.id = p.id;
                     row.dataset.status = p.health_status_class;
+                    row.dataset.activeCacheControl = p.active_cache_control ? '1' : '0';
                     
                     let healthBadge = '';
                     let latencyDisplay = '';
@@ -152,6 +153,12 @@
                         healthBadge = '<span class="health-badge unhealthy">未知</span>';
                         latencyDisplay = '<span class="health-latency">-</span>';
                     }
+                    
+                    // Active Cache Control 徽章: 打开时显示绿色 CC, 关闭时留空
+                    // 关键词: renderProviders active_cache_control 徽章列, 主动 cache_control 注入开关可视化
+                    const ccBadge = p.active_cache_control
+                        ? '<span class="health-badge healthy" title="Active Cache Control 已开启: 自动给最末 system 注入 cache_control:ephemeral">CC</span>'
+                        : '<span class="health-badge" style="color:#999;background:transparent;border:1px dashed #ccc;" title="Active Cache Control 关闭: 走 tongyi+白名单 legacy 路径或 strip">-</span>';
                     
                     row.innerHTML = `
                         <td class="checkbox-column">
@@ -186,6 +193,7 @@
                             </div>
                         </td>
                         <td>${p.total_requests}</td>
+                        <td class="text-center">${ccBadge}</td>
                         <td>
                             <div class="provider-actions">
                                 <button class="btn btn-sm btn-quick-add" onclick="quickAddProvider('${p.id}')" title="快速添加">
@@ -931,6 +939,14 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
                                 </label>
                             </div>
                         </div>
+                        <div class="form-group">
+                            <div class="checkbox">
+                                <label>
+                                    <input type="checkbox" id="activeCacheControl" name="activeCacheControl"> 启用 Active Cache Control (主动给最末 system 注入 cache_control:ephemeral, 推荐 dashscope/anthropic 等支持 ephemeral 缓存的 provider 打开)
+                                </label>
+                            </div>
+                            <small class="form-text text-muted">打开后, 客户端无 cache_control 时由 aibalance 自动给最末 system 消息注入 baseline ephemeral 标记; 客户端自带 cache_control 时 pass-through 不改写。Tongyi 白名单 model 即使关闭也保留旧行为。</small>
+                        </div>
                         <div class="form-group"> <!-- Removed inline flex style -->
                             <button type="button" id="validateConfigBtn" class="btn" style="display: block; width: 100%; margin-bottom: 10px; background-color: #4285f4; color: white; min-width: 120px; height: 40px; font-size: 14px; font-weight: 500; border-radius: 4px; border: none; transition: all 0.3s ease; box-shadow: 0 2px 5px rgba(0,0,0,0.1); padding: 0 15px;">验证配置</button>
                             <button type="submit" id="submitAddProviderBtn" class="btn" disabled style="display: block; width: 100%; background-color: #bdbdbd; color: white; cursor: not-allowed; min-width: 120px; height: 40px; font-size: 14px; font-weight: 500; border-radius: 4px; border: none; transition: all 0.3s ease; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 0 15px;">添加提供者</button>
@@ -1198,6 +1214,8 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
             const domainOrURL = document.getElementById('domainOrURL').value.trim();
             const apiKeys = document.getElementById('apiKeys').value;
             const noHTTPS = document.getElementById('noHTTPS').checked;
+            const activeCacheControlInput = document.getElementById('activeCacheControl');
+            const activeCacheControl = activeCacheControlInput ? activeCacheControlInput.checked : false;
             const optionalAllowReason = document.getElementById('optionalAllowReason').value;
             
             // 日志输出表单数据（方便调试）
@@ -1209,6 +1227,7 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
                 domain_or_url: domainOrURL,
                 api_keys: apiKeys,
                 no_https: noHTTPS ? 'on' : '',
+                active_cache_control: activeCacheControl ? 'on' : '',
                 optional_allow_reason: optionalAllowReason
             });
             
@@ -1242,6 +1261,9 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
                 params.append('api_keys', apiKeys);
                 if (noHTTPS) {
                     params.append('no_https', 'on');
+                }
+                if (activeCacheControl) {
+                    params.append('active_cache_control', 'on');
                 }
                 if (optionalAllowReason) {
                     params.append('optional_allow_reason', optionalAllowReason);
@@ -2994,6 +3016,10 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
                 if (noHTTPSCheckbox.checked) {
                     params.append('no_https', 'on');
                 }
+                const activeCCInput = document.getElementById('activeCacheControl');
+                if (activeCCInput && activeCCInput.checked) {
+                    params.append('active_cache_control', 'on');
+                }
 
                 const response = await fetch('/portal/validate-provider', {
                     method: 'POST',
@@ -3166,8 +3192,9 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
             const typeName = row.cells[5].getAttribute('data-full-text') || row.cells[5].textContent.trim();     // Cell 6: Type
             const domainOrURL = row.cells[6].getAttribute('data-full-text') || row.cells[6].textContent.trim(); // Cell 7: Domain
             const apiKey = row.cells[7].getAttribute('data-full-text'); // Cell 8: API Key (get full key)
+            const activeCC = row.dataset.activeCacheControl === '1'; // Active Cache Control flag, 见 renderProviders 写入
 
-            console.log(`Extracted data: Wrapper=${wrapperName}, Model=${modelName}, Type=${typeName}, Domain=${domainOrURL}, Key=...${apiKey ? apiKey.slice(-4) : ''}`); // Debug log
+            console.log(`Extracted data: Wrapper=${wrapperName}, Model=${modelName}, Type=${typeName}, Domain=${domainOrURL}, Key=...${apiKey ? apiKey.slice(-4) : ''}, ActiveCC=${activeCC}`); // Debug log
 
             // 切换到 'add' 标签页
             switchTab('add');
@@ -3204,6 +3231,13 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
                 modelInput.value = modelName;
                 domainInput.value = domainOrURL;
                 apiKeysInput.value = apiKey || ''; // 填充 API keys
+
+                // 同步 Active Cache Control 复选框, 让 quickAdd 拷贝原 provider 的设置
+                // 关键词: quickAddProvider activeCacheControl 同步, 主动 cache_control 注入开关
+                const activeCCInput = document.getElementById('activeCacheControl');
+                if (activeCCInput) {
+                    activeCCInput.checked = activeCC;
+                }
 
                 // 设置类型 - 直接使用原始类型值
                 // 如果原始类型存在于选项中，则选择它；否则尝试匹配或保持默认

@@ -95,6 +95,7 @@ func (c *ServerConfig) processAddProviders(conn net.Conn, request *http.Request)
 		NoHTTPS             bool
 		ProviderMode        string
 		OptionalAllowReason string
+		ActiveCacheControl  bool
 	}
 
 	var providers []ProviderData
@@ -119,6 +120,8 @@ func (c *ServerConfig) processAddProviders(conn net.Conn, request *http.Request)
 		noHTTPS := request.FormValue("no_https") == "on"
 		apiKeysStr := request.FormValue("api_keys")
 		optionalAllowReason := request.FormValue("optional_allow_reason")
+		// 关键词: ActiveCacheControl form 字段读取, 主动 cache_control 注入开关
+		activeCacheControl := request.FormValue("active_cache_control") == "on"
 
 		// If model_name is empty, use wrapper_name
 		if modelName == "" {
@@ -141,6 +144,7 @@ func (c *ServerConfig) processAddProviders(conn net.Conn, request *http.Request)
 				NoHTTPS:             noHTTPS,
 				ProviderMode:        providerMode,
 				OptionalAllowReason: optionalAllowReason,
+				ActiveCacheControl:  activeCacheControl,
 			})
 		}
 	} else {
@@ -163,6 +167,7 @@ func (c *ServerConfig) processAddProviders(conn net.Conn, request *http.Request)
 				NoHTTPS             bool   `json:"no_https"`
 				ProviderMode        string `json:"provider_mode"`
 				OptionalAllowReason string `json:"optional_allow_reason"`
+				ActiveCacheControl  bool   `json:"active_cache_control"`
 			} `json:"providers"`
 		}
 
@@ -186,6 +191,7 @@ func (c *ServerConfig) processAddProviders(conn net.Conn, request *http.Request)
 				NoHTTPS:             p.NoHTTPS,
 				ProviderMode:        p.ProviderMode,
 				OptionalAllowReason: p.OptionalAllowReason,
+				ActiveCacheControl:  p.ActiveCacheControl,
 			})
 		}
 	}
@@ -207,6 +213,7 @@ func (c *ServerConfig) processAddProviders(conn net.Conn, request *http.Request)
 		}
 
 		// Create provider record
+		// 关键词: ActiveCacheControl 字段写入 db, 主动 cache_control 注入开关
 		provider := &schema.AiProvider{
 			WrapperName:         p.WrapperName,
 			ModelName:           p.ModelName,
@@ -216,6 +223,7 @@ func (c *ServerConfig) processAddProviders(conn net.Conn, request *http.Request)
 			NoHTTPS:             p.NoHTTPS,
 			ProviderMode:        p.ProviderMode,
 			OptionalAllowReason: p.OptionalAllowReason,
+			ActiveCacheControl:  p.ActiveCacheControl,
 			IsHealthy:           true, // Default to healthy
 		}
 
@@ -440,8 +448,10 @@ func (c *ServerConfig) handleValidateProvider(conn net.Conn, request *http.Reque
 	}
 
 	// Parse request - support both form data and JSON
+	// 关键词: handleValidateProvider 表单字段透传, ActiveCacheControl 占位
 	var typeName, domainOrURL, apiKey, modelName, providerMode, optionalAllowReason string
 	var noHTTPS bool
+	var activeCacheControl bool
 
 	contentType := request.Header.Get("Content-Type")
 	if strings.Contains(contentType, "application/x-www-form-urlencoded") {
@@ -462,6 +472,7 @@ func (c *ServerConfig) handleValidateProvider(conn net.Conn, request *http.Reque
 		noHTTPS = request.FormValue("no_https") == "on"
 		providerMode = request.FormValue("provider_mode")
 		optionalAllowReason = request.FormValue("optional_allow_reason")
+		activeCacheControl = request.FormValue("active_cache_control") == "on"
 	} else {
 		// Parse JSON body
 		var reqBody struct {
@@ -473,6 +484,7 @@ func (c *ServerConfig) handleValidateProvider(conn net.Conn, request *http.Reque
 			NoHTTPS             bool   `json:"no_https"`
 			ProviderMode        string `json:"provider_mode"`
 			OptionalAllowReason string `json:"optional_allow_reason"`
+			ActiveCacheControl  bool   `json:"active_cache_control"`
 		}
 
 		bodyBytes, err := io.ReadAll(request.Body)
@@ -499,6 +511,7 @@ func (c *ServerConfig) handleValidateProvider(conn net.Conn, request *http.Reque
 		noHTTPS = reqBody.NoHTTPS
 		providerMode = reqBody.ProviderMode
 		optionalAllowReason = reqBody.OptionalAllowReason
+		activeCacheControl = reqBody.ActiveCacheControl
 	}
 
 	// Validate required fields
@@ -519,6 +532,7 @@ func (c *ServerConfig) handleValidateProvider(conn net.Conn, request *http.Reque
 	c.logInfo("Validating provider: type=%s, domain=%s, model=%s, mode=%s", typeName, domainOrURL, modelName, providerMode)
 
 	// Create a temporary provider for validation
+	// 关键词: handleValidateProvider 临时 Provider, ActiveCacheControl 字段对齐表单
 	provider := &Provider{
 		TypeName:            typeName,
 		DomainOrURL:         domainOrURL,
@@ -527,6 +541,7 @@ func (c *ServerConfig) handleValidateProvider(conn net.Conn, request *http.Reque
 		NoHTTPS:             noHTTPS,
 		ProviderMode:        providerMode,
 		OptionalAllowReason: optionalAllowReason,
+		ActiveCacheControl:  activeCacheControl,
 	}
 
 	// Validate by actually calling the AI and checking for valid response content
@@ -610,19 +625,21 @@ func (c *ServerConfig) serveProvidersAPI(conn net.Conn, request *http.Request) {
 	}
 
 	// Convert to API response format
+	// 关键词: serveProvidersAPI 输出字段, active_cache_control 透传到 portal
 	providerData := make([]map[string]interface{}, 0, len(providers))
 	for _, p := range providers {
 		providerData = append(providerData, map[string]interface{}{
-			"id":             p.ID,
-			"wrapper_name":   p.WrapperName,
-			"model_name":     p.ModelName,
-			"type_name":      p.TypeName,
-			"domain_or_url":  p.DomainOrURL,
-			"is_healthy":     p.IsHealthy,
-			"last_latency":   p.LastLatency,
-			"success_count":  p.SuccessCount,
-			"failure_count":  p.FailureCount,
-			"total_requests": p.TotalRequests,
+			"id":                   p.ID,
+			"wrapper_name":         p.WrapperName,
+			"model_name":           p.ModelName,
+			"type_name":            p.TypeName,
+			"domain_or_url":        p.DomainOrURL,
+			"is_healthy":           p.IsHealthy,
+			"last_latency":         p.LastLatency,
+			"success_count":        p.SuccessCount,
+			"failure_count":        p.FailureCount,
+			"total_requests":       p.TotalRequests,
+			"active_cache_control": p.ActiveCacheControl,
 		})
 	}
 

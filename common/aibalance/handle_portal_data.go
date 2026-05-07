@@ -108,18 +108,20 @@ type CacheTrendDayJSON struct {
 }
 
 // ProviderDataJSON is the JSON representation of provider data
+// 关键词: ProviderDataJSON, /portal/api/data 输出, active_cache_control 暴露给前端
 type ProviderDataJSON struct {
-	ID                uint    `json:"id"`
-	WrapperName       string  `json:"wrapper_name"`
-	ModelName         string  `json:"model_name"`
-	TypeName          string  `json:"type_name"`
-	DomainOrURL       string  `json:"domain_or_url"`
-	APIKey            string  `json:"api_key"`
-	TotalRequests     int64   `json:"total_requests"`
-	SuccessRate       float64 `json:"success_rate"`
-	LastLatency       int64   `json:"last_latency"`
-	IsHealthy         bool    `json:"is_healthy"`
-	HealthStatusClass string  `json:"health_status_class"`
+	ID                 uint    `json:"id"`
+	WrapperName        string  `json:"wrapper_name"`
+	ModelName          string  `json:"model_name"`
+	TypeName           string  `json:"type_name"`
+	DomainOrURL        string  `json:"domain_or_url"`
+	APIKey             string  `json:"api_key"`
+	TotalRequests      int64   `json:"total_requests"`
+	SuccessRate        float64 `json:"success_rate"`
+	LastLatency        int64   `json:"last_latency"`
+	IsHealthy          bool    `json:"is_healthy"`
+	HealthStatusClass  string  `json:"health_status_class"`
+	ActiveCacheControl bool    `json:"active_cache_control"`
 }
 
 // APIKeyDataJSON is the JSON representation of API key data
@@ -196,17 +198,18 @@ func (c *ServerConfig) servePortalDataAPI(conn net.Conn, request *http.Request) 
 		}
 
 		data.Providers = append(data.Providers, ProviderDataJSON{
-			ID:                p.ID,
-			WrapperName:       p.WrapperName,
-			ModelName:         p.ModelName,
-			TypeName:          p.TypeName,
-			DomainOrURL:       p.DomainOrURL,
-			APIKey:            p.APIKey,
-			TotalRequests:     p.TotalRequests,
-			SuccessRate:       successRate,
-			LastLatency:       p.LastLatency,
-			IsHealthy:         p.IsHealthy,
-			HealthStatusClass: healthClass,
+			ID:                 p.ID,
+			WrapperName:        p.WrapperName,
+			ModelName:          p.ModelName,
+			TypeName:           p.TypeName,
+			DomainOrURL:        p.DomainOrURL,
+			APIKey:             p.APIKey,
+			TotalRequests:      p.TotalRequests,
+			SuccessRate:        successRate,
+			LastLatency:        p.LastLatency,
+			IsHealthy:          p.IsHealthy,
+			HealthStatusClass:  healthClass,
+			ActiveCacheControl: p.ActiveCacheControl,
 		})
 
 		data.TotalRequests += p.TotalRequests

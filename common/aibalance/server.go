@@ -1075,39 +1075,39 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 			writer.WriteUsage(usage)
 		}
 
-		// provider-aware cache_control 处理 (RewriteMessagesForProvider):
+		// provider-aware cache_control 处理 (RewriteMessagesForProviderInstance):
 		//
-		//   - **tongyi** (dashscope 兼容): 走 RewriteMessagesForExplicitCache
-		//     - 客户端任意位置自带 cc -> 完全 pass-through (尊重客户端缓存策略,
-		//       例如 aicache hijacker 3 段路径主动打的 system+user1 双 cc)
-		//     - 客户端无 cc + 显式缓存白名单 model (qwen3.5-flash / qwen3.6-plus /
-		//       qwen3-vl-flash / qwen3.x-coder / deepseek-v3.2 / kimi-k2.* /
-		//       glm-5.1 等) -> 给最末 system 注入 baseline 单 cc, 让 dashscope
-		//       把 system 前缀作为命名缓存块缓存 5 分钟 (后续相同前缀请求按
-		//       input_token 单价 10% 计费; cached_tokens 走 onUsageForward 入库)
-		//     - 客户端无 cc + 不在白名单 model -> pass-through (零副作用)
+		// v2 路径在 v1 (RewriteMessagesForProvider) 之上多加一层 Provider 实例级
+		// 的 ActiveCacheControl Flag 优先判定, 让运维通过 portal.html 一键给任意
+		// provider 打开「主动 cache_control 注入」, 而不再绑死 tongyi+dashscope
+		// 白名单 model。
 		//
-		//   - **其他所有 provider** (siliconflow / openai / openrouter /
-		//     anthropic / azure / 等等): 走 StripCacheControlFromMessages
-		//     强制移除所有位置的 cc 字段, 兼容性 + 安全性硬约束:
-		//     - 部分 OpenAI 兼容层会因为 cache_control 未知字段直接 400
-		//     - 避免 dashscope 风格 cc 透传到其他 provider 引发意料外计费/路由
-		//     这是无条件的 strip, 无论 cc 来自客户端 SDK 还是来自 aicache hijacker.
+		//   - **provider.ActiveCacheControl == true** (Flag-on): 任意 type/model
+		//     都按「客户端自带 cc -> pass-through; 客户端无 cc -> 给最末 system
+		//     注入 baseline ephemeral cc」处理, 跳过 dashscope 白名单 gate。
+		//     适合 anthropic / 自建 dashscope 中转 / tongyi 没在白名单的新 model。
+		//
+		//   - **provider.ActiveCacheControl == false** (Flag-off): 退化到老路径:
+		//     - tongyi + dashscope 白名单 model -> 注入 baseline 单 cc (legacy)
+		//     - tongyi 非白名单 model -> pass-through (零副作用)
+		//     - 其它所有 provider -> StripCacheControlFromMessages 强制移除 cc
+		//       (跨 provider 安全硬约束: 兼容部分 OpenAI 兼容层 400 / 避免
+		//       dashscope 风格 cc 透传到其他 provider 引发意料外计费)
 		//
 		// 这个分发让 aicache hijacker 可以"无脑给 system+user1 打双 cc",
 		// 跨 provider 安全由 aibalance 兜底剥离, 不需要 hijacker 知道下游
 		// 是不是 tongyi。
 		//
-		// 关键词: aibalance provider-aware cc 路由, RewriteMessagesForProvider,
-		//        tongyi 保留 / 其他 strip, dashscope 显式缓存兜底,
-		//        跨 provider 安全, §7.7.7 职责重排
-		messagesForUpstream := RewriteMessagesForProvider(
-			bodyIns.Messages, provider.TypeName, provider.ModelName,
-		)
+		// 关键词: aibalance provider-aware cc 路由 v2, RewriteMessagesForProviderInstance,
+		//        ActiveCacheControl Flag, tongyi/anthropic 通用化, §7.7.7 职责重排
+		messagesForUpstream := RewriteMessagesForProviderInstance(bodyIns.Messages, provider)
 		if len(messagesForUpstream) > 0 && len(messagesForUpstream) == len(bodyIns.Messages) {
 			switch {
+			case provider.ActiveCacheControl:
+				c.logInfo("active cache_control baseline injected (flag=on): provider=%s model=%s msgs=%d",
+					provider.TypeName, provider.ModelName, len(messagesForUpstream))
 			case IsTongyiExplicitCacheModel(provider.TypeName, provider.ModelName):
-				c.logInfo("explicit cache_control baseline injected: provider=%s model=%s msgs=%d",
+				c.logInfo("explicit cache_control baseline injected (legacy tongyi whitelist): provider=%s model=%s msgs=%d",
 					provider.TypeName, provider.ModelName, len(messagesForUpstream))
 			case !IsCacheControlAwareProvider(provider.TypeName) && messagesAlreadyHaveCacheControl(bodyIns.Messages):
 				c.logInfo("cache_control stripped (non-tongyi provider): provider=%s model=%s msgs=%d",

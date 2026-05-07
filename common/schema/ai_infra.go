@@ -206,6 +206,18 @@ type AiProvider struct {
 	ProviderMode        string `json:"provider_mode" gorm:"default:'chat'"` // Provider 模式: "chat" 或 "embedding"
 	OptionalAllowReason string `json:"optional_allow_reason" gorm:"default:''"`
 
+	// ActiveCacheControl 决定是否在路由到该 provider 之前主动给最末 system 消息
+	// 注入 cache_control:{"type":"ephemeral"} baseline 标记。
+	// 关键词: aibalance Provider ActiveCacheControl Flag, 显式缓存通用化, dashscope/anthropic ephemeral 缓存
+	//
+	// 取值语义 (与 RewriteMessagesForProviderInstance 对齐):
+	//   - true  -> 该 provider 视为 cache-control aware: 客户端自带 cc 时 pass-through,
+	//              客户端无 cc 时给最末 system 注入 ephemeral cc (与 model 名无关)
+	//   - false -> 老路径兜底: tongyi+dashscope 白名单走显式缓存注入, 其它 provider strip cc
+	//
+	// 默认 false 是为了完全保留现有 tongyi+白名单 provider 行为, 不写 DB 迁移脚本。
+	ActiveCacheControl bool `json:"active_cache_control" gorm:"default:false"`
+
 	// 可用性指标
 	SuccessCount  int64 `json:"success_count"`  // 成功请求总数
 	FailureCount  int64 `json:"failure_count"`  // 失败请求总数

@@ -250,6 +250,7 @@ func LoadProvidersFromDatabase(config *ServerConfig) error {
 		}
 
 		// Create Provider instance
+		// 关键词: ActiveCacheControl 字段 db -> 内存透传, 主动 cache_control 注入开关
 		provider := &Provider{
 			ModelName:           dbProvider.ModelName,
 			TypeName:            dbProvider.TypeName,
@@ -258,6 +259,7 @@ func LoadProvidersFromDatabase(config *ServerConfig) error {
 			APIKey:              dbProvider.APIKey,
 			NoHTTPS:             dbProvider.NoHTTPS,
 			OptionalAllowReason: dbProvider.OptionalAllowReason,
+			ActiveCacheControl:  dbProvider.ActiveCacheControl,
 			DbProvider:          dbProvider,
 		}
 

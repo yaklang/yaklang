@@ -125,6 +125,92 @@ func ephemeralCacheControl() map[string]any {
 	return map[string]any{"type": "ephemeral"}
 }
 
+// RewriteMessagesForProviderInstance 是 aibalance v2 路由层的 cc 处理主入口,
+// 在 RewriteMessagesForProvider 基础上加入 Provider 实例级别的 ActiveCacheControl
+// Flag 优先判定, 让任何 provider (而不仅仅是 tongyi+dashscope 白名单 model) 都能被
+// 运维通过 portal.html 一键打开「主动 cache_control 注入」。
+//
+// 分发优先级 (与 plan compat_or + always_inject 语义对齐):
+//
+//  1. **p.ActiveCacheControl == true** (Flag-on 路径):
+//     - 调 injectExplicitCacheUnconditional 走「客户端自带 cc -> pass-through;
+//       客户端无 cc -> 给最末 system 注入 ephemeral baseline」, 完全跳过
+//       dashscope 白名单 model 那一道 gate;
+//     - 适合任意支持 ephemeral cc 的 provider (anthropic / 自建中转 /
+//       tongyi 没在白名单的新 model / 等等)。
+//
+//  2. **p.ActiveCacheControl == false** (Flag-off 兜底路径):
+//     - 直接复用 RewriteMessagesForProvider(messages, p.TypeName, p.ModelName);
+//     - 老 tongyi+dashscope 白名单 provider 即使 DB 里 ActiveCacheControl 仍为 false
+//       也能保留旧行为 (兼容优先);
+//     - 其它非 tongyi provider 仍然 StripCacheControlFromMessages, 跨 provider
+//       安全硬约束保留。
+//
+// p == nil 时退化为 messages 原样返回 (零浅复制零副作用), 防御调用方传错。
+//
+// 关键词: RewriteMessagesForProviderInstance, ActiveCacheControl Flag 优先,
+//        compat_or always_inject, Provider 实例级 cc 路由
+func RewriteMessagesForProviderInstance(messages []aispec.ChatDetail, p *Provider) []aispec.ChatDetail {
+	if len(messages) == 0 {
+		return messages
+	}
+	if p == nil {
+		return messages
+	}
+	if p.ActiveCacheControl {
+		return injectExplicitCacheUnconditional(messages)
+	}
+	return RewriteMessagesForProvider(messages, p.TypeName, p.ModelName)
+}
+
+// injectExplicitCacheUnconditional 是 RewriteMessagesForExplicitCache 的「无白名单 gate」版本,
+// 仅用于 ActiveCacheControl=true 的 Flag-on 路径。逻辑与 RewriteMessagesForExplicitCache
+// 完全一致, 区别只有一处: 跳过 IsTongyiExplicitCacheModel 的 model 白名单检查,
+// 让任意 (providerType, modelName) 组合都能享受「客户端自带 cc 退让 + 末 system
+// 注入 baseline」的处理。
+//
+// 行为契约 (与 RewriteMessagesForExplicitCache 同):
+//   - 客户端自带 cc -> pass-through 原切片 (零浅复制);
+//   - 没有 system 消息 / content 形态不可识别 -> 原样返回入参切片;
+//   - 找到最末 system 消息 + content 形态可识别 -> 浅复制新切片, 仅最末 system
+//     被替换为带 cache_control 的新对象, 入参 messages 永不被原地修改。
+//
+// 关键词: injectExplicitCacheUnconditional, Flag-on 注入, 跳过 model 白名单
+func injectExplicitCacheUnconditional(messages []aispec.ChatDetail) []aispec.ChatDetail {
+	if len(messages) == 0 {
+		return messages
+	}
+
+	// 客户端自带 cc 退让: 与 RewriteMessagesForExplicitCache 同,
+	// 任何位置出现 cache_control 标记都视为客户端自管缓存策略, 整体 pass-through。
+	if messagesAlreadyHaveCacheControl(messages) {
+		return messages
+	}
+
+	lastSys := pickLastSystemIndex(messages)
+	if lastSys < 0 {
+		return messages
+	}
+
+	sysMsg := messages[lastSys]
+	newContent, ok := injectCacheControlOnContent(sysMsg.Content)
+	if !ok {
+		return messages
+	}
+
+	out := make([]aispec.ChatDetail, len(messages))
+	copy(out, messages)
+	out[lastSys] = aispec.ChatDetail{
+		Role:         sysMsg.Role,
+		Name:         sysMsg.Name,
+		Content:      newContent,
+		ToolCalls:    sysMsg.ToolCalls,
+		ToolCallID:   sysMsg.ToolCallID,
+		FunctionCall: sysMsg.FunctionCall,
+	}
+	return out
+}
+
 // RewriteMessagesForProvider 是 aibalance 路由层的统一 cc 处理主入口,
 // 按 provider type 分发到两条路径:
 //

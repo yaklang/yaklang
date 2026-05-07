@@ -28,6 +28,11 @@ type ConfigProvider struct {
 	// works for qwen3
 	OptionalAllowReason  string `yaml:"optional_allow_reason,omitempty" json:"optional_allow_reason,omitempty"`
 	OptionalReasonBudget int    `yaml:"optional_reason_budget,omitempty" json:"optional_reason_budget,omitempty"`
+
+	// ActiveCacheControl 让该 provider 主动管理 cache_control:
+	// 客户端无 cc 时给最末 system 注入 ephemeral cc, 客户端自带 cc 时 pass-through。
+	// 关键词: ConfigProvider ActiveCacheControl, yaml/json 双 tag, ephemeral baseline
+	ActiveCacheControl bool `yaml:"active_cache_control,omitempty" json:"active_cache_control,omitempty"`
 }
 
 // Provider is the provider structure for actual API calls
@@ -41,6 +46,12 @@ type Provider struct {
 	// works for qwen3
 	OptionalAllowReason  string `json:"optional_allow_reason,omitempty"`
 	OptionalReasonBudget int    `json:"optional_reason_budget,omitempty"`
+
+	// ActiveCacheControl 控制是否走主动 cache_control 注入路径,
+	// 由 RewriteMessagesForProviderInstance 在透传 messages 给上游前消费。
+	// 关键词: Provider ActiveCacheControl, 主动 cache_control 注入开关
+	ActiveCacheControl bool `json:"active_cache_control"`
+
 	// External display name for users, usually an alias for the model
 	WrapperName string `json:"wrapper_name"`
 
@@ -73,6 +84,7 @@ func (cp *ConfigProvider) toProvider(apiKey string) *Provider {
 		NoHTTPS:              cp.NoHTTPS,
 		OptionalAllowReason:  cp.OptionalAllowReason,
 		OptionalReasonBudget: cp.OptionalReasonBudget,
+		ActiveCacheControl:   cp.ActiveCacheControl,
 		// WrapperName is initially empty, set by external
 		WrapperName: "",
 	}
@@ -403,12 +415,13 @@ func (p *Provider) GetDbProvider() (*schema.AiProvider, error) {
 
 	// Create a temporary AiProvider object for querying
 	dbProvider := &schema.AiProvider{
-		WrapperName: p.WrapperName,
-		ModelName:   p.ModelName,
-		TypeName:    p.TypeName,
-		DomainOrURL: p.DomainOrURL,
-		APIKey:      p.APIKey,
-		NoHTTPS:     p.NoHTTPS,
+		WrapperName:        p.WrapperName,
+		ModelName:          p.ModelName,
+		TypeName:           p.TypeName,
+		DomainOrURL:        p.DomainOrURL,
+		APIKey:             p.APIKey,
+		NoHTTPS:            p.NoHTTPS,
+		ActiveCacheControl: p.ActiveCacheControl,
 	}
 
 	// Get or create from database
