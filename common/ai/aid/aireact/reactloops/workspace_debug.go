@@ -250,6 +250,9 @@ func writePerceptionDebugMarkdown(loop *ReActLoop, state *PerceptionState, input
 	buf.WriteString(fmt.Sprintf("- Epoch: %d\n", state.Epoch))
 	buf.WriteString(fmt.Sprintf("- Trigger: %s\n", state.LastTrigger))
 	buf.WriteString(fmt.Sprintf("- Changed: %v\n", state.Changed))
+	// IntentShift 显示原始值与回退后实际生效的 pivot 判定, 便于调试看 AI 是否真填了字段以及向后兼容路径是否被命中.
+	// 关键词: workspace_debug perception IntentShift dump, effective_pivot 调试输出
+	buf.WriteString(fmt.Sprintf("- IntentShift: %q (effective_pivot=%v)\n", state.IntentShift, state.IsIntentPivot()))
 	buf.WriteString(fmt.Sprintf("- Confidence: %.4f\n\n", state.ConfidenceLevel))
 
 	appendWorkspaceDebugSection(&buf, "Timing", buildWorkspaceDebugTimingSection(loop, [][2]string{

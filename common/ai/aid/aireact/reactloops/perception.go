@@ -37,6 +37,28 @@ const (
 	perceptionMaxInputTokens = 30000
 )
 
+// IntentShift 取值约定 — 描述本轮 perception 与上一轮相比意图的"方向性"变化粒度.
+// 这是 Changed bool 的精细化补充: Changed 决定 state 是否覆盖 (受 topics hash 影响),
+// IntentShift 决定昂贵下游 (capability/knowledge/midterm timeline 召回) 是否要重新加载.
+//
+// 设计动机: AI 经常在同一个领域里推进时也把 Changed 标成 true, 导致下游每轮都重新刷新,
+// 浪费 token 与算力, 还让前端每轮都收到新的 perception_capabilities / perception_knowledge
+// 事件, 严重打扰用户. IntentShift=pivot 把"真正的方向性转向"显式分离出来作为下游门控.
+//
+// 关键词: PerceptionState IntentShift, 意图方向性变更, 下游昂贵刷新门控,
+//
+//	pivot drift none, perception 节流
+const (
+	// IntentShiftNone 与上一次感知相比基本没变化, 通常 Changed 应该也是 false.
+	IntentShiftNone = "none"
+	// IntentShiftDrift 同一问题域内的 topics 自然漂移 (例如同一个调试任务里
+	// 调整了关注点), Changed 可能是 true 但意图方向没变, 不应触发昂贵下游.
+	IntentShiftDrift = "drift"
+	// IntentShiftPivot 用户/任务真正切换了方向 (例如从写代码切换到写测试),
+	// 必须重新加载下游推荐 (capability / knowledge / midterm recall).
+	IntentShiftPivot = "pivot"
+)
+
 var perceptionCapabilitySearcher = SearchCapabilities
 var perceptionKnowledgeBaseNameLister = func() ([]string, error) {
 	return yakit.GetKnowledgeBaseNameList(consts.GetGormProfileDatabase())
@@ -54,6 +76,56 @@ type PerceptionState struct {
 	LastTrigger     string    `json:"last_trigger"`
 	LastUpdateAt    time.Time `json:"last_update_at"`
 	PrevTopicsHash  string    `json:"prev_topics_hash"`
+	// IntentShift 是可选字段, 取值 IntentShiftNone / IntentShiftDrift / IntentShiftPivot.
+	// AI 不返回时留空, 此时 IsIntentPivot 会回退到 Changed 的旧语义, 保证向后兼容.
+	// 关键词: PerceptionState.IntentShift, 意图方向性变更可选字段
+	IntentShift string `json:"intent_shift,omitempty"`
+}
+
+// IsIntentPivot 报告本轮 perception 是否应该被视作"方向性 pivot"的下游门控信号.
+//
+// 决策优先级:
+//  1. 显式 IntentShiftPivot -> true
+//  2. 显式 IntentShiftDrift / IntentShiftNone -> false
+//  3. IntentShift 为空 (AI 未返回新字段) -> 回退到 Changed 的值, 保留旧版"Changed=true
+//     就触发下游"的行为, 避免静默收紧导致旧模型/旧 prompt 路径下游永远不刷新.
+//
+// 关键词: PerceptionState.IsIntentPivot, 下游门控信号, 向后兼容回退 Changed
+func (p *PerceptionState) IsIntentPivot() bool {
+	if p == nil {
+		return false
+	}
+	switch strings.ToLower(strings.TrimSpace(p.IntentShift)) {
+	case IntentShiftPivot:
+		return true
+	case IntentShiftDrift, IntentShiftNone:
+		return false
+	default:
+		return p.Changed
+	}
+}
+
+// shouldRefreshDownstreamForState 集中表达"是否要触发昂贵下游刷新"的门控.
+//
+// 规则:
+//   - state 必须实际被覆盖 (updated=true), 否则没有新内容可推, 跳过
+//   - LastTrigger == PerceptionTriggerForced 时绕门 (用户/系统显式请求, 视作必须刷新)
+//   - 其他场景: 必须 IsIntentPivot() == true 才触发
+//
+// spin_detected / loop_switch 等"半紧急"trigger 仍然遵从 IntentShift, 在意图没真
+// pivot 时不重复加载, 把节流优先级放在紧急性之前 (用户选择).
+//
+// 关键词: shouldRefreshDownstreamForState, perception 下游门控,
+//
+//	forced 绕门, spin_detected loop_switch 受门控
+func (p *PerceptionState) shouldRefreshDownstreamForState(updated bool) bool {
+	if !updated || p == nil {
+		return false
+	}
+	if p.LastTrigger == PerceptionTriggerForced {
+		return true
+	}
+	return p.IsIntentPivot()
 }
 
 func hashTopics(topics []string) string {
@@ -726,6 +798,16 @@ var perceptionOutputSchema = []aitool.ToolOption{
 		aitool.WithParam_Min(0),
 		aitool.WithParam_Max(1),
 	),
+	// intent_shift 是可选字段, 比 changed 更精细的方向性变更信号. 留空时
+	// 系统回退到 changed 的旧语义, 不做硬性要求, 让旧 prompt 路径平滑过渡.
+	// 关键词: intent_shift schema, 可选枚举字段, 下游门控信号
+	aitool.WithStringParam("intent_shift",
+		aitool.WithParam_Description(
+			"可选: 意图方向性粒度 / Optional intent change granularity. "+
+				"none=完全无变化, drift=同领域内主题漂移 (changed 可能仍是 true 但方向没变), "+
+				"pivot=方向性转向 (仅 pivot 时下游会重新加载推荐). 不确定时不要填."),
+		aitool.WithParam_EnumString(IntentShiftNone, IntentShiftDrift, IntentShiftPivot),
+	),
 }
 
 // TriggerPerception runs a lightweight AI evaluation to sense what the user is
@@ -792,13 +874,40 @@ func (r *ReActLoop) TriggerPerception(reason string, force bool) *PerceptionStat
 		Keywords:        params.GetStringSlice("keywords"),
 		Changed:         params.GetBool("changed"),
 		ConfidenceLevel: params.GetFloat("confidence"),
+		// intent_shift 是新增的可选字段, AI 不返回时留空, IsIntentPivot 会回退到 Changed 语义.
+		// 这里做 lowercase + trim 归一化, 避免大小写/前后空格让枚举判定失效.
+		// 关键词: parsed.IntentShift 解析归一化, 大小写无关, intent_shift 可选解析
+		IntentShift: strings.ToLower(strings.TrimSpace(params.GetString("intent_shift"))),
 	}
 
 	parsed.LastTrigger = reason
 	currentState, updated := r.perception.applyResult(parsed)
-	if updated {
+
+	// 下游昂贵刷新统一走 IntentShift 门控.
+	//
+	// shouldRefreshDownstreamForState 已经合并了三条规则:
+	//   1. updated 必须为 true, 否则没有新内容可以推
+	//   2. forced trigger 一律绕门 (用户/系统显式请求, 必须刷新)
+	//   3. 否则要求 IntentShift=pivot (向后兼容: IntentShift 空时回退到 Changed)
+	//
+	// 注意行为变化: ScheduleMidtermTimelineRecallFromPerception 之前是每次 TriggerPerception
+	// 必调, 现在改为只在 pivot 或 forced 时调用. 这是用户明确要求的, 用于解决意图未真正
+	// 变化时的中长期 timeline 召回噪音.
+	//
+	// 关键词: TriggerPerception 下游门控, refreshCapabilities/refreshKnowledge/ScheduleMidterm
+	//        统一走 shouldRefreshDownstreamForState
+	if currentState.shouldRefreshDownstreamForState(updated) {
 		r.refreshCapabilitiesFromPerception(currentState)
 		r.refreshKnowledgeFromPerception(currentState)
+		if scheduler, ok := invoker.(midtermTimelineRecallScheduler); ok {
+			summaryForMidterm := strings.TrimSpace(parsed.OneLinerSummary)
+			if summaryForMidterm == "" {
+				if current := r.perception.getCurrent(); current != nil {
+					summaryForMidterm = strings.TrimSpace(current.OneLinerSummary)
+				}
+			}
+			scheduler.ScheduleMidtermTimelineRecallFromPerception(summaryForMidterm, parsed.Topics, parsed.Keywords)
+		}
 	}
 
 	if emitter := r.GetEmitter(); emitter != nil && currentState != nil {
@@ -811,25 +920,16 @@ func (r *ReActLoop) TriggerPerception(reason string, force bool) *PerceptionStat
 			currentState.ConfidenceLevel,
 			currentState.LastTrigger,
 			currentState.Epoch,
+			currentState.IntentShift,
 		)
-	}
-
-	if scheduler, ok := invoker.(midtermTimelineRecallScheduler); ok {
-		summaryForMidterm := strings.TrimSpace(parsed.OneLinerSummary)
-		if summaryForMidterm == "" {
-			if current := r.perception.getCurrent(); current != nil {
-				summaryForMidterm = strings.TrimSpace(current.OneLinerSummary)
-			}
-		}
-		scheduler.ScheduleMidtermTimelineRecallFromPerception(summaryForMidterm, parsed.Topics, parsed.Keywords)
 	}
 
 	invoker.AddToTimeline("perception",
 		fmt.Sprintf("Perception (epoch %d, trigger=%s): %s | topics=[%s]",
 			parsed.Epoch, reason, parsed.OneLinerSummary, strings.Join(parsed.Topics, ", ")))
 
-	log.Infof("perception updated (epoch=%d, trigger=%s, changed=%v, confidence=%.2f): %s",
-		parsed.Epoch, reason, parsed.Changed, parsed.ConfidenceLevel, parsed.OneLinerSummary)
+	log.Infof("perception updated (epoch=%d, trigger=%s, changed=%v, intent_shift=%q, confidence=%.2f): %s",
+		parsed.Epoch, reason, parsed.Changed, parsed.IntentShift, parsed.ConfidenceLevel, parsed.OneLinerSummary)
 
 	return r.perception.getCurrent()
 }

@@ -940,6 +940,12 @@ func (e *Emitter) EmitIntentRecognition(
 	})
 }
 
+// EmitPerception 把一次 perception 评估结果以事件形式投递给前端.
+//
+// intentShift 是后加入的可选字段, 表达本轮意图相对上一轮的方向性变更粒度
+// (none/drift/pivot). 仅作前端展示与诊断, 不影响事件路由. 可空字符串.
+//
+// 关键词: EmitPerception 签名扩展, intent_shift 透传前端
 func (e *Emitter) EmitPerception(
 	nodeId string,
 	summary string,
@@ -949,16 +955,18 @@ func (e *Emitter) EmitPerception(
 	confidence float64,
 	trigger string,
 	epoch int,
+	intentShift string,
 ) (*schema.AiOutputEvent, error) {
 	return e.EmitJSON(schema.EVENT_TYPE_PERCEPTION, nodeId, map[string]any{
-		"summary":    summary,
-		"topics":     topics,
-		"keywords":   keywords,
-		"changed":    changed,
-		"confidence": confidence,
-		"trigger":    trigger,
-		"epoch":      epoch,
-		"timestamp":  time.Now().Unix(),
+		"summary":      summary,
+		"topics":       topics,
+		"keywords":     keywords,
+		"changed":      changed,
+		"confidence":   confidence,
+		"trigger":      trigger,
+		"epoch":        epoch,
+		"intent_shift": intentShift,
+		"timestamp":    time.Now().Unix(),
 	})
 }
 

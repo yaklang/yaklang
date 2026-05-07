@@ -563,3 +563,144 @@ func TestMaybeTriggerPerceptionAfterAction_SyncPerceptionTriggerRunsInline(t *te
 	loop.MaybeTriggerPerceptionAfterAction(2)
 	require.Equal(t, "focused summary from perception", invoker.scheduledSummary)
 }
+
+// TestPerceptionState_IsIntentPivot_ExplicitValues 验证三个枚举值的显式判定:
+// 仅 IntentShiftPivot 返回 true, drift / none 返回 false. 不依赖 Changed.
+//
+// 关键词: TestPerceptionState_IsIntentPivot, IntentShift 枚举判定
+func TestPerceptionState_IsIntentPivot_ExplicitValues(t *testing.T) {
+	cases := []struct {
+		name    string
+		shift   string
+		changed bool
+		want    bool
+	}{
+		{"explicit pivot ignores changed=false", IntentShiftPivot, false, true},
+		{"explicit pivot with changed=true", IntentShiftPivot, true, true},
+		{"explicit drift ignores changed=true", IntentShiftDrift, true, false},
+		{"explicit drift with changed=false", IntentShiftDrift, false, false},
+		{"explicit none ignores changed=true", IntentShiftNone, true, false},
+		{"explicit none with changed=false", IntentShiftNone, false, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			s := &PerceptionState{IntentShift: tc.shift, Changed: tc.changed}
+			require.Equal(t, tc.want, s.IsIntentPivot())
+		})
+	}
+}
+
+// TestPerceptionState_IsIntentPivot_BackwardCompat 验证 IntentShift 为空 (旧 AI / 旧 prompt
+// 路径) 时回退到 Changed 的旧语义, 保证不破坏既有行为.
+//
+// 关键词: TestPerceptionState_IsIntentPivot 向后兼容回退 Changed
+func TestPerceptionState_IsIntentPivot_BackwardCompat(t *testing.T) {
+	require.True(t, (&PerceptionState{IntentShift: "", Changed: true}).IsIntentPivot(),
+		"IntentShift 空 + Changed=true 应回退到 true (保持旧行为)")
+	require.False(t, (&PerceptionState{IntentShift: "", Changed: false}).IsIntentPivot(),
+		"IntentShift 空 + Changed=false 应回退到 false")
+
+	// 大小写 / 空白也走归一化, 同样回退到 Changed 不会被未知字面量打断.
+	require.True(t, (&PerceptionState{IntentShift: "  PIVOT  ", Changed: false}).IsIntentPivot(),
+		"大写带空格的 PIVOT 也应识别为 pivot")
+	require.False(t, (&PerceptionState{IntentShift: "Drift", Changed: true}).IsIntentPivot(),
+		"大写首字母 Drift 应识别为 drift, 不再回退 Changed")
+
+	// 完全未知字面量应当走 default 分支回退 Changed.
+	require.True(t, (&PerceptionState{IntentShift: "unknown_value", Changed: true}).IsIntentPivot(),
+		"未知字面量回退 Changed=true 仍触发 pivot")
+
+	// nil 接收者必须安全返回 false.
+	var nilState *PerceptionState
+	require.False(t, nilState.IsIntentPivot())
+}
+
+// TestShouldRefreshDownstream_PivotOnly 验证下游门控核心规则: 非 forced trigger
+// 下, 只有 IntentShift=pivot (或回退后 Changed=true) 才会放行.
+//
+// 关键词: TestShouldRefreshDownstream PivotOnly, drift/none/空 不触发下游
+func TestShouldRefreshDownstream_PivotOnly(t *testing.T) {
+	mk := func(shift string, changed bool) *PerceptionState {
+		return &PerceptionState{
+			IntentShift: shift,
+			Changed:     changed,
+			LastTrigger: PerceptionTriggerPostAction,
+		}
+	}
+
+	require.True(t, mk(IntentShiftPivot, false).shouldRefreshDownstreamForState(true),
+		"pivot + updated=true 应放行下游")
+	require.False(t, mk(IntentShiftDrift, true).shouldRefreshDownstreamForState(true),
+		"drift 即使 updated=true 也不放行下游")
+	require.False(t, mk(IntentShiftNone, true).shouldRefreshDownstreamForState(true),
+		"none 即使 updated=true 也不放行下游")
+	require.False(t, mk("", false).shouldRefreshDownstreamForState(true),
+		"IntentShift 空 + Changed=false (回退 false) 不放行")
+	require.True(t, mk("", true).shouldRefreshDownstreamForState(true),
+		"IntentShift 空 + Changed=true (回退 true) 放行, 保持旧行为")
+}
+
+// TestShouldRefreshDownstream_ForcedBypassesGate 验证 forced trigger 绕过 IntentShift 门控:
+// 即使 AI 返回 drift / none, forced 仍然触发下游 (用户/系统显式请求).
+//
+// 关键词: TestShouldRefreshDownstream forced 绕门, PerceptionTriggerForced
+func TestShouldRefreshDownstream_ForcedBypassesGate(t *testing.T) {
+	mk := func(shift string) *PerceptionState {
+		return &PerceptionState{
+			IntentShift: shift,
+			Changed:     false,
+			LastTrigger: PerceptionTriggerForced,
+		}
+	}
+	require.True(t, mk(IntentShiftDrift).shouldRefreshDownstreamForState(true),
+		"forced + drift 必须绕门触发下游")
+	require.True(t, mk(IntentShiftNone).shouldRefreshDownstreamForState(true),
+		"forced + none 必须绕门触发下游")
+	require.True(t, mk("").shouldRefreshDownstreamForState(true),
+		"forced + 空 IntentShift 必须绕门触发下游")
+}
+
+// TestShouldRefreshDownstream_SpinAndLoopSwitchObeyGate 验证用户的明确选择:
+// spin_detected / loop_switch 不再无条件触发下游, 仍受 IntentShift 门控约束.
+//
+// 关键词: TestShouldRefreshDownstream spin_detected loop_switch 受门控
+func TestShouldRefreshDownstream_SpinAndLoopSwitchObeyGate(t *testing.T) {
+	for _, trigger := range []string{PerceptionTriggerSpinDetected, PerceptionTriggerLoopSwitch} {
+		t.Run(trigger+"/drift skipped", func(t *testing.T) {
+			s := &PerceptionState{
+				IntentShift: IntentShiftDrift,
+				LastTrigger: trigger,
+			}
+			require.False(t, s.shouldRefreshDownstreamForState(true),
+				"%s + drift 不应触发下游", trigger)
+		})
+		t.Run(trigger+"/pivot allowed", func(t *testing.T) {
+			s := &PerceptionState{
+				IntentShift: IntentShiftPivot,
+				LastTrigger: trigger,
+			}
+			require.True(t, s.shouldRefreshDownstreamForState(true),
+				"%s + pivot 应触发下游", trigger)
+		})
+	}
+}
+
+// TestShouldRefreshDownstream_RequiresUpdated 验证即使 trigger / IntentShift 都满足,
+// updated=false (state 没真正覆盖) 也一律不触发下游 — 没有新 state 可推就不要骚扰下游.
+//
+// 关键词: TestShouldRefreshDownstream updated 必要条件
+func TestShouldRefreshDownstream_RequiresUpdated(t *testing.T) {
+	combos := []*PerceptionState{
+		{IntentShift: IntentShiftPivot, LastTrigger: PerceptionTriggerForced, Changed: true},
+		{IntentShift: IntentShiftPivot, LastTrigger: PerceptionTriggerPostAction, Changed: true},
+		{IntentShift: "", LastTrigger: PerceptionTriggerForced, Changed: true},
+	}
+	for _, s := range combos {
+		require.False(t, s.shouldRefreshDownstreamForState(false),
+			"updated=false 时 (trigger=%s, shift=%q) 必须不触发下游", s.LastTrigger, s.IntentShift)
+	}
+
+	// nil 接收者也必须安全返回 false.
+	var nilState *PerceptionState
+	require.False(t, nilState.shouldRefreshDownstreamForState(true))
+}
