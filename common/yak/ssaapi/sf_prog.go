@@ -525,6 +525,38 @@ func (p *Program) ForEachExtraFile(callBack func(string, *memedit.MemEditor) boo
 func (p *Program) ForEachAllFile(callBack func(string, *memedit.MemEditor) bool) {
 	p.foreach(p.Program.FileList, callBack)
 }
+
+// forEachFileListAndExtraFile walks FileList then ExtraFile, deduplicating by path
+// so config / sidecar paths kept only in ExtraFile still participate in scans
+// (e.g. ${*.yml}.regexp / .re).
+func (p *Program) forEachFileListAndExtraFile(callBack func(string, *memedit.MemEditor) bool) {
+	if p == nil || p.Program == nil {
+		return
+	}
+	seen := make(map[string]struct{})
+	handler := func(filename, hash string) bool {
+		if _, ok := seen[filename]; ok {
+			return true
+		}
+		seen[filename] = struct{}{}
+		editor, err := p.getEditor(filename, hash)
+		if err != nil {
+			log.Errorf("get editor [%s] not found: %v", filename, err)
+			return true
+		}
+		return callBack(filename, editor)
+	}
+	for _, m := range []map[string]string{p.Program.FileList, p.Program.ExtraFile} {
+		if m == nil {
+			continue
+		}
+		for filename, hash := range m {
+			if !handler(filename, hash) {
+				return
+			}
+		}
+	}
+}
 func (p *Program) foreach(file2Hash map[string]string, callBack func(string, *memedit.MemEditor) bool) {
 	handler := func(filename, hash string) bool {
 		editor, err := p.getEditor(filename, hash)
@@ -562,7 +594,7 @@ func (p *Program) FileFilter(path string, match string, rule map[string]string, 
 	}
 
 	matchFile := false
-	p.ForEachAllFile(func(s string, me *memedit.MemEditor) bool {
+	p.forEachFileListAndExtraFile(func(s string, me *memedit.MemEditor) bool {
 		if me == nil {
 			return true
 		}
