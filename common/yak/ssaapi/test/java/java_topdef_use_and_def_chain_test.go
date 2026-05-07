@@ -56,7 +56,7 @@ exclude: <<<EXCLUDE
 EXCLUDE,
 }-> as $data
 
-$data?{<getCfg()><cfgGuards()>.kind?{!have:"earlyReturn"}} as $result
+$data?{<getCfg()><cfgGuards()>?{!opcode: return}} as $result
 `
 			vals, err := prog.SyntaxFlowWithError(sfRule)
 			require.NoError(t, err)

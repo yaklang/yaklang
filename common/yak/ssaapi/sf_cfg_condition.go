@@ -222,20 +222,7 @@ func cfgCtxForValueMemo(p *Program, v *Value, memo map[int64]*CfgCtxValue) *CfgC
 		}
 		return nil
 	}
-	fn := inst.GetFunc()
-	blk := inst.GetBlock()
-	if fn == nil || blk == nil {
-		if memo != nil && id > 0 {
-			memo[id] = nil
-		}
-		return nil
-	}
-	ctx := &CfgCtxValue{
-		prog:    p,
-		FuncID:  fn.GetId(),
-		BlockID: blk.GetId(),
-		InstID:  inst.GetId(),
-	}
+	ctx := cfgCtxFromExpandedSSAValue(p, v)
 	if memo != nil && id > 0 {
 		memo[id] = ctx
 	}

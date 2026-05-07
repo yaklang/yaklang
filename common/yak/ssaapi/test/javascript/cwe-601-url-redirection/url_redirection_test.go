@@ -30,6 +30,7 @@ func runOnFile(t *testing.T, rule, filename, code string) int {
 	ssatest.CheckWithFS(vfs, t, func(programs ssaapi.Programs) error {
 		require.Greater(t, len(programs), 0)
 		result, err := programs[0].SyntaxFlowWithError(rule)
+		result.Show()
 		require.NoError(t, err)
 		for _, v := range result.GetAlertVariables() {
 			total += len(result.GetValues(v))

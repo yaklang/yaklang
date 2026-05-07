@@ -75,19 +75,8 @@ func valuePassesCFGReach(v *Value, prog *Program, targetCfg *CfgCtxValue, opt re
 	if v == nil || v.IsEmpty() || prog == nil || targetCfg == nil || targetCfg.IsEmpty() {
 		return false
 	}
-	ok, got, _ := nativeCallGetCFG(sfvm.ValuesOf(v), nil, sfvm.NewNativeCallActualParams())
-	if !ok || got == nil || got.IsEmpty() {
-		return false
-	}
-	var candCfg *CfgCtxValue
-	_ = got.Recursive(func(op sfvm.ValueOperator) error {
-		if c, ok := op.(*CfgCtxValue); ok && c != nil && !c.IsEmpty() {
-			candCfg = c
-			return utils.Error("abort")
-		}
-		return nil
-	})
-	if candCfg == nil {
+	candCfg := cfgCtxFromExpandedSSAValue(prog, v)
+	if candCfg == nil || candCfg.IsEmpty() {
 		return false
 	}
 	// Same condition-inst but different block usually means opposite branches of one control split

@@ -70,7 +70,7 @@ $response.addCookie(, * as $headerContent)
 
 $headerContent #{
     until: "* & $entry",
-    exclude:"*?{opcode:phi}"
+    exclude:`*?{<getCfg()><cfgGuards()>?{opcode: return}}`
 }-> as $nocheckControledHeader
 
 alert $nocheckControledHeader for {

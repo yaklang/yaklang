@@ -226,14 +226,12 @@ $source?{<self>.endsWith(*)} as $guardedSources
 // Dataflow Analysis: Source (archive entry path) -> Sink (file write)
 // =====================================================================
 
-// Filter sinks: reachable from archive entry source, excluding phi nodes.
-// PHI node exclusion: patterns like "path.resolve() + startsWith() + early return"
-// produce a phi(destPath) at the merge point. Excluding phi from the backward
-// search correctly handles these early-return guard patterns without false positives.
+// Filter sinks: reachable from archive entry source, excluding CFG steps with earlyReturn cfgGuards
+// (替代 opcode:phi：path.resolve + startsWith + early return 等在汇合处的守卫由 cfgGuards 表达)
 $fsSink?{<self> #{include: <<<CODE
 * & $source
 CODE, exclude: <<<CODE
-*?{opcode: phi} as $__next__
+*?{<getCfg()><cfgGuards()>?{opcode: return}} as $__next__
 CODE}->} as $sink
 
 // =====================================================================

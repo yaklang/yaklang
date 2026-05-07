@@ -38,6 +38,9 @@ type Value struct {
 	Predecessors []*PredecessorValue
 	DescInfo     map[string]string
 	anchorBits   *utils.BitVector
+	// cfgSiteInstID: when <getCfg> wraps a BasicBlock, records the pipe-site instruction id
+	// so coerce/expand to CfgCtx keeps per-statement precision within one block.
+	cfgSiteInstID int64
 	// value from database
 	auditNode *ssadb.AuditNode
 }

@@ -22,6 +22,27 @@ const (
 	GuardKindNone = "none"
 )
 
+// guardPredicatePublicKeys lists synthetic field names for KeyMatch / glob / regexp on cfgGuard.
+var guardPredicatePublicKeys = []string{
+	"kind", "polarity", "func_id", "guard_block_id", "sink_block_id",
+	"cond_inst_id", "cond_value_id", "text",
+}
+
+// guardKindMatchesSSAOpcode maps cfgGuards Kind to SSA opcodes for ?{opcode: ...} filters
+// (semantic alias; not the abort-branch terminator instruction opcode).
+func guardKindMatchesSSAOpcode(kind string, op ssa.Opcode) bool {
+	switch kind {
+	case GuardKindEarlyReturn:
+		return op == ssa.SSAOpcodeReturn
+	case GuardKindEarlyPanic:
+		return op == ssa.SSAOpcodePanic
+	case GuardKindEarlyBreak, GuardKindEarlyContinue:
+		return op == ssa.SSAOpcodeJump
+	default:
+		return false
+	}
+}
+
 // GuardFieldValue is a synthetic member carrier used by GuardPredicateValue.GetFields().
 //
 // It matches by member-key (ssadb.KeyMatch) on FieldKey, and delegates const/string
@@ -324,14 +345,13 @@ func (g *GuardPredicateValue) ExactMatch(_ context.Context, mod ssadb.MatchMode,
 	return false, sfvm.NewEmptyValues(), nil
 }
 
-func (g *GuardPredicateValue) GlobMatch(_ context.Context, mod ssadb.MatchMode, pattern string) (bool, sfvm.Values, error) {
-	if mod != ssadb.KeyMatch {
+func (g *GuardPredicateValue) matchPublicFieldsByKeyPred(mod ssadb.MatchMode, keyOk func(string) bool) (bool, sfvm.Values, error) {
+	if mod != ssadb.KeyMatch || g == nil || g.prog == nil {
 		return false, sfvm.NewEmptyValues(), nil
 	}
-	keys := []string{"kind", "polarity", "func_id", "guard_block_id", "sink_block_id", "cond_inst_id", "cond_value_id", "text"}
 	var out []sfvm.ValueOperator
-	for _, k := range keys {
-		if !utils.MatchAnyOfGlob(k, pattern) {
+	for _, k := range guardPredicatePublicKeys {
+		if !keyOk(k) {
 			continue
 		}
 		if v, ok := g.fieldConstByKey(k); ok && v != nil && !v.IsEmpty() {
@@ -345,25 +365,12 @@ func (g *GuardPredicateValue) GlobMatch(_ context.Context, mod ssadb.MatchMode, 
 	return true, sfvm.NewValues(out), nil
 }
 
+func (g *GuardPredicateValue) GlobMatch(_ context.Context, mod ssadb.MatchMode, pattern string) (bool, sfvm.Values, error) {
+	return g.matchPublicFieldsByKeyPred(mod, func(k string) bool { return utils.MatchAnyOfGlob(k, pattern) })
+}
+
 func (g *GuardPredicateValue) RegexpMatch(_ context.Context, mod ssadb.MatchMode, re string) (bool, sfvm.Values, error) {
-	if mod != ssadb.KeyMatch {
-		return false, sfvm.NewEmptyValues(), nil
-	}
-	keys := []string{"kind", "polarity", "func_id", "guard_block_id", "sink_block_id", "cond_inst_id", "cond_value_id", "text"}
-	var out []sfvm.ValueOperator
-	for _, k := range keys {
-		if !utils.MatchAnyOfRegexp(k, re) {
-			continue
-		}
-		if v, ok := g.fieldConstByKey(k); ok && v != nil && !v.IsEmpty() {
-			sfvm.MergeAnchor(g, v)
-			out = append(out, v)
-		}
-	}
-	if len(out) == 0 {
-		return false, sfvm.NewEmptyValues(), nil
-	}
-	return true, sfvm.NewValues(out), nil
+	return g.matchPublicFieldsByKeyPred(mod, func(k string) bool { return utils.MatchAnyOfRegexp(k, re) })
 }
 
 func (g *GuardPredicateValue) GetCalled() (sfvm.Values, error)                    { return sfvm.NewEmptyValues(), nil }
@@ -373,18 +380,11 @@ func (g *GuardPredicateValue) GetFields() (sfvm.Values, error) {
 	if g == nil || g.prog == nil {
 		return sfvm.NewEmptyValues(), nil
 	}
-	cv := func(v any) sfvm.ValueOperator { return g.prog.NewConstValue(v) }
-	fields := []sfvm.ValueOperator{
-		&GuardFieldValue{prog: g.prog, FieldKey: "kind", Val: cv(g.Kind), anchorBits: g.anchorBits},
-		&GuardFieldValue{prog: g.prog, FieldKey: "polarity", Val: cv(g.Polarity), anchorBits: g.anchorBits},
-		&GuardFieldValue{prog: g.prog, FieldKey: "func_id", Val: cv(g.FuncID), anchorBits: g.anchorBits},
-		&GuardFieldValue{prog: g.prog, FieldKey: "guard_block_id", Val: cv(g.GuardBlockID), anchorBits: g.anchorBits},
-		&GuardFieldValue{prog: g.prog, FieldKey: "sink_block_id", Val: cv(g.SinkBlockID), anchorBits: g.anchorBits},
-		&GuardFieldValue{prog: g.prog, FieldKey: "cond_inst_id", Val: cv(g.CondInstID), anchorBits: g.anchorBits},
-		&GuardFieldValue{prog: g.prog, FieldKey: "cond_value_id", Val: cv(g.CondValueID), anchorBits: g.anchorBits},
-	}
-	if g.Text != "" {
-		fields = append(fields, &GuardFieldValue{prog: g.prog, FieldKey: "text", Val: cv(g.Text), anchorBits: g.anchorBits})
+	var fields []sfvm.ValueOperator
+	for _, k := range guardPredicatePublicKeys {
+		if v, ok := g.fieldConstByKey(k); ok && v != nil && !v.IsEmpty() {
+			fields = append(fields, &GuardFieldValue{prog: g.prog, FieldKey: k, Val: v, anchorBits: g.anchorBits})
+		}
 	}
 	return sfvm.NewValues(fields), nil
 }
@@ -415,7 +415,18 @@ func (g *GuardPredicateValue) FileFilter(string, string, map[string]string, []st
 }
 
 func (g *GuardPredicateValue) CompareString(*sfvm.StringComparator) (sfvm.Values, []bool) { return sfvm.NewEmptyValues(), nil }
-func (g *GuardPredicateValue) CompareOpcode(*sfvm.OpcodeComparator) (sfvm.Values, []bool) { return sfvm.NewEmptyValues(), nil }
+func (g *GuardPredicateValue) CompareOpcode(c *sfvm.OpcodeComparator) (sfvm.Values, []bool) {
+	if g == nil || c == nil {
+		return sfvm.NewEmptyValues(), []bool{false}
+	}
+	// Kind→opcode alias for e.g. `<getCfg()><cfgGuards()>?{opcode: return}` (not real Return IR opcode).
+	for _, op := range c.Opcodes {
+		if guardKindMatchesSSAOpcode(g.Kind, op) {
+			return sfvm.ValuesOf(g), []bool{true}
+		}
+	}
+	return sfvm.NewEmptyValues(), []bool{false}
+}
 func (g *GuardPredicateValue) CompareConst(*sfvm.ConstComparator) bool                     { return false }
 
 func (g *GuardPredicateValue) GetAnchorBitVector() *utils.BitVector {

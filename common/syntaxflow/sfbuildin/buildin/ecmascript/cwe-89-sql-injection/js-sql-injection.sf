@@ -171,8 +171,7 @@ $high + $concatHigh as $high
 //   1. $eq/$ne/$gt/$lt 等操作符包装：{ _id: { $eq: id } }
 //      检测方式：nosqlArg 的两层 members 中存在 MongoDB 查询操作符 key
 //   2. 运行时类型检查守卫（typeof id !== "string"）：
-//      typeof 检查会产生条件分支，导致 nosqlArg 的成员出现 phi 节点
-//      检测方式：nosqlArg 的 members 中存在 phi 节点则说明有条件守卫
+//      typeof 检查会产生条件分支；成员侧可用 <getCfg()><cfgGuards()>?{opcode: return} 识别截断分支守卫（替代 opcode:phi）
 // ============================================================
 *.find(* as $nosqlArg)
 *.findOne(* as $nosqlArg)
@@ -191,7 +190,7 @@ $high + $concatHigh as $high
 // 安全：使用 $eq/$ne/$gt 等操作符包装的查询对象
 $nosqlArg?{<self><getMembers><getMembers>?{have: /^\$(eq|ne|gt|gte|lt|lte|in|nin|exists|type|not|and|or|nor|all|size|elemMatch)$/}} as $nosqlSafeByOperator
 
-$nosqlArg?{<getCfg()><cfgGuards()>.kind?{!have:"earlyReturn"}} as $nosqlData
+$nosqlArg?{<getCfg()><cfgGuards()>?{!opcode: return}} as $nosqlData
 
 $nosqlData?{<self> #{
     include: <<<CODE
@@ -200,7 +199,7 @@ CODE,
     exclude: <<<CODE
 *?{opcode: call} as $__next__
 CODE
-}->}?{!(<self> & $nosqlSafeByOperator)}?{!<self><getMembers>?{opcode:phi}} as $nosqlHigh
+}->}?{!(<self> & $nosqlSafeByOperator)}?{!<self><getMembers>?{<getCfg()><cfgGuards()>?{opcode: return}}} as $nosqlHigh
 
 $high + $nosqlHigh as $high
 

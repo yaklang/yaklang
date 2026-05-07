@@ -1,7 +1,6 @@
 package ssaapi
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/samber/lo"
@@ -49,7 +48,8 @@ func valuesPipeHasCfgCtx(v sfvm.Values) bool {
 	return found
 }
 
-// expandValuesToCfgCtxList maps each SSA *Value under v to a CfgCtxValue (same rules as <getCfg>).
+// expandValuesToCfgCtxList maps each SSA *Value under v to a CfgCtxValue (supports normal inst values
+// and BasicBlock anchor values produced by <getCfg>).
 func expandValuesToCfgCtxList(v sfvm.Values) ([]sfvm.ValueOperator, *Program, error) {
 	prog, err := fetchProgram(v)
 	if err != nil {
@@ -65,16 +65,43 @@ func expandValuesToCfgCtxList(v sfvm.Values) ([]sfvm.ValueOperator, *Program, er
 		if inst == nil {
 			return nil
 		}
-		fn := inst.GetFunc()
-		blk := inst.GetBlock()
+		var fn *ssa.Function
+		var blk *ssa.BasicBlock
+		// Support block anchor values (where the underlying instruction is a BasicBlock).
+		if b, ok := ssa.ToBasicBlock(inst); ok && b != nil {
+			blk = b
+			fn = b.GetFunc()
+		} else {
+			fn = inst.GetFunc()
+			blk = inst.GetBlock()
+		}
 		if fn == nil || blk == nil {
 			return nil
+		}
+		instID := inst.GetId()
+		if val.cfgSiteInstID > 0 {
+			if _, ok := blk.GetInstructionById(val.cfgSiteInstID); ok {
+				instID = val.cfgSiteInstID
+			}
+		}
+		if instID == blk.GetId() {
+			// For block anchor values without a site id, choose a stable inst id inside the block
+			// for downstream consumers that expect InstID precision (prefer condition inst if present).
+			if summary := blk.BlockConditionSummary(); summary.CondInstID > 0 {
+				instID = summary.CondInstID
+			} else if last := blk.LastInst(); last != nil {
+				instID = last.GetId()
+			} else if len(blk.Insts) > 0 {
+				instID = blk.Insts[0]
+			} else {
+				instID = 0
+			}
 		}
 		ctx := &CfgCtxValue{
 			prog:    prog,
 			FuncID:  fn.GetId(),
 			BlockID: blk.GetId(),
-			InstID:  inst.GetId(),
+			InstID:  instID,
 		}
 		ctx.SetAnchorBitVector(op.GetAnchorBitVector())
 		outs = append(outs, ctx)
@@ -84,6 +111,24 @@ func expandValuesToCfgCtxList(v sfvm.Values) ([]sfvm.ValueOperator, *Program, er
 		return nil, nil, utils.Error("no cfg ctx produced")
 	}
 	return outs, prog, nil
+}
+
+// cfgCtxFromExpandedSSAValue maps one *Value to a *CfgCtxValue using the same rules as
+// expandValuesToCfgCtxList (including <getCfg> BasicBlock anchors with cfgSiteInstID).
+// Callers such as only_reachable / TopDef reach filters must use this instead of assuming
+// nativeCallGetCFG still returns *CfgCtxValue.
+func cfgCtxFromExpandedSSAValue(prog *Program, val *Value) *CfgCtxValue {
+	if prog == nil || val == nil || val.IsNil() {
+		return nil
+	}
+	outs, _, err := expandValuesToCfgCtxList(sfvm.ValuesOf(val))
+	if err != nil || len(outs) == 0 {
+		return nil
+	}
+	if c, ok := outs[0].(*CfgCtxValue); ok && c != nil && !c.IsEmpty() {
+		return c
+	}
+	return nil
 }
 
 // coerceCfgCallInputs ensures the pipe carries CfgCtxValue: if it already does, returns v unchanged;
@@ -122,29 +167,50 @@ func fetchProgramFromCfgValues(v sfvm.Values) (*Program, error) {
 }
 
 func nativeCallGetCFG(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
-	out, _, err := expandValuesToCfgCtxList(v)
+	prog, err := fetchProgram(v)
 	if err != nil {
 		return false, nil, err
 	}
-	return true, sfvm.NewValues(out), nil
-}
-
-func nativeCallCFGBlock(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
-	return mapCfgCtxValues(v, "no block info", func(prog *Program, _ sfvm.ValueOperator, ctx *CfgCtxValue, out *[]sfvm.ValueOperator) {
-		s := fmt.Sprintf("func=%d block=%d", ctx.FuncID, ctx.BlockID)
-		*out = append(*out, prog.NewConstValue(s))
+	var outs []sfvm.ValueOperator
+	_ = v.Recursive(func(op sfvm.ValueOperator) error {
+		val, ok := op.(*Value)
+		if !ok || val == nil || val.IsNil() {
+			return nil
+		}
+		inst := val.getInstruction()
+		if inst == nil {
+			return nil
+		}
+		blk := inst.GetBlock()
+		if b, ok := ssa.ToBasicBlock(inst); ok && b != nil {
+			blk = b
+		}
+		if blk == nil {
+			return nil
+		}
+		bv, berr := prog.NewValue(blk)
+		if berr != nil || bv == nil {
+			return nil
+		}
+		if inst.GetId() != blk.GetId() {
+			bv.cfgSiteInstID = inst.GetId()
+		}
+		bv.SetAnchorBitVector(op.GetAnchorBitVector())
+		outs = append(outs, bv)
+		return nil
 	})
-}
-
-func nativeCallCFGInst(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
-	return mapCfgCtxValues(v, "no inst info", func(prog *Program, _ sfvm.ValueOperator, ctx *CfgCtxValue, out *[]sfvm.ValueOperator) {
-		s := fmt.Sprintf("func=%d block=%d inst=%d", ctx.FuncID, ctx.BlockID, ctx.InstID)
-		*out = append(*out, prog.NewConstValue(s))
-	})
+	if len(outs) == 0 {
+		return false, nil, utils.Error("no cfg block produced")
+	}
+	return true, sfvm.NewValues(outs), nil
 }
 
 func nativeCallCFGCondition(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
-	return mapCfgCtxValues(v, "cfgCondition: no condition info", func(prog *Program, _ sfvm.ValueOperator, ctx *CfgCtxValue, out *[]sfvm.ValueOperator) {
+	pipe, _, err := coerceCfgCallInputs(v)
+	if err != nil {
+		return false, nil, utils.Wrap(err, "cfgCondition")
+	}
+	return mapCfgCtxValues(pipe, "cfgCondition: no condition info", func(prog *Program, _ sfvm.ValueOperator, ctx *CfgCtxValue, out *[]sfvm.ValueOperator) {
 		summary, err := getBlockConditionSummaryByCfgCtx(prog, ctx)
 		if err != nil || summary == nil {
 			return
@@ -154,7 +220,11 @@ func nativeCallCFGCondition(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.Nat
 }
 
 func nativeCallCFGConditionValues(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
-	return mapCfgCtxValues(v, "cfgConditionValues: no condition values", func(prog *Program, _ sfvm.ValueOperator, ctx *CfgCtxValue, out *[]sfvm.ValueOperator) {
+	pipe, _, err := coerceCfgCallInputs(v)
+	if err != nil {
+		return false, nil, utils.Wrap(err, "cfgConditionValues")
+	}
+	return mapCfgCtxValues(pipe, "cfgConditionValues: no condition values", func(prog *Program, _ sfvm.ValueOperator, ctx *CfgCtxValue, out *[]sfvm.ValueOperator) {
 		summary, err := getBlockConditionSummaryByCfgCtx(prog, ctx)
 		if err != nil || summary == nil {
 			return
@@ -397,8 +467,8 @@ func newGuardPredicate(
 }
 
 // ifRejoinsWithoutElsePayload：无实质 else 时，Yak 常把 then 接一条边到汇合 M，而 **False 直接是 M 块**
-//（M 上还有到后续 if 的出边，故不能用「两枝块都单后继且相同」来判）。此时该 if 对更后面的 sink 不增加分支约束
-//（与 for 内 if(continue) vs 落到 sink 不同，后者 false 块不是 then 的唯一下一跳）。
+// （M 上还有到后续 if 的出边，故不能用「两枝块都单后继且相同」来判）。此时该 if 对更后面的 sink 不增加分支约束
+// （与 for 内 if(continue) vs 落到 sink 不同，后者 false 块不是 then 的唯一下一跳）。
 func ifRejoinsWithoutElsePayload(fn *ssa.Function, tBranch, fBranch int64) bool {
 	if fn == nil || tBranch <= 0 || fBranch <= 0 {
 		return false

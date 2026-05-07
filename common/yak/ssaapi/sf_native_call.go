@@ -161,8 +161,6 @@ const (
 	NativeCall_CFGReachPath       = "cfgReachPath"
 	NativeCall_CFGCondition       = "cfgCondition"
 	NativeCall_CFGConditionValues = "cfgConditionValues"
-	NativeCall_CFGBlockInfo       = "cfgBlock"
-	NativeCall_CFGInstInfo        = "cfgInst"
 
 	// NativeCall_ReachabilityGuard reports mustExecute(from-entry) for a target point and optional predicates.
 	NativeCall_ReachabilityGuard = "reachabilityGuard"
@@ -1513,16 +1511,14 @@ func init() {
 	)
 
 	// ---- CFG helpers (intra-procedural, stage-1) ----
-	registerNativeCall(NativeCall_GetCFG, nc_func(nativeCallGetCFG), nc_desc(`获取输入命中点的 CFG 上下文（函数/基本块/指令定位），供 cfg* 系列 native call 使用。`))
-	registerNativeCall(NativeCall_CFGGuards, nc_func(nativeCallCFGGuards), nc_desc(`CFG guard：链上 cfg 为 sink；链上可为 SSA value（隐式同 <getCfg>）或 CfgCtx。同函数内扫两路分支：头块须 CFG 可达 sink；若真分支不可达 sink 且假分支可达（或对称），则输出 GuardPredicateValue（截断侧 kind 在分支区域内扫 return/panic/break/continue）。若无此类分支则输出 kind=none 的合成 cfgGuard（便于 .kind?{!have:"earlyReturn"} 等过滤不断链）。String 形如 cfgGuard(...)。polarity/kind 见 GuardKind*。无 config。详见 control_flow_limitations.md cfgGuards 一节。`))
+	registerNativeCall(NativeCall_GetCFG, nc_func(nativeCallGetCFG), nc_desc(`返回输入命中点所属基本块的 SSA Value（BasicBlock），作为 cfg* 系列 native call 的统一锚点；下游会自动扩展为内部 CfgCtx（func/block/inst）。`))
+	registerNativeCall(NativeCall_CFGGuards, nc_func(nativeCallCFGGuards), nc_desc(`CFG guard：链上 cfg 为 sink；链上可为 SSA value（隐式同 <getCfg>）或 CfgCtx。同函数内扫两路分支：头块须 CFG 可达 sink；若真分支不可达 sink 且假分支可达（或对称），则输出 GuardPredicateValue（截断侧 kind 在分支区域内扫 return/panic/break/continue）。若无此类分支则输出 kind=none 的合成 cfgGuard（便于过滤不断链）。String 形如 cfgGuard(...)。polarity/kind 见 GuardKind*。可用 ?{opcode: return} / ?{opcode: panic} / ?{opcode: jump} 作为 Kind 的别名过滤（对应 earlyReturn / earlyPanic / earlyBreak+earlyContinue）；建议替代 .kind?{have:"earlyReturn"}。无 config。详见 control_flow_limitations.md cfgGuards 一节。`))
 	registerNativeCall(NativeCall_CFGDominates, nc_func(nativeCallCFGDominates), nc_desc(`CFG 支配（必经 target）：从函数入口沿控制流到当前 cfg 是否必经 target cfg；等价于图论上 target 支配当前点（同函数内）。同基本块且当前点与 target 的 InstID 均落在该块 Insts 中时按指令序细化。链上可为 SSA value（隐式同 <getCfg>）或 CfgCtx。config：target="$var" 或 target: $var（target 可为 getCfg 结果或 SSA value）。`))
 	registerNativeCall(NativeCall_CFGPostDom, nc_func(nativeCallCFGPostDominates), nc_desc(`CFG 后支配（必经 target）：从当前 cfg 沿控制流走向函数出口是否必经 target cfg；等价于图论上 target 后支配当前点（同函数内，最小虚拟出口）。同基本块且当前点与 target 的 InstID 均落在该块 Insts 中时按指令序细化。链上可为 SSA value（隐式同 <getCfg>）或 CfgCtx。config：target="$var" 或 target: $var。`))
 	registerNativeCall(NativeCall_CFGReachable, nc_func(nativeCallCFGReachable), nc_desc(`CFG 可达性：当前 cfg 是否可达 target cfg。链上可为 SSA value（隐式同 <getCfg>）或 CfgCtx。config：target="$var" 或 target: $var（target 可为 getCfg 结果或 SSA value）；可选 icfg=true；可选 max_depth/max_nodes。`))
 	registerNativeCall(NativeCall_CFGReachPath, nc_func(nativeCallCFGReachPath), nc_desc(`CFG 最短路径证据：从当前 cfg 到 target 的 (函数,块) 链；不可达返回空字符串。链上与 target 解析同 cfgReachable；其余 config 同 cfgReachable。`))
 	registerNativeCall(NativeCall_CFGCondition, nc_func(nativeCallCFGCondition), nc_desc(`CFG 条件摘要：返回当前 block 的条件证据（inst/value/source/schema）。config 参数：无。`))
 	registerNativeCall(NativeCall_CFGConditionValues, nc_func(nativeCallCFGConditionValues), nc_desc(`CFG 条件 value 集：返回当前 block 条件关联的 value 列表。config 参数：无。`))
-	registerNativeCall(NativeCall_CFGBlockInfo, nc_func(nativeCallCFGBlock), nc_desc(`CFG block 信息：输出 cfg 的函数/基本块定位信息（用于证据与调试）。config 参数：无。`))
-	registerNativeCall(NativeCall_CFGInstInfo, nc_func(nativeCallCFGInst), nc_desc(`CFG inst 信息：输出 cfg 的函数/基本块/指令定位信息（用于证据与调试）。config 参数：无。`))
 	registerNativeCall(NativeCall_ReachabilityGuard, nc_func(nativeCallReachabilityGuard), nc_desc(`可达性守卫（mustExecute）：从函数入口起 target 是否在每条出路上必执行。返回值（可多项）：入口全路径必达且 cfgPostDominates 成立时仅返回布尔常量 true；入口 CFG 不可达 target 时返回 false；否则返回到达 target 时路径上的条件 SSA value 列表（CondValueID 顺序，嵌套 if/loop/switch 等可能对应多项）。跨 Program/跨函数/无入口信息时返回 false。必达判定依赖后支配，merge 块上可能保守。管道上可选同函数 SSA 作锚；必填 target="$to"。mode 仅 mustExecute。`))
 }
 

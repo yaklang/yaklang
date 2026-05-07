@@ -104,7 +104,7 @@ Controller.__ref__<getMembers>?{.annotation.*Mapping && !.annotation.ResponseBod
 $entryMethods<getReturns>?{<typeName>?{have: String}} as $sink;
 $sink #{
     until: `* & $params `,
-    exclude: `*?{opcode: phi}`,
+    exclude: `*?{<getCfg()><cfgGuards()>?{opcode: return}}`,
 }-> as $source;
 $source<dataflow(<<<CODE
 *?{opcode: call} as $__next__

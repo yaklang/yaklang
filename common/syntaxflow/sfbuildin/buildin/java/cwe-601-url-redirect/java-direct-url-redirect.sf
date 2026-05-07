@@ -116,7 +116,7 @@ check $sink;
 $sink #{
     until:`* & $source`,
     exclude:`*?{opcode:call}?{!<self> & $source}?{!<self> & $sink}`,
-    exclude:`*?{opcode:phi}`,
+    exclude:`*?{<getCfg()><cfgGuards()>?{opcode: return}}`,
 }->as $high;
 
 alert $high for {

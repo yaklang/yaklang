@@ -51,7 +51,7 @@ REFERENCE
 StreamingReader?{<typeName>?{have:"com.monitorjbl.xlsx.StreamingReader"}}.builder().open(* as $xssinput)
 $xssinput#{
     until: '* & $entry',
-    exclude: "*?{opcode:phi}"
+    exclude: `*?{<getCfg()><cfgGuards()>?{opcode: return}}`
 }->as $result
 
 alert $result for {

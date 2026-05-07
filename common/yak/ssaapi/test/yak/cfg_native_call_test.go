@@ -2,7 +2,7 @@ package ssaapi
 
 // 本文件用 SyntaxFlow 覆盖以下 native call（与 sf_native_call 常量名对应）：
 //   getCfg, cfgGuards, cfgDominates, cfgPostDominates, cfgReachable, cfgReachPath,
-//   cfgCondition, cfgConditionValues, cfgBlock, cfgInst, reachabilityGuard
+//   cfgCondition, cfgConditionValues, reachabilityGuard
 // 每个 native 对应独立测试；cfgGuards / cfgDominates / cfgPostDominates / cfgReachable / cfgReachPath 含多个 t.Run 子场景。
 // cfgDominates：从入口到「当前 cfg」是否必经 target（图论 target 支配当前）。cfgPostDominates：从「当前 cfg」到出口是否必经 target（图论 target 后支配当前）。
 
@@ -89,54 +89,8 @@ $arg<getCfg()> as $cfg
 			vs := res.GetValues("cfg")
 			res.Show()
 			require.NotEmpty(t, vs)
-			require.Contains(t, vs[0].String(), "block=")
-			s, ok := vs[0].GetConstValue().(string)
-			require.True(t, ok)
-			require.True(t, ssaapi.IsCfgCtxURLDisplayString(s))
-		},
-	})
-}
-
-// TestNativeCall_cfgBlock 覆盖 NativeCall_CFGBlockInfo（cfgBlock）。
-func TestNativeCall_cfgBlock(t *testing.T) {
-	runSyntaxFlowExpect(t, `
-c = 1
-if (c) {
-	x = "a"
-} else {
-	x = "b"
-}
-println(x)
-`, `
-println(* #-> as $arg)
-$arg<getCfg()> as $argCfg
-$argCfg<cfgBlock()> as $blk
-`, sfExpect{
-		WantMinCount: map[string]int{"blk": 1},
-		WantVarContains: map[string][]string{
-			"blk": {"func=", "block="},
-		},
-	})
-}
-
-// TestNativeCall_cfgInst 覆盖 NativeCall_CFGInstInfo（cfgInst）。
-func TestNativeCall_cfgInst(t *testing.T) {
-	runSyntaxFlowExpect(t, `
-c = 1
-if (c) {
-	x = "a"
-} else {
-	x = "b"
-}
-println(x)
-`, `
-println(* #-> as $arg)
-$arg<getCfg()> as $argCfg
-$argCfg<cfgInst()> as $ins
-`, sfExpect{
-		WantMinCount: map[string]int{"ins": 1},
-		WantVarContains: map[string][]string{
-			"ins": {"inst="},
+			// getCfg now returns block value (SSA BasicBlock) instead of cfgCtx display string.
+			require.Contains(t, strings.ToLower(vs[0].String()), "basicblock")
 		},
 	})
 }
@@ -156,6 +110,24 @@ $arg<getCfg()> as $sinkCfg
 $sinkCfg<cfgGuards()> as $guards
 `, sfExpect{
 			WantResultContains: []string{"cfgGuard(kind=" + ssaapi.GuardKindEarlyReturn},
+		})
+	})
+	t.Run("filter_guards_by_opcode_return_alias", func(t *testing.T) {
+		runSyntaxFlowExpect(t, `
+a = 1
+if (a) {
+	return
+}
+println("ok")
+`, `
+println(* #-> as $arg)
+$arg<getCfg()><cfgGuards()>?{opcode: return} as $hit
+$arg<getCfg()><cfgGuards()>?{!opcode: return} as $miss
+`, sfExpect{
+			WantMinCount: map[string]int{"hit": 1},
+			PostCheck: func(t *testing.T, res *ssaapi.SyntaxFlowResult) {
+				require.Empty(t, res.GetValues("miss"), "earlyReturn guard 应被 !opcode:return 滤掉")
+			},
 		})
 	})
 	t.Run("cfgGuards_implicit_getCfg_on_chain", func(t *testing.T) {
@@ -242,6 +214,24 @@ $sinkCfg<cfgGuards()> as $guards
 			WantResultContains: []string{"cfgGuard(kind=" + ssaapi.GuardKindEarlyPanic},
 		})
 	})
+	t.Run("filter_guards_by_opcode_panic_alias", func(t *testing.T) {
+		runSyntaxFlowExpect(t, `
+a = 1
+if (a) {
+	panic("x")
+}
+println("ok")
+`, `
+println(* #-> as $arg)
+$arg<getCfg()><cfgGuards()>?{opcode: panic} as $hit
+$arg<getCfg()><cfgGuards()>?{opcode: return} as $miss
+`, sfExpect{
+			WantMinCount: map[string]int{"hit": 1},
+			PostCheck: func(t *testing.T, res *ssaapi.SyntaxFlowResult) {
+				require.Empty(t, res.GetValues("miss"), "earlyPanic guard 不应命中 opcode:return")
+			},
+		})
+	})
 	t.Run("panic_on_false_branch_polarity_true", func(t *testing.T) {
 		// else 侧 panic、then 侧到达 sink：落到 sink 需 cond 为真，且 kind 取自 panic 所在分支。
 		runSyntaxFlowExpect(t, `
@@ -276,6 +266,21 @@ $sinkCfg<cfgGuards()> as $guards
 			WantResultContains: []string{"cfgGuard(kind=" + ssaapi.GuardKindEarlyBreak},
 		})
 	})
+	t.Run("filter_guards_by_opcode_jump_alias_for_break", func(t *testing.T) {
+		runSyntaxFlowExpect(t, `
+for i = 0; i < 3; i = i + 1 {
+	if (i == 1) {
+		break
+	}
+	println("sink")
+}
+`, `
+println(*?{have: "sink"} #-> as $arg)
+$arg<getCfg()><cfgGuards()>?{opcode: jump} as $hit
+`, sfExpect{
+			WantMinCount: map[string]int{"hit": 1},
+		})
+	})
 	t.Run("lists_early_continue_guard", func(t *testing.T) {
 		// for 内 if 一侧 continue（Jump→latch），另一侧到达 sink。
 		runSyntaxFlowExpect(t, `
@@ -291,6 +296,21 @@ $arg<getCfg()> as $sinkCfg
 $sinkCfg<cfgGuards()> as $guards
 `, sfExpect{
 			WantResultContains: []string{"cfgGuard(kind=" + ssaapi.GuardKindEarlyContinue},
+		})
+	})
+	t.Run("filter_guards_by_opcode_jump_alias_for_continue", func(t *testing.T) {
+		runSyntaxFlowExpect(t, `
+for i = 0; i < 3; i = i + 1 {
+	if (i < 2) {
+		continue
+	}
+	println("sink")
+}
+`, `
+println(*?{have: "sink"} #-> as $arg)
+$arg<getCfg()><cfgGuards()>?{opcode: jump} as $hit
+`, sfExpect{
+			WantMinCount: map[string]int{"hit": 1},
 		})
 	})
 }
@@ -436,7 +456,7 @@ $argCfg<cfgDominates(target="$condCfg")> as $dom
 
 	t.Run("multiple_target_cfgs_OR_same_function_only", func(t *testing.T) {
 		// 多 target：$tCfg 同时含「异函数」与「同函数」锚点，只应就与 sink 同函数的 a、b 做 OR。
-		// 多结果：两个 println 均绑定 $sink，$sinkCfg 上 cfgDominates 应对 **两个** 接收点各出一条 bool。
+		// 由于 getCfg 现在是 block anchor，两个 println 若落在同一 block，将只产生一条结果。
 		runSyntaxFlowExpect(t, `
 func fa() {
 	x = 0
@@ -459,7 +479,7 @@ println(*?{have: "20"} #-> as $sink)
 $sink<getCfg()> as $sinkCfg
 $sinkCfg<cfgDominates(target: "$tCfg")> as $dom
 `, sfExpect{
-			WantMinCount: map[string]int{"dom": 2},
+			WantMinCount: map[string]int{"dom": 1},
 			PostCheck: func(t *testing.T, res *ssaapi.SyntaxFlowResult) {
 				for _, v := range res.GetValues("dom") {
 					require.Contains(t, v.String(), "true")
@@ -655,7 +675,7 @@ $argCfg<cfgPostDominates(target="$condCfg")> as $pd
 
 	t.Run("multiple_target_cfgs_OR_same_function_only", func(t *testing.T) {
 		// 多 target：$tCfg 同时含 fa 的 println 与 fb 内两个 sink，仅同函数锚点参与 OR。
-		// 多结果：$r 合并 a、b 两个 receiver，应对 **两个** 位置各出一条 cfgPostDominates 结果且均为 true。
+		// 由于 getCfg 现在是 block anchor，a/b 若落在同一 block，将只产生一条结果。
 		runSyntaxFlowExpect(t, `
 func fa() {
 	println(99)
@@ -678,7 +698,7 @@ b as $r
 $r<getCfg()> as $rCfg
 $rCfg<cfgPostDominates(target: "$tCfg")> as $pd
 `, sfExpect{
-			WantMinCount: map[string]int{"pd": 2},
+			WantMinCount: map[string]int{"pd": 1},
 			PostCheck: func(t *testing.T, res *ssaapi.SyntaxFlowResult) {
 				for _, v := range res.GetValues("pd") {
 					require.Contains(t, v.String(), "true")
