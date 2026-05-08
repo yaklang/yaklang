@@ -520,11 +520,11 @@ func newConfig(ctx context.Context) *Config {
 		AiTransactionAutoRetry:             5,
 		TimelineContentSizeLimit:           50 * 1024, // Default limit for 50k tokens
 		Guardian:                           NewAsyncGuardian(ctx, id),
-		PerTaskUserInteractiveLimitedTimes: 3, // Default to 3 times
+		PerTaskUserInteractiveLimitedTimes: 1, // Default to 3 times
 		EnablePlanAndExec:                  true,
 		AllowRequireForUserInteract:        true,
 		ToolComposeConcurrency:             2,
-		PlanExecTaskConcurrency:            1,
+		PlanExecTaskConcurrency:            3,
 		Workdir:                            "",
 		MemoryPoolSize:                     10 * 1024, // 10k tokens
 		MemoryPool:                         omap.NewOrderedMap(make(map[string]*MemoryEntity)),
