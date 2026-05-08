@@ -378,17 +378,7 @@ func (m *PromptContextProvider) PromptForToolCallResultsForLastN(n int) string {
 
 // memory tools current task info
 func (m *PromptContextProvider) CurrentTaskInfo() string {
-	if m.CurrentTask == nil {
-		return "BUG:... currentTaskInfo cannot be generated in `CurrentTaskInfo`, no current task"
-	}
-	results, err := utils.RenderTemplate(__prompt_currentTaskInfo, map[string]interface{}{
-		"ContextProvider": m,
-	})
-	if err != nil {
-		return "BUG:... currentTaskInfo cannot be generated in `CurrentTaskInfo` err: " + err.Error()
-	}
-
-	return results
+	return m.RenderCurrentTaskInfo(m.CurrentTask)
 }
 
 func (m *PromptContextProvider) SharedEvidenceContext() string {

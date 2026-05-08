@@ -775,13 +775,7 @@ func formatDuration(d time.Duration) string {
 }
 
 func (t *AiTask) GenerateTaskSummaryPrompt() (string, error) {
-	results, err := utils.RenderTemplate(__prompt_TaskSummary, map[string]any{
-		"ContextProvider": t.Coordinator.ContextProvider,
-	})
-	if err != nil {
-		return "", err
-	}
-	return results, nil
+	return t.quickBuildTaskPrompt(__prompt_TaskSummary, nil)
 }
 
 func SelectSummary(task *AiTask, callResult *aitool.ToolResult) string {

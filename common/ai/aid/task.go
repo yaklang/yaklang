@@ -199,7 +199,8 @@ func (t *AiTask) GetUserInput() string {
 // 走老语义即可, 这里返回 (root user input, "")。
 //
 // 关键词: GetUserInputSplitForCache, PE-TASK frozen user context,
-//        rawQuery 留空, prefix cache
+//
+//	rawQuery 留空, prefix cache
 func (t *AiTask) GetUserInputSplitForCache() (rawQuery, frozenUserContext string) {
 	if utils.IsNil(t.ParentTask) {
 		// 普通 ReAct / root 任务: 用户原话保留在 dynamic 段, 不冻结
@@ -318,6 +319,7 @@ func (t *AiTask) MarshalJSON() ([]byte, error) {
 		Index                string    `json:"index"`
 		Name                 string    `json:"name"`
 		Goal                 string    `json:"goal"`
+		SemanticIdentifier   string    `json:"semantic_identifier"`
 		Subtasks             []*AiTask `json:"subtasks,omitempty"`
 		Progress             string    `json:"progress"` // 添加进度字段
 		Summary              string    `json:"summary"`
@@ -342,6 +344,7 @@ func (t *AiTask) MarshalJSON() ([]byte, error) {
 		TotalToolCallCount:   int64(len(t.GetAllToolCallResults())),
 		SuccessToolCallCount: t.GetSuccessCallCount(),
 		FailToolCallCount:    t.GetFailCallCount(),
+		SemanticIdentifier:   t.SemanticIdentifier,
 	})
 }
 
@@ -507,4 +510,18 @@ func (t *AiTask) TaskContinueCount() int {
 		return reactLoop.GetCurrentIterationIndex()
 	}
 	return 0
+}
+
+func (t *AiTask) CanContinue() bool {
+	if t == nil {
+		return false
+	}
+	maxContinue := int64(0)
+	if t.Coordinator != nil {
+		maxContinue = t.Coordinator.MaxTaskContinue
+	}
+	if maxContinue <= 0 {
+		return true
+	}
+	return int64(t.TaskContinueCount()) < maxContinue
 }

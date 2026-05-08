@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"io"
 	"slices"
-	"strings"
-	"text/template"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 
@@ -16,66 +14,25 @@ import (
 )
 
 func (t *AiTask) generateToolCallResponsePrompt(result *aitool.ToolResult, targetTool *aitool.Tool) (string, error) {
-	templatedata := map[string]any{
-		"ContextProvider": t.ContextProvider,
-		"Tool":            targetTool,
-		"Result":          result,
-	}
-	temp, err := template.New("tool-result").Parse(__prompt_ToolResultToDecisionPromptTemplate)
-	if err != nil {
-		return "", fmt.Errorf("error parsing tool result template: %w", err)
-	}
-	var promptBuilder strings.Builder
-	err = temp.Execute(&promptBuilder, templatedata)
-	if err != nil {
-		return "", fmt.Errorf("error executing tool result template: %w", err)
-	}
-	return promptBuilder.String(), nil
+	return t.quickBuildTaskPrompt(__prompt_ToolResultToDecisionPromptTemplate, map[string]any{
+		"Tool":   targetTool,
+		"Result": result,
+	})
 }
 
 func (t *AiTask) generateStatusSummaryPrompt() (string, error) {
-	templatedata := map[string]any{
-		"ContextProvider": t.ContextProvider,
-	}
-	temp, err := template.New("tool-result").Parse(__prompt_ToolResultToDecisionPromptTemplate)
-	if err != nil {
-		return "", fmt.Errorf("error parsing tool result template: %w", err)
-	}
-	var promptBuilder strings.Builder
-	err = temp.Execute(&promptBuilder, templatedata)
-	if err != nil {
-		return "", fmt.Errorf("error executing tool result template: %w", err)
-	}
-	return promptBuilder.String(), nil
+	return t.quickBuildTaskPrompt(__prompt_ToolResultToDecisionPromptTemplate, nil)
 }
 
 func (t *AiTask) generateDynamicPlanPrompt(userInput string) (string, error) {
-	// 创建模板数据
-	templateData := map[string]interface{}{
-		"ContextProvider": t.ContextProvider,
-		"UserInput":       userInput,
-	}
-
-	// 解析prompt模板
-	tmpl, err := template.New("dynamic-plan").Parse(__prompt_DynamicPlan)
-	if err != nil {
-		return "", fmt.Errorf("error parsing dynamic plan prompt template: %w", err)
-	}
-
-	// 渲染模板
-	var promptBuilder strings.Builder
-	err = tmpl.Execute(&promptBuilder, templateData)
-	if err != nil {
-		return "", fmt.Errorf("error executing dynamic plan prompt template: %w", err)
-	}
-
-	return promptBuilder.String(), nil
+	return t.quickBuildTaskPrompt(__prompt_DynamicPlan, map[string]any{
+		"UserInput": userInput,
+	})
 }
 
 func (t *AiTask) GenerateDeepThinkPlanPrompt(suggestion string) (string, error) {
-	return t.quickBuildPrompt(__prompt_DeepthinkTaskListPrompt, map[string]any{
-		"ContextProvider": t.ContextProvider,
-		"UserInput":       suggestion,
+	return t.quickBuildTaskPrompt(__prompt_DeepthinkTaskListPrompt, map[string]any{
+		"UserInput": suggestion,
 	})
 }
 
