@@ -137,12 +137,14 @@ func TestReActLoop_LoadSkillResources_ActionInSchema(t *testing.T) {
 		t.Fatal("main prompt was not captured")
 	}
 
-	if !strings.Contains(capturedMainPrompt, "load_skill_resources") {
-		t.Error("load_skill_resources should appear in prompt schema when skills are configured")
+	// 关键词: SCHEMA enum 精确判断, with skills 启用断言 (高静态段无条件介绍能力)
+	schemaBlock := extractSchemaBlock(capturedMainPrompt)
+	if !strings.Contains(schemaBlock, "load_skill_resources") {
+		t.Error("load_skill_resources should appear in SCHEMA enum when skills are configured")
 	}
 
-	if !strings.Contains(capturedMainPrompt, "resource_path") {
-		t.Error("resource_path parameter should appear in prompt schema")
+	if !strings.Contains(schemaBlock, "resource_path") {
+		t.Error("resource_path parameter should appear in SCHEMA")
 	}
 }
 
@@ -170,8 +172,12 @@ func TestReActLoop_LoadSkillResources_WithoutSkills(t *testing.T) {
 	}
 	_ = loop.Execute("test", context.Background(), "test")
 
-	if capturedMainPrompt != "" && strings.Contains(capturedMainPrompt, "load_skill_resources") {
-		t.Error("load_skill_resources should NOT appear when no skills are configured")
+	// 关键词: SCHEMA enum 精确判断, 无 skills 时 enum 不含 load_skill_resources
+	if capturedMainPrompt != "" {
+		schemaBlock := extractSchemaBlock(capturedMainPrompt)
+		if strings.Contains(schemaBlock, "load_skill_resources") {
+			t.Error("load_skill_resources should NOT appear in SCHEMA enum when no skills are configured")
+		}
 	}
 }
 

@@ -149,15 +149,18 @@ func TestPromptManager_AssembleLoopPrompt_SectionOrder(t *testing.T) {
 	require.Equal(t, "section.frozen_block.tool_inventory", sections[1].Children[0].Key)
 	require.Equal(t, reactloops.PromptSectionRoleFrozenBlock, sections[1].Children[0].Role)
 
-	// semi_dynamic 段子结构: skills_context + schema + output_example
-	// (Tool/Forge 已迁出, OutputExample 从 high_static 迁入并紧跟 Schema 之后)。
-	// 关键词: semi_dynamic children, output_example 迁入断言
-	require.Len(t, sections[2].Children, 3)
+	// semi_dynamic 段子结构: skills_context + schema + output_example +
+	// task_instruction (Tool/Forge 已迁出, OutputExample 从 high_static 迁入并紧跟
+	// Schema 之后, TaskInstruction 同样从 high_static 迁入并紧跟 OutputExample 之后)。
+	// 关键词: semi_dynamic children, output_example 迁入断言, task_instruction 迁入断言
+	require.Len(t, sections[2].Children, 4)
 	require.Equal(t, "section.semi_dynamic.skills_context", sections[2].Children[0].Key)
 	require.Equal(t, "section.semi_dynamic.schema", sections[2].Children[1].Key)
 	require.Equal(t, reactloops.PromptSectionRoleSemiDynamic, sections[2].Children[0].Role)
 	require.Equal(t, reactloops.PromptSectionRoleSemiDynamic, sections[2].Children[1].Role)
 	require.Equal(t, "section.semi_dynamic.output_example", sections[2].Children[2].Key)
+	require.Equal(t, "section.semi_dynamic.task_instruction", sections[2].Children[3].Key)
+	require.Equal(t, reactloops.PromptSectionRoleSemiDynamic, sections[2].Children[3].Role)
 
 	// timeline_open 段子结构 (P1-C2): timeline_open + current_time + workspace +
 	// session_evidence (本用例无 SessionEvidence -> 不出现) + user_history.
