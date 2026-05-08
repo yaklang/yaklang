@@ -493,7 +493,7 @@ func newConfig(ctx context.Context) *Config {
 		EnablePlanAndExec:                  true,
 		AllowRequireForUserInteract:        true,
 		ToolComposeConcurrency:             2,
-		PlanExecTaskConcurrency:            3,
+		PlanExecTaskConcurrency:            1,
 		Workdir:                            "",
 		MemoryPoolSize:                     10 * 1024, // 10k tokens
 		MemoryPool:                         omap.NewOrderedMap(make(map[string]*MemoryEntity)),
