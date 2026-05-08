@@ -320,6 +320,7 @@ func (t *AiTask) MarshalJSON() ([]byte, error) {
 		Name                 string    `json:"name"`
 		Goal                 string    `json:"goal"`
 		SemanticIdentifier   string    `json:"semantic_identifier"`
+		DependsOn            []string  `json:"depends_on,omitempty"`
 		Subtasks             []*AiTask `json:"subtasks,omitempty"`
 		Progress             string    `json:"progress"` // 添加进度字段
 		Summary              string    `json:"summary"`
@@ -334,6 +335,7 @@ func (t *AiTask) MarshalJSON() ([]byte, error) {
 		Index:                t.Index,
 		Name:                 t.Name,
 		Goal:                 t.Goal,
+		DependsOn:            t.DependsOn,
 		Subtasks:             t.Subtasks,
 		Progress:             progress,
 		Summary:              t.GetSummary(),
