@@ -656,7 +656,9 @@ func (c *Config) parseProjectWithFirstIncrementalCompile() (*Program, error) {
 			} else {
 				irProgram.OverlayLayers = nil
 			}
-			ssadb.UpdateProgram(irProgram)
+			if err := ssadb.UpdateProgramWithError(irProgram); err != nil {
+				log.Errorf("update incremental base program overlay failed: name=%s err=%v", irProgram.ProgramName, err)
+			}
 			// 更新 prog.irProgram 字段，确保 IsIncrementalCompile() 能正确工作
 			prog.irProgram = irProgram
 		}
@@ -707,7 +709,9 @@ func saveOverlayToDatabase(overlay *ProgramOverLay, diffProgram *Program) error 
 	irProgram.OverlayLayers = layerNames
 
 	// 更新数据库（只更新当前 program 的 overlay 信息，不更新 layer）
-	ssadb.UpdateProgram(irProgram)
+	if err := ssadb.UpdateProgramWithError(irProgram); err != nil {
+		log.Errorf("save overlay metadata failed: name=%s err=%v", irProgram.ProgramName, err)
+	}
 
 	return nil
 }
@@ -722,10 +726,21 @@ func hasDeleteEntries(fileHashMap map[string]int) bool {
 }
 
 func createDeleteOnlyProgram(ctx context.Context, programName string, projectID uint64) *Program {
-	irProg := ssadb.CreateProgram(programName, "", ssadb.Application)
+	irProg, err := ssadb.CreateProgramWithError(programName, "", ssadb.Application)
+	if err != nil {
+		log.Errorf("create delete-only program failed: name=%s err=%v", programName, err)
+		irProg = &ssadb.IrProgram{
+			ProgramName: programName,
+			ProgramKind: ssadb.Application,
+		}
+	}
 	if projectID > 0 {
 		irProg.ProjectID = projectID
-		ssadb.UpdateProgram(irProg)
+		if irProg.ID > 0 {
+			if err := ssadb.UpdateProgramWithError(irProg); err != nil {
+				log.Errorf("update delete-only program project id failed: name=%s err=%v", irProg.ProgramName, err)
+			}
+		}
 	}
 	cfg, err := ssaconfig.New(
 		ssaconfig.ModeSSACompile,

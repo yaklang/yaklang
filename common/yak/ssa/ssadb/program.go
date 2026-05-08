@@ -72,14 +72,25 @@ func (*IrProgram) TableName() string {
 	return TableIrPrograms
 }
 
-func CreateProgram(name, version string, kind ProgramKind) *IrProgram {
+func CreateProgramWithError(name, version string, kind ProgramKind) (*IrProgram, error) {
 	db := GetDB().Model(&IrProgram{})
 	out := &IrProgram{
 		ProgramName: name,
 		Version:     version,
 		ProgramKind: kind,
 	}
-	db.Save(out)
+	if err := db.Save(out).Error; err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func CreateProgram(name, version string, kind ProgramKind) *IrProgram {
+	out, err := CreateProgramWithError(name, version, kind)
+	if err != nil {
+		log.Errorf("create program failed: name=%s kind=%s version=%s err=%v", name, kind, version, err)
+		return nil
+	}
 	return out
 }
 
@@ -118,12 +129,25 @@ func GetProgram(name string, kind ProgramKind) (*IrProgram, error) {
 	return &p, nil
 }
 
-func UpdateProgram(prog *IrProgram) {
-	GetDB().Model(&IrProgram{}).
+func UpdateProgramWithError(prog *IrProgram) error {
+	if prog == nil {
+		return utils.Errorf("update program failed: program is nil")
+	}
+	return GetDB().Model(&IrProgram{}).
 		Where("id = ?", prog.ID).
 		Where("program_name = ?", prog.ProgramName).
 		Where("program_kind = ?", prog.ProgramKind).
-		Update(prog)
+		Update(prog).Error
+}
+
+func UpdateProgram(prog *IrProgram) {
+	if err := UpdateProgramWithError(prog); err != nil {
+		if prog == nil {
+			log.Errorf("update program failed: %v", err)
+			return
+		}
+		log.Errorf("update program failed: id=%d name=%s kind=%s err=%v", prog.ID, prog.ProgramName, prog.ProgramKind, err)
+	}
 }
 
 func GetDBInProgram(program string) *gorm.DB {
