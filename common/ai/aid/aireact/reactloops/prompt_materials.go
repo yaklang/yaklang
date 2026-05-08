@@ -110,16 +110,16 @@ type PromptPrefixMaterials struct {
 	FrozenUserContext string
 }
 
+// HighStaticData 返回空 map: high-static 段已重构为完全无变量的纯静态系统提示词,
+// 模板不再读取任何字段. 让该段跨 caller / 跨 turn 字节恒定, 最大化命中
+// AI_CACHE_SYSTEM 边界. 历史的 AllowToolCall / AllowPlanAndExec /
+// HasLoadCapability 三个能力开关已移除, 由 high-static 模板无条件介绍全部能力,
+// 实际可用性以 SCHEMA enum 为准. TaskInstruction (PERSISTENT 块) 已迁到
+// SemiDynamicData, 与 OutputExample 一起作为 caller-specific 的稳定 prefix.
+//
+// 关键词: HighStaticData 去变量化, AI_CACHE_SYSTEM 字节稳定, TaskInstruction 迁移
 func (m *PromptPrefixMaterials) HighStaticData() map[string]any {
-	if m == nil {
-		return map[string]any{}
-	}
-	return map[string]any{
-		"AllowToolCall":     m.AllowToolCall,
-		"AllowPlanAndExec":  m.AllowPlanAndExec,
-		"HasLoadCapability": m.HasLoadCapability,
-		"TaskInstruction":   m.TaskInstruction,
-	}
+	return map[string]any{}
 }
 
 // SemiDynamicData 仅供 semi_dynamic_section.txt 模板消费, 当前包含:
@@ -127,12 +127,17 @@ func (m *PromptPrefixMaterials) HighStaticData() map[string]any {
 //   - Schema: 当前 react loop 的 action schema (字节稳定 across turn)
 //   - OutputExample: 当前 react loop 的输出示例, caller-specific, 不应污染
 //     high-static 段; 放在 Schema 后作为半动态 prefix cache 候选
+//   - TaskInstruction: caller 注入的 PERSISTENT 指令, caller-specific, 从
+//     high-static 段下沉到此处, 与 OutputExample 同组, 跨同一 caller 的 turn 字节稳定
 //   - RecentToolsCache: CACHE_TOOL_CALL 块 (directly_call_tool routing hint +
 //     最近工具 schema/footer), 用稳定 nonce 渲染, 字节稳定
 //
-// (Tool/Forge/Timeline frozen 已迁出到 FrozenBlock; CACHE_TOOL_CALL 已迁入此段)
+// (Tool/Forge/Timeline frozen 已迁出到 FrozenBlock; CACHE_TOOL_CALL 已迁入此段;
+// TaskInstruction 已从 high-static 迁入此段)
 //
-// 关键词: SemiDynamicData, Skills Context + Schema + OutputExample + CacheToolCall, 迁移
+// 关键词: SemiDynamicData, Skills Context + Schema + OutputExample +
+//
+//	TaskInstruction + CacheToolCall, 迁移
 func (m *PromptPrefixMaterials) SemiDynamicData() map[string]any {
 	if m == nil {
 		return map[string]any{}
@@ -141,6 +146,7 @@ func (m *PromptPrefixMaterials) SemiDynamicData() map[string]any {
 		"SkillsContext":    m.SkillsContext,
 		"Schema":           m.Schema,
 		"OutputExample":    m.OutputExample,
+		"TaskInstruction":  m.TaskInstruction,
 		"RecentToolsCache": m.RecentToolsCache,
 	}
 }

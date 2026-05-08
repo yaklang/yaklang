@@ -12,5 +12,10 @@
 <|OUTPUT_EXAMPLE|>
 {{ .OutputExample }}
 <|OUTPUT_EXAMPLE_END|>{{ end }}
+{{ if .TaskInstruction }}
+
+<|PERSISTENT|>
+{{ .TaskInstruction }}
+<|PERSISTENT_END|>{{ end }}
 {{ if .RecentToolsCache }}
 {{ .RecentToolsCache }}{{ end }}

@@ -394,12 +394,16 @@ func (pm *PromptManager) buildHighStaticObservation(
 		"Highly Static",
 		reactloops.PromptSectionRoleHighStatic,
 	)
-	// section.high_static.output_example 已迁出: caller-specific 的 OutputExample
-	// 若进入 high-static 段会让 high-static chunk hash 跨 caller 漂移, 阻断
-	// AI_CACHE_SYSTEM 段的字节级前缀缓存。新位置在 semi-dynamic 段 (Schema 之后),
-	// 见 buildSemiDynamicResidualObservation。
-	// 关键词: section.high_static.output_example 迁出, high-static 反污染,
-	//        OutputExample 迁到 semi-dynamic
+	// section.high_static 已重构为完全无变量的纯静态系统提示词:
+	//   - OutputExample (caller-specific) 已迁到 semi-dynamic 段 Schema 之后
+	//   - TaskInstruction (PERSISTENT, caller-specific) 已迁到 semi-dynamic 段
+	//   - AllowToolCall / AllowPlanAndExec / HasLoadCapability 三个能力开关已移除,
+	//     新模板无条件介绍全部能力, 实际可用性以 SCHEMA enum 为准
+	// 让 high-static chunk hash 跨 caller / 跨 turn 字节恒定, 最大化 AI_CACHE_SYSTEM
+	// 段的 prefix cache 命中率.
+	//
+	// 关键词: section.high_static 完全去变量, AI_CACHE_SYSTEM 字节稳定,
+	//        OutputExample / TaskInstruction 迁到 semi-dynamic
 	children := []*reactloops.PromptSectionObservation{
 		reactloops.NewPromptSectionObservation(
 			"section.high_static.static_preamble",
@@ -407,13 +411,6 @@ func (pm *PromptManager) buildHighStaticObservation(
 			reactloops.PromptSectionRoleHighStatic,
 			false,
 			pm.renderHighStaticPreamble(materials),
-		),
-		reactloops.NewPromptSectionObservation(
-			"section.high_static.task_instruction",
-			"Highly Static / Task Instruction",
-			reactloops.PromptSectionRoleHighStatic,
-			false,
-			renderStaticTaggedBlock("PERSISTENT", materials.TaskInstruction),
 		),
 	}
 	section.Children = filterIncludedPromptSections(children)
@@ -551,6 +548,19 @@ func (pm *PromptManager) buildSemiDynamicResidualObservation(
 			true,
 			renderStaticTaggedBlock("OUTPUT_EXAMPLE", materials.OutputExample),
 		),
+		// section.semi_dynamic.task_instruction 从 high-static 段迁入: TaskInstruction
+		// 是 caller 注入的 PERSISTENT 指令, caller-specific, 与 OutputExample 同组,
+		// 跨同一 caller 的 turn 字节稳定. 留在 high-static 段会污染 AI_CACHE_SYSTEM
+		// 边界, 因此下沉到 semi-dynamic 段 (OutputExample 之后).
+		// 关键词: section.semi_dynamic.task_instruction, PERSISTENT 迁入,
+		//        high-static 反污染
+		reactloops.NewPromptSectionObservation(
+			"section.semi_dynamic.task_instruction",
+			"Semi Dynamic / Task Instruction",
+			reactloops.PromptSectionRoleSemiDynamic,
+			true,
+			renderStaticTaggedBlock("PERSISTENT", materials.TaskInstruction),
+		),
 		// CACHE_TOOL_CALL 块从 dynamic/REFLECTION 迁到此处, 用稳定 nonce 渲染.
 		// 关键词: Semi Dynamic / Cache Tool Call, RecentToolsCache 观测节点
 		reactloops.NewPromptSectionObservation(
@@ -685,22 +695,19 @@ func (pm *PromptManager) buildDynamicObservation(
 	return reactloops.FinalizePromptContainerSection(section)
 }
 
-// renderHighStaticPreamble 单独渲染 high-static 段的"前导文" (TRAITS + 方法论
-// 协议块), 强制把 TaskInstruction 置空, 这样观测树里 static_preamble 与
-// task_instruction 两个子节点的内容不会重复出现 PERSISTENT 块。
+// renderHighStaticPreamble 渲染 high-static 段的"前导文" (TRAITS + 方法论
+// 协议块 + 能力系统介绍). 当前 high_static_section.txt 已重构为完全无变量的
+// 纯静态系统提示词, HighStaticData() 返回空 map, 这里只是把模板原文 trim 后返回.
+// 若以后又向 HighStaticData 注入 caller-specific 字段, 需要重新审视: 任何
+// caller-specific 内容都会破坏 AI_CACHE_SYSTEM 段的 prefix cache, 应优先放
+// SemiDynamicData 而不是 HighStaticData.
 //
-// OutputExample 已不再出现在 HighStaticData 里 (见 SemiDynamicData), 这里也无需
-// 再覆盖。若以后 HighStaticData 又新增 caller-specific 字段, 需要在此一并清空,
-// 否则会污染高静态段。
-//
-// 关键词: renderHighStaticPreamble, TaskInstruction 清空, high-static 反污染
+// 关键词: renderHighStaticPreamble, high-static 纯静态, AI_CACHE_SYSTEM 反污染
 func (pm *PromptManager) renderHighStaticPreamble(materials *reactloops.PromptPrefixMaterials) string {
 	if materials == nil {
 		return ""
 	}
-	preamble := materials.HighStaticData()
-	preamble["TaskInstruction"] = ""
-	rendered, err := pm.executeTemplate("loop-high-static-preamble", loopHighStaticSectionTemplate, preamble)
+	rendered, err := pm.executeTemplate("loop-high-static-preamble", loopHighStaticSectionTemplate, materials.HighStaticData())
 	if err != nil {
 		return ""
 	}
