@@ -642,17 +642,27 @@ func (c *Coordinator) FindSubtaskByIndex(index string) *AiTask {
 }
 
 func (c *Coordinator) AppendTask(t *AiTask) {
-	r := c.runtime
-	task, ok := r.TaskLink.Get(r.currentIndex())
-	if !ok {
-		log.Warnf("coordinator: append task failed, current task not found")
+	if t == nil {
 		return
 	}
-	if parent := task.ParentTask; parent != nil {
-		t.ParentTask = parent
-		parent.Subtasks = append(parent.Subtasks, t)
-		c.standardizeTaskTreeAndNotify(parent, "task appended")
+
+	parent := t.ParentTask
+	if parent == nil && c.runtime != nil {
+		currentTask, err := c.runtime.currentInteractiveTask()
+		if err != nil {
+			log.Warnf("coordinator: append task failed, current task unavailable: %v", err)
+			return
+		}
+		parent = currentTask.ParentTask
 	}
+	if parent == nil {
+		log.Warnf("coordinator: append task failed, parent task not found")
+		return
+	}
+
+	t.ParentTask = parent
+	parent.Subtasks = append(parent.Subtasks, t)
+	c.standardizeTaskTreeAndNotify(parent, "task appended")
 }
 
 // HandleSkipSubtaskInPlan 处理跳过子任务的同步事件
@@ -702,10 +712,13 @@ func (c *Coordinator) HandleSkipSubtaskInPlan(event *ypb.AIInputEvent) error {
 	subtaskIndex := utils.InterfaceToString(params["subtask_index"])
 	if subtaskIndex == "" {
 		if utils.InterfaceToBoolean(params["skip_current_task"]) {
-			// 跳过当前任务
-			currentTask, ok := c.runtime.TaskLink.Get(c.runtime.currentIndex())
-			if !ok || currentTask == nil {
-				sendFailResponse("no current task found to skip")
+			currentTask, err := c.runtime.currentInteractiveTask()
+			if err != nil || currentTask == nil {
+				if err != nil {
+					sendFailResponse("no unambiguous current task found to skip: " + err.Error())
+				} else {
+					sendFailResponse("no current task found to skip")
+				}
 				return nil
 			}
 			subtaskIndex = currentTask.Index

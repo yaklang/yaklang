@@ -32,6 +32,7 @@ type AICallerConfigIf interface {
 	CallAIResponseConsumptionCallback(int)
 	GetAITransactionAutoRetryCount() int64
 	GetToolComposeConcurrency() int
+	GetPlanExecTaskConcurrency() int
 	GetTimelineContentSizeLimit() int64
 	GetUserInteractiveLimitedTimes() int64
 	GetMaxIterationCount() int64
