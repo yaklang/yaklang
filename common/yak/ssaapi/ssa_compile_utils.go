@@ -24,6 +24,7 @@ var (
 
 const (
 	antlrWorkerStateKey = "antlr_worker_state"
+	largeProjectByteCap = 16 * 1024 * 1024
 )
 
 var (
@@ -44,6 +45,19 @@ func antlrCacheResetEveryFiles() int {
 		}
 	})
 	return antlrCacheResetEveryFilesCached
+}
+
+func largeProjectCompileConcurrency() int {
+	concurrency := 2
+	if raw := strings.TrimSpace(os.Getenv("YAK_SSA_LARGE_PROJECT_CONCURRENCY")); raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil {
+			concurrency = v
+		}
+	}
+	if concurrency <= 0 {
+		return 1
+	}
+	return concurrency
 }
 
 type antlrWorkerState struct {
@@ -155,11 +169,22 @@ func (c *Config) GetFileHandler(
 	initWorker := func() *utils.SafeMap[any] {
 		return parser.initWorker()
 	}
+	concurrency := int(c.GetCompileConcurrency())
+	if c.GetCompileProjectBytes() >= largeProjectByteCap && concurrency > largeProjectCompileConcurrency() {
+		capped := largeProjectCompileConcurrency()
+		log.Infof(
+			"[ssa-compile] large project detected (%s), cap AST parse concurrency: %d -> %d",
+			formatFileSize(int(c.GetCompileProjectBytes())),
+			concurrency,
+			capped,
+		)
+		concurrency = capped
+	}
 	return ssareducer.FilesHandler(
 		c.ctx, filesystem, preHandlerFiles,
 		parse, initWorker,
 		c.GetCompileASTSequence(),
-		int(c.GetCompileConcurrency()),
+		concurrency,
 	)
 }
 

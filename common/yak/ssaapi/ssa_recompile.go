@@ -32,7 +32,9 @@ func SaveConfig(c *Config, prog *Program) {
 	if c.GetEnableIncrementalCompile() {
 		irProg.IsOverlay = true
 	}
-	ssadb.UpdateProgram(irProg)
+	if err := ssadb.UpdateProgramWithError(irProg); err != nil {
+		log.Errorf("save config update program failed: name=%s err=%v", irProg.ProgramName, err)
+	}
 }
 
 // 已弃用

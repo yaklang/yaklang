@@ -59,46 +59,55 @@ func (prog *Program) UpdateToDatabase() func() {
 
 func (prog *Program) UpdateToDatabaseWithWG(wg *sync.WaitGroup) {
 	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		ir := prog.irProgram
-		if ir == nil {
-			existingIr, err := ssadb.GetProgram(prog.Name, prog.ProgramKind)
-			if err == nil && existingIr != nil {
-				ir = existingIr
-				prog.irProgram = ir
-			} else {
-				ir = ssadb.CreateProgram(prog.Name, prog.Version, prog.ProgramKind)
-				prog.irProgram = ir
+	defer wg.Done()
+
+	// Keep program metadata persistence synchronous. Concurrently updating
+	// ir_programs while ir_codes batches are writing can leave SQLite waiting on
+	// the same write lock, which stalls finalization and leaves the database in a
+	// partially persisted state.
+	ir := prog.irProgram
+	if ir == nil {
+		existingIr, err := ssadb.GetProgram(prog.Name, prog.ProgramKind)
+		if err == nil && existingIr != nil {
+			ir = existingIr
+			prog.irProgram = ir
+		} else {
+			ir, err = ssadb.CreateProgramWithError(prog.Name, prog.Version, prog.ProgramKind)
+			if err != nil {
+				log.Errorf("program metadata create failed: name=%s kind=%s err=%v", prog.Name, prog.ProgramKind, err)
+				return
 			}
+			prog.irProgram = ir
 		}
-		ir.Language = prog.Language
-		ir.ProgramKind = prog.ProgramKind
-		ir.ProgramName = prog.Name
-		ir.Version = prog.Version
-		ir.ProjectID = prog.ProjectID
-		ir.FileList = prog.FileList
-		ir.LineCount = prog.LineCount
-		ir.ExtraFile = prog.ExtraFile
-		// 同步增量编译信息（如果存在）
-		if prog.BaseProgramName != "" {
-			ir.BaseProgramName = prog.BaseProgramName
+	}
+	ir.Language = prog.Language
+	ir.ProgramKind = prog.ProgramKind
+	ir.ProgramName = prog.Name
+	ir.Version = prog.Version
+	ir.ProjectID = prog.ProjectID
+	ir.FileList = prog.FileList
+	ir.LineCount = prog.LineCount
+	ir.ExtraFile = prog.ExtraFile
+	// 同步增量编译信息（如果存在）
+	if prog.BaseProgramName != "" {
+		ir.BaseProgramName = prog.BaseProgramName
+	}
+	if len(prog.FileHashMap) > 0 {
+		// 将 fileHashMap 转换为 StringMap 格式（int -> string）
+		fileHashMapStr := make(ssadb.StringMap)
+		for filePath, hash := range prog.FileHashMap {
+			fileHashMapStr[filePath] = fmt.Sprintf("%d", hash)
 		}
-		if len(prog.FileHashMap) > 0 {
-			// 将 fileHashMap 转换为 StringMap 格式（int -> string）
-			fileHashMapStr := make(ssadb.StringMap)
-			for filePath, hash := range prog.FileHashMap {
-				fileHashMapStr[filePath] = fmt.Sprintf("%d", hash)
-			}
-			ir.FileHashMap = fileHashMapStr
-		}
-		// 如果启用了增量编译（有 BaseProgramName 或 FileHashMap 不为 nil），设置 IsOverlay = true
-		// FileHashMap 不为 nil 表示启用了增量编译（即使为空 map，也表示这是增量编译流程的一部分）
-		if prog.BaseProgramName != "" || prog.FileHashMap != nil {
-			ir.IsOverlay = true
-		}
-		ssadb.UpdateProgram(ir)
-	}()
+		ir.FileHashMap = fileHashMapStr
+	}
+	// 如果启用了增量编译（有 BaseProgramName 或 FileHashMap 不为 nil），设置 IsOverlay = true
+	// FileHashMap 不为 nil 表示启用了增量编译（即使为空 map，也表示这是增量编译流程的一部分）
+	if prog.BaseProgramName != "" || prog.FileHashMap != nil {
+		ir.IsOverlay = true
+	}
+	if err := ssadb.UpdateProgramWithError(ir); err != nil {
+		log.Errorf("program metadata update failed: id=%d name=%s kind=%s err=%v", ir.ID, ir.ProgramName, ir.ProgramKind, err)
+	}
 }
 
 func (p *Program) GetIrProgram() *ssadb.IrProgram {
