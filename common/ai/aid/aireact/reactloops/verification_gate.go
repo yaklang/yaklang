@@ -14,7 +14,7 @@ const (
 	verificationIterationTriggerInterval  = aicommon.DefaultPeriodicVerificationInterval
 )
 
-var verificationWatchdogIdleTimeout = 2 * time.Minute
+var verificationWatchdogIdleTimeout = 10 * time.Second
 
 type VerificationRuntimeSnapshot struct {
 	GeneratedAt      time.Time `json:"generated_at"`
@@ -169,6 +169,49 @@ func (r *ReActLoop) VerifyUserSatisfactionNow(
 // checkpoint rule, it only re-runs auto-verification when the last accepted
 // verification baseline is absent, stale, or the loop prompt has changed
 // materially.
+// beginVerificationWatchdogToolSuppression marks the start of a synchronous blocking
+// tool invocation on the ReAct thread. While the depth is >0, the verification watchdog
+// timer must not fire or be rescheduled via touchVerificationWatchdog.
+func (r *ReActLoop) beginVerificationWatchdogToolSuppression() {
+	if r == nil || r.verificationMutex == nil {
+		return
+	}
+	r.verificationMutex.Lock()
+	defer r.verificationMutex.Unlock()
+	r.verificationWatchdogToolSuppressionDepth++
+	if r.verificationWatchdogToolSuppressionDepth == 1 && r.verificationWatchdogTimer != nil {
+		r.verificationWatchdogTimer.Stop()
+		r.verificationWatchdogTimer = nil
+	}
+}
+
+// endVerificationWatchdogToolSuppression pairs with beginVerificationWatchdogToolSuppression.
+// When the outermost tool call finishes, the watchdog timer is restarted from idle timeout.
+func (r *ReActLoop) endVerificationWatchdogToolSuppression() {
+	if r == nil || r.verificationMutex == nil {
+		return
+	}
+	task := r.GetCurrentTask()
+	r.verificationMutex.Lock()
+	defer r.verificationMutex.Unlock()
+	if r.verificationWatchdogToolSuppressionDepth > 0 {
+		r.verificationWatchdogToolSuppressionDepth--
+	}
+	if r.verificationWatchdogToolSuppressionDepth > 0 {
+		return
+	}
+	if task == nil {
+		return
+	}
+	if r.verificationWatchdogTimer != nil {
+		r.verificationWatchdogTimer.Stop()
+		r.verificationWatchdogTimer = nil
+	}
+	r.verificationWatchdogTimer = time.AfterFunc(verificationWatchdogIdleTimeout, func() {
+		r.triggerVerificationWatchdog(task)
+	})
+}
+
 func (r *ReActLoop) MaybeVerifyUserSatisfaction(
 	ctx context.Context,
 	originalQuery string,
@@ -206,6 +249,9 @@ func (r *ReActLoop) startVerificationWatchdog(task aicommon.AIStatefulTask) {
 	}
 	r.verificationMutex.Lock()
 	defer r.verificationMutex.Unlock()
+	if r.verificationWatchdogToolSuppressionDepth > 0 {
+		return
+	}
 	if r.verificationWatchdogTimer != nil {
 		r.verificationWatchdogTimer.Stop()
 	}
@@ -222,6 +268,14 @@ func (r *ReActLoop) touchVerificationWatchdog() {
 	if task == nil {
 		return
 	}
+	if r.verificationMutex != nil {
+		r.verificationMutex.Lock()
+		suppressed := r.verificationWatchdogToolSuppressionDepth > 0
+		r.verificationMutex.Unlock()
+		if suppressed {
+			return
+		}
+	}
 	r.startVerificationWatchdog(task)
 }
 
@@ -235,11 +289,20 @@ func (r *ReActLoop) stopVerificationWatchdogForTask(task aicommon.AIStatefulTask
 		r.verificationWatchdogTimer.Stop()
 		r.verificationWatchdogTimer = nil
 	}
+	r.verificationWatchdogToolSuppressionDepth = 0
 }
 
 func (r *ReActLoop) triggerVerificationWatchdog(task aicommon.AIStatefulTask) {
 	if r == nil || task == nil || task.IsFinished() {
 		return
+	}
+	if r.verificationMutex != nil {
+		r.verificationMutex.Lock()
+		suppressed := r.verificationWatchdogToolSuppressionDepth > 0
+		r.verificationMutex.Unlock()
+		if suppressed {
+			return
+		}
 	}
 	select {
 	case <-task.GetContext().Done():

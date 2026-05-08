@@ -27,6 +27,11 @@ func (r *ReAct) executeToolCallInternal(ctx context.Context, toolName string, pa
 	default:
 	}
 
+	if r.config != nil {
+		r.config.RunVerificationWatchdogToolBlockingStart()
+		defer r.config.RunVerificationWatchdogToolBlockingEnd()
+	}
+
 	// Setup task-aware event emitter
 	var taskId string
 	currentTask := r.GetCurrentTask()

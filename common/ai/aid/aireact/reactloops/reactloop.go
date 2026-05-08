@@ -130,6 +130,10 @@ type ReActLoop struct {
 	verificationRuntimeSnapshot  *VerificationRuntimeSnapshot
 	verificationMutex            *sync.Mutex
 	verificationWatchdogTimer    *time.Timer
+	// verificationWatchdogToolSuppressionDepth counts nested synchronous tool calls
+	// that block the ReAct thread; while >0 the verification watchdog must not fire
+	// or reschedule (see verification_gate.go).
+	verificationWatchdogToolSuppressionDepth int
 
 	// timeline differ for tracking changes during task execution
 	timelineDiffer        *aicommon.TimelineDiffer

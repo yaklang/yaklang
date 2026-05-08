@@ -224,6 +224,33 @@ func TestVerificationWatchdog_TriggersAfterIdle(t *testing.T) {
 	require.Equal(t, aicommon.AITaskState_Completed, task.GetStatus())
 }
 
+func TestVerificationWatchdog_SuppressedDuringToolBlocking(t *testing.T) {
+	previousTimeout := verificationWatchdogIdleTimeout
+	verificationWatchdogIdleTimeout = 25 * time.Millisecond
+	defer func() {
+		verificationWatchdogIdleTimeout = previousTimeout
+	}()
+
+	invoker := &verificationGateTestInvoker{
+		MockInvoker: mockcfg.NewMockInvoker(context.Background()),
+		result:      aicommon.NewVerifySatisfactionResult(false, "idle", ""),
+	}
+	loop := NewMinimalReActLoop(invoker.GetConfig(), invoker)
+	task := aicommon.NewStatefulTaskBase("watchdog-suppress-task", "query", context.Background(), nil, true)
+	loop.SetCurrentTask(task)
+	loop.startVerificationWatchdog(task)
+	defer loop.stopVerificationWatchdogForTask(task)
+
+	loop.beginVerificationWatchdogToolSuppression()
+	time.Sleep(80 * time.Millisecond)
+	require.Equal(t, 0, invoker.verifyCalls, "watchdog must not fire while tool blocking suppression is active")
+	loop.endVerificationWatchdogToolSuppression()
+
+	require.Eventually(t, func() bool {
+		return invoker.verifyCalls >= 1
+	}, time.Second, 10*time.Millisecond)
+}
+
 func TestVerificationWatchdog_ResetsWhenMaybeVerifyRuns(t *testing.T) {
 	previousTimeout := verificationWatchdogIdleTimeout
 	verificationWatchdogIdleTimeout = 40 * time.Millisecond

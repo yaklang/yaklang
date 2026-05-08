@@ -304,6 +304,12 @@ type Config struct {
 	ToolCallIntervalReviewExtraPrompt string        // Extra prompt injected into tool-call interval review
 	ToolComposeConcurrency            int           // Max concurrent tool calls in tool_compose DAG (default 2)
 
+	// verificationWatchdogToolBlockingStart/End are registered by reactloops.ReActLoop
+	// around synchronous invoker tool execution (aireact.executeToolCallInternal) so the
+	// verification watchdog timer does not fire while the ReAct thread is blocked in a tool.
+	verificationWatchdogToolBlockingStart func()
+	verificationWatchdogToolBlockingEnd   func()
+
 	// iteration limit
 	MaxIterationCount int64
 
@@ -802,6 +808,55 @@ func (c *Config) SetUserUsageCallback(cb func(*aispec.ChatUsage)) {
 	c.m.Lock()
 	defer c.m.Unlock()
 	c.userUsageCallback = cb
+}
+
+// SetVerificationWatchdogToolBlockingHooks registers callbacks invoked immediately
+// before and after synchronous blocking tool execution in the ReAct invoker.
+// Pass nil for both to clear. Used by reactloops to pause the verification watchdog
+// while a tool holds the ReAct thread.
+func (c *Config) SetVerificationWatchdogToolBlockingHooks(start, end func()) {
+	if c == nil {
+		return
+	}
+	if c.m == nil {
+		c.m = &sync.Mutex{}
+	}
+	c.m.Lock()
+	defer c.m.Unlock()
+	c.verificationWatchdogToolBlockingStart = start
+	c.verificationWatchdogToolBlockingEnd = end
+}
+
+// RunVerificationWatchdogToolBlockingStart runs the registered start hook if any.
+func (c *Config) RunVerificationWatchdogToolBlockingStart() {
+	if c == nil {
+		return
+	}
+	if c.m == nil {
+		return
+	}
+	c.m.Lock()
+	fn := c.verificationWatchdogToolBlockingStart
+	c.m.Unlock()
+	if fn != nil {
+		fn()
+	}
+}
+
+// RunVerificationWatchdogToolBlockingEnd runs the registered end hook if any.
+func (c *Config) RunVerificationWatchdogToolBlockingEnd() {
+	if c == nil {
+		return
+	}
+	if c.m == nil {
+		return
+	}
+	c.m.Lock()
+	fn := c.verificationWatchdogToolBlockingEnd
+	c.m.Unlock()
+	if fn != nil {
+		fn()
+	}
 }
 
 // WithUserUsageCallback 把 user 端 UsageCallback 写入 Config, 供 Tiered AI 路径

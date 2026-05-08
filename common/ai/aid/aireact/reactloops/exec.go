@@ -558,7 +558,22 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) (finalE
 	}
 
 	r.startVerificationWatchdog(task)
+	var clearWatchdogToolHooks func()
+	if inv := r.GetInvoker(); inv != nil {
+		if cfg, ok := inv.GetConfig().(*aicommon.Config); ok {
+			cfg.SetVerificationWatchdogToolBlockingHooks(
+				r.beginVerificationWatchdogToolSuppression,
+				r.endVerificationWatchdogToolSuppression,
+			)
+			clearWatchdogToolHooks = func() {
+				cfg.SetVerificationWatchdogToolBlockingHooks(nil, nil)
+			}
+		}
+	}
 	defer func() {
+		if clearWatchdogToolHooks != nil {
+			clearWatchdogToolHooks()
+		}
 		r.stopVerificationWatchdogForTask(task) // 退出循环则停止验证看门狗，因为异步长任务不需要验证
 	}()
 
