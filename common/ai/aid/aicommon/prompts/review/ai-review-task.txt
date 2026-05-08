@@ -37,12 +37,20 @@ Your output will be shown directly to users during task review. Keep it concise 
    - If a pending task's goal is based on an assumption that has been invalidated, it should be modified or removed.
    - If new attack surfaces, vulnerabilities, or opportunities have been discovered, new tasks should be inserted or appended.
 
+**6. Dependency Maintenance (MANDATORY when adjusting plan):**
+   - Any task change MUST re-check and update `depends_on`; never change task text only.
+   - For `insert_after`, `append`, `modify`, `remove`, and `replace_all`, ensure the resulting pending plan remains dependency-consistent.
+   - If a task is removed, you MUST repair every downstream task that referenced it; do not leave dangling `depends_on`.
+   - If a step is optional or just a supplementary check, prefer keeping it skippable rather than deleting it outright.
+   - Avoid meaningless serialization: only add dependencies when they are real prerequisites.
+
 ## Decision Guidelines
 
 - If the task completed successfully AND pending tasks remain reasonable: choose "continue".
 - If new critical findings were discovered that impact the plan: choose "adjust_plan" with specific `task_deltas`.
 - Avoid being overly conservative -- when important clues are found, actively adjust the plan rather than blindly continuing.
 - Avoid unnecessary adjustments -- only modify when there is a concrete reason backed by evidence from the task result.
+- When emitting `task_deltas`, make sure the final pending plan is still self-consistent in `depends_on`.
 
 ## Suggestion Options
 
