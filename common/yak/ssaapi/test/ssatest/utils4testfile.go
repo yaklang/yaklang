@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 
 	"github.com/gorilla/mux"
 	"github.com/google/uuid"
@@ -25,9 +26,23 @@ func GetJarFile() (string, error) {
 		return "", err
 	}
 
-	jarPath := dir + "/test.jar"
+	jarPath := filepath.Join(dir, "test.jar")
 	err = os.WriteFile(jarPath, jar, 0644)
 	if err != nil {
+		return "", err
+	}
+	return jarPath, nil
+}
+
+// GetBootInfSampleJarFile writes testfile/boot-inf-sample.jar (Spring-Boot-style layout) to a temp path, like GetJarFile.
+func GetBootInfSampleJarFile() (string, error) {
+	dir := os.TempDir()
+	jar, err := JavaTestFile.ReadFile("testfile/boot-inf-sample.jar")
+	if err != nil {
+		return "", err
+	}
+	jarPath := filepath.Join(dir, "boot-inf-sample.jar")
+	if err := os.WriteFile(jarPath, jar, 0644); err != nil {
 		return "", err
 	}
 	return jarPath, nil

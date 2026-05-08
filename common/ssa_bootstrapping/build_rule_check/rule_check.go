@@ -180,7 +180,7 @@ func (s *RuleChecker) run() error {
 		case string(ssaconfig.PHP):
 			defaultExclude = strings.Split("**vendor**,vendor**,lib**,**lib**", ",")
 		case string(ssaconfig.JAVA):
-			defaultExclude = strings.Split("**/classes/**,**/target/**", ",")
+			defaultExclude = strings.Split("**/target/**", ",")
 		}
 	}
 	opts = append(opts, ssaapi.WithExcludeFunc(defaultExclude...))

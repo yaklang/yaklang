@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
@@ -736,3 +737,4 @@ func TestExcludeFunction(t *testing.T) {
 		require.True(t, exclude("vendor/a.php"))
 	})
 }
+

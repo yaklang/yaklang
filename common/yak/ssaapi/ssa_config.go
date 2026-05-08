@@ -86,7 +86,6 @@ var DefaultExcludeFiles = []string{
 	"Vendor/**",
 	"**/vendor/**",
 	"vendor/**",
-	"**/classes/**",
 	"**/target/**",
 	"**include/**",
 	"**caches/**",
@@ -156,6 +155,12 @@ func newExcludeFunc(patterns []string, basePath string) ExcludeFunc {
 		}
 		return false
 	}
+}
+
+// CompileExcludeFunc returns a path exclude matcher that merges DefaultExcludeFiles with extraPatterns.
+// Same behavior as compile-time exclude construction in DefaultConfig; exported for external test packages.
+func CompileExcludeFunc(extraPatterns []string, basePath string) ExcludeFunc {
+	return newExcludeFunc(extraPatterns, basePath)
 }
 
 func (c *Config) Processf(process float64, format string, arg ...any) {
