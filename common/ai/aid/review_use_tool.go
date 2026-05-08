@@ -142,7 +142,7 @@ func (t *AiTask) toolReviewPolicy_wrongTool(ctx context.Context, oldTool *aitool
 		return oldTool, true, utils.Error("tool not found via user prompt")
 	}
 
-	prompt, err := t.quickBuildPrompt(__prompt_toolReSelect, map[string]any{
+	prompt, err := t.quickBuildTaskPrompt(__prompt_toolReSelect, map[string]any{
 		"OldTool":  oldTool,
 		"ToolList": tools,
 	})
@@ -201,7 +201,7 @@ func (t *AiTask) toolReviewPolicy_wrongParam(ctx context.Context, tool *aitool.T
 	default:
 	}
 
-	prompt, err := t.quickBuildPrompt(__prompt_ParamsReGenerate, map[string]any{
+	prompt, err := t.quickBuildTaskPrompt(__prompt_ParamsReGenerate, map[string]any{
 		"Tool":      tool,
 		"OldParam":  oldParam,
 		"UserInput": suggestion,
