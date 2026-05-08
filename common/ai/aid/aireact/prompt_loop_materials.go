@@ -433,7 +433,8 @@ func (pm *PromptManager) buildHighStaticObservation(
 // 间歇性扩展 (新一段 reducer 块产生时), 排在最后, 让前两段的前缀缓存更稳定。
 //
 // 关键词: buildFrozenBlockObservation, Tool/Forge/PlanContext/Timeline-frozen,
-//        AI_CACHE_FROZEN, PE-TASK frozen 注入位置
+//
+//	AI_CACHE_FROZEN, PE-TASK frozen 注入位置
 func (pm *PromptManager) buildFrozenBlockObservation(
 	materials *reactloops.PromptPrefixMaterials,
 	rendered string,
@@ -465,7 +466,7 @@ func (pm *PromptManager) buildFrozenBlockObservation(
 		reactloops.NewPromptSectionObservation(
 			"section.frozen_block.plan_context",
 			"Frozen Block / Plan Context (PE-TASK PLAN Output)",
-			reactloops.PromptSectionRoleUserInput,
+			reactloops.PromptSectionRoleFrozenBlock,
 			true,
 			renderPlanContextBlock(materials),
 		),
@@ -493,7 +494,8 @@ func (pm *PromptManager) buildFrozenBlockObservation(
 // 需要给 frozen-block splitter 一个稳定的边界标记, 与内层标签命名空间互不冲突。
 //
 // 关键词: renderPlanContextBlock, PLAN_CONTEXT, plan-scoped nonce,
-//        frozen-block 边界
+//
+//	frozen-block 边界
 func renderPlanContextBlock(materials *reactloops.PromptPrefixMaterials) string {
 	if materials == nil {
 		return ""
@@ -545,7 +547,7 @@ func (pm *PromptManager) buildSemiDynamicResidualObservation(
 		reactloops.NewPromptSectionObservation(
 			"section.semi_dynamic.output_example",
 			"Semi Dynamic / Output Example",
-			reactloops.PromptSectionRoleRuntimeCtx,
+			reactloops.PromptSectionRoleSemiDynamic,
 			true,
 			renderStaticTaggedBlock("OUTPUT_EXAMPLE", materials.OutputExample),
 		),
