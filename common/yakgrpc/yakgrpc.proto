@@ -2041,6 +2041,8 @@ message AIStartParams {
 
   // 启动时预启用能力（工具 / 技能 / 插件），支持会话缓存与热加载
   repeated AIEnabledCapability EnabledCapabilities = 42;
+
+  int64 PlanExecTaskConcurrency = 43; // 计划执行任务的并发度
 }
 
 message AITaskFilter {

@@ -110,6 +110,10 @@ func ConvertYPBAIStartParamsToReActConfig(i *ypb.AIStartParams) []aicommon.Confi
 		opts = append(opts, aicommon.WithUserPresetPrompt(i.GetUserPresetPrompt()))
 	}
 
+	if i.GetPlanExecTaskConcurrency() > 0 {
+		opts = append(opts, aicommon.WithPlanExecTaskConcurrency(int(i.GetPlanExecTaskConcurrency())))
+	}
+
 	if i.GetUserPlanPrompt() != "" {
 		opts = append(opts, aicommon.WithPlanPrompt(i.GetUserPlanPrompt()))
 	}
