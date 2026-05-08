@@ -390,6 +390,17 @@ func (s *Server) HTTPFlowsFieldGroup(ctx context.Context, req *ypb.HTTPFlowsFiel
 		})
 	}
 
+	// 查询唯一 PathSuffix 列表
+	suffixes, err := yakit.HTTPFlowSuffixes()
+	if err == nil {
+		for _, v := range suffixes {
+			tagsCode.Suffixes = append(tagsCode.Suffixes, &ypb.TagsCode{
+				Value: v.Value,
+				Total: int32(v.Count),
+			})
+		}
+	}
+
 	return &tagsCode, nil
 }
 

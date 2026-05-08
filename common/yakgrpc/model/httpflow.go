@@ -100,6 +100,7 @@ func FromHTTPFlowGRPCModel(f *ypb.HTTPFlow) (*schema.HTTPFlow, error) {
 		IsWebsocket:                f.IsWebsocket,
 		WebsocketHash:              f.WebsocketHash,
 		FromPlugin:                 f.FromPlugin,
+		PathSuffix:                 f.PathSuffix,
 		IsTooLargeResponse:         f.IsTooLargeResponse,
 		IsReadTooSlowResponse:      f.IsReadTooSlowResponse,
 		TooLargeResponseBodyFile:   string(f.TooLargeResponseBodyFile),
@@ -152,6 +153,7 @@ func toHTTPFlowGRPCModel(f *schema.HTTPFlow, full bool) (*ypb.HTTPFlow, error) {
 		TooLargeResponseBodyFile:   utf8safe(f.TooLargeResponseBodyFile),
 		TooLargeResponseHeaderFile: utf8safe(f.TooLargeResponseHeaderFile),
 		DurationMs:                 f.Duration / int64(time.Millisecond),
+		PathSuffix:                 utf8safe(f.PathSuffix),
 		Payloads: lo.Map(strings.Split(f.Payload, ","), func(i string, _ int) string {
 			return utf8safe(i)
 		}),

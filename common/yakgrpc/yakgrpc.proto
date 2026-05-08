@@ -6834,6 +6834,7 @@ message HTTPFlow {
   string HiddenIndex = 49;
   string FromPlugin = 50;
   string Host = 52;
+  string PathSuffix = 53;
 }
 
 message FuzzableParam {
@@ -6864,6 +6865,7 @@ message HTTPFlowsFieldGroupRequest {
 message HTTPFlowsFieldGroupResponse {
   repeated TagsCode Tags = 1;
   repeated TagsCode StatusCode = 2;
+  repeated TagsCode Suffixes = 3;
 }
 
 message HTTPFlowsShareRequest {

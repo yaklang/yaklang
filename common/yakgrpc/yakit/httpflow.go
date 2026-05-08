@@ -1276,6 +1276,26 @@ func QueryHTTPFlowTags() ([]*TagAndStatusCode, error) {
 	return tags, nil
 }
 
+func HTTPFlowSuffixes() ([]*TagAndStatusCode, error) {
+	suffixSet := make(map[string]int)
+	db := consts.GetGormProjectDatabase().Model(&schema.HTTPFlow{}).Select("id, path_suffix").Where("path_suffix IS NOT NULL AND path_suffix != ''")
+	for flow := range YieldHTTPFlows(db, context.Background()) {
+		suffix := strings.TrimSpace(flow.PathSuffix)
+		if suffix != "" {
+			suffixSet[suffix]++
+		}
+	}
+
+	suffixes := make([]*TagAndStatusCode, 0)
+	for suffix := range suffixSet {
+		suffixes = append(suffixes, &TagAndStatusCode{
+			Value: suffix,
+			Count: suffixSet[suffix],
+		})
+	}
+	return suffixes, nil
+}
+
 func QueryWebsocketFlowsByHTTPFlowHash(db *gorm.DB, req *ypb.DeleteHTTPFlowRequest) *gorm.DB {
 	db = db.Model(&schema.HTTPFlow{})
 
