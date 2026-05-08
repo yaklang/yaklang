@@ -363,7 +363,7 @@ func (r *runtime) currentInteractiveTask() (*AiTask, error) {
 		return nil, utils.Errorf("no active task")
 	}
 	if len(snapshot.activeTaskIDs) > 1 {
-		return nil, utils.Errorf("multiple active tasks in current stage")
+		log.Warnf("more than one active task found")
 	}
 	node, ok := graph.Node(snapshot.activeTaskIDs[0])
 	if !ok || node == nil || node.task == nil {
