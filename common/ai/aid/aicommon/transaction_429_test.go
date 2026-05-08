@@ -63,6 +63,7 @@ func (t *transactionTestConfig) GetContext() context.Context           { return 
 func (t *transactionTestConfig) CallAIResponseConsumptionCallback(int) {}
 func (t *transactionTestConfig) GetAITransactionAutoRetryCount() int64 { return t.retryMax }
 func (t *transactionTestConfig) GetToolComposeConcurrency() int        { return 2 }
+func (t *transactionTestConfig) GetPlanExecTaskConcurrency() int       { return 1 }
 func (t *transactionTestConfig) GetTimelineContentSizeLimit() int64    { return 1000 }
 func (t *transactionTestConfig) GetUserInteractiveLimitedTimes() int64 { return 3 }
 func (t *transactionTestConfig) GetMaxIterationCount() int64           { return 100 }

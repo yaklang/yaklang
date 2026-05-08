@@ -7,20 +7,23 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/workflowdag"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 type recoveredTask struct {
-	Index         string           `json:"index"`
-	Name          string           `json:"name"`
-	Goal          string           `json:"goal"`
-	Progress      string           `json:"progress"`
-	Summary       string           `json:"summary"`
-	StatusSummary string           `json:"status_summary"`
-	TaskSummary   string           `json:"task_summary"`
-	ShortSummary  string           `json:"short_summary"`
-	LongSummary   string           `json:"long_summary"`
-	Subtasks      []*recoveredTask `json:"subtasks,omitempty"`
+	Index              string           `json:"index"`
+	Name               string           `json:"name"`
+	Goal               string           `json:"goal"`
+	SemanticIdentifier string           `json:"semantic_identifier,omitempty"`
+	DependsOn          []string         `json:"depends_on,omitempty"`
+	Progress           string           `json:"progress"`
+	Summary            string           `json:"summary"`
+	StatusSummary      string           `json:"status_summary"`
+	TaskSummary        string           `json:"task_summary"`
+	ShortSummary       string           `json:"short_summary"`
+	LongSummary        string           `json:"long_summary"`
+	Subtasks           []*recoveredTask `json:"subtasks,omitempty"`
 }
 
 func (c *Coordinator) tryRecoverPlanAndExec(startTaskIndex string) (*AiTask, *PlanAndExecProgress, bool, error) {
@@ -64,7 +67,14 @@ func (c *Coordinator) tryRecoverPlanAndExec(startTaskIndex string) (*AiTask, *Pl
 	if root == nil {
 		return nil, &progress, false, nil
 	}
-	if err := prepareRecoveryStartTask(root, startTaskIndex); err != nil {
+	effectiveStartTaskIndex := strings.TrimSpace(startTaskIndex)
+	if effectiveStartTaskIndex == "" {
+		effectiveStartTaskIndex = strings.TrimSpace(progress.CurrentTaskIndex)
+		if effectiveStartTaskIndex == "" && len(progress.ActiveTaskIndexes) > 0 {
+			effectiveStartTaskIndex = strings.TrimSpace(progress.ActiveTaskIndexes[0])
+		}
+	}
+	if err := prepareRecoveryStartTask(root, effectiveStartTaskIndex); err != nil {
 		return nil, &progress, true, err
 	}
 	return root, &progress, true, nil
@@ -77,6 +87,10 @@ func (c *Coordinator) buildRecoveredTaskTree(src *recoveredTask, parent *AiTask)
 	task := c.generateAITaskWithName(src.Name, src.Goal)
 	task.Index = src.Index
 	task.ParentTask = parent
+	task.DependsOn = normalizeDependencyRefs(src.DependsOn)
+	if src.SemanticIdentifier != "" {
+		task.SetSemanticIdentifier(src.SemanticIdentifier)
+	}
 	if src.StatusSummary != "" {
 		task.StatusSummary = src.StatusSummary
 	}
@@ -116,42 +130,84 @@ func (c *Coordinator) buildRecoveredTaskTree(src *recoveredTask, parent *AiTask)
 	return task
 }
 
-// prepareRecoveryStartTask 会把恢复后的任务树整理成“从指定起点重新执行”的状态。
-// 规则很直接：
-// 1. 起点之前：已经完成的任务保留 completed，未完成的任务统一标记为 skipped，避免执行器再次进入。
-// 2. 起点及之后：无论之前是 completed、aborted 还是 skipped，全部重置为 created，确保会重新执行。
 func prepareRecoveryStartTask(root *AiTask, startTaskIndex string) error {
 	startTaskIndex = strings.TrimSpace(startTaskIndex)
-	if root == nil || startTaskIndex == "" {
+	if root == nil {
 		return nil
 	}
 
-	taskLink := DFSOrderAiTask(root)
-	foundStart := false
-	for i := 0; i < taskLink.Len(); i++ {
-		task, ok := taskLink.Get(i)
-		if !ok || task == nil {
-			continue
-		}
-		if task.Index == startTaskIndex {
-			// 命中恢复起点后，当前任务和后续任务都按“待重新执行”处理。
-			foundStart = true
-			resetTaskForRecovery(task)
-			continue
-		}
-		if foundStart {
-			resetTaskForRecovery(task)
-			continue
-		}
-		if task.executed() {
-			continue
-		}
-		task.AIStatefulTaskBase.RestoreStatus(aicommon.AITaskState_Skipped)
+	graph, err := buildStrictExecutableTaskGraph(root)
+	if err != nil {
+		return err
 	}
-	if !foundStart {
-		return utils.Errorf("recovery start task %q not found", startTaskIndex)
+
+	if startTaskIndex == "" {
+		if autoTaskIndex, ok := locateAutoRecoveryTask(graph); ok {
+			startTaskIndex = autoTaskIndex
+		} else {
+			return nil
+		}
+	}
+	targetOrder, err := locateRecoveryTaskOrder(root, graph, startTaskIndex)
+	if err != nil {
+		return err
+	}
+
+	for _, task := range graph.order {
+		if task == nil || task.Index == "" {
+			continue
+		}
+		order, ok := graph.OrderOf(task.Index)
+		if !ok {
+			continue
+		}
+		if order < targetOrder {
+			if task.executed() {
+				continue
+			}
+			task.AIStatefulTaskBase.RestoreStatus(aicommon.AITaskState_Skipped)
+			continue
+		}
+		resetTaskForRecovery(task)
 	}
 	return nil
+}
+
+func locateAutoRecoveryTask(graph *executableTaskGraph) (string, bool) {
+	if graph == nil {
+		return "", false
+	}
+	for _, task := range graph.order {
+		if task == nil {
+			continue
+		}
+		if task.executed() || task.GetStatus() == aicommon.AITaskState_Skipped {
+			continue
+		}
+		return task.Index, true
+	}
+	return "", false
+}
+
+func locateRecoveryTaskOrder(root *AiTask, graph *executableTaskGraph, startTaskIndex string) (int, error) {
+	if graph == nil {
+		return 0, workflowdag.ErrEmptyDAG
+	}
+
+	startTaskIndex = strings.TrimSpace(startTaskIndex)
+	if order, ok := graph.OrderOf(startTaskIndex); ok {
+		return order, nil
+	}
+
+	references := buildTaskReferenceMap(root)
+	targetIndex, ok := references[startTaskIndex]
+	if !ok {
+		return 0, utils.Errorf("recovery start task %q not found", startTaskIndex)
+	}
+	if order, ok := graph.OrderOf(targetIndex); ok {
+		return order, nil
+	}
+	return 0, utils.Errorf("recovery start task %q is not an executable task node", startTaskIndex)
 }
 
 // resetTaskForRecovery 会把任务恢复成未完成状态，让 runtime 不会因为旧状态而跳过它。
