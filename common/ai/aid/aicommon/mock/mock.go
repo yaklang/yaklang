@@ -160,6 +160,10 @@ func (m *MockedAIConfig) GetToolComposeConcurrency() int {
 	return 2
 }
 
+func (m *MockedAIConfig) GetPlanExecTaskConcurrency() int {
+	return 1
+}
+
 func (m *MockedAIConfig) RetryPromptBuilder(originalPrompt string, err error) string {
 	if err == nil {
 		return originalPrompt

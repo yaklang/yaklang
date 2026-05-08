@@ -16,16 +16,20 @@ const (
 )
 
 type PlanAndExecProgress struct {
-	TotalTasks       int    `json:"total_tasks"`
-	CompletedTasks   int    `json:"completed_tasks"`
-	SkippedTasks     int    `json:"skipped_tasks"`
-	AbortedTasks     int    `json:"aborted_tasks"`
-	CurrentIndex     int    `json:"current_index"`
-	CurrentTaskIndex string `json:"current_task_index"`
-	CurrentTask      string `json:"current_task"`
-	CurrentGoal      string `json:"current_goal"`
-	Phase            string `json:"phase"`
-	UpdatedAt        int64  `json:"updated_at"`
+	TotalTasks        int      `json:"total_tasks"`
+	CompletedTasks    int      `json:"completed_tasks"`
+	SkippedTasks      int      `json:"skipped_tasks"`
+	AbortedTasks      int      `json:"aborted_tasks"`
+	TotalStages       int      `json:"total_stages"`
+	CompletedStages   int      `json:"completed_stages"`
+	CurrentStage      int      `json:"current_stage"`
+	CurrentIndex      int      `json:"current_index"`
+	CurrentTaskIndex  string   `json:"current_task_index"`
+	CurrentTask       string   `json:"current_task"`
+	CurrentGoal       string   `json:"current_goal"`
+	ActiveTaskIndexes []string `json:"active_task_indexes,omitempty"`
+	Phase             string   `json:"phase"`
+	UpdatedAt         int64    `json:"updated_at"`
 }
 
 func (c *Coordinator) savePlanAndExecState(phase string, currentTask *AiTask) {
@@ -69,25 +73,38 @@ func (c *Coordinator) buildPlanAndExecProgress(root *AiTask, currentTask *AiTask
 	}
 
 	total, completed, skipped, aborted := countTaskStats(root)
-	currentIndex := 0
+	snapshot := runtimeProgressSnapshot{}
 	if c.runtime != nil {
-		currentIndex = c.runtime.currentProgressIndex()
+		snapshot = c.runtime.progressSnapshot()
 	}
 
 	progress := &PlanAndExecProgress{
-		TotalTasks:     total,
-		CompletedTasks: completed,
-		SkippedTasks:   skipped,
-		AbortedTasks:   aborted,
-		CurrentIndex:   currentIndex,
-		Phase:          phase,
-		UpdatedAt:      time.Now().Unix(),
+		TotalTasks:        total,
+		CompletedTasks:    completed,
+		SkippedTasks:      skipped,
+		AbortedTasks:      aborted,
+		TotalStages:       snapshot.totalStages,
+		CompletedStages:   snapshot.completedStages,
+		CurrentStage:      snapshot.currentStage,
+		CurrentIndex:      snapshot.currentIndex,
+		ActiveTaskIndexes: snapshot.activeTaskIDs,
+		Phase:             phase,
+		UpdatedAt:         time.Now().Unix(),
 	}
 
+	if c.runtime != nil {
+		if representative := c.runtime.representativeTask(); representative != nil {
+			progress.CurrentTaskIndex = representative.Index
+			progress.CurrentTask = representative.Name
+			progress.CurrentGoal = representative.Goal
+		}
+	}
 	if currentTask != nil {
 		progress.CurrentTaskIndex = currentTask.Index
 		progress.CurrentTask = currentTask.Name
 		progress.CurrentGoal = currentTask.Goal
+	} else if progress.CurrentTaskIndex == "" && snapshot.currentTaskIndex != "" {
+		progress.CurrentTaskIndex = snapshot.currentTaskIndex
 	}
 	return progress
 }
@@ -96,10 +113,8 @@ func countTaskStats(root *AiTask) (total, completed, skipped, aborted int) {
 	if root == nil {
 		return 0, 0, 0, 0
 	}
-	taskLink := DFSOrderAiTask(root)
-	for i := 0; i < taskLink.Len(); i++ {
-		task, ok := taskLink.Get(i)
-		if !ok || task == nil {
+	for _, task := range executableLeafTasks(root) {
+		if task == nil {
 			continue
 		}
 		total++

@@ -21,64 +21,71 @@ func newTestCoordinator(t *testing.T) *Coordinator {
 	}
 }
 
-func TestPlanAndExecProgressCounts(t *testing.T) {
+func newStateTask(c *Coordinator, name string) *AiTask {
+	return c.generateAITaskWithName(name, name+"-goal")
+}
+
+func TestPlanAndExecProgressCountsExecutableLeavesAndStages(t *testing.T) {
 	c := newTestCoordinator(t)
 
-	root := c.generateAITaskWithName("root", "root-goal")
-	sub1 := c.generateAITaskWithName("s1", "g1")
-	sub2 := c.generateAITaskWithName("s2", "g2")
-	sub2a := c.generateAITaskWithName("s2a", "g2a")
+	root := newStateTask(c, "root")
+	sub1 := newStateTask(c, "s1")
+	group := newStateTask(c, "group")
+	sub2 := newStateTask(c, "s2")
 
 	sub1.ParentTask = root
-	sub2.ParentTask = root
-	sub2a.ParentTask = sub2
-	root.Subtasks = []*AiTask{sub1, sub2}
-	sub2.Subtasks = []*AiTask{sub2a}
+	group.ParentTask = root
+	sub2.ParentTask = group
+	group.Subtasks = []*AiTask{sub2}
+	root.Subtasks = []*AiTask{sub1, group}
 
-	root.GenerateIndex()
+	c.standardizeTaskTree(root)
 
 	sub1.SetStatus(aicommon.AITaskState_Completed)
-	sub2a.SetStatus(aicommon.AITaskState_Skipped)
+	sub2.SetStatus(aicommon.AITaskState_Processing)
+
+	graph, err := buildStrictExecutableTaskGraph(root)
+	require.NoError(t, err)
 
 	r := &runtime{
-		RootTask: root,
-		TaskLink: DFSOrderAiTask(root),
-		cursor:   2,
+		RootTask:          root,
+		execGraph:         graph,
+		currentStage:      0,
+		stageAnchorTaskID: sub1.Index,
+		activeTaskIndexes: []string{sub2.Index},
 	}
 	c.runtime = r
 
-	progress := c.buildPlanAndExecProgress(root, sub2, "executing")
+	progress := c.buildPlanAndExecProgress(root, nil, "executing")
 
-	require.Equal(t, 4, progress.TotalTasks)
+	require.Equal(t, 2, progress.TotalTasks)
 	require.Equal(t, 1, progress.CompletedTasks)
-	require.Equal(t, 1, progress.SkippedTasks)
+	require.Equal(t, 0, progress.SkippedTasks)
 	require.Equal(t, 0, progress.AbortedTasks)
+	require.Equal(t, 1, progress.TotalStages)
+	require.Equal(t, 0, progress.CompletedStages)
+	require.Equal(t, 0, progress.CurrentStage)
 	require.Equal(t, 2, progress.CurrentIndex)
 	require.Equal(t, sub2.Index, progress.CurrentTaskIndex)
 	require.Equal(t, sub2.Name, progress.CurrentTask)
 	require.Equal(t, sub2.Goal, progress.CurrentGoal)
+	require.Equal(t, []string{sub2.Index}, progress.ActiveTaskIndexes)
 	require.Equal(t, "executing", progress.Phase)
 }
 
-func TestPlanExecTaskTreeRecovery(t *testing.T) {
+func TestPlanExecTaskTreeRecoveryRoundTripPreservesDependsOnAndSemanticIdentifier(t *testing.T) {
 	c := newTestCoordinator(t)
 
-	root := c.generateAITaskWithName("root", "root-goal")
-	sub1 := c.generateAITaskWithName("s1", "g1")
-	sub2 := c.generateAITaskWithName("s2", "g2")
-	sub2a := c.generateAITaskWithName("s2a", "g2a")
-
-	sub1.ParentTask = root
-	sub2.ParentTask = root
-	sub2a.ParentTask = sub2
-	root.Subtasks = []*AiTask{sub1, sub2}
-	sub2.Subtasks = []*AiTask{sub2a}
-
-	root.GenerateIndex()
-
-	sub1.TaskSummary = "done-1"
-	sub1.SetStatus(aicommon.AITaskState_Completed)
-	sub2a.SetStatus(aicommon.AITaskState_Processing)
+	root := newStateTask(c, "root")
+	root.SetSemanticIdentifier("root-semantic")
+	root.DependsOn = []string{"external-ref"}
+	child := newStateTask(c, "child")
+	child.ParentTask = root
+	child.SetSemanticIdentifier("child-semantic")
+	child.DependsOn = []string{"root-semantic"}
+	root.Subtasks = []*AiTask{child}
+	c.standardizeTaskTree(root)
+	child.SetStatus(aicommon.AITaskState_Processing)
 
 	var recovered recoveredTask
 	raw := utils.Jsonify(root)
@@ -86,29 +93,18 @@ func TestPlanExecTaskTreeRecovery(t *testing.T) {
 
 	recRoot := c.buildRecoveredTaskTree(&recovered, nil)
 	require.NotNil(t, recRoot)
-	require.Equal(t, root.Index, recRoot.Index)
-	require.Len(t, recRoot.Subtasks, 2)
-
-	recSub1 := recRoot.Subtasks[0]
-	recSub2 := recRoot.Subtasks[1]
-	require.NotNil(t, recSub1.AIStatefulTaskBase)
-	require.NotNil(t, recSub2.AIStatefulTaskBase)
-	require.Equal(t, recRoot, recSub1.ParentTask)
-	require.Equal(t, recRoot, recSub2.ParentTask)
-
-	require.Equal(t, aicommon.AITaskState_Completed, recSub1.GetStatus())
-	require.Equal(t, "done-1", recSub1.TaskSummary)
-
-	require.Len(t, recSub2.Subtasks, 1)
-	recSub2a := recSub2.Subtasks[0]
-	require.Equal(t, recSub2, recSub2a.ParentTask)
-	require.Equal(t, aicommon.AITaskState_Processing, recSub2a.GetStatus())
+	require.Equal(t, "root-semantic", recRoot.SemanticIdentifier)
+	require.Equal(t, []string{"external-ref"}, recRoot.DependsOn)
+	require.Len(t, recRoot.Subtasks, 1)
+	require.Equal(t, "child-semantic", recRoot.Subtasks[0].SemanticIdentifier)
+	require.Equal(t, []string{"root-semantic"}, recRoot.Subtasks[0].DependsOn)
+	require.Equal(t, aicommon.AITaskState_Processing, recRoot.Subtasks[0].GetStatus())
 }
 
 func TestPlanExecTaskSummaryRoundTrip(t *testing.T) {
 	c := newTestCoordinator(t)
 
-	root := c.generateAITaskWithName("root", "root-goal")
+	root := newStateTask(c, "root")
 	root.StatusSummary = "status-summary"
 	root.TaskSummary = "task-summary"
 	root.ShortSummary = "short-summary"
@@ -146,8 +142,8 @@ func TestPlanExecTaskSummaryLegacyFallback(t *testing.T) {
 func TestPlanExecTaskAbortedRoundTrip(t *testing.T) {
 	c := newTestCoordinator(t)
 
-	root := c.generateAITaskWithName("root", "root-goal")
-	sub := c.generateAITaskWithName("aborted-subtask", "aborted-goal")
+	root := newStateTask(c, "root")
+	sub := newStateTask(c, "aborted-subtask")
 	sub.ParentTask = root
 	root.Subtasks = []*AiTask{sub}
 	root.GenerateIndex()
@@ -168,62 +164,89 @@ func TestPlanExecTaskAbortedRoundTrip(t *testing.T) {
 	require.Equal(t, "aborted-summary", recRoot.Subtasks[0].TaskSummary)
 }
 
-func TestPrepareRecoveryStartTask(t *testing.T) {
+func TestPrepareRecoveryStartTaskResetsSelectedNodeAndLaterNodesOnly(t *testing.T) {
 	c := newTestCoordinator(t)
 
-	root := c.generateAITaskWithName("root", "root-goal")
-	sub1 := c.generateAITaskWithName("s1", "g1")
-	sub2 := c.generateAITaskWithName("s2", "g2")
-	sub2a := c.generateAITaskWithName("s2a", "g2a")
-	sub3 := c.generateAITaskWithName("s3", "g3")
+	root := newStateTask(c, "root")
+	a := newStateTask(c, "a")
+	b := newStateTask(c, "b")
+	cLeaf := newStateTask(c, "c")
+	d := newStateTask(c, "d")
 
-	sub1.ParentTask = root
-	sub2.ParentTask = root
-	sub3.ParentTask = root
-	sub2a.ParentTask = sub2
-	root.Subtasks = []*AiTask{sub1, sub2, sub3}
-	sub2.Subtasks = []*AiTask{sub2a}
+	a.ParentTask = root
+	b.ParentTask = root
+	cLeaf.ParentTask = root
+	d.ParentTask = root
+	root.Subtasks = []*AiTask{a, b, cLeaf, d}
+	c.standardizeTaskTree(root)
 
-	root.GenerateIndex()
+	a.SetStatus(aicommon.AITaskState_Completed)
+	b.SetStatus(aicommon.AITaskState_Completed)
+	cLeaf.SetStatus(aicommon.AITaskState_Completed)
+	d.SetStatus(aicommon.AITaskState_Completed)
 
-	require.NoError(t, prepareRecoveryStartTask(root, sub2a.Index))
-	require.Equal(t, aicommon.AITaskState_Skipped, sub1.GetStatus())
-	require.Equal(t, aicommon.AITaskState_Skipped, sub2.GetStatus(), "tasks before start should be marked skipped")
-	require.Equal(t, aicommon.AITaskState_Created, sub2a.GetStatus(), "start task should be reset to pending")
-	require.Equal(t, aicommon.AITaskState_Created, sub3.GetStatus(), "tasks after start task should be reset to pending")
+	require.NoError(t, prepareRecoveryStartTask(root, cLeaf.Index))
+
+	require.Equal(t, aicommon.AITaskState_Completed, a.GetStatus(), "earlier completed executable task should stay completed")
+	require.Equal(t, aicommon.AITaskState_Completed, b.GetStatus(), "earlier completed executable task in the same stage should stay completed")
+	require.Equal(t, aicommon.AITaskState_Created, cLeaf.GetStatus(), "selected executable task should reset")
+	require.Equal(t, aicommon.AITaskState_Created, d.GetStatus(), "later executable tasks should reset")
 }
 
-func TestPrepareRecoveryStartTaskResetsCompletedRangeForEarlierStart(t *testing.T) {
+func TestPrepareRecoveryStartTaskMarksEarlierIncompleteLeavesSkipped(t *testing.T) {
 	c := newTestCoordinator(t)
 
-	root := c.generateAITaskWithName("root", "root-goal")
-	sub1 := c.generateAITaskWithName("s1", "g1")
-	sub2 := c.generateAITaskWithName("s2", "g2")
-	sub3 := c.generateAITaskWithName("s3", "g3")
-	sub4 := c.generateAITaskWithName("s4", "g4")
+	root := newStateTask(c, "root")
+	sub1 := newStateTask(c, "s1")
+	group := newStateTask(c, "group")
+	sub2 := newStateTask(c, "s2")
+	sub3 := newStateTask(c, "s3")
 
 	sub1.ParentTask = root
-	sub2.ParentTask = root
+	group.ParentTask = root
+	sub2.ParentTask = group
 	sub3.ParentTask = root
-	sub4.ParentTask = root
-	root.Subtasks = []*AiTask{sub1, sub2, sub3, sub4}
-	root.GenerateIndex()
-
-	sub1.SetStatus(aicommon.AITaskState_Completed)
-	sub2.SetStatus(aicommon.AITaskState_Completed)
-	sub3.SetStatus(aicommon.AITaskState_Completed)
+	group.Subtasks = []*AiTask{sub2}
+	root.Subtasks = []*AiTask{sub1, group, sub3}
+	c.standardizeTaskTree(root)
 
 	require.NoError(t, prepareRecoveryStartTask(root, sub2.Index))
+	require.Equal(t, aicommon.AITaskState_Skipped, sub1.GetStatus())
+	require.Equal(t, aicommon.AITaskState_Created, sub2.GetStatus())
+	require.Equal(t, aicommon.AITaskState_Created, sub3.GetStatus())
+}
 
-	require.Equal(t, aicommon.AITaskState_Completed, sub1.GetStatus(), "tasks before the new start should keep their completed status")
-	require.Equal(t, aicommon.AITaskState_Created, sub2.GetStatus(), "new start task should be reset so recovery can rerun it")
-	require.Equal(t, aicommon.AITaskState_Created, sub3.GetStatus(), "completed tasks between new start and previous cursor should be reset")
-	require.Equal(t, aicommon.AITaskState_Created, sub4.GetStatus(), "previous current task boundary should not be reset by range rewind")
+func TestPrepareRecoveryStartTaskAutoDetectsFirstUnsuccessfulExecutableNode(t *testing.T) {
+	c := newTestCoordinator(t)
+
+	root := newStateTask(c, "root")
+	done := newStateTask(c, "done")
+	aborted := newStateTask(c, "aborted")
+	completedLater := newStateTask(c, "completed-later")
+	later := newStateTask(c, "later")
+
+	done.ParentTask = root
+	aborted.ParentTask = root
+	completedLater.ParentTask = root
+	later.ParentTask = root
+	root.Subtasks = []*AiTask{done, aborted, completedLater, later}
+	c.standardizeTaskTree(root)
+
+	done.SetStatus(aicommon.AITaskState_Completed)
+	aborted.SetStatus(aicommon.AITaskState_Aborted)
+	completedLater.SetStatus(aicommon.AITaskState_Completed)
+	later.SetStatus(aicommon.AITaskState_Created)
+
+	require.NoError(t, prepareRecoveryStartTask(root, ""))
+	require.Equal(t, aicommon.AITaskState_Completed, done.GetStatus())
+	require.Equal(t, aicommon.AITaskState_Created, aborted.GetStatus())
+	require.Equal(t, aicommon.AITaskState_Created, completedLater.GetStatus(), "later executable tasks should rewind even if they were completed")
+	require.Equal(t, aicommon.AITaskState_Created, later.GetStatus())
 }
 
 func TestPrepareRecoveryStartTaskNotFound(t *testing.T) {
 	c := newTestCoordinator(t)
-	root := c.generateAITaskWithName("root", "root-goal")
+	root := newStateTask(c, "root")
 	root.GenerateIndex()
 
 	err := prepareRecoveryStartTask(root, "1-99")
