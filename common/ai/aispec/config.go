@@ -64,17 +64,15 @@ type AIConfig struct {
 	// 关键词: AIConfig.Videos, 视频输入承载
 	Videos []*VideoDescription
 
-	Headers             []*ypb.KVPair
-	EnableThinking      bool
-	EnableThinkingField string
-	EnableThinkingValue any
+	Headers        []*ypb.KVPair
+	EnableThinking *bool
 	// 以下为可选模型采样/推理参数（与 ypb.ThirdPartyApplicationConfig 对齐）；nil 或空串表示不写入上游请求
-	MaxTokens          *int64   `json:"max_tokens,omitempty"`
-	Temperature        *float64 `json:"temperature,omitempty"`
-	TopP               *float64 `json:"top_p,omitempty"`
-	TopK               *int64   `json:"top_k,omitempty"`
-	FrequencyPenalty   *float64 `json:"frequency_penalty,omitempty"`
-	ReasoningEffort    string   `json:"reasoning_effort,omitempty"`
+	MaxTokens        *int64   `json:"max_tokens,omitempty"`
+	Temperature      *float64 `json:"temperature,omitempty"`
+	TopP             *float64 `json:"top_p,omitempty"`
+	TopK             *int64   `json:"top_k,omitempty"`
+	FrequencyPenalty *float64 `json:"frequency_penalty,omitempty"`
+	ReasoningEffort  string   `json:"reasoning_effort,omitempty"`
 
 	// ToolCallCallback is called when the AI response contains tool_calls.
 	// If set, tool_calls will NOT be converted to <|TOOL_CALL...|> format in the output stream.
@@ -187,35 +185,8 @@ func ExtraHeadersToMap(headers []*ypb.KVPair) map[string]string {
 	return result
 }
 
-func WithEnableThinkingEx(thinkField string, thinkValue any) AIConfigOption {
-	return func(config *AIConfig) {
-		if thinkField != "" && thinkValue != nil {
-			config.EnableThinkingField = thinkField
-			config.EnableThinkingValue = thinkValue
-		}
-	}
-}
-
-// WithExplicitThinkingBody 对应 ypb.ThirdPartyApplicationConfig 的 optional EnableThinkingOpt：
-// 仅在显式配置时由 BuildOptionsFromConfig 注入，在请求 JSON 根上写入
-// "thinking": {"type":"enabled"} 或 {"type":"disabled"}，与按厂商分支的 EnableThinking 行为解耦。
-func WithExplicitThinkingBody(enabled bool) AIConfigOption {
-	return func(config *AIConfig) {
-		config.EnableThinking = enabled
-		config.EnableThinkingField = "thinking"
-		if enabled {
-			config.EnableThinkingValue = map[string]any{
-				"type": "enabled",
-			}
-		} else {
-			config.EnableThinkingValue = map[string]any{
-				"type": "disabled",
-			}
-		}
-	}
-}
-
-// WithEnableThinking 启用think模式，目前只有当ai模型类型为`volcengine`类型也就是豆包相关模型时此配置才生效。
+// WithEnableThinking 设置是否启用思考链相关请求体字段；仅写入 EnableThinking（*bool）。
+// nil 表示不在请求体中注入思考参数（由网关默认值等单独处理）；非 nil 时 true 为开启，false 为关闭。
 //
 // 参数：
 // - t(any): 思维链配置
@@ -249,34 +220,31 @@ func WithEnableThinking(t any) AIConfigOption {
 		if utils.IsNil(t) {
 			return
 		}
-		switch ret := t.(type) {
+		switch v := t.(type) {
+		case *bool:
+			if v == nil {
+				return
+			}
+			copied := *v
+			config.EnableThinking = &copied
+			return
 		case bool:
-			config.EnableThinking = ret
+			b := v
+			config.EnableThinking = &b
+			return
 		default:
-			switch utils.InterfaceToString(t) {
-			case "yes", "y", "true", "1", "enable", "on", "auto", "a", "enabled":
-				config.EnableThinking = true
-			default:
-				config.EnableThinking = false
-			}
+			b := parseThinkingToggleFromAny(t)
+			config.EnableThinking = &b
 		}
+	}
+}
 
-		config.EnableThinkingField = "enable_thinking"
-		config.EnableThinkingValue = config.EnableThinking
-
-		switch config.Type {
-		case "volcengine":
-			config.EnableThinkingField = "thinking"
-			if config.EnableThinking {
-				config.EnableThinkingValue = map[string]any{
-					"type": "enabled",
-				}
-			} else {
-				config.EnableThinkingValue = map[string]any{
-					"type": "disabled",
-				}
-			}
-		}
+func parseThinkingToggleFromAny(t any) bool {
+	switch strings.ToLower(strings.TrimSpace(utils.InterfaceToString(t))) {
+	case "yes", "y", "true", "1", "enable", "on", "auto", "a", "enabled":
+		return true
+	default:
+		return false
 	}
 }
 

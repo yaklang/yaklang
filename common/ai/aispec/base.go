@@ -193,18 +193,17 @@ const (
 )
 
 type ChatBaseContext struct {
-	PoCOptionGenerator  func() ([]poc.PocConfigOption, error)
-	EnableThinking      bool
-	EnableThinkingField string
-	EnableThinkingValue any
-	ThinkingBudget      int64
+	PoCOptionGenerator func() ([]poc.PocConfigOption, error)
+	// ExtraBody is merged into the outbound JSON body (top-level keys) after marshaling msgResult.
+	ExtraBody      map[string]any
+	ThinkingBudget int64
 	// 模型采样/推理参数（来自 ThirdPartyApplicationConfig / AIConfig，未设置则不写入请求体）
-	MaxTokens          *int64
-	Temperature        *float64
-	TopP               *float64
-	TopK               *int64
-	FrequencyPenalty   *float64
-	ReasoningEffort    string
+	MaxTokens           *int64
+	Temperature         *float64
+	TopP                *float64
+	TopK                *int64
+	FrequencyPenalty    *float64
+	ReasoningEffort     string
 	StreamHandler       func(io.Reader)
 	ReasonStreamHandler func(reader io.Reader)
 	ErrHandler          func(err error)
@@ -279,17 +278,40 @@ func WithChatBase_ThinkingBudget(budget int64) ChatBaseOption {
 	}
 }
 
-func WithChatBase_EnableThinking(b bool) ChatBaseOption {
+// WithChatBase_EnableThinkingEx merges a single top-level key into ExtraBody (e.g. custom reasoning_effort).
+func WithChatBase_EnableThinkingEx(key string, value any) ChatBaseOption {
 	return func(c *ChatBaseContext) {
-		c.EnableThinking = b
+		if key == "" {
+			return
+		}
+		mergeChatBaseExtraBody(c, map[string]any{key: value})
 	}
 }
 
-func WithChatBase_EnableThinkingEx(b bool, key string, value any) ChatBaseOption {
+func mergeChatBaseExtraBody(c *ChatBaseContext, m map[string]any) {
+	if len(m) == 0 {
+		return
+	}
+	if c.ExtraBody == nil {
+		c.ExtraBody = make(map[string]any, len(m))
+	}
+	for k, v := range m {
+		c.ExtraBody[k] = v
+	}
+}
+
+// ChatBaseThinkingOptions merges ThinkingExtraBodyForProvider into ExtraBody when cfg.EnableThinking != nil.
+func ChatBaseThinkingOptions(cfg *AIConfig, resolvedTargetURL string) ChatBaseOption {
 	return func(c *ChatBaseContext) {
-		c.EnableThinking = b
-		c.EnableThinkingField = key
-		c.EnableThinkingValue = value
+		if cfg == nil || cfg.EnableThinking == nil {
+			return
+		}
+		baseURL := cfg.BaseURL
+		if baseURL == "" {
+			baseURL = resolvedTargetURL
+		}
+		m := ThinkingExtraBodyForProvider(cfg.Type, cfg.Model, baseURL, cfg.Domain, *cfg.EnableThinking)
+		mergeChatBaseExtraBody(c, m)
 	}
 }
 
@@ -453,8 +475,7 @@ func WithChatBase_RawMessages(msgs []ChatDetail) ChatBaseOption {
 
 func NewChatBaseContext(opts ...ChatBaseOption) *ChatBaseContext {
 	ctx := &ChatBaseContext{
-		EnableThinking: false,
-		InterfaceType:  ChatBaseInterfaceTypeChatCompletions,
+		InterfaceType: ChatBaseInterfaceTypeChatCompletions,
 	}
 	for _, i := range opts {
 		i(ctx)
@@ -885,7 +906,7 @@ func executeChatBaseRequest(
 
 	payload := msgResult
 	var raw []byte
-	if ctx.EnableThinkingField != "" {
+	if len(ctx.ExtraBody) > 0 {
 		raw, err = json.Marshal(msgResult)
 		if err != nil {
 			return "", utils.Errorf("marshal msg[%v] to json failed: %s", spew.Sdump(msgResult), err)
@@ -895,7 +916,9 @@ func executeChatBaseRequest(
 		if err != nil {
 			return "", utils.Errorf("unmarshal msg[%v] to map failed: %s", string(raw), err)
 		}
-		msgMap[ctx.EnableThinkingField] = ctx.EnableThinkingValue
+		for k, v := range ctx.ExtraBody {
+			msgMap[k] = v
+		}
 		payload = msgMap
 	}
 

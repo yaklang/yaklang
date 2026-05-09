@@ -51,13 +51,7 @@ func init() {
 		return &tongyi.GatewayClient{}
 	})
 	aispec.Register("volcengine", func() aispec.AIClient {
-		return &volcengine.GatewayClient{
-			ExtraOptions: []aispec.AIConfigOption{
-				aispec.WithEnableThinkingEx("thinking", map[string]any{
-					"type": "disabled",
-				}),
-			},
-		}
+		return &volcengine.GatewayClient{}
 	})
 	aispec.Register("comate", func() aispec.AIClient {
 		return &comate.Client{}
@@ -119,7 +113,7 @@ func (g *Gateway) Chat(s string, f ...any) (string, error) {
 		aispec.WithChatBase_ReasonStreamHandler(g.Config.ReasonStreamHandler),
 		aispec.WithChatBase_ErrHandler(g.Config.HTTPErrorHandler),
 		aispec.WithChatBase_ImageRawInstance(g.Config.Images...),
-		aispec.WithChatBase_EnableThinkingEx(g.Config.EnableThinking, g.Config.EnableThinkingField, g.Config.EnableThinkingValue),
+		aispec.ChatBaseThinkingOptions(g.Config, g.TargetUrl),
 		aispec.WithChatBase_AISamplingFromConfig(g.Config),
 		aispec.WithChatBase_ToolCallCallback(g.Config.ToolCallCallback),
 		aispec.WithChatBase_Tools(g.Config.Tools),
@@ -147,7 +141,7 @@ func (g *Gateway) ChatStream(s string) (io.Reader, error) {
 		g.Config.HTTPErrorHandler,
 		g.Config.StreamHandler,
 		g.AIClient.BuildHTTPOptions,
-		aispec.WithChatBase_EnableThinkingEx(g.Config.EnableThinking, g.Config.EnableThinkingField, g.Config.EnableThinkingValue),
+		aispec.ChatBaseThinkingOptions(g.Config, g.TargetUrl),
 		aispec.WithChatBase_AISamplingFromConfig(g.Config),
 		aispec.WithChatBase_RawHTTPResponseHeaderCallback(g.Config.RawHTTPResponseHeaderCallback),
 		aispec.WithChatBase_RawHTTPResponseCallback(g.Config.RawHTTPResponseCallback),

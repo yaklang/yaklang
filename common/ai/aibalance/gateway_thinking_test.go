@@ -3,11 +3,13 @@ package aibalance
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/yaklang/yaklang/common/ai/aispec"
 )
 
 func TestEnableThinkingConfig_Aibalance(t *testing.T) {
-	t.Run("thinking true sets field and value", func(t *testing.T) {
+	t.Run("thinking true sets pointer", func(t *testing.T) {
 		client := &GatewayClient{}
 		client.LoadOption(
 			aispec.WithType("aibalance"),
@@ -15,20 +17,13 @@ func TestEnableThinkingConfig_Aibalance(t *testing.T) {
 			aispec.WithModel("memfit-qwen3.5-plus-free"),
 			aispec.WithEnableThinking(true),
 		)
-
-		if client.config.EnableThinkingField != "enable_thinking" {
-			t.Fatalf("expected EnableThinkingField='enable_thinking', got '%s'", client.config.EnableThinkingField)
-		}
-		val, ok := client.config.EnableThinkingValue.(bool)
-		if !ok {
-			t.Fatalf("expected EnableThinkingValue to be bool, got %T", client.config.EnableThinkingValue)
-		}
-		if !val {
-			t.Fatalf("expected EnableThinkingValue=true, got false")
+		require.NotNil(t, client.config.EnableThinking)
+		if !*client.config.EnableThinking {
+			t.Fatalf("expected EnableThinking=true")
 		}
 	})
 
-	t.Run("thinking false sets field and value", func(t *testing.T) {
+	t.Run("thinking false sets pointer", func(t *testing.T) {
 		client := &GatewayClient{}
 		client.LoadOption(
 			aispec.WithType("aibalance"),
@@ -36,32 +31,21 @@ func TestEnableThinkingConfig_Aibalance(t *testing.T) {
 			aispec.WithModel("memfit-qwen3.5-plus-free"),
 			aispec.WithEnableThinking(false),
 		)
-
-		if client.config.EnableThinkingField != "enable_thinking" {
-			t.Fatalf("expected EnableThinkingField='enable_thinking', got '%s'", client.config.EnableThinkingField)
-		}
-		val, ok := client.config.EnableThinkingValue.(bool)
-		if !ok {
-			t.Fatalf("expected EnableThinkingValue to be bool, got %T", client.config.EnableThinkingValue)
-		}
-		if val {
-			t.Fatalf("expected EnableThinkingValue=false, got true")
+		require.NotNil(t, client.config.EnableThinking)
+		if *client.config.EnableThinking {
+			t.Fatalf("expected EnableThinking=false")
 		}
 	})
 
-	t.Run("no thinking option leaves field empty", func(t *testing.T) {
+	t.Run("no thinking option leaves nil", func(t *testing.T) {
 		client := &GatewayClient{}
 		client.LoadOption(
 			aispec.WithType("aibalance"),
 			aispec.WithAPIKey("test-key"),
 			aispec.WithModel("memfit-qwen3.5-plus-free"),
 		)
-
-		if client.config.EnableThinkingField != "" {
-			t.Fatalf("expected EnableThinkingField='', got '%s'", client.config.EnableThinkingField)
-		}
-		if client.config.EnableThinkingValue != nil {
-			t.Fatalf("expected EnableThinkingValue=nil, got %v", client.config.EnableThinkingValue)
+		if client.config.EnableThinking != nil {
+			t.Fatalf("expected EnableThinking=nil, got %v", client.config.EnableThinking)
 		}
 	})
 }
@@ -74,66 +58,44 @@ func TestEnableThinkingConfig_Tongyi(t *testing.T) {
 			aispec.WithModel("qwen3.5-plus"),
 			aispec.WithEnableThinking(true),
 		)
-
-		if config.EnableThinkingField != "enable_thinking" {
-			t.Fatalf("expected EnableThinkingField='enable_thinking', got '%s'", config.EnableThinkingField)
-		}
-		val, ok := config.EnableThinkingValue.(bool)
-		if !ok {
-			t.Fatalf("expected EnableThinkingValue to be bool, got %T", config.EnableThinkingValue)
-		}
-		if !val {
-			t.Fatalf("expected EnableThinkingValue=true, got false")
+		require.NotNil(t, config.EnableThinking)
+		if !*config.EnableThinking {
+			t.Fatalf("expected EnableThinking=true")
 		}
 	})
 
-	t.Run("tongyi no thinking option leaves field empty", func(t *testing.T) {
+	t.Run("tongyi no thinking option leaves nil", func(t *testing.T) {
 		config := aispec.NewDefaultAIConfig(
 			aispec.WithType("tongyi"),
 			aispec.WithAPIKey("test-key"),
 			aispec.WithModel("qwen3.5-plus"),
 		)
-
-		if config.EnableThinkingField != "" {
-			t.Fatalf("expected EnableThinkingField='', got '%s'", config.EnableThinkingField)
+		if config.EnableThinking != nil {
+			t.Fatalf("expected EnableThinking=nil")
 		}
 	})
 }
 
 func TestEnableThinkingConfig_GenericDefault(t *testing.T) {
-	t.Run("no type still sets enable_thinking", func(t *testing.T) {
+	t.Run("no type still sets pointer", func(t *testing.T) {
 		config := aispec.NewDefaultAIConfig(
 			aispec.WithEnableThinking(true),
 		)
-
-		if config.EnableThinkingField != "enable_thinking" {
-			t.Fatalf("expected EnableThinkingField='enable_thinking', got '%s'", config.EnableThinkingField)
-		}
-		val, ok := config.EnableThinkingValue.(bool)
-		if !ok {
-			t.Fatalf("expected EnableThinkingValue to be bool, got %T", config.EnableThinkingValue)
-		}
-		if !val {
-			t.Fatalf("expected EnableThinkingValue=true, got false")
+		require.NotNil(t, config.EnableThinking)
+		if !*config.EnableThinking {
+			t.Fatalf("expected EnableThinking=true")
 		}
 	})
 
-	t.Run("openai type also sets enable_thinking", func(t *testing.T) {
+	t.Run("openai type sets pointer", func(t *testing.T) {
 		config := aispec.NewDefaultAIConfig(
 			aispec.WithType("openai"),
 			aispec.WithAPIKey("test-key"),
 			aispec.WithEnableThinking(true),
 		)
-
-		if config.EnableThinkingField != "enable_thinking" {
-			t.Fatalf("expected EnableThinkingField='enable_thinking', got '%s'", config.EnableThinkingField)
-		}
-		val, ok := config.EnableThinkingValue.(bool)
-		if !ok {
-			t.Fatalf("expected EnableThinkingValue to be bool, got %T", config.EnableThinkingValue)
-		}
-		if !val {
-			t.Fatalf("expected EnableThinkingValue=true, got false")
+		require.NotNil(t, config.EnableThinking)
+		if !*config.EnableThinking {
+			t.Fatalf("expected EnableThinking=true")
 		}
 	})
 }
@@ -145,16 +107,17 @@ func TestEnableThinkingConfig_Volcengine(t *testing.T) {
 			aispec.WithAPIKey("test-key"),
 			aispec.WithEnableThinking(true),
 		)
-
-		if config.EnableThinkingField != "thinking" {
-			t.Fatalf("expected EnableThinkingField='thinking', got '%s'", config.EnableThinkingField)
+		require.NotNil(t, config.EnableThinking)
+		if !*config.EnableThinking {
+			t.Fatalf("expected EnableThinking=true")
 		}
-		valMap, ok := config.EnableThinkingValue.(map[string]any)
+		m := aispec.ThinkingExtraBodyForProvider(config.Type, config.Model, config.BaseURL, config.Domain, *config.EnableThinking)
+		inner, ok := m["thinking"].(map[string]any)
 		if !ok {
-			t.Fatalf("expected EnableThinkingValue to be map, got %T", config.EnableThinkingValue)
+			t.Fatalf("expected thinking map, got %T", m["thinking"])
 		}
-		if valMap["type"] != "enabled" {
-			t.Fatalf("expected thinking type='enabled', got '%v'", valMap["type"])
+		if inner["type"] != "enabled" {
+			t.Fatalf("expected thinking type='enabled', got '%v'", inner["type"])
 		}
 	})
 
@@ -165,16 +128,9 @@ func TestEnableThinkingConfig_Volcengine(t *testing.T) {
 			aispec.WithModel("deepseek-ai/DeepSeek-V4-Flash"),
 			aispec.WithEnableThinking(true),
 		)
-
-		if config.EnableThinkingField != "enable_thinking" {
-			t.Fatalf("expected EnableThinkingField='enable_thinking', got '%s'", config.EnableThinkingField)
-		}
-		val, ok := config.EnableThinkingValue.(bool)
-		if !ok {
-			t.Fatalf("expected EnableThinkingValue to be bool, got %T", config.EnableThinkingValue)
-		}
-		if !val {
-			t.Fatalf("expected EnableThinkingValue=true, got false")
+		require.NotNil(t, config.EnableThinking)
+		if !*config.EnableThinking {
+			t.Fatalf("expected EnableThinking=true")
 		}
 	})
 }

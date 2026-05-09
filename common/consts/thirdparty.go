@@ -264,8 +264,17 @@ func applyThirdPartyNonAppFields(target any, source *thirdPartyApplicationConfig
 		field.Set(reflect.ValueOf(cloneHTTPHeaders(source.Headers)))
 	}
 	field = elem.FieldByName("EnableThinking")
-	if field.IsValid() && field.CanSet() && field.Kind() == reflect.Bool {
+	if !field.IsValid() || !field.CanSet() {
+		return nil
+	}
+	switch field.Kind() {
+	case reflect.Bool:
 		field.SetBool(source.EnableThinking)
+	case reflect.Ptr:
+		if field.Type() == reflect.TypeOf((*bool)(nil)) {
+			v := source.EnableThinking
+			field.Set(reflect.ValueOf(&v))
+		}
 	}
 	return nil
 }

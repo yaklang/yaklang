@@ -50,11 +50,8 @@ func TestBuildOptionsFromConfig_AppliesEnableThinking(t *testing.T) {
 	}
 	assert.Equal(t, "siliconflow", resolved.Type)
 	assert.Equal(t, "deepseek-ai/DeepSeek-V4-Flash", resolved.Model)
-	assert.True(t, resolved.EnableThinking)
-	assert.Equal(t, "enable_thinking", resolved.EnableThinkingField)
-	val, ok := resolved.EnableThinkingValue.(bool)
-	assert.True(t, ok)
-	assert.True(t, val)
+	require.NotNil(t, resolved.EnableThinking)
+	assert.True(t, *resolved.EnableThinking)
 }
 
 func TestBuildOptionsFromConfig_EnableThinkingOptOverridesEnableThinking(t *testing.T) {
@@ -72,11 +69,8 @@ func TestBuildOptionsFromConfig_EnableThinkingOptOverridesEnableThinking(t *test
 	for _, opt := range BuildOptionsFromConfig(config) {
 		opt(resolved)
 	}
-	assert.Equal(t, "thinking", resolved.EnableThinkingField)
-	m, ok := resolved.EnableThinkingValue.(map[string]any)
-	require.True(t, ok)
-	assert.Equal(t, "disabled", m["type"])
-	assert.False(t, resolved.EnableThinking)
+	require.NotNil(t, resolved.EnableThinking)
+	assert.False(t, *resolved.EnableThinking)
 }
 
 func TestBuildOptionsFromConfig_EnableThinkingOptTrue(t *testing.T) {
@@ -93,10 +87,8 @@ func TestBuildOptionsFromConfig_EnableThinkingOptTrue(t *testing.T) {
 	for _, opt := range BuildOptionsFromConfig(config) {
 		opt(resolved)
 	}
-	assert.Equal(t, "thinking", resolved.EnableThinkingField)
-	m, ok := resolved.EnableThinkingValue.(map[string]any)
-	require.True(t, ok)
-	assert.Equal(t, "enabled", m["type"])
+	require.NotNil(t, resolved.EnableThinking)
+	assert.True(t, *resolved.EnableThinking)
 }
 
 func TestBuildOptionsFromConfig_AppliesModelSamplingParams(t *testing.T) {

@@ -633,7 +633,6 @@ func TestChatBaseStability_EnableThinking(t *testing.T) {
 					poc.WithTimeout(5),
 				}, nil
 			}),
-			aispec.WithChatBase_EnableThinking(true),
 			// 添加流式处理器确保稳定性
 			aispec.WithChatBase_StreamHandler(func(reader io.Reader) {
 				io.Copy(io.Discard, reader)
@@ -658,7 +657,7 @@ func TestChatBaseStability_EnableThinking(t *testing.T) {
 					poc.WithTimeout(5),
 				}, nil
 			}),
-			aispec.WithChatBase_EnableThinkingEx(true, "reasoning_effort", "high"),
+			aispec.WithChatBase_EnableThinkingEx("reasoning_effort", "high"),
 			aispec.WithChatBase_StreamHandler(func(reader io.Reader) {
 				io.Copy(io.Discard, reader)
 			}))
@@ -682,7 +681,6 @@ func TestChatBaseStability_EnableThinking(t *testing.T) {
 					poc.WithTimeout(5),
 				}, nil
 			}),
-			aispec.WithChatBase_EnableThinking(true),
 			aispec.WithChatBase_ThinkingBudget(1000),
 			aispec.WithChatBase_StreamHandler(func(reader io.Reader) {
 				io.Copy(io.Discard, reader)
