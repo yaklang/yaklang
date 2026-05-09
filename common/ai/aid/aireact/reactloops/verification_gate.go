@@ -14,7 +14,7 @@ const (
 	verificationIterationTriggerInterval  = aicommon.DefaultPeriodicVerificationInterval
 )
 
-var verificationWatchdogIdleTimeout = 10 * time.Second
+var verificationWatchdogIdleTimeout = 2 * time.Minute
 
 type VerificationRuntimeSnapshot struct {
 	GeneratedAt      time.Time `json:"generated_at"`
