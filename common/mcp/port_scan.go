@@ -216,8 +216,11 @@ func handlePortScan(s *MCPServer) server.ToolHandlerFunc {
 			content = handleExecMessage(content)
 			msgContent := gjson.GetBytes(exec.Message, "content")
 
-			isResult := gjson.GetBytes(exec.Message, "isOpen").Exists()
-			if isResult {
+			isOpenField := gjson.GetBytes(exec.Message, "isOpen")
+			if isOpenField.Exists() {
+				if !isOpenField.Bool() {
+					continue
+				}
 				content = "[Result] " + content
 			}
 
