@@ -330,9 +330,10 @@ func (c *Config) parseProjectWithFS(
 		}
 		handlerProcess := func() {
 			handlerNum++
-			process = 0.4 + (float64(handlerNum)/float64(totalToBuild))*0.5
-			if process > 0.9 {
-				process = 0.9 // limit to 90%
+			// Reserve [0.88, 0.90) for program metadata (f4) and [0.90, 1.0] for IR flush (f5).
+			process = 0.4 + (float64(handlerNum)/float64(totalToBuild))*0.48
+			if process > 0.88 {
+				process = 0.88
 			}
 		}
 		prog.SetPreHandler(false)
@@ -361,7 +362,7 @@ func (c *Config) parseProjectWithFS(
 	}
 
 	f4 := func() error {
-		process = 0.9 // %90
+		process = 0.88
 		prog.Finish()
 		// 在保存到数据库之前，设置增量编译信息（如果存在）
 		if baseProgramName := c.GetBaseProgramName(); baseProgramName != "" {
@@ -377,38 +378,31 @@ func (c *Config) parseProjectWithFS(
 			prog.FileHashMap = make(map[string]int)
 		}
 		if prog.DatabaseKind != ssa.ProgramCacheMemory { // save program
-			start := time.Now()
+			prog.ProcessInfof("[SSA/persist] program %s saving program metadata (ir_program)", prog.Name)
+			metaStart := time.Now()
 			prog.UpdateToDatabaseWithWG(&wg)
-			since := time.Since(start)
+			since := time.Since(metaStart)
 			log.Infof("program %s save to database cost: %s", prog.Name, since)
+			prog.ProcessInfof("[SSA/persist] program %s program metadata saved, cost %v", prog.Name, since)
 		}
+		process = 0.90
 		return nil
 	}
 
 	f5 := func() error {
+		saveStart := time.Now()
 		total := prog.Cache.CountInstruction()
-		process = 0.9
+		process = 0.90
 		if prog.DatabaseKind != ssa.ProgramCacheMemory {
-			prog.ProcessInfof("program %s finishing save cache instruction(len:%d) to database", prog.Name, total)
+			prog.ProcessInfof("[SSA/persist] program %s flushing IR cache (instructions=%d) to database", prog.Name, total)
 		} else {
-			prog.ProcessInfof("program %s finishing cache instruction(len:%d) (memory only, not saved)", prog.Name, total)
+			prog.ProcessInfof("[SSA/persist] program %s finishing cache instruction(len:%d) (memory only, not saved)", prog.Name, total)
 		}
 
-		var index int
-		prevProcess := 0.9
-		_ = prevProcess
-		lock := sync.Mutex{}
-		prog.Cache.SaveToDatabase(func(size int) {
-			lock.Lock()
-			defer lock.Unlock()
-			index += size
-			process = 0.9 + (float64(index)/float64(total))*0.1
-			if (process - prevProcess) > 0.0001 { // is 90.01%/90.02%/....
-				prog.ProcessInfof("Saving instructions: %d complete(total %d)", index, total)
-				prevProcess = process
-			}
-		})
-		saveTime = time.Since(start)
+		prog.Cache.SaveToDatabase(irSaveProgressCallback(prog, total, 0.90, 1.0, func(p float64) {
+			process = p
+		}))
+		saveTime = time.Since(saveStart)
 		return nil
 	}
 	f6 := func() error {
@@ -430,4 +424,46 @@ func (c *Config) parseProjectWithFS(
 		}
 	}
 	return NewProgram(prog, c), nil
+}
+
+const irSaveHeartbeatInterval = 5 * time.Second
+
+// irSaveProgressCallback builds a SaveToDatabase progress func: updates optional
+// compile bar in [processMin, processMax], logs delta steps (>0.0001 on that
+// range), and emits a heartbeat every irSaveHeartbeatInterval while work advances.
+func irSaveProgressCallback(prog *ssa.Program, total int, processMin, processMax float64, setProcess func(float64)) func(int) {
+	var mu sync.Mutex
+	var index int
+	prevP := processMin
+	lastHB := time.Now()
+	lastIdxAtHB := 0
+	return func(size int) {
+		mu.Lock()
+		defer mu.Unlock()
+		index += size
+		var p float64
+		if total > 0 {
+			p = processMin + (float64(index)/float64(total))*(processMax-processMin)
+		} else {
+			p = processMax
+		}
+		if setProcess != nil {
+			setProcess(p)
+		}
+		if total > 0 && (p-prevP) > 0.0001 {
+			prog.ProcessInfof("[SSA/persist] Saving instructions: %d / %d", index, total)
+			prevP = p
+		}
+		now := time.Now()
+		if total > 0 && index > lastIdxAtHB && now.Sub(lastHB) >= irSaveHeartbeatInterval {
+			elapsed := now.Sub(lastHB).Seconds()
+			if elapsed <= 0 {
+				elapsed = 1e-9
+			}
+			rate := float64(index-lastIdxAtHB) / elapsed
+			prog.ProcessInfof("[SSA/persist] IR save heartbeat: %d / %d (~%.0f inst/s over %.0fs)", index, total, rate, elapsed)
+			lastHB = now
+			lastIdxAtHB = index
+		}
+	}
 }

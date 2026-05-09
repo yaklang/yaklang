@@ -23,6 +23,16 @@ func newProgramWithTTL(programName string, ttl time.Duration, kind ProgramCacheK
 	return NewProgram(cfg, kind, Application, fs, "", 0)
 }
 
+func TestResolveInstructionPersistenceTuning_largeProject(t *testing.T) {
+	cfg, err := ssaconfig.New(ssaconfig.ModeSSACompile, ssaconfig.WithSetProgramName("large-proj"))
+	require.NoError(t, err)
+	cfg.SetCompileProjectBytes(largeProjectByteThreshold)
+	save, limit := resolveInstructionPersistenceTuning(cfg, 200)
+	require.Equal(t, largeProjectInstructionSave, save)
+	require.Equal(t, largeProjectPersistLimit, limit)
+	require.GreaterOrEqual(t, limit, save*4, "persist limit should cover eviction backpressure vs save batch")
+}
+
 func TestResolveInstructionCacheSettings(t *testing.T) {
 	cfg, err := ssaconfig.New(ssaconfig.ModeSSACompile)
 	require.NoError(t, err)
