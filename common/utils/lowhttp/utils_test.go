@@ -210,6 +210,8 @@ func TestGetPathSuffix(t *testing.T) {
 		{path: "/static/app.js/?version=1", want: ".js"},
 		{path: "/item/assets/428.png!cc_216x216", want: ".png"},
 		{path: "/item/assets/428.png!cc_216x216/", want: ".png"},
+		{path: "/search/src=https%3A%2F%2Fimgsrc.baidu.com%2Fforum&app=2021&size=w240&n=0&g=0n&fmt=auto", want: ""},
+		{path: "/search/src=https://imgsrc.baidu.com/forum&app=2021&size=w240&n=0&g=0n&fmt=auto", want: ""},
 		{path: "/api/health", want: ""},
 		{path: "/", want: ""},
 	}

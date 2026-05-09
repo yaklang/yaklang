@@ -26,6 +26,8 @@ const (
 	DoubleCRLF = "\r\n\r\n"
 )
 
+var validPathSuffixRegexp = regexp.MustCompile(`^\.[A-Za-z0-9]+$`)
+
 // pathExtModifierChars 是 CDN/图片服务在 path 扩展名后常加的修饰符字符。
 // 例如 a.png!cc_218x300 中的 !、.jpg@100w 中的 @。提取“真实扩展名”时需在此类字符处截断，
 // 只保留如 .png、.jpg 这样的后缀。
@@ -52,6 +54,9 @@ func GetPathSuffix(pathStr string) string {
 	}
 	if !strings.HasPrefix(ret, ".") {
 		ret = "." + ret
+	}
+	if !validPathSuffixRegexp.MatchString(ret) {
+		return ""
 	}
 	return ret
 }
