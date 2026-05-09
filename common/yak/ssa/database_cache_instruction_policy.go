@@ -17,8 +17,11 @@ const (
 	largeProjectByteThreshold    = 16 * 1024 * 1024
 	largeProjectCacheTTL         = 250 * time.Millisecond
 	largeProjectCacheMax         = 1024
-	largeProjectInstructionSave  = 1024
-	largeProjectPersistLimit     = 16384
+	// Instruction DB batches for repos >= largeProjectByteThreshold: larger batches
+	// mean fewer SQLite transactions per million IR rows (bounded by maxSaveSize).
+	// Persist limit stays >= 4x batch so dbcache eviction backpressure matches writer.
+	largeProjectInstructionSave = 4096
+	largeProjectPersistLimit    = 32768
 	largeProjectAuxiliarySave    = 512
 	largeProjectTypeSave         = 256
 )

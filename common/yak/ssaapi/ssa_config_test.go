@@ -3,6 +3,7 @@ package ssaapi
 import (
 	"archive/zip"
 	"bytes"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
@@ -738,3 +740,26 @@ func TestExcludeFunction(t *testing.T) {
 	})
 }
 
+func TestIrSaveProgressCallback_emitsDeltaAndUpdatesProcess(t *testing.T) {
+	prog := ssa.NewTmpProgram("test-ir-progress")
+	var messages []string
+	var lastP float64
+	prog.ProcessInfof = func(s string, v ...any) {
+		messages = append(messages, fmt.Sprintf(s, v...))
+	}
+	cb := irSaveProgressCallback(prog, 100_000, 0.90, 1.0, func(p float64) { lastP = p })
+	cb(6000)
+	require.Greater(t, lastP, 0.90)
+	require.GreaterOrEqual(t, len(messages), 1)
+	require.Contains(t, messages[0], "Saving instructions")
+	require.Contains(t, messages[0], "6000")
+}
+
+func TestIrSaveProgressCallback_totalZeroNoPanic(t *testing.T) {
+	prog := ssa.NewTmpProgram("test-ir-zero")
+	prog.ProcessInfof = func(s string, v ...any) {}
+	cb := irSaveProgressCallback(prog, 0, 0.0, 1.0, func(p float64) {
+		require.Equal(t, 1.0, p)
+	})
+	cb(1)
+}
