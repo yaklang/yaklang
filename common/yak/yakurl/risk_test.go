@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/url"
 	"path"
 	"sort"
 	"strconv"
@@ -227,6 +228,35 @@ func TestSSARiskRequestParse(t *testing.T) {
 			program: "aa",
 			rule:    "bb",
 			source:  "/cc.go",
+		})
+	})
+
+	t.Run("check get source with slash inside escaped rule name", func(t *testing.T) {
+		rule := "检测 Go JWT（dgrijalva/jwt-go）硬编码签名密钥"
+		encRule := yakurl.EncodeSSARiskRulePathSegment(rule)
+		check(t, "/aa/"+encRule, map[string]string{
+			"type": string(yakurl.SSARiskTypeRule),
+		}, filter{
+			level:   yakurl.SSARiskLevelSource,
+			node:    false,
+			program: "aa",
+			rule:    rule,
+		})
+	})
+
+	t.Run("check get risk with slash inside escaped rule and encoded source", func(t *testing.T) {
+		rule := "检测Golang使用不安全随机源（math/rand）"
+		encRule := yakurl.EncodeSSARiskRulePathSegment(rule)
+		src := "/aa/subdir/file.go"
+		encSrc := yakurl.EncodeSSARiskRulePathSegment(src)
+		check(t, "/aa/"+encRule+"/"+encSrc, map[string]string{
+			"type": string(yakurl.SSARiskTypeRule),
+		}, filter{
+			level:   yakurl.SSARiskLevelRisk,
+			node:    true,
+			program: "aa",
+			rule:    rule,
+			source:  src,
 		})
 	})
 	// }}}
@@ -548,11 +578,11 @@ func urlFunctionPath(progName, source, function string) string {
 }
 
 func urlRulePath(progName, ruleName string) string {
-	return path.Join(urlProgramPath(progName), ruleName)
+	return path.Join(urlProgramPath(progName), yakurl.EncodeSSARiskRulePathSegment(ruleName))
 }
 
 func urlRuleSourcePath(progName, ruleName, source string) string {
-	return path.Join(urlProgramPath(progName), ruleName, sourcePath(progName, source))
+	return path.Join(urlProgramPath(progName), yakurl.EncodeSSARiskRulePathSegment(ruleName), yakurl.EncodeSSARiskRulePathSegment(sourcePath(progName, source)))
 }
 
 func TestRiskAction(t *testing.T) {
@@ -1769,4 +1799,64 @@ func test1() {
 			require.NotContains(t, g.Name, "Test Risk 3")
 		}
 	})
+}
+
+func TestEncodeDecodeSSARiskRulePathSegment_RoundTrip(t *testing.T) {
+	cases := []string{
+		"a",
+		"a/b",
+		"a/b/c",
+		`检测 Go JWT（dgrijalva/jwt-go）硬编码签名密钥`,
+		`检测Golang使用不安全随机源（math/rand）`,
+		`检测Golang使用无超时控制的HTTP Serve模式`,
+		strings.Repeat("\u754c", 400) + "/x/y",
+	}
+	for _, want := range cases {
+		enc := yakurl.EncodeSSARiskRulePathSegment(want)
+		require.NotContains(t, enc, "/", "encoded segment must not contain raw slash: %q", enc)
+		got := yakurl.DecodeSSARiskRulePathSegment(enc)
+		require.Equal(t, want, got, "enc=%q", enc)
+	}
+}
+
+func TestDecodeSSARiskRulePathSegment_LegacyPctEncodedSlashes(t *testing.T) {
+	legacy := strings.ReplaceAll(url.PathEscape("x/y"), "%2F", "%252F")
+	require.Equal(t, "x/y", yakurl.DecodeSSARiskRulePathSegment(legacy))
+}
+
+func TestDecodeSSARiskRulePathSegment_LegacyPlainSegment(t *testing.T) {
+	require.Equal(t, "rule2", yakurl.DecodeSSARiskRulePathSegment("rule2"))
+}
+
+func TestDecodeSSARiskRulePathSegment_invalidV2PayloadFallsBackToLegacy(t *testing.T) {
+	s := "__r64__" + "!!!not-base64!!!"
+	require.Equal(t, s, yakurl.DecodeSSARiskRulePathSegment(s))
+}
+
+func TestGetSSARiskCountFilter_RulePathWithSlashesInRuleName_SimulatedClientDoubleDecode(t *testing.T) {
+	rule := `检测Golang使用不安全随机源（math/rand）`
+	seg := yakurl.EncodeSSARiskRulePathSegment(rule)
+	raw := "/prog1/" + seg
+	once, err := url.PathUnescape(raw)
+	require.NoError(t, err)
+	twice, err := url.PathUnescape(once)
+	require.NoError(t, err)
+	parts := strings.Split(strings.TrimPrefix(twice, "/"), "/")
+	require.GreaterOrEqual(t, len(parts), 2)
+	require.Equal(t, "prog1", parts[0])
+	require.Equal(t, rule, yakurl.DecodeSSARiskRulePathSegment(parts[1]))
+}
+
+func TestGetSSARiskCountFilter_TypeRule_EncodedRuleAndSource(t *testing.T) {
+	rule := `检测 Go JWT（dgrijalva/jwt-go）硬编码签名密钥`
+	src := "/prog/deep/dir/file.go"
+	path := "/myprog/" + yakurl.EncodeSSARiskRulePathSegment(rule) + "/" + yakurl.EncodeSSARiskRulePathSegment(src)
+	u := &ypb.YakURL{Schema: "ssarisk", Path: path, Query: []*ypb.KVPair{{Key: "type", Value: string(yakurl.SSARiskTypeRule)}}}
+	f, err := yakurl.GetSSARiskCountFilter(u)
+	require.NoError(t, err)
+	require.Equal(t, yakurl.SSARiskLevelRisk, f.Level)
+	require.True(t, f.LeafNode)
+	require.Equal(t, "myprog", f.Filter.ProgramName[0])
+	require.Equal(t, rule, f.Filter.FromRule[0])
+	require.Equal(t, src, f.Filter.CodeSourceUrl[0])
 }

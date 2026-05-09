@@ -7,11 +7,16 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -291,4 +296,61 @@ func TestGRPCMUSTPASS_RequestYakURL_Delete(t *testing.T) {
 		require.NoError(t, err)
 		os.Remove(fileName)
 	})
+}
+
+// TestGRPCMUSTPASS_RequestYakURL_SSARiskRuleTreeSlashInRuleName inserts a synthetic SSA risk whose
+// FromRule contains '/' and checks RequestYakURL (same entry as Yakit ipcRenderer.invoke('RequestYakURL')).
+// Backend maps ASCII '/' to fullwidth '／' in rule ResourceName and Path segments so clients can split on '/'.
+func TestGRPCMUSTPASS_RequestYakURL_SSARiskRuleTreeSlashInRuleName(t *testing.T) {
+	slashRule := "【tmp】检测math/rand与jwt-go/路径截断回归/" + uuid.NewString()
+	wantDisplay := strings.ReplaceAll(slashRule, "/", "\uFF0F")
+	programName := "grpc_ssarisk_slash_" + uuid.NewString()
+	db := ssadb.GetDB()
+	err := yakit.CreateSSARisk(db, &schema.SSARisk{
+		ProgramName:     programName,
+		CodeSourceUrl:   fmt.Sprintf("/%s/sub/pkg/x.go", programName),
+		FunctionName:    "F",
+		Title:           "slash-rule-title",
+		TitleVerbose:    "slash-rule-title-verbose",
+		FromRule:        slashRule,
+		ResultID:        999001,
+		Variable:        "v",
+		Index:           1,
+		RiskFeatureHash: programName + "-slash-rule-feature",
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, yakit.DeleteSSARisks(db, &ypb.SSARisksFilter{ProgramName: []string{programName}}))
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	resp, err := client.RequestYakURL(ctx, &ypb.RequestYakURLParams{
+		Method: http.MethodGet,
+		Url: &ypb.YakURL{
+			Schema: "ssarisk",
+			Path:   "/",
+			Query: []*ypb.KVPair{
+				{Key: "type", Value: "rule"},
+				{Key: "program", Value: programName},
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.Greater(t, len(resp.GetResources()), 0)
+
+	var ruleRes *ypb.YakURLResource
+	for _, r := range resp.GetResources() {
+		if r.GetResourceType() == "rule" && r.GetResourceName() == wantDisplay {
+			ruleRes = r
+			break
+		}
+	}
+	require.NotNil(t, ruleRes, "no rule row with slash-mapped FromRule; Resources=%+v", resp.GetResources())
+	require.NotContains(t, ruleRes.GetResourceName(), "math/rand")
+	require.Contains(t, ruleRes.GetResourceName(), "math\uFF0Frand")
+	require.Contains(t, ruleRes.GetPath(), wantDisplay)
 }

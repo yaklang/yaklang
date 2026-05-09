@@ -1,6 +1,7 @@
 package yakurl
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"net/url"
 	"path"
@@ -43,6 +44,8 @@ type riskTreeAction struct {
 			path:="${program?}/${source}/${risk}"
 		type="rule" :
 			path:="${program?}/${rule?}/${source}/${risk}"
+			// rule Path segment and rule ResourceName: '/' -> fullwidth '／'. Source Path segment same;
+			// source ResourceName stays DB value. Legacy "__r64__" segments still accepted.
 
 		source must contain "."
 
@@ -137,9 +140,65 @@ func (t riskTreeAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakURL
 }
 
 type SSARiskCountFilter struct {
-	Level    SSARiskResponseLevel
-	LeafNode bool
-	Filter   *ypb.SSARisksFilter
+	Level        SSARiskResponseLevel
+	LeafNode     bool
+	ResponseType SSARiskResponseType // how paths are split; rule mode uses escaped segments
+	Filter       *ypb.SSARisksFilter
+}
+
+// ssaRiskSegB64Prefix marks legacy type=rule path segments encoded as base64url (still decoded).
+const ssaRiskSegB64Prefix = "__r64__"
+
+// ssaRiskSlashDisplay is FULLWIDTH SOLIDUS (U+FF0F). Replacing ASCII '/' in path segments and
+// in ResourceName (rule rows) avoids clients splitting labels or paths on '/' inside rule titles.
+const ssaRiskSlashDisplay = "\uFF0F"
+
+// EncodeSSARiskRulePathSegment builds one path segment for ssarisk URLs with type=rule
+// (rule title, code_source_url in Path, etc.). Exposed for tests and external URL builders.
+func EncodeSSARiskRulePathSegment(s string) string {
+	return encodeSSARiskPathSegment(s)
+}
+
+// DecodeSSARiskRulePathSegment decodes one segment from a type=rule ssarisk path (inverse of
+// EncodeSSARiskRulePathSegment), including legacy __r64__ and percent-encoded segments.
+func DecodeSSARiskRulePathSegment(s string) string {
+	return decodeSSARiskPathSegment(s)
+}
+
+// decodeSSARiskPathSegment decodes one path segment from a type=rule ssarisk path.
+func decodeSSARiskPathSegment(s string) string {
+	if s == "" {
+		return s
+	}
+	if strings.HasPrefix(s, ssaRiskSegB64Prefix) {
+		payload := s[len(ssaRiskSegB64Prefix):]
+		if payload == "" {
+			return ""
+		}
+		b, err := base64.RawURLEncoding.DecodeString(payload)
+		if err == nil {
+			return string(b)
+		}
+		// malformed v2 segment; fall through to legacy decoding
+	}
+	cur := s
+	for i := 0; i < 8; i++ {
+		dec, err := url.PathUnescape(cur)
+		if err != nil {
+			return strings.ReplaceAll(cur, ssaRiskSlashDisplay, "/")
+		}
+		if dec == cur {
+			return strings.ReplaceAll(cur, ssaRiskSlashDisplay, "/")
+		}
+		cur = dec
+	}
+	return strings.ReplaceAll(cur, ssaRiskSlashDisplay, "/")
+}
+
+// encodeSSARiskPathSegment maps ASCII '/' to fullwidth '／' so a single path segment never
+// contains URL path separators that confuse frontends.
+func encodeSSARiskPathSegment(s string) string {
+	return strings.ReplaceAll(s, "/", ssaRiskSlashDisplay)
 }
 
 func GetSSARiskCountFilter(u *ypb.YakURL) (*SSARiskCountFilter, error) {
@@ -174,10 +233,10 @@ func GetSSARiskCountFilter(u *ypb.YakURL) (*SSARiskCountFilter, error) {
 		rawpath := strings.TrimPrefix(u.GetPath(), "/")
 		// if no set program-name, parse from path
 		if firstIndex := strings.Index(rawpath, "/"); firstIndex != -1 {
-			programName = rawpath[:firstIndex]
+			programName = decodeSSARiskPathSegment(rawpath[:firstIndex])
 			restPath = rawpath[firstIndex:]
 		} else {
-			programName = rawpath
+			programName = decodeSSARiskPathSegment(rawpath)
 		}
 	} else {
 		// if set program-name in param, ignore program in path
@@ -208,14 +267,22 @@ func GetSSARiskCountFilter(u *ypb.YakURL) (*SSARiskCountFilter, error) {
 			// 	restPath:="/${rule}/${source}"
 			restPath = strings.TrimPrefix(restPath, "/")
 			if lastIndex := strings.Index(restPath, "/"); lastIndex != -1 {
-				sourceUrl = restPath[lastIndex:]
-				rule = restPath[:lastIndex]
+				rule = decodeSSARiskPathSegment(restPath[:lastIndex])
+				tail := restPath[lastIndex+1:]
+				sourceUrl = decodeSSARiskPathSegment(tail)
+				if !strings.HasPrefix(sourceUrl, "/") && sourceUrl != "" {
+					sourceUrl = "/" + sourceUrl
+				}
 			} else {
-				rule = restPath
+				rule = decodeSSARiskPathSegment(restPath)
 			}
 		} else {
 			// restPath = "/${source}"
-			sourceUrl = restPath
+			sourceUrl = strings.TrimPrefix(restPath, "/")
+			sourceUrl = decodeSSARiskPathSegment(sourceUrl)
+			if !strings.HasPrefix(sourceUrl, "/") && sourceUrl != "" {
+				sourceUrl = "/" + sourceUrl
+			}
 		}
 	}
 
@@ -281,6 +348,7 @@ func GetSSARiskCountFilter(u *ypb.YakURL) (*SSARiskCountFilter, error) {
 	}
 
 	ret.Filter = yakit.NewSSARiskFilter(opts...)
+	ret.ResponseType = riskType
 	log.Debugf("path [%s] param [%v] filter [%v]", u.Path, query, ret)
 	return ret, nil
 }
@@ -381,10 +449,18 @@ func ConvertSSARiskCountInfoToResource(originParam *ypb.YakURL, countFilter *SSA
 
 	if countFilter.Level == SSARiskLevelRisk {
 		res.Path = path.Join(originParam.Path, rc.Hash)
+	} else if countFilter.ResponseType == SSARiskTypeRule &&
+		(countFilter.Level == SSARiskLevelRule || countFilter.Level == SSARiskLevelSource) {
+		// Program segment stays raw (UUID / project id); rule titles and source paths may contain '/'.
+		res.Path = path.Join(originParam.Path, encodeSSARiskPathSegment(rc.Name))
 	} else {
 		res.Path = path.Join(originParam.Path, rc.Name)
 	}
 	res.ResourceName = rc.Name
+	if countFilter.ResponseType == SSARiskTypeRule && countFilter.Level == SSARiskLevelRule {
+		// So UIs that split ResourceName on ASCII '/' still show the full rule title.
+		res.ResourceName = encodeSSARiskPathSegment(rc.Name)
+	}
 	res.ResourceType = string(countFilter.Level)
 	res.HaveChildrenNodes = !countFilter.LeafNode
 
