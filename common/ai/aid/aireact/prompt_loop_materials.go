@@ -234,9 +234,14 @@ func (pm *PromptManager) NewPromptPrefixMaterials(base *reactloops.LoopPromptBas
 		// CACHE_TOOL_CALL 块从 dynamic/REFLECTION 迁到 semi-dynamic 段
 		// 关键词: RecentToolsCache 透传, semi-dynamic 段
 		materials.RecentToolsCache = input.RecentToolsCache
-		// PE-TASK 缓存优化: PLAN 产物 (PARENT_TASK + CURRENT_TASK + INSTRUCTION)
-		// 通过 FrozenUserContext 字段从 dynamic 段迁到 frozen-block.
-		// 关键词: FrozenUserContext 透传, PLAN_CONTEXT, frozen-block
+		// PE-TASK PLAN 产物 (PARENT_TASK + CURRENT_TASK + INSTRUCTION) 通过
+		// FrozenUserContext 字段透传, 渲染时位于 timeline-open 段最末尾
+		// (UserHistory 之后), 落在所有 cache 边界之外。早期版本曾尝试
+		// frozen-block / semi-dynamic, 但 EVIDENCE 嵌入 root user input
+		// + 子任务切换造成 PlanContext 内容剧烈抖动, 破坏了上游缓存命中,
+		// 现采用"放弃自身缓存, 保护上游缓存"策略。
+		// 关键词: FrozenUserContext 透传, PLAN_CONTEXT, timeline-open 末尾,
+		//        缓存边界外
 		materials.FrozenUserContext = input.FrozenUserContext
 	}
 	if base != nil {
@@ -421,17 +426,21 @@ func (pm *PromptManager) buildHighStaticObservation(
 }
 
 // buildFrozenBlockObservation 给"AI_CACHE_FROZEN 块"做观测树:
-// Tool Inventory + Forge Inventory + (PE-TASK only) Plan Context +
-// Timeline-frozen (reducer + 非末 interval)。
+// Tool Inventory + Forge Inventory + Timeline-frozen (reducer + 非末 interval)。
 //
-// Plan Context 段位置在 Tool/Forge 之后、Timeline-frozen 之前: Tool/Forge 是
-// 整个 root 任务生命周期都不变的"系统级"内容, 应当排在最前; Plan Context
-// 在同一 plan 周期内字节稳定, 排在中间; Timeline-frozen 随时间轴增长可能
-// 间歇性扩展 (新一段 reducer 块产生时), 排在最后, 让前两段的前缀缓存更稳定。
+// 段顺序: Tool/Forge 是整个 root 任务生命周期都不变的"系统级"内容, 排在最前;
+// Timeline-frozen 随时间轴增长可能间歇性扩展 (新一段 reducer 块产生时), 排在
+// 最后, 让前两段的前缀缓存更稳定。
 //
-// 关键词: buildFrozenBlockObservation, Tool/Forge/PlanContext/Timeline-frozen,
+// PlanContext (PE-TASK PLAN 产物) 历史上曾在此段渲染, 但因仅 PE-TASK 子任务
+// 有内容, root task / 普通 ReAct 时为空, 这种"有时存在有时不存在"的渲染态
+// 会让 frozen-block 段字节内容随 task 类型剧烈抖动, 破坏 AI_CACHE_FROZEN
+// prefix cache 命中。现已迁到 buildSemiDynamicResidualObservation
+// (section.semi_dynamic.plan_context, AI_CACHE_SEMI 边界包裹)。
 //
-//	AI_CACHE_FROZEN, PE-TASK frozen 注入位置
+// 关键词: buildFrozenBlockObservation, Tool/Forge/Timeline-frozen,
+//
+//	AI_CACHE_FROZEN, PlanContext 已迁出
 func (pm *PromptManager) buildFrozenBlockObservation(
 	materials *reactloops.PromptPrefixMaterials,
 	rendered string,
@@ -456,17 +465,6 @@ func (pm *PromptManager) buildFrozenBlockObservation(
 			true,
 			renderForgeInventoryBlock(materials),
 		),
-		// PE-TASK 缓存优化: PLAN 产物 (PARENT_TASK + CURRENT_TASK +
-		// INSTRUCTION + 父链 FACTS/DOCUMENT) 从 dynamic 段迁到 frozen-block,
-		// 用 plan-scoped stable nonce 包装, 跨同一 plan 周期字节稳定。
-		// 关键词: section.frozen_block.plan_context, PLAN_CONTEXT 段
-		reactloops.NewPromptSectionObservation(
-			"section.frozen_block.plan_context",
-			"Frozen Block / Plan Context (PE-TASK PLAN Output)",
-			reactloops.PromptSectionRoleFrozenBlock,
-			true,
-			renderPlanContextBlock(materials),
-		),
 		reactloops.NewPromptSectionObservation(
 			"section.frozen_block.timeline_frozen",
 			"Frozen Block / Timeline (Frozen Prefix)",
@@ -488,11 +486,23 @@ func (pm *PromptManager) buildFrozenBlockObservation(
 // task.GetUserInput 内部使用的 (rawUserInput+parentInputs, "task_user_input")
 // nonce 不同, 这是有意为之: 内层 PARENT_TASK / CURRENT_TASK / INSTRUCTION
 // 三个标签已经用 plan-scoped 稳定 nonce 渲染好了, 外层 PLAN_CONTEXT 包装只
-// 需要给 frozen-block splitter 一个稳定的边界标记, 与内层标签命名空间互不冲突。
+// 需要给观测层一个稳定的边界标记, 与内层标签命名空间互不冲突。
+//
+// 物理位置: timeline-open 段最末尾 (UserHistory 之后)。timeline-open 段不被
+// AI_CACHE_FROZEN / AI_CACHE_SEMI 任何缓存边界包裹, 是"易变尾段"。这样安排
+// 是因为 PlanContext 内容会随两个独立维度抖动:
+//   - PE-TASK 子任务切换 (CURRENT_TASK 内容变化);
+//   - root user input 因 EvidenceOps 触发 syncRootTaskPlanContextDocs 嵌入
+//     新 FACTS/DOCUMENT 块而变化。
+//
+// 早期版本试图把 PlanContext 放进 frozen-block / semi-dynamic 等"可缓存段",
+// 但这种本质易变的内容不适合缓存; 保护策略改为让其落在所有 cache 边界外,
+// 不再追求 PlanContext 自身缓存, 而是保护更上游的 SYSTEM / FROZEN / SEMI
+// 三段缓存命中率。
 //
 // 关键词: renderPlanContextBlock, PLAN_CONTEXT, plan-scoped nonce,
 //
-//	frozen-block 边界
+//	timeline-open 末尾, 缓存边界外, 上游缓存保护
 func renderPlanContextBlock(materials *reactloops.PromptPrefixMaterials) string {
 	if materials == nil {
 		return ""
@@ -506,10 +516,17 @@ func renderPlanContextBlock(materials *reactloops.PromptPrefixMaterials) string 
 }
 
 // buildSemiDynamicResidualObservation 给"PROMPT_SECTION_semi-dynamic 残留段"做观测树:
-// Skills Context + Schema + Cache Tool Call. Tool/Forge 已迁出到 FrozenBlock,
-// CACHE_TOOL_CALL 从 dynamic/REFLECTION 迁入此段 (用稳定 nonce 渲染, 字节稳定).
+// Skills Context + Schema + OutputExample + TaskInstruction + Cache Tool Call.
+// Tool/Forge 已迁出到 FrozenBlock, CACHE_TOOL_CALL 从 dynamic/REFLECTION
+// 迁入此段 (用稳定 nonce 渲染, 字节稳定)。
 //
-// 关键词: buildSemiDynamicResidualObservation, Skills Context, Schema, Cache Tool Call
+// PlanContext 已彻底迁出本段 (历史曾位于此段, 但 EVIDENCE 嵌入 root user input
+// 导致内容抖动破坏 AI_CACHE_SEMI 命中; 现已迁到 timeline-open 段末尾, 落在所有
+// cache 边界之外, 见 buildTimelineOpenObservation)。
+//
+// 关键词: buildSemiDynamicResidualObservation, Skills Context, Schema,
+//        OutputExample, TaskInstruction, Cache Tool Call,
+//        PlanContext 已迁出至 timeline-open 末尾
 func (pm *PromptManager) buildSemiDynamicResidualObservation(
 	materials *reactloops.PromptPrefixMaterials,
 	rendered string,
@@ -579,9 +596,16 @@ func (pm *PromptManager) buildSemiDynamicResidualObservation(
 }
 
 // buildTimelineOpenObservation 给"PROMPT_SECTION_timeline-open 段"做观测树:
-// Timeline 末桶 (+ midterm 检索结果) + Current Time + Workspace。
+// Timeline 末桶 (+ midterm 检索结果) + Current Time + Workspace +
+// SessionEvidence + UserHistory + PlanContext (末尾)。
 //
-// 关键词: buildTimelineOpenObservation, Timeline 末桶, Current Time, Workspace
+// PlanContext 在本段最末尾, 是因为 PE-TASK PLAN 产物本质易变 (子任务切换 +
+// FACTS/DOCUMENT 嵌入 root user input), 不适合放任何 cache 边界内。
+// timeline-open 段位于 system / frozen / semi 三段缓存之外, 让 PlanContext
+// 抖动不再污染上游缓存命中率。
+//
+// 关键词: buildTimelineOpenObservation, Timeline 末桶, Current Time, Workspace,
+//        SessionEvidence, UserHistory, PlanContext 末尾, 缓存边界外
 func (pm *PromptManager) buildTimelineOpenObservation(
 	materials *reactloops.PromptPrefixMaterials,
 	rendered string,
@@ -628,6 +652,19 @@ func (pm *PromptManager) buildTimelineOpenObservation(
 			reactloops.PromptSectionRoleTimelineOpen,
 			false,
 			materials.UserHistory,
+		),
+		// PlanContext (PE-TASK PLAN 产物) 末尾注入: 该字段仅 PE-TASK 子任务
+		// 非空, 内容随子任务切换 + EvidenceOps 嵌入 root user input 抖动剧烈,
+		// 不适合放任何 cache 边界内。放 timeline-open 段最末让其落在所有
+		// cache 边界之外, 不污染上游 system / frozen / semi 三段缓存命中。
+		// 关键词: section.timeline_open.plan_context, PLAN_CONTEXT 末尾,
+		//        缓存边界外, 上游缓存保护
+		reactloops.NewPromptSectionObservation(
+			"section.timeline_open.plan_context",
+			"Timeline Open / Plan Context (PE-TASK PLAN Output)",
+			reactloops.PromptSectionRoleTimelineOpen,
+			true,
+			renderPlanContextBlock(materials),
 		),
 	}
 	section.Children = filterIncludedPromptSections(children)

@@ -57,20 +57,23 @@ func StablePromptNonce(parts ...string) string {
 }
 
 // CacheableUserInputProvider 让具体的 task 类型可以把"用户输入"再细分为
-// "本 turn 真正可变的部分 (rawQuery)" 和 "整个 plan 周期内可冻结的部分
-// (frozenUserContext, 例如 PARENT_TASK / CURRENT_TASK / INSTRUCTION 三联块)",
-// 配合 frozen-block 段把后者搬出 dynamic 段实现 prefix cache 命中。
+// "本 turn 真正可变的部分 (rawQuery)" 和 "需要从 dynamic 段搬出的稳定上下文
+// (frozenUserContext, 例如 PARENT_TASK / CURRENT_TASK / INSTRUCTION 三联块)"。
 //
 // rawQuery: 当前 turn 的用户原始输入或当前任务的轻量 query, 进入 dynamic 段
 //   USER_QUERY 块。
-// frozenUserContext: 跨同一 plan 周期所有子任务字节稳定的上下文块, 包装成
-//   PLAN_CONTEXT 后注入 frozen-block (Tool/Forge 之后, Timeline 之前)。
+// frozenUserContext: 包装成 PLAN_CONTEXT 后注入 timeline-open 段最末尾
+//   (UserHistory 之后)。注意: 字段名虽为 "frozen", 但物理位置在 timeline-open
+//   段, 不被任何 cache 边界包裹。这是 v4 迭代的最终设计: 之前尝试放 frozen-block /
+//   semi-dynamic 都因 EvidenceOps 嵌入 root user input + 子任务切换造成内容
+//   抖动, 反而破坏上游缓存命中。现采用"放弃 PlanContext 自身缓存, 保护上游
+//   SYSTEM / FROZEN / SEMI 三段缓存"策略。
 //
 // 老路径 (普通 ReAct loop / focus mode 等没有 plan 上下文的场景) 不实现该
 // 接口, 框架自动 fallback 到原始 task.GetUserInput() 语义, 行为保持不变。
 //
-// 关键词: CacheableUserInputProvider, PE-TASK PLAN 产物冻结,
-//        frozenUserContext, prefix cache
+// 关键词: CacheableUserInputProvider, PE-TASK PLAN 产物,
+//        frozenUserContext, timeline-open 末尾注入, 缓存边界外
 type CacheableUserInputProvider interface {
 	GetUserInputSplitForCache() (rawQuery, frozenUserContext string)
 }

@@ -196,18 +196,29 @@ type LoopPromptAssemblyInput struct {
 	RecentToolsCache string
 
 	// FrozenUserContext 用于承载 PE-TASK 等场景下"PLAN 阶段产出 + 用户原始
-	// 输入"两类只读上下文，跨同一 plan 周期的所有子任务执行字节稳定。
+	// 输入"两类只读上下文。注: 命名虽为 "Frozen", 但实际并不放入冻结段;
+	// 跨同一 plan 周期内同一子任务执行的多次 turn 字节稳定, 但子任务切换 +
+	// EvidenceOps 嵌入 root user input 仍会让其内容抖动, 故不适合 cache。
 	//
 	// 物理位置: 包装为 <|PLAN_CONTEXT_<stable-nonce>|>...<|PLAN_CONTEXT_END_
-	// <stable-nonce>|> 后, 注入到 frozen-block 段的 Tool/Forge Inventory 之后、
-	// Timeline-frozen 之前, 整个段被 AI_CACHE_FROZEN 边界包裹, 由 hijacker
-	// 切片成单独 cacheable user 段, 进入上游 prefix cache。
+	// <stable-nonce>|> 后, 注入到 timeline-open 段最末尾 (UserHistory 之后)。
+	// timeline-open 段不被 AI_CACHE_FROZEN / AI_CACHE_SEMI 任何缓存边界包裹,
+	// 是"易变尾段"。
+	//
+	// 设计取舍 (历史演进):
+	//   - v1: 注入 dynamic 段 (turn nonce), 完全不可缓存;
+	//   - v2: 迁到 frozen-block, 但 root task / 普通 ReAct 时为空, 渲染态
+	//     抖动破坏 AI_CACHE_FROZEN 命中;
+	//   - v3: 迁到 semi-dynamic, 但 EvidenceOps 嵌入 root user input + 子任务
+	//     切换仍让其内容抖动, 破坏 AI_CACHE_SEMI 命中;
+	//   - v4 (当前): 迁到 timeline-open 末尾, 主动让其落在所有 cache 边界外,
+	//     不再追求自身缓存, 而是保护更上游 SYSTEM / FROZEN / SEMI 三段缓存。
 	//
 	// 老路径 (普通 ReAct loop / focus mode 等没有 PLAN 上下文的场景): 此字段
-	// 为空, frozen-block 行为完全保持不变。
+	// 为空, timeline-open 段 PlanContext 子块自然不渲染, 段位置稳定。
 	//
-	// 关键词: FrozenUserContext, PLAN_CONTEXT 段, frozen-block 注入,
-	//        PE-TASK PLAN 产物冻结, prefix cache
+	// 关键词: FrozenUserContext, PLAN_CONTEXT 段, timeline-open 末尾注入,
+	//        缓存边界外, 上游缓存保护, PE-TASK PLAN 产物
 	FrozenUserContext string
 }
 

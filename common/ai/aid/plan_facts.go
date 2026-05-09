@@ -404,6 +404,19 @@ func sanitizeTaskPlanOutputFilePath(filePath string) string {
 	return cleaned
 }
 
+// syncRootTaskPlanContextDocs 把 root task 的 FACTS + DOCUMENT 同步嵌入到
+// root user input 前缀, 让所有子任务通过 GetUserInput / parentInputs 链路看到
+// 这两份 plan 周期级稳定文档。
+//
+// EVIDENCE 故意不再嵌入: 历史上曾把 EVIDENCE 作为第三份 prefix 嵌入, 但 EVIDENCE
+// 由 EvidenceOps 增量演化, 每次写入都会让 root user input 字节变化, 进而让
+// PlanContext (PARENT_TASK + CURRENT_TASK + INSTRUCTION 三联块, 内部依赖父链
+// user input) 跨子任务剧烈抖动, 破坏 prompt 缓存命中。现 EVIDENCE 统一由
+// SessionPromptState 渲染 (SESSION_EVIDENCE 段, 位于 timeline-open), 单一
+// 数据源, 不再污染 root user input。
+//
+// 关键词: syncRootTaskPlanContextDocs, FACTS + DOCUMENT 嵌入,
+//        EVIDENCE 已剥离, PlanContext 抖动修复, SessionPromptState 单源
 func syncRootTaskPlanContextDocs(task *AiTask) {
 	if task == nil {
 		return
@@ -416,7 +429,7 @@ func syncRootTaskPlanContextDocs(task *AiTask) {
 		return
 	}
 	base := stripPlanContextBlocks(root.AIStatefulTaskBase.GetUserInput())
-	root.SetUserInput(prependPlanContextDocsToRenderedPlan(base, getTaskPlanFacts(root), getTaskPlanDocument(root), getTaskPlanEvidence(root)))
+	root.SetUserInput(prependPlanContextDocsToRenderedPlan(base, getTaskPlanFacts(root), getTaskPlanDocument(root), ""))
 }
 
 func buildVerificationCarryoverEvidenceOps(task *AiTask, reasoning string, outputFiles []string) []aicommon.EvidenceOperation {

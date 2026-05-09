@@ -149,10 +149,13 @@ func (r *ReActLoop) generateSchemaString(disallowExit bool) (string, error) {
 //   - nonce: 当前 turn 的 nonce, 用于动态段标签
 //   - userInput: 进入 dynamic 段 USER_QUERY 块的用户原始输入 / 当前任务 query
 //     (跨 turn 不必稳定, 例如普通 ReAct 的用户当前轮次输入)
-//   - frozenUserContext: 跨同一 plan 周期所有子任务字节稳定的"用户上下文块"
-//     (例如 PE-TASK 的 PARENT_TASK + CURRENT_TASK + INSTRUCTION 三联块),
-//     注入 frozen-block (Tool/Forge 之后, Timeline 之前), 进入 prefix cache.
-//     普通场景传空串即可, 此时 frozen-block 行为完全不变.
+//   - frozenUserContext: PE-TASK 的 PARENT_TASK + CURRENT_TASK + INSTRUCTION
+//     三联块等"用户上下文块". 注入 timeline-open 段最末尾 (UserHistory 之后),
+//     落在所有 cache 边界之外. 字段名虽含 "frozen", 但因 EvidenceOps 嵌入
+//     root user input + 子任务切换实际会抖动, 故主动放弃自身缓存以保护上游
+//     SYSTEM / FROZEN / SEMI 三段缓存命中.
+//     普通场景传空串即可, 此时 timeline-open 段 PlanContext 子块自然不渲染,
+//     段位置稳定.
 //   - memory: 注入 memory 段
 //   - operator: loop 运行时操作句柄
 //

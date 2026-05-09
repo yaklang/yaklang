@@ -16,3 +16,6 @@ OS/Arch: {{ .OSArch }}
 {{ if .UserHistory }}{{ if or .TimelineOpen .CurrentTime .Workspace .SessionEvidence }}
 
 {{ end }}{{ .UserHistory }}{{ end }}
+{{ if .PlanContext }}{{ if or .TimelineOpen .CurrentTime .Workspace .SessionEvidence .UserHistory }}
+
+{{ end }}{{ .PlanContext }}{{ end }}

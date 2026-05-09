@@ -31,7 +31,15 @@ func generateGuidanceDocument(loop *reactloops.ReActLoop, task aicommon.AIStatef
 	}
 
 	facts := loop.Get(PLAN_FACTS_KEY)
-	evidence := getLoopTaskEvidenceDocument(loop)
+	// EVIDENCE 数据源切换: 历史用 getLoopTaskEvidenceDocument (从 plan_evidence
+	// 持久化键 + task user input 嵌入块提取), 现统一改为以 SessionPromptState
+	// 为权威数据源, 与 timeline-open SESSION_EVIDENCE 段保持一致, 避免渲染
+	// 重复或不一致问题。
+	// 关键词: SessionEvidence 单源, plan-evidence 数据源切换
+	evidence := ""
+	if cfg := loop.GetConfig(); cfg != nil {
+		evidence = cfg.GetSessionEvidenceRendered()
+	}
 	loopContext := getLoopTaskContext(loop)
 
 	templateData := loop.GetBaseFrameContext()

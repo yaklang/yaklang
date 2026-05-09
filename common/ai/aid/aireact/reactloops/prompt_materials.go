@@ -99,14 +99,27 @@ type PromptPrefixMaterials struct {
 	// 字节稳定的"用户级上下文"。
 	//
 	// 物理位置: 包装为 <|PLAN_CONTEXT_<plan-scoped-nonce>|>...<|PLAN_CONTEXT_END_
-	// <plan-scoped-nonce>|> 后注入 frozen-block 段, 紧跟 Tool/Forge Inventory
-	// 之后、Timeline-frozen 之前。整个 frozen-block 仍然由 AI_CACHE_FROZEN 边界
-	// 包裹, hijacker 切到 user1 段, 进入 prefix cache。
+	// <plan-scoped-nonce>|> 后注入 timeline-open 段最末尾 (UserHistory 之后)。
+	// timeline-open 段不被 AI_CACHE_FROZEN / AI_CACHE_SEMI 任何缓存边界包裹,
+	// 是 prompt 的"易变尾段", 同 plan 周期内 PlanContext 内容随子任务切换
+	// (CURRENT_TASK 内容变化) / EVIDENCE 演化 (root user input 嵌入更新) 抖动
+	// 不再污染上游缓存。
 	//
-	// 老路径 (普通 ReAct loop / focus mode) 此字段为空, frozen-block 行为不变。
+	// 历史:
+	//   - v1: 老路径放 dynamic 段, 每 turn 用 turn nonce 渲染, 不可缓存;
+	//   - v2: 迁到 frozen-block 段, 但本字段仅 PE-TASK 非空, root task / 普通
+	//     ReAct 时为空, 渲染态抖动破坏 AI_CACHE_FROZEN 命中;
+	//   - v3: 迁到 semi-dynamic 段, 但子任务切换 + EVIDENCE 嵌入 root user input
+	//     仍让其内容抖动, 破坏 AI_CACHE_SEMI 命中;
+	//   - v4 (当前): 迁到 timeline-open 段末尾, 主动让其落在所有 cache 边界外,
+	//     不再追求 PlanContext 自身缓存, 而是保护更上游的 SYSTEM / FROZEN /
+	//     SEMI 三段缓存稳定。
+	//
+	// 老路径 (普通 ReAct loop / focus mode 等) 此字段为空, timeline-open 段
+	// PlanContext 子块自然不渲染, 段位置稳定。
 	//
 	// 关键词: PromptPrefixMaterials, FrozenUserContext, PLAN_CONTEXT 段,
-	//        PE-TASK frozen-block 注入, prefix cache
+	//        timeline-open 末尾注入, 缓存边界外, 上游缓存保护
 	FrozenUserContext string
 }
 
@@ -135,9 +148,13 @@ func (m *PromptPrefixMaterials) HighStaticData() map[string]any {
 // (Tool/Forge/Timeline frozen 已迁出到 FrozenBlock; CACHE_TOOL_CALL 已迁入此段;
 // TaskInstruction 已从 high-static 迁入此段)
 //
+// PlanContext 已从此段移出 (曾短暂位于此段, 但因 PE-TASK 子任务切换和
+// EVIDENCE 嵌入 root user input 引发抖动, 进一步迁到 timeline-open 段末尾,
+// 落在所有 cache 边界之外, 见 TimelineOpenData)。
+//
 // 关键词: SemiDynamicData, Skills Context + Schema + OutputExample +
 //
-//	TaskInstruction + CacheToolCall, 迁移
+//	TaskInstruction + CacheToolCall, PlanContext 已迁出至 timeline-open
 func (m *PromptPrefixMaterials) SemiDynamicData() map[string]any {
 	if m == nil {
 		return map[string]any{}
@@ -153,15 +170,18 @@ func (m *PromptPrefixMaterials) SemiDynamicData() map[string]any {
 
 // FrozenBlockData 供 frozen_block_section.txt 模板消费, 当前包含:
 //   - ToolInventory + ForgeInventory: 系统级工具/forge 清单, 字节稳定
-//   - PlanContext: PE-TASK 的 PLAN 阶段产物 (PARENT_TASK + CURRENT_TASK +
-//     INSTRUCTION + 父链 FACTS/DOCUMENT), 跨同一 plan 周期所有子任务字节稳定,
-//     物理位置紧跟 Tool/Forge 之后, Timeline-frozen 之前
 //   - TimelineFrozen: 时间轴 reducer + 非末 interval, 字节稳定
 //
 // 整个段被 AI_CACHE_FROZEN 边界包裹, hijacker 切到 user1 段进入 prefix cache.
 //
-// 关键词: FrozenBlockData, Tool/Forge/PlanContext/Timeline-frozen,
-//        AI_CACHE_FROZEN 块, PE-TASK frozen 注入
+// PlanContext 历史上曾在此段渲染, 但因仅 PE-TASK 子任务有内容, root task /
+// 普通 ReAct loop 时为空, 这种"有时存在有时不存在"的渲染态会让 frozen-block
+// 段在不同 task 类型下字节内容剧烈抖动, 破坏 AI_CACHE_FROZEN prefix cache 命中.
+// 现已迁到 SemiDynamicData (semi-dynamic 段, AI_CACHE_SEMI 边界包裹), frozen-block
+// 段只保留这三块跨 task 类型字节稳定的内容。
+//
+// 关键词: FrozenBlockData, Tool/Forge/Timeline-frozen,
+//        AI_CACHE_FROZEN 块, PlanContext 已迁出
 func (m *PromptPrefixMaterials) FrozenBlockData() map[string]any {
 	if m == nil {
 		return map[string]any{}
@@ -174,18 +194,24 @@ func (m *PromptPrefixMaterials) FrozenBlockData() map[string]any {
 		"HasMoreTools":   m.HasMoreTools,
 		"ForgeInventory": m.ForgeInventory,
 		"AIForgeList":    m.AIForgeList,
-		"PlanContext":    m.FrozenUserContext,
 		"TimelineFrozen": m.TimelineFrozen,
 	}
 }
 
 // TimelineOpenData 供 timeline_open_section.txt 模板消费, 包含 Timeline 末桶 +
-// Current Time + Workspace + (P1-C2: SessionEvidence / UserHistory 上移)。midterm
-// 内容 (若有) 已并入 TimelineOpen。
+// Current Time + Workspace + (P1-C2: SessionEvidence / UserHistory 上移) +
+// PlanContext 末尾注入。midterm 内容 (若有) 已并入 TimelineOpen。
+//
+// PlanContext (PE-TASK PLAN 产物 PARENT_TASK + CURRENT_TASK + INSTRUCTION +
+// 父链 FACTS/DOCUMENT) 物理位置在本段最末尾 (UserHistory 之后)。本段不被
+// AI_CACHE_FROZEN / AI_CACHE_SEMI 任何缓存边界包裹, 是 prompt 的"易变尾段",
+// 让 PlanContext 的子任务切换抖动不会污染上游 system / frozen / semi 三段
+// 缓存命中。
 //
 // 关键词: TimelineOpenData, Timeline 末桶, Current Time, Workspace,
 //
-//	SessionEvidence, UserHistory, P1-C2
+//	SessionEvidence, UserHistory, P1-C2, PlanContext 末尾注入,
+//	缓存边界外
 func (m *PromptPrefixMaterials) TimelineOpenData() map[string]any {
 	if m == nil {
 		return map[string]any{}
@@ -199,6 +225,7 @@ func (m *PromptPrefixMaterials) TimelineOpenData() map[string]any {
 		"WorkingDirGlance": m.WorkingDirGlance,
 		"SessionEvidence":  m.SessionEvidence,
 		"UserHistory":      m.UserHistory,
+		"PlanContext":      m.FrozenUserContext,
 	}
 }
 

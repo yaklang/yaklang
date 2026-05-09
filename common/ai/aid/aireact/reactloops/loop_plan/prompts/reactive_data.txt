@@ -29,14 +29,9 @@
 <|FACTS_END_{{ .Nonce }}|>
 {{end}}{{/*
 
-*/}}{{if .Evidence}}## 运行证据库（EVIDENCE）
-
-以下是执行阶段累积的 EVIDENCE。它们来自真实执行、验证、文件、响应或环境观察：
-
-<|EVIDENCE_{{ .Nonce }}|>
-{{ .Evidence }}
-<|EVIDENCE_END_{{ .Nonce }}|>
-{{end}}{{/*
+EVIDENCE 已统一移到 SessionPromptState 渲染 (timeline-open 段的
+SESSION_EVIDENCE 块), 这里不再重复渲染 EVIDENCE, 避免 prompt 中
+EVIDENCE 多处重复出现。
 
 */}}{{if .Help }}
 ## 规划任务帮助信息

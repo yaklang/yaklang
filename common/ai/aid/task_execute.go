@@ -91,16 +91,21 @@ func (t *AiTask) execute() error {
 				allOps = append(allOps, lastRecord.EvidenceOps...)
 				allOps = append(allOps, buildVerificationCarryoverEvidenceOps(t, summary, outputFiles)...)
 				if len(allOps) > 0 {
-					if _, changed := applyTaskPlanEvidenceOps(t, allOps); changed {
-						log.Infof("task %s applied evidence operations, count=%d", t.Index, len(allOps))
-						if incremental := aicommon.FormatEvidenceOpsLines(allOps, t.GetLanguage()); incremental != "" {
-							if _, emitErr := t.EmitTextMarkdownStreamEvent(
-								"plan-evidence",
-								strings.NewReader(incremental),
-								t.GetIndex(),
-							); emitErr != nil {
-								log.Warnf("failed to emit evidence incremental: %v", emitErr)
-							}
+					// EVIDENCE 单写到 SessionPromptState (SESSION_EVIDENCE 段)。
+					// 历史曾同时写 task plan_evidence + syncRootTaskPlanContextDocs
+					// 把 EVIDENCE 块嵌入 root user input, 但这会让 PlanContext 跨子
+					// 任务抖动并破坏多个 prompt cache 命中。现仅保留 SESSION_EVIDENCE
+					// 单一渲染源, 其它 evidence 入口 (如 output_evidence action) 写入
+					// 的 task plan_evidence 不再被任何 prompt 模板读取。
+					// 关键词: EVIDENCE 单写, ApplySessionEvidenceOps, PlanContext 抖动修复
+					log.Infof("task %s applying session evidence ops, count=%d", t.Index, len(allOps))
+					if incremental := aicommon.FormatEvidenceOpsLines(allOps, t.GetLanguage()); incremental != "" {
+						if _, emitErr := t.EmitTextMarkdownStreamEvent(
+							"plan-evidence",
+							strings.NewReader(incremental),
+							t.GetIndex(),
+						); emitErr != nil {
+							log.Warnf("failed to emit evidence incremental: %v", emitErr)
 						}
 					}
 					t.ApplySessionEvidenceOps(allOps)
@@ -451,16 +456,17 @@ func (t *AiTask) generateTaskSummary(summary, nextMovements string) error {
 	if displaySummary != "" {
 		summaryOps := buildSummaryEvidenceOps(t, displaySummary)
 		if len(summaryOps) > 0 {
-			if _, changed := applyTaskPlanEvidenceOps(t, summaryOps); changed {
-				log.Infof("task %s applied summary evidence ops, count=%d", t.Index, len(summaryOps))
-				if incremental := aicommon.FormatEvidenceOpsLines(summaryOps, t.GetLanguage()); incremental != "" {
-					if _, emitErr := t.EmitTextMarkdownStreamEvent(
-						"plan-evidence",
-						strings.NewReader(incremental),
-						t.GetIndex(),
-					); emitErr != nil {
-						log.Warnf("failed to emit summary evidence incremental: %v", emitErr)
-					}
+			// EVIDENCE 单写到 SessionPromptState (SESSION_EVIDENCE 段),
+			// 同上方 verify-stage 处理理由。
+			// 关键词: EVIDENCE 单写, ApplySessionEvidenceOps, PlanContext 抖动修复
+			log.Infof("task %s applying session summary evidence ops, count=%d", t.Index, len(summaryOps))
+			if incremental := aicommon.FormatEvidenceOpsLines(summaryOps, t.GetLanguage()); incremental != "" {
+				if _, emitErr := t.EmitTextMarkdownStreamEvent(
+					"plan-evidence",
+					strings.NewReader(incremental),
+					t.GetIndex(),
+				); emitErr != nil {
+					log.Warnf("failed to emit summary evidence incremental: %v", emitErr)
 				}
 			}
 			t.ApplySessionEvidenceOps(summaryOps)

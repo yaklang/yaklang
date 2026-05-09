@@ -132,7 +132,6 @@ func init() {
 						"WebResults":      webResults,
 						"ReconResults":    reconResults,
 						"Facts":           loop.Get(PLAN_FACTS_KEY),
-						"Evidence":        getLoopTaskEvidenceDocument(loop),
 						"IsLastIteration": isLastIteration,
 					}
 					return utils.RenderTemplate(reactiveData, renderMap)
