@@ -135,15 +135,15 @@ func (m *PromptPrefixMaterials) HighStaticData() map[string]any {
 	return map[string]any{}
 }
 
-// SemiDynamicData 仅供 semi_dynamic_section.txt 模板消费, 当前包含:
+// SemiDynamicData 仅供 semi_dynamic_section.txt 模板消费, 渲染顺序为:
 //   - SkillsContext: 已加载的 skills 上下文 (字节稳定)
-//   - Schema: 当前 react loop 的 action schema (字节稳定 across turn)
-//   - OutputExample: 当前 react loop 的输出示例, caller-specific, 不应污染
-//     high-static 段; 放在 Schema 后作为半动态 prefix cache 候选
-//   - TaskInstruction: caller 注入的 PERSISTENT 指令, caller-specific, 从
-//     high-static 段下沉到此处, 与 OutputExample 同组, 跨同一 caller 的 turn 字节稳定
 //   - RecentToolsCache: CACHE_TOOL_CALL 块 (directly_call_tool routing hint +
 //     最近工具 schema/footer), 用稳定 nonce 渲染, 字节稳定
+//   - TaskInstruction: caller 注入的 PERSISTENT 指令, caller-specific, 从
+//     high-static 段下沉到此处, 跨同一 caller 的 turn 字节稳定
+//   - Schema: 当前 react loop 的 action schema (字节稳定 across turn)
+//   - OutputExample: 当前 react loop 的输出示例, caller-specific, 不应污染
+//     high-static 段; 紧跟 Schema 之后作为半动态 prefix cache 候选
 //
 // (Tool/Forge/Timeline frozen 已迁出到 FrozenBlock; CACHE_TOOL_CALL 已迁入此段;
 // TaskInstruction 已从 high-static 迁入此段)
@@ -152,9 +152,9 @@ func (m *PromptPrefixMaterials) HighStaticData() map[string]any {
 // EVIDENCE 嵌入 root user input 引发抖动, 进一步迁到 timeline-open 段末尾,
 // 落在所有 cache 边界之外, 见 TimelineOpenData)。
 //
-// 关键词: SemiDynamicData, Skills Context + Schema + OutputExample +
+// 关键词: SemiDynamicData, Skills Context + RecentToolsCache + TaskInstruction +
 //
-//	TaskInstruction + CacheToolCall, PlanContext 已迁出至 timeline-open
+//	Schema + OutputExample, PlanContext 已迁出至 timeline-open
 func (m *PromptPrefixMaterials) SemiDynamicData() map[string]any {
 	if m == nil {
 		return map[string]any{}
@@ -252,8 +252,9 @@ func (m *PromptPrefixMaterials) TimelineData() map[string]any {
 // TimelineOpen 字段分别保留各段渲染串以便观测/测试断言。
 //
 // HighStatic / SemiDynamic / Timeline 是兼容字段 (用于老路径与单元测试),
-// 在新路径下 SemiDynamic = SemiDynamic 残留段 (Skills + Schema), Timeline = 旧
-// 合并 timeline 渲染 (frozen + open 一起)。
+// 在新路径下 SemiDynamic = semi-dynamic 模板完整渲染串 (Skills + RecentToolsCache +
+// TaskInstruction + Schema + OutputExample), Timeline = 旧合并 timeline 渲染
+// (frozen + open 一起)。
 //
 // 关键词: PromptPrefixAssemblyResult, 4 段拆分, 按稳定性分层
 type PromptPrefixAssemblyResult struct {

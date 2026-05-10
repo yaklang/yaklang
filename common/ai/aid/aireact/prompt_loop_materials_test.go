@@ -24,9 +24,9 @@ func mustLoopPromptSections(t *testing.T, raw any) []*reactloops.PromptSectionOb
 }
 
 // TestPromptManager_AssembleLoopPrompt_SectionOrder 验证"按稳定性分层"路径
-// 下 5 段顺序: high_static -> frozen_block -> semi_dynamic (Skills + Schema) ->
-// timeline_open -> dynamic; 以及 frozen_block 段被 AI_CACHE_FROZEN_semi-dynamic
-// 标签包裹。
+// 下 5 段顺序: high_static -> frozen_block -> semi_dynamic (半冻结五块见
+// semi_dynamic_section.txt) -> timeline_open -> dynamic; 以及 frozen_block 段被
+// AI_CACHE_FROZEN_semi-dynamic 标签包裹。
 //
 // 关键词: AssembleLoopPrompt section order, 5 段顺序, frozen-block, AI_CACHE_FROZEN
 func TestPromptManager_AssembleLoopPrompt_SectionOrder(t *testing.T) {
@@ -83,6 +83,7 @@ func TestPromptManager_AssembleLoopPrompt_SectionOrder(t *testing.T) {
 	currentTimeIdx := strings.Index(prompt, "# Current Time")
 	toolInventoryIdx := strings.Index(prompt, "# Tool Inventory")
 	skillsIdx := strings.Index(prompt, "<|SKILLS_CONTEXT_skills_context|>")
+	persistentIdx := strings.Index(prompt, "<|PERSISTENT|>")
 	schemaIdx := strings.Index(prompt, "<|SCHEMA|>")
 	frozenStartIdx := strings.Index(prompt, "<|AI_CACHE_FROZEN_semi-dynamic|>")
 	frozenEndIdx := strings.Index(prompt, "<|AI_CACHE_FROZEN_END_semi-dynamic|>")
@@ -98,6 +99,7 @@ func TestPromptManager_AssembleLoopPrompt_SectionOrder(t *testing.T) {
 	require.NotEqual(t, -1, currentTimeIdx)
 	require.NotEqual(t, -1, toolInventoryIdx)
 	require.NotEqual(t, -1, skillsIdx)
+	require.NotEqual(t, -1, persistentIdx)
 	require.NotEqual(t, -1, schemaIdx)
 	require.NotEqual(t, -1, frozenStartIdx)
 	require.NotEqual(t, -1, frozenEndIdx)
@@ -109,7 +111,7 @@ func TestPromptManager_AssembleLoopPrompt_SectionOrder(t *testing.T) {
 
 	// 段顺序 (P1-C2 调整后): TRAITS -> AI_CACHE_FROZEN(START) ->
 	// Tool/Forge/Timeline-frozen -> AI_CACHE_FROZEN(END) ->
-	// PROMPT_SECTION_semi-dynamic(Skills + Schema) ->
+	// PROMPT_SECTION_semi-dynamic(Skills + Persistent + Schema + OutputExample; 无 Cache) ->
 	// PROMPT_SECTION_timeline-open(Timeline open + Time + Workspace +
 	// SessionEvidence + PREV_USER_INPUT) -> Dynamic(UserQuery + AutoCtx + ...)
 	require.Less(t, traitsIdx, frozenStartIdx)
@@ -117,7 +119,8 @@ func TestPromptManager_AssembleLoopPrompt_SectionOrder(t *testing.T) {
 	require.Less(t, toolInventoryIdx, frozenEndIdx)
 	require.Less(t, frozenEndIdx, semiSectionIdx)
 	require.Less(t, semiSectionIdx, skillsIdx)
-	require.Less(t, skillsIdx, schemaIdx)
+	require.Less(t, skillsIdx, persistentIdx)
+	require.Less(t, persistentIdx, schemaIdx)
 	require.Less(t, schemaIdx, timelineOpenSectionIdx)
 	// timelineIdx 是首次出现的 "# Timeline Memory", 此用例下 frozen 段无 timeline
 	// 内容 (单 timeline 事件全部落在最末桶), 因此首次出现位置必在 timeline_open 段。
@@ -149,17 +152,18 @@ func TestPromptManager_AssembleLoopPrompt_SectionOrder(t *testing.T) {
 	require.Equal(t, "section.frozen_block.tool_inventory", sections[1].Children[0].Key)
 	require.Equal(t, reactloops.PromptSectionRoleFrozenBlock, sections[1].Children[0].Role)
 
-	// semi_dynamic 段子结构: skills_context + schema + output_example +
-	// task_instruction (Tool/Forge 已迁出, OutputExample 从 high_static 迁入并紧跟
-	// Schema 之后, TaskInstruction 同样从 high_static 迁入并紧跟 OutputExample 之后)。
+	// semi_dynamic 段子结构: skills_context + task_instruction + schema +
+	// output_example (Tool/Forge 已迁出; RecentToolsCache 本用例为空被过滤;
+	// OutputExample / TaskInstruction 从 high_static 迁入 semi-dynamic;
+	// 渲染顺序见 semi_dynamic_section.txt)。
 	// 关键词: semi_dynamic children, output_example 迁入断言, task_instruction 迁入断言
 	require.Len(t, sections[2].Children, 4)
 	require.Equal(t, "section.semi_dynamic.skills_context", sections[2].Children[0].Key)
-	require.Equal(t, "section.semi_dynamic.schema", sections[2].Children[1].Key)
+	require.Equal(t, "section.semi_dynamic.task_instruction", sections[2].Children[1].Key)
 	require.Equal(t, reactloops.PromptSectionRoleSemiDynamic, sections[2].Children[0].Role)
 	require.Equal(t, reactloops.PromptSectionRoleSemiDynamic, sections[2].Children[1].Role)
-	require.Equal(t, "section.semi_dynamic.output_example", sections[2].Children[2].Key)
-	require.Equal(t, "section.semi_dynamic.task_instruction", sections[2].Children[3].Key)
+	require.Equal(t, "section.semi_dynamic.schema", sections[2].Children[2].Key)
+	require.Equal(t, "section.semi_dynamic.output_example", sections[2].Children[3].Key)
 	require.Equal(t, reactloops.PromptSectionRoleSemiDynamic, sections[2].Children[3].Role)
 
 	// timeline_open 段子结构 (P1-C2): timeline_open + current_time + workspace +
@@ -180,10 +184,10 @@ func TestPromptManager_AssembleLoopPrompt_SectionOrder(t *testing.T) {
 }
 
 // TestPromptManager_RenderLoopSemiDynamicSection_Order 验证 SEMI 残留段
-// (semi_dynamic_section.txt) 仅包含 Skills Context + Schema; Tool/Forge 已迁出
-// 到 frozen_block_section.txt。
+// (semi_dynamic_section.txt) 渲染 Skills 在 Schema 之前; Tool/Forge 已迁出到
+// frozen_block_section.txt。
 //
-// 关键词: renderLoopSemiDynamicSection, Skills + Schema 残留段
+// 关键词: renderLoopSemiDynamicSection, semi_dynamic_section 顺序
 func TestPromptManager_RenderLoopSemiDynamicSection_Order(t *testing.T) {
 	react, err := NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
@@ -303,7 +307,7 @@ func TestPromptManager_AssemblePromptPrefix(t *testing.T) {
 //   - user1: 含 AI_CACHE_FROZEN_semi-dynamic 完整闭合块 (Tool/Forge/Timeline-frozen),
 //     字节边界稳定, 主动 cc
 //   - user2: 含 AI_CACHE_SEMI_semi 完整闭合块 (PROMPT_SECTION_semi-dynamic +
-//     Skills + Schema + CacheToolCall), 字节边界稳定, 主动 cc
+//     Skills + CacheToolCall + TaskInstruction + Schema + OutputExample), 字节边界稳定, 主动 cc
 //   - user3: 含 PROMPT_SECTION_timeline-open + Dynamic 段, 不打 cc
 //
 // 这是 P1 双 cache 边界的核心收益: dashscope 同时命中 system 短前缀、

@@ -7,7 +7,7 @@ prefix-cache 边界对齐.
 | --- | --- | --- | --- |
 | `high_static_section.txt` | high-static | 跨 caller / 跨 turn 字节恒定 | `<\|AI_CACHE_SYSTEM_high-static\|>` |
 | `frozen_block_section.txt` | frozen-block | Tool/Forge inventory + Timeline frozen 前缀 | `<\|AI_CACHE_FROZEN_semi-dynamic\|>` |
-| `semi_dynamic_section.txt` | semi-dynamic | Skills + Schema + OutputExample + Persistent + RecentToolsCache | `<\|AI_CACHE_SEMI_semi\|>` |
+| `semi_dynamic_section.txt` | semi-dynamic | Skills + RecentToolsCache + Persistent + Schema + OutputExample | `<\|AI_CACHE_SEMI_semi\|>` |
 | `timeline_open_section.txt` | timeline-open | Timeline 末桶 + Workspace + UserHistory + PlanContext | 缓存边界外 (易变尾段) |
 | `dynamic_section.txt` | dynamic | UserQuery + AutoContext + ExtraCapabilities + Reflection + InjectedMemory | 缓存边界外 (本轮独有) |
 

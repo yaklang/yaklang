@@ -253,7 +253,8 @@ func (pm *PromptManager) NewPromptPrefixMaterials(base *reactloops.LoopPromptBas
 }
 
 // AssemblePromptPrefix 按"稳定性分层"路径输出 4 段: HighStatic | FrozenBlock |
-// SemiDynamic (Skills + Schema 残留) | TimelineOpen。Prompt 字段是 4 段拼接结果,
+// SemiDynamic (Skills + CacheToolCall + TaskInstruction + Schema + OutputExample) |
+// TimelineOpen。Prompt 字段是 4 段拼接结果,
 // 调用方拼上 Dynamic 段后形成完整 prompt。
 //
 // FrozenBlock 段 (Tool Inventory + Forge Inventory + Timeline-frozen) 整体字节稳定,
@@ -516,7 +517,7 @@ func renderPlanContextBlock(materials *reactloops.PromptPrefixMaterials) string 
 }
 
 // buildSemiDynamicResidualObservation 给"PROMPT_SECTION_semi-dynamic 残留段"做观测树:
-// Skills Context + Schema + OutputExample + TaskInstruction + Cache Tool Call.
+// Skills Context + Cache Tool Call + TaskInstruction + Schema + OutputExample.
 // Tool/Forge 已迁出到 FrozenBlock, CACHE_TOOL_CALL 从 dynamic/REFLECTION
 // 迁入此段 (用稳定 nonce 渲染, 字节稳定)。
 //
@@ -524,8 +525,8 @@ func renderPlanContextBlock(materials *reactloops.PromptPrefixMaterials) string 
 // 导致内容抖动破坏 AI_CACHE_SEMI 命中; 现已迁到 timeline-open 段末尾, 落在所有
 // cache 边界之外, 见 buildTimelineOpenObservation)。
 //
-// 关键词: buildSemiDynamicResidualObservation, Skills Context, Schema,
-//        OutputExample, TaskInstruction, Cache Tool Call,
+// 关键词: buildSemiDynamicResidualObservation, Skills Context, Cache Tool Call,
+//        TaskInstruction, Schema, OutputExample,
 //        PlanContext 已迁出至 timeline-open 末尾
 func (pm *PromptManager) buildSemiDynamicResidualObservation(
 	materials *reactloops.PromptPrefixMaterials,
@@ -544,6 +545,28 @@ func (pm *PromptManager) buildSemiDynamicResidualObservation(
 			true,
 			materials.SkillsContext,
 		),
+		// CACHE_TOOL_CALL 块从 dynamic/REFLECTION 迁到此处, 用稳定 nonce 渲染.
+		// 关键词: Semi Dynamic / Cache Tool Call, RecentToolsCache 观测节点
+		reactloops.NewPromptSectionObservation(
+			"section.semi_dynamic.cache_tool_call",
+			"Semi Dynamic / Cache Tool Call",
+			reactloops.PromptSectionRoleSemiDynamic,
+			true,
+			materials.RecentToolsCache,
+		),
+		// section.semi_dynamic.task_instruction 从 high-static 段迁入: TaskInstruction
+		// 是 caller 注入的 PERSISTENT 指令, caller-specific,
+		// 跨同一 caller 的 turn 字节稳定. 留在 high-static 段会污染 AI_CACHE_SYSTEM
+		// 边界, 因此下沉到 semi-dynamic 段.
+		// 关键词: section.semi_dynamic.task_instruction, PERSISTENT 迁入,
+		//        high-static 反污染
+		reactloops.NewPromptSectionObservation(
+			"section.semi_dynamic.task_instruction",
+			"Semi Dynamic / Task Instruction",
+			reactloops.PromptSectionRoleSemiDynamic,
+			true,
+			renderStaticTaggedBlock("PERSISTENT", materials.TaskInstruction),
+		),
 		reactloops.NewPromptSectionObservation(
 			"section.semi_dynamic.schema",
 			"Semi Dynamic / Schema",
@@ -554,38 +577,16 @@ func (pm *PromptManager) buildSemiDynamicResidualObservation(
 		// section.semi_dynamic.output_example 从 high-static 段迁入: OutputExample
 		// 是 caller-specific 字段, 不同 forge / loop 注入的内容差异较大, 留在
 		// high-static 段会破坏 AI_CACHE_SYSTEM 段的 hash 稳定性。Schema 同样是
-		// caller-specific, 因此把 OutputExample 紧跟 Schema 之后放在 semi-dynamic
-		// 段, 与 Schema 一起作为 caller 维度稳定的 prefix cache 候选.
+		// caller-specific; OutputExample 渲染顺序紧跟 Schema 之后, 二者同属
+		// caller 维度稳定的 prefix cache 候选.
 		// 关键词: section.semi_dynamic.output_example, OutputExample 迁入,
-		//        high-static 反污染, Schema 同段对齐
+		//        high-static 反污染
 		reactloops.NewPromptSectionObservation(
 			"section.semi_dynamic.output_example",
 			"Semi Dynamic / Output Example",
 			reactloops.PromptSectionRoleSemiDynamic,
 			true,
 			renderStaticTaggedBlock("OUTPUT_EXAMPLE", materials.OutputExample),
-		),
-		// section.semi_dynamic.task_instruction 从 high-static 段迁入: TaskInstruction
-		// 是 caller 注入的 PERSISTENT 指令, caller-specific, 与 OutputExample 同组,
-		// 跨同一 caller 的 turn 字节稳定. 留在 high-static 段会污染 AI_CACHE_SYSTEM
-		// 边界, 因此下沉到 semi-dynamic 段 (OutputExample 之后).
-		// 关键词: section.semi_dynamic.task_instruction, PERSISTENT 迁入,
-		//        high-static 反污染
-		reactloops.NewPromptSectionObservation(
-			"section.semi_dynamic.task_instruction",
-			"Semi Dynamic / Task Instruction",
-			reactloops.PromptSectionRoleSemiDynamic,
-			true,
-			renderStaticTaggedBlock("PERSISTENT", materials.TaskInstruction),
-		),
-		// CACHE_TOOL_CALL 块从 dynamic/REFLECTION 迁到此处, 用稳定 nonce 渲染.
-		// 关键词: Semi Dynamic / Cache Tool Call, RecentToolsCache 观测节点
-		reactloops.NewPromptSectionObservation(
-			"section.semi_dynamic.cache_tool_call",
-			"Semi Dynamic / Cache Tool Call",
-			reactloops.PromptSectionRoleSemiDynamic,
-			true,
-			materials.RecentToolsCache,
 		),
 	}
 	section.Children = filterIncludedPromptSections(children)
