@@ -9,13 +9,24 @@ package test
 // next-action-decision / tool-param-gen / verify-satisfaction / summary
 // 之间的分流全部错位, 表层症状是"原本无关的 mock 测试集体失败".
 //
-// 修改静态系统级 prompt 时, 散文侧统一用 kebab-case (`directly-answer` /
-// `require-tool` / `tool-compose` / `finish-exploration` 等) 引用动作名,
-// 不要写出 schema 字面 snake_case 形式. 详见
-// common/ai/aid/aicache/LESSONS_LEARNED.md 第 6 节 "反例与教训".
+// 修改静态系统级 prompt 时, **散文里禁止出现任何具体动作字面**, 无论
+// snake_case (`directly_answer` / `require_tool` 等) 还是 kebab-case
+// (`directly-answer` / `require-tool` / `tool-compose` /
+// `finish-exploration` 等). 一律改为中文语义类别指代 (例如"工具申请类入口" /
+// "直答类终结" / "工具编排入口" / "探索收口动作" / "强确认通道").
+//
+// 历史教训 (2026-05): 我们曾以为"散文写 kebab-case 安全", 但
+// `getReSelectTool` 这类 schema 的 enum 字面就是 kebab-case
+// (`require-tool` / `abandon`); 散文里只要出现 `require-tool`, fallback
+// 匹配 `MatchAllOfSubString(prompt, "require-tool", "abandon")` 就会和
+// timeline 里任意"abandon"字样组合误命中, 把 `directly_answer` prompt
+// 错判为"wrong-tool"分支, 导致 5 次 retry 后任务超时.
+//
+// 详见 common/ai/aid/aicache/LESSONS_LEARNED.md 第 6 节 "反例与教训"
+// 以及 common/ai/aid/aireact/prompts/loop/README.md.
 //
 // 关键词: prompt-mock 分流, high-static 散文污染, schema 字面量解耦,
-//        kebab-case 文档约定
+//        kebab-case 同样不安全, 中文语义类别指代
 
 import (
 	"strings"

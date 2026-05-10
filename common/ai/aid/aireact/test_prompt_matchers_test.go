@@ -8,10 +8,19 @@ package aireact
 // 共享的 high-static / base 等"系统级静态段"散文里. 一旦在静态段散文里
 // 写出这些字面量, mock 分流会全线错位.
 //
-// 修改静态系统级 prompt 时, 散文侧统一用 kebab-case 引用动作名. 详见
-// common/ai/aid/aicache/LESSONS_LEARNED.md 第 6 节 "反例与教训".
+// 修改静态系统级 prompt 时, **散文里禁止出现任何具体动作字面**, 无论
+// snake_case 还是 kebab-case. 一律改用中文语义类别指代. 详见
+// common/ai/aid/aicache/LESSONS_LEARNED.md 第 6 节 "反例与教训" 以及
+// common/ai/aid/aireact/prompts/loop/README.md "修改 high-static 段时的
+// 硬约束" 第 2 条.
 //
-// 关键词: prompt-mock 分流, high-static 散文污染, schema 字面量解耦
+// 历史教训 (2026-05): wrong-tool re-select 的 schema enum 字面就是
+// kebab-case (`require-tool` / `abandon`), 散文里写 `require-tool` 会让
+// fallback 匹配 `MatchAllOfSubString(prompt, "require-tool", "abandon")`
+// 在 timeline 含 abandon 字样时误命中.
+//
+// 关键词: prompt-mock 分流, high-static 散文污染, schema 字面量解耦,
+//        kebab-case 同样不安全
 
 import "strings"
 

@@ -281,19 +281,38 @@ cachebench 运行参数: `--input "hostscan" --max-prompts 50 --max-duration 150
     一旦 high-static 散文出现这些字面量, mock 把每一种 prompt 都误识别为
     next-action-decision, 工具调用 / 验证 / 总结链路全部错位, 表层症状是
     "tool stdout 为空 / 期望 token 永远不出现 / `Should be true` 失败".
-  - 文档侧约定. 散文统一用 kebab-case 引用动作名 (`directly-answer` /
-    `require-tool` / `tool-compose` / `finish-exploration` 等); 涉及标签
-    名时也避免精确字面 (例如散文写 `CURRENT-TASK`, 实际渲染仍是
-    `<|CURRENT_TASK_<nonce>|>`). 同时在静态段里保留一段"命名约定"小节
-    告诉模型 schema 字面以本轮 SCHEMA enum / const 为准, 防止模型把
-    kebab-case 形式照抄进 JSON 输出.
+  - 文档侧约定 (升级版, 2026-05). 散文里**禁止出现任何具体动作字面**,
+    无论 snake_case 还是 kebab-case. 全部改为**中文语义类别**指代
+    (例如"工具申请类入口" / "直答类终结" / "工具编排入口" / "探索收口动作" /
+    "强确认通道"). 涉及标签名时也避免精确字面 (例如散文写 `CURRENT-TASK`,
+    实际渲染仍是 `<|CURRENT_TASK_<nonce>|>`). 同时在静态段保留一段
+    "命名约定"小节告诉模型: 实际动作 / 字段标识符的字面值以本轮 SCHEMA
+    enum / const 为准.
+  - **kebab-case 同样不安全 (2026-05 复盘)**. 我们最初以为"散文用
+    kebab-case 安全"是因为大多数 schema 用 snake_case enum; 但
+    `getReSelectTool` 这类 schema 的 enum 字面就是 kebab-case
+    (`require-tool` / `abandon` / `ask-for-clarification`). 散文里只要
+    出现 `require-tool`, 它就会和 timeline 里任意"abandon"字样组合,
+    被 mock 的 fallback 匹配 `MatchAllOfSubString(prompt, "require-tool",
+    "abandon")` 一并吃掉, 让任何 prompt 都被错判成"wrong-tool"分支
+    返回 `{"@action":"abandon",...}`. 后续的 `directly_answer` prompt
+    收到 abandon 响应, AITAG 校验失败, 5 次 retry 后任务超时. 表层症状
+    是 `TestReAct_ToolUse_WrongTool_Abondon` 等 wrong-tool 用例失败 +
+    "ReAct 任务执行失败 / max retry count[5] reached" 错误.
   - 反向加固. 若必须修改这些 mock matcher, 让它们看 schema 句法
     (`"const": "directly_answer"`, `"@action": "directly_answer"`) 而不是
     朴素子串. 但 30+ 调用点改动面大, 优先约束 prompt 侧.
   - 自检. 在静态段加 / 改内容后, 跑 `common/ai/aid/test`,
     `common/ai/aid/aireact`, `common/ai/aid/aireact/reactloops/reactloopstests`
     三个目录的测试; 如果出现"原本无关的 mock 测试集体失败"且失败信息是
-    `expected token X not found in ""`, 90% 是这条规则被违反了.
+    `expected token X not found in ""` 或 `max retry count[5] reached`,
+    90% 是这条规则被违反了. 也可以直接 grep 校验:
+
+    ```bash
+    grep -nE "require[-_]tool|directly[-_]answer|tool[-_]compose|finish[-_]exploration|enter[-_]focus[-_]mode|load[-_]capability|loading[-_]skills|load[-_]skill[-_]resources|change[-_]skill[-_]view[-_]offset|ask[-_]for[-_]clarification|abandon|@action|answer_payload|tool_require_payload" common/ai/aid/aireact/prompts/loop/high_static_section.txt
+    ```
+
+    正常应**无任何输出**.
 
 ## 7. 后续待办 (Follow-ups)
 
