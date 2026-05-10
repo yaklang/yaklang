@@ -1,5 +1,18 @@
 package aireact
 
+// 本文件是 aireact 包内 mock AI 回调里"按 prompt 类型分流"的判定函数集.
+// 与 common/ai/aid/test/prompt_matchers_test.go 共享同一套契约假设:
+// 每个 schema 关键字面量 (`directly_answer` / `require_tool` /
+// `tool_compose` / `request_plan_and_execution` / `finish_exploration`
+// 等) **只**出现在该轮真正暴露该 enum 的 schema 块里, 不出现在被每轮
+// 共享的 high-static / base 等"系统级静态段"散文里. 一旦在静态段散文里
+// 写出这些字面量, mock 分流会全线错位.
+//
+// 修改静态系统级 prompt 时, 散文侧统一用 kebab-case 引用动作名. 详见
+// common/ai/aid/aicache/LESSONS_LEARNED.md 第 6 节 "反例与教训".
+//
+// 关键词: prompt-mock 分流, high-static 散文污染, schema 字面量解耦
+
 import "strings"
 
 func isToolParamGenerationPrompt(prompt, toolName string) bool {

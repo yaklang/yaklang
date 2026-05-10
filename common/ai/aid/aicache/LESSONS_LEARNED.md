@@ -262,6 +262,38 @@ cachebench 运行参数: `--input "hostscan" --max-prompts 50 --max-duration 150
   改用纯文字解释.
 - 不要把 lightweight tier 的命中率与 intelligent tier 混在一起算总体命中率,
   会被低成本路径稀释, 误导优化方向.
+- **不要在 `high_static_section.txt` / `base.txt` 这类被每轮 prompt 都
+  渲染的"静态系统级"段散文里, 写出与 SCHEMA enum / JSON key 完全一致的
+  字面量** (例如 `directly_answer` / `require_tool` / `tool_compose` /
+  `require_ai_blueprint` / `finish_exploration` / `request_plan_and_execution` /
+  `output_facts` / `read_file` / `loading_skills` / `load_capability` /
+  `enter_focus_mode` / `ask_for_clarification` / `answer_payload` /
+  `tool_require_payload` / `@action` 等). 关键词: prompt-mock 错位,
+  high-static 散文污染, schema 字面量解耦.
+  - 失效路径. `common/ai/aid/test/prompt_matchers_test.go` /
+    `common/ai/aid/aireact/test_prompt_matchers_test.go` 等 30+ 处
+    mock 用 `strings.Contains(prompt, "directly_answer")` /
+    `utils.MatchAllOfSubString(prompt, "directly_answer", "require_tool", ...)`
+    这类**朴素子串匹配**在 ReAct 主循环各类 prompt (next-action-decision /
+    tool-param-gen / verify-satisfaction / summary / forge / pe-task) 之间
+    分流. 这套契约假设这些 schema 字面量**只**出现在该轮真正暴露该
+    enum 的 schema 块里, 不出现在被全部轮共享的 high-static 散文段.
+    一旦 high-static 散文出现这些字面量, mock 把每一种 prompt 都误识别为
+    next-action-decision, 工具调用 / 验证 / 总结链路全部错位, 表层症状是
+    "tool stdout 为空 / 期望 token 永远不出现 / `Should be true` 失败".
+  - 文档侧约定. 散文统一用 kebab-case 引用动作名 (`directly-answer` /
+    `require-tool` / `tool-compose` / `finish-exploration` 等); 涉及标签
+    名时也避免精确字面 (例如散文写 `CURRENT-TASK`, 实际渲染仍是
+    `<|CURRENT_TASK_<nonce>|>`). 同时在静态段里保留一段"命名约定"小节
+    告诉模型 schema 字面以本轮 SCHEMA enum / const 为准, 防止模型把
+    kebab-case 形式照抄进 JSON 输出.
+  - 反向加固. 若必须修改这些 mock matcher, 让它们看 schema 句法
+    (`"const": "directly_answer"`, `"@action": "directly_answer"`) 而不是
+    朴素子串. 但 30+ 调用点改动面大, 优先约束 prompt 侧.
+  - 自检. 在静态段加 / 改内容后, 跑 `common/ai/aid/test`,
+    `common/ai/aid/aireact`, `common/ai/aid/aireact/reactloops/reactloopstests`
+    三个目录的测试; 如果出现"原本无关的 mock 测试集体失败"且失败信息是
+    `expected token X not found in ""`, 90% 是这条规则被违反了.
 
 ## 7. 后续待办 (Follow-ups)
 

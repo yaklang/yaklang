@@ -1,5 +1,22 @@
 package test
 
+// 本文件是 mock AI 回调里"按 prompt 类型分流"的判定函数集. 这套判定假设
+// 每个 schema 关键字面量 (`directly_answer` / `require_tool` /
+// `request_plan_and_execution` / `tool_compose` / `require_ai_blueprint` /
+// `finish_exploration` / `verify-satisfaction` / `@action` + `summary` 等)
+// **只**出现在该轮真正暴露这条 enum 的 schema 块里, 不出现在被每轮共享的
+// high-static / base 等"系统级静态段"散文里. 这条契约一旦被违反, 会导致
+// next-action-decision / tool-param-gen / verify-satisfaction / summary
+// 之间的分流全部错位, 表层症状是"原本无关的 mock 测试集体失败".
+//
+// 修改静态系统级 prompt 时, 散文侧统一用 kebab-case (`directly-answer` /
+// `require-tool` / `tool-compose` / `finish-exploration` 等) 引用动作名,
+// 不要写出 schema 字面 snake_case 形式. 详见
+// common/ai/aid/aicache/LESSONS_LEARNED.md 第 6 节 "反例与教训".
+//
+// 关键词: prompt-mock 分流, high-static 散文污染, schema 字面量解耦,
+//        kebab-case 文档约定
+
 import (
 	"strings"
 

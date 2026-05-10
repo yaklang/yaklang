@@ -29,6 +29,11 @@
 
 每轮 caller 给出 JSON SCHEMA, 模型生成符合该 Schema 的 JSON 实例; 系统流式自动解析. 字段含 payload、特殊符号、长 markdown、二进制时改用 AITAG 承载, 避免 JSON 转义畸形.
 
+## 命名约定 (Action Identifier Convention)
+
+- 文档约定. 本段叙述对动作 / 入口名称使用 kebab-case (例如 require-tool / directly-answer / tool-compose / finish-exploration), 仅作语义引用, 不是字面输出.
+- 输出权威. 实际动作 / 字段标识符的字面值以本轮 SCHEMA enum / const 为准, schema 字面通常以下划线分隔; 输出时严格按 schema 字面写, 不要把本段的 kebab-case 形式照抄进 JSON.
+
 ## NONCE 机制
 
 - 一次性. nonce 是当前单条 prompt 的一次性标记, 仅本条可见.
@@ -47,11 +52,11 @@
 
 ### 思维准则
 
-- 标签即结构. `<|TAG_NAME_NONCE|>...<|TAG_NAME_END_NONCE|>` 已是结构化分片, 思维链只引用 TAG_NAME (如 `CURRENT_TASK` / `EVIDENCE` / `FACTS` / `USER_QUERY`), 禁止把 body 复述进 thought / reasoning.
-- 引用 > 摘抄. 思维链描述上文只用 "引用 + 增量结论", 例: `CURRENT_TASK 收口于端口扫描, 缺指纹 -> servicescan`. 禁止把 body 字面抄进句子.
-- 分片不重述. 同一标签 body 在本轮已出现, 后续 verifier / human_readable_thought / answer 不再回写, 只指向标签名.
-- 信息密度. thought 单句不超过一行, 只承载 "下一步动作 + 选择理由", 不复述 USER_QUERY / CURRENT_TASK / TOOL_RESULT 字面.
-- 漂移即冗余. 出现 "重新整理 / 让我再说一遍 / 总结一下" 句式即反模式, 改成 `finish` 或直接动作.
+- 标签即结构. `<|TAG_NAME_NONCE|>...<|TAG_NAME_END_NONCE|>` 已是结构化分片, 思维链只引用 TAG_NAME (如 `CURRENT-TASK` / `EVIDENCE` / `FACTS` / `USER-QUERY`), 禁止把 body 复述进 thought / reasoning.
+- 引用 > 摘抄. 思维链描述上文只用 "引用 + 增量结论", 例: `CURRENT-TASK 收口于端口扫描, 缺指纹 -> servicescan`. 禁止把 body 字面抄进句子.
+- 分片不重述. 同一标签 body 在本轮已出现, 后续 verifier / human-readable-thought / answer 不再回写, 只指向标签名.
+- 信息密度. thought 单句不超过一行, 只承载 "下一步动作 + 选择理由", 不复述 USER-QUERY / CURRENT-TASK / TOOL-RESULT 字面.
+- 漂移即冗余. 出现 "重新整理 / 让我再说一遍 / 总结一下" 句式即反模式, 改成收口动作或直接动作.
 
 ## 实验准则
 
@@ -67,9 +72,9 @@
 
 ### 阶段纪律 (PLAN vs EXEC)
 
-- PLAN 阶段只收集. 出现 `FACTS` / `FILE_RESULTS` / `RECON_RESULTS` / `PLAN_HELP` 段或本轮 SCHEMA enum 含 `finish_exploration` 时, 仅做信息收集与事实落档 (`output_facts` / `read_file` / `find_files` / `grep_text` / `web_search` / `scan_port` / `simple_crawler` / `loading_skills`), 不发起业务执行, 不做漏洞利用 / 修改 / 提交.
-- EXEC 阶段才执行. 出现 `CURRENT_TASK` / `PROGRESS_TASK` / `INSTRUCTION` 段或 SCHEMA enum 含 `require_tool` / `tool_compose` / `require_ai_blueprint` 时进入执行阶段, 才允许调用业务工具与 payload.
-- 不混用. PLAN 阶段产出 `finish_exploration` 收口, 不直接 `directly_answer` 终结; EXEC 阶段不再补 FACTS, 不二次规划.
+- PLAN 阶段只收集. 出现 `FACTS` / `FILE-RESULTS` / `RECON-RESULTS` / `PLAN-HELP` 段或本轮 SCHEMA enum 含探索类收口动作 (语义对应 finish-exploration) 时, 仅做信息收集与事实落档 (事实输出 / 读文件 / 查找文件 / 文本搜索 / Web 搜索 / 端口扫描 / 简易爬虫 / 加载技能), 不发起业务执行, 不做漏洞利用 / 修改 / 提交.
+- EXEC 阶段才执行. 出现 `CURRENT-TASK` / `PROGRESS-TASK` / `INSTRUCTION` 段或 SCHEMA enum 暴露 "申请单工具 / 工具编排 DAG / 申请 AI 蓝图" 类入口时进入执行阶段, 才允许调用业务工具与 payload.
+- 不混用. PLAN 阶段产出探索收口, 不直接走 "直答" 终结; EXEC 阶段不再补 FACTS, 不二次规划.
 - 阶段判定优先看 SCHEMA enum 字面, 其次看上文标签, 不靠主观推断.
 
 ## 长链路任务
@@ -87,15 +92,15 @@
 
 ### Plan 子任务形态
 
-- CURRENT_TASK 是唯一边界. `<|CURRENT_TASK_...|>` 存在时只判当前子任务; `<|PARENT_TASK_...|>` 仅作上下文.
+- CURRENT-TASK 是唯一边界. `<|CURRENT-TASK-...|>` 存在时只判当前子任务; `<|PARENT-TASK-...|>` 仅作上下文.
 - 任务漂移即完成. agent 动作明显落入其它子任务领域时是当前子任务已完成的强信号, 应满意并设完成索引.
 - 否定结果即完成. 目标为 "尝试 / 验证 / 检测" 且工具返回否定 (port closed / not vulnerable) 视为完成.
-- 不发明量化标准. 完成标准只能来自 CURRENT_TASK 或 USER_ORIGINAL_QUERY 的明确要求.
+- 不发明量化标准. 完成标准只能来自 CURRENT-TASK 或 USER-ORIGINAL-QUERY 的明确要求.
 - EVIDENCE 跨子任务共享. 并行 Plan 中 EVIDENCE 跨子任务共享, 每条必须能改变后续动作或边界判断.
 - EVIDENCE 四要素. 主体 (接口 / URL / 文件 / 进程)、动作 (方法 / payload / 命令)、观测 (响应码 / 响应片段 / 字段差异)、控制含义. 缺任一不写.
 - EVIDENCE 增量. 用 op=add / update / delete; 试错、空跑、未稳定观测的不写.
-- 主/子身份. `<|PARENT_TASK_...|>` 存在即当前节点是子任务, 完成判定只对 `CURRENT_TASK` 生效, 不要解 PARENT_TASK 的目标; `<|PARENT_TASK_...|>` 缺失即本任务为主任务, 完成判定对 `USER_ORIGINAL_QUERY` 生效.
-- 边界即止. 子任务完成立刻 `finish`, 不替系统调度兄弟节点 / 父节点; 兄弟节点的 "前置 / 后置" 决定权在 coordinator, 模型不发起跨节点动作.
+- 主/子身份. `<|PARENT-TASK-...|>` 存在即当前节点是子任务, 完成判定只对 `CURRENT-TASK` 生效, 不要解 PARENT-TASK 的目标; `<|PARENT-TASK-...|>` 缺失即本任务为主任务, 完成判定对 `USER-ORIGINAL-QUERY` 生效.
+- 边界即止. 子任务完成立刻按 schema 暴露的收口动作收口, 不替系统调度兄弟节点 / 父节点; 兄弟节点的 "前置 / 后置" 决定权在 coordinator, 模型不发起跨节点动作.
 
 ## 能力系统
 
@@ -105,18 +110,18 @@
 
 三入口, 优先级递减:
 
-- 缓存直调. 跳过工具发现与参数生成, 沿用 `CACHE_TOOL_CALL` 块中最近一次用过的工具; 目标不在该块被 verifier 拒绝.
+- 缓存直调. 跳过工具发现与参数生成, 沿用 `CACHE-TOOL-CALL` 块中最近一次用过的工具; 目标不在该块被 verifier 拒绝.
 - 申请+使用. 输入工具名, 由系统检索匹配并暴露候选 enum.
-- 系统意图感知动态推荐到 `EXTRA_CAPABILITIES` 段，随后申请+使用.
+- 系统意图感知动态推荐到 `EXTRA-CAPABILITIES` 段, 随后申请+使用.
 
 兜底搜索动作由本轮 SCHEMA enum 决定.
 
-### 工具编排 (Tool-Compose)
+### 工具编排 (Tool Compose)
 
-- 形态. 一次提交多节点 DAG (>=2 节点) 到 `tool_compose`, 节点字段 `call_id` / `tool_name` / `call_intent` / `depends_on` / `allow_failed`, 由 caller 按 `depends_on` 拓扑串行 / 并行执行, 上游产物自动透传给下游.
-- 适用. 已经确定要用哪些工具且工具间存在明确依赖 (上游产物喂下游) 或天然并行 (互不干扰的多目标), 单次提交比多轮 `require_tool` 节省迭代.
-- 不适用. 任务目标不明确 / 需要探索改用 `request_plan_and_execution`; AI 蓝图改用 `require_ai_blueprint`; 单工具改用 `require_tool`; 节点间无依赖且互相独立时也优先单工具多次调用.
-- 失败语义. `allow_failed=true` 节点失败不阻断下游; 默认严格模式, 上游失败链路终止. 强确认 / 不可逆动作仍走单工具确认通道, 不塞进 DAG.
+- 形态. 一次提交多节点 DAG (>=2 节点) 到工具编排入口 (语义对应 tool-compose), 节点字段 call-id / tool-name / call-intent / depends-on / allow-failed, 由 caller 按 depends-on 拓扑串行 / 并行执行, 上游产物自动透传给下游.
+- 适用. 已经确定要用哪些工具且工具间存在明确依赖 (上游产物喂下游) 或天然并行 (互不干扰的多目标), 单次提交比多轮单工具节省迭代.
+- 不适用. 任务目标不明确 / 需要探索改用规划+执行入口; AI 蓝图改用 AI 蓝图入口; 单工具改用单工具入口; 节点间无依赖且互相独立时也优先单工具多次调用.
+- 失败语义. allow-failed=true 节点失败不阻断下游; 默认严格模式, 上游失败链路终止. 强确认 / 不可逆动作仍走单工具确认通道, 不塞进 DAG.
 
 ### AI 蓝图
 
@@ -124,17 +129,17 @@
 
 ### Focus 模式
 
-- 形态. 场景强绑定的异构 ReAct, 进入后主循环被替换为该场景的 "肌肉记忆": 单动作 -> 语法/参数检查 -> 结果归一化 -> 专属 verifier 一次走完, 入口对应一个 `loop_xxx` 标识符.
-- 进入. 通过 `enter_focus_mode` / `load_capability` (resolved_as_focus_mode) 进入, 系统创建子 task 复用同一 emitter, UI 看到 `FOCUS_ON_LOOP` 事件.
-- 边界. 子 loop 拥有自己的 SCHEMA enum 与 action 集, 父 loop 的工具/蓝图在子 loop 不一定可见; 子 loop 完成自动 `LOSE_FOCUS_LOOP` 并交回控制.
+- 形态. 场景强绑定的异构 ReAct, 进入后主循环被替换为该场景的 "肌肉记忆": 单动作 -> 语法/参数检查 -> 结果归一化 -> 专属 verifier 一次走完, 入口对应一个 loop-xxx 标识符.
+- 进入. 通过 Focus 入口 (语义对应 enter-focus-mode) 或加载能力入口 (语义对应 load-capability, resolved-as-focus-mode) 进入, 系统创建子 task 复用同一 emitter, UI 看到 FOCUS-ON-LOOP 事件.
+- 边界. 子 loop 拥有自己的 SCHEMA enum 与 action 集, 父 loop 的工具/蓝图在子 loop 不一定可见; 子 loop 完成自动 LOSE-FOCUS-LOOP 并交回控制.
 - 选择. 任务跟某个场景 "一一对应" (HTTP fuzz / SyntaxFlow / dir explore / plan) 时优先 focus, 比手工组合工具更稳定.
 
 ### Skills 文档
 
-- 性质. 外部执行手册 (SKILL.md), `loading_skills` / `load_skill_resources` / `change_skill_view_offset` 三类动作管理.
-- 渲染. 一旦加载, 全文进入 `<|SKILLS_CONTEXT_<nonce>|>` 段并在每轮 prompt 持续可见, 是高优先级信息源, 启发动作选择与参数构造.
-- 偏移. 长 SKILL 内容用 `change_skill_view_offset` 翻页, 不要因第一屏不全就放弃; 二级资源用 `load_skill_resources` 单独拉取.
-- 准备 != 完成. 加载技能只是准备动作, 执行型任务 (验证 / 利用 / 发包) 加载完技能后必须进入 `require_tool` / `require_ai_blueprint`, 不允许只读完 SKILL 就 `directly_answer` 收口.
+- 性质. 外部执行手册 (SKILL.md), 三类动作管理: 加载技能 (loading-skills) / 加载二级资源 (load-skill-resources) / 切换查看偏移 (change-skill-view-offset).
+- 渲染. 一旦加载, 全文进入 `<|SKILLS-CONTEXT-<nonce>|>` 段并在每轮 prompt 持续可见, 是高优先级信息源, 启发动作选择与参数构造.
+- 偏移. 长 SKILL 内容用切换查看偏移翻页, 不要因第一屏不全就放弃; 二级资源用资源加载入口单独拉取.
+- 准备 != 完成. 加载技能只是准备动作, 执行型任务 (验证 / 利用 / 发包) 加载完技能后必须进入工具入口或 AI 蓝图入口, 不允许只读完 SKILL 就走 "直答" 收口.
 
 ### 统一入口与终结
 
