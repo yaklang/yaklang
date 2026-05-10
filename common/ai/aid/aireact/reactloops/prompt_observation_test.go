@@ -44,12 +44,17 @@ func (i *promptObservationTestInvoker) AssembleLoopPrompt(tools []*aitool.Tool, 
 	}
 	frozenBlock = FinalizePromptContainerSection(frozenBlock)
 
-	semiDynamic := NewPromptContainerSection("section.semi_dynamic", "Semi Dynamic", PromptSectionRoleSemiDynamic)
-	semiDynamic.Children = []*PromptSectionObservation{
-		NewPromptSectionObservation("section.semi_dynamic.skills_context", "Skills Context", PromptSectionRoleSemiDynamic, true, "# Skills Context\nloaded skill-a"),
-		NewPromptSectionObservation("section.semi_dynamic.schema", "Schema", PromptSectionRoleSemiDynamic, false, "# Schema\n{\"type\":\"object\"}"),
+	semiDynamic1 := NewPromptContainerSection("section.semi_dynamic_1", "Semi Dynamic 1", PromptSectionRoleSemiDynamic1)
+	semiDynamic1.Children = []*PromptSectionObservation{
+		NewPromptSectionObservation("section.semi_dynamic_1.skills_context", "Skills Context", PromptSectionRoleSemiDynamic1, true, "# Skills Context\nloaded skill-a"),
 	}
-	semiDynamic = FinalizePromptContainerSection(semiDynamic)
+	semiDynamic1 = FinalizePromptContainerSection(semiDynamic1)
+
+	semiDynamic2 := NewPromptContainerSection("section.semi_dynamic_2", "Semi Dynamic 2", PromptSectionRoleSemiDynamic2)
+	semiDynamic2.Children = []*PromptSectionObservation{
+		NewPromptSectionObservation("section.semi_dynamic_2.schema", "Schema", PromptSectionRoleSemiDynamic2, false, "# Schema\n{\"type\":\"object\"}"),
+	}
+	semiDynamic2 = FinalizePromptContainerSection(semiDynamic2)
 
 	timelineOpen := NewPromptContainerSection("section.timeline_open", "Timeline", PromptSectionRoleTimelineOpen)
 	timelineOpen.Children = []*PromptSectionObservation{
@@ -66,11 +71,12 @@ func (i *promptObservationTestInvoker) AssembleLoopPrompt(tools []*aitool.Tool, 
 	}
 	dynamic = FinalizePromptContainerSection(dynamic)
 
-	sections := []*PromptSectionObservation{highStatic, frozenBlock, semiDynamic, timelineOpen, dynamic}
+	sections := []*PromptSectionObservation{highStatic, frozenBlock, semiDynamic1, semiDynamic2, timelineOpen, dynamic}
 	prompt := strings.Join([]string{
 		"<|PROMPT_SECTION_high-static|>\n" + strings.TrimSpace(highStatic.Children[0].Content+"\n\n"+highStatic.Children[1].Content) + "\n<|PROMPT_SECTION_END_high-static|>",
 		"<|AI_CACHE_FROZEN_semi-dynamic|>\n" + strings.TrimSpace(frozenBlock.Children[0].Content) + "\n<|AI_CACHE_FROZEN_END_semi-dynamic|>",
-		"<|PROMPT_SECTION_semi-dynamic|>\n" + strings.TrimSpace(semiDynamic.Children[0].Content+"\n\n"+semiDynamic.Children[1].Content) + "\n<|PROMPT_SECTION_END_semi-dynamic|>",
+		"<|PROMPT_SECTION_semi-dynamic-1|>\n" + strings.TrimSpace(semiDynamic1.Children[0].Content) + "\n<|PROMPT_SECTION_END_semi-dynamic-1|>",
+		"<|PROMPT_SECTION_semi-dynamic-2|>\n" + strings.TrimSpace(semiDynamic2.Children[0].Content) + "\n<|PROMPT_SECTION_END_semi-dynamic-2|>",
 		"<|PROMPT_SECTION_timeline-open|>\n" + strings.TrimSpace(timelineOpen.Children[0].Content+"\n\n"+timelineOpen.Children[1].Content) + "\n<|PROMPT_SECTION_END_timeline-open|>",
 		"<|PROMPT_SECTION_dynamic_" + input.Nonce + "|>\n" + strings.TrimSpace(dynamic.Children[0].Content+"\n\n"+dynamic.Children[1].Content+"\n\n"+dynamic.Children[2].Content) + "\n<|PROMPT_SECTION_dynamic_END_" + input.Nonce + "|>",
 	}, "\n\n")
@@ -117,7 +123,7 @@ func TestGenerateLoopPrompt_RecordsObservation(t *testing.T) {
 	require.Equal(t, "nonce1", observation.Nonce)
 	require.Equal(t, len(prompt), observation.PromptBytes)
 	require.Equal(t, ytoken.CalcTokenCount(prompt), observation.PromptTokens)
-	require.Len(t, observation.Sections, 5)
+	require.Len(t, observation.Sections, 6)
 	require.Greater(t, observation.SectionCount, len(observation.Sections))
 
 	require.Equal(t, "section.high_static", observation.Sections[0].Key)
@@ -129,16 +135,20 @@ func TestGenerateLoopPrompt_RecordsObservation(t *testing.T) {
 	require.Greater(t, observation.Sections[0].LineCount(), 0)
 	require.Empty(t, observation.Sections[0].Content)
 	require.Equal(t, "section.frozen_block", observation.Sections[1].Key)
-	require.Equal(t, "section.semi_dynamic", observation.Sections[2].Key)
-	require.Equal(t, "section.timeline_open", observation.Sections[3].Key)
-	require.Equal(t, "section.dynamic", observation.Sections[4].Key)
-	require.Equal(t, "section.dynamic.user_query", observation.Sections[4].Children[0].Key)
-	require.True(t, observation.Sections[4].Children[1].Compressible)
-	require.True(t, observation.Sections[4].Children[2].Compressible)
-	require.Len(t, observation.Stats.RoleStats, 5)
+	require.Equal(t, "section.semi_dynamic_1", observation.Sections[2].Key)
+	require.Equal(t, PromptSectionRoleSemiDynamic1, observation.Sections[2].Role)
+	require.Equal(t, "section.semi_dynamic_2", observation.Sections[3].Key)
+	require.Equal(t, PromptSectionRoleSemiDynamic2, observation.Sections[3].Role)
+	require.Equal(t, "section.timeline_open", observation.Sections[4].Key)
+	require.Equal(t, "section.dynamic", observation.Sections[5].Key)
+	require.Equal(t, "section.dynamic.user_query", observation.Sections[5].Children[0].Key)
+	require.True(t, observation.Sections[5].Children[1].Compressible)
+	require.True(t, observation.Sections[5].Children[2].Compressible)
+	require.Len(t, observation.Stats.RoleStats, 6)
 	require.NotZero(t, requirePromptObservationRoleStat(t, observation.Stats.RoleStats, PromptSectionRoleHighStatic).RoleBytes)
 	require.NotZero(t, requirePromptObservationRoleStat(t, observation.Stats.RoleStats, PromptSectionRoleFrozenBlock).RoleBytes)
-	require.NotZero(t, requirePromptObservationRoleStat(t, observation.Stats.RoleStats, PromptSectionRoleSemiDynamic).RoleBytes)
+	require.NotZero(t, requirePromptObservationRoleStat(t, observation.Stats.RoleStats, PromptSectionRoleSemiDynamic1).RoleBytes)
+	require.NotZero(t, requirePromptObservationRoleStat(t, observation.Stats.RoleStats, PromptSectionRoleSemiDynamic2).RoleBytes)
 	require.NotZero(t, requirePromptObservationRoleStat(t, observation.Stats.RoleStats, PromptSectionRoleTimelineOpen).RoleBytes)
 	require.NotZero(t, requirePromptObservationRoleStat(t, observation.Stats.RoleStats, PromptSectionRoleDynamic).RoleBytes)
 
@@ -158,7 +168,7 @@ func TestGenerateLoopPrompt_RecordsObservation(t *testing.T) {
 	require.Equal(t, observation.Nonce, status.Nonce)
 	require.Equal(t, observation.PromptBytes, status.PromptBytes)
 	require.Equal(t, observation.PromptTokens, status.PromptTokens)
-	require.Len(t, status.RoleStats, 5)
+	require.Len(t, status.RoleStats, 6)
 	require.Equal(t, PromptSectionRoleZHHighStatic, requirePromptObservationRoleStat(t, status.RoleStats, PromptSectionRoleHighStatic).RoleNameZh)
 	require.NotZero(t, requirePromptObservationRoleStat(t, status.RoleStats, PromptSectionRoleDynamic).RoleBytes)
 	require.NotEmpty(t, status.Sections)
@@ -169,10 +179,14 @@ func TestGenerateLoopPrompt_RecordsObservation(t *testing.T) {
 	require.Greater(t, status.Sections[0].Lines, 0)
 	require.Empty(t, status.Sections[0].Summary)
 	require.Equal(t, "section.high_static.task_instruction", status.Sections[0].Children[0].Key)
-	require.Equal(t, "section.dynamic", status.Sections[4].Key)
-	require.Equal(t, "section.dynamic.user_query", status.Sections[4].Children[0].Key)
-	require.Equal(t, PromptSectionRoleZHDynamic, status.Sections[4].Children[0].RoleZh)
-	require.Contains(t, status.Sections[4].Children[0].Summary, "raw user input")
+	require.Equal(t, "section.semi_dynamic_1", status.Sections[2].Key)
+	require.Equal(t, PromptSectionRoleZHSemiDynamic1, status.Sections[2].RoleZh)
+	require.Equal(t, "section.semi_dynamic_2", status.Sections[3].Key)
+	require.Equal(t, PromptSectionRoleZHSemiDynamic2, status.Sections[3].RoleZh)
+	require.Equal(t, "section.dynamic", status.Sections[5].Key)
+	require.Equal(t, "section.dynamic.user_query", status.Sections[5].Children[0].Key)
+	require.Equal(t, PromptSectionRoleZHDynamic, status.Sections[5].Children[0].RoleZh)
+	require.Contains(t, status.Sections[5].Children[0].Summary, "raw user input")
 
 	// 新增字段验证: bytes_percent / estimated_tokens / content_hash / summary_truncated
 	// 关键词: prompt_profile 新字段, BytesPercent, EstimatedTokens, ContentHash, SummaryTruncated
@@ -188,7 +202,7 @@ func TestGenerateLoopPrompt_RecordsObservation(t *testing.T) {
 		}
 	}
 	// timeline 段子段 "Timeline Memory" 内容含两行 step1 / step2, summary 必须保留换行
-	timelineMemory := status.Sections[3].Children[0]
+	timelineMemory := status.Sections[4].Children[0]
 	require.Equal(t, "section.timeline_open.timeline_open", timelineMemory.Key)
 	require.Contains(t, timelineMemory.Summary, "step1")
 	require.Contains(t, timelineMemory.Summary, "step2")
