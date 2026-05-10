@@ -122,13 +122,17 @@ func buildAdvicesWithCache(rep *HitReport, split *PromptSplit, gc *globalCache) 
 							distinct, total, reuseRate*100))
 				}
 			}
-		case SectionSemiDynamic:
+		case SectionSemiDynamic, SectionSemiDynamic1, SectionSemiDynamic2:
+			// SemiDynamic1/2 是 aireact 新路径下把单一 semi 段拆成两块的产物,
+			// 跨 turn 字节稳定性预期与老 semi-dynamic 段一致, 故共用同一阈值与
+			// 文案; 报警时携带具体 section 名以便定位是哪一半在漂移.
+			// 关键词: advice, SemiDynamic1/2 等价诊断
 			if total > 5 && distinct > 3 {
 				reuseRate := 1.0 - float64(distinct)/float64(total)
 				if reuseRate < 0.4 {
 					advices = append(advices,
-						fmt.Sprintf("semi-dynamic section drifts more than expected: %d distinct / %d total uses (reuse_rate=%.0f%%), tool/forge/schema list may be churning",
-							distinct, total, reuseRate*100))
+						fmt.Sprintf("%s section drifts more than expected: %d distinct / %d total uses (reuse_rate=%.0f%%), tool/forge/schema list may be churning",
+							section, distinct, total, reuseRate*100))
 				}
 			}
 		}
@@ -207,17 +211,26 @@ func missingSections(split *PromptSplit) []string {
 		have[ch.Section] = true
 	}
 	hasTimeline := have[SectionTimeline] || have[SectionTimelineOpen]
+	// semi-dynamic 等价识别: 老路径 SectionSemiDynamic 单段, 新路径 SectionSemiDynamic1
+	// + SectionSemiDynamic2 双段拆分, 任一存在即视为 "semi-dynamic 段已出现".
+	// 关键词: missingSections, semi-dynamic 三种段名等价识别
+	hasSemi := have[SectionSemiDynamic] || have[SectionSemiDynamic1] || have[SectionSemiDynamic2]
 	expected := []string{SectionHighStatic, SectionSemiDynamic, SectionTimeline, SectionDynamic}
 	var missing []string
 	for _, s := range expected {
-		if s == SectionTimeline {
+		switch s {
+		case SectionTimeline:
 			if !hasTimeline {
 				missing = append(missing, s)
 			}
-			continue
-		}
-		if !have[s] {
-			missing = append(missing, s)
+		case SectionSemiDynamic:
+			if !hasSemi {
+				missing = append(missing, s)
+			}
+		default:
+			if !have[s] {
+				missing = append(missing, s)
+			}
 		}
 	}
 	return missing

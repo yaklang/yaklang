@@ -176,7 +176,7 @@ func renderDebugDump(rep *HitReport, split *PromptSplit, gc *globalCache) string
 // SectionTimelineOpen 紧随 SectionTimeline, 两者并列展示时视觉相邻便于人工核对。
 // 关键词: aicache, orderedSections, timeline / timeline-open 排序
 func orderedSections(m map[string]int) []string {
-	known := []string{SectionHighStatic, SectionSemiDynamic, SectionTimeline, SectionTimelineOpen, SectionDynamic, SectionRaw}
+	known := []string{SectionHighStatic, SectionSemiDynamic, SectionSemiDynamic1, SectionSemiDynamic2, SectionTimeline, SectionTimelineOpen, SectionDynamic, SectionRaw}
 	seen := make(map[string]bool, len(known))
 	var out []string
 	for _, s := range known {

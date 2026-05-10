@@ -31,22 +31,39 @@ const ReActPromptObservationStatusKey = "re-act-prompt-observation-status"
 
 type PromptSectionRole string
 
+// PromptSectionRole 是上下文字节统计图 / 上下文成分面板用来按段分类的枚举.
+//
+// 注意 SemiDynamic 段在 P1.1 之后物理上拆成两块 (semi-dynamic-1 +
+// semi-dynamic-2), 字节统计图需要把这两块作为独立类型分开统计, 否则跨 turn
+// 字节抖动会被合并掩盖, 让面板趋势线不稳定. 因此引入两个新 Role:
+//   - PromptSectionRoleSemiDynamic1 ("semi_dynamic_1") -> "半动态段1"
+//   - PromptSectionRoleSemiDynamic2 ("semi_dynamic_2") -> "半动态段2"
+//
+// 老 PromptSectionRoleSemiDynamic ("semi_dynamic") 保留供老 caller 与未拆分的
+// 测试 fixture 使用 (liteforge / aireduce / 老快照对比), 新 aireact 主路径渲染
+// 与观测树都用 1/2 拆分版本.
+//
+// 关键词: PromptSectionRole 拆 SemiDynamic1/2, 字节统计独立分类, P1.1
 const (
-	PromptSectionRoleHighStatic   PromptSectionRole = "high_static"
-	PromptSectionRoleFrozenBlock  PromptSectionRole = "frozen_block"
-	PromptSectionRoleSemiDynamic  PromptSectionRole = "semi_dynamic"
-	PromptSectionRoleTimelineOpen PromptSectionRole = "timelineOpen"
-	PromptSectionRoleDynamic      PromptSectionRole = "dynamic"
+	PromptSectionRoleHighStatic    PromptSectionRole = "high_static"
+	PromptSectionRoleFrozenBlock   PromptSectionRole = "frozen_block"
+	PromptSectionRoleSemiDynamic   PromptSectionRole = "semi_dynamic"
+	PromptSectionRoleSemiDynamic1  PromptSectionRole = "semi_dynamic_1"
+	PromptSectionRoleSemiDynamic2  PromptSectionRole = "semi_dynamic_2"
+	PromptSectionRoleTimelineOpen  PromptSectionRole = "timelineOpen"
+	PromptSectionRoleDynamic       PromptSectionRole = "dynamic"
 )
 
 type PromptSectionRoleZH string
 
 const (
-	PromptSectionRoleZHHighStatic   PromptSectionRoleZH = "高静态段"
-	PromptSectionRoleZHFrozenBlock  PromptSectionRoleZH = "冻结块"
-	PromptSectionRoleZHSemiDynamic  PromptSectionRoleZH = "半动态段"
-	PromptSectionRoleZHTimelineOpen PromptSectionRoleZH = "时间线开放段"
-	PromptSectionRoleZHDynamic      PromptSectionRoleZH = "动态段"
+	PromptSectionRoleZHHighStatic    PromptSectionRoleZH = "高静态段"
+	PromptSectionRoleZHFrozenBlock   PromptSectionRoleZH = "冻结块"
+	PromptSectionRoleZHSemiDynamic   PromptSectionRoleZH = "半动态段"
+	PromptSectionRoleZHSemiDynamic1  PromptSectionRoleZH = "半动态段1"
+	PromptSectionRoleZHSemiDynamic2  PromptSectionRoleZH = "半动态段2"
+	PromptSectionRoleZHTimelineOpen  PromptSectionRoleZH = "时间线开放段"
+	PromptSectionRoleZHDynamic       PromptSectionRoleZH = "动态段"
 )
 
 type PromptSectionObservation struct {
@@ -814,6 +831,10 @@ func sectionRoleLabel(role PromptSectionRole) string {
 		return "frozen_block"
 	case PromptSectionRoleSemiDynamic:
 		return "semi_dynamic"
+	case PromptSectionRoleSemiDynamic1:
+		return "semi_dynamic_1"
+	case PromptSectionRoleSemiDynamic2:
+		return "semi_dynamic_2"
 	case PromptSectionRoleTimelineOpen:
 		return "timelineOpen"
 	case PromptSectionRoleDynamic:
@@ -831,6 +852,10 @@ func promptSectionRoleZH(role PromptSectionRole) PromptSectionRoleZH {
 		return PromptSectionRoleZHFrozenBlock
 	case PromptSectionRoleSemiDynamic:
 		return PromptSectionRoleZHSemiDynamic
+	case PromptSectionRoleSemiDynamic1:
+		return PromptSectionRoleZHSemiDynamic1
+	case PromptSectionRoleSemiDynamic2:
+		return PromptSectionRoleZHSemiDynamic2
 	case PromptSectionRoleTimelineOpen:
 		return PromptSectionRoleZHTimelineOpen
 	case PromptSectionRoleDynamic:
@@ -840,13 +865,22 @@ func promptSectionRoleZH(role PromptSectionRole) PromptSectionRoleZH {
 	}
 }
 
+// promptSectionRolesInOrder 返回字节统计图与上下文成分面板按段排序展示用的
+// Role 顺序. SemiDynamic1 / SemiDynamic2 紧跟在 FrozenBlock 之后, 顺序为
+// 渲染物理顺序 (high_static -> frozen_block -> semi_dynamic_1 ->
+// semi_dynamic_2 -> timeline_open -> dynamic). 老 PromptSectionRoleSemiDynamic
+// 不在主路径出现, 排序到列表末尾兜底, 让老 caller 也能正确落位.
+//
+// 关键词: promptSectionRolesInOrder, 字节统计排序, P1.1 拆 SemiDynamic1/2
 func promptSectionRolesInOrder() []PromptSectionRole {
 	return []PromptSectionRole{
 		PromptSectionRoleHighStatic,
 		PromptSectionRoleFrozenBlock,
-		PromptSectionRoleSemiDynamic,
+		PromptSectionRoleSemiDynamic1,
+		PromptSectionRoleSemiDynamic2,
 		PromptSectionRoleTimelineOpen,
 		PromptSectionRoleDynamic,
+		PromptSectionRoleSemiDynamic,
 	}
 }
 

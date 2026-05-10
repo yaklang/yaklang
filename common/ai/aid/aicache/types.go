@@ -12,17 +12,32 @@ import "time"
 //     midterm prefix)。frozen 部分被迁到 AI_CACHE_FROZEN 块中, 不再走 timeline
 //     section 包装。
 //
+// SectionSemiDynamic / SectionSemiDynamic1 / SectionSemiDynamic2 同时存在:
+//   - SectionSemiDynamic ("semi-dynamic"): 老路径 (liteforge / aireduce) 仍使用
+//     的单一 semi-dynamic 段。
+//   - SectionSemiDynamic1 ("semi-dynamic-1") / SectionSemiDynamic2 ("semi-dynamic-2"):
+//     aireact 新路径 "按稳定性分层 + UI 信息密度" 拆分后的两块 semi 段, 分别
+//     承载 SkillsContext + RecentToolsCache 与 TaskInstruction + Schema +
+//     OutputExample, 由 hijacker 切成两条 user message (semi-1 不打 cc /
+//     semi-2 打 cc, 合并算 prefix cache).
+//
+// 三种 semi 段都被 splitter 识别, advice 把它们等价计入 semi-dynamic 类别;
+// SectionHashCount 分别独立计数便于命中率诊断。
+//
 // 两段都被 splitter 与 hijacker 识别为 "timeline 类" section, 从而 SectionHashCount
 // 分别独立计数, 命中率分析能区分两条路径的稳定性。
 //
-// 关键词: aicache, section, 切片类型, timeline / timeline-open 双段
+// 关键词: aicache, section, 切片类型, timeline / timeline-open 双段,
+//        semi-dynamic / semi-dynamic-1 / semi-dynamic-2 三段
 const (
-	SectionHighStatic   = "high-static"
-	SectionSemiDynamic  = "semi-dynamic"
-	SectionTimeline     = "timeline"
-	SectionTimelineOpen = "timeline-open"
-	SectionDynamic      = "dynamic"
-	SectionRaw          = "raw"
+	SectionHighStatic    = "high-static"
+	SectionSemiDynamic   = "semi-dynamic"
+	SectionSemiDynamic1  = "semi-dynamic-1"
+	SectionSemiDynamic2  = "semi-dynamic-2"
+	SectionTimeline      = "timeline"
+	SectionTimelineOpen  = "timeline-open"
+	SectionDynamic       = "dynamic"
+	SectionRaw           = "raw"
 )
 
 // Chunk 表示 prompt 切片后的一个最小单元

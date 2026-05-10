@@ -13,9 +13,15 @@ import (
 )
 
 const (
-	promptSectionTagName     = "PROMPT_SECTION"
-	promptSectionHighStatic  = "high-static"
-	promptSectionSemiDynamic = "semi-dynamic"
+	promptSectionTagName    = "PROMPT_SECTION"
+	promptSectionHighStatic = "high-static"
+	// promptSectionSemiDynamic1 / promptSectionSemiDynamic2 是 P1.1 把单一
+	// semi-dynamic 段拆成两块后, 内层 PROMPT_SECTION 用的两个 nonce. 老 nonce
+	// "semi-dynamic" 保留供老路径 (liteforge / aireduce) 与历史断言识别, 但
+	// aireact 主路径不再使用.
+	// 关键词: promptSectionSemiDynamic1/2, semi 拆两块, P1.1
+	promptSectionSemiDynamic1 = "semi-dynamic-1"
+	promptSectionSemiDynamic2 = "semi-dynamic-2"
 	// promptSectionTimeline 是老段名 (合并 frozen + open + workspace), 现保留但
 	// 主路径不再使用。新路径用 promptSectionTimelineOpen 表示"易变尾段"。
 	// 关键词: promptSectionTimeline, 老 timeline 段名, 兼容
@@ -35,8 +41,11 @@ const (
 //go:embed prompts/loop/high_static_section.txt
 var loopHighStaticSectionTemplate string
 
-//go:embed prompts/loop/semi_dynamic_section.txt
-var loopSemiDynamicSectionTemplate string
+//go:embed prompts/loop/semi_dynamic_section_1.txt
+var loopSemiDynamicSection1Template string
+
+//go:embed prompts/loop/semi_dynamic_section_2.txt
+var loopSemiDynamicSection2Template string
 
 //go:embed prompts/loop/timeline_section.txt
 var loopTimelineSectionTemplate string
@@ -190,7 +199,15 @@ func (pm *PromptManager) AssembleLoopPrompt(tools []*aitool.Tool, input *reactlo
 		sections = append(sections, dynamicSection)
 	}
 
-	prompt := buildTaggedPromptSections(prefix.HighStatic, prefix.FrozenBlock, prefix.SemiDynamic, prefix.TimelineOpen, dynamic, base.Nonce)
+	prompt := buildTaggedPromptSections(
+		prefix.HighStatic,
+		prefix.FrozenBlock,
+		prefix.SemiDynamic1,
+		prefix.SemiDynamic2,
+		prefix.TimelineOpen,
+		dynamic,
+		base.Nonce,
+	)
 	return &reactloops.LoopPromptAssemblyResult{
 		Prompt:   prompt,
 		Sections: sections,
@@ -252,20 +269,27 @@ func (pm *PromptManager) NewPromptPrefixMaterials(base *reactloops.LoopPromptBas
 	return materials
 }
 
-// AssemblePromptPrefix 按"稳定性分层"路径输出 4 段: HighStatic | FrozenBlock |
-// SemiDynamic (Skills + CacheToolCall + TaskInstruction + Schema + OutputExample) |
-// TimelineOpen。Prompt 字段是 4 段拼接结果,
-// 调用方拼上 Dynamic 段后形成完整 prompt。
+// AssemblePromptPrefix 按"稳定性分层"路径输出 5 段: HighStatic | FrozenBlock |
+// SemiDynamic1 (Skills + CacheToolCall) | SemiDynamic2 (TaskInstruction + Schema +
+// OutputExample) | TimelineOpen。Prompt 字段是 5 段拼接结果, 调用方拼上 Dynamic
+// 段后形成完整 prompt。
 //
 // FrozenBlock 段 (Tool Inventory + Forge Inventory + Timeline-frozen) 整体字节稳定,
 // 由 buildTaggedPromptSections 用 <|AI_CACHE_FROZEN_semi-dynamic|>...
 // <|AI_CACHE_FROZEN_END_semi-dynamic|> 标签包裹, 供 aicache hijacker
 // splitByFrozenBoundary 精准切片 user1 (frozen prefix) / user2 (open tail)。
 //
+// SemiDynamic 段 P1.1 拆成两块:
+//   - SemiDynamic1 (Skills + CacheToolCall): 被 <|AI_CACHE_SEMI_semi|>...END 包裹,
+//     由 hijacker 切到 user2 (string content, 不打 cc).
+//   - SemiDynamic2 (TaskInstruction + Schema + OutputExample): 被
+//     <|AI_CACHE_SEMI2_semi|>...END 包裹, 由 hijacker 切到 user3 (ephemeral cc),
+//     让 dashscope 把 semi-1+semi-2 合并算 prefix cache.
+//
 // 兼容字段 Timeline: 等于老 timeline 段 (frozen + open + workspace + current time)
 // 的合并渲染, 仅供老 caller / 测试断言使用; 新路径不读取它。
 //
-// 关键词: AssemblePromptPrefix, 4 段拼接, 按稳定性分层, AI_CACHE_FROZEN
+// 关键词: AssemblePromptPrefix, 5 段拼接, 按稳定性分层, AI_CACHE_FROZEN, AI_CACHE_SEMI(2)
 func (pm *PromptManager) AssemblePromptPrefix(materials *reactloops.PromptPrefixMaterials) (*reactloops.PromptPrefixAssemblyResult, error) {
 	if pm == nil {
 		return nil, fmt.Errorf("prompt manager is nil")
@@ -282,7 +306,11 @@ func (pm *PromptManager) AssemblePromptPrefix(materials *reactloops.PromptPrefix
 	if err != nil {
 		return nil, err
 	}
-	semiDynamic, err := pm.renderLoopSemiDynamicSection(materials)
+	semiDynamic1, err := pm.renderLoopSemiDynamic1Section(materials)
+	if err != nil {
+		return nil, err
+	}
+	semiDynamic2, err := pm.renderLoopSemiDynamic2Section(materials)
 	if err != nil {
 		return nil, err
 	}
@@ -301,7 +329,8 @@ func (pm *PromptManager) AssemblePromptPrefix(materials *reactloops.PromptPrefix
 	sections := []*reactloops.PromptSectionObservation{
 		pm.buildHighStaticObservation(materials, highStatic),
 		pm.buildFrozenBlockObservation(materials, frozenBlock),
-		pm.buildSemiDynamicResidualObservation(materials, semiDynamic),
+		pm.buildSemiDynamic1Observation(materials, semiDynamic1),
+		pm.buildSemiDynamic2Observation(materials, semiDynamic2),
 		pm.buildTimelineOpenObservation(materials, timelineOpen),
 	}
 	var filtered []*reactloops.PromptSectionObservation
@@ -312,10 +341,11 @@ func (pm *PromptManager) AssemblePromptPrefix(materials *reactloops.PromptPrefix
 	}
 
 	return &reactloops.PromptPrefixAssemblyResult{
-		Prompt:       joinPromptSections(highStatic, frozenBlock, semiDynamic, timelineOpen),
+		Prompt:       joinPromptSections(highStatic, frozenBlock, semiDynamic1, semiDynamic2, timelineOpen),
 		HighStatic:   highStatic,
 		FrozenBlock:  frozenBlock,
-		SemiDynamic:  semiDynamic,
+		SemiDynamic1: semiDynamic1,
+		SemiDynamic2: semiDynamic2,
 		TimelineOpen: timelineOpen,
 		Timeline:     legacyTimeline,
 		Sections:     filtered,
@@ -410,10 +440,13 @@ func (pm *PromptManager) buildHighStaticObservation(
 	//
 	// 关键词: section.high_static 完全去变量, AI_CACHE_SYSTEM 字节稳定,
 	//        OutputExample / TaskInstruction 迁到 semi-dynamic
+	// 子节点 Name 已去掉 "Highly Static / " 前缀: UI 字节统计面板里父容器
+	// "Highly Static" 已经表达层级, 子节点重复前缀只是噪声.
+	// 关键词: section.high_static 子节点 Name 去前缀, UI 信息密度
 	children := []*reactloops.PromptSectionObservation{
 		reactloops.NewPromptSectionObservation(
 			"section.high_static.static_preamble",
-			"Highly Static / Traits & Agent Systems",
+			"Traits & Agent Systems",
 			reactloops.PromptSectionRoleHighStatic,
 			false,
 			pm.renderHighStaticPreamble(materials),
@@ -451,24 +484,27 @@ func (pm *PromptManager) buildFrozenBlockObservation(
 		"Frozen Block",
 		reactloops.PromptSectionRoleFrozenBlock,
 	)
+	// 子节点 Name 已去掉 "Frozen Block / " 前缀: UI 字节统计面板里父容器
+	// "Frozen Block" 已经表达层级.
+	// 关键词: section.frozen_block 子节点 Name 去前缀, UI 信息密度
 	children := []*reactloops.PromptSectionObservation{
 		reactloops.NewPromptSectionObservation(
 			"section.frozen_block.tool_inventory",
-			"Frozen Block / Tool Inventory",
+			"Tool Inventory",
 			reactloops.PromptSectionRoleFrozenBlock,
 			true,
 			renderToolInventoryBlock(materials),
 		),
 		reactloops.NewPromptSectionObservation(
 			"section.frozen_block.forge_inventory",
-			"Frozen Block / Forge Inventory",
+			"Forge Inventory",
 			reactloops.PromptSectionRoleFrozenBlock,
 			true,
 			renderForgeInventoryBlock(materials),
 		),
 		reactloops.NewPromptSectionObservation(
 			"section.frozen_block.timeline_frozen",
-			"Frozen Block / Timeline (Frozen Prefix)",
+			"Timeline (Frozen Prefix)",
 			reactloops.PromptSectionRoleFrozenBlock,
 			true,
 			renderTimelineFrozenBlock(materials),
@@ -516,75 +552,110 @@ func renderPlanContextBlock(materials *reactloops.PromptPrefixMaterials) string 
 	return fmt.Sprintf("<|PLAN_CONTEXT_%s|>\n%s\n<|PLAN_CONTEXT_END_%s|>", nonce, body, nonce)
 }
 
-// buildSemiDynamicResidualObservation 给"PROMPT_SECTION_semi-dynamic 残留段"做观测树:
-// Skills Context + Cache Tool Call + TaskInstruction + Schema + OutputExample.
-// Tool/Forge 已迁出到 FrozenBlock, CACHE_TOOL_CALL 从 dynamic/REFLECTION
-// 迁入此段 (用稳定 nonce 渲染, 字节稳定)。
+// buildSemiDynamic1Observation 给"PROMPT_SECTION_semi-dynamic-1 段"做观测树:
+// Skills Context + Cache Tool Call. 物理上对应 hijacker 5 段切分中的 user2
+// (string content, 不打 cc), 与 buildSemiDynamic2Observation 一起被 dashscope
+// 视作合并 prefix cache 计算.
 //
-// PlanContext 已彻底迁出本段 (历史曾位于此段, 但 EVIDENCE 嵌入 root user input
-// 导致内容抖动破坏 AI_CACHE_SEMI 命中; 现已迁到 timeline-open 段末尾, 落在所有
-// cache 边界之外, 见 buildTimelineOpenObservation)。
-//
-// 关键词: buildSemiDynamicResidualObservation, Skills Context, Cache Tool Call,
-//        TaskInstruction, Schema, OutputExample,
-//        PlanContext 已迁出至 timeline-open 末尾
-func (pm *PromptManager) buildSemiDynamicResidualObservation(
+// 关键词: buildSemiDynamic1Observation, Skills Context, Cache Tool Call, P1.1
+func (pm *PromptManager) buildSemiDynamic1Observation(
 	materials *reactloops.PromptPrefixMaterials,
 	rendered string,
 ) *reactloops.PromptSectionObservation {
+	// Role 用 PromptSectionRoleSemiDynamic1 ("半动态段1") 而非通用 SemiDynamic,
+	// 让上下文字节统计图 / 上下文成分面板把 SemiDynamic1 与 SemiDynamic2 作为
+	// 独立类型分开统计, 避免两块字节抖动被合并掩盖导致面板趋势线不稳定.
+	// 关键词: section.semi_dynamic_1 独立 Role, 字节统计独立分类, P1.1
 	section := reactloops.NewPromptContainerSection(
-		"section.semi_dynamic",
-		"Semi Dynamic",
-		reactloops.PromptSectionRoleSemiDynamic,
+		"section.semi_dynamic_1",
+		"Semi Dynamic 1",
+		reactloops.PromptSectionRoleSemiDynamic1,
 	)
+	// 子节点 Name 已去掉 "Semi Dynamic 1 / " 前缀: UI 字节统计面板里父容器
+	// 已经表达层级.
+	// 关键词: section.semi_dynamic_1 子节点 Name 去前缀, UI 信息密度
 	children := []*reactloops.PromptSectionObservation{
 		reactloops.NewPromptSectionObservation(
-			"section.semi_dynamic.skills_context",
-			"Semi Dynamic / Skills Context",
-			reactloops.PromptSectionRoleSemiDynamic,
+			"section.semi_dynamic_1.skills_context",
+			"Skills Context",
+			reactloops.PromptSectionRoleSemiDynamic1,
 			true,
 			materials.SkillsContext,
 		),
 		// CACHE_TOOL_CALL 块从 dynamic/REFLECTION 迁到此处, 用稳定 nonce 渲染.
-		// 关键词: Semi Dynamic / Cache Tool Call, RecentToolsCache 观测节点
+		// 关键词: Semi Dynamic 1 / Cache Tool Call, RecentToolsCache 观测节点
 		reactloops.NewPromptSectionObservation(
-			"section.semi_dynamic.cache_tool_call",
-			"Semi Dynamic / Cache Tool Call",
-			reactloops.PromptSectionRoleSemiDynamic,
+			"section.semi_dynamic_1.cache_tool_call",
+			"Cache Tool Call",
+			reactloops.PromptSectionRoleSemiDynamic1,
 			true,
 			materials.RecentToolsCache,
 		),
-		// section.semi_dynamic.task_instruction 从 high-static 段迁入: TaskInstruction
-		// 是 caller 注入的 PERSISTENT 指令, caller-specific,
-		// 跨同一 caller 的 turn 字节稳定. 留在 high-static 段会污染 AI_CACHE_SYSTEM
-		// 边界, 因此下沉到 semi-dynamic 段.
-		// 关键词: section.semi_dynamic.task_instruction, PERSISTENT 迁入,
+	}
+	section.Children = filterIncludedPromptSections(children)
+	if strings.TrimSpace(rendered) != "" {
+		section.Content = ""
+	}
+	return reactloops.FinalizePromptContainerSection(section)
+}
+
+// buildSemiDynamic2Observation 给"PROMPT_SECTION_semi-dynamic-2 段"做观测树:
+// TaskInstruction + Schema + OutputExample. 物理上对应 hijacker 5 段切分中的
+// user3 (ephemeral cc), 与 buildSemiDynamic1Observation 一起被 dashscope 视作
+// 合并 prefix cache 计算 (cc 锚点落在本段末尾, prefix 跨过 semi-1).
+//
+// PlanContext 已彻底迁出本段 (历史曾位于 semi-dynamic 段, 但 EVIDENCE 嵌入 root
+// user input 导致内容抖动破坏 AI_CACHE_SEMI 命中; 现已迁到 timeline-open 段末尾,
+// 落在所有 cache 边界之外, 见 buildTimelineOpenObservation)。
+//
+// 关键词: buildSemiDynamic2Observation, TaskInstruction, Schema, OutputExample,
+//        AI_CACHE_SEMI2 cc, P1.1, PlanContext 已迁出至 timeline-open 末尾
+func (pm *PromptManager) buildSemiDynamic2Observation(
+	materials *reactloops.PromptPrefixMaterials,
+	rendered string,
+) *reactloops.PromptSectionObservation {
+	// Role 用 PromptSectionRoleSemiDynamic2 ("半动态段2") 而非通用 SemiDynamic,
+	// 让上下文字节统计图 / 上下文成分面板把 SemiDynamic1 与 SemiDynamic2 作为
+	// 独立类型分开统计.
+	// 关键词: section.semi_dynamic_2 独立 Role, 字节统计独立分类, P1.1
+	section := reactloops.NewPromptContainerSection(
+		"section.semi_dynamic_2",
+		"Semi Dynamic 2",
+		reactloops.PromptSectionRoleSemiDynamic2,
+	)
+	// 子节点 Name 已去掉 "Semi Dynamic 2 / " 前缀: UI 字节统计面板里父容器
+	// 已经表达层级.
+	// 关键词: section.semi_dynamic_2 子节点 Name 去前缀, UI 信息密度
+	children := []*reactloops.PromptSectionObservation{
+		// section.semi_dynamic_2.task_instruction 从 high-static 段迁入:
+		// TaskInstruction 是 caller 注入的 PERSISTENT 指令, caller-specific,
+		// 跨同一 caller 的 turn 字节稳定. 留在 high-static 段会污染
+		// AI_CACHE_SYSTEM 边界, 因此下沉到 semi-dynamic 段.
+		// 关键词: section.semi_dynamic_2.task_instruction, PERSISTENT 迁入,
 		//        high-static 反污染
 		reactloops.NewPromptSectionObservation(
-			"section.semi_dynamic.task_instruction",
-			"Semi Dynamic / Task Instruction",
-			reactloops.PromptSectionRoleSemiDynamic,
+			"section.semi_dynamic_2.task_instruction",
+			"Task Instruction",
+			reactloops.PromptSectionRoleSemiDynamic2,
 			true,
 			renderStaticTaggedBlock("PERSISTENT", materials.TaskInstruction),
 		),
 		reactloops.NewPromptSectionObservation(
-			"section.semi_dynamic.schema",
-			"Semi Dynamic / Schema",
-			reactloops.PromptSectionRoleSemiDynamic,
+			"section.semi_dynamic_2.schema",
+			"Schema",
+			reactloops.PromptSectionRoleSemiDynamic2,
 			true,
 			renderSchemaBlock(materials.Schema),
 		),
-		// section.semi_dynamic.output_example 从 high-static 段迁入: OutputExample
-		// 是 caller-specific 字段, 不同 forge / loop 注入的内容差异较大, 留在
-		// high-static 段会破坏 AI_CACHE_SYSTEM 段的 hash 稳定性。Schema 同样是
-		// caller-specific; OutputExample 渲染顺序紧跟 Schema 之后, 二者同属
-		// caller 维度稳定的 prefix cache 候选.
-		// 关键词: section.semi_dynamic.output_example, OutputExample 迁入,
+		// section.semi_dynamic_2.output_example 从 high-static 段迁入:
+		// OutputExample 是 caller-specific 字段, 不同 forge / loop 注入的内容
+		// 差异较大, 留在 high-static 段会破坏 AI_CACHE_SYSTEM 段的 hash 稳定性.
+		// 关键词: section.semi_dynamic_2.output_example, OutputExample 迁入,
 		//        high-static 反污染
 		reactloops.NewPromptSectionObservation(
-			"section.semi_dynamic.output_example",
-			"Semi Dynamic / Output Example",
-			reactloops.PromptSectionRoleSemiDynamic,
+			"section.semi_dynamic_2.output_example",
+			"Output Example",
+			reactloops.PromptSectionRoleSemiDynamic2,
 			true,
 			renderStaticTaggedBlock("OUTPUT_EXAMPLE", materials.OutputExample),
 		),
@@ -616,24 +687,27 @@ func (pm *PromptManager) buildTimelineOpenObservation(
 		"Timeline Open & Workspace",
 		reactloops.PromptSectionRoleTimelineOpen,
 	)
+	// 子节点 Name 已去掉 "Timeline Open / " 前缀: UI 字节统计面板里父容器
+	// "Timeline Open & Workspace" 已经表达层级.
+	// 关键词: section.timeline_open 子节点 Name 去前缀, UI 信息密度
 	children := []*reactloops.PromptSectionObservation{
 		reactloops.NewPromptSectionObservation(
 			"section.timeline_open.timeline_open",
-			"Timeline Open / Timeline (Open Tail)",
+			"Timeline (Open Tail)",
 			reactloops.PromptSectionRoleTimelineOpen,
 			true,
 			renderTimelineOpenBlock(materials),
 		),
 		reactloops.NewPromptSectionObservation(
 			"section.timeline_open.current_time",
-			"Timeline Open / Current Time",
+			"Current Time",
 			reactloops.PromptSectionRoleTimelineOpen,
 			false,
 			renderCurrentTimeBlock(materials),
 		),
 		reactloops.NewPromptSectionObservation(
 			"section.timeline_open.workspace",
-			"Timeline Open / Workspace",
+			"Workspace",
 			reactloops.PromptSectionRoleTimelineOpen,
 			true,
 			renderWorkspaceBlock(materials),
@@ -641,7 +715,7 @@ func (pm *PromptManager) buildTimelineOpenObservation(
 		// P1-C2: SessionEvidence (SESSION_ARTIFACTS) 上移到 timeline-open
 		reactloops.NewPromptSectionObservation(
 			"section.timeline_open.session_evidence",
-			"Timeline Open / Session Evidence",
+			"Session Evidence",
 			reactloops.PromptSectionRoleTimelineOpen,
 			true,
 			materials.SessionEvidence,
@@ -649,7 +723,7 @@ func (pm *PromptManager) buildTimelineOpenObservation(
 		// P1-C2: UserHistory (PREV_USER_INPUT) 上移到 timeline-open
 		reactloops.NewPromptSectionObservation(
 			"section.timeline_open.user_history",
-			"Timeline Open / User History",
+			"User History",
 			reactloops.PromptSectionRoleTimelineOpen,
 			false,
 			materials.UserHistory,
@@ -662,7 +736,7 @@ func (pm *PromptManager) buildTimelineOpenObservation(
 		//        缓存边界外, 上游缓存保护
 		reactloops.NewPromptSectionObservation(
 			"section.timeline_open.plan_context",
-			"Timeline Open / Plan Context (PE-TASK PLAN Output)",
+			"Plan Context (PE-TASK PLAN Output)",
 			reactloops.PromptSectionRoleTimelineOpen,
 			true,
 			renderPlanContextBlock(materials),
@@ -685,17 +759,20 @@ func (pm *PromptManager) buildDynamicObservation(
 		"Pure Dynamic",
 		reactloops.PromptSectionRoleDynamic,
 	)
+	// 子节点 Name 已去掉 "Pure Dynamic / " 前缀: UI 字节统计面板里父容器
+	// "Pure Dynamic" 已经表达层级.
+	// 关键词: section.dynamic 子节点 Name 去前缀, UI 信息密度
 	children := []*reactloops.PromptSectionObservation{
 		reactloops.NewPromptSectionObservation(
 			"section.dynamic.user_query",
-			"Pure Dynamic / User Query",
+			"User Query",
 			reactloops.PromptSectionRoleDynamic,
 			false,
 			renderUserQueryBlock(input.Nonce, input.UserQuery),
 		),
 		reactloops.NewPromptSectionObservation(
 			"section.dynamic.auto_context",
-			"Pure Dynamic / Auto Context",
+			"Auto Context",
 			reactloops.PromptSectionRoleDynamic,
 			true,
 			base.AutoContext,
@@ -704,7 +781,7 @@ func (pm *PromptManager) buildDynamicObservation(
 		// 此处 dynamic 段不再渲染 PREV_USER_INPUT.
 		reactloops.NewPromptSectionObservation(
 			"section.dynamic.extra_capabilities",
-			"Pure Dynamic / Extra Capabilities",
+			"Extra Capabilities",
 			reactloops.PromptSectionRoleDynamic,
 			true,
 			renderTaggedBlock("EXTRA_CAPABILITIES", input.Nonce, input.ExtraCapabilities),
@@ -713,14 +790,14 @@ func (pm *PromptManager) buildDynamicObservation(
 		// 此处 dynamic 段不再渲染 SESSION_ARTIFACTS.
 		reactloops.NewPromptSectionObservation(
 			"section.dynamic.reactive_data",
-			"Pure Dynamic / Reactive Data",
+			"Reactive Data",
 			reactloops.PromptSectionRoleDynamic,
 			true,
 			renderTaggedBlock("REFLECTION", input.Nonce, input.ReactiveData),
 		),
 		reactloops.NewPromptSectionObservation(
 			"section.dynamic.injected_memory",
-			"Pure Dynamic / Injected Memory",
+			"Injected Memory",
 			reactloops.PromptSectionRoleDynamic,
 			true,
 			renderInjectedMemoryBlock(input.Nonce, input.InjectedMemory),
@@ -738,7 +815,7 @@ func (pm *PromptManager) buildDynamicObservation(
 // 纯静态系统提示词, HighStaticData() 返回空 map, 这里只是把模板原文 trim 后返回.
 // 若以后又向 HighStaticData 注入 caller-specific 字段, 需要重新审视: 任何
 // caller-specific 内容都会破坏 AI_CACHE_SYSTEM 段的 prefix cache, 应优先放
-// SemiDynamicData 而不是 HighStaticData.
+// SemiDynamic1Data / SemiDynamic2Data 而不是 HighStaticData.
 //
 // 关键词: renderHighStaticPreamble, high-static 纯静态, AI_CACHE_SYSTEM 反污染
 func (pm *PromptManager) renderHighStaticPreamble(materials *reactloops.PromptPrefixMaterials) string {
@@ -939,8 +1016,24 @@ func (pm *PromptManager) renderLoopHighStaticSection(materials *reactloops.Promp
 	return pm.executeTemplate("loop-high-static", loopHighStaticSectionTemplate, materials.HighStaticData())
 }
 
-func (pm *PromptManager) renderLoopSemiDynamicSection(materials *reactloops.PromptPrefixMaterials) (string, error) {
-	return pm.executeTemplate("loop-semi-dynamic", loopSemiDynamicSectionTemplate, materials.SemiDynamicData())
+// renderLoopSemiDynamic1Section 渲染 P1.1 拆分后的 semi-dynamic 第一块:
+// SkillsContext + RecentToolsCache. 物理上对应 hijacker 5 段切分中的 user2
+// (string content, 不打 cc), 由 wrapAICacheSemi 包一层 AI_CACHE_SEMI 边界.
+//
+// 关键词: renderLoopSemiDynamic1Section, semi_dynamic_section_1.txt, P1.1
+func (pm *PromptManager) renderLoopSemiDynamic1Section(materials *reactloops.PromptPrefixMaterials) (string, error) {
+	return pm.executeTemplate("loop-semi-dynamic-1", loopSemiDynamicSection1Template, materials.SemiDynamic1Data())
+}
+
+// renderLoopSemiDynamic2Section 渲染 P1.1 拆分后的 semi-dynamic 第二块:
+// TaskInstruction + Schema + OutputExample. 物理上对应 hijacker 5 段切分中的
+// user3 (ephemeral cc), 由 wrapAICacheSemi2 包一层 AI_CACHE_SEMI2 边界, dashscope
+// 把 semi-1+semi-2 视作合并 prefix cache 计算.
+//
+// 关键词: renderLoopSemiDynamic2Section, semi_dynamic_section_2.txt, P1.1,
+//        AI_CACHE_SEMI2 cc
+func (pm *PromptManager) renderLoopSemiDynamic2Section(materials *reactloops.PromptPrefixMaterials) (string, error) {
+	return pm.executeTemplate("loop-semi-dynamic-2", loopSemiDynamicSection2Template, materials.SemiDynamic2Data())
 }
 
 // renderLoopFrozenBlockSection 渲染"按稳定性分层"路径下的 FrozenBlock 段
@@ -971,32 +1064,37 @@ func (pm *PromptManager) renderLoopDynamicSection(data map[string]any) (string, 
 	return pm.executeTemplate("loop-dynamic", loopDynamicSectionTemplate, data)
 }
 
-// buildTaggedPromptSections 按"按稳定性分层"路径拼接 5 段:
+// buildTaggedPromptSections 按"按稳定性分层"路径拼接 6 段:
 //
-//	SYSTEM (high-static) | FROZEN (frozen-block) | SEMI (semi-dynamic 残留) |
+//	SYSTEM (high-static) | FROZEN (frozen-block) | SEMI-1 | SEMI-2 |
 //	OPEN (timeline-open) | DYNAMIC
 //
 // 各段之间空行分隔, 空段省略。
 //
-// 双 cache 边界 (P1):
+// 三 cache 边界 (P1.1):
 //   - frozen-block 段: <|AI_CACHE_FROZEN_semi-dynamic|>...<|AI_CACHE_FROZEN_END_semi-dynamic|>
 //     由 wrapAICacheFrozen 注入, hijacker 切到 user1, 主动打 ephemeral cc
-//   - semi-dynamic 段: <|AI_CACHE_SEMI_semi|>...<|AI_CACHE_SEMI_END_semi|>
-//     由 wrapAICacheSemi 注入 (覆盖 PROMPT_SECTION_semi-dynamic 整段),
-//     hijacker 切到 user2, 主动打 ephemeral cc
+//   - semi-dynamic-1 段: <|AI_CACHE_SEMI_semi|>...<|AI_CACHE_SEMI_END_semi|>
+//     由 wrapAICacheSemi 注入 (覆盖 PROMPT_SECTION_semi-dynamic-1 整段),
+//     hijacker 切到 user2, 不打 cc (string content)
+//   - semi-dynamic-2 段: <|AI_CACHE_SEMI2_semi|>...<|AI_CACHE_SEMI2_END_semi|>
+//     由 wrapAICacheSemi2 注入 (覆盖 PROMPT_SECTION_semi-dynamic-2 整段),
+//     hijacker 切到 user3, 主动打 ephemeral cc; dashscope 视 semi-1+semi-2 为
+//     合并 prefix cache (cc 锚点落 semi-2 末尾, prefix 跨过 semi-1)
 //
-// 内层 PROMPT_SECTION_semi-dynamic 标签保留 (不会与 AI_CACHE_SEMI 冲突, tagName
-// 不同), 让 splitter 4 段切片仍能识别 semi-dynamic 段. 字面量必须与
-// aicache.semiBoundaryTagName / semiBoundaryNonce 严格一致.
+// 内层 PROMPT_SECTION_semi-dynamic-1 / -2 标签保留 (不会与 AI_CACHE_SEMI / SEMI2
+// 冲突, tagName 不同), 让 splitter 6 段切片仍能识别 semi-dynamic-1/2 段.
+// 字面量必须与 aicache.semiBoundaryTagName / semi2BoundaryTagName 严格一致.
 //
-// 关键词: buildTaggedPromptSections, 5 段拼接, AI_CACHE_FROZEN, AI_CACHE_SEMI,
+// 关键词: buildTaggedPromptSections, 6 段拼接, AI_CACHE_FROZEN, AI_CACHE_SEMI,
 //
-//	aicache hijacker, 4 段切分, 双 cc, P1 双 cache 边界
-func buildTaggedPromptSections(highStatic string, frozenBlock string, semiDynamic string, timelineOpen string, dynamic string, dynamicNonce string) string {
+//	AI_CACHE_SEMI2, aicache hijacker, 5 段切分, P1.1 三 cache 边界, semi 拆两条 message
+func buildTaggedPromptSections(highStatic string, frozenBlock string, semiDynamic1 string, semiDynamic2 string, timelineOpen string, dynamic string, dynamicNonce string) string {
 	return joinPromptSections(
 		wrapPromptMessageSection(promptSectionHighStatic, highStatic, ""),
 		wrapAICacheFrozen(frozenBlock),
-		wrapAICacheSemi(wrapPromptMessageSection(promptSectionSemiDynamic, semiDynamic, "")),
+		wrapAICacheSemi(wrapPromptMessageSection(promptSectionSemiDynamic1, semiDynamic1, "")),
+		wrapAICacheSemi2(wrapPromptMessageSection(promptSectionSemiDynamic2, semiDynamic2, "")),
 		wrapPromptMessageSection(promptSectionTimelineOpen, timelineOpen, ""),
 		wrapPromptMessageSection(promptSectionDynamic, dynamic, dynamicNonce),
 	)
@@ -1021,20 +1119,23 @@ func wrapAICacheFrozen(content string) string {
 }
 
 // wrapAICacheSemi 用 <|AI_CACHE_SEMI_semi|>...<|AI_CACHE_SEMI_END_semi|> 包裹
-// 已经包了 PROMPT_SECTION_semi-dynamic 标签的 semi-dynamic 段内容, 字面量与
+// 已经包了 PROMPT_SECTION_semi-dynamic-1 标签的 semi-dynamic 第一块内容, 字面量与
 // aicommon.SemiDynamicCacheBoundaryTagName / SemiDynamicCacheBoundaryNonce 一致,
-// 让 aicache hijacker 在 frozen 边界 END 之后通过字符串 IndexOf 精准切到 user2,
-// 形成 4 段消息 (system+cc, user1+cc=frozen, user2+cc=semi, user3=open+dynamic).
+// 让 aicache hijacker 在 frozen 边界 END 之后通过字符串 IndexOf 精准切到 user2.
 //
-// 注意: 该函数包的是 wrapPromptMessageSection 已经产出的"PROMPT_SECTION_
-// semi-dynamic 完整段". 双层 tag 嵌套是有意为之: 内层 PROMPT_SECTION 让 splitter
+// P1.1 之后: hijacker 5 段切分中的 user2 (semi-1) 不再主动打 cc, 但前缀仍直达
+// 后续 semi-2 的 cc 锚点 (合并 prefix cache); P1.1 之前的老 4 段路径仍由 build4
+// 在 user2 (合并 SEMI 段) 上打 cc, 字面量未变, hijacker 保持兼容.
+//
+// 注意: 该函数包的是 wrapPromptMessageSection 已经产出的 "PROMPT_SECTION_
+// semi-dynamic-1 完整段". 双层 tag 嵌套是有意为之: 内层 PROMPT_SECTION 让 splitter
 // 仍能识别段归属, 外层 AI_CACHE_SEMI 给 hijacker 一对字节恒定的边界.
 //
 // 内容为空时返回空串, 调用方 joinPromptSections 会自动跳过空段.
 //
-// 关键词: wrapAICacheSemi, AI_CACHE_SEMI, semi cache boundary, 4 段拆分,
+// 关键词: wrapAICacheSemi, AI_CACHE_SEMI, semi-1 cache boundary, 5 段拆分,
 //
-//	与 PROMPT_SECTION_semi-dynamic 双层嵌套
+//	与 PROMPT_SECTION_semi-dynamic-1 双层嵌套, P1.1
 func wrapAICacheSemi(content string) string {
 	content = strings.TrimSpace(content)
 	if content == "" {
@@ -1042,6 +1143,33 @@ func wrapAICacheSemi(content string) string {
 	}
 	tagName := aicommon.SemiDynamicCacheBoundaryTagName
 	nonce := aicommon.SemiDynamicCacheBoundaryNonce
+	return fmt.Sprintf("<|%s_%s|>\n%s\n<|%s_END_%s|>", tagName, nonce, content, tagName, nonce)
+}
+
+// wrapAICacheSemi2 用 <|AI_CACHE_SEMI2_semi|>...<|AI_CACHE_SEMI2_END_semi|>
+// 包裹已经包了 PROMPT_SECTION_semi-dynamic-2 标签的 semi-dynamic 第二块内容,
+// 字面量与 aicommon.SemiDynamicPart2CacheBoundaryTagName /
+// SemiDynamicPart2CacheBoundaryNonce 一致, 让 aicache hijacker 在 SEMI 边界 END
+// 之后通过字符串 IndexOf 精准切到 user3, 形成 5 段消息
+// (system+cc, user1+cc=frozen, user2 无cc=semi-1, user3+cc=semi-2,
+// user4 无cc=open+dynamic).
+//
+// 注意: 该函数包的是 wrapPromptMessageSection 已经产出的 "PROMPT_SECTION_
+// semi-dynamic-2 完整段". 双层 tag 嵌套是有意为之: 内层 PROMPT_SECTION 让 splitter
+// 识别段归属, 外层 AI_CACHE_SEMI2 给 hijacker 一对字节恒定的边界.
+//
+// 内容为空时返回空串, 调用方 joinPromptSections 会自动跳过空段.
+//
+// 关键词: wrapAICacheSemi2, AI_CACHE_SEMI2, semi-2 cache boundary, 5 段拆分,
+//
+//	与 PROMPT_SECTION_semi-dynamic-2 双层嵌套, P1.1
+func wrapAICacheSemi2(content string) string {
+	content = strings.TrimSpace(content)
+	if content == "" {
+		return ""
+	}
+	tagName := aicommon.SemiDynamicPart2CacheBoundaryTagName
+	nonce := aicommon.SemiDynamicPart2CacheBoundaryNonce
 	return fmt.Sprintf("<|%s_%s|>\n%s\n<|%s_END_%s|>", tagName, nonce, content, tagName, nonce)
 }
 

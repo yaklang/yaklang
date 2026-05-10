@@ -735,6 +735,28 @@ const (
 	SemiDynamicCacheBoundaryNonce   = "semi"
 )
 
+// SemiDynamicPart2CacheBoundaryTagName / SemiDynamicPart2CacheBoundaryNonce 是
+// "semi-dynamic 段第二块"的 cache 边界字面量, 形成
+// <|AI_CACHE_SEMI2_semi|>...<|AI_CACHE_SEMI2_END_semi|>.
+//
+// 设计意图 (P1.1: 把 SEMI 段拆成两条 user message):
+//   - AI_CACHE_SEMI  (semi-1) -> 无 cc, user2 (Skills + RecentToolsCache)
+//   - AI_CACHE_SEMI2 (semi-2) -> ephemeral cc, user3 (Persistent + Schema + OutputExample)
+//
+// dashscope 命中点: system / system+frozen / system+frozen+semi1+semi2.
+// semi-1 不打 cc, prefix 仍跨过其字节序列直达 semi-2 cc 处, 等价于把 SEMI 视作
+// 一个合并 prefix 计算缓存; 但物理上仍是两条 user message, 让上游 UI 字节统计
+// 与 caller 端观测树能各自展示一组语义分块.
+//
+// 字面量必须与 aicache.semi2BoundaryTagName / semi2BoundaryNonce 严格一致.
+//
+// 关键词: SemiDynamicPart2CacheBoundaryTagName, AI_CACHE_SEMI2, P1.1,
+//        5 段切分, semi 拆两块, 合并 prefix
+const (
+	SemiDynamicPart2CacheBoundaryTagName = "AI_CACHE_SEMI2"
+	SemiDynamicPart2CacheBoundaryNonce   = "semi"
+)
+
 // Render 将所有 renderable block 按 aitag 兼容格式拼接：
 //
 //	<|TAGNAME_<nonce>|>

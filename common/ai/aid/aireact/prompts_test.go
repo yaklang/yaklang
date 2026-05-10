@@ -336,7 +336,8 @@ func TestPromptManager_GenerateToolParamsPromptWithMeta_UsesPromptSections(t *te
 	prompt := result.Prompt
 	if !utils.MatchAllOfSubString(prompt,
 		"<|AI_CACHE_SYSTEM_high-static|>",
-		"<|PROMPT_SECTION_semi-dynamic|>",
+		"<|PROMPT_SECTION_semi-dynamic-1|>",
+		"<|PROMPT_SECTION_semi-dynamic-2|>",
 		"<|PROMPT_SECTION_timeline-open|>",
 		"<|PROMPT_SECTION_dynamic_",
 		"<|SCHEMA|>",
@@ -372,7 +373,8 @@ func TestPromptManager_GenerateDirectlyAnswerPrompt_UsesPromptSections(t *testin
 
 	if !utils.MatchAllOfSubString(prompt,
 		"<|AI_CACHE_SYSTEM_high-static|>",
-		"<|PROMPT_SECTION_semi-dynamic|>",
+		"<|PROMPT_SECTION_semi-dynamic-1|>",
+		"<|PROMPT_SECTION_semi-dynamic-2|>",
 		"<|PROMPT_SECTION_timeline-open|>",
 		"<|PROMPT_SECTION_dynamic_"+nonce+"|>",
 		"<|SCHEMA|>",
@@ -409,7 +411,8 @@ func TestPromptManager_GenerateToolReSelectPrompt_UsesPromptSections(t *testing.
 
 	if !utils.MatchAllOfSubString(prompt,
 		"<|AI_CACHE_SYSTEM_high-static|>",
-		"<|PROMPT_SECTION_semi-dynamic|>",
+		"<|PROMPT_SECTION_semi-dynamic-1|>",
+		"<|PROMPT_SECTION_semi-dynamic-2|>",
 		"<|PROMPT_SECTION_timeline-open|>",
 		"<|PROMPT_SECTION_dynamic_",
 		"# Tool Inventory",
@@ -451,7 +454,8 @@ func TestPromptManager_GenerateReGenerateToolParamsPromptWithMeta_UsesPromptSect
 
 	if !utils.MatchAllOfSubString(result.Prompt,
 		"<|AI_CACHE_SYSTEM_high-static|>",
-		"<|PROMPT_SECTION_semi-dynamic|>",
+		"<|PROMPT_SECTION_semi-dynamic-1|>",
+		"<|PROMPT_SECTION_semi-dynamic-2|>",
 		"<|PROMPT_SECTION_timeline-open|>",
 		"<|PROMPT_SECTION_dynamic_",
 		"<|SCHEMA|>",
@@ -489,7 +493,8 @@ func TestPromptManager_GenerateChangeAIBlueprintPrompt_UsesPromptSections(t *tes
 
 	if !utils.MatchAllOfSubString(prompt,
 		"<|AI_CACHE_SYSTEM_high-static|>",
-		"<|PROMPT_SECTION_semi-dynamic|>",
+		"<|PROMPT_SECTION_semi-dynamic-1|>",
+		"<|PROMPT_SECTION_semi-dynamic-2|>",
 		"<|PROMPT_SECTION_timeline-open|>",
 		"<|PROMPT_SECTION_dynamic_",
 		"# AI Blueprint Inventory",
@@ -524,7 +529,8 @@ func TestPromptManager_GenerateAIBlueprintForgeParamsPrompt_UsesPromptSections(t
 
 	if !utils.MatchAllOfSubString(prompt,
 		"<|AI_CACHE_SYSTEM_high-static|>",
-		"<|PROMPT_SECTION_semi-dynamic|>",
+		"<|PROMPT_SECTION_semi-dynamic-1|>",
+		"<|PROMPT_SECTION_semi-dynamic-2|>",
 		"<|PROMPT_SECTION_timeline-open|>",
 		"<|PROMPT_SECTION_dynamic_",
 		"<|SCHEMA|>",

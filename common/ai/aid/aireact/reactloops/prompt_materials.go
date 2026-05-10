@@ -128,43 +128,57 @@ type PromptPrefixMaterials struct {
 // AI_CACHE_SYSTEM 边界. 历史的 AllowToolCall / AllowPlanAndExec /
 // HasLoadCapability 三个能力开关已移除, 由 high-static 模板无条件介绍全部能力,
 // 实际可用性以 SCHEMA enum 为准. TaskInstruction (PERSISTENT 块) 已迁到
-// SemiDynamicData, 与 OutputExample 一起作为 caller-specific 的稳定 prefix.
+// SemiDynamic2Data, 与 OutputExample 一起作为 caller-specific 的稳定 prefix.
 //
 // 关键词: HighStaticData 去变量化, AI_CACHE_SYSTEM 字节稳定, TaskInstruction 迁移
 func (m *PromptPrefixMaterials) HighStaticData() map[string]any {
 	return map[string]any{}
 }
 
-// SemiDynamicData 仅供 semi_dynamic_section.txt 模板消费, 渲染顺序为:
+// SemiDynamic1Data 仅供 semi_dynamic_section_1.txt 模板消费, 渲染顺序为:
 //   - SkillsContext: 已加载的 skills 上下文 (字节稳定)
 //   - RecentToolsCache: CACHE_TOOL_CALL 块 (directly_call_tool routing hint +
 //     最近工具 schema/footer), 用稳定 nonce 渲染, 字节稳定
+//
+// 物理上对应 hijacker 5 段切分中的 user2 (string content, 不打 cc), 与
+// SemiDynamic2Data 一起被 dashscope 视作合并 prefix cache 计算 (cc 锚点落在
+// SemiDynamic2 末尾, prefix 跨过 SemiDynamic1).
+//
+// 关键词: SemiDynamic1Data, Skills Context + RecentToolsCache, P1.1, semi 拆两块
+func (m *PromptPrefixMaterials) SemiDynamic1Data() map[string]any {
+	if m == nil {
+		return map[string]any{}
+	}
+	return map[string]any{
+		"SkillsContext":    m.SkillsContext,
+		"RecentToolsCache": m.RecentToolsCache,
+	}
+}
+
+// SemiDynamic2Data 仅供 semi_dynamic_section_2.txt 模板消费, 渲染顺序为:
 //   - TaskInstruction: caller 注入的 PERSISTENT 指令, caller-specific, 从
 //     high-static 段下沉到此处, 跨同一 caller 的 turn 字节稳定
 //   - Schema: 当前 react loop 的 action schema (字节稳定 across turn)
 //   - OutputExample: 当前 react loop 的输出示例, caller-specific, 不应污染
 //     high-static 段; 紧跟 Schema 之后作为半动态 prefix cache 候选
 //
-// (Tool/Forge/Timeline frozen 已迁出到 FrozenBlock; CACHE_TOOL_CALL 已迁入此段;
-// TaskInstruction 已从 high-static 迁入此段)
+// 物理上对应 hijacker 5 段切分中的 user3 (ephemeral cc), 是 P1.1 三 cache 边界
+// 中最末一对 cc 锚点, dashscope 在此处建立合并 prefix cache.
 //
-// PlanContext 已从此段移出 (曾短暂位于此段, 但因 PE-TASK 子任务切换和
-// EVIDENCE 嵌入 root user input 引发抖动, 进一步迁到 timeline-open 段末尾,
+// PlanContext 已从此段移出 (曾短暂位于 semi-dynamic 段, 但因 PE-TASK 子任务切换
+// 和 EVIDENCE 嵌入 root user input 引发抖动, 进一步迁到 timeline-open 段末尾,
 // 落在所有 cache 边界之外, 见 TimelineOpenData)。
 //
-// 关键词: SemiDynamicData, Skills Context + RecentToolsCache + TaskInstruction +
-//
-//	Schema + OutputExample, PlanContext 已迁出至 timeline-open
-func (m *PromptPrefixMaterials) SemiDynamicData() map[string]any {
+// 关键词: SemiDynamic2Data, TaskInstruction + Schema + OutputExample, P1.1,
+//        AI_CACHE_SEMI2 cc, PlanContext 已迁出至 timeline-open
+func (m *PromptPrefixMaterials) SemiDynamic2Data() map[string]any {
 	if m == nil {
 		return map[string]any{}
 	}
 	return map[string]any{
-		"SkillsContext":    m.SkillsContext,
-		"Schema":           m.Schema,
-		"OutputExample":    m.OutputExample,
-		"TaskInstruction":  m.TaskInstruction,
-		"RecentToolsCache": m.RecentToolsCache,
+		"Schema":          m.Schema,
+		"OutputExample":   m.OutputExample,
+		"TaskInstruction": m.TaskInstruction,
 	}
 }
 
@@ -177,7 +191,7 @@ func (m *PromptPrefixMaterials) SemiDynamicData() map[string]any {
 // PlanContext 历史上曾在此段渲染, 但因仅 PE-TASK 子任务有内容, root task /
 // 普通 ReAct loop 时为空, 这种"有时存在有时不存在"的渲染态会让 frozen-block
 // 段在不同 task 类型下字节内容剧烈抖动, 破坏 AI_CACHE_FROZEN prefix cache 命中.
-// 现已迁到 SemiDynamicData (semi-dynamic 段, AI_CACHE_SEMI 边界包裹), frozen-block
+// 现已迁到 SemiDynamic1/2Data (semi-dynamic 段, AI_CACHE_SEMI / SEMI2 边界包裹), frozen-block
 // 段只保留这三块跨 task 类型字节稳定的内容。
 //
 // 关键词: FrozenBlockData, Tool/Forge/Timeline-frozen,
@@ -248,20 +262,29 @@ func (m *PromptPrefixMaterials) TimelineData() map[string]any {
 }
 
 // PromptPrefixAssemblyResult 是 AssemblePromptPrefix 的输出。新路径下 Prompt
-// 字段按 SYSTEM | FROZEN | SEMI | OPEN 顺序拼接; FrozenBlock / SemiDynamic /
-// TimelineOpen 字段分别保留各段渲染串以便观测/测试断言。
+// 字段按 SYSTEM | FROZEN | SEMI-1 | SEMI-2 | OPEN 顺序拼接;
+// FrozenBlock / SemiDynamic1 / SemiDynamic2 / TimelineOpen 字段分别保留各段
+// 渲染串以便观测/测试断言。
 //
-// HighStatic / SemiDynamic / Timeline 是兼容字段 (用于老路径与单元测试),
-// 在新路径下 SemiDynamic = semi-dynamic 模板完整渲染串 (Skills + RecentToolsCache +
-// TaskInstruction + Schema + OutputExample), Timeline = 旧合并 timeline 渲染
-// (frozen + open 一起)。
+// HighStatic / SemiDynamic1 / SemiDynamic2 / Timeline 是兼容字段 (用于老路径
+// 与单元测试):
+//   - SemiDynamic1 = semi_dynamic_section_1.txt 完整渲染串
+//     (SkillsContext + RecentToolsCache),
+//     被 wrapAICacheSemi 包一层 AI_CACHE_SEMI 边界, 物理上对应 hijacker 5 段切分
+//     中的 user2 (不打 cc).
+//   - SemiDynamic2 = semi_dynamic_section_2.txt 完整渲染串
+//     (TaskInstruction + Schema + OutputExample),
+//     被 wrapAICacheSemi2 包一层 AI_CACHE_SEMI2 边界, 物理上对应 hijacker 5 段切分
+//     中的 user3 (主动打 ephemeral cc), 与 SemiDynamic1 合并算 prefix cache.
+//   - Timeline = 旧合并 timeline 渲染 (frozen + open 一起).
 //
-// 关键词: PromptPrefixAssemblyResult, 4 段拆分, 按稳定性分层
+// 关键词: PromptPrefixAssemblyResult, 5 段拆分, 按稳定性分层, P1.1 三 cache 边界
 type PromptPrefixAssemblyResult struct {
 	Prompt       string
 	HighStatic   string
 	FrozenBlock  string
-	SemiDynamic  string
+	SemiDynamic1 string
+	SemiDynamic2 string
 	TimelineOpen string
 	Timeline     string
 	Sections     []*PromptSectionObservation

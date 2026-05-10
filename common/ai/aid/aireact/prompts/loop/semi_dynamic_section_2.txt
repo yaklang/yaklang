@@ -1,9 +1,4 @@
-{{ if .SkillsContext }}{{ .SkillsContext }}{{ end }}
-{{ if .RecentToolsCache }}
-{{ .RecentToolsCache }}{{ end }}
-{{ if .TaskInstruction }}
-
-<|PERSISTENT|>
+{{ if .TaskInstruction }}<|PERSISTENT|>
 {{ .TaskInstruction }}
 <|PERSISTENT_END|>{{ end }}
 {{ if .Schema }}
