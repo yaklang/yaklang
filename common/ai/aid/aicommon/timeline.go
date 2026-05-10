@@ -44,6 +44,11 @@ type Timeline struct {
 	perDumpContentLimit   int64
 	totalDumpContentLimit int64
 
+	// bucketByteSize 为 GroupByMinutes 子桶的字节预算（渲染后的紧凑 Render 字节）。
+	// 0 表示使用 TimelineDumpDefaultBucketByteSize；负数表示禁用字节切分（仅按时间桶）。
+	// 关键词: bucketByteSize, 字节子桶, prefix cache
+	bucketByteSize int64
+
 	compressing *utils.Once
 }
 
@@ -57,6 +62,11 @@ func (m *Timeline) OrderInsertTs(ts int64, item *TimelineItem) {
 
 // MaxTimelineSaveSize is the maximum size (1.5MB storage limit) for timeline data when saving to database
 const MaxTimelineSaveSize = 1536 * 1024
+
+// TimelineDumpDefaultBucketByteSize 是 Dump / GroupByMinutes 默认的字节子桶上限（16KB）。
+// 用于在同一绝对时间桶内进一步切块，避免短时巨量 tool 输出拖垮单个 open 桶的前缀缓存。
+// 关键词: TimelineDumpDefaultBucketByteSize, 字节子桶默认
+const TimelineDumpDefaultBucketByteSize = 16 * 1024
 
 func (m *Timeline) Save(db *gorm.DB, persistentId string) {
 	if utils.IsNil(m) {
@@ -171,6 +181,7 @@ func (m *Timeline) CopyReducibleTimelineWithMemory() *Timeline {
 		archiveRefs:           m.archiveRefs.Copy(),
 		perDumpContentLimit:   m.perDumpContentLimit,
 		totalDumpContentLimit: m.totalDumpContentLimit,
+		bucketByteSize:        m.bucketByteSize,
 		compressing:           utils.NewOnce(),
 	}
 	return tl
@@ -205,6 +216,7 @@ func (m *Timeline) CreateSubTimeline(ids ...int64) *Timeline {
 		return nil
 	}
 	tl.ai = m.ai
+	tl.bucketByteSize = m.bucketByteSize
 	for _, id := range ids {
 		ts, ok := m.idToTs.Get(id)
 		if !ok {
@@ -271,6 +283,30 @@ func (m *Timeline) ExtraMetaInfo() string {
 
 func (m *Timeline) SetTimelineContentLimit(contentSize int64) {
 	m.totalDumpContentLimit = contentSize
+}
+
+// SetTimelineBucketByteSize 设置 GroupByMinutes 在同一时间桶内的字节子桶预算。
+// n > 0 时使用该值；n == 0 时恢复默认（TimelineDumpDefaultBucketByteSize）；
+// n < 0 时禁用字节切分，仅按分钟时间桶分组（与旧行为一致）。
+// 关键词: SetTimelineBucketByteSize, 字节子桶配置
+func (m *Timeline) SetTimelineBucketByteSize(n int64) {
+	if m == nil {
+		return
+	}
+	m.bucketByteSize = n
+}
+
+func (m *Timeline) getEffectiveBucketByteSize() int64 {
+	if m == nil {
+		return TimelineDumpDefaultBucketByteSize
+	}
+	if m.bucketByteSize < 0 {
+		return -1
+	}
+	if m.bucketByteSize == 0 {
+		return TimelineDumpDefaultBucketByteSize
+	}
+	return m.bucketByteSize
 }
 
 func (m *Timeline) setAICaller(ai AICaller) {
@@ -619,6 +655,8 @@ const TimelineDumpDefaultAITagName = "TIMELINE"
 //	    )
 //
 // 仅包含 reducer block + interval block，不包含 archive block（archive 暂时不展示在 Dump 中）。
+// GroupByMinutes 在 3 分钟时间桶之上叠加默认字节子桶（见 TimelineDumpDefaultBucketByteSize /
+// SetTimelineBucketByteSize），短时可切多个 interval 子块以保留前缀缓存。
 //
 // 输出在含混合 frozen+open 的场景下会自动加上
 // <|AI_CACHE_FROZEN_semi-dynamic|>...<|AI_CACHE_FROZEN_END_semi-dynamic|>
@@ -630,7 +668,8 @@ const TimelineDumpDefaultAITagName = "TIMELINE"
 // 让 hijacker 走 2 段拼接 + aibalance 单 cc 兜底。
 //
 // 关键词: Timeline.Dump, GroupByMinutes 别名, aitag 包裹, 前缀缓存,
-//        AI_CACHE_FROZEN 边界, hijacker 切割锚点, §7.7.7
+//
+//	AI_CACHE_FROZEN 边界, hijacker 切割锚点, §7.7.7
 func (m *Timeline) Dump() string {
 	if m == nil {
 		return ""

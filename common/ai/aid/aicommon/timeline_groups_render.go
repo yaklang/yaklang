@@ -14,15 +14,19 @@ import (
 	"github.com/yaklang/yaklang/common/utils/linktable"
 )
 
-// TimelineIntervalBlock 表示一个绝对时间对齐的固定时间桶
+// TimelineIntervalBlock 表示一个绝对时间对齐的固定时间桶（可含同一日历桶内的字节子桶）
 // 桶起点对齐到 N 分钟边界，例如 N=3 时桶为 [10:00,10:03)、[10:03,10:06)
 // 这种对齐方式让相同时间永远落入相同桶，从而保证渲染前缀字节级稳定，便于 LLM 前缀缓存命中
+// SeqInBucket / TotalInBucket: 同一时间日历桶内按字节预算切出的子桶序号；仅 1 个子桶时 nonce 不带 s 后缀。
+// 关键词: TimelineIntervalBlock, 字节子桶, SeqInBucket
 type TimelineIntervalBlock struct {
 	BucketStart     time.Time
 	BucketEnd       time.Time // exclusive
 	IntervalMinutes int
 	Items           []*TimelineItem // 按 id 升序，已剔除 deleted
-	Open            bool            // 仅最末一个产生 item 的桶为 true
+	Open            bool            // 仅整条 timeline 最末一个 interval 子桶为 true
+	SeqInBucket     int             // 同一时间日历桶内子桶序号，从 0 起
+	TotalInBucket   int             // 该日历桶内子桶总数；1 表示未拆子桶
 }
 
 // TimelineIntervalBlocks 是按时间顺序排列的 block 切片
@@ -87,83 +91,116 @@ func (g *TimelineGroups) IntervalMinutes() int {
 	return g.intervalMinutes
 }
 
-// GroupByMinutes 按 N 分钟时间桶对当前 timeline 中的活跃条目分组
-// 桶按绝对时间边界对齐（例如 N=3 时起点是 :00、:03、:06...）
-// minutes <= 0 时返回空 *TimelineGroups（GetBlocks 为 nil）
-// 该方法不修改 timeline 任何字段，纯读取
-// 关键词: GroupByMinutes, 时间桶分组, 缓存友好渲染
+// GroupByMinutes 等价于 GroupByMinutesAndBytes(minutes, m.getEffectiveBucketByteSize())：
+// 在绝对时间桶之上叠加默认字节子桶（除非 SetTimelineBucketByteSize 为负关闭）。
+// 关键词: GroupByMinutes, GroupByMinutesAndBytes 别名
 func (m *Timeline) GroupByMinutes(minutes int) *TimelineGroups {
 	if m == nil || minutes <= 0 {
 		return &TimelineGroups{intervalMinutes: 0}
 	}
-	if m.idToTimelineItem == nil || m.idToTimelineItem.Len() == 0 {
-		return &TimelineGroups{intervalMinutes: minutes}
+	return m.GroupByMinutesAndBytes(minutes, m.getEffectiveBucketByteSize())
+}
+
+// GroupByMinutesAndBytes 按 N 分钟绝对时间桶分组，并在同一日历桶内按 bytesPerBucket 切分子桶。
+// bytesPerBucket < 0 时关闭字节切分（仅按时间桶一块；nonce 与旧版完全一致）。
+// bytesPerBucket == 0 时使用 TimelineDumpDefaultBucketByteSize 并启用切分。
+// 该方法不修改 timeline 任何字段，纯读取。
+// 关键词: GroupByMinutesAndBytes, 字节子桶, 时间桶
+func (m *Timeline) GroupByMinutesAndBytes(minutes int, bytesPerBucket int64) *TimelineGroups {
+	if m == nil || minutes <= 0 {
+		return &TimelineGroups{intervalMinutes: 0}
+	}
+	var budget int64
+	var byteSplit bool
+	switch {
+	case bytesPerBucket < 0:
+		byteSplit = false
+	case bytesPerBucket == 0:
+		byteSplit = true
+		budget = TimelineDumpDefaultBucketByteSize
+	default:
+		byteSplit = true
+		budget = bytesPerBucket
 	}
 
-	type bucketKey struct {
-		startUnix int64
+	if m.idToTimelineItem == nil || m.idToTimelineItem.Len() == 0 {
+		return m.collectReducerGroups(minutes, nil)
 	}
-	bucketIndex := make(map[bucketKey]*TimelineIntervalBlock)
-	var orderedBuckets []*TimelineIntervalBlock
 
 	intervalDur := time.Duration(minutes) * time.Minute
 
-	m.idToTimelineItem.ForEach(func(id int64, item *TimelineItem) bool {
-		if item == nil {
-			return true
+	// 按 id 升序把条目归入日历时间桶，保证桶内 id 升序且日历桶按时间轴邻接
+	type calBucket struct {
+		start, end time.Time
+		items      []*TimelineItem
+	}
+	nanoOrder := make([]int64, 0)
+	nanoToCal := make(map[int64]*calBucket)
+
+	ids := m.idToTimelineItem.Keys()
+	for _, id := range ids {
+		item, ok := m.idToTimelineItem.Get(id)
+		if !ok || item == nil || item.deleted {
+			continue
 		}
-		if item.deleted {
-			return true
-		}
-		// 取时间戳：优先 createdAt（保留时区信息），回退 idToTs 毫秒戳
-		// 不优先用 idToTs 是因为 time.Unix 会丢失原 location，导致跨时区分桶不一致
 		var t time.Time
 		if !item.createdAt.IsZero() {
 			t = item.createdAt
-		} else if ts, ok := m.idToTs.Get(id); ok && ts > 0 {
+		} else if ts, ok2 := m.idToTs.Get(id); ok2 && ts > 0 {
 			t = time.Unix(0, ts*int64(time.Millisecond))
 		} else {
-			return true
+			continue
 		}
-
-		// 对齐到 N 分钟绝对边界
 		bucketStart := alignToBucket(t, minutes)
-		key := bucketKey{startUnix: bucketStart.UnixNano()}
-		blk, ok := bucketIndex[key]
+		nano := bucketStart.UnixNano()
+		cb, ok := nanoToCal[nano]
 		if !ok {
-			blk = &TimelineIntervalBlock{
-				BucketStart:     bucketStart,
-				BucketEnd:       bucketStart.Add(intervalDur),
-				IntervalMinutes: minutes,
-				Items:           nil,
-				Open:            false,
+			cb = &calBucket{
+				start: bucketStart,
+				end:   bucketStart.Add(intervalDur),
+				items: nil,
 			}
-			bucketIndex[key] = blk
-			orderedBuckets = append(orderedBuckets, blk)
+			nanoToCal[nano] = cb
+			nanoOrder = append(nanoOrder, nano)
 		}
-		blk.Items = append(blk.Items, item)
-		return true
-	})
-
-	// 按 BucketStart 升序排序
-	sort.SliceStable(orderedBuckets, func(i, j int) bool {
-		return orderedBuckets[i].BucketStart.Before(orderedBuckets[j].BucketStart)
-	})
-
-	// 每个桶内按 id 升序
-	for _, blk := range orderedBuckets {
-		sort.SliceStable(blk.Items, func(i, j int) bool {
-			return blk.Items[i].GetID() < blk.Items[j].GetID()
-		})
+		cb.items = append(cb.items, item)
 	}
 
-	// 标记最末一个桶为 Open
+	sort.SliceStable(nanoOrder, func(i, j int) bool {
+		return nanoOrder[i] < nanoOrder[j]
+	})
+
+	var orderedBuckets []*TimelineIntervalBlock
+	for _, nano := range nanoOrder {
+		cb := nanoToCal[nano]
+		if cb == nil || len(cb.items) == 0 {
+			continue
+		}
+		if byteSplit {
+			subs := packTimelineIntervalSubBlocks(cb.start, cb.end, minutes, cb.items, budget)
+			orderedBuckets = append(orderedBuckets, subs...)
+		} else {
+			orderedBuckets = append(orderedBuckets, &TimelineIntervalBlock{
+				BucketStart:     cb.start,
+				BucketEnd:       cb.end,
+				IntervalMinutes: minutes,
+				Items:           cb.items,
+				Open:            false,
+				SeqInBucket:     0,
+				TotalInBucket:   1,
+			})
+		}
+	}
+
 	if len(orderedBuckets) > 0 {
 		orderedBuckets[len(orderedBuckets)-1].Open = true
 	}
 
-	// 收集 reducer blocks（已压缩条目）
-	// 关键词: GroupByMinutes, reducerBlocks 填充, reducer 渲染
+	return m.collectReducerGroups(minutes, orderedBuckets)
+}
+
+// collectReducerGroups 组装 reducerBlocks + interval blocks；orderedBuckets 可为 nil（仅 reducer）
+func (m *Timeline) collectReducerGroups(minutes int, orderedBuckets []*TimelineIntervalBlock) *TimelineGroups {
 	var reducerBlocks []*TimelineReducerBlock
 	if m.reducers != nil && m.reducers.Len() > 0 {
 		m.reducers.ForEach(func(reducerKeyID int64, lt *linktable.LinkTable[string]) bool {
@@ -187,17 +224,124 @@ func (m *Timeline) GroupByMinutes(minutes int) *TimelineGroups {
 			})
 			return true
 		})
-		// 按 ReducerKeyID 升序排序，保证渲染顺序稳定
 		sort.SliceStable(reducerBlocks, func(i, j int) bool {
 			return reducerBlocks[i].ReducerKeyID < reducerBlocks[j].ReducerKeyID
 		})
 	}
-
 	return &TimelineGroups{
 		intervalMinutes: minutes,
 		blocks:          TimelineIntervalBlocks(orderedBuckets),
 		reducerBlocks:   reducerBlocks,
 	}
+}
+
+// packTimelineIntervalSubBlocks 在同一日历时间桶内按字节预算切分为多个 TimelineIntervalBlock。
+// 关键词: packTimelineIntervalSubBlocks, 字节子桶打包
+func packTimelineIntervalSubBlocks(bs, be time.Time, intervalMinutes int, items []*TimelineItem, bytesPerBucket int64) []*TimelineIntervalBlock {
+	if len(items) == 0 {
+		return nil
+	}
+	hl := intervalBlockHeaderByteLen(bs, be, intervalMinutes)
+	var out []*TimelineIntervalBlock
+	var cur []*TimelineItem
+	var curBytes int
+
+	flush := func() {
+		if len(cur) == 0 {
+			return
+		}
+		blk := &TimelineIntervalBlock{
+			BucketStart:     bs,
+			BucketEnd:       be,
+			IntervalMinutes: intervalMinutes,
+			Items:           append([]*TimelineItem(nil), cur...),
+			Open:            false,
+		}
+		out = append(out, blk)
+		cur = nil
+		curBytes = 0
+	}
+
+	for _, item := range items {
+		if item == nil || item.deleted {
+			continue
+		}
+		entFirst := timelineEntryAppendByteLen(item, bs, true)
+		entCont := timelineEntryAppendByteLen(item, bs, false)
+
+		if len(cur) == 0 {
+			cur = []*TimelineItem{item}
+			curBytes = hl + entFirst
+			continue
+		}
+		if int64(curBytes+entCont) > bytesPerBucket {
+			flush()
+			cur = []*TimelineItem{item}
+			curBytes = hl + timelineEntryAppendByteLen(item, bs, true)
+			continue
+		}
+		cur = append(cur, item)
+		curBytes += entCont
+	}
+	flush()
+
+	n := len(out)
+	for i := range out {
+		out[i].SeqInBucket = i
+		out[i].TotalInBucket = n
+	}
+	return out
+}
+
+func intervalBlockHeaderByteLen(bucketStart, bucketEnd time.Time, intervalMinutes int) int {
+	s := fmt.Sprintf("# bucket=%s-%s interval=%dm\n",
+		bucketStart.Format(utils.DefaultTimeFormat3),
+		bucketEnd.Format("15:04:05"),
+		intervalMinutes,
+	)
+	return len(s)
+}
+
+// timelineEntryAppendByteLen 估算 Render 中单个 entry 的字节贡献（与 TimelineIntervalBlock.Render 对齐）。
+// isFirstEntry 表示当前子桶内是否为第一条 entry（无前置换行）。
+// 关键词: timelineEntryAppendByteLen, 字节估算
+func timelineEntryAppendByteLen(item *TimelineItem, bucketStart time.Time, isFirstEntry bool) int {
+	if item == nil || item.deleted {
+		return 0
+	}
+	var n int
+	if !isFirstEntry {
+		n++
+	}
+	var ts time.Time
+	if !item.createdAt.IsZero() {
+		ts = item.createdAt
+	} else {
+		ts = bucketStart
+	}
+	hh, mm, ss := ts.Clock()
+	header := fmt.Sprintf("%02d:%02d:%02d [%s]", hh, mm, ss, renderItemTypeVerbose(item))
+	n += len(header)
+	content := selectShrunkContent(item)
+	if content == "" {
+		return n
+	}
+	var prevBlank bool
+	for _, line := range utils.ParseStringToRawLines(content) {
+		line = strings.TrimRight(line, " \t\r")
+		if strings.TrimSpace(line) == "" {
+			if prevBlank {
+				continue
+			}
+			prevBlank = true
+			n++
+			continue
+		}
+		prevBlank = false
+		n++
+		n += len(line)
+	}
+	return n
 }
 
 // alignToBucket 将 t 对齐到 N 分钟绝对边界
@@ -285,15 +429,20 @@ func (b *TimelineIntervalBlock) Render() string {
 }
 
 // StableNonce 基于桶绝对起点与 interval 派生的稳定 nonce
-// 同一桶（相同 BucketStart + IntervalMinutes）永远产生相同 nonce
+// 同一子桶（相同 BucketStart + IntervalMinutes + SeqInBucket）永远产生相同 nonce
 // 不含下划线，符合 aitag 标签规范（aitag 以最后一个 _ 区分 tagName 与 nonce）
+// 多子桶时附加 s{seq}，与旧版单桶 b{N}t{sec} 在 total==1 时完全兼容
 // 关键词: TimelineIntervalBlock.StableNonce, aitag 兼容 nonce, 缓存稳定
 func (b *TimelineIntervalBlock) StableNonce() string {
 	if b == nil {
 		return ""
 	}
 	// 用秒级 unix 时间足够区分（桶最小粒度 1 分钟），加 interval 避免不同 interval 重合
-	return fmt.Sprintf("b%dt%d", b.IntervalMinutes, b.BucketStart.Unix())
+	base := fmt.Sprintf("b%dt%d", b.IntervalMinutes, b.BucketStart.Unix())
+	if b.TotalInBucket > 1 {
+		return fmt.Sprintf("%ss%d", base, b.SeqInBucket)
+	}
+	return base
 }
 
 // StableKey 返回当前 block 的稳定哈希（基于桶范围 + 渲染内容）
@@ -306,10 +455,12 @@ func (b *TimelineIntervalBlock) StableKey() string {
 		return ""
 	}
 	h := sha256.New()
-	h.Write([]byte(fmt.Sprintf("interval=%d|start=%d|end=%d|content=",
+	h.Write([]byte(fmt.Sprintf("interval=%d|start=%d|end=%d|seq=%d|tot=%d|content=",
 		b.IntervalMinutes,
 		b.BucketStart.UnixNano(),
 		b.BucketEnd.UnixNano(),
+		b.SeqInBucket,
+		b.TotalInBucket,
 	)))
 	h.Write([]byte(b.Render()))
 	return hex.EncodeToString(h.Sum(nil))[:16]
@@ -577,7 +728,8 @@ const (
 // 包互不 import 各自定义本地副本).
 //
 // 关键词: SemiDynamicCacheBoundaryTagName, AI_CACHE_SEMI, semi cache boundary,
-//        4 段切分, 双 cc, P1
+//
+//	4 段切分, 双 cc, P1
 const (
 	SemiDynamicCacheBoundaryTagName = "AI_CACHE_SEMI"
 	SemiDynamicCacheBoundaryNonce   = "semi"
@@ -663,7 +815,8 @@ func (bs TimelineRenderableBlocks) Render(aitagName string) string {
 // TimelineFrozenBoundaryNonce。
 //
 // 关键词: TimelineRenderableBlocks.RenderWithFrozenBoundary, AI_CACHE_FROZEN,
-//        frozen open 边界标签, hijacker 切割锚点, 前缀缓存
+//
+//	frozen open 边界标签, hijacker 切割锚点, 前缀缓存
 func (bs TimelineRenderableBlocks) RenderWithFrozenBoundary(aitagName, frozenTagName, frozenNonce string) string {
 	if len(bs) == 0 {
 		return ""
