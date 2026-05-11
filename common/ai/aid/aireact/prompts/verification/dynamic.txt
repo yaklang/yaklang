@@ -1,0 +1,36 @@
+{{ if .AutoContext }}{{ .AutoContext }}{{ end }}
+
+{{ if .EnhanceData }}<|ENHANCE_DATA_{{ .Nonce }}|>
+# Knowledge Enhance 帮助判断的增强信息
+{{- range .EnhanceData }}
+{{ . }}
+
+{{- end }}
+<|ENHANCE_DATA_END_{{ .Nonce }}|>
+{{ end }}
+
+<|USER_ORIGINAL_QUERY_{{ .Nonce }}|>
+{{ .UserQuery }}
+<|USER_ORIGINAL_QUERY_END_{{ .Nonce }}|>
+
+<|INPUT_{{ .Nonce }}|>{{ if .IsToolCall }}
+# Tool Execution Context
+Tool executed: {{ .Payload }}{{ else }}
+User Raw INPUT/ReAction Thought/Observation:
+{{ .Payload }}
+{{ end }}<|INPUT_END_{{ .Nonce }}|>
+
+{{ if .TodoSnapshot }}
+# TODO:
+<|TODO_SNAPSHOT_{{ .Nonce }}|>
+{{ .TodoSnapshot }}
+<|TODO_SNAPSHOT_END_{{ .Nonce }}|>
+{{ end }}{{ if gt .IterationIndex 0 }}
+## 迭代上下文
+当前子任务已执行 **{{ .IterationIndex }}** 次迭代（最大 {{ .MaxIterations }} 次）。
+{{ if gt .IterationIndex 5 }}
+**警告：当前子任务迭代次数已超过 5 次。请重点检查：**
+1. 当前子任务的目标是否实际上已经完成（包括否定结果）？
+2. Agent 是否已经漂移到其他子任务的领域？如果 INPUT 中的动作与 CURRENT_TASK 目标不相关，应判定当前子任务完成。
+3. 不要因为"漏洞未成功利用"就认为"验证类任务"未完成——"已验证不存在"也是完成。
+{{ end }}{{ end }}

@@ -48,13 +48,13 @@ func newSplitTestReact(t *testing.T) *ReAct {
 	return react
 }
 
-// TestSplit_VerificationPrompt_FourSections 验证 verification.txt 在重构后:
-//   - 至少切出 high-static 和 dynamic 两段
+// TestSplit_VerificationPrompt_StableSections 验证 verification prompt 在重构后:
+//   - 至少切出 high-static / semi-dynamic-1 / semi-dynamic-2 / timeline-open / dynamic
 //   - 不出现 raw/noise chunk
-//   - 跨调用下 high-static 段 hash 稳定
+//   - 跨调用下 high-static / semi-dynamic-1 / semi-dynamic-2 段 hash 稳定
 //
-// 关键词: P0-A5, verification.txt 4 段断言, aicache.Split
-func TestSplit_VerificationPrompt_FourSections(t *testing.T) {
+// 关键词: verification prompt split, semi-dynamic-1, semi-dynamic-2, aicache.Split
+func TestSplit_VerificationPrompt_StableSections(t *testing.T) {
 	react := newSplitTestReact(t)
 
 	prompt1, _, err := react.promptManager.GenerateVerificationPrompt(
@@ -70,11 +70,18 @@ func TestSplit_VerificationPrompt_FourSections(t *testing.T) {
 	sec2 := chunkSections(t, prompt2)
 
 	require.NotEmpty(t, sec1[aicache.SectionHighStatic], "verification prompt must expose high-static chunk")
+	require.NotEmpty(t, sec1[aicache.SectionSemiDynamic1], "verification prompt must expose semi-dynamic-1 chunk")
+	require.NotEmpty(t, sec1[aicache.SectionSemiDynamic2], "verification prompt must expose semi-dynamic-2 chunk")
+	require.NotEmpty(t, sec1[aicache.SectionTimelineOpen], "verification prompt must expose timeline-open chunk")
 	require.NotEmpty(t, sec1[aicache.SectionDynamic], "verification prompt must expose dynamic chunk")
 	require.Empty(t, sec1[aicache.SectionRaw], "verification prompt should not produce raw/noise chunk; rendered output:\n%s", prompt1)
 
 	require.Equal(t, sec1[aicache.SectionHighStatic][0].Hash, sec2[aicache.SectionHighStatic][0].Hash,
 		"high-static hash must be byte-stable across calls")
+	require.Equal(t, sec1[aicache.SectionSemiDynamic1][0].Hash, sec2[aicache.SectionSemiDynamic1][0].Hash,
+		"semi-dynamic-1 hash must be byte-stable across calls")
+	require.Equal(t, sec1[aicache.SectionSemiDynamic2][0].Hash, sec2[aicache.SectionSemiDynamic2][0].Hash,
+		"semi-dynamic-2 hash must be byte-stable across calls")
 }
 
 // TestSplit_IntervalReviewPrompt_FourSections 验证 interval-review.txt 在重构后:

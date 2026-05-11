@@ -33,8 +33,14 @@ var toolParamsInstructionText string
 //go:embed prompts/tool-params/dynamic.txt
 var toolParamsDynamicTemplate string
 
-//go:embed prompts/verification/verification.txt
-var verificationPromptTemplate string
+//go:embed prompts/verification/instruction.txt
+var verificationInstructionText string
+
+//go:embed prompts/verification/output_example.txt
+var verificationOutputExampleText string
+
+//go:embed prompts/verification/dynamic.txt
+var verificationDynamicTemplate string
 
 //go:embed prompts/verification/verification.json
 var verificationSchemaJSON string
@@ -160,31 +166,6 @@ type ToolParamsPromptData struct {
 	DynamicContext   string
 	Nonce            string   // Nonce for AITAG format
 	ParamNames       []string // List of parameter names for AITAG hints
-}
-
-// VerificationPromptData contains data for verification prompt
-//
-// 关键词: VerificationPromptData, aicache 4 段切分, TimelineFrozen, TimelineOpen
-//
-// Timeline 字段保留以保证向后兼容; 模板内部已切换到使用 TimelineFrozen +
-// TimelineOpen 两个字段, 让 verification prompt 也按 5 段稳定性分层 (high-static
-// / semi-dynamic / frozen-block / timeline-open / dynamic) 走 aicache splitter,
-// 与 React 主 loop 的 buildTaggedPromptSections 输出对齐。
-type VerificationPromptData struct {
-	Nonce          string
-	OriginalQuery  string
-	IsToolCall     bool
-	Payload        string
-	Timeline       string // 兼容字段: frozen + open 拼接, 老观测路径用
-	TimelineFrozen string // 渐稳定前缀, 进 AI_CACHE_FROZEN 块
-	TimelineOpen   string // 末段 + midterm, 进 PROMPT_SECTION_timeline-open
-	TodoSnapshot   string
-	Language       string
-	Schema         string
-	DynamicContext string
-	EnhanceData    []string
-	IterationIndex int
-	MaxIterations  int
 }
 
 // AIReviewPromptData contains data for AI tool call review prompt
@@ -450,45 +431,66 @@ func (pm *PromptManager) GenerateToolParamsPromptWithMeta(tool *aitool.Tool) (*T
 	}, nil
 }
 
-// GenerateVerificationPrompt generates verification prompt using template.
+// GenerateVerificationPrompt generates verification prompt using shared prompt
+// prefix assembly.
 //
-// aicache 命中率优化 (P0-A1):
-//   - 模板已重构为 5 段稳定性分层结构 (high-static / semi-dynamic /
-//     frozen-block / timeline-open / dynamic)
-//   - Timeline 拆成 TimelineFrozen + TimelineOpen 两段, frozen 前缀与
-//     最末 interval 分别落到不同的 PROMPT_SECTION 包装中, 让 splitter
-//     能按 chunk 分别命中缓存
+// aicache 命中率优化:
+//   - 复用 preparePromptPrefixMaterials + assemblePromptWithDynamicSection,
+//     与 directly-answer / tool-params 走同一套前缀拼装路径
+//   - verification 专属规则与 few-shot 落在 semi-dynamic-2
+//     (TaskInstruction + Schema + OutputExample)
+//   - OriginalQuery / INPUT / TODO 快照 / 迭代上下文 / EnhanceData 留在 dynamic
+//     尾段, 避免污染上游 prefix cache
 //
-// 关键词: GenerateVerificationPrompt, aicache 4 段切分, TimelineFrozen, TimelineOpen
+// 关键词: GenerateVerificationPrompt, preparePromptPrefixMaterials,
+//
+//	assemblePromptWithDynamicSection, verification semi-dynamic-2
 func (pm *PromptManager) GenerateVerificationPrompt(originalQuery string, isToolResult bool, payload string, enhanceData ...string) (string, string, error) {
-	nonce := nonce()
-	data := &VerificationPromptData{
-		Nonce:          nonce,
-		OriginalQuery:  originalQuery,
-		IsToolCall:     isToolResult,
-		Payload:        payload,
-		TodoSnapshot:   pm.react.RenderVerificationTodoSnapshot(),
-		Language:       pm.react.config.GetLanguage(),
-		Schema:         verificationSchemaJSON,
-		DynamicContext: pm.DynamicContextWithNonce(nonce),
-		EnhanceData:    enhanceData,
+	nonceString := nonce()
+	base, prefixMaterials, err := pm.preparePromptPrefixMaterials(nil, &reactloops.LoopPromptAssemblyInput{
+		Nonce:  nonceString,
+		Schema: verificationSchemaJSON,
+	})
+	if err != nil {
+		return "", "", err
 	}
+	prefixMaterials.AllowToolCall = false
+	prefixMaterials.AllowPlanAndExec = false
+	prefixMaterials.HasLoadCapability = false
+	prefixMaterials.TaskInstruction = strings.TrimSpace(verificationInstructionText)
+	prefixMaterials.OutputExample = strings.TrimSpace(verificationOutputExampleText)
+	prefixMaterials.ToolInventory = false
+	prefixMaterials.ToolsCount = 0
+	prefixMaterials.TopToolsCount = 0
+	prefixMaterials.TopTools = nil
+	prefixMaterials.HasMoreTools = false
+	prefixMaterials.ForgeInventory = false
+	prefixMaterials.AIForgeList = ""
+	prefixMaterials.SkillsContext = ""
+	prefixMaterials.RecentToolsCache = ""
 
+	dynamicData := pm.buildLoopPromptSectionData(base, &reactloops.LoopPromptAssemblyInput{
+		Nonce:     nonceString,
+		UserQuery: originalQuery,
+	})
+	dynamicData["IsToolCall"] = isToolResult
+	dynamicData["Payload"] = payload
+	dynamicData["TodoSnapshot"] = pm.react.RenderVerificationTodoSnapshot()
+	dynamicData["EnhanceData"] = enhanceData
+	dynamicData["IterationIndex"] = 0
+	dynamicData["MaxIterations"] = 0
 	if currentLoop := pm.react.GetCurrentLoop(); currentLoop != nil {
-		data.IterationIndex = currentLoop.GetCurrentIterationIndex()
-		data.MaxIterations = currentLoop.GetMaxIterations()
+		dynamicData["IterationIndex"] = currentLoop.GetCurrentIterationIndex()
+		dynamicData["MaxIterations"] = currentLoop.GetMaxIterations()
 	}
 
-	// 同时填充 frozen / open 两段 timeline 以及 legacy Timeline 字段。
-	// 模板内部只读 frozen + open; Timeline 字段保留兼容老调用站点。
-	// 关键词: timeline frozen/open 双段填充, aicache 段稳定哈希
-	timeline := pm.react.config.GetTimeline()
-	data.TimelineFrozen = buildTimelineFrozenForPrompt(timeline)
-	data.TimelineOpen = buildTimelineOpenWithMidtermForPrompt(pm.react, timeline)
-	data.Timeline = pm.timelineDumpForPrompt()
-
-	promptResult, err := pm.executeTemplate("verification", verificationPromptTemplate, data)
-	return promptResult, nonce, err
+	prompt, err := pm.assemblePromptWithDynamicSection(
+		prefixMaterials,
+		"verification-dynamic",
+		verificationDynamicTemplate,
+		dynamicData,
+	)
+	return prompt, nonceString, err
 }
 
 // GenerateAIReviewPrompt generates AI tool call review prompt using template.

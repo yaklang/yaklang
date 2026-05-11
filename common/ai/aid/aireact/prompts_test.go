@@ -849,6 +849,45 @@ func TestPromptManager_AIForgeList(t *testing.T) {
 	t.Logf("Successfully verified AI Forge List contains hostscan forge")
 }
 
+func TestPromptManager_GenerateVerificationPrompt_UsesPromptSections(t *testing.T) {
+	react, err := NewTestReAct(
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "test"}}`))
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create ReAct instance: %v", err)
+	}
+
+	prompt, nonce, err := react.promptManager.GenerateVerificationPrompt(
+		"请验证当前子任务是否完成",
+		true,
+		"tool executed: verify target",
+		"extra verification hint",
+	)
+	if err != nil {
+		t.Fatalf("GenerateVerificationPrompt failed: %v", err)
+	}
+
+	if !utils.MatchAllOfSubString(prompt,
+		"<|AI_CACHE_SYSTEM_high-static|>",
+		"<|PROMPT_SECTION_semi-dynamic-1|>",
+		"<|PROMPT_SECTION_semi-dynamic-2|>",
+		"<|PROMPT_SECTION_timeline-open|>",
+		"<|PROMPT_SECTION_dynamic_"+nonce+"|>",
+		"<|SCHEMA|>",
+		"<|USER_ORIGINAL_QUERY_"+nonce+"|>",
+		"<|INPUT_"+nonce+"|>",
+		"<|TODO_SNAPSHOT_"+nonce+"|>",
+		"<|ENHANCE_DATA_"+nonce+"|>",
+	) {
+		t.Fatalf("verification prompt should be composed by prompt sections. Got:\n%s", prompt)
+	}
+}
+
 func TestGenerateVerificationPrompt_RendersTodoSnapshot(t *testing.T) {
 	react, err := NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
