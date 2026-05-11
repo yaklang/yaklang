@@ -4,13 +4,16 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"gopkg.in/yaml.v3"
 )
@@ -298,4 +301,94 @@ func TestLoadProvidersFromDatabase(t *testing.T) {
 
 	// 清理测试数据
 	db.Exec("DELETE FROM ai_providers WHERE wrapper_name LIKE 'test-load-%'")
+}
+
+// TestLoadProvidersFromDatabase_ClearsRemovedWrapper verifies that reloading
+// replaces the entire Models/Entrypoints maps so deleted wrappers vanish and
+// stray in-memory-only keys are dropped.
+func TestLoadProvidersFromDatabase_ClearsRemovedWrapper(t *testing.T) {
+	db := GetDB()
+	wrapperA := "test-clear-wrapper-a"
+	wrapperB := "test-clear-wrapper-b"
+	ghost := "test-clear-ghost-in-memory"
+	db.Exec("DELETE FROM ai_providers WHERE wrapper_name IN (?,?,?)", wrapperA, wrapperB, ghost)
+
+	pA, err := RegisterAiProvider(wrapperA, "gpt-4", "openai", "https://api.openai.com", "key-a-clear", false)
+	require.NoError(t, err)
+	pB, err := RegisterAiProvider(wrapperB, "gpt-4", "openai", "https://api.openai.com", "key-b-clear", false)
+	require.NoError(t, err)
+
+	cfg := NewServerConfig()
+	stale := &Provider{
+		ModelName: "x", TypeName: "openai",
+		DbProvider: &schema.AiProvider{WrapperName: ghost, IsHealthy: true, LastLatency: 100},
+	}
+	cfg.Models.models[ghost] = []*Provider{stale}
+	cfg.Entrypoints.providers[ghost] = []*Provider{stale}
+
+	err = LoadProvidersFromDatabase(cfg)
+	require.NoError(t, err)
+
+	_, okGhost := cfg.Entrypoints.providers[ghost]
+	assert.False(t, okGhost, "in-memory-only ghost wrapper should be dropped on reload")
+	_, okA := cfg.Entrypoints.providers[wrapperA]
+	_, okB := cfg.Entrypoints.providers[wrapperB]
+	assert.True(t, okA && okB, "registered wrappers should be present")
+
+	require.NoError(t, DeleteAiProviderByID(pB.ID))
+	err = LoadProvidersFromDatabase(cfg)
+	require.NoError(t, err)
+
+	_, okBAfter := cfg.Entrypoints.providers[wrapperB]
+	assert.False(t, okBAfter, "wrapper B should disappear when its last DB row is deleted")
+	_, okAAfter := cfg.Entrypoints.providers[wrapperA]
+	assert.True(t, okAAfter, "wrapper A should remain")
+	_, okModelsB := cfg.Models.Get(wrapperB)
+	assert.False(t, okModelsB)
+
+	_ = pA
+	db.Exec("DELETE FROM ai_providers WHERE wrapper_name IN (?,?,?)", wrapperA, wrapperB, ghost)
+}
+
+// TestHandleDeleteProvider_ReloadsInMemory verifies single-row delete triggers
+// LoadProvidersFromDatabase so Entrypoints no longer serves the removed wrapper.
+func TestHandleDeleteProvider_ReloadsInMemory(t *testing.T) {
+	db := GetDB()
+	wrapper := "test-del-reload-wrapper"
+	db.Exec("DELETE FROM ai_providers WHERE wrapper_name = ?", wrapper)
+
+	p, err := RegisterAiProvider(wrapper, "gpt-4", "openai", "https://api.openai.com", "key-del-reload", false)
+	require.NoError(t, err)
+
+	cfg := NewServerConfig()
+	cfg.AuthMiddleware = nil
+	cfg.AdminPassword = "test-del-reload-secret"
+	require.NoError(t, LoadProvidersFromDatabase(cfg))
+	_, ok := cfg.Entrypoints.providers[wrapper]
+	require.True(t, ok, "wrapper should be loaded before delete")
+
+	client, srv := net.Pipe()
+	defer client.Close()
+	go func() {
+		path := fmt.Sprintf("/portal/delete-provider/%d", p.ID)
+		req, err := http.NewRequest(http.MethodDelete, "http://127.0.0.1"+path+"?password=test-del-reload-secret", nil)
+		if err != nil {
+			t.Error(err)
+			srv.Close()
+			return
+		}
+		cfg.handleDeleteProvider(srv, req, path)
+		srv.Close()
+	}()
+
+	buf := make([]byte, 8192)
+	_ = client.SetReadDeadline(time.Now().Add(5 * time.Second))
+	n, _ := client.Read(buf)
+	resp := string(buf[:n])
+	assert.Contains(t, resp, "200 OK", "delete should succeed: %s", resp)
+
+	_, okAfter := cfg.Entrypoints.providers[wrapper]
+	assert.False(t, okAfter, "wrapper should be removed from memory after handleDeleteProvider")
+
+	db.Exec("DELETE FROM ai_providers WHERE wrapper_name = ?", wrapper)
 }

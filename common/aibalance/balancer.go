@@ -272,24 +272,23 @@ func LoadProvidersFromDatabase(config *ServerConfig) error {
 		modelProviders[modelName] = append(modelProviders[modelName], provider)
 	}
 
-	// Add providers to config
+	// Replace entire maps so wrappers removed from DB no longer linger in memory.
+	newModels := make(map[string][]*Provider, len(modelProviders))
+	newEntrypoints := make(map[string][]*Provider, len(modelProviders))
 	for modelName, providers := range modelProviders {
-		if len(providers) > 0 {
-			log.Infof("Adding %d providers for model %s", len(providers), modelName)
-
-			// Add to Models
-			config.Models.models[modelName] = providers
-
-			// Add to Entrypoints
-			config.Entrypoints.providers[modelName] = providers
-
-			// Print provider information
-			for i, p := range providers {
-				log.Infof("  Provider %d: TypeName=%s, ModelName=%s, Domain=%s, HealthStatus=%v",
-					i, p.TypeName, p.ModelName, p.DomainOrURL, p.DbProvider.IsHealthy)
-			}
+		if len(providers) == 0 {
+			continue
+		}
+		log.Infof("Adding %d providers for model %s", len(providers), modelName)
+		newModels[modelName] = providers
+		newEntrypoints[modelName] = providers
+		for i, p := range providers {
+			log.Infof("  Provider %d: TypeName=%s, ModelName=%s, Domain=%s, HealthStatus=%v",
+				i, p.TypeName, p.ModelName, p.DomainOrURL, p.DbProvider.IsHealthy)
 		}
 	}
+	config.Models.models = newModels
+	config.Entrypoints.providers = newEntrypoints
 
 	log.Infof("Database AI providers loaded, added %d models in total", len(modelProviders))
 

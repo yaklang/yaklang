@@ -57,7 +57,7 @@ func TestChatRateLimiter_RPMExceeded(t *testing.T) {
 
 	allowed, queueLen := rl.CheckRateLimit(key, "model-a")
 	assert.False(t, allowed, "6th request should be denied (RPM exceeded)")
-	assert.Greater(t, queueLen, int64(0), "queue length should be positive when denied")
+	assert.Equal(t, int64(1), queueLen, "first denial in window should report queue length 1")
 }
 
 func TestChatRateLimiter_DifferentKeysIndependent(t *testing.T) {
@@ -141,7 +141,7 @@ func TestChatRateLimiter_QueueCountTransient(t *testing.T) {
 	rl := NewChatRateLimiter()
 	defer rl.Stop()
 
-	assert.Equal(t, int64(0), rl.GetQueueCount(), "initial queue should be 0")
+	assert.Equal(t, int64(0), rl.GetQueueCount(), "initial rejection count should be 0")
 
 	rl.SetDefaultRPM(1)
 
@@ -149,10 +149,51 @@ func TestChatRateLimiter_QueueCountTransient(t *testing.T) {
 	assert.True(t, allowed1)
 
 	_, queueLen := rl.CheckRateLimit("key-q", "model")
-	assert.Greater(t, queueLen, int64(0), "queue count should be positive during denial")
+	assert.Equal(t, int64(1), queueLen, "denial should report one rejection in sliding window")
 
-	// After the CheckRateLimit call returns, queue count should be back to 0
-	assert.Equal(t, int64(0), rl.GetQueueCount(), "queue should reset after denial returns")
+	// Rejections accumulate in the 60s window (not reset when the call returns).
+	assert.Equal(t, int64(1), rl.GetQueueCount(), "GetQueueCount should match recent denials in window")
+}
+
+func TestQueueCount_AccumulatesRejections(t *testing.T) {
+	rl := NewChatRateLimiter()
+	defer rl.Stop()
+	rl.SetDefaultRPM(1)
+	key, model := "key-acc", "model-acc"
+
+	allowed, _ := rl.CheckRateLimit(key, model)
+	require.True(t, allowed)
+	for i := 0; i < 5; i++ {
+		allowed, _ := rl.CheckRateLimit(key, model)
+		assert.False(t, allowed, "denial %d", i+1)
+	}
+	assert.Equal(t, int64(5), rl.GetQueueCount(), "five denials in 60s window should be counted")
+}
+
+func TestQueueCount_WindowExpiry(t *testing.T) {
+	rl := NewChatRateLimiter()
+	defer rl.Stop()
+	rl.rejectMu.Lock()
+	rl.rejectTimes = []time.Time{time.Now().Add(-2 * rpmWindowDuration)}
+	rl.rejectMu.Unlock()
+	assert.Equal(t, int64(0), rl.GetQueueCount(), "rejections older than window should be trimmed")
+}
+
+func TestCheckRateLimit_QLenMonotonic(t *testing.T) {
+	rl := NewChatRateLimiter()
+	defer rl.Stop()
+	rl.SetDefaultRPM(1)
+	key, model := "key-mono", "model-mono"
+
+	allowed, q0 := rl.CheckRateLimit(key, model)
+	require.True(t, allowed)
+	assert.Equal(t, int64(0), q0, "allowed path should report current window rejection count")
+
+	for i := 1; i <= 4; i++ {
+		allowed, q := rl.CheckRateLimit(key, model)
+		require.False(t, allowed)
+		assert.Equal(t, int64(i), q, "denial index %d", i)
+	}
 }
 
 func TestChatRateLimiter_ConcurrentAccess(t *testing.T) {

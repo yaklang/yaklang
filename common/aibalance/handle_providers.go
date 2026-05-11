@@ -358,6 +358,11 @@ func (c *ServerConfig) handleDeleteProvider(conn net.Conn, request *http.Request
 		return
 	}
 
+	// Reload providers into memory so deleted wrappers disappear from Entrypoints/Models
+	if err := LoadProvidersFromDatabase(c); err != nil {
+		c.logError("Failed to reload providers after delete: %v", err)
+	}
+
 	c.logInfo("Successfully deleted provider with ID: %d", providerID)
 	c.writeJSONResponse(conn, http.StatusOK, map[string]string{"message": "Provider deleted successfully"})
 }

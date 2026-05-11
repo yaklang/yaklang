@@ -37,10 +37,11 @@ func (s *keyRPMState) trimExpired(now time.Time) {
 
 // ChatRateLimiter implements per-API-key RPM rate limiting for chat completions,
 // with optional per-model RPM overrides, per-model delay overrides for free
-// users, and a global queue counter.
+// users, and a sliding-window count of rate-limit rejections (same 60s window as RPM).
 type ChatRateLimiter struct {
 	states     sync.Map // map[apiKey]*keyRPMState
-	queueCount atomic.Int64
+	rejectMu   sync.Mutex
+	rejectTimes []time.Time // rejection timestamps within rpmWindowDuration (chronological)
 	defaultRPM atomic.Int64
 	modelRPM   sync.Map // map[modelName]int64 RPM override
 	modelDelay sync.Map // map[modelName]int64 free-user pre-call delay override (seconds)
@@ -115,9 +116,38 @@ func (rl *ChatRateLimiter) GetEffectiveDelay(modelName string, fallbackSec int64
 	return fallbackSec
 }
 
-// GetQueueCount returns the current number of rate-limited (queued) requests.
+// trimRejectExpiredLocked drops rejection timestamps older than rpmWindowDuration
+// relative to now. Caller must hold rl.rejectMu.
+func (rl *ChatRateLimiter) trimRejectExpiredLocked(now time.Time) {
+	cutoff := now.Add(-rpmWindowDuration)
+	i := 0
+	for i < len(rl.rejectTimes) && rl.rejectTimes[i].Before(cutoff) {
+		i++
+	}
+	if i > 0 {
+		rl.rejectTimes = rl.rejectTimes[i:]
+	}
+}
+
+// recordRejection records a rate-limit denial at now and returns how many
+// denials fall inside the current sliding window (including this one).
+func (rl *ChatRateLimiter) recordRejection(now time.Time) int64 {
+	rl.rejectMu.Lock()
+	defer rl.rejectMu.Unlock()
+	rl.trimRejectExpiredLocked(now)
+	rl.rejectTimes = append(rl.rejectTimes, now)
+	return int64(len(rl.rejectTimes))
+}
+
+// GetQueueCount returns how many requests were denied by RPM in the last
+// rpmWindowDuration (60s). This is not a live wait-queue size; the server
+// returns 429 immediately on denial.
 func (rl *ChatRateLimiter) GetQueueCount() int64 {
-	return rl.queueCount.Load()
+	rl.rejectMu.Lock()
+	defer rl.rejectMu.Unlock()
+	now := time.Now()
+	rl.trimRejectExpiredLocked(now)
+	return int64(len(rl.rejectTimes))
 }
 
 // getEffectiveRPM returns the RPM limit for a given model,
@@ -144,7 +174,7 @@ func (rl *ChatRateLimiter) CheckRateLimit(apiKey string, modelName string) (bool
 	}
 	val, loaded := rl.states.LoadOrStore(bucketKey, newState)
 	if !loaded {
-		return true, rl.queueCount.Load()
+		return true, rl.GetQueueCount()
 	}
 
 	state := val.(*keyRPMState)
@@ -154,14 +184,12 @@ func (rl *ChatRateLimiter) CheckRateLimit(apiKey string, modelName string) (bool
 	state.trimExpired(now)
 
 	if int64(len(state.requests)) >= rpm {
-		rl.queueCount.Add(1)
-		qLen := rl.queueCount.Load()
-		rl.queueCount.Add(-1)
+		qLen := rl.recordRejection(now)
 		return false, qLen
 	}
 
 	state.requests = append(state.requests, now)
-	return true, rl.queueCount.Load()
+	return true, rl.GetQueueCount()
 }
 
 // cleanupLoop periodically removes stale API key entries.
@@ -172,7 +200,12 @@ func (rl *ChatRateLimiter) cleanupLoop() {
 	for {
 		select {
 		case <-ticker.C:
-			cutoff := time.Now().Add(-staleEntryThreshold)
+			now := time.Now()
+			rl.rejectMu.Lock()
+			rl.trimRejectExpiredLocked(now)
+			rl.rejectMu.Unlock()
+
+			cutoff := now.Add(-staleEntryThreshold)
 			count := 0
 			rl.states.Range(func(key, value any) bool {
 				state := value.(*keyRPMState)
