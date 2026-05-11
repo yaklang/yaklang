@@ -7,6 +7,7 @@ package ssaapi
 // cfgDominates：从入口到「当前 cfg」是否必经 target（图论 target 支配当前）。cfgPostDominates：从「当前 cfg」到出口是否必经 target（图论 target 后支配当前）。
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 	"testing"
@@ -129,6 +130,32 @@ $arg<getCfg()><cfgGuards()>?{!opcode: return} as $miss
 				require.Empty(t, res.GetValues("miss"), "earlyReturn guard 应被 !opcode:return 滤掉")
 			},
 		})
+	})
+	t.Run("cfgGuards_opcode_native_arg_named_equals_positional", func(t *testing.T) {
+		code := `
+a = 1
+if (a) {
+	return
+}
+println("ok")
+`
+		base := `
+println(* #-> as $arg)
+$arg<getCfg()> as $sink
+$sink%s as $g
+`
+		for _, guardsCall := range []string{
+			`<cfgGuards(opcode: return)>`,
+			`<cfgGuards(return)>`,
+		} {
+			rule := fmt.Sprintf(base, guardsCall)
+			runSyntaxFlowExpect(t, code, rule, sfExpect{
+				WantMinCount: map[string]int{"g": 1},
+				PostCheck: func(t *testing.T, res *ssaapi.SyntaxFlowResult) {
+					require.Contains(t, res.GetValues("g").String(), ssaapi.GuardKindEarlyReturn)
+				},
+			})
+		}
 	})
 	t.Run("cfgGuards_implicit_getCfg_on_chain", func(t *testing.T) {
 		// 语法糖：链上可为 SSA value，无需显式 <getCfg> 再 <cfgGuards>。
@@ -449,6 +476,27 @@ println(* #-> as $arg)
 $cond<getCfg()> as $condCfg
 $arg<getCfg()> as $argCfg
 $argCfg<cfgDominates(target="$condCfg")> as $dom
+`, sfExpect{
+			WantVarContains: map[string][]string{"dom": {"true"}},
+		})
+	})
+
+	t.Run("positional_first_arg_same_as_target_named", func(t *testing.T) {
+		// 第一个位置参数与 target: 等价（parseCfgTargetParam / GetString(0, "target", ...)）。
+		runSyntaxFlowExpect(t, `
+c = 1
+if (c) {
+	x = "a"
+} else {
+	x = "b"
+}
+println(x)
+`, `
+c as $cond
+println(* #-> as $arg)
+$cond<getCfg()> as $condCfg
+$arg<getCfg()> as $argCfg
+$argCfg<cfgDominates("$condCfg")> as $dom
 `, sfExpect{
 			WantVarContains: map[string][]string{"dom": {"true"}},
 		})

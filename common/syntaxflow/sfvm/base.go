@@ -71,6 +71,16 @@ func validSSAOpcode(raw string) ssa.Opcode {
 	}
 }
 
+// ParseSSAOpcodeFromSyntaxFlowName maps a SyntaxFlow opcode-filter token (e.g. "return", "panic", "jump")
+// to IR opcode. It matches ?{opcode: ...} / OpCompareOpcode (frame_exec OpCompareOpcode).
+func ParseSSAOpcodeFromSyntaxFlowName(raw string) (ssa.Opcode, bool) {
+	op := validSSAOpcode(raw)
+	if op < 0 {
+		return ssa.SSAOpcodeUnKnow, false
+	}
+	return op, true
+}
+
 func validSSABinOpcode(raw string) string {
 	text := yakunquote.TryUnquote(raw)
 	switch text {

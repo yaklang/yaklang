@@ -231,7 +231,7 @@ $source?{<self>.endsWith(*)} as $guardedSources
 $fsSink?{<self> #{include: <<<CODE
 * & $source
 CODE, exclude: <<<CODE
-*?{<getCfg()><cfgGuards()>?{opcode: return}} as $__next__
+*?{<cfgGuards(opcode: return)>}  as $__next__
 CODE}->} as $sink
 
 // =====================================================================

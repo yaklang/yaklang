@@ -111,7 +111,7 @@ $sink.RawQuery as $func
 $func?(* #{
     until: `/Sprintf/`,
 	until: `*?{opcode:add}`,
-    until: `*<cfgDominates(target: "$input")>?{have: "true"}`
+    until: `*<cfgDominates("$input")>`
 }-> as $high);
 
 alert $high for {

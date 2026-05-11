@@ -58,7 +58,7 @@ $template #{
 
 $template #{
     until: "* & $entry",
-    exclude: `*?{<getCfg()><cfgGuards()>?{opcode: return}}`,
+    exclude: `*?{<cfgGuards(opcode: return)>} `,
 }-> as $mid
 
 alert $mid for {

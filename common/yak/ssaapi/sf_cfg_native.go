@@ -10,7 +10,8 @@ import (
 )
 
 // mapCfgCtxValues runs fn for each non-empty CfgCtxValue under v; emptyErr is returned if nothing was appended.
-func mapCfgCtxValues(v sfvm.Values, emptyErr string, fn func(prog *Program, op sfvm.ValueOperator, ctx *CfgCtxValue, out *[]sfvm.ValueOperator)) (bool, sfvm.Values, error) {
+// If allowEmpty is true, an empty output yields (true, NewEmptyValues(), nil) instead of an error.
+func mapCfgCtxValues(v sfvm.Values, emptyErr string, allowEmpty bool, fn func(prog *Program, op sfvm.ValueOperator, ctx *CfgCtxValue, out *[]sfvm.ValueOperator)) (bool, sfvm.Values, error) {
 	prog, err := fetchProgramFromCfgValues(v)
 	if err != nil {
 		return false, nil, err
@@ -25,6 +26,9 @@ func mapCfgCtxValues(v sfvm.Values, emptyErr string, fn func(prog *Program, op s
 		return nil
 	})
 	if len(out) == 0 {
+		if allowEmpty {
+			return true, sfvm.NewEmptyValues(), nil
+		}
 		return false, nil, utils.Error(emptyErr)
 	}
 	return true, sfvm.NewValues(out), nil
@@ -210,7 +214,7 @@ func nativeCallCFGCondition(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.Nat
 	if err != nil {
 		return false, nil, utils.Wrap(err, "cfgCondition")
 	}
-	return mapCfgCtxValues(pipe, "cfgCondition: no condition info", func(prog *Program, _ sfvm.ValueOperator, ctx *CfgCtxValue, out *[]sfvm.ValueOperator) {
+	return mapCfgCtxValues(pipe, "cfgCondition: no condition info", false, func(prog *Program, _ sfvm.ValueOperator, ctx *CfgCtxValue, out *[]sfvm.ValueOperator) {
 		summary, err := getBlockConditionSummaryByCfgCtx(prog, ctx)
 		if err != nil || summary == nil {
 			return
@@ -224,7 +228,7 @@ func nativeCallCFGConditionValues(v sfvm.Values, frame *sfvm.SFFrame, params *sf
 	if err != nil {
 		return false, nil, utils.Wrap(err, "cfgConditionValues")
 	}
-	return mapCfgCtxValues(pipe, "cfgConditionValues: no condition values", func(prog *Program, _ sfvm.ValueOperator, ctx *CfgCtxValue, out *[]sfvm.ValueOperator) {
+	return mapCfgCtxValues(pipe, "cfgConditionValues: no condition values", false, func(prog *Program, _ sfvm.ValueOperator, ctx *CfgCtxValue, out *[]sfvm.ValueOperator) {
 		summary, err := getBlockConditionSummaryByCfgCtx(prog, ctx)
 		if err != nil || summary == nil {
 			return
@@ -299,7 +303,11 @@ func allCfgCtxFromSymbolValues(vals sfvm.Values) ([]*CfgCtxValue, error) {
 	return out, nil
 }
 
-// parseCfgTargetParam 从 frame 中解析 <cfg* target="$var"> 指向的符号名与值（cfgDominates / cfgReachable / reachabilityGuard 等共用）。
+// parseCfgTargetParam 从 frame 中解析 cfg* 的 target 指向的符号名与值（cfgDominates / cfgReachable / reachabilityGuard 等共用）。
+//
+// 与命名参数等价：第一个位置参数（编译为 key "0"）与 target / var / against 命名参数表达同一含义，例如
+//   <cfgDominates("$input")> 与 <cfgDominates(target: "$input")>
+// 均解析为符号 input（见 sfvm.NativeCallActualParams.GetString(0, "target", "var", "against")）。
 func parseCfgTargetParam(frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (targetVar string, targetVals sfvm.Values, err error) {
 	if frame == nil {
 		return "", nil, utils.Error("cfg*: frame is nil")
@@ -428,7 +436,7 @@ func mapCfgWithReachableTarget(
 	}
 	icfg := parseBoolParam(params, "icfg", false)
 	opt := reachableOptsFromParams(params, icfg)
-	return mapCfgCtxValues(pipe, empty, func(prog *Program, _ sfvm.ValueOperator, a *CfgCtxValue, out *[]sfvm.ValueOperator) {
+	return mapCfgCtxValues(pipe, empty, false, func(prog *Program, _ sfvm.ValueOperator, a *CfgCtxValue, out *[]sfvm.ValueOperator) {
 		*out = append(*out, prog.NewConstValue(compute(prog, a, target, opt)))
 	})
 }
@@ -587,21 +595,66 @@ func computeCfgGuardsPredicates(prog *Program, fn *ssa.Function, sinkCtx *CfgCtx
 	return guards
 }
 
+// parseCfgGuardsOpcodeFilter reads optional native args for cfgGuards:
+//   <cfgGuards(opcode: return)>  or  <cfgGuards(return)>  (first positional == opcode key)
+// Token names match ?{opcode: ...} (sfvm.ParseSSAOpcodeFromSyntaxFlowName).
+func parseCfgGuardsOpcodeFilter(params *sfvm.NativeCallActualParams) ([]ssa.Opcode, error) {
+	if params == nil {
+		return nil, nil
+	}
+	raw := strings.TrimSpace(params.GetString(0, "opcode", "op"))
+	if raw == "" {
+		return nil, nil
+	}
+	op, ok := sfvm.ParseSSAOpcodeFromSyntaxFlowName(raw)
+	if !ok {
+		return nil, utils.Errorf("cfgGuards: invalid opcode filter %q (use same names as ?{opcode: ...}, e.g. return, panic, jump)", raw)
+	}
+	return []ssa.Opcode{op}, nil
+}
+
+func filterGuardsByOpcodeAliases(guards []*GuardPredicateValue, ops []ssa.Opcode) []*GuardPredicateValue {
+	if len(ops) == 0 {
+		return guards
+	}
+	out := make([]*GuardPredicateValue, 0, len(guards))
+	for _, g := range guards {
+		if g == nil {
+			continue
+		}
+		for _, op := range ops {
+			if guardKindMatchesSSAOpcode(g.Kind, op) {
+				out = append(out, g)
+				break
+			}
+		}
+	}
+	return out
+}
+
 // minimal guard extraction: detect if-in-block dominates sink block and one branch goes to exit.
 func nativeCallCFGGuards(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 	pipe, _, err := coerceCfgCallInputs(v)
 	if err != nil {
 		return false, nil, utils.Wrap(err, "cfgGuards")
 	}
-	return mapCfgCtxValues(pipe, "no guards found", func(prog *Program, op sfvm.ValueOperator, ctx *CfgCtxValue, out *[]sfvm.ValueOperator) {
+	filterOps, err := parseCfgGuardsOpcodeFilter(params)
+	if err != nil {
+		return false, nil, err
+	}
+	haveOpcodeFilter := len(filterOps) > 0
+	return mapCfgCtxValues(pipe, "no guards found", haveOpcodeFilter, func(prog *Program, op sfvm.ValueOperator, ctx *CfgCtxValue, out *[]sfvm.ValueOperator) {
 		fn, err := getFunctionByID(prog, ctx.FuncID)
 		if err != nil || fn == nil {
 			return
 		}
 
 		guards := computeCfgGuardsPredicates(prog, fn, ctx)
-		if len(guards) == 0 && ctx.FuncID > 0 && ctx.BlockID > 0 {
+		if len(guards) == 0 && ctx.FuncID > 0 && ctx.BlockID > 0 && !haveOpcodeFilter {
 			guards = append(guards, newGuardPredicate(prog, ctx, ctx.BlockID, 0, 0, false, GuardKindNone))
+		}
+		if haveOpcodeFilter {
+			guards = filterGuardsByOpcodeAliases(guards, filterOps)
 		}
 		for _, g := range lo.UniqBy(guards, func(v *GuardPredicateValue) string {
 			if v == nil {
