@@ -66,6 +66,45 @@ function checkAuthInResponse(data) {
     return false;
 }
 
+// ==================== Session Auto-Refresh ====================
+// 后端 OPS session 有效期为 30 分钟。只要 OPS portal 页面开着，
+// 这里就每 10 分钟自动调一次 /ops/api/session/refresh，把
+// ExpiresAt 顺延 30 分钟，避免因长时间挂在页面上而被强制登出。
+// 关键词: ops session auto refresh keep alive 自动续期 token
+const SESSION_REFRESH_INTERVAL_MS = 10 * 60 * 1000;
+let __sessionRefreshTimer = null;
+
+async function refreshOpsSessionOnce() {
+    try {
+        const resp = await fetch('/ops/api/session/refresh', {
+            method: 'POST',
+            credentials: 'same-origin',
+        });
+        if (resp.status === 401 || resp.status === 403) {
+            handleAuthError();
+            return false;
+        }
+        if (!resp.ok) {
+            console.warn('session refresh non-ok status:', resp.status);
+            return false;
+        }
+        const data = await resp.json().catch(() => null);
+        if (data && data.expires_at) {
+            console.debug('ops session refreshed, new expires_at:', data.expires_at);
+        }
+        return true;
+    } catch (e) {
+        console.warn('ops session refresh error:', e);
+        return false;
+    }
+}
+
+function startSessionAutoRefresh() {
+    if (__sessionRefreshTimer) return;
+    refreshOpsSessionOnce();
+    __sessionRefreshTimer = setInterval(refreshOpsSessionOnce, SESSION_REFRESH_INTERVAL_MS);
+}
+
 // ==================== Initialize ====================
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -74,6 +113,8 @@ document.addEventListener('DOMContentLoaded', function() {
     loadModels();
     initForms();
     updateApiEndpoint();
+    // 启动 OPS session 自动续期：只要页面开着就每 10 分钟续一次。
+    startSessionAutoRefresh();
 });
 
 // ==================== Tab Management ====================

@@ -75,6 +75,54 @@
             }
             return false;
         }
+
+        // ==================== Session Auto-Refresh ====================
+        // 后端 session 有效期为 30 分钟。只要 portal 页面开着，
+        // 这里就每 10 分钟自动调一次 /portal/api/session/refresh，把
+        // ExpiresAt 顺延 30 分钟，避免因长时间挂在页面上而被强制登出。
+        // 设计上不复用 authFetch，因为它会在 401/403 时直接跳转登录，
+        // 而我们希望续期失败时让上层业务请求自然触发跳转，这里只静默重试。
+        // 关键词: session auto refresh keep alive 自动续期 token
+        const SESSION_REFRESH_INTERVAL_MS = 10 * 60 * 1000;
+        let __sessionRefreshTimer = null;
+
+        async function refreshAdminSessionOnce() {
+            try {
+                const resp = await fetch('/portal/api/session/refresh', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                });
+                if (resp.status === 401 || resp.status === 403) {
+                    handleAuthError();
+                    return false;
+                }
+                if (!resp.ok) {
+                    console.warn('session refresh non-ok status:', resp.status);
+                    return false;
+                }
+                const data = await resp.json().catch(() => null);
+                if (data && data.expires_at) {
+                    console.debug('session refreshed, new expires_at:', data.expires_at);
+                }
+                return true;
+            } catch (e) {
+                console.warn('session refresh error:', e);
+                return false;
+            }
+        }
+
+        function startSessionAutoRefresh() {
+            if (__sessionRefreshTimer) return;
+            // 进入页面立刻续一次，覆盖 "session 还剩不多就刷新页面" 的场景，
+            // 避免下一次定时还没到就过期了。
+            refreshAdminSessionOnce();
+            __sessionRefreshTimer = setInterval(refreshAdminSessionOnce, SESSION_REFRESH_INTERVAL_MS);
+            // 暴露给手动调试。
+            window.__sessionRefreshTimer = __sessionRefreshTimer;
+        }
+
+        window.refreshAdminSessionOnce = refreshAdminSessionOnce;
+        window.startSessionAutoRefresh = startSessionAutoRefresh;
         
         // 模型选择相关
         let portalAvailableModels = [];
@@ -517,6 +565,9 @@
         // 页面加载完成后初始化
         document.addEventListener('DOMContentLoaded', function() {
             PortalDataLoader.init();
+            // 启动 session 自动续期：只要页面开着就每 10 分钟续一次。
+            // 关键词: session keep alive, 自动续期定时器启动
+            startSessionAutoRefresh();
         });
         
         // 全局刷新函数

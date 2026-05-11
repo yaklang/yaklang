@@ -7,8 +7,9 @@ on:
       - "cwe/*"
       - "feature/cwe*"
   schedule:
-    # 定时任务，在每周二0点更新（与CVE周一更新错开）
-    - cron: '0 0 * * 2'
+    # 定时任务，每月 1 号 18:00 UTC 更新（北京时间次日凌晨 2:00），与 MITRE/AITools 错开避免抢 OSS/AI 配额
+    # 如需立即重建，使用 workflow_dispatch 手动触发
+    - cron: '0 18 1 * *'
 
 jobs:
 

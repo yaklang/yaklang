@@ -16,8 +16,9 @@ on:
       - "attck/*"
       - "feature/attck*"
   schedule:
-    # 定时任务，每周三0点更新（与CWE周二更新错开）
-    - cron: '0 0 * * 3'
+    # 定时任务，每月 2 号 18:00 UTC 更新（北京时间次日凌晨 2:00），与 CWE/AITools 错开避免抢 OSS/AI 配额
+    # 如需立即重建，使用 workflow_dispatch 手动触发（可配合 force_rebuild=true 走全量重建）
+    - cron: '0 18 2 * *'
 
 jobs:
 

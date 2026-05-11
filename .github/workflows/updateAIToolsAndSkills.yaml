@@ -7,8 +7,9 @@ on:
       - "aitool/*"
       - "feature/aitool*"
   schedule:
-    # 定时任务，在每周三0点更新（与CVE周一、CWE周二错开）
-    - cron: '0 0 * * 3'
+    # 定时任务，每月 3 号 18:00 UTC 更新（北京时间次日凌晨 2:00），与 CWE/MITRE 错开避免抢 OSS/AI 配额
+    # 如需立即重建，使用 workflow_dispatch 手动触发
+    - cron: '0 18 3 * *'
 
 jobs:
 
