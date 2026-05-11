@@ -1,7 +1,6 @@
 package aicache
 
 import (
-	"encoding/json"
 	"os"
 	"strings"
 	"testing"
@@ -1005,57 +1004,6 @@ func TestHijack_SemiBoundary_HappyPath4Segments(t *testing.T) {
 	assertHasEphemeralCacheControl(t, res.Messages[1].Content, "4seg user1")
 	assertHasEphemeralCacheControl(t, res.Messages[2].Content, "4seg user2")
 	assertNoCacheControl(t, res.Messages[3].Content, "4seg user3")
-}
-
-// TestHijack_SemiBoundary_WithPriorModelThinking 在 frozen 与 semi 之间插入
-// PROMPT_SECTION_model-thinking 时, hijacker 应剥出独立 assistant 消息,
-// semi 段仍单独一条 user (带 cc).
-func TestHijack_SemiBoundary_WithPriorModelThinking(t *testing.T) {
-	mt := "<|PROMPT_SECTION_model-thinking|>\nstep-A\nstep-B\n<|PROMPT_SECTION_END_model-thinking|>"
-	prompt := strings.Join([]string{
-		"<|AI_CACHE_SYSTEM_high-static|>\nA-system\n<|AI_CACHE_SYSTEM_END_high-static|>",
-		"<|AI_CACHE_FROZEN_semi-dynamic|>\n" +
-			"frozen-tool-inventory\n" +
-			"<|AI_CACHE_FROZEN_END_semi-dynamic|>",
-		mt,
-		"<|AI_CACHE_SEMI_semi|>\n" +
-			"<|PROMPT_SECTION_semi-dynamic|>\n" +
-			"skills-context-block\n" +
-			"<|PROMPT_SECTION_END_semi-dynamic|>\n" +
-			"<|AI_CACHE_SEMI_END_semi|>",
-		"<|PROMPT_SECTION_timeline-open|>\nopen-timeline-bucket\n<|PROMPT_SECTION_END_timeline-open|>",
-		"<|PROMPT_SECTION_dynamic_q|>\nuser-query\n<|PROMPT_SECTION_dynamic_END_q|>",
-	}, "\n\n")
-
-	res := hijackHighStatic(prompt)
-	require.NotNil(t, res)
-	require.True(t, res.IsHijacked)
-	require.Len(t, res.Messages, 5, "expect system + user1 + assistant(thinking) + user2(semi) + user3")
-
-	require.Equal(t, "system", res.Messages[0].Role)
-	require.Equal(t, "user", res.Messages[1].Role)
-	require.Equal(t, "assistant", res.Messages[2].Role)
-	require.Equal(t, "user", res.Messages[3].Role)
-	require.Equal(t, "user", res.Messages[4].Role)
-
-	require.Equal(t, priorAssistantMessageSurface, extractTextContent(t, res.Messages[2].Content))
-	require.Contains(t, res.Messages[2].ReasoningContent, "step-A")
-	require.Contains(t, res.Messages[2].ReasoningContent, "step-B")
-	raw, err := json.Marshal(res.Messages[2])
-	require.NoError(t, err)
-	require.Contains(t, string(raw), `"reasoning_content"`)
-	require.Contains(t, string(raw), `"role":"assistant"`)
-
-	require.NotContains(t, extractTextContent(t, res.Messages[2].Content), "PROMPT_SECTION_model-thinking")
-
-	user2 := extractTextContent(t, res.Messages[3].Content)
-	require.Contains(t, user2, "<|AI_CACHE_SEMI_semi|>")
-	require.Contains(t, user2, "skills-context-block")
-	require.NotContains(t, user2, "step-A")
-	require.NotContains(t, user2, "PROMPT_SECTION_model-thinking")
-
-	user3 := extractTextContent(t, res.Messages[4].Content)
-	require.Contains(t, user3, "user-query")
 }
 
 // TestHijack_SemiBoundary_MissingSemi_FallsBackTo3Segments 验证仅有 frozen

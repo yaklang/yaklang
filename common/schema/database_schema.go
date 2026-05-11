@@ -134,7 +134,6 @@ var ProjectTables = []interface{}{
 	&AIAgentRuntime{},
 	&AiCheckpoint{},
 	&AiOutputEvent{},
-	&AIReActThinkingChunk{},
 	&AiProcess{},
 	&AiProcessAndAiEvent{},
 	&AIMemoryEntity{},

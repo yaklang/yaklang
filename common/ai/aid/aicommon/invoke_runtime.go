@@ -220,11 +220,6 @@ type LoopPromptAssemblyInput struct {
 	// 关键词: FrozenUserContext, PLAN_CONTEXT 段, timeline-open 末尾注入,
 	//        缓存边界外, 上游缓存保护, PE-TASK PLAN 产物
 	FrozenUserContext string
-
-	// PriorModelThinking 是跨轮次合并后的模型思考文本（调用方已按策略截断），
-	// 写入 PROMPT_SECTION_model-thinking 段（位于 frozen 与 semi 之间）；aicache
-	// hijacker 在发往上游 LLM 时会剥出该块并转为独立 assistant 消息，不再留在 user 段内。
-	PriorModelThinking string
 }
 
 type LoopPromptAssemblyResult struct {

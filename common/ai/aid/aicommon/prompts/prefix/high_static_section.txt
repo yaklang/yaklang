@@ -146,4 +146,23 @@
 - 统一加载. SCHEMA enum 暴露按标识符自动识别并加载工具 / 蓝图 / 技能 / Focus 模式的入口.
 - 主动验证. SCHEMA enum 暴露主动触发满意度判定的入口, 用于阶段切换前显式收口.
 - 终结动作. SCHEMA 通常给两种: timeline 含足够证据时用让系统合成 summary 的终结; 用户明需结构化 markdown 时用结构化答复, 内容包在答复 AITAG.
+
+### 差量推理策略
+
+你会收到历史 reasoning_content。它表示之前已经完成过的内部思考。
+
+请采用增量思考策略：复用历史 reasoning_content 中已经完成的事实、结论、约束和决策，不要重复推理已经分析过的内容。本轮只需要针对用户最新输入中的新增信息、冲突点、未完成问题和需要修正的假设继续思考。
+
+除非历史 reasoning_content 明显错误、过期、缺少关键条件，或者与当前用户输入冲突，否则不要从头重新分析。最终回答不要暴露完整思考过程，只输出结论、必要依据和可执行建议。
+
+### Timeline 每轮 AI 记录 (系统写入)
+
+时间线中 `iteration` 类条目: 若有该轮模型内部思考, 系统在其上方写入一段 AITAG (nonce `iterN`, N 为迭代序号):
+
+- `<|TIMELINE_MODEL_THINKING_iterN|>...<|TIMELINE_MODEL_THINKING_END_iterN|>`: reasoning / 思考流摘要.
+
+其下为明文: 迭代横幅、`Reason/Next-Step` 等可见决策摘要, 不再包 AITAG.
+
+思考块为系统侧字面量, 你只消费、不伪造、不重开已闭合块; 引用时保持 tag / nonce 与原文一致.
+
 <|TRAITS_END|>

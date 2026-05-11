@@ -21,6 +21,22 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+// timelineAITagModelThinking 与 prompts/loop/high_static_section.txt 中
+// 「Timeline 每轮记录」约定一致: 仅模型思考流用 AITAG; 其下决策摘要为明文.
+const timelineAITagModelThinking = "TIMELINE_MODEL_THINKING"
+
+// wrapTimelineAITagBlock 将一段正文包成 `<|TAG_nonce|>...<|TAG_END_nonce|>`。
+// body 或 nonce 为空时返回空串 (调用方跳过拼接).
+func wrapTimelineAITagBlock(tagName, nonce, body string) string {
+	body = strings.TrimSpace(body)
+	nonce = strings.TrimSpace(nonce)
+	tagName = strings.TrimSpace(tagName)
+	if body == "" || nonce == "" || tagName == "" {
+		return ""
+	}
+	return fmt.Sprintf("<|%s_%s|>\n%s\n<|%s_END_%s|>", tagName, nonce, body, tagName, nonce)
+}
+
 // isJSONEmbeddedAITagPrefix 判断字段流的首批 peek 字节是否以 `<|TagName_` 开头,
 // 兼容 JSON 字段流推过来的 raw bytes 通常带外层 `"` 与零宽空白. 命中即视为 AI 把
 // AITag 块塞进了 JSON 字符串值, 触发 JSON / AITag 双 emit 重复, 让调用方静默
@@ -228,6 +244,7 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 	currentCtxCanceled()
 
 	log.Infof("start to call aicommon.CallAITransaction in ReActLoop[%v]", r.loopName)
+	r.resetModelThinkingBuffer()
 	r.loadingStatus("等待 AI 回应 / Waiting AI Respond...")
 	aiCallback := r.config.CallAI
 	if r.useSpeedPriorityAI {
@@ -764,6 +781,7 @@ LOOP:
 		actionParams, handler, transactionErr := r.callAITransaction(streamWg, prompt, nonce)
 
 		streamWg.Wait()
+		iterationModelThinking := strings.TrimSpace(r.takeModelThinkingForTimeline())
 
 		if transactionErr != nil {
 			r.finishIterationLoopWithError(iterationCount, task, transactionErr)
@@ -812,9 +830,14 @@ LOOP:
 			loopName = "general-purpose"
 		}
 		reason := actionParams.GetString("human_readable_thought")
-		msg := fmt.Sprintf("[%v]======== ReAct iteration %d ========", loopName, iterationCount)
+		turnNonce := fmt.Sprintf("iter%d", iterationCount)
+		decisionBody := fmt.Sprintf("[%v]======== ReAct iteration %d ========", loopName, iterationCount)
 		if reason != "" {
-			msg += "\nReason/Next-Step: " + reason
+			decisionBody += "\nReason/Next-Step: " + reason
+		}
+		msg := decisionBody
+		if b := wrapTimelineAITagBlock(timelineAITagModelThinking, turnNonce, iterationModelThinking); b != "" {
+			msg = b + "\n\n" + decisionBody
 		}
 		r.GetInvoker().AddToTimeline("iteration", msg)
 

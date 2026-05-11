@@ -123,6 +123,11 @@ type ReActLoop struct {
 	actionHistory      []*ActionRecord
 	actionHistoryMutex *sync.Mutex
 
+	// modelThinkingBuf holds reason-stream deltas for the in-flight AI transaction;
+	// flushed into the timeline iteration line above the action summary.
+	modelThinkingBuf   bytes.Buffer
+	modelThinkingMutex sync.Mutex
+
 	// verificationRuntimeSnapshot stores the last verification gate baseline so
 	// generic auto-verification can compare the current loop state against the
 	// previous accepted checkpoint.

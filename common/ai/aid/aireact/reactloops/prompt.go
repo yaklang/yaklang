@@ -277,9 +277,8 @@ func (r *ReActLoop) generateLoopPrompt(
 		ExtraCapabilities:    extraCapabilities,
 		SessionEvidence:      sessionEvidence,
 		ReactiveData:         reactiveData,
-		InjectedMemory:       memory,
-		RecentToolsCache:     recentToolsCacheBlock,
-		PriorModelThinking:   r.PriorModelThinkingForPrompt(),
+		InjectedMemory:   memory,
+		RecentToolsCache: recentToolsCacheBlock,
 	})
 	if err != nil {
 		return "", utils.Wrap(err, "assemble loop prompt failed")
