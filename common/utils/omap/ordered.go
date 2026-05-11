@@ -613,16 +613,27 @@ func (o *OrderedMap[T, V]) ForEach(handler func(i T, v V) bool) {
 		return
 	}
 	o.init()
+	// Snapshot under read lock, then invoke handler without holding the lock.
+	// Otherwise a handler that calls Set/Add/... on the same map deadlocks (Lock waits for RLock; RLock held by ForEach).
 	o.lock.RLock()
-	keys := append([]T(nil), o.keyChain...)
-	values := make([]V, len(keys))
-	for i, key := range keys {
-		values[i] = o.m[key]
+	pairs := make([]struct {
+		k T
+		v V
+	}, 0, len(o.keyChain))
+	for _, key := range o.keyChain {
+		v, ok := o.m[key]
+		if !ok {
+			continue
+		}
+		pairs = append(pairs, struct {
+			k T
+			v V
+		}{key, v})
 	}
 	o.lock.RUnlock()
 
-	for i, key := range keys {
-		if !handler(key, values[i]) {
+	for _, p := range pairs {
+		if !handler(p.k, p.v) {
 			break
 		}
 	}

@@ -1,3 +1,4 @@
+// Scan-task polling + SSA risk overview hydration on the orchestrator loop (background goroutine during scan/watch).
 package loop_syntaxflow_scan
 
 import (
@@ -19,6 +20,14 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+// LoopVarInterpretLog 逐次解读/轮询的追加日志键（与 [sfu.LoopVarSFInterpretLog] 一致）。
+const LoopVarInterpretLog = sfu.LoopVarSFInterpretLog
+
+// AppendSfScanInterpretLog appends one interpret/poll line via syntaxflow_utils.
+func AppendSfScanInterpretLog(loop *reactloops.ReActLoop, r aicommon.AIInvokeRuntime, taskID, line string) {
+	sfu.AppendSfScanInterpretLog(loop, r, taskID, line)
+}
+
 // Re-export syntaxflow_utils risk-overview helpers so existing imports of loop_syntaxflow_scan keep compiling.
 var (
 	PersistEffectiveOverviewFilter   = sfu.PersistEffectiveOverviewFilter
@@ -27,8 +36,9 @@ var (
 )
 
 // StartScanTaskStatusPoll starts a light poll until the SyntaxFlow scan task is no longer
-// "executing" (or an error reading DB). During执行中：定时或以 risk 条数增长触发与 reload_ssa_risk_overview
-// 等价的 DB 总览；终态时写入扫描总结、大页 risk 列表、sf_scan_final_report_due=1 并强提示终局报告。
+// "executing" (or an error reading DB). During执行中：定时或以 risk 条数增长调用
+// ApplySSARiskOverviewToInterpret(limit=40)，与终态同源（是否走 ssa_risk_overview 子环仅看 YAK_SSA_RISK_OVERVIEW_SUBLOOP）。
+// 终态时写入扫描总结、更大 limit 的同入口总览、sf_scan_final_report_due=1 并强提示终局报告。
 // 不注册 schema 侧第二路广播：与 main 的 [schema.SetBroadCast_Data] 单 handler 一致；SSA Risk / ScanTask
 // 的 GORM 仍通过 [schema] 内 broadcast 推前端，本处仅依赖本 goroutine 的定时轮询读 DB。
 func StartScanTaskStatusPoll(
@@ -74,7 +84,7 @@ func StartScanTaskStatusPoll(
 					continue
 				}
 				s := st.Status
-				parentT := OrchestratorParentTaskID(loop, "")
+				parentT := OrchestratorParentTaskID(loop, task.GetId())
 				if s == schema.SYNTAXFLOWSCAN_EXECUTING {
 					riskGateLast = -1
 					riskGateSame = 0
@@ -101,28 +111,20 @@ func StartScanTaskStatusPoll(
 					} else if lastUserEmitRisk < 0 {
 						lastUserEmitRisk = st.RiskCount
 					}
-					// 定时 40s 或 risk 每增加 riskDeltaForOverview 条，刷新与 loop_ssa_risk_overview 同口径的摘要
+					// 定时 40s 或 risk 每增加 riskDeltaForOverview 条：与终态相同入口灌入 orchestrator loop（limit 较小）。
 					if lastRiskForDelta < 0 {
 						lastRiskForDelta = st.RiskCount
 					}
 					needOvh := time.Since(lastOverviewAt) >= overviewInterval || st.RiskCount >= lastRiskForDelta+riskDeltaForOverview
 					if needOvh && time.Since(pollAt) >= 15*time.Second {
-						if UseInScanSSARiskOverviewSubLoop() {
-							ApplySSARiskOverviewToInterpret(loop, r, db, task, runtimeID, filterRT, 40)
-							hint := loop.Get("ssa_risk_total_hint")
-							AppendSFPipelineLine(loop, fmt.Sprintf("【3·扫描中·Risk 总览】子环 ssa_risk_overview 已刷新，approx count=%s", hint))
-							AppendSfScanInterpretLog(loop, r, runtimeID, "定时/增量: 子环 ssa_risk_overview 已跑（YAK_SSA_RISK_OVERVIEW_IN_SCAN_SUBLOOP，limit=40）")
-							EmitSyntaxFlowScanPhase(loop, 3, "tick", "risk_overview_tick",
-								"扫描中 risk 总览子环 / in-scan overview subloop", runtimeID, "", map[string]any{
-									"approx_count": hint, "mode": "in_scan_subloop",
-								})
-						} else {
-							AppendSfScanInterpretLog(loop, r, runtimeID, "定时 tick：扫中不自动灌 DB 总览（见终态 ssa_risk_overview 子环；或设 YAK_SSA_RISK_OVERVIEW_IN_SCAN_SUBLOOP=1）")
-							EmitSyntaxFlowScanPhase(loop, 3, "tick", "risk_overview_deferred",
-								"扫中不刷新全库总览，终态由子环灌入 / in-scan overview deferred (mode A)", runtimeID, "", map[string]any{
-									"mode": "deferred",
-								})
-						}
+						ApplySSARiskOverviewToInterpret(loop, r, db, task, runtimeID, filterRT, 40)
+						hint := loop.Get("ssa_risk_total_hint")
+						AppendSFPipelineLine(loop, fmt.Sprintf("【3·扫描中·Risk 总览】已刷新 limit=40 approx=%s", hint))
+						AppendSfScanInterpretLog(loop, r, runtimeID, "定时/增量: ApplySSARiskOverviewToInterpret(limit=40)")
+						EmitSyntaxFlowScanPhase(loop, 3, "tick", "risk_overview_tick",
+							"扫描中 risk 总览已灌入 / in-scan overview hydrate", runtimeID, "", map[string]any{
+								"approx_count": hint, "list_limit": int64(40),
+							})
 						lastOverviewAt = now
 						lastRiskForDelta = st.RiskCount
 					}
@@ -170,7 +172,7 @@ func StartScanTaskStatusPoll(
 				}
 				ApplySSARiskOverviewToInterpret(loop, r, db, task, runtimeID, filterRT, lim)
 				AppendSFPipelineLine(loop, fmt.Sprintf("【4·全量风险列表】已按 runtime 灌入终局总览（最多 %d 条，ssa_risk_list_summary）", lim))
-				AppendSfScanInterpretLog(loop, r, runtimeID, "scan 终态: 终局总览已灌入 (ssa_risk_overview 子环或回退, limit="+fmt.Sprintf("%d", lim)+")")
+				AppendSfScanInterpretLog(loop, r, runtimeID, "scan 终态: 终局总览已灌入 (ApplySSARiskOverviewToInterpret, limit="+fmt.Sprintf("%d", lim)+")")
 
 				res, err := LoadScanSessionResult(db, runtimeID, DefaultRiskSampleLimit)
 				if err != nil {
@@ -180,15 +182,11 @@ func StartScanTaskStatusPoll(
 					EmitSyntaxFlowScanProgress(loop, "scan_complete_degraded",
 						"扫描已结束但摘要刷新失败 / finished, summary refresh failed", runtimeID, err.Error())
 				} else {
-					loop.Set("sf_scan_task_id", runtimeID)
-					loop.Set("sf_scan_session_mode", "watch_complete")
-					pipe := loop.Get(sfu.LoopVarSFPipelineSummary)
-					full := "【==== 大总结用数据：以下须全部纳入终局报告 ====】\n\n"
-					full += "【A·各阶段摘要 sf_scan_pipeline_summary】\n" + pipe + "\n\n"
-					full += "【B·扫描行终态】\n" + endText + "\n\n"
-					full += "【C·风险列表与抽样】优先阅读 reactive 中 ssa_risk_list_summary / ssa_risk_total_hint；与 preface 中条目不冲突。\n\n"
-					full += "下列信息来自数据库（扫描已结束，任务行 + SSA Risk 列表）：\n" + res.Preface
-					loop.Set("sf_scan_review_preface", full)
+					loop.Set(sfu.LoopVarSyntaxFlowTaskID, runtimeID)
+					loop.Set(sfu.LoopVarSyntaxFlowScanSessionMode, "watch_complete")
+					loop.Set("sf_scan_review_preface",
+						"扫描已终态；终局数据见 loop 变量 sf_scan_pipeline_summary、sf_scan_scan_end_summary、ssa_risk_list_summary、ssa_risk_total_hint 及报告输入物化。\n\n"+
+							utils.ShrinkTextBlock(res.Preface, 4000))
 					loop.Set(sfu.LoopVarSFFinalReportDue, "1")
 					r.AddToTimeline("syntaxflow_scan", utils.ShrinkTextBlock("扫描已结束(终态): "+endText, 4000))
 					AppendSfScanInterpretLog(loop, r, runtimeID,
@@ -198,8 +196,8 @@ func StartScanTaskStatusPoll(
 				}
 				EmitSyntaxFlowScanProgress(loop, "final_report_required",
 					"须输出大总结 / MUST deliver final merged report (all risks covered)", runtimeID, "")
-				EmitSyntaxFlowScanPhase(loop, 3, "end", "interpret_round_done",
-					"风险轮询阶段结束，进入终局大总结 / end risk poll", runtimeID, "", nil)
+				EmitSyntaxFlowScanPhase(loop, 3, "end", "risk_poll_done",
+					"风险轮询阶段结束，进入终局报告物化 / end risk poll", runtimeID, "", nil)
 				EmitSyntaxFlowScanPhase(loop, 4, "start", "final_report_mandatory",
 					"请输出含各阶段摘要 + 扫描统计 + 全部 risk 的终局大总结 / deliver final merged report (mandatory)", runtimeID, "", nil)
 				EmitSyntaxFlowScanPhase(loop, 4, "tick", "final_report",
@@ -219,22 +217,11 @@ func fmtRiskLine(st *schema.SyntaxFlowScanTask) string {
 }
 
 const (
-	// envSSARiskOverviewSubLoop 不为 "0"/"false"/"off" 时，终局/轮询总览走 ssa_risk_overview 子环 + copy（失败则回退 Apply）。
+	// envSSARiskOverviewSubLoop 不为 "0"/"false"/"off" 时，扫中 tick 与终态总览均优先走 ssa_risk_overview 子环 + copy（失败则回退 ApplySSARiskOverviewDB）。
 	envSSARiskOverviewSubLoop = "YAK_SSA_RISK_OVERVIEW_SUBLOOP"
-	// envSSARiskOverviewInScanSubLoop 为 "1"/"true"/"on" 时，长扫中周期总览也跑短子环（默认关，仅 emit）。
-	envSSARiskOverviewInScanSubLoop = "YAK_SSA_RISK_OVERVIEW_IN_SCAN_SUBLOOP"
 )
 
 var interpretSSAVarMu sync.Mutex
-
-func envTruthy(v string) bool {
-	switch strings.ToLower(strings.TrimSpace(v)) {
-	case "1", "true", "on", "yes":
-		return true
-	default:
-		return false
-	}
-}
 
 func envFalsy(v string) bool {
 	switch strings.ToLower(strings.TrimSpace(v)) {
@@ -254,13 +241,7 @@ func UseSSARiskOverviewSubLoop() bool {
 	return !envFalsy(v)
 }
 
-// UseInScanSSARiskOverviewSubLoop 长扫中周期子环（成本高；默认关）。
-func UseInScanSSARiskOverviewSubLoop() bool {
-	return envTruthy(os.Getenv(envSSARiskOverviewInScanSubLoop))
-}
-
-// WithInterpretSSAVarLock serializes writers that Set ssa_risk_* on the interpret loop from
-// the poll goroutine vs. other code paths. reload_ssa_risk_overview 仍走模型同线程，不在此包一层。
+// WithInterpretSSAVarLock serializes writers that Set ssa_risk_* from the poll goroutine vs. other paths.
 func WithInterpretSSAVarLock(fn func()) {
 	interpretSSAVarMu.Lock()
 	defer interpretSSAVarMu.Unlock()
@@ -276,7 +257,7 @@ func NewSyntaxflowSubTask(parent aicommon.AIStatefulTask, name string) aicommon.
 	return aicommon.NewSubTaskBase(parent, subID, parent.GetUserInput(), true)
 }
 
-// CopyOverviewOutputsToParent copies overview loop vars needed by syntaxflow_scan_interpret reactive.
+// CopyOverviewOutputsToParent copies overview loop vars from ssa_risk_overview sub-run into the orchestrator loop.
 func CopyOverviewOutputsToParent(overview, interpret *reactloops.ReActLoop) {
 	if overview == nil || interpret == nil {
 		return
@@ -343,7 +324,7 @@ func runSSARiskOverviewSubLoopWithChild(
 	} else if taskID != "" {
 		overview.Set(sfu.LoopVarSyntaxFlowTaskID, taskID)
 	}
-	for _, k := range []string{sfu.LoopVarSSARisksFilterJSON, sfu.LoopVarSSAOverviewFilterJSON, sfu.LoopVarSyntaxFlowScanSessionMode, "sf_scan_task_id"} {
+	for _, k := range []string{sfu.LoopVarSSARisksFilterJSON, sfu.LoopVarSSAOverviewFilterJSON, sfu.LoopVarSyntaxFlowScanSessionMode} {
 		if s := interpret.Get(k); s != "" {
 			overview.Set(k, s)
 		}
@@ -360,7 +341,7 @@ func runSSARiskOverviewSubLoopWithChild(
 	return overview, nil
 }
 
-// ApplySSARiskOverviewToInterpret 终局/轮询入口：优先子环 + copy，失败或 env 关则 Apply 直写 interpret。
+// ApplySSARiskOverviewToInterpret 扫中长扫 tick 与终态共用入口：优先 ssa_risk_overview 子环 + copy，YAK_SSA_RISK_OVERVIEW_SUBLOOP 关则直写 ApplySSARiskOverviewDB。
 func ApplySSARiskOverviewToInterpret(
 	interpret *reactloops.ReActLoop,
 	r aicommon.AIInvokeRuntime,

@@ -1,10 +1,16 @@
+// Loop registration and main orchestrator init (P1 intake → P2 compile/scan → poll → P4 report).
 package loop_syntaxflow_scan
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
+	sfu "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/syntaxflow_utils"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func init() {
@@ -20,17 +26,48 @@ func init() {
 		},
 		reactloops.WithVerboseName("IRify · SyntaxFlow Scan"),
 		reactloops.WithVerboseNameZh("IRify · SyntaxFlow 扫描"),
-		reactloops.WithLoopDescription("Multi-stage SyntaxFlow scan: orchestrator resolves task_id / sf_scan_config_json / project_path, then compiles and runs the interpret sub-loop (reload_syntaxflow_scan_session, reload_ssa_risk_overview, set_ssa_risk_review_target)."),
-		reactloops.WithLoopDescriptionZh("SyntaxFlow 多阶段扫描：编排层解析入参与校验后编译起扫，再由解读子循环拉会话与风险；工具同前。可 WithVar：syntaxflow_task_id、sf_scan_config_json、project_path。"),
-		reactloops.WithLoopUsagePrompt("Provide syntaxflow_task_id, sf_scan_config_json, or project_path (or natural-language project path for LiteForge). Interpret phase uses reload_syntaxflow_scan_session, reload_ssa_risk_overview, set_ssa_risk_review_target."),
+		reactloops.WithLoopDescription("Multi-stage SyntaxFlow scan: P1 resolves params from irify_syntaxflow attachments and/or LiteForge on user input (no loop-var reads); attaches validate task id in SSA."),
+		reactloops.WithLoopDescriptionZh("SyntaxFlow 扫描：编排入参仅从 irify_syntaxflow 附件 + 用户话术 LiteForge 解析（不在 P1 Read loop）；附着校验 task_id。Subtask 需带齐附件或使用自然语言兜底。"),
+		reactloops.WithLoopUsagePrompt("Set irify_syntaxflow attachments (session_mode, and task_id or sf_scan_config_json) on the task, or rely on LiteForge from the user message."),
 		reactloops.WithLoopOutputExample(`
 * SyntaxFlow 扫描会话：
   {"@action": "syntaxflow_scan", "human_readable_thought": "需要解读已注入的 SyntaxFlow 扫描任务（task_id 由引擎或变量提供）"}
-* 重新加载另一扫描任务摘要：
-  {"@action": "reload_syntaxflow_scan_session", "human_readable_thought": "用户提供了新的 task_id", "task_id": "550e8400-e29b-41d4-a716-446655440000"}
 `),
 	)
 	if err != nil {
 		log.Errorf("register reactloop %v failed: %v", schema.AI_REACT_LOOP_NAME_SYNTAXFLOW_SCAN, err)
+	}
+}
+
+// buildSyntaxflowOrchestratorInit runs P1 intake → P2 compile/scan (or attach) → wait for risk convergence → P4 report.
+func buildSyntaxflowOrchestratorInit(r aicommon.AIInvokeRuntime, state *SyntaxFlowState) func(*reactloops.ReActLoop, aicommon.AIStatefulTask, *reactloops.InitTaskOperator) {
+	return func(parentLoop *reactloops.ReActLoop, task aicommon.AIStatefulTask, op *reactloops.InitTaskOperator) {
+		userInput := task.GetUserInput()
+		r.AddToTimeline("syntaxflow_scan", "SyntaxFlow 扫描编排开始 / orchestrator: "+utils.ShrinkTextBlock(userInput, 300))
+
+		if err := runPhase1Intake(r, state, parentLoop, task); err != nil {
+			op.Failed(err)
+			return
+		}
+
+		db := sfu.GetSSADB()
+		if db == nil {
+			op.Failed(fmt.Errorf("无 SSA 工程库连接，无法使用 SyntaxFlow 扫描（请确认运行环境已初始化 SSA 数据库）"))
+			return
+		}
+
+		if err := runPhaseCompileAndScan(r, db, state, parentLoop, task); err != nil {
+			op.Failed(err)
+			return
+		}
+
+		state.SetPhase(SyntaxFlowPhaseReport)
+		WaitForSyntaxFlowReportGate(task.GetContext(), parentLoop)
+		if strings.TrimSpace(parentLoop.Get(sfu.LoopVarSFRiskConverged)) != "1" {
+			r.AddToTimeline("syntaxflow_scan", "P4 物化前未在预期窗口内看到风险行数与任务行已联合收敛，仍将尝试成稿，建议核对 SSA risk 表是否仍写入。")
+		}
+		runPhaseReportGenerating(r, parentLoop, task)
+		state.SetPhase(SyntaxFlowPhaseDone)
+		op.Done()
 	}
 }

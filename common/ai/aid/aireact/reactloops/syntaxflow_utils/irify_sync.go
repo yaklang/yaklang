@@ -9,32 +9,6 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
-// SyncSyntaxFlowLoopVarsFromIrifyTask copies irify_syntaxflow* attachments onto the loop when the
-// corresponding loop var is empty. When session mode is "start" (from loop or attachment), it does
-// not copy task_id from attachments. Call once at the beginning of P1 intake.
-func SyncSyntaxFlowLoopVarsFromIrifyTask(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask) {
-	if loop == nil || task == nil {
-		return
-	}
-	if strings.TrimSpace(loop.Get(LoopVarSyntaxFlowScanSessionMode)) == "" {
-		if m := readIrifySessionModeFromTask(task); m != "" {
-			loop.Set(LoopVarSyntaxFlowScanSessionMode, m)
-		}
-	}
-	mode := strings.ToLower(strings.TrimSpace(loop.Get(LoopVarSyntaxFlowScanSessionMode)))
-	if strings.TrimSpace(loop.Get(LoopVarSFRuleFullQuality)) == "" && readIrifyRuleFullQualityFromTask(task) {
-		loop.Set(LoopVarSFRuleFullQuality, "true")
-	}
-	if mode == SessionModeStart {
-		return
-	}
-	if strings.TrimSpace(loop.Get(LoopVarSyntaxFlowTaskID)) == "" {
-		if id, ok := ReadIrifySyntaxFlowTaskIDFromTask(task); ok && id != "" {
-			loop.Set(LoopVarSyntaxFlowTaskID, id)
-		}
-	}
-}
-
 // SyncSSARiskIDFromIrifyToLoop sets ssa_risk_id on the loop from irify_ssa_risk when the loop value is empty.
 func SyncSSARiskIDFromIrifyToLoop(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask) {
 	if loop == nil || task == nil {

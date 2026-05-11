@@ -283,41 +283,48 @@ func buildOrchestratorInitTask(r aicommon.AIInvokeRuntime, state *SFCodeAuditSta
 		autoCtxPath := filepath.Join(auditDirPath, "syntaxflow_scan_context_auto.md")
 		scanTid, haveIrifyTask := sfu.ReadIrifySyntaxFlowTaskIDFromTask(task)
 		if (!haveIrifyTask || strings.TrimSpace(scanTid) == "") && strings.TrimSpace(state.ProjectPath) != "" {
-			scanLoopAuto, err := reactloops.CreateLoopByName(schema.AI_REACT_LOOP_NAME_SYNTAXFLOW_SCAN, r,
-				reactloops.WithVar(sfu.LoopVarProjectPath, state.ProjectPath),
-				reactloops.WithVar(sfu.LoopVarSyntaxFlowScanSessionMode, sfu.SessionModeStart),
-			)
-			if err != nil {
-				log.Warnf("[SFCodeAudit] auto syntaxflow_scan (project path): %v", err)
+			scanJSON, jerr := sfu.BuildCodeScanJSONForLocalPath(state.ProjectPath)
+			if jerr != nil {
+				log.Warnf("[SFCodeAudit] build scan JSON for syntaxflow_scan: %v", jerr)
 			} else {
-				subAuto := newSubTask(task, "phase2b_scan")
-				if err := scanLoopAuto.ExecuteWithExistedTask(subAuto); err != nil {
-					log.Warnf("[SFCodeAudit] Phase 2b syntaxflow_scan: %v (continuing)", err)
+				scanLoopAuto, err := reactloops.CreateLoopByName(schema.AI_REACT_LOOP_NAME_SYNTAXFLOW_SCAN, r)
+				if err != nil {
+					log.Warnf("[SFCodeAudit] auto syntaxflow_scan (project path): %v", err)
 				} else {
-					summary := scanLoopAuto.Get("sf_scan_review_preface")
-					state.SetScanReviewSummary(summary)
-					if strings.TrimSpace(summary) != "" {
-						ctxPath := autoCtxPath
-						if err := os.WriteFile(ctxPath, []byte(summary), 0o644); err != nil {
-							log.Warnf("[SFCodeAudit] write auto scan context: %v", err)
-						} else {
-							hasScanContextFile = true
+					subAuto := newSubTask(task, "phase2b_scan")
+					subAuto.SetAttachedDatas([]*aicommon.AttachedResource{
+						aicommon.NewAttachedResource(sfu.IrifyTypeSyntaxFlow, sfu.IrifyKeySessionMode, sfu.SessionModeStart),
+						aicommon.NewAttachedResource(sfu.IrifyTypeSyntaxFlow, sfu.IrifyKeySFScanConfigJSON, scanJSON),
+					})
+					if err := scanLoopAuto.ExecuteWithExistedTask(subAuto); err != nil {
+						log.Warnf("[SFCodeAudit] Phase 2b syntaxflow_scan: %v (continuing)", err)
+					} else {
+						summary := scanLoopAuto.Get("sf_scan_review_preface")
+						state.SetScanReviewSummary(summary)
+						if strings.TrimSpace(summary) != "" {
+							ctxPath := autoCtxPath
+							if err := os.WriteFile(ctxPath, []byte(summary), 0o644); err != nil {
+								log.Warnf("[SFCodeAudit] write auto scan context: %v", err)
+							} else {
+								hasScanContextFile = true
+							}
 						}
 					}
 				}
 			}
 		}
 
-		// Phase 3 (optional): syntaxflow_scan when task_id present (attachments / loop vars on parent task)
+		// Phase 3 (optional): syntaxflow_scan when task irify_syntaxflow carries task_id
 		if scanTid, ok := sfu.ReadIrifySyntaxFlowTaskIDFromTask(task); ok && scanTid != "" {
-			scanLoop, err := reactloops.CreateLoopByName(schema.AI_REACT_LOOP_NAME_SYNTAXFLOW_SCAN, r,
-				reactloops.WithVar(sfu.LoopVarSyntaxFlowTaskID, scanTid),
-			)
+			scanLoop, err := reactloops.CreateLoopByName(schema.AI_REACT_LOOP_NAME_SYNTAXFLOW_SCAN, r)
 			if err != nil {
 				log.Warnf("[SFCodeAudit] create syntaxflow_scan: %v", err)
 			} else {
 				subScan := newSubTask(task, "phase3")
-				subScan.SetAttachedDatas(task.GetAttachedDatas())
+				subScan.SetAttachedDatas([]*aicommon.AttachedResource{
+					aicommon.NewAttachedResource(sfu.IrifyTypeSyntaxFlow, sfu.IrifyKeySessionMode, sfu.SessionModeAttach),
+					aicommon.NewAttachedResource(sfu.IrifyTypeSyntaxFlow, sfu.IrifyKeyTaskID, strings.TrimSpace(scanTid)),
+				})
 				if err := scanLoop.ExecuteWithExistedTask(subScan); err != nil {
 					log.Warnf("[SFCodeAudit] Phase 3 syntaxflow_scan: %v (continuing)", err)
 				}

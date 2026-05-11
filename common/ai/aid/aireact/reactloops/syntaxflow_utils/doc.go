@@ -13,11 +13,11 @@
 //	IrifyTypeSSARisk	"irify_ssa_risk"
 //	IrifyTypeSSARisksFilter	"irify_ssa_risks_filter"
 //	IrifyTypeSyntaxFlowRule	"irify_syntaxflow_rule"
-//	IrifyKeyTaskID … IrifyKeyFullQuality	keys: task_id, session_mode, programs, risk_id, filter_json, runtime_id, program_name, full_quality
+//	IrifyKeyTaskID … IrifyKeySFScanConfigJSON, IrifyKeyFullQuality	keys: task_id, session_mode, sf_scan_config_json, programs, …
 //	SessionModeAttach / SessionModeStart	values: attach, start
 //
-// Intake 使用 [SyncSyntaxFlowLoopVarsFromIrifyTask] 将底座附件写入下面「标准 loop 键」；session_mode=start 为**新扫**并忽略
-// irify 随附的 task_id；session_mode=attach 为**附着**。
+// syntaxflow_scan P1 intake 仅从 irify_syntaxflow（session_mode / task_id / sf_scan_config_json）
+// 与 LiteForge 解析用户输入拉取编排参数（不向 loop 预设 Get）。
 //
 // # Standard loop keys (const LoopVar* in loop_vars.go)
 //
@@ -34,7 +34,7 @@
 //
 // # Sync helpers and filter build (read attachments once → loop)
 //
-//   - [SyncSyntaxFlowLoopVarsFromIrifyTask] — P1 intake 入口：session_mode、full_quality、task_id（非 start）
+//   - （scan）irify_syntaxflow 键由 loop_syntaxflow_scan P1 intake 内联遍历；不设独立 Gather*
 //   - [SyncSSARiskIDFromIrifyToLoop] — 仅当 loop 上尚无 ssa_risk_id
 //   - [SyncSSARisksFilterFromIrifyToLoop] — 仅当 loop 上尚无 ssa_risks_filter_json
 //   - [BuildSSARisksFilterFromLoop] — 消费路径只读 loop 上的 ssa_risks_filter_json + 短 user query，不再读附件

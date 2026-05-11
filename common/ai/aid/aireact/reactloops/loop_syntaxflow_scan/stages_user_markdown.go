@@ -4,25 +4,23 @@ package loop_syntaxflow_scan
 
 import (
 	"fmt"
+	"hash/fnv"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	sfutil "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/syntaxflow_utils"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
 
-const (
-	// SkipQueryProductHint 为对外说明中「skip」的共性原因（不暴露引擎内部名）。
-	SkipQueryProductHint = "当某条规则与目标语言/工程形态不一致时，引擎会跳过该规则（不视为执行失败）。"
+const scanConfigJSONMaxRunes = 8000
 
-	scanConfigJSONMaxRunes = 8000
-)
-
-// AppendUserStageLog 在 interpret 子环上累加**用户向**阶段块，供 P4 物化与报告输入引用。
+// AppendUserStageLog 在编排环上累加**用户向**阶段块，供 P4 物化与报告输入引用。
 func AppendUserStageLog(loop *reactloops.ReActLoop, block string) {
 	if loop == nil {
 		return
@@ -39,14 +37,102 @@ func AppendUserStageLog(loop *reactloops.ReActLoop, block string) {
 	loop.Set(sfutil.LoopVarSFUserStageLog, prev+"\n\n---\n\n"+block)
 }
 
-// OrchestratorParentTaskID 与编排父任务 Id 对齐（用于主对话去重键）；无则回退 fallback。
-func OrchestratorParentTaskID(loop *reactloops.ReActLoop, fallback string) string {
+const (
+	// NodeIDSyntaxFlowStageReport 主对话区流式 Markdown（与 EVENT_TYPE_STRUCTURED 的 progress 节点区分）
+	NodeIDSyntaxFlowStageReport = "syntaxflow_scan_stage_report"
+)
+
+var stageMarkdownOnce sync.Map
+
+func dedupKey(taskID, phaseKey string) string {
+	if taskID == "" {
+		taskID = "_"
+	}
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(taskID + "|" + phaseKey))
+	return fmt.Sprintf("%x", h.Sum32())
+}
+
+// EmitSyntaxFlowStageMarkdown 向主对话区推送**引擎组装**的阶段性 Markdown（与 EmitSyntaxFlowScanPhase 的 JSON 进度互补）。
+// parentTaskID 优先用编排任务 Id；空则回退 GetCurrentTask()。
+// phaseKey 用于去重（同 parentTask+phase 只发一次）。title/body 会截断。
+func EmitSyntaxFlowStageMarkdown(loop *reactloops.ReActLoop, parentTaskID, phaseKey, title, body string) {
 	if loop == nil {
-		return strings.TrimSpace(fallback)
+		return
 	}
-	if s := strings.TrimSpace(loop.Get("sf_orchestrator_parent_task_id")); s != "" {
-		return s
+	taskID := strings.TrimSpace(parentTaskID)
+	if taskID == "" {
+		if task := loop.GetCurrentTask(); task != nil {
+			taskID = task.GetId()
+		}
 	}
+	if _, loaded := stageMarkdownOnce.LoadOrStore(dedupKey(taskID, phaseKey), true); loaded {
+		return
+	}
+	em := loop.GetEmitter()
+	if em == nil {
+		return
+	}
+	t := strings.TrimSpace(title)
+	if t == "" {
+		t = "SyntaxFlow 阶段"
+	}
+	b := strings.TrimSpace(body)
+	if b == "" {
+		b = "（无正文）"
+	}
+	doc := fmt.Sprintf("## %s\n\n%s\n", t, utils.ShrinkTextBlock(b, 12000))
+	if _, err := em.EmitTextMarkdownStreamEvent(
+		NodeIDSyntaxFlowStageReport,
+		strings.NewReader(doc),
+		taskID,
+		func() {},
+	); err != nil {
+		log.Debugf("syntaxflow stage markdown: %v", err)
+	}
+}
+
+// EmitSyntaxFlowUserStageMarkdown 用户向、章节化长文档：写入 `sfu.LoopVarSFUserStageLog` 并推主对话；`phaseKey` 须唯一以允许心跳等重复型帧去重不冲突（如 p1_hb_3）。
+// fullDocument 可含以 `#` 开头的顶级标题，不再包一层 `##`。
+func EmitSyntaxFlowUserStageMarkdown(loop *reactloops.ReActLoop, parentTaskID, phaseKey, fullDocument string) {
+	if loop == nil {
+		return
+	}
+	taskID := strings.TrimSpace(parentTaskID)
+	if taskID == "" {
+		if task := loop.GetCurrentTask(); task != nil {
+			taskID = task.GetId()
+		}
+	}
+	if _, loaded := stageMarkdownOnce.LoadOrStore(dedupKey(taskID, phaseKey), true); loaded {
+		return
+	}
+	doc := strings.TrimSpace(fullDocument)
+	if doc == "" {
+		return
+	}
+	AppendUserStageLog(loop, doc)
+	if len(doc) > 16000 {
+		doc = utils.ShrinkTextBlock(doc, 16000) + "\n"
+	} else {
+		doc += "\n"
+	}
+	em := loop.GetEmitter()
+	if em == nil {
+		return
+	}
+	if _, err := em.EmitTextMarkdownStreamEvent(
+		NodeIDSyntaxFlowStageReport,
+		strings.NewReader(doc),
+		taskID,
+		func() {},
+	); err != nil {
+		log.Debugf("syntaxflow user stage markdown: %v", err)
+	}
+}
+
+// OrchestratorParentTaskID 返回用于阶段 Markdown 去重的任务 Id；传入 task.GetId() 作为 fallback。
+func OrchestratorParentTaskID(_ *reactloops.ReActLoop, fallback string) string {
 	return strings.TrimSpace(fallback)
 }
 

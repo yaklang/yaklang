@@ -7,6 +7,7 @@ import (
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/syntaxflow_scan"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -35,16 +36,25 @@ func LoadScanSessionResult(db *gorm.DB, taskID string, riskSampleLimit int) (*Sc
 		riskSampleLimit = DefaultRiskSampleLimit
 	}
 
-	_, tasks, err := yakit.QuerySyntaxFlowScanTask(db, &ypb.QuerySyntaxFlowScanTaskRequest{
-		Filter: &ypb.SyntaxFlowScanTaskFilter{
-			TaskIds: []string{taskID},
-		},
-		Pagination: &ypb.Paging{Page: 1, Limit: 1, OrderBy: "id", Order: "desc"},
-	})
-	if err != nil || len(tasks) == 0 {
-		return nil, utils.Errorf("syntaxflow scan task not found: %v", err)
+	var st *schema.SyntaxFlowScanTask
+	if stMem, ok := syntaxflow_scan.GetScanTaskMemoryCache(taskID); ok {
+		st = stMem
+	} else {
+		_, tasks, err := yakit.QuerySyntaxFlowScanTask(db, &ypb.QuerySyntaxFlowScanTaskRequest{
+			Filter: &ypb.SyntaxFlowScanTaskFilter{
+				TaskIds: []string{taskID},
+			},
+			Pagination: &ypb.Paging{Page: 1, Limit: 1, OrderBy: "id", Order: "desc"},
+		})
+		if err != nil {
+			return nil, utils.Errorf("syntaxflow scan task query failed: %v", err)
+		}
+		if len(tasks) == 0 {
+			return nil, utils.Errorf("syntaxflow scan task not found for task_id=%q (no DB row and no in-process cache)", taskID)
+		}
+		st = tasks[0]
+		syntaxflow_scan.PutScanTaskMemoryCache(st)
 	}
-	st := tasks[0]
 
 	riskFilter := &ypb.SSARisksFilter{
 		RuntimeID: []string{taskID},

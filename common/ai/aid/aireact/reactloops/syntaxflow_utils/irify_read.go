@@ -41,40 +41,6 @@ func ReadIrifySSARiskIDFromTask(task aicommon.AIStatefulTask) (int64, bool) {
 	return 0, false
 }
 
-// readIrifySessionModeFromTask returns attach/start from irify_syntaxflow#session_mode, or "".
-func readIrifySessionModeFromTask(task aicommon.AIStatefulTask) string {
-	if task == nil {
-		return ""
-	}
-	for _, a := range task.GetAttachedDatas() {
-		if a == nil || a.Type != IrifyTypeSyntaxFlow || a.Key != IrifyKeySessionMode {
-			continue
-		}
-		m := strings.ToLower(strings.TrimSpace(a.Value))
-		if m == SessionModeAttach || m == SessionModeStart {
-			return m
-		}
-	}
-	return ""
-}
-
-// readIrifyRuleFullQualityFromTask returns true if irify_syntaxflow_rule#full_quality is truthy.
-func readIrifyRuleFullQualityFromTask(task aicommon.AIStatefulTask) bool {
-	if task == nil {
-		return false
-	}
-	for _, a := range task.GetAttachedDatas() {
-		if a == nil || a.Type != IrifyTypeSyntaxFlowRule || a.Key != IrifyKeyFullQuality {
-			continue
-		}
-		switch strings.ToLower(strings.TrimSpace(a.Value)) {
-		case "true", "1", "yes", "on":
-			return true
-		}
-	}
-	return false
-}
-
 // buildSSARisksFilterFromTaskAttachments assembles a filter from irify_ssa_risks_filter attachments only.
 // Returns (nil, false) when the task has no filter attachments with usable data.
 func buildSSARisksFilterFromTaskAttachments(task aicommon.AIStatefulTask) (*ypb.SSARisksFilter, bool) {

@@ -140,6 +140,7 @@ func createSyntaxflowTaskById(
 	}
 	m.setScanBatch()
 
+	m.primeMemoryTaskCache()
 	return m, nil
 }
 
@@ -161,15 +162,22 @@ func (m *scanManager) setScanBatch() {
 	}
 }
 
-// SaveTask save task info which is from manager to database
-func (m *scanManager) SaveTask() error {
+// primeMemoryTaskCache records the task row before the first periodic SaveTask persists to DB, so readers
+// (e.g. react loop LoadScanSessionResult) can resolve task_id immediately.
+func (m *scanManager) primeMemoryTaskCache() {
 	if m == nil {
-		// return utils.Errorf("manager is nil ")
-		return nil
+		return
 	}
 	m.lock.Lock()
-	defer m.lock.Unlock()
+	m.saveTaskRecorderLocked()
+	snap := cloneSyntaxFlowScanTaskForCache(m.taskRecorder)
+	m.lock.Unlock()
+	if snap != nil && strings.TrimSpace(snap.TaskId) != "" {
+		PutScanTaskMemoryCache(snap)
+	}
+}
 
+func (m *scanManager) saveTaskRecorderLocked() {
 	if m.taskRecorder == nil {
 		m.taskRecorder = &schema.SyntaxFlowScanTask{}
 	}
@@ -182,6 +190,7 @@ func (m *scanManager) SaveTask() error {
 	m.taskRecorder.RiskCount = m.GetRiskCount()
 	m.taskRecorder.TotalQuery = m.GetTotalQuery()
 	m.taskRecorder.Kind = m.kind
+	m.taskRecorder.RulesCount = m.rulesCount
 
 	m.taskRecorder.Config, _ = json.Marshal(m.Config)
 	// m.taskRecorder.RuleNames, _ = json.Marshal(m.ruleNames)
@@ -210,7 +219,22 @@ func (m *scanManager) SaveTask() error {
 			m.taskRecorder.RiskCount = riskTotal
 		}
 	}
+}
+
+// SaveTask save task info which is from manager to database
+func (m *scanManager) SaveTask() error {
+	if m == nil {
+		// return utils.Errorf("manager is nil ")
+		return nil
+	}
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	m.saveTaskRecorderLocked()
 	err := schema.SaveSyntaxFlowScanTask(ssadb.GetDB(), m.taskRecorder)
+	if err == nil {
+		PutScanTaskMemoryCache(cloneSyntaxFlowScanTaskForCache(m.taskRecorder))
+	}
 	return err
 }
 

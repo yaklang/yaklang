@@ -1,34 +1,239 @@
+// Phase 1: irify_syntaxflow attachments + LiteForge → intake signals committed to state/loop vars.
 package loop_syntaxflow_scan
 
 import (
+	"context"
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	sfu "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/syntaxflow_utils"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
-// clearStaleSyntaxFlowTaskID 在走「新扫 / 本地编译」路径时清空父 loop 上的 task_id，避免同一会话上一轮扫描遗留的
-// syntaxflow_task_id 覆盖本次显式配置（否则 phase_compile 会误走 attach、不再 LoadPrograms/StartScan）。
-func clearStaleSyntaxFlowTaskID(state *SyntaxFlowState, parentLoop *reactloops.ReActLoop) {
-	state.SetTaskID("")
-	if parentLoop != nil {
-		parentLoop.Set(sfu.LoopVarSyntaxFlowTaskID, "")
+// ParseSyntaxFlowScanIntakeSignalsFromAttachments 读取 irify_syntaxflow 上 session_mode / task_id / sf_scan_config_json。
+// 同 key 多条时，最后一条非空胜出。
+func ParseSyntaxFlowScanIntakeSignalsFromAttachments(task aicommon.AIStatefulTask) SyntaxFlowScanIntakeSignals {
+	var out SyntaxFlowScanIntakeSignals
+	if task == nil {
+		return out
 	}
+	for _, a := range task.GetAttachedDatas() {
+		if a == nil || a.Type != sfu.IrifyTypeSyntaxFlow {
+			continue
+		}
+		switch a.Key {
+		case sfu.IrifyKeySessionMode:
+			out.Mode = ParseSyntaxFlowScanSessionMode(a.Value)
+		case sfu.IrifyKeyTaskID:
+			if v := strings.TrimSpace(a.Value); v != "" {
+				out.TaskID = v
+			}
+		case sfu.IrifyKeySFScanConfigJSON:
+			if v := strings.TrimSpace(a.Value); v != "" {
+				out.SFScanConfigJSON = v
+			}
+		}
+	}
+	return out
 }
 
-// runPhase1Intake resolves task_id, explicit sf_scan_config_json, or project_path (WithVar, then LiteForge). Updates state and parent loop vars.
-//
-// 语义与顺序：
-// 1) **显式新扫**（`sf_scan_config_json` / `project_path` / LiteForge 项目路径）优先于只读 task 附着。
-// 2) `syntaxflow_scan_session_mode` 或 `irify_syntaxflow#session_mode`：值为 `start` 表示**新扫**（忽略 irify 随附的 `task_id` 附件，仅可 WithVar 显式 task_id 仍会被 clear 掉）；值为 `attach` 表示**附着已有**。
-// 3) 未显式设 session_mode 时，仍兼容仅带 `irify_syntaxflow/task_id` 的**附着**行为。
+// ForgeSyntaxFlowScanIntakeSignals 从用户自然语言抽取负载；Mode 保持 none，提交时由 commitScanFromIntakeSignals 写入 Attach/Start。
+func ForgeSyntaxFlowScanIntakeSignals(ctx context.Context, r aicommon.AIInvokeRuntime, userInput string) (SyntaxFlowScanIntakeSignals, error) {
+	var zero SyntaxFlowScanIntakeSignals
+
+	promptTpl := `From the user message, extract at most ONE primary kind of SyntaxFlow scan intake (see rules).
+
+## User message
+<|USER_INPUT_{{ .Nonce }}|>
+{{ .UserInput }}
+<|USER_INPUT_END_{{ .Nonce }}|>
+
+## Rules
+1. task_id: an **existing** SyntaxFlow scan runtime id / UUID in SSA (attach to that scan). Not a file path.
+2. project_path: a single local **absolute** directory (or file under a project) to start a **new** scan.
+3. sf_scan_config_json: the **full** code-scan JSON body (same as yak code-scan --config). Only if the user pasted near-valid JSON.
+4. Prefer leaving all three empty if ambiguous or if the user gave multiple conflicting signals.
+5. At most one of task_id / project_path / sf_scan_config_json should be non-empty.
+
+Return structured fields.`
+
+	rendered, err := utils.RenderTemplate(promptTpl, map[string]any{
+		"Nonce":     utils.RandStringBytes(4),
+		"UserInput": userInput,
+	})
+	if err != nil {
+		return zero, utils.Wrap(err, "render syntaxflow intake forge prompt")
+	}
+
+	result, err := r.InvokeSpeedPriorityLiteForge(
+		ctx,
+		"extract-syntaxflow-scan-intake",
+		rendered,
+		[]aitool.ToolOption{
+			aitool.WithStringParam("task_id",
+				aitool.WithParam_Required(false),
+				aitool.WithParam_Description("Existing scan task id or empty")),
+			aitool.WithStringParam("project_path",
+				aitool.WithParam_Required(false),
+				aitool.WithParam_Description("Absolute project path for new scan or empty")),
+			aitool.WithStringParam("sf_scan_config_json",
+				aitool.WithParam_Required(false),
+				aitool.WithParam_Description("Full code-scan JSON string or empty")),
+			aitool.WithStringParam("reason",
+				aitool.WithParam_Required(false),
+				aitool.WithParam_Description("Brief justification")),
+		},
+		aicommon.WithGeneralConfigStreamableFieldWithNodeId("intent", "reason"),
+	)
+	if err != nil {
+		return zero, err
+	}
+
+	out := SyntaxFlowScanIntakeSignals{
+		TaskID:           strings.TrimSpace(result.GetString("task_id")),
+		ProjectPath:      strings.TrimSpace(result.GetString("project_path")),
+		SFScanConfigJSON: strings.TrimSpace(result.GetString("sf_scan_config_json")),
+		Reason:           result.GetString("reason"),
+	}
+	log.Infof("[syntaxflow_scan] intake forge: task_id=%q path=%q json_len=%d reason=%q",
+		out.TaskID, out.ProjectPath, len(out.SFScanConfigJSON), out.Reason)
+	return out, nil
+}
+
+func requireLocalPathForScan(p string) error {
+	p = strings.TrimSpace(p)
+	if p == "" {
+		return fmt.Errorf("项目路径为空")
+	}
+	ok, err := utils.PathExists(p)
+	if err != nil {
+		return fmt.Errorf("检查路径失败 %q: %w", p, err)
+	}
+	if !ok {
+		return fmt.Errorf("路径不存在或不可访问: %s", p)
+	}
+	return nil
+}
+
+// commitNewScan 写入新扫：Mode=start，清空 task_id；可仅含 code-scan JSON、或仅含本地项目路径（由 P2 经 ssa_compile 探测+编译）。
+func commitNewScan(state *SyntaxFlowState, loop *reactloops.ReActLoop, sfJSON string, configInferred string, intakeProjectPath string) error {
+	sfJSON = strings.TrimSpace(sfJSON)
+	intakeProjectPath = strings.TrimSpace(intakeProjectPath)
+	if sfJSON == "" && intakeProjectPath == "" {
+		return fmt.Errorf("新扫需要 sf_scan_config_json 与项目路径至少其一")
+	}
+	state.SetTaskID("")
+	state.SetSessionMode(SyntaxFlowSessionModeStart)
+	state.SetProjectPath(intakeProjectPath)
+	loop.Set(sfu.LoopVarSyntaxFlowScanSessionMode, sfu.SessionModeStart)
+	loop.Set(sfu.LoopVarSFScanConfigJSON, sfJSON)
+	state.SetSFScanConfigJSON(sfJSON)
+	inferred := strings.TrimSpace(configInferred)
+	if inferred == "" {
+		inferred = "0"
+	}
+	state.SetConfigInferred(inferred)
+	return nil
+}
+
+// commitAttachScan 写入附着：task_id 存在性在 runPhase1Intake 结束前统一校验（validateAttachTaskAfterPhase1）。
+func commitAttachScan(state *SyntaxFlowState, loop *reactloops.ReActLoop, taskID string) error {
+	taskID = strings.TrimSpace(taskID)
+	if taskID == "" {
+		return fmt.Errorf("附着需要非空的 syntaxflow_task_id")
+	}
+	state.SetProjectPath("")
+	state.SetSessionMode(SyntaxFlowSessionModeAttach)
+	loop.Set(sfu.LoopVarSyntaxFlowScanSessionMode, sfu.SessionModeAttach)
+	state.SetTaskID(taskID)
+	loop.Set(sfu.LoopVarSyntaxFlowTaskID, taskID)
+	return nil
+}
+
+// commitAttachScanWithOptionalResolvedJSON 附着并可选附带一份配置 JSON（仅存 state.SFScanConfigJSON，不参与 compile 主路径）。
+func commitAttachScanWithOptionalResolvedJSON(state *SyntaxFlowState, loop *reactloops.ReActLoop, taskID string, optionalJSON string) error {
+	if err := commitAttachScan(state, loop, taskID); err != nil {
+		return err
+	}
+	if j := strings.TrimSpace(optionalJSON); j != "" {
+		state.SetSFScanConfigJSON(j)
+		state.SetConfigInferred("0")
+	}
+	return nil
+}
+
+// errIntakeSignalsUnmatched 表示 Mode 为 none 且 task_id / JSON / path 均未形成可提交负载；调用方（如再走 LiteForge）。
+var errIntakeSignalsUnmatched = errors.New("syntaxflow intake: no matching signals")
+
+// commitScanFromIntakeSignals 将 intake 落到 state/loop：显式 Mode 走 attach/start；Mode==none 时按 task_id → JSON → project_path 推导并写入对应 Mode 与路径快照。
+// 成功提交返回 nil；无可行负载返回 [errIntakeSignalsUnmatched]；其余为校验/数据库/路径等错误。
+// fromIrifyAttachment：为 true 时，无显式 Mode 下若同时给出 task_id 与 sf_scan_config_json 则报错（须显式 session_mode）；LiteForge 路径传 false。
+func commitScanFromIntakeSignals(state *SyntaxFlowState, loop *reactloops.ReActLoop, s SyntaxFlowScanIntakeSignals, fromIrifyAttachment bool) error {
+	switch s.Mode {
+	case SyntaxFlowSessionModeNone:
+		break // 见下方推导：成功后 Mode 必为 attach 或 start
+	case SyntaxFlowSessionModeAttach:
+		loop.Set(sfu.LoopVarSyntaxFlowScanSessionMode, sfu.SessionModeAttach)
+		return commitAttachScanWithOptionalResolvedJSON(state, loop, s.TaskID, s.SFScanConfigJSON)
+	case SyntaxFlowSessionModeStart:
+		loop.Set(sfu.LoopVarSyntaxFlowScanSessionMode, sfu.SessionModeStart)
+		j := strings.TrimSpace(s.SFScanConfigJSON)
+		pp := strings.TrimSpace(s.ProjectPath)
+		if j != "" {
+			return commitNewScan(state, loop, j, "0", pp)
+		}
+		if pp == "" {
+			return fmt.Errorf("session_mode=start 需要 sf_scan_config_json 或 project_path")
+		}
+		if err := requireLocalPathForScan(pp); err != nil {
+			return err
+		}
+		return commitNewScan(state, loop, "", "1", pp)
+	default:
+		return fmt.Errorf("附件 session_mode 无效（仅 attach 或 start）")
+	}
+
+	if fromIrifyAttachment && strings.TrimSpace(s.TaskID) != "" && strings.TrimSpace(s.SFScanConfigJSON) != "" {
+		return fmt.Errorf("附件同时含 task_id 与 sf_scan_config_json，请补充 irify_syntaxflow#session_mode")
+	}
+	if id := strings.TrimSpace(s.TaskID); id != "" {
+		return commitAttachScan(state, loop, id)
+	}
+	if j := strings.TrimSpace(s.SFScanConfigJSON); j != "" {
+		return commitNewScan(state, loop, j, "0", "")
+	}
+	if pp := strings.TrimSpace(s.ProjectPath); pp != "" {
+		if err := requireLocalPathForScan(pp); err != nil {
+			return err
+		}
+		return commitNewScan(state, loop, "", "1", pp)
+	}
+	return errIntakeSignalsUnmatched
+}
+
+// validateAttachTaskAfterPhase1 附着模式下校验 task_id 在 SSA 工程库存在（含「附着 + 可选 JSON」等路径）。
+func validateAttachTaskAfterPhase1(state *SyntaxFlowState) error {
+	if state.GetSessionMode() != SyntaxFlowSessionModeAttach {
+		return nil
+	}
+	tid := strings.TrimSpace(state.GetTaskID())
+	if tid == "" {
+		return fmt.Errorf("附着模式但 task_id 为空")
+	}
+	db := sfu.GetSSADB()
+	if db == nil {
+		return fmt.Errorf("SSA 工程库未连接，无法校验 task_id")
+	}
+	return EnsureSyntaxFlowScanTaskExists(db, tid)
+}
+
+// runPhase1Intake 仅从 irify_syntaxflow 附件与 LiteForge 解析入参。
+// 新扫时清空 state.TaskID；不向 loop 做「清理」型写入。
 func runPhase1Intake(
 	r aicommon.AIInvokeRuntime,
 	state *SyntaxFlowState,
@@ -36,190 +241,34 @@ func runPhase1Intake(
 	task aicommon.AIStatefulTask,
 ) error {
 	state.SetPhase(SyntaxFlowPhaseIntake)
+
+	ctx := task.GetContext()
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	userInput := task.GetUserInput()
 
-	sfu.SyncSyntaxFlowLoopVarsFromIrifyTask(parentLoop, task)
-	mode := strings.ToLower(strings.TrimSpace(parentLoop.Get(sfu.LoopVarSyntaxFlowScanSessionMode)))
-	if mode != "" {
-		parentLoop.Set(sfu.LoopVarSyntaxFlowScanSessionMode, mode)
-	}
-	// 新扫：先清可能来自底座/上层的 task_id 变量，且后续不采纳 irify 的 task_id 附件
-	if mode == sfu.SessionModeStart {
-		clearStaleSyntaxFlowTaskID(state, parentLoop)
-	}
-
-	if j := strings.TrimSpace(parentLoop.Get(sfu.LoopVarSFScanConfigJSON)); j != "" {
-		clearStaleSyntaxFlowTaskID(state, parentLoop)
-		state.SetResolvedSFScanConfigJSON(j)
-		state.SetConfigInferred("0")
-		return nil
-	}
-
-	proj := strings.TrimSpace(parentLoop.Get(sfu.LoopVarProjectPath))
-	if proj == "" {
-		proj = strings.TrimSpace(parentLoop.Get("target_path")) // common alias
-	}
-	if proj != "" {
-		clearStaleSyntaxFlowTaskID(state, parentLoop)
-		if err := pathMustExistForScan(proj); err != nil {
+	attached := ParseSyntaxFlowScanIntakeSignalsFromAttachments(task)
+	if err := commitScanFromIntakeSignals(state, parentLoop, attached, true); err != nil {
+		if !errors.Is(err, errIntakeSignalsUnmatched) {
 			return err
 		}
-		j, err := BuildCodeScanJSONForLocalPath(proj)
-		if err != nil {
-			return fmt.Errorf("build scan config for project path %s: %w", proj, err)
-		}
-		state.SetResolvedSFScanConfigJSON(j)
-		state.SetConfigInferred("1")
-		parentLoop.Set(sfu.LoopVarSFScanConfigJSON, j)
-		return nil
-	}
-
-	ex, err := ExtractSyntaxFlowScanIntake(task.GetContext(), r, userInput)
-	if err != nil {
-		log.Warnf("[syntaxflow_scan] LiteForge intake failed: %v", err)
 	} else {
-		if ex.ProjectPath != "" {
-			clearStaleSyntaxFlowTaskID(state, parentLoop)
-			if err := pathMustExistForScan(ex.ProjectPath); err != nil {
-				return err
-			}
-			j, berr := BuildCodeScanJSONForLocalPath(ex.ProjectPath)
-			if berr != nil {
-				return fmt.Errorf("build scan config for extracted project path: %w", berr)
-			}
-			state.SetResolvedSFScanConfigJSON(j)
-			state.SetConfigInferred("1")
-			parentLoop.Set(sfu.LoopVarSFScanConfigJSON, j)
-			return nil
-		}
-		// 新扫模式下不从自然语言采纳「已有 task_id」
-		if ex.TaskID != "" && mode != sfu.SessionModeStart {
-			state.SetTaskID(ex.TaskID)
-			parentLoop.Set(sfu.LoopVarSyntaxFlowTaskID, ex.TaskID)
-			return nil
-		}
+		return validateAttachTaskAfterPhase1(state)
 	}
 
-	// 仅 attach / 未声明 start：接受 WithVar 与已在 Sync 中写入的 syntaxflow_task_id
-	if id := strings.TrimSpace(parentLoop.Get(sfu.LoopVarSyntaxFlowTaskID)); id != "" {
-		state.SetTaskID(id)
-		parentLoop.Set(sfu.LoopVarSyntaxFlowTaskID, id)
-		return nil
-	}
-
-	if mode == sfu.SessionModeStart {
-		return fmt.Errorf("当前为**新扫**（`syntaxflow_scan_session_mode` 或 `irify_syntaxflow#session_mode` = `start`）：已忽略 `task_id` 随附/解析结果；请提供 `sf_scan_config_json`、`project_path` 或含**绝对**目录的自然语言，以进行本地编译与起扫。")
-	}
-	if mode == sfu.SessionModeAttach {
-		return fmt.Errorf("当前为**附着**（`session_mode=attach`），但未解析到有效 `task_id`：请随任务附加 `irify_syntaxflow` + `task_id`，或设置 loop 变量 `syntaxflow_task_id`。")
-	}
-	return fmt.Errorf("missing scan input: set Loop var `syntaxflow_task_id` or `sf_scan_config_json` or `project_path` (or say an absolute project path in your message). Example: attach task id `syntaxflow_task_id=...` or new scan: `请扫描 /path/to/project`")
-}
-
-func pathMustExistForScan(p string) error {
-	_, err := os.Stat(strings.TrimSpace(p))
+	forged, err := ForgeSyntaxFlowScanIntakeSignals(ctx, r, userInput)
 	if err != nil {
-		return fmt.Errorf("project path not accessible: %s: %w", p, err)
+		return fmt.Errorf("irify_syntaxflow 无扫描负载且 LiteForge 失败: %w", err)
 	}
-	return nil
-}
 
-// --- scan session (DB + formatting) ---
-
-// DefaultRiskSampleLimit is re-exported from syntaxflow_utils.
-const DefaultRiskSampleLimit = sfu.DefaultRiskSampleLimit
-
-// ScanSessionResult is re-exported from syntaxflow_utils.
-type ScanSessionResult = sfu.ScanSessionResult
-
-// LoadScanSessionResult loads task row + risk count + up to riskSampleLimit risks for AI preface.
-func LoadScanSessionResult(db *gorm.DB, taskID string, riskSampleLimit int) (*ScanSessionResult, error) {
-	return sfu.LoadScanSessionResult(db, taskID, riskSampleLimit)
-}
-
-// FormatScanTaskProgressLine summarizes query progress from the task row.
-func FormatScanTaskProgressLine(st *schema.SyntaxFlowScanTask) string {
-	return sfu.FormatScanTaskProgressLine(st)
-}
-
-// FormatSyntaxFlowScanEndReport is a one-line scan-end summary for pipeline / logs.
-func FormatSyntaxFlowScanEndReport(st *schema.SyntaxFlowScanTask) string {
-	if st == nil {
-		return ""
-	}
-	return fmt.Sprintf(
-		"【扫描终态】 task_id=%s status=%s reason=%q programs=%s kind=%s\n"+
-			"【规则/Query】 rules_count=%d total_query=%d success=%d failed=%d skip=%d\n"+
-			"【Risk 分级】 total=%d critical=%d high=%d warn=%d low=%d info=%d",
-		st.TaskId, st.Status, st.Reason, st.Programs, string(st.Kind),
-		st.RulesCount, st.TotalQuery, st.SuccessQuery, st.FailedQuery, st.SkipQuery,
-		st.RiskCount, st.CriticalCount, st.HighCount, st.WarningCount, st.LowCount, st.InfoCount,
-	)
-}
-
-// FormatSyntaxFlowScanEndReportMarkdownTable 扫描结束用户向表格（主对话与 P4 输入），避免以内部 key 作主结构。
-func FormatSyntaxFlowScanEndReportMarkdownTable(st *schema.SyntaxFlowScanTask) string {
-	if st == nil {
-		return ""
-	}
-	var b strings.Builder
-	b.WriteString("## 扫描任务行终态（汇总）\n\n")
-	b.WriteString("| 字段 | 值 |\n| --- | --- |\n")
-	fmt.Fprintf(&b, "| task_id | `%s` |\n", st.TaskId)
-	fmt.Fprintf(&b, "| status | `%s` |\n", st.Status)
-	fmt.Fprintf(&b, "| reason | %s |\n", escapeScanTableCell(st.Reason))
-	fmt.Fprintf(&b, "| programs | %s |\n", escapeScanTableCell(st.Programs))
-	fmt.Fprintf(&b, "| kind | `%s` |\n", string(st.Kind))
-	b.WriteString("\n### Query 与规则批次\n\n")
-	b.WriteString("| 指标 | 数值 |\n| --- | ---: |\n")
-	fmt.Fprintf(&b, "| rules_count（批次数/规则配置相关） | %d |\n", st.RulesCount)
-	fmt.Fprintf(&b, "| total_query | %d |\n", st.TotalQuery)
-	fmt.Fprintf(&b, "| success | %d |\n", st.SuccessQuery)
-	fmt.Fprintf(&b, "| failed | %d |\n", st.FailedQuery)
-	fmt.Fprintf(&b, "| skip | %d |\n", st.SkipQuery)
-	b.WriteString("\n**skip 说明**: " + SkipQueryProductHint + "\n\n")
-	b.WriteString("### 风险分级汇总\n\n")
-	b.WriteString("| 级别 | 条数 |\n| --- | ---: |\n")
-	fmt.Fprintf(&b, "| total | %d |\n", st.RiskCount)
-	fmt.Fprintf(&b, "| critical | %d |\n", st.CriticalCount)
-	fmt.Fprintf(&b, "| high | %d |\n", st.HighCount)
-	fmt.Fprintf(&b, "| warning | %d |\n", st.WarningCount)
-	fmt.Fprintf(&b, "| low | %d |\n", st.LowCount)
-	fmt.Fprintf(&b, "| info | %d |\n", st.InfoCount)
-	return b.String()
-}
-
-func escapeScanTableCell(s string) string {
-	s = strings.ReplaceAll(s, "\n", " ")
-	s = strings.ReplaceAll(s, "|", "¦")
-	return s
-}
-
-// --- task validate ---
-
-// ErrSyntaxFlowScanTaskNotFound 附着 task_id 在 SSA 工程库中无对应任务行时返回（errors.Is 可判断）。
-var ErrSyntaxFlowScanTaskNotFound = errors.New("syntaxflow scan task not found in SSA DB")
-
-// EnsureSyntaxFlowScanTaskExists 校验 `syntaxflow_scan_task` 中是否存在该 task_id（SSA runtime id）。
-// 用于 **attach** 路径在编排层尽早失败，避免进入 phase 后才读库才报错。
-func EnsureSyntaxFlowScanTaskExists(db *gorm.DB, taskID string) error {
-	if db == nil {
-		return fmt.Errorf("SSA 工程库未连接，无法校验 task_id")
-	}
-	tid := strings.TrimSpace(taskID)
-	if tid == "" {
-		return fmt.Errorf("task_id 为空，无法执行附着")
-	}
-	st, err := schema.GetSyntaxFlowScanTaskById(db, tid)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return fmt.Errorf("%w: task_id=%q 在库中无 SyntaxFlow 扫描任务行（请确认已落库或 id 非粘贴错误）: %v",
-				ErrSyntaxFlowScanTaskNotFound, tid, err)
+	if err := commitScanFromIntakeSignals(state, parentLoop, forged, false); err != nil {
+		if errors.Is(err, errIntakeSignalsUnmatched) {
+			log.Infof("[syntaxflow_scan] intake forge empty: reason=%q", forged.Reason)
+			return fmt.Errorf("irify_syntaxflow 无扫描参数，用户输入也未给出 task_id、路径或 sf_scan_config_json（可补充附件 session_mode）")
 		}
-		return fmt.Errorf("无法读取扫描任务行 task_id=%q: %w", tid, err)
+		return err
 	}
-	if st == nil {
-		return fmt.Errorf("%w: task_id=%q", ErrSyntaxFlowScanTaskNotFound, tid)
-	}
-	return nil
+	state.SetIntakeReason(forged.Reason)
+	return validateAttachTaskAfterPhase1(state)
 }

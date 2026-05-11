@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
@@ -43,4 +44,10 @@ func ParseProjectWithName(ctx context.Context, config *ssaconfig.Config, program
 		ForceProgramName:            true,
 		DisableTimestampProgramName: true,
 	})
+}
+
+// LoadProgramsMatchingName returns SSA application programs already stored in the profile DB,
+// matching the given name or REGEXP pattern (same semantics as [ssaapi.LoadProgramRegexp]).
+func LoadProgramsMatchingName(match string) []*ssaapi.Program {
+	return ssaapi.LoadProgramRegexp(match)
 }

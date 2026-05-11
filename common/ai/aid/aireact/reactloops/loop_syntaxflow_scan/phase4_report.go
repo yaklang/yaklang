@@ -82,28 +82,25 @@ func ApplyFinalReportContextWhenScanAlreadyDone(
 	AppendSFPipelineLine(loop, fmt.Sprintf("【4·全量风险列表】初载已结束任务：最多 %d 条", lim))
 	AppendSfScanInterpretLog(loop, r, taskID, "init: 扫描已非 executing，已灌入终态总结与全表风险抽样")
 
-	pipe := loop.Get(sfu.LoopVarSFPipelineSummary)
 	prev := loop.Get("sf_scan_review_preface")
-	full := "【==== 大总结用数据：须纳入终局报告 ====】\n\n" +
-		"【A·各阶段 pipeline】\n" + pipe + "\n\n" +
-		"【B·扫描行终态】\n" + endText + "\n\n" +
-		"【C·上文会话摘要 + risk 样例】\n" + prev
-	loop.Set("sf_scan_review_preface", full)
+	loop.Set("sf_scan_review_preface",
+		"扫描已非 executing；终局数据见 sf_scan_pipeline_summary、sf_scan_scan_end_summary、ssa_risk_list_summary。\n\n"+
+			utils.ShrinkTextBlock(prev, 4000))
 	loop.Set(sfu.LoopVarSFFinalReportDue, "1")
 	// 无后台 poll 时，任务行已终态、一次性读入即可视为可成稿
 	loop.Set(sfu.LoopVarSFRiskConverged, "1")
 }
 
-// runPhaseReportGenerating 在解读子环结束后，物化数据并委托 report_generating 子环落盘终稿（与 code_security_audit/phase4 同构，软失败）。
+// runPhaseReportGenerating 在风险收敛后物化数据并委托 report_generating 子环落盘终稿（软失败）。
 func runPhaseReportGenerating(
 	r aicommon.AIInvokeRuntime,
-	interpretLoop *reactloops.ReActLoop,
+	scanLoop *reactloops.ReActLoop,
 	parentTask aicommon.AIStatefulTask,
 ) {
-	if r == nil || interpretLoop == nil || parentTask == nil {
+	if r == nil || scanLoop == nil || parentTask == nil {
 		return
 	}
-	baseDir := interpretLoop.GetLoopContentDir("syntaxflow_scan")
+	baseDir := scanLoop.GetLoopContentDir("syntaxflow_scan")
 	if err := os.MkdirAll(baseDir, 0o755); err != nil {
 		log.Warnf("[syntaxflow_scan] report: mkdir: %v", err)
 		r.AddToTimeline("syntaxflow_scan", "终局报告：创建工作目录失败: "+err.Error())
@@ -112,7 +109,7 @@ func runPhaseReportGenerating(
 	inPath := filepath.Join(baseDir, "syntaxflow_scan_report_input.md")
 	outPath := filepath.Join(baseDir, "syntaxflow_scan_report.md")
 
-	inputBody := buildSyntaxflowReportInputMarkdown(interpretLoop, parentTask)
+	inputBody := buildSyntaxflowReportInputMarkdown(scanLoop, parentTask)
 	if err := os.WriteFile(inPath, []byte(inputBody), 0o644); err != nil {
 		log.Warnf("[syntaxflow_scan] report: write input: %v", err)
 		r.AddToTimeline("syntaxflow_scan", "终局报告：写入 input 失败: "+err.Error())
@@ -123,7 +120,7 @@ func runPhaseReportGenerating(
 		return
 	}
 
-	writePrompt := buildSyntaxflowReportWritePrompt(interpretLoop, inPath, outPath)
+	writePrompt := buildSyntaxflowReportWritePrompt(scanLoop, inPath, outPath)
 	reportLoop, err := reactloops.CreateLoopByName(
 		schema.AI_REACT_LOOP_NAME_REPORT_GENERATING,
 		r,
@@ -163,11 +160,8 @@ func runPhaseReportGenerating(
 	if err == nil && len(content) > 0 {
 		preview := utils.ShrinkTextBlock(string(content), 3000)
 		r.AddToTimeline("syntaxflow_scan", fmt.Sprintf("终局报告已写入: %s（%d 字节）\n前略:\n%s", outPath, len(content), preview))
-		parentID := strings.TrimSpace(interpretLoop.Get(loopVarOrchestratorParentTaskID))
-		if parentID == "" {
-			parentID = parentTask.GetId()
-		}
-		EmitSyntaxFlowStageMarkdown(interpretLoop, parentID, "p4_report_done", "终局·SyntaxFlow 扫描报告已生成", fmt.Sprintf(
+		parentID := parentTask.GetId()
+		EmitSyntaxFlowStageMarkdown(scanLoop, parentID, "p4_report_done", "终局·SyntaxFlow 扫描报告已生成", fmt.Sprintf(
 			"**输出文件**: `%s`（%d 字节）\n\n**预览（截断）**:\n```markdown\n%s\n```",
 			outPath, len(content), preview,
 		))
@@ -176,45 +170,45 @@ func runPhaseReportGenerating(
 	}
 }
 
-func buildSyntaxflowReportInputMarkdown(interpretLoop *reactloops.ReActLoop, parentTask aicommon.AIStatefulTask) string {
+func buildSyntaxflowReportInputMarkdown(scanLoop *reactloops.ReActLoop, parentTask aicommon.AIStatefulTask) string {
 	var b strings.Builder
 	b.WriteString("# SyntaxFlow 扫描报告：引擎输入\n\n")
-	b.WriteString("以 **风险总览 + 扫描行终态 + 用户向阶段** 为主；`sf_scan_findings_doc` / `sf_scan_interpret_log` 仅附截断样例，完整以数据库与 `reload_ssa_risk_overview` 等工具为准。\n\n")
+	b.WriteString("以 **风险总览 + 扫描行终态 + 用户向阶段** 为主；`sf_scan_findings_doc` / `sf_scan_interpret_log` 仅附截断样例，完整以数据库与引擎灌入的 loop 变量为准。\n\n")
 	b.WriteString("## 用户原始目标\n\n")
 	b.WriteString(utils.ShrinkTextBlock(parentTask.GetUserInput(), 8000))
 	b.WriteString("\n\n## 各阶段用户向 `sf_scan_user_stage_log`\n\n")
-	b.WriteString(utils.ShrinkTextBlock(interpretLoop.Get(sfu.LoopVarSFUserStageLog), 12000))
+	b.WriteString(utils.ShrinkTextBlock(scanLoop.Get(sfu.LoopVarSFUserStageLog), 12000))
 	b.WriteString("\n\n## Risk 总览（`ssa_risk_list_summary` / `ssa_risk_total_hint`）\n\n")
 	b.WriteString("- **total_hint**: ")
-	b.WriteString(interpretLoop.Get("ssa_risk_total_hint"))
+	b.WriteString(scanLoop.Get("ssa_risk_total_hint"))
 	b.WriteString("\n\n")
-	b.WriteString(utils.ShrinkTextBlock(interpretLoop.Get("ssa_risk_list_summary"), 12000))
+	b.WriteString(utils.ShrinkTextBlock(scanLoop.Get("ssa_risk_list_summary"), 12000))
 	b.WriteString("\n\n## 扫描行终态与 pipeline\n\n")
 	b.WriteString("### 终局表 / 行摘要 `sf_scan_scan_end_summary`\n\n```\n")
-	b.WriteString(utils.ShrinkTextBlock(interpretLoop.Get(sfu.LoopVarSFScanEndSummary), 6000))
+	b.WriteString(utils.ShrinkTextBlock(scanLoop.Get(sfu.LoopVarSFScanEndSummary), 6000))
 	b.WriteString("\n```\n\n### pipeline 摘要 `sf_scan_pipeline_summary`\n\n```\n")
-	b.WriteString(utils.ShrinkTextBlock(interpretLoop.Get(sfu.LoopVarSFPipelineSummary), 6000))
+	b.WriteString(utils.ShrinkTextBlock(scanLoop.Get(sfu.LoopVarSFPipelineSummary), 6000))
 	b.WriteString("\n```\n\n## 引擎键值（摘要）\n\n")
 	b.WriteString(fmt.Sprintf(
 		"- task_id: %s\n- session_mode: %s\n- sf_scan_final_report_due: %s\n- sf_scan_risk_converged: %s\n",
-		interpretLoop.Get(sfu.LoopVarSyntaxFlowTaskID),
-		interpretLoop.Get(sfu.LoopVarSyntaxFlowScanSessionMode),
-		interpretLoop.Get(sfu.LoopVarSFFinalReportDue),
-		interpretLoop.Get(sfu.LoopVarSFRiskConverged),
+		scanLoop.Get(sfu.LoopVarSyntaxFlowTaskID),
+		scanLoop.Get(sfu.LoopVarSyntaxFlowScanSessionMode),
+		scanLoop.Get(sfu.LoopVarSFFinalReportDue),
+		scanLoop.Get(sfu.LoopVarSFRiskConverged),
 	))
 	b.WriteString("\n### 编译元信息 `sf_scan_compile_meta`（截断）\n\n```\n")
-	b.WriteString(utils.ShrinkTextBlock(interpretLoop.Get(sfu.LoopVarSFCompileMeta), 2000))
+	b.WriteString(utils.ShrinkTextBlock(scanLoop.Get(sfu.LoopVarSFCompileMeta), 2000))
 	b.WriteString("\n```\n\n## 中间发现 / 解读（截断样例）\n\n")
 	b.WriteString("### `sf_scan_findings_doc`\n\n```\n")
-	b.WriteString(utils.ShrinkTextBlock(interpretLoop.Get("sf_scan_findings_doc"), 2000))
+	b.WriteString(utils.ShrinkTextBlock(scanLoop.Get("sf_scan_findings_doc"), 2000))
 	b.WriteString("\n```\n\n### `sf_scan_interpret_log`\n\n```\n")
-	b.WriteString(utils.ShrinkTextBlock(interpretLoop.Get(LoopVarInterpretLog), 3000))
+	b.WriteString(utils.ShrinkTextBlock(scanLoop.Get(LoopVarInterpretLog), 3000))
 	b.WriteString("\n```\n")
 	return b.String()
 }
 
-func buildSyntaxflowReportWritePrompt(interpretLoop *reactloops.ReActLoop, inPath, outPath string) string {
-	tid := interpretLoop.Get(sfu.LoopVarSyntaxFlowTaskID)
+func buildSyntaxflowReportWritePrompt(scanLoop *reactloops.ReActLoop, inPath, outPath string) string {
+	tid := scanLoop.Get(sfu.LoopVarSyntaxFlowTaskID)
 	return fmt.Sprintf(`你是安全报告撰写助手。请**仅**根据输入文件与引擎数据撰写一份**完整**的 SyntaxFlow 静态扫描结果报告（Markdown），保存到已指定的 report_filename（已由引擎创建）。
 
 ## 必须阅读的文件
@@ -224,7 +218,7 @@ func buildSyntaxflowReportWritePrompt(interpretLoop *reactloops.ReActLoop, inPat
 ## 任务与约束
 - **task_id / runtime_id**: %s
 - 报告 must 覆盖 pipeline 与扫描统计、风险总览、以及输入中的 risk/interpret 信息；**不得**编造未在输入中出现的 risk_id。
-- 与对话中的 interpret 摘要可对账，**以本文件与 DB 一致的数据为准**。
+- 以本文件与 DB 一致的数据为准。
 - 使用 read_reference_file 等工具读取 %s 后再写入报告文件。
 
 ## 建议章节

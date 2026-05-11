@@ -70,29 +70,57 @@ func buildMinimalInProcessCodeScanJSON(localPath string) ([]byte, error) {
 	return cfg.ToJSONRaw()
 }
 
-// LoadProgramsFromCodeScanJSON parses code-scan JSON (same family as `yak code-scan --config`) and loads SSA Programs.
-func LoadProgramsFromCodeScanJSON(ctx context.Context, jsonRaw []byte) (cfg *ssaconfig.Config, progs []*ssaapi.Program, err error) {
+// ResolveCodeScanConfigFromJSON 从 code-scan 族 JSON 得到落库后的编译配置（不编译）。
+func ResolveCodeScanConfigFromJSON(ctx context.Context, jsonRaw []byte) (*ssaconfig.Config, error) {
 	if len(jsonRaw) == 0 {
-		return nil, nil, utils.Error("empty code-scan config json")
+		return nil, utils.Error("empty code-scan config json")
 	}
-	cfg, err = ssaconfig.NewCLIScanConfig(ssaconfig.WithJsonRawConfig(jsonRaw))
+	cfg, err := ssaconfig.NewCLIScanConfig(ssaconfig.WithJsonRawConfig(jsonRaw))
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	if db := consts.GetGormProfileDatabase(); db != nil {
 		cfg, _, err = ssa_compile.EnsureSSAProjectRowForCodeScan(ctx, db, cfg)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 	}
-	progs, err = loadProgramsForCodeScanConfig(ctx, cfg)
-	if err != nil {
-		return cfg, nil, err
-	}
-	return cfg, progs, nil
+	return cfg, nil
 }
 
-func loadProgramsForCodeScanConfig(ctx context.Context, cfg *ssaconfig.Config) ([]*ssaapi.Program, error) {
+// ResolveCodeScanConfigFromProjectPath 仅做「SSA 项目探测」+ SSAProject 行同步（不编译）。path 可为文件或目录。
+func ResolveCodeScanConfigFromProjectPath(ctx context.Context, localPath string) (*ssaconfig.Config, error) {
+	localPath = strings.TrimSpace(localPath)
+	if localPath == "" {
+		return nil, utils.Error("empty project path")
+	}
+	if st, err := os.Stat(localPath); err != nil {
+		return nil, err
+	} else if !st.IsDir() {
+		localPath = filepath.Dir(localPath)
+	}
+	res, err := ssa_compile.ParseProjectWithAutoDetective(ctx, &ssa_compile.SSADetectConfig{
+		Target:             localPath,
+		CompileImmediately: false,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if res == nil || res.Info == nil || res.Info.Config == nil {
+		return nil, utils.Error("ssa auto-detect returned no config")
+	}
+	cfg := res.Info.Config
+	if db := consts.GetGormProfileDatabase(); db != nil {
+		cfg, _, err = ssa_compile.EnsureSSAProjectRowForCodeScan(ctx, db, cfg)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return cfg, nil
+}
+
+// CompileProgramsFromCodeScanConfig 在已解析的 cfg 上执行编译或从 DB 装载 Program（仅这一步触碰 ssa_compile 编译/加载）。
+func CompileProgramsFromCodeScanConfig(ctx context.Context, cfg *ssaconfig.Config) ([]*ssaapi.Program, error) {
 	if cfg == nil {
 		return nil, utils.Error("config is nil")
 	}
@@ -100,33 +128,52 @@ func loadProgramsForCodeScanConfig(ctx context.Context, cfg *ssaconfig.Config) (
 	programName := strings.TrimSpace(cfg.GetProgramName())
 
 	if targetPath != "" {
-		if !cfg.GetCompileMemory() && strings.TrimSpace(cfg.GetProgramName()) == "" {
+		if !cfg.GetCompileMemory() && programName == "" {
 			cfg.SetProgramName(InferredSSAProgramNameForPath(targetPath))
 		}
-		configJSON, err := cfg.ToJSONString()
+		compileRes, err := ssa_compile.ParseProjectWithConfig(ctx, cfg)
 		if err != nil {
 			return nil, err
 		}
-		ps, err := ssaapi.ParseProject(
-			ssaconfig.WithConfigJson(configJSON),
-			ssaconfig.WithContext(ctx),
-		)
-		if err != nil {
-			return nil, err
+		if compileRes == nil || compileRes.Program == nil {
+			return nil, utils.Errorf("ssa_compile 未产生 Program")
 		}
-		if len(ps) == 0 {
-			return nil, utils.Errorf("内存编译未产生任何 Program")
-		}
-		return []*ssaapi.Program(ps), nil
+		return []*ssaapi.Program{compileRes.Program}, nil
 	}
 	if programName != "" {
-		ret := ssaapi.LoadProgramRegexp(programName)
+		ret := ssa_compile.LoadProgramsMatchingName(programName)
 		if len(ret) == 0 {
 			return nil, utils.Errorf("数据库中未找到 SSA Program: %s", programName)
 		}
 		return ret, nil
 	}
-	return nil, utils.Errorf("code-scan JSON 需包含 CodeSource 本地路径，或 BaseInfo.program_names 指向已编译 Program")
+	return nil, utils.Errorf("code-scan 配置需包含 CodeSource 路径/URL，或 program_name 指向已编译 Program")
+}
+
+// LoadProgramsFromCodeScanJSON parses code-scan JSON、解析 cfg 并编译/装载 Programs。
+func LoadProgramsFromCodeScanJSON(ctx context.Context, jsonRaw []byte) (cfg *ssaconfig.Config, progs []*ssaapi.Program, err error) {
+	cfg, err = ResolveCodeScanConfigFromJSON(ctx, jsonRaw)
+	if err != nil {
+		return nil, nil, err
+	}
+	progs, err = CompileProgramsFromCodeScanConfig(ctx, cfg)
+	if err != nil {
+		return cfg, nil, err
+	}
+	return cfg, progs, nil
+}
+
+// LoadProgramsFromProjectPath 探测路径得到 cfg 后，再 [CompileProgramsFromCodeScanConfig]。
+func LoadProgramsFromProjectPath(ctx context.Context, localPath string) (cfg *ssaconfig.Config, progs []*ssaapi.Program, err error) {
+	cfg, err = ResolveCodeScanConfigFromProjectPath(ctx, localPath)
+	if err != nil {
+		return nil, nil, err
+	}
+	progs, err = CompileProgramsFromCodeScanConfig(ctx, cfg)
+	if err != nil {
+		return cfg, nil, err
+	}
+	return cfg, progs, nil
 }
 
 // CodeScanToSyntaxFlowRuleOptions aligns with yak code-scan useConfigMode options for StartScan (subset; no WithPrograms / WithContext).

@@ -260,6 +260,9 @@ func NewSideEffect(variable string, call *Call, value Value) *SideEffect {
 }
 
 func (i *If) SetCondition(t Value) {
+	if utils.IsNil(t) {
+		return
+	}
 	i.Cond = t.GetId()
 	if b := i.GetBlock(); b != nil {
 		b.SetConditionInstID(i.GetId())

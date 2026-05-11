@@ -13,14 +13,14 @@ const (
 	LoopVarSSAOverviewFilterJSON = "ssa_overview_filter_json"
 	// LoopVarSFScanConfigJSON: full code-scan JSON (same as yak `code-scan --config`).
 	LoopVarSFScanConfigJSON = "sf_scan_config_json"
-	// LoopVarProjectPath: optional absolute directory for minimal in-process code-scan JSON (orchestrator / WithVar).
+	// LoopVarProjectPath: optional hint for stage markdown / actions (not read by P1 intake).
 	LoopVarProjectPath = "project_path"
 
 	// Multi-stage pipeline + final report (interpret sub-loop; engine-filled).
-	LoopVarSFPipelineSummary  = "sf_scan_pipeline_summary"  // 各阶段一行行累积摘要
-	LoopVarSFScanEndSummary   = "sf_scan_scan_end_summary"  // 扫描任务行终态时一次性写入
-	LoopVarSFFinalReportDue   = "sf_scan_final_report_due"  // "1" 时模型必须输出大总结
-	LoopVarSFCompileMeta      = "sf_scan_compile_meta"      // 编译起止与项目名等
-	LoopVarSFUserStageLog     = "sf_scan_user_stage_log"    // 阶段化用户向正文（# / ##）
-	LoopVarSFRiskConverged    = "sf_scan_risk_converged"     // 风险侧收敛
+	LoopVarSFPipelineSummary = "sf_scan_pipeline_summary" // 各阶段一行行累积摘要
+	LoopVarSFScanEndSummary  = "sf_scan_scan_end_summary" // 扫描任务行终态时一次性写入
+	LoopVarSFFinalReportDue  = "sf_scan_final_report_due" // "1" 时模型必须输出大总结
+	LoopVarSFCompileMeta     = "sf_scan_compile_meta"     // 编译起止与项目名等
+	LoopVarSFUserStageLog    = "sf_scan_user_stage_log"   // 阶段化用户向正文（# / ##）
+	LoopVarSFRiskConverged   = "sf_scan_risk_converged"   // 风险侧收敛
 )

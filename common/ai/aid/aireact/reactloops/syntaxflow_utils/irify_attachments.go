@@ -14,12 +14,14 @@ const (
 const (
 	IrifyKeyTaskID      = "task_id"
 	IrifyKeySessionMode = "session_mode"
-	IrifyKeyPrograms    = "programs"
-	IrifyKeyRiskID      = "risk_id"
-	IrifyKeyFilterJSON  = "filter_json"
-	IrifyKeyRuntimeID   = "runtime_id"
-	IrifyKeyProgramName = "program_name"
-	IrifyKeyFullQuality = "full_quality"
+	// IrifyKeySFScanConfigJSON: full code-scan JSON (same family as loop sf_scan_config_json).
+	IrifyKeySFScanConfigJSON = "sf_scan_config_json"
+	IrifyKeyPrograms         = "programs"
+	IrifyKeyRiskID           = "risk_id"
+	IrifyKeyFilterJSON       = "filter_json"
+	IrifyKeyRuntimeID        = "runtime_id"
+	IrifyKeyProgramName      = "program_name"
+	IrifyKeyFullQuality      = "full_quality"
 )
 
 // SessionMode values (IrifyKeySessionMode or loop var LoopVarSyntaxFlowScanSessionMode).
