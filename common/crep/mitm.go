@@ -541,6 +541,151 @@ func (m *MITMServer) ServeWithListenedCallback(ctx context.Context, addr string,
 
 	return m.ServerListener(ctx, lis)
 }
+
+// ServeWithMultipleAddresses binds all addresses in addrs (duplicates removed)
+// to a single underlying MITMServer instance. The first address is used as the
+// primary listener; every subsequent address accepts connections and feeds them
+// into the same proxy loop via the extra-incoming-connection channel mechanism.
+// callback is invoked once after all listeners are successfully bound.
+//
+// If any listener fails to bind, all already-bound listeners are closed before
+// returning the error.
+func (m *MITMServer) ServeWithMultipleAddresses(ctx context.Context, addrs []string, callback func()) error {
+	if len(addrs) == 0 {
+		return utils.Error("no listen address provided")
+	}
+
+	// Deduplicate while preserving order.
+	seen := make(map[string]struct{}, len(addrs))
+	unique := make([]string, 0, len(addrs))
+	for _, a := range addrs {
+		if _, ok := seen[a]; ok {
+			continue
+		}
+		seen[a] = struct{}{}
+		unique = append(unique, a)
+	}
+
+	primary := unique[0]
+	extras := unique[1:]
+
+	primaryLis, err := net.Listen("tcp", primary)
+	if err != nil {
+		return handleListenError(primary, err)
+	}
+
+	// extraListeners tracks all successfully bound extra listeners so we can
+	// close them all on a subsequent bind failure.
+	extraListeners := make([]net.Listener, 0, len(extras))
+
+	// closeAll closes every listener that was successfully opened so far.
+	// Called only on the error path before returning.
+	closeAll := func() {
+		_ = primaryLis.Close()
+		for _, l := range extraListeners {
+			_ = l.Close()
+		}
+	}
+
+	for _, addr := range extras {
+		addr := addr
+		extraLis, lisErr := net.Listen("tcp", addr)
+		if lisErr != nil {
+			closeAll()
+			return handleListenError(addr, lisErr)
+		}
+		extraListeners = append(extraListeners, extraLis)
+
+		// connCh bridges accepted net.Conn values into the proxy's extra
+		// incoming connection channel (which expects *WrapperedConn).
+		connCh := make(chan net.Conn, 16)
+		m.extraIncomingConnChans = append(m.extraIncomingConnChans,
+			convertNetConnChanToWrapperedConn(connCh))
+
+		// Accept loop mirrors the error-handling strategy of the primary
+		// listener in minimartian/mitmloop.go: back off on temporary errors,
+		// stop on permanent errors or context cancellation.
+		go func() {
+			defer extraLis.Close()
+			defer close(connCh)
+			var delay time.Duration
+			for {
+				conn, acceptErr := extraLis.Accept()
+				if acceptErr != nil {
+					// Check context first — a closed listener during shutdown
+					// is not a real error.
+					select {
+					case <-ctx.Done():
+						return
+					default:
+					}
+					if nerr, ok := acceptErr.(net.Error); ok && nerr.Temporary() {
+						if delay == 0 {
+							delay = 5 * time.Millisecond
+						} else {
+							delay *= 2
+						}
+						if delay > time.Second {
+							delay = time.Second
+						}
+						log.Debugf("mitm extra listener %s: temporary accept error: %v", addr, acceptErr)
+						time.Sleep(delay)
+						continue
+					}
+					// Permanent error (includes the "use of closed network
+					// connection" that fires when we close the listener on
+					// ctx.Done from the goroutine below).
+					log.Debugf("mitm extra listener %s: accept stopped: %v", addr, acceptErr)
+					return
+				}
+				delay = 0
+				select {
+				case connCh <- conn:
+				case <-ctx.Done():
+					conn.Close()
+					return
+				}
+			}
+		}()
+
+		// Drive listener shutdown from context cancellation.
+		go func() {
+			<-ctx.Done()
+			_ = extraLis.Close()
+		}()
+
+		log.Infof("mitm: extra listener ready on %s", addr)
+	}
+
+	if callback != nil {
+		callback()
+	}
+
+	// Drive primary listener shutdown from context cancellation.
+	// ServerListener also does defer l.Close(), but we want the shutdown to
+	// happen as soon as ctx is cancelled rather than waiting for the next
+	// Accept / select iteration.
+	go func() {
+		<-ctx.Done()
+		_ = primaryLis.Close()
+	}()
+
+	return m.ServerListener(ctx, primaryLis)
+}
+
+// convertNetConnChanToWrapperedConn bridges a net.Conn channel into the
+// *minimartian.WrapperedConn channel expected by extraIncomingConnChans.
+// The destination channel is closed when src is closed.
+func convertNetConnChanToWrapperedConn(src chan net.Conn) chan *minimartian.WrapperedConn {
+	dst := make(chan *minimartian.WrapperedConn, cap(src))
+	go func() {
+		for conn := range src {
+			dst <- minimartian.NewWrapperedConnEx(conn, false, nil, true)
+		}
+		close(dst)
+	}()
+	return dst
+}
 func (m *MITMServer) ServerListener(ctx context.Context, lis net.Listener) error {
 	if err := m.initConfig(); err != nil {
 		return err
