@@ -173,10 +173,96 @@ func TestQueueCount_AccumulatesRejections(t *testing.T) {
 func TestQueueCount_WindowExpiry(t *testing.T) {
 	rl := NewChatRateLimiter()
 	defer rl.Stop()
+	// 新语义下 rejectExpiries 存的是"过期时间戳"。
+	// 任何已经过期的 deadline（这里取 now-120s）都应被 trim 掉。
 	rl.rejectMu.Lock()
-	rl.rejectTimes = []time.Time{time.Now().Add(-2 * rpmWindowDuration)}
+	rl.rejectExpiries = []time.Time{time.Now().Add(-2 * rpmWindowDuration)}
 	rl.rejectMu.Unlock()
-	assert.Equal(t, int64(0), rl.GetQueueCount(), "rejections older than window should be trimmed")
+	assert.Equal(t, int64(0), rl.GetQueueCount(), "expired deadlines should be trimmed")
+}
+
+// TestQueueCount_ResidenceAutoDecrement 验证新的"驻留 3-6 秒后自动 -1"语义：
+// 每次限流触发都会让排队数 +1，并在配置的 residence 区间到期后自动 -1，
+// 不再依赖 60s 滑动窗口。
+// 关键词: queue residence auto decrement, 排队自动衰减
+func TestQueueCount_ResidenceAutoDecrement(t *testing.T) {
+	rl := NewChatRateLimiter()
+	defer rl.Stop()
+	// 用极短的驻留区间加速测试，避免真的等 3~6s。
+	rl.SetRejectResidence(50*time.Millisecond, 80*time.Millisecond)
+	rl.SetDefaultRPM(1)
+
+	key, model := "key-residence", "model-residence"
+
+	allowed, _ := rl.CheckRateLimit(key, model)
+	require.True(t, allowed, "first request should be allowed")
+
+	_, q := rl.CheckRateLimit(key, model)
+	assert.Equal(t, int64(1), q, "denial should bump queue count to 1 immediately")
+	assert.Equal(t, int64(1), rl.GetQueueCount(),
+		"queue count should still be 1 within residence window")
+
+	// 等到最大 residence 之后，排队数应自动归零。
+	time.Sleep(150 * time.Millisecond)
+	assert.Equal(t, int64(0), rl.GetQueueCount(),
+		"after residence elapses, queue count must auto-decrement to 0")
+}
+
+// TestQueueCount_ResidenceIndependentPerRejection 验证每次拒绝单独计时：
+// 先后两次拒绝间隔较大，先压入的那条会先过期，排队数会从 2 衰减到 1，
+// 而不是统一在 60s 窗口边界一起消失。
+// 关键词: queue residence per-rejection 独立计时
+func TestQueueCount_ResidenceIndependentPerRejection(t *testing.T) {
+	rl := NewChatRateLimiter()
+	defer rl.Stop()
+	rl.SetRejectResidence(80*time.Millisecond, 80*time.Millisecond) // 固定 80ms 便于推理
+	rl.SetDefaultRPM(1)
+
+	key, model := "key-stagger", "model-stagger"
+
+	allowed, _ := rl.CheckRateLimit(key, model)
+	require.True(t, allowed)
+
+	// 第一次拒绝：deadline = T0 + 80ms。
+	_, q1 := rl.CheckRateLimit(key, model)
+	assert.Equal(t, int64(1), q1)
+
+	// 间隔 50ms 后再触发一次拒绝：deadline = T0 + 50ms + 80ms = T0 + 130ms。
+	time.Sleep(50 * time.Millisecond)
+	_, q2 := rl.CheckRateLimit(key, model)
+	assert.Equal(t, int64(2), q2, "queue should accumulate to 2")
+
+	// 再等约 50ms（总计 T0+100ms），此时第一条已过期，第二条仍在窗口内。
+	time.Sleep(50 * time.Millisecond)
+	assert.Equal(t, int64(1), rl.GetQueueCount(),
+		"first rejection should expire independently, leaving only the second")
+
+	// 再等到第二条也过期（总计 T0+200ms 之后）。
+	time.Sleep(100 * time.Millisecond)
+	assert.Equal(t, int64(0), rl.GetQueueCount(),
+		"both rejections should have expired by now")
+}
+
+// TestSetRejectResidence_Validation 验证 SetRejectResidence 对非法入参的兜底。
+// 关键词: SetRejectResidence 入参 校验
+func TestSetRejectResidence_Validation(t *testing.T) {
+	rl := NewChatRateLimiter()
+	defer rl.Stop()
+
+	rl.SetRejectResidence(-1*time.Second, -2*time.Second)
+	rl.rejectMu.Lock()
+	gotMin, gotMax := rl.rejectResidenceMin, rl.rejectResidenceMax
+	rl.rejectMu.Unlock()
+	assert.Equal(t, time.Duration(0), gotMin, "negative min should be clamped to 0")
+	assert.Equal(t, time.Duration(0), gotMax,
+		"max < min should be raised to min (which was clamped to 0)")
+
+	rl.SetRejectResidence(2*time.Second, 1*time.Second)
+	rl.rejectMu.Lock()
+	gotMin, gotMax = rl.rejectResidenceMin, rl.rejectResidenceMax
+	rl.rejectMu.Unlock()
+	assert.Equal(t, 2*time.Second, gotMin)
+	assert.Equal(t, 2*time.Second, gotMax, "max should be raised to min when input max < min")
 }
 
 func TestCheckRateLimit_QLenMonotonic(t *testing.T) {
