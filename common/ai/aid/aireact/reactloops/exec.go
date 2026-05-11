@@ -830,7 +830,7 @@ LOOP:
 			loopName = "general-purpose"
 		}
 		reason := actionParams.GetString("human_readable_thought")
-		turnNonce := fmt.Sprintf("iter%d", iterationCount)
+		turnNonce := strings.ToLower(utils.RandStringBytes(6))
 		decisionBody := fmt.Sprintf("[%v]======== ReAct iteration %d ========", loopName, iterationCount)
 		if reason != "" {
 			decisionBody += "\nReason/Next-Step: " + reason
