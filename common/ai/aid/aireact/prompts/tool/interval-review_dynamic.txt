@@ -1,0 +1,45 @@
+{{ if or .UserQuery .TaskGoal }}## User's Original Request
+{{ if .UserQuery }}The user originally requested:
+```
+{{ .UserQuery }}
+```
+{{ else }}User query not available.
+{{ end }}{{ if .TaskGoal }}
+**Task Goal**: {{ .TaskGoal }}
+{{ end }}
+{{ end }}
+
+## Current Time Information
+- **Current Time**: {{ .CurrentTime }}
+- **Tool Start Time**: {{ .StartTime }}
+- **Elapsed Duration**: {{ .ElapsedDuration }}
+- **Review Count**: This is review #{{ .ReviewCount }}
+
+## Tool Being Executed
+- **Tool Name**: {{ .ToolName }}
+- **Tool Description**: {{ .ToolDescription }}
+- **Parameters**:
+```json
+{{ .ToolParams }}
+```
+{{ if .CallExpectations }}### Call Expectations (AI-generated pre-execution predictions)
+{{ .CallExpectations }}
+{{ end }}
+
+## Current Output Snapshot
+
+### Standard Output (stdout)
+```
+{{ .StdoutSnapshot }}
+```
+
+### Standard Error (stderr)
+```
+{{ .StderrSnapshot }}
+```
+{{ if .ExtraPrompt }}
+## Additional Review Instructions
+<|EXTRA_PROMPT_{{ .Nonce }}|>
+{{ .ExtraPrompt }}
+<|EXTRA_PROMPT_END_{{ .Nonce }}|>
+{{ end }}

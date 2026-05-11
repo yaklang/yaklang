@@ -888,6 +888,95 @@ func TestPromptManager_GenerateVerificationPrompt_UsesPromptSections(t *testing.
 	}
 }
 
+func TestPromptManager_GenerateAIReviewPrompt_UsesPromptSections(t *testing.T) {
+	react, err := NewTestReAct(
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "risk_assessment", "risk_score": 0.2, "reason": "safe read"}`))
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create ReAct instance: %v", err)
+	}
+	react.AddToTimeline("review", "timeline content for ai review")
+
+	prompt, err := react.promptManager.GenerateAIReviewPrompt(
+		"verify file exists",
+		"bash",
+		`{"command":"ls /tmp"}`,
+	)
+	if err != nil {
+		t.Fatalf("GenerateAIReviewPrompt failed: %v", err)
+	}
+
+	nonce := aicommon.MustExtractDynamicSectionNonce(t, prompt)
+	if !utils.MatchAllOfSubString(prompt,
+		"<|AI_CACHE_SYSTEM_high-static|>",
+		"<|PROMPT_SECTION_semi-dynamic-2|>",
+		"<|PROMPT_SECTION_timeline-open|>",
+		"<|PROMPT_SECTION_dynamic_"+nonce+"|>",
+		"<|SCHEMA|>",
+		"<|OUTPUT_EXAMPLE|>",
+		"<|USER_QUERY_"+nonce+"|>",
+		"<|REVIEW_ENTITY|>",
+		"risk_assessment",
+		`{"command":"ls /tmp"}`,
+	) {
+		t.Fatalf("ai review prompt should be composed by prompt sections. Got:\n%s", prompt)
+	}
+}
+
+func TestPromptManager_GenerateIntervalReviewPrompt_UsesPromptSections(t *testing.T) {
+	react, err := NewTestReAct(
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "decision": "continue"}`))
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create ReAct instance: %v", err)
+	}
+	react.AddToTimeline("interval-review", "timeline content for interval review")
+
+	tool := aitool.NewWithoutCallback(
+		"network_diagnose",
+		aitool.WithDescription("Collect network diagnostics"),
+		aitool.WithStringParam("target"),
+	)
+	prompt, err := react.promptManager.GenerateIntervalReviewPromptWithContext(
+		tool,
+		aitool.InvokeParams{"target": "127.0.0.1"},
+		[]byte("partial output"),
+		[]byte("warn line"),
+		time.Unix(0, 0),
+		1,
+		"expect structured diagnostics",
+	)
+	if err != nil {
+		t.Fatalf("GenerateIntervalReviewPromptWithContext failed: %v", err)
+	}
+
+	nonce := aicommon.MustExtractDynamicSectionNonce(t, prompt)
+	if !utils.MatchAllOfSubString(prompt,
+		"<|AI_CACHE_SYSTEM_high-static|>",
+		"<|PROMPT_SECTION_semi-dynamic-2|>",
+		"<|PROMPT_SECTION_timeline-open|>",
+		"<|PROMPT_SECTION_dynamic_"+nonce+"|>",
+		"<|SCHEMA|>",
+		"<|OUTPUT_EXAMPLE|>",
+		"network_diagnose",
+		"partial output",
+		"interval-toolcall-review",
+		"expect structured diagnostics",
+	) {
+		t.Fatalf("interval review prompt should be composed by prompt sections. Got:\n%s", prompt)
+	}
+}
+
 func TestGenerateVerificationPrompt_RendersTodoSnapshot(t *testing.T) {
 	react, err := NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {

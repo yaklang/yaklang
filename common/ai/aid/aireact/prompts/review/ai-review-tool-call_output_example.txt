@@ -1,0 +1,3 @@
+Example:
+
+`{"@action": "risk_assessment", "risk_score": 0.3, "reason": "意图属\"查\"，无状态改动；范围限定在/var/log，命令明确；综合风险低，因只读访问且无敏感泄露迹象。"}`

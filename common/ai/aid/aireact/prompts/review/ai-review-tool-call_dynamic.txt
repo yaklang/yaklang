@@ -1,0 +1,12 @@
+{{ if eq .Language "zh" }}LANGUAGE: Please respond in Chinese (中文) unless specifically asked otherwise.{{ else }}LANGUAGE: Please respond in English unless specifically asked otherwise.{{ end }}
+
+# 待审核的内容
+**User Query That Triggered This Call:**
+<|USER_QUERY_{{ .Nonce }}|>
+{{ .UserQuery }}
+<|USER_QUERY_{{ .Nonce }}|>
+
+<|REVIEW_ENTITY|>
+{{ .Title }}
+{{ .Details }}
+<|REVIEW_ENTITY|>

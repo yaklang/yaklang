@@ -1,0 +1,11 @@
+Example valid response:
+
+```json
+{
+	"@action": "interval-toolcall-review",
+	"decision": "continue",
+	"reason": "工具仍在稳定输出，未见异常或卡死迹象。",
+	"progress_summary": "已完成网络接口、监听端口与路由配置的采集，正在补充协议与监控指标。",
+	"estimated_remaining_time": "约 20 秒"
+}
+```
