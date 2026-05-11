@@ -573,18 +573,20 @@
         th:nth-child(9), td:nth-child(9) { width: 80px; } /* 成功率 */
         th:nth-child(10), td:nth-child(10) { width: 60px; } /* 操作 */
         
-        /* API密钥表格列宽 */
-        #api-table th:nth-child(1), #api-table td:nth-child(1) { width: 30px; } /* 复选框 */
-        #api-table th:nth-child(2), #api-table td:nth-child(2) { width: 40px; } /* ID */
-        #api-table th:nth-child(3), #api-table td:nth-child(3) { width: 100px; } /* 新：状态/操作 */
-        #api-table th:nth-child(4), #api-table td:nth-child(4) { width: 150px; } /* API密钥 */
-        #api-table th:nth-child(5), #api-table td:nth-child(5) { width: 120px; } /* 允许模型 */
-        #api-table th:nth-child(6), #api-table td:nth-child(6) { width: 70px; }  /* 使用统计 */
-        #api-table th:nth-child(7), #api-table td:nth-child(7) { width: 100px; } /* 成功/失败 */
-        #api-table th:nth-child(8), #api-table td:nth-child(8) { width: 120px; } /* 流量 */
-        #api-table th:nth-child(9), #api-table td:nth-child(9) { width: 120px; } /* 最后使用 */
-        /* #api-table th:nth-child(9), #api-table td:nth-child(9) { width: 70px; } */ /* 原状态列 - 注释掉 */
-        /* #api-table th:nth-child(10), #api-table td:nth-child(10) { width: 80px; } */ /* 原操作列 - 注释掉 */
+        /* API密钥表格列宽 (兜底，与下面 13 列默认配置保持一致) */
+        #api-table th:nth-child(1),  #api-table td:nth-child(1)  { width: 30px;  } /* 复选框 */
+        #api-table th:nth-child(2),  #api-table td:nth-child(2)  { width: 40px;  } /* ID */
+        #api-table th:nth-child(3),  #api-table td:nth-child(3)  { width: 60px;  } /* 状态 */
+        #api-table th:nth-child(4),  #api-table td:nth-child(4)  { width: 110px; } /* API密钥 */
+        #api-table th:nth-child(5),  #api-table td:nth-child(5)  { width: 180px; } /* 允许模型 */
+        #api-table th:nth-child(6),  #api-table td:nth-child(6)  { width: 60px;  } /* 使用统计 */
+        #api-table th:nth-child(7),  #api-table td:nth-child(7)  { width: 70px;  } /* Web Search */
+        #api-table th:nth-child(8),  #api-table td:nth-child(8)  { width: 80px;  } /* 成功/失败 */
+        #api-table th:nth-child(9),  #api-table td:nth-child(9)  { width: 110px; } /* 流量 */
+        #api-table th:nth-child(10), #api-table td:nth-child(10) { width: 90px;  } /* 流量限制 */
+        #api-table th:nth-child(11), #api-table td:nth-child(11) { width: 80px;  } /* 创建者 */
+        #api-table th:nth-child(12), #api-table td:nth-child(12) { width: 130px; } /* 最后使用 */
+        #api-table th:nth-child(13), #api-table td:nth-child(13) { width: 130px; } /* 操作 */
 
         /* 表格列对齐方式 */
         /* ID、提供者和类型列居中 */
@@ -1682,19 +1684,92 @@
         #provider-table th:nth-child(9), #provider-table td:nth-child(9) { min-width: 50px; width: 60px; } /* 请求 */
         #provider-table th:nth-child(10), #provider-table td:nth-child(10) { min-width: 60px; width: 70px; } /* 操作 */
         
-        /* 优化的默认列宽配置 - API密钥表格 */
-        #api-table th:nth-child(1), #api-table td:nth-child(1) { min-width: 30px; width: 30px; } /* 复选框 */
-        #api-table th:nth-child(2), #api-table td:nth-child(2) { min-width: 35px; width: 40px; } /* ID */
-        #api-table th:nth-child(3), #api-table td:nth-child(3) { min-width: 45px; width: 50px; } /* 状态 */
-        #api-table th:nth-child(4), #api-table td:nth-child(4) { min-width: 90px; width: 100px; } /* API密钥 */
-        #api-table th:nth-child(5), #api-table td:nth-child(5) { min-width: 110px; width: 130px; } /* 允许模型 */
-        #api-table th:nth-child(6), #api-table td:nth-child(6) { min-width: 55px; width: 60px; } /* 使用统计 */
-        #api-table th:nth-child(7), #api-table td:nth-child(7) { min-width: 70px; width: 80px; } /* 成功/失败 */
-        #api-table th:nth-child(8), #api-table td:nth-child(8) { min-width: 90px; width: 100px; } /* 流量 */
-        #api-table th:nth-child(9), #api-table td:nth-child(9) { min-width: 70px; width: 80px; } /* 流量限制 */
-        #api-table th:nth-child(10), #api-table td:nth-child(10) { min-width: 80px; width: 90px; } /* 最后使用 */
-        #api-table th:nth-child(11), #api-table td:nth-child(11) { min-width: 110px; width: 120px; } /* 操作 */
-        
+        /* 优化的默认列宽配置 - API密钥表格 (与表头 13 列对齐) */
+        #api-table th:nth-child(1),  #api-table td:nth-child(1)  { min-width: 30px;  width: 30px;  } /* 复选框 */
+        #api-table th:nth-child(2),  #api-table td:nth-child(2)  { min-width: 35px;  width: 40px;  } /* ID */
+        #api-table th:nth-child(3),  #api-table td:nth-child(3)  { min-width: 50px;  width: 60px;  } /* 状态 */
+        #api-table th:nth-child(4),  #api-table td:nth-child(4)  { min-width: 90px;  width: 110px; } /* API密钥 */
+        #api-table th:nth-child(5),  #api-table td:nth-child(5)  { min-width: 130px; width: 180px; } /* 允许模型 */
+        #api-table th:nth-child(6),  #api-table td:nth-child(6)  { min-width: 55px;  width: 60px;  } /* 使用统计 */
+        #api-table th:nth-child(7),  #api-table td:nth-child(7)  { min-width: 60px;  width: 70px;  } /* Web Search */
+        #api-table th:nth-child(8),  #api-table td:nth-child(8)  { min-width: 70px;  width: 80px;  } /* 成功/失败 */
+        #api-table th:nth-child(9),  #api-table td:nth-child(9)  { min-width: 95px;  width: 110px; } /* 流量(输入/输出) */
+        #api-table th:nth-child(10), #api-table td:nth-child(10) { min-width: 80px;  width: 90px;  } /* 流量限制 */
+        #api-table th:nth-child(11), #api-table td:nth-child(11) { min-width: 70px;  width: 80px;  } /* 创建者 */
+        #api-table th:nth-child(12), #api-table td:nth-child(12) { min-width: 110px; width: 130px; } /* 最后使用 */
+        #api-table th:nth-child(13), #api-table td:nth-child(13) { min-width: 110px; width: 130px; } /* 操作 */
+
+        /* "允许模型" 单元格紧凑徽章布局
+           !important + max-width 确保即使 ColumnResizer 把旧的超大宽度从
+           localStorage 写回到 inline style，也不会再把整张表撑爆。 */
+        #api-table td.editable-allowed-models {
+            max-width: 240px !important;
+            min-width: 130px;
+            padding: 4px 6px;
+            overflow: hidden;
+            white-space: normal;
+        }
+        #api-table td.editable-allowed-models .allowed-models-wrap {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 3px;
+            align-items: center;
+            line-height: 1.2;
+        }
+        #api-table td.editable-allowed-models .allowed-model-count {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 22px;
+            height: 18px;
+            padding: 0 6px;
+            font-size: 11px;
+            font-weight: 600;
+            border-radius: 9px;
+            background: #455a64;
+            color: #fff;
+        }
+        #api-table td.editable-allowed-models .allowed-model-chip {
+            display: inline-flex;
+            align-items: center;
+            max-width: 96px;
+            padding: 1px 6px;
+            font-size: 11px;
+            line-height: 16px;
+            border-radius: 3px;
+            border: 1px solid transparent;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            font-family: monospace;
+        }
+        #api-table td.editable-allowed-models .chip-paid {
+            background: #e3f2fd;
+            color: #1565c0;
+            border-color: #bbdefb;
+        }
+        #api-table td.editable-allowed-models .chip-free {
+            background: #e8f5e9;
+            color: #2e7d32;
+            border-color: #c8e6c9;
+        }
+        #api-table td.editable-allowed-models .chip-glob {
+            background: #fff3e0;
+            color: #e65100;
+            border-color: #ffe0b2;
+        }
+        #api-table td.editable-allowed-models .chip-more {
+            background: #eceff1;
+            color: #455a64;
+            border-color: #cfd8dc;
+            font-weight: 600;
+        }
+        #api-table td.editable-allowed-models .allowed-models-empty {
+            color: #999;
+            font-style: italic;
+            font-size: 12px;
+        }
+
         /* 优化的默认列宽配置 - 模型信息表格 */
         #models-table th:nth-child(1), #models-table td:nth-child(1) { min-width: 100px; width: 140px; } /* 模型名 */
         #models-table th:nth-child(2), #models-table td:nth-child(2) { min-width: 65px; width: 75px; } /* 供应商数量 */

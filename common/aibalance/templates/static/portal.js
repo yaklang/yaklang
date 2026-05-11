@@ -297,7 +297,7 @@
                         <td class="text-center">${key.id}</td>
                         <td class="text-center">${statusBadge}</td>
                         <td class="copyable api-key-cell" data-full-text="${this.escapeHtml(key.key)}">${this.escapeHtml(key.display_key)}</td>
-                        <td class="copyable editable-allowed-models" data-api-id="${key.id}" data-current-models="${this.escapeHtml(key.allowed_models)}" data-full-text="${this.escapeHtml(key.allowed_models)}" title="右键点击修改允许的模型">${this.escapeHtml(key.allowed_models)}</td>
+                        <td class="copyable editable-allowed-models" data-api-id="${key.id}" data-current-models="${this.escapeHtml(key.allowed_models)}" data-full-text="${this.escapeHtml(key.allowed_models)}" title="右键点击修改允许的模型">${renderAllowedModelsCellContent(key.allowed_models)}</td>
                         <td class="text-center">${key.usage_count}</td>
                         <td class="text-center">${key.web_search_count || 0}</td>
                         <td class="text-center">
@@ -619,7 +619,7 @@
                     <td class="text-center">${key.id}</td>
                     <td class="text-center">${statusBadge}</td>
                     <td class="copyable api-key-cell" data-full-text="${escapeHtml(key.api_key)}">${escapeHtml(key.display_key)}</td>
-                    <td class="copyable editable-allowed-models" data-api-id="${key.id}" data-current-models="${escapeHtml(key.allowed_models)}" data-full-text="${escapeHtml(key.allowed_models)}" title="右键点击修改允许的模型">${escapeHtml(key.allowed_models)}</td>
+                    <td class="copyable editable-allowed-models" data-api-id="${key.id}" data-current-models="${escapeHtml(key.allowed_models)}" data-full-text="${escapeHtml(key.allowed_models)}" title="右键点击修改允许的模型">${renderAllowedModelsCellContent(key.allowed_models)}</td>
                     <td class="text-center">${key.usage_count || 0}</td>
                     <td class="text-center">${key.web_search_count || 0}</td>
                     <td class="text-center">
@@ -776,7 +776,36 @@
                 .replace(/"/g, '&quot;')
                 .replace(/'/g, '&#039;');
         }
-        
+
+        // Render compact allowed-models cell content (used by API key list).
+        // Keeps the cell narrow even with dozens of allowed models, while
+        // exposing the full list via tooltip + count badge. Right-click menu
+        // (editable-allowed-models) and full text copy (data-full-text) on
+        // the parent <td> still work because the tag/structure is preserved
+        // by the caller.
+        function renderAllowedModelsCellContent(allowedModelsString) {
+            const raw = (allowedModelsString || '').toString();
+            const items = raw.split(',').map(s => s.trim()).filter(s => s);
+            if (items.length === 0) {
+                return '<span class="allowed-models-empty" title="未配置任何允许模型">未授权</span>';
+            }
+            const previewCount = 2;
+            const visible = items.slice(0, previewCount);
+            const hidden = items.slice(previewCount);
+            const badges = visible.map(name => {
+                let cls = 'allowed-model-chip';
+                if (name.includes('*')) cls += ' chip-glob';
+                else if (name.endsWith('-free')) cls += ' chip-free';
+                else cls += ' chip-paid';
+                return '<span class="' + cls + '" title="' + escapeHtml(name) + '">' + escapeHtml(name) + '</span>';
+            }).join('');
+            const moreBadge = hidden.length > 0
+                ? '<span class="allowed-model-chip chip-more" title="' + escapeHtml(hidden.join(', ')) + '">+' + hidden.length + '</span>'
+                : '';
+            const countBadge = '<span class="allowed-model-count" title="共 ' + items.length + ' 个允许模型，右键修改">' + items.length + '</span>';
+            return '<div class="allowed-models-wrap">' + countBadge + badges + moreBadge + '</div>';
+        }
+
         // Export pagination functions
         window.loadAPIKeysPaginated = loadAPIKeysPaginated;
         window.changeAPIKeysPage = changeAPIKeysPage;
@@ -4143,7 +4172,7 @@ curl '${metaApiUrl}?name=${modelName}'`;
                         }
                     </td>
                     <td class="copyable api-key-cell" data-full-text="${key.api_key}">${key.display_key}</td>
-                    <td class="copyable editable-allowed-models" data-api-id="${key.id}" data-current-models="${key.allowed_models}" data-full-text="${key.allowed_models}" title="右键点击修改允许的模型">${key.allowed_models}</td>
+                    <td class="copyable editable-allowed-models" data-api-id="${key.id}" data-current-models="${escapeHtml(key.allowed_models)}" data-full-text="${escapeHtml(key.allowed_models)}" title="右键点击修改允许的模型">${renderAllowedModelsCellContent(key.allowed_models)}</td>
                     <td class="text-center">${key.usage_count}</td>
                     <td class="text-center">${key.web_search_count || 0}</td>
                     <td class="text-center">
@@ -4408,15 +4437,27 @@ curl '${metaApiUrl}?name=${modelName}'`;
                     
                     const widths = JSON.parse(saved);
                     const headers = table.querySelectorAll('thead th');
-                    
+
+                    // 防御：历史 bug 曾把"允许模型"列拖到几千 px，并被
+                    // localStorage 持久化下来。这里在恢复时按 CSS 上限钳制，
+                    // 避免每次刷新都把 #api-table 撑爆。
+                    const apiTableColumnCaps = {
+                        4: 320,  // 允许模型 (0-based index, 第 5 列)
+                    };
+                    const isApiTable = tableId === 'api-table';
+
                     headers.forEach((th, index) => {
                         if (widths[index]) {
-                            const width = widths[index] + 'px';
+                            let w = widths[index];
+                            if (isApiTable && apiTableColumnCaps[index] && w > apiTableColumnCaps[index]) {
+                                w = apiTableColumnCaps[index];
+                            }
+                            const width = w + 'px';
                             th.style.width = width;
                             th.style.minWidth = width;
                         }
                     });
-                    
+
                     // 同步 tbody 列宽
                     const rows = table.querySelectorAll('tbody tr');
                     rows.forEach(row => {
@@ -4424,7 +4465,11 @@ curl '${metaApiUrl}?name=${modelName}'`;
                             if (widths[index]) {
                                 const cell = row.children[index];
                                 if (cell) {
-                                    const width = widths[index] + 'px';
+                                    let w = widths[index];
+                                    if (isApiTable && apiTableColumnCaps[index] && w > apiTableColumnCaps[index]) {
+                                        w = apiTableColumnCaps[index];
+                                    }
+                                    const width = w + 'px';
                                     cell.style.width = width;
                                     cell.style.minWidth = width;
                                 }
