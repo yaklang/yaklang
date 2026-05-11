@@ -1680,6 +1680,21 @@ func (c *ServerConfig) serveEmbeddings(conn net.Conn, rawPacket []byte) {
 	c.logInfo("Embedding response sent successfully, %d bytes", len(responseJSON))
 }
 
+// isEmbeddingWrapper reports whether a wrapper should be excluded from GET /v1/models
+// (chat-oriented listing). True when the wrapper name suggests embedding or any provider
+// row is in embedding mode.
+func isEmbeddingWrapper(wrapperName string, providers []*Provider) bool {
+	if strings.Contains(strings.ToLower(wrapperName), "embedding") {
+		return true
+	}
+	for _, p := range providers {
+		if p != nil && strings.EqualFold(strings.TrimSpace(p.ProviderMode), "embedding") {
+			return true
+		}
+	}
+	return false
+}
+
 // 新增函数: 处理 /v1/models 请求，返回所有可用的 model 列表
 func (c *ServerConfig) serveModels(key *Key, conn net.Conn) {
 	c.logInfo("Serving models list")
@@ -1698,48 +1713,64 @@ func (c *ServerConfig) serveModels(key *Key, conn net.Conn) {
 		Data   []*ModelMeta `json:"data"`   // 使用指针切片与 ListChatModels 兼容
 	}
 
-	// 从 Entrypoints 中获取所有可用的模型
-	modelNames := make([]string, 0, len(c.Entrypoints.providers))
-	for modelName := range c.Entrypoints.providers {
+	totalWrappers := len(c.Entrypoints.providers)
+	modelNames := make([]string, 0, totalWrappers)
+	for modelName, plist := range c.Entrypoints.providers {
+		if isEmbeddingWrapper(modelName, plist) {
+			continue
+		}
 		modelNames = append(modelNames, modelName)
 	}
+	afterEmbedding := len(modelNames)
 
-	// 如果没有模型，返回空列表
-	if len(modelNames) == 0 {
-		c.logWarn("No models available for listing")
-	} else {
-		c.logInfo("Found %d available models", len(modelNames))
-	}
-
-	// 构建响应对象
-	response := ModelsResponse{
-		Object: "list",
-		Data:   make([]*ModelMeta, 0, len(modelNames)), // 使用指针切片
-	}
-
-	// 创建当前时间，用于 created 字段
-	now := time.Now().Unix()
-
-	// 为每个模型创建 ModelMeta
+	filtered := make([]string, 0, len(modelNames))
 	for _, name := range modelNames {
-		// 免费模型始终对所有用户可见
-		// 对于非免费模型，如果提供了 key，则检查权限
 		isFreeModel := strings.HasSuffix(name, "-free")
-		if key != nil {
-			if _, ok := key.AllowedModels[name]; !ok && !isFreeModel {
+		if key == nil {
+			if !isFreeModel {
+				continue
+			}
+		} else {
+			if !isFreeModel && !c.KeyAllowedModels.IsModelAllowed(key.Key, name) {
 				continue
 			}
 		}
+		filtered = append(filtered, name)
+	}
+	afterAuth := len(filtered)
 
-		response.Data = append(response.Data, &ModelMeta{ // 使用指针
+	sort.Slice(filtered, func(i, j int) bool {
+		fi := strings.HasSuffix(filtered[i], "-free")
+		fj := strings.HasSuffix(filtered[j], "-free")
+		if fi != fj {
+			// non-free wrappers first
+			return !fi && fj
+		}
+		return filtered[i] < filtered[j]
+	})
+
+	if totalWrappers == 0 {
+		c.logWarn("No models available for listing")
+	} else {
+		c.logInfo("Models list: total_wrappers=%d after_embedding_exclusion=%d after_auth=%d",
+			totalWrappers, afterEmbedding, afterAuth)
+	}
+
+	response := ModelsResponse{
+		Object: "list",
+		Data:   make([]*ModelMeta, 0, len(filtered)),
+	}
+
+	now := time.Now().Unix()
+	for _, name := range filtered {
+		response.Data = append(response.Data, &ModelMeta{
 			ID:      name,
 			Object:  "model",
 			Created: now,
-			OwnedBy: "library", // 改为 "library" 以匹配示例中的值
+			OwnedBy: "library",
 		})
 	}
 
-	// 序列化为 JSON
 	responseJSON, err := json.Marshal(response)
 	if err != nil {
 		c.logError("Failed to marshal models response: %v", err)
@@ -1748,16 +1779,14 @@ func (c *ServerConfig) serveModels(key *Key, conn net.Conn) {
 		return
 	}
 
-	// 构建 HTTP 响应
 	header := fmt.Sprintf("HTTP/1.1 200 OK\r\n"+
 		"Content-Type: application/json; charset=utf-8\r\n"+
 		"Content-Length: %d\r\n"+
 		"\r\n", len(responseJSON))
 
-	// 发送响应
 	conn.Write([]byte(header))
 	conn.Write(responseJSON)
-	c.logInfo("Models list response sent, %d bytes, models: %v", len(responseJSON), modelNames)
+	c.logInfo("Models list response sent, %d bytes, models: %v", len(responseJSON), filtered)
 }
 
 // serveModelMeta serves model metadata
