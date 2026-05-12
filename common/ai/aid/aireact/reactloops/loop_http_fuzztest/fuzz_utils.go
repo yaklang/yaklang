@@ -8,9 +8,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/mutate"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/yakgit/yakdiff"
@@ -25,6 +27,10 @@ const (
 	loopHTTPFuzzInterestingTopN      = 6
 	loopHTTPFuzzProgressEmitInterval = 2 * time.Second
 	modifiedPacketContentField       = "modified_packet_content"
+	loopHTTPFuzzStatusEventNode      = "http_flow_fuzz_status"
+	loopHTTPFuzzStatusStart          = "start"
+	loopHTTPFuzzStatusWorking        = "working"
+	loopHTTPFuzzStatusFinish         = "finish"
 )
 
 type loopHTTPFuzzInterestingSample struct {
@@ -100,6 +106,36 @@ type loopHTTPFuzzOverviewStats struct {
 	StatusCounts         map[int]int
 	ResponseLengthGroups map[int]*loopHTTPFuzzResponseLengthGroup
 	InterestingSamples   []loopHTTPFuzzInterestingSample
+}
+
+type loopHTTPFuzzStatusCodeCount struct {
+	Code  int `json:"code"`
+	Count int `json:"count"`
+}
+
+type loopHTTPFuzzResponseLengthCount struct {
+	BodyLength int `json:"body_length"`
+	Count      int `json:"count"`
+}
+
+type loopHTTPFuzzStatusProgress struct {
+	TotalRequests        int                               `json:"total_requests"`
+	SuccessfulResponses  int                               `json:"successful_responses"`
+	FailedRequests       int                               `json:"failed_requests"`
+	SavedHTTPFlowCount   int                               `json:"saved_httpflow_count"`
+	LastStatusCode       int                               `json:"last_status_code,omitempty"`
+	AverageResponseMs    int64                             `json:"average_response_ms,omitempty"`
+	InterestingSampleNum int                               `json:"interesting_sample_num"`
+	StatusCounts         []loopHTTPFuzzStatusCodeCount     `json:"status_counts,omitempty"`
+	ResponseLengthGroups []loopHTTPFuzzResponseLengthCount `json:"response_length_groups,omitempty"`
+}
+
+type loopHTTPFuzzStatusEvent struct {
+	Status     string                      `json:"status"`
+	FuzzID     string                      `json:"fuzz_id"`
+	RuntimeID  string                      `json:"runtime_id"`
+	ActionName string                      `json:"action_name,omitempty"`
+	Progress   *loopHTTPFuzzStatusProgress `json:"progress,omitempty"`
 }
 
 func newLoopHTTPFuzzOverviewStats() *loopHTTPFuzzOverviewStats {
@@ -532,6 +568,8 @@ func (s *loopHTTPFuzzOverviewStats) finalizeResponseLengthGroups() {
 type loopHTTPFuzzThrottleEmitter struct {
 	loop       *reactloops.ReActLoop
 	taskID     string
+	fuzzID     string
+	runtimeID  string
 	actionName string
 	throttle   func(func())
 }
@@ -541,62 +579,18 @@ func (r *loopHTTPFuzzThrottleEmitter) allowEmitDetailHttpFlow(resultIndex int) b
 }
 
 func (r *loopHTTPFuzzThrottleEmitter) emitProgress(stats *loopHTTPFuzzOverviewStats, lastStatusCode int, force bool) {
-	if r == nil || r.loop == nil || strings.TrimSpace(r.taskID) == "" || stats == nil {
+	if r == nil || r.loop == nil || strings.TrimSpace(r.fuzzID) == "" || stats == nil {
 		return
 	}
-	if !force && stats.TotalRequests <= loopHTTPFuzzFrontendDetailLimit {
-		return
-	}
-
-	snapshot := buildLoopHTTPFuzzProgressSnapshot(r.actionName, stats, lastStatusCode, force)
-	if strings.TrimSpace(snapshot) == "" {
-		return
-	}
+	statusProgress := buildLoopHTTPFuzzStatusProgress(stats, lastStatusCode, 3)
 	emit := func() {
-		emitFuzzStage(r.loop, r.taskID, snapshot)
+		emitLoopHTTPFuzzStatusEvent(r.loop, loopHTTPFuzzStatusWorking, r.fuzzID, r.runtimeID, r.actionName, statusProgress)
 	}
 	if force || r.throttle == nil {
 		emit()
 		return
 	}
 	r.throttle(emit)
-}
-
-func buildLoopHTTPFuzzProgressSnapshot(actionName string, stats *loopHTTPFuzzOverviewStats, lastStatusCode int, finished bool) string {
-	if stats == nil || stats.TotalRequests <= 0 {
-		return ""
-	}
-
-	stateLabel := "执行进度"
-	if finished {
-		stateLabel = "执行完成"
-	}
-
-	var out strings.Builder
-	out.WriteString(fmt.Sprintf("%s：%s 已处理 %d 个请求", stateLabel, actionName, stats.TotalRequests))
-	if stats.SuccessfulResponses > 0 || stats.FailedRequests > 0 {
-		out.WriteString(fmt.Sprintf("，成功 %d，失败 %d", stats.SuccessfulResponses, stats.FailedRequests))
-	}
-	if stats.SavedHTTPFlowCount > 0 {
-		out.WriteString(fmt.Sprintf("，已落库 %d 条 HTTPFlow", stats.SavedHTTPFlowCount))
-	}
-	if lastStatusCode > 0 {
-		out.WriteString(fmt.Sprintf("，最近状态 %s", formatLoopHTTPFuzzStatusCode(lastStatusCode)))
-	}
-	if stats.SuccessfulResponses > 0 {
-		out.WriteString(fmt.Sprintf("，平均响应 %d ms", stats.TotalDurationMs/int64(stats.SuccessfulResponses)))
-	}
-	if statusPreview := formatLoopHTTPFuzzTopStatusCounts(stats.StatusCounts, 3); statusPreview != "" {
-		out.WriteString(fmt.Sprintf("，状态分布 %s", statusPreview))
-	}
-	if lengthPreview := stats.responseLengthPreview(3); lengthPreview != "" {
-		out.WriteString(fmt.Sprintf("，长度分布 %s", lengthPreview))
-	}
-	if len(stats.InterestingSamples) > 0 {
-		out.WriteString(fmt.Sprintf("，可疑样本 %d 个", len(stats.InterestingSamples)))
-	}
-	out.WriteString("。")
-	return out.String()
 }
 
 func (s *loopHTTPFuzzOverviewStats) responseLengthPreview(maxItems int) string {
@@ -612,6 +606,77 @@ func (s *loopHTTPFuzzOverviewStats) responseLengthPreview(maxItems int) string {
 		parts = append(parts, fmt.Sprintf("%dB=%d", group.BodyLength, group.Count))
 	}
 	return strings.Join(parts, ", ")
+}
+
+func buildLoopHTTPFuzzStatusProgress(stats *loopHTTPFuzzOverviewStats, lastStatusCode int, maxItems int) *loopHTTPFuzzStatusProgress {
+	if stats == nil || stats.TotalRequests <= 0 {
+		return nil
+	}
+	progress := &loopHTTPFuzzStatusProgress{
+		TotalRequests:        stats.TotalRequests,
+		SuccessfulResponses:  stats.SuccessfulResponses,
+		FailedRequests:       stats.FailedRequests,
+		SavedHTTPFlowCount:   stats.SavedHTTPFlowCount,
+		LastStatusCode:       lastStatusCode,
+		InterestingSampleNum: len(stats.InterestingSamples),
+		StatusCounts:         buildLoopHTTPFuzzStatusCounts(stats.StatusCounts, maxItems),
+		ResponseLengthGroups: buildLoopHTTPFuzzResponseLengthCounts(stats, maxItems),
+	}
+	if stats.SuccessfulResponses > 0 {
+		progress.AverageResponseMs = stats.TotalDurationMs / int64(stats.SuccessfulResponses)
+	}
+	return progress
+}
+
+func buildLoopHTTPFuzzStatusCounts(counts map[int]int, maxItems int) []loopHTTPFuzzStatusCodeCount {
+	if len(counts) == 0 || maxItems <= 0 {
+		return nil
+	}
+	statuses := make([]int, 0, len(counts))
+	for statusCode := range counts {
+		statuses = append(statuses, statusCode)
+	}
+	sort.SliceStable(statuses, func(i, j int) bool {
+		if counts[statuses[i]] == counts[statuses[j]] {
+			return statuses[i] < statuses[j]
+		}
+		return counts[statuses[i]] > counts[statuses[j]]
+	})
+	if len(statuses) > maxItems {
+		statuses = statuses[:maxItems]
+	}
+	ret := make([]loopHTTPFuzzStatusCodeCount, 0, len(statuses))
+	for _, statusCode := range statuses {
+		ret = append(ret, loopHTTPFuzzStatusCodeCount{
+			Code:  statusCode,
+			Count: counts[statusCode],
+		})
+	}
+	return ret
+}
+
+func buildLoopHTTPFuzzResponseLengthCounts(stats *loopHTTPFuzzOverviewStats, maxItems int) []loopHTTPFuzzResponseLengthCount {
+	if stats == nil || maxItems <= 0 {
+		return nil
+	}
+	groups := stats.sortedResponseLengthGroups()
+	if len(groups) == 0 {
+		return nil
+	}
+	if len(groups) > maxItems {
+		groups = groups[:maxItems]
+	}
+	ret := make([]loopHTTPFuzzResponseLengthCount, 0, len(groups))
+	for _, group := range groups {
+		if group == nil {
+			continue
+		}
+		ret = append(ret, loopHTTPFuzzResponseLengthCount{
+			BodyLength: group.BodyLength,
+			Count:      group.Count,
+		})
+	}
+	return ret
 }
 
 func buildLoopHTTPFuzzProcessedResult(resultIndex int, result *mutate.HttpResult, originalRequest string, baselineBodyLength int) loopHTTPFuzzProcessedResult {
@@ -893,22 +958,29 @@ func executeFuzzAndCompare(loop *reactloops.ReActLoop, fuzzResult mutate.FuzzHTT
 		}
 		taskCtx = task.GetContext()
 	}
-	runtimeID := ""
+	runtimeID := uuid.New().String()
 	invoker := loop.GetInvoker()
 	if invoker != nil {
 		if cfg := invoker.GetConfig(); cfg != nil {
-			runtimeID = cfg.GetRuntimeId()
+			cfg.AppendRelatedRuntimeID(runtimeID)
 		}
 	}
 	if taskCtx == nil {
 		taskCtx = context.Background()
 	}
+	if loop != nil {
+		loop.Set("last_fuzz_runtime_id", runtimeID)
+	}
+	fuzzID := runtimeID
 
 	// 进度事件仍然边执行边发，但正文报告改成最后统一渲染。
+	emitLoopHTTPFuzzStatusEvent(loop, loopHTTPFuzzStatusStart, fuzzID, runtimeID, actionName, nil)
 	emitFuzzStage(loop, streamTaskID, fmt.Sprintf("开始执行 %s，HTTPFlow 会落库并保留完整请求/响应。", actionName))
 	progressEmitter := &loopHTTPFuzzThrottleEmitter{
 		loop:       loop,
 		taskID:     streamTaskID,
+		fuzzID:     fuzzID,
+		runtimeID:  runtimeID,
 		actionName: actionName,
 		throttle:   utils.NewThrottle(loopHTTPFuzzProgressEmitInterval.Seconds()),
 	}
@@ -925,6 +997,7 @@ func executeFuzzAndCompare(loop *reactloops.ReActLoop, fuzzResult mutate.FuzzHTT
 	}
 	resultCh, err := fuzzResult.Exec(execOpts...)
 	if err != nil {
+		emitLoopHTTPFuzzStatusEvent(loop, loopHTTPFuzzStatusFinish, fuzzID, runtimeID, actionName, nil)
 		return "", nil, utils.Errorf("failed to execute fuzz request: %v", err)
 	}
 
@@ -972,6 +1045,7 @@ func executeFuzzAndCompare(loop *reactloops.ReActLoop, fuzzResult mutate.FuzzHTT
 
 	overview.finalizeResponseLengthGroups()
 	progressEmitter.emitProgress(overview, representativeStatusCode, true)
+	emitLoopHTTPFuzzStatusEvent(loop, loopHTTPFuzzStatusFinish, fuzzID, runtimeID, actionName, nil)
 
 	if representativeRequest != "" || representativeResponse != "" {
 		loop.Set("representative_request", representativeRequest)
@@ -1025,6 +1099,19 @@ func executeFuzzAndCompare(loop *reactloops.ReActLoop, fuzzResult mutate.FuzzHTT
 	persistLoopHTTPFuzzSessionContext(loop, actionName)
 
 	return feedbackResult, verifyResult, nil
+}
+
+func emitLoopHTTPFuzzStatusEvent(loop *reactloops.ReActLoop, status, fuzzID, runtimeID, actionName string, progress *loopHTTPFuzzStatusProgress) {
+	if loop == nil || loop.GetEmitter() == nil || strings.TrimSpace(status) == "" || strings.TrimSpace(fuzzID) == "" {
+		return
+	}
+	_, _ = loop.GetEmitter().EmitJSON(schema.EVENT_TYPE_HTTP_FLOW_FUZZ_STATUS, loopHTTPFuzzStatusEventNode, loopHTTPFuzzStatusEvent{
+		Status:     status,
+		FuzzID:     fuzzID,
+		RuntimeID:  runtimeID,
+		ActionName: actionName,
+		Progress:   progress,
+	})
 }
 
 // buildFuzzCompressionTarget 只描述“可压缩分析段”的压缩目标，不包含固定 overview。

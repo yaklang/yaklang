@@ -162,6 +162,8 @@ const (
 	EVENT_TYPE_YAKIT_HTTPFLOW_COUNT               = "yak_httpflow_count"
 	EVENT_TYPE_HTTP_FUZZ_REQUEST_CHANGE EventType = "http_fuzz_request_change"
 
+	EVENT_TYPE_HTTP_FLOW_FUZZ_STATUS = "http_flow_fuzz_status"
+
 	// AI 推理过程通用事件类型
 	EVENT_TYPE_THOUGHT     EventType = "thought"     // AI 思考过程（适用于 ReAct、CoT 等推理模式）
 	EVENT_TYPE_ACTION      EventType = "action"      // AI 行动执行（工具调用、函数执行等）

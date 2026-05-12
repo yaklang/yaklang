@@ -79,35 +79,34 @@ func TestBuildLoopHTTPFuzzVerificationPayload_DoesNotDuplicateAggregateOverview(
 	require.Contains(t, payload, "Representative HTTPFlow: flow-9")
 }
 
-func TestBuildLoopHTTPFuzzProgressSnapshot_SummarizesCurrentProgress(t *testing.T) {
+func TestBuildLoopHTTPFuzzStatusProgress_UsesStructuredFields(t *testing.T) {
 	stats := newLoopHTTPFuzzOverviewStats()
-	stats.observeSuccess(200, 120, 24, true)
-	stats.observeSuccess(401, 1450, 0, true)
-	stats.observeSuccess(401, 1200, 0, true)
-	stats.observeSuccess(401, 1300, 0, true)
+	stats.observeSuccess(200, 100, 24, true)
+	stats.observeSuccess(200, 110, 24, true)
+	stats.observeSuccess(401, 300, 0, true)
 	stats.observeError()
-	sample := loopHTTPFuzzInterestingSample{
-		Index:      2,
-		Score:      70,
-		StatusCode: 401,
-		BodyLength: 0,
-	}
-	stats.considerInterestingSample(sample)
-	stats.observeResponseLengthGroup(loopHTTPFuzzInterestingSample{
-		Index:      1,
-		Score:      5,
-		StatusCode: 200,
-		BodyLength: 24,
-	})
-	stats.observeResponseLengthGroup(sample)
+	stats.observeResponseLengthGroup(loopHTTPFuzzInterestingSample{BodyLength: 24, StatusCode: 200})
+	stats.observeResponseLengthGroup(loopHTTPFuzzInterestingSample{BodyLength: 24, StatusCode: 200})
+	stats.observeResponseLengthGroup(loopHTTPFuzzInterestingSample{BodyLength: 0, StatusCode: 401})
+	stats.considerInterestingSample(loopHTTPFuzzInterestingSample{Index: 3, Score: 70, StatusCode: 401, BodyLength: 0})
 
-	snapshot := buildLoopHTTPFuzzProgressSnapshot("fuzz_body", stats, 401, false)
-	require.Contains(t, snapshot, "执行进度：fuzz_body 已处理 5 个请求")
-	require.Contains(t, snapshot, "成功 4，失败 1")
-	require.Contains(t, snapshot, "已落库 4 条 HTTPFlow")
-	require.Contains(t, snapshot, "最近状态 401")
-	require.Contains(t, snapshot, "状态分布 401=3, 200=1")
-	require.Contains(t, snapshot, "可疑样本 1 个")
+	progress := buildLoopHTTPFuzzStatusProgress(stats, 401, 3)
+	require.NotNil(t, progress)
+	require.Equal(t, 4, progress.TotalRequests)
+	require.Equal(t, 3, progress.SuccessfulResponses)
+	require.Equal(t, 1, progress.FailedRequests)
+	require.Equal(t, 3, progress.SavedHTTPFlowCount)
+	require.Equal(t, 401, progress.LastStatusCode)
+	require.Equal(t, int64(170), progress.AverageResponseMs)
+	require.Equal(t, 1, progress.InterestingSampleNum)
+	require.Equal(t, []loopHTTPFuzzStatusCodeCount{
+		{Code: 200, Count: 2},
+		{Code: 401, Count: 1},
+	}, progress.StatusCounts)
+	require.Equal(t, []loopHTTPFuzzResponseLengthCount{
+		{BodyLength: 24, Count: 2},
+		{BodyLength: 0, Count: 1},
+	}, progress.ResponseLengthGroups)
 }
 
 func TestFinalizeLoopHTTPFuzzResponseLengthGroups_UsesDominantLengthAsBaseline(t *testing.T) {
