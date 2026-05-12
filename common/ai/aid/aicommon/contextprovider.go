@@ -124,6 +124,28 @@ func isTextFileExtension(ext string) bool {
 	return textExtensions[ext]
 }
 
+// IsImageContextAttachmentPath reports whether filePath should be treated as an image
+// for prompt attachment (by extension or image/* MIME). Used so callers can route
+// images to vision pipelines instead of FileContextProvider (text-only).
+func IsImageContextAttachmentPath(filePath string) bool {
+	ext := strings.ToLower(filepath.Ext(filePath))
+	imageExts := map[string]bool{
+		".jpg": true, ".jpeg": true, ".png": true, ".gif": true, ".webp": true,
+		".bmp": true, ".tif": true, ".tiff": true, ".heic": true, ".heif": true, ".avif": true,
+	}
+	if imageExts[ext] {
+		return true
+	}
+	mimeType := mime.TypeByExtension(ext)
+	if mimeType != "" {
+		if idx := strings.Index(mimeType, ";"); idx != -1 {
+			mimeType = strings.TrimSpace(mimeType[:idx])
+		}
+		return strings.HasPrefix(strings.ToLower(mimeType), "image/")
+	}
+	return false
+}
+
 // MaxFileContentSize 文件内容最大读取大小（1KB）
 const MaxFileContentSize = 1024
 

@@ -232,9 +232,17 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 		}
 		resourcesInfo.WriteString("\n")
 
-		if len(files) > 0 {
+		allFiles := dedupStrings(files)
+		imagePaths, regularFilePaths := splitAttachedImagePaths(allFiles)
+		runCtx := loop.GetConfig().GetContext()
+		if task != nil && !utils.IsNil(task.GetContext()) {
+			runCtx = task.GetContext()
+		}
+		appendImageVisionToAttachedResources(loop, runCtx, userQuery, imagePaths, &resourcesInfo)
+
+		if len(regularFilePaths) > 0 {
 			resourcesInfo.WriteString("### 文件 (Files)\n")
-			for _, f := range files {
+			for _, f := range regularFilePaths {
 				resourcesInfo.WriteString(fmt.Sprintf("- %s\n", f))
 			}
 			resourcesInfo.WriteString("\n")
@@ -279,7 +287,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 		loop.Set("user_query", userQuery)
 		loop.Set("attached_resources", resourcesInfo.String())
 		loop.Set("knowledge_bases", strings.Join(knowledgeBases, ","))
-		loop.Set("files", strings.Join(files, ","))
+		loop.Set("files", strings.Join(allFiles, ","))
 		loop.Set("ai_tools", strings.Join(aiTools, ","))
 		loop.Set("ai_forges", strings.Join(aiForges, ","))
 		loop.Set("knowledge_core_summary", knowledgeCoreSummary)
