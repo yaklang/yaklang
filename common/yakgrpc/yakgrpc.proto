@@ -1940,6 +1940,10 @@ message AIStartParams {
   // 为 true 时，MaybeTriggerPerceptionAfterAction / MaybeTriggerPerceptionAfterVerification /
   // TriggerPerceptionOnSpin 内直接同步调用 TriggerPerception；默认 false 时为异步 goroutine 调用
   bool SyncPerceptionTrigger = 37;
+
+  // 为 true 时允许 request_plan_and_execution（PE）与 require_ai_blueprint（蓝图）两类动作；
+  // 默认 false 时禁用上述能力。该开关在 StartAIReAct 参数转换中晚于 DisableAISearchForge 应用，优先级更高。
+  bool EnablePlan = 38;
 }
 
 message AITaskFilter {

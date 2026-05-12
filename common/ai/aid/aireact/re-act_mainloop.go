@@ -321,6 +321,7 @@ func (r *ReAct) ExecuteLoopTask(taskTypeName string, task aicommon.AIStatefulTas
 			})
 		}),
 		reactloops.WithAllowAIForge(r.config.EnablePlanAndExec),
+		reactloops.WithAllowPlanAndExec(r.config.EnablePlanAndExec),
 	)
 
 	defaultOptions = append(defaultOptions, options...)

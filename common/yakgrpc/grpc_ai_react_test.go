@@ -43,6 +43,7 @@ func TestConvertYPBAIStartParamsToReActConfig(t *testing.T) {
 		DisableToolUse:               disableToolUse,
 		IncludeSuggestedToolKeywords: includeKeywords,
 		AIService:                    aiService,
+		EnablePlan:                   true, // explicit: default proto false would disable PE/blueprint actions
 		DisableAISearchForge:         true, // just to test that this field is ignored, not start embedding server in ci test
 		AICallTokenLimit:             100 * 1024,
 		UserPresetPrompt:             presetPrompt,
@@ -72,6 +73,20 @@ func TestConvertYPBAIStartParamsToReActConfig(t *testing.T) {
 	require.Equal(t, start.UserPresetPrompt, cfg.UserPresetPrompt)
 	require.Equal(t, start.DisableToolIntervalReview, cfg.DisableIntervalReview)
 	require.Equal(t, start.SyncPerceptionTrigger, cfg.GetSyncPerceptionTrigger())
+	require.Equal(t, start.GetEnablePlan(), cfg.GetEnablePlanAndExec())
 	// AiServerName is no longer set from frontend params (WithAIChatInfo deprecated),
 	// it is now auto-detected via ModelInfoCallback during actual AI gateway calls.
+}
+
+func TestConvertYPBAIStartParams_EnablePlanAppliedAfterDisableAISearchForge(t *testing.T) {
+	start := &ypb.AIStartParams{
+		DisableAISearchForge: false,
+		EnablePlan:           false,
+	}
+	opts := ConvertYPBAIStartParamsToReActConfig(start)
+	cfg := aicommon.NewConfig(context.Background(), append(opts,
+		aicommon.WithAICallback(func(aicommon.AICallerConfigIf, *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			return &aicommon.AIResponse{}, nil
+		}))...)
+	require.False(t, cfg.GetEnablePlanAndExec(), "EnablePlan=false must disable PE/blueprint regardless of DisableAISearchForge")
 }
