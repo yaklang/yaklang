@@ -43,11 +43,13 @@ type PromptSectionRole string
 // buildPromptSections, liteforge / aireduce 等) 已迁移到 1/2 版本.
 //
 // 字节统计图的 "从下往上" 堆叠顺序由 promptSectionRolesInOrder 决定:
-//   high_static -> frozen_block -> semi_dynamic_1 -> semi_dynamic_2 ->
-//   timelineOpen -> dynamic
+//
+//	high_static -> frozen_block -> semi_dynamic_1 -> semi_dynamic_2 ->
+//	timelineOpen -> dynamic
 //
 // 关键词: PromptSectionRole 拆 SemiDynamic1/2, 字节统计独立分类, P1.1,
-//        老 SemiDynamic 已移除
+//
+//	老 SemiDynamic 已移除
 const (
 	PromptSectionRoleHighStatic   PromptSectionRole = "high_static"
 	PromptSectionRoleFrozenBlock  PromptSectionRole = "frozen_block"
@@ -69,22 +71,27 @@ const (
 )
 
 type PromptSectionObservation struct {
-	Key          string                      `json:"key"`
-	Label        string                      `json:"label"`
-	Role         PromptSectionRole           `json:"role"`
-	RoleZh       PromptSectionRoleZH         `json:"role_zh"`
-	Included     bool                        `json:"included"`
-	Compressible bool                        `json:"compressible"`
-	Bytes        int                         `json:"bytes"`
-	Lines        int                         `json:"lines"`
-	Content      string                      `json:"content,omitempty"`
-	Children     []*PromptSectionObservation `json:"children,omitempty"`
+	Key          string              `json:"key"`
+	Label        string              `json:"label"`
+	Role         PromptSectionRole   `json:"role"`
+	RoleZh       PromptSectionRoleZH `json:"role_zh"`
+	Included     bool                `json:"included"`
+	Compressible bool                `json:"compressible"`
+	Bytes        int                 `json:"bytes"`
+	Lines        int                 `json:"lines"`
+	// EstimatedTokens 使用 ytoken.CalcTokenCount (Qwen BPE) 对本段 Content 或
+	// (容器段) 各子段之和做预估计数, 与同树 Bytes 聚合口径一致.
+	EstimatedTokens int                         `json:"estimated_tokens,omitempty"`
+	Content         string                      `json:"content,omitempty"`
+	Children        []*PromptSectionObservation `json:"children,omitempty"`
 }
 
 type PromptObservationRoleStat struct {
 	RoleName   PromptSectionRole   `json:"role_name"`
 	RoleNameZh PromptSectionRoleZH `json:"role_name_zh"`
 	RoleBytes  int                 `json:"role_bytes"`
+	// RoleTokens 为各叶子成分按 Role 汇总的 ytoken.CalcTokenCount 预估值.
+	RoleTokens int `json:"role_tokens,omitempty"`
 }
 
 type PromptObservationStats struct {
@@ -133,8 +140,8 @@ type PromptSectionStatus struct {
 	// BytesPercent 该段 (含 children) 字节占整 prompt 的百分比, 0-100, 保留两位小数.
 	// 前端可直接用作进度条 / 排序依据, 帮用户找到"哪段最大".
 	BytesPercent float64 `json:"bytes_percent,omitempty"`
-	// EstimatedTokens 按 4 byte ≈ 1 token 估算的 token 数. 与上游真实 prompt_tokens
-	// 不严格相等, 但同一 prompt 内段间相对量级可比, 可作为成本占比参考.
+	// EstimatedTokens 与 PromptSectionObservation 一致: ytoken.CalcTokenCount
+	// (Qwen BPE). 与上游计费 token 可能略有偏差, 段间相对量级可比.
 	EstimatedTokens int `json:"estimated_tokens,omitempty"`
 	// ContentHash 本段 (含 children 渲染后) 内容的 sha1 前 8 字符 (16 hex chars).
 	// 跨多次 prompt_profile 比对同 key 段的 hash 即可判断段内容是否抖动 -
@@ -235,7 +242,12 @@ func collectPromptObservationStats(section *PromptSectionObservation, observatio
 	}
 	observation.IncludedSectionCount++
 	bytes := section.ContentBytes()
+	tokens := section.EstimatedTokens
+	if tokens == 0 && strings.TrimSpace(section.Content) != "" {
+		tokens = ytoken.CalcTokenCount(section.Content)
+	}
 	observation.Stats.RoleStats = addPromptObservationRoleBytes(observation.Stats.RoleStats, section.Role, bytes)
+	observation.Stats.RoleStats = addPromptObservationRoleTokens(observation.Stats.RoleStats, section.Role, tokens)
 	if section.Compressible {
 		observation.Stats.CompressibleBytes += bytes
 	} else {
@@ -257,6 +269,11 @@ func (s *PromptSectionObservation) refreshMetrics() {
 	s.Bytes = len(s.Content)
 	s.Lines = countPromptLines(s.Content)
 	s.Included = strings.TrimSpace(s.Content) != ""
+	s.EstimatedTokens = 0
+	if len(s.Children) == 0 {
+		s.EstimatedTokens = ytoken.CalcTokenCount(s.Content)
+		return
+	}
 	for _, child := range s.Children {
 		if child == nil {
 			continue
@@ -267,6 +284,7 @@ func (s *PromptSectionObservation) refreshMetrics() {
 		}
 		s.Bytes += child.Bytes
 		s.Lines += child.Lines
+		s.EstimatedTokens += child.EstimatedTokens
 	}
 }
 
@@ -567,6 +585,7 @@ func newPromptObservationRoleStats() []PromptObservationRoleStat {
 			RoleName:   role,
 			RoleNameZh: promptSectionRoleZH(role),
 			RoleBytes:  0,
+			RoleTokens: 0,
 		})
 	}
 	return stats
@@ -594,6 +613,24 @@ func addPromptObservationRoleBytes(stats []PromptObservationRoleStat, role Promp
 		RoleName:   role,
 		RoleNameZh: promptSectionRoleZH(role),
 		RoleBytes:  bytes,
+		RoleTokens: 0,
+	})
+}
+
+func addPromptObservationRoleTokens(stats []PromptObservationRoleStat, role PromptSectionRole, tokens int) []PromptObservationRoleStat {
+	if tokens == 0 {
+		return stats
+	}
+	idx := promptObservationRoleStatIndex(stats, role)
+	if idx >= 0 {
+		stats[idx].RoleTokens += tokens
+		return stats
+	}
+	return append(stats, PromptObservationRoleStat{
+		RoleName:   role,
+		RoleNameZh: promptSectionRoleZH(role),
+		RoleBytes:  0,
+		RoleTokens: tokens,
 	})
 }
 
@@ -632,7 +669,7 @@ func (o *PromptObservation) RenderCLIReport(maxPreviewBytes int) string {
 	buf.WriteString("+---------------------------------------------------------------+\n")
 	buf.WriteString("| Role Summary                                                   |\n")
 	for _, stat := range o.Stats.RoleStats {
-		buf.WriteString(fmt.Sprintf("|   %-14s: %-45d |\n", stat.RoleName, stat.RoleBytes))
+		buf.WriteString(fmt.Sprintf("|   %-14s: %dB / ~%d tok |\n", stat.RoleName, stat.RoleBytes, stat.RoleTokens))
 	}
 	buf.WriteString("+---------------------------------------------------------------+\n")
 	buf.WriteString("| Section Tree (label / key / meta / summary)                   |\n")
@@ -697,7 +734,7 @@ func buildPromptSectionStatus(section *PromptSectionObservation, maxSummaryBytes
 		Summary:          preview,
 		SummaryTruncated: truncated,
 		BytesPercent:     bytesPercentOfTotal(bytesValue, totalPromptBytes),
-		EstimatedTokens:  estimateTokensFromBytes(bytesValue),
+		EstimatedTokens:  section.EstimatedTokens,
 		ContentHash:      contentHash8(section.Content),
 	}
 	for _, child := range section.Children {
@@ -755,17 +792,6 @@ func bytesPercentOfTotal(bytes, total int) float64 {
 	return float64(int(pct*100+0.5)) / 100.0
 }
 
-// estimateTokensFromBytes 按 ASCII / 拉丁字符约 4 byte ≈ 1 token 的经验估算
-// 给出段 token 量级. 不替代上游真实 token 计数, 只用于段间相对量级排序.
-// 关键词: estimateTokensFromBytes, EstimatedTokens
-func estimateTokensFromBytes(bytes int) int {
-	if bytes <= 0 {
-		return 0
-	}
-	// 向上取整, 让 < 4 字节的段也至少给 1 token, 避免前端误以为 0 成本.
-	return (bytes + 3) / 4
-}
-
 // contentHash8 取段原文 sha1 前 8 字符作为内容指纹, 给前端跨调用比对用.
 // 同 key 不同 hash = 该段内容抖动 = 缓存 prefix 失稳, 用户可据此定位优化点.
 // 空内容返回空串, 不浪费 16 字符传输.
@@ -798,12 +824,13 @@ func appendPromptSectionCLI(buf *strings.Builder, section *PromptSectionObservat
 	buf.WriteString(section.Key)
 	buf.WriteString("\n")
 	buf.WriteString(nextPrefix)
-	buf.WriteString(fmt.Sprintf("meta: role=%s, mode=%s, included=%s, size=%dB/%dL",
+	buf.WriteString(fmt.Sprintf("meta: role=%s, mode=%s, included=%s, size=%dB/%dL/~%d tok",
 		sectionRoleLabel(section.Role),
 		sectionCompressLabel(section.Compressible),
 		sectionIncludeLabel(section.IsIncluded()),
 		section.ContentBytes(),
 		section.LineCount(),
+		section.EstimatedTokens,
 	))
 	buf.WriteString("\n")
 	if preview := renderPromptSectionPreview(section.Content, maxPreviewBytes); preview != "" {
@@ -868,8 +895,9 @@ func promptSectionRoleZH(role PromptSectionRole) PromptSectionRoleZH {
 // 两个独立 Role, 老的 PromptSectionRoleSemiDynamic 已删除, 这里也不再保留兜底.
 //
 // 顺序固定为:
-//   high_static -> frozen_block -> semi_dynamic_1 -> semi_dynamic_2 ->
-//   timelineOpen -> dynamic
+//
+//	high_static -> frozen_block -> semi_dynamic_1 -> semi_dynamic_2 ->
+//	timelineOpen -> dynamic
 //
 // 关键词: promptSectionRolesInOrder, 字节统计排序, 堆叠顺序, P1.1
 func promptSectionRolesInOrder() []PromptSectionRole {
