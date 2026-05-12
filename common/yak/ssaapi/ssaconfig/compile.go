@@ -188,7 +188,18 @@ func WithProjectLanguage(language Language) Option {
 	}
 }
 
-// SSACompileConfig 编译配置
+// SSACompileConfig controls project-wide SSA compilation (JSON field `SSACompile` on the root config).
+//
+// Large-project notes:
+//   - compile_concurrency: only parallelizes pre-handler read+ParseAST; main per-file SSA build stays serial.
+//   - exclude_files / entry_files: primary levers to shrink work.
+//   - peephole_size: splits the virtual FS into multiple compile chunks (multiple programs).
+//   - enable_incremental_compile + base_program_name: incremental / diff workflows.
+//   - memory_compile: memory-only program cache (some CLIs force DB mode).
+//
+// AST parse ordering (OutOfOrder vs Order vs ReverseOrder) is not a field here; it is set via ssaapi.WithASTOrder
+// / extra option key `ssa_compile/ast_order`. Non-OutOfOrder modes buffer all file ASTs before main build — high RAM on large trees.
+// See common/yak/ssaapi/LARGE_PROJECT_SSA_COMPILE.md .
 type SSACompileConfig struct {
 	StrictMode               bool          `json:"strict_mode"`
 	PeepholeSize             int           `json:"peephole_size"`

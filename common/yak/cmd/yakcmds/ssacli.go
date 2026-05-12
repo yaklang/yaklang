@@ -216,7 +216,9 @@ var ssaCompile = &cli.Command{
 	UsageText: `yak ssa-compile (--target <path> | --config <json>) [--program <name>] [options]`,
 	Description: `Compile source code into SSA program and save it to database.
 Compile stage is shared with code-scan (same auto-detect + script compile pipeline).
-When --syntaxflow is provided, a follow-up SyntaxFlowQuery is executed for quick manual verification.`,
+When --syntaxflow is provided, a follow-up SyntaxFlowQuery is executed for quick manual verification.
+
+Large-project tuning, AST order memory behavior, diagnostics and pprof: see common/yak/ssaapi/LARGE_PROJECT_SSA_COMPILE.md.`,
 	Flags: []cli.Flag{
 		cli.StringFlag{Name: "log", Usage: "log level: debug, info, warn, error"},
 		cli.StringFlag{

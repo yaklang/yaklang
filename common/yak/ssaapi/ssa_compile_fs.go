@@ -17,17 +17,27 @@ type SaveFolder struct {
 	path []string
 }
 
+// parseProjectWithFS compiles a whole project from a filesystem.
+//
+// Pipeline fact: parallel read/ParseAST lives inside f1 only (FilesHandler -> channel).
+// A single goroutine consumes that channel (PreHandlerProject) and fills fileContents.
+// f3 Build walks fileContents sequentially — it does NOT consume the AST channel.
+// See common/yak/ssaapi/LARGE_PROJECT_SSA_COMPILE.md (section "f1 channel vs f3 Build").
 func (c *Config) parseProjectWithFS(
 	filesystem filesys_interface.FileSystem,
 	processCallback func(float64, string, ...any),
 ) (*Program, error) {
 
-	var calculateTime, preHandlerTime, parseTime, saveTime time.Duration
+	var calculateTime, preHandlerTime, parseTime, finishTime, saveTime time.Duration
+	overallStart := time.Now()
 	defer func() {
 		log.Debugf("calculate time: %v", calculateTime)
 		log.Debugf("pre-handler time: %v", preHandlerTime)
-		log.Debugf("parse time: %v", parseTime)
+		log.Debugf("parse time (main build f3): %v", parseTime)
+		log.Debugf("finish time (f4 Finish+metadata): %v", finishTime)
 		log.Debugf("save time: %v", saveTime)
+		log.Debugf("ssa.compile.phase_segments: %v", calculateTime+preHandlerTime+parseTime+finishTime+saveTime)
+		log.Debugf("ssa.compile.wall: %v", time.Since(overallStart))
 	}()
 
 	defer func() {
@@ -39,6 +49,9 @@ func (c *Config) parseProjectWithFS(
 	}()
 
 	wg := sync.WaitGroup{}
+
+	// compilePhase labels UI / callback messages and debug logs so operators can align htop with f1/f3/f5.
+	compilePhase := "f0_scan"
 
 	programName := c.GetProgramName()
 	programPath := c.programPath
@@ -53,8 +66,9 @@ func (c *Config) parseProjectWithFS(
 	filePerfRecorder := c.DiagnosticsRecorder()
 
 	calculateTime, err = filePerfRecorder.ForKind(diagnostics.TrackKindGeneral).TrackLow("calculate project size", func() error {
-		processCallback(0.0, fmt.Sprintf("parse project in fs: %v, path: %v", filesystem, c.GetCodeSource().ToJSONString()))
-		processCallback(0.0, "calculate total size of project")
+		log.Debugf("ssa.compile.phase enter %s", compilePhase)
+		processCallback(0.0, fmt.Sprintf("[%s] parse project in fs: %v, path: %v", compilePhase, filesystem, c.GetCodeSource().ToJSONString()))
+		processCallback(0.0, fmt.Sprintf("[%s] calculate total size of project", compilePhase))
 		if programName != "" {
 			folder2Save = append(folder2Save, []string{"/", programName})
 		}
@@ -101,10 +115,14 @@ func (c *Config) parseProjectWithFS(
 
 	process := 0.0
 	prog.ProcessInfof = func(s string, v ...any) {
-		processCallback(
-			process,
-			s, v...,
-		)
+		msg := s
+		if len(v) > 0 {
+			msg = fmt.Sprintf(s, v...)
+		}
+		if compilePhase != "" {
+			msg = fmt.Sprintf("[%s] %s", compilePhase, msg)
+		}
+		processCallback(process, msg)
 	}
 
 	if c.isStop() {
@@ -205,6 +223,8 @@ func (c *Config) parseProjectWithFS(
 	f2 := func() error {
 		if language := c.LanguageBuilder; language != nil {
 			language.AfterPreHandlerProject(builder)
+			// Drop ANTLR / lexer-parser caches before main build; main path does not need pre-handler parse caches.
+			language.Clearup()
 		}
 		prog.ProcessInfof("pre-handler parse project finish")
 		return nil
@@ -214,6 +234,7 @@ func (c *Config) parseProjectWithFS(
 		process = 0.4 // 40%
 		// parse project 40%-90%
 		prog.ProcessInfof("parse project start")
+		mainBuildStart := time.Now()
 		handlerNum := 0
 		handlerProcess := func() {
 			handlerNum++
@@ -261,7 +282,8 @@ func (c *Config) parseProjectWithFS(
 				path := fileContent.Path
 				ast := fileContent.AST
 				fileContent.AST = nil // clear AST
-				func() {
+				buildName := fmt.Sprintf("Build[%s]", path)
+				_, _ = filePerfRecorder.ForKind(ssa.TrackKindBuild).Track(buildName, func() error {
 					defer func() {
 						if r := recover(); r != nil {
 							log.Errorf("parse [%s] error %v  ", path, r)
@@ -270,11 +292,16 @@ func (c *Config) parseProjectWithFS(
 					}()
 					if e := prog.Build(ast, fileContent.Editor, builder); e != nil {
 						log.Errorf("parse %#v failed: %v", path, e)
+					} else {
+						// IR keeps *MemEditor via memedit.Range on values; drop duplicate ref from slice.
+						fileContent.Editor = nil
 					}
-				}()
+					return nil
+				})
 			}
 			return nil
 		}()
+		parseTime = time.Since(mainBuildStart)
 		_ = parseErr
 		fileContents = make([]*ssareducer.FileContent, 0)
 		if c.isStop() {
@@ -284,6 +311,8 @@ func (c *Config) parseProjectWithFS(
 	}
 
 	f4 := func() error {
+		f4Start := time.Now()
+		defer func() { finishTime = time.Since(f4Start) }()
 		process = 0.9 // %90
 		prog.Finish()
 		// 在保存到数据库之前，设置增量编译信息（如果存在）
@@ -342,8 +371,21 @@ func (c *Config) parseProjectWithFS(
 		return nil
 	}
 	if err := diagnostics.RunWithCurrentRecorderErr(filePerfRecorder, func() error {
-		for _, fn := range []func() error{f1, f2, f3, f4, f5, f6} {
-			if err := fn(); err != nil {
+		phases := []struct {
+			name string
+			fn   func() error
+		}{
+			{"f1_pre_handler", f1},
+			{"f2_after_pre", f2},
+			{"f3_main_build", f3},
+			{"f4_finish", f4},
+			{"f5_save_db", f5},
+			{"f6_wait", f6},
+		}
+		for _, p := range phases {
+			compilePhase = p.name
+			log.Debugf("ssa.compile.phase enter %s", compilePhase)
+			if err := p.fn(); err != nil {
 				return err
 			}
 		}
@@ -352,10 +394,24 @@ func (c *Config) parseProjectWithFS(
 		return nil, err
 	}
 
-	// 展示层：表格由 ParseProject 的 defer LogDiagnostics 统一打印一次，此处仅输出总耗时
-	totalCompile := calculateTime + preHandlerTime + saveTime
+	// 展示层：表格由 ParseProject 的 defer LogDiagnostics 统一打印一次，此处仅输出分阶段之和
+	totalCompile := calculateTime + preHandlerTime + parseTime + finishTime + saveTime
 	diagnostics.LogLow(ssa.TrackKindBuild, "", fmt.Sprintf("total compile elapsed %v", totalCompile))
 	diagnostics.LogHeapSnapshot("ssa_compile_project_end", true)
+
+	wall := time.Since(overallStart)
+	log.Infof(
+		"[ssa.compile.summary] program=%s handler_files=%d wall=%s scan=%s pre_handler=%s main_build=%s finish=%s save_instructions=%s phase_sum=%s",
+		prog.Name,
+		len(handlerFilesMap),
+		wall,
+		calculateTime,
+		preHandlerTime,
+		parseTime,
+		finishTime,
+		saveTime,
+		totalCompile,
+	)
 
 	return NewProgram(prog, c), nil
 }
