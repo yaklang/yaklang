@@ -1,0 +1,15 @@
+## 当前计划概览
+{{ .CurrentPlanDetail }}
+
+{{ if .PlanHelp }}
+## 规划任务帮助信息
+{{ .PlanHelp }}
+{{ end }}{{ if .OriginalUserInput }}
+
+## 最原始用户输入
+{{ .OriginalUserInput }}
+{{ end }}
+
+## 用户批阅
+下面是用户对当前任务规划进行批阅之后的规划信息：
+{{ .UserReviewPlan }}

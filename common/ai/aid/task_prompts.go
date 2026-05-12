@@ -50,33 +50,11 @@ func (t *AiTask) generateStatusSummaryPrompt() (string, error) {
 }
 
 func (t *AiTask) generateDynamicPlanPrompt(userInput string) (string, error) {
-	// 创建模板数据
-	templateData := map[string]interface{}{
-		"ContextProvider": t.ContextProvider,
-		"UserInput":       userInput,
-	}
-
-	// 解析prompt模板
-	tmpl, err := template.New("dynamic-plan").Parse(__prompt_DynamicPlan)
-	if err != nil {
-		return "", fmt.Errorf("error parsing dynamic plan prompt template: %w", err)
-	}
-
-	// 渲染模板
-	var promptBuilder strings.Builder
-	err = tmpl.Execute(&promptBuilder, templateData)
-	if err != nil {
-		return "", fmt.Errorf("error executing dynamic plan prompt template: %w", err)
-	}
-
-	return promptBuilder.String(), nil
+	return t.buildDynamicPlanPrompt(userInput)
 }
 
 func (t *AiTask) GenerateDeepThinkPlanPrompt(suggestion string) (string, error) {
-	return t.quickBuildPrompt(__prompt_DeepthinkTaskListPrompt, map[string]any{
-		"ContextProvider": t.ContextProvider,
-		"UserInput":       suggestion,
-	})
+	return t.buildDeepthinkPrompt(suggestion)
 }
 
 func (t *AiTask) DeepThink(suggestion string) error {

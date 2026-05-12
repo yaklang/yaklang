@@ -127,6 +127,7 @@ type ReActLoop struct {
 	// generic auto-verification can compare the current loop state against the
 	// previous accepted checkpoint.
 	periodicVerificationInterval int // when == 0 , trigger every iteration;
+	DisablePeriodicVerification       bool
 	verificationRuntimeSnapshot  *VerificationRuntimeSnapshot
 	verificationMutex            *sync.Mutex
 	verificationWatchdogTimer    *time.Timer

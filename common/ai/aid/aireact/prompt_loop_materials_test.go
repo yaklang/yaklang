@@ -30,7 +30,8 @@ func mustLoopPromptSections(t *testing.T, raw any) []*reactloops.PromptSectionOb
 // semi_dynamic_1 / semi_dynamic_2 段分别被 AI_CACHE_SEMI / AI_CACHE_SEMI2 包裹.
 //
 // 关键词: AssembleLoopPrompt section order, 6 段顺序, frozen-block, AI_CACHE_FROZEN,
-//        AI_CACHE_SEMI, AI_CACHE_SEMI2, P1.1 拆 semi
+//
+//	AI_CACHE_SEMI, AI_CACHE_SEMI2, P1.1 拆 semi
 func TestPromptManager_AssembleLoopPrompt_SectionOrder(t *testing.T) {
 	react, err := NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
@@ -355,7 +356,7 @@ func TestPromptManager_AssemblePromptPrefix(t *testing.T) {
 	require.NoError(t, err)
 
 	prefix, err := react.promptManager.AssemblePromptPrefix(
-		react.promptManager.NewPromptPrefixMaterials(base, &reactloops.LoopPromptAssemblyInput{
+		react.promptManager.NewPromptMaterials(base, &reactloops.LoopPromptAssemblyInput{
 			Nonce:           "pfx123",
 			TaskInstruction: "follow task rules",
 			OutputExample:   "example output",
@@ -391,7 +392,8 @@ func TestPromptManager_AssemblePromptPrefix(t *testing.T) {
 // 不打 cc 但前缀仍跨过其字节序列直达 semi-2 cc 锚点 (合并 prefix cache).
 //
 // 关键词: aicache hijack 5 段, AI_CACHE_FROZEN + AI_CACHE_SEMI + AI_CACHE_SEMI2
-//        三边界, 三 cc 主路径, P1.1 拆 semi
+//
+//	三边界, 三 cc 主路径, P1.1 拆 semi
 func TestPromptManager_AssembleLoopPrompt_HijackFiveSegment(t *testing.T) {
 	// P2.1 阈值合并默认 1024 byte 会把本测试的短 fixture (Tool Inventory 仅
 	// 一个 tool, 总字节数 << 1KB) 合并降级到 2 段, 与本测试断言的 5 段 happy
@@ -499,6 +501,44 @@ func TestPromptManager_AssembleLoopPrompt_HijackFiveSegment(t *testing.T) {
 	require.NotContains(t, user4Content, "<|AI_CACHE_SEMI2_semi|>",
 		"user4 must NOT contain semi-2 START tag")
 	requireMessageHasNoCacheControl(t, user4, "user4 open+dynamic")
+}
+
+func TestPromptManager_AssembleLoopPrompt_EmptySemiDynamic1StillKeepsWrapper(t *testing.T) {
+	restore := aicache.SetMinCachableUserSegmentBytesForTest(0)
+	defer restore()
+
+	react, err := NewTestReAct(
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action":"object","next_action":{"type":"directly_answer","answer_payload":"ok"},"cumulative_summary":"ok","human_readable_thought":"ok"}`))
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+	require.NoError(t, err)
+
+	result, err := react.promptManager.AssembleLoopPrompt(nil, &reactloops.LoopPromptAssemblyInput{
+		Nonce:           "emptysemi1",
+		UserQuery:       "user query body",
+		TaskInstruction: "follow task rules",
+		OutputExample:   "example output",
+		Schema:          `{"type":"object","properties":{"@action":{"type":"string"}}}`,
+	})
+	require.NoError(t, err)
+
+	require.Contains(t, result.Prompt, "<|AI_CACHE_SEMI_semi|>")
+	require.Contains(t, result.Prompt, "<|AI_CACHE_SEMI_END_semi|>")
+	require.Contains(t, result.Prompt, "<|PROMPT_SECTION_semi-dynamic-1|>")
+	require.Contains(t, result.Prompt, "<|PROMPT_SECTION_END_semi-dynamic-1|>")
+
+	split := aicache.Split(result.Prompt)
+	require.NotNil(t, split)
+	sectionsBySection := make(map[string]int)
+	for _, c := range split.Chunks {
+		sectionsBySection[c.Section]++
+	}
+	require.Equal(t, 1, sectionsBySection[aicache.SectionSemiDynamic1])
+	require.Zero(t, sectionsBySection[aicache.SectionRaw])
 }
 
 // requireMessageHasCacheControl 断言 ChatDetail 主动打了 ephemeral cc:
@@ -762,7 +802,8 @@ func chatDetailContentString(detail aispec.ChatDetail) string {
 //   - timeline-open 段独立计入 SectionTimelineOpen, 不与老 SectionTimeline 混淆
 //
 // 关键词: AssembleLoopPrompt aicache split, 6 段切片, SectionSemiDynamic1/2 识别,
-//        SectionTimelineOpen 识别, P1.1
+//
+//	SectionTimelineOpen 识别, P1.1
 func TestPromptManager_AssembleLoopPrompt_AicacheSplitClassification(t *testing.T) {
 	react, err := NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
@@ -822,7 +863,8 @@ func TestPromptManager_AssembleLoopPrompt_AicacheSplitClassification(t *testing.
 // 后续改动都让高静态段降到 1500 token 以下的回归门闸.
 //
 // 关键词: high-static token budget, dashscope cache 最小窗口, 1500 阈值,
-//        TestPromptManager_HighStaticSection_TokenBudget
+//
+//	TestPromptManager_HighStaticSection_TokenBudget
 func TestPromptManager_HighStaticSection_TokenBudget(t *testing.T) {
 	react, err := NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {

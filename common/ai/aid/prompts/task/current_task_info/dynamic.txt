@@ -1,0 +1,14 @@
+{{ .Progress }}
+--- 当前任务 ---
+{{ .CurrentTaskUserInput }}
+
+任务次数执行信息：
+- 调用了{{ .ToolCallCount }} 次工具。
+- 决策继续执行了{{ .TaskContinueCount }} 次。（系统限制为{{ .TaskMaxContinue}}次）
+
+{{ if .SingleLineStatusSummary }}任务状态：{{ .SingleLineStatusSummary }}{{end}}
+
+{{ if .SharedEvidenceContext }}
+--- 共享执行证据 ---
+{{ .SharedEvidenceContext }}
+{{end}}

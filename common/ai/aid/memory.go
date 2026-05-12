@@ -378,16 +378,44 @@ func (m *PromptContextProvider) PromptForToolCallResultsForLastN(n int) string {
 
 // memory tools current task info
 func (m *PromptContextProvider) CurrentTaskInfo() string {
+	dynamic := strings.TrimSpace(m.CurrentTaskInfoDynamic())
+	stable := strings.TrimSpace(m.CurrentTaskInfoStable())
+	switch {
+	case dynamic == "" && stable == "":
+		return ""
+	case dynamic == "":
+		return stable
+	case stable == "":
+		return dynamic
+	default:
+		return dynamic + "\n\n" + stable
+	}
+}
+
+func (m *PromptContextProvider) CurrentTaskInfoDynamic() string {
 	if m.CurrentTask == nil {
 		return "BUG:... currentTaskInfo cannot be generated in `CurrentTaskInfo`, no current task"
 	}
-	results, err := utils.RenderTemplate(__prompt_currentTaskInfo, map[string]interface{}{
-		"ContextProvider": m,
+	results, err := aicommon.RenderPromptTemplate("current-task-info-dynamic", __prompt_currentTaskInfoDynamic, map[string]any{
+		"Progress":                m.Progress(),
+		"CurrentTaskUserInput":    m.CurrentTask.GetUserInput(),
+		"ToolCallCount":           m.CurrentTask.ToolCallCount(),
+		"TaskContinueCount":       m.CurrentTask.TaskContinueCount(),
+		"TaskMaxContinue":         m.TaskMaxContinue(),
+		"SingleLineStatusSummary": m.CurrentTask.SingleLineStatusSummary(),
+		"SharedEvidenceContext":   m.SharedEvidenceContext(),
 	})
 	if err != nil {
 		return "BUG:... currentTaskInfo cannot be generated in `CurrentTaskInfo` err: " + err.Error()
 	}
+	return results
+}
 
+func (m *PromptContextProvider) CurrentTaskInfoStable() string {
+	results, err := aicommon.RenderPromptTemplate("current-task-info-stable", __prompt_currentTaskInfoStable, map[string]any{})
+	if err != nil {
+		return "BUG:... currentTaskInfo stable cannot be generated err: " + err.Error()
+	}
 	return results
 }
 

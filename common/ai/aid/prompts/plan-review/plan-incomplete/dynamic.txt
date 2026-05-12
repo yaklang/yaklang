@@ -1,0 +1,21 @@
+## 当前计划概览
+{{ .CurrentPlanDetail }}
+
+{{ if .PlanHelp }}
+## 规划任务帮助信息
+{{ .PlanHelp }}
+{{ end }}{{ if .OriginalUserInput }}
+
+## 最原始用户输入
+{{ .OriginalUserInput }}
+{{ end }}
+
+{{ if .UserSuggestion }}
+
+## 用户建议
+{{ .UserSuggestion }}
+{{ end }}{{ if .ExtraPrompt }}
+
+## 补充提示
+{{ .ExtraPrompt }}
+{{ end }}

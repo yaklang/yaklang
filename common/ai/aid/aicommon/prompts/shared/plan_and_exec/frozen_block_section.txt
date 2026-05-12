@@ -1,0 +1,14 @@
+{{ if .ToolInventory }}# Tool Inventory
+You have access to {{ .ToolsCount }} built-in tools. Top {{ .TopToolsCount }} tools:
+{{ range .TopTools }}
+* `{{ .Name }}`: {{ .Description }}
+{{ end }}{{ if .HasMoreTools }}
+... use `search_capabilities` to discover more tools and related capabilities.
+{{ end }}{{ end }}
+
+{{ if .ForgeInventory }}# AI Blueprint Inventory
+以下是当前可直接调用的 AI 蓝图列表：
+{{ .AIForgeList }}{{ end }}
+
+{{ if .TimelineFrozen }}# Timeline Memory (Frozen Prefix)
+{{ .TimelineFrozen }}{{ end }}

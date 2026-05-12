@@ -1,0 +1,21 @@
+## 计划概览（待改进的计划概览）
+{{ .CurrentPlanDetail }}
+
+{{ if .PlanHelp }}
+## 规划任务帮助信息
+{{ .PlanHelp }}
+{{ end }}{{ if .OriginalUserInput }}
+
+## 最原始用户输入
+{{ .OriginalUserInput }}
+{{ end }}
+
+{{ if .TargetPlansDetail }}
+
+## 重点拆分目标
+{{ .TargetPlansDetail }}
+{{ end }}{{ if .ExtraPrompt }}
+
+## 用户补充提示
+{{ .ExtraPrompt }}
+{{ end }}

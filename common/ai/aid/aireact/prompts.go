@@ -306,7 +306,7 @@ func (pm *PromptManager) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[s
 func (pm *PromptManager) preparePromptPrefixMaterials(
 	tools []*aitool.Tool,
 	input *reactloops.LoopPromptAssemblyInput,
-) (*reactloops.LoopPromptBaseMaterials, *reactloops.PromptPrefixMaterials, error) {
+) (*reactloops.LoopPromptBaseMaterials, *aicommon.PromptMaterials, error) {
 	if input == nil {
 		return nil, nil, fmt.Errorf("prompt assembly input is nil")
 	}
@@ -315,32 +315,22 @@ func (pm *PromptManager) preparePromptPrefixMaterials(
 	if err != nil {
 		return nil, nil, err
 	}
-	return base, pm.NewPromptPrefixMaterials(base, input), nil
+	return base, pm.NewPromptMaterials(base, input), nil
 }
 
 func (pm *PromptManager) assemblePromptWithDynamicSection(
-	materials *reactloops.PromptPrefixMaterials,
+	materials *aicommon.PromptMaterials,
 	dynamicTemplateName string,
 	dynamicTemplate string,
 	dynamicData any,
 ) (string, error) {
-	prefix, err := pm.AssemblePromptPrefix(materials)
-	if err != nil {
-		return "", err
-	}
-	dynamicSection, err := pm.executeTemplate(dynamicTemplateName, dynamicTemplate, dynamicData)
-	if err != nil {
-		return "", err
-	}
-	return buildTaggedPromptSections(
-		prefix.HighStatic,
-		prefix.FrozenBlock,
-		prefix.SemiDynamic1,
-		prefix.SemiDynamic2,
-		prefix.TimelineOpen,
-		dynamicSection,
+	return aicommon.NewDefaultPromptPrefixBuilder().AssemblePromptWithDynamicSection(
+		materials,
+		dynamicTemplateName,
+		dynamicTemplate,
+		dynamicData,
 		materials.Nonce,
-	), nil
+	)
 }
 
 // ToolParamsPromptResult contains the generated prompt and metadata for AITAG parsing

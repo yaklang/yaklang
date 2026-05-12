@@ -498,6 +498,18 @@ func WithDisableLoopPerception(disable ...bool) ReActLoopOption {
 	}
 }
 
+// WithDisablePeriodicVerification disables periodic verification checkpoints for this loop instance.
+// This is used by loops that should never run periodic verification regardless of the config-level setting.
+// For config-level (global) control, use aicommon.WithDisablePeriodicVerification instead.
+func WithDisablePeriodicVerification(disable ...bool) ReActLoopOption {
+	return func(r *ReActLoop) {
+		if len(disable) > 0 && !disable[0] {
+			return
+		}
+		r.DisablePeriodicVerification = true
+	}
+}
+
 // WithPeriodicVerificationInterval sets the  iteration interval used by
 // loop-level periodic checkpoint behaviors
 // auto-verification.

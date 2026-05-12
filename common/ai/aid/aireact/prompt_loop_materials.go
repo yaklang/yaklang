@@ -38,23 +38,8 @@ const (
 	aiCacheSystemTagName = "AI_CACHE_SYSTEM"
 )
 
-//go:embed prompts/loop/high_static_section.txt
-var loopHighStaticSectionTemplate string
-
-//go:embed prompts/loop/semi_dynamic_section_1.txt
-var loopSemiDynamicSection1Template string
-
-//go:embed prompts/loop/semi_dynamic_section_2.txt
-var loopSemiDynamicSection2Template string
-
 //go:embed prompts/loop/timeline_section.txt
 var loopTimelineSectionTemplate string
-
-//go:embed prompts/loop/frozen_block_section.txt
-var loopFrozenBlockSectionTemplate string
-
-//go:embed prompts/loop/timeline_open_section.txt
-var loopTimelineOpenSectionTemplate string
 
 //go:embed prompts/loop/dynamic_section.txt
 var loopDynamicSectionTemplate string
@@ -73,14 +58,14 @@ func (r *ReAct) AssembleLoopPrompt(tools []*aitool.Tool, input *reactloops.LoopP
 	return r.promptManager.AssembleLoopPrompt(tools, input)
 }
 
-func (r *ReAct) NewPromptPrefixMaterials(base *reactloops.LoopPromptBaseMaterials, input *reactloops.LoopPromptAssemblyInput) *reactloops.PromptPrefixMaterials {
+func (r *ReAct) NewPromptMaterials(base *reactloops.LoopPromptBaseMaterials, input *reactloops.LoopPromptAssemblyInput) *aicommon.PromptMaterials {
 	if r == nil || r.promptManager == nil {
 		return nil
 	}
-	return r.promptManager.NewPromptPrefixMaterials(base, input)
+	return r.promptManager.NewPromptMaterials(base, input)
 }
 
-func (r *ReAct) AssemblePromptPrefix(materials *reactloops.PromptPrefixMaterials) (*reactloops.PromptPrefixAssemblyResult, error) {
+func (r *ReAct) AssemblePromptPrefix(materials *aicommon.PromptMaterials) (*reactloops.PromptPrefixAssemblyResult, error) {
 	if r == nil || r.promptManager == nil {
 		return nil, fmt.Errorf("prompt manager is nil")
 	}
@@ -183,7 +168,7 @@ func (pm *PromptManager) AssembleLoopPrompt(tools []*aitool.Tool, input *reactlo
 		return nil, err
 	}
 
-	prefixMaterials := pm.NewPromptPrefixMaterials(base, input)
+	prefixMaterials := pm.NewPromptMaterials(base, input)
 	prefix, err := pm.AssemblePromptPrefix(prefixMaterials)
 	if err != nil {
 		return nil, err
@@ -214,8 +199,8 @@ func (pm *PromptManager) AssembleLoopPrompt(tools []*aitool.Tool, input *reactlo
 	}, nil
 }
 
-func (pm *PromptManager) NewPromptPrefixMaterials(base *reactloops.LoopPromptBaseMaterials, input *reactloops.LoopPromptAssemblyInput) *reactloops.PromptPrefixMaterials {
-	materials := &reactloops.PromptPrefixMaterials{}
+func (pm *PromptManager) NewPromptMaterials(base *reactloops.LoopPromptBaseMaterials, input *reactloops.LoopPromptAssemblyInput) *aicommon.PromptMaterials {
+	materials := &aicommon.PromptMaterials{}
 
 	if base != nil {
 		materials.Nonce = base.Nonce
@@ -290,7 +275,7 @@ func (pm *PromptManager) NewPromptPrefixMaterials(base *reactloops.LoopPromptBas
 // 的合并渲染, 仅供老 caller / 测试断言使用; 新路径不读取它。
 //
 // 关键词: AssemblePromptPrefix, 5 段拼接, 按稳定性分层, AI_CACHE_FROZEN, AI_CACHE_SEMI(2)
-func (pm *PromptManager) AssemblePromptPrefix(materials *reactloops.PromptPrefixMaterials) (*reactloops.PromptPrefixAssemblyResult, error) {
+func (pm *PromptManager) AssemblePromptPrefix(materials *aicommon.PromptMaterials) (*reactloops.PromptPrefixAssemblyResult, error) {
 	if pm == nil {
 		return nil, fmt.Errorf("prompt manager is nil")
 	}
@@ -298,26 +283,16 @@ func (pm *PromptManager) AssemblePromptPrefix(materials *reactloops.PromptPrefix
 		return nil, fmt.Errorf("prompt prefix materials is nil")
 	}
 
-	highStatic, err := pm.renderLoopHighStaticSection(materials)
+	prefixBuilder := aicommon.NewDefaultPromptPrefixBuilder()
+	assembled, err := prefixBuilder.AssemblePromptPrefix(materials)
 	if err != nil {
 		return nil, err
 	}
-	frozenBlock, err := pm.renderLoopFrozenBlockSection(materials)
-	if err != nil {
-		return nil, err
-	}
-	semiDynamic1, err := pm.renderLoopSemiDynamic1Section(materials)
-	if err != nil {
-		return nil, err
-	}
-	semiDynamic2, err := pm.renderLoopSemiDynamic2Section(materials)
-	if err != nil {
-		return nil, err
-	}
-	timelineOpen, err := pm.renderLoopTimelineOpenSection(materials)
-	if err != nil {
-		return nil, err
-	}
+	highStatic := assembled.HighStatic
+	frozenBlock := assembled.FrozenBlock
+	semiDynamic1 := assembled.SemiDynamic
+	semiDynamic2 := assembled.SemiDynamic2
+	timelineOpen := assembled.TimelineOpen
 
 	// 老 Timeline 段渲染保留, 仅写入 PromptPrefixAssemblyResult.Timeline 供观测/兼容;
 	// 不进入新路径的 Prompt 拼接。
@@ -341,7 +316,7 @@ func (pm *PromptManager) AssemblePromptPrefix(materials *reactloops.PromptPrefix
 	}
 
 	return &reactloops.PromptPrefixAssemblyResult{
-		Prompt:       joinPromptSections(highStatic, frozenBlock, semiDynamic1, semiDynamic2, timelineOpen),
+		Prompt:       assembled.Prompt,
 		HighStatic:   highStatic,
 		FrozenBlock:  frozenBlock,
 		SemiDynamic1: semiDynamic1,
@@ -609,7 +584,8 @@ func (pm *PromptManager) buildSemiDynamic1Observation(
 // 落在所有 cache 边界之外, 见 buildTimelineOpenObservation)。
 //
 // 关键词: buildSemiDynamic2Observation, TaskInstruction, Schema, OutputExample,
-//        AI_CACHE_SEMI2 cc, P1.1, PlanContext 已迁出至 timeline-open 末尾
+//
+//	AI_CACHE_SEMI2 cc, P1.1, PlanContext 已迁出至 timeline-open 末尾
 func (pm *PromptManager) buildSemiDynamic2Observation(
 	materials *reactloops.PromptPrefixMaterials,
 	rendered string,
@@ -677,7 +653,8 @@ func (pm *PromptManager) buildSemiDynamic2Observation(
 // 抖动不再污染上游缓存命中率。
 //
 // 关键词: buildTimelineOpenObservation, Timeline 末桶, Current Time, Workspace,
-//        SessionEvidence, UserHistory, PlanContext 末尾, 缓存边界外
+//
+//	SessionEvidence, UserHistory, PlanContext 末尾, 缓存边界外
 func (pm *PromptManager) buildTimelineOpenObservation(
 	materials *reactloops.PromptPrefixMaterials,
 	rendered string,
@@ -822,7 +799,7 @@ func (pm *PromptManager) renderHighStaticPreamble(materials *reactloops.PromptPr
 	if materials == nil {
 		return ""
 	}
-	rendered, err := pm.executeTemplate("loop-high-static-preamble", loopHighStaticSectionTemplate, materials.HighStaticData())
+	rendered, err := aicommon.RenderPromptTemplate("loop-high-static-preamble", aicommon.SharedPlanAndExecHighStaticTemplate, materials.HighStaticData())
 	if err != nil {
 		return ""
 	}
@@ -1013,7 +990,7 @@ func renderInjectedMemoryBlock(nonce string, memory string) string {
 }
 
 func (pm *PromptManager) renderLoopHighStaticSection(materials *reactloops.PromptPrefixMaterials) (string, error) {
-	return pm.executeTemplate("loop-high-static", loopHighStaticSectionTemplate, materials.HighStaticData())
+	return aicommon.RenderPromptTemplate("loop-high-static", aicommon.SharedPlanAndExecHighStaticTemplate, materials.HighStaticData())
 }
 
 // renderLoopSemiDynamic1Section 渲染 P1.1 拆分后的 semi-dynamic 第一块:
@@ -1022,7 +999,7 @@ func (pm *PromptManager) renderLoopHighStaticSection(materials *reactloops.Promp
 //
 // 关键词: renderLoopSemiDynamic1Section, semi_dynamic_section_1.txt, P1.1
 func (pm *PromptManager) renderLoopSemiDynamic1Section(materials *reactloops.PromptPrefixMaterials) (string, error) {
-	return pm.executeTemplate("loop-semi-dynamic-1", loopSemiDynamicSection1Template, materials.SemiDynamic1Data())
+	return aicommon.RenderPromptTemplate("loop-semi-dynamic-1", aicommon.SharedSemiDynamic1Template, materials.SemiDynamic1Data())
 }
 
 // renderLoopSemiDynamic2Section 渲染 P1.1 拆分后的 semi-dynamic 第二块:
@@ -1031,9 +1008,10 @@ func (pm *PromptManager) renderLoopSemiDynamic1Section(materials *reactloops.Pro
 // 把 semi-1+semi-2 视作合并 prefix cache 计算.
 //
 // 关键词: renderLoopSemiDynamic2Section, semi_dynamic_section_2.txt, P1.1,
-//        AI_CACHE_SEMI2 cc
+//
+//	AI_CACHE_SEMI2 cc
 func (pm *PromptManager) renderLoopSemiDynamic2Section(materials *reactloops.PromptPrefixMaterials) (string, error) {
-	return pm.executeTemplate("loop-semi-dynamic-2", loopSemiDynamicSection2Template, materials.SemiDynamic2Data())
+	return aicommon.RenderPromptTemplate("loop-semi-dynamic-2", aicommon.SharedTaskInstructionSchemaExampleTemplate, materials.SemiDynamic2Data())
 }
 
 // renderLoopFrozenBlockSection 渲染"按稳定性分层"路径下的 FrozenBlock 段
@@ -1041,7 +1019,7 @@ func (pm *PromptManager) renderLoopSemiDynamic2Section(materials *reactloops.Pro
 //
 // 关键词: renderLoopFrozenBlockSection, frozen_block_section.txt
 func (pm *PromptManager) renderLoopFrozenBlockSection(materials *reactloops.PromptPrefixMaterials) (string, error) {
-	return pm.executeTemplate("loop-frozen-block", loopFrozenBlockSectionTemplate, materials.FrozenBlockData())
+	return aicommon.RenderPromptTemplate("loop-frozen-block", aicommon.SharedFrozenBlockTemplate, materials.FrozenBlockData())
 }
 
 // renderLoopTimelineOpenSection 渲染"按稳定性分层"路径下的 TimelineOpen 段
@@ -1049,7 +1027,7 @@ func (pm *PromptManager) renderLoopFrozenBlockSection(materials *reactloops.Prom
 //
 // 关键词: renderLoopTimelineOpenSection, timeline_open_section.txt
 func (pm *PromptManager) renderLoopTimelineOpenSection(materials *reactloops.PromptPrefixMaterials) (string, error) {
-	return pm.executeTemplate("loop-timeline-open", loopTimelineOpenSectionTemplate, materials.TimelineOpenData())
+	return aicommon.RenderPromptTemplate("loop-timeline-open", aicommon.SharedTimelineOpenTemplate, materials.TimelineOpenData())
 }
 
 // renderLoopTimelineSection 是老路径的 Timeline 段渲染 (frozen + open + workspace
@@ -1090,110 +1068,16 @@ func (pm *PromptManager) renderLoopDynamicSection(data map[string]any) (string, 
 //
 //	AI_CACHE_SEMI2, aicache hijacker, 5 段切分, P1.1 三 cache 边界, semi 拆两条 message
 func buildTaggedPromptSections(highStatic string, frozenBlock string, semiDynamic1 string, semiDynamic2 string, timelineOpen string, dynamic string, dynamicNonce string) string {
-	return joinPromptSections(
-		wrapPromptMessageSection(promptSectionHighStatic, highStatic, ""),
-		wrapAICacheFrozen(frozenBlock),
-		wrapAICacheSemi(wrapPromptMessageSection(promptSectionSemiDynamic1, semiDynamic1, "")),
-		wrapAICacheSemi2(wrapPromptMessageSection(promptSectionSemiDynamic2, semiDynamic2, "")),
-		wrapPromptMessageSection(promptSectionTimelineOpen, timelineOpen, ""),
-		wrapPromptMessageSection(promptSectionDynamic, dynamic, dynamicNonce),
+	return aicommon.BuildTaggedPromptSectionsWithSectionNamesAndForce(
+		highStatic,
+		frozenBlock,
+		semiDynamic1,
+		promptSectionSemiDynamic1,
+		true,
+		semiDynamic2,
+		promptSectionSemiDynamic2,
+		timelineOpen,
+		dynamic,
+		dynamicNonce,
 	)
-}
-
-// wrapAICacheFrozen 用 <|AI_CACHE_FROZEN_semi-dynamic|>...
-// <|AI_CACHE_FROZEN_END_semi-dynamic|> 包裹 frozen-block 内容, 与
-// aicommon.TimelineFrozenBoundaryTagName / TimelineFrozenBoundaryNonce 一致,
-// 复用 aicache hijacker 既有的 splitByFrozenBoundary 锚点。
-//
-// 内容为空时返回空串, 调用方 joinPromptSections 会自动跳过空段。
-//
-// 关键词: wrapAICacheFrozen, AI_CACHE_FROZEN, frozen 边界标签
-func wrapAICacheFrozen(content string) string {
-	content = strings.TrimSpace(content)
-	if content == "" {
-		return ""
-	}
-	tagName := aicommon.TimelineFrozenBoundaryTagName
-	nonce := aicommon.TimelineFrozenBoundaryNonce
-	return fmt.Sprintf("<|%s_%s|>\n%s\n<|%s_END_%s|>", tagName, nonce, content, tagName, nonce)
-}
-
-// wrapAICacheSemi 用 <|AI_CACHE_SEMI_semi|>...<|AI_CACHE_SEMI_END_semi|> 包裹
-// 已经包了 PROMPT_SECTION_semi-dynamic-1 标签的 semi-dynamic 第一块内容, 字面量与
-// aicommon.SemiDynamicCacheBoundaryTagName / SemiDynamicCacheBoundaryNonce 一致,
-// 让 aicache hijacker 在 frozen 边界 END 之后通过字符串 IndexOf 精准切到 user2.
-//
-// P1.1 之后: hijacker 5 段切分中的 user2 (semi-1) 不再主动打 cc, 但前缀仍直达
-// 后续 semi-2 的 cc 锚点 (合并 prefix cache); P1.1 之前的老 4 段路径仍由 build4
-// 在 user2 (合并 SEMI 段) 上打 cc, 字面量未变, hijacker 保持兼容.
-//
-// 注意: 该函数包的是 wrapPromptMessageSection 已经产出的 "PROMPT_SECTION_
-// semi-dynamic-1 完整段". 双层 tag 嵌套是有意为之: 内层 PROMPT_SECTION 让 splitter
-// 仍能识别段归属, 外层 AI_CACHE_SEMI 给 hijacker 一对字节恒定的边界.
-//
-// 内容为空时返回空串, 调用方 joinPromptSections 会自动跳过空段.
-//
-// 关键词: wrapAICacheSemi, AI_CACHE_SEMI, semi-1 cache boundary, 5 段拆分,
-//
-//	与 PROMPT_SECTION_semi-dynamic-1 双层嵌套, P1.1
-func wrapAICacheSemi(content string) string {
-	content = strings.TrimSpace(content)
-	if content == "" {
-		return ""
-	}
-	tagName := aicommon.SemiDynamicCacheBoundaryTagName
-	nonce := aicommon.SemiDynamicCacheBoundaryNonce
-	return fmt.Sprintf("<|%s_%s|>\n%s\n<|%s_END_%s|>", tagName, nonce, content, tagName, nonce)
-}
-
-// wrapAICacheSemi2 用 <|AI_CACHE_SEMI2_semi|>...<|AI_CACHE_SEMI2_END_semi|>
-// 包裹已经包了 PROMPT_SECTION_semi-dynamic-2 标签的 semi-dynamic 第二块内容,
-// 字面量与 aicommon.SemiDynamicPart2CacheBoundaryTagName /
-// SemiDynamicPart2CacheBoundaryNonce 一致, 让 aicache hijacker 在 SEMI 边界 END
-// 之后通过字符串 IndexOf 精准切到 user3, 形成 5 段消息
-// (system+cc, user1+cc=frozen, user2 无cc=semi-1, user3+cc=semi-2,
-// user4 无cc=open+dynamic).
-//
-// 注意: 该函数包的是 wrapPromptMessageSection 已经产出的 "PROMPT_SECTION_
-// semi-dynamic-2 完整段". 双层 tag 嵌套是有意为之: 内层 PROMPT_SECTION 让 splitter
-// 识别段归属, 外层 AI_CACHE_SEMI2 给 hijacker 一对字节恒定的边界.
-//
-// 内容为空时返回空串, 调用方 joinPromptSections 会自动跳过空段.
-//
-// 关键词: wrapAICacheSemi2, AI_CACHE_SEMI2, semi-2 cache boundary, 5 段拆分,
-//
-//	与 PROMPT_SECTION_semi-dynamic-2 双层嵌套, P1.1
-func wrapAICacheSemi2(content string) string {
-	content = strings.TrimSpace(content)
-	if content == "" {
-		return ""
-	}
-	tagName := aicommon.SemiDynamicPart2CacheBoundaryTagName
-	nonce := aicommon.SemiDynamicPart2CacheBoundaryNonce
-	return fmt.Sprintf("<|%s_%s|>\n%s\n<|%s_END_%s|>", tagName, nonce, content, tagName, nonce)
-}
-
-func wrapPromptMessageSection(sectionName string, content string, nonce string) string {
-	content = strings.TrimSpace(content)
-	if sectionName == promptSectionDynamic && nonce != "" {
-		tagName := fmt.Sprintf("%s_%s", promptSectionTagName, sectionName)
-		return fmt.Sprintf("<|%s_%s|>\n%s\n<|%s_END_%s|>", tagName, nonce, content, tagName, nonce)
-	}
-	// high-static 段使用 AI_CACHE_SYSTEM tagName，让 aicache 与上游识别为系统级缓存边界
-	// 关键词: AI_CACHE_SYSTEM_high-static, aicache hijack
-	if sectionName == promptSectionHighStatic {
-		return fmt.Sprintf("<|%s_%s|>\n%s\n<|%s_END_%s|>", aiCacheSystemTagName, sectionName, content, aiCacheSystemTagName, sectionName)
-	}
-	return fmt.Sprintf("<|%s_%s|>\n%s\n<|%s_END_%s|>", promptSectionTagName, sectionName, content, promptSectionTagName, sectionName)
-}
-
-func joinPromptSections(parts ...string) string {
-	var filtered []string
-	for _, part := range parts {
-		part = strings.TrimSpace(part)
-		if part != "" {
-			filtered = append(filtered, part)
-		}
-	}
-	return strings.Join(filtered, "\n\n")
 }

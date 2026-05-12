@@ -1,13 +1,11 @@
 package aid
 
 import (
-	"bytes"
 	_ "embed"
 	"encoding/json"
 	"fmt"
 	"io"
 	"strings"
-	"text/template"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 
@@ -161,12 +159,7 @@ func (pr *planRequest) handleReviewPlanResponse(rsp *PlanResponse, param aitool.
 				"4. 无需额外解释"
 		}
 		targetPlans := param.GetStringSlice("target_plans")
-		if len(targetPlans) > 0 {
-			extraPrompt += "\n用户认为你应该重点关注的子任务：" + fmt.Sprint(targetPlans)
-		} else {
-			extraPrompt += "\n用户没有规定你需要具体拆分哪些子任务，你需要自己决定在当前任务树的叶节点拆分"
-		}
-		newPlan, err := pr.generateCreateSubtaskPlan(extraPrompt, rsp)
+		newPlan, err := pr.generateCreateSubtaskPlan(extraPrompt, targetPlans, rsp)
 		if err != nil {
 			pr.cod.EmitError("generate new plan failed: %v", err)
 			return nil, utils.Errorf("generate new plan failed: %v", err)
@@ -244,24 +237,12 @@ func generateReviewedTaskTree(task aitool.InvokeParams, buf *strings.Builder, pr
 	return nil
 }
 
-func (pr *planRequest) generateCreateSubtaskPlan(extraPrompt string, rsp *PlanResponse) (*PlanResponse, error) {
-	tmpl, err := template.New("partial-replan").Parse(planReviewCreateSubtaskPrompts)
-	if err != nil {
-		return nil, utils.Errorf("error parsing plan review prompt: %v", err)
-	}
-	nonce := utils.RandStringBytes(6)
-	params := map[string]any{
-		"ContextProvider": pr.cod.ContextProvider,
-		"CurrentPlan":     rsp.RootTask,
-		"ExtraPrompt":     extraPrompt,
-		"NONCE":           nonce,
-	}
-	var buf bytes.Buffer
-	err = tmpl.Execute(&buf, params)
+func (pr *planRequest) generateCreateSubtaskPlan(extraPrompt string, targetPlans []string, rsp *PlanResponse) (*PlanResponse, error) {
+	prompt, _, err := pr.buildCreateSubtaskPrompt(extraPrompt, targetPlans, rsp)
 	if err != nil {
 		return nil, err
 	}
-	err = pr.cod.CallAITransaction(buf.String(), func(response *aicommon.AIResponse) error {
+	err = pr.cod.CallAITransaction(prompt, func(response *aicommon.AIResponse) error {
 		reader := response.GetOutputStreamReader("create-subtasks", false, pr.cod.GetEmitter())
 		if reader == nil {
 			return utils.Error("get output stream failed")
@@ -295,28 +276,11 @@ func (pr *planRequest) generateCreateSubtaskPlan(extraPrompt string, rsp *PlanRe
 }
 
 func (pr *planRequest) freedomReviewGenerateNewPlan(extraPrompt string, rsp *PlanResponse) (*PlanResponse, error) {
-	// 生成新的计划，使用自由审查模式
-	tmpl, err := template.New("freedom-plan-review").Parse(planFreedomReviewPrompts)
-	if err != nil {
-		return nil, utils.Errorf("error parsing freedom plan review prompt: %v", err)
-	}
-
-	nonce := utils.RandStringBytes(6)
-	data := map[string]any{
-		"ContextProvider":  pr.cod.ContextProvider,
-		"CurrentPlan":      rsp.RootTask,
-		"USER_REVIEW_PLAN": extraPrompt,
-		"NONCE":            nonce,
-	}
-
-	var planPrompt bytes.Buffer
-	err = tmpl.Execute(&planPrompt, data)
+	prompt, _, err := pr.buildFreedomReviewPrompt(extraPrompt, rsp)
 	if err != nil {
 		return nil, utils.Errorf("error executing freedom plan review prompt: %v", err)
 	}
-
-	pr.cod.EmitInfo("freedom plan review prompt: %s", planPrompt.String())
-	prompt := planPrompt.String()
+	pr.cod.EmitInfo("freedom plan review prompt: %s", prompt)
 
 	var task *AiTask
 	err = pr.cod.CallAITransaction(prompt, func(response *aicommon.AIResponse) error {
@@ -340,29 +304,11 @@ func (pr *planRequest) freedomReviewGenerateNewPlan(extraPrompt string, rsp *Pla
 
 // generateNewPlan 生成新的计划
 func (pr *planRequest) generateNewPlan(suggestion string, extraPrompt string, rsp *PlanResponse) (*PlanResponse, error) {
-	tmpl, err := template.New("plan-review").Parse(planReviewPrompts)
-	if err != nil {
-		return nil, utils.Errorf("error parsing plan review prompt: %v", err)
-	}
-
-	nonce := utils.RandStringBytes(6)
-	data := map[string]any{
-		"ContextProvider": pr.cod.ContextProvider,
-		"CurrentPlan":     rsp.RootTask,
-		"UserSuggestion":  suggestion,
-		"ExtraPrompt":     extraPrompt,
-		"NONCE":           nonce,
-	}
-
-	var planPrompt bytes.Buffer
-	err = tmpl.Execute(&planPrompt, data)
+	prompt, _, err := pr.buildPlanIncompletePrompt(suggestion, extraPrompt, rsp)
 	if err != nil {
 		return nil, utils.Errorf("error executing plan review prompt: %v", err)
 	}
-
-	pr.cod.EmitInfo("re-plan review prompt: %s", planPrompt.String())
-	// 调用 AI 生成新的任务计划
-	prompt := planPrompt.String()
+	pr.cod.EmitInfo("re-plan review prompt: %s", prompt)
 
 	var task *AiTask
 	err = pr.cod.CallAITransaction(prompt, func(response *aicommon.AIResponse) error {

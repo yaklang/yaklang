@@ -1,0 +1,15 @@
+## 总任务规划/进度
+{{ .Progress }}
+
+{{ if .PlanHelp }}
+## 规划任务帮助信息
+{{ .PlanHelp }}
+{{ end }}
+
+## 当前步骤任务目标
+{{ .CurrentTaskGoal }}
+
+{{ if .UserInput }}
+## 用户提供的建议
+{{ .UserInput }}
+{{ end }}

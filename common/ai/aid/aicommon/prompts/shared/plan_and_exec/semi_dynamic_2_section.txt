@@ -1,0 +1,17 @@
+{{ if .TaskInstruction }}<|PERSISTENT|>
+{{ .TaskInstruction }}
+<|PERSISTENT_END|>{{ end }}
+{{ if .Schema }}
+
+响应格式输出JSON和<|TAG...|>，请遵守如下Schema ：
+
+<|SCHEMA|>
+```jsonschema
+{{ .Schema }}
+```
+<|SCHEMA|>{{ end }}
+{{ if .OutputExample }}
+
+<|OUTPUT_EXAMPLE|>
+{{ .OutputExample }}
+<|OUTPUT_EXAMPLE_END|>{{ end }}
