@@ -92,8 +92,7 @@ func init() {
 				reactloops.WithAllowPlanAndExec(false),
 				reactloops.WithAITagFieldWithAINodeId(PlanFactsAITagName, PlanFactsFieldName, PlanFactsAINodeID, aicommon.TypeTextMarkdown),
 				reactloops.WithInitTask(buildPlanInitTask(r)),
-				reactloops.WithDisableLoopPerception(),
-
+				reactloops.WithDisablePeriodicVerification(true),
 				reactloops.WithMaxIterations(PlanMaxIterations),
 				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
 				reactloops.WithActionFilter(func(action *reactloops.LoopAction) bool {

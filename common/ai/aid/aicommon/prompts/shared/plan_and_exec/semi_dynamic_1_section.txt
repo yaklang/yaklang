@@ -1,3 +1,0 @@
-{{ if .SkillsContext }}{{ .SkillsContext }}{{ end }}
-{{ if .RecentToolsCache }}
-{{ .RecentToolsCache }}{{ end }}
