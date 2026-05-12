@@ -2,6 +2,8 @@ package aicommon
 
 import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
 	"sync/atomic"
 )
 
@@ -11,6 +13,26 @@ func (c *Config) GetTimeline() *Timeline {
 
 func (c *Config) GetAIForgeManager() AIForgeFactory {
 	return c.AiForgeManager
+}
+
+// LookupAIForgeForInvoke returns the forge definition used when invoking a blueprint by name.
+// Resolution order matches aireact.ReAct.getForgeByName: ExtendedForge first, then AiForgeManager.
+func (c *Config) LookupAIForgeForInvoke(forgeName string) (*schema.AIForge, error) {
+	if c == nil {
+		return nil, utils.Error("config is nil")
+	}
+	if forgeName == "" {
+		return nil, utils.Error("forge name is empty")
+	}
+	for _, forge := range c.ExtendedForge {
+		if forge != nil && forge.ForgeName == forgeName {
+			return forge, nil
+		}
+	}
+	if c.AiForgeManager == nil {
+		return nil, utils.Error("AiForgeManager is not configured")
+	}
+	return c.AiForgeManager.GetAIForge(forgeName)
 }
 
 func (c *Config) GetForgeName() string {

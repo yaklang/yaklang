@@ -41,6 +41,18 @@ var loopAction_RequireAIBlueprintForge = &reactloops.LoopAction{
 			return utils.Errorf("'%s' is not an AI Blueprint: %s", forgeName, resolved.Suggestion)
 		}
 
+		// Match runtime resolution (ExtendedForge + AiForgeManager) so invalid names fail
+		// here and the AI transaction can retry instead of entering async mode and aborting.
+		if cfg, ok := loop.GetInvoker().GetConfig().(*aicommon.Config); ok {
+			if _, err := cfg.LookupAIForgeForInvoke(forgeName); err != nil {
+				loop.GetInvoker().AddToTimeline("[BLUEPRINT_NOT_FOUND]",
+					fmt.Sprintf("AI Blueprint '%s' does not exist or is not available. Error: %v", forgeName, err))
+				loop.GetInvoker().AddToTimeline("[ACTION_VERIFIER]",
+					fmt.Sprintf("require_ai_blueprint rejected: blueprint '%s' not found", forgeName))
+				return utils.Errorf("AI Blueprint '%s' not found: %v", forgeName, err)
+			}
+		}
+
 		// 记录准备调用的 Blueprint
 		loop.GetInvoker().AddToTimeline("[BLUEPRINT_ACTION_VERIFIED]", "Verified require_ai_blueprint action with blueprint_payload: '"+forgeName+"'. The action passed ActionVerifier and is ready for execution with the specified AI Blueprint.")
 		loop.Set("blueprint_payload", forgeName)
