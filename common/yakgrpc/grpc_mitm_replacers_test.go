@@ -1926,6 +1926,110 @@ Content-Length: 15
 	t.Logf("Match result: %s", results[0].MatchResult)
 }
 
+// TestMUSTPASS_ExactMatch_Compile verifies that MITMReplaceRule.Compile() with
+// ExactMatch=true escapes regex metacharacters so they are matched literally.
+// Without ExactMatch, a rule like "1.00" would compile as a regex where "." matches
+// any character, silently producing wrong results.
+func TestMUSTPASS_ExactMatch_Compile(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		rule        string
+		input       string
+		exactMatch  bool
+		expectMatch bool
+	}{
+		{
+			// With ExactMatch=false (default), "." is a regex wildcard – "1X00" also matches.
+			name: "regex_dot_matches_any_char",
+			rule: "1.00", exactMatch: false,
+			input: "price: 1X00", expectMatch: true,
+		},
+		{
+			// With ExactMatch=true, "." is literal – "1X00" must NOT match.
+			name: "exact_dot_no_match_on_any_char",
+			rule: "1.00", exactMatch: true,
+			input: "price: 1X00", expectMatch: false,
+		},
+		{
+			// With ExactMatch=true, "." is literal – "1.00" must match exactly.
+			name: "exact_dot_matches_literal",
+			rule: "1.00", exactMatch: true,
+			input: "price: 1.00", expectMatch: true,
+		},
+		{
+			// ExactMatch=true: "+" is literal, not "one-or-more".
+			name: "exact_plus_literal",
+			rule: "a+b", exactMatch: true,
+			input: "key: a+b", expectMatch: true,
+		},
+		{
+			// ExactMatch=true: "+" as literal should NOT match "aab".
+			name: "exact_plus_no_regex_expand",
+			rule: "a+b", exactMatch: true,
+			input: "key: aab", expectMatch: false,
+		},
+		{
+			// ExactMatch=true: "*" is literal, not "zero-or-more".
+			name: "exact_star_literal",
+			rule: "a*b", exactMatch: true,
+			input: "val: a*b", expectMatch: true,
+		},
+		{
+			// ExactMatch=false (regex): "a*b" matches "b" (zero a's).
+			name: "regex_star_matches_zero",
+			rule: "a*b", exactMatch: false,
+			input: "val: b", expectMatch: true,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := &yakit.MITMReplaceRule{
+				MITMContentReplacer: &ypb.MITMContentReplacer{
+					Rule:       tc.rule,
+					ExactMatch: tc.exactMatch,
+				},
+			}
+			re, err := r.Compile()
+			require.NoError(t, err)
+			got, err := re.MatchString(tc.input)
+			require.NoError(t, err)
+			require.Equalf(t, tc.expectMatch, got,
+				"rule=%q exactMatch=%v input=%q", tc.rule, tc.exactMatch, tc.input)
+		})
+	}
+}
+
+// TestMUSTPASS_ExactMatch_Hook verifies that the full Hook pipeline respects
+// ExactMatch: the replacement must only fire on an exact byte-for-byte match,
+// not on strings that merely satisfy the same regex pattern.
+func TestMUSTPASS_ExactMatch_Hook(t *testing.T) {
+	const replaceResult = "REPLACED"
+
+	// "1.00" as a regex would also match "1X00" (dot = any char).
+	// With ExactMatch=true it must only match the literal "1.00".
+	reqWithLiteral := []byte("POST / HTTP/1.1\r\nHost: example.com\r\nContent-Length: 12\r\n\r\nprice: 1.00")
+	reqWithWildcard := []byte("POST / HTTP/1.1\r\nHost: example.com\r\nContent-Length: 12\r\n\r\nprice: 1X00")
+
+	replacer := yakit.NewMITMReplacer()
+	replacer.SetRules(&ypb.MITMContentReplacer{
+		Rule:             "1.00",
+		ExactMatch:       true,
+		NoReplace:        false,
+		Result:           replaceResult,
+		EnableForRequest: true,
+		EnableForBody:    true,
+	})
+
+	_, modifiedLiteral, dropped := replacer.Hook(true, false, "", reqWithLiteral)
+	require.False(t, dropped)
+	require.Contains(t, string(modifiedLiteral), replaceResult,
+		"ExactMatch should replace literal '1.00'")
+
+	_, modifiedWildcard, dropped := replacer.Hook(true, false, "", reqWithWildcard)
+	require.False(t, dropped)
+	require.NotContains(t, string(modifiedWildcard), replaceResult,
+		"ExactMatch must NOT replace '1X00' when rule is literal '1.00'")
+}
+
 func TestMITMReplaceRule_UseInlowhttp(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()

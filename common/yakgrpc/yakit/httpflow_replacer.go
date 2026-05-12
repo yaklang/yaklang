@@ -124,6 +124,17 @@ func (r *MITMReplaceRule) Compile() (*regexp2.Regexp, error) {
 		return r.cache, nil
 	}
 
+	// ExactMatch=true: treat Rule as a plain-text literal; skip regex compilation
+	// and escape all special characters so they match literally.
+	if r.GetExactMatch() {
+		_, _, re, err := utils.Regexp2Compile(regexp2.Escape(r.Rule))
+		if err != nil {
+			return nil, err
+		}
+		r.cache = re
+		return re, nil
+	}
+
 	rule, _, re, err := utils.Regexp2Compile(r.Rule)
 	if err != nil {
 		log.Debugf("regexp2 compile %v failed: %s", rule, err)
@@ -689,6 +700,20 @@ func (m *MitmReplacer) GetRule(r *ypb.MITMContentReplacer) *regexp2.Regexp {
 	raw, ok := m._ruleRegexpCache.Load(r)
 	if ok {
 		return raw.(*regexp2.Regexp)
+	}
+
+	// ExactMatch=true: treat Rule as a plain-text literal; skip regex compilation
+	// and escape all special characters so they match literally.
+	if r.GetExactMatch() {
+		_, _, re, err := utils.Regexp2Compile(regexp2.Escape(r.Rule))
+		if err != nil {
+			log.Debugf("regexp2 compile escaped rule %v failed: %s", r.Rule, err)
+			m._ruleRegexpCache.Store(r, nil)
+			return nil
+		}
+		log.Debugf("regexp cache store (exact-match): %v", r.GetVerboseName())
+		m._ruleRegexpCache.Store(r, re)
+		return re
 	}
 
 	rule, _, re, err := utils.Regexp2Compile(r.Rule)
