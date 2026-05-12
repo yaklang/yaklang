@@ -318,12 +318,24 @@ func UpdateAiApiKeyAllowedModels(id uint, allowedModels string) error {
 }
 
 // AiModelMeta stores metadata for a model (WrapperName)
+//
+// Token 倍率四维（input/output/cache_create/cache_hit）于本批次新增，
+// 用于精确控制免费用户 Token 限额扣费、付费 key Token 累加。
+// 兼容策略：当任一新字段为 0/缺省，回落到老 TrafficMultiplier；
+// 老 TrafficMultiplier 同样为 0 时按 1.0 兜底，旧版数据不破坏。
+// 关键词: AiModelMeta Token 倍率, 多维倍率, dashscope cache_creation, cache_hit
 type AiModelMeta struct {
 	gorm.Model
-	ModelName         string  `gorm:"uniqueIndex;not null"`  // The platform model name (WrapperName)
+	ModelName         string  `gorm:"uniqueIndex;not null"` // The platform model name (WrapperName)
 	Description       string  `gorm:"type:text"`
-	Tags              string  `gorm:"type:text"`             // Comma-separated tags or JSON
-	TrafficMultiplier float64 `gorm:"default:1.0"`           // Traffic consumption multiplier, default 1.0
+	Tags              string  `gorm:"type:text"`   // Comma-separated tags or JSON
+	TrafficMultiplier float64 `gorm:"default:1.0"` // 老字段：字节流量倍数（保留兼容），0/缺省时按 1.0
+
+	// 四维 Token 倍率（与上游 SSE 末帧 ChatUsage 字段一一对应）
+	InputTokenMultiplier    float64 `gorm:"default:0"` // 输入 token 倍率（=prompt_tokens - cached - cache_create）
+	OutputTokenMultiplier   float64 `gorm:"default:0"` // 输出 token 倍率（=completion_tokens）
+	CacheCreationMultiplier float64 `gorm:"default:0"` // 缓存创建倍率（=cache_creation_input_tokens，dashscope 显式缓存）
+	CacheHitMultiplier      float64 `gorm:"default:0"` // 缓存命中倍率（=cached_tokens）
 }
 
 // EnsureModelMetaTable ensures the AiModelMeta table exists
@@ -336,13 +348,31 @@ func SaveModelMeta(modelName, description, tags string) error {
 	return SaveModelMetaWithMultiplier(modelName, description, tags, -1) // -1 means don't update multiplier
 }
 
-// SaveModelMetaWithMultiplier saves or updates model metadata with traffic multiplier
+// SaveModelMetaWithMultiplier saves or updates model metadata with traffic multiplier.
+// 老接口保留作为薄包装：仅写老 TrafficMultiplier，不动新四维倍率。
+// 关键词: SaveModelMetaWithMultiplier 兼容包装
 func SaveModelMetaWithMultiplier(modelName, description, tags string, trafficMultiplier float64) error {
+	return SaveModelMetaWithMultipliers(modelName, description, tags, trafficMultiplier, -1, -1, -1, -1)
+}
+
+// SaveModelMetaWithMultipliers saves or updates model metadata with both legacy traffic
+// multiplier and four-dimensional Token multipliers. Pass -1 for any multiplier to skip
+// updating that specific field (creation will use 0/default).
+//
+// 入参语义：
+//   - trafficMultiplier < 0  -> 不更新老 TrafficMultiplier；新建时按 1.0
+//   - input/output/cacheCreate/cacheHit < 0  -> 不更新该维度；新建时按 0（依赖 ComputeWeightedTokens 的回落）
+//
+// 关键词: SaveModelMetaWithMultipliers, 四维 Token 倍率写库
+func SaveModelMetaWithMultipliers(
+	modelName, description, tags string,
+	trafficMultiplier float64,
+	inputMul, outputMul, cacheCreateMul, cacheHitMul float64,
+) error {
 	var meta AiModelMeta
 	err := GetDB().Where("model_name = ?", modelName).First(&meta).Error
 	if err != nil {
 		if gorm.IsRecordNotFoundError(err) {
-			// Create new
 			multiplier := 1.0
 			if trafficMultiplier >= 0 {
 				multiplier = trafficMultiplier
@@ -353,16 +383,39 @@ func SaveModelMetaWithMultiplier(modelName, description, tags string, trafficMul
 				Tags:              tags,
 				TrafficMultiplier: multiplier,
 			}
+			if inputMul >= 0 {
+				meta.InputTokenMultiplier = inputMul
+			}
+			if outputMul >= 0 {
+				meta.OutputTokenMultiplier = outputMul
+			}
+			if cacheCreateMul >= 0 {
+				meta.CacheCreationMultiplier = cacheCreateMul
+			}
+			if cacheHitMul >= 0 {
+				meta.CacheHitMultiplier = cacheHitMul
+			}
 			return GetDB().Create(&meta).Error
 		}
 		return err
 	}
 
-	// Update existing
 	meta.Description = description
 	meta.Tags = tags
 	if trafficMultiplier >= 0 {
 		meta.TrafficMultiplier = trafficMultiplier
+	}
+	if inputMul >= 0 {
+		meta.InputTokenMultiplier = inputMul
+	}
+	if outputMul >= 0 {
+		meta.OutputTokenMultiplier = outputMul
+	}
+	if cacheCreateMul >= 0 {
+		meta.CacheCreationMultiplier = cacheCreateMul
+	}
+	if cacheHitMul >= 0 {
+		meta.CacheHitMultiplier = cacheHitMul
 	}
 	return GetDB().Save(&meta).Error
 }

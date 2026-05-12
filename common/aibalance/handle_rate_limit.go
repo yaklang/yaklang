@@ -49,13 +49,19 @@ func (c *ServerConfig) handleGetRateLimitConfig(conn net.Conn, request *http.Req
 		modelDelayOverrides = make(map[string]int64)
 	}
 
+	// 免费用户 Token 限额相关配置（全局 + 模型级覆盖）
+	// 关键词: handleGetRateLimitConfig free_user_token_limit_m, model overrides
+	freeUserTokenOverrides := parseFreeUserTokenModelOverrides(config.FreeUserTokenModelOverrides)
+
 	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
 		"success": true,
 		"config": map[string]interface{}{
-			"default_rpm":           config.DefaultRPM,
-			"free_user_delay_sec":   config.FreeUserDelaySec,
-			"model_rpm_overrides":   modelOverrides,
-			"model_delay_overrides": modelDelayOverrides,
+			"default_rpm":                     config.DefaultRPM,
+			"free_user_delay_sec":             config.FreeUserDelaySec,
+			"model_rpm_overrides":             modelOverrides,
+			"model_delay_overrides":           modelDelayOverrides,
+			"free_user_token_limit_m":         config.FreeUserTokenLimitM,
+			"free_user_token_model_overrides": freeUserTokenOverrides,
 		},
 	})
 }
@@ -78,10 +84,12 @@ func (c *ServerConfig) handleSetRateLimitConfig(conn net.Conn, request *http.Req
 	defer request.Body.Close()
 
 	var reqBody struct {
-		DefaultRPM          *int64           `json:"default_rpm,omitempty"`
-		FreeUserDelaySec    *int64           `json:"free_user_delay_sec,omitempty"`
-		ModelRPMOverrides   map[string]int64 `json:"model_rpm_overrides,omitempty"`
-		ModelDelayOverrides map[string]int64 `json:"model_delay_overrides,omitempty"`
+		DefaultRPM                  *int64           `json:"default_rpm,omitempty"`
+		FreeUserDelaySec            *int64           `json:"free_user_delay_sec,omitempty"`
+		ModelRPMOverrides           map[string]int64 `json:"model_rpm_overrides,omitempty"`
+		ModelDelayOverrides         map[string]int64 `json:"model_delay_overrides,omitempty"`
+		FreeUserTokenLimitM         *int64           `json:"free_user_token_limit_m,omitempty"`
+		FreeUserTokenModelOverrides map[string]FreeUserTokenModelOverride `json:"free_user_token_model_overrides,omitempty"`
 	}
 	if err := json.Unmarshal(bodyBytes, &reqBody); err != nil {
 		c.logError("failed to parse request body: %v", err)
@@ -110,6 +118,30 @@ func (c *ServerConfig) handleSetRateLimitConfig(conn net.Conn, request *http.Req
 		delayJSON, _ := json.Marshal(reqBody.ModelDelayOverrides)
 		config.ModelDelayOverrides = string(delayJSON)
 	}
+	if reqBody.FreeUserTokenLimitM != nil {
+		// <=0 视作未配置；GetRateLimitConfig 会按 1200 兜底
+		if *reqBody.FreeUserTokenLimitM < 0 {
+			config.FreeUserTokenLimitM = 0
+		} else {
+			config.FreeUserTokenLimitM = *reqBody.FreeUserTokenLimitM
+		}
+	}
+	if reqBody.FreeUserTokenModelOverrides != nil {
+		// 过滤掉空模型名，避免脏数据；同时把 limit_m<0 钳到 0
+		clean := make(map[string]FreeUserTokenModelOverride, len(reqBody.FreeUserTokenModelOverrides))
+		for k, v := range reqBody.FreeUserTokenModelOverrides {
+			k = strings.TrimSpace(k)
+			if k == "" {
+				continue
+			}
+			if v.LimitM < 0 {
+				v.LimitM = 0
+			}
+			clean[k] = v
+		}
+		ovJSON, _ := json.Marshal(clean)
+		config.FreeUserTokenModelOverrides = string(ovJSON)
+	}
 
 	if err := SaveRateLimitConfig(config); err != nil {
 		c.logError("failed to save rate limit config: %v", err)
@@ -120,8 +152,8 @@ func (c *ServerConfig) handleSetRateLimitConfig(conn net.Conn, request *http.Req
 	// Apply to in-memory rate limiter
 	c.applyRateLimitConfig(config)
 
-	c.logInfo("successfully updated rate limit config: default_rpm=%d, free_user_delay=%ds",
-		config.DefaultRPM, config.FreeUserDelaySec)
+	c.logInfo("successfully updated rate limit config: default_rpm=%d, free_user_delay=%ds, free_user_token_limit_m=%d",
+		config.DefaultRPM, config.FreeUserDelaySec, config.FreeUserTokenLimitM)
 	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
 		"success": true,
 		"message": "rate limit config updated successfully",
@@ -144,10 +176,36 @@ func (c *ServerConfig) handleGetRateLimitStatus(conn net.Conn, request *http.Req
 		defaultRPM = c.chatRateLimiter.defaultRPM.Load()
 	}
 
+	// 免费用户日 Token 用量快照（全局 + per-model 桶 + 重置日期）
+	// 关键词: handleGetRateLimitStatus free_user_token_usage 快照
+	freeTokenUsage := map[string]interface{}{}
+	if global, perModel, date, err := QueryFreeUserTokenUsageSnapshot(); err == nil {
+		freeTokenUsage["reset_date"] = date
+		freeTokenUsage["global"] = map[string]interface{}{
+			"tokens_used": global.TokensUsed,
+			"used_m":      global.UsedM,
+			"limit_m":     global.LimitM,
+		}
+		perModelOut := make([]map[string]interface{}, 0, len(perModel))
+		for _, m := range perModel {
+			perModelOut = append(perModelOut, map[string]interface{}{
+				"model":       m.Model,
+				"tokens_used": m.TokensUsed,
+				"used_m":      m.UsedM,
+				"limit_m":     m.LimitM,
+				"exempt":      m.Exempt,
+			})
+		}
+		freeTokenUsage["per_model"] = perModelOut
+	} else {
+		c.logWarn("QueryFreeUserTokenUsageSnapshot failed: %v", err)
+	}
+
 	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
-		"success":       true,
-		"queue_count":   queueCount,
-		"default_rpm":   defaultRPM,
+		"success":               true,
+		"queue_count":           queueCount,
+		"default_rpm":           defaultRPM,
+		"free_user_token_usage": freeTokenUsage,
 	})
 }
 

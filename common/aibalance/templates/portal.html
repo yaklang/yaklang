@@ -273,7 +273,7 @@
                             <tr>
                                 <th class="column-name">模型名 (WrapperName)</th>
                                 <th class="column-name text-center">供应商数量</th>
-                                <th class="column-name text-center">流量倍数</th>
+                                <th class="column-name text-center">Token 倍率<br><small style="color:#888;font-weight:normal;">输入/输出/缓存创建/缓存命中</small></th>
                                 <th class="column-name">描述</th>
                                 <th class="column-name">标签</th>
                                 <th class="column-name text-center">操作</th>
@@ -824,6 +824,8 @@
                         <span style="font-weight: bold; color: #2e7d32;">实时状态:</span>
                         <span>当前排队数: <strong id="rl-queue-count">--</strong></span>
                         <span>生效 RPM: <strong id="rl-effective-rpm">--</strong></span>
+                        <span>免费 Token 已用: <strong id="rl-free-token-used-m">--</strong> / <strong id="rl-free-token-limit-m">--</strong> M</span>
+                        <span style="color: #888; font-size: 12px;">重置日期: <span id="rl-free-token-reset-date">--</span></span>
                         <button class="btn" onclick="loadRateLimitStatus()" style="height: 32px; font-size: 12px;">刷新状态</button>
                     </div>
                 </div>
@@ -892,6 +894,37 @@
                         免费用户每次请求<strong>转发到上游之前</strong>，服务端会 sleep N~2N 秒（N 为配置值）。设为 0 则不延迟。
                         <br>调用前延迟可有效降低客户端的实际请求频率（客户端会被强制等待）。
                     </small>
+                </div>
+
+                <!-- Free user daily Token quota -->
+                <!-- 关键词: 免费用户 Token 日限额, 全局共享池 + 模型级覆盖 + 模型豁免 -->
+                <div style="margin-bottom: 20px;">
+                    <h4 style="margin-bottom: 10px;">免费用户 Token 日限额</h4>
+                    <small style="color: #888; margin-bottom: 10px; display: block;">
+                        所有免费用户（-free 模型）共享一个日 Token 池，按上游 SSE 末帧 usage 经模型四维倍率（输入/输出/缓存创建/缓存命中）加权后扣费。
+                        <br>基准：<strong>0.1 RMB / 1M Token</strong>。默认 1200M（约合 120 RMB/天）。
+                        <br>支持模型级覆盖：可为某个模型单独设定独立桶（不消耗全局池），或将该模型整体豁免（不计费）。
+                        <br>超额返回 <code>429 daily_token_limit_exceeded</code>，含 <code>tokens_used</code> / <code>tokens_limit</code> 字段。
+                    </small>
+                    <div style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 12px;">
+                        <div class="form-group" style="margin-bottom: 0; flex: 0 0 220px;">
+                            <label>全局共享池日限额 (M Token):</label>
+                            <input type="number" id="rl-free-token-limit-m-input" class="form-control" value="1200" min="0" step="1" style="font-family: monospace; font-size: 13px;">
+                        </div>
+                        <div style="font-size: 12px; color: #555;">
+                            当前已用：<strong id="rl-free-token-global-used">--</strong> M / <span id="rl-free-token-global-limit">--</span> M
+                        </div>
+                    </div>
+                    <div style="margin-top: 10px;">
+                        <strong style="font-size: 13px;">模型级覆盖</strong>
+                        <small style="color: #888; margin-left: 10px;">
+                            填限额(M)=独立桶；勾选「不计费」表示该模型完全豁免（不进入任何桶）。
+                        </small>
+                        <div id="rl-free-token-model-overrides-list" style="margin-top: 10px;">
+                            <!-- Dynamic rows -->
+                        </div>
+                        <button class="btn" onclick="addFreeTokenModelOverride()" style="font-size: 12px; margin-top: 8px;">+ 添加模型覆盖</button>
+                    </div>
                 </div>
 
                 <!-- Model rate-limit overrides (RPM + free-user delay) -->
@@ -1046,7 +1079,7 @@
     </div>
 
     <div id="editModelMetaModal" class="delete-confirmation-modal" style="display: none;">
-        <div class="modal-content">
+        <div class="modal-content" style="max-width: 720px;">
             <span class="close-modal" onclick="closeEditModelModal()">&times;</span>
             <h4>编辑模型信息</h4>
             <div class="form-group">
@@ -1061,10 +1094,38 @@
                 <label>标签 (逗号分隔):</label>
                 <input type="text" id="editModelTags" class="form-control">
             </div>
+
+            <!-- Token 倍率（4 维）-->
+            <!-- 关键词: 编辑模型信息 4 维 Token 倍率, 输入/输出/缓存创建/缓存命中 -->
             <div class="form-group">
-                <label>流量消耗倍数:</label>
+                <label>Token 倍率 <small style="color:#888;font-weight:normal;">（任一维度填 0 表示该维度回落到默认值；全部为 0 时整体回落到「传统倍数」）</small></label>
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;">
+                    <div>
+                        <label style="font-size: 12px; color: #555;">输入</label>
+                        <input type="number" id="editModelInputMul" class="form-control" min="0" step="0.05" value="1.0" style="font-family: monospace;">
+                    </div>
+                    <div>
+                        <label style="font-size: 12px; color: #555;">输出</label>
+                        <input type="number" id="editModelOutputMul" class="form-control" min="0" step="0.05" value="1.0" style="font-family: monospace;">
+                    </div>
+                    <div>
+                        <label style="font-size: 12px; color: #555;">缓存创建</label>
+                        <input type="number" id="editModelCacheCreateMul" class="form-control" min="0" step="0.05" value="1.25" style="font-family: monospace;">
+                    </div>
+                    <div>
+                        <label style="font-size: 12px; color: #555;">缓存命中</label>
+                        <input type="number" id="editModelCacheHitMul" class="form-control" min="0" step="0.05" value="0.1" style="font-family: monospace;">
+                    </div>
+                </div>
+                <small class="form-text text-muted">
+                    上游 SSE 末帧 usage 经四维倍率加权后，扣减免费用户日 Token 池或付费 key 的 Token 限额。
+                    基准：0.1 RMB / 1M Token；输入/输出 = 1.0；缓存创建 = 1.25；缓存命中 = 0.1（典型 dashscope 显式缓存）。
+                </small>
+            </div>
+
+            <div class="form-group">
+                <label>传统倍数 <small style="color:#888;font-weight:normal;">（兼容旧字节流量计费；为 0 时整体按 1.0 兜底）</small>:</label>
                 <input type="number" id="editModelTrafficMultiplier" class="form-control" min="0" step="0.1" value="1.0">
-                <small class="form-text text-muted">使用此模型时，流量消耗将乘以此倍数 (例如: 2.0 表示消耗双倍流量)</small>
             </div>
             <div class="modal-actions">
                 <button class="btn" onclick="closeEditModelModal()">取消</button>

@@ -254,6 +254,12 @@ type AiApiKeys struct {
 	TrafficUsed        int64 `json:"traffic_used" gorm:"default:0"`             // 已使用流量(经倍数计算后)
 	TrafficLimitEnable bool  `json:"traffic_limit_enable" gorm:"default:false"` // 是否启用流量限制
 
+	// Token 维度限额（与字节维度并行，按上游 SSE 末帧 usage 经多维倍率加权后累加）
+	// 关键词: AiApiKeys TokenLimit, Token 计费, 与字节计费并行
+	TokenLimit       int64 `json:"token_limit" gorm:"default:0"`            // Token 限额(raw token)，0 表示不限制
+	TokenUsed        int64 `json:"token_used" gorm:"default:0"`             // 已使用 Token (经四维倍率加权后)
+	TokenLimitEnable bool  `json:"token_limit_enable" gorm:"default:false"` // 是否启用 Token 限制
+
 	// Creator tracking (for OPS user audit)
 	CreatedByOpsID   uint   `json:"created_by_ops_id" gorm:"index"`  // Creator OpsUser.ID (0 means admin created)
 	CreatedByOpsName string `json:"created_by_ops_name" gorm:"index"` // Creator username
@@ -304,6 +310,11 @@ type AiBalanceRateLimitConfig struct {
 	FreeUserDelaySec    int64  `json:"free_user_delay_sec" gorm:"default:3"`   // Pre-call delay (seconds) for free users, actual delay is N~2N random
 	ModelRPMOverrides   string `json:"model_rpm_overrides" gorm:"type:text"`   // JSON map: {"model-name": rpm_int, ...}
 	ModelDelayOverrides string `json:"model_delay_overrides" gorm:"type:text"` // JSON map: {"model-name": delay_sec_int, ...}, only applies to free users
+
+	// 免费用户日 Token 限额相关字段
+	// 关键词: 免费用户 Token 日限额, 全局共享池, 模型级覆盖, 模型豁免
+	FreeUserTokenLimitM            int64  `json:"free_user_token_limit_m" gorm:"default:1200"` // 免费用户全局共享日 Token 限额，单位 M tokens，默认 1200M
+	FreeUserTokenModelOverrides    string `json:"free_user_token_model_overrides" gorm:"type:text"` // JSON map: {"model": {"limit_m": int, "exempt": bool}}; exempt=true 表示该 -free 模型不计费
 }
 
 func (a *AiBalanceRateLimitConfig) TableName() string {
@@ -459,6 +470,22 @@ type AiDailySummary struct {
 
 func (a *AiDailySummary) TableName() string {
 	return "ai_daily_summary"
+}
+
+// FreeUserDailyTokenUsage 持久化免费用户「每日 Token 已用量」聚合行。
+// 一行 = (date, model_name) 唯一；model_name == "" 表示「全局共享池」。
+// 跨日由首次访问时 Date != today 触发归零（轻量、无定时任务）。
+// 关键词: free_user_daily_token_usage, 免费 Token 限额, 全局/模型桶
+type FreeUserDailyTokenUsage struct {
+	gorm.Model
+
+	Date       string `json:"date" gorm:"size:10;unique_index:idx_free_token;not null"`
+	ModelName  string `json:"model_name" gorm:"size:128;unique_index:idx_free_token;not null"`
+	TokensUsed int64  `json:"tokens_used"`
+}
+
+func (a *FreeUserDailyTokenUsage) TableName() string {
+	return "free_user_daily_token_usage"
 }
 
 // AIMemoryEntity 存储AI记忆条目

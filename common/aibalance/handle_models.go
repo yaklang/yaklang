@@ -25,11 +25,16 @@ func (c *ServerConfig) handleUpdateModelMeta(conn net.Conn, request *http.Reques
 	}
 
 	// Parse request body
+	// 关键词: handleUpdateModelMeta, 4 \u500d\u7387\u5b57\u6bb5
 	var reqBody struct {
-		ModelName         string   `json:"model_name"`
-		Description       string   `json:"description"`
-		Tags              string   `json:"tags"`
-		TrafficMultiplier *float64 `json:"traffic_multiplier,omitempty"` // Use pointer to detect if provided
+		ModelName               string   `json:"model_name"`
+		Description             string   `json:"description"`
+		Tags                    string   `json:"tags"`
+		TrafficMultiplier       *float64 `json:"traffic_multiplier,omitempty"`        // 老字段：字节流量倍数（保留兼容）
+		InputTokenMultiplier    *float64 `json:"input_token_multiplier,omitempty"`    // 输入 token 倍率
+		OutputTokenMultiplier   *float64 `json:"output_token_multiplier,omitempty"`   // 输出 token 倍率
+		CacheCreationMultiplier *float64 `json:"cache_creation_multiplier,omitempty"` // 缓存创建倍率
+		CacheHitMultiplier      *float64 `json:"cache_hit_multiplier,omitempty"`      // 缓存命中倍率
 	}
 
 	bodyBytes, err := io.ReadAll(request.Body)
@@ -60,17 +65,34 @@ func (c *ServerConfig) handleUpdateModelMeta(conn net.Conn, request *http.Reques
 		return
 	}
 
-	// Determine traffic multiplier value (-1 means don't update)
-	multiplier := -1.0
+	// 老 TrafficMultiplier：-1 表示不更新；负数兜底为 1.0
+	trafficMul := -1.0
 	if reqBody.TrafficMultiplier != nil {
-		multiplier = *reqBody.TrafficMultiplier
-		if multiplier < 0 {
-			multiplier = 1.0 // Default negative to 1.0
+		trafficMul = *reqBody.TrafficMultiplier
+		if trafficMul < 0 {
+			trafficMul = 1.0
 		}
 	}
 
-	// Save to DB with traffic multiplier
-	if err := SaveModelMetaWithMultiplier(reqBody.ModelName, reqBody.Description, reqBody.Tags, multiplier); err != nil {
+	// 4 维 Token 倍率：nil 表示不更新（-1）；负数兜底为 0（=回落到默认/老倍率）
+	pickMul := func(p *float64) float64 {
+		if p == nil {
+			return -1
+		}
+		if *p < 0 {
+			return 0
+		}
+		return *p
+	}
+	inputMul := pickMul(reqBody.InputTokenMultiplier)
+	outputMul := pickMul(reqBody.OutputTokenMultiplier)
+	cacheCreateMul := pickMul(reqBody.CacheCreationMultiplier)
+	cacheHitMul := pickMul(reqBody.CacheHitMultiplier)
+
+	if err := SaveModelMetaWithMultipliers(
+		reqBody.ModelName, reqBody.Description, reqBody.Tags,
+		trafficMul, inputMul, outputMul, cacheCreateMul, cacheHitMul,
+	); err != nil {
 		c.logError("Failed to save model meta: %v", err)
 		c.writeJSONResponse(conn, http.StatusInternalServerError, map[string]interface{}{
 			"success": false,
@@ -79,7 +101,8 @@ func (c *ServerConfig) handleUpdateModelMeta(conn net.Conn, request *http.Reques
 		return
 	}
 
-	c.logInfo("Successfully updated metadata for model %s (multiplier: %.2f)", reqBody.ModelName, multiplier)
+	c.logInfo("Successfully updated metadata for model %s (traffic_mul=%.2f input=%.2f output=%.2f cache_create=%.2f cache_hit=%.2f)",
+		reqBody.ModelName, trafficMul, inputMul, outputMul, cacheCreateMul, cacheHitMul)
 	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
 		"success": true,
 		"message": "Model metadata updated successfully",

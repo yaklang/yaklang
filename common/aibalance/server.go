@@ -841,7 +841,22 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 		if !allowed {
 			c.logWarn("RPM rate limit exceeded for key=%s model=%s, queue_length=%d",
 				utils.ShrinkString(apiKeyForStat, 8), modelName, queueLen)
-			c.writeRateLimitResponse(conn, queueLen)
+			c.writeRPMRateLimitResponse(conn, queueLen)
+			return
+		}
+	}
+
+	// 免费用户日 Token 限额检查（在 RPM 之后、转发之前）。
+	// 模型豁免、模型独立桶、全局共享池三档优先级在 CheckFreeUserDailyTokenLimit 里。
+	// DB 异常回放为允许，避免限额逻辑的可用性反噬业务。
+	// 关键词: 免费用户日 Token 限额, CheckFreeUserDailyTokenLimit hot path
+	if isFreeModel {
+		if decision, dErr := CheckFreeUserDailyTokenLimit(modelName); dErr != nil {
+			c.logError("CheckFreeUserDailyTokenLimit failed (model=%s): %v", modelName, dErr)
+		} else if decision != nil && !decision.Allowed {
+			c.logWarn("Daily token limit exceeded for free user (model=%s bucket=%s used=%d limit=%d)",
+				modelName, decision.Bucket, decision.TokensUsed, decision.TokensLimit)
+			c.writeDailyTokenLimitResponse(conn, modelName, decision.Bucket, decision.TokensUsed, decision.TokensLimit)
 			return
 		}
 	}
@@ -1071,6 +1086,38 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 					modelName, provider.TypeName, err)
 			}
 			RecordDailySummaryDelta(usage)
+
+			// Token 维度计费：按模型四维倍率对上游 usage 加权后，
+			// 免费用户累加到日 Token 桶（全局/模型独立），付费 key 累加到 AiApiKeys.TokenUsed。
+			// 与既有「字节维度」计费并行，互不干扰。
+			// 关键词: onUsageForward Token 计费分流, ComputeWeightedTokens, AddFreeUserDailyTokenUsage
+			meta, _ := GetModelMeta(modelName)
+			weighted := ComputeWeightedTokens(meta, usage)
+			if weighted > 0 {
+				if isFreeModel {
+					overrides := parseFreeUserTokenModelOverridesFromConfig()
+					if ov, ok := overrides[modelName]; ok && ov.Exempt {
+						c.logInfo("Token billing skipped (exempt) for free model %s, weighted=%d", modelName, weighted)
+					} else {
+						modelHasOwnBucket := ok && ov.LimitM > 0
+						if err := AddFreeUserDailyTokenUsage(modelName, weighted, modelHasOwnBucket); err != nil {
+							c.logWarn("AddFreeUserDailyTokenUsage failed (model=%s weighted=%d): %v",
+								modelName, weighted, err)
+						} else {
+							c.logInfo("Free user token usage updated: model=%s weighted=%d bucket_kind=%s",
+								modelName, weighted, ternaryStr(modelHasOwnBucket, "model", "global"))
+						}
+					}
+				} else if key != nil {
+					if err := UpdateAiApiKeyTokenUsed(key.Key, weighted); err != nil {
+						c.logWarn("UpdateAiApiKeyTokenUsed failed (key=%s weighted=%d): %v",
+							utils.ShrinkString(key.Key, 8), weighted, err)
+					} else {
+						c.logInfo("API key token usage updated: key=%s model=%s weighted=%d",
+							utils.ShrinkString(key.Key, 8), modelName, weighted)
+					}
+				}
+			}
 
 			writer.WriteUsage(usage)
 		}
@@ -1507,6 +1554,21 @@ func (c *ServerConfig) serveEmbeddings(conn net.Conn, rawPacket []byte) {
 			}
 			c.logError("Key[%v] requested model %s is not in allowed list (including glob patterns), allowed models/patterns: %v", key.Key, modelName, allowedModelKeys)
 			conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
+			return
+		}
+	}
+
+	// 免费 embedding 模型同样受日 Token 限额保护（与 chat 入口对齐）。
+	// embedding 上游不返 ChatUsage，因此只做前置「是否已经超额」的检查，
+	// 真正扣费仍走老的 UpdateFreeUserStats 字节统计（embedding 体量极小可接受）。
+	// 关键词: embedding 免费用户日 Token 限额, 前置检查
+	if isFreeModel {
+		if decision, dErr := CheckFreeUserDailyTokenLimit(modelName); dErr != nil {
+			c.logError("CheckFreeUserDailyTokenLimit (embedding) failed (model=%s): %v", modelName, dErr)
+		} else if decision != nil && !decision.Allowed {
+			c.logWarn("Daily token limit exceeded for free embedding (model=%s bucket=%s used=%d limit=%d)",
+				modelName, decision.Bucket, decision.TokensUsed, decision.TokensLimit)
+			c.writeDailyTokenLimitResponse(conn, modelName, decision.Bucket, decision.TokensUsed, decision.TokensLimit)
 			return
 		}
 	}
@@ -2196,18 +2258,100 @@ func (c *ServerConfig) serveRequest(conn net.Conn, request *http.Request, should
 }
 
 // writeRateLimitResponse sends a 429 response with X-AIBalance-Info header containing the queue length.
+//
+// 兼容包装：保留老签名以避免破坏现有调用点 / 测试，内部直接转发到新的
+// writeRPMRateLimitResponse。日 Token 限额场景请改用 writeDailyTokenLimitResponse。
+// 关键词: writeRateLimitResponse 兼容包装, RPM 限流 429
 func (c *ServerConfig) writeRateLimitResponse(conn net.Conn, queueLength int64) {
-	body := fmt.Sprintf(`{"error":{"message":"Rate limit exceeded. You are in queue position %d. Please retry after 10 seconds.","type":"rate_limit_exceeded","queue_length":%d}}`, queueLength, queueLength)
+	c.writeRPMRateLimitResponse(conn, queueLength)
+}
+
+// writeRPMRateLimitResponse sends a 429 response for the RPM-based rate limiter
+// (per API key sliding window). Header includes X-AIBalance-Info (queue length)
+// and X-AIBalance-Limit-Kind: rpm so clients can branch behavior.
+//
+// 关键词: writeRPMRateLimitResponse, RPM 限流 429, X-AIBalance-Limit-Kind
+func (c *ServerConfig) writeRPMRateLimitResponse(conn net.Conn, queueLength int64) {
+	body := fmt.Sprintf(`{"error":{"message":"Rate limit exceeded. You are in queue position %d. Please retry after 10 seconds.","type":"rate_limit_exceeded","limit_kind":"rpm","limit_kind_zh":"\u8bf7\u6c42\u9891\u7387\u9650\u6d41","queue_length":%d}}`, queueLength, queueLength)
 	header := fmt.Sprintf(
 		"HTTP/1.1 429 Too Many Requests\r\n"+
 			"Content-Type: application/json; charset=utf-8\r\n"+
 			"X-AIBalance-Info: %d\r\n"+
+			"X-AIBalance-Limit-Kind: rpm\r\n"+
 			"Retry-After: 10\r\n"+
 			"Content-Length: %d\r\n"+
 			"\r\n",
 		queueLength, len(body))
 	conn.Write([]byte(header))
 	conn.Write([]byte(body))
+}
+
+// writeDailyTokenLimitResponse sends a 429 response when a free user has exceeded
+// the daily Token quota. Body includes both the absolute Token counts and the
+// M-unit shortcuts used by portal display.
+//
+// 字段对应：
+//   - type           "daily_token_limit_exceeded"
+//   - limit_kind     "daily_token_quota"
+//   - limit_kind_zh  "日限额已满"
+//   - tokens_used    int64 raw token
+//   - tokens_limit   int64 raw token
+//   - tokens_used_m  float (= tokens_used / 1_000_000)
+//   - tokens_limit_m int64 (= tokens_limit / 1_000_000)
+//   - bucket         "global" | "model"
+//   - model          实际触发限额的对外模型名
+//
+// HTTP header: X-AIBalance-Limit-Kind: daily_token + Retry-After: 3600
+// （建议客户端等到下一日 0 点附近重试）
+//
+// 关键词: writeDailyTokenLimitResponse, 日 Token 限额 429, 日限额已满
+func (c *ServerConfig) writeDailyTokenLimitResponse(conn net.Conn, modelName, bucket string, tokensUsed, tokensLimit int64) {
+	usedM := float64(tokensUsed) / float64(FreeUserTokenMUnit)
+	limitM := tokensLimit / FreeUserTokenMUnit
+	type errBody struct {
+		Type         string  `json:"type"`
+		Message      string  `json:"message"`
+		LimitKind    string  `json:"limit_kind"`
+		LimitKindZh  string  `json:"limit_kind_zh"`
+		Bucket       string  `json:"bucket"`
+		Model        string  `json:"model"`
+		TokensUsed   int64   `json:"tokens_used"`
+		TokensLimit  int64   `json:"tokens_limit"`
+		TokensUsedM  float64 `json:"tokens_used_m"`
+		TokensLimitM int64   `json:"tokens_limit_m"`
+	}
+	type wrap struct {
+		Error errBody `json:"error"`
+	}
+	payload := wrap{Error: errBody{
+		Type:         "daily_token_limit_exceeded",
+		Message:      fmt.Sprintf("Daily token limit exceeded for free users (used=%d, limit=%d).", tokensUsed, tokensLimit),
+		LimitKind:    "daily_token_quota",
+		LimitKindZh:  "日限额已满",
+		Bucket:       bucket,
+		Model:        modelName,
+		TokensUsed:   tokensUsed,
+		TokensLimit:  tokensLimit,
+		TokensUsedM:  usedM,
+		TokensLimitM: limitM,
+	}}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		c.logError("writeDailyTokenLimitResponse marshal failed: %v", err)
+		body = []byte(`{"error":{"type":"daily_token_limit_exceeded","limit_kind":"daily_token_quota","message":"Daily token limit exceeded."}}`)
+	}
+	header := fmt.Sprintf(
+		"HTTP/1.1 429 Too Many Requests\r\n"+
+			"Content-Type: application/json; charset=utf-8\r\n"+
+			"X-AIBalance-Limit-Kind: daily_token\r\n"+
+			"X-AIBalance-Token-Used: %d\r\n"+
+			"X-AIBalance-Token-Limit: %d\r\n"+
+			"Retry-After: 3600\r\n"+
+			"Content-Length: %d\r\n"+
+			"\r\n",
+		tokensUsed, tokensLimit, len(body))
+	conn.Write([]byte(header))
+	conn.Write(body)
 }
 
 // writeResponse writes a response with appropriate Connection header for keep-alive support

@@ -155,6 +155,13 @@ type ModelInfoJSON struct {
 	Tags              string  `json:"tags"`
 	ProviderCount     int     `json:"provider_count"`
 	TrafficMultiplier float64 `json:"traffic_multiplier"`
+
+	// 4 \u7ef4 Token \u500d\u7387\uff080 \u8868\u793a\u672a\u914d\u7f6e\uff0cUI \u8868\u73b0\u4e3a\u300c\u9ed8\u8ba4\u300d\uff09
+	// \u5173\u952e\u8bcd: ModelInfoJSON Token \u500d\u7387\u66b4\u9732
+	InputTokenMultiplier    float64 `json:"input_token_multiplier"`
+	OutputTokenMultiplier   float64 `json:"output_token_multiplier"`
+	CacheCreationMultiplier float64 `json:"cache_creation_multiplier"`
+	CacheHitMultiplier      float64 `json:"cache_hit_multiplier"`
 }
 
 // servePortalDataAPI handles the /portal/api/data endpoint
@@ -254,6 +261,10 @@ func (c *ServerConfig) servePortalDataAPI(conn net.Conn, request *http.Request) 
 				if meta.TrafficMultiplier > 0 {
 					info.TrafficMultiplier = meta.TrafficMultiplier
 				}
+				info.InputTokenMultiplier = meta.InputTokenMultiplier
+				info.OutputTokenMultiplier = meta.OutputTokenMultiplier
+				info.CacheCreationMultiplier = meta.CacheCreationMultiplier
+				info.CacheHitMultiplier = meta.CacheHitMultiplier
 			}
 			data.ModelMetas = append(data.ModelMetas, info)
 		}
