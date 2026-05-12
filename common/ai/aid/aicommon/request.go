@@ -19,6 +19,7 @@ type AIRequest struct {
 	saveCheckpointCallback func(CheckpointCommitHandler)
 	onAcquireSeq           func(int64)
 	imageDataList          []*ImageData
+	modelTier              string
 }
 
 func (a *AIRequest) GetStartTime() time.Time {
@@ -137,4 +138,18 @@ func WithAIRequest_ImageData(data *ImageData) AIRequestOption {
 		}
 		req.imageDataList = append(req.imageDataList, data)
 	}
+}
+
+func (a *AIRequest) GetModelTier() string {
+	if a == nil {
+		return ""
+	}
+	return a.modelTier
+}
+
+func (a *AIRequest) SetModelTier(tier string) {
+	if a == nil {
+		return
+	}
+	a.modelTier = tier
 }

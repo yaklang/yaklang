@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -36,6 +37,7 @@ func CallAITransaction(
 	var postHandlerErr error
 	var lastErr error
 	var lastRsp *AIResponse
+	var lastReq *AIRequest
 
 	emitter := c.GetEmitter()
 	bindEmitter := func(rsp *AIResponse) *Emitter {
@@ -51,7 +53,8 @@ func CallAITransaction(
 		}),
 		WithAIRequest_SaveCheckpointCallback(func(handler CheckpointCommitHandler) {
 			saver = handler
-		}))
+		}),
+	)
 
 	for i := int64(0); i < trcRetry; {
 		if c.IsCtxDone() {
@@ -71,6 +74,7 @@ func CallAITransaction(
 			finalPrompt,
 			append(requestOpts, WithAIRequest_SeqId(seq))...,
 		)
+		lastReq = aiReq
 		rsp, err := callAi(aiReq)
 		if err != nil {
 			lastErr = err
@@ -152,6 +156,12 @@ func CallAITransaction(
 		}
 	}
 	bindEmitter(lastRsp).EmitDefaultStreamEvent("ai-error", strings.NewReader(finalErrMsg), "")
+
+	var tier consts.ModelTier
+	if lastReq != nil {
+		tier = consts.ModelTier(lastReq.GetModelTier())
+	}
+	EmitAICallFailureIfApplicable(c, tier, lastRsp, lastErr, nil)
 
 	if lastErr != nil {
 		return utils.Errorf("max retry count[%v] reached in transaction, last error: %v", trcRetry, lastErr)

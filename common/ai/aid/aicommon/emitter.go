@@ -229,6 +229,12 @@ func (r *Emitter) EmitSystemJSON(typeName schema.EventType, id string, i any) (*
 	return r.emit(event)
 }
 
+// EmitAPIRequestFailed emits a system JSON event with type EVENT_TYPE_API_REQUEST_FAILED.
+// It is used for AI model API call failures so clients can detect and handle them uniformly.
+func (r *Emitter) EmitAPIRequestFailed(id string, payload map[string]any) (*schema.AiOutputEvent, error) {
+	return r.EmitSystemJSON(schema.EVENT_TYPE_API_REQUEST_FAILED, id, payload)
+}
+
 func (r *Emitter) EmitSyncJSON(typeName schema.EventType, id string, i any, syncID string) (*schema.AiOutputEvent, error) {
 	event := &schema.AiOutputEvent{
 		CoordinatorId: r.id,

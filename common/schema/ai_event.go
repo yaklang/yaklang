@@ -204,6 +204,7 @@ const (
 	// EVENT_TYPE_NOTIFY emits structured user-facing warning notifications.
 	// Payload includes the notification type, content, and display duration.
 	EVENT_TYPE_NOTIFY EventType = "notify"
+	EVENT_TYPE_API_REQUEST_FAILED EventType = "api_request_failed"
 )
 
 type AiOutputEvent struct {

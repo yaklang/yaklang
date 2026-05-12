@@ -194,6 +194,7 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 				rsp.SetRequestStartTime(request.GetStartTime())
 			}
 		}()
+		request.SetModelTier(string(tier))
 		if c.PromptHook != nil {
 			request.SetPrompt(c.PromptHook(request.GetPrompt()))
 		}

@@ -6,6 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/aiforge"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -87,14 +88,26 @@ func (r *ReAct) InvokeSpeedPriorityLiteForge(
 	ctx context.Context, actionName string, prompt string,
 	outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption,
 ) (*aicommon.Action, error) {
-	return r.invokeLiteForgeWithCallback(r.config.SpeedPriorityAICallback, ctx, actionName, prompt, outputs, opts...)
+	action, err := r.invokeLiteForgeWithCallback(r.config.SpeedPriorityAICallback, ctx, actionName, prompt, outputs, opts...)
+	if err != nil {
+		aicommon.EmitAICallFailureIfApplicable(r.config, consts.TierLightweight, nil, err, map[string]any{
+			"liteforge_action": actionName,
+		})
+	}
+	return action, err
 }
 
 func (r *ReAct) InvokeQualityPriorityLiteForge(
 	ctx context.Context, actionName string, prompt string,
 	outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption,
 ) (*aicommon.Action, error) {
-	return r.invokeLiteForgeWithCallback(r.config.QualityPriorityAICallback, ctx, actionName, prompt, outputs, opts...)
+	action, err := r.invokeLiteForgeWithCallback(r.config.QualityPriorityAICallback, ctx, actionName, prompt, outputs, opts...)
+	if err != nil {
+		aicommon.EmitAICallFailureIfApplicable(r.config, consts.TierIntelligent, nil, err, map[string]any{
+			"liteforge_action": actionName,
+		})
+	}
+	return action, err
 }
 
 func (r *ReAct) InvokeLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption) (*aicommon.Action, error) {
