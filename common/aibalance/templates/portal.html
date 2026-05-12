@@ -237,6 +237,9 @@
                                     <th class="column-name">成功/失败</th>
                                     <th class="column-name">流量(输入/输出)</th>
                                     <th class="column-name">流量限制</th>
+                                    <!-- 关键词: API Key 列表 Token 用量列, Token 维度限额, 推荐 token over traffic -->
+                                    <th class="column-name" title="Token 维度用量（按上游 SSE 末帧 usage 经倍率加权后累加）">Token 用量</th>
+                                    <th class="column-name" title="Token 维度限额（推荐使用，替代字节流量限制）">Token 限额 ★</th>
                                     <th class="column-name">创建者</th>
                                     <th class="column-name">最后使用</th>
                                     <th class="column-name">操作</th>
@@ -1079,7 +1082,8 @@
     </div>
 
     <div id="editModelMetaModal" class="delete-confirmation-modal" style="display: none;">
-        <div class="modal-content" style="max-width: 720px;">
+        <!-- 关键词: 编辑模型信息 modal 宽度修复 width:720px (max-width 单独不生效, 默认 .modal-content width:400px) -->
+        <div class="modal-content" style="width: 720px; max-width: 90vw;">
             <span class="close-modal" onclick="closeEditModelModal()">&times;</span>
             <h4>编辑模型信息</h4>
             <div class="form-group">

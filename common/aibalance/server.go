@@ -789,6 +789,23 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 			return
 		}
 
+		// Token-dimension limit check (parallel to traffic limit).
+		// 与字节维度并行检查 Token 维度。任何 DB 错误降级为放行（不阻塞业务）。
+		// 关键词: CheckAiApiKeyTokenLimit hot path chat, token_limit_exceeded 429
+		tokenAllowed, tErr := CheckAiApiKeyTokenLimit(key.Key)
+		if tErr != nil {
+			c.logError("Failed to check token limit for key %s: %v", utils.ShrinkString(key.Key, 8), tErr)
+		} else if !tokenAllowed {
+			c.logError("API key %s has exceeded token limit", utils.ShrinkString(key.Key, 8))
+			c.writeJSONResponse(conn, http.StatusTooManyRequests, map[string]interface{}{
+				"error": map[string]string{
+					"message": "API key has exceeded token limit. Please contact administrator to increase limit or reset usage.",
+					"type":    "token_limit_exceeded",
+				},
+			})
+			return
+		}
+
 		// Authorization check with glob pattern support
 		allowedModels, ok := c.KeyAllowedModels.Get(key.Key)
 		if !ok {
@@ -1533,6 +1550,22 @@ func (c *ServerConfig) serveEmbeddings(conn net.Conn, rawPacket []byte) {
 				"error": map[string]string{
 					"message": "API key has exceeded traffic limit. Please contact administrator to increase limit or reset usage.",
 					"type":    "traffic_limit_exceeded",
+				},
+			})
+			return
+		}
+
+		// Token-dimension limit check (parallel to traffic limit).
+		// 关键词: CheckAiApiKeyTokenLimit hot path embedding, token_limit_exceeded 429
+		tokenAllowed, tErr := CheckAiApiKeyTokenLimit(key.Key)
+		if tErr != nil {
+			c.logError("Failed to check token limit (embedding) for key %s: %v", utils.ShrinkString(key.Key, 8), tErr)
+		} else if !tokenAllowed {
+			c.logError("API key %s has exceeded token limit (embedding)", utils.ShrinkString(key.Key, 8))
+			c.writeJSONResponse(conn, http.StatusTooManyRequests, map[string]interface{}{
+				"error": map[string]string{
+					"message": "API key has exceeded token limit. Please contact administrator to increase limit or reset usage.",
+					"type":    "token_limit_exceeded",
 				},
 			})
 			return

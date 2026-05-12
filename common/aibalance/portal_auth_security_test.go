@@ -235,6 +235,9 @@ func TestPortalMutationEndpointsRequireAuth(t *testing.T) {
 		{"POST", "/portal/delete-api-keys"},
 		{"POST", "/portal/api-key-traffic-limit/1"},
 		{"POST", "/portal/reset-api-key-traffic/1"},
+		// 关键词: portal Token 限额 endpoints 越权防护
+		{"POST", "/portal/api-key-token-limit/1"},
+		{"POST", "/portal/reset-api-key-token/1"},
 		{"POST", "/portal/api/web-search-keys"},
 		{"DELETE", "/portal/api/web-search-keys/1"},
 		{"PUT", "/portal/api/web-search-keys/1"},
@@ -279,6 +282,8 @@ func TestOpsAPIEndpointsRequireAuth(t *testing.T) {
 		{"POST", "/ops/api/delete-api-key"},
 		{"POST", "/ops/api/update-api-key"},
 		{"POST", "/ops/api/reset-traffic"},
+		// 关键词: OPS reset-token 越权防护
+		{"POST", "/ops/api/reset-token"},
 		{"GET", "/ops/my-info"},
 		{"POST", "/ops/change-password"},
 		{"POST", "/ops/reset-key"},

@@ -391,6 +391,20 @@ function renderApiKeysTable() {
             const trafficPercent = Math.min(100, ((key.traffic_used || 0) / key.traffic_limit) * 100);
             trafficColor = trafficPercent > 80 ? '#dc3545' : trafficPercent > 50 ? '#ffc107' : '#28a745';
         }
+
+        // 关键词: OPS my-keys 渲染 Token 用量/限额列, 推荐使用 token 替代 traffic
+        const tokenUsedRaw = Number(key.token_used) || 0;
+        const tokenLimitRaw = Number(key.token_limit) || 0;
+        const tokenIsUnlimited = !key.token_limit_enable || tokenLimitRaw <= 0;
+        let tokenColor = '#28a745';
+        if (!tokenIsUnlimited && tokenLimitRaw > 0) {
+            const tPercent = Math.min(100, (tokenUsedRaw / tokenLimitRaw) * 100);
+            tokenColor = tPercent > 80 ? '#dc3545' : tPercent > 50 ? '#ffc107' : '#28a745';
+        }
+        const tokenUsedDisplay = formatTokenCount(tokenUsedRaw);
+        const tokenLimitDisplay = tokenIsUnlimited
+            ? '<span style="color: #28a745; font-weight: 500;">Unlimited</span>'
+            : formatTokenCount(tokenLimitRaw);
         
         // Display models (sorted)
         const models = key.allowed_models || [];
@@ -404,6 +418,8 @@ function renderApiKeysTable() {
                 <td title="${models.join(', ')}">${modelsDisplay || '-'}</td>
                 <td style="color: ${trafficColor}">${trafficUsedDisplay}</td>
                 <td>${trafficLimitDisplay}</td>
+                <td style="color: ${tokenColor}" title="Token usage (recommended billing dimension)">${tokenUsedDisplay}</td>
+                <td title="Token limit (recommended over byte traffic)">${tokenLimitDisplay}</td>
                 <td>${key.created_at || '--'}</td>
                 <td>
                     <div style="display: flex; gap: 5px; flex-wrap: wrap;">
@@ -598,9 +614,85 @@ function openEditKeyModal(apiKey) {
     if (editUnitSelect) {
         editUnitSelect.addEventListener('change', calculateEditTrafficBytes);
     }
+
+    // ==================== Token Settings Initialization ====================
+    // 关键词: openEditKeyModal Token 维度初始化, 推荐 token over traffic
+    const tokenUnlimitedCheckbox = document.getElementById('edit-token-unlimited');
+    const tokenLimitGroup = document.getElementById('edit-token-limit-group');
+    const tokenUnlimitedToggle = document.getElementById('edit-token-unlimited-toggle');
+    const tokenDesc = document.getElementById('edit-token-desc');
+    const tokenIsUnlimited = !currentEditKey.token_limit_enable || !currentEditKey.token_limit || currentEditKey.token_limit <= 0;
+
+    if (tokenUnlimitedCheckbox) {
+        tokenUnlimitedCheckbox.checked = tokenIsUnlimited;
+        if (tokenIsUnlimited) {
+            if (tokenLimitGroup) tokenLimitGroup.style.display = 'none';
+            if (tokenUnlimitedToggle) tokenUnlimitedToggle.classList.add('active');
+            if (tokenDesc) tokenDesc.textContent = 'API Key will have no token restrictions';
+        } else {
+            if (tokenLimitGroup) tokenLimitGroup.style.display = 'block';
+            if (tokenUnlimitedToggle) tokenUnlimitedToggle.classList.remove('active');
+            if (tokenDesc) tokenDesc.textContent = 'Set a custom token limit below';
+
+            const tokenRaw = Number(currentEditKey.token_limit) || 0;
+            const tokenValueInput = document.getElementById('edit-token-limit-value');
+            const tokenUnitSelect = document.getElementById('edit-token-limit-unit');
+            if (tokenValueInput && tokenUnitSelect) {
+                if (tokenRaw >= 1_000_000 && tokenRaw % 1_000_000 === 0) {
+                    tokenValueInput.value = tokenRaw / 1_000_000;
+                    tokenUnitSelect.value = '1000000';
+                } else if (tokenRaw >= 1000 && tokenRaw % 1000 === 0) {
+                    tokenValueInput.value = tokenRaw / 1000;
+                    tokenUnitSelect.value = '1000';
+                } else {
+                    tokenValueInput.value = tokenRaw;
+                    tokenUnitSelect.value = '1';
+                }
+            }
+            calculateEditTokenBytes();
+        }
+
+        tokenUnlimitedCheckbox.onchange = function() {
+            if (this.checked) {
+                if (tokenLimitGroup) tokenLimitGroup.style.display = 'none';
+                if (tokenUnlimitedToggle) tokenUnlimitedToggle.classList.add('active');
+                if (tokenDesc) tokenDesc.textContent = 'API Key will have no token restrictions';
+            } else {
+                if (tokenLimitGroup) tokenLimitGroup.style.display = 'block';
+                if (tokenUnlimitedToggle) tokenUnlimitedToggle.classList.remove('active');
+                if (tokenDesc) tokenDesc.textContent = 'Set a custom token limit below';
+                calculateEditTokenBytes();
+            }
+        };
+
+        const tokenValueInput2 = document.getElementById('edit-token-limit-value');
+        const tokenUnitSelect2 = document.getElementById('edit-token-limit-unit');
+        if (tokenValueInput2) tokenValueInput2.addEventListener('input', calculateEditTokenBytes);
+        if (tokenUnitSelect2) tokenUnitSelect2.addEventListener('change', calculateEditTokenBytes);
+    }
+    const tokenUsedEl = document.getElementById('edit-token-used');
+    if (tokenUsedEl) {
+        tokenUsedEl.textContent = (Number(currentEditKey.token_used) || 0).toString();
+    }
     
     // Show modal
     document.getElementById('edit-key-modal').style.display = 'flex';
+}
+
+// 关键词: calculateEditTokenBytes, OPS Token 限额输入实时换算
+function calculateEditTokenBytes() {
+    const valueInput = document.getElementById('edit-token-limit-value');
+    const unitSelect = document.getElementById('edit-token-limit-unit');
+    const calculatedDisplay = document.getElementById('edit-token-calculated');
+    if (!valueInput || !unitSelect) return 0;
+    const value = parseFloat(valueInput.value) || 0;
+    const multiplier = parseInt(unitSelect.value) || 1;
+    const tokens = Math.floor(value * multiplier);
+    if (calculatedDisplay) {
+        const formatted = formatTokenCount(tokens);
+        calculatedDisplay.textContent = `Calculated: ${tokens.toLocaleString()} tokens (${formatted})`;
+    }
+    return tokens;
 }
 
 // Calculate edit traffic bytes
@@ -735,12 +827,24 @@ async function saveEditKey() {
         showToast('Please enter a valid traffic limit or enable unlimited traffic', 'error');
         return;
     }
+
+    // 关键词: OPS saveEditKey Token 维度收集 + 校验
+    const tokenUnlimitedEl = document.getElementById('edit-token-unlimited');
+    const tokenIsUnlimited = tokenUnlimitedEl ? tokenUnlimitedEl.checked : true;
+    const tokenLimit = tokenIsUnlimited ? 0 : calculateEditTokenBytes();
+    if (!tokenIsUnlimited && tokenLimit <= 0) {
+        showToast('Please enter a valid token limit or enable unlimited token', 'error');
+        return;
+    }
     
     try {
         const requestBody = {
             api_key: apiKey,
             allowed_models: allModels,
-            unlimited: isUnlimited
+            unlimited: isUnlimited,
+            // Token 字段始终发送, 让后端基于 token_unlimited / token_limit 判定
+            token_unlimited: tokenIsUnlimited,
+            token_limit: tokenLimit
         };
         
         if (!isUnlimited && trafficLimit > 0) {
@@ -797,6 +901,33 @@ async function resetEditKeyTraffic() {
         }
     } catch (error) {
         console.error('Error resetting traffic:', error);
+        showToast('Network error', 'error');
+    }
+}
+
+// 关键词: resetEditKeyToken, OPS 用户重置自己 Key 的 Token 用量
+async function resetEditKeyToken() {
+    const apiKey = document.getElementById('edit-key-api-key').value;
+    if (!confirm('Are you sure you want to reset the token usage for this API key?')) {
+        return;
+    }
+    try {
+        const response = await fetch('/ops/api/reset-token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ api_key: apiKey })
+        });
+        const data = await response.json();
+        if (data.success) {
+            showToast('Token usage reset successfully', 'success');
+            const usedEl = document.getElementById('edit-token-used');
+            if (usedEl) usedEl.textContent = '0';
+            loadMyApiKeys();
+        } else {
+            showToast(data.error || 'Failed to reset token', 'error');
+        }
+    } catch (error) {
+        console.error('Error resetting token:', error);
         showToast('Network error', 'error');
     }
 }
@@ -861,12 +992,53 @@ function initForms() {
     if (trafficUnitSelect) {
         trafficUnitSelect.addEventListener('change', calculateTrafficBytes);
     }
+
+    // ==================== Token toggles (Create form) ====================
+    // 关键词: OPS Create API Key Token 限额 toggle, 推荐使用 Token over Traffic
+    const tokenUnlimitedCheckbox = document.getElementById('unlimited-token');
+    const tokenLimitGroup = document.getElementById('token-limit-group');
+    const tokenUnlimitedToggle = document.getElementById('token-unlimited-toggle');
+    const tokenDesc = document.getElementById('token-desc');
+    if (tokenUnlimitedCheckbox && tokenLimitGroup) {
+        tokenUnlimitedCheckbox.addEventListener('change', function() {
+            if (this.checked) {
+                tokenLimitGroup.style.display = 'none';
+                if (tokenUnlimitedToggle) tokenUnlimitedToggle.classList.add('active');
+                if (tokenDesc) tokenDesc.textContent = 'API Key will have no token restrictions';
+            } else {
+                tokenLimitGroup.style.display = 'block';
+                if (tokenUnlimitedToggle) tokenUnlimitedToggle.classList.remove('active');
+                if (tokenDesc) tokenDesc.textContent = 'Set a custom token limit below';
+                calculateTokenBytes();
+            }
+        });
+    }
+    const tokenValueInput = document.getElementById('token-limit-value');
+    const tokenUnitSelect = document.getElementById('token-limit-unit');
+    if (tokenValueInput) tokenValueInput.addEventListener('input', calculateTokenBytes);
+    if (tokenUnitSelect) tokenUnitSelect.addEventListener('change', calculateTokenBytes);
     
     // Glob patterns input listener
     const globInput = document.getElementById('glob-patterns');
     if (globInput) {
         globInput.addEventListener('input', updateSelectedPreview);
     }
+}
+
+// 关键词: calculateTokenBytes, OPS Create API Key Token 限额输入实时换算
+function calculateTokenBytes() {
+    const valueInput = document.getElementById('token-limit-value');
+    const unitSelect = document.getElementById('token-limit-unit');
+    const calculatedDisplay = document.getElementById('token-calculated');
+    if (!valueInput || !unitSelect) return 0;
+    const value = parseFloat(valueInput.value) || 0;
+    const multiplier = parseInt(unitSelect.value) || 1;
+    const tokens = Math.floor(value * multiplier);
+    if (calculatedDisplay) {
+        const formatted = (typeof formatTokenCount === 'function') ? formatTokenCount(tokens) : tokens.toString();
+        calculatedDisplay.textContent = `Calculated: ${tokens.toLocaleString()} tokens (${formatted})`;
+    }
+    return tokens;
 }
 
 async function handleCreateApiKey(e) {
@@ -888,6 +1060,11 @@ async function handleCreateApiKey(e) {
     
     // Calculate traffic limit using new method
     const trafficLimit = calculateTrafficBytes();
+
+    // 关键词: OPS handleCreateApiKey Token 限额参数收集
+    const tokenUnlimitedCheckbox = document.getElementById('unlimited-token');
+    const tokenIsUnlimited = tokenUnlimitedCheckbox ? tokenUnlimitedCheckbox.checked : true;
+    const tokenLimit = tokenIsUnlimited ? 0 : calculateTokenBytes();
     
     if (allModels.length === 0) {
         showAlert('create-key-alert', 'Please select at least one model or enter a glob pattern', 'error');
@@ -899,15 +1076,23 @@ async function handleCreateApiKey(e) {
         showAlert('create-key-alert', 'Please enter a valid traffic limit or enable unlimited traffic', 'error');
         return;
     }
+    if (!tokenIsUnlimited && tokenLimit <= 0) {
+        showAlert('create-key-alert', 'Please enter a valid token limit or enable unlimited token', 'error');
+        return;
+    }
     
     try {
         const requestBody = {
             allowed_models: allModels,
-            unlimited: isUnlimited
+            unlimited: isUnlimited,
+            token_unlimited: tokenIsUnlimited
         };
         
         if (!isUnlimited && trafficLimit > 0) {
             requestBody.traffic_limit = trafficLimit;
+        }
+        if (!tokenIsUnlimited && tokenLimit > 0) {
+            requestBody.token_limit = tokenLimit;
         }
         
         const response = await fetch('/ops/api/create-api-key', {
@@ -921,8 +1106,11 @@ async function handleCreateApiKey(e) {
         const data = await response.json();
         
         if (data.success) {
-            const limitInfo = data.unlimited ? 'Unlimited' : formatBytes(data.traffic_limit);
-            showAlert('create-key-alert', `API Key created successfully! Traffic: ${limitInfo}`, 'success');
+            const trafficInfo = data.unlimited ? 'Unlimited' : formatBytes(data.traffic_limit);
+            const tokenInfo = (data.token_limit_enable && data.token_limit > 0)
+                ? formatTokenCount(data.token_limit)
+                : 'Unlimited';
+            showAlert('create-key-alert', `API Key created! Traffic: ${trafficInfo}, Token: ${tokenInfo}`, 'success');
             document.getElementById('generated-key').textContent = data.api_key;
             document.getElementById('api-key-result').classList.add('show');
             
@@ -1199,6 +1387,17 @@ function formatBytes(bytes) {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
+// 关键词: OPS formatTokenCount, K/M/B tokens 展示, 与 portal 端对齐
+function formatTokenCount(n) {
+    const num = Number(n) || 0;
+    if (num === 0) return '0';
+    const abs = Math.abs(num);
+    if (abs < 1000) return String(num);
+    if (abs < 1_000_000) return (num / 1000).toFixed(num % 1000 === 0 ? 0 : 1) + 'K';
+    if (abs < 1_000_000_000) return (num / 1_000_000).toFixed(num % 1_000_000 === 0 ? 0 : 2) + 'M';
+    return (num / 1_000_000_000).toFixed(2) + 'B';
+}
+
 // ==================== Export to window ====================
 
 window.resetOpsKey = resetOpsKey;
@@ -1221,6 +1420,11 @@ window.editSelectAllModels = editSelectAllModels;
 window.editClearAllModels = editClearAllModels;
 window.saveEditKey = saveEditKey;
 window.resetEditKeyTraffic = resetEditKeyTraffic;
+// 关键词: OPS Token 限额相关 window 导出
+window.resetEditKeyToken = resetEditKeyToken;
+window.calculateEditTokenBytes = calculateEditTokenBytes;
+window.calculateTokenBytes = calculateTokenBytes;
+window.formatTokenCount = formatTokenCount;
 // My Keys pagination functions
 window.changeMyKeysPage = changeMyKeysPage;
 window.changeMyKeysPageSize = changeMyKeysPageSize;

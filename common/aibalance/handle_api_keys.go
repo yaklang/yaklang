@@ -781,6 +781,150 @@ func (c *ServerConfig) handleResetAPIKeyTraffic(conn net.Conn, request *http.Req
 	})
 }
 
+// ==================== API Key Token Limit Handlers ====================
+//
+// Token 维度限额是新推荐方式（流量限制语义不直观，且字节计费会因 ContentType
+// 与压缩等因素难以预估）。Token 维度直接按上游 SSE 末帧 ChatUsage 经四维倍率
+// 加权后入账，更接近真实计费成本。
+//
+// 关键词: handleUpdateAPIKeyTokenLimit handleResetAPIKeyToken,
+//        API Key Token 维度限额, 推荐使用 Token 替代 Traffic
+
+// handleUpdateAPIKeyTokenLimit handles POST /portal/api-key-token-limit/{id}.
+// Body: {"token_limit": int64 (raw token), "enable": bool}.
+// 单位说明: 直接传 raw token 数（未做 M 单位缩放），与字节限额保持对齐。
+func (c *ServerConfig) handleUpdateAPIKeyTokenLimit(conn net.Conn, request *http.Request, path string) {
+	c.logInfo("Processing update API key token limit request: %s", path)
+
+	if !c.checkAuth(request) {
+		c.writeJSONResponse(conn, http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+		return
+	}
+
+	parts := strings.Split(path, "/")
+	if len(parts) < 4 {
+		c.logError("Invalid path format for update token limit: %s", path)
+		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]interface{}{
+			"success": false,
+			"message": "Invalid request path",
+		})
+		return
+	}
+
+	idStr := parts[len(parts)-1]
+	id, err := strconv.ParseUint(idStr, 10, 32)
+	if err != nil {
+		c.logError("Invalid API key ID '%s' for token limit update: %v", idStr, err)
+		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]interface{}{
+			"success": false,
+			"message": "Invalid API key ID format",
+		})
+		return
+	}
+
+	var reqBody struct {
+		TokenLimit int64 `json:"token_limit"`
+		Enable     bool  `json:"enable"`
+	}
+	bodyBytes, err := io.ReadAll(request.Body)
+	if err != nil {
+		c.logError("Failed to read request body for token limit update: %v", err)
+		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]interface{}{
+			"success": false,
+			"message": "Failed to read request body",
+		})
+		return
+	}
+	defer request.Body.Close()
+	if err := json.Unmarshal(bodyBytes, &reqBody); err != nil {
+		c.logError("Failed to parse request body for token limit update: %v", err)
+		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]interface{}{
+			"success": false,
+			"message": "Invalid request format",
+		})
+		return
+	}
+	if reqBody.TokenLimit < 0 {
+		reqBody.TokenLimit = 0
+	}
+
+	if err := UpdateAiApiKeyTokenLimit(uint(id), reqBody.TokenLimit, reqBody.Enable); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.writeJSONResponse(conn, http.StatusNotFound, map[string]interface{}{
+				"success": false,
+				"message": "API key not found",
+			})
+			return
+		}
+		c.logError("Failed to update token limit for API key (ID: %d): %v", id, err)
+		c.writeJSONResponse(conn, http.StatusInternalServerError, map[string]interface{}{
+			"success": false,
+			"message": "Failed to update token limit",
+		})
+		return
+	}
+
+	c.logInfo("Successfully updated token limit for API key (ID: %d) limit=%d enable=%v",
+		id, reqBody.TokenLimit, reqBody.Enable)
+	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
+		"success": true,
+		"message": "Token limit updated successfully",
+	})
+}
+
+// handleResetAPIKeyToken handles POST /portal/reset-api-key-token/{id}.
+func (c *ServerConfig) handleResetAPIKeyToken(conn net.Conn, request *http.Request, path string) {
+	c.logInfo("Processing reset API key token request: %s", path)
+
+	if !c.checkAuth(request) {
+		c.writeJSONResponse(conn, http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+		return
+	}
+
+	parts := strings.Split(path, "/")
+	if len(parts) < 4 {
+		c.logError("Invalid path format for reset token: %s", path)
+		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]interface{}{
+			"success": false,
+			"message": "Invalid request path",
+		})
+		return
+	}
+
+	idStr := parts[len(parts)-1]
+	id, err := strconv.ParseUint(idStr, 10, 32)
+	if err != nil {
+		c.logError("Invalid API key ID '%s' for token reset: %v", idStr, err)
+		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]interface{}{
+			"success": false,
+			"message": "Invalid API key ID format",
+		})
+		return
+	}
+
+	if err := ResetAiApiKeyTokenUsed(uint(id)); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.writeJSONResponse(conn, http.StatusNotFound, map[string]interface{}{
+				"success": false,
+				"message": "API key not found",
+			})
+			return
+		}
+		c.logError("Failed to reset token for API key (ID: %d): %v", id, err)
+		c.writeJSONResponse(conn, http.StatusInternalServerError, map[string]interface{}{
+			"success": false,
+			"message": "Failed to reset token",
+		})
+		return
+	}
+
+	c.logInfo("Successfully reset token used for API key (ID: %d)", id)
+	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
+		"success": true,
+		"message": "Token usage reset successfully",
+	})
+}
+
 // ==================== API Key Pagination Handlers ====================
 
 // handleGetAPIKeysPaginated handles requests to get API keys with pagination
@@ -843,6 +987,8 @@ func (c *ServerConfig) handleGetAPIKeysPaginated(conn net.Conn, request *http.Re
 		sort.Strings(models)
 		sortedAllowedModels := strings.Join(models, ",")
 
+		// 同时返回字节维度与 Token 维度（后者推荐使用，前者仅为兼容旧版本展示）。
+		// 关键词: handleGetAPIKeysPaginated token_limit token_used 暴露
 		keyData := map[string]interface{}{
 			"id":                   key.ID,
 			"api_key":              key.APIKey,
@@ -858,6 +1004,9 @@ func (c *ServerConfig) handleGetAPIKeysPaginated(conn net.Conn, request *http.Re
 			"traffic_limit":        key.TrafficLimit,
 			"traffic_used":         key.TrafficUsed,
 			"traffic_limit_enable": key.TrafficLimitEnable,
+			"token_limit":          key.TokenLimit,
+			"token_used":           key.TokenUsed,
+			"token_limit_enable":   key.TokenLimitEnable,
 			"created_at":           key.CreatedAt.Format("2006-01-02 15:04:05"),
 			"created_by_ops_id":    key.CreatedByOpsID,
 			"created_by_ops_name":  key.CreatedByOpsName,

@@ -307,6 +307,9 @@
                     row.dataset.trafficLimit = key.traffic_limit;
                     row.dataset.trafficUsed = key.traffic_used;
                     row.dataset.trafficEnabled = key.traffic_limit_enable;
+                    row.dataset.tokenLimit = key.token_limit || 0;
+                    row.dataset.tokenUsed = key.token_used || 0;
+                    row.dataset.tokenEnabled = !!key.token_limit_enable;
                     
                     let statusBadge = key.active 
                         ? '<span class="health-badge healthy" style="font-size:12px;">激活</span>'
@@ -329,6 +332,28 @@
                         `;
                     } else {
                         trafficLimitCell = '<span style="color: #999;">未限制</span>';
+                    }
+                    
+                    // 关键词: API Key Token 用量列 + Token 限额列渲染, 推荐 token over traffic
+                    const tokenUsedRaw = Number(key.token_used) || 0;
+                    const tokenLimitRaw = Number(key.token_limit) || 0;
+                    const tokenUsedDisplay = formatTokenCount(tokenUsedRaw);
+                    let tokenLimitCell = '';
+                    if (key.token_limit_enable && tokenLimitRaw > 0) {
+                        const tPercent = (tokenUsedRaw / tokenLimitRaw) * 100;
+                        let tBarColor = '#4caf50';
+                        if (tPercent > 90) tBarColor = '#f44336';
+                        else if (tPercent > 70) tBarColor = '#ff9800';
+                        tokenLimitCell = `
+                            <div class="traffic-limit-info" title="Token 用量: ${tokenUsedRaw}/${tokenLimitRaw} (${tPercent.toFixed(1)}%)">
+                                <div class="traffic-progress" style="width: 80px; height: 8px; background: #e0e0e0; border-radius: 4px; overflow: hidden;">
+                                    <div style="width: ${Math.min(tPercent, 100)}%; height: 100%; background: ${tBarColor};"></div>
+                                </div>
+                                <small>${tokenUsedDisplay}/${formatTokenCount(tokenLimitRaw)}</small>
+                            </div>
+                        `;
+                    } else {
+                        tokenLimitCell = '<span style="color: #999;">未限制</span>';
                     }
                     
                     let actionButtons = key.active
@@ -359,12 +384,15 @@
                             </div>
                         </td>
                         <td class="text-center">${trafficLimitCell}</td>
+                        <td class="text-center" title="Token 用量（推荐计费维度）">${tokenUsedDisplay}</td>
+                        <td class="text-center">${tokenLimitCell}</td>
                         <td class="text-center">${this.escapeHtml(creatorName)}</td>
                         <td>${key.last_used_at || '-'}</td>
                         <td class="text-center">
                             <div style="display: flex; gap: 2px; justify-content: center; flex-wrap: wrap;">
                                 ${actionButtons}
-                                <button class="btn btn-sm" onclick="showTrafficLimitDialog(${key.id}, ${key.traffic_limit}, ${key.traffic_used}, ${key.traffic_limit_enable})" title="流量设置" style="padding:2px 4px;font-size:11px;">流量</button>
+                                <button class="btn btn-sm" onclick="showTokenLimitDialog(${key.id}, ${tokenLimitRaw}, ${tokenUsedRaw}, ${!!key.token_limit_enable})" title="Token 限额设置（推荐）" style="padding:2px 4px;font-size:11px;background:#1976d2;color:#fff;">Token★</button>
+                                <button class="btn btn-sm" onclick="showTrafficLimitDialog(${key.id}, ${key.traffic_limit}, ${key.traffic_used}, ${key.traffic_limit_enable})" title="流量设置（已弃用，推荐使用 Token）" style="padding:2px 4px;font-size:11px;opacity:0.85;">流量</button>
                                 <button class="btn btn-sm btn-danger" onclick="deleteAPIKey(${key.id})" title="删除" style="padding:2px 4px;font-size:11px;">删除</button>
                             </div>
                         </td>
@@ -626,7 +654,8 @@
             tbody.innerHTML = '';
             
             if (!keys || keys.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="12" class="text-center">No API keys found</td></tr>';
+                // 关键词: API Key 列表 colspan 修复, 新增 Token 用量列 + Token 限额列后 12 -> 14
+                tbody.innerHTML = '<tr><td colspan="14" class="text-center">No API keys found</td></tr>';
                 return;
             }
             
@@ -637,6 +666,9 @@
                 row.dataset.trafficLimit = key.traffic_limit;
                 row.dataset.trafficUsed = key.traffic_used;
                 row.dataset.trafficEnabled = key.traffic_limit_enable;
+                row.dataset.tokenLimit = key.token_limit || 0;
+                row.dataset.tokenUsed = key.token_used || 0;
+                row.dataset.tokenEnabled = !!key.token_limit_enable;
                 
                 let statusBadge = key.active 
                     ? '<span class="health-badge healthy" style="font-size:12px;">激活</span>'
@@ -668,6 +700,28 @@
                     trafficLimitCell = '<span style="color: #999;">未限制</span>';
                 }
                 
+                // 关键词: paginated 渲染 Token 用量列, Token 限额列, 推荐 token over traffic
+                const tokenUsedRaw = Number(key.token_used) || 0;
+                const tokenLimitRaw = Number(key.token_limit) || 0;
+                const tokenUsedDisplay = formatTokenCount(tokenUsedRaw);
+                let tokenLimitCell = '';
+                if (key.token_limit_enable && tokenLimitRaw > 0) {
+                    const tPercent = (tokenUsedRaw / tokenLimitRaw) * 100;
+                    let tBarColor = '#4caf50';
+                    if (tPercent > 90) tBarColor = '#f44336';
+                    else if (tPercent > 70) tBarColor = '#ff9800';
+                    tokenLimitCell = `
+                        <div class="traffic-limit-info" title="Token 用量: ${tokenUsedRaw}/${tokenLimitRaw} (${tPercent.toFixed(1)}%)">
+                            <div class="traffic-progress" style="width: 80px; height: 8px; background: #e0e0e0; border-radius: 4px; overflow: hidden;">
+                                <div style="width: ${Math.min(tPercent, 100)}%; height: 100%; background: ${tBarColor};"></div>
+                            </div>
+                            <small>${tokenUsedDisplay}/${formatTokenCount(tokenLimitRaw)}</small>
+                        </div>
+                    `;
+                } else {
+                    tokenLimitCell = '<span style="color: #999;">未限制</span>';
+                }
+                
                 let actionButtons = key.active
                     ? `<button class="btn btn-sm btn-danger" onclick="toggleAPIKeyStatus('${key.id}', false)" title="禁用" style="padding:2px 4px;font-size:11px;">禁用</button>`
                     : `<button class="btn btn-sm" onclick="toggleAPIKeyStatus('${key.id}', true)" title="激活" style="padding:2px 4px;font-size:11px;">激活</button>`;
@@ -696,12 +750,15 @@
                         </div>
                     </td>
                     <td class="text-center">${trafficLimitCell}</td>
+                    <td class="text-center" title="Token 用量（推荐计费维度）">${tokenUsedDisplay}</td>
+                    <td class="text-center">${tokenLimitCell}</td>
                     <td class="text-center">${escapeHtml(creatorName)}</td>
                     <td>${key.last_used_time || key.created_at || '-'}</td>
                     <td class="text-center">
                         <div style="display: flex; gap: 2px; justify-content: center; flex-wrap: wrap;">
                             ${actionButtons}
-                            <button class="btn btn-sm" onclick="showTrafficLimitDialog(${key.id}, ${key.traffic_limit || 0}, ${key.traffic_used || 0}, ${key.traffic_limit_enable})" title="流量设置" style="padding:2px 4px;font-size:11px;">流量</button>
+                            <button class="btn btn-sm" onclick="showTokenLimitDialog(${key.id}, ${tokenLimitRaw}, ${tokenUsedRaw}, ${!!key.token_limit_enable})" title="Token 限额设置（推荐）" style="padding:2px 4px;font-size:11px;background:#1976d2;color:#fff;">Token★</button>
+                            <button class="btn btn-sm" onclick="showTrafficLimitDialog(${key.id}, ${key.traffic_limit || 0}, ${key.traffic_used || 0}, ${key.traffic_limit_enable})" title="流量设置（已弃用，推荐使用 Token）" style="padding:2px 4px;font-size:11px;opacity:0.85;">流量</button>
                             <button class="btn btn-sm btn-danger" onclick="deleteAPIKey(${key.id})" title="删除" style="padding:2px 4px;font-size:11px;">删除</button>
                         </div>
                     </td>
@@ -827,6 +884,18 @@
             const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
             const i = Math.floor(Math.log(bytes) / Math.log(k));
             return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        }
+
+        // Helper: format raw Token count to human readable (K/M/B/T tokens).
+        // 关键词: formatTokenCount, Token 数千分位/M 单位展示, 与 portal Token 列对齐
+        function formatTokenCount(n) {
+            const num = Number(n) || 0;
+            if (num === 0) return '0';
+            const abs = Math.abs(num);
+            if (abs < 1000) return String(num);
+            if (abs < 1_000_000) return (num / 1000).toFixed(num % 1000 === 0 ? 0 : 1) + 'K';
+            if (abs < 1_000_000_000) return (num / 1_000_000).toFixed(num % 1_000_000 === 0 ? 0 : 2) + 'M';
+            return (num / 1_000_000_000).toFixed(2) + 'B';
         }
         
         // Helper: escape HTML
@@ -3866,7 +3935,10 @@ curl '${metaApiUrl}?name=${modelName}'`;
             setMul('editModelCacheCreateMul', cacheCreateMul, 1.25);
             setMul('editModelCacheHitMul', cacheHitMul, 0.1);
 
-            document.getElementById('editModelMetaModal').style.display = 'block';
+            // 修复定位 bug: .delete-confirmation-modal 依赖 flex 居中, 之前用 'block' 会导致
+            // modal-content 跌到左上角并继承默认 width:400px, Token 倍率 4 列网格被挤压。
+            // 关键词: editModelMetaModal display flex 居中修复
+            document.getElementById('editModelMetaModal').style.display = 'flex';
         }
 
         function closeEditModelModal() {
@@ -4192,6 +4264,117 @@ curl '${metaApiUrl}?name=${modelName}'`;
                 
                 showToast('流量计数已重置', 'success');
                 setTimeout(() => window.location.reload(), 1000);
+            } catch (error) {
+                showToast(`重置失败: ${error.message}`, 'error');
+            }
+        }
+
+        // ==================== API Key Token Limit (recommended) ====================
+        //
+        // 关键词: showTokenLimitDialog saveTokenLimit resetAPIKeyToken,
+        //        API Key Token 维度限额 UI, 推荐使用替代字节限额
+        //
+        // UI 设计：
+        //   1. 限额输入单位为 M tokens（百万）；保存时转换为 raw token；
+        //   2. 顶部明确说明「推荐使用 Token 限额，替代流量限制」；
+        //   3. 支持启用/禁用开关；
+        //   4. 同 modal 提供「重置 Token 用量」入口（沿用 traffic 风格）。
+
+        function showTokenLimitDialog(apiKeyId, currentLimit, currentUsed, enabled) {
+            // 关闭已存在 modal 避免重复（防止快速点击多次）
+            const existing = document.getElementById('tokenLimitModal');
+            if (existing) existing.remove();
+
+            const usedRaw = Number(currentUsed) || 0;
+            const limitRaw = Number(currentLimit) || 0;
+            // 默认以 M 为单位展示；如果限额非 M 的整数倍则显示带小数
+            const limitM = limitRaw > 0 ? (limitRaw / 1_000_000) : 0;
+            const usedDisplay = formatTokenCount(usedRaw);
+            const usedM = (usedRaw / 1_000_000).toFixed(usedRaw === 0 ? 0 : 3);
+
+            const html = `
+                <div id="tokenLimitModal" class="delete-confirmation-modal" style="display: flex;">
+                    <div class="modal-content" style="width: 480px; max-width: 90vw;">
+                        <span class="close-modal" onclick="closeTokenLimitModal()">&times;</span>
+                        <h4>Token 限额设置 <small style="color:#1976d2;font-weight:normal;">（推荐使用，替代字节流量限制）</small></h4>
+                        <div class="form-group">
+                            <label>API Key ID: ${apiKeyId}</label>
+                        </div>
+                        <div class="form-group">
+                            <label>当前已用 Token: <strong>${usedRaw}</strong> (${usedDisplay} ≈ ${usedM} M)</label>
+                        </div>
+                        <div class="form-group">
+                            <label for="tokenLimitMInput">Token 限额（单位：M tokens）:</label>
+                            <input type="number" id="tokenLimitMInput" class="form-control" value="${limitM}" min="0" step="0.1">
+                            <small class="form-text text-muted">
+                                设置为 0 表示不限制。Token 维度按上游 SSE 末帧 usage 经四维倍率
+                                加权后累加 (input/output/cache_creation/cache_hit)，更贴近真实计费。
+                            </small>
+                        </div>
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="tokenLimitEnableInput" ${enabled ? 'checked' : ''}>
+                                启用 Token 限额
+                            </label>
+                        </div>
+                        <div class="modal-actions">
+                            <button class="btn" onclick="resetAPIKeyToken(${apiKeyId})" style="background:#ff9800;color:#fff;">重置 Token 用量</button>
+                            <span style="flex:1;"></span>
+                            <button class="btn" onclick="closeTokenLimitModal()">取消</button>
+                            <button class="btn btn-primary" onclick="saveTokenLimit(${apiKeyId})">保存</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.insertAdjacentHTML('beforeend', html);
+        }
+
+        function closeTokenLimitModal() {
+            const modal = document.getElementById('tokenLimitModal');
+            if (modal) modal.remove();
+        }
+
+        async function saveTokenLimit(apiKeyId) {
+            const limitMRaw = parseFloat(document.getElementById('tokenLimitMInput').value);
+            const limitM = isFinite(limitMRaw) && limitMRaw > 0 ? limitMRaw : 0;
+            // Math.round 用于避免浮点累积误差（例如 1.1 * 1e6 = 1100000.0000001）
+            const limitRaw = Math.round(limitM * 1_000_000);
+            const enabled = document.getElementById('tokenLimitEnableInput').checked;
+
+            try {
+                const response = await fetch(`/portal/api-key-token-limit/${apiKeyId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ token_limit: limitRaw, enable: enabled })
+                });
+                const data = await response.json();
+                if (!response.ok || !data.success) {
+                    throw new Error(data.message || '保存 Token 限额失败');
+                }
+                showToast('Token 限额已保存', 'success');
+                closeTokenLimitModal();
+                setTimeout(() => window.location.reload(), 800);
+            } catch (error) {
+                showToast(`保存失败: ${error.message}`, 'error');
+            }
+        }
+
+        async function resetAPIKeyToken(apiKeyId) {
+            if (!confirm('确定要重置这个 API Key 的 Token 用量计数吗？')) {
+                return;
+            }
+            try {
+                const response = await fetch(`/portal/reset-api-key-token/${apiKeyId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const data = await response.json();
+                if (!response.ok || !data.success) {
+                    throw new Error(data.message || '重置 Token 用量失败');
+                }
+                showToast('Token 用量已重置', 'success');
+                closeTokenLimitModal();
+                setTimeout(() => window.location.reload(), 800);
             } catch (error) {
                 showToast(`重置失败: ${error.message}`, 'error');
             }
@@ -5488,7 +5671,19 @@ curl '${metaApiUrl}?name=${modelName}'`;
         window.closeTrafficLimitModal = closeTrafficLimitModal;
         window.saveTrafficLimit = saveTrafficLimit;
         window.closeTrafficLimitDialog = closeTrafficLimitModal; // 别名
-        window.resetApiKeyTraffic = resetApiKeyTraffic;
+        // 修正：之前赋值的是不存在的标识符 resetApiKeyTraffic（小写 pi），
+        // 函数实际定义为 resetAPIKeyTraffic（大写 API）。统一指向真实函数。
+        // 关键词: resetAPIKeyTraffic 名称大小写修复
+        window.resetApiKeyTraffic = resetAPIKeyTraffic;
+        window.resetAPIKeyTraffic = resetAPIKeyTraffic;
+
+        // Token 限额相关（推荐使用，替代字节限额）
+        // 关键词: window.showTokenLimitDialog window.saveTokenLimit window.resetAPIKeyToken
+        window.showTokenLimitDialog = showTokenLimitDialog;
+        window.closeTokenLimitModal = closeTokenLimitModal;
+        window.saveTokenLimit = saveTokenLimit;
+        window.resetAPIKeyToken = resetAPIKeyToken;
+        window.formatTokenCount = formatTokenCount;
         
         // 内存和系统监控相关
         window.showMemoryDialog = showMemoryDialog;

@@ -83,9 +83,37 @@
                             </div>
                         </div>
                         
-                        <!-- Traffic Limit Toggle -->
+                        <!-- Token Settings (Recommended) -->
+                        <!-- 关键词: OPS create-api-key Token 限额, 推荐使用替代字节流量 -->
+                        <div class="form-group" style="border-left: 3px solid #1976d2; padding-left: 10px; background: #f5faff;">
+                            <label>Token Settings <span style="color:#1976d2;font-weight:normal;">(Recommended)</span></label>
+                            <div class="toggle-group active" id="token-unlimited-toggle">
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="unlimited-token" checked>
+                                    <span class="toggle-slider"></span>
+                                </label>
+                                <div class="toggle-label">
+                                    <div class="title">Unlimited Token</div>
+                                    <div class="desc" id="token-desc">API Key will have no token restrictions</div>
+                                </div>
+                            </div>
+                            <div id="token-limit-group" style="display: none;">
+                                <div class="traffic-input-group">
+                                    <input type="number" id="token-limit-value" placeholder="10" min="0" step="0.1" value="10">
+                                    <select id="token-limit-unit">
+                                        <option value="1000000" selected>M tokens</option>
+                                        <option value="1000">K tokens</option>
+                                        <option value="1">tokens</option>
+                                    </select>
+                                </div>
+                                <p class="form-hint">Recommended billing dimension. Aggregated by weighted multipliers (input/output/cache).</p>
+                                <p class="form-hint calculated-bytes" id="token-calculated">Calculated: 10000000 tokens (10 M)</p>
+                            </div>
+                        </div>
+
+                        <!-- Traffic Limit Toggle (legacy) -->
                         <div class="form-group">
-                            <label>Traffic Settings</label>
+                            <label>Traffic Settings <small style="color:#888;">(legacy, prefer Token)</small></label>
                             <div class="toggle-group active" id="unlimited-toggle">
                                 <label class="toggle-switch">
                                     <input type="checkbox" id="unlimited-traffic" checked>
@@ -144,6 +172,9 @@
                                         <th>Models</th>
                                         <th>Traffic Used</th>
                                         <th>Traffic Limit</th>
+                                        <!-- 关键词: OPS my-keys 表格 Token 用量列, Token 限额列, 推荐 token over traffic -->
+                                        <th title="Token usage (recommended billing dimension)">Token Used</th>
+                                        <th title="Token limit (recommended over byte traffic)">Token Limit *</th>
                                         <th>Created At</th>
                                         <th>Actions</th>
                                     </tr>
@@ -444,9 +475,37 @@
                     </div>
                 </div>
                 
-                <!-- Traffic Settings -->
+                <!-- Token Settings (recommended over byte traffic) -->
+                <!-- 关键词: OPS edit modal Token 限额设置, 推荐替代字节流量限制 -->
+                <div class="form-group" style="border-left: 3px solid #1976d2; padding-left: 10px; background: #f5faff;">
+                    <label>Token Settings <span style="color:#1976d2;font-weight:normal;">(Recommended)</span></label>
+                    <div class="toggle-group" id="edit-token-unlimited-toggle">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="edit-token-unlimited">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <div class="toggle-label">
+                            <div class="title">Unlimited Token</div>
+                            <div class="desc" id="edit-token-desc">API Key will have no token restrictions</div>
+                        </div>
+                    </div>
+                    <div id="edit-token-limit-group" style="display: none; margin-top: 10px;">
+                        <div class="traffic-input-group">
+                            <input type="number" id="edit-token-limit-value" placeholder="10" min="0" step="0.1" value="10">
+                            <select id="edit-token-limit-unit">
+                                <option value="1000000" selected>M tokens</option>
+                                <option value="1000">K tokens</option>
+                                <option value="1">tokens</option>
+                            </select>
+                        </div>
+                        <p class="form-hint calculated-bytes" id="edit-token-calculated">Calculated: 10000000 tokens (10 M)</p>
+                        <p class="form-hint">Current usage: <span id="edit-token-used">0</span> tokens</p>
+                    </div>
+                </div>
+
+                <!-- Traffic Settings (legacy, will be deprecated) -->
                 <div class="form-group">
-                    <label>Traffic Settings</label>
+                    <label>Traffic Settings <small style="color:#888;">(legacy, prefer Token)</small></label>
                     <div class="toggle-group" id="edit-unlimited-toggle">
                         <label class="toggle-switch">
                             <input type="checkbox" id="edit-unlimited-traffic">
@@ -474,6 +533,7 @@
                 </div>
             </div>
             <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="resetEditKeyToken()">Reset Token</button>
                 <button class="btn btn-secondary" onclick="resetEditKeyTraffic()">Reset Traffic</button>
                 <button class="btn btn-secondary" onclick="closeEditKeyModal()">Cancel</button>
                 <button class="btn btn-primary" onclick="saveEditKey()">Save Changes</button>

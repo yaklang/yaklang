@@ -754,6 +754,12 @@ func (c *ServerConfig) HandlePortalRequest(conn net.Conn, request *http.Request,
 		c.handleUpdateAPIKeyTrafficLimit(conn, request, uriIns.Path)
 	case strings.HasPrefix(uriIns.Path, "/portal/reset-api-key-traffic/") && request.Method == "POST":
 		c.handleResetAPIKeyTraffic(conn, request, uriIns.Path)
+	// API Key Token-dimension limit (推荐使用 Token 维度限额, 与流量限制并行)
+	// 关键词: portal api-key-token-limit reset-api-key-token 路由注册
+	case strings.HasPrefix(uriIns.Path, "/portal/api-key-token-limit/") && request.Method == "POST":
+		c.handleUpdateAPIKeyTokenLimit(conn, request, uriIns.Path)
+	case strings.HasPrefix(uriIns.Path, "/portal/reset-api-key-token/") && request.Method == "POST":
+		c.handleResetAPIKeyToken(conn, request, uriIns.Path)
 
 	// ========== Web Search API Key Routes ==========
 	case uriIns.Path == "/portal/api/web-search-keys" && request.Method == "GET":
@@ -945,6 +951,9 @@ func (c *ServerConfig) HandleOpsPortalRequest(conn net.Conn, request *http.Reque
 		c.handleOpsUpdateApiKey(conn, request, authInfo)
 	case uriIns.Path == "/ops/api/reset-traffic" && request.Method == "POST":
 		c.handleOpsResetApiKeyTraffic(conn, request, authInfo)
+	// 关键词: OPS reset-token 路由注册, OPS 用户重置自己 API Key Token 用量
+	case uriIns.Path == "/ops/api/reset-token" && request.Method == "POST":
+		c.handleOpsResetApiKeyToken(conn, request, authInfo)
 
 	// ========== OPS Self-Service ==========
 	case uriIns.Path == "/ops/my-info" && request.Method == "GET":

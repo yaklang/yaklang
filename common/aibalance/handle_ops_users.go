@@ -920,10 +920,13 @@ func (c *ServerConfig) handleOpsCreateApiKey(conn net.Conn, request *http.Reques
 	}
 	defer request.Body.Close()
 
+	// 关键词: handleOpsCreateApiKey 新增 token_limit 字段, OPS 创建 API Key 支持 Token 限额
 	var reqBody struct {
-		AllowedModels []string `json:"allowed_models"`
-		TrafficLimit  int64    `json:"traffic_limit"` // Optional, 0 or negative means unlimited
-		Unlimited     bool     `json:"unlimited"`     // Explicitly set unlimited traffic
+		AllowedModels    []string `json:"allowed_models"`
+		TrafficLimit     int64    `json:"traffic_limit"`      // Optional, 0 or negative means unlimited (legacy)
+		Unlimited        bool     `json:"unlimited"`          // Explicitly set unlimited traffic (legacy)
+		TokenLimit       int64    `json:"token_limit"`        // 推荐使用：Token 维度限额，0/负数表示不限制
+		TokenUnlimited   bool     `json:"token_unlimited"`    // 显式禁用 Token 限额
 	}
 
 	if err := json.Unmarshal(bodyBytes, &reqBody); err != nil {
@@ -961,6 +964,18 @@ func (c *ServerConfig) handleOpsCreateApiKey(conn net.Conn, request *http.Reques
 		trafficLimitEnable = false
 	}
 
+	// Token-dimension limit handling. 与 Traffic 维度独立: OPS 可单独指定/禁用 token 限额。
+	// 关键词: OPS create-api-key TokenLimit TokenLimitEnable 默认逻辑
+	var tokenLimit int64 = 0
+	var tokenLimitEnable bool = false
+	if reqBody.TokenUnlimited {
+		tokenLimit = 0
+		tokenLimitEnable = false
+	} else if reqBody.TokenLimit > 0 {
+		tokenLimit = reqBody.TokenLimit
+		tokenLimitEnable = true
+	}
+
 	// Generate API key
 	apiKey := "mf-" + uuid.New().String()
 
@@ -976,6 +991,9 @@ func (c *ServerConfig) handleOpsCreateApiKey(conn net.Conn, request *http.Reques
 		TrafficLimitEnable: trafficLimitEnable,
 		TrafficLimit:       trafficLimit,
 		TrafficUsed:        0,
+		TokenLimitEnable:   tokenLimitEnable,
+		TokenLimit:         tokenLimit,
+		TokenUsed:          0,
 		CreatedByOpsID:     user.ID,
 		CreatedByOpsName:   user.Username,
 	}
@@ -1010,6 +1028,8 @@ func (c *ServerConfig) handleOpsCreateApiKey(conn net.Conn, request *http.Reques
 		"traffic_limit":        trafficLimit,
 		"traffic_limit_enable": trafficLimitEnable,
 		"unlimited":            !trafficLimitEnable,
+		"token_limit":          tokenLimit,
+		"token_limit_enable":   tokenLimitEnable,
 	})
 	LogOpsAction(user.ID, user.Username, "create_api_key", "api_key", fmt.Sprintf("%d", apiKeyRecord.ID), string(detailJSON), request)
 
@@ -1025,6 +1045,8 @@ func (c *ServerConfig) handleOpsCreateApiKey(conn net.Conn, request *http.Reques
 		"traffic_limit":        trafficLimit,
 		"traffic_limit_enable": trafficLimitEnable,
 		"unlimited":            !trafficLimitEnable,
+		"token_limit":          tokenLimit,
+		"token_limit_enable":   tokenLimitEnable,
 		"message":              "API key created successfully",
 	})
 }
@@ -1108,8 +1130,12 @@ func (c *ServerConfig) handleOpsGetMyKeys(conn net.Conn, request *http.Request, 
 			"traffic_used":         key.TrafficUsed,
 			"traffic_limit":        key.TrafficLimit,
 			"traffic_limit_enable": key.TrafficLimitEnable,
-			"active":               key.Active,
-			"created_at":           key.CreatedAt.Format("2006-01-02 15:04:05"),
+			// 关键词: OPS my-keys 接口暴露 Token 维度限额字段, 推荐使用 token 替代 traffic
+			"token_used":         key.TokenUsed,
+			"token_limit":        key.TokenLimit,
+			"token_limit_enable": key.TokenLimitEnable,
+			"active":             key.Active,
+			"created_at":         key.CreatedAt.Format("2006-01-02 15:04:05"),
 		})
 	}
 
@@ -1245,11 +1271,23 @@ func (c *ServerConfig) handleOpsUpdateApiKey(conn net.Conn, request *http.Reques
 	}
 	defer request.Body.Close()
 
+	// 关键词: handleOpsUpdateApiKey 支持 Token 维度限额, OPS 修改 API Key 同时支持 token 字段
+	// 字段语义：
+	//   - Unlimited=true            -> 关闭流量限额；
+	//   - TrafficLimit>0            -> 启用并设置流量限额；
+	//   - 两者都未提供              -> 流量限额保持不变（向后兼容旧前端）。
+	// Token 维度同理：
+	//   - TokenUnlimited=true       -> 关闭 token 限额；
+	//   - TokenLimit>0              -> 启用并设置 token 限额；
+	//   - 两者都未提供              -> token 限额保持不变。
+	// 使用 *int64 / *bool 让"未提供"可被区分；JSON 中字段缺省即为 nil。
 	var reqBody struct {
-		ApiKey        string   `json:"api_key"`
-		AllowedModels []string `json:"allowed_models"`
-		TrafficLimit  int64    `json:"traffic_limit"`
-		Unlimited     bool     `json:"unlimited"`
+		ApiKey         string   `json:"api_key"`
+		AllowedModels  []string `json:"allowed_models"`
+		TrafficLimit   int64    `json:"traffic_limit"`
+		Unlimited      bool     `json:"unlimited"`
+		TokenLimit     *int64   `json:"token_limit,omitempty"`
+		TokenUnlimited *bool    `json:"token_unlimited,omitempty"`
 	}
 
 	if err := json.Unmarshal(bodyBytes, &reqBody); err != nil {
@@ -1308,6 +1346,19 @@ func (c *ServerConfig) handleOpsUpdateApiKey(conn net.Conn, request *http.Reques
 		apiKey.TrafficLimit = reqBody.TrafficLimit
 	}
 
+	// Update Token settings (推荐使用，独立于流量维度)
+	if reqBody.TokenUnlimited != nil && *reqBody.TokenUnlimited {
+		apiKey.TokenLimitEnable = false
+		apiKey.TokenLimit = 0
+	} else if reqBody.TokenLimit != nil && *reqBody.TokenLimit > 0 {
+		apiKey.TokenLimitEnable = true
+		apiKey.TokenLimit = *reqBody.TokenLimit
+	} else if reqBody.TokenLimit != nil && *reqBody.TokenLimit == 0 && (reqBody.TokenUnlimited == nil || !*reqBody.TokenUnlimited) {
+		// 显式传 0 但 unlimited 没设 -> 等同关闭
+		apiKey.TokenLimitEnable = false
+		apiKey.TokenLimit = 0
+	}
+
 	// Save changes
 	if err := db.Save(&apiKey).Error; err != nil {
 		c.logError("Failed to update API key: %v", err)
@@ -1322,6 +1373,8 @@ func (c *ServerConfig) handleOpsUpdateApiKey(conn net.Conn, request *http.Reques
 		"allowed_models":       reqBody.AllowedModels,
 		"traffic_limit":        apiKey.TrafficLimit,
 		"traffic_limit_enable": apiKey.TrafficLimitEnable,
+		"token_limit":          apiKey.TokenLimit,
+		"token_limit_enable":   apiKey.TokenLimitEnable,
 	})
 	LogOpsAction(authInfo.UserID, authInfo.Username, "update_api_key", "api_key", fmt.Sprintf("%d", apiKey.ID), string(detailJSON), request)
 
@@ -1337,6 +1390,8 @@ func (c *ServerConfig) handleOpsUpdateApiKey(conn net.Conn, request *http.Reques
 		"message":              "API key updated successfully",
 		"traffic_limit":        apiKey.TrafficLimit,
 		"traffic_limit_enable": apiKey.TrafficLimitEnable,
+		"token_limit":          apiKey.TokenLimit,
+		"token_limit_enable":   apiKey.TokenLimitEnable,
 		"allowed_models":       reqBody.AllowedModels,
 	})
 }
@@ -1427,6 +1482,91 @@ func (c *ServerConfig) handleOpsResetApiKeyTraffic(conn net.Conn, request *http.
 	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
 		"success": true,
 		"message": "Traffic reset successfully",
+	})
+}
+
+// handleOpsResetApiKeyToken handles POST /ops/api/reset-token
+// 关键词: handleOpsResetApiKeyToken, OPS 用户重置自己 API Key 的 Token 用量
+//
+// 权限: 仅允许 OPS 用户重置自己创建的 API Key 的 TokenUsed 计数。
+func (c *ServerConfig) handleOpsResetApiKeyToken(conn net.Conn, request *http.Request, authInfo *AuthInfo) {
+	c.logInfo("Handling OPS reset API key token request")
+
+	if !authInfo.IsOps() {
+		c.writeJSONResponse(conn, http.StatusForbidden, map[string]string{
+			"error": "OPS user access required",
+		})
+		return
+	}
+
+	bodyBytes, err := io.ReadAll(request.Body)
+	if err != nil {
+		c.logError("Failed to read request body: %v", err)
+		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]string{
+			"error": "Failed to read request body",
+		})
+		return
+	}
+	defer request.Body.Close()
+
+	var reqBody struct {
+		ApiKey string `json:"api_key"`
+	}
+	if err := json.Unmarshal(bodyBytes, &reqBody); err != nil {
+		c.logError("Failed to parse request body: %v", err)
+		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]string{
+			"error": "Invalid request format",
+		})
+		return
+	}
+
+	if reqBody.ApiKey == "" {
+		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]string{
+			"error": "API key is required",
+		})
+		return
+	}
+
+	db := GetDB()
+	if db == nil {
+		c.writeJSONResponse(conn, http.StatusInternalServerError, map[string]string{
+			"error": "Database not initialized",
+		})
+		return
+	}
+
+	var apiKey schema.AiApiKeys
+	if err := db.Where("api_key = ?", reqBody.ApiKey).First(&apiKey).Error; err != nil {
+		c.writeJSONResponse(conn, http.StatusNotFound, map[string]string{
+			"error": "API key not found",
+		})
+		return
+	}
+
+	// 越权防护: 必须是本人创建的 Key
+	if apiKey.CreatedByOpsID != authInfo.UserID {
+		c.writeJSONResponse(conn, http.StatusForbidden, map[string]string{
+			"error": "You can only reset token for API keys you created",
+		})
+		return
+	}
+
+	apiKey.TokenUsed = 0
+	if err := db.Save(&apiKey).Error; err != nil {
+		c.logError("Failed to reset API key token used: %v", err)
+		c.writeJSONResponse(conn, http.StatusInternalServerError, map[string]string{
+			"error": "Failed to reset token",
+		})
+		return
+	}
+
+	LogOpsAction(authInfo.UserID, authInfo.Username, "reset_api_key_token", "api_key", fmt.Sprintf("%d", apiKey.ID), "", request)
+
+	log.Infof("OPS user %s reset token used for API key: %s", authInfo.Username, reqBody.ApiKey[:20]+"...")
+
+	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
+		"success": true,
+		"message": "Token usage reset successfully",
 	})
 }
 
