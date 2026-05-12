@@ -1,0 +1,4 @@
+Example:
+
+`{"@action":"summary","task_long_summary":"### 关键结果\n- 已确认目标服务为 Nginx 1.18.0 与 Tomcat 8.5.65。\n- 发现 Tomcat 管理界面对外暴露，且 TLS 存在弱套件。\n\n### 结论 / 风险\n- 当前未见高危漏洞直接命中，但管理界面暴露扩大攻击面，应优先整改。","task_short_summary":"确认存在管理面暴露，需优先整改。"}`
+

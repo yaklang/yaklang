@@ -1,0 +1,6 @@
+Examples:
+
+`{"@action":"task_review","suggestion":"continue","reason":"任务继续"}`
+
+`{"@action":"task_review","suggestion":"adjust_plan","reason":"发现新线索","task_delta_summary":"在 1-1 后补充验证任务","task_deltas":[{"op":"insert_after","ref_task_index":"1-1","tasks":[{"subtask_name":"Verify SQL injection on /api/login","subtask_goal":"Use sqlmap to confirm SQL injection and determine injection type"}]}]}`
+

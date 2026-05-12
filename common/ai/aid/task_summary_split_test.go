@@ -1,9 +1,7 @@
 package aid
 
 import (
-	"bytes"
 	"testing"
-	"text/template"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicache"
@@ -11,33 +9,29 @@ import (
 
 // 关键词: aicache.Split 单测, P0-A5, task-summary.txt 段稳定性回归
 //
-// task-summary.txt 在 P0-A2 阶段被改造成 4 段 PROMPT_SECTION 包装,
-// 这里通过直接渲染模板字符串验证:
+// task-summary prompt 通过 PromptPrefixBuilder 组装为多段 PROMPT_SECTION,
+// 这里通过 assembleTaskSummaryPrompt 验证:
 //  1. 切片输出多段 chunk, 包含 high-static 与 dynamic
 //  2. 不出现 raw/noise chunk
 //  3. high-static 段 hash 在跨调用下保持稳定 (任意 .ContextProvider 数据变化不影响)
 
-type taskSummaryStubSchema struct {
-	TaskSummarySchema string
+type taskSummaryFixture struct {
+	Schema          string
+	CurrentTaskInfo string
+	Timeline        string
+	Persistent      string
 }
 
-type taskSummaryStubProvider struct {
-	CurrentTaskInfo     string
-	CurrentTaskTimeline string
-	PersistentMemory    string
-	Schema              taskSummaryStubSchema
-}
-
-func renderTaskSummaryFixture(t *testing.T, provider taskSummaryStubProvider) string {
+func renderTaskSummaryFixture(t *testing.T, fixture taskSummaryFixture) string {
 	t.Helper()
-	tmpl, err := template.New("task-summary-test").Parse(__prompt_TaskSummary)
+	prompt, err := assembleTaskSummaryPrompt(
+		fixture.Schema,
+		fixture.Persistent,
+		fixture.Timeline,
+		fixture.CurrentTaskInfo,
+	)
 	require.NoError(t, err)
-	var buf bytes.Buffer
-	err = tmpl.Execute(&buf, map[string]any{
-		"ContextProvider": provider,
-	})
-	require.NoError(t, err)
-	return buf.String()
+	return prompt
 }
 
 func taskSummaryChunksBySection(t *testing.T, prompt string) map[string][]*aicache.Chunk {
@@ -54,13 +48,11 @@ func taskSummaryChunksBySection(t *testing.T, prompt string) map[string][]*aicac
 }
 
 func TestSplit_TaskSummaryPrompt_FourSections(t *testing.T) {
-	stub := taskSummaryStubProvider{
-		CurrentTaskInfo:     "current task: scan /tmp",
-		CurrentTaskTimeline: "interval-1 -> shell ls\ninterval-2 -> shell ps",
-		PersistentMemory:    "<persistent>vm-host=darwin</persistent>",
-		Schema: taskSummaryStubSchema{
-			TaskSummarySchema: `{"type":"object"}`,
-		},
+	stub := taskSummaryFixture{
+		Schema:          `{"type":"object"}`,
+		CurrentTaskInfo: "current task: scan /tmp",
+		Timeline:        "interval-1 -> shell ls\ninterval-2 -> shell ps",
+		Persistent:      "<persistent>vm-host=darwin</persistent>",
 	}
 
 	prompt1 := renderTaskSummaryFixture(t, stub)
@@ -82,8 +74,8 @@ func TestSplit_TaskSummaryPrompt_FourSections(t *testing.T) {
 	sec3 := taskSummaryChunksBySection(t, prompt3)
 	require.Equal(t, sec1[aicache.SectionHighStatic][0].Hash, sec3[aicache.SectionHighStatic][0].Hash,
 		"task-summary high-static hash must remain stable across different dynamic inputs")
-	if len(sec1[aicache.SectionSemiDynamic]) > 0 && len(sec3[aicache.SectionSemiDynamic]) > 0 {
-		require.Equal(t, sec1[aicache.SectionSemiDynamic][0].Hash, sec3[aicache.SectionSemiDynamic][0].Hash,
-			"task-summary semi-dynamic hash should remain stable when only dynamic input changes")
+	if len(sec1[aicache.SectionSemiDynamic1]) > 0 && len(sec3[aicache.SectionSemiDynamic1]) > 0 {
+		require.Equal(t, sec1[aicache.SectionSemiDynamic1][0].Hash, sec3[aicache.SectionSemiDynamic1][0].Hash,
+			"task-summary semi-dynamic-1 hash should remain stable when only dynamic input changes")
 	}
 }

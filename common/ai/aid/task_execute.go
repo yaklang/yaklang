@@ -775,13 +775,43 @@ func formatDuration(d time.Duration) string {
 }
 
 func (t *AiTask) GenerateTaskSummaryPrompt() (string, error) {
-	results, err := utils.RenderTemplate(__prompt_TaskSummary, map[string]any{
-		"ContextProvider": t.Coordinator.ContextProvider,
-	})
-	if err != nil {
-		return "", err
+	if t == nil || t.Coordinator == nil || t.Coordinator.ContextProvider == nil {
+		return "", fmt.Errorf("context provider is nil")
 	}
-	return results, nil
+	cp := t.Coordinator.ContextProvider
+	return assembleTaskSummaryPrompt(
+		cp.Schema()["TaskSummarySchema"],
+		cp.PersistentMemory(),
+		cp.CurrentTaskTimeline(),
+		cp.CurrentTaskInfo(),
+	)
+}
+
+type taskSummaryDynamicData struct {
+	CurrentTaskInfo string
+}
+
+func assembleTaskSummaryPrompt(schema string, persistentMemory string, currentTaskTimeline string, currentTaskInfo string) (string, error) {
+	materials := &aicommon.PromptMaterials{
+		TaskInstruction: strings.TrimSpace(__prompt_TaskSummaryInstruction),
+		Schema:          strings.TrimSpace(schema),
+		OutputExample:   strings.TrimSpace(__prompt_TaskSummaryOutputExample),
+	}
+	if persistentMemory = strings.TrimSpace(persistentMemory); persistentMemory != "" {
+		materials.SkillsContext = "# 牢记\n" + persistentMemory
+	}
+	if currentTaskTimeline = strings.TrimSpace(currentTaskTimeline); currentTaskTimeline != "" {
+		materials.TimelineOpen = fmt.Sprintf("## 当前任务的历史时间线\n<summary>\n%s\n</summary>", currentTaskTimeline)
+	}
+	return aicommon.NewDefaultPromptPrefixBuilder().AssemblePromptWithDynamicSection(
+		materials,
+		"aid-task-summary-dynamic",
+		__prompt_TaskSummary,
+		taskSummaryDynamicData{
+			CurrentTaskInfo: strings.TrimSpace(currentTaskInfo),
+		},
+		utils.RandStringBytes(6),
+	)
 }
 
 func SelectSummary(task *AiTask, callResult *aitool.ToolResult) string {

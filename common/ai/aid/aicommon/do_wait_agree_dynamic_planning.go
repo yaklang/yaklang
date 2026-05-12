@@ -30,6 +30,15 @@ var aiPlanReviewPromptTemplate string
 //go:embed prompts/review/ai-review-task.txt
 var aiTaskReviewPromptTemplate string
 
+//go:embed prompts/review/ai-review-task_instruction.txt
+var aiTaskReviewInstructionTemplate string
+
+//go:embed prompts/review/ai-review-task_output_example.txt
+var aiTaskReviewOutputExampleTemplate string
+
+//go:embed prompts/review/ai-review-task_schema.json
+var aiTaskReviewSchemaTemplate string
+
 type PlanReviewPromptData struct {
 	CurrentTime      string
 	OSArch           string
@@ -145,16 +154,25 @@ func generateTaskReviewPrompt(config *Config, materials aitool.InvokeParams) (st
 		}
 	}
 
-	tmpl, err := template.New("task-review").Parse(aiTaskReviewPromptTemplate)
-	if err != nil {
-		return "", fmt.Errorf("error parsing task review template: %w", err)
+	prefixMaterials := &PromptMaterials{
+		TaskInstruction:  strings.TrimSpace(aiTaskReviewInstructionTemplate),
+		Schema:           strings.TrimSpace(aiTaskReviewSchemaTemplate),
+		OutputExample:    strings.TrimSpace(aiTaskReviewOutputExampleTemplate),
+		TimelineOpen:     data.Timeline,
+		CurrentTime:      data.CurrentTime,
+		OSArch:           data.OSArch,
+		WorkingDir:       data.WorkingDir,
+		WorkingDirGlance: data.WorkingDirGlance,
+		Workspace:        strings.TrimSpace(data.OSArch+data.WorkingDir+data.WorkingDirGlance) != "",
 	}
 
-	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, data); err != nil {
-		return "", fmt.Errorf("error executing task review template: %w", err)
-	}
-	return buf.String(), nil
+	return NewDefaultPromptPrefixBuilder().AssemblePromptWithDynamicSection(
+		prefixMaterials,
+		"task-review-dynamic",
+		aiTaskReviewPromptTemplate,
+		data,
+		data.Nonce,
+	)
 }
 
 var validPlanSuggestions = map[string]bool{

@@ -1,0 +1,63 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["@action", "suggestion", "reason"],
+  "properties": {
+    "@action": {
+      "const": "task_review"
+    },
+    "suggestion": {
+      "description": "Your review decision",
+      "type": "string",
+      "enum": ["continue", "deeply_think", "inaccurate", "adjust_plan"]
+    },
+    "reason": {
+      "description": "Very brief evidence-based explanation for your decision. Keep it short.",
+      "type": "string"
+    },
+    "task_delta_summary": {
+      "description": "Optional short human-readable summary of how pending tasks should be adjusted. Prefer 1-3 short lines. Useful for streaming UI.",
+      "type": "string"
+    },
+    "task_deltas": {
+      "description": "Required when suggestion is adjust_plan. Array of delta operations on pending tasks. ref_task_index uses the task index shown in Progress (e.g. 1-2, 1-3). All indices refer to the state BEFORE any deltas are applied.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["op"],
+        "properties": {
+          "op": {
+            "type": "string",
+            "enum": ["insert_after", "append", "remove", "modify", "replace_all"],
+            "description": "insert_after: insert new tasks after ref_task_index; append: add tasks at the end; remove: delete a pending task; modify: change name/goal of a pending task; replace_all: replace ALL remaining pending tasks"
+          },
+          "ref_task_index": {
+            "description": "Target task index (e.g. '1-2'). Required for insert_after, remove, modify.",
+            "type": "string"
+          },
+          "tasks": {
+            "description": "New tasks to add. Required for insert_after, append, replace_all.",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["subtask_name", "subtask_goal"],
+              "properties": {
+                "subtask_name": { "type": "string" },
+                "subtask_goal": { "type": "string" }
+              }
+            }
+          },
+          "updated_name": {
+            "description": "New name for the task (for modify op only).",
+            "type": "string"
+          },
+          "updated_goal": {
+            "description": "New goal for the task (for modify op only).",
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
+

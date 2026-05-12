@@ -11,6 +11,12 @@ import (
 //go:embed prompts/tool/tool-result-to-decision.txt
 var __prompt_ToolResultToDecisionPromptTemplate string
 
+//go:embed prompts/task/task-summary_instruction.txt
+var __prompt_TaskSummaryInstruction string
+
+//go:embed prompts/task/task-summary_output_example.txt
+var __prompt_TaskSummaryOutputExample string
+
 //go:embed prompts/task/task-summary.txt
 var __prompt_TaskSummary string
 
