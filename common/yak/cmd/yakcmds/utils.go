@@ -55,6 +55,7 @@ var UtilsCommands = []*cli.Command{
 	VacuumSQLiteCommand,
 	createYakToolMetadataCommand(),
 	createBuildInForgeMetadataCommand(),
+	ExportBuiltinRulesCommand,
 	{
 		Name:  "sync-coreplugin",
 		Usage: "force sync built-in core plugin from embed to database (ignore hash check)",
