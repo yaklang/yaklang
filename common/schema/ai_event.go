@@ -49,7 +49,6 @@ var structuredNodeIDNotSaveBlackList = []string{
 	"system",
 	"react_task_cancelled",
 	"react_task_enqueue",
-	"react_task_dequeue",
 	"react_task_cleared",
 	"react_task_status_changed",
 	"react_task_created",
