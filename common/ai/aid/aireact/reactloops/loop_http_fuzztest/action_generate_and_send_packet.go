@@ -20,12 +20,12 @@ var generateAndSendPacketAction = func(r aicommon.AIInvokeRuntime) reactloops.Re
 		[]aitool.ToolOption{
 			aitool.WithStringParam("packet_type", aitool.WithParam_Description("数据包类型：mutation 表示基于当前请求变异，synthetic 表示重新生成完整原始包。"), aitool.WithParam_Required(true)),
 			aitool.WithStringParam("target_purpose", aitool.WithParam_Description("请用中文说明这次整包测试的漏洞目标，例如‘验证登录接口 SQL 注入’。"), aitool.WithParam_Required(true)),
-			aitool.WithStringParam("generation_reason", aitool.WithParam_Description("请用中文说明为何要发送这个完整数据包、怀疑的漏洞类型、以及必须遵守的安全边界。"), aitool.WithParam_Required(true)),
+			aitool.WithStringParam("reason", aitool.WithParam_Description("请用中文说明为何要发送这个完整数据包、怀疑的漏洞类型、以及必须遵守的安全边界。"), aitool.WithParam_Required(true)),
 		},
 		[]*reactloops.LoopStreamField{
 			{FieldName: "packet_type", AINodeId: "thought"},
 			{FieldName: "target_purpose", AINodeId: "thought"},
-			{FieldName: "generation_reason", AINodeId: "thought"},
+			{FieldName: "reason", AINodeId: "thought"},
 		},
 		func(l *reactloops.ReActLoop, action *aicommon.Action) error {
 			action.WaitStream(l.GetCurrentTask().GetContext())
@@ -37,8 +37,8 @@ var generateAndSendPacketAction = func(r aicommon.AIInvokeRuntime) reactloops.Re
 			if strings.TrimSpace(action.GetString("target_purpose")) == "" {
 				return fmt.Errorf("target_purpose is required")
 			}
-			if strings.TrimSpace(action.GetString("generation_reason")) == "" {
-				return fmt.Errorf("generation_reason is required")
+			if strings.TrimSpace(action.GetString("reason")) == "" {
+				return fmt.Errorf("reason is required")
 			}
 			packet := strings.TrimSpace(action.GetString(generatedPacketContentField))
 			if packet == "" {
@@ -52,7 +52,7 @@ var generateAndSendPacketAction = func(r aicommon.AIInvokeRuntime) reactloops.Re
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, operator *reactloops.LoopActionHandlerOperator) {
 			packetType := action.GetString("packet_type")
 			targetPurpose := action.GetString("target_purpose")
-			generationReason := action.GetString("generation_reason")
+			generationReason := action.GetString("reason")
 			rawPacket := strings.TrimSpace(action.GetString(generatedPacketContentField))
 			if rawPacket == "" {
 				rawPacket = strings.TrimSpace(loop.Get(generatedPacketContentField))
@@ -87,8 +87,8 @@ var generateAndSendPacketAction = func(r aicommon.AIInvokeRuntime) reactloops.Re
 
 			log.Infof("generate_and_send_packet action: packet_type=%s, target=%s, reason=%s", packetType, targetPurpose, generationReason)
 
-			paramSummary := fmt.Sprintf("packet_type=%s; target_purpose=%s; generation_reason=%s", packetType, targetPurpose, generationReason)
-			diffResult, verifyResult, err := executeFuzzAndCompare(loop, fuzzReq.Repeat(1), "generate_and_send_packet", paramSummary)
+			paramSummary := fmt.Sprintf("packet_type=%s; target_purpose=%s; reason=%s", packetType, targetPurpose, generationReason)
+			diffResult, verifyResult, err := executeFuzzAndCompare(loop, fuzzReq.Repeat(1), "generate_and_send_packet", paramSummary, action)
 			if err != nil {
 				operator.Fail(err)
 				return

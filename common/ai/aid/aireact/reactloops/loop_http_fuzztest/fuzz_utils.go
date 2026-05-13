@@ -131,11 +131,13 @@ type loopHTTPFuzzStatusProgress struct {
 }
 
 type loopHTTPFuzzStatusEvent struct {
-	Status     string                      `json:"status"`
-	FuzzID     string                      `json:"fuzz_id"`
-	RuntimeID  string                      `json:"runtime_id"`
-	ActionName string                      `json:"action_name,omitempty"`
-	Progress   *loopHTTPFuzzStatusProgress `json:"progress,omitempty"`
+	Status       string                      `json:"status"`
+	FuzzID       string                      `json:"fuzz_id"`
+	RuntimeID    string                      `json:"runtime_id"`
+	ActionName   string                      `json:"action_name,omitempty"`
+	Reason       string                      `json:"reason,omitempty"`
+	ParamSummary string                      `json:"param_summary,omitempty"`
+	Progress     *loopHTTPFuzzStatusProgress `json:"progress,omitempty"`
 }
 
 func newLoopHTTPFuzzOverviewStats() *loopHTTPFuzzOverviewStats {
@@ -566,12 +568,14 @@ func (s *loopHTTPFuzzOverviewStats) finalizeResponseLengthGroups() {
 }
 
 type loopHTTPFuzzThrottleEmitter struct {
-	loop       *reactloops.ReActLoop
-	taskID     string
-	fuzzID     string
-	runtimeID  string
-	actionName string
-	throttle   func(func())
+	loop         *reactloops.ReActLoop
+	taskID       string
+	fuzzID       string
+	runtimeID    string
+	actionName   string
+	reason       string
+	paramSummary string
+	throttle     func(func())
 }
 
 func (r *loopHTTPFuzzThrottleEmitter) allowEmitDetailHttpFlow(resultIndex int) bool {
@@ -584,7 +588,7 @@ func (r *loopHTTPFuzzThrottleEmitter) emitProgress(stats *loopHTTPFuzzOverviewSt
 	}
 	statusProgress := buildLoopHTTPFuzzStatusProgress(stats, lastStatusCode, 3)
 	emit := func() {
-		emitLoopHTTPFuzzStatusEvent(r.loop, loopHTTPFuzzStatusWorking, r.fuzzID, r.runtimeID, r.actionName, statusProgress)
+		emitLoopHTTPFuzzStatusEvent(r.loop, loopHTTPFuzzStatusWorking, r.fuzzID, r.runtimeID, r.actionName, r.reason, r.paramSummary, statusProgress)
 	}
 	if force || r.throttle == nil {
 		emit()
@@ -943,7 +947,7 @@ func getFuzzRequest(loop *reactloops.ReActLoop) (*mutate.FuzzHTTPRequest, error)
 // 1. 执行 fuzz，并在循环中只收集结构化统计与受限详细记录。
 // 2. 结束后根据数据规模渲染 overview + analysis 文档。
 // 3. 在需要时只压缩 analysis 段，再把最终反馈送去满意度验证。
-func executeFuzzAndCompare(loop *reactloops.ReActLoop, fuzzResult mutate.FuzzHTTPRequestIf, actionName string, paramSummary string) (string, *aicommon.VerifySatisfactionResult, error) {
+func executeFuzzAndCompare(loop *reactloops.ReActLoop, fuzzResult mutate.FuzzHTTPRequestIf, actionName string, paramSummary string, action *aicommon.Action) (string, *aicommon.VerifySatisfactionResult, error) {
 	isHttpsStr := loop.Get("is_https")
 	isHttps := isHttpsStr == "true"
 	task := loop.GetCurrentTask()
@@ -973,16 +977,27 @@ func executeFuzzAndCompare(loop *reactloops.ReActLoop, fuzzResult mutate.FuzzHTT
 	}
 	fuzzID := runtimeID
 
+	// 从 action 中提取 AI 生成的 reason（兼容 reason 和 generation_reason 两种字段名）
+	reason := ""
+	if action != nil {
+		reason = action.GetString("reason")
+		if reason == "" {
+			reason = action.GetString("generation_reason")
+		}
+	}
+
 	// 进度事件仍然边执行边发，但正文报告改成最后统一渲染。
-	emitLoopHTTPFuzzStatusEvent(loop, loopHTTPFuzzStatusStart, fuzzID, runtimeID, actionName, nil)
+	emitLoopHTTPFuzzStatusEvent(loop, loopHTTPFuzzStatusStart, fuzzID, runtimeID, actionName, reason, paramSummary, nil)
 	emitFuzzStage(loop, streamTaskID, fmt.Sprintf("开始执行 %s，HTTPFlow 会落库并保留完整请求/响应。", actionName))
 	progressEmitter := &loopHTTPFuzzThrottleEmitter{
-		loop:       loop,
-		taskID:     streamTaskID,
-		fuzzID:     fuzzID,
-		runtimeID:  runtimeID,
-		actionName: actionName,
-		throttle:   utils.NewThrottle(loopHTTPFuzzProgressEmitInterval.Seconds()),
+		loop:         loop,
+		taskID:       streamTaskID,
+		fuzzID:       fuzzID,
+		runtimeID:    runtimeID,
+		reason:       reason,
+		paramSummary: paramSummary,
+		actionName:   actionName,
+		throttle:     utils.NewThrottle(loopHTTPFuzzProgressEmitInterval.Seconds()),
 	}
 
 	// 真实执行阶段只保留结构化数据，不在循环里直接拼接长文本报告。
@@ -997,8 +1012,7 @@ func executeFuzzAndCompare(loop *reactloops.ReActLoop, fuzzResult mutate.FuzzHTT
 	}
 	resultCh, err := fuzzResult.Exec(execOpts...)
 	if err != nil {
-		emitLoopHTTPFuzzStatusEvent(loop, loopHTTPFuzzStatusFinish, fuzzID, runtimeID, actionName, nil)
-		return "", nil, utils.Errorf("failed to execute fuzz request: %v", err)
+		emitLoopHTTPFuzzStatusEvent(loop, loopHTTPFuzzStatusFinish, fuzzID, runtimeID, actionName, "", "", nil)
 	}
 
 	originalRequest := getCurrentRequestRaw(loop)
@@ -1045,7 +1059,7 @@ func executeFuzzAndCompare(loop *reactloops.ReActLoop, fuzzResult mutate.FuzzHTT
 
 	overview.finalizeResponseLengthGroups()
 	progressEmitter.emitProgress(overview, representativeStatusCode, true)
-	emitLoopHTTPFuzzStatusEvent(loop, loopHTTPFuzzStatusFinish, fuzzID, runtimeID, actionName, nil)
+	emitLoopHTTPFuzzStatusEvent(loop, loopHTTPFuzzStatusFinish, fuzzID, runtimeID, actionName, "", "", nil)
 
 	if representativeRequest != "" || representativeResponse != "" {
 		loop.Set("representative_request", representativeRequest)
@@ -1101,16 +1115,18 @@ func executeFuzzAndCompare(loop *reactloops.ReActLoop, fuzzResult mutate.FuzzHTT
 	return feedbackResult, verifyResult, nil
 }
 
-func emitLoopHTTPFuzzStatusEvent(loop *reactloops.ReActLoop, status, fuzzID, runtimeID, actionName string, progress *loopHTTPFuzzStatusProgress) {
+func emitLoopHTTPFuzzStatusEvent(loop *reactloops.ReActLoop, status, fuzzID, runtimeID, actionName string, reason string, paramSummary string, progress *loopHTTPFuzzStatusProgress) {
 	if loop == nil || loop.GetEmitter() == nil || strings.TrimSpace(status) == "" || strings.TrimSpace(fuzzID) == "" {
 		return
 	}
 	_, _ = loop.GetEmitter().EmitJSON(schema.EVENT_TYPE_HTTP_FLOW_FUZZ_STATUS, loopHTTPFuzzStatusEventNode, loopHTTPFuzzStatusEvent{
-		Status:     status,
-		FuzzID:     fuzzID,
-		RuntimeID:  runtimeID,
-		ActionName: actionName,
-		Progress:   progress,
+		Status:       status,
+		FuzzID:       fuzzID,
+		RuntimeID:    runtimeID,
+		ActionName:   actionName,
+		Reason:       reason,
+		ParamSummary: paramSummary,
+		Progress:     progress,
 	})
 }
 

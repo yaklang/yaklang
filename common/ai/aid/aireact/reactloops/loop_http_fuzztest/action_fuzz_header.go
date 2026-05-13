@@ -52,7 +52,7 @@ var fuzzHeaderAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpti
 
 			// Execute and compare
 			paramSummary := fmt.Sprintf("header_name=%s; header_values=%v; reason=%s", headerName, headerValues, reason)
-			diffResult, verifyResult, err := executeFuzzAndCompare(loop, fuzzResult, "fuzz_header", paramSummary)
+			diffResult, verifyResult, err := executeFuzzAndCompare(loop, fuzzResult, "fuzz_header", paramSummary, action)
 			if err != nil {
 				operator.Fail(err)
 				return

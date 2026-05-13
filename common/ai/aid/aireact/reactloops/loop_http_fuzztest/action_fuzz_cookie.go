@@ -65,7 +65,7 @@ var fuzzCookieAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpti
 
 			// Execute and compare
 			paramSummary := fmt.Sprintf("cookie_name=%s; cookie_values=%v; raw_mode=%v; reason=%s", cookieName, cookieValues, rawMode, reason)
-			diffResult, verifyResult, err := executeFuzzAndCompare(loop, fuzzResult, "fuzz_cookie", paramSummary)
+			diffResult, verifyResult, err := executeFuzzAndCompare(loop, fuzzResult, "fuzz_cookie", paramSummary, action)
 			if err != nil {
 				operator.Fail(err)
 				return

@@ -55,7 +55,7 @@ var fuzzPathAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption
 
 			// Execute and compare
 			paramSummary := fmt.Sprintf("paths=%v; append_mode=%v; reason=%s", paths, appendMode, reason)
-			diffResult, verifyResult, err := executeFuzzAndCompare(loop, fuzzResult, "fuzz_path", paramSummary)
+			diffResult, verifyResult, err := executeFuzzAndCompare(loop, fuzzResult, "fuzz_path", paramSummary, action)
 			if err != nil {
 				operator.Fail(err)
 				return
