@@ -1283,7 +1283,6 @@ func TestExternInstance(t *testing.T) {
 	})
 
 	t.Run("extern collision in parameter should report parameter position", func(t *testing.T) {
-		t.Skip()
 		code := `
 		maxRetry = 3
 		retryHandler = func(https, retryCount, req, rsp, retry) {

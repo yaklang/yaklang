@@ -93,20 +93,3 @@ int main() {
 		`, []string{"phi(i)[5,add(i, 1)]", "10"}, t)
 	})
 }
-
-func TestBlock_Return_Phi(t *testing.T) {
-	t.Skip()
-	t.Run("phi-with-return", func(t *testing.T) {
-		test.CheckPrintlnValue(`
-#include <stdio.h>
-int main() {
-    int a = 1;
-    if (1) {
-        return 0;
-    }
-    println(a);
-    return 0;
-}
-		`, []string{"phi(a)[Undefined-a,1]"}, t)
-	})
-}

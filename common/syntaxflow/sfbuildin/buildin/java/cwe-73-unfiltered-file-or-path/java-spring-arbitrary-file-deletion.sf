@@ -74,7 +74,7 @@ REFERENCE
 $sink #{
     include:`* & $source`,
     exclude:`* ?{opcode:call}?{!<self> & $source}?{!<self> & $sink}`,
-    exclude:`* ?{<cfgGuards()>?{opcode: return}}`,
+    exclude:`* ?{<cfgGuards(opcode: return)>}`,
 }->as $high;
 
 alert $high for {
