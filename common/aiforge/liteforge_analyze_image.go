@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/aireducer"
 	"github.com/yaklang/yaklang/common/chunkmaker"
 	"github.com/yaklang/yaklang/common/utils/chanx"
@@ -444,6 +445,11 @@ func (i *ImageAnalysisResult) Stats() map[string]interface{} {
 	return stats
 }
 
+// AnalyzeImageFile reads an image from disk and runs structured vision analysis via a temporary LiteForge.
+// opts may include aiforge.AnalysisOption values (e.g. WithExtraPrompt, WithAnalyzeContext, WithVisionAICallback)
+// and aicommon.ConfigOption values forwarded to the forge. Unless overridden by WithVisionAICallback, the
+// vision call uses aicommon.MustGetVisionAIModelCallback() (TierVision). WithVisionAICallback, when set,
+// is registered via WithFastAICallback so LiteForge's speed-priority path still invokes that callback.
 func AnalyzeImageFile(image string, opts ...any) (*ImageAnalysisResult, error) {
 	if !utils.FileExists(image) {
 		return nil, fmt.Errorf("image file not found: %s", image)
@@ -458,6 +464,9 @@ func AnalyzeImageFile(image string, opts ...any) (*ImageAnalysisResult, error) {
 
 func AnalyzeImage(image any, opts ...any) (*ImageAnalysisResult, error) {
 	var imgCfg = NewAnalysisConfig(opts...)
+	if imgCfg.VisionAICallback == nil {
+		imgCfg.VisionAICallback = aicommon.MustGetVisionAIModelCallback()
+	}
 	imgCfg.fallbackOptions = append(imgCfg.fallbackOptions, _withImageCompress(image), _withForceImage(true))
 	imgCfg.fallbackOptions = append(imgCfg.fallbackOptions, WithOutputJSONSchema(IMAGE_OUTPUT_SCHEMA))
 	// 构建详细的分析提示

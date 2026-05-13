@@ -243,10 +243,10 @@ type ChatBaseContext struct {
 	UsageCallback func(*ChatUsage)
 
 	// RawMessages 用于完整透传客户端原始 messages 数组到上游 LLM。
-	// 当 len(RawMessages) > 0 时，chatBaseChatCompletions 会跳过
-	// "单 user 包装+ImageUrls/VideoUrls 合并"逻辑，直接以本字段作为
-	// 最终请求体的 messages 数组；同时 ImageUrls/VideoUrls 会被忽略，
-	// 因为 RawMessages 已经原样携带了客户端的 image_url/video_url content。
+	// 当 len(RawMessages) > 0 时，chatBaseChatCompletions 不再做「单 user 包装」，
+	// 直接以本字段作为请求 messages 的基础；若同时存在 ImageUrls/VideoUrls
+	//（例如 gateway.LoadOption 注入的 WithImageRaw），会合并进**最后一条 user**
+	// 消息的 content（去重），与无 RawMessages 时的多模态顺序规则一致。
 	//
 	// 关键词: ChatBaseContext.RawMessages, messages 完整透传
 	RawMessages []ChatDetail
@@ -462,8 +462,9 @@ func WithChatBase_UsageCallback(cb func(*ChatUsage)) ChatBaseOption {
 	}
 }
 
-// WithChatBase_RawMessages 让 chatBaseChatCompletions 跳过"单 user 包装"，
-// 直接使用调用方提供的 messages 数组作为最终请求体的 messages 字段。
+// WithChatBase_RawMessages 让 chatBaseChatCompletions 跳过「仅 prompt 的单 user 包装」，
+// 直接使用调用方提供的 messages 作为请求体 messages；若同时存在 ImageUrls/VideoUrls，
+// 仍会合并进最后一条 user（见 mergeRawMessagesWithGatewayMedia）。
 // 配合 gateway.Chat(s) 中的 g.config.RawMessages 透传使用。
 //
 // 关键词: WithChatBase_RawMessages, messages 完整透传
@@ -549,21 +550,221 @@ func serializeRawMessagesForMirror(msgs []ChatDetail) string {
 	return string(b)
 }
 
+// dedupGatewayMedia 对 ctx 中的 VideoUrls/ImageUrls 做 URL 级去重，顺序保留首次出现。
+// 关键词: RawMessages 合并 gateway 多模态, multimodal dedup
+func dedupGatewayMedia(ctx *ChatBaseContext) (uniqVideos []*VideoDescription, uniqImages []*ImageDescription) {
+	seenVideo := map[string]bool{}
+	seenImage := map[string]bool{}
+	for _, v := range ctx.VideoUrls {
+		if v == nil || v.Url == "" || seenVideo[v.Url] {
+			continue
+		}
+		seenVideo[v.Url] = true
+		uniqVideos = append(uniqVideos, v)
+	}
+	for _, im := range ctx.ImageUrls {
+		if im == nil || im.Url == "" || seenImage[im.Url] {
+			continue
+		}
+		seenImage[im.Url] = true
+		uniqImages = append(uniqImages, im)
+	}
+	return uniqVideos, uniqImages
+}
+
+func extractOpenAICompatMediaURL(v any) string {
+	switch m := v.(type) {
+	case map[string]any:
+		if u, ok := m["url"].(string); ok {
+			return u
+		}
+	case string:
+		return m
+	}
+	return ""
+}
+
+func collectMediaURLsFromChatContents(arr []*ChatContent) (seenVideo, seenImage map[string]bool) {
+	seenVideo, seenImage = map[string]bool{}, map[string]bool{}
+	for _, c := range arr {
+		if c == nil {
+			continue
+		}
+		switch c.Type {
+		case "image_url":
+			if u := extractOpenAICompatMediaURL(c.ImageUrl); u != "" {
+				seenImage[u] = true
+			}
+		case "video_url":
+			if u := extractOpenAICompatMediaURL(c.VideoUrl); u != "" {
+				seenVideo[u] = true
+			}
+		}
+	}
+	return seenVideo, seenImage
+}
+
+func filterNewGatewayVideos(uniq []*VideoDescription, seen map[string]bool) []*VideoDescription {
+	out := make([]*VideoDescription, 0, len(uniq))
+	for _, v := range uniq {
+		if v == nil || v.Url == "" || seen[v.Url] {
+			continue
+		}
+		out = append(out, v)
+	}
+	return out
+}
+
+func filterNewGatewayImages(uniq []*ImageDescription, seen map[string]bool) []*ImageDescription {
+	out := make([]*ImageDescription, 0, len(uniq))
+	for _, im := range uniq {
+		if im == nil || im.Url == "" || seen[im.Url] {
+			continue
+		}
+		out = append(out, im)
+	}
+	return out
+}
+
+func resolveRawMergeUserText(existing string, legacyMsg string, hasVid bool, hasImg bool) string {
+	if strings.TrimSpace(existing) != "" {
+		return existing
+	}
+	if strings.TrimSpace(legacyMsg) != "" {
+		return legacyMsg
+	}
+	if hasVid {
+		return "请描述视频内容"
+	}
+	if hasImg {
+		return "请描述图片内容"
+	}
+	return ""
+}
+
+// buildGatewayMultimodalUserParts 与 chatBaseChatCompletions 非 Raw 分支一致：
+// 有视频时 video → image → text；仅图时 text → image。
+func buildGatewayMultimodalUserParts(uniqVideos []*VideoDescription, uniqImages []*ImageDescription, text string) []*ChatContent {
+	var contents []*ChatContent
+	if len(uniqVideos) > 0 {
+		for _, video := range uniqVideos {
+			contents = append(contents, NewUserChatContentVideoUrl(video.Url))
+		}
+		for _, image := range uniqImages {
+			contents = append(contents, NewUserChatContentImageUrl(image.Url))
+		}
+		contents = append(contents, NewUserChatContentText(text))
+	} else {
+		contents = append(contents, NewUserChatContentText(text))
+		for _, image := range uniqImages {
+			contents = append(contents, NewUserChatContentImageUrl(image.Url))
+		}
+	}
+	return contents
+}
+
+func mergeContentArrayWithGateway(arr []*ChatContent, newVideos []*VideoDescription, newImages []*ImageDescription) []*ChatContent {
+	if len(newVideos) > 0 {
+		prefix := make([]*ChatContent, 0, len(newVideos)+len(newImages))
+		for _, v := range newVideos {
+			if v != nil && v.Url != "" {
+				prefix = append(prefix, NewUserChatContentVideoUrl(v.Url))
+			}
+		}
+		for _, im := range newImages {
+			if im != nil && im.Url != "" {
+				prefix = append(prefix, NewUserChatContentImageUrl(im.Url))
+			}
+		}
+		return append(prefix, arr...)
+	}
+	out := make([]*ChatContent, 0, len(arr)+len(newImages))
+	out = append(out, arr...)
+	for _, im := range newImages {
+		if im != nil && im.Url != "" {
+			out = append(out, NewUserChatContentImageUrl(im.Url))
+		}
+	}
+	return out
+}
+
+// mergeRawMessagesWithGatewayMedia 在保留 RawMessages 对话结构的前提下，把 gateway 注入的
+// ImageUrls/VideoUrls 并入最后一条 user（无 user 则追加一条 user）。
+// 返回值 hasVideos/hasImages 表示**合并后**本条请求是否带对应模态，供 stream_options 等逻辑使用。
+// 关键词: RawMessages ImageUrls 合并, gateway 多模态透传
+func mergeRawMessagesWithGatewayMedia(msgs []ChatDetail, legacyMsg string, ctx *ChatBaseContext) ([]ChatDetail, bool, bool) {
+	uniqVideos, uniqImages := dedupGatewayMedia(ctx)
+	if len(uniqVideos) == 0 && len(uniqImages) == 0 {
+		return msgs, false, false
+	}
+
+	out := make([]ChatDetail, len(msgs))
+	copy(out, msgs)
+
+	lastUser := -1
+	for i := len(out) - 1; i >= 0; i-- {
+		if strings.EqualFold(strings.TrimSpace(out[i].Role), "user") {
+			lastUser = i
+			break
+		}
+	}
+
+	if lastUser < 0 {
+		text := resolveRawMergeUserText("", legacyMsg, len(uniqVideos) > 0, len(uniqImages) > 0)
+		parts := buildGatewayMultimodalUserParts(uniqVideos, uniqImages, text)
+		out = append(out, NewUserChatDetailEx(parts))
+		return out, len(uniqVideos) > 0, len(uniqImages) > 0
+	}
+
+	d := out[lastUser]
+	switch content := d.Content.(type) {
+	case string:
+		seenV, seenI := map[string]bool{}, map[string]bool{}
+		newV := filterNewGatewayVideos(uniqVideos, seenV)
+		newI := filterNewGatewayImages(uniqImages, seenI)
+		if len(newV) == 0 && len(newI) == 0 {
+			return msgs, false, false
+		}
+		text := resolveRawMergeUserText(content, legacyMsg, len(newV) > 0, len(newI) > 0)
+		parts := buildGatewayMultimodalUserParts(newV, newI, text)
+		d.Content = parts
+		out[lastUser] = d
+		return out, len(newV) > 0, len(newI) > 0
+
+	case []*ChatContent:
+		seenV, seenI := collectMediaURLsFromChatContents(content)
+		newV := filterNewGatewayVideos(uniqVideos, seenV)
+		newI := filterNewGatewayImages(uniqImages, seenI)
+		if len(newV) == 0 && len(newI) == 0 {
+			return msgs, false, false
+		}
+		d.Content = mergeContentArrayWithGateway(content, newV, newI)
+		out[lastUser] = d
+		return out, len(newV) > 0, len(newI) > 0
+
+	default:
+		text := resolveRawMergeUserText("", legacyMsg, len(uniqVideos) > 0, len(uniqImages) > 0)
+		parts := buildGatewayMultimodalUserParts(uniqVideos, uniqImages, text)
+		out = append(out, NewUserChatDetailEx(parts))
+		return out, len(uniqVideos) > 0, len(uniqImages) > 0
+	}
+}
+
 func chatBaseChatCompletions(url string, model string, msg string, ctx *ChatBaseContext) (string, error) {
 	var msgs []ChatDetail
 	hasImages := len(ctx.ImageUrls) > 0
 	hasVideos := len(ctx.VideoUrls) > 0
-	// RawMessages 优先：完全尊重客户端原始 messages 数组，
-	// 跳过单 user 包装与 ImageUrls/VideoUrls 合并，让上游隐式缓存
-	// 的前缀字节序列保持与客户端一致。
+	// RawMessages 优先：透传对话结构；若 gateway 另注入了 ImageUrls/VideoUrls，
+	// 合并进最后一条 user，避免 RawMessages 路径丢失多模态输入。
 	// 关键词: chatBaseChatCompletions RawMessages 分支, messages 完整透传
 	if len(ctx.RawMessages) > 0 {
 		msgs = append(msgs, ctx.RawMessages...)
-		// RawMessages 模式下忽略 ImageUrls/VideoUrls：客户端
-		// 应将 image_url/video_url 直接放在 messages 内的 content 数组
-		// 中携带，gateway 不再代为合并。
-		hasImages = false
-		hasVideos = false
+		if len(ctx.ImageUrls) > 0 || len(ctx.VideoUrls) > 0 {
+			msgs, hasVideos, hasImages = mergeRawMessagesWithGatewayMedia(msgs, msg, ctx)
+		} else {
+			hasImages = false
+			hasVideos = false
+		}
 	} else if !hasImages && !hasVideos {
 		msgs = append(msgs, NewUserChatDetail(msg))
 	} else {
@@ -676,7 +877,11 @@ func chatBaseResponses(url string, model string, msg string, ctx *ChatBaseContex
 	// 关键词: chatBaseResponses RawMessages 透传, system/user 边界保留
 	var input any
 	if len(ctx.RawMessages) > 0 {
-		input = convertChatDetailsToResponsesInput(ctx.RawMessages)
+		rmsgs := append([]ChatDetail(nil), ctx.RawMessages...)
+		if len(ctx.ImageUrls) > 0 || len(ctx.VideoUrls) > 0 {
+			rmsgs, _, _ = mergeRawMessagesWithGatewayMedia(rmsgs, msg, ctx)
+		}
+		input = convertChatDetailsToResponsesInput(rmsgs)
 	} else {
 		input = buildResponsesInput(msg, ctx.ImageUrls)
 	}

@@ -3,6 +3,7 @@ package aiforge
 import (
 	"context"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/rag/entityrepos"
 	"github.com/yaklang/yaklang/common/aireducer"
 	"github.com/yaklang/yaklang/common/chunkmaker"
@@ -17,6 +18,9 @@ type AnalysisConfig struct {
 	AnalyzeStatusCard     func(id string, data interface{}, tags ...string)
 	AnalyzeConcurrency    int
 	AllowMultiHopAIRefine bool
+	// VisionAICallback, when non-nil, is passed to temporary LiteForge execution as the
+	// preferred AI callback (after other options) so multimodal / vision routing uses the caller's model stack.
+	VisionAICallback aicommon.AICallbackType
 
 	chunkOption     []chunkmaker.Option
 	fallbackOptions []any
@@ -73,9 +77,14 @@ func (a *AnalysisConfig) KHopOption() []entityrepos.KHopQueryOption {
 }
 
 func (a *AnalysisConfig) ForgeExecOption(schema string) []any {
-	options := a.fallbackOptions
+	options := append([]any(nil), a.fallbackOptions...)
 	options = append(options, WithOutputJSONSchema(schema))
 	options = append(options, LiteForgeExecWithContext(a.Ctx))
+	if a.VisionAICallback != nil {
+		// Use WithFastAICallback so LiteForge's CallSpeedPriorityAI / CallAI paths both hit the
+		// same callback without re-wrapping it as intelligent/lightweight tiers (WithAICallback does that).
+		options = append(options, aicommon.WithFastAICallback(a.VisionAICallback))
+	}
 	return options
 }
 
@@ -126,5 +135,16 @@ func WithAnalyzeStatusCard(handler func(id string, data interface{}, tags ...str
 func WithAnalyzeConcurrency(concurrency int) AnalysisOption {
 	return func(config *AnalysisConfig) {
 		config.AnalyzeConcurrency = concurrency
+	}
+}
+
+// WithVisionAICallback sets the AI callback used for LiteForge when analyzing images.
+// When set, it is applied after other forge exec options so it takes precedence over
+// defaults or other ConfigOption callbacks bundled in AnalyzeImage* opts.
+// Typical value is aicommon.MustGetVisionAIModelCallback() (TierVision); if unset,
+// AnalyzeImage defaults to that callback.
+func WithVisionAICallback(cb aicommon.AICallbackType) AnalysisOption {
+	return func(config *AnalysisConfig) {
+		config.VisionAICallback = cb
 	}
 }

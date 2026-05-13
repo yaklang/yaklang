@@ -233,16 +233,9 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 		resourcesInfo.WriteString("\n")
 
 		allFiles := dedupStrings(files)
-		imagePaths, regularFilePaths := splitAttachedImagePaths(allFiles)
-		runCtx := loop.GetConfig().GetContext()
-		if task != nil && !utils.IsNil(task.GetContext()) {
-			runCtx = task.GetContext()
-		}
-		appendImageVisionToAttachedResources(loop, runCtx, userQuery, imagePaths, &resourcesInfo)
-
-		if len(regularFilePaths) > 0 {
+		if len(allFiles) > 0 {
 			resourcesInfo.WriteString("### 文件 (Files)\n")
-			for _, f := range regularFilePaths {
+			for _, f := range allFiles {
 				resourcesInfo.WriteString(fmt.Sprintf("- %s\n", f))
 			}
 			resourcesInfo.WriteString("\n")

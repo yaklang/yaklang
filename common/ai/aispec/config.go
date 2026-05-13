@@ -111,7 +111,8 @@ type AIConfig struct {
 	// RawMessages 用于完整透传客户端原始 messages 数组到上游 LLM，
 	// 而不是只透传一个 prompt 字符串。设置后，gateway 的 Chat(s) 会把这
 	// 个数组带入 ChatBaseContext.RawMessages，chatBaseChatCompletions 会
-	// 跳过"单 user 包装+ImageUrls/VideoUrls 合并"逻辑，直接使用本字段。
+	// 跳过「仅 prompt 的单 user 包装」；若同时存在 ImageUrls/VideoUrls，
+	// 仍会合并进最后一条 user（mergeRawMessagesWithGatewayMedia）。
 	//
 	// 主要使用场景: aibalance 等中转层希望保留客户端 messages 的 role 顺
 	// 序与 content 结构，最大化上游隐式缓存的前缀命中率。
@@ -1127,7 +1128,8 @@ func WithUsageCallback(cb func(*ChatUsage)) AIConfigOption {
 //
 // 行为：当 RawMessages 非空时，gateway 的 Chat(s) 会把它带入
 // ChatBaseContext.RawMessages，chatBaseChatCompletions 跳过单 user 包装，
-// 直接以 RawMessages 作为最终请求体的 messages 字段。
+// 以 RawMessages 为请求 messages 的基础；gateway 注入的图片/视频 URL
+// 会并入最后一条 user。
 //
 // 主要使用场景: aibalance 等中转层希望保留客户端 messages 的 role 顺序与
 // content 结构，最大化上游隐式缓存的前缀命中率。

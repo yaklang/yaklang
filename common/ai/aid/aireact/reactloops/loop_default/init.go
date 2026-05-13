@@ -12,9 +12,13 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 	return func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
 		config := r.GetConfig()
 
+		attachedDatas := task.GetAttachedDatas()
+		if imagePaths := collectAttachedImagePaths(attachedDatas); len(imagePaths) > 0 {
+			RunAttachedImageVisionInDefaultInit(r, loop, task, imagePaths)
+		}
+
 		// Original logic: process attached data (knowledge bases, files, etc.)
 		mustProcessMentionedInfo := config.GetConfigBool("MustProcessAttachedData")
-		attachedDatas := task.GetAttachedDatas()
 		if mustProcessMentionedInfo && len(attachedDatas) > 0 {
 			loop.LoadingStatus("开始处理用户提及的数据（@ Mentionup） / Start to process user-mentioned data (@ Mentionup)")
 			err := ProcessAttachedData(r, loop, task, operator)

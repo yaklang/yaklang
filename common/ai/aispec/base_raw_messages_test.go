@@ -136,10 +136,10 @@ func TestChatBase_RawMessagesByteStability(t *testing.T) {
 	}
 }
 
-// TestChatBase_RawMessagesIgnoresLegacyImage 验证 RawMessages 模式下，
-// 历史 ImageUrls/VideoUrls 选项会被忽略，不会污染最终请求体的 messages。
-// 关键词: RawMessages 优先, 旧 image url 忽略
-func TestChatBase_RawMessagesIgnoresLegacyImage(t *testing.T) {
+// TestChatBase_RawMessagesMergesGatewayImage 验证 RawMessages 非空时，
+// gateway 注入的 ImageUrls 仍会合并进最后一条 user 的 content（image_url 部件）。
+// 关键词: RawMessages ImageUrls 合并, gateway 多模态
+func TestChatBase_RawMessagesMergesGatewayImage(t *testing.T) {
 	url, get, closeFn := rawMessagesMockServer(t)
 	defer closeFn()
 
@@ -147,7 +147,7 @@ func TestChatBase_RawMessagesIgnoresLegacyImage(t *testing.T) {
 		{Role: "user", Content: "raw msg only"},
 	}
 	runChatBaseWithRawMessages(t, url, input,
-		WithChatBase_ImageRawInstance(&ImageDescription{Url: "https://example.com/should-be-ignored.png"}),
+		WithChatBase_ImageRawInstance(&ImageDescription{Url: "https://example.com/merged-from-gateway.png"}),
 	)
 
 	raw, parsed := get()
@@ -155,11 +155,18 @@ func TestChatBase_RawMessagesIgnoresLegacyImage(t *testing.T) {
 		t.Fatalf("upstream did not parse a ChatMessage")
 	}
 	if len(parsed.Messages) != 1 {
-		t.Fatalf("messages should be 1 (RawMessages only), got %d", len(parsed.Messages))
+		t.Fatalf("messages should be 1, got %d", len(parsed.Messages))
 	}
-	// 关键断言：上游收到的 body 中不应出现旧 ImageUrls 注入的 url
-	if bytes.Contains(raw, []byte("should-be-ignored.png")) {
-		t.Fatalf("legacy ImageUrls should be ignored under RawMessages mode, but body contains it: %s", string(raw))
+	if !bytes.Contains(raw, []byte("merged-from-gateway.png")) {
+		t.Fatalf("expected gateway ImageUrls merged into user content, body=%s", string(raw))
+	}
+	last := parsed.Messages[0]
+	contents, ok := last.Content.([]any)
+	if !ok {
+		t.Fatalf("user content should become multimodal array, got %T", last.Content)
+	}
+	if len(contents) < 2 {
+		t.Fatalf("expected text + image_url parts, got len=%d", len(contents))
 	}
 }
 
