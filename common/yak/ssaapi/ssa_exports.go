@@ -163,6 +163,7 @@ var Exports = map[string]any{
 	"Yak":        ssaconfig.Yak,
 	"PHP":        ssaconfig.PHP,
 	"Java":       ssaconfig.JAVA,
+	"Python":     ssaconfig.PYTHON,
 
 	/// static analyze
 	"YaklangScriptChecking": YaklangScriptChecking,

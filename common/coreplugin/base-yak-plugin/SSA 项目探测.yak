@@ -11,6 +11,7 @@ languages = cli.StringSlice(
     cli.setSelectOption("TypeScript", "ts"), 
     cli.setSelectOption("Golang", "go"), 
     cli.setSelectOption("C", "c"), 
+    cli.setSelectOption("Python", "python"), 
 )
 
 compile_immediately := cli.Bool(
@@ -189,9 +190,10 @@ javaDir = []
 jsFiles = ["package-lock.json", "package.json", "yarn.lock", "tsconfig.json"]
 phpFiles = ["index.php", "composer.json", "composer.lock", "wp-config.php", "config.php"]
 javaFiles = ["web.xml", "pom.xml", "application.properties", "struts.xml", "application.yml", "log4j2.xml", "log4j.properties", "shiro.ini"]
+pythonFiles = ["requirements.txt", "setup.py", "pyproject.toml", "pipfile", "manage.py", "setup.cfg"]
 // 后缀名 -> 语言，用于统一从文件扩展名推断语言
-extToLanguage = {"js": "js", "mjs": "js", "cjs": "js", "ts": "ts", "tsx": "ts", "php": "php", "java": "java", "go": "go", "yak": "yak"}
-var countMap = map[string]int{"php": 0, "go": 0, "java": 0, "yak": 0, "js": 0, "ts": 0}
+extToLanguage = {"js": "js", "mjs": "js", "cjs": "js", "ts": "ts", "tsx": "ts", "php": "php", "java": "java", "go": "go", "yak": "yak", "py": "python", "pyi": "python", "pyw": "python"}
+var countMap = map[string]int{"php": 0, "go": 0, "java": 0, "yak": 0, "js": 0, "ts": 0, "python": 0}
 
 params = {"program_name": "", "project_name": "", "language": "", "info": {"kind": "", "local_file": "", "url": "", "proxy": {"proxy": false, "url": ""}, "branch": "", "path": ""}, "description": "", "file_count": 0, "error": {"kind": "", "msg": ""}, "compile_immediately": false}
 func setLanguage(language) {
@@ -323,6 +325,9 @@ func getZipinfo(basePath) {
                     if info.Name().Lower() in jsFiles {
                         setLanguage(ssa.Javascript)
                     }
+                    if info.Name().Lower() in pythonFiles {
+                        setLanguage(ssa.Python)
+                    }
                 }
             }
         },
@@ -389,6 +394,8 @@ func getLocalInfo(localFile) {
                         setLanguage(ssa.PHP)
                     case info.Name().Lower() in jsFiles:
                         setLanguage(ssa.Javascript)
+                    case info.Name().Lower() in pythonFiles:
+                        setLanguage(ssa.Python)
                     }
                 }
             }), 
