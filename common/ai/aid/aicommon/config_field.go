@@ -4,6 +4,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+
 	"sync/atomic"
 )
 
@@ -120,7 +121,7 @@ func (c *Config) GetShowForgeListInPrompt() bool {
 }
 
 func (c *Config) GetMaxIterations() int64 {
-	return c.MaxIterationCount
+	return c.GetMaxIterationCount()
 }
 
 func (c *Config) GetEnableSelfReflection() bool {
