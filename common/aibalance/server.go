@@ -579,6 +579,12 @@ type ServerConfig struct {
 	chatRateLimiter    *ChatRateLimiter
 	freeUserDelaySec   int64 // cached from DB; actual delay is N~2N seconds random
 
+	// inFlightTokens 维护"在途请求预扣 token 总量"，按 daily token 桶分组。
+	// 与 DB 的 bucket_db_used 加和后参与 daily check，硬卡死并发过冲。
+	// 服务重启自动归零 (重启意味着 in-flight 流都被切断)。
+	// 关键词: ServerConfig.inFlightTokens 过冲防御, daily check 并发预扣
+	inFlightTokens *InFlightTokenTracker
+
 	closeOnce sync.Once
 }
 
@@ -609,6 +615,9 @@ func NewServerConfig() *ServerConfig {
 	// Initialize chat RPM rate limiter
 	config.chatRateLimiter = NewChatRateLimiter()
 	config.freeUserDelaySec = 3
+	// Initialize in-flight token tracker (overflow defense for daily token check)
+	// 关键词: NewServerConfig inFlightTokens 初始化
+	config.inFlightTokens = NewInFlightTokenTracker()
 	return config
 }
 
@@ -852,45 +861,11 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 		}
 	}
 
-	// RPM rate limit check (per API key, with per-model overrides)
-	if c.chatRateLimiter != nil {
-		allowed, queueLen := c.chatRateLimiter.CheckRateLimit(apiKeyForStat, modelName)
-		if !allowed {
-			c.logWarn("RPM rate limit exceeded for key=%s model=%s, queue_length=%d",
-				utils.ShrinkString(apiKeyForStat, 8), modelName, queueLen)
-			c.writeRPMRateLimitResponse(conn, queueLen)
-			return
-		}
-	}
-
-	// 免费用户日 Token 限额检查（在 RPM 之后、转发之前）。
-	// 模型豁免、模型独立桶、全局共享池三档优先级在 CheckFreeUserDailyTokenLimit 里。
-	// DB 异常回放为允许，避免限额逻辑的可用性反噬业务。
-	// 关键词: 免费用户日 Token 限额, CheckFreeUserDailyTokenLimit hot path
-	if isFreeModel {
-		if decision, dErr := CheckFreeUserDailyTokenLimit(modelName); dErr != nil {
-			c.logError("CheckFreeUserDailyTokenLimit failed (model=%s): %v", modelName, dErr)
-		} else if decision != nil && !decision.Allowed {
-			c.logWarn("Daily token limit exceeded for free user (model=%s bucket=%s used=%d limit=%d)",
-				modelName, decision.Bucket, decision.TokensUsed, decision.TokensLimit)
-			c.writeDailyTokenLimitResponse(conn, modelName, decision.Bucket, decision.TokensUsed, decision.TokensLimit)
-			return
-		}
-	}
-
-	// Free user pre-call delay: applied BEFORE forwarding to providers so
-	// the client perceives the throttle (post-call sleep was ineffective
-	// because the response had already been delivered). Per-model delay
-	// overrides win over the global free-user delay.
-	if isFreeModel && c.chatRateLimiter != nil {
-		delaySec := c.chatRateLimiter.GetEffectiveDelay(modelName, c.freeUserDelaySec)
-		if delaySec > 0 {
-			base := delaySec
-			jitter := time.Duration(base+(time.Now().UnixNano()%base+base)%base) * time.Second
-			c.logInfo("free user pre-call delay: sleeping %v before forwarding model %s", jitter, modelName)
-			time.Sleep(jitter)
-		}
-	}
+	// 免费用户限流三件套（daily check + RPM check + free user delay）整体搬
+	// 到 prompt 构造之后，目的是让 daily check 能用 prompt.String() + image
+	// 数立刻做 in-flight 预扣并参与本次判决，硬卡死并发过冲；同时维持
+	// "daily check 在 RPM check 之前"的契约，被 daily 挡的请求不污染 RPM 桶。
+	// 关键词: 免费用户限流三件套, 移到 prompt 构造之后, in-flight 预扣
 
 	// messages 处理：唯一路径——完整尊重 bodyIns.Messages 的顺序与 role/content 结构，
 	// 交给 GetAIClientWithRawMessages 透传给上游 LLM，用以最大化隐式缓存
@@ -946,6 +921,73 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 
 	c.logInfo("Built prompt length: %d with image content: %d (messages=%d)",
 		prompt.Len(), len(imageContent), len(bodyIns.Messages))
+
+	// 免费用户日 Token 限额检查 — 放在 prompt 构造之后，为了能与 in-flight
+	// 预扣紧挨着、无窗口地一起做：
+	//   1. checkFreeUserDailyTokenLimitWithInFlight: bucket_db_used + 其他
+	//      在跑请求的预扣加进 used 一起判 limit；拒掉就 429 + 计入 portal
+	//      "Daily token limit exceeded"，不污染 RPM 桶。
+	//   2. 通过则立即 Add 本次估算预扣（ytoken + image 4K + 8K completion）
+	//      到 inFlightTokens，下一个并发请求看到本次预扣即被卡。
+	//   3. defer Remove 在 stream 真正结束（或 return 任意路径）时释放。
+	//      同时正路的 onUsageForward 或 ytoken fallback 会把"真实 weighted"
+	//      累加到 DB bucket，预扣和真实扣费同体系不重复。
+	// DB 异常回放为允许，避免限额逻辑的可用性反噬业务。
+	// 关键词: 免费用户日 Token 限额前置, in-flight 预扣 Add defer Remove,
+	//          过冲防御, daily check 紧挨 add, RPM 桶不脱 +1
+	if isFreeModel {
+		if decision, dErr := c.checkFreeUserDailyTokenLimitWithInFlight(modelName); dErr != nil {
+			c.logError("CheckFreeUserDailyTokenLimit failed (model=%s): %v", modelName, dErr)
+		} else if decision != nil && !decision.Allowed {
+			c.logWarn("Daily token limit exceeded for free user (model=%s bucket=%s effective_used=%d limit=%d in_flight_included=true)",
+				modelName, decision.Bucket, decision.TokensUsed, decision.TokensLimit)
+			c.writeDailyTokenLimitResponse(conn, modelName, decision.Bucket, decision.TokensUsed, decision.TokensLimit)
+			return
+		}
+	}
+
+	// in-flight 预扣：daily check 通过后立即把本次估算 weighted token 加进
+	// inFlightTokens，下一个并发请求做 daily check 时会看到本次的份额。
+	// 估算偏严（completion 默认 8192），避免边缘穿透；stream 结束后释放。
+	// 关键词: in-flight Add 紧挨 daily check 通过, 过冲防御
+	if isFreeModel && c.inFlightTokens != nil {
+		inFlightBucketKey, inFlightExempt := resolveInFlightBucketKey(modelName)
+		if !inFlightExempt {
+			inFlightEstimate := computeInFlightTokenEstimate(modelName, prompt.String(), len(imageContent))
+			if inFlightEstimate > 0 {
+				c.inFlightTokens.Add(inFlightBucketKey, inFlightEstimate)
+				defer c.inFlightTokens.Remove(inFlightBucketKey, inFlightEstimate)
+				c.logInfo("in-flight token reserved: model=%s bucket=%q estimate=%d",
+					modelName, inFlightBucketKey, inFlightEstimate)
+			}
+		}
+	}
+
+	// RPM rate limit check (per API key, with per-model overrides)
+	// 仍然放在 daily check 之后：被 daily token 挡的请求不会污染 RPM 桶。
+	if c.chatRateLimiter != nil {
+		allowed, queueLen := c.chatRateLimiter.CheckRateLimit(apiKeyForStat, modelName)
+		if !allowed {
+			c.logWarn("RPM rate limit exceeded for key=%s model=%s, queue_length=%d",
+				utils.ShrinkString(apiKeyForStat, 8), modelName, queueLen)
+			c.writeRPMRateLimitResponse(conn, queueLen)
+			return
+		}
+	}
+
+	// Free user pre-call delay: applied BEFORE forwarding to providers so
+	// the client perceives the throttle (post-call sleep was ineffective
+	// because the response had already been delivered). Per-model delay
+	// overrides win over the global free-user delay.
+	if isFreeModel && c.chatRateLimiter != nil {
+		delaySec := c.chatRateLimiter.GetEffectiveDelay(modelName, c.freeUserDelaySec)
+		if delaySec > 0 {
+			base := delaySec
+			jitter := time.Duration(base+(time.Now().UnixNano()%base+base)%base) * time.Second
+			c.logInfo("free user pre-call delay: sleeping %v before forwarding model %s", jitter, modelName)
+			time.Sleep(jitter)
+		}
+	}
 
 	// Log at WARN level for production visibility when processing large requests
 	if len(imageContent) > 0 || prompt.Len() > 10000 {
@@ -1035,6 +1077,18 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 				provider.TypeName, runtime.NumGoroutine(), ms.HeapAlloc/1024/1024, ms.HeapObjects)
 		}
 
+		// fallback 计费镜像：把上游 LLM 实际返回的"纯文本 output / reason 流"
+		// 镜像到 buffer，便于在 SSE 末帧 usage 缺失 (provider 不支持 / 网络中断)
+		// 时用 ytoken (Qwen BPE) 估算 completion_tokens 兜底扣费。
+		// 注意：onOutputStream / onReasonStream 各自只会被回调一次、且写入由
+		// 单一 goroutine 串行执行 (io.Copy)，buffer 不需要互斥。
+		// 读侧 (后面的 fallback 块) 严格在 wg.Wait() 之后才访问，
+		// 与写侧有 happens-before 关系。
+		// 关键词: aibalance usage missing fallback buffer, ytoken 镜像, output/reason 文本
+		var outputTextBuf bytes.Buffer
+		var reasonTextBuf bytes.Buffer
+		var usageBilled atomic.Bool
+
 		// client 构造统一走 GetAIClientWithRawMessages：把 bodyIns.Messages
 		// 完整透传给上游 LLM，image_url 已经在 messages 内的 content 数组里
 		// 携带，imageContent 仅用于日志统计；不再有 legacy 拍平回滚通道。
@@ -1046,7 +1100,7 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 			}()
 			c.logInfo("Start to handle AI response stream")
 			sendHeaderOnce.Do(sendHeader)
-			io.Copy(pw, reader)
+			io.Copy(io.MultiWriter(pw, &outputTextBuf), reader)
 		}
 		onReasonStream := func(reader io.Reader) {
 			defer func() {
@@ -1055,7 +1109,7 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 			}()
 			c.logInfo("Start to handle AI response stream(reason)")
 			sendHeaderOnce.Do(sendHeader)
-			io.Copy(rw, reader)
+			io.Copy(io.MultiWriter(rw, &reasonTextBuf), reader)
 			utils.FlushWriter(writer.writerClose)
 		}
 		onToolCallForward := func(toolCalls []*aispec.ToolCall) {
@@ -1111,6 +1165,10 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 			meta, _ := GetModelMeta(modelName)
 			weighted := ComputeWeightedTokens(meta, usage)
 			if weighted > 0 {
+				// 标记本次请求已通过上游真实 usage 完成扣费，禁止 fallback 再扣一次。
+				// 仅在 weighted>0 时置位：上游返了空 usage (prompt=completion=0) 时仍走 fallback。
+				// 关键词: usageBilled 真实扣费幂等标志, 禁止 fallback 双扣
+				usageBilled.Store(true)
 				if isFreeModel {
 					overrides := parseFreeUserTokenModelOverridesFromConfig()
 					if ov, ok := overrides[modelName]; ok && ov.Exempt {
@@ -1337,6 +1395,20 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 		// 如果到达这里，说明当前提供者成功了
 		successfulProvider = provider
 		c.logInfo("Provider %s successfully handled the request for model %s", provider.TypeName, modelName)
+
+		// 兜底扣费：上游不返 SSE usage 帧 (provider 不支持 include_usage /
+		// 网络中断 / 上游返 0 token usage) 时，用 ytoken (Qwen BPE) 估算
+		// prompt + completion token，按与正路一致的 ComputeWeightedTokens 倍率
+		// 落到免费桶或 APIKEY，避免"白嫖"。
+		// usageBilled 在真实 usage 完成扣费时已置位，确保不双扣。
+		// 关键词: aibalance usage missing fallback, ytoken 估算扣费, 不双扣
+		if requestSucceeded && !usageBilled.Load() {
+			c.applyUsageFallbackEstimate(
+				modelName, isFreeModel, key, provider.TypeName,
+				prompt.String(), len(imageContent),
+				outputTextBuf.String(), reasonTextBuf.String(),
+			)
+		}
 
 		// Update successful provider status
 		latencyMs := firstByteDuration.Milliseconds()
