@@ -134,8 +134,8 @@
   {
     "rule_id": "d8f4a22b-9c1e-4b37-8e5d-7f3a901c2e84",
     "rule_name": "压缩包解压时未验证文件路径导致目录穿越（Zip Slip）",
-    "hash": "4b9fc074342df43cd23c0765f26f75f302383b5d5dc122873f26a95144f0137f",
-    "version": "20260415.0001"
+    "hash": "c37b70fc68e2aa165a4ce56acb12db1caaa99bec12eec701b95dbe2e427a23e6",
+    "version": "20260513.0001"
   },
   {
     "rule_id": "c3d4e5f6-a7b8-9012-cdef-326000000001",
@@ -188,8 +188,8 @@
   {
     "rule_id": "c7d8e9f0-a1b2-3456-cdef-789012345678",
     "rule_name": "用户可控输入构建的数据库查询（SQL/NoSQL 注入）",
-    "hash": "fde98bb7f2e96b2ee454d1e04b820d1bd78b035d4eaeee8536b76b2388219786",
-    "version": "20260415.0001"
+    "hash": "b2563c93ca42a9f04ccb0a52072036bfa682b2bbb6ce493b3a2a8fd5e5f88bc9",
+    "version": "20260513.0001"
   },
   {
     "rule_id": "d4e5f6a7-b8c9-0123-defa-918000000002",
@@ -248,8 +248,8 @@
   {
     "rule_id": "34545e88-e64d-4534-9e96-261ff984b6ba",
     "rule_name": "检测Golang头部操纵漏洞",
-    "hash": "5f7b8458545121a86d0b8ceb25c6c5789cdeefa7a8671915462096d891eb12d4",
-    "version": "20260326.0001"
+    "hash": "a112db1acc2982b8639421bbcfaafe3255433922cb0d23931d4fd0e4d61a3fe1",
+    "version": "20260513.0001"
   },
   {
     "rule_id": "017cae33-9b73-4470-9e98-adbdd10dbc3a",
@@ -530,8 +530,8 @@
   {
     "rule_id": "155bfb0e-379f-485a-a10c-cfec1109de1e",
     "rule_name": "检测到Golang反射型XSS漏洞",
-    "hash": "fce27131a1ec3633c90c2d938c56cd12d13dd3c4ba2f8a97a811369cb8314598",
-    "version": "20260326.0001"
+    "hash": "2eafe20e8d182182b22d51c05b44bb9f95a98f797af4384909d713a3d448b191",
+    "version": "20260513.0001"
   },
   {
     "rule_id": "4cd207df-132f-483f-ac89-328d466a5d3e",
@@ -578,14 +578,14 @@
   {
     "rule_id": "b89f27b3-35ee-48ae-ba75-415da669f60d",
     "rule_name": "检测Golang SQL注入漏洞(Models)",
-    "hash": "bbb41826a39d771b467baa14255cb052a0cbea78089af47a8e10094cbf7d1a88",
-    "version": "20260127.0001"
+    "hash": "e2d64de35b3e7d0843ff741dd81749bdad7b2c235eb4cb20d7ed604e9d5fd379",
+    "version": "20260513.0001"
   },
   {
     "rule_id": "56f41530-4175-41ec-96ac-198315171c10",
     "rule_name": "检测Golang SQL注入漏洞(Pop)",
-    "hash": "a1183416ffbe63971820b56f2acffacdc9d5ff2315f779c0ad375e9a392073c3",
-    "version": "20260127.0001"
+    "hash": "59570b90b96cbf1fe6b049fdf224456728734fd2b253df8ae54cfab7978493e9",
+    "version": "20260513.0001"
   },
   {
     "rule_id": "b06e92a2-0ff3-40a0-966e-7f0e4fe05480",
@@ -926,8 +926,8 @@
   {
     "rule_id": "cd3632dd-a25c-49c4-bf53-7f53fc7610ae",
     "rule_name": "SCA: 检测Java xlsx-streamer依赖漏洞",
-    "hash": "88738cdbdeb5505e5cb80319529e73a9d74dae9f3c77af20523eb4fb368d4971",
-    "version": "20260326.0001"
+    "hash": "ada4b61a1f35cb7d311efc2c12e5987b74d9ab494fac06997baedfee7318b39d",
+    "version": "20260513.0001"
   },
   {
     "rule_id": "e0e6ed1e-aa60-4522-a5c0-ae8f0b121b7e",
@@ -956,8 +956,8 @@
   {
     "rule_id": "4ada07d0-74e5-4d76-9d7d-4576610ee88e",
     "rule_name": "检测Spring控制器中未调用的SSTI漏洞",
-    "hash": "a045d1cdf68f9f85200469d4bcb67bedec3011240daa6a03a8faa04756e37137",
-    "version": "20260326.0001"
+    "hash": "d70413065360d9b0578292dbc3a69281a17a37247353fa689c34a46a00fc53b1",
+    "version": "20260513.0001"
   },
   {
     "rule_id": "0d552b29-dc8b-4f92-86f9-22badc7b5a87",
@@ -974,8 +974,8 @@
   {
     "rule_id": "09226a17-d449-4965-98c6-0ff02d802605",
     "rule_name": "检测Java Velocity Evaluate服务端模板注入漏洞",
-    "hash": "68648f64b0a225f42296d8a607c56b3c00b6abbae659174ccd0e9452a0c4965c",
-    "version": "20260326.0001"
+    "hash": "5023512cd4a8401fd55f4d90f0311080dc19d6e7c8d132f310b3743d34f068f7",
+    "version": "20260513.0001"
   },
   {
     "rule_id": "afdd05fc-a8f6-4e5c-9b72-d32c47ba0a7a",
@@ -998,8 +998,8 @@
   {
     "rule_id": "7b798768-13e1-4dcd-8ab5-99a6f9635605",
     "rule_name": "检测Java路径穿越漏洞",
-    "hash": "8096d0653ba60d8753366bd14eaf8e8e5976bd9173fa89e644ae5ff47ef7e389",
-    "version": "20260326.0001"
+    "hash": "0e5dec8cbb432468e460e969c668b4bba12d376fef502330412f8472406ace96",
+    "version": "20260513.0001"
   },
   {
     "rule_id": "7501f545-a313-4bb7-b6bb-48aab80cb284",
@@ -1220,8 +1220,8 @@
   {
     "rule_id": "56a91b23-787c-4c35-a4b9-dcf51521c20f",
     "rule_name": "检测Java URL重定向漏洞",
-    "hash": "1858c3c98ac3c41a4acc441886d19e0b36349116517938be5752ec2431095d7c",
-    "version": "20260415.0001"
+    "hash": "f8cf70c6fae85e7c39906b5fe5e4a54ad8109e869ed2d1feedb6b5b09dd8b2ec",
+    "version": "20260513.0001"
   },
   {
     "rule_id": "e6095554-52ef-4935-abc4-f9b9774d0671",
@@ -1298,8 +1298,8 @@
   {
     "rule_id": "52765bd8-011f-49f1-a492-c8f172b3acdc",
     "rule_name": "检测 Java Spring Boot 任意文件删除",
-    "hash": "3cd8af830582bb66680c68e524dca88b0dcbd9c73361cbe97794e0762479a939",
-    "version": "20260320.0001"
+    "hash": "943a7cc2431e107c981ec4d0aa4c82ab76a988e55efcb952606bf0f07db58b48",
+    "version": "20260513.0001"
   },
   {
     "rule_id": "41bfcaa6-f47e-4843-8bf0-9575eea4ee7a",
@@ -1448,8 +1448,8 @@
   {
     "rule_id": "cbf59495-e46c-45aa-9a10-e7c90559a17c",
     "rule_name": "检测Java LDAP注入漏洞",
-    "hash": "2ded071544aa123071d40fa94570b02037878c3e231e1f708bf100474861c52d",
-    "version": "20260415.0001"
+    "hash": "f1d09e754d1d41da67db1f9e64725e0d5e755e4b876571c13ddbcf679a167af1",
+    "version": "20260513.0001"
   },
   {
     "rule_id": "0539f4d4-14b9-4b9d-8a7b-8c72decdf400",
@@ -1460,8 +1460,8 @@
   {
     "rule_id": "44cc5217-5e06-4b5a-b726-d41bc725e934",
     "rule_name": "检测Java CRLF注入漏洞",
-    "hash": "6341bdd52c8253b983467d150b6c7a2e3ff891f986a3447050c2a96159eadc59",
-    "version": "20251230.0001"
+    "hash": "b992b8c733824460364c9b26a92cf8856cb32b7836bee654e41c6fee5af20dbc",
+    "version": "20260513.0001"
   },
   {
     "rule_id": "d45a6fba-7221-4750-8ad5-4566be060827",
@@ -1478,14 +1478,14 @@
   {
     "rule_id": "2446f3b6-3db3-4414-b593-4219073220c4",
     "rule_name": "检测Java Servlet Groovy Shell代码注入漏洞",
-    "hash": "5baea3324e4180ebf8bc96d197800affd21df3a1e00339d8dd64a6d4c0dc6b77",
-    "version": "20251230.0001"
+    "hash": "1a330638b67e58891926f00602697b5381d97dd04a07c94501e629fa8c5320f0",
+    "version": "20260513.0001"
   },
   {
     "rule_id": "44a473d8-3763-44c3-9819-17100cf17ad6",
     "rule_name": "检测Java Spring Boot Groovy Shell代码注入漏洞",
-    "hash": "9054f346539d90df4eaf105a7ef5a709e64d6f8a446e8aadd4bad31ad19e147f",
-    "version": "20260326.0001"
+    "hash": "86f0e84626f3928c9417f690add29984a29d4fd95fb33da1244a9958d6391e11",
+    "version": "20260513.0001"
   },
   {
     "rule_id": "74115441-8b30-4f9c-98d5-491b13b80713",
