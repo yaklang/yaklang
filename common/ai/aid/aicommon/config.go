@@ -951,26 +951,33 @@ func WithSkillsLocalDir(dirPath string) ConfigOption {
 	}
 }
 
-// WithSkillsZipFile adds a zip file as a skill source.
+// WithSkillsArchiveFile adds an archive file as a skill source.
 // Useful for distributing skills as a single file.
-// The zip file should contain subdirectories, each with a SKILL.md file.
-// Can be called multiple times to add multiple zip files.
+// Supported archive formats are zip, tar, tar.gz and tgz.
+// The archive should contain subdirectories, each with a SKILL.md file.
+// Can be called multiple times to add multiple archive files.
 //
 // Example:
 //
-//	aicommon.WithSkillsZipFile("/path/to/skills.zip")
-func WithSkillsZipFile(zipPath string) ConfigOption {
+//	aicommon.WithSkillsArchiveFile("/path/to/skills.tar.gz")
+func WithSkillsArchiveFile(archivePath string) ConfigOption {
 	return func(c *Config) error {
 		loader := c.ensureSkillLoader()
 		if loader == nil {
 			return utils.Error("failed to ensure skill loader")
 		}
-		_, err := loader.AddZipFile(zipPath)
+		_, err := loader.AddArchiveFile(archivePath)
 		if err != nil {
-			return utils.Wrapf(err, "failed to add skills from zip: %s", zipPath)
+			return utils.Wrapf(err, "failed to add skills from archive: %s", archivePath)
 		}
 		return nil
 	}
+}
+
+// WithSkillsZipFile adds an archive file as a skill source.
+// Deprecated: use WithSkillsArchiveFile instead.
+func WithSkillsZipFile(zipPath string) ConfigOption {
+	return WithSkillsArchiveFile(zipPath)
 }
 
 // WithSkillsFS adds a filesystem as a skill source.

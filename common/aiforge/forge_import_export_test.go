@@ -1,8 +1,11 @@
 package aiforge
 
 import (
+	"archive/tar"
+	"compress/gzip"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -362,4 +365,168 @@ Skill body from directory.
 	storedSkill, err := yakit.GetAIForgeByName(db, "dir-skill")
 	require.NoError(t, err)
 	require.Equal(t, schema.FORGE_TYPE_SkillMD, storedSkill.ForgeType)
+}
+
+func TestLoadAIForgesFromTarArchives(t *testing.T) {
+	root := t.TempDir()
+
+	yakForge := &schema.AIForge{
+		ForgeName:    "yak-tar-" + t.Name(),
+		ForgeType:    schema.FORGE_TYPE_YAK,
+		ForgeContent: "println('tar archive')",
+	}
+	require.NoError(t, dumpForgeToDir(yakForge, filepath.Join(root, yakForge.ForgeName), yakForge.ForgeName))
+
+	skillDir := filepath.Join(root, "skill-tar")
+	require.NoError(t, os.MkdirAll(filepath.Join(skillDir, "scripts"), 0o755))
+	skillMD := `---
+name: tar-skill
+description: Tar skill for import test.
+metadata:
+  owner: archive
+---
+Skill body from tar archive.
+`
+	require.NoError(t, os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte(skillMD), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(skillDir, "scripts", "helper.py"), []byte("print('tar')\n"), 0o644))
+
+	testCases := []struct {
+		name    string
+		pack    func(string, string) error
+		archive string
+	}{
+		{name: "tar", pack: tarDir, archive: "bundle.tar"},
+		{name: "tar.gz", pack: tarGzDir, archive: "bundle.tar.gz"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			archivePath := filepath.Join(t.TempDir(), tc.archive)
+			require.NoError(t, tc.pack(root, archivePath))
+
+			archive, err := LoadAIForgesFromZip(archivePath)
+			require.NoError(t, err)
+			require.Len(t, archive.AIForges, 2)
+
+			var loadedYak *schema.AIForge
+			var loadedSkill *schema.AIForge
+			for _, forge := range archive.AIForges {
+				switch forge.ForgeName {
+				case yakForge.ForgeName:
+					loadedYak = forge
+				case "tar-skill":
+					loadedSkill = forge
+				}
+			}
+			require.NotNil(t, loadedYak)
+			require.Equal(t, schema.FORGE_TYPE_YAK, loadedYak.ForgeType)
+			require.Equal(t, yakForge.ForgeContent, loadedYak.ForgeContent)
+
+			require.NotNil(t, loadedSkill)
+			require.Equal(t, schema.FORGE_TYPE_SkillMD, loadedSkill.ForgeType)
+			require.Equal(t, "Tar skill for import test.", loadedSkill.Description)
+			require.Equal(t, "Skill body from tar archive.", loadedSkill.InitPrompt)
+
+			db := newTestForgeDB(t)
+			defer db.Close()
+
+			imported, err := ImportAIForgesFromZip(db, archivePath, WithImportOverwrite(true))
+			require.NoError(t, err)
+			require.Len(t, imported, 2)
+
+			storedSkill, err := yakit.GetAIForgeByName(db, "tar-skill")
+			require.NoError(t, err)
+			require.Equal(t, schema.FORGE_TYPE_SkillMD, storedSkill.ForgeType)
+		})
+	}
+}
+
+func tarDir(srcDir, tarPath string) error {
+	file, err := os.Create(tarPath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	tw := tar.NewWriter(file)
+	defer tw.Close()
+
+	return filepath.Walk(srcDir, func(current string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if current == srcDir {
+			return nil
+		}
+		rel, err := filepath.Rel(srcDir, current)
+		if err != nil {
+			return err
+		}
+		rel = filepath.ToSlash(rel)
+		header, err := tar.FileInfoHeader(info, "")
+		if err != nil {
+			return err
+		}
+		header.Name = rel
+		if info.IsDir() {
+			header.Name += "/"
+			return tw.WriteHeader(header)
+		}
+		if err := tw.WriteHeader(header); err != nil {
+			return err
+		}
+		f, err := os.Open(current)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		_, err = io.Copy(tw, f)
+		return err
+	})
+}
+
+func tarGzDir(srcDir, tarGzPath string) error {
+	file, err := os.Create(tarGzPath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	gw := gzip.NewWriter(file)
+	defer gw.Close()
+	tw := tar.NewWriter(gw)
+	defer tw.Close()
+
+	return filepath.Walk(srcDir, func(current string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if current == srcDir {
+			return nil
+		}
+		rel, err := filepath.Rel(srcDir, current)
+		if err != nil {
+			return err
+		}
+		rel = filepath.ToSlash(rel)
+		header, err := tar.FileInfoHeader(info, "")
+		if err != nil {
+			return err
+		}
+		header.Name = rel
+		if info.IsDir() {
+			header.Name += "/"
+			return tw.WriteHeader(header)
+		}
+		if err := tw.WriteHeader(header); err != nil {
+			return err
+		}
+		f, err := os.Open(current)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		_, err = io.Copy(tw, f)
+		return err
+	})
 }

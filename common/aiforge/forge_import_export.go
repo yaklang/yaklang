@@ -1,14 +1,17 @@
 package aiforge
 
 import (
+	"archive/tar"
 	"archive/zip"
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -241,11 +244,17 @@ type AIForgesArchiveInfo struct {
 	AIYakTools []*schema.AIYakTool
 }
 
-// LoadAIForgesFromZip loads one or more forges (and optional AI tools) from a zip package.
+const (
+	importArchiveFormatZip   = "zip"
+	importArchiveFormatTar   = "tar"
+	importArchiveFormatTarGz = "tar.gz"
+)
+
+// LoadAIForgesFromZip loads one or more forges (and optional AI tools) from an archive package.
 // This function only parses and returns the data without saving to database.
 func LoadAIForgesFromZip(zipPath string, opts ...ForgeImportOption) (*AIForgesArchiveInfo, error) {
 	if zipPath == "" {
-		return nil, utils.Error("zip path is required")
+		return nil, utils.Error("archive path is required")
 	}
 	opt := applyImportOptions(opts...)
 
@@ -264,7 +273,7 @@ func LoadAIForgesFromZip(zipPath string, opts ...ForgeImportOption) (*AIForgesAr
 		rootDir = zipPath
 	} else {
 		if exist, _ := utils.PathExists(zipPath); !exist {
-			return nil, utils.Errorf("zip path not exists: %s", zipPath)
+			return nil, utils.Errorf("archive path not exists: %s", zipPath)
 		}
 
 		tmpDir, err := os.MkdirTemp("", "aiforge-import-*")
@@ -287,7 +296,7 @@ func LoadAIForgesFromZip(zipPath string, opts ...ForgeImportOption) (*AIForgesAr
 				return nil, err
 			}
 		}
-		if err := extractZipBytes(fileBytes, tmpDir); err != nil {
+		if err := extractArchiveBytes(fileBytes, zipPath, tmpDir); err != nil {
 			return nil, err
 		}
 		rootDir = tmpDir
@@ -377,7 +386,7 @@ func LoadAIForgesFromZip(zipPath string, opts ...ForgeImportOption) (*AIForgesAr
 	}, nil
 }
 
-// ImportAIForgesFromZip imports one or more forges (and optional AI tools) from a zip package.
+// ImportAIForgesFromZip imports one or more forges (and optional AI tools) from an archive package.
 // This function loads the data and saves it to database.
 func ImportAIForgesFromZip(db *gorm.DB, zipPath string, opts ...ForgeImportOption) ([]*schema.AIForge, error) {
 	if db == nil {
@@ -1019,9 +1028,9 @@ func extractZipBytes(data []byte, dst string) error {
 		return err
 	}
 	for _, f := range r.File {
-		target := filepath.Join(dst, f.Name)
-		if !strings.HasPrefix(target, filepath.Clean(dst)+string(os.PathSeparator)) {
-			return utils.Errorf("invalid path in zip: %s", f.Name)
+		target, err := resolveArchiveExtractTarget(dst, f.Name)
+		if err != nil {
+			return err
 		}
 		if f.FileInfo().IsDir() {
 			if err := os.MkdirAll(target, 0o755); err != nil {
@@ -1049,4 +1058,119 @@ func extractZipBytes(data []byte, dst string) error {
 		}
 	}
 	return nil
+}
+
+func extractArchiveBytes(data []byte, archivePath, dst string) error {
+	format := detectImportArchiveFormat(data, archivePath)
+	switch format {
+	case importArchiveFormatZip:
+		return extractZipBytes(data, dst)
+	case importArchiveFormatTarGz:
+		gzReader, err := gzip.NewReader(bytes.NewReader(data))
+		if err != nil {
+			return utils.Wrap(err, "create gzip reader failed")
+		}
+		defer gzReader.Close()
+		return extractTarReader(tar.NewReader(gzReader), dst)
+	case importArchiveFormatTar:
+		return extractTarReader(tar.NewReader(bytes.NewReader(data)), dst)
+	default:
+		return utils.Errorf("unsupported archive format: %s", archivePath)
+	}
+}
+
+func extractTarReader(reader *tar.Reader, dst string) error {
+	for {
+		header, err := reader.Next()
+		if err == io.EOF {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+
+		target, err := resolveArchiveExtractTarget(dst, header.Name)
+		if err != nil {
+			return err
+		}
+		if target == "" {
+			continue
+		}
+
+		switch header.Typeflag {
+		case tar.TypeDir:
+			if err := os.MkdirAll(target, 0o755); err != nil {
+				return err
+			}
+		case tar.TypeReg, tar.TypeRegA:
+			if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+				return err
+			}
+			out, err := os.OpenFile(target, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, header.FileInfo().Mode())
+			if err != nil {
+				return err
+			}
+			if _, err := io.Copy(out, reader); err != nil {
+				out.Close()
+				return err
+			}
+			if err := out.Close(); err != nil {
+				return err
+			}
+		case tar.TypeXHeader, tar.TypeXGlobalHeader:
+			continue
+		default:
+			return utils.Errorf("unsupported tar entry type %d: %s", header.Typeflag, header.Name)
+		}
+	}
+}
+
+func detectImportArchiveFormat(data []byte, archivePath string) string {
+	if len(data) >= 4 {
+		if bytes.Equal(data[:4], []byte("PK\x03\x04")) || bytes.Equal(data[:4], []byte("PK\x05\x06")) || bytes.Equal(data[:4], []byte("PK\x07\x08")) {
+			return importArchiveFormatZip
+		}
+	}
+	if len(data) >= 2 && data[0] == 0x1f && data[1] == 0x8b {
+		return importArchiveFormatTarGz
+	}
+	if len(data) >= 262 && string(data[257:262]) == "ustar" {
+		return importArchiveFormatTar
+	}
+	lowerPath := strings.ToLower(strings.TrimSpace(archivePath))
+	switch {
+	case strings.HasSuffix(lowerPath, ".tar.gz"), strings.HasSuffix(lowerPath, ".tgz"):
+		return importArchiveFormatTarGz
+	case strings.HasSuffix(lowerPath, ".tar"):
+		return importArchiveFormatTar
+	case strings.HasSuffix(lowerPath, ".zip"), strings.HasSuffix(lowerPath, ".enc"):
+		return importArchiveFormatZip
+	default:
+		return ""
+	}
+}
+
+func resolveArchiveExtractTarget(dst, entryName string) (string, error) {
+	cleaned := strings.TrimSpace(entryName)
+	if cleaned == "" {
+		return "", nil
+	}
+	cleaned = strings.ReplaceAll(cleaned, "\\", "/")
+	cleaned = strings.TrimPrefix(cleaned, "./")
+	cleaned = path.Clean(cleaned)
+	if cleaned == "." || cleaned == "" {
+		return "", nil
+	}
+	if strings.HasPrefix(cleaned, "/") || cleaned == ".." || strings.HasPrefix(cleaned, "../") {
+		return "", utils.Errorf("invalid archive path: %s", entryName)
+	}
+	target := filepath.Join(dst, filepath.FromSlash(cleaned))
+	rel, err := filepath.Rel(dst, target)
+	if err != nil {
+		return "", err
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
+		return "", utils.Errorf("invalid archive path: %s", entryName)
+	}
+	return target, nil
 }

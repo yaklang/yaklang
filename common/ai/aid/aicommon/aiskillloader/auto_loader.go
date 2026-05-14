@@ -49,16 +49,23 @@ func WithAutoLoad_LocalDir(dirPath string) AutoSkillLoaderOption {
 	}
 }
 
-// WithAutoLoad_ZipFile adds a zip file as a skill source.
-func WithAutoLoad_ZipFile(zipPath string) AutoSkillLoaderOption {
+// WithAutoLoad_ArchiveFile adds an archive file as a skill source.
+// Supported archive formats are zip, tar, tar.gz and tgz.
+func WithAutoLoad_ArchiveFile(archivePath string) AutoSkillLoaderOption {
 	return func(l *AutoSkillLoader) error {
-		zipFS, err := filesys.NewZipFSFromLocal(zipPath)
+		archiveFS, err := filesys.NewArchiveFSFromLocal(archivePath)
 		if err != nil {
-			return utils.Wrapf(err, "failed to open zip file: %s", zipPath)
+			return utils.Wrapf(err, "failed to open archive file: %s", archivePath)
 		}
-		l.sources = append(l.sources, zipFS)
+		l.sources = append(l.sources, archiveFS)
 		return nil
 	}
+}
+
+// WithAutoLoad_ZipFile adds an archive file as a skill source.
+// Deprecated: use WithAutoLoad_ArchiveFile instead.
+func WithAutoLoad_ZipFile(zipPath string) AutoSkillLoaderOption {
+	return WithAutoLoad_ArchiveFile(zipPath)
 }
 
 // WithAutoLoad_FileSystem adds a generic FileSystem as a skill source.
@@ -497,14 +504,20 @@ func (l *AutoSkillLoader) RescanLocalDir(dirPath string) (int, error) {
 	return afterCount - beforeCount, nil
 }
 
-// AddZipFile adds a zip file as a skill source.
+// AddArchiveFile adds an archive file as a skill source.
+// Supported archive formats are zip, tar, tar.gz and tgz.
+func (l *AutoSkillLoader) AddArchiveFile(archivePath string) (int, error) {
+	archiveFS, err := filesys.NewArchiveFSFromLocal(archivePath)
+	if err != nil {
+		return 0, utils.Wrapf(err, "failed to open archive file: %s", archivePath)
+	}
+	return l.AddSource(archiveFS)
+}
+
+// AddZipFile adds an archive file as a skill source.
 // This is a convenience method that wraps AddSource.
 func (l *AutoSkillLoader) AddZipFile(zipPath string) (int, error) {
-	zipFS, err := filesys.NewZipFSFromLocal(zipPath)
-	if err != nil {
-		return 0, utils.Wrapf(err, "failed to open zip file: %s", zipPath)
-	}
-	return l.AddSource(zipFS)
+	return l.AddArchiveFile(zipPath)
 }
 
 // AddDatabase attaches a lazy database-backed skill source.

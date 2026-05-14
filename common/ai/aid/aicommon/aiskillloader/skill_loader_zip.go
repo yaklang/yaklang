@@ -7,14 +7,20 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 )
 
-// NewZipSkillLoader creates a SkillLoader from a local zip file path.
-// The zip file should contain skill directories at its root level.
-func NewZipSkillLoader(zipPath string) (*FSSkillLoader, error) {
-	zipFS, err := filesys.NewZipFSFromLocal(zipPath)
+// NewArchiveSkillLoader creates a SkillLoader from a local archive path.
+// Supported archive formats are zip, tar, tar.gz and tgz.
+func NewArchiveSkillLoader(archivePath string) (*FSSkillLoader, error) {
+	archiveFS, err := filesys.NewArchiveFSFromLocal(archivePath)
 	if err != nil {
-		return nil, utils.Wrapf(err, "failed to open zip file: %s", zipPath)
+		return nil, utils.Wrapf(err, "failed to open archive file: %s", archivePath)
 	}
-	return NewFSSkillLoader(zipFS)
+	return NewFSSkillLoader(archiveFS)
+}
+
+// NewZipSkillLoader creates a SkillLoader from a local zip file path.
+// The archive should contain skill directories at its root level.
+func NewZipSkillLoader(zipPath string) (*FSSkillLoader, error) {
+	return NewArchiveSkillLoader(zipPath)
 }
 
 // NewZipSkillLoaderFromReader creates a SkillLoader from a zip reader.

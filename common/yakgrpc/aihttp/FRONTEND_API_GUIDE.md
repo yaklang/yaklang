@@ -442,7 +442,7 @@ data: {"Percent":100,"Message":"export completed","MessageType":"success"}
 
 ### `POST /forge/import`
 
-- 用途：导入 AI Forge 压缩包
+- 用途：导入 AI Forge 压缩包，支持 `zip`、`tar`、`tar.gz`
 - 请求体：透传 gRPC `ImportAIForgeRequest`
 - 响应：SSE 流，逐条透传 gRPC `GeneralProgress`
 

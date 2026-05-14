@@ -76,13 +76,20 @@ func ImportAISkillsFromLocalDirToDB(db *gorm.DB, dirPath string) (int, error) {
 	return ImportAISkillsToDB(db, loader)
 }
 
-// ImportAISkillsFromZipFileToDB imports skills from a zip file into ai_forges.
-func ImportAISkillsFromZipFileToDB(db *gorm.DB, zipPath string) (int, error) {
-	loader, err := NewAutoSkillLoader(WithAutoLoad_ZipFile(zipPath))
+// ImportAISkillsFromArchiveFileToDB imports skills from an archive file into ai_forges.
+// Supported archive formats are zip, tar, tar.gz and tgz.
+func ImportAISkillsFromArchiveFileToDB(db *gorm.DB, archivePath string) (int, error) {
+	loader, err := NewAutoSkillLoader(WithAutoLoad_ArchiveFile(archivePath))
 	if err != nil {
 		return 0, err
 	}
 	return ImportAISkillsToDB(db, loader)
+}
+
+// ImportAISkillsFromZipFileToDB imports skills from an archive file into ai_forges.
+// Deprecated: use ImportAISkillsFromArchiveFileToDB instead.
+func ImportAISkillsFromZipFileToDB(db *gorm.DB, zipPath string) (int, error) {
+	return ImportAISkillsFromArchiveFileToDB(db, zipPath)
 }
 
 // ImportAISkillsFromFileSystemToDB imports skills from a filesystem into ai_forges.
