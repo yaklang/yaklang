@@ -208,3 +208,22 @@ func TestConfig_ResolveIdentifier_Priority(t *testing.T) {
 	assert.Equal(t, ResolvedAs_Tool, result.IdentityType)
 	assert.Equal(t, schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL, result.ActionType)
 }
+
+func TestConfig_ResolveIdentifier_SkillMDForgeTreatedAsSkill(t *testing.T) {
+	forgeFactory := &mockForgeFactory{
+		forges: map[string]*schema.AIForge{
+			"db-skill": {
+				ForgeName: "db-skill",
+				ForgeType: schema.FORGE_TYPE_SkillMD,
+			},
+		},
+	}
+
+	cfg := &Config{
+		AiForgeManager: forgeFactory,
+	}
+
+	result := cfg.ResolveIdentifier("db-skill")
+	assert.Equal(t, ResolvedAs_Skill, result.IdentityType)
+	assert.Equal(t, schema.AI_REACT_LOOP_ACTION_LOADING_SKILLS, result.ActionType)
+}

@@ -179,7 +179,7 @@ func PopulateExtraCapabilitiesFromCapabilitySearchResult(r aicommon.AIInvokeRunt
 		}
 	}
 
-	if len(result.MatchedForgeNames) > 0 {
+	if len(result.MatchedForgeNames) > 0 && IsPlanAndExecAllowed(loop, r) {
 		type forgeManagerProvider interface {
 			GetAIForgeManager() aicommon.AIForgeFactory
 		}

@@ -134,6 +134,12 @@ func (r *ReAct) invokeBlueprint(forgeName string) (*schema.AIForge, aitool.Invok
 		r.Emitter.EmitError(fmt.Sprintf("AI Blueprint '%s' configuration error", forgeName))
 		return nil, nil, utils.Errorf("AI Blueprint '%s' instance is nil", forgeName)
 	}
+	if !schema.IsRunnableForgeType(ins.ForgeType) {
+		err := utils.Errorf("AI Blueprint '%s' is not runnable, forge_type=%s", forgeName, ins.ForgeType)
+		r.AddToTimeline("[BLUEPRINT_NON_RUNNABLE]", err.Error())
+		r.Emitter.EmitError(fmt.Sprintf("AI Blueprint '%s' is not runnable", forgeName))
+		return nil, nil, err
+	}
 
 	// 记录成功找到 Forge
 	r.AddToTimeline("[BLUEPRINT_FOUND]", fmt.Sprintf("AI Blueprint: %s (%s)", ins.ForgeName, ins.ForgeVerboseName))

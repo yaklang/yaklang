@@ -184,45 +184,47 @@ func makeSearchCapabilitiesAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 					loop.Set("matched_tool_names", existingToolNames+strings.Join(pluginNames, ","))
 				}
 
-				// 2. Search AI Forges via BM25 trigram
-				forgeSeen := make(map[string]bool)
-				var allForges []*schema.AIForge
+				// 2. Search AI Forges via BM25 trigram only when plan/exec is enabled.
+				if reactloops.IsPlanAndExecAllowed(nil, r) {
+					forgeSeen := make(map[string]bool)
+					var allForges []*schema.AIForge
 
-				forges, err := yakit.SearchAIForgeBM25(db, &yakit.AIForgeSearchFilter{
-					ForgeTypes: schema.RunnableForgeTypes(),
-					Keywords:   keywords,
-				}, 10, 0)
-				if err != nil {
-					log.Warnf("intent loop: BM25 forge AND-search failed: %v", err)
-				}
-				for _, f := range forges {
-					if !forgeSeen[f.ForgeName] {
-						forgeSeen[f.ForgeName] = true
-						allForges = append(allForges, f)
+					forges, err := yakit.SearchAIForgeBM25(db, &yakit.AIForgeSearchFilter{
+						ForgeTypes: schema.RunnableForgeTypes(),
+						Keywords:   keywords,
+					}, 10, 0)
+					if err != nil {
+						log.Warnf("intent loop: BM25 forge AND-search failed: %v", err)
 					}
-				}
-
-				if len(allForges) > 0 {
-					results.WriteString("### Matched AI Forges (Blueprints)\n")
-					for _, forge := range allForges {
-						name := forge.ForgeName
-						if forge.ForgeVerboseName != "" {
-							name = forge.ForgeVerboseName + " (" + forge.ForgeName + ")"
+					for _, f := range forges {
+						if !forgeSeen[f.ForgeName] {
+							forgeSeen[f.ForgeName] = true
+							allForges = append(allForges, f)
 						}
-						desc := utils.ShrinkString(forge.Description, 200)
-						results.WriteString(fmt.Sprintf("- **%s**: %s\n", name, desc))
-						appendCapDetail(&capDetails, forge.ForgeName, "forge", utils.ShrinkString(forge.Description, 200))
 					}
-					results.WriteString("\n")
-					log.Infof("intent loop: found %d forges (AND+OR)", len(allForges))
 
-					var forgeNames []string
-					for _, f := range allForges {
-						forgeNames = append(forgeNames, f.ForgeName)
+					if len(allForges) > 0 {
+						results.WriteString("### Matched AI Forges (Blueprints)\n")
+						for _, forge := range allForges {
+							name := forge.ForgeName
+							if forge.ForgeVerboseName != "" {
+								name = forge.ForgeVerboseName + " (" + forge.ForgeName + ")"
+							}
+							desc := utils.ShrinkString(forge.Description, 200)
+							results.WriteString(fmt.Sprintf("- **%s**: %s\n", name, desc))
+							appendCapDetail(&capDetails, forge.ForgeName, "forge", utils.ShrinkString(forge.Description, 200))
+						}
+						results.WriteString("\n")
+						log.Infof("intent loop: found %d forges (AND+OR)", len(allForges))
+
+						var forgeNames []string
+						for _, f := range allForges {
+							forgeNames = append(forgeNames, f.ForgeName)
+						}
+						loop.Set("matched_forge_names", strings.Join(forgeNames, ","))
+					} else {
+						results.WriteString("### AI Forges\nNo matching forges found.\n\n")
 					}
-					loop.Set("matched_forge_names", strings.Join(forgeNames, ","))
-				} else {
-					results.WriteString("### AI Forges\nNo matching forges found.\n\n")
 				}
 				reactloops.SetWorkspaceDebugDuration(loop, reactloops.IntentDebugCapabilityDBDurationKey, time.Since(dbSearchStart))
 			} else {

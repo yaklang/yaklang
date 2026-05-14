@@ -249,15 +249,17 @@ func FastIntentMatch(r aicommon.AIInvokeRuntime, input string) *FastMatchResult 
 			}
 		}
 
-		forges, err := yakit.SearchAIForgeBM25(db, &yakit.AIForgeSearchFilter{
-			ForgeTypes: schema.RunnableForgeTypes(),
-			Keywords:   []string{trimmed},
-		}, 5, 0)
-		if err != nil {
-			log.Warnf("fast intent match: BM25 forge search failed: %v", err)
-		} else if len(forges) > 0 {
-			result.MatchedForges = forges
-			log.Infof("fast intent match: found %d forges via BM25 for: %s", len(forges), trimmed)
+		if reactloops.IsPlanAndExecAllowed(nil, r) {
+			forges, err := yakit.SearchAIForgeBM25(db, &yakit.AIForgeSearchFilter{
+				ForgeTypes: schema.RunnableForgeTypes(),
+				Keywords:   []string{trimmed},
+			}, 5, 0)
+			if err != nil {
+				log.Warnf("fast intent match: BM25 forge search failed: %v", err)
+			} else if len(forges) > 0 {
+				result.MatchedForges = forges
+				log.Infof("fast intent match: found %d forges via BM25 for: %s", len(forges), trimmed)
+			}
 		}
 	}
 
@@ -567,7 +569,7 @@ func populateExtraCapabilitiesFromFastMatch(r aicommon.AIInvokeRuntime, loop *re
 	}
 
 	// Add matched forges
-	if len(result.MatchedForges) > 0 {
+	if len(result.MatchedForges) > 0 && reactloops.IsPlanAndExecAllowed(loop, r) {
 		for _, forge := range result.MatchedForges {
 			ecm.AddForges(reactloops.ExtraForgeInfo{
 				Name:        forge.ForgeName,

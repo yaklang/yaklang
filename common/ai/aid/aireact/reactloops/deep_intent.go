@@ -162,7 +162,7 @@ func PopulateExtraCapabilitiesFromDeepIntent(r aicommon.AIInvokeRuntime, loop *R
 		}
 	}
 
-	if result.MatchedForgeNames != "" {
+	if result.MatchedForgeNames != "" && IsPlanAndExecAllowed(loop, r) {
 		forgeNames := splitAndTrimNames(result.MatchedForgeNames)
 		type forgeManagerProvider interface {
 			GetAIForgeManager() aicommon.AIForgeFactory

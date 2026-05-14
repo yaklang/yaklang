@@ -28,13 +28,13 @@ type capabilityNameMatchCandidate struct {
 	Skill     *aiskillloader.SkillMeta
 }
 
-func MatchCapabilitiesByText(input string, skillLoader aiskillloader.SkillLoader) *CapabilityNameMatchResult {
+func MatchCapabilitiesByText(input string, skillLoader aiskillloader.SkillLoader, includeForges bool) *CapabilityNameMatchResult {
 	normalizedInput := strings.ToLower(strings.TrimSpace(input))
 	if normalizedInput == "" {
 		return nil
 	}
 
-	patterns, candidatesByPattern := collectCapabilityNameMatchCandidates(skillLoader)
+	patterns, candidatesByPattern := collectCapabilityNameMatchCandidates(skillLoader, includeForges)
 	if len(patterns) == 0 {
 		return nil
 	}
@@ -46,7 +46,7 @@ func MatchCapabilitiesByText(input string, skillLoader aiskillloader.SkillLoader
 	return result
 }
 
-func collectCapabilityNameMatchCandidates(skillLoader aiskillloader.SkillLoader) ([]string, map[string][]capabilityNameMatchCandidate) {
+func collectCapabilityNameMatchCandidates(skillLoader aiskillloader.SkillLoader, includeForges bool) ([]string, map[string][]capabilityNameMatchCandidate) {
 	var patterns []string
 	patternSeen := make(map[string]bool)
 	candidatesByPattern := make(map[string][]capabilityNameMatchCandidate)
@@ -66,7 +66,9 @@ func collectCapabilityNameMatchCandidates(skillLoader aiskillloader.SkillLoader)
 	if db := consts.GetGormProfileDatabase(); db != nil {
 		collectYakScriptNameMatchCandidates(db, addCandidate)
 		collectAIToolNameMatchCandidates(db, addCandidate)
-		collectForgeNameMatchCandidates(db, addCandidate)
+		if includeForges {
+			collectForgeNameMatchCandidates(db, addCandidate)
+		}
 	}
 	collectSkillNameMatchCandidates(skillLoader, addCandidate)
 
@@ -75,7 +77,11 @@ func collectCapabilityNameMatchCandidates(skillLoader aiskillloader.SkillLoader)
 
 func MatchCapabilitiesByTextWithConfig(config aicommon.AICallerConfigIf, input string) *CapabilityNameMatchResult {
 	EmitCapabilityMatchingStatus(config)
-	return MatchCapabilitiesByText(input, resolveSkillLoaderFromConfig(config))
+	return MatchCapabilitiesByText(input, resolveSkillLoaderFromConfig(config), shouldAutoMatchForges(config))
+}
+
+func shouldAutoMatchForges(config aicommon.AICallerConfigIf) bool {
+	return resolveExplicitEnablePlanAndExec(config) != disabledByExplicitConfig
 }
 
 func EmitCapabilityMatchingStatus(config aicommon.AICallerConfigIf) {
@@ -501,7 +507,7 @@ func PopulateExtraCapabilitiesFromCapabilityMatches(r aicommon.AIInvokeRuntime, 
 		}
 	}
 
-	if forgeNames := matches.ForgeNames(); len(forgeNames) > 0 {
+	if forgeNames := matches.ForgeNames(); len(forgeNames) > 0 && IsPlanAndExecAllowed(loop, r) {
 		type forgeManagerProvider interface {
 			GetAIForgeManager() aicommon.AIForgeFactory
 		}

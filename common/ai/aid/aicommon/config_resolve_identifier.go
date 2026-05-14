@@ -106,12 +106,21 @@ func (c *Config) ResolveIdentifier(name string) *ResolvedIdentifier {
 
 	// 2. Check forges (AI Blueprints)
 	if c.AiForgeManager != nil {
-		if _, err := c.AiForgeManager.GetAIForge(name); err == nil {
-			matches = append(matches, &ResolvedIdentifier{
-				Name:         name,
-				IdentityType: ResolvedAs_Forge,
-				ActionType:   schema.AI_REACT_LOOP_ACTION_REQUIRE_AI_BLUEPRINT,
-			})
+		if forge, err := c.AiForgeManager.GetAIForge(name); err == nil {
+			switch {
+			case forge != nil && forge.ForgeType == schema.FORGE_TYPE_SkillMD:
+				matches = append(matches, &ResolvedIdentifier{
+					Name:         name,
+					IdentityType: ResolvedAs_Skill,
+					ActionType:   schema.AI_REACT_LOOP_ACTION_LOADING_SKILLS,
+				})
+			case forge != nil && schema.IsRunnableForgeType(forge.ForgeType):
+				matches = append(matches, &ResolvedIdentifier{
+					Name:         name,
+					IdentityType: ResolvedAs_Forge,
+					ActionType:   schema.AI_REACT_LOOP_ACTION_REQUIRE_AI_BLUEPRINT,
+				})
+			}
 		}
 	}
 

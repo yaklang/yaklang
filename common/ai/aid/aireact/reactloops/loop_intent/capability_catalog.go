@@ -12,6 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
@@ -50,6 +51,9 @@ func BuildCapabilityCatalog(r aicommon.AIInvokeRuntime) string {
 			log.Warnf("capability catalog: failed to load forges: %v", err)
 		} else {
 			for _, f := range forges {
+				if f == nil || !schema.IsRunnableForgeType(f.ForgeType) {
+					continue
+				}
 				name := f.ForgeVerboseName
 				if name == "" {
 					name = f.ForgeName

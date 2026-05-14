@@ -323,6 +323,39 @@ func TestLoadCapability_Handler_Forge_AsyncMode(t *testing.T) {
 	assert.NotNil(t, invoker.forgeOnFinish, "forge callback should be set")
 }
 
+func TestLoadCapability_Handler_Forge_DisabledByConfig(t *testing.T) {
+	ctx := context.Background()
+	forgeMgr := &mockForgeFactory{
+		forges: map[string]*schema.AIForge{
+			"my-forge": {ForgeName: "my-forge"},
+		},
+	}
+	cfg := aicommon.NewConfig(context.Background(),
+		aicommon.WithEnablePlanAndExec(false),
+		aicommon.WithAICallback(func(aicommon.AICallerConfigIf, *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			return nil, nil
+		}),
+	)
+	cfg.AiForgeManager = forgeMgr
+	invoker := newTestInvoker(ctx)
+	task := newTestTask(ctx)
+	invoker.currentTask = task
+
+	loop := reactloops.NewMinimalReActLoop(cfg, invoker)
+	loop.SetCurrentTask(task)
+	loop.Set("_load_cap_identifier", "my-forge")
+	loop.Set("_load_cap_resolved_type", string(aicommon.ResolvedAs_Forge))
+
+	op := reactloops.NewActionHandlerOperator(task)
+	action := buildAction("my-forge")
+	loopAction_LoadCapability.ActionHandler(loop, action, op)
+
+	assert.False(t, invoker.forgeCalled, "forge must not start when plan/forge execution is disabled")
+	assert.True(t, op.IsContinued(), "disabled forge branch should return feedback and continue")
+	assert.Contains(t, op.GetFeedback().String(), "disabled")
+	assert.Contains(t, invoker.getTimelineString(), "[LOAD_CAPABILITY_FORGE_DISABLED]")
+}
+
 // --- Handler Tests: Skill Branch ---
 
 func TestLoadCapability_Handler_Skill_NoManager(t *testing.T) {

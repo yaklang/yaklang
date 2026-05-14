@@ -173,7 +173,7 @@ func populateExtraCapabilitiesFromIntent(
 		}
 	}
 
-	if matchedForgeNames != "" {
+	if matchedForgeNames != "" && reactloops.IsPlanAndExecAllowed(loop, invoker) {
 		forgeNames := splitAndTrimNames(matchedForgeNames)
 		type forgeManagerProvider interface {
 			GetAIForgeManager() aicommon.AIForgeFactory

@@ -142,6 +142,17 @@ func handleLoadForgeWithSkillFallback(
 	op *reactloops.LoopActionHandlerOperator,
 	hasSkillAlt bool,
 ) {
+	if !reactloops.IsPlanAndExecAllowed(loop, invoker) {
+		if hasSkillAlt {
+			log.Infof("load_capability: forge '%s' disabled, falling back to skill alternative", identifier)
+			invoker.AddToTimeline("[LOAD_CAPABILITY_FORGE_TO_SKILL_FALLBACK]",
+				fmt.Sprintf("'%s' exists as both forge and skill. Forge execution is disabled, falling back to skill.", identifier))
+			handleLoadSkill(loop, invoker, identifier, op)
+			return
+		}
+		handleLoadForgeDisabled(invoker, identifier, op)
+		return
+	}
 	task := loop.GetCurrentTask()
 	if task != nil && task.IsAsyncMode() && hasSkillAlt {
 		log.Infof("load_capability: forge '%s' rejected (async mode), falling back to skill alternative", identifier)
@@ -151,6 +162,24 @@ func handleLoadForgeWithSkillFallback(
 		return
 	}
 	handleLoadForge(loop, invoker, ctx, identifier, op)
+}
+
+func handleLoadForgeDisabled(
+	invoker aicommon.AIInvokeRuntime,
+	identifier string,
+	op *reactloops.LoopActionHandlerOperator,
+) {
+	log.Warnf("load_capability: rejecting forge '%s' because AI forge/plan execution is disabled", identifier)
+	rejectMsg := fmt.Sprintf(
+		"REJECTED: Cannot start AI Blueprint '%s' — blueprint/plan execution is disabled by the current config or loop policy. "+
+			"You MUST use tools, skills, focus modes, or directly answer instead of starting a forge.",
+		identifier)
+	invoker.AddToTimeline("[LOAD_CAPABILITY_FORGE_DISABLED]", rejectMsg)
+	op.Feedback(rejectMsg)
+	op.SetReflectionLevel(reactloops.ReflectionLevel_Critical)
+	op.SetReflectionData("forge_rejected_reason", "forge_disabled")
+	op.SetReflectionData("forge_name", identifier)
+	op.Continue()
 }
 
 // handleLoadForge starts an async blueprint/forge execution.
