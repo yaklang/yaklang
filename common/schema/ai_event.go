@@ -46,7 +46,6 @@ var eventTypeNotSaveBlackList = []EventType{
 
 var structuredNodeIDNotSaveBlackList = []string{
 	"status",
-	"system",
 	"react_task_cancelled",
 	"react_task_enqueue",
 	"react_task_cleared",
@@ -324,6 +323,13 @@ func (e *AiOutputEvent) saveAllowedByType() bool {
 func (e *AiOutputEvent) saveAllowedByNodeID() bool {
 	if e.Type != EVENT_TYPE_STRUCTURED {
 		return true
+	}
+	if e.NodeId == "system" {
+		data := make(map[string]any)
+		err := json.Unmarshal(e.Content, data)
+		if err == nil && (data["type"] == "pop_task" || data["type"] == "push_task") {
+			return true
+		}
 	}
 	return !lo.Contains(structuredNodeIDNotSaveBlackList, e.NodeId)
 }
