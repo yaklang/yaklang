@@ -25,6 +25,28 @@ func CallAITransaction(
 	postHandler func(rsp *AIResponse) error,
 	requestOpts ...AIRequestOption,
 ) error {
+	return callAITransaction(c, prompt, callAi, postHandler, nil, requestOpts...)
+}
+
+func CallAITransactionWithFailureExtra(
+	c AICallerConfigIf,
+	prompt string,
+	callAi func(*AIRequest) (*AIResponse, error),
+	postHandler func(rsp *AIResponse) error,
+	failureExtra map[string]any,
+	requestOpts ...AIRequestOption,
+) error {
+	return callAITransaction(c, prompt, callAi, postHandler, failureExtra, requestOpts...)
+}
+
+func callAITransaction(
+	c AICallerConfigIf,
+	prompt string,
+	callAi func(*AIRequest) (*AIResponse, error),
+	postHandler func(rsp *AIResponse) error,
+	failureExtra map[string]any,
+	requestOpts ...AIRequestOption,
+) error {
 	var seq int64
 	var saver CheckpointCommitHandler
 	var trcRetry int64 = 3
@@ -161,7 +183,7 @@ func CallAITransaction(
 	if lastReq != nil {
 		tier = consts.ModelTier(lastReq.GetModelTier())
 	}
-	EmitAICallFailureIfApplicable(c, tier, lastRsp, lastErr, nil)
+	EmitAICallFailureIfApplicable(c, tier, lastRsp, lastErr, failureExtra)
 
 	if lastErr != nil {
 		return utils.Errorf("max retry count[%v] reached in transaction, last error: %v", trcRetry, lastErr)

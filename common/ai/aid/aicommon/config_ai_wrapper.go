@@ -249,7 +249,10 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 				})
 				return rsp, err
 			}
-			return nil, utils.Errorf("ai request err with max retry: %v", err)
+			if rsp != nil {
+				rsp.SetTaskIndex(request.GetTaskIndex())
+			}
+			return rsp, utils.Errorf("ai request err with max retry: %v", err)
 		}
 
 		var seq = request.GetSeqId()
@@ -443,7 +446,10 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 			}
 			return rsp, err
 		}
-		return nil, utils.Errorf("")
+		if rsp != nil {
+			rsp.SetTaskIndex(request.GetTaskIndex())
+		}
+		return rsp, utils.Errorf("ai request err with max retry: %v", err)
 	}
 }
 

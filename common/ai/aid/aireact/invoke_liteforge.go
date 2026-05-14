@@ -6,7 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/aiforge"
-	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -69,6 +69,11 @@ func (r *ReAct) invokeLiteForgeWithCallback(cb aicommon.AICallbackType, ctx cont
 	if userUsageCb := r.config.GetUserUsageCallback(); userUsageCb != nil {
 		execOpts = append(execOpts, aicommon.WithUserUsageCallback(userUsageCb))
 	}
+	if eventHandler := r.config.EventHandler; eventHandler != nil {
+		execOpts = append(execOpts, aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
+			eventHandler(e)
+		}))
+	}
 	// P0-B4 (round2): 之前同时把 prompt 通过 WithLiteForge_Prompt 注入 dynamic 段
 	// <context_NONCE>, 又在这里再以 ExecParamItem(key="query") 的形式注入 dynamic
 	// 段 <params_NONCE>, 同一份内容被写入 2 次, 直接让 dynamic 段字节翻倍, 上游
@@ -88,26 +93,14 @@ func (r *ReAct) InvokeSpeedPriorityLiteForge(
 	ctx context.Context, actionName string, prompt string,
 	outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption,
 ) (*aicommon.Action, error) {
-	action, err := r.invokeLiteForgeWithCallback(r.config.SpeedPriorityAICallback, ctx, actionName, prompt, outputs, opts...)
-	if err != nil {
-		aicommon.EmitAICallFailureIfApplicable(r.config, consts.TierLightweight, nil, err, map[string]any{
-			"liteforge_action": actionName,
-		})
-	}
-	return action, err
+	return r.invokeLiteForgeWithCallback(r.config.SpeedPriorityAICallback, ctx, actionName, prompt, outputs, opts...)
 }
 
 func (r *ReAct) InvokeQualityPriorityLiteForge(
 	ctx context.Context, actionName string, prompt string,
 	outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption,
 ) (*aicommon.Action, error) {
-	action, err := r.invokeLiteForgeWithCallback(r.config.QualityPriorityAICallback, ctx, actionName, prompt, outputs, opts...)
-	if err != nil {
-		aicommon.EmitAICallFailureIfApplicable(r.config, consts.TierIntelligent, nil, err, map[string]any{
-			"liteforge_action": actionName,
-		})
-	}
-	return action, err
+	return r.invokeLiteForgeWithCallback(r.config.QualityPriorityAICallback, ctx, actionName, prompt, outputs, opts...)
 }
 
 func (r *ReAct) InvokeLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption) (*aicommon.Action, error) {

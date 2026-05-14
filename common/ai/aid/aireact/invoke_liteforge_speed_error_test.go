@@ -26,8 +26,13 @@ func TestInvokeSpeedPriorityLiteForge_EmitsStructuredErrorOnFailure(t *testing.T
 	speedErr := fmt.Errorf("simulated speed-tier model failure")
 
 	r, err := NewTestReAct(
+		aicommon.WithAIAutoRetry(1),
+		aicommon.WithAITransactionAutoRetry(1),
 		aicommon.WithSpeedPriorityAICallback(func(_ aicommon.AICallerConfigIf, _ *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			return nil, speedErr
+			rsp := aicommon.NewAIResponse(nil)
+			rsp.SetModelInfo("mock-provider", "mock-model")
+			rsp.SetHeaderReady()
+			return rsp, speedErr
 		}),
 		aicommon.WithQualityPriorityAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			_ = i
@@ -58,10 +63,12 @@ func TestInvokeSpeedPriorityLiteForge_EmitsStructuredErrorOnFailure(t *testing.T
 	mu.Unlock()
 
 	var found bool
+	var failureEventCount int
 	for _, e := range events {
 		if e == nil || e.NodeId != aicommon.NodeAICallFailure {
 			continue
 		}
+		failureEventCount++
 		if e.Type != schema.EVENT_TYPE_API_REQUEST_FAILED || !e.IsJson || !e.IsSystem {
 			continue
 		}
@@ -71,6 +78,8 @@ func TestInvokeSpeedPriorityLiteForge_EmitsStructuredErrorOnFailure(t *testing.T
 			continue
 		}
 		require.Equal(t, "lightweight", payload["model_tier"])
+		require.Equal(t, "mock-provider", payload["provider_name"])
+		require.Equal(t, "mock-model", payload["model_name"])
 		require.Equal(t, actionName, payload["liteforge_action"])
 		cause := fmt.Sprint(payload["cause"])
 		require.NotEmpty(t, cause)
@@ -81,5 +90,6 @@ func TestInvokeSpeedPriorityLiteForge_EmitsStructuredErrorOnFailure(t *testing.T
 		found = true
 		break
 	}
+	require.Equal(t, 1, failureEventCount, "expected only one ai_call_failure event")
 	require.True(t, found, "expected system structured event for ai call failure")
 }

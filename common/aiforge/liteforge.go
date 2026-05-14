@@ -313,7 +313,7 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 	if l.PreferSpeedPriority {
 		aiCallback = cod.CallSpeedPriorityAI
 	}
-	transactionErr := aicommon.CallAITransaction(cod, rendered, aiCallback,
+	transactionErr := aicommon.CallAITransactionWithFailureExtra(cod, rendered, aiCallback,
 		func(response *aicommon.AIResponse) error {
 			boundEmitter := response.BindEmitter(l.emitter)
 			if l.ForgeName == "" {
@@ -369,6 +369,9 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 				return utils.Errorf("action is nil(unknown reason): \n%v", mirrored.String())
 			}
 			return nil
+		},
+		map[string]any{
+			"liteforge_action": l.ForgeName,
 		},
 		lo.Map(imageData, func(item *aicommon.ImageData, _ int) aicommon.AIRequestOption {
 			return aicommon.WithAIRequest_ImageData(item)
