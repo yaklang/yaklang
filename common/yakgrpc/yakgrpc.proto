@@ -1940,6 +1940,10 @@ message AIStartParams {
   // 为 true 时，MaybeTriggerPerceptionAfterAction / MaybeTriggerPerceptionAfterVerification /
   // TriggerPerceptionOnSpin 内直接同步调用 TriggerPerception；默认 false 时为异步 goroutine 调用
   bool SyncPerceptionTrigger = 37;
+
+  // 非空时作为规划阶段（Plan loop）的补充说明注入，对应 aicommon.WithPlanPrompt；
+  // 会出现在计划探索提示词的「规划补充说明」区块，覆盖同会话内其它来源写入的 PlanPrompt（若有）。
+  string UserPlanPrompt = 38;
 }
 
 message AITaskFilter {
