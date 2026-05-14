@@ -110,9 +110,17 @@ func (p *FuzzHTTPRequestParam) IsCookieParams() bool {
 }
 
 func (p *FuzzHTTPRequestParam) Name() string {
-	//if p.param2nd != nil {
-	//	return ""
-	//}
+	// For JSON-expanded positions, param holds the outer parameter name (e.g. the GET key or
+	// cookie name) and param2nd holds the JSON sub-field name. Return param2nd so that callers
+	// see the actual field name rather than the outer container name.
+	switch p.position {
+	case lowhttp.PosGetQueryJson, lowhttp.PosGetQueryBase64Json,
+		lowhttp.PosPostQueryJson, lowhttp.PosPostQueryBase64Json,
+		lowhttp.PosCookieJson, lowhttp.PosCookieBase64Json:
+		if s := utils.InterfaceToString(p.param2nd); s != "" {
+			return s
+		}
+	}
 	return fmt.Sprintf("%v", p.param)
 }
 

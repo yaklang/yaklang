@@ -585,6 +585,7 @@ func (f *FuzzHTTPRequest) GetGetQueryParams() []*FuzzHTTPRequestParam {
 				fuzzParams = append(fuzzParams, &FuzzHTTPRequestParam{
 					position:   lowhttp.PosGetQueryJson,
 					param:      key,
+					param2nd:   jk.String(),
 					raw:        fixRaw,
 					paramValue: jv.String(),
 					path:       jPath,
