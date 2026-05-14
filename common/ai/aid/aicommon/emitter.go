@@ -936,6 +936,21 @@ func (e *Emitter) EmitResult(nodeId string, result interface{}, success bool) (*
 	})
 }
 
+func (e *Emitter) EmitNotify(promptType string, content string, duration time.Duration) (*schema.AiOutputEvent, error) {
+	if duration < 0 {
+		duration = 0
+	}
+	return e.EmitJSON(schema.EVENT_TYPE_NOTIFY, "notify", map[string]any{
+		"type":             promptType,
+		"warning_type":     promptType,
+		"content":          content,
+		"duration":         duration.Seconds(),
+		"duration_ms":      duration.Milliseconds(),
+		"duration_seconds": duration.Seconds(),
+		"timestamp":        time.Now().Unix(),
+	})
+}
+
 func (e *Emitter) EmitPinDirectory(path string) (*schema.AiOutputEvent, error) {
 	return e.EmitJSON(schema.EVENT_TYPE_FILESYSTEM_PIN_DIRECTORY, "filesystem", map[string]any{
 		"path":      path,

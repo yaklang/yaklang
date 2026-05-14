@@ -2,6 +2,7 @@ package aicommon
 
 import (
 	"context"
+	"encoding/json"
 	"sync"
 	"testing"
 	"time"
@@ -12,7 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 )
 
-func newTestConfigForHandle429(ctx context.Context) *Config {
+func newTestConfigForHandle429WithEvents(ctx context.Context) (*Config, func() []*schema.AiOutputEvent) {
 	var mu sync.Mutex
 	events := make([]*schema.AiOutputEvent, 0)
 	emitter := NewEmitter("test-429", func(e *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
@@ -22,13 +23,36 @@ func newTestConfigForHandle429(ctx context.Context) *Config {
 		return e, nil
 	})
 	return &Config{
-		Ctx:     ctx,
-		Emitter: emitter,
-	}
+			Ctx:     ctx,
+			Emitter: emitter,
+		}, func() []*schema.AiOutputEvent {
+			mu.Lock()
+			defer mu.Unlock()
+			return append([]*schema.AiOutputEvent(nil), events...)
+		}
+}
+
+func newTestConfigForHandle429(ctx context.Context) *Config {
+	cfg, _ := newTestConfigForHandle429WithEvents(ctx)
+	return cfg
 }
 
 func collectEvents(cfg *Config) []*schema.AiOutputEvent {
 	cfg.Emitter.WaitForStream()
+	return nil
+}
+
+func requireNotifyPayload(t *testing.T, events []*schema.AiOutputEvent) map[string]any {
+	t.Helper()
+	for _, event := range events {
+		if event.Type != schema.EVENT_TYPE_NOTIFY {
+			continue
+		}
+		var payload map[string]any
+		require.NoError(t, json.Unmarshal(event.Content, &payload))
+		return payload
+	}
+	t.Fatalf("notify event not found in %d events", len(events))
 	return nil
 }
 
@@ -139,6 +163,51 @@ func TestHandle429_AIBalance_ZeroQueue_ContextCancelled(t *testing.T) {
 	assert.True(t, is429)
 	assert.True(t, ctxDone)
 	assert.Less(t, elapsed, 2*time.Second)
+}
+
+func TestHandle429_AIBalance_EmitsNotifyEvent(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	cfg, snapshot := newTestConfigForHandle429WithEvents(ctx)
+	rsp := make429Response("X-AIBalance-Info: 2")
+
+	is429, ctxDone := cfg.handle429RateLimit(rsp)
+	cfg.Emitter.WaitForStream()
+
+	assert.True(t, is429)
+	assert.True(t, ctxDone)
+
+	payload := requireNotifyPayload(t, snapshot())
+	require.Equal(t, "notify", payload["type"])
+	require.Equal(t, "notify", payload["warning_type"])
+	require.Contains(t, payload["content"], "此刻有 2 位用户正在与我深度对话中")
+	require.Equal(t, float64(6), payload["duration"])
+	require.Equal(t, float64(6000), payload["duration_ms"])
+	require.Equal(t, float64(6), payload["duration_seconds"])
+}
+
+func TestHandle429_Generic429_EmitsRateLimitNotifyEvent(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	cfg, snapshot := newTestConfigForHandle429WithEvents(ctx)
+	rsp := make429Response()
+
+	is429, ctxDone := cfg.handle429RateLimit(rsp)
+	cfg.Emitter.WaitForStream()
+
+	assert.True(t, is429)
+	assert.True(t, ctxDone)
+
+	payload := requireNotifyPayload(t, snapshot())
+	require.Equal(t, "rate-limit", payload["type"])
+	require.Equal(t, "rate-limit", payload["warning_type"])
+	require.Contains(t, payload["content"], "HTTP 429")
+	require.GreaterOrEqual(t, payload["duration"].(float64), float64(5))
+	require.LessOrEqual(t, payload["duration"].(float64), float64(15))
+	require.GreaterOrEqual(t, payload["duration_ms"].(float64), float64(5000))
+	require.LessOrEqual(t, payload["duration_ms"].(float64), float64(15000))
 }
 
 func TestHandle429_Generic429_WaitsWhenContextAlive(t *testing.T) {

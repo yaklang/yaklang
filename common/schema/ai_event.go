@@ -200,6 +200,10 @@ const (
 	EVENT_TYPE_PERCEPTION            EventType = "perception"
 	EVENT_TYPE_PERCEPTION_CAPABILITY EventType = "perception_capabilities"
 	EVENT_TYPE_PERCEPTION_KNOWLEDGE  EventType = "perception_knowledge"
+
+	// EVENT_TYPE_NOTIFY emits structured user-facing warning notifications.
+	// Payload includes the notification type, content, and display duration.
+	EVENT_TYPE_NOTIFY EventType = "notify"
 )
 
 type AiOutputEvent struct {

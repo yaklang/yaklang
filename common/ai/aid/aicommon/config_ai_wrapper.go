@@ -146,24 +146,29 @@ func (c *Config) handle429RateLimit(rsp *AIResponse) (is429 bool, ctxDone bool) 
 					"您的任务同样重要，我不想敷衍任何一位\n"+
 					"预计等待约 %d 秒，感谢您的耐心",
 				queueCount, waitSec)
-			c.EmitDefaultStreamEvent("notify", strings.NewReader(msg), "")
-			log.Infof("AIBalance 429: queue=%d, waiting %ds", queueCount, waitSec)
 			waitDuration = time.Duration(waitSec) * time.Second
+			c.EmitDefaultStreamEvent("notify", strings.NewReader(msg), "")
+			c.EmitNotify("notify", msg, waitDuration)
+			c.EmitError("AIBalance 429 rate limit: %s", msg)
+			log.Infof("AIBalance 429: queue=%d, waiting %ds", queueCount, waitSec)
 		} else {
 			msg := "当前有大量用户正在与我深度对话中\n" +
 				"您的任务同样重要，我不想敷衍任何一位\n" +
 				"预计等待一段时间后自动请求，感谢您的耐心"
-			c.EmitDefaultStreamEvent("notify", strings.NewReader(msg), "")
-			log.Infof("AIBalance 429: queue info unparseable (%q), waiting 15s", queueInfo)
 			waitDuration = 15 * time.Second
+			c.EmitDefaultStreamEvent("notify", strings.NewReader(msg), "")
+			c.EmitNotify("notify", msg, waitDuration)
+			c.EmitError("AIBalance 429 rate limit: %s", msg)
+			log.Infof("AIBalance 429: queue info unparseable (%q), waiting 15s", queueInfo)
 		}
 	} else {
 		msg := "当前遇到 429 服务器访问人数过多，稍后自动重试\n" +
 			"Current request was rate-limited (HTTP 429), retrying shortly..."
-		c.EmitDefaultStreamEvent("rate-limit", strings.NewReader(msg), "")
 		sleepSec := 5 + rand.Intn(11)
-		log.Infof("generic 429 rate limit, waiting %ds", sleepSec)
 		waitDuration = time.Duration(sleepSec) * time.Second
+		c.EmitDefaultStreamEvent("rate-limit", strings.NewReader(msg), "")
+		c.EmitNotify("rate-limit", msg, waitDuration)
+		log.Infof("generic 429 rate limit, waiting %ds", sleepSec)
 	}
 
 	select {
