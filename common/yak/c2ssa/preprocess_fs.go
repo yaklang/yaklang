@@ -16,12 +16,17 @@ import (
 )
 
 var (
-	globalTempDir       string
-	globalIncludeDirs   []string
-	commonCLibraries    []string
-	headerCache         = make(map[string]bool)
-	includeLineRegexp   = regexp.MustCompile(`^\s*#\s*include\s*<[^>]+>`)
-	includeHeaderRegexp = regexp.MustCompile(`#\s*include\s*<([^>]+)>`)
+	globalTempDir     string
+	globalIncludeDirs []string
+	commonCLibraries  []string
+	headerCache       = make(map[string]bool)
+
+	// reAngleIncludeAnywhere matches #include <path> anywhere on a logical line (after comment strip).
+	reAngleIncludeAnywhere = regexp.MustCompile(`#\s*include\s*<([^>]+)>`)
+	// reAngleIncludeLinePrefix matches a line that begins with an angle-bracket include (same idea as legacy includeLineRegexp).
+	reAngleIncludeLinePrefix = regexp.MustCompile(`^\s*#\s*include\s*<[^>]+>`)
+	// reQuotedIncludeAnywhere matches #include "path" anywhere on a logical line.
+	reQuotedIncludeAnywhere = regexp.MustCompile(`#\s*include\s*"([^"]+)"`)
 )
 
 func newCPreprocessFS(underlying fi.FileSystem) fi.FileSystem {
@@ -35,7 +40,7 @@ func newCPreprocessFS(underlying fi.FileSystem) fi.FileSystem {
 		Matcher: filesys.SuffixMatcher(".c", ".h"),
 		AfterRead: func(ctx *filesys.ReadHookContext, data []byte) ([]byte, error) {
 			src := string(data)
-			headers := extractIncludeHeaders(src)
+			headers := collectStubIncludePaths(src)
 			if err := ensureHeaderFiles(headers); err != nil {
 				log.Warnf("ensure headers for %s failed: %v", ctx.Name, err)
 			}
@@ -132,16 +137,76 @@ func containsDir(dirs []string, dir string) bool {
 	return false
 }
 
-func extractIncludeHeaders(src string) []string {
-	matches := includeHeaderRegexp.FindAllStringSubmatch(src, -1)
-	headers := make([]string, 0, len(matches))
+// isAngleBracketIncludeLineForFilter reports whether a comment-stripped logical line should be
+// removed when mirroring headers (angle-bracket system-style includes only).
+func isAngleBracketIncludeLineForFilter(eff string) bool {
+	return reAngleIncludeLinePrefix.MatchString(strings.TrimSpace(eff))
+}
+
+// stripCCommentsFromPhysicalLine removes /* */ segments on this line, handles an inBlock state
+// carried across lines, and strips a trailing // line comment (naive: does not skip // inside strings).
+// Returns the remaining text on this line for include scanning / filter matching.
+func stripCCommentsFromPhysicalLine(line string, inBlock *bool) string {
+	rest := line
+	if *inBlock {
+		j := strings.Index(rest, "*/")
+		if j < 0 {
+			return ""
+		}
+		*inBlock = false
+		rest = rest[j+2:]
+	}
+	var eff strings.Builder
+	for len(rest) > 0 {
+		i := strings.Index(rest, "/*")
+		if i < 0 {
+			eff.WriteString(rest)
+			break
+		}
+		eff.WriteString(rest[:i])
+		rest = rest[i+2:]
+		j := strings.Index(rest, "*/")
+		if j < 0 {
+			*inBlock = true
+			break
+		}
+		rest = rest[j+2:]
+	}
+	out := eff.String()
+	if k := strings.Index(out, "//"); k >= 0 {
+		out = out[:k]
+	}
+	return out
+}
+
+// collectStubIncludePaths returns deduplicated include paths for empty header stubs before -nostdinc cpp.
+// It scans line-by-line, skips // and /* */ (including multiline blocks). Macro-expanded includes are not visible.
+// Paths inside string literals may be false positives (conservative tradeoff).
+func collectStubIncludePaths(src string) []string {
 	seen := make(map[string]bool)
-	for _, match := range matches {
-		if len(match) > 1 {
-			header := strings.TrimSpace(match[1])
-			if header != "" && !seen[header] {
-				headers = append(headers, header)
-				seen[header] = true
+	var headers []string
+	add := func(p string) {
+		p = strings.TrimSpace(p)
+		if p == "" || seen[p] {
+			return
+		}
+		seen[p] = true
+		headers = append(headers, p)
+	}
+
+	inBlock := false
+	scanner := bufio.NewScanner(strings.NewReader(src))
+	for scanner.Scan() {
+		line := scanner.Text()
+		eff := stripCCommentsFromPhysicalLine(line, &inBlock)
+		for _, m := range reAngleIncludeAnywhere.FindAllStringSubmatch(eff, -1) {
+			if len(m) > 1 {
+				add(m[1])
+			}
+		}
+		for _, m := range reQuotedIncludeAnywhere.FindAllStringSubmatch(eff, -1) {
+			if len(m) > 1 {
+				add(m[1])
 			}
 		}
 	}
@@ -164,9 +229,11 @@ func filterSystemIncludes(src string) string {
 	var builder strings.Builder
 	scanner := bufio.NewScanner(strings.NewReader(src))
 	firstLine := true
+	inBlock := false
 	for scanner.Scan() {
 		line := scanner.Text()
-		if includeLineRegexp.MatchString(line) {
+		eff := stripCCommentsFromPhysicalLine(line, &inBlock)
+		if isAngleBracketIncludeLineForFilter(eff) {
 			continue
 		}
 		if !firstLine {
