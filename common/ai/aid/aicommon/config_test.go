@@ -84,6 +84,17 @@ func TestConfig_ToolComposeConcurrencyPropagation(t *testing.T) {
 	require.Equal(t, 5, child.ToolComposeConcurrency)
 }
 
+func TestConfig_DefaultPlanExecTaskConcurrency(t *testing.T) {
+	config := NewConfig(context.Background())
+	require.Equal(t, 1, config.PlanExecTaskConcurrency)
+}
+
+func TestConfig_PlanExecTaskConcurrencyPropagation(t *testing.T) {
+	parent := NewConfig(context.Background(), WithPlanExecTaskConcurrency(3))
+	child := NewConfig(context.Background(), ConvertConfigToOptions(parent)...)
+	require.Equal(t, 3, child.PlanExecTaskConcurrency)
+}
+
 func TestConfig_IntervalReviewConfigPropagation(t *testing.T) {
 	parent := NewConfig(
 		context.Background(),

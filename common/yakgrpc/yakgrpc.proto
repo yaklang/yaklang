@@ -1940,6 +1940,8 @@ message AIStartParams {
   // 为 true 时，MaybeTriggerPerceptionAfterAction / MaybeTriggerPerceptionAfterVerification /
   // TriggerPerceptionOnSpin 内直接同步调用 TriggerPerception；默认 false 时为异步 goroutine 调用
   bool SyncPerceptionTrigger = 37;
+
+  int64 PlanExecTaskConcurrency = 38; // 计划执行任务的并发度
 }
 
 message AITaskFilter {

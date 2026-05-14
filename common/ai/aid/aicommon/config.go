@@ -303,6 +303,7 @@ type Config struct {
 	IntervalReviewDuration            time.Duration // Duration between reviews (default 20s)
 	ToolCallIntervalReviewExtraPrompt string        // Extra prompt injected into tool-call interval review
 	ToolComposeConcurrency            int           // Max concurrent tool calls in tool_compose DAG (default 2)
+	PlanExecTaskConcurrency           int           // Max concurrent executable tasks per PE DAG stage (default 1)
 
 	// verificationWatchdogToolBlockingStart/End are registered by reactloops.ReActLoop
 	// around synchronous invoker tool execution (aireact.executeToolCallInternal) so the
@@ -488,10 +489,11 @@ func newConfig(ctx context.Context) *Config {
 		AiTransactionAutoRetry:             5,
 		TimelineContentSizeLimit:           50 * 1024, // Default limit for 50k tokens
 		Guardian:                           NewAsyncGuardian(ctx, id),
-		PerTaskUserInteractiveLimitedTimes: 3, // Default to 3 times
+		PerTaskUserInteractiveLimitedTimes: 1, // Default to 3 times
 		EnablePlanAndExec:                  true,
 		AllowRequireForUserInteract:        true,
 		ToolComposeConcurrency:             2,
+		PlanExecTaskConcurrency:            1,
 		Workdir:                            "",
 		MemoryPoolSize:                     10 * 1024, // 10k tokens
 		MemoryPool:                         omap.NewOrderedMap(make(map[string]*MemoryEntity)),
@@ -1807,6 +1809,21 @@ func WithToolComposeConcurrency(n int) ConfigOption {
 	}
 }
 
+func WithPlanExecTaskConcurrency(n int) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		if n <= 0 {
+			n = 1
+		}
+		c.m.Lock()
+		c.PlanExecTaskConcurrency = n
+		c.m.Unlock()
+		return nil
+	}
+}
+
 func WithHijackPERequest(fn func(ctx context.Context, planPayload string) error) ConfigOption {
 	return func(c *Config) error {
 		if c.m == nil {
@@ -2873,6 +2890,13 @@ func (c *Config) GetToolComposeConcurrency() int {
 	return c.ToolComposeConcurrency
 }
 
+func (c *Config) GetPlanExecTaskConcurrency() int {
+	if c.PlanExecTaskConcurrency <= 0 {
+		return 1
+	}
+	return c.PlanExecTaskConcurrency
+}
+
 func (c *Config) GetTimelineContentSizeLimit() int64 {
 	return int64(c.TimelineContentSizeLimit)
 }
@@ -3184,6 +3208,9 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 	}
 	if i.ToolComposeConcurrency > 0 {
 		opts = append(opts, WithToolComposeConcurrency(i.ToolComposeConcurrency))
+	}
+	if i.PlanExecTaskConcurrency > 0 {
+		opts = append(opts, WithPlanExecTaskConcurrency(i.PlanExecTaskConcurrency))
 	}
 	if i.MaxTaskContinue > 0 {
 		opts = append(opts, WithMaxTaskContinue(i.MaxTaskContinue))
