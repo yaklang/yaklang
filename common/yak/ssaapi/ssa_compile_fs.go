@@ -56,6 +56,9 @@ func buildFileContent(
 
 	if err := prog.Build(ast, fileContent.Editor, builder); err != nil {
 		log.Errorf("parse %#v failed: %v", path, err)
+	} else {
+		// Drop duplicate *MemEditor ref from the slice; IR still holds editors via memedit.Range where needed.
+		fileContent.Editor = nil
 	}
 }
 
@@ -103,16 +106,27 @@ func collectCompileTargets(
 	return targets
 }
 
+// parseProjectWithFS compiles a whole project from a filesystem.
+//
+// Pipeline: parallel read/ParseAST is inside f1 only (FilesHandler -> channel). One goroutine
+// consumes the channel (PreHandlerProject) and fills fileContents. f3 walks targets and Build
+// sequentially — it does not consume the AST channel. Observability: log=info prints
+// [ssa.compile.summary]; log=debug prints ssa.compile.phase enter f1_pre_handler / f3_main_build / …
+// and ProcessInfof lines are prefixed with the current phase tag.
 func (c *Config) parseProjectWithFS(
 	filesystem filesys_interface.FileSystem,
 	processCallback func(float64, string, ...any),
 ) (*Program, error) {
-	var calculateTime, preHandlerTime, parseTime, saveTime time.Duration
+	var calculateTime, preHandlerTime, parseTime, finishTime, saveTime time.Duration
+	overallStart := time.Now()
 	defer func() {
 		log.Debugf("calculate time: %v", calculateTime)
 		log.Debugf("pre-handler time: %v", preHandlerTime)
-		log.Debugf("parse time: %v", parseTime)
+		log.Debugf("parse time (main build f3): %v", parseTime)
+		log.Debugf("finish time (f4 Finish+metadata): %v", finishTime)
 		log.Debugf("save time: %v", saveTime)
+		log.Debugf("ssa.compile.phase_segments: %v", calculateTime+preHandlerTime+parseTime+finishTime+saveTime)
+		log.Debugf("ssa.compile.wall: %v", time.Since(overallStart))
 	}()
 
 	defer func() {
@@ -125,6 +139,9 @@ func (c *Config) parseProjectWithFS(
 
 	wg := sync.WaitGroup{}
 
+	// compilePhase labels UI / callback messages and debug logs so operators can align htop with f1/f3/f5.
+	compilePhase := "f0_scan"
+
 	programName := c.GetProgramName()
 	programPath := c.programPath
 	preHandlerTotal := 0
@@ -136,8 +153,9 @@ func (c *Config) parseProjectWithFS(
 	var err error
 	start := time.Now()
 
-	processCallback(0.0, fmt.Sprintf("parse project in fs: %v, path: %v", filesystem, c.GetCodeSource().ToJSONString()))
-	processCallback(0.0, "calculate total size of project")
+	log.Debugf("ssa.compile.phase enter %s", compilePhase)
+	processCallback(0.0, fmt.Sprintf("[%s] parse project in fs: %v, path: %v", compilePhase, filesystem, c.GetCodeSource().ToJSONString()))
+	processCallback(0.0, fmt.Sprintf("[%s] calculate total size of project", compilePhase))
 
 	folder2Save := make([][]string, 0)
 	if programName != "" {
@@ -190,10 +208,14 @@ func (c *Config) parseProjectWithFS(
 
 	process := 0.0
 	prog.ProcessInfof = func(s string, v ...any) {
-		processCallback(
-			process,
-			s, v...,
-		)
+		msg := s
+		if len(v) > 0 {
+			msg = fmt.Sprintf(s, v...)
+		}
+		if compilePhase != "" {
+			msg = fmt.Sprintf("[%s] %s", compilePhase, msg)
+		}
+		processCallback(process, msg)
 	}
 
 	if c.isStop() {
@@ -362,6 +384,8 @@ func (c *Config) parseProjectWithFS(
 	}
 
 	f4 := func() error {
+		f4Start := time.Now()
+		defer func() { finishTime = time.Since(f4Start) }()
 		process = 0.88
 		prog.Finish()
 		// 在保存到数据库之前，设置增量编译信息（如果存在）
@@ -409,9 +433,48 @@ func (c *Config) parseProjectWithFS(
 		wg.Wait()
 		return nil
 	}
-	if err := c.DiagnosticsTrack("ParseProjectWithFS", f1, f2, f3, f4, f5, f6); err != nil {
+	wrapPhase := func(phase string, fn func() error) func() error {
+		return func() error {
+			compilePhase = phase
+			log.Debugf("ssa.compile.phase enter %s", compilePhase)
+			return fn()
+		}
+	}
+	phaseSteps := []func() error{
+		wrapPhase("f1_pre_handler", f1),
+		wrapPhase("f2_after_pre", f2),
+		wrapPhase("f3_main_build", f3),
+		wrapPhase("f4_finish", f4),
+		wrapPhase("f5_save_db", f5),
+		wrapPhase("f6_wait", f6),
+	}
+	if rec := c.DiagnosticsRecorder(); rec != nil {
+		err = rec.Track("ParseProjectWithFS", phaseSteps...)
+	} else {
+		for _, step := range phaseSteps {
+			if err = step(); err != nil {
+				break
+			}
+		}
+	}
+	if err != nil {
 		return nil, err
 	}
+
+	// wall := time.Since(overallStart)
+	// totalCompile := calculateTime + preHandlerTime + parseTime + finishTime + saveTime
+	// log.Infof(
+	// 	"[ssa.compile.summary] program=%s handler_files=%d wall=%s scan=%s pre_handler=%s main_build=%s finish=%s save_instructions=%s phase_sum=%s",
+	// 	prog.Name,
+	// 	len(handlerFilesMap),
+	// 	wall,
+	// 	calculateTime,
+	// 	preHandlerTime,
+	// 	parseTime,
+	// 	finishTime,
+	// 	saveTime,
+	// 	totalCompile,
+	// )
 
 	// 输出文件性能汇总表格
 	if enableFilePerfLog && filePerfRecorder != nil {
