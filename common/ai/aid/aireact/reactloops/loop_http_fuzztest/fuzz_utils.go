@@ -1059,7 +1059,7 @@ func executeFuzzAndCompare(loop *reactloops.ReActLoop, fuzzResult mutate.FuzzHTT
 
 	overview.finalizeResponseLengthGroups()
 	progressEmitter.emitProgress(overview, representativeStatusCode, true)
-	emitLoopHTTPFuzzStatusEvent(loop, loopHTTPFuzzStatusFinish, fuzzID, runtimeID, actionName, "", "", nil)
+	emitLoopHTTPFuzzStatusEvent(loop, loopHTTPFuzzStatusFinish, fuzzID, runtimeID, actionName, reason, paramSummary, buildLoopHTTPFuzzStatusProgress(overview, representativeStatusCode, 3))
 
 	if representativeRequest != "" || representativeResponse != "" {
 		loop.Set("representative_request", representativeRequest)
