@@ -232,6 +232,10 @@ func buildAIDOption(startParams *ypb.AIStartParams) []aicommon.ConfigOption {
 		aidOption = append(aidOption, aicommon.WithID(startParams.GetCoordinatorId()))
 	}
 
+	if startParams.GetUserPlanPrompt() != "" {
+		aidOption = append(aidOption, aicommon.WithPlanPrompt(startParams.GetUserPlanPrompt()))
+	}
+
 	if startParams.GetTaskMaxContinueCount() > 0 {
 		aidOption = append(aidOption, aicommon.WithMaxTaskContinue(startParams.GetTaskMaxContinueCount()))
 	}
