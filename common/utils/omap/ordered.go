@@ -614,14 +614,15 @@ func (o *OrderedMap[T, V]) ForEach(handler func(i T, v V) bool) {
 	}
 	o.init()
 	o.lock.RLock()
-	defer o.lock.RUnlock()
+	keys := append([]T(nil), o.keyChain...)
+	values := make([]V, len(keys))
+	for i, key := range keys {
+		values[i] = o.m[key]
+	}
+	o.lock.RUnlock()
 
-	for _, key := range o.keyChain {
-		v, ok := o.m[key]
-		if !ok {
-			continue
-		}
-		if !handler(key, v) {
+	for i, key := range keys {
+		if !handler(key, values[i]) {
 			break
 		}
 	}

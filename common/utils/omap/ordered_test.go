@@ -5,9 +5,38 @@ import (
 	"reflect"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/davecgh/go-spew/spew"
 )
+
+func TestOrderedMapLock(t *testing.T) {
+	m := NewGeneralOrderedMap()
+	m.Set("a", 1)
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		m.ForEach(func(key string, value any) bool {
+			got, ok := m.Get(key)
+			if !ok || got != value {
+				t.Errorf("Get inside ForEach failed for key %q", key)
+				return false
+			}
+			if m.Len() != 1 {
+				t.Errorf("Len inside ForEach: expected 1, got %d", m.Len())
+				return false
+			}
+			return true
+		})
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("deadlock while calling locked methods inside ForEach")
+	}
+}
 
 func TestWalk(t *testing.T) {
 	var a = NewGeneralOrderedMap()
