@@ -173,3 +173,24 @@ func TestReducerCompiling2_VirtualFile(t *testing.T) {
 	require.NoError(t, err, "compile failed")
 	require.Equal(t, 2, count, "count should be 2")
 }
+
+func TestPipeInitBufSize_capsHugeProjects(t *testing.T) {
+	if g := pipeInitBufSize(100_000, 8); g != 200 {
+		t.Fatalf("100k paths conc=8: want 200, got %d", g)
+	}
+	if g := pipeInitBufSize(100_000, 64); g != 512 {
+		t.Fatalf("100k paths conc=64: want 512, got %d", g)
+	}
+	if g := pipeInitBufSize(100_000, 2048); g != 8192 {
+		t.Fatalf("100k paths conc=2048: want hard cap 8192, got %d", g)
+	}
+}
+
+func TestPipeInitBufSize_smallProjectUnchanged(t *testing.T) {
+	if g := pipeInitBufSize(50, 8); g != 50 {
+		t.Fatalf("50 paths: want 50, got %d", g)
+	}
+	if g := pipeInitBufSize(1, 0); g != 1 {
+		t.Fatalf("1 path conc=0: want 1, got %d", g)
+	}
+}

@@ -67,10 +67,10 @@ func (c *Config) parseFile() (ret *Program, err error) {
 	prog.Finish()
 	wait := func() {}
 	if prog.DatabaseKind != ssa.ProgramCacheMemory {
-		prog.ProcessInfof("[SSA/persist] program %s saving program metadata (ir_program)", prog.Name)
-		metaStart := time.Now()
+		// prog.ProcessInfof("[SSA/persist] program %s saving program metadata (ir_program)", prog.Name)
+		// metaStart := time.Now()
 		wait = prog.UpdateToDatabase()
-		prog.ProcessInfof("[SSA/persist] program %s program metadata saved, cost %v", prog.Name, time.Since(metaStart))
+		// prog.ProcessInfof("[SSA/persist] program %s program metadata saved, cost %v", prog.Name, time.Since(metaStart))
 	}
 	total := prog.Cache.CountInstruction()
 	if prog.DatabaseKind != ssa.ProgramCacheMemory {
@@ -78,11 +78,11 @@ func (c *Config) parseFile() (ret *Program, err error) {
 	} else {
 		prog.ProcessInfof("[SSA/persist] program %s finishing cache instruction(len:%d) (memory only, not saved)", prog.Name, total)
 	}
-	saveStart := time.Now()
+	// saveStart := time.Now()
 	prog.Cache.SaveToDatabase(irSaveProgressCallback(prog, total, 0.0, 1.0, nil))
-	if prog.DatabaseKind != ssa.ProgramCacheMemory {
-		prog.ProcessInfof("[SSA/persist] program %s IR cache close/save finished, cost %v", prog.Name, time.Since(saveStart))
-	}
+	// if prog.DatabaseKind != ssa.ProgramCacheMemory {
+	// 	prog.ProcessInfof("[SSA/persist] program %s IR cache close/save finished, cost %v", prog.Name, time.Since(saveStart))
+	// }
 	wait()
 	p := NewProgram(prog, c)
 	SaveConfig(c, p)
