@@ -12,7 +12,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/syntaxflow_scan"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
@@ -20,7 +19,11 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 )
 
-// AppendSFPipelineLine appends one line to sf_scan_pipeline_summary (compile / scan / overview ticks / 终态).
+const (
+	introAttach = "下列信息来自已附着任务（SSA Risk 抽样），仅可在此基础上解读；不得编造未列出的 risk id。\n\n"
+	introStart  = "下列信息来自同进程新起的扫描，可在此基础上解读；不得编造未列出的 risk id。\n\n"
+)
+
 func AppendSFPipelineLine(loop *reactloops.ReActLoop, line string) {
 	if loop == nil {
 		return
@@ -37,19 +40,13 @@ func AppendSFPipelineLine(loop *reactloops.ReActLoop, line string) {
 	loop.Set(sfu.LoopVarSFPipelineSummary, prev+"\n"+line)
 }
 
-// runPhaseCompileAndScan is P2 orchestrator:
-//
-//	switch state.GetSessionMode():
-//	  Attach → attachAndWireSession（跳过 compile/startScan）
-//	  Start → compile → startScan → attachAndWireSession
-//	  None → 错误（P1 应已写入 attach 或 start）
-func runPhaseCompileAndScan(
+func runPhase2(
 	r aicommon.AIInvokeRuntime,
 	db *gorm.DB,
 	state *SyntaxFlowState,
 	scanLoop *reactloops.ReActLoop,
 	task aicommon.AIStatefulTask,
-) error {
+) (*riskDispatcher, error) {
 	state.SetPhase(SyntaxFlowPhaseCompileScan)
 	pT := task.GetId()
 	parentID := OrchestratorParentTaskID(scanLoop, pT)
@@ -59,13 +56,11 @@ func runPhaseCompileAndScan(
 		AppendSFPipelineLine(scanLoop, "【0·入参】附着已有 task_id，跳过编译与起扫。")
 		scanLoop.Set(sfu.LoopVarSFCompileMeta, "mode=attach (compile skipped)")
 		EmitSyntaxFlowUserStageMarkdown(scanLoop, parentID, "p0_attach", BuildScanStagePhase0Attach(state.GetTaskID(), pT))
-		EmitSyntaxFlowScanPhase(scanLoop, 1, "end", "compile_skipped", "附着 task_id，跳过本地编译 / attach mode, skip compile", state.GetTaskID(), "", nil)
-		return attachAndWireSession(r, db, state, scanLoop, task, state.GetTaskID(), parentID, pT,
-			"下列信息来自已附着任务（SSA Risk 抽样），仅可在此基础上解读；不得编造未列出的 risk id。\n\n")
+		return runAttach(r, db, state, scanLoop, task, state.GetTaskID(), parentID, introAttach)
 
 	case SyntaxFlowSessionModeNone:
 		abort(scanLoop, r, "session mode 仍为 none：P1 未提交 attach/start（不应进入 P2）")
-		return fmt.Errorf("syntaxflow scan: session mode none after intake")
+		return nil, fmt.Errorf("syntaxflow scan: session mode none after intake")
 
 	case SyntaxFlowSessionModeStart:
 		j := strings.TrimSpace(state.GetSFScanConfigJSON())
@@ -73,64 +68,52 @@ func runPhaseCompileAndScan(
 			j = strings.TrimSpace(scanLoop.Get(sfu.LoopVarSFScanConfigJSON))
 		}
 
-		inferred := state.GetConfigInferred()
-		if inferred == "" {
-			inferred = "0"
-		}
-		if strings.TrimSpace(scanLoop.Get(sfu.LoopVarSFScanConfigJSON)) == "" && j != "" {
-			scanLoop.Set(sfu.LoopVarSFScanConfigJSON, j)
-		}
-		scanLoop.Set("sf_scan_config_inferred", inferred)
-
 		proj := strings.TrimSpace(state.GetProjectPath())
 		if proj == "" {
 			proj = strings.TrimSpace(scanLoop.Get(sfu.LoopVarProjectPath))
 		}
-		uHint := strings.TrimSpace(task.GetUserInput())
-		EmitSyntaxFlowScanProgress(scanLoop, "resolve_config", "已得到扫描配置，准备编译 / scan config ready", "", "")
-		EmitSyntaxFlowUserStageMarkdown(scanLoop, parentID, "p0_intake", BuildScanStagePhase0Intake(proj, inferred, utils.ShrinkTextBlock(uHint, 2000), pT))
-
-		usePath := proj != "" && (j == "" || inferred == "1")
-		if !usePath && j == "" {
+		if proj == "" && j == "" {
 			abort(scanLoop, r, "缺少扫描配置：start 模式需要项目路径或 sf_scan_config_json。")
-			return fmt.Errorf("missing scan config after intake")
+			return nil, fmt.Errorf("missing scan config after intake")
 		}
+		if proj == "" {
+			proj = strings.TrimSpace(scanLoop.Get(sfu.LoopVarProjectPath))
+		}
+		uHint := strings.TrimSpace(task.GetUserInput())
+		EmitSyntaxFlowScanPhase(scanLoop, 0, "", "resolve_config", "已得到扫描配置，准备编译 / scan config ready", "", "", nil)
+		EmitSyntaxFlowUserStageMarkdown(scanLoop, parentID, "p0_intake", BuildScanStagePhase0Intake(proj, j, utils.ShrinkTextBlock(uHint, 2000), pT))
+
 		var cfg *ssaconfig.Config
 		var progs []*ssaapi.Program
 		var err error
 		var p1 string
 		var resolveCfg func() (*ssaconfig.Config, error)
-		if usePath {
+		if proj != "" {
 			p1 = BuildScanStagePhase1CompileStart(fmt.Sprintf(`{"_intake":"local_path_only","path":%q}`, strings.TrimSpace(proj)))
-			pathArg := proj
 			resolveCfg = func() (*ssaconfig.Config, error) {
-				return sfu.ResolveCodeScanConfigFromProjectPath(task.GetContext(), pathArg)
+				return sfu.ResolveCodeScanConfigFromProjectPath(task.GetContext(), proj)
 			}
 		} else {
-			p1 = BuildScanStagePhase1CompileStart(j)
-			jsonArg := j
 			resolveCfg = func() (*ssaconfig.Config, error) {
-				return sfu.ResolveCodeScanConfigFromJSON(task.GetContext(), []byte(jsonArg))
+				return sfu.ResolveCodeScanConfigFromJSON(task.GetContext(), []byte(j))
 			}
 		}
 		cfg, progs, _, err = syntaxFlowCompileFromResolved(task.GetContext(), r, scanLoop, parentID, task, p1, resolveCfg)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		tid, err := syntaxFlowStartScanInBackground(r, task.GetContext(), state, scanLoop, cfg, progs, parentID)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		return attachAndWireSession(r, db, state, scanLoop, task, tid, parentID, pT,
-			"下列信息来自同进程新起的扫描，可在此基础上解读；不得编造未列出的 risk id。\n\n")
+		return runAttach(r, db, state, scanLoop, task, tid, parentID, introStart)
 
 	default:
 		abort(scanLoop, r, fmt.Sprintf("不支持的 session mode: %v", state.GetSessionMode()))
-		return fmt.Errorf("unsupported session mode: %v", state.GetSessionMode())
+		return nil, fmt.Errorf("unsupported session mode: %v", state.GetSessionMode())
 	}
 }
 
-// runSyntaxFlowCompilePhase 执行阶段 1 编译：心跳、加载（由 load 提供）、emit。
 func runSyntaxFlowCompilePhase(
 	ctx context.Context,
 	r aicommon.AIInvokeRuntime,
@@ -201,7 +184,6 @@ func runSyntaxFlowCompilePhase(
 	return cfg, progs, compileMs, nil
 }
 
-// syntaxFlowCompileFromResolved：先 resolveCfg 得 cfg，再 [sfu.CompileProgramsFromCodeScanConfig]（与 JSON 或 path 无关）。
 func syntaxFlowCompileFromResolved(
 	ctx context.Context,
 	r aicommon.AIInvokeRuntime,
@@ -221,7 +203,6 @@ func syntaxFlowCompileFromResolved(
 	})
 }
 
-// syntaxFlowStartScanInBackground: call engine StartScanInBackground, write back task_id to state and loop.
 func syntaxFlowStartScanInBackground(
 	r aicommon.AIInvokeRuntime,
 	scanCtx context.Context,
@@ -239,7 +220,6 @@ func syntaxFlowStartScanInBackground(
 	opts = append(opts, CodeScanToSyntaxFlowRuleOptions(cfg)...)
 	EmitSyntaxFlowScanPhase(scanLoop, 2, "start", "scan", "阶段2：启动 SyntaxFlow 扫描 / phase2 scan start", "", "", nil)
 	AppendSFPipelineLine(scanLoop, "【2·起扫】准备 StartScanInBackground（program 见上）")
-	EmitSyntaxFlowScanProgress(scanLoop, "start_scan", "启动后台 SyntaxFlow 扫描 / starting background scan", "", "")
 	tid, err = syntaxflow_scan.StartScanInBackground(scanCtx, opts...)
 	if err != nil {
 		log.Warnf("[syntaxflow_scan] start: %v", err)
@@ -253,70 +233,60 @@ func syntaxFlowStartScanInBackground(
 	return tid, nil
 }
 
-// attachAndWireSession loads the scan session for taskID (may degrade to nil), calls wireSession, emits ready, starts poll if needed.
-// Shared tail for both the attach path (skip compile+start) and the fresh-scan path (after startScan).
-func attachAndWireSession(
+func runAttach(
 	r aicommon.AIInvokeRuntime,
 	db *gorm.DB,
 	state *SyntaxFlowState,
 	scanLoop *reactloops.ReActLoop,
 	task aicommon.AIStatefulTask,
-	taskID, parentID, pT, intro string,
-) error {
-	_ = pT
-	inferred := state.GetConfigInferred()
-	if inferred == "" {
-		inferred = "0"
-	}
+	taskID, parentID, intro string,
+) (*riskDispatcher, error) {
+	disp := newRiskDispatcher(r, scanLoop, task, db, taskID)
 
-	EmitSyntaxFlowScanProgress(scanLoop, "load_session", "加载扫描会话 / loading scan session", taskID, "")
 	res, err := LoadScanSessionResult(db, taskID, DefaultRiskSampleLimit)
 	if err != nil {
 		log.Warnf("[syntaxflow_scan] load session: %v", err)
-		EmitSyntaxFlowScanProgress(scanLoop, "session_degraded",
-			"任务行暂不可读 / task row unreadable (DB/migrations)", taskID, err.Error())
 		EmitSyntaxFlowUserStageMarkdown(scanLoop, parentID, "p2_session_degraded", fmt.Sprintf(
 			"# 代码扫描\n\n## 会话读库降级\n\n**task_id**: `%s`\n\n读库错误：\n```\n%s\n```\n已注册 watch+poll，将重试。",
 			taskID, utils.ShrinkTextBlock(err.Error(), 2000),
 		))
-		poll := wireSession(r, db, scanLoop, task, taskID, inferred,
-			fmt.Sprintf("task_id=%s，详情暂不可读：%v\n\n", taskID, err), nil)
-		if poll {
-			EmitSyntaxFlowScanPhase(scanLoop, 2, "tick", "scan_running", "扫描执行中（任务行待可读）/ running", taskID, "", nil)
-			emitPostWireHandoff(scanLoop, r, db, task, taskID, poll, nil,
-				"阶段3：后台风险轮询与 SSA 总览灌入 / phase3 risk poll",
-				"阶段3：扫描已结束，准备终局物化 / phase3 scan terminal")
-			EmitSyntaxFlowScanProgress(scanLoop, "watch", "扫描未结束，已订阅轮询 / scan running, poll registered", taskID, "")
-		}
-		return nil
+		loopSetPreface(scanLoop, fmt.Sprintf("task_id=%s，详情暂不可读：%v\n\n", taskID, err), nil)
+		disp.Start(task.GetContext())
+		StartScanTaskStatusPoll(scanLoop, r, task, taskID, disp)
+		return disp, nil
 	}
 
-	if res.ScanTask != nil && res.ScanTask.Status != schema.SYNTAXFLOWSCAN_EXECUTING {
-		EmitSyntaxFlowScanPhase(scanLoop, 2, "end", "scan_done", "扫描已结束 / scan done", taskID, "", nil)
-	} else {
-		st := ""
-		if res.ScanTask != nil {
-			st = res.ScanTask.Status
-		}
-		EmitSyntaxFlowScanPhase(scanLoop, 2, "tick", "scan_running", "扫描执行中 / scan running", taskID, "", map[string]any{
-			"status": st,
-		})
-	}
+	scanAlreadyDone := res.ScanTask != nil && res.ScanTask.Status != schema.SYNTAXFLOWSCAN_EXECUTING
 
-	poll := wireSession(r, db, scanLoop, task, taskID, inferred, intro, res)
+	loopSetPreface(scanLoop, intro, res)
 	AppendSfScanInterpretLog(scanLoop, r, taskID, "init: 已加载首包 risk 样本")
-	EmitSyntaxFlowScanProgress(scanLoop, "ready", "扫描会话已就绪 / scan session ready", taskID, "")
 	EmitSyntaxFlowUserStageMarkdown(scanLoop, parentID, "p2_session_ready", fmt.Sprintf(
-		"# 代码扫描·阶段 2\n\n## 会话已就绪\n\n- **task_id**: `%s`\n- **轮询**: %v\n\n**preface 头（截断）**:\n```\n%s\n```",
-		taskID, poll, utils.ShrinkTextBlock(scanLoop.Get("sf_scan_review_preface"), 6000),
+		"# 代码扫描·阶段 2\n\n## 会话已就绪\n\n- **task_id**: `%s`\n- **扫描已结束**: %v\n\n**preface 头（截断）**:\n```\n%s\n```",
+		taskID, scanAlreadyDone, utils.ShrinkTextBlock(scanLoop.Get("sf_scan_review_preface"), 6000),
 	))
-	emitPostWireHandoff(scanLoop, r, db, task, taskID, poll, res,
-		"阶段3：后台风险轮询、SSA 总览与终局物化 / phase3 risk poll",
-		"阶段3：扫描已结束，准备终局物化 / phase3 scan terminal")
-	if poll {
-		EmitSyntaxFlowScanProgress(scanLoop, "watch", "扫描未结束，已订阅轮询 / scan running, poll registered", taskID, "")
+
+	if scanAlreadyDone {
+		if res.ScanTask != nil {
+			endText := FormatSyntaxFlowScanEndReport(res.ScanTask)
+			scanLoop.Set(sfu.LoopVarSFScanEndSummary, endText)
+			AppendSFPipelineLine(scanLoop, "【2·结束】"+endText)
+		}
+		disp.SeedExistingRisks(task.GetContext())
+		disp.NotifyScanTerminal()
+	} else {
+		disp.Start(task.GetContext())
+		StartScanTaskStatusPoll(scanLoop, r, task, taskID, disp)
 	}
-	return nil
+	return disp, nil
+}
+
+func loopSetPreface(loop *reactloops.ReActLoop, intro string, res *sfu.ScanSessionResult) {
+	preface := intro
+	if res != nil {
+		preface += res.Preface
+	}
+	loop.Set("sf_scan_review_preface", preface)
+	loop.Set(sfu.LoopVarSyntaxFlowScanSessionMode, sfu.SessionModeAttach)
 }
 
 func abort(loop *reactloops.ReActLoop, r aicommon.AIInvokeRuntime, msg string) {
@@ -324,53 +294,4 @@ func abort(loop *reactloops.ReActLoop, r aicommon.AIInvokeRuntime, msg string) {
 	if r != nil {
 		r.AddToTimeline("syntaxflow_scan", msg)
 	}
-	EmitSyntaxFlowScanProgress(loop, "failed", "初始化未通过 / init aborted", "", msg)
-}
-
-// emitPostWireHandoff: after wireSession, either register risk poll (step 3) or apply final context + P4 hints (scan already done).
-func emitPostWireHandoff(
-	scanLoop *reactloops.ReActLoop,
-	r aicommon.AIInvokeRuntime,
-	db *gorm.DB,
-	task aicommon.AIStatefulTask,
-	taskID string,
-	poll bool,
-	res *ScanSessionResult,
-	msgWhenPolling, msgWhenAlreadyDone string,
-) {
-	if poll {
-		EmitSyntaxFlowScanPhase(scanLoop, 3, "start", "risk_watch", msgWhenPolling, taskID, "", nil)
-		return
-	}
-	ApplyFinalReportContextWhenScanAlreadyDone(scanLoop, r, db, task, taskID, res)
-	EmitSyntaxFlowScanPhase(scanLoop, 3, "start", "risk_watch", msgWhenAlreadyDone, taskID, "", nil)
-	EmitSyntaxFlowScanProgress(scanLoop, "final_report_required", "须输出大总结 / MUST deliver final merged report", taskID, "")
-	EmitSyntaxFlowScanPhase(scanLoop, 4, "start", "final_report_mandatory",
-		"请输出含各阶段 + 扫描统计 + 全部 risk 的终局大总结 / deliver final report (mandatory)", taskID, "", nil)
-}
-
-// wireSession writes the scan session into loop vars + timeline, registers poll if still executing.
-func wireSession(
-	r aicommon.AIInvokeRuntime,
-	db *gorm.DB,
-	loop *reactloops.ReActLoop,
-	task aicommon.AIStatefulTask,
-	taskID, inferred, intro string,
-	res *ScanSessionResult,
-) (poll bool) {
-	loop.Set(sfu.LoopVarSyntaxFlowTaskID, taskID)
-	loop.Set(sfu.LoopVarSyntaxFlowScanSessionMode, sfu.SessionModeAttach)
-	loop.Set("sf_scan_config_inferred", inferred)
-	preface := intro
-	if res != nil {
-		preface += res.Preface
-	}
-	loop.Set("sf_scan_review_preface", preface)
-	r.AddToTimeline("syntaxflow_scan", utils.ShrinkTextBlock(preface, 4000))
-	PersistEffectiveOverviewFilter(loop, &ypb.SSARisksFilter{RuntimeID: []string{taskID}})
-	poll = res == nil || (res.ScanTask != nil && res.ScanTask.Status == schema.SYNTAXFLOWSCAN_EXECUTING)
-	if poll {
-		StartScanTaskStatusPoll(db, loop, r, task, taskID, task.GetContext())
-	}
-	return poll
 }

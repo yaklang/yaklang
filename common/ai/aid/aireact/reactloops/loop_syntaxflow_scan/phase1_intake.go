@@ -98,10 +98,9 @@ Return structured fields.`
 		TaskID:           strings.TrimSpace(result.GetString("task_id")),
 		ProjectPath:      strings.TrimSpace(result.GetString("project_path")),
 		SFScanConfigJSON: strings.TrimSpace(result.GetString("sf_scan_config_json")),
-		Reason:           result.GetString("reason"),
 	}
-	log.Infof("[syntaxflow_scan] intake forge: task_id=%q path=%q json_len=%d reason=%q",
-		out.TaskID, out.ProjectPath, len(out.SFScanConfigJSON), out.Reason)
+	log.Infof("[syntaxflow_scan] intake forge: task_id=%q path=%q json_len=%d",
+		out.TaskID, out.ProjectPath, len(out.SFScanConfigJSON))
 	return out, nil
 }
 
@@ -121,7 +120,7 @@ func requireLocalPathForScan(p string) error {
 }
 
 // commitNewScan 写入新扫：Mode=start，清空 task_id；可仅含 code-scan JSON、或仅含本地项目路径（由 P2 经 ssa_compile 探测+编译）。
-func commitNewScan(state *SyntaxFlowState, loop *reactloops.ReActLoop, sfJSON string, configInferred string, intakeProjectPath string) error {
+func commitNewScan(state *SyntaxFlowState, loop *reactloops.ReActLoop, sfJSON string, intakeProjectPath string) error {
 	sfJSON = strings.TrimSpace(sfJSON)
 	intakeProjectPath = strings.TrimSpace(intakeProjectPath)
 	if sfJSON == "" && intakeProjectPath == "" {
@@ -133,16 +132,12 @@ func commitNewScan(state *SyntaxFlowState, loop *reactloops.ReActLoop, sfJSON st
 	loop.Set(sfu.LoopVarSyntaxFlowScanSessionMode, sfu.SessionModeStart)
 	loop.Set(sfu.LoopVarSFScanConfigJSON, sfJSON)
 	state.SetSFScanConfigJSON(sfJSON)
-	inferred := strings.TrimSpace(configInferred)
-	if inferred == "" {
-		inferred = "0"
-	}
-	state.SetConfigInferred(inferred)
 	return nil
 }
 
 // commitAttachScan 写入附着：task_id 存在性在 runPhase1Intake 结束前统一校验（validateAttachTaskAfterPhase1）。
-func commitAttachScan(state *SyntaxFlowState, loop *reactloops.ReActLoop, taskID string) error {
+// optionalJSON 可选：仅存 state.SFScanConfigJSON，不参与 compile 主路径。
+func commitAttachScan(state *SyntaxFlowState, loop *reactloops.ReActLoop, taskID string, optionalJSON ...string) error {
 	taskID = strings.TrimSpace(taskID)
 	if taskID == "" {
 		return fmt.Errorf("附着需要非空的 syntaxflow_task_id")
@@ -152,17 +147,10 @@ func commitAttachScan(state *SyntaxFlowState, loop *reactloops.ReActLoop, taskID
 	loop.Set(sfu.LoopVarSyntaxFlowScanSessionMode, sfu.SessionModeAttach)
 	state.SetTaskID(taskID)
 	loop.Set(sfu.LoopVarSyntaxFlowTaskID, taskID)
-	return nil
-}
-
-// commitAttachScanWithOptionalResolvedJSON 附着并可选附带一份配置 JSON（仅存 state.SFScanConfigJSON，不参与 compile 主路径）。
-func commitAttachScanWithOptionalResolvedJSON(state *SyntaxFlowState, loop *reactloops.ReActLoop, taskID string, optionalJSON string) error {
-	if err := commitAttachScan(state, loop, taskID); err != nil {
-		return err
-	}
-	if j := strings.TrimSpace(optionalJSON); j != "" {
-		state.SetSFScanConfigJSON(j)
-		state.SetConfigInferred("0")
+	if len(optionalJSON) > 0 {
+		if j := strings.TrimSpace(optionalJSON[0]); j != "" {
+			state.SetSFScanConfigJSON(j)
+		}
 	}
 	return nil
 }
@@ -179,13 +167,13 @@ func commitScanFromIntakeSignals(state *SyntaxFlowState, loop *reactloops.ReActL
 		break // 见下方推导：成功后 Mode 必为 attach 或 start
 	case SyntaxFlowSessionModeAttach:
 		loop.Set(sfu.LoopVarSyntaxFlowScanSessionMode, sfu.SessionModeAttach)
-		return commitAttachScanWithOptionalResolvedJSON(state, loop, s.TaskID, s.SFScanConfigJSON)
+		return commitAttachScan(state, loop, s.TaskID, s.SFScanConfigJSON)
 	case SyntaxFlowSessionModeStart:
 		loop.Set(sfu.LoopVarSyntaxFlowScanSessionMode, sfu.SessionModeStart)
-		j := strings.TrimSpace(s.SFScanConfigJSON)
+		json := strings.TrimSpace(s.SFScanConfigJSON)
 		pp := strings.TrimSpace(s.ProjectPath)
-		if j != "" {
-			return commitNewScan(state, loop, j, "0", pp)
+		if json != "" {
+			return commitNewScan(state, loop, json, pp)
 		}
 		if pp == "" {
 			return fmt.Errorf("session_mode=start 需要 sf_scan_config_json 或 project_path")
@@ -193,25 +181,22 @@ func commitScanFromIntakeSignals(state *SyntaxFlowState, loop *reactloops.ReActL
 		if err := requireLocalPathForScan(pp); err != nil {
 			return err
 		}
-		return commitNewScan(state, loop, "", "1", pp)
+		return commitNewScan(state, loop, "", pp)
 	default:
 		return fmt.Errorf("附件 session_mode 无效（仅 attach 或 start）")
 	}
 
-	if fromIrifyAttachment && strings.TrimSpace(s.TaskID) != "" && strings.TrimSpace(s.SFScanConfigJSON) != "" {
-		return fmt.Errorf("附件同时含 task_id 与 sf_scan_config_json，请补充 irify_syntaxflow#session_mode")
+	if taskID := strings.TrimSpace(s.TaskID); taskID != "" {
+		return commitAttachScan(state, loop, taskID)
 	}
-	if id := strings.TrimSpace(s.TaskID); id != "" {
-		return commitAttachScan(state, loop, id)
+	if json := strings.TrimSpace(s.SFScanConfigJSON); json != "" {
+		return commitNewScan(state, loop, json, "")
 	}
-	if j := strings.TrimSpace(s.SFScanConfigJSON); j != "" {
-		return commitNewScan(state, loop, j, "0", "")
-	}
-	if pp := strings.TrimSpace(s.ProjectPath); pp != "" {
-		if err := requireLocalPathForScan(pp); err != nil {
+	if projectPath := strings.TrimSpace(s.ProjectPath); projectPath != "" {
+		if err := requireLocalPathForScan(projectPath); err != nil {
 			return err
 		}
-		return commitNewScan(state, loop, "", "1", pp)
+		return commitNewScan(state, loop, "", projectPath)
 	}
 	return errIntakeSignalsUnmatched
 }
@@ -264,11 +249,10 @@ func runPhase1Intake(
 
 	if err := commitScanFromIntakeSignals(state, parentLoop, forged, false); err != nil {
 		if errors.Is(err, errIntakeSignalsUnmatched) {
-			log.Infof("[syntaxflow_scan] intake forge empty: reason=%q", forged.Reason)
+			log.Infof("[syntaxflow_scan] intake forge empty")
 			return fmt.Errorf("irify_syntaxflow 无扫描参数，用户输入也未给出 task_id、路径或 sf_scan_config_json（可补充附件 session_mode）")
 		}
 		return err
 	}
-	state.SetIntakeReason(forged.Reason)
 	return validateAttachTaskAfterPhase1(state)
 }

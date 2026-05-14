@@ -14,6 +14,7 @@ var runtimeScopedBroadcastThrottleInterval = 1.0
 var (
 	RuntimeScopedBroadcastTypeHTTPFlow = "httpflow"
 	RuntimeScopedBroadcastTypeRisk     = "risk"
+	RuntimeScopedBroadcastTypeSSARisk  = "ssa_risk"
 )
 
 type RuntimeScopedBroadcastEvent struct {

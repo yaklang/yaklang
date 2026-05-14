@@ -73,10 +73,7 @@ type SyntaxFlowScanIntakeSignals struct {
 	Mode             SyntaxFlowScanSessionMode
 	TaskID           string
 	ProjectPath      string
-	SFScanConfigJSON string // resolved code-scan JSON body after intake when applicable
-	// ConfigInferred is "1" when SFScanConfigJSON was inferred from local path; otherwise "0". Wired as loop var sf_scan_config_inferred.
-	ConfigInferred string
-	Reason         string // LiteForge justification when attachments lacked payload
+	SFScanConfigJSON string
 }
 
 // SyntaxFlowState is shared by the orchestrator init task and phase emitters (loop vars + emitter).
@@ -85,7 +82,6 @@ type SyntaxFlowState struct {
 
 	Phase SyntaxFlowPhase
 
-	// Intake snapshot after successful P1 (mode, ids, config, inferred flag, reason).
 	SyntaxFlowScanIntakeSignals
 }
 
@@ -93,8 +89,7 @@ func NewSyntaxFlowState() *SyntaxFlowState {
 	return &SyntaxFlowState{
 		Phase: SyntaxFlowPhaseIntake,
 		SyntaxFlowScanIntakeSignals: SyntaxFlowScanIntakeSignals{
-			Mode:           SyntaxFlowSessionModeNone,
-			ConfigInferred: "0",
+			Mode: SyntaxFlowSessionModeNone,
 		},
 	}
 }
@@ -159,36 +154,7 @@ func (s *SyntaxFlowState) GetProjectPath() string {
 	return s.SyntaxFlowScanIntakeSignals.ProjectPath
 }
 
-func (s *SyntaxFlowState) SetConfigInferred(inferred string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if inferred == "1" {
-		s.SyntaxFlowScanIntakeSignals.ConfigInferred = "1"
-	} else {
-		s.SyntaxFlowScanIntakeSignals.ConfigInferred = "0"
-	}
-}
 
-func (s *SyntaxFlowState) GetConfigInferred() string {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	v := s.SyntaxFlowScanIntakeSignals.ConfigInferred
-	if v == "" {
-		return "0"
-	}
-	return v
-}
-
-func (s *SyntaxFlowState) SetIntakeReason(r string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.SyntaxFlowScanIntakeSignals.Reason = r
-}
-
-// EmitSyntaxFlowScanProgress 在引擎内同步阶段：顶栏 loading（EmitStatus）+ 结构化事件（EVENT_TYPE_STRUCTURED, nodeId=syntaxflow_scan_progress）。
-func EmitSyntaxFlowScanProgress(loop *reactloops.ReActLoop, phase, message, taskID, err string) {
-	EmitSyntaxFlowScanPhase(loop, 0, "", phase, message, taskID, err, nil)
-}
 
 // EmitSyntaxFlowScanPhase 三阶段编排：step=1 编译、2 扫描、3 风险轮询/总览；stage=start|end|tick。
 // extra 可带 program_name、risk_count、status 等结构化附字段。

@@ -1,9 +1,7 @@
-// Loop registration and main orchestrator init (P1 intake → P2 compile/scan → poll → P4 report).
 package loop_syntaxflow_scan
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
@@ -39,7 +37,6 @@ func init() {
 	}
 }
 
-// buildSyntaxflowOrchestratorInit runs P1 intake → P2 compile/scan (or attach) → wait for risk convergence → P4 report.
 func buildSyntaxflowOrchestratorInit(r aicommon.AIInvokeRuntime, state *SyntaxFlowState) func(*reactloops.ReActLoop, aicommon.AIStatefulTask, *reactloops.InitTaskOperator) {
 	return func(parentLoop *reactloops.ReActLoop, task aicommon.AIStatefulTask, op *reactloops.InitTaskOperator) {
 		userInput := task.GetUserInput()
@@ -56,16 +53,15 @@ func buildSyntaxflowOrchestratorInit(r aicommon.AIInvokeRuntime, state *SyntaxFl
 			return
 		}
 
-		if err := runPhaseCompileAndScan(r, db, state, parentLoop, task); err != nil {
+		disp, err := runPhase2(r, db, state, parentLoop, task)
+		if err != nil {
 			op.Failed(err)
 			return
 		}
 
 		state.SetPhase(SyntaxFlowPhaseReport)
-		WaitForSyntaxFlowReportGate(task.GetContext(), parentLoop)
-		if strings.TrimSpace(parentLoop.Get(sfu.LoopVarSFRiskConverged)) != "1" {
-			r.AddToTimeline("syntaxflow_scan", "P4 物化前未在预期窗口内看到风险行数与任务行已联合收敛，仍将尝试成稿，建议核对 SSA risk 表是否仍写入。")
-		}
+		disp.WaitDrained(task.GetContext())
+
 		runPhaseReportGenerating(r, parentLoop, task)
 		state.SetPhase(SyntaxFlowPhaseDone)
 		op.Done()

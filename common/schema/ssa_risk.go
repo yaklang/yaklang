@@ -145,6 +145,7 @@ func (s *SSARisk) AfterCreate(tx *gorm.DB) (err error) {
 		"task_id": s.RuntimeId,
 		"action":  "update", // just notify update for frontend
 	})
+	PublishRuntimeScopedBroadcast(RuntimeScopedBroadcastTypeSSARisk, s.RuntimeId, "create", uint(s.ID))
 	return nil
 }
 
@@ -153,6 +154,7 @@ func (s *SSARisk) AfterUpdate(tx *gorm.DB) (err error) {
 		"task_id": s.RuntimeId,
 		"action":  "update",
 	})
+	PublishRuntimeScopedBroadcast(RuntimeScopedBroadcastTypeSSARisk, s.RuntimeId, "update", uint(s.ID))
 	return nil
 }
 

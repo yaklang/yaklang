@@ -14,17 +14,9 @@ import (
 // DefaultRiskSampleLimit is re-exported from syntaxflow_utils.
 const DefaultRiskSampleLimit = sfu.DefaultRiskSampleLimit
 
-// ScanSessionResult is re-exported from syntaxflow_utils.
-type ScanSessionResult = sfu.ScanSessionResult
-
 // LoadScanSessionResult loads task row + risk count + up to riskSampleLimit risks for AI preface.
-func LoadScanSessionResult(db *gorm.DB, taskID string, riskSampleLimit int) (*ScanSessionResult, error) {
+func LoadScanSessionResult(db *gorm.DB, taskID string, riskSampleLimit int) (*sfu.ScanSessionResult, error) {
 	return sfu.LoadScanSessionResult(db, taskID, riskSampleLimit)
-}
-
-// FormatScanTaskProgressLine summarizes query progress from the task row.
-func FormatScanTaskProgressLine(st *schema.SyntaxFlowScanTask) string {
-	return sfu.FormatScanTaskProgressLine(st)
 }
 
 // ErrSyntaxFlowScanTaskNotFound 附着 task_id 在 SSA 工程库中无对应任务行时返回（errors.Is 可判断）。

@@ -248,7 +248,7 @@ func BuildScanStagePhase2ScanStart(taskID string) string {
 // BuildScanStagePhase2Progress 扫描执行中或终态后等待收敛时的一帧用户向摘要。
 func BuildScanStagePhase2Progress(
 	st *schema.SyntaxFlowScanTask,
-	res *ScanSessionResult,
+	res *sfutil.ScanSessionResult,
 	frameIdx int,
 	riskStabilizing bool,
 ) string {
@@ -347,7 +347,7 @@ func DistinctFromRulesFromRisks(risks []*schema.SSARisk) []string {
 }
 
 // buildRiskSampleTableAndRules 返回 (规则 bullet 行, markdown 表)。
-func buildRiskSampleTableAndRules(res *ScanSessionResult, maxRows int) (rulesLine, table string) {
+func buildRiskSampleTableAndRules(res *sfutil.ScanSessionResult, maxRows int) (rulesLine, table string) {
 	if res == nil {
 		return "", "（当前未取到本批风险样本。若总风险为 0，或尚未落库/查询失败，会显示为「暂无已入库风险」。）\n"
 	}
