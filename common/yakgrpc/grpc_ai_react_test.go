@@ -30,6 +30,7 @@ func TestConvertYPBAIStartParamsToReActConfig(t *testing.T) {
 	includeKeywords := []string{uuid.New().String(), uuid.New().String()}
 	aiService := uuid.NewString()
 	presetPrompt := uuid.New().String()
+	userPlanPrompt := uuid.New().String()
 	disableToolIntervalReview := rand.Intn(2) == 1
 	syncPerceptionTrigger := rand.Intn(2) == 1
 
@@ -47,6 +48,7 @@ func TestConvertYPBAIStartParamsToReActConfig(t *testing.T) {
 		DisableAISearchForge:         true, // just to test that this field is ignored, not start embedding server in ci test
 		AICallTokenLimit:             100 * 1024,
 		UserPresetPrompt:             presetPrompt,
+		UserPlanPrompt:               userPlanPrompt,
 		DisableToolIntervalReview:    disableToolIntervalReview,
 		SyncPerceptionTrigger: syncPerceptionTrigger,
 	}
@@ -71,6 +73,7 @@ func TestConvertYPBAIStartParamsToReActConfig(t *testing.T) {
 	require.ElementsMatch(t, start.IncludeSuggestedToolKeywords, cfg.Keywords)
 	require.Equal(t, start.AICallTokenLimit, cfg.AiCallTokenLimit)
 	require.Equal(t, start.UserPresetPrompt, cfg.UserPresetPrompt)
+	require.Equal(t, start.UserPlanPrompt, cfg.PlanPrompt)
 	require.Equal(t, start.DisableToolIntervalReview, cfg.DisableIntervalReview)
 	require.Equal(t, start.SyncPerceptionTrigger, cfg.GetSyncPerceptionTrigger())
 	require.Equal(t, start.GetEnablePlan(), cfg.GetEnablePlanAndExec())
