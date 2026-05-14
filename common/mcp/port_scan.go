@@ -86,7 +86,7 @@ func init() {
 			),
 			mcp.WithStringArray("proto",
 				mcp.Description("Protocols to scan: tcp, udp"),
-				mcp.Enum("tcp", "udp"),
+				mcp.ItemsEnum("tcp", "udp"),
 				mcp.Default([]string{"tcp"}),
 				mcp.Required(),
 			),

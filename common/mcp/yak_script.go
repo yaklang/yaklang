@@ -55,7 +55,7 @@ var filterOnlinePluginToolOptions = []mcp.ToolOption{
 	mcp.WithStringArray("scriptName"),
 	mcp.WithStringArray("pluginType",
 		mcp.Description("Script type"),
-		mcp.Enum("yak", "codec", "mitm", "nuclei", "port-scan"),
+		mcp.ItemsEnum("yak", "codec", "mitm", "nuclei", "port-scan"),
 	),
 	mcp.WithStringArray("tags",
 		mcp.Description("Tags associated with the scripts"),
@@ -65,7 +65,7 @@ var filterOnlinePluginToolOptions = []mcp.ToolOption{
 	),
 	mcp.WithStringArray("excludeTypes",
 		mcp.Description("Script types to exclude from the query"),
-		mcp.Enum("yak", "codec", "mitm", "nuclei", "port-scan"),
+		mcp.ItemsEnum("yak", "codec", "mitm", "nuclei", "port-scan"),
 	),
 	mcp.WithString("group",
 		mcp.Description("Script Group"),
@@ -137,12 +137,8 @@ func init() {
 				mcp.Description("Exclude specific script types"),
 			),
 			mcp.WithNumber("IsMITMParamPlugins",
-				mcp.Description(`Filter MITM parameter plugins:
-0 - No filter
-1 - Only plugins with MITM parameters
-2 - Plugins without MITM params OR port-scan type`),
+				mcp.Description(`Filter MITM parameter plugins. Allowed values: 0 (no filter), 1 (only plugins with MITM parameters), 2 (plugins without MITM params OR port-scan type)`),
 				mcp.Default(0),
-				mcp.Enum(0, 1, 2),
 			),
 		), handleListYakScriptGroup),
 

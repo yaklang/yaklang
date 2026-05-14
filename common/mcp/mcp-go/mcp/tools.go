@@ -259,6 +259,20 @@ func EnumString(values ...string) PropertyOption {
 	}
 }
 
+// ItemsEnum sets the enum constraint on the items schema of an array property.
+// Use this instead of Enum for array-typed fields to comply with strict JSON Schema
+// validators (e.g. Gemini) that only allow enum on string-typed fields.
+func ItemsEnum(values ...string) PropertyOption {
+	return func(schema map[string]any) {
+		items, ok := schema["items"].(map[string]any)
+		if !ok {
+			items = map[string]any{"type": "string"}
+			schema["items"] = items
+		}
+		items["enum"] = lo.Map(values, func(item string, _ int) any { return item })
+	}
+}
+
 // MaxLength sets the maximum length for a string property.
 // The string value must not exceed this length.
 func MaxLength(max int) PropertyOption {

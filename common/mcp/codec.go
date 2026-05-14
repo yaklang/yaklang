@@ -51,7 +51,7 @@ func init() {
 			mcp.WithDescription("Get codec method details, include codec name, description and params. Should be use with exec_codec tool"),
 			mcp.WithStringArray("method",
 				mcp.Description("Name of codec method"),
-				mcp.EnumString(codegrpc.GetCodecLibsDocMethodNames()...),
+				mcp.ItemsEnum(codegrpc.GetCodecLibsDocMethodNames()...),
 				mcp.Required(),
 			),
 		), handleCodecMethodDetails),
