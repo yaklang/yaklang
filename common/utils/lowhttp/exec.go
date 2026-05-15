@@ -671,12 +671,12 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 		if clientHelloSpec != nil {
 			dialopts = append(dialopts, netx.DialX_WithClientHelloSpec(clientHelloSpec))
 		} else if randomJA3FingerPrint {
-			spec, err := utls.UTLSIdToSpec(utls.HelloRandomizedALPN)
+			spec, err := utls.UTLSIdToSpec(utls.HelloChrome_120)
 			if err == nil {
 				clientHelloSpec = &spec
 				dialopts = append(dialopts, netx.DialX_WithClientHelloSpec(&spec))
 			} else {
-				log.Debugf("generate random JA3 fingerprint failed: %v", err)
+				log.Debugf("generate Chrome TLS fingerprint failed: %v", err)
 			}
 		}
 		if sni != nil {
