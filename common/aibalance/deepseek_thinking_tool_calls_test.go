@@ -458,37 +458,23 @@ func TestServeChatCompletions_DeepseekToolCalls_NonStream(t *testing.T) {
 	resp := driveServeRequest(t, cfg, body, nil)
 	require.True(t, strings.Contains(resp, "200 OK"), "expect 200 OK, got: %s", resp)
 
-	// 非流式响应仍然走 chunked transfer + writer.GetNotStreamBody (server.go 1352-1359)
-	// 解析所有 chunked body, 然后再尝试 JSON 解码
-	var bodyBuf bytes.Buffer
+	// 非流式响应使用 Content-Length + 一次性 body, 不再用 chunked transfer.
+	// 这样上游 nginx 反代到 HTTP/2 时不会出现 stream not closed cleanly 的问题。
+	// 关键词: 非流式 Content-Length 响应解析
 	idx := strings.Index(resp, "\r\n\r\n")
 	require.GreaterOrEqual(t, idx, 0)
-	rest := resp[idx+4:]
-	cursor := 0
-	for cursor < len(rest) {
-		newline := strings.Index(rest[cursor:], "\r\n")
-		if newline < 0 {
-			break
-		}
-		sizeStr := strings.TrimSpace(rest[cursor : cursor+newline])
-		if sizeStr == "" {
-			cursor += newline + 2
-			continue
-		}
-		size := 0
-		_, perr := fmt.Sscanf(sizeStr, "%x", &size)
-		if perr != nil || size <= 0 {
-			break
-		}
-		cursor += newline + 2
-		if cursor+size > len(rest) {
-			break
-		}
-		bodyBuf.Write([]byte(rest[cursor : cursor+size]))
-		cursor += size + 2
-	}
+	headerPart := resp[:idx]
+	body2 := resp[idx+4:]
 
-	respBody := bytes.TrimSpace(bodyBuf.Bytes())
+	// 必须含 application/json header, 防止退回 SSE
+	assert.True(t, strings.Contains(strings.ToLower(headerPart), "content-type: application/json"),
+		"non-stream response must use application/json content-type, header=%s", headerPart)
+	assert.True(t, strings.Contains(strings.ToLower(headerPart), "content-length:"),
+		"non-stream response must declare Content-Length, header=%s", headerPart)
+	assert.False(t, strings.Contains(strings.ToLower(headerPart), "transfer-encoding: chunked"),
+		"non-stream response MUST NOT use chunked transfer encoding (HTTP/2 INTERNAL_ERROR risk)")
+
+	respBody := bytes.TrimSpace([]byte(body2))
 	require.NotEmpty(t, respBody, "non-stream body should not be empty, raw=%s", resp)
 
 	var parsed map[string]any
@@ -664,3 +650,100 @@ func TestChatJSONChunkWriter_AccumulateParallelToolCalls_IndexIsolation(t *testi
 type nopWriteCloser struct{ io.Writer }
 
 func (nopWriteCloser) Close() error { return nil }
+
+// ============================================================
+// 测试 5: tool round-trip 第二轮 (回灌 tool result -> 模型 NL 回答)
+// 模拟 OpenAI Python SDK / langchain / litellm / codex 真实链路:
+//   round1: client -> aibalance -> upstream, upstream 返回 tool_calls
+//   round2: client 把 tool 结果回灌给 aibalance, 上游模型给出最终 NL 回答
+//
+// 旧实现真实链路在这个 round2 出现 "上游正常回了 content,
+// 但 aibalance 返回客户端的 SSE 是空" 的现象。该测试 mock 一个上游,
+// 上游对 round2 (识别出消息里包含 role=tool 的消息) 返回正常 content
+// + finish_reason=stop, 然后断言 aibalance 透传给客户端的 SSE 也含 content。
+//
+// 关键词: tool round-trip 第二轮, role=tool 回灌, OpenAI SDK 真实闭环
+// ============================================================
+
+func TestServeChatCompletions_DeepseekToolRoundTrip_Round2NotEmpty(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		// 上游 mock 必须看到 round2 的 messages: 应包含 role=tool 与 tool_calls 字段
+		hasTool := bytes.Contains(body, []byte(`"role":"tool"`))
+		hasToolCalls := bytes.Contains(body, []byte(`"tool_calls"`))
+		if !hasTool || !hasToolCalls {
+			t.Errorf("upstream did not see round2 fields: hasTool=%v hasToolCalls=%v body=%s",
+				hasTool, hasToolCalls, body)
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		flusher, _ := w.(http.Flusher)
+		writeFrame := func(payload string) {
+			fmt.Fprintf(w, "data: %s\n\n", payload)
+			if flusher != nil {
+				flusher.Flush()
+			}
+			time.Sleep(2 * time.Millisecond)
+		}
+		writeFrame(`{"id":"r2","object":"chat.completion.chunk","created":1717000000,"model":"deepseek-v4-pro","choices":[{"index":0,"delta":{"role":"assistant","content":""},"finish_reason":null}]}`)
+		for _, piece := range []string{"Beijing ", "is currently ", "sunny ", "with 21C."} {
+			writeFrame(fmt.Sprintf(`{"id":"r2","object":"chat.completion.chunk","created":1717000000,"model":"deepseek-v4-pro","choices":[{"index":0,"delta":{"content":%q},"finish_reason":null}]}`, piece))
+		}
+		writeFrame(`{"id":"r2","object":"chat.completion.chunk","created":1717000000,"model":"deepseek-v4-pro","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":50,"completion_tokens":10,"total_tokens":60}}`)
+		fmt.Fprintf(w, "data: [DONE]\n\n")
+		if flusher != nil {
+			flusher.Flush()
+		}
+	}))
+	defer srv.Close()
+
+	cfg := setupDeepseekServerCfg(t, srv.URL, "deepseek-v4-pro")
+	defer cfg.Close()
+
+	body := `{
+  "model": "deepseek-v4-pro",
+  "stream": true,
+  "messages": [
+    {"role": "user", "content": "What's the weather in Beijing?"},
+    {"role": "assistant", "content": "", "tool_calls": [
+      {"id": "call_xyz", "type": "function", "function": {"name": "get_current_weather", "arguments": "{\"city\":\"Beijing\"}"}}
+    ]},
+    {"role": "tool", "tool_call_id": "call_xyz", "name": "get_current_weather", "content": "{\"temperature_c\":21,\"condition\":\"sunny\"}"}
+  ]
+}`
+	resp := driveServeRequest(t, cfg, body, nil)
+	require.True(t, strings.Contains(resp, "200 OK"), "expect 200 OK, got: %s", resp)
+
+	chunks := parseSSEDataChunks(t, resp)
+	require.NotEmpty(t, chunks, "must receive SSE chunks, raw resp:\n%s", resp)
+
+	var contentTotal strings.Builder
+	var lastFR string
+	for _, payload := range chunks {
+		if payload == "[DONE]" {
+			continue
+		}
+		var chunk map[string]any
+		if err := json.Unmarshal([]byte(payload), &chunk); err != nil {
+			continue
+		}
+		choices, _ := chunk["choices"].([]any)
+		if len(choices) == 0 {
+			continue
+		}
+		first, _ := choices[0].(map[string]any)
+		if fr, ok := first["finish_reason"].(string); ok && fr != "" {
+			lastFR = fr
+		}
+		delta, _ := first["delta"].(map[string]any)
+		if c, ok := delta["content"].(string); ok && c != "" {
+			contentTotal.WriteString(c)
+		}
+	}
+
+	assert.Equal(t, "Beijing is currently sunny with 21C.", contentTotal.String(),
+		"round2 content must be forwarded to client byte-by-byte, "+
+			"not silently dropped (regression of 'aibalance round2 empty response')")
+	assert.Equal(t, "stop", lastFR,
+		"round2 finish_reason must be 'stop' since model returned NL answer")
+}

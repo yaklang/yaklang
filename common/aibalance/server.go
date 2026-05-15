@@ -8,7 +8,6 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"net/http/httputil"
 	"net/url"
 	"os"
 	"runtime"
@@ -1364,26 +1363,33 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 
 		if !stream {
 			// 关键修复: 非流式响应必须由 server.go 主流程统一发送
-			// HTTP/1.1 200 OK + Content-Type: application/json header,
-			// 然后再 chunked-write 一次性 body。
-			// 旧实现因为 sendHeader 已先把 SSE header 推给客户端,
-			// 导致 OpenAI/DeepSeek SDK 在 stream=false 下解析失败、
-			// 完全丢失 reasoning_content 与 tool_calls。
-			// 关键词: 非流式 application/json header 收尾, chat.completion 完整体
+			// HTTP/1.1 200 OK + Content-Type: application/json + Content-Length,
+			// 然后一次性写出完整 body。
+			//
+			// 不使用 chunked transfer encoding 的原因:
+			//   - 上游 nginx 反代到 HTTP/2 时, chunked 末尾 "0\r\n\r\n" 与
+			//     HTTP/2 帧的结束语义不完全等价, 实测 curl 报
+			//     "HTTP/2 stream was not closed cleanly: INTERNAL_ERROR (err 2)",
+			//     导致 OpenAI Python SDK / urllib3 在 stream=false 路径上
+			//     抛 APIConnectionError, 看似完整的 JSON 被丢弃。
+			//   - 非流式 body 已经一次性拼好(GetNotStreamBody), 完全有 length,
+			//     直接 Content-Length 即可避免任何 chunked 转换风险。
+			//
+			// 关键词: 非流式 Content-Length 替换 chunked, HTTP/2 INTERNAL_ERROR 修复,
+			// nginx 反代非流式响应稳定性
 			body = writer.GetNotStreamBody()
 			var header = "HTTP/1.1 200 OK\r\n" +
 				"Content-Type: application/json; charset=utf-8\r\n" +
 				"Cache-Control: no-cache\r\n" +
 				"Connection: keep-alive\r\n" +
-				"Transfer-Encoding: chunked\r\n" +
+				fmt.Sprintf("Content-Length: %d\r\n", len(body)) +
 				"\r\n"
 			if _, err := conn.Write([]byte(header)); err != nil {
 				c.logError("Failed to send non-stream response header: %v", err)
 			}
-			cwr := httputil.NewChunkedWriter(conn)
-			cwr.Write(body)
-			cwr.Close()
-			utils.FlushWriter(cwr)
+			if _, err := conn.Write(body); err != nil {
+				c.logError("Failed to write non-stream response body: %v", err)
+			}
 			utils.FlushWriter(conn)
 		}
 

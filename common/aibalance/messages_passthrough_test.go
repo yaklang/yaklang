@@ -224,6 +224,97 @@ func TestServeChatCompletions_PreservesToolCalls(t *testing.T) {
 	}
 }
 
+// TestServeChatCompletions_ToolRoundTripPassthrough 验证「tool round-trip 第二轮」
+// 整条消息链 (user -> assistant{tool_calls} -> tool{tool_call_id, content})
+// 经 aibalance 透传后, 上游 mock 收到的 body 必须:
+//   1. messages 长度 == 3 (不丢、不合并)
+//   2. assistant.tool_calls 数组完整, id/name/arguments 字段都有
+//   3. tool 消息的 tool_call_id 与 assistant.tool_calls[0].id 严格匹配
+//
+// 这正是 OpenAI Python SDK round-trip 的真实链路, 也是用户报告
+// "z-deepseek-v4-pro 经中转后空响应" 的根因排查覆盖。
+// 关键词: tool round-trip 透传, tool_call_id 匹配, OpenAI SDK 真实链路
+func TestServeChatCompletions_ToolRoundTripPassthrough(t *testing.T) {
+	url, get, closeFn := passthroughMockServer(t)
+	defer closeFn()
+	p := makePassthroughProvider(url)
+
+	toolCallID := "call_round2_xyz"
+	input := []aispec.ChatDetail{
+		{Role: "user", Content: "What's the weather in Beijing?"},
+		{
+			Role:    "assistant",
+			Content: "",
+			ToolCalls: []*aispec.ToolCall{
+				{
+					ID:   toolCallID,
+					Type: "function",
+					Function: aispec.FuncReturn{
+						Name:      "get_current_weather",
+						Arguments: `{"city":"Beijing"}`,
+					},
+				},
+			},
+		},
+		{
+			Role:       "tool",
+			Name:       "get_current_weather",
+			ToolCallID: toolCallID,
+			Content:    `{"temperature_c":21,"condition":"sunny"}`,
+		},
+	}
+	invokeChatViaRawMessages(t, p, input, nil)
+
+	raw, parsed := get()
+	if parsed == nil {
+		t.Fatalf("upstream did not parse a ChatMessage, raw=%s", string(raw))
+	}
+	if len(parsed.Messages) != 3 {
+		t.Fatalf("messages len mismatch (round-trip lost messages): got %d want 3, raw=%s",
+			len(parsed.Messages), string(raw))
+	}
+
+	// assistant.tool_calls 必须存在且 id 一致
+	assistantMsg := parsed.Messages[1]
+	if assistantMsg.Role != "assistant" {
+		t.Fatalf("messages[1].role: got %q want assistant", assistantMsg.Role)
+	}
+	if len(assistantMsg.ToolCalls) != 1 {
+		t.Fatalf("messages[1].tool_calls len: got %d want 1, raw=%s",
+			len(assistantMsg.ToolCalls), string(raw))
+	}
+	if assistantMsg.ToolCalls[0].ID != toolCallID {
+		t.Fatalf("messages[1].tool_calls[0].id: got %q want %q",
+			assistantMsg.ToolCalls[0].ID, toolCallID)
+	}
+	if assistantMsg.ToolCalls[0].Function.Name != "get_current_weather" {
+		t.Fatalf("messages[1].tool_calls[0].function.name: got %q want get_current_weather",
+			assistantMsg.ToolCalls[0].Function.Name)
+	}
+	if assistantMsg.ToolCalls[0].Function.Arguments != `{"city":"Beijing"}` {
+		t.Fatalf("messages[1].tool_calls[0].function.arguments: got %q want %q",
+			assistantMsg.ToolCalls[0].Function.Arguments, `{"city":"Beijing"}`)
+	}
+
+	// tool 消息必须保留 tool_call_id 与 assistant.tool_calls[0].id 一致
+	toolMsg := parsed.Messages[2]
+	if toolMsg.Role != "tool" {
+		t.Fatalf("messages[2].role: got %q want tool", toolMsg.Role)
+	}
+	if toolMsg.ToolCallID != toolCallID {
+		t.Fatalf("messages[2].tool_call_id: got %q want %q (mismatch breaks deepseek/openai validation)",
+			toolMsg.ToolCallID, toolCallID)
+	}
+	// raw body 必须明确包含 "tool_call_id" 字段（防止序列化时被 omitempty 吃掉）
+	if !bytes.Contains(raw, []byte(`"tool_call_id":"`+toolCallID+`"`)) {
+		t.Fatalf("upstream body must carry tool_call_id literal, raw=%s", string(raw))
+	}
+	// raw body 必须含 "content":"{...}" 这是 deepseek/openai 验证所需
+	if !bytes.Contains(raw, []byte(`"content":"{\"temperature_c\":21,\"condition\":\"sunny\"}"`)) {
+		t.Fatalf("upstream body must carry tool result content as JSON string, raw=%s", string(raw))
+	}
+}
+
 // TestServeChatCompletions_AffinityKeyStable 验证相同 messages 输入产生相同
 // affinity key（保证亲和性路由稳定到同一上游 provider）。
 // 关键词: aibalance affinity key 稳定
