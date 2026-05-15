@@ -38,6 +38,9 @@ func TestLoopHTTPFuzztestOutputExample_CoversStructuredDirectAnswerFewShot(t *te
 		"| 观察项 | 当前结论 | 对后续测试的价值 |",
 		"{{fuzz:password(admin)}}",
 		"{{fuzz:username(admin)}}",
+		"复杂 JSON 使用 raw + fuzztag",
+		"json_params 只能替换最外层简单 JSON 字段",
+		"{{int(1000-1005)}}",
 		"这里优先使用 fuzztag 表达批量生成规则",
 	}
 

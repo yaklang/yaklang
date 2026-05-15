@@ -48,6 +48,18 @@
 }
 ```
 
+### 示例 4.1：复杂 JSON 使用 raw + fuzztag
+```json
+{
+  "@action": "fuzz_body",
+  "body_type": "raw",
+  "param_values": [
+    "{\"filters\":[{\"field\":\"owner_id\",\"op\":\"eq\",\"value\":{{ "{{int(1000-1005)}}" }}},{\"field\":\"role\",\"op\":\"eq\",\"value\":\"user\"}],\"profile\":{\"name\":\"tester\",\"tags\":[\"safe\",\"{{ "{{fuzz:username(admin)}}" }}\"]},\"page\":1}"
+  ],
+  "reason": "当前目标字段位于 filters 数组和 profile 嵌套对象中，json_params 只能替换最外层简单 JSON 字段，不能表达数组元素或嵌套路径；因此使用 raw 替换完整 JSON Body，并用 fuzztag 批量生成 owner_id 和用户名枚举值。整个测试保持只读，不包含破坏性 payload。"
+}
+```
+
 ### 示例 5：使用 fuzztag 做登录口密码爆破
 ```json
 {
