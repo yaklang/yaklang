@@ -1920,6 +1920,9 @@ func (b *singleFileBuilder) VisitFuncdef(raw pythonparser.IFuncdefContext) inter
 	funcVar := b.CreateVariable(funcName)
 	b.AssignVariable(funcVar, newFunc)
 
+	b.GetProgram().SetExportValue(funcName, newFunc)
+	b.syncPythonVirtualModuleExport(funcName, newFunc.GetType(), newFunc)
+
 	return nil
 }
 

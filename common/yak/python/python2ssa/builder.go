@@ -250,6 +250,59 @@ func (b *singleFileBuilder) addWildcardImportPackage(pkg string) {
 	b.wildcardImportPackages = append(b.wildcardImportPackages, pkg)
 }
 
+// pythonDottedModuleFromEditor maps the compiling source file to the dotted name used as the
+// virtual library key for imports: "db_manager.py" -> "db_manager", "helper/db_manager.py" -> "helper.db_manager".
+func pythonDottedModuleFromEditor(editor *memedit.MemEditor) string {
+	if editor == nil {
+		return ""
+	}
+	p := strings.TrimSpace(editor.GetFilePath())
+	if p == "" {
+		p = strings.TrimSpace(editor.GetUrl())
+	}
+	p = filepath.ToSlash(p)
+	p = strings.TrimPrefix(p, "/")
+	if p == "" {
+		return ""
+	}
+	base := filepath.Base(p)
+	if strings.EqualFold(base, "__init__.py") {
+		dir := filepath.Dir(p)
+		if dir == "." || dir == "" {
+			return ""
+		}
+		return strings.ReplaceAll(strings.TrimPrefix(filepath.ToSlash(dir), "/"), "/", ".")
+	}
+	if ext := filepath.Ext(p); strings.EqualFold(ext, ".py") {
+		p = strings.TrimSuffix(p, ext)
+	}
+	return strings.ReplaceAll(p, "/", ".")
+}
+
+// syncPythonVirtualModuleExport publishes a top-level symbol to the per-module virtual library Program
+// so `from <module> import <name>` (bindImportedName / GetOrCreateLibrary) sees the same Value as the merged Application IR.
+func (b *singleFileBuilder) syncPythonVirtualModuleExport(exportName string, typ ssa.Type, val ssa.Value) {
+	if b == nil || exportName == "" || val == nil {
+		return
+	}
+	prog := b.GetProgram()
+	if prog == nil {
+		return
+	}
+	mod := pythonDottedModuleFromEditor(b.GetEditor())
+	if mod == "" {
+		return
+	}
+	lib, err := prog.GetOrCreateLibrary(mod)
+	if err != nil || lib == nil {
+		return
+	}
+	lib.SetExportValue(exportName, val)
+	if typ != nil {
+		lib.SetExportType(exportName, typ)
+	}
+}
+
 func (b *singleFileBuilder) newDynamicPlaceholder(name string) ssa.Value {
 	if name == "" {
 		name = "dynamic"
@@ -318,7 +371,11 @@ func (b *singleFileBuilder) shouldUseDynamicMemberFallback(value ssa.Value) bool
 		ssa.SSAOpcodeParameterMember,
 		ssa.SSAOpcodePhi,
 		ssa.SSAOpcodeUndefined,
-		ssa.SSAOpcodeConstInst:
+		ssa.SSAOpcodeConstInst,
+		// Imported modules (e.g. import sqlite3; sqlite3.connect(...)) are ExternLib values.
+		// Use pkg.method as the call target name so SyntaxFlow have: 'sqlite3.connect' matches
+		// the same qualified form as source, instead of only the short method name from ReadMemberCallMethod.
+		ssa.SSAOpcodeExternLib:
 		return true
 	default:
 		return false
@@ -587,6 +644,9 @@ func (b *singleFileBuilder) resolveWildcardImportName(name string) ssa.Value {
 
 		if err := prog.ImportValueFromLib(lib, name); err != nil {
 			return b.bindImportedPlaceholder(name, joinImportPath(pkg, name))
+		}
+		if _, ok := lib.GetExportType(name); ok {
+			_ = prog.ImportTypeFromLib(lib, name, nil)
 		}
 		if imported, ok := prog.ReadImportValue(name); ok {
 			return imported
