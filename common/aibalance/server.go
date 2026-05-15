@@ -1282,43 +1282,63 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 			}
 		}
 
-		// ReAct 模式一致性: 只要本轮请求需要按 ReAct 文本协议与上游对话, 就必须
-		// **同时**做四件事, 保证请求与响应两侧协议一致, 避免协议串扰:
+		// ReAct 模式一致性 (Full ReAct): 只要本轮请求需要按 ReAct 文本协议
+		// 与上游对话, 就必须**同时**做三件事:
 		//   1. 把 client 携带的 tools=[...] 渲染为 ReAct system prompt 注入 messages,
-		//      让上游模型知道当前可用工具集 (否则 round2 ReAct 模式下模型只能凭
-		//      历史里的 [tool_call ...] 文本猜可用工具名, 易掉链);
+		//      让上游模型知道当前可用工具集;
 		//   2. 清空 toolsForUpstream / toolChoiceForUpstream, 避免上游 wrapper
 		//      看到原生 tools 字段后用 OpenAI tool_calls 协议响应 (而我们 messages
 		//      又是 ReAct 文本, 协议混用会触发 hostile wrapper 空回);
-		//   3. 在 writer 上启用 ReactToolExtractor, 把上游回吐的
-		//      [tool_call ...]args[/tool_call] 文本反解析为 OpenAI tool_calls
-		//      delta 帧透传给客户端, 让 opencode / litellm / Vercel AI SDK 等
-		//      标准 OpenAI 客户端能正确触发工具执行 (否则 tool_call 文本会被
-		//      作为 content 透传, 在客户端 UI 里被渲染成 markdown 链接, 用户
-		//      看到 "AI 输出了工具调用但实际不执行" 的诡异现象, 这是用户截图
-		//      里报告的真实 bug 触发场景);
-		//   4. 即便 round1 没有显式 tools 列表 (例如 round2 续聊里 client 不再
-		//      重发 tools), 仍需启用 extractor —— 模型仍可能基于历史 ReAct 文本
-		//      产出新的 [tool_call ...] 段.
+		//   3. 在 writer 上启用 ReactToolExtractor.
 		//
-		// 关键词: ReAct 模式一致性, round1+round2 统一处理, tools 注入 + 清空 +
-		//        extractor 启用三联动, opencode 并行工具执行修复
+		// Safety-net ReAct extractor (即便走 native 透传也启用):
+		//   只要本轮请求涉及工具调用 (client 带 tools, 或 messages 含
+		//   round-trip 标记), 就**额外**始终启用 ReactToolExtractor 兜底.
+		//   动机:
+		//     - 实战中即使 DB 标记 provider 为 native (Round1/Round2=native),
+		//       某些 wrapper 在长上下文 / 多轮工具调用 (尤其并行多 tool_call)
+		//       场景下也会**随机退化**, 把工具调用以 [tool_call ...]
+		//       ARGS[/tool_call] 纯文本形态写入 content 流而不是用 native
+		//       tool_calls 字段, 导致 opencode / litellm / Vercel AI SDK 把
+		//       它当 markdown 链接渲染、无法触发工具执行 (用户截图复现的
+		//       "前面单次调用 OK, 多次并行调用样式全炸" 就是这一退化的体现).
+		//     - extractor 仅监听 content 流字节; 上游若仍走 native tool_calls
+		//       (delta.tool_calls), 那条路径走的是 WriteToolCalls callback,
+		//       与 extractor 完全独立, 不会发生重复 emit.
+		//     - 上游若 content 流里没出现 `[tool_call` 子串, extractor 等同
+		//       零开销透传 (drainLocked openIdx==-1 走 fast path).
+		//   因此 "工具相关请求一律启用 extractor 兜底" 在收益巨大、副作用
+		//   可忽略, 是 native/react 二分模式之外必须的 safety net.
+		//
+		// 关键词: ReAct 模式一致性, safety net react extractor, native 模式兜底,
+		//        opencode 并行工具调用样式全炸修复, content -> tool_calls 反解析始终启用
 		toolsForUpstream := bodyIns.Tools
 		toolChoiceForUpstream := bodyIns.ToolChoice
 		round1ReactMode := toolMode.Round1 == "react" && len(bodyIns.Tools) > 0 && !hasRoundTripToolMarker
-		useReactMode := round1ReactMode || round2ReactMode
-		if useReactMode {
+		useFullReactMode := round1ReactMode || round2ReactMode
+		// safety-net: 只要本轮涉及工具 (有 tools 字段 / 有 round-trip 标记),
+		// 即便走 native 透传也要启用 extractor 兜底 content 流里的 ReAct 文本.
+		// 关键词: safety net react extractor 触发条件
+		needReactExtractor := useFullReactMode || len(bodyIns.Tools) > 0 || hasRoundTripToolMarker
+		if useFullReactMode {
 			beforeLen := len(messagesForUpstream)
 			if len(bodyIns.Tools) > 0 {
 				messagesForUpstream = InjectToolsAsReactPrompt(messagesForUpstream, bodyIns.Tools)
 			}
 			toolsForUpstream = nil
 			toolChoiceForUpstream = nil
-			writer.EnableReactExtractor()
-			c.logInfo("ReAct mode enabled (round1=%v round2=%v): model=%s wrapper=%s provider=%s msgs=%d->%d tools=%d source=%s",
+			c.logInfo("Full ReAct mode enabled (round1=%v round2=%v): model=%s wrapper=%s provider=%s msgs=%d->%d tools=%d source=%s",
 				round1ReactMode, round2ReactMode,
 				modelName, provider.WrapperName, provider.TypeName,
 				beforeLen, len(messagesForUpstream), len(bodyIns.Tools), toolMode.Source)
+		}
+		if needReactExtractor {
+			writer.EnableReactExtractor()
+			if !useFullReactMode {
+				c.logInfo("safety-net ReAct extractor enabled (native passthrough mode): model=%s wrapper=%s provider=%s tools=%d round_trip=%v source=%s",
+					modelName, provider.WrapperName, provider.TypeName,
+					len(bodyIns.Tools), hasRoundTripToolMarker, toolMode.Source)
+			}
 		}
 
 		client, err := provider.GetAIClientWithRawMessages(
