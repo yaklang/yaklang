@@ -17,6 +17,11 @@ import (
 // chatJSONChunkWriter handles the streaming of chat completion responses
 // It implements chunked transfer encoding for streaming responses
 type chatJSONChunkWriter struct {
+	// notStream 标记本次响应是否走「非流式」路径（客户端 stream=false）。
+	// true 时所有 writerWrapper.Write / WriteToolCalls 仅累积到内部缓冲，
+	// 不再向 writerClose 发送 SSE 增量帧；最终由 GetNotStreamBody 一次性
+	// 拼出完整 chat.completion JSON 由 server.go 主流程写出。
+	// 关键词: chatJSONChunkWriter notStream, 非流式不发 SSE
 	notStream bool
 
 	wg              *sync.WaitGroup
@@ -37,6 +42,18 @@ type chatJSONChunkWriter struct {
 	// 让客户端能感知隐式缓存命中（cached_tokens 等关键计费指标）。
 	// 关键词: aibalance writer usage 透传, cached_tokens, include_usage 末帧
 	lastUsage *aispec.ChatUsage
+
+	// accumulatedToolCalls 按 index 合并所有上游回调过来的 tool_calls 增量，
+	// 同时服务于两条链路：
+	//   1. 流式模式: Close() 据此把 finish_reason 从 "stop" 修正为 "tool_calls"，
+	//      让 OpenAI 兼容客户端 (OpenAI SDK / LangChain / litellm) 正确触发
+	//      工具执行；deepseek-v4-pro thinking + tool_calls 必须依赖此判定。
+	//   2. 非流式模式: GetNotStreamBody 据此把完整 tool_calls 字段写入返回的
+	//      assistant message，避免 tool_calls 在非流式响应中被静默吞掉。
+	//
+	// 关键词: aibalance tool_calls 增量累积, finish_reason tool_calls, 非流式 tool_calls 还原
+	accumulatedToolCalls map[int]*aispec.ToolCall
+	toolCallOrder        []int
 }
 
 // NewChatJSONChunkWriter creates a new chat JSON chunk writer
@@ -44,6 +61,17 @@ type chatJSONChunkWriter struct {
 // uid: Unique identifier for the chat session
 // model: Name of the AI model being used
 func NewChatJSONChunkWriter(writer io.WriteCloser, uid string, model string) *chatJSONChunkWriter {
+	return NewChatJSONChunkWriterEx(writer, uid, model, false)
+}
+
+// NewChatJSONChunkWriterEx 与 NewChatJSONChunkWriter 等价，但允许显式声明
+// 本次响应是否「非流式」。当 notStream=true 时，writerWrapper.Write 与
+// WriteToolCalls 都不会向客户端管道写 SSE 帧，仅把内容累积到 reasonBufWriter /
+// outputBufWriter / accumulatedToolCalls 中，由 server.go 主流程在最后调用
+// GetNotStreamBody 拼出完整的 chat.completion JSON。
+//
+// 关键词: NewChatJSONChunkWriterEx, 非流式 writer, 显式 notStream
+func NewChatJSONChunkWriterEx(writer io.WriteCloser, uid string, model string, notStream bool) *chatJSONChunkWriter {
 	pr, pw := bufpipe.NewPipe()
 	wg := new(sync.WaitGroup)
 	wg.Add(1)
@@ -56,6 +84,7 @@ func NewChatJSONChunkWriter(writer io.WriteCloser, uid string, model string) *ch
 		utils.FlushWriter(writer)
 	}()
 	return &chatJSONChunkWriter{
+		notStream:       notStream,
 		wg:              wg,
 		writerClose:     pw,
 		reasonBufWriter: bytes.NewBuffer(nil),
@@ -93,6 +122,14 @@ func (w *chatJSONChunkWriter) buildDelta(reason bool, content string) ([]byte, e
 // buildMessage constructs a full message for streaming responses
 // reason: Whether this is a reason message (true) or content message (false)
 // content: The actual content to be sent
+//
+// 关键修复：
+//   - 当 accumulatedToolCalls 非空时把完整 tool_calls 数组写入 message，避免
+//     非流式响应里 tool_calls 字段被静默丢失（旧实现只透传 content/reasoning_content）。
+//   - finish_reason 与 tool_calls 状态联动：有 tool_calls 时改用 "tool_calls"，
+//     与 OpenAI / DeepSeek 官方 chat completions 规范对齐，让 SDK 触发工具执行。
+//
+// 关键词: buildMessage tool_calls 还原, 非流式 finish_reason 联动
 func (w *chatJSONChunkWriter) buildMessage(reasonContent string, content string) ([]byte, error) {
 	r := map[string]any{
 		"role": "assistant",
@@ -101,6 +138,13 @@ func (w *chatJSONChunkWriter) buildMessage(reasonContent string, content string)
 		r["reasoning_content"] = reasonContent
 	}
 	r["content"] = content
+
+	finishReason := "stop"
+	if toolCalls := w.snapshotToolCallsForOutput(); len(toolCalls) > 0 {
+		r["tool_calls"] = toolCalls
+		finishReason = "tool_calls"
+	}
+
 	result := map[string]any{
 		"id":      "chat-ai-balance-" + w.uid,
 		"object":  "chat.completion.chunk",
@@ -110,11 +154,93 @@ func (w *chatJSONChunkWriter) buildMessage(reasonContent string, content string)
 			{
 				"message":       r,
 				"index":         0,
-				"finish_reason": "stop",
+				"finish_reason": finishReason,
 			},
 		},
 	}
 	return json.Marshal(result)
+}
+
+// snapshotToolCallsForOutput 把 accumulatedToolCalls 按追加顺序拍平成
+// 适合 JSON marshaling 的 []map[string]any 形态。读侧调用，写侧（accumulate）
+// 已被 mu 保护，因此本方法假定调用者已持有 mu，避免在 GetNotStreamBody 等
+// 已经持锁的路径上重复 Lock 引发死锁。
+//
+// 关键词: snapshotToolCallsForOutput, tool_calls JSON 输出形态
+func (w *chatJSONChunkWriter) snapshotToolCallsForOutput() []map[string]any {
+	if len(w.accumulatedToolCalls) == 0 {
+		return nil
+	}
+	out := make([]map[string]any, 0, len(w.accumulatedToolCalls))
+	for _, idx := range w.toolCallOrder {
+		tc, ok := w.accumulatedToolCalls[idx]
+		if !ok || tc == nil {
+			continue
+		}
+		fn := map[string]any{
+			"name":      tc.Function.Name,
+			"arguments": tc.Function.Arguments,
+		}
+		out = append(out, map[string]any{
+			"index":    tc.Index,
+			"id":       tc.ID,
+			"type":     tc.Type,
+			"function": fn,
+		})
+	}
+	return out
+}
+
+// accumulateToolCalls 把这一帧 tool_calls 增量按 index 合并到 writer 内部状态：
+//
+//   - 同一 index 的多帧（deepseek/OpenAI 流式 incremental arguments）会合并为一个
+//     完整 ToolCall，arguments 字符串按到达顺序拼接。
+//   - 不同 index 视为独立 tool call，按首次出现顺序在 toolCallOrder 中追加，
+//     保证最终输出顺序稳定。
+//
+// 调用方需自行加锁（外层 WriteToolCalls 已持有 mu）。
+//
+// 关键词: accumulateToolCalls, tool_calls 按 index 累积, arguments 拼接
+func (w *chatJSONChunkWriter) accumulateToolCalls(toolCalls []*aispec.ToolCall) {
+	if len(toolCalls) == 0 {
+		return
+	}
+	if w.accumulatedToolCalls == nil {
+		w.accumulatedToolCalls = make(map[int]*aispec.ToolCall)
+	}
+	for _, tc := range toolCalls {
+		if tc == nil {
+			continue
+		}
+		existing, ok := w.accumulatedToolCalls[tc.Index]
+		if !ok {
+			existing = &aispec.ToolCall{
+				Index: tc.Index,
+				Type:  "function",
+			}
+			w.accumulatedToolCalls[tc.Index] = existing
+			w.toolCallOrder = append(w.toolCallOrder, tc.Index)
+		}
+		if tc.ID != "" {
+			existing.ID = tc.ID
+		}
+		if tc.Type != "" {
+			existing.Type = tc.Type
+		}
+		if tc.Function.Name != "" {
+			existing.Function.Name = tc.Function.Name
+		}
+		if tc.Function.Arguments != "" {
+			existing.Function.Arguments += tc.Function.Arguments
+		}
+	}
+}
+
+// hasAccumulatedToolCalls 是 Close() 判定 finish_reason 是否应当切换到
+// "tool_calls" 的核心依据。需要持有 mu。
+// 关键词: hasAccumulatedToolCalls, finish_reason 切换
+func (w *chatJSONChunkWriter) hasAccumulatedToolCalls() bool {
+	return len(w.accumulatedToolCalls) > 0
 }
 
 // writerWrapper wraps the chatJSONChunkWriter to handle different types of messages
@@ -262,15 +388,26 @@ func (w *chatJSONChunkWriter) WriteUsage(usage *aispec.ChatUsage) {
 
 // WriteToolCalls writes tool calls to the streaming response
 // toolCalls: The tool calls received from AI provider to be forwarded to client
+//
+// 关键修复：
+//   - 无论 stream / 非 stream 模式都先把这一帧 tool_calls 累积到内部状态
+//     (accumulateToolCalls)，让 Close() 能判定 finish_reason 是否应改为
+//     "tool_calls"，也让 GetNotStreamBody 能拼出完整 tool_calls 数组。
+//   - notStream 模式下不再向客户端管道写 SSE 帧（与 writerWrapper.Write
+//     非流式行为对齐），避免「同时输出 SSE 增量帧 + 最终 JSON」的混乱响应。
+//
+// 关键词: WriteToolCalls 总累积, finish_reason 联动, 非流式不发 SSE
 func (w *chatJSONChunkWriter) WriteToolCalls(toolCalls []*aispec.ToolCall) error {
-	if w.notStream {
-		// For non-streaming, tool calls would be included in the final message
-		// This is handled separately in the complete message response
-		return nil
-	}
-
 	w.mu.Lock()
 	defer w.mu.Unlock()
+
+	// 总是累积，让 Close 与 GetNotStreamBody 都能感知 tool_calls。
+	w.accumulateToolCalls(toolCalls)
+
+	if w.notStream {
+		// 非流式: tool_calls 已累积，最终通过 GetNotStreamBody 一次性输出。
+		return nil
+	}
 
 	if w.closed {
 		return nil
@@ -295,12 +432,78 @@ func (w *chatJSONChunkWriter) WriteToolCalls(toolCalls []*aispec.ToolCall) error
 	return nil
 }
 
+// GetNotStreamBody 拼出符合 OpenAI 规范的「chat.completion」非流式响应体：
+//   - object 字段使用 "chat.completion"（流式才用 "chat.completion.chunk"）。
+//   - message.tool_calls 来源于全程累积的 accumulatedToolCalls，避免丢失。
+//   - finish_reason 与 tool_calls 状态联动，存在 tool_calls 时为 "tool_calls"。
+//   - 若上游回填了 usage（lastUsage），一并写入顶层 usage 字段，
+//     与 OpenAI / DeepSeek chat completions 一致，便于上层 SDK 计费 / 限速。
+//
+// 关键词: GetNotStreamBody, chat.completion, 非流式 tool_calls/usage 完整体
 func (w *chatJSONChunkWriter) GetNotStreamBody() []byte {
-	msg, err := w.buildMessage(w.reasonBufWriter.String(), w.outputBufWriter.String())
-	if err != nil {
-		msg = []byte(utils.Errorf("w.buildMessage failed: %v", err).Error())
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	reasonContent := w.reasonBufWriter.String()
+	content := w.outputBufWriter.String()
+
+	message := map[string]any{
+		"role":    "assistant",
+		"content": content,
 	}
-	return msg
+	if reasonContent != "" {
+		message["reasoning_content"] = reasonContent
+	}
+
+	finishReason := "stop"
+	if toolCalls := w.snapshotToolCallsForOutput(); len(toolCalls) > 0 {
+		message["tool_calls"] = toolCalls
+		finishReason = "tool_calls"
+	}
+
+	result := map[string]any{
+		"id":      "chat-ai-balance-" + w.uid,
+		"object":  "chat.completion",
+		"created": w.created.Unix(),
+		"model":   w.model,
+		"choices": []map[string]any{
+			{
+				"message":       message,
+				"index":         0,
+				"finish_reason": finishReason,
+			},
+		},
+	}
+
+	if w.lastUsage != nil {
+		result["usage"] = buildUsageMap(w.lastUsage)
+	}
+
+	body, err := json.Marshal(result)
+	if err != nil {
+		return []byte(utils.Errorf("GetNotStreamBody marshal failed: %v", err).Error())
+	}
+	return body
+}
+
+// buildUsageMap 把 aispec.ChatUsage 转成与 OpenAI chat.completion.usage
+// 字段一致的 map（含可选的 prompt_tokens_details.cached_tokens）。
+// 关键词: buildUsageMap, OpenAI usage 字段映射, cached_tokens
+func buildUsageMap(u *aispec.ChatUsage) map[string]any {
+	if u == nil {
+		return nil
+	}
+	out := map[string]any{
+		"prompt_tokens":     u.PromptTokens,
+		"completion_tokens": u.CompletionTokens,
+		"total_tokens":      u.TotalTokens,
+	}
+	if u.PromptTokensDetails != nil {
+		out["prompt_tokens_details"] = map[string]any{
+			"cached_tokens": u.PromptTokensDetails.CachedTokens,
+		}
+	}
+	return out
 }
 
 func (w *chatJSONChunkWriter) Wait() {
@@ -333,6 +536,17 @@ func (w *chatJSONChunkWriter) Close() error {
 	}
 	log.Info("start to close ChatJsonChunkWriter")
 
+	// 关键修复: 当本次响应里曾经发送过 tool_calls 时，按 OpenAI / DeepSeek
+	// chat completions 规范，末帧 finish_reason 必须是 "tool_calls" 而非 "stop"。
+	// 否则 OpenAI Python SDK / LangChain / litellm 等库会把响应当作普通对话结束，
+	// 不会触发函数执行 —— 这是用户报告的「deepseek-v4-pro 工具调用无法启用」
+	// 的核心原因。
+	// 关键词: Close finish_reason tool_calls 修正, OpenAI 规范对齐
+	finishReason := "stop"
+	if w.hasAccumulatedToolCalls() {
+		finishReason = "tool_calls"
+	}
+
 	rawmsg := map[string]any{
 		"id":      "chat-ai-balance-" + w.uid,
 		"object":  "chat.completion.chunk",
@@ -341,7 +555,7 @@ func (w *chatJSONChunkWriter) Close() error {
 		"choices": []map[string]any{
 			{
 				"index":         0,
-				"finish_reason": "stop",
+				"finish_reason": finishReason,
 			},
 		},
 	}

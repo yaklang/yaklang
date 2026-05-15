@@ -1042,6 +1042,16 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 
 		sendHeaderOnce := sync.Once{}
 		sendHeader := func() {
+			// 非流式模式不再立刻把 SSE header 推给客户端，否则会产生
+			// 「Content-Type: text/event-stream + 后续 application/json body」
+			// 的混合响应，并让 OpenAI SDK 在 stream=false 路径下解析失败。
+			// 真实 application/json 头在 non-stream 收尾分支中由 server.go
+			// 主流程统一发送。
+			// 关键词: 非流式模式不发 SSE header, application/json 收尾统一发头
+			if !stream {
+				c.logInfo("Non-stream mode: defer header until non-stream body assembly completes")
+				return
+			}
 			c.logInfo("Successfully obtained AI client, starting to send response header")
 			var header = "HTTP/1.1 200 OK\r\n" +
 				"Content-Type: text/event-stream; charset=utf-8\r\n" +
@@ -1059,7 +1069,10 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 		pr, pw := utils.NewBufPipe(nil)
 		rr, rw := utils.NewBufPipe(nil)
 
-		writer := NewChatJSONChunkWriter(conn, apiKeyForStat, modelName)
+		// notStream 显式传给 writer，让 writerWrapper.Write / WriteToolCalls
+		// 在客户端 stream=false 时只累积到内部缓冲，不再向客户端管道吐 SSE 帧。
+		// 关键词: writer notStream 显式传递, 非流式 writer 行为
+		writer := NewChatJSONChunkWriterEx(conn, apiKeyForStat, modelName, !stream)
 
 		// cleanupResources is a helper function to properly close all resources
 		// to prevent memory leaks when switching to next provider or on failure
@@ -1350,7 +1363,23 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 		utils.FlushWriter(writer.writerClose)
 
 		if !stream {
+			// 关键修复: 非流式响应必须由 server.go 主流程统一发送
+			// HTTP/1.1 200 OK + Content-Type: application/json header,
+			// 然后再 chunked-write 一次性 body。
+			// 旧实现因为 sendHeader 已先把 SSE header 推给客户端,
+			// 导致 OpenAI/DeepSeek SDK 在 stream=false 下解析失败、
+			// 完全丢失 reasoning_content 与 tool_calls。
+			// 关键词: 非流式 application/json header 收尾, chat.completion 完整体
 			body = writer.GetNotStreamBody()
+			var header = "HTTP/1.1 200 OK\r\n" +
+				"Content-Type: application/json; charset=utf-8\r\n" +
+				"Cache-Control: no-cache\r\n" +
+				"Connection: keep-alive\r\n" +
+				"Transfer-Encoding: chunked\r\n" +
+				"\r\n"
+			if _, err := conn.Write([]byte(header)); err != nil {
+				c.logError("Failed to send non-stream response header: %v", err)
+			}
 			cwr := httputil.NewChunkedWriter(conn)
 			cwr.Write(body)
 			cwr.Close()
