@@ -25,6 +25,8 @@ import (
 )
 
 type Timeline struct {
+	mu sync.RWMutex
+
 	extraMetaInfo func() string // extra meta info for timeline, like runtime id, etc.
 	config        AICallerConfigIf
 	ai            AICaller
@@ -54,7 +56,10 @@ type Timeline struct {
 	// 关键词: bucketSizer, 动态桶大小, 主动缓存调优
 	bucketSizer BucketSizer
 
-	compressing *utils.Once
+	compressing          *utils.Once
+	forkProtectedMaxID   int64
+	autoCompressDisabled bool
+	branchTimeline       bool
 }
 
 type TimelineCompressedHead struct {
@@ -115,9 +120,14 @@ func (m *Timeline) Save(db *gorm.DB, persistentId string) {
 		log.Warnf("try to save nil timeline for persistentId: %v", persistentId)
 		return
 	}
+	if m.IsBranchTimeline() {
+		return
+	}
 
 	// Check and emergency compress if timeline is too large before saving
-	tlstr, err := MarshalTimeline(m)
+	m.mu.RLock()
+	tlstr, err := marshalTimelineUnlocked(m)
+	m.mu.RUnlock()
 	if err != nil {
 		log.Warnf("save(/marshal) timeline failed: %v", err)
 		return
@@ -129,7 +139,9 @@ func (m *Timeline) Save(db *gorm.DB, persistentId string) {
 		m.emergencyCompress(MaxTimelineSaveSize)
 
 		// Re-marshal after emergency compression
-		tlstr, err = MarshalTimeline(m)
+		m.mu.RLock()
+		tlstr, err = marshalTimelineUnlocked(m)
+		m.mu.RUnlock()
 		if err != nil {
 			log.Warnf("save(/marshal) timeline after emergency compress failed: %v", err)
 			return
@@ -166,12 +178,20 @@ func (m *Timeline) GetIdToTimelineItem() *omap.OrderedMap[int64, *TimelineItem] 
 }
 
 func (m *Timeline) GetTimelineItemIDs() []int64 {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	return m.idToTimelineItem.Keys()
 }
 
 // GetMaxID 返回当前 timeline 中最大的条目 ID。
 // 如果 timeline 为空则返回 0。
 func (m *Timeline) GetMaxID() int64 {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.getMaxIDLocked()
+}
+
+func (m *Timeline) getMaxIDLocked() int64 {
 	ids := m.idToTimelineItem.Keys()
 	var maxID int64
 	for _, id := range ids {
@@ -185,9 +205,13 @@ func (m *Timeline) GetMaxID() int64 {
 // TruncateAfter 软删除所有 ID 严格大于 checkpointID 的 timeline 条目。
 // 用于在串行 sub-agent 结束后恢复 timeline 状态，实现 agent 间上下文隔离。
 func (m *Timeline) TruncateAfter(checkpointID int64) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	for _, id := range m.idToTimelineItem.Keys() {
 		if id > checkpointID {
-			m.SoftDelete(id)
+			if v, ok := m.idToTimelineItem.Get(id); ok {
+				v.deleted = true
+			}
 		}
 	}
 }
@@ -226,11 +250,16 @@ func (m *Timeline) CopyReducibleTimelineWithMemory() *Timeline {
 		bucketByteSize:        m.bucketByteSize,
 		bucketSizer:           m.bucketSizer,
 		compressing:           utils.NewOnce(),
+		forkProtectedMaxID:    m.forkProtectedMaxID,
+		autoCompressDisabled:  m.autoCompressDisabled,
+		branchTimeline:        m.branchTimeline,
 	}
 	return tl
 }
 
 func (m *Timeline) SoftDelete(id ...int64) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	for _, i := range id {
 		if v, ok := m.idToTimelineItem.Get(i); ok {
 			v.deleted = true
@@ -244,6 +273,12 @@ func (m *Timeline) SoftDelete(id ...int64) {
 // compressedHead 继承语义：sub-timeline 始终继承主 timeline 的 compressedHead 与 compressedHistory，
 // 保证任何派生的 sub.Dump() 都包含完整的压缩记忆，与 ids 解耦。
 func (m *Timeline) CreateSubTimeline(ids ...int64) *Timeline {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.createSubTimelineLocked(ids...)
+}
+
+func (m *Timeline) createSubTimelineLocked(ids ...int64) *Timeline {
 	tl := NewTimeline(m.ai, m.extraMetaInfo)
 	if m.config != nil {
 		tl.config = m.config
@@ -270,6 +305,24 @@ func (m *Timeline) CreateSubTimeline(ids ...int64) *Timeline {
 	return tl
 }
 
+func (m *Timeline) IsBranchTimeline() bool {
+	if m == nil {
+		return false
+	}
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.branchTimeline
+}
+
+func (m *Timeline) markBranchTimeline(branch bool) {
+	if m == nil {
+		return
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.branchTimeline = branch
+}
+
 func (m *Timeline) SoftBindConfig(config AICallerConfigIf, aiCaller AICaller) {
 	if config != nil {
 		m.config = config
@@ -289,6 +342,7 @@ func NewTimeline(ai AICaller, extraMetaInfo func() string) *Timeline {
 		idToTs:           omap.NewOrderedMap(map[int64]int64{}),
 		archiveRefs:      omap.NewOrderedMap(map[int64]*TimelineArchiveRef{}),
 		compressing:      utils.NewOnce(),
+		branchTimeline:   false,
 	}
 }
 
@@ -412,6 +466,8 @@ func (m *Timeline) setAICaller(ai AICaller) {
 }
 
 func (m *Timeline) PushToolResult(toolResult *aitool.ToolResult) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	now := time.Now()
 	ts := now.UnixMilli()
 	if m.tsToTimelineItem.Have(ts) {
@@ -440,7 +496,7 @@ func (m *Timeline) PushToolResult(toolResult *aitool.ToolResult) {
 func (m *Timeline) pushTimelineItem(ts int64, id int64, item *TimelineItem) {
 	m.OrderInsertId(id, item)
 	m.OrderInsertTs(ts, item)
-	m.dumpSizeCheck()
+	m.dumpSizeCheckLocked()
 
 	// Emit timeline item asynchronously to avoid blocking when EventHandler
 	// writes to an unbuffered channel that hasn't been consumed yet
@@ -464,6 +520,8 @@ func (m *Timeline) pushTimelineItem(ts int64, id int64, item *TimelineItem) {
 }
 
 func (m *Timeline) PushUserInteraction(stage UserInteractionStage, id int64, systemPrompt string, userExtraPrompt string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	now := time.Now()
 	ts := now.UnixMilli()
 	if m.tsToTimelineItem.Have(ts) {
@@ -497,6 +555,12 @@ func (m *Timeline) PushUserInteraction(stage UserInteractionStage, id int64, sys
 // timeline.go 仅保留: calculateActualContentSize / dumpSizeCheck / emergencyCompress / createEmergencySummary
 
 func (m *Timeline) calculateActualContentSize() int64 {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.calculateActualContentSizeLocked()
+}
+
+func (m *Timeline) calculateActualContentSizeLocked() int64 {
 	buf := bytes.NewBuffer(nil)
 	initOnce := sync.Once{}
 	count := 0
@@ -532,13 +596,19 @@ func (m *Timeline) calculateActualContentSize() int64 {
 }
 
 func (m *Timeline) dumpSizeCheck() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.dumpSizeCheckLocked()
+}
+
+func (m *Timeline) dumpSizeCheckLocked() {
 	// 在 push 时检查内容大小，如果超过限制就压缩
-	if m.totalDumpContentLimit <= 0 {
+	if m.totalDumpContentLimit <= 0 || m.autoCompressDisabled {
 		return
 	}
 
 	// 获取当前内容大小（不包括reducer）
-	contentSize := m.calculateActualContentSize()
+	contentSize := m.calculateActualContentSizeLocked()
 	if contentSize <= m.totalDumpContentLimit {
 		return // 内容大小正常
 	}
@@ -552,12 +622,18 @@ func (m *Timeline) dumpSizeCheck() {
 // emergencyCompress performs non-AI compression by removing oldest items
 // This is used when timeline is too large and needs to be compressed without AI assistance
 func (m *Timeline) emergencyCompress(targetSize int) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.emergencyCompressLocked(targetSize)
+}
+
+func (m *Timeline) emergencyCompressLocked(targetSize int) {
 	if m == nil {
 		return
 	}
 
 	// Calculate current size
-	tlstr, err := MarshalTimeline(m)
+	tlstr, err := marshalTimelineUnlocked(m)
 	if err != nil {
 		log.Errorf("emergency compress: failed to marshal timeline: %v", err)
 		return
@@ -619,7 +695,7 @@ func (m *Timeline) emergencyCompress(targetSize int) {
 
 		// Recalculate size periodically (every 10 items for performance)
 		if removedCount%10 == 0 {
-			tlstr, err = MarshalTimeline(m)
+			tlstr, err = marshalTimelineUnlocked(m)
 			if err != nil {
 				continue
 			}
@@ -657,7 +733,7 @@ func (m *Timeline) emergencyCompress(targetSize int) {
 	}
 
 	// Final size check
-	tlstr, _ = MarshalTimeline(m)
+	tlstr, _ = marshalTimelineUnlocked(m)
 	log.Infof("emergency compress completed: removed %d items, final size: %d (target: %d)", removedCount, len(tlstr), targetSize)
 }
 
@@ -790,7 +866,13 @@ func (m *Timeline) Dump() string {
 	if m == nil {
 		return ""
 	}
-	return m.GroupByMinutes(TimelineDumpDefaultIntervalMinutes).
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.dumpLocked()
+}
+
+func (m *Timeline) dumpLocked() string {
+	return m.groupByMinutesAndBytesLocked(TimelineDumpDefaultIntervalMinutes, m.getEffectiveBucketByteSize()).
 		GetAllRenderable().
 		RenderWithFrozenBoundary(
 			TimelineDumpDefaultAITagName,
@@ -840,6 +922,8 @@ func (m *Timeline) DumpBefore(beforeId int64) string {
 	if m == nil {
 		return ""
 	}
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	if m.idToTimelineItem == nil {
 		return ""
 	}
@@ -858,7 +942,7 @@ func (m *Timeline) DumpBefore(beforeId int64) string {
 		}
 	}
 
-	sub := m.CreateSubTimeline(ids...)
+	sub := m.createSubTimelineLocked(ids...)
 	if sub == nil {
 		return ""
 	}
@@ -1031,6 +1115,11 @@ func (m *Timeline) timelineArchiveStore() TimelineArchiveStore {
 	if m == nil || m.config == nil {
 		return nil
 	}
+	// NOTE: this function can be called while Timeline.mu is already held (e.g. compression apply path),
+	// so it must not call lock-taking helpers like IsBranchTimeline().
+	if m.branchTimeline {
+		return nil
+	}
 	if provider, ok := m.config.(interface{ GetTimelineArchiveStore() TimelineArchiveStore }); ok {
 		return provider.GetTimelineArchiveStore()
 	}
@@ -1039,6 +1128,10 @@ func (m *Timeline) timelineArchiveStore() TimelineArchiveStore {
 
 func (m *Timeline) timelinePersistentSessionID() string {
 	if m == nil || m.config == nil {
+		return ""
+	}
+	// NOTE: this function can be called while Timeline.mu is already held.
+	if m.branchTimeline {
 		return ""
 	}
 	if provider, ok := m.config.(interface{ GetPersistentSessionID() string }); ok {
@@ -1051,6 +1144,8 @@ func (m *Timeline) timelinePersistentSessionID() string {
 var toolResultHistory string
 
 func (m *Timeline) PromptForToolCallResultsForLastN(n int) string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	if m.idToTimelineItem.Len() == 0 {
 		return ""
 	}
@@ -1086,6 +1181,8 @@ func (m *Timeline) PromptForToolCallResultsForLastN(n int) string {
 }
 
 func (m *Timeline) PushText(id int64, fmtText string, items ...any) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	now := time.Now()
 	ts := now.UnixMilli()
 	if m.tsToTimelineItem.Have(ts) {
