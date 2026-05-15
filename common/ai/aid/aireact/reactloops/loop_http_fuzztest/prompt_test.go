@@ -14,6 +14,9 @@ func TestLoopHTTPFuzztestPersistentInstruction_CoversDirectAnswerAndPacketRepair
 		"User-Agent",
 		"FINAL_ANSWER AITAG",
 		"answer_payload 与 FINAL_ANSWER 互斥",
+		"generate_risk",
+		"risks 数组",
+		"target、title、risk_type、severity、description、details、payload",
 		"fuzztag 使用规则",
 		"{{fuzz:password}}",
 		"{{payload(pass_top25)}}",
@@ -42,6 +45,10 @@ func TestLoopHTTPFuzztestOutputExample_CoversStructuredDirectAnswerFewShot(t *te
 		"json_params 只能替换最外层简单 JSON 字段",
 		"{{int(1000-1005)}}",
 		"这里优先使用 fuzztag 表达批量生成规则",
+		"订单详情接口疑似 IDOR 越权读取",
+		"\"@action\": \"generate_risk\"",
+		"一次生成多个 Risk",
+		"\"risks\": [",
 	}
 
 	for _, needle := range checks {
