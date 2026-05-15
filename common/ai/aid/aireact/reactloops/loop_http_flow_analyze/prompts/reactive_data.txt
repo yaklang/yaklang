@@ -48,6 +48,16 @@ Review these to avoid repeating searches with identical parameters. Each entry s
 <|CURRENT_FLOW_END_{{ .Nonce }}|>
 {{ end }}
 
+{{ if .DispatchedFuzzTasks }}
+### 已派发 Fuzz 测试任务
+
+以下任务已通过 dispatch_fuzz_test 启动。结果已合并到 FINDINGS，此处仅展示摘要。
+
+<|DISPATCHED_FUZZ_TASKS_{{ .Nonce }}|>
+{{ .DispatchedFuzzTasks }}
+<|DISPATCHED_FUZZ_TASKS_END_{{ .Nonce }}|>
+{{ end }}
+
 {{ if .FeedbackMessages }}
 ### Feedback Messages
 
@@ -66,6 +76,7 @@ Think about the next step based on the above context:
 3. **Search precision**: Are search conditions specific enough? Can you add more filters (URL, status, method, keyword) to narrow results?
 4. **Avoid repetition**: Check Recent Action History. Do not repeat the same search with identical parameters.
 5. **Deep dive vs. broaden**: Should you inspect a specific flow in detail, or broaden the search with different conditions?
-6. **Scope discipline**: This mode is for traffic analysis only. Do not attempt to modify packets, send requests, or perform fuzz testing.{{ if .IsLastIteration }}
+6. **Scope discipline**: This mode is for traffic analysis only. Do not attempt to modify packets, send requests, or perform fuzz testing.
+7. **Fuzz 派发判断**: 如果当前 FINDINGS 中有识别出可疑漏洞点但尚未派发 fuzz 测试，评估是否应调用 `dispatch_fuzz_test`。已派发的任务避免重复。{{ if .IsLastIteration }}
 
 **WARNING: This is the LAST iteration.** You must provide a final answer now using `directly_answer`. Summarize all findings and answer the user's question based on collected evidence.{{ end }}

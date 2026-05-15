@@ -6,6 +6,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
+	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_http_fuzztest"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -50,6 +51,7 @@ func init() {
 						"CurrentFlow":          loop.Get("current_flow"),
 						"FeedbackMessages":     feedbacker.String(),
 						"IsLastIteration":      isLastIteration,
+						"DispatchedFuzzTasks":  buildDispatchedFuzzTasksPrompt(loop),
 					}
 					return utils.RenderTemplate(reactiveData, renderMap)
 				}),
@@ -57,6 +59,7 @@ func init() {
 				filterAndMatchHTTPFlowsAction(r),
 				matchHTTPFlowsWithSimpleMatcherAction(r),
 				outputFindingsAction(r),
+				dispatchFuzzTestAction(r),
 				buildPostIterationHook(r),
 			}
 			preset = append(preset, opts...)

@@ -20,6 +20,7 @@
 * `match_http_flows_with_matcher`: 支持基础过滤和单个简单匹配器（直接通过参数指定匹配器字段，更简洁）
 * `get_http_flow_detail`: 检查单个数据包的完整详情
 * `output_findings`: 记录分析过程中的中间发现到 FINDINGS 文档
+* `dispatch_fuzz_test`: 针对已识别的可疑 flow，启动专用的 HTTP 安全模糊测试子循环。需要提供 flow 标识符（hidden_index/hash/id）、漏洞类型（vulnerability_type）和测试说明（task_description）。子循环异步执行完成后，测试结果会自动合并到 FINDINGS。
 
 ## 工具使用建议
 
@@ -62,6 +63,29 @@
 - 流量特征解释和安全问题分析
 
 本模式不处理的任务（请建议用户切换到对应的专注模式）：
-- 修改数据包或发送 HTTP 请求 -> 请使用 HTTP 安全模糊测试模式
+- 修改数据包或发送 HTTP 请求 -> 使用 `dispatch_fuzz_test` 派发给 fuzztest 子循环处理，或建议用户切换到 HTTP 安全模糊测试模式
 - 渗透测试或漏洞利用 -> 请使用对应的安全测试模式
 - 与流量分析无关的通用编程任务 -> 请使用代码编辑模式
+
+## dispatch_fuzz_test 使用决策
+
+当分析结果表明某条 flow 存在以下特征时，应考虑调用 `dispatch_fuzz_test` 启动 fuzz 测试：
+
+### 应派发 fuzz 测试的信号
+- 参数名称包含 id、uid、userId、orderId、accountId 等对象标识符 → IDOR/越权
+- 请求包含 SQL 相关关键词回显，或响应包含数据库错误信息 → SQL 注入
+- 响应内容原样回显了用户输入的 HTML/JS 内容 → XSS
+- 路径参数包含 file、path、dir、filename 等 → 路径穿越
+- 请求头包含可控 Host、Origin、Referer 且服务端有 SSRF 风险 → SSRF
+- 接口明显无鉴权或鉴权逻辑可疑 → 未授权访问
+
+### 派发策略
+- 每次 `dispatch_fuzz_test` 只针对一条 flow、一类漏洞（保持专注）
+- 同一条 flow 可多次派发，每次关注不同漏洞类型
+- 先用 `output_findings` 记录识别结论，再派发 fuzz 任务
+- fuzz 结果会自动写入 FINDINGS，后续迭代可查看汇总
+
+### 禁止行为
+- 不要在没有合理理由的情况下批量无差别派发所有 flow
+- 不要因为 fuzz 测试正在运行而停止继续分析其他 flow
+- dispatch_fuzz_test 不能替代 output_findings：先记录分析依据，再派发测试
