@@ -261,6 +261,12 @@ func (w *chatJSONChunkWriter) HasToolCalls() bool {
 	return w.hasAccumulatedToolCalls()
 }
 
+func (w *chatJSONChunkWriter) flushReactExtractor() {
+	if w.reactExtractor != nil {
+		_ = w.reactExtractor.Flush()
+	}
+}
+
 // writerWrapper wraps the chatJSONChunkWriter to handle different types of messages
 type writerWrapper struct {
 	notStream bool
@@ -551,6 +557,8 @@ func (w *chatJSONChunkWriter) WriteToolCalls(toolCalls []*aispec.ToolCall) error
 //
 // 关键词: GetNotStreamBody, chat.completion, 非流式 tool_calls/usage 完整体
 func (w *chatJSONChunkWriter) GetNotStreamBody() []byte {
+	w.flushReactExtractor()
+
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
@@ -632,9 +640,7 @@ func (w *chatJSONChunkWriter) Close() error {
 	// 先 Flush reactExtractor (不持 mu, 它的 callback emitReactContent / emitReactToolCall
 	// 内部会各自 Lock/Unlock mu, 否则会死锁).
 	// 关键词: Close react extractor flush before lock, deadlock-free
-	if w.reactExtractor != nil {
-		_ = w.reactExtractor.Flush()
-	}
+	w.flushReactExtractor()
 
 	w.mu.Lock()
 	defer w.mu.Unlock()

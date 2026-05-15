@@ -44,11 +44,11 @@ import (
 // startDeepseekStreamMock 启动一个 mock 上游, 返回 SSE 流 (每帧之间带 keep-alive
 // 间隔), 模拟 deepseek-v4-pro thinking + tool_calls 的真实响应顺序:
 //
-//   1. role: "assistant"
-//   2. delta.reasoning_content 多帧 (思考)
-//   3. delta.tool_calls 多帧 (函数名 -> 参数 incremental)
-//   4. finish_reason="tool_calls"
-//   5. [DONE]
+//  1. role: "assistant"
+//  2. delta.reasoning_content 多帧 (思考)
+//  3. delta.tool_calls 多帧 (函数名 -> 参数 incremental)
+//  4. finish_reason="tool_calls"
+//  5. [DONE]
 //
 // 关键词: deepseek mock SSE, thinking 多帧, tool_calls incremental, finish_reason tool_calls
 func startDeepseekStreamMock(t *testing.T) *httptest.Server {
@@ -576,6 +576,93 @@ func TestServeChatCompletions_DeepseekTextOnly_FinishReasonStop(t *testing.T) {
 		"text-only response must keep finish_reason='stop', regression guard for tool_calls fix")
 }
 
+// TestServeChatCompletions_ToolCallOnlyResponseIsSuccess 验证纯 tool_calls 响应
+// 也必须被 server 判定为成功。真实 opencode round1 常见形态就是:
+// 上游只通过 tool_calls callback 返回函数调用, content/reasoning 文本字节为 0。
+//
+// 旧成功判定只看 total text bytes > 0, 会把这种合法响应误判成
+// "no data received from provider", 然后在 200 SSE 后追加 500/all providers failed。
+// 关键词: tool_call-only success, opencode round1 compatibility
+func TestServeChatCompletions_ToolCallOnlyResponseIsSuccess(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		flusher, _ := w.(http.Flusher)
+		writeFrame := func(payload string) {
+			fmt.Fprintf(w, "data: %s\n\n", payload)
+			if flusher != nil {
+				flusher.Flush()
+			}
+			time.Sleep(2 * time.Millisecond)
+		}
+		writeFrame(`{"id":"tc-only","object":"chat.completion.chunk","created":1717000000,"model":"deepseek-v4-pro","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"call_only","type":"function","function":{"name":"get_weather","arguments":"{\"city\":\"Beijing\"}"}}]},"finish_reason":null}]}`)
+		writeFrame(`{"id":"tc-only","object":"chat.completion.chunk","created":1717000000,"model":"deepseek-v4-pro","choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}],"usage":{"prompt_tokens":10,"completion_tokens":5,"total_tokens":15}}`)
+		fmt.Fprintf(w, "data: [DONE]\n\n")
+		if flusher != nil {
+			flusher.Flush()
+		}
+	}))
+	defer srv.Close()
+
+	cfg := setupDeepseekServerCfg(t, srv.URL, "deepseek-v4-pro")
+	defer cfg.Close()
+
+	body := `{
+  "model": "deepseek-v4-pro",
+  "stream": true,
+  "messages": [{"role": "user", "content": "What's the weather in Beijing?"}],
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "get_weather",
+        "description": "Get weather for a city",
+        "parameters": {
+          "type": "object",
+          "properties": {"city": {"type": "string"}},
+          "required": ["city"]
+        }
+      }
+    }
+  ]
+}`
+	resp := driveServeRequest(t, cfg, body, nil)
+	require.True(t, strings.Contains(resp, "200 OK"), "expect 200 OK, got: %s", resp)
+	assert.NotContains(t, resp, "500 Internal Server Error",
+		"tool-call-only response must not be downgraded to all-providers-failed")
+
+	chunks := parseSSEDataChunks(t, resp)
+	require.NotEmpty(t, chunks, "must receive SSE chunks, raw resp:\n%s", resp)
+
+	var gotToolCalls bool
+	var finalFinishReason string
+	for _, payload := range chunks {
+		if payload == "[DONE]" {
+			continue
+		}
+		var chunk map[string]any
+		if err := json.Unmarshal([]byte(payload), &chunk); err != nil {
+			continue
+		}
+		choices, _ := chunk["choices"].([]any)
+		if len(choices) == 0 {
+			continue
+		}
+		first, _ := choices[0].(map[string]any)
+		if fr, ok := first["finish_reason"].(string); ok && fr != "" {
+			finalFinishReason = fr
+		}
+		delta, _ := first["delta"].(map[string]any)
+		if tc, ok := delta["tool_calls"].([]any); ok && len(tc) > 0 {
+			gotToolCalls = true
+		}
+	}
+
+	assert.True(t, gotToolCalls, "client must receive tool_calls delta")
+	assert.Equal(t, "tool_calls", finalFinishReason,
+		"tool-call-only response must finish with tool_calls")
+}
+
 // ============================================================
 // 测试 4 (writer 单元): 多 tool_calls (index 0 + index 1) 增量交错时,
 // chatJSONChunkWriter 内部 accumulatedToolCalls 必须按 index 各自累积、
@@ -650,6 +737,37 @@ func TestChatJSONChunkWriter_AccumulateParallelToolCalls_IndexIsolation(t *testi
 	assert.Equal(t, "get_time", fn1["name"])
 	assert.Equal(t, `{"tz":"UTC"}`, fn1["arguments"],
 		"index 1 arguments must reassemble to UTC payload, no fragments leaked from index 0")
+}
+
+// TestChatJSONChunkWriter_NonStreamReactFlushBeforeBody 验证非流式 ReAct 模式
+// 在 GetNotStreamBody 拼最终 JSON 前会 flush extractor。否则尾部刚好落在
+// "[tool_call" 前缀保护区时, 那段普通文本会留在 extractor buffer 里被漏掉。
+// 关键词: GetNotStreamBody flush react extractor, 非流式 ReAct 尾部文本不丢
+func TestChatJSONChunkWriter_NonStreamReactFlushBeforeBody(t *testing.T) {
+	w := NewChatJSONChunkWriterEx(nopWriteCloser{io.Discard}, "uid-react", "deepseek-v4-pro", true)
+	defer w.Close()
+	w.EnableReactExtractor()
+
+	raw := "answer tail [tool_cal"
+	_, err := w.GetOutputWriter().Write([]byte(raw))
+	require.NoError(t, err)
+
+	body := w.GetNotStreamBody()
+	var parsed map[string]any
+	require.NoError(t, json.Unmarshal(body, &parsed),
+		"GetNotStreamBody must produce valid JSON, body=%s", body)
+
+	choices, _ := parsed["choices"].([]any)
+	require.Len(t, choices, 1)
+	first, _ := choices[0].(map[string]any)
+	require.NotNil(t, first)
+	msg, _ := first["message"].(map[string]any)
+	require.NotNil(t, msg)
+
+	assert.Equal(t, raw, msg["content"],
+		"GetNotStreamBody must flush react extractor buffered text before serializing content")
+	assert.Equal(t, "stop", first["finish_reason"],
+		"plain buffered text must not turn into a tool_calls finish")
 }
 
 // nopWriteCloser 把 io.Writer 包成 io.WriteCloser, 仅用于 writer 单元测试。

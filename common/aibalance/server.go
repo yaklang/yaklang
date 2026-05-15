@@ -575,8 +575,8 @@ type ServerConfig struct {
 	amapHealthCheckStopCh chan struct{}
 
 	// RPM rate limiter for chat completions (per API key, with per-model overrides)
-	chatRateLimiter    *ChatRateLimiter
-	freeUserDelaySec   int64 // cached from DB; actual delay is N~2N seconds random
+	chatRateLimiter  *ChatRateLimiter
+	freeUserDelaySec int64 // cached from DB; actual delay is N~2N seconds random
 
 	// inFlightTokens 维护"在途请求预扣 token 总量"，按 daily token 桶分组。
 	// 与 DB 的 bucket_db_used 加和后参与 daily check，硬卡死并发过冲。
@@ -1446,7 +1446,15 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 
 		endDuration := time.Since(start)
 		total := atomic.LoadInt64(totalBytes)
-		requestSucceeded := total > 0 // Determine actual request success based on data received
+		// Tool-call-only responses legitimately have zero content/reasoning bytes:
+		// the provider reports success through the tool_calls callback instead of
+		// the text pipes. Treat those as successful so OpenAI-compatible clients
+		// like opencode can complete the first tool round.
+		// 关键词: tool_call-only response success, opencode tool_calls first round
+		requestSucceeded := total > 0 || writer.HasToolCalls()
+		if requestSucceeded && firstByteDuration == 0 {
+			firstByteDuration = endDuration
+		}
 
 		// Check if chat request succeeded
 		if chatErr != nil {

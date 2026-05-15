@@ -73,13 +73,23 @@ func main() {
 // 关键词: native respondRound1WithToolCall, OpenAI tool_calls stream
 func respondRound1WithToolCall(w http.ResponseWriter, model string, isStream bool, body []byte) {
 	// 通常 client 请求 tool 名为 get_current_weather / get_weather 之类
-	toolName := extractToolFunctionName(body)
-	if toolName == "" {
-		toolName = "echo"
+	toolNames := extractAllToolFunctionNames(body)
+	if len(toolNames) == 0 {
+		toolNames = []string{"echo"}
 	}
+	// 默认参数: city=Beijing (兼容 e2e 测试中 get_current_weather 等典型 tool 期望)
+	defaultArgs := `{"city":"Beijing"}`
+	parallel := len(toolNames) >= 2
+	primaryName := toolNames[0]
+	secondaryName := ""
+	if parallel {
+		secondaryName = toolNames[1]
+	}
+
 	if !isStream {
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(fmt.Sprintf(`{
+		if !parallel {
+			_, _ = w.Write([]byte(fmt.Sprintf(`{
   "id": "chatcmpl-mock-native-1",
   "object": "chat.completion",
   "created": 1717000000,
@@ -92,18 +102,51 @@ func respondRound1WithToolCall(w http.ResponseWriter, model string, isStream boo
       "tool_calls": [{
         "id": "call_native_1",
         "type": "function",
-        "function": {"name": %q, "arguments": "{}"}
+        "function": {"name": %q, "arguments": %q}
       }]
     },
     "finish_reason": "tool_calls"
   }]
-}`, model, toolName)))
+}`, model, primaryName, defaultArgs)))
+			return
+		}
+		// 并行 2 个工具调用
+		_, _ = w.Write([]byte(fmt.Sprintf(`{
+  "id": "chatcmpl-mock-native-1",
+  "object": "chat.completion",
+  "created": 1717000000,
+  "model": %q,
+  "choices": [{
+    "index": 0,
+    "message": {
+      "role": "assistant",
+      "content": "",
+      "tool_calls": [
+        {"id": "call_native_1", "type": "function", "function": {"name": %q, "arguments": %q}},
+        {"id": "call_native_2", "type": "function", "function": {"name": %q, "arguments": %q}}
+      ]
+    },
+    "finish_reason": "tool_calls"
+  }]
+}`, model, primaryName, defaultArgs, secondaryName, defaultArgs)))
+		return
+	}
+
+	if !parallel {
+		streamSSE(w, []string{
+			fmt.Sprintf(`{"id":"chatcmpl-mock-native-1","object":"chat.completion.chunk","model":%q,"choices":[{"index":0,"delta":{"role":"assistant","content":""}}]}`, model),
+			fmt.Sprintf(`{"id":"chatcmpl-mock-native-1","object":"chat.completion.chunk","model":%q,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"call_native_1","type":"function","function":{"name":%q,"arguments":""}}]}}]}`, model, primaryName),
+			fmt.Sprintf(`{"id":"chatcmpl-mock-native-1","object":"chat.completion.chunk","model":%q,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":%q}}]}}]}`, model, defaultArgs),
+			fmt.Sprintf(`{"id":"chatcmpl-mock-native-1","object":"chat.completion.chunk","model":%q,"choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}]}`, model),
+		})
 		return
 	}
 	streamSSE(w, []string{
 		fmt.Sprintf(`{"id":"chatcmpl-mock-native-1","object":"chat.completion.chunk","model":%q,"choices":[{"index":0,"delta":{"role":"assistant","content":""}}]}`, model),
-		fmt.Sprintf(`{"id":"chatcmpl-mock-native-1","object":"chat.completion.chunk","model":%q,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"call_native_1","type":"function","function":{"name":%q,"arguments":""}}]}}]}`, model, toolName),
-		fmt.Sprintf(`{"id":"chatcmpl-mock-native-1","object":"chat.completion.chunk","model":%q,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"{}"}}]}}]}`, model),
+		fmt.Sprintf(`{"id":"chatcmpl-mock-native-1","object":"chat.completion.chunk","model":%q,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"call_native_1","type":"function","function":{"name":%q,"arguments":""}}]}}]}`, model, primaryName),
+		fmt.Sprintf(`{"id":"chatcmpl-mock-native-1","object":"chat.completion.chunk","model":%q,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":%q}}]}}]}`, model, defaultArgs),
+		fmt.Sprintf(`{"id":"chatcmpl-mock-native-1","object":"chat.completion.chunk","model":%q,"choices":[{"index":0,"delta":{"tool_calls":[{"index":1,"id":"call_native_2","type":"function","function":{"name":%q,"arguments":""}}]}}]}`, model, secondaryName),
+		fmt.Sprintf(`{"id":"chatcmpl-mock-native-1","object":"chat.completion.chunk","model":%q,"choices":[{"index":0,"delta":{"tool_calls":[{"index":1,"function":{"arguments":%q}}]}}]}`, model, defaultArgs),
 		fmt.Sprintf(`{"id":"chatcmpl-mock-native-1","object":"chat.completion.chunk","model":%q,"choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}]}`, model),
 	})
 }
@@ -194,26 +237,29 @@ func extractField(body []byte, key string) string {
 	return ""
 }
 
-// 关键词: extractToolFunctionName, find first tools[].function.name in body
-func extractToolFunctionName(body []byte) string {
+// 关键词: extractAllToolFunctionNames, 取 tools[].function.name 全集 (保留顺序)
+func extractAllToolFunctionNames(body []byte) []string {
 	probe := map[string]any{}
 	if err := json.Unmarshal(body, &probe); err != nil {
-		return ""
+		return nil
 	}
 	tools, _ := probe["tools"].([]any)
 	if len(tools) == 0 {
-		return ""
+		return nil
 	}
-	first, _ := tools[0].(map[string]any)
-	if first == nil {
-		return ""
+	names := make([]string, 0, len(tools))
+	for _, t := range tools {
+		m, _ := t.(map[string]any)
+		if m == nil {
+			continue
+		}
+		fn, _ := m["function"].(map[string]any)
+		if fn == nil {
+			continue
+		}
+		if name, ok := fn["name"].(string); ok && name != "" {
+			names = append(names, name)
+		}
 	}
-	fn, _ := first["function"].(map[string]any)
-	if fn == nil {
-		return ""
-	}
-	if name, ok := fn["name"].(string); ok {
-		return name
-	}
-	return ""
+	return names
 }
