@@ -21,24 +21,43 @@ type traceIDState struct {
 // Rules:
 //   - Minimum 1 second between any two requests from the same Trace-ID
 //   - After a successful request, 3 second cooldown before next request is allowed
+//
+// 注意：cleanupLoop 是 lazy 启动 (在 ensureCleanupStarted 内 startOnce 触发)。
+// 没有实际流量的 WebSearchRateLimiter 不会创建后台 goroutine，避免在测试中
+// 大量 NewServerConfig() 但从不发 web-search 请求的场景下污染 goroutine
+// baseline，进而触发 TestGoroutineTracing 的 leak 误报。
+// 关键词: WebSearchRateLimiter lazy cleanup, goroutine baseline 净化, TestGoroutineTracing 误报修复
 type WebSearchRateLimiter struct {
-	states   sync.Map // map[string]*traceIDState
-	stopCh   chan struct{}
-	stopOnce sync.Once
+	states    sync.Map // map[string]*traceIDState
+	stopCh    chan struct{}
+	stopOnce  sync.Once
+	startOnce sync.Once
 }
 
-// NewWebSearchRateLimiter creates a new rate limiter and starts background cleanup
+// NewWebSearchRateLimiter creates a new rate limiter. The cleanup goroutine is
+// NOT started until the first call to CheckRateLimit / RecordSuccess,
+// keeping cost-of-creation at zero for unused limiters.
 func NewWebSearchRateLimiter() *WebSearchRateLimiter {
-	rl := &WebSearchRateLimiter{
+	return &WebSearchRateLimiter{
 		stopCh: make(chan struct{}),
 	}
-	go rl.cleanupLoop()
-	return rl
+}
+
+// ensureCleanupStarted starts the background cleanup goroutine on first use.
+// Subsequent calls are no-ops (sync.Once). If Stop() was already called before
+// the first use (stopCh already closed), the goroutine starts and exits
+// immediately on the first ticker select, which is harmless.
+// 关键词: WebSearchRateLimiter lazy 启动 cleanupLoop, startOnce 幂等
+func (rl *WebSearchRateLimiter) ensureCleanupStarted() {
+	rl.startOnce.Do(func() {
+		go rl.cleanupLoop()
+	})
 }
 
 // CheckRateLimit checks if a request from the given Trace-ID is allowed
 // Returns (allowed, retryAfterSeconds)
 func (rl *WebSearchRateLimiter) CheckRateLimit(traceID string) (bool, int) {
+	rl.ensureCleanupStarted()
 	now := time.Now()
 
 	// LoadOrStore ensures we get-or-create atomically
@@ -78,6 +97,7 @@ func (rl *WebSearchRateLimiter) CheckRateLimit(traceID string) (bool, int) {
 // RecordSuccess records that a request from the given Trace-ID was successful
 // This triggers the 3-second cooldown for subsequent requests
 func (rl *WebSearchRateLimiter) RecordSuccess(traceID string) {
+	rl.ensureCleanupStarted()
 	now := time.Now()
 
 	val, loaded := rl.states.Load(traceID)

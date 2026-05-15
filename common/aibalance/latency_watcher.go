@@ -59,13 +59,25 @@ func StopLatencyWatcher() {
 	}
 }
 
-// Start begins the latency watcher background goroutine
+// Start begins the latency watcher background goroutine.
+//
+// 注意：支持 Stop -> Start 的循环（测试场景需要在 chat baseline 采样
+// 之前暂停 watcher、采样后重新开启）。如果之前的 Stop 已经 close 了
+// stopChan，这里会重建一个新的 channel，让 watchLoop 不会刚启动就退出。
+//
+// 关键词: LatencyWatcher Start 支持 stopChan 重建, Stop->Start 循环
 func (w *LatencyWatcher) Start() {
 	w.mutex.Lock()
 	if w.running {
 		w.mutex.Unlock()
 		log.Infof("LatencyWatcher is already running")
 		return
+	}
+	// 如果旧 stopChan 已 close，重建一个，避免 watchLoop 起来就退出。
+	select {
+	case <-w.stopChan:
+		w.stopChan = make(chan struct{})
+	default:
 	}
 	w.running = true
 	w.mutex.Unlock()

@@ -20,19 +20,37 @@ type amapTraceIDState struct {
 //
 // Rules:
 //   - Minimum 1 second between any two requests from the same Trace-ID
+//
+// 注意：cleanupLoop 是 lazy 启动 (在 ensureCleanupStarted 内 startOnce 触发)。
+// 没有实际请求经过的 AmapRateLimiter 不会创建后台 goroutine，避免在测试中
+// 大量 NewServerConfig() 但从不发请求的场景下污染 goroutine baseline，
+// 进而触发 TestGoroutineTracing 的 leak 误报。
+// 关键词: AmapRateLimiter lazy cleanup, goroutine baseline 净化, TestGoroutineTracing 误报修复
 type AmapRateLimiter struct {
-	states   sync.Map // map[string]*amapTraceIDState
-	stopCh   chan struct{}
-	stopOnce sync.Once
+	states     sync.Map // map[string]*amapTraceIDState
+	stopCh     chan struct{}
+	stopOnce   sync.Once
+	startOnce  sync.Once
 }
 
-// NewAmapRateLimiter creates a new rate limiter and starts background cleanup
+// NewAmapRateLimiter creates a new rate limiter. The cleanup goroutine is NOT
+// started until the first call to WaitForRateLimit / checkAndGetWait,
+// keeping cost-of-creation at zero for unused limiters.
 func NewAmapRateLimiter() *AmapRateLimiter {
-	rl := &AmapRateLimiter{
+	return &AmapRateLimiter{
 		stopCh: make(chan struct{}),
 	}
-	go rl.cleanupLoop()
-	return rl
+}
+
+// ensureCleanupStarted starts the background cleanup goroutine on first use.
+// Subsequent calls are no-ops (sync.Once). If Stop() was already called before
+// the first use (stopCh already closed), the goroutine starts and exits
+// immediately on the first ticker select, which is harmless.
+// 关键词: AmapRateLimiter lazy 启动 cleanupLoop, startOnce 幂等
+func (rl *AmapRateLimiter) ensureCleanupStarted() {
+	rl.startOnce.Do(func() {
+		go rl.cleanupLoop()
+	})
 }
 
 // WaitForRateLimit blocks until the rate limit allows the request through,
@@ -58,6 +76,7 @@ func (rl *AmapRateLimiter) WaitForRateLimit(traceID string, ctx context.Context)
 
 // checkAndGetWait checks if a request is allowed and returns the wait duration if not.
 func (rl *AmapRateLimiter) checkAndGetWait(traceID string) (bool, time.Duration) {
+	rl.ensureCleanupStarted()
 	now := time.Now()
 
 	newState := &amapTraceIDState{

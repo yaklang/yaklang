@@ -2,6 +2,7 @@ package aibalance
 
 import (
 	"bytes"
+	"context"
 	"runtime"
 	"runtime/pprof"
 	"strings"
@@ -56,6 +57,16 @@ func waitForGoroutineCountAtLeast(t *testing.T, signature string, minimum int, t
 	}
 }
 
+// TestBalancerCloseReleasesRateLimiterGoroutines 验证 rate limiter
+// 的后台 cleanup goroutine 在 Balancer.Close 后被正确释放。
+//
+// 注意：WebSearchRateLimiter / AmapRateLimiter 现在采用 lazy 启动
+// (sync.Once + ensureCleanupStarted)，构造时不会创建后台 goroutine，
+// 只在第一次 CheckRateLimit / WaitForRateLimit 时才 fire。
+// 因此本测试在 NewServerConfig() 之后必须显式触发一次使用，让 cleanup
+// 进入运行状态，再验证 Close 能把它收回。
+//
+// 关键词: TestBalancerCloseReleasesRateLimiterGoroutines, lazy cleanup goroutine 释放验证
 func TestBalancerCloseReleasesRateLimiterGoroutines(t *testing.T) {
 	const balancerCount = 4
 	const webLimiterSig = "aibalance.(*WebSearchRateLimiter).cleanupLoop"
@@ -66,7 +77,16 @@ func TestBalancerCloseReleasesRateLimiterGoroutines(t *testing.T) {
 
 	balancers := make([]*Balancer, 0, balancerCount)
 	for i := 0; i < balancerCount; i++ {
-		balancers = append(balancers, &Balancer{config: NewServerConfig()})
+		cfg := NewServerConfig()
+		// 触发 lazy 启动：构造后 limiter 默认不会启动 cleanup goroutine，
+		// 用一次 dummy 检查把 startOnce 走完，与生产路径首次接到请求时的
+		// 行为一致。
+		// 关键词: 触发 lazy cleanup, dummy CheckRateLimit
+		cfg.webSearchRateLimiter.CheckRateLimit("lifecycle-test-trigger")
+		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		_ = cfg.amapRateLimiter.WaitForRateLimit("lifecycle-test-trigger", ctx)
+		cancel()
+		balancers = append(balancers, &Balancer{config: cfg})
 	}
 
 	waitForGoroutineCountAtLeast(t, webLimiterSig, baseWeb+balancerCount, 2*time.Second)

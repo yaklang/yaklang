@@ -71,8 +71,14 @@ type ChatRateLimiter struct {
 	modelDelay         sync.Map // map[modelName]int64 free-user pre-call delay override (seconds)
 	stopCh             chan struct{}
 	stopOnce           sync.Once
+	startOnce          sync.Once
 }
 
+// NewChatRateLimiter creates a new chat rate limiter. The background cleanup
+// goroutine is started lazily on first CheckRateLimit, so an unused limiter
+// (e.g. NewServerConfig() in tests that never send chat requests) does not
+// contribute a leaked goroutine to TestGoroutineTracing's baseline.
+// 关键词: NewChatRateLimiter lazy cleanup, goroutine baseline 净化
 func NewChatRateLimiter() *ChatRateLimiter {
 	rl := &ChatRateLimiter{
 		stopCh:             make(chan struct{}),
@@ -80,8 +86,18 @@ func NewChatRateLimiter() *ChatRateLimiter {
 		rejectResidenceMax: defaultRejectResidenceMax,
 	}
 	rl.defaultRPM.Store(defaultRPMValue)
-	go rl.cleanupLoop()
 	return rl
+}
+
+// ensureCleanupStarted lazily starts the background cleanupLoop on first use.
+// Idempotent across concurrent callers (sync.Once). If Stop() was already
+// called, cleanupLoop will start and exit immediately on the first ticker
+// select, which is harmless.
+// 关键词: ChatRateLimiter lazy 启动 cleanupLoop, startOnce 幂等
+func (rl *ChatRateLimiter) ensureCleanupStarted() {
+	rl.startOnce.Do(func() {
+		go rl.cleanupLoop()
+	})
 }
 
 // SetRejectResidence 调整限流拒绝条目在排队计数中的驻留区间。
@@ -238,6 +254,7 @@ func (rl *ChatRateLimiter) getEffectiveRPM(modelName string) int64 {
 // The rate-limit bucket is keyed by (apiKey, modelName) so that per-model RPM
 // overrides are enforced independently instead of sharing a single bucket.
 func (rl *ChatRateLimiter) CheckRateLimit(apiKey string, modelName string) (bool, int64) {
+	rl.ensureCleanupStarted()
 	now := time.Now()
 	rpm := rl.getEffectiveRPM(modelName)
 
