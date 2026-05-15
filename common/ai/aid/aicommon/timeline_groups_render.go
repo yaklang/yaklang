@@ -85,10 +85,12 @@ func (m *Timeline) GroupByMinutes(minutes int) *TimelineGroups {
 	if m == nil || minutes <= 0 {
 		return &TimelineGroups{intervalMinutes: 0}
 	}
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	if m.bucketSizer != nil {
 		return m.groupByMinutesWithSizer(minutes, m.bucketSizer)
 	}
-	return m.GroupByMinutesAndBytes(minutes, m.getEffectiveBucketByteSize())
+	return m.groupByMinutesAndBytesLocked(minutes, m.getEffectiveBucketByteSize())
 }
 
 // groupByMinutesWithSizer 用动态 sizer 决策每个 flush 临界的桶大小。
@@ -161,6 +163,15 @@ func (m *Timeline) groupByMinutesWithSizer(minutes int, sizer BucketSizer) *Time
 // 该方法不修改 timeline 任何字段，纯读取。
 // 关键词: GroupByMinutesAndBytes, 字节子桶, 时间桶
 func (m *Timeline) GroupByMinutesAndBytes(minutes int, bytesPerBucket int64) *TimelineGroups {
+	if m == nil || minutes <= 0 {
+		return &TimelineGroups{intervalMinutes: 0}
+	}
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.groupByMinutesAndBytesLocked(minutes, bytesPerBucket)
+}
+
+func (m *Timeline) groupByMinutesAndBytesLocked(minutes int, bytesPerBucket int64) *TimelineGroups {
 	if m == nil || minutes <= 0 {
 		return &TimelineGroups{intervalMinutes: 0}
 	}
