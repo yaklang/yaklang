@@ -55,10 +55,11 @@ func TestAITaskCallToolStdOut_VerifyUserQuery(t *testing.T) {
 	}
 	go coordinator.Run()
 
-	count := 0
 	var outBuffer = bytes.NewBuffer(nil)
 	var errBuffer = bytes.NewBuffer(nil)
 	var toolCallID string
+	count := 0
+	deadline := time.After(20 * time.Second)
 	testConditionsMet := func() bool {
 		return strings.Contains(outBuffer.String(), outputToken) &&
 			strings.Contains(errBuffer.String(), errToken)
@@ -67,14 +68,13 @@ func TestAITaskCallToolStdOut_VerifyUserQuery(t *testing.T) {
 LOOP:
 	for {
 		select {
-		case <-time.After(10 * time.Second):
+		case <-deadline:
 			break LOOP
 		case result := <-outputChan:
 			count++
 			if count > 5000 { // 关键词: count 上限放宽, ReAct 事件量增加
 				break LOOP
 			}
-
 			if result.Type == schema.EVENT_TOOL_CALL_START {
 				toolCallID = result.CallToolID
 				continue
@@ -181,10 +181,11 @@ func TestAITaskCallToolStdOut_VerifyTimelineAndUserQuery(t *testing.T) {
 
 	go coordinator.Run()
 
-	count := 0
 	var outBuffer = bytes.NewBuffer(nil)
 	var errBuffer = bytes.NewBuffer(nil)
 	var toolCallID string
+	count := 0
+	deadline := time.After(20 * time.Second)
 	testConditionsMet := func() bool {
 		return strings.Contains(outBuffer.String(), outputToken) &&
 			strings.Contains(errBuffer.String(), errToken)
@@ -193,14 +194,13 @@ func TestAITaskCallToolStdOut_VerifyTimelineAndUserQuery(t *testing.T) {
 LOOP:
 	for {
 		select {
-		case <-time.After(10 * time.Second):
+		case <-deadline:
 			break LOOP
 		case result := <-outputChan:
 			count++
 			if count > 5000 { // 关键词: count 上限放宽, ReAct 事件量增加
 				break LOOP
 			}
-
 			if result.Type == schema.EVENT_TOOL_CALL_START {
 				toolCallID = result.CallToolID
 				continue
