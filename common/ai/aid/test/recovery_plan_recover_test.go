@@ -17,6 +17,27 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+func safeTestEventHandler(outputChan chan *schema.AiOutputEvent, stop <-chan struct{}) func(event *schema.AiOutputEvent) {
+	return func(event *schema.AiOutputEvent) {
+		if event == nil {
+			return
+		}
+
+		select {
+		case <-stop:
+			return
+		case outputChan <- event:
+			return
+		case <-time.After(500 * time.Millisecond):
+			select {
+			case <-stop:
+			default:
+				log.Warnf("drop test event due to full output channel: %s", event.Type)
+			}
+		}
+	}
+}
+
 func recoverPlan(t *testing.T, uuid string) {
 	fmt.Println("----------------------------------------------------------------")
 	fmt.Println("----------------------------------------------------------------")
@@ -32,25 +53,25 @@ func recoverPlan(t *testing.T, uuid string) {
 }`
 	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10)
 	outputChan := make(chan *schema.AiOutputEvent, 100)
-
-	defer func() {
-		inputChan.Close()
-		go func() {
-			for range outputChan {
-			}
-		}()
-		time.Sleep(100 * time.Millisecond)
-		close(outputChan)
-	}()
 	recoverCtx, recoverCancel := context.WithCancel(context.Background())
-	defer recoverCancel()
+	stopEvents := make(chan struct{})
+	runDone := make(chan struct{})
+	defer func() {
+		close(stopEvents)
+		recoverCancel()
+		select {
+		case <-runDone:
+		case <-time.After(3 * time.Second):
+			t.Log("timeout waiting for recover coordinator shutdown")
+		}
+		inputChan.Close()
+	}()
+
 	ord, err := aid.NewFastRecoverCoordinatorContext(
 		recoverCtx,
 		uuid,
 		aicommon.WithEventInputChanx(inputChan),
-		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
-			outputChan <- event
-		}),
+		aicommon.WithEventHandler(safeTestEventHandler(outputChan, stopEvents)),
 		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := request.GetPrompt()
 			if rsp, err := tryHandleNewPlanFlowPrompt(config, prompt, planJSON); rsp != nil {
@@ -75,6 +96,7 @@ func recoverPlan(t *testing.T, uuid string) {
 		t.Fatal(err)
 	}
 	go func() {
+		defer close(runDone)
 		defer func() {
 			if r := recover(); r != nil {
 				log.Errorf("recovered from panic in ord.Run(): %v", r)
@@ -123,26 +145,25 @@ func TestCoordinator_RecoverCase(t *testing.T) {
 }`
 	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10)
 	outputChan := make(chan *schema.AiOutputEvent, 100)
-
+	ctx, cancel := context.WithCancel(context.Background())
+	stopEvents := make(chan struct{})
+	runDone := make(chan struct{})
 	defer func() {
+		close(stopEvents)
+		cancel()
+		select {
+		case <-runDone:
+		case <-time.After(3 * time.Second):
+			t.Log("timeout waiting for coordinator shutdown")
+		}
 		inputChan.Close()
-		go func() {
-			for range outputChan {
-			}
-		}()
-		time.Sleep(100 * time.Millisecond)
-		close(outputChan)
 	}()
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	ins, err := aid.NewCoordinator(
 		"test",
 		aicommon.WithContext(ctx),
 		aicommon.WithEventInputChanx(inputChan),
-		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
-			outputChan <- event
-		}),
+		aicommon.WithEventHandler(safeTestEventHandler(outputChan, stopEvents)),
 		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := request.GetPrompt()
 			if rsp, err := tryHandleNewPlanFlowPrompt(config, prompt, planJSON); rsp != nil {
@@ -158,6 +179,7 @@ func TestCoordinator_RecoverCase(t *testing.T) {
 		t.Fatal(err)
 	}
 	go func() {
+		defer close(runDone)
 		defer func() {
 			if r := recover(); r != nil {
 				log.Errorf("recovered from panic in ins.Run(): %v", r)
