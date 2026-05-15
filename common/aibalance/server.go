@@ -1412,6 +1412,36 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 		wg.Wait()
 		utils.FlushWriter(writer.writerClose)
 
+		// 提前判断本轮 chat 是否成功 (与下方 1454 行同口径)，
+		// 用于决定是否在 writer.Close / GetNotStreamBody 之前触发
+		// 兜底 usage 估算 + 透传。
+		// 关键词: aibalance fallback usage 前移, 估算前 success 判定
+		preTotal := atomic.LoadInt64(totalBytes)
+		preSucceeded := chatErr == nil && (preTotal > 0 || writer.HasToolCalls())
+
+		// 兜底 usage 估算 + 客户端下发：上游 LLM 不返 SSE usage 帧时
+		// （DeepSeek 早期 endpoint / 第三方 wrapper / 网络中断），用 ytoken
+		// (Qwen BPE) 估算 prompt + completion token，并通过
+		// writer.WriteUsageEstimated 把估算结果写进响应 usage 字段
+		// （带 "estimated": true 标记），确保 opencode / Vercel AI SDK /
+		// OpenAI npm 等强依赖 usage 的客户端不会拿到 usage=null。
+		// 注意：扣费仍受 usageBilled 幂等保护，真实 usage 已扣费时不再二次扣。
+		// 此处必须在流式 Close / 非流式 GetNotStreamBody 之前调用，否则
+		// 写入的 WriteUsageEstimated 不会被发送出去。
+		// 关键词: aibalance fallback usage 下发前置, opencode usage 非 null,
+		// Vercel AI SDK usage 兼容, OpenAI include_usage 兼容
+		if preSucceeded && !usageBilled.Load() {
+			fbResult := c.applyUsageFallbackEstimate(
+				modelName, isFreeModel, key, provider.TypeName,
+				prompt.String(), len(imageContent),
+				outputTextBuf.String(), reasonTextBuf.String(),
+			)
+			if fbResult.EstimatedUsage != nil {
+				writer.WriteUsageEstimated(fbResult.EstimatedUsage)
+			}
+			usageBilled.Store(true) // 防止 1499 段二次执行 (估算口径已记账)
+		}
+
 		if !stream {
 			// 关键修复: 非流式响应必须由 server.go 主流程统一发送
 			// HTTP/1.1 200 OK + Content-Type: application/json + Content-Length,
@@ -1490,19 +1520,10 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 		successfulProvider = provider
 		c.logInfo("Provider %s successfully handled the request for model %s", provider.TypeName, modelName)
 
-		// 兜底扣费：上游不返 SSE usage 帧 (provider 不支持 include_usage /
-		// 网络中断 / 上游返 0 token usage) 时，用 ytoken (Qwen BPE) 估算
-		// prompt + completion token，按与正路一致的 ComputeWeightedTokens 倍率
-		// 落到免费桶或 APIKEY，避免"白嫖"。
-		// usageBilled 在真实 usage 完成扣费时已置位，确保不双扣。
-		// 关键词: aibalance usage missing fallback, ytoken 估算扣费, 不双扣
-		if requestSucceeded && !usageBilled.Load() {
-			c.applyUsageFallbackEstimate(
-				modelName, isFreeModel, key, provider.TypeName,
-				prompt.String(), len(imageContent),
-				outputTextBuf.String(), reasonTextBuf.String(),
-			)
-		}
+		// 兜底 usage 估算 + 扣费的实际触发点已上移到 wg.Wait() 之后、writer 输出之前
+		// （见上方 preSucceeded 块），目的是让估算 usage 也能透传给客户端 (opencode /
+		// Vercel AI SDK / OpenAI npm)。此处不再重复触发，避免与上方逻辑双扣。
+		// 关键词: aibalance fallback usage 上移说明, 不双扣, 透传客户端
 
 		// Update successful provider status
 		latencyMs := firstByteDuration.Milliseconds()

@@ -43,6 +43,13 @@ type chatJSONChunkWriter struct {
 	// 关键词: aibalance writer usage 透传, cached_tokens, include_usage 末帧
 	lastUsage *aispec.ChatUsage
 
+	// usageEstimated 由 WriteUsageEstimated 写入。
+	// true 时表示 lastUsage 是 aibalance 基于 ytoken (Qwen BPE) 估算的兜底值
+	// （上游 LLM 未返 SSE usage 帧），需要在下发给客户端的 usage 体里加
+	// "estimated": true 标记，避免误导客户端把估算当真实 token。
+	// 关键词: aibalance usage estimated 标记, ytoken 兜底, 客户端 usage 非 null
+	usageEstimated bool
+
 	// accumulatedToolCalls 按 index 合并所有上游回调过来的 tool_calls 增量，
 	// 同时服务于两条链路：
 	//   1. 流式模式: Close() 据此把 finish_reason 从 "stop" 修正为 "tool_calls"，
@@ -516,6 +523,37 @@ func (w *chatJSONChunkWriter) WriteUsage(usage *aispec.ChatUsage) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	w.lastUsage = usage
+	w.usageEstimated = false
+}
+
+// WriteUsageEstimated 用于把 aibalance 兜底估算的 token 用量
+// （ytoken Qwen BPE 估算 prompt + completion token，与 onUsageForward 正路
+// 一致的 ComputeWeightedTokens 倍率体系）回填到客户端响应里。
+//
+// 与 WriteUsage 的差异：
+//   - 仅当 lastUsage 还未被真实 usage 写入时才覆盖，避免覆盖真实值。
+//   - 置位 usageEstimated 标记，让 buildUsageMap 在下发的 usage 体里写入
+//     "estimated": true，告诉客户端这是估算值，便于计费侧人工审计。
+//
+// 目的：当上游 LLM 不支持 stream_options.include_usage（如 DeepSeek
+// 部分早期 endpoint 或第三方 wrapper），仍能让 opencode / Vercel AI SDK /
+// openai npm 等强依赖 usage 的客户端拿到一份非 null 的 token 估算，
+// 不破坏它们的 step 跟踪 / cost 计算流程。
+//
+// 关键词: WriteUsageEstimated, ytoken 兜底 usage 下发, usage estimated 标记,
+// opencode usage 非 null, Vercel AI SDK usage 兼容
+func (w *chatJSONChunkWriter) WriteUsageEstimated(usage *aispec.ChatUsage) {
+	if usage == nil {
+		return
+	}
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.lastUsage != nil && !w.usageEstimated {
+		// 真实 usage 已就位，不要被估算值覆盖。
+		return
+	}
+	w.lastUsage = usage
+	w.usageEstimated = true
 }
 
 // WriteToolCalls writes tool calls to the streaming response
@@ -610,7 +648,7 @@ func (w *chatJSONChunkWriter) GetNotStreamBody() []byte {
 	}
 
 	if w.lastUsage != nil {
-		result["usage"] = buildUsageMap(w.lastUsage)
+		result["usage"] = buildUsageMap(w.lastUsage, w.usageEstimated)
 	}
 
 	body, err := json.Marshal(result)
@@ -622,8 +660,10 @@ func (w *chatJSONChunkWriter) GetNotStreamBody() []byte {
 
 // buildUsageMap 把 aispec.ChatUsage 转成与 OpenAI chat.completion.usage
 // 字段一致的 map（含可选的 prompt_tokens_details.cached_tokens）。
-// 关键词: buildUsageMap, OpenAI usage 字段映射, cached_tokens
-func buildUsageMap(u *aispec.ChatUsage) map[string]any {
+// estimated=true 时附加 "estimated": true 自定义字段，
+// 用于标识 aibalance 兜底估算（非上游真实 token 计数）。
+// 关键词: buildUsageMap, OpenAI usage 字段映射, cached_tokens, estimated 标记
+func buildUsageMap(u *aispec.ChatUsage, estimated bool) map[string]any {
 	if u == nil {
 		return nil
 	}
@@ -636,6 +676,9 @@ func buildUsageMap(u *aispec.ChatUsage) map[string]any {
 		out["prompt_tokens_details"] = map[string]any{
 			"cached_tokens": u.PromptTokensDetails.CachedTokens,
 		}
+	}
+	if estimated {
+		out["estimated"] = true
 	}
 	return out
 }
@@ -725,7 +768,7 @@ func (w *chatJSONChunkWriter) Close() error {
 			"created": w.created.Unix(),
 			"model":   w.model,
 			"choices": []map[string]any{},
-			"usage":   w.lastUsage,
+			"usage":   buildUsageMap(w.lastUsage, w.usageEstimated),
 		}
 		if usageBytes, jerr := json.Marshal(usageMsg); jerr == nil {
 			usageData := fmt.Sprintf("data: %s\n\n", string(usageBytes))

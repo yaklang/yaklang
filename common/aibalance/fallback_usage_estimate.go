@@ -113,6 +113,18 @@ type FallbackEstimateResult struct {
 	Billed bool
 	// Bucket 实际扣费走的桶："global" / "model" / "apikey" / ""(未扣)
 	Bucket string
+	// EstimatedUsage 是 ytoken BPE 估算得到的 ChatUsage，
+	// 调用方可以把它通过 writer.WriteUsageEstimated 下发给客户端，
+	// 保证 opencode / Vercel AI SDK / OpenAI npm 等强依赖 usage 的客户端
+	// 不会拿到 usage=null。Weighted=0 时此字段为 nil。
+	// 关键词: EstimatedUsage 兜底 usage 下发, opencode usage 非 null
+	EstimatedUsage *aispec.ChatUsage
+}
+
+// usageWriter 抽象 chatJSONChunkWriter 的 usage 下发能力，便于单元测试 mock。
+// 关键词: usageWriter, fallback usage 下发抽象
+type usageWriter interface {
+	WriteUsageEstimated(usage *aispec.ChatUsage)
 }
 
 // applyUsageFallbackEstimate 用 ytoken (Qwen BPE) 估算 prompt + completion token，
@@ -126,9 +138,12 @@ type FallbackEstimateResult struct {
 //
 // 与 onUsageForward 正路的差异：
 //   - 不调用 RecordDailyCacheStats / RecordDailySummaryDelta (那些只反映真实上游数据)
-//   - 不调用 writer.WriteUsage (estUsage 是估算值，不应下发给客户端)
+//   - estUsage 写到 result.EstimatedUsage 返回，调用方负责通过
+//     writer.WriteUsageEstimated 把估算 usage 下发给客户端
+//     （保证 opencode / Vercel AI SDK 不会拿到 usage=null）。
+//     如果上游确实没返 usage，估算值会被标 "estimated": true 写到响应里。
 //
-// 关键词: applyUsageFallbackEstimate, ytoken 兜底, fallback 扣费分发
+// 关键词: applyUsageFallbackEstimate, ytoken 兜底, fallback 扣费分发, usage 估算下发
 func (c *ServerConfig) applyUsageFallbackEstimate(
 	modelName string,
 	isFreeModel bool,
@@ -154,6 +169,7 @@ func (c *ServerConfig) applyUsageFallbackEstimate(
 		CompletionTokens: int(result.EstCompletionTokens),
 		TotalTokens:      int(result.EstPromptTokens + result.EstCompletionTokens),
 	}
+	result.EstimatedUsage = estUsage
 	meta, _ := GetModelMeta(modelName)
 	result.Weighted = ComputeWeightedTokens(meta, estUsage)
 	if result.Weighted <= 0 {
