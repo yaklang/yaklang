@@ -699,6 +699,14 @@ func joinImportPath(base, name string) string {
 	}
 }
 
+func isPythonImportPlaceholderValue(v ssa.Value) bool {
+	if v == nil {
+		return false
+	}
+	u, ok := ssa.ToUndefined(v)
+	return ok && u != nil && u.Kind == ssa.UndefinedValueValid
+}
+
 func (b *singleFileBuilder) bindImportedName(bindingName, sourceName, packagePath string) ssa.Value {
 	if bindingName == "" {
 		return nil
@@ -720,16 +728,52 @@ func (b *singleFileBuilder) bindImportedName(bindingName, sourceName, packagePat
 		return value
 	}
 
-	if prog.GetCurrentEditor() == nil {
-		return b.bindImportedPlaceholder(bindingName, sourceName)
-	}
-
 	lib, err := prog.GetOrCreateLibrary(packagePath)
 	if err != nil || lib == nil {
 		return b.bindImportedPlaceholder(bindingName, sourceName)
 	}
 
+	app := prog.GetApplication()
+	if app == nil {
+		app = prog
+	}
+
 	value := lib.GetExportValue(bindingName)
+	if isPythonImportPlaceholderValue(value) {
+		value = nil
+	}
+	if value == nil {
+		if t, ok := lib.GetExportType(bindingName); ok {
+			if bp, ok := ssa.ToClassBluePrintType(t); ok && bp != nil {
+				if c := bp.Container(); c != nil {
+					value = c
+					lib.SetExportValue(bindingName, value)
+				}
+			}
+		}
+	}
+	// All project .py lower into one Application Program; virtual libs start empty. Resolve from app
+	// and back-fill the virtual module lib so `from db_manager import DBManager` gets the class container,
+	// not `Undefined-db_manager.DBManager` (module+name concatenated as a single placeholder string).
+	if value == nil || isPythonImportPlaceholderValue(value) {
+		if v := app.GetExportValue(bindingName); v != nil && !isPythonImportPlaceholderValue(v) {
+			value = v
+		} else if t, ok := app.GetExportType(bindingName); ok {
+			if bp, ok := ssa.ToClassBluePrintType(t); ok && bp != nil {
+				if c := bp.Container(); c != nil {
+					value = c
+				}
+			}
+		}
+	}
+	if value != nil {
+		if cur := lib.GetExportValue(bindingName); cur == nil || isPythonImportPlaceholderValue(cur) {
+			lib.SetExportValue(bindingName, value)
+			if t, ok := app.GetExportType(bindingName); ok {
+				lib.SetExportType(bindingName, t)
+			}
+		}
+	}
 	if value == nil {
 		libBuilder := lib.GetAndCreateFunctionBuilder(lib.PkgName, string(ssa.VirtualFunctionName))
 		if libBuilder == nil {
@@ -744,6 +788,14 @@ func (b *singleFileBuilder) bindImportedName(bindingName, sourceName, packagePat
 
 	if err := prog.ImportValueFromLib(lib, bindingName); err != nil {
 		return b.bindImportedPlaceholder(bindingName, sourceName)
+	}
+	// Register blueprint (and other exported types) on the import-declare typ map so
+	// VisitName ReadImportType → ToClassBluePrintType works; values alone only filled pkg.val.
+	if _, ok := lib.GetExportType(bindingName); ok {
+		_ = prog.ImportTypeFromLib(lib, bindingName, nil)
+	} else if t, ok := app.GetExportType(bindingName); ok {
+		lib.SetExportType(bindingName, t)
+		_ = prog.ImportTypeFromLib(lib, bindingName, nil)
 	}
 	if imported, ok := prog.ReadImportValue(bindingName); ok && imported != nil {
 		return imported
@@ -1282,7 +1334,11 @@ func (b *singleFileBuilder) extractAssignTargetFromExpr(raw pythonparser.IExprCo
 			}
 		}
 		if b.shouldUseDynamicMemberFallback(obj) {
-			return assignTarget{varName: syntheticName}
+			// Do not flatten to varName "self.conn": reads use ParameterMember / PeekValue
+			// (ReadMemberCallValue); a synthetic global name breaks dataflow to self.conn.cursor().
+			obj = b.ensureDynamicObjectType(obj)
+			key := b.EmitConstInst(attrName)
+			return assignTarget{memberVar: b.CreateMemberCallVariable(obj, key)}
 		}
 		b.ensureBlueprintMember(obj, attrName)
 		obj = b.ensureDynamicObjectType(obj)
