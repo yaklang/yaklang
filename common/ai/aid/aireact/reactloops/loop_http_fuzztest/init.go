@@ -103,6 +103,7 @@ func init() {
 				fuzzBodyAction(r),
 				fuzzCookieAction(r),
 				generateAndSendPacketAction(r),
+				generateRiskAction(r),
 			}
 			preset = append(preset, opts...)
 			return reactloops.NewReActLoop(LoopHTTPFuzztestName, r, preset...)
@@ -111,7 +112,7 @@ func init() {
 		reactloops.WithLoopDescriptionZh("HTTP 安全模糊测试模式：对 HTTP 请求进行变异、发送和响应差异分析，用于发现潜在安全问题。"),
 		reactloops.WithVerboseName("HTTP Fuzz Test"),
 		reactloops.WithVerboseNameZh("HTTP 安全模糊测试"),
-		reactloops.WithLoopUsagePrompt("Use when user wants to fuzz HTTP requests and analyze security-relevant response differences. First use 'set_http_request' to set the target request, then use 'patch_http_request' for fine-grained single-step packet edits, auth/header/body format transforms, or repair, fuzz actions (fuzz_method, fuzz_path, fuzz_header, fuzz_get_params, fuzz_body, fuzz_cookie), 'modify_http_request' when the current packet must be revised with visible merge details via a full raw packet, 'generate_and_send_packet' when a complete raw packet must be constructed and sent, or 'directly_answer' for short testing-process Q&A."),
+		reactloops.WithLoopUsagePrompt("Use when user wants to fuzz HTTP requests and analyze security-relevant response differences. First use 'set_http_request' to set the target request, then use 'patch_http_request' for fine-grained single-step packet edits, auth/header/body format transforms, or repair, fuzz actions (fuzz_method, fuzz_path, fuzz_header, fuzz_get_params, fuzz_body, fuzz_cookie), 'modify_http_request' when the current packet must be revised with visible merge details via a full raw packet, 'generate_and_send_packet' when a complete raw packet must be constructed and sent, 'generate_risk' when validated or defensible vulnerability evidence should be saved as a Yakit risk, or 'directly_answer' for short testing-process Q&A."),
 		reactloops.WithLoopOutputExample(`
 * When user requests to fuzz HTTP request:
   {"@action": "http_fuzztest", "human_readable_thought": "I need to fuzz HTTP request parameters to find vulnerabilities"}

@@ -79,7 +79,7 @@ func captureLoopHTTPFuzzSessionContext(loop *reactloops.ReActLoop, source string
 		RequestChangeSummary:      strings.TrimSpace(loop.Get("request_change_summary")),
 		RequestModificationReason: strings.TrimSpace(loop.Get("request_modification_reason")),
 		RequestReviewDecision:     strings.TrimSpace(loop.Get("request_review_decision")),
-		IsHTTPS:                   strings.EqualFold(loop.Get("is_https"), "true"),
+		IsHTTPS:                   strings.EqualFold(loop.Get("is_https"), "false"),
 		BootstrapSource:           strings.TrimSpace(source),
 		RepresentativeRequest:     strings.TrimSpace(loop.Get("representative_request")),
 		RepresentativeResponse:    strings.TrimSpace(loop.Get("representative_response")),

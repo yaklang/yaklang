@@ -226,3 +226,47 @@ Content-Type: application/json
 
 {"name":"tester","template":"{{ "{{7*7}}" }}","preview":true}
 <|GEN_PACKET_END_CURRENT_NONCE|>
+
+### 示例 15：将已验证的漏洞线索生成 Risk
+```json
+{
+  "@action": "generate_risk",
+  "target": "https://target.internal/api/orders?id=1002",
+  "title": "订单详情接口疑似 IDOR 越权读取",
+  "title_verbose": "订单详情接口通过切换 id 参数读取到其他用户订单摘要",
+  "risk_type": "privilege-escalation",
+  "severity": "high",
+  "description": "在只读测试中，连续切换订单 id 后服务端均返回 200，并且响应中出现不同用户的订单摘要、邮箱等字段，说明接口可能缺少对象级权限校验。测试未执行写入、删除或破坏性操作。",
+  "details": "{\"evidence\":\"id=1001/1002/1003 返回不同用户订单摘要\",\"tested_payloads\":[\"1001\",\"1002\",\"1003\"],\"response_difference\":\"状态码一致但响应主体中的用户标识和订单摘要发生稳定变化\",\"reproduction_steps\":\"复用代表性 HTTPFlow，切换 id 参数观察返回对象是否属于当前账号\"}",
+  "payload": "id=1002"
+}
+```
+
+### 示例 16：一次生成多个 Risk
+```json
+{
+  "@action": "generate_risk",
+  "risks": [
+    {
+      "target": "https://target.internal/api/orders?id=1002",
+      "title": "订单详情接口疑似 IDOR 越权读取",
+      "title_verbose": "订单详情接口通过切换 id 参数读取到其他用户订单摘要",
+      "risk_type": "privilege-escalation",
+      "severity": "high",
+      "description": "只读测试中切换订单 id 后仍返回 200，并稳定返回不同用户的订单摘要，说明对象级权限校验可能缺失。",
+      "details": "{\"evidence\":\"id=1001/1002/1003 返回不同用户订单摘要\",\"tested_payloads\":[\"1001\",\"1002\",\"1003\"],\"response_difference\":\"状态码一致但响应主体中的用户标识发生变化\"}",
+      "payload": "id=1002"
+    },
+    {
+      "target": "https://target.internal/api/orders?id=1002",
+      "title": "订单详情响应暴露用户邮箱信息",
+      "title_verbose": "订单详情接口在越权响应中暴露其他用户邮箱和内部用户 ID",
+      "risk_type": "info-exposure",
+      "severity": "warning",
+      "description": "代表性响应中包含其他用户邮箱和内部用户 ID，这些字段可辅助后续越权利用或账号枚举。测试过程未执行写入或破坏性操作。",
+      "details": "{\"evidence\":\"响应体包含 email 与 internal_user_id 字段\",\"impact\":\"敏感用户标识泄漏，可与 IDOR 组合扩大影响\"}",
+      "payload": "id=1002"
+    }
+  ]
+}
+```

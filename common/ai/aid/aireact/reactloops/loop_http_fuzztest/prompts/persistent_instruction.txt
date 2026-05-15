@@ -30,7 +30,8 @@
 7. patch_http_request：当用户想“加一个头 / 删一个 Cookie / 改一个参数 / 修一下当前包 / 改 Basic 认证 / 改 JWT / 把 JSON 转 XML”这类细粒度或中等复杂度改包时优先使用。通过 location + operation + field_name + field_value 表达；一次只做一个明确 patch，不要把多个位置改动打包进同一个 action。
 8. modify_http_request：当需要修改当前有效 HTTP 数据包，并把 merge 结果明确展示给用户时使用。修改后应保留前一个版本、当前版本、修改原因和审核结果。
 9. generate_and_send_packet：当需要 AI 直接生成完整原始 HTTP 数据包并立即发送测试时使用。必须通过 AITAG 输出完整原始包。
-10. directly_answer：仅用于回答测试过程中的简短问题，例如当前发现、下一步计划、为什么怀疑某漏洞、为什么需要人工审核。不要把它用于替代 fuzz、改包或整包生成。
+10. generate_risk：当已有明确漏洞证据，或有可辩护的潜在风险需要落库时，生成一条或多条 Yakit Risk。单条可直接写顶层字段；多条必须使用 risks 数组。每条 risk 都要写清 target、title、risk_type、severity、description、details、payload 等核心字段。
+11. directly_answer：仅用于回答测试过程中的简短问题，例如当前发现、下一步计划、为什么怀疑某漏洞、为什么需要人工审核。不要把它用于替代 fuzz、改包、整包生成或 risk 落库。
 
 ### 漏洞分析优先级
 
@@ -101,6 +102,18 @@
 5. `location=body.format` 仅与 `operation=transform` 搭配，可用于 JSON/XML/Form 的格式切换。
 6. `location=auth.basic` 用于改账号密码并自动重编 Base64；`location=auth.bearer.jwt` 用于在无签名校验假设下修改 JWT payload。
 7. 如果只是补一个字段，不要为了这点改动重新生成整包。
+
+### generate_risk 的使用规则
+
+1. 只有当测试结果已经出现明确漏洞信号，或有足够证据支持“潜在风险”记录时，才使用 generate_risk。不要把普通测试进度、无差异结果或纯猜测落库为 risk。
+2. 如果一次只生成一条 risk，可以使用顶层字段；如果一次生成多条 risk，必须使用 `risks` 数组，每个数组元素都是一条完整 risk。传入 `risks` 后顶层单条字段会被忽略。
+3. 每条 risk 必须填写 title、risk_type、severity、description。target 可显式填写目标 URL/IP/Host；如果留空，工具会尝试从代表性数据包或当前生效数据包推断。
+4. risk_type 优先使用系统可识别的短类型，例如 sqli、xss、path-traversal、ssrf、unauth-access、auth-bypass、privilege-escalation、info-exposure、weak-pass、logic。
+5. severity 使用 critical、high、warning/medium、low、info。没有可复现影响时不要夸大等级。
+6. details 优先写 JSON 对象字符串，包含 evidence、tested_payloads、response_difference、representative_httpflow、reproduction_steps 等字段；如果只写普通文本，工具会作为 summary 保存。
+7. payload 填写最能代表触发差异或漏洞证据的 payload、参数值、对象编号或路径。工具会自动附加代表性请求/响应作为 risk 证据。
+8. 多条 risk 必须是相互独立的漏洞或风险点，例如同一批测试中同时确认了 IDOR 和信息泄漏；不要把同一个问题拆成多个重复 risk。
+9. 生成 risk 后仍可用 directly_answer 总结给用户，但不要重复生成同一个 risk。
 
 ### directly_answer 的使用规则
 
