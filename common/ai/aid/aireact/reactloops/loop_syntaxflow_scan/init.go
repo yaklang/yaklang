@@ -26,7 +26,7 @@ func init() {
 		reactloops.WithVerboseNameZh("IRify · SyntaxFlow 扫描"),
 		reactloops.WithLoopDescription("Multi-stage SyntaxFlow scan: P1 resolves params from irify_syntaxflow attachments and/or LiteForge on user input (no loop-var reads); attaches validate task id in SSA."),
 		reactloops.WithLoopDescriptionZh("SyntaxFlow 扫描：编排入参仅从 irify_syntaxflow 附件 + 用户话术 LiteForge 解析（不在 P1 Read loop）；附着校验 task_id。Subtask 需带齐附件或使用自然语言兜底。"),
-		reactloops.WithLoopUsagePrompt("Set irify_syntaxflow attachments (session_mode, and task_id or sf_scan_config_json) on the task, or rely on LiteForge from the user message."),
+		reactloops.WithLoopUsagePrompt("Set irify_syntaxflow attachments (session_mode=attach|compile_scan|program, plus task_id / project_path / project_name / program_name) on the task, or rely on LiteForge from the user message."),
 		reactloops.WithLoopOutputExample(`
 * SyntaxFlow 扫描会话：
   {"@action": "syntaxflow_scan", "human_readable_thought": "需要解读已注入的 SyntaxFlow 扫描任务（task_id 由引擎或变量提供）"}

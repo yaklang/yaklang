@@ -136,8 +136,8 @@ func OrchestratorParentTaskID(_ *reactloops.ReActLoop, fallback string) string {
 	return strings.TrimSpace(fallback)
 }
 
-// BuildScanStagePhase0Intake 阶段 0：输入与下一步（本地静态编译后接扫描）。
-func BuildScanStagePhase0Intake(projectPath, configInferred, userHint, orchestratorTaskID string) string {
+// BuildScanStagePhase0Intake 阶段 0：输入与下一步。
+func BuildScanStagePhase0Intake(mode SyntaxFlowScanSessionMode, projectPath, projectName, programName, userHint, orchestratorTaskID string) string {
 	var b strings.Builder
 	b.WriteString("# 代码扫描·阶段 0\n\n")
 	b.WriteString("## 你的目标与范围\n\n")
@@ -146,23 +146,65 @@ func BuildScanStagePhase0Intake(projectPath, configInferred, userHint, orchestra
 		b.WriteString("\n\n")
 	}
 	b.WriteString("## 当前输入\n\n")
-	if p := strings.TrimSpace(projectPath); p != "" {
-		fmt.Fprintf(&b, "- **项目/路径**: `%s`\n", p)
-	} else {
-		b.WriteString("- **项目/路径**: （本回合由扫描配置 JSON 描述；未从编排单独填写 project_path 变量）\n")
+	fmt.Fprintf(&b, "- **会话模式**: `%s`\n", mode.String())
+	switch mode {
+	case SyntaxFlowSessionModeCompileScan:
+		if p := strings.TrimSpace(projectPath); p != "" {
+			fmt.Fprintf(&b, "- **项目/路径**: `%s`\n", p)
+		}
+		if pn := strings.TrimSpace(projectName); pn != "" {
+			fmt.Fprintf(&b, "- **项目名称（project_name）**: `%s`\n", pn)
+		}
+		b.WriteString("- **配置来源**: 将按本地路径匹配已有 SSA 项目，或自动探测并创建项目配置\n")
+		b.WriteString("\n## 下一步\n\n")
+		b.WriteString("将先在本地对目标工程做**静态程序分析用的编译（SSA）**，随后再启动**后台代码扫描**。\n")
+	case SyntaxFlowSessionModeProgramScan:
+		fmt.Fprintf(&b, "- **Program 名称**: `%s`\n", strings.TrimSpace(programName))
+		b.WriteString("\n## 下一步\n\n")
+		b.WriteString("将跳过 SSA 编译，直接对已编译 Program 启动**后台代码扫描**。\n")
+	default:
+		b.WriteString("\n## 下一步\n\n")
+		b.WriteString("将按已提交的会话模式继续编排。\n")
 	}
 	if t := strings.TrimSpace(orchestratorTaskID); t != "" {
-		fmt.Fprintf(&b, "- **编排任务 Id（便于对账）**: `%s`\n", t)
+		fmt.Fprintf(&b, "\n- **编排任务 Id（便于对账）**: `%s`\n", t)
 	}
-	ci := strings.TrimSpace(configInferred)
-	if ci == "1" {
-		b.WriteString("- **配置来源**: 已根据本机目录推断为最小化 code-scan 配置\n")
-	} else if ci == "0" {
-		b.WriteString("- **配置来源**: 使用显式提供的 code-scan 配置\n")
+	return b.String()
+}
+
+// BuildScanStagePhase0ProgramScan program 模式：跳过编译，直接扫描。
+func BuildScanStagePhase0ProgramScan(programName, userHint, orchestratorTaskID string) string {
+	return BuildScanStagePhase0Intake(SyntaxFlowSessionModeProgramScan, "", "", programName, userHint, orchestratorTaskID)
+}
+
+// BuildScanStagePhase0ConfigResolve 阶段 0：配置解析结果（显式 JSON / 复用项目 / 自动探测新建）。
+func BuildScanStagePhase0ConfigResolve(out *sfutil.CodeScanConfigResolveOutcome) string {
+	var b strings.Builder
+	b.WriteString("# 代码扫描·阶段 0\n\n")
+	b.WriteString("## 配置解析结果\n\n")
+	if out == nil || out.Config == nil {
+		b.WriteString("（未能解析出有效配置。）\n")
+		return b.String()
+	}
+	switch out.Source {
+	case sfutil.CodeScanConfigSourceExistingProject:
+		b.WriteString("- **解析方式**: 已匹配到已有 SSA 项目，直接复用其配置\n")
+	case sfutil.CodeScanConfigSourceAutoDetectNew:
+		b.WriteString("- **解析方式**: 未找到匹配项目，已自动探测工程并创建/同步 SSA 项目配置\n")
+	default:
+		b.WriteString("- **解析方式**: 未知\n")
+	}
+	if p := strings.TrimSpace(out.ResolvedPath); p != "" {
+		fmt.Fprintf(&b, "- **归一化路径**: `%s`\n", p)
+	}
+	if pn := strings.TrimSpace(out.ProjectName); pn != "" {
+		fmt.Fprintf(&b, "- **项目名称**: `%s`\n", pn)
+	}
+	if out.ProjectID > 0 {
+		fmt.Fprintf(&b, "- **项目 Id**: `%d`\n", out.ProjectID)
 	}
 	b.WriteString("\n## 下一步\n\n")
-	b.WriteString("将先在本地对目标工程做**静态程序分析用的编译（SSA）**，随后再启动**后台代码扫描**（规则与 Query 由配置与引擎决定）。\n\n")
-	b.WriteString("> 若你选择**附着**已有 `task_id` 而非新扫，可跳过「本地起扫」路径；该分支的完整产品文案可后续接 intake。\n")
+	b.WriteString("已得到可用于编译的 code-scan 配置，即将进入 SSA 编译阶段。\n")
 	return b.String()
 }
 

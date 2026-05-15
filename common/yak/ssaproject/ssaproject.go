@@ -1,6 +1,8 @@
 package ssaproject
 
 import (
+	"strings"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
@@ -239,6 +241,20 @@ func LoadSSAProjectByNameAndURL(projectName, url string) (*SSAProject, error) {
 	db := consts.GetGormProfileDatabase()
 	var project schema.SSAProject
 	err := db.Where("project_name = ? AND url = ?", projectName, url).First(&project).Error
+	if err != nil {
+		return nil, utils.Errorf("load SSA project failed: %s", err)
+	}
+	return loadSSAProjectBySchema(&project)
+}
+
+func LoadSSAProjectByURL(url string) (*SSAProject, error) {
+	url = strings.TrimSpace(url)
+	if url == "" {
+		return nil, utils.Errorf("load SSA project failed: url is required")
+	}
+	db := consts.GetGormProfileDatabase()
+	var project schema.SSAProject
+	err := db.Where("url = ?", url).First(&project).Error
 	if err != nil {
 		return nil, utils.Errorf("load SSA project failed: %s", err)
 	}

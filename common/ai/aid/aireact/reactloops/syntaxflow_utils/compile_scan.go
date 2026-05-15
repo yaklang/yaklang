@@ -10,7 +10,9 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa_compile"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -70,8 +72,142 @@ func buildMinimalInProcessCodeScanJSON(localPath string) ([]byte, error) {
 	return cfg.ToJSONRaw()
 }
 
+// CodeScanConfigResolveSource describes how a code-scan config was obtained before compile.
+type CodeScanConfigResolveSource string
+
+const (
+	CodeScanConfigSourceExplicitJSON    CodeScanConfigResolveSource = "explicit_json"
+	CodeScanConfigSourceExistingProject CodeScanConfigResolveSource = "existing_project"
+	CodeScanConfigSourceAutoDetectNew   CodeScanConfigResolveSource = "auto_detect_new"
+)
+
+// CodeScanConfigResolveOutcome is the resolved config plus metadata for user-facing stage markdown.
+type CodeScanConfigResolveOutcome struct {
+	Config       *ssaconfig.Config
+	Source       CodeScanConfigResolveSource
+	ProjectName  string
+	ProjectID    uint64
+	ResolvedPath string
+}
+
+func normalizeLocalProjectPath(localPath string) (string, error) {
+	localPath = strings.TrimSpace(localPath)
+	if localPath == "" {
+		return "", utils.Error("empty project path")
+	}
+	st, err := os.Stat(localPath)
+	if err != nil {
+		return "", err
+	}
+	if !st.IsDir() {
+		localPath = filepath.Dir(localPath)
+	}
+	return filepath.Clean(localPath), nil
+}
+
+func lookupExistingSSAProject(projectName, localPath string) (*schema.SSAProject, error) {
+	db := consts.GetGormProfileDatabase()
+	if db == nil {
+		return nil, nil
+	}
+	localPath = strings.TrimSpace(localPath)
+	if localPath == "" {
+		return nil, nil
+	}
+	q := db.Where("url = ?", localPath)
+	if projectName = strings.TrimSpace(projectName); projectName != "" {
+		q = q.Where("project_name = ?", projectName)
+	}
+	var project schema.SSAProject
+	err := q.First(&project).Error
+	if err == gorm.ErrRecordNotFound {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &project, nil
+}
+
+func configFromExistingSSAProject(ctx context.Context, project *schema.SSAProject) (*ssaconfig.Config, error) {
+	if project == nil {
+		return nil, utils.Error("ssa project is nil")
+	}
+	cfg, err := project.GetConfig()
+	if err != nil {
+		return nil, err
+	}
+	if project.ID > 0 {
+		if err := cfg.Update(ssaconfig.WithProjectID(uint64(project.ID))); err != nil {
+			return nil, err
+		}
+	}
+	if ctx != nil {
+		if err := cfg.Update(ssaconfig.WithContext(ctx)); err != nil {
+			return nil, err
+		}
+	}
+	return cfg, nil
+}
+
+// ResolveCodeScanConfigForLocalPath resolves config for path-only intake: reuse SSAProject by url (+ optional project_name) or auto-detect and sync project row.
+func ResolveCodeScanConfigForLocalPath(ctx context.Context, localPath, projectName string) (*CodeScanConfigResolveOutcome, error) {
+	resolvedPath, err := normalizeLocalProjectPath(localPath)
+	if err != nil {
+		return nil, err
+	}
+	if existing, err := lookupExistingSSAProject(projectName, resolvedPath); err == nil && existing != nil {
+		cfg, err := configFromExistingSSAProject(ctx, existing)
+		if err != nil {
+			return nil, err
+		}
+		out := &CodeScanConfigResolveOutcome{
+			Config:       cfg,
+			Source:       CodeScanConfigSourceExistingProject,
+			ProjectName:  cfg.GetProjectName(),
+			ProjectID:    uint64(existing.ID),
+			ResolvedPath: resolvedPath,
+		}
+		if out.ProjectName == "" {
+			out.ProjectName = existing.ProjectName
+		}
+		return out, nil
+	} else if err != nil {
+		return nil, err
+	}
+
+	res, err := ssa_compile.ParseProjectWithAutoDetective(ctx, &ssa_compile.SSADetectConfig{
+		Target:             resolvedPath,
+		CompileImmediately: false,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if res == nil || res.Info == nil || res.Info.Config == nil {
+		return nil, utils.Error("ssa auto-detect returned no config")
+	}
+	cfg := res.Info.Config
+	source := CodeScanConfigSourceAutoDetectNew
+	if res.Info.ProjectExists {
+		source = CodeScanConfigSourceExistingProject
+	}
+	if db := consts.GetGormProfileDatabase(); db != nil {
+		cfg, _, err = ssa_compile.EnsureSSAProjectRowForCodeScan(ctx, db, cfg)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return &CodeScanConfigResolveOutcome{
+		Config:       cfg,
+		Source:       source,
+		ProjectName:  cfg.GetProjectName(),
+		ProjectID:    cfg.GetProjectID(),
+		ResolvedPath: resolvedPath,
+	}, nil
+}
+
 // ResolveCodeScanConfigFromJSON 从 code-scan 族 JSON 得到落库后的编译配置（不编译）。
-func ResolveCodeScanConfigFromJSON(ctx context.Context, jsonRaw []byte) (*ssaconfig.Config, error) {
+func ResolveCodeScanConfigFromJSON(ctx context.Context, jsonRaw []byte) (*CodeScanConfigResolveOutcome, error) {
 	if len(jsonRaw) == 0 {
 		return nil, utils.Error("empty code-scan config json")
 	}
@@ -85,38 +221,34 @@ func ResolveCodeScanConfigFromJSON(ctx context.Context, jsonRaw []byte) (*ssacon
 			return nil, err
 		}
 	}
-	return cfg, nil
+	return &CodeScanConfigResolveOutcome{
+		Config:      cfg,
+		Source:      CodeScanConfigSourceExplicitJSON,
+		ProjectName: cfg.GetProjectName(),
+		ProjectID:   cfg.GetProjectID(),
+	}, nil
 }
 
 // ResolveCodeScanConfigFromProjectPath 仅做「SSA 项目探测」+ SSAProject 行同步（不编译）。path 可为文件或目录。
 func ResolveCodeScanConfigFromProjectPath(ctx context.Context, localPath string) (*ssaconfig.Config, error) {
-	localPath = strings.TrimSpace(localPath)
-	if localPath == "" {
-		return nil, utils.Error("empty project path")
-	}
-	if st, err := os.Stat(localPath); err != nil {
-		return nil, err
-	} else if !st.IsDir() {
-		localPath = filepath.Dir(localPath)
-	}
-	res, err := ssa_compile.ParseProjectWithAutoDetective(ctx, &ssa_compile.SSADetectConfig{
-		Target:             localPath,
-		CompileImmediately: false,
-	})
+	out, err := ResolveCodeScanConfigForLocalPath(ctx, localPath, "")
 	if err != nil {
 		return nil, err
 	}
-	if res == nil || res.Info == nil || res.Info.Config == nil {
-		return nil, utils.Error("ssa auto-detect returned no config")
+	return out.Config, nil
+}
+
+// LoadCompiledProgramsByName loads already-compiled SSA Programs from the database by program_name.
+func LoadCompiledProgramsByName(programName string) ([]*ssaapi.Program, error) {
+	programName = strings.TrimSpace(programName)
+	if programName == "" {
+		return nil, utils.Error("program_name is empty")
 	}
-	cfg := res.Info.Config
-	if db := consts.GetGormProfileDatabase(); db != nil {
-		cfg, _, err = ssa_compile.EnsureSSAProjectRowForCodeScan(ctx, db, cfg)
-		if err != nil {
-			return nil, err
-		}
+	ret := ssa_compile.LoadProgramsMatchingName(programName)
+	if len(ret) == 0 {
+		return nil, utils.Errorf("数据库中未找到 SSA Program: %s", programName)
 	}
-	return cfg, nil
+	return ret, nil
 }
 
 // CompileProgramsFromCodeScanConfig 在已解析的 cfg 上执行编译或从 DB 装载 Program（仅这一步触碰 ssa_compile 编译/加载）。
@@ -152,10 +284,11 @@ func CompileProgramsFromCodeScanConfig(ctx context.Context, cfg *ssaconfig.Confi
 
 // LoadProgramsFromCodeScanJSON parses code-scan JSON、解析 cfg 并编译/装载 Programs。
 func LoadProgramsFromCodeScanJSON(ctx context.Context, jsonRaw []byte) (cfg *ssaconfig.Config, progs []*ssaapi.Program, err error) {
-	cfg, err = ResolveCodeScanConfigFromJSON(ctx, jsonRaw)
+	out, err := ResolveCodeScanConfigFromJSON(ctx, jsonRaw)
 	if err != nil {
 		return nil, nil, err
 	}
+	cfg = out.Config
 	progs, err = CompileProgramsFromCodeScanConfig(ctx, cfg)
 	if err != nil {
 		return cfg, nil, err

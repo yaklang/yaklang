@@ -20,8 +20,9 @@ import (
 )
 
 const (
-	introAttach = "下列信息来自已附着任务（SSA Risk 抽样），仅可在此基础上解读；不得编造未列出的 risk id。\n\n"
-	introStart  = "下列信息来自同进程新起的扫描，可在此基础上解读；不得编造未列出的 risk id。\n\n"
+	introAttach      = "下列信息来自已附着任务（SSA Risk 抽样），仅可在此基础上解读；不得编造未列出的 risk id。\n\n"
+	introCompileScan = "下列信息来自同进程新起的编译+扫描，可在此基础上解读；不得编造未列出的 risk id。\n\n"
+	introProgramScan = "下列信息来自同进程对已编译 Program 直接起扫，可在此基础上解读；不得编造未列出的 risk id。\n\n"
 )
 
 func AppendSFPipelineLine(loop *reactloops.ReActLoop, line string) {
@@ -59,46 +60,37 @@ func runPhase2(
 		return runAttach(r, db, state, scanLoop, task, state.GetTaskID(), parentID, introAttach)
 
 	case SyntaxFlowSessionModeNone:
-		abort(scanLoop, r, "session mode 仍为 none：P1 未提交 attach/start（不应进入 P2）")
+		abort(scanLoop, r, "session mode 仍为 none：P1 未提交 attach/compile_scan/program（不应进入 P2）")
 		return nil, fmt.Errorf("syntaxflow scan: session mode none after intake")
 
-	case SyntaxFlowSessionModeStart:
-		j := strings.TrimSpace(state.GetSFScanConfigJSON())
-		if j == "" {
-			j = strings.TrimSpace(scanLoop.Get(sfu.LoopVarSFScanConfigJSON))
-		}
-
-		proj := strings.TrimSpace(state.GetProjectPath())
-		if proj == "" {
-			proj = strings.TrimSpace(scanLoop.Get(sfu.LoopVarProjectPath))
-		}
-		if proj == "" && j == "" {
-			abort(scanLoop, r, "缺少扫描配置：start 模式需要项目路径或 sf_scan_config_json。")
-			return nil, fmt.Errorf("missing scan config after intake")
-		}
-		if proj == "" {
-			proj = strings.TrimSpace(scanLoop.Get(sfu.LoopVarProjectPath))
+	case SyntaxFlowSessionModeCompileScan:
+		path := strings.TrimSpace(state.GetProjectPath())
+		projectName := strings.TrimSpace(state.GetProjectName())
+		if path == "" {
+			abort(scanLoop, r, "缺少扫描目标：compile_scan 模式需要 project_path。")
+			return nil, fmt.Errorf("missing project_path after intake")
 		}
 		uHint := strings.TrimSpace(task.GetUserInput())
-		EmitSyntaxFlowScanPhase(scanLoop, 0, "", "resolve_config", "已得到扫描配置，准备编译 / scan config ready", "", "", nil)
-		EmitSyntaxFlowUserStageMarkdown(scanLoop, parentID, "p0_intake", BuildScanStagePhase0Intake(proj, j, utils.ShrinkTextBlock(uHint, 2000), pT))
+		EmitSyntaxFlowScanPhase(scanLoop, 0, "", "resolve_config", "已解析项目路径，准备编译 / project resolved", "", "", nil)
+		EmitSyntaxFlowUserStageMarkdown(scanLoop, parentID, "p0_intake", BuildScanStagePhase0Intake(SyntaxFlowSessionModeCompileScan, path, projectName, "", utils.ShrinkTextBlock(uHint, 2000), pT))
 
-		var cfg *ssaconfig.Config
-		var progs []*ssaapi.Program
-		var err error
-		var p1 string
-		var resolveCfg func() (*ssaconfig.Config, error)
-		if proj != "" {
-			p1 = BuildScanStagePhase1CompileStart(fmt.Sprintf(`{"_intake":"local_path_only","path":%q}`, strings.TrimSpace(proj)))
-			resolveCfg = func() (*ssaconfig.Config, error) {
-				return sfu.ResolveCodeScanConfigFromProjectPath(task.GetContext(), proj)
-			}
-		} else {
-			resolveCfg = func() (*ssaconfig.Config, error) {
-				return sfu.ResolveCodeScanConfigFromJSON(task.GetContext(), []byte(j))
-			}
+		resolveOutcome, err := sfu.ResolveCodeScanConfigForLocalPath(task.GetContext(), path, projectName)
+		if err != nil {
+			abort(scanLoop, r, fmt.Sprintf("解析项目配置失败：%v", err))
+			return nil, err
 		}
-		cfg, progs, _, err = syntaxFlowCompileFromResolved(task.GetContext(), r, scanLoop, parentID, task, p1, resolveCfg)
+		EmitSyntaxFlowUserStageMarkdown(scanLoop, parentID, "p0_config_resolve", BuildScanStagePhase0ConfigResolve(resolveOutcome))
+
+		cfgJSON, jsonErr := resolveOutcome.Config.ToJSONString()
+		if jsonErr != nil {
+			abort(scanLoop, r, fmt.Sprintf("序列化扫描配置失败：%v", jsonErr))
+			return nil, jsonErr
+		}
+		p1 := BuildScanStagePhase1CompileStart(cfgJSON)
+		resolvedCfg := resolveOutcome.Config
+		cfg, progs, _, err := syntaxFlowCompileFromResolved(task.GetContext(), r, scanLoop, parentID, task, p1, func() (*ssaconfig.Config, error) {
+			return resolvedCfg, nil
+		})
 		if err != nil {
 			return nil, err
 		}
@@ -106,7 +98,29 @@ func runPhase2(
 		if err != nil {
 			return nil, err
 		}
-		return runAttach(r, db, state, scanLoop, task, tid, parentID, introStart)
+		return runAttach(r, db, state, scanLoop, task, tid, parentID, introCompileScan)
+
+	case SyntaxFlowSessionModeProgramScan:
+		programName := strings.TrimSpace(state.GetProgramName())
+		if programName == "" {
+			abort(scanLoop, r, "缺少扫描目标：program 模式需要 program_name。")
+			return nil, fmt.Errorf("missing program_name after intake")
+		}
+		uHint := strings.TrimSpace(task.GetUserInput())
+		AppendSFPipelineLine(scanLoop, fmt.Sprintf("【0·入参】program_name=%s，跳过编译直接起扫。", programName))
+		scanLoop.Set(sfu.LoopVarSFCompileMeta, "mode=program (compile skipped)")
+		EmitSyntaxFlowUserStageMarkdown(scanLoop, parentID, "p0_program", BuildScanStagePhase0ProgramScan(programName, utils.ShrinkTextBlock(uHint, 2000), pT))
+
+		progs, err := sfu.LoadCompiledProgramsByName(programName)
+		if err != nil {
+			abort(scanLoop, r, fmt.Sprintf("加载 Program 失败：%v", err))
+			return nil, err
+		}
+		tid, err := syntaxFlowStartScanInBackground(r, task.GetContext(), state, scanLoop, nil, progs, parentID)
+		if err != nil {
+			return nil, err
+		}
+		return runAttach(r, db, state, scanLoop, task, tid, parentID, introProgramScan)
 
 	default:
 		abort(scanLoop, r, fmt.Sprintf("不支持的 session mode: %v", state.GetSessionMode()))

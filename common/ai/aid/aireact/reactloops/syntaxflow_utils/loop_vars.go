@@ -11,10 +11,9 @@ const (
 	LoopVarSSARisksFilterJSON        = "ssa_risks_filter_json"
 	// LoopVarSSAOverviewFilterJSON stores the last effective SSARisksFilter (protojson) for reload_ssa_risk_overview without parameters.
 	LoopVarSSAOverviewFilterJSON = "ssa_overview_filter_json"
-	// LoopVarSFScanConfigJSON: full code-scan JSON (same as yak `code-scan --config`).
-	LoopVarSFScanConfigJSON = "sf_scan_config_json"
-	// LoopVarProjectPath: optional hint for stage markdown / actions (not read by P1 intake).
-	LoopVarProjectPath = "project_path"
+	LoopVarProjectPath           = "project_path"
+	LoopVarProjectName           = "project_name"
+	LoopVarProgramName           = "program_name"
 
 	// Multi-stage pipeline + final report (interpret sub-loop; engine-filled).
 	LoopVarSFPipelineSummary = "sf_scan_pipeline_summary" // 各阶段一行行累积摘要
