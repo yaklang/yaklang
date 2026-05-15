@@ -1265,14 +1265,15 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 		// 上游 wrapper 不识别 OpenAI tool_calls 字段 (mode=react) 或 mode=unknown
 		// 且 AutoFallback=true 都需要把 messages 扁平化为 ReAct 文本.
 		// 关键词: round2 ReAct flatten, AutoFallback 兜底
+		round2ReactMode := false
 		if hasRoundTripToolMarker {
-			shouldFlatten := toolMode.Round2 == "react"
-			if !shouldFlatten && toolMode.AutoFallback {
-				shouldFlatten = true
+			round2ReactMode = toolMode.Round2 == "react"
+			if !round2ReactMode && toolMode.AutoFallback {
+				round2ReactMode = true
 				c.logWarn("provider needs capability probe; auto-fallback to react for round-trip messages: model=%s wrapper=%s",
 					modelName, provider.WrapperName)
 			}
-			if shouldFlatten {
+			if round2ReactMode {
 				beforeLen := len(messagesForUpstream)
 				messagesForUpstream = FlattenToolCallsForRoundTrip(messagesForUpstream)
 				c.logInfo("round2 ReAct flatten applied: model=%s wrapper=%s provider=%s msgs=%d->%d source=%s",
@@ -1281,23 +1282,43 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 			}
 		}
 
-		// round1: 客户端带 tools=[...] (并且不是 round-trip 续聊) + 上游不识别 tool_calls
-		// 协议时, 把 tools 描述注入 system prompt + 隐藏 tools 字段, 同时启用
-		// writer.ReactToolExtractor 把上游回吐的 [tool_call ...] 文本反解析回 OpenAI
-		// tool_calls delta 给客户端.
-		// 关键词: round1 react inject, tools -> system prompt, EnableReactExtractor
+		// ReAct 模式一致性: 只要本轮请求需要按 ReAct 文本协议与上游对话, 就必须
+		// **同时**做四件事, 保证请求与响应两侧协议一致, 避免协议串扰:
+		//   1. 把 client 携带的 tools=[...] 渲染为 ReAct system prompt 注入 messages,
+		//      让上游模型知道当前可用工具集 (否则 round2 ReAct 模式下模型只能凭
+		//      历史里的 [tool_call ...] 文本猜可用工具名, 易掉链);
+		//   2. 清空 toolsForUpstream / toolChoiceForUpstream, 避免上游 wrapper
+		//      看到原生 tools 字段后用 OpenAI tool_calls 协议响应 (而我们 messages
+		//      又是 ReAct 文本, 协议混用会触发 hostile wrapper 空回);
+		//   3. 在 writer 上启用 ReactToolExtractor, 把上游回吐的
+		//      [tool_call ...]args[/tool_call] 文本反解析为 OpenAI tool_calls
+		//      delta 帧透传给客户端, 让 opencode / litellm / Vercel AI SDK 等
+		//      标准 OpenAI 客户端能正确触发工具执行 (否则 tool_call 文本会被
+		//      作为 content 透传, 在客户端 UI 里被渲染成 markdown 链接, 用户
+		//      看到 "AI 输出了工具调用但实际不执行" 的诡异现象, 这是用户截图
+		//      里报告的真实 bug 触发场景);
+		//   4. 即便 round1 没有显式 tools 列表 (例如 round2 续聊里 client 不再
+		//      重发 tools), 仍需启用 extractor —— 模型仍可能基于历史 ReAct 文本
+		//      产出新的 [tool_call ...] 段.
+		//
+		// 关键词: ReAct 模式一致性, round1+round2 统一处理, tools 注入 + 清空 +
+		//        extractor 启用三联动, opencode 并行工具执行修复
 		toolsForUpstream := bodyIns.Tools
 		toolChoiceForUpstream := bodyIns.ToolChoice
 		round1ReactMode := toolMode.Round1 == "react" && len(bodyIns.Tools) > 0 && !hasRoundTripToolMarker
-		if round1ReactMode {
+		useReactMode := round1ReactMode || round2ReactMode
+		if useReactMode {
 			beforeLen := len(messagesForUpstream)
-			messagesForUpstream = InjectToolsAsReactPrompt(messagesForUpstream, bodyIns.Tools)
+			if len(bodyIns.Tools) > 0 {
+				messagesForUpstream = InjectToolsAsReactPrompt(messagesForUpstream, bodyIns.Tools)
+			}
 			toolsForUpstream = nil
 			toolChoiceForUpstream = nil
-			c.logInfo("round1 ReAct tools prompt injected: model=%s wrapper=%s provider=%s msgs=%d->%d tools=%d source=%s",
+			writer.EnableReactExtractor()
+			c.logInfo("ReAct mode enabled (round1=%v round2=%v): model=%s wrapper=%s provider=%s msgs=%d->%d tools=%d source=%s",
+				round1ReactMode, round2ReactMode,
 				modelName, provider.WrapperName, provider.TypeName,
 				beforeLen, len(messagesForUpstream), len(bodyIns.Tools), toolMode.Source)
-			writer.EnableReactExtractor()
 		}
 
 		client, err := provider.GetAIClientWithRawMessages(

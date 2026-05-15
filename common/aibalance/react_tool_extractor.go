@@ -206,7 +206,21 @@ func safeEmitTextLen(raw []byte) int {
 
 // parseReactToolCall 解析一段完整的 [tool_call name=NAME]ARGS_JSON[/tool_call] 文本.
 // 失败返回 error, 调用方 fallback 到 text emit.
-// 关键词: parseReactToolCall, react tool_call serialization parse
+//
+// 兼容多种 header 形态:
+//   - [tool_call name=foo]
+//   - [tool_call name="foo"]
+//   - [tool_call id="call_xyz" name="foo"]  (round2 flatten 后模型常 mimic 该格式)
+//
+// 当 header 同时携带 id="..." 时, 优先使用上游模型给出的 id, 以便:
+//   - 与上游模型自己后续可能用到的 tool_call_id 强一致, 让调试/日志可追溯;
+//   - 保留 round2 flatten 注入到历史里的原始 client tool_call_id, 让客户端
+//     做精确的 tool_call_id 匹配 (虽然多数客户端只看 index, 但 OpenCode /
+//     Codex 等会显示 id 用于 UI 关联).
+// 未携带 id 时, 回落到 "call_react_N" 规则保持向后兼容.
+//
+// 关键词: parseReactToolCall, react tool_call serialization parse,
+//        id 属性透传, OpenCode tool_call_id 关联
 func parseReactToolCall(segment []byte, index int) (*aispec.ToolCall, error) {
 	if !bytes.HasPrefix(segment, []byte(reactToolCallOpen)) {
 		return nil, fmt.Errorf("segment does not start with %s", reactToolCallOpen)
@@ -223,7 +237,7 @@ func parseReactToolCall(segment []byte, index int) (*aispec.ToolCall, error) {
 	header := string(inner[:rightBracket])
 	argsRaw := inner[rightBracket+1:]
 
-	name := extractReactToolName(header)
+	name := extractReactHeaderAttr(header, "name")
 	if name == "" {
 		return nil, fmt.Errorf("missing name= in header: %q", header)
 	}
@@ -238,9 +252,14 @@ func parseReactToolCall(segment []byte, index int) (*aispec.ToolCall, error) {
 		return nil, fmt.Errorf("invalid args JSON: %v", err)
 	}
 
+	id := strings.TrimSpace(extractReactHeaderAttr(header, "id"))
+	if id == "" {
+		id = fmt.Sprintf("call_react_%d", index)
+	}
+
 	return &aispec.ToolCall{
 		Index: index,
-		ID:    fmt.Sprintf("call_react_%d", index),
+		ID:    id,
 		Type:  "function",
 		Function: aispec.FuncReturn{
 			Name:      name,
@@ -249,32 +268,62 @@ func parseReactToolCall(segment []byte, index int) (*aispec.ToolCall, error) {
 	}, nil
 }
 
-// extractReactToolName 从 header 字符串 (如 " name=foo" 或 ` name="foo"`) 中抠出 name 值.
-// 关键词: extractReactToolName, react header parser
-func extractReactToolName(header string) string {
-	const key = "name="
-	idx := strings.Index(header, key)
-	if idx == -1 {
+// extractReactHeaderAttr 从 header 字符串中抠出指定 key 的值.
+// 支持形态:
+//   - key=val     (val 直到空白 / `,` 截断)
+//   - key="val"   (val 是引号包裹)
+//
+// 多个属性共存时按 key 精确匹配, 不会把 `id="..."` 中的 `name=` 子串误判
+// (检索时要求 key 前一个字符是分隔符或字符串起点, 避免 prefix 子串误中).
+// 关键词: extractReactHeaderAttr, react header attr 多属性解析
+func extractReactHeaderAttr(header string, key string) string {
+	if key == "" || header == "" {
 		return ""
 	}
-	rest := strings.TrimSpace(header[idx+len(key):])
-	if rest == "" {
-		return ""
-	}
-	// 支持带引号 / 不带引号两种形式
-	if rest[0] == '"' {
-		end := strings.IndexByte(rest[1:], '"')
-		if end == -1 {
+	full := key + "="
+	cur := 0
+	for cur < len(header) {
+		idx := strings.Index(header[cur:], full)
+		if idx == -1 {
 			return ""
 		}
-		return rest[1 : 1+end]
-	}
-	// 直到空白 / `]` 截断
-	for i := 0; i < len(rest); i++ {
-		c := rest[i]
-		if c == ' ' || c == '\t' || c == '\n' || c == ',' {
-			return rest[:i]
+		pos := cur + idx
+		// 前一个字符必须是空白 / 引号 / `,` / 字符串起点, 否则继续查找,
+		// 避免 `xname=` 这种子串误中 `name=`.
+		// 关键词: header 属性前置分隔符校验
+		if pos > 0 {
+			prev := header[pos-1]
+			if prev != ' ' && prev != '\t' && prev != '\n' && prev != ',' && prev != '"' && prev != '\'' {
+				cur = pos + len(full)
+				continue
+			}
 		}
+		rest := strings.TrimLeft(header[pos+len(full):], " \t")
+		if rest == "" {
+			return ""
+		}
+		if rest[0] == '"' {
+			end := strings.IndexByte(rest[1:], '"')
+			if end == -1 {
+				return ""
+			}
+			return rest[1 : 1+end]
+		}
+		// 直到空白 / `,` 截断
+		for i := 0; i < len(rest); i++ {
+			c := rest[i]
+			if c == ' ' || c == '\t' || c == '\n' || c == ',' {
+				return rest[:i]
+			}
+		}
+		return rest
 	}
-	return rest
+	return ""
+}
+
+// extractReactToolName 是 extractReactHeaderAttr 的语义薄包装, 保留旧名字
+// 兼容已有调用方与单元测试.
+// 关键词: extractReactToolName, react header parser
+func extractReactToolName(header string) string {
+	return extractReactHeaderAttr(header, "name")
 }

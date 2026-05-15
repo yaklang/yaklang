@@ -13,7 +13,22 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-// SaveMemoryEntities 保存记忆条目到数据库并索引到RAG系统和HNSW
+// SaveMemoryEntities 保存记忆条目到数据库并索引到RAG系统和HNSW。
+//
+// 容错策略 (best-effort batch save)：单个 entity 的任何子步骤失败 (db /
+// hnsw / rag) 都不能阻断其余 entity 的保存。这避免了之前在 CI 上观察到的
+// "ShouldSaveMemoryEntities 返回 N 个 entity, 但 SaveMemoryEntities 只入库
+// 第一个就因为某步报错 return, 后续 entity 静默丢失" 的诡异现象 —— 例如
+// TestReAct_ToolUse_Reject_WithAIMemory 在 CI 上偶发只能找到 1/2 条 memory，
+// 期待 \"系统行为\" 那条永远丢失.
+//
+// 错误返回语义：
+//   - 所有 entity 都失败入库时返回最后一个错误，便于上层感知整体失败。
+//   - 任何一个 entity 成功入库，返回 nil（其余子步骤错误降级为日志，与本函数
+//     之前对 RAG 错误的处理一致）。
+//
+// 关键词: SaveMemoryEntities 容错批量保存, 单 entity 失败不阻断后续 entity,
+//   TestReAct_ToolUse_Reject_WithAIMemory CI 偶发丢条修复
 func (r *AIMemoryTriage) SaveMemoryEntities(entities ...*aicommon.MemoryEntity) error {
 	db := r.SafeGetDB()
 	if db == nil {
@@ -21,6 +36,8 @@ func (r *AIMemoryTriage) SaveMemoryEntities(entities ...*aicommon.MemoryEntity) 
 	}
 
 	emitter := r.GetEmitter()
+	var lastDBErr error
+	savedCount := 0
 	for _, entity := range entities {
 		if entity == nil {
 			continue
@@ -44,9 +61,13 @@ func (r *AIMemoryTriage) SaveMemoryEntities(entities ...*aicommon.MemoryEntity) 
 		}
 
 		if err := db.Create(dbEntity).Error; err != nil {
-			log.Errorf("save memory entity to database failed: %v", err)
-			return utils.Errorf("save memory entity to database failed: %v", err)
+			log.Errorf("save memory entity to database failed: %v (entity id=%s)", err, entity.Id)
+			// 记录最后一次 db 错误，继续尝试保存其他 entity。
+			// 关键词: best-effort, 不因单条 db 写入失败丢失整批 memory
+			lastDBErr = utils.Errorf("save memory entity to database failed: %v", err)
+			continue
 		}
+		savedCount++
 
 		if emitter != nil {
 			emitter.EmitJSON(schema.EVENT_TYPE_MEMORY_SAVE, "memory-save", map[string]any{
@@ -56,13 +77,12 @@ func (r *AIMemoryTriage) SaveMemoryEntities(entities ...*aicommon.MemoryEntity) 
 		}
 		log.Infof("saved memory entity to database: %s content: %v", entity.Id, utils.ShrinkString(entity.Content, 256))
 
-		// 添加到HNSW索引
+		// 添加到HNSW索引（失败仅记录日志，不阻断后续 entity）
 		if r.hnswBackend != nil {
 			if err := r.hnswBackend.Add(entity); err != nil {
-				log.Errorf("add to HNSW index failed: %v", err)
-				return utils.Errorf("add to HNSW index failed: %v", err)
+				log.Errorf("add to HNSW index failed: %v (entity id=%s)", err, entity.Id)
+				log.Warnf("continuing despite HNSW indexing failure for memory entity: %s", entity.Id)
 			}
-			//log.Infof("added memory entity to HNSW index: %s", entity.Id)
 		}
 
 		// 索引 potential_questions 到 RAG 系统
@@ -94,6 +114,11 @@ func (r *AIMemoryTriage) SaveMemoryEntities(entities ...*aicommon.MemoryEntity) 
 		}
 	}
 
+	// 全部 entity 都失败入库才向上传播错误；只要有一条成功就返回 nil。
+	// 关键词: SaveMemoryEntities 全部失败才返回错误
+	if savedCount == 0 && lastDBErr != nil {
+		return lastDBErr
+	}
 	return nil
 }
 
