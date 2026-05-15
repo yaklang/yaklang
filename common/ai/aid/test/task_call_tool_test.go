@@ -43,10 +43,11 @@ func TestAITaskCallToolStdOut(t *testing.T) {
 	}
 	go coordinator.Run()
 
-	count := 0
 	var outBuffer = bytes.NewBuffer(nil)
 	var errBuffer = bytes.NewBuffer(nil)
 	var toolCallID string
+	count := 0
+	deadline := time.After(20 * time.Second)
 
 	testConditionsMet := func() bool {
 		return strings.Contains(outBuffer.String(), outputToken) &&
@@ -56,7 +57,7 @@ func TestAITaskCallToolStdOut(t *testing.T) {
 LOOP:
 	for {
 		select {
-		case <-time.After(10 * time.Second):
+		case <-deadline:
 			break LOOP
 		case result := <-outputChan:
 			count++
