@@ -1249,6 +1249,30 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 			}
 		}
 
+		// round2 ReAct flatten 兼容兜底:
+		// 客户端 (OpenAI Python SDK / Codex / OpenCode / litellm 等) 按 OpenAI
+		// tool_calls 标准协议发起 round2 (messages 数组里出现
+		// assistant.tool_calls 或 role=tool) 时, 部分上游 wrapper 不识别这些
+		// OpenAI tool_calls round-trip 字段, 收到后会立即 finish_reason=stop
+		// 给出空响应。当且仅当:
+		//   1. messages 里**真的**包含 round-trip 标记 (IsRoundTripFlattenEligible)
+		//   2. 当前 model/wrapper 命中 env 白名单
+		//      (AIBALANCE_FLATTEN_TOOLCALLS_FOR_MODELS) 或全局开关
+		//      (AIBALANCE_FLATTEN_TOOLCALLS_ALL=true)
+		// 时, 把 round-trip messages 自动改写成 ReAct 文本风格喂给上游 wrapper,
+		// 让任何 LLM 仍能基于纯文本对话历史给出正确的 NL 回答, 把响应原样
+		// (OpenAI 协议) 转回客户端。
+		// 关键词: round2 ReAct flatten 注入点, OpenAI tool_calls round-trip 兼容兜底,
+		//        z-deepseek-v4-pro round2 修复, traditional client compatibility
+		if ResolveFlattenForModel(modelName, provider.WrapperName) &&
+			IsRoundTripFlattenEligible(messagesForUpstream) {
+			beforeLen := len(messagesForUpstream)
+			messagesForUpstream = FlattenToolCallsForRoundTrip(messagesForUpstream)
+			c.logInfo("round2 ReAct flatten applied: model=%s wrapper=%s provider=%s msgs=%d->%d (env-driven)",
+				modelName, provider.WrapperName, provider.TypeName,
+				beforeLen, len(messagesForUpstream))
+		}
+
 		client, err := provider.GetAIClientWithRawMessages(
 			messagesForUpstream,
 			bodyIns.Tools,

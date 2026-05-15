@@ -24,8 +24,11 @@ import time
 from openai import OpenAI
 
 
-BASE_URL = "https://aibalance.yaklang.com/v1"
-KEY_PATH = os.path.expanduser("~/yakit-projects/aibalance-key-z.txt")
+BASE_URL = os.environ.get("AIBALANCE_BASE", "https://aibalance.yaklang.com/v1")
+KEY_PATH = os.environ.get(
+    "AIBALANCE_KEY_FILE",
+    os.path.expanduser("~/yakit-projects/aibalance-key-z.txt"),
+)
 
 
 WEATHER_TOOL = {
@@ -190,7 +193,11 @@ def main() -> int:
     client = OpenAI(api_key=api_key, base_url=BASE_URL, timeout=120)
 
     # 仅测试已确认工作的模型, 避免在 0-byte provider 上浪费时间
-    models = ["z-deepseek-v4-pro", "z-deepseek-v4-flash", "qwen3.5-397b-a17b-free"]
+    env_models = os.environ.get("AIBALANCE_MODEL", "").strip()
+    if env_models:
+        models = [m.strip() for m in env_models.replace(";", ",").split(",") if m.strip()]
+    else:
+        models = ["z-deepseek-v4-pro", "z-deepseek-v4-flash", "qwen3.5-397b-a17b-free"]
 
     results = []
     for m in models:
