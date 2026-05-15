@@ -48,7 +48,6 @@ func TestAITaskCallToolStdOut(t *testing.T) {
 	var errBuffer = bytes.NewBuffer(nil)
 	var toolCallID string
 
-	// Helper to check if test conditions are met
 	testConditionsMet := func() bool {
 		return strings.Contains(outBuffer.String(), outputToken) &&
 			strings.Contains(errBuffer.String(), errToken)
@@ -57,7 +56,7 @@ func TestAITaskCallToolStdOut(t *testing.T) {
 LOOP:
 	for {
 		select {
-		case <-time.After(5 * time.Second): // 优化：从30秒减少到5秒
+		case <-time.After(10 * time.Second):
 			break LOOP
 		case result := <-outputChan:
 			count++
@@ -102,7 +101,7 @@ LOOP:
 					break LOOP
 				}
 			}
-			if utils.MatchAllOfSubString(string(result.Content), "start to generate and feedback tool:") {
+			if utils.MatchAllOfSubString(string(result.Content), "start to generate and feedback tool:") && testConditionsMet() {
 				break LOOP
 			}
 			fmt.Println("review task result:" + result.String())

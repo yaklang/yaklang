@@ -59,6 +59,10 @@ func TestAITaskCallToolStdOut_VerifyUserQuery(t *testing.T) {
 	var outBuffer = bytes.NewBuffer(nil)
 	var errBuffer = bytes.NewBuffer(nil)
 	var toolCallID string
+	testConditionsMet := func() bool {
+		return strings.Contains(outBuffer.String(), outputToken) &&
+			strings.Contains(errBuffer.String(), errToken)
+	}
 
 LOOP:
 	for {
@@ -77,6 +81,9 @@ LOOP:
 			}
 
 			if result.Type == schema.EVENT_TOOL_CALL_DONE || result.Type == schema.EVENT_TOOL_CALL_ERROR || result.Type == schema.EVENT_TOOL_CALL_USER_CANCEL {
+				if testConditionsMet() {
+					break LOOP
+				}
 				continue
 			}
 			if result.Type == schema.EVENT_TYPE_STREAM {
@@ -90,6 +97,9 @@ LOOP:
 					require.True(t, result.DisableMarkdown)
 					errBuffer.Write(result.StreamDelta)
 				}
+				if testConditionsMet() {
+					break LOOP
+				}
 			}
 
 			if result.Type == schema.EVENT_TYPE_STRUCTURED {
@@ -99,7 +109,7 @@ LOOP:
 				}
 			}
 
-			if utils.MatchAllOfSubString(string(result.Content), "start to generate and feedback tool") {
+			if utils.MatchAllOfSubString(string(result.Content), "start to generate and feedback tool") && testConditionsMet() {
 				break LOOP
 			}
 		}
@@ -175,6 +185,10 @@ func TestAITaskCallToolStdOut_VerifyTimelineAndUserQuery(t *testing.T) {
 	var outBuffer = bytes.NewBuffer(nil)
 	var errBuffer = bytes.NewBuffer(nil)
 	var toolCallID string
+	testConditionsMet := func() bool {
+		return strings.Contains(outBuffer.String(), outputToken) &&
+			strings.Contains(errBuffer.String(), errToken)
+	}
 
 LOOP:
 	for {
@@ -193,6 +207,9 @@ LOOP:
 			}
 
 			if result.Type == schema.EVENT_TOOL_CALL_DONE || result.Type == schema.EVENT_TOOL_CALL_ERROR || result.Type == schema.EVENT_TOOL_CALL_USER_CANCEL {
+				if testConditionsMet() {
+					break LOOP
+				}
 				continue
 			}
 			if result.Type == schema.EVENT_TYPE_STREAM {
@@ -206,6 +223,9 @@ LOOP:
 					require.True(t, result.DisableMarkdown)
 					errBuffer.Write(result.StreamDelta)
 				}
+				if testConditionsMet() {
+					break LOOP
+				}
 			}
 
 			if result.Type == schema.EVENT_TYPE_STRUCTURED {
@@ -215,7 +235,7 @@ LOOP:
 				}
 			}
 
-			if utils.MatchAllOfSubString(string(result.Content), "start to generate and feedback tool") {
+			if utils.MatchAllOfSubString(string(result.Content), "start to generate and feedback tool") && testConditionsMet() {
 				break LOOP
 			}
 		}
