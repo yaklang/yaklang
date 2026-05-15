@@ -2237,6 +2237,75 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
         }
 
         // 健康检查功能
+        // ==================== Tool Calls Capability Probe ====================
+        // 关键词: aibalance probe tool calls, capability matrix manual trigger
+        let isToolCallsProbeInProgress = false;
+        async function probeAllToolCalls() {
+            if (isToolCallsProbeInProgress) return;
+            isToolCallsProbeInProgress = true;
+            const button = document.getElementById('probe-all-tool-calls-btn');
+            const originalHTML = button ? button.innerHTML : '';
+            if (button) {
+                button.innerHTML = `
+                    <svg viewBox="0 0 24 24" class="rotating" style="width: 16px; height: 16px; margin-right: 6px;">
+                        <path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                    </svg>
+                    探测中...
+                `;
+                button.disabled = true;
+            }
+            try {
+                const response = await fetch('/portal/probe-tool-calls-all', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                });
+                if (!response.ok) {
+                    throw new Error('probe request failed: HTTP ' + response.status);
+                }
+                const data = await response.json();
+                if (!data.success) {
+                    throw new Error(data.message || 'probe failed');
+                }
+                const results = Array.isArray(data.data) ? data.data : [];
+                let native = 0, react = 0, skipped = 0, failed = 0;
+                results.forEach(item => {
+                    if (item.skipped) { skipped += 1; return; }
+                    if (item.error) { failed += 1; return; }
+                    if (item.round1_mode === 'native' && item.round2_mode === 'native') native += 1;
+                    else react += 1;
+                });
+                showToast(`工具调用能力探测完成: native=${native} react=${react} skipped=${skipped} failed=${failed}`, 'success');
+            } catch (e) {
+                showToast('工具调用能力探测失败: ' + e.message, 'error');
+            } finally {
+                if (button) {
+                    button.innerHTML = originalHTML;
+                    button.disabled = false;
+                }
+                isToolCallsProbeInProgress = false;
+            }
+        }
+
+        async function probeSingleToolCalls(providerId) {
+            try {
+                const response = await fetch(`/portal/probe-tool-calls/${providerId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                });
+                if (!response.ok) {
+                    throw new Error('probe request failed: HTTP ' + response.status);
+                }
+                const data = await response.json();
+                if (!data.success) {
+                    throw new Error(data.message || 'probe failed');
+                }
+                const d = data.data || {};
+                showToast(`Provider ${d.wrapper_name || providerId} 探测完成: round1=${d.round1_mode} round2=${d.round2_mode}${d.error ? ' err=' + d.error : ''}`, 'success');
+            } catch (e) {
+                showToast('工具调用能力探测失败: ' + e.message, 'error');
+            }
+        }
+
         async function checkAllProvidersHealth() {
             if (isHealthCheckInProgress) return;
             isHealthCheckInProgress = true;
@@ -5649,6 +5718,8 @@ curl '${metaApiUrl}?name=${modelName}'`;
         window.checkAllProvidersHealth = checkAllProvidersHealth;
         window.checkSelectedProvider = checkSelectedProvider;
         window.selectAllProviders = selectAllProviders;
+        window.probeAllToolCalls = probeAllToolCalls;
+        window.probeSingleToolCalls = probeSingleToolCalls;
         window.updateDeleteSelectedButton = updateDeleteSelectedButton;
         
         // API Key 相关

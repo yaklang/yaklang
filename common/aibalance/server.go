@@ -1249,34 +1249,61 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 			}
 		}
 
-		// round2 ReAct flatten 兼容兜底:
-		// 客户端 (OpenAI Python SDK / Codex / OpenCode / litellm 等) 按 OpenAI
-		// tool_calls 标准协议发起 round2 (messages 数组里出现
-		// assistant.tool_calls 或 role=tool) 时, 部分上游 wrapper 不识别这些
-		// OpenAI tool_calls round-trip 字段, 收到后会立即 finish_reason=stop
-		// 给出空响应。当且仅当:
-		//   1. messages 里**真的**包含 round-trip 标记 (IsRoundTripFlattenEligible)
-		//   2. 当前 model/wrapper 命中 env 白名单
-		//      (AIBALANCE_FLATTEN_TOOLCALLS_FOR_MODELS) 或全局开关
-		//      (AIBALANCE_FLATTEN_TOOLCALLS_ALL=true)
-		// 时, 把 round-trip messages 自动改写成 ReAct 文本风格喂给上游 wrapper,
-		// 让任何 LLM 仍能基于纯文本对话历史给出正确的 NL 回答, 把响应原样
-		// (OpenAI 协议) 转回客户端。
-		// 关键词: round2 ReAct flatten 注入点, OpenAI tool_calls round-trip 兼容兜底,
-		//        z-deepseek-v4-pro round2 修复, traditional client compatibility
-		if ResolveFlattenForModel(modelName, provider.WrapperName) &&
-			IsRoundTripFlattenEligible(messagesForUpstream) {
+		// 工具调用兼容性裁决 (capability matrix v1):
+		// 由 ResolveToolCallsMode 统一根据 env > DB > default 优先级裁决 round1 / round2
+		// 各自走 native 透传还是 react 降级. 未 probe 的 provider 走 default (unknown)
+		// + AutoFallback, 让运维忘记 probe 时 round2 仍能闭环.
+		// 关键词: aibalance tool_calls capability resolved, round1 react inject + round2 react flatten + AutoFallback
+		toolMode := ResolveToolCallsMode(provider, modelName)
+		hasRoundTripToolMarker := MessagesHaveToolMarker(messagesForUpstream)
+		c.logInfo("tool_calls mode resolved: model=%s wrapper=%s provider=%s round1=%s round2=%s source=%s auto_fallback=%v round_trip_marker=%v tools=%d",
+			modelName, provider.WrapperName, provider.TypeName,
+			toolMode.Round1, toolMode.Round2, toolMode.Source, toolMode.AutoFallback,
+			hasRoundTripToolMarker, len(bodyIns.Tools))
+
+		// round2: 客户端发完整 round-trip messages (assistant.tool_calls / role=tool) 时,
+		// 上游 wrapper 不识别 OpenAI tool_calls 字段 (mode=react) 或 mode=unknown
+		// 且 AutoFallback=true 都需要把 messages 扁平化为 ReAct 文本.
+		// 关键词: round2 ReAct flatten, AutoFallback 兜底
+		if hasRoundTripToolMarker {
+			shouldFlatten := toolMode.Round2 == "react"
+			if !shouldFlatten && toolMode.AutoFallback {
+				shouldFlatten = true
+				c.logWarn("provider needs capability probe; auto-fallback to react for round-trip messages: model=%s wrapper=%s",
+					modelName, provider.WrapperName)
+			}
+			if shouldFlatten {
+				beforeLen := len(messagesForUpstream)
+				messagesForUpstream = FlattenToolCallsForRoundTrip(messagesForUpstream)
+				c.logInfo("round2 ReAct flatten applied: model=%s wrapper=%s provider=%s msgs=%d->%d source=%s",
+					modelName, provider.WrapperName, provider.TypeName,
+					beforeLen, len(messagesForUpstream), toolMode.Source)
+			}
+		}
+
+		// round1: 客户端带 tools=[...] (并且不是 round-trip 续聊) + 上游不识别 tool_calls
+		// 协议时, 把 tools 描述注入 system prompt + 隐藏 tools 字段, 同时启用
+		// writer.ReactToolExtractor 把上游回吐的 [tool_call ...] 文本反解析回 OpenAI
+		// tool_calls delta 给客户端.
+		// 关键词: round1 react inject, tools -> system prompt, EnableReactExtractor
+		toolsForUpstream := bodyIns.Tools
+		toolChoiceForUpstream := bodyIns.ToolChoice
+		round1ReactMode := toolMode.Round1 == "react" && len(bodyIns.Tools) > 0 && !hasRoundTripToolMarker
+		if round1ReactMode {
 			beforeLen := len(messagesForUpstream)
-			messagesForUpstream = FlattenToolCallsForRoundTrip(messagesForUpstream)
-			c.logInfo("round2 ReAct flatten applied: model=%s wrapper=%s provider=%s msgs=%d->%d (env-driven)",
+			messagesForUpstream = InjectToolsAsReactPrompt(messagesForUpstream, bodyIns.Tools)
+			toolsForUpstream = nil
+			toolChoiceForUpstream = nil
+			c.logInfo("round1 ReAct tools prompt injected: model=%s wrapper=%s provider=%s msgs=%d->%d tools=%d source=%s",
 				modelName, provider.WrapperName, provider.TypeName,
-				beforeLen, len(messagesForUpstream))
+				beforeLen, len(messagesForUpstream), len(bodyIns.Tools), toolMode.Source)
+			writer.EnableReactExtractor()
 		}
 
 		client, err := provider.GetAIClientWithRawMessages(
 			messagesForUpstream,
-			bodyIns.Tools,
-			bodyIns.ToolChoice,
+			toolsForUpstream,
+			toolChoiceForUpstream,
 			bodyIns.EnableThinking,
 			onOutputStream,
 			onReasonStream,

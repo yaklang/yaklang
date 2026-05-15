@@ -232,6 +232,27 @@ type AiProvider struct {
 	IsHealthy             bool      `json:"is_healthy"`                                    // 提供者是否健康
 	HealthCheckTime       time.Time `json:"health_check_time"`                             // 最后一次健康检查时间
 	IsFirstCheckCompleted bool      `json:"is_first_check_completed" gorm:"default:false"` // 首次健康检查是否完成
+
+	// 工具调用兼容能力 (capability matrix v1, 仅 tool_calls 维度)
+	// 关键词: aibalance Tool Calls Capability Matrix, ToolCallsRound1Mode, ToolCallsRound2Mode
+	//
+	// Round1 = 客户端首次带 tools=[...] 的请求 (让模型决定要不要调工具)
+	// Round2 = 客户端发完整 round-trip 消息 (含 assistant.tool_calls + role=tool 回灌)
+	//
+	// 取值语义:
+	//   ""        : unknown, 未 probe (新 provider 默认), server 走 auto-fallback (透传 + 空回检测 + react 重试)
+	//   "native"  : 上游原生支持 OpenAI tool_calls 协议, 直接透传
+	//   "react"   : 上游不识别 tool_calls, aibalance 在请求侧降级 (round1 tools 注入 system prompt / round2 flatten)
+	//               + 响应侧反解析 [tool_call name=...]args[/tool_call] 文本回 OpenAI tool_calls 结构
+	//
+	// 兼容策略:
+	//   - 老 113 个 provider 默认值全空, 行为完全不变 (走 unknown auto-fallback)
+	//   - 运维通过 Portal 按钮 / cmd `capability probe-tools` 手动触发 probe 后落 DB
+	//   - 环境变量 AIBALANCE_FLATTEN_TOOLCALLS_ALL / AIBALANCE_FLATTEN_TOOLCALLS_FOR_MODELS 仍是最高优先级
+	ToolCallsRound1Mode string    `json:"tool_calls_round1_mode" gorm:"default:''"`
+	ToolCallsRound2Mode string    `json:"tool_calls_round2_mode" gorm:"default:''"`
+	ToolCallsProbeAt    time.Time `json:"tool_calls_probe_at"`
+	ToolCallsProbeError string    `json:"tool_calls_probe_error" gorm:"default:''"`
 }
 
 type AiApiKeys struct {

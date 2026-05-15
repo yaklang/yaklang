@@ -169,6 +169,12 @@ func setupDeepseekServerCfg(t *testing.T, upstreamURL, modelName string) *Server
 			APIKey:      "upstream-key",
 			IsHealthy:   true,
 			LastLatency: 100,
+			// 这些测试模拟的是"上游 native 支持 OpenAI tool_calls 协议"的场景,
+			// 在 capability matrix v1 设计里, 这相当于运维已通过 probe 按钮
+			// 把该 provider 标记为 native, 因此走透传不走 react 降级.
+			// 关键词: setupDeepseekServerCfg native mode, capability matrix mock
+			ToolCallsRound1Mode: "native",
+			ToolCallsRound2Mode: "native",
 		},
 	}
 	cfg.Models.models[modelName] = []*Provider{provider}

@@ -54,6 +54,12 @@ type chatJSONChunkWriter struct {
 	// 关键词: aibalance tool_calls 增量累积, finish_reason tool_calls, 非流式 tool_calls 还原
 	accumulatedToolCalls map[int]*aispec.ToolCall
 	toolCallOrder        []int
+
+	// reactExtractor 在 round1 react 模式下被 EnableReactExtractor 实例化:
+	// content 流字节先过 extractor, 由它分离出 [tool_call ...][/tool_call] 文本片段
+	// 转换为 OpenAI tool_calls delta, 同时把普通 content 透传给客户端.
+	// 关键词: chatJSONChunkWriter reactExtractor, ReAct -> tool_calls 反解析
+	reactExtractor *ReactToolExtractor
 }
 
 // NewChatJSONChunkWriter creates a new chat JSON chunk writer
@@ -243,6 +249,18 @@ func (w *chatJSONChunkWriter) hasAccumulatedToolCalls() bool {
 	return len(w.accumulatedToolCalls) > 0
 }
 
+// HasToolCalls reports whether this response has emitted or accumulated any
+// OpenAI-compatible tool_calls. It is used by the server success detector:
+// tool-call-only responses are successful even when no content/reasoning bytes
+// flowed through the text pipes.
+//
+// 关键词: HasToolCalls, tool_call-only success detector
+func (w *chatJSONChunkWriter) HasToolCalls() bool {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.hasAccumulatedToolCalls()
+}
+
 // writerWrapper wraps the chatJSONChunkWriter to handle different types of messages
 type writerWrapper struct {
 	notStream bool
@@ -254,7 +272,22 @@ type writerWrapper struct {
 
 // Write implements io.Writer interface for streaming responses
 // It formats the data into chunked transfer encoding format
+//
+// 关键修复 (round1 react 模式):
+//   - 当 writer 启用 reactExtractor 且本 wrapper 写的是 content 流 (非 reason),
+//     字节先过 extractor: 普通文本走 emitReactContent, [tool_call ...] 文本块走 emitReactToolCall.
+//   - reasoning_content 流保持原行为 (上游 thinking 思考链不应被 ReAct 抠出),
+//     因此 reactExtractor 不接管 reason wrapper.
+//
+// 关键词: writerWrapper.Write react 接入, content vs reasoning_content
 func (w *writerWrapper) Write(p []byte) (n int, err error) {
+	if !w.reason && w.writer.reactExtractor != nil {
+		if werr := w.writer.reactExtractor.Write(p); werr != nil {
+			return 0, werr
+		}
+		return len(p), nil
+	}
+
 	if w.notStream {
 		return w.buf.Write(p)
 	}
@@ -273,16 +306,93 @@ func (w *writerWrapper) Write(p []byte) (n int, err error) {
 	w.writer.writerClose.Write([]byte(fmt.Sprintf("%x\r\n", buf.Len())))
 	w.writer.writerClose.Write(buf.Bytes())
 	w.writer.writerClose.Write([]byte("\r\n"))
-	//msg := fmt.Sprintf("data: %s\r\n\r\n", string(delta))
-	//chunk := fmt.Sprintf("%x\r\n%s\r\n", len(msg), msg)
-	//
-	//// fmt.Println(string(chunk))
-	//if _, err := w.writer.writerClose.Write([]byte(chunk)); err != nil {
-	//	return 0, err
-	//}
 	utils.FlushWriter(w.writer.writerClose)
-	// Return the length of the original data, not the chunk
 	return len(p), nil
+}
+
+// EnableReactExtractor 开启 ReAct -> tool_calls 反解析模式.
+// 调用后, output (content) 流字节会先过 ReactToolExtractor:
+//   - 普通文本 -> 走 OpenAI delta.content 路径透传给客户端;
+//   - [tool_call name=...]ARGS_JSON[/tool_call] -> 转成 OpenAI delta.tool_calls 透传给客户端,
+//     同时累积到 accumulatedToolCalls 让 Close / GetNotStreamBody 把 finish_reason 联动为 tool_calls.
+//
+// 关键词: EnableReactExtractor, react extractor 接入 writer
+func (w *chatJSONChunkWriter) EnableReactExtractor() {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.reactExtractor != nil {
+		return
+	}
+	w.reactExtractor = NewReactToolExtractor(
+		func(p []byte) error { return w.emitReactContent(p) },
+		func(tc *aispec.ToolCall) error { return w.emitReactToolCall(tc) },
+	)
+}
+
+// emitReactContent 把 react extractor 抽出的纯文本片段透传给客户端.
+// 自己持锁, 与 writerWrapper.Write 在不同调用栈上不会死锁 (writerWrapper.Write 入口已不再持锁).
+// 关键词: emitReactContent, react extractor text passthrough
+func (w *chatJSONChunkWriter) emitReactContent(p []byte) error {
+	if len(p) == 0 {
+		return nil
+	}
+	if w.notStream {
+		w.mu.Lock()
+		defer w.mu.Unlock()
+		w.outputBufWriter.Write(p)
+		return nil
+	}
+	delta, err := w.buildDelta(false, string(p))
+	if err != nil {
+		return err
+	}
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.closed {
+		return nil
+	}
+	buf := bytes.Buffer{}
+	buf.WriteString("data: ")
+	buf.Write(delta)
+	buf.WriteString("\n\n")
+	w.writerClose.Write([]byte(fmt.Sprintf("%x\r\n", buf.Len())))
+	w.writerClose.Write(buf.Bytes())
+	w.writerClose.Write([]byte("\r\n"))
+	utils.FlushWriter(w.writerClose)
+	return nil
+}
+
+// emitReactToolCall 把 react extractor 抽出的完整 tool_call 透传给客户端,
+// 同时累积到 accumulatedToolCalls 让 finish_reason 联动.
+// 关键词: emitReactToolCall, react tool_call -> OpenAI delta
+func (w *chatJSONChunkWriter) emitReactToolCall(tc *aispec.ToolCall) error {
+	if tc == nil {
+		return nil
+	}
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.accumulateToolCalls([]*aispec.ToolCall{tc})
+	if w.notStream {
+		// 非流式: 已累积, GetNotStreamBody 一次性输出
+		return nil
+	}
+	if w.closed {
+		return nil
+	}
+	delta, err := w.buildToolCallsDelta([]*aispec.ToolCall{tc})
+	if err != nil {
+		return err
+	}
+	buf := bytes.Buffer{}
+	buf.WriteString("data: ")
+	buf.Write(delta)
+	buf.WriteString("\n\n")
+	w.writerClose.Write([]byte(fmt.Sprintf("%x\r\n", buf.Len())))
+	w.writerClose.Write(buf.Bytes())
+	w.writerClose.Write([]byte("\r\n"))
+	utils.FlushWriter(w.writerClose)
+	log.Infof("emitReactToolCall: forwarded react tool_call name=%s index=%d", tc.Function.Name, tc.Index)
+	return nil
 }
 
 // GetOutputWriter returns a writer for content messages
@@ -519,6 +629,13 @@ func (w *chatJSONChunkWriter) Wait() {
 // It sends the [DONE] marker and closes the underlying writer
 // Safe to call multiple times - subsequent calls are no-op
 func (w *chatJSONChunkWriter) Close() error {
+	// 先 Flush reactExtractor (不持 mu, 它的 callback emitReactContent / emitReactToolCall
+	// 内部会各自 Lock/Unlock mu, 否则会死锁).
+	// 关键词: Close react extractor flush before lock, deadlock-free
+	if w.reactExtractor != nil {
+		_ = w.reactExtractor.Flush()
+	}
+
 	w.mu.Lock()
 	defer w.mu.Unlock()
 

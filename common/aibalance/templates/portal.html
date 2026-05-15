@@ -121,6 +121,12 @@
                         </svg>
                         检查健康状态
                     </button>
+                    <button class="btn" onclick="probeAllToolCalls()" id="probe-all-tool-calls-btn" title="对所有健康的 Provider 真发 round1+round2 探测, 把 tool_calls 兼容能力 (native / react) 写回数据库, 让 aibalance 后续按 mode 路由">
+                        <svg viewBox="0 0 24 24" style="width: 16px; height: 16px; margin-right: 4px; vertical-align: middle;">
+                            <path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                        </svg>
+                        探测工具调用能力
+                    </button>
                     <button class="btn btn-danger" id="delete-selected" onclick="confirmDeleteSelected()" disabled>删除选中项</button>
                     <button class="reset-column-widths-btn" onclick="resetColumnWidths('provider-table')" title="Reset column widths to default">Reset columns</button>
                 </div>

@@ -727,6 +727,13 @@ func (c *ServerConfig) HandlePortalRequest(conn net.Conn, request *http.Request,
 	case strings.HasPrefix(uriIns.Path, "/portal/check-health/") && request.Method == "POST":
 		c.handleCheckSingleHealth(conn, request, uriIns.Path)
 
+	// ========== Tool Calls Capability Probe Routes ==========
+	// 关键词: portal probe-tool-calls 路由, 手动触发工具调用能力探测
+	case strings.HasPrefix(uriIns.Path, "/portal/probe-tool-calls/") && request.Method == "POST":
+		c.handleProbeToolCallsSingle(conn, request, uriIns.Path)
+	case uriIns.Path == "/portal/probe-tool-calls-all" && request.Method == "POST":
+		c.handleProbeToolCallsAll(conn, request)
+
 	// ========== API Key Routes ==========
 	case uriIns.Path == "/portal/api-keys":
 		c.serveAPIKeysPage(conn)

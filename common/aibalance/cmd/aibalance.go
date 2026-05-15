@@ -360,6 +360,77 @@ func main() {
 			},
 		},
 		{
+			Name:  "capability",
+			Usage: "Manage AI provider capability matrix (tool_calls compatibility)",
+			Subcommands: []cli.Command{
+				{
+					Name:  "probe-tools",
+					Usage: "Probe tool_calls compatibility (native/react) for one or all providers",
+					Flags: []cli.Flag{
+						cli.UintFlag{
+							Name:  "provider-id, p",
+							Usage: "Provider ID to probe (use --all for all providers)",
+							Value: 0,
+						},
+						cli.BoolFlag{
+							Name:  "all, a",
+							Usage: "Probe all healthy providers",
+						},
+					},
+					Action: func(c *cli.Context) error {
+						providerID := c.Uint("provider-id")
+						all := c.Bool("all")
+						if !all && providerID == 0 {
+							return cli.NewExitError("either --provider-id or --all is required", 1)
+						}
+
+						if all {
+							providers, err := aibalance.GetAllAiProviders()
+							if err != nil {
+								return cli.NewExitError("failed to list providers: "+err.Error(), 1)
+							}
+							log.Infof("probing tool_calls capability for %d providers", len(providers))
+							native, react, skipped, failed := 0, 0, 0, 0
+							for _, p := range providers {
+								if !p.IsHealthy {
+									log.Warnf("skip unhealthy provider id=%d wrapper=%s", p.ID, p.WrapperName)
+									skipped++
+									continue
+								}
+								result, err := aibalance.ProbeAndSaveByProviderID(p.ID)
+								if err != nil || result == nil {
+									log.Errorf("probe failed id=%d wrapper=%s: %v", p.ID, p.WrapperName, err)
+									failed++
+									continue
+								}
+								log.Infof("probed id=%d wrapper=%s round1=%s round2=%s err=%q",
+									p.ID, p.WrapperName, result.Round1Mode, result.Round2Mode, result.Error)
+								if result.Round1Mode == "native" && result.Round2Mode == "native" {
+									native++
+								} else {
+									react++
+								}
+							}
+							log.Infof("probe summary: native=%d react=%d skipped=%d failed=%d", native, react, skipped, failed)
+							return nil
+						}
+
+						result, err := aibalance.ProbeAndSaveByProviderID(providerID)
+						if err != nil {
+							return cli.NewExitError("probe failed: "+err.Error(), 1)
+						}
+						if result == nil {
+							return cli.NewExitError("probe returned no result", 1)
+						}
+						log.Infof("probe result: round1=%s round2=%s probed_at=%s err=%q",
+							result.Round1Mode, result.Round2Mode,
+							result.ProbedAt.Format(time.RFC3339), result.Error)
+						return nil
+					},
+				},
+			},
+		},
+		{
 			Name:  "api-key",
 			Usage: "Manage API keys for AI models",
 			Subcommands: []cli.Command{
