@@ -15,7 +15,8 @@ import (
 )
 
 func (c *Coordinator) ExecuteLoopTask(taskTypeName string, task aicommon.AIStatefulTask, options ...reactloops.ReActLoopOption) error {
-	memoryFlushBuffer := aicommon.NewMemoryFlushBuffer("coordinator", c.TimelineDiffer, nil)
+	memoryFlushDiffer := c.timelineDifferForTask(task)
+	memoryFlushBuffer := aicommon.NewMemoryFlushBuffer("coordinator", memoryFlushDiffer, nil)
 	defer memoryFlushBuffer.Close()
 	taskCtx := task.GetContext()
 	inputChannel := chanx.NewUnlimitedChan[*ypb.AIInputEvent](taskCtx, 10)
@@ -37,6 +38,9 @@ func (c *Coordinator) ExecuteLoopTask(taskTypeName string, task aicommon.AIState
 	defer cancel()
 	hotpatchChan := c.Config.HotPatchBroadcaster.Subscribe()
 	baseOpts := aicommon.ConvertConfigToOptions(c.Config)
+	if peTask, ok := task.(*AiTask); ok && peTask.timelineFork != nil && peTask.timelineFork.Branch != nil {
+		baseOpts = append(baseOpts, aicommon.WithTimeline(peTask.timelineFork.Branch))
+	}
 	baseOpts = append(baseOpts,
 		aicommon.WithID(c.Config.Id), // pe -> react should use same id
 		// 在深度规划（PlanAndExecute）场景中，原子任务Loop强制继承父级的智能回调配置，确保规划执行过程中 AI Callback 的Wrapper Config一致，维护流输出的同步性和Seq计数器存Checkpoint的正确递增。
@@ -133,4 +137,13 @@ func (c *Coordinator) ExecuteLoopTask(taskTypeName string, task aicommon.AIState
 		return err
 	}
 	return nil
+}
+
+func (c *Coordinator) timelineDifferForTask(task aicommon.AIStatefulTask) *aicommon.TimelineDiffer {
+	if peTask, ok := task.(*AiTask); ok && peTask.timelineFork != nil && peTask.timelineFork.Branch != nil {
+		differ := aicommon.NewTimelineDiffer(peTask.timelineFork.Branch)
+		differ.SetBaseline()
+		return differ
+	}
+	return c.TimelineDiffer
 }

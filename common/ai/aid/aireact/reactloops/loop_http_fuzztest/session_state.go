@@ -162,6 +162,9 @@ func persistLoopHTTPFuzzTimeline(cfg *aicommon.Config) {
 	if cfg == nil || cfg.GetDB() == nil || cfg.PersistentSessionId == "" || cfg.Timeline == nil {
 		return
 	}
+	if cfg.Timeline.IsBranchTimeline() {
+		return
+	}
 	timelineRaw, err := aicommon.MarshalTimeline(cfg.Timeline)
 	if err != nil {
 		log.Warnf("http_fuzztest: marshal timeline failed: %v", err)

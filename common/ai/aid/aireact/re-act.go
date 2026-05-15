@@ -119,14 +119,14 @@ func (r *ReAct) GetConfig() aicommon.AICallerConfigIf {
 }
 
 func (r *ReAct) SaveTimeline() {
-	if r.config.PersistentSessionId == "" {
+	if r == nil || r.config == nil || r.config.PersistentSessionId == "" {
+		return
+	}
+	ins := r.config.Timeline
+	if ins == nil || ins.IsBranchTimeline() {
 		return
 	}
 	r.saveTimelineThrottle(func() {
-		ins := r.config.Timeline
-		if ins == nil {
-			return
-		}
 		tl, err := aicommon.MarshalTimeline(ins)
 		if err != nil {
 			log.Errorf("ReAct: marshal timeline failed: %v", err)

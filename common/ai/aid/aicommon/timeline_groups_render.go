@@ -98,7 +98,9 @@ func (m *Timeline) GroupByMinutes(minutes int) *TimelineGroups {
 	if m == nil || minutes <= 0 {
 		return &TimelineGroups{intervalMinutes: 0}
 	}
-	return m.GroupByMinutesAndBytes(minutes, m.getEffectiveBucketByteSize())
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.groupByMinutesAndBytesLocked(minutes, m.getEffectiveBucketByteSize())
 }
 
 // GroupByMinutesAndBytes 按 N 分钟绝对时间桶分组，并在同一日历桶内按 bytesPerBucket 切分子桶。
@@ -107,6 +109,15 @@ func (m *Timeline) GroupByMinutes(minutes int) *TimelineGroups {
 // 该方法不修改 timeline 任何字段，纯读取。
 // 关键词: GroupByMinutesAndBytes, 字节子桶, 时间桶
 func (m *Timeline) GroupByMinutesAndBytes(minutes int, bytesPerBucket int64) *TimelineGroups {
+	if m == nil || minutes <= 0 {
+		return &TimelineGroups{intervalMinutes: 0}
+	}
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.groupByMinutesAndBytesLocked(minutes, bytesPerBucket)
+}
+
+func (m *Timeline) groupByMinutesAndBytesLocked(minutes int, bytesPerBucket int64) *TimelineGroups {
 	if m == nil || minutes <= 0 {
 		return &TimelineGroups{intervalMinutes: 0}
 	}
@@ -751,7 +762,8 @@ const (
 // 字面量必须与 aicache.semi2BoundaryTagName / semi2BoundaryNonce 严格一致.
 //
 // 关键词: SemiDynamicPart2CacheBoundaryTagName, AI_CACHE_SEMI2, P1.1,
-//        5 段切分, semi 拆两块, 合并 prefix
+//
+//	5 段切分, semi 拆两块, 合并 prefix
 const (
 	SemiDynamicPart2CacheBoundaryTagName = "AI_CACHE_SEMI2"
 	SemiDynamicPart2CacheBoundaryNonce   = "semi"

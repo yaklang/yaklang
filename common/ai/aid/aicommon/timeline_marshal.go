@@ -33,6 +33,15 @@ func MarshalTimeline(i *Timeline) (string, error) {
 	if i == nil {
 		return "", nil
 	}
+	i.mu.RLock()
+	defer i.mu.RUnlock()
+	return marshalTimelineUnlocked(i)
+}
+
+func marshalTimelineUnlocked(i *Timeline) (string, error) {
+	if i == nil {
+		return "", nil
+	}
 
 	// 转换omap为map，使用字符串键
 	idToTsMap := make(map[string]int64)
@@ -110,6 +119,7 @@ func UnmarshalTimeline(s string) (*Timeline, error) {
 		perDumpContentLimit:   serializable.PerDumpContentLimit,
 		totalDumpContentLimit: serializable.TotalDumpContentLimit,
 		compressing:           utils.NewOnce(),
+		branchTimeline:        false,
 	}
 
 	// 恢复 idToTs

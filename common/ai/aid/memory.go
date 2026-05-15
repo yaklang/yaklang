@@ -5,6 +5,7 @@ import (
 	"fmt"
 	osRuntime "runtime"
 	"strings"
+	"sync"
 	"text/template"
 	"time"
 
@@ -43,8 +44,9 @@ type PromptContextProvider struct {
 	PersistentData *omap.OrderedMap[string, *PersistentDataRecord]
 
 	// task info
-	CurrentTask *AiTask
-	RootTask    *AiTask
+	CurrentTask   *AiTask
+	RootTask      *AiTask
+	currentTaskMu sync.RWMutex
 
 	// todo
 	PlanHistory []*PlanRecord
@@ -227,14 +229,31 @@ func (m *PromptContextProvider) Progress() string {
 	if utils.IsNil(m) {
 		return "empty *PromptContextProvider maybe a BUG"
 	}
+	currentTask := m.getCurrentTask()
 	if utils.IsNil(m.RootTask) {
-		m.RootTask = m.CurrentTask.rootTask
+		if currentTask != nil {
+			m.RootTask = currentTask.rootTask
+		}
+	}
+	if m.RootTask == nil {
+		return ""
 	}
 	return m.RootTask.Progress()
 }
 
 func (m *PromptContextProvider) StoreCurrentTask(task *AiTask) {
+	m.currentTaskMu.Lock()
+	defer m.currentTaskMu.Unlock()
 	m.CurrentTask = task
+}
+
+func (m *PromptContextProvider) getCurrentTask() *AiTask {
+	if m == nil {
+		return nil
+	}
+	m.currentTaskMu.RLock()
+	defer m.currentTaskMu.RUnlock()
+	return m.CurrentTask
 }
 
 // interactive history memory
@@ -349,10 +368,11 @@ func (m *PromptContextProvider) CurrentTaskTimeline() string {
 			fmt.Println(utils.ErrorStack(r))
 		}
 	}()
-	if m.CurrentTask == nil {
+	currentTask := m.getCurrentTask()
+	if currentTask == nil {
 		return m.TimelineDump()
 	}
-	stl := m.timeline.CreateSubTimeline(m.CurrentTask.ToolCallResultsID()...)
+	stl := m.timeline.CreateSubTimeline(currentTask.ToolCallResultsID()...)
 	if stl == nil {
 		return "no-toolcall, so not timeline"
 	}
@@ -364,7 +384,11 @@ func (m *PromptContextProvider) CurrentTaskTimeline() string {
 }
 
 func (m *PromptContextProvider) TaskMaxContinue() int64 {
-	return m.CurrentTask.Coordinator.MaxTaskContinue
+	currentTask := m.getCurrentTask()
+	if currentTask == nil || currentTask.Coordinator == nil {
+		return 0
+	}
+	return currentTask.Coordinator.MaxTaskContinue
 }
 
 // timeline limit set
@@ -378,15 +402,16 @@ func (m *PromptContextProvider) PromptForToolCallResultsForLastN(n int) string {
 
 // memory tools current task info
 func (m *PromptContextProvider) CurrentTaskInfo() string {
-	return m.RenderCurrentTaskInfo(m.CurrentTask)
+	return m.RenderCurrentTaskInfo(m.getCurrentTask())
 }
 
 func (m *PromptContextProvider) SharedEvidenceContext() string {
-	if m.CurrentTask == nil {
+	currentTask := m.getCurrentTask()
+	if currentTask == nil {
 		return ""
 	}
 
-	evidence := strings.TrimSpace(getTaskPlanEvidence(m.CurrentTask))
+	evidence := strings.TrimSpace(getTaskPlanEvidence(currentTask))
 	if evidence == "" {
 		return ""
 	}
@@ -474,7 +499,11 @@ func (m *PromptContextProvider) ToolsList() string {
 }
 
 func (m *PromptContextProvider) CurrentTaskToolCallResults() []*aitool.ToolResult {
-	return m.CurrentTask.GetAllToolCallResults()
+	task := m.getCurrentTask()
+	if task == nil {
+		return nil
+	}
+	return task.GetAllToolCallResults()
 }
 
 func (m *PromptContextProvider) StoreCliParameter(param []*ypb.ExecParamItem) {

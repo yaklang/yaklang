@@ -40,17 +40,14 @@ func (t *AiTask) execute() error {
 
 	// Record timeline baseline before task execution starts
 	// We use the global timeline differ to track changes during task execution
-	if t.Coordinator != nil {
-		timeline := t.Coordinator.ContextProvider.GetTimelineInstance()
-		if timeline != nil {
-			// Create a new TimelineDiffer for this task to track changes during execution
-			// This differ will be used to calculate the diff at the end of task execution
-			taskTimelineDiffer := aicommon.NewTimelineDiffer(timeline)
-			taskTimelineDiffer.SetBaseline()
-			// Store the differ for later use in generateTaskSummary
-			t.taskTimelineDiffer = taskTimelineDiffer
-			log.Debugf("task %s timeline baseline recorded, baseline content length: %d", t.Index, len(taskTimelineDiffer.GetLastDump()))
-		}
+	if timeline := t.CurrentTimeline(); timeline != nil {
+		// Create a new TimelineDiffer for this task to track changes during execution
+		// This differ will be used to calculate the diff at the end of task execution
+		taskTimelineDiffer := aicommon.NewTimelineDiffer(timeline)
+		taskTimelineDiffer.SetBaseline()
+		// Store the differ for later use in generateTaskSummary
+		t.taskTimelineDiffer = taskTimelineDiffer
+		log.Debugf("task %s timeline baseline recorded, baseline content length: %d", t.Index, len(taskTimelineDiffer.GetLastDump()))
 	}
 
 	// Emit task execution start status
@@ -158,10 +155,9 @@ func (t *AiTask) execute() error {
 					if nextMovements != "" {
 						timelineMsg += fmt.Sprintf(" | Suggested next steps: %s", nextMovements)
 					}
-					t.Coordinator.Timeline.PushText(
-						t.Coordinator.AcquireId(),
-						timelineMsg,
-					)
+					if timeline := t.CurrentTimeline(); timeline != nil {
+						timeline.PushText(t.Coordinator.AcquireId(), timelineMsg)
+					}
 				}
 			}
 		}),

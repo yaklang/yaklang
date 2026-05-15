@@ -64,18 +64,26 @@ func (m *Timeline) estimateItemContentTokens(id int64, item *TimelineItem) int64
 //
 // 关键词: findCompressSplitByRecentKeepTokens, batchCompress 切点, recent keep, token 维度
 func (m *Timeline) findCompressSplitByRecentKeepTokens(keepTokens int64) int {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.findCompressSplitByRecentKeepTokensLocked(keepTokens)
+}
+
+func (m *Timeline) findCompressSplitByRecentKeepTokensLocked(keepTokens int64) int {
 	if m == nil || m.idToTimelineItem == nil {
 		return 0
 	}
-	total := m.idToTimelineItem.Len()
-	if total <= 1 {
-		return 0
+	ids := make([]int64, 0, m.idToTimelineItem.Len())
+	for _, id := range m.idToTimelineItem.Keys() {
+		if id <= m.forkProtectedMaxID {
+			continue
+		}
+		if item, ok := m.idToTimelineItem.Get(id); ok && item != nil && !item.deleted {
+			ids = append(ids, id)
+		}
 	}
-
-	// 关键词: idToTimelineItem.Keys, id 升序, 反向遍历
-	ids := m.idToTimelineItem.Keys()
-	if len(ids) != total {
-		// 防御性: Keys() 应与 Len() 一致
+	total := len(ids)
+	if total <= 1 {
 		return 0
 	}
 
@@ -114,13 +122,22 @@ func (m *Timeline) compressForSizeLimit() {
 		return
 	}
 
-	total := m.idToTimelineItem.Len()
+	candidateIDs := make([]int64, 0, m.idToTimelineItem.Len())
+	for _, id := range m.idToTimelineItem.Keys() {
+		if id <= m.forkProtectedMaxID {
+			continue
+		}
+		if item, ok := m.idToTimelineItem.Get(id); ok && item != nil && !item.deleted {
+			candidateIDs = append(candidateIDs, id)
+		}
+	}
+	total := len(candidateIDs)
 	if total <= 1 {
 		return // 不能压缩到少于1个项目
 	}
 
 	// 计算当前活跃区 token 数（不含 reducer），与触发同口径
-	currentSize := m.calculateActualContentSize()
+	currentSize := m.calculateActualContentSizeLocked()
 	if currentSize <= m.totalDumpContentLimit {
 		return
 	}
@@ -132,7 +149,7 @@ func (m *Timeline) compressForSizeLimit() {
 		keepTokens = 1
 	}
 
-	splitIdx := m.findCompressSplitByRecentKeepTokens(keepTokens)
+	splitIdx := m.findCompressSplitByRecentKeepTokensLocked(keepTokens)
 	if splitIdx <= 0 {
 		// 全部 item 累加 token 仍未达到 keepTokens，或活跃 item 太少；不压缩
 		log.Infof("compress skipped: %d active items, keep all as recent (currentSize=%d, keepTokens=%d)",
@@ -148,15 +165,10 @@ func (m *Timeline) compressForSizeLimit() {
 		return
 	}
 
-	// 按 id 升序收集 toCompress / recentKeep 切片
-	ids := m.idToTimelineItem.Keys()
-	if len(ids) != total {
-		log.Warnf("compressForSizeLimit: ids length %d != total %d, skip", len(ids), total)
-		return
-	}
+	// 按候选 id 升序收集 toCompress / recentKeep 切片
 	var toCompress []*TimelineItem
 	var recentKeep []*TimelineItem
-	for i, id := range ids {
+	for i, id := range candidateIDs {
 		item, ok := m.idToTimelineItem.Get(id)
 		if !ok || item == nil {
 			continue
@@ -217,11 +229,6 @@ func (m *Timeline) batchCompressOldestWithRecent(toCompress []*TimelineItem, rec
 		return
 	}
 
-	total := int64(m.idToTimelineItem.Len())
-	if total <= 1 {
-		return
-	}
-
 	// Check if current timeline is already too large for AI processing
 	// If so, do emergency compress first to bring it to a manageable size
 	tlstr, err := MarshalTimeline(m)
@@ -240,7 +247,12 @@ func (m *Timeline) batchCompressOldestWithRecent(toCompress []*TimelineItem, rec
 		if item == nil {
 			continue
 		}
-		idsToRemove = append(idsToRemove, item.GetID())
+		id := item.GetID()
+		if id <= m.forkProtectedMaxID {
+			log.Warnf("batch compress: skip protected id=%d (forkProtectedMaxID=%d)", id, m.forkProtectedMaxID)
+			continue
+		}
+		idsToRemove = append(idsToRemove, id)
 	}
 
 	if len(idsToRemove) == 0 {
@@ -327,8 +339,28 @@ func (m *Timeline) batchCompressOldestWithRecent(toCompress []*TimelineItem, rec
 		return
 	}
 
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	filteredIDs := make([]int64, 0, len(idsToRemove))
+	filteredItems := make([]*TimelineItem, 0, len(idsToRemove))
+	for _, id := range idsToRemove {
+		if id <= m.forkProtectedMaxID {
+			continue
+		}
+		item, ok := m.idToTimelineItem.Get(id)
+		if !ok || item == nil {
+			continue
+		}
+		filteredIDs = append(filteredIDs, id)
+		filteredItems = append(filteredItems, item)
+	}
+	if len(filteredIDs) == 0 {
+		return
+	}
+
 	// 存储压缩结果
-	lastCompressedId := idsToRemove[len(idsToRemove)-1]
+	lastCompressedId := filteredIDs[len(filteredIDs)-1]
 	// 关键词: batchCompressOldestWithRecent, reducerTs, 缓存稳定
 	// 在删除 idToTs 之前先获取最末压缩 item 的原始 ts，写入 reducerTs
 	// 这样 DumpBefore / GroupByMinutes 渲染 reducer 行时能拿到稳定时间，避免 time.Now() 漂移
@@ -347,14 +379,14 @@ func (m *Timeline) batchCompressOldestWithRecent(toCompress []*TimelineItem, rec
 	m.attachArchiveRef(lastCompressedId, m.archiveForgottenBatch(
 		TimelineArchiveReasonBatchCompress,
 		lastCompressedId,
-		idsToRemove,
-		toCompress,
+		filteredIDs,
+		filteredItems,
 		compressedMemory,
 	))
-	log.Infof("batch compressed %d items into reducer at id: %v", len(toCompress), lastCompressedId)
+	log.Infof("batch compressed %d items into reducer at id: %v", len(filteredIDs), lastCompressedId)
 
 	// 删除被压缩的 items
-	for _, id := range idsToRemove {
+	for _, id := range filteredIDs {
 		m.idToTimelineItem.Delete(id)
 		if ts, ok := m.idToTs.Get(id); ok {
 			m.tsToTimelineItem.Delete(ts)

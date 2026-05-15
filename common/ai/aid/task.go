@@ -52,6 +52,7 @@ type AiTask struct {
 	toolCallResultIds  *omap.OrderedMap[int64, *aitool.ToolResult]
 	taskTimelineDiffer *aicommon.TimelineDiffer // Timeline differ for tracking task execution timeline changes
 	taskStartTime      time.Time                // Task execution start time for duration calculation
+	timelineFork       *aicommon.TimelineFork
 }
 
 // GetSemanticIdentifier returns the semantic identifier for directory naming.

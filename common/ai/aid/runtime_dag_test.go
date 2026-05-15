@@ -2,6 +2,7 @@ package aid
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -238,4 +239,85 @@ func TestRuntimeExecuteStageReturnsFirstErrorAfterWholeStage(t *testing.T) {
 	require.True(t, ok)
 	_, ok = finished.Load(b.Index)
 	require.True(t, ok, "stage executor should wait for all tasks in the stage to finish before returning")
+}
+
+func TestRuntimeStageTimelineForkIsolation(t *testing.T) {
+	coordinator := newTestCoordinator(t)
+	coordinator.Config = aicommon.NewConfig(context.Background(), aicommon.WithPlanExecTaskConcurrency(2), aicommon.WithDisableAutoSkills(true))
+
+	a := newStateTask(coordinator, "a")
+	b := newStateTask(coordinator, "b")
+	a.Index = "1-1"
+	b.Index = "1-2"
+
+	graph := buildManualExecutableGraph(t,
+		&executableTaskNode{task: a, id: a.Index, order: 0},
+		&executableTaskNode{task: b, id: b.Index, order: 1},
+	)
+	r := &runtime{config: coordinator, RootTask: a, execGraph: graph, currentStage: -1}
+
+	aWrote := make(chan struct{})
+	bWrote := make(chan struct{})
+	_, err := r.executeStageWithHandler(0, graph.stages[0], graph.TotalTasks(), graph.TotalStages(), func(task *AiTask) error {
+		tl := task.CurrentTimeline()
+		if tl == nil {
+			return nil
+		}
+		switch task.Index {
+		case a.Index:
+			tl.PushText(coordinator.AcquireId(), "task-A-marker")
+			close(aWrote)
+			<-bWrote
+			if strings.Contains(tl.Dump(), "task-B-marker") {
+				return context.Canceled
+			}
+		case b.Index:
+			tl.PushText(coordinator.AcquireId(), "task-B-marker")
+			close(bWrote)
+			<-aWrote
+			if strings.Contains(tl.Dump(), "task-A-marker") {
+				return context.Canceled
+			}
+		}
+		return nil
+	})
+	require.NoError(t, err)
+
+	mainDump := coordinator.Timeline.Dump()
+	require.Contains(t, mainDump, "task-A-marker")
+	require.Contains(t, mainDump, "task-B-marker")
+}
+
+func TestRuntimeStageTimelineForkMergeOrderStable(t *testing.T) {
+	coordinator := newTestCoordinator(t)
+	coordinator.Config = aicommon.NewConfig(context.Background(), aicommon.WithPlanExecTaskConcurrency(2), aicommon.WithDisableAutoSkills(true))
+
+	a := newStateTask(coordinator, "a")
+	b := newStateTask(coordinator, "b")
+	a.Index = "1-1"
+	b.Index = "1-2"
+
+	graph := buildManualExecutableGraph(t,
+		&executableTaskNode{task: a, id: a.Index, order: 0},
+		&executableTaskNode{task: b, id: b.Index, order: 1},
+	)
+	r := &runtime{config: coordinator, RootTask: a, execGraph: graph, currentStage: -1}
+
+	_, err := r.executeStageWithHandler(0, graph.stages[0], graph.TotalTasks(), graph.TotalStages(), func(task *AiTask) error {
+		switch task.Index {
+		case a.Index:
+			time.Sleep(120 * time.Millisecond)
+			task.CurrentTimeline().PushText(coordinator.AcquireId(), "task-A-order-marker")
+		case b.Index:
+			time.Sleep(10 * time.Millisecond)
+			task.CurrentTimeline().PushText(coordinator.AcquireId(), "task-B-order-marker")
+		}
+		return nil
+	})
+	require.NoError(t, err)
+
+	mainDump := coordinator.Timeline.Dump()
+	require.Contains(t, mainDump, "task-A-order-marker")
+	require.Contains(t, mainDump, "task-B-order-marker")
+	require.Less(t, strings.Index(mainDump, "task-A-order-marker"), strings.Index(mainDump, "task-B-order-marker"))
 }
