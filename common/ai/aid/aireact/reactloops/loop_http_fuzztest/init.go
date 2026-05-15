@@ -45,6 +45,7 @@ func init() {
 				reactloops.WithOverrideLoopAction(loopActionDirectlyAnswerHTTPFuzztest),
 				reactloops.WithInitTask(buildInitTask(r)),
 				BuildOnPostIterationHook(r),
+				reactloops.WithDisablePeriodicVerification(true),
 				reactloops.WithMaxIterations(int(r.GetConfig().GetMaxIterationCount())),
 				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
 				reactloops.WithPersistentInstruction(instruction),
@@ -219,7 +220,7 @@ func tryBootstrapFuzzRequestFromUserInput(r aicommon.AIInvokeRuntime, loop *reac
 			aitool.WithStringParam("reason", aitool.WithParam_Description("说明提取依据和置信度")),
 		},
 		aicommon.WithGeneralConfigStreamableFieldWithNodeId("http_flow", "raw_http_request"),
-		aicommon.WithGeneralConfigStreamableFieldWithNodeId("thought", "url"),
+		aicommon.WithGeneralConfigStreamableFieldWithNodeId("http_flow", "url"),
 		aicommon.WithGeneralConfigStreamableFieldWithNodeId("thought", "reason"),
 	)
 	if err != nil {
