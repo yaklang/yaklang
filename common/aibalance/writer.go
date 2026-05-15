@@ -444,9 +444,14 @@ func (w *chatJSONChunkWriter) WriteError(err error) {
 
 // buildToolCallsDelta constructs a delta message for tool calls streaming responses
 // toolCalls: The tool calls to be sent
+//
+// OpenAI 流式规范要求增量 chunk 中只携带本次"变化"的字段, 未变化的字段必须省略 (否则
+// 严格 schema 校验 - Vercel AI SDK v5 OpenAI provider 内置 Zod schema - 会拒绝
+// type=""/id=""/name="" 这种空字符串). 这里按字段是否为零值决定写入与否, 同时
+// 保留 index 以便客户端能按 index 合并多帧 incremental arguments.
+//
+// 关键词: buildToolCallsDelta 空字段省略, OpenAI 流式规范 schema, vercel ai sdk 兼容
 func (w *chatJSONChunkWriter) buildToolCallsDelta(toolCalls []*aispec.ToolCall) ([]byte, error) {
-	// Convert to OpenAI format tool_calls structure
-	// Use ToolCall.Index if set, otherwise fall back to array position
 	var formattedToolCalls []map[string]any
 	for i, tc := range toolCalls {
 		index := tc.Index
@@ -455,15 +460,26 @@ func (w *chatJSONChunkWriter) buildToolCallsDelta(toolCalls []*aispec.ToolCall) 
 			// This handles cases where Index wasn't explicitly set
 			index = i
 		}
-		formattedToolCalls = append(formattedToolCalls, map[string]any{
+		item := map[string]any{
 			"index": index,
-			"id":    tc.ID,
-			"type":  tc.Type,
-			"function": map[string]any{
-				"name":      tc.Function.Name,
-				"arguments": tc.Function.Arguments,
-			},
-		})
+		}
+		if tc.ID != "" {
+			item["id"] = tc.ID
+		}
+		if tc.Type != "" {
+			item["type"] = tc.Type
+		}
+		fn := map[string]any{}
+		if tc.Function.Name != "" {
+			fn["name"] = tc.Function.Name
+		}
+		if tc.Function.Arguments != "" {
+			fn["arguments"] = tc.Function.Arguments
+		}
+		if len(fn) > 0 {
+			item["function"] = fn
+		}
+		formattedToolCalls = append(formattedToolCalls, item)
 	}
 
 	result := map[string]any{

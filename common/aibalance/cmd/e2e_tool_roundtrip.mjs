@@ -215,15 +215,18 @@ async function runWithOpenAI({ baseURL, apiKey, timeoutSec }, { model, stream, p
 // ---------- vercel ai sdk path ----------
 
 async function runWithVercel({ baseURL, apiKey, timeoutSec }, { model, stream, parallel }) {
-    let createOpenAI, generateText, streamText, tool;
+    let createOpenAI, generateText, streamText, tool, stepCountIs;
     try {
         ({ createOpenAI } = await import("@ai-sdk/openai"));
-        ({ generateText, streamText, tool } = await import("ai"));
+        ({ generateText, streamText, tool, stepCountIs } = await import("ai"));
     } catch (e) {
         throw new Error(`vercel ai sdk not installed (npm install ai @ai-sdk/openai zod): ${e.message}`);
     }
     const { z } = await import("zod");
 
+    // 关键词: vercel ai sdk v5 chat-completions 路由强制
+    // v5 默认 provider(model) 会走 /v1/responses (OpenAI Responses API),
+    // aibalance 只暴露 /v1/chat/completions, 所以必须用 provider.chat(model) 强切到 chat completions.
     const provider = createOpenAI({ baseURL, apiKey, compatibility: "compatible" });
     const tools = parallel
         ? {
@@ -247,11 +250,14 @@ async function runWithVercel({ baseURL, apiKey, timeoutSec }, { model, stream, p
         };
     const userPrompt = buildUserPrompt(parallel);
     const opts = {
-        model: provider(model),
+        model: provider.chat(model),
         prompt: userPrompt,
         tools,
         toolChoice: "auto",
-        stopWhen: () => false, // 让 Vercel SDK 自动跑完工具结果 round-trip
+        // Vercel AI SDK v5 默认 stepCountIs(1) 一步停止; 要跑 tool round-trip 至少需要 2 步:
+        // step1 模型决定调工具 -> SDK execute tool -> step2 模型用 tool result 生成 final text.
+        // 关键词: vercel ai sdk stopWhen stepCountIs tool round-trip
+        stopWhen: stepCountIs(5),
         maxRetries: 0,
         abortSignal: AbortSignal.timeout(timeoutSec * 1000),
     };
@@ -260,11 +266,26 @@ async function runWithVercel({ baseURL, apiKey, timeoutSec }, { model, stream, p
         const result = streamText(opts);
         let text = "";
         for await (const chunk of result.textStream) text += chunk;
-        if (!text.trim()) throw new Error("vercel streamText empty text");
+        if (!text.trim()) {
+            // 取最终步骤里 step.text 作为兜底, 兼容某些模型只返回 finishStep 没有 text-delta
+            try {
+                const steps = await result.steps;
+                for (const s of (steps || [])) {
+                    if (s.text && s.text.trim()) {
+                        return s.text.trim();
+                    }
+                }
+            } catch (_) {}
+            throw new Error("vercel streamText empty text");
+        }
         return text.trim();
     }
     const result = await generateText(opts);
     if (!result.text || !result.text.trim()) {
+        // 兜底: 从 steps 里找最后一个有 text 的 step
+        for (const s of (result.steps || [])) {
+            if (s.text && s.text.trim()) return s.text.trim();
+        }
         throw new Error(`vercel generateText empty text; toolResults=${JSON.stringify(result.toolResults || []).slice(0, 200)}`);
     }
     return result.text.trim();
