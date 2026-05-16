@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -395,27 +396,36 @@ func TestYieldFun(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	i := 0
-	var finished bool
+	// yieldCount 与 finished 会被 YieldFun 内部 goroutine 与测试主线程同时访问，
+	// 使用 atomic 类型避免 data race。
+	var yieldCount atomic.Int32
+	var finished atomic.Bool
 	generator := parser.NewGenerator(nil, nodes, map[string]*parser.TagMethod{
 		"genStringList": &parser.TagMethod{
 			YieldFun: func(ctx context.Context, params string, yield func(*parser.FuzzResult)) error {
-				for ; i < 10; i++ {
-					yield(parser.NewFuzzResultWithData(strconv.Itoa(i)))
+				for n := 0; n < 10; n++ {
+					yield(parser.NewFuzzResultWithData(strconv.Itoa(n)))
+					yieldCount.Add(1)
 				}
-				finished = true
+				finished.Store(true)
 				return nil
 			},
 		},
 	})
-	for i := 0; i < 3; i++ {
+	for n := 0; n < 3; n++ {
 		generator.Next()
 	}
 	assert.Equal(t, "2", string(generator.Result().GetData()))
-	assert.Equal(t, 3, i)
+	// yield 走的是无缓冲 channel，主线程从 channel 取到值后会立刻继续执行，
+	// 而 goroutine 还需要解锁、返回 yield 才能执行 yieldCount.Add(1)，
+	// 这之间存在调度时序竞争。Next 已被调用 3 次，第 4 次 yield 必然阻塞，
+	// 因此 yieldCount 最终会稳定收敛到 3，这里用 Eventually 等待其到位。
+	require.Eventually(t, func() bool {
+		return yieldCount.Load() == 3
+	}, 2*time.Second, 10*time.Millisecond, "yieldCount should reach 3 after 3 Next() calls")
 	generator.Cancel()
 	generator.Wait()
-	assert.Equal(t, true, finished)
+	assert.True(t, finished.Load())
 }
 
 func TestFuzztagGeneratorCancel(t *testing.T) {

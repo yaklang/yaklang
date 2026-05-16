@@ -13,6 +13,26 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+// syncBuffer 是 bytes.Buffer 的并发安全包装, 用于在 goroutine 写入和
+// 主线程读取同一个 buffer 时避免 data race. bytes.Buffer 自身的 Write 与
+// String 不是并发安全的, 直接共享访问会触发 race detector.
+type syncBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *syncBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *syncBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
+}
+
 func TestReader(t *testing.T) {
 	gener, err := NewTagReader("aaa\n{{sleep(1)}}sdfa", map[string]*parser.TagMethod{
 		"sleep": {
@@ -74,7 +94,7 @@ func TestReader(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	buf := &bytes.Buffer{}
+	buf := &syncBuffer{}
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {

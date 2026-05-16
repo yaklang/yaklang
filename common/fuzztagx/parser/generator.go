@@ -199,9 +199,18 @@ func (f *TagExecNode) exec(s *FuzzResult) error {
 		case ch <- result:
 		}
 	}
+	// err 由 sender goroutine 写入, 主线程通过 getter 读取.
+	// 通过 Go 内存模型保证 race-free:
+	//   sender goroutine 内 "err 赋值" -> defer "close(ch)" 是顺序执行;
+	//   close(ch) happens-before 接收方读到 channel 的 zero value (!ok);
+	// 因此主线程只在 !ok 路径下读 err, 不会与 sender 的写入产生 race.
 	var err error
 	getter := func() (*FuzzResult, error) {
-		return <-ch, err
+		r, ok := <-ch
+		if !ok {
+			return nil, err
+		}
+		return r, nil
 	}
 
 	go func() {
@@ -230,25 +239,16 @@ func (f *TagExecNode) exec(s *FuzzResult) error {
 		f.methodCtx.UpdateLabels(f)
 		r.Source = append(r.Source, s)
 		r.ByTag = true
+		// r 非 nil 时来自 sender goroutine 还在产数据的中间态, 此时主线程
+		// 无法安全读取 sender 还未写入的 err, getter 已强制 err==nil.
 		r.Error = err
 		return r, err
 	}
 	f.getter = newGetter
-	//if len(res) == 0 {
-	//	res = []*FuzzResult{NewFuzzResultWithData("")}
-	//}
-	//for _, r := range res {
-	//
-	//}
-
-	if !f.config.AssertError {
-		err = nil
-	}
-	if err != nil {
-		return err
-	}
-	//f.methodCtx.UpdateLabels(f)
-	//f.cache = &res
+	// 注: 原先在此处存在 `if !f.config.AssertError { err = nil }; if err != nil { return err }`
+	// 的逻辑. 由于 sender 通过 go 异步启动, 主线程在此读到的 err 几乎必然仍为
+	// nil(sender 还没有机会赋值), 该分支实际为死代码且会与 sender goroutine 的
+	// err 写入并发. AssertError 的过滤已在 GetCache 中处理, 这里无需重复.
 	return nil
 }
 func (f *TagExecNode) Exec() (bool, error) {
