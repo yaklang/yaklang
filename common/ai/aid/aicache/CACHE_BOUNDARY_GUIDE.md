@@ -732,6 +732,26 @@ without a cached match will be rejected by the verifier and force a retry."
 **不需要改**。后续若新增 skill view window 渲染必须保持 `sortedViewWindows` +
 `RenderWithInfo` 的稳定输出契约 (见 §6.1 表格)。
 
+#### `RenderWithInfo` 双模式契约 (重要)
+
+`ViewWindow.RenderWithInfo` 按 view 模式产出**不同形状**的 header, 改动该函数
+前必须读懂下表, 否则会同时破坏缓存稳定性与 AI 的 scroll 决策路径:
+
+| 场景 | 触发条件 | header 内容 | 内容主体 |
+| --- | --- | --- | --- |
+| 全文展示 | `offset == 1` 且无 32KB 截断 | 仅 `File: <path> (Skill: <name>)` | 裸文本, **无 `N \|` 行号前缀**, 无 `...` 省略号 |
+| 部分展示 | `offset > 1` 或触发截断 | `File:` + `Total Lines: N, Current Offset: M` + (truncated 时) `Note: Content truncated ... change_skill_view_offset ...` | 每行带 `N \| ` 行号前缀, 必要时含 `...` 省略号 |
+
+约束:
+
+- 行号 (`N | `) 是 `change_skill_view_offset.offset` 的输入契约, 一旦走部分
+  展示路径必须保留, 不允许"省略号无行号"的中间形态。
+- 全文展示去掉行号同时把 `Total Lines` / `Current Offset` / 截断 Note 一并
+  省略, 因为这三条信息只对滚动决策有价值; 全文已在视野内时它们会误导 AI 去
+  发起无意义的 `change_skill_view_offset` 调用。
+- 两种模式都保留 `<|VIEW_WINDOW_<nonce>|>` / `<|VIEW_WINDOW_END_<nonce>|>`
+  tag, 缓存断点与上下游解析依赖这个边界, 不要动 (见 §6.1)。
+
 ### 9.5 后置项 (P2.2)
 
 - `disallowLoopExit` 跳变: `finish` 进出 schema. 频率低于 HasRecentlyUsedTools,

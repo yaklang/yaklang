@@ -451,6 +451,9 @@ func TestRenderFileSystemTree_EmptyFS(t *testing.T) {
 // --- ViewWindow tests ---
 
 func TestViewWindow_BasicRender(t *testing.T) {
+	// 全文展示场景: 5 行短内容 + offset == 1, 远低于 ViewWindowMaxBytes,
+	// Render 应走 full-view 模式输出纯净行 (无 "N | " 前缀, 无 "..." 省略号).
+	// 关键词: TestViewWindow_BasicRender, full-view 无行号断言
 	content := "line1\nline2\nline3\nline4\nline5"
 	vw := NewViewWindow("test-skill", "SKILL.md", content, "abc123")
 
@@ -458,12 +461,24 @@ func TestViewWindow_BasicRender(t *testing.T) {
 	if truncated {
 		t.Fatal("small content should not be truncated")
 	}
-	if !strings.Contains(rendered, "1 | line1") {
-		t.Fatal("rendered should contain '1 | line1'")
+	// 正向: 全文模式输出每行裸文本, 行后只有 \n
+	if !strings.Contains(rendered, "\nline1\n") {
+		t.Fatalf("rendered should contain bare 'line1' (full-view mode), got %q", rendered)
 	}
-	if !strings.Contains(rendered, "5 | line5") {
-		t.Fatal("rendered should contain '5 | line5'")
+	if !strings.Contains(rendered, "\nline5\n") {
+		t.Fatalf("rendered should contain bare 'line5' (full-view mode), got %q", rendered)
 	}
+	// 反向: 全文模式不应再出现行号前缀格式
+	if strings.Contains(rendered, "1 | line1") {
+		t.Fatalf("full-view mode should NOT contain '1 | line1' line-number prefix, got %q", rendered)
+	}
+	if strings.Contains(rendered, "5 | line5") {
+		t.Fatalf("full-view mode should NOT contain '5 | line5' line-number prefix, got %q", rendered)
+	}
+	if strings.Contains(rendered, "...\n") {
+		t.Fatalf("full-view mode should NOT contain ellipsis, got %q", rendered)
+	}
+	// 边界 tag 任何模式下都保留
 	if !strings.Contains(rendered, "<|VIEW_WINDOW_abc123|>") {
 		t.Fatal("rendered should contain VIEW_WINDOW header tag")
 	}
@@ -473,6 +488,9 @@ func TestViewWindow_BasicRender(t *testing.T) {
 }
 
 func TestViewWindow_OffsetRendering(t *testing.T) {
+	// 部分展示场景: offset>1 强制走 partial-view 模式, 行号 + 前导 "..." 必须保留,
+	// 因为这里的行号是 change_skill_view_offset 的 offset 输入契约.
+	// 关键词: TestViewWindow_OffsetRendering, partial-view 行号契约
 	content := "line1\nline2\nline3\nline4\nline5"
 	vw := NewViewWindow("test-skill", "SKILL.md", content, "abc123")
 
@@ -508,12 +526,18 @@ func TestViewWindow_OffsetClamping(t *testing.T) {
 }
 
 func TestViewWindow_EmptyContent(t *testing.T) {
-	// Note: strings.Split("", "\n") returns [""], so empty string has 1 line.
+	// 空内容也属于全文展示, 走 full-view 模式: 不带行号, 仅在 header 与 footer
+	// 之间留一个空行 (来自 strings.Split("", "\n") == [""]).
+	// 关键词: TestViewWindow_EmptyContent, full-view 空内容无行号
 	vw := NewViewWindow("s", "f", "", "n")
 	rendered, truncated := vw.Render()
-	// The empty string is still treated as one line (the empty line)
-	if !strings.Contains(rendered, "1 | ") {
-		t.Fatalf("empty content should still render one empty line, got %q", rendered)
+	// 全文模式不带行号前缀
+	if strings.Contains(rendered, " | ") {
+		t.Fatalf("empty content full-view should NOT contain line-number separator, got %q", rendered)
+	}
+	// header/footer 之间应该夹一个空行
+	if !strings.Contains(rendered, "<|VIEW_WINDOW_n|>\n\n<|VIEW_WINDOW_END_n|>") {
+		t.Fatalf("empty content should render exactly one empty line between tags, got %q", rendered)
 	}
 	if truncated {
 		t.Fatal("empty content should not be truncated")
@@ -524,7 +548,9 @@ func TestViewWindow_EmptyContent(t *testing.T) {
 }
 
 func TestViewWindow_LargeContentTruncation(t *testing.T) {
-	// Build content that exceeds 15KB
+	// 大文件触发截断 -> 走 partial-view 模式: 必须保留行号格式与尾部 "..."
+	// 省略号, 这样 AI 才能据此调用 change_skill_view_offset 滚动.
+	// 关键词: TestViewWindow_LargeContentTruncation, partial-view 行号契约保留
 	var lines []string
 	for i := 0; i < 1000; i++ {
 		lines = append(lines, strings.Repeat("x", 100))
@@ -546,17 +572,60 @@ func TestViewWindow_LargeContentTruncation(t *testing.T) {
 	if !strings.Contains(rendered, "...\n<|VIEW_WINDOW_END_") {
 		t.Fatal("truncated content should end with '...' before end tag")
 	}
+	// 确保截断场景仍保留行号格式 (scroll 入口). 取第一行 "1 | xxx..." 检测.
+	if !strings.Contains(rendered, "1 | ") {
+		t.Fatalf("truncated content must preserve '1 | ' line-number prefix for change_skill_view_offset, got prefix: %q", rendered[:min(len(rendered), 200)])
+	}
 }
 
 func TestViewWindow_RenderWithInfo(t *testing.T) {
+	// 全文展示场景: 短内容 + offset==1 -> RenderWithInfo 仅保留 File / Skill 行,
+	// 不再输出 Total Lines / Current Offset / 截断 Note, 避免误导 AI 去 scroll.
+	// 关键词: TestViewWindow_RenderWithInfo, full-view 头部精简
 	content := "line1\nline2"
 	vw := NewViewWindow("my-skill", "SKILL.md", content, "nonce1")
 	info := vw.RenderWithInfo()
 	if !strings.Contains(info, "File: SKILL.md (Skill: my-skill)") {
 		t.Fatal("RenderWithInfo should contain file info header")
 	}
-	if !strings.Contains(info, "Total Lines: 2") {
-		t.Fatal("RenderWithInfo should contain total lines")
+	if strings.Contains(info, "Total Lines:") {
+		t.Fatalf("full-view RenderWithInfo should NOT contain 'Total Lines:', got %q", info)
+	}
+	if strings.Contains(info, "Current Offset:") {
+		t.Fatalf("full-view RenderWithInfo should NOT contain 'Current Offset:', got %q", info)
+	}
+	if strings.Contains(info, "Note: Content truncated") {
+		t.Fatalf("full-view RenderWithInfo should NOT contain truncation note, got %q", info)
+	}
+}
+
+// TestViewWindow_RenderWithInfo_PartialView 覆盖部分展示场景: 大文件触发截断后,
+// RenderWithInfo 仍需输出 Total Lines / Current Offset / change_skill_view_offset
+// 的滚动提示, 这是 AI 决定是否 scroll 的关键信号.
+// 关键词: TestViewWindow_RenderWithInfo_PartialView, partial-view 头部完整
+func TestViewWindow_RenderWithInfo_PartialView(t *testing.T) {
+	var lines []string
+	for i := 0; i < 1000; i++ {
+		lines = append(lines, strings.Repeat("x", 100))
+	}
+	content := strings.Join(lines, "\n")
+	vw := NewViewWindow("big-skill", "BIG.md", content, "noncebig")
+
+	info := vw.RenderWithInfo()
+	if !strings.Contains(info, "File: BIG.md (Skill: big-skill)") {
+		t.Fatalf("partial-view RenderWithInfo should contain file header, got prefix: %q", info[:min(len(info), 200)])
+	}
+	if !strings.Contains(info, "Total Lines: 1000") {
+		t.Fatalf("partial-view RenderWithInfo should contain 'Total Lines: 1000', got prefix: %q", info[:min(len(info), 200)])
+	}
+	if !strings.Contains(info, "Current Offset: 1") {
+		t.Fatalf("partial-view RenderWithInfo should contain 'Current Offset: 1', got prefix: %q", info[:min(len(info), 200)])
+	}
+	if !strings.Contains(info, "Note: Content truncated") {
+		t.Fatalf("partial-view RenderWithInfo should contain truncation note, got prefix: %q", info[:min(len(info), 200)])
+	}
+	if !strings.Contains(info, "change_skill_view_offset") {
+		t.Fatalf("partial-view RenderWithInfo should hint change_skill_view_offset, got prefix: %q", info[:min(len(info), 200)])
 	}
 }
 
