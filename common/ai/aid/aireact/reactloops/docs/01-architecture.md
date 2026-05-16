@@ -206,7 +206,7 @@ sequenceDiagram
 |------|----------|
 | 1. 异步快速记忆 | [exec.go:609-625](../exec.go) `waitMem` |
 | 2. 生成 prompt | [exec.go:628-640](../exec.go) `generateLoopPrompt` |
-| 3. debug 保存 prompt | [exec.go:641-645](../exec.go) `savePromptToFile` / `savePromptObservationToFile` |
+| 3. debug 保存 prompt | [exec.go:641-645](../exec.go) `savePromptToFile` (仅 debug 模式落盘 prompt 全文; prompt observation 不再落盘, 由 `emitter.EmitPromptProfile` 走 `prompt_profile` 结构化事件推前端) |
 | 4. 调用 AI | [exec.go:647-651](../exec.go) `callAITransaction` |
 | 5. 校验 + 提取 Action | `callAITransaction` 内部 `ExtractActionFromStream` + `ActionVerifier` |
 | 6. 执行 Handler | [exec.go ~692-750](../exec.go) |
