@@ -118,12 +118,21 @@ func TestPromptManager_AssembleLoopPrompt_SectionOrder(t *testing.T) {
 	require.NotEqual(t, -1, autoCtxIdx)
 	require.NotEqual(t, -1, prevUserInputIdx)
 
-	// 段顺序 (P1.1 拆 semi 后): TRAITS -> AI_CACHE_FROZEN(START) ->
+	// 段顺序 (P1-C3 timeline-open 段内子项重排后): TRAITS -> AI_CACHE_FROZEN(START) ->
 	// Tool/Forge/Timeline-frozen -> AI_CACHE_FROZEN(END) ->
 	// PROMPT_SECTION_semi-dynamic-1 (Skills + CacheToolCall) ->
 	// PROMPT_SECTION_semi-dynamic-2 (Persistent + Schema + OutputExample) ->
-	// PROMPT_SECTION_timeline-open (Timeline open + Time + Workspace +
-	// SessionEvidence + PREV_USER_INPUT) -> Dynamic (UserQuery + AutoCtx + ...)
+	// PROMPT_SECTION_timeline-open (Timeline open + SessionEvidence +
+	// Workspace + PREV_USER_INPUT + Current Time + PlanContext) ->
+	// Dynamic (UserQuery + AutoCtx + ...)
+	//
+	// timeline-open 段内子项顺序 (P1-C3):
+	//   Timeline (Open Tail) -> Session Evidence -> Workspace ->
+	//   User History (PREV_USER_INPUT) -> Current Time -> Plan Context
+	// 排序原则: Timeline / SessionEvidence 形成"会话级实证"连续块在前;
+	// Workspace 居中作为环境标识; UserHistory + Current Time 形成"用户输入
+	// 历史 -> 现在"时序前缀; PlanContext 末尾落在所有 cache 边界外。
+	// 关键词: P1-C3 timeline-open 段内顺序断言, currentTime 后置
 	require.Less(t, traitsIdx, frozenStartIdx)
 	require.Less(t, frozenStartIdx, toolInventoryIdx)
 	require.Less(t, toolInventoryIdx, frozenEndIdx)
@@ -136,12 +145,13 @@ func TestPromptManager_AssembleLoopPrompt_SectionOrder(t *testing.T) {
 	// timelineIdx 是首次出现的 "# Timeline Memory", 此用例下 frozen 段无 timeline
 	// 内容 (单 timeline 事件全部落在最末桶), 因此首次出现位置必在 timeline_open 段。
 	require.Less(t, timelineOpenSectionIdx, timelineIdx)
-	require.Less(t, timelineIdx, currentTimeIdx)
-	require.Less(t, currentTimeIdx, workspaceIdx)
-	// P1-C2: PREV_USER_INPUT 已上移到 timeline-open 段, 排在 workspace 之后,
-	// userQuery (dynamic 段) 之前.
+	// P1-C3: 段内新顺序 — Timeline -> Workspace -> PREV_USER_INPUT ->
+	// Current Time. SessionEvidence 在本测试中未注入 (LoopPromptAssemblyInput
+	// 未设 SessionEvidence), 模板会跳过空块, 不影响其它字段相对位置。
+	require.Less(t, timelineIdx, workspaceIdx)
 	require.Less(t, workspaceIdx, prevUserInputIdx)
-	require.Less(t, prevUserInputIdx, userQueryIdx)
+	require.Less(t, prevUserInputIdx, currentTimeIdx)
+	require.Less(t, currentTimeIdx, userQueryIdx)
 	require.Less(t, userQueryIdx, autoCtxIdx)
 	require.Contains(t, prompt, "<|PERSISTENT|>")
 	require.Contains(t, prompt, "<|OUTPUT_EXAMPLE|>")
@@ -186,20 +196,26 @@ func TestPromptManager_AssembleLoopPrompt_SectionOrder(t *testing.T) {
 	require.Equal(t, reactloops.PromptSectionRoleSemiDynamic2, sections[3].Children[0].Role)
 	require.Equal(t, reactloops.PromptSectionRoleSemiDynamic2, sections[3].Children[2].Role)
 
-	// timeline_open 段子结构 (P1-C2): timeline_open + current_time + workspace +
-	// session_evidence (本用例无 SessionEvidence -> 不出现) + user_history.
-	// 关键词: timeline_open children Name 去前缀
+	// timeline_open 段子结构 (P1-C3 段内重排后):
+	//   timeline_open -> session_evidence (本用例 SessionEvidence 为空被过滤) ->
+	//   workspace -> user_history -> current_time -> plan_context (本用例
+	//   FrozenUserContext 为空被过滤).
+	// filterIncludedPromptSections 会过滤空段, 故实际剩 4 个 children:
+	//   [0] timeline_open
+	//   [1] workspace
+	//   [2] user_history
+	//   [3] current_time
+	// 关键词: timeline_open children Name 去前缀, P1-C3 子项顺序
 	require.GreaterOrEqual(t, len(sections[4].Children), 4)
 	require.Equal(t, "section.timeline_open.timeline_open", sections[4].Children[0].Key)
 	require.Equal(t, "Timeline (Open Tail)", sections[4].Children[0].Label)
-	require.Equal(t, "section.timeline_open.current_time", sections[4].Children[1].Key)
-	require.Equal(t, "Current Time", sections[4].Children[1].Label)
-	require.Equal(t, "section.timeline_open.workspace", sections[4].Children[2].Key)
-	require.Equal(t, "Workspace", sections[4].Children[2].Label)
-	// P1-C2: user_history 现在挂在 timeline_open 之下而非 dynamic 之下.
-	require.Equal(t, "section.timeline_open.user_history", sections[4].Children[3].Key)
-	require.Equal(t, "User History", sections[4].Children[3].Label)
-	require.Equal(t, reactloops.PromptSectionRoleTimelineOpen, sections[4].Children[3].Role)
+	require.Equal(t, "section.timeline_open.workspace", sections[4].Children[1].Key)
+	require.Equal(t, "Workspace", sections[4].Children[1].Label)
+	require.Equal(t, "section.timeline_open.user_history", sections[4].Children[2].Key)
+	require.Equal(t, "User History", sections[4].Children[2].Label)
+	require.Equal(t, reactloops.PromptSectionRoleTimelineOpen, sections[4].Children[2].Role)
+	require.Equal(t, "section.timeline_open.current_time", sections[4].Children[3].Key)
+	require.Equal(t, "Current Time", sections[4].Children[3].Label)
 
 	require.GreaterOrEqual(t, len(sections[5].Children), 2)
 	require.Equal(t, "section.dynamic.user_query", sections[5].Children[0].Key)

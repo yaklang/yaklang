@@ -645,17 +645,31 @@ func (pm *PromptManager) buildSemiDynamic2Observation(
 }
 
 // buildTimelineOpenObservation 给"PROMPT_SECTION_timeline-open 段"做观测树:
-// Timeline 末桶 (+ midterm 检索结果) + Current Time + Workspace +
-// SessionEvidence + UserHistory + PlanContext (末尾)。
+// Timeline 末桶 (+ midterm 检索结果) + SessionEvidence + Workspace +
+// UserHistory + Current Time + PlanContext (末尾)。
 //
-// PlanContext 在本段最末尾, 是因为 PE-TASK PLAN 产物本质易变 (子任务切换 +
-// FACTS/DOCUMENT 嵌入 root user input), 不适合放任何 cache 边界内。
-// timeline-open 段位于 system / frozen / semi 三段缓存之外, 让 PlanContext
-// 抖动不再污染上游缓存命中率。
+// 段内排序原则 (P1-C3 调整):
+//  1. Timeline (Open Tail) 在最前: 时间线最末桶是模型理解"刚发生了什么"的
+//     首要信息源, 顶到段首让 LLM 第一时间看到。
+//  2. Session Evidence 紧跟其后: SESSION_ARTIFACTS 是 Config 级持久化观测
+//     (跨 turn 累积的工件证据), 与 Timeline 末桶共同构成"会话级实证"语料,
+//     物理上贴近 Timeline 让两者形成连续语义块。
+//  3. Workspace 居中: OS/Arch + working dir + glance 是相对静态的环境标识,
+//     既不属于"刚发生", 也不属于"用户视角", 居中过渡。
+//  4. User History 在 Workspace 之后: PREV_USER_INPUT 是用户历史输入轨迹,
+//     与 Current Time 一起构成"时序前缀", 紧贴当前时间。
+//  5. Current Time 紧跟 User History: 当前时间是最末稳定的时序锚点, 放在
+//     User History 之后形成"历史输入 -> 现在"的时间递进, 同时与下方
+//     PlanContext (任务规划) 形成"时间 -> 任务"的语义衔接。
+//  6. Plan Context 末尾: PE-TASK PLAN 产物本质易变 (子任务切换 +
+//     FACTS/DOCUMENT 嵌入 root user input), 放最末让其落在所有 cache
+//     边界外, 不污染上游 system / frozen / semi 三段缓存命中率。
+// timeline-open 整段位于 system / frozen / semi 三段缓存之外, 是 prompt 的
+// "易变尾段", 段内子块顺序不影响上游 prefix cache, 仅影响 LLM 理解顺序。
 //
-// 关键词: buildTimelineOpenObservation, Timeline 末桶, Current Time, Workspace,
-//
-//	SessionEvidence, UserHistory, PlanContext 末尾, 缓存边界外
+// 关键词: buildTimelineOpenObservation, Timeline 末桶, SessionEvidence,
+//        Workspace, UserHistory, Current Time, PlanContext 末尾,
+//        段内排序原则, P1-C3 顺序调整, 缓存边界外
 func (pm *PromptManager) buildTimelineOpenObservation(
 	materials *reactloops.PromptPrefixMaterials,
 	rendered string,
@@ -668,6 +682,12 @@ func (pm *PromptManager) buildTimelineOpenObservation(
 	// 子节点 Name 已去掉 "Timeline Open / " 前缀: UI 字节统计面板里父容器
 	// "Timeline Open & Workspace" 已经表达层级.
 	// 关键词: section.timeline_open 子节点 Name 去前缀, UI 信息密度
+	//
+	// 子节点排列顺序 (P1-C3): timeline_open -> session_evidence -> workspace ->
+	// user_history -> current_time -> plan_context. 该顺序与 timeline_open_section.txt
+	// 模板渲染顺序严格一致, 让"上下文成分"面板看到的层级与实际 prompt 字节
+	// 流顺序保持同步.
+	// 关键词: P1-C3 子节点顺序, observation 与模板对齐
 	children := []*reactloops.PromptSectionObservation{
 		reactloops.NewPromptSectionObservation(
 			"section.timeline_open.timeline_open",
@@ -676,12 +696,14 @@ func (pm *PromptManager) buildTimelineOpenObservation(
 			true,
 			renderTimelineOpenBlock(materials),
 		),
+		// P1-C3: SessionEvidence 紧跟 Timeline (Open Tail), 与时间线末桶
+		// 形成"会话级实证"连续块.
 		reactloops.NewPromptSectionObservation(
-			"section.timeline_open.current_time",
-			"Current Time",
+			"section.timeline_open.session_evidence",
+			"Session Evidence",
 			reactloops.PromptSectionRoleTimelineOpen,
-			false,
-			renderCurrentTimeBlock(materials),
+			true,
+			materials.SessionEvidence,
 		),
 		reactloops.NewPromptSectionObservation(
 			"section.timeline_open.workspace",
@@ -690,21 +712,23 @@ func (pm *PromptManager) buildTimelineOpenObservation(
 			true,
 			renderWorkspaceBlock(materials),
 		),
-		// P1-C2: SessionEvidence (SESSION_ARTIFACTS) 上移到 timeline-open
-		reactloops.NewPromptSectionObservation(
-			"section.timeline_open.session_evidence",
-			"Session Evidence",
-			reactloops.PromptSectionRoleTimelineOpen,
-			true,
-			materials.SessionEvidence,
-		),
-		// P1-C2: UserHistory (PREV_USER_INPUT) 上移到 timeline-open
+		// P1-C3: UserHistory 在 Workspace 之后, 与下方 Current Time 共同
+		// 构成"用户输入历史 -> 现在"的时序前缀.
 		reactloops.NewPromptSectionObservation(
 			"section.timeline_open.user_history",
 			"User History",
 			reactloops.PromptSectionRoleTimelineOpen,
 			false,
 			materials.UserHistory,
+		),
+		// P1-C3: Current Time 紧跟 User History, 充当时序末端锚点;
+		// 同时与下方 PlanContext (任务规划) 形成"现在 -> 任务"语义衔接.
+		reactloops.NewPromptSectionObservation(
+			"section.timeline_open.current_time",
+			"Current Time",
+			reactloops.PromptSectionRoleTimelineOpen,
+			false,
+			renderCurrentTimeBlock(materials),
 		),
 		// PlanContext (PE-TASK PLAN 产物) 末尾注入: 该字段仅 PE-TASK 子任务
 		// 非空, 内容随子任务切换 + EvidenceOps 嵌入 root user input 抖动剧烈,

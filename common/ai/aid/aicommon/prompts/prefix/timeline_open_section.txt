@@ -1,21 +1,32 @@
 {{ if .TimelineOpen }}# Timeline Memory (Open Tail)
+
+开放时间线记录的是当前回合"刚刚发生过的事情"——最近若干步工具调用、其返回的观察结果、以及与之配套的推理 / 决策片段，按时间先后追加，是会话内最易变的"近期记忆"段。
+请把它作为"目前已经做了什么"的事实依据：判断任务进度、确认已经尝试过哪些路径、避免重复发起同一工具调用。若条目以 "midterm-memory:" 起头，则是引擎按当前主题从更早的归档时间线中召回的相关旧片段，不是本回合新发生的事件。
+
 {{ .TimelineOpen }}{{ end }}
-{{ if .CurrentTime }}{{ if .TimelineOpen }}
 
-{{ end }}# Current Time
-{{ .CurrentTime }}{{ end }}
-{{ if .Workspace }}{{ if or .TimelineOpen .CurrentTime }}
+{{ if .SessionEvidence }}
 
-{{ end }}# Workspace Context
+会话级证据（SESSION EVIDENCE）是历轮工具实际执行后被显式写入的"已确认观测"，跨回合在整段会话中累积保留——它代表可能性空间中已被探明的边界：哪些路径已被排除、哪些路径产出过非基线信号。在做下一步规划时，请优先以这里给出的事实为准；详细的使用纪律见下方 SESSION_EVIDENCE 块内 "## 已知观测（Evidence）" 段。
+
+{{ .SessionEvidence }}
+{{ end }}
+
+{{ if .Workspace }}# Workspace Context
+
+工作区上下文给出 Agent 当前运行环境的"物理坐标"：操作系统 / 架构、当前工作目录的绝对路径、以及该目录顶层结构的概览（文件 / 子目录列表）。
+所有涉及文件读写、脚本执行工具调用，都应以下方 working dir 为锚点来构造路径；working dir glance 提供"这个目录里有什么"的快速参考，可用于判断目标文件是否已经存在、是否需要先列目录确认。
+
 OS/Arch: {{ .OSArch }}
 {{ if .WorkingDir }}working dir: {{ .WorkingDir }}
 {{ end }}{{ if .WorkingDirGlance }}working dir glance: {{ .WorkingDirGlance }}{{ end }}{{ end }}
-{{ if .SessionEvidence }}{{ if or .TimelineOpen .CurrentTime .Workspace }}
 
-{{ end }}{{ .SessionEvidence }}{{ end }}
-{{ if .UserHistory }}{{ if or .TimelineOpen .CurrentTime .Workspace .SessionEvidence }}
+{{ if .UserHistory }}
+以下 PREV_USER_INPUT 块是当前会话内用户在此前各轮的原始输入文本，按时间先后给出，用于跨回合维持上下文连贯：理解用户的真实意图、追溯尚未完成的请求、避免反复询问用户早已明确说过的信息。
+注意：这里列出的是"历史输入"，当前回合的实际指令以 USER_QUERY 块为准，本块仅作背景参考。
+{{ .UserHistory }}
+{{ end }}
+{{ if .CurrentTime }}# Current Time
+{{ .CurrentTime }}{{ end }}
 
-{{ end }}{{ .UserHistory }}{{ end }}
-{{ if .PlanContext }}{{ if or .TimelineOpen .CurrentTime .Workspace .SessionEvidence .UserHistory }}
-
-{{ end }}{{ .PlanContext }}{{ end }}
+{{ if .PlanContext }}{{ .PlanContext }}{{ end }}

@@ -47,6 +47,12 @@ type LoopPromptAssemblyResult = aicommon.LoopPromptAssemblyResult
 
 // PromptPrefixMaterials 已收敛到 aicommon.PromptMaterials。
 // 保留 alias 只是兼容 reactloops 现有调用面，不再维护第二套顶层语义模型。
+//
+// 段内顺序与字段语义已由 aicommon/prompt_materials.go 集中维护，相关注释
+// (P1-C3 段内排序原则等) 也迁移到 aicommon 包中。
+//
+// 关键词: PromptPrefixMaterials alias, aicommon.PromptMaterials,
+//        prompt 语义材料统一收敛
 type PromptPrefixMaterials = aicommon.PromptMaterials
 
 // PromptPrefixAssemblyResult 是 AssemblePromptPrefix 的输出。新路径下 Prompt
