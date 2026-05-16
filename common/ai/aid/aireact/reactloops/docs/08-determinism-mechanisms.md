@@ -271,7 +271,7 @@ WithUseSpeedPriorityAICallback(true)         // 用 speed 模型（默认 qualit
 |------|------|
 | `Satisfied` | true → 任务完成 |
 | `Reasoning` | LLM 的判断理由 |
-| `OutputFiles` | 生成的关键文件路径（自动 `EmitPinFilename` + 注册为 ContextProvider） |
+| `OutputFiles` | 生成的关键文件路径（自动 `EmitPinFilename` + 推入 Open Timeline，仅 `[DELIVERY FILE]` + 文件名 + size/mime/mtime，**不嵌入文件正文**；老路径的 `output_file:` ContextProvider 已废弃） |
 | `Evidence` / `EvidenceOps` | 留存证据，注入到下一轮 prompt 的 `<|SESSION_EVIDENCE_<nonce>|>` 段 |
 | `NextMovements` | 若不满意，给出建议下一步 |
 | `CompletedTaskIndex` | 已完成的子任务标识 |

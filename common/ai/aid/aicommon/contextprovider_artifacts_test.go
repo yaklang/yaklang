@@ -172,12 +172,18 @@ func TestArtifactsContextProvider_RootLevelFiles(t *testing.T) {
 	t.Logf("output:\n%s", result)
 }
 
-func TestArtifactsContextProvider_RegisteredInNewConfig(t *testing.T) {
-	// Verify that NewConfig automatically registers the session_artifacts provider
+// TestArtifactsContextProvider_NotRegisteredInNewConfig 验证 session_artifacts
+// 不再被注册到 ContextProviderManager. 该清单已下沉到 Workspace 块,
+// 由 RenderSessionArtifactsListing 在构造 PromptMaterials 时直接渲染, 走
+// timeline-open 段, 不再污染 Pure Dynamic / AutoContext.
+//
+// 关键词: session_artifacts 反注册, RenderSessionArtifactsListing,
+//
+//	Workspace 内嵌, Pure Dynamic 反污染
+func TestArtifactsContextProvider_NotRegisteredInNewConfig(t *testing.T) {
 	cfg := NewConfig(context.Background())
 
-	// Create a temp dir as workdir and populate it
-	tmpDir, err := os.MkdirTemp("", "artifacts_ctx_auto_*")
+	tmpDir, err := os.MkdirTemp("", "artifacts_ctx_unreg_*")
 	require.NoError(t, err)
 	defer os.RemoveAll(tmpDir)
 
@@ -187,10 +193,17 @@ func TestArtifactsContextProvider_RegisteredInNewConfig(t *testing.T) {
 
 	cfg.Workdir = tmpDir
 
-	// Execute the ContextProviderManager to get DynamicContext
-	result := cfg.ContextProviderManager.Execute(cfg, cfg.Emitter)
-	assert.Contains(t, result, "Session Artifacts", "DynamicContext should contain session_artifacts provider output")
-	assert.Contains(t, result, "task_1-1_auto_test", "DynamicContext should contain task directory name")
-	assert.Contains(t, result, "output.txt", "DynamicContext should contain filename")
-	t.Logf("DynamicContext output:\n%s", result)
+	// ContextProviderManager.Execute should NOT contain Session Artifacts,
+	// because the provider is no longer registered there.
+	dyn := cfg.ContextProviderManager.Execute(cfg, cfg.Emitter)
+	assert.NotContains(t, dyn, "Session Artifacts",
+		"DynamicContext (Pure Dynamic) must NOT contain Session Artifacts after migration")
+	assert.NotContains(t, dyn, "task_1-1_auto_test",
+		"DynamicContext must NOT contain artifacts task directory after migration")
+
+	// However the Workspace-embedded path must still produce the listing.
+	listing := RenderSessionArtifactsListing(cfg)
+	assert.Contains(t, listing, "task_1-1_auto_test", "RenderSessionArtifactsListing should pick up the workdir")
+	assert.Contains(t, listing, "output.txt", "RenderSessionArtifactsListing should include the file")
+	t.Logf("workspace-embedded listing:\n%s", listing)
 }

@@ -752,7 +752,59 @@ without a cached match will be rejected by the verifier and force a retry."
 - 两种模式都保留 `<|VIEW_WINDOW_<nonce>|>` / `<|VIEW_WINDOW_END_<nonce>|>`
   tag, 缓存断点与上下游解析依赖这个边界, 不要动 (见 §6.1)。
 
-### 9.5 后置项 (P2.2)
+### 9.5 Session Artifacts 与 Delivery Files (P2.3 / 已落地)
+
+P2.3 一次性把两类工件相关上下文从 Pure Dynamic / AutoContext 段下沉, 大幅缩减
+dynamic 段尺寸并提升缓存命中:
+
+#### Session Artifacts 合入 Workspace 块
+
+| 维度 | 老路径 | 新路径 |
+| --- | --- | --- |
+| 注入点 | `ContextProviderManager.Register("session_artifacts", ArtifactsContextProvider)` -> AutoContext | `RenderSessionArtifactsListing(cfg)` 直接拼到 `# Workspace Context` 块下 (`## Session Artifacts` 子段) |
+| 段位 | Pure Dynamic (易变, 不缓存) | timeline-open (不缓存, 但与 OS / WorkingDir 同处一个语义块) |
+| 触发面 | 每个 prompt build 都跑 ContextProvider | 仅在构造 `PromptMaterials` 时走一次 listing 渲染 |
+| 8K shrink | 保留 | 保留, 通过 `RenderSessionArtifactsListing` 内部调用 `ShrinkTextBlockByTokens` |
+| 子标题 | `## <task>` (旧) | `### <task>` (新; 让 `## Session Artifacts` 自身占据二级位) |
+
+约束:
+
+- `NewConfig` 不再注册 `session_artifacts` 提供者. 反向断言已加在
+  `TestArtifactsContextProvider_NotRegisteredInNewConfig` 与
+  `TestArtifactsVisibility_*` 中, 任何回退到 ContextProvider 注册路径的改动会
+  立即失败.
+- Workspace 启用判定 (`materials.Workspace`) 取 OS/Arch / WorkingDir /
+  WorkingDirGlance / SessionArtifactsListing 任意一项非空, 避免环境字段全空
+  但 listing 非空时被过滤掉.
+- `ArtifactsContextProvider` 函数本身保留为兼容薄壳 (供老测试调用), 但不再
+  被注册.
+
+#### Delivery files via Open Timeline
+
+交付文件路径 (`VerifySatisfactionResult.OutputFiles`) 的载荷形态彻底重写:
+
+| 维度 | 老路径 | 新路径 |
+| --- | --- | --- |
+| 注入点 | `RegisterTracedContent("output_file:"+path, OutputFileContextProvider(path))` -> AutoContext, 每轮重发文件正文 ≤40KB | `pushDeliveryFileToTimeline(cfg, path)` -> `Timeline.PushText` |
+| 段位 | Pure Dynamic | Open Timeline (随 frozen / open / batch_compress 自然淘汰) |
+| 文件正文 | 每轮重新读取 + 行号渲染, 全文反复占 token | **不读取、不采样、不嵌入**, 仅 `[DELIVERY FILE] path=... size=... mime=... mtime=...` |
+| AI 重新查看正文 | 自动塞回 prompt | AI 主动通过 file-read / view-window 等动作显式访问 |
+| EmitPinFilename | 走 ContextProvider 同时打 emitter | 保留 emitter 通道, 与 prompt 上下文解耦 |
+
+约束:
+
+- `OutputFileContextProvider` 函数已删除 (注释墓碑保留在
+  `common/ai/aid/aicommon/contextprovider.go`); 任何对它的引用都会编译失败.
+- 反向断言: `TestVerificationGate_DeliveryFile_PushesToTimeline` 验证
+  timeline dump 不含文件正文 marker, ContextProviderManager 不再含
+  `output_file:` 前缀注册项.
+- 单条 timeline entry 保持极简体量 (path + size + mime + mtime + 头尾标识),
+  实测整段 timeline dump 含一条 entry 时 ≤ 1KB. 让 entry 即便不被 reducer
+  压缩也几乎可忽略.
+- `aitool.ReadOutputFileFromPath` / `MaxOutputFileTokens` /
+  `LineNumberedContent` 公共 API 保留, 不影响外部 caller.
+
+### 9.6 后置项 (P2.2)
 
 - `disallowLoopExit` 跳变: `finish` 进出 schema. 频率低于 HasRecentlyUsedTools,
   本次 P2.1 不动; 若 cachebench 仍发现 finish 跳变是主要 churn 源, 再考虑

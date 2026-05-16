@@ -377,8 +377,21 @@ func TestReActLoop_Skills_LoadedContentInPrompt(t *testing.T) {
 func TestReActLoop_Skills_ChangeViewOffset(t *testing.T) {
 	vfs := filesys.NewVirtualFs()
 
+	// SKILL view window 走双模式契约 (见 aiskillloader/view_window.go):
+	//   - offset == 1 且 内容 <= ViewWindowMaxBytes (32KB) -> 全文展示, 仅 File header,
+	//     不带 Total Lines / Current Offset / 行号 / 截断 Note;
+	//   - 否则 (内容 > 32KB 或 offset > 1) -> 部分展示, 带 Total Lines /
+	//     Current Offset / 行号 / 截断 Note, 这才是 change_skill_view_offset
+	//     真正生效的场景.
+	//
+	// 这里测试名是 "ChangeViewOffset", 必须让 skill 体量超过 32KB 才能触发部分
+	// 展示路径, 否则原来 100 行 / 4KB 会落到全文展示路径, 自然不会出现 Total
+	// Lines / Current Offset.
+	//
+	// 关键词: ChangeViewOffset 测试体量调整, ViewWindowMaxBytes 32KB,
+	//        部分展示路径, Total Lines / Current Offset 元数据, 双模式契约
 	var bodyContent string
-	for i := 1; i <= 100; i++ {
+	for i := 1; i <= 1000; i++ {
 		bodyContent += "Line of content for truncation testing.\n"
 	}
 

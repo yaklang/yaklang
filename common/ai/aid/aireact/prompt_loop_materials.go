@@ -224,7 +224,15 @@ func (pm *PromptManager) NewPromptMaterials(base *reactloops.LoopPromptBaseMater
 		materials.OSArch = base.OSArch
 		materials.WorkingDir = base.WorkingDir
 		materials.WorkingDirGlance = base.WorkingDirGlance
-		materials.Workspace = strings.TrimSpace(base.OSArch+base.WorkingDir+base.WorkingDirGlance) != ""
+		// session_artifacts 不再走 ContextProviderManager / Pure Dynamic; 在
+		// 构造 materials 时直接调 RenderSessionArtifactsListing 抓取 workdir
+		// 文件清单, 后续由 renderWorkspaceBlock 嵌入 Workspace 块下方.
+		// 关键词: SessionArtifactsListing 注入, Workspace 内嵌, Pure Dynamic 反污染
+		if pm != nil && pm.react != nil && pm.react.config != nil {
+			materials.SessionArtifactsListing = aicommon.RenderSessionArtifactsListing(pm.react.config)
+		}
+		materials.Workspace = strings.TrimSpace(base.OSArch+base.WorkingDir+base.WorkingDirGlance) != "" ||
+			strings.TrimSpace(materials.SessionArtifactsListing) != ""
 	}
 
 	if input != nil {
@@ -330,35 +338,36 @@ func (pm *PromptManager) AssemblePromptPrefix(materials *aicommon.PromptMaterial
 
 func (pm *PromptManager) buildLoopPromptSectionData(base *reactloops.LoopPromptBaseMaterials, input *reactloops.LoopPromptAssemblyInput) map[string]any {
 	data := map[string]any{
-		"Nonce":              "",
-		"UserQuery":          "",
-		"TaskInstruction":    "",
-		"OutputExample":      "",
-		"Schema":             "",
-		"SkillsContext":      "",
-		"ExtraCapabilities":  "",
-		"SessionEvidence":    "",
-		"ReactiveData":       "",
-		"InjectedMemory":     "",
-		"AllowPlanAndExec":   false,
-		"AllowToolCall":      false,
-		"HasLoadCapability":  false,
-		"ShowForgeInventory": false,
-		"CurrentTime":        "",
-		"OSArch":             "",
-		"WorkingDir":         "",
-		"WorkingDirGlance":   "",
-		"Workspace":          false,
-		"AutoContext":        "",
-		"UserHistory":        "",
-		"ToolsCount":         0,
-		"TopToolsCount":      0,
-		"TopTools":           []*aitool.Tool{},
-		"HasMoreTools":       false,
-		"ToolInventory":      false,
-		"AIForgeList":        "",
-		"ForgeInventory":     false,
-		"Timeline":           "",
+		"Nonce":                   "",
+		"UserQuery":               "",
+		"TaskInstruction":         "",
+		"OutputExample":           "",
+		"Schema":                  "",
+		"SkillsContext":           "",
+		"ExtraCapabilities":       "",
+		"SessionEvidence":         "",
+		"ReactiveData":            "",
+		"InjectedMemory":          "",
+		"AllowPlanAndExec":        false,
+		"AllowToolCall":           false,
+		"HasLoadCapability":       false,
+		"ShowForgeInventory":      false,
+		"CurrentTime":             "",
+		"OSArch":                  "",
+		"WorkingDir":              "",
+		"WorkingDirGlance":        "",
+		"SessionArtifactsListing": "",
+		"Workspace":               false,
+		"AutoContext":             "",
+		"UserHistory":             "",
+		"ToolsCount":              0,
+		"TopToolsCount":           0,
+		"TopTools":                []*aitool.Tool{},
+		"HasMoreTools":            false,
+		"ToolInventory":           false,
+		"AIForgeList":             "",
+		"ForgeInventory":          false,
+		"Timeline":                "",
 	}
 	if base != nil {
 		data["Nonce"] = base.Nonce
@@ -370,7 +379,17 @@ func (pm *PromptManager) buildLoopPromptSectionData(base *reactloops.LoopPromptB
 		data["OSArch"] = base.OSArch
 		data["WorkingDir"] = base.WorkingDir
 		data["WorkingDirGlance"] = base.WorkingDirGlance
-		data["Workspace"] = strings.TrimSpace(base.OSArch+base.WorkingDir+base.WorkingDirGlance) != ""
+		// session_artifacts 已合入 Workspace 块, 这里同步把 listing 注入 data
+		// 让 legacy timeline section / 兼容路径模板都能消费; Workspace 启用
+		// 判定也跟着 listing 状态走, 避免环境为空但 artifacts 非空时被过滤掉.
+		// 关键词: SessionArtifactsListing 兼容路径注入, Workspace 启用扩展
+		var artifactsListing string
+		if pm != nil && pm.react != nil && pm.react.config != nil {
+			artifactsListing = aicommon.RenderSessionArtifactsListing(pm.react.config)
+		}
+		data["SessionArtifactsListing"] = artifactsListing
+		data["Workspace"] = strings.TrimSpace(base.OSArch+base.WorkingDir+base.WorkingDirGlance) != "" ||
+			strings.TrimSpace(artifactsListing) != ""
 		data["AutoContext"] = base.AutoContext
 		data["UserHistory"] = base.UserHistory
 		data["ToolsCount"] = base.ToolsCount
@@ -893,14 +912,32 @@ func renderSchemaBlock(schema string) string {
 	return fmt.Sprintf("响应格式输出JSON和<|TAG...|>，请遵守如下Schema ：\n\n<|SCHEMA|>\n```jsonschema\n%s\n```\n<|SCHEMA|>", schema)
 }
 
+// renderWorkspaceBlock 渲染 timeline-open 段中 Workspace 子块.
+//
+// 之前 SessionArtifacts 走 ContextProviderManager 落到 Pure Dynamic /
+// AutoContext 段, 每次 prompt build 都把 workdir 文件清单塞进 dynamic 区,
+// 干扰严重且与 OS / WorkingDir / Glance 等环境信息分离. 现在直接把
+// SessionArtifactsListing 拼到 Workspace 块下方 (## Session Artifacts 子段),
+// 与文件系统语义合一; Pure Dynamic 段 auto_context 不再含此清单.
+//
+// 启用判定: 任意 OS/Arch / WorkingDir / WorkingDirGlance / SessionArtifactsListing
+// 之一非空即整块输出, 避免环境字段全空但 artifacts 非空时被过滤掉.
+//
+// 关键词: renderWorkspaceBlock, ## Session Artifacts 子段, Workspace 内嵌,
+//
+//	Pure Dynamic 反污染, SessionArtifactsListing 注入
 func renderWorkspaceBlock(materials *reactloops.PromptPrefixMaterials) string {
 	if materials == nil {
 		return ""
 	}
-	var lines []string
-	if !materials.Workspace || (strings.TrimSpace(materials.OSArch) == "" && strings.TrimSpace(materials.WorkingDir) == "" && strings.TrimSpace(materials.WorkingDirGlance) == "") {
+	listing := strings.TrimSpace(materials.SessionArtifactsListing)
+	hasEnv := strings.TrimSpace(materials.OSArch) != "" ||
+		strings.TrimSpace(materials.WorkingDir) != "" ||
+		strings.TrimSpace(materials.WorkingDirGlance) != ""
+	if !materials.Workspace || (!hasEnv && listing == "") {
 		return ""
 	}
+	var lines []string
 	lines = append(lines, "# Workspace Context")
 	if materials.OSArch != "" {
 		lines = append(lines, "OS/Arch: "+materials.OSArch)
@@ -910,6 +947,11 @@ func renderWorkspaceBlock(materials *reactloops.PromptPrefixMaterials) string {
 	}
 	if materials.WorkingDirGlance != "" {
 		lines = append(lines, "working dir glance: "+materials.WorkingDirGlance)
+	}
+	if listing != "" {
+		lines = append(lines, "")
+		lines = append(lines, "## Session Artifacts")
+		lines = append(lines, listing)
 	}
 	return strings.Join(lines, "\n")
 }

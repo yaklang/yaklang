@@ -14,12 +14,16 @@
 
 {{ if .Workspace }}# Workspace Context
 
-工作区上下文给出 Agent 当前运行环境的"物理坐标"：操作系统 / 架构、当前工作目录的绝对路径、以及该目录顶层结构的概览（文件 / 子目录列表）。
+工作区上下文给出 Agent 当前运行环境的"物理坐标"：操作系统 / 架构、当前工作目录的绝对路径、该目录顶层结构概览，以及本会话已经累积的工件文件清单（Session Artifacts）。
 所有涉及文件读写、脚本执行工具调用，都应以下方 working dir 为锚点来构造路径；working dir glance 提供"这个目录里有什么"的快速参考，可用于判断目标文件是否已经存在、是否需要先列目录确认。
+Session Artifacts 段由历轮任务/工具产生的输出文件汇总而来（按 task 子目录分组、按修改时间倒序），仅给出文件名、大小、修改时间——不嵌入文件正文；若需查看具体内容，请通过文件读取动作显式访问。
 
 OS/Arch: {{ .OSArch }}
 {{ if .WorkingDir }}working dir: {{ .WorkingDir }}
-{{ end }}{{ if .WorkingDirGlance }}working dir glance: {{ .WorkingDirGlance }}{{ end }}{{ end }}
+{{ end }}{{ if .WorkingDirGlance }}working dir glance: {{ .WorkingDirGlance }}
+{{ end }}{{ if .SessionArtifactsListing }}
+## Session Artifacts
+{{ .SessionArtifactsListing }}{{ end }}{{ end }}
 
 {{ if .UserHistory }}
 以下 PREV_USER_INPUT 块是当前会话内用户在此前各轮的原始输入文本，按时间先后给出，用于跨回合维持上下文连贯：理解用户的真实意图、追溯尚未完成的请求、避免反复询问用户早已明确说过的信息。

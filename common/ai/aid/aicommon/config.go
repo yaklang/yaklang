@@ -510,11 +510,13 @@ func newConfig(ctx context.Context) *Config {
 		buildinaitools.WithEnableAllTools(),
 	)
 
-	// Register the session artifacts context provider.
-	// This provider scans the session's working directory on every prompt build
-	// and injects a file listing (paths, sizes, modification times) into DynamicContext,
-	// so that all subsequent AI turns can see artifacts produced by async plan/forge tasks.
-	config.ContextProviderManager.Register("session_artifacts", ArtifactsContextProvider)
+	// NOTE: session_artifacts provider is intentionally NOT registered into
+	// ContextProviderManager. Routing the artifacts listing through Pure
+	// Dynamic / AutoContext flooded the dynamic segment with file metadata
+	// every turn. The listing is now embedded directly into the Workspace
+	// block (timeline-open segment) via RenderSessionArtifactsListing, where
+	// it lives alongside OS/Arch / working dir / glance.
+	// 关键词: session_artifacts 反注册, Workspace 内嵌, Pure Dynamic 反污染
 
 	// Initialize emitter
 	config.Emitter = NewEmitter(id, func(e *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {

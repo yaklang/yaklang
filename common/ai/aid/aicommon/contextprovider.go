@@ -13,7 +13,6 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/yakgit/yakdiff"
@@ -244,28 +243,21 @@ func FileContextProvider(filePath string, userPrompt ...string) ContextProvider 
 	}
 }
 
-// OutputFileContextProvider reads a tool-produced file (up to 40KB) and renders it
-// with line numbers using utils.PrefixLinesWithLineNumbers. Designed for use with
-// RegisterTracedContent to automatically inject output file content into subsequent prompts,
-// enabling the modify_file -> re-execute fast loop.
-func OutputFileContextProvider(filePath string) ContextProvider {
-	return func(config AICallerConfigIf, emitter *Emitter, key string) (string, error) {
-		info, err := aitool.ReadOutputFileFromPath(filePath)
-		if err != nil {
-			return fmt.Sprintf("[Error: failed to read output file %s: %v]", filePath, err), err
-		}
-		var buf strings.Builder
-		buf.WriteString(fmt.Sprintf("## Output File: %s (%s)\n", filePath, formatFileSize(info.Size)))
-		if info.Size > aitool.MaxOutputFileTokens {
-			buf.WriteString(fmt.Sprintf("Note: file truncated to first %d bytes (original: %d bytes)\n", aitool.MaxOutputFileTokens, info.Size))
-		}
-		buf.WriteString("```\n")
-		buf.WriteString(info.LineNumberedContent())
-		buf.WriteString("\n```\n")
-		return buf.String(), nil
-	}
-}
-
+// OutputFileContextProvider has been removed. It used to read each
+// verification-confirmed output file (up to 40KB) and re-inject its full body
+// into Pure Dynamic / AutoContext on every prompt build via
+// RegisterTracedContent, which flooded the dynamic segment with stale file
+// contents.
+//
+// Delivery files are now recorded as a single Open Timeline entry by
+// pushDeliveryFileToTimeline (see common/ai/aid/aireact/reactloops/
+// verification_gate.go). The timeline entry contains only path / size /
+// mime / mtime; the file body is never re-injected into the prompt and can
+// be re-read on demand via existing file-read or view-window actions.
+//
+// 关键词: OutputFileContextProvider 已废弃, 交付文件 timeline 化,
+//
+//	Pure Dynamic 反污染, AutoContext 反污染
 func KnowledgeBaseContextProvider(knowledgeBaseName string, userPrompt ...string) ContextProvider {
 	return func(config AICallerConfigIf, emitter *Emitter, key string) (string, error) {
 		// 构建基本信息（即使出错也要包含）
@@ -472,27 +464,40 @@ type artifactFileEntry struct {
 	ModTime time.Time
 }
 
-// ArtifactsContextProvider scans the session's working directory (artifacts dir) and generates
-// a structured summary of all task output files. This provider is registered once and executed
-// on every prompt build, ensuring all subsequent AI turns can see the artifacts filesystem.
+// RenderSessionArtifactsListing scans the session's working directory and
+// renders a structured listing of all task output files. The output is the
+// listing **body only** (without any leading "# Session Artifacts" heading);
+// the caller is expected to wrap it under whatever heading suits its host
+// section (currently the Workspace block uses "## Session Artifacts").
 //
-// The output is limited to ArtifactsContextMaxTokens using token-based shrinking.
-func ArtifactsContextProvider(config AICallerConfigIf, emitter *Emitter, key string) (string, error) {
+// Behavior preserved from the original ArtifactsContextProvider:
+//   - Walks workdir, groups by top-level task dir, sorts by mtime desc,
+//     formats each entry with size + HH:MM:SS;
+//   - Result is shrunk to ArtifactsContextMaxTokens via ShrinkTextBlockByTokens
+//     when oversized;
+//   - Returns an empty string when there is no workdir, the dir does not
+//     exist, or there are zero files.
+//
+// 关键词: RenderSessionArtifactsListing, Session Artifacts 抽离 helper,
+//
+//	Workspace 内嵌, 8K token shrink
+func RenderSessionArtifactsListing(config AICallerConfigIf) string {
+	if config == nil {
+		return ""
+	}
 	workDir := config.GetOrCreateWorkDir()
 	if workDir == "" {
-		return "", nil
+		return ""
 	}
-
-	// Check if the directory exists
 	info, err := os.Stat(workDir)
 	if err != nil || !info.IsDir() {
-		return "", nil
+		return ""
 	}
 
 	var entries []artifactFileEntry
 	walkErr := filepath.Walk(workDir, func(path string, fi os.FileInfo, err error) error {
 		if err != nil {
-			log.Warnf("[ArtifactsContextProvider] walk error for %s: %v", path, err)
+			log.Warnf("[SessionArtifactsListing] walk error for %s: %v", path, err)
 			return nil // skip errors
 		}
 		if fi.IsDir() {
@@ -502,7 +507,7 @@ func ArtifactsContextProvider(config AICallerConfigIf, emitter *Emitter, key str
 		if err != nil {
 			relPath = path
 		}
-		log.Infof("[ArtifactsContextProvider] found file: %s", relPath)
+		log.Infof("[SessionArtifactsListing] found file: %s", relPath)
 		entries = append(entries, artifactFileEntry{
 			RelPath: relPath,
 			Size:    fi.Size(),
@@ -511,28 +516,25 @@ func ArtifactsContextProvider(config AICallerConfigIf, emitter *Emitter, key str
 		return nil
 	})
 	if walkErr != nil {
-		log.Warnf("artifacts context provider: walk error: %v", walkErr)
+		log.Warnf("session artifacts listing: walk error: %v", walkErr)
 	}
 
-	log.Infof("[ArtifactsContextProvider] total entries found: %d in workDir: %s", len(entries), workDir)
+	log.Infof("[SessionArtifactsListing] total entries found: %d in workDir: %s", len(entries), workDir)
 
 	if len(entries) == 0 {
-		return "", nil
+		return ""
 	}
 
-	// Sort entries by modification time (newest first)
 	sort.Slice(entries, func(i, j int) bool {
 		return entries[i].ModTime.After(entries[j].ModTime)
 	})
 
-	// Group entries by top-level task directory
 	taskGroups := omap.NewOrderedMap(make(map[string][]artifactFileEntry))
 	var rootFiles []artifactFileEntry
 
 	for _, e := range entries {
 		parts := strings.SplitN(e.RelPath, string(filepath.Separator), 2)
 		if len(parts) == 1 {
-			// File directly in workDir (not in a task subfolder)
 			rootFiles = append(rootFiles, e)
 		} else {
 			taskDir := parts[0]
@@ -542,25 +544,22 @@ func ArtifactsContextProvider(config AICallerConfigIf, emitter *Emitter, key str
 	}
 
 	var sb strings.Builder
-	sb.WriteString("# Session Artifacts\n")
+	// Caller owns the outer heading; this helper emits only the body.
 	sb.WriteString(fmt.Sprintf("artifacts_dir: %s\n", workDir))
 	sb.WriteString(fmt.Sprintf("total_files: %d\n\n", len(entries)))
 
-	// Write task directory groups
 	taskGroups.ForEach(func(taskDir string, files []artifactFileEntry) bool {
-		// Find the latest modification time for the group
 		var latestMod time.Time
 		for _, f := range files {
 			if f.ModTime.After(latestMod) {
 				latestMod = f.ModTime
 			}
 		}
-		sb.WriteString(fmt.Sprintf("## %s (modified: %s)\n",
+		sb.WriteString(fmt.Sprintf("### %s (modified: %s)\n",
 			taskDir,
 			latestMod.Format("2006-01-02 15:04:05"),
 		))
 		for _, f := range files {
-			// Show only the part after the task directory
 			innerPath := strings.TrimPrefix(f.RelPath, taskDir+string(filepath.Separator))
 			sb.WriteString(fmt.Sprintf("- %s (%s, %s)\n",
 				innerPath,
@@ -572,9 +571,8 @@ func ArtifactsContextProvider(config AICallerConfigIf, emitter *Emitter, key str
 		return true
 	})
 
-	// Write root-level files (if any)
 	if len(rootFiles) > 0 {
-		sb.WriteString("## [root files]\n")
+		sb.WriteString("### [root files]\n")
 		for _, f := range rootFiles {
 			sb.WriteString(fmt.Sprintf("- %s (%s, %s)\n",
 				f.RelPath,
@@ -589,7 +587,29 @@ func ArtifactsContextProvider(config AICallerConfigIf, emitter *Emitter, key str
 	if MeasureTokens(result) > ArtifactsContextMaxTokens {
 		result = ShrinkTextBlockByTokens(result, ArtifactsContextMaxTokens)
 	}
-	return result, nil
+	return result
+}
+
+// ArtifactsContextProvider is a thin wrapper around RenderSessionArtifactsListing
+// that adds the legacy "# Session Artifacts" heading expected by older callers
+// and existing tests. New code should call RenderSessionArtifactsListing
+// directly and own the heading.
+//
+// Deprecated: this provider used to be registered into ContextProviderManager
+// (which routed it into Pure Dynamic / AutoContext). That registration has
+// been removed; the listing is now embedded into the Workspace block via
+// RenderSessionArtifactsListing. The wrapper is kept only to preserve the
+// existing test surface.
+//
+// 关键词: ArtifactsContextProvider 薄壳, 兼容旧 surface,
+//
+//	Workspace 内嵌路径, 不再注册到 ContextProviderManager
+func ArtifactsContextProvider(config AICallerConfigIf, emitter *Emitter, key string) (string, error) {
+	listing := RenderSessionArtifactsListing(config)
+	if listing == "" {
+		return "", nil
+	}
+	return "# Session Artifacts\n" + listing, nil
 }
 
 // formatFileSize formats a file size in human-readable form.

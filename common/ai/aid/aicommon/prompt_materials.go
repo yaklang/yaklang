@@ -41,16 +41,23 @@ type PromptMaterials struct {
 	// Timeline 是兼容字段 (合并 frozen + open), 老 caller 仍可消费。
 	Timeline string
 
-	TimelineFrozen    string
-	TimelineOpen      string
-	CurrentTime       string
-	Workspace         bool
-	OSArch            string
-	WorkingDir        string
-	WorkingDirGlance  string
-	SessionEvidence   string
-	UserHistory       string
-	FrozenUserContext string
+	TimelineFrozen   string
+	TimelineOpen     string
+	CurrentTime      string
+	Workspace        bool
+	OSArch           string
+	WorkingDir       string
+	WorkingDirGlance string
+	// SessionArtifactsListing 是会话工件目录的结构化清单 (path / size /
+	// mtime, 按 task 分组 + mtime desc), 由 RenderSessionArtifactsListing
+	// 生成. 之前作为 ContextProviderManager 的 "session_artifacts" 注册项
+	// 落到 Pure Dynamic / AutoContext 段, 现已下沉到 Workspace 块, 与 OS /
+	// working dir / glance 一起渲染, 段位仍属 timeline-open.
+	// 关键词: SessionArtifactsListing, Workspace 内嵌, Pure Dynamic 反污染
+	SessionArtifactsListing string
+	SessionEvidence         string
+	UserHistory             string
+	FrozenUserContext       string
 }
 
 // HighStaticData 返回空 map: high-static 段是完全无变量的系统级共享 static。
@@ -143,15 +150,16 @@ func (m *PromptMaterials) TimelineOpenData() map[string]any {
 		return map[string]any{}
 	}
 	return map[string]any{
-		"TimelineOpen":     m.TimelineOpen,
-		"SessionEvidence":  m.SessionEvidence,
-		"Workspace":        m.Workspace,
-		"OSArch":           m.OSArch,
-		"WorkingDir":       m.WorkingDir,
-		"WorkingDirGlance": m.WorkingDirGlance,
-		"UserHistory":      m.UserHistory,
-		"CurrentTime":      m.CurrentTime,
-		"PlanContext":      m.FrozenUserContext,
+		"TimelineOpen":            m.TimelineOpen,
+		"SessionEvidence":         m.SessionEvidence,
+		"Workspace":               m.Workspace,
+		"OSArch":                  m.OSArch,
+		"WorkingDir":              m.WorkingDir,
+		"WorkingDirGlance":        m.WorkingDirGlance,
+		"SessionArtifactsListing": m.SessionArtifactsListing,
+		"UserHistory":             m.UserHistory,
+		"CurrentTime":             m.CurrentTime,
+		"PlanContext":             m.FrozenUserContext,
 	}
 }
 

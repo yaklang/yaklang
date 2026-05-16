@@ -3,9 +3,13 @@ package reactloops
 import (
 	"context"
 	"fmt"
+	"mime"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 const (
@@ -101,6 +105,88 @@ func (r *ReActLoop) ShouldTriggerPeriodicCheckpointOnIteration(iterationIndex in
 	return r.maxIterations > 0 && iterationIndex > 0 && iterationIndex == r.maxIterations
 }
 
+// pushDeliveryFileToTimeline records a verification-confirmed output file as
+// an Open Timeline entry. Only the file path + lightweight metadata
+// (size / mime / mtime) is written; the file body is NEVER read or sampled.
+//
+// Rationale: previously, every confirmed delivery file was wired into
+// ContextProviderManager via RegisterTracedContent + OutputFileContextProvider,
+// which re-injected the full file body (capped at 40KB) into Pure Dynamic /
+// AutoContext on EVERY subsequent prompt build. That flooded the dynamic
+// segment with stale file contents and bloated tokens regardless of whether
+// the AI actually needed them.
+//
+// New design: the only fact we want the model to remember is "such-and-such
+// file was delivered at iteration N"; the body, if needed, can be re-read on
+// demand via existing file-read / view-window actions. By going through
+// Timeline.PushText, the entry naturally rides the frozen / open / batch
+// compress lifecycle and is forgotten organically as the conversation moves on.
+//
+// 关键词: pushDeliveryFileToTimeline, [DELIVERY FILE] 极简元数据,
+//
+//	Open Timeline 自然淘汰, Pure Dynamic 反污染, AutoContext 反污染,
+//	不读取文件正文, 不采样字节
+// timelineProvider is the duck-typed interface pushDeliveryFileToTimeline
+// uses to obtain the timeline instance. *aicommon.Config already satisfies
+// it via its GetTimeline() method; tests can satisfy it with a mock that
+// returns a real *aicommon.Timeline. This keeps AICallerConfigIf untouched
+// while still letting the helper be exercised from the reactloops test pkg.
+//
+// 关键词: timelineProvider 鸭子类型, GetTimeline, 测试 mock 友好
+type timelineProvider interface {
+	GetTimeline() *aicommon.Timeline
+}
+
+func pushDeliveryFileToTimeline(cfg aicommon.AICallerConfigIf, filePath string) {
+	if cfg == nil || filePath == "" {
+		return
+	}
+	provider, ok := cfg.(timelineProvider)
+	if !ok || provider == nil {
+		log.Warnf("delivery file %s: config does not expose Timeline; skip", filePath)
+		return
+	}
+	timeline := provider.GetTimeline()
+	if timeline == nil {
+		log.Warnf("delivery file %s: Timeline instance unavailable; skip", filePath)
+		return
+	}
+
+	sizeStr := "unknown"
+	mtimeStr := "unknown"
+	if fi, err := os.Stat(filePath); err == nil {
+		sizeStr = formatDeliveryFileSize(fi.Size())
+		mtimeStr = fi.ModTime().UTC().Format(time.RFC3339)
+	} else {
+		log.Warnf("delivery file %s: stat failed (%v); recording path-only entry", filePath, err)
+	}
+
+	mimeStr := mime.TypeByExtension(filepath.Ext(filePath))
+	if mimeStr == "" {
+		mimeStr = "unknown"
+	}
+
+	text := fmt.Sprintf(
+		"[DELIVERY FILE] path=%s\nsize=%s mime=%s\nmtime=%s",
+		filePath, sizeStr, mimeStr, mtimeStr,
+	)
+	timeline.PushText(cfg.AcquireId(), text)
+}
+
+// formatDeliveryFileSize is a local copy of the size formatter used by the
+// Workspace artifacts listing, kept here to avoid pulling aicommon-internal
+// helpers across packages.
+func formatDeliveryFileSize(size int64) string {
+	switch {
+	case size >= 1024*1024:
+		return fmt.Sprintf("%.1fMB", float64(size)/(1024*1024))
+	case size >= 1024:
+		return fmt.Sprintf("%.1fKB", float64(size)/1024)
+	default:
+		return fmt.Sprintf("%dB", size)
+	}
+}
+
 // ApplyVerificationResult stores verification side effects in the loop state.
 func (r *ReActLoop) ApplyVerificationResult(result *aicommon.VerifySatisfactionResult) {
 	if r == nil || result == nil {
@@ -109,16 +195,14 @@ func (r *ReActLoop) ApplyVerificationResult(result *aicommon.VerifySatisfactionR
 
 	cfg := r.GetConfig()
 	if cfg != nil && len(result.OutputFiles) > 0 {
-		if providerManager := cfg.GetContextProviderManager(); providerManager != nil {
-			for _, filePath := range result.OutputFiles {
-				providerName := "output_file:" + filePath
-				providerManager.RegisterTracedContent(
-					providerName,
-					aicommon.OutputFileContextProvider(filePath),
-				)
-				if emitter := cfg.GetEmitter(); emitter != nil {
-					emitter.EmitPinFilename(filePath)
-				}
+		// 交付文件不再走 ContextProviderManager / Pure Dynamic; 改为 push 到
+		// Open Timeline (仅文件名 + 元数据, 不读文件正文). EmitPinFilename
+		// 仍保留, 走前端文件 pin 通道, 与 prompt 上下文无关.
+		// 关键词: 交付文件 timeline 化, AutoContext 反污染, EmitPinFilename 保留
+		for _, filePath := range result.OutputFiles {
+			pushDeliveryFileToTimeline(cfg, filePath)
+			if emitter := cfg.GetEmitter(); emitter != nil {
+				emitter.EmitPinFilename(filePath)
 			}
 		}
 	}
