@@ -46,6 +46,14 @@ var eventTypeNotSaveBlackList = []EventType{
 
 var structuredNodeIDNotSaveBlackList = []string{
 	"status",
+	// 关键词: structured system 不保存默认行为, pop_task / push_task 特例保存
+	// 之前 commit 把 "system" 从黑名单中移除并新增了 pop_task / push_task
+	// 特例分支, 但忘了恢复"默认不保存"语义, 导致所有 NodeId == "system" 的
+	// STRUCTURED 事件全部被持久化, 与 TestAiOutputEvent_ShouldSave 中
+	// "structured_system_should_not_save" 的期望相悖. 把 "system" 加回黑名单
+	// 后, saveAllowedByNodeID 中 pop_task / push_task 早返路径仍然保留特例
+	// 保存; 其余 system 节点回归默认不保存.
+	"system",
 	"react_task_cancelled",
 	"react_task_enqueue",
 	"react_task_cleared",
@@ -332,10 +340,19 @@ func (e *AiOutputEvent) saveAllowedByNodeID() bool {
 		return true
 	}
 	if e.NodeId == "system" {
-		data := make(map[string]any)
-		err := json.Unmarshal(e.Content, data)
-		if err == nil && (data["type"] == "pop_task" || data["type"] == "push_task") {
-			return true
+		// 关键词: json.Unmarshal pointer 修复, pop_task / push_task 特例保存
+		// 之前传的是 map 值而非 map 指针, 导致 json.Unmarshal 直接返回
+		// InvalidUnmarshalError, pop_task / push_task 特例永远走不到, system
+		// 节点的 push_task / pop_task 实际上不会被保存. 改为传 &data 让
+		// Unmarshal 能正确解析; 同时容忍 nil / 空 Content (不是 JSON 时直接
+		// 跳过特例, 走默认黑名单 not-save 路径).
+		var data map[string]any
+		if len(e.Content) > 0 {
+			if err := json.Unmarshal(e.Content, &data); err == nil {
+				if data["type"] == "pop_task" || data["type"] == "push_task" {
+					return true
+				}
+			}
 		}
 	}
 	return !lo.Contains(structuredNodeIDNotSaveBlackList, e.NodeId)

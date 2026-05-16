@@ -196,6 +196,27 @@ func TestAiOutputEvent_ShouldSave(t *testing.T) {
 			want:  false,
 		},
 		{
+			// 关键词: NodeId=system 特例保存路径, pop_task / push_task 必须保留
+			// 这条用例锁定 saveAllowedByNodeID 中 system + pop_task/push_task
+			// 的特例分支真实生效, 防止 json.Unmarshal pointer bug 再次回归.
+			name: "structured system with pop_task should save",
+			event: &schema.AiOutputEvent{
+				Type:    schema.EVENT_TYPE_STRUCTURED,
+				NodeId:  "system",
+				Content: []byte(`{"type":"pop_task","task":"demo"}`),
+			},
+			want: true,
+		},
+		{
+			name: "structured system with push_task should save",
+			event: &schema.AiOutputEvent{
+				Type:    schema.EVENT_TYPE_STRUCTURED,
+				NodeId:  "system",
+				Content: []byte(`{"type":"push_task","task":"demo"}`),
+			},
+			want: true,
+		},
+		{
 			name:  "structured status detail should save",
 			event: &schema.AiOutputEvent{Type: schema.EVENT_TYPE_STRUCTURED, NodeId: "status_detail"},
 			want:  true,
