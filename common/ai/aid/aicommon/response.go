@@ -467,6 +467,15 @@ func (a *AIResponse) GetOutputStreamReader(nodeId string, system bool, emitter *
 	emitter = a.BindEmitter(emitter)
 	go func() {
 		cbBuffer := bytes.NewBuffer(make([]byte, 4096))
+		// 关键词: AIResponse output stream goroutine panic 兜底
+		// 这个后台 goroutine 在测试 cleanup / config ctx 取消后仍可能在循环
+		// 发 EmitSystemStreamEvent / EmitStreamEvent. 任何 emitter 路径下游
+		// (channel send 等) 触发的 panic 都不应让整个进程退出.
+		defer func() {
+			if rec := recover(); rec != nil {
+				log.Warnf("AIResponse output stream goroutine panic recovered: %v", rec)
+			}
+		}()
 		defer func() {
 			if a.onOutputFinished != nil {
 				a.onOutputFinished(cbBuffer.String())

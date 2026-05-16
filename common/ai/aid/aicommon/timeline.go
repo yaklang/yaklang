@@ -346,8 +346,22 @@ func (m *Timeline) pushTimelineItem(ts int64, id int64, item *TimelineItem) {
 
 	// Emit timeline item asynchronously to avoid blocking when EventHandler
 	// writes to an unbuffered channel that hasn't been consumed yet
+	//
+	// 关键词: 异步 emit panic 兜底, send on closed channel 兜底, defer recover
+	// 这个匿名 goroutine 是测试 cleanup 后产生 send on closed channel panic
+	// 的高发路径之一: pushTimelineItem 在主流程已结束、outputChan 已被测试关
+	// 闭后仍可能被触发. 即便 Emitter.emit 自身已 defer recover, 这里再加一
+	// 层 recover 形成 belt-and-suspenders, 杜绝因 channel 关闭引起的进程退出.
 	if m.config != nil && m.config.GetEmitter() != nil {
-		go m.config.GetEmitter().EmitTimelineItem(item)
+		emitter := m.config.GetEmitter()
+		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					log.Warnf("Timeline async emit panic recovered: %v", r)
+				}
+			}()
+			emitter.EmitTimelineItem(item)
+		}()
 	}
 }
 

@@ -161,10 +161,20 @@ func (i *Emitter) callEventBeforeSave(event *schema.AiOutputEvent) *schema.AiOut
 }
 
 func (i *Emitter) emit(e *schema.AiOutputEvent) (finalEvent *schema.AiOutputEvent, retErr error) {
-	if err := recover(); err != nil {
-		retErr = utils.Errorf("Emitter panic: %v", err)
-		_ = retErr
-	}
+	// 关键词: Emitter panic 兜底, send on closed channel 兜底, defer recover 修复
+	// 注意: recover() 必须在 defer 函数内部调用才有效, 之前直接在函数体内调用 recover()
+	// 实际永远返回 nil, 完全形同虚设. 这是 panic: send on closed channel 长期溢出
+	// 到测试 cleanup 阶段后导致整个进程退出的根因.
+	// 现在通过 defer 包裹 recover, 把 baseEmitter / eventProcesserStack 中下游
+	// (channel send / EventHandler 回调等) 的 panic 收敛为 retErr 返回, 不再让
+	// panic 穿透到 runtime 引发进程退出.
+	defer func() {
+		if r := recover(); r != nil {
+			finalEvent = e
+			retErr = utils.Errorf("Emitter panic recovered: %v", r)
+			log.Warnf("Emitter.emit recovered panic: %v", r)
+		}
+	}()
 	if i.eventProcesserStack != nil {
 		e = i.callEventBeforeSave(e)
 	}
@@ -806,6 +816,16 @@ func (r *Emitter) emitStreamEvent(e *streamEvent) (*schema.AiOutputEvent, error)
 
 	go func() {
 		defer r.streamWG.Done()
+		// 关键词: stream emit goroutine panic 兜底, send on closed channel 兜底
+		// 异步 stream 复制 / r.emit(streamFinished) 可能在 EventHandler 监听
+		// 端 (e.g. test outputChan) 已关闭后才 fire. 即便 Emitter.emit 自身已
+		// 经 defer recover, 这里再叠一层 recover, 防止 io.Copy / producer.Write
+		// 内部某条路径绕过 emit 仍触发 send on closed channel 而让进程退出.
+		defer func() {
+			if rec := recover(); rec != nil {
+				log.Warnf("emitStreamEvent goroutine panic recovered: %v", rec)
+			}
+		}()
 		defer func() {
 			for _, f := range e.emitFinishCallback {
 				if f == nil {

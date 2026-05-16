@@ -61,7 +61,13 @@ LOOP:
 			break LOOP
 		case result := <-outputChan:
 			count++
-			if count > 500 {
+			// 关键词: count 上限放宽, ReAct + 计划评估事件量增加
+			// 历史上 500 这个上限是为旧的 plan 流程设的, 现在 ReAct 在
+			// 工具评审通过到首条 stdout/stderr stream chunk 之间会涌入
+			// timeline / iteration / pressure / ai_call_summary 等大量
+			// 事件, 旧上限会让 LOOP 在收到工具流首字节前就 break, 导致
+			// outBuffer 永远为空. 上限提到 5000 给工具流足够窗口.
+			if count > 5000 {
 				break LOOP
 			}
 			fmt.Println("result:" + result.String())

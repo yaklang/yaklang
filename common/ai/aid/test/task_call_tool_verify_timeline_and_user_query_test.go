@@ -67,7 +67,7 @@ LOOP:
 			break LOOP
 		case result := <-outputChan:
 			count++
-			if count > 500 {
+			if count > 5000 { // 关键词: count 上限放宽, ReAct 事件量增加
 				break LOOP
 			}
 
@@ -183,7 +183,7 @@ LOOP:
 			break LOOP
 		case result := <-outputChan:
 			count++
-			if count > 500 {
+			if count > 5000 { // 关键词: count 上限放宽, ReAct 事件量增加
 				break LOOP
 			}
 
