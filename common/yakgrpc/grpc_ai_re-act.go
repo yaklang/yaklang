@@ -2,7 +2,6 @@ package yakgrpc
 
 import (
 	"context"
-	"fmt"
 	"github.com/yaklang/yaklang/common/consts"
 	"sync"
 	"time"
@@ -145,6 +144,16 @@ func (s *Server) StartAIReAct(stream ypb.Yak_StartAIReActServer) error {
 	_ = currentCoordinatorId
 	var coordinatorIdOnce = new(sync.Once)
 	var sendMu sync.Mutex
+	// debugStreamPrinter 在 DEBUG=1 时把流式 delta 合并到单行，避免每个
+	// token 单独换行造成的刷屏；非流事件来临时先 FlushIfActive 收尾，让
+	// 后续 log / 普通事件都从新行开始，消除"夹心"现象。
+	// 关键词: DEBUG=1 流式输出体验, AI stream delta debug print
+	debugStreamPrinter := aicommon.GetDefaultDebugStreamPrinter()
+	// 同步把 common/log 默认输出包装上一层 flush, 让任何日志写入前先把
+	// 流缓冲刷出, 彻底消灭日志被夹在流中间的视觉混乱。
+	// 关键词: EnsureLogFlushWrapperInstalled grpc_ai_react entry
+	aicommon.EnsureLogFlushWrapperInstalled()
+
 	feedback := func(e *schema.AiOutputEvent) {
 		if e.Timestamp <= 0 {
 			e.Timestamp = time.Now().Unix() // fallback
@@ -156,10 +165,10 @@ func (s *Server) StartAIReAct(stream ypb.Yak_StartAIReActServer) error {
 		}
 
 		utils.Debug(func() {
-			if res := e.ToGRPC(); res != nil {
-				if res.IsStream {
-					fmt.Println(string(res.GetStreamDelta()))
-				}
+			if e.IsStream {
+				debugStreamPrinter.PrintStreamDelta(e)
+			} else {
+				debugStreamPrinter.FlushIfActive()
 			}
 		})
 

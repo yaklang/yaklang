@@ -28,7 +28,8 @@ import (
 //     之前对 RAG 错误的处理一致）。
 //
 // 关键词: SaveMemoryEntities 容错批量保存, 单 entity 失败不阻断后续 entity,
-//   TestReAct_ToolUse_Reject_WithAIMemory CI 偶发丢条修复
+//
+//	TestReAct_ToolUse_Reject_WithAIMemory CI 偶发丢条修复
 func (r *AIMemoryTriage) SaveMemoryEntities(entities ...*aicommon.MemoryEntity) error {
 	db := r.SafeGetDB()
 	if db == nil {

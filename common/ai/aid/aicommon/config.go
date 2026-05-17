@@ -3001,9 +3001,17 @@ func (c *Config) emitBaseHandler(e *schema.AiOutputEvent) {
 	if c.EventHandler == nil {
 		if e.IsStream {
 			if c.DebugEvent {
-				fmt.Print(string(e.StreamDelta))
+				// 走统一的 DebugStreamPrinter, 合并同流 delta 到单行、
+				// 串行化并发流、转义内嵌换行, 避免每个 token 一行刷屏。
+				// 关键词: DEBUG 流式输出 fallback, AI emit stream coalesce
+				GetDefaultDebugStreamPrinter().PrintStreamDelta(e)
 			}
 			return
+		}
+
+		// 非流事件来了, 先把可能存在的"活动流行"收尾, 避免日志夹心。
+		if c.DebugEvent {
+			GetDefaultDebugStreamPrinter().FlushIfActive()
 		}
 
 		if e.Type == schema.EVENT_TYPE_CONSUMPTION {

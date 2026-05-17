@@ -112,6 +112,11 @@ func runAIFocusCLI(c *cli.Context) error {
 		}
 	}()
 
+	// DEBUG=1 入口：把 log 默认输出包装上 flush, 让流式调试输出和日志
+	// 不再视觉打架。非 DEBUG 模式下是 no-op。
+	// 关键词: ai-focus EnsureLogFlushWrapperInstalled entry
+	aicommon.EnsureLogFlushWrapperInstalled()
+
 	// 4. AI 回调
 	aiCallback := buildAIFocusAICallback(c.String("ai-type"))
 
@@ -237,6 +242,7 @@ func buildAIFocusAICallback(aiType string) aicommon.AICallbackType {
 
 // printAIFocusEvent 把单个 AiOutputEvent 输出到 stdout。
 // json 模式：每行一个 JSON；text 模式：节点 ID + 类型 + 内容预览。
+// 关键词: yak ai-focus event print, DEBUG 流式输出
 func printAIFocusEvent(e *schema.AiOutputEvent, useJSON bool) {
 	if useJSON {
 		raw, err := json.Marshal(e)
@@ -253,13 +259,18 @@ func printAIFocusEvent(e *schema.AiOutputEvent, useJSON bool) {
 		schema.EVENT_TYPE_AI_FIRST_BYTE_COST_MS, schema.EVENT_TYPE_AI_TOTAL_COST_MS:
 		return
 	}
+	// 流式 delta 走统一的 DebugStreamPrinter, 把同流 token 合并到单行,
+	// 流切换时换行 + 头部, 避免之前每个 delta 自带 \n 造成的刷屏。
+	if e.IsStream && len(e.StreamDelta) > 0 {
+		aicommon.GetDefaultDebugStreamPrinter().PrintStreamDelta(e)
+		return
+	}
+	// 非流事件: 先把可能存在的活动流行收尾, 再打印自身, 防止"夹心"。
+	aicommon.GetDefaultDebugStreamPrinter().FlushIfActive()
+
 	prefix := fmt.Sprintf("[%s]", e.Type)
 	if e.NodeId != "" {
 		prefix += fmt.Sprintf("[%s]", e.NodeId)
-	}
-	if e.IsStream && len(e.StreamDelta) > 0 {
-		fmt.Fprintf(os.Stdout, "%s delta: %s\n", prefix, string(e.StreamDelta))
-		return
 	}
 	if len(e.Content) > 0 {
 		fmt.Fprintf(os.Stdout, "%s %s\n", prefix, string(e.Content))
