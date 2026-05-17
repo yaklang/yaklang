@@ -301,7 +301,60 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 	r.AppendVerificationHistory(result)
 	r.emitTodoListUpdate(result)
 
+	// 写一条 NEXT_MOVEMENTS delta breadcrumb 到 timeline. 这里**不写完整 TODO
+	// 快照** (那是 SessionPromptState.VerificationTodoStore 渲染到 prompt
+	// timeline-open 段的职责), 只把本轮 applied_ops 以 "OP[id]: content"
+	// 形式逐行写出, 提供:
+	//   1. 一个可被 grep / dump / 测试观察到的时间戳信号: 哪一轮 verify 改
+	//      动了 TODO;
+	//   2. 失败回放友好: 事后看 timeline 也能复原 "每轮 verify 加了哪些
+	//      next_movements / 完成了哪些" 的变更轨迹;
+	//   3. 与 evidence_ops 同位: 后者也只写一行 "OP[ID]" 的 delta, 二者形成
+	//      对偶的事件 log, 而权威全量状态分别落在
+	//      SessionPromptState.VerificationTodoStore 与 SessionEvidenceStore.
+	// 这一行不再是"重复表达全量 JSON" — 是事件 / 变更日志, 不破坏 251cb078e
+	// 重构的初衷.
+	// 关键词: NEXT_MOVEMENTS timeline delta breadcrumb, applied_ops 事件日志,
+	//        TODO 变更轨迹观察, 与 evidence_ops 同位事件流
+	r.addNextMovementsBreadcrumb(result)
+
 	return result, nil
+}
+
+// addNextMovementsBreadcrumb writes a compact one-line-per-op timeline entry
+// summarising the next_movements applied in this verification round. The
+// full TODO snapshot remains the responsibility of
+// SessionPromptState.VerificationTodoStore (rendered into the prompt's
+// timeline-open section every iteration). This breadcrumb only captures the
+// delta and is the chronological signal consumers (UI / test / log analysis)
+// rely on to answer "when was the TODO updated?".
+//
+// 关键词: addNextMovementsBreadcrumb, delta-only timeline 事件, TODO 时间戳信号
+func (r *ReAct) addNextMovementsBreadcrumb(result *aicommon.VerifySatisfactionResult) {
+	if r == nil || result == nil || len(result.NextMovements) == 0 {
+		return
+	}
+	var lines []string
+	for _, m := range result.NextMovements {
+		op := strings.ToUpper(strings.TrimSpace(m.Op))
+		if op == "" {
+			op = "ADD"
+		}
+		id := strings.TrimSpace(m.ID)
+		content := strings.TrimSpace(m.Content)
+		switch {
+		case id != "" && content != "":
+			lines = append(lines, fmt.Sprintf("%s[%s]: %s", op, id, content))
+		case id != "":
+			lines = append(lines, fmt.Sprintf("%s[%s]", op, id))
+		case content != "":
+			lines = append(lines, fmt.Sprintf("%s: %s", op, content))
+		}
+	}
+	if len(lines) == 0 {
+		return
+	}
+	r.AddToTimeline("NEXT_MOVEMENTS", strings.Join(lines, "\n"))
 }
 
 // emitTodoListUpdate publishes the post-commit TODO snapshot as a structured
