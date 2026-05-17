@@ -203,10 +203,33 @@ type ReActLoop struct {
 
 	noEndLoadingStatus bool
 
+	// scenarioToolWhitelist 是这个 loop 对 "VisibilityScenario 工具" 的拉回
+	// 名单, 由 focus mode 的 __SCENARIO_TOOLS__ dunder 或代码侧 WithScenarioToolWhitelist
+	// 显式声明. 默认 nil/空, 即不把任何 scenario 工具拉回 Tool Inventory.
+	//
+	// 仅影响默认 Tool Inventory 段的 visibility 过滤 (aicommon.FilterToolsByVisibility);
+	// 不影响 search_capabilities / require_tool / load_capability 等其他链路.
+	//
+	// 关键词: scenario tool whitelist, focus mode pull back scenario,
+	//        VisibilityScenario, Tool Inventory render-time only
+	scenarioToolWhitelist []string
+
 	// Perception layer: continuous awareness of what the user is doing,
 	// producing Topics/Keywords/Summary that dynamically adjust the
 	// possibility space throughout the loop lifecycle.
 	perception *perceptionController
+}
+
+// GetScenarioToolWhitelist 返回当前 loop 声明的 scenario 工具拉回名单.
+// nil-safe: receiver 为 nil 时返回 nil, 让 prompt 渲染入口可以无条件调用.
+// 返回值是只读副本式的 nil 或原 slice, 调用方不应修改.
+//
+// 关键词: GetScenarioToolWhitelist, nil-safe, render entry use
+func (r *ReActLoop) GetScenarioToolWhitelist() []string {
+	if r == nil {
+		return nil
+	}
+	return r.scenarioToolWhitelist
 }
 
 // AddOnReleaseHook 添加 loop 释放阶段的清理回调。多次调用按注册顺序执行。
