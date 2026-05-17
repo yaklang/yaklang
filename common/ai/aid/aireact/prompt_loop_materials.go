@@ -144,12 +144,30 @@ func (pm *PromptManager) GetLoopPromptBaseMaterials(tools []*aitool.Tool, nonce 
 	}
 
 	if allowToolCall && len(tools) > 0 {
+		// 1. 先用 GetTopToolsCount 作为"候选池上限"取出 prioritized 的前 N 个
+		//    (默认 100, 用户可用 WithTopToolsCount(N) 缩窄).
+		// 2. 再用 SelectToolsByTokenBudget 按 token 预算 (3K) 从候选池里二次裁剪,
+		//    同时保底 ToolInventoryMinCount (20) 个工具, 即便描述很长也不会
+		//    出现"Top 15 tools"那种被武断截短的局面.
+		// 3. HasMoreTools / MoreToolsCount 以"全部 tools - 实际展示"计算, 让
+		//    模板里能给出具体剩余数字, search_capabilities 提示更具象.
+		// 关键词: GetLoopPromptBaseMaterials tool budget, SelectToolsByTokenBudget,
+		//        TopToolsCount 候选池上限, 保底 20
 		topCount := pm.react.config.GetTopToolsCount()
-		topTools := pm.react.getPrioritizedTools(tools, topCount)
+		candidate := pm.react.getPrioritizedTools(tools, topCount)
+		display := aicommon.SelectToolsByTokenBudget(
+			candidate,
+			aicommon.ToolInventoryTokenBudget,
+			aicommon.ToolInventoryMinCount,
+		)
 		materials.ToolsCount = len(tools)
-		materials.TopTools = topTools
-		materials.TopToolsCount = len(topTools)
-		materials.HasMoreTools = len(tools) > len(topTools)
+		materials.TopTools = display
+		materials.TopToolsCount = len(display)
+		materials.HasMoreTools = len(tools) > len(display)
+		materials.MoreToolsCount = len(tools) - len(display)
+		if materials.MoreToolsCount < 0 {
+			materials.MoreToolsCount = 0
+		}
 	}
 
 	return materials, nil
@@ -214,6 +232,7 @@ func (pm *PromptManager) NewPromptMaterials(base *reactloops.LoopPromptBaseMater
 		materials.TopToolsCount = base.TopToolsCount
 		materials.TopTools = append([]*aitool.Tool{}, base.TopTools...)
 		materials.HasMoreTools = base.HasMoreTools
+		materials.MoreToolsCount = base.MoreToolsCount
 		materials.ForgeInventory = base.ShowForgeInventory && strings.TrimSpace(base.AIForgeList) != ""
 		materials.AIForgeList = base.AIForgeList
 
@@ -975,12 +994,31 @@ func renderWorkspaceBlock(materials *reactloops.PromptPrefixMaterials) string {
 	return strings.Join(lines, "\n")
 }
 
+// renderToolInventoryBlock 是给 observation 树 (UI / 调试) 用的镜像渲染, 必须
+// 与 frozen_block_section.txt 模板保持字节级一致, 否则面板里看到的与 LLM 真正
+// 收到的会错位. 任何模板改动都要同步本函数, 反之亦然.
+// 关键词: renderToolInventoryBlock, observation 镜像, frozen_block_section 对齐
 func renderToolInventoryBlock(materials *reactloops.PromptPrefixMaterials) string {
 	if materials == nil || !materials.ToolInventory || materials.ToolsCount <= 0 || len(materials.TopTools) == 0 {
 		return ""
 	}
 	var lines []string
-	lines = append(lines, fmt.Sprintf("# Tool Inventory\nYou have access to %d built-in tools. Top %d tools:", materials.ToolsCount, materials.TopToolsCount))
+	lines = append(lines,
+		"# Tool Inventory",
+		fmt.Sprintf("You have access to %d built-in tools. Below are %d prioritized entries selected within a token budget:", materials.ToolsCount, materials.TopToolsCount),
+		"",
+		"## Call Mode (single tool vs tool_compose)",
+		"",
+		"- 单工具入口: 一次提一个工具 + 参数, 返回后再决策下一步; 探索 / 上游不确定 / 需要逐步收紧时的默认形态.",
+		"- 工具编排入口 (tool_compose): 一次提交 >=2 节点的 DAG, 节点间显式串行依赖或天然并行, 由 caller 拓扑跑完后再观察整体结果.",
+		"- 选择原则 (与 high-static 段实验准则保持一致):",
+		"  - 默认单步. 凡是\"调一步看一眼再定下一步\"的链路一律走单工具, 不要把猜测拼成 DAG.",
+		"  - 节点 <2 / 节点之间无依赖且互相独立 / 任务目标尚不明确 / 不可逆动作 -> 走单工具.",
+		"  - 已经知道要调哪些工具 + 上游产物喂下游 (硬数据依赖) 或同质多目标 (多 URL / 多文件 / 多参数并行) -> 走 tool_compose, 单次 DAG <=5 节点, 超出拆多轮.",
+		"  - DAG 限定在当前 CURRENT-TASK 内, 不跨子任务串接; 探索阶段一律单步, 仅 EXEC 阶段才合法.",
+		"",
+		"## Prioritized Tools",
+	)
 	for _, tool := range materials.TopTools {
 		if tool == nil {
 			continue
@@ -988,7 +1026,10 @@ func renderToolInventoryBlock(materials *reactloops.PromptPrefixMaterials) strin
 		lines = append(lines, fmt.Sprintf("* `%s`: %s", tool.Name, tool.Description))
 	}
 	if materials.HasMoreTools {
-		lines = append(lines, "... use `search_capabilities` to discover more tools and related capabilities.")
+		lines = append(lines,
+			"",
+			fmt.Sprintf("> 还有 %d 个工具未列入上方清单. 不在列表中的工具 / AI 蓝图 / 技能 / Focus 模式, 通过 `search_capabilities` 按关键字检索后再加载使用.", materials.MoreToolsCount),
+		)
 	}
 	return strings.Join(lines, "\n")
 }

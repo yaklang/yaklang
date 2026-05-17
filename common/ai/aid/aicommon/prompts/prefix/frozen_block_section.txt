@@ -1,9 +1,21 @@
 {{ if .ToolInventory }}# Tool Inventory
-You have access to {{ .ToolsCount }} built-in tools. Top {{ .TopToolsCount }} tools:
+You have access to {{ .ToolsCount }} built-in tools. Below are {{ .TopToolsCount }} prioritized entries selected within a token budget:
+
+## Call Mode (single tool vs tool_compose)
+
+- 单工具入口: 一次提一个工具 + 参数, 返回后再决策下一步; 探索 / 上游不确定 / 需要逐步收紧时的默认形态.
+- 工具编排入口 (tool_compose): 一次提交 >=2 节点的 DAG, 节点间显式串行依赖或天然并行, 由 caller 拓扑跑完后再观察整体结果.
+- 选择原则 (与 high-static 段实验准则保持一致):
+  - 默认单步. 凡是"调一步看一眼再定下一步"的链路一律走单工具, 不要把猜测拼成 DAG.
+  - 节点 <2 / 节点之间无依赖且互相独立 / 任务目标尚不明确 / 不可逆动作 -> 走单工具.
+  - 已经知道要调哪些工具 + 上游产物喂下游 (硬数据依赖) 或同质多目标 (多 URL / 多文件 / 多参数并行) -> 走 tool_compose, 单次 DAG <=5 节点, 超出拆多轮.
+  - DAG 限定在当前 CURRENT-TASK 内, 不跨子任务串接; 探索阶段一律单步, 仅 EXEC 阶段才合法.
+
+## Prioritized Tools
 {{ range .TopTools }}
 * `{{ .Name }}`: {{ .Description }}
 {{ end }}{{ if .HasMoreTools }}
-... use `search_capabilities` to discover more tools and related capabilities.
+> 还有 {{ .MoreToolsCount }} 个工具未列入上方清单. 不在列表中的工具 / AI 蓝图 / 技能 / Focus 模式, 通过 `search_capabilities` 按关键字检索后再加载使用.
 {{ end }}{{ end }}
 
 {{ if .ForgeInventory }}# AI Blueprint Inventory

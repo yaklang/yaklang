@@ -30,11 +30,16 @@ type PromptMaterials struct {
 	OriginalUserInput string
 	StableInstruction string
 
-	ToolInventory  bool
-	ToolsCount     int
-	TopToolsCount  int
-	TopTools       []*aitool.Tool
-	HasMoreTools   bool
+	ToolInventory bool
+	ToolsCount    int
+	TopToolsCount int
+	TopTools      []*aitool.Tool
+	HasMoreTools  bool
+	// MoreToolsCount = ToolsCount - TopToolsCount, 即未在 prompt Top 列表中
+	// 渲染的剩余工具数量. 让模板能直接展开成具体数字 ("...still 73 more tools
+	// available via search_capabilities"), 而不是只给一个无信息的省略号.
+	// 关键词: MoreToolsCount, Tool Inventory 剩余工具数
+	MoreToolsCount int
 	ForgeInventory bool
 	AIForgeList    string
 
@@ -114,6 +119,7 @@ func (m *PromptMaterials) FrozenBlockData() map[string]any {
 		"TopToolsCount":  m.TopToolsCount,
 		"TopTools":       m.TopTools,
 		"HasMoreTools":   m.HasMoreTools,
+		"MoreToolsCount": m.MoreToolsCount,
 		"ForgeInventory": m.ForgeInventory,
 		"AIForgeList":    m.AIForgeList,
 		"TimelineFrozen": m.TimelineFrozen,
