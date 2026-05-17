@@ -47,57 +47,102 @@ func (r ReflectionLevel) String() string {
 	}
 }
 
-// shouldTriggerReflection 决定是否需要触发反思以及反思级别
+// shouldTriggerReflection 决定是否需要触发反思以及反思级别.
+//
+// 重构后语义(降噪 + 收紧):
+//   - 未启用自我反思 -> None
+//   - operator 显式设置了 ReflectionLevel -> 按 operator 透传(action 自定义优先级)
+//   - 执行失败(isTerminated && err != nil) -> Critical(同步,失败必须立即归因)
+//   - 其它情形: 只有 iteration > 5 且 SPIN 双维度命中时才返回 Standard;
+//     否则一律 None — 不再返回 Minimal, 也不再为 directly_answer/finish
+//     额外注入反思. 这样未触发 SPIN 的常规执行流不会产生任何反思事件 /
+//     timeline 噪声, 也不会调用 AI.
+//
+// 关键词: shouldTriggerReflection 重构, 只在 SPIN 触发反思, 去 Minimal 噪声
 func (r *ReActLoop) shouldTriggerReflection(
 	action *LoopAction,
 	operator *LoopActionHandlerOperator,
 	iterationCount int,
 ) ReflectionLevel {
-	// 如果未启用自我反思，直接返回 None
 	if !r.enableSelfReflection {
 		return ReflectionLevel_None
 	}
 
-	// 优先使用 action 通过 operator 设置的反思级别
+	// action 通过 operator 显式声明的反思级别优先(用于自定义 action 的关键反思需求)
 	operatorLevel := operator.GetReflectionLevel()
 	if operatorLevel != ReflectionLevel_None {
 		log.Infof("use action-defined reflection level: %s", operatorLevel.String())
 		return operatorLevel
 	}
 
-	// 检查是否执行失败
+	// 执行失败 -> 触发关键反思(同步, 用于失败归因, 必须在下一轮 prompt 前到位)
 	isTerminated, err := operator.IsTerminated()
 	if isTerminated && err != nil {
-		// 失败场景：触发关键反思
 		log.Infof("action[%s] failed, trigger critical reflection", action.ActionType)
 		return ReflectionLevel_Critical
 	}
 
-	// 内置简单动作：最小反思
-	if action.ActionType == "directly_answer" || action.ActionType == "finish" {
-		return ReflectionLevel_Minimal
+	// 其它情形: 只在 iteration > 5 且检测到 SPIN 时反思. SPIN 阈值已经提到 8
+	// (双维度判定), 实际触发非常稀疏 — 这正是我们想要的 "不干扰常规执行流"
+	if iterationCount > 5 && r.IsInSameActionTypeSpin() {
+		log.Infof("SPIN detected at iteration[%d], trigger standard reflection (async)", iterationCount)
+		return ReflectionLevel_Standard
 	}
 
-	// 高迭代次数：采用间隔反思策略减少噪声（5 次之后才开始）
-	if iterationCount > 5 {
-		// 优先检查 SPIN 情况：如果检测到 SPIN，立即触发反思
-		r.loadingStatus("是否陷入循环（SPIN）检测中... / Checking for SPIN...")
-		if r.IsInSameActionTypeSpin() {
-			log.Infof("SPIN detected at iteration[%d], trigger immediate reflection", iterationCount)
-			r.loadingStatus("检测到 SPIN 迹象，触发反思 / SPIN detected, triggering reflection...")
-			return ReflectionLevel_Standard
-		}
-
-		// 非反思轮次：仅最小反思（不调用 AI，减少噪声）
-		log.Debugf("skip AI reflection at iteration[%d], use minimal level", iterationCount)
-		return ReflectionLevel_Minimal
-	}
-
-	// 默认情况：最小反思
-	return ReflectionLevel_Minimal
+	return ReflectionLevel_None
 }
 
-// executeReflection 执行自我反思
+// MaybeExecuteReflection 是 exec.go 主循环的统一反思入口.
+//
+// 调度策略:
+//   - Critical 级别(失败归因) -> 同步阻塞执行, 因为下一轮 prompt 必须包含
+//     失败上下文才能让 AI 做合理决策.
+//   - 其它级别(主要是 SPIN 触发的 Standard) -> fire-and-forget 异步执行,
+//     主循环不等待结果, 完成后通过 invoker.AddToTimeline 让下一轮 prompt
+//     自然吸收 SPIN warning. 这样反思 AI 调用不会卡住主循环执行流, 用户也
+//     不会觉得"卡了".
+//
+// 关键词: MaybeExecuteReflection, 反思异步化, fire-and-forget,
+//
+//	Critical 同步 / Standard 异步, SPIN 不干扰执行
+func (r *ReActLoop) MaybeExecuteReflection(
+	action *LoopAction,
+	actionParams *aicommon.Action,
+	operator *LoopActionHandlerOperator,
+	reflectionLevel ReflectionLevel,
+	iterationCount int,
+	executionDuration time.Duration,
+) {
+	if reflectionLevel == ReflectionLevel_None {
+		return
+	}
+
+	// 失败归因: 必须同步, 让下一轮 prompt 立即看到失败反思
+	if reflectionLevel == ReflectionLevel_Critical {
+		r.executeReflection(action, actionParams, operator, reflectionLevel, iterationCount, executionDuration)
+		return
+	}
+
+	// 其它级别(SPIN/Standard): 异步执行, 主循环立即返回
+	r.reflectionInflight.Add(1)
+	go func() {
+		defer r.reflectionInflight.Done()
+		defer func() {
+			if rec := recover(); rec != nil {
+				log.Errorf("async reflection panic recovered for action[%s]: %v",
+					action.ActionType, rec)
+			}
+		}()
+		r.executeReflection(action, actionParams, operator, reflectionLevel, iterationCount, executionDuration)
+	}()
+}
+
+// executeReflection 执行一次反思流程(同步). 由 MaybeExecuteReflection 决定
+// 在主线程同步调用还是 goroutine 异步调用.
+//
+// 注: 调用方持有的 operator / actionParams 在 action handler 执行后即不再
+// 被主循环写入, 异步路径里安全使用. 关键词: 反思执行流, 同步实现, 不可单独
+// 在主循环里用作 fire-and-forget — 走 MaybeExecuteReflection 入口.
 func (r *ReActLoop) executeReflection(
 	action *LoopAction,
 	actionParams *aicommon.Action,
@@ -177,6 +222,7 @@ func (r *ReActLoop) collectReflectionData(
 	reflection := &ActionReflection{
 		ActionType:          action.ActionType,
 		ActionParams:        allParams,
+		ToolName:            extractToolNameFromAction(actionParams),
 		ExecutionTime:       executionDuration,
 		IterationNum:        iterationCount,
 		Success:             success,
@@ -244,19 +290,19 @@ func (r *ReActLoop) performAIReflection(ctx context.Context, reflection *ActionR
 	task := r.GetCurrentTask()
 	nonce := utils.RandStringBytes(4)
 
-	// 第一步：根据反思级别搜索相关记忆
-	relevantMemories := r.searchRelevantMemories(reflection, reflectionLevel)
-	previousReflections := r.getPreviousReflectionsContext(nonce)
-
-	// 第二步：构建反思 prompt（使用模板和 nonce 保护）
-	prompt, err := r.buildReflectionPrompt(reflection, nonce, relevantMemories, previousReflections)
+	// 反思 prompt 构建: 复用主循环 prefix cache (high-static / frozen-block /
+	// timeline-open), dynamic 段只放反思特有内容 (action 详情 + SPIN + schema).
+	// 去掉 RelevantMemories / PreviousReflections — 它们是 cache 杀手, 且 SPIN
+	// 决策的真正依据已经在 timeline-open + action 历史里覆盖.
+	// 关键词: 反思 prompt 复用 prefix cache, 去内存噪声
+	prompt, err := r.buildReflectionPrompt(reflection, nonce)
 	if err != nil {
 		log.Errorf("failed to build reflection prompt: %v", err)
 		return
 	}
 
-	log.Infof("reflection prompt built with nonce[%s], memory_size[%d], prev_reflections[%d]",
-		nonce, len(relevantMemories), strings.Count(previousReflections, "##"))
+	log.Infof("reflection prompt built with nonce[%s], prompt_bytes[%d]",
+		nonce, len(prompt))
 
 	// 第三步：使用 CallAITransaction 进行稳定的 AI 调用
 	err = aicommon.CallAITransaction(
@@ -278,13 +324,18 @@ func (r *ReActLoop) performAIReflection(ctx context.Context, reflection *ActionR
 				aicommon.WithActionAlias("self_reflection"),
 			}
 
-			// 注册字段流式处理器 - action 会自动拆解这些字段
+			// 注册字段流式处理器 - action 会自动拆解这些字段.
+			// 节点 id 改为独立的 "self-reflection-suggestions" (而非沿用主循环
+			// 的 "thought"), 让前端可以单独识别/折叠/i18n 自我反思内容, 也
+			// 不会污染主循环思考流的 UI 节点.
+			// 前缀文案统一为中文 "自我反思:", 与 i18n nodeId 文案保持一致.
+			// 关键词: 自我反思流节点 id, self-reflection-suggestions, 中文前缀
 			if !utils.IsNil(task) {
 				actionOptions = append(actionOptions, aicommon.WithActionFieldStreamHandler(
 					[]string{"suggestions"},
 					func(key string, reader io.Reader) {
 
-						r.loadingStatus("AI 自我反省中 / Loading Self-Reflection Suggestions Stream...")
+						r.loadingStatus("自我反思中 / Self-Reflection...")
 						raw, err := io.ReadAll(reader)
 						if err != nil {
 							log.Warnf("failed to read suggestions stream: %v", err)
@@ -295,11 +346,11 @@ func (r *ReActLoop) performAIReflection(ctx context.Context, reflection *ActionR
 						for _, i := range sgs {
 							pr, pw := utils.NewPipe()
 							boundEmitter.EmitDefaultStreamEvent(
-								"thought",
+								"self-reflection-suggestions",
 								pr,
 								task.GetId(),
 							)
-							pw.WriteString("- [Self-Reflection]: " + i + "\n")
+							pw.WriteString("- 自我反思: " + i + "\n")
 							pw.Close()
 						}
 					},

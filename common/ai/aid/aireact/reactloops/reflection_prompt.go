@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -13,63 +14,66 @@ import (
 //go:embed prompts/self_reflection_template.tpl
 var selfReflectionTemplate string
 
-// buildReflectionPrompt 构建反思 prompt，使用模板和 nonce 保护
+// buildReflectionPrompt 构建反思 prompt.
+//
+// 设计要点:
+//   - 反思 prompt 的"前缀"(high-static + frozen-block + timeline-open) 直接
+//     复用主循环最近一次 prompt 的对应段, 用同一套 boundary 标签 (AI_CACHE_SYSTEM /
+//     AI_CACHE_FROZEN / PROMPT_SECTION) 套回, 字节对齐, 享受 LLM provider 侧
+//     的 prefix cache 命中, 显著降低反思 AI 调用的 token 成本与首字延迟.
+//   - 反思特有内容 (action 详情 + SPIN 检测信息 + 输出 schema) 单独走 dynamic
+//     段, 用反思 goroutine 自己的 nonce 包裹, 不影响 prefix cache.
+//   - 去掉了历史的 RelevantMemories / PreviousReflections / EnvironmentalImpact
+//     大段, 减少 cache 杀手 — SPIN 决策的核心依据是 timeline-open + 最近 action
+//     历史, 这两者已经在 prefix + dynamic 段里覆盖.
+//
+// 关键词: buildReflectionPrompt, prefix cache 复用, dynamic 段隔离,
+//
+//	反思 prompt 精简
 func (r *ReActLoop) buildReflectionPrompt(
 	reflection *ActionReflection,
 	nonce string,
-	relevantMemories string,
-	previousReflections string,
 ) (string, error) {
 	schema := buildReflectionSchema()
 
-	// 准备模板数据
+	resultStatus := "SUCCESS"
+	if !reflection.Success {
+		resultStatus = "FAILED"
+	}
+
 	data := map[string]interface{}{
-		"Nonce":             nonce,
-		"ActionType":        reflection.ActionType,
-		"IterationNum":      reflection.IterationNum,
-		"ExecutionTime":     reflection.ExecutionTime.String(),
-		"ResultStatus": func() string {
-			if reflection.Success {
-				return "✓ SUCCESS"
-			}
-			return "✗ FAILED"
-		}(),
-		"ErrorMessage":      reflection.ErrorMessage,
-		"Schema":            schema,
+		"Nonce":         nonce,
+		"ActionType":    reflection.ActionType,
+		"ToolName":      reflection.ToolName,
+		"IterationNum":  reflection.IterationNum,
+		"ExecutionTime": reflection.ExecutionTime.String(),
+		"ResultStatus":  resultStatus,
+		"ErrorMessage":  reflection.ErrorMessage,
+		"Schema":        schema,
 	}
 
-	// 添加环境影响
-	if reflection.EnvironmentalImpact != nil {
-		data["EnvironmentalImpact"] = map[string]interface{}{
-			"StateChanges":    strings.Join(reflection.EnvironmentalImpact.StateChanges, ", "),
-			"SideEffects":     strings.Join(reflection.EnvironmentalImpact.SideEffects, ", "),
-			"PositiveEffects": strings.Join(reflection.EnvironmentalImpact.PositiveEffects, ", "),
-			"NegativeEffects": strings.Join(reflection.EnvironmentalImpact.NegativeEffects, ", "),
-		}
-	}
-
-	// 添加相关记忆
-	if relevantMemories != "" {
-		data["RelevantMemories"] = relevantMemories
-	}
-
-	// 添加之前的反思
-	if previousReflections != "" {
-		data["PreviousReflections"] = previousReflections
-	}
-
-	// 添加 SPIN 检测相关的数据（如果满足条件）
-	spinData := r.getSpinDetectionData()
-	if spinData != nil {
+	if spinData := r.getSpinDetectionData(); spinData != nil {
 		data["SpinDetection"] = spinData
 	}
 
-	// 使用模板渲染 prompt
-	prompt, err := utils.RenderTemplate(selfReflectionTemplate, data)
+	dynamic, err := utils.RenderTemplate(selfReflectionTemplate, data)
 	if err != nil {
 		return "", utils.Wrap(err, "render self-reflection template failed")
 	}
 
+	// 复用主循环最近一次 prompt 的 high-static / frozen-block / timeline-open
+	// 三段, 与主循环保持字节对齐. semi-dynamic 段反思场景不需要, 留空让
+	// BuildTaggedPromptSections 自然过滤.
+	highStatic, frozenBlock, timelineOpen := r.getCachedPrefixBodies()
+	prompt := aicommon.BuildTaggedPromptSections(
+		highStatic,
+		frozenBlock,
+		"", // semi-dynamic-1 (反思不需要 SkillsContext / RecentToolsCache)
+		"", // semi-dynamic-2 (反思不需要主循环的 TaskInstruction / Schema)
+		timelineOpen,
+		dynamic,
+		nonce,
+	)
 	return prompt, nil
 }
 
@@ -93,11 +97,13 @@ func (r *ReActLoop) getSpinDetectionData() map[string]interface{} {
 	copy(recentActions, r.actionHistory[historyLen-r.sameActionTypeSpinThreshold:])
 	r.actionHistoryMutex.Unlock()
 
-	// 检查是否都是相同的 Action 类型
+	// 检查是否都是相同的 ActionType + ToolName(与 IsInSameActionTypeSpin 双维度对齐)
+	// 关键词: 反思 prompt 双维度过滤
 	firstActionType := recentActions[0].ActionType
+	firstToolName := recentActions[0].ToolName
 	allSameType := true
 	for _, action := range recentActions {
-		if action.ActionType != firstActionType {
+		if action.ActionType != firstActionType || action.ToolName != firstToolName {
 			allSameType = false
 			break
 		}
@@ -126,7 +132,10 @@ func (r *ReActLoop) getSpinDetectionData() map[string]interface{} {
 		actionsText.WriteString("\n")
 	}
 
-	escalationLevel := r.consecutiveSpinWarnings + 1 // next level after this detection
+	r.spinCounterMu.Lock()
+	currentSpinWarning := r.consecutiveSpinWarnings
+	r.spinCounterMu.Unlock()
+	escalationLevel := currentSpinWarning + 1 // next level after this detection
 	if escalationLevel < 1 {
 		escalationLevel = 1
 	}
@@ -135,8 +144,9 @@ func (r *ReActLoop) getSpinDetectionData() map[string]interface{} {
 		"RecentActionsText": actionsText.String(),
 		"TimelineContent":   timelineContent,
 		"ActionType":        firstActionType,
+		"ToolName":          firstToolName,
 		"ConsecutiveCount":  len(recentActions),
-		"SpinWarningCount":  r.consecutiveSpinWarnings,
+		"SpinWarningCount":  currentSpinWarning,
 		"EscalationLevel":   escalationLevel,
 	}
 }
@@ -177,26 +187,3 @@ func buildReflectionSchema() string {
 	return schema
 }
 
-// getPreviousReflectionsContext 获取之前反思的上下文
-func (r *ReActLoop) getPreviousReflectionsContext(nonce string) string {
-	history := r.GetReflectionHistory()
-	if len(history) == 0 {
-		return ""
-	}
-
-	// 只取最近 3 次反思
-	start := 0
-	if len(history) > 3 {
-		start = len(history) - 3
-	}
-
-	recentReflections := history[start:]
-
-	var buf strings.Builder
-	for _, reflection := range recentReflections {
-		buf.WriteString(reflection.Dump(nonce))
-		buf.WriteString("\n")
-	}
-
-	return buf.String()
-}

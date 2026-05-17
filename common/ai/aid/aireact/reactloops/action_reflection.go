@@ -16,6 +16,11 @@ type ActionReflection struct {
 	Success       bool                   `json:"success"`
 	ErrorMessage  string                 `json:"error_message,omitempty"`
 
+	// ToolName 实际调用的工具名 (与 ActionRecord.ToolName 同源), 反思 prompt
+	// 用于让 AI 区分 "同 action type 不同 tool" 与真正的同质重复.
+	// 关键词: ActionReflection.ToolName, SPIN 反思工具区分
+	ToolName string `json:"tool_name,omitempty"`
+
 	// 环境影响
 	EnvironmentalImpact *EnvironmentalImpact `json:"environmental_impact,omitempty"`
 

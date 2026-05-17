@@ -28,6 +28,15 @@ var verifyCount int
 var iterationMutex sync.Mutex
 
 // mockedSelfReflectionToolCalling mocks AI responses for self-reflection test
+//
+// 注意: 反思 prompt 现在会复用主循环的 high-static/frozen-block/timeline-open
+// 三段做 prefix cache 复用, 所以 "self-reflection prompt" 里会包含主循环 schema
+// (含 require_tool/directly_answer/request_plan_and_execution 关键词).
+// mock 的匹配顺序必须先识别 SELF_REFLECTION_TASK, 再识别主循环 decision, 否则
+// 会把反思请求误判成主循环 decision 返回错误的 JSON.
+//
+// 同时, SPIN 触发阈值默认改成 8 (双维度 ActionType+ToolName), 所以要让 SPIN 命中
+// 必须连续返回 >= 8 次同样 require_tool + 同样 tool 名, 之后再 finish.
 func mockedSelfReflectionToolCalling(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, toolName string) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
 
@@ -45,17 +54,37 @@ func mockedSelfReflectionToolCalling(i aicommon.AICallerConfigIf, req *aicommon.
 		"USER_INPUT",
 		"SELF_REFLECTION_TASK",
 		"ACTION_DETAILS",
-		"ENVIRONMENTAL_IMPACT",
-		"RELEVANT_MEMORIES",
-		"PREVIOUS_REFLECTIONS",
-		"ANALYSIS_REQUIREMENTS",
+		"SPIN_DETECTION",
+		"OUTPUT_SCHEMA",
 	)
 	if nonce == "" {
 		// Use default nonce for mock responses when extraction fails
 		nonce = "test123"
 	}
 
-	// Mock decision to call tool - continue until we reach 7 iterations (> 5)
+	// Mock self-reflection AI analysis (CRITICAL FOR REFLECTION TEST).
+	// 必须放在最前面, 因为反思 prompt 由于复用主循环 prefix 缓存会包含
+	// require_tool / directly_answer 等主循环 schema 关键词, 后面的主循环 mock 分支
+	// 会误命中. 用最特异的 SELF_REFLECTION_TASK 标签优先匹配.
+	if strings.Contains(prompt, "SELF_REFLECTION_TASK") ||
+		utils.MatchAllOfSubString(prompt, "自我反思任务", "suggestions") {
+		rsp := i.NewAIResponse()
+		// Generate a simplified reflection response (all fields optional now)
+		reflectionJSON := fmt.Sprintf(`{
+  "@action": "self_reflection",
+  "suggestions": [
+    "工具执行模式需要参数验证 (nonce: %s)",
+    "多次迭代表明有优化空间，考虑为重复调用实现缓存机制"
+  ]
+}`, nonce)
+		rsp.EmitOutputStream(bytes.NewBufferString(reflectionJSON))
+		rsp.Close()
+		return rsp, nil
+	}
+
+	// Mock decision to call tool - continue until we reach 10 iterations (>= 8 to trigger SPIN
+	// at default threshold). After SPIN triggers (iter > 5 && consecutive >= 8), reflection
+	// will be fired asynchronously.
 	if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") {
 		iterationMutex.Lock()
 		iterationCount++
@@ -63,15 +92,16 @@ func mockedSelfReflectionToolCalling(i aicommon.AICallerConfigIf, req *aicommon.
 		iterationMutex.Unlock()
 
 		rsp := i.NewAIResponse()
-		// Continue iterating until we've done 7 iterations
-		if currentIter < 7 {
+		// Continue iterating until we've done 10 iterations (so SPIN fires at iter 8/9 with
+		// the new default threshold of 8 same-action-type + same-tool-name).
+		if currentIter < 10 {
 			rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "` + toolName + `" },
 "human_readable_thought": "Iteration ` + fmt.Sprintf("%d", currentIter) + `: continuing to test multi-iteration reflection trigger", 
 "cumulative_summary": "..cumulative summary for iteration ` + fmt.Sprintf("%d", currentIter) + `.."}
 `))
 		} else {
-			// After 7 iterations, finish
+			// After 10 iterations, finish
 			rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "finish", 
 "human_readable_thought": "Completed ` + fmt.Sprintf("%d", currentIter) + ` iterations, finishing test", 
@@ -90,25 +120,6 @@ func mockedSelfReflectionToolCalling(i aicommon.AICallerConfigIf, req *aicommon.
 		return rsp, nil
 	}
 
-	// Mock self-reflection AI analysis (CRITICAL FOR REFLECTION TEST)
-	// 注意：字段现在都是可选的，可以返回简化的响应
-	if utils.MatchAllOfSubString(prompt, "自我反思", "suggestions") ||
-		utils.MatchAllOfSubString(prompt, "SELF-REFLECTION", "suggestions") ||
-		utils.MatchAllOfSubString(prompt, "自我反思任务") {
-		rsp := i.NewAIResponse()
-		// Generate a simplified reflection response (all fields optional now)
-		reflectionJSON := fmt.Sprintf(`{
-  "@action": "self_reflection",
-  "suggestions": [
-    "工具执行模式需要参数验证 (nonce: %s)",
-    "多次迭代表明有优化空间，考虑为重复调用实现缓存机制"
-  ]
-}`, nonce)
-		rsp.EmitOutputStream(bytes.NewBufferString(reflectionJSON))
-		rsp.Close()
-		return rsp, nil
-	}
-
 	// Mock verification - keep iterating until we've done enough iterations
 	if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
 		iterationMutex.Lock()
@@ -117,11 +128,11 @@ func mockedSelfReflectionToolCalling(i aicommon.AICallerConfigIf, req *aicommon.
 		iterationMutex.Unlock()
 
 		rsp := i.NewAIResponse()
-		// Only mark as satisfied after 7 verifications (one per iteration)
-		if currentVerify < 7 {
-			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": false, "reasoning": "Still need more iterations for testing (` + fmt.Sprintf("%d", currentVerify) + `/7)"}`))
+		// Only mark as satisfied after 10 verifications (one per iteration)
+		if currentVerify < 10 {
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": false, "reasoning": "Still need more iterations for testing (` + fmt.Sprintf("%d", currentVerify) + `/10)"}`))
 		} else {
-			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "Completed 7 iterations for reflection test"}`))
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "Completed 10 iterations for reflection test"}`))
 		}
 		rsp.Close()
 		return rsp, nil
@@ -322,11 +333,13 @@ LOOP:
 				reflectionDetected = true
 			}
 
-			// Early break: if we've seen reflection and >= 7 tool calls, we're done
+			// Early break: if we've seen reflection and >= 9 tool calls, we're done.
+			// 9 tool calls means we've executed enough require_tool actions to trigger SPIN
+			// at the default threshold of 8 (iter > 5 && consecutive >= 8).
 			toolCallMutex.Lock()
 			currentToolCalls := toolCallCount
 			toolCallMutex.Unlock()
-			if reflectionDetected && currentToolCalls >= 7 {
+			if reflectionDetected && currentToolCalls >= 9 {
 				t.Logf("Early termination: reflection detected and %d tool calls completed", currentToolCalls)
 				break LOOP
 			}
@@ -348,8 +361,10 @@ LOOP:
 	}
 	close(in)
 
-	// Give memory system minimal time to process
-	time.Sleep(500 * time.Millisecond)
+	// Give memory system and async self-reflection goroutines minimal time to process.
+	// Reflection is now fire-and-forget, so we need a small grace period for the inflight
+	// reflection AI call and its timeline write to settle before assertions.
+	time.Sleep(1200 * time.Millisecond)
 
 	t.Log("---------- VERIFICATION PHASE ----------")
 

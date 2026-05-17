@@ -390,8 +390,8 @@ func WithEnableSelfReflection(enable ...bool) ReActLoopOption {
 }
 
 // WithSameActionTypeSpinThreshold 设置相同任务自旋阈值
-// 当连续执行相同 Action 类型的次数达到此阈值时，触发 SPIN 检测
-// 默认值为 3
+// 当连续执行"相同 ActionType + 相同 ToolName"的次数达到此阈值时,触发 SPIN 检测
+// 默认值为 8(从历史的 3 提到 8,降低误触发频率,只在长时间真的卡住时才介入)
 func WithSameActionTypeSpinThreshold(threshold int) ReActLoopOption {
 	return func(r *ReActLoop) {
 		if threshold > 0 {
@@ -401,8 +401,8 @@ func WithSameActionTypeSpinThreshold(threshold int) ReActLoopOption {
 }
 
 // WithSameLogicSpinThreshold 设置相同逻辑自旋阈值
-// 当连续执行相同 Action 类型的次数达到此阈值时，使用 AI 进行深度 SPIN 检测
-// 默认值为 3
+// 当连续执行"相同 ActionType + 相同 ToolName"次数达到此阈值时,使用 AI 进行深度 SPIN 检测
+// 默认值为 8(与简单检测阈值对齐)
 func WithSameLogicSpinThreshold(threshold int) ReActLoopOption {
 	return func(r *ReActLoop) {
 		if threshold > 0 {

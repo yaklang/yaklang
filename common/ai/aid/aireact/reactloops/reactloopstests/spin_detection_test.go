@@ -12,6 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 // TestIsInSameActionTypeSpin 测试 IsInSameActionTypeSpin 方法
@@ -51,6 +52,9 @@ func TestIsInSameActionTypeSpin(t *testing.T) {
 			t.Fatalf("ExecuteAction failed at iteration %d: %v", i+1, err)
 		}
 	}
+
+	// 等待异步自我反思 goroutine 完成
+	loop.WaitForInflightReflections()
 
 	// 检查是否检测到 SPIN
 	isSpinning := loop.IsInSameActionTypeSpin()
@@ -186,6 +190,10 @@ func TestIsInSameLogicSpinWithAI(t *testing.T) {
 	if err != nil && err != context.DeadlineExceeded {
 		t.Fatalf("Execute failed: %v", err)
 	}
+
+	// 等待异步自我反思 goroutine 完成,以便后续断言反思历史/时间线写入.
+	// 关键词: 异步反思等待, 测试可观测
+	loop.WaitForInflightReflections()
 
 	// 检查 Timeline 中是否有 logic_spin_warning
 	// 由于 Timeline 是通过 invoker.AddToTimeline 添加的，我们需要检查
@@ -335,6 +343,8 @@ func TestSpinDetectionWithDifferentActions(t *testing.T) {
 		t.Fatalf("Execute failed: %v", err)
 	}
 
+	loop.WaitForInflightReflections()
+
 	// 不应该检测到 SPIN（因为 Action 类型不同，交替执行）
 	isSpinning := loop.IsInSameActionTypeSpin()
 	if isSpinning {
@@ -457,6 +467,9 @@ func TestSelfReflectionInvoked(t *testing.T) {
 		t.Fatalf("Execute failed: %v", err)
 	}
 
+	// 等待异步自我反思 goroutine 完成,以便后续断言反思历史/时间线写入.
+	loop.WaitForInflightReflections()
+
 	// 验证 SPIN 被检测到
 	isSpinning := loop.IsInSameActionTypeSpin()
 	if !isSpinning {
@@ -573,6 +586,8 @@ func TestIsInSpinTrustsAINotSpinning(t *testing.T) {
 	if err != nil && err != context.DeadlineExceeded {
 		t.Fatalf("Execute failed: %v", err)
 	}
+
+	loop.WaitForInflightReflections()
 
 	// 验证：因为 AI 始终返回 is_spinning=false + is_task_progressing=true，
 	// spin 计数应该被持续清零，timeline 中不应出现 logic_spin_warning
@@ -737,6 +752,8 @@ func TestIsTaskProgressingResetsSpinCounter(t *testing.T) {
 		t.Fatalf("Execute failed: %v", err)
 	}
 
+	loop.WaitForInflightReflections()
+
 	// 验证 is_task_progressing=true 的反思出现后，spin 警告 timeline 中不会持续累积
 	// 通过检查反思历史中存在 IsTaskProgressing=true 的记录
 	reflectionHistory := loop.GetReflectionHistory()
@@ -865,6 +882,8 @@ func TestSpinThresholdNoLongerForcesExit(t *testing.T) {
 	if err != nil && err != context.DeadlineExceeded {
 		t.Fatalf("Execute failed unexpectedly: %v", err)
 	}
+
+	loop.WaitForInflightReflections()
 
 	mu.Lock()
 	totalIter := iterCount
@@ -1156,5 +1175,336 @@ func TestSelfReflectionThenSpin(t *testing.T) {
 
 	if !hasSpinReflection {
 		t.Error("Expected to find at least one reflection with IsSpinning=true, but none was found")
+	}
+}
+
+// TestSpinDetectionSameActionTypeDifferentTool 验证 SPIN 双维度判定 (ActionType+ToolName):
+// 即使 ActionType 都相同, 只要 ToolName 不同, 也不应触发 SPIN.
+// 这是从旧版"只比 ActionType"误判到新版"ActionType+ToolName"双维度判定的关键回归测试.
+//
+// 实现要点: 注册一个自定义 action "fake_tool_call", action 参数里带 "tool_name"
+// 字段; 每次 AI 返回的 tool_name 都不同. extractToolNameFromAction 会用
+// tool_name 字段填充 ActionRecord.ToolName.
+//
+// 关键词: SPIN 双维度回归测试, 同 ActionType 不同 ToolName 不触发
+func TestSpinDetectionSameActionTypeDifferentTool(t *testing.T) {
+	var aiCallCount int
+	var mu sync.Mutex
+	testActionName := "fake_tool_call"
+	toolNames := []string{"tool-a", "tool-b", "tool-c", "tool-d"}
+
+	aiCallback := func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		mu.Lock()
+		aiCallCount++
+		callNum := aiCallCount
+		mu.Unlock()
+
+		rsp := i.NewAIResponse()
+		prompt := req.GetPrompt()
+
+		if strings.Contains(prompt, "verify-satisfaction") || strings.Contains(prompt, "user_satisfied") {
+			rsp.EmitOutputStream(strings.NewReader(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "ok"}`))
+			rsp.Close()
+			return rsp, nil
+		}
+		if strings.Contains(prompt, "SELF_REFLECTION_TASK") {
+			rsp.EmitOutputStream(strings.NewReader(`{"@action": "self_reflection"}`))
+			rsp.Close()
+			return rsp, nil
+		}
+		if callNum > len(toolNames) {
+			rsp.EmitOutputStream(strings.NewReader(`{"@action": "finish", "answer": "done"}`))
+			rsp.Close()
+			return rsp, nil
+		}
+		// 关键: ActionType 都是 fake_tool_call, ToolName 每次不同 (通过 tool_name 字段).
+		actionJSON := fmt.Sprintf(
+			`{"@action": "%s", "tool_name": "%s", "iteration": %d}`,
+			testActionName, toolNames[callNum-1], callNum,
+		)
+		rsp.EmitOutputStream(strings.NewReader(actionJSON))
+		rsp.Close()
+		return rsp, nil
+	}
+
+	framework := NewActionTestFrameworkEx(
+		t,
+		"spin-different-tool-test",
+		[]reactloops.ReActLoopOption{
+			reactloops.WithSameActionTypeSpinThreshold(2), // 显式低阈值, 旧逻辑会误触发
+			reactloops.WithEnableSelfReflection(true),
+		},
+		[]aicommon.ConfigOption{
+			aicommon.WithAICallback(aiCallback),
+			aicommon.WithAgreePolicy(aicommon.AgreePolicyYOLO),
+			aicommon.WithAIAutoRetry(1),
+			aicommon.WithAITransactionAutoRetry(1),
+		},
+	)
+
+	loop := framework.GetLoop()
+
+	framework.RegisterTestAction(
+		testActionName,
+		"Fake tool call action; tool_name varies between iterations",
+		nil,
+		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
+			op.Continue()
+		},
+	)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 9*time.Second)
+	defer cancel()
+
+	err := loop.Execute("spin-diff-tool", ctx, "Testing dual-dimension spin requires same tool name")
+	if err != nil && err != context.DeadlineExceeded {
+		t.Fatalf("Execute failed: %v", err)
+	}
+
+	loop.WaitForInflightReflections()
+
+	history := loop.GetAllExistedActionRecord()
+	t.Logf("action history length: %d", len(history))
+	for idx, rec := range history {
+		t.Logf("  [%d] ActionType=%q ToolName=%q", idx, rec.ActionType, rec.ToolName)
+	}
+
+	// 关键断言: 同 ActionType 不同 ToolName 不应触发 SPIN.
+	if loop.IsInSameActionTypeSpin() {
+		t.Error("FAIL: IsInSameActionTypeSpin returned true for actions with different tool names")
+	} else {
+		t.Log("PASS: dual-dimension spin detection correctly ignored different tool names")
+	}
+}
+
+// TestSpinDetectionSameActionTypeSameTool 验证 SPIN 双维度判定:
+// 当连续 N 次执行"同 ActionType + 同 ToolName" 达到阈值时, SPIN 应该被检测到.
+//
+// 关键词: SPIN 双维度命中, 同 ActionType 同 ToolName 触发
+func TestSpinDetectionSameActionTypeSameTool(t *testing.T) {
+	var aiCallCount int
+	var mu sync.Mutex
+	testActionName := "fake_tool_call_same"
+	const sameToolName = "echo_tool"
+
+	aiCallback := func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		mu.Lock()
+		aiCallCount++
+		callNum := aiCallCount
+		mu.Unlock()
+
+		rsp := i.NewAIResponse()
+		prompt := req.GetPrompt()
+
+		if strings.Contains(prompt, "verify-satisfaction") || strings.Contains(prompt, "user_satisfied") {
+			rsp.EmitOutputStream(strings.NewReader(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "ok"}`))
+			rsp.Close()
+			return rsp, nil
+		}
+		if strings.Contains(prompt, "SELF_REFLECTION_TASK") {
+			rsp.EmitOutputStream(strings.NewReader(`{"@action": "self_reflection"}`))
+			rsp.Close()
+			return rsp, nil
+		}
+		if callNum > 4 {
+			rsp.EmitOutputStream(strings.NewReader(`{"@action": "finish", "answer": "done"}`))
+			rsp.Close()
+			return rsp, nil
+		}
+		actionJSON := fmt.Sprintf(
+			`{"@action": "%s", "tool_name": "%s", "iteration": %d}`,
+			testActionName, sameToolName, callNum,
+		)
+		rsp.EmitOutputStream(strings.NewReader(actionJSON))
+		rsp.Close()
+		return rsp, nil
+	}
+
+	framework := NewActionTestFrameworkEx(
+		t,
+		"spin-same-tool-test",
+		[]reactloops.ReActLoopOption{
+			reactloops.WithSameActionTypeSpinThreshold(3),
+			reactloops.WithEnableSelfReflection(true),
+		},
+		[]aicommon.ConfigOption{
+			aicommon.WithAICallback(aiCallback),
+			aicommon.WithAgreePolicy(aicommon.AgreePolicyYOLO),
+			aicommon.WithAIAutoRetry(1),
+			aicommon.WithAITransactionAutoRetry(1),
+		},
+	)
+
+	loop := framework.GetLoop()
+
+	framework.RegisterTestAction(
+		testActionName,
+		"Fake tool call action; tool_name stays constant",
+		nil,
+		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
+			op.Continue()
+		},
+	)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 9*time.Second)
+	defer cancel()
+
+	err := loop.Execute("spin-same-tool", ctx, "Testing dual-dimension spin triggers on same action+tool")
+	if err != nil && err != context.DeadlineExceeded {
+		t.Fatalf("Execute failed: %v", err)
+	}
+
+	loop.WaitForInflightReflections()
+
+	history := loop.GetAllExistedActionRecord()
+	t.Logf("action history length: %d", len(history))
+	for idx, rec := range history {
+		t.Logf("  [%d] ActionType=%q ToolName=%q", idx, rec.ActionType, rec.ToolName)
+	}
+
+	// 行为断言: action 历史里至少存在连续 3 条同质 (ActionType + ToolName) 记录.
+	// 双维度判定要求在循环执行中真的连发同质动作.
+	maxStreak := 0
+	curStreak := 0
+	for _, rec := range history {
+		if rec.ActionType == testActionName && rec.ToolName == sameToolName {
+			curStreak++
+			if curStreak > maxStreak {
+				maxStreak = curStreak
+			}
+		} else {
+			curStreak = 0
+		}
+	}
+	if maxStreak < 3 {
+		t.Errorf("FAIL: expected at least 3 consecutive same action+tool actions, got max streak %d", maxStreak)
+	} else {
+		t.Logf("PASS: max streak of same action+tool = %d, dual-dim spin triggers", maxStreak)
+	}
+}
+
+// TestSelfReflectionNoSpinNoEvent 验证降噪: 连续 < 阈值 次同动作不触发 SPIN,
+// 也就不应该触发反思 (历史为空, timeline 没有反思事件), 主循环也不应被阻塞.
+//
+// 关键词: 反思降噪, 非 SPIN 不触发, fire-and-forget
+func TestSelfReflectionNoSpinNoEvent(t *testing.T) {
+	var aiCallCount int
+	var mu sync.Mutex
+	var spuriousReflection int
+	testActionName := "noop_action"
+
+	aiCallback := func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		mu.Lock()
+		aiCallCount++
+		callNum := aiCallCount
+		mu.Unlock()
+
+		rsp := i.NewAIResponse()
+		prompt := req.GetPrompt()
+
+		if strings.Contains(prompt, "verify-satisfaction") || strings.Contains(prompt, "user_satisfied") {
+			rsp.EmitOutputStream(strings.NewReader(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "ok"}`))
+			rsp.Close()
+			return rsp, nil
+		}
+		// 反思 prompt 不应该被触发. 如果触发了记录失败计数.
+		if strings.Contains(prompt, "SELF_REFLECTION_TASK") {
+			mu.Lock()
+			spuriousReflection++
+			mu.Unlock()
+			rsp.EmitOutputStream(strings.NewReader(`{"@action": "self_reflection"}`))
+			rsp.Close()
+			return rsp, nil
+		}
+		// 只执行 5 次 (< 默认阈值 8), 然后 finish.
+		if callNum > 5 {
+			rsp.EmitOutputStream(strings.NewReader(`{"@action": "finish", "answer": "done"}`))
+			rsp.Close()
+			return rsp, nil
+		}
+		actionJSON := fmt.Sprintf(`{"@action": "%s", "iteration": %d}`, testActionName, callNum)
+		rsp.EmitOutputStream(strings.NewReader(actionJSON))
+		rsp.Close()
+		return rsp, nil
+	}
+
+	framework := NewActionTestFrameworkEx(
+		t,
+		"no-spin-no-event-test",
+		[]reactloops.ReActLoopOption{
+			// 用默认阈值 (8), 显式不设, 验证降噪默认行为
+			reactloops.WithEnableSelfReflection(true),
+		},
+		[]aicommon.ConfigOption{
+			aicommon.WithAICallback(aiCallback),
+			aicommon.WithAgreePolicy(aicommon.AgreePolicyYOLO),
+			aicommon.WithAIAutoRetry(1),
+			aicommon.WithAITransactionAutoRetry(1),
+		},
+	)
+
+	loop := framework.GetLoop()
+
+	framework.RegisterTestAction(
+		testActionName,
+		"Plain noop action that just continues",
+		nil,
+		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
+			op.Continue()
+		},
+	)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 9*time.Second)
+	defer cancel()
+
+	start := time.Now()
+	err := loop.Execute("no-spin-no-event", ctx, "Testing that non-SPIN iterations produce no reflection noise")
+	if err != nil && err != context.DeadlineExceeded {
+		t.Fatalf("Execute failed: %v", err)
+	}
+	elapsed := time.Since(start)
+	t.Logf("Execute completed in %v", elapsed)
+
+	loop.WaitForInflightReflections()
+
+	mu.Lock()
+	spurious := spuriousReflection
+	mu.Unlock()
+	if spurious > 0 {
+		t.Errorf("FAIL: reflection AI was called %d time(s) although SPIN should not have triggered (iter=5 < threshold=8)", spurious)
+	} else {
+		t.Log("PASS: reflection AI was not called for sub-threshold iterations")
+	}
+
+	// 反思历史必须为空 (没有任何反思被触发).
+	reflectionHistory := loop.GetReflectionHistory()
+	if len(reflectionHistory) != 0 {
+		t.Errorf("FAIL: expected empty reflection history, got %d entries", len(reflectionHistory))
+		for _, r := range reflectionHistory {
+			t.Logf("  unexpected reflection: action=%q iter=%d level=%q",
+				r.ActionType, r.IterationNum, r.ReflectionLevel)
+		}
+	} else {
+		t.Log("PASS: no reflection generated for sub-threshold iterations")
+	}
+
+	// Timeline 不应该出现反思事件 (REFLECTION / critical-reflection).
+	reactIns := framework.reactInstance
+	if react, ok := reactIns.(*aireact.ReAct); ok {
+		config := react.GetConfig()
+		if config != nil {
+			if cfg, ok := config.(interface{ GetTimeline() *aicommon.Timeline }); ok {
+				timeline := cfg.GetTimeline()
+				if timeline != nil {
+					outputs := timeline.ToTimelineItemOutputLastN(200)
+					for _, output := range outputs {
+						if strings.Contains(output.Type, "reflection") {
+							t.Errorf("FAIL: found reflection event in timeline (type=%q content=%q) — should be suppressed",
+								output.Type, utils.ShrinkString(output.Content, 100))
+						}
+					}
+				}
+			}
+		}
 	}
 }
