@@ -93,12 +93,81 @@ func (g *TimelineGroups) IntervalMinutes() int {
 
 // GroupByMinutes 等价于 GroupByMinutesAndBytes(minutes, m.getEffectiveBucketByteSize())：
 // 在绝对时间桶之上叠加默认字节子桶（除非 SetTimelineBucketByteSize 为负关闭）。
-// 关键词: GroupByMinutes, GroupByMinutesAndBytes 别名
+// 若 Timeline 设置了 BucketSizer (SetTimelineBucketSizer), sizer 优先于固定 budget,
+// 同一时间桶内按 sizer.NextBudget(ctx) 决策 flush 时机。
+// 关键词: GroupByMinutes, GroupByMinutesAndBytes 别名, BucketSizer 接入
 func (m *Timeline) GroupByMinutes(minutes int) *TimelineGroups {
 	if m == nil || minutes <= 0 {
 		return &TimelineGroups{intervalMinutes: 0}
 	}
+	if m.bucketSizer != nil {
+		return m.groupByMinutesWithSizer(minutes, m.bucketSizer)
+	}
 	return m.GroupByMinutesAndBytes(minutes, m.getEffectiveBucketByteSize())
+}
+
+// groupByMinutesWithSizer 用动态 sizer 决策每个 flush 临界的桶大小。
+// 关键词: groupByMinutesWithSizer, 动态桶切分
+func (m *Timeline) groupByMinutesWithSizer(minutes int, sizer BucketSizer) *TimelineGroups {
+	if m == nil || minutes <= 0 || sizer == nil {
+		return &TimelineGroups{intervalMinutes: 0}
+	}
+	if m.idToTimelineItem == nil || m.idToTimelineItem.Len() == 0 {
+		return m.collectReducerGroups(minutes, nil)
+	}
+	intervalDur := time.Duration(minutes) * time.Minute
+
+	type calBucket struct {
+		start, end time.Time
+		items      []*TimelineItem
+	}
+	nanoOrder := make([]int64, 0)
+	nanoToCal := make(map[int64]*calBucket)
+	ids := m.idToTimelineItem.Keys()
+	for _, id := range ids {
+		item, ok := m.idToTimelineItem.Get(id)
+		if !ok || item == nil || item.deleted {
+			continue
+		}
+		var t time.Time
+		if !item.createdAt.IsZero() {
+			t = item.createdAt
+		} else if ts, ok2 := m.idToTs.Get(id); ok2 && ts > 0 {
+			t = time.Unix(0, ts*int64(time.Millisecond))
+		} else {
+			continue
+		}
+		bucketStart := alignToBucket(t, minutes)
+		nano := bucketStart.UnixNano()
+		cb, ok := nanoToCal[nano]
+		if !ok {
+			cb = &calBucket{
+				start: bucketStart,
+				end:   bucketStart.Add(intervalDur),
+				items: nil,
+			}
+			nanoToCal[nano] = cb
+			nanoOrder = append(nanoOrder, nano)
+		}
+		cb.items = append(cb.items, item)
+	}
+	sort.SliceStable(nanoOrder, func(i, j int) bool {
+		return nanoOrder[i] < nanoOrder[j]
+	})
+
+	var orderedBuckets []*TimelineIntervalBlock
+	for _, nano := range nanoOrder {
+		cb := nanoToCal[nano]
+		if cb == nil || len(cb.items) == 0 {
+			continue
+		}
+		subs := packTimelineIntervalSubBlocksWithSizer(cb.start, cb.end, minutes, cb.items, sizer)
+		orderedBuckets = append(orderedBuckets, subs...)
+	}
+	if len(orderedBuckets) > 0 {
+		orderedBuckets[len(orderedBuckets)-1].Open = true
+	}
+	return m.collectReducerGroups(minutes, orderedBuckets)
 }
 
 // GroupByMinutesAndBytes 按 N 分钟绝对时间桶分组，并在同一日历桶内按 bytesPerBucket 切分子桶。
@@ -275,6 +344,107 @@ func packTimelineIntervalSubBlocks(bs, be time.Time, intervalMinutes int, items 
 			continue
 		}
 		if int64(curBytes+entCont) > bytesPerBucket {
+			flush()
+			cur = []*TimelineItem{item}
+			curBytes = hl + timelineEntryAppendByteLen(item, bs, true)
+			continue
+		}
+		cur = append(cur, item)
+		curBytes += entCont
+	}
+	flush()
+
+	n := len(out)
+	for i := range out {
+		out[i].SeqInBucket = i
+		out[i].TotalInBucket = n
+	}
+	return out
+}
+
+// packTimelineIntervalSubBlocksWithSizer 与 packTimelineIntervalSubBlocks 等价,
+// 但每次决定是否 flush 时通过 sizer.NextBudget(ctx) 重新询问预算。
+// 这让 sizer 可以根据"当前桶累积字节 / item 数 / 时间剩余"动态决策。
+//
+// 单条 item 超过当次 budget 时仍按原规则独占一个子桶 (不在 entry 内部切)。
+//
+// 关键词: packTimelineIntervalSubBlocksWithSizer, 动态切桶
+func packTimelineIntervalSubBlocksWithSizer(bs, be time.Time, intervalMinutes int, items []*TimelineItem, sizer BucketSizer) []*TimelineIntervalBlock {
+	if len(items) == 0 {
+		return nil
+	}
+	if sizer == nil {
+		return packTimelineIntervalSubBlocks(bs, be, intervalMinutes, items, TimelineDumpDefaultBucketByteSize)
+	}
+	hl := intervalBlockHeaderByteLen(bs, be, intervalMinutes)
+	var out []*TimelineIntervalBlock
+	var cur []*TimelineItem
+	var curBytes int
+	// recentEntrySamples 用于让 sizer 看到最近若干 entry 的平均字节
+	const recentN = 8
+	var recentSizes []int
+
+	flush := func() {
+		if len(cur) == 0 {
+			return
+		}
+		blk := &TimelineIntervalBlock{
+			BucketStart:     bs,
+			BucketEnd:       be,
+			IntervalMinutes: intervalMinutes,
+			Items:           append([]*TimelineItem(nil), cur...),
+			Open:            false,
+		}
+		out = append(out, blk)
+		cur = nil
+		curBytes = 0
+	}
+
+	for _, item := range items {
+		if item == nil || item.deleted {
+			continue
+		}
+		entFirst := timelineEntryAppendByteLen(item, bs, true)
+		entCont := timelineEntryAppendByteLen(item, bs, false)
+
+		// 更新最近样本
+		recentSizes = append(recentSizes, entFirst)
+		if len(recentSizes) > recentN {
+			recentSizes = recentSizes[len(recentSizes)-recentN:]
+		}
+		meanRecent := 0
+		if len(recentSizes) > 0 {
+			sum := 0
+			for _, s := range recentSizes {
+				sum += s
+			}
+			meanRecent = sum / len(recentSizes)
+		}
+
+		nextAt := bs
+		if !item.createdAt.IsZero() {
+			nextAt = item.createdAt
+		}
+		budget := sizer.NextBudget(BucketSizerContext{
+			IntervalMinutes:      intervalMinutes,
+			BucketStart:          bs,
+			BucketEnd:            be,
+			NextItemCreatedAt:    nextAt,
+			CurrentBucketBytes:   curBytes,
+			CurrentBucketItems:   len(cur),
+			RecentEntryMeanBytes: meanRecent,
+		})
+		if budget <= 0 {
+			// sizer 表态"不切", 这里把单次 budget 设为很大值, 保证不 flush
+			budget = 1 << 31
+		}
+
+		if len(cur) == 0 {
+			cur = []*TimelineItem{item}
+			curBytes = hl + entFirst
+			continue
+		}
+		if int64(curBytes+entCont) > budget {
 			flush()
 			cur = []*TimelineItem{item}
 			curBytes = hl + timelineEntryAppendByteLen(item, bs, true)

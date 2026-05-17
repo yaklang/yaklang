@@ -49,6 +49,13 @@ type Timeline struct {
 	// 关键词: bucketByteSize, 字节子桶, prefix cache
 	bucketByteSize int64
 
+	// bucketSizer 为动态桶大小决策器。非 nil 时优先于 bucketByteSize, 在
+	// 同一时间桶内按 sizer 提供的 budget 做切分; 为 nil 时退回固定 budget 路径,
+	// 与原行为字节完全等价。该字段仅影响 GroupByMinutes(public 别名) 路径,
+	// 显式调用 GroupByMinutesAndBytes(N, X) 时仍走传统固定值 (向后兼容)。
+	// 关键词: bucketSizer, 动态桶大小, 主动缓存调优
+	bucketSizer BucketSizer
+
 	compressing *utils.Once
 }
 
@@ -63,10 +70,29 @@ func (m *Timeline) OrderInsertTs(ts int64, item *TimelineItem) {
 // MaxTimelineSaveSize is the maximum size (1.5MB storage limit) for timeline data when saving to database
 const MaxTimelineSaveSize = 1536 * 1024
 
-// TimelineDumpDefaultBucketByteSize 是 Dump / GroupByMinutes 默认的字节子桶上限（16KB）。
+// TimelineDumpDefaultBucketByteSize 是 Dump / GroupByMinutes 默认的字节子桶上限（64KB）。
 // 用于在同一绝对时间桶内进一步切块，避免短时巨量 tool 输出拖垮单个 open 桶的前缀缓存。
-// 关键词: TimelineDumpDefaultBucketByteSize, 字节子桶默认
-const TimelineDumpDefaultBucketByteSize = 16 * 1024
+//
+// **调优历史 (2026-05)**: 默认值从 16KB 调整为 64KB。
+// 原因: dashscope/qwen 实测 "不存在部分命中 + 增量建块" (见 TONGYI_CACHE_REPORT.md
+// §4.12), frozen 段每变化一次, 整段 user1 需按 125% cache_creation 计费重建。
+// 桶切得越小, 同一时间桶内触发 flush 越多, cache_create 次数越多。
+// 离线重放实验 (见 TIMELINE_BUCKET_TUNING.md) 在真实 session (90 events) 上显示:
+//   - 16K 默认: net_cost = -1.99M (基线)
+//   - 64K 默认: net_cost = -3.12M (省 1.13M, 提升 56%)
+// 在密集工具场景 (dense_tools, 20 events / 3 min):
+//   - 16K 默认: net_cost = +127K (亏损)
+//   - 64K 默认: net_cost = -215K (转亏为盈)
+// 64K 在所有测过的场景里都 ≥ 16K, 不存在劣化。
+//
+// 关键词: TimelineDumpDefaultBucketByteSize, 字节子桶默认, 主动缓存调优, 64K
+const TimelineDumpDefaultBucketByteSize = 64 * 1024
+
+// TimelineDumpLegacyBucketByteSize 是 2026-05 调优前的旧默认值 (16KB)。
+// 仅作历史标记保留: 老 fixture 测试 / 显式回滚场景可以引用该常量明示语义,
+// 避免与新默认 (64KB) 混淆。生产代码不应直接使用。
+// 关键词: TimelineDumpLegacyBucketByteSize, 16K 旧默认
+const TimelineDumpLegacyBucketByteSize = 16 * 1024
 
 func (m *Timeline) Save(db *gorm.DB, persistentId string) {
 	if utils.IsNil(m) {
@@ -182,6 +208,7 @@ func (m *Timeline) CopyReducibleTimelineWithMemory() *Timeline {
 		perDumpContentLimit:   m.perDumpContentLimit,
 		totalDumpContentLimit: m.totalDumpContentLimit,
 		bucketByteSize:        m.bucketByteSize,
+		bucketSizer:           m.bucketSizer,
 		compressing:           utils.NewOnce(),
 	}
 	return tl
@@ -217,6 +244,7 @@ func (m *Timeline) CreateSubTimeline(ids ...int64) *Timeline {
 	}
 	tl.ai = m.ai
 	tl.bucketByteSize = m.bucketByteSize
+	tl.bucketSizer = m.bucketSizer
 	for _, id := range ids {
 		ts, ok := m.idToTs.Get(id)
 		if !ok {
@@ -307,6 +335,30 @@ func (m *Timeline) getEffectiveBucketByteSize() int64 {
 		return TimelineDumpDefaultBucketByteSize
 	}
 	return m.bucketByteSize
+}
+
+// SetTimelineBucketSizer 设置动态桶大小决策器, 影响 GroupByMinutes 默认路径。
+// 传入 nil 等价于禁用动态算法, 退回 SetTimelineBucketByteSize / 默认常量。
+//
+// 与 SetTimelineBucketByteSize 的关系: 二者并存, sizer 优先级更高 (非 nil 时
+// 覆盖固定 byteSize)。显式调用 GroupByMinutesAndBytes(N, X) 仍走固定值,
+// 不被 sizer 影响, 用于老路径与单测兼容。
+//
+// 关键词: SetTimelineBucketSizer, 动态桶大小配置, 主动缓存
+func (m *Timeline) SetTimelineBucketSizer(sizer BucketSizer) {
+	if m == nil {
+		return
+	}
+	m.bucketSizer = sizer
+}
+
+// GetTimelineBucketSizer 返回当前已设置的 sizer (可能为 nil)。
+// 关键词: GetTimelineBucketSizer
+func (m *Timeline) GetTimelineBucketSizer() BucketSizer {
+	if m == nil {
+		return nil
+	}
+	return m.bucketSizer
 }
 
 func (m *Timeline) setAICaller(ai AICaller) {
