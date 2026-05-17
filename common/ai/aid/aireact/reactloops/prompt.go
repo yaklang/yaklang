@@ -42,6 +42,9 @@ func renderRecentToolRoutingHint() string {
 //go:embed prompts/session_evidence.txt
 var sessionEvidenceTemplate string
 
+//go:embed prompts/todo_list.txt
+var todoListTemplate string
+
 func (r *ReActLoop) generateSchemaString(disallowExit bool) (string, error) {
 	// loop
 	// build in code
@@ -235,6 +238,23 @@ func (r *ReActLoop) generateLoopPrompt(
 		}
 	}
 
+	// 全局 TODO 块: 与 SessionEvidence 同处 timeline-open 段, 物理位置紧跟
+	// SessionEvidence 之后. 任何 loop iteration 都能看到, 不再受限于 Verify
+	// 调用时机. 数据源是 SessionPromptState 的 VerificationTodoStore, 由
+	// VerifyUserSatisfaction 通过 ApplyVerificationTodoOps 增量写入.
+	// 关键词: TodoSnapshot 渲染, timeline-open 全局可见, SessionPromptState
+	var todoSnapshot string
+	if todoContent := r.config.GetVerificationTodoRendered(); todoContent != "" {
+		todoSnapshot, err = utils.RenderTemplate(todoListTemplate, map[string]any{
+			"Nonce": nonce,
+			"Todo":  todoContent,
+		})
+		if err != nil {
+			log.Warnf("render todo list template failed: %v", err)
+			todoSnapshot = ""
+		}
+	}
+
 	// CACHE_TOOL_CALL 块的渲染. 整段都用稳定 nonce
 	// aicommon.RecentToolCacheStableNonce, 让该段跨 turn 字节稳定; 物理位置从
 	// dynamic/REFLECTION 迁到 semi-dynamic 段 (经 LoopPromptAssemblyInput.
@@ -267,18 +287,19 @@ func (r *ReActLoop) generateLoopPrompt(
 	}
 
 	result, err := r.invoker.AssembleLoopPrompt(tools, &LoopPromptAssemblyInput{
-		Nonce:                nonce,
-		UserQuery:            userInput,
-		FrozenUserContext:    frozenUserContext,
-		TaskInstruction:      persistent,
-		OutputExample:        outputExample,
-		Schema:               schema,
-		SkillsContext:        skillsContext,
-		ExtraCapabilities:    extraCapabilities,
-		SessionEvidence:      sessionEvidence,
-		ReactiveData:         reactiveData,
-		InjectedMemory:   memory,
-		RecentToolsCache: recentToolsCacheBlock,
+		Nonce:             nonce,
+		UserQuery:         userInput,
+		FrozenUserContext: frozenUserContext,
+		TaskInstruction:   persistent,
+		OutputExample:     outputExample,
+		Schema:            schema,
+		SkillsContext:     skillsContext,
+		ExtraCapabilities: extraCapabilities,
+		SessionEvidence:   sessionEvidence,
+		TodoSnapshot:      todoSnapshot,
+		ReactiveData:      reactiveData,
+		InjectedMemory:    memory,
+		RecentToolsCache:  recentToolsCacheBlock,
 	})
 	if err != nil {
 		return "", utils.Wrap(err, "assemble loop prompt failed")

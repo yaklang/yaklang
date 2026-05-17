@@ -2620,6 +2620,48 @@ func (c *Config) ApplySessionEvidenceOps(ops []EvidenceOperation) {
 	}
 }
 
+// GetVerificationTodoRendered returns the rendered TODO snapshot for the
+// current session, suitable for prompt injection (loop prompt timeline-open
+// section). Returns empty string when no TODO has been tracked yet.
+//
+// 关键词: GetVerificationTodoRendered, prompt 注入, 全局 TODO
+func (c *Config) GetVerificationTodoRendered() string {
+	return c.GetSessionPromptState().GetVerificationTodoRendered()
+}
+
+// ApplyVerificationTodoOps applies one verification round's next_movements to
+// the persisted TODO store. When the persistent session id is configured, the
+// resulting JSON is also flushed to DB (TODO persistence hooks may be added
+// later — for now this only updates the in-memory SessionPromptState).
+//
+// 关键词: ApplyVerificationTodoOps, Verify 写入, SessionPromptState 同步
+func (c *Config) ApplyVerificationTodoOps(satisfied bool, movements []VerifyNextMovement) {
+	if c == nil {
+		return
+	}
+	// 即便没有 movements, satisfied=true 也可能触发 SKIPPED 状态转换；故不 early-return.
+	c.GetSessionPromptState().ApplyVerificationTodoOps(satisfied, movements)
+}
+
+// GetVerificationTodoMarkdownDelta returns the markdown snapshot computed
+// against the current state without mutating it. Use this when you need the
+// delta markers (new / done / deleted / skipped) for a markdown stream emitted
+// BEFORE you commit the ops via ApplyVerificationTodoOps.
+func (c *Config) GetVerificationTodoMarkdownDelta(satisfied bool, movements []VerifyNextMovement) string {
+	return c.GetSessionPromptState().GetVerificationTodoMarkdownDelta(satisfied, movements)
+}
+
+// SnapshotVerificationTodoItems returns a deep-copied slice of the current
+// TODO items, intended for structured event payloads.
+func (c *Config) SnapshotVerificationTodoItems() []VerificationTodoItem {
+	return c.GetSessionPromptState().SnapshotVerificationTodoItems()
+}
+
+// GetVerificationTodoStats returns aggregated TODO stats.
+func (c *Config) GetVerificationTodoStats() VerificationTodoStats {
+	return c.GetSessionPromptState().GetVerificationTodoStats()
+}
+
 // FlushRestoredSessionEvidence persists the in-memory session evidence (restored from
 // a previous runtime) to the current runtime's DB row. This must be called after
 // the runtime DB row is created, because restorePersistentSession runs before row creation.

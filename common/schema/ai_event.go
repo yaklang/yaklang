@@ -213,6 +213,31 @@ const (
 	// Payload includes the notification type, content, and display duration.
 	EVENT_TYPE_NOTIFY EventType = "notify"
 	EVENT_TYPE_API_REQUEST_FAILED EventType = "api_request_failed"
+
+	// EVENT_TYPE_TODO_LIST_UPDATE emits the full structured TODO list snapshot
+	// after one verification round commits its next_movements to the shared
+	// SessionPromptState. The frontend uses this to render a persistent TODO
+	// panel that stays visible across loop iterations (not only during Verify
+	// markdown streaming).
+	//
+	// Payload schema:
+	//   {
+	//     "items": [
+	//       {"id":"...","content":"...","status":"PENDING|DOING|DONE|DELETED|SKIPPED",
+	//        "created_at":<int>,"updated_at":<int>}
+	//     ],
+	//     "stats": {"pending":N,"doing":N,"done":N,"deleted":N,"skipped":N},
+	//     "applied_ops": [
+	//       {"op":"add","id":"...","content":"..."},
+	//       {"op":"done","id":"..."}
+	//     ],
+	//     "satisfied": <bool>,
+	//     "iteration_index": <int>,
+	//     "task_id": "..."
+	//   }
+	//
+	// 关键词: EVENT_TYPE_TODO_LIST_UPDATE, 全局 TODO 事件, 结构化前端通道
+	EVENT_TYPE_TODO_LIST_UPDATE EventType = "todo_list_update"
 )
 
 type AiOutputEvent struct {

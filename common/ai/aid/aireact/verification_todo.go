@@ -6,72 +6,79 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/ai/ytoken"
-	"github.com/yaklang/yaklang/common/utils"
 )
 
-// verificationTodoSnapshotLimit is measured in tokens (not bytes).
-const verificationTodoSnapshotLimit = 10 * 1024
-
-type verificationTodoStatus string
+// Type / constant aliases keep the old aireact-local symbol surface
+// intact so in-package tests can keep referencing them without churn.
+// Real logic lives in aicommon.VerificationTodoStore.
+//
+// 关键词: aireact <-> aicommon TODO 兼容层, 类型别名, 字符串别名
+type verificationTodoStatus = aicommon.VerificationTodoStatus
 
 const (
-	verificationTodoStatusPending verificationTodoStatus = "PENDING"
-	verificationTodoStatusDoing   verificationTodoStatus = "DOING"
-	verificationTodoStatusDone    verificationTodoStatus = "DONE"
-	verificationTodoStatusDeleted verificationTodoStatus = "DELETED"
-	verificationTodoStatusSkipped verificationTodoStatus = "SKIPPED"
+	verificationTodoStatusPending = aicommon.VerificationTodoStatusPending
+	verificationTodoStatusDoing   = aicommon.VerificationTodoStatusDoing
+	verificationTodoStatusDone    = aicommon.VerificationTodoStatusDone
+	verificationTodoStatusDeleted = aicommon.VerificationTodoStatusDeleted
+	verificationTodoStatusSkipped = aicommon.VerificationTodoStatusSkipped
 )
 
-type verificationTodoStats struct {
-	Pending int
-	Doing   int
-	Done    int
-	Deleted int
-	Skipped int
-}
+type verificationTodoStats = aicommon.VerificationTodoStats
+type verificationTodoItem = aicommon.VerificationTodoItem
 
-type verificationTodoItem struct {
-	ID        string
-	Content   string
-	Status    verificationTodoStatus
-	CreatedAt int
-	UpdatedAt int
-}
+// verificationTodoSnapshotLimit is measured in tokens (not bytes). Re-exported
+// here for backward-compatible test references.
+const verificationTodoSnapshotLimit = aicommon.VerificationTodoSnapshotLimit
 
+// AppendVerificationHistory commits one verification round's
+// next_movements (and the round's satisfied flag) into the shared
+// SessionPromptState TODO store. The TODO list is then visible to the loop
+// prompt (timeline-open section) on every subsequent iteration, not only
+// inside the next Verify call.
+//
+// 关键词: AppendVerificationHistory, SessionPromptState 写入,
+//
+//	Loop prompt TODO 可见性, 全局 TODO
 func (r *ReAct) AppendVerificationHistory(result *aicommon.VerifySatisfactionResult) {
 	if r == nil || result == nil {
 		return
 	}
-	r.verificationHistoryMutex.Lock()
-	defer r.verificationHistoryMutex.Unlock()
-	cloned := &aicommon.VerifySatisfactionResult{
-		Satisfied:          result.Satisfied,
-		Reasoning:          result.Reasoning,
-		CompletedTaskIndex: result.CompletedTaskIndex,
-		NextMovements:      append([]aicommon.VerifyNextMovement(nil), result.NextMovements...),
+	if r.config == nil {
+		return
 	}
-	r.verificationHistory = append(r.verificationHistory, cloned)
+	r.config.ApplyVerificationTodoOps(result.Satisfied, result.NextMovements)
 }
 
+// RenderVerificationTodoSnapshot returns the plain-text TODO snapshot built
+// from the shared SessionPromptState store. When the store is empty the
+// caller-friendly placeholder "- no tracked TODO items" is returned (the
+// caller can choose to suppress empty blocks itself).
 func (r *ReAct) RenderVerificationTodoSnapshot() string {
-	if r == nil {
+	if r == nil || r.config == nil {
 		return "- no tracked TODO items"
 	}
-	r.verificationHistoryMutex.Lock()
-	history := append([]*aicommon.VerifySatisfactionResult(nil), r.verificationHistory...)
-	r.verificationHistoryMutex.Unlock()
-	return renderVerificationTodoSnapshot(history)
+	rendered := r.config.GetVerificationTodoRendered()
+	if rendered == "" {
+		return "- no tracked TODO items"
+	}
+	return rendered
 }
 
+// RenderVerificationTodoMarkdownSnapshot returns the markdown snapshot used by
+// the verification markdown stream (with delta markers like (new) / (done)).
+// `current` is the not-yet-committed verification result; the function computes
+// the snapshot AS IF `current` were applied, leaving the underlying state
+// untouched.
 func (r *ReAct) RenderVerificationTodoMarkdownSnapshot(current *aicommon.VerifySatisfactionResult) string {
-	if r == nil {
+	if r == nil || r.config == nil {
 		return ""
 	}
-	r.verificationHistoryMutex.Lock()
-	history := append([]*aicommon.VerifySatisfactionResult(nil), r.verificationHistory...)
-	r.verificationHistoryMutex.Unlock()
-	return renderVerificationTodoMarkdownSnapshot(history, current)
+	if current == nil {
+		// preserve old behaviour: when nothing new is supplied, still surface
+		// the current full snapshot via the markdown formatter.
+		return r.config.GetVerificationTodoMarkdownDelta(false, nil)
+	}
+	return r.config.GetVerificationTodoMarkdownDelta(current.Satisfied, current.NextMovements)
 }
 
 func (r *ReAct) RenderVerificationOutputFilesMarkdown(outputFiles []string) string {
@@ -81,315 +88,70 @@ func (r *ReAct) RenderVerificationOutputFilesMarkdown(outputFiles []string) stri
 	return renderVerificationOutputFilesMarkdown(outputFiles)
 }
 
+// renderVerificationTodoSnapshot is kept as a package-local shim so existing
+// aireact tests (verification_todo_test.go) can keep operating on a
+// VerifySatisfactionResult history slice. It rebuilds a fresh
+// VerificationTodoStore by applying each history entry sequentially, then
+// renders.
+//
+// 关键词: renderVerificationTodoSnapshot 兼容层, history -> store
 func renderVerificationTodoSnapshot(history []*aicommon.VerifySatisfactionResult) string {
-	items, _ := buildVerificationTodoItemsAndStats(history)
-	if len(items) == 0 {
+	store := buildVerificationTodoStoreFromHistory(history)
+	if store.IsEmpty() {
 		return "- no tracked TODO items"
 	}
-
-	pending := make([]verificationTodoItem, 0)
-	doing := make([]verificationTodoItem, 0)
-	closed := make([]verificationTodoItem, 0)
-	for _, item := range items {
-		if item.Status == verificationTodoStatusPending {
-			pending = append(pending, item)
-			continue
-		}
-		if item.Status == verificationTodoStatusDoing {
-			doing = append(doing, item)
-			continue
-		}
-		closed = append(closed, item)
-	}
-
-	lines := make([]string, 0, len(items)+1)
-	for index := len(doing) - 1; index >= 0; index-- {
-		lines = append(lines, formatVerificationTodoLine(doing[index]))
-	}
-	for index := len(pending) - 1; index >= 0; index-- {
-		lines = append(lines, formatVerificationTodoLine(pending[index]))
-	}
-	for index := len(closed) - 1; index >= 0; index-- {
-		lines = append(lines, formatVerificationTodoLine(closed[index]))
-	}
-
-	note := "- NOTE: TODO history exceeded 10K tokens; older closed items were truncated because this ReAct chain is too long. Prioritize finishing or dropping stale TODOs."
-	if ytoken.CalcTokenCount(strings.Join(lines, "\n")) <= verificationTodoSnapshotLimit {
-		return strings.Join(lines, "\n")
-	}
-
-	truncated := make([]string, 0, len(lines))
-	currentTokens := 0
-	for _, line := range lines {
-		lineTokens := ytoken.CalcTokenCount(line)
-		separatorTokens := 0
-		if len(truncated) > 0 {
-			separatorTokens = 1
-		}
-		if currentTokens+separatorTokens+lineTokens > verificationTodoSnapshotLimit-ytoken.CalcTokenCount(note)-1 {
-			break
-		}
-		truncated = append(truncated, line)
-		currentTokens += separatorTokens + lineTokens
-	}
-	truncated = append(truncated, note)
-	return strings.Join(truncated, "\n")
+	return store.Render()
 }
 
 func renderVerificationTodoMarkdownSnapshot(history []*aicommon.VerifySatisfactionResult, current *aicommon.VerifySatisfactionResult) string {
-	previousItems, _ := buildVerificationTodoItemsAndStats(history)
-	previousIDs := make(map[string]struct{}, len(previousItems))
-	for _, item := range previousItems {
-		previousIDs[item.ID] = struct{}{}
+	store := buildVerificationTodoStoreFromHistory(history)
+	if current == nil {
+		return store.RenderMarkdownDelta(false, nil)
 	}
-
-	if current != nil {
-		history = append(append([]*aicommon.VerifySatisfactionResult(nil), history...), current)
-	}
-	items, _ := buildVerificationTodoItemsAndStats(history)
-	if len(items) == 0 {
-		return ""
-	}
-
-	currentNewIDs := make(map[string]struct{})
-	currentDoneIDs := make(map[string]struct{})
-	if current != nil {
-		for _, movement := range current.NextMovements {
-			id := strings.TrimSpace(movement.ID)
-			if id == "" {
-				continue
-			}
-			switch strings.ToLower(strings.TrimSpace(movement.Op)) {
-			case "add":
-				if _, exists := previousIDs[id]; !exists {
-					currentNewIDs[id] = struct{}{}
-				}
-			case "done":
-				currentDoneIDs[id] = struct{}{}
-			}
-		}
-	}
-
-	oldPending := make([]string, 0)
-	doingItems := make([]string, 0)
-	newPending := make([]string, 0)
-	oldDone := make([]string, 0)
-	currentDone := make([]string, 0)
-	deleted := make([]string, 0)
-	skipped := make([]string, 0)
-
-	for _, item := range items {
-		switch item.Status {
-		case verificationTodoStatusPending:
-			if _, isNew := currentNewIDs[item.ID]; isNew {
-				newPending = append(newPending, formatVerificationTodoMarkdownLine(item, "new"))
-			} else {
-				oldPending = append(oldPending, formatVerificationTodoMarkdownLine(item, ""))
-			}
-		case verificationTodoStatusDoing:
-			doingItems = append(doingItems, formatVerificationTodoMarkdownLine(item, "doing"))
-		case verificationTodoStatusDone:
-			if _, isDone := currentDoneIDs[item.ID]; isDone {
-				currentDone = append(currentDone, formatVerificationTodoMarkdownLine(item, "done"))
-			} else {
-				oldDone = append(oldDone, formatVerificationTodoMarkdownLine(item, ""))
-			}
-		case verificationTodoStatusDeleted:
-			deleted = append(deleted, formatVerificationTodoMarkdownLine(item, "deleted"))
-		case verificationTodoStatusSkipped:
-			skipped = append(skipped, formatVerificationTodoMarkdownLine(item, "skipped"))
-		}
-	}
-
-	lines := append([]string{}, doingItems...)
-	lines = append(lines, oldPending...)
-	lines = append(lines, newPending...)
-	lines = append(lines, oldDone...)
-	lines = append(lines, currentDone...)
-	lines = append(lines, deleted...)
-	lines = append(lines, skipped...)
-
-	note := "- [x] (truncated) TODO snapshot exceeded 10K tokens; older items were omitted to keep the view stable."
-	if ytoken.CalcTokenCount(strings.Join(lines, "\n")) <= verificationTodoSnapshotLimit {
-		return strings.Join(lines, "\n")
-	}
-
-	truncated := make([]string, 0, len(lines))
-	currentTokens := 0
-	for _, line := range lines {
-		lineTokens := ytoken.CalcTokenCount(line)
-		separatorTokens := 0
-		if len(truncated) > 0 {
-			separatorTokens = 1
-		}
-		if currentTokens+separatorTokens+lineTokens > verificationTodoSnapshotLimit-ytoken.CalcTokenCount(note)-1 {
-			break
-		}
-		truncated = append(truncated, line)
-		currentTokens += separatorTokens + lineTokens
-	}
-	truncated = append(truncated, note)
-	return strings.Join(truncated, "\n")
+	return store.RenderMarkdownDelta(current.Satisfied, current.NextMovements)
 }
 
-func buildVerificationTodoItems(history []*aicommon.VerifySatisfactionResult) []verificationTodoItem {
-	items, _ := buildVerificationTodoItemsAndStats(history)
-	return items
-}
-
-func buildVerificationTodoItemsAndStats(history []*aicommon.VerifySatisfactionResult) ([]verificationTodoItem, verificationTodoStats) {
-	itemsByID := make(map[string]*verificationTodoItem)
-	order := make([]string, 0)
-	for recordIndex, record := range history {
+func buildVerificationTodoStoreFromHistory(history []*aicommon.VerifySatisfactionResult) *aicommon.VerificationTodoStore {
+	store := aicommon.NewVerificationTodoStore()
+	for _, record := range history {
 		if record == nil {
 			continue
 		}
-		for _, movement := range record.NextMovements {
-			id := strings.TrimSpace(movement.ID)
-			if id == "" {
-				continue
-			}
-			switch strings.ToLower(strings.TrimSpace(movement.Op)) {
-			case "add":
-				content := strings.TrimSpace(movement.Content)
-				if content == "" {
-					continue
-				}
-				item, exists := itemsByID[id]
-				if !exists {
-					item = &verificationTodoItem{ID: id, CreatedAt: recordIndex}
-					itemsByID[id] = item
-					order = append(order, id)
-				}
-				item.Content = content
-				item.Status = verificationTodoStatusPending
-				item.UpdatedAt = recordIndex
-			case "doing", "pending":
-				item, exists := itemsByID[id]
-				if !exists {
-					continue
-				}
-				if content := strings.TrimSpace(movement.Content); content != "" {
-					item.Content = content
-				}
-				item.Status = verificationTodoStatusDoing
-				item.UpdatedAt = recordIndex
-			case "done":
-				item, exists := itemsByID[id]
-				if !exists {
-					continue
-				}
-				item.Status = verificationTodoStatusDone
-				item.UpdatedAt = recordIndex
-			case "delete":
-				item, exists := itemsByID[id]
-				if !exists {
-					continue
-				}
-				if content := strings.TrimSpace(movement.Content); content != "" {
-					item.Content = content
-				}
-				item.Status = verificationTodoStatusDeleted
-				item.UpdatedAt = recordIndex
-			}
-		}
-		if record.Satisfied {
-			for _, id := range order {
-				item := itemsByID[id]
-				if item == nil || (item.Status != verificationTodoStatusPending && item.Status != verificationTodoStatusDoing) {
-					continue
-				}
-				item.Status = verificationTodoStatusSkipped
-				item.UpdatedAt = recordIndex
-			}
-		}
+		store.Apply(record.Satisfied, record.NextMovements)
 	}
-
-	items := make([]verificationTodoItem, 0, len(order))
-	for _, id := range order {
-		item := itemsByID[id]
-		if item == nil {
-			continue
-		}
-		items = append(items, *item)
-	}
-	return items, calculateVerificationTodoStats(items)
+	return store
 }
 
-func calculateVerificationTodoStats(items []verificationTodoItem) verificationTodoStats {
-	stats := verificationTodoStats{}
-	for _, item := range items {
-		switch item.Status {
-		case verificationTodoStatusPending:
-			stats.Pending++
-		case verificationTodoStatusDoing:
-			stats.Doing++
-		case verificationTodoStatusDone:
-			stats.Done++
-		case verificationTodoStatusDeleted:
-			stats.Deleted++
-		case verificationTodoStatusSkipped:
-			stats.Skipped++
-		}
-	}
-	return stats
+// buildVerificationTodoItems / buildVerificationTodoItemsAndStats remain as
+// package-local helpers for back-compat with verification_todo_test.go.
+func buildVerificationTodoItems(history []*aicommon.VerifySatisfactionResult) []aicommon.VerificationTodoItem {
+	store := buildVerificationTodoStoreFromHistory(history)
+	return store.SnapshotItems()
 }
 
-func formatVerificationTodoLine(item verificationTodoItem) string {
-	statusLabel := "[ ]"
-	switch item.Status {
-	case verificationTodoStatusDoing:
-		statusLabel = "[DOING]"
-	case verificationTodoStatusDone:
-		statusLabel = "[x]"
-	case verificationTodoStatusDeleted:
-		statusLabel = "[DELETED]"
-	case verificationTodoStatusSkipped:
-		statusLabel = "[SKIPPED]"
-	}
-	content := utils.ShrinkString(strings.TrimSpace(item.Content), 400)
-	if content == "" {
-		content = "(no content)"
-	}
-	return fmt.Sprintf("- %s: [id: %s]: %s", statusLabel, item.ID, content)
+func buildVerificationTodoItemsAndStats(history []*aicommon.VerifySatisfactionResult) ([]aicommon.VerificationTodoItem, aicommon.VerificationTodoStats) {
+	store := buildVerificationTodoStoreFromHistory(history)
+	return store.SnapshotItems(), store.Stats()
 }
 
-func formatVerificationTodoMarkdownLine(item verificationTodoItem, marker string) string {
-	statusLabel := "[ ]"
-	switch item.Status {
-	case verificationTodoStatusDone, verificationTodoStatusDeleted, verificationTodoStatusSkipped:
-		statusLabel = "[x]"
-	}
-	content := sanitizeVerificationTodoMarkdownContent(item.Content)
-	if item.Status == verificationTodoStatusDone || item.Status == verificationTodoStatusDeleted {
-		content = "~~" + content + "~~"
-	}
-	if marker == "" && item.Status == verificationTodoStatusDeleted {
-		marker = "deleted"
-	}
-	if marker == "" {
-		return fmt.Sprintf("- %s %s", statusLabel, content)
-	}
-	return fmt.Sprintf("- %s (%s) %s", statusLabel, marker, content)
+// Package-local pass-through helpers kept for legacy tests. New code should
+// use the aicommon.Format* / aicommon.Sanitize* functions directly.
+
+func formatVerificationTodoLine(item aicommon.VerificationTodoItem) string {
+	return aicommon.FormatVerificationTodoLine(item)
+}
+
+func formatVerificationTodoMarkdownLine(item aicommon.VerificationTodoItem, marker string) string {
+	return aicommon.FormatVerificationTodoMarkdownLine(item, marker)
 }
 
 func sanitizeVerificationTodoMarkdownContent(content string) string {
-	replacer := strings.NewReplacer(
-		"\r", " ",
-		"\n", " ",
-		"\t", " ",
-		"\u2028", " ",
-		"\u2029", " ",
-	)
-	content = replacer.Replace(content)
-	content = strings.Join(strings.Fields(content), " ")
-	content = utils.ShrinkString(strings.TrimSpace(content), 400)
-	if content == "" {
-		return "(no content)"
-	}
-	return content
+	return aicommon.SanitizeVerificationTodoMarkdownContent(content)
 }
 
+// renderVerificationOutputFilesMarkdown renders the per-task delivery file
+// listing emitted at verification time. The logic is intentionally local to
+// aireact because it has no equivalent in the SessionPromptState store yet.
 func renderVerificationOutputFilesMarkdown(outputFiles []string) string {
 	normalized := normalizeVerificationOutputFiles(outputFiles)
 	if len(normalized) == 0 {

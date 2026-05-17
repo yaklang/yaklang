@@ -242,6 +242,11 @@ func (pm *PromptManager) NewPromptMaterials(base *reactloops.LoopPromptBaseMater
 		materials.Schema = input.Schema
 		// P1-C2: SessionEvidence / UserHistory 从 dynamic 段上移到 timeline-open 段
 		materials.SessionEvidence = input.SessionEvidence
+		// 全局 TODO 块: 与 SessionEvidence 平行透传, 物理位置在 timeline-open 段
+		// section.timeline_open.todo_list (在 session_evidence 之后), 让 loop
+		// prompt 任何一次 iteration 都能看到当前 TODO 全貌.
+		// 关键词: TodoSnapshot 透传, timeline-open, SessionEvidence 之后
+		materials.TodoSnapshot = input.TodoSnapshot
 		// CACHE_TOOL_CALL 块从 dynamic/REFLECTION 迁到 semi-dynamic 段
 		// 关键词: RecentToolsCache 透传, semi-dynamic 段
 		materials.RecentToolsCache = input.RecentToolsCache
@@ -346,6 +351,7 @@ func (pm *PromptManager) buildLoopPromptSectionData(base *reactloops.LoopPromptB
 		"SkillsContext":           "",
 		"ExtraCapabilities":       "",
 		"SessionEvidence":         "",
+		"TodoSnapshot":            "",
 		"ReactiveData":            "",
 		"InjectedMemory":          "",
 		"AllowPlanAndExec":        false,
@@ -410,6 +416,7 @@ func (pm *PromptManager) buildLoopPromptSectionData(base *reactloops.LoopPromptB
 		data["SkillsContext"] = input.SkillsContext
 		data["ExtraCapabilities"] = input.ExtraCapabilities
 		data["SessionEvidence"] = input.SessionEvidence
+		data["TodoSnapshot"] = input.TodoSnapshot
 		data["ReactiveData"] = input.ReactiveData
 		data["InjectedMemory"] = input.InjectedMemory
 	}
@@ -723,6 +730,18 @@ func (pm *PromptManager) buildTimelineOpenObservation(
 			reactloops.PromptSectionRoleTimelineOpen,
 			true,
 			materials.SessionEvidence,
+		),
+		// 全局 TODO 块: 紧跟 SessionEvidence, 让 loop prompt 始终能看到当前
+		// TODO 列表; 数据来源是 SessionPromptState.VerificationTodoStore,
+		// 由 VerifyUserSatisfaction 通过 ApplyVerificationTodoOps 增量写入.
+		// 段位仍属 timeline-open, 落在所有 cache 边界外, 不污染上游 prefix cache.
+		// 关键词: section.timeline_open.todo_list, 全局 TODO, SessionEvidence 之后
+		reactloops.NewPromptSectionObservation(
+			"section.timeline_open.todo_list",
+			"Todo List",
+			reactloops.PromptSectionRoleTimelineOpen,
+			true,
+			materials.TodoSnapshot,
 		),
 		reactloops.NewPromptSectionObservation(
 			"section.timeline_open.workspace",
