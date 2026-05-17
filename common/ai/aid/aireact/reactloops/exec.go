@@ -691,6 +691,13 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) (finalE
 
 	r.GetInvoker().AddToTimeline(aicommon.TIMELINE_ITEM_TYPE_CURRENT_TASK_USER_INPUT, fmt.Sprintf("%v", task.GetOriginUserInput()))
 
+	// 启动主循环卡死兜底观察 goroutine: 周期性比对 lastIterationTickAt,
+	// 长时间无推进就 emit timeline + dump goroutine stack. 不会主动 abort
+	// 任务, 只是给外部观察者 (人 / 测试 / 监控) 一个明确信号. 关键词:
+	// startStallHeartbeat, post-action 卡死兜底观察
+	stopStallHeartbeat := r.startStallHeartbeat(task.GetContext(), task)
+	defer stopStallHeartbeat()
+
 	if r.GetCurrentMemoriesContent() == "" {
 		r.fastLoadSearchMemoryWithoutAI(task.GetUserInput())
 	}
@@ -711,6 +718,10 @@ LOOP:
 	for {
 		iterationCount++
 		r.currentIterationIndex = iterationCount
+		// 主循环每轮推进一次都给 stall heartbeat 打个 tick, 让心跳协程
+		// 知道 "我还在动"; 心跳逻辑见 startStallHeartbeat / recordIterationTick.
+		// 关键词: 主循环 tick, lastIterationTickAt
+		r.recordIterationTick()
 		if iterationCount > maxIterations {
 			maxIterErr := utils.Errorf("reached max iterations (%d), stopping code generation loop", maxIterations)
 			postOp := r.finishIterationLoopWithError(iterationCount, task, maxIterErr)

@@ -225,6 +225,12 @@ func (r *ReActLoop) ApplyVerificationResult(result *aicommon.VerifySatisfactionR
 // VerifyUserSatisfactionNow forces a verification pass immediately, bypassing
 // periodic checkpoint throttling. This is used by explicit AI-triggered
 // verification actions.
+//
+// 并发模型: 通过 verificationInFlight (atomic.Bool, CAS) 保证同一时间只有一
+// 个 verification AI 调用在飞行中. verificationMutex 不再覆盖 AI 调用本身
+// (那会让 watchdog 也被卡死), 仅用于保护 snapshot 与 suppression depth 等
+// 内部状态读写. 关键词: VerifyUserSatisfactionNow watchdog 解锁,
+// verificationInFlight CAS, verificationMutex 缩窄作用域
 func (r *ReActLoop) VerifyUserSatisfactionNow(
 	ctx context.Context,
 	originalQuery string,
@@ -235,10 +241,16 @@ func (r *ReActLoop) VerifyUserSatisfactionNow(
 		return nil, nil
 	}
 	r.touchVerificationWatchdog()
-	if r.verificationMutex != nil {
-		r.verificationMutex.Lock()
-		defer r.verificationMutex.Unlock()
+	if !r.verificationInFlight.CompareAndSwap(false, true) {
+		// 已有一次 verification 在跑, 不重入. 这条路径会被 explicit
+		// AI-triggered 触发 (例如 verify action), 直接返回 nil/nil 让上层
+		// 视为"本次跳过", 不影响主循环.
+		if invoker := r.GetInvoker(); invoker != nil {
+			invoker.AddToTimeline("[VERIFICATION_REENTRY_SKIP]", "VerifyUserSatisfactionNow skipped: another verification still in flight")
+		}
+		return nil, nil
 	}
+	defer r.verificationInFlight.Store(false)
 	result, err := r.invoker.VerifyUserSatisfaction(ctx, originalQuery, isToolCall, payload)
 	if err != nil {
 		return nil, err
@@ -296,6 +308,16 @@ func (r *ReActLoop) endVerificationWatchdogToolSuppression() {
 	})
 }
 
+// MaybeVerifyUserSatisfaction gates generic automatic verification. 并发模型:
+//   - verificationMutex 仍保留, 但作用域缩窄到 snapshot/throttle 双检, 不再
+//     覆盖 AI 调用本身. 既有测试中对 verificationMutex 字段存在的依赖不受
+//     影响.
+//   - verificationInFlight (atomic.Bool, CAS) 是 AI 调用本身的并发屏障, 让
+//     watchdog 在 verification 跑飞时能立刻感知而不阻塞.
+//
+// 关键词: MaybeVerifyUserSatisfaction watchdog 解锁, verificationInFlight CAS,
+//
+//	verificationMutex 缩窄作用域
 func (r *ReActLoop) MaybeVerifyUserSatisfaction(
 	ctx context.Context,
 	originalQuery string,
@@ -312,12 +334,25 @@ func (r *ReActLoop) MaybeVerifyUserSatisfaction(
 	}
 	if r.verificationMutex != nil {
 		r.verificationMutex.Lock()
-		defer r.verificationMutex.Unlock()
+		currentSnapshot = r.buildVerificationRuntimeSnapshot(time.Now())
+		shouldRun := r.shouldTriggerAutomaticVerification(currentSnapshot)
+		r.verificationMutex.Unlock()
+		if !shouldRun {
+			return nil, false, nil
+		}
+	} else {
+		currentSnapshot = r.buildVerificationRuntimeSnapshot(time.Now())
+		if !r.shouldTriggerAutomaticVerification(currentSnapshot) {
+			return nil, false, nil
+		}
 	}
-	currentSnapshot = r.buildVerificationRuntimeSnapshot(time.Now())
-	if !r.shouldTriggerAutomaticVerification(currentSnapshot) {
+	if !r.verificationInFlight.CompareAndSwap(false, true) {
+		// 上一次 verification 还没回来, 本轮自动 verification 让位. 不算
+		// 一次有效 verification (returned bool = false), 也不写 timeline,
+		// 否则同一个卡死会被反复广播. 关键词: 自动 verification 让位
 		return nil, false, nil
 	}
+	defer r.verificationInFlight.Store(false)
 	result, err := r.invoker.VerifyUserSatisfaction(ctx, originalQuery, isToolCall, payload)
 	if err != nil {
 		return nil, true, err
@@ -394,6 +429,16 @@ func (r *ReActLoop) triggerVerificationWatchdog(task aicommon.AIStatefulTask) {
 	default:
 	}
 	if r.GetInvoker() == nil {
+		return
+	}
+	// 关键: 若 verification 此刻仍在飞行 (可能因 AI 流卡死), watchdog
+	// 不再去抢同一把锁 — 直接写一条 [ASYNC_VERIFICATION_WATCHDOG_BUSY]
+	// timeline 痕迹后退出, 等下一个 idle 周期再重试. 这条路径是修复"AI
+	// 流假活 + watchdog 跟着一起阻塞"问题的核心. 关键词:
+	// triggerVerificationWatchdog 解锁, [ASYNC_VERIFICATION_WATCHDOG_BUSY]
+	if r.verificationInFlight.Load() {
+		r.GetInvoker().AddToTimeline("[ASYNC_VERIFICATION_WATCHDOG_BUSY]",
+			"previous verification still in flight, watchdog skipped this round; will retry on next idle window")
 		return
 	}
 	payload := r.buildVerificationWatchdogPayload(task)
