@@ -157,6 +157,19 @@ const (
 	// 把它包装成可调用的 sub-loop action。
 	// 对应 WithActionFactoryFromLoop。
 	FocusDunder_ActionsFromLoops = "__ACTIONS_FROM_LOOPS__"
+
+	// FocusDunder_ScenarioTools 字符串列表（或逗号分隔字符串），元素为
+	// VisibilityScenario 工具名。声明后, 这些 scenario 工具会被拉回当前
+	// focus loop 的默认 Tool Inventory 并置顶 (具体过滤在
+	// aicommon.FilterToolsByVisibility, 置顶在
+	// aireact.getPrioritizedTools 的 extraPriority 参数).
+	// 对应 WithScenarioToolWhitelist。
+	//
+	// 仅对 scenario 工具生效, 永远不能把 hidden 工具拉回 (hidden 语义=已废弃).
+	//
+	// 关键词: __SCENARIO_TOOLS__, scenario tool whitelist dunder,
+	//        focus mode pull back, hidden never returns
+	FocusDunder_ScenarioTools = "__SCENARIO_TOOLS__"
 )
 
 // ----------------------------------------------------------------------------

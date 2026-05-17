@@ -1,6 +1,8 @@
 package reactloops
 
 import (
+	"strings"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -102,7 +104,92 @@ func CollectFocusModeStaticOptions(caller *FocusModeYakHookCaller) []ReActLoopOp
 		}
 	}
 
+	// ---- __SCENARIO_TOOLS__ -> WithScenarioToolWhitelist ----
+	// 接受三种声明形式 (yak 脚本作者按习惯选一种即可):
+	//   1) string slice:  __SCENARIO_TOOLS__ = ["ssa-grep", "ssa-read-file"]
+	//   2) []any (yak dict literal 容易塞 any): 同上, 元素逐个 ToString
+	//   3) 逗号分隔字符串: __SCENARIO_TOOLS__ = "ssa-grep, ssa-read-file"
+	// 命中后 emit WithScenarioToolWhitelist; 仅对 scenario 工具生效, hidden
+	// 工具永远不能被拉回 (aicommon.FilterToolsByVisibility 内部保证).
+	//
+	// 关键词: __SCENARIO_TOOLS__ parser, scenario whitelist dunder,
+	//        slice / comma separated / hidden never returns
+	if whitelist := parseScenarioToolsDunder(caller); len(whitelist) > 0 {
+		opts = append(opts, WithScenarioToolWhitelist(whitelist))
+	}
+
 	return opts
+}
+
+// parseScenarioToolsDunder 从 caller 中解析 __SCENARIO_TOOLS__ dunder,
+// 兼容 slice / 逗号分隔字符串 / 单个字符串. 返回 nil 表示未声明.
+//
+// 关键词: parseScenarioToolsDunder, scenario whitelist parsing, multi-format
+func parseScenarioToolsDunder(caller *FocusModeYakHookCaller) []string {
+	if caller == nil {
+		return nil
+	}
+	v, ok := caller.GetVar(FocusDunder_ScenarioTools)
+	if !ok || utils.IsNil(v) {
+		return nil
+	}
+	collect := func(items []any) []string {
+		out := make([]string, 0, len(items))
+		for _, it := range items {
+			if utils.IsNil(it) {
+				continue
+			}
+			s := strings.TrimSpace(utils.InterfaceToString(it))
+			if s == "" {
+				continue
+			}
+			out = append(out, s)
+		}
+		return out
+	}
+	switch val := v.(type) {
+	case []string:
+		out := make([]string, 0, len(val))
+		for _, s := range val {
+			s = strings.TrimSpace(s)
+			if s == "" {
+				continue
+			}
+			out = append(out, s)
+		}
+		return out
+	case []any:
+		return collect(val)
+	case string:
+		out := make([]string, 0)
+		for _, part := range strings.Split(val, ",") {
+			part = strings.TrimSpace(part)
+			if part == "" {
+				continue
+			}
+			out = append(out, part)
+		}
+		return out
+	default:
+		// 兜底走通用 slice 转换 (例如 yak vm 包出的 *yakvm.YakList 类型),
+		// 仍允许逗号分隔的退化路径
+		if list := caller.GetSlice(FocusDunder_ScenarioTools); len(list) > 0 {
+			return collect(list)
+		}
+		raw := strings.TrimSpace(utils.InterfaceToString(v))
+		if raw == "" {
+			return nil
+		}
+		out := make([]string, 0)
+		for _, part := range strings.Split(raw, ",") {
+			part = strings.TrimSpace(part)
+			if part == "" {
+				continue
+			}
+			out = append(out, part)
+		}
+		return out
+	}
 }
 
 // parseAITagFieldEntry 把 yak 中 __AI_TAG_FIELDS__ 列表里的单条项解析出来。

@@ -144,6 +144,24 @@ func (pm *PromptManager) GetLoopPromptBaseMaterials(tools []*aitool.Tool, nonce 
 	}
 
 	if allowToolCall && len(tools) > 0 {
+		// 0. hidden tool pattern: 先按可见性过滤掉 VisibilityHidden 与 VisibilityScenario
+		//    工具, 让默认 Tool Inventory 不出现 amap / 已被 do_http_request
+		//    覆盖的 send_http_request_* / url_content_summary / ssa-* 这类
+		//    工具. 若当前 loop (典型: yak focus mode) 通过
+		//    WithScenarioToolWhitelist 显式声明了 scenario 拉回名单, 命中
+		//    名单的 scenario 工具会被保留, 并在后面通过 getPrioritizedTools
+		//    的 extraPriority 参数置顶展示. hidden 工具一律不复活.
+		//    这一步必须在 ToolsCount 统计之前做完, 否则模板里
+		//    "You have access to N built-in tools" / MoreToolsCount 会把
+		//    被过滤掉的工具也算进去, 误导 AI.
+		//    关键词: hidden tool pattern, FilterToolsByVisibility, scenario whitelist,
+		//           Tool Inventory render entry filter
+		scenarioWL := pm.react.GetCurrentLoop().GetScenarioToolWhitelist()
+		tools = aicommon.FilterToolsByVisibility(tools, scenarioWL)
+		if len(tools) == 0 {
+			return materials, nil
+		}
+
 		// 1. 先用 GetTopToolsCount 作为"候选池上限"取出 prioritized 的前 N 个
 		//    (默认 100, 用户可用 WithTopToolsCount(N) 缩窄).
 		// 2. 再用 SelectToolsByTokenBudget 按 token 预算 (3K) 从候选池里二次裁剪,
@@ -154,7 +172,7 @@ func (pm *PromptManager) GetLoopPromptBaseMaterials(tools []*aitool.Tool, nonce 
 		// 关键词: GetLoopPromptBaseMaterials tool budget, SelectToolsByTokenBudget,
 		//        TopToolsCount 候选池上限, 保底 20
 		topCount := pm.react.config.GetTopToolsCount()
-		candidate := pm.react.getPrioritizedTools(tools, topCount)
+		candidate := pm.react.getPrioritizedTools(tools, topCount, scenarioWL...)
 		display := aicommon.SelectToolsByTokenBudget(
 			candidate,
 			aicommon.ToolInventoryTokenBudget,

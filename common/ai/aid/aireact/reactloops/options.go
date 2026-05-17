@@ -101,6 +101,38 @@ func WithToolsGetter(getter func() []*aitool.Tool) ReActLoopOption {
 	}
 }
 
+// WithScenarioToolWhitelist 声明这个 loop 对 VisibilityScenario 工具的拉回
+// 名单. 命中名单的 scenario 工具会重新出现在默认 Tool Inventory 中, 并被
+// 视为高优先级 (置顶展示). 主要使用方:
+//   - yak focus mode 的 __SCENARIO_TOOLS__ dunder, 由 CollectFocusModeStaticOptions
+//     emit 出来.
+//   - 代码侧 (Go 内嵌 ReAct loop) 直接调用, 给特定 loop 默认带上某些 ssa-* 工具.
+//
+// 多次调用按 last-write-wins 覆盖 (保持与其他 With* 选项一致). 传入 nil /
+// 空 slice 等价于"不拉回任何 scenario 工具", 即与默认行为一致.
+//
+// 该选项不会让 VisibilityHidden 工具复活 (hidden 在 aicommon.FilterToolsByVisibility
+// 中永远丢弃, whitelist 不参与 hidden 决策).
+//
+// 关键词: WithScenarioToolWhitelist, focus mode pull back, scenario tools,
+//        last-write-wins, hidden never returns
+func WithScenarioToolWhitelist(names []string) ReActLoopOption {
+	return func(r *ReActLoop) {
+		if r == nil {
+			return
+		}
+		if len(names) == 0 {
+			r.scenarioToolWhitelist = nil
+			return
+		}
+		copied := make([]string, 0, len(names))
+		for _, n := range names {
+			copied = append(copied, n)
+		}
+		r.scenarioToolWhitelist = copied
+	}
+}
+
 func WithUserInteractGetter(allowUserInteract func() bool) ReActLoopOption {
 	return func(r *ReActLoop) {
 		r.allowUserInteract = allowUserInteract

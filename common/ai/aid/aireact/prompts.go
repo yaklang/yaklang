@@ -288,6 +288,13 @@ func (pm *PromptManager) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[s
 		if err != nil {
 			return "", nil, err
 		}
+		// hidden tool pattern: 与 GetLoopPromptBaseMaterials 入口对齐, 先按
+		// 可见性过滤掉 hidden + scenario 工具, 再统计 ToolsCount 等数字.
+		// 这条路径(老 base.txt 渲染)没有 loop 上下文, scenario whitelist 固定为
+		// nil, 即 scenario 全部丢弃 (这就是非 focus 模式的默认行为).
+		// 关键词: GetBasicPromptInfo hidden tool pattern, FilterToolsByVisibility,
+		//        与 frozen_block 对齐
+		tools = aicommon.FilterToolsByVisibility(tools, nil)
 		result["Tools"] = tools
 		result["ToolsCount"] = len(tools)
 		// 与 prompt_loop_materials.go GetLoopPromptBaseMaterials 保持完全一致:
