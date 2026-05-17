@@ -233,7 +233,7 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 			// Store next_movements in result for status tracking.
 			//
 			// 注意: 旧版本会把 nextMovements 整段 JSON 通过 AddToTimeline 写入
-			// Timeline. 现已移除该 push, 因为：
+			// Timeline. 251cb078e 重构后已移除"整段 JSON"的写法, 因为：
 			//   1. 全局 TODO 列表已由 SessionPromptState.VerificationTodoStore
 			//      在 loop prompt 的 timeline-open 段独立渲染 (任何 iteration
 			//      都能看到), Timeline 中的逐轮 JSON 流水属于重复表达;
@@ -244,12 +244,16 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 			//   3. 同步发出的 EVENT_TYPE_TODO_LIST_UPDATE 结构化事件 (见
 			//      AppendVerificationHistory 之后) 携带完整 items + stats +
 			//      applied_ops, 是前端 TODO 面板的权威来源.
-			// 保留 r.AddToTimeline("verify", ...) 与 r.AddToTimeline(
-			// "evidence_ops", ...) 这两条, 它们与 TODO 是独立语义.
-			//
-			// 关键词: 移除 next_movements timeline 冗余, TODO 单一来源,
-			//        SessionPromptState.VerificationTodoStore, 事件回放
+			// 但保留一条 NEXT_MOVEMENTS delta breadcrumb, 形态是 "OP[id]:
+			// content" 一行一个, 和 evidence_ops 形成对偶事件流, 用于失败
+			// 回放与测试观察. 这条必须**写在 transaction callback 内部**,
+			// 与 result.NextMovements 赋值同位; 写在 CallAITransaction 返回
+			// 之后会引入与 stream 事件不可控的时序窗口 (CI 超时偶发会让
+			// 消费者侧观察不到 timeline 已写入). 关键词: NEXT_MOVEMENTS
+			// timeline delta breadcrumb 同位 stream, 事件流时序保证, CI
+			// 时序敏感.
 			result.NextMovements = nextMovements
+			r.addNextMovementsBreadcrumb(result)
 
 			markdownSnapshot := r.RenderVerificationTodoMarkdownSnapshot(result)
 			if strings.TrimSpace(markdownSnapshot) != "" {
@@ -301,23 +305,6 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 	r.AppendVerificationHistory(result)
 	r.emitTodoListUpdate(result)
 
-	// 写一条 NEXT_MOVEMENTS delta breadcrumb 到 timeline. 这里**不写完整 TODO
-	// 快照** (那是 SessionPromptState.VerificationTodoStore 渲染到 prompt
-	// timeline-open 段的职责), 只把本轮 applied_ops 以 "OP[id]: content"
-	// 形式逐行写出, 提供:
-	//   1. 一个可被 grep / dump / 测试观察到的时间戳信号: 哪一轮 verify 改
-	//      动了 TODO;
-	//   2. 失败回放友好: 事后看 timeline 也能复原 "每轮 verify 加了哪些
-	//      next_movements / 完成了哪些" 的变更轨迹;
-	//   3. 与 evidence_ops 同位: 后者也只写一行 "OP[ID]" 的 delta, 二者形成
-	//      对偶的事件 log, 而权威全量状态分别落在
-	//      SessionPromptState.VerificationTodoStore 与 SessionEvidenceStore.
-	// 这一行不再是"重复表达全量 JSON" — 是事件 / 变更日志, 不破坏 251cb078e
-	// 重构的初衷.
-	// 关键词: NEXT_MOVEMENTS timeline delta breadcrumb, applied_ops 事件日志,
-	//        TODO 变更轨迹观察, 与 evidence_ops 同位事件流
-	r.addNextMovementsBreadcrumb(result)
-
 	return result, nil
 }
 
@@ -328,6 +315,10 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 // timeline-open section every iteration). This breadcrumb only captures the
 // delta and is the chronological signal consumers (UI / test / log analysis)
 // rely on to answer "when was the TODO updated?".
+//
+// 必须在 transaction callback 内部、与 result.NextMovements 赋值同位调用;
+// 否则会和 stream 事件之间形成不可控的时序窗口 (CI 超时偶发会让消费者侧观
+// 察不到 timeline 已写入).
 //
 // 关键词: addNextMovementsBreadcrumb, delta-only timeline 事件, TODO 时间戳信号
 func (r *ReAct) addNextMovementsBreadcrumb(result *aicommon.VerifySatisfactionResult) {
