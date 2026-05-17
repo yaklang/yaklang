@@ -25,11 +25,33 @@ import (
 
 // ReactToolCallTag = "[tool_call"        // 反解析时的开括号匹配
 // ReactToolCallTagClose = "[/tool_call]" // 反解析时的闭括号匹配
+//
+// 兼容性补丁: 部分上游模型 (如 deepseek-v4-pro 在 thinking + react 模式下)
+// 会自由发挥, 把 tool_call 渲染成多种漂移格式, 实测见过的混合形态:
+//   - 规范方括号:          [tool_call name=NAME]ARGS[/tool_call]
+//   - 纯尖括号 (XML):       <tool_call name="NAME">ARGS</tool_call>
+//   - 方括号 + > headerEnd: [tool_call id="..." name="bash">ARGS[/tool_call]
+//   - 尖括号 + ] headerEnd: <tool_call id="..." name="bash"]ARGS</tool_call>
+//   - 方/尖括号交叉 close:  [tool_call ...>ARGS</tool_call> 与 <tool_call ...]ARGS[/tool_call]
+//
+// 任何穷举式 variant 都不能预先知道全部组合, react_tool_extractor.go 改用
+// "open / headerEnd / close 三段独立解析 + quote-aware header end" 来处理
+// 上面所有混合. 新写出的 round1/round2 文本仍然只用方括号 (与历史协议一致),
+// 这些常量仅在反解析侧作为候选 token 使用.
+//
+// 关键词: react tool_call 多格式漂移兼容, deepseek thinking hallucinate,
+//        opencode TUI 失败修复, 三段独立解析
 const (
-	reactToolCallOpen   = "[tool_call"
-	reactToolCallClose  = "[/tool_call]"
-	reactToolResultOpen = "[tool_result"
-	reactToolResultEnd  = "[/tool_result]"
+	// 反解析侧 open token 候选. 写出仍只用 reactToolCallOpen.
+	reactToolCallOpen       = "[tool_call"
+	reactToolCallOpenAngle  = "<tool_call"
+	// 反解析侧 close token 候选. 写出仍只用 reactToolCallClose.
+	reactToolCallClose         = "[/tool_call]"
+	reactToolCallCloseAngle    = "</tool_call>"
+	reactToolCallCloseMixedBA  = "[/tool_call>" // 方括号开 + 尖括号闭 hallucinate
+	reactToolCallCloseMixedAB  = "</tool_call]" // 尖括号开 + 方括号闭 hallucinate
+	reactToolResultOpen        = "[tool_result"
+	reactToolResultEnd         = "[/tool_result]"
 )
 
 // reactSystemPromptHeader 是工具调用说明的固定头部.
