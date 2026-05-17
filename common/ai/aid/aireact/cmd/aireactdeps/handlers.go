@@ -14,6 +14,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/jsonpath"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -337,6 +338,14 @@ func handleClientEvent(event *schema.AiOutputEvent, inputChan chan<- *ypb.AIInpu
 		log.Debugf("Handling client event: type=%s, content_preview=%s", event.Type, preview)
 	}
 
+	// 非流事件来临时, 先把"活动流行"收尾, 避免日志 / 普通事件被
+	// 拼接在前一条流末尾造成"夹心"; stream 事件本身在下面的分支里
+	// 走 DebugStreamPrinter, 内部会自行处理流切换。
+	// 关键词: handleClientEvent flush stream, DEBUG 流式输出
+	if event.Type != schema.EVENT_TYPE_STREAM {
+		aicommon.GetDefaultDebugStreamPrinter().FlushIfActive()
+	}
+
 	// 使用简化显示处理输出事件
 	switch event.Type {
 	case schema.EVENT_TYPE_CONSUMPTION:
@@ -430,8 +439,11 @@ func handleClientEvent(event *schema.AiOutputEvent, inputChan chan<- *ypb.AIInpu
 		// 更新事件时间，重置3秒计时器
 		globalEventMonitor.UpdateEventTime()
 	case schema.EVENT_TYPE_STREAM:
-		// 始终显示带有滚动效果的流事件
-		fmt.Printf("[stream]: %s\n", string(event.StreamDelta))
+		// 流式 delta 通过统一的 DebugStreamPrinter 合并打印, 同一条流
+		// 的 token 留在同一行, 流切换才换行并打印头部, 避免之前每个
+		// chunk 自带 \n 造成的刷屏与字节级交错。
+		// 关键词: aireactdeps stream debug print, DEBUG 流式输出
+		aicommon.GetDefaultDebugStreamPrinter().PrintStreamDelta(event)
 	case schema.EVENT_TYPE_PRESSURE, schema.EVENT_TYPE_AID_CONFIG:
 		log.Debugf("received event: %s", event.Type)
 	case schema.EVENT_TYPE_AI_FIRST_BYTE_COST_MS:
