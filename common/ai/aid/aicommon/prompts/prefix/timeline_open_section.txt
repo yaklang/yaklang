@@ -12,6 +12,13 @@
 {{ .SessionEvidence }}
 {{ end }}
 
+{{ if .TodoSnapshot }}
+
+全局待办清单（TODO LIST）由历轮 Verify 阶段累积维护，跨整段会话保持可见，是当前最权威的"应做、正在做、已关闭"事项集合。在选择下一步动作前请先对照此清单：优先沿 [DOING] 项继续推进、不要重复创建已存在的 [ ] 项、[DELETED] / [SKIPPED] 已显式放弃不应再尝试。任何新增 / 完成 / 删除都只能通过 verify-satisfaction 的 next_movements 走，正常 loop 动作不直接写入。
+
+{{ .TodoSnapshot }}
+{{ end }}
+
 {{ if .Workspace }}# Workspace Context
 
 工作区上下文给出 Agent 当前运行环境的"物理坐标"：操作系统 / 架构、当前工作目录的绝对路径、该目录顶层结构概览，以及本会话已经累积的工件文件清单（Session Artifacts）。

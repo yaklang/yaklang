@@ -56,8 +56,15 @@ type PromptMaterials struct {
 	// 关键词: SessionArtifactsListing, Workspace 内嵌, Pure Dynamic 反污染
 	SessionArtifactsListing string
 	SessionEvidence         string
-	UserHistory             string
-	FrozenUserContext       string
+	// TodoSnapshot 是会话级 TODO 列表渲染结果 (含 <|TODO_LIST_<nonce>|>...
+	// 边界标签的整段块). 物理位置紧跟 SessionEvidence, 与 SessionEvidence
+	// 一样落在 timeline-open 段, 不被 AI_CACHE_FROZEN / AI_CACHE_SEMI 任何
+	// 缓存边界包裹, 避免污染上游 prefix cache.
+	//
+	// 关键词: TodoSnapshot, 全局 TODO 块, timeline-open 段位
+	TodoSnapshot      string
+	UserHistory       string
+	FrozenUserContext string
 }
 
 // HighStaticData 返回空 map: high-static 段是完全无变量的系统级共享 static。
@@ -152,6 +159,7 @@ func (m *PromptMaterials) TimelineOpenData() map[string]any {
 	return map[string]any{
 		"TimelineOpen":            m.TimelineOpen,
 		"SessionEvidence":         m.SessionEvidence,
+		"TodoSnapshot":            m.TodoSnapshot,
 		"Workspace":               m.Workspace,
 		"OSArch":                  m.OSArch,
 		"WorkingDir":              m.WorkingDir,

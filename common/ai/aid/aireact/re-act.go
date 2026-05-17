@@ -68,8 +68,9 @@ type ReAct struct {
 	currentIteration            int
 	currentUserInteractiveCount int64 // 当前用户交互次数
 	knowledgeEmitCounter        int   // Counter for knowledge emit events
-	verificationHistoryMutex    sync.Mutex
-	verificationHistory         []*aicommon.VerifySatisfactionResult
+	// verificationHistory 已上移到 aicommon.SessionPromptState 作为 todoJSON 持久态,
+	// 让 loop prompt 与 verify 路径共享同一份增量 TODO 状态; ReAct 内不再保存副本.
+	// 关键词: verificationHistory 迁移, SessionPromptState todoJSON, 单一来源
 
 	config        *aicommon.Config
 	promptManager *PromptManager

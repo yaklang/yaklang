@@ -230,22 +230,26 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 			}
 
 			nextMovements := normalizeVerifyNextMovements(action)
-			// Store next_movements in result for status tracking
+			// Store next_movements in result for status tracking.
+			//
+			// 注意: 旧版本会把 nextMovements 整段 JSON 通过 AddToTimeline 写入
+			// Timeline. 现已移除该 push, 因为：
+			//   1. 全局 TODO 列表已由 SessionPromptState.VerificationTodoStore
+			//      在 loop prompt 的 timeline-open 段独立渲染 (任何 iteration
+			//      都能看到), Timeline 中的逐轮 JSON 流水属于重复表达;
+			//   2. RenderVerificationTodoMarkdownSnapshot 已在下方通过
+			//      EmitTextMarkdownStreamEvent 把 markdown 形式的快照同步给
+			//      前端, 用于事件流回放; Timeline 里的旧 JSON 不再被任何
+			//      消费者依赖;
+			//   3. 同步发出的 EVENT_TYPE_TODO_LIST_UPDATE 结构化事件 (见
+			//      AppendVerificationHistory 之后) 携带完整 items + stats +
+			//      applied_ops, 是前端 TODO 面板的权威来源.
+			// 保留 r.AddToTimeline("verify", ...) 与 r.AddToTimeline(
+			// "evidence_ops", ...) 这两条, 它们与 TODO 是独立语义.
+			//
+			// 关键词: 移除 next_movements timeline 冗余, TODO 单一来源,
+			//        SessionPromptState.VerificationTodoStore, 事件回放
 			result.NextMovements = nextMovements
-			if len(nextMovements) > 0 {
-				nextMovementsJSON, err := json.MarshalIndent(nextMovements, "", "  ")
-				if err != nil {
-					return utils.Errorf("failed to marshal next_movements: %v", err)
-				}
-				r.AddToTimeline("next_movements", utils.MustRenderTemplate(`
-<|NEXT_MOVEMENTS_{{.Nonce}}|>
-{{ .NextMovements }}
-<|NEXT_MOVEMENTS_END_{{.Nonce}}|>
-`, map[string]string{
-					"Nonce":         utils.RandStringBytes(4),
-					"NextMovements": string(nextMovementsJSON),
-				}))
-			}
 
 			markdownSnapshot := r.RenderVerificationTodoMarkdownSnapshot(result)
 			if strings.TrimSpace(markdownSnapshot) != "" {
@@ -295,8 +299,44 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 		return nil, transErr
 	}
 	r.AppendVerificationHistory(result)
+	r.emitTodoListUpdate(result)
 
 	return result, nil
+}
+
+// emitTodoListUpdate publishes the post-commit TODO snapshot as a structured
+// EVENT_TYPE_TODO_LIST_UPDATE so the frontend can render a persistent TODO
+// panel. The payload carries the full items list (already mutated by
+// AppendVerificationHistory above), aggregated stats, the increment that
+// triggered this update, and minimal context (satisfied flag, current
+// iteration index, task id).
+//
+// 关键词: emitTodoListUpdate, 全局 TODO 通道, 结构化事件, 前端 TODO 面板
+func (r *ReAct) emitTodoListUpdate(result *aicommon.VerifySatisfactionResult) {
+	if r == nil || r.config == nil || result == nil {
+		return
+	}
+	emitter := r.config.GetEmitter()
+	if emitter == nil {
+		return
+	}
+
+	payload := aicommon.TodoListUpdatePayload{
+		Items:      r.config.SnapshotVerificationTodoItems(),
+		Stats:      r.config.GetVerificationTodoStats(),
+		AppliedOps: append([]aicommon.VerifyNextMovement(nil), result.NextMovements...),
+		Satisfied:  result.Satisfied,
+	}
+	if currentLoop := r.GetCurrentLoop(); currentLoop != nil {
+		payload.IterationIndex = currentLoop.GetCurrentIterationIndex()
+	}
+	if currentTask := r.GetCurrentTask(); currentTask != nil {
+		payload.TaskID = currentTask.GetId()
+	}
+
+	if _, err := emitter.EmitTodoListUpdate(payload); err != nil {
+		log.Warnf("emit todo_list_update event failed: %v", err)
+	}
 }
 
 func writeNextMovementsDisplayStream(reader io.Reader, writer io.Writer) error {

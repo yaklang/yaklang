@@ -100,6 +100,25 @@ func (m *MockedAIConfig) GetSessionEvidenceRendered() string {
 func (m *MockedAIConfig) ApplySessionEvidenceOps(ops []aicommon.EvidenceOperation) {
 }
 
+func (m *MockedAIConfig) GetVerificationTodoRendered() string {
+	return ""
+}
+
+func (m *MockedAIConfig) ApplyVerificationTodoOps(satisfied bool, movements []aicommon.VerifyNextMovement) {
+}
+
+func (m *MockedAIConfig) GetVerificationTodoMarkdownDelta(satisfied bool, movements []aicommon.VerifyNextMovement) string {
+	return ""
+}
+
+func (m *MockedAIConfig) SnapshotVerificationTodoItems() []aicommon.VerificationTodoItem {
+	return nil
+}
+
+func (m *MockedAIConfig) GetVerificationTodoStats() aicommon.VerificationTodoStats {
+	return aicommon.VerificationTodoStats{}
+}
+
 func (m *MockedAIConfig) IsCtxDone() bool {
 	select {
 	case <-m.Ctx.Done():

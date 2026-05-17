@@ -20,6 +20,16 @@ type SessionPromptState struct {
 	// evidenceJSON stores the serialized EvidenceStore JSON for session-level evidence.
 	// Persisted to DB alongside UserInputHistory under the same persistent session.
 	evidenceJSON string
+
+	// todoJSON stores the serialized VerificationTodoStore JSON for the global
+	// TODO list maintained by VerifyUserSatisfaction. The list is rendered
+	// into every loop prompt (timeline-open section, right after
+	// SessionEvidence) so the model can see its own pending TODOs on every
+	// iteration, not only at Verify checkpoints.
+	//
+	// 关键词: todoJSON, VerificationTodoStore 序列化, SessionEvidence 同构,
+	//        全局 TODO 持久态
+	todoJSON string
 }
 
 func NewSessionPromptState() *SessionPromptState {
@@ -132,4 +142,103 @@ func (s *SessionPromptState) GetSessionEvidenceRendered() string {
 
 	store := UnmarshalEvidenceStore(s.evidenceJSON)
 	return store.Render()
+}
+
+// GetVerificationTodo returns the raw serialized VerificationTodoStore JSON
+// (no quoting). Suitable for DB persistence callers that want to manage their
+// own quoting strategy.
+func (s *SessionPromptState) GetVerificationTodo() string {
+	if s == nil {
+		return ""
+	}
+	s.m.RLock()
+	defer s.m.RUnlock()
+	return s.todoJSON
+}
+
+// SetVerificationTodo replaces the in-memory TODO state with the given JSON
+// payload. Used during session restore from DB.
+func (s *SessionPromptState) SetVerificationTodo(todoJSON string) {
+	if s == nil {
+		return
+	}
+	s.m.Lock()
+	defer s.m.Unlock()
+	s.todoJSON = todoJSON
+}
+
+// ApplyVerificationTodoOps applies one verification round's next_movements
+// operations (and the round's satisfied flag) to the persisted TODO store,
+// then re-serializes back to todoJSON. Returns the quoted serialized JSON so
+// callers can persist it (mirroring ApplySessionEvidenceOps).
+//
+// 关键词: ApplyVerificationTodoOps, 增量更新, satisfied -> SKIPPED, DB 持久化
+func (s *SessionPromptState) ApplyVerificationTodoOps(satisfied bool, movements []VerifyNextMovement) string {
+	if s == nil {
+		return ""
+	}
+	s.m.Lock()
+	defer s.m.Unlock()
+
+	store := UnmarshalVerificationTodoStore(s.todoJSON)
+	store.Apply(satisfied, movements)
+	s.todoJSON = store.Marshal()
+	return codec.StrConvQuote(s.todoJSON)
+}
+
+// GetVerificationTodoRendered returns the plain-text TODO snapshot ready for
+// loop prompt injection. Empty string when no TODO has been tracked yet, so
+// the prompt template can naturally skip the block.
+func (s *SessionPromptState) GetVerificationTodoRendered() string {
+	if s == nil {
+		return ""
+	}
+	s.m.RLock()
+	defer s.m.RUnlock()
+	store := UnmarshalVerificationTodoStore(s.todoJSON)
+	if store.IsEmpty() {
+		return ""
+	}
+	return store.Render()
+}
+
+// GetVerificationTodoMarkdownDelta returns the markdown snapshot computed
+// against the current persisted state without mutating it. Callers should
+// invoke this BEFORE ApplyVerificationTodoOps so the (new) / (done) markers
+// are derived from the pre-apply state.
+//
+// 关键词: GetVerificationTodoMarkdownDelta, 预览模式, 不变更状态
+func (s *SessionPromptState) GetVerificationTodoMarkdownDelta(satisfied bool, movements []VerifyNextMovement) string {
+	if s == nil {
+		return ""
+	}
+	s.m.RLock()
+	defer s.m.RUnlock()
+	store := UnmarshalVerificationTodoStore(s.todoJSON)
+	return store.RenderMarkdownDelta(satisfied, movements)
+}
+
+// SnapshotVerificationTodoItems returns a copy of the current TODO items for
+// consumers that need structured access (e.g. emitting structured frontend
+// events).
+func (s *SessionPromptState) SnapshotVerificationTodoItems() []VerificationTodoItem {
+	if s == nil {
+		return nil
+	}
+	s.m.RLock()
+	defer s.m.RUnlock()
+	store := UnmarshalVerificationTodoStore(s.todoJSON)
+	return store.SnapshotItems()
+}
+
+// GetVerificationTodoStats returns aggregated stats over the current TODO
+// store.
+func (s *SessionPromptState) GetVerificationTodoStats() VerificationTodoStats {
+	if s == nil {
+		return VerificationTodoStats{}
+	}
+	s.m.RLock()
+	defer s.m.RUnlock()
+	store := UnmarshalVerificationTodoStore(s.todoJSON)
+	return store.Stats()
 }
