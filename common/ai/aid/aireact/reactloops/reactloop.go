@@ -40,11 +40,18 @@ type SatisfactionRecord struct {
 }
 
 // ActionRecord 记录每次迭代执行的 Action 信息
+// 关键词: ActionRecord, SPIN 检测, ActionType+ToolName 双维度判定
 type ActionRecord struct {
 	ActionType     string                 `json:"action_type"`
 	ActionName     string                 `json:"action_name"`
 	ActionParams   map[string]interface{} `json:"action_params"`
 	IterationIndex int                    `json:"iteration_index"`
+
+	// ToolName 是该 action 实际调用的工具名(如 require_tool/directly_call_tool 类动作),
+	// 用于 SPIN 检测的细粒度判定 — 仅当 ActionType 与 ToolName 同时连续匹配时才计为
+	// 一次同质执行, 避免"同 ActionType 不同 tool"被误判为 SPIN.
+	// 关键词: ActionRecord.ToolName, SPIN 细粒度, tool_name 抽取
+	ToolName string `json:"tool_name,omitempty"`
 }
 
 type ReActLoop struct {
@@ -150,8 +157,18 @@ type ReActLoop struct {
 	sameLogicSpinThreshold      int // 相同逻辑自旋阈值
 
 	// SPIN force-exit: consecutive spin warnings counter and threshold
+	// 注: counter 由异步反思 goroutine (IncrementSpinWarning/ResetSpinWarning) 写入,
+	// 主循环线程 (ShouldForceExitDueToSpin) 读取, 必须通过 spinCounterMu 保护以避免
+	// 数据竞争. 关键词: SPIN counter 并发保护
 	consecutiveSpinWarnings    int
 	maxConsecutiveSpinWarnings int
+	spinCounterMu              sync.Mutex
+
+	// reflectionInflight 跟踪异步自我反思 goroutine 数量, 供测试 best-effort
+	// 等待 (WaitForInflightReflections) 与 Release 阶段 join 使用. 生产路径
+	// 不会主动等待 (fire-and-forget).
+	// 关键词: 异步反思 inflight 跟踪, 测试可观测
+	reflectionInflight sync.WaitGroup
 
 	// Init handler action constraints
 	// These are set by the init handler and cleared after first iteration
@@ -212,20 +229,48 @@ func (r *ReActLoop) Release() {
 	}
 }
 
+// IncrementSpinWarning 累加 SPIN 警告计数. 异步反思 goroutine 调用.
+// 关键词: SPIN counter mu protected
 func (r *ReActLoop) IncrementSpinWarning() {
+	r.spinCounterMu.Lock()
 	r.consecutiveSpinWarnings++
-	log.Infof("consecutive spin warnings incremented to %d (max: %d)", r.consecutiveSpinWarnings, r.maxConsecutiveSpinWarnings)
+	cur := r.consecutiveSpinWarnings
+	max := r.maxConsecutiveSpinWarnings
+	r.spinCounterMu.Unlock()
+	log.Infof("consecutive spin warnings incremented to %d (max: %d)", cur, max)
 }
 
+// ResetSpinWarning 清零 SPIN 警告计数(任务正常推进时调用).
+// 关键词: SPIN counter mu protected
 func (r *ReActLoop) ResetSpinWarning() {
-	if r.consecutiveSpinWarnings > 0 {
-		log.Infof("consecutive spin warnings reset from %d to 0", r.consecutiveSpinWarnings)
-	}
+	r.spinCounterMu.Lock()
+	prev := r.consecutiveSpinWarnings
 	r.consecutiveSpinWarnings = 0
+	r.spinCounterMu.Unlock()
+	if prev > 0 {
+		log.Infof("consecutive spin warnings reset from %d to 0", prev)
+	}
 }
 
+// ShouldForceExitDueToSpin 主循环线程读取 SPIN 计数器, 决定是否强制退出.
+// 关键词: SPIN counter mu protected
 func (r *ReActLoop) ShouldForceExitDueToSpin() bool {
-	return r.maxConsecutiveSpinWarnings > 0 && r.consecutiveSpinWarnings >= r.maxConsecutiveSpinWarnings
+	r.spinCounterMu.Lock()
+	cur := r.consecutiveSpinWarnings
+	max := r.maxConsecutiveSpinWarnings
+	r.spinCounterMu.Unlock()
+	return max > 0 && cur >= max
+}
+
+// WaitForInflightReflections 等待所有异步自我反思 goroutine 完成. 主循环
+// 不应调用 (会破坏 fire-and-forget 语义); 仅用于测试在 Execute 返回后
+// 断言反思历史, 以及 Release/abort 阶段做 best-effort 清理.
+// 关键词: 异步反思 join, 测试可观测
+func (r *ReActLoop) WaitForInflightReflections() {
+	if r == nil {
+		return
+	}
+	r.reflectionInflight.Wait()
 }
 
 func (r *ReActLoop) PushSatisfactionRecord(satisfactory bool, reason string) {
@@ -474,8 +519,8 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		actionHistory:                make([]*ActionRecord, 0),
 		actionHistoryMutex:           new(sync.Mutex),
 		currentIterationIndex:        0,
-		sameActionTypeSpinThreshold:  3, // 默认连续 3 次相同 Action 触发检测
-		sameLogicSpinThreshold:       3, // 默认连续 3 次相同逻辑触发 AI 检测
+		sameActionTypeSpinThreshold:  8, // 默认连续 8 次同 ActionType+ToolName 才触发 SPIN 检测,降低误触发
+		sameLogicSpinThreshold:       8, // 默认连续 8 次同质 action 触发 AI 检测(与简单阈值对齐)
 		maxConsecutiveSpinWarnings:   3, // 默认连续 3 次 SPIN 警告后强制退出
 		extraCapabilities:            NewExtraCapabilitiesManager(),
 		perception:                   newPerceptionController(perceptionDefaultIterationInterval),

@@ -53,15 +53,28 @@ func (r *ReActLoop) IsInSpin() (bool, *SpinDetectionResult) {
 	return false, nil
 }
 
-// IsInSameActionTypeSpin 检测是否连续 N 次执行了相同的 Action 类型
-// 这是一个低成本的检测方法，不需要 AI 参与
+// IsInSameActionTypeSpin 检测是否连续 N 次执行了"相同 ActionType + 相同 ToolName"
+// 的同质动作. 这是一个低成本的纯本地检测方法, 不调用 AI.
+//
+// 双维度判定:
+//   - ActionType 必须一致 (例如都是 require_tool / directly_call_tool / 自定义 action 名)
+//   - ToolName 必须一致 (从 action 参数里抽出的实际工具名; 若该 action 不是 tool 调用类,
+//     ToolName 通常是空串, 此时退化为只比 ActionType — 仍保持兼容)
+//
+// 设计意图: 旧版只比 ActionType 会把"同样 require_tool 但调用了不同工具"误判成 SPIN,
+// 大量误触发. 现在要求 tool 名也一致, 与"用户感知的同质操作"对齐. 同时把默认阈值
+// 从 3 提到 8, 降低 SPIN 触发频率, 避免干扰正常的多步执行流.
+//
+// 关键词: IsInSameActionTypeSpin, SPIN 双维度判定, ActionType+ToolName,
+//
+//	降误触, 默认阈值 8
 func (r *ReActLoop) IsInSameActionTypeSpin() bool {
 	r.actionHistoryMutex.Lock()
 	defer r.actionHistoryMutex.Unlock()
 
 	threshold := r.sameActionTypeSpinThreshold
 	if threshold <= 0 {
-		threshold = 3 // 默认阈值
+		threshold = 8 // 默认阈值
 	}
 
 	historyLen := len(r.actionHistory)
@@ -69,15 +82,19 @@ func (r *ReActLoop) IsInSameActionTypeSpin() bool {
 		return false
 	}
 
-	// 检查最近 threshold 次是否都是相同的 Action 类型
 	lastActionType := r.actionHistory[historyLen-1].ActionType
+	lastToolName := r.actionHistory[historyLen-1].ToolName
 	for i := historyLen - threshold; i < historyLen; i++ {
 		if r.actionHistory[i].ActionType != lastActionType {
 			return false
 		}
+		if r.actionHistory[i].ToolName != lastToolName {
+			return false
+		}
 	}
 
-	log.Infof("detected same action type spin: %d consecutive actions of type %s", threshold, lastActionType)
+	log.Infof("detected same action+tool spin: %d consecutive actions of type %q tool %q",
+		threshold, lastActionType, lastToolName)
 	return true
 }
 
@@ -96,18 +113,20 @@ func (r *ReActLoop) IsInSameLogicSpinWithAI() (*SpinDetectionResult, error) {
 	copy(recentActions, r.actionHistory[historyLen-r.sameLogicSpinThreshold:])
 	r.actionHistoryMutex.Unlock()
 
-	// 检查是否都是相同的 Action 类型
+	// 检查是否都是相同的 ActionType + ToolName(双维度,与 IsInSameActionTypeSpin 对齐)
+	// 关键词: AI SPIN 检测双维度前置过滤
 	firstActionType := recentActions[0].ActionType
+	firstToolName := recentActions[0].ToolName
 	allSameType := true
 	for _, action := range recentActions {
-		if action.ActionType != firstActionType {
+		if action.ActionType != firstActionType || action.ToolName != firstToolName {
 			allSameType = false
 			break
 		}
 	}
 
 	if !allSameType {
-		// 如果不是相同类型，不进行 AI 检测
+		// 如果不是同质,不进行 AI 检测
 		return &SpinDetectionResult{IsSpinning: false}, nil
 	}
 

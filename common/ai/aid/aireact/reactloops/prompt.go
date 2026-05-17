@@ -288,6 +288,12 @@ func (r *ReActLoop) generateLoopPrompt(
 	}
 	observation := BuildPromptObservation(r.loopName, nonce, result.Prompt, getLoopPromptObservationSections(result))
 	r.SetLastPromptObservation(observation)
+	// 把 high-static / frozen-block / timeline-open 三段的"段内内容"
+	// (不含外层 boundary 标签)单独缓存, 供异步自我反思 prompt 复用. 反思
+	// prompt 把这三段拼回完全相同的 boundary 标签内, 与主循环字节对齐,
+	// 共享 LLM provider 侧的 prefix cache 命中.
+	// 关键词: 反思 prompt 缓存复用, prefix cache reuse, 字节对齐前缀
+	r.cachePrefixBodiesFromObservation(observation)
 	// 传 0 走 defaultPromptSummaryBytes; 当前默认 = 0 = 段内容完整透传.
 	// 用户实测段体量在数 KB ~ 数十 KB 量级, 本地 ipc 完全可承受;
 	// 想换成截断模式时改成显式正数即可.
@@ -309,6 +315,91 @@ func getLoopPromptObservationSections(result *LoopPromptAssemblyResult) []*Promp
 		return sections
 	}
 	return nil
+}
+
+// cachedPrefixHighStaticKey / cachedPrefixFrozenBlockKey / cachedPrefixTimelineOpenKey
+// 是把主循环 prompt 的 high-static / frozen-block / timeline-open 三段
+// "段内内容"(不含外层 boundary 标签)按 key 存到 r.vars 的稳定 key.
+// 异步反思 goroutine 从这里读取做缓存复用.
+// 关键词: 反思 prefix cache 复用 key, vars 持久化
+const (
+	cachedPrefixHighStaticKey   = "last_prompt_section_high_static"
+	cachedPrefixFrozenBlockKey  = "last_prompt_section_frozen_block"
+	cachedPrefixTimelineOpenKey = "last_prompt_section_timeline_open"
+)
+
+// cachePrefixBodiesFromObservation 从最新一次 prompt 观测树里抽出 high-static /
+// frozen-block / timeline-open 三段的"段内内容"(纯渲染文本, 不含 boundary 标签),
+// 缓存到 r.vars 供异步反思 prompt 复用. 反思路径会用 aicommon.BuildTaggedPromptSections
+// 在这三段外面套回完全相同的 boundary 标签, 与主循环字节对齐, 享受同一份 prefix cache.
+//
+// 设计要点:
+//   - observation 已经把每段(含 container)按 role 排好, 直接按 role 找顶级节点即可.
+//   - 段内内容拼接顺序与 main loop 渲染保持一致 (Children 顺序 + \n\n 分隔 + TrimSpace),
+//     确保字节级稳定; 否则即使内容相同, 字节顺序不同也会破坏 prefix cache 命中.
+//
+// 关键词: cachePrefixBodiesFromObservation, 字节稳定提取, prefix cache 复用
+func (r *ReActLoop) cachePrefixBodiesFromObservation(observation *PromptObservation) {
+	if r == nil || observation == nil {
+		return
+	}
+	for _, section := range observation.Sections {
+		if section == nil {
+			continue
+		}
+		body := concatPromptSectionContent(section)
+		switch section.Role {
+		case PromptSectionRoleHighStatic:
+			r.Set(cachedPrefixHighStaticKey, body)
+		case PromptSectionRoleFrozenBlock:
+			r.Set(cachedPrefixFrozenBlockKey, body)
+		case PromptSectionRoleTimelineOpen:
+			r.Set(cachedPrefixTimelineOpenKey, body)
+		}
+	}
+}
+
+// concatPromptSectionContent 把一个 section (可能是 container) 的 Children 内容
+// 按 \n\n 拼接后 TrimSpace. 与 prompt 模板渲染的拼接方式一致, 保证字节稳定.
+// 关键词: section 内容拼接, 字节稳定
+func concatPromptSectionContent(section *PromptSectionObservation) string {
+	if section == nil {
+		return ""
+	}
+	if len(section.Children) == 0 {
+		return strings.TrimSpace(section.Content)
+	}
+	parts := make([]string, 0, len(section.Children))
+	for _, child := range section.Children {
+		if child == nil {
+			continue
+		}
+		body := concatPromptSectionContent(child)
+		if body == "" {
+			continue
+		}
+		parts = append(parts, body)
+	}
+	return strings.TrimSpace(strings.Join(parts, "\n\n"))
+}
+
+// getCachedPrefixBodies 读取 cachePrefixBodiesFromObservation 缓存好的
+// 三段 prefix bodies. 异步反思 prompt 复用入口.
+// 关键词: 反思 prefix cache 读取, 字节对齐
+func (r *ReActLoop) getCachedPrefixBodies() (highStatic, frozenBlock, timelineOpen string) {
+	if r == nil {
+		return "", "", ""
+	}
+	if v, ok := r.GetVariable(cachedPrefixHighStaticKey).(string); ok {
+		highStatic = v
+	}
+	if v, ok := r.GetVariable(cachedPrefixFrozenBlockKey).(string); ok {
+		frozenBlock = v
+	}
+	if v, ok := r.GetVariable(cachedPrefixTimelineOpenKey).(string); ok {
+		timelineOpen = v
+	}
+	return
 }
 
 // syncRecentToolParamAITagFields 给当前 react loop 的 aiTagFields 注册

@@ -8,67 +8,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-// searchRelevantMemories 根据反思级别搜索相关记忆
-func (r *ReActLoop) searchRelevantMemories(reflection *ActionReflection, level ReflectionLevel) string {
-	// 如果没有 memoryTriage，返回空
-	if r.memoryTriage == nil {
-		log.Debug("memory triage not available, skip memory search")
-		return ""
-	}
-
-	// 根据反思级别决定搜索深度
-	var searchSizeLimit int
-	switch level {
-	case ReflectionLevel_Minimal:
-		return "" // 最小级别不搜索记忆
-	case ReflectionLevel_Standard:
-		searchSizeLimit = 2 * 1024 // 2KB
-	case ReflectionLevel_Deep:
-		searchSizeLimit = 5 * 1024 // 5KB
-	case ReflectionLevel_Critical:
-		searchSizeLimit = 10 * 1024 // 10KB - 关键反思需要更多上下文
-	default:
-		return ""
-	}
-
-	// 构建搜索查询
-	query := fmt.Sprintf("action '%s' execution analysis failure success pattern",
-		reflection.ActionType)
-
-	if !reflection.Success && reflection.ErrorMessage != "" {
-		query += " " + reflection.ErrorMessage
-	}
-
-	log.Infof("searching memories for reflection with query[%s], size_limit[%d]",
-		query, searchSizeLimit)
-
-	// 搜索记忆
-	searchResult, err := r.memoryTriage.SearchMemory(query, searchSizeLimit)
-	if err != nil {
-		log.Warnf("failed to search memories: %v", err)
-		return ""
-	}
-
-	if searchResult == nil || len(searchResult.Memories) == 0 {
-		log.Debug("no relevant memories found")
-		return ""
-	}
-
-	// 格式化记忆内容
-	var buf strings.Builder
-	for i, memory := range searchResult.Memories {
-		if i > 0 {
-			buf.WriteString("\n---\n\n")
-		}
-		buf.WriteString(fmt.Sprintf("### Memory %d\n\n", i+1))
-		buf.WriteString(memory.Content)
-		buf.WriteString("\n")
-	}
-
-	log.Infof("found %d relevant memories for reflection", len(searchResult.Memories))
-	return buf.String()
-}
-
 // cacheReflection 缓存反思结果供 prompt 使用（保留最近 3 条）
 func (r *ReActLoop) cacheReflection(reflection *ActionReflection) {
 	var reflections []*ActionReflection

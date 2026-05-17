@@ -234,8 +234,8 @@ var nodeIdMapper = map[string]*I18n{
 		En: "Plan Evidence",
 	},
 	"self-reflection-suggestions": {
-		Zh: "自省建议",
-		En: "Self Reflection Suggestions",
+		Zh: "自我反思",
+		En: "Self-Reflection",
 	},
 	"semantic_questions": {
 		Zh: "语义搜索条件",

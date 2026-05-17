@@ -809,12 +809,14 @@ LOOP:
 		r.loadingStatus(fmt.Sprintf("[%v]执行中 / [%v] executing action...", actionName, actionName))
 
 		// 记录当前迭代索引和 Action 信息
+		// 关键词: action history append, SPIN 检测数据源, tool_name 抽取
 		r.actionHistoryMutex.Lock()
 		actionRecord := &ActionRecord{
 			ActionType:     actionParams.ActionType(),
 			ActionName:     actionName,
 			ActionParams:   actionParams.GetParams(),
 			IterationIndex: iterationCount,
+			ToolName:       extractToolNameFromAction(actionParams),
 		}
 		// 复制 Action 参数（避免并发修改）
 		params := actionParams.GetParams()
@@ -963,12 +965,15 @@ LOOP:
 		default:
 		}
 
-		// 执行自我反思（如果启用）
+		// 执行自我反思 (如果启用且策略命中).
+		// Critical(失败归因) 走同步以保证下一轮 prompt 立即含失败上下文;
+		// 其它级别(主要是 SPIN/Standard) 走异步 fire-and-forget, 主循环不阻塞.
+		// 关键词: 反思入口, 异步 fire-and-forget, SPIN 不干扰执行
 		reflectionLevel := r.shouldTriggerReflection(handler, operator, iterationCount)
 		if reflectionLevel != ReflectionLevel_None {
-			r.loadingStatus(fmt.Sprintf("[%v]反思中 / [%v] self-reflecting...", actionName, actionName))
-			log.Infof("trigger self-reflection for action[%s] with level[%s]", actionName, reflectionLevel.String())
-			r.executeReflection(handler, actionParams, operator, reflectionLevel, iterationCount, actionExecutionDuration)
+			log.Infof("trigger self-reflection for action[%s] with level[%s] (async=%v)",
+				actionName, reflectionLevel.String(), reflectionLevel != ReflectionLevel_Critical)
+			r.MaybeExecuteReflection(handler, actionParams, operator, reflectionLevel, iterationCount, actionExecutionDuration)
 		}
 
 		// T1: perception after action execution (async, non-blocking)
@@ -1294,6 +1299,45 @@ func (r *ReActLoop) isDebugModeEnabled() bool {
 		}
 	}
 	return false
+}
+
+// extractToolNameFromAction 按优先级从 action 参数里抽取工具名,用于 SPIN
+// 双维度判定(ActionType + ToolName). 字段优先级:
+//  1. directly_call_tool_name 顶层
+//  2. next_action.directly_call_tool_name (legacy 兼容)
+//  3. tool_require_payload (require_tool 路径)
+//  4. tool_name / tool 通用兜底
+//
+// 全部命中为空返回空串, 表示该 action 不是 tool 调用类, SPIN 检测会退化为
+// 只比 ActionType.
+//
+// 关键词: extractToolNameFromAction, SPIN 细粒度, tool_name 抽取优先级
+func extractToolNameFromAction(action *aicommon.Action) string {
+	if utils.IsNil(action) {
+		return ""
+	}
+	if name := strings.TrimSpace(action.GetString("directly_call_tool_name")); name != "" {
+		return name
+	}
+	nextAction := action.GetInvokeParams("next_action")
+	if nextAction != nil {
+		if name := strings.TrimSpace(nextAction.GetString("directly_call_tool_name")); name != "" {
+			return name
+		}
+		if name := strings.TrimSpace(nextAction.GetString("tool_require_payload")); name != "" {
+			return name
+		}
+	}
+	if name := strings.TrimSpace(action.GetString("tool_require_payload")); name != "" {
+		return name
+	}
+	if name := strings.TrimSpace(action.GetString("tool_name")); name != "" {
+		return name
+	}
+	if name := strings.TrimSpace(action.GetString("tool")); name != "" {
+		return name
+	}
+	return ""
 }
 
 func sanitizeActionFilename(name string) string {
