@@ -48,7 +48,14 @@ function loadConfig() {
     const onlyStream = ["1", "true", "yes"].includes((process.env.AIBALANCE_ONLY_STREAM || "").toLowerCase());
     const onlySingle = ["1", "true", "yes"].includes((process.env.AIBALANCE_ONLY_SINGLE || "").toLowerCase());
     const skipVercel = ["1", "true", "yes"].includes((process.env.AIBALANCE_SKIP_VERCEL || "").toLowerCase());
-    return { baseURL, apiKey, timeoutSec, models, onlyStream, onlySingle, skipVercel };
+    // AIBALANCE_E2E_DUMP_RAW: 当置为 1/true/yes 时, 把 baseURL 改写为
+    // AIBALANCE_E2E_DUMP_VIA (默认 http://127.0.0.1:18223/v1) - 即让所有
+    // SDK 流量经过 debug_proxy_dump.mjs 反向代理, 由代理把 raw SSE 字节落盘.
+    // 默认关闭, 不改变历史行为. 关键词: AIBALANCE_E2E_DUMP_RAW, 经反代抓包.
+    const dumpRaw = ["1", "true", "yes"].includes((process.env.AIBALANCE_E2E_DUMP_RAW || "").toLowerCase());
+    const dumpVia = process.env.AIBALANCE_E2E_DUMP_VIA || "http://127.0.0.1:18223/v1";
+    const effectiveBaseURL = dumpRaw ? dumpVia : baseURL;
+    return { baseURL: effectiveBaseURL, originalBaseURL: baseURL, apiKey, timeoutSec, models, onlyStream, onlySingle, skipVercel, dumpRaw };
 }
 
 // 关键词: e2e fake tool implementations
@@ -308,6 +315,9 @@ async function main() {
     const cfg = loadConfig();
     console.log("aibalance Node E2E Tool Round-trip Matrix");
     console.log(`  base_url   = ${cfg.baseURL}`);
+    if (cfg.dumpRaw) {
+        console.log(`  dump_raw   = enabled, traffic via proxy ${cfg.baseURL} (origin=${cfg.originalBaseURL})`);
+    }
     console.log(`  models     = ${JSON.stringify(cfg.models)}`);
     console.log(`  skipVercel = ${cfg.skipVercel}`);
     console.log("");

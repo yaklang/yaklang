@@ -15,20 +15,25 @@ import (
 // 关键词: aibalance ReactToolExtractor, react -> tool_calls 反解析, 流式状态机
 //
 // 协议 (与 round1_react_inject.go / FlattenToolCallsForRoundTrip 严格一致):
-//   - 工具调用文本格式: [tool_call name=NAME]ARGS_JSON[/tool_call]
+//   - 工具调用文本格式 (规范): [tool_call name=NAME]ARGS_JSON[/tool_call]
+//   - 工具调用文本格式 (兼容): <tool_call name="NAME" id="...">ARGS_JSON</tool_call>
+//     (deepseek-v4-pro thinking + react 模式下的 hallucinate 漂移格式,
+//      用户在 opencode TUI 实测复现, system prompt 仍只声明方括号一种)
 //   - 工具结果文本格式: [tool_result tool_call_id=ID]CONTENT[/tool_result]
 //     (extractor 仅解析 tool_call, tool_result 是 round2 -> 上游方向)
 //
 // 输入: 上游 wrapper 写过来的 content 字节流 (流式 chunk by chunk).
 // 输出:
 //   - 普通 content 文本 -> OnContent 回调, 按 OpenAI delta.content 透传给客户端
-//   - 完整 [tool_call ...][/tool_call] -> OnToolCall 回调, 按 OpenAI delta.tool_calls 透传给客户端
+//   - 完整 [tool_call ...][/tool_call] 或 <tool_call ...></tool_call>
+//     -> OnToolCall 回调, 按 OpenAI delta.tool_calls 透传给客户端
 //
 // 设计要点:
 //  1. 跨 chunk 边界缓冲: buffer 累积所有未消费字节, 反复尝试匹配完整 tool_call.
 //  2. 容错坏 JSON: 解析失败的内容仍作为 text emit 给 OnContent, 避免误吞普通文本.
 //  3. 并行 multi tool_call: 一次 Flush 可 emit 多个独立 tool_call (index 递增).
-//  4. partial prefix 保留: buffer 尾部若可能是 "[tool_call" 的前缀, 暂不 emit, 等下次 Write.
+//  4. partial prefix 保留: buffer 尾部若可能是 "[tool_call" 或 "<tool_call"
+//     的前缀, 暂不 emit, 等下次 Write.
 //  5. 并发安全: 所有公开方法持单锁, 与 writerWrapper.Write 在同一线程也是安全的.
 
 const (
@@ -110,18 +115,85 @@ func (e *ReactToolExtractor) HasEmittedToolCall() bool {
 	return e.nextToolCallIndex > 0
 }
 
-// drainLocked 反复扫描 buf, 抽出所有完整 [tool_call ...] tool_call.
+// reactToolCallOpenTokens / reactToolCallCloseTokens 是反解析时的全部候选
+// open / close 字面量. 三段独立扫描: 找最早 open -> 找最早 close -> 切 segment.
+// 这是 deepseek-v4-pro thinking + react 模式下"格式漂移可以是任意混合"
+// 这一事实下唯一能稳定工作的策略: 不把 open/close 绑成 variant 二元组,
+// 而是允许 open 与 close 自由组合.
+//
+// 关键词: reactToolCallOpenTokens, reactToolCallCloseTokens, 三段独立扫描,
+//        多变体 hallucinate 防御
+var (
+	reactToolCallOpenTokens = []string{
+		reactToolCallOpen,
+		reactToolCallOpenAngle,
+	}
+	reactToolCallCloseTokens = []string{
+		reactToolCallClose,
+		reactToolCallCloseAngle,
+		reactToolCallCloseMixedBA,
+		reactToolCallCloseMixedAB,
+	}
+)
+
+// findEarliestToken 在 raw 中找任一 candidate 最早出现的位置, 返回
+// (idx, candidate). 都没找到返回 (-1, "").
+// 关键词: findEarliestToken, multi-token scanner
+func findEarliestToken(raw []byte, candidates []string) (int, string) {
+	bestIdx := -1
+	bestCand := ""
+	for _, c := range candidates {
+		idx := bytes.Index(raw, []byte(c))
+		if idx == -1 {
+			continue
+		}
+		if bestIdx == -1 || idx < bestIdx {
+			bestIdx = idx
+			bestCand = c
+		}
+	}
+	return bestIdx, bestCand
+}
+
+// findHeaderEndQuoteAware 在 inner 里找第一个 ']' 或 '>' 当 header 终止符,
+// 跳过 "..." 与 '...' 引号包裹内的字节, 防止 attr value 内嵌的特殊字符被
+// 误识别为 header end. 返回 -1 表示没有 header end.
+// 关键词: findHeaderEndQuoteAware, attr value > ] 字符防误切
+func findHeaderEndQuoteAware(inner []byte) int {
+	inQuote := false
+	quoteCh := byte(0)
+	for i := 0; i < len(inner); i++ {
+		c := inner[i]
+		if inQuote {
+			if c == quoteCh {
+				inQuote = false
+			}
+			continue
+		}
+		if c == '"' || c == '\'' {
+			inQuote = true
+			quoteCh = c
+			continue
+		}
+		if c == ']' || c == '>' {
+			return i
+		}
+	}
+	return -1
+}
+
+// drainLocked 反复扫描 buf, 抽出所有完整 tool_call (任意 open/close 混合).
 // 不能消费的 partial 前缀保留在 buf 里. 假定调用方持锁.
-// 关键词: drainLocked, react extractor state machine
+// 关键词: drainLocked, react extractor state machine, 三段独立扫描
 func (e *ReactToolExtractor) drainLocked() error {
 	for {
 		raw := e.buf.Bytes()
 		if len(raw) == 0 {
 			return nil
 		}
-		openIdx := bytes.Index(raw, []byte(reactToolCallOpen))
+		openIdx, openTok := findEarliestToken(raw, reactToolCallOpenTokens)
 		if openIdx == -1 {
-			// 没有 [tool_call 开头标签. 但要保留尾部可能是 partial prefix 的字节
+			// 没有任何 open 标签. 但要保留尾部可能是某种 partial prefix 的字节
 			safeLen := safeEmitTextLen(raw)
 			if safeLen > 0 {
 				if err := e.emitContentLocked(raw[:safeLen]); err != nil {
@@ -132,18 +204,19 @@ func (e *ReactToolExtractor) drainLocked() error {
 			return nil
 		}
 
-		// [tool_call 之前的纯文本可以立即 emit
+		// open 之前的纯文本可以立即 emit
 		if openIdx > 0 {
 			if err := e.emitContentLocked(raw[:openIdx]); err != nil {
 				return err
 			}
 			e.buf.Next(openIdx)
-			continue // 重新从 buf 头部开始扫描 (现在 buf 以 [tool_call 开头)
+			continue // 重新从 buf 头部开始扫描
 		}
 
-		// buf 现在 [tool_call... 开头, 找闭合标签 [/tool_call]
-		closeIdx := bytes.Index(raw, []byte(reactToolCallClose))
-		if closeIdx == -1 {
+		// buf 现在以 openTok 开头. 在 openTok 之后找最早的 close (任一种)
+		afterOpen := raw[len(openTok):]
+		closeRel, closeTok := findEarliestToken(afterOpen, reactToolCallCloseTokens)
+		if closeRel == -1 {
 			// 没找到 close tag. 若 buf 已经超长, 视为坏数据 fall back to text emit.
 			if e.buf.Len() > extractorBufferLimit {
 				if err := e.emitContentLocked(raw); err != nil {
@@ -156,11 +229,14 @@ func (e *ReactToolExtractor) drainLocked() error {
 			return nil
 		}
 
-		// 完整 tool_call 区段: raw[:closeIdx+len(close)]
-		segment := raw[:closeIdx+len(reactToolCallClose)]
-		tc, parseErr := parseReactToolCall(segment, e.nextToolCallIndex)
+		// 完整 tool_call 区段: raw[:len(openTok)+closeRel+len(closeTok)]
+		segmentEnd := len(openTok) + closeRel + len(closeTok)
+		segment := raw[:segmentEnd]
+		tc, parseErr := parseReactToolCallSegment(segment, e.nextToolCallIndex, openTok, closeTok)
 		if parseErr != nil {
-			// 解析失败 (坏 JSON / name 缺失等), 兜底当 text emit
+			// 解析失败 (坏 JSON / name 缺失 / header end 缺失), 兜底当 text emit.
+			// 这一兜底重要: 当 args body 里恰好嵌入了 close token 子串导致提前切割时,
+			// JSON 校验会失败, 整段 fall back, 不会给客户端发残缺 tool_call.
 			if err := e.emitContentLocked(segment); err != nil {
 				return err
 			}
@@ -170,7 +246,7 @@ func (e *ReactToolExtractor) drainLocked() error {
 			}
 			e.nextToolCallIndex++
 		}
-		e.buf.Next(len(segment))
+		e.buf.Next(segmentEnd)
 		continue
 	}
 }
@@ -185,57 +261,63 @@ func (e *ReactToolExtractor) emitContentLocked(p []byte) error {
 }
 
 // safeEmitTextLen 返回可以立即 emit 的 text 长度.
-// 尾部如果可能是 "[tool_call" 的前缀, 要保留, 等下一次 Write 来填齐.
-// 关键词: safeEmitTextLen, partial prefix protection
+// 尾部如果可能是任何已知 open 标签 ("[tool_call" / "<tool_call") 的前缀,
+// 要保留, 等下一次 Write 来填齐, 否则会把跨 chunk 拆开的 open tag 误 emit
+// 给客户端, 让本来能识别的 tool_call 退化成残缺文本.
+// 关键词: safeEmitTextLen, partial prefix protection, 多 open token
 func safeEmitTextLen(raw []byte) int {
-	maxPrefix := len(reactToolCallOpen)
 	n := len(raw)
-	// 检查 raw 末尾最多 maxPrefix-1 字节是否是 "[tool_call" 的某个前缀
-	for k := maxPrefix - 1; k > 0; k-- {
-		if k > n {
-			continue
-		}
-		tail := raw[n-k:]
-		if bytes.HasPrefix([]byte(reactToolCallOpen), tail) {
-			// 末尾 k 字节是 prefix, 不能 emit
-			return n - k
+	// 找最大需要保留的尾部长度: 取所有 open token 前缀检查里能命中的最大 k
+	holdBack := 0
+	for _, opn := range reactToolCallOpenTokens {
+		opnBytes := []byte(opn)
+		maxPrefix := len(opnBytes)
+		for k := maxPrefix - 1; k > 0; k-- {
+			if k > n {
+				continue
+			}
+			if bytes.HasPrefix(opnBytes, raw[n-k:]) {
+				if k > holdBack {
+					holdBack = k
+				}
+				break
+			}
 		}
 	}
-	return n
+	return n - holdBack
 }
 
-// parseReactToolCall 解析一段完整的 [tool_call name=NAME]ARGS_JSON[/tool_call] 文本.
-// 失败返回 error, 调用方 fallback 到 text emit.
+// parseReactToolCallSegment 解析一段以 openTok 开头、closeTok 结尾的 tool_call
+// 文本块, openTok / closeTok 来自 reactToolCallOpenTokens / reactToolCallCloseTokens
+// 的任意组合 (方/尖括号 + 4 种 close token).
 //
-// 兼容多种 header 形态:
-//   - [tool_call name=foo]
-//   - [tool_call name="foo"]
-//   - [tool_call id="call_xyz" name="foo"]  (round2 flatten 后模型常 mimic 该格式)
+// header end 用 quote-aware 扫描在 inner 里找第一个未被引号包裹的 ']' 或 '>',
+// 因此:
+//   - args body 中的 ']' '>' 字符 (如 shell redirect `2>/dev/null`) 不影响切分;
+//   - attr value 用 "..." 或 '...' 包裹时, 内部嵌入的 ']' '>' 不会被误当 header end.
 //
-// 当 header 同时携带 id="..." 时, 优先使用上游模型给出的 id, 以便:
-//   - 与上游模型自己后续可能用到的 tool_call_id 强一致, 让调试/日志可追溯;
-//   - 保留 round2 flatten 注入到历史里的原始 client tool_call_id, 让客户端
-//     做精确的 tool_call_id 匹配 (虽然多数客户端只看 index, 但 OpenCode /
-//     Codex 等会显示 id 用于 UI 关联).
-// 未携带 id 时, 回落到 "call_react_N" 规则保持向后兼容.
+// 兼容 header 形态:
+//   - name=foo                      (裸值)
+//   - name="foo"                    (双引号)
+//   - name='foo'                    (单引号)
+//   - id="call_xyz" name="foo"      (顺序无关)
 //
-// 关键词: parseReactToolCall, react tool_call serialization parse,
-//        id 属性透传, OpenCode tool_call_id 关联
-func parseReactToolCall(segment []byte, index int) (*aispec.ToolCall, error) {
-	if !bytes.HasPrefix(segment, []byte(reactToolCallOpen)) {
-		return nil, fmt.Errorf("segment does not start with %s", reactToolCallOpen)
+// 关键词: parseReactToolCallSegment, 三段独立解析, quote-aware header end,
+//        多变体 hallucinate 防御
+func parseReactToolCallSegment(segment []byte, index int, openTok, closeTok string) (*aispec.ToolCall, error) {
+	if !bytes.HasPrefix(segment, []byte(openTok)) {
+		return nil, fmt.Errorf("segment does not start with %s", openTok)
 	}
-	if !bytes.HasSuffix(segment, []byte(reactToolCallClose)) {
-		return nil, fmt.Errorf("segment does not end with %s", reactToolCallClose)
+	if !bytes.HasSuffix(segment, []byte(closeTok)) {
+		return nil, fmt.Errorf("segment does not end with %s", closeTok)
 	}
-	inner := segment[len(reactToolCallOpen) : len(segment)-len(reactToolCallClose)]
-	// inner 形如 " name=NAME]ARGS_JSON" (有前导空格 / NAME 可能带引号)
-	rightBracket := bytes.IndexByte(inner, ']')
-	if rightBracket == -1 {
-		return nil, fmt.Errorf("missing ] after [tool_call header")
+	inner := segment[len(openTok) : len(segment)-len(closeTok)]
+	headerEndIdx := findHeaderEndQuoteAware(inner)
+	if headerEndIdx == -1 {
+		return nil, fmt.Errorf("missing header end (']' or '>') after %s open tag", openTok)
 	}
-	header := string(inner[:rightBracket])
-	argsRaw := inner[rightBracket+1:]
+	header := string(inner[:headerEndIdx])
+	argsRaw := inner[headerEndIdx+1:]
 
 	name := extractReactHeaderAttr(header, "name")
 	if name == "" {
@@ -246,7 +328,6 @@ func parseReactToolCall(segment []byte, index int) (*aispec.ToolCall, error) {
 	if argsStr == "" {
 		argsStr = "{}"
 	}
-	// 校验 args 是合法 JSON object
 	var probe map[string]any
 	if err := json.Unmarshal([]byte(argsStr), &probe); err != nil {
 		return nil, fmt.Errorf("invalid args JSON: %v", err)
@@ -266,6 +347,13 @@ func parseReactToolCall(segment []byte, index int) (*aispec.ToolCall, error) {
 			Arguments: argsStr,
 		},
 	}, nil
+}
+
+// parseReactToolCall 是 parseReactToolCallSegment 的规范方括号薄包装,
+// 保留以兼容历史调用方 / 老测试.
+// 关键词: parseReactToolCall, 方括号格式默认入口, 兼容历史 API
+func parseReactToolCall(segment []byte, index int) (*aispec.ToolCall, error) {
+	return parseReactToolCallSegment(segment, index, reactToolCallOpen, reactToolCallClose)
 }
 
 // extractReactHeaderAttr 从 header 字符串中抠出指定 key 的值.
@@ -302,8 +390,11 @@ func extractReactHeaderAttr(header string, key string) string {
 		if rest == "" {
 			return ""
 		}
-		if rest[0] == '"' {
-			end := strings.IndexByte(rest[1:], '"')
+		// 双引号 / 单引号 attr value 都接受 (deepseek hallucinate 时也会
+		// 用 ' 包裹 attr value). 关键词: 单双引号 attr value 兼容.
+		if rest[0] == '"' || rest[0] == '\'' {
+			quote := rest[0]
+			end := strings.IndexByte(rest[1:], quote)
 			if end == -1 {
 				return ""
 			}
