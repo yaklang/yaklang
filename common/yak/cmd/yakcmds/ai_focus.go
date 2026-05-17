@@ -259,19 +259,25 @@ func printAIFocusEvent(e *schema.AiOutputEvent, useJSON bool) {
 		schema.EVENT_TYPE_AI_FIRST_BYTE_COST_MS, schema.EVENT_TYPE_AI_TOTAL_COST_MS:
 		return
 	}
-	// 流式 delta 走统一的 DebugStreamPrinter, 把同流 token 合并到单行,
-	// 流切换时换行 + 头部, 避免之前每个 delta 自带 \n 造成的刷屏。
-	if e.IsStream && len(e.StreamDelta) > 0 {
-		aicommon.GetDefaultDebugStreamPrinter().PrintStreamDelta(e)
-		return
-	}
-	// 非流事件: 先把可能存在的活动流行收尾, 再打印自身, 防止"夹心"。
-	aicommon.GetDefaultDebugStreamPrinter().FlushIfActive()
 
+	// ai-focus 的契约: 所有事件 (含 stream delta) 都写到 stdout, 这样
+	// 调用方 `yak ai-focus -q ... > out.txt` 才能拿到完整 AI 输出。
+	// DebugStreamPrinter 默认写 stderr, 是给 DEBUG=1 场景下 log 与流
+	// 同侧防夹心用的, 不能拿来承载 CLI 的主输出, 否则 stream 正文会
+	// 漏到 stderr, stdout 拿不到也无法管道化。
+	// 关键词: ai-focus stream stdout contract, fix stderr regression
 	prefix := fmt.Sprintf("[%s]", e.Type)
 	if e.NodeId != "" {
 		prefix += fmt.Sprintf("[%s]", e.NodeId)
 	}
+	if e.IsStream && len(e.StreamDelta) > 0 {
+		fmt.Fprintf(os.Stdout, "%s %s\n", prefix, string(e.StreamDelta))
+		return
+	}
+	// 非流事件来临时, 把可能挂在默认 DebugStreamPrinter (stderr) 上的
+	// 活动流行先收尾, 避免 DEBUG=1 时 stderr 侧出现"夹心"。
+	// 关键词: ai-focus flush stderr stream before non-stream event
+	aicommon.GetDefaultDebugStreamPrinter().FlushIfActive()
 	if len(e.Content) > 0 {
 		fmt.Fprintf(os.Stdout, "%s %s\n", prefix, string(e.Content))
 		return
