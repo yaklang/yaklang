@@ -204,7 +204,13 @@ type Config struct {
 	/*
 		Prompt Manager
 	*/
-	TopToolsCount          int  // Number of top tools to display in prompt
+	// TopToolsCount 是 Tool Inventory 段的候选池上限 (按 getPrioritizedTools
+	// 排序后取前 N 个), 真正展示给 LLM 的工具数量再由 aicommon.SelectToolsByTokenBudget
+	// 按 token 预算从候选池里二次裁剪, 同时保底 ToolInventoryMinCount 个.
+	// 这个字段不是"实际展示数量", 而是"候选数量上限", 用 WithTopToolsCount(N)
+	// 可以缩窄候选池 (例如限制只看排序最前的 30 个), 但展示上限仍以 token 预算为准.
+	// 关键词: TopToolsCount 候选池上限, token 预算二次裁剪, 保底 20
+	TopToolsCount          int
 	ShowForgeListInPrompt  bool // Whether to show forge list in base prompt (default false, forges discoverable via search_capabilities)
 	AiForgeManager         AIForgeFactory
 	ContextProviderManager *ContextProviderManager
@@ -482,7 +488,7 @@ func newConfig(ctx context.Context) *Config {
 		AiTaskReviewControl:                DefaultAITaskReviewControl,
 		MaxIterationCount:                  100,
 		Language:                           "zh", // Default to Chinese
-		TopToolsCount:                      15,
+		TopToolsCount:                      100,
 		ContextProviderManager:             NewContextProviderManager(),
 		AiAutoRetry:                        5,
 		AiTransactionAutoRetry:             5,

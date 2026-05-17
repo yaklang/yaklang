@@ -268,11 +268,15 @@ func (pm *PromptManager) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[s
 	result["AskForClarificationCurrentTime"] = pm.react.currentUserInteractiveCount
 	result["AskForClarificationMaxTimes"] = pm.react.config.GetUserInteractiveLimitedTimes()
 	if len(tools) > 0 {
+		// caller 已经指定了一个工具子集, 直接全量展示, 不走 token 预算裁剪 -
+		// 这种调用方通常是测试 / 老路径自定义 prompt, 工具集本身就是它筛过的.
+		// 关键词: GetBasicPromptInfo caller-supplied tools, 不二次裁剪
 		result["Tools"] = tools
 		result["ToolsCount"] = len(tools)
 		result["TopToolsCount"] = len(tools)
 		result["TopTools"] = tools
 		result["HasMoreTools"] = false
+		result["MoreToolsCount"] = 0
 	} else {
 		var err error
 		// use getter for ai tool manager and handle nil
@@ -286,15 +290,32 @@ func (pm *PromptManager) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[s
 		}
 		result["Tools"] = tools
 		result["ToolsCount"] = len(tools)
-		result["TopToolsCount"] = pm.react.config.GetTopToolsCount()
-		// Get prioritized tools
+		// 与 prompt_loop_materials.go GetLoopPromptBaseMaterials 保持完全一致:
+		// 先用 GetTopToolsCount 取候选池, 再用 SelectToolsByTokenBudget 按 3K
+		// token 预算二次裁剪, 保底 ToolInventoryMinCount 个工具, base.txt 模板
+		// 与 frozen_block_section.txt 看到同一份 TopTools / MoreToolsCount.
+		// 关键词: GetBasicPromptInfo token budget, 与主路径口径对齐
 		if len(tools) > 0 {
-			topTools := pm.react.getPrioritizedTools(tools, pm.react.config.GetTopToolsCount())
-			result["TopTools"] = topTools
-			result["HasMoreTools"] = len(tools) > len(topTools)
+			topCount := pm.react.config.GetTopToolsCount()
+			candidate := pm.react.getPrioritizedTools(tools, topCount)
+			display := aicommon.SelectToolsByTokenBudget(
+				candidate,
+				aicommon.ToolInventoryTokenBudget,
+				aicommon.ToolInventoryMinCount,
+			)
+			more := len(tools) - len(display)
+			if more < 0 {
+				more = 0
+			}
+			result["TopTools"] = display
+			result["TopToolsCount"] = len(display)
+			result["HasMoreTools"] = len(tools) > len(display)
+			result["MoreToolsCount"] = more
 		} else {
 			result["TopTools"] = []*aitool.Tool{}
+			result["TopToolsCount"] = 0
 			result["HasMoreTools"] = false
+			result["MoreToolsCount"] = 0
 		}
 	}
 

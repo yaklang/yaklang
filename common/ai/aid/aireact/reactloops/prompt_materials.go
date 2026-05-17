@@ -31,10 +31,15 @@ type LoopPromptBaseMaterials struct {
 	WorkingDirGlance   string
 	AutoContext        string
 	UserHistory        string
-	ToolsCount         int
-	TopToolsCount      int
-	TopTools           []*aitool.Tool
-	HasMoreTools       bool
+	ToolsCount    int
+	TopToolsCount int
+	TopTools      []*aitool.Tool
+	HasMoreTools  bool
+	// MoreToolsCount = ToolsCount - TopToolsCount, 即 token 预算裁剪后没能
+	// 进入 Tool Inventory 列表的剩余工具数量, 由 aicommon.SelectToolsByTokenBudget
+	// 计算结果设置, 让模板能给出具体数字而不是模糊的 "...".
+	// 关键词: MoreToolsCount, Tool Inventory 剩余工具数, search_capabilities 具象提示
+	MoreToolsCount int
 	AIForgeList        string
 	Timeline           string
 	TimelineFrozen     string
