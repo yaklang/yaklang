@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -305,18 +306,35 @@ func (r *ReActLoop) performAIReflection(ctx context.Context, reflection *ActionR
 		nonce, len(prompt))
 
 	// 第三步：使用 CallAITransaction 进行稳定的 AI 调用
+	// 同步反思 AI 调用 post-action 卡死兜底: 给反思流套一层 idle-timeout
+	// reader, 与 verification 共享同一 feature flag / 默认阈值. 关闭时退化
+	// 为纯计时观测 (P0 埋点), 始终输出 [REFLECTION_AI_TIMING] 结构化日志.
+	// 关键词: performAIReflection 流空闲超时, P0 埋点, P1 兜底
+	reflectionTTFB, reflectionIdle := aicommon.ResolveAIStreamIdleThresholds(config)
+	var reflectionTimedOut atomic.Bool
+
 	err = aicommon.CallAITransaction(
 		config,
 		prompt,
 		config.CallSpeedPriorityAI,
 		func(rsp *aicommon.AIResponse) error {
+			reflectionTimedOut.Store(false)
 			boundEmitter := rsp.BindEmitter(emitter)
-			// 获取流式输出
-			stream := rsp.GetOutputStreamReader(
+			rawStream := rsp.GetOutputStreamReader(
 				"self-reflection",
 				true,
 				emitter,
 			)
+			idleReader := aicommon.NewStreamIdleTimeoutReader(rawStream, reflectionTTFB, reflectionIdle)
+			defer func() {
+				snap := idleReader.Snapshot()
+				aicommon.LogStreamTimingSnapshot("REFLECTION_AI_TIMING", snap)
+				if snap.TimedOut {
+					reflectionTimedOut.Store(true)
+				}
+				_ = idleReader.Close()
+			}()
+			stream := io.Reader(idleReader)
 
 			// 构建 action 提取选项，让 action 自动处理字段流式输出
 			actionOptions := []aicommon.ActionMakerOption{
@@ -390,6 +408,16 @@ func (r *ReActLoop) performAIReflection(ctx context.Context, reflection *ActionR
 
 	if err != nil {
 		log.Warnf("failed to perform AI reflection transaction: %v", err)
+		// P1 兜底: AI 反思流卡死且重试用光时, 仅写一条 [REFLECTION_TIMEOUT]
+		// timeline 痕迹, 不阻塞主循环. 反思本身是 fire-and-forget, 失败
+		// 不应升级为致命错误. 关键词: performAIReflection 流空闲降级,
+		// [REFLECTION_TIMEOUT]
+		if reflectionTimedOut.Load() {
+			r.GetInvoker().AddToTimeline("[REFLECTION_TIMEOUT]", fmt.Sprintf(
+				"AI reflection for action[%s] hit stream idle timeout (ttfb=%v idle=%v); skipped, loop continues without spin warning escalation",
+				reflection.ActionType, reflectionTTFB, reflectionIdle,
+			))
+		}
 		return
 	}
 

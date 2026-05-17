@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -151,6 +152,23 @@ type ReActLoop struct {
 	// timeline differ for tracking changes during task execution
 	timelineDiffer        *aicommon.TimelineDiffer
 	currentIterationIndex int
+
+	// lastIterationTickAt 记录主循环最近一次推进 (iterationCount++) 的
+	// 单调时间戳, 单位 unix nanoseconds. 仅由主循环线程写, stall heartbeat
+	// goroutine 与外部观察方原子读, 故用 atomic.Int64 即可. 心跳协程依此
+	// 判断"我还在动吗?", 90s 无变更则 emit [LOOP_STALL_DETECTED] timeline
+	// + dump goroutine stack 用于事后分析, 但绝不主动中止主循环 — 这是
+	// 兜底观察而非抢断.
+	// 关键词: lastIterationTickAt, 主循环心跳, [LOOP_STALL_DETECTED]
+	lastIterationTickAt atomic.Int64
+
+	// verificationInFlight 标记 verification AI 调用是否正在飞行中, 用于
+	// 让 watchdog 在不持锁的情况下感知 "上一次还没回来". 与 verificationMutex
+	// 解耦后, watchdog 即便正赶上 verification 卡死也能立刻拿到这个原子
+	// 状态, 写一条 [ASYNC_VERIFICATION_WATCHDOG_BUSY] 痕迹后返回, 而不会
+	// 跟着一起阻塞.
+	// 关键词: verificationInFlight, watchdog 解锁, atomic.Bool
+	verificationInFlight atomic.Bool
 
 	// SPIN detection thresholds
 	sameActionTypeSpinThreshold int // 相同任务自旋阈值

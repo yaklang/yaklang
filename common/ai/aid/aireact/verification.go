@@ -8,6 +8,7 @@ import (
 	"io"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/log"
@@ -67,11 +68,33 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 	}
 
 	log.Infof("Verifying if user needs are satisfied and formatting results...")
+	// 同步 AI 调用 post-action 卡死兜底: 给 verification 的 AI 输出流套一层
+	// StreamIdleTimeoutReader (TTFB / 字节间 idle 双阈值, 由 feature flag
+	// EnableAIStreamIdleTimeout 控制, 默认开). 即便 feature flag 关闭,
+	// reader 仍以 ttfb=0/idle=0 模式落地, 只做计时观测 (P0 埋点).
+	// 关键词: VerifyUserSatisfaction 流空闲超时, P0 埋点, P1 兜底
+	verifyTTFB, verifyIdle := aicommon.ResolveAIStreamIdleThresholds(r.config)
+	var verificationTimedOut atomic.Bool
+
 	transErr := aicommon.CallAITransaction(
 		r.config, verificationPrompt, r.config.CallAI,
 		func(rsp *aicommon.AIResponse) error {
+			// 每个 retry attempt 独立重置, 仅当"最后一次失败"时才作为
+			// 整体降级依据 (transErr != nil 时再读 verificationTimedOut).
+			verificationTimedOut.Store(false)
 			boundEmitter := rsp.BindEmitter(r.Emitter)
-			stream := rsp.GetOutputStreamReader("re-act-verify", true, r.Emitter)
+			rawStream := rsp.GetOutputStreamReader("re-act-verify", true, r.Emitter)
+
+			idleReader := aicommon.NewStreamIdleTimeoutReader(rawStream, verifyTTFB, verifyIdle)
+			defer func() {
+				snap := idleReader.Snapshot()
+				aicommon.LogStreamTimingSnapshot("VERIFY_AI_TIMING", snap)
+				if snap.TimedOut {
+					verificationTimedOut.Store(true)
+				}
+				_ = idleReader.Close()
+			}()
+			stream := io.Reader(idleReader)
 
 			var rawResponse bytes.Buffer
 			stream = io.TeeReader(stream, &rawResponse)
@@ -300,6 +323,25 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 	)
 	if transErr != nil {
 		log.Errorf("AI transaction failed during verification: %v", transErr)
+		// P1 兜底: 当所有 retry 都因 AI 流"假活"(无字节/字节间空闲)而失败时,
+		// 不再向上抛出 transErr 让调用方 Fail loop, 而是降级为
+		// "本轮 verification 跳过 = 视为未满足", 同时 timeline 留下
+		// [VERIFICATION_TIMEOUT] 痕迹供前端 / 后续 prompt / 自我反思感知.
+		// 关键词: VerifyUserSatisfaction 流空闲降级, [VERIFICATION_TIMEOUT]
+		if verificationTimedOut.Load() {
+			r.AddToTimeline("[VERIFICATION_TIMEOUT]", fmt.Sprintf(
+				"AI verification stream idle timeout (ttfb=%v idle=%v); skipped this round, treated as not-satisfied so the loop keeps moving",
+				verifyTTFB, verifyIdle,
+			))
+			skipped := &aicommon.VerifySatisfactionResult{
+				Satisfied: false,
+				Reasoning: fmt.Sprintf(
+					"Verification skipped due to AI stream idle timeout (ttfb=%v idle=%v); treating as not-satisfied so the loop continues without blocking",
+					verifyTTFB, verifyIdle,
+				),
+			}
+			return skipped, nil
+		}
 		return nil, transErr
 	}
 	r.AppendVerificationHistory(result)
