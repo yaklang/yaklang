@@ -55,28 +55,35 @@ func TestAITaskCallToolStdOut_VerifyUserQuery(t *testing.T) {
 	}
 	go coordinator.Run()
 
-	count := 0
 	var outBuffer = bytes.NewBuffer(nil)
 	var errBuffer = bytes.NewBuffer(nil)
 	var toolCallID string
+	count := 0
+	deadline := time.After(20 * time.Second)
+	testConditionsMet := func() bool {
+		return strings.Contains(outBuffer.String(), outputToken) &&
+			strings.Contains(errBuffer.String(), errToken)
+	}
 
 LOOP:
 	for {
 		select {
-		case <-time.After(10 * time.Second):
+		case <-deadline:
 			break LOOP
 		case result := <-outputChan:
 			count++
 			if count > 5000 { // 关键词: count 上限放宽, ReAct 事件量增加
 				break LOOP
 			}
-
 			if result.Type == schema.EVENT_TOOL_CALL_START {
 				toolCallID = result.CallToolID
 				continue
 			}
 
 			if result.Type == schema.EVENT_TOOL_CALL_DONE || result.Type == schema.EVENT_TOOL_CALL_ERROR || result.Type == schema.EVENT_TOOL_CALL_USER_CANCEL {
+				if testConditionsMet() {
+					break LOOP
+				}
 				continue
 			}
 			if result.Type == schema.EVENT_TYPE_STREAM {
@@ -90,6 +97,9 @@ LOOP:
 					require.True(t, result.DisableMarkdown)
 					errBuffer.Write(result.StreamDelta)
 				}
+				if testConditionsMet() {
+					break LOOP
+				}
 			}
 
 			if result.Type == schema.EVENT_TYPE_STRUCTURED {
@@ -99,7 +109,7 @@ LOOP:
 				}
 			}
 
-			if utils.MatchAllOfSubString(string(result.Content), "start to generate and feedback tool") {
+			if utils.MatchAllOfSubString(string(result.Content), "start to generate and feedback tool") && testConditionsMet() {
 				break LOOP
 			}
 		}
@@ -171,28 +181,35 @@ func TestAITaskCallToolStdOut_VerifyTimelineAndUserQuery(t *testing.T) {
 
 	go coordinator.Run()
 
-	count := 0
 	var outBuffer = bytes.NewBuffer(nil)
 	var errBuffer = bytes.NewBuffer(nil)
 	var toolCallID string
+	count := 0
+	deadline := time.After(20 * time.Second)
+	testConditionsMet := func() bool {
+		return strings.Contains(outBuffer.String(), outputToken) &&
+			strings.Contains(errBuffer.String(), errToken)
+	}
 
 LOOP:
 	for {
 		select {
-		case <-time.After(10 * time.Second):
+		case <-deadline:
 			break LOOP
 		case result := <-outputChan:
 			count++
 			if count > 5000 { // 关键词: count 上限放宽, ReAct 事件量增加
 				break LOOP
 			}
-
 			if result.Type == schema.EVENT_TOOL_CALL_START {
 				toolCallID = result.CallToolID
 				continue
 			}
 
 			if result.Type == schema.EVENT_TOOL_CALL_DONE || result.Type == schema.EVENT_TOOL_CALL_ERROR || result.Type == schema.EVENT_TOOL_CALL_USER_CANCEL {
+				if testConditionsMet() {
+					break LOOP
+				}
 				continue
 			}
 			if result.Type == schema.EVENT_TYPE_STREAM {
@@ -206,6 +223,9 @@ LOOP:
 					require.True(t, result.DisableMarkdown)
 					errBuffer.Write(result.StreamDelta)
 				}
+				if testConditionsMet() {
+					break LOOP
+				}
 			}
 
 			if result.Type == schema.EVENT_TYPE_STRUCTURED {
@@ -215,7 +235,7 @@ LOOP:
 				}
 			}
 
-			if utils.MatchAllOfSubString(string(result.Content), "start to generate and feedback tool") {
+			if utils.MatchAllOfSubString(string(result.Content), "start to generate and feedback tool") && testConditionsMet() {
 				break LOOP
 			}
 		}

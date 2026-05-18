@@ -1186,7 +1186,7 @@ func executeChatBaseRequest(
 			defer wg.Done()
 			defer func() {
 				if err := recover(); err != nil {
-					log.Warnf("reasonStreamHandler panic: %v", err)
+					log.Warnf("reasonStreamHandler panicked: %v", err)
 				}
 			}()
 			ctx.ReasonStreamHandler(reasonPr)
@@ -1200,7 +1200,7 @@ func executeChatBaseRequest(
 		defer wg.Done()
 		defer func() {
 			if err := recover(); err != nil {
-				log.Warnf("streamHandler panic: %v", err)
+				log.Warnf("streamHandler panicked: %v", err)
 			}
 		}()
 

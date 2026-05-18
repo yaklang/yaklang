@@ -145,6 +145,7 @@ func TestReAct_PlanAndExecute_MultiPlan(t *testing.T) {
 	_ = iid
 	var processCount = 0
 	directlyAnswer := false
+	var answerStream bytes.Buffer
 LOOP:
 	for {
 		select {
@@ -173,6 +174,14 @@ LOOP:
 			if e.Type == string(schema.EVENT_TYPE_RESULT) {
 				directlyAnswer = true
 				break LOOP
+			}
+			if e.Type == string(schema.EVENT_TYPE_STREAM) && e.NodeId == "re-act-loop-answer-payload" {
+				answerStream.Write(e.GetContent())
+				if strings.Contains(answerStream.String(), "mocked answer directly after plan") ||
+					strings.Contains(answerStream.String(), "mocked post-iteration summary") {
+					directlyAnswer = true
+					break LOOP
+				}
 			}
 		case <-after:
 			break LOOP
