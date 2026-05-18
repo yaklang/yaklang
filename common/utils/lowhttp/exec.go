@@ -997,9 +997,9 @@ RECONNECT:
 			streamHandlerDone = make(chan struct{})
 			reader, writer := utils.NewBufPipe(nil)
 			defer func() {
-				utils.Debug(func() {
-					log.Infof("close reader and writer")
-				})
+				// utils.Debug(func() {
+				// 	log.Infof("close reader and writer")
+				// })
 				writer.Close()
 			}()
 			//startHandlerStream := time.Now()

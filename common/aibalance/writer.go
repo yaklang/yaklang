@@ -85,7 +85,13 @@ func NewChatJSONChunkWriter(writer io.WriteCloser, uid string, model string) *ch
 //
 // 关键词: NewChatJSONChunkWriterEx, 非流式 writer, 显式 notStream
 func NewChatJSONChunkWriterEx(writer io.WriteCloser, uid string, model string, notStream bool) *chatJSONChunkWriter {
-	pr, pw := bufpipe.NewPipe()
+	prRaw, pw := bufpipe.NewPipe()
+
+	var pr io.Reader = prRaw
+	// utils.Debug(func() {
+	// 	pr = io.TeeReader(prRaw, os.Stdout)
+	// })
+
 	wg := new(sync.WaitGroup)
 	wg.Add(1)
 	go func() {
@@ -598,7 +604,7 @@ func (w *chatJSONChunkWriter) WriteToolCalls(toolCalls []*aispec.ToolCall) error
 	w.writerClose.Write([]byte("\r\n"))
 	utils.FlushWriter(w.writerClose)
 
-	log.Infof("WriteToolCalls: forwarded %d tool calls to client", len(toolCalls))
+	// log.Infof("WriteToolCalls: forwarded %d tool calls to client", len(toolCalls))
 	return nil
 }
 
