@@ -158,3 +158,19 @@
 ```json
 {"@action": "verify-satisfaction", "user_satisfied": false, "completed_task_index": "", "reasoning": "阶段推进：已完成上一项观察，准备进入下一步", "next_movements": [{"op": "done", "id": "collect_page_signal"}, {"op": "add", "id": "replay_with_new_payload", "content": "使用新的 payload 复测并对比响应差异"}]}
 ```
+
+### 示例13：宣告完成前必须先关闭所有残留 TODO
+
+**场景**：当前子任务 `1-1` 是"获取操作系统类型"，已经成功获取为 `Darwin`。此时 TODO 列表中还有 `verify_kernel_version`（PENDING）和 `collect_uptime`（DOING）这两个未关闭的 TODO，但你判断当前子任务的目标已经达成。
+
+**错误判断（系统会强制回退）**：
+```json
+{"@action": "verify-satisfaction", "user_satisfied": true, "completed_task_index": "1-1", "reasoning": "目标达成：已获取操作系统类型为 Darwin", "next_movements": []}
+```
+错误原因：仍有 PENDING / DOING TODO 未关闭，系统会强制把 `user_satisfied` 回退为 `false` 并写入 `[VERIFICATION_TODO_INCOMPLETE]` timeline，相当于你这一轮 verification 白做。
+
+**正确判断（同一轮显式关闭所有残留 TODO 再宣告完成）**：
+```json
+{"@action": "verify-satisfaction", "user_satisfied": true, "completed_task_index": "1-1", "reasoning": "目标达成：已获取操作系统类型为 Darwin；同时清理残留 TODO", "next_movements": [{"op": "done", "id": "collect_uptime"}, {"op": "skip", "id": "verify_kernel_version"}]}
+```
+正确原因：`done` 关闭已经完成的 TODO，`skip` 主动跳过本次范围内不再推进的 TODO。两类操作都属于"显式关闭"，关闭后 store 中不再有 PENDING / DOING，`user_satisfied=true` 才能稳定生效。

@@ -391,6 +391,24 @@ ActionHandler: func(loop *ReActLoop, action *aicommon.Action, op *LoopActionHand
 }
 ```
 
+### TODO 关闭与 Satisfied 兜底机制
+
+`VerifyUserSatisfaction` 不仅产出 `Satisfied`，还驱动一个全局 TODO 闭环：
+
+1. **TODO 状态**：`SessionPromptState.VerificationTodoStore` 维护 TODO 列表（PENDING / DOING / DONE / DELETED / SKIPPED），通过 `next_movements` 的增量 op 演进。
+2. **关闭 TODO 的三种方式**（必须 AI 主动声明，旧的"Satisfied=true 自动翻 SKIPPED"语义已废弃）：
+   - `{"op": "done", "id": "..."}`：表示该项已完成
+   - `{"op": "delete", "id": "..."}`：表示该项不再需要
+   - `{"op": "skip", "id": "..."}`：表示该项主动跳过（与 delete 区别：skip 表"本次范围内不做"，delete 表"彻底不要"）
+3. **Satisfied 兜底**（[verification.go](../../../verification.go) `enforceTodoCompletionBeforeSatisfaction`）：
+   - 在 `AppendVerificationHistory` 写入 TODO 状态之后、`emitTodoListUpdate` 发送前端事件之前触发
+   - 若 AI 声明 `user_satisfied=true` 但 store 仍有 `PENDING + DOING > 0`：
+     - `result.Satisfied` 被强制覆盖为 `false`
+     - `result.Reasoning` 前注入 `[OVERRIDE] ...`，保留 AI 原文于 `[AI ORIGINAL] ...`
+     - timeline 写入 `[VERIFICATION_TODO_INCOMPLETE]`，列出残留 TODO，把"未关闭项"反馈给下一轮 prompt
+   - 让 operator 路径 (`tool_call_common.go` / `action_tool_compose.go` 等) 看到的是覆盖后的真值，不会错误地 `op.Exit()`
+4. **控制论语义**：AI 的 `user_satisfied=true` 是控制器的"已达稳态"主观信号；TODO store 是客观可观测量。两者互相冲突时以客观量为准，主观信号回退，并把残差作为下一轮的输入反馈，形成闭环。
+
 ### 在 OnPostIteraction 里读 spin 状态
 
 ```go

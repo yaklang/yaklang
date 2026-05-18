@@ -70,6 +70,11 @@ func FormatVerifyNextMovementsSummary(nextMovements []VerifyNextMovement) string
 			parts = append(parts, "DONE["+movement.ID+"]")
 		case "delete":
 			parts = append(parts, "DELETE["+movement.ID+"]")
+		case "skip":
+			// 显式跳过 op summary, 与 done/delete 平行展示, 形成
+			// "三种主动关闭方式" (DONE/DELETE/SKIP) 的统一摘要文本.
+			// 关键词: FormatVerifyNextMovementsSummary skip 摘要
+			parts = append(parts, "SKIP["+movement.ID+"]")
 		default:
 			parts = append(parts, strings.ToUpper(movement.Op)+"["+movement.ID+"]")
 		}

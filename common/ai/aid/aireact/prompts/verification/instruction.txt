@@ -114,17 +114,17 @@
 - 如果最新的步骤执行成功且产生了无可辩驳的证据，证明用户的【最终请求】已经完全解决时，通常应该设置user_satisfied为true。
 - 只有当工具执行完全失败或没有任何相关输出时，才设置user_satisfied为false。
 - 重点关注用户的核心需求是否得到满足，而不是执行过程的细节。
-- 当 `user_satisfied` 为 false 的时候，需要考虑 `next_movements` 设置好：
-    - `next_movements` 不再是自由文本，而是 TODO 增量操作数组。
-    - 你可以使用：
+- `next_movements` 是 TODO 增量操作数组（不再是自由文本），无论 `user_satisfied` 为 true 还是 false 都遵循同一份语法：
     - `{"op": "add", "id": "stable_id", "content": "新增一个短链路 TODO"}`
     - `{"op": "doing", "id": "stable_id"}`
     - `{"op": "done", "id": "stable_id"}`
     - `{"op": "delete", "id": "stable_id"}`
+    - `{"op": "skip", "id": "stable_id"}`
     - `doing` 用于标记某个已有 TODO 当前正在进行中，通常只需要 `id`。
     - 如果某个 TODO 已经存在，而你只是要表达"现在开始做它"或"正在推进它"，优先使用 `doing`，不要重复用 `add` 再创建一次。
     - `done` 用于关闭已存在 TODO，表示该事项已经完成，`content` 可省略。
-    - `delete` 用于标记某个已有 TODO 不再需要，表示删除而非完成，`content` 可省略。
+    - `delete` 用于标记某个已有 TODO 不再需要，表示彻底删除而非完成，`content` 可省略。
+    - `skip` 用于主动跳过某个 TODO，表示"本次任务范围内不打算做"。语义上与 `delete` 区分：`delete` 是"这条任务不再有效"，`skip` 是"这条任务有效但从此放弃推进"。`content` 可省略。
     - `add` 必须提供 `content`，且内容要与当前任务直接对齐。
     - 如果没有必要增减 TODO，输出 `[]`。
     - 不要把整套执行计划、风险分析、长段说明重新塞进 `next_movements`。
@@ -150,9 +150,10 @@
     - 因此不要遗漏真实交付物，也不要把只在回答里提到、但没有工具证据的路径写进去。
 
 - 不必每次都输出 evidence；只有真的有关键新增发现时再写。
-- 当 `user_satisfied` 为 true 的时候：
-    - `next_movements` 必须输出 `[]`。
-    - 系统会自动把剩余未关闭 TODO 标记为 `SKIPPED`，你不需要手动输出 skipped 状态。
+- 当 `user_satisfied` 为 true 的时候（重要，必须遵守）：
+    - 全局 TODO 列表中所有项都必须被显式关闭（`done` / `delete` / `skip`），不能留下任何 PENDING / DOING 状态的 TODO。
+    - 系统不再自动把剩余未关闭 TODO 标记为 `SKIPPED`；如果你声明 `user_satisfied: true` 时仍有未关闭的 TODO，系统会强制把 `user_satisfied` 回退为 `false`，并在 timeline 中写入 `[VERIFICATION_TODO_INCOMPLETE]` 推动你继续处理。
+    - 因此在宣告完成之前，必须先在 `next_movements` 中用 `done` / `delete` / `skip` 一次性关闭所有残留 TODO，再发出 `user_satisfied=true`。允许同一轮内 `user_satisfied=true` 与非空 `next_movements`（仅用于关闭剩余 TODO）共存。
 - 关于 `reasoning` 的设置，一定要简明扼要，并且战略性分析，我会给你一些简明扼要的风格，作为回答的参考：
     - 工具执行失败：命令返回非零退出码，无法继续任务
     - 任务未完成：当前结果仅确认了文件存在，仍需进行实际修改操作
@@ -200,7 +201,7 @@
 2. 禁止任务未完成时设置错误的 `completed_task_index`
 3. 禁止自行发明任务描述中不存在的量化完成标准（如字数、行数、条目数等），并以此为由将已完成的任务判定为未完成
 4. 禁止把完整 TODO 列表重新输出到 `next_movements`
-5. 禁止在 `user_satisfied=true` 时继续输出非空 `next_movements`
+5. 禁止在仍有未关闭 TODO (PENDING / DOING) 的情况下宣告 `user_satisfied=true`。要么先用 `next_movements` 中的 `done` / `delete` / `skip` 把它们关闭，要么继续 `user_satisfied=false` 推进剩余工作。
 6. 禁止把"技能已加载""技能文档已读取""AI 已直接回答"当成执行型安全任务的直接证据
 7. 禁止把未出现在 `output_files`、工具 stdout 或时间线创建记录中的文件路径写成已生成交付物
 
