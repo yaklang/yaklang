@@ -861,6 +861,9 @@ func (b *singleFileBuilder) VisitName(raw *pythonparser.NameContext) interface{}
 	if wildcardValue := b.resolveWildcardImportName(name); wildcardValue != nil {
 		return wildcardValue
 	}
+	if modExport := b.readVirtualModuleExport(name); modExport != nil {
+		return modExport
+	}
 	// Fall back to the original full lookup path for closure/freevalue resolution,
 	// externs, and undefined placeholders.
 	if varVal := b.ReadValue(name); varVal != nil {

@@ -1817,6 +1817,61 @@ func (b *singleFileBuilder) VisitSuite(raw pythonparser.ISuiteContext) interface
 	return nil
 }
 
+func compoundStmtTopLevelFuncdef(comp pythonparser.ICompound_stmtContext) *pythonparser.FuncdefContext {
+	if comp == nil {
+		return nil
+	}
+	cof, ok := comp.(*pythonparser.Class_or_func_def_stmtContext)
+	if !ok || cof == nil {
+		return nil
+	}
+	if fd := cof.Funcdef(); fd != nil {
+		if fdc, ok := fd.(*pythonparser.FuncdefContext); ok {
+			return fdc
+		}
+	}
+	return nil
+}
+
+func stmtTopLevelFuncdef(stmt pythonparser.IStmtContext) *pythonparser.FuncdefContext {
+	s, ok := stmt.(*pythonparser.StmtContext)
+	if !ok || s == nil {
+		return nil
+	}
+	return compoundStmtTopLevelFuncdef(s.Compound_stmt())
+}
+
+// predeclareTopLevelFuncShells creates SSA function shells and module bindings for every
+// top-level def before statement visitation, so a def that appears earlier in the file can
+// call a function defined later (Python forward reference within the same module).
+func (b *singleFileBuilder) predeclareTopLevelFuncShells(stmts []pythonparser.IStmtContext) {
+	if b == nil || len(stmts) == 0 {
+		return
+	}
+	m := make(map[*pythonparser.FuncdefContext]*ssa.Function)
+	for _, raw := range stmts {
+		fd := stmtTopLevelFuncdef(raw)
+		if fd == nil {
+			continue
+		}
+		nameCtx := fd.Name()
+		if nameCtx == nil {
+			continue
+		}
+		funcName := nameCtx.GetText()
+		if funcName == "" || fd.Suite() == nil {
+			continue
+		}
+		newFunc := b.NewFunc(funcName)
+		funcVar := b.CreateVariable(funcName)
+		b.AssignVariable(funcVar, newFunc)
+		b.GetProgram().SetExportValue(funcName, newFunc)
+		b.syncPythonVirtualModuleExport(funcName, newFunc.GetType(), newFunc)
+		m[fd] = newFunc
+	}
+	b.topLevelFuncShells = m
+}
+
 // VisitClassOrFuncDefStmt visits a class_or_func_def_stmt node.
 // This handles decorated class and function definitions.
 func (b *singleFileBuilder) VisitClassOrFuncDefStmt(raw *pythonparser.Class_or_func_def_stmtContext) interface{} {
@@ -1906,7 +1961,16 @@ func (b *singleFileBuilder) VisitFuncdef(raw pythonparser.IFuncdefContext) inter
 		return nil
 	}
 
-	newFunc := b.NewFunc(funcName)
+	var newFunc *ssa.Function
+	if b.topLevelFuncShells != nil {
+		if shell, ok := b.topLevelFuncShells[funcdef]; ok {
+			newFunc = shell
+			delete(b.topLevelFuncShells, funcdef)
+		}
+	}
+	if newFunc == nil {
+		newFunc = b.NewFunc(funcName)
+	}
 	b.FunctionBuilder = b.PushFunction(newFunc)
 
 	if params := funcdef.Typedargslist(); params != nil {

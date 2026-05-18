@@ -774,6 +774,14 @@ func (b *singleFileBuilder) bindImportedName(bindingName, sourceName, packagePat
 			}
 		}
 	}
+	if value == nil || isPythonImportPlaceholderValue(value) {
+		if sub := b.resolvePythonSubmoduleImport(bindingName, sourceName, packagePath); sub != nil {
+			value = sub
+			if cur := lib.GetExportValue(bindingName); cur == nil || isPythonImportPlaceholderValue(cur) {
+				lib.SetExportValue(bindingName, value)
+			}
+		}
+	}
 	if value == nil {
 		libBuilder := lib.GetAndCreateFunctionBuilder(lib.PkgName, string(ssa.VirtualFunctionName))
 		if libBuilder == nil {
@@ -798,7 +806,11 @@ func (b *singleFileBuilder) bindImportedName(bindingName, sourceName, packagePat
 		_ = prog.ImportTypeFromLib(lib, bindingName, nil)
 	}
 	if imported, ok := prog.ReadImportValue(bindingName); ok && imported != nil {
+		b.AssignVariable(b.createVar(bindingName), imported)
 		return imported
+	}
+	if value != nil {
+		b.AssignVariable(b.createVar(bindingName), value)
 	}
 	return value
 }

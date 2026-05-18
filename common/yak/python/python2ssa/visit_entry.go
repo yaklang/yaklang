@@ -50,6 +50,10 @@ func (b *singleFileBuilder) VisitFileInput(raw pythonparser.IFile_inputContext) 
 
 	// Visit all statements in the file
 	stmts := fileInput.AllStmt()
+	b.predeclareTopLevelFuncShells(stmts)
+	defer func() {
+		b.topLevelFuncShells = nil
+	}()
 	for _, stmt := range stmts {
 		b.VisitStmt(stmt)
 		if b.shouldStopStatementWalk() {
