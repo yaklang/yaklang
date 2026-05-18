@@ -1136,8 +1136,10 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 			io.Copy(io.MultiWriter(rw, &reasonTextBuf), reader)
 			utils.FlushWriter(writer.writerClose)
 		}
+
+		// merge toolcalls to output to log
 		onToolCallForward := func(toolCalls []*aispec.ToolCall) {
-			c.logInfo("Received %d tool calls from AI provider, forwarding to client", len(toolCalls))
+			// c.logInfo("Received %d tool calls from AI provider, forwarding to client", len(toolCalls))
 			sendHeaderOnce.Do(sendHeader)
 			if err := writer.WriteToolCalls(toolCalls); err != nil {
 				c.logError("Failed to write tool calls to client: %v", err)
