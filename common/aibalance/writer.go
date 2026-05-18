@@ -67,6 +67,12 @@ type chatJSONChunkWriter struct {
 	// 转换为 OpenAI tool_calls delta, 同时把普通 content 透传给客户端.
 	// 关键词: chatJSONChunkWriter reactExtractor, ReAct -> tool_calls 反解析
 	reactExtractor *ReactToolExtractor
+
+	// toolAgg 镜像所有进入 WriteToolCalls 的 incremental delta, 按 index 状态机
+	// 聚合成"完整 tool_call"日志, 不影响下行 SSE 字节. 默认启用 (NewToolCallAggregator
+	// 会读 env AIBALANCE_TOOL_CALL_AGG, 关闭时返回 nil, 全程 no-op).
+	// 关键词: chatJSONChunkWriter toolAgg, incremental tool_calls 聚合日志镜像
+	toolAgg *ToolCallAggregator
 }
 
 // NewChatJSONChunkWriter creates a new chat JSON chunk writer
@@ -111,6 +117,7 @@ func NewChatJSONChunkWriterEx(writer io.WriteCloser, uid string, model string, n
 		uid:             uid,
 		created:         time.Now(),
 		model:           model,
+		toolAgg:         NewToolCallAggregator(uid),
 	}
 }
 
@@ -580,6 +587,12 @@ func (w *chatJSONChunkWriter) WriteToolCalls(toolCalls []*aispec.ToolCall) error
 	// 总是累积，让 Close 与 GetNotStreamBody 都能感知 tool_calls。
 	w.accumulateToolCalls(toolCalls)
 
+	// 镜像一份到聚合日志器: 把上游 incremental delta 按 index 状态机聚合,
+	// 在新 index 出现 / Close Flush 时输出"完整 tool_call"一行日志.
+	// 不持锁: ToolCallAggregator 自带 mu, 调用安全.
+	// 关键词: WriteToolCalls 喂帧聚合, 日志可观测性, 不影响下行 SSE
+	w.toolAgg.Observe(toolCalls)
+
 	if w.notStream {
 		// 非流式: tool_calls 已累积，最终通过 GetNotStreamBody 一次性输出。
 		return nil
@@ -706,6 +719,11 @@ func (w *chatJSONChunkWriter) Close() error {
 	// 内部会各自 Lock/Unlock mu, 否则会死锁).
 	// 关键词: Close react extractor flush before lock, deadlock-free
 	w.flushReactExtractor()
+
+	// Flush 工具调用聚合日志器: 把所有还未 flush 的 tool_call entry 一次性输出.
+	// 不持 w.mu, 它自己有 mu, 避免死锁; 幂等, 重复 Close 安全.
+	// 关键词: Close 触发 toolAgg flush, 完整 tool_call 日志兜底输出
+	w.toolAgg.Flush()
 
 	w.mu.Lock()
 	defer w.mu.Unlock()
