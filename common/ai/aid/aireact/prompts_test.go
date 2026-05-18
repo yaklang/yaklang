@@ -1024,6 +1024,10 @@ func TestGenerateVerificationPrompt_RendersTodoSnapshot(t *testing.T) {
 		"next_movements 只输出增量",
 		"{\"op\": \"doing\", \"id\": \"stable_id\"}",
 		"{\"op\": \"delete\", \"id\": \"stable_id\"}",
+		// 新增 skip op 必须出现在 verification prompt 的 op 清单中, 否则
+		// AI 无从得知"如何主动跳过 TODO", 兜底机制就会反复触发.
+		// 关键词: prompt skip op 清单, AI 关闭 TODO 通道
+		"{\"op\": \"skip\", \"id\": \"stable_id\"}",
 		"{\"op\": \"add\", \"id\": \"stable_id\", \"content\": \"新增一个短链路 TODO\"}",
 	) {
 		t.Fatalf("verification prompt should contain structured TODO snapshot and incremental instructions. Got:\n%s", prompt)
@@ -1051,10 +1055,16 @@ func TestGenerateVerificationPrompt_RendersAbandonedTodosAfterSatisfied(t *testi
 			{Op: "add", ID: "retry_payload", Content: "更换 payload 再次验证"},
 		},
 	})
+	// AI 主动 skip 两条残留 TODO, 这是新机制下唯一能让残留项进入 SKIPPED
+	// 状态的路径; 旧版本依赖 Satisfied=true 自动翻 SKIPPED, 该语义已废弃.
+	// 关键词: 显式 skip op + Satisfied=true 同轮关闭 + prompt 渲染
 	react.AppendVerificationHistory(&aicommon.VerifySatisfactionResult{
-		Satisfied:     true,
-		Reasoning:     "目标达成",
-		NextMovements: []aicommon.VerifyNextMovement{},
+		Satisfied: true,
+		Reasoning: "目标达成；同时主动跳过未推进的 TODO",
+		NextMovements: []aicommon.VerifyNextMovement{
+			{Op: "skip", ID: "collect_signal"},
+			{Op: "skip", ID: "retry_payload"},
+		},
 	})
 
 	prompt, _, err := react.promptManager.GenerateVerificationPrompt("观察页面回显", false, "已成功得到完整响应")
@@ -1066,10 +1076,10 @@ func TestGenerateVerificationPrompt_RendersAbandonedTodosAfterSatisfied(t *testi
 		prompt,
 		"- [SKIPPED]: [id: collect_signal]: 收集页面回显信号",
 		"- [SKIPPED]: [id: retry_payload]: 更换 payload 再次验证",
-		"系统会自动把剩余未关闭 TODO 标记为 `SKIPPED`",
-		"`next_movements` 必须输出 `[]`",
+		"必须被显式关闭",
+		"系统不再自动把剩余未关闭 TODO 标记为 `SKIPPED`",
 	) {
-		t.Fatalf("verification prompt should render abandoned TODO items after satisfaction. Got:\n%s", prompt)
+		t.Fatalf("verification prompt should render explicitly-skipped TODO items and the new no-auto-skip guidance. Got:\n%s", prompt)
 	}
 }
 

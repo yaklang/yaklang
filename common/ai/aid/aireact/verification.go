@@ -345,9 +345,79 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 		return nil, transErr
 	}
 	r.AppendVerificationHistory(result)
+	r.enforceTodoCompletionBeforeSatisfaction(result)
 	r.emitTodoListUpdate(result)
 
 	return result, nil
+}
+
+// enforceTodoCompletionBeforeSatisfaction is the Satisfied bottom-line override.
+//
+// 控制论视角: AI 输出的 user_satisfied=true 是控制器的"已达稳态"信号. 但
+// 当全局 TODO store 还有 PENDING/DOING 项, 说明可能性空间内仍存在 AI 自己
+// 列出的待完成动作, 这与"已达稳态"在控制语义上互相冲突. 此时我们用
+// SessionPromptState 中可观测的 TODO 状态作为客观反馈, 推翻 AI 的主观
+// 声明 — 把 user_satisfied 强制回退为 false, 并写一条
+// [VERIFICATION_TODO_INCOMPLETE] timeline 把"残留 TODO"作为下一轮的输入
+// 反馈给 AI, 形成闭环.
+//
+// 触发条件:
+//  1. result.Satisfied == true
+//  2. SessionPromptState 中 stats.Pending + stats.Doing > 0
+//
+// 副作用:
+//  - result.Satisfied 翻为 false
+//  - result.Reasoning 前缀注入 [OVERRIDE]，保留 AI 原文于 [AI ORIGINAL]
+//  - timeline 写入 [VERIFICATION_TODO_INCOMPLETE], 列出残留 TODO 摘要
+//
+// 关键词: enforceTodoCompletionBeforeSatisfaction, Satisfied 兜底回退,
+//
+//	[VERIFICATION_TODO_INCOMPLETE], 闭环反馈, 客观 TODO 反馈推翻主观声明
+func (r *ReAct) enforceTodoCompletionBeforeSatisfaction(result *aicommon.VerifySatisfactionResult) {
+	if r == nil || result == nil {
+		return
+	}
+	if !result.Satisfied {
+		return
+	}
+	if r.config == nil {
+		return
+	}
+
+	stats := r.config.GetVerificationTodoStats()
+	activeTotal := stats.Pending + stats.Doing
+	if activeTotal == 0 {
+		return
+	}
+
+	items := r.config.SnapshotVerificationTodoItems()
+	activeLines := make([]string, 0, activeTotal)
+	for _, item := range items {
+		if item.Status != aicommon.VerificationTodoStatusPending &&
+			item.Status != aicommon.VerificationTodoStatusDoing {
+			continue
+		}
+		activeLines = append(activeLines, aicommon.FormatVerificationTodoLine(item))
+	}
+
+	msg := fmt.Sprintf(
+		"AI declared user_satisfied=true but %d active TODO item(s) still remain (pending=%d, doing=%d). "+
+			"user_satisfied has been force-overridden to false. Each remaining TODO must be explicitly closed "+
+			"via next_movements with op=done / op=delete / op=skip before completion can be acknowledged. "+
+			"Remaining TODOs:\n%s",
+		activeTotal, stats.Pending, stats.Doing, strings.Join(activeLines, "\n"),
+	)
+
+	result.Satisfied = false
+	originalReasoning := strings.TrimSpace(result.Reasoning)
+	if originalReasoning == "" {
+		result.Reasoning = "[OVERRIDE] " + msg
+	} else {
+		result.Reasoning = "[OVERRIDE] " + msg + "\n\n[AI ORIGINAL] " + originalReasoning
+	}
+
+	r.AddToTimeline("[VERIFICATION_TODO_INCOMPLETE]", msg)
+	log.Warnf("verification satisfied override: %d active TODO(s) remain, forcing user_satisfied=false", activeTotal)
 }
 
 // addNextMovementsBreadcrumb writes a compact one-line-per-op timeline entry
@@ -496,6 +566,18 @@ func formatNextMovementDisplayLine(movement aicommon.VerifyNextMovement) string 
 			return fmt.Sprintf("- [DELETED]: [id: %s]", id)
 		}
 		return fmt.Sprintf("- [DELETED]: [id: %s]: %s", id, content)
+	case "skip":
+		// 显式跳过, 与 delete 形态对偶, 用于在前端 next_movements stream 中
+		// 一眼看出"AI 主动声明这个 TODO 跳过". 与自动翻 SKIPPED 区别开来:
+		// 自动翻已废弃, 出现 [SKIPPED] 标签现在都来源于显式 skip op.
+		// 关键词: skip op stream 显示, 主动跳过
+		if id == "" {
+			return ""
+		}
+		if content == "" {
+			return fmt.Sprintf("- [SKIPPED]: [id: %s]", id)
+		}
+		return fmt.Sprintf("- [SKIPPED]: [id: %s]: %s", id, content)
 	default:
 		label := strings.ToUpper(strings.TrimSpace(movement.Op))
 		if label == "" {

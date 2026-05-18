@@ -30,7 +30,13 @@ func TestVerificationTodoStore_ApplyAndRender(t *testing.T) {
 	require.Contains(t, rendered, "- [ ]: [id: replay_payload]: 使用新 payload 复测")
 }
 
-func TestVerificationTodoStore_ApplySatisfiedFlipsActiveToSkipped(t *testing.T) {
+// TestVerificationTodoStore_ApplySatisfiedDoesNotAutoSkip 验证旧"satisfied
+// 自动翻 SKIPPED"语义已被废弃: 当 Apply(true, nil) 被调用时, store 不应该
+// 自行把残留 PENDING/DOING 改成 SKIPPED. AI 必须通过显式 done / delete /
+// skip op 才能关闭 TODO.
+//
+// 关键词: 取消自动翻转, 显式关闭, Satisfied 兜底前置条件
+func TestVerificationTodoStore_ApplySatisfiedDoesNotAutoSkip(t *testing.T) {
 	store := NewVerificationTodoStore()
 	store.Apply(false, []VerifyNextMovement{
 		{Op: "add", ID: "collect_signal", Content: "收集页面回显信号"},
@@ -39,13 +45,167 @@ func TestVerificationTodoStore_ApplySatisfiedFlipsActiveToSkipped(t *testing.T) 
 	store.Apply(true, nil)
 
 	stats := store.Stats()
-	require.Equal(t, 2, stats.Skipped)
-	require.Zero(t, stats.Pending)
+	require.Zero(t, stats.Skipped, "satisfied flag must NOT auto-flip active TODOs to SKIPPED anymore")
+	require.Equal(t, 2, stats.Pending, "pending TODOs must stay PENDING until AI explicitly closes them")
 	require.Zero(t, stats.Doing)
 
 	rendered := store.Render()
-	require.Contains(t, rendered, "- [SKIPPED]: [id: collect_signal]: 收集页面回显信号")
-	require.Contains(t, rendered, "- [SKIPPED]: [id: retry_payload]: 更换 payload 再次验证")
+	require.Contains(t, rendered, "- [ ]: [id: collect_signal]: 收集页面回显信号")
+	require.Contains(t, rendered, "- [ ]: [id: retry_payload]: 更换 payload 再次验证")
+	require.NotContains(t, rendered, "[SKIPPED]")
+}
+
+// TestVerificationTodoStore_ExplicitSkipOpMarksSkipped 验证新增的显式
+// `skip` op: AI 主动声明跳过某个 TODO 时, status 切到 SKIPPED, 但 content
+// 仍然保留, 让 prompt 渲染能告诉模型"这个 TODO 是被主动跳过的, 不是被
+// 删除的".
+//
+// 关键词: 显式 skip op, SKIPPED 状态, content 保留
+func TestVerificationTodoStore_ExplicitSkipOpMarksSkipped(t *testing.T) {
+	store := NewVerificationTodoStore()
+	store.Apply(false, []VerifyNextMovement{
+		{Op: "add", ID: "stale_idea", Content: "本次范围内不打算继续推进"},
+	})
+	store.Apply(false, []VerifyNextMovement{
+		{Op: "skip", ID: "stale_idea"},
+	})
+
+	stats := store.Stats()
+	require.Equal(t, 1, stats.Skipped)
+	require.Zero(t, stats.Pending)
+	require.Zero(t, stats.Doing)
+
+	items := store.SnapshotItems()
+	require.Len(t, items, 1)
+	require.Equal(t, VerificationTodoStatusSkipped, items[0].Status)
+	require.Equal(t, "本次范围内不打算继续推进", items[0].Content,
+		"explicit skip must keep the original content so the prompt can still describe what was skipped")
+
+	rendered := store.Render()
+	require.Contains(t, rendered, "- [SKIPPED]: [id: stale_idea]: 本次范围内不打算继续推进")
+}
+
+// TestVerificationTodoStore_ExplicitSkipOpCanUpdateContent 验证 skip op 与
+// delete op 类似, 当 movement.Content 非空时允许在跳过时一并更新 content
+// (例如"跳过原因"). 这给 AI 留下一种语义化的 audit trail 能力.
+//
+// 关键词: skip op content 覆盖, 跳过原因
+func TestVerificationTodoStore_ExplicitSkipOpCanUpdateContent(t *testing.T) {
+	store := NewVerificationTodoStore()
+	store.Apply(false, []VerifyNextMovement{
+		{Op: "add", ID: "verify_target", Content: "复现错误码"},
+	})
+	store.Apply(false, []VerifyNextMovement{
+		{Op: "skip", ID: "verify_target", Content: "目标接口已下线，跳过复现"},
+	})
+
+	items := store.SnapshotItems()
+	require.Len(t, items, 1)
+	require.Equal(t, VerificationTodoStatusSkipped, items[0].Status)
+	require.Equal(t, "目标接口已下线，跳过复现", items[0].Content)
+}
+
+// TestVerificationTodoStore_HasActiveTodos 覆盖 HasActiveTodos 的全部分支:
+// 空 store / 仅 pending / 仅 doing / 仅 done / 仅 deleted / 仅 skipped /
+// 混合 active 与 closed. 这是 Satisfied 兜底机制最直接依赖的信号源.
+//
+// 关键词: HasActiveTodos 全分支覆盖, Satisfied 兜底信号
+func TestVerificationTodoStore_HasActiveTodos(t *testing.T) {
+	t.Run("empty store has no active todos", func(t *testing.T) {
+		store := NewVerificationTodoStore()
+		require.False(t, store.HasActiveTodos())
+	})
+
+	t.Run("pending only is active", func(t *testing.T) {
+		store := NewVerificationTodoStore()
+		store.Apply(false, []VerifyNextMovement{
+			{Op: "add", ID: "p1", Content: "p"},
+		})
+		require.True(t, store.HasActiveTodos())
+	})
+
+	t.Run("doing only is active", func(t *testing.T) {
+		store := NewVerificationTodoStore()
+		store.Apply(false, []VerifyNextMovement{
+			{Op: "add", ID: "d1", Content: "d"},
+			{Op: "doing", ID: "d1"},
+		})
+		require.True(t, store.HasActiveTodos())
+	})
+
+	t.Run("all closed via done is not active", func(t *testing.T) {
+		store := NewVerificationTodoStore()
+		store.Apply(false, []VerifyNextMovement{
+			{Op: "add", ID: "x", Content: "x"},
+			{Op: "done", ID: "x"},
+		})
+		require.False(t, store.HasActiveTodos())
+	})
+
+	t.Run("all closed via delete is not active", func(t *testing.T) {
+		store := NewVerificationTodoStore()
+		store.Apply(false, []VerifyNextMovement{
+			{Op: "add", ID: "x", Content: "x"},
+			{Op: "delete", ID: "x"},
+		})
+		require.False(t, store.HasActiveTodos())
+	})
+
+	t.Run("all closed via skip is not active", func(t *testing.T) {
+		store := NewVerificationTodoStore()
+		store.Apply(false, []VerifyNextMovement{
+			{Op: "add", ID: "x", Content: "x"},
+			{Op: "skip", ID: "x"},
+		})
+		require.False(t, store.HasActiveTodos())
+	})
+
+	t.Run("mixed active and closed is still active", func(t *testing.T) {
+		store := NewVerificationTodoStore()
+		store.Apply(false, []VerifyNextMovement{
+			{Op: "add", ID: "a", Content: "a"},
+			{Op: "add", ID: "b", Content: "b"},
+			{Op: "done", ID: "a"},
+		})
+		require.True(t, store.HasActiveTodos())
+	})
+
+	t.Run("nil store returns false", func(t *testing.T) {
+		var store *VerificationTodoStore
+		require.False(t, store.HasActiveTodos())
+	})
+}
+
+// TestVerificationTodoStore_ActiveTodoItems 验证 ActiveTodoItems 仅返回
+// PENDING / DOING 项的深拷贝, 并保留原始顺序 (Apply 追加顺序). 这是
+// Satisfied 兜底机制用来构造"剩余 TODO 报告"的输入.
+//
+// 关键词: ActiveTodoItems 顺序保留, 深拷贝, 仅 active 子集
+func TestVerificationTodoStore_ActiveTodoItems(t *testing.T) {
+	store := NewVerificationTodoStore()
+	store.Apply(false, []VerifyNextMovement{
+		{Op: "add", ID: "pending_one", Content: "p1"},
+		{Op: "add", ID: "doing_one", Content: "d1"},
+		{Op: "add", ID: "done_one", Content: "x"},
+		{Op: "add", ID: "skipped_one", Content: "s"},
+	})
+	store.Apply(false, []VerifyNextMovement{
+		{Op: "doing", ID: "doing_one"},
+		{Op: "done", ID: "done_one"},
+		{Op: "skip", ID: "skipped_one"},
+	})
+
+	active := store.ActiveTodoItems()
+	require.Len(t, active, 2)
+	require.Equal(t, "pending_one", active[0].ID)
+	require.Equal(t, VerificationTodoStatusPending, active[0].Status)
+	require.Equal(t, "doing_one", active[1].ID)
+	require.Equal(t, VerificationTodoStatusDoing, active[1].Status)
+
+	// 深拷贝: 修改返回切片中的字段不应影响 store 内部状态
+	active[0].Content = "mutated"
+	require.Equal(t, "p1", store.SnapshotItems()[0].Content,
+		"ActiveTodoItems must return a deep copy so callers cannot accidentally mutate the live store")
 }
 
 func TestVerificationTodoStore_DoingPreservesContentUpdate(t *testing.T) {
@@ -96,6 +256,36 @@ func TestVerificationTodoStore_RenderMarkdownDeltaIsReadOnly(t *testing.T) {
 	stats := store.Stats()
 	require.Equal(t, 1, stats.Pending)
 	require.Zero(t, stats.Done)
+}
+
+// TestVerificationTodoStore_RenderMarkdownDeltaHighlightsCurrentSkip 验证
+// 本轮显式 skip op 在 RenderMarkdownDelta 中被打上 (skipped) marker, 而
+// 此前轮次已经被 skip 的 TODO 不再带 marker. 这是前端"本轮变化高亮"必须
+// 区分新旧 skip 的关键.
+//
+// 关键词: RenderMarkdownDelta skip 当轮高亮, 新旧 SKIPPED 区分
+func TestVerificationTodoStore_RenderMarkdownDeltaHighlightsCurrentSkip(t *testing.T) {
+	store := NewVerificationTodoStore()
+	store.Apply(false, []VerifyNextMovement{
+		{Op: "add", ID: "old_skipped", Content: "上一轮就被跳过的任务"},
+		{Op: "add", ID: "to_skip_now", Content: "本轮将被跳过的任务"},
+	})
+	store.Apply(false, []VerifyNextMovement{
+		{Op: "skip", ID: "old_skipped"},
+	})
+
+	delta := store.RenderMarkdownDelta(false, []VerifyNextMovement{
+		{Op: "skip", ID: "to_skip_now"},
+	})
+	require.Contains(t, delta, "(skipped) 本轮将被跳过的任务",
+		"current round's skip must carry the (skipped) marker so the frontend can highlight it")
+	require.NotContains(t, delta, "(skipped) 上一轮就被跳过的任务",
+		"historic skipped TODOs must NOT be re-highlighted on every render")
+
+	// preview must not mutate underlying state
+	stats := store.Stats()
+	require.Equal(t, 1, stats.Skipped, "store should retain only the previously-skipped TODO")
+	require.Equal(t, 1, stats.Pending, "to_skip_now should still be pending in the live store because RenderMarkdownDelta is read-only")
 }
 
 func TestSessionPromptState_ApplyVerificationTodoOps_AccumulatesAndRenders(t *testing.T) {

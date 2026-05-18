@@ -89,13 +89,25 @@ func (s *VerificationTodoStore) Clone() *VerificationTodoStore {
 }
 
 // Apply incrementally updates the store with one verification round's
-// `next_movements` operations. When `satisfied == true`, all remaining pending
-// or doing items are flipped to SKIPPED, mirroring the original
-// "Satisfied implies leftover TODO is abandoned" semantics.
+// `next_movements` operations.
+//
+// 历史: 旧版本在 satisfied == true 时, 会自动把剩余 PENDING/DOING 项翻成
+// SKIPPED. 该自动翻转语义已被废弃, 原因如下:
+//  1. AI 可能在还有未关闭 TODO 的情况下错误地宣告 user_satisfied=true,
+//     自动翻转会掩盖问题, 让 verify gate 直接 Exit 主循环;
+//  2. 兜底机制 (ReAct.enforceTodoCompletionBeforeSatisfaction) 需要在
+//     Apply 之后观察"是否仍有活跃 TODO", 自动翻转会让兜底永远观察不到.
+//
+// 新语义: AI 必须通过 next_movements 显式输出 done / delete / skip 来关闭
+// 每一个 TODO. satisfied 形参保留是为了接口稳定 (DB 反序列化 + 兼容旧
+// 调用方), 但不再触发任何状态变更.
+//
+// 关键词: Apply 取消自动翻 SKIPPED, 显式关闭, AI 主动 done/delete/skip
 func (s *VerificationTodoStore) Apply(satisfied bool, movements []VerifyNextMovement) {
 	if s == nil {
 		return
 	}
+	_ = satisfied // 保留形参; 语义见上方注释, 不再触发自动翻转
 	s.Counter++
 	roundIndex := s.Counter
 
@@ -146,16 +158,17 @@ func (s *VerificationTodoStore) Apply(satisfied bool, movements []VerifyNextMove
 			}
 			item.Status = VerificationTodoStatusDeleted
 			item.UpdatedAt = roundIndex
-		}
-	}
-
-	if satisfied {
-		for _, item := range s.Items {
+		case "skip":
+			// 显式跳过: AI 主动声明"这个 TODO 暂不做, 但也不算删除".
+			// 与 delete 的区别在于语义层面 — delete 表示"不再需要", skip 表
+			// 示"本次任务范围内不做". 状态上都是终态, 不再算 active TODO.
+			// 关键词: 显式 skip op, 主动跳过, 终态状态
+			item := s.findItem(id)
 			if item == nil {
 				continue
 			}
-			if item.Status != VerificationTodoStatusPending && item.Status != VerificationTodoStatusDoing {
-				continue
+			if content := strings.TrimSpace(movement.Content); content != "" {
+				item.Content = content
 			}
 			item.Status = VerificationTodoStatusSkipped
 			item.UpdatedAt = roundIndex
@@ -184,6 +197,51 @@ func (s *VerificationTodoStore) SnapshotItems() []VerificationTodoItem {
 	out := make([]VerificationTodoItem, 0, len(s.Items))
 	for _, item := range s.Items {
 		if item == nil {
+			continue
+		}
+		out = append(out, *item)
+	}
+	return out
+}
+
+// HasActiveTodos reports whether the store still tracks any PENDING or DOING
+// item. This is the primary signal consumed by the Satisfied bottom-line
+// override: when the AI declares user_satisfied=true while
+// HasActiveTodos() == true, the verification result is rolled back to
+// user_satisfied=false so the loop keeps pushing on the unfinished TODOs.
+//
+// 关键词: HasActiveTodos, Satisfied 兜底信号, 仍有未关闭 TODO 检测
+func (s *VerificationTodoStore) HasActiveTodos() bool {
+	if s == nil {
+		return false
+	}
+	for _, item := range s.Items {
+		if item == nil {
+			continue
+		}
+		if item.Status == VerificationTodoStatusPending || item.Status == VerificationTodoStatusDoing {
+			return true
+		}
+	}
+	return false
+}
+
+// ActiveTodoItems returns a deep-copied snapshot containing only PENDING /
+// DOING items in their original ordering. Used by the Satisfied bottom-line
+// override to build a human-readable "remaining TODOs" report for the
+// timeline breadcrumb pushed to the AI.
+//
+// 关键词: ActiveTodoItems, 残留 TODO 快照, Satisfied 兜底 timeline 输入
+func (s *VerificationTodoStore) ActiveTodoItems() []VerificationTodoItem {
+	if s == nil {
+		return nil
+	}
+	out := make([]VerificationTodoItem, 0)
+	for _, item := range s.Items {
+		if item == nil {
+			continue
+		}
+		if item.Status != VerificationTodoStatusPending && item.Status != VerificationTodoStatusDoing {
 			continue
 		}
 		out = append(out, *item)
@@ -308,6 +366,7 @@ func (s *VerificationTodoStore) RenderMarkdownDelta(satisfied bool, movements []
 
 	currentNewIDs := make(map[string]struct{})
 	currentDoneIDs := make(map[string]struct{})
+	currentSkippedIDs := make(map[string]struct{})
 	for _, movement := range movements {
 		id := strings.TrimSpace(movement.ID)
 		if id == "" {
@@ -320,6 +379,11 @@ func (s *VerificationTodoStore) RenderMarkdownDelta(satisfied bool, movements []
 			}
 		case "done":
 			currentDoneIDs[id] = struct{}{}
+		case "skip":
+			// 本轮显式 skip 的 TODO, 在 markdown delta 中需要打上 (skipped)
+			// marker, 与 done / deleted 形成对偶的关闭信号.
+			// 关键词: RenderMarkdownDelta skip marker, 显式跳过高亮
+			currentSkippedIDs[id] = struct{}{}
 		}
 	}
 
@@ -329,7 +393,8 @@ func (s *VerificationTodoStore) RenderMarkdownDelta(satisfied bool, movements []
 	oldDone := make([]string, 0)
 	currentDone := make([]string, 0)
 	deleted := make([]string, 0)
-	skipped := make([]string, 0)
+	oldSkipped := make([]string, 0)
+	currentSkipped := make([]string, 0)
 
 	for _, item := range cloned.Items {
 		if item == nil {
@@ -353,7 +418,14 @@ func (s *VerificationTodoStore) RenderMarkdownDelta(satisfied bool, movements []
 		case VerificationTodoStatusDeleted:
 			deleted = append(deleted, FormatVerificationTodoMarkdownLine(*item, "deleted"))
 		case VerificationTodoStatusSkipped:
-			skipped = append(skipped, FormatVerificationTodoMarkdownLine(*item, "skipped"))
+			if _, isSkipped := currentSkippedIDs[item.ID]; isSkipped {
+				currentSkipped = append(currentSkipped, FormatVerificationTodoMarkdownLine(*item, "skipped"))
+			} else {
+				// 历史轮次已经被 skip 的 TODO 不应该每轮都带 (skipped)
+				// marker, 否则前端会把它当成"本轮新发生的变化"反复闪一下.
+				// 关键词: 历史 SKIPPED 不再高亮, 仅本轮 skip 才带 marker
+				oldSkipped = append(oldSkipped, FormatVerificationTodoMarkdownLine(*item, ""))
+			}
 		}
 	}
 
@@ -363,7 +435,8 @@ func (s *VerificationTodoStore) RenderMarkdownDelta(satisfied bool, movements []
 	lines = append(lines, oldDone...)
 	lines = append(lines, currentDone...)
 	lines = append(lines, deleted...)
-	lines = append(lines, skipped...)
+	lines = append(lines, oldSkipped...)
+	lines = append(lines, currentSkipped...)
 
 	note := "- [x] (truncated) TODO snapshot exceeded 10K tokens; older items were omitted to keep the view stable."
 	if ytoken.CalcTokenCount(strings.Join(lines, "\n")) <= VerificationTodoSnapshotLimit {
