@@ -490,12 +490,17 @@ func (a *AIResponse) GetOutputStreamReader(nodeId string, system bool, emitter *
 			}
 			if i.IsReason {
 				wg.Add(1)
-				reasonBytes, readErr := io.ReadAll(i.out)
-				if readErr != nil {
-					log.Warnf("read model reason stream: %v", readErr)
-				}
-				a.invokeReasonChunk(reasonBytes)
-				emitter.EmitDefaultStreamEvent("thought", bytes.NewReader(reasonBytes), a.GetTaskIndex(), func() {
+				// 关键词: reason stream tee, 思考流 tee 收集
+				// emit 拿到的必须是真正的流 (边读边发, 保持流式 SSE 语义),
+				// 同时用 io.TeeReader 把原始字节旁路到 reasonBuf, 等
+				// emitStreamEvent 内部 io.Copy 完成后, finishCallback 串
+				// 行触发, 此时 reasonBuf 已包含完整 reason payload, 再
+				// 一次性 invokeReasonChunk (保持原"一段 reason 一次完整
+				// 回调"语义). 不能再用 ReadAll + bytes.NewReader 的方式.
+				reasonBuf := new(bytes.Buffer)
+				teedReason := io.TeeReader(i.out, reasonBuf)
+				emitter.EmitDefaultStreamEvent("thought", teedReason, a.GetTaskIndex(), func() {
+					a.invokeReasonChunk(reasonBuf.Bytes())
 					wg.Done()
 				})
 				continue

@@ -599,8 +599,6 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) (finalE
 		}()
 	}
 
-
-
 	done := utils.NewOnce()
 	abort := func(err error) {
 		result := task.GetResult()
