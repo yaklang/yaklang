@@ -28,6 +28,12 @@ func TestServer_QueryAISession_Pagination(t *testing.T) {
 		sessionIDs = append(sessionIDs, sessionID)
 		_, err = yakit.CreateOrUpdateAISessionMeta(db, sessionID, fmt.Sprintf("%s-title-%d", marker, i))
 		require.NoError(t, err)
+		_, err = yakit.CreateOrUpdateAISessionMetaStartParams(db, sessionID, &ypb.AIStartParams{
+			AIService:         "svc",
+			AIModelName:       fmt.Sprintf("model-%d", i),
+			TimelineSessionID: sessionID,
+		})
+		require.NoError(t, err)
 		require.NoError(t, db.Model(&schema.AISession{}).
 			Where("session_id = ?", sessionID).
 			UpdateColumn("updated_at", time.Unix(int64(1000+i), 0)).Error)
@@ -52,6 +58,7 @@ func TestServer_QueryAISession_Pagination(t *testing.T) {
 	require.Len(t, page1.GetData(), 2)
 	require.Equal(t, sessionIDs[4], page1.GetData()[0].GetSessionID())
 	require.Equal(t, sessionIDs[3], page1.GetData()[1].GetSessionID())
+	require.Equal(t, "model-5", page1.GetData()[0].GetStartParams().GetAIModelName())
 
 	page2, err := srv.QueryAISession(ctx, &ypb.QueryAISessionRequest{
 		Pagination: &ypb.Paging{
