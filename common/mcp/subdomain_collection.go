@@ -40,13 +40,7 @@ func handleSubdomainCollection(s *MCPServer) server.ToolHandlerFunc {
 			"子域名收集",
 			"8cc4491d-5b77-43ea-b6ea-3f78b99b73e2",
 			request,
-			func(stream ypb.Yak_DebugPluginClient, taskName string) (*mcp.CallToolResult, error) {
-				var progressToken mcp.ProgressToken
-				meta := request.Params.Meta
-				if meta != nil {
-					progressToken = meta.ProgressToken
-				}
-
+			func(stream ypb.Yak_DebugPluginClient, _ string) (*mcp.CallToolResult, error) {
 				results := make([]any, 0, 4)
 				for {
 					exec, err := stream.Recv()
@@ -78,9 +72,9 @@ func handleSubdomainCollection(s *MCPServer) server.ToolHandlerFunc {
 						Type: "text",
 						Text: content,
 					})
-					s.notificationServer(ctx).SendNotificationToClient(fmt.Sprintf("%s/info", taskName), map[string]any{
-						"content":       content,
-						"progressToken": progressToken,
+					s.notificationServer(ctx).SendNotificationToClient("notifications/message", map[string]any{
+						"level": "info",
+						"data":  content,
 					})
 				}
 				if len(results) == 0 {

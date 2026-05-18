@@ -21,6 +21,9 @@ func init() {
 }
 
 func TestMCPServerEx(t *testing.T) {
+	if _, err := NewLocalClient(); err != nil {
+		t.Skipf("skipping: NewLocalClient not registered (%v)", err)
+	}
 	s, _ := NewMCPServer()
 
 	if err := s.ServeSSE(":18083", "http://localhost:18083"); err != nil {
@@ -29,6 +32,9 @@ func TestMCPServerEx(t *testing.T) {
 }
 
 func TestMCPClient(t *testing.T) {
+	if _, err := NewLocalClient(); err != nil {
+		t.Skipf("skipping: NewLocalClient not registered (%v)", err)
+	}
 	log.SetLevel(log.FatalLevel)
 
 	port := utils.GetRandomAvailableTCPPort()

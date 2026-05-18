@@ -54,17 +54,34 @@ func CodecFlowExec(req *ypb.CodecRequestFlow) (resp *ypb.CodecResponse, err erro
 
 		var callParams []reflect.Value
 		paramsInfo := getParamsInfo(work.CodecType)
+
+		// Build a default-value map from CodecLibsDoc so that optional/defaulted
+		// parameters do not require explicit values from the caller.
+		defaultValues := make(map[string]string)
+		if doc, ok := CodecLibsDoc[work.CodecType]; ok {
+			for _, p := range doc.GetParams() {
+				if p.GetDefaultValue() != "" {
+					defaultValues[p.GetName()] = p.GetDefaultValue()
+				}
+			}
+		}
+
 		for i := 0; i < methodType.NumIn(); i++ {
 			fieldType := methodType.In(i)
-			if param, ok := params[paramsInfo[i].Name]; ok {
-				value, err := covertParamType(param, fieldType)
-				if err != nil {
-					return nil, err
-				}
-				callParams = append(callParams, reflect.ValueOf(value))
-			} else {
-				return nil, utils.Errorf("codec param %v not found", paramsInfo[i].Name)
+			paramName := paramsInfo[i].Name
+			rawVal, ok := params[paramName]
+			if !ok {
+				// Fall back to the declared default value when the caller omits the param.
+				rawVal, ok = defaultValues[paramName]
 			}
+			if !ok {
+				return nil, utils.Errorf("codec param %v not found", paramName)
+			}
+			value, err := covertParamType(rawVal, fieldType)
+			if err != nil {
+				return nil, err
+			}
+			callParams = append(callParams, reflect.ValueOf(value))
 		}
 		ret := methodValue.Call(callParams)
 		if len(ret) != 1 {

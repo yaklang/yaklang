@@ -162,22 +162,23 @@ func handleBrute(s *MCPServer) server.ToolHandlerFunc {
 
 			content := string(exec.Message)
 			if content == "" {
-				s.notificationServer(ctx).SendNotificationToClient("brute/progress", map[string]any{
-					"content":  content,
-					"progress": exec.Progress,
-				})
+				// Only send progress notification when the client provided a progressToken.
+				if progressToken != nil {
+					s.notificationServer(ctx).SendNotificationToClient("notifications/progress", map[string]any{
+						"progressToken": progressToken,
+						"progress":      exec.Progress,
+					})
+				}
 				continue
 			}
 			content = handleExecMessage(content)
-
 			results = append(results, mcp.TextContent{
 				Type: "text",
 				Text: content,
 			})
-			s.notificationServer(ctx).SendNotificationToClient("brute/info", map[string]any{
-				"content":       content,
-				"progress":      exec.Progress,
-				"progressToken": progressToken,
+			s.notificationServer(ctx).SendNotificationToClient("notifications/message", map[string]any{
+				"level": "info",
+				"data":  content,
 			})
 		}
 		if len(results) == 0 {

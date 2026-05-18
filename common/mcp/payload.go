@@ -11,7 +11,6 @@ import (
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/server"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -205,27 +204,69 @@ func handleQueryPayload(s *MCPServer) server.ToolHandlerFunc {
 		if err != nil {
 			return nil, utils.Wrap(err, "invalid argument")
 		}
-		payload, err := yakit.GetPayloadFirst(s.grpcClient.GetProfileDatabase(), req.Group)
+
+		// Determine whether the group is file-backed by querying the group list via
+		// gRPC instead of accessing the local profile database directly. The direct
+		// DB call (GetProfileDatabase) is only valid in-process and would panic when
+		// the MCP server is accessed remotely through a gRPC client stub.
+		isFile, err := isPayloadGroupFile(ctx, s, req.Group)
 		if err != nil {
-			return nil, utils.Wrap(err, "failed to query payload first")
+			return nil, utils.Wrapf(err, "failed to resolve payload group type for [%s]", req.Group)
 		}
-		if payload.GetIsFile() {
+
+		if isFile {
 			rsp, err := s.grpcClient.QueryPayloadFromFile(ctx, &ypb.QueryPayloadFromFileRequest{
 				Group:  req.Group,
 				Folder: req.Folder,
 			})
 			if err != nil {
-				return nil, utils.Wrapf(err, "failed to query payload from file[%s]", payload.GetContent())
-			}
-			return NewCommonCallToolResult(rsp.Data)
-		} else {
-			rsp, err := s.grpcClient.QueryPayload(ctx, &req)
-			if err != nil {
-				return nil, utils.Wrap(err, "failed to query payload")
+				return nil, utils.Wrapf(err, "failed to query payload from file for group[%s]", req.Group)
 			}
 			return NewCommonCallToolResult(rsp.Data)
 		}
+
+		rsp, err := s.grpcClient.QueryPayload(ctx, &req)
+		if err != nil {
+			return nil, utils.Wrap(err, "failed to query payload")
+		}
+		return NewCommonCallToolResult(rsp.Data)
 	}
+}
+
+// isPayloadGroupFile walks the payload group tree returned by GetAllPayloadGroup
+// and reports whether the named group is of file type ("File").
+func isPayloadGroupFile(ctx context.Context, s *MCPServer, group string) (bool, error) {
+	rsp, err := s.grpcClient.GetAllPayloadGroup(ctx, &ypb.Empty{})
+	if err != nil {
+		return false, utils.Wrap(err, "failed to get all payload groups")
+	}
+	return findPayloadGroupIsFile(rsp.Nodes, group)
+}
+
+// findPayloadGroupIsFile recursively walks the group node tree and reports
+// whether a group named [group] exists and is of file type ("File").
+// Exported as a pure function so it can be unit-tested without a gRPC client.
+func findPayloadGroupIsFile(nodes []*ypb.PayloadGroupNode, group string) (bool, error) {
+	var walk func(nodes []*ypb.PayloadGroupNode) (found bool, isFile bool)
+	walk = func(nodes []*ypb.PayloadGroupNode) (found bool, isFile bool) {
+		for _, node := range nodes {
+			if node.Type == "Folder" {
+				if f, file := walk(node.Nodes); f {
+					return f, file
+				}
+				continue
+			}
+			if node.Name == group {
+				return true, node.Type == "File"
+			}
+		}
+		return false, false
+	}
+	found, isFile := walk(nodes)
+	if !found {
+		return false, utils.Errorf("payload group [%s] not found", group)
+	}
+	return isFile, nil
 }
 
 func handleSavePayload(s *MCPServer) server.ToolHandlerFunc {
@@ -291,10 +332,16 @@ func handleSavePayload(s *MCPServer) server.ToolHandlerFunc {
 				}
 				break
 			}
-			s.notificationServer(ctx).SendNotificationToClient("save_payload/progress", map[string]any{
-				"progress":      msg.Progress,
-				"message":       msg.Message,
-				"progressToken": progressToken,
+			// Only send progress notification when the client provided a progressToken.
+			if progressToken != nil {
+				s.notificationServer(ctx).SendNotificationToClient("notifications/progress", map[string]any{
+					"progressToken": progressToken,
+					"progress":      msg.Progress,
+				})
+			}
+			s.notificationServer(ctx).SendNotificationToClient("notifications/message", map[string]any{
+				"level": "info",
+				"data":  msg.Message,
 			})
 
 		}
@@ -407,11 +454,11 @@ func handleUpdateOnePayload(s *MCPServer) server.ToolHandlerFunc {
 		if req.Data == nil {
 			return nil, utils.Error("argument:data is empty")
 		}
-		payload, err := yakit.GetPayloadFirst(s.grpcClient.GetProfileDatabase(), req.Group)
+		isFile, err := isPayloadGroupFile(ctx, s, req.Group)
 		if err != nil {
-			return nil, utils.Wrap(err, "failed to query payload first")
+			return nil, utils.Wrapf(err, "failed to resolve payload group type for [%s]", req.Group)
 		}
-		if payload.GetIsFile() {
+		if isFile {
 			return nil, utils.Error(`cannot update payload of "file" type`)
 		}
 
@@ -433,11 +480,11 @@ func handleUpdatePayloadFileContent(s *MCPServer) server.ToolHandlerFunc {
 		if err != nil {
 			return nil, utils.Wrap(err, "invalid argument")
 		}
-		payload, err := yakit.GetPayloadFirst(s.grpcClient.GetProfileDatabase(), req.GroupName)
+		isFile, err := isPayloadGroupFile(ctx, s, req.GroupName)
 		if err != nil {
-			return nil, utils.Wrap(err, "failed to query payload first")
+			return nil, utils.Wrapf(err, "failed to resolve payload group type for [%s]", req.GroupName)
 		}
-		if !payload.GetIsFile() {
+		if !isFile {
 			return nil, utils.Error(`cannot update payload of "database" type`)
 		}
 		_, err = s.grpcClient.UpdatePayloadToFile(ctx, &req)
