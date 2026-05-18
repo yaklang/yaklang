@@ -719,6 +719,18 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 		return
 	}
 
+	// debug trace 抓包会话: env AIBALANCE_DEBUG_TRACE / AIBALANCE_TRACE_DIR
+	// 任一打开时启用. 同时 wrap conn 把所有下行字节 tee 到 04 文件,
+	// 把客户端原始请求体写入 01 文件; aispec 上游 raw HTTP request/response
+	// 字节会在 GetAIClientWithRawMessagesAndTrace 中接到 trace.
+	// 关键词: serveChatCompletions trace session 创建, wrap conn, client body 落盘
+	traceSession := NewDebugTraceSession("")
+	if traceSession != nil {
+		defer traceSession.Close()
+		traceSession.WriteClientRequest(body)
+		conn = WrapConnForTrace(conn, traceSession)
+	}
+
 	stream := bodyIns.Stream
 	log.Infof("user require stream flag: %v", stream)
 
@@ -877,7 +889,7 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 	for _, message := range bodyIns.Messages {
 		switch ret := message.Content.(type) {
 		case string:
-			log.Infof("Received text content: %s", utils.ShrinkString(ret, 200))
+			// log.Infof("Received text block content role[%s]: %s", message.Role, utils.ShrinkString(ret, 200))
 			prompt.Write([]byte(ret))
 		default:
 			handleItem := func(element any) {
@@ -1341,7 +1353,36 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 			}
 		}
 
-		client, err := provider.GetAIClientWithRawMessages(
+		// debug trace 元信息: provider 身份 + tool 模式 + react 模式. 仅在 trace
+		// 开启时执行 (debugTraceLazyMeta 内部判 nil).
+		// 关键词: trace meta 元信息落盘, provider 身份 + 路由决策
+		debugTraceLazyMeta(traceSession, func() any {
+			return map[string]any{
+				"req_id":                           traceSession.ReqID(),
+				"model":                            modelName,
+				"api_key":                          utils.ShrinkString(apiKeyForStat, 8),
+				"affinity_key":                     utils.ShrinkString(affinityKey, 8),
+				"provider_type":                    provider.TypeName,
+				"provider_model":                   provider.ModelName,
+				"provider_wrapper":                 provider.WrapperName,
+				"provider_domain":                  provider.DomainOrURL,
+				"provider_no_https":                provider.NoHTTPS,
+				"tool_mode_round1":                 toolMode.Round1,
+				"tool_mode_round2":                 toolMode.Round2,
+				"tool_mode_source":                 toolMode.Source,
+				"tool_auto_fallback":               toolMode.AutoFallback,
+				"tools_count":                      len(bodyIns.Tools),
+				"messages_count":                   len(messagesForUpstream),
+				"stream":                           stream,
+				"react_round1":                     round1ReactMode,
+				"react_round2":                     round2ReactMode,
+				"react_extractor":                  needReactExtractor,
+				"client_requested_enable_thinking": bodyIns.EnableThinking,
+			}
+		})
+
+		client, err := provider.GetAIClientWithRawMessagesAndTrace(
+			traceSession,
 			messagesForUpstream,
 			toolsForUpstream,
 			toolChoiceForUpstream,
@@ -1638,7 +1679,7 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 		// Log at WARN level for production visibility
 		var ms runtime.MemStats
 		runtime.ReadMemStats(&ms)
-		log.Warnf("[REQUEST_SUCCESS] model=%s provider=%s bytes=%d duration=%v goroutines=%d heap_mb=%d",
+		log.Debugf("[REQUEST_SUCCESS] model=%s provider=%s bytes=%d duration=%v goroutines=%d heap_mb=%d",
 			modelName, successfulProvider.TypeName, total, endDuration, runtime.NumGoroutine(), ms.HeapAlloc/1024/1024)
 
 		break // 成功处理，退出循环
