@@ -75,7 +75,7 @@ func handleQueryCVE(s *MCPServer) server.ToolHandlerFunc {
 			rsp, err := s.grpcClient.GetCVE(ctx, &req)
 			if err != nil {
 				if strings.Contains(err.Error(), "empty cve database") {
-					return nil, utils.Errorf("CVE database is not initialized. Run 'yakit cve --update' to import CVE data, then retry.")
+					return nil, utils.Errorf("CVE database is not initialized. Please download it via Yakit GUI (「漏洞数据库」page) first.")
 				}
 				return nil, utils.Wrap(err, "failed to query cve")
 			}
@@ -89,7 +89,7 @@ func handleQueryCVE(s *MCPServer) server.ToolHandlerFunc {
 			rsp, err := s.grpcClient.QueryCVE(ctx, &req)
 			if err != nil {
 				if strings.Contains(err.Error(), "empty cve database") {
-					return nil, utils.Errorf("CVE database is not initialized. Run 'yakit cve --update' to import CVE data, then retry.")
+					return nil, utils.Errorf("CVE database is not initialized. Please download it via Yakit GUI (「漏洞数据库」page) first.")
 				}
 				return nil, utils.Wrap(err, "failed to query cve")
 			}
