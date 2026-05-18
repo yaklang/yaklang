@@ -1,8 +1,10 @@
 package python
 
 import (
+	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
@@ -133,4 +135,36 @@ sqlite3.connect as $connect
 		}, true, ssaapi.WithLanguage(ssaconfig.PYTHON))
 	})
 
+}
+
+// TestPython_ImportSubModule_CalleeResolvesToFunction ensures bare and member calls to
+// cmd_injection_low both resolve to Function-cmd_injection_low (not FreeValue / Undefined).
+func TestPython_ImportSubModule_CalleeResolvesToFunction(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("vulnerabilities/CommandInjection.py", `
+def cmd_injection_low(query):
+    return query
+
+def cmd_injection_medium(query):
+    return cmd_injection_low(query)
+`)
+	vf.AddFile("app.py", `
+from vulnerabilities import CommandInjection
+
+def cmd_injection_route(query):
+    ci = CommandInjection
+    return ci.cmd_injection_low(query=query)
+`)
+
+	ssatest.CheckResultWithFS(t, vf, `cmd_injection_low as $callee`, func(res *ssaapi.SyntaxFlowResult) {
+		vals := res.GetValues("callee")
+		res.Show()
+		require.NotEmpty(t, vals)
+		for _, v := range vals {
+			s := v.String()
+			require.True(t, strings.HasPrefix(s, "Function-cmd_injection_low"), "got %s", s)
+			require.NotContains(t, s, "FreeValue")
+			require.NotContains(t, s, "Undefined")
+		}
+	}, ssaapi.WithLanguage(ssaconfig.PYTHON))
 }

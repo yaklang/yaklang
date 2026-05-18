@@ -73,6 +73,9 @@ func (*SSABuilder) BuildFromAST(raw ssa.FrontAST, b *ssa.FunctionBuilder) error 
 		constMap:        make(map[string]ssa.Value),
 		globalNames:     make(map[string]bool),
 	}
+	// Nested defs use a fresh scope root per function; reading outer/module names goes through
+	// getParentFunctionVariable, which is only active when SupportClosure is set (see ssa readValueEx).
+	build.SupportClosure = true
 	build.VisitRoot(ast)
 	return nil
 }
@@ -184,6 +187,9 @@ type singleFileBuilder struct {
 	staticLoopControls     []*staticLoopControl
 	wildcardImportPackages []string
 	tryControls            []*tryControl
+	// topLevelFuncShells maps each module-level funcdef AST node to its SSA function shell,
+	// pre-created before bodies are built so later-defined callees resolve in earlier defs.
+	topLevelFuncShells map[*pythonparser.FuncdefContext]*ssa.Function
 }
 
 type staticLoopControlState uint8
@@ -301,6 +307,66 @@ func (b *singleFileBuilder) syncPythonVirtualModuleExport(exportName string, typ
 	if typ != nil {
 		lib.SetExportType(exportName, typ)
 	}
+}
+
+// readVirtualModuleExport returns a top-level symbol from the current file's virtual module
+// library so same-module calls use Function exports instead of closure FreeValues.
+func (b *singleFileBuilder) readVirtualModuleExport(name string) ssa.Value {
+	if b == nil || name == "" {
+		return nil
+	}
+	prog := b.GetProgram()
+	if prog == nil {
+		return nil
+	}
+	mod := pythonDottedModuleFromEditor(b.GetEditor())
+	if mod == "" {
+		return nil
+	}
+	lib, ok := prog.GetLibrary(mod)
+	if !ok || lib == nil {
+		var err error
+		lib, err = prog.GetOrCreateLibrary(mod)
+		if err != nil || lib == nil {
+			return nil
+		}
+	}
+	v := lib.GetExportValue(name)
+	if v == nil || isPythonImportPlaceholderValue(v) {
+		return nil
+	}
+	return v
+}
+
+// resolvePythonSubmoduleImport builds an ExternLib for `from pkg import submod` when exports
+// live on the child library (e.g. vulnerabilities.CommandInjection), not on pkg.
+func (b *singleFileBuilder) resolvePythonSubmoduleImport(bindingName, sourceName, packagePath string) ssa.Value {
+	if b == nil || bindingName == "" || sourceName == "" || sourceName == bindingName {
+		return nil
+	}
+	wantSource := joinImportPath(packagePath, bindingName)
+	if sourceName != wantSource {
+		return nil
+	}
+	prog := b.GetProgram()
+	if prog == nil {
+		return nil
+	}
+	childLib, err := prog.GetOrCreateLibrary(sourceName)
+	if err != nil || childLib == nil {
+		return nil
+	}
+	ex := ssa.NewExternLib(bindingName, b.FunctionBuilder, nil)
+	ex.LibraryName = sourceName
+	ex.SetExtern(true)
+	for exportName, exportVal := range childLib.ExportValue {
+		if exportVal == nil || isPythonImportPlaceholderValue(exportVal) {
+			continue
+		}
+		ex.MemberMap[exportName] = exportVal.GetId()
+		ex.Member = append(ex.Member, exportVal.GetId())
+	}
+	return ex
 }
 
 func (b *singleFileBuilder) newDynamicPlaceholder(name string) ssa.Value {
