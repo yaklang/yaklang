@@ -1,0 +1,53 @@
+desc(
+	title: "Python file read operations (lib)"
+	title_zh: "文件读取操作（Python 库规则）"
+	type: audit
+	level: info
+	lib: "python-file-read"
+	risk: "路径遍历 / 任意文件读取"
+	desc: <<<DESC
+标记 open 读模式、Path.read_text/read_bytes、read/readlines 等读取行为。若路径或缓冲区大小受外部输入影响，可能导致任意文件读取或路径遍历。
+DESC
+	solution: <<<SOLUTION
+对路径做规范化并限制在允许根目录内；使用 pathlib 并结合 resolve 校验；避免将用户字符串直接作为 open 路径。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-22](https://cwe.mitre.org/data/definitions/22.html)
+REFERENCE
+	rule_id: "f2a2b3c4-d5e6-7890-abcd-ef2222222222"
+)
+
+open as $sink
+*.read_text as $sink
+*.read_bytes as $sink
+*.readlines as $sink
+*.read as $sink
+
+alert $sink for {
+	title: "File read"
+	title_zh: "文件读取"
+	level: "info"
+	type: "audit"
+	risk: "路径遍历 / 任意文件读取"
+	message: "检测到文件读取相关 API，请确认路径来源可信且已做边界校验。"
+	name: "output"
+}
+
+desc(
+	lang: python
+	alert_min: 4
+	'file://unsafe_read.py': <<<UNSAFE
+from pathlib import Path
+from flask import request
+
+def bad():
+    open(request.args.get("p", "")).read()
+    Path(request.args.get("p2", "")).read_text()
+    Path(request.args.get("p3", "")).read_bytes()
+    open(request.args.get("p4", ""), "r").readlines()
+UNSAFE
+	'safefile://safe_read.py': <<<SAFE
+def ok():
+    return 0
+SAFE
+)

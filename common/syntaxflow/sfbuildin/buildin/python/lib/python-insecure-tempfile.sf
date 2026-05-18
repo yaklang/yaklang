@@ -1,0 +1,49 @@
+desc(
+	title: "Python insecure tempfile API (lib)"
+	title_zh: "不安全临时文件（mktemp）（Python 库规则）"
+	type: audit
+	level: info
+	lib: "python-insecure-tempfile"
+	risk: "符号链接竞争 / 检查时与使用时竞态"
+	desc: <<<DESC
+标记 tempfile.mktemp。该 API 已弃用且在生成路径与真正创建文件之间存在竞态，易被符号链接攻击利用。
+DESC
+	solution: <<<SOLUTION
+使用 tempfile.mkstemp、NamedTemporaryFile 或 TemporaryDirectory；不要使用 mktemp。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-377](https://cwe.mitre.org/data/definitions/377.html)
+REFERENCE
+	rule_id: "b8c9d0e1-f2a3-4567-1234-890123456789"
+)
+
+tempfile.mktemp as $sink
+
+alert $sink for {
+	title: "tempfile.mktemp"
+	title_zh: "tempfile.mktemp 调用"
+	level: "info"
+	type: "audit"
+	risk: "符号链接竞争 / 检查时与使用时竞态"
+	message: "检测到 tempfile.mktemp，存在竞态与不安全临时路径问题，请替换为 mkstemp 或 NamedTemporaryFile。"
+	name: "output"
+}
+
+desc(
+	lang: python
+	alert_min: 2
+	'file://unsafe_temp.py': <<<UNSAFE
+import tempfile
+from flask import request
+
+def bad():
+    tempfile.mktemp(suffix=request.args.get("s", ""))
+    tempfile.mktemp(prefix=request.args.get("p", ""))
+UNSAFE
+	'safefile://safe_temp.py': <<<SAFE
+import tempfile
+def ok():
+    fd, path = tempfile.mkstemp()
+    return path
+SAFE
+)

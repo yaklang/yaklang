@@ -1,0 +1,60 @@
+desc(
+	title: "Check Python Flask render_template_string SSTI Vulnerability"
+	title_zh: "检测Python Flask render_template_string服务端模板注入漏洞"
+	type: audit
+	level: high
+	risk: "服务端模板注入（SSTI）"
+	desc: <<<DESC
+该规则用于检测Python Flask应用中`render_template_string`函数的不安全使用所导致的服务端模板注入（SSTI）漏洞。`render_template_string`是Flask框架提供的模板渲染函数，其直接将字符串作为模板进行解析和渲染。当该函数的模板参数中包含用户可控的输入数据时，攻击者可以构造恶意的模板表达式（如`{{config}}`、`{{''.__class__.__mro__[2].__subclasses__()}}`等），从而在服务器端执行任意代码，导致远程代码执行（RCE）。与`render_template`不同，`render_template_string`缺乏对模板文件的隔离，且更容易在动态生成模板内容的场景中被误用。常见的触发场景包括：直接将用户输入拼接进模板字符串、从数据库或外部接口获取不可信数据作为模板内容、以及错误地将用户可控数据作为模板字符串参数传递等。该漏洞的危害极大，可导致服务器完全被控制、敏感信息泄露、以及横向渗透等严重后果。
+DESC
+	solution: <<<SOLUTION
+修复该漏洞的核心原则是避免将用户可控数据直接作为模板字符串进行渲染。具体措施包括：
+
+1. **优先使用`render_template`加载静态模板文件**：将模板内容存放在独立的模板文件中，通过`render_template('template.html', user_data=data)`的方式渲染，确保模板结构固定，仅将用户数据作为变量传递。
+
+2. **严格输入校验与过滤**：若必须使用`render_template_string`，需对用户输入的数据进行严格的白名单过滤，禁止模板语法相关字符（如`{{`、`}}`、`{%`、`%}`等）的出现。
+
+3. **使用模板沙箱或安全渲染库**：考虑使用Jinja2的`SandboxedEnvironment`等安全模板环境，限制模板执行的危险操作；或采用专门的HTML转义库对用户输出进行编码。
+
+4. **最小权限原则**：运行Flask应用的服务账号应限制系统权限，避免因SSTI漏洞导致的全局系统沦陷。
+
+5. **代码审计与静态分析**：定期使用静态代码分析工具扫描`render_template_string`等高风险函数的使用场景，确保所有调用点均经过安全处理。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-1336](https://cwe.mitre.org/data/definitions/1336.html)
+REFERENCE
+	rule_id: "e8bd0b9e-97e6-4179-9e38-03b80026a0db"
+)
+
+render_template_string as $sink
+
+alert $sink for {
+	title: "Flask render_template_string SSTI",
+	title_zh: "Flask render_template_string 模板注入风险",
+	level: "high",
+	type: "audit",
+	risk: "模板注入",
+	message: "检测到 render_template_string 使用了用户可达的模板文本，存在 SSTI 风险。",
+	name: "sink",
+	solution: <<<SOLUTION
+优先使用 render_template 并指定模板文件，将用户数据以变量形式传入；若必须使用 render_template_string，需对用户输入进行严格的模板语法过滤或转义，避免用户输入直接拼接到模板字符串中。
+SOLUTION
+	desc: <<<DESC
+render_template_string 将字符串直接作为模板进行渲染，若模板内容中包含用户可控的输入片段，攻击者可注入模板语法，导致服务器端模板注入（SSTI），进而可能引发远程代码执行（RCE）。
+DESC
+}
+
+desc(
+	lang: python
+	alert_high: 1
+	'file://unsafe_flask.py': <<<UNSAFE
+from flask import render_template_string, request
+
+def page():
+    return render_template_string(request.args.get("t", ""))
+UNSAFE
+	'safefile://safe_flask.py': <<<SAFE
+def page():
+    return "Hello"
+SAFE
+)

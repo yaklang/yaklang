@@ -1,0 +1,65 @@
+desc(
+	title: "Python user input sources (lib)"
+	title_zh: "用户输入源（Python 库规则）"
+	type: audit
+	level: info
+	lib: "python-user-input"
+	risk: "输入校验不当"
+	desc: <<<DESC
+标记常见不可信输入来源：Flask/Django 的 request 取值、input()、sys.argv 等。可与命令执行、SQL、路径类 sink 规则通过数据流组合分析。
+DESC
+	solution: <<<SOLUTION
+对用户输入做校验与参数化绑定；禁止将原始请求数据直接传入 exec、拼接到 SQL 字符串或用于敏感路径 API。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-20](https://cwe.mitre.org/data/definitions/20.html)
+REFERENCE
+	rule_id: "f1a2b3c4-d5e6-7890-abcd-ef1111111111"
+)
+
+request.args.get as $output
+request.form.get as $output
+request.get_json as $output
+request.values.get as $output
+request.cookies.get as $output
+request.headers.get as $output
+request.POST.get as $output
+request.GET.get as $output
+*.args.get as $output
+*.form.get as $output
+*.get_json as $output
+*.values.get as $output
+*.cookies.get as $output
+*.headers.get as $output
+*.POST.get as $output
+*.GET.get as $output
+input as $output
+sys.argv as $output
+
+alert $output for {
+	title: "User input source"
+	title_zh: "用户输入点"
+	level: "info"
+	type: "audit"
+	risk: "输入校验不当"
+	message: "可能存在用户可控的输入来源。"
+	name: "output"
+}
+
+desc(
+	lang: python
+	alert_min: 5
+	'file://unsafe_user_input.py': <<<UNSAFE
+from flask import request
+def h():
+    request.args.get("a")
+    request.form.get("b")
+    request.get_json()
+    request.values.get("c")
+x = input("?")
+UNSAFE
+	'safefile://safe_user_input.py': <<<SAFE
+def ok():
+    return 1
+SAFE
+)

@@ -1,0 +1,48 @@
+desc(
+	title: "Python base64 decode (lib)"
+	title_zh: "Base64 解码（b64decode）（Python 库规则）"
+	type: audit
+	level: info
+	lib: "python-base64-decode"
+	risk: "不安全反序列化链路"
+	desc: <<<DESC
+标记 base64.b64decode 等解码调用。攻击者控制的 Base64 载荷解码后常被送入 pickle、yaml、json 等解析逻辑，构成反序列化或解析攻击链的一环。
+DESC
+	solution: <<<SOLUTION
+解码后校验长度与类型；禁止将解码结果直接传入 pickle.loads、yaml.load 等非安全解析接口。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-502](https://cwe.mitre.org/data/definitions/502.html)
+REFERENCE
+	rule_id: "f3a4b5c6-d7e8-9012-cdef-445566778899"
+)
+
+b64decode as $sink
+
+alert $sink for {
+	title: "base64.b64decode"
+	title_zh: "Base64 解码"
+	level: "info"
+	type: "audit"
+	risk: "不安全反序列化链路"
+	message: "检测到 Base64 解码，请关注下游是否接入不安全的反序列化或解析逻辑。"
+	name: "output"
+}
+
+desc(
+	lang: python
+	alert_min: 2
+	'file://unsafe_b64.py': <<<UNSAFE
+import base64
+from flask import request
+
+def a():
+    return base64.b64decode(request.args.get("x", ""))
+def b():
+    return base64.b64decode(request.args.get("y", "") + "==")
+UNSAFE
+	'safefile://safe_b64.py': <<<SAFE
+def ok():
+    return 1
+SAFE
+)

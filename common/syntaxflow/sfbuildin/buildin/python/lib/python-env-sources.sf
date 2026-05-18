@@ -1,0 +1,47 @@
+desc(
+	title: "Python environment variable sources (lib)"
+	title_zh: "环境变量读取（Python 库规则）"
+	type: audit
+	level: info
+	lib: "python-env-sources"
+	risk: "配置不当 / 敏感信息暴露"
+	desc: <<<DESC
+标记 os.getenv、os.environ.get 等读取环境变量的位置。环境变量常含配置与密钥，需关注是否记录日志、是否注入下游危险 sink。
+DESC
+	solution: <<<SOLUTION
+使用带校验的配置对象；避免在日志中输出完整环境变量；敏感凭据优先使用密钥管理服务。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-497](https://cwe.mitre.org/data/definitions/497.html)
+REFERENCE
+	rule_id: "d4e5f6a7-b8c9-0123-def0-234567890123"
+)
+
+os.getenv as $output
+os.environ.get as $output
+
+alert $output for {
+	title: "Environment variable read"
+	title_zh: "读取环境变量"
+	level: "info"
+	type: "audit"
+	risk: "配置不当 / 敏感信息暴露"
+	message: "检测到读取环境变量，请评估敏感性与默认值是否安全。"
+	name: "output"
+}
+
+desc(
+	lang: python
+	alert_min: 3
+	'file://unsafe_env.py': <<<UNSAFE
+import os
+
+os.getenv("A")
+os.getenv("B", "default")
+os.environ.get("C")
+UNSAFE
+	'safefile://safe_env.py': <<<SAFE
+def ok():
+    return 1
+SAFE
+)

@@ -1,0 +1,53 @@
+desc(
+	title: "Python file write operations (lib)"
+	title_zh: "文件写入操作（Python 库规则）"
+	type: audit
+	level: info
+	lib: "python-file-write"
+	risk: "任意文件写入"
+	desc: <<<DESC
+标记 open 写模式、write/writelines、Path.write_text/write_bytes 等写入行为。若路径或写入内容受外部输入影响，可能导致任意位置写入或覆盖敏感文件。
+DESC
+	solution: <<<SOLUTION
+将写入目录限制在安全根路径内；写入前校验路径与内容；需要时使用原子写入策略降低损坏风险。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-434](https://cwe.mitre.org/data/definitions/434.html)
+REFERENCE
+	rule_id: "f3a2b3c4-d5e6-7890-abcd-ef3333333333"
+)
+
+open as $sink
+*.write as $sink
+*.writelines as $sink
+*.write_text as $sink
+*.write_bytes as $sink
+
+alert $sink for {
+	title: "File write"
+	title_zh: "文件写入"
+	level: "info"
+	type: "audit"
+	risk: "任意文件写入"
+	message: "检测到文件写入相关 API，请确认目标路径与写入内容来源可信。"
+	name: "output"
+}
+
+desc(
+	lang: python
+	alert_min: 3
+	'file://unsafe_write.py': <<<UNSAFE
+from pathlib import Path
+from flask import request
+
+def bad():
+    p = request.args.get("p", "")
+    open(p, "w").write(request.args.get("d", ""))
+    Path(request.args.get("p2", "")).write_text(request.args.get("t", ""))
+    Path(request.args.get("p3", "")).write_bytes(request.args.get("b", "").encode())
+UNSAFE
+	'safefile://safe_write.py': <<<SAFE
+def ok():
+    return 0
+SAFE
+)

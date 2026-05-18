@@ -1,0 +1,52 @@
+desc(
+	title: "Python DB cursor execute APIs (lib)"
+	title_zh: "数据库游标执行（execute 系列）（Python 库规则）"
+	type: audit
+	level: info
+	lib: "python-db-cursor-execute"
+	risk: "SQL 注入"
+	desc: <<<DESC
+标记 DB-API 风格的 cursor.execute、executemany、executescript 等调用。若 SQL 文本或参数拼接自用户输入，易导致 SQL 注入。
+DESC
+	solution: <<<SOLUTION
+一律使用参数化查询（占位符绑定参数）；集中管理 SQL 构造逻辑，禁止将用户输入直接拼进 SQL 字符串。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-89](https://cwe.mitre.org/data/definitions/89.html)
+REFERENCE
+	rule_id: "b3c4d5e6-f7a8-9012-cdef-334455667788"
+)
+
+*.execute as $sink
+*.executemany as $sink
+*.executescript as $sink
+
+alert $sink for {
+	title: "DB cursor execute"
+	title_zh: "数据库游标执行"
+	level: "info"
+	type: "audit"
+	risk: "SQL 注入"
+	message: "检测到数据库 execute 类 API，请确认 SQL 已参数化且未拼接不可信输入。"
+	name: "output"
+}
+
+desc(
+	lang: python
+	alert_min: 3
+	'file://unsafe_db_execute.py': <<<UNSAFE
+import sqlite3
+from flask import request
+
+def demo():
+    c = sqlite3.connect(":memory:").cursor()
+    q = request.args.get("q", "")
+    c.execute("SELECT * FROM u WHERE x = '" + q + "'")
+    c.executemany("INSERT INTO u VALUES (?)", [(request.args.get("v", ""),)])
+    c.executescript(request.args.get("script", ""))
+UNSAFE
+	'safefile://safe_db_execute.py': <<<SAFE
+def ok():
+    return 1
+SAFE
+)

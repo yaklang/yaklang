@@ -1,0 +1,68 @@
+desc(
+	title: "Python HTTP client calls (lib)"
+	title_zh: "HTTP 客户端外连（Python 库规则）"
+	type: audit
+	level: info
+	lib: "python-http-client"
+	risk: "服务端请求伪造（SSRF）/ 非预期外连"
+	desc: <<<DESC
+标记 requests、urllib.request、httpx 等常见出站 HTTP 调用。若 URL 或请求参数来自用户或不可信配置，可能导致 SSRF 或敏感内网探测。
+DESC
+	solution: <<<SOLUTION
+对目标主机与协议做白名单；阻断 file://、元数据地址等危险目标；在网络层限制出站访问范围。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-918](https://cwe.mitre.org/data/definitions/918.html)
+REFERENCE
+	rule_id: "c1d2e3f4-a5b6-7890-cdef-112233445566"
+)
+
+requests.get as $sink
+requests.post as $sink
+requests.put as $sink
+requests.delete as $sink
+requests.head as $sink
+requests.patch as $sink
+requests.request as $sink
+urllib.request.urlopen as $sink
+urllib.request.urlretrieve as $sink
+httpx.get as $sink
+httpx.post as $sink
+httpx.put as $sink
+httpx.delete as $sink
+httpx.request as $sink
+httpx.Client as $sink
+
+alert $sink for {
+	title: "HTTP client call"
+	title_zh: "HTTP 客户端请求"
+	level: "info"
+	type: "audit"
+	risk: "服务端请求伪造（SSRF）/ 非预期外连"
+	message: "检测到出站 HTTP 客户端调用，请审计 URL 来源、重定向处理与是否暴露内网。"
+	name: "output"
+}
+
+desc(
+	lang: python
+	alert_min: 7
+	'file://unsafe_http_client.py': <<<UNSAFE
+import requests
+import urllib.request
+import httpx
+from flask import request
+
+def bad():
+    requests.get(request.args.get("u1", ""))
+    requests.post(request.args.get("u2", ""))
+    urllib.request.urlopen(request.args.get("u3", ""))
+    httpx.get(request.args.get("u4", ""))
+    httpx.post(request.args.get("u5", ""))
+    httpx.request("GET", request.args.get("u6", ""))
+    httpx.Client(base_url=request.args.get("u7", ""))
+UNSAFE
+	'safefile://safe_http_client.py': <<<SAFE
+def ok():
+    return 0
+SAFE
+)

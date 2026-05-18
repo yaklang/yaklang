@@ -1,0 +1,60 @@
+desc(
+	title: "Python path and filesystem operations (lib)"
+	title_zh: "路径与文件系统操作（Python 库规则）"
+	type: audit
+	level: info
+	lib: "python-path-operations"
+	risk: "路径遍历"
+	desc: <<<DESC
+标记 os.path.join、os.remove/rename/makedirs、shutil 拷贝移动删除、pathlib.Path 等路径与文件系统操作。若参数含不可信路径片段，可能导致穿越目录或删除敏感文件。
+DESC
+	solution: <<<SOLUTION
+在任意文件系统操作前将路径解析并限制在允许根目录下；拒绝包含 .. 或绝对路径逃逸的输入。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-22](https://cwe.mitre.org/data/definitions/22.html)
+REFERENCE
+	rule_id: "f4a2b3c4-d5e6-7890-abcd-ef4444444444"
+)
+
+os.path.join as $sink
+os.remove as $sink
+os.rename as $sink
+os.makedirs as $sink
+os.unlink as $sink
+shutil.copy as $sink
+shutil.move as $sink
+shutil.rmtree as $sink
+pathlib.Path as $sink
+
+alert $sink for {
+	title: "Path / filesystem op"
+	title_zh: "路径与文件系统操作"
+	level: "info"
+	type: "audit"
+	risk: "路径遍历"
+	message: "检测到路径或文件系统相关 API，请确认参数已规范化且未受路径遍历影响。"
+	name: "output"
+}
+
+desc(
+	lang: python
+	alert_min: 5
+	'file://unsafe_path.py': <<<UNSAFE
+import os
+import shutil
+from pathlib import Path
+from flask import request
+
+def bad():
+    os.path.join(request.args.get("a", ""), request.args.get("b", ""))
+    os.remove(request.args.get("x", ""))
+    os.makedirs(request.args.get("z", ""))
+    shutil.copy(request.args.get("s", ""), request.args.get("d", ""))
+    Path(request.args.get("p", ""))
+UNSAFE
+	'safefile://safe_path.py': <<<SAFE
+def ok():
+    return 0
+SAFE
+)

@@ -1,0 +1,44 @@
+desc(
+	title: "Python SSL unverified context (lib)"
+	title_zh: "SSL 跳过证书校验（Python 库规则）"
+	type: audit
+	level: info
+	lib: "python-ssl-unverified-context"
+	risk: "中间人攻击"
+	desc: <<<DESC
+标记 ssl._create_unverified_context 等跳过证书校验的用法，攻击者可实施中间人攻击，窃听或篡改 TLS 流量。
+DESC
+	solution: <<<SOLUTION
+使用系统默认信任链或显式加载可信 CA；优先使用 ssl.create_default_context() 并按用途配置 verify_mode 与 check_hostname。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-295](https://cwe.mitre.org/data/definitions/295.html)
+REFERENCE
+	rule_id: "e1f2a3b4-c5d6-7890-abcd-ef0123456789"
+)
+
+_create_unverified_context as $output
+
+alert $output for {
+	title: "SSL unverified context"
+	title_zh: "未校验证书的 SSL 上下文"
+	level: "info"
+	type: "audit"
+	risk: "中间人攻击"
+	message: "检测到未校验证书的 SSL 上下文，存在被中间人攻击的风险。"
+	name: "output"
+}
+
+desc(
+	lang: python
+	alert_min: 1
+	'file://unsafe_ssl.py': <<<UNSAFE
+import ssl
+ssl._create_unverified_context()
+UNSAFE
+	'safefile://safe_ssl.py': <<<SAFE
+import ssl
+def ok():
+    return ssl.create_default_context()
+SAFE
+)
