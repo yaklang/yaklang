@@ -123,13 +123,14 @@ func handleHybridScan(s *MCPServer) server.ToolHandlerFunc {
 				break
 			}
 
-			// progress
-			if rsp.TotalTasks > 0 {
+			// Only send progress notification when the client provided a progressToken.
+			if progressToken != nil && rsp.TotalTasks > 0 {
 				newProgress := float64(rsp.FinishedTasks) / float64(rsp.TotalTasks)
 				if newProgress > progress {
-					s.notificationServer(ctx).SendNotificationToClient("hybrid_scan/progress", map[string]any{
-						"progress":      float64(rsp.FinishedTasks) / float64(rsp.TotalTasks),
+					s.notificationServer(ctx).SendNotificationToClient("notifications/progress", map[string]any{
 						"progressToken": progressToken,
+						"progress":      newProgress,
+						"total":         float64(rsp.TotalTasks),
 					})
 					progress = newProgress
 				}
@@ -163,9 +164,9 @@ func handleHybridScan(s *MCPServer) server.ToolHandlerFunc {
 				Type: "text",
 				Text: content,
 			})
-			s.notificationServer(ctx).SendNotificationToClient("hybrid_scan/info", map[string]any{
-				"content":       content,
-				"progressToken": progressToken,
+			s.notificationServer(ctx).SendNotificationToClient("notifications/message", map[string]any{
+				"level": "info",
+				"data":  content,
 			})
 		}
 		if len(results) == 0 {

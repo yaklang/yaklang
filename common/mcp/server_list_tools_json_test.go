@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/log"
@@ -25,8 +24,6 @@ func TestMCPServerListToolsJSONFormat(t *testing.T) {
 	testServer := mcpserver.NewTestServer(s.server)
 	defer testServer.Close()
 
-	println(testServer.URL)
-	time.Sleep(10 * time.Hour)
 	sseResp, messageURL := openMcpSSESession(t, testServer.URL)
 	defer sseResp.Body.Close()
 

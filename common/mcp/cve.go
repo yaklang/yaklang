@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"strings"
 
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
@@ -73,6 +74,9 @@ func handleQueryCVE(s *MCPServer) server.ToolHandlerFunc {
 			}
 			rsp, err := s.grpcClient.GetCVE(ctx, &req)
 			if err != nil {
+				if strings.Contains(err.Error(), "empty cve database") {
+					return nil, utils.Errorf("CVE database is not initialized. Run 'yakit cve --update' to import CVE data, then retry.")
+				}
 				return nil, utils.Wrap(err, "failed to query cve")
 			}
 			return NewCommonCallToolResult(rsp.CVE)
@@ -84,6 +88,9 @@ func handleQueryCVE(s *MCPServer) server.ToolHandlerFunc {
 			}
 			rsp, err := s.grpcClient.QueryCVE(ctx, &req)
 			if err != nil {
+				if strings.Contains(err.Error(), "empty cve database") {
+					return nil, utils.Errorf("CVE database is not initialized. Run 'yakit cve --update' to import CVE data, then retry.")
+				}
 				return nil, utils.Wrap(err, "failed to query cve")
 			}
 			return NewCommonCallToolResult(rsp.Data)

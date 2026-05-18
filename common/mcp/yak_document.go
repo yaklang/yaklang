@@ -122,10 +122,17 @@ func handleYakDocVariableDetails(s *MCPServer) server.ToolHandlerFunc {
 		for _, varName := range varNames {
 			i := doc.GetDocumentInstance(libName, varName)
 			if i == nil {
-				if libName == "" {
-					libName = "GLOBAL"
+				displayLib := libName
+				if displayLib == "" {
+					displayLib = "GLOBAL"
 				}
-				return nil, utils.Errorf("variable[%s.%s] not found", libName, varName)
+				// Provide available variable names as a hint so callers can
+				// discover the correct names without a separate round-trip.
+				available := lo.Keys(doc.GetDocumentInstances(libName))
+				return nil, utils.Errorf(
+					"variable[%s.%s] not found; use yakdoc_library_details to list available variable names (found: %v)",
+					displayLib, varName, available,
+				)
 			}
 			results[varName] = i
 		}
