@@ -115,10 +115,13 @@ func appendPresetPrompt(request *AIRequest, tagName, description, prompt string)
 //   - is429:   true if a 429 was detected
 //   - ctxDone: true if the context was cancelled during the wait
 //
-// Two cases:
-//  1. AIBalance 429 (X-AIBalance-Info header present): parse queue count,
+// Three cases:
+//  1. AIBalance daily token quota exceeded (X-AIBalance-Limit-Kind: daily_token):
+//     show daily-quota friendly notification highlighting the Yi-unit usage and
+//     the daily 06:00 Asia/Shanghai refresh time, then wait random 5-15 seconds.
+//  2. AIBalance 429 (X-AIBalance-Info header present): parse queue count,
 //     show warm notification, wait queueCount*3 seconds.
-//  2. Generic 429: show generic rate-limit message, wait random 5-15 seconds.
+//  3. Generic 429: show generic rate-limit message, wait random 5-15 seconds.
 func (c *Config) handle429RateLimit(rsp *AIResponse) (is429 bool, ctxDone bool) {
 	if rsp == nil {
 		return false, false
@@ -133,6 +136,37 @@ func (c *Config) handle429RateLimit(rsp *AIResponse) (is429 bool, ctxDone bool) 
 	}
 
 	var waitDuration time.Duration
+
+	// 关键词: handle429RateLimit, daily_token_limit_exceeded, 日 Token 限额友好提示
+	// 优先识别日 Token 限额（X-AIBalance-Limit-Kind: daily_token），按"亿词元"展示
+	// 当日全球免费池消耗状态，并提示每日北京时间 06:00 刷新；行为对齐 generic 429，
+	// 等待 5-15 秒后由上层重试，避免改变现有重试循环语义。
+	limitKind := strings.TrimSpace(rsp.GetHTTPHeader("X-AIBalance-Limit-Kind"))
+	if limitKind == "daily_token" {
+		tokensUsed, _ := strconv.ParseInt(strings.TrimSpace(rsp.GetHTTPHeader("X-AIBalance-Token-Used")), 10, 64)
+		tokensLimit, _ := strconv.ParseInt(strings.TrimSpace(rsp.GetHTTPHeader("X-AIBalance-Token-Limit")), 10, 64)
+		const yiUnit = 100_000_000 // 1 亿 = 1e8 token
+		limitYi := float64(tokensLimit) / float64(yiUnit)
+		msg := fmt.Sprintf(
+			"今日免费词元额度 %.2f 亿 已经全部消耗完毕\n"+
+				"感谢大家踊跃使用，每日北京时间 06:00 准时刷新\n"+
+				"稍后将自动重试，您也可以稍候再来",
+			limitYi)
+		sleepSec := 5 + rand.Intn(11)
+		waitDuration = time.Duration(sleepSec) * time.Second
+		c.EmitDefaultStreamEvent("daily-token-exceeded", strings.NewReader(msg), "")
+		c.EmitNotify("daily-token-exceeded", msg, waitDuration)
+		log.Infof("daily token quota exceeded (used=%d, limit=%d), retrying in %ds",
+			tokensUsed, tokensLimit, sleepSec)
+
+		select {
+		case <-c.Ctx.Done():
+			return true, true
+		case <-time.After(waitDuration):
+			return true, false
+		}
+	}
+
 	queueInfo := strings.TrimSpace(rsp.GetHTTPHeader("X-AIBalance-Info"))
 	if queueInfo != "" {
 		queueCount, parseErr := strconv.Atoi(queueInfo)

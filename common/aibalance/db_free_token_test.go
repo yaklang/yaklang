@@ -230,6 +230,63 @@ func TestQueryFreeUserTokenUsageSnapshot(t *testing.T) {
 	assert.True(t, modelMap["foo-free"].Exempt)
 }
 
+// setFreeTokenWallClock 临时替换 freeTokenWallClock，便于断言切日边界。
+// 返回 restore 函数恢复原值，与 setFreeTokenNowDate 风格一致。
+// 关键词: setFreeTokenWallClock, 单元测试 wall clock mock
+func setFreeTokenWallClock(now time.Time) func() {
+	orig := freeTokenWallClock
+	freeTokenWallClock = func() time.Time { return now }
+	return func() { freeTokenWallClock = orig }
+}
+
+// TestFreeTokenNowDate_BeijingSixAMBoundary 验证免费用户日 Token 限额的切日时点
+// 落在「北京时间每日 06:00」：
+//   - 北京时间 05:59:59 仍属于昨日桶
+//   - 北京时间 06:00:00 切换到今日桶
+//   - 跨时区 wall clock（UTC 22:00 等价于北京时间次日 06:00）也应当切日
+//
+// 关键词: TestFreeTokenNowDate_BeijingSixAMBoundary, 北京时间 6 点切日边界
+func TestFreeTokenNowDate_BeijingSixAMBoundary(t *testing.T) {
+	// 北京时间 2026-05-19 05:59:59 -> 应归入 2026-05-18
+	beijing0559 := time.Date(2026, 5, 19, 5, 59, 59, 0, beijingTZ)
+	restore1 := setFreeTokenWallClock(beijing0559)
+	got1 := freeTokenNowDate()
+	restore1()
+	assert.Equal(t, "2026-05-18", got1,
+		"Beijing 05:59:59 must still belong to yesterday's bucket")
+
+	// 北京时间 2026-05-19 06:00:00 -> 应切换到 2026-05-19
+	beijing0600 := time.Date(2026, 5, 19, 6, 0, 0, 0, beijingTZ)
+	restore2 := setFreeTokenWallClock(beijing0600)
+	got2 := freeTokenNowDate()
+	restore2()
+	assert.Equal(t, "2026-05-19", got2,
+		"Beijing 06:00:00 must roll over to a new bucket")
+
+	// UTC 2026-05-18 22:00:00 == 北京时间 2026-05-19 06:00 -> 切到 2026-05-19
+	utc2200 := time.Date(2026, 5, 18, 22, 0, 0, 0, time.UTC)
+	restore3 := setFreeTokenWallClock(utc2200)
+	got3 := freeTokenNowDate()
+	restore3()
+	assert.Equal(t, "2026-05-19", got3,
+		"cross-timezone wall clock should respect Beijing 06:00 cutover")
+
+	// 北京时间正午 -> 当天日期
+	beijingNoon := time.Date(2026, 5, 19, 12, 0, 0, 0, beijingTZ)
+	restore4 := setFreeTokenWallClock(beijingNoon)
+	got4 := freeTokenNowDate()
+	restore4()
+	assert.Equal(t, "2026-05-19", got4, "Beijing noon should be today's bucket")
+
+	// 北京时间凌晨 03:00 -> 应归入前一天
+	beijing0300 := time.Date(2026, 5, 19, 3, 0, 0, 0, beijingTZ)
+	restore5 := setFreeTokenWallClock(beijing0300)
+	got5 := freeTokenNowDate()
+	restore5()
+	assert.Equal(t, "2026-05-18", got5,
+		"Beijing 03:00 still belongs to previous day's bucket")
+}
+
 func TestUpdateAiApiKeyTokenUsedAndCheck(t *testing.T) {
 	require.NoError(t, GetDB().AutoMigrate(&schema.AiApiKeys{}).Error)
 

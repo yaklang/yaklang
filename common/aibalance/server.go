@@ -2606,12 +2606,20 @@ func (c *ServerConfig) writeRPMRateLimitResponse(conn net.Conn, queueLength int6
 //   - model          实际触发限额的对外模型名
 //
 // HTTP header: X-AIBalance-Limit-Kind: daily_token + Retry-After: 3600
-// （建议客户端等到下一日 0 点附近重试）
+// （建议客户端等到下一日北京时间 06:00 附近重试）
 //
-// 关键词: writeDailyTokenLimitResponse, 日 Token 限额 429, 日限额已满
+// 关键词: writeDailyTokenLimitResponse, 日 Token 限额 429, 日限额已满, 北京时间 6 点刷新
 func (c *ServerConfig) writeDailyTokenLimitResponse(conn net.Conn, modelName, bucket string, tokensUsed, tokensLimit int64) {
 	usedM := float64(tokensUsed) / float64(FreeUserTokenMUnit)
 	limitM := tokensLimit / FreeUserTokenMUnit
+	// 关键词: 日 Token 限额提示词, 亿词元单位, 北京时间 06:00 刷新
+	// 1 亿 = 1e8 token；同时拼接英文便于运维日志检索。
+	const yiUnit = 100_000_000
+	limitYi := float64(tokensLimit) / float64(yiUnit)
+	friendlyMessage := fmt.Sprintf(
+		"今日免费词元额度 %.2f 亿已经全部消耗完毕，每日北京时间 06:00 准时刷新。"+
+			"Daily token quota exceeded (used=%d, limit=%d), refreshes daily at 06:00 Asia/Shanghai.",
+		limitYi, tokensUsed, tokensLimit)
 	type errBody struct {
 		Type         string  `json:"type"`
 		Message      string  `json:"message"`
@@ -2629,7 +2637,7 @@ func (c *ServerConfig) writeDailyTokenLimitResponse(conn net.Conn, modelName, bu
 	}
 	payload := wrap{Error: errBody{
 		Type:         "daily_token_limit_exceeded",
-		Message:      fmt.Sprintf("Daily token limit exceeded for free users (used=%d, limit=%d).", tokensUsed, tokensLimit),
+		Message:      friendlyMessage,
 		LimitKind:    "daily_token_quota",
 		LimitKindZh:  "日限额已满",
 		Bucket:       bucket,

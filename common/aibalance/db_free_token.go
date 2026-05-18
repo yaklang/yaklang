@@ -39,10 +39,31 @@ func EnsureFreeUserDailyTokenUsageTable() error {
 	return GetDB().AutoMigrate(&schema.FreeUserDailyTokenUsage{}).Error
 }
 
-// freeTokenNowDate 抽出来便于测试 mock。
-// 关键词: freeTokenNowDate
+// dailyTokenResetHour 是免费用户日 Token 限额的切日时点：北京时间每日 06:00 刷新。
+// 关键词: dailyTokenResetHour, 日 Token 限额切日时点, 北京时间 6 点
+const dailyTokenResetHour = 6
+
+// beijingTZ 是免费用户日 Token 限额切日所用的时区（Asia/Shanghai）。
+// 加载失败回退到固定 UTC+8 时区，避免容器内 tzdata 缺失导致 panic。
+// 关键词: beijingTZ, Asia/Shanghai, UTC+8 兜底
+var beijingTZ = func() *time.Location {
+	if loc, err := time.LoadLocation("Asia/Shanghai"); err == nil {
+		return loc
+	}
+	return time.FixedZone("CST", 8*3600)
+}()
+
+// freeTokenWallClock 抽出来便于单元测试 mock wall clock。
+// 关键词: freeTokenWallClock
+var freeTokenWallClock = func() time.Time { return time.Now() }
+
+// freeTokenNowDate 返回当前的「免费用户日 Token 限额自然日」字符串（YYYY-MM-DD）。
+// 切日时点为北京时间每日 06:00：北京时间 2026-05-19 05:59:59 仍属 2026-05-18 桶；
+// 北京时间 2026-05-19 06:00:00 切换到 2026-05-19 桶。实现方法：把「北京时间」
+// 向前偏移 6 小时再 Format —— 06:00 减 6h 落回 00:00，于是 Format 出新日期。
+// 关键词: freeTokenNowDate, 北京时间 6 点切日, 日 Token 限额自然日
 var freeTokenNowDate = func() string {
-	return time.Now().Format("2006-01-02")
+	return freeTokenWallClock().In(beijingTZ).Add(-dailyTokenResetHour * time.Hour).Format("2006-01-02")
 }
 
 // FreeUserTokenModelOverride 描述对某个 -free 模型的限额覆盖配置。

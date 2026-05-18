@@ -64,6 +64,65 @@ func TestWriteDailyTokenLimitResponse_Format(t *testing.T) {
 	assert.Equal(t, float64(1200), errObj["tokens_limit_m"])
 }
 
+// TestWriteDailyTokenLimitResponse_FriendlyMessage 验证日 Token 限额 429 响应 body
+// 中的 message 字段包含中文友好提示词与北京时间 06:00 刷新表述，并按「亿」单位展示
+// 当日额度，便于客户端直接转发给最终用户。
+// 关键词: TestWriteDailyTokenLimitResponse_FriendlyMessage, 亿词元, 北京时间 06:00 刷新
+func TestWriteDailyTokenLimitResponse_FriendlyMessage(t *testing.T) {
+	cfg := NewServerConfig()
+	defer cfg.Close()
+
+	client, server := net.Pipe()
+	defer client.Close()
+	defer server.Close()
+
+	go func() {
+		// tokens_limit = 130 亿 (13_000_000_000), tokens_used = 130.01 亿
+		cfg.writeDailyTokenLimitResponse(server, "memfit-qwen3.5-plus-thinking-free", "global", 13001115701, 13000000000)
+		server.Close()
+	}()
+
+	var result []byte
+	buf := make([]byte, 8192)
+	for {
+		client.SetReadDeadline(time.Now().Add(2 * time.Second))
+		n, err := client.Read(buf)
+		if n > 0 {
+			result = append(result, buf[:n]...)
+		}
+		if err != nil {
+			break
+		}
+	}
+	resp := string(result)
+
+	// 旧 header 断言保留，保证不破坏现有契约
+	assert.Contains(t, resp, "X-AIBalance-Limit-Kind: daily_token")
+	assert.Contains(t, resp, "Retry-After: 3600")
+
+	bodyIdx := strings.Index(resp, "\r\n\r\n")
+	require.Greater(t, bodyIdx, 0)
+
+	var parsed map[string]interface{}
+	require.NoError(t, json.Unmarshal([]byte(resp[bodyIdx+4:]), &parsed))
+	errObj, ok := parsed["error"].(map[string]interface{})
+	require.True(t, ok)
+
+	// type / limit_kind / limit_kind_zh 保持不变
+	assert.Equal(t, "daily_token_limit_exceeded", errObj["type"])
+	assert.Equal(t, "daily_token_quota", errObj["limit_kind"])
+	assert.Equal(t, "日限额已满", errObj["limit_kind_zh"])
+
+	// 新友好 message 字段：包含「亿」单位与「北京时间 06:00」刷新表述，
+	// 同时保留英文便于运维日志检索
+	msg, _ := errObj["message"].(string)
+	assert.Contains(t, msg, "亿", "message should describe the quota in Yi unit")
+	assert.Contains(t, msg, "130.00 亿", "should format the 13_000_000_000 limit as 130.00 yi")
+	assert.Contains(t, msg, "北京时间 06:00", "message must mention Beijing 06:00 refresh")
+	assert.Contains(t, msg, "Daily token quota exceeded", "should keep English clue for ops")
+	assert.Contains(t, msg, "Asia/Shanghai", "should keep timezone in english clue")
+}
+
 // TestWriteRPMRateLimitResponse_HasLimitKindHeader 验证拆分后的 RPM 429 也带 X-AIBalance-Limit-Kind 头。
 func TestWriteRPMRateLimitResponse_HasLimitKindHeader(t *testing.T) {
 	cfg := NewServerConfig()
