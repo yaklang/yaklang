@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -555,6 +556,174 @@ func TestSSEServer(t *testing.T) {
 		}
 		if !strings.Contains(response.Error.Message, "legacy SSE transport") {
 			t.Fatalf("Expected legacy SSE rejection, got %q", response.Error.Message)
+		}
+	})
+
+	// Regression: endpoint URL host must reflect the host the client used, not
+	// the bind address (e.g. 0.0.0.0). Strict MCP SDK validators reject an
+	// endpoint whose origin differs from the SSE connection origin.
+	t.Run("Endpoint URL matches client request host, not bind address", func(t *testing.T) {
+		mcpServer := NewMCPServer("test", "1.0.0")
+		// Deliberately set baseURL to a 0.0.0.0 address that a strict client
+		// would reject.
+		sseServer := &SSEServer{
+			server:       mcpServer,
+			baseURL:      "http://0.0.0.0:19999",
+			dispatchDone: make(chan struct{}),
+		}
+		sseServer.startNotificationDispatcher()
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.URL.Path {
+			case "/sse":
+				sseServer.handleSSE(w, r)
+			case "/message":
+				sseServer.handleMessage(w, r)
+			default:
+				http.NotFound(w, r)
+			}
+		}))
+
+		// Open SSE session, read endpoint event, then immediately close the
+		// connection so testServer.Close() does not block.
+		sseResp, messageURL := openSSESession(t, ts)
+		sseResp.Body.Close() // unblock the long-lived SSE handler goroutine
+		ts.Close()
+
+		parsed, err := url.Parse(messageURL)
+		if err != nil {
+			t.Fatalf("failed to parse endpoint URL %q: %v", messageURL, err)
+		}
+		if parsed.Hostname() == "0.0.0.0" {
+			t.Fatalf("endpoint URL must not use bind address 0.0.0.0, got %q", messageURL)
+		}
+		expectedHost := ts.Listener.Addr().String()
+		if parsed.Host != expectedHost {
+			t.Fatalf("endpoint host: want %q, got %q", expectedHost, parsed.Host)
+		}
+	})
+
+	// Regression: SSE event frames containing multi-byte UTF-8 characters (e.g.
+	// Chinese) must be delivered as complete, parseable JSON. Previously,
+	// fmt.Fprintf split large payloads across multiple write calls which could
+	// cause the bufio.Writer to auto-flush mid-frame, leaving the SSE client
+	// with a truncated JSON string ("Unterminated string" / json.loads error).
+	t.Run("Large UTF-8 SSE frame is delivered without truncation", func(t *testing.T) {
+		// Build a tool that returns > 4 KiB of Chinese text so the payload
+		// reliably crosses the default bufio.Writer buffer boundary (4096 B).
+		chineseChar := "中文测试内容，验证SSE帧完整性。"
+		// Each Chinese character is 3 bytes in UTF-8; ~48 bytes per repetition;
+		// 300 repetitions ≈ 14 400 bytes, well over the 4096-byte boundary.
+		largeText := strings.Repeat(chineseChar, 300)
+
+		mcpServer := NewMCPServer("test", "1.0.0")
+		mcpServer.AddTool(
+			mcp.NewTool("large_chinese_tool"),
+			func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				return &mcp.CallToolResult{
+					Content: []interface{}{
+						mcp.TextContent{Type: "text", Text: largeText},
+					},
+				}, nil
+			},
+		)
+		testServer := NewTestServer(mcpServer)
+
+		sseResp, messageURL := openSSESession(t, testServer)
+		// Close SSE body before testServer.Close() to avoid connection hang.
+		t.Cleanup(func() {
+			sseResp.Body.Close()
+			testServer.Close()
+		})
+
+		// Send initialize so the session is accepted.
+		initResp := doSSEInitializeRequest(t, messageURL, "application/json", 1)
+		defer initResp.Body.Close()
+		if initResp.StatusCode != http.StatusAccepted {
+			t.Fatalf("initialize: expected 202, got %d", initResp.StatusCode)
+		}
+
+		// Read the SSE stream in a goroutine; collect complete event frames.
+		type sseEvent struct {
+			eventType string
+			data      string
+		}
+		eventCh := make(chan sseEvent, 16)
+		go func() {
+			defer close(eventCh)
+			// Use a large scanner buffer so multi-KB lines are not rejected.
+			scanner := bufio.NewScanner(sseResp.Body)
+			scanner.Buffer(make([]byte, 64*1024), 64*1024)
+			var currentType, currentData string
+			for scanner.Scan() {
+				line := scanner.Text()
+				switch {
+				case strings.HasPrefix(line, "event: "):
+					currentType = strings.TrimPrefix(line, "event: ")
+				case strings.HasPrefix(line, "data: "):
+					currentData = strings.TrimPrefix(line, "data: ")
+				case line == "":
+					if currentType != "" || currentData != "" {
+						eventCh <- sseEvent{eventType: currentType, data: currentData}
+						currentType, currentData = "", ""
+					}
+				}
+			}
+		}()
+
+		// Call the tool; its response will be pushed over the SSE channel.
+		callResp := doSSEJSONRequest(t, messageURL, "application/json", map[string]interface{}{
+			"jsonrpc": "2.0",
+			"id":      2,
+			"method":  "tools/call",
+			"params": map[string]interface{}{
+				"name":      "large_chinese_tool",
+				"arguments": map[string]interface{}{},
+			},
+		})
+		defer callResp.Body.Close()
+		if callResp.StatusCode != http.StatusAccepted {
+			t.Fatalf("tools/call: expected 202, got %d", callResp.StatusCode)
+		}
+
+		// Drain SSE events until the tools/call response arrives (id==2).
+		timeout := time.After(5 * time.Second)
+		for {
+			select {
+			case ev, ok := <-eventCh:
+				if !ok {
+					t.Fatal("SSE stream closed before receiving tool result")
+				}
+				if ev.eventType != "message" {
+					continue
+				}
+				// Validate JSON integrity – no truncated UTF-8.
+				if !json.Valid([]byte(ev.data)) {
+					t.Fatalf("SSE event data is not valid JSON (truncated?): %.200s…", ev.data)
+				}
+				var result map[string]interface{}
+				if err := json.Unmarshal([]byte(ev.data), &result); err != nil {
+					t.Fatalf("failed to unmarshal SSE event: %v", err)
+				}
+				if id, _ := result["id"].(float64); id != 2 {
+					continue // skip the initialize response
+				}
+				res, _ := result["result"].(map[string]interface{})
+				if res == nil {
+					t.Fatalf("tools/call response missing result field")
+				}
+				content, _ := res["content"].([]interface{})
+				if len(content) == 0 {
+					t.Fatalf("tools/call result has no content")
+				}
+				first, _ := content[0].(map[string]interface{})
+				text, _ := first["text"].(string)
+				if text != largeText {
+					t.Fatalf("text mismatch: want %d chars, got %d chars", len(largeText), len(text))
+				}
+				return // pass
+			case <-timeout:
+				t.Fatal("timed out waiting for large UTF-8 tool result over SSE")
+			}
 		}
 	})
 

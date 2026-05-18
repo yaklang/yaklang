@@ -37,9 +37,9 @@ type sseSession struct {
 }
 
 var allowedMessageOriginExtensionSchemes = map[string]struct{}{
-	"chrome-extension":      {},
-	"moz-extension":         {},
-	"safari-web-extension":  {},
+	"chrome-extension":     {},
+	"moz-extension":        {},
+	"safari-web-extension": {},
 }
 
 var allowedMessageOriginLocalHosts = map[string]struct{}{
@@ -71,8 +71,25 @@ func (sess *sseSession) writeMessageEvent(eventData []byte) (err error) {
 			err = fmt.Errorf("sse write: %v", r)
 		}
 	}()
-	_, werr := fmt.Fprintf(sess.writer, "event: message\ndata: %s\n\n", eventData)
-	if werr != nil {
+
+	// Assemble the complete SSE frame in a single buffer before writing.
+	// http.ResponseWriter wraps a bufio.Writer (default 4 KiB). If we call
+	// fmt.Fprintf with a large payload the runtime may auto-flush mid-write,
+	// sending the "event: message\ndata: " prefix and part of the JSON in one
+	// TCP chunk and the rest (including the mandatory "\n\n" terminator) in a
+	// later chunk. SSE clients that feed each received chunk directly to a JSON
+	// parser will then see a truncated / incomplete string and report errors like
+	// "Unterminated string" – a symptom visible especially with multi-byte UTF-8
+	// content (Chinese characters, etc.) that exceeds the buffer boundary.
+	//
+	// Writing the entire frame atomically ensures the SSE event is always
+	// delivered as a coherent unit.
+	frame := make([]byte, 0, len("event: message\ndata: ")+len(eventData)+2)
+	frame = append(frame, "event: message\ndata: "...)
+	frame = append(frame, eventData...)
+	frame = append(frame, '\n', '\n')
+
+	if _, werr := sess.writer.Write(frame); werr != nil {
 		return werr
 	}
 	sess.flusher.Flush()
@@ -215,9 +232,22 @@ func (s *SSEServer) handleSSE(w http.ResponseWriter, r *http.Request) {
 		closeOnce: sync.Once{},
 	}
 
+	// Derive the message endpoint base from the incoming request so that the
+	// returned URL always matches the origin the client used to connect.
+	// This avoids "Endpoint origin does not match connection origin" errors
+	// thrown by strict MCP SDK validators when the server binds to 0.0.0.0
+	// but the client connects via a real IP or hostname.
+	endpointBase := s.baseURL
+	if host := r.Host; host != "" {
+		scheme := "http"
+		if r.TLS != nil {
+			scheme = "https"
+		}
+		endpointBase = scheme + "://" + host
+	}
 	messageEndpoint := fmt.Sprintf(
 		"%s/message?sessionId=%s",
-		s.baseURL,
+		endpointBase,
 		sessionID,
 	)
 	fmt.Fprintf(w, "event: endpoint\ndata: %s\r\n\r\n", messageEndpoint)
@@ -245,7 +275,7 @@ func (s *SSEServer) handleSSE(w http.ResponseWriter, r *http.Request) {
 				session.Close()
 				return
 			default:
-				fmt.Fprintf(session.writer, ":keepalive\n\n")
+				_, _ = session.writer.Write([]byte(":keepalive\n\n"))
 				session.flusher.Flush()
 				session.mu.Unlock()
 			}
