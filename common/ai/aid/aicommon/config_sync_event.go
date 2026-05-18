@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"strings"
 	"time"
 
 	"github.com/yaklang/yaklang/common/schema"
@@ -259,8 +261,29 @@ func (c *Config) HandleSyncPlanExecTasksEvent(event *ypb.AIInputEvent) error {
 }
 
 func (c *Config) HandleSyncUpdataConfigEvent(event *ypb.AIInputEvent) error {
+	if event == nil || event.Params == nil {
+		return utils.Errorf("update config params is nil")
+	}
+
 	updateConfig := map[string]interface{}{}
 	var legacyHotpatchEvent *ypb.AIInputEvent
+	sessionID := strings.TrimSpace(c.PersistentSessionId)
+	if sessionID != "" && c.GetDB() != nil {
+		cached, err := yakit.GetAISessionMetaStartParamsBySessionID(c.GetDB(), sessionID)
+		if err != nil {
+			log.Warnf("load ai session start params failed for %s: %v", sessionID, err)
+		}
+		next := yakit.OverlayAISessionStartParams(cached, event.Params)
+		if next == nil {
+			next = event.Params
+		}
+		if _, err := yakit.CreateOrUpdateAISessionMetaStartParams(c.GetDB(), sessionID, next); err != nil {
+			log.Warnf("persist ai session start params failed for %s: %v", sessionID, err)
+		} else {
+			updateConfig["session_id"] = sessionID
+			updateConfig["persisted"] = true
+		}
+	}
 	if event.Params.GetAIService() != "" {
 		legacyHotpatchEvent = &ypb.AIInputEvent{
 			HotpatchType: HotPatchType_AIService,

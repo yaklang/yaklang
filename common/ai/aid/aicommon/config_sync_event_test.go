@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -334,4 +335,40 @@ func TestProcessInputEvent_SyncRecoveryHistory(t *testing.T) {
 	require.Equal(t, float64(1), payload["event_count"])
 	require.Equal(t, float64(seed.blockAID), payload["next_start_id"])
 	require.Equal(t, false, payload["has_more"])
+}
+
+func TestHandleSyncUpdataConfigEvent_PersistSessionStartParams(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	c := NewTestConfig(ctx,
+		WithPersistentSessionId("session-sync-config"),
+	)
+	require.NoError(t, c.GetDB().AutoMigrate(&schema.AISession{}).Error)
+	_, err := yakit.CreateOrUpdateAISessionMetaStartParams(c.GetDB(), "session-sync-config", &ypb.AIStartParams{
+		AIService:         "old-service",
+		AIModelName:       "old-model",
+		ReviewPolicy:      "manual",
+		TimelineSessionID: "session-sync-config",
+		UserInteractLimit: 7,
+	})
+	require.NoError(t, err)
+
+	err = c.HandleSyncUpdataConfigEvent(&ypb.AIInputEvent{
+		SyncID: uuid.NewString(),
+		Params: &ypb.AIStartParams{
+			AIService:     "new-service",
+			AIModelName:   "new-model",
+			ReviewPolicy:  "ai",
+		},
+	})
+	require.NoError(t, err)
+
+	got, err := yakit.GetAISessionMetaStartParamsBySessionID(c.GetDB(), "session-sync-config")
+	require.NoError(t, err)
+	require.Equal(t, "new-service", got.GetAIService())
+	require.Equal(t, "new-model", got.GetAIModelName())
+	require.Equal(t, "ai", got.GetReviewPolicy())
+	require.Equal(t, int64(7), got.GetUserInteractLimit())
+	require.Equal(t, "session-sync-config", got.GetTimelineSessionID())
 }
