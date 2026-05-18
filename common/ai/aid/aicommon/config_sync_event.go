@@ -267,7 +267,6 @@ func (c *Config) HandleSyncUpdataConfigEvent(event *ypb.AIInputEvent) error {
 	}
 
 	updateConfig := map[string]interface{}{}
-	var legacyHotpatchEvent *ypb.AIInputEvent
 	sessionID := strings.TrimSpace(c.PersistentSessionId)
 	if sessionID != "" && c.GetDB() != nil {
 		cached, err := yakit.GetAISessionMetaStartParamsBySessionID(c.GetDB(), sessionID)
@@ -285,24 +284,46 @@ func (c *Config) HandleSyncUpdataConfigEvent(event *ypb.AIInputEvent) error {
 			updateConfig["persisted"] = true
 		}
 	}
+	applyHotpatch := func(legacyHotpatchEvent *ypb.AIInputEvent) {
+		if legacyHotpatchEvent == nil {
+			return
+		}
+		for _, opt := range c.ProcessHotPatchMessage(legacyHotpatchEvent) {
+			if opt == nil {
+				continue
+			}
+			if c.HotPatchOptionChan != nil {
+				c.HotPatchOptionChan.SafeFeed(opt)
+				continue
+			}
+			if err := opt(c); err != nil {
+				c.EmitError("apply config hotpatch failed: %v", err)
+			}
+		}
+	}
+
 	if event.Params.GetAIService() != "" {
-		legacyHotpatchEvent = &ypb.AIInputEvent{
+		applyHotpatch(&ypb.AIInputEvent{
 			HotpatchType: HotPatchType_AIService,
 			Params: &ypb.AIStartParams{
 				AIService:   event.Params.GetAIService(),
 				AIModelName: event.Params.GetAIModelName(),
 			},
+		})
+		updateConfig["AIService"] = event.Params.GetAIService()
+		if event.Params.GetAIModelName() != "" {
+			updateConfig["AIModelName"] = event.Params.GetAIModelName()
 		}
 	}
 	if event.Params.GetReviewPolicy() != "" {
-		legacyHotpatchEvent = &ypb.AIInputEvent{
+		applyHotpatch(&ypb.AIInputEvent{
 			HotpatchType: HotPatchType_AgreePolicy,
 			Params: &ypb.AIStartParams{
 				ReviewPolicy: event.Params.GetReviewPolicy(),
 			},
-		}
+		})
+		updateConfig["ReviewPolicy"] = event.Params.GetReviewPolicy()
 	}
-	c.ProcessHotPatchMessage(legacyHotpatchEvent)
 	c.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, "update_config", updateConfig, event.SyncID)
 	return nil
 }
