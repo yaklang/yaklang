@@ -1,0 +1,52 @@
+desc(
+	title: "Python dynamic import (lib)"
+	title_zh: "动态导入（Python 库规则）"
+	type: audit
+	level: info
+	lib: "python-dynamic-import"
+	risk: "任意代码加载"
+	desc: <<<DESC
+标记 __import__、importlib.import_module、importlib.util.find_spec 等动态导入。若模块名来自用户或外部输入，可能加载非预期模块并触发导入期副作用。
+DESC
+	solution: <<<SOLUTION
+对模块名使用固定白名单或映射表；禁止将用户字符串直接作为导入目标；在受限环境审计导入副作用。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-829](https://cwe.mitre.org/data/definitions/829.html)
+REFERENCE
+	rule_id: "f6a7b8c9-d0e1-2345-f012-678901234567"
+)
+
+__import__ as $sink
+importlib.import_module as $sink
+importlib.util.find_spec as $sink
+
+alert $sink for {
+	title: "Dynamic import"
+	title_zh: "动态导入"
+	level: "info"
+	type: "audit"
+	risk: "任意代码加载"
+	message: "检测到动态导入 API，请确认模块名来源可信且经过白名单约束。"
+	name: "output"
+}
+
+desc(
+	lang: python
+	alert_min: 3
+	'file://unsafe_import.py': <<<UNSAFE
+import importlib
+import importlib.util
+from flask import request
+
+def bad():
+    __import__(request.args.get("m", ""))
+    importlib.import_module(request.args.get("m2", ""))
+    importlib.util.find_spec(request.args.get("m3", ""))
+UNSAFE
+	'safefile://safe_import.py': <<<SAFE
+import json
+def ok():
+    return json.dumps({"a": 1})
+SAFE
+)

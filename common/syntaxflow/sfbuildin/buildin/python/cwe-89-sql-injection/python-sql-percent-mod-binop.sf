@@ -1,0 +1,49 @@
+desc(
+	title: "Check Python SQL Injection via Percent-Format String Concatenation"
+	title_zh: "检测Python基于百分号格式化的SQL注入漏洞"
+	type: audit
+	level: high
+	risk: "SQL 注入"
+	desc: <<<DESC
+该规则用于检测Python应用程序中通过百分号格式化（% formatting）或字符串拼接方式构建SQL语句的安全漏洞。当用户可控输入通过`%`操作符（如`"SELECT ... '%s'" % (user, pass)`）直接嵌入SQL字符串时，攻击者可构造恶意输入绕过查询逻辑，导致SQL注入（SQLi）。此类漏洞常见于使用`sqlite3`、`MySQLdb`等数据库驱动且未采用参数化查询的Web应用（如Flask、Django）。攻击者可通过注入`' OR '1'='1`等Payload篡改查询语义，造成数据泄露、未授权访问甚至数据库完全控制。规则通过追踪用户输入（`python-user-input`）与包含`%`的SQL字符串拼接点之间的数据流，识别高危Sink。
+DESC
+	solution: <<<SOLUTION
+修复此类漏洞应严格使用参数化查询（prepared statements），将用户输入作为参数绑定而非直接拼接到SQL字符串中。例如，使用`cursor.execute("SELECT * FROM users WHERE username=? AND password=?", (user, pass))`替代字符串格式化。同时，避免使用`%`格式化、f-string或`+`拼接用户输入到SQL语句中。对于必须动态构建的查询，应使用ORM框架（如SQLAlchemy）并启用其参数化能力，或在应用层实施严格的输入校验与白名单过滤。此外，建议对数据库操作层进行统一封装，禁止直接传递原始SQL字符串，并定期审计代码中存在的字符串拼接SQL模式。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-89](https://cwe.mitre.org/data/definitions/89.html)
+REFERENCE
+	rule_id: "6e64e380-374d-400b-8223-22dd2867e0de"
+)
+
+*.execute?(*<slice(index=0)> #{until: `*.cursor()`}->) as $func
+$func<getCallee()>?(*<slice(index=1)> #{until: `*?{ have: /%/}`}-> ) as $high
+
+alert $high for {
+	title: "SQL percent-format string",
+	title_zh: "SQL percent format",
+	level: "high",
+	type: "audit",
+	risk: "SQL 注入",
+	message: "检测到使用百分号格式化拼接 SQL，且相关片段可能受用户输入影响。",
+	name: "sink",
+}
+
+desc(
+	lang: python
+	alert_high: 1
+	'file://unsafe_sql_percent.py': <<<UNSAFE
+import sqlite3
+from flask import request
+
+def bad():
+    c = sqlite3.connect(":memory:").cursor()
+    u = request.args.get("u", "")
+    p = request.args.get("p", "")
+    c.execute("SELECT userid, username FROM users WHERE username='%s' AND password='%s'" % (u, p))
+UNSAFE
+	'safefile://safe_sql_percent.py': <<<SAFE
+def ok():
+    return 1 + 2
+SAFE
+)

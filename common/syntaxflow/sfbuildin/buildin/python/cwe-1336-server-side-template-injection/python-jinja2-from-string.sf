@@ -1,0 +1,78 @@
+desc(
+	title: "Detect Python Jinja2 from_string SSTI Vulnerability"
+	title_zh: "检测Python Jinja2 from_string SSTI漏洞"
+	type: audit
+	level: high
+	risk: "服务端模板注入（SSTI）"
+	desc: <<<DESC
+## 漏洞原理
+
+Jinja2 是 Python 中广泛使用的模板引擎。`Environment.from_string()` 方法可以将任意字符串作为模板源码进行编译和执行。当应用程序将用户可控的输入直接传递给 `from_string()` 时，攻击者可以构造恶意模板表达式，利用 Jinja2 的内置对象和方法实现服务端模板注入（SSTI），进而可能导致远程代码执行（RCE）。
+
+## 触发场景
+
+- Web 应用直接接收用户输入并作为模板源码渲染
+- 使用 `Environment.from_string(request.args.get("t", "")).render()` 等模式
+- 动态模板字符串拼接场景
+
+## 潜在影响
+
+- 信息泄露：读取服务器敏感文件、环境变量
+- 远程代码执行：通过模板表达式执行任意系统命令
+- 权限提升：获取服务器控制权限
+DESC
+	solution: <<<SOLUTION
+## 修复建议
+
+1. **使用文件模板替代字符串模板**：优先使用 `Environment.get_template(filename)` 加载预定义的模板文件，避免直接编译用户输入的字符串。
+
+2. **输入过滤与校验**：如必须使用动态模板，应对用户输入进行严格的白名单过滤，禁止包含 `{{`、`{%`、`${` 等模板语法关键字。
+
+3. **沙箱环境隔离**：使用受限的 Jinja2 环境，禁用危险的内置函数和对象，如 `__import__`、`os`、`subprocess` 等。
+
+4. **最小权限原则**：运行应用的服务账号应限制权限，避免因 SSTI 导致的全局系统沦陷。
+
+5. **安全编码规范**：建立模板渲染的安全编码规范，禁止将用户输入直接作为模板源码。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-1336](https://cwe.mitre.org/data/definitions/1336.html)
+REFERENCE
+	rule_id: "7e9783e9-58c5-46b4-96d7-0cfa184ae67a"
+)
+
+from_string as $sink
+
+alert $sink for {
+	title: "Jinja2 from_string SSTI",
+	title_zh: "Jinja2 from_string 模板注入漏洞",
+	level: "high",
+	type: "audit",
+	risk: "模板注入",
+	message: "检测到 Jinja2 from_string 使用了用户可达的模板源，存在模板注入风险。",
+	name: "sink",
+	solution: <<<SOLUTION
+避免使用 from_string 直接编译用户输入的字符串；改用 get_template 加载预定义模板文件，并将用户数据作为 render 的参数传入（即分离模板与数据）。若必须使用动态模板，需对用户输入实施严格的白名单过滤与转义，或使用沙箱环境限制可用对象与方法。
+SOLUTION
+	desc: <<<DESC
+Jinja2 的 Environment.from_string 方法可将任意字符串编译为模板并执行。若模板内容来自用户可控输入（如 request.args、request.form 等），攻击者可构造恶意模板语法实现服务器端模板注入（SSTI），进而导致远程代码执行（RCE）。该漏洞在 Web 应用中风险极高，常见于动态渲染用户输入的场景。
+DESC
+}
+
+desc(
+	lang: python
+	alert_high: 1
+	'file://unsafe_jinja2_ssti.py': <<<UNSAFE
+from jinja2 import Environment
+from flask import request
+
+def page():
+    env = Environment()
+    return env.from_string(request.args.get("t", "")).render()
+UNSAFE
+	'safefile://safe_jinja2_ssti.py': <<<SAFE
+from jinja2 import Environment
+def page():
+    env = Environment()
+    return env.get_template("x.html").render()
+SAFE
+)

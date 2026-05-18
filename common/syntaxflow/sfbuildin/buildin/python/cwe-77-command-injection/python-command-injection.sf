@@ -1,0 +1,89 @@
+desc(
+    title: "Python OS Command Injection via User Input"
+    title_zh: "Python 操作系统命令注入（用户输入驱动）"
+    type: audit
+    level: high
+    risk: "操作系统命令注入（用户输入驱动）"
+    desc: <<<DESC
+检测用户可控输入在未充分净化的情况下流入 os.popen、os.system、subprocess 等命令执行入口，可导致任意系统命令执行（CWE-78）。常见于 Web 应用与脚本中将请求参数拼接到 shell 命令的场景。
+DESC
+    solution: <<<SOLUTION
+1. 优先使用 subprocess.run，以参数列表传参并设置 shell=False。
+2. 若必须使用 shell=True，应对输入做严格白名单校验，必要时使用 shlex.quote 转义。
+3. 禁止将原始请求参数直接拼接到 shell 命令字符串中。
+SOLUTION
+    reference: <<<REFERENCE
+- https://cwe.mitre.org/data/definitions/78.html
+- https://owasp.org/www-community/attacks/Command_Injection
+REFERENCE
+    rule_id: "python-cmd-injection-user-input"
+)
+
+<include("python-user-input")> as $input
+<include("python-command-exec-sinks")> as $sink
+
+$sink(* #{until: `* & $input`}->) as $high
+
+alert $high for {
+    title: "Python OS Command Injection via User Input",
+    title_zh: "Python 操作系统命令注入（用户输入驱动）",
+    level: "high",
+    type: "audit",
+    risk: "用户可控输入流入命令执行入口，可导致任意操作系统命令执行。",
+    message: "检测到命令注入：用户输入未经净化即流入命令执行函数。",
+    name: "sink",
+}
+
+desc(
+    lang: python
+    alert_high: 1
+    'file://unsafe_tar.py': <<<UNSAFE
+import os
+import sys
+
+def cmd_injection():
+    output = None
+    if len(request.form) < 1:
+        return render_template('vulnerabilities/command_injection.html')
+    else:
+        query = request.form.get('input')
+        if session['level'] == 0:
+            output = cmd_injection_low(query=query)
+
+def cmd_injection_low(query):
+    if "win" in sys.platform:
+        query = 'ping ' + query
+    elif "linux" in sys.platform:
+        query = 'ping -c 4 ' + query
+
+    stream = os.popen(query)
+    output = stream.read()
+
+    return output
+
+UNSAFE
+    'safefile://safe_tar.py': <<<SAFE
+import os
+import sys
+
+def cmd_injection():
+    output = None
+    if len(request.form) < 1:
+        return render_template('vulnerabilities/command_injection.html')
+    else:
+        query = 'input'
+        if session['level'] == 0:
+            output = cmd_injection_low(query=query)
+
+def cmd_injection_low(query):
+    if "win" in sys.platform:
+        query = 'ping ' + query
+    elif "linux" in sys.platform:
+        query = 'ping -c 4 ' + query
+
+    stream = os.popen(query)
+    output = stream.read()
+
+    return output
+SAFE
+)

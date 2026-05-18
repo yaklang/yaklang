@@ -1,0 +1,64 @@
+desc(
+	title: "Check Python stdlib XML parse XXE Vulnerability"
+	title_zh: "检测Python标准库XML解析XXE漏洞"
+	type: audit
+	level: mid
+	risk: "XML 外部实体注入（XXE）/ 实体扩展"
+	desc: <<<DESC
+该规则用于检测Python标准库中XML解析相关函数（如`xml.etree.ElementTree.parse`、`xml.etree.ElementTree.fromstring`、`xml.etree.ElementTree.iterparse`、`xml.dom.minidom.parse`、`xml.dom.minidom.parseString`、`xml.dom.pulldom.parse`、`xml.sax.parse`等）在处理用户可控输入时可能引发的XML外部实体（XXE）注入及实体扩展（Billion Laughs）攻击风险。Python标准库的XML解析器默认未禁用外部实体解析和DTD处理，攻击者可构造恶意XML文档读取服务器本地文件、发起SSRF请求或造成拒绝服务。该漏洞常见于Web应用接收XML格式数据（如API接口、文件上传功能）且未使用安全库或正确配置解析器特性的场景。
+DESC
+	solution: <<<SOLUTION
+1. 优先使用`defusedxml`等安全库替代Python标准库的XML解析器，该库已默认禁用危险特性。
+2. 若必须使用标准库，需显式禁用DTD和外部实体：对`xml.etree.ElementTree`设置`parser = ET.XMLParser(resolve_entities=False)`；对`xml.dom.minidom`在解析前移除或过滤DOCTYPE声明；对`xml.sax`设置`parser.setFeature(xml.sax.handler.feature_external_ges, False)`。
+3. 对输入XML数据实施严格的格式校验和大小限制，防止实体扩展攻击导致的内存耗尽。
+4. 在应用架构层面，将XML解析操作置于最小权限环境中，避免解析器直接访问敏感文件系统资源。
+5. 定期审计依赖库版本，关注Python官方安全公告中关于XML模块的补丁更新。
+SOLUTION
+	reference: <<<REFERENCE
+https://cwe.mitre.org/data/definitions/611.html
+REFERENCE
+	rule_id: "82dbb9b5-3a2c-40cc-96e2-9e5527fdd59c"
+)
+
+xml.etree.ElementTree.parse as $sink
+xml.etree.ElementTree.fromstring as $sink
+xml.etree.ElementTree.iterparse as $sink
+xml.dom.minidom.parse as $sink
+xml.dom.minidom.parseString as $sink
+xml.dom.pulldom.parse as $sink
+xml.sax.parse as $sink
+
+alert $sink for {
+	title: "stdlib XML parse",
+	title_zh: "Python 标准库 XML 解析",
+	level: "middle",
+	type: "audit",
+	risk: "XML 外部实体注入（XXE）",
+	message: "存在标准库 XML 解析器处理用户可控输入，可能导致 XXE 与实体扩展攻击。",
+	name: "sink",
+	solution: <<<SOLUTION
+1. 优先使用 defusedxml 等安全库替代标准库 XML 解析器；2. 若必须使用标准库，应显式禁用 DTD 和外部实体解析（各库具体配置方式参考官方文档）；3. 对 XML 输入进行大小限制和格式校验；4. 避免直接解析来自不可信来源的 XML 数据。
+SOLUTION
+	desc: <<<DESC
+检测到使用了 Python 标准库中的 XML 解析器（如 xml.etree.ElementTree、xml.dom.minidom、xml.sax 等）处理用户可控输入。这些标准库解析器默认未禁用外部实体（DTD/Entities）和实体扩展，攻击者可构造恶意 XML 文档触发 XML 外部实体注入（XXE）或实体扩展攻击（如 Billion Laughs），导致服务器端请求伪造（SSRF）、敏感文件读取、拒绝服务（DoS）等安全风险。
+DESC
+}
+
+desc(
+	lang: python
+	alert_mid: 3
+	'file://unsafe_xml.py': <<<UNSAFE
+import xml.etree.ElementTree
+import xml.dom.minidom
+from flask import request
+
+def bad():
+    xml.etree.ElementTree.parse(request.args.get("path", ""))
+    xml.etree.ElementTree.fromstring(request.args.get("xml", "").encode())
+    xml.dom.minidom.parseString(request.args.get("frag", "").encode())
+UNSAFE
+	'safefile://safe_xml.py': <<<SAFE
+def ok():
+    return 1
+SAFE
+)

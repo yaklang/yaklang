@@ -1,0 +1,57 @@
+desc(
+	title: "Python random module usage (lib)"
+	title_zh: "标准库 random 伪随机（Python 库规则）"
+	type: audit
+	level: info
+	lib: "python-weak-random"
+	risk: "可预测随机数"
+	desc: <<<DESC
+标记 random 模块的 PRNG 相关调用。标准库 random 非密码学安全，不可用于密钥、令牌、会话 ID 等安全场景。
+DESC
+	solution: <<<SOLUTION
+安全敏感随机数请使用 secrets.token_bytes、secrets.token_urlsafe 或 os.urandom 等密码学安全接口。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-330](https://cwe.mitre.org/data/definitions/330.html)
+REFERENCE
+	rule_id: "a7b8c9d0-e1f2-3456-0123-789012345678"
+)
+
+random.random as $sink
+random.randint as $sink
+random.randrange as $sink
+random.choice as $sink
+random.shuffle as $sink
+random.getrandbits as $sink
+
+alert $sink for {
+	title: "random PRNG call"
+	title_zh: "random 伪随机调用"
+	level: "info"
+	type: "audit"
+	risk: "可预测随机数"
+	message: "检测到 random 模块调用；非密码学安全，勿用于密钥或令牌生成。"
+	name: "output"
+}
+
+desc(
+	lang: python
+	alert_min: 5
+	'file://unsafe_random.py': <<<UNSAFE
+import random
+from flask import request
+
+def bad():
+    random.randint(int(request.args.get("a", "1")), 9)
+    random.randrange(int(request.args.get("b", "10")))
+    random.choice([request.args.get("c", "1")])
+    l = list(request.args.getlist("d"))
+    random.shuffle(l)
+    random.getrandbits(int(request.args.get("n", "8")))
+UNSAFE
+	'safefile://safe_random.py': <<<SAFE
+import secrets
+def ok():
+    return secrets.token_hex(8)
+SAFE
+)

@@ -1,0 +1,51 @@
+desc(
+	title: "Python MD5 / SHA1 hash constructors (lib)"
+	title_zh: "弱哈希算法（MD5/SHA1/hashlib.new）（Python 库规则）"
+	type: audit
+	level: info
+	lib: "python-weak-hash"
+	risk: "弱完整性 / 易碰撞"
+	desc: <<<DESC
+标记 hashlib.md5、hashlib.sha1、hashlib.new 等调用。MD5/SHA1 不适合口令存储与现代完整性保证；算法名或数据若来自用户输入风险更高。
+DESC
+	solution: <<<SOLUTION
+完整性校验优先使用 SHA-256 及以上；口令存储使用 Argon2/bcrypt 等专用算法；按需可选用 BLAKE2 等更现代摘要算法。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-327](https://cwe.mitre.org/data/definitions/327.html)
+REFERENCE
+	rule_id: "d0e1f2a3-b4c5-6789-3456-012345678901"
+)
+
+hashlib.md5 as $sink
+hashlib.sha1 as $sink
+hashlib.new as $sink
+
+alert $sink for {
+	title: "Weak hash primitive"
+	title_zh: "弱哈希调用"
+	level: "info"
+	type: "audit"
+	risk: "弱完整性 / 易碰撞"
+	message: "检测到 MD5、SHA1 或 hashlib.new；请确认用途非安全敏感场景或升级为更强算法。"
+	name: "output"
+}
+
+desc(
+	lang: python
+	alert_min: 3
+	'file://unsafe_hash.py': <<<UNSAFE
+import hashlib
+from flask import request
+
+def bad():
+    hashlib.md5(request.args.get("x", "").encode())
+    hashlib.sha1(request.args.get("y", "").encode())
+    hashlib.new(request.args.get("alg", "md5"))
+UNSAFE
+	'safefile://safe_hash.py': <<<SAFE
+import hashlib
+def ok():
+    return hashlib.sha256(b"x").hexdigest()
+SAFE
+)

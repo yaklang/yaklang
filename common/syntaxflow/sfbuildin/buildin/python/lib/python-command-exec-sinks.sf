@@ -1,0 +1,59 @@
+desc(
+	title: "Python OS / subprocess command execution sinks (lib)"
+	title_zh: "操作系统命令执行入口（Python 库规则）"
+	type: audit
+	level: info
+	lib: "python-command-exec-sinks"
+	risk: "操作系统命令注入"
+	desc: <<<DESC
+标记 os.system、os.popen 以及 subprocess 系列等可执行系统命令的 API。若参数受用户或外部数据影响，可能导致命令注入。
+DESC
+	solution: <<<SOLUTION
+优先使用 subprocess.run 等 API 并以列表形式传参且 shell=False；对用户输入使用 shlex.quote 或白名单；避免 os.system。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-78](https://cwe.mitre.org/data/definitions/78.html)
+REFERENCE
+	rule_id: "d1e2f3a4-b5c6-7890-def1-223344556677"
+)
+
+os.system as $sink
+os.popen as $sink
+subprocess.Popen as $sink
+subprocess.call as $sink
+subprocess.run as $sink
+subprocess.check_output as $sink
+subprocess.check_call as $sink
+
+alert $sink for {
+	title: "Python command execution API"
+	title_zh: "命令执行类 API"
+	level: "info"
+	type: "audit"
+	risk: "操作系统命令注入"
+	message: "检测到可执行系统命令的 API，请检查参数来源与是否误用 shell=True。"
+	name: "output"
+}
+
+desc(
+	lang: python
+	alert_min: 7
+	'file://unsafe_cmd.py': <<<UNSAFE
+import os
+import subprocess
+from flask import request
+
+def bad():
+    os.system(request.args.get("a", ""))
+    os.popen(request.args.get("b", ""))
+    subprocess.call([request.args.get("c", "")])
+    subprocess.run([request.args.get("d", "")])
+    subprocess.Popen(request.args.get("e", ""))
+    subprocess.check_output([request.args.get("f", "")])
+    subprocess.check_call([request.args.get("g", "")])
+UNSAFE
+	'safefile://safe_cmd.py': <<<SAFE
+def safe_main():
+    return str(1 + 2)
+SAFE
+)

@@ -1,0 +1,47 @@
+desc(
+	title: "Python jwt.decode with verify_signature disabled (lib)"
+	title_zh: "JWT 关闭签名校验（Python 库规则）"
+	type: audit
+	level: high
+	lib: "python-jwt-verify-signature-disabled"
+	risk: "身份认证被绕过"
+	desc: <<<DESC
+标记 jwt.decode 等调用。若在 options 中将 verify_signature 设为 False，攻击者可伪造令牌通过校验，导致认证与授权失效。
+DESC
+	solution: <<<SOLUTION
+禁止在生产环境关闭签名校验；校验 iss、aud 等声明；使用足够强度的密钥并妥善保管。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-347](https://cwe.mitre.org/data/definitions/347.html)
+REFERENCE
+	rule_id: "c4d5e6f7-a8b9-0123-def0-445566778899"
+)
+
+jwt.decode as $sink
+
+alert $sink for {
+	title: "jwt decode verify_signature"
+	title_zh: "JWT 关闭签名验证"
+	level: "high"
+	type: "audit"
+	risk: "身份认证被绕过"
+	message: "检测到 jwt.decode；请确认未关闭签名校验（verify_signature 不应为 False）。"
+	name: "output"
+}
+
+desc(
+	lang: python
+	alert_min: 1
+	'file://unsafe_jwt.py': <<<UNSAFE
+import jwt
+from flask import request
+
+def bad():
+    return jwt.decode(request.args.get("token", ""), key="", algorithms=["HS256"], options={"verify_signature": False})
+UNSAFE
+	'safefile://safe_jwt.py': <<<SAFE
+import jwt
+def ok(token, secret):
+    return jwt.decode(token, key=secret, algorithms=["HS256"])
+SAFE
+)

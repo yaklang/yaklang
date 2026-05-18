@@ -1,0 +1,47 @@
+desc(
+	title: "Python pickle.dumps (lib)"
+	title_zh: "pickle 序列化（dumps）（Python 库规则）"
+	type: audit
+	level: info
+	lib: "python-pickle-dumps"
+	risk: "不安全反序列化链路"
+	desc: <<<DESC
+标记 pickle.dumps 调用。Pickle 字节流在反序列化时可执行任意代码，若暴露给不可信方或用于“令牌”等场景，存在严重安全风险。
+DESC
+	solution: <<<SOLUTION
+与不可信对等方交互时优先使用 JSON 等安全格式；若必须二进制格式，应对载荷签名并限制接收方。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-502](https://cwe.mitre.org/data/definitions/502.html)
+REFERENCE
+	rule_id: "a4b5c6d7-e8f9-0123-def0-556677889900"
+)
+
+pickle.dumps as $sink
+
+alert $sink for {
+	title: "pickle.dumps"
+	title_zh: "pickle.dumps 调用"
+	level: "info"
+	type: "audit"
+	risk: "不安全反序列化链路"
+	message: "检测到 pickle.dumps；若输出可被不可信方获取并在对方环境反序列化，可能导致远程代码执行。"
+	name: "output"
+}
+
+desc(
+	lang: python
+	alert_min: 1
+	'file://unsafe_pickle_dumps.py': <<<UNSAFE
+import pickle
+from flask import request
+
+def tok():
+    return pickle.dumps(request.get_json())
+UNSAFE
+	'safefile://safe_pickle_dumps.py': <<<SAFE
+import json
+def tok(d):
+    return json.dumps(d)
+SAFE
+)

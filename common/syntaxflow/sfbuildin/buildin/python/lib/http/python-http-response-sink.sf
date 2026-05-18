@@ -1,0 +1,57 @@
+desc(
+	title: "Python HTTP response construction (lib)"
+	title_zh: "HTTP 响应构造（Python 库规则）"
+	type: audit
+	level: info
+	lib: "python-http-response-sink"
+	risk: "跨站脚本（XSS）/ 敏感信息泄露"
+	desc: <<<DESC
+标记 Flask 的 jsonify、make_response 以及 Django 的 HttpResponse、JsonResponse 等常见响应构造方式。若响应体或头字段直接反映用户输入，可能导致 XSS 或信息泄露。
+DESC
+	solution: <<<SOLUTION
+对输出做编码与转义；正确设置 Content-Type；模板使用默认自动转义；避免原样回显用户输入。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-79](https://cwe.mitre.org/data/definitions/79.html)
+REFERENCE
+	rule_id: "c3d4e5f6-a7b8-9012-cdef-123456789012"
+)
+
+jsonify as $sink
+make_response as $sink
+HttpResponse as $sink
+JsonResponse as $sink
+StreamingHttpResponse as $sink
+FileResponse as $sink
+HTMLResponse as $sink
+JSONResponse as $sink
+PlainTextResponse as $sink
+
+alert $sink for {
+	title: "HTTP response helper"
+	title_zh: "HTTP 响应构造"
+	level: "info"
+	type: "audit"
+	risk: "跨站脚本（XSS）/ 敏感信息泄露"
+	message: "检测到 HTTP 响应构造 API，请检查响应体与头是否包含未净化的用户数据。"
+	name: "output"
+}
+
+desc(
+	lang: python
+	alert_min: 4
+	'file://unsafe_http_response.py': <<<UNSAFE
+from flask import jsonify, make_response, request
+from django.http import HttpResponse, JsonResponse
+
+def f():
+    jsonify({request.args.get("k", ""): 1})
+    make_response(request.args.get("m", ""))
+    HttpResponse(request.args.get("h", ""))
+    JsonResponse({request.args.get("j", ""): 1})
+UNSAFE
+	'safefile://safe_http_response.py': <<<SAFE
+def ok():
+    return 1
+SAFE
+)

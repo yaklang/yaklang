@@ -1,0 +1,48 @@
+desc(
+	title: "Check Python Tarfile Path Traversal Vulnerability"
+	title_zh: "检测Python tarfile模块路径遍历漏洞"
+	type: audit
+	level: mid
+	risk: "路径遍历"
+	desc: <<<DESC
+该规则用于检测Python代码中`tarfile`模块的`extract()`或`extractall()`方法的不安全调用。当使用`tarfile`解压归档文件时，如果未对归档内文件路径进行校验，攻击者可能构造包含恶意路径（如`../`）的压缩包，导致文件被解压到目标目录之外的位置，造成任意文件写入或覆盖。这种攻击方式与ZipSlip类似，属于典型的路径遍历（Path Traversal）漏洞。受影响的场景包括：服务端接收用户上传的tar压缩包并直接解压、自动化处理外部来源的归档文件等。漏洞可能导致敏感文件被覆盖、远程代码执行或系统控制权丢失。
+DESC
+	solution: <<<SOLUTION
+1. 在使用`extractall()`或`extract()`前，对`TarInfo`对象的`name`属性进行路径校验，确保其不包含`..`或绝对路径等危险成分。
+2. 对于Python 3.12及以上版本，建议使用`extractall`的`filter='data'`参数，该参数会自动过滤掉危险的路径和特殊文件。
+3. 将解压目标路径与归档内文件路径进行拼接后，解析并校验最终路径是否严格位于目标目录内。
+4. 避免直接使用用户可控的字符串作为解压目标路径或归档内文件路径。
+5. 对于不可信的归档文件，建议在隔离环境（如沙箱或容器）中进行解压操作，限制潜在影响范围。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-22](https://cwe.mitre.org/data/definitions/22.html)
+REFERENCE
+	rule_id: "b0e529e8-d502-4178-81d6-c2554863f2e6"
+)
+
+*.extractall as $func
+*.extract as $func
+
+alert $func for {
+	title: "tarfile extract",
+	title_zh: "tarfile extract",
+	level: "mid",
+	type: "audit",
+	risk: "路径遍历",
+	message: "检测到 tarfile.extract/extractall，归档路径或解压目标可能受用户影响，存在路径遍历风险。",
+	name: "sink",
+}
+
+desc(
+	lang: python
+	alert_mid: 1
+	'file://unsafe_tar.py': <<<UNSAFE
+import tarfile
+def u(p):
+    tarfile.open(p).extractall("/tmp/out")
+UNSAFE
+	'safefile://safe_tar.py': <<<SAFE
+def ok():
+    return 1
+SAFE
+)

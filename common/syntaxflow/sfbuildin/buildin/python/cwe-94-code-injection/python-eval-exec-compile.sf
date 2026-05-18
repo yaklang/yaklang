@@ -1,0 +1,47 @@
+desc(
+	title: "Check Python eval/exec/compile Code Injection Vulnerability"
+	title_zh: "检测Python eval/exec/compile代码注入漏洞"
+	type: audit
+	level: high
+	risk: "代码注入"
+	desc: <<<DESC
+该规则用于检测Python代码中因使用`eval()`、`exec()`和`compile()`等动态代码执行函数而引发的代码注入漏洞。当这些函数处理来自不可信来源的用户输入时，攻击者可通过构造恶意输入直接执行任意Python代码，导致远程代码执行（RCE）。常见触发场景包括Web应用接收用户提交的表达式或代码字符串后未经验证直接传入上述函数。漏洞影响涵盖服务器完全控制、敏感数据泄露、横向移动及持久化后门植入等严重后果。
+DESC
+	solution: <<<SOLUTION
+避免对用户可控输入直接使用`eval()`、`exec()`或`compile()`函数；若必须使用动态执行，应实施严格的输入校验与白名单机制，仅允许预定义的安全表达式。优先采用`ast.literal_eval()`等安全解析器替代`eval()`处理结构化数据。对于代码模板渲染场景，使用Jinja2等模板引擎并启用沙箱模式，而非直接执行原始代码。在架构层面，将敏感操作封装至独立服务并限制其权限，部署运行时应用自我防护（RASP）机制拦截异常代码执行行为。
+SOLUTION
+	reference: <<<REFERENCE
+https://cwe.mitre.org/data/definitions/94.html
+REFERENCE
+	rule_id: "de8fe36b-568d-4b52-b223-7694ffe2014f"
+)
+
+eval() as $sink
+exec() as $sink
+compile() as $sink
+
+alert $sink for {
+	title: "eval exec compile",
+	title_zh: "eval exec compile",
+	level: "high",
+	type: "audit",
+	risk: "代码注入",
+	message: "检测到 eval/exec/compile 处理了可能受用户影响的输入，存在代码注入风险。",
+	name: "sink",
+}
+
+desc(
+	lang: python
+	alert_high: 3
+	'file://unsafe_eval.py': <<<UNSAFE
+def bad():
+    s = input("code")
+    eval(s)
+    exec(s)
+    compile(s, "<s>", "eval")
+UNSAFE
+	'safefile://safe_eval.py': <<<SAFE
+def ok():
+    return len("abc")
+SAFE
+)
