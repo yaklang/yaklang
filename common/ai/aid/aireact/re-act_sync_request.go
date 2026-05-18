@@ -4,12 +4,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -22,6 +24,8 @@ func (r *ReAct) handleSyncMessage(event *ypb.AIInputEvent) error {
 		return r.HandleSyncTypeQueueInfoEvent(event)
 	case SYNC_TYPE_KNOWLEDGE:
 		return r.HandleSyncTypeKnowledgeEvent(event)
+	case SYNC_TYPE_UPDATE_CONFIG, aicommon.SYNC_TYPE_UPDATE_CONFIG:
+		return r.HandleSyncTypeUpdateConfigEvent(event)
 	case SYNC_TYPE_REACT_JUMP_QUEUE:
 		return r.HandleSyncTypeReactJumpQueueEvent(event)
 	case SYNC_TYPE_REACT_CANCEL_CURRENT_TASK:
@@ -44,6 +48,8 @@ func (r *ReAct) handleSyncMessage(event *ypb.AIInputEvent) error {
 func (r *ReAct) RegisterReActSyncEvent() {
 	r.config.InputEventManager.RegisterSyncCallback(SYNC_TYPE_QUEUE_INFO, r.HandleSyncTypeQueueInfoEvent)
 	r.config.InputEventManager.RegisterSyncCallback(SYNC_TYPE_KNOWLEDGE, r.HandleSyncTypeKnowledgeEvent)
+	r.config.InputEventManager.RegisterSyncCallback(SYNC_TYPE_UPDATE_CONFIG, r.HandleSyncTypeUpdateConfigEvent)
+	r.config.InputEventManager.RegisterSyncCallback(aicommon.SYNC_TYPE_UPDATE_CONFIG, r.HandleSyncTypeUpdateConfigEvent)
 	r.config.InputEventManager.RegisterSyncCallback(SYNC_TYPE_REACT_JUMP_QUEUE, r.HandleSyncTypeReactJumpQueueEvent)
 	r.config.InputEventManager.RegisterSyncCallback(SYNC_TYPE_REACT_CANCEL_CURRENT_TASK, r.HandleSyncTypeReactCancelCurrentTaskEvent)
 	r.config.InputEventManager.RegisterSyncCallback(SYNC_TYPE_REACT_REMOVE_TASK, r.HandleSyncTypeReactRemoveTaskEvent)
@@ -56,6 +62,8 @@ func (r *ReAct) RegisterReActSyncEvent() {
 func (r *ReAct) UnRegisterReActSyncEvent() {
 	r.config.InputEventManager.UnRegisterSyncCallback(SYNC_TYPE_QUEUE_INFO)
 	r.config.InputEventManager.UnRegisterSyncCallback(SYNC_TYPE_KNOWLEDGE)
+	r.config.InputEventManager.UnRegisterSyncCallback(SYNC_TYPE_UPDATE_CONFIG)
+	r.config.InputEventManager.UnRegisterSyncCallback(aicommon.SYNC_TYPE_UPDATE_CONFIG)
 	r.config.InputEventManager.UnRegisterSyncCallback(SYNC_TYPE_REACT_JUMP_QUEUE)
 	r.config.InputEventManager.UnRegisterSyncCallback(SYNC_TYPE_REACT_CANCEL_CURRENT_TASK)
 	r.config.InputEventManager.UnRegisterSyncCallback(SYNC_TYPE_REACT_REMOVE_TASK)
@@ -94,6 +102,92 @@ func (r *ReAct) HandleSyncTypeKnowledgeEvent(event *ypb.AIInputEvent) error {
 		log.Error("no knowledge found")
 	}
 	r.EmitKnowledgeListAboutTask(taskID, knowledgeList, event.SyncID)
+	return nil
+}
+
+func (r *ReAct) HandleSyncTypeUpdateConfigEvent(event *ypb.AIInputEvent) error {
+	updateConfig := map[string]interface{}{}
+	applyOption := func(opt aicommon.ConfigOption) {
+		if opt == nil {
+			return
+		}
+		if err := opt(r.config); err != nil {
+			r.EmitSyncEventError("update_config", err, event.SyncID)
+		}
+	}
+
+	if event.Params != nil {
+		if event.Params.GetEnablePlan() {
+			applyOption(aicommon.WithEnablePlanAndExec(true))
+			updateConfig["EnablePlan"] = true
+		}
+		if event.Params.GetAllowPlanUserInteract() {
+			applyOption(aicommon.WithAllowPlanUserInteract(true))
+			updateConfig["AllowPlanUserInteract"] = true
+		}
+		if event.Params.GetDisallowRequireForUserPrompt() {
+			applyOption(aicommon.WithAllowRequireForUserInteract(false))
+			updateConfig["AllowRequireForUserInteract"] = false
+		}
+	}
+
+	if strings.TrimSpace(event.SyncJsonInput) != "" {
+		var params map[string]interface{}
+		if err := json.Unmarshal([]byte(event.SyncJsonInput), &params); err != nil {
+			r.EmitSyncEventError("update_config", fmt.Errorf("failed to parse update config params: %v", err), event.SyncID)
+			return nil
+		}
+
+		if raw, ok := params["AllowPlanUserInteract"]; ok {
+			value := utils.InterfaceToBoolean(raw)
+			applyOption(aicommon.WithAllowPlanUserInteract(value))
+			updateConfig["AllowPlanUserInteract"] = value
+		}
+		if raw, ok := params["allow_plan_user_interact"]; ok {
+			value := utils.InterfaceToBoolean(raw)
+			applyOption(aicommon.WithAllowPlanUserInteract(value))
+			updateConfig["AllowPlanUserInteract"] = value
+		}
+		if raw, ok := params["EnablePlan"]; ok {
+			value := utils.InterfaceToBoolean(raw)
+			applyOption(aicommon.WithEnablePlanAndExec(value))
+			updateConfig["EnablePlan"] = value
+		}
+		if raw, ok := params["enable_plan"]; ok {
+			value := utils.InterfaceToBoolean(raw)
+			applyOption(aicommon.WithEnablePlanAndExec(value))
+			updateConfig["EnablePlan"] = value
+		}
+		if raw, ok := params["DisableIntentRecognition"]; ok {
+			value := utils.InterfaceToBoolean(raw)
+			applyOption(aicommon.WithDisableIntentRecognition(value))
+			updateConfig["DisableIntentRecognition"] = value
+		}
+		if raw, ok := params["disable_intent_recognition"]; ok {
+			value := utils.InterfaceToBoolean(raw)
+			applyOption(aicommon.WithDisableIntentRecognition(value))
+			updateConfig["DisableIntentRecognition"] = value
+		}
+		if raw, ok := params["EnableIntentRecognition"]; ok {
+			value := utils.InterfaceToBoolean(raw)
+			applyOption(aicommon.WithDisableIntentRecognition(!value))
+			updateConfig["DisableIntentRecognition"] = !value
+		}
+		if raw, ok := params["enable_intent_recognition"]; ok {
+			value := utils.InterfaceToBoolean(raw)
+			applyOption(aicommon.WithDisableIntentRecognition(!value))
+			updateConfig["DisableIntentRecognition"] = !value
+		}
+	}
+
+	updateConfig["applied"] = true
+	updateConfig["current"] = map[string]interface{}{
+		"EnablePlan":                  r.config.GetEnablePlanAndExec(),
+		"AllowPlanUserInteract":       r.config.AllowPlanUserInteract,
+		"AllowRequireForUserInteract": r.config.AllowRequireForUserInteract,
+		"DisableIntentRecognition":    r.config.GetConfigBool("DisableIntentRecognition"),
+	}
+	r.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, "update_config", updateConfig, event.SyncID)
 	return nil
 }
 
