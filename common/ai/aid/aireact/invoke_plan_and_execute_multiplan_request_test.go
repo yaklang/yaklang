@@ -78,8 +78,8 @@ func mockedRequestPlanAndExecuting_MultiPlans(i aicommon.AICallerConfigIf, req *
 func TestReAct_PlanAndExecute_MultiPlan(t *testing.T) {
 	flag := ksuid.New().String()
 	_ = flag
-	in := make(chan *ypb.AIInputEvent, 10)
-	out := make(chan *ypb.AIOutputEvent, 10)
+	in := make(chan *ypb.AIInputEvent, 100)
+	out := make(chan *ypb.AIOutputEvent, 10000)
 
 	toolCalled := false
 	sleepTool, err := aitool.New(
