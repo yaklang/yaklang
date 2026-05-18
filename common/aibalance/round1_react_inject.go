@@ -39,23 +39,53 @@ import (
 // 上面所有混合. 新写出的 round1/round2 文本仍然只用方括号 (与历史协议一致),
 // 这些常量仅在反解析侧作为候选 token 使用.
 //
+// v2 raw passthrough 扩展: 在原有方/尖括号基础上, 再支持 3 类业界主流漂移形态,
+// args body 不再解析, 只做 name 提取 + 原文塞 ToolCall.Function.Arguments. 详见
+// react_tool_extractor.go extractNameAndArgsRaw / drainLocked 特例路径.
+//
+//   - chinese-invoke:  [调用 NAME] ... [/tool_call]
+//   - deepseek-fullwidth: <｜tool_calls_begin｜> ... <｜tool_calls_end｜>  外层包裹多个
+//                         <｜tool_call_begin｜>NAME<｜tool_sep｜>ARGS<｜tool_call_end｜> 子帧
+//   - mistral-toolcalls: [TOOL_CALLS] [{"name":"X","arguments":{...}}, ...]
+//                        JSON 数组自闭合, brace-balanced 扫描, 不走通用 close 候选
+//
 // 关键词: react tool_call 多格式漂移兼容, deepseek thinking hallucinate,
-//        opencode TUI 失败修复, 三段独立解析
+//
+//	opencode TUI 失败修复, 三段独立解析, raw passthrough variants
 const (
 	// 反解析侧 open token 候选. 写出仍只用 reactToolCallOpen.
-	reactToolCallOpen       = "[tool_call"
-	reactToolCallOpenAngle  = "<tool_call"
+	reactToolCallOpen           = "[tool_call"
+	reactToolCallOpenAngle      = "<tool_call"
+	reactToolCallOpenChinese    = "[调用"               // chinese-invoke open, 中文动词 hallucinate
+	reactToolCallOpenDeepseekFW = "<｜tool_calls_begin｜>" // deepseek V3.1 全角外层包裹 open (复数 calls)
+	reactToolCallOpenMistral    = "[TOOL_CALLS]"        // mistral 数组 open, JSON 数组自闭合
+
 	// 反解析侧 close token 候选. 写出仍只用 reactToolCallClose.
-	reactToolCallClose         = "[/tool_call]"
-	reactToolCallCloseAngle    = "</tool_call>"
-	reactToolCallCloseMixedBA  = "[/tool_call>" // 方括号开 + 尖括号闭 hallucinate
-	reactToolCallCloseMixedAB  = "</tool_call]" // 尖括号开 + 方括号闭 hallucinate
-	reactToolResultOpen        = "[tool_result"
-	reactToolResultEnd         = "[/tool_result]"
+	reactToolCallClose           = "[/tool_call]"
+	reactToolCallCloseAngle      = "</tool_call>"
+	reactToolCallCloseMixedBA    = "[/tool_call>"          // 方括号开 + 尖括号闭 hallucinate
+	reactToolCallCloseMixedAB    = "</tool_call]"          // 尖括号开 + 方括号闭 hallucinate
+	reactToolCallCloseDeepseekFW = "<｜tool_calls_end｜>" // deepseek V3.1 全角外层 close, 仅在 deepseek 特例路径用, 不进通用候选
+
+	// deepseek V3.1 内部子帧分隔符, 仅在 extractDeepseekFullwidthAll 内部使用.
+	reactDeepseekSubFrameBegin = "<｜tool_call_begin｜>" // 单数 call, 子帧开始
+	reactDeepseekSubFrameSep   = "<｜tool_sep｜>"        // name 与 args 分隔
+	reactDeepseekSubFrameEnd   = "<｜tool_call_end｜>"   // 单数 call, 子帧结束
+
+	reactToolResultOpen = "[tool_result"
+	reactToolResultEnd  = "[/tool_result]"
 )
 
 // reactSystemPromptHeader 是工具调用说明的固定头部.
 // 模型必须严格遵循该格式输出 [tool_call name=NAME]ARG_JSON[/tool_call] 才能被反解析识别.
+//
+// v2 raw passthrough 在末尾追加 negative example 段, 显式禁止 5 类业界主流漂移格式.
+// 即便模型忽略禁令仍然漂移, react_tool_extractor.go 也会按 raw passthrough 路径兜底.
+// 这一段是 "预防 > 治疗" 的预防层, 降低漂移概率.
+//
+// 关键词: reactSystemPromptHeader, negative example, hallucinate 预防,
+//
+//	anthropic xml param / chinese invoke / hermes body / mistral / deepseek fullwidth 禁令
 const reactSystemPromptHeader = `You have access to the following tools. When you decide to call a tool, output exactly this format (and nothing else):
 
 [tool_call name=TOOL_NAME]JSON_ARGUMENTS[/tool_call]
@@ -66,6 +96,15 @@ Rules:
   - Output [/tool_call] immediately after the JSON. Do not add any explanation, prefix, or suffix.
   - If a tool result is provided to you in the format [tool_result tool_call_id=ID]...[/tool_result], read it and answer the user in plain text.
   - You may call multiple tools in parallel by emitting multiple [tool_call ...]...[/tool_call] blocks back-to-back.
+
+DO NOT use any of the following alternative formats. They will be parsed as best-effort raw passthrough but degrade tool execution reliability:
+  - <tool_call name="X"><parameter name="K">V</parameter></tool_call>                              (Anthropic XML parameter nesting)
+  - [调用 NAME] {...} [/tool_call]                                                                  (Chinese verb invoke)
+  - <tool_call>{"name":"X","arguments":{...}}</tool_call>                                           (Hermes / Qwen body-name)
+  - [TOOL_CALLS] [{"name":"X","arguments":{...}}, ...]                                              (Mistral array)
+  - <｜tool_calls_begin｜><｜tool_call_begin｜>X<｜tool_sep｜>{...}<｜tool_call_end｜><｜tool_calls_end｜>  (DeepSeek V3.1 fullwidth)
+
+Use ONLY: [tool_call name=NAME]JSON_ARGUMENTS[/tool_call]
 
 Available tools:
 `

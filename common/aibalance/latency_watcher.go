@@ -154,7 +154,7 @@ func (w *LatencyWatcher) checkProviders(isNormalCheck bool) {
 			go w.triggerHealthCheck(p.ID, p.WrapperName)
 		} else if wasTracked {
 			// Provider has recovered
-			log.Infof("LatencyWatcher: provider %s (ID: %d) has recovered, latency: %dms, healthy: %v",
+			log.Debugf("LatencyWatcher: provider %s (ID: %d) has recovered, latency: %dms, healthy: %v",
 				p.WrapperName, p.ID, p.LastLatency, p.IsHealthy)
 			delete(w.problematicIDs, p.ID)
 		}
@@ -162,7 +162,7 @@ func (w *LatencyWatcher) checkProviders(isNormalCheck bool) {
 
 	// Log summary
 	if len(w.problematicIDs) > 0 {
-		log.Infof("LatencyWatcher: currently monitoring %d problematic providers with fast health check interval (%v)",
+		log.Debugf("LatencyWatcher: currently monitoring %d problematic providers with fast health check interval (%v)",
 			len(w.problematicIDs), w.fastInterval)
 	}
 }
@@ -194,7 +194,7 @@ func (w *LatencyWatcher) triggerHealthCheck(providerID uint, providerName string
 	}
 
 	if result != nil {
-		log.Infof("LatencyWatcher: health check result for provider %s (ID: %d): healthy=%v, latency=%dms",
+		log.Debugf("LatencyWatcher: health check result for provider %s (ID: %d): healthy=%v, latency=%dms",
 			providerName, providerID, result.IsHealthy, result.ResponseTime)
 	}
 }

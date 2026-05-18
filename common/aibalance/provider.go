@@ -283,6 +283,21 @@ func (p *Provider) GetAIClientWithImages(imageContents []*aispec.ChatContent, en
 // 在 [DONE] 帧之前往下游客户端发一帧 choices=[] + usage={...}，达成
 // "上游 cached_tokens -> 下游客户端可见"的端到端透传。
 func (p *Provider) GetAIClientWithRawMessages(messages []aispec.ChatDetail, tools []aispec.Tool, toolChoice any, enableThinking bool, onStream, onReasonStream func(reader io.Reader), onToolCall func([]*aispec.ToolCall), onUsage func(*aispec.ChatUsage)) (aispec.AIClient, error) {
+	return p.GetAIClientWithRawMessagesAndTrace(nil, messages, tools, toolChoice, enableThinking, onStream, onReasonStream, onToolCall, onUsage)
+}
+
+// GetAIClientWithRawMessagesAndTrace 在原有 GetAIClientWithRawMessages 之上额外
+// 接受一个 DebugTraceSession 用于上游 raw HTTP request/response 字节抓包.
+//
+// trace=nil 时与 GetAIClientWithRawMessages 行为完全一致 (零开销 fallback);
+// trace!=nil 时, 把 aispec.WithRawHTTPRequestResponseCallback 接到 trace 上,
+// stream 完整 body / 非流式响应都会被 aispec 自动 tee 到 03.upstream_response.raw,
+// 同时 02.upstream_request.raw 落盘上游真实 raw HTTP request 包.
+//
+// 关键词: GetAIClientWithRawMessagesAndTrace, aispec.WithRawHTTPRequestResponseCallback,
+//
+//	上游字节流抓包, 零开销 fallback
+func (p *Provider) GetAIClientWithRawMessagesAndTrace(trace *DebugTraceSession, messages []aispec.ChatDetail, tools []aispec.Tool, toolChoice any, enableThinking bool, onStream, onReasonStream func(reader io.Reader), onToolCall func([]*aispec.ToolCall), onUsage func(*aispec.ChatUsage)) (aispec.AIClient, error) {
 	log.Infof("GetAIClientWithRawMessages: type: %s, domain: %s, key: %s, model: %s, no_https: %v, messages: %d, tools: %d", p.TypeName, p.DomainOrURL, utils.ShrinkString(p.APIKey, 8), p.ModelName, p.NoHTTPS, len(messages), len(tools))
 
 	var opts []aispec.AIConfigOption
@@ -312,6 +327,15 @@ func (p *Provider) GetAIClientWithRawMessages(messages []aispec.ChatDetail, tool
 	)
 	if onUsage != nil {
 		opts = append(opts, aispec.WithUsageCallback(onUsage))
+	}
+
+	// debug trace 接线: 把 aispec 内置的 RawHTTPRequestResponseCallback 接到
+	// trace session, 拿到上游真实 raw HTTP request bytes + response header bytes
+	// + 完整 SSE body (stream 模式下 aispec TeeReader 会累积整段 body).
+	// trace=nil 时 debugTraceCallbackForAispec 返回 nil, 不 append.
+	// 关键词: provider trace 接线, aispec 上游字节抓包
+	if cb := debugTraceCallbackForAispec(trace); cb != nil {
+		opts = append(opts, aispec.WithRawHTTPRequestResponseCallback(cb))
 	}
 
 	shouldEnableThinking := enableThinking

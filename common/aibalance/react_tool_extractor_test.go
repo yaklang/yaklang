@@ -112,14 +112,19 @@ func TestReactExtractor_LeadingTextThenToolCall(t *testing.T) {
 }
 
 // 关键词: bad JSON tool_call, 坏数据兜底为 text emit
+// v2 raw passthrough 行为: 坏 JSON args 仍然 emit ToolCall, 原文 args 透传给客户端.
+// 旧 v1 行为 "整段 fall back to text" 已废弃, 设计依据见 TestReactExtractor_AngleBracketBadJsonFallback.
 func TestReactExtractor_BadJsonFallbackToText(t *testing.T) {
 	r := newRec()
 	e := newExtractorWithRec(r)
 	body := `[tool_call name=bad]{unclosed[/tool_call]`
 	require.NoError(t, e.Write([]byte(body)))
 	require.NoError(t, e.Flush())
-	assert.Contains(t, r.textSB.String(), `[tool_call name=bad]`, "fallback raw text")
-	assert.Empty(t, r.toolCalls)
+	require.Len(t, r.toolCalls, 1, "v2 raw passthrough: 坏 JSON 仍 emit ToolCall")
+	assert.Equal(t, "bad", r.toolCalls[0].Function.Name)
+	assert.Equal(t, "{unclosed", r.toolCalls[0].Function.Arguments,
+		"v2: args body 原文透传, 不做 JSON 校验")
+	assert.Empty(t, r.textSB.String(), "v2: 整段不再 fall back to text content")
 }
 
 // 关键词: missing close tag, 流末 Flush 把残段当 text emit
@@ -441,15 +446,25 @@ func TestReactExtractor_StrayAngleBracketInText(t *testing.T) {
 	assert.Empty(t, r.toolCalls)
 }
 
-// 关键词: 尖括号坏 JSON, 兜底 text
+// 关键词: 尖括号坏 JSON, v2 raw passthrough
+//
+// v2 raw passthrough 行为变更: extractor 不再对 args body 做 json.Unmarshal 强校验.
+// 坏 JSON args 仍然作为 ToolCall 透传给客户端 (Arguments 是原文坏 JSON 字符串),
+// 由客户端自己决定怎么处理. 设计依据: OpenAI 协议 arguments 字段是 string, 协议层面
+// 没有规定必须是 valid JSON, aibalance 作为中转不替客户端做这件事.
+//
+// 旧 v1 行为是 "坏 JSON 整段当 text fall back", 已废弃.
 func TestReactExtractor_AngleBracketBadJsonFallback(t *testing.T) {
 	r := newRec()
 	e := newExtractorWithRec(r)
 	body := `<tool_call name="bad">{unclosed</tool_call>`
 	require.NoError(t, e.Write([]byte(body)))
 	require.NoError(t, e.Flush())
-	assert.Contains(t, r.textSB.String(), `<tool_call name="bad">`)
-	assert.Empty(t, r.toolCalls)
+	require.Len(t, r.toolCalls, 1, "v2 raw passthrough: 坏 JSON 仍 emit ToolCall, 由客户端处理")
+	assert.Equal(t, "bad", r.toolCalls[0].Function.Name)
+	assert.Equal(t, "{unclosed", r.toolCalls[0].Function.Arguments,
+		"v2: args body 原文透传, 不做 JSON 校验")
+	assert.Empty(t, r.textSB.String(), "v2: 整段不再 fall back to text content")
 }
 
 // ----- 混合格式 (deepseek hallucinate 变体) 边界覆盖 -----
@@ -537,25 +552,36 @@ func TestReactExtractor_MixedAngleOpenBracketClose(t *testing.T) {
 }
 
 // 关键词: args 字符串内含 [/tool_call] 子串 (用户写脚本时引用了关键字),
-// 不能被误识别为 close 标签提前切割.
+// 按"最早 close"切割导致 args 残缺
 //
-// 注意: 这是已知边界 case. 当前实现按"最早 close"切割, 如果 args body 里
-// 出现完整的 [/tool_call] 子串, 会被提前切. JSON 校验会失败 (因为 args 切残),
-// 然后整段 fall back 成 text. 测试只断言 "不会让客户端解析出残缺 args 调用",
-// 不强求识别成功 -- 这是上游模型自己生成 args 时该回避的字符.
-func TestReactExtractor_ArgsContainingCloseTokenSubstringDoesNotProduceCorruptCall(t *testing.T) {
+// 已知边界 case: 如果 args body 里出现完整的 [/tool_call] 子串, 当前按"最早 close"
+// 切割策略会提前切, args 残缺.
+//
+// v1 行为: 残缺 args 触发 json.Unmarshal 失败 → 整段 fall back to text content.
+// v2 行为 (raw passthrough): 残缺 args 原文透传给客户端, 客户端自己处理.
+//
+// 这个 trade-off 由 v2 plan 决策: aibalance 不替客户端做 JSON 校验, 把皮球踢回客户端.
+// 模型 prompt 已经禁止在 args 里使用 [/tool_call] 字面量, 这是上游模型的责任.
+// 实际命中率极低, 真撞上时也只是当前轮 tool_call 解析错, 客户端拿到 tool_result error
+// 反馈 AI 后下一轮自然纠错.
+//
+// 测试断言改为: 验证 v2 行为符合预期 (emit ToolCall 而不是 fall back to text),
+// 残缺 args 是被接受的.
+func TestReactExtractor_ArgsContainingCloseTokenSubstringV2RawPassthrough(t *testing.T) {
 	r := newRec()
 	e := newExtractorWithRec(r)
 	// args 描述里故意包含 "[/tool_call]" 字面量, 模拟模型在 description 里抄袭 prompt 的极端情况
 	body := `[tool_call id="cx" name="bash"]{"command":"echo done","description":"prints [/tool_call] in log"}[/tool_call]`
 	require.NoError(t, e.Write([]byte(body)))
 	require.NoError(t, e.Flush())
-	for _, tc := range r.toolCalls {
-		// 任何识别出的 tool_call 都必须有合法 JSON args, 不能给客户端发残缺 JSON
-		var probe map[string]any
-		assert.NoErrorf(t, json.Unmarshal([]byte(tc.Function.Arguments), &probe),
-			"identified tool_call must carry valid JSON args, got: %s", tc.Function.Arguments)
-	}
+	// v2: extractor 按"最早 close"切割 -> emit 第一段 (含残缺 args), 第二段剩余文本 emit as content
+	require.GreaterOrEqual(t, len(r.toolCalls), 1, "v2 raw passthrough: 至少 emit 一个 ToolCall, 即便 args 残缺")
+	tc := r.toolCalls[0]
+	assert.Equal(t, "cx", tc.ID)
+	assert.Equal(t, "bash", tc.Function.Name)
+	// args 是残缺的 (按 v2 raw passthrough 哲学透传), 不再做合法 JSON 强校验
+	assert.Contains(t, tc.Function.Arguments, `"command":"echo done"`,
+		"v2: args body 截断到第一个 [/tool_call] 之前, 原文透传")
 }
 
 // 关键词: header attr value 内含 ] 或 > 字符, quote-aware 必须跳过引号内的特殊字符
