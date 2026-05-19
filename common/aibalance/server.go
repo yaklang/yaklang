@@ -1263,101 +1263,22 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 			}
 		}
 
-		// 工具调用兼容性裁决 (capability matrix v1):
-		// 由 ResolveToolCallsMode 统一根据 env > DB > default 优先级裁决 round1 / round2
-		// 各自走 native 透传还是 react 降级. 未 probe 的 provider 走 default (unknown)
-		// + AutoFallback, 让运维忘记 probe 时 round2 仍能闭环.
-		// 关键词: aibalance tool_calls capability resolved, round1 react inject + round2 react flatten + AutoFallback
-		toolMode := ResolveToolCallsMode(provider, modelName)
-		hasRoundTripToolMarker := MessagesHaveToolMarker(messagesForUpstream)
-		c.logInfo("tool_calls mode resolved: model=%s wrapper=%s provider=%s round1=%s round2=%s source=%s auto_fallback=%v round_trip_marker=%v tools=%d",
-			modelName, provider.WrapperName, provider.TypeName,
-			toolMode.Round1, toolMode.Round2, toolMode.Source, toolMode.AutoFallback,
-			hasRoundTripToolMarker, len(bodyIns.Tools))
-
-		// round2: 客户端发完整 round-trip messages (assistant.tool_calls / role=tool) 时,
-		// 上游 wrapper 不识别 OpenAI tool_calls 字段 (mode=react) 或 mode=unknown
-		// 且 AutoFallback=true 都需要把 messages 扁平化为 ReAct 文本.
-		// 关键词: round2 ReAct flatten, AutoFallback 兜底
-		round2ReactMode := false
-		if hasRoundTripToolMarker {
-			round2ReactMode = toolMode.Round2 == "react"
-			if !round2ReactMode && toolMode.AutoFallback {
-				round2ReactMode = true
-				c.logWarn("provider needs capability probe; auto-fallback to react for round-trip messages: model=%s wrapper=%s",
-					modelName, provider.WrapperName)
-			}
-			if round2ReactMode {
-				beforeLen := len(messagesForUpstream)
-				messagesForUpstream = FlattenToolCallsForRoundTrip(messagesForUpstream)
-				c.logInfo("round2 ReAct flatten applied: model=%s wrapper=%s provider=%s msgs=%d->%d source=%s",
-					modelName, provider.WrapperName, provider.TypeName,
-					beforeLen, len(messagesForUpstream), toolMode.Source)
-			}
-		}
-
-		// ReAct 模式一致性 (Full ReAct): 只要本轮请求需要按 ReAct 文本协议
-		// 与上游对话, 就必须**同时**做三件事:
-		//   1. 把 client 携带的 tools=[...] 渲染为 ReAct system prompt 注入 messages,
-		//      让上游模型知道当前可用工具集;
-		//   2. 清空 toolsForUpstream / toolChoiceForUpstream, 避免上游 wrapper
-		//      看到原生 tools 字段后用 OpenAI tool_calls 协议响应 (而我们 messages
-		//      又是 ReAct 文本, 协议混用会触发 hostile wrapper 空回);
-		//   3. 在 writer 上启用 ReactToolExtractor.
-		//
-		// Safety-net ReAct extractor (即便走 native 透传也启用):
-		//   只要本轮请求涉及工具调用 (client 带 tools, 或 messages 含
-		//   round-trip 标记), 就**额外**始终启用 ReactToolExtractor 兜底.
-		//   动机:
-		//     - 实战中即使 DB 标记 provider 为 native (Round1/Round2=native),
-		//       某些 wrapper 在长上下文 / 多轮工具调用 (尤其并行多 tool_call)
-		//       场景下也会**随机退化**, 把工具调用以 [tool_call ...]
-		//       ARGS[/tool_call] 纯文本形态写入 content 流而不是用 native
-		//       tool_calls 字段, 导致 opencode / litellm / Vercel AI SDK 把
-		//       它当 markdown 链接渲染、无法触发工具执行 (用户截图复现的
-		//       "前面单次调用 OK, 多次并行调用样式全炸" 就是这一退化的体现).
-		//     - extractor 仅监听 content 流字节; 上游若仍走 native tool_calls
-		//       (delta.tool_calls), 那条路径走的是 WriteToolCalls callback,
-		//       与 extractor 完全独立, 不会发生重复 emit.
-		//     - 上游若 content 流里没出现 `[tool_call` 子串, extractor 等同
-		//       零开销透传 (drainLocked openIdx==-1 走 fast path).
-		//   因此 "工具相关请求一律启用 extractor 兜底" 在收益巨大、副作用
-		//   可忽略, 是 native/react 二分模式之外必须的 safety net.
-		//
-		// 关键词: ReAct 模式一致性, safety net react extractor, native 模式兜底,
-		//        opencode 并行工具调用样式全炸修复, content -> tool_calls 反解析始终启用
+		// 工具调用一律走 native OpenAI tool_calls 透传：
+		//   - tools / tool_choice 原样转发给上游
+		//   - 上游若按 OpenAI 协议返回 delta.tool_calls，会由 onToolCallForward
+		//     -> writer.WriteToolCalls -> accumulatedToolCalls 累积，最终联动
+		//     finish_reason="tool_calls" 并按 OpenAI 规范 delta 帧形式下发。
+		// 历史的 ReAct 降级 / safety-net content 反解析链路已经全部移除，
+		// aibalance 不再在 content 流上做任何 tool_call 文本识别，避免上游漂移
+		// 输出（[tool_call ...] / [调用 ...] / [TOOL_CALLS] 等）被错误"翻译"成
+		// 客户端可见的乱码或被吞掉的 partial buffer。
+		// 关键词: aibalance tool_calls native passthrough, 透明转发, 移除 ReAct 降级
 		toolsForUpstream := bodyIns.Tools
 		toolChoiceForUpstream := bodyIns.ToolChoice
-		round1ReactMode := toolMode.Round1 == "react" && len(bodyIns.Tools) > 0 && !hasRoundTripToolMarker
-		useFullReactMode := round1ReactMode || round2ReactMode
-		// safety-net: 只要本轮涉及工具 (有 tools 字段 / 有 round-trip 标记),
-		// 即便走 native 透传也要启用 extractor 兜底 content 流里的 ReAct 文本.
-		// 关键词: safety net react extractor 触发条件
-		needReactExtractor := useFullReactMode || len(bodyIns.Tools) > 0 || hasRoundTripToolMarker
-		if useFullReactMode {
-			beforeLen := len(messagesForUpstream)
-			if len(bodyIns.Tools) > 0 {
-				messagesForUpstream = InjectToolsAsReactPrompt(messagesForUpstream, bodyIns.Tools)
-			}
-			toolsForUpstream = nil
-			toolChoiceForUpstream = nil
-			c.logInfo("Full ReAct mode enabled (round1=%v round2=%v): model=%s wrapper=%s provider=%s msgs=%d->%d tools=%d source=%s",
-				round1ReactMode, round2ReactMode,
-				modelName, provider.WrapperName, provider.TypeName,
-				beforeLen, len(messagesForUpstream), len(bodyIns.Tools), toolMode.Source)
-		}
-		if needReactExtractor {
-			writer.EnableReactExtractor()
-			if !useFullReactMode {
-				c.logInfo("safety-net ReAct extractor enabled (native passthrough mode): model=%s wrapper=%s provider=%s tools=%d round_trip=%v source=%s",
-					modelName, provider.WrapperName, provider.TypeName,
-					len(bodyIns.Tools), hasRoundTripToolMarker, toolMode.Source)
-			}
-		}
 
-		// debug trace 元信息: provider 身份 + tool 模式 + react 模式. 仅在 trace
+		// debug trace 元信息: provider 身份 + 请求关键字段. 仅在 trace
 		// 开启时执行 (debugTraceLazyMeta 内部判 nil).
-		// 关键词: trace meta 元信息落盘, provider 身份 + 路由决策
+		// 关键词: trace meta 元信息落盘, provider 身份 + 透传字段
 		debugTraceLazyMeta(traceSession, func() any {
 			return map[string]any{
 				"req_id":                           traceSession.ReqID(),
@@ -1369,16 +1290,9 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 				"provider_wrapper":                 provider.WrapperName,
 				"provider_domain":                  provider.DomainOrURL,
 				"provider_no_https":                provider.NoHTTPS,
-				"tool_mode_round1":                 toolMode.Round1,
-				"tool_mode_round2":                 toolMode.Round2,
-				"tool_mode_source":                 toolMode.Source,
-				"tool_auto_fallback":               toolMode.AutoFallback,
 				"tools_count":                      len(bodyIns.Tools),
 				"messages_count":                   len(messagesForUpstream),
 				"stream":                           stream,
-				"react_round1":                     round1ReactMode,
-				"react_round2":                     round2ReactMode,
-				"react_extractor":                  needReactExtractor,
 				"client_requested_enable_thinking": bodyIns.EnableThinking,
 			}
 		})
