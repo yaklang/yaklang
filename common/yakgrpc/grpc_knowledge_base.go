@@ -123,7 +123,10 @@ func (s *Server) DeleteKnowledgeBase(ctx context.Context, req *ypb.DeleteKnowled
 func (s *Server) CreateKnowledgeBase(ctx context.Context, req *ypb.CreateKnowledgeBaseRequest) (*ypb.GeneralResponse, error) {
 	db := consts.GetGormProfileDatabase()
 
-	_, err := rag.Get(req.GetKnowledgeBaseName(), rag.WithDB(db), rag.WithTryRebuildHNSWIndex(true))
+	// 关键词: CreateKnowledgeBase, lazy_load_embedding, 元信息创建不连 AIBalance
+	// 创建空知识库只写元信息，不真正写入向量；用 lazy load 避免在 embedder 不可用
+	// (例如 AIBalance daily-token 用尽) 时直接拒绝建库请求。
+	_, err := rag.Get(req.GetKnowledgeBaseName(), rag.WithDB(db), rag.WithTryRebuildHNSWIndex(true), rag.WithLazyLoadEmbeddingClient(true))
 	if err != nil {
 		return nil, utils.Wrap(err, "创建知识库失败")
 	}
@@ -143,7 +146,9 @@ func (s *Server) CreateKnowledgeBaseV2(ctx context.Context, req *ypb.CreateKnowl
 		return nil, utils.Errorf("知识库已存在")
 	}
 
-	ragSystem, err := rag.Get(req.GetName(), rag.WithDB(db), rag.WithDescription(req.GetDescription()), rag.WithTags(req.GetTags()...), rag.WithTryRebuildHNSWIndex(true))
+	// 关键词: CreateKnowledgeBaseV2, lazy_load_embedding, 元信息创建不连 AIBalance
+	// 同 CreateKnowledgeBase：建库只落元数据，向量化推迟到首次写入条目时再初始化。
+	ragSystem, err := rag.Get(req.GetName(), rag.WithDB(db), rag.WithDescription(req.GetDescription()), rag.WithTags(req.GetTags()...), rag.WithTryRebuildHNSWIndex(true), rag.WithLazyLoadEmbeddingClient(true))
 	if err != nil {
 		return nil, utils.Wrap(err, "创建知识库失败")
 	}

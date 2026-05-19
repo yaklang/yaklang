@@ -45,7 +45,12 @@ func newDefaultRAGSystem() *RAGSystem {
 func NewRAGSystem(options ...RAGSystemConfigOption) (*RAGSystem, error) {
 	config := NewRAGSystemConfig(options...)
 
-	if utils.IsNil(config.embeddingClient) && !vectorstore.IsMockMode {
+	// 关键词: NewRAGSystem, LazyLoadEmbeddingClient, lazy_load_embedding
+	// 仅在「未显式传入 embedding client」且「未开启 lazy load」且「非 mock 模式」时，
+	// 才在此处提前请求 AIBalance 免费 embedding 服务。开启 lazy load 时，将把
+	// embedder 初始化下沉到 vectorstore.CollectionConfig.FixEmbeddingClient /
+	// SQLiteVectorStoreHNSW.GetEmbedder，避免不必要的外网请求与 daily-token-limit 抖动。
+	if utils.IsNil(config.embeddingClient) && !vectorstore.IsMockMode && !config.lazyLoadEmbeddingClient {
 		embedder, err := vectorstore.GetAIBalanceFreeEmbeddingService()
 		if err != nil {
 			return nil, utils.Wrap(err, "aibalance embedder and local embedder all failed")
