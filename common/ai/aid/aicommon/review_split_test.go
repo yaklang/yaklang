@@ -90,6 +90,7 @@ func TestSplit_TaskReviewPrompt_FourSections(t *testing.T) {
 		"task-review high-static hash must be byte-stable across calls")
 	require.Contains(t, prompt1, "<|AI_CACHE_FROZEN_semi-dynamic|>")
 	require.Contains(t, prompt1, "# Tool Inventory")
+	require.NotContains(t, prompt1, "You have access to 0 built-in tools")
 	require.Contains(t, prompt1, "frozen task review timeline")
 	require.Contains(t, prompt1, "<|PROMPT_SECTION_timeline-open|>")
 	require.Contains(t, prompt1, "open task review timeline")
