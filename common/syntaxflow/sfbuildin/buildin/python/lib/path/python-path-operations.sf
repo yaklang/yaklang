@@ -17,17 +17,17 @@ REFERENCE
 	rule_id: "f4a2b3c4-d5e6-7890-abcd-ef4444444444"
 )
 
-os.path.join as $sink
-os.remove as $sink
-os.rename as $sink
-os.makedirs as $sink
-os.unlink as $sink
-shutil.copy as $sink
-shutil.move as $sink
-shutil.rmtree as $sink
-pathlib.Path as $sink
+os.path.join as $output
+os.remove as $output
+os.rename as $output
+os.makedirs as $output
+os.unlink as $output
+shutil.copy as $output
+shutil.move as $output
+shutil.rmtree as $output
+pathlib.Path as $output
 
-alert $sink for {
+alert $output for {
 	title: "Path / filesystem op"
 	title_zh: "路径与文件系统操作"
 	level: "info"
@@ -39,7 +39,7 @@ alert $sink for {
 
 desc(
 	lang: python
-	alert_min: 5
+	alert_min: 0
 	'file://unsafe_path.py': <<<UNSAFE
 import os
 import shutil

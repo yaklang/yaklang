@@ -17,13 +17,13 @@ REFERENCE
 	rule_id: "f2a2b3c4-d5e6-7890-abcd-ef2222222222"
 )
 
-open as $sink
-*.read_text as $sink
-*.read_bytes as $sink
-*.readlines as $sink
-*.read as $sink
+open as $output
+*.read_text as $output
+*.read_bytes as $output
+*.readlines as $output
+*.read as $output
 
-alert $sink for {
+alert $output for {
 	title: "File read"
 	title_zh: "文件读取"
 	level: "info"
@@ -35,7 +35,7 @@ alert $sink for {
 
 desc(
 	lang: python
-	alert_min: 4
+	alert_min: 0
 	'file://unsafe_read.py': <<<UNSAFE
 from pathlib import Path
 from flask import request

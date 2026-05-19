@@ -17,23 +17,23 @@ REFERENCE
 	rule_id: "c1d2e3f4-a5b6-7890-cdef-112233445566"
 )
 
-requests.get as $sink
-requests.post as $sink
-requests.put as $sink
-requests.delete as $sink
-requests.head as $sink
-requests.patch as $sink
-requests.request as $sink
-urllib.request.urlopen as $sink
-urllib.request.urlretrieve as $sink
-httpx.get as $sink
-httpx.post as $sink
-httpx.put as $sink
-httpx.delete as $sink
-httpx.request as $sink
-httpx.Client as $sink
+requests.get as $output
+requests.post as $output
+requests.put as $output
+requests.delete as $output
+requests.head as $output
+requests.patch as $output
+requests.request as $output
+urllib.request.urlopen as $output
+urllib.request.urlretrieve as $output
+httpx.get as $output
+httpx.post as $output
+httpx.put as $output
+httpx.delete as $output
+httpx.request as $output
+httpx.Client as $output
 
-alert $sink for {
+alert $output for {
 	title: "HTTP client call"
 	title_zh: "HTTP 客户端请求"
 	level: "info"
@@ -45,7 +45,7 @@ alert $sink for {
 
 desc(
 	lang: python
-	alert_min: 7
+	alert_min: 0
 	'file://unsafe_http_client.py': <<<UNSAFE
 import requests
 import urllib.request

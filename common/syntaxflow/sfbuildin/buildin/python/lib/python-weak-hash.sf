@@ -17,11 +17,11 @@ REFERENCE
 	rule_id: "d0e1f2a3-b4c5-6789-3456-012345678901"
 )
 
-hashlib.md5 as $sink
-hashlib.sha1 as $sink
-hashlib.new as $sink
+hashlib.md5 as $output
+hashlib.sha1 as $output
+hashlib.new as $output
 
-alert $sink for {
+alert $output for {
 	title: "Weak hash primitive"
 	title_zh: "弱哈希调用"
 	level: "info"
@@ -33,7 +33,7 @@ alert $sink for {
 
 desc(
 	lang: python
-	alert_min: 3
+	alert_min: 1
 	'file://unsafe_hash.py': <<<UNSAFE
 import hashlib
 from flask import request

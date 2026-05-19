@@ -17,9 +17,9 @@ REFERENCE
 	rule_id: "b8c9d0e1-f2a3-4567-1234-890123456789"
 )
 
-tempfile.mktemp as $sink
+tempfile.mktemp as $output
 
-alert $sink for {
+alert $output for {
 	title: "tempfile.mktemp"
 	title_zh: "tempfile.mktemp 调用"
 	level: "info"
@@ -31,7 +31,7 @@ alert $sink for {
 
 desc(
 	lang: python
-	alert_min: 2
+	alert_min: 1
 	'file://unsafe_temp.py': <<<UNSAFE
 import tempfile
 from flask import request

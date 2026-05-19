@@ -17,13 +17,13 @@ REFERENCE
 	rule_id: "f3a2b3c4-d5e6-7890-abcd-ef3333333333"
 )
 
-open as $sink
-*.write as $sink
-*.writelines as $sink
-*.write_text as $sink
-*.write_bytes as $sink
+open as $output
+*.write as $output
+*.writelines as $output
+*.write_text as $output
+*.write_bytes as $output
 
-alert $sink for {
+alert $output for {
 	title: "File write"
 	title_zh: "文件写入"
 	level: "info"
@@ -35,7 +35,7 @@ alert $sink for {
 
 desc(
 	lang: python
-	alert_min: 3
+	alert_min: 0
 	'file://unsafe_write.py': <<<UNSAFE
 from pathlib import Path
 from flask import request

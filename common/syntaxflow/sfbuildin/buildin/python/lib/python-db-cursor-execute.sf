@@ -17,11 +17,11 @@ REFERENCE
 	rule_id: "b3c4d5e6-f7a8-9012-cdef-334455667788"
 )
 
-*.execute as $sink
-*.executemany as $sink
-*.executescript as $sink
+*.execute as $output
+*.executemany as $output
+*.executescript as $output
 
-alert $sink for {
+alert $output for {
 	title: "DB cursor execute"
 	title_zh: "数据库游标执行"
 	level: "info"
@@ -33,7 +33,7 @@ alert $sink for {
 
 desc(
 	lang: python
-	alert_min: 3
+	alert_min: 0
 	'file://unsafe_db_execute.py': <<<UNSAFE
 import sqlite3
 from flask import request

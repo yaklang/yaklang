@@ -17,9 +17,9 @@ REFERENCE
 	rule_id: "a4b5c6d7-e8f9-0123-def0-556677889900"
 )
 
-pickle.dumps as $sink
+pickle.dumps as $output
 
-alert $sink for {
+alert $output for {
 	title: "pickle.dumps"
 	title_zh: "pickle.dumps 调用"
 	level: "info"

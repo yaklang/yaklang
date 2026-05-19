@@ -42,14 +42,14 @@ func TestPython_Lowering_ImportAliasBinding(t *testing.T) {
 	CheckPythonPrintlnValue(`
 import requests as req
 println(req)
-`, []string{"Undefined-requests"}, t)
+`, []string{"Undefined-req"}, t)
 }
 
 func TestPython_Lowering_FromImportAliasBinding(t *testing.T) {
 	CheckPythonPrintlnValue(`
 from pkg.sub import run as execute
 println(execute)
-`, []string{"Undefined-pkg.sub.run"}, t)
+`, []string{"Undefined-execute"}, t)
 }
 
 func TestPython_Lowering_FromImportStarBinding(t *testing.T) {

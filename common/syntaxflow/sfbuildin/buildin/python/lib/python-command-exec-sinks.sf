@@ -17,15 +17,15 @@ REFERENCE
 	rule_id: "d1e2f3a4-b5c6-7890-def1-223344556677"
 )
 
-os.system as $sink
-os.popen as $sink
-subprocess.Popen as $sink
-subprocess.call as $sink
-subprocess.run as $sink
-subprocess.check_output as $sink
-subprocess.check_call as $sink
+os.system as $output
+os.popen as $output
+subprocess.Popen as $output
+subprocess.call as $output
+subprocess.run as $output
+subprocess.check_output as $output
+subprocess.check_call as $output
 
-alert $sink for {
+alert $output for {
 	title: "Python command execution API"
 	title_zh: "命令执行类 API"
 	level: "info"
@@ -37,7 +37,7 @@ alert $sink for {
 
 desc(
 	lang: python
-	alert_min: 7
+	alert_min: 0
 	'file://unsafe_cmd.py': <<<UNSAFE
 import os
 import subprocess

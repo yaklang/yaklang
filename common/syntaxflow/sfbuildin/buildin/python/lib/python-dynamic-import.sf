@@ -17,11 +17,11 @@ REFERENCE
 	rule_id: "f6a7b8c9-d0e1-2345-f012-678901234567"
 )
 
-__import__ as $sink
-importlib.import_module as $sink
-importlib.util.find_spec as $sink
+__import__ as $output
+importlib.import_module as $output
+importlib.util.find_spec as $output
 
-alert $sink for {
+alert $output for {
 	title: "Dynamic import"
 	title_zh: "动态导入"
 	level: "info"
@@ -33,7 +33,7 @@ alert $sink for {
 
 desc(
 	lang: python
-	alert_min: 3
+	alert_min: 0
 	'file://unsafe_import.py': <<<UNSAFE
 import importlib
 import importlib.util

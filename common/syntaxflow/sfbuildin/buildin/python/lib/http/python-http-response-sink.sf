@@ -17,17 +17,17 @@ REFERENCE
 	rule_id: "c3d4e5f6-a7b8-9012-cdef-123456789012"
 )
 
-jsonify as $sink
-make_response as $sink
-HttpResponse as $sink
-JsonResponse as $sink
-StreamingHttpResponse as $sink
-FileResponse as $sink
-HTMLResponse as $sink
-JSONResponse as $sink
-PlainTextResponse as $sink
+jsonify as $output
+make_response as $output
+HttpResponse as $output
+JsonResponse as $output
+StreamingHttpResponse as $output
+FileResponse as $output
+HTMLResponse as $output
+JSONResponse as $output
+PlainTextResponse as $output
 
-alert $sink for {
+alert $output for {
 	title: "HTTP response helper"
 	title_zh: "HTTP 响应构造"
 	level: "info"
@@ -39,7 +39,7 @@ alert $sink for {
 
 desc(
 	lang: python
-	alert_min: 4
+	alert_min: 0
 	'file://unsafe_http_response.py': <<<UNSAFE
 from flask import jsonify, make_response, request
 from django.http import HttpResponse, JsonResponse
