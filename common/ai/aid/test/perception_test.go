@@ -53,7 +53,10 @@ func TestPerception_DefaultLoop_PerceptionTriggered(t *testing.T) {
 			n := callCount
 			mu.Unlock()
 
-			if n < 4 {
+			// 让 loop 跑足够多 iter 以触发 perception 节流门 (任意 interval 2-5 都覆盖).
+			// finish 阈值设到 n>=10, 配合 maxIterations=12, 兜底允许 loop 自然结束.
+			// 关键词: mock callback 续命, perception 节流门覆盖, finish 阈值上调
+			if n < 10 {
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "continue_action"}`))
 			} else {
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "answer": "done"}`))
@@ -66,8 +69,12 @@ func TestPerception_DefaultLoop_PerceptionTriggered(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// maxIterations 设置为 12, 配合下面 mock 在 callCount<10 时 continue,
+	// 保证 loop 至少跑 10 个 iter, 不论 perceptionDefaultIterationInterval
+	// 取 2/3/4/5 都能触发到 perception (覆盖 iter%interval==0 的至少一个候选).
+	// 关键词: TestPerception_DefaultLoop_PerceptionTriggered 与默认值解耦, maxIterations 充裕
 	loop, err := reactloops.NewReActLoop("default-perception-test", reactIns,
-		reactloops.WithMaxIterations(6),
+		reactloops.WithMaxIterations(12),
 		reactloops.WithRegisterLoopAction(
 			"continue_action", "Continue action for testing", nil, nil,
 			func(loop *reactloops.ReActLoop, action *aicommon.Action, operator *reactloops.LoopActionHandlerOperator) {
@@ -83,7 +90,7 @@ func TestPerception_DefaultLoop_PerceptionTriggered(t *testing.T) {
 		t.Fatal("perception should be enabled when DisablePerception is false")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 9*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
 	execErr := loop.Execute("test-perception-default", ctx, "test perception in default loop")
@@ -91,8 +98,10 @@ func TestPerception_DefaultLoop_PerceptionTriggered(t *testing.T) {
 		t.Logf("execution result: %v", execErr)
 	}
 
-	// perception goroutines are async, give them a moment to complete
-	time.Sleep(500 * time.Millisecond)
+	// perception goroutines are async, give them a moment to complete.
+	// 拉长到 1.5s 容忍 CI 慢机器场景下的 goroutine 启动 + LiteForge 框架初始化.
+	// 关键词: perception async goroutine 等待, CI 容忍度
+	time.Sleep(1500 * time.Millisecond)
 
 	count := atomic.LoadInt32(&perceptionCalled)
 	if count == 0 {
