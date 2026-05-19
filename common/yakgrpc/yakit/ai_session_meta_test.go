@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func TestAISessionMetaCRUD(t *testing.T) {
@@ -144,6 +145,64 @@ func TestAppendAISessionMetaRelatedRuntimeID_PlainString(t *testing.T) {
 	got, err := GetAISessionMetaBySessionID(db, sessionID)
 	require.NoError(t, err)
 	require.Equal(t, `["not-a-uuid"]`, got.RelatedRuntimeIDS)
+}
+
+func TestAISessionMetaStartParamsCRUD(t *testing.T) {
+	db, err := utils.CreateTempTestDatabaseInMemory()
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&schema.AISession{}).Error)
+
+	params := &ypb.AIStartParams{
+		ReviewPolicy:              "ai",
+		AIService:                 "openai",
+		AIModelName:               "gpt-test",
+		EnablePlan:                true,
+		TimelineSessionID:         "sess-start-params",
+		PreferSessionCachedConfig: true,
+	}
+
+	gotMeta, err := CreateOrUpdateAISessionMetaStartParams(db, "sess-start-params", params)
+	require.NoError(t, err)
+	require.NotEmpty(t, gotMeta.StartParams)
+
+	got, err := GetAISessionMetaStartParamsBySessionID(db, "sess-start-params")
+	require.NoError(t, err)
+	require.Equal(t, "ai", got.GetReviewPolicy())
+	require.Equal(t, "openai", got.GetAIService())
+	require.Equal(t, "gpt-test", got.GetAIModelName())
+	require.True(t, got.GetEnablePlan())
+	require.True(t, got.GetPreferSessionCachedConfig())
+}
+
+func TestOverlayAISessionStartParams(t *testing.T) {
+	base := &ypb.AIStartParams{
+		ReviewPolicy:          "manual",
+		AIService:             "deepseek",
+		AIModelName:           "model-a",
+		EnablePlan:            true,
+		UserInteractLimit:     9,
+		TimelineSessionID:     "sess-1",
+		DisableToolUse:        true,
+		DisableAISearchForge:  true,
+		UserPresetPrompt:      "cached",
+	}
+	patch := &ypb.AIStartParams{
+		AIService:         "openai",
+		AIModelName:       "model-b",
+		ReviewPolicy:      "ai",
+		UserInteractLimit: 3,
+	}
+
+	next := OverlayAISessionStartParams(base, patch)
+	require.Equal(t, "openai", next.GetAIService())
+	require.Equal(t, "model-b", next.GetAIModelName())
+	require.Equal(t, "ai", next.GetReviewPolicy())
+	require.Equal(t, int64(3), next.GetUserInteractLimit())
+	require.True(t, next.GetEnablePlan())
+	require.True(t, next.GetDisableToolUse())
+	require.True(t, next.GetDisableAISearchForge())
+	require.Equal(t, "cached", next.GetUserPresetPrompt())
+	require.Equal(t, "sess-1", next.GetTimelineSessionID())
 }
 
 func TestMigrateAISessionMetaFromEvents(t *testing.T) {

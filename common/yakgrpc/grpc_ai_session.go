@@ -42,17 +42,22 @@ func (s *Server) QueryAISession(ctx context.Context, req *ypb.QueryAISessionRequ
 			continue
 		}
 		var runtimeIDs []string
+		startParams, err := yakit.GetAISessionMetaStartParamsBySessionID(s.GetProjectDatabase(), item.SessionID)
+		if err != nil {
+			return nil, err
+		}
 		if strings.TrimSpace(item.RelatedRuntimeIDS) != "" {
 			json.Unmarshal([]byte(item.RelatedRuntimeIDS), &runtimeIDs)
 		}
 		respData = append(respData, &ypb.AISession{
-			Id:               int64(item.ID),
-			SessionID:        item.SessionID,
-			Title:            item.Title,
-			TitleInitialized: item.TitleInitialized,
-			CreatedAt:        item.CreatedAt.Unix(),
-			UpdatedAt:        item.UpdatedAt.Unix(),
+			Id:                int64(item.ID),
+			SessionID:         item.SessionID,
+			Title:             item.Title,
+			TitleInitialized:  item.TitleInitialized,
+			CreatedAt:         item.CreatedAt.Unix(),
+			UpdatedAt:         item.UpdatedAt.Unix(),
 			RelatedRuntimeIDs: runtimeIDs,
+			StartParams:       startParams,
 		})
 	}
 

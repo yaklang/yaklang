@@ -2,12 +2,14 @@ package yakgrpc
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/consts"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/jinzhu/gorm"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiconfig"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"github.com/yaklang/yaklang/common/ai/aid"
@@ -111,6 +113,24 @@ func ConvertYPBAIStartParamsToReActConfig(i *ypb.AIStartParams) []aicommon.Confi
 	return opts
 }
 
+func resolveAISessionStartParams(db *gorm.DB, sessionID string, request *ypb.AIStartParams, preferCached bool) (*ypb.AIStartParams, error) {
+	if request == nil {
+		request = &ypb.AIStartParams{}
+	}
+	if !preferCached || db == nil || strings.TrimSpace(sessionID) == "" {
+		return request, nil
+	}
+
+	cached, err := yakit.GetAISessionMetaStartParamsBySessionID(db, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	if cached == nil {
+		return request, nil
+	}
+	return yakit.MergeCachedAISessionStartParams(cached, request), nil
+}
+
 func (s *Server) StartAIReAct(stream ypb.Yak_StartAIReActServer) error {
 	firstMsg, err := stream.Recv()
 	if err != nil {
@@ -137,8 +157,6 @@ func (s *Server) StartAIReAct(stream ypb.Yak_StartAIReActServer) error {
 	defer cancel()
 
 	inputEvent := chanx.NewUnlimitedChan[*ypb.AIInputEvent](baseCtx, 10)
-
-	optsFromStartParams := ConvertYPBAIStartParamsToReActConfig(startParams)
 
 	var currentCoordinatorId = startParams.CoordinatorId
 	_ = currentCoordinatorId
@@ -187,6 +205,23 @@ func (s *Server) StartAIReAct(stream ypb.Yak_StartAIReActServer) error {
 	if persistentSession == "" {
 		persistentSession = "default"
 	}
+	resolvedStartParams, err := resolveAISessionStartParams(
+		s.GetProjectDatabase(),
+		persistentSession,
+		startParams,
+		startParams.GetPreferSessionCachedConfig(),
+	)
+	if err != nil {
+		return utils.Errorf("resolve session cached config failed: %v", err)
+	}
+	startParams = resolvedStartParams
+	firstMsg.Params = resolvedStartParams
+
+	if _, err := yakit.CreateOrUpdateAISessionMetaStartParams(s.GetProjectDatabase(), persistentSession, startParams); err != nil {
+		log.Warnf("persist ai session start params failed for %s: %v", persistentSession, err)
+	}
+
+	optsFromStartParams := ConvertYPBAIStartParamsToReActConfig(startParams)
 	var hotpatchChan = chanx.NewUnlimitedChan[aicommon.ConfigOption](baseCtx, 10)
 
 	if aiconfig.IsTieredAIConfig() {
