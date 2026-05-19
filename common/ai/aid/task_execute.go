@@ -787,7 +787,6 @@ func (t *AiTask) GenerateTaskSummaryPrompt() (string, error) {
 	}
 	return assembleTaskSummaryPrompt(
 		cp.Schema()["TaskSummarySchema"],
-		cp.PersistentMemory(),
 		timelineFrozen,
 		timelineOpen,
 		cp.CurrentTaskInfo(),
@@ -798,20 +797,18 @@ type taskSummaryDynamicData struct {
 	CurrentTaskInfo string
 }
 
-func assembleTaskSummaryPrompt(schema string, persistentMemory string, currentTaskTimelineFrozen string, currentTaskTimelineOpen string, currentTaskInfo string) (string, error) {
+func assembleTaskSummaryPrompt(schema string, currentTaskTimelineFrozen string, currentTaskTimelineOpen string, currentTaskInfo string) (string, error) {
 	materials := &aicommon.PromptMaterials{
 		TaskInstruction: strings.TrimSpace(__prompt_TaskSummaryInstruction),
 		Schema:          strings.TrimSpace(schema),
 		OutputExample:   strings.TrimSpace(__prompt_TaskSummaryOutputExample),
-	}
-	if persistentMemory = strings.TrimSpace(persistentMemory); persistentMemory != "" {
-		materials.SkillsContext = "# 牢记\n" + persistentMemory
+		ToolInventory:   true,
 	}
 	if currentTaskTimelineFrozen = strings.TrimSpace(currentTaskTimelineFrozen); currentTaskTimelineFrozen != "" {
-		materials.TimelineFrozen = fmt.Sprintf("## 当前任务的历史时间线\n<summary>\n%s\n</summary>", currentTaskTimelineFrozen)
+		materials.TimelineFrozen = currentTaskTimelineFrozen
 	}
 	if currentTaskTimelineOpen = strings.TrimSpace(currentTaskTimelineOpen); currentTaskTimelineOpen != "" {
-		materials.TimelineOpen = fmt.Sprintf("## 当前任务的历史时间线\n<summary>\n%s\n</summary>", currentTaskTimelineOpen)
+		materials.TimelineOpen = currentTaskTimelineOpen
 	}
 	return aicommon.NewDefaultPromptPrefixBuilder().AssemblePromptWithDynamicSection(
 		materials,
