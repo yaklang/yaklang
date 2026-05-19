@@ -470,7 +470,6 @@ func (pm *PromptManager) GenerateVerificationPrompt(originalQuery string, isTool
 	prefixMaterials.AIForgeList = ""
 	prefixMaterials.SkillsContext = ""
 	prefixMaterials.RecentToolsCache = ""
-
 	dynamicData := pm.buildLoopPromptSectionData(base, &reactloops.LoopPromptAssemblyInput{
 		Nonce:     nonceString,
 		UserQuery: originalQuery,
@@ -486,6 +485,7 @@ func (pm *PromptManager) GenerateVerificationPrompt(originalQuery string, isTool
 		dynamicData["MaxIterations"] = currentLoop.GetMaxIterations()
 	}
 
+	aicommon.PopulateToolInventoryFromConfig(prefixMaterials, pm.react.config) // verification prompt 也展示工具列表, 避免ai cache出现连锁反应
 	prompt, err := pm.assemblePromptWithDynamicSection(
 		prefixMaterials,
 		"verification-dynamic",
