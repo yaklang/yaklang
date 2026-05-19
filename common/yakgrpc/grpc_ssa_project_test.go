@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -572,18 +573,19 @@ func TestGRPCMUSTPASS_SSAProjectDatabaseBinding(t *testing.T) {
 	require.NoError(t, err)
 	ctx := context.Background()
 
-	codeSourceConfig := &ssaconfig.CodeSourceInfo{
+	tmpDir := t.TempDir()
+	codeSourceConfigA := &ssaconfig.CodeSourceInfo{
 		Kind:      ssaconfig.CodeSourceLocal,
-		LocalFile: "/tmp/test-db-binding",
+		LocalFile: filepath.Join(tmpDir, "project-a"),
 	}
-	configBytes, err := json.Marshal(codeSourceConfig)
+	configBytesA, err := json.Marshal(codeSourceConfigA)
 	require.NoError(t, err)
 
 	projectName := fmt.Sprintf("db-bind-%s", uuid.NewString())
 	createResp, err := client.CreateSSAProject(ctx, &ypb.CreateSSAProjectRequest{
 		Project: &ypb.SSAProject{
 			ProjectName:      projectName,
-			CodeSourceConfig: string(configBytes),
+			CodeSourceConfig: string(configBytesA),
 			Description:      "database binding test",
 			Language:         "go",
 		},
@@ -595,12 +597,16 @@ func TestGRPCMUSTPASS_SSAProjectDatabaseBinding(t *testing.T) {
 
 	projectID := createResp.GetProject().GetID()
 	programName := fmt.Sprintf("prog-%s", uuid.NewString())
+
+	// Parse 不会自动切库，须与编译路径一致先打开项目 A 的 IR 库。
+	require.NoError(t, yakit.EnsureSSAProjectDatabaseOpen(uint64(projectID)))
 	_, err = ssaapi.Parse(`package main; func main() {}`,
 		ssaapi.WithProgramName(programName),
 		ssaapi.WithLanguage(ssaconfig.GO),
 		ssaconfig.WithProjectID(uint64(projectID)),
 	)
 	require.NoError(t, err)
+	require.NoError(t, yakit.EnsureSSAProjectDatabaseOpen(uint64(projectID)))
 	irProg, err := yakit.GetSSAProgramByName(consts.GetGormSSAProjectDataBase(), programName)
 	require.NoError(t, err)
 	require.Equal(t, uint64(projectID), irProg.ProjectID)
@@ -613,11 +619,18 @@ func TestGRPCMUSTPASS_SSAProjectDatabaseBinding(t *testing.T) {
 	require.Equal(t, int64(0), listResp.Projects[0].CompileTimes)
 	require.Equal(t, int64(0), listResp.Projects[0].RiskNumber)
 
+	codeSourceConfigB := &ssaconfig.CodeSourceInfo{
+		Kind:      ssaconfig.CodeSourceLocal,
+		LocalFile: filepath.Join(tmpDir, "project-b"),
+	}
+	configBytesB, err := json.Marshal(codeSourceConfigB)
+	require.NoError(t, err)
+
 	projectNameB := fmt.Sprintf("db-bind-b-%s", uuid.NewString())
 	createRespB, err := client.CreateSSAProject(ctx, &ypb.CreateSSAProjectRequest{
 		Project: &ypb.SSAProject{
 			ProjectName:      projectNameB,
-			CodeSourceConfig: string(configBytes),
+			CodeSourceConfig: string(configBytesB),
 			Language:         "go",
 		},
 	})
@@ -648,22 +661,30 @@ func TestGRPCMUSTPASS_SSAProjectDatabaseBinding(t *testing.T) {
 		Filter: &ypb.SSAProgramFilter{ProjectIds: []uint64{uint64(projectID)}},
 	})
 	require.NoError(t, err)
-	require.NotNil(t, progRespAfterClose)
+	require.NotEmpty(t, progRespAfterClose.Data)
 	require.True(t, consts.IsGormSSAProjectDatabaseOpen())
 
 	t.Cleanup(func() {
 		profileDB := consts.GetGormProfileDatabase()
-		for _, id := range []int64{projectID, projectIDB} {
+		cleanupProject := func(id int64, progName string) {
 			schemaProj, err := yakit.GetSSAProjectById(uint64(id))
 			if err != nil {
-				continue
+				profileDB.Unscoped().Delete(&schema.SSAProject{}, id)
+				return
 			}
+			_ = yakit.EnsureSSAProjectDatabaseOpen(uint64(id))
+			if progName != "" {
+				ssadb.DeleteProgram(consts.GetGormSSAProjectDataBase(), progName)
+			}
+			_ = consts.CloseGormSSAProjectDatabase()
 			if schemaProj.DatabasePath != "" {
 				_ = os.Remove(schemaProj.DatabasePath)
 			}
 			profileDB.Unscoped().Delete(&schema.SSAProject{}, id)
 		}
-		ssadb.DeleteProgram(consts.GetGormSSAProjectDataBase(), programName)
+		cleanupProject(projectID, programName)
+		cleanupProject(projectIDB, "")
+		_ = yakit.EnsureSSAProjectDatabaseOpen(0)
 	})
 }
 
