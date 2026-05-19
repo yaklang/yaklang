@@ -1,6 +1,7 @@
 package aid
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -18,7 +19,8 @@ import (
 type taskSummaryFixture struct {
 	Schema          string
 	CurrentTaskInfo string
-	Timeline        string
+	TimelineFrozen  string
+	TimelineOpen    string
 	Persistent      string
 }
 
@@ -27,7 +29,8 @@ func renderTaskSummaryFixture(t *testing.T, fixture taskSummaryFixture) string {
 	prompt, err := assembleTaskSummaryPrompt(
 		fixture.Schema,
 		fixture.Persistent,
-		fixture.Timeline,
+		fixture.TimelineFrozen,
+		fixture.TimelineOpen,
 		fixture.CurrentTaskInfo,
 	)
 	require.NoError(t, err)
@@ -51,7 +54,7 @@ func TestSplit_TaskSummaryPrompt_FourSections(t *testing.T) {
 	stub := taskSummaryFixture{
 		Schema:          `{"type":"object"}`,
 		CurrentTaskInfo: "current task: scan /tmp",
-		Timeline:        "interval-1 -> shell ls\ninterval-2 -> shell ps",
+		TimelineOpen:    "interval-2 -> shell ps",
 		Persistent:      "<persistent>vm-host=darwin</persistent>",
 	}
 
@@ -78,4 +81,51 @@ func TestSplit_TaskSummaryPrompt_FourSections(t *testing.T) {
 		require.Equal(t, sec1[aicache.SectionSemiDynamic1][0].Hash, sec3[aicache.SectionSemiDynamic1][0].Hash,
 			"task-summary semi-dynamic-1 hash should remain stable when only dynamic input changes")
 	}
+}
+
+func TestSplit_TaskSummaryPrompt_FrozenTimelineLandsInFrozenBlock(t *testing.T) {
+	stub := taskSummaryFixture{
+		Schema:          `{"type":"object"}`,
+		CurrentTaskInfo: "current task: scan /tmp",
+		TimelineFrozen:  "<|TIMELINE_r1t100|>\nfrozen task timeline\n<|TIMELINE_END_r1t100|>",
+		TimelineOpen:    "<|TIMELINE_r2t200|>\nopen task timeline\n<|TIMELINE_END_r2t200|>",
+		Persistent:      "<persistent>vm-host=darwin</persistent>",
+	}
+
+	prompt := renderTaskSummaryFixture(t, stub)
+	require.Contains(t, prompt, "<|AI_CACHE_FROZEN_semi-dynamic|>")
+	require.Contains(t, prompt, "frozen task timeline")
+	require.Contains(t, prompt, "<|AI_CACHE_FROZEN_END_semi-dynamic|>")
+	require.Contains(t, prompt, "<|PROMPT_SECTION_timeline-open|>")
+
+	frozenStart := strings.Index(prompt, "<|AI_CACHE_FROZEN_semi-dynamic|>")
+	frozenEnd := strings.Index(prompt, "<|AI_CACHE_FROZEN_END_semi-dynamic|>")
+	openStart := strings.Index(prompt, "<|PROMPT_SECTION_timeline-open|>")
+	require.GreaterOrEqual(t, frozenStart, 0)
+	require.Greater(t, frozenEnd, frozenStart)
+	require.Greater(t, openStart, frozenEnd)
+	require.NotContains(t, prompt[frozenStart:frozenEnd], "open task timeline")
+	require.Contains(t, prompt[openStart:], "open task timeline")
+}
+
+func TestGenerateTaskSummaryPrompt_UsesConfigTimelineFrozenOpen(t *testing.T) {
+	_, task, _, _ := newPlanExecPromptFixture(t)
+	timeline := task.ContextProvider.GetTimelineInstance()
+	require.NotNil(t, timeline)
+	task.Config.Timeline = timeline
+	timeline.SetTimelineBucketByteSize(80)
+
+	timeline.PushText(101, "first current task timeline block "+strings.Repeat("A", 120))
+	timeline.PushText(102, "second current task timeline block "+strings.Repeat("B", 120))
+
+	prompt, err := task.GenerateTaskSummaryPrompt()
+	require.NoError(t, err)
+	require.Contains(t, prompt, "<|AI_CACHE_FROZEN_semi-dynamic|>")
+	require.Contains(t, prompt, "first current task timeline block")
+	require.Contains(t, prompt, "<|PROMPT_SECTION_timeline-open|>")
+	require.Contains(t, prompt, "second current task timeline block")
+	frozenEnd := strings.Index(prompt, "<|AI_CACHE_FROZEN_END_semi-dynamic|>")
+	openStart := strings.Index(prompt, "<|PROMPT_SECTION_timeline-open|>")
+	require.Greater(t, frozenEnd, 0)
+	require.Greater(t, openStart, frozenEnd, "frozen timeline must be outside and before timeline-open")
 }

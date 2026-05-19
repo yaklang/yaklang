@@ -779,10 +779,17 @@ func (t *AiTask) GenerateTaskSummaryPrompt() (string, error) {
 		return "", fmt.Errorf("context provider is nil")
 	}
 	cp := t.Coordinator.ContextProvider
+	var timelineFrozen, timelineOpen string
+	if t.Coordinator.Config != nil {
+		if timeline := t.Coordinator.Config.GetTimeline(); timeline != nil {
+			timelineFrozen, timelineOpen = timeline.DumpFrozenOpen()
+		}
+	}
 	return assembleTaskSummaryPrompt(
 		cp.Schema()["TaskSummarySchema"],
 		cp.PersistentMemory(),
-		cp.CurrentTaskTimeline(),
+		timelineFrozen,
+		timelineOpen,
 		cp.CurrentTaskInfo(),
 	)
 }
@@ -791,7 +798,7 @@ type taskSummaryDynamicData struct {
 	CurrentTaskInfo string
 }
 
-func assembleTaskSummaryPrompt(schema string, persistentMemory string, currentTaskTimeline string, currentTaskInfo string) (string, error) {
+func assembleTaskSummaryPrompt(schema string, persistentMemory string, currentTaskTimelineFrozen string, currentTaskTimelineOpen string, currentTaskInfo string) (string, error) {
 	materials := &aicommon.PromptMaterials{
 		TaskInstruction: strings.TrimSpace(__prompt_TaskSummaryInstruction),
 		Schema:          strings.TrimSpace(schema),
@@ -800,8 +807,11 @@ func assembleTaskSummaryPrompt(schema string, persistentMemory string, currentTa
 	if persistentMemory = strings.TrimSpace(persistentMemory); persistentMemory != "" {
 		materials.SkillsContext = "# 牢记\n" + persistentMemory
 	}
-	if currentTaskTimeline = strings.TrimSpace(currentTaskTimeline); currentTaskTimeline != "" {
-		materials.TimelineOpen = fmt.Sprintf("## 当前任务的历史时间线\n<summary>\n%s\n</summary>", currentTaskTimeline)
+	if currentTaskTimelineFrozen = strings.TrimSpace(currentTaskTimelineFrozen); currentTaskTimelineFrozen != "" {
+		materials.TimelineFrozen = fmt.Sprintf("## 当前任务的历史时间线\n<summary>\n%s\n</summary>", currentTaskTimelineFrozen)
+	}
+	if currentTaskTimelineOpen = strings.TrimSpace(currentTaskTimelineOpen); currentTaskTimelineOpen != "" {
+		materials.TimelineOpen = fmt.Sprintf("## 当前任务的历史时间线\n<summary>\n%s\n</summary>", currentTaskTimelineOpen)
 	}
 	return aicommon.NewDefaultPromptPrefixBuilder().AssemblePromptWithDynamicSection(
 		materials,
