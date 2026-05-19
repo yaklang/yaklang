@@ -35,7 +35,7 @@ func NewReadWriteCloserEndpoint(rw io.ReadWriteCloser, mtu uint32, offset int) (
 }
 
 func NewWireGuardDeviceEndpoint(device lowtun.Device) (*ReadWriteEndpoint, error) {
-	offset := 4
+	offset := lowtun.TUNLinkOffset()
 
 	mtuInt, err := device.MTU()
 	if err != nil {

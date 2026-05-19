@@ -239,3 +239,9 @@ func (rate *rateJuggler) update(packetLen uint64) {
 		rate.changing.Store(false)
 	}
 }
+
+// TUNLinkOffset is the L3 packet start index for gVisor rwendpoint ↔ Device.
+// Wintun passes raw L3 frames with no PI/virtio prefix.
+func TUNLinkOffset() int {
+	return 0
+}

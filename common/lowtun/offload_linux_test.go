@@ -7,6 +7,7 @@ package lowtun
 
 import (
 	"net/netip"
+	"strings"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/lowtun/conn"
@@ -15,9 +16,8 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-const (
-	offset = virtioNetHdrLen
-)
+// offset is the IP start index in test buffers; same as production TUNLinkOffset() on linux.
+var offset = TUNLinkOffset()
 
 var (
 	ip4PortA = netip.MustParseAddrPort("192.0.2.1:1")
@@ -27,6 +27,35 @@ var (
 	ip6PortB = netip.MustParseAddrPort("[2001:db8::2]:1")
 	ip6PortC = netip.MustParseAddrPort("[2001:db8::3]:1")
 )
+
+func TestTUNLinkOffsetMatchesVirtioNetHdrLen(t *testing.T) {
+	if got := TUNLinkOffset(); got != virtioNetHdrLen {
+		t.Fatalf("TUNLinkOffset() = %d, want virtioNetHdrLen %d", got, virtioNetHdrLen)
+	}
+}
+
+func TestHandleGRO_acceptsTUNLinkOffset(t *testing.T) {
+	pkt := tcp4Packet(ip4PortA, ip4PortB, header.TCPFlagSyn, 0, 1)
+	toWrite := make([]int, 0, 1)
+	if err := handleGRO([][]byte{pkt}, offset, newTCPGROTable(), newUDPGROTable(), false, &toWrite); err != nil {
+		t.Fatalf("handleGRO(..., offset=%d): %v", offset, err)
+	}
+	if len(toWrite) < 1 {
+		t.Fatalf("expected at least one write index, got %v", toWrite)
+	}
+}
+
+func TestHandleGRO_rejectsOffsetBelowVirtioNetHdrLen(t *testing.T) {
+	pkt := tcp4Packet(ip4PortA, ip4PortB, header.TCPFlagSyn, 0, 1)
+	toWrite := make([]int, 0, 1)
+	err := handleGRO([][]byte{pkt}, 4, newTCPGROTable(), newUDPGROTable(), false, &toWrite)
+	if err == nil {
+		t.Fatal("handleGRO(..., offset=4): expected error")
+	}
+	if !strings.Contains(err.Error(), "invalid offset") {
+		t.Fatalf("expected invalid offset, got: %v", err)
+	}
+}
 
 func udp4PacketMutateIPFields(srcIPPort, dstIPPort netip.AddrPort, payloadLen int, ipFn func(*header.IPv4Fields)) []byte {
 	totalLen := 28 + payloadLen
