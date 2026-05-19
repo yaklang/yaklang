@@ -24,13 +24,13 @@ open as $output
 *.read as $output
 
 alert $output for {
-	title: "File read"
-	title_zh: "文件读取"
-	level: "info"
-	type: "audit"
-	risk: "路径遍历 / 任意文件读取"
-	message: "检测到文件读取相关 API，请确认路径来源可信且已做边界校验。"
-	name: "output"
+	title: "File read",
+	title_zh: "文件读取",
+	level: "info",
+	type: "audit",
+	risk: "路径遍历 / 任意文件读取",
+	message: "检测到文件读取相关 API，请确认路径来源可信且已做边界校验。",
+	name: "output",
 }
 
 desc(

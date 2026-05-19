@@ -22,13 +22,13 @@ REFERENCE
 *.executescript as $output
 
 alert $output for {
-	title: "DB cursor execute"
-	title_zh: "数据库游标执行"
-	level: "info"
-	type: "audit"
-	risk: "SQL 注入"
-	message: "检测到数据库 execute 类 API，请确认 SQL 已参数化且未拼接不可信输入。"
-	name: "output"
+	title: "DB cursor execute",
+	title_zh: "数据库游标执行",
+	level: "info",
+	type: "audit",
+	risk: "SQL 注入",
+	message: "检测到数据库 execute 类 API，请确认 SQL 已参数化且未拼接不可信输入。",
+	name: "output",
 }
 
 desc(

@@ -22,13 +22,13 @@ hashlib.sha1 as $output
 hashlib.new as $output
 
 alert $output for {
-	title: "Weak hash primitive"
-	title_zh: "弱哈希调用"
-	level: "info"
-	type: "audit"
-	risk: "弱完整性 / 易碰撞"
-	message: "检测到 MD5、SHA1 或 hashlib.new；请确认用途非安全敏感场景或升级为更强算法。"
-	name: "output"
+	title: "Weak hash primitive",
+	title_zh: "弱哈希调用",
+	level: "info",
+	type: "audit",
+	risk: "弱完整性 / 易碰撞",
+	message: "检测到 MD5、SHA1 或 hashlib.new；请确认用途非安全敏感场景或升级为更强算法。",
+	name: "output",
 }
 
 desc(

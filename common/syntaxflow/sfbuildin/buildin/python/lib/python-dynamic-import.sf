@@ -22,13 +22,13 @@ importlib.import_module as $output
 importlib.util.find_spec as $output
 
 alert $output for {
-	title: "Dynamic import"
-	title_zh: "动态导入"
-	level: "info"
-	type: "audit"
-	risk: "任意代码加载"
-	message: "检测到动态导入 API，请确认模块名来源可信且经过白名单约束。"
-	name: "output"
+	title: "Dynamic import",
+	title_zh: "动态导入",
+	level: "info",
+	type: "audit",
+	risk: "任意代码加载",
+	message: "检测到动态导入 API，请确认模块名来源可信且经过白名单约束。",
+	name: "output",
 }
 
 desc(

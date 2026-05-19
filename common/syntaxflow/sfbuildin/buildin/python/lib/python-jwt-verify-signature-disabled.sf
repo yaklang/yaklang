@@ -20,13 +20,13 @@ REFERENCE
 jwt.decode as $output
 
 alert $output for {
-	title: "jwt decode verify_signature"
-	title_zh: "JWT 关闭签名验证"
-	level: "high"
-	type: "audit"
-	risk: "身份认证被绕过"
-	message: "检测到 jwt.decode；请确认未关闭签名校验（verify_signature 不应为 False）。"
-	name: "output"
+	title: "jwt decode verify_signature",
+	title_zh: "JWT 关闭签名验证",
+	level: "high",
+	type: "audit",
+	risk: "身份认证被绕过",
+	message: "检测到 jwt.decode；请确认未关闭签名校验（verify_signature 不应为 False）。",
+	name: "output",
 }
 
 desc(

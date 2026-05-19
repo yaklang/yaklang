@@ -24,13 +24,13 @@ open as $output
 *.write_bytes as $output
 
 alert $output for {
-	title: "File write"
-	title_zh: "文件写入"
-	level: "info"
-	type: "audit"
-	risk: "任意文件写入"
-	message: "检测到文件写入相关 API，请确认目标路径与写入内容来源可信。"
-	name: "output"
+	title: "File write",
+	title_zh: "文件写入",
+	level: "info",
+	type: "audit",
+	risk: "任意文件写入",
+	message: "检测到文件写入相关 API，请确认目标路径与写入内容来源可信。",
+	name: "output",
 }
 
 desc(

@@ -20,13 +20,13 @@ REFERENCE
 pickle.dumps as $output
 
 alert $output for {
-	title: "pickle.dumps"
-	title_zh: "pickle.dumps 调用"
-	level: "info"
-	type: "audit"
-	risk: "不安全反序列化链路"
-	message: "检测到 pickle.dumps；若输出可被不可信方获取并在对方环境反序列化，可能导致远程代码执行。"
-	name: "output"
+	title: "pickle.dumps",
+	title_zh: "pickle.dumps 调用",
+	level: "info",
+	type: "audit",
+	risk: "不安全反序列化链路",
+	message: "检测到 pickle.dumps；若输出可被不可信方获取并在对方环境反序列化，可能导致远程代码执行。",
+	name: "output",
 }
 
 desc(

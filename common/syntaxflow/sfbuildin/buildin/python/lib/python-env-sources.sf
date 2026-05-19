@@ -21,13 +21,13 @@ os.getenv as $output
 os.environ.get as $output
 
 alert $output for {
-	title: "Environment variable read"
-	title_zh: "读取环境变量"
-	level: "info"
-	type: "audit"
-	risk: "配置不当 / 敏感信息暴露"
-	message: "检测到读取环境变量，请评估敏感性与默认值是否安全。"
-	name: "output"
+	title: "Environment variable read",
+	title_zh: "读取环境变量",
+	level: "info",
+	type: "audit",
+	risk: "配置不当 / 敏感信息暴露",
+	message: "检测到读取环境变量，请评估敏感性与默认值是否安全。",
+	name: "output",
 }
 
 desc(

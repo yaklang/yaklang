@@ -25,13 +25,13 @@ random.shuffle as $output
 random.getrandbits as $output
 
 alert $output for {
-	title: "random PRNG call"
-	title_zh: "random 伪随机调用"
-	level: "info"
-	type: "audit"
-	risk: "可预测随机数"
-	message: "检测到 random 模块调用；非密码学安全，勿用于密钥或令牌生成。"
-	name: "output"
+	title: "random PRNG call",
+	title_zh: "random 伪随机调用",
+	level: "info",
+	type: "audit",
+	risk: "可预测随机数",
+	message: "检测到 random 模块调用；非密码学安全，勿用于密钥或令牌生成。",
+	name: "output",
 }
 
 desc(
