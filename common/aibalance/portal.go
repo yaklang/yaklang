@@ -23,9 +23,7 @@ import (
 //go:embed templates/portal.html templates/login.html templates/index.html templates/ops_portal.html templates/static/*
 var templatesFS embed.FS
 
-// ==================== Helper Functions ====================
-
-// formatBytes converts bytes to human-readable format (KB, MB, GB, etc.)
+// formatBytes 把字节数转换为人类可读的格式 (KB, MB, GB, etc.)
 func formatBytes(bytes int64) string {
 	const unit = 1024
 	if bytes < unit {
@@ -459,12 +457,12 @@ func (c *ServerConfig) processLogin(conn net.Conn, request *http.Request) {
 //  3. 返回新的过期时间，方便前端做就地展示或 debug。
 //
 // 设计要点：
-//  - 该接口同时服务于 /portal/api/session/refresh（admin）和
-//    /ops/api/session/refresh（OPS）。两者都已被 AuthMiddleware 的
-//    通配规则覆盖，无需额外配置。
-//  - 如果不是基于 cookie 的会话（比如 OPS 通过 X-Ops-Key header
-//    访问 API），SessionID 为空，这种情况下没有 cookie session 可续，
-//    直接返回 refreshed=false 即可，不需要报错。
+//   - 该接口同时服务于 /portal/api/session/refresh（admin）和
+//     /ops/api/session/refresh（OPS）。两者都已被 AuthMiddleware 的
+//     通配规则覆盖，无需额外配置。
+//   - 如果不是基于 cookie 的会话（比如 OPS 通过 X-Ops-Key header
+//     访问 API），SessionID 为空，这种情况下没有 cookie session 可续，
+//     直接返回 refreshed=false 即可，不需要报错。
 //
 // 关键词: handleSessionRefresh 续期接口 keep alive
 func (c *ServerConfig) handleSessionRefresh(conn net.Conn, request *http.Request) {
@@ -1109,14 +1107,14 @@ func (c *ServerConfig) serveOpsPortal(conn net.Conn) {
 // Only these paths will serve a login page for unauthenticated GET requests;
 // all other paths return 401 JSON.
 var portalPagePaths = map[string]bool{
-	"/portal":              true,
-	"/portal/":             true,
+	"/portal":                 true,
+	"/portal/":                true,
 	"/portal/add-ai-provider": true,
-	"/portal/api-keys":     true,
-	"/portal/totp-settings": true,
-	"/portal/autocomplete": true,
-	"/portal/get-totp-code": true,
-	"/portal/logout":       true,
+	"/portal/api-keys":        true,
+	"/portal/totp-settings":   true,
+	"/portal/autocomplete":    true,
+	"/portal/get-totp-code":   true,
+	"/portal/logout":          true,
 }
 
 func isPortalPagePath(path string) bool {
