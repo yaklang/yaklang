@@ -21,14 +21,12 @@ type taskSummaryFixture struct {
 	CurrentTaskInfo string
 	TimelineFrozen  string
 	TimelineOpen    string
-	Persistent      string
 }
 
 func renderTaskSummaryFixture(t *testing.T, fixture taskSummaryFixture) string {
 	t.Helper()
 	prompt, err := assembleTaskSummaryPrompt(
 		fixture.Schema,
-		fixture.Persistent,
 		fixture.TimelineFrozen,
 		fixture.TimelineOpen,
 		fixture.CurrentTaskInfo,
@@ -55,7 +53,6 @@ func TestSplit_TaskSummaryPrompt_FourSections(t *testing.T) {
 		Schema:          `{"type":"object"}`,
 		CurrentTaskInfo: "current task: scan /tmp",
 		TimelineOpen:    "interval-2 -> shell ps",
-		Persistent:      "<persistent>vm-host=darwin</persistent>",
 	}
 
 	prompt1 := renderTaskSummaryFixture(t, stub)
@@ -67,6 +64,9 @@ func TestSplit_TaskSummaryPrompt_FourSections(t *testing.T) {
 	require.NotEmpty(t, sec1[aicache.SectionHighStatic], "task-summary prompt must expose high-static chunk")
 	require.NotEmpty(t, sec1[aicache.SectionDynamic], "task-summary prompt must expose dynamic chunk")
 	require.Empty(t, sec1[aicache.SectionRaw], "task-summary prompt should not produce raw/noise chunk; rendered:\n%s", prompt1)
+	require.Contains(t, prompt1, "<|AI_CACHE_FROZEN_semi-dynamic|>")
+	require.Contains(t, prompt1, "# Tool Inventory")
+	require.NotContains(t, prompt1, "# 牢记")
 
 	require.Equal(t, sec1[aicache.SectionHighStatic][0].Hash, sec2[aicache.SectionHighStatic][0].Hash,
 		"task-summary high-static hash must be byte-stable across calls")
@@ -89,11 +89,11 @@ func TestSplit_TaskSummaryPrompt_FrozenTimelineLandsInFrozenBlock(t *testing.T) 
 		CurrentTaskInfo: "current task: scan /tmp",
 		TimelineFrozen:  "<|TIMELINE_r1t100|>\nfrozen task timeline\n<|TIMELINE_END_r1t100|>",
 		TimelineOpen:    "<|TIMELINE_r2t200|>\nopen task timeline\n<|TIMELINE_END_r2t200|>",
-		Persistent:      "<persistent>vm-host=darwin</persistent>",
 	}
 
 	prompt := renderTaskSummaryFixture(t, stub)
 	require.Contains(t, prompt, "<|AI_CACHE_FROZEN_semi-dynamic|>")
+	require.Contains(t, prompt, "# Tool Inventory")
 	require.Contains(t, prompt, "frozen task timeline")
 	require.Contains(t, prompt, "<|AI_CACHE_FROZEN_END_semi-dynamic|>")
 	require.Contains(t, prompt, "<|PROMPT_SECTION_timeline-open|>")
@@ -105,7 +105,9 @@ func TestSplit_TaskSummaryPrompt_FrozenTimelineLandsInFrozenBlock(t *testing.T) 
 	require.Greater(t, frozenEnd, frozenStart)
 	require.Greater(t, openStart, frozenEnd)
 	require.NotContains(t, prompt[frozenStart:frozenEnd], "open task timeline")
+	require.NotContains(t, prompt[frozenStart:frozenEnd], "<summary>")
 	require.Contains(t, prompt[openStart:], "open task timeline")
+	require.NotContains(t, prompt[openStart:], "<summary>")
 }
 
 func TestGenerateTaskSummaryPrompt_UsesConfigTimelineFrozenOpen(t *testing.T) {

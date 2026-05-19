@@ -89,6 +89,7 @@ func TestSplit_TaskReviewPrompt_FourSections(t *testing.T) {
 	require.Equal(t, sec1[aicache.SectionHighStatic][0].Hash, sec2[aicache.SectionHighStatic][0].Hash,
 		"task-review high-static hash must be byte-stable across calls")
 	require.Contains(t, prompt1, "<|AI_CACHE_FROZEN_semi-dynamic|>")
+	require.Contains(t, prompt1, "# Tool Inventory")
 	require.Contains(t, prompt1, "frozen task review timeline")
 	require.Contains(t, prompt1, "<|PROMPT_SECTION_timeline-open|>")
 	require.Contains(t, prompt1, "open task review timeline")
