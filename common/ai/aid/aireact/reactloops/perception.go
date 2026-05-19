@@ -26,9 +26,29 @@ const (
 	PerceptionTriggerSpinDetected = "spin_detected"
 	PerceptionTriggerLoopSwitch   = "loop_switch"
 
-	perceptionDefaultMinInterval        = 30 * time.Second
-	perceptionMaxInterval               = 5 * time.Minute
-	perceptionDefaultIterationInterval  = 2
+	// perceptionDefaultMinInterval 是两次 perception AI 调用之间的最小时间间隔.
+	// 调整自 30s -> 120s (v2 进一步加大), 依据 redhaze 案例扩展仿真
+	// (docs/15-perception-frequency-experiment.md):
+	// 意图感知主要服务于 capability/SKILL/knowledge 补充, 大方向不变时
+	// 频繁感知反而是负担. 120s 阈值刚好让紧邻的同阶段 drift 候选 (iter 间隔
+	// <100s) 被跳过, 而阶段切换 (iter 间隔 >150s) 仍可触发. 在 realistic 画像
+	// 下与 iter=3 配合达到 100% 命中 (fired=updated=4, wasted=0), 同时 noisy
+	// 上界也从 10 降到 4 (-60%).
+	// 关键词: perceptionDefaultMinInterval v2 默认值调整, 120s 节流,
+	//        drift 跳过 pivot 保留, capability 补充语义
+	perceptionDefaultMinInterval = 120 * time.Second
+	perceptionMaxInterval        = 5 * time.Minute
+	// perceptionDefaultIterationInterval 控制每隔几个 iter 触发一次 post_action 感知.
+	// 调整自 2 -> 3, 依据 redhaze 案例仿真:
+	//   iter=2 min=30s: 13 分钟内 10 次 AI 调用, realistic 浪费率 60%
+	//   iter=3 min=60s: 6 次 AI 调用 (-40%), 浪费率 33%
+	//   iter=3 min=120s: 4 次 AI 调用 (-60%), 浪费率 0%, 仍覆盖全部 4 个 phase pivot (最优)
+	//   iter=4: 5 次, 但首次感知推迟到 iter 4 (~150s) 错过 phase 1 recon
+	//   iter=6: 3 次, 但首次感知推迟到 iter 6 (~240s) 太晚
+	// iter=3 在 first-fire 响应性 (iter 3, ~40s) 与节流之间取得最佳平衡.
+	// 关键词: perceptionDefaultIterationInterval 默认值调整, iter=3 节流甜点,
+	//        响应性平衡, phase pivot 全覆盖
+	perceptionDefaultIterationInterval  = 3
 	perceptionMaxContextTokens          = 500
 	perceptionKnowledgeMaxContextTokens = 15 * 1024
 
