@@ -528,6 +528,45 @@ func TestGRPCMUSTPASS_SSAProjectMigrateSSAProject(t *testing.T) {
 
 }
 
+func TestGRPCMUSTPASS_CreateSSAProjectIdempotentWhenExists(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	ctx := context.Background()
+
+	codeSourceConfig := &ssaconfig.CodeSourceInfo{
+		Kind:      ssaconfig.CodeSourceLocal,
+		LocalFile: "/tmp/test-idempotent-create",
+	}
+	configBytes, err := json.Marshal(codeSourceConfig)
+	require.NoError(t, err)
+	projectName := fmt.Sprintf("idem-%s", uuid.NewString())
+
+	createReq := &ypb.CreateSSAProjectRequest{
+		Project: &ypb.SSAProject{
+			ProjectName:      projectName,
+			CodeSourceConfig: string(configBytes),
+			Language:         "go",
+		},
+	}
+	first, err := client.CreateSSAProject(ctx, createReq)
+	require.NoError(t, err)
+	require.NotZero(t, first.GetProject().GetID())
+
+	second, err := client.CreateSSAProject(ctx, &ypb.CreateSSAProjectRequest{
+		JSONStringConfig: first.GetProject().GetJSONStringConfig(),
+	})
+	require.NoError(t, err)
+	require.Equal(t, first.GetProject().GetID(), second.GetProject().GetID())
+
+	t.Cleanup(func() {
+		schemaProj, err := yakit.GetSSAProjectById(uint64(first.GetProject().GetID()))
+		if err == nil && schemaProj.DatabasePath != "" {
+			_ = os.Remove(schemaProj.DatabasePath)
+		}
+		consts.GetGormProfileDatabase().Unscoped().Delete(&schema.SSAProject{}, first.GetProject().GetID())
+	})
+}
+
 func TestGRPCMUSTPASS_SSAProjectDatabaseBinding(t *testing.T) {
 	client, err := NewLocalClient()
 	require.NoError(t, err)

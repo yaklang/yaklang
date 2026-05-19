@@ -168,6 +168,65 @@ func EnsureSSAProjectDatabaseReady(projectIDs ...uint64) error {
 	return ensureDefaultSSADatabaseOpen()
 }
 
+// LookupSSAProjectIDByProgramName finds the SSA analysis project that owns programName.
+func LookupSSAProjectIDByProgramName(profileDB *gorm.DB, programName string) (uint64, error) {
+	if programName == "" {
+		return 0, utils.Errorf("lookup SSA project by program name failed: program name is empty")
+	}
+	if profileDB == nil {
+		profileDB = consts.GetGormProfileDatabase()
+	}
+	var projects []schema.SSAProject
+	if err := profileDB.Find(&projects).Error; err != nil {
+		return 0, utils.Errorf("lookup SSA project by program name failed: %s", err)
+	}
+	for i := range projects {
+		p := &projects[i]
+		if err := OpenSSAProjectDatabase(p); err != nil {
+			continue
+		}
+		irProg, err := GetSSAProgramByName(consts.GetGormSSAProjectDataBase(), programName)
+		if err == nil && irProg != nil {
+			if irProg.ProjectID > 0 {
+				return irProg.ProjectID, nil
+			}
+			return uint64(p.ID), nil
+		}
+	}
+	if err := ensureDefaultSSADatabaseOpen(); err != nil {
+		return 0, err
+	}
+	irProg, err := GetSSAProgramByName(consts.GetGormSSAProjectDataBase(), programName)
+	if err != nil {
+		return 0, utils.Errorf("lookup SSA project by program name failed: %s", err)
+	}
+	if irProg.ProjectID > 0 {
+		return irProg.ProjectID, nil
+	}
+	return 0, utils.Errorf("lookup SSA project by program name failed: program has no project_id")
+}
+
+// EnsureSSAProjectDatabaseForProgramFilter opens the SSA IR DB implied by an SSAProgramFilter.
+func EnsureSSAProjectDatabaseForProgramFilter(filter *ypb.SSAProgramFilter) error {
+	if filter == nil {
+		return EnsureSSAProjectDatabaseReady()
+	}
+	projectIDs := filter.GetProjectIds()
+	if len(projectIDs) == 1 && projectIDs[0] > 0 {
+		return EnsureSSAProjectDatabaseOpen(projectIDs[0])
+	}
+	if len(projectIDs) == 0 {
+		names := filter.GetProgramNames()
+		if len(names) == 1 && names[0] != "" {
+			id, err := LookupSSAProjectIDByProgramName(consts.GetGormProfileDatabase(), names[0])
+			if err == nil && id > 0 {
+				return EnsureSSAProjectDatabaseOpen(id)
+			}
+		}
+	}
+	return EnsureSSAProjectDatabaseReady(projectIDs...)
+}
+
 func ensureDefaultSSADatabaseOpen() error {
 	if consts.IsGormSSAProjectDatabaseOpen() &&
 		isSSADatabasePathActive(ResolveDefaultSSADatabasePath()) {

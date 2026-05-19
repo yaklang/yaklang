@@ -264,6 +264,11 @@ func (m *scanManager) initByConfig() error {
 
 	if len(config.GetProgramNames()) > 0 {
 		for _, name := range config.GetProgramNames() {
+			if projectID, err := yakit.LookupSSAProjectIDByProgramName(consts.GetGormProfileDatabase(), name); err == nil && projectID > 0 {
+				if err := yakit.EnsureSSAProjectDatabaseOpen(projectID); err != nil {
+					return utils.Errorf("SyntaxFlow Scan Failed: open SSA project database: %s", err)
+				}
+			}
 			prog, err := ssaapi.FromDatabase(name)
 			if err != nil {
 				log.Errorf("SyntaxFlow Scan Init Program By Names Failed: SSA Program [%s] not found in database or cache", name)

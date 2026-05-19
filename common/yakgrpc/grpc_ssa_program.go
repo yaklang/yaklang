@@ -63,16 +63,15 @@ func (s *Server) DeleteSSAPrograms(ctx context.Context, req *ypb.DeleteSSAProgra
 }
 
 func ensureSSAProgramDatabase(req *ypb.QuerySSAProgramRequest) error {
-	var projectIDs []uint64
-	if req != nil && req.GetFilter() != nil {
-		projectIDs = req.GetFilter().GetProjectIds()
+	if req == nil || req.GetFilter() == nil {
+		return yakit.EnsureSSAProjectDatabaseReady()
 	}
-	return yakit.EnsureSSAProjectDatabaseReady(projectIDs...)
+	return yakit.EnsureSSAProjectDatabaseForProgramFilter(req.GetFilter())
 }
 
 func ensureSSAProgramDatabaseFromDelete(req *ypb.DeleteSSAProgramRequest) error {
 	if req == nil || req.GetFilter() == nil {
 		return yakit.EnsureSSAProjectDatabaseReady()
 	}
-	return yakit.EnsureSSAProjectDatabaseReady(req.GetFilter().GetProjectIds()...)
+	return yakit.EnsureSSAProjectDatabaseForProgramFilter(req.GetFilter())
 }
