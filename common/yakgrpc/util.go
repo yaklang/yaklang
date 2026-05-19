@@ -201,17 +201,23 @@ type Client struct {
 }
 
 func (c *Client) GetProfileDatabase() *gorm.DB {
+	// Delegate to Server.GetProfileDatabase() which falls back to the
+	// consts global singleton when Server.profileDatabase is nil (the
+	// common production case – the field is only set for test servers that
+	// use WithProfileDatabasePath). Direct field access here would return
+	// nil in production and cause panics in callers (e.g. MCP payload handlers).
 	if c.server == nil {
 		return nil
 	}
-	return c.server.profileDatabase
+	return c.server.GetProfileDatabase()
 }
 
 func (c *Client) GetProjectDatabase() *gorm.DB {
+	// Same reasoning as GetProfileDatabase above.
 	if c.server == nil {
 		return nil
 	}
-	return c.server.projectDatabase
+	return c.server.GetProjectDatabase()
 }
 
 func NewLocalClient(locals ...bool) (ypb.YakClient, error) {
