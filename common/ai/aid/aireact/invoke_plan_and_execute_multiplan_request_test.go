@@ -133,9 +133,13 @@ func TestReAct_PlanAndExecute_MultiPlan(t *testing.T) {
 		}
 	}()
 
+	// 关键词: TestReAct_PlanAndExecute_MultiPlan, github_actions_timeout
+	// CI 上 ReAct 主循环 + post-iteration summary mock 至少需要 2 轮 AI 调用 +
+	// 事件投递，1s 太紧导致 EVENT_TYPE_RESULT 还没派发到 out channel 测试就退出。
+	// 这里改为 5s，仍远小于本地 10s 上限，不会显著拉长 CI。
 	du := time.Duration(10)
 	if utils.InGithubActions() {
-		du = time.Duration(1)
+		du = time.Duration(5)
 	}
 	after := time.After(du * time.Second)
 

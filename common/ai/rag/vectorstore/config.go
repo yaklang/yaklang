@@ -114,14 +114,25 @@ func (c *CollectionConfig) FixEmbeddingClient() error {
 		return nil
 	}
 	if IsMockMode {
-		// 使用模拟的嵌入服务
+		// 关键词: FixEmbeddingClient, IsMockMode, mock_embedding_fallback
+		// 字典 lookup mock 只覆盖 mock_embedding_data.json 里预录的文本，
+		// KB CRUD / Imported flag 等 grpc 测试会写入任意业务文本，必须有兜底；
+		// 这里包一层：命中字典优先返回字典向量（保留旧有相似度语义），
+		// 否则降级到 Vocabulary1024 词频向量（NewDefaultMockEmbedding），
+		// 既不破坏依赖字典语义的老测试，又让任意文本可以稳定生成向量。
 		mockRagDataForTest, err := getMockRagDataForTest()
 		if err != nil {
 			log.Errorf("failed to get mock rag data for test: %v", err)
 			return utils.Errorf("failed to get mock rag data for test: %v", err)
 		}
-		log.Infof("successfully initialized RAG system with mock embedding service")
-		c.EmbeddingClient = NewMockEmbedder(mockRagDataForTest)
+		fallbackMock := NewDefaultMockEmbedding()
+		c.EmbeddingClient = NewMockEmbedder(func(text string) ([]float32, error) {
+			if vec, err := mockRagDataForTest(text); err == nil {
+				return vec, nil
+			}
+			return fallbackMock.Embedding(text)
+		})
+		log.Infof("successfully initialized RAG system with mock embedding service (dict + vocab fallback)")
 	} else if c.EmbeddingClient == nil {
 		// 优先尝试使用 AIBalance 免费服务（如果可用）
 		aibalanceEmbedder, err := GetAIBalanceFreeEmbeddingService()
