@@ -159,6 +159,7 @@ func generateTaskReviewPrompt(config *Config, materials aitool.InvokeParams) (st
 		TaskInstruction:  strings.TrimSpace(aiTaskReviewInstructionTemplate),
 		Schema:           strings.TrimSpace(aiTaskReviewSchemaTemplate),
 		OutputExample:    strings.TrimSpace(aiTaskReviewOutputExampleTemplate),
+		ToolInventory:    true,
 		TimelineFrozen:   data.TimelineFrozen,
 		TimelineOpen:     data.TimelineOpen,
 		CurrentTime:      data.CurrentTime,
