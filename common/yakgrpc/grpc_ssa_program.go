@@ -10,10 +10,7 @@ import (
 )
 
 func (s *Server) QuerySSAPrograms(ctx context.Context, req *ypb.QuerySSAProgramRequest) (*ypb.QuerySSAProgramResponse, error) {
-	if err := ensureSSAProgramDatabase(req); err != nil {
-		return nil, err
-	}
-	pagine, programs, err := yakit.QuerySSAProgram(s.GetSSADatabase(), req)
+	pagine, programs, err := yakit.QuerySSAProgram(req)
 	if err != nil {
 		return nil, err
 	}

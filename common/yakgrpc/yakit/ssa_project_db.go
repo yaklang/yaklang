@@ -208,14 +208,30 @@ func LookupSSAProjectIDByProgramName(profileDB *gorm.DB, programName string) (ui
 
 // EnsureSSAProjectDatabaseForProgramFilter opens the SSA IR DB implied by an SSAProgramFilter.
 func EnsureSSAProjectDatabaseForProgramFilter(filter *ypb.SSAProgramFilter) error {
+	projectIDs, multi, err := ResolveSSAProgramQueryProjectIDs(filter)
+	if err != nil {
+		return err
+	}
+	if multi {
+		return nil
+	}
+	return ensureSSAProjectDatabaseForResolvedProjectIDs(filter, projectIDs)
+}
+
+func ensureSSAProjectDatabaseForResolvedProjectIDs(filter *ypb.SSAProgramFilter, projectIDs []uint64) error {
+	if len(projectIDs) == 1 {
+		if projectIDs[0] > 0 {
+			return EnsureSSAProjectDatabaseOpen(projectIDs[0])
+		}
+		return ensureDefaultSSADatabaseOpen()
+	}
 	if filter == nil {
 		return EnsureSSAProjectDatabaseReady()
 	}
-	projectIDs := filter.GetProjectIds()
-	if len(projectIDs) == 1 && projectIDs[0] > 0 {
-		return EnsureSSAProjectDatabaseOpen(projectIDs[0])
+	if len(filter.GetProjectIds()) == 1 && filter.GetProjectIds()[0] > 0 {
+		return EnsureSSAProjectDatabaseOpen(filter.GetProjectIds()[0])
 	}
-	if len(projectIDs) == 0 {
+	if len(filter.GetProjectIds()) == 0 {
 		names := filter.GetProgramNames()
 		if len(names) == 1 && names[0] != "" {
 			id, err := LookupSSAProjectIDByProgramName(consts.GetGormProfileDatabase(), names[0])
@@ -224,7 +240,83 @@ func EnsureSSAProjectDatabaseForProgramFilter(filter *ypb.SSAProgramFilter) erro
 			}
 		}
 	}
-	return EnsureSSAProjectDatabaseReady(projectIDs...)
+	return EnsureSSAProjectDatabaseReady(filter.GetProjectIds()...)
+}
+
+// ResolveSSAProgramQueryProjectIDs decides which SSA IR databases must be queried.
+// multi is true when programs may span more than one database and results must be merged.
+func ResolveSSAProgramQueryProjectIDs(filter *ypb.SSAProgramFilter) (projectIDs []uint64, multi bool, err error) {
+	if filter == nil {
+		return nil, false, nil
+	}
+
+	ids := uniqueUint64Slice(filter.GetProjectIds())
+	if len(ids) > 1 {
+		return ids, true, nil
+	}
+	if len(ids) == 1 {
+		return ids, false, nil
+	}
+
+	names := filter.GetProgramNames()
+	if len(names) == 0 {
+		return nil, false, nil
+	}
+
+	profileDB := consts.GetGormProfileDatabase()
+	idSet := make(map[uint64]struct{})
+	for _, name := range names {
+		if name == "" {
+			continue
+		}
+		id, lookupErr := LookupSSAProjectIDByProgramName(profileDB, name)
+		if lookupErr != nil {
+			idSet[0] = struct{}{}
+			continue
+		}
+		idSet[id] = struct{}{}
+	}
+	if len(idSet) == 0 {
+		return nil, false, nil
+	}
+	if len(idSet) == 1 {
+		for id := range idSet {
+			return []uint64{id}, false, nil
+		}
+	}
+	return mapKeysUint64(idSet), true, nil
+}
+
+func uniqueUint64Slice(ids []uint64) []uint64 {
+	if len(ids) == 0 {
+		return nil
+	}
+	seen := make(map[uint64]struct{}, len(ids))
+	out := make([]uint64, 0, len(ids))
+	for _, id := range ids {
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		out = append(out, id)
+	}
+	return out
+}
+
+func mapKeysUint64(m map[uint64]struct{}) []uint64 {
+	out := make([]uint64, 0, len(m))
+	for id := range m {
+		out = append(out, id)
+	}
+	return out
+}
+
+// EnsureSSAProjectDatabaseForProjectID opens the SSA IR database for a resolved project id (0 = default).
+func EnsureSSAProjectDatabaseForProjectID(projectID uint64) error {
+	if projectID > 0 {
+		return EnsureSSAProjectDatabaseOpen(projectID)
+	}
+	return ensureDefaultSSADatabaseOpen()
 }
 
 func ensureDefaultSSADatabaseOpen() error {

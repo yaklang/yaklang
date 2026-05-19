@@ -163,9 +163,64 @@ func findRootBaseProgram(baseProgramName string, programMap map[string]*ssadb.Ir
 	return findRootBaseProgram(prog.BaseProgramName, programMap)
 }
 
-func QuerySSAProgram(db *gorm.DB, request *ypb.QuerySSAProgramRequest) (*bizhelper.Paginator, []*ypb.SSAProgram, error) {
+// QuerySSAProgram queries SSA IR programs, routing across per-project databases when needed.
+func QuerySSAProgram(request *ypb.QuerySSAProgramRequest) (*bizhelper.Paginator, []*ypb.SSAProgram, error) {
+	projectIDs, multi, err := ResolveSSAProgramQueryProjectIDs(request.GetFilter())
+	if err != nil {
+		return nil, nil, err
+	}
+	if multi {
+		return querySSAProgramMultiDB(projectIDs, request)
+	}
+	if err := ensureSSAProjectDatabaseForResolvedProjectIDs(request.GetFilter(), projectIDs); err != nil {
+		return nil, nil, err
+	}
+	return querySSAProgramSingle(consts.GetGormSSAProjectDataBase(), request)
+}
+
+func querySSAProgramSingle(db *gorm.DB, request *ypb.QuerySSAProgramRequest) (*bizhelper.Paginator, []*ypb.SSAProgram, error) {
+	programs, err := fetchSSAProgramsMatchingFilter(db, request)
+	if err != nil {
+		return nil, nil, err
+	}
+	paging, pagePrograms := paginateIrPrograms(programs, request.GetPagination())
+	return paging, buildSSAProgramGRPCList(pagePrograms), nil
+}
+
+func querySSAProgramMultiDB(projectIDs []uint64, request *ypb.QuerySSAProgramRequest) (*bizhelper.Paginator, []*ypb.SSAProgram, error) {
+	if len(projectIDs) == 0 {
+		return querySSAProgramSingle(consts.GetGormSSAProjectDataBase(), request)
+	}
+
+	merged := make([]*ssadb.IrProgram, 0)
+	seen := make(map[string]struct{})
+	for _, projectID := range projectIDs {
+		if err := EnsureSSAProjectDatabaseForProjectID(projectID); err != nil {
+			return nil, nil, err
+		}
+		programs, err := fetchSSAProgramsMatchingFilter(consts.GetGormSSAProjectDataBase(), request)
+		if err != nil {
+			return nil, nil, err
+		}
+		for _, prog := range programs {
+			if prog == nil || prog.ProgramName == "" {
+				continue
+			}
+			if _, ok := seen[prog.ProgramName]; ok {
+				continue
+			}
+			seen[prog.ProgramName] = struct{}{}
+			merged = append(merged, prog)
+		}
+	}
+	sortIrProgramsByPaging(merged, request.GetPagination())
+	paging, pagePrograms := paginateIrPrograms(merged, request.GetPagination())
+	return paging, buildSSAProgramGRPCList(pagePrograms), nil
+}
+
+func fetchSSAProgramsMatchingFilter(db *gorm.DB, request *ypb.QuerySSAProgramRequest) ([]*ssadb.IrProgram, error) {
 	var programs []*ssadb.IrProgram
-	p := request.Pagination
+	p := request.GetPagination()
 	if p == nil {
 		p = &ypb.Paging{
 			Page:    1,
@@ -176,21 +231,93 @@ func QuerySSAProgram(db *gorm.DB, request *ypb.QuerySSAProgramRequest) (*bizhelp
 	}
 	db = bizhelper.QueryOrder(db, p.OrderBy, p.Order)
 	db = FilterSSAProgram(db, request.GetFilter())
-	paging, dbx := bizhelper.Paging(db, int(p.Page), int(p.Limit), &programs)
-	if dbx.Error != nil {
-		return nil, nil, utils.Errorf("select ssa program fail: %s", dbx.Error)
+	if err := db.Find(&programs).Error; err != nil {
+		return nil, utils.Errorf("select ssa program fail: %s", err)
 	}
+	return programs, nil
+}
 
-	// 分析增量编译组
+func sortIrProgramsByPaging(programs []*ssadb.IrProgram, p *ypb.Paging) {
+	orderBy := "updated_at"
+	order := "desc"
+	if p != nil {
+		if p.OrderBy != "" {
+			orderBy = p.OrderBy
+		}
+		if p.Order != "" {
+			order = p.Order
+		}
+	}
+	sort.Slice(programs, func(i, j int) bool {
+		switch orderBy {
+		case "created_at":
+			if order == "asc" {
+				return programs[i].CreatedAt.Before(programs[j].CreatedAt)
+			}
+			return programs[i].CreatedAt.After(programs[j].CreatedAt)
+		case "program_name", "name":
+			if order == "asc" {
+				return programs[i].ProgramName < programs[j].ProgramName
+			}
+			return programs[i].ProgramName > programs[j].ProgramName
+		default:
+			if order == "asc" {
+				return programs[i].UpdatedAt.Before(programs[j].UpdatedAt)
+			}
+			return programs[i].UpdatedAt.After(programs[j].UpdatedAt)
+		}
+	})
+}
+
+func paginateIrPrograms(programs []*ssadb.IrProgram, p *ypb.Paging) (*bizhelper.Paginator, []*ssadb.IrProgram) {
+	if p == nil {
+		p = &ypb.Paging{
+			Page:    1,
+			Limit:   30,
+			OrderBy: "updated_at",
+			Order:   "desc",
+		}
+	}
+	page := int(p.Page)
+	limit := int(p.Limit)
+	if page < 1 {
+		page = 1
+	}
+	if limit <= 0 {
+		limit = 30
+	}
+	total := len(programs)
+	paginator := &bizhelper.Paginator{
+		TotalRecord: total,
+		Page:        page,
+		Limit:       limit,
+	}
+	if total == 0 {
+		paginator.TotalPage = 0
+		return paginator, nil
+	}
+	paginator.TotalPage = (total + limit - 1) / limit
+	start := (page - 1) * limit
+	if start >= total {
+		return paginator, nil
+	}
+	end := start + limit
+	if end > total {
+		end = total
+	}
+	paginator.Offset = start
+	return paginator, programs[start:end]
+}
+
+func buildSSAProgramGRPCList(programs []*ssadb.IrProgram) []*ypb.SSAProgram {
 	groups := analyzeIncrementalCompileGroups(programs)
 
-	// 创建 program 到增量编译信息的映射
 	programIncrementalInfo := make(map[string]*incrementalInfo)
 	for groupId, groupPrograms := range groups {
 		if len(groupPrograms) == 0 {
 			continue
 		}
-		headProgram := groupPrograms[0] // [0] 是头部
+		headProgram := groupPrograms[0]
 		for _, prog := range groupPrograms {
 			isIncremental := prog.IsOverlay || prog.BaseProgramName != ""
 			var overlayLayers []string
@@ -198,7 +325,7 @@ func QuerySSAProgram(db *gorm.DB, request *ypb.QuerySSAProgramRequest) (*bizhelp
 				overlayLayers = prog.OverlayLayers
 			}
 			programIncrementalInfo[prog.ProgramName] = &incrementalInfo{
-				isIncremental:  isIncremental,
+				isIncremental:   isIncremental,
 				groupId:         groupId,
 				headProgramName: headProgram.ProgramName,
 				overlayLayers:   overlayLayers,
@@ -206,11 +333,10 @@ func QuerySSAProgram(db *gorm.DB, request *ypb.QuerySSAProgramRequest) (*bizhelp
 		}
 	}
 
-	// 对于不在 groups 中的 program（普通编译），也需要设置信息
 	for _, prog := range programs {
 		if _, exists := programIncrementalInfo[prog.ProgramName]; !exists {
 			programIncrementalInfo[prog.ProgramName] = &incrementalInfo{
-				isIncremental:  false,
+				isIncremental:   false,
 				groupId:         prog.ProgramName,
 				headProgramName: prog.ProgramName,
 				overlayLayers:   nil,
@@ -221,7 +347,6 @@ func QuerySSAProgram(db *gorm.DB, request *ypb.QuerySSAProgramRequest) (*bizhelp
 	progGRPCs := make([]*ypb.SSAProgram, 0, len(programs))
 	for _, prog := range programs {
 		grpcProg := Prog2GRPC(prog)
-		// 填充增量编译信息
 		if info, ok := programIncrementalInfo[prog.ProgramName]; ok {
 			grpcProg.IsIncrementalCompile = info.isIncremental
 			grpcProg.IncrementalGroupId = info.groupId
@@ -230,7 +355,7 @@ func QuerySSAProgram(db *gorm.DB, request *ypb.QuerySSAProgramRequest) (*bizhelp
 		}
 		progGRPCs = append(progGRPCs, grpcProg)
 	}
-	return paging, progGRPCs, nil
+	return progGRPCs
 }
 
 // incrementalInfo 存储增量编译信息
