@@ -11,6 +11,7 @@ import (
 	_ "github.com/jinzhu/gorm/dialects/mysql"
 	_ "github.com/jinzhu/gorm/dialects/postgres"
 
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 
@@ -50,6 +51,22 @@ func GetSSADataBaseInfo() (string, string) {
 		}
 	}
 	return SSA_PROJECT_DB_DIALECT, SSA_PROJECT_DB_RAW
+}
+
+// GetCanonicalDefaultSSADatabasePath returns the configured legacy/default SSA IR database path.
+// Unlike GetSSADataBaseInfo, this is stable while dedicated project databases are opened.
+func GetCanonicalDefaultSSADatabasePath() string {
+	raw := GetSSADatabaseInfoFromEnv()
+	if raw == "" {
+		return filepath.Join(GetDefaultYakitBaseDir(), SSA_PROJECT_Default_DB_DEFAULT)
+	}
+	dialect, path := parseDatabaseURL(raw)
+	if dialect == SQLiteExtend || dialect == SQLite {
+		if !filepath.IsAbs(path) {
+			path = filepath.Join(GetDefaultYakitBaseDir(), path)
+		}
+	}
+	return path
 }
 
 func parseDatabaseURL(raw string) (string, string) {
@@ -93,7 +110,13 @@ func SetSSADatabaseInfo(raw string) {
 }
 
 func SetGormSSAProjectDatabaseByInfo(raw string) error {
+	if raw == "" {
+		return utils.Errorf("set SSA database failed: path is empty")
+	}
 	SetSSADatabaseInfo(raw)
+	if err := CloseGormSSAProjectDatabase(); err != nil {
+		return err
+	}
 	db, err := CreateSSAProjectDatabaseRaw(raw)
 	if err != nil {
 		return err
@@ -135,9 +158,43 @@ func SetGormSSAProjectDatabase(db *gorm.DB) {
 	schema.SetDefaultSSADatabase(db)
 }
 
-func GetGormSSAProjectDataBase() *gorm.DB {
+// CloseGormSSAProjectDatabase closes the global SSA IR database handle.
+func CloseGormSSAProjectDatabase() error {
 	if ssaDatabase == nil {
-		initYakitDatabase()
+		return nil
 	}
+	err := ssaDatabase.Close()
+	ssaDatabase = nil
+	schema.SetDefaultSSADatabase(nil)
+	return err
+}
+
+// GetActiveSSADatabaseRawPath returns the connection target of the current SSA database.
+func GetActiveSSADatabaseRawPath() string {
+	_, path := GetSSADataBaseInfo()
+	return path
+}
+
+// IsGormSSAProjectDatabaseOpen reports whether the global SSA IR database handle is open.
+func IsGormSSAProjectDatabaseOpen() bool {
+	return ssaDatabase != nil
+}
+
+func ensureGormSSAProjectDatabase() {
+	if ssaDatabase != nil {
+		return
+	}
+	initYakitDatabase()
+	if ssaDatabase != nil {
+		return
+	}
+	path := GetCanonicalDefaultSSADatabasePath()
+	if err := SetGormSSAProjectDatabaseByInfo(path); err != nil {
+		log.Errorf("reopen default SSA database failed: %s", err)
+	}
+}
+
+func GetGormSSAProjectDataBase() *gorm.DB {
+	ensureGormSSAProjectDatabase()
 	return ssaDatabase
 }
