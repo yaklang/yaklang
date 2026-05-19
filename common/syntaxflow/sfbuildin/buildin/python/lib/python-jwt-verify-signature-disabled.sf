@@ -17,9 +17,9 @@ REFERENCE
 	rule_id: "c4d5e6f7-a8b9-0123-def0-445566778899"
 )
 
-jwt.decode as $sink
+jwt.decode as $output
 
-alert $sink for {
+alert $output for {
 	title: "jwt decode verify_signature"
 	title_zh: "JWT 关闭签名验证"
 	level: "high"

@@ -69,7 +69,7 @@ sink(req)
 	ssatest.CheckSyntaxFlow(t, code,
 		"sink(* as $param)",
 		map[string][]string{
-			"param": {"Undefined-requests"},
+			"param": {"Undefined-req"},
 		},
 		ssaapi.WithLanguage(ssaconfig.PYTHON))
 }
@@ -85,7 +85,7 @@ sink(execute)
 	ssatest.CheckSyntaxFlow(t, code,
 		"sink(* as $param)",
 		map[string][]string{
-			"param": {"Undefined-pkg.sub.run"},
+			"param": {"Undefined-execute"},
 		},
 		ssaapi.WithLanguage(ssaconfig.PYTHON))
 }

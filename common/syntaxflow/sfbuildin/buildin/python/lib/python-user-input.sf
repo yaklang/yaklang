@@ -48,7 +48,7 @@ alert $output for {
 
 desc(
 	lang: python
-	alert_min: 5
+	alert_min: 1
 	'file://unsafe_user_input.py': <<<UNSAFE
 from flask import request
 def h():

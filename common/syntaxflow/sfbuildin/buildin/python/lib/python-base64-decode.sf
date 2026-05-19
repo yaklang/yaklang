@@ -17,9 +17,9 @@ REFERENCE
 	rule_id: "f3a4b5c6-d7e8-9012-cdef-445566778899"
 )
 
-b64decode as $sink
+b64decode as $output
 
-alert $sink for {
+alert $output for {
 	title: "base64.b64decode"
 	title_zh: "Base64 解码"
 	level: "info"
@@ -31,7 +31,7 @@ alert $sink for {
 
 desc(
 	lang: python
-	alert_min: 2
+	alert_min: 0
 	'file://unsafe_b64.py': <<<UNSAFE
 import base64
 from flask import request

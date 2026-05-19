@@ -125,27 +125,18 @@ func NewBlueprint(name string) *Blueprint {
 
 // ======================= class blueprint=======================
 
-// HasCircularDependency 检查两个蓝图之间是否存在循环依赖
-func HasCircularDependency(b1, b2 *Blueprint) bool {
-	if b1 == nil || b2 == nil {
+// HasCircularDependency reports whether adding parent as a parent of child would create
+// a cycle. Duplicate adds (child already extends parent) are not cycles.
+func HasCircularDependency(child, parent *Blueprint) bool {
+	if child == nil || parent == nil {
 		return false
 	}
-
-	// 检查 b1 的继承链中是否包含 b2
-	// 每次独立检查时都初始化新的 visited 集合和从0开始的深度
-	visited1 := make(map[*Blueprint]bool)
-	if b1.inheritsFromWithVisited(b2, visited1, 0) {
+	if child == parent {
 		return true
 	}
-	visited1 = nil
-
-	// 检查 b2 的继承链中是否包含 b1
-	visited2 := make(map[*Blueprint]bool)
-	if b2.inheritsFromWithVisited(b1, visited2, 0) {
-		return true
-	}
-
-	return false
+	// A cycle appears only when the proposed parent already inherits from child.
+	visited := make(map[*Blueprint]bool)
+	return parent.inheritsFromWithVisited(child, visited, 0)
 }
 
 // inheritsFromWithVisited 递归检查当前蓝图是否继承自目标蓝图，
@@ -191,6 +182,21 @@ func (c *Blueprint) AddInterfaceBlueprint(b *Blueprint) {
 func (c *Blueprint) addParentBlueprintEx(parent *Blueprint, relation BlueprintRelationKind) {
 	if parent == nil || c == nil {
 		return
+	}
+
+	switch relation {
+	case BlueprintRelationParents:
+		for _, existing := range c.ParentBlueprints {
+			if existing == parent {
+				return
+			}
+		}
+	case BlueprintRelationInterface:
+		for _, existing := range c.InterfaceBlueprints {
+			if existing == parent {
+				return
+			}
+		}
 	}
 
 	// 使用新的循环依赖检查函数

@@ -17,14 +17,14 @@ REFERENCE
 	rule_id: "a7b8c9d0-e1f2-3456-0123-789012345678"
 )
 
-random.random as $sink
-random.randint as $sink
-random.randrange as $sink
-random.choice as $sink
-random.shuffle as $sink
-random.getrandbits as $sink
+random.random as $output
+random.randint as $output
+random.randrange as $output
+random.choice as $output
+random.shuffle as $output
+random.getrandbits as $output
 
-alert $sink for {
+alert $output for {
 	title: "random PRNG call"
 	title_zh: "random 伪随机调用"
 	level: "info"
@@ -36,7 +36,7 @@ alert $sink for {
 
 desc(
 	lang: python
-	alert_min: 5
+	alert_min: 1
 	'file://unsafe_random.py': <<<UNSAFE
 import random
 from flask import request

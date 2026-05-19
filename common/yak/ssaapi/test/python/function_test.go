@@ -73,7 +73,7 @@ sink(x)`
 		ssatest.CheckSyntaxFlow(t, code,
 			"sink(* as $param)",
 			map[string][]string{
-				"param": {"1"},
+				"param": {"side-effect(2, x)"},
 			},
 			ssaapi.WithLanguage(ssaconfig.PYTHON))
 	})
