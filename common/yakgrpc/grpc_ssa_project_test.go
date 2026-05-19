@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"testing"
 	"time"
 
@@ -525,4 +526,221 @@ func TestGRPCMUSTPASS_SSAProjectMigrateSSAProject(t *testing.T) {
 		})
 	}
 
+}
+
+func TestGRPCMUSTPASS_SSAProjectDatabaseBinding(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	ctx := context.Background()
+
+	codeSourceConfig := &ssaconfig.CodeSourceInfo{
+		Kind:      ssaconfig.CodeSourceLocal,
+		LocalFile: "/tmp/test-db-binding",
+	}
+	configBytes, err := json.Marshal(codeSourceConfig)
+	require.NoError(t, err)
+
+	projectName := fmt.Sprintf("db-bind-%s", uuid.NewString())
+	createResp, err := client.CreateSSAProject(ctx, &ypb.CreateSSAProjectRequest{
+		Project: &ypb.SSAProject{
+			ProjectName:      projectName,
+			CodeSourceConfig: string(configBytes),
+			Description:      "database binding test",
+			Language:         "go",
+		},
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, createResp.GetProject().GetDatabasePath())
+	_, err = os.Stat(createResp.GetProject().GetDatabasePath())
+	require.NoError(t, err)
+
+	projectID := createResp.GetProject().GetID()
+	programName := fmt.Sprintf("prog-%s", uuid.NewString())
+	_, err = ssaapi.Parse(`package main; func main() {}`,
+		ssaapi.WithProgramName(programName),
+		ssaapi.WithLanguage(ssaconfig.GO),
+		ssaconfig.WithProjectID(uint64(projectID)),
+	)
+	require.NoError(t, err)
+	irProg, err := yakit.GetSSAProgramByName(consts.GetGormSSAProjectDataBase(), programName)
+	require.NoError(t, err)
+	require.Equal(t, uint64(projectID), irProg.ProjectID)
+
+	listResp, err := client.QuerySSAProject(ctx, &ypb.QuerySSAProjectRequest{
+		Filter: &ypb.SSAProjectFilter{IDs: []int64{projectID}},
+	})
+	require.NoError(t, err)
+	require.Len(t, listResp.Projects, 1)
+	require.Equal(t, int64(0), listResp.Projects[0].CompileTimes)
+	require.Equal(t, int64(0), listResp.Projects[0].RiskNumber)
+
+	projectNameB := fmt.Sprintf("db-bind-b-%s", uuid.NewString())
+	createRespB, err := client.CreateSSAProject(ctx, &ypb.CreateSSAProjectRequest{
+		Project: &ypb.SSAProject{
+			ProjectName:      projectNameB,
+			CodeSourceConfig: string(configBytes),
+			Language:         "go",
+		},
+	})
+	require.NoError(t, err)
+	projectIDB := createRespB.GetProject().GetID()
+
+	openResp, err := client.OpenSSAProject(ctx, &ypb.OpenSSAProjectRequest{ID: projectID})
+	require.NoError(t, err)
+	require.GreaterOrEqual(t, openResp.GetProject().GetCompileTimes(), int64(1))
+
+	progResp, err := client.QuerySSAPrograms(ctx, &ypb.QuerySSAProgramRequest{
+		Filter: &ypb.SSAProgramFilter{ProjectIds: []uint64{uint64(projectID)}},
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, progResp.Data)
+
+	_, err = client.OpenSSAProject(ctx, &ypb.OpenSSAProjectRequest{ID: projectIDB})
+	require.NoError(t, err)
+	progRespB, err := client.QuerySSAPrograms(ctx, &ypb.QuerySSAProgramRequest{
+		Filter: &ypb.SSAProgramFilter{ProjectIds: []uint64{uint64(projectIDB)}},
+	})
+	require.NoError(t, err)
+	require.Empty(t, progRespB.Data)
+
+	require.NoError(t, consts.CloseGormSSAProjectDatabase())
+	require.False(t, consts.IsGormSSAProjectDatabaseOpen())
+	progRespAfterClose, err := client.QuerySSAPrograms(ctx, &ypb.QuerySSAProgramRequest{
+		Filter: &ypb.SSAProgramFilter{ProjectIds: []uint64{uint64(projectID)}},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, progRespAfterClose)
+	require.True(t, consts.IsGormSSAProjectDatabaseOpen())
+
+	t.Cleanup(func() {
+		profileDB := consts.GetGormProfileDatabase()
+		for _, id := range []int64{projectID, projectIDB} {
+			schemaProj, err := yakit.GetSSAProjectById(uint64(id))
+			if err != nil {
+				continue
+			}
+			if schemaProj.DatabasePath != "" {
+				_ = os.Remove(schemaProj.DatabasePath)
+			}
+			profileDB.Unscoped().Delete(&schema.SSAProject{}, id)
+		}
+		ssadb.DeleteProgram(consts.GetGormSSAProjectDataBase(), programName)
+	})
+}
+
+func TestGRPCMUSTPASS_SSAProjectDeleteClosesDatabase(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	ctx := context.Background()
+
+	codeSourceConfig := &ssaconfig.CodeSourceInfo{
+		Kind:      ssaconfig.CodeSourceLocal,
+		LocalFile: "/tmp/test-db-delete",
+	}
+	configBytes, err := json.Marshal(codeSourceConfig)
+	require.NoError(t, err)
+
+	createResp, err := client.CreateSSAProject(ctx, &ypb.CreateSSAProjectRequest{
+		Project: &ypb.SSAProject{
+			ProjectName:      fmt.Sprintf("del-clear-%s", uuid.NewString()),
+			CodeSourceConfig: string(configBytes),
+			Language:         "go",
+		},
+	})
+	require.NoError(t, err)
+	projectID := createResp.GetProject().GetID()
+	dbPath := createResp.GetProject().GetDatabasePath()
+	require.NotEmpty(t, dbPath)
+
+	programName := fmt.Sprintf("del-prog-%s", uuid.NewString())
+	_, err = ssaapi.Parse(`package main; func main() {}`,
+		ssaapi.WithProgramName(programName),
+		ssaapi.WithLanguage(ssaconfig.GO),
+		ssaconfig.WithProjectID(uint64(projectID)),
+	)
+	require.NoError(t, err)
+
+	_, err = client.DeleteSSAProject(ctx, &ypb.DeleteSSAProjectRequest{
+		Filter:     &ypb.SSAProjectFilter{IDs: []int64{projectID}},
+		DeleteMode: string(yakit.SSAProjectClearCompileHistory),
+	})
+	require.NoError(t, err)
+
+	_, err = os.Stat(dbPath)
+	require.NoError(t, err, "dedicated db file should exist after clear_compile_history")
+
+	_, err = client.OpenSSAProject(ctx, &ypb.OpenSSAProjectRequest{ID: projectID})
+	require.NoError(t, err)
+	progResp, err := client.QuerySSAPrograms(ctx, &ypb.QuerySSAProgramRequest{
+		Filter: &ypb.SSAProgramFilter{ProjectIds: []uint64{uint64(projectID)}},
+	})
+	require.NoError(t, err)
+	require.Empty(t, progResp.Data)
+
+	createResp2, err := client.CreateSSAProject(ctx, &ypb.CreateSSAProjectRequest{
+		Project: &ypb.SSAProject{
+			ProjectName:      fmt.Sprintf("del-all-%s", uuid.NewString()),
+			CodeSourceConfig: string(configBytes),
+			Language:         "go",
+		},
+	})
+	require.NoError(t, err)
+	projectID2 := createResp2.GetProject().GetID()
+	dbPath2 := createResp2.GetProject().GetDatabasePath()
+	require.NotEmpty(t, dbPath2)
+
+	_, err = client.DeleteSSAProject(ctx, &ypb.DeleteSSAProjectRequest{
+		Filter:     &ypb.SSAProjectFilter{IDs: []int64{projectID2}},
+		DeleteMode: string(yakit.SSAProjectDeleteAll),
+	})
+	require.NoError(t, err)
+
+	_, err = os.Stat(dbPath2)
+	require.True(t, os.IsNotExist(err), "dedicated db file should be removed after delete_all")
+
+	queryResp, err := client.QuerySSAProject(ctx, &ypb.QuerySSAProjectRequest{
+		Filter: &ypb.SSAProjectFilter{IDs: []int64{projectID2}},
+	})
+	require.NoError(t, err)
+	require.Empty(t, queryResp.Projects)
+	require.Equal(t, uint64(0), yakit.GetCurrentSSAProjectID())
+
+	progRespDeleted, err := client.QuerySSAPrograms(ctx, &ypb.QuerySSAProgramRequest{
+		Filter: &ypb.SSAProgramFilter{ProjectIds: []uint64{uint64(projectID2)}},
+	})
+	require.NoError(t, err)
+	require.Empty(t, progRespDeleted.Data)
+
+	profileDB := consts.GetGormProfileDatabase()
+	yakit.SetCurrentSSAProjectID(profileDB, 42)
+	require.Equal(t, uint64(42), yakit.GetCurrentSSAProjectID())
+	yakit.SetCurrentSSAProjectID(profileDB, 0)
+	require.Equal(t, uint64(0), yakit.GetCurrentSSAProjectID())
+	require.NoError(t, yakit.EnsureSSAProjectDatabaseOpen(0))
+	require.Equal(t, uint64(0), yakit.GetCurrentSSAProjectID())
+
+	t.Cleanup(func() {
+		_ = os.Remove(dbPath)
+		consts.GetGormProfileDatabase().Unscoped().Delete(&schema.SSAProject{}, projectID)
+	})
+}
+
+func TestGRPCMUSTPASS_SSAProjectLegacyOpenUsesDefaultDB(t *testing.T) {
+	profileDB := consts.GetGormProfileDatabase()
+	project := &schema.SSAProject{
+		ProjectName: fmt.Sprintf("legacy-%s", uuid.NewString()),
+		Language:    ssaconfig.GO,
+		Description: "legacy without dedicated db",
+		URL:         "/tmp/legacy",
+	}
+	require.NoError(t, profileDB.Create(project).Error)
+	require.Empty(t, project.DatabasePath)
+
+	require.NoError(t, yakit.OpenSSAProjectDatabase(project))
+	_, defaultPath := consts.GetSSADataBaseInfo()
+	require.Equal(t, defaultPath, yakit.ResolveSSAProjectDatabasePath(project))
+
+	t.Cleanup(func() {
+		profileDB.Unscoped().Delete(project)
+	})
 }

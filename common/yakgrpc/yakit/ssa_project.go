@@ -1,6 +1,9 @@
 package yakit
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaproject"
 
@@ -40,6 +43,9 @@ func CreateSSAProject(db *gorm.DB, req *ypb.CreateSSAProjectRequest) (*schema.SS
 	}
 	if projectBuilder.SSAProject == nil {
 		return nil, utils.Errorf("create SSA project failed: schema project is nil")
+	}
+	if err := BindSSAProjectDatabase(db, projectBuilder.SSAProject); err != nil {
+		return nil, err
 	}
 	return projectBuilder.SSAProject, nil
 }
@@ -105,32 +111,63 @@ func DeleteSSAProject(db *gorm.DB, req *ypb.DeleteSSAProjectRequest) (int64, err
 		return 0, nil
 	}
 
-	ssaDB := consts.GetGormSSAProjectDataBase()
 	deleteMode := req.GetDeleteMode()
+	if deleteMode == "" {
+		deleteMode = string(SSAProjectDeleteAll)
+	}
+
 	var totalDeleted int64
+	var failReasons []string
 
 	for _, project := range projects {
+		if err := EnsureSSAProjectDatabaseOpen(uint64(project.ID)); err != nil {
+			failReasons = append(failReasons, fmt.Sprintf("%s(%d): %s", project.ProjectName, project.ID, err))
+			continue
+		}
+
+		var err error
+		switch deleteMode {
+		case string(SSAProjectClearCompileHistory):
+			err = resetDedicatedSSAProjectDatabase(db, project)
+		default:
+			err = deleteSSAProjectFully(db, project)
+		}
+		if err != nil {
+			log.Errorf("delete SSA project %d failed: %s", project.ID, err)
+			failReasons = append(failReasons, fmt.Sprintf("%s(%d): %s", project.ProjectName, project.ID, err))
+			continue
+		}
+		totalDeleted++
+	}
+
+	if len(failReasons) > 0 {
+		msg := strings.Join(failReasons, "; ")
+		if totalDeleted == 0 {
+			return 0, utils.Errorf("delete SSA project failed: %s", msg)
+		}
+		return totalDeleted, utils.Errorf("delete SSA project partially failed: %s", msg)
+	}
+	return totalDeleted, nil
+}
+
+func deleteSSAProjectFully(profileDB *gorm.DB, project *schema.SSAProject) error {
+	if project == nil {
+		return utils.Errorf("delete SSA project failed: project is nil")
+	}
+	dbPath := ResolveSSAProjectDatabasePath(project)
+	dedicated := project.DatabasePath != "" && !IsDefaultSSADatabasePath(dbPath)
+	if !dedicated {
 		programFilter := &ypb.SSAProgramFilter{
 			ProjectIds: []uint64{uint64(project.ID)},
 		}
-		count, err := DeleteSSAProgram(ssaDB, programFilter)
-		if err != nil {
-			log.Errorf("delete SSA programs for project %d failed: %s", project.ID, err)
-			continue
-		}
-		switch deleteMode {
-		case string(SSAProjectClearCompileHistory):
-			totalDeleted += int64(count)
-		default:
-			result := db.Model(&schema.SSAProject{}).Where("id = ?", project.ID).Unscoped().Delete(&schema.SSAProject{})
-			if result.Error != nil {
-				log.Errorf("delete SSA project %d failed: %s", project.ID, result.Error)
-				continue
-			}
-			totalDeleted += result.RowsAffected
+		if _, err := DeleteSSAProgram(consts.GetGormSSAProjectDataBase(), programFilter); err != nil {
+			return utils.Errorf("delete SSA programs failed: %s", err)
 		}
 	}
-	return totalDeleted, nil
+	if err := removeDedicatedSSAProjectDatabaseFile(profileDB, project, true); err != nil {
+		return err
+	}
+	return deleteSSAProjectRecord(profileDB, project)
 }
 
 func QuerySSAProject(db *gorm.DB, req *ypb.QuerySSAProjectRequest) (*bizhelper.Paginator, []*schema.SSAProject, error) {

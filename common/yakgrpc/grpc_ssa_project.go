@@ -26,13 +26,28 @@ func (s *Server) QuerySSAProject(ctx context.Context, req *ypb.QuerySSAProjectRe
 		Total:      int64(p.TotalRecord),
 	}
 	for _, d := range data {
-		model := SSAProjectToGRPCModel(d)
+		model := SSAProjectToGRPCModelBasic(d)
 		if model == nil {
 			continue
 		}
 		rsp.Projects = append(rsp.Projects, model)
 	}
 	return rsp, nil
+}
+
+func (s *Server) OpenSSAProject(ctx context.Context, req *ypb.OpenSSAProjectRequest) (*ypb.OpenSSAProjectResponse, error) {
+	if req == nil || req.GetID() <= 0 {
+		return nil, utils.Errorf("open SSA project failed: project id is required")
+	}
+	project, err := yakit.OpenSSAProjectByID(consts.GetGormProfileDatabase(), uint64(req.GetID()))
+	if err != nil {
+		return nil, err
+	}
+	model := SSAProjectToGRPCModelWithStats(project)
+	if model == nil {
+		return nil, utils.Errorf("open SSA project failed: build grpc model failed")
+	}
+	return &ypb.OpenSSAProjectResponse{Project: model}, nil
 }
 
 func (s *Server) CreateSSAProject(ctx context.Context, req *ypb.CreateSSAProjectRequest) (*ypb.CreateSSAProjectResponse, error) {
@@ -48,7 +63,7 @@ func (s *Server) CreateSSAProject(ctx context.Context, req *ypb.CreateSSAProject
 		}, err
 	}
 	return &ypb.CreateSSAProjectResponse{
-		Project: SSAProjectToGRPCModel(project),
+		Project: SSAProjectToGRPCModelWithStats(project),
 		Message: &ypb.DbOperateMessage{
 			TableName:    "ssa_projects",
 			Operation:    DbOperationCreate,
@@ -75,7 +90,7 @@ func (s *Server) UpdateSSAProject(ctx context.Context, req *ypb.UpdateSSAProject
 		}, err
 	}
 	return &ypb.UpdateSSAProjectResponse{
-		Project: SSAProjectToGRPCModel(project),
+		Project: SSAProjectToGRPCModelBasic(project),
 		Message: &ypb.DbOperateMessage{
 			TableName:    "ssa_projects",
 			Operation:    DbOperationUpdate,
@@ -106,12 +121,22 @@ func (s *Server) DeleteSSAProject(ctx context.Context, req *ypb.DeleteSSAProject
 	}, nil
 }
 
-func SSAProjectToGRPCModel(p *schema.SSAProject) *ypb.SSAProject {
+func SSAProjectToGRPCModelBasic(p *schema.SSAProject) *ypb.SSAProject {
+	if p == nil {
+		return nil
+	}
+	return p.ToGRPCModelBasic()
+}
+
+func SSAProjectToGRPCModelWithStats(p *schema.SSAProject) *ypb.SSAProject {
 	if p == nil {
 		return nil
 	}
 	db := consts.GetGormSSAProjectDataBase()
 	project := p.ToGRPCModelBasic()
+	if project == nil {
+		return nil
+	}
 	project.CompileTimes = yakit.QuerySSACompileTimesByProjectID(db, p.ID)
 	project.RiskNumber = yakit.QuerySSARiskNumberByProjectID(db, p.ID)
 	return project

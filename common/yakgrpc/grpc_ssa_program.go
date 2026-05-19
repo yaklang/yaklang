@@ -10,6 +10,9 @@ import (
 )
 
 func (s *Server) QuerySSAPrograms(ctx context.Context, req *ypb.QuerySSAProgramRequest) (*ypb.QuerySSAProgramResponse, error) {
+	if err := ensureSSAProgramDatabase(req); err != nil {
+		return nil, err
+	}
 	pagine, programs, err := yakit.QuerySSAProgram(s.GetSSADatabase(), req)
 	if err != nil {
 		return nil, err
@@ -25,6 +28,9 @@ func (s *Server) QuerySSAPrograms(ctx context.Context, req *ypb.QuerySSAProgramR
 }
 
 func (s *Server) UpdateSSAProgram(ctx context.Context, req *ypb.UpdateSSAProgramRequest) (*ypb.DbOperateMessage, error) {
+	if err := yakit.EnsureSSAProjectDatabaseReady(); err != nil {
+		return nil, err
+	}
 	count, err := yakit.UpdateSSAProgram(s.GetSSADatabase(), req.GetProgramInput())
 	return &ypb.DbOperateMessage{
 		TableName:    "ssa_programs",
@@ -35,6 +41,9 @@ func (s *Server) UpdateSSAProgram(ctx context.Context, req *ypb.UpdateSSAProgram
 }
 
 func (s *Server) DeleteSSAPrograms(ctx context.Context, req *ypb.DeleteSSAProgramRequest) (*ypb.DbOperateMessage, error) {
+	if err := ensureSSAProgramDatabaseFromDelete(req); err != nil {
+		return nil, err
+	}
 	var count int
 	var err error
 	if req.DeleteAll {
@@ -51,4 +60,19 @@ func (s *Server) DeleteSSAPrograms(ctx context.Context, req *ypb.DeleteSSAProgra
 		EffectRows:   int64(count),
 		ExtraMessage: "",
 	}, nil
+}
+
+func ensureSSAProgramDatabase(req *ypb.QuerySSAProgramRequest) error {
+	var projectIDs []uint64
+	if req != nil && req.GetFilter() != nil {
+		projectIDs = req.GetFilter().GetProjectIds()
+	}
+	return yakit.EnsureSSAProjectDatabaseReady(projectIDs...)
+}
+
+func ensureSSAProgramDatabaseFromDelete(req *ypb.DeleteSSAProgramRequest) error {
+	if req == nil || req.GetFilter() == nil {
+		return yakit.EnsureSSAProjectDatabaseReady()
+	}
+	return yakit.EnsureSSAProjectDatabaseReady(req.GetFilter().GetProjectIds()...)
 }

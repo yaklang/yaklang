@@ -272,6 +272,9 @@ func (m *scanManager) initByConfig() error {
 			config.Programs = append(config.Programs, prog)
 		}
 	} else if config.GetProjectID() != 0 {
+		if err := yakit.EnsureSSAProjectDatabaseOpen(config.GetProjectID()); err != nil {
+			return utils.Errorf("SyntaxFlow Scan Failed: open SSA project database: %s", err)
+		}
 		// 前端如果没传programName扫描功能默认选择最新的programName进行扫描
 		name, err := yakit.QueryLatestSSAProgramNameByProjectId(consts.GetGormSSAProjectDataBase(), config.GetProjectID())
 		if err != nil {
