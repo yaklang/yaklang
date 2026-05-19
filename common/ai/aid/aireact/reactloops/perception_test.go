@@ -555,7 +555,10 @@ func TestMaybeTriggerPerceptionAfterAction_SyncPerceptionTriggerRunsInline(t *te
 
 	loop := NewMinimalReActLoop(cfg, invoker)
 	loop.loopName = "perception-sync-trigger-test"
-	loop.perception = newPerceptionController(loop.periodicVerificationInterval)
+	// 显式指定 iterationTriggerInterval=2 让测试与全局默认值解耦; 调过默认值
+	// 后旧测试在 iter=2 不再触发, 这里手动钉住 interval=2 保留原意图.
+	// 关键词: 测试与默认值解耦, iterationTriggerInterval 显式指定
+	loop.perception = newPerceptionController(2)
 	loop.maxIterations = 100
 	loop.actionHistory = make([]*ActionRecord, 0)
 	loop.actionHistoryMutex = new(sync.Mutex)
