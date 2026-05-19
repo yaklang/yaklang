@@ -248,14 +248,69 @@ func (r *ReActLoop) Execute(taskId string, ctx context.Context, userInput string
 	return err
 }
 
+// aiResponseHTTPOrEmptyErr surfaces gateway/auth failures that would otherwise
+// surface as misleading "action type is empty" after parsing an empty stream.
+func aiResponseHTTPOrEmptyErr(ctx context.Context, resp *aicommon.AIResponse, body string) error {
+	if resp == nil {
+		return nil
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if !resp.WaitForHTTPHeaders(ctx) {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+	}
+	code := resp.GetHTTPStatusCode()
+	provider, model := resp.GetProviderName(), resp.GetModelName()
+	modelLabel := strings.TrimSpace(provider + ":" + model)
+	if modelLabel == ":" {
+		modelLabel = "unknown"
+	}
+	if code == 429 {
+		return nil
+	}
+	if code > 0 && (code < 200 || code > 299) {
+		dump := utils.ShrinkString(resp.GetRawHTTPResponseDump(), 800)
+		if dump == "" {
+			dump = "(no response body)"
+		}
+		return utils.Errorf(
+			"AI gateway HTTP %d for %s — check API key, balance, or switch model tier. %s",
+			code, modelLabel, dump,
+		)
+	}
+	if strings.TrimSpace(body) == "" {
+		return utils.Errorf(
+			"AI returned empty output for %s (no JSON/@action in stream); check gateway auth or try another model",
+			modelLabel,
+		)
+	}
+	return nil
+}
+
 func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, nonce string) (*aicommon.Action, *LoopAction, error) {
 	var action *aicommon.Action
 	var actionNames = r.GetAllActionNames()
 
 	getNextActionType := func(a *aicommon.Action) string { //legacy support
-		actionType := action.ActionType()
-		if actionType == "object" || actionType == "" {
-			actionType = action.GetString("next_action.type")
+		if a == nil {
+			return ""
+		}
+		actionType := a.ActionType()
+		// ExtractActionFromStream(..., "object", WithActionAlias(...)) always puts
+		// maker.actionName "object" in the whitelist. Models sometimes emit
+		// `"@action":"object"` meaning "a JSON object" without legacy `next_action`.
+		// Old logic cleared "object" to next_action.type and returned "" →
+		// "action type is empty". Only peel `next_action.type` when it is non-empty;
+		// otherwise keep "object" so GetActionHandler fails with a concrete name.
+		if actionType == "object" {
+			if nt := a.GetString("next_action.type"); nt != "" {
+				actionType = nt
+			}
+		} else if actionType == "" {
+			actionType = a.GetString("next_action.type")
 		}
 		return actionType
 	}
@@ -290,6 +345,10 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 		func(resp *aicommon.AIResponse) error {
 			if ctxCanceled.IsSet() {
 				return nil
+			}
+			parseCtx := context.Background()
+			if r.GetCurrentTask() != nil {
+				parseCtx = r.GetCurrentTask().GetContext()
 			}
 			resp.SetOnReasonChunk(func(b []byte) {
 				r.appendModelThinkingChunk(b)
@@ -423,6 +482,12 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 			r.Set("last_ai_decision_nonce", nonce)
 			r.Set("last_ai_decision_response", buf.String())
 
+			if err := aiResponseHTTPOrEmptyErr(parseCtx, resp, buf.String()); err != nil {
+				r.loadingStatus("AI 响应无效 / Invalid AI Response")
+				log.Errorf("ai response invalid before action parse: %v", err)
+				return err
+			}
+
 			if actionErr != nil {
 				r.loadingStatus("解析响应失败 / Parse Response Failed")
 				log.Errorf("ai response stream content before error: %s", buf.String())
@@ -440,8 +505,10 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 					println(action.DumpRawParams())
 					println("=== [DEBUG] end raw params dump ===")
 				}
-				emptyErr := utils.Errorf("action type is empty (available_actions=%v)",
-					actionNames)
+				emptyErr := utils.Errorf(
+					"could not parse @action from model output (available_actions=%v); body_len=%d",
+					actionNames, len(buf.String()),
+				)
 				if currentCtxCanceled() {
 					emptyErr = utils.Wrap(emptyErr, "task context canceled while parsing action")
 				}

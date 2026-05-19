@@ -454,6 +454,11 @@ func (m *ActionMaker) ReadFromReader(ctx context.Context, reader io.Reader) *Act
 							return
 						}
 					}
+				} else if value != "" && len(parents) == 0 {
+					// Top-level only: nested objects (e.g. directly_call_tool_params) may
+					// carry their own @action strings that must not clobber the root action.
+					action.ForceSet(ActionMagicKey, value)
+					action.SetName(value)
 				}
 			} else {
 				keyString := utils.InterfaceToString(key)
