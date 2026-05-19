@@ -48,7 +48,7 @@ const (
 	// iter=3 在 first-fire 响应性 (iter 3, ~40s) 与节流之间取得最佳平衡.
 	// 关键词: perceptionDefaultIterationInterval 默认值调整, iter=3 节流甜点,
 	//        响应性平衡, phase pivot 全覆盖
-	perceptionDefaultIterationInterval  = 3
+	perceptionDefaultIterationInterval  = 4
 	perceptionMaxContextTokens          = 500
 	perceptionKnowledgeMaxContextTokens = 15 * 1024
 
