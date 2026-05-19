@@ -9,9 +9,7 @@ import (
 // the runtime so the loop can assemble prompt sections without reverse-parsing
 // a monolithic background template.
 //
-// Timeline / TimelineFrozen / TimelineOpen 三个字段共存:
-//   - Timeline: 老路径 (verification / tool-params 等) 仍消费的合并字符串, 与
-//     timeline.Dump() 等价
+// Timeline 已经按稳定性分层为 frozen / open 两段:
 //   - TimelineFrozen: 仅 reducer + 非末 interval 的"冻结前缀"渲染, 不带边界 tag
 //   - TimelineOpen: 仅最末 interval 桶 + midterm prefix 等"易变尾段", 不带边界 tag
 //
@@ -31,19 +29,18 @@ type LoopPromptBaseMaterials struct {
 	WorkingDirGlance   string
 	AutoContext        string
 	UserHistory        string
-	ToolsCount    int
-	TopToolsCount int
-	TopTools      []*aitool.Tool
-	HasMoreTools  bool
+	ToolsCount         int
+	TopToolsCount      int
+	TopTools           []*aitool.Tool
+	HasMoreTools       bool
 	// MoreToolsCount = ToolsCount - TopToolsCount, 即 token 预算裁剪后没能
 	// 进入 Tool Inventory 列表的剩余工具数量, 由 aicommon.SelectToolsByTokenBudget
 	// 计算结果设置, 让模板能给出具体数字而不是模糊的 "...".
 	// 关键词: MoreToolsCount, Tool Inventory 剩余工具数, search_capabilities 具象提示
 	MoreToolsCount int
-	AIForgeList        string
-	Timeline           string
-	TimelineFrozen     string
-	TimelineOpen       string
+	AIForgeList    string
+	TimelineFrozen string
+	TimelineOpen   string
 }
 
 type LoopPromptAssemblyInput = aicommon.LoopPromptAssemblyInput
@@ -65,8 +62,7 @@ type PromptPrefixMaterials = aicommon.PromptMaterials
 // FrozenBlock / SemiDynamic1 / SemiDynamic2 / TimelineOpen 字段分别保留各段
 // 渲染串以便观测/测试断言。
 //
-// HighStatic / SemiDynamic1 / SemiDynamic2 / Timeline 是兼容字段 (用于老路径
-// 与单元测试):
+// HighStatic / SemiDynamic1 / SemiDynamic2 是兼容字段 (用于老路径与单元测试):
 //   - SemiDynamic1 = semi_dynamic_section_1.txt 完整渲染串
 //     (SkillsContext + RecentToolsCache),
 //     被 wrapAICacheSemi 包一层 AI_CACHE_SEMI 边界, 物理上对应 hijacker 5 段切分
@@ -75,7 +71,6 @@ type PromptPrefixMaterials = aicommon.PromptMaterials
 //     (TaskInstruction + Schema + OutputExample),
 //     被 wrapAICacheSemi2 包一层 AI_CACHE_SEMI2 边界, 物理上对应 hijacker 5 段切分
 //     中的 user3 (主动打 ephemeral cc), 与 SemiDynamic1 合并算 prefix cache.
-//   - Timeline = 旧合并 timeline 渲染 (frozen + open 一起).
 //
 // 关键词: PromptPrefixAssemblyResult, 5 段拆分, 按稳定性分层, P1.1 三 cache 边界
 type PromptPrefixAssemblyResult struct {
@@ -85,6 +80,5 @@ type PromptPrefixAssemblyResult struct {
 	SemiDynamic1 string
 	SemiDynamic2 string
 	TimelineOpen string
-	Timeline     string
 	Sections     []*PromptSectionObservation
 }

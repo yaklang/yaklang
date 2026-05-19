@@ -1,3 +1,13 @@
+{{/*
+TODO: migrate to AssembleLoopPrompt for prefix cache reuse
+
+本模板仅供 aimem (aimemory_build_memory.go AddRawText) 老路径使用,
+其它 aireact / aid 调用方均已切换到 aicommon.NewDefaultPromptPrefixBuilder
+5 段 prefix。{{ .Timeline }} / {{ .CurrentTime }} 等变量来自 GetBasicPromptInfo,
+不与新路径的 PromptMaterials 共享数据通道。
+
+关键词: base.txt 老路径, aimem 待迁移, AssembleLoopPrompt
+*/}}
 # Background
 Current Time: {{ .CurrentTime }} OS/Arch: {{ .OSArch }}
 {{ if .WorkingDir }}working dir: {{ .WorkingDir }}{{ end }}

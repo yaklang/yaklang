@@ -84,14 +84,14 @@ func WithPersistentInstruction(instruction string) ReActLoopOption
 最常用的 prompt 注入方式。`instruction` 是一段 Go template 字符串，渲染时会自动获得：
 
 - `Nonce`：当前轮次的唯一标识
-- 来自 `getRenderInfo()` 的所有变量（`CurrentTime` / `OSArch` / `WorkingDir` / `Tools` / `AllowPlan` / `AllowKnowledgeEnhanceAnswer` 等）
+- 来自 `getRenderValues()` 的所有变量（`CurrentTime` / `OSArch` / `WorkingDir` / `Tools` / `AllowPlan` / `AllowKnowledgeEnhanceAnswer` 等）
 
 源码 [options.go:259-267](../options.go)：
 
 ```go
 func WithPersistentInstruction(instruction string) ReActLoopOption {
     return WithPersistentContextProvider(func(loop *ReActLoop, nonce string) (string, error) {
-        _, result, err := loop.getRenderInfo()
+        _, result, err := loop.getRenderValues()
         if err != nil {
             return "", utils.Errorf("get basic prompt info failed: %v", err)
         }
