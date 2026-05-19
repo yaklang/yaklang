@@ -383,18 +383,6 @@ func (r *ReActLoop) Actions() *omap.OrderedMap[string, *LoopAction] {
 	return r.actions
 }
 
-func (r *ReActLoop) getRenderInfo() (string, map[string]any, error) {
-	temp, info, err := r.getRenderValues()
-	if err != nil {
-		return "", nil, err
-	}
-	result, err := utils.RenderTemplate(temp, info)
-	if err != nil {
-		return "", nil, err
-	}
-	return result, info, nil
-}
-
 func (r *ReActLoop) getRenderValues() (string, map[string]any, error) {
 	var tools []*aitool.Tool
 	if r.toolsGetter == nil {

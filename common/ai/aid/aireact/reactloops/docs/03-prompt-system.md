@@ -2,87 +2,72 @@
 
 > 回到 [README](../README.md) | 上一章：[02-options-reference.md](02-options-reference.md) | 下一章：[04-actions.md](04-actions.md)
 
-本章解释每一轮主循环 prompt 是怎么"长"出来的：模板长什么样、占位符从哪儿来、谁在两层渲染、如何防注入、如何调试。
+本章解释每一轮主循环 prompt 是怎么"长"出来的：5 段按稳定性分层的 prefix 从哪儿来、各 hook 怎么注入自己的 prompt 段、如何防注入、如何调试。
 
 读完本章你应该能：
 
-- 看懂 [prompts/loop_template.tpl](../prompts/loop_template.tpl) 的所有占位符
+- 看懂 5 段 prefix（HighStatic / FrozenBlock / SemiDynamic1 / SemiDynamic2 / TimelineOpen）的字节稳定性约束
 - 知道在不同 hook 里如何注入自己的 prompt 段
 - 理解 nonce / `<|TAG|>` 防注入约定
 - 掌握 prompt 调试技巧
 
 ## 3.1 总览
 
-每一轮主循环里 [`generateLoopPrompt`](../prompt.go) 是 prompt 的总入口。源码 [prompt.go:126-250](../prompt.go) 描述了完整流程：
+每一轮主循环里 [`AssembleLoopPrompt`](../../prompt_loop_materials.go) 是 prompt 的总入口。它在 `aireact.PromptManager` 上实现，调用 `aicommon.NewDefaultPromptPrefixBuilder()` 加载公共前缀模板，再叠上当前 loop 的 PersistentInstruction / ReactiveData / OutputExample / Schema 与易变 dynamic 段。
 
 ```mermaid
 flowchart TD
-    A["每轮 LOOP 开始"] --> B["getRenderInfo()<br/>(基础变量)"]
-    B --> C["generateSchemaString()<br/>(过滤后的 actions JSON Schema)"]
-    C --> D["persistentInstructionProvider"]
-    D --> E["reflectionOutputExampleProvider"]
-    E --> F["reactiveDataBuilder<br/>(传入 operator.GetFeedback())"]
-    F --> G["skillsContextManager.Render()"]
-    G --> H["extraCapabilities.Render()"]
-    H --> I["sessionEvidenceTemplate"]
-    I --> J["CACHE_TOOL_CALL 拼接<br/>(若有最近工具调用)"]
-    J --> K["填 infos map<br/>(InjectedMemory/ReactiveData/Background/...)"]
-    K --> L["RenderTemplate(coreTemplate, infos)"]
-    L --> M["输出 final prompt"]
-    L --> N["buildPromptObservation()<br/>(emit prompt_profile + 落盘)"]
+    A["每轮 LOOP 开始"] --> B["GetLoopPromptBaseMaterials<br/>(timeline frozen/open 拆分 + 工具 token 预算裁剪)"]
+    B --> C["NewPromptMaterials<br/>(填 PromptMaterials)"]
+    C --> D["AssemblePromptPrefix<br/>(aicommon.PromptPrefixBuilder)"]
+    D --> D1["high_static_section.txt"]
+    D --> D2["frozen_block_section.txt"]
+    D --> D3["semi_dynamic_1_section.txt"]
+    D --> D4["semi_dynamic_2_section.txt"]
+    D --> D5["timeline_open_section.txt"]
+    C --> E["buildLoopPromptSectionData + dynamic_section.txt"]
+    D1 --> F["buildTaggedPromptSections 6 段拼接"]
+    D2 --> F
+    D3 --> F
+    D4 --> F
+    D5 --> F
+    E --> F
+    F --> G["输出 final prompt"]
+    F --> H["buildPromptObservation()<br/>(emit prompt_profile + 落盘)"]
 ```
 
 **两层渲染**的含义：
 
-1. **第一层**：`PersistentInstruction`、`OutputExample`、`ReactiveData` 自身可以是 Go template 字符串，使用 `getRenderInfo` 提供的变量渲染。
-2. **第二层**：上一步渲染出的字符串，作为变量再喂给 `coreTemplate` ([prompts/loop_template.tpl](../prompts/loop_template.tpl)) 一起渲染。
+1. **第一层**：`PersistentInstruction`、`OutputExample`、`ReactiveData` 自身可以是 Go template 字符串，使用 `getRenderValues()` 提供的变量渲染。
+2. **第二层**：上一步渲染出的字符串通过 `WithPersistentInstruction` / `WithReflectionOutputExample` / `WithReactiveDataBuilder` 注入到 `PromptMaterials` 对应字段，再由 `aicommon.PromptPrefixBuilder` 把它们落到 semi-dynamic-2 与 dynamic 段。
 
 这样 loop 编写者可以在自己的 prompt 里用 `{{ .CurrentTime }}`、`{{ .OSArch }}` 这些通用变量。
 
-## 3.2 核心模板：`prompts/loop_template.tpl`
+## 3.2 5 段 prefix 的字节稳定性分层
 
-完整内容（已经很短，46 行）：
+公共前缀模板都放在 `common/ai/aid/aicommon/prompts/prefix/`，由 [aicommon/prompt_section_builder.go](../../../aicommon/prompt_section_builder.go) 中 `//go:embed prompts/prefix/...` 静态注入。
 
-```46:46:common/ai/aid/aireact/reactloops/prompts/loop_template.tpl
-{{ .Background }}
+| 段 | 模板 | 稳定性 | 主要内容 |
+|----|------|--------|---------|
+| HighStatic | [high_static_section.txt](../../../aicommon/prompts/prefix/high_static_section.txt) | 跨 caller / 跨 turn 字节恒定 | TRAITS + 方法论协议 + 能力系统介绍（完全无变量） |
+| FrozenBlock | [frozen_block_section.txt](../../../aicommon/prompts/prefix/frozen_block_section.txt) | 整体字节稳定（被 `<\|AI_CACHE_FROZEN_*\|>` 包裹） | Tool Inventory + Forge Inventory + Timeline-frozen |
+| SemiDynamic1 | [semi_dynamic_1_section.txt](../../../aicommon/prompts/prefix/semi_dynamic_1_section.txt) | caller-specific 稳定（被 `<\|AI_CACHE_SEMI_*\|>` 包裹） | SkillsContext + Cache Tool Call |
+| SemiDynamic2 | [semi_dynamic_2_section.txt](../../../aicommon/prompts/prefix/semi_dynamic_2_section.txt) | caller-specific 稳定（被 `<\|AI_CACHE_SEMI2_*\|>` 包裹） | TaskInstruction + Schema + OutputExample |
+| TimelineOpen | [timeline_open_section.txt](../../../aicommon/prompts/prefix/timeline_open_section.txt) | 易变尾段，落在所有 cache 边界外 | Timeline 末桶 + SessionEvidence + Todo + Workspace + UserHistory + Current Time + PlanContext |
 
-<|USER_QUERY_{{ .Nonce }}|>
-{{ .UserQuery }}
-<|USER_QUERY_END_{{ .Nonce }}|>
+最后由 `dynamic_section.txt`（loop 自己的 dynamic 段）渲染 UserQuery / AutoContext / ExtraCapabilities / REFLECTION / InjectedMemory，与前 5 段一起经 `buildTaggedPromptSections` 拼成完整 prompt。
 
-{{/*----------------------------------------  额外能力（ExtraCapabilities - from intent recognition）------------------*/}}
-{{ if .ExtraCapabilities }}<|EXTRA_CAPABILITIES_{{ .Nonce }}|>
-{{ .ExtraCapabilities }}
-<|EXTRA_CAPABILITIES_END_{{ .Nonce }}|>{{ end }}
-```
+**所有 `<|XXX_{{.Nonce}}|>` 标签是为了防止 prompt 注入**：用户输入永远夹在 `<|USER_QUERY_<nonce>|>` ... `<|USER_QUERY_END_<nonce>|>` 之间，nonce 是每轮随机的 4 字符串（`utils.RandStringBytes(4)`）。LLM 看到的 `<|USER_QUERY_aB3x|>` 这样的 tag 不会被用户提前伪造，也不会被 LLM 提前学到固定值。
 
-完整模板按段落如下：
+## 3.3 `getRenderValues()` 提供的变量
 
-| 段落 | 占位符 | 来源 |
-|------|--------|------|
-| 顶部 | `{{ .Background }}` | `getRenderInfo()` 渲染 background 模板 |
-| USER_QUERY | `{{ .UserQuery }}` | 用户输入原文 |
-| EXTRA_CAPABILITIES | `{{ .ExtraCapabilities }}` | `extraCapabilities.Render(nonce)` |
-| PERSISTENT | `{{ .PersistentContext }}` | `persistentInstructionProvider(loop, nonce)` |
-| SessionEvidence | `{{ .SessionEvidence }}` | 渲染 [prompts/session_evidence.txt](../prompts/session_evidence.txt) |
-| SkillsContext | `{{ .SkillsContext }}` | `skillsContextManager.Render(nonce)` |
-| REFLECTION | `{{ .ReactiveData }}` | `reactiveDataBuilder(loop, feedbacker, nonce)` |
-| INJECTED_MEMORY | `{{ .InjectedMemory }}` | `r.GetCurrentMemoriesContent()` |
-| 响应格式说明 | 固定文案 | 模板硬编码 |
-| SCHEMA | `{{ .Schema }}` | `generateSchemaString(disallowExit)` |
-| OUTPUT_EXAMPLE | `{{ .OutputExample }}` | `reflectionOutputExampleProvider(loop, nonce)` |
-
-**所有 `<|XXX_{{.Nonce}}|>` 标签是为了防止 prompt 注入**：用户输入永远夹在 `<|USER_QUERY_<nonce>|>` ... `<|USER_QUERY_END_<nonce>|>` 之间，nonce 是每轮随机的 4 字符串（`utils.RandStringBytes(4)`，[exec.go:522](../exec.go)）。LLM 看到的 `<|USER_QUERY_aB3x|>` 这样的 tag 不会被用户提前伪造，也不会被 LLM 提前学到固定值。
-
-## 3.3 `getRenderInfo()` 提供的变量
-
-源码 [prompt_info.go](../prompt_info.go)（如未单独出现，即在 reactloop.go 附近）。返回 `(background string, infos map[string]any, err error)`。
+源码 [reactloop.go](../reactloop.go) 中 `func (r *ReActLoop) getRenderValues()`。返回 `(background string, infos map[string]any, err error)`。
 
 `infos` 包含：
 
 | 变量名 | 含义 | 来源 |
 |--------|------|------|
-| `Nonce` | 当前 nonce | 由 `generateLoopPrompt` 注入 |
+| `Nonce` | 当前 nonce | 由 caller 注入 |
 | `OSArch` | 操作系统架构 | runtime |
 | `CurrentTime` | 当前时间 | `time.Now` |
 | `WorkingDir` | 工作目录 | `os.Getwd` |

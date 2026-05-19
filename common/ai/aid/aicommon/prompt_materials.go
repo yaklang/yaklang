@@ -43,9 +43,6 @@ type PromptMaterials struct {
 	ForgeInventory bool
 	AIForgeList    string
 
-	// Timeline 是兼容字段 (合并 frozen + open), 老 caller 仍可消费。
-	Timeline string
-
 	TimelineFrozen   string
 	TimelineOpen     string
 	CurrentTime      string
@@ -177,17 +174,3 @@ func (m *PromptMaterials) TimelineOpenData() map[string]any {
 	}
 }
 
-// TimelineData 是老路径兼容字段。
-func (m *PromptMaterials) TimelineData() map[string]any {
-	if m == nil {
-		return map[string]any{}
-	}
-	return map[string]any{
-		"Timeline":         m.Timeline,
-		"CurrentTime":      m.CurrentTime,
-		"Workspace":        m.Workspace,
-		"OSArch":           m.OSArch,
-		"WorkingDir":       m.WorkingDir,
-		"WorkingDirGlance": m.WorkingDirGlance,
-	}
-}

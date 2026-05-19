@@ -158,7 +158,7 @@ flowchart TB
 | **加一个新 RAG 集合 / 知识入口** | `common/ai/rag/` 加导出 + `grpc_rag_collection.go` 加 RPC |
 | **加一个新工具（yak 脚本形式）** | `aid/aitool/buildinaitools/yakscripttools/yakscriptforai/<name>/<name>.yak` → embed |
 | **加一个新工具（Go 实现）** | `aid/aitool/buildinaitools/` 加 `aitool.Tool` 实现 + 注册 |
-| **改 prompt 模板** | `aid/aireact/reactloops/prompts/loop_template.tpl` 或具体 `loop_xxx/prompts/persistent_instruction.txt` |
+| **改 prompt 模板** | 5 段公共前缀在 `aid/aicommon/prompts/prefix/*.txt`；loop 专属 prompt 在 `aid/aireact/reactloops/loop_xxx/prompts/persistent_instruction.txt` 等 |
 | **加一个新 LiteForge** | `common/aiforge/` 写 `LiteForge` 实现 → 通过 `WithLiteForgeAt` 等接入 |
 | **改 AI 提供方（gateway）** | `common/ai/openai/` / `chatglm/` / ... 同级目录新增 / 修改 `gateway.go` |
 | **想看用户配置 AI 模型时走哪里** | `common/ai/aid/aicommon/aiconfig/` + `aispec.AIConfig` |

@@ -20,9 +20,6 @@ var __prompt_TaskSummaryOutputExample string
 //go:embed prompts/task/task-summary.txt
 var __prompt_TaskSummary string
 
-//go:embed prompts/report-finished.txt
-var __prompt_ReportFinished string
-
 //go:embed prompts/task/current_task_info/stable.txt
 var __prompt_currentTaskInfoStable string
 

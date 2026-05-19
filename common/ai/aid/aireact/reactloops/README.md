@@ -47,7 +47,7 @@ flowchart TD
 
 五大扩展点：
 
-1. **Prompt 系统**：模板 `prompts/loop_template.tpl` + `PersistentInstruction` + `ReactiveData` + `OutputExample` + 动态 Schema。
+1. **Prompt 系统**：5 段按稳定性分层 prefix（`aicommon.NewDefaultPromptPrefixBuilder` 从 `common/ai/aid/aicommon/prompts/prefix/` 加载）+ `PersistentInstruction` + `ReactiveData` + `OutputExample` + 动态 Schema + `dynamic_section.txt` 易变尾段。
 2. **Action 体系**：内置 / loopinfra 通用 / 从 Tool 派生 / 从子 Loop 派生 四种来源。
 3. **生命周期 Hook**：`InitTask` / `OnPostIteraction` / `OnLoopInstanceCreated` / 异步任务回调。
 4. **Emitter 流式输出**：把任务进度、思考、结果以事件流推给 UI。
@@ -85,7 +85,7 @@ flowchart TD
 |------|------|
 | [docs/01-architecture.md](docs/01-architecture.md) | `ReActLoop` 字段分组、主循环走读、状态机、`LoopActionHandlerOperator` 语义 |
 | [docs/02-options-reference.md](docs/02-options-reference.md) | 所有 `With*` 选项分组完整参考（默认值/示例/源码引用） |
-| [docs/03-prompt-system.md](docs/03-prompt-system.md) | `loop_template.tpl` 占位符、两层渲染、PersistentInstruction / ReactiveData / OutputExample / Schema |
+| [docs/03-prompt-system.md](docs/03-prompt-system.md) | 5 段 prefix 拼装、PersistentInstruction / ReactiveData / OutputExample / Schema 注入点 |
 | [docs/04-actions.md](docs/04-actions.md) | `LoopAction` 数据结构、4 种来源、流式字段、operator 控制 |
 | [docs/05-hooks-and-lifecycle.md](docs/05-hooks-and-lifecycle.md) | `InitTask` / `OnPostIteraction` / `OnLoopInstanceCreated` / 异步任务钩子 |
 | [docs/06-emitter-and-streaming.md](docs/06-emitter-and-streaming.md) | `Emitter` 结构、流式机制、事件速查表、UX 最佳实践 |

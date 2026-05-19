@@ -126,7 +126,7 @@ type ExtraCapabilitiesManager struct {
 
 ### 在 prompt 中的位置
 
-`<|EXTRA_CAPABILITIES_<nonce>|>...<|EXTRA_CAPABILITIES_END_<nonce>|>` 段（参考 [prompts/loop_template.tpl](../prompts/loop_template.tpl)）：
+`<|EXTRA_CAPABILITIES_<nonce>|>...<|EXTRA_CAPABILITIES_END_<nonce>|>` 段（位于 `dynamic_section.txt` 易变尾段中）：
 
 ```text
 <|EXTRA_CAPABILITIES_<nonce>|>

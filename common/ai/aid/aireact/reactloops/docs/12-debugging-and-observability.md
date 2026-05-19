@@ -147,7 +147,7 @@ Query: sql injection login
 
 | 段落 | 来源 |
 |------|------|
-| Background | `getRenderInfo` 系统注入 |
+| HighStatic / FrozenBlock / SemiDynamic1 / SemiDynamic2 / TimelineOpen | `AssembleLoopPrompt` 调 `aicommon.NewDefaultPromptPrefixBuilder` 5 段渲染 |
 | UserQuery | `task.GetUserInput()` |
 | PersistentContext | `WithPersistentInstruction` 渲染结果 |
 | ReactiveData | `WithReactiveDataBuilder` 渲染结果 |

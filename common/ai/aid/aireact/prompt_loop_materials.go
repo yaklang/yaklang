@@ -38,9 +38,6 @@ const (
 	aiCacheSystemTagName = "AI_CACHE_SYSTEM"
 )
 
-//go:embed prompts/loop/timeline_section.txt
-var loopTimelineSectionTemplate string
-
 //go:embed prompts/loop/dynamic_section.txt
 var loopDynamicSectionTemplate string
 
@@ -100,12 +97,10 @@ func (pm *PromptManager) GetLoopPromptBaseMaterials(tools []*aitool.Tool, nonce 
 	// 按稳定性分层渲染 timeline:
 	//   TimelineFrozen: reducer + 非末 interval, 字节稳定, 进 AI_CACHE_FROZEN 块
 	//   TimelineOpen: 最末 interval (+ midterm 检索结果, midterm 在此处一次性消费)
-	//   Timeline: frozen + open 的拼接, 仅供老观测路径作 fallback 使用
 	// 关键词: GetLoopPromptBaseMaterials, timeline frozen/open 拆分, midterm 一次消费
 	timeline := pm.react.config.GetTimeline()
 	materials.TimelineFrozen = buildTimelineFrozenForPrompt(timeline)
 	materials.TimelineOpen = buildTimelineOpenWithMidtermForPrompt(pm.react, timeline)
-	materials.Timeline = joinTimelineFrozenOpen(materials.TimelineFrozen, materials.TimelineOpen)
 
 	allowPlanAndExec := pm.react.config.GetEnablePlanAndExec() && pm.react.GetCurrentPlanExecutionTask() == nil
 	allowToolCall := true
@@ -254,7 +249,6 @@ func (pm *PromptManager) NewPromptMaterials(base *reactloops.LoopPromptBaseMater
 		materials.ForgeInventory = base.ShowForgeInventory && strings.TrimSpace(base.AIForgeList) != ""
 		materials.AIForgeList = base.AIForgeList
 
-		materials.Timeline = base.Timeline
 		materials.TimelineFrozen = base.TimelineFrozen
 		materials.TimelineOpen = base.TimelineOpen
 		materials.CurrentTime = base.CurrentTime
@@ -322,9 +316,6 @@ func (pm *PromptManager) NewPromptMaterials(base *reactloops.LoopPromptBaseMater
 //     <|AI_CACHE_SEMI2_semi|>...END 包裹, 由 hijacker 切到 user3 (ephemeral cc),
 //     让 dashscope 把 semi-1+semi-2 合并算 prefix cache.
 //
-// 兼容字段 Timeline: 等于老 timeline 段 (frozen + open + workspace + current time)
-// 的合并渲染, 仅供老 caller / 测试断言使用; 新路径不读取它。
-//
 // 关键词: AssemblePromptPrefix, 5 段拼接, 按稳定性分层, AI_CACHE_FROZEN, AI_CACHE_SEMI(2)
 func (pm *PromptManager) AssemblePromptPrefix(materials *aicommon.PromptMaterials) (*reactloops.PromptPrefixAssemblyResult, error) {
 	if pm == nil {
@@ -344,13 +335,6 @@ func (pm *PromptManager) AssemblePromptPrefix(materials *aicommon.PromptMaterial
 	semiDynamic1 := assembled.SemiDynamic
 	semiDynamic2 := assembled.SemiDynamic2
 	timelineOpen := assembled.TimelineOpen
-
-	// 老 Timeline 段渲染保留, 仅写入 PromptPrefixAssemblyResult.Timeline 供观测/兼容;
-	// 不进入新路径的 Prompt 拼接。
-	legacyTimeline, err := pm.renderLoopTimelineSection(materials)
-	if err != nil {
-		return nil, err
-	}
 
 	sections := []*reactloops.PromptSectionObservation{
 		pm.buildHighStaticObservation(materials, highStatic),
@@ -373,7 +357,6 @@ func (pm *PromptManager) AssemblePromptPrefix(materials *aicommon.PromptMaterial
 		SemiDynamic1: semiDynamic1,
 		SemiDynamic2: semiDynamic2,
 		TimelineOpen: timelineOpen,
-		Timeline:     legacyTimeline,
 		Sections:     filtered,
 	}, nil
 }
@@ -410,7 +393,6 @@ func (pm *PromptManager) buildLoopPromptSectionData(base *reactloops.LoopPromptB
 		"ToolInventory":           false,
 		"AIForgeList":             "",
 		"ForgeInventory":          false,
-		"Timeline":                "",
 	}
 	if base != nil {
 		data["Nonce"] = base.Nonce
@@ -442,7 +424,6 @@ func (pm *PromptManager) buildLoopPromptSectionData(base *reactloops.LoopPromptB
 		data["ToolInventory"] = base.AllowToolCall && base.ToolsCount > 0
 		data["AIForgeList"] = base.AIForgeList
 		data["ForgeInventory"] = base.ShowForgeInventory && strings.TrimSpace(base.AIForgeList) != ""
-		data["Timeline"] = base.Timeline
 	}
 	if input != nil {
 		data["Nonce"] = input.Nonce
@@ -1059,13 +1040,6 @@ func renderForgeInventoryBlock(materials *reactloops.PromptPrefixMaterials) stri
 	return "# AI Blueprint Inventory\n以下是当前可直接调用的 AI 蓝图列表：\n" + materials.AIForgeList
 }
 
-func renderTimelineBlock(materials *reactloops.PromptPrefixMaterials) string {
-	if materials == nil || strings.TrimSpace(materials.Timeline) == "" {
-		return ""
-	}
-	return "# Timeline Memory\n" + materials.Timeline
-}
-
 // renderTimelineFrozenBlock 渲染 timeline 冻结前缀 (reducer + 非末 interval)。
 // 用于 FrozenBlock 段的观测树, 不带 frozen 边界 tag (边界由 wrapAICacheFrozen 统一加)。
 //
@@ -1086,29 +1060,6 @@ func renderTimelineOpenBlock(materials *reactloops.PromptPrefixMaterials) string
 		return ""
 	}
 	return "# Timeline Memory (Open Tail)\n" + materials.TimelineOpen
-}
-
-// joinTimelineFrozenOpen 把 frozen + open 两半 timeline 合成一条字符串, 仅供老
-// 观测路径作 fallback。两半都非空时以单空行分隔, 任一半为空则返回另一半。
-//
-// 注意: 此函数不再向输出中注入 AI_CACHE_FROZEN 边界标签 (边界由 wrapAICacheFrozen
-// 在更高层用统一 tag 包裹)。如果有外部代码期望旧 Dump() 风格 (含 boundary tag),
-// 请改用 timeline.Dump()。
-//
-// 关键词: joinTimelineFrozenOpen, Timeline frozen + open 合并, 兼容字段
-func joinTimelineFrozenOpen(frozen, open string) string {
-	frozen = strings.TrimRight(frozen, "\n")
-	open = strings.TrimLeft(open, "\n")
-	switch {
-	case frozen == "" && open == "":
-		return ""
-	case frozen == "":
-		return open
-	case open == "":
-		return frozen
-	default:
-		return frozen + "\n" + open
-	}
 }
 
 func renderCurrentTimeBlock(materials *reactloops.PromptPrefixMaterials) string {
@@ -1165,22 +1116,6 @@ func (pm *PromptManager) renderLoopSemiDynamic2Section(materials *reactloops.Pro
 // 关键词: renderLoopFrozenBlockSection, frozen_block_section.txt
 func (pm *PromptManager) renderLoopFrozenBlockSection(materials *reactloops.PromptPrefixMaterials) (string, error) {
 	return aicommon.RenderPromptTemplate("loop-frozen-block", aicommon.SharedFrozenBlockTemplate, materials.FrozenBlockData())
-}
-
-// renderLoopTimelineOpenSection 渲染"按稳定性分层"路径下的 TimelineOpen 段
-// (Timeline 末桶 + Current Time + Workspace)。
-//
-// 关键词: renderLoopTimelineOpenSection, timeline_open_section.txt
-func (pm *PromptManager) renderLoopTimelineOpenSection(materials *reactloops.PromptPrefixMaterials) (string, error) {
-	return aicommon.RenderPromptTemplate("loop-timeline-open", aicommon.SharedTimelineOpenTemplate, materials.TimelineOpenData())
-}
-
-// renderLoopTimelineSection 是老路径的 Timeline 段渲染 (frozen + open + workspace
-// 合并)。仅供 PromptPrefixAssemblyResult.Timeline 字段填充, 主路径不再消费。
-//
-// 关键词: renderLoopTimelineSection, 老 timeline 段, 兼容
-func (pm *PromptManager) renderLoopTimelineSection(materials *reactloops.PromptPrefixMaterials) (string, error) {
-	return pm.executeTemplate("loop-timeline", loopTimelineSectionTemplate, materials.TimelineData())
 }
 
 func (pm *PromptManager) renderLoopDynamicSection(data map[string]any) (string, error) {
