@@ -84,7 +84,7 @@ func NewTunVirtualMachine(ctx context.Context) (*TunVirtualMachine, error) {
 	baseCtx, cancel := context.WithCancel(ctx)
 
 	mtu := uint32(TUN_MTU)
-	offset := 4
+	offset := tun.TUNLinkOffset()
 	log.Infof("Creating TUN endpoint with MTU: %d", mtu)
 	tunEp, err := rwendpoint.NewReadWriteCloserEndpointContext(
 		ctx, rwendpoint.NewWireGuardReadWriteCloserWrapper(device, mtu, offset),
@@ -250,7 +250,7 @@ func NewTunVirtualMachineFromDevice(ctx context.Context, device tun.Device) (*Tu
 	baseCtx, cancel := context.WithCancel(ctx)
 
 	mtu := uint32(TUN_MTU)
-	offset := 4
+	offset := tun.TUNLinkOffset()
 	log.Infof("Creating TUN endpoint with MTU: %d", mtu)
 	tunEp, err := rwendpoint.NewReadWriteCloserEndpointContext(
 		ctx, rwendpoint.NewWireGuardReadWriteCloserWrapper(device, mtu, offset),

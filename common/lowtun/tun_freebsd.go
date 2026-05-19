@@ -433,3 +433,9 @@ func (tun *NativeTun) MTU() (int, error) {
 func (tun *NativeTun) BatchSize() int {
 	return 1
 }
+
+// TUNLinkOffset is the L3 packet start index for gVisor rwendpoint ↔ Device.
+// NativeTun Read/Write use a 4-byte PI header at buf[offset-4:offset].
+func TUNLinkOffset() int {
+	return 4
+}

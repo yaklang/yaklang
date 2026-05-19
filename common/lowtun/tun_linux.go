@@ -658,3 +658,9 @@ func CreateUnmonitoredTUNFromFD(fd int) (Device, string, error) {
 	}
 	return tun, name, err
 }
+
+// TUNLinkOffset is the L3 packet start index for gVisor rwendpoint ↔ Device.
+// IFF_VNET_HDR TUN write path uses handleGRO, which requires offset >= virtioNetHdrLen.
+func TUNLinkOffset() int {
+	return virtioNetHdrLen
+}

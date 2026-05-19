@@ -334,3 +334,9 @@ func socketCloexec(family, sotype, proto int) (fd int, err error) {
 	}
 	return
 }
+
+// TUNLinkOffset is the L3 packet start index for gVisor rwendpoint ↔ Device.
+// NativeTun Read/Write use a 4-byte PI header at buf[offset-4:offset].
+func TUNLinkOffset() int {
+	return 4
+}
