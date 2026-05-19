@@ -28,13 +28,13 @@ JSONResponse as $output
 PlainTextResponse as $output
 
 alert $output for {
-	title: "HTTP response helper"
-	title_zh: "HTTP 响应构造"
-	level: "info"
-	type: "audit"
-	risk: "跨站脚本（XSS）/ 敏感信息泄露"
-	message: "检测到 HTTP 响应构造 API，请检查响应体与头是否包含未净化的用户数据。"
-	name: "output"
+	title: "HTTP response helper",
+	title_zh: "HTTP 响应构造",
+	level: "info",
+	type: "audit",
+	risk: "跨站脚本（XSS）/ 敏感信息泄露",
+	message: "检测到 HTTP 响应构造 API，请检查响应体与头是否包含未净化的用户数据。",
+	name: "output",
 }
 
 desc(

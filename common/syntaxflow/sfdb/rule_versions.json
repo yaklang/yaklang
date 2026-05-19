@@ -2026,5 +2026,155 @@
     "rule_name": "可预测的Cookie值（伪随机）",
     "hash": "95e671ec0c262f24d5f2bb3a59a50268a89764b1a16e4cbb087c4ad3de44bd2d",
     "version": "20251230.0001"
+  },
+  {
+    "rule_id": "e8bd0b9e-97e6-4179-9e38-03b80026a0db",
+    "rule_name": "检测Python Flask render_template_string服务端模板注入漏洞",
+    "hash": "efc88cc289d56439cc91eb6ed0d4287161b7c96e8c6e5b9644c276be72e97be4",
+    "version": "20260519.0001"
+  },
+  {
+    "rule_id": "7e9783e9-58c5-46b4-96d7-0cfa184ae67a",
+    "rule_name": "检测Python Jinja2 from_string SSTI漏洞",
+    "hash": "9522ba2d0e99153e68e570781a7a6b12859a09f2393d9bd703fe85622c5d3b95",
+    "version": "20260519.0001"
+  },
+  {
+    "rule_id": "b0e529e8-d502-4178-81d6-c2554863f2e6",
+    "rule_name": "检测Python tarfile模块路径遍历漏洞",
+    "hash": "ae089fd183527fbae321e48d23547251ba34635f9fd814e9cb2f6cba137a698d",
+    "version": "20260519.0001"
+  },
+  {
+    "rule_id": "c1ea6466-8eab-4f25-828a-b50a1556307c",
+    "rule_name": "检测Python不安全反序列化漏洞",
+    "hash": "9ba0bfbd4f8f88d4557c953a3e3a5fbff9ba4c489980a6e391cb53055866e818",
+    "version": "20260519.0001"
+  },
+  {
+    "rule_id": "82dbb9b5-3a2c-40cc-96e2-9e5527fdd59c",
+    "rule_name": "检测Python标准库XML解析XXE漏洞",
+    "hash": "ebdc8e0da189d616e53c67d044ecdff9a7984ed8a79fb29886b91889041c5dfa",
+    "version": "20260519.0001"
+  },
+  {
+    "rule_id": "python-cmd-injection-user-input",
+    "rule_name": "Python 操作系统命令注入（用户输入驱动）",
+    "hash": "87de9ef6cb8a81bc89435e1157cfaee94a8fb014caa95eae6a4984d2a54dba15",
+    "version": "20260519.0001"
+  },
+  {
+    "rule_id": "6e64e380-374d-400b-8223-22dd2867e0de",
+    "rule_name": "检测Python基于百分号格式化的SQL注入漏洞",
+    "hash": "ff2ce3fc8f6449747e3b962f7717f6a8b0c113c9d2e44560a8eb28245d7fa3ba",
+    "version": "20260519.0001"
+  },
+  {
+    "rule_id": "de8fe36b-568d-4b52-b223-7694ffe2014f",
+    "rule_name": "检测Python eval/exec/compile代码注入漏洞",
+    "hash": "1f221d8de63b8f2ef8018b2b95642c6c262c78cd5d12f9e1b61bf181e77ea086",
+    "version": "20260519.0001"
+  },
+  {
+    "rule_id": "c1d2e3f4-a5b6-7890-cdef-112233445566",
+    "rule_name": "HTTP 客户端外连（Python 库规则）",
+    "hash": "baa0289284af74eea45875cdcf30bacee7615ab910cd7ea0e209984436c3b0af",
+    "version": "20260519.0001"
+  },
+  {
+    "rule_id": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+    "rule_name": "HTTP 响应构造（Python 库规则）",
+    "hash": "0052fa29664eb038c832926e198dc5b0a55650bccfc187701df011a0bc51005f",
+    "version": "20260519.0001"
+  },
+  {
+    "rule_id": "f4a2b3c4-d5e6-7890-abcd-ef4444444444",
+    "rule_name": "路径与文件系统操作（Python 库规则）",
+    "hash": "a11fa4eee89b545badd534014b25833e79058ccae6785061f2276094a6bb8347",
+    "version": "20260519.0001"
+  },
+  {
+    "rule_id": "f3a4b5c6-d7e8-9012-cdef-445566778899",
+    "rule_name": "Base64 解码（b64decode）（Python 库规则）",
+    "hash": "3e132cc2eef59c2e1dcad7cf0f452164eb7e5ef1aff9f1cd6da198158c84a8e9",
+    "version": "20260519.0001"
+  },
+  {
+    "rule_id": "d1e2f3a4-b5c6-7890-def1-223344556677",
+    "rule_name": "操作系统命令执行入口（Python 库规则）",
+    "hash": "8ee7233ad5adab4390a88146ea773731ceb07861f7ccab702d0514660600e374",
+    "version": "20260519.0001"
+  },
+  {
+    "rule_id": "b3c4d5e6-f7a8-9012-cdef-334455667788",
+    "rule_name": "数据库游标执行（execute 系列）（Python 库规则）",
+    "hash": "feb60527e48f4abee79b21f5d91faa39e49f5d1fef0318c58f19504e86819ba2",
+    "version": "20260519.0001"
+  },
+  {
+    "rule_id": "f6a7b8c9-d0e1-2345-f012-678901234567",
+    "rule_name": "动态导入（Python 库规则）",
+    "hash": "80280690908a01a2f2788f9b21126d57635e8e2aa7f3838f36419502dc831b00",
+    "version": "20260519.0001"
+  },
+  {
+    "rule_id": "d4e5f6a7-b8c9-0123-def0-234567890123",
+    "rule_name": "环境变量读取（Python 库规则）",
+    "hash": "baf7fd22684ed38efe74d8af0ca5360f7fb4648d46b625b425e7d34150ac40fa",
+    "version": "20260519.0001"
+  },
+  {
+    "rule_id": "b8c9d0e1-f2a3-4567-1234-890123456789",
+    "rule_name": "不安全临时文件（mktemp）（Python 库规则）",
+    "hash": "71e51ef50c559a53f767fb8472f5b06d846b39f3d52e63d1d545a39518a04e2c",
+    "version": "20260519.0001"
+  },
+  {
+    "rule_id": "c4d5e6f7-a8b9-0123-def0-445566778899",
+    "rule_name": "JWT 关闭签名校验（Python 库规则）",
+    "hash": "76f9c2a16345266ecf9ab6f2573eb4ff0daca53e90bb1212b01a492d9775e44a",
+    "version": "20260519.0001"
+  },
+  {
+    "rule_id": "a4b5c6d7-e8f9-0123-def0-556677889900",
+    "rule_name": "pickle 序列化（dumps）（Python 库规则）",
+    "hash": "823ea73cfa39bf6d10398b77344ab76b7b114d6c9f6956317c75af2a4e6e1bce",
+    "version": "20260519.0001"
+  },
+  {
+    "rule_id": "e1f2a3b4-c5d6-7890-abcd-ef0123456789",
+    "rule_name": "SSL 跳过证书校验（Python 库规则）",
+    "hash": "1cb922aeea84f82e6d816611c9edcfd92e624d41874d56b060eaa3760dec737b",
+    "version": "20260519.0001"
+  },
+  {
+    "rule_id": "f1a2b3c4-d5e6-7890-abcd-ef1111111111",
+    "rule_name": "用户输入源（Python 库规则）",
+    "hash": "d837c99f7ec171fb07b9325208112d1f4a95eec64bb473b0a1f840a89e6e6286",
+    "version": "20260519.0001"
+  },
+  {
+    "rule_id": "d0e1f2a3-b4c5-6789-3456-012345678901",
+    "rule_name": "弱哈希算法（MD5/SHA1/hashlib.new）（Python 库规则）",
+    "hash": "a72119b8b6c6844984193e2f153e7b4339a66fffccde05f17e049f904dcd8bec",
+    "version": "20260519.0001"
+  },
+  {
+    "rule_id": "a7b8c9d0-e1f2-3456-0123-789012345678",
+    "rule_name": "标准库 random 伪随机（Python 库规则）",
+    "hash": "48c56575a036c8e2feff1366825317396b123fe5cda42cebcd2c4863d4dc8fc1",
+    "version": "20260519.0001"
+  },
+  {
+    "rule_id": "f2a2b3c4-d5e6-7890-abcd-ef2222222222",
+    "rule_name": "文件读取操作（Python 库规则）",
+    "hash": "5116cad6a6a40fb9931169bedcd5e1c956c79e72b20ed3cb5ca0e769e9a66d55",
+    "version": "20260519.0001"
+  },
+  {
+    "rule_id": "f3a2b3c4-d5e6-7890-abcd-ef3333333333",
+    "rule_name": "文件写入操作（Python 库规则）",
+    "hash": "a5eddea2c1caa83b14d43667be5df27c9717140590552832831af93a97fea550",
+    "version": "20260519.0001"
   }
 ]

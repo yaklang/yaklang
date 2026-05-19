@@ -37,13 +37,13 @@ input as $output
 sys.argv as $output
 
 alert $output for {
-	title: "User input source"
-	title_zh: "用户输入点"
-	level: "info"
-	type: "audit"
-	risk: "输入校验不当"
-	message: "可能存在用户可控的输入来源。"
-	name: "output"
+	title: "User input source",
+	title_zh: "用户输入点",
+	level: "info",
+	type: "audit",
+	risk: "输入校验不当",
+	message: "可能存在用户可控的输入来源。",
+	name: "output",
 }
 
 desc(

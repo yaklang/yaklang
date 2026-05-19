@@ -34,13 +34,13 @@ httpx.request as $output
 httpx.Client as $output
 
 alert $output for {
-	title: "HTTP client call"
-	title_zh: "HTTP 客户端请求"
-	level: "info"
-	type: "audit"
-	risk: "服务端请求伪造（SSRF）/ 非预期外连"
-	message: "检测到出站 HTTP 客户端调用，请审计 URL 来源、重定向处理与是否暴露内网。"
-	name: "output"
+	title: "HTTP client call",
+	title_zh: "HTTP 客户端请求",
+	level: "info",
+	type: "audit",
+	risk: "服务端请求伪造（SSRF）/ 非预期外连",
+	message: "检测到出站 HTTP 客户端调用，请审计 URL 来源、重定向处理与是否暴露内网。",
+	name: "output",
 }
 
 desc(

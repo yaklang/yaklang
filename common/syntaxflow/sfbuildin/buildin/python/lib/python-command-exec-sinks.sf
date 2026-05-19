@@ -26,13 +26,13 @@ subprocess.check_output as $output
 subprocess.check_call as $output
 
 alert $output for {
-	title: "Python command execution API"
-	title_zh: "命令执行类 API"
-	level: "info"
-	type: "audit"
-	risk: "操作系统命令注入"
-	message: "检测到可执行系统命令的 API，请检查参数来源与是否误用 shell=True。"
-	name: "output"
+	title: "Python command execution API",
+	title_zh: "命令执行类 API",
+	level: "info",
+	type: "audit",
+	risk: "操作系统命令注入",
+	message: "检测到可执行系统命令的 API，请检查参数来源与是否误用 shell=True。",
+	name: "output",
 }
 
 desc(

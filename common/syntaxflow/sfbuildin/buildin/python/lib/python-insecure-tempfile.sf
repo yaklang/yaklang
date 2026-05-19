@@ -20,13 +20,13 @@ REFERENCE
 tempfile.mktemp as $output
 
 alert $output for {
-	title: "tempfile.mktemp"
-	title_zh: "tempfile.mktemp 调用"
-	level: "info"
-	type: "audit"
-	risk: "符号链接竞争 / 检查时与使用时竞态"
-	message: "检测到 tempfile.mktemp，存在竞态与不安全临时路径问题，请替换为 mkstemp 或 NamedTemporaryFile。"
-	name: "output"
+	title: "tempfile.mktemp",
+	title_zh: "tempfile.mktemp 调用",
+	level: "info",
+	type: "audit",
+	risk: "符号链接竞争 / 检查时与使用时竞态",
+	message: "检测到 tempfile.mktemp，存在竞态与不安全临时路径问题，请替换为 mkstemp 或 NamedTemporaryFile。",
+	name: "output",
 }
 
 desc(

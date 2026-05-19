@@ -20,13 +20,13 @@ REFERENCE
 b64decode as $output
 
 alert $output for {
-	title: "base64.b64decode"
-	title_zh: "Base64 解码"
-	level: "info"
-	type: "audit"
-	risk: "不安全反序列化链路"
-	message: "检测到 Base64 解码，请关注下游是否接入不安全的反序列化或解析逻辑。"
-	name: "output"
+	title: "base64.b64decode",
+	title_zh: "Base64 解码",
+	level: "info",
+	type: "audit",
+	risk: "不安全反序列化链路",
+	message: "检测到 Base64 解码，请关注下游是否接入不安全的反序列化或解析逻辑。",
+	name: "output",
 }
 
 desc(

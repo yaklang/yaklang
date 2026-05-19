@@ -20,13 +20,13 @@ REFERENCE
 _create_unverified_context as $output
 
 alert $output for {
-	title: "SSL unverified context"
-	title_zh: "未校验证书的 SSL 上下文"
-	level: "info"
-	type: "audit"
-	risk: "中间人攻击"
-	message: "检测到未校验证书的 SSL 上下文，存在被中间人攻击的风险。"
-	name: "output"
+	title: "SSL unverified context",
+	title_zh: "未校验证书的 SSL 上下文",
+	level: "info",
+	type: "audit",
+	risk: "中间人攻击",
+	message: "检测到未校验证书的 SSL 上下文，存在被中间人攻击的风险。",
+	name: "output",
 }
 
 desc(

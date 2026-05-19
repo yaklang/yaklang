@@ -28,13 +28,13 @@ shutil.rmtree as $output
 pathlib.Path as $output
 
 alert $output for {
-	title: "Path / filesystem op"
-	title_zh: "路径与文件系统操作"
-	level: "info"
-	type: "audit"
-	risk: "路径遍历"
-	message: "检测到路径或文件系统相关 API，请确认参数已规范化且未受路径遍历影响。"
-	name: "output"
+	title: "Path / filesystem op",
+	title_zh: "路径与文件系统操作",
+	level: "info",
+	type: "audit",
+	risk: "路径遍历",
+	message: "检测到路径或文件系统相关 API，请确认参数已规范化且未受路径遍历影响。",
+	name: "output",
 }
 
 desc(
