@@ -786,6 +786,7 @@ func (t *AiTask) GenerateTaskSummaryPrompt() (string, error) {
 		}
 	}
 	return assembleTaskSummaryPrompt(
+		t.Coordinator.Config,
 		cp.Schema()["TaskSummarySchema"],
 		timelineFrozen,
 		timelineOpen,
@@ -797,12 +798,14 @@ type taskSummaryDynamicData struct {
 	CurrentTaskInfo string
 }
 
-func assembleTaskSummaryPrompt(schema string, currentTaskTimelineFrozen string, currentTaskTimelineOpen string, currentTaskInfo string) (string, error) {
+func assembleTaskSummaryPrompt(config *aicommon.Config, schema string, currentTaskTimelineFrozen string, currentTaskTimelineOpen string, currentTaskInfo string) (string, error) {
 	materials := &aicommon.PromptMaterials{
 		TaskInstruction: strings.TrimSpace(__prompt_TaskSummaryInstruction),
 		Schema:          strings.TrimSpace(schema),
 		OutputExample:   strings.TrimSpace(__prompt_TaskSummaryOutputExample),
-		ToolInventory:   true,
+	}
+	if err := aicommon.PopulateToolInventoryFromConfig(materials, config); err != nil {
+		return "", fmt.Errorf("populate task summary tool inventory failed: %w", err)
 	}
 	if currentTaskTimelineFrozen = strings.TrimSpace(currentTaskTimelineFrozen); currentTaskTimelineFrozen != "" {
 		materials.TimelineFrozen = currentTaskTimelineFrozen

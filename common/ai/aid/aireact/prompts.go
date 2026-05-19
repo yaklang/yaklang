@@ -302,28 +302,11 @@ func (pm *PromptManager) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[s
 		// token 预算二次裁剪, 保底 ToolInventoryMinCount 个工具, base.txt 模板
 		// 与 frozen_block_section.txt 看到同一份 TopTools / MoreToolsCount.
 		// 关键词: GetBasicPromptInfo token budget, 与主路径口径对齐
-		if len(tools) > 0 {
-			topCount := pm.react.config.GetTopToolsCount()
-			candidate := pm.react.getPrioritizedTools(tools, topCount)
-			display := aicommon.SelectToolsByTokenBudget(
-				candidate,
-				aicommon.ToolInventoryTokenBudget,
-				aicommon.ToolInventoryMinCount,
-			)
-			more := len(tools) - len(display)
-			if more < 0 {
-				more = 0
-			}
-			result["TopTools"] = display
-			result["TopToolsCount"] = len(display)
-			result["HasMoreTools"] = len(tools) > len(display)
-			result["MoreToolsCount"] = more
-		} else {
-			result["TopTools"] = []*aitool.Tool{}
-			result["TopToolsCount"] = 0
-			result["HasMoreTools"] = false
-			result["MoreToolsCount"] = 0
-		}
+		inventory := aicommon.BuildToolInventoryData(tools, pm.react.config.GetTopToolsCount())
+		result["TopTools"] = inventory.TopTools
+		result["TopToolsCount"] = inventory.TopToolsCount
+		result["HasMoreTools"] = inventory.HasMoreTools
+		result["MoreToolsCount"] = inventory.MoreToolsCount
 	}
 
 	// use timeline getter
