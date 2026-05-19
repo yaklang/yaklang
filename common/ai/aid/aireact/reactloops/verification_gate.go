@@ -13,9 +13,30 @@ import (
 )
 
 const (
-	verificationAutoTriggerMaxSnapshotAge = 30 * time.Second
-	verificationAutoTriggerMinPromptDelta = 500
-	verificationIterationTriggerInterval  = aicommon.DefaultPeriodicVerificationInterval
+	// verificationAutoTriggerMaxSnapshotAge 控制"距上次 verification 多久后强制再跑"的时间门.
+	// 调整自 30s -> 120s, 依据 redhaze 案例仿真 docs/16-verification-frequency-experiment.md:
+	// 原 30s 阈值在 redhaze 32s/iter 节奏下几乎每轮都过门, 相邻 verification
+	// 多次产出 63-64 字节相同 delivery, 是当前默认下最大的浪费源.
+	// 新阈值 120s 配合 1500 token 门, 在 realistic 画像下 satisfiedLag 仍保持 0,
+	// pessimistic 画像下 fired 从 13 降到 6 (-54%), 是扫描矩阵中 cost/lag 最佳甜点.
+	// 关键词: verificationAutoTriggerMaxSnapshotAge 时间门, redhaze 32s/iter 刷屏,
+	//        120s 甜点, lag=0 性价比最高
+	verificationAutoTriggerMaxSnapshotAge = 120 * time.Second
+
+	// verificationAutoTriggerMinPromptDelta 控制"prompt token 增量到多少触发再 verify"的 token 门.
+	// 调整自 500 -> 1500, 依据 redhaze 案例仿真:
+	// 单个工具结果 (如 do_http_request 返回体) 常 >500 tokens, 原阈值过松,
+	// 几乎每个工具调用后都过门. 新阈值 1500 让小响应/重复探测被过滤,
+	// 仅在 phase 切换 / 数据爆炸 (如 union extract) 时触发, 配合 120s 时间门
+	// 保留 satisfiedLag=0 的响应性 (token 门更敏感, 数据爆炸时仍能及时 verify).
+	// 关键词: verificationAutoTriggerMinPromptDelta token 门, 1500 甜点,
+	//        小工具响应过滤, phase 切换敏感
+	verificationAutoTriggerMinPromptDelta = 1500
+
+	// verificationIterationTriggerInterval 控制 iter 门 (每 N 轮强制 verify 兜底).
+	// 维持 5 不动, 作为时间/token 门都不触发时的最后兜底.
+	// 关键词: verificationIterationTriggerInterval iter 门兜底, 维持 5
+	verificationIterationTriggerInterval = aicommon.DefaultPeriodicVerificationInterval
 )
 
 var verificationWatchdogIdleTimeout = 2 * time.Minute
