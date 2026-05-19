@@ -6,6 +6,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicache"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 )
 
 // 关键词: aicache.Split 单测, P0-A5, task-summary.txt 段稳定性回归
@@ -23,9 +26,21 @@ type taskSummaryFixture struct {
 	TimelineOpen    string
 }
 
+func taskSummaryToolConfig() *aicommon.Config {
+	tool := aitool.NewWithoutCallback("grep", aitool.WithDescription("grep tool"))
+	return &aicommon.Config{
+		AiToolManager: buildinaitools.NewToolManagerByToolGetter(
+			func() []*aitool.Tool { return []*aitool.Tool{tool} },
+			buildinaitools.WithEnableAllTools(),
+		),
+		TopToolsCount: 100,
+	}
+}
+
 func renderTaskSummaryFixture(t *testing.T, fixture taskSummaryFixture) string {
 	t.Helper()
 	prompt, err := assembleTaskSummaryPrompt(
+		taskSummaryToolConfig(),
 		fixture.Schema,
 		fixture.TimelineFrozen,
 		fixture.TimelineOpen,
@@ -66,6 +81,7 @@ func TestSplit_TaskSummaryPrompt_FourSections(t *testing.T) {
 	require.Empty(t, sec1[aicache.SectionRaw], "task-summary prompt should not produce raw/noise chunk; rendered:\n%s", prompt1)
 	require.Contains(t, prompt1, "<|AI_CACHE_FROZEN_semi-dynamic|>")
 	require.Contains(t, prompt1, "# Tool Inventory")
+	require.Contains(t, prompt1, "`grep`: grep tool")
 	require.NotContains(t, prompt1, "# 牢记")
 
 	require.Equal(t, sec1[aicache.SectionHighStatic][0].Hash, sec2[aicache.SectionHighStatic][0].Hash,
@@ -94,6 +110,7 @@ func TestSplit_TaskSummaryPrompt_FrozenTimelineLandsInFrozenBlock(t *testing.T) 
 	prompt := renderTaskSummaryFixture(t, stub)
 	require.Contains(t, prompt, "<|AI_CACHE_FROZEN_semi-dynamic|>")
 	require.Contains(t, prompt, "# Tool Inventory")
+	require.Contains(t, prompt, "`grep`: grep tool")
 	require.Contains(t, prompt, "frozen task timeline")
 	require.Contains(t, prompt, "<|AI_CACHE_FROZEN_END_semi-dynamic|>")
 	require.Contains(t, prompt, "<|PROMPT_SECTION_timeline-open|>")
@@ -115,6 +132,8 @@ func TestGenerateTaskSummaryPrompt_UsesConfigTimelineFrozenOpen(t *testing.T) {
 	timeline := task.ContextProvider.GetTimelineInstance()
 	require.NotNil(t, timeline)
 	task.Config.Timeline = timeline
+	task.Config.AiToolManager = taskSummaryToolConfig().AiToolManager
+	task.Config.TopToolsCount = 100
 	timeline.SetTimelineBucketByteSize(80)
 
 	timeline.PushText(101, "first current task timeline block "+strings.Repeat("A", 120))
@@ -123,6 +142,7 @@ func TestGenerateTaskSummaryPrompt_UsesConfigTimelineFrozenOpen(t *testing.T) {
 	prompt, err := task.GenerateTaskSummaryPrompt()
 	require.NoError(t, err)
 	require.Contains(t, prompt, "<|AI_CACHE_FROZEN_semi-dynamic|>")
+	require.Contains(t, prompt, "`grep`: grep tool")
 	require.Contains(t, prompt, "first current task timeline block")
 	require.Contains(t, prompt, "<|PROMPT_SECTION_timeline-open|>")
 	require.Contains(t, prompt, "second current task timeline block")

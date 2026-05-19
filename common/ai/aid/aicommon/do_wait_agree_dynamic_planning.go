@@ -159,7 +159,6 @@ func generateTaskReviewPrompt(config *Config, materials aitool.InvokeParams) (st
 		TaskInstruction:  strings.TrimSpace(aiTaskReviewInstructionTemplate),
 		Schema:           strings.TrimSpace(aiTaskReviewSchemaTemplate),
 		OutputExample:    strings.TrimSpace(aiTaskReviewOutputExampleTemplate),
-		ToolInventory:    true,
 		TimelineFrozen:   data.TimelineFrozen,
 		TimelineOpen:     data.TimelineOpen,
 		CurrentTime:      data.CurrentTime,
@@ -167,6 +166,9 @@ func generateTaskReviewPrompt(config *Config, materials aitool.InvokeParams) (st
 		WorkingDir:       data.WorkingDir,
 		WorkingDirGlance: data.WorkingDirGlance,
 		Workspace:        strings.TrimSpace(data.OSArch+data.WorkingDir+data.WorkingDirGlance) != "",
+	}
+	if err := PopulateToolInventoryFromConfig(prefixMaterials, config); err != nil {
+		return "", fmt.Errorf("populate task review tool inventory failed: %w", err)
 	}
 
 	return NewDefaultPromptPrefixBuilder().AssemblePromptWithDynamicSection(

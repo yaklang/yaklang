@@ -139,48 +139,16 @@ func (pm *PromptManager) GetLoopPromptBaseMaterials(tools []*aitool.Tool, nonce 
 	}
 
 	if allowToolCall && len(tools) > 0 {
-		// 0. hidden tool pattern: 先按可见性过滤掉 VisibilityHidden 与 VisibilityScenario
-		//    工具, 让默认 Tool Inventory 不出现 amap / 已被 do_http_request
-		//    覆盖的 send_http_request_* / url_content_summary / ssa-* 这类
-		//    工具. 若当前 loop (典型: yak focus mode) 通过
-		//    WithScenarioToolWhitelist 显式声明了 scenario 拉回名单, 命中
-		//    名单的 scenario 工具会被保留, 并在后面通过 getPrioritizedTools
-		//    的 extraPriority 参数置顶展示. hidden 工具一律不复活.
-		//    这一步必须在 ToolsCount 统计之前做完, 否则模板里
-		//    "You have access to N built-in tools" / MoreToolsCount 会把
-		//    被过滤掉的工具也算进去, 误导 AI.
-		//    关键词: hidden tool pattern, FilterToolsByVisibility, scenario whitelist,
-		//           Tool Inventory render entry filter
-		scenarioWL := pm.react.GetCurrentLoop().GetScenarioToolWhitelist()
-		tools = aicommon.FilterToolsByVisibility(tools, scenarioWL)
-		if len(tools) == 0 {
-			return materials, nil
+		scenarioWL := []string(nil)
+		if currentLoop := pm.react.GetCurrentLoop(); currentLoop != nil {
+			scenarioWL = currentLoop.GetScenarioToolWhitelist()
 		}
-
-		// 1. 先用 GetTopToolsCount 作为"候选池上限"取出 prioritized 的前 N 个
-		//    (默认 100, 用户可用 WithTopToolsCount(N) 缩窄).
-		// 2. 再用 SelectToolsByTokenBudget 按 token 预算 (3K) 从候选池里二次裁剪,
-		//    同时保底 ToolInventoryMinCount (20) 个工具, 即便描述很长也不会
-		//    出现"Top 15 tools"那种被武断截短的局面.
-		// 3. HasMoreTools / MoreToolsCount 以"全部 tools - 实际展示"计算, 让
-		//    模板里能给出具体剩余数字, search_capabilities 提示更具象.
-		// 关键词: GetLoopPromptBaseMaterials tool budget, SelectToolsByTokenBudget,
-		//        TopToolsCount 候选池上限, 保底 20
-		topCount := pm.react.config.GetTopToolsCount()
-		candidate := pm.react.getPrioritizedTools(tools, topCount, scenarioWL...)
-		display := aicommon.SelectToolsByTokenBudget(
-			candidate,
-			aicommon.ToolInventoryTokenBudget,
-			aicommon.ToolInventoryMinCount,
-		)
-		materials.ToolsCount = len(tools)
-		materials.TopTools = display
-		materials.TopToolsCount = len(display)
-		materials.HasMoreTools = len(tools) > len(display)
-		materials.MoreToolsCount = len(tools) - len(display)
-		if materials.MoreToolsCount < 0 {
-			materials.MoreToolsCount = 0
-		}
+		inventory := aicommon.BuildToolInventoryData(tools, pm.react.config.GetTopToolsCount(), scenarioWL...)
+		materials.ToolsCount = inventory.ToolsCount
+		materials.TopTools = inventory.TopTools
+		materials.TopToolsCount = inventory.TopToolsCount
+		materials.HasMoreTools = inventory.HasMoreTools
+		materials.MoreToolsCount = inventory.MoreToolsCount
 	}
 
 	return materials, nil
@@ -708,12 +676,14 @@ func (pm *PromptManager) buildSemiDynamic2Observation(
 //  6. Plan Context 末尾: PE-TASK PLAN 产物本质易变 (子任务切换 +
 //     FACTS/DOCUMENT 嵌入 root user input), 放最末让其落在所有 cache
 //     边界外, 不污染上游 system / frozen / semi 三段缓存命中率。
+//
 // timeline-open 整段位于 system / frozen / semi 三段缓存之外, 是 prompt 的
 // "易变尾段", 段内子块顺序不影响上游 prefix cache, 仅影响 LLM 理解顺序。
 //
 // 关键词: buildTimelineOpenObservation, Timeline 末桶, SessionEvidence,
-//        Workspace, UserHistory, Current Time, PlanContext 末尾,
-//        段内排序原则, P1-C3 顺序调整, 缓存边界外
+//
+//	Workspace, UserHistory, Current Time, PlanContext 末尾,
+//	段内排序原则, P1-C3 顺序调整, 缓存边界外
 func (pm *PromptManager) buildTimelineOpenObservation(
 	materials *reactloops.PromptPrefixMaterials,
 	rendered string,
