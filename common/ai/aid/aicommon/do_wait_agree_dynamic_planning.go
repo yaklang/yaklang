@@ -55,7 +55,8 @@ type TaskReviewPromptData struct {
 	OSArch           string
 	WorkingDir       string
 	WorkingDirGlance string
-	Timeline         string
+	TimelineFrozen   string
+	TimelineOpen     string
 	Nonce            string
 	TaskDetails      string
 	ShortSummary     string
@@ -130,7 +131,7 @@ func generateTaskReviewPrompt(config *Config, materials aitool.InvokeParams) (st
 	}
 
 	if t := config.GetTimeline(); t != nil {
-		data.Timeline = t.Dump()
+		data.TimelineFrozen, data.TimelineOpen = t.DumpFrozenOpen()
 	}
 
 	if !utils.IsNil(materials) {
@@ -158,7 +159,8 @@ func generateTaskReviewPrompt(config *Config, materials aitool.InvokeParams) (st
 		TaskInstruction:  strings.TrimSpace(aiTaskReviewInstructionTemplate),
 		Schema:           strings.TrimSpace(aiTaskReviewSchemaTemplate),
 		OutputExample:    strings.TrimSpace(aiTaskReviewOutputExampleTemplate),
-		TimelineOpen:     data.Timeline,
+		TimelineFrozen:   data.TimelineFrozen,
+		TimelineOpen:     data.TimelineOpen,
 		CurrentTime:      data.CurrentTime,
 		OSArch:           data.OSArch,
 		WorkingDir:       data.WorkingDir,
