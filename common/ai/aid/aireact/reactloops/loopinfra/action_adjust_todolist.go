@@ -2,6 +2,7 @@ package loopinfra
 
 import (
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -61,7 +62,25 @@ var loopAction_AdjustTodolist = &reactloops.LoopAction{
 		),
 	},
 	StreamFields: []*reactloops.LoopStreamField{
-		{FieldName: "next_movements", AINodeId: "adjust_todolist"},
+		{
+			// AINodeId 保留 "adjust_todolist", 前端 i18n 把它翻译成 "待办事项"
+			// 这个用户已经熟悉的标签 (见 schema/ai_node_id_i18n.go). 关键改动
+			// 在 StreamHandler: 把原本会被框架原样转发的 next_movements JSON
+			// 数组在流过程中实时翻译成 verification 路径完全一致的 display
+			// 行 (`- [+]: [id: x]: y`), 前端不再看到裸 JSON, 与 verification.
+			// next_movements 字节级对齐.
+			//
+			// markdown 形态的全量快照仍然走独立的 next_movements_snapshot
+			// 节点 (apply 后由 emitAdjustTodolistMarkdownSnapshot 发出),
+			// 与 verification 路径同位 — 前端 TODO 面板因此能在 adjust 和
+			// verification 两条通道之间自动联动, 不需要区分来源.
+			//
+			// 关键词: adjust_todolist next_movements StreamHandler, 不裸 JSON,
+			//   verification 字节对齐, 待办事项 i18n 不破坏
+			FieldName:     "next_movements",
+			AINodeId:      "adjust_todolist",
+			StreamHandler: adjustTodolistNextMovementsStreamHandler,
+		},
 	},
 	ActionVerifier: func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
 		movements := aicommon.NormalizeVerifyNextMovements(action)
@@ -136,6 +155,26 @@ func getAdjustTodolistMovements(loop *reactloops.ReActLoop, action *aicommon.Act
 		return raw
 	}
 	return aicommon.NormalizeVerifyNextMovements(action)
+}
+
+// adjustTodolistNextMovementsStreamHandler 把 AI 流式输出的 next_movements
+// JSON 数组实时翻译成"- [+]: [id: x]: y / - [DOING]: ..."这种 display
+// 行, 与 verification 路径的 next_movements stream 字节级一致. 这里只是把
+// aicommon 的公开 helper 包裹一层 — LoopStreamFieldHandler 签名不返回
+// error, 解析失败由 helper 内部 log/return 自然消化即可, 上层 framework
+// 拷贝完后会自动关闭管道.
+//
+// 关键词: adjustTodolistNextMovementsStreamHandler, next_movements 实时翻译,
+//
+//	verification 字节一致, LoopStreamFieldHandler 适配
+func adjustTodolistNextMovementsStreamHandler(fieldReader io.Reader, emitWriter io.Writer) {
+	if err := aicommon.WriteNextMovementsDisplayStream(fieldReader, emitWriter); err != nil {
+		// 解析失败往往是 AI 把 next_movements 写成了非数组形态 (例如裸字符串
+		// 或者半截 JSON); 此时静默 drain 余下输入避免 producer 卡在 pipe 上.
+		// 关键词: next_movements stream 兜底, JSON 非数组容错, drain pipe
+		log.Debugf("adjust_todolist: next_movements display stream failed: %v", err)
+		_, _ = io.Copy(io.Discard, fieldReader)
+	}
 }
 
 // emitAdjustTodolistMarkdownSnapshot 把"应用本轮增量后"的全量 TODO markdown

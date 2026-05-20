@@ -1,10 +1,13 @@
 package loopinfra
 
 import (
+	"bytes"
 	"context"
+	"io"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -368,6 +371,72 @@ func TestAdjustTodolist_Handler_SkipsMarkdownStreamWhenEmpty(t *testing.T) {
 		assert.NotEqual(t, "next_movements_snapshot", e.NodeId,
 			"empty markdown delta must not emit a next_movements_snapshot stream")
 	}
+}
+
+// TestAdjustTodolistNextMovementsStreamHandler_TranslatesJSONToDisplayLines
+// 验证: stream handler 把 AI 流出来的 next_movements JSON 数组**实时**翻译
+// 成 verification 路径同字节的 display 行 (`- [+]: [id: x]: y`), 前端在
+// "adjust_todolist" 节点 (UI 文案 "待办事项") 上看到的不再是裸 JSON.
+//
+// 关键词: adjust_todolist next_movements StreamHandler, JSON→display 行,
+//
+//	verification 字节级对齐, 不裸 JSON
+func TestAdjustTodolistNextMovementsStreamHandler_TranslatesJSONToDisplayLines(t *testing.T) {
+	input := `[
+		{"op":"add","id":"recon_dns","content":"DNS 信息收集: dig id.redhaze.top"},
+		{"op":"done","id":"old_step"},
+		{"op":"doing","id":"step2","content":"扫描"},
+		{"op":"delete","id":"dropped"},
+		{"op":"skip","id":"skipped_branch"}
+	]`
+
+	var out bytes.Buffer
+	adjustTodolistNextMovementsStreamHandler(strings.NewReader(input), &out)
+	rendered := out.String()
+
+	// 与 verification 路径完全一致的 marker 集合
+	assert.Contains(t, rendered, "- [+]: [id: recon_dns]: DNS 信息收集: dig id.redhaze.top")
+	assert.Contains(t, rendered, "- [x]: [id: old_step]")
+	assert.Contains(t, rendered, "- [DOING]: [id: step2]: 扫描")
+	assert.Contains(t, rendered, "- [DELETED]: [id: dropped]")
+	assert.Contains(t, rendered, "- [SKIPPED]: [id: skipped_branch]")
+
+	// display 行之间用 "\n" 分隔, 没有裸 `{"op":`
+	assert.NotContains(t, rendered, `{"op":`,
+		"display stream must not leak raw JSON tokens to the frontend")
+	assert.Equal(t, 5, strings.Count(rendered, "\n- ")+1,
+		"expected one display line per movement (got %q)", rendered)
+}
+
+// TestAdjustTodolistNextMovementsStreamHandler_DrainsOnNonArrayInput 验证:
+// 当 AI 误把 next_movements 写成非数组形态 (例如裸字符串 / 半截 JSON) 时,
+// handler 必须把 fieldReader 全部排空, 否则上游 producer 会卡在 pipe 上
+// 阻塞整个 react loop.
+//
+// 关键词: stream handler 容错, drain pipe 防卡死, 非数组兜底
+func TestAdjustTodolistNextMovementsStreamHandler_DrainsOnNonArrayInput(t *testing.T) {
+	garbage := strings.Repeat("not-an-array ", 64)
+	pr, pw := io.Pipe()
+	go func() {
+		defer pw.Close()
+		_, _ = io.WriteString(pw, garbage)
+	}()
+
+	done := make(chan struct{})
+	var out bytes.Buffer
+	go func() {
+		defer close(done)
+		adjustTodolistNextMovementsStreamHandler(pr, &out)
+	}()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("handler must not block on malformed (non-array) input")
+	}
+	// 既然原始输入不是合法 JSON 数组, display stream 应该几乎不输出有效内容,
+	// 但绝不应该把裸 garbage 透传到前端.
+	assert.NotContains(t, out.String(), "not-an-array",
+		"non-array garbage must never reach the display stream emitter")
 }
 
 // TestAdjustTodolist_Handler_RecoversWithoutVerifierCache 验证: 即使 handler
