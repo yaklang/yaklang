@@ -236,7 +236,9 @@ type httpPoolConfig struct {
 	// withPayloads 是否查询 payloads
 	WithPayloads bool
 
-	RandomSession bool // for cookie jar
+	RandomSession bool // for cookie jar（保留选项，session 由 lowhttp.HTTP 在 session 为空时自动分配）
+
+	DisableSession bool
 
 	SaveHTTPFlow bool // 是否保存 HTTP 流量
 
@@ -705,6 +707,12 @@ func _httpPool_withPayloads(b bool) HttpPoolConfigOption {
 func _httpPool_withRandomSession(randomSession bool) HttpPoolConfigOption {
 	return func(config *httpPoolConfig) {
 		config.RandomSession = randomSession
+	}
+}
+
+func _httpPool_withDisableSession(disableSession bool) HttpPoolConfigOption {
+	return func(config *httpPoolConfig) {
+		config.DisableSession = disableSession
 	}
 }
 
@@ -1364,9 +1372,8 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 							lowhttpOptions = append(lowhttpOptions, lowhttp.WithSNI(*config.SNI))
 						}
 
-						if config.RandomSession {
-							tmpSession := uuid.NewString()
-							lowhttpOptions = append(lowhttpOptions, lowhttp.WithSession(tmpSession))
+						if config.DisableSession {
+							lowhttpOptions = append(lowhttpOptions, lowhttp.WithDisableSession(true))
 						}
 
 						if config.FromPlugin != "" {
@@ -1836,6 +1843,7 @@ var (
 	WithPoolOpt_ExternSwitch               = _httpPool_ExternSwitch
 	WithPoolOpt_WithPayloads               = _httpPool_withPayloads
 	WithPoolOpt_RandomSession              = _httpPool_withRandomSession
+	WithPoolOpt_DisableSession             = _httpPool_withDisableSession
 	WithPoolOpt_SaveHTTPFlow               = _httpPool_withSaveHTTPFlow
 	WithPoolOpt_EnableRandomChunked        = _httpPool_enableRandomChunked
 	WithPoolOpt_AutoDetectSSE              = _httpPool_AutoDetectSSE

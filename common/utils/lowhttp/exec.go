@@ -77,11 +77,12 @@ func HTTP(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		opt(option)
 	}
 
-	if option.Session == nil {
-		sessionId := uuid.New().String()
-		option.Session = sessionId
+	if !option.DisableSession {
+		if option.Session == "" {
+			option.Session = uuid.NewString()
+			defer RemoveCookiejar(option.Session)
+		}
 		opts = append(opts, WithSession(option.Session))
-		defer RemoveCookiejar(sessionId)
 	}
 
 	if option.WithConnPool && option.ConnPool == nil {
@@ -556,9 +557,9 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 	// 逐个记录 response 中的内容
 	response.Url = urlStr
 
-	// 获取 cookiejar（仅在 session != nil 时启用自动 cookie 管理）
+	// 获取 cookiejar（仅在 session 非空时启用自动 cookie 管理）
 	var cookiejar http.CookieJar
-	if session != nil {
+	if session != "" {
 		cookiejar = GetCookiejar(session)
 		cookies := cookiejar.Cookies(urlIns)
 		if cookies != nil {
@@ -1208,12 +1209,12 @@ RECONNECT:
 	}
 
 	// 更新 cookiejar 中的 cookie
-	if session != nil && firstResponse != nil {
+	if session != "" && firstResponse != nil {
 		cookiejar.SetCookies(urlIns, firstResponse.Cookies())
 	}
 
 	// 将请求中的cookie更新到cookiejar中
-	if session != nil && reqIns != nil {
+	if session != "" && reqIns != nil {
 		reqCookies := reqIns.Cookies()
 		for _, cookie := range reqCookies {
 			// 限制domain为当前域, path为当前路径

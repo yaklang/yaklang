@@ -504,9 +504,16 @@ func WithContext(ctx context.Context) http_struct.HttpOption {
 // ```
 // rsp, err = http.Get("http://www.yaklang.com", http.session("request1"))
 // ```
-func WithSession(value interface{}) http_struct.HttpOption {
+func WithSession(value string) http_struct.HttpOption {
 	return func(config *http_struct.HTTPConfig) {
-		config.AppendPocOpts(poc.WithSession(utils.InterfaceToString(value)))
+		config.AppendPocOpts(poc.WithSession(value))
+	}
+}
+
+// disableSession 为 true 时不自动分配 session，也不使用 cookie jar
+func WithDisableSession(b bool) http_struct.HttpOption {
+	return func(config *http_struct.HTTPConfig) {
+		config.AppendPocOpts(poc.WithDisableSession(b))
 	}
 }
 
@@ -735,7 +742,8 @@ var HttpExports = map[string]interface{}{
 	"noredirect": WithNoRedirect,
 
 	// session
-	"session": WithSession,
+	"session":         WithSession,
+	"disableSession":  WithDisableSession,
 
 	// context
 	"source":           WithSource,
