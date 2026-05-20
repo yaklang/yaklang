@@ -412,6 +412,9 @@ func (s *AIStatefulTaskBase) GetStatus() AITaskState {
 }
 
 func (s *AIStatefulTaskBase) SetStatus(status AITaskState) {
+	if s.IsFinished() {
+		return // 已完成的任务状态不可更改
+	}
 	old := s.status
 	s.status = status
 
