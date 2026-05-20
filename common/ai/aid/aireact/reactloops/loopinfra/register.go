@@ -17,4 +17,8 @@ func init() {
 	reactloops.RegisterAction(loopAction_LoadSkillResources)
 	reactloops.RegisterAction(loopAction_SearchCapabilities)
 	reactloops.RegisterAction(loopAction_LoadCapability)
+	// adjust_todolist 主循环 TODO 通道, 与 verification.next_movements 共享 store,
+	// 写入全局动作表后由 NewReActLoop 默认 inject 给所有 loop.
+	// 关键词: adjust_todolist 全局注册, 默认所有 loop 可见
+	reactloops.RegisterAction(loopAction_AdjustTodolist)
 }

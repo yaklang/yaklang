@@ -432,32 +432,20 @@ func (r *ReAct) enforceTodoCompletionBeforeSatisfaction(result *aicommon.VerifyS
 // 否则会和 stream 事件之间形成不可控的时序窗口 (CI 超时偶发会让消费者侧观
 // 察不到 timeline 已写入).
 //
+// 实际格式化交给 aicommon.FormatNextMovementsBreadcrumb, 该函数也被
+// adjust_todolist 主循环路径复用, 保证两条通道写出的 timeline breadcrumb
+// 字节一致.
+//
 // 关键词: addNextMovementsBreadcrumb, delta-only timeline 事件, TODO 时间戳信号
 func (r *ReAct) addNextMovementsBreadcrumb(result *aicommon.VerifySatisfactionResult) {
-	if r == nil || result == nil || len(result.NextMovements) == 0 {
+	if r == nil || result == nil {
 		return
 	}
-	var lines []string
-	for _, m := range result.NextMovements {
-		op := strings.ToUpper(strings.TrimSpace(m.Op))
-		if op == "" {
-			op = "ADD"
-		}
-		id := strings.TrimSpace(m.ID)
-		content := strings.TrimSpace(m.Content)
-		switch {
-		case id != "" && content != "":
-			lines = append(lines, fmt.Sprintf("%s[%s]: %s", op, id, content))
-		case id != "":
-			lines = append(lines, fmt.Sprintf("%s[%s]", op, id))
-		case content != "":
-			lines = append(lines, fmt.Sprintf("%s: %s", op, content))
-		}
-	}
-	if len(lines) == 0 {
+	line := aicommon.FormatNextMovementsBreadcrumb(result.NextMovements)
+	if line == "" {
 		return
 	}
-	r.AddToTimeline("NEXT_MOVEMENTS", strings.Join(lines, "\n"))
+	r.AddToTimeline("NEXT_MOVEMENTS", line)
 }
 
 // emitTodoListUpdate publishes the post-commit TODO snapshot as a structured
@@ -671,42 +659,15 @@ func normalizeEvidenceOperations(action *aicommon.Action) []aicommon.EvidenceOpe
 	return ops
 }
 
+// normalizeVerifyNextMovements is a thin wrapper around the public
+// aicommon.NormalizeVerifyNextMovements helper. The verification path keeps
+// its own private symbol so existing call sites and tests in this package
+// do not need to be touched, while the underlying parsing logic stays in
+// aicommon and is also reused by the main-loop adjust_todolist action.
+//
+// 关键词: normalizeVerifyNextMovements thin wrapper, aicommon 单源,
+//
+//	adjust_todolist 复用
 func normalizeVerifyNextMovements(action *aicommon.Action) []aicommon.VerifyNextMovement {
-	if action == nil {
-		return nil
-	}
-	nextMovementsRaw := action.GetInvokeParamsArray("next_movements")
-	nextMovements := make([]aicommon.VerifyNextMovement, 0, len(nextMovementsRaw))
-	for _, movement := range nextMovementsRaw {
-		if movement == nil {
-			continue
-		}
-		op := strings.ToLower(strings.TrimSpace(movement.GetString("op")))
-		if op == "pending" {
-			op = "doing"
-		}
-		id := strings.TrimSpace(movement.GetString("id"))
-		content := strings.TrimSpace(movement.GetString("content"))
-		if op == "" || id == "" {
-			continue
-		}
-		nextMovements = append(nextMovements, aicommon.VerifyNextMovement{
-			Op:      op,
-			Content: content,
-			ID:      id,
-		})
-	}
-	if len(nextMovements) > 0 {
-		return nextMovements
-	}
-
-	legacy := strings.TrimSpace(action.GetString("next_movements"))
-	if legacy == "" {
-		return nil
-	}
-	return []aicommon.VerifyNextMovement{{
-		Op:      "add",
-		ID:      "legacy_next_movements",
-		Content: legacy,
-	}}
+	return aicommon.NormalizeVerifyNextMovements(action)
 }
