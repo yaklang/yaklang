@@ -1,6 +1,12 @@
 package aicommon
 
-import "testing"
+import (
+	"encoding/json"
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/schema"
+	"testing"
+)
 
 func TestAIStatefulTaskBase_TaskSemanticAccessors(t *testing.T) {
 	task := NewStatefulTaskBase("task-1", "input", nil, nil, true)
@@ -39,4 +45,21 @@ func TestAIStatefulTaskBase_TaskSemanticAccessors(t *testing.T) {
 	if got.Target != "提升可读性" {
 		t.Fatalf("target should be returned as a copy")
 	}
+}
+
+func TestAIStatefulTaskBase_TaskCannotUpdateFinishStatus(t *testing.T) {
+	task := NewStatefulTaskBase("task-1", "input", nil, NewEmitter(uuid.NewString(), func(e *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
+		if e.Type == schema.EVENT_TYPE_STRUCTURED && e.NodeId == "react_task_status_changed" {
+			var data map[string]interface{}
+			if err := json.Unmarshal(e.Content, data); err != nil {
+				return nil, err
+			}
+			require.NotEqual(t, AITaskState_Completed, data["react_task_now_status"].(string))
+		}
+		return nil, nil
+	}), false)
+	task.SetStatus(AITaskState_Aborted)
+	require.Equal(t, AITaskState_Aborted, task.GetStatus())
+	task.SetStatus(AITaskState_Completed)
+	require.Equal(t, AITaskState_Aborted, task.GetStatus(), "status should not change to Finished after being Aborted")
 }
