@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiskillloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 )
 
@@ -61,32 +60,13 @@ func (r *reActLoopCapabilityContext) DynamicForges() []aicommon.CapabilityInvent
 	return result
 }
 
-func (r *reActLoopCapabilityContext) LoadedSkills() []aicommon.CapabilityInventoryNamedItem {
+func (r *reActLoopCapabilityContext) InventorySkills() []aicommon.CapabilityInventoryNamedItem {
 	mgr := (*ReActLoop)(r).GetSkillsContextManager()
-	if mgr == nil {
-		return nil
-	}
-	return buildLoadedSkillItems(mgr.GetCurrentSelectedSkills())
+	return aicommon.BuildInventorySkillsFromManager(mgr)
 }
 
 func BuildCapabilityInventoryPayload(cfg *aicommon.Config, loop *ReActLoop) aicommon.CapabilityInventoryPayload {
 	return aicommon.BuildCapabilityInventoryPayload(cfg, loop.capabilityInventoryContext())
-}
-
-func buildLoadedSkillItems(selected []*aiskillloader.SkillMeta) []aicommon.CapabilityInventoryNamedItem {
-	result := make([]aicommon.CapabilityInventoryNamedItem, 0, len(selected))
-	for _, item := range selected {
-		if item == nil || strings.TrimSpace(item.Name) == "" {
-			continue
-		}
-		result = append(result, aicommon.CapabilityInventoryNamedItem{
-			Name:        item.Name,
-			VerboseName: item.Name,
-			Description: item.Description,
-			Category:    "skill",
-		})
-	}
-	return result
 }
 
 func EmitCapabilityInventorySnapshot(cfg *aicommon.Config, loop *ReActLoop) {

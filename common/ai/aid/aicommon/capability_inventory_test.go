@@ -3,13 +3,23 @@ package aicommon
 import (
 	"testing"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiskillloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
+	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/stretchr/testify/require"
 )
 
+func testSkillInventoryVFS() *filesys.VirtualFS {
+	vfs := filesys.NewVirtualFs()
+	vfs.AddFile("deploy-app/SKILL.md", "---\nname: deploy-app\ndescription: deploy\n---\n# Deploy\n")
+	vfs.AddFile("code-review/SKILL.md", "---\nname: code-review\ndescription: review\n---\n# Review\n")
+	return vfs
+}
+
 type testCapabilityInventoryLoop struct {
-	extraTools []*aitool.Tool
+	extraTools        []*aitool.Tool
+	inventorySkills   []CapabilityInventoryNamedItem
 }
 
 func (t *testCapabilityInventoryLoop) PromptCandidateTools() []*aitool.Tool { return nil }
@@ -19,7 +29,9 @@ func (t *testCapabilityInventoryLoop) DynamicExtraTools() []*aitool.Tool {
 	return t.extraTools
 }
 func (t *testCapabilityInventoryLoop) DynamicForges() []CapabilityInventoryNamedItem { return nil }
-func (t *testCapabilityInventoryLoop) LoadedSkills() []CapabilityInventoryNamedItem { return nil }
+func (t *testCapabilityInventoryLoop) InventorySkills() []CapabilityInventoryNamedItem {
+	return t.inventorySkills
+}
 
 func TestBuildCapabilityInventoryPayload_SplitsFixedAndDynamicTools(t *testing.T) {
 	fixedTool := aitool.NewWithoutCallback("grep", aitool.WithDescription("grep files"))
@@ -101,7 +113,7 @@ func (l *allowToolCallLoop) ScenarioToolWhitelist() []string                    
 func (l *allowToolCallLoop) AllowToolCall() bool                                  { return l.allow }
 func (l *allowToolCallLoop) DynamicExtraTools() []*aitool.Tool                    { return nil }
 func (l *allowToolCallLoop) DynamicForges() []CapabilityInventoryNamedItem        { return nil }
-func (l *allowToolCallLoop) LoadedSkills() []CapabilityInventoryNamedItem       { return nil }
+func (l *allowToolCallLoop) InventorySkills() []CapabilityInventoryNamedItem { return nil }
 
 func TestIsFixedInventoryTool(t *testing.T) {
 	require.True(t, IsFixedInventoryTool("grep"))
@@ -140,6 +152,52 @@ func TestResolvePromptCandidateTools_FallsBackToEnableTools(t *testing.T) {
 		}
 	}
 	require.True(t, found)
+}
+
+func TestBuildInventorySkillsFromLoader_MetadataAndLoaded(t *testing.T) {
+	loader, err := aiskillloader.NewFSSkillLoader(testSkillInventoryVFS())
+	require.NoError(t, err)
+
+	all := BuildInventorySkillsFromLoader(loader, nil)
+	require.Len(t, all, 2)
+	byName := map[string]CapabilityInventoryNamedItem{}
+	for _, item := range all {
+		byName[item.Name] = item
+	}
+	require.Equal(t, CapabilityInventorySkillLoadMetadata, byName["code-review"].SkillLoadState)
+	require.Equal(t, CapabilityInventorySkillLoadMetadata, byName["deploy-app"].SkillLoadState)
+
+	loaded, err := loader.LoadSkill("deploy-app")
+	require.NoError(t, err)
+	require.NotNil(t, loaded)
+
+	mgr := aiskillloader.NewSkillsContextManager(loader)
+	require.NoError(t, mgr.LoadSkill("deploy-app"))
+
+	withLoaded := BuildInventorySkillsFromManager(mgr)
+	require.Len(t, withLoaded, 2)
+	byName = map[string]CapabilityInventoryNamedItem{}
+	for _, item := range withLoaded {
+		byName[item.Name] = item
+	}
+	require.Equal(t, CapabilityInventorySkillLoadLoaded, byName["deploy-app"].SkillLoadState)
+	require.Equal(t, CapabilityInventorySkillLoadMetadata, byName["code-review"].SkillLoadState)
+}
+
+func TestBuildCapabilityInventoryPayload_IncludesInventorySkills(t *testing.T) {
+	loader, err := aiskillloader.NewFSSkillLoader(testSkillInventoryVFS())
+	require.NoError(t, err)
+
+	cfg := &Config{TopToolsCount: 100}
+	payload := BuildCapabilityInventoryPayload(cfg, &testCapabilityInventoryLoop{
+		inventorySkills: BuildInventorySkillsFromLoader(loader, nil),
+	})
+
+	require.Len(t, payload.Dynamic.Skills, 2)
+	for _, skill := range payload.Dynamic.Skills {
+		require.Equal(t, "skill", skill.Category)
+		require.Equal(t, CapabilityInventorySkillLoadMetadata, skill.SkillLoadState)
+	}
 }
 
 func TestSelectToolInventoryTools_MoreToolsCount(t *testing.T) {

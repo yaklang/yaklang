@@ -20,11 +20,19 @@ type CapabilityInventoryToolItem struct {
 	Keywords    []string `json:"keywords,omitempty"`
 }
 
+// Skill load states for capability_inventory.skills entries (SkillLoadState field).
+const (
+	CapabilityInventorySkillLoadMetadata = "metadata" // in prompt Available Skills registry only
+	CapabilityInventorySkillLoadLoaded   = "loaded"   // fully loaded into SKILLS_CONTEXT
+)
+
 type CapabilityInventoryNamedItem struct {
 	Name        string `json:"name"`
 	VerboseName string `json:"verbose_name,omitempty"`
 	Description string `json:"description,omitempty"`
 	Category    string `json:"category,omitempty"`
+	// SkillLoadState is set for category "skill" only: "metadata" | "loaded".
+	SkillLoadState string `json:"skill_load_state,omitempty"`
 }
 
 type CapabilityInventorySection struct {
@@ -47,7 +55,8 @@ type CapabilityInventoryLoopContext interface {
 	AllowToolCall() bool
 	DynamicExtraTools() []*aitool.Tool
 	DynamicForges() []CapabilityInventoryNamedItem
-	LoadedSkills() []CapabilityInventoryNamedItem
+	// InventorySkills lists registry + loaded skills with SkillLoadState (see constants above).
+	InventorySkills() []CapabilityInventoryNamedItem
 }
 
 // ConfigPromptCapabilityLoopContext 表示无 loop 时的 prompt 工具上下文,
@@ -61,7 +70,7 @@ func (ConfigPromptCapabilityLoopContext) DynamicExtraTools() []*aitool.Tool   { 
 func (ConfigPromptCapabilityLoopContext) DynamicForges() []CapabilityInventoryNamedItem {
 	return nil
 }
-func (ConfigPromptCapabilityLoopContext) LoadedSkills() []CapabilityInventoryNamedItem { return nil }
+func (ConfigPromptCapabilityLoopContext) InventorySkills() []CapabilityInventoryNamedItem { return nil }
 
 func resolveCapabilityInventoryLoopContext(loop CapabilityInventoryLoopContext) CapabilityInventoryLoopContext {
 	if loop != nil {
@@ -182,8 +191,19 @@ func BuildCapabilityInventoryPayload(cfg *Config, loop CapabilityInventoryLoopCo
 	payload.Fixed.MCPServers = collectEnabledMCPServers(cfg.DisallowMCPServers)
 	payload.Dynamic.Tools = dynamicTools
 	payload.Dynamic.Forges = loop.DynamicForges()
-	payload.Dynamic.Skills = loop.LoadedSkills()
+	payload.Dynamic.Skills = resolveCapabilityInventorySkills(cfg, loop)
 	return payload
+}
+
+func resolveCapabilityInventorySkills(cfg *Config, loop CapabilityInventoryLoopContext) []CapabilityInventoryNamedItem {
+	skills := loop.InventorySkills()
+	if len(skills) > 0 {
+		return skills
+	}
+	if cfg == nil {
+		return nil
+	}
+	return BuildInventorySkillsFromLoader(cfg.GetSkillLoader(), nil)
 }
 
 // BuildBaseCapabilityInventoryPayload 保留给 coordinator 初始化 emit.

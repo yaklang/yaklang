@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/jinzhu/gorm"
-	"github.com/yaklang/yaklang/common/ai/ytoken"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
@@ -385,6 +384,13 @@ func (m *SkillsContextManager) GetLoader() SkillLoader {
 	return m.loader
 }
 
+// TokenEstimator returns the optional custom token estimator for prompt sizing.
+func (m *SkillsContextManager) TokenEstimator() func(string) int {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.tokenEstimator
+}
+
 // Render generates the full skills context string for injection into the prompt.
 func (m *SkillsContextManager) Render(nonce string) string {
 	if strings.TrimSpace(nonce) == "" {
@@ -462,7 +468,7 @@ func (m *SkillsContextManager) renderWithTag(tag string) string {
 //
 // 关键词: SkillsContext appendAvailableSkillsSection, registry listing 稳定
 func (m *SkillsContextManager) appendAvailableSkillsSection(buf *bytes.Buffer) {
-	skills := sortSkillMetasByName(m.loader.AllSkillMetas())
+	skills := m.loader.AllSkillMetas()
 	stats := GetSkillSourceStats(m.loader)
 
 	if len(skills) == 0 {
@@ -475,17 +481,13 @@ func (m *SkillsContextManager) appendAvailableSkillsSection(buf *bytes.Buffer) {
 		return
 	}
 
-	buf.WriteString("== Available Skills (use loading_skills action to load) ==\n")
-	listed := 0
-	for _, s := range skills {
-		line := fmt.Sprintf("  - %s: %s\n", s.Name, s.Description)
-		if m.measureSize(buf.String())+m.measureSize(line) > MetadataListMaxTokens {
-			remaining := len(skills) - listed
-			buf.WriteString(fmt.Sprintf("  ... and %d more skills. Use search_capabilities to find specific skills.\n", remaining))
-			break
-		}
-		buf.WriteString(line)
-		listed++
+	listed, omitted := SelectSkillMetasForPromptRegistry(skills, m.tokenEstimator)
+	buf.WriteString(AvailableSkillsRegistryHeader)
+	for _, meta := range listed {
+		buf.WriteString(FormatAvailableSkillRegistryLine(meta))
+	}
+	if omitted > 0 {
+		buf.WriteString(AvailableSkillsOverflowHint(omitted))
 	}
 	if stats.DatabaseCount > 0 {
 		buf.WriteString(fmt.Sprintf("  ... plus %d database-backed skills available via search.\n", stats.DatabaseCount))
@@ -690,12 +692,8 @@ func (m *SkillsContextManager) estimateContextSize() int {
 }
 
 // measureSize returns the size of a rendered string in tokens.
-// Uses the custom tokenEstimator if set, otherwise falls back to ytoken.CalcTokenCount.
 func (m *SkillsContextManager) measureSize(rendered string) int {
-	if m.tokenEstimator != nil {
-		return m.tokenEstimator(rendered)
-	}
-	return ytoken.CalcTokenCount(rendered)
+	return MeasureStringTokens(rendered, m.tokenEstimator)
 }
 
 func buildKeywordsString(meta *SkillMeta) string {
