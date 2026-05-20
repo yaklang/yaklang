@@ -223,15 +223,15 @@ func (pm *PromptManager) NewPromptMaterials(base *reactloops.LoopPromptBaseMater
 		materials.OSArch = base.OSArch
 		materials.WorkingDir = base.WorkingDir
 		materials.WorkingDirGlance = base.WorkingDirGlance
-		// session_artifacts 不再走 ContextProviderManager / Pure Dynamic; 在
-		// 构造 materials 时直接调 RenderSessionArtifactsListing 抓取 workdir
-		// 文件清单, 后续由 renderWorkspaceBlock 嵌入 Workspace 块下方.
-		// 关键词: SessionArtifactsListing 注入, Workspace 内嵌, Pure Dynamic 反污染
 		if pm != nil && pm.react != nil && pm.react.config != nil {
-			materials.SessionArtifactsListing = aicommon.RenderSessionArtifactsListing(pm.react.config)
+			artifactBlocks := aicommon.RenderSessionArtifactsFrozenOpen(pm.react.config)
+			materials.SessionArtifactsFrozen = artifactBlocks.Frozen
+			materials.SessionArtifactsOpen = artifactBlocks.Open
 		}
-		materials.Workspace = strings.TrimSpace(base.OSArch+base.WorkingDir+base.WorkingDirGlance) != "" ||
-			strings.TrimSpace(materials.SessionArtifactsListing) != ""
+		materials.Workspace = strings.TrimSpace(base.OSArch+base.WorkingDir+base.WorkingDirGlance) != ""
+	}
+	if pm != nil && pm.react != nil && pm.react.config != nil {
+		materials.FrozenPartitions = append(materials.FrozenPartitions, aicommon.FrozenBlockPartitionsFromConfig(pm.react.config)...)
 	}
 
 	if input != nil {
@@ -252,18 +252,19 @@ func (pm *PromptManager) NewPromptMaterials(base *reactloops.LoopPromptBaseMater
 		// PE-TASK PLAN 产物 (PARENT_TASK + CURRENT_TASK + INSTRUCTION) 通过
 		// FrozenUserContext 字段透传, 渲染时位于 timeline-open 段最末尾
 		// (UserHistory 之后), 落在所有 cache 边界之外。早期版本曾尝试
-		// frozen-block / semi-dynamic, 但 EVIDENCE 嵌入 root user input
-		// + 子任务切换造成 PlanContext 内容剧烈抖动, 破坏了上游缓存命中,
-		// 现采用"放弃自身缓存, 保护上游缓存"策略。
+		// frozen-block / semi-dynamic, 但子任务切换会让 PlanContext 内容
+		// 抖动, 破坏上游缓存命中, 现采用"放弃自身缓存, 保护上游缓存"策略。
 		// 关键词: FrozenUserContext 透传, PLAN_CONTEXT, timeline-open 末尾,
 		//        缓存边界外
 		materials.FrozenUserContext = input.FrozenUserContext
+		materials.FrozenPartitions = append(materials.FrozenPartitions, input.FrozenPartitions...)
 	}
 	if base != nil {
 		// UserHistory 来自 LoopPromptBaseMaterials (config.FormatUserInputHistoryAITag)
 		materials.UserHistory = base.UserHistory
 	}
 
+	materials.FrozenPartitions = aicommon.NormalizeFrozenBlockPartitions(materials.FrozenPartitions)
 	return materials
 }
 
@@ -351,6 +352,8 @@ func (pm *PromptManager) buildLoopPromptSectionData(base *reactloops.LoopPromptB
 		"WorkingDir":              "",
 		"WorkingDirGlance":        "",
 		"SessionArtifactsListing": "",
+		"SessionArtifactsFrozen":  "",
+		"SessionArtifactsOpen":    "",
 		"Workspace":               false,
 		"AutoContext":             "",
 		"UserHistory":             "",
@@ -372,17 +375,7 @@ func (pm *PromptManager) buildLoopPromptSectionData(base *reactloops.LoopPromptB
 		data["OSArch"] = base.OSArch
 		data["WorkingDir"] = base.WorkingDir
 		data["WorkingDirGlance"] = base.WorkingDirGlance
-		// session_artifacts 已合入 Workspace 块, 这里同步把 listing 注入 data
-		// 让 legacy timeline section / 兼容路径模板都能消费; Workspace 启用
-		// 判定也跟着 listing 状态走, 避免环境为空但 artifacts 非空时被过滤掉.
-		// 关键词: SessionArtifactsListing 兼容路径注入, Workspace 启用扩展
-		var artifactsListing string
-		if pm != nil && pm.react != nil && pm.react.config != nil {
-			artifactsListing = aicommon.RenderSessionArtifactsListing(pm.react.config)
-		}
-		data["SessionArtifactsListing"] = artifactsListing
-		data["Workspace"] = strings.TrimSpace(base.OSArch+base.WorkingDir+base.WorkingDirGlance) != "" ||
-			strings.TrimSpace(artifactsListing) != ""
+		data["Workspace"] = strings.TrimSpace(base.OSArch+base.WorkingDir+base.WorkingDirGlance) != ""
 		data["AutoContext"] = base.AutoContext
 		data["UserHistory"] = base.UserHistory
 		data["ToolsCount"] = base.ToolsCount
@@ -490,6 +483,32 @@ func (pm *PromptManager) buildFrozenBlockObservation(
 			true,
 			renderForgeInventoryBlock(materials),
 		),
+	}
+	var partitions []aicommon.FrozenBlockPartition
+	if materials != nil {
+		partitions = aicommon.NormalizeFrozenBlockPartitions(materials.FrozenPartitions)
+	}
+	for _, partition := range partitions {
+		label := partition.Title
+		if strings.TrimSpace(label) == "" {
+			label = partition.ID
+		}
+		children = append(children, reactloops.NewPromptSectionObservation(
+			"section.frozen_block.partition."+partition.ID,
+			label,
+			reactloops.PromptSectionRoleFrozenBlock,
+			true,
+			renderFrozenPartitionBlock(partition),
+		))
+	}
+	children = append(children,
+		reactloops.NewPromptSectionObservation(
+			"section.frozen_block.session_artifacts_frozen",
+			"Session Artifacts (Frozen)",
+			reactloops.PromptSectionRoleFrozenBlock,
+			true,
+			renderSessionArtifactsFrozenBlock(materials),
+		),
 		reactloops.NewPromptSectionObservation(
 			"section.frozen_block.timeline_frozen",
 			"Timeline (Frozen Prefix)",
@@ -497,7 +516,7 @@ func (pm *PromptManager) buildFrozenBlockObservation(
 			true,
 			renderTimelineFrozenBlock(materials),
 		),
-	}
+	)
 	section.Children = filterIncludedPromptSections(children)
 	if strings.TrimSpace(rendered) != "" {
 		section.Content = ""
@@ -515,10 +534,7 @@ func (pm *PromptManager) buildFrozenBlockObservation(
 //
 // 物理位置: timeline-open 段最末尾 (UserHistory 之后)。timeline-open 段不被
 // AI_CACHE_FROZEN / AI_CACHE_SEMI 任何缓存边界包裹, 是"易变尾段"。这样安排
-// 是因为 PlanContext 内容会随两个独立维度抖动:
-//   - PE-TASK 子任务切换 (CURRENT_TASK 内容变化);
-//   - root user input 因 EvidenceOps 触发 syncRootTaskPlanContextDocs 嵌入
-//     新 FACTS/DOCUMENT 块而变化。
+// 是因为 PlanContext 内容会随 PE-TASK 子任务切换抖动 (CURRENT_TASK 内容变化)。
 //
 // 早期版本试图把 PlanContext 放进 frozen-block / semi-dynamic 等"可缓存段",
 // 但这种本质易变的内容不适合缓存; 保护策略改为让其落在所有 cache 边界外,
@@ -592,8 +608,8 @@ func (pm *PromptManager) buildSemiDynamic1Observation(
 // user3 (ephemeral cc), 与 buildSemiDynamic1Observation 一起被 dashscope 视作
 // 合并 prefix cache 计算 (cc 锚点落在本段末尾, prefix 跨过 semi-1).
 //
-// PlanContext 已彻底迁出本段 (历史曾位于 semi-dynamic 段, 但 EVIDENCE 嵌入 root
-// user input 导致内容抖动破坏 AI_CACHE_SEMI 命中; 现已迁到 timeline-open 段末尾,
+// PlanContext 已彻底迁出本段 (历史曾位于 semi-dynamic 段, 但子任务切换会让
+// 内容抖动并破坏 AI_CACHE_SEMI 命中; 现已迁到 timeline-open 段末尾,
 // 落在所有 cache 边界之外, 见 buildTimelineOpenObservation)。
 //
 // 关键词: buildSemiDynamic2Observation, TaskInstruction, Schema, OutputExample,
@@ -657,8 +673,8 @@ func (pm *PromptManager) buildSemiDynamic2Observation(
 }
 
 // buildTimelineOpenObservation 给"PROMPT_SECTION_timeline-open 段"做观测树:
-// Timeline 末桶 (+ midterm 检索结果) + SessionEvidence + Workspace +
-// UserHistory + Current Time + PlanContext (末尾)。
+// Timeline 末桶 (+ midterm 检索结果) + SessionEvidence + TodoSnapshot + Workspace +
+// SessionArtifactsOpen + UserHistory + Current Time + PlanContext (末尾)。
 //
 // 段内排序原则 (P1-C3 调整):
 //  1. Timeline (Open Tail) 在最前: 时间线最末桶是模型理解"刚发生了什么"的
@@ -666,15 +682,18 @@ func (pm *PromptManager) buildSemiDynamic2Observation(
 //  2. Session Evidence 紧跟其后: SESSION_ARTIFACTS 是 Config 级持久化观测
 //     (跨 turn 累积的工件证据), 与 Timeline 末桶共同构成"会话级实证"语料,
 //     物理上贴近 Timeline 让两者形成连续语义块。
-//  3. Workspace 居中: OS/Arch + working dir + glance 是相对静态的环境标识,
+//  3. TodoSnapshot 紧跟 SessionEvidence, 暴露全局待办状态。
+//  4. Workspace 居中: OS/Arch + working dir + glance 是相对静态的环境标识,
 //     既不属于"刚发生", 也不属于"用户视角", 居中过渡。
-//  4. User History 在 Workspace 之后: PREV_USER_INPUT 是用户历史输入轨迹,
+//  5. Session Artifacts (Open) 在 Workspace 之后: 最近 task group 与 root files
+//     仍属易变尾段, 不污染 frozen prefix。
+//  6. User History 在 Artifacts 之后: PREV_USER_INPUT 是用户历史输入轨迹,
 //     与 Current Time 一起构成"时序前缀", 紧贴当前时间。
-//  5. Current Time 紧跟 User History: 当前时间是最末稳定的时序锚点, 放在
+//  7. Current Time 紧跟 User History: 当前时间是最末稳定的时序锚点, 放在
 //     User History 之后形成"历史输入 -> 现在"的时间递进, 同时与下方
 //     PlanContext (任务规划) 形成"时间 -> 任务"的语义衔接。
-//  6. Plan Context 末尾: PE-TASK PLAN 产物本质易变 (子任务切换 +
-//     FACTS/DOCUMENT 嵌入 root user input), 放最末让其落在所有 cache
+//  8. Plan Context 末尾: PE-TASK PLAN 产物本质易变 (子任务切换),
+//     放最末让其落在所有 cache
 //     边界外, 不污染上游 system / frozen / semi 三段缓存命中率。
 //
 // timeline-open 整段位于 system / frozen / semi 三段缓存之外, 是 prompt 的
@@ -682,7 +701,7 @@ func (pm *PromptManager) buildSemiDynamic2Observation(
 //
 // 关键词: buildTimelineOpenObservation, Timeline 末桶, SessionEvidence,
 //
-//	Workspace, UserHistory, Current Time, PlanContext 末尾,
+//	Workspace, SessionArtifactsOpen, UserHistory, Current Time, PlanContext 末尾,
 //	段内排序原则, P1-C3 顺序调整, 缓存边界外
 func (pm *PromptManager) buildTimelineOpenObservation(
 	materials *reactloops.PromptPrefixMaterials,
@@ -697,8 +716,8 @@ func (pm *PromptManager) buildTimelineOpenObservation(
 	// "Timeline Open & Workspace" 已经表达层级.
 	// 关键词: section.timeline_open 子节点 Name 去前缀, UI 信息密度
 	//
-	// 子节点排列顺序 (P1-C3): timeline_open -> session_evidence -> workspace ->
-	// user_history -> current_time -> plan_context. 该顺序与 timeline_open_section.txt
+	// 子节点排列顺序: timeline_open -> session_evidence -> todo_list -> workspace ->
+	// session_artifacts_open -> user_history -> current_time -> plan_context. 该顺序与 timeline_open_section.txt
 	// 模板渲染顺序严格一致, 让"上下文成分"面板看到的层级与实际 prompt 字节
 	// 流顺序保持同步.
 	// 关键词: P1-C3 子节点顺序, observation 与模板对齐
@@ -738,6 +757,13 @@ func (pm *PromptManager) buildTimelineOpenObservation(
 			true,
 			renderWorkspaceBlock(materials),
 		),
+		reactloops.NewPromptSectionObservation(
+			"section.timeline_open.session_artifacts_open",
+			"Session Artifacts (Open)",
+			reactloops.PromptSectionRoleTimelineOpen,
+			true,
+			renderSessionArtifactsOpenBlock(materials),
+		),
 		// P1-C3: UserHistory 在 Workspace 之后, 与下方 Current Time 共同
 		// 构成"用户输入历史 -> 现在"的时序前缀.
 		reactloops.NewPromptSectionObservation(
@@ -757,8 +783,8 @@ func (pm *PromptManager) buildTimelineOpenObservation(
 			renderCurrentTimeBlock(materials),
 		),
 		// PlanContext (PE-TASK PLAN 产物) 末尾注入: 该字段仅 PE-TASK 子任务
-		// 非空, 内容随子任务切换 + EvidenceOps 嵌入 root user input 抖动剧烈,
-		// 不适合放任何 cache 边界内。放 timeline-open 段最末让其落在所有
+		// 非空, 内容随子任务切换抖动, 不适合放任何 cache 边界内。
+		// 放 timeline-open 段最末让其落在所有
 		// cache 边界之外, 不污染上游 system / frozen / semi 三段缓存命中。
 		// 关键词: section.timeline_open.plan_context, PLAN_CONTEXT 末尾,
 		//        缓存边界外, 上游缓存保护
@@ -921,27 +947,18 @@ func renderSchemaBlock(schema string) string {
 
 // renderWorkspaceBlock 渲染 timeline-open 段中 Workspace 子块.
 //
-// 之前 SessionArtifacts 走 ContextProviderManager 落到 Pure Dynamic /
-// AutoContext 段, 每次 prompt build 都把 workdir 文件清单塞进 dynamic 区,
-// 干扰严重且与 OS / WorkingDir / Glance 等环境信息分离. 现在直接把
-// SessionArtifactsListing 拼到 Workspace 块下方 (## Session Artifacts 子段),
-// 与文件系统语义合一; Pure Dynamic 段 auto_context 不再含此清单.
+// SessionArtifacts 已迁出 Workspace，作为 SessionArtifactsFrozen /
+// SessionArtifactsOpen 一级块渲染。Workspace 只保留 OS / working dir / glance。
 //
-// 启用判定: 任意 OS/Arch / WorkingDir / WorkingDirGlance / SessionArtifactsListing
-// 之一非空即整块输出, 避免环境字段全空但 artifacts 非空时被过滤掉.
-//
-// 关键词: renderWorkspaceBlock, ## Session Artifacts 子段, Workspace 内嵌,
-//
-//	Pure Dynamic 反污染, SessionArtifactsListing 注入
+// 关键词: renderWorkspaceBlock, Workspace 不再内嵌 Session Artifacts
 func renderWorkspaceBlock(materials *reactloops.PromptPrefixMaterials) string {
 	if materials == nil {
 		return ""
 	}
-	listing := strings.TrimSpace(materials.SessionArtifactsListing)
 	hasEnv := strings.TrimSpace(materials.OSArch) != "" ||
 		strings.TrimSpace(materials.WorkingDir) != "" ||
 		strings.TrimSpace(materials.WorkingDirGlance) != ""
-	if !materials.Workspace || (!hasEnv && listing == "") {
+	if !materials.Workspace || !hasEnv {
 		return ""
 	}
 	var lines []string
@@ -955,12 +972,45 @@ func renderWorkspaceBlock(materials *reactloops.PromptPrefixMaterials) string {
 	if materials.WorkingDirGlance != "" {
 		lines = append(lines, "working dir glance: "+materials.WorkingDirGlance)
 	}
-	if listing != "" {
-		lines = append(lines, "")
-		lines = append(lines, "## Session Artifacts")
-		lines = append(lines, listing)
-	}
 	return strings.Join(lines, "\n")
+}
+
+func renderFrozenPartitionBlock(partition aicommon.FrozenBlockPartition) string {
+	partition.Content = strings.TrimSpace(partition.Content)
+	if partition.Content == "" {
+		return ""
+	}
+	partition.ID = aicommon.NormalizeFrozenPartitionID(partition.ID)
+	partition.Title = strings.TrimSpace(partition.Title)
+	if partition.Title == "" {
+		partition.Title = partition.ID
+	}
+	partition.Nonce = strings.TrimSpace(partition.Nonce)
+	if partition.Nonce == "" {
+		partition.Nonce = aicommon.StablePromptNonce("frozen-partition", partition.ID, partition.Content)
+	}
+	return fmt.Sprintf("# %s\n<|FROZEN_PARTITION_%s_%s|>\n%s\n<|FROZEN_PARTITION_END_%s_%s|>",
+		partition.Title,
+		partition.ID,
+		partition.Nonce,
+		partition.Content,
+		partition.ID,
+		partition.Nonce,
+	)
+}
+
+func renderSessionArtifactsFrozenBlock(materials *reactloops.PromptPrefixMaterials) string {
+	if materials == nil || strings.TrimSpace(materials.SessionArtifactsFrozen) == "" {
+		return ""
+	}
+	return "# Session Artifacts (Frozen)\n" + materials.SessionArtifactsFrozen
+}
+
+func renderSessionArtifactsOpenBlock(materials *reactloops.PromptPrefixMaterials) string {
+	if materials == nil || strings.TrimSpace(materials.SessionArtifactsOpen) == "" {
+		return ""
+	}
+	return "# Session Artifacts (Open)\n" + materials.SessionArtifactsOpen
 }
 
 // renderToolInventoryBlock 是给 observation 树 (UI / 调试) 用的镜像渲染, 必须

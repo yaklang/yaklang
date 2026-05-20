@@ -2,6 +2,8 @@ package aireact
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -384,11 +386,70 @@ func TestPromptManager_AssemblePromptPrefix(t *testing.T) {
 	require.Len(t, prefix.Sections, 5)
 	require.Contains(t, prefix.Prompt, "<|TRAITS|>")
 	require.Contains(t, prefix.Prompt, "<|SCHEMA|>")
+	require.NotContains(t, prefix.Prompt, "Plan Facts")
+	require.NotContains(t, prefix.Prompt, "Plan Document")
 	require.Equal(t, "section.high_static", prefix.Sections[0].Key)
 	require.Equal(t, "section.frozen_block", prefix.Sections[1].Key)
 	require.Equal(t, "section.semi_dynamic_1", prefix.Sections[2].Key)
 	require.Equal(t, "section.semi_dynamic_2", prefix.Sections[3].Key)
 	require.Equal(t, "section.timeline_open", prefix.Sections[4].Key)
+}
+
+func TestPromptManager_AssemblePromptPrefix_FrozenPartitionsInFrozenBlock(t *testing.T) {
+	react, err := NewTestReAct(
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action":"object","next_action":{"type":"directly_answer","answer_payload":"ok"},"cumulative_summary":"ok","human_readable_thought":"ok"}`))
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+	require.NoError(t, err)
+
+	facts, ok := aicommon.NewFrozenBlockPartition("plan_facts", "Plan Facts", "## Facts\n- stable", 100)
+	require.True(t, ok)
+	document, ok := aicommon.NewFrozenBlockPartition("plan_document", "Plan Document", "## Document\n- stable", 110)
+	require.True(t, ok)
+
+	prefix, err := react.promptManager.AssemblePromptPrefix(&aicommon.PromptMaterials{
+		FrozenPartitions: []aicommon.FrozenBlockPartition{document, facts},
+	})
+	require.NoError(t, err)
+	require.Contains(t, prefix.FrozenBlock, "# Plan Facts")
+	require.Contains(t, prefix.FrozenBlock, "# Plan Document")
+	require.Less(t, strings.Index(prefix.FrozenBlock, "# Plan Facts"), strings.Index(prefix.FrozenBlock, "# Plan Document"))
+	require.Contains(t, prefix.FrozenBlock, "<|FROZEN_PARTITION_plan_facts_"+facts.Nonce+"|>")
+	require.Contains(t, prefix.FrozenBlock, "<|FROZEN_PARTITION_END_plan_document_"+document.Nonce+"|>")
+
+	frozen := prefix.Sections[1]
+	require.Equal(t, "section.frozen_block", frozen.Key)
+	var keys []string
+	for _, child := range frozen.Children {
+		keys = append(keys, child.Key)
+	}
+	require.Contains(t, keys, "section.frozen_block.partition.plan_facts")
+	require.Contains(t, keys, "section.frozen_block.partition.plan_document")
+}
+
+func TestPromptManager_NewPromptMaterials_ConfigFrozenPartitionProducer(t *testing.T) {
+	produced, ok := aicommon.NewFrozenBlockPartition("plan_facts", "Plan Facts", "## Facts\n- from config", 100)
+	require.True(t, ok)
+	react, err := NewTestReAct(
+		aicommon.WithFrozenBlockPartitionProducer(func() []aicommon.FrozenBlockPartition {
+			return []aicommon.FrozenBlockPartition{produced}
+		}),
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			rsp := i.NewAIResponse()
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+	require.NoError(t, err)
+
+	materials := react.promptManager.NewPromptMaterials(&reactloops.LoopPromptBaseMaterials{}, nil)
+	require.Len(t, materials.FrozenPartitions, 1)
+	require.Equal(t, "plan_facts", materials.FrozenPartitions[0].ID)
+	require.Equal(t, produced.Content, materials.FrozenPartitions[0].Content)
 }
 
 // TestPromptManager_AssembleLoopPrompt_HijackFiveSegment 验证 aireact 主路径
@@ -517,6 +578,55 @@ func TestPromptManager_AssembleLoopPrompt_HijackFiveSegment(t *testing.T) {
 	require.NotContains(t, user4Content, "<|AI_CACHE_SEMI2_semi|>",
 		"user4 must NOT contain semi-2 START tag")
 	requireMessageHasNoCacheControl(t, user4, "user4 open+dynamic")
+}
+
+func TestPromptManager_AssembleLoopPrompt_HijackArtifactsFrozenOpenPlacement(t *testing.T) {
+	restore := aicache.SetMinCachableUserSegmentBytesForTest(0)
+	defer restore()
+
+	workDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(workDir, "task_1-1_done"), 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(workDir, "task_1-1_done", "result.txt"), []byte("done"), 0644))
+	require.NoError(t, os.MkdirAll(filepath.Join(workDir, "task_1-2_open"), 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(workDir, "task_1-2_open", "result.txt"), []byte("open"), 0644))
+
+	react, err := NewTestReAct(
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action":"object","next_action":{"type":"directly_answer","answer_payload":"ok"},"cumulative_summary":"ok","human_readable_thought":"ok"}`))
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+	require.NoError(t, err)
+	react.config.Workdir = workDir
+
+	tool := aitool.NewWithoutCallback("tool-a", aitool.WithDescription("tool a desc"))
+	result, err := react.promptManager.AssembleLoopPrompt([]*aitool.Tool{tool}, &reactloops.LoopPromptAssemblyInput{
+		Nonce:           "artifacts01",
+		UserQuery:       "user query body",
+		TaskInstruction: "follow task rules",
+		OutputExample:   "example output",
+		Schema:          `{"type":"object","properties":{"@action":{"type":"string"}}}`,
+	})
+	require.NoError(t, err)
+
+	hijack := aicache.Observe("test-model", result.Prompt)
+	require.NotNil(t, hijack)
+	require.True(t, hijack.IsHijacked)
+	require.Len(t, hijack.Messages, 5)
+
+	user1Content := chatDetailContentString(hijack.Messages[1])
+	require.Contains(t, user1Content, "<|AI_CACHE_FROZEN_semi-dynamic|>")
+	require.Contains(t, user1Content, "# Session Artifacts (Frozen)")
+	require.Contains(t, user1Content, "task_1-1_done")
+	require.NotContains(t, user1Content, "task_1-2_open")
+
+	user4Content := chatDetailContentString(hijack.Messages[4])
+	require.Contains(t, user4Content, "<|PROMPT_SECTION_timeline-open|>")
+	require.Contains(t, user4Content, "# Session Artifacts (Open)")
+	require.Contains(t, user4Content, "task_1-2_open")
+	require.NotContains(t, user4Content, "task_1-1_done")
 }
 
 func TestPromptManager_AssembleLoopPrompt_EmptySemiDynamic1StillKeepsWrapper(t *testing.T) {

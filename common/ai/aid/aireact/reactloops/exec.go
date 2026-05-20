@@ -770,6 +770,7 @@ LOOP:
 			nonce,
 			userInputForDynamic,
 			frozenUserContext,
+			nil,
 			r.GetCurrentMemoriesContent(),
 			operator,
 		)

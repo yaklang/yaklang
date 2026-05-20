@@ -601,8 +601,7 @@ func WithBuiltinTools() aicommon.ConfigOption {
 
 // emitArtifactsSummaryToTimeline pushes a summary of the artifacts directory into the
 // timeline after plan/forge completion, and ensures EmitPinDirectory is called for UI visibility.
-// This provides an immediate notification layer; the persistent layer is ArtifactsContextProvider
-// which runs on every prompt build.
+// Prompt visibility is handled by RenderSessionArtifactsFrozenOpen during prompt build.
 func (r *ReAct) emitArtifactsSummaryToTimeline() {
 	artifactsDir := r.config.GetOrCreateWorkDir()
 	if artifactsDir == "" {

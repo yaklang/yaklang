@@ -154,20 +154,24 @@ func (r *ReActLoop) generateSchemaString(disallowExit bool) (string, error) {
 //     (跨 turn 不必稳定, 例如普通 ReAct 的用户当前轮次输入)
 //   - frozenUserContext: PE-TASK 的 PARENT_TASK + CURRENT_TASK + INSTRUCTION
 //     三联块等"用户上下文块". 注入 timeline-open 段最末尾 (UserHistory 之后),
-//     落在所有 cache 边界之外. 字段名虽含 "frozen", 但因 EvidenceOps 嵌入
-//     root user input + 子任务切换实际会抖动, 故主动放弃自身缓存以保护上游
-//     SYSTEM / FROZEN / SEMI 三段缓存命中.
+//     落在所有 cache 边界之外. 字段名虽含 "frozen", 但 PE-TASK 子任务切换
+//     会让 CURRENT_TASK 内容抖动, 故主动放弃自身缓存以保护上游 SYSTEM /
+//     FROZEN / SEMI 三段缓存命中.
 //     普通场景传空串即可, 此时 timeline-open 段 PlanContext 子块自然不渲染,
 //     段位置稳定.
+//   - frozenPartitions: 调用方显式传入的 frozen-block 分区; config 上注册的
+//     FrozenBlockPartitionProducer 会在 PromptMaterials 构造时追加.
 //   - memory: 注入 memory 段
 //   - operator: loop 运行时操作句柄
 //
 // 关键词: generateLoopPrompt, frozenUserContext, PLAN_CONTEXT 段,
-//        prefix cache, PE-TASK 缓存优化
+//
+//	prefix cache, PE-TASK 缓存优化
 func (r *ReActLoop) generateLoopPrompt(
 	nonce string,
 	userInput string,
 	frozenUserContext string,
+	frozenPartitions []aicommon.FrozenBlockPartition,
 	memory string,
 	operator *LoopActionHandlerOperator,
 ) (string, error) {
@@ -290,6 +294,7 @@ func (r *ReActLoop) generateLoopPrompt(
 		Nonce:             nonce,
 		UserQuery:         userInput,
 		FrozenUserContext: frozenUserContext,
+		FrozenPartitions:  frozenPartitions,
 		TaskInstruction:   persistent,
 		OutputExample:     outputExample,
 		Schema:            schema,
