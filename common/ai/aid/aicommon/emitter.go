@@ -966,7 +966,7 @@ func (e *Emitter) EmitNotify(promptType string, content string, duration time.Du
 	if duration < 0 {
 		duration = 0
 	}
-	return e.EmitJSON(schema.EVENT_TYPE_NOTIFY, "notify", map[string]any{
+	return e.EmitJSON(schema.EVENT_TYPE_NOTIFY, promptType, map[string]any{
 		"type":             promptType,
 		"warning_type":     promptType,
 		"content":          content,
