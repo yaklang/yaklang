@@ -201,6 +201,7 @@ type PromptFrozenOpenMaterials struct {
 	TimelineFrozen         string
 	TimelineOpen           string
 	TimelineFrozenTimeUnix int64
+	FrozenPartitions       []FrozenBlockPartition
 
 	SessionArtifactsFrozen string
 	SessionArtifactsOpen   string
@@ -216,6 +217,7 @@ func BuildPromptFrozenOpenMaterials(config *Config) PromptFrozenOpenMaterials {
 		TimelineFrozen:         timelineBlocks.Frozen,
 		TimelineOpen:           timelineBlocks.Open,
 		TimelineFrozenTimeUnix: timelineBlocks.FrozenTimeUnix,
+		FrozenPartitions:       FrozenBlockPartitionsFromConfig(config),
 		SessionArtifactsFrozen: artifactBlocks.Frozen,
 		SessionArtifactsOpen:   artifactBlocks.Open,
 	}
@@ -228,6 +230,7 @@ func ApplyPromptFrozenOpenMaterials(materials *PromptMaterials, frozenOpen Promp
 	materials.TimelineFrozen = frozenOpen.TimelineFrozen
 	materials.TimelineOpen = frozenOpen.TimelineOpen
 	materials.TimelineFrozenTimeUnix = frozenOpen.TimelineFrozenTimeUnix
+	materials.FrozenPartitions = append([]FrozenBlockPartition(nil), NormalizeFrozenBlockPartitions(frozenOpen.FrozenPartitions)...)
 	materials.SessionArtifactsFrozen = frozenOpen.SessionArtifactsFrozen
 	materials.SessionArtifactsOpen = frozenOpen.SessionArtifactsOpen
 }

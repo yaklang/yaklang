@@ -126,11 +126,16 @@ func TestBuildPromptFrozenOpenMaterialsCoordinatesTimelineAndArtifacts(t *testin
 	cfg := NewConfig(context.Background())
 	cfg.Workdir = dir
 	cfg.Timeline = timeline
+	partition, ok := NewFrozenBlockPartition("plan_facts", "Plan Facts", "stable facts", 100)
+	require.True(t, ok)
+	cfg.GetOrCreateFrozenBlockPartitionProducer().AppendPartition(partition)
 
 	materials := BuildPromptFrozenOpenMaterials(cfg)
 	require.Equal(t, baseTime.Add(3*time.Minute).Unix(), materials.TimelineFrozenTimeUnix)
 	require.Contains(t, materials.TimelineFrozen, "scan-ok")
 	require.Contains(t, materials.TimelineOpen, "verify-ok")
+	require.Len(t, materials.FrozenPartitions, 1)
+	require.Equal(t, "plan_facts", materials.FrozenPartitions[0].ID)
 	require.Contains(t, materials.SessionArtifactsFrozen, "task_1-1_scan")
 	require.Contains(t, materials.SessionArtifactsOpen, "task_1-2_verify")
 }
