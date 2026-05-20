@@ -815,6 +815,10 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "请求限频",
 		En: "Rate Limited",
 	},
+	"daily-token-exceeded": {
+		Zh: "日额度超限",
+		En: "Daily Token Exceeded",
+	},
 	"notify": {
 		Zh: "系统通知",
 		En: "System Notification",

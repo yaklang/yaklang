@@ -181,8 +181,8 @@ func (c *Config) handle429RateLimit(rsp *AIResponse) (is429 bool, ctxDone bool) 
 					"预计等待约 %d 秒，感谢您的耐心",
 				queueCount, waitSec)
 			waitDuration = time.Duration(waitSec) * time.Second
-			c.EmitDefaultStreamEvent("notify", strings.NewReader(msg), "")
-			c.EmitNotify("notify", msg, waitDuration)
+			c.EmitDefaultStreamEvent("rate-limit", strings.NewReader(msg), "")
+			c.EmitNotify("rate-limit", msg, waitDuration)
 			c.EmitError("AIBalance 429 rate limit: %s", msg)
 			log.Infof("AIBalance 429: queue=%d, waiting %ds", queueCount, waitSec)
 		} else {
