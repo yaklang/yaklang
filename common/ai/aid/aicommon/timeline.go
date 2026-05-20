@@ -80,9 +80,11 @@ const MaxTimelineSaveSize = 1536 * 1024
 // 离线重放实验 (见 TIMELINE_BUCKET_TUNING.md) 在真实 session (90 events) 上显示:
 //   - 16K 默认: net_cost = -1.99M (基线)
 //   - 64K 默认: net_cost = -3.12M (省 1.13M, 提升 56%)
+//
 // 在密集工具场景 (dense_tools, 20 events / 3 min):
 //   - 16K 默认: net_cost = +127K (亏损)
 //   - 64K 默认: net_cost = -215K (转亏为盈)
+//
 // 64K 在所有测过的场景里都 ≥ 16K, 不存在劣化。
 //
 // 关键词: TimelineDumpDefaultBucketByteSize, 字节子桶默认, 主动缓存调优, 64K
@@ -777,9 +779,8 @@ func (m *Timeline) DumpFrozenOpen() (frozen string, open string) {
 	if m == nil {
 		return "", ""
 	}
-	rb := m.GroupByMinutes(TimelineDumpDefaultIntervalMinutes).GetAllRenderable()
-	return rb.RenderFrozenOnly(TimelineDumpDefaultAITagName),
-		rb.RenderOpenOnly(TimelineDumpDefaultAITagName)
+	blocks := RenderTimelineFrozenOpen(m)
+	return blocks.Frozen, blocks.Open
 }
 
 // DumpBefore 输出 ID <= beforeId 的部分 timeline，结构与 Dump 一致
