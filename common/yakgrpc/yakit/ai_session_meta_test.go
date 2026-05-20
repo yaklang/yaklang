@@ -2,6 +2,7 @@ package yakit
 
 import (
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
@@ -174,17 +175,61 @@ func TestAISessionMetaStartParamsCRUD(t *testing.T) {
 	require.True(t, got.GetPreferSessionCachedConfig())
 }
 
+func TestTouchAISessionMetaLastUsedAt(t *testing.T) {
+	db, err := utils.CreateTempTestDatabaseInMemory()
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&schema.AISession{}).Error)
+
+	lastUsedAt := time.Unix(1716200000, 0)
+	got, err := TouchAISessionMetaLastUsedAt(db, "sess-last-used", lastUsedAt)
+	require.NoError(t, err)
+	require.Equal(t, "sess-last-used", got.SessionID)
+	require.Equal(t, lastUsedAt.Unix(), got.LastUsedAt.Unix())
+	require.Equal(t, lastUsedAt.Unix(), got.UpdatedAt.Unix())
+
+	got, err = GetAISessionMetaBySessionID(db, "sess-last-used")
+	require.NoError(t, err)
+	require.Equal(t, lastUsedAt.Unix(), got.LastUsedAt.Unix())
+	require.Equal(t, lastUsedAt.Unix(), got.UpdatedAt.Unix())
+}
+
+func TestCreateOrUpdateAISessionMetaOnStart(t *testing.T) {
+	db, err := utils.CreateTempTestDatabaseInMemory()
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&schema.AISession{}).Error)
+
+	lastUsedAt := time.Unix(1716201234, 0)
+	params := &ypb.AIStartParams{
+		AIService:         "openai",
+		AIModelName:       "gpt-test",
+		TimelineSessionID: "sess-on-start",
+	}
+
+	got, err := CreateOrUpdateAISessionMetaOnStart(db, "sess-on-start", params, lastUsedAt)
+	require.NoError(t, err)
+	require.Equal(t, "sess-on-start", got.SessionID)
+	require.Equal(t, lastUsedAt.Unix(), got.LastUsedAt.Unix())
+	require.Equal(t, lastUsedAt.Unix(), got.UpdatedAt.Unix())
+	require.NotEmpty(t, got.StartParams)
+
+	savedParams, err := GetAISessionMetaStartParamsBySessionID(db, "sess-on-start")
+	require.NoError(t, err)
+	require.Equal(t, "openai", savedParams.GetAIService())
+	require.Equal(t, "gpt-test", savedParams.GetAIModelName())
+	require.Equal(t, "sess-on-start", savedParams.GetTimelineSessionID())
+}
+
 func TestOverlayAISessionStartParams(t *testing.T) {
 	base := &ypb.AIStartParams{
-		ReviewPolicy:          "manual",
-		AIService:             "deepseek",
-		AIModelName:           "model-a",
-		EnablePlan:            true,
-		UserInteractLimit:     9,
-		TimelineSessionID:     "sess-1",
-		DisableToolUse:        true,
-		DisableAISearchForge:  true,
-		UserPresetPrompt:      "cached",
+		ReviewPolicy:         "manual",
+		AIService:            "deepseek",
+		AIModelName:          "model-a",
+		EnablePlan:           true,
+		UserInteractLimit:    9,
+		TimelineSessionID:    "sess-1",
+		DisableToolUse:       true,
+		DisableAISearchForge: true,
+		UserPresetPrompt:     "cached",
 	}
 	patch := &ypb.AIStartParams{
 		AIService:         "openai",

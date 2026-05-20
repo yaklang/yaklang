@@ -2036,6 +2036,7 @@ message AISession {
   int64 UpdatedAt = 6;
   repeated string RelatedRuntimeIDs = 7;
   AIStartParams StartParams = 8;
+  int64 LastUsedAt = 9;
 }
 
 message QueryAISessionRequest {

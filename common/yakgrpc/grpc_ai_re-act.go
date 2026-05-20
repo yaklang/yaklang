@@ -217,8 +217,8 @@ func (s *Server) StartAIReAct(stream ypb.Yak_StartAIReActServer) error {
 	startParams = resolvedStartParams
 	firstMsg.Params = resolvedStartParams
 
-	if _, err := yakit.CreateOrUpdateAISessionMetaStartParams(s.GetProjectDatabase(), persistentSession, startParams); err != nil {
-		log.Warnf("persist ai session start params failed for %s: %v", persistentSession, err)
+	if _, err := yakit.CreateOrUpdateAISessionMetaOnStart(s.GetProjectDatabase(), persistentSession, startParams, time.Now()); err != nil {
+		log.Warnf("persist ai session start meta failed for %s: %v", persistentSession, err)
 	}
 
 	optsFromStartParams := ConvertYPBAIStartParamsToReActConfig(startParams)
