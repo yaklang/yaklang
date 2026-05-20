@@ -656,6 +656,16 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		}
 	}
 
+	// adjust_todolist 是 verification.next_movements 的主循环兄弟通道, 写入同一份
+	// 全局 TODO store, 因此默认对所有 loop 开放 (无 allowXxx gate). 子 loop 可在
+	// option 阶段提前 r.actions.Set 同名 key 覆盖, 这里只做缺省兜底 inject.
+	// 关键词: adjust_todolist 默认全 loop 接入, 与 request_verification 同位
+	if _, ok := r.actions.Get(schema.AI_REACT_LOOP_ACTION_ADJUST_TODOLIST); !ok {
+		if adjustTodolist, ok := GetLoopAction(schema.AI_REACT_LOOP_ACTION_ADJUST_TODOLIST); ok {
+			r.actions.Set(adjustTodolist.ActionType, adjustTodolist)
+		}
+	}
+
 	if r.allowRAG == nil || r.allowRAG() {
 		// allow tool call, must have tools
 		ins, ok := GetLoopAction(schema.AI_REACT_LOOP_ACTION_KNOWLEDGE_ENHANCE)
