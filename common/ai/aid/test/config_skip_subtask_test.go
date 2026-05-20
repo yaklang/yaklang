@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"github.com/yaklang/yaklang/common/ai/aid/aicache"
 	"regexp"
 	"strings"
 	"sync"
@@ -26,6 +27,16 @@ import (
 // extractCurrentTaskContent 从 prompt 中提取 <|CURRENT_TASK_{{nonce}}|> 和 <|CURRENT_TASK_END_{{nonce}}|> 之间的内容
 // 返回提取的内容，如果未找到则返回空字符串
 func extractCurrentTaskContent(prompt string) string {
+	splitRes := aicache.Split(prompt)
+	for _, chunk := range splitRes.Chunks {
+		if chunk.Section == aicache.SectionDynamic {
+			re := regexp.MustCompile(`(?s)<\|CURRENT_TASK(?:_[a-z0-9]+)?\|>(.*?)<\|CURRENT_TASK_END(?:_[a-z0-9]+)?\|>`)
+			matches := re.FindStringSubmatch(chunk.Content)
+			if len(matches) >= 2 {
+				return matches[1]
+			}
+		}
+	}
 	re := regexp.MustCompile(`(?s)<\|CURRENT_TASK(?:_[a-z0-9]+)?\|>(.*?)<\|CURRENT_TASK_END(?:_[a-z0-9]+)?\|>`)
 	matches := re.FindStringSubmatch(prompt)
 	if len(matches) >= 2 {
