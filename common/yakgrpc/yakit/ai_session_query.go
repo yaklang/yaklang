@@ -11,6 +11,23 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+func normalizeAISessionFilterStrings(vals []string) []string {
+	seen := make(map[string]struct{}, len(vals))
+	out := make([]string, 0, len(vals))
+	for _, v := range vals {
+		v = strings.TrimSpace(v)
+		if v == "" {
+			continue
+		}
+		if _, ok := seen[v]; ok {
+			continue
+		}
+		seen[v] = struct{}{}
+		out = append(out, v)
+	}
+	return out
+}
+
 func FilterAISessionMeta(db *gorm.DB, filter *ypb.AISessionFilter) *gorm.DB {
 	db = db.Model(&schema.AISession{})
 	if filter == nil {
@@ -20,6 +37,9 @@ func FilterAISessionMeta(db *gorm.DB, filter *ypb.AISessionFilter) *gorm.DB {
 	db = bizhelper.ExactQueryStringArrayOr(db, "session_id", filter.GetSessionID())
 	if filter.GetKeyword() != "" {
 		db = bizhelper.FuzzSearchWithStringArrayOrEx(db, []string{"session_id", "title"}, []string{filter.GetKeyword()}, false)
+	}
+	if sources := normalizeAISessionFilterStrings(filter.GetSource()); len(sources) > 0 {
+		db = bizhelper.ExactQueryStringArrayOr(db, "source", sources)
 	}
 	return db
 }
@@ -91,7 +111,9 @@ func QueryAISessionIDsForDelete(db *gorm.DB, filter *ypb.DeleteAISessionFilter, 
 		if filter.GetBeforeTimestamp() > 0 {
 			query = query.Where("updated_at < ?", time.Unix(filter.GetBeforeTimestamp(), 0))
 		}
-		if len(sessionIDs) == 0 && filter.GetAfterTimestamp() <= 0 && filter.GetBeforeTimestamp() <= 0 {
+		sources := normalizeAISessionFilterStrings(filter.GetSource())
+		query = bizhelper.ExactQueryStringArrayOr(query, "source", sources)
+		if len(sessionIDs) == 0 && filter.GetAfterTimestamp() <= 0 && filter.GetBeforeTimestamp() <= 0 && len(sources) == 0 {
 			return nil, utils.Errorf("at least one filter condition is required")
 		}
 	}

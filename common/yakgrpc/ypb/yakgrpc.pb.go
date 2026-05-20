@@ -8792,8 +8792,10 @@ type AIStartParams struct {
 	// 非空时作为规划阶段（Plan loop）的补充说明注入，对应 aicommon.WithPlanPrompt；
 	// 会出现在计划探索提示词的「规划补充说明」区块，覆盖同会话内其它来源写入的 PlanPrompt（若有）。
 	UserPlanPrompt string `protobuf:"bytes,40,opt,name=UserPlanPrompt,proto3" json:"UserPlanPrompt,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// 会话来源（如 ide / cli / yak），写入项目库 ai_sessions_v1.source
+	Source        string `protobuf:"bytes,41,opt,name=Source,proto3" json:"Source,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *AIStartParams) Reset() {
@@ -9095,6 +9097,13 @@ func (x *AIStartParams) GetPreferSessionCachedConfig() bool {
 func (x *AIStartParams) GetUserPlanPrompt() string {
 	if x != nil {
 		return x.UserPlanPrompt
+	}
+	return ""
+}
+
+func (x *AIStartParams) GetSource() string {
+	if x != nil {
+		return x.Source
 	}
 	return ""
 }
@@ -9792,9 +9801,11 @@ func (x *AITask) GetForgeName() string {
 }
 
 type AISessionFilter struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	SessionID     []string               `protobuf:"bytes,1,rep,name=SessionID,proto3" json:"SessionID,omitempty"`
-	Keyword       string                 `protobuf:"bytes,2,opt,name=Keyword,proto3" json:"Keyword,omitempty"`
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	SessionID []string               `protobuf:"bytes,1,rep,name=SessionID,proto3" json:"SessionID,omitempty"`
+	Keyword   string                 `protobuf:"bytes,2,opt,name=Keyword,proto3" json:"Keyword,omitempty"`
+	// 按会话来源筛选（OR，与 SessionID / Keyword 条件 AND 组合）
+	Source        []string `protobuf:"bytes,3,rep,name=Source,proto3" json:"Source,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -9843,6 +9854,13 @@ func (x *AISessionFilter) GetKeyword() string {
 	return ""
 }
 
+func (x *AISessionFilter) GetSource() []string {
+	if x != nil {
+		return x.Source
+	}
+	return nil
+}
+
 type AISession struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
 	Id                int64                  `protobuf:"varint,1,opt,name=Id,proto3" json:"Id,omitempty"`
@@ -9854,8 +9872,10 @@ type AISession struct {
 	RelatedRuntimeIDs []string               `protobuf:"bytes,7,rep,name=RelatedRuntimeIDs,proto3" json:"RelatedRuntimeIDs,omitempty"`
 	StartParams       *AIStartParams         `protobuf:"bytes,8,opt,name=StartParams,proto3" json:"StartParams,omitempty"`
 	LastUsedAt        int64                  `protobuf:"varint,9,opt,name=LastUsedAt,proto3" json:"LastUsedAt,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	// 会话来源（与 AIStartParams.Source 对应），用于统计/筛选
+	Source        string `protobuf:"bytes,10,opt,name=Source,proto3" json:"Source,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *AISession) Reset() {
@@ -9949,6 +9969,13 @@ func (x *AISession) GetLastUsedAt() int64 {
 		return x.LastUsedAt
 	}
 	return 0
+}
+
+func (x *AISession) GetSource() string {
+	if x != nil {
+		return x.Source
+	}
+	return ""
 }
 
 type QueryAISessionRequest struct {
@@ -10120,8 +10147,10 @@ type DeleteAISessionFilter struct {
 	SessionID       []string               `protobuf:"bytes,1,rep,name=SessionID,proto3" json:"SessionID,omitempty"`
 	AfterTimestamp  int64                  `protobuf:"varint,2,opt,name=AfterTimestamp,proto3" json:"AfterTimestamp,omitempty"`
 	BeforeTimestamp int64                  `protobuf:"varint,3,opt,name=BeforeTimestamp,proto3" json:"BeforeTimestamp,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// 删除 source 匹配的会话（OR，可与 SessionID / 时间范围 AND 组合）
+	Source        []string `protobuf:"bytes,4,rep,name=Source,proto3" json:"Source,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *DeleteAISessionFilter) Reset() {
@@ -10173,6 +10202,13 @@ func (x *DeleteAISessionFilter) GetBeforeTimestamp() int64 {
 		return x.BeforeTimestamp
 	}
 	return 0
+}
+
+func (x *DeleteAISessionFilter) GetSource() []string {
+	if x != nil {
+		return x.Source
+	}
+	return nil
 }
 
 type DeleteAISessionRequest struct {
@@ -69803,7 +69839,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\tMcpConfig\x12\x12\n" +
 	"\x04Type\x18\x01 \x01(\tR\x04Type\x12\x10\n" +
 	"\x03Key\x18\x02 \x01(\tR\x03Key\x12\x10\n" +
-	"\x03Url\x18\x03 \x01(\tR\x03Url\"\xef\x0e\n" +
+	"\x03Url\x18\x03 \x01(\tR\x03Url\"\x87\x0f\n" +
 	"\rAIStartParams\x12$\n" +
 	"\rCoordinatorId\x18\x11 \x01(\tR\rCoordinatorId\x12\x1a\n" +
 	"\bSequence\x18\x12 \x01(\x03R\bSequence\x12.\n" +
@@ -69848,7 +69884,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"EnablePlan\x18& \x01(\bR\n" +
 	"EnablePlan\x12<\n" +
 	"\x19PreferSessionCachedConfig\x18' \x01(\bR\x19PreferSessionCachedConfig\x12&\n" +
-	"\x0eUserPlanPrompt\x18( \x01(\tR\x0eUserPlanPrompt\"\x9e\x01\n" +
+	"\x0eUserPlanPrompt\x18( \x01(\tR\x0eUserPlanPrompt\x12\x16\n" +
+	"\x06Source\x18) \x01(\tR\x06Source\"\x9e\x01\n" +
 	"\fAITaskFilter\x12\x12\n" +
 	"\x04Name\x18\x01 \x03(\tR\x04Name\x12\x18\n" +
 	"\aKeyword\x18\x02 \x03(\tR\aKeyword\x12\x1c\n" +
@@ -69906,10 +69943,11 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x04Name\x18\x02 \x01(\tR\x04Name\x12\x10\n" +
 	"\x03Seq\x18\x03 \x01(\x03R\x03Seq\x12\x1c\n" +
 	"\tUserInput\x18\x04 \x01(\tR\tUserInput\x12\x1c\n" +
-	"\tForgeName\x18\x05 \x01(\tR\tForgeName\"I\n" +
+	"\tForgeName\x18\x05 \x01(\tR\tForgeName\"a\n" +
 	"\x0fAISessionFilter\x12\x1c\n" +
 	"\tSessionID\x18\x01 \x03(\tR\tSessionID\x12\x18\n" +
-	"\aKeyword\x18\x02 \x01(\tR\aKeyword\"\xbb\x02\n" +
+	"\aKeyword\x18\x02 \x01(\tR\aKeyword\x12\x16\n" +
+	"\x06Source\x18\x03 \x03(\tR\x06Source\"\xd3\x02\n" +
 	"\tAISession\x12\x0e\n" +
 	"\x02Id\x18\x01 \x01(\x03R\x02Id\x12\x1c\n" +
 	"\tSessionID\x18\x02 \x01(\tR\tSessionID\x12\x14\n" +
@@ -69921,7 +69959,9 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\vStartParams\x18\b \x01(\v2\x12.ypb.AIStartParamsR\vStartParams\x12\x1e\n" +
 	"\n" +
 	"LastUsedAt\x18\t \x01(\x03R\n" +
-	"LastUsedAt\"r\n" +
+	"LastUsedAt\x12\x16\n" +
+	"\x06Source\x18\n" +
+	" \x01(\tR\x06Source\"r\n" +
 	"\x15QueryAISessionRequest\x12+\n" +
 	"\n" +
 	"Pagination\x18\x01 \x01(\v2\v.ypb.PagingR\n" +
@@ -69935,11 +69975,12 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x05Total\x18\x03 \x01(\x03R\x05Total\"Q\n" +
 	"\x1bUpdateAISessionTitleRequest\x12\x1c\n" +
 	"\tSessionID\x18\x01 \x01(\tR\tSessionID\x12\x14\n" +
-	"\x05Title\x18\x02 \x01(\tR\x05Title\"\x87\x01\n" +
+	"\x05Title\x18\x02 \x01(\tR\x05Title\"\x9f\x01\n" +
 	"\x15DeleteAISessionFilter\x12\x1c\n" +
 	"\tSessionID\x18\x01 \x03(\tR\tSessionID\x12&\n" +
 	"\x0eAfterTimestamp\x18\x02 \x01(\x03R\x0eAfterTimestamp\x12(\n" +
-	"\x0fBeforeTimestamp\x18\x03 \x01(\x03R\x0fBeforeTimestamp\"j\n" +
+	"\x0fBeforeTimestamp\x18\x03 \x01(\x03R\x0fBeforeTimestamp\x12\x16\n" +
+	"\x06Source\x18\x04 \x03(\tR\x06Source\"j\n" +
 	"\x16DeleteAISessionRequest\x122\n" +
 	"\x06Filter\x18\x01 \x01(\v2\x1a.ypb.DeleteAISessionFilterR\x06Filter\x12\x1c\n" +
 	"\tDeleteAll\x18\x02 \x01(\bR\tDeleteAll\"\xcd\x01\n" +

@@ -435,7 +435,10 @@ func AppendAISessionMetaRelatedRuntimeID(db *gorm.DB, sessionID, runtimeID strin
 		UpdateColumn("related_runtime_ids", string(raw)).Error
 }
 
-func EnsureAISessionMeta(db *gorm.DB, sessionID string) (*schema.AISession, error) {
+// EnsureAISessionMeta creates session meta if missing. Optional source (first
+// variadic arg, trimmed) is written on insert and backfilled when the row
+// exists but source is still empty.
+func EnsureAISessionMeta(db *gorm.DB, sessionID string, sourceOpt ...string) (*schema.AISession, error) {
 	if db == nil {
 		return nil, utils.Errorf("database is nil")
 	}
@@ -444,17 +447,35 @@ func EnsureAISessionMeta(db *gorm.DB, sessionID string) (*schema.AISession, erro
 		return nil, utils.Errorf("session_id is empty")
 	}
 
+	source := ""
+	if len(sourceOpt) > 0 {
+		source = strings.TrimSpace(sourceOpt[0])
+	}
+
 	record := &schema.AISession{SessionID: sessionID}
+	attrs := map[string]any{
+		"title":               defaultAISessionTitle,
+		"title_initialized":   false,
+		"related_runtime_ids": emptyRelatedRuntimeIDsJSON,
+	}
+	if source != "" {
+		attrs["source"] = source
+	}
 	result := db.Model(&schema.AISession{}).
 		Where("session_id = ?", sessionID).
-		Attrs(map[string]any{
-			"title":               defaultAISessionTitle,
-			"title_initialized":   false,
-			"related_runtime_ids": emptyRelatedRuntimeIDsJSON,
-		}).
+		Attrs(attrs).
 		FirstOrCreate(record)
 	if result.Error != nil {
 		return nil, result.Error
+	}
+
+	if source != "" && strings.TrimSpace(record.Source) == "" {
+		if err := db.Model(&schema.AISession{}).
+			Where("session_id = ?", sessionID).
+			Update("source", source).Error; err != nil {
+			return nil, err
+		}
+		record.Source = source
 	}
 	return record, nil
 }

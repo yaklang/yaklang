@@ -16,6 +16,9 @@ type AISession struct {
 	StartParams      string    `json:"start_params" gorm:"column:start_params;type:text"`
 	LastUsedAt       time.Time `json:"last_used_at" gorm:"column:last_used_at;index"`
 
+	// Source identifies who started the session (e.g. ide, cli); indexed for filtering.
+	Source string `json:"source" gorm:"index;type:varchar(128)"`
+
 	// RelatedRuntimeIDS stores a JSON-encoded string array of related runtime UUIDs.
 	RelatedRuntimeIDS string `json:"related_runtime_ids" gorm:"column:related_runtime_ids;type:text"`
 }

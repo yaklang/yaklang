@@ -114,6 +114,10 @@ func ConvertYPBAIStartParamsToReActConfig(i *ypb.AIStartParams) []aicommon.Confi
 		opts = append(opts, aicommon.WithPlanPrompt(i.GetUserPlanPrompt()))
 	}
 
+	if i.GetSource() != "" {
+		opts = append(opts, aicommon.WithSessionSource(i.GetSource()))
+	}
+
 	return opts
 }
 

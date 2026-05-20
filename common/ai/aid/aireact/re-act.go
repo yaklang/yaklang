@@ -223,7 +223,7 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 	}
 
 	if cfg.PersistentSessionId != "" && cfg.GetDB() != nil {
-		meta, err := yakit.EnsureAISessionMeta(cfg.GetDB(), cfg.PersistentSessionId)
+		meta, err := yakit.EnsureAISessionMeta(cfg.GetDB(), cfg.PersistentSessionId, cfg.SessionSource)
 		if err != nil {
 			log.Warnf("ensure ai session meta failed for %s: %v", cfg.PersistentSessionId, err)
 		} else if meta != nil && strings.TrimSpace(meta.Title) != "" {

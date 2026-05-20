@@ -1978,6 +1978,9 @@ message AIStartParams {
   // 非空时作为规划阶段（Plan loop）的补充说明注入，对应 aicommon.WithPlanPrompt；
   // 会出现在计划探索提示词的「规划补充说明」区块，覆盖同会话内其它来源写入的 PlanPrompt（若有）。
   string UserPlanPrompt = 40;
+
+  // 会话来源（如 ide / cli / yak），写入项目库 ai_sessions_v1.source
+  string Source = 41;
 }
 
 message AITaskFilter {
@@ -2055,6 +2058,8 @@ message AITask {
 message AISessionFilter {
   repeated string SessionID = 1;
   string Keyword = 2;
+  // 按会话来源筛选（OR，与 SessionID / Keyword 条件 AND 组合）
+  repeated string Source = 3;
 }
 
 message AISession {
@@ -2067,6 +2072,8 @@ message AISession {
   repeated string RelatedRuntimeIDs = 7;
   AIStartParams StartParams = 8;
   int64 LastUsedAt = 9;
+  // 会话来源（与 AIStartParams.Source 对应），用于统计/筛选
+  string Source = 10;
 }
 
 message QueryAISessionRequest {
@@ -2089,6 +2096,8 @@ message DeleteAISessionFilter {
   repeated string SessionID = 1;
   int64 AfterTimestamp = 2;
   int64 BeforeTimestamp = 3;
+  // 删除 source 匹配的会话（OR，可与 SessionID / 时间范围 AND 组合）
+  repeated string Source = 4;
 }
 
 message DeleteAISessionRequest {

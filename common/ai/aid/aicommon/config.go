@@ -152,7 +152,9 @@ type Config struct {
 
 	// session id
 	PersistentSessionId string
-	SessionTitle        string
+	// SessionSource is persisted to ai_sessions_v1.source (e.g. ide, cli).
+	SessionSource string
+	SessionTitle  string
 	SessionPromptState  *SessionPromptState
 
 	// memory triage id
@@ -592,6 +594,19 @@ func WithPersistentSessionId(sid string) ConfigOption {
 		}
 		c.m.Lock()
 		c.PersistentSessionId = sid
+		c.m.Unlock()
+		return nil
+	}
+}
+
+// WithSessionSource sets the client/source label stored on ai_sessions_v1.
+func WithSessionSource(src string) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		c.SessionSource = strings.TrimSpace(src)
 		c.m.Unlock()
 		return nil
 	}
@@ -3375,6 +3390,9 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 
 	if i.PersistentSessionId != "" {
 		opts = append(opts, WithPersistentSessionId(i.PersistentSessionId))
+	}
+	if strings.TrimSpace(i.SessionSource) != "" {
+		opts = append(opts, WithSessionSource(i.SessionSource))
 	}
 	if i.SessionTitle != "" {
 		opts = append(opts, WithSessionTitle(i.SessionTitle))
