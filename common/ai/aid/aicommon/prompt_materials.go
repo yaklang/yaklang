@@ -43,19 +43,19 @@ type PromptMaterials struct {
 	ForgeInventory bool
 	AIForgeList    string
 
-	TimelineFrozen   string
-	TimelineOpen     string
-	CurrentTime      string
-	Workspace        bool
-	OSArch           string
-	WorkingDir       string
-	WorkingDirGlance string
-	// SessionArtifactsListing 是会话工件目录的结构化清单 (path / size /
-	// mtime, 按 task 分组 + mtime desc), 由 RenderSessionArtifactsListing
-	// 生成. 之前作为 ContextProviderManager 的 "session_artifacts" 注册项
-	// 落到 Pure Dynamic / AutoContext 段, 现已下沉到 Workspace 块, 与 OS /
-	// working dir / glance 一起渲染, 段位仍属 timeline-open.
-	// 关键词: SessionArtifactsListing, Workspace 内嵌, Pure Dynamic 反污染
+	TimelineFrozen         string
+	TimelineOpen           string
+	FrozenPartitions       []FrozenBlockPartition
+	SessionArtifactsFrozen string
+	SessionArtifactsOpen   string
+	CurrentTime            string
+	Workspace              bool
+	OSArch                 string
+	WorkingDir             string
+	WorkingDirGlance       string
+
+	// Deprecated: SessionArtifactsListing 保留给旧测试 / 兼容调用面。新 prompt
+	// 主路径使用 SessionArtifactsFrozen / SessionArtifactsOpen 两个一级字段。
 	SessionArtifactsListing string
 	SessionEvidence         string
 	// TodoSnapshot 是会话级 TODO 列表渲染结果 (含 <|TODO_LIST_<nonce>|>...
@@ -111,22 +111,24 @@ func (m *PromptMaterials) FrozenBlockData() map[string]any {
 		return map[string]any{}
 	}
 	return map[string]any{
-		"ToolInventory":  m.ToolInventory,
-		"ToolsCount":     m.ToolsCount,
-		"TopToolsCount":  m.TopToolsCount,
-		"TopTools":       m.TopTools,
-		"HasMoreTools":   m.HasMoreTools,
-		"MoreToolsCount": m.MoreToolsCount,
-		"ForgeInventory": m.ForgeInventory,
-		"AIForgeList":    m.AIForgeList,
-		"TimelineFrozen": m.TimelineFrozen,
+		"ToolInventory":          m.ToolInventory,
+		"ToolsCount":             m.ToolsCount,
+		"TopToolsCount":          m.TopToolsCount,
+		"TopTools":               m.TopTools,
+		"HasMoreTools":           m.HasMoreTools,
+		"MoreToolsCount":         m.MoreToolsCount,
+		"ForgeInventory":         m.ForgeInventory,
+		"AIForgeList":            m.AIForgeList,
+		"FrozenPartitions":       NormalizeFrozenBlockPartitions(m.FrozenPartitions),
+		"SessionArtifactsFrozen": m.SessionArtifactsFrozen,
+		"TimelineFrozen":         m.TimelineFrozen,
 	}
 }
 
 // TimelineOpenData 供 timeline-open 模板消费, 模板字段渲染顺序 (P1-C3):
 //
-//	Timeline (Open Tail) -> SessionEvidence -> Workspace -> UserHistory ->
-//	Current Time -> PlanContext (末尾)
+//	Timeline (Open Tail) -> SessionEvidence -> TodoSnapshot -> Workspace ->
+//	SessionArtifactsOpen -> UserHistory -> Current Time -> PlanContext (末尾)
 //
 // 段内排序原则:
 //  1. Timeline (Open Tail) 在最前: 时间线最末桶是模型理解"刚发生了什么"的
@@ -142,8 +144,8 @@ func (m *PromptMaterials) FrozenBlockData() map[string]any {
 //  5. Current Time 紧跟 UserHistory: 当前时间是最末稳定的时序锚点, 形成
 //     "历史输入 -> 现在"时间递进, 同时与下方 PlanContext 形成"时间 ->
 //     任务"语义衔接。
-//  6. PlanContext (PE-TASK PLAN 产物 PARENT_TASK + CURRENT_TASK + INSTRUCTION
-//     + 父链 FACTS/DOCUMENT) 在段最末尾。本段不被 AI_CACHE_FROZEN /
+//  6. PlanContext (PE-TASK PLAN 产物 PARENT_TASK + CURRENT_TASK + INSTRUCTION)
+//     在段最末尾。本段不被 AI_CACHE_FROZEN /
 //     AI_CACHE_SEMI 任何缓存边界包裹, 是 prompt 的"易变尾段", 让 PlanContext
 //     的子任务切换抖动不会污染上游 system / frozen / semi 三段缓存命中。
 //
@@ -160,17 +162,16 @@ func (m *PromptMaterials) TimelineOpenData() map[string]any {
 		return map[string]any{}
 	}
 	return map[string]any{
-		"TimelineOpen":            m.TimelineOpen,
-		"SessionEvidence":         m.SessionEvidence,
-		"TodoSnapshot":            m.TodoSnapshot,
-		"Workspace":               m.Workspace,
-		"OSArch":                  m.OSArch,
-		"WorkingDir":              m.WorkingDir,
-		"WorkingDirGlance":        m.WorkingDirGlance,
-		"SessionArtifactsListing": m.SessionArtifactsListing,
-		"UserHistory":             m.UserHistory,
-		"CurrentTime":             m.CurrentTime,
-		"PlanContext":             m.FrozenUserContext,
+		"TimelineOpen":         m.TimelineOpen,
+		"SessionEvidence":      m.SessionEvidence,
+		"TodoSnapshot":         m.TodoSnapshot,
+		"Workspace":            m.Workspace,
+		"OSArch":               m.OSArch,
+		"WorkingDir":           m.WorkingDir,
+		"WorkingDirGlance":     m.WorkingDirGlance,
+		"SessionArtifactsOpen": m.SessionArtifactsOpen,
+		"UserHistory":          m.UserHistory,
+		"CurrentTime":          m.CurrentTime,
+		"PlanContext":          m.FrozenUserContext,
 	}
 }
-

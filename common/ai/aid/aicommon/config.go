@@ -519,10 +519,9 @@ func newConfig(ctx context.Context) *Config {
 	// NOTE: session_artifacts provider is intentionally NOT registered into
 	// ContextProviderManager. Routing the artifacts listing through Pure
 	// Dynamic / AutoContext flooded the dynamic segment with file metadata
-	// every turn. The listing is now embedded directly into the Workspace
-	// block (timeline-open segment) via RenderSessionArtifactsListing, where
-	// it lives alongside OS/Arch / working dir / glance.
-	// 关键词: session_artifacts 反注册, Workspace 内嵌, Pure Dynamic 反污染
+	// every turn. Prompt materials now render artifacts through first-class
+	// frozen/open blocks via RenderSessionArtifactsFrozenOpen.
+	// 关键词: session_artifacts 反注册, 一级 frozen/open, Pure Dynamic 反污染
 
 	// Initialize emitter
 	config.Emitter = NewEmitter(id, func(e *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
@@ -3354,6 +3353,18 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 	}
 	if i.SessionPromptState != nil {
 		opts = append(opts, WithSessionPromptState(i.SessionPromptState))
+	}
+	if i.KeyValueConfig != nil {
+		if existing, ok := i.GetConfig(frozenBlockPartitionProducersConfigKey); ok {
+			switch producers := existing.(type) {
+			case []FrozenBlockPartitionProducer:
+				for _, producer := range producers {
+					opts = append(opts, WithFrozenBlockPartitionProducer(producer))
+				}
+			case FrozenBlockPartitionProducer:
+				opts = append(opts, WithFrozenBlockPartitionProducer(producers))
+			}
+		}
 	}
 
 	if i.Seq > 0 {

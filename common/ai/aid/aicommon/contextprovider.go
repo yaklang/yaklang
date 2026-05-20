@@ -10,7 +10,6 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"time"
 	"unicode"
 
 	"github.com/yaklang/yaklang/common/consts"
@@ -457,153 +456,16 @@ func KnowledgeBaseSystemFlagContextProvider(flag string, userPrompt ...string) C
 // ArtifactsContextMaxTokens is the maximum size (in tokens) for the artifacts context output.
 const ArtifactsContextMaxTokens = 8 * 1024
 
-// artifactFileEntry holds metadata for a single file in the artifacts directory.
-type artifactFileEntry struct {
-	RelPath string
-	Size    int64
-	ModTime time.Time
-}
-
-// RenderSessionArtifactsListing scans the session's working directory and
-// renders a structured listing of all task output files. The output is the
-// listing **body only** (without any leading "# Session Artifacts" heading);
-// the caller is expected to wrap it under whatever heading suits its host
-// section (currently the Workspace block uses "## Session Artifacts").
-//
-// Behavior preserved from the original ArtifactsContextProvider:
-//   - Walks workdir, groups by top-level task dir, sorts by mtime desc,
-//     formats each entry with size + HH:MM:SS;
-//   - Result is shrunk to ArtifactsContextMaxTokens via ShrinkTextBlockByTokens
-//     when oversized;
-//   - Returns an empty string when there is no workdir, the dir does not
-//     exist, or there are zero files.
-//
-// 关键词: RenderSessionArtifactsListing, Session Artifacts 抽离 helper,
-//
-//	Workspace 内嵌, 8K token shrink
-func RenderSessionArtifactsListing(config AICallerConfigIf) string {
-	if config == nil {
-		return ""
-	}
-	workDir := config.GetOrCreateWorkDir()
-	if workDir == "" {
-		return ""
-	}
-	info, err := os.Stat(workDir)
-	if err != nil || !info.IsDir() {
-		return ""
-	}
-
-	var entries []artifactFileEntry
-	walkErr := filepath.Walk(workDir, func(path string, fi os.FileInfo, err error) error {
-		if err != nil {
-			log.Warnf("[SessionArtifactsListing] walk error for %s: %v", path, err)
-			return nil // skip errors
-		}
-		if fi.IsDir() {
-			return nil
-		}
-		relPath, err := filepath.Rel(workDir, path)
-		if err != nil {
-			relPath = path
-		}
-		log.Infof("[SessionArtifactsListing] found file: %s", relPath)
-		entries = append(entries, artifactFileEntry{
-			RelPath: relPath,
-			Size:    fi.Size(),
-			ModTime: fi.ModTime(),
-		})
-		return nil
-	})
-	if walkErr != nil {
-		log.Warnf("session artifacts listing: walk error: %v", walkErr)
-	}
-
-	log.Infof("[SessionArtifactsListing] total entries found: %d in workDir: %s", len(entries), workDir)
-
-	if len(entries) == 0 {
-		return ""
-	}
-
-	sort.Slice(entries, func(i, j int) bool {
-		return entries[i].ModTime.After(entries[j].ModTime)
-	})
-
-	taskGroups := omap.NewOrderedMap(make(map[string][]artifactFileEntry))
-	var rootFiles []artifactFileEntry
-
-	for _, e := range entries {
-		parts := strings.SplitN(e.RelPath, string(filepath.Separator), 2)
-		if len(parts) == 1 {
-			rootFiles = append(rootFiles, e)
-		} else {
-			taskDir := parts[0]
-			existing, _ := taskGroups.Get(taskDir)
-			taskGroups.Set(taskDir, append(existing, e))
-		}
-	}
-
-	var sb strings.Builder
-	// Caller owns the outer heading; this helper emits only the body.
-	sb.WriteString(fmt.Sprintf("artifacts_dir: %s\n", workDir))
-	sb.WriteString(fmt.Sprintf("total_files: %d\n\n", len(entries)))
-
-	taskGroups.ForEach(func(taskDir string, files []artifactFileEntry) bool {
-		var latestMod time.Time
-		for _, f := range files {
-			if f.ModTime.After(latestMod) {
-				latestMod = f.ModTime
-			}
-		}
-		sb.WriteString(fmt.Sprintf("### %s (modified: %s)\n",
-			taskDir,
-			latestMod.Format("2006-01-02 15:04:05"),
-		))
-		for _, f := range files {
-			innerPath := strings.TrimPrefix(f.RelPath, taskDir+string(filepath.Separator))
-			sb.WriteString(fmt.Sprintf("- %s (%s, %s)\n",
-				innerPath,
-				formatFileSize(f.Size),
-				f.ModTime.Format("15:04:05"),
-			))
-		}
-		sb.WriteString("\n")
-		return true
-	})
-
-	if len(rootFiles) > 0 {
-		sb.WriteString("### [root files]\n")
-		for _, f := range rootFiles {
-			sb.WriteString(fmt.Sprintf("- %s (%s, %s)\n",
-				f.RelPath,
-				formatFileSize(f.Size),
-				f.ModTime.Format("15:04:05"),
-			))
-		}
-		sb.WriteString("\n")
-	}
-
-	result := sb.String()
-	if MeasureTokens(result) > ArtifactsContextMaxTokens {
-		result = ShrinkTextBlockByTokens(result, ArtifactsContextMaxTokens)
-	}
-	return result
-}
-
 // ArtifactsContextProvider is a thin wrapper around RenderSessionArtifactsListing
 // that adds the legacy "# Session Artifacts" heading expected by older callers
-// and existing tests. New code should call RenderSessionArtifactsListing
-// directly and own the heading.
+// and existing tests. New prompt code should call RenderSessionArtifactsFrozenOpen
+// and render artifacts as first-class frozen/open blocks.
 //
 // Deprecated: this provider used to be registered into ContextProviderManager
-// (which routed it into Pure Dynamic / AutoContext). That registration has
-// been removed; the listing is now embedded into the Workspace block via
-// RenderSessionArtifactsListing. The wrapper is kept only to preserve the
-// existing test surface.
+// (which routed it into Pure Dynamic / AutoContext). That registration has been
+// removed; the wrapper is kept only to preserve the existing test surface.
 //
-// 关键词: ArtifactsContextProvider 薄壳, 兼容旧 surface,
-//
-//	Workspace 内嵌路径, 不再注册到 ContextProviderManager
+// 关键词: ArtifactsContextProvider 薄壳, 兼容旧 surface, 不再注册到 ContextProviderManager
 func ArtifactsContextProvider(config AICallerConfigIf, emitter *Emitter, key string) (string, error) {
 	listing := RenderSessionArtifactsListing(config)
 	if listing == "" {
