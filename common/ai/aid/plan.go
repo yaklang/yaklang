@@ -147,6 +147,14 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 		if planRes.RootTask != nil {
 			pr.cod.standardizeTaskTreeAndNotify(planRes.RootTask, "mock plan initialized")
 		}
+		if pr.cod.ContextProvider != nil {
+			if strings.TrimSpace(planRes.Facts) != "" {
+				pr.cod.ContextProvider.SetPersistentData(planFactsPersistentKey, planRes.Facts)
+			}
+			if strings.TrimSpace(planRes.Document) != "" {
+				pr.cod.ContextProvider.SetPersistentData(planDocumentPersistentKey, planRes.Document)
+			}
+		}
 		return planRes, nil
 	}
 
@@ -245,12 +253,6 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 	}
 	if planDocument != "" && rootTask.Coordinator != nil && rootTask.Coordinator.ContextProvider != nil {
 		rootTask.Coordinator.ContextProvider.SetPersistentData(planDocumentPersistentKey, planDocument)
-	}
-
-	// Inject PLAN context docs (FACTS + DOCUMENT + EVIDENCE) as prefix blocks
-	// in the root task's user input so every subtask can see them.
-	if planFacts != "" || planDocument != "" {
-		syncRootTaskPlanContextDocs(rootTask)
 	}
 
 	resp := pr.cod.newPlanResponse(rootTask)

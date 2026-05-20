@@ -47,6 +47,9 @@ func (c *Coordinator) ExecuteLoopTask(taskTypeName string, task aicommon.AIState
 		aicommon.WithConsumption(c.GetConsumptionConfig()),
 		aicommon.WithEnablePlanAndExec(false),
 		aicommon.WithHotPatchOptionChan(hotpatchChan),
+		aicommon.WithFrozenBlockPartitionProducer(func() []aicommon.FrozenBlockPartition {
+			return BuildPlanStaticFrozenPartitions(c)
+		}),
 	)
 
 	invoker, err := aicommon.AIRuntimeInvokerGetter(c.GetContext(), baseOpts...)
