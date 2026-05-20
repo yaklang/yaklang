@@ -106,7 +106,20 @@ func (r *ReAct) HandleSyncTypeKnowledgeEvent(event *ypb.AIInputEvent) error {
 }
 
 func (r *ReAct) HandleSyncTypeUpdateConfigEvent(event *ypb.AIInputEvent) error {
+	if event == nil {
+		return fmt.Errorf("update config event is nil")
+	}
+
 	updateConfig := map[string]interface{}{}
+	paramsUpdate, err := r.config.ApplySyncUpdateConfigFromParams(event)
+	if err != nil {
+		r.EmitSyncEventError("update_config", err, event.SyncID)
+		return nil
+	}
+	for k, v := range paramsUpdate {
+		updateConfig[k] = v
+	}
+
 	applyOption := func(opt aicommon.ConfigOption) {
 		if opt == nil {
 			return

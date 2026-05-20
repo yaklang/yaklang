@@ -3,7 +3,9 @@ package yakgrpc
 import (
 	"context"
 	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"math/rand"
 	"testing"
 	"time"
@@ -92,4 +94,40 @@ func TestConvertYPBAIStartParams_EnablePlanAppliedAfterDisableAISearchForge(t *t
 			return &aicommon.AIResponse{}, nil
 		}))...)
 	require.False(t, cfg.GetEnablePlanAndExec(), "EnablePlan=false must disable PE/blueprint regardless of DisableAISearchForge")
+}
+
+func TestResolveAISessionStartParams(t *testing.T) {
+	db, err := utils.CreateTempTestDatabaseInMemory()
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&schema.AISession{}).Error)
+
+	request := &ypb.AIStartParams{
+		AIService:   "request-service",
+		AIModelName: "request-model",
+		UserQuery:   "hello",
+	}
+
+	got, err := resolveAISessionStartParams(db, "missing-session", request, true)
+	require.NoError(t, err)
+	require.Equal(t, "request-service", got.GetAIService())
+	require.Equal(t, "request-model", got.GetAIModelName())
+	require.Equal(t, "hello", got.GetUserQuery())
+
+	_, err = yakit.CreateOrUpdateAISessionMetaStartParams(db, "cached-session", &ypb.AIStartParams{
+		AIService:   "cached-service",
+		AIModelName: "cached-model",
+		ReviewPolicy: "ai",
+	})
+	require.NoError(t, err)
+
+	got, err = resolveAISessionStartParams(db, "cached-session", &ypb.AIStartParams{
+		AIService:   "request-service",
+		AIModelName: "request-model",
+		UserQuery:   "hello",
+	}, true)
+	require.NoError(t, err)
+	require.Equal(t, "cached-service", got.GetAIService())
+	require.Equal(t, "cached-model", got.GetAIModelName())
+	require.Equal(t, "ai", got.GetReviewPolicy())
+	require.Equal(t, "hello", got.GetUserQuery())
 }

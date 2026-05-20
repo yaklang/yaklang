@@ -261,9 +261,12 @@ func (c *Config) HandleSyncPlanExecTasksEvent(event *ypb.AIInputEvent) error {
 	return nil
 }
 
-func (c *Config) HandleSyncUpdataConfigEvent(event *ypb.AIInputEvent) error {
-	if event == nil || event.Params == nil {
-		return utils.Errorf("update config params is nil")
+func (c *Config) ApplySyncUpdateConfigFromParams(event *ypb.AIInputEvent) (map[string]interface{}, error) {
+	if event == nil {
+		return nil, utils.Errorf("update config event is nil")
+	}
+	if event.Params == nil {
+		return nil, nil
 	}
 
 	updateConfig := map[string]interface{}{}
@@ -323,6 +326,17 @@ func (c *Config) HandleSyncUpdataConfigEvent(event *ypb.AIInputEvent) error {
 			},
 		})
 		updateConfig["ReviewPolicy"] = event.Params.GetReviewPolicy()
+	}
+	return updateConfig, nil
+}
+
+func (c *Config) HandleSyncUpdataConfigEvent(event *ypb.AIInputEvent) error {
+	updateConfig, err := c.ApplySyncUpdateConfigFromParams(event)
+	if err != nil {
+		return err
+	}
+	if updateConfig == nil {
+		return nil
 	}
 	c.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, "update_config", updateConfig, event.SyncID)
 	return nil
@@ -442,7 +456,6 @@ func (c *Config) RegisterBasicSyncHandlers() {
 	c.InputEventManager.RegisterSyncCallback(SYNC_TYPE_PING, c.HandleSyncPongEvent)
 	c.InputEventManager.RegisterSyncCallback(SYNC_TYPE_USER_INTERVENTION, c.HandleSyncUserIntervention)
 	c.InputEventManager.RegisterSyncCallback(SYNC_TYPE_TIMELINE, c.HandleSyncTimelineEvent)
-	c.InputEventManager.RegisterSyncCallback(SYNC_TYPE_UPDATE_CONFIG, c.HandleSyncUpdataConfigEvent)
 	c.InputEventManager.RegisterSyncCallback(SYNC_TYPE_MEMORY_CONTEXT, c.HandleSyncMemoryContextEvent)
 	c.InputEventManager.RegisterSyncCallback(SYNC_TYPE_PLAN_EXEC_TASKS, c.HandleSyncPlanExecTasksEvent)
 	c.InputEventManager.RegisterSyncCallback(SYNC_TYPE_RECOVERY_HISTORY, c.HandleSyncRecoveryHistoryEvent)

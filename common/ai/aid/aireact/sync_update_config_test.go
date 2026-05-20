@@ -86,16 +86,22 @@ func TestReAct_SyncUpdateConfig_DisablePlan(t *testing.T) {
 	defer cancel()
 
 	in := make(chan *ypb.AIInputEvent, 16)
-	out := make(chan *schema.AiOutputEvent, 16)
+	syncDone := make(chan struct{}, 1)
 	promptCh := make(chan string, 2)
 
-	_, err := NewTestReAct(
+	syncID := uuid.NewString()
+	ins, err := NewTestReAct(
 		aicommon.WithContext(ctx),
 		aicommon.WithEventInputChan(in),
 		aicommon.WithEnablePlanAndExec(true),
 		aicommon.WithDisableIntentRecognition(true),
 		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
-			out <- e
+			if e != nil && e.IsSync && e.SyncID == syncID && e.NodeId == "update_config" {
+				select {
+				case syncDone <- struct{}{}:
+				default:
+				}
+			}
 		}),
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			select {
@@ -110,7 +116,6 @@ func TestReAct_SyncUpdateConfig_DisablePlan(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	syncID := uuid.NewString()
 	in <- &ypb.AIInputEvent{
 		IsSyncMessage: true,
 		SyncType:      "update_config",
@@ -122,8 +127,8 @@ func TestReAct_SyncUpdateConfig_DisablePlan(t *testing.T) {
 
 	require.Eventually(t, func() bool {
 		select {
-		case event := <-out:
-			return event != nil && event.IsSync && event.SyncID == syncID && event.NodeId == "update_config"
+		case <-syncDone:
+			return true
 		default:
 			return false
 		}
@@ -141,8 +146,9 @@ func TestReAct_SyncUpdateConfig_DisablePlan(t *testing.T) {
 		t.Fatal("timeout waiting for main loop prompt")
 	}
 
-	require.NotContains(t, prompt, "request_plan_and_execution")
 	require.NotContains(t, prompt, "申请分步计划")
+	require.NotContains(t, prompt, `{"@action": "request_plan_and_execution"`)
+	require.False(t, ins.config.GetEnablePlanAndExec())
 }
 
 func TestReAct_SyncUpdateConfig_EmitStructuredResponse(t *testing.T) {
