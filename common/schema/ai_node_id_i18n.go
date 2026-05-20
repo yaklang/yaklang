@@ -69,6 +69,10 @@ func saveNodeIdI18nToDB(nodeId string, i18n *I18n) {
 }
 
 var nodeIdMapper = map[string]*I18n{
+	"adjust_todolist": {
+		Zh: "待办事项",
+		En: "TODO List",
+	},
 	"task-dependency": {
 		Zh: "任务依赖",
 		En: "Task Dependency",
