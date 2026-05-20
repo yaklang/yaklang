@@ -402,16 +402,10 @@ func (pm *PromptManager) GenerateToolParamsPromptWithMeta(tool *aitool.Tool) (*T
 	if err != nil {
 		return nil, err
 	}
-	prefixMaterials.AllowToolCall = false
 	prefixMaterials.AllowPlanAndExec = false
 	prefixMaterials.HasLoadCapability = false
 	prefixMaterials.TaskInstruction = strings.TrimSpace(toolParamsInstructionText)
 	prefixMaterials.OutputExample = ""
-	prefixMaterials.ToolInventory = true
-	prefixMaterials.ToolsCount = 0
-	prefixMaterials.TopToolsCount = 0
-	prefixMaterials.TopTools = nil
-	prefixMaterials.HasMoreTools = false
 	prefixMaterials.ForgeInventory = false
 	prefixMaterials.AIForgeList = ""
 	prefixMaterials.SkillsContext = ""
@@ -670,16 +664,10 @@ func (pm *PromptManager) GenerateReGenerateToolParamsPromptWithMeta(userQuery st
 	if err != nil {
 		return nil, err
 	}
-	prefixMaterials.AllowToolCall = false
 	prefixMaterials.AllowPlanAndExec = false
 	prefixMaterials.HasLoadCapability = false
 	prefixMaterials.TaskInstruction = strings.TrimSpace(wrongParamsInstructionText)
 	prefixMaterials.OutputExample = strings.TrimSpace(wrongParamsOutputExampleText)
-	prefixMaterials.ToolInventory = false
-	prefixMaterials.ToolsCount = 0
-	prefixMaterials.TopToolsCount = 0
-	prefixMaterials.TopTools = nil
-	prefixMaterials.HasMoreTools = false
 	prefixMaterials.ForgeInventory = false
 	prefixMaterials.AIForgeList = ""
 	prefixMaterials.SkillsContext = ""
