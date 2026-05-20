@@ -61,7 +61,8 @@ type PocConfig struct {
 	NoFixContentLength       *bool
 	JsRedirect               *bool
 	RedirectHandler          func(bool, []byte, []byte) bool
-	Session                  interface{} // session的标识符，可以用任意对象
+	Session                  string // session 标识符（cookie jar 池 key）
+	DisableSession           bool   // 为 true 时不自动分配 session，也不使用 cookie jar
 	SaveHTTPFlow             *bool
 	SaveHTTPFlowHandler      []func(*lowhttp.LowhttpResponse)
 	AfterSaveHTTPFlowHandler []func(*schema.HTTPFlow)
@@ -208,7 +209,10 @@ func (c *PocConfig) ToLowhttpOptions() []lowhttp.LowhttpOpt {
 		}
 		return c.RedirectHandler(isHttps, req, rsp)
 	}))
-	if c.Session != nil {
+	if c.DisableSession {
+		opts = append(opts, lowhttp.WithDisableSession(true))
+	}
+	if c.Session != "" {
 		opts = append(opts, lowhttp.WithSession(c.Session))
 	}
 	if c.Source != "" {
@@ -279,7 +283,7 @@ func NewDefaultPoCConfig() *PocConfig {
 		Proxy:                  nil,
 		FuzzParams:             nil,
 		RedirectHandler:        nil,
-		Session:                nil,
+		Session:                "",
 		Source:                 "",
 		Websocket:              false,
 		WebsocketHandler:       nil,
@@ -810,15 +814,22 @@ func WithJSRedirect(b bool) PocConfigOption {
 	}
 }
 
-// session 是一个请求选项参数，用于指定请求的session，参数可以是任意类型的值，用此值做标识符从而找到唯一的session。使用session进行请求时会自动管理cookie，这在登录后操作的场景非常有用
+// session 是一个请求选项参数，用于指定请求的 session 标识（string），同一 session 共享 cookie jar，适合登录后连续请求
 // Example:
 // ```
 // poc.Get("https://pie.dev/cookies/set/AAA/BBB", poc.session("test")) // 向 pie.dev 发起第一次请求，这会设置一个名为AAA，值为BBB的cookie
 // rsp, req, err = poc.Get("https://pie.dev/cookies", poc.session("test")) // 向 pie.dev 发起第二次请求，这个请求会输出所有的cookies，可以看到第一次请求设置的cookie已经存在了
 // ```
-func WithSession(i interface{}) PocConfigOption {
+func WithSession(session string) PocConfigOption {
 	return func(c *PocConfig) {
-		c.Session = i
+		c.Session = session
+	}
+}
+
+// disableSession 为 true 时不自动分配 session，也不启用 cookie jar（适合无需 cookie 的探测请求）
+func WithDisableSession(b bool) PocConfigOption {
+	return func(c *PocConfig) {
+		c.DisableSession = b
 	}
 }
 
@@ -1797,9 +1808,7 @@ func pochttp(packet []byte, config *PocConfig) (*lowhttp.LowhttpResponse, error)
 	opts := config.ToLowhttpOptions()
 	opts = append(opts, lowhttp.WithPacketBytes(packet))
 
-	response, err := lowhttp.HTTP(
-		opts...,
-	)
+	response, err := lowhttp.HTTP(opts...)
 	return response, err
 }
 
@@ -2251,7 +2260,7 @@ func extractContentLength(headerBytes []byte) int64 {
 // poc.Get("https://example.com/api", poc.session("user1"))   // 继续使用 session "user1"
 // poc.RemoveSession("user1") // 清除 session "user1"，释放其 cookiejar
 // ```
-func RemoveSession(session interface{}) {
+func RemoveSession(session string) {
 	lowhttp.RemoveCookiejar(session)
 }
 
@@ -2449,6 +2458,7 @@ var PoCExports = map[string]interface{}{
 	"noBodyBuffer":         WithNoBodyBuffer,
 	"bodyStreamHandler":    WithBodyStreamReaderHandler,
 	"session":              WithSession,
+	"disableSession":       WithDisableSession,
 	"save":                 WithSave,
 	"saveSync":             WithSaveSync,
 	"saveHandler":          WithSaveHandler,

@@ -61,7 +61,8 @@ type LowhttpExecConfig struct {
 	NoFixContentLength               bool
 	NoReadMultiResponse              bool
 	RedirectHandler                  func(bool, []byte, []byte) bool
-	Session                          interface{}
+	Session                          string
+	DisableSession                   bool
 	BeforeDoRequest                  func([]byte) []byte
 	Ctx                              context.Context
 	SaveHTTPFlow                     bool
@@ -780,9 +781,17 @@ func WithRedirectHandler(redirectHandler func(bool, []byte, []byte) bool) Lowhtt
 	}
 }
 
-func WithSession(session interface{}) LowhttpOpt {
+// WithSession 指定 session 标识；cookie jar 在池中跨请求复用，调用方负责 RemoveCookiejar 或 poc.RemoveSession。
+func WithSession(session string) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.Session = session
+	}
+}
+
+// WithDisableSession 为 true 时不自动分配 session，也不启用 cookie jar。
+func WithDisableSession(b bool) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.DisableSession = b
 	}
 }
 
