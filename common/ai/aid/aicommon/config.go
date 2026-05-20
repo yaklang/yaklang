@@ -283,6 +283,9 @@ type Config struct {
 	// This content appears once during plan initialization and does not affect subsequent task execution.
 	PlanPrompt string
 
+	// FrozenBlockPartitionProducer holds explicit prompt frozen-block partitions.
+	FrozenBlockPartitionProducer *FrozenBlockPartitionProducer
+
 	// result processer
 	GenerateReport               bool
 	MaxTaskContinue              int64
@@ -3354,17 +3357,8 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 	if i.SessionPromptState != nil {
 		opts = append(opts, WithSessionPromptState(i.SessionPromptState))
 	}
-	if i.KeyValueConfig != nil {
-		if existing, ok := i.GetConfig(frozenBlockPartitionProducersConfigKey); ok {
-			switch producers := existing.(type) {
-			case []FrozenBlockPartitionProducer:
-				for _, producer := range producers {
-					opts = append(opts, WithFrozenBlockPartitionProducer(producer))
-				}
-			case FrozenBlockPartitionProducer:
-				opts = append(opts, WithFrozenBlockPartitionProducer(producers))
-			}
-		}
+	if i.FrozenBlockPartitionProducer != nil {
+		opts = append(opts, WithFrozenBlockPartitionProducer(i.FrozenBlockPartitionProducer))
 	}
 
 	if i.Seq > 0 {

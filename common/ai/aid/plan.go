@@ -147,12 +147,12 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 		if planRes.RootTask != nil {
 			pr.cod.standardizeTaskTreeAndNotify(planRes.RootTask, "mock plan initialized")
 		}
-		if pr.cod.ContextProvider != nil {
+		if pr.cod.Config != nil {
 			if strings.TrimSpace(planRes.Facts) != "" {
-				pr.cod.ContextProvider.SetPersistentData(planFactsPersistentKey, planRes.Facts)
+				appendPlanFactsFrozenPartition(pr.cod.Config, planRes.Facts)
 			}
 			if strings.TrimSpace(planRes.Document) != "" {
-				pr.cod.ContextProvider.SetPersistentData(planDocumentPersistentKey, planRes.Document)
+				appendPlanDocumentFrozenPartition(pr.cod.Config, planRes.Document)
 			}
 		}
 		return planRes, nil
@@ -233,12 +233,16 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 
 					if facts := loop.Get(loop_plan.PLAN_FACTS_KEY); facts != "" {
 						planFacts = facts
-						pr.cod.ContextProvider.SetPersistentData(planFactsPersistentKey, facts)
+						if pr.cod.Config != nil {
+							appendPlanFactsFrozenPartition(pr.cod.Config, facts)
+						}
 					}
 
 					if doc := loop.Get(loop_plan.PLAN_DOCUMENT_KEY); doc != "" {
 						planDocument = doc
-						pr.cod.ContextProvider.SetPersistentData(planDocumentPersistentKey, doc)
+						if pr.cod.Config != nil {
+							appendPlanDocumentFrozenPartition(pr.cod.Config, doc)
+						}
 					}
 				})
 			}
@@ -248,11 +252,11 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 	}
 	pr.cod.standardizeTaskTreeAndNotify(rootTask, "initial plan generated")
 
-	if planFacts != "" && rootTask.Coordinator != nil && rootTask.Coordinator.ContextProvider != nil {
-		rootTask.Coordinator.ContextProvider.SetPersistentData(planFactsPersistentKey, planFacts)
+	if planFacts != "" && rootTask.Coordinator != nil && rootTask.Coordinator.Config != nil {
+		appendPlanFactsFrozenPartition(rootTask.Coordinator.Config, planFacts)
 	}
-	if planDocument != "" && rootTask.Coordinator != nil && rootTask.Coordinator.ContextProvider != nil {
-		rootTask.Coordinator.ContextProvider.SetPersistentData(planDocumentPersistentKey, planDocument)
+	if planDocument != "" && rootTask.Coordinator != nil && rootTask.Coordinator.Config != nil {
+		appendPlanDocumentFrozenPartition(rootTask.Coordinator.Config, planDocument)
 	}
 
 	resp := pr.cod.newPlanResponse(rootTask)

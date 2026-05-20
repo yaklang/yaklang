@@ -18,10 +18,10 @@ func TestBuildPlanStaticFrozenPartitions(t *testing.T) {
 	root := cod.generateAITaskWithName("Root", "root goal")
 	root.Index = "1"
 
-	mem.SetPersistentData(planFactsPersistentKey, "## Facts\n- stable fact")
-	mem.SetPersistentData(planDocumentPersistentKey, "## Document\n- stable guidance")
+	appendPlanFactsFrozenPartition(cod.Config, "## Facts\n- stable fact")
+	appendPlanDocumentFrozenPartition(cod.Config, "## Document\n- stable guidance")
 
-	partitions := BuildPlanStaticFrozenPartitions(cod)
+	partitions := BuildPlanStaticFrozenPartitions(cod.Config.GetOrCreateFrozenBlockPartitionProducer())
 	require.Len(t, partitions, 2)
 	require.Equal(t, "plan_facts", partitions[0].ID)
 	require.Equal(t, "Plan Facts", partitions[0].Title)
@@ -32,7 +32,7 @@ func TestBuildPlanStaticFrozenPartitions(t *testing.T) {
 	require.Equal(t, "## Document\n- stable guidance", partitions[1].Content)
 	require.Equal(t, 110, partitions[1].Order)
 
-	again := BuildPlanStaticFrozenPartitions(cod)
+	again := BuildPlanStaticFrozenPartitions(cod.Config.GetOrCreateFrozenBlockPartitionProducer())
 	require.Equal(t, partitions[0].Nonce, again[0].Nonce)
 	require.Equal(t, partitions[1].Nonce, again[1].Nonce)
 }
@@ -64,7 +64,7 @@ root input`)
 	cod.rootTask = root
 	mem.RootTask = root
 
-	require.Empty(t, BuildPlanStaticFrozenPartitions(cod), "plan static partitions must come from coordinator persistent data, not task user input")
+	require.Empty(t, BuildPlanStaticFrozenPartitions(cod.Config.GetOrCreateFrozenBlockPartitionProducer()), "plan static partitions must come from explicit config append, not task user input")
 }
 
 func TestTaskProgressDoesNotPrependPlanStaticDocs(t *testing.T) {
@@ -76,8 +76,8 @@ func TestTaskProgressDoesNotPrependPlanStaticDocs(t *testing.T) {
 	}
 	root := cod.generateAITaskWithName("Root", "root goal")
 	root.Index = "1"
-	mem.SetPersistentData(planFactsPersistentKey, "## Facts\n- stable fact")
-	mem.SetPersistentData(planDocumentPersistentKey, "## Document\n- stable guidance")
+	appendPlanFactsFrozenPartition(cod.Config, "## Facts\n- stable fact")
+	appendPlanDocumentFrozenPartition(cod.Config, "## Document\n- stable guidance")
 
 	progress := root.Progress()
 	require.Contains(t, progress, "Root")

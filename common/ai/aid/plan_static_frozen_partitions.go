@@ -7,27 +7,30 @@ const (
 	planDocumentFrozenPartitionOrder = 110
 )
 
-func BuildPlanStaticFrozenPartitions(c *Coordinator) []aicommon.FrozenBlockPartition {
-	if c == nil || c.ContextProvider == nil {
+func appendPlanFactsFrozenPartition(config *aicommon.Config, facts string) {
+	if config == nil {
+		return
+	}
+	config.AppendFrozenBlockPartition("plan_facts", "Plan Facts", facts, planFactsFrozenPartitionOrder)
+}
+
+func appendPlanDocumentFrozenPartition(config *aicommon.Config, document string) {
+	if config == nil {
+		return
+	}
+	config.AppendFrozenBlockPartition("plan_document", "Plan Document", document, planDocumentFrozenPartitionOrder)
+}
+
+func BuildPlanStaticFrozenPartitions(producer *aicommon.FrozenBlockPartitionProducer) []aicommon.FrozenBlockPartition {
+	if producer == nil {
 		return nil
 	}
 	var out []aicommon.FrozenBlockPartition
-	if p, ok := aicommon.NewFrozenBlockPartition("plan_facts", "Plan Facts", getCoordinatorPlanPersistentData(c, planFactsPersistentKey), planFactsFrozenPartitionOrder); ok {
-		out = append(out, p)
-	}
-	if p, ok := aicommon.NewFrozenBlockPartition("plan_document", "Plan Document", getCoordinatorPlanPersistentData(c, planDocumentPersistentKey), planDocumentFrozenPartitionOrder); ok {
-		out = append(out, p)
+	for _, partition := range producer.ProducePartitions() {
+		switch partition.ID {
+		case "plan_facts", "plan_document":
+			out = append(out, partition)
+		}
 	}
 	return out
-}
-
-func getCoordinatorPlanPersistentData(c *Coordinator, key string) string {
-	if c == nil || c.ContextProvider == nil {
-		return ""
-	}
-	content, ok := c.ContextProvider.GetPersistentData(key)
-	if !ok {
-		return ""
-	}
-	return content
 }
