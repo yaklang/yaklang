@@ -223,10 +223,6 @@ func (pm *PromptManager) NewPromptMaterials(base *reactloops.LoopPromptBaseMater
 		materials.WorkingDirGlance = base.WorkingDirGlance
 		materials.Workspace = strings.TrimSpace(base.OSArch+base.WorkingDir+base.WorkingDirGlance) != ""
 	}
-	if pm != nil && pm.react != nil && pm.react.config != nil {
-		materials.FrozenPartitions = append(materials.FrozenPartitions, aicommon.FrozenBlockPartitionsFromConfig(pm.react.config)...)
-	}
-
 	if input != nil {
 		materials.TaskInstruction = input.TaskInstruction
 		materials.OutputExample = input.OutputExample
