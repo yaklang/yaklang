@@ -11,29 +11,33 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-	"sync"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-var CookiejarPool sync.Map
+var cookiejarPool = utils.NewSafeMapWithKey[string, http.CookieJar]()
 
-func RemoveCookiejar(session interface{}) {
-	CookiejarPool.Delete(session)
-}
-func GetCookiejar(session interface{}) http.CookieJar {
-	var jar http.CookieJar
-
-	if iJar, ok := CookiejarPool.Load(session); !ok {
-		jar, _ = cookiejar.New(nil)
-		CookiejarPool.Store(session, jar)
-	} else {
-		jar = iJar.(http.CookieJar)
+func RemoveCookiejar(session string) {
+	if session == "" {
+		return
 	}
+	cookiejarPool.Delete(session)
+}
 
+func GetCookiejar(session string) http.CookieJar {
+	if jar, ok := cookiejarPool.Get(session); ok {
+		return jar
+	}
+	jar, _ := cookiejar.New(nil)
+	cookiejarPool.Set(session, jar)
 	return jar
+}
+
+// CookiejarPoolCount returns how many session cookie jars are cached.
+func CookiejarPoolCount() int {
+	return cookiejarPool.Count()
 }
 
 func ExtractCookieJarFromHTTPResponse(rawResponse []byte) []*http.Cookie {
