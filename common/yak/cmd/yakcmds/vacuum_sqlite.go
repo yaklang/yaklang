@@ -54,9 +54,9 @@ var VacuumSQLiteCommand = &cli.Command{
 			Name:  "dry-run",
 			Usage: "Only show what would be done without actually vacuuming",
 		},
-		cli.BoolTFlag{
-			Name:  "wal-checkpoint",
-			Usage: "Perform WAL checkpoint (TRUNCATE) before and after vacuum (default: true; use --wal-checkpoint=false to disable)",
+		cli.BoolFlag{
+			Name:  "no-wal-checkpoint",
+			Usage: "Disable WAL checkpoint (TRUNCATE) before and after vacuum (checkpoint is on by default)",
 		},
 		cli.BoolFlag{
 			Name:  "force-truncate-wal",
@@ -85,7 +85,8 @@ var VacuumSQLiteCommand = &cli.Command{
 		dbFiles := c.StringSlice("db-file")
 		vacuumAll := c.Bool("all")
 		dryRun := c.Bool("dry-run")
-		walCheckpoint := c.Bool("wal-checkpoint")
+		noWalCheckpoint := c.Bool("no-wal-checkpoint")
+		walCheckpoint := !noWalCheckpoint
 		forceTruncateWAL := c.Bool("force-truncate-wal")
 		noForceTruncateWAL := c.Bool("no-force-truncate-wal")
 		skipDefault := c.Bool("skip-default")
@@ -95,8 +96,8 @@ var VacuumSQLiteCommand = &cli.Command{
 		// Auto-detect mode: will be set per-database based on WAL existence
 		autoDetectForceTruncate := !forceTruncateWAL && !noForceTruncateWAL
 
-		// force-truncate-wal implies wal-checkpoint
-		if forceTruncateWAL {
+		// force-truncate-wal implies checkpoint (unless explicitly disabled)
+		if forceTruncateWAL && !noWalCheckpoint {
 			walCheckpoint = true
 		}
 
@@ -206,7 +207,7 @@ var VacuumSQLiteCommand = &cli.Command{
 			fmt.Printf("[%d/%d] Processing: %s\n", i+1, len(databasesToVacuum), dbPath)
 			fmt.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
 
-			saved, err := vacuumDatabase(dbPath, dryRun, walCheckpoint, forceTruncateWAL, autoDetectForceTruncate, busyTimeout)
+			saved, err := vacuumDatabase(dbPath, dryRun, walCheckpoint, noWalCheckpoint, forceTruncateWAL, autoDetectForceTruncate, busyTimeout)
 			if err != nil {
 				log.Errorf("failed to vacuum %s: %v", dbPath, err)
 				failCount++
@@ -259,7 +260,7 @@ var VacuumSQLiteCommand = &cli.Command{
 
 // vacuumDatabase performs vacuum on a single SQLite database file
 // Returns the number of bytes saved
-func vacuumDatabase(dbPath string, dryRun bool, walCheckpoint bool, forceTruncateWAL bool, autoDetectForceTruncate bool, busyTimeout int) (int64, error) {
+func vacuumDatabase(dbPath string, dryRun bool, walCheckpoint bool, noWalCheckpoint bool, forceTruncateWAL bool, autoDetectForceTruncate bool, busyTimeout int) (int64, error) {
 	// Get file info before vacuum
 	dbInfo, err := os.Stat(dbPath)
 	if err != nil {
@@ -289,7 +290,9 @@ func vacuumDatabase(dbPath string, dryRun bool, walCheckpoint bool, forceTruncat
 	// Auto-detect: enable force truncate WAL if WAL file exists and is significant (> 1MB)
 	if autoDetectForceTruncate && walExists && walSizeBefore > 1024*1024 && isWALJournal {
 		forceTruncateWAL = true
-		walCheckpoint = true
+		if !noWalCheckpoint {
+			walCheckpoint = true
+		}
 		fmt.Printf("  [AUTO] Detected large WAL file (%s), enabling force truncate optimization\n", utils.ByteSize(uint64(walSizeBefore)))
 	}
 
@@ -327,7 +330,9 @@ func vacuumDatabase(dbPath string, dryRun bool, walCheckpoint bool, forceTruncat
 				fmt.Printf("     [WARN] Database is locked (Yakit/GoLand may be running), falling back to regular vacuum...\n")
 				fmt.Printf("     [TIP] Close Yakit/GoLand database tools for best results, or use --no-force-truncate-wal\n")
 				// Fall back to regular vacuum
-				walCheckpoint = true
+				if !noWalCheckpoint {
+					walCheckpoint = true
+				}
 				forceTruncateWAL = false
 			} else {
 				return saved, err
