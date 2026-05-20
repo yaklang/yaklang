@@ -37,13 +37,19 @@ var loopAction_AdjustTodolist = &reactloops.LoopAction{
 		"(ops: add / doing / done / delete / skip). Use this when the current iteration produced enough new information to enqueue, mark in-progress, " +
 		"close, drop, or skip TODO items, but you don't want to wait for the next verification round. Always submit only the delta against the existing " +
 		"TODO list; never repeat unchanged items. The applied delta is written into the shared TODO store, broadcast as a structured todo_list_update " +
-		"event, and breadcrumbed into the timeline under NEXT_MOVEMENTS, exactly like verification.",
+		"event, and breadcrumbed into the timeline under NEXT_MOVEMENTS, exactly like verification. " +
+		"LANGUAGE: every human-readable string (especially the `content` field) MUST be written in the same natural language as the user's query " +
+		"and the surrounding session. If the user is speaking Chinese, write Chinese; if English, write English. Never auto-translate to English " +
+		"just because the action description happens to be in English. The frontend renders these strings verbatim into the shared TODO panel " +
+		"alongside verification.next_movements output, so any language drift will look jarring to the user.",
 	Options: []aitool.ToolOption{
 		aitool.WithStructArrayParam("next_movements",
 			[]aitool.PropertyOption{
 				aitool.WithParam_Description("TODO increment array. Each item describes one delta op against the shared global TODO list. " +
 					"Submit only the items that should change this round; never repeat existing TODOs unchanged. " +
-					"Same shape as verification.next_movements: {op, id, content}. When you have nothing to change, do NOT emit this action."),
+					"Same shape as verification.next_movements: {op, id, content}. When you have nothing to change, do NOT emit this action. " +
+					"Language rule: the `content` field MUST match the language of the user query / surrounding session " +
+					"(用户用中文 → content 写中文; English user → English content). Do NOT translate to English just because this schema is English."),
 				aitool.WithParam_Required(true),
 			},
 			nil,
@@ -53,11 +59,16 @@ var loopAction_AdjustTodolist = &reactloops.LoopAction{
 				aitool.WithParam_Required(true),
 			),
 			aitool.WithStringParam("id",
-				aitool.WithParam_Description("Stable TODO identifier (snake_case is preferred). For non-add ops it must refer to an existing TODO."),
+				aitool.WithParam_Description("Stable TODO identifier (snake_case ASCII, e.g. `recon_dns_whois`). The id is a machine handle, " +
+					"NOT user-facing text, so keep it ASCII regardless of the session language. For non-add ops it must refer to an existing TODO."),
 				aitool.WithParam_Required(true),
 			),
 			aitool.WithStringParam("content",
-				aitool.WithParam_Description("TODO content. Required when op=add; optional otherwise. Keep it short, action-oriented, and aligned with the current task goal."),
+				aitool.WithParam_Description("TODO content shown directly in the user-facing TODO panel. Required when op=add; optional otherwise. "+
+					"Keep it short, action-oriented, aligned with the current task goal. "+
+					"LANGUAGE: write in the SAME natural language as the user's query (用户中文 → 用中文; English user → English). "+
+					"Do NOT translate to English. This text sits next to verification.next_movements output in the same panel; "+
+					"language drift between the two channels will look broken to the user."),
 			),
 		),
 	},
