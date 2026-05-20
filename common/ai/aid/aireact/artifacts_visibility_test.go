@@ -209,11 +209,8 @@ WAIT_SECOND:
 
 	secondPrompt := capturedPrompts[len(capturedPrompts)-1]
 
-	// SessionArtifacts 现在嵌入 Workspace 块 (timeline-open 段) 而非 Pure Dynamic
-	// 段, 但作为字符串仍出现在最终 prompt 中.
-	// 关键词: artifacts visibility, Workspace 内嵌, Pure Dynamic 反污染
 	assert.Contains(t, secondPrompt, "Session Artifacts",
-		"subsequent conversation prompt should still surface 'Session Artifacts' (now inside Workspace block)")
+		"subsequent conversation prompt should still surface Session Artifacts as a first-class prompt block")
 	assert.Contains(t, secondPrompt, "task_1-1_network_scan",
 		"subsequent conversation prompt should contain task_1-1 directory name")
 	assert.Contains(t, secondPrompt, "task_1-2_vuln_analysis",
@@ -226,8 +223,7 @@ WAIT_SECOND:
 		"subsequent conversation prompt should contain result summary filename")
 
 	// 反向断言: Pure Dynamic / AutoContext 段对应的 <|AUTO_PROVIDE_CTX_*|> tag
-	// 不应再含 Session Artifacts; 即使包裹 tag 没出现 (provider 已退役), Session
-	// Artifacts 也只能出现在 Workspace 块下. 通过裁切验证: 若 Session Artifacts
+	// 不应再含 Session Artifacts; 通过裁切验证: 若 Session Artifacts
 	// 出现的位置, 不在 AutoContext tag 之间.
 	// 关键词: 反向断言, AUTO_PROVIDE_CTX 不含 Session Artifacts
 	if autoIdx := strings.Index(secondPrompt, "<|AUTO_PROVIDE_CTX_"); autoIdx >= 0 {
@@ -239,14 +235,15 @@ WAIT_SECOND:
 		}
 	}
 
-	// Workspace 块在 timeline-open 段, 字面上含 # Workspace Context 标题与
-	// Session Artifacts 子段; 二者前后相邻是新归属的标志.
-	// 关键词: Workspace 内嵌, ## Session Artifacts 子段
+	// Workspace 与 Session Artifacts 都在 timeline-open 段, 但 Artifacts 是
+	// Workspace 后面的一级块，不再作为 Workspace 子段。
 	wsIdx := strings.Index(secondPrompt, "# Workspace Context")
-	saIdx := strings.Index(secondPrompt, "Session Artifacts")
+	saIdx := strings.Index(secondPrompt, "# Session Artifacts (Open)")
 	if wsIdx >= 0 && saIdx >= 0 {
 		assert.Greater(t, saIdx, wsIdx,
-			"Session Artifacts should be embedded under Workspace Context block")
+			"Session Artifacts should render after Workspace Context")
+		assert.NotContains(t, secondPrompt[wsIdx:saIdx], "## Session Artifacts",
+			"Workspace Context must not contain the legacy Session Artifacts subsection")
 	}
 
 	t.Logf("artifacts section found in prompt (extracting Workspace portion):")
