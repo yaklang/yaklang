@@ -483,105 +483,21 @@ func (r *ReAct) emitTodoListUpdate(result *aicommon.VerifySatisfactionResult) {
 	}
 }
 
+// writeNextMovementsDisplayStream / formatNextMovementDisplayLine 都已经
+// 抽到 aicommon 包成为公开 helper, 这里保留 package-local 薄包装是为了:
+//  1. 让 verification_compat_test.go 等历史调用点继续按原符号引用, 无需大改;
+//  2. 让 adjust_todolist 主循环路径与 verification 共享同一份字节流转换,
+//     避免双通道字符级漂移.
+//
+// 关键词: writeNextMovementsDisplayStream 兼容层, formatNextMovementDisplayLine
+//
+//	薄包装, aicommon 单源, verification + adjust_todolist 双通道一致
 func writeNextMovementsDisplayStream(reader io.Reader, writer io.Writer) error {
-	decoder := json.NewDecoder(reader)
-	token, err := decoder.Token()
-	if err != nil {
-		return err
-	}
-	delim, ok := token.(json.Delim)
-	if !ok || delim != '[' {
-		return utils.Errorf("next_movements is not a JSON array")
-	}
-
-	firstLine := true
-	for decoder.More() {
-		var movement aicommon.VerifyNextMovement
-		if err := decoder.Decode(&movement); err != nil {
-			return err
-		}
-		line := formatNextMovementDisplayLine(movement)
-		if strings.TrimSpace(line) == "" {
-			continue
-		}
-		if !firstLine {
-			if _, err := writer.Write([]byte("\n")); err != nil {
-				return err
-			}
-		}
-		firstLine = false
-		if _, err := io.WriteString(writer, line); err != nil {
-			return err
-		}
-	}
-	_, err = decoder.Token()
-	return err
+	return aicommon.WriteNextMovementsDisplayStream(reader, writer)
 }
 
 func formatNextMovementDisplayLine(movement aicommon.VerifyNextMovement) string {
-	id := strings.TrimSpace(movement.ID)
-	content := strings.TrimSpace(movement.Content)
-	switch strings.ToLower(strings.TrimSpace(movement.Op)) {
-	case "add":
-		if id == "" && content == "" {
-			return ""
-		}
-		if id == "" {
-			return fmt.Sprintf("- [+]: %s", content)
-		}
-		if content == "" {
-			return fmt.Sprintf("- [+]: [id: %s]", id)
-		}
-		return fmt.Sprintf("- [+]: [id: %s]: %s", id, content)
-	case "doing", "pending":
-		if id == "" {
-			return ""
-		}
-		if content == "" {
-			return fmt.Sprintf("- [DOING]: [id: %s]", id)
-		}
-		return fmt.Sprintf("- [DOING]: [id: %s]: %s", id, content)
-	case "done":
-		if id == "" {
-			return ""
-		}
-		return fmt.Sprintf("- [x]: [id: %s]", id)
-	case "delete":
-		if id == "" {
-			return ""
-		}
-		if content == "" {
-			return fmt.Sprintf("- [DELETED]: [id: %s]", id)
-		}
-		return fmt.Sprintf("- [DELETED]: [id: %s]: %s", id, content)
-	case "skip":
-		// 显式跳过, 与 delete 形态对偶, 用于在前端 next_movements stream 中
-		// 一眼看出"AI 主动声明这个 TODO 跳过". 与自动翻 SKIPPED 区别开来:
-		// 自动翻已废弃, 出现 [SKIPPED] 标签现在都来源于显式 skip op.
-		// 关键词: skip op stream 显示, 主动跳过
-		if id == "" {
-			return ""
-		}
-		if content == "" {
-			return fmt.Sprintf("- [SKIPPED]: [id: %s]", id)
-		}
-		return fmt.Sprintf("- [SKIPPED]: [id: %s]: %s", id, content)
-	default:
-		label := strings.ToUpper(strings.TrimSpace(movement.Op))
-		if label == "" {
-			label = "?"
-		}
-		if id == "" && content == "" {
-			return ""
-		}
-		if id == "" {
-			return fmt.Sprintf("- [%s]: %s", label, content)
-		}
-		if content == "" {
-			return fmt.Sprintf("- [%s]: [id: %s]", label, id)
-		}
-		return fmt.Sprintf("- [%s]: [id: %s]: %s", label, id, content)
-	}
+	return aicommon.FormatNextMovementDisplayLine(movement)
 }
 
 func writeEvidenceDisplayStream(reader io.Reader, writer io.Writer) error {
