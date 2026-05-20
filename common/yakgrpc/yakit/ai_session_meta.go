@@ -3,16 +3,17 @@ package yakit
 import (
 	"encoding/json"
 	"strings"
+	"time"
 
 	"github.com/jinzhu/gorm"
 	"github.com/samber/lo"
-	"google.golang.org/protobuf/encoding/protojson"
-	"google.golang.org/protobuf/proto"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 )
 
 const aiSessionMetaMigrationKey = "yakit.ai_session_meta.migrated.v1"
@@ -103,6 +104,74 @@ func CreateOrUpdateAISessionMetaStartParams(db *gorm.DB, sessionID string, param
 		return nil, err
 	}
 	if _, err := UpdateAISessionMetaStartParams(db, sessionID, params); err != nil {
+		return nil, err
+	}
+	return GetAISessionMetaBySessionID(db, sessionID)
+}
+
+func CreateOrUpdateAISessionMetaOnStart(db *gorm.DB, sessionID string, params *ypb.AIStartParams, lastUsedAt time.Time) (*schema.AISession, error) {
+	if db == nil {
+		return nil, utils.Errorf("database is nil")
+	}
+	sessionID = strings.TrimSpace(sessionID)
+	if sessionID == "" {
+		return nil, utils.Errorf("session_id is empty")
+	}
+	if lastUsedAt.IsZero() {
+		lastUsedAt = time.Now()
+	}
+	raw, err := marshalAISessionStartParams(params)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := EnsureAISessionMeta(db, sessionID); err != nil {
+		return nil, err
+	}
+	if err := db.Model(&schema.AISession{}).
+		Where("session_id = ?", sessionID).
+		UpdateColumns(map[string]any{
+			"start_params": raw,
+			"last_used_at": lastUsedAt,
+			"updated_at":   lastUsedAt,
+		}).Error; err != nil {
+		return nil, err
+	}
+	return GetAISessionMetaBySessionID(db, sessionID)
+}
+
+func UpdateAISessionMetaLastUsedAt(db *gorm.DB, sessionID string, lastUsedAt time.Time) (int64, error) {
+	if db == nil {
+		return 0, utils.Errorf("database is nil")
+	}
+	sessionID = strings.TrimSpace(sessionID)
+	if sessionID == "" {
+		return 0, utils.Errorf("session_id is empty")
+	}
+	if lastUsedAt.IsZero() {
+		lastUsedAt = time.Now()
+	}
+
+	result := db.Model(&schema.AISession{}).
+		Where("session_id = ?", sessionID).
+		UpdateColumns(map[string]any{
+			"last_used_at": lastUsedAt,
+			"updated_at":   lastUsedAt,
+		})
+	return result.RowsAffected, result.Error
+}
+
+func TouchAISessionMetaLastUsedAt(db *gorm.DB, sessionID string, lastUsedAt time.Time) (*schema.AISession, error) {
+	if db == nil {
+		return nil, utils.Errorf("database is nil")
+	}
+	sessionID = strings.TrimSpace(sessionID)
+	if sessionID == "" {
+		return nil, utils.Errorf("session_id is empty")
+	}
+	if _, err := EnsureAISessionMeta(db, sessionID); err != nil {
+		return nil, err
+	}
+	if _, err := UpdateAISessionMetaLastUsedAt(db, sessionID, lastUsedAt); err != nil {
 		return nil, err
 	}
 	return GetAISessionMetaBySessionID(db, sessionID)
@@ -353,7 +422,6 @@ func AppendAISessionMetaRelatedRuntimeID(db *gorm.DB, sessionID, runtimeID strin
 			return utils.Errorf("unmarshal related_runtime_ids failed: %v", err)
 		}
 	}
-
 
 	normalized := lo.Uniq(append(runtimeIDs, runtimeID))
 

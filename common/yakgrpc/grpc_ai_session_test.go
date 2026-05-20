@@ -36,6 +36,9 @@ func TestServer_QueryAISession_Pagination(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, db.Model(&schema.AISession{}).
 			Where("session_id = ?", sessionID).
+			UpdateColumn("last_used_at", time.Unix(int64(2000+i), 0)).Error)
+		require.NoError(t, db.Model(&schema.AISession{}).
+			Where("session_id = ?", sessionID).
 			UpdateColumn("updated_at", time.Unix(int64(1000+i), 0)).Error)
 	}
 
@@ -59,6 +62,7 @@ func TestServer_QueryAISession_Pagination(t *testing.T) {
 	require.Equal(t, sessionIDs[4], page1.GetData()[0].GetSessionID())
 	require.Equal(t, sessionIDs[3], page1.GetData()[1].GetSessionID())
 	require.Equal(t, "model-5", page1.GetData()[0].GetStartParams().GetAIModelName())
+	require.Equal(t, int64(2005), page1.GetData()[0].GetLastUsedAt())
 
 	page2, err := srv.QueryAISession(ctx, &ypb.QueryAISessionRequest{
 		Pagination: &ypb.Paging{

@@ -41,10 +41,14 @@ func (s *Server) QueryAISession(ctx context.Context, req *ypb.QueryAISessionRequ
 		if item == nil {
 			continue
 		}
+		var lastUsedAt int64
 		var runtimeIDs []string
 		startParams, err := yakit.GetAISessionMetaStartParamsBySessionID(s.GetProjectDatabase(), item.SessionID)
 		if err != nil {
 			return nil, err
+		}
+		if !item.LastUsedAt.IsZero() {
+			lastUsedAt = item.LastUsedAt.Unix()
 		}
 		if strings.TrimSpace(item.RelatedRuntimeIDS) != "" {
 			json.Unmarshal([]byte(item.RelatedRuntimeIDS), &runtimeIDs)
@@ -56,6 +60,7 @@ func (s *Server) QueryAISession(ctx context.Context, req *ypb.QueryAISessionRequ
 			TitleInitialized:  item.TitleInitialized,
 			CreatedAt:         item.CreatedAt.Unix(),
 			UpdatedAt:         item.UpdatedAt.Unix(),
+			LastUsedAt:        lastUsedAt,
 			RelatedRuntimeIDs: runtimeIDs,
 			StartParams:       startParams,
 		})
