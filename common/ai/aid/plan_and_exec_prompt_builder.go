@@ -52,8 +52,18 @@ func newAidPromptMaterials(instruction string, schema string) *aicommon.PromptMa
 	}
 }
 
+func newAidPromptMaterialsForConfig(config *aicommon.Config, instruction string, schema string) *aicommon.PromptMaterials {
+	materials := newAidPromptMaterials(instruction, schema)
+	aicommon.ApplyPromptFrozenOpenMaterials(materials, aicommon.BuildPromptFrozenOpenMaterials(config))
+	return materials
+}
+
 func newAidPlanReviewPromptMaterials(pr *planRequest, instruction string, schemaKey string) *aicommon.PromptMaterials {
-	return newAidPromptMaterials(instruction, pr.cod.ContextProvider.Schema()[schemaKey])
+	var config *aicommon.Config
+	if pr != nil && pr.cod != nil {
+		config = pr.cod.Config
+	}
+	return newAidPromptMaterialsForConfig(config, instruction, pr.cod.ContextProvider.Schema()[schemaKey])
 }
 
 func (pr *planRequest) assemblePlanReviewPrompt(
@@ -99,7 +109,7 @@ func buildCreateSubtaskTargetPlansDetail(c *Coordinator, targetPlans []string) s
 func (t *AiTask) buildDeepthinkPrompt(userInput string) (string, error) {
 	builder := aicommon.NewDefaultPromptPrefixBuilder()
 	nonce := utils.RandStringBytes(6)
-	materials := newAidPromptMaterials(__prompt_deepthinkInstruction, t.ContextProvider.Schema()["PlanJsonSchema"])
+	materials := newAidPromptMaterialsForConfig(t.Config, __prompt_deepthinkInstruction, t.ContextProvider.Schema()["PlanJsonSchema"])
 	return builder.AssemblePromptWithDynamicSection(
 		materials,
 		"aid-deepthink-dynamic",
@@ -115,12 +125,9 @@ func (t *AiTask) buildDeepthinkPrompt(userInput string) (string, error) {
 }
 
 func (t *AiTask) buildDynamicPlanPrompt(userInput string) (string, error) {
-	frozen, open := t.ContextProvider.TimelineDumpFrozenOpen()
 	builder := aicommon.NewDefaultPromptPrefixBuilder()
 	nonce := utils.RandStringBytes(6)
-	materials := newAidPromptMaterials(__prompt_dynamicPlanInstruction, t.ContextProvider.Schema()["RePlanJsonSchema"])
-	materials.TimelineFrozen = frozen
-	materials.TimelineOpen = open
+	materials := newAidPromptMaterialsForConfig(t.Config, __prompt_dynamicPlanInstruction, t.ContextProvider.Schema()["RePlanJsonSchema"])
 	return builder.AssemblePromptWithDynamicSection(
 		materials,
 		"aid-dynamic-plan-dynamic",

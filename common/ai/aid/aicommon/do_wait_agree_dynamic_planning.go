@@ -55,8 +55,6 @@ type TaskReviewPromptData struct {
 	OSArch           string
 	WorkingDir       string
 	WorkingDirGlance string
-	TimelineFrozen   string
-	TimelineOpen     string
 	Nonce            string
 	TaskDetails      string
 	ShortSummary     string
@@ -130,9 +128,7 @@ func generateTaskReviewPrompt(config *Config, materials aitool.InvokeParams) (st
 		data.WorkingDirGlance = filesys.Glance(data.WorkingDir)
 	}
 
-	if t := config.GetTimeline(); t != nil {
-		data.TimelineFrozen, data.TimelineOpen = t.DumpFrozenOpen()
-	}
+	frozenOpen := BuildPromptFrozenOpenMaterials(config)
 
 	if !utils.IsNil(materials) {
 		data.ShortSummary = materials.GetString("short_summary")
@@ -159,14 +155,13 @@ func generateTaskReviewPrompt(config *Config, materials aitool.InvokeParams) (st
 		TaskInstruction:  strings.TrimSpace(aiTaskReviewInstructionTemplate),
 		Schema:           strings.TrimSpace(aiTaskReviewSchemaTemplate),
 		OutputExample:    strings.TrimSpace(aiTaskReviewOutputExampleTemplate),
-		TimelineFrozen:   data.TimelineFrozen,
-		TimelineOpen:     data.TimelineOpen,
 		CurrentTime:      data.CurrentTime,
 		OSArch:           data.OSArch,
 		WorkingDir:       data.WorkingDir,
 		WorkingDirGlance: data.WorkingDirGlance,
 		Workspace:        strings.TrimSpace(data.OSArch+data.WorkingDir+data.WorkingDirGlance) != "",
 	}
+	ApplyPromptFrozenOpenMaterials(prefixMaterials, frozenOpen)
 	if err := PopulateToolInventoryFromConfig(prefixMaterials, config); err != nil {
 		return "", fmt.Errorf("populate task review tool inventory failed: %w", err)
 	}
