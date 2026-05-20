@@ -407,7 +407,7 @@ func (pm *PromptManager) GenerateToolParamsPromptWithMeta(tool *aitool.Tool) (*T
 	prefixMaterials.HasLoadCapability = false
 	prefixMaterials.TaskInstruction = strings.TrimSpace(toolParamsInstructionText)
 	prefixMaterials.OutputExample = ""
-	prefixMaterials.ToolInventory = false
+	prefixMaterials.ToolInventory = true
 	prefixMaterials.ToolsCount = 0
 	prefixMaterials.TopToolsCount = 0
 	prefixMaterials.TopTools = nil
