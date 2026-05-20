@@ -232,6 +232,17 @@ func (r *ReActLoop) GetScenarioToolWhitelist() []string {
 	return r.scenarioToolWhitelist
 }
 
+// GetPromptCandidateTools 返回 loop 的 toolsGetter 原始结果.
+// toolsGetter 由 WithToolsGetter 在 NewReActLoop 时注入; 当前生产 loop 均未设置,
+// 默认 nil. 为空时由 ResolveLoopPromptCandidateTools fallback 到 GetEnableTools,
+// 与 generateLoopPrompt 行为一致.
+func (r *ReActLoop) GetPromptCandidateTools() []*aitool.Tool {
+	if r == nil || r.toolsGetter == nil {
+		return nil
+	}
+	return r.toolsGetter()
+}
+
 // AddOnReleaseHook 添加 loop 释放阶段的清理回调。多次调用按注册顺序执行。
 // 关键词: loop release hook, cleanup callback
 func (r *ReActLoop) AddOnReleaseHook(fn func()) {

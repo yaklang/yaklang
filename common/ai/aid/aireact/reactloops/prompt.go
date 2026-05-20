@@ -3,13 +3,14 @@ package reactloops
 import (
 	_ "embed"
 	"fmt"
+	"slices"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
-	"slices"
-	"strings"
 )
 
 const directlyCallToolParamsNodeID = "directly_call_tool_params"

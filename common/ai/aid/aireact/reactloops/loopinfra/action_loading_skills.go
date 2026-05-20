@@ -210,6 +210,9 @@ var loopAction_LoadingSkills = &reactloops.LoopAction{
 			for _, name := range loaded {
 				emitSkillReferenceMaterial(invoker, name, mgr)
 			}
+			if cfg, ok := invoker.GetConfig().(*aicommon.Config); ok {
+				reactloops.EmitCapabilityInventorySnapshot(cfg, loop)
+			}
 
 			var recommendationLines []string
 			for _, name := range loaded {
@@ -422,6 +425,9 @@ var loopAction_LoadingSkills = &reactloops.LoopAction{
 
 		persistLoadedSkillNames(loop, invoker)
 		emitSkillReferenceMaterial(invoker, skillName, mgr)
+		if cfg, ok := invoker.GetConfig().(*aicommon.Config); ok {
+			reactloops.EmitCapabilityInventorySnapshot(cfg, loop)
+		}
 		recommendationSummary := recommendCapabilitiesFromSkillContent(loop, invoker, skillName, "Skill "+skillName)
 
 		feedbackMsg := fmt.Sprintf(

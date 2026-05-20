@@ -288,25 +288,21 @@ func (pm *PromptManager) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[s
 		if err != nil {
 			return "", nil, err
 		}
-		// hidden tool pattern: 与 GetLoopPromptBaseMaterials 入口对齐, 先按
-		// 可见性过滤掉 hidden + scenario 工具, 再统计 ToolsCount 等数字.
-		// 这条路径(老 base.txt 渲染)没有 loop 上下文, scenario whitelist 固定为
-		// nil, 即 scenario 全部丢弃 (这就是非 focus 模式的默认行为).
-		// 关键词: GetBasicPromptInfo hidden tool pattern, FilterToolsByVisibility,
-		//        与 frozen_block 对齐
-		tools = aicommon.FilterToolsByVisibility(tools, nil)
-		result["Tools"] = tools
-		result["ToolsCount"] = len(tools)
-		// 与 prompt_loop_materials.go GetLoopPromptBaseMaterials 保持完全一致:
-		// 先用 GetTopToolsCount 取候选池, 再用 SelectToolsByTokenBudget 按 3K
-		// token 预算二次裁剪, 保底 ToolInventoryMinCount 个工具, base.txt 模板
-		// 与 frozen_block_section.txt 看到同一份 TopTools / MoreToolsCount.
-		// 关键词: GetBasicPromptInfo token budget, 与主路径口径对齐
-		inventory := aicommon.BuildToolInventoryData(tools, pm.react.config.GetTopToolsCount())
-		result["TopTools"] = inventory.TopTools
-		result["TopToolsCount"] = inventory.TopToolsCount
-		result["HasMoreTools"] = inventory.HasMoreTools
-		result["MoreToolsCount"] = inventory.MoreToolsCount
+		tools = aicommon.ResolvePromptCandidateTools(pm.react.config, tools)
+		selection := aicommon.ResolvePromptToolInventory(pm.react.config, tools, nil, true)
+		result["Tools"] = selection.VisibleTools
+		result["ToolsCount"] = len(selection.VisibleTools)
+		if len(selection.VisibleTools) > 0 {
+			result["TopTools"] = selection.DisplayTools
+			result["TopToolsCount"] = len(selection.DisplayTools)
+			result["HasMoreTools"] = selection.MoreToolsCount() > 0
+			result["MoreToolsCount"] = selection.MoreToolsCount()
+		} else {
+			result["TopTools"] = []*aitool.Tool{}
+			result["TopToolsCount"] = 0
+			result["HasMoreTools"] = false
+			result["MoreToolsCount"] = 0
+		}
 	}
 
 	// use timeline getter

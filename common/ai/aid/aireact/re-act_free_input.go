@@ -106,8 +106,12 @@ func (r *ReAct) GetCurrentLoop() *reactloops.ReActLoop {
 	if currentTask == nil {
 		return nil
 	}
-	currentLoop := currentTask.GetReActLoop().(*reactloops.ReActLoop)
-	if currentLoop == nil {
+	loop := currentTask.GetReActLoop()
+	if loop == nil {
+		return nil
+	}
+	currentLoop, ok := loop.(*reactloops.ReActLoop)
+	if !ok || currentLoop == nil {
 		return nil
 	}
 	return currentLoop

@@ -7,7 +7,9 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -32,6 +34,8 @@ func (r *ReAct) handleSyncMessage(event *ypb.AIInputEvent) error {
 		return r.HandleSyncTypeReactClearTaskEvent(event)
 	case SYNC_TYPE_RECOVERY_PLAN_AND_EXEC:
 		return r.HandleSyncTypeRecoveryPlanAndExecEvent(event)
+	case aicommon.SYNC_TYPE_CAPABILITY_INVENTORY:
+		return r.HandleSyncTypeCapabilityInventoryEvent(event)
 	default:
 		return fmt.Errorf("unsupported sync type: %s", event.SyncType)
 	}
@@ -46,6 +50,7 @@ func (r *ReAct) RegisterReActSyncEvent() {
 	r.config.InputEventManager.RegisterSyncCallback(SYNC_TYPE_REACT_CLEAR_TASK, r.HandleSyncTypeReactClearTaskEvent)
 	r.config.InputEventManager.RegisterSyncCallback(SYNC_TYPE_REACT_CANCEL_TASK, r.HandleSyncTypeCancelTaskEvent)
 	r.config.InputEventManager.RegisterSyncCallback(SYNC_TYPE_RECOVERY_PLAN_AND_EXEC, r.HandleSyncTypeRecoveryPlanAndExecEvent)
+	r.config.InputEventManager.RegisterSyncCallback(aicommon.SYNC_TYPE_CAPABILITY_INVENTORY, r.HandleSyncTypeCapabilityInventoryEvent)
 }
 
 func (r *ReAct) UnRegisterReActSyncEvent() {
@@ -57,9 +62,8 @@ func (r *ReAct) UnRegisterReActSyncEvent() {
 	r.config.InputEventManager.UnregisterMirrorOfAIInputEvent(SYNC_TYPE_REACT_CLEAR_TASK)
 	r.config.InputEventManager.UnRegisterSyncCallback(SYNC_TYPE_REACT_CANCEL_TASK)
 	r.config.InputEventManager.UnRegisterSyncCallback(SYNC_TYPE_RECOVERY_PLAN_AND_EXEC)
+	r.config.InputEventManager.UnRegisterSyncCallback(aicommon.SYNC_TYPE_CAPABILITY_INVENTORY)
 }
-
-// 单独拆分的 handler 函数
 
 func (r *ReAct) HandleSyncTypeQueueInfoEvent(event *ypb.AIInputEvent) error {
 	// 获取队列信息并通过事件发送
@@ -347,5 +351,11 @@ func (r *ReAct) HandleSyncTypeReactRemoveTaskEvent(event *ypb.AIInputEvent) erro
 func (r *ReAct) HandleSyncTypeReactClearTaskEvent(event *ypb.AIInputEvent) error {
 	r.taskQueue.Clear()
 	r.EmitSyncEvent(REACT_TASK_clear, fmt.Sprintf("clear react tas queue at %s", time.Now().String()), event.SyncID)
+	return nil
+}
+
+func (r *ReAct) HandleSyncTypeCapabilityInventoryEvent(event *ypb.AIInputEvent) error {
+	payload := reactloops.BuildCapabilityInventoryPayload(r.config, r.GetCurrentLoop())
+	_, _ = r.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, aicommon.CapabilityInventoryNodeID, payload, event.SyncID)
 	return nil
 }

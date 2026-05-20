@@ -307,6 +307,12 @@ func NewCoordinatorContext(ctx context.Context, userInput string, options ...aic
 	if err := c.loadToolsViaOptions(); err != nil {
 		return nil, utils.Errorf("coordinator: load tools (post-init) failed: %v", err)
 	}
+	if config.GetEmitter() != nil {
+		_, _ = config.GetEmitter().EmitSystemStructured(
+			aicommon.CapabilityInventoryNodeID,
+			aicommon.BuildBaseCapabilityInventoryPayload(config),
+		)
+	}
 	c.CreateDatabaseSchema(c.userInput)
 	return c, nil
 }
