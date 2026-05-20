@@ -39,8 +39,7 @@ type LoopPromptBaseMaterials struct {
 	// 关键词: MoreToolsCount, Tool Inventory 剩余工具数, search_capabilities 具象提示
 	MoreToolsCount int
 	AIForgeList    string
-	TimelineFrozen string
-	TimelineOpen   string
+	aicommon.PromptFrozenOpenMaterials
 }
 
 type LoopPromptAssemblyInput = aicommon.LoopPromptAssemblyInput
@@ -54,7 +53,8 @@ type LoopPromptAssemblyResult = aicommon.LoopPromptAssemblyResult
 // (P1-C3 段内排序原则等) 也迁移到 aicommon 包中。
 //
 // 关键词: PromptPrefixMaterials alias, aicommon.PromptMaterials,
-//        prompt 语义材料统一收敛
+//
+//	prompt 语义材料统一收敛
 type PromptPrefixMaterials = aicommon.PromptMaterials
 
 // PromptPrefixAssemblyResult 是 AssemblePromptPrefix 的输出。新路径下 Prompt

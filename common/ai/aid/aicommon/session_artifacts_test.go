@@ -24,12 +24,12 @@ func TestRenderSessionArtifactsFrozenOpenEmpty(t *testing.T) {
 	cfg := NewConfig(context.Background())
 	cfg.Workdir = dir
 
-	blocks := RenderSessionArtifactsFrozenOpen(cfg)
+	blocks := RenderSessionArtifactsFrozenOpen(cfg, 0)
 	require.Empty(t, blocks.Frozen)
 	require.Empty(t, blocks.Open)
 }
 
-func TestRenderSessionArtifactsFrozenOpenSplitsLastTaskGroupOpen(t *testing.T) {
+func TestRenderSessionArtifactsFrozenOpenSplitsByFrozenTime(t *testing.T) {
 	dir := t.TempDir()
 	baseTime := time.Unix(1700000000, 0)
 	writeArtifactFile(t, dir, "task_1-1_scan/result.txt", "scan", baseTime)
@@ -38,26 +38,29 @@ func TestRenderSessionArtifactsFrozenOpenSplitsLastTaskGroupOpen(t *testing.T) {
 	cfg := NewConfig(context.Background())
 	cfg.Workdir = dir
 
-	blocks := RenderSessionArtifactsFrozenOpen(cfg)
+	blocks := RenderSessionArtifactsFrozenOpen(cfg, baseTime.Add(30*time.Second).Unix())
 	require.Contains(t, blocks.Frozen, "task_1-1_scan")
 	require.NotContains(t, blocks.Frozen, "task_1-2_verify")
 	require.Contains(t, blocks.Open, "task_1-2_verify")
 	require.NotContains(t, blocks.Open, "task_1-1_scan")
+	require.NotContains(t, blocks.Frozen, "total_files")
+	require.Contains(t, blocks.Frozen, "frozen_time:")
 }
 
-func TestRenderSessionArtifactsFrozenOpenSingleTaskGroupOpenOnly(t *testing.T) {
+func TestRenderSessionArtifactsFrozenOpenEqualFrozenTimeStaysOpen(t *testing.T) {
 	dir := t.TempDir()
-	writeArtifactFile(t, dir, "task_1-1_scan/result.txt", "scan", time.Unix(1700000000, 0))
+	baseTime := time.Unix(1700000000, 0)
+	writeArtifactFile(t, dir, "task_1-1_scan/result.txt", "scan", baseTime)
 
 	cfg := NewConfig(context.Background())
 	cfg.Workdir = dir
 
-	blocks := RenderSessionArtifactsFrozenOpen(cfg)
+	blocks := RenderSessionArtifactsFrozenOpen(cfg, baseTime.Unix())
 	require.Empty(t, blocks.Frozen)
 	require.Contains(t, blocks.Open, "task_1-1_scan")
 }
 
-func TestRenderSessionArtifactsFrozenOpenStableFrozenWhenOpenGroupChanges(t *testing.T) {
+func TestRenderSessionArtifactsFrozenOpenStableFrozenWhenFrozenGroupChanges(t *testing.T) {
 	dir := t.TempDir()
 	baseTime := time.Unix(1700000000, 0)
 	writeArtifactFile(t, dir, "task_1-1_scan/result.txt", "scan", baseTime)
@@ -66,16 +69,18 @@ func TestRenderSessionArtifactsFrozenOpenStableFrozenWhenOpenGroupChanges(t *tes
 	cfg := NewConfig(context.Background())
 	cfg.Workdir = dir
 
-	before := RenderSessionArtifactsFrozenOpen(cfg)
-	writeArtifactFile(t, dir, "task_1-2_verify/details.txt", "details", baseTime.Add(2*time.Minute))
-	after := RenderSessionArtifactsFrozenOpen(cfg)
+	frozenTime := baseTime.Add(30 * time.Second).Unix()
+	before := RenderSessionArtifactsFrozenOpen(cfg, frozenTime)
+	writeArtifactFile(t, dir, "task_1-1_scan/details.txt", "details", baseTime.Add(2*time.Minute))
+	after := RenderSessionArtifactsFrozenOpen(cfg, frozenTime)
 
 	require.Equal(t, before.Frozen, after.Frozen)
 	require.NotEqual(t, before.Open, after.Open)
 	require.Contains(t, after.Open, "details.txt")
+	require.Contains(t, after.Open, "task_1-1_scan (updates after frozen snapshot)")
 }
 
-func TestRenderSessionArtifactsFrozenOpenNewTaskFreezesOldOpenGroup(t *testing.T) {
+func TestRenderSessionArtifactsFrozenOpenFrozenTimeAdvanceSealsEligibleGroup(t *testing.T) {
 	dir := t.TempDir()
 	baseTime := time.Unix(1700000000, 0)
 	writeArtifactFile(t, dir, "task_1-1_scan/result.txt", "scan", baseTime)
@@ -83,14 +88,51 @@ func TestRenderSessionArtifactsFrozenOpenNewTaskFreezesOldOpenGroup(t *testing.T
 	cfg := NewConfig(context.Background())
 	cfg.Workdir = dir
 
-	before := RenderSessionArtifactsFrozenOpen(cfg)
+	before := RenderSessionArtifactsFrozenOpen(cfg, baseTime.Unix())
 	require.Empty(t, before.Frozen)
 	require.Contains(t, before.Open, "task_1-1_scan")
 
-	writeArtifactFile(t, dir, "task_1-2_verify/result.txt", "verify", baseTime.Add(time.Minute))
-	after := RenderSessionArtifactsFrozenOpen(cfg)
+	after := RenderSessionArtifactsFrozenOpen(cfg, baseTime.Add(time.Second).Unix())
 	require.Contains(t, after.Frozen, "task_1-1_scan")
-	require.Contains(t, after.Open, "task_1-2_verify")
+	require.NotContains(t, after.Open, "task_1-1_scan")
+}
+
+func TestRenderSessionArtifactsFrozenOpenRootFilesAlwaysOpen(t *testing.T) {
+	dir := t.TempDir()
+	baseTime := time.Unix(1700000000, 0)
+	writeArtifactFile(t, dir, "session_summary.txt", "root", baseTime)
+	writeArtifactFile(t, dir, "task_1-1_scan/result.txt", "scan", baseTime)
+
+	cfg := NewConfig(context.Background())
+	cfg.Workdir = dir
+
+	blocks := RenderSessionArtifactsFrozenOpen(cfg, baseTime.Add(time.Hour).Unix())
+	require.Contains(t, blocks.Frozen, "task_1-1_scan")
+	require.NotContains(t, blocks.Frozen, "session_summary.txt")
+	require.Contains(t, blocks.Open, "[root files]")
+	require.Contains(t, blocks.Open, "session_summary.txt")
+}
+
+func TestBuildPromptFrozenOpenMaterialsCoordinatesTimelineAndArtifacts(t *testing.T) {
+	dir := t.TempDir()
+	baseTime := time.Date(2026, 5, 2, 10, 0, 0, 0, time.UTC)
+	writeArtifactFile(t, dir, "task_1-1_scan/result.txt", "scan", baseTime.Add(30*time.Second))
+	writeArtifactFile(t, dir, "task_1-2_verify/result.txt", "verify", baseTime.Add(4*time.Minute))
+
+	timeline := NewTimeline(nil, nil)
+	injectTimelineItem(timeline, 1, baseTime.Add(30*time.Second), makeToolResult(1, "scan", true, "scan-ok"))
+	injectTimelineItem(timeline, 2, baseTime.Add(4*time.Minute), makeToolResult(2, "verify", true, "verify-ok"))
+
+	cfg := NewConfig(context.Background())
+	cfg.Workdir = dir
+	cfg.Timeline = timeline
+
+	materials := BuildPromptFrozenOpenMaterials(cfg)
+	require.Equal(t, baseTime.Add(3*time.Minute).Unix(), materials.TimelineFrozenTimeUnix)
+	require.Contains(t, materials.TimelineFrozen, "scan-ok")
+	require.Contains(t, materials.TimelineOpen, "verify-ok")
+	require.Contains(t, materials.SessionArtifactsFrozen, "task_1-1_scan")
+	require.Contains(t, materials.SessionArtifactsOpen, "task_1-2_verify")
 }
 
 func TestSessionArtifactsTemplatesPlacement(t *testing.T) {

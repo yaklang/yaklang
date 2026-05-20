@@ -586,7 +586,10 @@ func TestPromptManager_AssembleLoopPrompt_HijackArtifactsFrozenOpenPlacement(t *
 
 	workDir := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(workDir, "task_1-1_done"), 0755))
-	require.NoError(t, os.WriteFile(filepath.Join(workDir, "task_1-1_done", "result.txt"), []byte("done"), 0644))
+	donePath := filepath.Join(workDir, "task_1-1_done", "result.txt")
+	require.NoError(t, os.WriteFile(donePath, []byte("done"), 0644))
+	oldArtifactTime := time.Unix(946684800, 0)
+	require.NoError(t, os.Chtimes(donePath, oldArtifactTime, oldArtifactTime))
 	require.NoError(t, os.MkdirAll(filepath.Join(workDir, "task_1-2_open"), 0755))
 	require.NoError(t, os.WriteFile(filepath.Join(workDir, "task_1-2_open", "result.txt"), []byte("open"), 0644))
 
@@ -600,6 +603,7 @@ func TestPromptManager_AssembleLoopPrompt_HijackArtifactsFrozenOpenPlacement(t *
 	)
 	require.NoError(t, err)
 	react.config.Workdir = workDir
+	react.config.GetTimeline().PushText(1, "timeline anchor")
 
 	tool := aitool.NewWithoutCallback("tool-a", aitool.WithDescription("tool a desc"))
 	result, err := react.promptManager.AssembleLoopPrompt([]*aitool.Tool{tool}, &reactloops.LoopPromptAssemblyInput{

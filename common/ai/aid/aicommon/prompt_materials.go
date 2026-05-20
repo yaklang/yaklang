@@ -45,6 +45,7 @@ type PromptMaterials struct {
 
 	TimelineFrozen         string
 	TimelineOpen           string
+	TimelineFrozenTimeUnix int64
 	FrozenPartitions       []FrozenBlockPartition
 	SessionArtifactsFrozen string
 	SessionArtifactsOpen   string
@@ -122,6 +123,7 @@ func (m *PromptMaterials) FrozenBlockData() map[string]any {
 		"FrozenPartitions":       NormalizeFrozenBlockPartitions(m.FrozenPartitions),
 		"SessionArtifactsFrozen": m.SessionArtifactsFrozen,
 		"TimelineFrozen":         m.TimelineFrozen,
+		"TimelineFrozenTimeUnix": m.TimelineFrozenTimeUnix,
 	}
 }
 
@@ -162,16 +164,96 @@ func (m *PromptMaterials) TimelineOpenData() map[string]any {
 		return map[string]any{}
 	}
 	return map[string]any{
-		"TimelineOpen":         m.TimelineOpen,
-		"SessionEvidence":      m.SessionEvidence,
-		"TodoSnapshot":         m.TodoSnapshot,
-		"Workspace":            m.Workspace,
-		"OSArch":               m.OSArch,
-		"WorkingDir":           m.WorkingDir,
-		"WorkingDirGlance":     m.WorkingDirGlance,
-		"SessionArtifactsOpen": m.SessionArtifactsOpen,
-		"UserHistory":          m.UserHistory,
-		"CurrentTime":          m.CurrentTime,
-		"PlanContext":          m.FrozenUserContext,
+		"TimelineOpen":           m.TimelineOpen,
+		"TimelineFrozenTimeUnix": m.TimelineFrozenTimeUnix,
+		"SessionEvidence":        m.SessionEvidence,
+		"TodoSnapshot":           m.TodoSnapshot,
+		"Workspace":              m.Workspace,
+		"OSArch":                 m.OSArch,
+		"WorkingDir":             m.WorkingDir,
+		"WorkingDirGlance":       m.WorkingDirGlance,
+		"SessionArtifactsOpen":   m.SessionArtifactsOpen,
+		"UserHistory":            m.UserHistory,
+		"CurrentTime":            m.CurrentTime,
+		"PlanContext":            m.FrozenUserContext,
 	}
+}
+
+type TimelineFrozenOpenBlocks struct {
+	Frozen         string
+	Open           string
+	FrozenTimeUnix int64
+}
+
+func RenderTimelineFrozenOpen(timeline *Timeline) TimelineFrozenOpenBlocks {
+	if timeline == nil {
+		return TimelineFrozenOpenBlocks{}
+	}
+	rb := timeline.GroupByMinutes(TimelineDumpDefaultIntervalMinutes).GetAllRenderable()
+	return TimelineFrozenOpenBlocks{
+		Frozen:         rb.RenderFrozenOnly(TimelineDumpDefaultAITagName),
+		Open:           rb.RenderOpenOnly(TimelineDumpDefaultAITagName),
+		FrozenTimeUnix: timelineFrozenTimeUnixFromRenderable(rb),
+	}
+}
+
+type PromptFrozenOpenMaterials struct {
+	TimelineFrozen         string
+	TimelineOpen           string
+	TimelineFrozenTimeUnix int64
+
+	SessionArtifactsFrozen string
+	SessionArtifactsOpen   string
+}
+
+func BuildPromptFrozenOpenMaterials(config *Config) PromptFrozenOpenMaterials {
+	if config == nil {
+		return PromptFrozenOpenMaterials{}
+	}
+	timelineBlocks := RenderTimelineFrozenOpen(config.GetTimeline())
+	artifactBlocks := RenderSessionArtifactsFrozenOpen(config, timelineBlocks.FrozenTimeUnix)
+	return PromptFrozenOpenMaterials{
+		TimelineFrozen:         timelineBlocks.Frozen,
+		TimelineOpen:           timelineBlocks.Open,
+		TimelineFrozenTimeUnix: timelineBlocks.FrozenTimeUnix,
+		SessionArtifactsFrozen: artifactBlocks.Frozen,
+		SessionArtifactsOpen:   artifactBlocks.Open,
+	}
+}
+
+func ApplyPromptFrozenOpenMaterials(materials *PromptMaterials, frozenOpen PromptFrozenOpenMaterials) {
+	if materials == nil {
+		return
+	}
+	materials.TimelineFrozen = frozenOpen.TimelineFrozen
+	materials.TimelineOpen = frozenOpen.TimelineOpen
+	materials.TimelineFrozenTimeUnix = frozenOpen.TimelineFrozenTimeUnix
+	materials.SessionArtifactsFrozen = frozenOpen.SessionArtifactsFrozen
+	materials.SessionArtifactsOpen = frozenOpen.SessionArtifactsOpen
+}
+
+func timelineFrozenTimeUnixFromRenderable(blocks TimelineRenderableBlocks) int64 {
+	if len(blocks) == 0 {
+		return 0
+	}
+	var lastFrozenEnd int64
+	for _, block := range blocks {
+		if block == nil {
+			continue
+		}
+		interval, ok := block.(*TimelineIntervalBlock)
+		if !ok || interval == nil {
+			continue
+		}
+		if block.IsOpen() {
+			if !interval.BucketStart.IsZero() {
+				return interval.BucketStart.Unix()
+			}
+			return 0
+		}
+		if !interval.BucketEnd.IsZero() {
+			lastFrozenEnd = interval.BucketEnd.Unix()
+		}
+	}
+	return lastFrozenEnd
 }

@@ -94,13 +94,12 @@ func (pm *PromptManager) GetLoopPromptBaseMaterials(tools []*aitool.Tool, nonce 
 	materials.AutoContext = pm.AutoContextWithNonce(nonce)
 	materials.UserHistory = pm.UserHistoryContextWithNonce(nonce)
 
-	// 按稳定性分层渲染 timeline:
-	//   TimelineFrozen: reducer + 非末 interval, 字节稳定, 进 AI_CACHE_FROZEN 块
-	//   TimelineOpen: 最末 interval (+ midterm 检索结果, midterm 在此处一次性消费)
-	// 关键词: GetLoopPromptBaseMaterials, timeline frozen/open 拆分, midterm 一次消费
-	timeline := pm.react.config.GetTimeline()
-	materials.TimelineFrozen = buildTimelineFrozenForPrompt(timeline)
-	materials.TimelineOpen = buildTimelineOpenWithMidtermForPrompt(pm.react, timeline)
+	// Timeline frozen/open 与 Session Artifacts frozen/open 必须共享同一轮
+	// FrozenTimeUnix；midterm recall 是 turn 级 open prefix，在统一切分之后追加。
+	// 关键词: BuildPromptFrozenOpenMaterials, artifacts frozen time, midterm open
+	frozenOpen := aicommon.BuildPromptFrozenOpenMaterials(pm.react.config)
+	frozenOpen.TimelineOpen = prependMidtermTimelinePrefixForPrompt(pm.react, frozenOpen.TimelineOpen)
+	materials.PromptFrozenOpenMaterials = frozenOpen
 
 	allowPlanAndExec := pm.react.config.GetEnablePlanAndExec() && pm.react.GetCurrentPlanExecutionTask() == nil
 	allowToolCall := true
@@ -217,17 +216,11 @@ func (pm *PromptManager) NewPromptMaterials(base *reactloops.LoopPromptBaseMater
 		materials.ForgeInventory = base.ShowForgeInventory && strings.TrimSpace(base.AIForgeList) != ""
 		materials.AIForgeList = base.AIForgeList
 
-		materials.TimelineFrozen = base.TimelineFrozen
-		materials.TimelineOpen = base.TimelineOpen
+		aicommon.ApplyPromptFrozenOpenMaterials(materials, base.PromptFrozenOpenMaterials)
 		materials.CurrentTime = base.CurrentTime
 		materials.OSArch = base.OSArch
 		materials.WorkingDir = base.WorkingDir
 		materials.WorkingDirGlance = base.WorkingDirGlance
-		if pm != nil && pm.react != nil && pm.react.config != nil {
-			artifactBlocks := aicommon.RenderSessionArtifactsFrozenOpen(pm.react.config)
-			materials.SessionArtifactsFrozen = artifactBlocks.Frozen
-			materials.SessionArtifactsOpen = artifactBlocks.Open
-		}
 		materials.Workspace = strings.TrimSpace(base.OSArch+base.WorkingDir+base.WorkingDirGlance) != ""
 	}
 	if pm != nil && pm.react != nil && pm.react.config != nil {
@@ -385,6 +378,8 @@ func (pm *PromptManager) buildLoopPromptSectionData(base *reactloops.LoopPromptB
 		data["ToolInventory"] = base.AllowToolCall && base.ToolsCount > 0
 		data["AIForgeList"] = base.AIForgeList
 		data["ForgeInventory"] = base.ShowForgeInventory && strings.TrimSpace(base.AIForgeList) != ""
+		data["SessionArtifactsFrozen"] = base.SessionArtifactsFrozen
+		data["SessionArtifactsOpen"] = base.SessionArtifactsOpen
 	}
 	if input != nil {
 		data["Nonce"] = input.Nonce

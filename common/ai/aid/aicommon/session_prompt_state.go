@@ -30,10 +30,27 @@ type SessionPromptState struct {
 	// 关键词: todoJSON, VerificationTodoStore 序列化, SessionEvidence 同构,
 	//        全局 TODO 持久态
 	todoJSON string
+
+	// sessionArtifactsState keeps the sealed frozen artifact snapshots for the
+	// current session/workdir. It is intentionally in-memory only; persistent
+	// restore can add serialization later without changing the prompt API.
+	sessionArtifactsState *SessionArtifactsRenderState
 }
 
 func NewSessionPromptState() *SessionPromptState {
 	return &SessionPromptState{}
+}
+
+func (s *SessionPromptState) GetOrCreateSessionArtifactsRenderState() *SessionArtifactsRenderState {
+	if s == nil {
+		return NewSessionArtifactsRenderState()
+	}
+	s.m.Lock()
+	defer s.m.Unlock()
+	if s.sessionArtifactsState == nil {
+		s.sessionArtifactsState = NewSessionArtifactsRenderState()
+	}
+	return s.sessionArtifactsState
 }
 
 func (s *SessionPromptState) GetUserInputHistory() []schema.AIAgentUserInputRecord {

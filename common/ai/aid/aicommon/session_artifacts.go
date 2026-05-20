@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -24,9 +25,34 @@ type SessionArtifactTaskGroup struct {
 	LatestMod int64
 }
 
+type SessionArtifactTaskGroupSnapshot struct {
+	TaskDir   string
+	Files     []SessionArtifactEntry
+	LatestMod int64
+}
+
 type SessionArtifactsPromptBlocks struct {
 	Frozen string
 	Open   string
+}
+
+type SessionArtifactsRenderState struct {
+	m sync.Mutex
+
+	WorkDir string
+
+	LastFrozenTimeUnix int64
+	LastFrozenRendered string
+
+	FrozenGroups map[string]SessionArtifactTaskGroupSnapshot
+}
+
+var sessionArtifactsStateByWorkDir sync.Map
+
+func NewSessionArtifactsRenderState() *SessionArtifactsRenderState {
+	return &SessionArtifactsRenderState{
+		FrozenGroups: make(map[string]SessionArtifactTaskGroupSnapshot),
+	}
 }
 
 func CollectSessionArtifactEntries(config AICallerConfigIf) ([]SessionArtifactEntry, string) {
@@ -96,9 +122,7 @@ func GroupSessionArtifactsByTask(entries []SessionArtifactEntry) []SessionArtifa
 	for taskDir, files := range groupByTask {
 		groups = append(groups, buildSessionArtifactTaskGroup(taskDir, files))
 	}
-	sort.SliceStable(groups, func(i, j int) bool {
-		return compareSessionArtifactTaskDir(groups[i].TaskDir, groups[j].TaskDir) < 0
-	})
+	sortSessionArtifactTaskGroups(groups)
 	if len(rootFiles) > 0 {
 		groups = append(groups, buildSessionArtifactTaskGroup("", rootFiles))
 	}
@@ -179,13 +203,35 @@ func RenderSessionArtifactGroups(workDir string, groups []SessionArtifactTaskGro
 	return result
 }
 
-func RenderSessionArtifactsFrozenOpen(config AICallerConfigIf) SessionArtifactsPromptBlocks {
+func RenderSessionArtifactsFrozenOpen(config AICallerConfigIf, frozenTimeUnix int64) SessionArtifactsPromptBlocks {
 	entries, workDir := CollectSessionArtifactEntries(config)
 	groups := GroupSessionArtifactsByTask(entries)
-	frozenGroups, openGroups := SplitSessionArtifactGroups(groups)
+	state := getSessionArtifactsRenderState(config, workDir)
+	if state == nil {
+		state = NewSessionArtifactsRenderState()
+	}
+
+	state.m.Lock()
+	defer state.m.Unlock()
+
+	if state.WorkDir != strings.TrimSpace(workDir) {
+		resetSessionArtifactsRenderState(state, workDir)
+	}
+	if frozenTimeUnix < state.LastFrozenTimeUnix {
+		resetSessionArtifactsRenderState(state, workDir)
+	}
+
+	frozen := state.LastFrozenRendered
+	if frozenTimeUnix > state.LastFrozenTimeUnix {
+		UpdateSessionArtifactsFrozenState(state, workDir, groups, frozenTimeUnix)
+		state.LastFrozenTimeUnix = frozenTimeUnix
+		frozen = RenderSessionArtifactsFrozenFromState(state)
+		state.LastFrozenRendered = frozen
+	}
+
 	return SessionArtifactsPromptBlocks{
-		Frozen: RenderSessionArtifactGroups(workDir, frozenGroups),
-		Open:   RenderSessionArtifactGroups(workDir, openGroups),
+		Frozen: frozen,
+		Open:   RenderSessionArtifactsOpenFromLiveGroups(state, workDir, groups, frozenTimeUnix),
 	}
 }
 
@@ -193,6 +239,238 @@ func RenderSessionArtifactsListing(config AICallerConfigIf) string {
 	entries, workDir := CollectSessionArtifactEntries(config)
 	groups := GroupSessionArtifactsByTask(entries)
 	return RenderSessionArtifactGroups(workDir, groups)
+}
+
+func UpdateSessionArtifactsFrozenState(
+	state *SessionArtifactsRenderState,
+	workDir string,
+	groups []SessionArtifactTaskGroup,
+	frozenTimeUnix int64,
+) {
+	if state == nil {
+		return
+	}
+	if state.FrozenGroups == nil {
+		state.FrozenGroups = make(map[string]SessionArtifactTaskGroupSnapshot)
+	}
+	workDir = strings.TrimSpace(workDir)
+	if state.WorkDir != workDir {
+		resetSessionArtifactsRenderState(state, workDir)
+	}
+	if frozenTimeUnix <= 0 {
+		return
+	}
+	for _, group := range groups {
+		normalizeSessionArtifactTaskGroup(&group)
+		taskDir := strings.TrimSpace(group.TaskDir)
+		if taskDir == "" {
+			continue
+		}
+		if _, exists := state.FrozenGroups[taskDir]; exists {
+			continue
+		}
+		if group.LatestMod < frozenTimeUnix {
+			state.FrozenGroups[taskDir] = snapshotSessionArtifactTaskGroup(group)
+		}
+	}
+}
+
+func RenderSessionArtifactsFrozenFromState(state *SessionArtifactsRenderState) string {
+	if state == nil || len(state.FrozenGroups) == 0 {
+		return ""
+	}
+	groups := make([]SessionArtifactTaskGroup, 0, len(state.FrozenGroups))
+	for _, snapshot := range state.FrozenGroups {
+		groups = append(groups, SessionArtifactTaskGroup{
+			TaskDir:   snapshot.TaskDir,
+			Files:     append([]SessionArtifactEntry{}, snapshot.Files...),
+			LatestMod: snapshot.LatestMod,
+		})
+	}
+	sortSessionArtifactTaskGroups(groups)
+	return renderSessionArtifactPromptGroups(
+		state.WorkDir,
+		groups,
+		state.LastFrozenTimeUnix,
+		nil,
+	)
+}
+
+func RenderSessionArtifactsOpenFromLiveGroups(
+	state *SessionArtifactsRenderState,
+	workDir string,
+	groups []SessionArtifactTaskGroup,
+	frozenTimeUnix int64,
+) string {
+	if len(groups) == 0 {
+		return ""
+	}
+	if state == nil {
+		state = NewSessionArtifactsRenderState()
+	}
+	openGroups := make([]SessionArtifactTaskGroup, 0, len(groups))
+	headerSuffix := make(map[string]string)
+
+	for _, group := range groups {
+		normalizeSessionArtifactTaskGroup(&group)
+		taskDir := strings.TrimSpace(group.TaskDir)
+		if taskDir == "" {
+			openGroups = append(openGroups, group)
+			continue
+		}
+
+		if snapshot, frozen := state.FrozenGroups[taskDir]; frozen {
+			delta := diffSessionArtifactTaskGroup(snapshot, group)
+			if len(delta.Files) > 0 {
+				openGroups = append(openGroups, delta)
+				headerSuffix[taskDir] = " (updates after frozen snapshot)"
+			}
+			continue
+		}
+
+		// A non-sealed group is always kept open. In the normal path, eligible
+		// groups are sealed when FrozenTimeUnix advances; this also prevents a
+		// newly-created/backdated group from disappearing while FrozenTimeUnix is
+		// unchanged.
+		openGroups = append(openGroups, group)
+	}
+	sortSessionArtifactTaskGroups(openGroups)
+	return renderSessionArtifactPromptGroups(workDir, openGroups, frozenTimeUnix, headerSuffix)
+}
+
+func getSessionArtifactsRenderState(config AICallerConfigIf, workDir string) *SessionArtifactsRenderState {
+	if cfg, ok := config.(*Config); ok && cfg != nil {
+		if cfg.SessionPromptState == nil {
+			if cfg.m != nil {
+				cfg.m.Lock()
+				if cfg.SessionPromptState == nil {
+					cfg.SessionPromptState = NewSessionPromptState()
+				}
+				cfg.m.Unlock()
+			} else {
+				cfg.SessionPromptState = NewSessionPromptState()
+			}
+		}
+		return cfg.SessionPromptState.GetOrCreateSessionArtifactsRenderState()
+	}
+
+	workDir = strings.TrimSpace(workDir)
+	if workDir == "" {
+		return NewSessionArtifactsRenderState()
+	}
+	state, _ := sessionArtifactsStateByWorkDir.LoadOrStore(workDir, NewSessionArtifactsRenderState())
+	if typed, ok := state.(*SessionArtifactsRenderState); ok {
+		return typed
+	}
+	return NewSessionArtifactsRenderState()
+}
+
+func resetSessionArtifactsRenderState(state *SessionArtifactsRenderState, workDir string) {
+	if state == nil {
+		return
+	}
+	state.WorkDir = strings.TrimSpace(workDir)
+	state.LastFrozenTimeUnix = 0
+	state.LastFrozenRendered = ""
+	state.FrozenGroups = make(map[string]SessionArtifactTaskGroupSnapshot)
+}
+
+func snapshotSessionArtifactTaskGroup(group SessionArtifactTaskGroup) SessionArtifactTaskGroupSnapshot {
+	normalizeSessionArtifactTaskGroup(&group)
+	return SessionArtifactTaskGroupSnapshot{
+		TaskDir:   strings.TrimSpace(group.TaskDir),
+		Files:     append([]SessionArtifactEntry{}, group.Files...),
+		LatestMod: group.LatestMod,
+	}
+}
+
+func diffSessionArtifactTaskGroup(
+	snapshot SessionArtifactTaskGroupSnapshot,
+	live SessionArtifactTaskGroup,
+) SessionArtifactTaskGroup {
+	normalizeSessionArtifactTaskGroup(&live)
+	seen := make(map[string]SessionArtifactEntry, len(snapshot.Files))
+	for _, file := range snapshot.Files {
+		seen[file.RelPath] = file
+	}
+
+	delta := SessionArtifactTaskGroup{TaskDir: live.TaskDir}
+	for _, file := range live.Files {
+		prev, ok := seen[file.RelPath]
+		if ok && prev.Size == file.Size && prev.ModUnix == file.ModUnix {
+			continue
+		}
+		delta.Files = append(delta.Files, file)
+	}
+	normalizeSessionArtifactTaskGroup(&delta)
+	return delta
+}
+
+func renderSessionArtifactPromptGroups(
+	workDir string,
+	groups []SessionArtifactTaskGroup,
+	frozenTimeUnix int64,
+	headerSuffix map[string]string,
+) string {
+	if len(groups) == 0 {
+		return ""
+	}
+
+	normalized := make([]SessionArtifactTaskGroup, 0, len(groups))
+	for _, group := range groups {
+		normalizeSessionArtifactTaskGroup(&group)
+		if len(group.Files) == 0 {
+			continue
+		}
+		normalized = append(normalized, group)
+	}
+	if len(normalized) == 0 {
+		return ""
+	}
+
+	var sb strings.Builder
+	if workDir = strings.TrimSpace(workDir); workDir != "" {
+		sb.WriteString(fmt.Sprintf("artifacts_dir: %s\n", workDir))
+	}
+	sb.WriteString(fmt.Sprintf("frozen_time: %s\n\n", formatArtifactModTime(frozenTimeUnix, "2006-01-02 15:04:05")))
+
+	for _, group := range normalized {
+		taskDir := strings.TrimSpace(group.TaskDir)
+		if taskDir == "" {
+			sb.WriteString("### [root files]\n")
+		} else {
+			sb.WriteString(fmt.Sprintf("### %s%s\n", taskDir, headerSuffix[taskDir]))
+		}
+		for _, file := range group.Files {
+			displayPath := file.RelPath
+			if taskDir != "" {
+				displayPath = strings.TrimPrefix(displayPath, taskDir+"/")
+			}
+			sb.WriteString(fmt.Sprintf("- %s (%s, %s)\n",
+				displayPath,
+				formatFileSize(file.Size),
+				formatArtifactModTime(file.ModUnix, "2006-01-02 15:04:05"),
+			))
+		}
+		sb.WriteString("\n")
+	}
+
+	result := sb.String()
+	if MeasureTokens(result) > ArtifactsContextMaxTokens {
+		result = ShrinkTextBlockByTokens(result, ArtifactsContextMaxTokens)
+	}
+	return result
+}
+
+func sortSessionArtifactTaskGroups(groups []SessionArtifactTaskGroup) {
+	sort.SliceStable(groups, func(i, j int) bool {
+		leftRoot := strings.TrimSpace(groups[i].TaskDir) == ""
+		rightRoot := strings.TrimSpace(groups[j].TaskDir) == ""
+		if leftRoot != rightRoot {
+			return !leftRoot
+		}
+		return compareSessionArtifactTaskDir(groups[i].TaskDir, groups[j].TaskDir) < 0
+	})
 }
 
 func sessionArtifactTaskDir(relPath string) (string, bool) {
@@ -217,6 +495,8 @@ func normalizeSessionArtifactTaskGroup(group *SessionArtifactTaskGroup) {
 	if group == nil {
 		return
 	}
+	group.TaskDir = strings.TrimSpace(group.TaskDir)
+	group.LatestMod = 0
 	for i := range group.Files {
 		group.Files[i].RelPath = filepath.ToSlash(strings.TrimSpace(group.Files[i].RelPath))
 		if group.Files[i].ModUnix > group.LatestMod {
