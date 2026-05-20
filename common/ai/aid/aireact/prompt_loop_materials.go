@@ -105,16 +105,7 @@ func (pm *PromptManager) GetLoopPromptBaseMaterials(tools []*aitool.Tool, nonce 
 	allowToolCall := true
 	hasLoadCapability := false
 
-	if len(tools) == 0 {
-		toolMgr := pm.react.config.GetAiToolManager()
-		if toolMgr != nil {
-			enableTools, err := toolMgr.GetEnableTools()
-			if err != nil {
-				return nil, err
-			}
-			tools = enableTools
-		}
-	}
+	tools = aicommon.ResolvePromptCandidateTools(pm.react.config, tools)
 
 	if currentLoop := pm.react.GetCurrentLoop(); currentLoop != nil {
 		if getter := currentLoop.AllowPlanAndExec(); getter != nil {
@@ -137,18 +128,19 @@ func (pm *PromptManager) GetLoopPromptBaseMaterials(tools []*aitool.Tool, nonce 
 		materials.AIForgeList = pm.GetAvailableAIForgeBlueprints()
 	}
 
-	if allowToolCall && len(tools) > 0 {
-		scenarioWL := []string(nil)
-		if currentLoop := pm.react.GetCurrentLoop(); currentLoop != nil {
-			scenarioWL = currentLoop.GetScenarioToolWhitelist()
-		}
-		inventory := aicommon.BuildToolInventoryData(tools, pm.react.config.GetTopToolsCount(), scenarioWL...)
-		materials.ToolsCount = inventory.ToolsCount
-		materials.TopTools = inventory.TopTools
-		materials.TopToolsCount = inventory.TopToolsCount
-		materials.HasMoreTools = inventory.HasMoreTools
-		materials.MoreToolsCount = inventory.MoreToolsCount
+	var scenarioWL []string
+	if currentLoop := pm.react.GetCurrentLoop(); currentLoop != nil {
+		scenarioWL = currentLoop.GetScenarioToolWhitelist()
 	}
+	selection := aicommon.ResolvePromptToolInventory(pm.react.config, tools, scenarioWL, allowToolCall)
+	if len(selection.VisibleTools) == 0 {
+		return materials, nil
+	}
+	materials.ToolsCount = len(selection.VisibleTools)
+	materials.TopTools = selection.DisplayTools
+	materials.TopToolsCount = len(selection.DisplayTools)
+	materials.HasMoreTools = selection.MoreToolsCount() > 0
+	materials.MoreToolsCount = selection.MoreToolsCount()
 
 	return materials, nil
 }

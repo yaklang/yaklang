@@ -226,6 +226,10 @@ func PopulateExtraCapabilitiesFromCapabilitySearchResult(r aicommon.AIInvokeRunt
 			ecm.AddFocusModes(ExtraFocusModeInfo{Name: meta.Name, Description: meta.Description})
 		}
 	}
+
+	if cfg, ok := r.GetConfig().(*aicommon.Config); ok {
+		EmitCapabilityInventorySnapshot(cfg, loop)
+	}
 }
 
 func BuildCapabilityCatalog(r aicommon.AIInvokeRuntime) string {
