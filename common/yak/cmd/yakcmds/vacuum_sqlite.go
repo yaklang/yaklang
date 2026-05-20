@@ -54,13 +54,13 @@ var VacuumSQLiteCommand = &cli.Command{
 			Name:  "dry-run",
 			Usage: "Only show what would be done without actually vacuuming",
 		},
-		cli.BoolFlag{
+		cli.BoolTFlag{
 			Name:  "wal-checkpoint",
-			Usage: "Also perform WAL checkpoint (TRUNCATE) before vacuum",
+			Usage: "Perform WAL checkpoint (TRUNCATE) before and after vacuum (default: true; use --wal-checkpoint=false to disable)",
 		},
 		cli.BoolFlag{
 			Name:  "force-truncate-wal",
-			Usage: "Force truncate WAL file by temporarily switching to DELETE journal mode (enabled by default when WAL exists)",
+			Usage: "Force truncate WAL file by temporarily switching to DELETE journal mode (enabled by default when WAL file > 1MB)",
 		},
 		cli.BoolFlag{
 			Name:  "no-force-truncate-wal",
@@ -284,8 +284,10 @@ func vacuumDatabase(dbPath string, dryRun bool, walCheckpoint bool, forceTruncat
 		log.Warnf("cannot get database info: %v", err)
 	}
 
+	isWALJournal := strings.ToUpper(journalMode) == "WAL"
+
 	// Auto-detect: enable force truncate WAL if WAL file exists and is significant (> 1MB)
-	if autoDetectForceTruncate && walExists && walSizeBefore > 1024*1024 && strings.ToUpper(journalMode) == "WAL" {
+	if autoDetectForceTruncate && walExists && walSizeBefore > 1024*1024 && isWALJournal {
 		forceTruncateWAL = true
 		walCheckpoint = true
 		fmt.Printf("  [AUTO] Detected large WAL file (%s), enabling force truncate optimization\n", utils.ByteSize(uint64(walSizeBefore)))
@@ -307,7 +309,7 @@ func vacuumDatabase(dbPath string, dryRun bool, walCheckpoint bool, forceTruncat
 
 	if dryRun {
 		fmt.Printf("     [DRY RUN] Would vacuum this database\n")
-		if forceTruncateWAL && strings.ToUpper(journalMode) == "WAL" {
+		if forceTruncateWAL && isWALJournal {
 			fmt.Printf("     [DRY RUN] Would force truncate WAL by switching to DELETE mode\n")
 		}
 		return 0, nil
@@ -317,7 +319,7 @@ func vacuumDatabase(dbPath string, dryRun bool, walCheckpoint bool, forceTruncat
 	// 1. Switch to DELETE journal mode (this checkpoints and removes WAL)
 	// 2. Perform VACUUM
 	// 3. Switch back to WAL mode
-	if forceTruncateWAL && strings.ToUpper(journalMode) == "WAL" {
+	if forceTruncateWAL && isWALJournal {
 		saved, err := vacuumWithForceTruncateWAL(dbPath, walPath, shmPath, sizeBefore, walSizeBefore, busyTimeout)
 		if err != nil {
 			// Check if it's a database locked error
@@ -340,7 +342,11 @@ func vacuumDatabase(dbPath string, dryRun bool, walCheckpoint bool, forceTruncat
 	if err != nil {
 		return 0, fmt.Errorf("cannot open database: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Warnf("failed to close database: %v", err)
+		}
+	}()
 
 	// Set busy timeout
 	_, err = db.Exec(fmt.Sprintf("PRAGMA busy_timeout = %d;", busyTimeout))
@@ -349,7 +355,7 @@ func vacuumDatabase(dbPath string, dryRun bool, walCheckpoint bool, forceTruncat
 	}
 
 	// Perform WAL checkpoint if requested and in WAL mode
-	if walCheckpoint && strings.ToUpper(journalMode) == "WAL" {
+	if walCheckpoint && isWALJournal {
 		fmt.Printf("     Performing WAL checkpoint (TRUNCATE)...\n")
 		_, err = db.Exec("PRAGMA wal_checkpoint(TRUNCATE);")
 		if err != nil {
@@ -373,13 +379,14 @@ func vacuumDatabase(dbPath string, dryRun bool, walCheckpoint bool, forceTruncat
 		return 0, fmt.Errorf("VACUUM failed: %v", err)
 	}
 
-	// Perform another checkpoint after vacuum to truncate the new WAL
-	if walCheckpoint && strings.ToUpper(journalMode) == "WAL" {
+	// Post-vacuum checkpoint is required in WAL mode: VACUUM leaves the rebuilt DB in -wal until truncated.
+	if walCheckpoint && isWALJournal {
 		fmt.Printf("     Performing post-vacuum WAL checkpoint (TRUNCATE)...\n")
 		_, err = db.Exec("PRAGMA wal_checkpoint(TRUNCATE);")
 		if err != nil {
 			if strings.Contains(err.Error(), "database is locked") {
 				fmt.Printf("     [WARN] Post-vacuum WAL checkpoint skipped (database locked)\n")
+				fmt.Printf("     [TIP] Close Yakit/other DB clients, then run: sqlite3 %q \"PRAGMA wal_checkpoint(TRUNCATE);\"\n", dbPath)
 			} else {
 				log.Warnf("Post-vacuum WAL checkpoint failed: %v", err)
 			}
@@ -388,10 +395,7 @@ func vacuumDatabase(dbPath string, dryRun bool, walCheckpoint bool, forceTruncat
 		}
 	}
 
-	// Close the database to ensure changes are flushed
-	db.Close()
-
-	// Get file info after vacuum
+	// Get file info after vacuum (db closed via defer on return)
 	dbInfoAfter, err := os.Stat(dbPath)
 	if err != nil {
 		return 0, fmt.Errorf("cannot stat database file after vacuum: %v", err)
@@ -420,8 +424,13 @@ func vacuumDatabase(dbPath string, dryRun bool, walCheckpoint bool, forceTruncat
 			utils.ByteSize(uint64(dbSaved)),
 			utils.ByteSize(uint64(walSaved)))
 	} else if totalSaved < 0 {
-		fmt.Printf("     [WARN] Size increased by: %s (this can happen with small databases)\n",
-			utils.ByteSize(uint64(-totalSaved)))
+		if isWALJournal && walSizeAfter > walSizeBefore {
+			fmt.Printf("     [WARN] Disk usage increased by: %s (WAL grew; checkpoint was skipped or failed — close other DB clients and retry)\n",
+				utils.ByteSize(uint64(-totalSaved)))
+		} else {
+			fmt.Printf("     [WARN] Size increased by: %s (this can happen with small databases)\n",
+				utils.ByteSize(uint64(-totalSaved)))
+		}
 	} else {
 		fmt.Printf("     [INFO] No size change\n")
 	}
