@@ -129,6 +129,13 @@ func resolveAISessionStartParams(db *gorm.DB, sessionID string, request *ypb.AIS
 		return request, nil
 	}
 
+	if _, err := yakit.GetAISessionMetaBySessionID(db, sessionID); err != nil {
+		if gorm.IsRecordNotFoundError(err) {
+			return request, nil
+		}
+		return nil, err
+	}
+
 	cached, err := yakit.GetAISessionMetaStartParamsBySessionID(db, sessionID)
 	if err != nil {
 		return nil, err
