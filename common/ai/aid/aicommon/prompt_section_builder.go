@@ -118,6 +118,7 @@ func (b *PromptPrefixBuilder) AssemblePromptPrefix(materials *PromptMaterials) (
 	if materials == nil {
 		materials = &PromptMaterials{}
 	}
+	materials.FrozenPartitions = NormalizeFrozenBlockPartitions(materials.FrozenPartitions)
 
 	highStatic, err := RenderPromptTemplate(b.HighStaticTemplateName, b.HighStaticTemplate, materials.HighStaticData())
 	if err != nil {

@@ -24,12 +24,12 @@ var stablePromptNonceAlphabet = []byte("abcdefghijklmnopqrstuvwxyz0123456789")
 // StablePromptNonce 把任意若干字符串 part 哈希成跨调用稳定的 6 字符 nonce。
 //
 // 使用场景:
-//   1) 任何在 prompt 中以 <|TAG_<nonce>|>...<|TAG_END_<nonce>|> 形式出现的
-//      AITag, 如果该段内容跨多次调用字节稳定, 都应该用 StablePromptNonce
-//      派生 nonce, 替代 utils.RandStringBytes(6) 这类反模式。
-//   2) 派生时把语义明确的 part (rootTaskID / planEpoch / "PARENT_TASK" 等)
-//      作为参数传入, 不同 part 组合自然产出不同 nonce 而互不冲突, 不需要
-//      手工维护命名空间。
+//  1. 任何在 prompt 中以 <|TAG_<nonce>|>...<|TAG_END_<nonce>|> 形式出现的
+//     AITag, 如果该段内容跨多次调用字节稳定, 都应该用 StablePromptNonce
+//     派生 nonce, 替代 utils.RandStringBytes(6) 这类反模式。
+//  2. 派生时把语义明确的 part (rootTaskID / planEpoch / "PARENT_TASK" 等)
+//     作为参数传入, 不同 part 组合自然产出不同 nonce 而互不冲突, 不需要
+//     手工维护命名空间。
 //
 // 同一组 part 反复调用必返回相同 nonce; part 顺序敏感, "a","b" 与 "b","a"
 // 派生的 nonce 不同。
@@ -61,19 +61,22 @@ func StablePromptNonce(parts ...string) string {
 // (frozenUserContext, 例如 PARENT_TASK / CURRENT_TASK / INSTRUCTION 三联块)"。
 //
 // rawQuery: 当前 turn 的用户原始输入或当前任务的轻量 query, 进入 dynamic 段
-//   USER_QUERY 块。
+//
+//	USER_QUERY 块。
+//
 // frozenUserContext: 包装成 PLAN_CONTEXT 后注入 timeline-open 段最末尾
-//   (UserHistory 之后)。注意: 字段名虽为 "frozen", 但物理位置在 timeline-open
-//   段, 不被任何 cache 边界包裹。这是 v4 迭代的最终设计: 之前尝试放 frozen-block /
-//   semi-dynamic 都因 EvidenceOps 嵌入 root user input + 子任务切换造成内容
-//   抖动, 反而破坏上游缓存命中。现采用"放弃 PlanContext 自身缓存, 保护上游
-//   SYSTEM / FROZEN / SEMI 三段缓存"策略。
+//
+//	(UserHistory 之后)。注意: 字段名虽为 "frozen", 但物理位置在 timeline-open
+//	段, 不被任何 cache 边界包裹。这是 v4 迭代的最终设计: 之前尝试放 frozen-block /
+//	semi-dynamic 都因 PE-TASK 子任务切换造成内容抖动, 反而破坏上游缓存命中。
+//	现采用"放弃 PlanContext 自身缓存, 保护上游 SYSTEM / FROZEN / SEMI 三段缓存"策略。
 //
 // 老路径 (普通 ReAct loop / focus mode 等没有 plan 上下文的场景) 不实现该
 // 接口, 框架自动 fallback 到原始 task.GetUserInput() 语义, 行为保持不变。
 //
 // 关键词: CacheableUserInputProvider, PE-TASK PLAN 产物,
-//        frozenUserContext, timeline-open 末尾注入, 缓存边界外
+//
+//	frozenUserContext, timeline-open 末尾注入, 缓存边界外
 type CacheableUserInputProvider interface {
 	GetUserInputSplitForCache() (rawQuery, frozenUserContext string)
 }

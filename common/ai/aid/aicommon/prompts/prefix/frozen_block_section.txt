@@ -22,5 +22,16 @@ You have access to {{ .ToolsCount }} built-in tools. Below are {{ .TopToolsCount
 以下是当前可直接调用的 AI 蓝图列表：
 {{ .AIForgeList }}{{ end }}
 
+{{ range .FrozenPartitions }}
+{{ if .Content }}# {{ .Title }}
+<|FROZEN_PARTITION_{{ .ID }}_{{ .Nonce }}|>
+{{ .Content }}
+<|FROZEN_PARTITION_END_{{ .ID }}_{{ .Nonce }}|>
+{{ end }}
+{{ end }}
+
+{{ if .SessionArtifactsFrozen }}# Session Artifacts (Frozen)
+{{ .SessionArtifactsFrozen }}{{ end }}
+
 {{ if .TimelineFrozen }}# Timeline Memory (Frozen Prefix)
 {{ .TimelineFrozen }}{{ end }}
