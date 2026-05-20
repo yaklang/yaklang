@@ -2,6 +2,7 @@ package loopinfra
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
@@ -88,6 +89,13 @@ var loopAction_AdjustTodolist = &reactloops.LoopAction{
 			return
 		}
 
+		// markdown delta 必须在 apply 之前算, 因为预览语义需要"还未提交时的
+		// (new) / (done) 标记". 与 verification 路径完全一致: 先 emit 伪流再
+		// 真 apply, 让前端按"流先到, 结构化事件随后定稿"的顺序消费.
+		// 关键词: adjust_todolist markdown 预览, apply 前计算 delta
+		markdownSnapshot := cfg.GetVerificationTodoMarkdownDelta(false, movements)
+		emitAdjustTodolistMarkdownSnapshot(loop, cfg, markdownSnapshot)
+
 		// satisfied=false: 主循环路径仅做增量调整, 不主张"任务已完成";
 		// 收口判定仍交给 verification 路径的 enforceTodoCompletionBeforeSatisfaction.
 		// 关键词: adjust_todolist satisfied=false, 仅增量, 不抢 verification 收口
@@ -128,6 +136,45 @@ func getAdjustTodolistMovements(loop *reactloops.ReActLoop, action *aicommon.Act
 		return raw
 	}
 	return aicommon.NormalizeVerifyNextMovements(action)
+}
+
+// emitAdjustTodolistMarkdownSnapshot 把"应用本轮增量后"的全量 TODO markdown
+// 快照以伪流形式发出, 节点 ID 与 verification 路径的 next_movements_snapshot
+// 完全一致, 让前端 markdown 渲染器无需感知调用方 — 不管来源是 verification
+// 还是 adjust_todolist, 走同一个面板渲染入口.
+//
+// 入参 markdownSnapshot 已经是 `cfg.GetVerificationTodoMarkdownDelta` 渲染好的
+// 文本; 在 apply 之前算好传入, 这样 (new) / (done) / (deleted) / (skipped)
+// 这些 delta 标记才是相对"上一轮 store"的真实增量.
+//
+// 关键词: emitAdjustTodolistMarkdownSnapshot, next_movements_snapshot 节点对齐,
+//
+//	EmitTextMarkdownStreamEvent 伪流, verification 同位事件
+func emitAdjustTodolistMarkdownSnapshot(loop *reactloops.ReActLoop, cfg aicommon.AICallerConfigIf, markdownSnapshot string) {
+	if cfg == nil {
+		return
+	}
+	if strings.TrimSpace(markdownSnapshot) == "" {
+		return
+	}
+	emitter := cfg.GetEmitter()
+	if emitter == nil {
+		return
+	}
+	taskID := ""
+	if loop != nil {
+		if task := loop.GetCurrentTask(); task != nil {
+			taskID = task.GetId()
+		}
+	}
+	if _, err := emitter.EmitTextMarkdownStreamEvent(
+		"next_movements_snapshot",
+		strings.NewReader(markdownSnapshot),
+		taskID,
+		func() {},
+	); err != nil {
+		log.Warnf("adjust_todolist: emit next_movements_snapshot markdown stream event failed: %v", err)
+	}
 }
 
 // emitAdjustTodolistUpdate publishes the post-apply TODO snapshot as a
