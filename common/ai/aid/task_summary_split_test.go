@@ -39,11 +39,21 @@ func taskSummaryToolConfig() *aicommon.Config {
 
 func renderTaskSummaryFixture(t *testing.T, fixture taskSummaryFixture) string {
 	t.Helper()
+	cfg := taskSummaryToolConfig()
+	if fixture.TimelineFrozen != "" || fixture.TimelineOpen != "" {
+		timeline := aicommon.NewTimeline(cfg, nil)
+		timeline.SetTimelineBucketByteSize(80)
+		if fixture.TimelineFrozen != "" {
+			timeline.PushText(101, fixture.TimelineFrozen+" "+strings.Repeat("A", 120))
+		}
+		if fixture.TimelineOpen != "" {
+			timeline.PushText(102, fixture.TimelineOpen+" "+strings.Repeat("B", 120))
+		}
+		cfg.Timeline = timeline
+	}
 	prompt, err := assembleTaskSummaryPrompt(
-		taskSummaryToolConfig(),
+		cfg,
 		fixture.Schema,
-		fixture.TimelineFrozen,
-		fixture.TimelineOpen,
 		fixture.CurrentTaskInfo,
 	)
 	require.NoError(t, err)
@@ -67,7 +77,6 @@ func TestSplit_TaskSummaryPrompt_FourSections(t *testing.T) {
 	stub := taskSummaryFixture{
 		Schema:          `{"type":"object"}`,
 		CurrentTaskInfo: "current task: scan /tmp",
-		TimelineOpen:    "interval-2 -> shell ps",
 	}
 
 	prompt1 := renderTaskSummaryFixture(t, stub)
@@ -103,8 +112,8 @@ func TestSplit_TaskSummaryPrompt_FrozenTimelineLandsInFrozenBlock(t *testing.T) 
 	stub := taskSummaryFixture{
 		Schema:          `{"type":"object"}`,
 		CurrentTaskInfo: "current task: scan /tmp",
-		TimelineFrozen:  "<|TIMELINE_r1t100|>\nfrozen task timeline\n<|TIMELINE_END_r1t100|>",
-		TimelineOpen:    "<|TIMELINE_r2t200|>\nopen task timeline\n<|TIMELINE_END_r2t200|>",
+		TimelineFrozen:  "frozen task timeline",
+		TimelineOpen:    "open task timeline",
 	}
 
 	prompt := renderTaskSummaryFixture(t, stub)

@@ -779,17 +779,9 @@ func (t *AiTask) GenerateTaskSummaryPrompt() (string, error) {
 		return "", fmt.Errorf("context provider is nil")
 	}
 	cp := t.Coordinator.ContextProvider
-	var timelineFrozen, timelineOpen string
-	if t.Coordinator.Config != nil {
-		if timeline := t.Coordinator.Config.GetTimeline(); timeline != nil {
-			timelineFrozen, timelineOpen = timeline.DumpFrozenOpen()
-		}
-	}
 	return assembleTaskSummaryPrompt(
 		t.Coordinator.Config,
 		cp.Schema()["TaskSummarySchema"],
-		timelineFrozen,
-		timelineOpen,
 		cp.CurrentTaskInfo(),
 	)
 }
@@ -798,20 +790,15 @@ type taskSummaryDynamicData struct {
 	CurrentTaskInfo string
 }
 
-func assembleTaskSummaryPrompt(config *aicommon.Config, schema string, currentTaskTimelineFrozen string, currentTaskTimelineOpen string, currentTaskInfo string) (string, error) {
+func assembleTaskSummaryPrompt(config *aicommon.Config, schema string, currentTaskInfo string) (string, error) {
 	materials := &aicommon.PromptMaterials{
 		TaskInstruction: strings.TrimSpace(__prompt_TaskSummaryInstruction),
 		Schema:          strings.TrimSpace(schema),
 		OutputExample:   strings.TrimSpace(__prompt_TaskSummaryOutputExample),
 	}
+	aicommon.ApplyPromptFrozenOpenMaterials(materials, aicommon.BuildPromptFrozenOpenMaterials(config))
 	if err := aicommon.PopulateToolInventoryFromConfig(materials, config); err != nil {
 		return "", fmt.Errorf("populate task summary tool inventory failed: %w", err)
-	}
-	if currentTaskTimelineFrozen = strings.TrimSpace(currentTaskTimelineFrozen); currentTaskTimelineFrozen != "" {
-		materials.TimelineFrozen = currentTaskTimelineFrozen
-	}
-	if currentTaskTimelineOpen = strings.TrimSpace(currentTaskTimelineOpen); currentTaskTimelineOpen != "" {
-		materials.TimelineOpen = currentTaskTimelineOpen
 	}
 	return aicommon.NewDefaultPromptPrefixBuilder().AssemblePromptWithDynamicSection(
 		materials,
