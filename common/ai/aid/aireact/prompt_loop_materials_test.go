@@ -434,10 +434,9 @@ func TestPromptManager_AssemblePromptPrefix_FrozenPartitionsInFrozenBlock(t *tes
 func TestPromptManager_NewPromptMaterials_ConfigFrozenPartitionProducer(t *testing.T) {
 	produced, ok := aicommon.NewFrozenBlockPartition("plan_facts", "Plan Facts", "## Facts\n- from config", 100)
 	require.True(t, ok)
+	producer := aicommon.NewFrozenBlockPartitionProducer(produced)
 	react, err := NewTestReAct(
-		aicommon.WithFrozenBlockPartitionProducer(func() []aicommon.FrozenBlockPartition {
-			return []aicommon.FrozenBlockPartition{produced}
-		}),
+		aicommon.WithFrozenBlockPartitionProducer(producer),
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
 			rsp.Close()
@@ -446,7 +445,9 @@ func TestPromptManager_NewPromptMaterials_ConfigFrozenPartitionProducer(t *testi
 	)
 	require.NoError(t, err)
 
-	materials := react.promptManager.NewPromptMaterials(&reactloops.LoopPromptBaseMaterials{}, nil)
+	materials := react.promptManager.NewPromptMaterials(&reactloops.LoopPromptBaseMaterials{
+		PromptFrozenOpenMaterials: aicommon.BuildPromptFrozenOpenMaterials(react.config),
+	}, nil)
 	require.Len(t, materials.FrozenPartitions, 1)
 	require.Equal(t, "plan_facts", materials.FrozenPartitions[0].ID)
 	require.Equal(t, produced.Content, materials.FrozenPartitions[0].Content)

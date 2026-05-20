@@ -3,6 +3,7 @@ package aicommon
 import (
 	"sort"
 	"strings"
+	"sync"
 )
 
 type FrozenBlockPartition struct {
@@ -13,9 +14,116 @@ type FrozenBlockPartition struct {
 	Order   int
 }
 
-type FrozenBlockPartitionProducer func() []FrozenBlockPartition
+type FrozenBlockPartitionProducer struct {
+	m sync.RWMutex
 
-const frozenBlockPartitionProducersConfigKey = "frozen_block_partition_producers"
+	partitions []FrozenBlockPartition
+}
+
+func NewFrozenBlockPartitionProducer(partitions ...FrozenBlockPartition) *FrozenBlockPartitionProducer {
+	producer := &FrozenBlockPartitionProducer{}
+	producer.AppendPartitions(partitions...)
+	return producer
+}
+
+func (p *FrozenBlockPartitionProducer) AppendPartition(partition FrozenBlockPartition) {
+	if p == nil {
+		return
+	}
+	partitions := NormalizeFrozenBlockPartitions([]FrozenBlockPartition{partition})
+	if len(partitions) == 0 {
+		return
+	}
+	p.m.Lock()
+	p.partitions = append(p.partitions, partitions[0])
+	p.m.Unlock()
+}
+
+func (p *FrozenBlockPartitionProducer) AppendPartitions(partitions ...FrozenBlockPartition) {
+	if p == nil || len(partitions) == 0 {
+		return
+	}
+	partitions = NormalizeFrozenBlockPartitions(partitions)
+	if len(partitions) == 0 {
+		return
+	}
+	p.m.Lock()
+	p.partitions = append(p.partitions, partitions...)
+	p.m.Unlock()
+}
+
+func (p *FrozenBlockPartitionProducer) AppendNewPartition(id string, title string, content string, order int) {
+	if p == nil {
+		return
+	}
+	partition, ok := NewFrozenBlockPartition(id, title, content, order)
+	if !ok {
+		return
+	}
+	p.AppendPartition(partition)
+}
+
+func (p *FrozenBlockPartitionProducer) ProducePartitions() []FrozenBlockPartition {
+	if p == nil {
+		return nil
+	}
+	p.m.RLock()
+	partitions := append([]FrozenBlockPartition(nil), p.partitions...)
+	p.m.RUnlock()
+	return NormalizeFrozenBlockPartitions(partitions)
+}
+
+func (c *Config) GetOrCreateFrozenBlockPartitionProducer() *FrozenBlockPartitionProducer {
+	if c == nil {
+		return nil
+	}
+	if c.m == nil {
+		c.m = &sync.Mutex{}
+	}
+	c.m.Lock()
+	defer c.m.Unlock()
+	if c.FrozenBlockPartitionProducer == nil {
+		c.FrozenBlockPartitionProducer = NewFrozenBlockPartitionProducer()
+	}
+	return c.FrozenBlockPartitionProducer
+}
+
+func (c *Config) AppendFrozenBlockPartition(id string, title string, content string, order int) {
+	producer := c.GetOrCreateFrozenBlockPartitionProducer()
+	if producer == nil {
+		return
+	}
+	producer.AppendNewPartition(id, title, content, order)
+}
+
+func WithFrozenBlockPartitionProducer(producer *FrozenBlockPartitionProducer) ConfigOption {
+	return func(c *Config) error {
+		if c == nil || producer == nil {
+			return nil
+		}
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		c.FrozenBlockPartitionProducer = producer
+		c.m.Unlock()
+		return nil
+	}
+}
+
+func WithFrozenBlockPartitions(partitions ...FrozenBlockPartition) ConfigOption {
+	return func(c *Config) error {
+		if c == nil || len(partitions) == 0 {
+			return nil
+		}
+		producer := c.GetOrCreateFrozenBlockPartitionProducer()
+		if producer == nil {
+			return nil
+		}
+		producer.AppendPartitions(partitions...)
+		return nil
+	}
+}
 
 func NewFrozenBlockPartition(id string, title string, content string, order int) (FrozenBlockPartition, bool) {
 	content = strings.TrimSpace(content)
@@ -103,57 +211,17 @@ func NormalizeFrozenBlockPartitions(partitions []FrozenBlockPartition) []FrozenB
 	return out
 }
 
-func WithFrozenBlockPartitionProducer(producer FrozenBlockPartitionProducer) ConfigOption {
-	return func(c *Config) error {
-		if c == nil || producer == nil {
-			return nil
-		}
-		if c.KeyValueConfig == nil {
-			c.KeyValueConfig = NewKeyValueConfig()
-		}
-		var producers []FrozenBlockPartitionProducer
-		if existing, ok := c.GetConfig(frozenBlockPartitionProducersConfigKey); ok {
-			switch typed := existing.(type) {
-			case []FrozenBlockPartitionProducer:
-				producers = append(producers, typed...)
-			case FrozenBlockPartitionProducer:
-				producers = append(producers, typed)
-			}
-		}
-		producers = append(producers, producer)
-		c.SetConfig(frozenBlockPartitionProducersConfigKey, producers)
-		return nil
-	}
-}
-
 func FrozenBlockPartitionsFromConfig(config AICallerConfigIf) []FrozenBlockPartition {
 	if config == nil {
 		return nil
 	}
-	if cfg, ok := config.(*Config); ok && cfg.KeyValueConfig == nil {
+	cfg, ok := config.(*Config)
+	if !ok || cfg == nil {
 		return nil
 	}
-	existing, ok := config.GetConfig(frozenBlockPartitionProducersConfigKey)
-	if !ok {
+	producer := cfg.FrozenBlockPartitionProducer
+	if producer == nil {
 		return nil
 	}
-
-	var producers []FrozenBlockPartitionProducer
-	switch typed := existing.(type) {
-	case []FrozenBlockPartitionProducer:
-		producers = typed
-	case FrozenBlockPartitionProducer:
-		producers = []FrozenBlockPartitionProducer{typed}
-	default:
-		return nil
-	}
-
-	var partitions []FrozenBlockPartition
-	for _, producer := range producers {
-		if producer == nil {
-			continue
-		}
-		partitions = append(partitions, producer()...)
-	}
-	return NormalizeFrozenBlockPartitions(partitions)
+	return producer.ProducePartitions()
 }
