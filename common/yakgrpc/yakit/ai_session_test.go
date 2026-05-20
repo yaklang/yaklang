@@ -270,6 +270,42 @@ func TestQueryAISessionIDsForDelete_DeleteAll(t *testing.T) {
 	require.Contains(t, sessionIDs, sessionB)
 }
 
+func TestQueryAISessionIDsForDelete_BySource(t *testing.T) {
+	db, err := utils.CreateTempTestDatabaseInMemory()
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&schema.AISession{}).Error)
+
+	sIde := "sess-ide-" + uuid.NewString()
+	sCli := "sess-cli-" + uuid.NewString()
+	sOther := "sess-other-" + uuid.NewString()
+
+	_, err = CreateOrUpdateAISessionMeta(db, sIde, "a")
+	require.NoError(t, err)
+	_, err = CreateOrUpdateAISessionMeta(db, sCli, "b")
+	require.NoError(t, err)
+	_, err = CreateOrUpdateAISessionMeta(db, sOther, "c")
+	require.NoError(t, err)
+
+	require.NoError(t, db.Model(&schema.AISession{}).Where("session_id = ?", sIde).UpdateColumn("source", "ide").Error)
+	require.NoError(t, db.Model(&schema.AISession{}).Where("session_id = ?", sCli).UpdateColumn("source", "cli").Error)
+	require.NoError(t, db.Model(&schema.AISession{}).Where("session_id = ?", sOther).UpdateColumn("source", "ide").Error)
+
+	sessionIDs, err := QueryAISessionIDsForDelete(db, &ypb.DeleteAISessionFilter{
+		Source: []string{"ide"},
+	}, false)
+	require.NoError(t, err)
+	require.Len(t, sessionIDs, 2)
+	require.Contains(t, sessionIDs, sIde)
+	require.Contains(t, sessionIDs, sOther)
+
+	sessionIDs, err = QueryAISessionIDsForDelete(db, &ypb.DeleteAISessionFilter{
+		SessionID: []string{sIde, sCli},
+		Source:    []string{"cli"},
+	}, false)
+	require.NoError(t, err)
+	require.Equal(t, []string{sCli}, sessionIDs)
+}
+
 func TestQueryAllAISessionMetaOrderByUpdated(t *testing.T) {
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)

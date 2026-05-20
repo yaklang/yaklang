@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
+	"strings"
 
 	"github.com/gorilla/mux"
 	"github.com/yaklang/yaklang/common/consts"
@@ -152,7 +153,30 @@ func hasDeleteAISessionFilterCondition(filter *ypb.DeleteAISessionFilter) bool {
 	if filter == nil {
 		return false
 	}
-	return len(filter.GetSessionID()) > 0 || filter.GetAfterTimestamp() > 0 || filter.GetBeforeTimestamp() > 0
+	if len(filter.GetSessionID()) > 0 || filter.GetAfterTimestamp() > 0 || filter.GetBeforeTimestamp() > 0 {
+		return true
+	}
+	for _, s := range filter.GetSource() {
+		if strings.TrimSpace(s) != "" {
+			return true
+		}
+	}
+	return false
+}
+
+func needsAISessionDeleteDBLookup(filter *ypb.DeleteAISessionFilter) bool {
+	if filter == nil {
+		return false
+	}
+	if filter.GetAfterTimestamp() > 0 || filter.GetBeforeTimestamp() > 0 {
+		return true
+	}
+	for _, s := range filter.GetSource() {
+		if strings.TrimSpace(s) != "" {
+			return true
+		}
+	}
+	return false
 }
 
 func (gw *AIAgentHTTPGateway) cancelAndRemoveDeletedSessions(req *ypb.DeleteAISessionRequest) {
@@ -166,7 +190,7 @@ func (gw *AIAgentHTTPGateway) cancelAndRemoveDeletedSessions(req *ypb.DeleteAISe
 		for _, item := range gw.runManager.ListAll() {
 			targets = append(targets, item.RunID)
 		}
-	case req.GetFilter() != nil && (req.GetFilter().GetAfterTimestamp() > 0 || req.GetFilter().GetBeforeTimestamp() > 0):
+	case req.GetFilter() != nil && needsAISessionDeleteDBLookup(req.GetFilter()):
 		db := consts.GetGormProjectDatabase()
 		if db != nil {
 			if sessionIDs, err := yakit.QueryAISessionIDsForDelete(db, req.GetFilter(), false); err == nil {

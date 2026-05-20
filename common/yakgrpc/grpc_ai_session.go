@@ -63,6 +63,7 @@ func (s *Server) QueryAISession(ctx context.Context, req *ypb.QueryAISessionRequ
 			LastUsedAt:        lastUsedAt,
 			RelatedRuntimeIDs: runtimeIDs,
 			StartParams:       startParams,
+			Source:            item.Source,
 		})
 	}
 

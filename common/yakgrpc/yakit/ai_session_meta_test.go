@@ -148,6 +148,45 @@ func TestAppendAISessionMetaRelatedRuntimeID_PlainString(t *testing.T) {
 	require.Equal(t, `["not-a-uuid"]`, got.RelatedRuntimeIDS)
 }
 
+func TestEnsureAISessionMetaSetsSource(t *testing.T) {
+	db, err := utils.CreateTempTestDatabaseInMemory()
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&schema.AISession{}).Error)
+
+	meta, err := EnsureAISessionMeta(db, "sess-src-new", "ide")
+	require.NoError(t, err)
+	require.Equal(t, "ide", meta.Source)
+
+	got, err := GetAISessionMetaBySessionID(db, "sess-src-new")
+	require.NoError(t, err)
+	require.Equal(t, "ide", got.Source)
+
+	// Second start with a different source must not overwrite an existing value.
+	_, err = EnsureAISessionMeta(db, "sess-src-new", "cli")
+	require.NoError(t, err)
+	got, err = GetAISessionMetaBySessionID(db, "sess-src-new")
+	require.NoError(t, err)
+	require.Equal(t, "ide", got.Source)
+}
+
+func TestEnsureAISessionMetaBackfillSource(t *testing.T) {
+	db, err := utils.CreateTempTestDatabaseInMemory()
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&schema.AISession{}).Error)
+
+	_, err = CreateOrUpdateAISessionMeta(db, "sess-backfill", "t")
+	require.NoError(t, err)
+	got, err := GetAISessionMetaBySessionID(db, "sess-backfill")
+	require.NoError(t, err)
+	require.Equal(t, "", got.Source)
+
+	_, err = EnsureAISessionMeta(db, "sess-backfill", "yak")
+	require.NoError(t, err)
+	got, err = GetAISessionMetaBySessionID(db, "sess-backfill")
+	require.NoError(t, err)
+	require.Equal(t, "yak", got.Source)
+}
+
 func TestAISessionMetaStartParamsCRUD(t *testing.T) {
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
