@@ -92,11 +92,11 @@ func (t *AiTask) execute() error {
 				allOps = append(allOps, buildVerificationCarryoverEvidenceOps(t, summary, outputFiles)...)
 				if len(allOps) > 0 {
 					// EVIDENCE 单写到 SessionPromptState (SESSION_EVIDENCE 段)。
-					// 历史曾同时写 task plan_evidence + syncRootTaskPlanContextDocs
-					// 把 EVIDENCE 块嵌入 root user input, 但这会让 PlanContext 跨子
-					// 任务抖动并破坏多个 prompt cache 命中。现仅保留 SESSION_EVIDENCE
-					// 单一渲染源, 其它 evidence 入口 (如 output_evidence action) 写入
-					// 的 task plan_evidence 不再被任何 prompt 模板读取。
+					// 历史曾把 EVIDENCE 块嵌入 root user input, 但这会让 PlanContext
+					// 跨子任务抖动并破坏多个 prompt cache 命中。现仅保留
+					// SESSION_EVIDENCE 单一渲染源, 其它 evidence 入口 (如
+					// output_evidence action) 写入的 task plan_evidence 不再被任何
+					// prompt 模板读取。
 					// 关键词: EVIDENCE 单写, ApplySessionEvidenceOps, PlanContext 抖动修复
 					log.Infof("task %s applying session evidence ops, count=%d", t.Index, len(allOps))
 					if incremental := aicommon.FormatEvidenceOpsLines(allOps, t.GetLanguage()); incremental != "" {

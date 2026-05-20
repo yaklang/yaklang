@@ -99,7 +99,7 @@ func (t *AiTask) GetUserInput() string {
 
 		// 添加当前层父任务的输入
 		if task.ParentTask.AIStatefulTaskBase != nil {
-			input := task.ParentTask.AIStatefulTaskBase.GetUserInput()
+			input := stripPlanContextBlocks(task.ParentTask.AIStatefulTaskBase.GetUserInput())
 			if input != "" {
 				inputs = append(inputs, input)
 			}
@@ -117,7 +117,7 @@ func (t *AiTask) GetUserInput() string {
 	// 获取当前任务的输入
 	var currentInput string
 	if t.AIStatefulTaskBase != nil {
-		currentInput = t.AIStatefulTaskBase.GetUserInput()
+		currentInput = stripPlanContextBlocks(t.AIStatefulTaskBase.GetUserInput())
 	}
 
 	var rawUserInput string
@@ -136,8 +136,8 @@ func (t *AiTask) GetUserInput() string {
 	//
 	// 新实现: 用 (rawUserInput, parentInputsJoined) 派生稳定 nonce，
 	// 让同一个 plan 周期内的所有 PE-TASK 子任务共用同一个 nonce。plan 重新
-	// 生成 / facts/document 演化时, parentInputsJoined 自然变化, nonce 随之
-	// 变化, 不会污染新 plan 的缓存。
+	// 生成时, rawUserInput / parentInputsJoined 自然变化, nonce 随之变化,
+	// 不会污染新 plan 的缓存。
 	//
 	// 关键词: task user input nonce, plan scoped nonce, prefix cache,
 	//        反 RandStringBytes 反模式
@@ -199,7 +199,8 @@ func (t *AiTask) GetUserInput() string {
 // 走老语义即可, 这里返回 (root user input, "")。
 //
 // 关键词: GetUserInputSplitForCache, PE-TASK frozen user context,
-//        rawQuery 留空, prefix cache
+//
+//	rawQuery 留空, prefix cache
 func (t *AiTask) GetUserInputSplitForCache() (rawQuery, frozenUserContext string) {
 	if utils.IsNil(t.ParentTask) {
 		// 普通 ReAct / root 任务: 用户原话保留在 dynamic 段, 不冻结

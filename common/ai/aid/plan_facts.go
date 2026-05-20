@@ -34,67 +34,6 @@ type discoveredAITagBlock struct {
 	End     int
 }
 
-func buildFactsBlock(facts string) string {
-	return buildPlanContextBlock("FACTS", facts)
-}
-
-func buildEvidenceBlock(evidence string) string {
-	return buildPlanContextBlock("EVIDENCE", evidence)
-}
-
-func buildDocumentBlock(document string) string {
-	return buildPlanContextBlock("DOCUMENT", document)
-}
-
-// buildPlanContextBlock 构造 <|TAG_<nonce>|>...<|TAG_END_<nonce>|> 块。
-//
-// 缓存优化: nonce 由 (tag, content) 通过 aicommon.StablePromptNonce 派生，
-// 同样的 content 跨多次调用必产出相同 nonce，避免老反模式
-// utils.RandStringBytes(6) 让相同 FACTS/DOCUMENT/EVIDENCE body 在每次重渲染
-// 时都换 nonce，从而打破上游的 prefix cache。
-//
-// content 一旦变化 (例如 plan 演化新增 facts), nonce 自然变化, 这是预期
-// 行为, 让旧缓存自然失效。
-//
-// 关键词: buildPlanContextBlock, plan facts/document/evidence nonce 稳定,
-//        反 RandStringBytes 反模式, prefix cache
-func buildPlanContextBlock(tag string, content string) string {
-	content = strings.TrimSpace(content)
-	if content == "" {
-		return ""
-	}
-	nonce := aicommon.StablePromptNonce("plan-context", tag, content)
-	return fmt.Sprintf("<|%s_%s|>\n%s\n<|%s_END_%s|>", tag, nonce, content, tag, nonce)
-}
-
-func prependPlanFactsToRenderedPlan(base string, facts string) string {
-	return prependPlanContextDocsToRenderedPlan(base, facts, "", "")
-}
-
-func prependPlanContextDocsToRenderedPlan(base string, facts string, document string, evidence string) string {
-	facts = strings.TrimSpace(facts)
-	document = strings.TrimSpace(document)
-	evidence = strings.TrimSpace(evidence)
-	if facts == "" && document == "" && evidence == "" {
-		return base
-	}
-	blocks := make([]string, 0, 3)
-	if facts != "" {
-		blocks = append(blocks, buildFactsBlock(facts))
-	}
-	if document != "" {
-		blocks = append(blocks, buildDocumentBlock(document))
-	}
-	if evidence != "" {
-		blocks = append(blocks, buildEvidenceBlock(evidence))
-	}
-	joinedBlocks := strings.Join(blocks, "\n\n")
-	if strings.TrimSpace(base) == "" {
-		return joinedBlocks
-	}
-	return joinedBlocks + "\n\n" + base
-}
-
 func extractPlanFactsFromText(content string) string {
 	return extractPlanContextFromText(content, planFactsAITags...)
 }
@@ -245,16 +184,8 @@ func parseAITagStartToken(token string) (string, string, bool) {
 	return tagName, nonce, true
 }
 
-func getTaskPlanFacts(task *AiTask) string {
-	return getTaskPlanPersistentMarkdown(task, planFactsPersistentKey, extractPlanFactsFromText)
-}
-
 func getTaskPlanEvidence(task *AiTask) string {
 	return getTaskPlanPersistentMarkdown(task, planEvidencePersistentKey, extractPlanEvidenceFromText)
-}
-
-func getTaskPlanDocument(task *AiTask) string {
-	return getTaskPlanPersistentMarkdown(task, planDocumentPersistentKey, extractPlanDocumentFromText)
 }
 
 func getTaskPlanPersistentMarkdown(task *AiTask, key string, extractor func(string) string) string {
@@ -313,7 +244,6 @@ func appendTaskPlanEvidence(task *AiTask, incoming string) (string, bool) {
 	if task.Coordinator != nil && task.Coordinator.ContextProvider != nil {
 		task.Coordinator.ContextProvider.SetPersistentData(planEvidencePersistentKey, merged)
 	}
-	syncRootTaskPlanContextDocs(task)
 	return merged, true
 }
 
@@ -402,34 +332,6 @@ func sanitizeTaskPlanOutputFilePath(filePath string) string {
 		return ""
 	}
 	return cleaned
-}
-
-// syncRootTaskPlanContextDocs 把 root task 的 FACTS + DOCUMENT 同步嵌入到
-// root user input 前缀, 让所有子任务通过 GetUserInput / parentInputs 链路看到
-// 这两份 plan 周期级稳定文档。
-//
-// EVIDENCE 故意不再嵌入: 历史上曾把 EVIDENCE 作为第三份 prefix 嵌入, 但 EVIDENCE
-// 由 EvidenceOps 增量演化, 每次写入都会让 root user input 字节变化, 进而让
-// PlanContext (PARENT_TASK + CURRENT_TASK + INSTRUCTION 三联块, 内部依赖父链
-// user input) 跨子任务剧烈抖动, 破坏 prompt 缓存命中。现 EVIDENCE 统一由
-// SessionPromptState 渲染 (SESSION_EVIDENCE 段, 位于 timeline-open), 单一
-// 数据源, 不再污染 root user input。
-//
-// 关键词: syncRootTaskPlanContextDocs, FACTS + DOCUMENT 嵌入,
-//        EVIDENCE 已剥离, PlanContext 抖动修复, SessionPromptState 单源
-func syncRootTaskPlanContextDocs(task *AiTask) {
-	if task == nil {
-		return
-	}
-	root := task
-	for root.ParentTask != nil {
-		root = root.ParentTask
-	}
-	if root.AIStatefulTaskBase == nil {
-		return
-	}
-	base := stripPlanContextBlocks(root.AIStatefulTaskBase.GetUserInput())
-	root.SetUserInput(prependPlanContextDocsToRenderedPlan(base, getTaskPlanFacts(root), getTaskPlanDocument(root), ""))
 }
 
 func buildVerificationCarryoverEvidenceOps(task *AiTask, reasoning string, outputFiles []string) []aicommon.EvidenceOperation {
@@ -522,7 +424,6 @@ func applyTaskPlanEvidenceOps(task *AiTask, ops []aicommon.EvidenceOperation) (s
 	if task.Coordinator != nil && task.Coordinator.ContextProvider != nil {
 		task.Coordinator.ContextProvider.SetPersistentData(planEvidencePersistentKey, merged)
 	}
-	syncRootTaskPlanContextDocs(task)
 	return merged, true
 }
 
