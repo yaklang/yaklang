@@ -342,11 +342,6 @@ func vacuumDatabase(dbPath string, dryRun bool, walCheckpoint bool, forceTruncat
 	if err != nil {
 		return 0, fmt.Errorf("cannot open database: %v", err)
 	}
-	defer func() {
-		if err := db.Close(); err != nil {
-			log.Warnf("failed to close database: %v", err)
-		}
-	}()
 
 	// Set busy timeout
 	_, err = db.Exec(fmt.Sprintf("PRAGMA busy_timeout = %d;", busyTimeout))
@@ -354,48 +349,29 @@ func vacuumDatabase(dbPath string, dryRun bool, walCheckpoint bool, forceTruncat
 		log.Warnf("failed to set busy_timeout: %v", err)
 	}
 
-	// Perform WAL checkpoint if requested and in WAL mode
 	if walCheckpoint && isWALJournal {
-		fmt.Printf("     Performing WAL checkpoint (TRUNCATE)...\n")
-		_, err = db.Exec("PRAGMA wal_checkpoint(TRUNCATE);")
-		if err != nil {
-			if strings.Contains(err.Error(), "database is locked") {
-				fmt.Printf("     [WARN] WAL checkpoint skipped (database locked by other process)\n")
-			} else {
-				log.Warnf("WAL checkpoint failed: %v", err)
-			}
-		} else {
-			fmt.Printf("     WAL checkpoint completed\n")
-		}
+		runWALCheckpointTruncate(db, "pre-vacuum", "")
 	}
 
 	// Perform VACUUM
 	fmt.Printf("     Performing VACUUM...\n")
 	_, err = db.Exec("VACUUM;")
 	if err != nil {
+		closeSQLiteDB(db)
 		if strings.Contains(err.Error(), "database is locked") {
 			return 0, fmt.Errorf("VACUUM failed: database is locked. Please close Yakit and try again")
 		}
 		return 0, fmt.Errorf("VACUUM failed: %v", err)
 	}
 
-	// Post-vacuum checkpoint is required in WAL mode: VACUUM leaves the rebuilt DB in -wal until truncated.
+	// Post-vacuum checkpoint: best-effort; failure/busy does not abort (WAL may remain until next checkpoint).
 	if walCheckpoint && isWALJournal {
-		fmt.Printf("     Performing post-vacuum WAL checkpoint (TRUNCATE)...\n")
-		_, err = db.Exec("PRAGMA wal_checkpoint(TRUNCATE);")
-		if err != nil {
-			if strings.Contains(err.Error(), "database is locked") {
-				fmt.Printf("     [WARN] Post-vacuum WAL checkpoint skipped (database locked)\n")
-				fmt.Printf("     [TIP] Close Yakit/other DB clients, then run: sqlite3 %q \"PRAGMA wal_checkpoint(TRUNCATE);\"\n", dbPath)
-			} else {
-				log.Warnf("Post-vacuum WAL checkpoint failed: %v", err)
-			}
-		} else {
-			fmt.Printf("     Post-vacuum WAL checkpoint completed\n")
-		}
+		runWALCheckpointTruncate(db, "post-vacuum", dbPath)
 	}
 
-	// Get file info after vacuum (db closed via defer on return)
+	// Close before measuring files or removing -wal/-shm (avoid deleting while connection is open).
+	closeSQLiteDB(db)
+
 	dbInfoAfter, err := os.Stat(dbPath)
 	if err != nil {
 		return 0, fmt.Errorf("cannot stat database file after vacuum: %v", err)
@@ -448,6 +424,44 @@ func vacuumDatabase(dbPath string, dryRun bool, walCheckpoint bool, forceTruncat
 	return totalSaved, nil
 }
 
+func closeSQLiteDB(db *sql.DB) {
+	if db == nil {
+		return
+	}
+	if err := db.Close(); err != nil {
+		log.Warnf("failed to close database: %v", err)
+	}
+}
+
+// runWALCheckpointTruncate runs wal_checkpoint(TRUNCATE). Errors and busy status are logged only;
+// the caller should continue (e.g. still run VACUUM).
+func runWALCheckpointTruncate(db *sql.DB, phase, dbPath string) {
+	fmt.Printf("     Performing %s WAL checkpoint (TRUNCATE)...\n", phase)
+	var busy, logFrames, checkpointed int
+	err := db.QueryRow("PRAGMA wal_checkpoint(TRUNCATE);").Scan(&busy, &logFrames, &checkpointed)
+	if err != nil {
+		if strings.Contains(err.Error(), "database is locked") {
+			fmt.Printf("     [WARN] %s WAL checkpoint skipped (database locked by other process)\n", phase)
+		} else {
+			fmt.Printf("     [WARN] %s WAL checkpoint failed: %v\n", phase, err)
+			log.Warnf("%s WAL checkpoint failed: %v", phase, err)
+		}
+		if dbPath != "" {
+			fmt.Printf("     [TIP] Close Yakit/other DB clients, then run: sqlite3 %q \"PRAGMA wal_checkpoint(TRUNCATE);\"\n", dbPath)
+		}
+		return
+	}
+	if busy != 0 {
+		fmt.Printf("     [WARN] %s WAL checkpoint busy (other connections active); log=%d checkpointed=%d — continuing\n",
+			phase, logFrames, checkpointed)
+		if dbPath != "" {
+			fmt.Printf("     [TIP] Close Yakit/other DB clients, then run: sqlite3 %q \"PRAGMA wal_checkpoint(TRUNCATE);\"\n", dbPath)
+		}
+		return
+	}
+	fmt.Printf("     %s WAL checkpoint completed (log=%d checkpointed=%d)\n", phase, logFrames, checkpointed)
+}
+
 // vacuumWithForceTruncateWAL performs vacuum with forced WAL truncation
 // by temporarily switching to DELETE journal mode
 func vacuumWithForceTruncateWAL(dbPath, walPath, shmPath string, sizeBefore, walSizeBefore int64, busyTimeout int) (int64, error) {
@@ -465,23 +479,14 @@ func vacuumWithForceTruncateWAL(dbPath, walPath, shmPath string, sizeBefore, wal
 		log.Warnf("failed to set busy_timeout: %v", err)
 	}
 
-	// First, checkpoint all WAL content
-	fmt.Printf("     Performing final WAL checkpoint (TRUNCATE)...\n")
-	_, err = db.Exec("PRAGMA wal_checkpoint(TRUNCATE);")
-	if err != nil {
-		if strings.Contains(err.Error(), "database is locked") {
-			db.Close()
-			return 0, fmt.Errorf("database is locked - please close Yakit first")
-		}
-		log.Warnf("WAL checkpoint failed: %v", err)
-	}
+	runWALCheckpointTruncate(db, "pre-delete-mode", dbPath)
 
 	// Switch to DELETE mode - this will checkpoint and remove WAL
 	fmt.Printf("     Switching to DELETE journal mode...\n")
 	var newMode string
 	err = db.QueryRow("PRAGMA journal_mode=DELETE;").Scan(&newMode)
 	if err != nil {
-		db.Close()
+		closeSQLiteDB(db)
 		if strings.Contains(err.Error(), "database is locked") {
 			return 0, fmt.Errorf("database is locked - please close Yakit first")
 		}
@@ -493,7 +498,7 @@ func vacuumWithForceTruncateWAL(dbPath, walPath, shmPath string, sizeBefore, wal
 	fmt.Printf("     Performing VACUUM in DELETE mode...\n")
 	_, err = db.Exec("VACUUM;")
 	if err != nil {
-		db.Close()
+		closeSQLiteDB(db)
 		return 0, fmt.Errorf("VACUUM failed: %v", err)
 	}
 
@@ -506,8 +511,7 @@ func vacuumWithForceTruncateWAL(dbPath, walPath, shmPath string, sizeBefore, wal
 		fmt.Printf("     Journal mode restored to: %s\n", newMode)
 	}
 
-	// Close the database
-	db.Close()
+	closeSQLiteDB(db)
 
 	// Manually remove WAL and SHM files if they still exist
 	if _, err := os.Stat(walPath); err == nil {
