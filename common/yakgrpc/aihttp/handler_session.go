@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
-	"strings"
 
 	"github.com/gorilla/mux"
 	"github.com/yaklang/yaklang/common/consts"
@@ -156,10 +155,8 @@ func hasDeleteAISessionFilterCondition(filter *ypb.DeleteAISessionFilter) bool {
 	if len(filter.GetSessionID()) > 0 || filter.GetAfterTimestamp() > 0 || filter.GetBeforeTimestamp() > 0 {
 		return true
 	}
-	for _, s := range filter.GetSource() {
-		if strings.TrimSpace(s) != "" {
-			return true
-		}
+	if len(filter.GetSource()) > 0 {
+		return true
 	}
 	return false
 }
@@ -171,12 +168,7 @@ func needsAISessionDeleteDBLookup(filter *ypb.DeleteAISessionFilter) bool {
 	if filter.GetAfterTimestamp() > 0 || filter.GetBeforeTimestamp() > 0 {
 		return true
 	}
-	for _, s := range filter.GetSource() {
-		if strings.TrimSpace(s) != "" {
-			return true
-		}
-	}
-	return false
+	return len(filter.GetSource()) > 0
 }
 
 func (gw *AIAgentHTTPGateway) cancelAndRemoveDeletedSessions(req *ypb.DeleteAISessionRequest) {

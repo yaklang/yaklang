@@ -16,9 +16,6 @@ func normalizeAISessionFilterStrings(vals []string) []string {
 	out := make([]string, 0, len(vals))
 	for _, v := range vals {
 		v = strings.TrimSpace(v)
-		if v == "" {
-			continue
-		}
 		if _, ok := seen[v]; ok {
 			continue
 		}
