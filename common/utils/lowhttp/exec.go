@@ -267,6 +267,8 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 		gmTLS                   = option.GmTLS
 		onlyGMTLS               = option.GmTLSOnly
 		preferGMTLS             = option.GmTLSPrefer
+		gmTLSCipherSuites           = option.GmTLSCipherSuites
+		gmTLSCompatMode             = option.GmTLSCompatMode
 		host                    = option.Host
 		port                    = option.Port
 		requestPacket           = option.Packet
@@ -654,12 +656,16 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 
 	if https {
 		if gmTLS {
-			dialopts = append(dialopts, netx.DialX_WithGMTLSConfig(&gmtls.Config{
+			gmCfg := &gmtls.Config{
 				GMSupport:          &gmtls.GMSupport{WorkMode: gmtls.ModeAutoSwitch},
 				NextProtos:         nextProto,
 				ServerName:         host,
 				InsecureSkipVerify: !option.VerifyCertificate,
-			}))
+			}
+			if len(gmTLSCipherSuites) > 0 {
+				gmCfg.CipherSuites = gmTLSCipherSuites
+			}
+			dialopts = append(dialopts, netx.DialX_WithGMTLSConfig(gmCfg))
 		} else {
 			dialopts = append(dialopts, netx.DialX_WithTLSConfig(&gmtls.Config{
 				NextProtos:         nextProto,
@@ -667,7 +673,13 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 				InsecureSkipVerify: !option.VerifyCertificate,
 			}))
 		}
-		dialopts = append(dialopts, netx.DialX_WithGMTLSSupport(gmTLS), netx.DialX_WithTLS(https), netx.DialX_WithGMTLSOnly(onlyGMTLS), netx.DialX_WithGMTLSPrefer(preferGMTLS))
+		dialopts = append(dialopts,
+			netx.DialX_WithGMTLSSupport(gmTLS),
+			netx.DialX_WithTLS(https),
+			netx.DialX_WithGMTLSOnly(onlyGMTLS),
+			netx.DialX_WithGMTLSPrefer(preferGMTLS),
+			netx.DialX_WithGMTLSCompatMode(gmTLSCompatMode),
+		)
 
 		if clientHelloSpec != nil {
 			dialopts = append(dialopts, netx.DialX_WithClientHelloSpec(clientHelloSpec))

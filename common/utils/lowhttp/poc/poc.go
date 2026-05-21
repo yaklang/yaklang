@@ -107,9 +107,11 @@ type PocConfig struct {
 	ClientHelloSpec *utls.ClientHelloSpec
 	RandomJA3       bool
 
-	GmTLS       bool
-	GmTLSOnly   bool
-	GmTLSPrefer bool
+	GmTLS                      bool
+	GmTLSOnly                  bool
+	GmTLSPrefer                bool
+	GmTLSCipherSuites          []uint16
+	GmTLSCompatMode            bool
 
 	// random chunked
 	EnableRandomChunked bool
@@ -262,6 +264,16 @@ func (c *PocConfig) ToLowhttpOptions() []lowhttp.LowhttpOpt {
 	}
 	if c.GmTLSPrefer {
 		opts = append(opts, lowhttp.WithGmTLSPrefer(c.GmTLSPrefer))
+	}
+	if len(c.GmTLSCipherSuites) > 0 {
+		suiteIDs := make([]int, len(c.GmTLSCipherSuites))
+		for i, id := range c.GmTLSCipherSuites {
+			suiteIDs[i] = int(id)
+		}
+		opts = append(opts, lowhttp.WithGmTLSCipherSuite(suiteIDs...))
+	}
+	if c.GmTLSCompatMode {
+		opts = append(opts, lowhttp.WithGmTLSCompatMode(true))
 	}
 	if c.EnableRandomChunked {
 		opts = append(opts, lowhttp.WithEnableRandomChunked(c.EnableRandomChunked))
@@ -2102,6 +2114,32 @@ func WithGmTLSPrefer() PocConfigOption {
 	}
 }
 
+// WithGmTLSCipherSuite 指定国密 TLS 套件，使用 tls.GMTLS_* 常量（可传多个）。
+// Example:
+// ```
+// poc.Get("https://example.com", poc.gmTLS(true), poc.gmTLSCipherSuite(tls.GMTLS_ECC_SM4_CBC_SM3))
+// ```
+func WithGmTLSCipherSuite(suites ...int) PocConfigOption {
+	return func(c *PocConfig) {
+		c.GmTLSCipherSuites = make([]uint16, len(suites))
+		for i, id := range suites {
+			c.GmTLSCipherSuites[i] = uint16(id)
+		}
+	}
+}
+
+// WithGmTLSCompatMode 开启国密兼容模式（默认关闭：单次 ClientHello 提供四套套件）。
+// 适用于服务端在「四套同发」时会误选 ECDHE 的站点（如部分银行 GM 网关）。
+// Example:
+// ```
+// poc.Get(url, poc.gmTLS(true), poc.gmTLSCompatMode(true))
+// ```
+func WithGmTLSCompatMode(b bool) PocConfigOption {
+	return func(c *PocConfig) {
+		c.GmTLSCompatMode = b
+	}
+}
+
 // fixQueryEscape 是一个请求选项参数，用于指定是否修复查询参数中的 URL 编码，默认为 false 即会自动修复URL编码
 // Example:
 // ```
@@ -2475,6 +2513,8 @@ var PoCExports = map[string]interface{}{
 	"gmTls":                WithGmTls,
 	"gmTlsOnly":            WithGmTlsOnly,
 	"gmTLSPrefer":          WithGmTLSPrefer,
+	"gmTLSCipherSuite":     WithGmTLSCipherSuite,
+	"gmTLSCompatMode":           WithGmTLSCompatMode,
 	"fixQueryEscape":       WithFixQueryEscape,
 	// download options
 	"downloadProgress": WithDownloadProgress,
