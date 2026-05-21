@@ -42,6 +42,8 @@ type LowhttpExecConfig struct {
 	GmTLS                            bool
 	GmTLSOnly                        bool
 	GmTLSPrefer                      bool
+	GmTLSCipherSuites                []uint16
+	GmTLSCompatMode                  bool
 	OverrideEnableSystemProxyFromEnv bool
 	EnableSystemProxyFromEnv         bool
 	ConnectTimeout                   time.Duration
@@ -473,6 +475,32 @@ func WithGmTLSOnly(b bool) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.GmTLSOnly = b
 	}
+}
+
+// WithGmTLSCipherSuite 指定国密 ClientHello 套件（套件 ID 使用 tls.GMTLS_* 常量，可传多个）。
+// 设置后仅协商所列套件，不再使用 netx 默认的 ECC→ECDHE→全套 三轮回退。
+func WithGmTLSCipherSuite(suites ...int) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.GmTLSCipherSuites = intsToGMTLSCipherSuites(suites)
+	}
+}
+
+// WithGmTLSCompatMode 开启国密兼容模式（默认关闭）。
+func WithGmTLSCompatMode(b bool) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.GmTLSCompatMode = b
+	}
+}
+
+func intsToGMTLSCipherSuites(suites []int) []uint16 {
+	if len(suites) == 0 {
+		return nil
+	}
+	out := make([]uint16, len(suites))
+	for i, id := range suites {
+		out[i] = uint16(id)
+	}
+	return out
 }
 
 // WithDNSNoCache is not effective

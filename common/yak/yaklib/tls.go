@@ -83,4 +83,10 @@ var TlsExports = map[string]interface{}{
 	// --- 密钥材料选项 ---
 	"privateKeyFromFile": tlsutils.WithPrivateKeyFromFile,
 	"privateKeyFromRaw":  tlsutils.WithPrivateKeyFromBytes,
+
+	// --- 国密 TLS 套件（供 poc.gmTLSCipherSuite / tls.GMTLS_* 使用，见 tls_gmtls.go）---
+	"GMTLS_ECC_SM4_CBC_SM3":   GMTLS_ECC_SM4_CBC_SM3,
+	"GMTLS_ECC_SM4_GCM_SM3":   GMTLS_ECC_SM4_GCM_SM3,
+	"GMTLS_ECDHE_SM4_CBC_SM3": GMTLS_ECDHE_SM4_CBC_SM3,
+	"GMTLS_ECDHE_SM4_GCM_SM3": GMTLS_ECDHE_SM4_GCM_SM3,
 }

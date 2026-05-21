@@ -10,15 +10,15 @@ import (
 	utls "github.com/refraction-networking/utls"
 )
 
-// 国密四套件的密钥协商分两类：静态 ECC（证书 SM2）与 ECDHE（需 ServerKeyExchange）。
+// 国密套件按密钥协商分两类：静态 ECC 与 ECDHE。CBC/GCM 为 SM4 不同模式，同族套件可放在同一轮 ClientHello。
 var (
-	eccGMTLSCipherSuites = []uint16{
-		gmtls.GMTLS_ECC_SM4_CBC_SM3, // 0xe013，Tongsuo: ECC-SM2-SM4-CBC-SM3
-		gmtls.GMTLS_ECC_SM4_GCM_SM3, // 0xe053
+	eccGMTLSCipherSuitesCompat = []uint16{
+		gmtls.GMTLS_ECC_SM4_CBC_SM3,
+		gmtls.GMTLS_ECC_SM4_GCM_SM3,
 	}
-	ecdheGMTLSCipherSuites = []uint16{
-		gmtls.GMTLS_ECDHE_SM4_CBC_SM3, // 0xe011
-		gmtls.GMTLS_ECDHE_SM4_GCM_SM3, // 0xe051
+	ecdheGMTLSCipherSuitesCompat = []uint16{
+		gmtls.GMTLS_ECDHE_SM4_CBC_SM3,
+		gmtls.GMTLS_ECDHE_SM4_GCM_SM3,
 	}
 	allGMTLSCipherSuites = []uint16{
 		gmtls.GMTLS_ECC_SM4_CBC_SM3,
@@ -28,17 +28,22 @@ var (
 	}
 )
 
-// gmtlsCipherSuiteDialAttempts 返回国密握手时的套件重试顺序（最多三轮）：
-// 1) 仅 ECC 静态  2) 仅 ECDHE  3) 四套全开（兼容只接受「全列表」协商的站点）。
-func gmtlsCipherSuiteDialAttempts(base *gmtls.Config) [][]uint16 {
+// gmtlsCipherSuiteDialAttempts 返回国密握手每轮 ClientHello 的套件列表。
+// - 已设置 CipherSuites：仅一轮（用户指定）
+// - 默认：一轮、四套全开（与 gmtls 默认 getCipherSuites 一致）
+// - 兼容模式：三轮 ECC×2 → ECDHE×2 → 四套（部分站点需避免首轮同时提供 ECDHE）
+func gmtlsCipherSuiteDialAttempts(base *gmtls.Config, compatMode bool) [][]uint16 {
 	if len(base.CipherSuites) > 0 {
 		return [][]uint16{base.CipherSuites}
 	}
-	return [][]uint16{
-		eccGMTLSCipherSuites,
-		ecdheGMTLSCipherSuites,
-		allGMTLSCipherSuites,
+	if compatMode {
+		return [][]uint16{
+			eccGMTLSCipherSuitesCompat,
+			ecdheGMTLSCipherSuitesCompat,
+			allGMTLSCipherSuites,
+		}
 	}
+	return [][]uint16{allGMTLSCipherSuites}
 }
 
 func shouldRetryGMTLSWithOtherCipherSuites(err error) bool {
@@ -62,7 +67,7 @@ func dialTLSWithGMTLSCipherFallback(
 	tlsTimeout time.Duration,
 	clientHelloSpec *utls.ClientHelloSpec,
 ) (net.Conn, error) {
-	attempts := gmtlsCipherSuiteDialAttempts(baseConfig)
+	attempts := gmtlsCipherSuiteDialAttempts(baseConfig, config.GMTLSCompatMode)
 	var lastErr error
 
 	for i, cipherSuites := range attempts {

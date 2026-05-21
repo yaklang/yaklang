@@ -63,9 +63,10 @@ type dialXConfig struct {
 	TLSConfig               *gmtls.Config
 	//ShouldOverrideGMTLSConfig bool
 	//GMTLSConfig               *gmtls.Config
-	GMTLSSupport      bool
-	GMTLSPrefer       bool
-	GMTLSOnly         bool
+	GMTLSSupport               bool
+	GMTLSPrefer                bool
+	GMTLSOnly                  bool
+	GMTLSCompatMode            bool // 国密兼容模式：按 ECC×2 → ECDHE×2 → 四套 分轮握手（默认关闭）
 	TLSTimeout        time.Duration
 	ShouldOverrideSNI bool // High priority (will overwrite TlsConfig)
 	SNI               string
@@ -226,6 +227,13 @@ func DialX_WithGMTLSPrefer(b bool) DialXOption {
 func DialX_WithGMTLSOnly(b bool) DialXOption {
 	return func(c *dialXConfig) {
 		c.GMTLSOnly = b
+	}
+}
+
+// DialX_WithGMTLSCompatMode 开启国密兼容模式（默认关闭：单次 ClientHello 提供四套套件）。
+func DialX_WithGMTLSCompatMode(b bool) DialXOption {
+	return func(c *dialXConfig) {
+		c.GMTLSCompatMode = b
 	}
 }
 
