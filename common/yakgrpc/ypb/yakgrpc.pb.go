@@ -65505,6 +65505,7 @@ type AIGlobalConfig struct {
 	LightweightModels []*AIModelConfig       `protobuf:"bytes,7,rep,name=LightweightModels,proto3" json:"LightweightModels,omitempty"`
 	VisionModels      []*AIModelConfig       `protobuf:"bytes,8,rep,name=VisionModels,proto3" json:"VisionModels,omitempty"`
 	AIPresetPrompt    string                 `protobuf:"bytes,9,opt,name=AIPresetPrompt,proto3" json:"AIPresetPrompt,omitempty"`
+	AIPlanPrompt      string                 `protobuf:"bytes,10,opt,name=AIPlanPrompt,proto3" json:"AIPlanPrompt,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -65598,6 +65599,13 @@ func (x *AIGlobalConfig) GetVisionModels() []*AIModelConfig {
 func (x *AIGlobalConfig) GetAIPresetPrompt() string {
 	if x != nil {
 		return x.AIPresetPrompt
+	}
+	return ""
+}
+
+func (x *AIGlobalConfig) GetAIPlanPrompt() string {
+	if x != nil {
+		return x.AIPlanPrompt
 	}
 	return ""
 }
@@ -74533,7 +74541,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"ProviderId\x12<\n" +
 	"\bProvider\x18\x02 \x01(\v2 .ypb.ThirdPartyApplicationConfigR\bProvider\x12\x1c\n" +
 	"\tModelName\x18\x03 \x01(\tR\tModelName\x12-\n" +
-	"\vExtraParams\x18\x04 \x03(\v2\v.ypb.KVPairR\vExtraParams\"\xaa\x03\n" +
+	"\vExtraParams\x18\x04 \x03(\v2\v.ypb.KVPairR\vExtraParams\"\xce\x03\n" +
 	"\x0eAIGlobalConfig\x12\x18\n" +
 	"\aEnabled\x18\x01 \x01(\bR\aEnabled\x12$\n" +
 	"\rRoutingPolicy\x18\x02 \x01(\tR\rRoutingPolicy\x12(\n" +
@@ -74543,7 +74551,9 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x11IntelligentModels\x18\x06 \x03(\v2\x12.ypb.AIModelConfigR\x11IntelligentModels\x12@\n" +
 	"\x11LightweightModels\x18\a \x03(\v2\x12.ypb.AIModelConfigR\x11LightweightModels\x126\n" +
 	"\fVisionModels\x18\b \x03(\v2\x12.ypb.AIModelConfigR\fVisionModels\x12&\n" +
-	"\x0eAIPresetPrompt\x18\t \x01(\tR\x0eAIPresetPrompt\"D\n" +
+	"\x0eAIPresetPrompt\x18\t \x01(\tR\x0eAIPresetPrompt\x12\"\n" +
+	"\fAIPlanPrompt\x18\n" +
+	" \x01(\tR\fAIPlanPrompt\"D\n" +
 	"\x1aIsLlamaServerReadyResponse\x12\x0e\n" +
 	"\x02Ok\x18\x01 \x01(\bR\x02Ok\x12\x16\n" +
 	"\x06Reason\x18\x02 \x01(\tR\x06Reason\"8\n" +
