@@ -214,6 +214,28 @@ func TestAISessionMetaStartParamsCRUD(t *testing.T) {
 	require.True(t, got.GetPreferSessionCachedConfig())
 }
 
+func TestGetAISessionMetaStartParams_DiscardUnknownFields(t *testing.T) {
+	db, err := utils.CreateTempTestDatabaseInMemory()
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&schema.AISession{}).Error)
+
+	sessionID := "sess-unknown-start-field"
+	_, err = CreateOrUpdateAISessionMeta(db, sessionID, "test")
+	require.NoError(t, err)
+
+	// Simulates start_params written by an older build that had UserPlanPrompt in AIStartParams.
+	legacyJSON := `{"ReviewPolicy":"ai","AIService":"openai","UserPlanPrompt":"legacy plan hint"}`
+	result := db.Model(&schema.AISession{}).
+		Where("session_id = ?", sessionID).
+		UpdateColumn("start_params", legacyJSON)
+	require.NoError(t, result.Error)
+
+	got, err := GetAISessionMetaStartParamsBySessionID(db, sessionID)
+	require.NoError(t, err)
+	require.Equal(t, "ai", got.GetReviewPolicy())
+	require.Equal(t, "openai", got.GetAIService())
+}
+
 func TestTouchAISessionMetaLastUsedAt(t *testing.T) {
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)

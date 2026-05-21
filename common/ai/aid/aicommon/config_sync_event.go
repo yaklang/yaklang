@@ -331,12 +331,97 @@ func (c *Config) ApplySyncUpdateConfigFromParams(event *ypb.AIInputEvent) (map[s
 }
 
 func (c *Config) HandleSyncUpdataConfigEvent(event *ypb.AIInputEvent) error {
-	updateConfig, err := c.ApplySyncUpdateConfigFromParams(event)
+	if event == nil {
+		return utils.Errorf("update config event is nil")
+	}
+
+	updateConfig := map[string]interface{}{}
+	paramsUpdate, err := c.ApplySyncUpdateConfigFromParams(event)
 	if err != nil {
 		return err
 	}
-	if updateConfig == nil {
-		return nil
+	for k, v := range paramsUpdate {
+		updateConfig[k] = v
+	}
+
+	applyOption := func(opt ConfigOption) {
+		if opt == nil {
+			return
+		}
+		if err := opt(c); err != nil {
+			c.EmitError("apply config update option failed: %v", err)
+		}
+	}
+
+	if event.Params != nil {
+		if event.Params.GetEnablePlan() {
+			applyOption(WithEnablePlanAndExec(true))
+			updateConfig["EnablePlan"] = true
+		}
+		if event.Params.GetAllowPlanUserInteract() {
+			applyOption(WithAllowPlanUserInteract(true))
+			updateConfig["AllowPlanUserInteract"] = true
+		}
+		if event.Params.GetDisallowRequireForUserPrompt() {
+			applyOption(WithAllowRequireForUserInteract(false))
+			updateConfig["AllowRequireForUserInteract"] = false
+		}
+	}
+
+	if strings.TrimSpace(event.SyncJsonInput) != "" {
+		var params map[string]interface{}
+		if err := json.Unmarshal([]byte(event.SyncJsonInput), &params); err != nil {
+			return utils.Errorf("failed to parse update config params: %v", err)
+		}
+
+		if raw, ok := params["AllowPlanUserInteract"]; ok {
+			value := utils.InterfaceToBoolean(raw)
+			applyOption(WithAllowPlanUserInteract(value))
+			updateConfig["AllowPlanUserInteract"] = value
+		}
+		if raw, ok := params["allow_plan_user_interact"]; ok {
+			value := utils.InterfaceToBoolean(raw)
+			applyOption(WithAllowPlanUserInteract(value))
+			updateConfig["AllowPlanUserInteract"] = value
+		}
+		if raw, ok := params["EnablePlan"]; ok {
+			value := utils.InterfaceToBoolean(raw)
+			applyOption(WithEnablePlanAndExec(value))
+			updateConfig["EnablePlan"] = value
+		}
+		if raw, ok := params["enable_plan"]; ok {
+			value := utils.InterfaceToBoolean(raw)
+			applyOption(WithEnablePlanAndExec(value))
+			updateConfig["EnablePlan"] = value
+		}
+		if raw, ok := params["DisableIntentRecognition"]; ok {
+			value := utils.InterfaceToBoolean(raw)
+			applyOption(WithDisableIntentRecognition(value))
+			updateConfig["DisableIntentRecognition"] = value
+		}
+		if raw, ok := params["disable_intent_recognition"]; ok {
+			value := utils.InterfaceToBoolean(raw)
+			applyOption(WithDisableIntentRecognition(value))
+			updateConfig["DisableIntentRecognition"] = value
+		}
+		if raw, ok := params["EnableIntentRecognition"]; ok {
+			value := utils.InterfaceToBoolean(raw)
+			applyOption(WithDisableIntentRecognition(!value))
+			updateConfig["DisableIntentRecognition"] = !value
+		}
+		if raw, ok := params["enable_intent_recognition"]; ok {
+			value := utils.InterfaceToBoolean(raw)
+			applyOption(WithDisableIntentRecognition(!value))
+			updateConfig["DisableIntentRecognition"] = !value
+		}
+	}
+
+	updateConfig["applied"] = true
+	updateConfig["current"] = map[string]interface{}{
+		"EnablePlan":                  c.GetEnablePlanAndExec(),
+		"AllowPlanUserInteract":       c.AllowPlanUserInteract,
+		"AllowRequireForUserInteract": c.AllowRequireForUserInteract,
+		"DisableIntentRecognition":    c.GetConfigBool("DisableIntentRecognition"),
 	}
 	c.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, "update_config", updateConfig, event.SyncID)
 	return nil
@@ -456,6 +541,7 @@ func (c *Config) RegisterBasicSyncHandlers() {
 	c.InputEventManager.RegisterSyncCallback(SYNC_TYPE_PING, c.HandleSyncPongEvent)
 	c.InputEventManager.RegisterSyncCallback(SYNC_TYPE_USER_INTERVENTION, c.HandleSyncUserIntervention)
 	c.InputEventManager.RegisterSyncCallback(SYNC_TYPE_TIMELINE, c.HandleSyncTimelineEvent)
+	c.InputEventManager.RegisterSyncCallback(SYNC_TYPE_UPDATE_CONFIG, c.HandleSyncUpdataConfigEvent)
 	c.InputEventManager.RegisterSyncCallback(SYNC_TYPE_MEMORY_CONTEXT, c.HandleSyncMemoryContextEvent)
 	c.InputEventManager.RegisterSyncCallback(SYNC_TYPE_PLAN_EXEC_TASKS, c.HandleSyncPlanExecTasksEvent)
 	c.InputEventManager.RegisterSyncCallback(SYNC_TYPE_RECOVERY_HISTORY, c.HandleSyncRecoveryHistoryEvent)
