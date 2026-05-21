@@ -14,10 +14,18 @@ type verificationGateTestInvoker struct {
 	*mockcfg.MockInvoker
 	verifyCalls int
 	result      *aicommon.VerifySatisfactionResult
+	// verifyDelay 用于在测试里模拟 AI 调用耗时. 当 > 0 时, VerifyUserSatisfaction
+	// 会先 sleep 这段时间再返回, 让 fire 开始时间与 fire 结束时间能被测试
+	// 显式区分, 用于验证 "fire 完成后用真实结束时刻作为新基线" 的清零语义.
+	// 关键词: verifyDelay, fire 开始/结束时间差, 基线时刻验证
+	verifyDelay time.Duration
 }
 
 func (i *verificationGateTestInvoker) VerifyUserSatisfaction(ctx context.Context, query string, isToolCall bool, payload string) (*aicommon.VerifySatisfactionResult, error) {
 	i.verifyCalls++
+	if i.verifyDelay > 0 {
+		time.Sleep(i.verifyDelay)
+	}
 	if i.result != nil {
 		return i.result, nil
 	}
@@ -488,4 +496,120 @@ func TestRefreshVerificationRuntimeSnapshot_UsesPromptStatusFallback(t *testing.
 	require.NotNil(t, snapshot)
 	require.Equal(t, 2, snapshot.IterationIndex)
 	require.Equal(t, 72, snapshot.LoopPromptTokens)
+}
+
+// TestMaybeVerifyUserSatisfaction_BaselineRebuildAfterFire 验证自动路径在 fire
+// 完成后, prev snapshot 使用的是 fire **结束时刻** 的真实 snapshot, 而不是
+// fire 开始前计算的 currentSnapshot. 这是多门交叉触发场景下"清零公平"
+// 的核心修复: AI 调用耗时不应被白送给时间门, 否则下一轮时间门会比期望
+// 提前到位.
+//
+// 测试做法: 模拟 AI 调用延迟 60ms, 记录 fire 开始时间; fire 完成后取
+// snapshot.GeneratedAt, 验证它晚于 fire 开始时间至少 50ms (允许 10ms
+// 调度抖动), 说明基线时刻是 fire 结束时刻而不是 fire 开始时刻.
+//
+// 关键词: TestMaybeVerifyUserSatisfaction_BaselineRebuildAfterFire,
+//
+//	fire 完成后基线时刻验证, AI 调用耗时不白送时间门,
+//	自动路径与显式路径一致, 多门交叉触发清零公平
+func TestMaybeVerifyUserSatisfaction_BaselineRebuildAfterFire(t *testing.T) {
+	invoker := &verificationGateTestInvoker{
+		MockInvoker: mockcfg.NewMockInvoker(context.Background()),
+		verifyDelay: 60 * time.Millisecond,
+	}
+	loop := NewMinimalReActLoop(invoker.GetConfig(), invoker)
+	loop.periodicVerificationInterval = 100 // 避免 iter 门干扰, 用硬 token 门 fire
+	loop.perception = newPerceptionController(loop.periodicVerificationInterval)
+	loop.historySatisfactionReasons = make([]*SatisfactionRecord, 0)
+
+	// baseline 建立在远早于 fire 的时间点, 让我们关注 fire 完成后 prev 的
+	// GeneratedAt 是否被刷新到 fire 结束时刻
+	baselineTokens := 200
+	baselineCreatedAt := time.Now().Add(-30 * time.Second)
+	loop.setVerificationRuntimeSnapshot(&VerificationRuntimeSnapshot{
+		GeneratedAt:      baselineCreatedAt,
+		IterationIndex:   3,
+		LoopPromptTokens: baselineTokens,
+	})
+	// 用硬 token 门豁免冷静期触发 fire, iter delta=1 仍然 < 3 冷静期
+	loop.currentIterationIndex = 4
+	loop.SetLastPromptObservation(&PromptObservation{
+		PromptTokens: baselineTokens + verificationAutoTriggerHardPromptDelta,
+	})
+
+	beforeFire := time.Now()
+	_, triggered, err := loop.MaybeVerifyUserSatisfaction(context.Background(), "query", true, "tool")
+	afterFire := time.Now()
+	require.NoError(t, err)
+	require.True(t, triggered, "硬 token 门应触发 fire")
+	require.Equal(t, 1, invoker.verifyCalls)
+
+	snapshot := loop.GetVerificationRuntimeSnapshot()
+	require.NotNil(t, snapshot, "fire 完成后 prev snapshot 必须存在")
+	require.Equal(t, 4, snapshot.IterationIndex, "prev.iter 应为 fire 时刻的 currentIterationIndex")
+	require.Equal(t, baselineTokens+verificationAutoTriggerHardPromptDelta, snapshot.LoopPromptTokens,
+		"prev.tokens 应为 fire 时刻的当前 tokens")
+
+	// 核心断言: GeneratedAt 必须晚于 fire 开始时间至少 50ms (留 10ms 抖动余量),
+	// 说明它反映的是 fire 结束时刻, 而不是 fire 开始时刻.
+	elapsed := snapshot.GeneratedAt.Sub(beforeFire)
+	require.GreaterOrEqual(t, elapsed, 50*time.Millisecond,
+		"prev.GeneratedAt 必须反映 fire 结束时刻, 与 fire 开始时刻差 >= AI 调用耗时 (60ms - 10ms 抖动)")
+	require.LessOrEqual(t, snapshot.GeneratedAt.Sub(afterFire), 5*time.Millisecond,
+		"prev.GeneratedAt 与 fire 实际结束时刻应非常接近")
+	// 同时显式验证 GeneratedAt 不再是 baseline 旧时刻 (旧 baseline 是 30s 前)
+	require.True(t, snapshot.GeneratedAt.After(baselineCreatedAt.Add(time.Second)),
+		"prev.GeneratedAt 必须远晚于旧 baseline, 而不是停留在 baseline 时刻")
+}
+
+// TestMaybeVerifyUserSatisfaction_TimeGateRefreshAfterFire 验证修复后的实际效果:
+// 当时间门触发 fire 后, 下一轮判断中时间门必须以 fire 结束时刻为新起点重新
+// 计算 180s, 而不是以 fire 开始时刻 (会被 AI 调用耗时白送一段时间)
+// 为新起点. 通过模拟 60ms AI 调用延迟 + 立即再次触发 MaybeVerifyUserSatisfaction
+// 来验证: 修复前 prev.GeneratedAt 是 fire 开始时间, 此时时间差为
+// (180s + fire 耗时) 才到下次时间门; 修复后 prev.GeneratedAt 是 fire 结束
+// 时间, 时间门下次触发严格等待完整 180s. 这里通过断言"刚 fire 完后
+// snapshot.GeneratedAt 必须晚于 baseline", 间接确认时间门基线已经被
+// 推进到 fire 完成时刻.
+//
+// 关键词: TestMaybeVerifyUserSatisfaction_TimeGateRefreshAfterFire,
+//
+//	时间门基线推进到 fire 完成时刻, AI 调用耗时不白送给时间门,
+//	清零公平
+func TestMaybeVerifyUserSatisfaction_TimeGateRefreshAfterFire(t *testing.T) {
+	invoker := &verificationGateTestInvoker{
+		MockInvoker: mockcfg.NewMockInvoker(context.Background()),
+		verifyDelay: 60 * time.Millisecond,
+	}
+	loop := NewMinimalReActLoop(invoker.GetConfig(), invoker)
+	loop.periodicVerificationInterval = 100 // 避免 iter 门干扰
+	loop.perception = newPerceptionController(loop.periodicVerificationInterval)
+	loop.historySatisfactionReasons = make([]*SatisfactionRecord, 0)
+
+	// baseline 故意置成"刚好超过时间门阈值", 让时间门是首要触发原因
+	staleAt := time.Now().Add(-verificationAutoTriggerMaxSnapshotAge - time.Second)
+	loop.setVerificationRuntimeSnapshot(&VerificationRuntimeSnapshot{
+		GeneratedAt:      staleAt,
+		IterationIndex:   3,
+		LoopPromptTokens: 200,
+	})
+	loop.currentIterationIndex = 4
+	loop.SetLastPromptObservation(&PromptObservation{PromptTokens: 200})
+
+	beforeFire := time.Now()
+	_, triggered, err := loop.MaybeVerifyUserSatisfaction(context.Background(), "query", true, "tool")
+	require.NoError(t, err)
+	require.True(t, triggered, "时间门已超阈值, 应触发 fire")
+	require.Equal(t, 1, invoker.verifyCalls)
+
+	// 核心断言: 时间门触发的 fire, prev.GeneratedAt 必须被推进到 fire 结束时刻,
+	// 而不是停留在 fire 开始时刻 (旧实现) 或 baseline 旧时刻 (彻底没清零).
+	// 这样下次时间门重新计算 180s 时, 起点是 fire 真正完成的瞬间, 不被 AI
+	// 调用耗时白送.
+	snapshot := loop.GetVerificationRuntimeSnapshot()
+	require.NotNil(t, snapshot)
+	require.True(t, snapshot.GeneratedAt.After(beforeFire.Add(50*time.Millisecond)),
+		"prev.GeneratedAt 必须晚于 fire 开始时间 50ms 以上, 反映 fire 真实结束时刻")
+	require.True(t, snapshot.GeneratedAt.After(staleAt.Add(time.Minute)),
+		"prev.GeneratedAt 必须远离旧 baseline staleAt, 说明时间门基线已被同步清零")
 }
