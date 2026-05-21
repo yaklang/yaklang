@@ -48,4 +48,24 @@ func TestHotPatchConfig(t *testing.T) {
 	time.Sleep(1 * time.Second)
 	require.Equal(t, 0.75, c.AgreeAIScoreMiddle)
 	require.Equal(t, 0.55, c.AgreeAIScoreLow)
+
+	c.EventInputChan.SafeFeed(&ypb.AIInputEvent{
+		IsConfigHotpatch: true,
+		HotpatchType:     HotPatchType_EnablePlan,
+		Params: &ypb.AIStartParams{
+			EnablePlan: false,
+		},
+	})
+	time.Sleep(1 * time.Second)
+	require.False(t, c.GetEnablePlanAndExec())
+
+	c.EventInputChan.SafeFeed(&ypb.AIInputEvent{
+		IsConfigHotpatch: true,
+		HotpatchType:     HotPatchType_SyncPerceptionTrigger,
+		Params: &ypb.AIStartParams{
+			SyncPerceptionTrigger: true,
+		},
+	})
+	time.Sleep(1 * time.Second)
+	require.True(t, c.GetSyncPerceptionTrigger())
 }

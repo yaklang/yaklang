@@ -2,6 +2,7 @@ package aicommon
 
 import (
 	"context"
+
 	"github.com/yaklang/yaklang/common/consts"
 
 	"github.com/yaklang/yaklang/common/ai"
@@ -72,6 +73,8 @@ func (c *Config) SimpleInfoMap() map[string]interface{} {
 		"AIAutoTransactionRetry":      c.AiTransactionAutoRetry,
 		"GenerateReport":              c.GenerateReport,
 		"ForgeName":                   c.ForgeName,
+		"EnablePlan":            c.GetEnablePlanAndExec(),
+		"SyncPerceptionTrigger": c.GetSyncPerceptionTrigger(),
 	}
 }
 
@@ -81,6 +84,9 @@ var (
 	HotPatchType_AIService                   = "AIService"
 	HotPatchType_ModelName                   = "ModelName"
 	HotPatchType_RiskControlScore            = "RiskControlScore"
+	HotPatchType_EnablePlan                  = "EnablePlan"
+	HotPatchType_AllowPlanUserInteract       = "AllowPlanUserInteract"
+	HotPatchType_SyncPerceptionTrigger       = "SyncPerceptionTrigger"
 
 	hotPatchPromoteIntelligentConfig = func(serviceName, modelName string) error {
 		mgr := aiconfig.GetGlobalManager()
@@ -151,6 +157,18 @@ func (c *Config) ProcessHotPatchMessage(e *ypb.AIInputEvent) []ConfigOption {
 			}
 		}
 		aiOption = append(aiOption, WithAIChatInfo(serviceName, modelName))
+	}
+
+	if e.HotpatchType == HotPatchType_EnablePlan {
+		aiOption = append(aiOption, WithEnablePlanAndExec(hotPatchParams.GetEnablePlan()))
+	}
+
+	if e.HotpatchType == HotPatchType_AllowPlanUserInteract {
+		aiOption = append(aiOption, WithAllowPlanUserInteract(hotPatchParams.GetAllowPlanUserInteract()))
+	}
+
+	if e.HotpatchType == HotPatchType_SyncPerceptionTrigger {
+		aiOption = append(aiOption, WithSyncPerceptionTrigger(hotPatchParams.GetSyncPerceptionTrigger()))
 	}
 
 	if e.HotpatchType == HotPatchType_ModelName {
