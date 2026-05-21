@@ -261,15 +261,13 @@ func (c *Config) HandleSyncPlanExecTasksEvent(event *ypb.AIInputEvent) error {
 	return nil
 }
 
-func (c *Config) ApplySyncUpdateConfigFromParams(event *ypb.AIInputEvent) (map[string]interface{}, error) {
-	if event == nil {
-		return nil, utils.Errorf("update config event is nil")
-	}
-	if event.Params == nil {
-		return nil, nil
+func (c *Config) HandleSyncUpdataConfigEvent(event *ypb.AIInputEvent) error {
+	if event == nil || event.Params == nil {
+		return utils.Errorf("update config params is nil")
 	}
 
 	updateConfig := map[string]interface{}{}
+	var legacyHotpatchEvent *ypb.AIInputEvent
 	sessionID := strings.TrimSpace(c.PersistentSessionId)
 	if sessionID != "" && c.GetDB() != nil {
 		cached, err := yakit.GetAISessionMetaStartParamsBySessionID(c.GetDB(), sessionID)
@@ -287,142 +285,24 @@ func (c *Config) ApplySyncUpdateConfigFromParams(event *ypb.AIInputEvent) (map[s
 			updateConfig["persisted"] = true
 		}
 	}
-	applyHotpatch := func(legacyHotpatchEvent *ypb.AIInputEvent) {
-		if legacyHotpatchEvent == nil {
-			return
-		}
-		for _, opt := range c.ProcessHotPatchMessage(legacyHotpatchEvent) {
-			if opt == nil {
-				continue
-			}
-			if c.HotPatchOptionChan != nil {
-				c.HotPatchOptionChan.SafeFeed(opt)
-				continue
-			}
-			if err := opt(c); err != nil {
-				c.EmitError("apply config hotpatch failed: %v", err)
-			}
-		}
-	}
-
 	if event.Params.GetAIService() != "" {
-		applyHotpatch(&ypb.AIInputEvent{
+		legacyHotpatchEvent = &ypb.AIInputEvent{
 			HotpatchType: HotPatchType_AIService,
 			Params: &ypb.AIStartParams{
 				AIService:   event.Params.GetAIService(),
 				AIModelName: event.Params.GetAIModelName(),
 			},
-		})
-		updateConfig["AIService"] = event.Params.GetAIService()
-		if event.Params.GetAIModelName() != "" {
-			updateConfig["AIModelName"] = event.Params.GetAIModelName()
 		}
 	}
 	if event.Params.GetReviewPolicy() != "" {
-		applyHotpatch(&ypb.AIInputEvent{
+		legacyHotpatchEvent = &ypb.AIInputEvent{
 			HotpatchType: HotPatchType_AgreePolicy,
 			Params: &ypb.AIStartParams{
 				ReviewPolicy: event.Params.GetReviewPolicy(),
 			},
-		})
-		updateConfig["ReviewPolicy"] = event.Params.GetReviewPolicy()
-	}
-	return updateConfig, nil
-}
-
-func (c *Config) HandleSyncUpdataConfigEvent(event *ypb.AIInputEvent) error {
-	if event == nil {
-		return utils.Errorf("update config event is nil")
-	}
-
-	updateConfig := map[string]interface{}{}
-	paramsUpdate, err := c.ApplySyncUpdateConfigFromParams(event)
-	if err != nil {
-		return err
-	}
-	for k, v := range paramsUpdate {
-		updateConfig[k] = v
-	}
-
-	applyOption := func(opt ConfigOption) {
-		if opt == nil {
-			return
-		}
-		if err := opt(c); err != nil {
-			c.EmitError("apply config update option failed: %v", err)
 		}
 	}
-
-	if event.Params != nil {
-		if event.Params.GetEnablePlan() {
-			applyOption(WithEnablePlanAndExec(true))
-			updateConfig["EnablePlan"] = true
-		}
-		if event.Params.GetAllowPlanUserInteract() {
-			applyOption(WithAllowPlanUserInteract(true))
-			updateConfig["AllowPlanUserInteract"] = true
-		}
-		if event.Params.GetDisallowRequireForUserPrompt() {
-			applyOption(WithAllowRequireForUserInteract(false))
-			updateConfig["AllowRequireForUserInteract"] = false
-		}
-	}
-
-	if strings.TrimSpace(event.SyncJsonInput) != "" {
-		var params map[string]interface{}
-		if err := json.Unmarshal([]byte(event.SyncJsonInput), &params); err != nil {
-			return utils.Errorf("failed to parse update config params: %v", err)
-		}
-
-		if raw, ok := params["AllowPlanUserInteract"]; ok {
-			value := utils.InterfaceToBoolean(raw)
-			applyOption(WithAllowPlanUserInteract(value))
-			updateConfig["AllowPlanUserInteract"] = value
-		}
-		if raw, ok := params["allow_plan_user_interact"]; ok {
-			value := utils.InterfaceToBoolean(raw)
-			applyOption(WithAllowPlanUserInteract(value))
-			updateConfig["AllowPlanUserInteract"] = value
-		}
-		if raw, ok := params["EnablePlan"]; ok {
-			value := utils.InterfaceToBoolean(raw)
-			applyOption(WithEnablePlanAndExec(value))
-			updateConfig["EnablePlan"] = value
-		}
-		if raw, ok := params["enable_plan"]; ok {
-			value := utils.InterfaceToBoolean(raw)
-			applyOption(WithEnablePlanAndExec(value))
-			updateConfig["EnablePlan"] = value
-		}
-		if raw, ok := params["DisableIntentRecognition"]; ok {
-			value := utils.InterfaceToBoolean(raw)
-			applyOption(WithDisableIntentRecognition(value))
-			updateConfig["DisableIntentRecognition"] = value
-		}
-		if raw, ok := params["disable_intent_recognition"]; ok {
-			value := utils.InterfaceToBoolean(raw)
-			applyOption(WithDisableIntentRecognition(value))
-			updateConfig["DisableIntentRecognition"] = value
-		}
-		if raw, ok := params["EnableIntentRecognition"]; ok {
-			value := utils.InterfaceToBoolean(raw)
-			applyOption(WithDisableIntentRecognition(!value))
-			updateConfig["DisableIntentRecognition"] = !value
-		}
-		if raw, ok := params["enable_intent_recognition"]; ok {
-			value := utils.InterfaceToBoolean(raw)
-			applyOption(WithDisableIntentRecognition(!value))
-			updateConfig["DisableIntentRecognition"] = !value
-		}
-	}
-
-	updateConfig["applied"] = true
-	updateConfig["current"] = map[string]interface{}{
-		"EnablePlan":                  c.GetEnablePlanAndExec(),
-		"AllowPlanUserInteract":       c.AllowPlanUserInteract,
-		"AllowRequireForUserInteract": c.AllowRequireForUserInteract,
-		"DisableIntentRecognition":    c.GetConfigBool("DisableIntentRecognition"),
-	}
+	c.ProcessHotPatchMessage(legacyHotpatchEvent)
 	c.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, "update_config", updateConfig, event.SyncID)
 	return nil
 }

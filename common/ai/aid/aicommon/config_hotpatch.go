@@ -2,6 +2,7 @@ package aicommon
 
 import (
 	"context"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/consts"
 
@@ -9,7 +10,9 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiconfig"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"google.golang.org/protobuf/proto"
 )
 
 func (c *Config) StartHotPatchLoop(ctx context.Context) {
@@ -200,4 +203,80 @@ func (c *Config) ProcessHotPatchMessage(e *ypb.AIInputEvent) []ConfigOption {
 	}
 
 	return aiOption
+}
+
+// mergeHotpatchSessionStartParams overlays hotpatch Params onto cached session start_params.
+// Bool fields use HotpatchType to distinguish explicit false from proto3 zero values.
+func mergeHotpatchSessionStartParams(base *ypb.AIStartParams, e *ypb.AIInputEvent) (*ypb.AIStartParams, bool) {
+	if e == nil || e.Params == nil {
+		return base, false
+	}
+	hotpatchType := strings.TrimSpace(e.GetHotpatchType())
+	if hotpatchType == "" {
+		return base, false
+	}
+
+	var next *ypb.AIStartParams
+	if base == nil {
+		next = &ypb.AIStartParams{}
+	} else {
+		next = proto.Clone(base).(*ypb.AIStartParams)
+	}
+	p := e.Params
+
+	switch hotpatchType {
+	case HotPatchType_EnablePlan:
+		next.EnablePlan = p.GetEnablePlan()
+	case HotPatchType_SyncPerceptionTrigger:
+		next.SyncPerceptionTrigger = p.GetSyncPerceptionTrigger()
+	case HotPatchType_AllowPlanUserInteract:
+		next.AllowPlanUserInteract = p.GetAllowPlanUserInteract()
+	case HotPatchType_AllowRequireForUserInteract:
+		next.DisallowRequireForUserPrompt = p.GetDisallowRequireForUserPrompt()
+	case HotPatchType_AgreePolicy:
+		if p.GetReviewPolicy() == "" {
+			return base, false
+		}
+		next.ReviewPolicy = p.GetReviewPolicy()
+	case HotPatchType_RiskControlScore:
+		next.AIReviewRiskControlScore = p.GetAIReviewRiskControlScore()
+	case HotPatchType_AIService:
+		if p.GetAIService() == "" {
+			return base, false
+		}
+		next.AIService = p.GetAIService()
+		if p.GetAIModelName() != "" {
+			next.AIModelName = p.GetAIModelName()
+		}
+	case HotPatchType_ModelName:
+		if p.GetAIModelName() == "" {
+			return base, false
+		}
+		next.AIModelName = p.GetAIModelName()
+	default:
+		return base, false
+	}
+	return next, true
+}
+
+func (c *Config) PersistSessionStartParamsFromHotpatch(e *ypb.AIInputEvent) {
+	if c == nil || e == nil || !e.IsConfigHotpatch {
+		return
+	}
+	sessionID := strings.TrimSpace(c.PersistentSessionId)
+	if sessionID == "" || c.GetDB() == nil {
+		return
+	}
+
+	cached, err := yakit.GetAISessionMetaStartParamsBySessionID(c.GetDB(), sessionID)
+	if err != nil {
+		log.Warnf("load ai session start params failed for %s: %v", sessionID, err)
+	}
+	next, changed := mergeHotpatchSessionStartParams(cached, e)
+	if !changed {
+		return
+	}
+	if _, err := yakit.CreateOrUpdateAISessionMetaStartParams(c.GetDB(), sessionID, next); err != nil {
+		log.Warnf("persist ai session start params from hotpatch failed for %s: %v", sessionID, err)
+	}
 }

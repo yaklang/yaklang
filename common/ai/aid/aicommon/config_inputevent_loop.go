@@ -104,6 +104,7 @@ func (c *Config) StartEventLoopEx(ctx context.Context, startCall func(), doneCal
 
 					if event.IsConfigHotpatch {
 						hotPatchOptions := c.ProcessHotPatchMessage(event)
+						c.PersistSessionStartParamsFromHotpatch(event)
 						for _, option := range hotPatchOptions {
 							c.HotPatchOptionChan.SafeFeed(option)
 						}
