@@ -364,9 +364,16 @@ func (r *ReActLoop) endVerificationWatchdogToolSuppression() {
 //   - verificationInFlight (atomic.Bool, CAS) 是 AI 调用本身的并发屏障, 让
 //     watchdog 在 verification 跑飞时能立刻感知而不阻塞.
 //
+// 清零语义 (与 VerifyUserSatisfactionNow 显式路径对齐):
+//   - 触发 fire 前的 currentSnapshot 仅用于"门判断", 不再作为新基线落盘
+//   - fire 完成后, 用 fire 结束时刻的实时 snapshot 替换 prev (时间 / iter /
+//     token 三维度统一清零), 让多门交叉触发后下一轮 verification 节奏
+//     稳定公平, 不会被 AI 调用耗时白送给时间门
+//
 // 关键词: MaybeVerifyUserSatisfaction watchdog 解锁, verificationInFlight CAS,
 //
-//	verificationMutex 缩窄作用域
+//	verificationMutex 缩窄作用域, fire 完成后清零基线统一,
+//	时间门 iter 门冷静期同步清零
 func (r *ReActLoop) MaybeVerifyUserSatisfaction(
 	ctx context.Context,
 	originalQuery string,
@@ -406,7 +413,30 @@ func (r *ReActLoop) MaybeVerifyUserSatisfaction(
 	if err != nil {
 		return nil, true, err
 	}
-	r.setVerificationRuntimeSnapshot(currentSnapshot)
+	// fire 完成后, 用 fire 结束时刻的实时 snapshot 替换 prev, 而不是 fire
+	// 开始前计算的 currentSnapshot. 这样 prev.GeneratedAt / prev.IterationIndex
+	// / prev.LoopPromptTokens 三个维度都以 fire 完成时刻为新基线, 让时间门
+	// (180s) / iter 门 (6) / 冷静期 (3 iter) 下次判断都从"上次 verify 真正
+	// 结束"那一刻起算, 而不是被 AI 调用耗时 (常 5-30s) 白送给时间门.
+	//
+	// 修复前问题: 自动路径用 fire 开始前的 currentSnapshot, 显式路径
+	// (VerifyUserSatisfactionNow) 用 fire 结束后的 buildVerificationRuntimeSnapshot
+	// (time.Now()), 两条路径"清零"语义不一致. 在多门交叉触发场景下, 自动
+	// 路径会让 prev.GeneratedAt 比真实 fire 完成时间早 AI 调用耗时那么多,
+	// 进而让下一轮时间门 (180s) 比期望提前到位, 各门接力交叉触发, verify
+	// 频率不公平地被推高.
+	//
+	// 修复后: 两条路径统一以"fire 结束时刻"为新基线, 任意一个门触发后,
+	// 时间/iter/token 三个维度都被同步、及时地清零, 多门交叉触发后下一
+	// 轮 verification 节奏稳定可预期.
+	//
+	// 注意: 主循环 fire 期间是同步阻塞的, currentIterationIndex 与
+	// LoopPromptTokens 不会变化, 所以这两个字段的值与 currentSnapshot
+	// 一致; 唯一变化的是 GeneratedAt (从 fire 开始时间 -> fire 完成时间).
+	// 关键词: setVerificationRuntimeSnapshot fire 完成后基线, 交叉触发节流公平,
+	//        自动路径与显式路径一致, 时间门 iter 门冷静期统一清零,
+	//        AI 调用耗时不再白送时间门, 多门交叉触发节奏修复
+	r.setVerificationRuntimeSnapshot(r.buildVerificationRuntimeSnapshot(time.Now()))
 	r.ApplyVerificationResult(result)
 	return result, true, nil
 }
