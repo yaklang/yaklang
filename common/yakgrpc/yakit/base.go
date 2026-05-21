@@ -4,8 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"reflect"
-	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -76,8 +74,9 @@ type initializingCallback struct {
 }
 
 var (
-	__initializingDatabase []*initializingCallback
-	__mutexForInit         = new(sync.Mutex)
+	__initializingDatabase    []*initializingCallback
+	__mutexForInit            = new(sync.Mutex)
+	sqliteLargeDBTuneThrottle = utils.NewThrottle(60) // re-tune at most once per minute when slow writes appear
 
 	// HTTPFlowSlowInsertCallback 相关变量（慢插入）
 	httpFlowSlowInsertCallbackMutex sync.Mutex
@@ -109,67 +108,24 @@ func init() {
 	throttle := utils.NewThrottle(2)
 	go func() {
 		var count uint64 = 0
-		for {
-			select {
-			case f := <-DBSaveAsyncChannel:
-				start := time.Now()
-				// 为单次执行创建 tracer，记录耗时 SQL
-				tracer := &sqlTraceLogger{}
-				db := consts.GetGormProjectDatabase()
-				if db != nil {
-					// 创建新的会话以避免数据竞争，因为 SetLogger 和 LogMode 会修改 db 的内部状态
-					db = db.New()
-					db.SetLogger(tracer)
-					db = db.LogMode(true)
-				}
-
-				err := f(db)
-				elapsed := time.Since(start)
-				if elapsed > 2*time.Second {
-					// 提供更多信息帮助定位耗时的执行
-					ptr := reflect.ValueOf(f).Pointer()
-					fn := runtime.FuncForPC(ptr)
-					fnName := "<unknown>"
-					if fn != nil {
-						fnName = fn.Name()
+		for f := range DBSaveAsyncChannel {
+			db := consts.GetGormProjectDatabase()
+			batch := drainDBSaveBatch(f)
+			if db != nil {
+				execDBSaveBatch(db, batch)
+			} else {
+				for _, item := range batch {
+					if err := item(nil); err != nil {
+						log.Errorf("Throttle sql exec failed: %s", err)
 					}
-					log.Warnf("SQL execution took too long: %v, func_ptr:%p, func_name:%s, queue_len:%d, last_sql:%s",
-						elapsed, f, fnName, len(DBSaveAsyncChannel), tracer.Last())
-
-					// 收集慢 SQL 信息（此处为 project DB，在此设置 dbpath）
-					now := time.Now()
-					slowSQLItem := &LongSQLDescription{
-						Duration:      elapsed,
-						DurationMs:    elapsed.Milliseconds(),
-						DurationStr:   elapsed.String(),
-						FuncName:      fnName,
-						FuncPtr:       fmt.Sprintf("%p", f),
-						QueueLen:      len(DBSaveAsyncChannel),
-						LastSQL:       tracer.Last(),
-						Timestamp:     now,
-						TimestampUnix: now.Unix(),
-						DatabasePath:  consts.GetCurrentProjectDatabasePath(),
-					}
-
-					// 添加到收集列表（慢插入）
-					slowInsertSQLItemsMutex.Lock()
-					slowInsertSQLItems = append(slowInsertSQLItems, slowSQLItem)
-					slowInsertSQLItemsMutex.Unlock()
-
-					// 使用节流机制触发回调（每2秒最多触发一次），异步执行
-					slowInsertSQLThrottle(func() {
-						go triggerSlowInsertSQLCallback()
-					})
 				}
-				count++
-				if count%1000 == 0 {
-					throttle(func() {
-						//log.Infof("Throttle sql exec count: %d", count)
-					})
-				}
-				if err != nil {
-					log.Errorf("Throttle sql exec failed: %s", err)
-				}
+			}
+
+			count += uint64(len(batch))
+			if count%1000 == 0 {
+				throttle(func() {
+					//log.Infof("Throttle sql exec count: %d", count)
+				})
 			}
 		}
 	}()
