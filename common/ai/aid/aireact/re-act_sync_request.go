@@ -4,14 +4,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -130,75 +128,15 @@ func (r *ReAct) HandleSyncTypeUpdateConfigEvent(event *ypb.AIInputEvent) error {
 	}
 
 	if event.Params != nil {
-		if event.Params.GetEnablePlan() {
-			applyOption(aicommon.WithEnablePlanAndExec(true))
-			updateConfig["EnablePlan"] = true
-		}
-		if event.Params.GetAllowPlanUserInteract() {
-			applyOption(aicommon.WithAllowPlanUserInteract(true))
-			updateConfig["AllowPlanUserInteract"] = true
-		}
 		if event.Params.GetDisallowRequireForUserPrompt() {
 			applyOption(aicommon.WithAllowRequireForUserInteract(false))
 			updateConfig["AllowRequireForUserInteract"] = false
 		}
 	}
 
-	if strings.TrimSpace(event.SyncJsonInput) != "" {
-		var params map[string]interface{}
-		if err := json.Unmarshal([]byte(event.SyncJsonInput), &params); err != nil {
-			r.EmitSyncEventError("update_config", fmt.Errorf("failed to parse update config params: %v", err), event.SyncID)
-			return nil
-		}
-
-		if raw, ok := params["AllowPlanUserInteract"]; ok {
-			value := utils.InterfaceToBoolean(raw)
-			applyOption(aicommon.WithAllowPlanUserInteract(value))
-			updateConfig["AllowPlanUserInteract"] = value
-		}
-		if raw, ok := params["allow_plan_user_interact"]; ok {
-			value := utils.InterfaceToBoolean(raw)
-			applyOption(aicommon.WithAllowPlanUserInteract(value))
-			updateConfig["AllowPlanUserInteract"] = value
-		}
-		if raw, ok := params["EnablePlan"]; ok {
-			value := utils.InterfaceToBoolean(raw)
-			applyOption(aicommon.WithEnablePlanAndExec(value))
-			updateConfig["EnablePlan"] = value
-		}
-		if raw, ok := params["enable_plan"]; ok {
-			value := utils.InterfaceToBoolean(raw)
-			applyOption(aicommon.WithEnablePlanAndExec(value))
-			updateConfig["EnablePlan"] = value
-		}
-		if raw, ok := params["DisableIntentRecognition"]; ok {
-			value := utils.InterfaceToBoolean(raw)
-			applyOption(aicommon.WithDisableIntentRecognition(value))
-			updateConfig["DisableIntentRecognition"] = value
-		}
-		if raw, ok := params["disable_intent_recognition"]; ok {
-			value := utils.InterfaceToBoolean(raw)
-			applyOption(aicommon.WithDisableIntentRecognition(value))
-			updateConfig["DisableIntentRecognition"] = value
-		}
-		if raw, ok := params["EnableIntentRecognition"]; ok {
-			value := utils.InterfaceToBoolean(raw)
-			applyOption(aicommon.WithDisableIntentRecognition(!value))
-			updateConfig["DisableIntentRecognition"] = !value
-		}
-		if raw, ok := params["enable_intent_recognition"]; ok {
-			value := utils.InterfaceToBoolean(raw)
-			applyOption(aicommon.WithDisableIntentRecognition(!value))
-			updateConfig["DisableIntentRecognition"] = !value
-		}
-	}
-
 	updateConfig["applied"] = true
 	updateConfig["current"] = map[string]interface{}{
-		"EnablePlan":                  r.config.GetEnablePlanAndExec(),
-		"AllowPlanUserInteract":       r.config.AllowPlanUserInteract,
 		"AllowRequireForUserInteract": r.config.AllowRequireForUserInteract,
-		"DisableIntentRecognition":    r.config.GetConfigBool("DisableIntentRecognition"),
 	}
 	r.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, "update_config", updateConfig, event.SyncID)
 	return nil
