@@ -9,7 +9,6 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -22,8 +21,6 @@ func (r *ReAct) handleSyncMessage(event *ypb.AIInputEvent) error {
 		return r.HandleSyncTypeQueueInfoEvent(event)
 	case SYNC_TYPE_KNOWLEDGE:
 		return r.HandleSyncTypeKnowledgeEvent(event)
-	case SYNC_TYPE_UPDATE_CONFIG, aicommon.SYNC_TYPE_UPDATE_CONFIG:
-		return r.HandleSyncTypeUpdateConfigEvent(event)
 	case SYNC_TYPE_REACT_JUMP_QUEUE:
 		return r.HandleSyncTypeReactJumpQueueEvent(event)
 	case SYNC_TYPE_REACT_CANCEL_CURRENT_TASK:
@@ -46,8 +43,6 @@ func (r *ReAct) handleSyncMessage(event *ypb.AIInputEvent) error {
 func (r *ReAct) RegisterReActSyncEvent() {
 	r.config.InputEventManager.RegisterSyncCallback(SYNC_TYPE_QUEUE_INFO, r.HandleSyncTypeQueueInfoEvent)
 	r.config.InputEventManager.RegisterSyncCallback(SYNC_TYPE_KNOWLEDGE, r.HandleSyncTypeKnowledgeEvent)
-	r.config.InputEventManager.RegisterSyncCallback(SYNC_TYPE_UPDATE_CONFIG, r.HandleSyncTypeUpdateConfigEvent)
-	r.config.InputEventManager.RegisterSyncCallback(aicommon.SYNC_TYPE_UPDATE_CONFIG, r.HandleSyncTypeUpdateConfigEvent)
 	r.config.InputEventManager.RegisterSyncCallback(SYNC_TYPE_REACT_JUMP_QUEUE, r.HandleSyncTypeReactJumpQueueEvent)
 	r.config.InputEventManager.RegisterSyncCallback(SYNC_TYPE_REACT_CANCEL_CURRENT_TASK, r.HandleSyncTypeReactCancelCurrentTaskEvent)
 	r.config.InputEventManager.RegisterSyncCallback(SYNC_TYPE_REACT_REMOVE_TASK, r.HandleSyncTypeReactRemoveTaskEvent)
@@ -60,8 +55,6 @@ func (r *ReAct) RegisterReActSyncEvent() {
 func (r *ReAct) UnRegisterReActSyncEvent() {
 	r.config.InputEventManager.UnRegisterSyncCallback(SYNC_TYPE_QUEUE_INFO)
 	r.config.InputEventManager.UnRegisterSyncCallback(SYNC_TYPE_KNOWLEDGE)
-	r.config.InputEventManager.UnRegisterSyncCallback(SYNC_TYPE_UPDATE_CONFIG)
-	r.config.InputEventManager.UnRegisterSyncCallback(aicommon.SYNC_TYPE_UPDATE_CONFIG)
 	r.config.InputEventManager.UnRegisterSyncCallback(SYNC_TYPE_REACT_JUMP_QUEUE)
 	r.config.InputEventManager.UnRegisterSyncCallback(SYNC_TYPE_REACT_CANCEL_CURRENT_TASK)
 	r.config.InputEventManager.UnRegisterSyncCallback(SYNC_TYPE_REACT_REMOVE_TASK)
@@ -100,45 +93,6 @@ func (r *ReAct) HandleSyncTypeKnowledgeEvent(event *ypb.AIInputEvent) error {
 		log.Error("no knowledge found")
 	}
 	r.EmitKnowledgeListAboutTask(taskID, knowledgeList, event.SyncID)
-	return nil
-}
-
-func (r *ReAct) HandleSyncTypeUpdateConfigEvent(event *ypb.AIInputEvent) error {
-	if event == nil {
-		return fmt.Errorf("update config event is nil")
-	}
-
-	updateConfig := map[string]interface{}{}
-	paramsUpdate, err := r.config.ApplySyncUpdateConfigFromParams(event)
-	if err != nil {
-		r.EmitSyncEventError("update_config", err, event.SyncID)
-		return nil
-	}
-	for k, v := range paramsUpdate {
-		updateConfig[k] = v
-	}
-
-	applyOption := func(opt aicommon.ConfigOption) {
-		if opt == nil {
-			return
-		}
-		if err := opt(r.config); err != nil {
-			r.EmitSyncEventError("update_config", err, event.SyncID)
-		}
-	}
-
-	if event.Params != nil {
-		if event.Params.GetDisallowRequireForUserPrompt() {
-			applyOption(aicommon.WithAllowRequireForUserInteract(false))
-			updateConfig["AllowRequireForUserInteract"] = false
-		}
-	}
-
-	updateConfig["applied"] = true
-	updateConfig["current"] = map[string]interface{}{
-		"AllowRequireForUserInteract": r.config.AllowRequireForUserInteract,
-	}
-	r.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, "update_config", updateConfig, event.SyncID)
 	return nil
 }
 

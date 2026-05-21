@@ -67,7 +67,7 @@ func unmarshalAISessionStartParams(raw string) (*ypb.AIStartParams, error) {
 		return nil, nil
 	}
 	params := &ypb.AIStartParams{}
-	if err := protojson.Unmarshal([]byte(raw), params); err != nil {
+	if err := (protojson.UnmarshalOptions{DiscardUnknown: true}).Unmarshal([]byte(raw), params); err != nil {
 		return nil, utils.Errorf("unmarshal ai start params failed: %v", err)
 	}
 	return params, nil
