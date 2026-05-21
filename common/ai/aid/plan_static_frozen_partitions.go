@@ -2,23 +2,18 @@ package aid
 
 import "github.com/yaklang/yaklang/common/ai/aid/aicommon"
 
-const (
-	planFactsFrozenPartitionOrder    = 100
-	planDocumentFrozenPartitionOrder = 110
-)
-
 func appendPlanFactsFrozenPartition(config *aicommon.Config, facts string) {
 	if config == nil {
 		return
 	}
-	config.AppendFrozenBlockPartition("plan_facts", "Plan Facts", facts, planFactsFrozenPartitionOrder)
+	config.AppendFrozenBlockPartition("plan_facts", "Plan Facts", facts, aicommon.PlanFactsFrozenPartitionOrder)
 }
 
 func appendPlanDocumentFrozenPartition(config *aicommon.Config, document string) {
 	if config == nil {
 		return
 	}
-	config.AppendFrozenBlockPartition("plan_document", "Plan Document", document, planDocumentFrozenPartitionOrder)
+	config.AppendFrozenBlockPartition("plan_document", "Plan Document", document, aicommon.PlanDocumentFrozenPartitionOrder)
 }
 
 func BuildPlanStaticFrozenPartitions(producer *aicommon.FrozenBlockPartitionProducer) []aicommon.FrozenBlockPartition {
