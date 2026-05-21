@@ -50,9 +50,9 @@ func mockedToolCalling3(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, to
 		return rsp, nil
 	}
 
-	fmt.Println("Unexpected prompt:", prompt)
+	fmt.Println("Unexpected prompt:", utils.ShrinkString(prompt, 500))
 
-	return nil, utils.Errorf("unexpected prompt: %s", prompt)
+	return nil, utils.Errorf("unexpected prompt")
 }
 
 func TestReAct_ToolUse_MultiCalls(t *testing.T) {

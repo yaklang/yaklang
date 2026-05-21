@@ -179,8 +179,8 @@ func TestHandle429_AIBalance_EmitsNotifyEvent(t *testing.T) {
 	assert.True(t, ctxDone)
 
 	payload := requireNotifyPayload(t, snapshot())
-	require.Equal(t, "notify", payload["type"])
-	require.Equal(t, "notify", payload["warning_type"])
+	require.Equal(t, "rate-limit", payload["type"])
+	require.Equal(t, "rate-limit", payload["warning_type"])
 	require.Contains(t, payload["content"], "此刻有 2 位用户正在与我深度对话中")
 	require.Equal(t, float64(6), payload["duration"])
 	require.Equal(t, float64(6000), payload["duration_ms"])
