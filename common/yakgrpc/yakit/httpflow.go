@@ -262,7 +262,32 @@ func SaveFromHTTPWithBodySaved(db *gorm.DB, isHttps bool, req *http.Request, rsp
 	return flow, nil
 }
 
-const maxBodyLength = 4 * 1024 * 1024
+const (
+	// Responses dominate project-DB bloat; cap above fuzzer/MITM limits (~4–5MB) but below huge scan bodies.
+	maxStoredHTTPFlowResponseBodyBytes = 5 * 1024 * 1024
+	// Requests can be large uploads (MITM/fuzzer); keep a higher cap so history stays usable.
+	maxStoredHTTPFlowRequestBodyBytes = 16 * 1024 * 1024
+	storedHTTPFlowTruncateNotice      = "[[yakit: body truncated for storage]]"
+)
+
+// truncateHTTPPacketBodyForStorage caps HTTP body stored in project DB to slow index/bloat growth.
+func truncateHTTPPacketBodyForStorage(packet []byte, maxBody int) []byte {
+	if maxBody <= 0 || len(packet) == 0 {
+		return packet
+	}
+	header, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(packet)
+	if len(body) <= maxBody {
+		return packet
+	}
+	notice := []byte(fmt.Sprintf("%s original=%s", storedHTTPFlowTruncateNotice, utils.ByteSize(uint64(len(body)))))
+	keep := maxBody - len(notice)
+	if keep < 0 {
+		keep = maxBody
+		notice = nil
+	}
+	truncated := append(body[:keep], notice...)
+	return lowhttp.ReplaceHTTPPacketBody([]byte(header), truncated, false)
+}
 
 func CreateHTTPFlow(opts ...CreateHTTPFlowOptions) (*schema.HTTPFlow, error) {
 	c := &CreateHTTPFlowConfig{}
@@ -299,10 +324,8 @@ func CreateHTTPFlow(opts ...CreateHTTPFlowOptions) (*schema.HTTPFlow, error) {
 		return nil
 	})
 
-	if false && len(body) > maxBodyLength {
-		// Truncated by saver
-		reqRaw = lowhttp.ReplaceHTTPPacketBody([]byte(header), body[:maxBodyLength], false)
-	}
+	_ = header
+	reqRaw = truncateHTTPPacketBodyForStorage(reqRaw, maxStoredHTTPFlowRequestBodyBytes)
 	requestRaw := strconv.Quote(string(reqRaw))
 	if strings.HasPrefix(requestRaw, `"HTTP/1.`) {
 		log.Errorf("[BUG] requestRaw is invalid: %s", requestRaw)
@@ -324,12 +347,14 @@ func CreateHTTPFlow(opts ...CreateHTTPFlowOptions) (*schema.HTTPFlow, error) {
 	}
 
 	var rspContentType string
+	rspRaw = truncateHTTPPacketBodyForStorage(rspRaw, maxStoredHTTPFlowResponseBodyBytes)
 	header, body = lowhttp.SplitHTTPHeadersAndBodyFromPacket(rspRaw, func(line string) {
 		k, v := lowhttp.SplitHTTPHeader(line)
 		if strings.ToLower(k) == "content-type" {
 			rspContentType = v
 		}
 	})
+	_ = header
 	responseRaw := strconv.Quote(string(rspRaw))
 
 	flow := &schema.HTTPFlow{
@@ -546,7 +571,7 @@ func InsertHTTPFlow(db *gorm.DB, i *schema.HTTPFlow) (fErr error) {
 	if i.PathSuffix == "" && i.Path != "" {
 		i.PathSuffix = lowhttp.GetPathSuffix(i.Path)
 	}
-	if db = db.Model(&schema.HTTPFlow{}).Save(i); db.Error != nil {
+	if db = db.Create(i); db.Error != nil {
 		return utils.Errorf("insert HTTPFlow failed: %s", db.Error)
 	}
 	callHTTPFlowAfterSaveHandlers(i)

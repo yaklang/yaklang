@@ -35,6 +35,7 @@ func CreateProjectDatabase(path string) (*gorm.DB, error) {
 	if err != nil {
 		return nil, err
 	}
+	TuneSQLiteByDatabaseFileSize(db, path)
 	schema.AutoMigrate(db, schema.KEY_SCHEMA_YAKIT_DATABASE)
 	schema.ApplyPatches(db, schema.KEY_SCHEMA_YAKIT_DATABASE)
 	return db, nil
@@ -55,11 +56,24 @@ func SetGormProjectDatabase(path string) error {
 	if err != nil {
 		return err
 	}
-	projectDataBase = d
-	currentProjectDatabasePath = path
+	BindProjectDatabase(d, path)
 	schema.AutoMigrate(d, schema.KEY_SCHEMA_YAKIT_DATABASE)
-	schema.SetGormProjectDatabase(d)
 	return nil
+}
+
+// BindProjectDatabase registers an already-open project DB as the global project handle.
+// Used by grpc test servers so DBSaveAsyncChannel and Server.GetProjectDatabase() share one SQLite file.
+func BindProjectDatabase(db *gorm.DB, path string) {
+	projectDataBase = db
+	currentProjectDatabasePath = path
+	schema.SetGormProjectDatabase(db)
+}
+
+// BindProfileDatabase registers an already-open profile DB as the global profile handle.
+// Used by grpc test servers so lowhttp MITM replacer hooks and plugin DB access share one SQLite file.
+func BindProfileDatabase(db *gorm.DB, path string) {
+	profileDatabase = db
+	currentProfileDatabasePath = path
 }
 
 func GetGormProfileDatabase() *gorm.DB {
