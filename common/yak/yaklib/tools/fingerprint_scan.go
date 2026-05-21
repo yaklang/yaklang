@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"sync"
+	"sync/atomic"
 
 	"github.com/yaklang/yaklang/common/utils/spacengine/base"
 
@@ -15,6 +17,50 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/pingutil"
 )
+
+// fingerprintDropWarnOnce 是 fingerprint 结果因 ctx cancel 而被丢弃时的
+// "首次告警" 标记. 进程生命周期内只会触发一次, 避免 cancel 时刷屏.
+//
+// 关键词: fingerprint outC drop warn once, sync.Once
+var fingerprintDropWarnOnce sync.Once
+
+// fingerprintInFlight 统计当前正在执行的 fingerprint inner goroutine 数量,
+// 用于运维诊断 (例如 stall 时与历史泄漏数对比, 或在 pprof 之外快速判断是否
+// 还有未收敛的扫描). 不影响业务逻辑.
+//
+// 关键词: fingerprint in-flight 计数, goroutine 可观测性
+var fingerprintInFlight atomic.Int64
+
+// GetInFlightFingerprintScans 返回当前正在执行的 fingerprint inner goroutine
+// 数量. 主要供运维诊断使用 (从 Go 侧调用, 不通过 yak export 暴露, 避免污染
+// 用户面的 servicescan API).
+//
+// 关键词: GetInFlightFingerprintScans, 可观测性接口
+func GetInFlightFingerprintScans() int64 {
+	return fingerprintInFlight.Load()
+}
+
+// sendMatchResultOrDrop 把 fingerprint 结果送入 outC. 当 ctx 已 cancel
+// 时主动放弃, 防止下游已停止消费时 inner goroutine 永久阻塞 (chan send hang).
+//
+// 这是 fingerprint goroutine 泄漏修复的核心点. 历史问题: 当上游 yak VM 或
+// servicescan 调用方在 cancel ctx 后停止 range outC, 但 outC 未关闭 (因为
+// inner goroutine 仍在工作), 之前的 `outC <- result` 会永久阻塞, swg.Done
+// 永远不调用, swg.Wait/close(outC) 永远不返回, goroutine 永久泄漏.
+//
+// 关键词: fingerprint goroutine 泄漏修复, outC ctx 短路, drop on cancel
+func sendMatchResultOrDrop(ctx context.Context, outC chan<- *fp.MatchResult, result *fp.MatchResult) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	select {
+	case outC <- result:
+	case <-ctx.Done():
+		fingerprintDropWarnOnce.Do(func() {
+			log.Warnf("fingerprint result dropped because ctx cancelled before downstream consumed; subsequent drops will be silent for this process")
+		})
+	}
+}
 
 // Scan servicescan 库使用的端口扫描类型的方式为全连接扫描，用于对连接目标进行精准的扫描，相比 synscan 库的单纯扫描，servicescan 库会尝试获取精确指纹信息以及 CPE 信息
 // @param {string} target 目标地址，支持 CIDR 格式，支持 192.168.1.1-100 格式
@@ -64,6 +110,16 @@ func scanOneFingerprint(target string, port int, opts ...fp.ConfigOption) (*fp.M
 	return matcher.Match(target, port)
 }
 
+// _scanFingerprint 启动一组并发指纹识别 goroutine, 通过 outC 返回结果.
+//
+// Context 契约 (重要):
+//   - 调用方应该传入一个可被自己取消的 ctx (通过 servicescan.ctx() 注入).
+//   - 调用方如果在 outC 关闭之前停止消费 outC, 必须先 cancel ctx, 否则正在
+//     发送 result 的 inner goroutine 会通过 sendMatchResultOrDrop 内的
+//     ctx.Done() 分支退出.
+//   - 当 ctx == nil 时, 走 context.Background(), 退出条件由 fp 内部超时托底.
+//
+// 关键词: _scanFingerprint ctx 契约, fingerprint goroutine 退出条件
 func _scanFingerprint(ctx context.Context, config *fp.Config, concurrent int, host, port string) (chan *fp.MatchResult, error) {
 	matcher, err := fp.NewDefaultFingerprintMatcher(config)
 	if err != nil {
@@ -78,7 +134,15 @@ func _scanFingerprint(ctx context.Context, config *fp.Config, concurrent int, ho
 
 	filter := filter2.NewFilter()
 
-	outC := make(chan *fp.MatchResult)
+	// outC 改为 buffered (容量 = concurrent), 与上游 inner goroutine 数量匹配.
+	// 配合 sendMatchResultOrDrop 的 ctx 短路, 构成 "正常路径不阻塞, 异常路径
+	// 可解开" 的双保险, 防止 goroutine 泄漏.
+	// 关键词: fingerprint outC buffered, goroutine 泄漏防御性叠加
+	outCBuf := concurrent
+	if outCBuf <= 0 {
+		outCBuf = 1
+	}
+	outC := make(chan *fp.MatchResult, outCBuf)
 	go func() {
 		swg := utils.NewSizedWaitGroup(concurrent)
 		portsInt := utils.ParseStringToPorts(port)
@@ -91,6 +155,8 @@ func _scanFingerprint(ctx context.Context, config *fp.Config, concurrent int, ho
 						swg.Add()
 						go func() {
 							defer swg.Done()
+							fingerprintInFlight.Add(1)
+							defer fingerprintInFlight.Add(-1)
 							proto, portWithoutProto := utils.ParsePortToProtoPort(buildinPort) // 这里将协议和端口分开，便于后面打印日志
 							addr := utils.HostPort(buildinHost, buildinPort)
 							if filter.Exist(addr) {
@@ -113,7 +179,7 @@ func _scanFingerprint(ctx context.Context, config *fp.Config, concurrent int, ho
 								return
 							}
 
-							outC <- result
+							sendMatchResultOrDrop(ctx, outC, result)
 						}()
 					}
 				}
@@ -124,6 +190,8 @@ func _scanFingerprint(ctx context.Context, config *fp.Config, concurrent int, ho
 				proto, portWithoutProto := utils.ParsePortToProtoPort(p) // 这里将协议和端口分开，便于后面打印日志
 				go func() {
 					defer swg.Done()
+					fingerprintInFlight.Add(1)
+					defer fingerprintInFlight.Add(-1)
 
 					addr := utils.HostPort(rawHost, rawPort)
 					if filter.Exist(addr) {
@@ -138,7 +206,7 @@ func _scanFingerprint(ctx context.Context, config *fp.Config, concurrent int, ho
 						return
 					}
 
-					outC <- result
+					sendMatchResultOrDrop(ctx, outC, result)
 				}()
 			}
 		}
@@ -222,6 +290,16 @@ func _scanFromPingUtils(res chan *pingutil.PingResult, ports string, opts ...fp.
 //	}
 //
 // ```
+//
+// Context 契约 (重要):
+//   - 通过 servicescan.ctx() 注入的 ctx 会被本函数下游 inner goroutine 用作
+//     "发送结果时的退出信号". 调用方在停止 range outC 之前应当 cancel ctx,
+//     否则 inner goroutine 会通过 sendMatchResultOrDrop 的 ctx.Done() 分支
+//     退出, 结果会被丢弃 (首次丢弃会有一条 log.Warn, 后续静默).
+//   - ctx 缺省 (config.Ctx == nil) 时退化为 context.Background(), 仅依赖
+//     fp 内部超时托底, 这种情况下 cancel 路径不存在, 建议生产环境显式注入 ctx.
+//
+// 关键词: _scanFromTargetStream ctx 契约, outC goroutine 泄漏防护
 func _scanFromTargetStream(res interface{}, opts ...fp.ConfigOption) (chan *fp.MatchResult, error) {
 	synResults := make(chan *synscan.SynScanResult, 1000)
 
@@ -319,7 +397,15 @@ func _scanFromTargetStream(res interface{}, opts ...fp.ConfigOption) (chan *fp.M
 		concurrent = matcher.Config.PoolSize
 	}
 
-	outC := make(chan *fp.MatchResult)
+	// outC 改为 buffered (容量 = concurrent), 与上游 inner goroutine 数量匹配.
+	// 配合 sendMatchResultOrDrop 的 ctx 短路, 构成 "正常路径不阻塞, 异常路径
+	// 可解开" 的双保险, 防止 goroutine 泄漏.
+	// 关键词: fingerprint outC buffered, goroutine 泄漏防御性叠加
+	outCBuf := concurrent
+	if outCBuf <= 0 {
+		outCBuf = 1
+	}
+	outC := make(chan *fp.MatchResult, outCBuf)
 	go func() {
 		swg := utils.NewSizedWaitGroup(concurrent)
 		for synRes := range synResults {
@@ -329,6 +415,8 @@ func _scanFromTargetStream(res interface{}, opts ...fp.ConfigOption) (chan *fp.M
 			proto, portWithoutProto := utils.ParsePortToProtoPort(rawPort) // 这里将协议和端口分开，便于后面打印日志
 			go func() {
 				defer swg.Done()
+				fingerprintInFlight.Add(1)
+				defer fingerprintInFlight.Add(-1)
 
 				log.Infof("start task to scan: [%s://%s]", proto, utils.HostPort(rawHost, portWithoutProto))
 				result, err := matcher.MatchWithContext(ctx, rawHost, rawPort)
@@ -337,7 +425,7 @@ func _scanFromTargetStream(res interface{}, opts ...fp.ConfigOption) (chan *fp.M
 					return
 				}
 
-				outC <- result
+				sendMatchResultOrDrop(ctx, outC, result)
 			}()
 		}
 
@@ -458,6 +546,17 @@ var FingerprintScanExports = map[string]interface{}{
 	"ScanFromPing":        _scanFromPingUtils,
 
 	"proto": _protoOption,
+
+	// 注入可取消 ctx, 调用方应在停止 range 结果 channel 前 cancel ctx,
+	// 否则正在向 outC 发送结果的 inner goroutine 会通过 ctx.Done() 分支退出
+	// 并产生一条 warn-once 日志 (见 sendMatchResultOrDrop).
+	//
+	// Example (yak): ctx, cancel = context.WithCancel(context.Background())
+	//                defer cancel()
+	//                servicescan.Scan("...", "...", servicescan.context(ctx))
+	//
+	// 关键词: servicescan context 注入, fingerprint cancel
+	"context": fp.WithCtx,
 
 	// 整体扫描并发
 	"concurrent": fp.WithPoolSize,
