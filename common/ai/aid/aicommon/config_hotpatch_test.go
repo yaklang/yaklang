@@ -2,10 +2,13 @@ package aicommon
 
 import (
 	"context"
-	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func TestHotPatchConfig(t *testing.T) {
@@ -68,4 +71,62 @@ func TestHotPatchConfig(t *testing.T) {
 	})
 	time.Sleep(1 * time.Second)
 	require.True(t, c.GetSyncPerceptionTrigger())
+}
+
+func TestConfigHotpatch_PersistSessionStartParams(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	sessionID := "session-hotpatch-persist"
+	c := NewTestConfig(ctx, WithPersistentSessionId(sessionID))
+	require.NoError(t, c.GetDB().AutoMigrate(&schema.AISession{}).Error)
+	_, err := yakit.CreateOrUpdateAISessionMetaStartParams(c.GetDB(), sessionID, &ypb.AIStartParams{
+		EnablePlan:            false,
+		SyncPerceptionTrigger: false,
+		TimelineSessionID:     sessionID,
+	})
+	require.NoError(t, err)
+	c.StartEventLoop(ctx)
+
+	c.EventInputChan.SafeFeed(&ypb.AIInputEvent{
+		IsConfigHotpatch: true,
+		HotpatchType:     HotPatchType_EnablePlan,
+		Params: &ypb.AIStartParams{
+			EnablePlan: true,
+		},
+	})
+	time.Sleep(time.Second)
+
+	got, err := yakit.GetAISessionMetaStartParamsBySessionID(c.GetDB(), sessionID)
+	require.NoError(t, err)
+	require.True(t, got.GetEnablePlan())
+	require.False(t, got.GetSyncPerceptionTrigger())
+
+	c.EventInputChan.SafeFeed(&ypb.AIInputEvent{
+		IsConfigHotpatch: true,
+		HotpatchType:     HotPatchType_SyncPerceptionTrigger,
+		Params: &ypb.AIStartParams{
+			SyncPerceptionTrigger: true,
+		},
+	})
+	time.Sleep(time.Second)
+
+	got, err = yakit.GetAISessionMetaStartParamsBySessionID(c.GetDB(), sessionID)
+	require.NoError(t, err)
+	require.True(t, got.GetEnablePlan())
+	require.True(t, got.GetSyncPerceptionTrigger())
+
+	c.EventInputChan.SafeFeed(&ypb.AIInputEvent{
+		IsConfigHotpatch: true,
+		HotpatchType:     HotPatchType_EnablePlan,
+		Params: &ypb.AIStartParams{
+			EnablePlan: false,
+		},
+	})
+	time.Sleep(time.Second)
+
+	got, err = yakit.GetAISessionMetaStartParamsBySessionID(c.GetDB(), sessionID)
+	require.NoError(t, err)
+	require.False(t, got.GetEnablePlan())
+	require.True(t, got.GetSyncPerceptionTrigger())
 }

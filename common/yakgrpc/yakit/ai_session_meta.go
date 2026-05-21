@@ -61,7 +61,7 @@ func marshalAISessionStartParams(params *ypb.AIStartParams) (string, error) {
 	return string(raw), nil
 }
 
-func unmarshalAISessionStartParams(raw string) (*ypb.AIStartParams, error) {
+func UnmarshalAISessionStartParams(raw string) (*ypb.AIStartParams, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
 		return nil, nil
@@ -182,7 +182,7 @@ func GetAISessionMetaStartParamsBySessionID(db *gorm.DB, sessionID string) (*ypb
 	if err != nil {
 		return nil, err
 	}
-	return unmarshalAISessionStartParams(meta.StartParams)
+	return UnmarshalAISessionStartParams(meta.StartParams)
 }
 
 func MergeCachedAISessionStartParams(cached, request *ypb.AIStartParams) *ypb.AIStartParams {

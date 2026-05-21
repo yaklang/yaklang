@@ -43,7 +43,7 @@ func (s *Server) QueryAISession(ctx context.Context, req *ypb.QueryAISessionRequ
 		}
 		var lastUsedAt int64
 		var runtimeIDs []string
-		startParams, err := yakit.GetAISessionMetaStartParamsBySessionID(s.GetProjectDatabase(), item.SessionID)
+		startParams, err := yakit.UnmarshalAISessionStartParams(item.StartParams)
 		if err != nil {
 			return nil, err
 		}
