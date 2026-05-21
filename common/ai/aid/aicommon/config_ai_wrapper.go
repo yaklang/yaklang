@@ -190,8 +190,8 @@ func (c *Config) handle429RateLimit(rsp *AIResponse) (is429 bool, ctxDone bool) 
 				"您的任务同样重要，我不想敷衍任何一位\n" +
 				"预计等待一段时间后自动请求，感谢您的耐心"
 			waitDuration = 15 * time.Second
-			c.EmitDefaultStreamEvent("notify", strings.NewReader(msg), "")
-			c.EmitNotify("notify", msg, waitDuration)
+			c.EmitDefaultStreamEvent("rate-limit", strings.NewReader(msg), "")
+			c.EmitNotify("rate-limit", msg, waitDuration)
 			c.EmitError("AIBalance 429 rate limit: %s", msg)
 			log.Infof("AIBalance 429: queue info unparseable (%q), waiting 15s", queueInfo)
 		}
