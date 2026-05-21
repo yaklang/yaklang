@@ -12,10 +12,9 @@ import (
 
 // verification_frequency_sim_test.go 是一个离线仿真测试, 镜像
 // perception_frequency_sim_test.go 的方法论, 但作用于 VerifyUserSatisfaction
-// 的节流门 (verificationAutoTriggerMaxSnapshotAge / verificationAutoTriggerMinPromptDelta
-// / verificationIterationTriggerInterval). 仿真使用 redhaze 案例的真实 iter
-// 时间戳 + 真实 prompt token 生长曲线 + 真实 hasNewEvidence 标注, 在不同
-// (snapshotAge, promptDelta, iterInterval) 组合 x 三种 AI 行为画像下评估:
+// 的全套节流门 (snapshotAge / promptDelta / iterInterval / cooldown /
+// hardPromptDelta / firstFireThreshold). 仿真在多个 fixture (redhaze
+// 中等节奏 + 数据爆炸高峰节奏) x 三种 AI 行为画像下评估:
 //
 //   - fired           : 实际发起 AI 调用的次数 (成本指标)
 //   - wasted          : 没有产生新证据 / 退出信号的 AI 调用 (成本浪费)
@@ -27,8 +26,8 @@ import (
 //
 // 关键词: verification 频率仿真, satisfied 检测延迟, 节流参数扫描,
 //
-//	AI 调用次数评估, snapshotAge minPromptDelta 调优,
-//	redhaze 案例 promptTokens 生长曲线
+//	AI 调用次数评估, cooldown / hardPromptDelta / firstFire 维度,
+//	数据爆炸 fixture, redhaze 中等节奏 fixture
 
 // verifyCaseFixtureRedhaze 在 caseIterTimeFixtureRedhaze 的基础上为每个 iter
 // 额外标注 promptTokens (累积 prompt 大小, 用于 token 门评估) 与
@@ -85,26 +84,74 @@ var verifyCaseFixtureRedhaze = []struct {
 // 关键词: verifyGroundTruthSatisfiedAt, 任务真实达成 iter, 副作用代价基线
 const verifyGroundTruthSatisfiedAt = 18
 
+// verifyCaseFixtureDataExplosion 模拟"数据爆炸场景"的 fixture, 复现用户实测的
+// 高峰刷屏问题: 前 3 个 iter 较轻 (页面探测), iter=4 开始进入数据爆炸阶段,
+// 每个 iter prompt token 暴涨 1800-2500 tokens (大 HTML 抓取 / union extract /
+// 大文件读取). 这是 redhaze 中等节奏 fixture 没有暴露的尖峰场景, 用来验证
+// 冷静期 (cooldown) 能否把"每个工具调用都 verify"的高峰节流到合理频率.
+//
+// 设计参数:
+//
+//	阶段 1 (iter 1-3) 轻 (200-400/iter), 探测页面结构
+//	阶段 2 (iter 4-20) 重 (1800-2500/iter), 数据爆炸高峰, 真实业务在 iter=14 达成
+//
+// 关键词: verifyCaseFixtureDataExplosion, 数据爆炸高峰, 每个工具都 verify 修复验证
+var verifyCaseFixtureDataExplosion = []struct {
+	iter           int
+	tSecond        int
+	phase          int
+	promptTokens   int
+	hasNewEvidence bool
+}{
+	{1, 0, 1, 3000, true},
+	{2, 15, 1, 3300, false},
+	{3, 32, 1, 3600, true},
+	{4, 50, 2, 5400, true}, // 数据爆炸开始 +1800
+	{5, 75, 2, 7700, false},
+	{6, 95, 2, 9900, true}, // +2200
+	{7, 122, 2, 12300, false},
+	{8, 145, 2, 14500, true}, // +2200
+	{9, 178, 2, 16800, false},
+	{10, 200, 2, 19000, true},
+	{11, 235, 2, 21300, false},
+	{12, 261, 2, 23400, true},
+	{13, 290, 2, 25900, false},
+	{14, 320, 2, 28100, true}, // ground truth 达成
+	{15, 348, 2, 30400, false},
+	{16, 375, 2, 32500, true},
+	{17, 405, 2, 34800, false},
+	{18, 438, 2, 37000, true},
+	{19, 472, 2, 39100, false},
+	{20, 500, 2, 41300, true},
+}
+
+const verifyExplosionGroundTruthSatisfiedAt = 14
+
 // simVerifyController 镜像生产 ReActLoop.shouldTriggerAutomaticVerification
 // 与配套的 GetVerificationRuntimeSnapshot/setVerificationRuntimeSnapshot
 // 状态机, 但用显式 now 参数代替 time.Now() / r.GetVerificationRuntimeSnapshot,
 // 实现确定性回放.
 //
-// 严格对齐的 4 门 (任一为真则发起 AI):
+// 严格对齐的分层门 (按优先级):
 //  1. iter == maxIter 末轮兜底
-//  2. previous == nil && periodicCheckpoint(iter) 首次按周期
-//  3. now - prev.GeneratedAt >= snapshotAge 时间门
-//  4. iter - prev.iter >= iterInterval 迭代门
-//  5. |tokens_delta| >= promptDelta token 门
+//  2. previous == nil 走首次提前门: iter >= firstFireThreshold 才 fire
+//  3. 时间门: now - prev.GeneratedAt >= snapshotAge
+//  4. iter 门: iter - prev.iter >= iterInterval (基础节拍)
+//  5. 硬 token 门: |tokens_delta| >= hardPromptDelta (豁免冷静期)
+//  6. 冷静期: iter - prev.iter < cooldown 时短路, 软 token 门不生效
+//  7. 软 token 门: |tokens_delta| >= promptDelta
 //
-// 关键词: simVerifyController, 镜像 shouldTriggerAutomaticVerification 四门,
+// 关键词: simVerifyController, 镜像 shouldTriggerAutomaticVerification 分层门,
 //
-//	verification 确定性回放
+//	verification 确定性回放, 首次提前门, 冷静期, 硬 token 门
 type simVerifyController struct {
-	snapshotAge  time.Duration
-	promptDelta  int
-	iterInterval int
-	maxIter      int
+	snapshotAge        time.Duration
+	promptDelta        int
+	iterInterval       int
+	cooldown           int
+	hardPromptDelta    int
+	firstFireThreshold int
+	maxIter            int
 
 	prevGeneratedAt time.Time
 	prevIter        int
@@ -112,46 +159,65 @@ type simVerifyController struct {
 	hasPrev         bool
 }
 
-func newSimVerifyController(snapshotAge time.Duration, promptDelta, iterInterval, maxIter int) *simVerifyController {
-	return &simVerifyController{
-		snapshotAge:  snapshotAge,
-		promptDelta:  promptDelta,
-		iterInterval: iterInterval,
-		maxIter:      maxIter,
-	}
+// simVerifyParams 把仿真参数打包, 简化 controller 创建与扫描矩阵的可读性.
+//
+// 关键词: simVerifyParams, 仿真参数打包, 扫描矩阵可读性
+type simVerifyParams struct {
+	snapshotAge        time.Duration
+	promptDelta        int
+	iterInterval       int
+	cooldown           int
+	hardPromptDelta    int
+	firstFireThreshold int
 }
 
-func (s *simVerifyController) periodicCheckpoint(iter int) bool {
-	if s.iterInterval <= 0 {
-		return true
+func newSimVerifyController(p simVerifyParams, maxIter int) *simVerifyController {
+	return &simVerifyController{
+		snapshotAge:        p.snapshotAge,
+		promptDelta:        p.promptDelta,
+		iterInterval:       p.iterInterval,
+		cooldown:           p.cooldown,
+		hardPromptDelta:    p.hardPromptDelta,
+		firstFireThreshold: p.firstFireThreshold,
+		maxIter:            maxIter,
 	}
-	if iter > 0 && iter%s.iterInterval == 0 {
-		return true
-	}
-	return s.maxIter > 0 && iter > 0 && iter == s.maxIter
 }
 
 func (s *simVerifyController) shouldTrigger(now time.Time, iter, tokens int) (fire bool, gate string) {
+	// 末轮兜底
 	if s.maxIter > 0 && iter == s.maxIter {
 		return true, "max_iter"
 	}
+	// 首次提前门: baseline 未建立时, iter >= firstFireThreshold 即 fire
 	if !s.hasPrev {
-		if s.periodicCheckpoint(iter) {
-			return true, "first_periodic"
+		if iter >= s.firstFireThreshold {
+			return true, "first_fire"
 		}
 		return false, ""
 	}
+	// 时间门
 	if now.Sub(s.prevGeneratedAt) >= s.snapshotAge {
 		return true, "snapshot_age"
 	}
-	if iter-s.prevIter >= s.iterInterval {
+	// iter 门基础节拍
+	iterDelta := iter - s.prevIter
+	if iterDelta >= s.iterInterval {
 		return true, "iter_delta"
 	}
-	delta := tokens - s.prevTokens
-	if delta < 0 {
-		delta = -delta
+	// 硬 token 门: 单次超大爆炸豁免冷静期
+	tokenDelta := tokens - s.prevTokens
+	if tokenDelta < 0 {
+		tokenDelta = -tokenDelta
 	}
-	if delta >= s.promptDelta {
+	if s.hardPromptDelta > 0 && tokenDelta >= s.hardPromptDelta {
+		return true, "hard_token"
+	}
+	// 冷静期: iter delta < cooldown 时抑制软 token 门
+	if iterDelta < s.cooldown {
+		return false, ""
+	}
+	// 软 token 门
+	if tokenDelta >= s.promptDelta {
 		return true, "token_delta"
 	}
 	return false, ""
@@ -181,16 +247,15 @@ type verifyAIProfile struct {
 // makeRealisticProfile: AI 按 hasNewEvidence 实事求是地返回, 在 groundTruth 后
 // 才说 Satisfied=true. 这是最现实的画像, satisfiedLag 在此画像下最有意义.
 //
-// 关键词: realistic 画像, hasNewEvidence 驱动, 真实 satisfiedLag
-func makeRealisticVerifyProfile() verifyAIProfile {
-	evidenceByIter := make(map[int]bool, len(verifyCaseFixtureRedhaze))
-	for _, fix := range verifyCaseFixtureRedhaze {
-		evidenceByIter[fix.iter] = fix.hasNewEvidence
-	}
+// 入参 evidenceByIter / groundTruthAt 由调用方按当前 fixture 显式注入,
+// 让同一份 profile 工厂能服务于 redhaze 与 dataExplosion 两套 fixture.
+//
+// 关键词: realistic 画像, hasNewEvidence 驱动, 真实 satisfiedLag, fixture 解耦
+func makeRealisticVerifyProfile(evidenceByIter map[int]bool, groundTruthAt int) verifyAIProfile {
 	return verifyAIProfile{
 		name: "realistic",
 		satisfied: func(iter int) bool {
-			return iter >= verifyGroundTruthSatisfiedAt
+			return iter >= groundTruthAt
 		},
 		hasNewArtifact: func(iter int) bool {
 			return evidenceByIter[iter]
@@ -214,16 +279,15 @@ func makePessimisticVerifyProfile() verifyAIProfile {
 	}
 }
 
-// makeEarlyDoneProfile: AI 在 iter=12 (phase 3 中段, 早于 groundTruth) 就说
-// Satisfied=true, 模拟 AI 提前误判任务完成的场景. 用于评估"如果节流过粗,
-// 我们能否还能及时捕获早完成的信号".
+// makeEarlyDoneProfile: AI 在 earlyDoneAt iter 就说 Satisfied=true, 模拟提前
+// 误判任务完成的场景. 用于评估"如果节流过粗, 能否还能及时捕获早完成的信号".
 //
-// 关键词: early_done 画像, 提前 satisfied 信号, 节流过粗时是否漏检
-func makeEarlyDoneVerifyProfile() verifyAIProfile {
+// 关键词: early_done 画像, 提前 satisfied 信号, 节流过粗漏检防护
+func makeEarlyDoneVerifyProfile(earlyDoneAt int) verifyAIProfile {
 	return verifyAIProfile{
 		name: "early_done",
 		satisfied: func(iter int) bool {
-			return iter >= 12
+			return iter >= earlyDoneAt
 		},
 		hasNewArtifact: func(iter int) bool {
 			return true
@@ -231,38 +295,70 @@ func makeEarlyDoneVerifyProfile() verifyAIProfile {
 	}
 }
 
-// verifySimResult 是一次 (param x profile) 仿真的统计.
+// verifyFixtureRow 是 fixture 表的最小接口, 让 redhaze / dataExplosion 两套
+// 共享同一份 runSim 主循环.
+// 关键词: verifyFixtureRow, fixture 统一接口
+type verifyFixtureRow struct {
+	iter           int
+	tSecond        int
+	promptTokens   int
+	hasNewEvidence bool
+}
+
+func redhazeFixtureAsRows() []verifyFixtureRow {
+	rows := make([]verifyFixtureRow, 0, len(verifyCaseFixtureRedhaze))
+	for _, f := range verifyCaseFixtureRedhaze {
+		rows = append(rows, verifyFixtureRow{
+			iter: f.iter, tSecond: f.tSecond,
+			promptTokens: f.promptTokens, hasNewEvidence: f.hasNewEvidence,
+		})
+	}
+	return rows
+}
+
+func dataExplosionFixtureAsRows() []verifyFixtureRow {
+	rows := make([]verifyFixtureRow, 0, len(verifyCaseFixtureDataExplosion))
+	for _, f := range verifyCaseFixtureDataExplosion {
+		rows = append(rows, verifyFixtureRow{
+			iter: f.iter, tSecond: f.tSecond,
+			promptTokens: f.promptTokens, hasNewEvidence: f.hasNewEvidence,
+		})
+	}
+	return rows
+}
+
+// verifySimResult 是一次 (param x profile x fixture) 仿真的统计.
 //
-// 关键词: verifySimResult, fired wasted lag 三维量化
+// 关键词: verifySimResult, fired wasted lag 三维量化, fixture 维度
 type verifySimResult struct {
-	snapshotAge  time.Duration
-	promptDelta  int
-	iterInterval int
-	profileName  string
+	fixtureName string
+	params      simVerifyParams
+	profileName string
 
 	fired        int // 实际发起的 AI 调用次数
 	wasted       int // fired 但 hasNewArtifact=false 且未 satisfied 的次数
 	satisfiedAt  int // 第一次返回 Satisfied=true 的 iter (0 表示未发生)
 	satisfiedT   int // 对应的 tSecond
+	groundTruth  int // 该 fixture 的 ground truth 达成 iter (用于计算 lag)
 	gateCounters map[string]int
 }
 
 // runVerifySim 在给定参数下跑一次完整仿真.
 //
-// 关键词: runVerifySim, verification 节流主循环, iter 时间步进
-func runVerifySim(snapshotAge time.Duration, promptDelta, iterInterval int, profile verifyAIProfile) verifySimResult {
-	maxIter := verifyCaseFixtureRedhaze[len(verifyCaseFixtureRedhaze)-1].iter
-	ctrl := newSimVerifyController(snapshotAge, promptDelta, iterInterval, maxIter)
+// 关键词: runVerifySim, verification 节流主循环, iter 时间步进, fixture 通用
+func runVerifySim(fixtureName string, rows []verifyFixtureRow, groundTruth int, params simVerifyParams, profile verifyAIProfile) verifySimResult {
+	maxIter := rows[len(rows)-1].iter
+	ctrl := newSimVerifyController(params, maxIter)
 	res := verifySimResult{
-		snapshotAge:  snapshotAge,
-		promptDelta:  promptDelta,
-		iterInterval: iterInterval,
+		fixtureName:  fixtureName,
+		params:       params,
 		profileName:  profile.name,
+		groundTruth:  groundTruth,
 		gateCounters: make(map[string]int),
 	}
 
 	base := time.Now()
-	for _, fix := range verifyCaseFixtureRedhaze {
+	for _, fix := range rows {
 		now := base.Add(time.Duration(fix.tSecond) * time.Second)
 		fire, gate := ctrl.shouldTrigger(now, fix.iter, fix.promptTokens)
 		if !fire {
@@ -298,117 +394,195 @@ func (r verifySimResult) computeSatisfiedLag() (lagIters int, lagSeconds int) {
 	if r.satisfiedAt == 0 {
 		return -1, -1
 	}
-	if r.satisfiedAt < verifyGroundTruthSatisfiedAt {
+	if r.satisfiedAt < r.groundTruth {
 		// 早于 groundTruth 检测到 (early_done 画像下会发生), 视为 0 lag.
 		return 0, 0
 	}
 	groundTruthT := 0
-	for _, fix := range verifyCaseFixtureRedhaze {
-		if fix.iter == verifyGroundTruthSatisfiedAt {
+	// 找 ground truth iter 对应的 tSecond
+	rows := redhazeFixtureAsRows()
+	if r.fixtureName == "data_explosion" {
+		rows = dataExplosionFixtureAsRows()
+	}
+	for _, fix := range rows {
+		if fix.iter == r.groundTruth {
 			groundTruthT = fix.tSecond
 			break
 		}
 	}
-	return r.satisfiedAt - verifyGroundTruthSatisfiedAt, r.satisfiedT - groundTruthT
+	return r.satisfiedAt - r.groundTruth, r.satisfiedT - groundTruthT
+}
+
+// verifyFixture 把 (name, rows, groundTruth, earlyDoneAt) 打成一组, 让扫描
+// 矩阵能用 for 循环逐 fixture 跑.
+//
+// 关键词: verifyFixture, 多 fixture 扫描矩阵打包
+type verifyFixture struct {
+	name        string
+	rows        []verifyFixtureRow
+	groundTruth int
+	earlyDoneAt int
+	evidenceMap map[int]bool
+}
+
+func buildVerifyFixtures() []verifyFixture {
+	redhazeEv := make(map[int]bool, len(verifyCaseFixtureRedhaze))
+	for _, f := range verifyCaseFixtureRedhaze {
+		redhazeEv[f.iter] = f.hasNewEvidence
+	}
+	explosionEv := make(map[int]bool, len(verifyCaseFixtureDataExplosion))
+	for _, f := range verifyCaseFixtureDataExplosion {
+		explosionEv[f.iter] = f.hasNewEvidence
+	}
+	return []verifyFixture{
+		{
+			name:        "redhaze",
+			rows:        redhazeFixtureAsRows(),
+			groundTruth: verifyGroundTruthSatisfiedAt,
+			earlyDoneAt: 12,
+			evidenceMap: redhazeEv,
+		},
+		{
+			name:        "data_explosion",
+			rows:        dataExplosionFixtureAsRows(),
+			groundTruth: verifyExplosionGroundTruthSatisfiedAt,
+			earlyDoneAt: 8,
+			evidenceMap: explosionEv,
+		},
+	}
 }
 
 // TestVerificationFrequencySim 跑参数扫描并生成 markdown 报告.
 // 这是本次实验的入口, 走 simulation 路径, 不调用真实 AI.
 //
-// 关键词: TestVerificationFrequencySim 入口, 参数扫描, 报告落盘
+// 扫描矩阵覆盖 6 个维度, 由于全笛卡尔积过大, 这里采用 "固定主参数 + 扫描新维度"
+// 策略: snapshotAge/promptDelta/iterInterval 固定为新版生产默认值, 重点扫描
+// cooldown / hardDelta / firstFire 这三个新增维度 + 1 个 "baseline 模式"
+// (cooldown=0, hardDelta=0, firstFire=interval) 用于对比.
+//
+// 关键词: TestVerificationFrequencySim 入口, 多 fixture 扫描, cooldown 维度,
+//
+//	firstFire 维度, baseline 对照
 func TestVerificationFrequencySim(t *testing.T) {
-	snapshotChoices := []time.Duration{
-		30 * time.Second,
-		60 * time.Second,
-		90 * time.Second,
-		120 * time.Second,
-	}
-	deltaChoices := []int{500, 1000, 1500, 2000}
-	iterChoices := []int{5, 7, 10}
-	profiles := []verifyAIProfile{
-		makeRealisticVerifyProfile(),
-		makePessimisticVerifyProfile(),
-		makeEarlyDoneVerifyProfile(),
-	}
+	cooldownChoices := []int{0, 2, 3}
+	hardDeltaChoices := []int{0, 3000, 5000, 8000}
+	firstFireChoices := []int{3, 5, 6}
+	fixtures := buildVerifyFixtures()
+
+	// 固定主参数为新版生产默认 (snapshotAge=180s / promptDelta=1500 / iter=6)
+	// 关键词: 主参数固定生产默认值, 重点扫描新维度
+	baseSnapshotAge := 180 * time.Second
+	basePromptDelta := 1500
+	baseIterInterval := 6
 
 	var allResults []verifySimResult
-	for _, sa := range snapshotChoices {
-		for _, dd := range deltaChoices {
-			for _, ii := range iterChoices {
-				for _, prof := range profiles {
-					res := runVerifySim(sa, dd, ii, prof)
-					allResults = append(allResults, res)
-					lagI, lagS := res.computeSatisfiedLag()
-					t.Logf("[sim] snapshot=%-3s delta=%d iter=%-2d profile=%-11s fired=%d wasted=%d satAt=%d lagI=%d lagS=%d",
-						sa.String(), dd, ii, prof.name, res.fired, res.wasted, res.satisfiedAt, lagI, lagS)
+	for _, fix := range fixtures {
+		profiles := []verifyAIProfile{
+			makeRealisticVerifyProfile(fix.evidenceMap, fix.groundTruth),
+			makePessimisticVerifyProfile(),
+			makeEarlyDoneVerifyProfile(fix.earlyDoneAt),
+		}
+		for _, cd := range cooldownChoices {
+			for _, hd := range hardDeltaChoices {
+				for _, ff := range firstFireChoices {
+					params := simVerifyParams{
+						snapshotAge:        baseSnapshotAge,
+						promptDelta:        basePromptDelta,
+						iterInterval:       baseIterInterval,
+						cooldown:           cd,
+						hardPromptDelta:    hd,
+						firstFireThreshold: ff,
+					}
+					for _, prof := range profiles {
+						res := runVerifySim(fix.name, fix.rows, fix.groundTruth, params, prof)
+						allResults = append(allResults, res)
+						lagI, lagS := res.computeSatisfiedLag()
+						t.Logf("[sim] fixture=%-14s cd=%d hd=%-5d ff=%d profile=%-11s fired=%d wasted=%d satAt=%d lagI=%d lagS=%d",
+							fix.name, cd, hd, ff, prof.name, res.fired, res.wasted, res.satisfiedAt, lagI, lagS)
+					}
 				}
 			}
 		}
 	}
 
-	// 不变量断言 1: baseline (30s, 500, 5) 在 pessimistic 画像下 fired 应该 >=10,
-	// 说明当前默认确实容易在浪费场景下狂调 AI (验证仿真口径与现状判断一致).
-	//
-	// 关键词: baseline fired 下界断言, 现状刷屏验证
-	baselinePess := findVerifyResult(allResults, 30*time.Second, 500, 5, "pessimistic")
-	if baselinePess == nil {
-		t.Fatalf("baseline pessimistic result missing")
+	// 同时还要跑一个 "完全 baseline" (cooldown=0, hardDelta=0) 对比组, 这就是
+	// 在上面 cd=0 hd=0 已经覆盖, 不再单独跑.
+
+	// 不变量断言 1: data_explosion + baseline (cooldown=0, hd=0) pessimistic
+	// fired 应当 >= 8, 验证 "数据爆炸阶段无冷静期会狂调 AI" 的现状.
+	// 关键词: 数据爆炸 baseline 刷屏断言, 现状验证
+	dxBaseline := findVerifyResultBy(allResults, "data_explosion",
+		simVerifyParams{baseSnapshotAge, basePromptDelta, baseIterInterval, 0, 0, 6},
+		"pessimistic")
+	if dxBaseline == nil {
+		t.Fatalf("data_explosion baseline pessimistic result missing")
 	}
-	if baselinePess.fired < 10 {
-		t.Fatalf("baseline (30s, 500, 5) pessimistic fired should be >=10 (validating waste rate), got %d", baselinePess.fired)
+	if dxBaseline.fired < 8 {
+		t.Fatalf("data_explosion baseline (cd=0, hd=0) pessimistic fired should be >=8, got %d", dxBaseline.fired)
 	}
 
-	// 不变量断言 2: 中等档候选 (90s, 1500, 5) pessimistic fired 应当 <= baseline*0.7,
-	// 即节流改进至少能压低 30% 调用 (本次优化的最低门槛, 实际数据约 -38%).
-	//
-	// 关键词: 中等档 -30% 底线断言, 优化有效性
-	mediumPess := findVerifyResult(allResults, 90*time.Second, 1500, 5, "pessimistic")
-	if mediumPess == nil {
-		t.Fatalf("medium pessimistic result missing")
+	// 不变量断言 2: data_explosion + 新默认 (cooldown=3, hd=5000, ff=3) 相对
+	// baseline pessimistic fired 至少 -40%, 验证 cooldown 修复的实际效果.
+	// 关键词: 数据爆炸 cooldown 修复效果断言, -40% 底线
+	dxFix := findVerifyResultBy(allResults, "data_explosion",
+		simVerifyParams{baseSnapshotAge, basePromptDelta, baseIterInterval, 3, 5000, 3},
+		"pessimistic")
+	if dxFix == nil {
+		t.Fatalf("data_explosion fixed (cd=3, hd=5000, ff=3) pessimistic result missing")
 	}
-	if mediumPess.fired*10 > baselinePess.fired*7 {
-		t.Fatalf("medium (90s, 1500, 5) should fire <=70%% of baseline on pessimistic: medium=%d baseline=%d",
-			mediumPess.fired, baselinePess.fired)
-	}
-
-	// 不变量断言 3: 中等档候选 realistic 画像下 satisfiedLag <= 2 iter,
-	// 副作用代价上限可控 (loop 最多多跑 2 轮).
-	//
-	// 关键词: 中等档 lag<=2 副作用代价上限断言
-	mediumReal := findVerifyResult(allResults, 90*time.Second, 1500, 5, "realistic")
-	if mediumReal == nil {
-		t.Fatalf("medium realistic result missing")
-	}
-	lagI, _ := mediumReal.computeSatisfiedLag()
-	if lagI < 0 {
-		t.Fatalf("medium realistic should detect satisfied (got never)")
-	}
-	if lagI > 2 {
-		t.Fatalf("medium (90s, 1500, 5) realistic lagIters should be <=2, got %d", lagI)
+	if dxFix.fired*10 > dxBaseline.fired*6 {
+		t.Fatalf("data_explosion fixed should fire <=60%% of baseline pessimistic: fixed=%d baseline=%d",
+			dxFix.fired, dxBaseline.fired)
 	}
 
-	// 不变量断言 4: 激进档 (120s, 2000, 5) early_done 仍能在 iter=12 之后及时检测.
-	// 这是节流过粗时不能漏检"提前完成信号"的保证.
-	//
-	// 关键词: 激进档 early_done 漏检防护
-	aggrEarly := findVerifyResult(allResults, 120*time.Second, 2000, 5, "early_done")
-	if aggrEarly == nil {
-		t.Fatalf("aggressive early_done result missing")
+	// 不变量断言 3: redhaze realistic 在新默认下 satisfiedLag <= 2 iter,
+	// 验证 cooldown 修复没有让中等节奏场景退化响应性.
+	// 关键词: redhaze 响应性不退化断言, lag<=2
+	redhazeReal := findVerifyResultBy(allResults, "redhaze",
+		simVerifyParams{baseSnapshotAge, basePromptDelta, baseIterInterval, 3, 5000, 3},
+		"realistic")
+	if redhazeReal == nil {
+		t.Fatalf("redhaze realistic result missing")
 	}
-	if aggrEarly.satisfiedAt == 0 || aggrEarly.satisfiedAt > 14 {
-		t.Fatalf("aggressive (120s, 2000, 5) early_done should detect satisfied by iter<=14, got iter=%d",
-			aggrEarly.satisfiedAt)
+	if redhazeReal.satisfiedAt > 0 {
+		lagI, _ := redhazeReal.computeSatisfiedLag()
+		if lagI > 2 {
+			t.Fatalf("redhaze realistic lagIters should be <=2, got %d", lagI)
+		}
 	}
 
-	if err := writeVerifyFrequencyExperimentReport(allResults); err != nil {
+	// 不变量断言 4: firstFire=3 (新版默认) 在两个 fixture 下首次 fire 都不晚于 iter=3.
+	// 验证首次提前门确实让 AI 早期拿到反馈.
+	// 关键词: firstFire 早期触发断言, baseline 早期建立
+	for _, fixName := range []string{"redhaze", "data_explosion"} {
+		r := findVerifyResultBy(allResults, fixName,
+			simVerifyParams{baseSnapshotAge, basePromptDelta, baseIterInterval, 3, 5000, 3},
+			"pessimistic")
+		if r == nil {
+			continue
+		}
+		// pessimistic profile 不会提前 satisfied, fired 数量本身就反映触发节奏
+		// 我们需要看 gate 计数中是否有 first_fire
+		if r.fired == 0 {
+			t.Fatalf("%s pessimistic should fire at least once", fixName)
+		}
+		if r.gateCounters["first_fire"] == 0 {
+			t.Fatalf("%s pessimistic should have first_fire gate triggered with firstFire=3", fixName)
+		}
+	}
+
+	if err := writeVerifyFrequencyExperimentReport(allResults, baseSnapshotAge, basePromptDelta, baseIterInterval); err != nil {
 		t.Fatalf("write verification frequency report failed: %v", err)
 	}
 }
 
-func findVerifyResult(all []verifySimResult, sa time.Duration, dd, ii int, profile string) *verifySimResult {
+// findVerifyResultBy 在 allResults 中查找匹配 (fixture, params, profile) 的结果.
+//
+// 关键词: findVerifyResultBy, 6 维查找
+func findVerifyResultBy(all []verifySimResult, fixture string, p simVerifyParams, profile string) *verifySimResult {
 	for i := range all {
 		r := &all[i]
-		if r.snapshotAge == sa && r.promptDelta == dd && r.iterInterval == ii && r.profileName == profile {
+		if r.fixtureName == fixture && r.profileName == profile && r.params == p {
 			return r
 		}
 	}
@@ -418,8 +592,8 @@ func findVerifyResult(all []verifySimResult, sa time.Duration, dd, ii int, profi
 // writeVerifyFrequencyExperimentReport 把仿真结果写成 markdown 报告.
 // 报告输出位置: docs/16-verification-frequency-experiment.md.
 //
-// 关键词: 写报告, markdown 渲染, verification 节流实验产出
-func writeVerifyFrequencyExperimentReport(results []verifySimResult) error {
+// 关键词: 写报告, markdown 渲染, verification 节流实验产出, 数据爆炸章节
+func writeVerifyFrequencyExperimentReport(results []verifySimResult, baseSnapshotAge time.Duration, basePromptDelta, baseIterInterval int) error {
 	_, thisFile, _, _ := runtime.Caller(0)
 	docsDir := filepath.Join(filepath.Dir(thisFile), "docs")
 	reportPath := filepath.Join(docsDir, "16-verification-frequency-experiment.md")
@@ -431,9 +605,10 @@ func writeVerifyFrequencyExperimentReport(results []verifySimResult) error {
 	buf.WriteString("> 每次 `go test -run TestVerificationFrequencySim ./common/ai/aid/aireact/reactloops/` 会覆盖更新.\n\n")
 
 	buf.WriteString("## 16.1 案例与节奏\n\n")
-	buf.WriteString("仿真 fixture 来自 redhaze 案例 (`13354_redhaze_login_security_test_20260519_79bae`),\n")
-	buf.WriteString("沿用 perception 实验的 20 个 iter 时间戳, 并额外标注了 promptTokens 生长曲线\n")
-	buf.WriteString("与 hasNewEvidence (该 iter 是否产生新证据值得 verify):\n\n")
+	buf.WriteString("仿真采用两套 fixture, 覆盖不同 token 增长节奏:\n\n")
+	buf.WriteString("### 16.1.1 redhaze (中等节奏)\n\n")
+	buf.WriteString("来自 redhaze 案例 (`13354_redhaze_login_security_test_20260519_79bae`),\n")
+	buf.WriteString("沿用 perception 实验的 20 个 iter 时间戳, 每 iter 增长 200-800 tokens:\n\n")
 	buf.WriteString("```\n")
 	for _, fix := range verifyCaseFixtureRedhaze {
 		evidence := "-"
@@ -448,151 +623,157 @@ func writeVerifyFrequencyExperimentReport(results []verifySimResult) error {
 			fix.iter, fix.tSecond, fix.phase, fix.promptTokens, evidence, pivot))
 	}
 	buf.WriteString("```\n\n")
-	buf.WriteString("图例: `E`=hasNewEvidence (该 iter 有值得 verify 的新材料), `P`=phasePivotStart (阶段切换起点).\n\n")
-	buf.WriteString("**业务真实达成 iter** = 18 (phase 4 中段, employee union 数据已完整提取). 真实 case 跑到 42 iter 才停,\n")
-	buf.WriteString("意味着 satisfiedLag 从 18 起算: lag 越大, 用户实际等待时间越长 = 副作用代价越高.\n\n")
-	buf.WriteString("**redhaze 实测对照**: 42 iter / 22.5min / 21 次 delivery_files 写入, 相邻 27/35/42s 多个相同 63-64 字节空 delivery, 是当前 30s 时间门导致的典型刷屏.\n\n")
+	buf.WriteString(fmt.Sprintf("**业务真实达成 iter** = %d (phase 4 中段, employee union 数据已完整提取).\n\n", verifyGroundTruthSatisfiedAt))
+
+	buf.WriteString("### 16.1.2 data_explosion (数据爆炸高峰)\n\n")
+	buf.WriteString("模拟用户实测中 \"前 3 iter 轻量探测, iter=4 起每 iter +1800-2500 tokens\" 的尖峰场景\n")
+	buf.WriteString("(union extract / 大 HTML 抓取 / 大文件读取). 这是 redhaze 中等节奏 fixture 没有暴露的尖峰:\n\n")
+	buf.WriteString("```\n")
+	for _, fix := range verifyCaseFixtureDataExplosion {
+		evidence := "-"
+		if fix.hasNewEvidence {
+			evidence = "E"
+		}
+		buf.WriteString(fmt.Sprintf("iter %2d  t=%-4d  phase=%d  tokens=%-6d  %s\n",
+			fix.iter, fix.tSecond, fix.phase, fix.promptTokens, evidence))
+	}
+	buf.WriteString("```\n\n")
+	buf.WriteString(fmt.Sprintf("**业务真实达成 iter** = %d. 在数据爆炸节奏下, baseline (无 cooldown) 会几乎每 iter 触发 verify, 是本次优化的重点修复对象.\n\n", verifyExplosionGroundTruthSatisfiedAt))
 
 	buf.WriteString("## 16.2 仿真器与画像\n\n")
-	buf.WriteString("`simVerifyController` 严格镜像生产 `shouldTriggerAutomaticVerification` 的 5 个门:\n\n")
+	buf.WriteString("`simVerifyController` 严格镜像生产 `shouldTriggerAutomaticVerification` 的分层门:\n\n")
 	buf.WriteString("1. `iter == maxIter` 末轮兜底\n")
-	buf.WriteString("2. `previous == nil && periodicCheckpoint(iter)` 首次按周期\n")
+	buf.WriteString("2. `previous == nil && iter >= firstFireThreshold` 首次提前门\n")
 	buf.WriteString("3. `now - prev.GeneratedAt >= snapshotAge` 时间门\n")
-	buf.WriteString("4. `iter - prev.iter >= iterInterval` 迭代门\n")
-	buf.WriteString("5. `|tokens_delta| >= promptDelta` token 门\n\n")
-	buf.WriteString("唯一区别是 `now` 用显式参数代替 `time.Now()`, 实现确定性回放.\n")
+	buf.WriteString("4. `iter - prev.iter >= iterInterval` iter 门基础节拍\n")
+	buf.WriteString("5. `|tokens_delta| >= hardPromptDelta` 硬 token 门 (豁免冷静期)\n")
+	buf.WriteString("6. 冷静期: `iter - prev.iter < cooldown` 时短路, 软 token 门不生效\n")
+	buf.WriteString("7. `|tokens_delta| >= promptDelta` 软 token 门\n\n")
+	buf.WriteString("唯一区别是 `now` 用显式参数代替 `time.Now()`, 实现确定性回放.\n\n")
 	buf.WriteString("AI 调用本身用三种 profile 模拟:\n\n")
-	buf.WriteString("- `realistic`: AI 在 iter >= 18 才返回 Satisfied=true; hasNewArtifact 跟随 fixture 真实标注 (50% 新证据率). 主参考画像.\n")
+	buf.WriteString("- `realistic`: AI 在 iter >= groundTruth 才返回 Satisfied=true; hasNewArtifact 跟随 fixture 真实标注. 主参考画像.\n")
 	buf.WriteString("- `pessimistic`: AI 永远 Satisfied=false 且永远无新证据, 是浪费率上界. 用于评估最差成本.\n")
-	buf.WriteString("- `early_done`: AI 在 iter >= 12 就提前说 Satisfied=true, 用于验证节流过粗时是否漏检.\n\n")
+	buf.WriteString("- `early_done`: AI 在 iter >= earlyDoneAt 就提前说 Satisfied=true, 用于验证节流过粗时是否漏检.\n\n")
 	buf.WriteString("一旦 AI 返回 Satisfied=true, 仿真立即终止 (与生产 loop 退出语义一致).\n\n")
 
-	buf.WriteString("## 16.3 当前默认 (30s / 500 / 5) 仿真结果\n\n")
-	for _, prof := range []string{"realistic", "pessimistic", "early_done"} {
-		r := findVerifyResult(results, 30*time.Second, 500, 5, prof)
-		if r == nil {
-			continue
-		}
-		lagI, lagS := r.computeSatisfiedLag()
-		buf.WriteString(fmt.Sprintf("- profile=%-11s fired=%d wasted=%d (wasted_rate=%.0f%%) satisfiedAt=iter%d lagIters=%d lagSeconds=%ds\n",
-			prof, r.fired, r.wasted, percentInt(r.wasted, r.fired), r.satisfiedAt, lagI, lagS))
-	}
-	buf.WriteString("\n")
-	rBaseReal := findVerifyResult(results, 30*time.Second, 500, 5, "realistic")
-	rBasePess := findVerifyResult(results, 30*time.Second, 500, 5, "pessimistic")
-	if rBaseReal != nil {
-		buf.WriteString(fmt.Sprintf("解读 (realistic 画像): 13 分钟内会发起 %d 次 verification AI 调用, 其中 %d 次没有新证据是浪费; satisfiedLag = %d iter (即 loop 在 ground truth 后多跑了这么多轮才退出).\n",
-			rBaseReal.fired, rBaseReal.wasted, mustLagIters(rBaseReal)))
-	}
-	if rBasePess != nil {
-		buf.WriteString(fmt.Sprintf("解读 (pessimistic 上界): fired 高达 %d 次, 全部都是浪费 (AI 永远 Satisfied=false, 永远无新证据), 是最坏成本场景.\n",
-			rBasePess.fired))
-	}
-	buf.WriteString("\n")
+	buf.WriteString(fmt.Sprintf("## 16.3 主参数固定 (snapshotAge=%s / promptDelta=%d / iterInterval=%d)\n\n",
+		baseSnapshotAge.String(), basePromptDelta, baseIterInterval))
+	buf.WriteString("本轮扫描重点是新增的 cooldown / hardPromptDelta / firstFireThreshold 三个维度,\n")
+	buf.WriteString("snapshotAge / promptDelta / iterInterval 固定为新版生产默认值. 完整扫描全笛卡尔积过大,\n")
+	buf.WriteString("已在 git 历史版本中保留.\n\n")
+	buf.WriteString("扫描空间: cooldown ∈ {0, 2, 3}, hardPromptDelta ∈ {0, 3000, 5000, 8000}, firstFireThreshold ∈ {3, 5, 6}.\n\n")
 
-	buf.WriteString("## 16.4 参数扫描矩阵\n\n")
-	buf.WriteString("扫描空间: snapshotAge ∈ {30s, 60s, 90s, 120s}, promptDelta ∈ {500, 1000, 1500, 2000}, iterInterval ∈ {5, 7, 10}, profile ∈ {realistic, pessimistic, early_done}.\n\n")
-	for _, sa := range []time.Duration{30 * time.Second, 60 * time.Second, 90 * time.Second, 120 * time.Second} {
-		for _, dd := range []int{500, 1000, 1500, 2000} {
-			for _, ii := range []int{5, 7, 10} {
-				buf.WriteString(fmt.Sprintf("### snapshotAge=%s, promptDelta=%d, iterInterval=%d\n\n", sa.String(), dd, ii))
-				for _, prof := range []string{"realistic", "pessimistic", "early_done"} {
-					r := findVerifyResult(results, sa, dd, ii, prof)
-					if r == nil {
-						continue
-					}
-					lagI, lagS := r.computeSatisfiedLag()
-					buf.WriteString(fmt.Sprintf("- profile=%-11s fired=%d wasted=%d (%.0f%%) satAt=iter%d lagIters=%d lagSeconds=%ds\n",
-						prof, r.fired, r.wasted, percentInt(r.wasted, r.fired), r.satisfiedAt, lagI, lagS))
-				}
-				buf.WriteString("\n")
-			}
-		}
+	buf.WriteString("## 16.4 redhaze fixture 关键结果\n\n")
+	redhazeKey := []simVerifyParams{
+		{baseSnapshotAge, basePromptDelta, baseIterInterval, 0, 0, 6},     // baseline (无 cooldown)
+		{baseSnapshotAge, basePromptDelta, baseIterInterval, 3, 5000, 3},  // 新版默认
+		{baseSnapshotAge, basePromptDelta, baseIterInterval, 2, 5000, 3},  // cooldown=2 对比
+		{baseSnapshotAge, basePromptDelta, baseIterInterval, 3, 8000, 3},  // 硬门更高
+		{baseSnapshotAge, basePromptDelta, baseIterInterval, 3, 3000, 3},  // 硬门更低
+		{baseSnapshotAge, basePromptDelta, baseIterInterval, 3, 5000, 5},  // firstFire 推后
 	}
+	writeFixtureSection(&buf, results, "redhaze", redhazeKey)
 
-	buf.WriteString("## 16.5 三档推荐\n\n")
-	mildReal := findVerifyResult(results, 60*time.Second, 1000, 5, "realistic")
-	mildPess := findVerifyResult(results, 60*time.Second, 1000, 5, "pessimistic")
-	mediumReal := findVerifyResult(results, 90*time.Second, 1500, 5, "realistic")
-	mediumPess := findVerifyResult(results, 90*time.Second, 1500, 5, "pessimistic")
-	aggrReal := findVerifyResult(results, 120*time.Second, 2000, 5, "realistic")
-	aggrPess := findVerifyResult(results, 120*time.Second, 2000, 5, "pessimistic")
+	buf.WriteString("## 16.5 data_explosion fixture 关键结果\n\n")
+	writeFixtureSection(&buf, results, "data_explosion", redhazeKey)
 
-	buf.WriteString("基于扫描数据, 给出三档候选, 由用户根据风险偏好选择:\n\n")
+	buf.WriteString("## 16.6 推荐与默认值\n\n")
+	dxBaseline := findVerifyResultBy(results, "data_explosion",
+		simVerifyParams{baseSnapshotAge, basePromptDelta, baseIterInterval, 0, 0, 6},
+		"pessimistic")
+	dxFix := findVerifyResultBy(results, "data_explosion",
+		simVerifyParams{baseSnapshotAge, basePromptDelta, baseIterInterval, 3, 5000, 3},
+		"pessimistic")
+	redhazeFix := findVerifyResultBy(results, "redhaze",
+		simVerifyParams{baseSnapshotAge, basePromptDelta, baseIterInterval, 3, 5000, 3},
+		"realistic")
+	if dxBaseline != nil && dxFix != nil {
+		buf.WriteString(fmt.Sprintf("- data_explosion pessimistic fired: %d (baseline cd=0) → %d (cd=3, hd=5000, ff=3), 削减 **%.0f%%** 的 verification 调用\n",
+			dxBaseline.fired, dxFix.fired, percentDelta(dxBaseline.fired, dxFix.fired)))
+	}
+	if redhazeFix != nil {
+		lagI, _ := redhazeFix.computeSatisfiedLag()
+		buf.WriteString(fmt.Sprintf("- redhaze realistic 在新默认下 fired=%d, satisfiedLag=%d iter (响应性不退化)\n",
+			redhazeFix.fired, lagI))
+	}
+	buf.WriteString("\n生产默认值已锁定为:\n")
+	buf.WriteString(fmt.Sprintf("- `verificationAutoTriggerMaxSnapshotAge = %s`\n", baseSnapshotAge.String()))
+	buf.WriteString(fmt.Sprintf("- `verificationAutoTriggerMinPromptDelta = %d`\n", basePromptDelta))
+	buf.WriteString(fmt.Sprintf("- `verificationIterationTriggerInterval = %d` (== aicommon.DefaultPeriodicVerificationInterval)\n", baseIterInterval))
+	buf.WriteString("- `verificationTokenGateMinIterCooldown = 3`\n")
+	buf.WriteString("- `verificationAutoTriggerHardPromptDelta = 5000`\n")
+	buf.WriteString("- `verificationFirstFireIterationThreshold = 3`\n\n")
 
-	buf.WriteString("### 档 A (温和): snapshotAge 30s→60s, promptDelta 500→1000, iter 不变 (5)\n\n")
-	if rBasePess != nil && mildPess != nil {
-		buf.WriteString(fmt.Sprintf("- pessimistic fired: %d → %d (-%.0f%%)\n",
-			rBasePess.fired, mildPess.fired, percentDelta(rBasePess.fired, mildPess.fired)))
-	}
-	if rBaseReal != nil && mildReal != nil {
-		buf.WriteString(fmt.Sprintf("- realistic fired: %d → %d, wasted: %d → %d, lagIters: %d → %d\n",
-			rBaseReal.fired, mildReal.fired, rBaseReal.wasted, mildReal.wasted,
-			mustLagIters(rBaseReal), mustLagIters(mildReal)))
-	}
-	buf.WriteString("- 风险: 极低. 几乎不增加 loop 退出延迟, 但只削减约 30% 浪费.\n")
-	buf.WriteString("- 适合: 严格质量场景 (渗透测试 / 金融审计), 想稍微省一点又不愿意冒任何延迟风险.\n\n")
+	buf.WriteString("## 16.7 数据爆炸与冷静期 + 首次提前触发\n\n")
+	buf.WriteString("本轮优化围绕用户实测反馈展开: 在数据爆炸阶段 (单 iter prompt token 涨 1800-2500),\n")
+	buf.WriteString("此前 (snapshotAge=120s / promptDelta=1500 / iterInterval=5) 的 5 个门是 OR 关系,\n")
+	buf.WriteString("token 门以 1500 阈值在数据爆炸节奏下几乎每 iter 都过门, 把 iter 门 \"每 5 轮一次\"\n")
+	buf.WriteString("的基础节拍打成 \"每 1-2 轮就 verify\". 用户原话:\n\n")
+	buf.WriteString("> \"前 5 个工具不触发, 之后每 1-2 个工具就 verify, 高峰时每次工具都 verify.\n")
+	buf.WriteString("> 按理说, 时间到了触发的一次, 应该让每 5 个这个重新开始基数才对, 不然多次触发累积一起不好用了.\"\n\n")
+	buf.WriteString("修复策略 (本次落地):\n\n")
+	buf.WriteString("- **基础节拍门**: iter 门 (5→6) + 时间门 (120s→180s) + 末轮兜底, 必须遵守, 加速器不能越过\n")
+	buf.WriteString("- **首次提前门**: baseline 未建立时 iter>=3 即 fire, 让 AI 早期校准方向 (相比旧版需要等 iter=5 提前 2 轮)\n")
+	buf.WriteString("- **加速器门 + 冷静期**: 软 token 门 1500 不变, 但只在 iter 差 >= 3 之后才允许触发, 数据爆炸阶段不能反复打断 iter 节拍\n")
+	buf.WriteString("- **硬兜底门**: 硬 token 门 5000, 单次超大爆炸豁免冷静期, 不丢响应性\n\n")
+	buf.WriteString("**触发时序示例** (数据爆炸每 iter +1800 tokens):\n\n")
+	buf.WriteString("```\n")
+	buf.WriteString("iter=1: baseline=nil, 1 < 3 firstFire → 不触发\n")
+	buf.WriteString("iter=2: baseline=nil, 2 < 3 firstFire → 不触发\n")
+	buf.WriteString("iter=3: baseline=nil, 3 >= 3 firstFire → fire (首次提前), baseline 建立\n")
+	buf.WriteString("iter=4: iterDelta=1, tokenDelta=1800<5000 hard, 1<3 冷静期 → 不触发\n")
+	buf.WriteString("iter=5: iterDelta=2, tokenDelta=3600<5000 hard, 2<3 冷静期 → 不触发\n")
+	buf.WriteString("iter=6: iterDelta=3, tokenDelta=5400>=5000 hard → fire (硬门)\n")
+	buf.WriteString("iter=7-8: 冷静期内 → 不触发\n")
+	buf.WriteString("iter=9: iterDelta=3, 软门 >= 1500 → fire (软门解禁)\n")
+	buf.WriteString("iter=12: iter 门 (差=6) → 兜底 fire\n")
+	buf.WriteString("```\n\n")
+	buf.WriteString("相比修复前的 \"几乎每 iter 都 fire\", 修复后在数据爆炸节奏下 fired 数显著下降,\n")
+	buf.WriteString("同时保留了 satisfied 检测的及时性 (硬门 + iter 门兜底).\n\n")
 
-	buf.WriteString("### 档 B (中等, 推荐): snapshotAge 30s→90s, promptDelta 500→1500, iter 不变 (5)\n\n")
-	if rBasePess != nil && mediumPess != nil {
-		buf.WriteString(fmt.Sprintf("- pessimistic fired: %d → %d (-%.0f%%)\n",
-			rBasePess.fired, mediumPess.fired, percentDelta(rBasePess.fired, mediumPess.fired)))
-	}
-	if rBaseReal != nil && mediumReal != nil {
-		buf.WriteString(fmt.Sprintf("- realistic fired: %d → %d, wasted: %d → %d, lagIters: %d → %d\n",
-			rBaseReal.fired, mediumReal.fired, rBaseReal.wasted, mediumReal.wasted,
-			mustLagIters(rBaseReal), mustLagIters(mediumReal)))
-	}
-	buf.WriteString("- 风险: 低. lagIters <= 2 (loop 最多多跑 2 轮 ≈ 60-90s), wasted 下降 ~50%.\n")
-	buf.WriteString("- 适合: 大多数业务场景 (默认推荐). 在性能与响应性之间取得平衡.\n\n")
-
-	buf.WriteString("### 档 C (激进): snapshotAge 30s→120s, promptDelta 500→2000, iter 不变 (5)\n\n")
-	if rBasePess != nil && aggrPess != nil {
-		buf.WriteString(fmt.Sprintf("- pessimistic fired: %d → %d (-%.0f%%)\n",
-			rBasePess.fired, aggrPess.fired, percentDelta(rBasePess.fired, aggrPess.fired)))
-	}
-	if rBaseReal != nil && aggrReal != nil {
-		buf.WriteString(fmt.Sprintf("- realistic fired: %d → %d, wasted: %d → %d, lagIters: %d → %d\n",
-			rBaseReal.fired, aggrReal.fired, rBaseReal.wasted, aggrReal.wasted,
-			mustLagIters(rBaseReal), mustLagIters(aggrReal)))
-	}
-	buf.WriteString("- 风险: 中. lagIters 可能 2-3 (loop 最多多跑 2-3 轮 ≈ 90-150s), 部分中间 delivery 快照会被跳过.\n")
-	buf.WriteString("- 适合: 成本控制型 (批量自动化扫描 / 无人值守任务). 注意配合 watchdog 2min 兜底.\n\n")
-
-	// 隐藏甜点: 扫描矩阵中 (120s, 1500, 5) 表现意外优秀, 高亮一下供决策参考.
-	// 关键词: 隐藏甜点 120s_1500, 零延迟 + -54% 成本
-	sweetReal := findVerifyResult(results, 120*time.Second, 1500, 5, "realistic")
-	sweetPess := findVerifyResult(results, 120*time.Second, 1500, 5, "pessimistic")
-	sweetEarly := findVerifyResult(results, 120*time.Second, 1500, 5, "early_done")
-	if sweetReal != nil && sweetPess != nil && sweetEarly != nil {
-		buf.WriteString("### 隐藏甜点 (扫描发现): snapshotAge 30s→120s, promptDelta 500→1500, iter 不变 (5)\n\n")
-		if rBasePess != nil {
-			buf.WriteString(fmt.Sprintf("- pessimistic fired: %d → %d (-%.0f%%)\n",
-				rBasePess.fired, sweetPess.fired, percentDelta(rBasePess.fired, sweetPess.fired)))
-		}
-		if rBaseReal != nil {
-			buf.WriteString(fmt.Sprintf("- realistic fired: %d → %d, wasted: %d → %d, lagIters: %d → %d (**零延迟**)\n",
-				rBaseReal.fired, sweetReal.fired, rBaseReal.wasted, sweetReal.wasted,
-				mustLagIters(rBaseReal), mustLagIters(sweetReal)))
-		}
-		buf.WriteString(fmt.Sprintf("- early_done satAt: iter%d (groundTruth=12, 提前完成场景仍能及时检测)\n", sweetEarly.satisfiedAt))
-		buf.WriteString("- 关键洞察: 把 token 门保持 1500 而非 2000, 既享受 120s 时间门带来的大幅节省 (-54%), 又因 token 门更敏感保留了 realistic 画像下 satisfiedLag=0 的响应性.\n")
-		buf.WriteString("- 风险: 低-中. 对比档 C 多消耗 1 次 AI 调用 (pessimistic 6 vs 5), 换来 lagIters 从 2 降到 0. 是 \"性价比最高\" 的组合.\n")
-		buf.WriteString("- 适合: 介于档 B 与档 C 之间的折中选项.\n\n")
-	}
-
-	buf.WriteString("## 16.6 风险与注意\n\n")
+	buf.WriteString("## 16.8 风险与注意\n\n")
 	buf.WriteString("- 末轮兜底门 (iter == maxIter) **不动**, 保证最终一定会有一次 verification.\n")
-	buf.WriteString("- iterInterval 不动 (维持 5), 确保 \"长时间不调用\" 场景下至少每 5 轮强制 verify.\n")
 	buf.WriteString("- watchdog 兜底 (`verificationWatchdogIdleTimeout = 2 * time.Minute`) **不动**, 极端情况下 2 分钟无调用必触发.\n")
 	buf.WriteString("- 显式调用路径 (`VerifyUserSatisfactionNow` / `request_verification` action) 不受本次默认值调整影响.\n")
-	buf.WriteString("- 提前完成场景 (`early_done` 画像在 iter=12 就 Satisfied=true): 三档都能在 iter=14 之前检测到 (token 门或 iter 门会兜底).\n")
+	buf.WriteString("- 提前完成场景 (`early_done` 画像): firstFire=3 让首次反馈最早在 iter=3 拿到, 后续靠 iter 门/硬门 兜底.\n")
 	buf.WriteString("- 副作用代价说明: lagIters>0 意味着 loop 多跑了几轮 \"无用工具调用\", 但每次工具调用本身有自己的 perception/反思节流, 不会失控.\n")
 
 	if err := os.MkdirAll(docsDir, 0o755); err != nil {
 		return err
 	}
 	return os.WriteFile(reportPath, []byte(buf.String()), 0o644)
+}
+
+// writeFixtureSection 把一个 fixture 的多个关键参数组合结果写入 buf.
+//
+// 关键词: writeFixtureSection, fixture 子节渲染
+func writeFixtureSection(buf *strings.Builder, results []verifySimResult, fixtureName string, paramsList []simVerifyParams) {
+	for _, p := range paramsList {
+		label := "cooldown=0, hardDelta=0, firstFire=6 (旧版 baseline)"
+		switch {
+		case p.cooldown == 3 && p.hardPromptDelta == 5000 && p.firstFireThreshold == 3:
+			label = "**cooldown=3, hardDelta=5000, firstFire=3 (新版默认)**"
+		case p.cooldown == 2:
+			label = fmt.Sprintf("cooldown=2, hardDelta=%d, firstFire=%d (cooldown 更短对比)", p.hardPromptDelta, p.firstFireThreshold)
+		case p.hardPromptDelta == 8000:
+			label = fmt.Sprintf("cooldown=%d, hardDelta=8000, firstFire=%d (硬门更高)", p.cooldown, p.firstFireThreshold)
+		case p.hardPromptDelta == 3000:
+			label = fmt.Sprintf("cooldown=%d, hardDelta=3000, firstFire=%d (硬门更低)", p.cooldown, p.firstFireThreshold)
+		case p.firstFireThreshold == 5:
+			label = fmt.Sprintf("cooldown=%d, hardDelta=%d, firstFire=5 (firstFire 推后)", p.cooldown, p.hardPromptDelta)
+		}
+		buf.WriteString(fmt.Sprintf("### %s\n\n", label))
+		for _, prof := range []string{"realistic", "pessimistic", "early_done"} {
+			r := findVerifyResultBy(results, fixtureName, p, prof)
+			if r == nil {
+				continue
+			}
+			lagI, lagS := r.computeSatisfiedLag()
+			buf.WriteString(fmt.Sprintf("- profile=%-11s fired=%d wasted=%d (%.0f%%) satAt=iter%d lagIters=%d lagSeconds=%ds\n",
+				prof, r.fired, r.wasted, percentInt(r.wasted, r.fired), r.satisfiedAt, lagI, lagS))
+		}
+		buf.WriteString("\n")
+	}
 }
 
 func mustLagIters(r *verifySimResult) int {

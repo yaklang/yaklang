@@ -255,13 +255,24 @@ WithUseSpeedPriorityAICallback(true)         // 用 speed 模型（默认 qualit
 
 ### `MaybeVerifyUserSatisfaction` 的节流条件
 
-源码 [verification_gate.go:172-200](../verification_gate.go)：必须满足以下任一：
+源码 [verification_gate.go](../verification_gate.go) 中的 `shouldTriggerAutomaticVerification`,
+按优先级走分层门（详细数据见 [16-verification-frequency-experiment.md](16-verification-frequency-experiment.md)）：
 
-1. 周期到了（`ShouldTriggerPeriodicCheckpointOnIteration`，默认每 N 轮）
-2. 上次验证已经过了 30 秒（`verificationAutoTriggerMaxSnapshotAge`）
-3. prompt token 数变化 > 500（`verificationAutoTriggerMinPromptDelta`）
+1. **末轮兜底**: `iter == maxIterations`，保证最终一定 verify 一次
+2. **首次提前门**: baseline 未建立时 `iter >= 3`（`verificationFirstFireIterationThreshold`）即 fire，
+   让 AI 早期校准方向，相比旧版 "等到 iter 门才首次 fire" 提前 2-3 轮
+3. **时间门**: 上次验证已经过了 180 秒（`verificationAutoTriggerMaxSnapshotAge`，从 30s/120s 上调）
+4. **iter 门基础节拍**: iter 差 >= 6 轮（`verificationIterationTriggerInterval` ==
+   `aicommon.DefaultPeriodicVerificationInterval`，从 5 上调到 6）
+5. **硬 token 门**: 单次 prompt token 增量 >= 5000（`verificationAutoTriggerHardPromptDelta`），
+   单次超大数据爆炸豁免冷静期立即触发
+6. **冷静期**: 上次 fire 后 iter 差 < 3（`verificationTokenGateMinIterCooldown`）时，
+   软 token 门一律抑制，避免数据爆炸阶段反复打断 iter 节拍
+7. **软 token 门**: prompt token 增量 >= 1500（`verificationAutoTriggerMinPromptDelta`，
+   从 500 上调到 1500），冷静期之外才生效
 
-否则直接跳过，不调 LLM。
+任一条件命中即 fire，否则跳过。设计要点：基础节拍门 (1/3/4) 与硬兜底 (5) 不受冷静期影响；
+软 token 门 (7) 必须等冷静期结束才能加速触发。
 
 ### 验证输出
 

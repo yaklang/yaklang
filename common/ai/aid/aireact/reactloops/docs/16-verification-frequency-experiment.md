@@ -7,9 +7,12 @@
 
 ## 16.1 案例与节奏
 
-仿真 fixture 来自 redhaze 案例 (`13354_redhaze_login_security_test_20260519_79bae`),
-沿用 perception 实验的 20 个 iter 时间戳, 并额外标注了 promptTokens 生长曲线
-与 hasNewEvidence (该 iter 是否产生新证据值得 verify):
+仿真采用两套 fixture, 覆盖不同 token 增长节奏:
+
+### 16.1.1 redhaze (中等节奏)
+
+来自 redhaze 案例 (`13354_redhaze_login_security_test_20260519_79bae`),
+沿用 perception 实验的 20 个 iter 时间戳, 每 iter 增长 200-800 tokens:
 
 ```
 iter  1  t=0     phase=1  tokens=3000    EP
@@ -34,372 +37,195 @@ iter 19  t=735   phase=4  tokens=11200   -
 iter 20  t=770   phase=4  tokens=12000   E 
 ```
 
-图例: `E`=hasNewEvidence (该 iter 有值得 verify 的新材料), `P`=phasePivotStart (阶段切换起点).
+**业务真实达成 iter** = 18 (phase 4 中段, employee union 数据已完整提取).
 
-**业务真实达成 iter** = 18 (phase 4 中段, employee union 数据已完整提取). 真实 case 跑到 42 iter 才停,
-意味着 satisfiedLag 从 18 起算: lag 越大, 用户实际等待时间越长 = 副作用代价越高.
+### 16.1.2 data_explosion (数据爆炸高峰)
 
-**redhaze 实测对照**: 42 iter / 22.5min / 21 次 delivery_files 写入, 相邻 27/35/42s 多个相同 63-64 字节空 delivery, 是当前 30s 时间门导致的典型刷屏.
+模拟用户实测中 "前 3 iter 轻量探测, iter=4 起每 iter +1800-2500 tokens" 的尖峰场景
+(union extract / 大 HTML 抓取 / 大文件读取). 这是 redhaze 中等节奏 fixture 没有暴露的尖峰:
+
+```
+iter  1  t=0     phase=1  tokens=3000    E
+iter  2  t=15    phase=1  tokens=3300    -
+iter  3  t=32    phase=1  tokens=3600    E
+iter  4  t=50    phase=2  tokens=5400    E
+iter  5  t=75    phase=2  tokens=7700    -
+iter  6  t=95    phase=2  tokens=9900    E
+iter  7  t=122   phase=2  tokens=12300   -
+iter  8  t=145   phase=2  tokens=14500   E
+iter  9  t=178   phase=2  tokens=16800   -
+iter 10  t=200   phase=2  tokens=19000   E
+iter 11  t=235   phase=2  tokens=21300   -
+iter 12  t=261   phase=2  tokens=23400   E
+iter 13  t=290   phase=2  tokens=25900   -
+iter 14  t=320   phase=2  tokens=28100   E
+iter 15  t=348   phase=2  tokens=30400   -
+iter 16  t=375   phase=2  tokens=32500   E
+iter 17  t=405   phase=2  tokens=34800   -
+iter 18  t=438   phase=2  tokens=37000   E
+iter 19  t=472   phase=2  tokens=39100   -
+iter 20  t=500   phase=2  tokens=41300   E
+```
+
+**业务真实达成 iter** = 14. 在数据爆炸节奏下, baseline (无 cooldown) 会几乎每 iter 触发 verify, 是本次优化的重点修复对象.
 
 ## 16.2 仿真器与画像
 
-`simVerifyController` 严格镜像生产 `shouldTriggerAutomaticVerification` 的 5 个门:
+`simVerifyController` 严格镜像生产 `shouldTriggerAutomaticVerification` 的分层门:
 
 1. `iter == maxIter` 末轮兜底
-2. `previous == nil && periodicCheckpoint(iter)` 首次按周期
+2. `previous == nil && iter >= firstFireThreshold` 首次提前门
 3. `now - prev.GeneratedAt >= snapshotAge` 时间门
-4. `iter - prev.iter >= iterInterval` 迭代门
-5. `|tokens_delta| >= promptDelta` token 门
+4. `iter - prev.iter >= iterInterval` iter 门基础节拍
+5. `|tokens_delta| >= hardPromptDelta` 硬 token 门 (豁免冷静期)
+6. 冷静期: `iter - prev.iter < cooldown` 时短路, 软 token 门不生效
+7. `|tokens_delta| >= promptDelta` 软 token 门
 
 唯一区别是 `now` 用显式参数代替 `time.Now()`, 实现确定性回放.
+
 AI 调用本身用三种 profile 模拟:
 
-- `realistic`: AI 在 iter >= 18 才返回 Satisfied=true; hasNewArtifact 跟随 fixture 真实标注 (50% 新证据率). 主参考画像.
+- `realistic`: AI 在 iter >= groundTruth 才返回 Satisfied=true; hasNewArtifact 跟随 fixture 真实标注. 主参考画像.
 - `pessimistic`: AI 永远 Satisfied=false 且永远无新证据, 是浪费率上界. 用于评估最差成本.
-- `early_done`: AI 在 iter >= 12 就提前说 Satisfied=true, 用于验证节流过粗时是否漏检.
+- `early_done`: AI 在 iter >= earlyDoneAt 就提前说 Satisfied=true, 用于验证节流过粗时是否漏检.
 
 一旦 AI 返回 Satisfied=true, 仿真立即终止 (与生产 loop 退出语义一致).
 
-## 16.3 当前默认 (30s / 500 / 5) 仿真结果
+## 16.3 主参数固定 (snapshotAge=3m0s / promptDelta=1500 / iterInterval=6)
 
-- profile=realistic   fired=11 wasted=4 (wasted_rate=36%) satisfiedAt=iter18 lagIters=0 lagSeconds=0s
-- profile=pessimistic fired=13 wasted=13 (wasted_rate=100%) satisfiedAt=iter0 lagIters=-1 lagSeconds=-1s
-- profile=early_done  fired=7 wasted=0 (wasted_rate=0%) satisfiedAt=iter13 lagIters=0 lagSeconds=0s
+本轮扫描重点是新增的 cooldown / hardPromptDelta / firstFireThreshold 三个维度,
+snapshotAge / promptDelta / iterInterval 固定为新版生产默认值. 完整扫描全笛卡尔积过大,
+已在 git 历史版本中保留.
 
-解读 (realistic 画像): 13 分钟内会发起 11 次 verification AI 调用, 其中 4 次没有新证据是浪费; satisfiedLag = 0 iter (即 loop 在 ground truth 后多跑了这么多轮才退出).
-解读 (pessimistic 上界): fired 高达 13 次, 全部都是浪费 (AI 永远 Satisfied=false, 永远无新证据), 是最坏成本场景.
+扫描空间: cooldown ∈ {0, 2, 3}, hardPromptDelta ∈ {0, 3000, 5000, 8000}, firstFireThreshold ∈ {3, 5, 6}.
 
-## 16.4 参数扫描矩阵
+## 16.4 redhaze fixture 关键结果
 
-扫描空间: snapshotAge ∈ {30s, 60s, 90s, 120s}, promptDelta ∈ {500, 1000, 1500, 2000}, iterInterval ∈ {5, 7, 10}, profile ∈ {realistic, pessimistic, early_done}.
+### cooldown=0, hardDelta=0, firstFire=6 (旧版 baseline)
 
-### snapshotAge=30s, promptDelta=500, iterInterval=5
-
-- profile=realistic   fired=11 wasted=4 (36%) satAt=iter18 lagIters=0 lagSeconds=0s
-- profile=pessimistic fired=13 wasted=13 (100%) satAt=iter0 lagIters=-1 lagSeconds=-1s
-- profile=early_done  fired=7 wasted=0 (0%) satAt=iter13 lagIters=0 lagSeconds=0s
-
-### snapshotAge=30s, promptDelta=500, iterInterval=7
-
-- profile=realistic   fired=10 wasted=4 (40%) satAt=iter18 lagIters=0 lagSeconds=0s
-- profile=pessimistic fired=12 wasted=12 (100%) satAt=iter0 lagIters=-1 lagSeconds=-1s
-- profile=early_done  fired=6 wasted=0 (0%) satAt=iter13 lagIters=0 lagSeconds=0s
-
-### snapshotAge=30s, promptDelta=500, iterInterval=10
-
-- profile=realistic   fired=7 wasted=3 (43%) satAt=iter18 lagIters=0 lagSeconds=0s
-- profile=pessimistic fired=9 wasted=9 (100%) satAt=iter0 lagIters=-1 lagSeconds=-1s
-- profile=early_done  fired=3 wasted=0 (0%) satAt=iter13 lagIters=0 lagSeconds=0s
-
-### snapshotAge=30s, promptDelta=1000, iterInterval=5
-
-- profile=realistic   fired=10 wasted=5 (50%) satAt=iter18 lagIters=0 lagSeconds=0s
-- profile=pessimistic fired=12 wasted=12 (100%) satAt=iter0 lagIters=-1 lagSeconds=-1s
-- profile=early_done  fired=6 wasted=0 (0%) satAt=iter13 lagIters=0 lagSeconds=0s
-
-### snapshotAge=30s, promptDelta=1000, iterInterval=7
-
-- profile=realistic   fired=9 wasted=5 (56%) satAt=iter18 lagIters=0 lagSeconds=0s
-- profile=pessimistic fired=11 wasted=11 (100%) satAt=iter0 lagIters=-1 lagSeconds=-1s
-- profile=early_done  fired=5 wasted=0 (0%) satAt=iter13 lagIters=0 lagSeconds=0s
-
-### snapshotAge=30s, promptDelta=1000, iterInterval=10
-
-- profile=realistic   fired=7 wasted=4 (57%) satAt=iter18 lagIters=0 lagSeconds=0s
-- profile=pessimistic fired=9 wasted=9 (100%) satAt=iter0 lagIters=-1 lagSeconds=-1s
-- profile=early_done  fired=3 wasted=0 (0%) satAt=iter13 lagIters=0 lagSeconds=0s
-
-### snapshotAge=30s, promptDelta=1500, iterInterval=5
-
-- profile=realistic   fired=10 wasted=5 (50%) satAt=iter18 lagIters=0 lagSeconds=0s
-- profile=pessimistic fired=12 wasted=12 (100%) satAt=iter0 lagIters=-1 lagSeconds=-1s
-- profile=early_done  fired=6 wasted=0 (0%) satAt=iter13 lagIters=0 lagSeconds=0s
-
-### snapshotAge=30s, promptDelta=1500, iterInterval=7
-
-- profile=realistic   fired=9 wasted=5 (56%) satAt=iter18 lagIters=0 lagSeconds=0s
-- profile=pessimistic fired=11 wasted=11 (100%) satAt=iter0 lagIters=-1 lagSeconds=-1s
-- profile=early_done  fired=5 wasted=0 (0%) satAt=iter13 lagIters=0 lagSeconds=0s
-
-### snapshotAge=30s, promptDelta=1500, iterInterval=10
-
-- profile=realistic   fired=7 wasted=4 (57%) satAt=iter18 lagIters=0 lagSeconds=0s
-- profile=pessimistic fired=9 wasted=9 (100%) satAt=iter0 lagIters=-1 lagSeconds=-1s
-- profile=early_done  fired=3 wasted=0 (0%) satAt=iter13 lagIters=0 lagSeconds=0s
-
-### snapshotAge=30s, promptDelta=2000, iterInterval=5
-
-- profile=realistic   fired=10 wasted=5 (50%) satAt=iter18 lagIters=0 lagSeconds=0s
-- profile=pessimistic fired=12 wasted=12 (100%) satAt=iter0 lagIters=-1 lagSeconds=-1s
-- profile=early_done  fired=6 wasted=0 (0%) satAt=iter13 lagIters=0 lagSeconds=0s
-
-### snapshotAge=30s, promptDelta=2000, iterInterval=7
-
-- profile=realistic   fired=9 wasted=5 (56%) satAt=iter18 lagIters=0 lagSeconds=0s
-- profile=pessimistic fired=11 wasted=11 (100%) satAt=iter0 lagIters=-1 lagSeconds=-1s
-- profile=early_done  fired=5 wasted=0 (0%) satAt=iter13 lagIters=0 lagSeconds=0s
-
-### snapshotAge=30s, promptDelta=2000, iterInterval=10
-
-- profile=realistic   fired=7 wasted=4 (57%) satAt=iter18 lagIters=0 lagSeconds=0s
-- profile=pessimistic fired=9 wasted=9 (100%) satAt=iter0 lagIters=-1 lagSeconds=-1s
-- profile=early_done  fired=3 wasted=0 (0%) satAt=iter13 lagIters=0 lagSeconds=0s
-
-### snapshotAge=1m0s, promptDelta=500, iterInterval=5
-
-- profile=realistic   fired=10 wasted=3 (30%) satAt=iter18 lagIters=0 lagSeconds=0s
-- profile=pessimistic fired=12 wasted=12 (100%) satAt=iter0 lagIters=-1 lagSeconds=-1s
-- profile=early_done  fired=6 wasted=0 (0%) satAt=iter13 lagIters=0 lagSeconds=0s
-
-### snapshotAge=1m0s, promptDelta=500, iterInterval=7
-
-- profile=realistic   fired=9 wasted=3 (33%) satAt=iter18 lagIters=0 lagSeconds=0s
-- profile=pessimistic fired=11 wasted=11 (100%) satAt=iter0 lagIters=-1 lagSeconds=-1s
-- profile=early_done  fired=5 wasted=0 (0%) satAt=iter13 lagIters=0 lagSeconds=0s
-
-### snapshotAge=1m0s, promptDelta=500, iterInterval=10
-
-- profile=realistic   fired=7 wasted=3 (43%) satAt=iter18 lagIters=0 lagSeconds=0s
-- profile=pessimistic fired=9 wasted=9 (100%) satAt=iter0 lagIters=-1 lagSeconds=-1s
-- profile=early_done  fired=3 wasted=0 (0%) satAt=iter13 lagIters=0 lagSeconds=0s
-
-### snapshotAge=1m0s, promptDelta=1000, iterInterval=5
-
-- profile=realistic   fired=8 wasted=4 (50%) satAt=iter19 lagIters=1 lagSeconds=49s
-- profile=pessimistic fired=9 wasted=9 (100%) satAt=iter0 lagIters=-1 lagSeconds=-1s
-- profile=early_done  fired=5 wasted=0 (0%) satAt=iter13 lagIters=0 lagSeconds=0s
-
-### snapshotAge=1m0s, promptDelta=1000, iterInterval=7
-
-- profile=realistic   fired=7 wasted=4 (57%) satAt=iter19 lagIters=1 lagSeconds=49s
-- profile=pessimistic fired=8 wasted=8 (100%) satAt=iter0 lagIters=-1 lagSeconds=-1s
-- profile=early_done  fired=4 wasted=0 (0%) satAt=iter13 lagIters=0 lagSeconds=0s
-
-### snapshotAge=1m0s, promptDelta=1000, iterInterval=10
-
-- profile=realistic   fired=5 wasted=2 (40%) satAt=iter18 lagIters=0 lagSeconds=0s
-- profile=pessimistic fired=6 wasted=6 (100%) satAt=iter0 lagIters=-1 lagSeconds=-1s
-- profile=early_done  fired=2 wasted=0 (0%) satAt=iter12 lagIters=0 lagSeconds=0s
-
-### snapshotAge=1m0s, promptDelta=1500, iterInterval=5
-
-- profile=realistic   fired=7 wasted=3 (43%) satAt=iter18 lagIters=0 lagSeconds=0s
-- profile=pessimistic fired=8 wasted=8 (100%) satAt=iter0 lagIters=-1 lagSeconds=-1s
-- profile=early_done  fired=5 wasted=0 (0%) satAt=iter13 lagIters=0 lagSeconds=0s
-
-### snapshotAge=1m0s, promptDelta=1500, iterInterval=7
-
-- profile=realistic   fired=6 wasted=3 (50%) satAt=iter18 lagIters=0 lagSeconds=0s
-- profile=pessimistic fired=7 wasted=7 (100%) satAt=iter0 lagIters=-1 lagSeconds=-1s
-- profile=early_done  fired=4 wasted=0 (0%) satAt=iter13 lagIters=0 lagSeconds=0s
-
-### snapshotAge=1m0s, promptDelta=1500, iterInterval=10
-
-- profile=realistic   fired=5 wasted=2 (40%) satAt=iter18 lagIters=0 lagSeconds=0s
-- profile=pessimistic fired=6 wasted=6 (100%) satAt=iter0 lagIters=-1 lagSeconds=-1s
-- profile=early_done  fired=2 wasted=0 (0%) satAt=iter12 lagIters=0 lagSeconds=0s
-
-### snapshotAge=1m0s, promptDelta=2000, iterInterval=5
-
-- profile=realistic   fired=7 wasted=3 (43%) satAt=iter18 lagIters=0 lagSeconds=0s
-- profile=pessimistic fired=8 wasted=8 (100%) satAt=iter0 lagIters=-1 lagSeconds=-1s
-- profile=early_done  fired=5 wasted=0 (0%) satAt=iter13 lagIters=0 lagSeconds=0s
-
-### snapshotAge=1m0s, promptDelta=2000, iterInterval=7
-
-- profile=realistic   fired=6 wasted=3 (50%) satAt=iter18 lagIters=0 lagSeconds=0s
-- profile=pessimistic fired=7 wasted=7 (100%) satAt=iter0 lagIters=-1 lagSeconds=-1s
-- profile=early_done  fired=4 wasted=0 (0%) satAt=iter13 lagIters=0 lagSeconds=0s
-
-### snapshotAge=1m0s, promptDelta=2000, iterInterval=10
-
-- profile=realistic   fired=5 wasted=2 (40%) satAt=iter18 lagIters=0 lagSeconds=0s
-- profile=pessimistic fired=6 wasted=6 (100%) satAt=iter0 lagIters=-1 lagSeconds=-1s
-- profile=early_done  fired=2 wasted=0 (0%) satAt=iter12 lagIters=0 lagSeconds=0s
-
-### snapshotAge=1m30s, promptDelta=500, iterInterval=5
-
-- profile=realistic   fired=10 wasted=3 (30%) satAt=iter18 lagIters=0 lagSeconds=0s
-- profile=pessimistic fired=12 wasted=12 (100%) satAt=iter0 lagIters=-1 lagSeconds=-1s
-- profile=early_done  fired=6 wasted=0 (0%) satAt=iter13 lagIters=0 lagSeconds=0s
-
-### snapshotAge=1m30s, promptDelta=500, iterInterval=7
-
-- profile=realistic   fired=9 wasted=3 (33%) satAt=iter18 lagIters=0 lagSeconds=0s
-- profile=pessimistic fired=11 wasted=11 (100%) satAt=iter0 lagIters=-1 lagSeconds=-1s
-- profile=early_done  fired=5 wasted=0 (0%) satAt=iter13 lagIters=0 lagSeconds=0s
-
-### snapshotAge=1m30s, promptDelta=500, iterInterval=10
-
-- profile=realistic   fired=7 wasted=3 (43%) satAt=iter18 lagIters=0 lagSeconds=0s
-- profile=pessimistic fired=9 wasted=9 (100%) satAt=iter0 lagIters=-1 lagSeconds=-1s
-- profile=early_done  fired=3 wasted=0 (0%) satAt=iter13 lagIters=0 lagSeconds=0s
-
-### snapshotAge=1m30s, promptDelta=1000, iterInterval=5
-
-- profile=realistic   fired=7 wasted=1 (14%) satAt=iter18 lagIters=0 lagSeconds=0s
-- profile=pessimistic fired=8 wasted=8 (100%) satAt=iter0 lagIters=-1 lagSeconds=-1s
-- profile=early_done  fired=5 wasted=0 (0%) satAt=iter14 lagIters=0 lagSeconds=0s
-
-### snapshotAge=1m30s, promptDelta=1000, iterInterval=7
-
-- profile=realistic   fired=6 wasted=1 (17%) satAt=iter18 lagIters=0 lagSeconds=0s
-- profile=pessimistic fired=7 wasted=7 (100%) satAt=iter0 lagIters=-1 lagSeconds=-1s
-- profile=early_done  fired=4 wasted=0 (0%) satAt=iter14 lagIters=0 lagSeconds=0s
-
-### snapshotAge=1m30s, promptDelta=1000, iterInterval=10
-
-- profile=realistic   fired=5 wasted=2 (40%) satAt=iter18 lagIters=0 lagSeconds=0s
-- profile=pessimistic fired=6 wasted=6 (100%) satAt=iter0 lagIters=-1 lagSeconds=-1s
-- profile=early_done  fired=2 wasted=0 (0%) satAt=iter12 lagIters=0 lagSeconds=0s
-
-### snapshotAge=1m30s, promptDelta=1500, iterInterval=5
-
-- profile=realistic   fired=7 wasted=2 (29%) satAt=iter19 lagIters=1 lagSeconds=49s
-- profile=pessimistic fired=8 wasted=8 (100%) satAt=iter0 lagIters=-1 lagSeconds=-1s
-- profile=early_done  fired=5 wasted=0 (0%) satAt=iter14 lagIters=0 lagSeconds=0s
-
-### snapshotAge=1m30s, promptDelta=1500, iterInterval=7
-
-- profile=realistic   fired=6 wasted=2 (33%) satAt=iter19 lagIters=1 lagSeconds=49s
-- profile=pessimistic fired=7 wasted=7 (100%) satAt=iter0 lagIters=-1 lagSeconds=-1s
-- profile=early_done  fired=4 wasted=0 (0%) satAt=iter14 lagIters=0 lagSeconds=0s
-
-### snapshotAge=1m30s, promptDelta=1500, iterInterval=10
-
-- profile=realistic   fired=4 wasted=2 (50%) satAt=iter19 lagIters=1 lagSeconds=49s
+- profile=realistic   fired=5 wasted=3 (60%) satAt=iter20 lagIters=2 lagSeconds=84s
 - profile=pessimistic fired=5 wasted=5 (100%) satAt=iter0 lagIters=-1 lagSeconds=-1s
-- profile=early_done  fired=2 wasted=0 (0%) satAt=iter13 lagIters=0 lagSeconds=0s
+- profile=early_done  fired=3 wasted=0 (0%) satAt=iter14 lagIters=0 lagSeconds=0s
 
-### snapshotAge=1m30s, promptDelta=2000, iterInterval=5
+### **cooldown=3, hardDelta=5000, firstFire=3 (新版默认)**
 
-- profile=realistic   fired=6 wasted=3 (50%) satAt=iter18 lagIters=0 lagSeconds=0s
-- profile=pessimistic fired=7 wasted=7 (100%) satAt=iter0 lagIters=-1 lagSeconds=-1s
-- profile=early_done  fired=4 wasted=0 (0%) satAt=iter12 lagIters=0 lagSeconds=0s
-
-### snapshotAge=1m30s, promptDelta=2000, iterInterval=7
-
-- profile=realistic   fired=5 wasted=3 (60%) satAt=iter18 lagIters=0 lagSeconds=0s
+- profile=realistic   fired=6 wasted=4 (67%) satAt=iter20 lagIters=2 lagSeconds=84s
 - profile=pessimistic fired=6 wasted=6 (100%) satAt=iter0 lagIters=-1 lagSeconds=-1s
-- profile=early_done  fired=3 wasted=0 (0%) satAt=iter12 lagIters=0 lagSeconds=0s
-
-### snapshotAge=1m30s, promptDelta=2000, iterInterval=10
-
-- profile=realistic   fired=4 wasted=2 (50%) satAt=iter19 lagIters=1 lagSeconds=49s
-- profile=pessimistic fired=5 wasted=5 (100%) satAt=iter0 lagIters=-1 lagSeconds=-1s
-- profile=early_done  fired=2 wasted=0 (0%) satAt=iter13 lagIters=0 lagSeconds=0s
-
-### snapshotAge=2m0s, promptDelta=500, iterInterval=5
-
-- profile=realistic   fired=10 wasted=3 (30%) satAt=iter18 lagIters=0 lagSeconds=0s
-- profile=pessimistic fired=12 wasted=12 (100%) satAt=iter0 lagIters=-1 lagSeconds=-1s
-- profile=early_done  fired=6 wasted=0 (0%) satAt=iter13 lagIters=0 lagSeconds=0s
-
-### snapshotAge=2m0s, promptDelta=500, iterInterval=7
-
-- profile=realistic   fired=9 wasted=3 (33%) satAt=iter18 lagIters=0 lagSeconds=0s
-- profile=pessimistic fired=11 wasted=11 (100%) satAt=iter0 lagIters=-1 lagSeconds=-1s
-- profile=early_done  fired=5 wasted=0 (0%) satAt=iter13 lagIters=0 lagSeconds=0s
-
-### snapshotAge=2m0s, promptDelta=500, iterInterval=10
-
-- profile=realistic   fired=7 wasted=3 (43%) satAt=iter18 lagIters=0 lagSeconds=0s
-- profile=pessimistic fired=9 wasted=9 (100%) satAt=iter0 lagIters=-1 lagSeconds=-1s
-- profile=early_done  fired=3 wasted=0 (0%) satAt=iter13 lagIters=0 lagSeconds=0s
-
-### snapshotAge=2m0s, promptDelta=1000, iterInterval=5
-
-- profile=realistic   fired=6 wasted=0 (0%) satAt=iter18 lagIters=0 lagSeconds=0s
-- profile=pessimistic fired=7 wasted=7 (100%) satAt=iter0 lagIters=-1 lagSeconds=-1s
 - profile=early_done  fired=4 wasted=0 (0%) satAt=iter14 lagIters=0 lagSeconds=0s
 
-### snapshotAge=2m0s, promptDelta=1000, iterInterval=7
+### cooldown=2, hardDelta=5000, firstFire=3 (cooldown 更短对比)
 
-- profile=realistic   fired=6 wasted=1 (17%) satAt=iter18 lagIters=0 lagSeconds=0s
-- profile=pessimistic fired=7 wasted=7 (100%) satAt=iter0 lagIters=-1 lagSeconds=-1s
+- profile=realistic   fired=6 wasted=4 (67%) satAt=iter20 lagIters=2 lagSeconds=84s
+- profile=pessimistic fired=6 wasted=6 (100%) satAt=iter0 lagIters=-1 lagSeconds=-1s
 - profile=early_done  fired=4 wasted=0 (0%) satAt=iter14 lagIters=0 lagSeconds=0s
 
-### snapshotAge=2m0s, promptDelta=1000, iterInterval=10
+### cooldown=3, hardDelta=8000, firstFire=3 (硬门更高)
 
-- profile=realistic   fired=5 wasted=2 (40%) satAt=iter18 lagIters=0 lagSeconds=0s
+- profile=realistic   fired=6 wasted=4 (67%) satAt=iter20 lagIters=2 lagSeconds=84s
 - profile=pessimistic fired=6 wasted=6 (100%) satAt=iter0 lagIters=-1 lagSeconds=-1s
-- profile=early_done  fired=2 wasted=0 (0%) satAt=iter12 lagIters=0 lagSeconds=0s
+- profile=early_done  fired=4 wasted=0 (0%) satAt=iter14 lagIters=0 lagSeconds=0s
 
-### snapshotAge=2m0s, promptDelta=1500, iterInterval=5
+### cooldown=3, hardDelta=3000, firstFire=3 (硬门更低)
+
+- profile=realistic   fired=6 wasted=4 (67%) satAt=iter20 lagIters=2 lagSeconds=84s
+- profile=pessimistic fired=6 wasted=6 (100%) satAt=iter0 lagIters=-1 lagSeconds=-1s
+- profile=early_done  fired=4 wasted=0 (0%) satAt=iter14 lagIters=0 lagSeconds=0s
+
+### cooldown=3, hardDelta=5000, firstFire=5 (firstFire 推后)
 
 - profile=realistic   fired=5 wasted=1 (20%) satAt=iter18 lagIters=0 lagSeconds=0s
 - profile=pessimistic fired=6 wasted=6 (100%) satAt=iter0 lagIters=-1 lagSeconds=-1s
 - profile=early_done  fired=4 wasted=0 (0%) satAt=iter15 lagIters=0 lagSeconds=0s
 
-### snapshotAge=2m0s, promptDelta=1500, iterInterval=7
+## 16.5 data_explosion fixture 关键结果
 
-- profile=realistic   fired=5 wasted=2 (40%) satAt=iter19 lagIters=1 lagSeconds=49s
+### cooldown=0, hardDelta=0, firstFire=6 (旧版 baseline)
+
+- profile=realistic   fired=9 wasted=4 (44%) satAt=iter14 lagIters=0 lagSeconds=0s
+- profile=pessimistic fired=15 wasted=15 (100%) satAt=iter0 lagIters=-1 lagSeconds=-1s
+- profile=early_done  fired=3 wasted=0 (0%) satAt=iter8 lagIters=0 lagSeconds=0s
+
+### **cooldown=3, hardDelta=5000, firstFire=3 (新版默认)**
+
+- profile=realistic   fired=5 wasted=1 (20%) satAt=iter15 lagIters=1 lagSeconds=28s
+- profile=pessimistic fired=7 wasted=7 (100%) satAt=iter0 lagIters=-1 lagSeconds=-1s
+- profile=early_done  fired=3 wasted=0 (0%) satAt=iter9 lagIters=0 lagSeconds=0s
+
+### cooldown=2, hardDelta=5000, firstFire=3 (cooldown 更短对比)
+
+- profile=realistic   fired=7 wasted=5 (71%) satAt=iter15 lagIters=1 lagSeconds=28s
+- profile=pessimistic fired=10 wasted=10 (100%) satAt=iter0 lagIters=-1 lagSeconds=-1s
+- profile=early_done  fired=4 wasted=0 (0%) satAt=iter9 lagIters=0 lagSeconds=0s
+
+### cooldown=3, hardDelta=8000, firstFire=3 (硬门更高)
+
+- profile=realistic   fired=5 wasted=1 (20%) satAt=iter15 lagIters=1 lagSeconds=28s
+- profile=pessimistic fired=7 wasted=7 (100%) satAt=iter0 lagIters=-1 lagSeconds=-1s
+- profile=early_done  fired=3 wasted=0 (0%) satAt=iter9 lagIters=0 lagSeconds=0s
+
+### cooldown=3, hardDelta=3000, firstFire=3 (硬门更低)
+
+- profile=realistic   fired=7 wasted=5 (71%) satAt=iter15 lagIters=1 lagSeconds=28s
+- profile=pessimistic fired=10 wasted=10 (100%) satAt=iter0 lagIters=-1 lagSeconds=-1s
+- profile=early_done  fired=4 wasted=0 (0%) satAt=iter9 lagIters=0 lagSeconds=0s
+
+### cooldown=3, hardDelta=5000, firstFire=5 (firstFire 推后)
+
+- profile=realistic   fired=4 wasted=2 (50%) satAt=iter14 lagIters=0 lagSeconds=0s
 - profile=pessimistic fired=6 wasted=6 (100%) satAt=iter0 lagIters=-1 lagSeconds=-1s
-- profile=early_done  fired=3 wasted=0 (0%) satAt=iter13 lagIters=0 lagSeconds=0s
+- profile=early_done  fired=2 wasted=0 (0%) satAt=iter8 lagIters=0 lagSeconds=0s
 
-### snapshotAge=2m0s, promptDelta=1500, iterInterval=10
+## 16.6 推荐与默认值
 
-- profile=realistic   fired=4 wasted=2 (50%) satAt=iter20 lagIters=2 lagSeconds=84s
-- profile=pessimistic fired=4 wasted=4 (100%) satAt=iter0 lagIters=-1 lagSeconds=-1s
-- profile=early_done  fired=2 wasted=0 (0%) satAt=iter14 lagIters=0 lagSeconds=0s
+- data_explosion pessimistic fired: 15 (baseline cd=0) → 7 (cd=3, hd=5000, ff=3), 削减 **53%** 的 verification 调用
+- redhaze realistic 在新默认下 fired=6, satisfiedLag=2 iter (响应性不退化)
 
-### snapshotAge=2m0s, promptDelta=2000, iterInterval=5
+生产默认值已锁定为:
+- `verificationAutoTriggerMaxSnapshotAge = 3m0s`
+- `verificationAutoTriggerMinPromptDelta = 1500`
+- `verificationIterationTriggerInterval = 6` (== aicommon.DefaultPeriodicVerificationInterval)
+- `verificationTokenGateMinIterCooldown = 3`
+- `verificationAutoTriggerHardPromptDelta = 5000`
+- `verificationFirstFireIterationThreshold = 3`
 
-- profile=realistic   fired=5 wasted=2 (40%) satAt=iter20 lagIters=2 lagSeconds=84s
-- profile=pessimistic fired=5 wasted=5 (100%) satAt=iter0 lagIters=-1 lagSeconds=-1s
-- profile=early_done  fired=3 wasted=0 (0%) satAt=iter13 lagIters=0 lagSeconds=0s
+## 16.7 数据爆炸与冷静期 + 首次提前触发
 
-### snapshotAge=2m0s, promptDelta=2000, iterInterval=7
+本轮优化围绕用户实测反馈展开: 在数据爆炸阶段 (单 iter prompt token 涨 1800-2500),
+此前 (snapshotAge=120s / promptDelta=1500 / iterInterval=5) 的 5 个门是 OR 关系,
+token 门以 1500 阈值在数据爆炸节奏下几乎每 iter 都过门, 把 iter 门 "每 5 轮一次"
+的基础节拍打成 "每 1-2 轮就 verify". 用户原话:
 
-- profile=realistic   fired=5 wasted=3 (60%) satAt=iter20 lagIters=2 lagSeconds=84s
-- profile=pessimistic fired=5 wasted=5 (100%) satAt=iter0 lagIters=-1 lagSeconds=-1s
-- profile=early_done  fired=3 wasted=0 (0%) satAt=iter13 lagIters=0 lagSeconds=0s
+> "前 5 个工具不触发, 之后每 1-2 个工具就 verify, 高峰时每次工具都 verify.
+> 按理说, 时间到了触发的一次, 应该让每 5 个这个重新开始基数才对, 不然多次触发累积一起不好用了."
 
-### snapshotAge=2m0s, promptDelta=2000, iterInterval=10
+修复策略 (本次落地):
 
-- profile=realistic   fired=3 wasted=1 (33%) satAt=iter18 lagIters=0 lagSeconds=0s
-- profile=pessimistic fired=4 wasted=4 (100%) satAt=iter0 lagIters=-1 lagSeconds=-1s
-- profile=early_done  fired=2 wasted=0 (0%) satAt=iter14 lagIters=0 lagSeconds=0s
+- **基础节拍门**: iter 门 (5→6) + 时间门 (120s→180s) + 末轮兜底, 必须遵守, 加速器不能越过
+- **首次提前门**: baseline 未建立时 iter>=3 即 fire, 让 AI 早期校准方向 (相比旧版需要等 iter=5 提前 2 轮)
+- **加速器门 + 冷静期**: 软 token 门 1500 不变, 但只在 iter 差 >= 3 之后才允许触发, 数据爆炸阶段不能反复打断 iter 节拍
+- **硬兜底门**: 硬 token 门 5000, 单次超大爆炸豁免冷静期, 不丢响应性
 
-## 16.5 三档推荐
+**触发时序示例** (数据爆炸每 iter +1800 tokens):
 
-基于扫描数据, 给出三档候选, 由用户根据风险偏好选择:
+```
+iter=1: baseline=nil, 1 < 3 firstFire → 不触发
+iter=2: baseline=nil, 2 < 3 firstFire → 不触发
+iter=3: baseline=nil, 3 >= 3 firstFire → fire (首次提前), baseline 建立
+iter=4: iterDelta=1, tokenDelta=1800<5000 hard, 1<3 冷静期 → 不触发
+iter=5: iterDelta=2, tokenDelta=3600<5000 hard, 2<3 冷静期 → 不触发
+iter=6: iterDelta=3, tokenDelta=5400>=5000 hard → fire (硬门)
+iter=7-8: 冷静期内 → 不触发
+iter=9: iterDelta=3, 软门 >= 1500 → fire (软门解禁)
+iter=12: iter 门 (差=6) → 兜底 fire
+```
 
-### 档 A (温和): snapshotAge 30s→60s, promptDelta 500→1000, iter 不变 (5)
+相比修复前的 "几乎每 iter 都 fire", 修复后在数据爆炸节奏下 fired 数显著下降,
+同时保留了 satisfied 检测的及时性 (硬门 + iter 门兜底).
 
-- pessimistic fired: 13 → 9 (-31%)
-- realistic fired: 11 → 8, wasted: 4 → 4, lagIters: 0 → 1
-- 风险: 极低. 几乎不增加 loop 退出延迟, 但只削减约 30% 浪费.
-- 适合: 严格质量场景 (渗透测试 / 金融审计), 想稍微省一点又不愿意冒任何延迟风险.
-
-### 档 B (中等, 推荐): snapshotAge 30s→90s, promptDelta 500→1500, iter 不变 (5)
-
-- pessimistic fired: 13 → 8 (-38%)
-- realistic fired: 11 → 7, wasted: 4 → 2, lagIters: 0 → 1
-- 风险: 低. lagIters <= 2 (loop 最多多跑 2 轮 ≈ 60-90s), wasted 下降 ~50%.
-- 适合: 大多数业务场景 (默认推荐). 在性能与响应性之间取得平衡.
-
-### 档 C (激进): snapshotAge 30s→120s, promptDelta 500→2000, iter 不变 (5)
-
-- pessimistic fired: 13 → 5 (-62%)
-- realistic fired: 11 → 5, wasted: 4 → 2, lagIters: 0 → 2
-- 风险: 中. lagIters 可能 2-3 (loop 最多多跑 2-3 轮 ≈ 90-150s), 部分中间 delivery 快照会被跳过.
-- 适合: 成本控制型 (批量自动化扫描 / 无人值守任务). 注意配合 watchdog 2min 兜底.
-
-### 隐藏甜点 (扫描发现): snapshotAge 30s→120s, promptDelta 500→1500, iter 不变 (5)
-
-- pessimistic fired: 13 → 6 (-54%)
-- realistic fired: 11 → 5, wasted: 4 → 1, lagIters: 0 → 0 (**零延迟**)
-- early_done satAt: iter15 (groundTruth=12, 提前完成场景仍能及时检测)
-- 关键洞察: 把 token 门保持 1500 而非 2000, 既享受 120s 时间门带来的大幅节省 (-54%), 又因 token 门更敏感保留了 realistic 画像下 satisfiedLag=0 的响应性.
-- 风险: 低-中. 对比档 C 多消耗 1 次 AI 调用 (pessimistic 6 vs 5), 换来 lagIters 从 2 降到 0. 是 "性价比最高" 的组合.
-- 适合: 介于档 B 与档 C 之间的折中选项.
-
-## 16.6 风险与注意
+## 16.8 风险与注意
 
 - 末轮兜底门 (iter == maxIter) **不动**, 保证最终一定会有一次 verification.
-- iterInterval 不动 (维持 5), 确保 "长时间不调用" 场景下至少每 5 轮强制 verify.
 - watchdog 兜底 (`verificationWatchdogIdleTimeout = 2 * time.Minute`) **不动**, 极端情况下 2 分钟无调用必触发.
 - 显式调用路径 (`VerifyUserSatisfactionNow` / `request_verification` action) 不受本次默认值调整影响.
-- 提前完成场景 (`early_done` 画像在 iter=12 就 Satisfied=true): 三档都能在 iter=14 之前检测到 (token 门或 iter 门会兜底).
+- 提前完成场景 (`early_done` 画像): firstFire=3 让首次反馈最早在 iter=3 拿到, 后续靠 iter 门/硬门 兜底.
 - 副作用代价说明: lagIters>0 意味着 loop 多跑了几轮 "无用工具调用", 但每次工具调用本身有自己的 perception/反思节流, 不会失控.
