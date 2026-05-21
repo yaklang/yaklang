@@ -25,15 +25,11 @@ func (t *AiTask) generateStatusSummaryPrompt() (string, error) {
 }
 
 func (t *AiTask) generateDynamicPlanPrompt(userInput string) (string, error) {
-	return t.quickBuildTaskPrompt(__prompt_DynamicPlan, map[string]any{
-		"UserInput": userInput,
-	})
+	return t.buildDynamicPlanPrompt(userInput)
 }
 
 func (t *AiTask) GenerateDeepThinkPlanPrompt(suggestion string) (string, error) {
-	return t.quickBuildTaskPrompt(__prompt_DeepthinkTaskListPrompt, map[string]any{
-		"UserInput": suggestion,
-	})
+	return t.buildDynamicPlanPrompt(suggestion)
 }
 
 func (t *AiTask) DeepThink(suggestion string) error {

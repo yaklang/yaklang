@@ -110,15 +110,16 @@ func (t *AiTask) buildDeepthinkPrompt(userInput string) (string, error) {
 	builder := aicommon.NewDefaultPromptPrefixBuilder()
 	nonce := utils.RandStringBytes(6)
 	materials := newAidPromptMaterialsForConfig(t.Config, __prompt_deepthinkInstruction, t.ContextProvider.Schema()["PlanJsonSchema"])
+	ctxProvider := t.taskPromptContext()
 	return builder.AssemblePromptWithDynamicSection(
 		materials,
 		"aid-deepthink-dynamic",
 		__prompt_deepthinkDynamic,
 		deepthinkDynamicData{
-			Progress:        t.ContextProvider.Progress(),
-			CurrentTaskGoal: t.ContextProvider.CurrentTask.Goal,
+			Progress:        ctxProvider.Progress(),
+			CurrentTaskGoal: t.Goal,
 			UserInput:       strings.TrimSpace(userInput),
-			PlanHelp:        t.ContextProvider.PlanHelp(),
+			PlanHelp:        ctxProvider.PlanHelp(),
 		},
 		nonce,
 	)
@@ -128,15 +129,16 @@ func (t *AiTask) buildDynamicPlanPrompt(userInput string) (string, error) {
 	builder := aicommon.NewDefaultPromptPrefixBuilder()
 	nonce := utils.RandStringBytes(6)
 	materials := newAidPromptMaterialsForConfig(t.Config, __prompt_dynamicPlanInstruction, t.ContextProvider.Schema()["RePlanJsonSchema"])
+	ctxProvider := t.taskPromptContext()
 	return builder.AssemblePromptWithDynamicSection(
 		materials,
 		"aid-dynamic-plan-dynamic",
 		__prompt_dynamicPlanDynamic,
 		dynamicPlanDynamicData{
-			CurrentTaskInfo:   t.ContextProvider.CurrentTaskInfoDynamic(),
+			CurrentTaskInfo:   ctxProvider.CurrentTaskInfoDynamic(),
 			UserInput:         strings.TrimSpace(userInput),
-			PlanHelp:          t.ContextProvider.PlanHelp(),
-			StableInstruction: t.ContextProvider.CurrentTaskInfoStable(),
+			PlanHelp:          ctxProvider.PlanHelp(),
+			StableInstruction: ctxProvider.CurrentTaskInfoStable(),
 		},
 		nonce,
 	)
