@@ -97,6 +97,13 @@ func (f *SingleFileModificationSuiteFactory) buildWriteAction() reactloops.ReAct
 
 			log.Infof("write_code done: hasBlockingErrors=%v", blocking)
 			loop.GetEmitter().EmitPinFilename(filename)
+			_, _ = f.applyLoopYaklangCodeChange(loop, &loopYaklangCodeChange{
+				Content:      code,
+				Path:         filename,
+				SourceAction: actionName,
+				EventOp:      loopYaklangCodeEventOpReplace,
+				EmitEvent:    true,
+			})
 			loop.GetEmitter().EmitJSON(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR, "write_code", code)
 		},
 	)
@@ -233,6 +240,14 @@ func (f *SingleFileModificationSuiteFactory) buildModifyAction() reactloops.ReAc
 			runtime.AddToTimeline("code_modified", msg)
 			log.Infof("modify_code done: hasBlockingErrors=%v", hasBlockingErrors)
 			loop.GetEmitter().EmitPinFilename(filename)
+			_, _ = f.applyLoopYaklangCodeChange(loop, &loopYaklangCodeChange{
+				Content:      fullCode,
+				Path:         filename,
+				SourceAction: actionName,
+				ChangeReason: reason,
+				EventOp:      loopYaklangCodeEventOpReplace,
+				EmitEvent:    true,
+			})
 			loop.GetEmitter().EmitJSON(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR, "modify_code", partialCode)
 
 			if errMsg != "" && !isSpinning {
@@ -341,6 +356,14 @@ func (f *SingleFileModificationSuiteFactory) buildInsertAction() reactloops.ReAc
 			runtime.AddToTimeline("lines_inserted", msg)
 			log.Infof("insert_lines done: hasBlockingErrors=%v", hasBlockingErrors)
 			loop.GetEmitter().EmitPinFilename(filename)
+			_, _ = f.applyLoopYaklangCodeChange(loop, &loopYaklangCodeChange{
+				Content:      fullCode,
+				Path:         filename,
+				SourceAction: actionName,
+				ChangeReason: reason,
+				EventOp:      loopYaklangCodeEventOpReplace,
+				EmitEvent:    true,
+			})
 			loop.GetEmitter().EmitJSON(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR, "insert_lines", partialCode)
 
 			if errMsg != "" {
@@ -480,6 +503,14 @@ func (f *SingleFileModificationSuiteFactory) buildDeleteAction() reactloops.ReAc
 			runtime.AddToTimeline("lines_deleted", msg)
 			log.Infof("delete_lines done: hasBlockingErrors=%v", hasBlockingErrors)
 			loop.GetEmitter().EmitPinFilename(filename)
+			_, _ = f.applyLoopYaklangCodeChange(loop, &loopYaklangCodeChange{
+				Content:      fullCode,
+				Path:         filename,
+				SourceAction: actionName,
+				ChangeReason: reason,
+				EventOp:      loopYaklangCodeEventOpReplace,
+				EmitEvent:    true,
+			})
 
 			// Emit event with deletion info
 			deletionInfo := map[string]interface{}{

@@ -168,6 +168,7 @@ const (
 	EVENT_TYPE_YAKIT_HTTPFLOW                     = "yak_httpflow" // yakit httpflow event, used to emit saved httpflow identity information
 	EVENT_TYPE_YAKIT_HTTPFLOW_COUNT               = "yak_httpflow_count"
 	EVENT_TYPE_HTTP_FUZZ_REQUEST_CHANGE EventType = "http_fuzz_request_change"
+	EVENT_TYPE_YAKLANG_CODE_CHANGE      EventType = "yaklang_code_change"
 
 	EVENT_TYPE_HTTP_FLOW_FUZZ_STATUS = "http_flow_fuzz_status"
 
