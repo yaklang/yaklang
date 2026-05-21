@@ -218,6 +218,13 @@ func (s *Server) UpdateProject(ctx context.Context, req *ypb.NewProjectRequest) 
 	if CheckDefault(req.GetProjectName(), req.GetType(), req.GetFolderId(), req.GetChildFolderId()) {
 		return nil, utils.Errorf("cannot use this builtin name: %s", yakit.INIT_DATABASE_RECORD_NAME)
 	}
+
+	// check this name exist (exclude current project)
+	pro, _ := yakit.GetProjectByWhere(s.GetProfileDatabase(), req.GetProjectName(), req.GetFolderId(), req.GetChildFolderId(), req.GetType(), req.GetId())
+	if pro != nil {
+		return nil, utils.Error("Project or directory name can not be duplicated in the same directory")
+	}
+
 	oldPro, err := yakit.GetProjectByID(s.GetProfileDatabase(), req.GetId())
 	if err != nil {
 		return nil, utils.Errorf("update row not exist: %v", err)

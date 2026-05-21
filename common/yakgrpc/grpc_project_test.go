@@ -20,6 +20,45 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+func TestServer_UpdateProject_DuplicateName(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	nameA := uuid.NewString()
+	nameB := uuid.NewString()
+	pjcA, err := client.NewProject(context.Background(), &ypb.NewProjectRequest{
+		ProjectName:   nameA,
+		Description:   "project-a",
+		Type:          yakit.TypeProject,
+		ChildFolderId: 0,
+		FolderId:      0,
+	})
+	require.NoError(t, err)
+	pjcB, err := client.NewProject(context.Background(), &ypb.NewProjectRequest{
+		ProjectName:   nameB,
+		Description:   "project-b",
+		Type:          yakit.TypeProject,
+		ChildFolderId: 0,
+		FolderId:      0,
+	})
+	require.NoError(t, err)
+	defer func() {
+		_, _ = client.DeleteProject(context.Background(), &ypb.DeleteProjectRequest{Id: pjcA.Id, IsDeleteLocal: true})
+		_, _ = client.DeleteProject(context.Background(), &ypb.DeleteProjectRequest{Id: pjcB.Id, IsDeleteLocal: true})
+	}()
+
+	_, err = client.UpdateProject(context.Background(), &ypb.NewProjectRequest{
+		Id:            pjcB.Id,
+		ProjectName:   nameA,
+		Description:   "rename-to-duplicate",
+		Type:          yakit.TypeProject,
+		ChildFolderId: 0,
+		FolderId:      0,
+	})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "duplicated")
+}
+
 func TestServer_UpdateProject(t *testing.T) {
 	client, err := NewLocalClient()
 	require.NoError(t, err)
