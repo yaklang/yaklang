@@ -225,3 +225,10 @@ func FrozenBlockPartitionsFromConfig(config AICallerConfigIf) []FrozenBlockParti
 	}
 	return producer.ProducePartitions()
 }
+
+const ( // stable partition orders for prefix cache , users can also define their own partitions with custom orders
+	PersistentMemoryOrder = 90
+
+	PlanFactsFrozenPartitionOrder    = 100
+	PlanDocumentFrozenPartitionOrder = 110
+)

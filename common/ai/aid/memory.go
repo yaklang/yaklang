@@ -3,6 +3,7 @@ package aid
 import (
 	"bytes"
 	"fmt"
+	"github.com/google/uuid"
 	osRuntime "runtime"
 	"strings"
 	"text/template"
@@ -113,6 +114,7 @@ func (m *PromptContextProvider) BindCoordinator(c *Coordinator) {
 		return config.Keywords
 	})
 	m.PushPersistentData(config.PersistentMemory...)
+	config.AppendFrozenBlockPartition(uuid.NewString(), "persistent_context", strings.Join(config.PersistentMemory, "\n"), aicommon.PersistentMemoryOrder)
 	m.timeline.SoftBindConfig(config, config)
 }
 
