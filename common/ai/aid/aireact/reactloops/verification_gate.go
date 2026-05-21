@@ -14,29 +14,57 @@ import (
 
 const (
 	// verificationAutoTriggerMaxSnapshotAge 控制"距上次 verification 多久后强制再跑"的时间门.
-	// 调整自 30s -> 120s, 依据 redhaze 案例仿真 docs/16-verification-frequency-experiment.md:
-	// 原 30s 阈值在 redhaze 32s/iter 节奏下几乎每轮都过门, 相邻 verification
-	// 多次产出 63-64 字节相同 delivery, 是当前默认下最大的浪费源.
-	// 新阈值 120s 配合 1500 token 门, 在 realistic 画像下 satisfiedLag 仍保持 0,
-	// pessimistic 画像下 fired 从 13 降到 6 (-54%), 是扫描矩阵中 cost/lag 最佳甜点.
-	// 关键词: verificationAutoTriggerMaxSnapshotAge 时间门, redhaze 32s/iter 刷屏,
-	//        120s 甜点, lag=0 性价比最高
-	verificationAutoTriggerMaxSnapshotAge = 120 * time.Second
+	// 调整自 120s -> 180s, 依据用户实测反馈 + docs/16-verification-frequency-experiment.md:
+	// 原 120s 阈值在长任务节奏下仍偶发"时间门刚好触发"导致额外开销.
+	// 新阈值 180s 与 iter 门 (6) + 冷静期 (3) 配合, 形成更克制的时间兜底:
+	// 仅在 3 分钟无 verify 时才走时间门, 平时主要由 iter 门 / token 门掌控节奏.
+	// 关键词: verificationAutoTriggerMaxSnapshotAge 180s, 时间门进一步放宽,
+	//        iter+冷静期主导节流
+	verificationAutoTriggerMaxSnapshotAge = 180 * time.Second
 
-	// verificationAutoTriggerMinPromptDelta 控制"prompt token 增量到多少触发再 verify"的 token 门.
-	// 调整自 500 -> 1500, 依据 redhaze 案例仿真:
-	// 单个工具结果 (如 do_http_request 返回体) 常 >500 tokens, 原阈值过松,
-	// 几乎每个工具调用后都过门. 新阈值 1500 让小响应/重复探测被过滤,
-	// 仅在 phase 切换 / 数据爆炸 (如 union extract) 时触发, 配合 120s 时间门
-	// 保留 satisfiedLag=0 的响应性 (token 门更敏感, 数据爆炸时仍能及时 verify).
-	// 关键词: verificationAutoTriggerMinPromptDelta token 门, 1500 甜点,
-	//        小工具响应过滤, phase 切换敏感
+	// verificationAutoTriggerMinPromptDelta 控制软 token 门 (加速器门) 的触发阈值.
+	// 保持 1500, 但语义变化: 仅当 iter 差 >= verificationTokenGateMinIterCooldown
+	// 时这个门才生效. 数据爆炸阶段单 iter token 突增也不再立刻打断 iter 节拍,
+	// 必须等冷静期过完软门才能 fire, 避免 token 门反复打断 iter 基础节拍.
+	// 关键词: verificationAutoTriggerMinPromptDelta 1500 软门, 受冷静期约束,
+	//        token 门反复打断 iter 节拍修复
 	verificationAutoTriggerMinPromptDelta = 1500
 
 	// verificationIterationTriggerInterval 控制 iter 门 (每 N 轮强制 verify 兜底).
-	// 维持 5 不动, 作为时间/token 门都不触发时的最后兜底.
-	// 关键词: verificationIterationTriggerInterval iter 门兜底, 维持 5
+	// 引用 aicommon.DefaultPeriodicVerificationInterval (已调整为 6), 作为
+	// 时间/token 门都不触发时的基础节拍兜底.
+	// 关键词: verificationIterationTriggerInterval iter 门基础节拍, 跟随 6
 	verificationIterationTriggerInterval = aicommon.DefaultPeriodicVerificationInterval
+
+	// verificationTokenGateMinIterCooldown 控制软 token 门的"冷静期":
+	// 当上次 verification 与当前 iter 差 < cooldown 时, 即使软 token 门触发
+	// 也不允许 fire (除非达到硬 token 门). 这是为了修复 "数据爆炸阶段
+	// token 门反复打断 iter 基础节拍" 的尖峰问题. iter 门 / 时间门 / 末轮
+	// 兜底 / 硬 token 门不受冷静期影响.
+	// 取值 3: 与 iter 门 6 形成 "1:2" 节拍 (走完基础节拍一半后才允许加速器),
+	// 既保留对数据爆炸的响应性又避免每 iter 都触发.
+	// 关键词: verificationTokenGateMinIterCooldown 3, token 门冷静期,
+	//        iter 节拍优先, 数据爆炸场景修复
+	verificationTokenGateMinIterCooldown = 3
+
+	// verificationAutoTriggerHardPromptDelta 是 token 门的"硬阈值"上界:
+	// 当单次 prompt token 增量 >= 此值时, 视为单次超大数据爆炸 (例如
+	// 一次性抓回 5000+ token 的 HTML / 大文件), 此时即使在冷静期内也
+	// 立即 fire, 避免错过关键 verify 时机. 取值 5000 (~ 软门 1500 的 3.3 倍),
+	// 既能覆盖单 iter 大爆炸又不会被中等 token 增量误触.
+	// 关键词: verificationAutoTriggerHardPromptDelta 5000, 硬门兜底,
+	//        单次爆炸豁免冷静期
+	verificationAutoTriggerHardPromptDelta = 5000
+
+	// verificationFirstFireIterationThreshold 控制 baseline 未建立时的"首次提前触发"门:
+	// 当 previous == nil (从未 verify 过) 且 current iter >= 此阈值时立即 fire,
+	// 让 AI 在初期就能拿到一次反馈建立 baseline, 而非等到 iter 门 (6) 才触发.
+	// 取值 3: iter=1 通常只是 perception 起步, iter=2 是首次工具反馈, iter=3
+	// 已积累 2-3 次工具调用结果, 足以建立有意义的 baseline; 同时与冷静期 3
+	// 数值对齐, 减少认知负担.
+	// 关键词: verificationFirstFireIterationThreshold 3, 首次提前触发,
+	//        baseline 早期建立, AI 早期校准
+	verificationFirstFireIterationThreshold = 3
 )
 
 var verificationWatchdogIdleTimeout = 2 * time.Minute
@@ -495,24 +523,66 @@ func (r *ReActLoop) buildVerificationWatchdogPayload(task aicommon.AIStatefulTas
 	return payload
 }
 
+// shouldTriggerAutomaticVerification 决定本轮是否需要发起一次自动 verification.
+// 5 个门按角色分层 (与原 OR 关系不同, 新版有优先级 + 冷静期):
+//
+//	1) 末轮兜底: iter == maxIterations 必触发, 保证最终一定有一次 verify.
+//	2) 首次提前门: baseline 未建立 (previous == nil) 且当前 iter
+//	   >= verificationFirstFireIterationThreshold 时立即 fire, 让 AI
+//	   能尽早拿到一次反馈建立 baseline, 避免错误方向跑满 iter 门才被纠正.
+//	3) 基础节拍 (时间门): now - prevGeneratedAt >= verificationAutoTriggerMaxSnapshotAge,
+//	   保证长时间无 verify 不会被遗忘.
+//	4) 基础节拍 (iter 门): iter 差 >= periodicVerificationInterval, 默认 6 轮一兜底.
+//	5) 硬兜底 (硬 token 门): 单次 token 增量 >= verificationAutoTriggerHardPromptDelta
+//	   立即 fire, 不被冷静期压制, 用于单次超大爆炸场景.
+//	6) 加速器 (软 token 门): 仅当 iter 差 >= verificationTokenGateMinIterCooldown 时,
+//	   token 差 >= verificationAutoTriggerMinPromptDelta 才允许 fire. 冷静期内即使
+//	   软门触发也不 fire, 避免数据爆炸阶段反复打断 iter 基础节拍.
+//
+// 关键词: shouldTriggerAutomaticVerification 节流分层, 首次提前门,
+//
+//	token 门冷静期, 硬门豁免, iter 基础节拍优先
 func (r *ReActLoop) shouldTriggerAutomaticVerification(current *VerificationRuntimeSnapshot) bool {
 	if r == nil || current == nil {
 		return false
 	}
+	// 末轮兜底
 	if r.maxIterations > 0 && current.IterationIndex == r.maxIterations {
 		return true
 	}
 	previous := r.GetVerificationRuntimeSnapshot()
 	if previous == nil {
-		return r.ShouldTriggerPeriodicCheckpointOnIteration(current.IterationIndex)
+		// 当 periodicVerificationInterval <= 0 时表示 "禁用节流, 每次 iter
+		// 都 fire" 的测试/调试模式 (语义与 ShouldTriggerPeriodicCheckpointOnIteration
+		// 保持一致), 直接 fire 兼容旧行为, 不走首次提前门阈值.
+		// 关键词: periodicVerificationInterval 0 退化为每次 fire, 测试兼容
+		if r.periodicVerificationInterval <= 0 {
+			return true
+		}
+		// 首次提前门: baseline 未建立时, iter >= 阈值 (3) 即 fire,
+		// 让 AI 早期校准方向. 不再等到 iter 门 (6) 才首次 verify.
+		return current.IterationIndex >= verificationFirstFireIterationThreshold
 	}
+	// 基础节拍: 时间门 (180s)
 	if current.GeneratedAt.Sub(previous.GeneratedAt) >= verificationAutoTriggerMaxSnapshotAge {
 		return true
 	}
-	if current.IterationIndex-previous.IterationIndex >= r.getVerificationIterationTriggerInterval() {
+	// 基础节拍: iter 门 (6)
+	iterDelta := current.IterationIndex - previous.IterationIndex
+	if iterDelta >= r.getVerificationIterationTriggerInterval() {
 		return true
 	}
-	return verificationPromptTokenDelta(previous, current) >= verificationAutoTriggerMinPromptDelta
+	// 硬兜底: 单次超大爆炸豁免冷静期 (>= 5000 tokens)
+	tokenDelta := verificationPromptTokenDelta(previous, current)
+	if tokenDelta >= verificationAutoTriggerHardPromptDelta {
+		return true
+	}
+	// 加速器: 冷静期 (< 3 iter) 内抑制软 token 门,
+	// 修复数据爆炸阶段每个工具调用都 verify 的尖峰问题.
+	if iterDelta < verificationTokenGateMinIterCooldown {
+		return false
+	}
+	return tokenDelta >= verificationAutoTriggerMinPromptDelta
 }
 
 func verificationPromptTokenDelta(previous *VerificationRuntimeSnapshot, current *VerificationRuntimeSnapshot) int {
