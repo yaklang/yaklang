@@ -22,6 +22,34 @@ const (
 	FilterBuiltinRuleFalse string = "unBuildIn"
 )
 
+var syntaxFlowRuleNameFields = []string{
+	"syntax_flow_rules.rule_name",
+	"syntax_flow_rules.title",
+	"syntax_flow_rules.title_zh",
+}
+
+// Full-text search scope (UI "全文"), aligned with QueryYakScript.Keyword minus name/tag columns.
+var syntaxFlowRuleFullTextFields = []string{
+	"syntax_flow_rules.description",
+	"syntax_flow_rules.content",
+}
+
+func splitSyntaxFlowSearchKeyword(raw string) []string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil
+	}
+	parts := strings.Split(raw, ",")
+	terms := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			terms = append(terms, p)
+		}
+	}
+	return terms
+}
+
 type SyntaxFlowRuleFilterOption func(*ypb.SyntaxFlowRuleFilter)
 
 func WithSyntaxFlowRuleLib(b bool) SyntaxFlowRuleFilterOption {
@@ -68,6 +96,12 @@ func NewSyntaxFlowRuleFilter(filter *ypb.SyntaxFlowRuleFilter, opt ...SyntaxFlow
 	return filter
 }
 
+// FilterSyntaxFlowRule applies SyntaxFlowRuleFilter.
+//
+// UI search (frontend switches scope):
+//   - Keyword: full-text fuzzy on description, content (comma-separated OR)
+//   - RuleNames: name fuzzy on rule_name, title, title_zh (comma-separated OR per element)
+//   - Tag: exact tag category filter
 func FilterSyntaxFlowRule(db *gorm.DB, filter *ypb.SyntaxFlowRuleFilter, opt ...SyntaxFlowRuleFilterOption) *gorm.DB {
 	filter = NewSyntaxFlowRuleFilter(filter, opt...)
 
@@ -85,18 +119,24 @@ func FilterSyntaxFlowRule(db *gorm.DB, filter *ypb.SyntaxFlowRuleFilter, opt ...
 	db = bizhelper.ExactQueryUInt64ArrayOr(db, "id", filter.GetIds())
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "rule_id", filter.GetRuleIds())
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "severity", filter.GetSeverity())
-	db = bizhelper.ExactOrQueryStringArrayOr(db, "rule_name", filter.GetRuleNames())
+	if len(filter.GetRuleNames()) > 0 {
+		var nameTerms []string
+		for _, name := range filter.GetRuleNames() {
+			nameTerms = append(nameTerms, splitSyntaxFlowSearchKeyword(name)...)
+		}
+		if len(nameTerms) > 0 {
+			db = bizhelper.FuzzSearchWithStringArrayOrEx(db, syntaxFlowRuleNameFields, nameTerms, false)
+		}
+	}
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "language", filter.GetLanguage())
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "purpose", filter.GetPurpose())
-	db = bizhelper.ExactOrQueryStringArrayOr(db, "tag", filter.GetTag())
+	db = bizhelper.ExactOrQueryStringArrayOr(db, "syntax_flow_rules.tag", filter.GetTag())
 	//if !params.GetIncludeLibraryRule() {
 	//	db = db.Where("allow_included = ?", false)
 	//}
 
-	if filter.GetKeyword() != "" {
-		db = bizhelper.FuzzSearchWithStringArrayOrEx(db, []string{
-			"rule_name", "title", "title_zh", "description", "content", "tag",
-		}, []string{filter.GetKeyword()}, false)
+	if terms := splitSyntaxFlowSearchKeyword(filter.GetKeyword()); len(terms) > 0 {
+		db = bizhelper.FuzzSearchWithStringArrayOrEx(db, syntaxFlowRuleFullTextFields, terms, false)
 	}
 	if filter.GetAfterId() > 0 {
 		db = db.Where("id > ?", filter.GetAfterId())
