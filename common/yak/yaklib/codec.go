@@ -182,6 +182,8 @@ var CodecExports = map[string]interface{}{
 	"HmacMD5":    codec.HmacMD5,
 	"HmacSM3":    codec.HmacSM3,
 
+	"PBKDF2SHA1Key": codec.PBKDF2SHA1Key,
+
 	//
 	"UnicodeEncode": codec.JsonUnicodeEncode,
 	"UnicodeDecode": codec.JsonUnicodeDecode,

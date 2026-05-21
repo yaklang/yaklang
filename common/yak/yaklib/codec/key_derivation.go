@@ -65,3 +65,16 @@ func NewPBKDF2Generator(hashFunc func() hash.Hash, iterations int) KeyDerivation
 		return m[:opensslKeyLength], m[opensslKeyLength : opensslKeyLength+opensslIVLength], nil
 	}
 }
+
+// PBKDF2SHA1Key derives a key with PBKDF2-HMAC-SHA1 (e.g. WeChat wxapkg V1MMWX decryption).
+func PBKDF2SHA1Key(password, salt interface{}, iterations, keyLen int) ([]byte, error) {
+	p := interfaceToBytes(password)
+	s := interfaceToBytes(salt)
+	if iterations <= 0 {
+		iterations = DefaultPBKDF2Iterations
+	}
+	if keyLen <= 0 {
+		keyLen = opensslKeyLength
+	}
+	return pbkdf2.Key(p, s, iterations, keyLen, sha1.New), nil
+}
