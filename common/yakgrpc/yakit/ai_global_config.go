@@ -179,6 +179,7 @@ func cloneAIGlobalConfig(cfg *ypb.AIGlobalConfig) *ypb.AIGlobalConfig {
 		LightweightModels: cloneAIModelConfigs(cfg.GetLightweightModels()),
 		VisionModels:      cloneAIModelConfigs(cfg.GetVisionModels()),
 		AIPresetPrompt:    cfg.GetAIPresetPrompt(),
+		AIPlanPrompt:      cfg.GetAIPlanPrompt(),
 	}
 }
 
