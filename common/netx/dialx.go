@@ -323,26 +323,26 @@ func DialX(target string, opt ...DialXOption) (net.Conn, error) {
 		if config.Debug {
 			log.Infof("dial %v with tls strategy: %v, SNI: %s", target, strategy, tempTlsConfig.ServerName)
 		}
-		conn, err := dialPlainTCPConnWithRetry(target, config)
-		if err != nil {
-			return nil, err
-		}
+		startTLSHandshake := time.Now()
+		var tlsConn net.Conn
+		var tlsErr error
 
 		switch strategy {
 		case TLS_Strategy_Ordinary:
-			tempTlsConfig.GMSupport = nil
-		case TLS_Strategy_GMDail:
-			tempTlsConfig.GMSupport = &gmtls.GMSupport{
-				WorkMode: gmtls.ModeGMSSLOnly,
+			conn, err := dialPlainTCPConnWithRetry(target, config)
+			if err != nil {
+				return nil, err
 			}
+			tempTlsConfig.GMSupport = nil
+			tlsConn, tlsErr = UpgradeToTLSConnectionWithTimeout(conn, sni, tempTlsConfig, tlsTimeout, clientHelloSpec, config.TLSNextProto...)
+		case TLS_Strategy_GMDail:
+			tlsConn, tlsErr = dialTLSWithGMTLSCipherFallback(target, config, tempTlsConfig, sni, tlsTimeout, clientHelloSpec)
 		default:
 			return nil, utils.Errorf("unknown tls strategy %v", strategy)
 		}
 
-		startTLSHandshake := time.Now()
-		tlsConn, err := UpgradeToTLSConnectionWithTimeout(conn, sni, tempTlsConfig, tlsTimeout, clientHelloSpec, config.TLSNextProto...)
-		if err != nil {
-			errs = append(errs, err)
+		if tlsErr != nil {
+			errs = append(errs, tlsErr)
 			continue
 		}
 		config.TraceInfo.SetTLSHandshakeDuration(time.Since(startTLSHandshake))
