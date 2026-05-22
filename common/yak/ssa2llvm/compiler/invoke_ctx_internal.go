@@ -186,5 +186,21 @@ func (c *Compiler) loadBoundParameterValue(fn *ssa.Function, param *ssa.Paramete
 		return val, true
 	}
 
+	freeValueBase := int64(len(fn.Params) + len(fn.ParameterMembers))
+	for i, binding := range callframe.OrderedFreeValueBindings(fn) {
+		if binding.ValueID != param.GetId() {
+			continue
+		}
+		ctxPtr, err := c.ctxI64Ptr()
+		if err != nil {
+			return llvm.Value{}, false
+		}
+		idx := llvm.ConstInt(i64, uint64(argBase+freeValueBase+int64(i)), false)
+		elemPtr := c.Builder.CreateGEP(i64, ctxPtr, []llvm.Value{idx}, "")
+		val := c.Builder.CreateLoad(i64, elemPtr, fmt.Sprintf("fv_lazy_%d", binding.ValueID))
+		c.Values[binding.ValueID] = val
+		return val, true
+	}
+
 	return llvm.Value{}, false
 }
