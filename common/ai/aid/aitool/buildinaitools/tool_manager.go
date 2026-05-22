@@ -3,6 +3,7 @@ package buildinaitools
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"sort"
 	"strings"
 	"sync"
@@ -77,6 +78,7 @@ type AiToolManager struct {
 	forgeSearchTool       []*aitool.Tool
 	noCacheTools          bool // 是否不缓存工具
 	enableAllTools        bool // 是否开启所有工具
+	disallowMCPServers    bool // when true, hide MCP tools from search/list/lookup paths
 
 	recentToolsCache []*RecentToolEntry
 	recentToolsMu    sync.Mutex
@@ -187,6 +189,14 @@ func WithSearchToolEnabled(enabled bool) ToolManagerOption {
 	}
 }
 
+// WithDisallowMCPServers hides MCP tools from search, prompt inventory, and name lookup.
+func WithDisallowMCPServers(disallow bool) ToolManagerOption {
+	return func(m *AiToolManager) {
+		m.disallowMCPServers = disallow
+		m.searchTool = nil
+	}
+}
+
 func NewToolManagerByToolGetter(getter func() []*aitool.Tool, options ...ToolManagerOption) *AiToolManager {
 	manager := &AiToolManager{
 		toolsGetter:           getter,
@@ -201,6 +211,23 @@ func NewToolManagerByToolGetter(getter func() []*aitool.Tool, options ...ToolMan
 	}
 
 	return manager
+}
+
+// SetDisallowMCPServers updates MCP visibility policy and invalidates cached search tools.
+func (m *AiToolManager) SetDisallowMCPServers(disallow bool) {
+	if m == nil {
+		return
+	}
+	m.disallowMCPServers = disallow
+	m.searchTool = nil
+}
+
+// DisallowMCPServers reports whether MCP tools are hidden from this manager.
+func (m *AiToolManager) DisallowMCPServers() bool {
+	if m == nil {
+		return false
+	}
+	return m.disallowMCPServers
 }
 
 // NewToolManager 创建一个新的默认工具管理器实例
@@ -224,6 +251,11 @@ func (m *AiToolManager) safeToolsGetter() []*aitool.Tool {
 		return []*aitool.Tool{}
 	}
 	allTools := m.toolsGetter()
+	if m.disallowMCPServers {
+		allTools = lo.Filter(allTools, func(tool *aitool.Tool, _ int) bool {
+			return !IsMCPToolName(tool.Name)
+		})
+	}
 	if len(m.disableTools) > 0 {
 		allTools = lo.Filter(allTools, func(tool *aitool.Tool, _ int) bool {
 			_, ok := m.disableTools[tool.Name]
@@ -273,7 +305,7 @@ func (m *AiToolManager) getForgeSearchTools() ([]*aitool.Tool, error) {
 				log.Errorf("get all ai forge error: %v", err)
 			}
 			return forgeList
-		}, searchtools.SearchForgeName)
+		}, searchtools.SearchForgeName, false)
 		if err != nil {
 			return nil, utils.Errorf("create ai forge search tools: %v", err)
 		}
@@ -286,7 +318,12 @@ func (m *AiToolManager) getSearchTools() ([]*aitool.Tool, error) {
 	if m.searchTool == nil {
 		var err error
 		// ai tool search tools
-		aiToolSearchTools, err := searchtools.CreateAISearchTools(m.aiToolsSearcher, m.safeToolsGetter, searchtools.SearchToolName)
+		aiToolSearchTools, err := searchtools.CreateAISearchTools(
+			m.aiToolsSearcher,
+			m.safeToolsGetter,
+			searchtools.SearchToolName,
+			!m.disallowMCPServers,
+		)
 		if err != nil {
 			log.Error(err)
 		}
@@ -331,7 +368,19 @@ func (m *AiToolManager) GetToolByName(name string) (*aitool.Tool, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("cannot find [%v] in ai_yak_tools, yak_scripts, or enabled tools", name)
+	// Look up cached MCP tool metadata using the compound name "mcp_{server}_{tool}".
+	// Skip when MCP servers are disabled for this runtime.
+	if !m.disallowMCPServers {
+		mcpCfg, mcpErr := yakit.GetMCPServerToolConfigByFullName(db, name)
+		if mcpErr == nil && mcpCfg.Enable && mcpCfg.Description != "" {
+			stub := buildStubToolFromMCPCache(name, mcpCfg)
+			if stub != nil {
+				return stub, nil
+			}
+		}
+	}
+
+	return nil, fmt.Errorf("cannot find [%v] in ai_yak_tools, yak_scripts, mcp cache, or enabled tools", name)
 }
 
 // SearchTools 通过字符串搜索相关工具
@@ -513,7 +562,8 @@ func (m *AiToolManager) HasRecentlyUsedTools() bool {
 // 不命中, 内容丢失). 当前两边都是 "[current-nonce]".
 //
 // 关键词: RecentToolCacheStableNonce, [current-nonce], 占位符语义,
-//        与 aicommon.RecentToolCacheStableNonce 字面量严格一致
+//
+//	与 aicommon.RecentToolCacheStableNonce 字面量严格一致
 const RecentToolCacheStableNonce = "[current-nonce]"
 
 const recentToolEntryTemplate = `<|TOOL_{{ .Name }}_{{ .Nonce }}|>
@@ -771,4 +821,90 @@ func (m *AiToolManager) GetRecentToolsSummary(maxTokens int, nonce string) strin
 	}
 	sb.WriteString(renderRecentToolSummaryFooter(RecentToolCacheStableNonce, m.getRecentToolParamNamesLocked()))
 	return sb.String()
+}
+
+// BuildStubToolFromMCPCachePublic is the exported wrapper for buildStubToolFromMCPCache.
+// Use this when pre-loading MCP stubs from outside the package (e.g., aireact).
+func BuildStubToolFromMCPCachePublic(fullName string, cfg *schema.MCPServerToolConfig) *aitool.Tool {
+	return buildStubToolFromMCPCache(fullName, cfg)
+}
+
+// buildStubToolFromMCPCache constructs a minimal aitool.Tool from cached MCP metadata.
+// The stub carries a real Callback that returns TOOL_INITIALIZING so the AI receives a
+// meaningful error and can fall back gracefully. If the MCP server comes back online,
+// the live tool (with a real network Callback) takes precedence via the in-memory tool
+// list populated by loadMCPServers.
+func buildStubToolFromMCPCache(fullName string, cfg *schema.MCPServerToolConfig) *aitool.Tool {
+	serverName := cfg.ServerName
+	toolName := cfg.ToolName
+
+	// Normalize description to match live tool format: [MCP:server] desc.
+	desc := cfg.Description
+	prefix := fmt.Sprintf("[MCP:%s] ", serverName)
+	if desc == "" {
+		desc = fmt.Sprintf("[MCP:%s] Tool from MCP server: %s (not yet connected)", serverName, serverName)
+	} else if !strings.HasPrefix(desc, prefix) {
+		desc = prefix + desc
+	}
+
+	// Usage mirrors live tool: tells parameter-generation prompt this is a
+	// remote MCP tool and should not be bridged via call_yak_plugin.
+	usage := fmt.Sprintf(
+		"This is a remote MCP tool provided by server %q. "+
+			"Pass parameters exactly as defined in the schema; the system will forward them to the MCP server automatically. "+
+			"Do NOT call this tool via call_yak_plugin — use require_tool %s directly. "+
+			"Note: the MCP server may still be connecting; if this call fails with TOOL_INITIALIZING, retry after a moment.",
+		serverName, fullName,
+	)
+
+	opts := []aitool.ToolOption{
+		aitool.WithMCPPendingStub(true),
+		aitool.WithDescription(desc),
+		aitool.WithUsage(usage),
+		aitool.WithKeywords([]string{"mcp", serverName, toolName, "external", "remote"}),
+		aitool.WithVerboseName(fmt.Sprintf("%s (MCP:%s)", toolName, serverName)),
+		// Callback returns a retryable error so AI can degrade gracefully
+		// instead of crashing when the MCP server is still initializing.
+		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+			msg := fmt.Sprintf(
+				"MCP tool %q (server: %s) is not yet available — the MCP server is still connecting or unreachable. "+
+					"Please try a different approach or wait for the server to become ready.",
+				toolName, serverName,
+			)
+			fmt.Fprintln(stderr, msg)
+			return nil, utils.Errorf("%s %s", MCPToolInitializingErrPrefix, msg)
+		}),
+	}
+
+	// Reconstruct parameters from cached JSON.
+	if cfg.ParamsJSON != "" && cfg.ParamsJSON != "[]" {
+		type paramEntry struct {
+			Name        string `json:"name"`
+			Type        string `json:"type"`
+			Description string `json:"description"`
+			Default     string `json:"default"`
+			Required    bool   `json:"required"`
+		}
+		var entries []paramEntry
+		if err := json.Unmarshal([]byte(cfg.ParamsJSON), &entries); err == nil {
+			for _, e := range entries {
+				name := e.Name
+				paramOpts := []aitool.PropertyOption{
+					aitool.WithParam_Description(e.Description),
+				}
+				if e.Required {
+					paramOpts = append(paramOpts, aitool.WithParam_Required(true))
+				}
+				if e.Default != "" {
+					paramOpts = append(paramOpts, aitool.WithParam_Default(e.Default))
+				}
+				// Cached params are serialized as string type; numeric/boolean params
+				// will still work since MCP arguments are passed as interface{} values.
+				opts = append(opts, aitool.WithStringParam(name, paramOpts...))
+			}
+		}
+	}
+
+	tool := aitool.NewWithoutCallback(fullName, opts...)
+	return tool
 }

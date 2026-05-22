@@ -342,7 +342,14 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 	// EmitPinDirectory is deferred to ensureWorkDirectory when user input arrives
 
 	if !react.config.DisallowMCPServers {
-		// load mcp servers into ai-tool
+		// Synchronously pre-load MCP stub tools from DB into the tool manager
+		// so they appear in the system prompt on the very first request, before
+		// the background connection goroutine has finished.
+		react.preloadMCPStubsFromDB()
+
+		// Fire-and-forget: connect to MCP servers, write fresh tool metadata
+		// to DB, then append live tools (with real callbacks) to AiToolManager,
+		// replacing the stubs. The first user query is not blocked.
 		react.loadMCPServers()
 	}
 
@@ -591,9 +598,54 @@ func (r *ReAct) loadMCPServers() {
 		}
 		if len(tools) > 0 {
 			mng := r.config.GetAiToolManager()
-			mng.AppendTools(tools...)
+			// Use OverrideToolByName so live MCP tools replace any stub tools
+			// that were pre-loaded from the DB cache (AppendTools skips
+			// already-registered names, so stubs would block live replacements).
+			for _, t := range tools {
+				mng.OverrideToolByName(t)
+			}
 		}
 	}()
+}
+
+// preloadMCPStubsFromDB loads MCP tool stubs from the DB cache into the tool
+// manager synchronously, before the background MCP server connection goroutine
+// finishes. This ensures MCP tools appear in the system prompt on the first
+// request even when the remote MCP server hasn't responded yet.
+// Once loadMCPServers completes, AppendTools will replace each stub with a
+// live tool carrying a real network callback (OverrideToolByName semantics via
+// AppendTools dedup logic).
+func (r *ReAct) preloadMCPStubsFromDB() {
+	db := consts.GetGormProfileDatabase()
+	if db == nil {
+		return
+	}
+	cfgs, err := yakit.GetAllEnabledMCPServerToolConfigs(db)
+	if err != nil {
+		log.Warnf("preload MCP stubs: failed to query DB: %v", err)
+		return
+	}
+	if len(cfgs) == 0 {
+		return
+	}
+
+	mng := r.config.GetAiToolManager()
+	if mng == nil {
+		return
+	}
+
+	var stubs []*aitool.Tool
+	for _, cfg := range cfgs {
+		fullName := fmt.Sprintf("mcp_%s_%s", cfg.ServerName, cfg.ToolName)
+		stub := buildinaitools.BuildStubToolFromMCPCachePublic(fullName, cfg)
+		if stub != nil {
+			stubs = append(stubs, stub)
+		}
+	}
+	if len(stubs) > 0 {
+		mng.AppendTools(stubs...)
+		log.Infof("preloaded %d MCP tool stubs from DB cache into tool manager", len(stubs))
+	}
 }
 
 // cycle import issue

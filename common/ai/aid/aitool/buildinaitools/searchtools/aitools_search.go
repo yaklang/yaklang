@@ -22,7 +22,7 @@ const SearchForgeName = "aiforge_search"
 const SearchCapabilitiesName = "search_capabilities"
 
 // CreateAISearchTools creates a single-category search tool (legacy, kept for compatibility).
-func CreateAISearchTools[T AISearchable](searcher AISearcher[T], searchListGetter func() []T, toolName string) ([]*aitool.Tool, error) {
+func CreateAISearchTools[T AISearchable](searcher AISearcher[T], searchListGetter func() []T, toolName string, allowMCPSearch bool) ([]*aitool.Tool, error) {
 	factory := aitool.NewFactory()
 	err := factory.RegisterTool(
 		toolName,
@@ -50,7 +50,8 @@ func CreateAISearchTools[T AISearchable](searcher AISearcher[T], searchListGette
 			}
 			var buf bytes.Buffer
 
-			tools, err := yakit.SearchAIYakTool(consts.GetGormProfileDatabase(), query)
+			db := consts.GetGormProfileDatabase()
+			tools, err := yakit.SearchAIYakTool(db, query)
 			if err != nil {
 				return nil, utils.Errorf("search AIYakTool failed: %v", err)
 			}
@@ -60,6 +61,21 @@ func CreateAISearchTools[T AISearchable](searcher AISearcher[T], searchListGette
 					suffix = fmt.Sprintf(" (%s)", i.VerboseName)
 				}
 				buf.WriteString(fmt.Sprintf("- `%v`: %v%v\n", i.Name, i.Description, suffix))
+			}
+
+			if allowMCPSearch {
+				mcpTools, err := yakit.SearchMCPServerToolsBM25(db, query, 10)
+				if err != nil {
+					return nil, utils.Errorf("search MCP tools failed: %v", err)
+				}
+				for _, t := range mcpTools {
+					fullName := fmt.Sprintf("mcp_%s_%s", t.ServerName, t.ToolName)
+					suffix := ""
+					if t.ServerName != "" {
+						suffix = fmt.Sprintf(" (MCP:%s)", t.ServerName)
+					}
+					buf.WriteString(fmt.Sprintf("- `%v`: %v%v\n", fullName, t.Description, suffix))
+				}
 			}
 
 			results := buf.String()
@@ -84,6 +100,8 @@ type SearchCapabilitiesConfig struct {
 	ForgeSearcher AISearcher[*schema.AIForge]
 	ForgesGetter  func() []*schema.AIForge
 	SkillSearchFn SkillSearchFunc
+	// AllowMCPSearch controls whether MCP tool metadata is included in tool search results.
+	AllowMCPSearch bool
 
 	// OnSearchCompleted is called after each successful search.
 	// It can be used to add timeline entries (e.g., via AddToTimeline) to inform the AI
@@ -231,8 +249,10 @@ func searchTools(cfg *SearchCapabilitiesConfig, query string) string {
 		}
 	}
 
-	// Fallback to BM25 DB search
 	db := consts.GetGormProfileDatabase()
+	hasResults := false
+
+	// BM25 search over ai_yak_tools
 	if db != nil {
 		tools, err := yakit.SearchAIYakToolBM25(db, &yakit.AIYakToolFilter{Keywords: []string{query}}, 10, 0)
 		if err != nil {
@@ -251,10 +271,35 @@ func searchTools(cfg *SearchCapabilitiesConfig, query string) string {
 				buf.WriteString(fmt.Sprintf("- **%s**: %s\n", name, desc))
 			}
 			buf.WriteString("\n")
-			return buf.String()
+			hasResults = true
 		}
 	}
 
+	// BM25 search over cached MCP tool metadata so externally-provided MCP tools are discoverable.
+	if db != nil && searchToolsAllowMCP(cfg) {
+		mcpTools, err := yakit.SearchMCPServerToolsBM25(db, query, 10)
+		if err != nil {
+			log.Warnf("search_capabilities: MCP tool BM25 search failed: %v", err)
+		} else if len(mcpTools) > 0 {
+			if !hasResults {
+				buf.WriteString("### Matched Tools\n")
+			}
+			for _, t := range mcpTools {
+				fullName := fmt.Sprintf("mcp_%s_%s", t.ServerName, t.ToolName)
+				desc := t.Description
+				if len(desc) > 200 {
+					desc = desc[:200] + "..."
+				}
+				buf.WriteString(fmt.Sprintf("- **%s** [MCP:%s]: %s\n", fullName, t.ServerName, desc))
+			}
+			buf.WriteString("\n")
+			hasResults = true
+		}
+	}
+
+	if hasResults {
+		return buf.String()
+	}
 	return ""
 }
 
@@ -307,6 +352,13 @@ func searchForges(cfg *SearchCapabilitiesConfig, query string) string {
 	}
 
 	return ""
+}
+
+func searchToolsAllowMCP(cfg *SearchCapabilitiesConfig) bool {
+	if cfg == nil {
+		return true
+	}
+	return cfg.AllowMCPSearch
 }
 
 func searchSkills(cfg *SearchCapabilitiesConfig, query string) string {

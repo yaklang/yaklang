@@ -6,6 +6,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiskillloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
@@ -167,13 +168,20 @@ type FastMatchResult struct {
 	// MatchedCapabilityMentions contains exact-name capability mentions found in user input.
 	MatchedCapabilityMentions *reactloops.CapabilityNameMatchResult
 
+	// MatchedMCPTools holds MCP tool configs matched via cached metadata BM25
+	// keyword search (same pattern as MatchedTools). Populated only when MCP
+	// servers are allowed for this runtime;
+	MatchedMCPTools []*schema.MCPServerToolConfig
+
 	// ContextSummary is a pre-formatted string summarizing matched capabilities
 	ContextSummary string
 }
 
-// HasMatches returns true if any tools, forges, or loops were matched.
+// HasMatches returns true if any tools, forges, loops, or MCP tools were matched.
 func (r *FastMatchResult) HasMatches() bool {
-	return len(r.MatchedTools) > 0 || len(r.MatchedForges) > 0 || len(r.MatchedLoops) > 0 || len(r.MatchedSkills) > 0 || (r.MatchedCapabilityMentions != nil && r.MatchedCapabilityMentions.HasMatches())
+	return len(r.MatchedTools) > 0 || len(r.MatchedForges) > 0 || len(r.MatchedLoops) > 0 ||
+		len(r.MatchedSkills) > 0 || len(r.MatchedMCPTools) > 0 ||
+		(r.MatchedCapabilityMentions != nil && r.MatchedCapabilityMentions.HasMatches())
 }
 
 // NeedsDeepAnalysis returns true when fast matching is insufficient and
@@ -261,6 +269,15 @@ func FastIntentMatch(r aicommon.AIInvokeRuntime, input string) *FastMatchResult 
 				log.Infof("fast intent match: found %d forges via BM25 for: %s", len(forges), trimmed)
 			}
 		}
+
+		// MCP tools use a separate metadata table; skip when MCP is disabled for this runtime.
+		if reactloops.IsMCPServersAllowed(r) {
+			mcpTools := searchMCPToolsForFastIntent(db, trimmed, 5)
+			if len(mcpTools) > 0 {
+				result.MatchedMCPTools = mcpTools
+				log.Infof("fast intent match: found %d MCP tools for: %s", len(mcpTools), trimmed)
+			}
+		}
 	}
 
 	// Search registered loop metadata (in-memory, not DB-backed)
@@ -298,6 +315,23 @@ func FastIntentMatch(r aicommon.AIInvokeRuntime, input string) *FastMatchResult 
 	}
 
 	return result
+}
+
+// searchMCPToolsForFastIntent searches cached MCP tool metadata via BM25 keyword matching.
+func searchMCPToolsForFastIntent(db *gorm.DB, query string, limit int) []*schema.MCPServerToolConfig {
+	if db == nil || strings.TrimSpace(query) == "" {
+		return nil
+	}
+	if limit <= 0 {
+		limit = 5
+	}
+
+	mcpTools, err := yakit.SearchMCPServerToolsBM25(db, query, limit)
+	if err != nil {
+		log.Warnf("fast intent match: MCP tool BM25 search failed: %v", err)
+		return nil
+	}
+	return mcpTools
 }
 
 // containsAnyToken checks if the searchFields contain any word-level token from the input.
@@ -380,6 +414,16 @@ func buildFastMatchSummary(result *FastMatchResult) string {
 		sb.WriteString("### Matched Focus Modes\n")
 		for _, loop := range result.MatchedLoops {
 			sb.WriteString(fmt.Sprintf("- **%s**: %s\n", loop.Name, truncateString(loop.Description, 120)))
+		}
+		sb.WriteString("\n")
+	}
+
+	if len(result.MatchedMCPTools) > 0 {
+		sb.WriteString("### Matched MCP Tools\n")
+		sb.WriteString("Call via `require_tool` using the full name `mcp_{server}_{tool}`.\n\n")
+		for _, t := range result.MatchedMCPTools {
+			fullName := fmt.Sprintf("mcp_%s_%s", t.ServerName, t.ToolName)
+			sb.WriteString(fmt.Sprintf("- **%s** [MCP:%s]: %s\n", fullName, t.ServerName, truncateString(t.Description, 120)))
 		}
 		sb.WriteString("\n")
 	}
@@ -551,6 +595,28 @@ func populateExtraCapabilitiesFromFastMatch(r aicommon.AIInvokeRuntime, loop *re
 					continue
 				}
 				addedToolNames[name] = true
+				ecm.AddTools(tool)
+			}
+		}
+	}
+
+	if len(result.MatchedMCPTools) > 0 && reactloops.IsMCPServersAllowed(r) {
+		toolMgr := r.GetConfig().GetAiToolManager()
+		if toolMgr != nil {
+			for _, t := range result.MatchedMCPTools {
+				if t == nil {
+					continue
+				}
+				fullName := fmt.Sprintf("mcp_%s_%s", t.ServerName, t.ToolName)
+				if addedToolNames[fullName] {
+					continue
+				}
+				tool, err := toolMgr.GetToolByName(fullName)
+				if err != nil {
+					log.Debugf("extra capabilities (fast): skip MCP tool %q: %v", fullName, err)
+					continue
+				}
+				addedToolNames[fullName] = true
 				ecm.AddTools(tool)
 			}
 		}

@@ -49,6 +49,7 @@ type CapabilitySearchResult struct {
 
 var capabilityTypeUsageGuides = map[string]string{
 	"tool":       "通过 `require_tool` 调用指定工具执行任务。/ Use `require_tool` to invoke the tool.",
+	"mcp-tool":   "通过 `require_tool` 调用指定 MCP 工具执行任务（工具名以 mcp_ 开头）。/ Use `require_tool` with the mcp_ prefixed name to invoke the MCP tool.",
 	"forge":      "通过 `require_ai_blueprint` 调用蓝图，由蓝图系统负责自动化执行编排。/ Use `require_ai_blueprint` to execute the blueprint workflow.",
 	"skill":      "技能会被自动加载到上下文中，提供特定领域的知识和方法指引。/ Skills are auto-loaded into context.",
 	"focus_mode": "通过 `enter_focus_mode` 进入专注模式，在独立的执行环境中完成特定任务。/ Use `enter_focus_mode` to enter focus mode.",
@@ -56,12 +57,13 @@ var capabilityTypeUsageGuides = map[string]string{
 
 var capabilityTypeLabels = map[string]string{
 	"tool":       "Tools (工具)",
+	"mcp-tool":   "MCP Tools (外部 MCP 工具)",
 	"forge":      "Forges / Blueprints (AI 蓝图)",
 	"skill":      "Skills (技能)",
 	"focus_mode": "Focus Modes (专注模式)",
 }
 
-var capabilityTypeOrder = []string{"tool", "forge", "skill", "focus_mode"}
+var capabilityTypeOrder = []string{"tool", "mcp-tool", "forge", "skill", "focus_mode"}
 
 func SearchCapabilities(r aicommon.AIInvokeRuntime, loop *ReActLoop, input CapabilitySearchInput) (*CapabilitySearchResult, error) {
 	queries := normalizeCapabilityStrings(append([]string{input.Query}, input.Queries...))
@@ -82,7 +84,7 @@ func SearchCapabilities(r aicommon.AIInvokeRuntime, loop *ReActLoop, input Capab
 		if len(keywords) == 0 {
 			continue
 		}
-		searchToolsAndForges(query, keywords, limit, result, &markdown)
+		searchToolsAndForges(r, loop, query, keywords, limit, result, &markdown)
 		searchSkillsFromLoader(r, query, limit, result, &markdown)
 		searchFocusModes(query, result, &markdown)
 	}
@@ -274,6 +276,25 @@ func BuildCapabilityCatalog(r aicommon.AIInvokeRuntime) string {
 				sb.WriteString("\n")
 			}
 		}
+
+		// Include enabled MCP tools with cached descriptions so the LLM
+		// catalog-match pass can also discover them.
+		if IsMCPServersAllowed(r) {
+			mcpToolConfigs, mcpErr := yakit.GetAllEnabledMCPServerToolConfigs(db)
+			if mcpErr != nil {
+				log.Warnf("capability catalog: failed to load MCP tool configs: %v", mcpErr)
+			} else {
+				for _, t := range mcpToolConfigs {
+					if t.Description == "" {
+						continue
+					}
+					fullName := fmt.Sprintf("mcp_%s_%s", t.ServerName, t.ToolName)
+					desc := utils.ShrinkString(t.Description, 120)
+					// Use [mcp-tool:] prefix to distinguish MCP tools from built-in tools.
+					sb.WriteString(fmt.Sprintf("[mcp-tool:%s]: %s - %s\n", fullName, fullName, desc))
+				}
+			}
+		}
 	}
 
 	type skillLoaderProvider interface {
@@ -431,7 +452,7 @@ func ParseCapabilityDetails(jsonStr string) []CapabilityDetail {
 	return details
 }
 
-func searchToolsAndForges(query string, keywords []string, limit int, result *CapabilitySearchResult, markdown *strings.Builder) {
+func searchToolsAndForges(r aicommon.AIInvokeRuntime, loop *ReActLoop, query string, keywords []string, limit int, result *CapabilitySearchResult, markdown *strings.Builder) {
 	db := consts.GetGormProfileDatabase()
 	if db == nil {
 		markdown.WriteString("### Tools & Forges\nDatabase not available.\n\n")
@@ -490,6 +511,28 @@ func searchToolsAndForges(query string, keywords []string, limit int, result *Ca
 			result.Details = append(result.Details, CapabilityDetail{CapabilityName: forge.ForgeName, CapabilityType: "forge", Description: desc})
 		}
 		markdown.WriteString("\n")
+	}
+
+	// Search cached MCP tool metadata using BM25 when MCP servers are enabled.
+	if r != nil && IsMCPServersAllowed(r) {
+		mcpTools, err := yakit.SearchMCPServerToolsBM25(db, query, limit)
+		if err != nil {
+			log.Warnf("capability search: MCP tool BM25 search failed: %v", err)
+		} else if len(mcpTools) > 0 {
+			markdown.WriteString(fmt.Sprintf("### Matched MCP Tools for: %s\n", query))
+			for _, t := range mcpTools {
+				fullName := fmt.Sprintf("mcp_%s_%s", t.ServerName, t.ToolName)
+				desc := utils.ShrinkString(t.Description, 200)
+				markdown.WriteString(fmt.Sprintf("- **%s** [MCP:%s]: %s\n", fullName, t.ServerName, desc))
+				result.MatchedToolNames = append(result.MatchedToolNames, fullName)
+				result.Details = append(result.Details, CapabilityDetail{
+					CapabilityName: fullName,
+					CapabilityType: "mcp-tool",
+					Description:    desc,
+				})
+			}
+			markdown.WriteString("\n")
+		}
 	}
 }
 

@@ -140,7 +140,7 @@ type ReActLoop struct {
 	// generic auto-verification can compare the current loop state against the
 	// previous accepted checkpoint.
 	periodicVerificationInterval int // when == 0 , trigger every iteration;
-	DisablePeriodicVerification       bool
+	DisablePeriodicVerification  bool
 	verificationRuntimeSnapshot  *VerificationRuntimeSnapshot
 	verificationMutex            *sync.Mutex
 	verificationWatchdogTimer    *time.Timer
@@ -721,6 +721,19 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		if r.allowSkillViewOffset == nil || r.allowSkillViewOffset() {
 			if changeOffset, ok := GetLoopAction(schema.AI_REACT_LOOP_ACTION_CHANGE_SKILL_VIEW_OFFSET); ok {
 				r.actions.Set(changeOffset.ActionType, changeOffset)
+			}
+		}
+	}
+
+	if IsMCPServersAllowed(invoker) {
+		if _, ok := r.actions.Get(schema.AI_REACT_LOOP_ACTION_QUERY_MCP_SERVERS); !ok {
+			if queryMCPServers, ok := GetLoopAction(schema.AI_REACT_LOOP_ACTION_QUERY_MCP_SERVERS); ok {
+				r.actions.Set(queryMCPServers.ActionType, queryMCPServers)
+			}
+		}
+		if _, ok := r.actions.Get(schema.AI_REACT_LOOP_ACTION_QUERY_MCP_TOOLS); !ok {
+			if queryMCPTools, ok := GetLoopAction(schema.AI_REACT_LOOP_ACTION_QUERY_MCP_TOOLS); ok {
+				r.actions.Set(queryMCPTools.ActionType, queryMCPTools)
 			}
 		}
 	}

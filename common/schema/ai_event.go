@@ -79,6 +79,8 @@ const (
 	AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL       = "directly_call_tool"
 	AI_REACT_LOOP_ACTION_REQUEST_VERIFICATION     = "request_verification"
 	AI_REACT_LOOP_ACTION_ADJUST_TODOLIST          = "adjust_todolist"
+	AI_REACT_LOOP_ACTION_QUERY_MCP_SERVERS        = "query_mcp_servers"
+	AI_REACT_LOOP_ACTION_QUERY_MCP_TOOLS          = "query_mcp_tools"
 )
 
 const (
