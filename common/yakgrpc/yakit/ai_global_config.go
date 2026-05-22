@@ -154,6 +154,7 @@ func ApplyAIGlobalConfig(db *gorm.DB, cfg *ypb.AIGlobalConfig) error {
 		RoutingPolicy:   routing,
 		DefaultModelID:  cfg.GetDefaultModelId(),
 		GlobalWeight:    cfg.GetGlobalWeight(),
+		IsOnline:        cfg.GetIsOnline(),
 	}
 
 	tiered.IntelligentConfigs = buildModels(cfg.IntelligentModels)
