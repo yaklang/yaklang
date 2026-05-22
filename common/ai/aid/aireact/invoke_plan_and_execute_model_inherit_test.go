@@ -46,17 +46,55 @@ func TestReAct_RequestPlanAndExecution_PreservesQualityModelInsideAid(t *testing
 
 		prompt := req.GetPrompt()
 		switch {
-		case utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool"):
+		// Outer ReAct: trigger plan-and-execute (exclude inner subtask loops)
+		case utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") &&
+			!utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_"):
 			rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "request_plan_and_execution", "plan_request_payload": "execute mock tool in aid" },
 "human_readable_thought": "delegate to plan execution", "cumulative_summary": "delegate to aid"}
 `))
-		case utils.MatchAllOfSubString(prompt, "FINAL_ANSWER", "answer_payload") && !utils.MatchAllOfSubString(prompt, "require_tool"):
-			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "outer summary"}`))
+		// Plan generation (LiteForge plan_from_document)
+		case utils.MatchAllOfSubString(prompt, "main_task", "main_task_goal", "subtask_name", "subtask_goal"):
+			rsp.EmitOutputStream(bytes.NewBufferString(`{
+  "@action": "plan_from_document",
+  "main_task": "execute mock tool in aid",
+  "main_task_goal": "run the mock tool and complete the delegated task",
+  "tasks": [
+    {
+      "subtask_name": "call mock plan exec tool",
+      "subtask_goal": "invoke the mock tool once and finish the task"
+    }
+  ]
+}`))
+		// Inner subtask ReAct loop: require tool
+		case utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_", "directly_answer", "require_tool"):
+			rsp.EmitOutputStream(bytes.NewBufferString(`
+{"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "mock_plan_exec_tool" },
+"human_readable_thought": "call delegated tool", "cumulative_summary": "call delegated tool"}
+`))
+		// Tool parameter generation
+		case utils.MatchAllOfSubString(prompt, "Generate appropriate parameters for this tool call based on the context above"):
+			rsp.EmitOutputStream(bytes.NewBufferString(`
+{"@action": "call-tool", "tool": "mock_plan_exec_tool", "params": {}}
+`))
+		// Task progress decision
+		case utils.MatchAllOfSubString(prompt, "continue-current-task", "proceed-next-task", "task-failed"):
+			rsp.EmitOutputStream(bytes.NewBufferString(`{
+  "@action": "continue-current-task",
+  "status_summary": "mock tool call completed",
+  "task_short_summary": "mock tool completed"
+}`))
+		// Task summary
+		case utils.MatchAllOfSubString(prompt, "任务执行引擎", "task_long_summary") && !utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_"):
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "summary", "status_summary": "done", "task_short_summary": "completed", "task_long_summary": "task completed"}`))
+		// verify-satisfaction
 		case utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning"):
-			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "outer task completed"}`))
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "task completed"}`))
+		// Final answer
+		case utils.MatchAllOfSubString(prompt, "FINAL_ANSWER", "answer_payload") && !utils.MatchAllOfSubString(prompt, "require_tool"):
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "summary"}`))
 		default:
-			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "outer fallback"}`))
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "fallback"}`))
 		}
 
 		rsp.Close()
@@ -74,7 +112,7 @@ func TestReAct_RequestPlanAndExecution_PreservesQualityModelInsideAid(t *testing
 			strings.Contains(prompt, `"main_task_goal"`) &&
 			strings.Contains(prompt, `"subtask_name"`):
 			rsp.EmitOutputStream(bytes.NewBufferString(`{
-  "@action": "plan",
+  "@action": "plan_from_document",
   "query": "execute mock tool in aid",
   "main_task": "execute mock tool in aid",
   "main_task_goal": "run the mock tool and complete the delegated task",
