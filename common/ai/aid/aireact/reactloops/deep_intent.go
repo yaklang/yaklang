@@ -35,6 +35,7 @@ func ExecuteDeepIntentRecognition(r aicommon.AIInvokeRuntime, loop *ReActLoop, t
 		userInput,
 		r.GetConfig().GetContext(),
 		r.GetConfig().GetEmitter(),
+		true,
 	)
 
 	originOptions := r.GetConfig().OriginOptions()
