@@ -8,8 +8,12 @@ import (
 type functionCompileContext struct {
 	current *ssa.Function
 
-	invokeCtx   llvm.Value
-	returnBlock llvm.BasicBlock
+	invokeCtx       llvm.Value
+	returnBlock     llvm.BasicBlock
+	activeBlockID   int64
+	compiledBlocks  map[int64]struct{}
+	valueBlock      map[int64]int64
+	blockDominators map[int64]map[int64]struct{}
 
 	exceptionValueIDs    map[int64]struct{}
 	activeHandlerByBlock map[int64]int64
@@ -19,7 +23,8 @@ type functionCompileContext struct {
 
 func newFunctionCompileContext(fn *ssa.Function) *functionCompileContext {
 	return &functionCompileContext{
-		current: fn,
+		current:        fn,
+		compiledBlocks: make(map[int64]struct{}),
 	}
 }
 
