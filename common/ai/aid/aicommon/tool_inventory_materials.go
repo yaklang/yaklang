@@ -1,14 +1,64 @@
 package aicommon
 
-import "github.com/yaklang/yaklang/common/ai/aid/aitool"
+import (
+	"strings"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+)
+
+// inventoryPriorityToolNames 是 Tool Inventory 展示优先级名单, 与 capability_inventory fixed 段对齐.
+var inventoryPriorityToolNames = []string{
+	"search_capabilities",
+	"web_search",
+	"grep",
+	"read_file",
+	"write_file",
+	"modify_file",
+	"find_file",
+	"tree",
+	"bash",
+	"cmd",
+	"encode",
+	"decode",
+	"auto_decode",
+	"scan_port",
+	"git-clone",
+	"do_http_request",
+	"batch_do_http_request",
+	"simple_crawler",
+	"cybersecurity-risk",
+	"brute",
+}
 
 type ToolInventoryData struct {
 	ToolInventory  bool
 	ToolsCount     int
 	TopToolsCount  int
 	TopTools       []*aitool.Tool
+	VisibleTools   []*aitool.Tool
 	HasMoreTools   bool
 	MoreToolsCount int
+}
+
+// IsFixedInventoryTool 判断工具是否属于 capability_inventory fixed 段.
+func IsFixedInventoryTool(name string) bool {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return false
+	}
+	for _, fixedName := range inventoryPriorityToolNames {
+		if fixedName == name {
+			return true
+		}
+	}
+	return false
+}
+
+func resolveToolInventoryTopCount(cfg *Config) int {
+	if cfg != nil && cfg.GetTopToolsCount() > 0 {
+		return cfg.GetTopToolsCount()
+	}
+	return ToolInventoryMinCount
 }
 
 func PrioritizeToolsForInventory(tools []*aitool.Tool, maxCount int, extraPriority ...string) []*aitool.Tool {
@@ -16,29 +66,7 @@ func PrioritizeToolsForInventory(tools []*aitool.Tool, maxCount int, extraPriori
 		return nil
 	}
 
-	priorityNames := []string{
-		"search_capabilities",
-		"web_search",
-		"grep",
-		"read_file",
-		"write_file",
-		"modify_file",
-		"find_file",
-		"tree",
-		"bash",
-		"cmd",
-		"encode",
-		"decode",
-		"auto_decode",
-		"scan_port",
-		"git-clone",
-		"do_http_request",
-		"batch_do_http_request",
-		"simple_crawler",
-		"cybersecurity-risk",
-		"brute",
-	}
-
+	priorityNames := inventoryPriorityToolNames
 	if len(extraPriority) > 0 {
 		seen := make(map[string]bool, len(extraPriority))
 		merged := make([]string, 0, len(extraPriority)+len(priorityNames))
@@ -61,7 +89,7 @@ func PrioritizeToolsForInventory(tools []*aitool.Tool, maxCount int, extraPriori
 
 	toolMap := make(map[string]*aitool.Tool, len(tools))
 	for _, tool := range tools {
-		if tool == nil {
+		if tool == nil || tool.Name == "" {
 			continue
 		}
 		toolMap[tool.Name] = tool
@@ -82,7 +110,7 @@ func PrioritizeToolsForInventory(tools []*aitool.Tool, maxCount int, extraPriori
 		if len(result) >= maxCount {
 			break
 		}
-		if tool == nil || usedNames[tool.Name] {
+		if tool == nil || tool.Name == "" || usedNames[tool.Name] {
 			continue
 		}
 		result = append(result, tool)
@@ -109,6 +137,7 @@ func BuildToolInventoryData(tools []*aitool.Tool, topToolsCount int, scenarioWhi
 		ToolsCount:     len(tools),
 		TopToolsCount:  len(display),
 		TopTools:       display,
+		VisibleTools:   tools,
 		HasMoreTools:   len(tools) > len(display),
 		MoreToolsCount: more,
 	}
@@ -126,7 +155,7 @@ func BuildToolInventoryDataFromConfig(config *Config, scenarioWhitelist ...strin
 	if err != nil {
 		return ToolInventoryData{}, err
 	}
-	return BuildToolInventoryData(tools, config.GetTopToolsCount(), scenarioWhitelist...), nil
+	return BuildToolInventoryData(tools, resolveToolInventoryTopCount(config), scenarioWhitelist...), nil
 }
 
 func ApplyToolInventoryData(materials *PromptMaterials, data ToolInventoryData) {
