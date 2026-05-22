@@ -1,15 +1,14 @@
 package compiler
 
 import (
+	"fmt"
+
 	"github.com/yaklang/go-llvm"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
 func (c *Compiler) withLazyCompileInsertPoint(contextInst, targetInst ssa.Instruction, compile func() error) error {
-	var restoreBB llvm.BasicBlock
-	if contextInst != nil && contextInst.GetBlock() != nil {
-		restoreBB, _ = c.Blocks[contextInst.GetBlock().GetId()]
-	}
+	restoreBB := c.restoreInsertBlock(contextInst)
 
 	if c == nil || targetInst == nil || targetInst.GetBlock() == nil {
 		return compile()
@@ -23,12 +22,43 @@ func (c *Compiler) withLazyCompileInsertPoint(contextInst, targetInst ssa.Instru
 	if !ok || targetBB.IsNil() {
 		return compile()
 	}
+	targetBlockID := targetInst.GetBlock().GetId()
+	if c.function != nil {
+		if _, compiled := c.function.compiledBlocks[targetBlockID]; !compiled {
+			// Forward reference: emit in the entry block so the value dominates all uses.
+			if fn := c.function.current; fn != nil && fn.EnterBlock > 0 {
+				if entryBB, ok := c.Blocks[fn.EnterBlock]; ok && !entryBB.IsNil() {
+					c.setInsertPointBeforeTerminator(entryBB)
+					err := compile()
+					if !restoreBB.IsNil() {
+						c.Builder.SetInsertPointAtEnd(restoreBB)
+					}
+					return err
+				}
+			}
+			return compile()
+		}
+	}
 	c.setInsertPointBeforeTerminator(targetBB)
 	err := compile()
 	if !restoreBB.IsNil() {
 		c.Builder.SetInsertPointAtEnd(restoreBB)
 	}
 	return err
+}
+
+func (c *Compiler) restoreInsertBlock(contextInst ssa.Instruction) llvm.BasicBlock {
+	if contextInst != nil && contextInst.GetBlock() != nil {
+		if bb, ok := c.Blocks[contextInst.GetBlock().GetId()]; ok && !bb.IsNil() {
+			return bb
+		}
+	}
+	if c != nil && c.function != nil && c.function.activeBlockID > 0 {
+		if bb, ok := c.Blocks[c.function.activeBlockID]; ok && !bb.IsNil() {
+			return bb
+		}
+	}
+	return llvm.BasicBlock{}
 }
 
 func (c *Compiler) setInsertPointBeforeTerminator(bb llvm.BasicBlock) {
@@ -55,4 +85,32 @@ func (c *Compiler) instructionIsTerminator(inst llvm.Value) bool {
 	default:
 		return false
 	}
+}
+
+func (c *Compiler) emitImplicitFunctionExit(fn *ssa.Function) error {
+	if err := c.storeContextReturn(llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)); err != nil {
+		return err
+	}
+	if fn != nil && fn.DeferBlock > 0 && c.function != nil && !c.function.returnBlock.IsNil() {
+		deferBB, ok := c.Blocks[fn.DeferBlock]
+		if !ok {
+			return fmt.Errorf("defer block %d not found for function %s", fn.DeferBlock, fn.GetName())
+		}
+		c.Builder.CreateBr(deferBB)
+		return nil
+	}
+	c.Builder.CreateRetVoid()
+	return nil
+}
+
+func (c *Compiler) ensureBasicBlockTerminator(bb llvm.BasicBlock, fn *ssa.Function) error {
+	if c == nil || bb.IsNil() || fn == nil {
+		return nil
+	}
+	last := c.lastInstruction(bb)
+	if !last.IsNil() && c.instructionIsTerminator(last) {
+		return nil
+	}
+	c.Builder.SetInsertPointAtEnd(bb)
+	return c.emitImplicitFunctionExit(fn)
 }

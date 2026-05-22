@@ -166,6 +166,7 @@ func (c *Compiler) CompileFunction(fn *ssa.Function) error {
 	}
 
 	c.function = newFunctionCompileContext(fn)
+	c.function.blockDominators = computeBlockDominators(fn)
 	defer func() {
 		c.function = nil
 	}()
@@ -224,12 +225,15 @@ func (c *Compiler) CompileFunction(fn *ssa.Function) error {
 	}
 
 	// 4. Compile Instructions in each Block
-	for _, blockID := range fn.Blocks {
+	for _, blockID := range orderBlocksForCompile(fn) {
 		bb, ok := c.Blocks[blockID]
 		if !ok {
 			return fmt.Errorf("block %d not found", blockID)
 		}
 		c.Builder.SetInsertPointAtEnd(bb)
+		if c.function != nil {
+			c.function.activeBlockID = blockID
+		}
 
 		// Get Block object from function
 		val, ok := fn.GetValueById(blockID)
@@ -333,24 +337,17 @@ func (c *Compiler) CompileFunction(fn *ssa.Function) error {
 
 			// If still no terminator, add default return
 			if !hasTerminator {
-				if fn.DeferBlock > 0 && !c.function.returnBlock.IsNil() {
-					// Implicit return 0 through defer.
-					if err := c.storeContextReturn(llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)); err != nil {
-						return err
-					}
-					deferBB, ok := c.Blocks[fn.DeferBlock]
-					if !ok {
-						return fmt.Errorf("defer block %d not found for function %s", fn.DeferBlock, fn.GetName())
-					}
-					c.Builder.CreateBr(deferBB)
-				} else {
-					// Implicit return 0.
-					if err := c.storeContextReturn(llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)); err != nil {
-						return err
-					}
-					c.Builder.CreateRetVoid()
+				if err := c.emitImplicitFunctionExit(fn); err != nil {
+					return err
 				}
 			}
+		}
+		if err := c.ensureBasicBlockTerminator(bb, fn); err != nil {
+			return err
+		}
+		if c.function != nil {
+			c.function.compiledBlocks[blockID] = struct{}{}
+			c.function.activeBlockID = 0
 		}
 	}
 
