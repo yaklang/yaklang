@@ -33,5 +33,8 @@ You have access to {{ .ToolsCount }} built-in tools. Below are {{ .TopToolsCount
 {{ if .SessionArtifactsFrozen }}# Session Artifacts (Frozen)
 {{ .SessionArtifactsFrozen }}{{ end }}
 
+{{ if .SessionEvidenceFrozen }}# Session Evidence (Frozen)
+{{ .SessionEvidenceFrozen }}{{ end }}
+
 {{ if .TimelineFrozen }}# Timeline Memory (Frozen Prefix)
 {{ .TimelineFrozen }}{{ end }}

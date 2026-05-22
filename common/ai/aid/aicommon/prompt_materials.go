@@ -49,6 +49,8 @@ type PromptMaterials struct {
 	FrozenPartitions       []FrozenBlockPartition
 	SessionArtifactsFrozen string
 	SessionArtifactsOpen   string
+	SessionEvidenceFrozen  string
+	SessionEvidenceOpen    string
 	CurrentTime            string
 	Workspace              bool
 	OSArch                 string
@@ -58,7 +60,9 @@ type PromptMaterials struct {
 	// Deprecated: SessionArtifactsListing 保留给旧测试 / 兼容调用面。新 prompt
 	// 主路径使用 SessionArtifactsFrozen / SessionArtifactsOpen 两个一级字段。
 	SessionArtifactsListing string
-	SessionEvidence         string
+	// Deprecated: SessionEvidence 保留给旧调用路径 fallback。新主路径使用
+	// SessionEvidenceFrozen / SessionEvidenceOpen 两个一级字段。
+	SessionEvidence string
 	// TodoSnapshot 是会话级 TODO 列表渲染结果 (含 <|TODO_LIST_<nonce>|>...
 	// 边界标签的整段块). 物理位置紧跟 SessionEvidence, 与 SessionEvidence
 	// 一样落在 timeline-open 段, 不被 AI_CACHE_FROZEN / AI_CACHE_SEMI 任何
@@ -122,6 +126,7 @@ func (m *PromptMaterials) FrozenBlockData() map[string]any {
 		"AIForgeList":            m.AIForgeList,
 		"FrozenPartitions":       NormalizeFrozenBlockPartitions(m.FrozenPartitions),
 		"SessionArtifactsFrozen": m.SessionArtifactsFrozen,
+		"SessionEvidenceFrozen":  m.SessionEvidenceFrozen,
 		"TimelineFrozen":         m.TimelineFrozen,
 		"TimelineFrozenTimeUnix": m.TimelineFrozenTimeUnix,
 	}
@@ -163,10 +168,14 @@ func (m *PromptMaterials) TimelineOpenData() map[string]any {
 	if m == nil {
 		return map[string]any{}
 	}
+	sessionEvidenceOpen := m.SessionEvidenceOpen
+	if sessionEvidenceOpen == "" {
+		sessionEvidenceOpen = m.SessionEvidence
+	}
 	return map[string]any{
 		"TimelineOpen":           m.TimelineOpen,
 		"TimelineFrozenTimeUnix": m.TimelineFrozenTimeUnix,
-		"SessionEvidence":        m.SessionEvidence,
+		"SessionEvidence":        sessionEvidenceOpen,
 		"TodoSnapshot":           m.TodoSnapshot,
 		"Workspace":              m.Workspace,
 		"OSArch":                 m.OSArch,
@@ -205,14 +214,21 @@ type PromptFrozenOpenMaterials struct {
 
 	SessionArtifactsFrozen string
 	SessionArtifactsOpen   string
+	SessionEvidenceFrozen  string
+	SessionEvidenceOpen    string
 }
 
-func BuildPromptFrozenOpenMaterials(config *Config) PromptFrozenOpenMaterials {
+func BuildPromptFrozenOpenMaterials(config *Config, openNonce ...string) PromptFrozenOpenMaterials {
 	if config == nil {
 		return PromptFrozenOpenMaterials{}
 	}
+	nonce := ""
+	if len(openNonce) > 0 {
+		nonce = openNonce[0]
+	}
 	timelineBlocks := RenderTimelineFrozenOpen(config.GetTimeline())
 	artifactBlocks := RenderSessionArtifactsFrozenOpen(config, timelineBlocks.FrozenTimeUnix)
+	evidenceBlocks := config.GetSessionPromptState().GetSessionEvidenceFrozenOpenBlocks(timelineBlocks.FrozenTimeUnix, nonce)
 	return PromptFrozenOpenMaterials{
 		TimelineFrozen:         timelineBlocks.Frozen,
 		TimelineOpen:           timelineBlocks.Open,
@@ -220,6 +236,8 @@ func BuildPromptFrozenOpenMaterials(config *Config) PromptFrozenOpenMaterials {
 		FrozenPartitions:       FrozenBlockPartitionsFromConfig(config),
 		SessionArtifactsFrozen: artifactBlocks.Frozen,
 		SessionArtifactsOpen:   artifactBlocks.Open,
+		SessionEvidenceFrozen:  evidenceBlocks.Frozen,
+		SessionEvidenceOpen:    evidenceBlocks.Open,
 	}
 }
 
@@ -233,6 +251,8 @@ func ApplyPromptFrozenOpenMaterials(materials *PromptMaterials, frozenOpen Promp
 	materials.FrozenPartitions = append([]FrozenBlockPartition(nil), NormalizeFrozenBlockPartitions(frozenOpen.FrozenPartitions)...)
 	materials.SessionArtifactsFrozen = frozenOpen.SessionArtifactsFrozen
 	materials.SessionArtifactsOpen = frozenOpen.SessionArtifactsOpen
+	materials.SessionEvidenceFrozen = frozenOpen.SessionEvidenceFrozen
+	materials.SessionEvidenceOpen = frozenOpen.SessionEvidenceOpen
 }
 
 func timelineFrozenTimeUnixFromRenderable(blocks TimelineRenderableBlocks) int64 {

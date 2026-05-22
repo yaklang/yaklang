@@ -35,6 +35,10 @@ type SessionPromptState struct {
 	// current session/workdir. It is intentionally in-memory only; persistent
 	// restore can add serialization later without changing the prompt API.
 	sessionArtifactsState *SessionArtifactsRenderState
+
+	// sessionEvidenceState keeps the frozen evidence snapshot used to render
+	// frozen/open evidence blocks under a timeline frozen cutoff.
+	sessionEvidenceState *SessionEvidenceRenderState
 }
 
 func NewSessionPromptState() *SessionPromptState {
@@ -126,6 +130,7 @@ func (s *SessionPromptState) SetSessionEvidence(evidenceJSON string) {
 	s.m.Lock()
 	defer s.m.Unlock()
 	s.evidenceJSON = evidenceJSON
+	s.sessionEvidenceState = nil
 }
 
 // ApplySessionEvidenceOps deserializes the current evidence store, applies
@@ -140,7 +145,7 @@ func (s *SessionPromptState) ApplySessionEvidenceOps(ops []EvidenceOperation) st
 
 	store := UnmarshalEvidenceStore(s.evidenceJSON)
 	store.ApplyOperations(ops)
-	store.ShrinkToTokenBudget(sessionEvidenceTokenBudget)
+	shrinkEvidenceStoreWithStateToTokenBudget(store, s.sessionEvidenceState, sessionEvidenceTokenBudget)
 	s.evidenceJSON = store.Marshal()
 	return codec.StrConvQuote(s.evidenceJSON)
 }
@@ -159,6 +164,46 @@ func (s *SessionPromptState) GetSessionEvidenceRendered() string {
 
 	store := UnmarshalEvidenceStore(s.evidenceJSON)
 	return store.Render()
+}
+
+func (s *SessionPromptState) GetSessionEvidenceFrozenOpenBlocks(frozenTimeUnix int64, openNonce string) SessionEvidencePromptBlocks {
+	if s == nil {
+		return SessionEvidencePromptBlocks{}
+	}
+	s.m.Lock()
+	defer s.m.Unlock()
+
+	store := UnmarshalEvidenceStore(s.evidenceJSON)
+	if s.sessionEvidenceState == nil {
+		s.sessionEvidenceState = NewSessionEvidenceRenderState()
+	}
+
+	blocks := RenderSessionEvidenceFrozenOpen(s.sessionEvidenceState, store, frozenTimeUnix)
+	rendered := renderSessionEvidencePromptBlocks(blocks, openNonce)
+	for MeasureTokens(joinSessionEvidencePromptBlocks(rendered)) > sessionEvidenceTokenBudget && len(store.Items) > 1 {
+		trimmed := store.Items[0]
+		store.Items = store.Items[1:]
+		pruneSessionEvidenceFrozenItem(s.sessionEvidenceState, trimmed.ID)
+		blocks = RenderSessionEvidenceFrozenOpen(s.sessionEvidenceState, store, frozenTimeUnix)
+		rendered = renderSessionEvidencePromptBlocks(blocks, openNonce)
+	}
+	s.evidenceJSON = store.Marshal()
+	return rendered
+}
+
+func shrinkEvidenceStoreWithStateToTokenBudget(store *EvidenceStore, state *SessionEvidenceRenderState, budget int) {
+	if store == nil || budget <= 0 {
+		return
+	}
+	for len(store.Items) > 1 {
+		rendered := store.Render()
+		if MeasureTokens(rendered) <= budget {
+			return
+		}
+		trimmed := store.Items[0]
+		store.Items = store.Items[1:]
+		pruneSessionEvidenceFrozenItem(state, trimmed.ID)
+	}
 }
 
 // GetVerificationTodo returns the raw serialized VerificationTodoStore JSON

@@ -40,9 +40,6 @@ func renderRecentToolRoutingHint() string {
 	})
 }
 
-//go:embed prompts/session_evidence.txt
-var sessionEvidenceTemplate string
-
 //go:embed prompts/todo_list.txt
 var todoListTemplate string
 
@@ -231,18 +228,6 @@ func (r *ReActLoop) generateLoopPrompt(
 		extraCapabilities = r.extraCapabilities.Render(nonce)
 	}
 
-	var sessionEvidence string
-	if evidenceContent := r.config.GetSessionEvidenceRendered(); evidenceContent != "" {
-		sessionEvidence, err = utils.RenderTemplate(sessionEvidenceTemplate, map[string]any{
-			"Nonce":    nonce,
-			"Evidence": evidenceContent,
-		})
-		if err != nil {
-			log.Warnf("render session evidence template failed: %v", err)
-			sessionEvidence = ""
-		}
-	}
-
 	// 全局 TODO 块: 与 SessionEvidence 同处 timeline-open 段, 物理位置紧跟
 	// SessionEvidence 之后. 任何 loop iteration 都能看到, 不再受限于 Verify
 	// 调用时机. 数据源是 SessionPromptState 的 VerificationTodoStore, 由
@@ -301,7 +286,6 @@ func (r *ReActLoop) generateLoopPrompt(
 		Schema:            schema,
 		SkillsContext:     skillsContext,
 		ExtraCapabilities: extraCapabilities,
-		SessionEvidence:   sessionEvidence,
 		TodoSnapshot:      todoSnapshot,
 		ReactiveData:      reactiveData,
 		InjectedMemory:    memory,
