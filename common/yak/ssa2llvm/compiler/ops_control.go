@@ -170,42 +170,46 @@ func (c *Compiler) resolvePhi(inst *ssa.Phi) error {
 		preds = c.predecessorBlockIDs(fn, blockID)
 	}
 
-	var incomingVals []llvm.Value
-	var incomingBlocks []llvm.BasicBlock
-	zero := llvm.ConstInt(c.inferPhiType(inst), 0, false)
-
+	edgeByPred := make(map[int64]int64, len(preds))
 	for i, predBlockID := range preds {
-		blk, ok := c.Blocks[predBlockID]
-		if !ok {
-			continue
-		}
-
-		val := zero
 		if i < len(edges) {
-			edgeValID := edges[i]
-			if edgeObj, ok := fn.GetValueById(edgeValID); ok && edgeObj != nil {
-				if _, isUndef := edgeObj.(*ssa.Undefined); !isUndef {
-					if resolved, err := c.getValue(inst, edgeValID); err == nil {
-						val = resolved
+			edgeByPred[predBlockID] = edges[i]
+		}
+	}
+
+	phiBB, ok := c.Blocks[blockID]
+	if !ok || phiBB.IsNil() {
+		return fmt.Errorf("resolvePhi: llvm block %d not found", blockID)
+	}
+
+	llvmPreds := c.gatherLLVMPredecessors(phiBB)
+	if len(llvmPreds) == 0 {
+		for _, predBlockID := range preds {
+			if blk, ok := c.Blocks[predBlockID]; ok && !blk.IsNil() {
+				llvmPreds = append(llvmPreds, blk)
+			}
+		}
+	}
+
+	zero := llvm.ConstInt(c.inferPhiType(inst), 0, false)
+	incomingVals := make([]llvm.Value, 0, len(llvmPreds))
+	incomingBlocks := make([]llvm.BasicBlock, 0, len(llvmPreds))
+
+	for _, predBB := range llvmPreds {
+		val := zero
+		if predID := c.blockIDForLLVM(predBB); predID > 0 {
+			if edgeValID, ok := edgeByPred[predID]; ok {
+				if edgeObj, ok := fn.GetValueById(edgeValID); ok && edgeObj != nil {
+					if _, isUndef := edgeObj.(*ssa.Undefined); !isUndef {
+						if resolved, err := c.getValue(inst, edgeValID); err == nil {
+							val = resolved
+						}
 					}
 				}
 			}
 		}
-
 		incomingVals = append(incomingVals, val)
-		incomingBlocks = append(incomingBlocks, blk)
-	}
-
-	if phiBB, ok := c.Blocks[blockID]; ok && !phiBB.IsNil() {
-		llvmPreds := c.gatherLLVMPredecessors(phiBB)
-		for len(incomingBlocks) < len(llvmPreds) {
-			fill := zero
-			if len(incomingVals) > 0 {
-				fill = incomingVals[len(incomingVals)-1]
-			}
-			incomingVals = append(incomingVals, fill)
-			incomingBlocks = append(incomingBlocks, llvmPreds[len(incomingBlocks)])
-		}
+		incomingBlocks = append(incomingBlocks, predBB)
 	}
 
 	if len(incomingVals) > 0 {
