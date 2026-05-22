@@ -1,0 +1,109 @@
+package aicommon
+
+import (
+	"strings"
+
+	"github.com/yaklang/yaklang/common/log"
+)
+
+// ApplyVerificationNextMovementsAndEmit is the single-source-of-truth helper
+// that wires a `next_movements` delta through to the shared
+// VerificationTodoStore and fires the canonical event triple consumed by the
+// frontend TODO panel:
+//
+//  1. text/markdown stream chunk on AINodeId "next_movements_snapshot" (前端
+//     "待办" 节点) — must be computed BEFORE apply so (new) / (done) markers
+//     reflect the pre-apply delta state.
+//  2. ApplyVerificationTodoOps mutates the global TODO store.
+//  3. EVENT_TYPE_TODO_LIST_UPDATE structured event carrying the post-apply
+//     items + stats + applied_ops + minimal context (satisfied / iteration /
+//     task) so the frontend can render the panel as-is.
+//  4. Optional NEXT_MOVEMENTS timeline breadcrumb (via timelineHook) — written
+//     in the same chronological position as the verification path's own
+//     breadcrumb so log/test consumers see one unified TODO timeline
+//     regardless of which channel produced the delta.
+//
+// 设计动机:
+//
+//	旧设计把 apply + 三连 emit 重复实现在两处 (verification path 内嵌, 主循环
+//	adjust_todolist action 内嵌). 当主循环出现 第三 / 第 N 条通道 (例如 AI 在
+//	directly_call_tool 等 action 的 JSON 中"自作主张"携带 next_movements 字段)
+//	时, 没有统一的 apply 入口可以复用, 导致 stream display 已经 emit 出"待办
+//	事项"显示, 但 store 不更新, snapshot/todo_list_update 永远缺席, 用户看到
+//	的是孤儿待办. 本函数让任意调用方都能用同一个函数把 next_movements 推到
+//	store 并触发完整的事件三联, 字节级与 verification / adjust_todolist 对齐.
+//
+// 调用方:
+//
+//   - verification path (after AI verify-satisfaction completes, 当前仍内嵌
+//     在 aireact/verification.go, 后续可迁移到此函数)
+//   - adjust_todolist 主循环 action handler
+//   - ReActLoop 主循环 next_movements 兜底拦截 (任意 action JSON 携带
+//     next_movements 字段都会被兜底 apply)
+//
+// 关键词: ApplyVerificationNextMovementsAndEmit, snapshot+apply+update+timeline
+//
+//	四联动单源, verification / adjust_todolist / main-loop 三路汇聚,
+//	孤儿待办修复, snapshot 必须在 apply 之前算
+func ApplyVerificationNextMovementsAndEmit(
+	cfg AICallerConfigIf,
+	emitter *Emitter,
+	taskID string,
+	iterationIndex int,
+	satisfied bool,
+	movements []VerifyNextMovement,
+	timelineHook func(category, line string),
+) {
+	if cfg == nil || len(movements) == 0 {
+		return
+	}
+
+	// 1. snapshot 必须在 apply 之前算, 才能让 (new) / (done) / (deleted) /
+	//    (skipped) 这些 delta marker 反映"未提交"状态. 与 verification 路径
+	//    完全一致, 不能颠倒. 即使 emitter 为 nil 也要算, 保留与旧
+	//    adjust_todolist 实现的 side effect 等价 (mock 测试用它做调用次数
+	//    探针).
+	// 关键词: apply 前算 markdown delta, snapshot 时序, side effect 等价
+	markdownSnapshot := cfg.GetVerificationTodoMarkdownDelta(satisfied, movements)
+	if emitter != nil && strings.TrimSpace(markdownSnapshot) != "" {
+		if _, err := emitter.EmitTextMarkdownStreamEvent(
+			"next_movements_snapshot",
+			strings.NewReader(markdownSnapshot),
+			taskID,
+			func() {},
+		); err != nil {
+			log.Warnf("emit next_movements_snapshot markdown stream event failed: %v", err)
+		}
+	}
+
+	// 2. apply: 把 delta 写入共享 store, 后续任何 prompt 渲染都能看到.
+	//    无论 emitter 是否存在, store 都必须更新 — 这是契约的关键, 让
+	//    "apply 必有效果"的语义不依赖前端事件通道的可用性.
+	cfg.ApplyVerificationTodoOps(satisfied, movements)
+
+	// 3. emit 结构化 todo_list_update: 携带 apply 之后的全量 items + stats,
+	//    让前端 TODO 面板直接以最新快照渲染, 不需要二次拼接 history.
+	//    emitter 为 nil 时跳过 (例如部分单元测试).
+	if emitter != nil {
+		payload := TodoListUpdatePayload{
+			Items:          cfg.SnapshotVerificationTodoItems(),
+			Stats:          cfg.GetVerificationTodoStats(),
+			AppliedOps:     append([]VerifyNextMovement(nil), movements...),
+			Satisfied:      satisfied,
+			IterationIndex: iterationIndex,
+			TaskID:         taskID,
+		}
+		if _, err := emitter.EmitTodoListUpdate(payload); err != nil {
+			log.Warnf("emit todo_list_update event failed: %v", err)
+		}
+	}
+
+	// 4. timeline breadcrumb: delta-only 一行一个 op, 与 verification 路径
+	//    共用同一个 NEXT_MOVEMENTS 类别, 消费者无需区分来源即可还原 TODO
+	//    时间线. timelineHook 为 nil 时跳过 (例如脱离 invoker 的纯单元测试).
+	if timelineHook != nil {
+		if line := FormatNextMovementsBreadcrumb(movements); line != "" {
+			timelineHook("NEXT_MOVEMENTS", line)
+		}
+	}
+}
