@@ -11,6 +11,9 @@ func (c *Compiler) compileSideEffect(inst *ssa.SideEffect) error {
 	if inst == nil {
 		return nil
 	}
+	if val, ok := c.getCachedValue(inst, inst.GetId()); ok && !val.IsNil() {
+		return nil
+	}
 	fn := inst.GetFunc()
 	if fn == nil {
 		return fmt.Errorf("compileSideEffect: missing function for side-effect %d", inst.GetId())
@@ -50,7 +53,7 @@ func (c *Compiler) compileSideEffect(inst *ssa.SideEffect) error {
 	}
 	actualVal = c.coerceToInt64(actualVal)
 	if inst.GetId() > 0 {
-		c.Values[inst.GetId()] = actualVal
+		c.cacheValue(inst.GetId(), actualVal)
 	}
 
 	// SideEffect values are used for SSA-level member tracking and are passed

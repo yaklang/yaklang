@@ -11,6 +11,11 @@ import (
 
 // compileMake handles SSA Make instruction (allocates arrays, slices, maps, etc.)
 func (c *Compiler) compileMake(inst *ssa.Make) error {
+	if inst != nil {
+		if _, ok := c.getCachedValue(inst, inst.GetId()); ok {
+			return nil
+		}
+	}
 	typ := inst.GetType()
 	switch typ.GetTypeKind() {
 	case ssa.StructTypeKind:
@@ -25,7 +30,7 @@ func (c *Compiler) compileMake(inst *ssa.Make) error {
 		return c.compileMakeGeneric(inst)
 	default:
 		// For unhandled types, create a null/zero placeholder
-		c.Values[inst.GetId()] = llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)
+		c.cacheValue(inst.GetId(), llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false))
 		return nil
 	}
 }
@@ -91,7 +96,7 @@ func (c *Compiler) compileMakeSlice(inst *ssa.Make, typ ssa.Type) error {
 	makeFn, makeType := c.getOrInsertRuntimeMakeSlice()
 	elemKind := llvm.ConstInt(i64, uint64(sliceElementKind(typ)), false)
 	val := c.Builder.CreateCall(makeType, makeFn, []llvm.Value{elemKind, length, capacity}, "make_slice")
-	c.Values[inst.GetId()] = val
+	c.cacheValue(inst.GetId(), val)
 	return nil
 }
 
@@ -102,7 +107,7 @@ func (c *Compiler) compileMakeGeneric(inst *ssa.Make) error {
 	mallocFn, mallocType := c.getOrInsertMalloc()
 	rawVal := c.Builder.CreateCall(mallocType, mallocFn, []llvm.Value{size}, "generic_alloc")
 	// Keep as i64 (uintptr)
-	c.Values[inst.GetId()] = rawVal
+	c.cacheValue(inst.GetId(), rawVal)
 	return nil
 }
 
@@ -127,7 +132,7 @@ func (c *Compiler) compileMakeStruct(inst *ssa.Make, typ ssa.Type) error {
 
 	// 4. Cast i64 -> struct*
 	// Keep as i64 (uintptr)
-	c.Values[inst.GetId()] = rawVal
+	c.cacheValue(inst.GetId(), rawVal)
 	return nil
 }
 
@@ -150,6 +155,11 @@ func (c *Compiler) getOrInsertMalloc() (llvm.Value, llvm.Type) {
 // compileParameterMember handles parameter member access (e.g. r.w)
 // ParameterMember is an instruction in YakSSA.
 func (c *Compiler) compileParameterMember(inst *ssa.ParameterMember) error {
+	if inst != nil {
+		if _, ok := c.getCachedValue(inst, inst.GetId()); ok {
+			return nil
+		}
+	}
 	fn := inst.GetFunc()
 	if fn == nil {
 		return fmt.Errorf("ParameterMember %s has no function", inst.GetName())
@@ -174,7 +184,7 @@ func (c *Compiler) compileParameterMember(inst *ssa.ParameterMember) error {
 	keyStr := c.resolveMemberKeyString(keyVal)
 
 	val := c.emitRuntimeGetField(parentVal, keyStr, inst.GetId())
-	c.Values[inst.GetId()] = val
+	c.cacheValue(inst.GetId(), val)
 	return nil
 }
 
@@ -214,7 +224,7 @@ func (c *Compiler) compileMemberCall(val ssa.Value, mc ssa.MemberCall) error {
 	if obj == nil {
 		if _, ok := val.(*ssa.Undefined); ok {
 			zero := llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)
-			c.Values[val.GetId()] = zero
+			c.cacheValue(val.GetId(), zero)
 			return nil
 		}
 		return fmt.Errorf("compileMemberCall: object is nil for value %d", val.GetId())
@@ -228,7 +238,7 @@ func (c *Compiler) compileMemberCall(val ssa.Value, mc ssa.MemberCall) error {
 	keyStr := c.resolveMemberKeyString(key)
 
 	valResult := c.emitRuntimeGetField(parentVal, keyStr, val.GetId())
-	c.Values[val.GetId()] = valResult
+	c.cacheValue(val.GetId(), valResult)
 	return nil
 }
 
@@ -272,6 +282,9 @@ func (c *Compiler) getOrInsertRuntimeToCString() (llvm.Value, llvm.Type) {
 }
 
 func (c *Compiler) resolveMemberKeyString(key ssa.Value) string {
+	if key == nil {
+		return ""
+	}
 	if cinst, ok := ssa.ToConstInst(key); ok {
 		return strings.Trim(cinst.String(), "\"")
 	}
