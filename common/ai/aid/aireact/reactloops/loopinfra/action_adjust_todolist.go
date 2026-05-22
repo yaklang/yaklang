@@ -3,7 +3,6 @@ package loopinfra
 import (
 	"fmt"
 	"io"
-	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
@@ -82,9 +81,10 @@ var loopAction_AdjustTodolist = &reactloops.LoopAction{
 			// next_movements 字节级对齐.
 			//
 			// markdown 形态的全量快照仍然走独立的 next_movements_snapshot
-			// 节点 (apply 后由 emitAdjustTodolistMarkdownSnapshot 发出),
-			// 与 verification 路径同位 — 前端 TODO 面板因此能在 adjust 和
-			// verification 两条通道之间自动联动, 不需要区分来源.
+			// 节点 (apply 前由 aicommon.ApplyVerificationNextMovementsAndEmit
+			// 发出), 与 verification 路径同位 — 前端 TODO 面板因此能在
+			// adjust / verification / 主循环兜底三条通道之间自动联动,
+			// 不需要区分来源.
 			//
 			// 关键词: adjust_todolist next_movements StreamHandler, 不裸 JSON,
 			//   verification 字节对齐, 待办事项 i18n 不破坏
@@ -119,29 +119,17 @@ var loopAction_AdjustTodolist = &reactloops.LoopAction{
 			return
 		}
 
-		// markdown delta 必须在 apply 之前算, 因为预览语义需要"还未提交时的
-		// (new) / (done) 标记". 与 verification 路径完全一致: 先 emit 伪流再
-		// 真 apply, 让前端按"流先到, 结构化事件随后定稿"的顺序消费.
-		// 关键词: adjust_todolist markdown 预览, apply 前计算 delta
-		markdownSnapshot := cfg.GetVerificationTodoMarkdownDelta(false, movements)
-		emitAdjustTodolistMarkdownSnapshot(loop, cfg, markdownSnapshot)
-
 		// satisfied=false: 主循环路径仅做增量调整, 不主张"任务已完成";
 		// 收口判定仍交给 verification 路径的 enforceTodoCompletionBeforeSatisfaction.
-		// 关键词: adjust_todolist satisfied=false, 仅增量, 不抢 verification 收口
-		cfg.ApplyVerificationTodoOps(false, movements)
-
-		emitAdjustTodolistUpdate(loop, cfg, movements)
-
-		invoker := loop.GetInvoker()
-		if invoker != nil {
-			if line := aicommon.FormatNextMovementsBreadcrumb(movements); line != "" {
-				// 与 verification 的 NEXT_MOVEMENTS breadcrumb 共用同一个
-				// timeline 类别, 消费者无需区分来源即可还原 TODO 时间线.
-				// 关键词: NEXT_MOVEMENTS timeline 通道融合, 主循环来源对齐
-				invoker.AddToTimeline("NEXT_MOVEMENTS", line)
-			}
-		}
+		//
+		// 所有 apply + emit 流程统一走 aicommon.ApplyVerificationNextMovementsAndEmit
+		// 这个单源 helper, 与 verification 路径 / 主循环 next_movements 兜底
+		// 共用同一份逻辑, 保证字节级一致 (snapshot apply 前算, ApplyVerificationTodoOps
+		// 后再 emit todo_list_update, 最后写 NEXT_MOVEMENTS timeline breadcrumb).
+		//
+		// 关键词: adjust_todolist satisfied=false, 仅增量, ApplyVerificationNextMovementsAndEmit
+		//   单源, 三路汇聚
+		applyAdjustTodolistMovements(loop, cfg, movements)
 
 		summary := aicommon.FormatVerifyNextMovementsSummary(movements)
 		feedback := "TODO list adjusted"
@@ -151,6 +139,51 @@ var loopAction_AdjustTodolist = &reactloops.LoopAction{
 		operator.Feedback(feedback)
 		operator.Continue()
 	},
+}
+
+// applyAdjustTodolistMovements 把"在主循环里"出现的 next_movements 增量
+// 推到共享 TODO store, 并触发完整的 snapshot/todo_list_update/timeline
+// 三联事件. 内部直接转调 aicommon 包的单源 helper, 由调用方决定
+// satisfied 维度 (主循环 adjust_todolist 路径硬编码 satisfied=false).
+//
+// 关键词: applyAdjustTodolistMovements, ApplyVerificationNextMovementsAndEmit
+//
+//	单源 helper 适配层, loop 上下文展平
+func applyAdjustTodolistMovements(
+	loop *reactloops.ReActLoop,
+	cfg aicommon.AICallerConfigIf,
+	movements []aicommon.VerifyNextMovement,
+) {
+	if cfg == nil || len(movements) == 0 {
+		return
+	}
+	taskID := ""
+	iterationIndex := 0
+	if loop != nil {
+		if task := loop.GetCurrentTask(); task != nil {
+			taskID = task.GetId()
+		}
+		iterationIndex = loop.GetCurrentIterationIndex()
+	}
+
+	var timelineHook func(category, line string)
+	if loop != nil {
+		if invoker := loop.GetInvoker(); invoker != nil {
+			timelineHook = func(category, line string) {
+				invoker.AddToTimeline(category, line)
+			}
+		}
+	}
+
+	aicommon.ApplyVerificationNextMovementsAndEmit(
+		cfg,
+		cfg.GetEmitter(),
+		taskID,
+		iterationIndex,
+		false,
+		movements,
+		timelineHook,
+	)
 }
 
 // getAdjustTodolistMovements 复用 verifier 写入 loop 变量的归一化结果;
@@ -188,74 +221,3 @@ func adjustTodolistNextMovementsStreamHandler(fieldReader io.Reader, emitWriter 
 	}
 }
 
-// emitAdjustTodolistMarkdownSnapshot 把"应用本轮增量后"的全量 TODO markdown
-// 快照以伪流形式发出, 节点 ID 与 verification 路径的 next_movements_snapshot
-// 完全一致, 让前端 markdown 渲染器无需感知调用方 — 不管来源是 verification
-// 还是 adjust_todolist, 走同一个面板渲染入口.
-//
-// 入参 markdownSnapshot 已经是 `cfg.GetVerificationTodoMarkdownDelta` 渲染好的
-// 文本; 在 apply 之前算好传入, 这样 (new) / (done) / (deleted) / (skipped)
-// 这些 delta 标记才是相对"上一轮 store"的真实增量.
-//
-// 关键词: emitAdjustTodolistMarkdownSnapshot, next_movements_snapshot 节点对齐,
-//
-//	EmitTextMarkdownStreamEvent 伪流, verification 同位事件
-func emitAdjustTodolistMarkdownSnapshot(loop *reactloops.ReActLoop, cfg aicommon.AICallerConfigIf, markdownSnapshot string) {
-	if cfg == nil {
-		return
-	}
-	if strings.TrimSpace(markdownSnapshot) == "" {
-		return
-	}
-	emitter := cfg.GetEmitter()
-	if emitter == nil {
-		return
-	}
-	taskID := ""
-	if loop != nil {
-		if task := loop.GetCurrentTask(); task != nil {
-			taskID = task.GetId()
-		}
-	}
-	if _, err := emitter.EmitTextMarkdownStreamEvent(
-		"next_movements_snapshot",
-		strings.NewReader(markdownSnapshot),
-		taskID,
-		func() {},
-	); err != nil {
-		log.Warnf("adjust_todolist: emit next_movements_snapshot markdown stream event failed: %v", err)
-	}
-}
-
-// emitAdjustTodolistUpdate publishes the post-apply TODO snapshot as a
-// structured EVENT_TYPE_TODO_LIST_UPDATE event, matching the verification
-// path's emitTodoListUpdate so the frontend TODO panel sees both channels
-// through one consistent contract.
-//
-// 关键词: emitAdjustTodolistUpdate, EVENT_TYPE_TODO_LIST_UPDATE 双通道一致,
-//
-//	IterationIndex / TaskID 上下文
-func emitAdjustTodolistUpdate(loop *reactloops.ReActLoop, cfg aicommon.AICallerConfigIf, movements []aicommon.VerifyNextMovement) {
-	if cfg == nil {
-		return
-	}
-	emitter := cfg.GetEmitter()
-	if emitter == nil {
-		return
-	}
-	payload := aicommon.TodoListUpdatePayload{
-		Items:      cfg.SnapshotVerificationTodoItems(),
-		Stats:      cfg.GetVerificationTodoStats(),
-		AppliedOps: append([]aicommon.VerifyNextMovement(nil), movements...),
-		Satisfied:  false,
-	}
-	if loop != nil {
-		payload.IterationIndex = loop.GetCurrentIterationIndex()
-		if task := loop.GetCurrentTask(); task != nil {
-			payload.TaskID = task.GetId()
-		}
-	}
-	if _, err := emitter.EmitTodoListUpdate(payload); err != nil {
-		log.Warnf("adjust_todolist: emit todo_list_update event failed: %v", err)
-	}
-}

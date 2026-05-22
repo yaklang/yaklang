@@ -855,6 +855,13 @@ LOOP:
 		}
 		r.GetInvoker().AddToTimeline("iteration", msg)
 
+		// 主 loop next_movements 兜底拦截: 详见 applyNextMovementsBottomLine.
+		// 时序保证: AddToTimeline("iteration") 已完成 → 兜底 apply + emit →
+		// handler.AsyncMode check / ActionHandler 才跑. async mode reject
+		// (continue 跳出) 之前兜底也已经执行, 不会漏 apply.
+		// 关键词: 主 loop next_movements 兜底入口, 孤儿待办修复
+		applyNextMovementsBottomLine(r, task, iterationCount, actionParams)
+
 		if handler.AsyncMode {
 			r.loadingStatus("当前任务进入异步模式 / Async mode, ending loop")
 			if task.IsAsyncMode() {
