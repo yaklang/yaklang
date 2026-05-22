@@ -268,7 +268,7 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 		onlyGMTLS               = option.GmTLSOnly
 		preferGMTLS             = option.GmTLSPrefer
 		gmTLSCipherSuites           = option.GmTLSCipherSuites
-		gmTLSCompatMode             = option.GmTLSCompatMode
+		gmTLSDisableCompatMode      = option.GmTLSDisableCompatMode
 		host                    = option.Host
 		port                    = option.Port
 		requestPacket           = option.Packet
@@ -678,7 +678,7 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 			netx.DialX_WithTLS(https),
 			netx.DialX_WithGMTLSOnly(onlyGMTLS),
 			netx.DialX_WithGMTLSPrefer(preferGMTLS),
-			netx.DialX_WithGMTLSCompatMode(gmTLSCompatMode),
+			netx.DialX_WithGMTLSDisableCompatMode(gmTLSDisableCompatMode),
 		)
 
 		if clientHelloSpec != nil {

@@ -323,9 +323,9 @@ func DialX(target string, opt ...DialXOption) (net.Conn, error) {
 		if config.Debug {
 			log.Infof("dial %v with tls strategy: %v, SNI: %s", target, strategy, tempTlsConfig.ServerName)
 		}
-		startTLSHandshake := time.Now()
 		var tlsConn net.Conn
 		var tlsErr error
+		var tlsHandshakeDur time.Duration
 
 		switch strategy {
 		case TLS_Strategy_Ordinary:
@@ -334,9 +334,11 @@ func DialX(target string, opt ...DialXOption) (net.Conn, error) {
 				return nil, err
 			}
 			tempTlsConfig.GMSupport = nil
+			startUpgrade := time.Now()
 			tlsConn, tlsErr = UpgradeToTLSConnectionWithTimeout(conn, sni, tempTlsConfig, tlsTimeout, clientHelloSpec, config.TLSNextProto...)
+			tlsHandshakeDur = time.Since(startUpgrade)
 		case TLS_Strategy_GMDail:
-			tlsConn, tlsErr = dialTLSWithGMTLSCipherFallback(target, config, tempTlsConfig, sni, tlsTimeout, clientHelloSpec)
+			tlsConn, tlsHandshakeDur, tlsErr = dialTLSWithGMTLSCipherFallback(target, config, tempTlsConfig, sni, tlsTimeout, clientHelloSpec)
 		default:
 			return nil, utils.Errorf("unknown tls strategy %v", strategy)
 		}
@@ -345,7 +347,7 @@ func DialX(target string, opt ...DialXOption) (net.Conn, error) {
 			errs = append(errs, tlsErr)
 			continue
 		}
-		config.TraceInfo.SetTLSHandshakeDuration(time.Since(startTLSHandshake))
+		config.TraceInfo.SetTLSHandshakeDuration(tlsHandshakeDur)
 		return tlsConn, nil
 	}
 	if len(errs) > 0 {

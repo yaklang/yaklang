@@ -43,7 +43,7 @@ type LowhttpExecConfig struct {
 	GmTLSOnly                        bool
 	GmTLSPrefer                      bool
 	GmTLSCipherSuites                []uint16
-	GmTLSCompatMode                  bool
+	GmTLSDisableCompatMode           bool
 	OverrideEnableSystemProxyFromEnv bool
 	EnableSystemProxyFromEnv         bool
 	ConnectTimeout                   time.Duration
@@ -485,10 +485,14 @@ func WithGmTLSCipherSuite(suites ...int) LowhttpOpt {
 	}
 }
 
-// WithGmTLSCompatMode 开启国密兼容模式（默认关闭）。
-func WithGmTLSCompatMode(b bool) LowhttpOpt {
+// WithGmTLSDisableCompatMode 关闭国密兼容模式；不传参等价于 true。
+func WithGmTLSDisableCompatMode(disable ...bool) LowhttpOpt {
+	v := true
+	if len(disable) > 0 {
+		v = disable[0]
+	}
 	return func(o *LowhttpExecConfig) {
-		o.GmTLSCompatMode = b
+		o.GmTLSDisableCompatMode = v
 	}
 }
 
