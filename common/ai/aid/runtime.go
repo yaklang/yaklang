@@ -2,13 +2,14 @@ package aid
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 
@@ -23,6 +24,9 @@ type runtime struct {
 	cursor      int
 	TaskLink    *linktable.LinkedList[*AiTask]
 	statusMutex sync.Mutex
+
+	completedCount atomic.Int32
+	inFlightCount  atomic.Int32
 }
 
 func (r *runtime) currentIndex() int {
@@ -34,6 +38,13 @@ func (r *runtime) currentIndex() int {
 
 // currentProgressIndex returns the current progress index (1-based)
 func (r *runtime) currentProgressIndex() int {
+	if r == nil {
+		return 0
+	}
+	progress := int(r.completedCount.Load()) + int(r.inFlightCount.Load())
+	if progress > 0 {
+		return progress
+	}
 	return r.cursor
 }
 
@@ -193,9 +204,8 @@ func (r *runtime) Invoke(task *AiTask, startTaskIndex string) (retErr error) {
 		return err
 	}
 
-	// Calculate total tasks for progress display
-	totalTasks := r.TaskLink.Len()
-	r.config.planLoadingStatus(fmt.Sprintf("开始执行任务队列 (%d 个任务) / Starting Task Queue (%d Tasks)", totalTasks, totalTasks))
+	leafTotal := len(collectLeafTasks(r.RootTask))
+	r.config.planLoadingStatus(fmt.Sprintf("开始执行任务队列 (%d 个叶子任务, DAG 并发) / Starting Task Queue (%d Leaf Tasks, DAG Concurrent)", leafTotal, leafTotal))
 
 	var currentTask *AiTask
 	phase := Phase_NotCompleted
@@ -203,105 +213,51 @@ func (r *runtime) Invoke(task *AiTask, startTaskIndex string) (retErr error) {
 		r.config.savePlanAndExecState(phase, currentTask)
 	}()
 
-	invokeTask := func(current *AiTask) error {
-		// 检查任务是否已被用户主动跳过（Skipped 状态，区别于 Aborted 失败状态）
-		// 如果任务已被用户主动跳过，则直接返回 nil 继续下一个任务
-		if current.GetStatus() == aicommon.AITaskState_Skipped {
-			r.config.planLoadingStatus(fmt.Sprintf("任务 [%s] 已跳过 / Task [%s] Skipped", current.Index, current.Index))
-			r.config.EmitInfo("subtask %s was skipped by user, moving to next task", current.Name)
-			return nil
-		}
-		// 恢复执行时，如果任务已完成，直接跳过
-		if current.executed() {
-			r.config.planLoadingStatus(fmt.Sprintf("任务 [%s] 已完成 / Task [%s] Completed", current.Index, current.Index))
-			r.config.EmitInfo("subtask %s already completed, moving to next task", current.Name)
-			return nil
-		}
-		// 检查全局 context 是否被取消（用户终止整个任务）
-		if r.config.IsCtxDone() {
-			r.config.planLoadingStatus("执行已取消 / Execution Cancelled")
-			return utils.Errorf("coordinator context is done")
-		}
-
-		// 检查任务自身的 context（可能被 skiped/redo 重置）
-		if current.IsCtxDone() {
-			// 再次检查状态，如果是 Skipped，说明是被用户主动跳过的
-			if current.GetStatus() == aicommon.AITaskState_Skipped {
-				r.config.planLoadingStatus(fmt.Sprintf("任务 [%s] 已跳过 / Task [%s] Skipped", current.Index, current.Index))
-				r.config.EmitInfo("subtask %s context cancelled (skipped), moving to next task", current.Name)
-				return nil
-			}
-			return utils.Errorf("task context is done")
-		}
-
-		// Emit task start status with progress info
-		r.config.planLoadingStatus(fmt.Sprintf("准备执行任务 [%s]: %s / Preparing Task [%s]: %s",
-			current.Index, current.Name, current.Index, current.Name))
-
-		r.config.EmitInfo("invoke subtask: %v", current.Name)
-		if len(current.Subtasks) == 0 {
-			current.SetStatus(aicommon.AITaskState_Processing) // 设置为执行中
-		}
-		r.config.EmitPushTask(current)
-		defer func() {
-			r.config.EmitUpdateTaskStatus(current)
-			r.config.EmitPopTask(current)
-		}()
-
-		if len(current.Subtasks) == 0 {
-			return current.executeTaskPushTaskIndex()
-		}
-		return nil
+	ctx := r.config.GetContext()
+	if ctx == nil {
+		ctx = context.Background()
 	}
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
+	recoveryStart := startTaskIndex
 	for {
-		// 每次开始任务之前，先 emit 任务树，更新任务树进度
 		if r.RootTask != nil {
 			r.config.EmitJSON(schema.EVENT_TYPE_PLAN, "system", map[string]any{
 				"root_task": r.RootTask,
 			})
 		}
 
-		var ok bool
-		currentTask, ok = r.NextStep()
-		if !ok {
+		pending := r.collectSchedulableLeaves(recoveryStart)
+		if len(pending) == 0 {
 			r.config.planLoadingStatus("所有任务执行完成 / All Tasks Completed")
 			phase = Phase_Completed
 			currentTask = nil
 			return nil
 		}
 
-		// Emit current progress
-		r.config.planLoadingStatus(fmt.Sprintf("执行进度: %d/%d - 当前: [%s] / Progress: %d/%d - Current: [%s]",
-			r.currentProgressIndex(), totalTasks, currentTask.Index, r.currentProgressIndex(), totalTasks, currentTask.Index))
+		currentTask = pending[0]
+		r.config.planLoadingStatus(fmt.Sprintf("执行进度: %d/%d - 待执行: %d / Progress: %d/%d - Pending: %d",
+			r.currentProgressIndex(), leafTotal, len(pending), r.currentProgressIndex(), leafTotal, len(pending)))
 		r.config.savePlanAndExecState(Phase_NotCompleted, currentTask)
 
-		if err := invokeTask(currentTask); err != nil {
-			// 检查是否是任务被用户主动跳过导致的错误
-			// 1. 检查任务状态是否为 Skipped（用户主动跳过）
-			// 2. 检查错误是否包含 context canceled（任务执行中被中断）
-			isSkipped := currentTask.GetStatus() == aicommon.AITaskState_Skipped
-			isContextCanceled := strings.Contains(err.Error(), "context canceled") || strings.Contains(err.Error(), "context done")
-
-			if isSkipped || (isContextCanceled && currentTask.GetStatus() == aicommon.AITaskState_Skipped) {
-				r.config.planLoadingStatus(fmt.Sprintf("任务 [%s] 用户跳过,继续下一个 / Task [%s] User Skipped, Continuing", currentTask.Index, currentTask.Index))
-				r.config.EmitInfo("task %s was skipped by user, continuing to next task", currentTask.Name)
-				continue
-			}
-
-			// 检查全局 context 是否被取消（用户终止整个任务）
+		if err := r.executePlanTaskDAG(ctx, recoveryStart); err != nil {
 			if r.config.IsCtxDone() {
 				r.config.planLoadingStatus("用户终止执行 / User Terminated Execution")
 				r.config.EmitInfo("coordinator context cancelled, stopping execution")
 				return err
 			}
-
-			r.config.planLoadingStatus(fmt.Sprintf("任务 [%s] 执行失败 / Task [%s] Failed", currentTask.Index, currentTask.Index))
-			r.config.EmitPlanExecFail("invoke task[%s] failed: %v", currentTask.Name, err)
-			r.config.EmitError("invoke subtask failed: %v", err)
-			log.Errorf("invoke subtask failed: %v", err)
+			r.config.planLoadingStatus(fmt.Sprintf("任务执行失败 / Task Execution Failed"))
+			r.config.EmitPlanExecFail("invoke plan task dag failed: %v", err)
+			r.config.EmitError("invoke plan task dag failed: %v", err)
+			log.Errorf("invoke plan task dag failed: %v", err)
+			cancel()
 			return err
 		}
+
+		recoveryStart = ""
+		r.updateTaskLink()
+		leafTotal = len(collectLeafTasks(r.RootTask))
 	}
 }
 

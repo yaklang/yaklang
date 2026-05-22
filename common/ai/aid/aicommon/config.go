@@ -318,6 +318,7 @@ type Config struct {
 	IntervalReviewDuration            time.Duration // Duration between reviews (default 20s)
 	ToolCallIntervalReviewExtraPrompt string        // Extra prompt injected into tool-call interval review
 	ToolComposeConcurrency            int           // Max concurrent tool calls in tool_compose DAG (default 2)
+	PlanTaskConcurrency               int           // Max concurrent leaf tasks in plan execution DAG (default 2)
 
 	// verificationWatchdogToolBlockingStart/End are registered by reactloops.ReActLoop
 	// around synchronous invoker tool execution (aireact.executeToolCallInternal) so the
@@ -507,6 +508,7 @@ func newConfig(ctx context.Context) *Config {
 		EnablePlanAndExec:                  true,
 		AllowRequireForUserInteract:        true,
 		ToolComposeConcurrency:             2,
+		PlanTaskConcurrency:                2,
 		Workdir:                            "",
 		MemoryPoolSize:                     10 * 1024, // 10k tokens
 		MemoryPool:                         omap.NewOrderedMap(make(map[string]*MemoryEntity)),
@@ -1830,6 +1832,21 @@ func WithToolComposeConcurrency(n int) ConfigOption {
 	}
 }
 
+func WithPlanTaskConcurrency(n int) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		if n <= 0 {
+			n = 2
+		}
+		c.m.Lock()
+		c.PlanTaskConcurrency = n
+		c.m.Unlock()
+		return nil
+	}
+}
+
 func WithHijackPERequest(fn func(ctx context.Context, planPayload string) error) ConfigOption {
 	return func(c *Config) error {
 		if c.m == nil {
@@ -2938,6 +2955,13 @@ func (c *Config) GetToolComposeConcurrency() int {
 	return c.ToolComposeConcurrency
 }
 
+func (c *Config) GetPlanTaskConcurrency() int {
+	if c.PlanTaskConcurrency <= 0 {
+		return 2
+	}
+	return c.PlanTaskConcurrency
+}
+
 func (c *Config) GetTimelineContentSizeLimit() int64 {
 	return int64(c.TimelineContentSizeLimit)
 }
@@ -3276,6 +3300,9 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 	}
 	if i.ToolComposeConcurrency > 0 {
 		opts = append(opts, WithToolComposeConcurrency(i.ToolComposeConcurrency))
+	}
+	if i.PlanTaskConcurrency > 0 {
+		opts = append(opts, WithPlanTaskConcurrency(i.PlanTaskConcurrency))
 	}
 	if i.MaxTaskContinue > 0 {
 		opts = append(opts, WithMaxTaskContinue(i.MaxTaskContinue))
