@@ -25,6 +25,34 @@ func normalizeAISessionFilterStrings(vals []string) []string {
 	return out
 }
 
+// applyAISessionSourceFilter matches source values. Empty string in the filter
+// also matches legacy rows where source was never set (NULL in DB).
+func applyAISessionSourceFilter(db *gorm.DB, sources []string) *gorm.DB {
+	sources = normalizeAISessionFilterStrings(sources)
+	if len(sources) == 0 {
+		return db
+	}
+
+	includeEmpty := false
+	nonEmpty := make([]string, 0, len(sources))
+	for _, s := range sources {
+		if s == "" {
+			includeEmpty = true
+			continue
+		}
+		nonEmpty = append(nonEmpty, s)
+	}
+
+	switch {
+	case includeEmpty && len(nonEmpty) == 0:
+		return db.Where("source IS NULL OR source = ?", "")
+	case includeEmpty:
+		return db.Where("(source IS NULL OR source = ?) OR source IN (?)", "", nonEmpty)
+	default:
+		return bizhelper.ExactQueryStringArrayOr(db, "source", sources)
+	}
+}
+
 func FilterAISessionMeta(db *gorm.DB, filter *ypb.AISessionFilter) *gorm.DB {
 	db = db.Model(&schema.AISession{})
 	if filter == nil {
@@ -35,8 +63,8 @@ func FilterAISessionMeta(db *gorm.DB, filter *ypb.AISessionFilter) *gorm.DB {
 	if filter.GetKeyword() != "" {
 		db = bizhelper.FuzzSearchWithStringArrayOrEx(db, []string{"session_id", "title"}, []string{filter.GetKeyword()}, false)
 	}
-	if sources := normalizeAISessionFilterStrings(filter.GetSource()); len(sources) > 0 {
-		db = bizhelper.ExactQueryStringArrayOr(db, "source", sources)
+	if len(filter.GetSource()) > 0 {
+		db = applyAISessionSourceFilter(db, filter.GetSource())
 	}
 	return db
 }
@@ -109,7 +137,9 @@ func QueryAISessionIDsForDelete(db *gorm.DB, filter *ypb.DeleteAISessionFilter, 
 			query = query.Where("updated_at < ?", time.Unix(filter.GetBeforeTimestamp(), 0))
 		}
 		sources := normalizeAISessionFilterStrings(filter.GetSource())
-		query = bizhelper.ExactQueryStringArrayOr(query, "source", sources)
+		if len(filter.GetSource()) > 0 {
+			query = applyAISessionSourceFilter(query, filter.GetSource())
+		}
 		if len(sessionIDs) == 0 && filter.GetAfterTimestamp() <= 0 && filter.GetBeforeTimestamp() <= 0 && len(sources) == 0 {
 			return nil, utils.Errorf("at least one filter condition is required")
 		}

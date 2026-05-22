@@ -348,6 +348,45 @@ func TestQueryAISessionMetaPaging_ByEmptySource(t *testing.T) {
 	require.Equal(t, []string{sEmpty}, sessionIDs)
 }
 
+func TestQueryAISessionMetaPaging_ByNullSource(t *testing.T) {
+	db, err := utils.CreateTempTestDatabaseInMemory()
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&schema.AISession{}).Error)
+
+	sNull := "sess-null-" + uuid.NewString()
+	sAi := "sess-ai-" + uuid.NewString()
+
+	require.NoError(t, db.Exec(
+		`INSERT INTO ai_sessions_v1 (session_id, title, source, created_at, updated_at) VALUES (?, ?, NULL, datetime('now'), datetime('now'))`,
+		sNull, "legacy",
+	).Error)
+	_, err = CreateOrUpdateAISessionMeta(db, sAi, "ai")
+	require.NoError(t, err)
+	require.NoError(t, db.Model(&schema.AISession{}).Where("session_id = ?", sAi).UpdateColumn("source", "ai").Error)
+
+	_, records, err := QueryAISessionMetaPaging(db, &ypb.AISessionFilter{
+		Source: []string{""},
+	}, &ypb.Paging{Page: 1, Limit: 30})
+	require.NoError(t, err)
+	require.Len(t, records, 1)
+	require.Equal(t, sNull, records[0].SessionID)
+
+	_, records, err = QueryAISessionMetaPaging(db, &ypb.AISessionFilter{
+		Source: []string{"ai", ""},
+	}, &ypb.Paging{Page: 1, Limit: 30})
+	require.NoError(t, err)
+	require.Len(t, records, 2)
+	gotIDs := []string{records[0].SessionID, records[1].SessionID}
+	require.Contains(t, gotIDs, sNull)
+	require.Contains(t, gotIDs, sAi)
+
+	sessionIDs, err := QueryAISessionIDsForDelete(db, &ypb.DeleteAISessionFilter{
+		Source: []string{""},
+	}, false)
+	require.NoError(t, err)
+	require.Equal(t, []string{sNull}, sessionIDs)
+}
+
 func TestQueryAllAISessionMetaOrderByUpdated(t *testing.T) {
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
