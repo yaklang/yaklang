@@ -22,6 +22,60 @@ type DataFlowPath struct {
 	Nodes       []*NodeInfo `json:"nodes"`
 	Edges       []*EdgeInfo `json:"edges"`
 	DotGraph    string      `json:"dot_graph,omitempty"`
+	Paths       [][]string  `json:"paths,omitempty"`
+}
+
+type DataflowDetailLevel string
+
+const (
+	DataflowDetailMinimal DataflowDetailLevel = "minimal"
+	DataflowDetailFull    DataflowDetailLevel = "full"
+)
+
+// MarshalDataFlowPath serializes a DataFlowPath according to the given detail level.
+// Minimal mode strips DotGraph and CodeRange; full mode preserves them.
+func MarshalDataFlowPath(p *DataFlowPath, level DataflowDetailLevel) ([]byte, error) {
+	if p == nil {
+		return nil, nil
+	}
+	if level == DataflowDetailMinimal {
+		return MarshalMinimalDataFlowPath(p)
+	}
+
+	nodes := make([]*NodeInfo, 0, len(p.Nodes))
+	for _, n := range p.Nodes {
+		if n == nil {
+			continue
+		}
+		nodes = append(nodes, &NodeInfo{
+			NodeID:       n.NodeID,
+			IRCode:       n.IRCode,
+			IRSourceHash: n.IRSourceHash,
+			StartOffset:  n.StartOffset,
+			EndOffset:    n.EndOffset,
+			IsEntryNode:  n.IsEntryNode,
+			CodeRange:    n.CodeRange,
+		})
+	}
+	edges := make([]*EdgeInfo, 0, len(p.Edges))
+	for _, e := range p.Edges {
+		if e == nil {
+			continue
+		}
+		edges = append(edges, e)
+	}
+
+	if len(nodes) == 0 && len(edges) == 0 {
+		return nil, nil
+	}
+
+	return json.Marshal(&DataFlowPath{
+		Description: p.Description,
+		Nodes:       nodes,
+		Edges:       edges,
+		DotGraph:    p.DotGraph,
+		Paths:       p.Paths,
+	})
 }
 
 type NodeInfo struct {
