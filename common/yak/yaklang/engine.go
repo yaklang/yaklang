@@ -2,6 +2,7 @@ package yaklang
 
 import (
 	"os"
+	"reflect"
 
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
@@ -20,6 +21,18 @@ func Import(mod string, v interface{}) {
 func HasModule(mod string) bool {
 	_, ok := yaklangLibs[mod]
 	return ok
+}
+
+// LookupGlobalCallable resolves a top-level yaklang builtin registered via Import(name, fn).
+func LookupGlobalCallable(name string) (any, bool) {
+	v, ok := yaklangLibs[name]
+	if !ok || v == nil {
+		return nil, false
+	}
+	if rv := reflect.ValueOf(v); rv.IsValid() && rv.Kind() == reflect.Func {
+		return v, true
+	}
+	return nil, false
 }
 
 // LookupExport resolves a yaklang module export by name.

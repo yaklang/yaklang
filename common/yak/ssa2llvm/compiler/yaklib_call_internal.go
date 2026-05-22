@@ -26,6 +26,9 @@ func (c *Compiler) shouldUseYaklibDispatch(calleeName string) bool {
 	if _, ok := c.getExternBinding(calleeName); ok {
 		return false
 	}
+	if _, ok := yaklang.LookupGlobalCallable(calleeName); ok {
+		return true
+	}
 	pkg, method, ok := splitQualifiedName(calleeName)
 	if !ok || method == "" {
 		return false

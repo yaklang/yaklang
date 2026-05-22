@@ -200,11 +200,12 @@ func (c *Compiler) compileCall(inst *ssa.Call) error {
 	}
 
 	if c.shouldUseYaklibDispatch(calleeName) {
-		pkg, method, _ := splitQualifiedName(calleeName)
-		spec, err := c.newYaklibDispatchSpec(inst, pkg, method)
-		if err != nil {
-			return err
-		}
+		return c.lowerYaklibDispatchCall(inst, calleeName)
+	}
+
+	if spec, ok, err := c.newParameterCallableContextCallSpec(inst, fn, calleeVal); err != nil {
+		return err
+	} else if ok {
 		return c.lowerResolvedContextCall(spec)
 	}
 
