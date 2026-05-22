@@ -369,7 +369,7 @@ func (c *Coordinator) emitBaseCapabilityInventory() {
 
 func (c *Coordinator) Run() error {
 	c.planLoadingStatus("初始化 / Initializing...")
-	defer c.planLoadingStatus("end")
+	defer c.planLoadingStatus("任务规划执行结束 / Plan Execution Finished")
 
 	c.registerPEModeInputEventCallback()
 	c.EmitCurrentConfigInfo()
