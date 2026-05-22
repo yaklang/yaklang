@@ -5,25 +5,29 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/abi"
 )
 
-func (c *Compiler) newParameterCallableContextCallSpec(inst *ssa.Call, fn *ssa.Function, calleeVal ssa.Value) (contextCallSpec, bool, error) {
+func (c *Compiler) newDynamicCallableContextCallSpec(inst *ssa.Call, fn *ssa.Function, calleeVal ssa.Value) (contextCallSpec, bool, error) {
 	if inst == nil || calleeVal == nil {
 		return contextCallSpec{}, false, nil
 	}
 
-	param, ok := ssa.ToParameter(calleeVal)
-	if !ok || param == nil {
+	if mc, ok := calleeVal.(ssa.MemberCall); ok && mc.IsMember() {
+		return contextCallSpec{}, false, nil
+	}
+	if ssaFn, ok := ssa.ToFunction(calleeVal); ok && ssaFn != nil {
 		return contextCallSpec{}, false, nil
 	}
 
-	targetVal, err := c.getValue(inst, param.GetId())
+	targetVal, err := c.getValue(inst, calleeVal.GetId())
 	if err != nil {
-		if val, ok := c.loadBoundParameterValue(fn, param); ok {
-			targetVal = val
-			err = nil
+		if param, ok := ssa.ToParameter(calleeVal); ok {
+			if val, ok := c.loadBoundParameterValue(fn, param); ok {
+				targetVal = val
+				err = nil
+			}
 		}
 	}
 	if err != nil {
-		return contextCallSpec{}, false, err
+		return contextCallSpec{}, false, nil
 	}
 
 	return contextCallSpec{
@@ -32,8 +36,8 @@ func (c *Compiler) newParameterCallableContextCallSpec(inst *ssa.Call, fn *ssa.F
 		target:    c.coerceToInt64(targetVal),
 		args:      ssaArgs(append([]int64{}, inst.Args...), true),
 		async:     inst.Async,
-		ctxName:   "yak_param_call_ctx",
-		errPrefix: "emitParameterCallableContextCall",
+		ctxName:   "yak_dynamic_call_ctx",
+		errPrefix: "emitDynamicCallableContextCall",
 	}, true, nil
 }
 

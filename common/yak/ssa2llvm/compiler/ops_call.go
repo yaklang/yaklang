@@ -203,7 +203,7 @@ func (c *Compiler) compileCall(inst *ssa.Call) error {
 		return c.lowerYaklibDispatchCall(inst, calleeName)
 	}
 
-	if spec, ok, err := c.newParameterCallableContextCallSpec(inst, fn, calleeVal); err != nil {
+	if spec, ok, err := c.newDynamicCallableContextCallSpec(inst, fn, calleeVal); err != nil {
 		return err
 	} else if ok {
 		return c.lowerResolvedContextCall(spec)

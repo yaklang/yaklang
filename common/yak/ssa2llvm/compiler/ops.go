@@ -93,6 +93,14 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 		return llvm.Value{}, fmt.Errorf("getValue: compileConst succeded but value %d not cached", id)
 	}
 
+	// 3. Lazy compile if Phi (pre-created in pass 1, resolved in pass 2)
+	if phi, ok := valObj.(*ssa.Phi); ok && phi != nil {
+		if val, ok := c.Values[id]; ok {
+			return val, nil
+		}
+		return llvm.Value{}, fmt.Errorf("getValue: phi value %d not pre-created", id)
+	}
+
 	// 4. Lazy compile if Parameter (function argument / closure binding)
 	if param, ok := ssa.ToParameter(valObj); ok && param != nil {
 		if val, ok := c.loadBoundParameterValue(fn, param); ok {
