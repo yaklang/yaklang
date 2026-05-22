@@ -114,6 +114,24 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 			c.Values[id] = val
 			return val, nil
 		}
+		if def := param.GetDefault(); def != nil {
+			if ssaFn, ok := ssa.ToFunction(def); ok && ssaFn != nil {
+				llvmFn, _ := c.getOrDeclareLLVMFunction(ssaFn)
+				val := c.Builder.CreatePtrToInt(llvmFn, c.LLVMCtx.Int64Type(), "yak_fn_i64")
+				c.Values[id] = val
+				return val, nil
+			}
+			if defConst, ok := ssa.ToConstInst(def); ok {
+				if err := c.compileConst(defConst); err == nil {
+					if val, ok := c.Values[id]; ok {
+						return val, nil
+					}
+				}
+			}
+		}
+		val := llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)
+		c.Values[id] = val
+		return val, nil
 	}
 
 	// 5. Treat unresolved globals / placeholders as nil i64 for compile-through.
@@ -128,7 +146,10 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 
 	// 6. Lazy compile if ParameterMember (Value, not Instruction)
 	if pm, ok := valObj.(*ssa.ParameterMember); ok {
-		if err := c.compileParameterMember(pm); err != nil {
+		err := c.withLazyCompileInsertPoint(contextInst, pm, func() error {
+			return c.compileParameterMember(pm)
+		})
+		if err != nil {
 			return llvm.Value{}, err
 		}
 		if val, ok := c.Values[id]; ok {
@@ -246,12 +267,6 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 	if ssaFn, ok := ssa.ToFunction(valObj); ok && ssaFn != nil {
 		llvmFn, _ := c.getOrDeclareLLVMFunction(ssaFn)
 		return c.Builder.CreatePtrToInt(llvmFn, c.LLVMCtx.Int64Type(), "yak_fn_i64"), nil
-	}
-	if param, ok := ssa.ToParameter(valObj); ok && param != nil && param.GetDefault() != nil {
-		if ssaFn, ok := ssa.ToFunction(param.GetDefault()); ok && ssaFn != nil {
-			llvmFn, _ := c.getOrDeclareLLVMFunction(ssaFn)
-			return c.Builder.CreatePtrToInt(llvmFn, c.LLVMCtx.Int64Type(), "yak_fn_i64"), nil
-		}
 	}
 
 	// 16. Return error if not found and not a constant
