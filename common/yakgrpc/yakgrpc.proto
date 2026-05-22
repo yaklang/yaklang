@@ -8722,6 +8722,7 @@ message AIGlobalConfig {
   repeated AIModelConfig VisionModels = 8;
   string AIPresetPrompt = 9;
   string AIPlanPrompt = 10;
+  bool   IsOnline = 11;
 }
 
 // Local Model Messages
