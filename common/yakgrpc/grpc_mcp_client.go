@@ -2,9 +2,11 @@ package yakgrpc
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/client"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/schema"
@@ -106,12 +108,21 @@ func (s *Server) DeleteMCPServer(ctx context.Context, req *ypb.DeleteMCPServerRe
 		}, nil
 	}
 
-	err := yakit.DeleteMCPServer(s.GetProfileDatabase(), req.GetID())
+	db := s.GetProfileDatabase()
+
+	// Resolve server name so we can clean up tool configs.
+	server, err := yakit.GetMCPServer(db, req.GetID())
 	if err != nil {
-		return &ypb.GeneralResponse{
-			Ok:     false,
-			Reason: err.Error(),
-		}, nil
+		return &ypb.GeneralResponse{Ok: false, Reason: err.Error()}, nil
+	}
+
+	if err := yakit.DeleteMCPServer(db, req.GetID()); err != nil {
+		return &ypb.GeneralResponse{Ok: false, Reason: err.Error()}, nil
+	}
+
+	// Best-effort cleanup of per-tool configs; non-fatal if it fails.
+	if cleanErr := yakit.DeleteMCPServerToolConfigs(db, server.Name); cleanErr != nil {
+		log.Warnf("cleanup tool configs for server %s failed: %v", server.Name, cleanErr)
 	}
 
 	return &ypb.GeneralResponse{
@@ -180,6 +191,11 @@ func (s *Server) GetAllMCPServers(ctx context.Context, req *ypb.GetAllMCPServers
 			tools, err := s.getMCPServerTools(ctx, server)
 			if err != nil {
 				mcpServer.ErrorMsg = err.Error()
+				// Connection failed — fall back to cached metadata so the UI
+				// can still display previously-seen tools.
+				if cached := s.getMCPServerToolsFromCache(server); len(cached) > 0 {
+					mcpServer.Tools = cached
+				}
 			} else {
 				mcpServer.Tools = tools
 			}
@@ -269,6 +285,32 @@ func (s *Server) getMCPServerTools(ctx context.Context, server *schema.MCPServer
 		return nil, err
 	}
 
+	db := s.GetProfileDatabase()
+
+	// Reconcile the local DB cache with the freshly-fetched tool list in one pass:
+	// delete rows for tools that disappeared, insert new tools, update changed metadata.
+	if db != nil {
+		liveEntries := make([]yakit.MCPToolEntry, 0, len(toolsResult.Tools))
+		for _, t := range toolsResult.Tools {
+			liveEntries = append(liveEntries, yakit.MCPToolEntry{
+				ToolName:    t.Name,
+				FullName:    fmt.Sprintf("mcp_%s_%s", server.Name, t.Name),
+				Description: t.Description,
+				ParamsJSON:  serializeMCPToolParamsFromSchema(&t.InputSchema),
+			})
+		}
+		if syncErr := yakit.SyncAndCacheMCPServerTools(db, server.Name, liveEntries); syncErr != nil {
+			log.Warnf("sync mcp tool cache for server %s failed: %v", server.Name, syncErr)
+		}
+	}
+
+	// Batch-load per-tool configs for this server.
+	toolConfigs, err := yakit.BatchGetMCPServerToolConfigs(db, server.Name)
+	if err != nil {
+		log.Warnf("batch load tool configs for server %s failed: %v", server.Name, err)
+		toolConfigs = map[string]*schema.MCPServerToolConfig{}
+	}
+
 	// 转换为gRPC格式
 	var tools []*ypb.MCPServerTool
 	for _, tool := range toolsResult.Tools {
@@ -276,10 +318,18 @@ func (s *Server) getMCPServerTools(ctx context.Context, server *schema.MCPServer
 		if err != nil {
 			return nil, utils.Errorf("parse mcp tool input schema failed: %s", err)
 		}
+
+		// Merge with persisted per-tool config.
+		enable := true
+		if cfg, ok := toolConfigs[tool.Name]; ok {
+			enable = cfg.Enable
+		}
+
 		mcpTool := &ypb.MCPServerTool{
 			Name:        tool.Name,
 			Description: tool.Description,
 			Params:      params,
+			Enable:      enable,
 		}
 		tools = append(tools, mcpTool)
 	}
@@ -430,4 +480,127 @@ func parseMCPToolInputSchema(inputSchema *mcp.ToolInputSchema) ([]*ypb.MCPServer
 	})
 
 	return params, nil
+}
+
+// UpdateMCPServerToolConfig persists the per-tool Enable flag.
+// Calling this does not require a full server reconnect; the updated config takes
+// effect the next time the AI agent loads tools from this server.
+func (s *Server) UpdateMCPServerToolConfig(ctx context.Context, req *ypb.UpdateMCPServerToolConfigRequest) (*ypb.GeneralResponse, error) {
+	if req.GetServerName() == "" {
+		return &ypb.GeneralResponse{Ok: false, Reason: "服务器名称不能为空"}, nil
+	}
+	if req.GetToolName() == "" {
+		return &ypb.GeneralResponse{Ok: false, Reason: "工具名称不能为空"}, nil
+	}
+
+	err := yakit.UpsertMCPServerToolConfig(
+		s.GetProfileDatabase(),
+		req.GetServerName(),
+		req.GetToolName(),
+		req.GetEnable(),
+	)
+	if err != nil {
+		return &ypb.GeneralResponse{Ok: false, Reason: err.Error()}, nil
+	}
+
+	return &ypb.GeneralResponse{Ok: true, Reason: "工具配置更新成功"}, nil
+}
+
+// getMCPServerToolsFromCache reads tool metadata from the local DB cache.
+// This is used as a fallback when the remote MCP server is unreachable.
+func (s *Server) getMCPServerToolsFromCache(server *schema.MCPServer) []*ypb.MCPServerTool {
+	db := s.GetProfileDatabase()
+	cfgs, err := yakit.BatchGetMCPServerToolConfigs(db, server.Name)
+	if err != nil || len(cfgs) == 0 {
+		return nil
+	}
+
+	var tools []*ypb.MCPServerTool
+	for _, cfg := range cfgs {
+		// Only surface tools that have cached metadata (Description populated means
+		// the server was reachable at least once before).
+		if cfg.Description == "" && cfg.ParamsJSON == "" {
+			continue
+		}
+		var params []*ypb.MCPServerToolParamInfo
+		if cfg.ParamsJSON != "" && cfg.ParamsJSON != "[]" {
+			// Parse the compact JSON back into proto structs.
+			type paramEntry struct {
+				Name        string `json:"name"`
+				Type        string `json:"type"`
+				Description string `json:"description"`
+				Default     string `json:"default"`
+				Required    bool   `json:"required"`
+			}
+			var entries []paramEntry
+			if jsonErr := json.Unmarshal([]byte(cfg.ParamsJSON), &entries); jsonErr == nil {
+				for _, e := range entries {
+					params = append(params, &ypb.MCPServerToolParamInfo{
+						Name:        e.Name,
+						Type:        e.Type,
+						Description: e.Description,
+						Default:     e.Default,
+						Required:    e.Required,
+					})
+				}
+			}
+		}
+		tools = append(tools, &ypb.MCPServerTool{
+			Name:        cfg.ToolName,
+			Description: cfg.Description,
+			Params:      params,
+			Enable:      cfg.Enable,
+		})
+	}
+	return tools
+}
+
+// serializeMCPToolParamsFromSchema converts a mcp.ToolInputSchema into the compact
+// JSON format stored in MCPServerToolConfig.ParamsJSON. Mirrors the logic in
+// mcp_server_loader.go so the grpc layer can write the same format without importing
+// the aitool package.
+func serializeMCPToolParamsFromSchema(schema *mcp.ToolInputSchema) string {
+	if schema == nil || schema.Properties == nil || schema.Properties.Len() == 0 {
+		return "[]"
+	}
+
+	requiredSet := make(map[string]bool, len(schema.Required))
+	for _, r := range schema.Required {
+		requiredSet[r] = true
+	}
+
+	type paramEntry struct {
+		Name        string `json:"name"`
+		Type        string `json:"type"`
+		Description string `json:"description,omitempty"`
+		Default     string `json:"default,omitempty"`
+		Required    bool   `json:"required"`
+	}
+
+	var params []paramEntry
+	schema.Properties.ForEach(func(name string, val any) bool {
+		p := paramEntry{Name: name, Required: requiredSet[name]}
+		if m, ok := val.(map[string]interface{}); ok {
+			if t, ok := m["type"].(string); ok {
+				p.Type = t
+			}
+			if d, ok := m["description"].(string); ok {
+				p.Description = d
+			}
+			if def, ok := m["default"]; ok {
+				p.Default = fmt.Sprintf("%v", def)
+			}
+		}
+		if p.Type == "" {
+			p.Type = "string"
+		}
+		params = append(params, p)
+		return true
+	})
+
+	b, err := json.Marshal(params)
+	if err != nil {
+		return "[]"
+	}
+	return string(b)
 }

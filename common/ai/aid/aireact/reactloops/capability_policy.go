@@ -38,6 +38,14 @@ func IsPlanAndExecAllowed(loop *ReActLoop, invoker aicommon.AIInvokeRuntime) boo
 	return true
 }
 
+// IsMCPServersAllowed reports whether MCP tools may be discovered or recommended
+// for this runtime. When Config.DisallowMCPServers is true (WithDisallowMCPServers),
+// ReAct does not preload or connect MCP servers; intent/capability paths should
+// not surface MCP matches either, so the model is not steered toward unreachable tools.
+func IsMCPServersAllowed(invoker aicommon.AIInvokeRuntime) bool {
+	return aicommon.IsMCPServersAllowedRuntime(invoker)
+}
+
 func resolveExplicitEnablePlanAndExec(cfg aicommon.AICallerConfigIf) planExecPolicyState {
 	if cfg == nil {
 		return planExecPolicyUnspecified

@@ -4,15 +4,17 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"io"
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 	"unicode"
+
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -21,6 +23,7 @@ import (
 
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"gopkg.in/yaml.v3"
 )
 
@@ -218,6 +221,162 @@ func recoverSingleMismatchedAITagParam(invokeParams aitool.InvokeParams, rawAIRe
 
 	invokeParams.Set(candidate.ParamName, candidate.Content)
 	return &candidate, ""
+}
+
+func containsToolParamAITagMarkup(value string) bool {
+	return strings.Contains(value, "<|TOOL_PARAM_")
+}
+
+func pickToolParamAITagBlock(blocks []toolParamAITagBlock, paramName, expectedNonce string) (toolParamAITagBlock, bool) {
+	var fallback *toolParamAITagBlock
+	for i := range blocks {
+		block := &blocks[i]
+		if block.ParamName != paramName || strings.TrimSpace(block.Content) == "" {
+			continue
+		}
+		if expectedNonce != "" && block.Nonce == expectedNonce {
+			return *block, true
+		}
+		if fallback == nil {
+			fallback = block
+		}
+	}
+	if fallback != nil {
+		return *fallback, true
+	}
+	return toolParamAITagBlock{}, false
+}
+
+func extractToolParamContentFromPollutedValue(value, paramName string) string {
+	blocks := extractKnownToolParamAITagBlocks(value, []string{paramName})
+	if block, ok := pickToolParamAITagBlock(blocks, paramName, ""); ok {
+		return block.Content
+	}
+	return ""
+}
+
+// normalizeToolParamStringValue decodes JSON-style escape literals that sometimes
+// survive when models embed block parameters inside JSON string values.
+func normalizeToolParamStringValue(value string) string {
+	if value == "" {
+		return value
+	}
+	if containsToolParamAITagMarkup(value) {
+		return value
+	}
+
+	trimmed := strings.TrimSpace(value)
+	if len(trimmed) >= 2 {
+		if (trimmed[0] == '"' && trimmed[len(trimmed)-1] == '"') ||
+			(trimmed[0] == '\'' && trimmed[len(trimmed)-1] == '\'') {
+			if unquoted, err := strconv.Unquote(trimmed); err == nil {
+				return unquoted
+			}
+		}
+	}
+
+	if strings.Contains(value, "\\n") && !strings.Contains(value, "\n") {
+		replacer := strings.NewReplacer(
+			"\\n", "\n",
+			"\\r", "\r",
+			"\\t", "\t",
+			"\\\"", `"`,
+			"\\\\", `\`,
+		)
+		return replacer.Replace(value)
+	}
+	return value
+}
+
+// ResolveToolParamAITags merges stream AITAG params, recovers block content from raw AI
+// responses and polluted JSON strings, and normalizes JSON escape literals before invoke.
+func ResolveToolParamAITags(
+	action *Action,
+	invokeParams aitool.InvokeParams,
+	rawAIResponse string,
+	expectedNonce string,
+	paramNames []string,
+) []string {
+	if invokeParams == nil {
+		invokeParams = make(aitool.InvokeParams)
+	}
+	paramNames = FilterSupportedToolParamAITagNames(paramNames)
+	if len(paramNames) == 0 {
+		return nil
+	}
+
+	mergedSet := make(map[string]struct{}, len(paramNames))
+	mergedList := make([]string, 0, len(paramNames))
+	addMerged := func(paramName string) {
+		if paramName == "" {
+			return
+		}
+		if _, ok := mergedSet[paramName]; ok {
+			return
+		}
+		mergedSet[paramName] = struct{}{}
+		mergedList = append(mergedList, paramName)
+	}
+
+	for _, paramName := range MergeActionAITagParams(action, invokeParams, paramNames) {
+		addMerged(paramName)
+	}
+
+	allBlocks := extractKnownToolParamAITagBlocks(rawAIResponse, paramNames)
+	for _, paramName := range paramNames {
+		current := invokeParams.GetString(paramName)
+
+		if containsToolParamAITagMarkup(current) {
+			if content := extractToolParamContentFromPollutedValue(current, paramName); content != "" {
+				invokeParams.Set(paramName, normalizeToolParamStringValue(content))
+				addMerged(paramName)
+				continue
+			}
+			if block, ok := pickToolParamAITagBlock(allBlocks, paramName, expectedNonce); ok {
+				invokeParams.Set(paramName, normalizeToolParamStringValue(block.Content))
+				addMerged(paramName)
+				continue
+			}
+		}
+
+		if strings.TrimSpace(current) == "" {
+			if block, ok := pickToolParamAITagBlock(allBlocks, paramName, expectedNonce); ok {
+				invokeParams.Set(paramName, normalizeToolParamStringValue(block.Content))
+				addMerged(paramName)
+				continue
+			}
+		} else if _, ok := mergedSet[paramName]; !ok {
+			normalized := normalizeToolParamStringValue(current)
+			if normalized != current {
+				invokeParams.Set(paramName, normalized)
+				addMerged(paramName)
+			}
+		}
+	}
+
+	if expectedNonce != "" {
+		if recovered, _ := recoverSingleMismatchedAITagParam(
+			invokeParams, rawAIResponse, expectedNonce, paramNames, mergedSet,
+		); recovered != nil {
+			addMerged(recovered.ParamName)
+		}
+	}
+
+	// Always normalize after merge/extract: stream AITAG merge can still leave JSON-style
+	// escape literals (e.g. "\\nimport") that must not be forwarded to MCP/py_eval.
+	for _, paramName := range paramNames {
+		current := invokeParams.GetString(paramName)
+		if current == "" {
+			continue
+		}
+		normalized := normalizeToolParamStringValue(current)
+		if normalized != current {
+			invokeParams.Set(paramName, normalized)
+			addMerged(paramName)
+		}
+	}
+
+	return mergedList
 }
 
 type ToolCaller struct {
@@ -573,15 +732,14 @@ func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) 
 			invokeParams.Set(k, v)
 		}
 
-		// Then, merge AITAG params (they take precedence over JSON params)
-		mergedAITagParams := make(map[string]struct{})
 		if promptMeta != nil && len(promptMeta.ParamNames) > 0 {
-			for _, paramName := range MergeActionAITagParams(callToolAction, invokeParams, promptMeta.ParamNames) {
-				mergedAITagParams[paramName] = struct{}{}
+			rawAIResponse = response.String()
+			for _, paramName := range ResolveToolParamAITags(
+				callToolAction, invokeParams, rawAIResponse, promptMeta.Nonce, promptMeta.ParamNames,
+			) {
 				log.Debugf("merged AITAG param[%s] for tool[%s]", paramName, tool.Name)
 			}
 
-			rawAIResponse = response.String()
 			blocks := extractKnownToolParamAITagBlocks(rawAIResponse, promptMeta.ParamNames)
 			var mismatched []toolParamAITagBlock
 			for _, block := range blocks {
@@ -597,14 +755,6 @@ func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) 
 				message := fmt.Sprintf("tool[%s] generated mismatched AITAG nonce, expected=%s observed=%s", tool.Name, promptMeta.Nonce, strings.Join(parts, ", "))
 				log.Warn(message)
 				emitter.EmitWarning(message)
-			}
-
-			if recovered, reason := recoverSingleMismatchedAITagParam(invokeParams, rawAIResponse, promptMeta.Nonce, promptMeta.ParamNames, mergedAITagParams); recovered != nil {
-				message := fmt.Sprintf("tool[%s] recovered single AITAG param[%s] from mismatched nonce[%s], expected nonce[%s]", tool.Name, recovered.ParamName, recovered.Nonce, promptMeta.Nonce)
-				log.Warn(message)
-				emitter.EmitWarning(message)
-			} else if len(mismatched) > 0 {
-				log.Debugf("tool[%s] skipped AITAG nonce fallback: %s", tool.Name, reason)
 			}
 		}
 
@@ -865,7 +1015,7 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 		}
 		t.emitter.EmitInteractiveJSON(ep.GetId(), schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE, "review-require", reqs)
 
-		// wait for agree
+		// wait for agree using global policy
 		config.DoWaitAgree(t.ctx, ep)
 		params := ep.GetParams()
 		t.emitter.EmitInteractiveRelease(ep.GetId(), params)
@@ -916,6 +1066,36 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 	stderrMultiWriter := io.MultiWriter(stderrWriter, stderrBuffer)
 
 	waitToolStdFlush := t.emitter.EmitToolCallStd(tool.Name, stdoutReader, stderrReader, t.task.GetIndex())
+
+	// Refresh MCP tools from the manager immediately before invoke. Parameter generation
+	// may take several seconds; background loadMCPServers can replace stubs with live
+	// tools while the AI is still drafting params.
+	if buildinaitools.IsMCPToolName(tool.Name) {
+		if mgr := t.config.GetAiToolManager(); mgr != nil {
+			waitCtx := t.ctx
+			if waitCtx == nil {
+				waitCtx = t.config.GetContext()
+			}
+			liveTool, waitErr := buildinaitools.WaitForMCPLiveTool(
+				waitCtx, mgr, tool.Name,
+				buildinaitools.MCPToolInitWaitTimeout,
+				buildinaitools.MCPToolInitPollInterval,
+				func(elapsed time.Duration) {
+					t.emitter.EmitInfo(
+						"MCP tool %q still connecting (elapsed %v), waiting for remote server before invoke...",
+						tool.Name, elapsed.Round(time.Second),
+					)
+				},
+			)
+			if waitErr != nil {
+				return nil, false, waitErr
+			}
+			if liveTool != nil {
+				tool = liveTool
+			}
+		}
+	}
+
 	t.emitter.EmitInfo("start to invoke tool: %v", tool.Name)
 	t.m.Lock()
 	// Measure pure plugin execution time from real invoke start to invoke return.

@@ -208,6 +208,31 @@ func TestLoadAIToolFromMCPServers(t *testing.T) {
 	})
 }
 
+func TestFilterParamsForMCPCall(t *testing.T) {
+	in := InvokeParams{
+		"runtime_id":  "rt-123",
+		"__DEFAULT__": []any{},
+		"@action":     "call-tool",
+		"file_path":   "/tmp/crackme.elf",
+		"switch":      true,
+	}
+	got := filterParamsForMCPCall(in)
+	assert.Equal(t, map[string]interface{}{
+		"file_path": "/tmp/crackme.elf",
+		"switch":    true,
+	}, got)
+}
+
+func TestFirstMCPTextFromContent_MapUnmarshal(t *testing.T) {
+	content := []any{
+		map[string]interface{}{
+			"type": "text",
+			"text": "Invalid params: unexpected parameters",
+		},
+	}
+	assert.Equal(t, "Invalid params: unexpected parameters", firstMCPTextFromContent(content))
+}
+
 // testWriter 是一个简单的 io.Writer 实现，用于测试
 type testWriter struct {
 	data []byte

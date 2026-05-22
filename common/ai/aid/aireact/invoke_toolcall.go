@@ -3,9 +3,11 @@ package aireact
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -54,9 +56,30 @@ func (r *ReAct) executeToolCallInternal(ctx context.Context, toolName string, pa
 	}()
 
 	// Find the required tool
+	if buildinaitools.IsMCPToolName(toolName) && !aicommon.IsMCPServersAllowedConfig(r.config) {
+		return nil, false, utils.Errorf("MCP tools are disabled for this runtime")
+	}
+
 	tool, err := r.config.AiToolManager.GetToolByName(toolName)
 	if err != nil {
 		return nil, false, utils.Errorf("tool '%s' not found: %v", toolName, err)
+	}
+
+	// For MCP tools, wait until the background loader replaces the DB stub with a live
+	// tool (or timeout). This avoids TOOL_INITIALIZING failures right after engine start.
+	if buildinaitools.IsMCPToolName(toolName) && buildinaitools.IsMCPPendingStub(tool) {
+		r.EmitInfo("MCP tool %q is still connecting; waiting for remote server before tool require phase...", toolName)
+		tool, err = buildinaitools.WaitForMCPLiveTool(
+			ctx, r.config.AiToolManager, toolName,
+			buildinaitools.MCPToolInitWaitTimeout,
+			buildinaitools.MCPToolInitPollInterval,
+			func(elapsed time.Duration) {
+				r.EmitInfo("still waiting for MCP tool %q (elapsed %v)...", toolName, elapsed.Round(time.Second))
+			},
+		)
+		if err != nil {
+			return nil, false, err
+		}
 	}
 
 	if skipRequire {

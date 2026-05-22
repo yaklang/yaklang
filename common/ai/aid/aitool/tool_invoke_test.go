@@ -11,6 +11,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/utils"
 
+	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/stretchr/testify/require"
 )
 
@@ -629,4 +630,53 @@ func TestInvokeWithParamsLargeContent(t *testing.T) {
 	resultStr, ok := execResult.Result.(string)
 	require.True(t, ok, "JSON结果类型错误，应为字符串")
 	require.Contains(t, resultStr, "saved in file", "JSON结果应包含文件保存信息")
+}
+
+func TestApplyDefault_NestedArrayWithNilPropertyTypesDoesNotPanic(t *testing.T) {
+	schemaJSON := `{
+		"type": "object",
+		"properties": {
+			"queries": {
+				"type": "array",
+				"items": {
+					"type": "object",
+					"properties": {
+						"addr": { "type": "string" },
+						"include_decompile": { "type": "boolean", "default": true },
+						"include_proto": { "type": "boolean" }
+					}
+				}
+			}
+		}
+	}`
+
+	var plainSchema any
+	require.NoError(t, json.Unmarshal([]byte(schemaJSON), &plainSchema))
+
+	compiler := jsonschema.NewCompiler()
+	require.NoError(t, compiler.AddResource("schema.json", plainSchema))
+	schema, err := compiler.Compile("schema.json")
+	require.NoError(t, err)
+
+	params := map[string]any{
+		"queries": []any{
+			map[string]any{
+				"addr":                 "main",
+				"include_decompile":    true,
+				"include_proto":        true,
+				"include_basic_blocks": false,
+				"include_callees":      false,
+				"include_callers":      false,
+				"include_constants":    false,
+				"include_disasm":       false,
+				"include_strings":      true,
+				"include_xrefs":        true,
+			},
+		},
+		"runtime_id": "9fce319c-aa3c-46fd-bdb7-edc4195ce39d",
+	}
+
+	require.NotPanics(t, func() {
+		applyDefault(schema, params)
+	})
 }

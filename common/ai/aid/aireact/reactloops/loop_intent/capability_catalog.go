@@ -67,6 +67,25 @@ func BuildCapabilityCatalog(r aicommon.AIInvokeRuntime) string {
 				sb.WriteString("\n")
 			}
 		}
+
+		// Include enabled MCP tools that have a cached description so the LLM
+		// catalog-match pass can discover them via semantic matching.
+		// Use [mcp-tool:] prefix to distinguish MCP tools from built-in tools.
+		if reactloops.IsMCPServersAllowed(r) {
+			mcpToolConfigs, mcpErr := yakit.GetAllEnabledMCPServerToolConfigs(db)
+			if mcpErr != nil {
+				log.Warnf("capability catalog: failed to load MCP tool configs: %v", mcpErr)
+			} else {
+				for _, t := range mcpToolConfigs {
+					if t.Description == "" {
+						continue
+					}
+					fullName := fmt.Sprintf("mcp_%s_%s", t.ServerName, t.ToolName)
+					desc := utils.ShrinkString(t.Description, 120)
+					sb.WriteString(fmt.Sprintf("[mcp-tool:%s]: %s - %s\n", fullName, fullName, desc))
+				}
+			}
+		}
 	}
 
 	type skillLoaderProvider interface {

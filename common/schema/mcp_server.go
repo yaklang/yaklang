@@ -20,6 +20,33 @@ type MCPServer struct {
 	Headers MapStringAny `gorm:"type:text" json:"headers"`   // 自定义请求头
 }
 
+// MCPServerToolConfig stores per-tool configuration and cached metadata for MCP tools.
+//
+// The tool list is fetched dynamically from the remote MCP server at runtime; this table
+// serves two purposes:
+//  1. User overrides: Enable flag that persists across sessions.
+//  2. Metadata cache: Description and ParamsJSON populated on first successful connection,
+//     so the tool is discoverable via search even when the server is offline.
+//
+// Key: (ServerName, ToolName)
+type MCPServerToolConfig struct {
+	gorm.Model
+
+	ServerName string `gorm:"index;not null" json:"server_name"`     // owning MCP server name
+	ToolName   string `gorm:"index;not null" json:"tool_name"`       // tool name as reported by the server
+	FullName   string `gorm:"uniqueIndex;not null" json:"full_name"` // "mcp_{server_name}_{tool_name}" for direct lookup
+	Enable     bool   `gorm:"default:true" json:"enable"`            // whether the tool is loaded by the AI agent
+
+	// Metadata cached from the remote server on last successful tool list refresh.
+	// These fields are never edited by the user; they are overwritten on every refresh.
+	Description string `gorm:"type:text" json:"description"` // tool description
+	ParamsJSON  string `gorm:"type:text" json:"params_json"` // JSON-encoded input schema (MCPServerToolParamInfo[])
+}
+
+func (m *MCPServerToolConfig) TableName() string {
+	return "mcp_server_tool_configs"
+}
+
 func (m *MCPServer) TableName() string {
 	return "mcp_servers"
 }
@@ -73,4 +100,5 @@ func (m *MCPServer) ToGRPCWithTools(tools []*ypb.MCPServerTool) *ypb.MCPServer {
 func init() {
 	// 注册MCP服务器表到Profile数据库
 	RegisterDatabaseSchema(KEY_SCHEMA_PROFILE_DATABASE, &MCPServer{})
+	RegisterDatabaseSchema(KEY_SCHEMA_PROFILE_DATABASE, &MCPServerToolConfig{})
 }

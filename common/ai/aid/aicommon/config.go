@@ -450,6 +450,9 @@ func NewConfig(ctx context.Context, opts ...ConfigOption) *Config {
 	if config.AiToolManager == nil {
 		config.AiToolManager = buildinaitools.NewToolManager(config.AiToolManagerOption...)
 	}
+	if config.AiToolManager != nil {
+		config.AiToolManager.SetDisallowMCPServers(config.DisallowMCPServers)
+	}
 
 	// Restore persistent session if configured
 	if !config.InitStatus.IsPersistentSessionRestored() {
@@ -1462,6 +1465,13 @@ func WithDisallowMCPServers(disallow bool) ConfigOption {
 		c.m.Lock()
 		defer c.m.Unlock()
 		c.DisallowMCPServers = disallow
+		if c.AiToolManager != nil {
+			c.AiToolManager.SetDisallowMCPServers(disallow)
+		}
+		if c.AiToolManagerOption == nil {
+			c.AiToolManagerOption = make([]buildinaitools.ToolManagerOption, 0)
+		}
+		c.AiToolManagerOption = append(c.AiToolManagerOption, buildinaitools.WithDisallowMCPServers(disallow))
 		return nil
 	}
 }

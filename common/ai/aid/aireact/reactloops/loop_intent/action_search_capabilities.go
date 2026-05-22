@@ -184,6 +184,32 @@ func makeSearchCapabilitiesAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 					loop.Set("matched_tool_names", existingToolNames+strings.Join(pluginNames, ","))
 				}
 
+				// 1.6 Search cached MCP tool metadata via keyword BM25 (same pattern as tools/forges).
+				if reactloops.IsMCPServersAllowed(r) {
+					mcpTools, mcpErr := yakit.SearchMCPServerToolsBM25(db, query, 10)
+					if mcpErr != nil {
+						log.Warnf("intent loop: MCP tool BM25 search failed: %v", mcpErr)
+					} else if len(mcpTools) > 0 {
+						results.WriteString("### Matched MCP Tools\n")
+						results.WriteString("These are MCP (Model Context Protocol) tools. Call them directly via require_tool using their full name (mcp_{server}_{tool}).\n\n")
+						var mcpToolNames []string
+						for _, t := range mcpTools {
+							fullName := fmt.Sprintf("mcp_%s_%s", t.ServerName, t.ToolName)
+							desc := utils.ShrinkString(t.Description, 200)
+							results.WriteString(fmt.Sprintf("- **%s**: %s\n", fullName, desc))
+							appendCapDetail(&capDetails, fullName, "mcp-tool", desc)
+							mcpToolNames = append(mcpToolNames, fullName)
+						}
+						results.WriteString("\n")
+						log.Infof("intent loop: found %d MCP tools", len(mcpTools))
+						existingToolNames := loop.Get("matched_tool_names")
+						if existingToolNames != "" {
+							existingToolNames += ","
+						}
+						loop.Set("matched_tool_names", existingToolNames+strings.Join(mcpToolNames, ","))
+					}
+				}
+
 				// 2. Search AI Forges via BM25 trigram only when plan/exec is enabled.
 				if reactloops.IsPlanAndExecAllowed(nil, r) {
 					forgeSeen := make(map[string]bool)

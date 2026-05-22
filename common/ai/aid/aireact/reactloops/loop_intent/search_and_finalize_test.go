@@ -21,6 +21,7 @@ import (
 func TestBuildCapabilityEnrichmentMarkdown_AllFourTypes(t *testing.T) {
 	details := []capabilityDetail{
 		{CapabilityName: "synscan", CapabilityType: "tool", Description: "SYN port scanning tool"},
+		{CapabilityName: "mcp_srv_echo", CapabilityType: "mcp-tool", Description: "Remote MCP echo tool"},
 		{CapabilityName: "servicescan", CapabilityType: "tool", Description: "Service fingerprint detection"},
 		{CapabilityName: "report_gen", CapabilityType: "forge", Description: "Generate penetration test reports"},
 		{CapabilityName: "nuclei_scan", CapabilityType: "skill", Description: "Nuclei vulnerability scanning skill"},
@@ -533,6 +534,7 @@ func TestCapabilityEnrichment_AllFourTypesEndToEnd(t *testing.T) {
 
 	details := []capabilityDetail{
 		{CapabilityName: "tool_" + nonce, CapabilityType: "tool", Description: "test tool " + nonce},
+		{CapabilityName: "mcp_srv_tool_" + nonce, CapabilityType: "mcp-tool", Description: "test mcp tool " + nonce},
 		{CapabilityName: "forge_" + nonce, CapabilityType: "forge", Description: "test forge " + nonce},
 		{CapabilityName: "skill_" + nonce, CapabilityType: "skill", Description: "test skill " + nonce},
 		{CapabilityName: "focus_" + nonce, CapabilityType: "focus_mode", Description: "test focus mode " + nonce},
@@ -546,8 +548,8 @@ func TestCapabilityEnrichment_AllFourTypesEndToEnd(t *testing.T) {
 
 	// Parse back (simulating what action_finalize reads)
 	parsed := parseCapabilityDetails(jsonStr)
-	if len(parsed) != 4 {
-		t.Fatalf("expected 4 parsed details, got %d", len(parsed))
+	if len(parsed) != 5 {
+		t.Fatalf("expected 5 parsed details, got %d", len(parsed))
 	}
 
 	// Build unfiltered Markdown (all capabilities)

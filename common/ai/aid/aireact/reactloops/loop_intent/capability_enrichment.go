@@ -16,6 +16,7 @@ type capabilityDetail struct {
 
 var capabilityTypeUsageGuides = map[string]string{
 	"tool":       "通过 `require_tool` 调用指定工具执行任务。/ Use `require_tool` to invoke the tool.",
+	"mcp-tool":   "通过 `require_tool` 调用指定 MCP 工具执行任务（工具名以 mcp_ 开头）。/ Use `require_tool` with the mcp_ prefixed name to invoke the MCP tool.",
 	"forge":      "通过 `require_ai_blueprint` 调用蓝图，由蓝图系统负责自动化执行编排。/ Use `require_ai_blueprint` to execute the blueprint workflow.",
 	"skill":      "技能会被自动加载到上下文中，提供特定领域的知识和方法指引。/ Skills are auto-loaded into context.",
 	"focus_mode": "通过 `enter_focus_mode` 进入专注模式，在独立的执行环境中完成特定任务。/ Use `enter_focus_mode` to enter focus mode.",
@@ -23,12 +24,13 @@ var capabilityTypeUsageGuides = map[string]string{
 
 var capabilityTypeLabels = map[string]string{
 	"tool":       "Tools (工具)",
+	"mcp-tool":   "MCP Tools (外部 MCP 工具)",
 	"forge":      "Forges / Blueprints (AI 蓝图)",
 	"skill":      "Skills (技能)",
 	"focus_mode": "Focus Modes (专注模式)",
 }
 
-var capabilityTypeOrder = []string{"tool", "forge", "skill", "focus_mode"}
+var capabilityTypeOrder = []string{"tool", "mcp-tool", "forge", "skill", "focus_mode"}
 
 func parseCapabilityDetails(jsonStr string) []capabilityDetail {
 	if jsonStr == "" {
