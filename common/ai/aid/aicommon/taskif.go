@@ -126,6 +126,8 @@ type AIStatefulTaskBase struct {
 	taskRetrievalInfo *AITaskRetrievalInfo
 
 	asyncDeferCallback func(err error)
+
+	skipTaskStatusChangeEmit bool
 }
 
 func (s *AIStatefulTaskBase) GetFocusMode() string {
@@ -427,7 +429,7 @@ func (s *AIStatefulTaskBase) SetStatus(status AITaskState) {
 	// 输出调试日志记录状态变化
 	if old != status {
 		log.Debugf("Task %s status changed: %s -> %s", s.GetId(), old, status)
-		if s.Emitter != nil {
+		if !s.skipTaskStatusChangeEmit && s.Emitter != nil {
 			s.Emitter.EmitStructured("react_task_status_changed", map[string]any{
 				"react_task_id":         s.GetId(),
 				"react_task_old_status": old,
@@ -483,7 +485,7 @@ func NewSubTaskBase(
 	parentTask AIStatefulTask,
 	subTaskId string,
 	userInput string,
-	skipEvent ...bool,
+	skipTaskStatusChangeEmit ...bool,
 ) *AIStatefulTaskBase {
 	var parentCtx context.Context
 	if parentTask != nil {
@@ -497,7 +499,7 @@ func NewSubTaskBase(
 	if parentTask != nil {
 		emitter = parentTask.GetEmitter()
 	}
-	return NewStatefulTaskBase(subTaskId, userInput, parentCtx, emitter, skipEvent...)
+	return NewStatefulTaskBase(subTaskId, userInput, parentCtx, emitter, skipTaskStatusChangeEmit...)
 }
 
 func NewStatefulTaskBase(
@@ -505,7 +507,7 @@ func NewStatefulTaskBase(
 	userInput string,
 	ctx context.Context,
 	Emitter *Emitter,
-	skipEvent ...bool,
+	skipTaskStatusChangeEmit ...bool,
 ) *AIStatefulTaskBase {
 	if ctx == nil {
 		ctx = context.Background()
@@ -524,6 +526,10 @@ func NewStatefulTaskBase(
 		toolCallResultIds: omap.NewOrderedMap[int64, *aitool.ToolResult](make(map[int64]*aitool.ToolResult)),
 		uuid:              ksuid.New().String(),
 	}
+	if len(skipTaskStatusChangeEmit) > 0 && skipTaskStatusChangeEmit[0] {
+		base.skipTaskStatusChangeEmit = true
+	}
+
 	if base.Emitter != nil {
 		base.Emitter = base.Emitter.PushEventProcesser(func(event *schema.AiOutputEvent) *schema.AiOutputEvent {
 			if event != nil {
@@ -531,9 +537,7 @@ func NewStatefulTaskBase(
 			}
 			return event
 		})
-		if len(skipEvent) > 0 && skipEvent[0] {
-
-		} else {
+		if !base.skipTaskStatusChangeEmit {
 			base.Emitter.EmitStructured(
 				"react_task_created",
 				map[string]any{
