@@ -97,7 +97,7 @@ func (pm *PromptManager) GetLoopPromptBaseMaterials(tools []*aitool.Tool, nonce 
 	// Timeline frozen/open 与 Session Artifacts frozen/open 必须共享同一轮
 	// FrozenTimeUnix；midterm recall 是 turn 级 open prefix，在统一切分之后追加。
 	// 关键词: BuildPromptFrozenOpenMaterials, artifacts frozen time, midterm open
-	frozenOpen := aicommon.BuildPromptFrozenOpenMaterials(pm.react.config)
+	frozenOpen := aicommon.BuildPromptFrozenOpenMaterials(pm.react.config, nonce)
 	frozenOpen.TimelineOpen = prependMidtermTimelinePrefixForPrompt(pm.react, frozenOpen.TimelineOpen)
 	materials.PromptFrozenOpenMaterials = frozenOpen
 
@@ -222,6 +222,9 @@ func (pm *PromptManager) NewPromptMaterials(base *reactloops.LoopPromptBaseMater
 		materials.Schema = input.Schema
 		// P1-C2: SessionEvidence / UserHistory 从 dynamic 段上移到 timeline-open 段
 		materials.SessionEvidence = input.SessionEvidence
+		if strings.TrimSpace(materials.SessionEvidenceOpen) == "" {
+			materials.SessionEvidenceOpen = input.SessionEvidence
+		}
 		// 全局 TODO 块: 与 SessionEvidence 平行透传, 物理位置在 timeline-open 段
 		// section.timeline_open.todo_list (在 session_evidence 之后), 让 loop
 		// prompt 任何一次 iteration 都能看到当前 TODO 全貌.
@@ -491,6 +494,13 @@ func (pm *PromptManager) buildFrozenBlockObservation(
 			reactloops.PromptSectionRoleFrozenBlock,
 			true,
 			renderSessionArtifactsFrozenBlock(materials),
+		),
+		reactloops.NewPromptSectionObservation(
+			"section.frozen_block.session_evidence_frozen",
+			"Session Evidence (Frozen)",
+			reactloops.PromptSectionRoleFrozenBlock,
+			true,
+			renderSessionEvidenceFrozenBlock(materials),
 		),
 		reactloops.NewPromptSectionObservation(
 			"section.frozen_block.timeline_frozen",
@@ -994,6 +1004,13 @@ func renderSessionArtifactsOpenBlock(materials *reactloops.PromptPrefixMaterials
 		return ""
 	}
 	return "# Session Artifacts (Open)\n" + materials.SessionArtifactsOpen
+}
+
+func renderSessionEvidenceFrozenBlock(materials *reactloops.PromptPrefixMaterials) string {
+	if materials == nil || strings.TrimSpace(materials.SessionEvidenceFrozen) == "" {
+		return ""
+	}
+	return "# Session Evidence (Frozen)\n" + materials.SessionEvidenceFrozen
 }
 
 // renderToolInventoryBlock 是给 observation 树 (UI / 调试) 用的镜像渲染, 必须
