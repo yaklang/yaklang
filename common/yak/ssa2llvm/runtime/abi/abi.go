@@ -120,6 +120,15 @@ const (
 	IDSyncNewOnce FuncID = 20
 	IDSyncNewPool FuncID = 21
 	IDSyncNewCond FuncID = 22
+
+	// Generic yaklang stdlib dispatch: args are (module, method, call args...).
+	IDYaklibCall FuncID = 23
+
+	// Iterator advance for SSA Next: args are (iter, inNext).
+	IDRuntimeNext FuncID = 24
+
+	// Membership test for `x in y`.
+	IDRuntimeIn FuncID = 25
 )
 
 type SliceElemKind int64

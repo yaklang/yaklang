@@ -36,6 +36,9 @@ var runtimeDispatchTargets = map[abi.FuncID]any{
 
 var runtimeDispatchHandlers = map[abi.FuncID]runtimeDispatchFunc{
 	abi.IDRuntimeShadowMethod: runtimeDispatchShadowMethod,
+	abi.IDYaklibCall:          runtimeDispatchYaklibCall,
+	abi.IDRuntimeNext:         runtimeDispatchNext,
+	abi.IDRuntimeIn:           runtimeDispatchIn,
 }
 
 func executeRuntimeDispatch(ctx unsafe.Pointer) {

@@ -37,6 +37,10 @@ func (c *Compiler) compileInstruction(inst ssa.Instruction) error {
 		return c.compileParameterMember(op)
 	case *ssa.TypeCast:
 		return c.compileTypeCast(op)
+	case *ssa.UnOp:
+		return c.compileUnOp(op, id)
+	case *ssa.Next:
+		return c.compileNext(op)
 	default:
 		// Ignore unimplemented instructions for now
 		return nil
@@ -88,7 +92,25 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 		return llvm.Value{}, fmt.Errorf("getValue: compileConst succeded but value %d not cached", id)
 	}
 
-	// 4. Lazy compile if ParameterMember (Value, not Instruction)
+	// 4. Lazy compile if Parameter (function argument / closure binding)
+	if param, ok := ssa.ToParameter(valObj); ok && param != nil {
+		if val, ok := c.loadBoundParameterValue(fn, param); ok {
+			c.Values[id] = val
+			return val, nil
+		}
+	}
+
+	// 5. Treat unresolved globals / placeholders as nil i64 for compile-through.
+	if undef, ok := valObj.(*ssa.Undefined); ok && undef != nil {
+		switch undef.Kind {
+		case ssa.UndefinedValueValid, ssa.UndefinedValueInValid, ssa.UndefinedMemberInValid:
+			val := llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)
+			c.Values[id] = val
+			return val, nil
+		}
+	}
+
+	// 6. Lazy compile if ParameterMember (Value, not Instruction)
 	if pm, ok := valObj.(*ssa.ParameterMember); ok {
 		if err := c.compileParameterMember(pm); err != nil {
 			return llvm.Value{}, err
@@ -99,7 +121,7 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 		return llvm.Value{}, fmt.Errorf("getValue: compileParameterMember succeeded but value %d not cached", id)
 	}
 
-	// 5. Lazy compile if TypeCast
+	// 7. Lazy compile if TypeCast
 	if tc, ok := valObj.(*ssa.TypeCast); ok {
 		if err := c.compileTypeCast(tc); err != nil {
 			return llvm.Value{}, err
@@ -110,7 +132,7 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 		return llvm.Value{}, fmt.Errorf("getValue: compileTypeCast succeeded but value %d not cached", id)
 	}
 
-	// 6. Lazy compile if SideEffect
+	// 8. Lazy compile if SideEffect
 	if se, ok := valObj.(*ssa.SideEffect); ok {
 		if err := c.compileSideEffect(se); err != nil {
 			return llvm.Value{}, err
@@ -121,7 +143,7 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 		return llvm.Value{}, fmt.Errorf("getValue: compileSideEffect succeeded but value %d not cached", id)
 	}
 
-	// 7. Lazy compile if Make
+	// 9. Lazy compile if Make
 	if mk, ok := valObj.(*ssa.Make); ok {
 		if err := c.compileMake(mk); err != nil {
 			return llvm.Value{}, err
@@ -132,7 +154,7 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 		return llvm.Value{}, fmt.Errorf("getValue: compileMake succeeded but value %d not cached", id)
 	}
 
-	// 8. Generic MemberCall
+	// 10. Generic MemberCall
 	if mc, ok := valObj.(ssa.MemberCall); ok && mc.IsMember() {
 		if err := c.compileMemberCall(valObj, mc); err != nil {
 			return llvm.Value{}, err
@@ -143,7 +165,7 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 		return llvm.Value{}, fmt.Errorf("getValue: compileMemberCall succeeded but value %d not cached", id)
 	}
 
-	// 9. Function values are materialized as i64 function pointers in the
+	// 11. Function values are materialized as i64 function pointers in the
 	// unified InvokeContext representation.
 	if ssaFn, ok := ssa.ToFunction(valObj); ok && ssaFn != nil {
 		llvmFn, _ := c.getOrDeclareLLVMFunction(ssaFn)
@@ -156,7 +178,7 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 		}
 	}
 
-	// 10. Return error if not found and not a constant
+	// 12. Return error if not found and not a constant
 	// This usually means we are referencing an instruction that hasn't been compiled yet
 	// (back-edge or dependency order issue) or not implemented.
 	return llvm.Value{}, fmt.Errorf("getValue: value %d (%T) not found (dependency missing?)", id, valObj)
@@ -198,6 +220,12 @@ func (c *Compiler) compileBinOp(inst *ssa.BinOp, resultID int64) error {
 		val = c.Builder.CreateZExt(c.Builder.CreateICmp(llvm.IntEQ, lhs, rhs, name), c.LLVMCtx.Int64Type(), name)
 	case ssa.OpNotEq:
 		val = c.Builder.CreateZExt(c.Builder.CreateICmp(llvm.IntNE, lhs, rhs, name), c.LLVMCtx.Int64Type(), name)
+	case ssa.OpIn:
+		spec, err := c.newRuntimeInDispatchSpec(inst)
+		if err != nil {
+			return err
+		}
+		return c.lowerResolvedContextCall(spec)
 	default:
 		return fmt.Errorf("unknown BinOp opcode: %v", inst.Op)
 	}

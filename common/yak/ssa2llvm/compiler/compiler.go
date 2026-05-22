@@ -194,6 +194,35 @@ func (c *Compiler) CompileFunction(fn *ssa.Function) error {
 		c.function.returnBlock = c.LLVMCtx.AddBasicBlock(llvmFn, fmt.Sprintf("yak_ret_%d", fn.GetId()))
 	}
 
+	// 3b. Pre-create all Phi nodes before compiling any block instructions.
+	// Other blocks may reference phis before their defining block is visited.
+	for _, blockID := range fn.Blocks {
+		val, ok := fn.GetValueById(blockID)
+		if !ok {
+			continue
+		}
+		blockObj, ok := val.(*ssa.BasicBlock)
+		if !ok || blockObj == nil {
+			continue
+		}
+		bb, ok := c.Blocks[blockID]
+		if !ok {
+			continue
+		}
+		c.Builder.SetInsertPointAtEnd(bb)
+		for _, phiID := range blockObj.Phis {
+			phiVal, ok := fn.GetValueById(phiID)
+			if !ok {
+				continue
+			}
+			if phi, ok := phiVal.(*ssa.Phi); ok {
+				if err := c.compilePhi(phi); err != nil {
+					return err
+				}
+			}
+		}
+	}
+
 	// 4. Compile Instructions in each Block
 	for _, blockID := range fn.Blocks {
 		bb, ok := c.Blocks[blockID]
@@ -213,21 +242,7 @@ func (c *Compiler) CompileFunction(fn *ssa.Function) error {
 			return fmt.Errorf("value %d is not a BasicBlock", blockID)
 		}
 
-		// First, create Phi nodes at the beginning of the block
-		for _, phiID := range blockObj.Phis {
-			phiVal, ok := fn.GetValueById(phiID)
-			if !ok {
-				continue
-			}
-			if phi, ok := phiVal.(*ssa.Phi); ok {
-				if err := c.compilePhi(phi); err != nil {
-					return err
-				}
-			}
-		}
-
-		// Bind parameters from InvokeContext after phi nodes, to keep entry-block
-		// phi ordering valid for LLVM IR.
+		// First, phi nodes were pre-created in a function-wide pass.
 		if blockID == fn.EnterBlock {
 			if err := c.bindParamsFromContext(fn); err != nil {
 				return err
