@@ -155,25 +155,14 @@ func (c *Compiler) compileParameterMember(inst *ssa.ParameterMember) error {
 		return fmt.Errorf("ParameterMember %s has no function", inst.GetName())
 	}
 
-	var parentID int64
-	switch inst.MemberCallKind {
-	case ssa.ParameterMemberCall:
-		if inst.MemberCallObjectIndex >= len(fn.Params) {
-			return fmt.Errorf("ParameterMember index %d out of bounds (params len %d)", inst.MemberCallObjectIndex, len(fn.Params))
-		}
-		parentID = fn.Params[inst.MemberCallObjectIndex]
-	case ssa.MoreParameterMember:
-		if inst.MemberCallObjectIndex >= len(fn.ParameterMembers) {
-			return fmt.Errorf("MoreParameterMember index %d out of bounds", inst.MemberCallObjectIndex)
-		}
-		parentID = fn.ParameterMembers[inst.MemberCallObjectIndex]
-	default:
-		return fmt.Errorf("unsupported ParameterMember kind: %v", inst.MemberCallKind)
+	parentID, err := c.resolveParameterMemberParentID(fn, inst)
+	if err != nil {
+		return err
 	}
 
-	parentVal, ok := c.Values[parentID]
-	if !ok {
-		return fmt.Errorf("parent value %d not found for ParameterMember %s", parentID, inst.GetName())
+	parentVal, err := c.getValue(inst, parentID)
+	if err != nil {
+		return fmt.Errorf("parent value %d for ParameterMember %s: %w", parentID, inst.GetName(), err)
 	}
 
 	keyID := inst.MemberCallKey
@@ -189,12 +178,45 @@ func (c *Compiler) compileParameterMember(inst *ssa.ParameterMember) error {
 	return nil
 }
 
+func (c *Compiler) resolveParameterMemberParentID(fn *ssa.Function, inst *ssa.ParameterMember) (int64, error) {
+	if fn == nil || inst == nil {
+		return 0, fmt.Errorf("resolveParameterMemberParentID: missing function or parameter member")
+	}
+
+	switch inst.MemberCallKind {
+	case ssa.ParameterMemberCall:
+		if inst.MemberCallObjectIndex >= len(fn.Params) {
+			return 0, fmt.Errorf("ParameterMember index %d out of bounds (params len %d)", inst.MemberCallObjectIndex, len(fn.Params))
+		}
+		return fn.Params[inst.MemberCallObjectIndex], nil
+	case ssa.MoreParameterMember:
+		if inst.MemberCallObjectIndex >= len(fn.ParameterMembers) {
+			return 0, fmt.Errorf("MoreParameterMember index %d out of bounds", inst.MemberCallObjectIndex)
+		}
+		return fn.ParameterMembers[inst.MemberCallObjectIndex], nil
+	case ssa.FreeValueMemberCall:
+		for variable, id := range fn.FreeValues {
+			if variable != nil && variable.GetName() == inst.MemberCallObjectName {
+				return id, nil
+			}
+		}
+		return 0, fmt.Errorf("free value %q not found for ParameterMember %s", inst.MemberCallObjectName, inst.GetName())
+	default:
+		return 0, fmt.Errorf("unsupported ParameterMember kind: %v", inst.MemberCallKind)
+	}
+}
+
 // compileMemberCall handles generic member access (MemberCall interface)
 func (c *Compiler) compileMemberCall(val ssa.Value, mc ssa.MemberCall) error {
 	obj := mc.GetObject()
 	key := mc.GetKey()
 
 	if obj == nil {
+		if _, ok := val.(*ssa.Undefined); ok {
+			zero := llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)
+			c.Values[val.GetId()] = zero
+			return nil
+		}
 		return fmt.Errorf("compileMemberCall: object is nil for value %d", val.GetId())
 	}
 
