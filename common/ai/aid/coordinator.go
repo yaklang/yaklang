@@ -307,12 +307,6 @@ func NewCoordinatorContext(ctx context.Context, userInput string, options ...aic
 	if err := c.loadToolsViaOptions(); err != nil {
 		return nil, utils.Errorf("coordinator: load tools (post-init) failed: %v", err)
 	}
-	if config.GetEmitter() != nil {
-		_, _ = config.GetEmitter().EmitSystemStructured(
-			aicommon.CapabilityInventoryNodeID,
-			aicommon.BuildBaseCapabilityInventoryPayload(config),
-		)
-	}
 	c.CreateDatabaseSchema(c.userInput)
 	return c, nil
 }
@@ -363,12 +357,23 @@ func (c *Coordinator) CallAITransaction(prompt string, postHandler func(response
 	}, requestOpts...)
 }
 
+func (c *Coordinator) emitBaseCapabilityInventory() {
+	if c == nil || c.Config == nil || c.GetEmitter() == nil {
+		return
+	}
+	_, _ = c.GetEmitter().EmitSystemStructured(
+		aicommon.CapabilityInventoryNodeID,
+		aicommon.BuildBaseCapabilityInventoryPayload(c.Config),
+	)
+}
+
 func (c *Coordinator) Run() error {
 	c.planLoadingStatus("初始化 / Initializing...")
 	defer c.planLoadingStatus("end")
 
 	c.registerPEModeInputEventCallback()
 	c.EmitCurrentConfigInfo()
+	c.emitBaseCapabilityInventory()
 
 	executeRoot := func(root *AiTask, startTaskIndex string) error {
 		// Phase 6: Executing tasks
