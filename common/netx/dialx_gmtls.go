@@ -30,20 +30,20 @@ var (
 
 // gmtlsCipherSuiteDialAttempts 返回国密握手每轮 ClientHello 的套件列表。
 // - 已设置 CipherSuites：仅一轮（用户指定）
-// - 默认：一轮、四套全开（与 gmtls 默认 getCipherSuites 一致）
-// - 兼容模式：三轮 ECC×2 → ECDHE×2 → 四套（部分站点需避免首轮同时提供 ECDHE）
-func gmtlsCipherSuiteDialAttempts(base *gmtls.Config, compatMode bool) [][]uint16 {
+// - 关闭兼容模式（DisableCompat=true）：一轮、四套全开
+// - 兼容模式（默认）：三轮 四套 → ECC×2 → ECDHE×2（首轮全发提高一次握手成功率）
+func gmtlsCipherSuiteDialAttempts(base *gmtls.Config, disableCompat bool) [][]uint16 {
 	if len(base.CipherSuites) > 0 {
 		return [][]uint16{base.CipherSuites}
 	}
-	if compatMode {
-		return [][]uint16{
-			eccGMTLSCipherSuitesCompat,
-			ecdheGMTLSCipherSuitesCompat,
-			allGMTLSCipherSuites,
-		}
+	if disableCompat {
+		return [][]uint16{allGMTLSCipherSuites}
 	}
-	return [][]uint16{allGMTLSCipherSuites}
+	return [][]uint16{
+		allGMTLSCipherSuites,
+		eccGMTLSCipherSuitesCompat,
+		ecdheGMTLSCipherSuitesCompat,
+	}
 }
 
 func shouldRetryGMTLSWithOtherCipherSuites(err error) bool {
@@ -66,8 +66,8 @@ func dialTLSWithGMTLSCipherFallback(
 	sni string,
 	tlsTimeout time.Duration,
 	clientHelloSpec *utls.ClientHelloSpec,
-) (net.Conn, error) {
-	attempts := gmtlsCipherSuiteDialAttempts(baseConfig, config.GMTLSCompatMode)
+) (net.Conn, time.Duration, error) {
+	attempts := gmtlsCipherSuiteDialAttempts(baseConfig, config.GMTLSDisableCompatMode)
 	var lastErr error
 
 	for i, cipherSuites := range attempts {
@@ -81,12 +81,14 @@ func dialTLSWithGMTLSCipherFallback(
 
 		conn, err := dialPlainTCPConnWithRetry(target, config)
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 
+		startUpgrade := time.Now()
 		tlsConn, err := UpgradeToTLSConnectionWithTimeout(conn, sni, tempTlsConfig, tlsTimeout, clientHelloSpec, config.TLSNextProto...)
+		handshakeDur := time.Since(startUpgrade)
 		if err == nil {
-			return tlsConn, nil
+			return tlsConn, handshakeDur, nil
 		}
 		lastErr = err
 		_ = conn.Close()
@@ -100,5 +102,5 @@ func dialTLSWithGMTLSCipherFallback(
 		}
 	}
 
-	return nil, lastErr
+	return nil, 0, lastErr
 }

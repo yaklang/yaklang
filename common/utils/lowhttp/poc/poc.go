@@ -111,7 +111,7 @@ type PocConfig struct {
 	GmTLSOnly                  bool
 	GmTLSPrefer                bool
 	GmTLSCipherSuites          []uint16
-	GmTLSCompatMode            bool
+	GmTLSDisableCompatMode     bool
 
 	// random chunked
 	EnableRandomChunked bool
@@ -272,8 +272,8 @@ func (c *PocConfig) ToLowhttpOptions() []lowhttp.LowhttpOpt {
 		}
 		opts = append(opts, lowhttp.WithGmTLSCipherSuite(suiteIDs...))
 	}
-	if c.GmTLSCompatMode {
-		opts = append(opts, lowhttp.WithGmTLSCompatMode(true))
+	if c.GmTLSDisableCompatMode {
+		opts = append(opts, lowhttp.WithGmTLSDisableCompatMode())
 	}
 	if c.EnableRandomChunked {
 		opts = append(opts, lowhttp.WithEnableRandomChunked(c.EnableRandomChunked))
@@ -2128,15 +2128,20 @@ func WithGmTLSCipherSuite(suites ...int) PocConfigOption {
 	}
 }
 
-// WithGmTLSCompatMode 开启国密兼容模式（默认关闭：单次 ClientHello 提供四套套件）。
-// 适用于服务端在「四套同发」时会误选 ECDHE 的站点（如部分银行 GM 网关）。
+// WithGmTLSDisableCompatMode 关闭国密兼容模式；不传参等价于 true（仅单次四套）。
 // Example:
 // ```
-// poc.Get(url, poc.gmTLS(true), poc.gmTLSCompatMode(true))
+// poc.Get(url, poc.gmTLS(true)) // 默认兼容模式开启
+// poc.Get(url, poc.gmTLS(true), poc.gmTLSDisableCompatMode()) // 关闭兼容
+// poc.Get(url, poc.gmTLS(true), poc.gmTLSDisableCompatMode(false)) // 显式保持兼容开启
 // ```
-func WithGmTLSCompatMode(b bool) PocConfigOption {
+func WithGmTLSDisableCompatMode(disable ...bool) PocConfigOption {
+	v := true
+	if len(disable) > 0 {
+		v = disable[0]
+	}
 	return func(c *PocConfig) {
-		c.GmTLSCompatMode = b
+		c.GmTLSDisableCompatMode = v
 	}
 }
 
@@ -2514,7 +2519,7 @@ var PoCExports = map[string]interface{}{
 	"gmTlsOnly":            WithGmTlsOnly,
 	"gmTLSPrefer":          WithGmTLSPrefer,
 	"gmTLSCipherSuite":     WithGmTLSCipherSuite,
-	"gmTLSCompatMode":           WithGmTLSCompatMode,
+	"gmTLSDisableCompatMode":    WithGmTLSDisableCompatMode,
 	"fixQueryEscape":       WithFixQueryEscape,
 	// download options
 	"downloadProgress": WithDownloadProgress,
