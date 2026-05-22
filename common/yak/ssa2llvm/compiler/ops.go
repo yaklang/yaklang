@@ -80,6 +80,13 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 	if !ok {
 		return llvm.Value{}, fmt.Errorf("getValue: value %d not found in function", id)
 	}
+	if inst, ok := valObj.(ssa.Instruction); ok && inst.IsLazy() {
+		if self := inst.Self(); self != nil {
+			if materialized, ok := self.(ssa.Value); ok && materialized != nil {
+				valObj = materialized
+			}
+		}
+	}
 
 	// 3. Lazy compile if ConstInst
 	if constInst, ok := valObj.(*ssa.ConstInst); ok {
@@ -165,7 +172,10 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 
 	// 10. Lazy compile if BinOp
 	if binOp, ok := valObj.(*ssa.BinOp); ok {
-		if err := c.compileBinOp(binOp, id); err != nil {
+		err := c.withLazyCompileInsertPoint(contextInst, binOp, func() error {
+			return c.compileBinOp(binOp, id)
+		})
+		if err != nil {
 			return llvm.Value{}, err
 		}
 		if val, ok := c.Values[id]; ok {
@@ -176,7 +186,10 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 
 	// 11. Lazy compile if Call
 	if callInst, ok := valObj.(*ssa.Call); ok {
-		if err := c.compileCall(callInst); err != nil {
+		err := c.withLazyCompileInsertPoint(contextInst, callInst, func() error {
+			return c.compileCall(callInst)
+		})
+		if err != nil {
 			return llvm.Value{}, err
 		}
 		if val, ok := c.Values[id]; ok {
@@ -187,7 +200,10 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 
 	// 12. Lazy compile if UnOp
 	if unOp, ok := valObj.(*ssa.UnOp); ok {
-		if err := c.compileUnOp(unOp, id); err != nil {
+		err := c.withLazyCompileInsertPoint(contextInst, unOp, func() error {
+			return c.compileUnOp(unOp, id)
+		})
+		if err != nil {
 			return llvm.Value{}, err
 		}
 		if val, ok := c.Values[id]; ok {
@@ -198,7 +214,10 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 
 	// 13. Lazy compile if Next
 	if next, ok := valObj.(*ssa.Next); ok {
-		if err := c.compileNext(next); err != nil {
+		err := c.withLazyCompileInsertPoint(contextInst, next, func() error {
+			return c.compileNext(next)
+		})
+		if err != nil {
 			return llvm.Value{}, err
 		}
 		if val, ok := c.Values[id]; ok {
@@ -209,7 +228,11 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 
 	// 14. Generic MemberCall
 	if mc, ok := valObj.(ssa.MemberCall); ok && mc.IsMember() {
-		if err := c.compileMemberCall(valObj, mc); err != nil {
+		targetInst, _ := valObj.(ssa.Instruction)
+		err := c.withLazyCompileInsertPoint(contextInst, targetInst, func() error {
+			return c.compileMemberCall(valObj, mc)
+		})
+		if err != nil {
 			return llvm.Value{}, err
 		}
 		if val, ok := c.Values[id]; ok {
