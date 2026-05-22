@@ -48,11 +48,15 @@ Optional Parameters:
   file-size-max   (int)     Maximum file size in bytes. Files larger than this are skipped entirely.
                             Default: 2000000000 (2GB). Set to a smaller value for faster scans.
   context-buffer  (int)     Number of bytes of surrounding context to show around each match.
-                            Default: 0: each result is reported as "filepath:lineNo: full line content"
-                            (standard grep-style output — the entire matching line is always shown).
-                            When > 0, the tool additionally extracts [match_start - context_buffer,
-                            match_end + context_buffer] bytes as a raw snippet around the match.
+                            Default: 0: each result is reported as "filepath:lineNo: line content"
+                            (see max-line-chars for minified one-line JS).
+                            When > 0, each result is a raw snippet
+                            [match_start - context_buffer, match_end + context_buffer] only (not full line).
                             (Only effective in "content" output-mode.)
+  max-line-chars   (int)    Max bytes shown for the text after "filepath:lineNo:" when context-buffer is 0.
+                            Long logical lines (e.g. minified JS as one line) are shown as a centered
+                            snippet around the match, with "..." when truncated. Default: 2048.
+                            Set to 0 for unlimited (may print megabyte-long "lines").
   exclude         (string)  Comma-separated list of directory/file names to exclude.
                             Each name is checked against EVERY component of the file path.
                             For example, "node_modules,.git" will skip any file whose path contains
@@ -91,6 +95,7 @@ maxResult := cli.Int("limit", cli.setHelp("max results to return; default 50 for
 offsetResultCount := cli.Int("offset", cli.setHelp("skip how many first match"), cli.setDefault(0))
 fileSizeLimit = cli.Int("file-size-max", cli.setHelp("limit for file size, if the file is too large, stop it auto"), cli.setDefault(1000 * 1000 * 1000 * 2)) // 2G
 contextBuffer := cli.Int("context-buffer", cli.setHelp("Show (or display) a certain number of bytes of context around the matching text, default 0 is for not show"), cli.setDefault(0))
+maxLineChars := cli.Int("max-line-chars", cli.setHelp("when context-buffer is 0, max bytes of line/snippet to show per hit (0=unlimited). Long lines get a centered snippet around the match"), cli.setDefault(2048))
 excludeRaw := cli.String("exclude", cli.setHelp("comma-separated list of directory/file names to exclude from scanning"), cli.setDefault(".git,.svn,.hg,node_modules,__pycache__,.DS_Store,.idea,.vscode,.next,.nuxt,.cache"))
 includeRaw := cli.String("include", cli.setHelp("comma-separated list of file name substrings to include (whitelist)"), cli.setDefault(""))
 excludeExtRaw := cli.String("exclude-ext", cli.setHelp("comma-separated list of file extensions to exclude (e.g. '.pyc,.o,.so')"), cli.setDefault(""))
@@ -232,7 +237,7 @@ yakit.Info("pattern-mode: %v", matchMode)
 if filesOnlyMode {
     yakit.Info("output-mode: files_with_matches")
 }
-yakit.Info("limit: %v, offset: %v, context-buffer: %v", maxResult, offsetResultCount, contextBuffer)
+yakit.Info("limit: %v, offset: %v, context-buffer: %v, max-line-chars: %v", maxResult, offsetResultCount, contextBuffer, maxLineChars)
 if len(excludeNames) > 0 {
     yakit.Info("exclude: %v", excludeRaw)
 }
@@ -280,25 +285,22 @@ end = false
 // Maximum number of matches to log individually via yakit.Info IPC
 // to avoid flooding the IPC channel (each yakit.Info is a network round-trip).
 maxIPCLogCount = 20
-currentOriginalContent = ""
-currentTargetFile = ""
 
-// countLineNumber returns the 1-based line number of the byte at position byteOffset
-// within content (a string). It counts '\n' characters before byteOffset.
-countLineNumber = (content, byteOffset) => {
-    if byteOffset <= 0 {
-        return 1
+// advanceLineState counts newlines in content[from:until] and returns (newLineNo, newFrom).
+// Uses native str.Count instead of a Yak byte loop (huge win on MB-scale gaps between matches).
+advanceLineState = (content, from, until, lineNo) => {
+    n = len(content)
+    if until > n {
+        until = n
     }
-    if byteOffset > len(content) {
-        byteOffset = len(content)
+    if from < 0 {
+        from = 0
     }
-    lineNo = 1
-    for i := 0; i < byteOffset; i++ {
-        if content[i] == '\n' {
-            lineNo++
-        }
+    if from >= until {
+        return lineNo, until
     }
-    return lineNo
+    lineNo = lineNo + str.Count(content[from:until], "\n")
+    return lineNo, until
 }
 
 // extractLine returns the full text of the line that contains byteOffset (without trailing newline).
@@ -309,56 +311,109 @@ extractLine = (content, byteOffset) => {
     if byteOffset >= len(content) {
         byteOffset = len(content) - 1
     }
-    // find line start
-    lineStart = byteOffset
-    for lineStart > 0 && content[lineStart-1] != '\n' {
-        lineStart--
-    }
-    // find line end
-    lineEnd = byteOffset
-    for lineEnd < len(content) && content[lineEnd] != '\n' {
-        lineEnd++
-    }
+    head = content[:byteOffset]
+    li = str.LastIndex(head, "\n")
+    lineStart = li >= 0 ? li + 1 : 0
+    tail = content[byteOffset:]
+    ri = str.Index(tail, "\n")
+    lineEnd = ri < 0 ? len(content) : byteOffset + ri
     return str.TrimRight(content[lineStart:lineEnd], "\r")
 }
 
-collectMatchPreview = (offset, offsetEnd) => {
-    if contextBuffer > 0 {
-        return
-    }
+// Max distance from the match when searching for a newline. Stops minified single-line files
+// from scanning megabytes left/right just to find logical line boundaries.
+lineBoundaryProbe = 128 * 1024
 
-    m.Lock()
-    defer m.Unlock()
+// extractLineCapped finds [lineStart, lineEnd) of the logical line at byteOffset, but only walks
+// at most maxLeft / maxRight bytes from byteOffset when looking for '\n'.
+extractLineCapped = (content, byteOffset, maxLeft, maxRight) => {
+    leftLim = byteOffset - maxLeft
+    if leftLim < 0 {
+        leftLim = 0
+    }
+    segL = content[leftLim:byteOffset]
+    li = str.LastIndex(segL, "\n")
+    lineStart = li >= 0 ? leftLim + li + 1 : leftLim
 
-    if count <= offsetResultCount || count > (maxResult + offsetResultCount) {
-        return
+    rightCap = byteOffset + maxRight
+    if rightCap > len(content) {
+        rightCap = len(content)
     }
-    if len(currentOriginalContent) <= 0 {
-        return
-    }
-    if offset < 0 {
-        offset = 0
-    }
-    if offsetEnd > len(currentOriginalContent) {
-        offsetEnd = len(currentOriginalContent)
-    }
-    if offsetEnd <= offset {
-        return
-    }
+    segR = content[byteOffset:rightCap]
+    ri = str.Index(segR, "\n")
+    lineEnd = ri >= 0 ? byteOffset + ri : rightCap
+    return lineStart, lineEnd
+}
 
-    lineNo = countLineNumber(currentOriginalContent, offset)
-    lineContent = extractLine(currentOriginalContent, offset)
-    entry = sprintf("%v:%v: %v", currentTargetFile, lineNo, lineContent)
-
-    displayCount = count - offsetResultCount
-    if displayCount <= maxIPCLogCount {
-        yakit.Info("  %v", entry)
+// snippetCenter returns at most maxChars bytes from segment, centered on [relMatchStart, relMatchEnd),
+// with "..." when the segment is longer than maxChars.
+snippetCenter = (segment, relMatchStart, relMatchEnd, maxChars) => {
+    segLen = len(segment)
+    matchLen = relMatchEnd - relMatchStart
+    if maxChars <= 0 || segLen <= maxChars {
+        return segment
     }
+    if matchLen >= maxChars {
+        take = maxChars - 6
+        if take < 1 {
+            take = maxChars
+        }
+        endPos = relMatchStart + take
+        if endPos > segLen {
+            endPos = segLen
+        }
+        if endPos <= relMatchStart {
+            return "...(match too long)..."
+        }
+        return "..." + segment[relMatchStart:endPos] + "..."
+    }
+    pad = maxChars - matchLen
+    leftPad = pad / 2
+    winS = relMatchStart - leftPad
+    if winS < 0 {
+        winS = 0
+    }
+    if winS + maxChars > segLen {
+        winS = segLen - maxChars
+        if winS < 0 {
+            winS = 0
+        }
+    }
+    winE = winS + maxChars
+    if winE > segLen {
+        winE = segLen
+    }
+    part = segment[winS:winE]
+    pre = winS > 0 ? "..." : ""
+    suf = winE < segLen ? "..." : ""
+    return pre + part + suf
+}
+
+// formatDisplayLine builds the human-readable fragment after "file:line:" for one hit.
+// When maxLineDisplay > 0, long logical lines (e.g. minified JS) are shown as a short snippet around the match.
+formatDisplayLine = (content, matchStart, matchEnd, maxLineDisplay) => {
+    if maxLineDisplay <= 0 {
+        return extractLine(content, matchStart)
+    }
+    lineStart, lineEnd = extractLineCapped(content, matchStart, lineBoundaryProbe, lineBoundaryProbe)
+    segment = content[lineStart:lineEnd]
+    relS = matchStart - lineStart
+    relE = matchEnd - lineStart
+    if relS < 0 {
+        relS = 0
+    }
+    if relE > len(segment) {
+        relE = len(segment)
+    }
+    if relE < relS {
+        relE = relS
+    }
+    return snippetCenter(segment, relS, relE, maxLineDisplay)
 }
 
 // output uses in-memory rawContent ([]byte) to extract context,
 // avoiding per-match file I/O and excessive yakit.File IPC calls.
-output = (targetFile, offset, offsetEnd, rawContent) => {
+output = (targetFile, offset, offsetEnd, rawContent, rawStr, lineNo) => {
     m.Lock()
     defer m.Unlock()
     count++
@@ -374,12 +429,17 @@ output = (targetFile, offset, offsetEnd, rawContent) => {
 
     displayCount = count - offsetResultCount
 
-    // Compute line number from byte offset for human-readable output
-    rawStr = string(rawContent)
-    lineNo = countLineNumber(rawStr, offset)
-
-    // Build match info string: "filepath:lineNo: matched line content"
-    lineContent = extractLine(rawStr, offset)
+    // Primary line text: default snippet for long logical lines (minified JS); context-buffer
+    // mode prefers full line unless it still exceeds max-line-chars.
+    lineContent = ""
+    if contextBuffer > 0 {
+        lineContent = extractLine(rawStr, offset)
+        if maxLineChars > 0 && len(lineContent) > maxLineChars {
+            lineContent = formatDisplayLine(rawStr, offset, offsetEnd, maxLineChars)
+        }
+    } else {
+        lineContent = formatDisplayLine(rawStr, offset, offsetEnd, maxLineChars)
+    }
     var msg
     msg = "%v:%v: %v" % [targetFile, lineNo, lineContent]
 
@@ -446,7 +506,12 @@ tryCompileRegexp = (subpattern) => {
 }
 
 scanMatches = (patternRe, targetFile, content, rawContent) => {
+    // One []byte→string per file per pattern; avoid repeating full-buffer conversion on every match.
+    rawStr = string(rawContent)
     searchBase = 0
+    // Incremental line tracking on rawStr (byte offsets align with content for regexp / ASCII substr paths).
+    lineScanPos = 0
+    lineNoAtScanPos = 1
     for {
         if end { return }
         if searchBase >= len(content) {
@@ -461,17 +526,21 @@ scanMatches = (patternRe, targetFile, content, rawContent) => {
 
         start = searchBase + match[0]
         finish = searchBase + match[1]
-        output(targetFile, start, finish, rawContent)
-        collectMatchPreview(start, finish)
+        lineNoAtScanPos, lineScanPos = advanceLineState(rawStr, lineScanPos, start, lineNoAtScanPos)
+        output(targetFile, start, finish, rawContent, rawStr, lineNoAtScanPos)
         if end { return }
 
-        // Skip to the start of the next line (bash grep reports each line at most once)
+        // Skip to the start of the next line (bash grep reports each line at most once).
+        // Use str.Index so newline search runs in native code (Yak byte loops on MB lines were very slow).
         nextBase = finish
-        for nextBase < len(content) && content[nextBase] != '\n' {
-            nextBase++
-        }
         if nextBase < len(content) {
-            nextBase++
+            tail = content[nextBase:]
+            ni = str.Index(tail, "\n")
+            if ni < 0 {
+                nextBase = len(content)
+            } else {
+                nextBase = nextBase + ni + 1
+            }
         }
         if nextBase <= searchBase {
             nextBase = searchBase + 1
@@ -482,8 +551,6 @@ scanMatches = (patternRe, targetFile, content, rawContent) => {
 
 handleRegexp = (subpattern, targetFile, content, rawContent) => {
     defer recover()
-    currentOriginalContent = content
-    currentTargetFile = targetFile
     subpatternRe, ok := tryCompileRegexp(subpattern)
     if !ok || subpatternRe == nil {
         handle(subpattern, targetFile, content, rawContent)
@@ -501,8 +568,6 @@ handle = (patternSubstr, targetFile, content, rawContent) => {
     }
 
     defer recover()
-    currentOriginalContent = content
-    currentTargetFile = targetFile
     patternRe := re.Compile(re.QuoteMeta(patternSubstr))~
     scanMatches(patternRe, targetFile, workingContent, rawContent)
 }
