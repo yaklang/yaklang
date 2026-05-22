@@ -500,7 +500,7 @@ func (r *ReActLoop) LoadingStatus(i string) {
 func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) (finalError error) {
 	r.loadingStatus("初始化 / initializing...")
 	if !r.noEndLoadingStatus {
-		defer r.loadingStatus("end")
+		defer r.loadingStatus("ReAct 任务结束 / ReAct task finished")
 	}
 	defer r.Release()
 
