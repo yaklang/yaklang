@@ -163,7 +163,51 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 		return llvm.Value{}, fmt.Errorf("getValue: compileMake succeeded but value %d not cached", id)
 	}
 
-	// 10. Generic MemberCall
+	// 10. Lazy compile if BinOp
+	if binOp, ok := valObj.(*ssa.BinOp); ok {
+		if err := c.compileBinOp(binOp, id); err != nil {
+			return llvm.Value{}, err
+		}
+		if val, ok := c.Values[id]; ok {
+			return val, nil
+		}
+		return llvm.Value{}, fmt.Errorf("getValue: compileBinOp succeeded but value %d not cached", id)
+	}
+
+	// 11. Lazy compile if Call
+	if callInst, ok := valObj.(*ssa.Call); ok {
+		if err := c.compileCall(callInst); err != nil {
+			return llvm.Value{}, err
+		}
+		if val, ok := c.Values[id]; ok {
+			return val, nil
+		}
+		return llvm.Value{}, fmt.Errorf("getValue: compileCall succeeded but value %d not cached", id)
+	}
+
+	// 12. Lazy compile if UnOp
+	if unOp, ok := valObj.(*ssa.UnOp); ok {
+		if err := c.compileUnOp(unOp, id); err != nil {
+			return llvm.Value{}, err
+		}
+		if val, ok := c.Values[id]; ok {
+			return val, nil
+		}
+		return llvm.Value{}, fmt.Errorf("getValue: compileUnOp succeeded but value %d not cached", id)
+	}
+
+	// 13. Lazy compile if Next
+	if next, ok := valObj.(*ssa.Next); ok {
+		if err := c.compileNext(next); err != nil {
+			return llvm.Value{}, err
+		}
+		if val, ok := c.Values[id]; ok {
+			return val, nil
+		}
+		return llvm.Value{}, fmt.Errorf("getValue: compileNext succeeded but value %d not cached", id)
+	}
+
+	// 14. Generic MemberCall
 	if mc, ok := valObj.(ssa.MemberCall); ok && mc.IsMember() {
 		if err := c.compileMemberCall(valObj, mc); err != nil {
 			return llvm.Value{}, err
@@ -174,7 +218,7 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 		return llvm.Value{}, fmt.Errorf("getValue: compileMemberCall succeeded but value %d not cached", id)
 	}
 
-	// 11. Function values are materialized as i64 function pointers in the
+	// 15. Function values are materialized as i64 function pointers in the
 	// unified InvokeContext representation.
 	if ssaFn, ok := ssa.ToFunction(valObj); ok && ssaFn != nil {
 		llvmFn, _ := c.getOrDeclareLLVMFunction(ssaFn)
@@ -187,7 +231,7 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 		}
 	}
 
-	// 12. Return error if not found and not a constant
+	// 16. Return error if not found and not a constant
 	// This usually means we are referencing an instruction that hasn't been compiled yet
 	// (back-edge or dependency order issue) or not implemented.
 	return llvm.Value{}, fmt.Errorf("getValue: value %d (%T) not found (dependency missing?)", id, valObj)
