@@ -163,6 +163,28 @@ func runtimeDispatchNext(args []uint64) (int64, error) {
 	return int64(uintptr(newRuntimeShadow(result))), nil
 }
 
+func runtimeDispatchChanRecv(args []uint64) (int64, error) {
+	if len(args) < 1 {
+		return 0, fmt.Errorf("chan recv expects channel argument")
+	}
+	value := runtimeDecodeIterValue(args[0])
+	rv := reflect.ValueOf(value)
+	for rv.IsValid() && rv.Kind() == reflect.Interface {
+		if rv.IsNil() {
+			return 0, nil
+		}
+		rv = rv.Elem()
+	}
+	if !rv.IsValid() || rv.Kind() != reflect.Chan {
+		return 0, fmt.Errorf("chan recv on non-channel %T", value)
+	}
+	recv, ok := rv.Recv()
+	if !ok {
+		return 0, nil
+	}
+	return runtimeValueToInt64(recv), nil
+}
+
 func runtimeMatchInContainer(left, right any) bool {
 	if left == nil || right == nil {
 		return false

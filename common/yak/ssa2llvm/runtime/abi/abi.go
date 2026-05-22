@@ -129,6 +129,9 @@ const (
 
 	// Membership test for `x in y`.
 	IDRuntimeIn FuncID = 25
+
+	// Channel receive for `<-ch`.
+	IDRuntimeChanRecv FuncID = 26
 )
 
 type SliceElemKind int64
