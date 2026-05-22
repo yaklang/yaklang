@@ -5,6 +5,7 @@ import (
 
 	"github.com/yaklang/go-llvm"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/abi"
 )
 
 func (c *Compiler) compileUnOp(inst *ssa.UnOp, resultID int64) error {
@@ -30,6 +31,26 @@ func (c *Compiler) compileUnOp(inst *ssa.UnOp, resultID int64) error {
 	case ssa.OpBitwiseNot:
 		minusOne := llvm.ConstInt(i64, ^uint64(0), true)
 		val = c.Builder.CreateXor(x, minusOne, name)
+	case ssa.OpChan:
+		spec := contextCallSpec{
+			inst: inst,
+			kind: abi.KindDispatch,
+			target: llvm.ConstInt(
+				c.LLVMCtx.Int64Type(),
+				uint64(abi.IDRuntimeChanRecv),
+				false,
+			),
+			args: []contextCallArg{
+				{value: x, tagPointerArg: true},
+			},
+			ctxName:   "yak_chan_recv_ctx",
+			errPrefix: "emitRuntimeChanRecv",
+		}
+		result, err := c.emitContextCall(spec)
+		if err != nil {
+			return err
+		}
+		val = c.coerceToInt64(result)
 	default:
 		return fmt.Errorf("compileUnOp: unsupported opcode %v", inst.Op)
 	}
