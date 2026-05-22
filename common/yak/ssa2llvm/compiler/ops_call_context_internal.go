@@ -11,7 +11,7 @@ import (
 const yakTaggedPointerMask uint64 = 1 << 62
 
 type contextCallSpec struct {
-	inst      *ssa.Call
+	inst      ssa.Instruction
 	kind      uint64
 	target    llvm.Value
 	args      []contextCallArg
@@ -43,7 +43,7 @@ func (c *Compiler) emitRuntimeInvoke(ctxI8 llvm.Value) {
 	c.Builder.CreateCall(invokeType, invokeFn, []llvm.Value{ctxI8}, "")
 }
 
-func (c *Compiler) resolveContextCallArg(inst *ssa.Call, argID int64, tagPointerArgs bool) (llvm.Value, llvm.Value, error) {
+func (c *Compiler) resolveContextCallArg(inst ssa.Instruction, argID int64, tagPointerArgs bool) (llvm.Value, llvm.Value, error) {
 	argVal, err := c.resolveSSAValueAsInt64(inst, argID, "yak_ctx_fn")
 	if err != nil {
 		return llvm.Value{}, llvm.Value{}, err
@@ -72,7 +72,7 @@ func (c *Compiler) resolveContextCallArg(inst *ssa.Call, argID int64, tagPointer
 	return argI64, root, nil
 }
 
-func (c *Compiler) resolveContextCallArgValue(inst *ssa.Call, arg contextCallArg) (llvm.Value, llvm.Value, error) {
+func (c *Compiler) resolveContextCallArgValue(inst ssa.Instruction, arg contextCallArg) (llvm.Value, llvm.Value, error) {
 	if arg.ssaID > 0 {
 		return c.resolveContextCallArg(inst, arg.ssaID, arg.tagPointerArg)
 	}
@@ -151,13 +151,16 @@ func (c *Compiler) emitContextCall(spec contextCallSpec) (llvm.Value, error) {
 	return c.coerceToInt64(ret), nil
 }
 
-func (c *Compiler) finishContextCall(inst *ssa.Call, result llvm.Value) error {
+func (c *Compiler) finishContextCall(inst ssa.Instruction, result llvm.Value) error {
 	if inst == nil || inst.GetId() <= 0 {
 		return nil
 	}
 	result = c.coerceToInt64(result)
 	c.Values[inst.GetId()] = result
-	return c.maybeEmitMemberSet(inst, inst, result)
+	if val, ok := inst.(ssa.Value); ok {
+		return c.maybeEmitMemberSet(inst, val, result)
+	}
+	return nil
 }
 
 func (c *Compiler) lowerResolvedContextCall(spec contextCallSpec) error {

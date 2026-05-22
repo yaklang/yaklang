@@ -16,6 +16,27 @@ func Import(mod string, v interface{}) {
 	yaklangLibs[mod] = v
 }
 
+// HasModule reports whether a yaklang module name was registered.
+func HasModule(mod string) bool {
+	_, ok := yaklangLibs[mod]
+	return ok
+}
+
+// LookupExport resolves a yaklang module export by name.
+func LookupExport(mod, name string) (any, bool) {
+	table, ok := yaklangLibs[mod]
+	if !ok || table == nil {
+		return nil, false
+	}
+	switch exports := table.(type) {
+	case map[string]interface{}:
+		fn, ok := exports[name]
+		return fn, ok
+	default:
+		return nil, false
+	}
+}
+
 // -----------------------------------------------------------------------------
 
 func IsNew() bool {
