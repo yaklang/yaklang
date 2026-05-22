@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["@action", "suggestion", "reason"],
+  "properties": {
+    "@action": {
+      "const": "plan_review"
+    },
+    "suggestion": {
+      "description": "Your review decision",
+      "type": "string",
+      "enum": ["continue", "unclear", "incomplete", "create-subtask"]
+    },
+    "reason": {
+      "description": "Brief explanation for your decision: what is good/bad about the plan, why you chose this suggestion",
+      "type": "string"
+    }
+  }
+}

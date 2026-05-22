@@ -9,7 +9,6 @@ import (
 	"io"
 	"runtime"
 	"strings"
-	"text/template"
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -27,6 +26,15 @@ type PlanningReviewControl func(ctx context.Context, config *Config, ep *Endpoin
 //go:embed prompts/review/ai-review-plan.txt
 var aiPlanReviewPromptTemplate string
 
+//go:embed prompts/review/ai-review-plan_instruction.txt
+var aiPlanReviewInstructionTemplate string
+
+//go:embed prompts/review/ai-review-plan_schema.json
+var aiPlanReviewSchemaTemplate string
+
+//go:embed prompts/review/ai-review-plan_output_example.txt
+var aiPlanReviewOutputExampleTemplate string
+
 //go:embed prompts/review/ai-review-task.txt
 var aiTaskReviewPromptTemplate string
 
@@ -40,14 +48,9 @@ var aiTaskReviewOutputExampleTemplate string
 var aiTaskReviewSchemaTemplate string
 
 type PlanReviewPromptData struct {
-	CurrentTime      string
-	OSArch           string
-	WorkingDir       string
-	WorkingDirGlance string
-	Timeline         string
-	Nonce            string
-	PlanDetails      string
-	Language         string
+	Nonce       string
+	PlanDetails string
+	Language    string
 }
 
 type TaskReviewPromptData struct {
@@ -65,23 +68,9 @@ type TaskReviewPromptData struct {
 }
 
 func generatePlanReviewPrompt(config *Config, materials aitool.InvokeParams) (string, error) {
-	// CurrentTime 用分钟粒度: 让 BACKGROUND 段在分钟内多次调用时字节稳定,
-	// 配合 PROMPT_SECTION_semi-dynamic 包装使 prefix cache 能命中。
-	// 关键词: aicache 分钟粒度时间戳, semi-dynamic 稳定哈希
 	data := &PlanReviewPromptData{
-		CurrentTime: time.Now().Format("2006-01-02 15:04"),
-		OSArch:      fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
-		Nonce:       utils.RandStringBytes(4),
-		Language:    config.Language,
-	}
-
-	data.WorkingDir = config.Workdir
-	if data.WorkingDir != "" {
-		data.WorkingDirGlance = filesys.Glance(data.WorkingDir)
-	}
-
-	if t := config.GetTimeline(); t != nil {
-		data.Timeline = t.Dump()
+		Nonce:    utils.RandStringBytes(4),
+		Language: config.Language,
 	}
 
 	if !utils.IsNil(materials) {
@@ -100,16 +89,34 @@ func generatePlanReviewPrompt(config *Config, materials aitool.InvokeParams) (st
 		}
 	}
 
-	tmpl, err := template.New("plan-review").Parse(aiPlanReviewPromptTemplate)
-	if err != nil {
-		return "", fmt.Errorf("error parsing plan review template: %w", err)
-	}
+	frozenOpen := BuildPromptFrozenOpenMaterials(config)
 
-	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, data); err != nil {
-		return "", fmt.Errorf("error executing plan review template: %w", err)
+	workingDir := config.Workdir
+	var workingDirGlance string
+	if workingDir != "" {
+		workingDirGlance = filesys.Glance(workingDir)
 	}
-	return buf.String(), nil
+	osArch := fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)
+
+	prefixMaterials := &PromptMaterials{
+		TaskInstruction:  strings.TrimSpace(aiPlanReviewInstructionTemplate),
+		Schema:           strings.TrimSpace(aiPlanReviewSchemaTemplate),
+		OutputExample:    strings.TrimSpace(aiPlanReviewOutputExampleTemplate),
+		CurrentTime:      time.Now().Format("2006-01-02 15:04"),
+		OSArch:           osArch,
+		WorkingDir:       workingDir,
+		WorkingDirGlance: workingDirGlance,
+		Workspace:        strings.TrimSpace(osArch+workingDir+workingDirGlance) != "",
+	}
+	ApplyPromptFrozenOpenMaterials(prefixMaterials, frozenOpen)
+
+	return NewDefaultPromptPrefixBuilder().AssemblePromptWithDynamicSection(
+		prefixMaterials,
+		"plan-review-dynamic",
+		aiPlanReviewPromptTemplate,
+		data,
+		data.Nonce,
+	)
 }
 
 func generateTaskReviewPrompt(config *Config, materials aitool.InvokeParams) (string, error) {
