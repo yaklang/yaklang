@@ -178,13 +178,32 @@ func BuildCallFrameArgIDs(program *ssa.Program, call *ssa.Call, calleeFn *ssa.Fu
 				argIDs = append(argIDs, zero)
 			}
 		case FrameInputFreeValue:
+			resolved := false
+			name := ""
 			if input.Variable != nil {
-				if actualID, ok := call.Binding[input.Variable.GetName()]; ok && actualID > 0 {
-					argIDs = append(argIDs, actualID)
-					continue
+				name = input.Variable.GetName()
+			}
+			callerFn := call.GetFunc()
+			if name != "" && callerFn != nil {
+				if actualID, ok := call.Binding[name]; ok && actualID > 0 {
+					if _, exists := callerFn.GetValueById(actualID); exists {
+						argIDs = append(argIDs, actualID)
+						resolved = true
+					}
+				}
+				if !resolved {
+					for variable, valueID := range callerFn.FreeValues {
+						if variable != nil && variable.GetName() == name && valueID > 0 {
+							argIDs = append(argIDs, valueID)
+							resolved = true
+							break
+						}
+					}
 				}
 			}
-			argIDs = append(argIDs, zero)
+			if !resolved {
+				argIDs = append(argIDs, zero)
+			}
 		default:
 			argIDs = append(argIDs, zero)
 		}
