@@ -40,68 +40,47 @@ func TestGRPCMUSTPASS_HTTPFuzzer_History_Detail(t *testing.T) {
 	}
 
 	t.Run("single request", func(t *testing.T) {
-		var success bool
-		var lastErr error
+		client, err := c.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
+			Request: `GET /?c=1 HTTP/1.1
+Host: ` + utils.HostPort(targetHost, targetPort) + `
+`,
+		})
+		require.NoError(t, err)
 
-		for i := 0; i < 5; i++ {
-			func() {
-				client, err := c.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
-					Request: `GET /?c=1 HTTP/1.1
-	Host: ` + utils.HostPort(targetHost, targetPort) + `
-	`,
-				})
-				if err != nil {
-					lastErr = err
-					return
-				}
-
-				var taskID int64 = 0
-				for {
-					rsp, err := client.Recv()
-					if err != nil {
-						break
-					}
-					if taskID == 0 {
-						taskID = rsp.GetTaskId()
-					}
-				}
-				if taskID == 0 {
-					lastErr = utils.Error("No Response")
-					return
-				}
-
-				client, err = c.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
-					HistoryWebFuzzerId: int32(taskID),
-				})
-				if err != nil {
-					lastErr = err
-					return
-				}
-
-				count := 0
-				for {
-					_, err := client.Recv()
-					if err != nil {
-						break
-					}
-					count++
-				}
-				if count != 1 {
-					lastErr = utils.Errorf("Get History WebFuzzer Detail Failed, want 1 response, but got %d", count)
-					return
-				}
-
-				success = true
-			}()
-
-			if success {
+		var taskID int64 = 0
+		for {
+			rsp, err := client.Recv()
+			if err != nil {
 				break
 			}
+			if taskID == 0 {
+				taskID = rsp.GetTaskId()
+			}
 		}
+		require.NotZero(t, taskID, "TaskID not found in response")
 
-		if !success {
-			t.Fatal(lastErr)
-		}
+		err = utils.AttemptWithDelayFast(func() error {
+			client, err = c.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
+				HistoryWebFuzzerId: int32(taskID),
+			})
+			if err != nil {
+				return err
+			}
+
+			count := 0
+			for {
+				_, err := client.Recv()
+				if err != nil {
+					break
+				}
+				count++
+			}
+			if count != 1 {
+				return utils.Errorf("Get History WebFuzzer Detail Failed, want 1 response, but got %d", count)
+			}
+			return nil
+		})
+		require.NoError(t, err)
 	})
 
 	t.Run("multi request", func(t *testing.T) {
