@@ -19,8 +19,17 @@ func runtimeDispatchYaklibCall(args []uint64) (int64, error) {
 	}
 	pkg := runtimeCStringToGoString(unsafe.Pointer(uintptr(args[0])))
 	method := runtimeCStringToGoString(unsafe.Pointer(uintptr(args[1])))
-	fn, ok := yaklang.LookupExport(pkg, method)
+	var fn any
+	var ok bool
+	if pkg == "" {
+		fn, ok = yaklang.LookupGlobalCallable(method)
+	} else {
+		fn, ok = yaklang.LookupExport(pkg, method)
+	}
 	if !ok || fn == nil {
+		if pkg == "" {
+			return 0, fmt.Errorf("yaklib global callable %q not found", method)
+		}
 		return 0, fmt.Errorf("yaklib export %q.%q not found", pkg, method)
 	}
 	return callRuntimeValue(reflect.ValueOf(fn), args[2:])

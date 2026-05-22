@@ -2,6 +2,7 @@ package compiler
 
 import (
 	"fmt"
+	"unsafe"
 
 	"github.com/yaklang/go-llvm"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -165,75 +166,45 @@ func (c *Compiler) resolvePhi(inst *ssa.Phi) error {
 
 	edges := inst.Edge
 	preds := bbSsa.Preds
+	if len(preds) == 0 {
+		preds = c.predecessorBlockIDs(fn, blockID)
+	}
 
 	var incomingVals []llvm.Value
 	var incomingBlocks []llvm.BasicBlock
+	zero := llvm.ConstInt(c.inferPhiType(inst), 0, false)
 
-	// Handle cases where edges don't match preds exactly
-	// YakSSA may have Undefined edges that don't correspond to actual predecessors
-	if len(edges) != len(preds) {
-		// Try to match edges to preds by filtering out Undefined values
-		for i, edgeValID := range edges {
-			edgeObj, ok := fn.GetValueById(edgeValID)
-			if !ok {
-				continue
-			}
-
-			// Skip Undefined values
-			if _, isUndef := edgeObj.(*ssa.Undefined); isUndef {
-				continue
-			}
-
-			val, err := c.getValue(inst, edgeValID)
-			if err != nil {
-				return err
-			}
-
-			// Use the corresponding predecessor if available
-			if i < len(preds) {
-				predBlockID := preds[i]
-				blk, ok := c.Blocks[predBlockID]
-				if ok {
-					incomingVals = append(incomingVals, val)
-					incomingBlocks = append(incomingBlocks, blk)
-				}
-			}
+	for i, predBlockID := range preds {
+		blk, ok := c.Blocks[predBlockID]
+		if !ok {
+			continue
 		}
 
-		// If we couldn't match any edges, use a simple strategy:
-		// replicate the first valid edge value for all predecessors
-		if len(incomingVals) == 0 {
-			for _, edgeValID := range edges {
-				val, err := c.getValue(inst, edgeValID)
-				if err == nil {
-					// Use this value for all predecessors
-					for _, predBlockID := range preds {
-						blk, ok := c.Blocks[predBlockID]
-						if ok {
-							incomingVals = append(incomingVals, val)
-							incomingBlocks = append(incomingBlocks, blk)
-						}
+		val := zero
+		if i < len(edges) {
+			edgeValID := edges[i]
+			if edgeObj, ok := fn.GetValueById(edgeValID); ok && edgeObj != nil {
+				if _, isUndef := edgeObj.(*ssa.Undefined); !isUndef {
+					if resolved, err := c.getValue(inst, edgeValID); err == nil {
+						val = resolved
 					}
-					break
 				}
 			}
 		}
-	} else {
-		// Normal case: edges match preds
-		for i, edgeValID := range edges {
-			val, err := c.getValue(inst, edgeValID)
-			if err != nil {
-				return err
-			}
 
-			predBlockID := preds[i]
-			blk, ok := c.Blocks[predBlockID]
-			if !ok {
-				return fmt.Errorf("resolvePhi: incoming block %d not found", predBlockID)
-			}
+		incomingVals = append(incomingVals, val)
+		incomingBlocks = append(incomingBlocks, blk)
+	}
 
-			incomingVals = append(incomingVals, val)
-			incomingBlocks = append(incomingBlocks, blk)
+	if phiBB, ok := c.Blocks[blockID]; ok && !phiBB.IsNil() {
+		llvmPreds := c.gatherLLVMPredecessors(phiBB)
+		for len(incomingBlocks) < len(llvmPreds) {
+			fill := zero
+			if len(incomingVals) > 0 {
+				fill = incomingVals[len(incomingVals)-1]
+			}
+			incomingVals = append(incomingVals, fill)
+			incomingBlocks = append(incomingBlocks, llvmPreds[len(incomingBlocks)])
 		}
 	}
 
@@ -242,4 +213,88 @@ func (c *Compiler) resolvePhi(inst *ssa.Phi) error {
 	}
 
 	return nil
+}
+
+func (c *Compiler) predecessorBlockIDs(fn *ssa.Function, blockID int64) []int64 {
+	if fn == nil || blockID <= 0 {
+		return nil
+	}
+	var preds []int64
+	for _, fromID := range fn.Blocks {
+		fromVal, ok := fn.GetValueById(fromID)
+		if !ok {
+			continue
+		}
+		fromBB, ok := ssa.ToBasicBlock(fromVal)
+		if !ok || fromBB == nil {
+			continue
+		}
+		for _, succID := range fromBB.Succs {
+			if succID == blockID {
+				preds = append(preds, fromID)
+				break
+			}
+		}
+	}
+	return preds
+}
+
+func (c *Compiler) gatherLLVMPredecessors(target llvm.BasicBlock) []llvm.BasicBlock {
+	if target.IsNil() {
+		return nil
+	}
+	targetID := c.blockIDForLLVM(target)
+	if targetID <= 0 {
+		return nil
+	}
+
+	var preds []llvm.BasicBlock
+	for fromID, fromBB := range c.Blocks {
+		if fromID == targetID {
+			continue
+		}
+		if c.terminatorJumpsTo(fromBB, target) {
+			preds = append(preds, fromBB)
+		}
+	}
+	return preds
+}
+
+func (c *Compiler) blockIDForLLVM(target llvm.BasicBlock) int64 {
+	for id, bb := range c.Blocks {
+		if bb.C == target.C {
+			return id
+		}
+	}
+	return 0
+}
+
+func (c *Compiler) terminatorJumpsTo(from, target llvm.BasicBlock) bool {
+	term := c.lastInstruction(from)
+	if term.IsNil() || target.IsNil() {
+		return false
+	}
+	targetPtr := unsafe.Pointer(target.C)
+	matches := func(op llvm.Value) bool {
+		if op.IsNil() {
+			return false
+		}
+		return unsafe.Pointer(op.C) == targetPtr
+	}
+	switch term.NumOperands() {
+	case 1:
+		return matches(term.Operand(0))
+	case 3:
+		return matches(term.Operand(1)) || matches(term.Operand(2))
+	default:
+		return false
+	}
+}
+
+func (c *Compiler) lastInstruction(bb llvm.BasicBlock) llvm.Value {
+	var last llvm.Value
+	for inst := bb.FirstInstruction(); !inst.IsNil(); inst = inst.NextInstruction() {
+		last = inst
+	}
+	return last
 }

@@ -90,11 +90,18 @@ func (c *Compiler) prepareErrorHandling(fn *ssa.Function) error {
 	}
 
 	activeHandlerByBlock := make(map[int64]int64, len(fn.Blocks))
+	resolving := make(map[int64]struct{}, len(fn.Blocks))
 	var resolve func(int64) int64
 	resolve = func(blockID int64) int64 {
 		if existing, ok := activeHandlerByBlock[blockID]; ok {
 			return existing
 		}
+		if _, ok := resolving[blockID]; ok {
+			activeHandlerByBlock[blockID] = 0
+			return 0
+		}
+		resolving[blockID] = struct{}{}
+		defer delete(resolving, blockID)
 
 		bb, ok := fn.GetBasicBlockByID(blockID)
 		if !ok || bb == nil {

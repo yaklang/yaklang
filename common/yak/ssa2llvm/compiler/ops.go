@@ -2,6 +2,7 @@ package compiler
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/yaklang/go-llvm"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -257,6 +258,14 @@ func (c *Compiler) compileConst(inst *ssa.ConstInst) error {
 		// Use Int64 for simplicity as per Phase 1
 		val := inst.Number()
 		llvmVal := llvm.ConstInt(c.LLVMCtx.Int64Type(), uint64(val), true) // Signed
+		c.Values[id] = llvmVal
+		if err := c.maybeEmitMemberSet(inst, inst, llvmVal); err != nil {
+			return err
+		}
+		return nil
+	} else if inst.IsFloat() {
+		bits := math.Float64bits(inst.Float())
+		llvmVal := llvm.ConstInt(c.LLVMCtx.Int64Type(), bits, false)
 		c.Values[id] = llvmVal
 		if err := c.maybeEmitMemberSet(inst, inst, llvmVal); err != nil {
 			return err
