@@ -38,20 +38,22 @@ type SSARiskPart struct {
 }
 
 type StreamPartsOptions struct {
-	ReportType       ReportType
-	ShowDataflowPath bool
-	ShowFileContent  bool
-	WithFile         bool
+	ReportType          ReportType
+	ShowDataflowPath    bool
+	ShowFileContent     bool
+	WithFile            bool
+	DataflowDetailLevel DataflowDetailLevel
 }
 
 type StreamPartsOption func(*StreamPartsOptions)
 
 func NewStreamPartsOptions(opts ...StreamPartsOption) StreamPartsOptions {
 	o := StreamPartsOptions{
-		ReportType:       IRifyFullReportType,
-		ShowDataflowPath: true,
-		ShowFileContent:  true,
-		WithFile:         true,
+		ReportType:          IRifyFullReportType,
+		ShowDataflowPath:    true,
+		ShowFileContent:     true,
+		WithFile:            true,
+		DataflowDetailLevel: DataflowDetailMinimal,
 	}
 	for _, opt := range opts {
 		if opt != nil {
@@ -85,6 +87,12 @@ func WithStreamShowFileContent(v bool) StreamPartsOption {
 func WithStreamWithFile(v bool) StreamPartsOption {
 	return func(o *StreamPartsOptions) {
 		o.WithFile = v
+	}
+}
+
+func WithStreamDataflowDetailLevel(v DataflowDetailLevel) StreamPartsOption {
+	return func(o *StreamPartsOptions) {
+		o.DataflowDetailLevel = v
 	}
 }
 
@@ -211,7 +219,7 @@ func ConvertSingleResultToSSAResultParts(result *ssaapi.SyntaxFlowResult, opts S
 		}
 
 		for _, p := range risk.DataFlowPaths {
-			raw, err := MarshalMinimalDataFlowPath(p)
+			raw, err := MarshalDataFlowPath(p, opts.DataflowDetailLevel)
 			if err != nil || len(raw) == 0 {
 				continue
 			}
