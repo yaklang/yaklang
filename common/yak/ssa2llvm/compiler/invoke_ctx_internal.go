@@ -119,7 +119,7 @@ func (c *Compiler) bindParamsFromContext(fn *ssa.Function) error {
 		idx := llvm.ConstInt(i64, uint64(argBase+int64(i)), false)
 		elemPtr := c.Builder.CreateGEP(i64, ctxPtr, []llvm.Value{idx}, "")
 		val := c.Builder.CreateLoad(i64, elemPtr, fmt.Sprintf("arg_%d", paramID))
-		c.Values[paramID] = val
+		c.cacheValue(paramID, val)
 	}
 
 	for i, memberID := range fn.ParameterMembers {
@@ -127,7 +127,7 @@ func (c *Compiler) bindParamsFromContext(fn *ssa.Function) error {
 		idx := llvm.ConstInt(i64, uint64(argBase+paramIndex), false)
 		elemPtr := c.Builder.CreateGEP(i64, ctxPtr, []llvm.Value{idx}, "")
 		val := c.Builder.CreateLoad(i64, elemPtr, fmt.Sprintf("pm_%d", memberID))
-		c.Values[memberID] = val
+		c.cacheValue(memberID, val)
 	}
 
 	freeValueBase := int64(len(fn.Params) + len(fn.ParameterMembers))
@@ -135,7 +135,7 @@ func (c *Compiler) bindParamsFromContext(fn *ssa.Function) error {
 		idx := llvm.ConstInt(i64, uint64(argBase+freeValueBase+int64(i)), false)
 		elemPtr := c.Builder.CreateGEP(i64, ctxPtr, []llvm.Value{idx}, "")
 		val := c.Builder.CreateLoad(i64, elemPtr, fmt.Sprintf("fv_%d", binding.ValueID))
-		c.Values[binding.ValueID] = val
+		c.cacheValue(binding.ValueID, val)
 	}
 
 	return nil
@@ -166,7 +166,7 @@ func (c *Compiler) loadBoundParameterValue(fn *ssa.Function, param *ssa.Paramete
 		idx := llvm.ConstInt(i64, uint64(argBase+int64(i)), false)
 		elemPtr := c.Builder.CreateGEP(i64, ctxPtr, []llvm.Value{idx}, "")
 		val := c.Builder.CreateLoad(i64, elemPtr, fmt.Sprintf("arg_lazy_%d", paramID))
-		c.Values[paramID] = val
+		c.cacheValue(paramID, val)
 		return val, true
 	}
 
@@ -182,7 +182,7 @@ func (c *Compiler) loadBoundParameterValue(fn *ssa.Function, param *ssa.Paramete
 		idx := llvm.ConstInt(i64, uint64(argBase+paramIndex), false)
 		elemPtr := c.Builder.CreateGEP(i64, ctxPtr, []llvm.Value{idx}, "")
 		val := c.Builder.CreateLoad(i64, elemPtr, fmt.Sprintf("pm_lazy_%d", memberID))
-		c.Values[memberID] = val
+		c.cacheValue(memberID, val)
 		return val, true
 	}
 
@@ -198,7 +198,7 @@ func (c *Compiler) loadBoundParameterValue(fn *ssa.Function, param *ssa.Paramete
 		idx := llvm.ConstInt(i64, uint64(argBase+freeValueBase+int64(i)), false)
 		elemPtr := c.Builder.CreateGEP(i64, ctxPtr, []llvm.Value{idx}, "")
 		val := c.Builder.CreateLoad(i64, elemPtr, fmt.Sprintf("fv_lazy_%d", binding.ValueID))
-		c.Values[binding.ValueID] = val
+		c.cacheValue(binding.ValueID, val)
 		return val, true
 	}
 

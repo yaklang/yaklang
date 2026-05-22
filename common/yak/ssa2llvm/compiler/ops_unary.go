@@ -9,6 +9,9 @@ import (
 )
 
 func (c *Compiler) compileUnOp(inst *ssa.UnOp, resultID int64) error {
+	if _, ok := c.getCachedValue(inst, resultID); ok {
+		return nil
+	}
 	x, err := c.getValue(inst, inst.X)
 	if err != nil {
 		return err
@@ -55,7 +58,7 @@ func (c *Compiler) compileUnOp(inst *ssa.UnOp, resultID int64) error {
 		return fmt.Errorf("compileUnOp: unsupported opcode %v", inst.Op)
 	}
 
-	c.Values[resultID] = val
+	c.cacheValue(resultID, val)
 	if err := c.maybeEmitMemberSet(inst, inst, val); err != nil {
 		return err
 	}

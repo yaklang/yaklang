@@ -70,7 +70,7 @@ func (c *Compiler) compileLoop(inst *ssa.Loop) error {
 func (c *Compiler) compilePhi(inst *ssa.Phi) error {
 	phiType := c.inferPhiType(inst)
 	phiNode := c.Builder.CreatePHI(phiType, fmt.Sprintf("phi_%d", inst.GetId()))
-	c.Values[inst.GetId()] = phiNode
+	c.cacheValue(inst.GetId(), phiNode)
 	return nil
 }
 
@@ -167,7 +167,7 @@ func (c *Compiler) resolvePhi(inst *ssa.Phi) error {
 	edges := inst.Edge
 	preds := bbSsa.Preds
 	if len(preds) == 0 {
-		preds = c.predecessorBlockIDs(fn, blockID)
+		preds = predecessorBlockIDs(fn, blockID)
 	}
 
 	edgeByPred := make(map[int64]int64, len(preds))
@@ -182,7 +182,17 @@ func (c *Compiler) resolvePhi(inst *ssa.Phi) error {
 		return fmt.Errorf("resolvePhi: llvm block %d not found", blockID)
 	}
 
-	llvmPreds := c.gatherLLVMPredecessors(phiBB)
+	llvmPreds := make([]llvm.BasicBlock, 0, len(preds))
+	for _, predBlockID := range preds {
+		predBB, ok := c.Blocks[predBlockID]
+		if !ok || predBB.IsNil() {
+			continue
+		}
+		if !c.terminatorJumpsTo(predBB, phiBB) {
+			continue
+		}
+		llvmPreds = append(llvmPreds, predBB)
+	}
 	if len(llvmPreds) == 0 {
 		for _, predBlockID := range preds {
 			if blk, ok := c.Blocks[predBlockID]; ok && !blk.IsNil() {
@@ -195,13 +205,28 @@ func (c *Compiler) resolvePhi(inst *ssa.Phi) error {
 	incomingVals := make([]llvm.Value, 0, len(llvmPreds))
 	incomingBlocks := make([]llvm.BasicBlock, 0, len(llvmPreds))
 
+	prevActive := int64(0)
+	if c.function != nil {
+		prevActive = c.function.activeBlockID
+	}
+	defer func() {
+		if c.function != nil {
+			c.function.activeBlockID = prevActive
+		}
+	}()
+
 	for _, predBB := range llvmPreds {
 		val := zero
-		if predID := c.blockIDForLLVM(predBB); predID > 0 {
+		predID := c.blockIDForLLVM(predBB)
+		if predID > 0 {
+			c.setInsertPointBeforeTerminator(predBB)
+			if c.function != nil {
+				c.function.activeBlockID = predID
+			}
 			if edgeValID, ok := edgeByPred[predID]; ok {
 				if edgeObj, ok := fn.GetValueById(edgeValID); ok && edgeObj != nil {
 					if _, isUndef := edgeObj.(*ssa.Undefined); !isUndef {
-						if resolved, err := c.getValue(inst, edgeValID); err == nil {
+						if resolved, err := c.resolvePhiIncomingValue(inst, fn, predID, edgeValID); err == nil {
 							val = resolved
 						}
 					}
@@ -219,28 +244,25 @@ func (c *Compiler) resolvePhi(inst *ssa.Phi) error {
 	return nil
 }
 
-func (c *Compiler) predecessorBlockIDs(fn *ssa.Function, blockID int64) []int64 {
-	if fn == nil || blockID <= 0 {
-		return nil
+func (c *Compiler) resolvePhiIncomingValue(contextInst *ssa.Phi, fn *ssa.Function, predID int64, edgeValID int64) (llvm.Value, error) {
+	zero := llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)
+	if fn == nil || edgeValID <= 0 {
+		return zero, nil
 	}
-	var preds []int64
-	for _, fromID := range fn.Blocks {
-		fromVal, ok := fn.GetValueById(fromID)
-		if !ok {
-			continue
+	edgeObj, ok := fn.GetValueById(edgeValID)
+	if !ok || edgeObj == nil {
+		return zero, nil
+	}
+	if edgePhi, ok := edgeObj.(*ssa.Phi); ok && edgePhi != nil {
+		phiBlockID := int64(0)
+		if edgePhi.GetBlock() != nil {
+			phiBlockID = edgePhi.GetBlock().GetId()
 		}
-		fromBB, ok := ssa.ToBasicBlock(fromVal)
-		if !ok || fromBB == nil {
-			continue
-		}
-		for _, succID := range fromBB.Succs {
-			if succID == blockID {
-				preds = append(preds, fromID)
-				break
-			}
+		if phiBlockID != predID {
+			return zero, nil
 		}
 	}
-	return preds
+	return c.getValue(contextInst, edgeValID)
 }
 
 func (c *Compiler) gatherLLVMPredecessors(target llvm.BasicBlock) []llvm.BasicBlock {

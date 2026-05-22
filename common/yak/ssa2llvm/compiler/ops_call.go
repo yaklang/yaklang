@@ -116,6 +116,11 @@ func (c *Compiler) newRuntimeMethodDispatchSpec(inst *ssa.Call, fn *ssa.Function
 
 // compileCall compiles a ssa.Call instruction to LLVM IR.
 func (c *Compiler) compileCall(inst *ssa.Call) error {
+	if inst != nil {
+		if _, ok := c.getCachedValue(inst, inst.GetId()); ok {
+			return nil
+		}
+	}
 	if handled, err := c.compileTaggedObfCall(inst); handled || err != nil {
 		return err
 	}

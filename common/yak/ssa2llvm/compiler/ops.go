@@ -59,8 +59,8 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 		}
 	}
 
-	// 1. Check cache
-	if val, ok := c.Values[id]; ok {
+	// 1. Check cache (invalidate when the cached def does not dominate this use).
+	if val, ok := c.getCachedValue(contextInst, id); ok {
 		return val, nil
 	}
 
@@ -110,15 +110,28 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 
 	// 4. Lazy compile if Parameter (function argument / closure binding)
 	if param, ok := ssa.ToParameter(valObj); ok && param != nil {
-		if val, ok := c.loadBoundParameterValue(fn, param); ok {
-			c.Values[id] = val
-			return val, nil
+		var loaded llvm.Value
+		var loadedOK bool
+		err := c.withEntryInsertPoint(fn, func() error {
+			val, ok := c.loadBoundParameterValue(fn, param)
+			if ok {
+				loaded = val
+				loadedOK = true
+				c.cacheValue(id, val)
+			}
+			return nil
+		})
+		if err != nil {
+			return llvm.Value{}, err
+		}
+		if loadedOK {
+			return loaded, nil
 		}
 		if def := param.GetDefault(); def != nil {
 			if ssaFn, ok := ssa.ToFunction(def); ok && ssaFn != nil {
 				llvmFn, _ := c.getOrDeclareLLVMFunction(ssaFn)
 				val := c.Builder.CreatePtrToInt(llvmFn, c.LLVMCtx.Int64Type(), "yak_fn_i64")
-				c.Values[id] = val
+				c.cacheValue(id, val)
 				return val, nil
 			}
 			if defConst, ok := ssa.ToConstInst(def); ok {
@@ -130,7 +143,7 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 			}
 		}
 		val := llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)
-		c.Values[id] = val
+		c.cacheValue(id, val)
 		return val, nil
 	}
 
@@ -139,7 +152,7 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 		switch undef.Kind {
 		case ssa.UndefinedValueValid, ssa.UndefinedValueInValid, ssa.UndefinedMemberInValid:
 			val := llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)
-			c.Values[id] = val
+			c.cacheValue(id, val)
 			return val, nil
 		}
 	}
@@ -171,7 +184,10 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 
 	// 8. Lazy compile if SideEffect
 	if se, ok := valObj.(*ssa.SideEffect); ok {
-		if err := c.compileSideEffect(se); err != nil {
+		err := c.withLazyCompileInsertPoint(contextInst, se, func() error {
+			return c.compileSideEffect(se)
+		})
+		if err != nil {
 			return llvm.Value{}, err
 		}
 		if val, ok := c.Values[id]; ok {
@@ -182,7 +198,10 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 
 	// 9. Lazy compile if Make
 	if mk, ok := valObj.(*ssa.Make); ok {
-		if err := c.compileMake(mk); err != nil {
+		err := c.withLazyCompileInsertPoint(contextInst, mk, func() error {
+			return c.compileMake(mk)
+		})
+		if err != nil {
 			return llvm.Value{}, err
 		}
 		if val, ok := c.Values[id]; ok {
@@ -276,6 +295,9 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 }
 
 func (c *Compiler) compileBinOp(inst *ssa.BinOp, resultID int64) error {
+	if _, ok := c.getCachedValue(inst, resultID); ok {
+		return nil
+	}
 	lhs, err := c.getValue(inst, inst.X)
 	if err != nil {
 		return err
@@ -321,7 +343,7 @@ func (c *Compiler) compileBinOp(inst *ssa.BinOp, resultID int64) error {
 		return fmt.Errorf("unknown BinOp opcode: %v", inst.Op)
 	}
 
-	c.Values[resultID] = val
+	c.cacheValue(resultID, val)
 	if err := c.maybeEmitMemberSet(inst, inst, val); err != nil {
 		return err
 	}
@@ -330,7 +352,7 @@ func (c *Compiler) compileBinOp(inst *ssa.BinOp, resultID int64) error {
 
 func (c *Compiler) compileConst(inst *ssa.ConstInst) error {
 	id := inst.GetId()
-	if _, ok := c.Values[id]; ok {
+	if _, ok := c.getCachedValue(inst, id); ok {
 		return nil // Already compiled
 	}
 
@@ -338,7 +360,7 @@ func (c *Compiler) compileConst(inst *ssa.ConstInst) error {
 	// For now, assume int64 unless we can detect otherwise
 	if inst.GetRawValue() == nil {
 		llvmVal := llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)
-		c.Values[id] = llvmVal
+		c.cacheValue(id, llvmVal)
 		if err := c.maybeEmitMemberSet(inst, inst, llvmVal); err != nil {
 			return err
 		}
@@ -348,7 +370,7 @@ func (c *Compiler) compileConst(inst *ssa.ConstInst) error {
 		// Use Int64 for simplicity as per Phase 1
 		val := inst.Number()
 		llvmVal := llvm.ConstInt(c.LLVMCtx.Int64Type(), uint64(val), true) // Signed
-		c.Values[id] = llvmVal
+		c.cacheValue(id, llvmVal)
 		if err := c.maybeEmitMemberSet(inst, inst, llvmVal); err != nil {
 			return err
 		}
@@ -356,7 +378,7 @@ func (c *Compiler) compileConst(inst *ssa.ConstInst) error {
 	} else if inst.IsFloat() {
 		bits := math.Float64bits(inst.Float())
 		llvmVal := llvm.ConstInt(c.LLVMCtx.Int64Type(), bits, false)
-		c.Values[id] = llvmVal
+		c.cacheValue(id, llvmVal)
 		if err := c.maybeEmitMemberSet(inst, inst, llvmVal); err != nil {
 			return err
 		}
@@ -373,7 +395,7 @@ func (c *Compiler) compileConst(inst *ssa.ConstInst) error {
 			iVal = 1
 		}
 		llvmVal := llvm.ConstInt(c.LLVMCtx.Int64Type(), iVal, false)
-		c.Values[id] = llvmVal
+		c.cacheValue(id, llvmVal)
 		if err := c.maybeEmitMemberSet(inst, inst, llvmVal); err != nil {
 			return err
 		}
@@ -385,7 +407,7 @@ func (c *Compiler) compileConst(inst *ssa.ConstInst) error {
 		// call sites (e.g. print/println) so non-print stdlib calls can receive
 		// raw C-string pointers.
 		llvmVal := llvm.ConstPtrToInt(ptr, c.LLVMCtx.Int64Type())
-		c.Values[id] = llvmVal
+		c.cacheValue(id, llvmVal)
 		if err := c.maybeEmitMemberSet(inst, inst, llvmVal); err != nil {
 			return err
 		}
@@ -397,7 +419,7 @@ func (c *Compiler) compileConst(inst *ssa.ConstInst) error {
 	// Return 0 for unknown to prevent crash?
 	fmt.Printf("WARNING: Unsupported constant type for %v (ID: %d)\n", inst.GetRawValue(), id)
 	llvmVal := llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)
-	c.Values[id] = llvmVal
+	c.cacheValue(id, llvmVal)
 	if err := c.maybeEmitMemberSet(inst, inst, llvmVal); err != nil {
 		return err
 	}
@@ -453,7 +475,7 @@ func (c *Compiler) compileTypeCast(inst *ssa.TypeCast) error {
 	}
 
 	val = c.coerceToInt64(val)
-	c.Values[inst.GetId()] = val
+	c.cacheValue(inst.GetId(), val)
 	if err := c.maybeEmitMemberSet(inst, inst, val); err != nil {
 		return err
 	}
