@@ -6,6 +6,11 @@ import (
 )
 
 func (c *Compiler) withLazyCompileInsertPoint(contextInst, targetInst ssa.Instruction, compile func() error) error {
+	var restoreBB llvm.BasicBlock
+	if contextInst != nil && contextInst.GetBlock() != nil {
+		restoreBB, _ = c.Blocks[contextInst.GetBlock().GetId()]
+	}
+
 	if c == nil || targetInst == nil || targetInst.GetBlock() == nil {
 		return compile()
 	}
@@ -19,7 +24,11 @@ func (c *Compiler) withLazyCompileInsertPoint(contextInst, targetInst ssa.Instru
 		return compile()
 	}
 	c.setInsertPointBeforeTerminator(targetBB)
-	return compile()
+	err := compile()
+	if !restoreBB.IsNil() {
+		c.Builder.SetInsertPointAtEnd(restoreBB)
+	}
+	return err
 }
 
 func (c *Compiler) setInsertPointBeforeTerminator(bb llvm.BasicBlock) {
