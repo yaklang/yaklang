@@ -58,6 +58,10 @@ func (c *Compiler) finishGetValue(contextInst ssa.Instruction, id int64) (llvm.V
 // getValue resolves an SSA value ID to an LLVM value, performing lazy compilation
 // for constants if they haven't been visited yet.
 func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, error) {
+	if id == 0 {
+		return llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false), nil
+	}
+
 	// Exception values (try/catch `err`) are backed by the current function's panic slot.
 	// These values can be referenced in multiple blocks, so do not cache the load.
 	if c != nil && c.function != nil && c.function.exceptionValueIDs != nil {
@@ -109,6 +113,12 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 
 	// 3. Lazy compile if Phi (pre-created in pass 1, resolved in pass 2)
 	if phi, ok := valObj.(*ssa.Phi); ok && phi != nil {
+		if val, ok := c.Values[id]; ok && !val.IsNil() {
+			return val, nil
+		}
+		if err := c.ensurePhiNode(phi); err != nil {
+			return llvm.Value{}, err
+		}
 		if val, ok := c.Values[id]; ok && !val.IsNil() {
 			return val, nil
 		}

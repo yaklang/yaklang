@@ -12,6 +12,11 @@ func (c *Compiler) resolveSSAValueAsInt64(contextInst ssa.Instruction, valueID i
 	}
 
 	fn := contextInst.GetFunc()
+	if fn != nil {
+		if _, ok := fn.GetValueById(valueID); !ok {
+			return llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false), nil
+		}
+	}
 	if fn == nil {
 		return llvm.Value{}, err
 	}
