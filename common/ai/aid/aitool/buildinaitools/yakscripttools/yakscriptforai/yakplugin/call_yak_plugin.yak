@@ -1,4 +1,4 @@
-__DESC__ = "一个Yak插件调用器，可以通过指定插件名称来执行插件，可以指定多个插件名，使用逗号分隔，支持传递HTTP请求包等参数，并提供反馈机制来显示插件执行结果（调用时url参数和requestPacket必须传入其中一个）。"
+__DESC__ = "一个Yak插件调用器，可以通过数据库ID或UUID执行插件，接收请求URL并自动生成GET请求包，提供反馈机制来显示插件执行结果。"
 __VERBOSE_NAME__ = "Yak插件调用器"
 __KEYWORDS__ = "插件调用,MITM插件,插件执行,HTTP请求,插件管理,反馈机制,plugin caller,mitm plugin,plugin execution,http request,plugin management,feedback mechanism,yak plugin,hook manager"
 
@@ -6,41 +6,32 @@ __USAGE__ = <<<USAGE_BLOCK
 Yak Plugin Caller Tool - Parameter Description for JSON Tool Calls
 
 Required Parameters:
-  names           (string)  Comma-separated Yak plugin names to load and execute.
+  ids             (string)  Comma-separated Yak plugin database IDs or UUIDs.
+                            This accepts the "调用标识" returned by query_plugin_by_fp.
+  url             (string)  Target request URL. The tool generates a GET request packet
+                            automatically and invokes loaded MITM plugins with it.
 
 Optional Parameters:
-  url             (string)  Target request URL. If provided and requestPacket is empty,
-                            tool generates a GET request packet automatically.
-  requestPacket   (string)  Raw HTTP request packet used for plugin invocation.
   isHttps         (string)  Whether target is HTTPS. Use "true" or "false".
-
-Rules:
-  - At least one of "url" or "requestPacket" must be provided.
 USAGE_BLOCK
 
-pluginNames = cli.String("names", cli.setVerboseName("插件名列表"),cli.setHelp("插件名列表，多个插件之间使用逗号分隔"),cli.setRequired(true))
+pluginIds = cli.String("ids", cli.setVerboseName("插件ID/UUID列表"), cli.setHelp("插件数据库ID或UUID列表，多个插件之间使用逗号分隔；可直接使用 query_plugin_by_fp 返回的调用标识"), cli.setRequired(true))
 
-targetUrl = cli.Text("url",cli.setVerboseName("请求URL"), cli.setHelp("指定请求URL，用于插件调用"))
-reqPacket = cli.Text("requestPacket",cli.setVerboseName("请求报文"), cli.setHelp("指定请求包报文，用于插件调用，插件会通过此报文对目标发起请求"))
+targetUrl = cli.Text("url",cli.setVerboseName("请求URL"), cli.setHelp("指定请求URL，用于插件调用"), cli.setRequired(true))
 isHttpsStr = cli.String("isHttps",cli.setVerboseName("是否是https站点"), cli.setHelp("目标是否是https站点"))
 isHttps = isHttpsStr == "true"
-mitmParamsIsOk = true
-if reqPacket == ""{
-    if targetUrl != ""{
-        isHttps,req,err = poc.ParseUrlToHTTPRequestRaw("GET", targetUrl)
-        if err{
-            yakit.Error("解析URL，生成请求包出错: %v" % err)
-            return
-        }
-        reqPacket = req
-    }else{
-        mitmParamsIsOk = false
-    }
-}
-
 cli.check()
 
-pluginNameList = str.Split(pluginNames, ",")
+isHttpsFromUrl, reqPacket, err = poc.ParseUrlToHTTPRequestRaw("GET", targetUrl)
+if err{
+    yakit.Error("解析URL，生成请求包出错: %v" % err)
+    return
+}
+if isHttpsStr == "" {
+    isHttps = isHttpsFromUrl
+}
+
+pluginIdList = str.Split(pluginIds, ",")
 
 manager, err = hook.NewMixPluginCaller()
 if err != nil {
@@ -60,19 +51,37 @@ manager.SetFeedback(func(i){
         yakit.Info("收到信息，不支持的信息类型: [%s] %s",level,data)
     }
 })
-for plugin in pluginNameList{
-    manager.LoadPlugin(plugin)
+loadedCount = 0
+for pluginId in pluginIdList{
+    pluginId = str.TrimSpace(pluginId)
+    if pluginId == "" {
+        continue
+    }
+    loadId = pluginId
+    if re.Match(`^\d+$`, pluginId) {
+        loadId = parseInt(pluginId)
+    }
+    err = manager.LoadPluginByID(loadId)
+    if err != nil {
+        yakit.Error("按插件ID/UUID加载失败 [%v]: %v", pluginId, err)
+        return
+    }
+    yakit.Info("已按插件ID/UUID加载: %v", pluginId)
+    loadedCount++
+}
+if loadedCount <= 0 {
+    yakit.Error("没有有效的插件ID/UUID")
+    return
 }
 callMitmPlugin = (reqPacket)=>{
-    if !mitmParamsIsOk{
-        return "参数不正确"
-    }
-
     reqIns,err = str.ParseStringToHTTPRequest(reqPacket)
     if err{
         return "解析请求包失败: %v" % err
     }
-    url = reqIns.URL.String()
+    url = str.TrimSpace(targetUrl)
+    if url == "" {
+        url = poc.GetUrlFromHTTPRequest(isHttps ? "https" : "http", reqPacket)
+    }
     body = poc.GetHTTPPacketBody(reqPacket)
 
     rsp,req,err = poc.HTTP(reqPacket, poc.https(isHttps))
