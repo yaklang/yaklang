@@ -170,18 +170,17 @@ func (c *Compiler) compileParameterMember(inst *ssa.ParameterMember) error {
 		return err
 	}
 
-	parentVal, err := c.getValue(inst, parentID)
-	if err != nil {
-		return fmt.Errorf("parent value %d for ParameterMember %s: %w", parentID, inst.GetName(), err)
-	}
-
 	keyID := inst.MemberCallKey
 	keyVal, ok := fn.GetValueById(keyID)
 	if !ok {
 		return fmt.Errorf("key value %d not found", keyID)
 	}
-
 	keyStr := c.resolveMemberKeyString(keyVal)
+
+	parentVal, err := c.getValue(inst, parentID)
+	if err != nil {
+		return fmt.Errorf("parent value %d for ParameterMember %s: %w", parentID, inst.GetName(), err)
+	}
 
 	val := c.emitRuntimeGetField(parentVal, keyStr, inst.GetId())
 	c.cacheValue(inst.GetId(), val)
@@ -217,7 +216,7 @@ func (c *Compiler) resolveParameterMemberParentID(fn *ssa.Function, inst *ssa.Pa
 }
 
 // compileMemberCall handles generic member access (MemberCall interface)
-func (c *Compiler) compileMemberCall(val ssa.Value, mc ssa.MemberCall) error {
+func (c *Compiler) compileMemberCall(contextInst ssa.Instruction, val ssa.Value, mc ssa.MemberCall) error {
 	obj := mc.GetObject()
 	key := mc.GetKey()
 
@@ -230,15 +229,15 @@ func (c *Compiler) compileMemberCall(val ssa.Value, mc ssa.MemberCall) error {
 		return fmt.Errorf("compileMemberCall: object is nil for value %d", val.GetId())
 	}
 
-	parentVal, err := c.getValue(nil, obj.GetId())
+	keyStr := c.resolveMemberKeyString(key)
+
+	parentVal, err := c.getValue(contextInst, obj.GetId())
 	if err != nil {
 		return fmt.Errorf("compileMemberCall: failed to get object value: %w", err)
 	}
 
-	keyStr := c.resolveMemberKeyString(key)
-
 	valResult := c.emitRuntimeGetField(parentVal, keyStr, val.GetId())
-	c.cacheValue(val.GetId(), valResult)
+	c.storeSSAValue(val.GetId(), valResult)
 	return nil
 }
 

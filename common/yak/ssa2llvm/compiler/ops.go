@@ -111,18 +111,15 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 		return llvm.Value{}, fmt.Errorf("getValue: compileConst succeded but value %d not cached", id)
 	}
 
-	// 3. Lazy compile if Phi (pre-created in pass 1, resolved in pass 2)
+	// 3. Lazy compile if Phi (slot-backed; incoming stores emitted in resolvePhi)
 	if phi, ok := valObj.(*ssa.Phi); ok && phi != nil {
-		if val, ok := c.Values[id]; ok && !val.IsNil() {
-			return val, nil
-		}
 		if err := c.ensurePhiNode(phi); err != nil {
 			return llvm.Value{}, err
 		}
-		if val, ok := c.Values[id]; ok && !val.IsNil() {
+		if val, ok := c.getCachedValue(contextInst, id); ok {
 			return val, nil
 		}
-		return llvm.Value{}, fmt.Errorf("getValue: phi value %d not pre-created", id)
+		return c.loadSSAValue(id), nil
 	}
 
 	// 4. Lazy compile if Parameter (function argument / closure binding)
@@ -299,7 +296,7 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 	if mc, ok := valObj.(ssa.MemberCall); ok && mc.IsMember() {
 		targetInst, _ := valObj.(ssa.Instruction)
 		err := c.withLazyCompileInsertPoint(contextInst, targetInst, func() error {
-			return c.compileMemberCall(valObj, mc)
+			return c.compileMemberCall(contextInst, valObj, mc)
 		})
 		if err != nil {
 			return llvm.Value{}, err

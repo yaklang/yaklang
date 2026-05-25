@@ -65,19 +65,13 @@ func (c *Compiler) compileLoop(inst *ssa.Loop) error {
 	return nil
 }
 
-// compilePhi creates the PHI node but DOES NOT populate incoming values.
-// This is Pass 1 of Phi handling.
+// compilePhi reserves an entry alloca slot for the phi. Incoming edge values are
+// stored by resolvePhi; uses load from the slot (mem2reg-friendly).
 func (c *Compiler) compilePhi(inst *ssa.Phi) error {
 	if inst == nil {
 		return fmt.Errorf("compilePhi: nil phi")
 	}
-	id := inst.GetId()
-	if val, ok := c.Values[id]; ok && !val.IsNil() {
-		return nil
-	}
-	phiType := c.inferPhiType(inst)
-	phiNode := c.Builder.CreatePHI(phiType, fmt.Sprintf("phi_%d", id))
-	c.Values[id] = phiNode
+	c.ensureValueSlot(inst.GetId())
 	return nil
 }
 
@@ -85,37 +79,8 @@ func (c *Compiler) ensurePhiNode(phi *ssa.Phi) error {
 	if phi == nil {
 		return fmt.Errorf("ensurePhiNode: nil phi")
 	}
-	id := phi.GetId()
-	if val, ok := c.Values[id]; ok && !val.IsNil() {
-		return nil
-	}
-	block := phi.GetBlock()
-	if block == nil {
-		return fmt.Errorf("ensurePhiNode: phi %d has no block", id)
-	}
-	blockID := block.GetId()
-	if _, ok := c.Blocks[blockID]; !ok {
-		if c.function == nil || c.function.llvmFn.IsNil() {
-			return fmt.Errorf("ensurePhiNode: no llvm function for phi %d", id)
-		}
-		bb := c.LLVMCtx.AddBasicBlock(c.function.llvmFn, fmt.Sprintf("bb_%d", blockID))
-		c.Blocks[blockID] = bb
-	}
-	bb, ok := c.Blocks[blockID]
-	if !ok || bb.IsNil() {
-		return fmt.Errorf("ensurePhiNode: llvm block %d missing for phi %d", blockID, id)
-	}
-	restore := c.restoreInsertBlock(nil)
-	if first := bb.FirstInstruction(); first.IsNil() {
-		c.Builder.SetInsertPointAtEnd(bb)
-	} else {
-		c.Builder.SetInsertPointBefore(first)
-	}
-	err := c.compilePhi(phi)
-	if !restore.IsNil() {
-		c.Builder.SetInsertPointAtEnd(restore)
-	}
-	return err
+	c.ensureValueSlot(phi.GetId())
+	return nil
 }
 
 func (c *Compiler) llvmValueTypeForSSA(t ssa.Type) llvm.Type {
@@ -179,23 +144,23 @@ func (c *Compiler) callReturnsPointer(call *ssa.Call, fn *ssa.Function) bool {
 	}
 }
 
-// resolvePhi populates the incoming values for a PHI node.
-// This is Pass 2 of Phi handling, called after all blocks are generated.
+// resolvePhi stores incoming edge values into each predecessor's outgoing slot store.
 func (c *Compiler) resolvePhi(inst *ssa.Phi) error {
-	phiVal, ok := c.Values[inst.GetId()]
-	if !ok {
-		return fmt.Errorf("resolvePhi: phi value %d not found", inst.GetId())
+	if inst == nil {
+		return fmt.Errorf("resolvePhi: nil phi")
 	}
+	phiID := inst.GetId()
+	c.ensureValueSlot(phiID)
 
 	block := inst.GetBlock()
 	if block == nil {
-		return fmt.Errorf("resolvePhi: phi %d has no block", inst.GetId())
+		return fmt.Errorf("resolvePhi: phi %d has no block", phiID)
 	}
 	blockID := block.GetId()
 
 	fn := inst.GetFunc()
 	if fn == nil {
-		return fmt.Errorf("resolvePhi: function for phi %d is nil", inst.GetId())
+		return fmt.Errorf("resolvePhi: function for phi %d is nil", phiID)
 	}
 
 	blockVal, ok := fn.GetValueById(blockID)
@@ -236,8 +201,6 @@ func (c *Compiler) resolvePhi(inst *ssa.Phi) error {
 	}
 
 	zero := llvm.ConstInt(c.inferPhiType(inst), 0, false)
-	incomingVals := make([]llvm.Value, 0, len(llvmPreds))
-	incomingBlocks := make([]llvm.BasicBlock, 0, len(llvmPreds))
 
 	prevActive := int64(0)
 	if c.function != nil {
@@ -252,8 +215,8 @@ func (c *Compiler) resolvePhi(inst *ssa.Phi) error {
 	for _, predBB := range llvmPreds {
 		val := zero
 		predID := c.blockIDForLLVM(predBB)
+		c.setInsertPointBeforeTerminator(predBB)
 		if predID > 0 {
-			c.setInsertPointBeforeTerminator(predBB)
 			if c.function != nil {
 				c.function.activeBlockID = predID
 			}
@@ -267,12 +230,7 @@ func (c *Compiler) resolvePhi(inst *ssa.Phi) error {
 				}
 			}
 		}
-		incomingVals = append(incomingVals, val)
-		incomingBlocks = append(incomingBlocks, predBB)
-	}
-
-	if len(incomingVals) > 0 {
-		phiVal.AddIncoming(incomingVals, incomingBlocks)
+		c.storeSSAValue(phiID, val)
 	}
 
 	return nil

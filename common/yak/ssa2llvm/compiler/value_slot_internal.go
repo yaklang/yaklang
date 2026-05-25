@@ -35,7 +35,7 @@ func (c *Compiler) isSlotBackedValue(id int64) bool {
 		return false
 	}
 	switch valObj.(type) {
-	case *ssa.ConstInst, *ssa.Undefined, *ssa.Phi:
+	case *ssa.ConstInst, *ssa.Undefined:
 		return false
 	}
 	if _, ok := ssa.ToFunction(valObj); ok {
@@ -78,7 +78,11 @@ func (c *Compiler) ensureValueSlot(id int64) llvm.Value {
 	c.function.valueSlots[id] = slot
 
 	if !restoreBB.IsNil() {
-		c.Builder.SetInsertPointAtEnd(restoreBB)
+		if c.blockHasTerminator(restoreBB) {
+			c.setInsertPointBeforeTerminator(restoreBB)
+		} else {
+			c.Builder.SetInsertPointAtEnd(restoreBB)
+		}
 	}
 	c.function.activeBlockID = prevActive
 	return slot
