@@ -666,26 +666,8 @@ jobs:
       - name: Push Version Info to OSS
         run: |
           echo "start to handle versions"
-          if [ -f current_version.txt ]; then rm current_version.txt; fi
-          if [ -f new_history_versions.txt ]; then rm new_history_versions.txt; fi
-          
-          echo "${{ env.YAK_TAG }}" > current_version.txt
-          # check if history_versions.txt url 404 existed
-          HISTORY_URL="https://aliyun-oss.yaklang.com/yak/version-info/history_versions.txt"
-          if wget --spider --server-response "$HISTORY_URL" 2>&1 | grep 'HTTP/.* 200' >/dev/null; then
-            echo "Downloading history_versions.txt..."
-            wget -O history_versions.txt -q $HISTORY_URL
-            # 去重：当前版本置顶，历史版本中已存在的当前版本会被过滤，避免 rerun CI 产生重复
-            { cat ./current_version.txt; cat history_versions.txt; } | awk '!seen[$0]++' > new_history_versions.txt
-          else
-            echo "history_versions.txt not found or server did not return HTTP 200 for $HISTORY_URL, skipping download."
-            cat ./current_version.txt > new_history_versions.txt
-          fi
-          
-          echo "Uploading version.txt to oss"
-          cat new_history_versions.txt | head -n 100
-          cat new_history_versions.txt | head -n 100 > active_versions.txt
-          
+          bash ./scripts/prepare-version-info-for-oss.sh "${{ env.YAK_TAG }}"
+
           LINUX_BINARY=$(ls | grep -E "(yak|yaklang_(yakit|irify))_linux_amd64$" | head -n 1)
           "./$LINUX_BINARY" upload-oss -f 'new_history_versions.txt:/yak/version-info/history_versions.txt' -ak ${{ secrets.OSS_KEY_ID }} -sk ${{ secrets.OSS_KEY_SECRET }} -t 5
           "./$LINUX_BINARY" upload-oss -f 'active_versions.txt:/yak/version-info/active_versions.txt' -ak ${{ secrets.OSS_KEY_ID }} -sk ${{ secrets.OSS_KEY_SECRET }} -t 5
