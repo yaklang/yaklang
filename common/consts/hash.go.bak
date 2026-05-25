@@ -20,4 +20,4 @@ const ExistedBuildInForgeEmbedFSHash string = "533895adcf65bf6f02d445fe7dcc7992f
 // ExistedBuildInAIToolEmbedFSHash contains the SHA256 hash of the embedded AI tool filesystem.
 // This hash is used to verify the integrity of AI-related tools and configurations embedded in the binary.
 // These tools include AI-powered analysis engines and machine learning models for security testing.
-const ExistedBuildInAIToolEmbedFSHash string = "e6ab480fbac853033439578791ad40639f77b4ed4df828fdeb561a40ce6d0f71"
+const ExistedBuildInAIToolEmbedFSHash string = "0e61191b67baae5ac53b3c6fb1d485e379060fce0ac9341336d6809c4e13da27"
