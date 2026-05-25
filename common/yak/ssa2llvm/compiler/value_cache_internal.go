@@ -19,44 +19,28 @@ func (c *Compiler) cacheValue(id int64, val llvm.Value) {
 	if c == nil || id <= 0 || val.IsNil() {
 		return
 	}
-	c.Values[id] = val
-	if c.function == nil {
+	if c.isSlotBackedValue(id) {
+		c.storeSSAValue(id, val)
 		return
 	}
-	if c.function.valueBlock == nil {
-		c.function.valueBlock = make(map[int64]int64)
-	}
-	if blockID := c.function.activeBlockID; blockID > 0 {
-		c.function.valueBlock[id] = blockID
-	}
+	c.Values[id] = val
 }
 
 func (c *Compiler) getCachedValue(contextInst ssa.Instruction, id int64) (llvm.Value, bool) {
-	if c == nil {
+	if c == nil || id <= 0 {
 		return llvm.Value{}, false
+	}
+	if c.isSlotBackedValue(id) {
+		if !c.isSSAValueStored(id) {
+			return llvm.Value{}, false
+		}
+		return c.loadSSAValue(id), true
 	}
 	val, ok := c.Values[id]
 	if !ok || val.IsNil() {
 		return llvm.Value{}, false
 	}
-	if c.isPortableCachedValue(id, val) {
-		return val, true
-	}
-
-	useBlockID := c.useBlockID(contextInst)
-	if useBlockID <= 0 || c.function == nil {
-		return val, true
-	}
-
-	defBlockID, recorded := c.function.valueBlock[id]
-	if !recorded || defBlockID == useBlockID {
-		return val, true
-	}
-	if blockDominates(c.function.blockDominators, defBlockID, useBlockID) {
-		return val, true
-	}
-
-	return llvm.Value{}, false
+	return val, true
 }
 
 func (c *Compiler) isPortableCachedValue(id int64, val llvm.Value) bool {

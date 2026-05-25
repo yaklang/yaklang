@@ -35,7 +35,7 @@ func (c *Compiler) compileTaggedObfCall(inst *ssa.Call) (bool, error) {
 
 	callResult := c.Builder.CreateCall(fnType, fn, args, "")
 	if inst.GetId() > 0 {
-		c.Values[inst.GetId()] = callResult
+		c.cacheValue(inst.GetId(), callResult)
 	}
 	return true, nil
 }

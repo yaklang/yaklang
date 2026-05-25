@@ -101,7 +101,7 @@ func (c *Compiler) compileRecover(inst *ssa.Recover) error {
 		return err
 	}
 	if inst.GetId() > 0 {
-		c.Values[inst.GetId()] = c.coerceToInt64(val)
+		c.cacheValue(inst.GetId(), c.coerceToInt64(val))
 	}
 	return nil
 }

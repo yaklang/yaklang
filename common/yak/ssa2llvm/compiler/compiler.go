@@ -166,7 +166,8 @@ func (c *Compiler) CompileFunction(fn *ssa.Function) error {
 	}
 
 	c.function = newFunctionCompileContext(fn)
-	c.function.blockDominators = computeBlockDominators(fn)
+	c.Values = make(map[int64]llvm.Value)
+	c.Blocks = make(map[int64]llvm.BasicBlock)
 	defer func() {
 		c.function = nil
 	}()
@@ -322,7 +323,15 @@ func (c *Compiler) CompileFunction(fn *ssa.Function) error {
 				}
 
 				if condID != -1 {
-					condVal, _ := c.Values[condID]
+					var contextInst ssa.Instruction
+					if condInst, ok := fn.GetInstructionById(condID); ok {
+						contextInst = condInst
+					}
+					condVal, err := c.getValue(contextInst, condID)
+					if err != nil {
+						return err
+					}
+					condVal = c.coerceToI1(condVal, "if_cond")
 					trueBlock := c.Blocks[blockObj.Succs[0]]
 					falseBlock := c.Blocks[blockObj.Succs[1]]
 					c.Builder.CreateCondBr(condVal, trueBlock, falseBlock)

@@ -70,7 +70,7 @@ func (c *Compiler) compileLoop(inst *ssa.Loop) error {
 func (c *Compiler) compilePhi(inst *ssa.Phi) error {
 	phiType := c.inferPhiType(inst)
 	phiNode := c.Builder.CreatePHI(phiType, fmt.Sprintf("phi_%d", inst.GetId()))
-	c.cacheValue(inst.GetId(), phiNode)
+	c.Values[inst.GetId()] = phiNode
 	return nil
 }
 
@@ -263,6 +263,30 @@ func (c *Compiler) resolvePhiIncomingValue(contextInst *ssa.Phi, fn *ssa.Functio
 		}
 	}
 	return c.getValue(contextInst, edgeValID)
+}
+
+func predecessorBlockIDs(fn *ssa.Function, blockID int64) []int64 {
+	if fn == nil || blockID <= 0 {
+		return nil
+	}
+	var preds []int64
+	for _, fromID := range fn.Blocks {
+		fromVal, ok := fn.GetValueById(fromID)
+		if !ok {
+			continue
+		}
+		fromBB, ok := ssa.ToBasicBlock(fromVal)
+		if !ok || fromBB == nil {
+			continue
+		}
+		for _, succID := range fromBB.Succs {
+			if succID == blockID {
+				preds = append(preds, fromID)
+				break
+			}
+		}
+	}
+	return preds
 }
 
 func (c *Compiler) gatherLLVMPredecessors(target llvm.BasicBlock) []llvm.BasicBlock {

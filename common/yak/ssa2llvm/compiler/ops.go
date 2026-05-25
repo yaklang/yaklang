@@ -48,6 +48,13 @@ func (c *Compiler) compileInstruction(inst ssa.Instruction) error {
 	}
 }
 
+func (c *Compiler) finishGetValue(contextInst ssa.Instruction, id int64) (llvm.Value, error) {
+	if val, ok := c.getCachedValue(contextInst, id); ok {
+		return val, nil
+	}
+	return llvm.Value{}, fmt.Errorf("getValue: value %d not materialized", id)
+}
+
 // getValue resolves an SSA value ID to an LLVM value, performing lazy compilation
 // for constants if they haven't been visited yet.
 func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, error) {
@@ -94,7 +101,7 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 			return llvm.Value{}, err
 		}
 		// Should be in cache now
-		if val, ok := c.Values[id]; ok {
+		if val, ok := c.getCachedValue(contextInst, id); ok {
 			return val, nil
 		}
 		return llvm.Value{}, fmt.Errorf("getValue: compileConst succeded but value %d not cached", id)
@@ -102,7 +109,7 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 
 	// 3. Lazy compile if Phi (pre-created in pass 1, resolved in pass 2)
 	if phi, ok := valObj.(*ssa.Phi); ok && phi != nil {
-		if val, ok := c.Values[id]; ok {
+		if val, ok := c.Values[id]; ok && !val.IsNil() {
 			return val, nil
 		}
 		return llvm.Value{}, fmt.Errorf("getValue: phi value %d not pre-created", id)
@@ -110,12 +117,10 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 
 	// 4. Lazy compile if Parameter (function argument / closure binding)
 	if param, ok := ssa.ToParameter(valObj); ok && param != nil {
-		var loaded llvm.Value
 		var loadedOK bool
 		err := c.withEntryInsertPoint(fn, func() error {
 			val, ok := c.loadBoundParameterValue(fn, param)
 			if ok {
-				loaded = val
 				loadedOK = true
 				c.cacheValue(id, val)
 			}
@@ -125,14 +130,14 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 			return llvm.Value{}, err
 		}
 		if loadedOK {
-			return loaded, nil
+			return c.finishGetValue(contextInst, id)
 		}
 		if def := param.GetDefault(); def != nil {
 			if ssaFn, ok := ssa.ToFunction(def); ok && ssaFn != nil {
 				llvmFn, _ := c.getOrDeclareLLVMFunction(ssaFn)
 				val := c.Builder.CreatePtrToInt(llvmFn, c.LLVMCtx.Int64Type(), "yak_fn_i64")
 				c.cacheValue(id, val)
-				return val, nil
+				return c.finishGetValue(contextInst, id)
 			}
 			if defConst, ok := ssa.ToConstInst(def); ok {
 				if err := c.compileConst(defConst); err == nil {
@@ -144,7 +149,7 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 		}
 		val := llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)
 		c.cacheValue(id, val)
-		return val, nil
+		return c.finishGetValue(contextInst, id)
 	}
 
 	// 5. Treat unresolved globals / placeholders as nil i64 for compile-through.
@@ -165,7 +170,7 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 		if err != nil {
 			return llvm.Value{}, err
 		}
-		if val, ok := c.Values[id]; ok {
+		if val, ok := c.getCachedValue(contextInst, id); ok {
 			return val, nil
 		}
 		return llvm.Value{}, fmt.Errorf("getValue: compileParameterMember succeeded but value %d not cached", id)
@@ -176,7 +181,7 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 		if err := c.compileTypeCast(tc); err != nil {
 			return llvm.Value{}, err
 		}
-		if val, ok := c.Values[id]; ok {
+		if val, ok := c.getCachedValue(contextInst, id); ok {
 			return val, nil
 		}
 		return llvm.Value{}, fmt.Errorf("getValue: compileTypeCast succeeded but value %d not cached", id)
@@ -190,7 +195,7 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 		if err != nil {
 			return llvm.Value{}, err
 		}
-		if val, ok := c.Values[id]; ok {
+		if val, ok := c.getCachedValue(contextInst, id); ok {
 			return val, nil
 		}
 		return llvm.Value{}, fmt.Errorf("getValue: compileSideEffect succeeded but value %d not cached", id)
@@ -204,7 +209,7 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 		if err != nil {
 			return llvm.Value{}, err
 		}
-		if val, ok := c.Values[id]; ok {
+		if val, ok := c.getCachedValue(contextInst, id); ok {
 			return val, nil
 		}
 		return llvm.Value{}, fmt.Errorf("getValue: compileMake succeeded but value %d not cached", id)
@@ -218,7 +223,7 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 		if err != nil {
 			return llvm.Value{}, err
 		}
-		if val, ok := c.Values[id]; ok {
+		if val, ok := c.getCachedValue(contextInst, id); ok {
 			return val, nil
 		}
 		return llvm.Value{}, fmt.Errorf("getValue: compileBinOp succeeded but value %d not cached", id)
@@ -232,7 +237,7 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 		if err != nil {
 			return llvm.Value{}, err
 		}
-		if val, ok := c.Values[id]; ok {
+		if val, ok := c.getCachedValue(contextInst, id); ok {
 			return val, nil
 		}
 		return llvm.Value{}, fmt.Errorf("getValue: compileCall succeeded but value %d not cached", id)
@@ -246,13 +251,27 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 		if err != nil {
 			return llvm.Value{}, err
 		}
-		if val, ok := c.Values[id]; ok {
+		if val, ok := c.getCachedValue(contextInst, id); ok {
 			return val, nil
 		}
 		return llvm.Value{}, fmt.Errorf("getValue: compileUnOp succeeded but value %d not cached", id)
 	}
 
-	// 13. Lazy compile if Next
+	// 13. Lazy compile if Recover
+	if rec, ok := valObj.(*ssa.Recover); ok {
+		err := c.withLazyCompileInsertPoint(contextInst, rec, func() error {
+			return c.compileRecover(rec)
+		})
+		if err != nil {
+			return llvm.Value{}, err
+		}
+		if val, ok := c.getCachedValue(contextInst, id); ok {
+			return val, nil
+		}
+		return llvm.Value{}, fmt.Errorf("getValue: compileRecover succeeded but value %d not cached", id)
+	}
+
+	// 14. Lazy compile if Next
 	if next, ok := valObj.(*ssa.Next); ok {
 		err := c.withLazyCompileInsertPoint(contextInst, next, func() error {
 			return c.compileNext(next)
@@ -260,13 +279,13 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 		if err != nil {
 			return llvm.Value{}, err
 		}
-		if val, ok := c.Values[id]; ok {
+		if val, ok := c.getCachedValue(contextInst, id); ok {
 			return val, nil
 		}
 		return llvm.Value{}, fmt.Errorf("getValue: compileNext succeeded but value %d not cached", id)
 	}
 
-	// 14. Generic MemberCall
+	// 15. Generic MemberCall
 	if mc, ok := valObj.(ssa.MemberCall); ok && mc.IsMember() {
 		targetInst, _ := valObj.(ssa.Instruction)
 		err := c.withLazyCompileInsertPoint(contextInst, targetInst, func() error {
@@ -275,20 +294,20 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 		if err != nil {
 			return llvm.Value{}, err
 		}
-		if val, ok := c.Values[id]; ok {
+		if val, ok := c.getCachedValue(contextInst, id); ok {
 			return val, nil
 		}
 		return llvm.Value{}, fmt.Errorf("getValue: compileMemberCall succeeded but value %d not cached", id)
 	}
 
-	// 15. Function values are materialized as i64 function pointers in the
+	// 16. Function values are materialized as i64 function pointers in the
 	// unified InvokeContext representation.
 	if ssaFn, ok := ssa.ToFunction(valObj); ok && ssaFn != nil {
 		llvmFn, _ := c.getOrDeclareLLVMFunction(ssaFn)
 		return c.Builder.CreatePtrToInt(llvmFn, c.LLVMCtx.Int64Type(), "yak_fn_i64"), nil
 	}
 
-	// 16. Return error if not found and not a constant
+	// 17. Return error if not found and not a constant
 	// This usually means we are referencing an instruction that hasn't been compiled yet
 	// (back-edge or dependency order issue) or not implemented.
 	return llvm.Value{}, fmt.Errorf("getValue: value %d (%T) not found (dependency missing?)", id, valObj)
@@ -344,7 +363,7 @@ func (c *Compiler) compileBinOp(inst *ssa.BinOp, resultID int64) error {
 	}
 
 	c.cacheValue(resultID, val)
-	if err := c.maybeEmitMemberSet(inst, inst, val); err != nil {
+	if err := c.maybeEmitMemberSet(inst, inst, resultID); err != nil {
 		return err
 	}
 	return nil
@@ -361,7 +380,7 @@ func (c *Compiler) compileConst(inst *ssa.ConstInst) error {
 	if inst.GetRawValue() == nil {
 		llvmVal := llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)
 		c.cacheValue(id, llvmVal)
-		if err := c.maybeEmitMemberSet(inst, inst, llvmVal); err != nil {
+		if err := c.maybeEmitMemberSet(inst, inst, id); err != nil {
 			return err
 		}
 		return nil
@@ -371,7 +390,7 @@ func (c *Compiler) compileConst(inst *ssa.ConstInst) error {
 		val := inst.Number()
 		llvmVal := llvm.ConstInt(c.LLVMCtx.Int64Type(), uint64(val), true) // Signed
 		c.cacheValue(id, llvmVal)
-		if err := c.maybeEmitMemberSet(inst, inst, llvmVal); err != nil {
+		if err := c.maybeEmitMemberSet(inst, inst, id); err != nil {
 			return err
 		}
 		return nil
@@ -379,7 +398,7 @@ func (c *Compiler) compileConst(inst *ssa.ConstInst) error {
 		bits := math.Float64bits(inst.Float())
 		llvmVal := llvm.ConstInt(c.LLVMCtx.Int64Type(), bits, false)
 		c.cacheValue(id, llvmVal)
-		if err := c.maybeEmitMemberSet(inst, inst, llvmVal); err != nil {
+		if err := c.maybeEmitMemberSet(inst, inst, id); err != nil {
 			return err
 		}
 		return nil
@@ -396,7 +415,7 @@ func (c *Compiler) compileConst(inst *ssa.ConstInst) error {
 		}
 		llvmVal := llvm.ConstInt(c.LLVMCtx.Int64Type(), iVal, false)
 		c.cacheValue(id, llvmVal)
-		if err := c.maybeEmitMemberSet(inst, inst, llvmVal); err != nil {
+		if err := c.maybeEmitMemberSet(inst, inst, id); err != nil {
 			return err
 		}
 		return nil
@@ -408,7 +427,7 @@ func (c *Compiler) compileConst(inst *ssa.ConstInst) error {
 		// raw C-string pointers.
 		llvmVal := llvm.ConstPtrToInt(ptr, c.LLVMCtx.Int64Type())
 		c.cacheValue(id, llvmVal)
-		if err := c.maybeEmitMemberSet(inst, inst, llvmVal); err != nil {
+		if err := c.maybeEmitMemberSet(inst, inst, id); err != nil {
 			return err
 		}
 		return nil
@@ -420,7 +439,7 @@ func (c *Compiler) compileConst(inst *ssa.ConstInst) error {
 	fmt.Printf("WARNING: Unsupported constant type for %v (ID: %d)\n", inst.GetRawValue(), id)
 	llvmVal := llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)
 	c.cacheValue(id, llvmVal)
-	if err := c.maybeEmitMemberSet(inst, inst, llvmVal); err != nil {
+	if err := c.maybeEmitMemberSet(inst, inst, id); err != nil {
 		return err
 	}
 	return nil
@@ -476,7 +495,7 @@ func (c *Compiler) compileTypeCast(inst *ssa.TypeCast) error {
 
 	val = c.coerceToInt64(val)
 	c.cacheValue(inst.GetId(), val)
-	if err := c.maybeEmitMemberSet(inst, inst, val); err != nil {
+	if err := c.maybeEmitMemberSet(inst, inst, inst.GetId()); err != nil {
 		return err
 	}
 	return nil
