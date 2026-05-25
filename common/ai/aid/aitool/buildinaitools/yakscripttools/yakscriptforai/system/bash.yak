@@ -355,7 +355,7 @@ commandRuns = (cmdline)=>{
 detectBashPath = ()=>{
     candidates := []
 
-    if commandRuns("bash --version") {
+    if osType != "windows" && commandRuns("bash --version") {
         return "bash"
     }
 
