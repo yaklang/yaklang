@@ -225,10 +225,10 @@ func TestGrepTool_RegexpDollarMatchesLineEnd(t *testing.T) {
 	t.Log("✓ regexp $ correctly matches line end (multi-line mode)")
 }
 
-// TestGrepTool_SameLineDedup verifies that when a pattern matches multiple times
-// on the same line, grep reports the line only ONCE — matching bash grep behavior.
-// Bash `grep 'foo'` on "foo bar foo baz foo\n" outputs 1 line, not 3.
-func TestGrepTool_SameLineDedup(t *testing.T) {
+// TestGrepTool_SameLineMultipleMatches verifies that content mode reports each
+// occurrence on the same line. This is intentional for bundled/minified JS where
+// one long line may contain many API-like matches.
+func TestGrepTool_SameLineMultipleMatches(t *testing.T) {
 	grepTool := getGrepToolFromEmbed(t)
 
 	content := "aaa bbb aaa ccc aaa\nxxx\naaa end\n"
@@ -256,16 +256,16 @@ func TestGrepTool_SameLineDedup(t *testing.T) {
 	t.Logf("stdout:\n%s", stdoutStr)
 
 	// "aaa" appears on line 1 (3 times) and line 3 (1 time).
-	// Bash grep would output 2 lines. Current grep.yak may report 4 matches.
-	// We expect exactly 2 match entries in findRes (one per line).
-	if !strings.Contains(stdoutStr, "2 matches") {
-		t.Fatalf("expected 2 matches (one per matching line, like bash grep), got:\n%s", stdoutStr)
+	// Content mode intentionally reports all 4 occurrences.
+	if !strings.Contains(stdoutStr, "4 matches") {
+		t.Fatalf("expected 4 matches (one per occurrence), got:\n%s", stdoutStr)
 	}
 }
 
-// TestGrepTool_RegexpSameLineDedup verifies same-line dedup works in regexp mode too.
-// Pattern `\d+` on "a1b2c3\n" should report 1 line, not 3 matches.
-func TestGrepTool_RegexpSameLineDedup(t *testing.T) {
+// TestGrepTool_RegexpSameLineMultipleMatches verifies same-line multi-match
+// output works in regexp mode too.
+// Pattern `\d+` on "a1b2c3\n" should report 3 occurrences on that line.
+func TestGrepTool_RegexpSameLineMultipleMatches(t *testing.T) {
 	grepTool := getGrepToolFromEmbed(t)
 
 	content := "a1b2c3\nno digits here\nx9y\n"
@@ -294,9 +294,8 @@ func TestGrepTool_RegexpSameLineDedup(t *testing.T) {
 	t.Logf("stdout:\n%s", stdoutStr)
 
 	// \d+ matches 3 times on line 1 ("1","2","3") and once on line 3 ("9").
-	// Like bash grep -E '\d+', we should get 2 matching lines, not 4 individual matches.
-	if !strings.Contains(stdoutStr, "2 matches") {
-		t.Fatalf("expected 2 matches (one per matching line), got:\n%s", stdoutStr)
+	if !strings.Contains(stdoutStr, "4 matches") {
+		t.Fatalf("expected 4 matches (one per occurrence), got:\n%s", stdoutStr)
 	}
 }
 
