@@ -408,14 +408,7 @@ Few-shot example 2 (valid directly_call_tool):
 		if params == nil {
 			params = make(aitool.InvokeParams)
 		}
-		paramNames := getDirectlyCallToolParamNames(loop, toolName)
-		mergedBlockParams := aicommon.ResolveToolParamAITags(
-			action,
-			params,
-			loop.Get(directlyCallToolResponseLoopKey),
-			loop.Get(directlyCallToolNonceLoopKey),
-			paramNames,
-		)
+		mergedBlockParams := aicommon.MergeActionAITagParams(action, params, getDirectlyCallToolParamNames(loop, toolName))
 		if len(mergedBlockParams) > 0 {
 			notes = append(notes, fmt.Sprintf("merged %d AITAG block params: %s", len(mergedBlockParams), strings.Join(mergedBlockParams, ", ")))
 		}

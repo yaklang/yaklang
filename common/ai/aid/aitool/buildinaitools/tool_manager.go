@@ -847,20 +847,9 @@ func buildStubToolFromMCPCache(fullName string, cfg *schema.MCPServerToolConfig)
 		desc = prefix + desc
 	}
 
-	// Usage mirrors live tool: tells parameter-generation prompt this is a
-	// remote MCP tool and should not be bridged via call_yak_plugin.
-	usage := fmt.Sprintf(
-		"This is a remote MCP tool provided by server %q. "+
-			"Pass parameters exactly as defined in the schema; the system will forward them to the MCP server automatically. "+
-			"Do NOT call this tool via call_yak_plugin — use require_tool %s directly. "+
-			"Note: the MCP server may still be connecting; if this call fails with TOOL_INITIALIZING, retry after a moment.",
-		serverName, fullName,
-	)
-
 	opts := []aitool.ToolOption{
 		aitool.WithMCPPendingStub(true),
 		aitool.WithDescription(desc),
-		aitool.WithUsage(usage),
 		aitool.WithKeywords([]string{"mcp", serverName, toolName, "external", "remote"}),
 		aitool.WithVerboseName(fmt.Sprintf("%s (MCP:%s)", toolName, serverName)),
 		// Callback returns a retryable error so AI can degrade gracefully

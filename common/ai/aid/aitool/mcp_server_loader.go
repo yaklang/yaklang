@@ -250,19 +250,9 @@ func convertMCPToolToAITool(mcpTool *mcp.Tool, server *schema.MCPServer, mcpClie
 		description = fmt.Sprintf("[MCP:%s] %s", server.Name, description)
 	}
 
-	// Usage tells the parameter-generation prompt that this is a remote MCP
-	// tool and parameters should be passed directly per the JSON schema.
-	usage := fmt.Sprintf(
-		"This is a remote MCP tool provided by server %q. "+
-			"Pass parameters exactly as defined in the schema; the system will forward them to the MCP server automatically. "+
-			"Do NOT call this tool via call_yak_plugin — use require_tool %s directly.",
-		server.Name, toolName,
-	)
-
 	aiTool, err := NewFromMCPTool(
 		mcpTool,
 		WithDescription(description),
-		WithUsage(usage),
 		WithKeywords([]string{"mcp", server.Name, mcpTool.Name, "external", "remote"}),
 		WithVerboseName(fmt.Sprintf("%s (MCP:%s)", mcpTool.Name, server.Name)),
 		WithCallback(createToolCallback(mcpClient, mcpTool.Name, server.Name)),
