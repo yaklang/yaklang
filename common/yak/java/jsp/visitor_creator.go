@@ -104,14 +104,20 @@ func wrapStandaloneJSPFragment(src string) string {
 	return "<yak:fragment>" + src + "</yak:fragment>"
 }
 
+// preprocessJavascriptHrefQuotes normalizes href="javascript:..."> bodies so nested
+// double quotes do not break the JSP/HTML lexer. Each match spans from after `="` to
+// the closing `">` of that attribute value.
 func preprocessJavascriptHrefQuotes(src string) string {
 	const marker = `="javascript:`
+	// searchFrom advances per match; do not restart Index from 0 after edits/skips.
+	searchFrom := 0
 	for {
-		start := strings.Index(src, marker)
-		if start < 0 {
+		relStart := strings.Index(src[searchFrom:], marker)
+		if relStart < 0 {
 			return src
 		}
-		bodyStart := start + 2
+		start := searchFrom + relStart
+		bodyStart := start + 2 // skip leading `="` of marker
 		endRel := strings.Index(src[bodyStart:], `">`)
 		if endRel < 0 {
 			return src
@@ -121,8 +127,10 @@ func preprocessJavascriptHrefQuotes(src string) string {
 		if strings.Count(body, `"`) > 0 {
 			body = strings.ReplaceAll(body, `"`, `'`)
 			src = src[:bodyStart] + body + src[end:]
+			searchFrom = bodyStart + len(body)
 		} else {
-			src = src[:end] + src[end:]
+			// Nothing to rewrite; must still skip past `">` or the same match repeats forever.
+			searchFrom = end + 2
 		}
 	}
 }
