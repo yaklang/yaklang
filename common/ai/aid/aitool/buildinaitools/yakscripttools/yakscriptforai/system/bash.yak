@@ -1,4 +1,4 @@
-__DESC__ = "跨平台Shell命令执行工具，支持bash/cmd/powershell，具备超时控制和输出捕获。bash 与 powershell 脚本默认都不启用命令追踪，不默认回显执行中的命令，适用于系统管理、自动化脚本和运维操作。"
+__DESC__ = "跨平台Shell命令执行工具，支持bash/cmd/powershell，具备超时控制和输出捕获。bash 默认以登录 shell 执行以加载系统和用户 profile 中的 PATH/环境变量，不额外启用 set -e 或命令追踪，行为更接近原生终端执行。"
 __VERBOSE_NAME__ = "跨平台Shell命令执行工具"
 __KEYWORDS__ = "shell command,bash,cmd,powershell,命令行工具,系统管理,自动化脚本,运维工具,shell script,command execution,系统操作,终端命令,system administration,automation tools,操作系统,跨平台命令,timeout,超时控制,python script,pandas,data analysis,excel analysis,csv cache,data cache,批量分析"
 
@@ -23,13 +23,19 @@ Optional:
                         - Network commands (curl, wget, ping -c N): 30-60
                         - Build/compile/install (make, go build, pip install): 120-300
   shell     (string)  Shell type: "bash" | "cmd" | "powershell"
-                      Default: auto-detect (linux/mac -> bash, windows -> cmd)
+                      Default: auto-detect (linux/mac -> bash,
+                      windows -> bash if Git Bash/MSYS/Cygwin bash exists,
+                      otherwise powershell/cmd)
 
 ## Execution Characteristics
 
-bash:  set -e (exit on error), does not enable command trace by default
-cmd:   executes via "cmd /c", backslashes MUST be escaped: "C:\\Users"
-powershell: $ErrorActionPreference="Stop", does not enable trace by default
+bash:  executes a temporary script via "bash --login <script>" so /etc/profile
+       and user bash profile files can populate default PATH/environment.
+       It does not force set -e or command tracing.
+cmd:   executes via "cmd.exe /d /s /c <command>", backslashes MUST be escaped:
+       "C:\\Users"
+powershell: executes a temporary script via PowerShell with normal profile loading;
+            it does not force $ErrorActionPreference or command tracing.
 
 ## Safety Rules
 
@@ -306,28 +312,141 @@ Get-Service |
 8. ** DATA CACHING ** -- When analyzing large data files (Excel > 10MB), save a CSV cache
    after the first read. Subsequent scripts should check for and use the cache.
    Save analysis results to JSON files so downstream tasks can reuse them.
-9. ** WINDOWS TARGETS ** -- Set shell explicitly to "cmd" or "powershell" when generating
-   Windows commands. This avoids mixing Bash syntax with Windows command syntax.
+9. ** WINDOWS TARGETS ** -- The tool prefers bash on Windows when Git Bash/MSYS/Cygwin
+   bash is available. Set shell explicitly to "cmd" or "powershell" when generating
+   Windows-native commands. This avoids mixing Bash syntax with Windows command syntax.
 USAGE_BLOCK
 
 yakit.AutoInitYakit()
 
 // 解析命令行参数：超时时间、shell类型和要执行的命令
 timeoutSeconds := cli.Int("timeout", cli.setRequired(false), cli.setHelp("the timeout seconds for the shell command, default 60. Commands exceeding this timeout will be killed. Set a reasonable value to avoid hanging. IMPORTANT: Avoid indefinite commands like 'tail -f', 'ping' without -c, 'watch', etc."), cli.setDefault(60))
-shellType := cli.String("shell", cli.setRequired(false), cli.setHelp("shell type: bash, cmd, powershell. Auto-detect if not specified (linux/mac: bash, windows: cmd)"), cli.setDefault(""))
+shellType := cli.String("shell", cli.setRequired(false), cli.setHelp("shell type: bash, cmd, powershell. Auto-detect if not specified (linux/mac: bash, windows: bash if available, otherwise powershell/cmd)"), cli.setDefault(""))
 command := cli.String("command", cli.setRequired(true), cli.setHelp("the shell command you want to execute. IMPORTANT: Avoid commands that run indefinitely (e.g., tail -f, ping without -c, watch). For potentially long-running commands, use timeout wrapper or add limits."))
 
 cli.check()
 
 // 获取操作系统类型
 osType = os.OS
+shellType = str.ToLower(str.TrimSpace(shellType))
+
+// exec.CommandContext in Yak accepts a single command line and splits it with shlex.
+// Quote every dynamic argument so paths with spaces and user commands stay intact.
+quoteForExec = (s)=>{
+    if s == "" {
+        return "''"
+    }
+    return "'" + str.ReplaceAll(s, "'", "'\\''") + "'"
+}
+
+commandRuns = (cmdline)=>{
+    probeCtx, probeCancel := context.WithTimeout(context.Background(), time.ParseDuration("3s")~)
+    defer probeCancel()
+
+    probeCmd, probeErr := exec.CommandContext(probeCtx, cmdline)
+    if probeErr != nil {
+        return false
+    }
+
+    probeErr = probeCmd.Run()
+    return probeErr == nil
+}
+
+detectBashPath = ()=>{
+    candidates := []
+
+    if commandRuns("bash --version") {
+        return "bash"
+    }
+
+    if osType == "windows" {
+        programFiles := os.Getenv("ProgramFiles")
+        programFilesX86 := os.Getenv("ProgramFiles(x86)")
+        localAppData := os.Getenv("LOCALAPPDATA")
+        userProfile := os.Getenv("USERPROFILE")
+
+        if programFiles != "" {
+            candidates = append(candidates, file.Join(programFiles, "Git", "bin", "bash.exe"))
+            candidates = append(candidates, file.Join(programFiles, "Git", "usr", "bin", "bash.exe"))
+        }
+        if programFilesX86 != "" {
+            candidates = append(candidates, file.Join(programFilesX86, "Git", "bin", "bash.exe"))
+            candidates = append(candidates, file.Join(programFilesX86, "Git", "usr", "bin", "bash.exe"))
+        }
+        if localAppData != "" {
+            candidates = append(candidates, file.Join(localAppData, "Programs", "Git", "bin", "bash.exe"))
+            candidates = append(candidates, file.Join(localAppData, "Programs", "Git", "usr", "bin", "bash.exe"))
+        }
+        if userProfile != "" {
+            candidates = append(candidates, file.Join(userProfile, "scoop", "apps", "git", "current", "bin", "bash.exe"))
+            candidates = append(candidates, file.Join(userProfile, "scoop", "apps", "git", "current", "usr", "bin", "bash.exe"))
+        }
+
+        candidates = append(candidates, `C:\msys64\usr\bin\bash.exe`)
+        candidates = append(candidates, `C:\msys64\mingw64\bin\bash.exe`)
+        candidates = append(candidates, `C:\cygwin64\bin\bash.exe`)
+    } else {
+        candidates = append(candidates, "/bin/bash")
+        candidates = append(candidates, "/usr/bin/bash")
+        candidates = append(candidates, "/usr/local/bin/bash")
+        candidates = append(candidates, "/opt/homebrew/bin/bash")
+    }
+
+    for _, candidate := range candidates {
+        if candidate != "" && file.IsExisted(candidate) {
+            return candidate
+        }
+    }
+
+    return ""
+}
+
+detectPowerShellPath = ()=>{
+    if commandRuns("pwsh -Version") {
+        return "pwsh"
+    }
+    if commandRuns("powershell.exe -Version") {
+        return "powershell.exe"
+    }
+    if commandRuns("powershell -Version") {
+        return "powershell"
+    }
+    return ""
+}
+
+bashPath := ""
+powershellPath := ""
+
+switch shellType {
+case "bash.exe":
+    shellType = "bash"
+case "cmd.exe":
+    shellType = "cmd"
+case "ps", "pwsh", "powershell.exe":
+    if shellType == "pwsh" {
+        powershellPath = "pwsh"
+    }
+    shellType = "powershell"
+}
 
 // 根据系统类型和用户设置确定shell类型
 if shellType == "" {
     switch osType {
     case "windows":
-        shellType = "cmd"
-        yakit.Info("Auto-detected Windows, using cmd shell")
+        bashPath = detectBashPath()
+        if bashPath != "" {
+            shellType = "bash"
+            yakit.Info("Auto-detected Windows, using bash shell: %v", bashPath)
+        } else {
+            powershellPath = detectPowerShellPath()
+            if powershellPath != "" {
+                shellType = "powershell"
+                yakit.Info("Auto-detected Windows, bash not found, using PowerShell: %v", powershellPath)
+            } else {
+                shellType = "cmd"
+                yakit.Info("Auto-detected Windows, bash/PowerShell not found, using cmd shell")
+            }
+        }
     case "linux", "darwin":
         shellType = "bash"
         yakit.Info("Auto-detected %v, using bash shell", osType)
@@ -356,15 +475,19 @@ var scriptFile = ""
 
 switch shellType {
 case "bash":
-    // Generate a temporary script file with proper bash settings
-    // - set -e: Exit immediately if a command exits with a non-zero status
-    // Keep command tracing disabled by default to avoid noisy stderr output.
-    // This approach avoids quoting/escaping issues while keeping output concise.
+    if bashPath == "" {
+        bashPath = detectBashPath()
+    }
+    if bashPath == "" {
+        yakit.Error("bash shell not found. Install bash or set shell to cmd/powershell on Windows.")
+        return
+    }
     
-    scriptContent := `#!/bin/bash
+    // Generate a temporary script file and run it through a login bash.
+    // This avoids quoting issues while letting profile files populate PATH/env.
+    scriptContent := `#!/usr/bin/env bash
 # Auto-generated script by AI tool
-# Exit on error (prevents catastrophic cascading failures)
-set -e
+# Runs under bash --login; no extra set -e or command tracing is enabled.
 
 # User command starts here
 ` + command + `
@@ -400,22 +523,35 @@ set -e
         yakit.Info("Note: Failed to chmod script file: %v (continuing anyway)", chmodErr)
     }
     
-    yakit.Info("Executing bash script with %d seconds timeout", timeoutSeconds)
+    yakit.Info("Executing bash login shell with %d seconds timeout", timeoutSeconds)
+    yakit.Info("Bash binary: %v", bashPath)
     yakit.Info("Script file: %v", scriptFile)
     
-    // Execute the script using bash
-    cmd, err = exec.CommandContext(ctx, "bash " + scriptFile)
+    // Execute the script using login bash so /etc/profile and user bash profile files load.
+    bashScriptFile := scriptFile
+    if osType == "windows" {
+        // Git Bash/MSYS/Cygwin handle forward-slash Windows paths more reliably.
+        bashScriptFile = str.ReplaceAll(scriptFile, "\\", "/")
+    }
+    cmd, err = exec.CommandContext(ctx, quoteForExec(bashPath) + " --login " + quoteForExec(bashScriptFile))
     
 case "cmd":
-    // For Windows cmd, use direct command execution
+    // For Windows cmd, pass the whole user command as one /c argument.
     yakit.Info("Executing cmd command with %d seconds timeout: %v", timeoutSeconds, command)
-    cmd, err = exec.CommandContext(ctx, "cmd /c " + command)
+    cmd, err = exec.CommandContext(ctx, "cmd.exe /d /s /c " + quoteForExec(command))
     
 case "powershell":
-    // For PowerShell, create a temporary script file as well
+    if powershellPath == "" {
+        powershellPath = detectPowerShellPath()
+    }
+    if powershellPath == "" {
+        yakit.Error("PowerShell shell not found.")
+        return
+    }
+
+    // For PowerShell, create a temporary script file as well.
     scriptContent := `# Auto-generated PowerShell script by AI tool
-# Stop on first error
-$ErrorActionPreference = "Stop"
+# Runs with normal PowerShell profile loading; no extra tracing or ErrorActionPreference is forced.
 
 # User command starts here
 ` + command + `
@@ -443,9 +579,10 @@ $ErrorActionPreference = "Stop"
     }
     
     yakit.Info("Executing PowerShell script with %d seconds timeout", timeoutSeconds)
+    yakit.Info("PowerShell binary: %v", powershellPath)
     yakit.Info("Script file: %v", scriptFile)
     
-    cmd, err = exec.CommandContext(ctx, "powershell.exe -NoProfile -ExecutionPolicy Bypass -File " + scriptFile)
+    cmd, err = exec.CommandContext(ctx, quoteForExec(powershellPath) + " -NoLogo -ExecutionPolicy Bypass -File " + quoteForExec(scriptFile))
     
 default:
     yakit.Error("Unsupported shell type: %v. Supported types: bash, cmd, powershell", shellType)
@@ -455,43 +592,6 @@ default:
 if err != nil {
     yakit.Error("Failed to create %v command: %v", shellType, err)
     return
-}
-
-// 创建输出缓冲区以捕获命令结果
-stdoutbuf = bufio.NewBuffer()
-stderrbuf = bufio.NewBuffer()
-cmd.Stdout = stdoutbuf
-cmd.Stderr = stderrbuf
-
-// 执行命令并处理结果
-startTime = time.Now()
-err = cmd.Run()
-elapsed = time.Since(startTime)
-elapsedSec = int(elapsed.Seconds())
-isTimeout = false
-exitCode = 0
-
-if err != nil {
-    errStr = sprint(err)
-    // 检查是否是超时导致的错误（通过错误信息判断）
-    if str.Contains(errStr, "killed") || str.Contains(errStr, "signal: killed") || str.Contains(errStr, "context deadline exceeded") {
-        isTimeout = true
-        yakit.Info("COMMAND TIMEOUT: The command was killed after %d seconds timeout. The command may be running too long or hanging indefinitely.", timeoutSeconds)
-        yakit.Info("SUGGESTION: For long-running commands, consider using 'timeout' command wrapper (e.g., 'timeout 30 your_command'), or add limits to your command (e.g., 'ping -c 5' instead of 'ping').")
-    } else {
-        // Extract exit code if available
-        if str.Contains(errStr, "exit status") {
-            // Parse exit code from error message like "exit status 1"
-            parts = str.Split(errStr, " ")
-            if len(parts) >= 3 {
-                exitCode = parseInt(parts[len(parts)-1])
-            }
-        }
-        yakit.Error("%v command execution failed (exit code %d): %v", shellType, exitCode, err)
-        if shellType == "bash" {
-            yakit.Info("TIP: Bash uses 'set -e' by default, so the script exits on the first failing command.")
-        }
-    }
 }
 
 // Platform-aware output encoding conversion:
@@ -517,17 +617,89 @@ toUtf8 = (s)=>{
     return codec.FixUTF8(s)
 }
 
-// 输出执行结果
-count := 0
-if stdoutbuf.Len() > 0 {
-    count++
-    yakit.Info("Stdout:\n%v", toUtf8(stdoutbuf.String()))
+// 创建输出缓冲区以捕获命令结果
+stdoutbuf = bufio.NewBuffer()
+stderrbuf = bufio.NewBuffer()
+stdoutPipe, stdoutPipeErr := cmd.StdoutPipe()
+if stdoutPipeErr != nil {
+    yakit.Error("Failed to create stdout pipe: %v", stdoutPipeErr)
+    return
 }
-if stderrbuf.Len() > 0 {
-    count++
-    yakit.Info("Stderr:\n%v", toUtf8(stderrbuf.String()))
+stderrPipe, stderrPipeErr := cmd.StderrPipe()
+if stderrPipeErr != nil {
+    yakit.Error("Failed to create stderr pipe: %v", stderrPipeErr)
+    return
 }
-if count <= 0 {
+
+streamWg := sync.NewWaitGroup()
+streamWg.Add(2)
+stdoutStreamLen := 0
+stderrStreamLen := 0
+
+go func() {
+    defer streamWg.Done()
+    io.ReadEvery1s(context.Background(), stdoutPipe, func(raw) {
+        rawLen := len(raw)
+        if rawLen <= stdoutStreamLen {
+            return true
+        }
+        delta := raw[stdoutStreamLen:]
+        stdoutStreamLen = rawLen
+        stdoutbuf.Write(delta)
+        yakit.Info("Stdout(stream):\n%v", toUtf8(string(delta)))
+        return true
+    })
+}()
+
+go func() {
+    defer streamWg.Done()
+    io.ReadEvery1s(context.Background(), stderrPipe, func(raw) {
+        rawLen := len(raw)
+        if rawLen <= stderrStreamLen {
+            return true
+        }
+        delta := raw[stderrStreamLen:]
+        stderrStreamLen = rawLen
+        stderrbuf.Write(delta)
+        yakit.Info("Stderr(stream):\n%v", toUtf8(string(delta)))
+        return true
+    })
+}()
+
+// 执行命令并处理结果
+startTime = time.Now()
+err = cmd.Run()
+streamWg.Wait()
+elapsed = time.Since(startTime)
+elapsedSec = int(elapsed.Seconds())
+isTimeout = false
+exitCode = 0
+
+if err != nil {
+    errStr = sprint(err)
+    // 检查是否是超时导致的错误（通过错误信息判断）
+    if str.Contains(errStr, "killed") || str.Contains(errStr, "signal: killed") || str.Contains(errStr, "context deadline exceeded") {
+        isTimeout = true
+        yakit.Info("COMMAND TIMEOUT: The command was killed after %d seconds timeout. The command may be running too long or hanging indefinitely.", timeoutSeconds)
+        yakit.Info("SUGGESTION: For long-running commands, consider using 'timeout' command wrapper (e.g., 'timeout 30 your_command'), or add limits to your command (e.g., 'ping -c 5' instead of 'ping').")
+    } else {
+        // Extract exit code if available
+        if str.Contains(errStr, "exit status") {
+            // Parse exit code from error message like "exit status 1"
+            parts = str.Split(errStr, " ")
+            if len(parts) >= 3 {
+                exitCode = parseInt(parts[len(parts)-1])
+            }
+        }
+        yakit.Error("%v command execution failed (exit code %d): %v", shellType, exitCode, err)
+        if shellType == "bash" {
+            yakit.Info("TIP: Bash is executed as a login shell. If PATH/env differs from your terminal, check /etc/profile and your bash profile files.")
+        }
+    }
+}
+
+// 输出已经在执行过程中实时流式打印；这里仅处理无输出场景。
+if stdoutbuf.Len() <= 0 && stderrbuf.Len() <= 0 {
     if isTimeout {
         yakit.Info("No output captured before timeout")
     } else {
