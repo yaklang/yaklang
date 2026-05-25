@@ -12,8 +12,8 @@ type functionCompileContext struct {
 	returnBlock     llvm.BasicBlock
 	activeBlockID   int64
 	compiledBlocks  map[int64]struct{}
-	valueBlock      map[int64]int64
-	blockDominators map[int64]map[int64]struct{}
+	valueSlots     map[int64]llvm.Value
+	storedValues   map[int64]struct{}
 
 	exceptionValueIDs    map[int64]struct{}
 	activeHandlerByBlock map[int64]int64

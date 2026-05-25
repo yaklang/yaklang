@@ -158,7 +158,7 @@ func (c *Compiler) finishContextCall(inst ssa.Instruction, result llvm.Value) er
 	result = c.coerceToInt64(result)
 	c.cacheValue(inst.GetId(), result)
 	if val, ok := inst.(ssa.Value); ok {
-		return c.maybeEmitMemberSet(inst, val, result)
+		return c.maybeEmitMemberSet(inst, val, inst.GetId())
 	}
 	return nil
 }

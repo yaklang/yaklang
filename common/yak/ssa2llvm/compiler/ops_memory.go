@@ -334,7 +334,7 @@ func (c *Compiler) emitRuntimeSetField(objVal llvm.Value, keyStr string, val llv
 	c.Builder.CreateCall(fnType, fn, []llvm.Value{objPtr, keyPtr, intVal}, "")
 }
 
-func (c *Compiler) maybeEmitMemberSet(contextInst ssa.Instruction, val ssa.Value, llvmVal llvm.Value) error {
+func (c *Compiler) maybeEmitMemberSet(contextInst ssa.Instruction, val ssa.Value, resultID int64) error {
 	mc, ok := val.(ssa.MemberCall)
 	if !ok || !mc.IsMember() {
 		return nil
@@ -359,6 +359,10 @@ func (c *Compiler) maybeEmitMemberSet(contextInst ssa.Instruction, val ssa.Value
 		return nil
 	}
 
+	llvmVal, err := c.finishGetValue(contextInst, resultID)
+	if err != nil {
+		return err
+	}
 	c.emitRuntimeSetField(objVal, keyStr, llvmVal, val.GetId())
 	return nil
 }

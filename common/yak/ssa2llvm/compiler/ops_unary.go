@@ -59,7 +59,7 @@ func (c *Compiler) compileUnOp(inst *ssa.UnOp, resultID int64) error {
 	}
 
 	c.cacheValue(resultID, val)
-	if err := c.maybeEmitMemberSet(inst, inst, val); err != nil {
+	if err := c.maybeEmitMemberSet(inst, inst, resultID); err != nil {
 		return err
 	}
 	return nil
