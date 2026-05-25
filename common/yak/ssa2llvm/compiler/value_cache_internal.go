@@ -30,11 +30,11 @@ func (c *Compiler) getCachedValue(contextInst ssa.Instruction, id int64) (llvm.V
 	if c == nil || id <= 0 {
 		return llvm.Value{}, false
 	}
-	if c.isSlotBackedValue(id) {
-		if !c.isSSAValueStored(id) {
-			return llvm.Value{}, false
-		}
+	if c.isSSAValueStored(id) {
 		return c.loadSSAValue(id), true
+	}
+	if c.isSlotBackedValue(id) {
+		return llvm.Value{}, false
 	}
 	val, ok := c.Values[id]
 	if !ok || val.IsNil() {
