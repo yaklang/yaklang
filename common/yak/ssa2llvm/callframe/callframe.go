@@ -291,14 +291,8 @@ func resolveFunctionByName(name string, program *ssa.Program) (*ssa.Function, bo
 }
 
 func ensureProgramZeroConst(program *ssa.Program) int64 {
-	if program == nil {
-		return 0
-	}
-	zero := ssa.NewConst(int64(0))
-	zero.SetProgram(program)
-	program.SetVirtualRegister(zero)
-	program.AddConstInstruction(zero)
-	return zero.GetId()
+	_ = program
+	return 0
 }
 
 func normalizeValueName(name string) string {

@@ -8,10 +8,11 @@ import (
 type functionCompileContext struct {
 	current *ssa.Function
 
-	invokeCtx       llvm.Value
-	returnBlock     llvm.BasicBlock
-	activeBlockID   int64
-	compiledBlocks  map[int64]struct{}
+	invokeCtx      llvm.Value
+	returnBlock    llvm.BasicBlock
+	llvmFn         llvm.Value
+	activeBlockID  int64
+	compiledBlocks map[int64]struct{}
 	valueSlots     map[int64]llvm.Value
 	storedValues   map[int64]struct{}
 

@@ -107,8 +107,7 @@ func (c *Compiler) ensureBasicBlockTerminator(bb llvm.BasicBlock, fn *ssa.Functi
 	if c == nil || bb.IsNil() || fn == nil {
 		return nil
 	}
-	last := c.lastInstruction(bb)
-	if !last.IsNil() && c.instructionIsTerminator(last) {
+	if c.blockHasTerminator(bb) {
 		return nil
 	}
 	c.Builder.SetInsertPointAtEnd(bb)

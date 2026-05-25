@@ -68,10 +68,54 @@ func (c *Compiler) compileLoop(inst *ssa.Loop) error {
 // compilePhi creates the PHI node but DOES NOT populate incoming values.
 // This is Pass 1 of Phi handling.
 func (c *Compiler) compilePhi(inst *ssa.Phi) error {
+	if inst == nil {
+		return fmt.Errorf("compilePhi: nil phi")
+	}
+	id := inst.GetId()
+	if val, ok := c.Values[id]; ok && !val.IsNil() {
+		return nil
+	}
 	phiType := c.inferPhiType(inst)
-	phiNode := c.Builder.CreatePHI(phiType, fmt.Sprintf("phi_%d", inst.GetId()))
-	c.Values[inst.GetId()] = phiNode
+	phiNode := c.Builder.CreatePHI(phiType, fmt.Sprintf("phi_%d", id))
+	c.Values[id] = phiNode
 	return nil
+}
+
+func (c *Compiler) ensurePhiNode(phi *ssa.Phi) error {
+	if phi == nil {
+		return fmt.Errorf("ensurePhiNode: nil phi")
+	}
+	id := phi.GetId()
+	if val, ok := c.Values[id]; ok && !val.IsNil() {
+		return nil
+	}
+	block := phi.GetBlock()
+	if block == nil {
+		return fmt.Errorf("ensurePhiNode: phi %d has no block", id)
+	}
+	blockID := block.GetId()
+	if _, ok := c.Blocks[blockID]; !ok {
+		if c.function == nil || c.function.llvmFn.IsNil() {
+			return fmt.Errorf("ensurePhiNode: no llvm function for phi %d", id)
+		}
+		bb := c.LLVMCtx.AddBasicBlock(c.function.llvmFn, fmt.Sprintf("bb_%d", blockID))
+		c.Blocks[blockID] = bb
+	}
+	bb, ok := c.Blocks[blockID]
+	if !ok || bb.IsNil() {
+		return fmt.Errorf("ensurePhiNode: llvm block %d missing for phi %d", blockID, id)
+	}
+	restore := c.restoreInsertBlock(nil)
+	if first := bb.FirstInstruction(); first.IsNil() {
+		c.Builder.SetInsertPointAtEnd(bb)
+	} else {
+		c.Builder.SetInsertPointBefore(first)
+	}
+	err := c.compilePhi(phi)
+	if !restore.IsNil() {
+		c.Builder.SetInsertPointAtEnd(restore)
+	}
+	return err
 }
 
 func (c *Compiler) llvmValueTypeForSSA(t ssa.Type) llvm.Type {
@@ -182,17 +226,7 @@ func (c *Compiler) resolvePhi(inst *ssa.Phi) error {
 		return fmt.Errorf("resolvePhi: llvm block %d not found", blockID)
 	}
 
-	llvmPreds := make([]llvm.BasicBlock, 0, len(preds))
-	for _, predBlockID := range preds {
-		predBB, ok := c.Blocks[predBlockID]
-		if !ok || predBB.IsNil() {
-			continue
-		}
-		if !c.terminatorJumpsTo(predBB, phiBB) {
-			continue
-		}
-		llvmPreds = append(llvmPreds, predBB)
-	}
+	llvmPreds := c.gatherLLVMPredecessors(phiBB)
 	if len(llvmPreds) == 0 {
 		for _, predBlockID := range preds {
 			if blk, ok := c.Blocks[predBlockID]; ok && !blk.IsNil() {
@@ -270,7 +304,7 @@ func predecessorBlockIDs(fn *ssa.Function, blockID int64) []int64 {
 		return nil
 	}
 	var preds []int64
-	for _, fromID := range fn.Blocks {
+	for _, fromID := range collectFunctionBlockIDs(fn) {
 		fromVal, ok := fn.GetValueById(fromID)
 		if !ok {
 			continue

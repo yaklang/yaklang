@@ -173,6 +173,7 @@ func (c *Compiler) CompileFunction(fn *ssa.Function) error {
 	}()
 	// 1. Get or declare LLVM function with a stable unique symbol name.
 	llvmFn, _ := c.getOrDeclareLLVMFunction(fn)
+	c.function.llvmFn = llvmFn
 	if err := c.prepareErrorHandling(fn); err != nil {
 		return err
 	}
@@ -187,7 +188,10 @@ func (c *Compiler) CompileFunction(fn *ssa.Function) error {
 
 	// 3. Pre-create all BasicBlocks
 	// LLVM IR requires jump targets to exist, so we create them first.
-	for _, blockID := range fn.Blocks {
+	for _, blockID := range collectFunctionBlockIDs(fn) {
+		if _, ok := c.Blocks[blockID]; ok {
+			continue
+		}
 		bb := c.LLVMCtx.AddBasicBlock(llvmFn, fmt.Sprintf("bb_%d", blockID))
 		c.Blocks[blockID] = bb
 	}
@@ -198,7 +202,7 @@ func (c *Compiler) CompileFunction(fn *ssa.Function) error {
 
 	// 3b. Pre-create all Phi nodes before compiling any block instructions.
 	// Other blocks may reference phis before their defining block is visited.
-	for _, blockID := range fn.Blocks {
+	for _, blockID := range collectFunctionBlockIDs(fn) {
 		val, ok := fn.GetValueById(blockID)
 		if !ok {
 			continue
@@ -216,6 +220,13 @@ func (c *Compiler) CompileFunction(fn *ssa.Function) error {
 			phiVal, ok := fn.GetValueById(phiID)
 			if !ok {
 				continue
+			}
+			if inst, ok := phiVal.(ssa.Instruction); ok && inst.IsLazy() {
+				if self := inst.Self(); self != nil {
+					if materialized, ok := self.(ssa.Value); ok && materialized != nil {
+						phiVal = materialized
+					}
+				}
 			}
 			if phi, ok := phiVal.(*ssa.Phi); ok {
 				if err := c.compilePhi(phi); err != nil {
@@ -303,8 +314,6 @@ func (c *Compiler) CompileFunction(fn *ssa.Function) error {
 		}
 		if !hasTerminator {
 			if len(blockObj.Succs) == 2 {
-				// This is an If - find the condition from last BinOp (comparison)
-				// Look backwards in Insts for the last comparison
 				var condID int64 = -1
 				for i := len(blockObj.Insts) - 1; i >= 0; i-- {
 					instVal, ok := fn.GetValueById(blockObj.Insts[i])
@@ -312,7 +321,6 @@ func (c *Compiler) CompileFunction(fn *ssa.Function) error {
 						continue
 					}
 					if binOp, ok := instVal.(*ssa.BinOp); ok {
-						// Check if it's a comparison
 						if binOp.Op == ssa.OpGt || binOp.Op == ssa.OpLt ||
 							binOp.Op == ssa.OpGtEq || binOp.Op == ssa.OpLtEq ||
 							binOp.Op == ssa.OpEq || binOp.Op == ssa.OpNotEq {
@@ -338,13 +346,11 @@ func (c *Compiler) CompileFunction(fn *ssa.Function) error {
 					hasTerminator = true
 				}
 			} else if len(blockObj.Succs) == 1 {
-				// This is a Jump
 				targetBlock := c.Blocks[blockObj.Succs[0]]
 				c.Builder.CreateBr(targetBlock)
 				hasTerminator = true
 			}
 
-			// If still no terminator, add default return
 			if !hasTerminator {
 				if err := c.emitImplicitFunctionExit(fn); err != nil {
 					return err
@@ -361,7 +367,7 @@ func (c *Compiler) CompileFunction(fn *ssa.Function) error {
 	}
 
 	// 6. Resolve Phis (Pass 2)
-	for _, blockID := range fn.Blocks {
+	for _, blockID := range collectFunctionBlockIDs(fn) {
 		val, ok := fn.GetValueById(blockID)
 		if !ok {
 			return fmt.Errorf("pass 2: block value %d not found", blockID)
@@ -382,6 +388,10 @@ func (c *Compiler) CompileFunction(fn *ssa.Function) error {
 				}
 			}
 		}
+	}
+
+	if err := c.ensureAllBlockTerminators(fn); err != nil {
+		return err
 	}
 
 	if fn.DeferBlock > 0 && !c.function.returnBlock.IsNil() {
