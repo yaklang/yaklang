@@ -404,7 +404,7 @@ func (pm *PromptManager) GenerateToolParamsPromptWithMeta(tool *aitool.Tool) (*T
 	prefixMaterials.OutputExample = ""
 	prefixMaterials.ForgeInventory = false
 	prefixMaterials.AIForgeList = ""
-	prefixMaterials.SkillsContext = ""
+	prefixMaterials.SkillsContext = pm.renderSkillsContextForPrompt()
 
 	prompt, err := pm.assemblePromptWithDynamicSection(
 		prefixMaterials,
@@ -666,7 +666,7 @@ func (pm *PromptManager) GenerateReGenerateToolParamsPromptWithMeta(userQuery st
 	prefixMaterials.OutputExample = strings.TrimSpace(wrongParamsOutputExampleText)
 	prefixMaterials.ForgeInventory = false
 	prefixMaterials.AIForgeList = ""
-	prefixMaterials.SkillsContext = ""
+	prefixMaterials.SkillsContext = pm.renderSkillsContextForPrompt()
 
 	dynamicData := pm.buildLoopPromptSectionData(base, &reactloops.LoopPromptAssemblyInput{
 		Nonce:     generatedNonce,
@@ -889,6 +889,24 @@ func (pm *PromptManager) DynamicContextWithNonce(nonce string) string {
 	default:
 		return baseContext + "\n\n" + historyContext
 	}
+}
+
+// renderSkillsContextForPrompt mirrors the main ReAct loop skills block so tool
+// parameter generation can reuse loaded SKILL.md guidance instead of guessing CLI
+// commands from task context alone.
+func (pm *PromptManager) renderSkillsContextForPrompt() string {
+	if pm == nil || pm.react == nil {
+		return ""
+	}
+	currentLoop := pm.react.GetCurrentLoop()
+	if currentLoop == nil {
+		return ""
+	}
+	mgr := currentLoop.GetSkillsContextManager()
+	if mgr == nil {
+		return ""
+	}
+	return mgr.RenderStable()
 }
 
 // GenerateIntervalReviewPrompt generates interval review prompt for long-running tool execution

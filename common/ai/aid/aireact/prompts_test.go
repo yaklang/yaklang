@@ -2,6 +2,7 @@ package aireact
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -10,9 +11,11 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/filesys"
 )
 
 func TestPromptManagerWithDynamicContextProvider(t *testing.T) {
@@ -350,6 +353,140 @@ func TestPromptManager_GenerateToolParamsPromptWithMeta_UsesPromptSections(t *te
 	}
 	if strings.Contains(prompt, "<|TOOL_PARAM_SCHEMA|>") {
 		t.Fatalf("tool schema should now be rendered in static schema block instead of dynamic tags. Got:\n%s", prompt)
+	}
+}
+
+func TestPromptManager_GenerateToolParamsPromptWithMeta_IncludesLoadedSkillsContext(t *testing.T) {
+	const skillCommandMarker = "excelcli import tax001-skill-marker-for-tool-params"
+
+	vfs := filesys.NewVirtualFs()
+	vfs.AddFile("tax-excel/SKILL.md", `---
+name: tax-excel
+description: Tax excel analysis skill for tool parameter generation
+---
+# Tax Excel Analysis
+
+Use this exact command sequence:
+
+`+skillCommandMarker+`
+`)
+
+	react, err := NewTestReAct(
+		aicommon.WithSkillsFS(vfs),
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "test"}, "cumulative_summary": "test summary", "human_readable_thought": "test thought"}`))
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create ReAct instance: %v", err)
+	}
+
+	loop, err := reactloops.NewReActLoop("tool-params-skill-test", react)
+	if err != nil {
+		t.Fatalf("failed to create ReAct loop: %v", err)
+	}
+
+	mgr := loop.GetSkillsContextManager()
+	if mgr == nil {
+		t.Fatal("SkillsContextManager should not be nil when skills FS is configured")
+	}
+	if err := mgr.LoadSkill("tax-excel"); err != nil {
+		t.Fatalf("failed to load tax-excel skill: %v", err)
+	}
+
+	task := aicommon.NewStatefulTaskBase("tool-params-skill-task", "analyze tax excel files", context.Background(), react.config.GetEmitter(), true)
+	task.SetReActLoop(loop)
+	react.setCurrentTask(task)
+
+	tool := aitool.NewWithoutCallback("bash",
+		aitool.WithDescription("Execute shell commands"),
+		aitool.WithStringParam("command",
+			aitool.WithParam_Description("shell command"),
+			aitool.WithParam_Required(true),
+		),
+	)
+	tool.Usage = "Run shell commands in the workspace."
+
+	result, err := react.promptManager.GenerateToolParamsPromptWithMeta(tool)
+	if err != nil {
+		t.Fatalf("GenerateToolParamsPromptWithMeta failed: %v", err)
+	}
+	if result == nil {
+		t.Fatal("GenerateToolParamsPromptWithMeta returned nil result")
+	}
+
+	prompt := result.Prompt
+	if !strings.Contains(prompt, "<|SKILLS_CONTEXT_skills_context|>") {
+		t.Fatalf("tool params prompt should include SKILLS_CONTEXT block. Got:\n%s", prompt)
+	}
+	if !strings.Contains(prompt, "== Currently Loaded Skills ==") {
+		t.Fatalf("tool params prompt should include loaded skills section. Got:\n%s", prompt)
+	}
+	if !strings.Contains(prompt, skillCommandMarker) {
+		t.Fatalf("tool params prompt should include loaded SKILL.md command guidance. Got:\n%s", prompt)
+	}
+	if !strings.Contains(prompt, "tax-excel") {
+		t.Fatalf("tool params prompt should include loaded skill name. Got:\n%s", prompt)
+	}
+}
+
+func TestPromptManager_GenerateToolParamsPromptWithMeta_OmitsUnloadedSkillBody(t *testing.T) {
+	const skillCommandMarker = "excelcli import tax001-skill-marker-not-loaded"
+
+	vfs := filesys.NewVirtualFs()
+	vfs.AddFile("tax-excel/SKILL.md", `---
+name: tax-excel
+description: Tax excel analysis skill
+---
+# Tax Excel
+
+`+skillCommandMarker+`
+`)
+
+	react, err := NewTestReAct(
+		aicommon.WithSkillsFS(vfs),
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "test"}, "cumulative_summary": "test summary", "human_readable_thought": "test thought"}`))
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create ReAct instance: %v", err)
+	}
+
+	loop, err := reactloops.NewReActLoop("tool-params-skill-not-loaded-test", react)
+	if err != nil {
+		t.Fatalf("failed to create ReAct loop: %v", err)
+	}
+
+	task := aicommon.NewStatefulTaskBase("tool-params-skill-not-loaded-task", "analyze tax excel files", context.Background(), react.config.GetEmitter(), true)
+	task.SetReActLoop(loop)
+	react.setCurrentTask(task)
+
+	tool := aitool.NewWithoutCallback("bash",
+		aitool.WithDescription("Execute shell commands"),
+		aitool.WithStringParam("command",
+			aitool.WithParam_Description("shell command"),
+			aitool.WithParam_Required(true),
+		),
+	)
+
+	result, err := react.promptManager.GenerateToolParamsPromptWithMeta(tool)
+	if err != nil {
+		t.Fatalf("GenerateToolParamsPromptWithMeta failed: %v", err)
+	}
+
+	prompt := result.Prompt
+	if strings.Contains(prompt, skillCommandMarker) {
+		t.Fatalf("unloaded skill body should not appear in tool params prompt. Got:\n%s", prompt)
+	}
+	if !strings.Contains(prompt, "tax-excel") {
+		t.Fatalf("available skill registry should still be visible. Got:\n%s", prompt)
 	}
 }
 
