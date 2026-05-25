@@ -727,8 +727,14 @@ func TestIntentSearchDualChannel(t *testing.T) {
 	})
 
 	t.Run("search covers tools forges loops and mcp", func(t *testing.T) {
-		// Verify that FastIntentMatch can hold all fast-path capability types:
-		// AIYakTool, AIForge, LoopMetadata, MCPServerToolConfig.
+		// Verify that FastIntentMatch searches all four capability types:
+		// 1. AIYakTool via yakit.SearchAIYakToolBM25 (BM25 + LIKE fallback)
+		// 2. AIForge via yakit.SearchAIForgeBM25 (BM25 + LIKE fallback)
+		// 3. LoopMetadata via matchLoopMetadata (in-memory token matching)
+		// 4. MCPTool via yakit.SearchMCPServerToolsBM25
+
+		// This is a structural test - the actual search requires a DB
+		// We verify the result struct can hold all four types
 
 		result := &FastMatchResult{
 			MatchedTools:    []*schema.AIYakTool{{Name: "tool1"}},

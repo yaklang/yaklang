@@ -239,24 +239,7 @@ func BuildCapabilityCatalog(r aicommon.AIInvokeRuntime) string {
 
 	db := consts.GetGormProfileDatabase()
 	if db != nil {
-		tools, err := yakit.SearchAIYakTool(db, "")
-		if err != nil {
-			log.Warnf("capability catalog: failed to load tools: %v", err)
-		} else {
-			for _, tool := range tools {
-				name := tool.VerboseName
-				if name == "" {
-					name = tool.Name
-				}
-				desc := utils.ShrinkString(tool.Description, 120)
-				line := fmt.Sprintf("[tool:%s]: %s - %s", tool.Name, name, desc)
-				if tool.Keywords != "" {
-					line += fmt.Sprintf(". keywords: %s", utils.ShrinkString(tool.Keywords, 80))
-				}
-				sb.WriteString(line)
-				sb.WriteString("\n")
-			}
-		}
+		GenerateYakToolsCatalog(&sb)
 
 		forges, err := yakit.GetAllAIForge(db)
 		if err != nil {
@@ -688,4 +671,29 @@ func dedupeCapabilityDetails(details []CapabilityDetail) []CapabilityDetail {
 		result = append(result, detail)
 	}
 	return result
+}
+
+func GenerateYakToolsCatalog(sb *strings.Builder){
+	db := consts.GetGormProfileDatabase()
+	if db == nil {
+		return
+	}
+	tools, err := yakit.SearchAIYakTool(db, "")
+	if err != nil {
+		log.Warnf("capability catalog: failed to load tools: %v", err)
+	} else {
+		for _, t := range tools {
+			name := t.VerboseName
+			if name == "" {
+				name = t.Name
+			}
+			desc := utils.ShrinkString(t.Description, 120)
+			line := fmt.Sprintf("[tool:%s]: %s - %s", t.Name, name, desc)
+			if t.Keywords != "" {
+				line += fmt.Sprintf(". keywords: %s", utils.ShrinkString(t.Keywords, 80))
+			}
+			sb.WriteString(line)
+			sb.WriteString("\n")
+		}
+	}
 }

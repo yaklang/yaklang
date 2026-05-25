@@ -1,10 +1,8 @@
 package aireact
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"io"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -48,13 +46,9 @@ func (r *ReAct) _invokeToolCall_ReviewWrongParam(ctx context.Context, tool *aito
 				}
 			}
 
-			stream := rsp.GetOutputStreamReader("call-tools", true, r.Emitter)
-			var rawResponse bytes.Buffer
-			stream = io.TeeReader(stream, &rawResponse)
-
 			action, err := aicommon.ExtractValidActionFromStream(
 				r.config.GetContext(),
-				stream,
+				rsp.GetOutputStreamReader("call-tools", true, r.Emitter),
 				"call-tool",
 				actionOpts...,
 			)
@@ -66,18 +60,17 @@ func (r *ReAct) _invokeToolCall_ReviewWrongParam(ctx context.Context, tool *aito
 			}
 			switch string(action.ActionType()) {
 			case "call-tool":
+				// First, get params from JSON
 				result = action.GetInvokeParams("params")
-				if result == nil {
-					result = make(aitool.InvokeParams)
-				}
+
+				// Then, merge AITAG params (they take precedence over JSON params)
 				if len(promptMeta.ParamNames) > 0 {
-					aicommon.ResolveToolParamAITags(
-						action,
-						result,
-						rawResponse.String(),
-						promptMeta.Nonce,
-						promptMeta.ParamNames,
-					)
+					for _, paramName := range promptMeta.ParamNames {
+						aitagKey := fmt.Sprintf("__aitag__%s", paramName)
+						if aitagValue := action.GetString(aitagKey); aitagValue != "" {
+							result.Set(paramName, aitagValue)
+						}
+					}
 				}
 
 				ok, reasons := tool.ValidateParams(result)
