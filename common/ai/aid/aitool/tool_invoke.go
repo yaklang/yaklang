@@ -444,49 +444,16 @@ func NewToolFromJSON(jsonStr string, callback func(params InvokeParams, stdout i
 	return tool, nil
 }
 
-func schemaPropertyIsObject(prop *jsonschema.Schema) bool {
-	if prop == nil {
-		return false
-	}
-	if len(prop.Properties) > 0 {
-		return true
-	}
-	if prop.Types != nil {
-		return strings.Contains(prop.Types.String(), "object")
-	}
-	return false
-}
-
-func schemaPropertyIsArray(prop *jsonschema.Schema) bool {
-	if prop == nil {
-		return false
-	}
-	if prop.Items2020 != nil || prop.Items != nil {
-		return true
-	}
-	if prop.Types != nil {
-		return strings.Contains(prop.Types.String(), "array")
-	}
-	return false
-}
-
 func applyDefault(schema *jsonschema.Schema, params map[string]any) {
-	if schema == nil || params == nil || len(schema.Properties) == 0 {
-		return
-	}
-
 	for key, prop := range schema.Properties {
-		if prop == nil {
-			continue
-		}
-
 		// 检查字段是否存在
 		if _, exists := params[key]; !exists && prop.Default != nil {
 			params[key] = *prop.Default
 		}
 
 		// 处理嵌套对象
-		if schemaPropertyIsObject(prop) {
+		types := prop.Types.String()
+		if types == "[object]" && prop.Properties != nil {
 			subParams, ok := params[key].(map[string]any)
 			if ok {
 				applyDefault(prop, subParams)
@@ -494,29 +461,27 @@ func applyDefault(schema *jsonschema.Schema, params map[string]any) {
 		}
 
 		// 处理数组
-		if !schemaPropertyIsArray(prop) {
-			continue
-		}
-
 		var (
 			arraySchema *jsonschema.Schema
 			realParams  []any
 			ok          bool
 		)
-		if prop.Items2020 != nil {
-			realParams, ok = params[key].([]any)
-			if ok {
-				arraySchema = prop.Items2020
-			}
-		} else if prop.Items != nil {
-			switch items := prop.Items.(type) {
-			case *jsonschema.Schema:
+		if types == "[array]" {
+			if prop.Items2020 != nil {
 				realParams, ok = params[key].([]any)
 				if ok {
-					arraySchema = items
+					arraySchema = prop.Items2020
 				}
-			case []*jsonschema.Schema:
-				// TODO handle this case
+			} else if prop.Items != nil {
+				switch items := prop.Items.(type) {
+				case *jsonschema.Schema:
+					realParams, ok = params[key].([]any)
+					if ok {
+						arraySchema = items
+					}
+				case []*jsonschema.Schema:
+					// TODO handle this case
+				}
 			}
 		}
 
