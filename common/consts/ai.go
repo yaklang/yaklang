@@ -71,8 +71,6 @@ type TieredAIConfig struct {
 	LightweightConfigs []*ypb.AIModelConfig
 	// VisionConfigs contains configurations for vision models
 	VisionConfigs []*ypb.AIModelConfig
-
-	IsOnline bool
 }
 
 // tieredAIConfig stores the global tiered AI configuration

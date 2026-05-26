@@ -8709,6 +8709,7 @@ message AIModelConfig {
   ThirdPartyApplicationConfig Provider = 2;
   string ModelName = 3;
   repeated KVPair ExtraParams = 4;
+  bool   IsOnline = 5;
 }
 
 message AIGlobalConfig {
@@ -8722,7 +8723,6 @@ message AIGlobalConfig {
   repeated AIModelConfig VisionModels = 8;
   string AIPresetPrompt = 9;
   string AIPlanPrompt = 10;
-  bool   IsOnline = 11;
 }
 
 // Local Model Messages
