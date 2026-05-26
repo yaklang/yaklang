@@ -8,95 +8,110 @@ import (
 	test "github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
+func getError2Extern() map[string]any {
+	return map[string]any{
+		"getError2": func() (int, error) { return 1, errors.New("err") },
+	}
+}
+
 func TestErrorPropagationViaReturn(t *testing.T) {
-	t.Run("wrapper returns single error - no report inside wrapper", func(t *testing.T) {
-		test.CheckError(t, test.TestCase{
-			Code: `
-			getError = func() {
-				return getError1()
-			}
-			`,
-			Want: []string{},
-			ExternValue: map[string]any{
-				"getError1": func() error { return errors.New("err") },
-			},
-		})
-	})
+	ext2 := getError2Extern()
 
-	t.Run("caller discards wrapper return - no report", func(t *testing.T) {
+	t.Run("direct return passes multi-value to caller", func(t *testing.T) {
 		test.CheckError(t, test.TestCase{
 			Code: `
-			getError = func() {
-				return getError1()
-			}
-			getError()
-			`,
-			Want: []string{},
-			ExternValue: map[string]any{
-				"getError1": func() error { return errors.New("err") },
-			},
-		})
-	})
-
-	t.Run("caller assigns wrapper error without handling", func(t *testing.T) {
-		test.CheckError(t, test.TestCase{
-			Code: `
-			getError = func() {
-				return getError1()
-			}
-			err = getError()
-			`,
-			Want: []string{
-				ssa4analyze.ErrorUnhandled(),
-			},
-			ExternValue: map[string]any{
-				"getError1": func() error { return errors.New("err") },
-			},
-		})
-	})
-
-	t.Run("closure returns multi-value with error - no report inside wrapper", func(t *testing.T) {
-		test.CheckError(t, test.TestCase{
-			Code: `
-			wrapHTTP = func() {
+			wrap = func() {
 				return getError2()
 			}
 			`,
-			Want: []string{},
-			ExternValue: map[string]any{
-				"getError2": func() (int, error) { return 1, errors.New("err") },
-			},
+			Want:        []string{},
+			ExternValue: ext2,
 		})
 	})
 
-	t.Run("closure like sendPacket0 returns mockHTTP - no report inside", func(t *testing.T) {
+	t.Run("unpack then return both values propagates error", func(t *testing.T) {
 		test.CheckError(t, test.TestCase{
 			Code: `
-			sendPacket0 = func(target, payload) {
-				return mockHTTP(target, payload)
+			wrap = func() {
+				a, e = getError2()
+				return a, e
 			}
 			`,
-			Want: []string{},
-			ExternValue: map[string]any{
-				"mockHTTP": func(any, any) (any, error) { return nil, errors.New("err") },
-			},
+			Want:        []string{},
+			ExternValue: ext2,
 		})
 	})
 
-	t.Run("caller assigns multi-value from wrapper without handling err", func(t *testing.T) {
+	t.Run("unpack then return error only propagates error", func(t *testing.T) {
 		test.CheckError(t, test.TestCase{
 			Code: `
-			sendPacket0 = func(target, payload) {
-				return mockHTTP(target, payload)
+			wrap = func() {
+				a, e = getError2()
+				return e
 			}
-			rsp, err = sendPacket0("a", "b")
+			`,
+			Want:        []string{},
+			ExternValue: ext2,
+		})
+	})
+
+	t.Run("unpack then return value only drops error", func(t *testing.T) {
+		test.CheckError(t, test.TestCase{
+			Code: `
+			wrap = func() {
+				a, e = getError2()
+				return a
+			}
 			`,
 			Want: []string{
 				ssa4analyze.ErrorUnhandled(),
 			},
-			ExternValue: map[string]any{
-				"mockHTTP": func(any, any) (any, error) { return nil, errors.New("err") },
+			ExternValue: ext2,
+		})
+	})
+
+	t.Run("unpack handle error then return", func(t *testing.T) {
+		test.CheckError(t, test.TestCase{
+			Code: `
+			wrap = func() {
+				a, e = getError2()
+				if e != nil {
+					return 0, e
+				}
+				return a, nil
+			}
+			`,
+			Want:        []string{},
+			ExternValue: ext2,
+		})
+	})
+
+	t.Run("unpack without return reports inside function", func(t *testing.T) {
+		test.CheckError(t, test.TestCase{
+			Code: `
+			wrap = func() {
+				a, e = getError2()
+			}
+			`,
+			Want: []string{
+				ssa4analyze.ErrorUnhandled(),
 			},
+			ExternValue: ext2,
+		})
+	})
+
+	t.Run("caller assigns from wrapper without handling err", func(t *testing.T) {
+		test.CheckError(t, test.TestCase{
+			Code: `
+			wrap = func() {
+				return getError2()
+			}
+			_, err = wrap()
+			`,
+			Want: []string{
+				ssa4analyze.ErrorUnhandled(),
+			},
+			ExternValue: ext2,
 		})
 	})
 
