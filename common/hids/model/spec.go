@@ -25,7 +25,7 @@ type DesiredSpec struct {
 	Mode            string          `json:"mode"`
 	Collectors      Collectors      `json:"collectors"`
 	BuiltinRuleSets []string        `json:"builtin_rule_sets,omitempty"`
-	TemporaryRules  []TemporaryRule `json:"temporary_rules,omitempty"`
+	CustomRules     []CustomRule    `json:"custom_rules,omitempty"`
 	EvidencePolicy  EvidencePolicy  `json:"evidence_policy,omitempty"`
 	Reporting       ReportingPolicy `json:"reporting,omitempty"`
 	ContextPolicy   ContextPolicy   `json:"context_policy,omitempty"`
@@ -107,7 +107,7 @@ type DriftAlertPolicy struct {
 	MaxAggregationEntries    int    `json:"max_aggregation_entries,omitempty"`
 }
 
-type TemporaryRule struct {
+type CustomRule struct {
 	RuleID         string         `json:"rule_id"`
 	Title          string         `json:"title,omitempty"`
 	Description    string         `json:"description,omitempty"`
@@ -120,7 +120,7 @@ type TemporaryRule struct {
 	Metadata       map[string]any `json:"metadata,omitempty"`
 }
 
-func (r TemporaryRule) IsBlank() bool {
+func (r CustomRule) IsBlank() bool {
 	return !r.Enabled &&
 		r.RuleID == "" &&
 		r.MatchEventType == "" &&
@@ -172,7 +172,7 @@ func (s DesiredSpec) Normalize() DesiredSpec {
 	s.Collectors.Audit.Backend = strings.ToLower(strings.TrimSpace(s.Collectors.Audit.Backend))
 	s.Collectors.File.WatchPaths = normalizePaths(s.Collectors.File.WatchPaths)
 	s.BuiltinRuleSets = normalizeStringList(s.BuiltinRuleSets)
-	s.TemporaryRules = normalizeTemporaryRules(s.TemporaryRules)
+	s.CustomRules = normalizeCustomRules(s.CustomRules)
 	s.ContextPolicy = s.ContextPolicy.Normalize()
 	s.BaselinePolicy = s.BaselinePolicy.Normalize()
 	s.ResponsePolicy = s.ResponsePolicy.Normalize()
@@ -224,11 +224,11 @@ func (s DesiredSpec) Validate() error {
 		return err
 	}
 
-	for i, rule := range s.TemporaryRules {
+	for i, rule := range s.CustomRules {
 		if !rule.Enabled {
 			continue
 		}
-		fieldPrefix := fmt.Sprintf("temporary_rules[%d]", i)
+		fieldPrefix := fmt.Sprintf("custom_rules[%d]", i)
 		if rule.RuleID == "" {
 			return invalidField(fieldPrefix+".rule_id", "is required")
 		}
@@ -493,8 +493,8 @@ func normalizeCIDRString(value string) string {
 	return netip.PrefixFrom(addr, bits).Masked().String()
 }
 
-func normalizeTemporaryRules(rules []TemporaryRule) []TemporaryRule {
-	normalized := make([]TemporaryRule, 0, len(rules))
+func normalizeCustomRules(rules []CustomRule) []CustomRule {
+	normalized := make([]CustomRule, 0, len(rules))
 	for _, rule := range rules {
 		rule.RuleID = strings.TrimSpace(rule.RuleID)
 		rule.Title = strings.TrimSpace(rule.Title)

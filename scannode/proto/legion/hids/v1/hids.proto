@@ -41,6 +41,24 @@ message HIDSDesiredSpecDryRunCommand {
   bytes desired_spec_json = 4;
 }
 
+message CollectHIDSCurrentStateCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  legion.capability.v1.CapabilityRef capability = 3;
+  string collect_type = 4;
+}
+
+message CollectHIDSFileEvidenceCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  legion.capability.v1.CapabilityRef capability = 3;
+  string kind = 4;
+  string path = 5;
+  bool recursive = 6;
+  int32 max_depth = 7;
+  int32 max_entries = 8;
+}
+
 message HIDSDesiredSpecDryRunResult {
   legion.node.v1.EventMetadata metadata = 1;
   legion.capability.v1.CapabilityRef capability = 2;

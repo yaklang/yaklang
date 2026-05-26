@@ -2,7 +2,6 @@ package aicommon
 
 import (
 	"context"
-	"encoding/json"
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/jsonextractor"
@@ -41,20 +40,19 @@ func (c *Config) StartEventLoopEx(ctx context.Context, startCall func(), doneCal
 				startCall()
 			}
 
-			lastConsumptionSignature := ""
 			consumptionNotification := func() {
 				if c.GetInputConsumption() > 0 || c.GetOutputConsumption() > 0 || c.GetCacheHitToken() > 0 {
-					payload := map[string]any{
-						"input_consumption":  c.GetInputConsumption(),
-						"output_consumption": c.GetOutputConsumption(),
-						"cache_hit_token":    c.GetCacheHitToken(),
-						"consumption_uuid":   c.GetConsumptionUUID(),
-						"tier_consumption":   c.GetTierConsumptionSnapshot(),
-					}
-					if !shouldEmitConsumptionPayload(&lastConsumptionSignature, payload) {
-						return
-					}
-					c.EmitJSON(schema.EVENT_TYPE_CONSUMPTION, "system", payload)
+					c.EmitJSON(
+						schema.EVENT_TYPE_CONSUMPTION,
+						"system",
+						map[string]any{
+							"input_consumption":  c.GetInputConsumption(),
+							"output_consumption": c.GetOutputConsumption(),
+							"cache_hit_token":    c.GetCacheHitToken(),
+							"consumption_uuid":   c.GetConsumptionUUID(),
+							"tier_consumption":   c.GetTierConsumptionSnapshot(),
+						},
+					)
 				}
 			}
 
@@ -160,22 +158,6 @@ func (c *Config) drainPendingEvents() {
 	}
 }
 
-func shouldEmitConsumptionPayload(lastSignature *string, payload map[string]any) bool {
-	if lastSignature == nil || payload == nil {
-		return true
-	}
-	raw, err := json.Marshal(payload)
-	if err != nil {
-		return true
-	}
-	signature := string(raw)
-	if *lastSignature == signature {
-		return false
-	}
-	*lastSignature = signature
-	return true
-}
-
 // processInputEvent processes a single input event and triggers ReAct loop
 func (c *Config) processInputEvent(event *ypb.AIInputEvent) error {
 	if c.DebugEvent {
@@ -209,6 +191,7 @@ func (c *Config) processInputEvent(event *ypb.AIInputEvent) error {
 					"suggestion": "continue",
 				})
 			}
+
 		}
 	} else if c.InputEventManager != nil {
 		return c.InputEventManager.processEvent(event) // process other input events, can register different callbacks

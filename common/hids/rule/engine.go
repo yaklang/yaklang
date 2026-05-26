@@ -22,7 +22,7 @@ type Engine struct {
 }
 
 type compiledRule struct {
-	rule model.TemporaryRule
+	rule model.CustomRule
 }
 
 func NewEngine(spec model.DesiredSpec) (*Engine, error) {
@@ -35,7 +35,7 @@ func NewEngine(spec model.DesiredSpec) (*Engine, error) {
 	}
 	engine.builtin = builtinRules
 
-	for i, rule := range spec.TemporaryRules {
+	for i, rule := range spec.CustomRules {
 		if !rule.Enabled || rule.IsBlank() {
 			continue
 		}
@@ -69,7 +69,7 @@ func (e *Engine) Evaluate(event model.Event) []model.Alert {
 
 		matched, err := e.sandbox.ExecuteAsBoolean(rule.Condition, context)
 		if err != nil {
-			log.Warnf("hids temporary rule evaluation failed: rule_id=%s err=%v", rule.RuleID, err)
+			log.Warnf("hids custom rule evaluation failed: rule_id=%s err=%v", rule.RuleID, err)
 			continue
 		}
 		if !matched {
@@ -107,20 +107,20 @@ func (e *Engine) HasRulesForEventType(eventTypes ...string) bool {
 	return false
 }
 
-func (e *Engine) validateRule(index int, rule model.TemporaryRule) error {
+func (e *Engine) validateRule(index int, rule model.CustomRule) error {
 	if e == nil || e.sandbox == nil {
 		return fmt.Errorf("rule sandbox is not initialized")
 	}
 	_, err := e.sandbox.ExecuteAsBoolean(rule.Condition, buildValidationContext(rule.MatchEventType))
 	if err != nil {
 		return &model.ValidationError{
-			Field:  fmt.Sprintf("temporary_rules[%d].condition", index),
+			Field:  fmt.Sprintf("custom_rules[%d].condition", index),
 			Reason: fmt.Sprintf("invalid yak rule condition: %v", err),
 		}
 	}
 	if err := validateActionExpression(e.sandbox, rule.Action, buildValidationContext(rule.MatchEventType)); err != nil {
 		return &model.ValidationError{
-			Field:  fmt.Sprintf("temporary_rules[%d].action", index),
+			Field:  fmt.Sprintf("custom_rules[%d].action", index),
 			Reason: fmt.Sprintf("invalid yak rule action: %v", err),
 		}
 	}
@@ -128,30 +128,30 @@ func (e *Engine) validateRule(index int, rule model.TemporaryRule) error {
 }
 
 func (e *Engine) evaluateAction(
-	rule model.TemporaryRule,
+	rule model.CustomRule,
 	context map[string]any,
-) (temporaryRuleActionResult, error) {
+) (customRuleActionResult, error) {
 	if e == nil || e.sandbox == nil || strings.TrimSpace(rule.Action) == "" {
-		return temporaryRuleActionResult{}, nil
+		return customRuleActionResult{}, nil
 	}
 
 	raw, err := e.sandbox.ExecuteAsExpression(rule.Action, context)
 	if err != nil {
-		return temporaryRuleActionResult{}, err
+		return customRuleActionResult{}, err
 	}
-	return parseTemporaryRuleActionResult(raw)
+	return parseCustomRuleActionResult(raw)
 }
 
 func buildAlert(
-	rule model.TemporaryRule,
+	rule model.CustomRule,
 	event model.Event,
 	context map[string]any,
-	actionResult temporaryRuleActionResult,
+	actionResult customRuleActionResult,
 	actionErr error,
 ) model.Alert {
 	detail := map[string]any{
 		"rule_id":          rule.RuleID,
-		"source":           "temporary",
+		"source":           "custom",
 		"match_event_type": rule.MatchEventType,
 		"condition":        rule.Condition,
 		"event":            cloneValue(context["event"]),
@@ -168,7 +168,7 @@ func buildAlert(
 	if actionErr != nil {
 		detail["action_error"] = actionErr.Error()
 	}
-	if actionResultMap := temporaryRuleActionResultMap(actionResult); len(actionResultMap) > 0 {
+	if actionResultMap := customRuleActionResultMap(actionResult); len(actionResultMap) > 0 {
 		detail["action_result"] = actionResultMap
 	}
 	if len(actionResult.Detail) > 0 {
@@ -423,6 +423,8 @@ func buildArtifactContext(artifact *model.Artifact) map[string]any {
 		"segment_count": 0,
 		"sections":      []string{},
 		"segments":      []string{},
+		"section_items": []map[string]any{},
+		"segment_items": []map[string]any{},
 	}
 	value := map[string]any{
 		"path":        "",
@@ -461,6 +463,8 @@ func buildArtifactContext(artifact *model.Artifact) map[string]any {
 		elfValue["segment_count"] = artifact.ELF.SegmentCount
 		elfValue["sections"] = cloneStringSlice(artifact.ELF.Sections)
 		elfValue["segments"] = cloneStringSlice(artifact.ELF.Segments)
+		elfValue["section_items"] = model.ELFSectionDetailItems(artifact.ELF.SectionItems)
+		elfValue["segment_items"] = model.ELFSegmentDetailItems(artifact.ELF.SegmentItems)
 	}
 	return value
 }

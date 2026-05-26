@@ -51,7 +51,7 @@ func TestManagerApplyReportsPartialBuiltinRuleCoverage(t *testing.T) {
 	}
 }
 
-func TestManagerApplyReportsTemporaryRuleRuntimeSummary(t *testing.T) {
+func TestManagerApplyReportsCustomRuleRuntimeSummary(t *testing.T) {
 	t.Parallel()
 
 	manager := NewManager()
@@ -68,7 +68,7 @@ func TestManagerApplyReportsTemporaryRuleRuntimeSummary(t *testing.T) {
 				WatchPaths: []string{t.TempDir()},
 			},
 		},
-		TemporaryRules: []model.TemporaryRule{
+		CustomRules: []model.CustomRule{
 			{
 				RuleID:         "tmp.file.active",
 				Title:          "Active file rule",
@@ -99,40 +99,40 @@ func TestManagerApplyReportsTemporaryRuleRuntimeSummary(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected rule status detail, got %#v", result.State.Detail["rules"])
 	}
-	temporary, ok := rules["temporary_rules"].(map[string]any)
+	temporary, ok := rules["custom_rules"].(map[string]any)
 	if !ok {
-		t.Fatalf("expected temporary rule runtime detail, got %#v", rules["temporary_rules"])
+		t.Fatalf("expected custom rule runtime detail, got %#v", rules["custom_rules"])
 	}
 	if temporary["configured_count"] != 2 {
-		t.Fatalf("unexpected configured temporary rule count: %#v", temporary["configured_count"])
+		t.Fatalf("unexpected configured custom rule count: %#v", temporary["configured_count"])
 	}
 	if temporary["active_count"] != 1 {
-		t.Fatalf("unexpected active temporary rule count: %#v", temporary["active_count"])
+		t.Fatalf("unexpected active custom rule count: %#v", temporary["active_count"])
 	}
 	if temporary["inactive_count"] != 1 {
-		t.Fatalf("unexpected inactive temporary rule count: %#v", temporary["inactive_count"])
+		t.Fatalf("unexpected inactive custom rule count: %#v", temporary["inactive_count"])
 	}
 
 	activeRules, ok := temporary["active_rules"].([]map[string]any)
 	if !ok {
-		t.Fatalf("expected active temporary rules, got %#v", temporary["active_rules"])
+		t.Fatalf("expected active custom rules, got %#v", temporary["active_rules"])
 	}
 	if len(activeRules) != 1 || activeRules[0]["rule_id"] != "tmp.file.active" {
-		t.Fatalf("unexpected active temporary rules: %#v", activeRules)
+		t.Fatalf("unexpected active custom rules: %#v", activeRules)
 	}
 	if activeRules[0]["template_id"] != "system-elf-drift" {
-		t.Fatalf("unexpected active temporary rule template id: %#v", activeRules[0]["template_id"])
+		t.Fatalf("unexpected active custom rule template id: %#v", activeRules[0]["template_id"])
 	}
 
 	inactiveRules, ok := temporary["inactive_rules"].([]map[string]any)
 	if !ok {
-		t.Fatalf("expected inactive temporary rules, got %#v", temporary["inactive_rules"])
+		t.Fatalf("expected inactive custom rules, got %#v", temporary["inactive_rules"])
 	}
 	if len(inactiveRules) != 1 || inactiveRules[0]["rule_id"] != "tmp.file.disabled" {
-		t.Fatalf("unexpected inactive temporary rules: %#v", inactiveRules)
+		t.Fatalf("unexpected inactive custom rules: %#v", inactiveRules)
 	}
 	if inactiveRules[0]["reason"] != "disabled in desired spec" {
-		t.Fatalf("unexpected inactive temporary rule reason: %#v", inactiveRules[0]["reason"])
+		t.Fatalf("unexpected inactive custom rule reason: %#v", inactiveRules[0]["reason"])
 	}
 }
 
@@ -183,6 +183,106 @@ func TestManagerReplayInventoryReemitsCurrentSnapshots(t *testing.T) {
 	third := <-instance.events
 	if first.Source != "inventory.process" || second.Source != "inventory.network" || third.Source != "inventory.users" {
 		t.Fatalf("unexpected replay sources: %s / %s / %s", first.Source, second.Source, third.Source)
+	}
+}
+
+func TestManagerCollectCurrentStateEmitsOnlyRequestedInventory(t *testing.T) {
+	t.Parallel()
+
+	manager := NewManager()
+	instance := &Instance{
+		spec: model.DesiredSpec{
+			Collectors: model.Collectors{
+				Process: model.CollectorSpec{Enabled: true},
+				Network: model.CollectorSpec{Enabled: true},
+			},
+		},
+		events: make(chan model.Event, 4),
+		baselineProvider: replayInventoryProviderStub{
+			processEvents: []model.Event{{Type: model.EventTypeProcessState, Source: "inventory.process"}},
+			networkEvents: []model.Event{{Type: model.EventTypeNetworkSocket, Source: "inventory.network"}},
+			userEvents:    []model.Event{{Type: model.EventTypeHostUsers, Source: "inventory.users"}},
+		},
+	}
+	manager.instance = instance
+
+	if err := manager.CollectCurrentState(context.Background(), "processes"); err != nil {
+		t.Fatalf("collect process inventory: %v", err)
+	}
+	first := <-instance.events
+	if first.Source != "inventory.process" {
+		t.Fatalf("expected process inventory, got %s", first.Source)
+	}
+	select {
+	case extra := <-instance.events:
+		t.Fatalf("expected only process inventory, got extra %s", extra.Source)
+	default:
+	}
+
+	if err := manager.CollectCurrentState(context.Background(), "connections"); err != nil {
+		t.Fatalf("collect network inventory: %v", err)
+	}
+	second := <-instance.events
+	if second.Source != "inventory.network" {
+		t.Fatalf("expected network inventory, got %s", second.Source)
+	}
+	select {
+	case extra := <-instance.events:
+		t.Fatalf("expected only network inventory, got extra %s", extra.Source)
+	default:
+	}
+}
+
+func TestManagerCollectCurrentStateDoesNotRequireCollectorEnabled(t *testing.T) {
+	t.Parallel()
+
+	manager := NewManager()
+	instance := &Instance{
+		spec:   model.DesiredSpec{},
+		events: make(chan model.Event, 4),
+		baselineProvider: replayInventoryProviderStub{
+			processEvents: []model.Event{{Type: model.EventTypeProcessState, Source: "inventory.process"}},
+			networkEvents: []model.Event{{Type: model.EventTypeNetworkSocket, Source: "inventory.network"}},
+			userEvents:    []model.Event{{Type: model.EventTypeHostUsers, Source: "inventory.users"}},
+		},
+	}
+	manager.instance = instance
+
+	if err := manager.CollectCurrentState(context.Background(), "connections"); err != nil {
+		t.Fatalf("collect network inventory: %v", err)
+	}
+	first := readInventoryEvent(t, instance.events)
+	if first.Source != "inventory.network" {
+		t.Fatalf("expected network inventory, got %s", first.Source)
+	}
+	select {
+	case extra := <-instance.events:
+		t.Fatalf("expected only network inventory, got extra %s", extra.Source)
+	default:
+	}
+
+	if err := manager.CollectCurrentState(context.Background(), "processes"); err != nil {
+		t.Fatalf("collect process inventory: %v", err)
+	}
+	second := readInventoryEvent(t, instance.events)
+	if second.Source != "inventory.process" {
+		t.Fatalf("expected process inventory, got %s", second.Source)
+	}
+	select {
+	case extra := <-instance.events:
+		t.Fatalf("expected only process inventory, got extra %s", extra.Source)
+	default:
+	}
+}
+
+func readInventoryEvent(t *testing.T, events <-chan model.Event) model.Event {
+	t.Helper()
+	select {
+	case event := <-events:
+		return event
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for inventory event")
+		return model.Event{}
 	}
 }
 

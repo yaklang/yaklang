@@ -269,7 +269,7 @@ func checkAIProviderHealthOnce(
 		aispec.WithDisableProviderFallback(true),
 		aispec.WithStreamHandler(markFirstByte),
 		aispec.WithReasonStreamHandler(markFirstByte),
-		aispec.WithRawHTTPRequestResponseCallback(func(requestBytes []byte, responseHeaderBytes []byte, bodyPreview []byte) {
+		aispec.WithRawHTTPRequestResponseCallback(func(requestBytes []byte, responseHeaderBytes []byte, bodyPreview []byte, _ *aispec.ChatUsage) {
 			result.RawRequest = sanitizeAIProviderDebugString(string(requestBytes))
 			result.RawResponse = sanitizeAIProviderDebugString(string(responseHeaderBytes) + string(bodyPreview))
 			result.ResponseStatusCode = int32(lowhttp.GetStatusCodeFromResponse(responseHeaderBytes))

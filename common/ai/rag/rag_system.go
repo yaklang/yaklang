@@ -593,15 +593,24 @@ func (r *RAGSystem) AddKnowledgeEntry(entry *schema.KnowledgeBaseEntry, options 
 func (r *RAGSystem) GenerateQuestionIndexForKnowledge(hiddenIndex string, options ...RAGSystemConfigOption) error {
 	ragConfig := r.newRagSystemConfig(options...)
 	docOpts := ragConfig.ConvertToDocumentOptions()
+	if err := ragContextErr(ragConfig.ctx); err != nil {
+		return err
+	}
 
 	entry, err := yakit.GetKnowledgeBaseEntryByHiddenIndex(ragConfig.db, hiddenIndex)
 	if err != nil {
 		return utils.Wrap(err, "failed to get knowledge base entry")
 	}
+	if err := ragContextErr(ragConfig.ctx); err != nil {
+		return err
+	}
 
 	questionsMap, err := enhancesearch.BuildIndexQuestions([]string{entry.KnowledgeDetails}, ragConfig.GetAIService())
 	if err != nil {
 		return utils.Wrap(err, "failed to build index questions")
+	}
+	if err := ragContextErr(ragConfig.ctx); err != nil {
+		return err
 	}
 	var questions []string
 	for _, qs := range questionsMap {
@@ -617,6 +626,9 @@ func (r *RAGSystem) GenerateQuestionIndexForKnowledge(hiddenIndex string, option
 		}
 	}
 	for _, question := range questions {
+		if err := ragContextErr(ragConfig.ctx); err != nil {
+			return err
+		}
 		questionId := entry.HiddenIndex + "_question_" + utils.CalcSha1(question)
 		entry.PotentialQuestions = append(entry.PotentialQuestions, question)
 		r.VectorStore.AddWithOptions(questionId, question, append(docOpts,
@@ -633,12 +645,27 @@ func (r *RAGSystem) GetKnowledgeBaseID() int64 {
 	return r.KnowledgeBase.GetID()
 }
 
+func ragContextErr(ctx context.Context) error {
+	if ctx == nil {
+		return nil
+	}
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+		return nil
+	}
+}
+
 func (r *RAGSystem) GenerateQuestionIndex(options ...RAGSystemConfigOption) error {
 	config := r.newRagSystemConfig(options...)
 	if config.progressHandler == nil {
 		config.progressHandler = func(percent float64, message string, messageType string) {
 			log.Infof("GenerateQuestionIndex progress: %f%%, message: %s", percent, message)
 		}
+	}
+	if err := ragContextErr(config.ctx); err != nil {
+		return err
 	}
 	// 1. 遍历知识库的所有项
 	page := 1
@@ -647,13 +674,19 @@ func (r *RAGSystem) GenerateQuestionIndex(options ...RAGSystemConfigOption) erro
 
 	var totalEntries int
 	db.Model(&schema.KnowledgeBaseEntry{}).Where("knowledge_base_id = ?", r.GetKnowledgeBaseID()).Count(&totalEntries)
+	if err := ragContextErr(config.ctx); err != nil {
+		return err
+	}
 	config.progressHandler(0, fmt.Sprintf("start to generate question index for %d entries", totalEntries), "info")
 	processedCount := 0
 
 	var pendingEntries []*schema.KnowledgeBaseEntry
-	processBatch := func(batch []*schema.KnowledgeBaseEntry) {
+	processBatch := func(batch []*schema.KnowledgeBaseEntry) error {
 		if len(batch) == 0 {
-			return
+			return ragContextErr(config.ctx)
+		}
+		if err := ragContextErr(config.ctx); err != nil {
+			return err
 		}
 		var batchContent []string
 		for _, e := range batch {
@@ -664,11 +697,17 @@ func (r *RAGSystem) GenerateQuestionIndex(options ...RAGSystemConfigOption) erro
 		questionsMap, err := enhancesearch.BuildIndexQuestions(batchContent, config.GetAIService())
 		if err != nil {
 			log.Errorf("failed to build index questions for batch: %v", err)
-			return
+			return nil
+		}
+		if err := ragContextErr(config.ctx); err != nil {
+			return err
 		}
 
 		docOpts := config.ConvertToDocumentOptions()
 		for _, entry := range batch {
+			if err := ragContextErr(config.ctx); err != nil {
+				return err
+			}
 			var uniqueQuestions = make(map[string]struct{})
 			for snippet, qs := range questionsMap {
 				// key 是片段，如果条目内容包含该片段，或者片段包含条目内容，则认为该问题属于该条目
@@ -684,6 +723,9 @@ func (r *RAGSystem) GenerateQuestionIndex(options ...RAGSystemConfigOption) erro
 			}
 
 			for question := range uniqueQuestions {
+				if err := ragContextErr(config.ctx); err != nil {
+					return err
+				}
 				questionId := entry.HiddenIndex + "_question_" + utils.CalcSha1(question)
 				err := r.VectorStore.AddWithOptions(questionId, question, append(docOpts,
 					vectorstore.WithDocumentQuestionIndex(true),
@@ -696,13 +738,20 @@ func (r *RAGSystem) GenerateQuestionIndex(options ...RAGSystemConfigOption) erro
 			}
 
 			// 更新 HasQuestionIndex
+			if err := ragContextErr(config.ctx); err != nil {
+				return err
+			}
 			if err := db.Model(entry).Update("has_question_index", true).Error; err != nil {
 				log.Errorf("failed to update has_question_index for entry %s: %v", entry.HiddenIndex, err)
 			}
 		}
+		return ragContextErr(config.ctx)
 	}
 
 	for {
+		if err := ragContextErr(config.ctx); err != nil {
+			return err
+		}
 		var entries []*schema.KnowledgeBaseEntry
 		err := db.Model(&schema.KnowledgeBaseEntry{}).
 			Where("knowledge_base_id = ? AND (has_question_index IS NULL OR has_question_index = ?)", r.GetKnowledgeBaseID(), false).
@@ -718,6 +767,9 @@ func (r *RAGSystem) GenerateQuestionIndex(options ...RAGSystemConfigOption) erro
 		}
 
 		for _, entry := range entries {
+			if err := ragContextErr(config.ctx); err != nil {
+				return err
+			}
 			processedCount++
 			percent := float64(processedCount) / float64(totalEntries) * 100
 			config.progressHandler(percent, fmt.Sprintf("processing entry: %s", entry.KnowledgeTitle), "info")
@@ -725,7 +777,9 @@ func (r *RAGSystem) GenerateQuestionIndex(options ...RAGSystemConfigOption) erro
 			// 加入待处理列表
 			pendingEntries = append(pendingEntries, entry)
 			if len(pendingEntries) >= 10 {
-				processBatch(pendingEntries)
+				if err := processBatch(pendingEntries); err != nil {
+					return err
+				}
 				pendingEntries = nil
 			}
 		}
@@ -736,7 +790,9 @@ func (r *RAGSystem) GenerateQuestionIndex(options ...RAGSystemConfigOption) erro
 		page++
 	}
 	// 处理剩余的 pendingEntries
-	processBatch(pendingEntries)
+	if err := processBatch(pendingEntries); err != nil {
+		return err
+	}
 
 	config.progressHandler(100, "generate question index finished", "success")
 	return nil

@@ -1,6 +1,7 @@
 package aiconfig
 
 import (
+	"strings"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/consts"
@@ -115,11 +116,15 @@ func ensureTierModelConfigsAvailable(cfg *ypb.AIGlobalConfig) bool {
 		return false
 	}
 
+	changed := backfillModelConfigNames(cfg.GetIntelligentModels())
+	changed = backfillModelConfigNames(cfg.GetLightweightModels()) || changed
+	changed = backfillModelConfigNames(cfg.GetVisionModels()) || changed
+
 	needIntelligent := !hasAvailableModelConfig(cfg.GetIntelligentModels())
 	needLightweight := !hasAvailableModelConfig(cfg.GetLightweightModels())
 	needVision := !hasAvailableModelConfig(cfg.GetVisionModels())
 	if !needIntelligent && !needLightweight && !needVision {
-		return false
+		return changed
 	}
 
 	defaultCfg := buildDefaultAIGlobalConfig()
@@ -129,22 +134,42 @@ func ensureTierModelConfigsAvailable(cfg *ypb.AIGlobalConfig) bool {
 
 	if needIntelligent {
 		cfg.IntelligentModels = cloneAIModelConfigs(defaultCfg.GetIntelligentModels())
+		changed = true
 	}
 	if needLightweight {
 		cfg.LightweightModels = cloneAIModelConfigs(defaultCfg.GetLightweightModels())
+		changed = true
 	}
 	if needVision {
 		cfg.VisionModels = cloneAIModelConfigs(defaultCfg.GetVisionModels())
+		changed = true
 	}
-	return true
+	return changed
+}
+
+func backfillModelConfigNames(models []*ypb.AIModelConfig) bool {
+	changed := false
+	for _, model := range models {
+		if model == nil || model.GetProvider() == nil {
+			continue
+		}
+		if strings.TrimSpace(model.GetModelName()) != "" {
+			continue
+		}
+		if resolved := strings.TrimSpace(getModelFromConfig(model)); resolved != "" {
+			model.ModelName = resolved
+			changed = true
+		}
+	}
+	return changed
 }
 
 func hasAvailableModelConfig(models []*ypb.AIModelConfig) bool {
 	for _, model := range models {
-		if model == nil {
+		if model == nil || model.GetProvider() == nil {
 			continue
 		}
-		if model.GetProvider() != nil {
+		if strings.TrimSpace(getModelFromConfig(model)) != "" {
 			return true
 		}
 	}

@@ -2,8 +2,10 @@ package scannode
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -187,5 +189,154 @@ func TestBuildYakAIEngineOptionsMapsExtendedRuntimeOptions(t *testing.T) {
 	}
 	if _, err := aiConfig.GetAiToolManager().GetToolByName("ls"); err != nil {
 		t.Fatalf("expected system file operator tools to be available: %v", err)
+	}
+}
+
+type stubAISyncOperator struct {
+	*aicommon.AIEngineOperatorBase
+	syncType  string
+	syncInput string
+}
+
+func newStubAISyncOperator() *stubAISyncOperator {
+	operator := &stubAISyncOperator{}
+	operator.AIEngineOperatorBase = aicommon.NewAIEngineOperatorBase(func(event *ypb.AIInputEvent) error {
+		if event.GetIsSyncMessage() {
+			operator.syncType = event.GetSyncType()
+			operator.syncInput = event.GetSyncJsonInput()
+		}
+		return nil
+	}, nil, nil)
+	return operator
+}
+
+func TestYakAIInputContentParsesSyncEvent(t *testing.T) {
+	t.Parallel()
+
+	content, interactive, syncEvent, options, err := yakAIInputContent(aiSessionInput{
+		InputType:   "sync_event",
+		PayloadJSON: []byte(`{"sync_type":"recovery_plan_and_exec","sync_json_input":{"coordinator_id":"coor-1","start_task_index":"1-2"}}`),
+	})
+	if err != nil {
+		t.Fatalf("yakAIInputContent() error = %v", err)
+	}
+	if content != "" {
+		t.Fatalf("unexpected content: %q", content)
+	}
+	if interactive {
+		t.Fatal("sync_event should not be interactive")
+	}
+	if len(options) != 0 {
+		t.Fatalf("sync_event should not have attached resource options: %d", len(options))
+	}
+	if syncEvent == nil {
+		t.Fatal("expected sync event")
+	}
+	if syncEvent.SyncType != "recovery_plan_and_exec" {
+		t.Fatalf("unexpected sync type: %s", syncEvent.SyncType)
+	}
+	assertJSONEqualRuntimeYak(t, []byte(syncEvent.SyncJSONInput), `{"coordinator_id":"coor-1","start_task_index":"1-2"}`)
+}
+
+func TestYakAIInputContentTreatsUserInterventionAsInteractivePayload(t *testing.T) {
+	t.Parallel()
+
+	payload := []byte(`{"id":"interactive-1","option_value":"input_params","review_type":"exec_aiforge_review_require","params":{"query":"target"}}`)
+	content, interactive, syncEvent, options, err := yakAIInputContent(aiSessionInput{
+		InputType:   "user_intervention",
+		PayloadJSON: payload,
+	})
+	if err != nil {
+		t.Fatalf("yakAIInputContent() error = %v", err)
+	}
+	if !interactive {
+		t.Fatal("user_intervention should be interactive")
+	}
+	if syncEvent != nil {
+		t.Fatalf("user_intervention should not be a sync event: %#v", syncEvent)
+	}
+	if len(options) != 0 {
+		t.Fatalf("user_intervention should not have attached resource options: %d", len(options))
+	}
+	assertJSONEqualRuntimeYak(t, []byte(content), string(payload))
+}
+
+func TestYakAIInputContentMapsAttachedResources(t *testing.T) {
+	t.Parallel()
+
+	content, interactive, syncEvent, options, err := yakAIInputContent(aiSessionInput{
+		InputType: "message",
+		PayloadJSON: []byte(`{
+			"content":"scan target",
+			"attached_resource_info":[
+				{"type":"file","key":"file_path","value":"/tmp/targets.txt"},
+				{"type":"knowledge_base","key":"system_flag","value":"all_knowledge_base"},
+				{"type":"aiforge","key":"name","value":"yak-cve-analysis"},
+				{"type":"aitool","key":"name","value":"httpx"}
+			]
+		}`),
+	})
+	if err != nil {
+		t.Fatalf("yakAIInputContent() error = %v", err)
+	}
+	if content != "scan target" {
+		t.Fatalf("unexpected content: %q", content)
+	}
+	if interactive {
+		t.Fatal("message should not be interactive")
+	}
+	if syncEvent != nil {
+		t.Fatalf("message should not be a sync event: %#v", syncEvent)
+	}
+	config := aiengine.NewAIEngineConfig(options...)
+	if len(config.AttachedResources) != 4 {
+		t.Fatalf("unexpected attached resource count: %d", len(config.AttachedResources))
+	}
+	if got := config.AttachedResources[0]; got.Type != "file" || got.Key != "file_path" || got.Value != "/tmp/targets.txt" {
+		t.Fatalf("unexpected file attached resource: %#v", got)
+	}
+	if got := config.AttachedResources[1]; got.Type != "knowledge_base" || got.Key != "system_flag" || got.Value != "all_knowledge_base" {
+		t.Fatalf("unexpected knowledge attached resource: %#v", got)
+	}
+	if got := config.AttachedResources[2]; got.Type != "aiforge" || got.Key != "name" || got.Value != "yak-cve-analysis" {
+		t.Fatalf("unexpected forge attached resource: %#v", got)
+	}
+	if got := config.AttachedResources[3]; got.Type != "aitool" || got.Key != "name" || got.Value != "httpx" {
+		t.Fatalf("unexpected tool attached resource: %#v", got)
+	}
+}
+
+func TestDispatchYakAISyncEventUsesOperator(t *testing.T) {
+	t.Parallel()
+
+	operator := newStubAISyncOperator()
+	err := dispatchYakAISyncEvent(operator, &yakAISyncEvent{
+		SyncType:      "skip_subtask_in_plan",
+		SyncJSONInput: `{"skip_current_task":true}`,
+	})
+	if err != nil {
+		t.Fatalf("dispatchYakAISyncEvent() error = %v", err)
+	}
+	if operator.syncType != "skip_subtask_in_plan" {
+		t.Fatalf("unexpected sync type: %s", operator.syncType)
+	}
+	assertJSONEqualRuntimeYak(t, []byte(operator.syncInput), `{"skip_current_task":true}`)
+}
+
+func assertJSONEqualRuntimeYak(t *testing.T, got []byte, want string) {
+	t.Helper()
+
+	var gotValue any
+	if err := json.Unmarshal(got, &gotValue); err != nil {
+		t.Fatalf("unmarshal got json: %v", err)
+	}
+
+	var wantValue any
+	if err := json.Unmarshal([]byte(want), &wantValue); err != nil {
+		t.Fatalf("unmarshal want json: %v", err)
+	}
+
+	if !reflect.DeepEqual(gotValue, wantValue) {
+		t.Fatalf("unexpected json payload: got=%s want=%s", string(got), want)
 	}
 }

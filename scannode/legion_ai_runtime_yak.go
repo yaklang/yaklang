@@ -71,7 +71,7 @@ func (h *yakAIEngineRuntimeHandle) SendInput(ctx context.Context, input aiSessio
 	if h == nil || h.engine == nil {
 		return fmt.Errorf("yak ai engine is not ready")
 	}
-	content, interactive, err := yakAIInputContent(input)
+	content, interactive, syncEvent, options, err := yakAIInputContent(input)
 	if err != nil {
 		return err
 	}
@@ -89,8 +89,14 @@ func (h *yakAIEngineRuntimeHandle) SendInput(ctx context.Context, input aiSessio
 		}
 		return nil
 	}
+	if syncEvent != nil {
+		if err := dispatchYakAISyncEvent(h.engine.GetOperator(), syncEvent); err != nil {
+			return fmt.Errorf("send yak ai sync event: %w", err)
+		}
+		return nil
+	}
 
-	go h.sendMessage(ctx, content)
+	go h.sendMessage(ctx, content, options...)
 	return nil
 }
 
@@ -142,7 +148,7 @@ func (h *yakAIEngineRuntimeHandle) Close(reason string) {
 	h.engine.Close()
 }
 
-func (h *yakAIEngineRuntimeHandle) sendMessage(ctx context.Context, content string) {
+func (h *yakAIEngineRuntimeHandle) sendMessage(ctx context.Context, content string, options ...aiengine.AIEngineConfigOption) {
 	h.sendMu.Lock()
 	defer h.sendMu.Unlock()
 
@@ -153,7 +159,7 @@ func (h *yakAIEngineRuntimeHandle) sendMessage(ctx context.Context, content stri
 	}
 	h.mu.Unlock()
 
-	if err := h.engine.SendMsg(content); err != nil {
+	if err := h.engine.SendMsg(content, options...); err != nil {
 		if ctx.Err() != nil {
 			return
 		}
@@ -704,26 +710,113 @@ func mergeYakRuntimeOptions(base yakRuntimeOptions, overlay yakRuntimeOptions) y
 	return base
 }
 
-func yakAIInputContent(input aiSessionInput) (string, bool, error) {
+type yakAISyncEvent struct {
+	SyncType      string
+	SyncJSONInput string
+}
+
+func dispatchYakAISyncEvent(operator aicommon.AIEngineOperator, syncEvent *yakAISyncEvent) error {
+	if syncEvent == nil {
+		return nil
+	}
+	if operator == nil {
+		return fmt.Errorf("yak ai engine operator is not ready")
+	}
+	return operator.SendSyncEvent(syncEvent.SyncType, syncEvent.SyncJSONInput)
+}
+
+type yakAIInputAttachedResource struct {
+	Type  string `json:"type"`
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
+func yakAIInputContent(input aiSessionInput) (string, bool, *yakAISyncEvent, []aiengine.AIEngineConfigOption, error) {
 	var payload map[string]any
 	if err := json.Unmarshal(input.PayloadJSON, &payload); err != nil {
-		return "", false, fmt.Errorf("decode ai session input payload: %w", err)
+		return "", false, nil, nil, fmt.Errorf("decode ai session input payload: %w", err)
 	}
 	inputType := strings.ToLower(strings.TrimSpace(input.InputType))
 	switch inputType {
-	case "interactive", "interactive_response", "review_response":
+	case "interactive", "interactive_response", "review_response", "user_intervention":
 		content := firstNonEmptyString(payload, "interactive_json_input", "response", "content", "message", "text")
 		if content == "" {
 			content = string(input.PayloadJSON)
 		}
-		return content, true, nil
+		return content, true, nil, nil, nil
+	case "sync_event":
+		syncType := firstNonEmptyString(payload, "sync_type", "syncType", "type")
+		if syncType == "" {
+			return "", false, nil, nil, fmt.Errorf("ai session sync event type is required")
+		}
+		var syncJSONInput string
+		switch value := payload["sync_json_input"].(type) {
+		case string:
+			syncJSONInput = strings.TrimSpace(value)
+		case nil:
+		default:
+			raw, err := json.Marshal(value)
+			if err != nil {
+				return "", false, nil, nil, fmt.Errorf("marshal ai session sync_json_input: %w", err)
+			}
+			syncJSONInput = string(raw)
+		}
+		if syncJSONInput == "" {
+			switch value := payload["syncJsonInput"].(type) {
+			case string:
+				syncJSONInput = strings.TrimSpace(value)
+			case nil:
+			default:
+				raw, err := json.Marshal(value)
+				if err != nil {
+					return "", false, nil, nil, fmt.Errorf("marshal ai session syncJsonInput: %w", err)
+				}
+				syncJSONInput = string(raw)
+			}
+		}
+		return "", false, &yakAISyncEvent{
+			SyncType:      syncType,
+			SyncJSONInput: syncJSONInput,
+		}, nil, nil
 	default:
 		content := firstNonEmptyString(payload, "content", "message", "text", "free_input")
 		if content == "" {
-			return "", false, fmt.Errorf("ai session message content is required")
+			return "", false, nil, nil, fmt.Errorf("ai session message content is required")
 		}
-		return content, false, nil
+		return content, false, nil, yakAIInputAttachedResourceOptions(payload), nil
 	}
+}
+
+func yakAIInputAttachedResourceOptions(payload map[string]any) []aiengine.AIEngineConfigOption {
+	rawValue, ok := payload["attached_resource_info"]
+	if !ok {
+		rawValue, ok = payload["attachedResourceInfo"]
+	}
+	if !ok {
+		rawValue, ok = payload["AttachedResourceInfo"]
+	}
+	if !ok || rawValue == nil {
+		return nil
+	}
+	raw, err := json.Marshal(rawValue)
+	if err != nil {
+		return nil
+	}
+	var resources []yakAIInputAttachedResource
+	if err := json.Unmarshal(raw, &resources); err != nil {
+		return nil
+	}
+	options := make([]aiengine.AIEngineConfigOption, 0, len(resources))
+	for _, resource := range resources {
+		resourceType := strings.TrimSpace(resource.Type)
+		key := strings.TrimSpace(resource.Key)
+		value := strings.TrimSpace(resource.Value)
+		if resourceType == "" || key == "" || value == "" {
+			continue
+		}
+		options = append(options, aiengine.WithAttachedResource(resourceType, key, value))
+	}
+	return options
 }
 
 func firstNonEmptyString(payload map[string]any, keys ...string) string {

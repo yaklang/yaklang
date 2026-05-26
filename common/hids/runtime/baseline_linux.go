@@ -538,30 +538,73 @@ func emitInventoryObservations(
 	seedCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 
-	if spec.Collectors.Process.Enabled {
-		processEvents, err := provider.ListProcessEvents(seedCtx)
-		if err != nil {
-			log.Warnf("seed hids process inventory failed: %v", err)
-		} else {
-			publishInventoryEvents(seedCtx, sink, processEvents)
-		}
-	}
+	collectProcessInventoryObservations(seedCtx, spec, provider, sink)
+	collectNetworkInventoryObservations(seedCtx, spec, provider, sink)
+	collectHostUserInventoryObservations(seedCtx, spec, provider, sink)
+}
 
-	if spec.Collectors.Network.Enabled {
-		networkEvents, err := provider.ListNetworkEvents(seedCtx)
-		if err != nil {
-			log.Warnf("seed hids network inventory failed: %v", err)
-		} else {
-			publishInventoryEvents(seedCtx, sink, networkEvents)
-		}
+func collectProcessInventoryObservations(
+	ctx context.Context,
+	spec model.DesiredSpec,
+	provider inventoryProvider,
+	sink chan<- model.Event,
+) {
+	if !spec.Collectors.Process.Enabled {
+		return
 	}
+	collectProcessCurrentStateObservations(ctx, provider, sink)
+}
 
+func collectProcessCurrentStateObservations(
+	ctx context.Context,
+	provider inventoryProvider,
+	sink chan<- model.Event,
+) {
+	processEvents, err := provider.ListProcessEvents(ctx)
+	if err != nil {
+		log.Warnf("seed hids process inventory failed: %v", err)
+		return
+	}
+	publishInventoryEvents(ctx, sink, processEvents)
+}
+
+func collectNetworkInventoryObservations(
+	ctx context.Context,
+	spec model.DesiredSpec,
+	provider inventoryProvider,
+	sink chan<- model.Event,
+) {
+	if !spec.Collectors.Network.Enabled {
+		return
+	}
+	collectNetworkCurrentStateObservations(ctx, provider, sink)
+}
+
+func collectNetworkCurrentStateObservations(
+	ctx context.Context,
+	provider inventoryProvider,
+	sink chan<- model.Event,
+) {
+	networkEvents, err := provider.ListNetworkEvents(ctx)
+	if err != nil {
+		log.Warnf("seed hids network inventory failed: %v", err)
+		return
+	}
+	publishInventoryEvents(ctx, sink, networkEvents)
+}
+
+func collectHostUserInventoryObservations(
+	ctx context.Context,
+	spec model.DesiredSpec,
+	provider inventoryProvider,
+	sink chan<- model.Event,
+) {
 	if hasAnyEnabledCollector(spec) {
-		userEvents, err := provider.ListHostUserEvents(seedCtx)
+		userEvents, err := provider.ListHostUserEvents(ctx)
 		if err != nil {
 			log.Warnf("seed hids host user inventory failed: %v", err)
 		} else {
-			publishInventoryEvents(seedCtx, sink, userEvents)
+			publishInventoryEvents(ctx, sink, userEvents)
 		}
 	}
 }

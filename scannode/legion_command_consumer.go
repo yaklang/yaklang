@@ -262,6 +262,10 @@ func (b *legionJobBridge) handleMessage(
 		return b.handleCapabilityApply(ctx, message.Data)
 	case strings.HasSuffix(message.Subject, "."+legionCommandHIDSDesiredSpecDryRun):
 		return b.handleHIDSDesiredSpecDryRun(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandHIDSCurrentStateCollect):
+		return b.handleHIDSCurrentStateCollect(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandHIDSFileEvidenceCollect):
+		return b.handleHIDSFileEvidenceCollect(ctx, message.Data)
 	case strings.HasSuffix(message.Subject, "."+legionCommandHIDSResponseActionExecute):
 		return b.handleHIDSResponseActionExecute(ctx, message.Data)
 	case strings.HasSuffix(message.Subject, "."+legionCommandSSARuleSyncExport):
@@ -276,10 +280,126 @@ func (b *legionJobBridge) handleMessage(
 		return b.handleAISessionCancel(ctx, message.Data)
 	case strings.HasSuffix(message.Subject, "."+legionCommandAISessionClose):
 		return b.handleAISessionClose(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAISessionTitleUpdate):
+		return b.handleAISessionTitleUpdate(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAISessionDelete):
+		return b.handleAISessionDelete(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAILogsCheckpointsExport):
+		return b.handleAILogsCheckpointsExport(ctx, message.Data)
 	case strings.HasSuffix(message.Subject, "."+legionCommandAIProviderModelsList):
 		return b.handleAIProviderModelsList(ctx, message.Data)
 	case strings.HasSuffix(message.Subject, "."+legionCommandAIProviderHealthCheck):
 		return b.handleAIProviderHealthCheck(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAIFocusQuery):
+		return b.handleAIFocusQuery(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAIMaterialsRandomQuery):
+		return b.handleAIMaterialsRandomQuery(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAIGlobalConfigGet):
+		return b.handleAIGlobalConfigGet(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAIGlobalConfigSet):
+		return b.handleAIGlobalConfigSet(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAIMCPServersList):
+		return b.handleAIMCPServersList(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAIMCPServerCreate):
+		return b.handleAIMCPServerCreate(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAIMCPServerUpdate):
+		return b.handleAIMCPServerUpdate(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAIMCPServerDelete):
+		return b.handleAIMCPServerDelete(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAILocalModelsList):
+		return b.handleAILocalModelsList(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAILlamaServerReady):
+		return b.handleAILlamaServerReady(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAILlamaServerInstall):
+		return b.handleAILlamaServerInstall(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAILocalModelCreate):
+		return b.handleAILocalModelCreate(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAILocalModelUpdate):
+		return b.handleAILocalModelUpdate(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAILocalModelDelete):
+		return b.handleAILocalModelDelete(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAILocalModelStart):
+		return b.handleAILocalModelStart(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAILocalModelStop):
+		return b.handleAILocalModelStop(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAILocalModelDownload):
+		return b.handleAILocalModelDownload(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAILocalModelOperationCancel):
+		return b.handleAILocalModelOperationCancel(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAILocalModelsClear):
+		return b.handleAILocalModelsClear(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAIForgesList):
+		return b.handleAIForgesList(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAIForgeCreate):
+		return b.handleAIForgeCreate(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAIForgeUpdate):
+		return b.handleAIForgeUpdate(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAIForgeDelete):
+		return b.handleAIForgeDelete(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAIForgeExport):
+		return b.handleAIForgeExport(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAIForgeImport):
+		return b.handleAIForgeImport(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAIToolsList):
+		return b.handleAIToolsList(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAIToolCreate):
+		return b.handleAIToolCreate(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAIToolUpdate):
+		return b.handleAIToolUpdate(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAIToolMetadataGenerate):
+		return b.handleAIToolGenerateMetadata(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAIToolsFavoriteToggle):
+		return b.handleAIToolFavoriteToggle(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAIToolsDelete):
+		return b.handleAIToolsDelete(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAIKnowledgeBasesList):
+		return b.handleAIKnowledgeBasesList(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAIKnowledgeBaseCreate):
+		return b.handleAIKnowledgeBaseCreate(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAIKnowledgeBaseImport):
+		return b.handleAIKnowledgeBaseImport(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAIKnowledgeBaseUpdate):
+		return b.handleAIKnowledgeBaseUpdate(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAIKnowledgeBaseDelete):
+		return b.handleAIKnowledgeBaseDelete(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAIKnowledgeBaseExport):
+		return b.handleAIKnowledgeBaseExport(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAIKnowledgeBaseEntriesSearch):
+		return b.handleAIKnowledgeBaseEntriesSearch(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAIKnowledgeBaseQueryByAI):
+		return b.handleAIKnowledgeBaseQueryByAI(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAIKnowledgeBaseQueryByAICancel):
+		return b.handleAIKnowledgeBaseQueryByAICancel(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAIKnowledgeBaseQuestionIndexGenerate):
+		return b.handleAIKnowledgeBaseQuestionIndexGenerate(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAIKnowledgeBaseQuestionIndexCancel):
+		return b.handleAIKnowledgeBaseQuestionIndexCancel(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAIKnowledgeBaseEntryCreate):
+		return b.handleAIKnowledgeBaseEntryCreate(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAIKnowledgeBaseEntryUpdate):
+		return b.handleAIKnowledgeBaseEntryUpdate(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAIKnowledgeBaseEntryDelete):
+		return b.handleAIKnowledgeBaseEntryDelete(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAIKnowledgeBaseVectorIndexBuild):
+		return b.handleAIKnowledgeBaseVectorIndexBuild(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAIKnowledgeBaseEntryVectorIndexBuild):
+		return b.handleAIKnowledgeBaseEntryVectorIndexBuild(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAIMemoryEntityCreate):
+		return b.handleAIMemoryEntityCreate(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAIMemoryEntityGet):
+		return b.handleAIMemoryEntityGet(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAIMemoryEntitiesQuery):
+		return b.handleAIMemoryEntitiesQuery(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAIMemoryEntityUpdate):
+		return b.handleAIMemoryEntityUpdate(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAIMemoryEntitiesDelete):
+		return b.handleAIMemoryEntitiesDelete(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAIMemoryEntityTagsCount):
+		return b.handleAIMemoryEntityTagsCount(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAIHTTPFlowsQuery):
+		return b.handleAIHTTPFlowsQuery(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAIRisksQuery):
+		return b.handleAIRisksQuery(ctx, message.Data)
 	default:
 		return fmt.Errorf("unsupported legion command subject: %s", message.Subject)
 	}
