@@ -135,7 +135,7 @@ func TestRenderBatchCompressPrompt_ContainsBothSections(t *testing.T) {
 		recentKeep = append(recentKeep, item)
 	}
 
-	out := tl.renderBatchCompressPrompt(toCompress, recentKeep, "TESTNONCE")
+	out := tl.renderBatchCompressPrompt(nil, toCompress, recentKeep, "TESTNONCE")
 	require.NotEmpty(t, out)
 	require.Contains(t, out, "<|RECENT_KEEP_TESTNONCE|>", "RECENT_KEEP open tag missing")
 	require.Contains(t, out, "<|RECENT_KEEP_END_TESTNONCE|>", "RECENT_KEEP close tag missing")
@@ -158,7 +158,7 @@ func TestRenderBatchCompressPrompt_NoRecentKept(t *testing.T) {
 		item, _ := tl.idToTimelineItem.Get(i)
 		toCompress = append(toCompress, item)
 	}
-	out := tl.renderBatchCompressPrompt(toCompress, nil, "NOREC")
+	out := tl.renderBatchCompressPrompt(nil, toCompress, nil, "NOREC")
 	require.NotEmpty(t, out)
 	require.Contains(t, out, "<|ITEMS_TO_COMPRESS_NOREC|>")
 	require.NotContains(t, out, "<|RECENT_KEEP_NOREC|>", "RECENT_KEEP block must be omitted when recent is empty")
@@ -232,7 +232,7 @@ func TestRenderBatchCompressPrompt_RecentBudgetRespectsToCompress(t *testing.T) 
 		recentKeep = append(recentKeep, item)
 	}
 
-	out := tl.renderBatchCompressPrompt(toCompress, recentKeep, "BUDGET")
+	out := tl.renderBatchCompressPrompt(nil, toCompress, recentKeep, "BUDGET")
 	require.NotEmpty(t, out)
 	// toCompress 段必须可见
 	require.Contains(t, out, "old-keyword-XYZ", "toCompress must remain visible even when recent contends for budget")
@@ -262,7 +262,7 @@ func TestRenderBatchCompressPrompt_SingleHugeRecentDropped(t *testing.T) {
 	bigItem, _ := tl.idToTimelineItem.Get(int64(999))
 	recentKeep := []*TimelineItem{bigItem}
 
-	out := tl.renderBatchCompressPrompt(toCompress, recentKeep, "HUGE")
+	out := tl.renderBatchCompressPrompt(nil, toCompress, recentKeep, "HUGE")
 	require.NotEmpty(t, out)
 	require.Contains(t, out, "stay-visible", "toCompress must still render even if single recent item exceeds budget")
 	require.NotContains(t, out, "<|RECENT_KEEP_HUGE|>", "RECENT_KEEP must be dropped when no item fits in its budget")
@@ -272,6 +272,6 @@ func TestRenderBatchCompressPrompt_SingleHugeRecentDropped(t *testing.T) {
 // 关键词: renderBatchCompressPrompt 空 toCompress
 func TestRenderBatchCompressPrompt_EmptyToCompress(t *testing.T) {
 	tl := NewTimeline(nil, nil)
-	out := tl.renderBatchCompressPrompt(nil, nil, "EMPTY")
+	out := tl.renderBatchCompressPrompt(nil, nil, nil, "EMPTY")
 	require.Empty(t, out, "empty toCompress should produce empty prompt")
 }

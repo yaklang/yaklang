@@ -7,7 +7,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/utils/linktable"
 )
 
 func TestMemoryTimelineOrdinary(t *testing.T) {
@@ -216,11 +215,9 @@ func TestTimelineConfigurationMethods(t *testing.T) {
 	require.Equal(t, "", metaInfoNil)
 }
 
-// TestTimelineReducerTsInitialized 测试 NewTimeline 后 reducerTs 已初始化
-// 关键词: reducerTs 初始化校验
-// 历史说明：原 TestTimelineRenderSummaryPrompt 仅断言 memoryTimeline.summary 非 nil，
-// summary 字段已被识别为 dead code 并移除；这里改为校验新增的 reducerTs 字段
-func TestTimelineReducerTsInitialized(t *testing.T) {
+// TestTimelineCompressedHeadInitialized 测试 NewTimeline 后 compressedHead 初始为 nil
+// 关键词: compressedHead 初始化校验
+func TestTimelineCompressedHeadInitialized(t *testing.T) {
 	memoryTimeline := NewTimeline(&mockedAI{}, nil)
 
 	// Add items
@@ -236,8 +233,8 @@ func TestTimelineReducerTsInitialized(t *testing.T) {
 		})
 	}
 
-	require.NotNil(t, memoryTimeline.reducerTs)
-	require.Equal(t, 0, memoryTimeline.reducerTs.Len())
+	require.Nil(t, memoryTimeline.compressedHead)
+	require.Empty(t, memoryTimeline.compressedHistory)
 }
 
 // TestTimelineItemOutputString 测试TimelineItemOutput的String方法
@@ -330,11 +327,22 @@ func TestDump_ByteStability(t *testing.T) {
 	injectTimelineItem(tl, int64(103), baseTs.Add(5*time.Minute), makeToolResult(103, "cat", true, "cat-output"))
 	injectTimelineItem(tl, int64(104), baseTs.Add(8*time.Minute+45*time.Second), makeToolResult(104, "echo", true, "echo-output"))
 
-	// 注入 reducer 模拟之前已批量压缩
-	tl.reducers.Set(int64(50), linktable.NewUnlimitedStringLinkTable("compressed batch memory alpha"))
-	tl.reducerTs.Set(int64(50), baseTs.Add(-5*time.Minute).UnixMilli())
-	tl.reducers.Set(int64(60), linktable.NewUnlimitedStringLinkTable("compressed batch memory beta"))
-	tl.reducerTs.Set(int64(60), baseTs.Add(-2*time.Minute).UnixMilli())
+	// 注入 compressedHead 模拟之前已批量压缩
+	tl.compressedHead = &TimelineCompressedHead{
+		Text:             "compressed batch memory beta",
+		CoveredEndItemID: 60,
+		CoveredEndAtMs:   baseTs.Add(-2 * time.Minute).UnixMilli(),
+		Version:          2,
+	}
+	tl.compressedHistory = []*TimelineCompressedHistoryNode{
+		{
+			Version:          1,
+			PrevVersion:      0,
+			Text:             "compressed batch memory alpha",
+			CoveredEndItemID: 50,
+			CoveredEndAtMs:   baseTs.Add(-5 * time.Minute).UnixMilli(),
+		},
+	}
 
 	dump1 := tl.Dump()
 	require.NotEmpty(t, dump1, "Dump should not be empty for non-empty timeline")

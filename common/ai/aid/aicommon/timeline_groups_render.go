@@ -11,7 +11,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/linktable"
 )
 
 // TimelineIntervalBlock 表示一个绝对时间对齐的固定时间桶（可含同一日历桶内的字节子桶）
@@ -34,12 +33,11 @@ type TimelineIntervalBlocks []*TimelineIntervalBlock
 
 // TimelineGroups 是 GroupByMinutes 的结果，包含若干 block
 // 持有 intervalMinutes 元信息以便外层校验/调试
-// reducerBlocks 持有由 Timeline.reducers 派生出的稳定可渲染 reducer 块，按 ReducerKeyID 升序
-// 关键词: TimelineGroups, reducerBlocks
+// 关键词: TimelineGroups
 type TimelineGroups struct {
 	intervalMinutes int
 	blocks          TimelineIntervalBlocks
-	reducerBlocks   []*TimelineReducerBlock
+	compressedHead  *TimelineCompressedHeadBlock
 }
 
 // GetBlocks 返回当前分组的 block 切片，多次调用返回同一切片引用，避免复制开销
@@ -50,29 +48,16 @@ func (g *TimelineGroups) GetBlocks() TimelineIntervalBlocks {
 	return g.blocks
 }
 
-// GetReducerBlocks 返回当前分组中由 Timeline.reducers 派生出的 reducer block
-// 不复制底层切片，调用方不应修改返回值
-// 关键词: TimelineGroups.GetReducerBlocks
-func (g *TimelineGroups) GetReducerBlocks() []*TimelineReducerBlock {
-	if g == nil {
-		return nil
-	}
-	return g.reducerBlocks
-}
-
-// GetAllRenderable 返回 reducer blocks 在前、interval blocks 在后的统一可渲染列表
-// 该顺序与 DumpBefore 一致：先输出 reducer，再输出活跃 timeline item 的时间桶
-// 关键词: TimelineGroups.GetAllRenderable, reducer 优先, 与 Dump 一致
+// GetAllRenderable 返回 compressed head block 在前、interval blocks 在后的统一可渲染列表
+// 该顺序与 DumpBefore 一致：先输出压缩历史，再输出活跃 timeline item 的时间桶
+// 关键词: TimelineGroups.GetAllRenderable, compressedHead 优先, 与 Dump 一致
 func (g *TimelineGroups) GetAllRenderable() TimelineRenderableBlocks {
 	if g == nil {
 		return nil
 	}
-	out := make(TimelineRenderableBlocks, 0, len(g.reducerBlocks)+len(g.blocks))
-	for _, rb := range g.reducerBlocks {
-		if rb == nil {
-			continue
-		}
-		out = append(out, rb)
+	out := make(TimelineRenderableBlocks, 0, len(g.blocks)+1)
+	if g.compressedHead != nil {
+		out = append(out, g.compressedHead)
 	}
 	for _, blk := range g.blocks {
 		if blk == nil {
@@ -268,39 +253,21 @@ func (m *Timeline) GroupByMinutesAndBytes(minutes int, bytesPerBucket int64) *Ti
 	return m.collectReducerGroups(minutes, orderedBuckets)
 }
 
-// collectReducerGroups 组装 reducerBlocks + interval blocks；orderedBuckets 可为 nil（仅 reducer）
+// collectReducerGroups 组装 compressed head block + interval blocks；orderedBuckets 可为 nil（仅 head）
 func (m *Timeline) collectReducerGroups(minutes int, orderedBuckets []*TimelineIntervalBlock) *TimelineGroups {
-	var reducerBlocks []*TimelineReducerBlock
-	if m.reducers != nil && m.reducers.Len() > 0 {
-		m.reducers.ForEach(func(reducerKeyID int64, lt *linktable.LinkTable[string]) bool {
-			if lt == nil {
-				return true
-			}
-			text := lt.Value()
-			if strings.TrimSpace(text) == "" {
-				return true
-			}
-			var ts time.Time
-			if m.reducerTs != nil {
-				if msTs, ok := m.reducerTs.Get(reducerKeyID); ok && msTs > 0 {
-					ts = time.Unix(0, msTs*int64(time.Millisecond))
-				}
-			}
-			reducerBlocks = append(reducerBlocks, &TimelineReducerBlock{
-				ReducerKeyID: reducerKeyID,
-				Ts:           ts,
-				Text:         text,
-			})
-			return true
-		})
-		sort.SliceStable(reducerBlocks, func(i, j int) bool {
-			return reducerBlocks[i].ReducerKeyID < reducerBlocks[j].ReducerKeyID
-		})
+	var compressedHeadBlock *TimelineCompressedHeadBlock
+	if m.compressedHead != nil && strings.TrimSpace(m.compressedHead.Text) != "" {
+		compressedHeadBlock = &TimelineCompressedHeadBlock{
+			CoveredEndItemID: m.compressedHead.CoveredEndItemID,
+			CoveredEndAtMs:   m.compressedHead.CoveredEndAtMs,
+			Version:          m.compressedHead.Version,
+			Text:             m.compressedHead.Text,
+		}
 	}
 	return &TimelineGroups{
 		intervalMinutes: minutes,
 		blocks:          TimelineIntervalBlocks(orderedBuckets),
-		reducerBlocks:   reducerBlocks,
+		compressedHead:  compressedHeadBlock,
 	}
 }
 
@@ -780,39 +747,22 @@ func (b *TimelineIntervalBlock) IsOpen() bool {
 	return b.Open
 }
 
-// TimelineReducerBlock 表示一个由 Timeline.reducers 中已压缩条目派生出的可渲染块
-// 始终为 frozen（IsOpen 恒为 false），渲染内容稳定可缓存
-// 关键词: TimelineReducerBlock, reducer 渲染, 缓存稳定
-type TimelineReducerBlock struct {
-	ReducerKeyID int64
-	Ts           time.Time // 来自 Timeline.reducerTs；为零时表示老数据无稳定时间戳
-	Text         string
+type TimelineCompressedHeadBlock struct {
+	CoveredEndItemID int64
+	CoveredEndAtMs   int64
+	Version          int64
+	Text             string
 }
 
-// Render 渲染单个 reducer block 的内部内容（不含 aitag 包裹）
-// 输出格式（与 TimelineIntervalBlock.Render 风格对齐，无前导缩进）：
-//
-//	# reducer key=<id> ts=<seconds since epoch or 0>
-//	HH:MM:SS [reducer/memory]
-//	${reducer text line 1}
-//	${reducer text line 2}
-//
-// 关键词: TimelineReducerBlock.Render, 缓存稳定, 无缩进
-func (r *TimelineReducerBlock) Render() string {
-	if r == nil {
+func (h *TimelineCompressedHeadBlock) Render() string {
+	if h == nil {
 		return ""
 	}
-	var sec int64
-	hh, mm, ss := 0, 0, 0
-	if !r.Ts.IsZero() {
-		sec = r.Ts.Unix()
-		hh, mm, ss = r.Ts.Clock()
-	}
 	var buf bytes.Buffer
-	buf.WriteString(fmt.Sprintf("# reducer key=%d ts=%d\n", r.ReducerKeyID, sec))
-	buf.WriteString(fmt.Sprintf("%02d:%02d:%02d [reducer/memory]", hh, mm, ss))
-
-	text := strings.TrimSpace(r.Text)
+	buf.WriteString(fmt.Sprintf("# compressed_head covered_end_item_id=%d covered_end_at_ms=%d version=%d\n",
+		h.CoveredEndItemID, h.CoveredEndAtMs, h.Version))
+	buf.WriteString("[compressed/head]")
+	text := strings.TrimSpace(h.Text)
 	if text != "" {
 		var prevBlank bool
 		for _, line := range utils.ParseStringToRawLines(text) {
@@ -833,28 +783,18 @@ func (r *TimelineReducerBlock) Render() string {
 	return strings.TrimRight(buf.String(), "\n")
 }
 
-// StableNonce 基于 ReducerKeyID 与稳定时间戳派生的 aitag-兼容 nonce
-// 形如 "r{ReducerKeyID}t{unixSec}"，无下划线、字母数字组合
-// 同一 reducer key + ts 永远产生相同 nonce，可被前缀缓存复用
-// 关键词: TimelineReducerBlock.StableNonce, aitag nonce
-func (r *TimelineReducerBlock) StableNonce() string {
-	if r == nil {
+func (h *TimelineCompressedHeadBlock) StableNonce() string {
+	if h == nil {
 		return ""
 	}
-	var sec int64
-	if !r.Ts.IsZero() {
-		sec = r.Ts.Unix()
-	}
-	return fmt.Sprintf("r%dt%d", r.ReducerKeyID, sec)
+	return fmt.Sprintf("h%dv%d", h.CoveredEndAtMs/1000, h.Version)
 }
 
-// IsOpen 恒为 false，reducer 一旦写入即视为冻结
-// 关键词: TimelineReducerBlock.IsOpen
-func (r *TimelineReducerBlock) IsOpen() bool {
+func (h *TimelineCompressedHeadBlock) IsOpen() bool {
 	return false
 }
 
-// TimelineRenderableBlocks 是任意可渲染块的有序集合（可混合 IntervalBlock + ReducerBlock）
+// TimelineRenderableBlocks 是任意可渲染块的有序集合（可混合 IntervalBlock + CompressedHeadBlock）
 // 关键词: TimelineRenderableBlocks
 type TimelineRenderableBlocks []TimelineRenderableBlock
 
@@ -921,7 +861,8 @@ const (
 // 字面量必须与 aicache.semi2BoundaryTagName / semi2BoundaryNonce 严格一致.
 //
 // 关键词: SemiDynamicPart2CacheBoundaryTagName, AI_CACHE_SEMI2, P1.1,
-//        5 段切分, semi 拆两块, 合并 prefix
+//
+//	5 段切分, semi 拆两块, 合并 prefix
 const (
 	SemiDynamicPart2CacheBoundaryTagName = "AI_CACHE_SEMI2"
 	SemiDynamicPart2CacheBoundaryNonce   = "semi"

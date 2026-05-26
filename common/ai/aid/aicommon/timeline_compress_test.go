@@ -6,7 +6,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/utils/linktable"
 )
 
 type mockTimelineArchiveStore struct {
@@ -31,7 +30,7 @@ func (m *mockTimelineArchiveStore) SearchArchivedBatches(context.Context, *Timel
 	return &TimelineArchiveSearchResult{}, nil
 }
 
-// TestTimelineCompress_ItemsRemoved 测试压缩后条目被正确删除
+// TestTimelineCompress_ItemsRemoved 测试压缩后条目被正确标记为非活跃（inactive）
 func TestTimelineCompress_ItemsRemoved(t *testing.T) {
 	timeline := NewTimeline(nil, nil)
 
@@ -48,49 +47,42 @@ func TestTimelineCompress_ItemsRemoved(t *testing.T) {
 
 	require.Equal(t, 100, timeline.idToTimelineItem.Len())
 
-	// 模拟批量压缩：删除前60个，保留一个 reducer
-	var idsToRemove []int64
-	for i := int64(1); i <= 60; i++ {
-		idsToRemove = append(idsToRemove, i)
-	}
-
-	// 模拟压缩结果
+	// 模拟批量压缩：把前60个标记为 inactive，设置 compressedHead
 	compressedMemory := "This is a compressed summary of 60 items"
-	lastCompressedId := idsToRemove[len(idsToRemove)-1]
-	timeline.reducers.Set(lastCompressedId, linktable.NewUnlimitedStringLinkTable(compressedMemory))
-
-	// 删除被压缩的 items
-	for _, id := range idsToRemove {
-		if ts, ok := timeline.idToTs.Get(id); ok {
-			timeline.tsToTimelineItem.Delete(ts)
-		}
-		timeline.idToTs.Delete(id)
-		timeline.idToTimelineItem.Delete(id)
+	lastCompressedId := int64(60)
+	timeline.compressedHead = &TimelineCompressedHead{
+		Text:             compressedMemory,
+		CoveredEndItemID: lastCompressedId,
+		Version:          1,
 	}
-
-	// 验证压缩后的状态
-	require.Equal(t, 40, timeline.idToTimelineItem.Len(), "Should have 40 items left (100 - 60)")
-	require.Equal(t, 1, timeline.reducers.Len(), "Should have 1 reducer")
-
-	// 验证被删除的 ID 不存在
 	for i := int64(1); i <= 60; i++ {
-		_, exists := timeline.idToTimelineItem.Get(i)
-		require.False(t, exists, "ID %d should not exist after compression", i)
+		timeline.SoftDelete(i)
 	}
 
-	// 验证保留的 ID 存在
+	// 验证活跃 item 数量（底层 map 仍有 100 条，但活跃只有 40）
+	activeIDs := timeline.getActiveTimelineItemIDs()
+	require.Equal(t, 40, len(activeIDs), "Should have 40 active items (100 - 60)")
+
+	// 验证被压缩的 ID 确实已 inactive
+	for i := int64(1); i <= 60; i++ {
+		item, exists := timeline.idToTimelineItem.Get(i)
+		require.True(t, exists, "ID %d should still exist in map", i)
+		require.True(t, item.deleted, "ID %d should be marked inactive", i)
+	}
+
+	// 验证保留的 ID 仍活跃
 	for i := int64(61); i <= 100; i++ {
-		_, exists := timeline.idToTimelineItem.Get(i)
+		item, exists := timeline.idToTimelineItem.Get(i)
 		require.True(t, exists, "ID %d should still exist", i)
+		require.False(t, item.deleted, "ID %d should be active", i)
 	}
 
-	// 验证 reducer 存在
-	reducer, exists := timeline.reducers.Get(lastCompressedId)
-	require.True(t, exists)
-	require.Equal(t, compressedMemory, reducer.Value())
+	// 验证 compressedHead 存在
+	require.NotNil(t, timeline.compressedHead)
+	require.Equal(t, compressedMemory, timeline.compressedHead.Text)
 }
 
-// TestTimelineCompress_Serialization 测试序列化只包含 reducer，不包含被删除的内容
+// TestTimelineCompress_Serialization 测试序列化只包含 compressedHead，不包含被压缩的内容
 func TestTimelineCompress_Serialization(t *testing.T) {
 	timeline := NewTimeline(nil, nil)
 
@@ -118,7 +110,11 @@ func TestTimelineCompress_Serialization(t *testing.T) {
 
 	compressedMemory := "Compressed summary of 60 items"
 	lastCompressedId := idsToRemove[len(idsToRemove)-1]
-	timeline.reducers.Set(lastCompressedId, linktable.NewUnlimitedStringLinkTable(compressedMemory))
+	timeline.compressedHead = &TimelineCompressedHead{
+		Text:             compressedMemory,
+		CoveredEndItemID: lastCompressedId,
+		Version:          1,
+	}
 
 	// 删除被压缩的 items
 	for _, id := range idsToRemove {
@@ -142,7 +138,7 @@ func TestTimelineCompress_Serialization(t *testing.T) {
 	restored, err := UnmarshalTimeline(afterCompress)
 	require.NoError(t, err)
 	require.Equal(t, 40, restored.idToTimelineItem.Len(), "Restored timeline should only have 40 items")
-	require.Equal(t, 1, restored.reducers.Len(), "Restored timeline should have 1 reducer")
+	require.NotNil(t, restored.compressedHead, "Restored timeline should have compressed head")
 
 	// 验证被删除的条目确实不在序列化结果中
 	for i := int64(1); i <= 60; i++ {
@@ -150,10 +146,8 @@ func TestTimelineCompress_Serialization(t *testing.T) {
 		require.False(t, exists, "Deleted ID %d should not be in restored timeline", i)
 	}
 
-	// 验证 reducer 被正确恢复
-	reducer, exists := restored.reducers.Get(lastCompressedId)
-	require.True(t, exists)
-	require.Equal(t, compressedMemory, reducer.Value())
+	require.Equal(t, compressedMemory, restored.compressedHead.Text)
+	require.Equal(t, lastCompressedId, restored.compressedHead.CoveredEndItemID)
 }
 
 // TestTimelineCompress_SizeReduction 测试压缩达到目标大小
@@ -189,16 +183,16 @@ func TestTimelineCompress_SizeReduction(t *testing.T) {
 	}
 
 	compressedMemory := "Compressed 50 items into summary"
-	lastCompressedId := idsToRemove[len(idsToRemove)-1]
-	timeline.reducers.Set(lastCompressedId, linktable.NewUnlimitedStringLinkTable(compressedMemory))
+	lastCompressedId := int64(50)
+	timeline.compressedHead = &TimelineCompressedHead{
+		Text:             compressedMemory,
+		CoveredEndItemID: lastCompressedId,
+		Version:          1,
+	}
 
-	// 删除被压缩的 items
+	// 标记被压缩的 items 为 inactive
 	for _, id := range idsToRemove {
-		if ts, ok := timeline.idToTs.Get(id); ok {
-			timeline.tsToTimelineItem.Delete(ts)
-		}
-		timeline.idToTs.Delete(id)
-		timeline.idToTimelineItem.Delete(id)
+		timeline.SoftDelete(id)
 	}
 
 	// 计算压缩后的大小
@@ -208,7 +202,8 @@ func TestTimelineCompress_SizeReduction(t *testing.T) {
 
 	// 验证大小显著减小（考虑到有额外开销，放宽到 60%）
 	require.Less(t, afterSize, beforeSize*6/10, "Size should be significantly reduced after compression")
-	require.Equal(t, 50, timeline.idToTimelineItem.Len(), "Should have 50 items left")
+	activeAfter := timeline.getActiveTimelineItemIDs()
+	require.Equal(t, 50, len(activeAfter), "Should have 50 active items left")
 }
 
 func TestTimelineArchiveMergedContent_IncludesTimelineDetails(t *testing.T) {
@@ -226,7 +221,8 @@ func TestTimelineArchiveMergedContent_IncludesTimelineDetails(t *testing.T) {
 	require.Contains(t, merged, "user answer")
 }
 
-// TestTimelineCompress_MultipleCompressions 测试多次压缩
+// TestTimelineCompress_MultipleCompressions 测试多次压缩（单有效压缩段不变式）
+// 新模型：每次压缩产生新 head，旧 head 入 history，运行态只有一个有效段
 func TestTimelineCompress_MultipleCompressions(t *testing.T) {
 	timeline := NewTimeline(nil, nil)
 
@@ -242,56 +238,49 @@ func TestTimelineCompress_MultipleCompressions(t *testing.T) {
 	require.Equal(t, 100, timeline.idToTimelineItem.Len())
 
 	// 第一次压缩：压缩前40个
-	var ids1 []int64
 	for i := int64(1); i <= 40; i++ {
-		ids1 = append(ids1, i)
+		timeline.SoftDelete(i)
 	}
-	timeline.reducers.Set(40, linktable.NewUnlimitedStringLinkTable("First compression"))
-	for _, id := range ids1 {
-		if ts, ok := timeline.idToTs.Get(id); ok {
-			timeline.tsToTimelineItem.Delete(ts)
-		}
-		timeline.idToTs.Delete(id)
-		timeline.idToTimelineItem.Delete(id)
-	}
+	timeline.updateCompressedHead(&TimelineCompressedHead{
+		Text:             "First compression",
+		CoveredEndItemID: 40,
+		CoveredEndAtMs:   0,
+	})
 
-	require.Equal(t, 60, timeline.idToTimelineItem.Len())
-	require.Equal(t, 1, timeline.reducers.Len())
+	activeAfter1 := timeline.getActiveTimelineItemIDs()
+	require.Equal(t, 60, len(activeAfter1), "Should have 60 active items after first compression")
+	require.NotNil(t, timeline.compressedHead, "Should have 1 compressed head")
+	require.Equal(t, "First compression", timeline.compressedHead.Text)
+	require.Equal(t, int64(40), timeline.compressedHead.CoveredEndItemID)
+	require.Equal(t, int64(1), timeline.compressedHead.Version)
 
 	// 第二次压缩：再压缩20个 (ID 41-60)
-	var ids2 []int64
 	for i := int64(41); i <= 60; i++ {
-		ids2 = append(ids2, i)
+		timeline.SoftDelete(i)
 	}
-	timeline.reducers.Set(60, linktable.NewUnlimitedStringLinkTable("Second compression"))
-	for _, id := range ids2 {
-		if ts, ok := timeline.idToTs.Get(id); ok {
-			timeline.tsToTimelineItem.Delete(ts)
-		}
-		timeline.idToTs.Delete(id)
-		timeline.idToTimelineItem.Delete(id)
-	}
+	timeline.updateCompressedHead(&TimelineCompressedHead{
+		Text:             "Second compression",
+		CoveredEndItemID: 60,
+		CoveredEndAtMs:   0,
+	})
 
-	require.Equal(t, 40, timeline.idToTimelineItem.Len())
-	require.Equal(t, 2, timeline.reducers.Len(), "Should have 2 reducers")
+	activeAfter2 := timeline.getActiveTimelineItemIDs()
+	require.Equal(t, 40, len(activeAfter2), "Should have 40 active items after second compression")
 
-	// 验证两个 reducer 都存在
-	r1, ok1 := timeline.reducers.Get(40)
-	require.True(t, ok1)
-	require.Equal(t, "First compression", r1.Value())
+	// 单有效段不变式：只有一个 compressedHead
+	require.NotNil(t, timeline.compressedHead)
+	require.Equal(t, "Second compression", timeline.compressedHead.Text)
+	require.Equal(t, int64(60), timeline.compressedHead.CoveredEndItemID)
+	require.Equal(t, int64(2), timeline.compressedHead.Version)
 
-	r2, ok2 := timeline.reducers.Get(60)
-	require.True(t, ok2)
-	require.Equal(t, "Second compression", r2.Value())
+	// 旧 head 应进入 history
+	require.Equal(t, 1, len(timeline.compressedHistory))
+	require.Equal(t, "First compression", timeline.compressedHistory[0].Text)
 
-	// 验证只有 61-100 的条目存在
-	for i := int64(1); i <= 60; i++ {
-		_, exists := timeline.idToTimelineItem.Get(i)
-		require.False(t, exists, "ID %d should not exist", i)
-	}
-	for i := int64(61); i <= 100; i++ {
-		_, exists := timeline.idToTimelineItem.Get(i)
-		require.True(t, exists, "ID %d should exist", i)
+	// 验证只有 61-100 的条目处于活跃
+	activeIDs := timeline.getActiveTimelineItemIDs()
+	for _, id := range activeIDs {
+		require.True(t, id >= 61 && id <= 100, "Active item ID %d should be in range 61-100", id)
 	}
 }
 
@@ -316,13 +305,13 @@ func TestTimelineCompress_PreservesUncompressedData(t *testing.T) {
 		idsToRemove = append(idsToRemove, i)
 	}
 
-	timeline.reducers.Set(50, linktable.NewUnlimitedStringLinkTable("Compressed"))
+	timeline.compressedHead = &TimelineCompressedHead{
+		Text:             "Compressed",
+		CoveredEndItemID: 50,
+		Version:          1,
+	}
 	for _, id := range idsToRemove {
-		if ts, ok := timeline.idToTs.Get(id); ok {
-			timeline.tsToTimelineItem.Delete(ts)
-		}
-		timeline.idToTs.Delete(id)
-		timeline.idToTimelineItem.Delete(id)
+		timeline.SoftDelete(id)
 	}
 
 	// 验证保留的数据完整性
@@ -356,16 +345,17 @@ func TestTimelineCompress_ReassignAfterCompress(t *testing.T) {
 	}
 
 	compressedID := int64(60)
-	timeline.reducers.Set(compressedID, linktable.NewUnlimitedStringLinkTable("Compressed"))
+	timeline.compressedHead = &TimelineCompressedHead{
+		Text:             "Compressed",
+		CoveredEndItemID: compressedID,
+		Version:          1,
+	}
 	for _, id := range idsToRemove {
-		if ts, ok := timeline.idToTs.Get(id); ok {
-			timeline.tsToTimelineItem.Delete(ts)
-		}
-		timeline.idToTs.Delete(id)
-		timeline.idToTimelineItem.Delete(id)
+		timeline.SoftDelete(id)
 	}
 
-	require.Equal(t, 40, timeline.idToTimelineItem.Len())
+	activeAfter := timeline.getActiveTimelineItemIDs()
+	require.Equal(t, 40, len(activeAfter))
 
 	// 重新分配 ID
 	var idCounter int64 = 0
@@ -386,12 +376,10 @@ func TestTimelineCompress_ReassignAfterCompress(t *testing.T) {
 		require.Equal(t, int64(i+1), ids[i])
 	}
 
-	// 注意：压缩后，reducer 的 ID 指向的是已删除的 item
-	// 在 ReassignIDs 时，由于这些 items 已经被删除，reducer 不会被重新分配
-	// 这是预期的行为，因为 reducer 代表的是已经被压缩删除的内容
-	// 在实际使用中，这些 reducer 应该在序列化时被特殊处理
-	// 这里我们验证 reducer 仍然存在（虽然 ID 可能已经无效）
-	require.GreaterOrEqual(t, timeline.reducers.Len(), 0, "Reducers may be cleaned up")
+	// 注意：compressedHead 的 CoveredEndItemID 指向的是已被软删除的 item ID
+	// ReassignIDs 会尝试重映射 compressedHead.CoveredEndItemID，但由于这些 items
+	// 已标记为 deleted（软删除），不会参与重新分配
+	require.NotNil(t, timeline.compressedHead, "compressedHead should still exist after ReassignIDs")
 }
 
 // TestTimelineCompress_SerializationSize 测试序列化大小确实减小
@@ -437,14 +425,14 @@ func TestTimelineCompress_SerializationSize(t *testing.T) {
 
 	// 使用一个小的摘要
 	compressedSummary := "Summary of 50 compressed items"
-	timelineCompressed.reducers.Set(50, linktable.NewUnlimitedStringLinkTable(compressedSummary))
+	timelineCompressed.compressedHead = &TimelineCompressedHead{
+		Text:             compressedSummary,
+		CoveredEndItemID: 50,
+		Version:          1,
+	}
 
 	for _, id := range idsToRemove {
-		if ts, ok := timelineCompressed.idToTs.Get(id); ok {
-			timelineCompressed.tsToTimelineItem.Delete(ts)
-		}
-		timelineCompressed.idToTs.Delete(id)
-		timelineCompressed.idToTimelineItem.Delete(id)
+		timelineCompressed.SoftDelete(id)
 	}
 
 	// 序列化压缩的

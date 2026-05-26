@@ -18,7 +18,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/linktable"
 	"github.com/yaklang/yaklang/common/utils/omap"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -33,12 +32,11 @@ type Timeline struct {
 	idToTs           *omap.OrderedMap[int64, int64]
 	tsToTimelineItem *omap.OrderedMap[int64, *TimelineItem]
 	idToTimelineItem *omap.OrderedMap[int64, *TimelineItem]
-	reducers         *omap.OrderedMap[int64, *linktable.LinkTable[string]]
-	// reducerTs 与 reducers 一一对应，记录 reducer 的稳定时间戳（毫秒，UnixMilli）
-	// 用于 DumpBefore / GroupByMinutes 渲染 reducer 行的时间字段，避免使用 time.Now() 破坏缓存稳定性
-	// 关键词: reducerTs, reducer 稳定时间戳, 缓存稳定
-	reducerTs   *omap.OrderedMap[int64, int64]
-	archiveRefs *omap.OrderedMap[int64, *TimelineArchiveRef]
+	// compressedHead 是运行态唯一有效压缩段（single source of truth）
+	compressedHead *TimelineCompressedHead
+	// compressedHistory 仅用于追溯，不参与当前并列渲染
+	compressedHistory []*TimelineCompressedHistoryNode
+	archiveRefs       *omap.OrderedMap[int64, *TimelineArchiveRef]
 
 	// this limit is used to limit the timeline dump content size (in tokens).
 	perDumpContentLimit   int64
@@ -57,6 +55,22 @@ type Timeline struct {
 	bucketSizer BucketSizer
 
 	compressing *utils.Once
+}
+
+type TimelineCompressedHead struct {
+	Text             string `json:"text"`
+	CoveredEndItemID int64  `json:"covered_end_item_id"`
+	CoveredEndAtMs   int64  `json:"covered_end_at_ms"`
+	Version          int64  `json:"version"`
+}
+
+type TimelineCompressedHistoryNode struct {
+	Version          int64  `json:"version"`
+	PrevVersion      int64  `json:"prev_version"`
+	Text             string `json:"text"`
+	CoveredEndItemID int64  `json:"covered_end_item_id"`
+	CoveredEndAtMs   int64  `json:"covered_end_at_ms"`
+	CreatedAtMs      int64  `json:"created_at_ms"`
 }
 
 func (m *Timeline) OrderInsertId(id int64, item *TimelineItem) {
@@ -204,8 +218,8 @@ func (m *Timeline) CopyReducibleTimelineWithMemory() *Timeline {
 		idToTs:                m.idToTs.Copy(),
 		tsToTimelineItem:      m.tsToTimelineItem.Copy(),
 		idToTimelineItem:      m.idToTimelineItem.Copy(),
-		reducers:              m.reducers.Copy(),
-		reducerTs:             m.reducerTs.Copy(),
+		compressedHead:        cloneTimelineCompressedHead(m.compressedHead),
+		compressedHistory:     cloneTimelineCompressedHistory(m.compressedHistory),
 		archiveRefs:           m.archiveRefs.Copy(),
 		perDumpContentLimit:   m.perDumpContentLimit,
 		totalDumpContentLimit: m.totalDumpContentLimit,
@@ -225,28 +239,20 @@ func (m *Timeline) SoftDelete(id ...int64) {
 }
 
 // CreateSubTimeline 用入参 ids 限定活跃 item 集合，构造一个新的 sub-timeline
-// 关键词: CreateSubTimeline, 子 timeline 构造, reducer 继承
+// 关键词: CreateSubTimeline, 子 timeline 构造, compressedHead 继承
 //
-// reducer 继承语义:
-//
-//	reducers 代表的是主 timeline 的历史压缩快照，其 key 是 reducerKeyID（已被批量压缩
-//	并从活跃区移除的旧 item id），与入参 ids（活跃 item id 子集）属于不同命名空间，
-//	用 ids 去 m.reducers.Get(id) 必然 miss——这是历史死代码。
-//	为保持 sub-timeline 与主 timeline 历史视图一致（任何派生 sub.Dump() 都应包含完整压缩
-//	记忆），这里始终全量复制 reducers 与 reducerTs，与 ids 解耦。
-//	历史 bug: DumpBefore / TimelineWithout / CurrentTaskTimeline 全部经此路径，旧实现使
-//	它们在 prompt 中丢失全部 reducer block，破坏 LLM 记忆连续性，源头此处修复。
+// compressedHead 继承语义：sub-timeline 始终继承主 timeline 的 compressedHead 与 compressedHistory，
+// 保证任何派生的 sub.Dump() 都包含完整的压缩记忆，与 ids 解耦。
 func (m *Timeline) CreateSubTimeline(ids ...int64) *Timeline {
 	tl := NewTimeline(m.ai, m.extraMetaInfo)
 	if m.config != nil {
 		tl.config = m.config
 	}
-	if len(ids) == 0 {
-		return nil
-	}
 	tl.ai = m.ai
 	tl.bucketByteSize = m.bucketByteSize
 	tl.bucketSizer = m.bucketSizer
+	tl.compressedHead = cloneTimelineCompressedHead(m.compressedHead)
+	tl.compressedHistory = cloneTimelineCompressedHistory(m.compressedHistory)
 	for _, id := range ids {
 		ts, ok := m.idToTs.Get(id)
 		if !ok {
@@ -259,22 +265,6 @@ func (m *Timeline) CreateSubTimeline(ids ...int64) *Timeline {
 		if ret, ok := m.tsToTimelineItem.Get(ts); ok {
 			tl.OrderInsertTs(ts, ret)
 		}
-	}
-
-	// 全量继承 reducer 历史快照（与 ids 解耦）
-	if m.reducers != nil && m.reducers.Len() > 0 {
-		m.reducers.ForEach(func(reducerKeyID int64, lt *linktable.LinkTable[string]) bool {
-			if lt == nil {
-				return true
-			}
-			tl.reducers.Set(reducerKeyID, lt)
-			if m.reducerTs != nil {
-				if ts, ok := m.reducerTs.Get(reducerKeyID); ok {
-					tl.reducerTs.Set(reducerKeyID, ts)
-				}
-			}
-			return true
-		})
 	}
 
 	return tl
@@ -297,11 +287,65 @@ func NewTimeline(ai AICaller, extraMetaInfo func() string) *Timeline {
 		tsToTimelineItem: omap.NewOrderedMap(map[int64]*TimelineItem{}),
 		idToTimelineItem: omap.NewOrderedMap(map[int64]*TimelineItem{}),
 		idToTs:           omap.NewOrderedMap(map[int64]int64{}),
-		reducers:         omap.NewOrderedMap(map[int64]*linktable.LinkTable[string]{}),
-		reducerTs:        omap.NewOrderedMap(map[int64]int64{}),
 		archiveRefs:      omap.NewOrderedMap(map[int64]*TimelineArchiveRef{}),
 		compressing:      utils.NewOnce(),
 	}
+}
+
+func cloneTimelineCompressedHead(head *TimelineCompressedHead) *TimelineCompressedHead {
+	if head == nil {
+		return nil
+	}
+	cp := *head
+	return &cp
+}
+
+func cloneTimelineCompressedHistory(history []*TimelineCompressedHistoryNode) []*TimelineCompressedHistoryNode {
+	if len(history) == 0 {
+		return nil
+	}
+	out := make([]*TimelineCompressedHistoryNode, 0, len(history))
+	for _, h := range history {
+		if h == nil {
+			continue
+		}
+		cp := *h
+		out = append(out, &cp)
+	}
+	return out
+}
+
+func (m *Timeline) updateCompressedHead(newHead *TimelineCompressedHead) {
+	if m == nil || newHead == nil {
+		return
+	}
+	newHead.Text = strings.TrimSpace(newHead.Text)
+	if newHead.Text == "" {
+		return
+	}
+	if m.compressedHead != nil {
+		prev := m.compressedHead
+		prevVersion := prev.Version - 1
+		if prevVersion < 0 {
+			prevVersion = 0
+		}
+		m.compressedHistory = append(m.compressedHistory, &TimelineCompressedHistoryNode{
+			Version:          prev.Version,
+			PrevVersion:      prevVersion,
+			Text:             prev.Text,
+			CoveredEndItemID: prev.CoveredEndItemID,
+			CoveredEndAtMs:   prev.CoveredEndAtMs,
+			CreatedAtMs:      time.Now().UnixMilli(),
+		})
+	}
+	if newHead.Version <= 0 {
+		if m.compressedHead == nil {
+			newHead.Version = 1
+		} else {
+			newHead.Version = m.compressedHead.Version + 1
+		}
+	}
+	m.compressedHead = cloneTimelineCompressedHead(newHead)
 }
 
 func (m *Timeline) ExtraMetaInfo() string {
@@ -528,6 +572,9 @@ func (m *Timeline) emergencyCompress(targetSize int) {
 	// Get all item IDs ordered by timestamp (oldest first)
 	var itemIDs []int64
 	m.idToTimelineItem.ForEach(func(id int64, item *TimelineItem) bool {
+		if item == nil || item.deleted {
+			return true
+		}
 		itemIDs = append(itemIDs, id)
 		return true
 	})
@@ -564,27 +611,8 @@ func (m *Timeline) emergencyCompress(targetSize int) {
 		}
 		lastRemovedID = oldestID
 
-		// 在删除 idToTs 之前先取出 ts，写入 reducerTs 用于稳定渲染
-		// 关键词: emergencyCompress, reducerTs, 稳定时间戳
-		var origTs int64
-		if ts, ok := m.idToTs.Get(oldestID); ok {
-			origTs = ts
-			m.tsToTimelineItem.Delete(ts)
-			m.idToTs.Delete(oldestID)
-		}
-		m.idToTimelineItem.Delete(oldestID)
-
-		// Store the emergency summary in reducers
-		if briefSummary != "" {
-			if lt, ok := m.reducers.Get(oldestID); ok {
-				lt.Push(briefSummary)
-			} else {
-				m.reducers.Set(oldestID, linktable.NewUnlimitedStringLinkTable(briefSummary))
-			}
-			// 同步写入 reducerTs（关键词: emergencyCompress, reducer 稳定时间戳）
-			if origTs > 0 {
-				m.reducerTs.Set(oldestID, origTs)
-			}
+		if item != nil {
+			item.deleted = true
 		}
 
 		removedCount++
@@ -599,6 +627,26 @@ func (m *Timeline) emergencyCompress(targetSize int) {
 		}
 	}
 	if len(removedIDs) > 0 {
+		lastRemovedID = removedIDs[len(removedIDs)-1]
+		var coveredEndAtMs int64
+		if ts, ok := m.idToTs.Get(lastRemovedID); ok {
+			coveredEndAtMs = ts
+		}
+		headText := strings.TrimSpace(strings.Join(emergencySummaries, "\n"))
+		if m.compressedHead != nil && strings.TrimSpace(m.compressedHead.Text) != "" {
+			if headText == "" {
+				headText = m.compressedHead.Text
+			} else {
+				headText = m.compressedHead.Text + "\n" + headText
+			}
+		}
+		if headText != "" {
+			m.updateCompressedHead(&TimelineCompressedHead{
+				Text:             headText,
+				CoveredEndItemID: lastRemovedID,
+				CoveredEndAtMs:   coveredEndAtMs,
+			})
+		}
 		m.attachArchiveRef(lastRemovedID, m.archiveForgottenBatch(
 			TimelineArchiveReasonEmergencyCompress,
 			lastRemovedID,
@@ -805,15 +853,17 @@ func (m *Timeline) DumpBefore(beforeId int64) string {
 		return true
 	})
 	if len(ids) == 0 {
-		// 无活跃 item 时与 Dump() 在 idToTimelineItem 空时的行为对齐：返回空。
-		// GroupByMinutes 在活跃 item 为空时即便有 reducer 也不会渲染 reducer block，
-		// 这里不做特例化，以保持 Dump / DumpBefore 的语义对称。
-		return ""
+		if m.compressedHead == nil || beforeId < m.compressedHead.CoveredEndItemID {
+			return ""
+		}
 	}
 
 	sub := m.CreateSubTimeline(ids...)
 	if sub == nil {
 		return ""
+	}
+	if sub.compressedHead != nil && beforeId < sub.compressedHead.CoveredEndItemID {
+		sub.compressedHead = nil
 	}
 	return sub.Dump()
 }
@@ -1102,17 +1152,17 @@ func (m *Timeline) ReassignIDs(idGenerator func() int64) int64 {
 	// Create new mappings
 	newIdToTs := omap.NewOrderedMap(map[int64]int64{})
 	newIdToTimelineItem := omap.NewOrderedMap(map[int64]*TimelineItem{})
-	newReducers := omap.NewOrderedMap(map[int64]*linktable.LinkTable[string]{})
-	// 关键词: ReassignIDs, reducerTs 重映射
-	newReducerTs := omap.NewOrderedMap(map[int64]int64{})
 
-	// Track old ID to new ID mapping for reducers
+	// Track old ID to new ID mapping for compressedHead remapping
 	oldToNewID := make(map[int64]int64)
 
 	var lastID int64
-	// Reassign IDs in order
+	// Reassign IDs in order, skipping soft-deleted (inactive) items
 	for _, itemWithTs := range orderedItems {
 		item := itemWithTs.item
+		if item.deleted {
+			continue
+		}
 		ts := itemWithTs.ts
 		oldID := item.GetID()
 		newID := idGenerator()
@@ -1136,26 +1186,24 @@ func (m *Timeline) ReassignIDs(idGenerator func() int64) int64 {
 		// Add to new mappings
 		newIdToTs.Set(newID, ts)
 		newIdToTimelineItem.Set(newID, item)
-
-		// Update reducers if exists for this old ID
-		if reducerLt, ok := m.reducers.Get(oldID); ok {
-			newReducers.Set(newID, reducerLt)
-			// 同步重映射 reducerTs
-			if origTs, tsOk := m.reducerTs.Get(oldID); tsOk {
-				newReducerTs.Set(newID, origTs)
-			}
-		}
 	}
-
-	// 注意：保持 ReassignIDs 原有语义——只重映射 idToTimelineItem 中存在的 ID 对应的 reducers，
-	// 不为孤立 reducer key（idToTimelineItem 里已不存在）单独再分配新 ID
-	_ = oldToNewID
 
 	// Replace old mappings with new ones
 	m.idToTs = newIdToTs
 	m.idToTimelineItem = newIdToTimelineItem
-	m.reducers = newReducers
-	m.reducerTs = newReducerTs
+	if m.compressedHead != nil {
+		if mapped, ok := oldToNewID[m.compressedHead.CoveredEndItemID]; ok {
+			m.compressedHead.CoveredEndItemID = mapped
+		}
+	}
+	for _, h := range m.compressedHistory {
+		if h == nil {
+			continue
+		}
+		if mapped, ok := oldToNewID[h.CoveredEndItemID]; ok {
+			h.CoveredEndItemID = mapped
+		}
+	}
 
 	log.Infof("reassigned IDs for %d timeline items, last ID: %d", len(orderedItems), lastID)
 	return lastID

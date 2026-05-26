@@ -2,12 +2,10 @@ package aicommon
 
 import (
 	"fmt"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/utils/linktable"
 )
 
 // TestDumpBefore_PreservesReducerBlocks 回归测试：DumpBefore 必须保留 reducer block
@@ -32,22 +30,26 @@ func TestDumpBefore_PreservesReducerBlocks(t *testing.T) {
 	}
 
 	// 模拟批量压缩留下的 reducer，key 是某个已经从活跃区移除的旧 id（远小于活跃 id 范围更安全）
-	reducerKey := int64(100)
+	reducerKey := int64(5)
 	reducerTsMs := baseTs.UnixMilli()
-	tl.reducers.Set(reducerKey, linktable.NewUnlimitedStringLinkTable("compressed batch alpha"))
-	tl.reducerTs.Set(reducerKey, reducerTsMs)
+	tl.compressedHead = &TimelineCompressedHead{
+		Text:             "compressed batch alpha",
+		CoveredEndItemID: reducerKey,
+		CoveredEndAtMs:   reducerTsMs,
+		Version:          3,
+	}
 
 	// DumpBefore 上界覆盖所有活跃 item
 	out := tl.DumpBefore(5)
 	require.NotEmpty(t, out, "DumpBefore should not be empty when reducer + active items both exist")
 
 	// 必须包含 reducer block 的 aitag 包裹与首行
-	expectedNonce := fmt.Sprintf("r%dt%d", reducerKey, reducerTsMs/1000)
+	expectedNonce := fmt.Sprintf("h%dv3", reducerTsMs/1000)
 	require.Contains(t, out, "<|TIMELINE_"+expectedNonce+"|>",
-		"DumpBefore MUST preserve reducer block aitag wrapper after sub-timeline materialization")
-	require.Contains(t, out, fmt.Sprintf("# reducer key=%d ts=%d", reducerKey, reducerTsMs/1000),
-		"DumpBefore reducer block first line missing or unstable")
-	require.Contains(t, out, "compressed batch alpha", "reducer body lost in DumpBefore")
+		"DumpBefore MUST preserve compressed-head block aitag wrapper after sub-timeline materialization")
+	require.Contains(t, out, fmt.Sprintf("# compressed_head covered_end_item_id=%d covered_end_at_ms=%d version=%d", reducerKey, reducerTsMs, int64(3)),
+		"DumpBefore compressed-head block first line missing or unstable")
+	require.Contains(t, out, "compressed batch alpha", "compressed head body lost in DumpBefore")
 
 	// 也要包含至少一个 interval block（活跃 item 渲染），interval block nonce 形如 b<minutes>t<unixSec>
 	require.Contains(t, out, "<|TIMELINE_b", "DumpBefore should still emit interval block(s) for active items")
@@ -62,14 +64,17 @@ func TestDumpBefore_NoActiveItems_SilentLikeDump(t *testing.T) {
 
 	injectTimelineItem(tl, int64(10), baseTs, makeToolResult(10, "tool", true, "active"))
 
-	tl.reducers.Set(int64(7), linktable.NewUnlimitedStringLinkTable("legacy compressed memo"))
-	tl.reducerTs.Set(int64(7), baseTs.Add(-time.Hour).UnixMilli())
+	tl.compressedHead = &TimelineCompressedHead{
+		Text:             "legacy compressed memo",
+		CoveredEndItemID: 7,
+		CoveredEndAtMs:   baseTs.Add(-time.Hour).UnixMilli(),
+		Version:          1,
+	}
 
 	// 上界 5：活跃 item id (=10) 全部被过滤
 	out := tl.DumpBefore(5)
-	// 与 Dump() 对称：若 sub-timeline 没有活跃 item，则不渲染 reducer block，输出为空
 	require.Empty(t, out,
-		"DumpBefore must return empty when no active items survive the upper bound, mirroring Dump on empty active set")
+		"DumpBefore hides compressed head when beforeId is before covered end")
 }
 
 // TestDumpBefore_MultipleReducers_AllPreserved 多个 reducer 全部保留
@@ -82,26 +87,18 @@ func TestDumpBefore_MultipleReducers_AllPreserved(t *testing.T) {
 		injectTimelineItem(tl, i, baseTs.Add(time.Duration(i)*time.Second), makeToolResult(i, "tool", true, "x"))
 	}
 
-	keys := []int64{200, 201, 202}
-	for idx, k := range keys {
-		tl.reducers.Set(k, linktable.NewUnlimitedStringLinkTable(fmt.Sprintf("memory-%d", k)))
-		tl.reducerTs.Set(k, baseTs.Add(time.Duration(idx)*time.Minute).UnixMilli())
+	tl.compressedHead = &TimelineCompressedHead{
+		Text:             "memory-200",
+		CoveredEndItemID: 3,
+		CoveredEndAtMs:   baseTs.UnixMilli(),
+		Version:          4,
 	}
 
 	out := tl.DumpBefore(3)
 	require.NotEmpty(t, out)
 
-	for _, k := range keys {
-		require.Contains(t, out, fmt.Sprintf("memory-%d", k), "reducer body for key=%d missing", k)
-		require.Contains(t, out, fmt.Sprintf("# reducer key=%d ts=", k), "reducer header for key=%d missing", k)
-	}
-
-	// reducer block 顺序应按 ReducerKeyID 升序（与 GroupByMinutes 内部一致）
-	idx0 := strings.Index(out, "memory-200")
-	idx1 := strings.Index(out, "memory-201")
-	idx2 := strings.Index(out, "memory-202")
-	require.Greater(t, idx1, idx0, "reducer 200 should appear before 201")
-	require.Greater(t, idx2, idx1, "reducer 201 should appear before 202")
+	require.Contains(t, out, "memory-200")
+	require.Contains(t, out, "# compressed_head covered_end_item_id=3")
 }
 
 // TestDumpBefore_EquivalentToDumpWhenAllItemsCovered 上界覆盖所有 item 时，
@@ -115,10 +112,12 @@ func TestDumpBefore_EquivalentToDumpWhenAllItemsCovered(t *testing.T) {
 		injectTimelineItem(tl, i, baseTs.Add(time.Duration(i)*time.Second), makeToolResult(i, "tool", true, "data"))
 	}
 
-	tl.reducers.Set(int64(50), linktable.NewUnlimitedStringLinkTable("alpha-mem"))
-	tl.reducerTs.Set(int64(50), baseTs.Add(-5*time.Minute).UnixMilli())
-	tl.reducers.Set(int64(51), linktable.NewUnlimitedStringLinkTable("beta-mem"))
-	tl.reducerTs.Set(int64(51), baseTs.Add(-2*time.Minute).UnixMilli())
+	tl.compressedHead = &TimelineCompressedHead{
+		Text:             "beta-mem",
+		CoveredEndItemID: 4,
+		CoveredEndAtMs:   baseTs.Add(-2 * time.Minute).UnixMilli(),
+		Version:          2,
+	}
 
 	full := tl.Dump()
 	bounded := tl.DumpBefore(4)
@@ -142,35 +141,24 @@ func TestCreateSubTimeline_InheritsAllReducers(t *testing.T) {
 	}
 
 	// 模拟两次批量压缩留下的 reducer，key 是已经从活跃区移除的旧 id（与 ids 不重叠）
-	reducerKeys := []int64{900, 901}
-	for idx, k := range reducerKeys {
-		tl.reducers.Set(k, linktable.NewUnlimitedStringLinkTable(fmt.Sprintf("hist-mem-%d", k)))
-		tl.reducerTs.Set(k, baseTs.Add(time.Duration(idx)*time.Minute).UnixMilli())
+	tl.compressedHead = &TimelineCompressedHead{
+		Text:             "hist-mem-901",
+		CoveredEndItemID: 901,
+		CoveredEndAtMs:   baseTs.UnixMilli(),
+		Version:          2,
 	}
 
 	sub := tl.CreateSubTimeline(1, 2)
 	require.NotNil(t, sub)
 
-	// 关键回归断言：sub 必须全量继承 reducers / reducerTs，与 ids 解耦
-	require.Equal(t, len(reducerKeys), sub.reducers.Len(),
-		"CreateSubTimeline must inherit ALL reducers regardless of input ids")
-	for _, k := range reducerKeys {
-		got, ok := sub.reducers.Get(k)
-		require.True(t, ok, "reducer key=%d missing from sub-timeline", k)
-		require.Equal(t, fmt.Sprintf("hist-mem-%d", k), got.Value())
-
-		gotTs, tsOk := sub.reducerTs.Get(k)
-		require.True(t, tsOk, "reducerTs for key=%d missing from sub-timeline", k)
-		require.Greater(t, gotTs, int64(0))
-	}
+	require.NotNil(t, sub.compressedHead)
+	require.Equal(t, tl.compressedHead.Text, sub.compressedHead.Text)
+	require.Equal(t, tl.compressedHead.CoveredEndItemID, sub.compressedHead.CoveredEndItemID)
 
 	// 副语义：sub.Dump() 中应能渲染出所有 reducer block
 	out := sub.Dump()
-	for _, k := range reducerKeys {
-		require.Contains(t, out, fmt.Sprintf("# reducer key=%d ts=", k),
-			"sub.Dump() must render reducer block for key=%d", k)
-		require.Contains(t, out, fmt.Sprintf("hist-mem-%d", k))
-	}
+	require.Contains(t, out, "hist-mem-901")
+	require.Contains(t, out, "# compressed_head covered_end_item_id=901")
 }
 
 // TestCreateSubTimeline_ReducerInheritIndependentOfIds 验证 reducer 继承与 ids 是否包含
@@ -184,14 +172,16 @@ func TestCreateSubTimeline_ReducerInheritIndependentOfIds(t *testing.T) {
 		injectTimelineItem(tl, i, baseTs.Add(time.Duration(i)*time.Second), makeToolResult(i, "tool", true, "x"))
 	}
 
-	tl.reducers.Set(int64(5), linktable.NewUnlimitedStringLinkTable("orphan-reducer"))
-	tl.reducerTs.Set(int64(5), baseTs.UnixMilli())
+	tl.compressedHead = &TimelineCompressedHead{
+		Text:             "orphan-reducer",
+		CoveredEndItemID: 5,
+		CoveredEndAtMs:   baseTs.UnixMilli(),
+		Version:          1,
+	}
 
 	// ids 中不包含 5（reducer key），但 reducer 仍应被继承
 	sub := tl.CreateSubTimeline(10, 11)
 	require.NotNil(t, sub)
-	require.Equal(t, 1, sub.reducers.Len())
-	v, ok := sub.reducers.Get(int64(5))
-	require.True(t, ok)
-	require.Equal(t, "orphan-reducer", v.Value())
+	require.NotNil(t, sub.compressedHead)
+	require.Equal(t, "orphan-reducer", sub.compressedHead.Text)
 }

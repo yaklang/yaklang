@@ -8,7 +8,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/utils/linktable"
 )
 
 // TestTimelineFinal_CompressedDataNotInSerialization 核心测试：压缩后的数据不在序列化中
@@ -48,7 +47,11 @@ func TestTimelineFinal_CompressedDataNotInSerialization(t *testing.T) {
 	}
 
 	compressedSummary := "SUMMARY_COMPRESSED_70_ITEMS"
-	timeline.reducers.Set(70, linktable.NewUnlimitedStringLinkTable(compressedSummary))
+	timeline.compressedHead = &TimelineCompressedHead{
+		Text:             compressedSummary,
+		CoveredEndItemID: 70,
+		Version:          1,
+	}
 
 	// 删除被压缩的条目
 	for _, id := range compressedIDs {
@@ -60,7 +63,7 @@ func TestTimelineFinal_CompressedDataNotInSerialization(t *testing.T) {
 	}
 
 	require.Equal(t, 30, timeline.idToTimelineItem.Len())
-	require.Equal(t, 1, timeline.reducers.Len(), "Should have exactly 1 reducer")
+	require.NotNil(t, timeline.compressedHead, "Should have compressed head")
 
 	// 序列化
 	serialized, err := MarshalTimeline(timeline)
@@ -88,7 +91,7 @@ func TestTimelineFinal_CompressedDataNotInSerialization(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, 30, restored.idToTimelineItem.Len(), "Should have 30 items")
-	require.Equal(t, 1, restored.reducers.Len(), "Should have 1 reducer")
+	require.NotNil(t, restored.compressedHead, "Should have compressed head")
 
 	// 验证被压缩的条目不存在
 	for _, id := range compressedIDs {
@@ -118,7 +121,11 @@ func TestTimelineFinal_ReassignAfterCompress(t *testing.T) {
 		compressedIDs = append(compressedIDs, int64(i*100))
 	}
 
-	timeline.reducers.Set(6000, linktable.NewUnlimitedStringLinkTable("Phase1 compressed"))
+	timeline.compressedHead = &TimelineCompressedHead{
+		Text:             "Phase1 compressed",
+		CoveredEndItemID: 6000,
+		Version:          1,
+	}
 	for _, id := range compressedIDs {
 		if ts, ok := timeline.idToTs.Get(id); ok {
 			timeline.tsToTimelineItem.Delete(ts)
@@ -128,7 +135,7 @@ func TestTimelineFinal_ReassignAfterCompress(t *testing.T) {
 	}
 
 	require.Equal(t, 40, timeline.idToTimelineItem.Len())
-	require.Equal(t, 1, timeline.reducers.Len())
+	require.NotNil(t, timeline.compressedHead)
 
 	// 序列化
 	serialized, err := MarshalTimeline(timeline)
@@ -175,8 +182,7 @@ func TestTimelineFinal_ReassignAfterCompress(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, 100, final.idToTimelineItem.Len())
-	// reducers数量应该控制在合理范围
-	require.LessOrEqual(t, final.reducers.Len(), 2, "Should not accumulate too many reducers")
+	require.NotNil(t, final.compressedHead)
 
 	t.Log("✓ PASS: Can reassign IDs and continue working after compression")
 }
@@ -200,7 +206,11 @@ func TestTimelineFinal_SingleReducerPolicy(t *testing.T) {
 		ids1 = append(ids1, i)
 	}
 
-	timeline.reducers.Set(100, linktable.NewUnlimitedStringLinkTable("First batch compressed"))
+	timeline.compressedHead = &TimelineCompressedHead{
+		Text:             "First batch compressed",
+		CoveredEndItemID: 100,
+		Version:          1,
+	}
 	for _, id := range ids1 {
 		if ts, ok := timeline.idToTs.Get(id); ok {
 			timeline.tsToTimelineItem.Delete(ts)
@@ -210,7 +220,7 @@ func TestTimelineFinal_SingleReducerPolicy(t *testing.T) {
 	}
 
 	require.Equal(t, 100, timeline.idToTimelineItem.Len())
-	require.Equal(t, 1, timeline.reducers.Len(), "Should have 1 reducer")
+	require.NotNil(t, timeline.compressedHead, "Should have compressed head")
 
 	serialized1, err := MarshalTimeline(timeline)
 	require.NoError(t, err)
@@ -222,7 +232,11 @@ func TestTimelineFinal_SingleReducerPolicy(t *testing.T) {
 		ids2 = append(ids2, i)
 	}
 
-	timeline.reducers.Set(150, linktable.NewUnlimitedStringLinkTable("Second batch also compressed"))
+	timeline.compressedHead = &TimelineCompressedHead{
+		Text:             "Second batch also compressed",
+		CoveredEndItemID: 150,
+		Version:          2,
+	}
 	for _, id := range ids2 {
 		if ts, ok := timeline.idToTs.Get(id); ok {
 			timeline.tsToTimelineItem.Delete(ts)
@@ -241,7 +255,7 @@ func TestTimelineFinal_SingleReducerPolicy(t *testing.T) {
 	require.Less(t, size2, size1, "Second serialization should be smaller")
 
 	t.Logf("First compression: %d bytes (100 items), Second compression: %d bytes (50 items)", size1, size2)
-	t.Logf("Reducers count: %d (production should merge to 1, but test allows 2)", timeline.reducers.Len())
+	t.Logf("Compressed head version: %d", timeline.compressedHead.Version)
 
 	// 验证大小显著减小
 	require.Less(t, size2, size1*7/10, "Size should decrease significantly with fewer items")
@@ -272,7 +286,11 @@ func TestTimelineFinal_LargeScaleStressTest(t *testing.T) {
 	}
 
 	smallSummary := "Compressed 450 items summary"
-	timeline.reducers.Set(450, linktable.NewUnlimitedStringLinkTable(smallSummary))
+	timeline.compressedHead = &TimelineCompressedHead{
+		Text:             smallSummary,
+		CoveredEndItemID: 450,
+		Version:          1,
+	}
 
 	for _, id := range compressedIDs {
 		if ts, ok := timeline.idToTs.Get(id); ok {
@@ -283,7 +301,7 @@ func TestTimelineFinal_LargeScaleStressTest(t *testing.T) {
 	}
 
 	require.Equal(t, 50, timeline.idToTimelineItem.Len())
-	require.Equal(t, 1, timeline.reducers.Len())
+	require.NotNil(t, timeline.compressedHead)
 
 	// 序列化
 	serialized, err := MarshalTimeline(timeline)
@@ -300,7 +318,7 @@ func TestTimelineFinal_LargeScaleStressTest(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, 50, restored.idToTimelineItem.Len())
-	require.Equal(t, 1, restored.reducers.Len())
+	require.NotNil(t, restored.compressedHead)
 
 	// 重新分配ID并继续使用
 	var idCounter int64 = 10000
@@ -326,7 +344,7 @@ func TestTimelineFinal_LargeScaleStressTest(t *testing.T) {
 	finalSerialized, err := MarshalTimeline(restored)
 	require.NoError(t, err)
 
-	t.Logf("Final size: %d bytes (100 items + 1 reducer)", len(finalSerialized))
+	t.Logf("Final size: %d bytes (100 items + compressed head)", len(finalSerialized))
 	require.Less(t, len(finalSerialized), 200*1024,
 		"Final size should still be reasonable")
 
@@ -352,7 +370,11 @@ func TestTimelineFinal_MemorySafety(t *testing.T) {
 		toCompress = append(toCompress, i)
 	}
 
-	timeline.reducers.Set(250, linktable.NewUnlimitedStringLinkTable("Compressed batch 1"))
+	timeline.compressedHead = &TimelineCompressedHead{
+		Text:             "Compressed batch 1",
+		CoveredEndItemID: 250,
+		Version:          1,
+	}
 	for _, id := range toCompress {
 		if ts, ok := timeline.idToTs.Get(id); ok {
 			timeline.tsToTimelineItem.Delete(ts)
@@ -392,7 +414,11 @@ func TestTimelineFinal_MemorySafety(t *testing.T) {
 		toCompress2 = append(toCompress2, i)
 	}
 
-	r1.reducers.Set(250, linktable.NewUnlimitedStringLinkTable("Compressed batch 2"))
+	r1.compressedHead = &TimelineCompressedHead{
+		Text:             "Compressed batch 2",
+		CoveredEndItemID: 250,
+		Version:          2,
+	}
 	for _, id := range toCompress2 {
 		if ts, ok := r1.idToTs.Get(id); ok {
 			r1.tsToTimelineItem.Delete(ts)
@@ -414,11 +440,8 @@ func TestTimelineFinal_MemorySafety(t *testing.T) {
 	// 允许第二次稍大一些（因为可能有2个reducers），但不应该翻倍
 	require.Less(t, ratio, 3.0, "Size should not triple (no severe memory leak)")
 
-	// reducers 数量应该很少
 	r2, _ := UnmarshalTimeline(s2)
-	t.Logf("Final reducers count: %d", r2.reducers.Len())
-	require.LessOrEqual(t, r2.reducers.Len(), 2,
-		"Should have at most 2 reducers")
+	require.NotNil(t, r2.compressedHead)
 
 	t.Log("✓ PASS: No severe memory leak, sizes remain controlled")
 }
