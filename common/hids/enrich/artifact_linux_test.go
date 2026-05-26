@@ -37,4 +37,16 @@ func TestSnapshotArtifactDetectsELFAndHashes(t *testing.T) {
 	if artifact.ELF.Machine == "" || artifact.ELF.EntryAddress == "" {
 		t.Fatalf("unexpected elf metadata: %#v", artifact.ELF)
 	}
+	if artifact.ELF.SectionCount <= 0 || len(artifact.ELF.SectionItems) == 0 {
+		t.Fatalf("expected structured elf sections, got %#v", artifact.ELF)
+	}
+	if artifact.ELF.SegmentCount <= 0 || len(artifact.ELF.SegmentItems) == 0 {
+		t.Fatalf("expected structured elf segments, got %#v", artifact.ELF)
+	}
+	if artifact.ELF.SectionItems[0].Type == "" {
+		t.Fatalf("expected section item type, got %#v", artifact.ELF.SectionItems[0])
+	}
+	if artifact.ELF.SegmentItems[0].Type == "" {
+		t.Fatalf("expected segment item type, got %#v", artifact.ELF.SegmentItems[0])
+	}
 }

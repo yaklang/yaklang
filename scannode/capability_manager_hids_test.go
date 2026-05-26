@@ -97,7 +97,7 @@ func TestCapabilityManagerApplyRejectsInvalidHIDSRuleConditionWhenCompiled(t *te
 					"watch_paths": [%q]
 				}
 			},
-			"temporary_rules": [
+			"custom_rules": [
 				{
 					"rule_id": "bad-rule",
 					"enabled": true,
@@ -138,7 +138,7 @@ func TestCapabilityManagerDryRunCompilesHIDSWithoutPersistingOrStartingRuntime(t
 					"watch_paths": [%q]
 				}
 			},
-			"temporary_rules": [
+			"custom_rules": [
 				{
 					"rule_id": "tmp-dry-run",
 					"enabled": true,
@@ -186,7 +186,7 @@ func TestCapabilityManagerDryRunReportsValidationFailureWithoutPersisting(t *tes
 			"collectors": {
 				"process": {"enabled": true, "backend": "ebpf"}
 			},
-			"temporary_rules": [
+			"custom_rules": [
 				{
 					"rule_id": "tmp-bad",
 					"enabled": true,
@@ -206,7 +206,7 @@ func TestCapabilityManagerDryRunReportsValidationFailureWithoutPersisting(t *tes
 	if result.ErrorCode != "invalid_desired_spec" {
 		t.Fatalf("unexpected dry-run error code: %+v", result)
 	}
-	if !strings.Contains(result.ErrorMessage, "temporary_rules[0].condition") {
+	if !strings.Contains(result.ErrorMessage, "custom_rules[0].condition") {
 		t.Fatalf("expected condition validation error, got %+v", result)
 	}
 	if statuses := manager.RuntimeStatuses(); len(statuses) != 0 {
@@ -244,7 +244,7 @@ func TestCapabilityManagerForwardsHIDSAlertsWhenReportingEnabled(t *testing.T) {
 					"watch_paths": [%q]
 				}
 			},
-			"temporary_rules": [
+			"custom_rules": [
 				{
 					"rule_id": "tmp-observed-file",
 					"title": "Observed file write",
@@ -267,15 +267,15 @@ func TestCapabilityManagerForwardsHIDSAlertsWhenReportingEnabled(t *testing.T) {
 	if err != nil {
 		t.Fatalf("apply capability: %v", err)
 	}
-	if !strings.Contains(string(result.StatusDetailJSON), `"temporary_rules"`) {
+	if !strings.Contains(string(result.StatusDetailJSON), `"custom_rules"`) {
 		t.Fatalf(
-			"expected temporary rule runtime summary in status detail: %s",
+			"expected custom rule runtime summary in status detail: %s",
 			string(result.StatusDetailJSON),
 		)
 	}
 	if !strings.Contains(string(result.StatusDetailJSON), `"rule_id":"tmp-observed-file"`) {
 		t.Fatalf(
-			"expected active temporary rule in status detail: %s",
+			"expected active custom rule in status detail: %s",
 			string(result.StatusDetailJSON),
 		)
 	}
@@ -309,7 +309,7 @@ func TestCapabilityManagerForwardsHIDSAlertsWhenReportingEnabled(t *testing.T) {
 		if detail["match_event_type"] != "file.change" {
 			t.Fatalf("unexpected match_event_type: %#v", detail["match_event_type"])
 		}
-		if detail["source"] != "temporary" {
+		if detail["source"] != "custom" {
 			t.Fatalf("unexpected source: %#v", detail["source"])
 		}
 		if detail["rule_description"] != "Detect writes to the watched file during capability tests." {
@@ -400,6 +400,37 @@ func TestCapabilityManagerForwardsBuiltinHIDSAlertsWhenConfigured(t *testing.T) 
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("timed out waiting for builtin capability alert")
+	}
+}
+
+func TestHIDSAlertLimiterSuppressesRepeatedAlertTargets(t *testing.T) {
+	t.Parallel()
+
+	limiter := newHIDSAlertLimiter(30*time.Second, 16)
+	alert := hidsmodel.Alert{
+		RuleID:     "rule-a",
+		Title:      "same target",
+		ObservedAt: time.Unix(100, 0).UTC(),
+		Detail: map[string]any{
+			"match_event_type": "process.exec",
+			"event": map[string]any{
+				"process": map[string]any{
+					"image": "/tmp/dropper",
+				},
+			},
+		},
+	}
+
+	if limiter.ShouldSuppress(alert) {
+		t.Fatal("first alert should pass")
+	}
+	if !limiter.ShouldSuppress(alert) {
+		t.Fatal("repeated alert should be suppressed")
+	}
+
+	alert.ObservedAt = alert.ObservedAt.Add(31 * time.Second)
+	if limiter.ShouldSuppress(alert) {
+		t.Fatal("alert after suppression window should pass")
 	}
 }
 
@@ -527,7 +558,7 @@ func TestCapabilityManagerApplyReportsAppliedSpecReceipt(t *testing.T) {
 			}
 		},
 		"builtin_rule_sets": ["linux.file.integrity"],
-		"temporary_rules": [
+		"custom_rules": [
 			{
 				"rule_id": "tmp-apply-receipt",
 				"enabled": true,
@@ -574,8 +605,8 @@ func TestCapabilityManagerApplyReportsAppliedSpecReceipt(t *testing.T) {
 	if ruleEngine["builtin_rule_set_count"] != float64(1) {
 		t.Fatalf("unexpected builtin rule-set count: %#v", ruleEngine["builtin_rule_set_count"])
 	}
-	if ruleEngine["temporary_rule_count"] != float64(1) {
-		t.Fatalf("unexpected temporary rule count: %#v", ruleEngine["temporary_rule_count"])
+	if ruleEngine["custom_rule_count"] != float64(1) {
+		t.Fatalf("unexpected custom rule count: %#v", ruleEngine["custom_rule_count"])
 	}
 	if activeCount, _ := ruleEngine["active_rule_count"].(float64); activeCount < 1 {
 		t.Fatalf("expected active rule count, got %#v", ruleEngine["active_rule_count"])

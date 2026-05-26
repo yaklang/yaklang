@@ -212,26 +212,47 @@ func snapshotELFArtifact(path string) (*model.ELFArtifact, error) {
 	defer file.Close()
 
 	sections := make([]string, 0, len(file.Sections))
+	sectionItems := make([]model.ELFSectionArtifact, 0, len(file.Sections))
 	for _, section := range file.Sections {
 		if section == nil {
 			continue
 		}
 		name := strings.TrimSpace(section.Name)
-		if name == "" {
-			continue
+		if name != "" {
+			sections = append(sections, name)
 		}
-		sections = append(sections, name)
+		sectionItems = append(sectionItems, model.ELFSectionArtifact{
+			Name:     name,
+			Type:     strings.TrimSpace(section.Type.String()),
+			Flags:    formatELFSectionFlags(section.Flags),
+			Addr:     fmt.Sprintf("0x%x", section.Addr),
+			Offset:   int64(section.Offset),
+			Size:     int64(section.Size),
+			IsSymTab: isELFSymbolTableSection(section.Type),
+			IsStrTab: section.Type == elf.SHT_STRTAB,
+		})
 	}
 	segments := make([]string, 0, len(file.Progs))
+	segmentItems := make([]model.ELFSegmentArtifact, 0, len(file.Progs))
 	for _, prog := range file.Progs {
 		if prog == nil {
 			continue
 		}
 		name := strings.TrimSpace(prog.Type.String())
-		if name == "" {
-			continue
+		if name != "" {
+			segments = append(segments, name)
 		}
-		segments = append(segments, name)
+		flags := formatELFProgFlags(prog.Flags)
+		segmentItems = append(segmentItems, model.ELFSegmentArtifact{
+			Type:   name,
+			Flags:  flags,
+			Offset: int64(prog.Off),
+			VAddr:  fmt.Sprintf("0x%x", prog.Vaddr),
+			FileSz: int64(prog.Filesz),
+			MemSz:  int64(prog.Memsz),
+			IsCode: strings.Contains(flags, "X"),
+			IsData: strings.Contains(flags, "W") || strings.Contains(flags, "R"),
+		})
 	}
 
 	return &model.ELFArtifact{
@@ -243,7 +264,44 @@ func snapshotELFArtifact(path string) (*model.ELFArtifact, error) {
 		SegmentCount: len(file.Progs),
 		Sections:     sections,
 		Segments:     segments,
+		SectionItems: sectionItems,
+		SegmentItems: segmentItems,
 	}, nil
+}
+
+func formatELFProgFlags(flags elf.ProgFlag) string {
+	var parts []string
+	if flags&elf.PF_R != 0 {
+		parts = append(parts, "R")
+	}
+	if flags&elf.PF_W != 0 {
+		parts = append(parts, "W")
+	}
+	if flags&elf.PF_X != 0 {
+		parts = append(parts, "X")
+	}
+	return strings.Join(parts, "")
+}
+
+func formatELFSectionFlags(flags elf.SectionFlag) string {
+	var parts []string
+	if flags&elf.SHF_ALLOC != 0 {
+		parts = append(parts, "A")
+	}
+	if flags&elf.SHF_WRITE != 0 {
+		parts = append(parts, "W")
+	}
+	if flags&elf.SHF_EXECINSTR != 0 {
+		parts = append(parts, "X")
+	}
+	if flags&elf.SHF_STRINGS != 0 {
+		parts = append(parts, "S")
+	}
+	return strings.Join(parts, "")
+}
+
+func isELFSymbolTableSection(value elf.SectionType) bool {
+	return value == elf.SHT_SYMTAB || value == elf.SHT_DYNSYM
 }
 
 func artifactByteOrder(order binary.ByteOrder) string {

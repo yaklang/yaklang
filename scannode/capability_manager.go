@@ -118,6 +118,8 @@ type capabilityHIDSApplyInput struct {
 type capabilityHIDSHooks interface {
 	Apply(m *CapabilityManager, input capabilityHIDSApplyInput) (CapabilityApplyResult, error)
 	DryRun(m *CapabilityManager, input capabilityHIDSApplyInput) (CapabilityDryRunResult, error)
+	CollectCurrentState(context.Context, string) error
+	CollectFileEvidence(context.Context, hidsFileEvidenceCollectInput) (map[string]any, error)
 	Alerts() <-chan CapabilityRuntimeAlert
 	Observations() <-chan CapabilityRuntimeObservation
 	CurrentStatus() (CapabilityRuntimeStatus, bool)
@@ -287,6 +289,23 @@ func (m *CapabilityManager) RuntimeStatuses() []CapabilityRuntimeStatus {
 		return nil
 	}
 	return []CapabilityRuntimeStatus{status}
+}
+
+func (m *CapabilityManager) CollectHIDSCurrentState(ctx context.Context, collectType string) error {
+	if m == nil || m.hidsHooks == nil {
+		return ErrHIDSCapabilityNotCompiled
+	}
+	return m.hidsHooks.CollectCurrentState(ctx, collectType)
+}
+
+func (m *CapabilityManager) CollectHIDSFileEvidence(
+	ctx context.Context,
+	input hidsFileEvidenceCollectInput,
+) (map[string]any, error) {
+	if m == nil || m.hidsHooks == nil {
+		return nil, ErrHIDSCapabilityNotCompiled
+	}
+	return m.hidsHooks.CollectFileEvidence(ctx, input)
 }
 
 func (m *CapabilityManager) OnSessionReady(ctx context.Context) error {

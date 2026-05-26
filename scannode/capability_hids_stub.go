@@ -24,6 +24,17 @@ func (hidsCapabilityHooksStub) DryRun(
 	return CapabilityDryRunResult{}, ErrHIDSCapabilityNotCompiled
 }
 
+func (hidsCapabilityHooksStub) CollectCurrentState(context.Context, string) error {
+	return ErrHIDSCapabilityNotCompiled
+}
+
+func (hidsCapabilityHooksStub) CollectFileEvidence(
+	context.Context,
+	hidsFileEvidenceCollectInput,
+) (map[string]any, error) {
+	return nil, ErrHIDSCapabilityNotCompiled
+}
+
 func (hidsCapabilityHooksStub) Alerts() <-chan CapabilityRuntimeAlert {
 	return nil
 }

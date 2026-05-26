@@ -147,6 +147,26 @@ func (i *Instance) replayInventory(ctx context.Context) error {
 	return nil
 }
 
+func (i *Instance) collectCurrentState(ctx context.Context, collectType string) error {
+	if i == nil || i.baselineProvider == nil || i.events == nil {
+		return nil
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	collectCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	defer cancel()
+	switch strings.TrimSpace(collectType) {
+	case "processes":
+		collectProcessCurrentStateObservations(collectCtx, i.baselineProvider, i.events)
+	case "connections":
+		collectNetworkCurrentStateObservations(collectCtx, i.baselineProvider, i.events)
+	default:
+		return fmt.Errorf("unsupported collect_type: %s", collectType)
+	}
+	return nil
+}
+
 func (i *Instance) refreshInventoryLoop(ctx context.Context) {
 	if i == nil || i.baselineProvider == nil || i.events == nil {
 		return
@@ -281,8 +301,8 @@ func (i *Instance) ruleStatusDetail() map[string]any {
 		detail["active_count"] = activeCount
 		detail["inactive_count"] = inactiveCount
 	}
-	if temporaryRules := i.temporaryRuleStatusDetail(); len(temporaryRules) > 0 {
-		detail["temporary_rules"] = temporaryRules
+	if customRules := i.customRuleStatusDetail(); len(customRules) > 0 {
+		detail["custom_rules"] = customRules
 	}
 	if len(detail) == 0 {
 		return nil
@@ -319,21 +339,21 @@ func inactiveRuleCoverageList(rules []builtinrules.InactiveRuleCoverage) []map[s
 	return items
 }
 
-func (i *Instance) temporaryRuleStatusDetail() map[string]any {
-	if i == nil || len(i.spec.TemporaryRules) == 0 {
+func (i *Instance) customRuleStatusDetail() map[string]any {
+	if i == nil || len(i.spec.CustomRules) == 0 {
 		return nil
 	}
 
-	activeRules := make([]map[string]any, 0, len(i.spec.TemporaryRules))
-	inactiveRules := make([]map[string]any, 0, len(i.spec.TemporaryRules))
+	activeRules := make([]map[string]any, 0, len(i.spec.CustomRules))
+	inactiveRules := make([]map[string]any, 0, len(i.spec.CustomRules))
 	configuredCount := 0
-	for _, temporaryRule := range i.spec.TemporaryRules {
-		if temporaryRule.IsBlank() {
+	for _, customRule := range i.spec.CustomRules {
+		if customRule.IsBlank() {
 			continue
 		}
 		configuredCount++
-		item := temporaryRuleStatusMap(temporaryRule)
-		if temporaryRule.Enabled {
+		item := customRuleStatusMap(customRule)
+		if customRule.Enabled {
 			item["status"] = "active"
 			activeRules = append(activeRules, item)
 			continue
@@ -355,23 +375,23 @@ func (i *Instance) temporaryRuleStatusDetail() map[string]any {
 	}
 }
 
-func temporaryRuleStatusMap(rule model.TemporaryRule) map[string]any {
+func customRuleStatusMap(rule model.CustomRule) map[string]any {
 	item := map[string]any{
 		"rule_id":          rule.RuleID,
 		"title":            firstNonEmptyRuleText(rule.Title, rule.RuleID),
 		"match_event_type": rule.MatchEventType,
 		"severity":         rule.Severity,
 	}
-	if templateID := temporaryRuleMetadataString(rule.Metadata, "template_id"); templateID != "" {
+	if templateID := customRuleMetadataString(rule.Metadata, "template_id"); templateID != "" {
 		item["template_id"] = templateID
 	}
-	if packID := temporaryRuleMetadataString(rule.Metadata, "pack_id"); packID != "" {
+	if packID := customRuleMetadataString(rule.Metadata, "pack_id"); packID != "" {
 		item["pack_id"] = packID
 	}
 	return item
 }
 
-func temporaryRuleMetadataString(metadata map[string]any, key string) string {
+func customRuleMetadataString(metadata map[string]any, key string) string {
 	if len(metadata) == 0 {
 		return ""
 	}
