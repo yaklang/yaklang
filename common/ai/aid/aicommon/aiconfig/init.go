@@ -86,6 +86,7 @@ func buildDefaultAIGlobalConfig() *ypb.AIGlobalConfig {
 				ModelName: "memfit-standard-free",
 				ExtraParams: []*ypb.KVPair{
 					{Key: consts.ModelExtraParamKey, Value: "memfit-standard-free"},
+					{Key: consts.BuildinModelExtraParamKey, Value: "true"},
 				},
 			},
 		},
@@ -95,6 +96,7 @@ func buildDefaultAIGlobalConfig() *ypb.AIGlobalConfig {
 				ModelName: "memfit-light-free",
 				ExtraParams: []*ypb.KVPair{
 					{Key: consts.ModelExtraParamKey, Value: "memfit-light-free"},
+					{Key: consts.BuildinModelExtraParamKey, Value: "true"},
 				},
 			},
 		},
@@ -104,6 +106,7 @@ func buildDefaultAIGlobalConfig() *ypb.AIGlobalConfig {
 				ModelName: "memfit-vision-free",
 				ExtraParams: []*ypb.KVPair{
 					{Key: consts.ModelExtraParamKey, Value: "memfit-vision-free"},
+					{Key: consts.BuildinModelExtraParamKey, Value: "true"},
 				},
 			},
 		},
