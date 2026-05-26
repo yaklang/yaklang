@@ -231,14 +231,34 @@ func (c *Compiler) compileMemberCall(contextInst ssa.Instruction, val ssa.Value,
 
 	keyStr := c.resolveMemberKeyString(key)
 
-	parentVal, err := c.getValue(contextInst, obj.GetId())
-	if err != nil {
-		return fmt.Errorf("compileMemberCall: failed to get object value: %w", err)
+	memberID := val.GetId()
+	var loadCtx ssa.Instruction
+	if inst, ok := val.(ssa.Instruction); ok {
+		loadCtx = inst
+	} else {
+		loadCtx = contextInst
 	}
-
-	valResult := c.emitRuntimeGetField(parentVal, keyStr, val.GetId())
-	c.storeSSAValue(val.GetId(), valResult)
-	return nil
+	var emitErr error
+	c.withSSADefInsertPoint(memberID, func() {
+		if !c.isSSAValueStored(obj.GetId()) {
+			if _, err := c.getValue(loadCtx, obj.GetId()); err != nil {
+				emitErr = fmt.Errorf("compileMemberCall: failed to get object value: %w", err)
+				return
+			}
+		}
+		c.reanchorSSADefInsertPoint(memberID)
+		slot := c.ensureValueSlot(memberID)
+		if slot.IsNil() {
+			emitErr = fmt.Errorf("compileMemberCall: slot for value %d unavailable", memberID)
+			return
+		}
+		c.reanchorSSADefInsertPoint(memberID)
+		parentVal := c.loadSSAValue(obj.GetId())
+		valResult := c.emitRuntimeGetField(parentVal, keyStr, memberID)
+		c.Builder.CreateStore(c.coerceToInt64(valResult), slot)
+		c.markSSAValueStored(memberID)
+	})
+	return emitErr
 }
 
 func (c *Compiler) getOrInsertRuntimeGetField() (llvm.Value, llvm.Type) {
