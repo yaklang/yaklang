@@ -639,6 +639,446 @@ func (x *CloseAISessionCommand) GetReason() string {
 	return ""
 }
 
+type UpdateAISessionTitleCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId  string                 `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Session       *AISessionRef          `protobuf:"bytes,4,opt,name=session,proto3" json:"session,omitempty"`
+	Title         string                 `protobuf:"bytes,5,opt,name=title,proto3" json:"title,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateAISessionTitleCommand) Reset() {
+	*x = UpdateAISessionTitleCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateAISessionTitleCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateAISessionTitleCommand) ProtoMessage() {}
+
+func (x *UpdateAISessionTitleCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateAISessionTitleCommand.ProtoReflect.Descriptor instead.
+func (*UpdateAISessionTitleCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *UpdateAISessionTitleCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *UpdateAISessionTitleCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *UpdateAISessionTitleCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *UpdateAISessionTitleCommand) GetSession() *AISessionRef {
+	if x != nil {
+		return x.Session
+	}
+	return nil
+}
+
+func (x *UpdateAISessionTitleCommand) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+type AISessionTitleUpdated struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Session       *AISessionRef          `protobuf:"bytes,3,opt,name=session,proto3" json:"session,omitempty"`
+	Title         string                 `protobuf:"bytes,4,opt,name=title,proto3" json:"title,omitempty"`
+	Message       string                 `protobuf:"bytes,5,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AISessionTitleUpdated) Reset() {
+	*x = AISessionTitleUpdated{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AISessionTitleUpdated) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AISessionTitleUpdated) ProtoMessage() {}
+
+func (x *AISessionTitleUpdated) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AISessionTitleUpdated.ProtoReflect.Descriptor instead.
+func (*AISessionTitleUpdated) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *AISessionTitleUpdated) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AISessionTitleUpdated) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AISessionTitleUpdated) GetSession() *AISessionRef {
+	if x != nil {
+		return x.Session
+	}
+	return nil
+}
+
+func (x *AISessionTitleUpdated) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *AISessionTitleUpdated) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type AISessionTitleUpdateFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Session       *AISessionRef          `protobuf:"bytes,3,opt,name=session,proto3" json:"session,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,4,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,5,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AISessionTitleUpdateFailed) Reset() {
+	*x = AISessionTitleUpdateFailed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AISessionTitleUpdateFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AISessionTitleUpdateFailed) ProtoMessage() {}
+
+func (x *AISessionTitleUpdateFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AISessionTitleUpdateFailed.ProtoReflect.Descriptor instead.
+func (*AISessionTitleUpdateFailed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *AISessionTitleUpdateFailed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AISessionTitleUpdateFailed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AISessionTitleUpdateFailed) GetSession() *AISessionRef {
+	if x != nil {
+		return x.Session
+	}
+	return nil
+}
+
+func (x *AISessionTitleUpdateFailed) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AISessionTitleUpdateFailed) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+type DeleteAISessionCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId  string                 `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Session       *AISessionRef          `protobuf:"bytes,4,opt,name=session,proto3" json:"session,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteAISessionCommand) Reset() {
+	*x = DeleteAISessionCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteAISessionCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteAISessionCommand) ProtoMessage() {}
+
+func (x *DeleteAISessionCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteAISessionCommand.ProtoReflect.Descriptor instead.
+func (*DeleteAISessionCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *DeleteAISessionCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *DeleteAISessionCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *DeleteAISessionCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *DeleteAISessionCommand) GetSession() *AISessionRef {
+	if x != nil {
+		return x.Session
+	}
+	return nil
+}
+
+type AISessionDeleteCompleted struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Session       *AISessionRef          `protobuf:"bytes,3,opt,name=session,proto3" json:"session,omitempty"`
+	Message       string                 `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AISessionDeleteCompleted) Reset() {
+	*x = AISessionDeleteCompleted{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AISessionDeleteCompleted) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AISessionDeleteCompleted) ProtoMessage() {}
+
+func (x *AISessionDeleteCompleted) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AISessionDeleteCompleted.ProtoReflect.Descriptor instead.
+func (*AISessionDeleteCompleted) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *AISessionDeleteCompleted) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AISessionDeleteCompleted) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AISessionDeleteCompleted) GetSession() *AISessionRef {
+	if x != nil {
+		return x.Session
+	}
+	return nil
+}
+
+func (x *AISessionDeleteCompleted) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type AISessionDeleteFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Session       *AISessionRef          `protobuf:"bytes,3,opt,name=session,proto3" json:"session,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,4,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,5,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AISessionDeleteFailed) Reset() {
+	*x = AISessionDeleteFailed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AISessionDeleteFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AISessionDeleteFailed) ProtoMessage() {}
+
+func (x *AISessionDeleteFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AISessionDeleteFailed.ProtoReflect.Descriptor instead.
+func (*AISessionDeleteFailed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *AISessionDeleteFailed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AISessionDeleteFailed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AISessionDeleteFailed) GetSession() *AISessionRef {
+	if x != nil {
+		return x.Session
+	}
+	return nil
+}
+
+func (x *AISessionDeleteFailed) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AISessionDeleteFailed) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
 type AIProviderPreviewConfigSnapshot struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	ProviderType   string                 `protobuf:"bytes,1,opt,name=provider_type,json=providerType,proto3" json:"provider_type,omitempty"`
@@ -658,7 +1098,7 @@ type AIProviderPreviewConfigSnapshot struct {
 
 func (x *AIProviderPreviewConfigSnapshot) Reset() {
 	*x = AIProviderPreviewConfigSnapshot{}
-	mi := &file_legion_ai_v1_ai_proto_msgTypes[8]
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -670,7 +1110,7 @@ func (x *AIProviderPreviewConfigSnapshot) String() string {
 func (*AIProviderPreviewConfigSnapshot) ProtoMessage() {}
 
 func (x *AIProviderPreviewConfigSnapshot) ProtoReflect() protoreflect.Message {
-	mi := &file_legion_ai_v1_ai_proto_msgTypes[8]
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -683,7 +1123,7 @@ func (x *AIProviderPreviewConfigSnapshot) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AIProviderPreviewConfigSnapshot.ProtoReflect.Descriptor instead.
 func (*AIProviderPreviewConfigSnapshot) Descriptor() ([]byte, []int) {
-	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{8}
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *AIProviderPreviewConfigSnapshot) GetProviderType() string {
@@ -775,7 +1215,7 @@ type ListAIProviderModelsCommand struct {
 
 func (x *ListAIProviderModelsCommand) Reset() {
 	*x = ListAIProviderModelsCommand{}
-	mi := &file_legion_ai_v1_ai_proto_msgTypes[9]
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -787,7 +1227,7 @@ func (x *ListAIProviderModelsCommand) String() string {
 func (*ListAIProviderModelsCommand) ProtoMessage() {}
 
 func (x *ListAIProviderModelsCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_legion_ai_v1_ai_proto_msgTypes[9]
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -800,7 +1240,7 @@ func (x *ListAIProviderModelsCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListAIProviderModelsCommand.ProtoReflect.Descriptor instead.
 func (*ListAIProviderModelsCommand) Descriptor() ([]byte, []int) {
-	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{9}
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *ListAIProviderModelsCommand) GetMetadata() *v1.CommandMetadata {
@@ -841,7 +1281,7 @@ type AIProviderPreviewModel struct {
 
 func (x *AIProviderPreviewModel) Reset() {
 	*x = AIProviderPreviewModel{}
-	mi := &file_legion_ai_v1_ai_proto_msgTypes[10]
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -853,7 +1293,7 @@ func (x *AIProviderPreviewModel) String() string {
 func (*AIProviderPreviewModel) ProtoMessage() {}
 
 func (x *AIProviderPreviewModel) ProtoReflect() protoreflect.Message {
-	mi := &file_legion_ai_v1_ai_proto_msgTypes[10]
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -866,7 +1306,7 @@ func (x *AIProviderPreviewModel) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AIProviderPreviewModel.ProtoReflect.Descriptor instead.
 func (*AIProviderPreviewModel) Descriptor() ([]byte, []int) {
-	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{10}
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *AIProviderPreviewModel) GetModelId() string {
@@ -894,7 +1334,7 @@ type AIProviderModelsListed struct {
 
 func (x *AIProviderModelsListed) Reset() {
 	*x = AIProviderModelsListed{}
-	mi := &file_legion_ai_v1_ai_proto_msgTypes[11]
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -906,7 +1346,7 @@ func (x *AIProviderModelsListed) String() string {
 func (*AIProviderModelsListed) ProtoMessage() {}
 
 func (x *AIProviderModelsListed) ProtoReflect() protoreflect.Message {
-	mi := &file_legion_ai_v1_ai_proto_msgTypes[11]
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -919,7 +1359,7 @@ func (x *AIProviderModelsListed) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AIProviderModelsListed.ProtoReflect.Descriptor instead.
 func (*AIProviderModelsListed) Descriptor() ([]byte, []int) {
-	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{11}
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *AIProviderModelsListed) GetMetadata() *v1.EventMetadata {
@@ -955,7 +1395,7 @@ type AIProviderModelsFailed struct {
 
 func (x *AIProviderModelsFailed) Reset() {
 	*x = AIProviderModelsFailed{}
-	mi := &file_legion_ai_v1_ai_proto_msgTypes[12]
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -967,7 +1407,7 @@ func (x *AIProviderModelsFailed) String() string {
 func (*AIProviderModelsFailed) ProtoMessage() {}
 
 func (x *AIProviderModelsFailed) ProtoReflect() protoreflect.Message {
-	mi := &file_legion_ai_v1_ai_proto_msgTypes[12]
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -980,7 +1420,7 @@ func (x *AIProviderModelsFailed) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AIProviderModelsFailed.ProtoReflect.Descriptor instead.
 func (*AIProviderModelsFailed) Descriptor() ([]byte, []int) {
-	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{12}
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *AIProviderModelsFailed) GetMetadata() *v1.EventMetadata {
@@ -1024,7 +1464,7 @@ type HealthCheckAIProviderCommand struct {
 
 func (x *HealthCheckAIProviderCommand) Reset() {
 	*x = HealthCheckAIProviderCommand{}
-	mi := &file_legion_ai_v1_ai_proto_msgTypes[13]
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1036,7 +1476,7 @@ func (x *HealthCheckAIProviderCommand) String() string {
 func (*HealthCheckAIProviderCommand) ProtoMessage() {}
 
 func (x *HealthCheckAIProviderCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_legion_ai_v1_ai_proto_msgTypes[13]
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1049,7 +1489,7 @@ func (x *HealthCheckAIProviderCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthCheckAIProviderCommand.ProtoReflect.Descriptor instead.
 func (*HealthCheckAIProviderCommand) Descriptor() ([]byte, []int) {
-	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{13}
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *HealthCheckAIProviderCommand) GetMetadata() *v1.CommandMetadata {
@@ -1106,7 +1546,7 @@ type AIProviderHealthCheckCompleted struct {
 
 func (x *AIProviderHealthCheckCompleted) Reset() {
 	*x = AIProviderHealthCheckCompleted{}
-	mi := &file_legion_ai_v1_ai_proto_msgTypes[14]
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1118,7 +1558,7 @@ func (x *AIProviderHealthCheckCompleted) String() string {
 func (*AIProviderHealthCheckCompleted) ProtoMessage() {}
 
 func (x *AIProviderHealthCheckCompleted) ProtoReflect() protoreflect.Message {
-	mi := &file_legion_ai_v1_ai_proto_msgTypes[14]
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1131,7 +1571,7 @@ func (x *AIProviderHealthCheckCompleted) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AIProviderHealthCheckCompleted.ProtoReflect.Descriptor instead.
 func (*AIProviderHealthCheckCompleted) Descriptor() ([]byte, []int) {
-	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{14}
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *AIProviderHealthCheckCompleted) GetMetadata() *v1.EventMetadata {
@@ -1223,7 +1663,7 @@ type AIProviderHealthCheckFailed struct {
 
 func (x *AIProviderHealthCheckFailed) Reset() {
 	*x = AIProviderHealthCheckFailed{}
-	mi := &file_legion_ai_v1_ai_proto_msgTypes[15]
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1235,7 +1675,7 @@ func (x *AIProviderHealthCheckFailed) String() string {
 func (*AIProviderHealthCheckFailed) ProtoMessage() {}
 
 func (x *AIProviderHealthCheckFailed) ProtoReflect() protoreflect.Message {
-	mi := &file_legion_ai_v1_ai_proto_msgTypes[15]
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1248,7 +1688,7 @@ func (x *AIProviderHealthCheckFailed) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AIProviderHealthCheckFailed.ProtoReflect.Descriptor instead.
 func (*AIProviderHealthCheckFailed) Descriptor() ([]byte, []int) {
-	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{15}
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *AIProviderHealthCheckFailed) GetMetadata() *v1.EventMetadata {
@@ -1279,6 +1719,16418 @@ func (x *AIProviderHealthCheckFailed) GetErrorMessage() string {
 	return ""
 }
 
+type AIConfigKVPair struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Key           string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	Value         string                 `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIConfigKVPair) Reset() {
+	*x = AIConfigKVPair{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIConfigKVPair) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIConfigKVPair) ProtoMessage() {}
+
+func (x *AIConfigKVPair) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIConfigKVPair.ProtoReflect.Descriptor instead.
+func (*AIConfigKVPair) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *AIConfigKVPair) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+func (x *AIConfigKVPair) GetValue() string {
+	if x != nil {
+		return x.Value
+	}
+	return ""
+}
+
+type AIThirdPartyApplicationConfigSnapshot struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Type           string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`
+	ApiKey         string                 `protobuf:"bytes,2,opt,name=api_key,json=apiKey,proto3" json:"api_key,omitempty"`
+	UserIdentifier string                 `protobuf:"bytes,3,opt,name=user_identifier,json=userIdentifier,proto3" json:"user_identifier,omitempty"`
+	UserSecret     string                 `protobuf:"bytes,4,opt,name=user_secret,json=userSecret,proto3" json:"user_secret,omitempty"`
+	Namespace      string                 `protobuf:"bytes,5,opt,name=namespace,proto3" json:"namespace,omitempty"`
+	Domain         string                 `protobuf:"bytes,6,opt,name=domain,proto3" json:"domain,omitempty"`
+	WebhookUrl     string                 `protobuf:"bytes,7,opt,name=webhook_url,json=webhookUrl,proto3" json:"webhook_url,omitempty"`
+	ExtraParams    []*AIConfigKVPair      `protobuf:"bytes,8,rep,name=extra_params,json=extraParams,proto3" json:"extra_params,omitempty"`
+	Disabled       bool                   `protobuf:"varint,9,opt,name=disabled,proto3" json:"disabled,omitempty"`
+	Proxy          string                 `protobuf:"bytes,10,opt,name=proxy,proto3" json:"proxy,omitempty"`
+	NoHttps        bool                   `protobuf:"varint,11,opt,name=no_https,json=noHttps,proto3" json:"no_https,omitempty"`
+	ApiType        string                 `protobuf:"bytes,12,opt,name=api_type,json=apiType,proto3" json:"api_type,omitempty"`
+	BaseUrl        string                 `protobuf:"bytes,13,opt,name=base_url,json=baseUrl,proto3" json:"base_url,omitempty"`
+	Endpoint       string                 `protobuf:"bytes,14,opt,name=endpoint,proto3" json:"endpoint,omitempty"`
+	EnableEndpoint bool                   `protobuf:"varint,15,opt,name=enable_endpoint,json=enableEndpoint,proto3" json:"enable_endpoint,omitempty"`
+	Headers        []*AIConfigKVPair      `protobuf:"bytes,16,rep,name=headers,proto3" json:"headers,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *AIThirdPartyApplicationConfigSnapshot) Reset() {
+	*x = AIThirdPartyApplicationConfigSnapshot{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIThirdPartyApplicationConfigSnapshot) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIThirdPartyApplicationConfigSnapshot) ProtoMessage() {}
+
+func (x *AIThirdPartyApplicationConfigSnapshot) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIThirdPartyApplicationConfigSnapshot.ProtoReflect.Descriptor instead.
+func (*AIThirdPartyApplicationConfigSnapshot) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *AIThirdPartyApplicationConfigSnapshot) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
+}
+
+func (x *AIThirdPartyApplicationConfigSnapshot) GetApiKey() string {
+	if x != nil {
+		return x.ApiKey
+	}
+	return ""
+}
+
+func (x *AIThirdPartyApplicationConfigSnapshot) GetUserIdentifier() string {
+	if x != nil {
+		return x.UserIdentifier
+	}
+	return ""
+}
+
+func (x *AIThirdPartyApplicationConfigSnapshot) GetUserSecret() string {
+	if x != nil {
+		return x.UserSecret
+	}
+	return ""
+}
+
+func (x *AIThirdPartyApplicationConfigSnapshot) GetNamespace() string {
+	if x != nil {
+		return x.Namespace
+	}
+	return ""
+}
+
+func (x *AIThirdPartyApplicationConfigSnapshot) GetDomain() string {
+	if x != nil {
+		return x.Domain
+	}
+	return ""
+}
+
+func (x *AIThirdPartyApplicationConfigSnapshot) GetWebhookUrl() string {
+	if x != nil {
+		return x.WebhookUrl
+	}
+	return ""
+}
+
+func (x *AIThirdPartyApplicationConfigSnapshot) GetExtraParams() []*AIConfigKVPair {
+	if x != nil {
+		return x.ExtraParams
+	}
+	return nil
+}
+
+func (x *AIThirdPartyApplicationConfigSnapshot) GetDisabled() bool {
+	if x != nil {
+		return x.Disabled
+	}
+	return false
+}
+
+func (x *AIThirdPartyApplicationConfigSnapshot) GetProxy() string {
+	if x != nil {
+		return x.Proxy
+	}
+	return ""
+}
+
+func (x *AIThirdPartyApplicationConfigSnapshot) GetNoHttps() bool {
+	if x != nil {
+		return x.NoHttps
+	}
+	return false
+}
+
+func (x *AIThirdPartyApplicationConfigSnapshot) GetApiType() string {
+	if x != nil {
+		return x.ApiType
+	}
+	return ""
+}
+
+func (x *AIThirdPartyApplicationConfigSnapshot) GetBaseUrl() string {
+	if x != nil {
+		return x.BaseUrl
+	}
+	return ""
+}
+
+func (x *AIThirdPartyApplicationConfigSnapshot) GetEndpoint() string {
+	if x != nil {
+		return x.Endpoint
+	}
+	return ""
+}
+
+func (x *AIThirdPartyApplicationConfigSnapshot) GetEnableEndpoint() bool {
+	if x != nil {
+		return x.EnableEndpoint
+	}
+	return false
+}
+
+func (x *AIThirdPartyApplicationConfigSnapshot) GetHeaders() []*AIConfigKVPair {
+	if x != nil {
+		return x.Headers
+	}
+	return nil
+}
+
+type AIModelConfigSnapshot struct {
+	state         protoimpl.MessageState                 `protogen:"open.v1"`
+	ProviderId    int64                                  `protobuf:"varint,1,opt,name=provider_id,json=providerId,proto3" json:"provider_id,omitempty"`
+	Provider      *AIThirdPartyApplicationConfigSnapshot `protobuf:"bytes,2,opt,name=provider,proto3" json:"provider,omitempty"`
+	ModelName     string                                 `protobuf:"bytes,3,opt,name=model_name,json=modelName,proto3" json:"model_name,omitempty"`
+	ExtraParams   []*AIConfigKVPair                      `protobuf:"bytes,4,rep,name=extra_params,json=extraParams,proto3" json:"extra_params,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIModelConfigSnapshot) Reset() {
+	*x = AIModelConfigSnapshot{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIModelConfigSnapshot) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIModelConfigSnapshot) ProtoMessage() {}
+
+func (x *AIModelConfigSnapshot) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIModelConfigSnapshot.ProtoReflect.Descriptor instead.
+func (*AIModelConfigSnapshot) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *AIModelConfigSnapshot) GetProviderId() int64 {
+	if x != nil {
+		return x.ProviderId
+	}
+	return 0
+}
+
+func (x *AIModelConfigSnapshot) GetProvider() *AIThirdPartyApplicationConfigSnapshot {
+	if x != nil {
+		return x.Provider
+	}
+	return nil
+}
+
+func (x *AIModelConfigSnapshot) GetModelName() string {
+	if x != nil {
+		return x.ModelName
+	}
+	return ""
+}
+
+func (x *AIModelConfigSnapshot) GetExtraParams() []*AIConfigKVPair {
+	if x != nil {
+		return x.ExtraParams
+	}
+	return nil
+}
+
+type AIGlobalConfigSnapshot struct {
+	state             protoimpl.MessageState   `protogen:"open.v1"`
+	Enabled           bool                     `protobuf:"varint,1,opt,name=enabled,proto3" json:"enabled,omitempty"`
+	RoutingPolicy     string                   `protobuf:"bytes,2,opt,name=routing_policy,json=routingPolicy,proto3" json:"routing_policy,omitempty"`
+	DisableFallback   bool                     `protobuf:"varint,3,opt,name=disable_fallback,json=disableFallback,proto3" json:"disable_fallback,omitempty"`
+	DefaultModelId    string                   `protobuf:"bytes,4,opt,name=default_model_id,json=defaultModelId,proto3" json:"default_model_id,omitempty"`
+	GlobalWeight      float64                  `protobuf:"fixed64,5,opt,name=global_weight,json=globalWeight,proto3" json:"global_weight,omitempty"`
+	IntelligentModels []*AIModelConfigSnapshot `protobuf:"bytes,6,rep,name=intelligent_models,json=intelligentModels,proto3" json:"intelligent_models,omitempty"`
+	LightweightModels []*AIModelConfigSnapshot `protobuf:"bytes,7,rep,name=lightweight_models,json=lightweightModels,proto3" json:"lightweight_models,omitempty"`
+	VisionModels      []*AIModelConfigSnapshot `protobuf:"bytes,8,rep,name=vision_models,json=visionModels,proto3" json:"vision_models,omitempty"`
+	AiPresetPrompt    string                   `protobuf:"bytes,9,opt,name=ai_preset_prompt,json=aiPresetPrompt,proto3" json:"ai_preset_prompt,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *AIGlobalConfigSnapshot) Reset() {
+	*x = AIGlobalConfigSnapshot{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIGlobalConfigSnapshot) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIGlobalConfigSnapshot) ProtoMessage() {}
+
+func (x *AIGlobalConfigSnapshot) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIGlobalConfigSnapshot.ProtoReflect.Descriptor instead.
+func (*AIGlobalConfigSnapshot) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *AIGlobalConfigSnapshot) GetEnabled() bool {
+	if x != nil {
+		return x.Enabled
+	}
+	return false
+}
+
+func (x *AIGlobalConfigSnapshot) GetRoutingPolicy() string {
+	if x != nil {
+		return x.RoutingPolicy
+	}
+	return ""
+}
+
+func (x *AIGlobalConfigSnapshot) GetDisableFallback() bool {
+	if x != nil {
+		return x.DisableFallback
+	}
+	return false
+}
+
+func (x *AIGlobalConfigSnapshot) GetDefaultModelId() string {
+	if x != nil {
+		return x.DefaultModelId
+	}
+	return ""
+}
+
+func (x *AIGlobalConfigSnapshot) GetGlobalWeight() float64 {
+	if x != nil {
+		return x.GlobalWeight
+	}
+	return 0
+}
+
+func (x *AIGlobalConfigSnapshot) GetIntelligentModels() []*AIModelConfigSnapshot {
+	if x != nil {
+		return x.IntelligentModels
+	}
+	return nil
+}
+
+func (x *AIGlobalConfigSnapshot) GetLightweightModels() []*AIModelConfigSnapshot {
+	if x != nil {
+		return x.LightweightModels
+	}
+	return nil
+}
+
+func (x *AIGlobalConfigSnapshot) GetVisionModels() []*AIModelConfigSnapshot {
+	if x != nil {
+		return x.VisionModels
+	}
+	return nil
+}
+
+func (x *AIGlobalConfigSnapshot) GetAiPresetPrompt() string {
+	if x != nil {
+		return x.AiPresetPrompt
+	}
+	return ""
+}
+
+type GetAIGlobalConfigCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId  string                 `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetAIGlobalConfigCommand) Reset() {
+	*x = GetAIGlobalConfigCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetAIGlobalConfigCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetAIGlobalConfigCommand) ProtoMessage() {}
+
+func (x *GetAIGlobalConfigCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetAIGlobalConfigCommand.ProtoReflect.Descriptor instead.
+func (*GetAIGlobalConfigCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *GetAIGlobalConfigCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *GetAIGlobalConfigCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *GetAIGlobalConfigCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+type SetAIGlobalConfigCommand struct {
+	state         protoimpl.MessageState  `protogen:"open.v1"`
+	Metadata      *v1.CommandMetadata     `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId  string                  `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId   string                  `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Config        *AIGlobalConfigSnapshot `protobuf:"bytes,4,opt,name=config,proto3" json:"config,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetAIGlobalConfigCommand) Reset() {
+	*x = SetAIGlobalConfigCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetAIGlobalConfigCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetAIGlobalConfigCommand) ProtoMessage() {}
+
+func (x *SetAIGlobalConfigCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetAIGlobalConfigCommand.ProtoReflect.Descriptor instead.
+func (*SetAIGlobalConfigCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *SetAIGlobalConfigCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *SetAIGlobalConfigCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *SetAIGlobalConfigCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *SetAIGlobalConfigCommand) GetConfig() *AIGlobalConfigSnapshot {
+	if x != nil {
+		return x.Config
+	}
+	return nil
+}
+
+type AIGlobalConfigFetched struct {
+	state         protoimpl.MessageState  `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata       `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                  `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Config        *AIGlobalConfigSnapshot `protobuf:"bytes,3,opt,name=config,proto3" json:"config,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIGlobalConfigFetched) Reset() {
+	*x = AIGlobalConfigFetched{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIGlobalConfigFetched) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIGlobalConfigFetched) ProtoMessage() {}
+
+func (x *AIGlobalConfigFetched) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIGlobalConfigFetched.ProtoReflect.Descriptor instead.
+func (*AIGlobalConfigFetched) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *AIGlobalConfigFetched) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIGlobalConfigFetched) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIGlobalConfigFetched) GetConfig() *AIGlobalConfigSnapshot {
+	if x != nil {
+		return x.Config
+	}
+	return nil
+}
+
+type AIGlobalConfigFetchFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,3,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIGlobalConfigFetchFailed) Reset() {
+	*x = AIGlobalConfigFetchFailed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIGlobalConfigFetchFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIGlobalConfigFetchFailed) ProtoMessage() {}
+
+func (x *AIGlobalConfigFetchFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIGlobalConfigFetchFailed.ProtoReflect.Descriptor instead.
+func (*AIGlobalConfigFetchFailed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *AIGlobalConfigFetchFailed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIGlobalConfigFetchFailed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIGlobalConfigFetchFailed) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AIGlobalConfigFetchFailed) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+type AIGlobalConfigUpdated struct {
+	state         protoimpl.MessageState  `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata       `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                  `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Config        *AIGlobalConfigSnapshot `protobuf:"bytes,3,opt,name=config,proto3" json:"config,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIGlobalConfigUpdated) Reset() {
+	*x = AIGlobalConfigUpdated{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIGlobalConfigUpdated) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIGlobalConfigUpdated) ProtoMessage() {}
+
+func (x *AIGlobalConfigUpdated) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIGlobalConfigUpdated.ProtoReflect.Descriptor instead.
+func (*AIGlobalConfigUpdated) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *AIGlobalConfigUpdated) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIGlobalConfigUpdated) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIGlobalConfigUpdated) GetConfig() *AIGlobalConfigSnapshot {
+	if x != nil {
+		return x.Config
+	}
+	return nil
+}
+
+type AIGlobalConfigUpdateFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,3,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIGlobalConfigUpdateFailed) Reset() {
+	*x = AIGlobalConfigUpdateFailed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIGlobalConfigUpdateFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIGlobalConfigUpdateFailed) ProtoMessage() {}
+
+func (x *AIGlobalConfigUpdateFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIGlobalConfigUpdateFailed.ProtoReflect.Descriptor instead.
+func (*AIGlobalConfigUpdateFailed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{31}
+}
+
+func (x *AIGlobalConfigUpdateFailed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIGlobalConfigUpdateFailed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIGlobalConfigUpdateFailed) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AIGlobalConfigUpdateFailed) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+type AIFocus struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	Name                string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Description         string                 `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
+	OutputExamplePrompt string                 `protobuf:"bytes,3,opt,name=output_example_prompt,json=outputExamplePrompt,proto3" json:"output_example_prompt,omitempty"`
+	UsagePrompt         string                 `protobuf:"bytes,4,opt,name=usage_prompt,json=usagePrompt,proto3" json:"usage_prompt,omitempty"`
+	VerboseName         string                 `protobuf:"bytes,5,opt,name=verbose_name,json=verboseName,proto3" json:"verbose_name,omitempty"`
+	VerboseNameZh       string                 `protobuf:"bytes,6,opt,name=verbose_name_zh,json=verboseNameZh,proto3" json:"verbose_name_zh,omitempty"`
+	DescriptionZh       string                 `protobuf:"bytes,7,opt,name=description_zh,json=descriptionZh,proto3" json:"description_zh,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+func (x *AIFocus) Reset() {
+	*x = AIFocus{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIFocus) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIFocus) ProtoMessage() {}
+
+func (x *AIFocus) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIFocus.ProtoReflect.Descriptor instead.
+func (*AIFocus) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{32}
+}
+
+func (x *AIFocus) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *AIFocus) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *AIFocus) GetOutputExamplePrompt() string {
+	if x != nil {
+		return x.OutputExamplePrompt
+	}
+	return ""
+}
+
+func (x *AIFocus) GetUsagePrompt() string {
+	if x != nil {
+		return x.UsagePrompt
+	}
+	return ""
+}
+
+func (x *AIFocus) GetVerboseName() string {
+	if x != nil {
+		return x.VerboseName
+	}
+	return ""
+}
+
+func (x *AIFocus) GetVerboseNameZh() string {
+	if x != nil {
+		return x.VerboseNameZh
+	}
+	return ""
+}
+
+func (x *AIFocus) GetDescriptionZh() string {
+	if x != nil {
+		return x.DescriptionZh
+	}
+	return ""
+}
+
+type QueryAIFocusCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId  string                 `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *QueryAIFocusCommand) Reset() {
+	*x = QueryAIFocusCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *QueryAIFocusCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*QueryAIFocusCommand) ProtoMessage() {}
+
+func (x *QueryAIFocusCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use QueryAIFocusCommand.ProtoReflect.Descriptor instead.
+func (*QueryAIFocusCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{33}
+}
+
+func (x *QueryAIFocusCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *QueryAIFocusCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *QueryAIFocusCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+type AIFocusQueried struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Items         []*AIFocus             `protobuf:"bytes,3,rep,name=items,proto3" json:"items,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIFocusQueried) Reset() {
+	*x = AIFocusQueried{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[34]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIFocusQueried) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIFocusQueried) ProtoMessage() {}
+
+func (x *AIFocusQueried) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[34]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIFocusQueried.ProtoReflect.Descriptor instead.
+func (*AIFocusQueried) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{34}
+}
+
+func (x *AIFocusQueried) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIFocusQueried) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIFocusQueried) GetItems() []*AIFocus {
+	if x != nil {
+		return x.Items
+	}
+	return nil
+}
+
+type AIFocusQueryFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,3,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIFocusQueryFailed) Reset() {
+	*x = AIFocusQueryFailed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[35]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIFocusQueryFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIFocusQueryFailed) ProtoMessage() {}
+
+func (x *AIFocusQueryFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[35]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIFocusQueryFailed.ProtoReflect.Descriptor instead.
+func (*AIFocusQueryFailed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{35}
+}
+
+func (x *AIFocusQueryFailed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIFocusQueryFailed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIFocusQueryFailed) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AIFocusQueryFailed) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+type GetRandomAIMaterialsCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId  string                 `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Limit         int64                  `protobuf:"varint,4,opt,name=limit,proto3" json:"limit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetRandomAIMaterialsCommand) Reset() {
+	*x = GetRandomAIMaterialsCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[36]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetRandomAIMaterialsCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetRandomAIMaterialsCommand) ProtoMessage() {}
+
+func (x *GetRandomAIMaterialsCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[36]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetRandomAIMaterialsCommand.ProtoReflect.Descriptor instead.
+func (*GetRandomAIMaterialsCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{36}
+}
+
+func (x *GetRandomAIMaterialsCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *GetRandomAIMaterialsCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *GetRandomAIMaterialsCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *GetRandomAIMaterialsCommand) GetLimit() int64 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+type AIMaterialsRandomQueried struct {
+	state                protoimpl.MessageState        `protogen:"open.v1"`
+	Metadata             *v1.EventMetadata             `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId          string                        `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	KnowledgeBaseEntries []*AIKnowledgeBaseEntryRecord `protobuf:"bytes,3,rep,name=knowledge_base_entries,json=knowledgeBaseEntries,proto3" json:"knowledge_base_entries,omitempty"`
+	AiTools              []*AIToolRecord               `protobuf:"bytes,4,rep,name=ai_tools,json=aiTools,proto3" json:"ai_tools,omitempty"`
+	AiForges             []*AIForgeRecord              `protobuf:"bytes,5,rep,name=ai_forges,json=aiForges,proto3" json:"ai_forges,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
+}
+
+func (x *AIMaterialsRandomQueried) Reset() {
+	*x = AIMaterialsRandomQueried{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[37]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIMaterialsRandomQueried) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIMaterialsRandomQueried) ProtoMessage() {}
+
+func (x *AIMaterialsRandomQueried) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[37]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIMaterialsRandomQueried.ProtoReflect.Descriptor instead.
+func (*AIMaterialsRandomQueried) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{37}
+}
+
+func (x *AIMaterialsRandomQueried) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIMaterialsRandomQueried) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIMaterialsRandomQueried) GetKnowledgeBaseEntries() []*AIKnowledgeBaseEntryRecord {
+	if x != nil {
+		return x.KnowledgeBaseEntries
+	}
+	return nil
+}
+
+func (x *AIMaterialsRandomQueried) GetAiTools() []*AIToolRecord {
+	if x != nil {
+		return x.AiTools
+	}
+	return nil
+}
+
+func (x *AIMaterialsRandomQueried) GetAiForges() []*AIForgeRecord {
+	if x != nil {
+		return x.AiForges
+	}
+	return nil
+}
+
+type AIMaterialsRandomQueryFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,3,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIMaterialsRandomQueryFailed) Reset() {
+	*x = AIMaterialsRandomQueryFailed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[38]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIMaterialsRandomQueryFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIMaterialsRandomQueryFailed) ProtoMessage() {}
+
+func (x *AIMaterialsRandomQueryFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[38]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIMaterialsRandomQueryFailed.ProtoReflect.Descriptor instead.
+func (*AIMaterialsRandomQueryFailed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{38}
+}
+
+func (x *AIMaterialsRandomQueryFailed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIMaterialsRandomQueryFailed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIMaterialsRandomQueryFailed) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AIMaterialsRandomQueryFailed) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+type AIMCPServerPagination struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Page          int64                  `protobuf:"varint,1,opt,name=page,proto3" json:"page,omitempty"`
+	Limit         int64                  `protobuf:"varint,2,opt,name=limit,proto3" json:"limit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIMCPServerPagination) Reset() {
+	*x = AIMCPServerPagination{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[39]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIMCPServerPagination) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIMCPServerPagination) ProtoMessage() {}
+
+func (x *AIMCPServerPagination) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[39]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIMCPServerPagination.ProtoReflect.Descriptor instead.
+func (*AIMCPServerPagination) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{39}
+}
+
+func (x *AIMCPServerPagination) GetPage() int64 {
+	if x != nil {
+		return x.Page
+	}
+	return 0
+}
+
+func (x *AIMCPServerPagination) GetLimit() int64 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+type AIMCPServerToolParam struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Type          string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`
+	Description   string                 `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
+	DefaultValue  string                 `protobuf:"bytes,3,opt,name=default_value,json=defaultValue,proto3" json:"default_value,omitempty"`
+	Required      bool                   `protobuf:"varint,4,opt,name=required,proto3" json:"required,omitempty"`
+	Name          string                 `protobuf:"bytes,5,opt,name=name,proto3" json:"name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIMCPServerToolParam) Reset() {
+	*x = AIMCPServerToolParam{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[40]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIMCPServerToolParam) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIMCPServerToolParam) ProtoMessage() {}
+
+func (x *AIMCPServerToolParam) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[40]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIMCPServerToolParam.ProtoReflect.Descriptor instead.
+func (*AIMCPServerToolParam) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{40}
+}
+
+func (x *AIMCPServerToolParam) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
+}
+
+func (x *AIMCPServerToolParam) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *AIMCPServerToolParam) GetDefaultValue() string {
+	if x != nil {
+		return x.DefaultValue
+	}
+	return ""
+}
+
+func (x *AIMCPServerToolParam) GetRequired() bool {
+	if x != nil {
+		return x.Required
+	}
+	return false
+}
+
+func (x *AIMCPServerToolParam) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+type AIMCPServerTool struct {
+	state         protoimpl.MessageState  `protogen:"open.v1"`
+	Name          string                  `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Description   string                  `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
+	Params        []*AIMCPServerToolParam `protobuf:"bytes,3,rep,name=params,proto3" json:"params,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIMCPServerTool) Reset() {
+	*x = AIMCPServerTool{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[41]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIMCPServerTool) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIMCPServerTool) ProtoMessage() {}
+
+func (x *AIMCPServerTool) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[41]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIMCPServerTool.ProtoReflect.Descriptor instead.
+func (*AIMCPServerTool) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{41}
+}
+
+func (x *AIMCPServerTool) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *AIMCPServerTool) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *AIMCPServerTool) GetParams() []*AIMCPServerToolParam {
+	if x != nil {
+		return x.Params
+	}
+	return nil
+}
+
+type AIMCPServerRecord struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ServerId      int64                  `protobuf:"varint,1,opt,name=server_id,json=serverId,proto3" json:"server_id,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	TransportType string                 `protobuf:"bytes,3,opt,name=transport_type,json=transportType,proto3" json:"transport_type,omitempty"`
+	Url           string                 `protobuf:"bytes,4,opt,name=url,proto3" json:"url,omitempty"`
+	Command       string                 `protobuf:"bytes,5,opt,name=command,proto3" json:"command,omitempty"`
+	Enabled       bool                   `protobuf:"varint,6,opt,name=enabled,proto3" json:"enabled,omitempty"`
+	Tools         []*AIMCPServerTool     `protobuf:"bytes,7,rep,name=tools,proto3" json:"tools,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,8,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	Envs          []*AIConfigKVPair      `protobuf:"bytes,9,rep,name=envs,proto3" json:"envs,omitempty"`
+	Headers       []*AIConfigKVPair      `protobuf:"bytes,10,rep,name=headers,proto3" json:"headers,omitempty"`
+	CreatedAt     int64                  `protobuf:"varint,11,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt     int64                  `protobuf:"varint,12,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIMCPServerRecord) Reset() {
+	*x = AIMCPServerRecord{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[42]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIMCPServerRecord) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIMCPServerRecord) ProtoMessage() {}
+
+func (x *AIMCPServerRecord) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[42]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIMCPServerRecord.ProtoReflect.Descriptor instead.
+func (*AIMCPServerRecord) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{42}
+}
+
+func (x *AIMCPServerRecord) GetServerId() int64 {
+	if x != nil {
+		return x.ServerId
+	}
+	return 0
+}
+
+func (x *AIMCPServerRecord) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *AIMCPServerRecord) GetTransportType() string {
+	if x != nil {
+		return x.TransportType
+	}
+	return ""
+}
+
+func (x *AIMCPServerRecord) GetUrl() string {
+	if x != nil {
+		return x.Url
+	}
+	return ""
+}
+
+func (x *AIMCPServerRecord) GetCommand() string {
+	if x != nil {
+		return x.Command
+	}
+	return ""
+}
+
+func (x *AIMCPServerRecord) GetEnabled() bool {
+	if x != nil {
+		return x.Enabled
+	}
+	return false
+}
+
+func (x *AIMCPServerRecord) GetTools() []*AIMCPServerTool {
+	if x != nil {
+		return x.Tools
+	}
+	return nil
+}
+
+func (x *AIMCPServerRecord) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+func (x *AIMCPServerRecord) GetEnvs() []*AIConfigKVPair {
+	if x != nil {
+		return x.Envs
+	}
+	return nil
+}
+
+func (x *AIMCPServerRecord) GetHeaders() []*AIConfigKVPair {
+	if x != nil {
+		return x.Headers
+	}
+	return nil
+}
+
+func (x *AIMCPServerRecord) GetCreatedAt() int64 {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return 0
+}
+
+func (x *AIMCPServerRecord) GetUpdatedAt() int64 {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return 0
+}
+
+type ListAIMCPServersCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId  string                 `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Query         string                 `protobuf:"bytes,4,opt,name=query,proto3" json:"query,omitempty"`
+	ServerId      int64                  `protobuf:"varint,5,opt,name=server_id,json=serverId,proto3" json:"server_id,omitempty"`
+	TransportType string                 `protobuf:"bytes,6,opt,name=transport_type,json=transportType,proto3" json:"transport_type,omitempty"`
+	Pagination    *AIMCPServerPagination `protobuf:"bytes,7,opt,name=pagination,proto3" json:"pagination,omitempty"`
+	IncludeTools  bool                   `protobuf:"varint,8,opt,name=include_tools,json=includeTools,proto3" json:"include_tools,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAIMCPServersCommand) Reset() {
+	*x = ListAIMCPServersCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[43]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAIMCPServersCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAIMCPServersCommand) ProtoMessage() {}
+
+func (x *ListAIMCPServersCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[43]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAIMCPServersCommand.ProtoReflect.Descriptor instead.
+func (*ListAIMCPServersCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{43}
+}
+
+func (x *ListAIMCPServersCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *ListAIMCPServersCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *ListAIMCPServersCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *ListAIMCPServersCommand) GetQuery() string {
+	if x != nil {
+		return x.Query
+	}
+	return ""
+}
+
+func (x *ListAIMCPServersCommand) GetServerId() int64 {
+	if x != nil {
+		return x.ServerId
+	}
+	return 0
+}
+
+func (x *ListAIMCPServersCommand) GetTransportType() string {
+	if x != nil {
+		return x.TransportType
+	}
+	return ""
+}
+
+func (x *ListAIMCPServersCommand) GetPagination() *AIMCPServerPagination {
+	if x != nil {
+		return x.Pagination
+	}
+	return nil
+}
+
+func (x *ListAIMCPServersCommand) GetIncludeTools() bool {
+	if x != nil {
+		return x.IncludeTools
+	}
+	return false
+}
+
+type AIMCPServersListed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Items         []*AIMCPServerRecord   `protobuf:"bytes,3,rep,name=items,proto3" json:"items,omitempty"`
+	Pagination    *AIMCPServerPagination `protobuf:"bytes,4,opt,name=pagination,proto3" json:"pagination,omitempty"`
+	Total         int64                  `protobuf:"varint,5,opt,name=total,proto3" json:"total,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIMCPServersListed) Reset() {
+	*x = AIMCPServersListed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[44]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIMCPServersListed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIMCPServersListed) ProtoMessage() {}
+
+func (x *AIMCPServersListed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[44]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIMCPServersListed.ProtoReflect.Descriptor instead.
+func (*AIMCPServersListed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{44}
+}
+
+func (x *AIMCPServersListed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIMCPServersListed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIMCPServersListed) GetItems() []*AIMCPServerRecord {
+	if x != nil {
+		return x.Items
+	}
+	return nil
+}
+
+func (x *AIMCPServersListed) GetPagination() *AIMCPServerPagination {
+	if x != nil {
+		return x.Pagination
+	}
+	return nil
+}
+
+func (x *AIMCPServersListed) GetTotal() int64 {
+	if x != nil {
+		return x.Total
+	}
+	return 0
+}
+
+type AIMCPServersListFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,3,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIMCPServersListFailed) Reset() {
+	*x = AIMCPServersListFailed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[45]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIMCPServersListFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIMCPServersListFailed) ProtoMessage() {}
+
+func (x *AIMCPServersListFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[45]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIMCPServersListFailed.ProtoReflect.Descriptor instead.
+func (*AIMCPServersListFailed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{45}
+}
+
+func (x *AIMCPServersListFailed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIMCPServersListFailed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIMCPServersListFailed) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AIMCPServersListFailed) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+type CreateAIMCPServerCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId  string                 `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Name          string                 `protobuf:"bytes,4,opt,name=name,proto3" json:"name,omitempty"`
+	TransportType string                 `protobuf:"bytes,5,opt,name=transport_type,json=transportType,proto3" json:"transport_type,omitempty"`
+	Url           string                 `protobuf:"bytes,6,opt,name=url,proto3" json:"url,omitempty"`
+	Command       string                 `protobuf:"bytes,7,opt,name=command,proto3" json:"command,omitempty"`
+	Enabled       bool                   `protobuf:"varint,8,opt,name=enabled,proto3" json:"enabled,omitempty"`
+	Envs          []*AIConfigKVPair      `protobuf:"bytes,9,rep,name=envs,proto3" json:"envs,omitempty"`
+	Headers       []*AIConfigKVPair      `protobuf:"bytes,10,rep,name=headers,proto3" json:"headers,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateAIMCPServerCommand) Reset() {
+	*x = CreateAIMCPServerCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[46]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateAIMCPServerCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateAIMCPServerCommand) ProtoMessage() {}
+
+func (x *CreateAIMCPServerCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[46]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateAIMCPServerCommand.ProtoReflect.Descriptor instead.
+func (*CreateAIMCPServerCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{46}
+}
+
+func (x *CreateAIMCPServerCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *CreateAIMCPServerCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *CreateAIMCPServerCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *CreateAIMCPServerCommand) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *CreateAIMCPServerCommand) GetTransportType() string {
+	if x != nil {
+		return x.TransportType
+	}
+	return ""
+}
+
+func (x *CreateAIMCPServerCommand) GetUrl() string {
+	if x != nil {
+		return x.Url
+	}
+	return ""
+}
+
+func (x *CreateAIMCPServerCommand) GetCommand() string {
+	if x != nil {
+		return x.Command
+	}
+	return ""
+}
+
+func (x *CreateAIMCPServerCommand) GetEnabled() bool {
+	if x != nil {
+		return x.Enabled
+	}
+	return false
+}
+
+func (x *CreateAIMCPServerCommand) GetEnvs() []*AIConfigKVPair {
+	if x != nil {
+		return x.Envs
+	}
+	return nil
+}
+
+func (x *CreateAIMCPServerCommand) GetHeaders() []*AIConfigKVPair {
+	if x != nil {
+		return x.Headers
+	}
+	return nil
+}
+
+type AIMCPServerCreated struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Item          *AIMCPServerRecord     `protobuf:"bytes,3,opt,name=item,proto3" json:"item,omitempty"`
+	Message       string                 `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIMCPServerCreated) Reset() {
+	*x = AIMCPServerCreated{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[47]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIMCPServerCreated) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIMCPServerCreated) ProtoMessage() {}
+
+func (x *AIMCPServerCreated) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[47]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIMCPServerCreated.ProtoReflect.Descriptor instead.
+func (*AIMCPServerCreated) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{47}
+}
+
+func (x *AIMCPServerCreated) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIMCPServerCreated) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIMCPServerCreated) GetItem() *AIMCPServerRecord {
+	if x != nil {
+		return x.Item
+	}
+	return nil
+}
+
+func (x *AIMCPServerCreated) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type AIMCPServerCreateFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,3,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIMCPServerCreateFailed) Reset() {
+	*x = AIMCPServerCreateFailed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[48]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIMCPServerCreateFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIMCPServerCreateFailed) ProtoMessage() {}
+
+func (x *AIMCPServerCreateFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[48]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIMCPServerCreateFailed.ProtoReflect.Descriptor instead.
+func (*AIMCPServerCreateFailed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{48}
+}
+
+func (x *AIMCPServerCreateFailed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIMCPServerCreateFailed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIMCPServerCreateFailed) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AIMCPServerCreateFailed) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+type UpdateAIMCPServerCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId  string                 `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ServerId      int64                  `protobuf:"varint,4,opt,name=server_id,json=serverId,proto3" json:"server_id,omitempty"`
+	Name          string                 `protobuf:"bytes,5,opt,name=name,proto3" json:"name,omitempty"`
+	TransportType string                 `protobuf:"bytes,6,opt,name=transport_type,json=transportType,proto3" json:"transport_type,omitempty"`
+	Url           string                 `protobuf:"bytes,7,opt,name=url,proto3" json:"url,omitempty"`
+	Command       string                 `protobuf:"bytes,8,opt,name=command,proto3" json:"command,omitempty"`
+	Enabled       bool                   `protobuf:"varint,9,opt,name=enabled,proto3" json:"enabled,omitempty"`
+	Envs          []*AIConfigKVPair      `protobuf:"bytes,10,rep,name=envs,proto3" json:"envs,omitempty"`
+	Headers       []*AIConfigKVPair      `protobuf:"bytes,11,rep,name=headers,proto3" json:"headers,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateAIMCPServerCommand) Reset() {
+	*x = UpdateAIMCPServerCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[49]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateAIMCPServerCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateAIMCPServerCommand) ProtoMessage() {}
+
+func (x *UpdateAIMCPServerCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[49]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateAIMCPServerCommand.ProtoReflect.Descriptor instead.
+func (*UpdateAIMCPServerCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{49}
+}
+
+func (x *UpdateAIMCPServerCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *UpdateAIMCPServerCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *UpdateAIMCPServerCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *UpdateAIMCPServerCommand) GetServerId() int64 {
+	if x != nil {
+		return x.ServerId
+	}
+	return 0
+}
+
+func (x *UpdateAIMCPServerCommand) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *UpdateAIMCPServerCommand) GetTransportType() string {
+	if x != nil {
+		return x.TransportType
+	}
+	return ""
+}
+
+func (x *UpdateAIMCPServerCommand) GetUrl() string {
+	if x != nil {
+		return x.Url
+	}
+	return ""
+}
+
+func (x *UpdateAIMCPServerCommand) GetCommand() string {
+	if x != nil {
+		return x.Command
+	}
+	return ""
+}
+
+func (x *UpdateAIMCPServerCommand) GetEnabled() bool {
+	if x != nil {
+		return x.Enabled
+	}
+	return false
+}
+
+func (x *UpdateAIMCPServerCommand) GetEnvs() []*AIConfigKVPair {
+	if x != nil {
+		return x.Envs
+	}
+	return nil
+}
+
+func (x *UpdateAIMCPServerCommand) GetHeaders() []*AIConfigKVPair {
+	if x != nil {
+		return x.Headers
+	}
+	return nil
+}
+
+type AIMCPServerUpdated struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Item          *AIMCPServerRecord     `protobuf:"bytes,3,opt,name=item,proto3" json:"item,omitempty"`
+	Message       string                 `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIMCPServerUpdated) Reset() {
+	*x = AIMCPServerUpdated{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[50]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIMCPServerUpdated) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIMCPServerUpdated) ProtoMessage() {}
+
+func (x *AIMCPServerUpdated) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[50]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIMCPServerUpdated.ProtoReflect.Descriptor instead.
+func (*AIMCPServerUpdated) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{50}
+}
+
+func (x *AIMCPServerUpdated) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIMCPServerUpdated) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIMCPServerUpdated) GetItem() *AIMCPServerRecord {
+	if x != nil {
+		return x.Item
+	}
+	return nil
+}
+
+func (x *AIMCPServerUpdated) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type AIMCPServerUpdateFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,3,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIMCPServerUpdateFailed) Reset() {
+	*x = AIMCPServerUpdateFailed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[51]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIMCPServerUpdateFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIMCPServerUpdateFailed) ProtoMessage() {}
+
+func (x *AIMCPServerUpdateFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[51]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIMCPServerUpdateFailed.ProtoReflect.Descriptor instead.
+func (*AIMCPServerUpdateFailed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{51}
+}
+
+func (x *AIMCPServerUpdateFailed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIMCPServerUpdateFailed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIMCPServerUpdateFailed) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AIMCPServerUpdateFailed) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+type DeleteAIMCPServerCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId  string                 `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ServerId      int64                  `protobuf:"varint,4,opt,name=server_id,json=serverId,proto3" json:"server_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteAIMCPServerCommand) Reset() {
+	*x = DeleteAIMCPServerCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[52]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteAIMCPServerCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteAIMCPServerCommand) ProtoMessage() {}
+
+func (x *DeleteAIMCPServerCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[52]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteAIMCPServerCommand.ProtoReflect.Descriptor instead.
+func (*DeleteAIMCPServerCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{52}
+}
+
+func (x *DeleteAIMCPServerCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *DeleteAIMCPServerCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *DeleteAIMCPServerCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *DeleteAIMCPServerCommand) GetServerId() int64 {
+	if x != nil {
+		return x.ServerId
+	}
+	return 0
+}
+
+type AIMCPServerDeleted struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Item          *AIMCPServerRecord     `protobuf:"bytes,3,opt,name=item,proto3" json:"item,omitempty"`
+	Message       string                 `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIMCPServerDeleted) Reset() {
+	*x = AIMCPServerDeleted{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[53]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIMCPServerDeleted) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIMCPServerDeleted) ProtoMessage() {}
+
+func (x *AIMCPServerDeleted) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[53]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIMCPServerDeleted.ProtoReflect.Descriptor instead.
+func (*AIMCPServerDeleted) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{53}
+}
+
+func (x *AIMCPServerDeleted) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIMCPServerDeleted) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIMCPServerDeleted) GetItem() *AIMCPServerRecord {
+	if x != nil {
+		return x.Item
+	}
+	return nil
+}
+
+func (x *AIMCPServerDeleted) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type AIMCPServerDeleteFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,3,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIMCPServerDeleteFailed) Reset() {
+	*x = AIMCPServerDeleteFailed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[54]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIMCPServerDeleteFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIMCPServerDeleteFailed) ProtoMessage() {}
+
+func (x *AIMCPServerDeleteFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[54]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIMCPServerDeleteFailed.ProtoReflect.Descriptor instead.
+func (*AIMCPServerDeleteFailed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{54}
+}
+
+func (x *AIMCPServerDeleteFailed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIMCPServerDeleteFailed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIMCPServerDeleteFailed) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AIMCPServerDeleteFailed) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+type AILocalModelStatus struct {
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	Status               string                 `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
+	Host                 string                 `protobuf:"bytes,2,opt,name=host,proto3" json:"host,omitempty"`
+	Port                 int32                  `protobuf:"varint,3,opt,name=port,proto3" json:"port,omitempty"`
+	Model                string                 `protobuf:"bytes,4,opt,name=model,proto3" json:"model,omitempty"`
+	ModelPath            string                 `protobuf:"bytes,5,opt,name=model_path,json=modelPath,proto3" json:"model_path,omitempty"`
+	LlamaServerPath      string                 `protobuf:"bytes,6,opt,name=llama_server_path,json=llamaServerPath,proto3" json:"llama_server_path,omitempty"`
+	ContextSize          int32                  `protobuf:"varint,7,opt,name=context_size,json=contextSize,proto3" json:"context_size,omitempty"`
+	ContBatching         bool                   `protobuf:"varint,8,opt,name=cont_batching,json=contBatching,proto3" json:"cont_batching,omitempty"`
+	BatchSize            int32                  `protobuf:"varint,9,opt,name=batch_size,json=batchSize,proto3" json:"batch_size,omitempty"`
+	Threads              int32                  `protobuf:"varint,10,opt,name=threads,proto3" json:"threads,omitempty"`
+	Detached             bool                   `protobuf:"varint,11,opt,name=detached,proto3" json:"detached,omitempty"`
+	Debug                bool                   `protobuf:"varint,12,opt,name=debug,proto3" json:"debug,omitempty"`
+	Pooling              string                 `protobuf:"bytes,13,opt,name=pooling,proto3" json:"pooling,omitempty"`
+	StartupTimeoutSecond int32                  `protobuf:"varint,14,opt,name=startup_timeout_second,json=startupTimeoutSecond,proto3" json:"startup_timeout_second,omitempty"`
+	Args                 []string               `protobuf:"bytes,15,rep,name=args,proto3" json:"args,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
+}
+
+func (x *AILocalModelStatus) Reset() {
+	*x = AILocalModelStatus{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[55]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AILocalModelStatus) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AILocalModelStatus) ProtoMessage() {}
+
+func (x *AILocalModelStatus) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[55]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AILocalModelStatus.ProtoReflect.Descriptor instead.
+func (*AILocalModelStatus) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{55}
+}
+
+func (x *AILocalModelStatus) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *AILocalModelStatus) GetHost() string {
+	if x != nil {
+		return x.Host
+	}
+	return ""
+}
+
+func (x *AILocalModelStatus) GetPort() int32 {
+	if x != nil {
+		return x.Port
+	}
+	return 0
+}
+
+func (x *AILocalModelStatus) GetModel() string {
+	if x != nil {
+		return x.Model
+	}
+	return ""
+}
+
+func (x *AILocalModelStatus) GetModelPath() string {
+	if x != nil {
+		return x.ModelPath
+	}
+	return ""
+}
+
+func (x *AILocalModelStatus) GetLlamaServerPath() string {
+	if x != nil {
+		return x.LlamaServerPath
+	}
+	return ""
+}
+
+func (x *AILocalModelStatus) GetContextSize() int32 {
+	if x != nil {
+		return x.ContextSize
+	}
+	return 0
+}
+
+func (x *AILocalModelStatus) GetContBatching() bool {
+	if x != nil {
+		return x.ContBatching
+	}
+	return false
+}
+
+func (x *AILocalModelStatus) GetBatchSize() int32 {
+	if x != nil {
+		return x.BatchSize
+	}
+	return 0
+}
+
+func (x *AILocalModelStatus) GetThreads() int32 {
+	if x != nil {
+		return x.Threads
+	}
+	return 0
+}
+
+func (x *AILocalModelStatus) GetDetached() bool {
+	if x != nil {
+		return x.Detached
+	}
+	return false
+}
+
+func (x *AILocalModelStatus) GetDebug() bool {
+	if x != nil {
+		return x.Debug
+	}
+	return false
+}
+
+func (x *AILocalModelStatus) GetPooling() string {
+	if x != nil {
+		return x.Pooling
+	}
+	return ""
+}
+
+func (x *AILocalModelStatus) GetStartupTimeoutSecond() int32 {
+	if x != nil {
+		return x.StartupTimeoutSecond
+	}
+	return 0
+}
+
+func (x *AILocalModelStatus) GetArgs() []string {
+	if x != nil {
+		return x.Args
+	}
+	return nil
+}
+
+type AILocalModelRecord struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Type          string                 `protobuf:"bytes,2,opt,name=type,proto3" json:"type,omitempty"`
+	FileName      string                 `protobuf:"bytes,3,opt,name=file_name,json=fileName,proto3" json:"file_name,omitempty"`
+	DownloadUrl   string                 `protobuf:"bytes,4,opt,name=download_url,json=downloadUrl,proto3" json:"download_url,omitempty"`
+	Description   string                 `protobuf:"bytes,5,opt,name=description,proto3" json:"description,omitempty"`
+	DefaultPort   int32                  `protobuf:"varint,6,opt,name=default_port,json=defaultPort,proto3" json:"default_port,omitempty"`
+	IsLocal       bool                   `protobuf:"varint,7,opt,name=is_local,json=isLocal,proto3" json:"is_local,omitempty"`
+	IsReady       bool                   `protobuf:"varint,8,opt,name=is_ready,json=isReady,proto3" json:"is_ready,omitempty"`
+	Path          string                 `protobuf:"bytes,9,opt,name=path,proto3" json:"path,omitempty"`
+	Status        *AILocalModelStatus    `protobuf:"bytes,10,opt,name=status,proto3" json:"status,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AILocalModelRecord) Reset() {
+	*x = AILocalModelRecord{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[56]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AILocalModelRecord) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AILocalModelRecord) ProtoMessage() {}
+
+func (x *AILocalModelRecord) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[56]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AILocalModelRecord.ProtoReflect.Descriptor instead.
+func (*AILocalModelRecord) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{56}
+}
+
+func (x *AILocalModelRecord) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *AILocalModelRecord) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
+}
+
+func (x *AILocalModelRecord) GetFileName() string {
+	if x != nil {
+		return x.FileName
+	}
+	return ""
+}
+
+func (x *AILocalModelRecord) GetDownloadUrl() string {
+	if x != nil {
+		return x.DownloadUrl
+	}
+	return ""
+}
+
+func (x *AILocalModelRecord) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *AILocalModelRecord) GetDefaultPort() int32 {
+	if x != nil {
+		return x.DefaultPort
+	}
+	return 0
+}
+
+func (x *AILocalModelRecord) GetIsLocal() bool {
+	if x != nil {
+		return x.IsLocal
+	}
+	return false
+}
+
+func (x *AILocalModelRecord) GetIsReady() bool {
+	if x != nil {
+		return x.IsReady
+	}
+	return false
+}
+
+func (x *AILocalModelRecord) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *AILocalModelRecord) GetStatus() *AILocalModelStatus {
+	if x != nil {
+		return x.Status
+	}
+	return nil
+}
+
+type ListAILocalModelsCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId  string                 `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAILocalModelsCommand) Reset() {
+	*x = ListAILocalModelsCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[57]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAILocalModelsCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAILocalModelsCommand) ProtoMessage() {}
+
+func (x *ListAILocalModelsCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[57]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAILocalModelsCommand.ProtoReflect.Descriptor instead.
+func (*ListAILocalModelsCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{57}
+}
+
+func (x *ListAILocalModelsCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *ListAILocalModelsCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *ListAILocalModelsCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+type AILocalModelsListed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Items         []*AILocalModelRecord  `protobuf:"bytes,3,rep,name=items,proto3" json:"items,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AILocalModelsListed) Reset() {
+	*x = AILocalModelsListed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[58]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AILocalModelsListed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AILocalModelsListed) ProtoMessage() {}
+
+func (x *AILocalModelsListed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[58]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AILocalModelsListed.ProtoReflect.Descriptor instead.
+func (*AILocalModelsListed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{58}
+}
+
+func (x *AILocalModelsListed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AILocalModelsListed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AILocalModelsListed) GetItems() []*AILocalModelRecord {
+	if x != nil {
+		return x.Items
+	}
+	return nil
+}
+
+type AILocalModelsListFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,3,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AILocalModelsListFailed) Reset() {
+	*x = AILocalModelsListFailed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[59]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AILocalModelsListFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AILocalModelsListFailed) ProtoMessage() {}
+
+func (x *AILocalModelsListFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[59]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AILocalModelsListFailed.ProtoReflect.Descriptor instead.
+func (*AILocalModelsListFailed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{59}
+}
+
+func (x *AILocalModelsListFailed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AILocalModelsListFailed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AILocalModelsListFailed) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AILocalModelsListFailed) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+type CheckAILlamaServerReadyCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId  string                 `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CheckAILlamaServerReadyCommand) Reset() {
+	*x = CheckAILlamaServerReadyCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[60]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CheckAILlamaServerReadyCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CheckAILlamaServerReadyCommand) ProtoMessage() {}
+
+func (x *CheckAILlamaServerReadyCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[60]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CheckAILlamaServerReadyCommand.ProtoReflect.Descriptor instead.
+func (*CheckAILlamaServerReadyCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{60}
+}
+
+func (x *CheckAILlamaServerReadyCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *CheckAILlamaServerReadyCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *CheckAILlamaServerReadyCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+type AILlamaServerReadyChecked struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Ok            bool                   `protobuf:"varint,3,opt,name=ok,proto3" json:"ok,omitempty"`
+	Reason        string                 `protobuf:"bytes,4,opt,name=reason,proto3" json:"reason,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AILlamaServerReadyChecked) Reset() {
+	*x = AILlamaServerReadyChecked{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[61]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AILlamaServerReadyChecked) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AILlamaServerReadyChecked) ProtoMessage() {}
+
+func (x *AILlamaServerReadyChecked) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[61]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AILlamaServerReadyChecked.ProtoReflect.Descriptor instead.
+func (*AILlamaServerReadyChecked) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{61}
+}
+
+func (x *AILlamaServerReadyChecked) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AILlamaServerReadyChecked) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AILlamaServerReadyChecked) GetOk() bool {
+	if x != nil {
+		return x.Ok
+	}
+	return false
+}
+
+func (x *AILlamaServerReadyChecked) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+type AILlamaServerReadyCheckFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,3,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AILlamaServerReadyCheckFailed) Reset() {
+	*x = AILlamaServerReadyCheckFailed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[62]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AILlamaServerReadyCheckFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AILlamaServerReadyCheckFailed) ProtoMessage() {}
+
+func (x *AILlamaServerReadyCheckFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[62]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AILlamaServerReadyCheckFailed.ProtoReflect.Descriptor instead.
+func (*AILlamaServerReadyCheckFailed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{62}
+}
+
+func (x *AILlamaServerReadyCheckFailed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AILlamaServerReadyCheckFailed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AILlamaServerReadyCheckFailed) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AILlamaServerReadyCheckFailed) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+type InstallAILlamaServerCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId  string                 `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Proxy         string                 `protobuf:"bytes,4,opt,name=proxy,proto3" json:"proxy,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *InstallAILlamaServerCommand) Reset() {
+	*x = InstallAILlamaServerCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[63]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InstallAILlamaServerCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InstallAILlamaServerCommand) ProtoMessage() {}
+
+func (x *InstallAILlamaServerCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[63]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InstallAILlamaServerCommand.ProtoReflect.Descriptor instead.
+func (*InstallAILlamaServerCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{63}
+}
+
+func (x *InstallAILlamaServerCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *InstallAILlamaServerCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *InstallAILlamaServerCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *InstallAILlamaServerCommand) GetProxy() string {
+	if x != nil {
+		return x.Proxy
+	}
+	return ""
+}
+
+type AILocalModelOperation struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	OperationId   string                 `protobuf:"bytes,1,opt,name=operation_id,json=operationId,proto3" json:"operation_id,omitempty"`
+	Kind          string                 `protobuf:"bytes,2,opt,name=kind,proto3" json:"kind,omitempty"`
+	ModelName     string                 `protobuf:"bytes,3,opt,name=model_name,json=modelName,proto3" json:"model_name,omitempty"`
+	Title         string                 `protobuf:"bytes,4,opt,name=title,proto3" json:"title,omitempty"`
+	TargetNodeId  string                 `protobuf:"bytes,5,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AILocalModelOperation) Reset() {
+	*x = AILocalModelOperation{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[64]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AILocalModelOperation) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AILocalModelOperation) ProtoMessage() {}
+
+func (x *AILocalModelOperation) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[64]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AILocalModelOperation.ProtoReflect.Descriptor instead.
+func (*AILocalModelOperation) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{64}
+}
+
+func (x *AILocalModelOperation) GetOperationId() string {
+	if x != nil {
+		return x.OperationId
+	}
+	return ""
+}
+
+func (x *AILocalModelOperation) GetKind() string {
+	if x != nil {
+		return x.Kind
+	}
+	return ""
+}
+
+func (x *AILocalModelOperation) GetModelName() string {
+	if x != nil {
+		return x.ModelName
+	}
+	return ""
+}
+
+func (x *AILocalModelOperation) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *AILocalModelOperation) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+type AILocalModelOperationAccepted struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Operation     *AILocalModelOperation `protobuf:"bytes,3,opt,name=operation,proto3" json:"operation,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AILocalModelOperationAccepted) Reset() {
+	*x = AILocalModelOperationAccepted{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[65]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AILocalModelOperationAccepted) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AILocalModelOperationAccepted) ProtoMessage() {}
+
+func (x *AILocalModelOperationAccepted) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[65]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AILocalModelOperationAccepted.ProtoReflect.Descriptor instead.
+func (*AILocalModelOperationAccepted) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{65}
+}
+
+func (x *AILocalModelOperationAccepted) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AILocalModelOperationAccepted) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AILocalModelOperationAccepted) GetOperation() *AILocalModelOperation {
+	if x != nil {
+		return x.Operation
+	}
+	return nil
+}
+
+type AILocalModelOperationProgressed struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Metadata        *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId     string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Operation       *AILocalModelOperation `protobuf:"bytes,3,opt,name=operation,proto3" json:"operation,omitempty"`
+	ProgressPercent float32                `protobuf:"fixed32,4,opt,name=progress_percent,json=progressPercent,proto3" json:"progress_percent,omitempty"`
+	Message         string                 `protobuf:"bytes,5,opt,name=message,proto3" json:"message,omitempty"`
+	IsMessage       bool                   `protobuf:"varint,6,opt,name=is_message,json=isMessage,proto3" json:"is_message,omitempty"`
+	RawMessage      string                 `protobuf:"bytes,7,opt,name=raw_message,json=rawMessage,proto3" json:"raw_message,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *AILocalModelOperationProgressed) Reset() {
+	*x = AILocalModelOperationProgressed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[66]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AILocalModelOperationProgressed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AILocalModelOperationProgressed) ProtoMessage() {}
+
+func (x *AILocalModelOperationProgressed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[66]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AILocalModelOperationProgressed.ProtoReflect.Descriptor instead.
+func (*AILocalModelOperationProgressed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{66}
+}
+
+func (x *AILocalModelOperationProgressed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AILocalModelOperationProgressed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AILocalModelOperationProgressed) GetOperation() *AILocalModelOperation {
+	if x != nil {
+		return x.Operation
+	}
+	return nil
+}
+
+func (x *AILocalModelOperationProgressed) GetProgressPercent() float32 {
+	if x != nil {
+		return x.ProgressPercent
+	}
+	return 0
+}
+
+func (x *AILocalModelOperationProgressed) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *AILocalModelOperationProgressed) GetIsMessage() bool {
+	if x != nil {
+		return x.IsMessage
+	}
+	return false
+}
+
+func (x *AILocalModelOperationProgressed) GetRawMessage() string {
+	if x != nil {
+		return x.RawMessage
+	}
+	return ""
+}
+
+type AILocalModelOperationCompleted struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Operation     *AILocalModelOperation `protobuf:"bytes,3,opt,name=operation,proto3" json:"operation,omitempty"`
+	Ok            bool                   `protobuf:"varint,4,opt,name=ok,proto3" json:"ok,omitempty"`
+	Reason        string                 `protobuf:"bytes,5,opt,name=reason,proto3" json:"reason,omitempty"`
+	Item          *AILocalModelRecord    `protobuf:"bytes,6,opt,name=item,proto3" json:"item,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AILocalModelOperationCompleted) Reset() {
+	*x = AILocalModelOperationCompleted{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[67]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AILocalModelOperationCompleted) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AILocalModelOperationCompleted) ProtoMessage() {}
+
+func (x *AILocalModelOperationCompleted) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[67]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AILocalModelOperationCompleted.ProtoReflect.Descriptor instead.
+func (*AILocalModelOperationCompleted) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{67}
+}
+
+func (x *AILocalModelOperationCompleted) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AILocalModelOperationCompleted) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AILocalModelOperationCompleted) GetOperation() *AILocalModelOperation {
+	if x != nil {
+		return x.Operation
+	}
+	return nil
+}
+
+func (x *AILocalModelOperationCompleted) GetOk() bool {
+	if x != nil {
+		return x.Ok
+	}
+	return false
+}
+
+func (x *AILocalModelOperationCompleted) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *AILocalModelOperationCompleted) GetItem() *AILocalModelRecord {
+	if x != nil {
+		return x.Item
+	}
+	return nil
+}
+
+type AILocalModelOperationCancelled struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Operation     *AILocalModelOperation `protobuf:"bytes,3,opt,name=operation,proto3" json:"operation,omitempty"`
+	Reason        string                 `protobuf:"bytes,4,opt,name=reason,proto3" json:"reason,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AILocalModelOperationCancelled) Reset() {
+	*x = AILocalModelOperationCancelled{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[68]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AILocalModelOperationCancelled) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AILocalModelOperationCancelled) ProtoMessage() {}
+
+func (x *AILocalModelOperationCancelled) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[68]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AILocalModelOperationCancelled.ProtoReflect.Descriptor instead.
+func (*AILocalModelOperationCancelled) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{68}
+}
+
+func (x *AILocalModelOperationCancelled) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AILocalModelOperationCancelled) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AILocalModelOperationCancelled) GetOperation() *AILocalModelOperation {
+	if x != nil {
+		return x.Operation
+	}
+	return nil
+}
+
+func (x *AILocalModelOperationCancelled) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+type AILocalModelOperationFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Operation     *AILocalModelOperation `protobuf:"bytes,3,opt,name=operation,proto3" json:"operation,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,4,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,5,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AILocalModelOperationFailed) Reset() {
+	*x = AILocalModelOperationFailed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[69]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AILocalModelOperationFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AILocalModelOperationFailed) ProtoMessage() {}
+
+func (x *AILocalModelOperationFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[69]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AILocalModelOperationFailed.ProtoReflect.Descriptor instead.
+func (*AILocalModelOperationFailed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{69}
+}
+
+func (x *AILocalModelOperationFailed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AILocalModelOperationFailed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AILocalModelOperationFailed) GetOperation() *AILocalModelOperation {
+	if x != nil {
+		return x.Operation
+	}
+	return nil
+}
+
+func (x *AILocalModelOperationFailed) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AILocalModelOperationFailed) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+type AILlamaServerInstalled struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Ok            bool                   `protobuf:"varint,3,opt,name=ok,proto3" json:"ok,omitempty"`
+	Reason        string                 `protobuf:"bytes,4,opt,name=reason,proto3" json:"reason,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AILlamaServerInstalled) Reset() {
+	*x = AILlamaServerInstalled{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[70]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AILlamaServerInstalled) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AILlamaServerInstalled) ProtoMessage() {}
+
+func (x *AILlamaServerInstalled) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[70]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AILlamaServerInstalled.ProtoReflect.Descriptor instead.
+func (*AILlamaServerInstalled) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{70}
+}
+
+func (x *AILlamaServerInstalled) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AILlamaServerInstalled) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AILlamaServerInstalled) GetOk() bool {
+	if x != nil {
+		return x.Ok
+	}
+	return false
+}
+
+func (x *AILlamaServerInstalled) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+type AILlamaServerInstallFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,3,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AILlamaServerInstallFailed) Reset() {
+	*x = AILlamaServerInstallFailed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[71]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AILlamaServerInstallFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AILlamaServerInstallFailed) ProtoMessage() {}
+
+func (x *AILlamaServerInstallFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[71]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AILlamaServerInstallFailed.ProtoReflect.Descriptor instead.
+func (*AILlamaServerInstallFailed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{71}
+}
+
+func (x *AILlamaServerInstallFailed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AILlamaServerInstallFailed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AILlamaServerInstallFailed) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AILlamaServerInstallFailed) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+type CreateAILocalModelCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId  string                 `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Name          string                 `protobuf:"bytes,4,opt,name=name,proto3" json:"name,omitempty"`
+	ModelType     string                 `protobuf:"bytes,5,opt,name=model_type,json=modelType,proto3" json:"model_type,omitempty"`
+	Description   string                 `protobuf:"bytes,6,opt,name=description,proto3" json:"description,omitempty"`
+	Path          string                 `protobuf:"bytes,7,opt,name=path,proto3" json:"path,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateAILocalModelCommand) Reset() {
+	*x = CreateAILocalModelCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[72]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateAILocalModelCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateAILocalModelCommand) ProtoMessage() {}
+
+func (x *CreateAILocalModelCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[72]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateAILocalModelCommand.ProtoReflect.Descriptor instead.
+func (*CreateAILocalModelCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{72}
+}
+
+func (x *CreateAILocalModelCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *CreateAILocalModelCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *CreateAILocalModelCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *CreateAILocalModelCommand) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *CreateAILocalModelCommand) GetModelType() string {
+	if x != nil {
+		return x.ModelType
+	}
+	return ""
+}
+
+func (x *CreateAILocalModelCommand) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *CreateAILocalModelCommand) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+type AILocalModelCreated struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Item          *AILocalModelRecord    `protobuf:"bytes,3,opt,name=item,proto3" json:"item,omitempty"`
+	Message       string                 `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AILocalModelCreated) Reset() {
+	*x = AILocalModelCreated{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[73]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AILocalModelCreated) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AILocalModelCreated) ProtoMessage() {}
+
+func (x *AILocalModelCreated) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[73]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AILocalModelCreated.ProtoReflect.Descriptor instead.
+func (*AILocalModelCreated) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{73}
+}
+
+func (x *AILocalModelCreated) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AILocalModelCreated) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AILocalModelCreated) GetItem() *AILocalModelRecord {
+	if x != nil {
+		return x.Item
+	}
+	return nil
+}
+
+func (x *AILocalModelCreated) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type AILocalModelCreateFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,3,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AILocalModelCreateFailed) Reset() {
+	*x = AILocalModelCreateFailed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[74]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AILocalModelCreateFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AILocalModelCreateFailed) ProtoMessage() {}
+
+func (x *AILocalModelCreateFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[74]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AILocalModelCreateFailed.ProtoReflect.Descriptor instead.
+func (*AILocalModelCreateFailed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{74}
+}
+
+func (x *AILocalModelCreateFailed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AILocalModelCreateFailed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AILocalModelCreateFailed) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AILocalModelCreateFailed) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+type UpdateAILocalModelCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId  string                 `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ModelName     string                 `protobuf:"bytes,4,opt,name=model_name,json=modelName,proto3" json:"model_name,omitempty"`
+	ModelType     string                 `protobuf:"bytes,5,opt,name=model_type,json=modelType,proto3" json:"model_type,omitempty"`
+	Description   string                 `protobuf:"bytes,6,opt,name=description,proto3" json:"description,omitempty"`
+	Path          string                 `protobuf:"bytes,7,opt,name=path,proto3" json:"path,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateAILocalModelCommand) Reset() {
+	*x = UpdateAILocalModelCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[75]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateAILocalModelCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateAILocalModelCommand) ProtoMessage() {}
+
+func (x *UpdateAILocalModelCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[75]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateAILocalModelCommand.ProtoReflect.Descriptor instead.
+func (*UpdateAILocalModelCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{75}
+}
+
+func (x *UpdateAILocalModelCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *UpdateAILocalModelCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *UpdateAILocalModelCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *UpdateAILocalModelCommand) GetModelName() string {
+	if x != nil {
+		return x.ModelName
+	}
+	return ""
+}
+
+func (x *UpdateAILocalModelCommand) GetModelType() string {
+	if x != nil {
+		return x.ModelType
+	}
+	return ""
+}
+
+func (x *UpdateAILocalModelCommand) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *UpdateAILocalModelCommand) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+type AILocalModelUpdated struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Item          *AILocalModelRecord    `protobuf:"bytes,3,opt,name=item,proto3" json:"item,omitempty"`
+	Message       string                 `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AILocalModelUpdated) Reset() {
+	*x = AILocalModelUpdated{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[76]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AILocalModelUpdated) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AILocalModelUpdated) ProtoMessage() {}
+
+func (x *AILocalModelUpdated) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[76]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AILocalModelUpdated.ProtoReflect.Descriptor instead.
+func (*AILocalModelUpdated) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{76}
+}
+
+func (x *AILocalModelUpdated) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AILocalModelUpdated) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AILocalModelUpdated) GetItem() *AILocalModelRecord {
+	if x != nil {
+		return x.Item
+	}
+	return nil
+}
+
+func (x *AILocalModelUpdated) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type AILocalModelUpdateFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,3,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AILocalModelUpdateFailed) Reset() {
+	*x = AILocalModelUpdateFailed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[77]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AILocalModelUpdateFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AILocalModelUpdateFailed) ProtoMessage() {}
+
+func (x *AILocalModelUpdateFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[77]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AILocalModelUpdateFailed.ProtoReflect.Descriptor instead.
+func (*AILocalModelUpdateFailed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{77}
+}
+
+func (x *AILocalModelUpdateFailed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AILocalModelUpdateFailed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AILocalModelUpdateFailed) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AILocalModelUpdateFailed) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+type DeleteAILocalModelCommand struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Metadata         *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId     string                 `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId      string                 `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ModelName        string                 `protobuf:"bytes,4,opt,name=model_name,json=modelName,proto3" json:"model_name,omitempty"`
+	DeleteSourceFile bool                   `protobuf:"varint,5,opt,name=delete_source_file,json=deleteSourceFile,proto3" json:"delete_source_file,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *DeleteAILocalModelCommand) Reset() {
+	*x = DeleteAILocalModelCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[78]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteAILocalModelCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteAILocalModelCommand) ProtoMessage() {}
+
+func (x *DeleteAILocalModelCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[78]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteAILocalModelCommand.ProtoReflect.Descriptor instead.
+func (*DeleteAILocalModelCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{78}
+}
+
+func (x *DeleteAILocalModelCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *DeleteAILocalModelCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *DeleteAILocalModelCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *DeleteAILocalModelCommand) GetModelName() string {
+	if x != nil {
+		return x.ModelName
+	}
+	return ""
+}
+
+func (x *DeleteAILocalModelCommand) GetDeleteSourceFile() bool {
+	if x != nil {
+		return x.DeleteSourceFile
+	}
+	return false
+}
+
+type AILocalModelDeleted struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Item          *AILocalModelRecord    `protobuf:"bytes,3,opt,name=item,proto3" json:"item,omitempty"`
+	Message       string                 `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AILocalModelDeleted) Reset() {
+	*x = AILocalModelDeleted{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[79]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AILocalModelDeleted) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AILocalModelDeleted) ProtoMessage() {}
+
+func (x *AILocalModelDeleted) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[79]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AILocalModelDeleted.ProtoReflect.Descriptor instead.
+func (*AILocalModelDeleted) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{79}
+}
+
+func (x *AILocalModelDeleted) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AILocalModelDeleted) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AILocalModelDeleted) GetItem() *AILocalModelRecord {
+	if x != nil {
+		return x.Item
+	}
+	return nil
+}
+
+func (x *AILocalModelDeleted) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type AILocalModelDeleteFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,3,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AILocalModelDeleteFailed) Reset() {
+	*x = AILocalModelDeleteFailed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[80]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AILocalModelDeleteFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AILocalModelDeleteFailed) ProtoMessage() {}
+
+func (x *AILocalModelDeleteFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[80]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AILocalModelDeleteFailed.ProtoReflect.Descriptor instead.
+func (*AILocalModelDeleteFailed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{80}
+}
+
+func (x *AILocalModelDeleteFailed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AILocalModelDeleteFailed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AILocalModelDeleteFailed) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AILocalModelDeleteFailed) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+type StartAILocalModelCommand struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Metadata         *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId     string                 `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId      string                 `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ModelName        string                 `protobuf:"bytes,4,opt,name=model_name,json=modelName,proto3" json:"model_name,omitempty"`
+	Host             string                 `protobuf:"bytes,5,opt,name=host,proto3" json:"host,omitempty"`
+	Port             int32                  `protobuf:"varint,6,opt,name=port,proto3" json:"port,omitempty"`
+	ContextSize      int32                  `protobuf:"varint,7,opt,name=context_size,json=contextSize,proto3" json:"context_size,omitempty"`
+	BatchSize        int32                  `protobuf:"varint,8,opt,name=batch_size,json=batchSize,proto3" json:"batch_size,omitempty"`
+	Threads          int32                  `protobuf:"varint,9,opt,name=threads,proto3" json:"threads,omitempty"`
+	Debug            bool                   `protobuf:"varint,10,opt,name=debug,proto3" json:"debug,omitempty"`
+	Pooling          string                 `protobuf:"bytes,11,opt,name=pooling,proto3" json:"pooling,omitempty"`
+	StartupTimeoutMs int64                  `protobuf:"varint,12,opt,name=startup_timeout_ms,json=startupTimeoutMs,proto3" json:"startup_timeout_ms,omitempty"`
+	Args             []string               `protobuf:"bytes,13,rep,name=args,proto3" json:"args,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *StartAILocalModelCommand) Reset() {
+	*x = StartAILocalModelCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[81]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StartAILocalModelCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StartAILocalModelCommand) ProtoMessage() {}
+
+func (x *StartAILocalModelCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[81]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StartAILocalModelCommand.ProtoReflect.Descriptor instead.
+func (*StartAILocalModelCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{81}
+}
+
+func (x *StartAILocalModelCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *StartAILocalModelCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *StartAILocalModelCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *StartAILocalModelCommand) GetModelName() string {
+	if x != nil {
+		return x.ModelName
+	}
+	return ""
+}
+
+func (x *StartAILocalModelCommand) GetHost() string {
+	if x != nil {
+		return x.Host
+	}
+	return ""
+}
+
+func (x *StartAILocalModelCommand) GetPort() int32 {
+	if x != nil {
+		return x.Port
+	}
+	return 0
+}
+
+func (x *StartAILocalModelCommand) GetContextSize() int32 {
+	if x != nil {
+		return x.ContextSize
+	}
+	return 0
+}
+
+func (x *StartAILocalModelCommand) GetBatchSize() int32 {
+	if x != nil {
+		return x.BatchSize
+	}
+	return 0
+}
+
+func (x *StartAILocalModelCommand) GetThreads() int32 {
+	if x != nil {
+		return x.Threads
+	}
+	return 0
+}
+
+func (x *StartAILocalModelCommand) GetDebug() bool {
+	if x != nil {
+		return x.Debug
+	}
+	return false
+}
+
+func (x *StartAILocalModelCommand) GetPooling() string {
+	if x != nil {
+		return x.Pooling
+	}
+	return ""
+}
+
+func (x *StartAILocalModelCommand) GetStartupTimeoutMs() int64 {
+	if x != nil {
+		return x.StartupTimeoutMs
+	}
+	return 0
+}
+
+func (x *StartAILocalModelCommand) GetArgs() []string {
+	if x != nil {
+		return x.Args
+	}
+	return nil
+}
+
+type AILocalModelStarted struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Item          *AILocalModelRecord    `protobuf:"bytes,3,opt,name=item,proto3" json:"item,omitempty"`
+	Message       string                 `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AILocalModelStarted) Reset() {
+	*x = AILocalModelStarted{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[82]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AILocalModelStarted) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AILocalModelStarted) ProtoMessage() {}
+
+func (x *AILocalModelStarted) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[82]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AILocalModelStarted.ProtoReflect.Descriptor instead.
+func (*AILocalModelStarted) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{82}
+}
+
+func (x *AILocalModelStarted) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AILocalModelStarted) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AILocalModelStarted) GetItem() *AILocalModelRecord {
+	if x != nil {
+		return x.Item
+	}
+	return nil
+}
+
+func (x *AILocalModelStarted) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type AILocalModelStartFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,3,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AILocalModelStartFailed) Reset() {
+	*x = AILocalModelStartFailed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[83]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AILocalModelStartFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AILocalModelStartFailed) ProtoMessage() {}
+
+func (x *AILocalModelStartFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[83]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AILocalModelStartFailed.ProtoReflect.Descriptor instead.
+func (*AILocalModelStartFailed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{83}
+}
+
+func (x *AILocalModelStartFailed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AILocalModelStartFailed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AILocalModelStartFailed) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AILocalModelStartFailed) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+type StopAILocalModelCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId  string                 `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ModelName     string                 `protobuf:"bytes,4,opt,name=model_name,json=modelName,proto3" json:"model_name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StopAILocalModelCommand) Reset() {
+	*x = StopAILocalModelCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[84]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StopAILocalModelCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StopAILocalModelCommand) ProtoMessage() {}
+
+func (x *StopAILocalModelCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[84]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StopAILocalModelCommand.ProtoReflect.Descriptor instead.
+func (*StopAILocalModelCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{84}
+}
+
+func (x *StopAILocalModelCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *StopAILocalModelCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *StopAILocalModelCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *StopAILocalModelCommand) GetModelName() string {
+	if x != nil {
+		return x.ModelName
+	}
+	return ""
+}
+
+type AILocalModelStopped struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Item          *AILocalModelRecord    `protobuf:"bytes,3,opt,name=item,proto3" json:"item,omitempty"`
+	Message       string                 `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AILocalModelStopped) Reset() {
+	*x = AILocalModelStopped{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[85]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AILocalModelStopped) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AILocalModelStopped) ProtoMessage() {}
+
+func (x *AILocalModelStopped) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[85]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AILocalModelStopped.ProtoReflect.Descriptor instead.
+func (*AILocalModelStopped) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{85}
+}
+
+func (x *AILocalModelStopped) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AILocalModelStopped) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AILocalModelStopped) GetItem() *AILocalModelRecord {
+	if x != nil {
+		return x.Item
+	}
+	return nil
+}
+
+func (x *AILocalModelStopped) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type AILocalModelStopFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,3,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AILocalModelStopFailed) Reset() {
+	*x = AILocalModelStopFailed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[86]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AILocalModelStopFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AILocalModelStopFailed) ProtoMessage() {}
+
+func (x *AILocalModelStopFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[86]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AILocalModelStopFailed.ProtoReflect.Descriptor instead.
+func (*AILocalModelStopFailed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{86}
+}
+
+func (x *AILocalModelStopFailed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AILocalModelStopFailed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AILocalModelStopFailed) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AILocalModelStopFailed) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+type DownloadAILocalModelCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId  string                 `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ModelName     string                 `protobuf:"bytes,4,opt,name=model_name,json=modelName,proto3" json:"model_name,omitempty"`
+	Proxy         string                 `protobuf:"bytes,5,opt,name=proxy,proto3" json:"proxy,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DownloadAILocalModelCommand) Reset() {
+	*x = DownloadAILocalModelCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[87]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DownloadAILocalModelCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DownloadAILocalModelCommand) ProtoMessage() {}
+
+func (x *DownloadAILocalModelCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[87]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DownloadAILocalModelCommand.ProtoReflect.Descriptor instead.
+func (*DownloadAILocalModelCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{87}
+}
+
+func (x *DownloadAILocalModelCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *DownloadAILocalModelCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *DownloadAILocalModelCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *DownloadAILocalModelCommand) GetModelName() string {
+	if x != nil {
+		return x.ModelName
+	}
+	return ""
+}
+
+func (x *DownloadAILocalModelCommand) GetProxy() string {
+	if x != nil {
+		return x.Proxy
+	}
+	return ""
+}
+
+type CancelAILocalModelOperationCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId  string                 `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	OperationId   string                 `protobuf:"bytes,4,opt,name=operation_id,json=operationId,proto3" json:"operation_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CancelAILocalModelOperationCommand) Reset() {
+	*x = CancelAILocalModelOperationCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[88]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CancelAILocalModelOperationCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CancelAILocalModelOperationCommand) ProtoMessage() {}
+
+func (x *CancelAILocalModelOperationCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[88]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CancelAILocalModelOperationCommand.ProtoReflect.Descriptor instead.
+func (*CancelAILocalModelOperationCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{88}
+}
+
+func (x *CancelAILocalModelOperationCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *CancelAILocalModelOperationCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *CancelAILocalModelOperationCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *CancelAILocalModelOperationCommand) GetOperationId() string {
+	if x != nil {
+		return x.OperationId
+	}
+	return ""
+}
+
+type AILocalModelDownloaded struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Item          *AILocalModelRecord    `protobuf:"bytes,3,opt,name=item,proto3" json:"item,omitempty"`
+	Message       string                 `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AILocalModelDownloaded) Reset() {
+	*x = AILocalModelDownloaded{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[89]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AILocalModelDownloaded) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AILocalModelDownloaded) ProtoMessage() {}
+
+func (x *AILocalModelDownloaded) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[89]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AILocalModelDownloaded.ProtoReflect.Descriptor instead.
+func (*AILocalModelDownloaded) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{89}
+}
+
+func (x *AILocalModelDownloaded) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AILocalModelDownloaded) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AILocalModelDownloaded) GetItem() *AILocalModelRecord {
+	if x != nil {
+		return x.Item
+	}
+	return nil
+}
+
+func (x *AILocalModelDownloaded) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type AILocalModelDownloadFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,3,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AILocalModelDownloadFailed) Reset() {
+	*x = AILocalModelDownloadFailed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[90]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AILocalModelDownloadFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AILocalModelDownloadFailed) ProtoMessage() {}
+
+func (x *AILocalModelDownloadFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[90]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AILocalModelDownloadFailed.ProtoReflect.Descriptor instead.
+func (*AILocalModelDownloadFailed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{90}
+}
+
+func (x *AILocalModelDownloadFailed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AILocalModelDownloadFailed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AILocalModelDownloadFailed) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AILocalModelDownloadFailed) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+type ClearAILocalModelsCommand struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Metadata         *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId     string                 `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId      string                 `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	DeleteSourceFile bool                   `protobuf:"varint,4,opt,name=delete_source_file,json=deleteSourceFile,proto3" json:"delete_source_file,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *ClearAILocalModelsCommand) Reset() {
+	*x = ClearAILocalModelsCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[91]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ClearAILocalModelsCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ClearAILocalModelsCommand) ProtoMessage() {}
+
+func (x *ClearAILocalModelsCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[91]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ClearAILocalModelsCommand.ProtoReflect.Descriptor instead.
+func (*ClearAILocalModelsCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{91}
+}
+
+func (x *ClearAILocalModelsCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *ClearAILocalModelsCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *ClearAILocalModelsCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *ClearAILocalModelsCommand) GetDeleteSourceFile() bool {
+	if x != nil {
+		return x.DeleteSourceFile
+	}
+	return false
+}
+
+type AILocalModelsCleared struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Ok            bool                   `protobuf:"varint,3,opt,name=ok,proto3" json:"ok,omitempty"`
+	Reason        string                 `protobuf:"bytes,4,opt,name=reason,proto3" json:"reason,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AILocalModelsCleared) Reset() {
+	*x = AILocalModelsCleared{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[92]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AILocalModelsCleared) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AILocalModelsCleared) ProtoMessage() {}
+
+func (x *AILocalModelsCleared) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[92]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AILocalModelsCleared.ProtoReflect.Descriptor instead.
+func (*AILocalModelsCleared) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{92}
+}
+
+func (x *AILocalModelsCleared) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AILocalModelsCleared) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AILocalModelsCleared) GetOk() bool {
+	if x != nil {
+		return x.Ok
+	}
+	return false
+}
+
+func (x *AILocalModelsCleared) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+type AILocalModelsClearFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,3,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AILocalModelsClearFailed) Reset() {
+	*x = AILocalModelsClearFailed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[93]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AILocalModelsClearFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AILocalModelsClearFailed) ProtoMessage() {}
+
+func (x *AILocalModelsClearFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[93]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AILocalModelsClearFailed.ProtoReflect.Descriptor instead.
+func (*AILocalModelsClearFailed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{93}
+}
+
+func (x *AILocalModelsClearFailed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AILocalModelsClearFailed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AILocalModelsClearFailed) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AILocalModelsClearFailed) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+type AIForgePagination struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Page          int64                  `protobuf:"varint,1,opt,name=page,proto3" json:"page,omitempty"`
+	Limit         int64                  `protobuf:"varint,2,opt,name=limit,proto3" json:"limit,omitempty"`
+	OrderBy       string                 `protobuf:"bytes,3,opt,name=order_by,json=orderBy,proto3" json:"order_by,omitempty"`
+	Order         string                 `protobuf:"bytes,4,opt,name=order,proto3" json:"order,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIForgePagination) Reset() {
+	*x = AIForgePagination{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[94]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIForgePagination) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIForgePagination) ProtoMessage() {}
+
+func (x *AIForgePagination) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[94]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIForgePagination.ProtoReflect.Descriptor instead.
+func (*AIForgePagination) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{94}
+}
+
+func (x *AIForgePagination) GetPage() int64 {
+	if x != nil {
+		return x.Page
+	}
+	return 0
+}
+
+func (x *AIForgePagination) GetLimit() int64 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+func (x *AIForgePagination) GetOrderBy() string {
+	if x != nil {
+		return x.OrderBy
+	}
+	return ""
+}
+
+func (x *AIForgePagination) GetOrder() string {
+	if x != nil {
+		return x.Order
+	}
+	return ""
+}
+
+type AIForgeRecord struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	Id                 int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	ForgeName          string                 `protobuf:"bytes,2,opt,name=forge_name,json=forgeName,proto3" json:"forge_name,omitempty"`
+	ForgeContent       string                 `protobuf:"bytes,3,opt,name=forge_content,json=forgeContent,proto3" json:"forge_content,omitempty"`
+	ForgeType          string                 `protobuf:"bytes,4,opt,name=forge_type,json=forgeType,proto3" json:"forge_type,omitempty"`
+	Description        string                 `protobuf:"bytes,5,opt,name=description,proto3" json:"description,omitempty"`
+	ParamsUiConfig     string                 `protobuf:"bytes,6,opt,name=params_ui_config,json=paramsUiConfig,proto3" json:"params_ui_config,omitempty"`
+	Params             string                 `protobuf:"bytes,7,opt,name=params,proto3" json:"params,omitempty"`
+	UserPersistentData string                 `protobuf:"bytes,8,opt,name=user_persistent_data,json=userPersistentData,proto3" json:"user_persistent_data,omitempty"`
+	ToolNames          []string               `protobuf:"bytes,9,rep,name=tool_names,json=toolNames,proto3" json:"tool_names,omitempty"`
+	ToolKeywords       []string               `protobuf:"bytes,10,rep,name=tool_keywords,json=toolKeywords,proto3" json:"tool_keywords,omitempty"`
+	Action             string                 `protobuf:"bytes,11,opt,name=action,proto3" json:"action,omitempty"`
+	Tags               []string               `protobuf:"bytes,12,rep,name=tags,proto3" json:"tags,omitempty"`
+	InitPrompt         string                 `protobuf:"bytes,13,opt,name=init_prompt,json=initPrompt,proto3" json:"init_prompt,omitempty"`
+	PersistentPrompt   string                 `protobuf:"bytes,14,opt,name=persistent_prompt,json=persistentPrompt,proto3" json:"persistent_prompt,omitempty"`
+	PlanPrompt         string                 `protobuf:"bytes,15,opt,name=plan_prompt,json=planPrompt,proto3" json:"plan_prompt,omitempty"`
+	ResultPrompt       string                 `protobuf:"bytes,16,opt,name=result_prompt,json=resultPrompt,proto3" json:"result_prompt,omitempty"`
+	ForgeVerboseName   string                 `protobuf:"bytes,17,opt,name=forge_verbose_name,json=forgeVerboseName,proto3" json:"forge_verbose_name,omitempty"`
+	Author             string                 `protobuf:"bytes,18,opt,name=author,proto3" json:"author,omitempty"`
+	SkillPath          string                 `protobuf:"bytes,19,opt,name=skill_path,json=skillPath,proto3" json:"skill_path,omitempty"`
+	CreatedAt          int64                  `protobuf:"varint,20,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt          int64                  `protobuf:"varint,21,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	IsBuiltin          bool                   `protobuf:"varint,22,opt,name=is_builtin,json=isBuiltin,proto3" json:"is_builtin,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *AIForgeRecord) Reset() {
+	*x = AIForgeRecord{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[95]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIForgeRecord) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIForgeRecord) ProtoMessage() {}
+
+func (x *AIForgeRecord) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[95]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIForgeRecord.ProtoReflect.Descriptor instead.
+func (*AIForgeRecord) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{95}
+}
+
+func (x *AIForgeRecord) GetId() int64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *AIForgeRecord) GetForgeName() string {
+	if x != nil {
+		return x.ForgeName
+	}
+	return ""
+}
+
+func (x *AIForgeRecord) GetForgeContent() string {
+	if x != nil {
+		return x.ForgeContent
+	}
+	return ""
+}
+
+func (x *AIForgeRecord) GetForgeType() string {
+	if x != nil {
+		return x.ForgeType
+	}
+	return ""
+}
+
+func (x *AIForgeRecord) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *AIForgeRecord) GetParamsUiConfig() string {
+	if x != nil {
+		return x.ParamsUiConfig
+	}
+	return ""
+}
+
+func (x *AIForgeRecord) GetParams() string {
+	if x != nil {
+		return x.Params
+	}
+	return ""
+}
+
+func (x *AIForgeRecord) GetUserPersistentData() string {
+	if x != nil {
+		return x.UserPersistentData
+	}
+	return ""
+}
+
+func (x *AIForgeRecord) GetToolNames() []string {
+	if x != nil {
+		return x.ToolNames
+	}
+	return nil
+}
+
+func (x *AIForgeRecord) GetToolKeywords() []string {
+	if x != nil {
+		return x.ToolKeywords
+	}
+	return nil
+}
+
+func (x *AIForgeRecord) GetAction() string {
+	if x != nil {
+		return x.Action
+	}
+	return ""
+}
+
+func (x *AIForgeRecord) GetTags() []string {
+	if x != nil {
+		return x.Tags
+	}
+	return nil
+}
+
+func (x *AIForgeRecord) GetInitPrompt() string {
+	if x != nil {
+		return x.InitPrompt
+	}
+	return ""
+}
+
+func (x *AIForgeRecord) GetPersistentPrompt() string {
+	if x != nil {
+		return x.PersistentPrompt
+	}
+	return ""
+}
+
+func (x *AIForgeRecord) GetPlanPrompt() string {
+	if x != nil {
+		return x.PlanPrompt
+	}
+	return ""
+}
+
+func (x *AIForgeRecord) GetResultPrompt() string {
+	if x != nil {
+		return x.ResultPrompt
+	}
+	return ""
+}
+
+func (x *AIForgeRecord) GetForgeVerboseName() string {
+	if x != nil {
+		return x.ForgeVerboseName
+	}
+	return ""
+}
+
+func (x *AIForgeRecord) GetAuthor() string {
+	if x != nil {
+		return x.Author
+	}
+	return ""
+}
+
+func (x *AIForgeRecord) GetSkillPath() string {
+	if x != nil {
+		return x.SkillPath
+	}
+	return ""
+}
+
+func (x *AIForgeRecord) GetCreatedAt() int64 {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return 0
+}
+
+func (x *AIForgeRecord) GetUpdatedAt() int64 {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return 0
+}
+
+func (x *AIForgeRecord) GetIsBuiltin() bool {
+	if x != nil {
+		return x.IsBuiltin
+	}
+	return false
+}
+
+type ListAIForgesCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId  string                 `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Query         string                 `protobuf:"bytes,4,opt,name=query,proto3" json:"query,omitempty"`
+	ForgeName     string                 `protobuf:"bytes,5,opt,name=forge_name,json=forgeName,proto3" json:"forge_name,omitempty"`
+	ForgeNames    []string               `protobuf:"bytes,6,rep,name=forge_names,json=forgeNames,proto3" json:"forge_names,omitempty"`
+	ForgeType     string                 `protobuf:"bytes,7,opt,name=forge_type,json=forgeType,proto3" json:"forge_type,omitempty"`
+	Tags          []string               `protobuf:"bytes,8,rep,name=tags,proto3" json:"tags,omitempty"`
+	ForgeId       int64                  `protobuf:"varint,9,opt,name=forge_id,json=forgeId,proto3" json:"forge_id,omitempty"`
+	ShowTemporary bool                   `protobuf:"varint,10,opt,name=show_temporary,json=showTemporary,proto3" json:"show_temporary,omitempty"`
+	Pagination    *AIForgePagination     `protobuf:"bytes,11,opt,name=pagination,proto3" json:"pagination,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAIForgesCommand) Reset() {
+	*x = ListAIForgesCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[96]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAIForgesCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAIForgesCommand) ProtoMessage() {}
+
+func (x *ListAIForgesCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[96]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAIForgesCommand.ProtoReflect.Descriptor instead.
+func (*ListAIForgesCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{96}
+}
+
+func (x *ListAIForgesCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *ListAIForgesCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *ListAIForgesCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *ListAIForgesCommand) GetQuery() string {
+	if x != nil {
+		return x.Query
+	}
+	return ""
+}
+
+func (x *ListAIForgesCommand) GetForgeName() string {
+	if x != nil {
+		return x.ForgeName
+	}
+	return ""
+}
+
+func (x *ListAIForgesCommand) GetForgeNames() []string {
+	if x != nil {
+		return x.ForgeNames
+	}
+	return nil
+}
+
+func (x *ListAIForgesCommand) GetForgeType() string {
+	if x != nil {
+		return x.ForgeType
+	}
+	return ""
+}
+
+func (x *ListAIForgesCommand) GetTags() []string {
+	if x != nil {
+		return x.Tags
+	}
+	return nil
+}
+
+func (x *ListAIForgesCommand) GetForgeId() int64 {
+	if x != nil {
+		return x.ForgeId
+	}
+	return 0
+}
+
+func (x *ListAIForgesCommand) GetShowTemporary() bool {
+	if x != nil {
+		return x.ShowTemporary
+	}
+	return false
+}
+
+func (x *ListAIForgesCommand) GetPagination() *AIForgePagination {
+	if x != nil {
+		return x.Pagination
+	}
+	return nil
+}
+
+type AIForgesListed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Items         []*AIForgeRecord       `protobuf:"bytes,3,rep,name=items,proto3" json:"items,omitempty"`
+	Pagination    *AIForgePagination     `protobuf:"bytes,4,opt,name=pagination,proto3" json:"pagination,omitempty"`
+	Total         int64                  `protobuf:"varint,5,opt,name=total,proto3" json:"total,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIForgesListed) Reset() {
+	*x = AIForgesListed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[97]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIForgesListed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIForgesListed) ProtoMessage() {}
+
+func (x *AIForgesListed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[97]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIForgesListed.ProtoReflect.Descriptor instead.
+func (*AIForgesListed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{97}
+}
+
+func (x *AIForgesListed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIForgesListed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIForgesListed) GetItems() []*AIForgeRecord {
+	if x != nil {
+		return x.Items
+	}
+	return nil
+}
+
+func (x *AIForgesListed) GetPagination() *AIForgePagination {
+	if x != nil {
+		return x.Pagination
+	}
+	return nil
+}
+
+func (x *AIForgesListed) GetTotal() int64 {
+	if x != nil {
+		return x.Total
+	}
+	return 0
+}
+
+type AIForgesListFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,3,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIForgesListFailed) Reset() {
+	*x = AIForgesListFailed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[98]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIForgesListFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIForgesListFailed) ProtoMessage() {}
+
+func (x *AIForgesListFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[98]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIForgesListFailed.ProtoReflect.Descriptor instead.
+func (*AIForgesListFailed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{98}
+}
+
+func (x *AIForgesListFailed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIForgesListFailed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIForgesListFailed) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AIForgesListFailed) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+type CreateAIForgeCommand struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	Metadata           *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId       string                 `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId        string                 `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ForgeName          string                 `protobuf:"bytes,4,opt,name=forge_name,json=forgeName,proto3" json:"forge_name,omitempty"`
+	ForgeContent       string                 `protobuf:"bytes,5,opt,name=forge_content,json=forgeContent,proto3" json:"forge_content,omitempty"`
+	ForgeType          string                 `protobuf:"bytes,6,opt,name=forge_type,json=forgeType,proto3" json:"forge_type,omitempty"`
+	Description        string                 `protobuf:"bytes,7,opt,name=description,proto3" json:"description,omitempty"`
+	ParamsUiConfig     string                 `protobuf:"bytes,8,opt,name=params_ui_config,json=paramsUiConfig,proto3" json:"params_ui_config,omitempty"`
+	Params             string                 `protobuf:"bytes,9,opt,name=params,proto3" json:"params,omitempty"`
+	UserPersistentData string                 `protobuf:"bytes,10,opt,name=user_persistent_data,json=userPersistentData,proto3" json:"user_persistent_data,omitempty"`
+	ToolNames          []string               `protobuf:"bytes,11,rep,name=tool_names,json=toolNames,proto3" json:"tool_names,omitempty"`
+	ToolKeywords       []string               `protobuf:"bytes,12,rep,name=tool_keywords,json=toolKeywords,proto3" json:"tool_keywords,omitempty"`
+	Action             string                 `protobuf:"bytes,13,opt,name=action,proto3" json:"action,omitempty"`
+	Tags               []string               `protobuf:"bytes,14,rep,name=tags,proto3" json:"tags,omitempty"`
+	InitPrompt         string                 `protobuf:"bytes,15,opt,name=init_prompt,json=initPrompt,proto3" json:"init_prompt,omitempty"`
+	PersistentPrompt   string                 `protobuf:"bytes,16,opt,name=persistent_prompt,json=persistentPrompt,proto3" json:"persistent_prompt,omitempty"`
+	PlanPrompt         string                 `protobuf:"bytes,17,opt,name=plan_prompt,json=planPrompt,proto3" json:"plan_prompt,omitempty"`
+	ResultPrompt       string                 `protobuf:"bytes,18,opt,name=result_prompt,json=resultPrompt,proto3" json:"result_prompt,omitempty"`
+	ForgeVerboseName   string                 `protobuf:"bytes,19,opt,name=forge_verbose_name,json=forgeVerboseName,proto3" json:"forge_verbose_name,omitempty"`
+	IsBuiltin          bool                   `protobuf:"varint,20,opt,name=is_builtin,json=isBuiltin,proto3" json:"is_builtin,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *CreateAIForgeCommand) Reset() {
+	*x = CreateAIForgeCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[99]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateAIForgeCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateAIForgeCommand) ProtoMessage() {}
+
+func (x *CreateAIForgeCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[99]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateAIForgeCommand.ProtoReflect.Descriptor instead.
+func (*CreateAIForgeCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{99}
+}
+
+func (x *CreateAIForgeCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *CreateAIForgeCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *CreateAIForgeCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *CreateAIForgeCommand) GetForgeName() string {
+	if x != nil {
+		return x.ForgeName
+	}
+	return ""
+}
+
+func (x *CreateAIForgeCommand) GetForgeContent() string {
+	if x != nil {
+		return x.ForgeContent
+	}
+	return ""
+}
+
+func (x *CreateAIForgeCommand) GetForgeType() string {
+	if x != nil {
+		return x.ForgeType
+	}
+	return ""
+}
+
+func (x *CreateAIForgeCommand) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *CreateAIForgeCommand) GetParamsUiConfig() string {
+	if x != nil {
+		return x.ParamsUiConfig
+	}
+	return ""
+}
+
+func (x *CreateAIForgeCommand) GetParams() string {
+	if x != nil {
+		return x.Params
+	}
+	return ""
+}
+
+func (x *CreateAIForgeCommand) GetUserPersistentData() string {
+	if x != nil {
+		return x.UserPersistentData
+	}
+	return ""
+}
+
+func (x *CreateAIForgeCommand) GetToolNames() []string {
+	if x != nil {
+		return x.ToolNames
+	}
+	return nil
+}
+
+func (x *CreateAIForgeCommand) GetToolKeywords() []string {
+	if x != nil {
+		return x.ToolKeywords
+	}
+	return nil
+}
+
+func (x *CreateAIForgeCommand) GetAction() string {
+	if x != nil {
+		return x.Action
+	}
+	return ""
+}
+
+func (x *CreateAIForgeCommand) GetTags() []string {
+	if x != nil {
+		return x.Tags
+	}
+	return nil
+}
+
+func (x *CreateAIForgeCommand) GetInitPrompt() string {
+	if x != nil {
+		return x.InitPrompt
+	}
+	return ""
+}
+
+func (x *CreateAIForgeCommand) GetPersistentPrompt() string {
+	if x != nil {
+		return x.PersistentPrompt
+	}
+	return ""
+}
+
+func (x *CreateAIForgeCommand) GetPlanPrompt() string {
+	if x != nil {
+		return x.PlanPrompt
+	}
+	return ""
+}
+
+func (x *CreateAIForgeCommand) GetResultPrompt() string {
+	if x != nil {
+		return x.ResultPrompt
+	}
+	return ""
+}
+
+func (x *CreateAIForgeCommand) GetForgeVerboseName() string {
+	if x != nil {
+		return x.ForgeVerboseName
+	}
+	return ""
+}
+
+func (x *CreateAIForgeCommand) GetIsBuiltin() bool {
+	if x != nil {
+		return x.IsBuiltin
+	}
+	return false
+}
+
+type AIForgeCreated struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Item          *AIForgeRecord         `protobuf:"bytes,3,opt,name=item,proto3" json:"item,omitempty"`
+	Message       string                 `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIForgeCreated) Reset() {
+	*x = AIForgeCreated{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[100]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIForgeCreated) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIForgeCreated) ProtoMessage() {}
+
+func (x *AIForgeCreated) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[100]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIForgeCreated.ProtoReflect.Descriptor instead.
+func (*AIForgeCreated) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{100}
+}
+
+func (x *AIForgeCreated) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIForgeCreated) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIForgeCreated) GetItem() *AIForgeRecord {
+	if x != nil {
+		return x.Item
+	}
+	return nil
+}
+
+func (x *AIForgeCreated) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type AIForgeCreateFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,3,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIForgeCreateFailed) Reset() {
+	*x = AIForgeCreateFailed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[101]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIForgeCreateFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIForgeCreateFailed) ProtoMessage() {}
+
+func (x *AIForgeCreateFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[101]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIForgeCreateFailed.ProtoReflect.Descriptor instead.
+func (*AIForgeCreateFailed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{101}
+}
+
+func (x *AIForgeCreateFailed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIForgeCreateFailed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIForgeCreateFailed) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AIForgeCreateFailed) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+type UpdateAIForgeCommand struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	Metadata           *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId       string                 `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId        string                 `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ForgeId            int64                  `protobuf:"varint,4,opt,name=forge_id,json=forgeId,proto3" json:"forge_id,omitempty"`
+	ForgeName          string                 `protobuf:"bytes,5,opt,name=forge_name,json=forgeName,proto3" json:"forge_name,omitempty"`
+	ForgeContent       string                 `protobuf:"bytes,6,opt,name=forge_content,json=forgeContent,proto3" json:"forge_content,omitempty"`
+	ForgeType          string                 `protobuf:"bytes,7,opt,name=forge_type,json=forgeType,proto3" json:"forge_type,omitempty"`
+	Description        string                 `protobuf:"bytes,8,opt,name=description,proto3" json:"description,omitempty"`
+	ParamsUiConfig     string                 `protobuf:"bytes,9,opt,name=params_ui_config,json=paramsUiConfig,proto3" json:"params_ui_config,omitempty"`
+	Params             string                 `protobuf:"bytes,10,opt,name=params,proto3" json:"params,omitempty"`
+	UserPersistentData string                 `protobuf:"bytes,11,opt,name=user_persistent_data,json=userPersistentData,proto3" json:"user_persistent_data,omitempty"`
+	ToolNames          []string               `protobuf:"bytes,12,rep,name=tool_names,json=toolNames,proto3" json:"tool_names,omitempty"`
+	ToolKeywords       []string               `protobuf:"bytes,13,rep,name=tool_keywords,json=toolKeywords,proto3" json:"tool_keywords,omitempty"`
+	Action             string                 `protobuf:"bytes,14,opt,name=action,proto3" json:"action,omitempty"`
+	Tags               []string               `protobuf:"bytes,15,rep,name=tags,proto3" json:"tags,omitempty"`
+	InitPrompt         string                 `protobuf:"bytes,16,opt,name=init_prompt,json=initPrompt,proto3" json:"init_prompt,omitempty"`
+	PersistentPrompt   string                 `protobuf:"bytes,17,opt,name=persistent_prompt,json=persistentPrompt,proto3" json:"persistent_prompt,omitempty"`
+	PlanPrompt         string                 `protobuf:"bytes,18,opt,name=plan_prompt,json=planPrompt,proto3" json:"plan_prompt,omitempty"`
+	ResultPrompt       string                 `protobuf:"bytes,19,opt,name=result_prompt,json=resultPrompt,proto3" json:"result_prompt,omitempty"`
+	ForgeVerboseName   string                 `protobuf:"bytes,20,opt,name=forge_verbose_name,json=forgeVerboseName,proto3" json:"forge_verbose_name,omitempty"`
+	IsBuiltin          bool                   `protobuf:"varint,21,opt,name=is_builtin,json=isBuiltin,proto3" json:"is_builtin,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *UpdateAIForgeCommand) Reset() {
+	*x = UpdateAIForgeCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[102]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateAIForgeCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateAIForgeCommand) ProtoMessage() {}
+
+func (x *UpdateAIForgeCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[102]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateAIForgeCommand.ProtoReflect.Descriptor instead.
+func (*UpdateAIForgeCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{102}
+}
+
+func (x *UpdateAIForgeCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *UpdateAIForgeCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *UpdateAIForgeCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *UpdateAIForgeCommand) GetForgeId() int64 {
+	if x != nil {
+		return x.ForgeId
+	}
+	return 0
+}
+
+func (x *UpdateAIForgeCommand) GetForgeName() string {
+	if x != nil {
+		return x.ForgeName
+	}
+	return ""
+}
+
+func (x *UpdateAIForgeCommand) GetForgeContent() string {
+	if x != nil {
+		return x.ForgeContent
+	}
+	return ""
+}
+
+func (x *UpdateAIForgeCommand) GetForgeType() string {
+	if x != nil {
+		return x.ForgeType
+	}
+	return ""
+}
+
+func (x *UpdateAIForgeCommand) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *UpdateAIForgeCommand) GetParamsUiConfig() string {
+	if x != nil {
+		return x.ParamsUiConfig
+	}
+	return ""
+}
+
+func (x *UpdateAIForgeCommand) GetParams() string {
+	if x != nil {
+		return x.Params
+	}
+	return ""
+}
+
+func (x *UpdateAIForgeCommand) GetUserPersistentData() string {
+	if x != nil {
+		return x.UserPersistentData
+	}
+	return ""
+}
+
+func (x *UpdateAIForgeCommand) GetToolNames() []string {
+	if x != nil {
+		return x.ToolNames
+	}
+	return nil
+}
+
+func (x *UpdateAIForgeCommand) GetToolKeywords() []string {
+	if x != nil {
+		return x.ToolKeywords
+	}
+	return nil
+}
+
+func (x *UpdateAIForgeCommand) GetAction() string {
+	if x != nil {
+		return x.Action
+	}
+	return ""
+}
+
+func (x *UpdateAIForgeCommand) GetTags() []string {
+	if x != nil {
+		return x.Tags
+	}
+	return nil
+}
+
+func (x *UpdateAIForgeCommand) GetInitPrompt() string {
+	if x != nil {
+		return x.InitPrompt
+	}
+	return ""
+}
+
+func (x *UpdateAIForgeCommand) GetPersistentPrompt() string {
+	if x != nil {
+		return x.PersistentPrompt
+	}
+	return ""
+}
+
+func (x *UpdateAIForgeCommand) GetPlanPrompt() string {
+	if x != nil {
+		return x.PlanPrompt
+	}
+	return ""
+}
+
+func (x *UpdateAIForgeCommand) GetResultPrompt() string {
+	if x != nil {
+		return x.ResultPrompt
+	}
+	return ""
+}
+
+func (x *UpdateAIForgeCommand) GetForgeVerboseName() string {
+	if x != nil {
+		return x.ForgeVerboseName
+	}
+	return ""
+}
+
+func (x *UpdateAIForgeCommand) GetIsBuiltin() bool {
+	if x != nil {
+		return x.IsBuiltin
+	}
+	return false
+}
+
+type AIForgeUpdated struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Item          *AIForgeRecord         `protobuf:"bytes,3,opt,name=item,proto3" json:"item,omitempty"`
+	Message       string                 `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIForgeUpdated) Reset() {
+	*x = AIForgeUpdated{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[103]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIForgeUpdated) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIForgeUpdated) ProtoMessage() {}
+
+func (x *AIForgeUpdated) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[103]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIForgeUpdated.ProtoReflect.Descriptor instead.
+func (*AIForgeUpdated) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{103}
+}
+
+func (x *AIForgeUpdated) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIForgeUpdated) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIForgeUpdated) GetItem() *AIForgeRecord {
+	if x != nil {
+		return x.Item
+	}
+	return nil
+}
+
+func (x *AIForgeUpdated) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type AIForgeUpdateFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,3,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIForgeUpdateFailed) Reset() {
+	*x = AIForgeUpdateFailed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[104]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIForgeUpdateFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIForgeUpdateFailed) ProtoMessage() {}
+
+func (x *AIForgeUpdateFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[104]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIForgeUpdateFailed.ProtoReflect.Descriptor instead.
+func (*AIForgeUpdateFailed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{104}
+}
+
+func (x *AIForgeUpdateFailed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIForgeUpdateFailed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIForgeUpdateFailed) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AIForgeUpdateFailed) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+type DeleteAIForgeCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId  string                 `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ForgeId       int64                  `protobuf:"varint,4,opt,name=forge_id,json=forgeId,proto3" json:"forge_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteAIForgeCommand) Reset() {
+	*x = DeleteAIForgeCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[105]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteAIForgeCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteAIForgeCommand) ProtoMessage() {}
+
+func (x *DeleteAIForgeCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[105]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteAIForgeCommand.ProtoReflect.Descriptor instead.
+func (*DeleteAIForgeCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{105}
+}
+
+func (x *DeleteAIForgeCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *DeleteAIForgeCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *DeleteAIForgeCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *DeleteAIForgeCommand) GetForgeId() int64 {
+	if x != nil {
+		return x.ForgeId
+	}
+	return 0
+}
+
+type AIForgeDeleted struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ForgeId       string                 `protobuf:"bytes,3,opt,name=forge_id,json=forgeId,proto3" json:"forge_id,omitempty"`
+	Message       string                 `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIForgeDeleted) Reset() {
+	*x = AIForgeDeleted{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[106]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIForgeDeleted) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIForgeDeleted) ProtoMessage() {}
+
+func (x *AIForgeDeleted) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[106]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIForgeDeleted.ProtoReflect.Descriptor instead.
+func (*AIForgeDeleted) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{106}
+}
+
+func (x *AIForgeDeleted) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIForgeDeleted) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIForgeDeleted) GetForgeId() string {
+	if x != nil {
+		return x.ForgeId
+	}
+	return ""
+}
+
+func (x *AIForgeDeleted) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type AIForgeDeleteFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,3,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIForgeDeleteFailed) Reset() {
+	*x = AIForgeDeleteFailed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[107]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIForgeDeleteFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIForgeDeleteFailed) ProtoMessage() {}
+
+func (x *AIForgeDeleteFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[107]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIForgeDeleteFailed.ProtoReflect.Descriptor instead.
+func (*AIForgeDeleteFailed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{107}
+}
+
+func (x *AIForgeDeleteFailed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIForgeDeleteFailed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIForgeDeleteFailed) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AIForgeDeleteFailed) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+type ExportAIForgeCommand struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	Metadata          *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId      string                 `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId       string                 `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Query             string                 `protobuf:"bytes,4,opt,name=query,proto3" json:"query,omitempty"`
+	ForgeName         string                 `protobuf:"bytes,5,opt,name=forge_name,json=forgeName,proto3" json:"forge_name,omitempty"`
+	ForgeNames        []string               `protobuf:"bytes,6,rep,name=forge_names,json=forgeNames,proto3" json:"forge_names,omitempty"`
+	ForgeType         string                 `protobuf:"bytes,7,opt,name=forge_type,json=forgeType,proto3" json:"forge_type,omitempty"`
+	Tags              []string               `protobuf:"bytes,8,rep,name=tags,proto3" json:"tags,omitempty"`
+	ForgeId           int64                  `protobuf:"varint,9,opt,name=forge_id,json=forgeId,proto3" json:"forge_id,omitempty"`
+	OutputName        string                 `protobuf:"bytes,10,opt,name=output_name,json=outputName,proto3" json:"output_name,omitempty"`
+	Password          string                 `protobuf:"bytes,11,opt,name=password,proto3" json:"password,omitempty"`
+	ToolNames         []string               `protobuf:"bytes,12,rep,name=tool_names,json=toolNames,proto3" json:"tool_names,omitempty"`
+	ObjectStoreBucket string                 `protobuf:"bytes,13,opt,name=object_store_bucket,json=objectStoreBucket,proto3" json:"object_store_bucket,omitempty"`
+	ObjectStoreKey    string                 `protobuf:"bytes,14,opt,name=object_store_key,json=objectStoreKey,proto3" json:"object_store_key,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *ExportAIForgeCommand) Reset() {
+	*x = ExportAIForgeCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[108]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ExportAIForgeCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExportAIForgeCommand) ProtoMessage() {}
+
+func (x *ExportAIForgeCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[108]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExportAIForgeCommand.ProtoReflect.Descriptor instead.
+func (*ExportAIForgeCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{108}
+}
+
+func (x *ExportAIForgeCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *ExportAIForgeCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *ExportAIForgeCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *ExportAIForgeCommand) GetQuery() string {
+	if x != nil {
+		return x.Query
+	}
+	return ""
+}
+
+func (x *ExportAIForgeCommand) GetForgeName() string {
+	if x != nil {
+		return x.ForgeName
+	}
+	return ""
+}
+
+func (x *ExportAIForgeCommand) GetForgeNames() []string {
+	if x != nil {
+		return x.ForgeNames
+	}
+	return nil
+}
+
+func (x *ExportAIForgeCommand) GetForgeType() string {
+	if x != nil {
+		return x.ForgeType
+	}
+	return ""
+}
+
+func (x *ExportAIForgeCommand) GetTags() []string {
+	if x != nil {
+		return x.Tags
+	}
+	return nil
+}
+
+func (x *ExportAIForgeCommand) GetForgeId() int64 {
+	if x != nil {
+		return x.ForgeId
+	}
+	return 0
+}
+
+func (x *ExportAIForgeCommand) GetOutputName() string {
+	if x != nil {
+		return x.OutputName
+	}
+	return ""
+}
+
+func (x *ExportAIForgeCommand) GetPassword() string {
+	if x != nil {
+		return x.Password
+	}
+	return ""
+}
+
+func (x *ExportAIForgeCommand) GetToolNames() []string {
+	if x != nil {
+		return x.ToolNames
+	}
+	return nil
+}
+
+func (x *ExportAIForgeCommand) GetObjectStoreBucket() string {
+	if x != nil {
+		return x.ObjectStoreBucket
+	}
+	return ""
+}
+
+func (x *ExportAIForgeCommand) GetObjectStoreKey() string {
+	if x != nil {
+		return x.ObjectStoreKey
+	}
+	return ""
+}
+
+type AIForgeExportProgressed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Percent       float64                `protobuf:"fixed64,3,opt,name=percent,proto3" json:"percent,omitempty"`
+	Message       string                 `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`
+	MessageType   string                 `protobuf:"bytes,5,opt,name=message_type,json=messageType,proto3" json:"message_type,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIForgeExportProgressed) Reset() {
+	*x = AIForgeExportProgressed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[109]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIForgeExportProgressed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIForgeExportProgressed) ProtoMessage() {}
+
+func (x *AIForgeExportProgressed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[109]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIForgeExportProgressed.ProtoReflect.Descriptor instead.
+func (*AIForgeExportProgressed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{109}
+}
+
+func (x *AIForgeExportProgressed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIForgeExportProgressed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIForgeExportProgressed) GetPercent() float64 {
+	if x != nil {
+		return x.Percent
+	}
+	return 0
+}
+
+func (x *AIForgeExportProgressed) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *AIForgeExportProgressed) GetMessageType() string {
+	if x != nil {
+		return x.MessageType
+	}
+	return ""
+}
+
+type AIForgeExported struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	Metadata          *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId       string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	FileName          string                 `protobuf:"bytes,3,opt,name=file_name,json=fileName,proto3" json:"file_name,omitempty"`
+	ContentType       string                 `protobuf:"bytes,4,opt,name=content_type,json=contentType,proto3" json:"content_type,omitempty"`
+	ObjectStoreBucket string                 `protobuf:"bytes,5,opt,name=object_store_bucket,json=objectStoreBucket,proto3" json:"object_store_bucket,omitempty"`
+	ObjectStoreKey    string                 `protobuf:"bytes,6,opt,name=object_store_key,json=objectStoreKey,proto3" json:"object_store_key,omitempty"`
+	SizeBytes         uint64                 `protobuf:"varint,7,opt,name=size_bytes,json=sizeBytes,proto3" json:"size_bytes,omitempty"`
+	Message           string                 `protobuf:"bytes,8,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *AIForgeExported) Reset() {
+	*x = AIForgeExported{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[110]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIForgeExported) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIForgeExported) ProtoMessage() {}
+
+func (x *AIForgeExported) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[110]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIForgeExported.ProtoReflect.Descriptor instead.
+func (*AIForgeExported) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{110}
+}
+
+func (x *AIForgeExported) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIForgeExported) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIForgeExported) GetFileName() string {
+	if x != nil {
+		return x.FileName
+	}
+	return ""
+}
+
+func (x *AIForgeExported) GetContentType() string {
+	if x != nil {
+		return x.ContentType
+	}
+	return ""
+}
+
+func (x *AIForgeExported) GetObjectStoreBucket() string {
+	if x != nil {
+		return x.ObjectStoreBucket
+	}
+	return ""
+}
+
+func (x *AIForgeExported) GetObjectStoreKey() string {
+	if x != nil {
+		return x.ObjectStoreKey
+	}
+	return ""
+}
+
+func (x *AIForgeExported) GetSizeBytes() uint64 {
+	if x != nil {
+		return x.SizeBytes
+	}
+	return 0
+}
+
+func (x *AIForgeExported) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type AIForgeExportFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,3,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIForgeExportFailed) Reset() {
+	*x = AIForgeExportFailed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[111]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIForgeExportFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIForgeExportFailed) ProtoMessage() {}
+
+func (x *AIForgeExportFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[111]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIForgeExportFailed.ProtoReflect.Descriptor instead.
+func (*AIForgeExportFailed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{111}
+}
+
+func (x *AIForgeExportFailed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIForgeExportFailed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIForgeExportFailed) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AIForgeExportFailed) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+type AIForgeImportAttachment struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AttachmentId  string                 `protobuf:"bytes,1,opt,name=attachment_id,json=attachmentId,proto3" json:"attachment_id,omitempty"`
+	Filename      string                 `protobuf:"bytes,2,opt,name=filename,proto3" json:"filename,omitempty"`
+	ContentType   string                 `protobuf:"bytes,3,opt,name=content_type,json=contentType,proto3" json:"content_type,omitempty"`
+	DownloadUrl   string                 `protobuf:"bytes,4,opt,name=download_url,json=downloadUrl,proto3" json:"download_url,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIForgeImportAttachment) Reset() {
+	*x = AIForgeImportAttachment{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[112]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIForgeImportAttachment) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIForgeImportAttachment) ProtoMessage() {}
+
+func (x *AIForgeImportAttachment) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[112]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIForgeImportAttachment.ProtoReflect.Descriptor instead.
+func (*AIForgeImportAttachment) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{112}
+}
+
+func (x *AIForgeImportAttachment) GetAttachmentId() string {
+	if x != nil {
+		return x.AttachmentId
+	}
+	return ""
+}
+
+func (x *AIForgeImportAttachment) GetFilename() string {
+	if x != nil {
+		return x.Filename
+	}
+	return ""
+}
+
+func (x *AIForgeImportAttachment) GetContentType() string {
+	if x != nil {
+		return x.ContentType
+	}
+	return ""
+}
+
+func (x *AIForgeImportAttachment) GetDownloadUrl() string {
+	if x != nil {
+		return x.DownloadUrl
+	}
+	return ""
+}
+
+type ImportAIForgeCommand struct {
+	state         protoimpl.MessageState   `protogen:"open.v1"`
+	Metadata      *v1.CommandMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId  string                   `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId   string                   `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ArchiveName   string                   `protobuf:"bytes,4,opt,name=archive_name,json=archiveName,proto3" json:"archive_name,omitempty"`
+	Overwrite     bool                     `protobuf:"varint,5,opt,name=overwrite,proto3" json:"overwrite,omitempty"`
+	NewForgeName  string                   `protobuf:"bytes,6,opt,name=new_forge_name,json=newForgeName,proto3" json:"new_forge_name,omitempty"`
+	Password      string                   `protobuf:"bytes,7,opt,name=password,proto3" json:"password,omitempty"`
+	Attachment    *AIForgeImportAttachment `protobuf:"bytes,8,opt,name=attachment,proto3" json:"attachment,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ImportAIForgeCommand) Reset() {
+	*x = ImportAIForgeCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[113]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ImportAIForgeCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ImportAIForgeCommand) ProtoMessage() {}
+
+func (x *ImportAIForgeCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[113]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ImportAIForgeCommand.ProtoReflect.Descriptor instead.
+func (*ImportAIForgeCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{113}
+}
+
+func (x *ImportAIForgeCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *ImportAIForgeCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *ImportAIForgeCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *ImportAIForgeCommand) GetArchiveName() string {
+	if x != nil {
+		return x.ArchiveName
+	}
+	return ""
+}
+
+func (x *ImportAIForgeCommand) GetOverwrite() bool {
+	if x != nil {
+		return x.Overwrite
+	}
+	return false
+}
+
+func (x *ImportAIForgeCommand) GetNewForgeName() string {
+	if x != nil {
+		return x.NewForgeName
+	}
+	return ""
+}
+
+func (x *ImportAIForgeCommand) GetPassword() string {
+	if x != nil {
+		return x.Password
+	}
+	return ""
+}
+
+func (x *ImportAIForgeCommand) GetAttachment() *AIForgeImportAttachment {
+	if x != nil {
+		return x.Attachment
+	}
+	return nil
+}
+
+type AIForgeImportProgressed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Percent       float64                `protobuf:"fixed64,3,opt,name=percent,proto3" json:"percent,omitempty"`
+	Message       string                 `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`
+	MessageType   string                 `protobuf:"bytes,5,opt,name=message_type,json=messageType,proto3" json:"message_type,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIForgeImportProgressed) Reset() {
+	*x = AIForgeImportProgressed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[114]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIForgeImportProgressed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIForgeImportProgressed) ProtoMessage() {}
+
+func (x *AIForgeImportProgressed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[114]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIForgeImportProgressed.ProtoReflect.Descriptor instead.
+func (*AIForgeImportProgressed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{114}
+}
+
+func (x *AIForgeImportProgressed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIForgeImportProgressed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIForgeImportProgressed) GetPercent() float64 {
+	if x != nil {
+		return x.Percent
+	}
+	return 0
+}
+
+func (x *AIForgeImportProgressed) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *AIForgeImportProgressed) GetMessageType() string {
+	if x != nil {
+		return x.MessageType
+	}
+	return ""
+}
+
+type AIForgeImportItem struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ForgeName     string                 `protobuf:"bytes,1,opt,name=forge_name,json=forgeName,proto3" json:"forge_name,omitempty"`
+	ForgeId       string                 `protobuf:"bytes,2,opt,name=forge_id,json=forgeId,proto3" json:"forge_id,omitempty"`
+	Status        string                 `protobuf:"bytes,3,opt,name=status,proto3" json:"status,omitempty"`
+	Message       string                 `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIForgeImportItem) Reset() {
+	*x = AIForgeImportItem{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[115]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIForgeImportItem) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIForgeImportItem) ProtoMessage() {}
+
+func (x *AIForgeImportItem) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[115]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIForgeImportItem.ProtoReflect.Descriptor instead.
+func (*AIForgeImportItem) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{115}
+}
+
+func (x *AIForgeImportItem) GetForgeName() string {
+	if x != nil {
+		return x.ForgeName
+	}
+	return ""
+}
+
+func (x *AIForgeImportItem) GetForgeId() string {
+	if x != nil {
+		return x.ForgeId
+	}
+	return ""
+}
+
+func (x *AIForgeImportItem) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *AIForgeImportItem) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type AIForgeImported struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Created       int64                  `protobuf:"varint,3,opt,name=created,proto3" json:"created,omitempty"`
+	Updated       int64                  `protobuf:"varint,4,opt,name=updated,proto3" json:"updated,omitempty"`
+	Skipped       int64                  `protobuf:"varint,5,opt,name=skipped,proto3" json:"skipped,omitempty"`
+	Items         []*AIForgeImportItem   `protobuf:"bytes,6,rep,name=items,proto3" json:"items,omitempty"`
+	Message       string                 `protobuf:"bytes,7,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIForgeImported) Reset() {
+	*x = AIForgeImported{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[116]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIForgeImported) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIForgeImported) ProtoMessage() {}
+
+func (x *AIForgeImported) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[116]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIForgeImported.ProtoReflect.Descriptor instead.
+func (*AIForgeImported) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{116}
+}
+
+func (x *AIForgeImported) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIForgeImported) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIForgeImported) GetCreated() int64 {
+	if x != nil {
+		return x.Created
+	}
+	return 0
+}
+
+func (x *AIForgeImported) GetUpdated() int64 {
+	if x != nil {
+		return x.Updated
+	}
+	return 0
+}
+
+func (x *AIForgeImported) GetSkipped() int64 {
+	if x != nil {
+		return x.Skipped
+	}
+	return 0
+}
+
+func (x *AIForgeImported) GetItems() []*AIForgeImportItem {
+	if x != nil {
+		return x.Items
+	}
+	return nil
+}
+
+func (x *AIForgeImported) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type AIForgeImportFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,3,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIForgeImportFailed) Reset() {
+	*x = AIForgeImportFailed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[117]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIForgeImportFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIForgeImportFailed) ProtoMessage() {}
+
+func (x *AIForgeImportFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[117]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIForgeImportFailed.ProtoReflect.Descriptor instead.
+func (*AIForgeImportFailed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{117}
+}
+
+func (x *AIForgeImportFailed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIForgeImportFailed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIForgeImportFailed) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AIForgeImportFailed) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+type AIToolPagination struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Page          int64                  `protobuf:"varint,1,opt,name=page,proto3" json:"page,omitempty"`
+	Limit         int64                  `protobuf:"varint,2,opt,name=limit,proto3" json:"limit,omitempty"`
+	OrderBy       string                 `protobuf:"bytes,3,opt,name=order_by,json=orderBy,proto3" json:"order_by,omitempty"`
+	Order         string                 `protobuf:"bytes,4,opt,name=order,proto3" json:"order,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIToolPagination) Reset() {
+	*x = AIToolPagination{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[118]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIToolPagination) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIToolPagination) ProtoMessage() {}
+
+func (x *AIToolPagination) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[118]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIToolPagination.ProtoReflect.Descriptor instead.
+func (*AIToolPagination) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{118}
+}
+
+func (x *AIToolPagination) GetPage() int64 {
+	if x != nil {
+		return x.Page
+	}
+	return 0
+}
+
+func (x *AIToolPagination) GetLimit() int64 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+func (x *AIToolPagination) GetOrderBy() string {
+	if x != nil {
+		return x.OrderBy
+	}
+	return ""
+}
+
+func (x *AIToolPagination) GetOrder() string {
+	if x != nil {
+		return x.Order
+	}
+	return ""
+}
+
+type AIToolRecord struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	VerboseName   string                 `protobuf:"bytes,3,opt,name=verbose_name,json=verboseName,proto3" json:"verbose_name,omitempty"`
+	Description   string                 `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
+	Content       string                 `protobuf:"bytes,5,opt,name=content,proto3" json:"content,omitempty"`
+	ToolPath      string                 `protobuf:"bytes,6,opt,name=tool_path,json=toolPath,proto3" json:"tool_path,omitempty"`
+	Keywords      []string               `protobuf:"bytes,7,rep,name=keywords,proto3" json:"keywords,omitempty"`
+	IsFavorite    bool                   `protobuf:"varint,8,opt,name=is_favorite,json=isFavorite,proto3" json:"is_favorite,omitempty"`
+	Author        string                 `protobuf:"bytes,9,opt,name=author,proto3" json:"author,omitempty"`
+	CreatedAt     int64                  `protobuf:"varint,10,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt     int64                  `protobuf:"varint,11,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	IsBuiltin     bool                   `protobuf:"varint,12,opt,name=is_builtin,json=isBuiltin,proto3" json:"is_builtin,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIToolRecord) Reset() {
+	*x = AIToolRecord{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[119]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIToolRecord) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIToolRecord) ProtoMessage() {}
+
+func (x *AIToolRecord) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[119]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIToolRecord.ProtoReflect.Descriptor instead.
+func (*AIToolRecord) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{119}
+}
+
+func (x *AIToolRecord) GetId() int64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *AIToolRecord) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *AIToolRecord) GetVerboseName() string {
+	if x != nil {
+		return x.VerboseName
+	}
+	return ""
+}
+
+func (x *AIToolRecord) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *AIToolRecord) GetContent() string {
+	if x != nil {
+		return x.Content
+	}
+	return ""
+}
+
+func (x *AIToolRecord) GetToolPath() string {
+	if x != nil {
+		return x.ToolPath
+	}
+	return ""
+}
+
+func (x *AIToolRecord) GetKeywords() []string {
+	if x != nil {
+		return x.Keywords
+	}
+	return nil
+}
+
+func (x *AIToolRecord) GetIsFavorite() bool {
+	if x != nil {
+		return x.IsFavorite
+	}
+	return false
+}
+
+func (x *AIToolRecord) GetAuthor() string {
+	if x != nil {
+		return x.Author
+	}
+	return ""
+}
+
+func (x *AIToolRecord) GetCreatedAt() int64 {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return 0
+}
+
+func (x *AIToolRecord) GetUpdatedAt() int64 {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return 0
+}
+
+func (x *AIToolRecord) GetIsBuiltin() bool {
+	if x != nil {
+		return x.IsBuiltin
+	}
+	return false
+}
+
+type ListAIToolsCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId  string                 `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Query         string                 `protobuf:"bytes,4,opt,name=query,proto3" json:"query,omitempty"`
+	ToolName      string                 `protobuf:"bytes,5,opt,name=tool_name,json=toolName,proto3" json:"tool_name,omitempty"`
+	ToolId        int64                  `protobuf:"varint,6,opt,name=tool_id,json=toolId,proto3" json:"tool_id,omitempty"`
+	Pagination    *AIToolPagination      `protobuf:"bytes,7,opt,name=pagination,proto3" json:"pagination,omitempty"`
+	OnlyFavorites bool                   `protobuf:"varint,8,opt,name=only_favorites,json=onlyFavorites,proto3" json:"only_favorites,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAIToolsCommand) Reset() {
+	*x = ListAIToolsCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[120]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAIToolsCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAIToolsCommand) ProtoMessage() {}
+
+func (x *ListAIToolsCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[120]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAIToolsCommand.ProtoReflect.Descriptor instead.
+func (*ListAIToolsCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{120}
+}
+
+func (x *ListAIToolsCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *ListAIToolsCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *ListAIToolsCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *ListAIToolsCommand) GetQuery() string {
+	if x != nil {
+		return x.Query
+	}
+	return ""
+}
+
+func (x *ListAIToolsCommand) GetToolName() string {
+	if x != nil {
+		return x.ToolName
+	}
+	return ""
+}
+
+func (x *ListAIToolsCommand) GetToolId() int64 {
+	if x != nil {
+		return x.ToolId
+	}
+	return 0
+}
+
+func (x *ListAIToolsCommand) GetPagination() *AIToolPagination {
+	if x != nil {
+		return x.Pagination
+	}
+	return nil
+}
+
+func (x *ListAIToolsCommand) GetOnlyFavorites() bool {
+	if x != nil {
+		return x.OnlyFavorites
+	}
+	return false
+}
+
+type AIToolsListed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Items         []*AIToolRecord        `protobuf:"bytes,3,rep,name=items,proto3" json:"items,omitempty"`
+	Pagination    *AIToolPagination      `protobuf:"bytes,4,opt,name=pagination,proto3" json:"pagination,omitempty"`
+	Total         int64                  `protobuf:"varint,5,opt,name=total,proto3" json:"total,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIToolsListed) Reset() {
+	*x = AIToolsListed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[121]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIToolsListed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIToolsListed) ProtoMessage() {}
+
+func (x *AIToolsListed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[121]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIToolsListed.ProtoReflect.Descriptor instead.
+func (*AIToolsListed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{121}
+}
+
+func (x *AIToolsListed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIToolsListed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIToolsListed) GetItems() []*AIToolRecord {
+	if x != nil {
+		return x.Items
+	}
+	return nil
+}
+
+func (x *AIToolsListed) GetPagination() *AIToolPagination {
+	if x != nil {
+		return x.Pagination
+	}
+	return nil
+}
+
+func (x *AIToolsListed) GetTotal() int64 {
+	if x != nil {
+		return x.Total
+	}
+	return 0
+}
+
+type AIToolsListFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,3,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIToolsListFailed) Reset() {
+	*x = AIToolsListFailed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[122]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIToolsListFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIToolsListFailed) ProtoMessage() {}
+
+func (x *AIToolsListFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[122]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIToolsListFailed.ProtoReflect.Descriptor instead.
+func (*AIToolsListFailed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{122}
+}
+
+func (x *AIToolsListFailed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIToolsListFailed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIToolsListFailed) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AIToolsListFailed) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+type CreateAIToolCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId  string                 `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Name          string                 `protobuf:"bytes,4,opt,name=name,proto3" json:"name,omitempty"`
+	Description   string                 `protobuf:"bytes,5,opt,name=description,proto3" json:"description,omitempty"`
+	Content       string                 `protobuf:"bytes,6,opt,name=content,proto3" json:"content,omitempty"`
+	ToolPath      string                 `protobuf:"bytes,7,opt,name=tool_path,json=toolPath,proto3" json:"tool_path,omitempty"`
+	Keywords      []string               `protobuf:"bytes,8,rep,name=keywords,proto3" json:"keywords,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateAIToolCommand) Reset() {
+	*x = CreateAIToolCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[123]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateAIToolCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateAIToolCommand) ProtoMessage() {}
+
+func (x *CreateAIToolCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[123]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateAIToolCommand.ProtoReflect.Descriptor instead.
+func (*CreateAIToolCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{123}
+}
+
+func (x *CreateAIToolCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *CreateAIToolCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *CreateAIToolCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *CreateAIToolCommand) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *CreateAIToolCommand) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *CreateAIToolCommand) GetContent() string {
+	if x != nil {
+		return x.Content
+	}
+	return ""
+}
+
+func (x *CreateAIToolCommand) GetToolPath() string {
+	if x != nil {
+		return x.ToolPath
+	}
+	return ""
+}
+
+func (x *CreateAIToolCommand) GetKeywords() []string {
+	if x != nil {
+		return x.Keywords
+	}
+	return nil
+}
+
+type AIToolCreated struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Item          *AIToolRecord          `protobuf:"bytes,3,opt,name=item,proto3" json:"item,omitempty"`
+	Message       string                 `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIToolCreated) Reset() {
+	*x = AIToolCreated{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[124]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIToolCreated) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIToolCreated) ProtoMessage() {}
+
+func (x *AIToolCreated) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[124]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIToolCreated.ProtoReflect.Descriptor instead.
+func (*AIToolCreated) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{124}
+}
+
+func (x *AIToolCreated) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIToolCreated) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIToolCreated) GetItem() *AIToolRecord {
+	if x != nil {
+		return x.Item
+	}
+	return nil
+}
+
+func (x *AIToolCreated) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type AIToolCreateFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,3,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIToolCreateFailed) Reset() {
+	*x = AIToolCreateFailed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[125]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIToolCreateFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIToolCreateFailed) ProtoMessage() {}
+
+func (x *AIToolCreateFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[125]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIToolCreateFailed.ProtoReflect.Descriptor instead.
+func (*AIToolCreateFailed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{125}
+}
+
+func (x *AIToolCreateFailed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIToolCreateFailed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIToolCreateFailed) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AIToolCreateFailed) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+type UpdateAIToolCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId  string                 `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ToolId        int64                  `protobuf:"varint,4,opt,name=tool_id,json=toolId,proto3" json:"tool_id,omitempty"`
+	Name          string                 `protobuf:"bytes,5,opt,name=name,proto3" json:"name,omitempty"`
+	Description   string                 `protobuf:"bytes,6,opt,name=description,proto3" json:"description,omitempty"`
+	Content       string                 `protobuf:"bytes,7,opt,name=content,proto3" json:"content,omitempty"`
+	ToolPath      string                 `protobuf:"bytes,8,opt,name=tool_path,json=toolPath,proto3" json:"tool_path,omitempty"`
+	Keywords      []string               `protobuf:"bytes,9,rep,name=keywords,proto3" json:"keywords,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateAIToolCommand) Reset() {
+	*x = UpdateAIToolCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[126]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateAIToolCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateAIToolCommand) ProtoMessage() {}
+
+func (x *UpdateAIToolCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[126]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateAIToolCommand.ProtoReflect.Descriptor instead.
+func (*UpdateAIToolCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{126}
+}
+
+func (x *UpdateAIToolCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *UpdateAIToolCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *UpdateAIToolCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *UpdateAIToolCommand) GetToolId() int64 {
+	if x != nil {
+		return x.ToolId
+	}
+	return 0
+}
+
+func (x *UpdateAIToolCommand) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *UpdateAIToolCommand) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *UpdateAIToolCommand) GetContent() string {
+	if x != nil {
+		return x.Content
+	}
+	return ""
+}
+
+func (x *UpdateAIToolCommand) GetToolPath() string {
+	if x != nil {
+		return x.ToolPath
+	}
+	return ""
+}
+
+func (x *UpdateAIToolCommand) GetKeywords() []string {
+	if x != nil {
+		return x.Keywords
+	}
+	return nil
+}
+
+type AIToolUpdated struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Item          *AIToolRecord          `protobuf:"bytes,3,opt,name=item,proto3" json:"item,omitempty"`
+	Message       string                 `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIToolUpdated) Reset() {
+	*x = AIToolUpdated{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[127]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIToolUpdated) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIToolUpdated) ProtoMessage() {}
+
+func (x *AIToolUpdated) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[127]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIToolUpdated.ProtoReflect.Descriptor instead.
+func (*AIToolUpdated) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{127}
+}
+
+func (x *AIToolUpdated) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIToolUpdated) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIToolUpdated) GetItem() *AIToolRecord {
+	if x != nil {
+		return x.Item
+	}
+	return nil
+}
+
+func (x *AIToolUpdated) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type AIToolUpdateFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,3,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIToolUpdateFailed) Reset() {
+	*x = AIToolUpdateFailed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[128]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIToolUpdateFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIToolUpdateFailed) ProtoMessage() {}
+
+func (x *AIToolUpdateFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[128]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIToolUpdateFailed.ProtoReflect.Descriptor instead.
+func (*AIToolUpdateFailed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{128}
+}
+
+func (x *AIToolUpdateFailed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIToolUpdateFailed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIToolUpdateFailed) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AIToolUpdateFailed) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+type GenerateAIToolMetadataCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId  string                 `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ToolName      string                 `protobuf:"bytes,4,opt,name=tool_name,json=toolName,proto3" json:"tool_name,omitempty"`
+	Content       string                 `protobuf:"bytes,5,opt,name=content,proto3" json:"content,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GenerateAIToolMetadataCommand) Reset() {
+	*x = GenerateAIToolMetadataCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[129]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GenerateAIToolMetadataCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GenerateAIToolMetadataCommand) ProtoMessage() {}
+
+func (x *GenerateAIToolMetadataCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[129]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GenerateAIToolMetadataCommand.ProtoReflect.Descriptor instead.
+func (*GenerateAIToolMetadataCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{129}
+}
+
+func (x *GenerateAIToolMetadataCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *GenerateAIToolMetadataCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *GenerateAIToolMetadataCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *GenerateAIToolMetadataCommand) GetToolName() string {
+	if x != nil {
+		return x.ToolName
+	}
+	return ""
+}
+
+func (x *GenerateAIToolMetadataCommand) GetContent() string {
+	if x != nil {
+		return x.Content
+	}
+	return ""
+}
+
+type AIToolMetadataGenerated struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Name          string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	Description   string                 `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
+	Keywords      []string               `protobuf:"bytes,5,rep,name=keywords,proto3" json:"keywords,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIToolMetadataGenerated) Reset() {
+	*x = AIToolMetadataGenerated{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[130]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIToolMetadataGenerated) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIToolMetadataGenerated) ProtoMessage() {}
+
+func (x *AIToolMetadataGenerated) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[130]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIToolMetadataGenerated.ProtoReflect.Descriptor instead.
+func (*AIToolMetadataGenerated) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{130}
+}
+
+func (x *AIToolMetadataGenerated) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIToolMetadataGenerated) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIToolMetadataGenerated) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *AIToolMetadataGenerated) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *AIToolMetadataGenerated) GetKeywords() []string {
+	if x != nil {
+		return x.Keywords
+	}
+	return nil
+}
+
+type AIToolMetadataGenerateFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,3,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIToolMetadataGenerateFailed) Reset() {
+	*x = AIToolMetadataGenerateFailed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[131]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIToolMetadataGenerateFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIToolMetadataGenerateFailed) ProtoMessage() {}
+
+func (x *AIToolMetadataGenerateFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[131]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIToolMetadataGenerateFailed.ProtoReflect.Descriptor instead.
+func (*AIToolMetadataGenerateFailed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{131}
+}
+
+func (x *AIToolMetadataGenerateFailed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIToolMetadataGenerateFailed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIToolMetadataGenerateFailed) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AIToolMetadataGenerateFailed) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+type ToggleAIToolFavoriteCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId  string                 `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ToolId        int64                  `protobuf:"varint,4,opt,name=tool_id,json=toolId,proto3" json:"tool_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ToggleAIToolFavoriteCommand) Reset() {
+	*x = ToggleAIToolFavoriteCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[132]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ToggleAIToolFavoriteCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ToggleAIToolFavoriteCommand) ProtoMessage() {}
+
+func (x *ToggleAIToolFavoriteCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[132]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ToggleAIToolFavoriteCommand.ProtoReflect.Descriptor instead.
+func (*ToggleAIToolFavoriteCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{132}
+}
+
+func (x *ToggleAIToolFavoriteCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *ToggleAIToolFavoriteCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *ToggleAIToolFavoriteCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *ToggleAIToolFavoriteCommand) GetToolId() int64 {
+	if x != nil {
+		return x.ToolId
+	}
+	return 0
+}
+
+type AIToolFavoriteToggled struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ToolId        int64                  `protobuf:"varint,3,opt,name=tool_id,json=toolId,proto3" json:"tool_id,omitempty"`
+	IsFavorite    bool                   `protobuf:"varint,4,opt,name=is_favorite,json=isFavorite,proto3" json:"is_favorite,omitempty"`
+	Message       string                 `protobuf:"bytes,5,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIToolFavoriteToggled) Reset() {
+	*x = AIToolFavoriteToggled{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[133]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIToolFavoriteToggled) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIToolFavoriteToggled) ProtoMessage() {}
+
+func (x *AIToolFavoriteToggled) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[133]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIToolFavoriteToggled.ProtoReflect.Descriptor instead.
+func (*AIToolFavoriteToggled) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{133}
+}
+
+func (x *AIToolFavoriteToggled) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIToolFavoriteToggled) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIToolFavoriteToggled) GetToolId() int64 {
+	if x != nil {
+		return x.ToolId
+	}
+	return 0
+}
+
+func (x *AIToolFavoriteToggled) GetIsFavorite() bool {
+	if x != nil {
+		return x.IsFavorite
+	}
+	return false
+}
+
+func (x *AIToolFavoriteToggled) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type AIToolFavoriteToggleFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,3,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIToolFavoriteToggleFailed) Reset() {
+	*x = AIToolFavoriteToggleFailed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[134]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIToolFavoriteToggleFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIToolFavoriteToggleFailed) ProtoMessage() {}
+
+func (x *AIToolFavoriteToggleFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[134]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIToolFavoriteToggleFailed.ProtoReflect.Descriptor instead.
+func (*AIToolFavoriteToggleFailed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{134}
+}
+
+func (x *AIToolFavoriteToggleFailed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIToolFavoriteToggleFailed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIToolFavoriteToggleFailed) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AIToolFavoriteToggleFailed) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+type DeleteAIToolsCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId  string                 `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ToolIds       []int64                `protobuf:"varint,4,rep,packed,name=tool_ids,json=toolIds,proto3" json:"tool_ids,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteAIToolsCommand) Reset() {
+	*x = DeleteAIToolsCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[135]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteAIToolsCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteAIToolsCommand) ProtoMessage() {}
+
+func (x *DeleteAIToolsCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[135]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteAIToolsCommand.ProtoReflect.Descriptor instead.
+func (*DeleteAIToolsCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{135}
+}
+
+func (x *DeleteAIToolsCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *DeleteAIToolsCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *DeleteAIToolsCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *DeleteAIToolsCommand) GetToolIds() []int64 {
+	if x != nil {
+		return x.ToolIds
+	}
+	return nil
+}
+
+type AIToolsDeleted struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ToolIds       []int64                `protobuf:"varint,3,rep,packed,name=tool_ids,json=toolIds,proto3" json:"tool_ids,omitempty"`
+	Message       string                 `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIToolsDeleted) Reset() {
+	*x = AIToolsDeleted{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[136]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIToolsDeleted) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIToolsDeleted) ProtoMessage() {}
+
+func (x *AIToolsDeleted) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[136]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIToolsDeleted.ProtoReflect.Descriptor instead.
+func (*AIToolsDeleted) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{136}
+}
+
+func (x *AIToolsDeleted) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIToolsDeleted) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIToolsDeleted) GetToolIds() []int64 {
+	if x != nil {
+		return x.ToolIds
+	}
+	return nil
+}
+
+func (x *AIToolsDeleted) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type AIToolsDeleteFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,3,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIToolsDeleteFailed) Reset() {
+	*x = AIToolsDeleteFailed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[137]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIToolsDeleteFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIToolsDeleteFailed) ProtoMessage() {}
+
+func (x *AIToolsDeleteFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[137]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIToolsDeleteFailed.ProtoReflect.Descriptor instead.
+func (*AIToolsDeleteFailed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{137}
+}
+
+func (x *AIToolsDeleteFailed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIToolsDeleteFailed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIToolsDeleteFailed) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AIToolsDeleteFailed) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+type AIKnowledgeBasePagination struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Page          int64                  `protobuf:"varint,1,opt,name=page,proto3" json:"page,omitempty"`
+	Limit         int64                  `protobuf:"varint,2,opt,name=limit,proto3" json:"limit,omitempty"`
+	OrderBy       string                 `protobuf:"bytes,3,opt,name=order_by,json=orderBy,proto3" json:"order_by,omitempty"`
+	Order         string                 `protobuf:"bytes,4,opt,name=order,proto3" json:"order,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIKnowledgeBasePagination) Reset() {
+	*x = AIKnowledgeBasePagination{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[138]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIKnowledgeBasePagination) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIKnowledgeBasePagination) ProtoMessage() {}
+
+func (x *AIKnowledgeBasePagination) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[138]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIKnowledgeBasePagination.ProtoReflect.Descriptor instead.
+func (*AIKnowledgeBasePagination) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{138}
+}
+
+func (x *AIKnowledgeBasePagination) GetPage() int64 {
+	if x != nil {
+		return x.Page
+	}
+	return 0
+}
+
+func (x *AIKnowledgeBasePagination) GetLimit() int64 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+func (x *AIKnowledgeBasePagination) GetOrderBy() string {
+	if x != nil {
+		return x.OrderBy
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBasePagination) GetOrder() string {
+	if x != nil {
+		return x.Order
+	}
+	return ""
+}
+
+type AIKnowledgeBaseRecord struct {
+	state                    protoimpl.MessageState `protogen:"open.v1"`
+	Id                       int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	KnowledgeBaseName        string                 `protobuf:"bytes,2,opt,name=knowledge_base_name,json=knowledgeBaseName,proto3" json:"knowledge_base_name,omitempty"`
+	KnowledgeBaseDescription string                 `protobuf:"bytes,3,opt,name=knowledge_base_description,json=knowledgeBaseDescription,proto3" json:"knowledge_base_description,omitempty"`
+	KnowledgeBaseType        string                 `protobuf:"bytes,4,opt,name=knowledge_base_type,json=knowledgeBaseType,proto3" json:"knowledge_base_type,omitempty"`
+	Tags                     []string               `protobuf:"bytes,5,rep,name=tags,proto3" json:"tags,omitempty"`
+	IsDefault                bool                   `protobuf:"varint,6,opt,name=is_default,json=isDefault,proto3" json:"is_default,omitempty"`
+	CreatedFromUi            bool                   `protobuf:"varint,7,opt,name=created_from_ui,json=createdFromUi,proto3" json:"created_from_ui,omitempty"`
+	IsImported               bool                   `protobuf:"varint,8,opt,name=is_imported,json=isImported,proto3" json:"is_imported,omitempty"`
+	SerialVersionId          string                 `protobuf:"bytes,9,opt,name=serial_version_id,json=serialVersionId,proto3" json:"serial_version_id,omitempty"`
+	CreatedAt                int64                  `protobuf:"varint,10,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt                int64                  `protobuf:"varint,11,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	unknownFields            protoimpl.UnknownFields
+	sizeCache                protoimpl.SizeCache
+}
+
+func (x *AIKnowledgeBaseRecord) Reset() {
+	*x = AIKnowledgeBaseRecord{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[139]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIKnowledgeBaseRecord) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIKnowledgeBaseRecord) ProtoMessage() {}
+
+func (x *AIKnowledgeBaseRecord) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[139]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIKnowledgeBaseRecord.ProtoReflect.Descriptor instead.
+func (*AIKnowledgeBaseRecord) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{139}
+}
+
+func (x *AIKnowledgeBaseRecord) GetId() int64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *AIKnowledgeBaseRecord) GetKnowledgeBaseName() string {
+	if x != nil {
+		return x.KnowledgeBaseName
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseRecord) GetKnowledgeBaseDescription() string {
+	if x != nil {
+		return x.KnowledgeBaseDescription
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseRecord) GetKnowledgeBaseType() string {
+	if x != nil {
+		return x.KnowledgeBaseType
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseRecord) GetTags() []string {
+	if x != nil {
+		return x.Tags
+	}
+	return nil
+}
+
+func (x *AIKnowledgeBaseRecord) GetIsDefault() bool {
+	if x != nil {
+		return x.IsDefault
+	}
+	return false
+}
+
+func (x *AIKnowledgeBaseRecord) GetCreatedFromUi() bool {
+	if x != nil {
+		return x.CreatedFromUi
+	}
+	return false
+}
+
+func (x *AIKnowledgeBaseRecord) GetIsImported() bool {
+	if x != nil {
+		return x.IsImported
+	}
+	return false
+}
+
+func (x *AIKnowledgeBaseRecord) GetSerialVersionId() string {
+	if x != nil {
+		return x.SerialVersionId
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseRecord) GetCreatedAt() int64 {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return 0
+}
+
+func (x *AIKnowledgeBaseRecord) GetUpdatedAt() int64 {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return 0
+}
+
+type ListAIKnowledgeBasesCommand struct {
+	state             protoimpl.MessageState     `protogen:"open.v1"`
+	Metadata          *v1.CommandMetadata        `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId      string                     `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId       string                     `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Query             string                     `protobuf:"bytes,4,opt,name=query,proto3" json:"query,omitempty"`
+	KnowledgeBaseId   int64                      `protobuf:"varint,5,opt,name=knowledge_base_id,json=knowledgeBaseId,proto3" json:"knowledge_base_id,omitempty"`
+	OnlyCreatedFromUi bool                       `protobuf:"varint,6,opt,name=only_created_from_ui,json=onlyCreatedFromUi,proto3" json:"only_created_from_ui,omitempty"`
+	OnlyIsDefault     bool                       `protobuf:"varint,7,opt,name=only_is_default,json=onlyIsDefault,proto3" json:"only_is_default,omitempty"`
+	Pagination        *AIKnowledgeBasePagination `protobuf:"bytes,8,opt,name=pagination,proto3" json:"pagination,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *ListAIKnowledgeBasesCommand) Reset() {
+	*x = ListAIKnowledgeBasesCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[140]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAIKnowledgeBasesCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAIKnowledgeBasesCommand) ProtoMessage() {}
+
+func (x *ListAIKnowledgeBasesCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[140]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAIKnowledgeBasesCommand.ProtoReflect.Descriptor instead.
+func (*ListAIKnowledgeBasesCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{140}
+}
+
+func (x *ListAIKnowledgeBasesCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *ListAIKnowledgeBasesCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *ListAIKnowledgeBasesCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *ListAIKnowledgeBasesCommand) GetQuery() string {
+	if x != nil {
+		return x.Query
+	}
+	return ""
+}
+
+func (x *ListAIKnowledgeBasesCommand) GetKnowledgeBaseId() int64 {
+	if x != nil {
+		return x.KnowledgeBaseId
+	}
+	return 0
+}
+
+func (x *ListAIKnowledgeBasesCommand) GetOnlyCreatedFromUi() bool {
+	if x != nil {
+		return x.OnlyCreatedFromUi
+	}
+	return false
+}
+
+func (x *ListAIKnowledgeBasesCommand) GetOnlyIsDefault() bool {
+	if x != nil {
+		return x.OnlyIsDefault
+	}
+	return false
+}
+
+func (x *ListAIKnowledgeBasesCommand) GetPagination() *AIKnowledgeBasePagination {
+	if x != nil {
+		return x.Pagination
+	}
+	return nil
+}
+
+type AIKnowledgeBasesListed struct {
+	state         protoimpl.MessageState     `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata          `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                     `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Items         []*AIKnowledgeBaseRecord   `protobuf:"bytes,3,rep,name=items,proto3" json:"items,omitempty"`
+	Pagination    *AIKnowledgeBasePagination `protobuf:"bytes,4,opt,name=pagination,proto3" json:"pagination,omitempty"`
+	Total         int64                      `protobuf:"varint,5,opt,name=total,proto3" json:"total,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIKnowledgeBasesListed) Reset() {
+	*x = AIKnowledgeBasesListed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[141]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIKnowledgeBasesListed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIKnowledgeBasesListed) ProtoMessage() {}
+
+func (x *AIKnowledgeBasesListed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[141]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIKnowledgeBasesListed.ProtoReflect.Descriptor instead.
+func (*AIKnowledgeBasesListed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{141}
+}
+
+func (x *AIKnowledgeBasesListed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIKnowledgeBasesListed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBasesListed) GetItems() []*AIKnowledgeBaseRecord {
+	if x != nil {
+		return x.Items
+	}
+	return nil
+}
+
+func (x *AIKnowledgeBasesListed) GetPagination() *AIKnowledgeBasePagination {
+	if x != nil {
+		return x.Pagination
+	}
+	return nil
+}
+
+func (x *AIKnowledgeBasesListed) GetTotal() int64 {
+	if x != nil {
+		return x.Total
+	}
+	return 0
+}
+
+type AIKnowledgeBasesListFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,3,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIKnowledgeBasesListFailed) Reset() {
+	*x = AIKnowledgeBasesListFailed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[142]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIKnowledgeBasesListFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIKnowledgeBasesListFailed) ProtoMessage() {}
+
+func (x *AIKnowledgeBasesListFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[142]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIKnowledgeBasesListFailed.ProtoReflect.Descriptor instead.
+func (*AIKnowledgeBasesListFailed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{142}
+}
+
+func (x *AIKnowledgeBasesListFailed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIKnowledgeBasesListFailed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBasesListFailed) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBasesListFailed) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+type CreateAIKnowledgeBaseCommand struct {
+	state                    protoimpl.MessageState `protogen:"open.v1"`
+	Metadata                 *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId             string                 `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId              string                 `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	KnowledgeBaseName        string                 `protobuf:"bytes,4,opt,name=knowledge_base_name,json=knowledgeBaseName,proto3" json:"knowledge_base_name,omitempty"`
+	KnowledgeBaseDescription string                 `protobuf:"bytes,5,opt,name=knowledge_base_description,json=knowledgeBaseDescription,proto3" json:"knowledge_base_description,omitempty"`
+	KnowledgeBaseType        string                 `protobuf:"bytes,6,opt,name=knowledge_base_type,json=knowledgeBaseType,proto3" json:"knowledge_base_type,omitempty"`
+	Tags                     []string               `protobuf:"bytes,7,rep,name=tags,proto3" json:"tags,omitempty"`
+	IsDefault                bool                   `protobuf:"varint,8,opt,name=is_default,json=isDefault,proto3" json:"is_default,omitempty"`
+	CreatedFromUi            bool                   `protobuf:"varint,9,opt,name=created_from_ui,json=createdFromUi,proto3" json:"created_from_ui,omitempty"`
+	unknownFields            protoimpl.UnknownFields
+	sizeCache                protoimpl.SizeCache
+}
+
+func (x *CreateAIKnowledgeBaseCommand) Reset() {
+	*x = CreateAIKnowledgeBaseCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[143]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateAIKnowledgeBaseCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateAIKnowledgeBaseCommand) ProtoMessage() {}
+
+func (x *CreateAIKnowledgeBaseCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[143]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateAIKnowledgeBaseCommand.ProtoReflect.Descriptor instead.
+func (*CreateAIKnowledgeBaseCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{143}
+}
+
+func (x *CreateAIKnowledgeBaseCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *CreateAIKnowledgeBaseCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *CreateAIKnowledgeBaseCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *CreateAIKnowledgeBaseCommand) GetKnowledgeBaseName() string {
+	if x != nil {
+		return x.KnowledgeBaseName
+	}
+	return ""
+}
+
+func (x *CreateAIKnowledgeBaseCommand) GetKnowledgeBaseDescription() string {
+	if x != nil {
+		return x.KnowledgeBaseDescription
+	}
+	return ""
+}
+
+func (x *CreateAIKnowledgeBaseCommand) GetKnowledgeBaseType() string {
+	if x != nil {
+		return x.KnowledgeBaseType
+	}
+	return ""
+}
+
+func (x *CreateAIKnowledgeBaseCommand) GetTags() []string {
+	if x != nil {
+		return x.Tags
+	}
+	return nil
+}
+
+func (x *CreateAIKnowledgeBaseCommand) GetIsDefault() bool {
+	if x != nil {
+		return x.IsDefault
+	}
+	return false
+}
+
+func (x *CreateAIKnowledgeBaseCommand) GetCreatedFromUi() bool {
+	if x != nil {
+		return x.CreatedFromUi
+	}
+	return false
+}
+
+type AIKnowledgeBaseImportAttachment struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AttachmentId  string                 `protobuf:"bytes,1,opt,name=attachment_id,json=attachmentId,proto3" json:"attachment_id,omitempty"`
+	Filename      string                 `protobuf:"bytes,2,opt,name=filename,proto3" json:"filename,omitempty"`
+	ContentType   string                 `protobuf:"bytes,3,opt,name=content_type,json=contentType,proto3" json:"content_type,omitempty"`
+	DownloadUrl   string                 `protobuf:"bytes,4,opt,name=download_url,json=downloadUrl,proto3" json:"download_url,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIKnowledgeBaseImportAttachment) Reset() {
+	*x = AIKnowledgeBaseImportAttachment{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[144]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIKnowledgeBaseImportAttachment) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIKnowledgeBaseImportAttachment) ProtoMessage() {}
+
+func (x *AIKnowledgeBaseImportAttachment) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[144]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIKnowledgeBaseImportAttachment.ProtoReflect.Descriptor instead.
+func (*AIKnowledgeBaseImportAttachment) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{144}
+}
+
+func (x *AIKnowledgeBaseImportAttachment) GetAttachmentId() string {
+	if x != nil {
+		return x.AttachmentId
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseImportAttachment) GetFilename() string {
+	if x != nil {
+		return x.Filename
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseImportAttachment) GetContentType() string {
+	if x != nil {
+		return x.ContentType
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseImportAttachment) GetDownloadUrl() string {
+	if x != nil {
+		return x.DownloadUrl
+	}
+	return ""
+}
+
+type AIKnowledgeBaseCreated struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Item          *AIKnowledgeBaseRecord `protobuf:"bytes,3,opt,name=item,proto3" json:"item,omitempty"`
+	Message       string                 `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIKnowledgeBaseCreated) Reset() {
+	*x = AIKnowledgeBaseCreated{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[145]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIKnowledgeBaseCreated) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIKnowledgeBaseCreated) ProtoMessage() {}
+
+func (x *AIKnowledgeBaseCreated) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[145]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIKnowledgeBaseCreated.ProtoReflect.Descriptor instead.
+func (*AIKnowledgeBaseCreated) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{145}
+}
+
+func (x *AIKnowledgeBaseCreated) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIKnowledgeBaseCreated) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseCreated) GetItem() *AIKnowledgeBaseRecord {
+	if x != nil {
+		return x.Item
+	}
+	return nil
+}
+
+func (x *AIKnowledgeBaseCreated) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type AIKnowledgeBaseCreateFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,3,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIKnowledgeBaseCreateFailed) Reset() {
+	*x = AIKnowledgeBaseCreateFailed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[146]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIKnowledgeBaseCreateFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIKnowledgeBaseCreateFailed) ProtoMessage() {}
+
+func (x *AIKnowledgeBaseCreateFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[146]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIKnowledgeBaseCreateFailed.ProtoReflect.Descriptor instead.
+func (*AIKnowledgeBaseCreateFailed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{146}
+}
+
+func (x *AIKnowledgeBaseCreateFailed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIKnowledgeBaseCreateFailed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseCreateFailed) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseCreateFailed) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+type ImportAIKnowledgeBaseCommand struct {
+	state             protoimpl.MessageState           `protogen:"open.v1"`
+	Metadata          *v1.CommandMetadata              `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId      string                           `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId       string                           `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	KnowledgeBaseName string                           `protobuf:"bytes,4,opt,name=knowledge_base_name,json=knowledgeBaseName,proto3" json:"knowledge_base_name,omitempty"`
+	Attachment        *AIKnowledgeBaseImportAttachment `protobuf:"bytes,5,opt,name=attachment,proto3" json:"attachment,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *ImportAIKnowledgeBaseCommand) Reset() {
+	*x = ImportAIKnowledgeBaseCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[147]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ImportAIKnowledgeBaseCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ImportAIKnowledgeBaseCommand) ProtoMessage() {}
+
+func (x *ImportAIKnowledgeBaseCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[147]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ImportAIKnowledgeBaseCommand.ProtoReflect.Descriptor instead.
+func (*ImportAIKnowledgeBaseCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{147}
+}
+
+func (x *ImportAIKnowledgeBaseCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *ImportAIKnowledgeBaseCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *ImportAIKnowledgeBaseCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *ImportAIKnowledgeBaseCommand) GetKnowledgeBaseName() string {
+	if x != nil {
+		return x.KnowledgeBaseName
+	}
+	return ""
+}
+
+func (x *ImportAIKnowledgeBaseCommand) GetAttachment() *AIKnowledgeBaseImportAttachment {
+	if x != nil {
+		return x.Attachment
+	}
+	return nil
+}
+
+type AIKnowledgeBaseImported struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Item          *AIKnowledgeBaseRecord `protobuf:"bytes,3,opt,name=item,proto3" json:"item,omitempty"`
+	Message       string                 `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIKnowledgeBaseImported) Reset() {
+	*x = AIKnowledgeBaseImported{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[148]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIKnowledgeBaseImported) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIKnowledgeBaseImported) ProtoMessage() {}
+
+func (x *AIKnowledgeBaseImported) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[148]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIKnowledgeBaseImported.ProtoReflect.Descriptor instead.
+func (*AIKnowledgeBaseImported) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{148}
+}
+
+func (x *AIKnowledgeBaseImported) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIKnowledgeBaseImported) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseImported) GetItem() *AIKnowledgeBaseRecord {
+	if x != nil {
+		return x.Item
+	}
+	return nil
+}
+
+func (x *AIKnowledgeBaseImported) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type AIKnowledgeBaseImportFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,3,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIKnowledgeBaseImportFailed) Reset() {
+	*x = AIKnowledgeBaseImportFailed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[149]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIKnowledgeBaseImportFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIKnowledgeBaseImportFailed) ProtoMessage() {}
+
+func (x *AIKnowledgeBaseImportFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[149]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIKnowledgeBaseImportFailed.ProtoReflect.Descriptor instead.
+func (*AIKnowledgeBaseImportFailed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{149}
+}
+
+func (x *AIKnowledgeBaseImportFailed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIKnowledgeBaseImportFailed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseImportFailed) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseImportFailed) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+type UpdateAIKnowledgeBaseCommand struct {
+	state                    protoimpl.MessageState `protogen:"open.v1"`
+	Metadata                 *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId             string                 `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId              string                 `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	KnowledgeBaseId          int64                  `protobuf:"varint,4,opt,name=knowledge_base_id,json=knowledgeBaseId,proto3" json:"knowledge_base_id,omitempty"`
+	KnowledgeBaseName        string                 `protobuf:"bytes,5,opt,name=knowledge_base_name,json=knowledgeBaseName,proto3" json:"knowledge_base_name,omitempty"`
+	KnowledgeBaseDescription string                 `protobuf:"bytes,6,opt,name=knowledge_base_description,json=knowledgeBaseDescription,proto3" json:"knowledge_base_description,omitempty"`
+	KnowledgeBaseType        string                 `protobuf:"bytes,7,opt,name=knowledge_base_type,json=knowledgeBaseType,proto3" json:"knowledge_base_type,omitempty"`
+	Tags                     []string               `protobuf:"bytes,8,rep,name=tags,proto3" json:"tags,omitempty"`
+	IsDefault                bool                   `protobuf:"varint,9,opt,name=is_default,json=isDefault,proto3" json:"is_default,omitempty"`
+	unknownFields            protoimpl.UnknownFields
+	sizeCache                protoimpl.SizeCache
+}
+
+func (x *UpdateAIKnowledgeBaseCommand) Reset() {
+	*x = UpdateAIKnowledgeBaseCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[150]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateAIKnowledgeBaseCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateAIKnowledgeBaseCommand) ProtoMessage() {}
+
+func (x *UpdateAIKnowledgeBaseCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[150]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateAIKnowledgeBaseCommand.ProtoReflect.Descriptor instead.
+func (*UpdateAIKnowledgeBaseCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{150}
+}
+
+func (x *UpdateAIKnowledgeBaseCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *UpdateAIKnowledgeBaseCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *UpdateAIKnowledgeBaseCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *UpdateAIKnowledgeBaseCommand) GetKnowledgeBaseId() int64 {
+	if x != nil {
+		return x.KnowledgeBaseId
+	}
+	return 0
+}
+
+func (x *UpdateAIKnowledgeBaseCommand) GetKnowledgeBaseName() string {
+	if x != nil {
+		return x.KnowledgeBaseName
+	}
+	return ""
+}
+
+func (x *UpdateAIKnowledgeBaseCommand) GetKnowledgeBaseDescription() string {
+	if x != nil {
+		return x.KnowledgeBaseDescription
+	}
+	return ""
+}
+
+func (x *UpdateAIKnowledgeBaseCommand) GetKnowledgeBaseType() string {
+	if x != nil {
+		return x.KnowledgeBaseType
+	}
+	return ""
+}
+
+func (x *UpdateAIKnowledgeBaseCommand) GetTags() []string {
+	if x != nil {
+		return x.Tags
+	}
+	return nil
+}
+
+func (x *UpdateAIKnowledgeBaseCommand) GetIsDefault() bool {
+	if x != nil {
+		return x.IsDefault
+	}
+	return false
+}
+
+type AIKnowledgeBaseUpdated struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Item          *AIKnowledgeBaseRecord `protobuf:"bytes,3,opt,name=item,proto3" json:"item,omitempty"`
+	Message       string                 `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIKnowledgeBaseUpdated) Reset() {
+	*x = AIKnowledgeBaseUpdated{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[151]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIKnowledgeBaseUpdated) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIKnowledgeBaseUpdated) ProtoMessage() {}
+
+func (x *AIKnowledgeBaseUpdated) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[151]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIKnowledgeBaseUpdated.ProtoReflect.Descriptor instead.
+func (*AIKnowledgeBaseUpdated) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{151}
+}
+
+func (x *AIKnowledgeBaseUpdated) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIKnowledgeBaseUpdated) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseUpdated) GetItem() *AIKnowledgeBaseRecord {
+	if x != nil {
+		return x.Item
+	}
+	return nil
+}
+
+func (x *AIKnowledgeBaseUpdated) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type AIKnowledgeBaseUpdateFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,3,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIKnowledgeBaseUpdateFailed) Reset() {
+	*x = AIKnowledgeBaseUpdateFailed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[152]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIKnowledgeBaseUpdateFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIKnowledgeBaseUpdateFailed) ProtoMessage() {}
+
+func (x *AIKnowledgeBaseUpdateFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[152]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIKnowledgeBaseUpdateFailed.ProtoReflect.Descriptor instead.
+func (*AIKnowledgeBaseUpdateFailed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{152}
+}
+
+func (x *AIKnowledgeBaseUpdateFailed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIKnowledgeBaseUpdateFailed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseUpdateFailed) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseUpdateFailed) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+type DeleteAIKnowledgeBaseCommand struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Metadata        *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId    string                 `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId     string                 `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	KnowledgeBaseId int64                  `protobuf:"varint,4,opt,name=knowledge_base_id,json=knowledgeBaseId,proto3" json:"knowledge_base_id,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *DeleteAIKnowledgeBaseCommand) Reset() {
+	*x = DeleteAIKnowledgeBaseCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[153]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteAIKnowledgeBaseCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteAIKnowledgeBaseCommand) ProtoMessage() {}
+
+func (x *DeleteAIKnowledgeBaseCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[153]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteAIKnowledgeBaseCommand.ProtoReflect.Descriptor instead.
+func (*DeleteAIKnowledgeBaseCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{153}
+}
+
+func (x *DeleteAIKnowledgeBaseCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *DeleteAIKnowledgeBaseCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *DeleteAIKnowledgeBaseCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *DeleteAIKnowledgeBaseCommand) GetKnowledgeBaseId() int64 {
+	if x != nil {
+		return x.KnowledgeBaseId
+	}
+	return 0
+}
+
+type AIKnowledgeBaseDeleted struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Item          *AIKnowledgeBaseRecord `protobuf:"bytes,3,opt,name=item,proto3" json:"item,omitempty"`
+	Message       string                 `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIKnowledgeBaseDeleted) Reset() {
+	*x = AIKnowledgeBaseDeleted{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[154]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIKnowledgeBaseDeleted) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIKnowledgeBaseDeleted) ProtoMessage() {}
+
+func (x *AIKnowledgeBaseDeleted) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[154]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIKnowledgeBaseDeleted.ProtoReflect.Descriptor instead.
+func (*AIKnowledgeBaseDeleted) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{154}
+}
+
+func (x *AIKnowledgeBaseDeleted) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIKnowledgeBaseDeleted) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseDeleted) GetItem() *AIKnowledgeBaseRecord {
+	if x != nil {
+		return x.Item
+	}
+	return nil
+}
+
+func (x *AIKnowledgeBaseDeleted) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type AIKnowledgeBaseDeleteFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,3,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIKnowledgeBaseDeleteFailed) Reset() {
+	*x = AIKnowledgeBaseDeleteFailed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[155]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIKnowledgeBaseDeleteFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIKnowledgeBaseDeleteFailed) ProtoMessage() {}
+
+func (x *AIKnowledgeBaseDeleteFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[155]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIKnowledgeBaseDeleteFailed.ProtoReflect.Descriptor instead.
+func (*AIKnowledgeBaseDeleteFailed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{155}
+}
+
+func (x *AIKnowledgeBaseDeleteFailed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIKnowledgeBaseDeleteFailed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseDeleteFailed) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseDeleteFailed) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+type ExportAIKnowledgeBaseCommand struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	Metadata          *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId      string                 `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId       string                 `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	KnowledgeBaseId   int64                  `protobuf:"varint,4,opt,name=knowledge_base_id,json=knowledgeBaseId,proto3" json:"knowledge_base_id,omitempty"`
+	OutputName        string                 `protobuf:"bytes,5,opt,name=output_name,json=outputName,proto3" json:"output_name,omitempty"`
+	ObjectStoreBucket string                 `protobuf:"bytes,6,opt,name=object_store_bucket,json=objectStoreBucket,proto3" json:"object_store_bucket,omitempty"`
+	ObjectStoreKey    string                 `protobuf:"bytes,7,opt,name=object_store_key,json=objectStoreKey,proto3" json:"object_store_key,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *ExportAIKnowledgeBaseCommand) Reset() {
+	*x = ExportAIKnowledgeBaseCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[156]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ExportAIKnowledgeBaseCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExportAIKnowledgeBaseCommand) ProtoMessage() {}
+
+func (x *ExportAIKnowledgeBaseCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[156]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExportAIKnowledgeBaseCommand.ProtoReflect.Descriptor instead.
+func (*ExportAIKnowledgeBaseCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{156}
+}
+
+func (x *ExportAIKnowledgeBaseCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *ExportAIKnowledgeBaseCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *ExportAIKnowledgeBaseCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *ExportAIKnowledgeBaseCommand) GetKnowledgeBaseId() int64 {
+	if x != nil {
+		return x.KnowledgeBaseId
+	}
+	return 0
+}
+
+func (x *ExportAIKnowledgeBaseCommand) GetOutputName() string {
+	if x != nil {
+		return x.OutputName
+	}
+	return ""
+}
+
+func (x *ExportAIKnowledgeBaseCommand) GetObjectStoreBucket() string {
+	if x != nil {
+		return x.ObjectStoreBucket
+	}
+	return ""
+}
+
+func (x *ExportAIKnowledgeBaseCommand) GetObjectStoreKey() string {
+	if x != nil {
+		return x.ObjectStoreKey
+	}
+	return ""
+}
+
+type AIKnowledgeBaseExported struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	Metadata          *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId       string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Item              *AIKnowledgeBaseRecord `protobuf:"bytes,3,opt,name=item,proto3" json:"item,omitempty"`
+	Message           string                 `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`
+	FileName          string                 `protobuf:"bytes,5,opt,name=file_name,json=fileName,proto3" json:"file_name,omitempty"`
+	ContentType       string                 `protobuf:"bytes,6,opt,name=content_type,json=contentType,proto3" json:"content_type,omitempty"`
+	ObjectStoreBucket string                 `protobuf:"bytes,7,opt,name=object_store_bucket,json=objectStoreBucket,proto3" json:"object_store_bucket,omitempty"`
+	ObjectStoreKey    string                 `protobuf:"bytes,8,opt,name=object_store_key,json=objectStoreKey,proto3" json:"object_store_key,omitempty"`
+	SizeBytes         uint64                 `protobuf:"varint,9,opt,name=size_bytes,json=sizeBytes,proto3" json:"size_bytes,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *AIKnowledgeBaseExported) Reset() {
+	*x = AIKnowledgeBaseExported{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[157]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIKnowledgeBaseExported) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIKnowledgeBaseExported) ProtoMessage() {}
+
+func (x *AIKnowledgeBaseExported) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[157]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIKnowledgeBaseExported.ProtoReflect.Descriptor instead.
+func (*AIKnowledgeBaseExported) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{157}
+}
+
+func (x *AIKnowledgeBaseExported) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIKnowledgeBaseExported) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseExported) GetItem() *AIKnowledgeBaseRecord {
+	if x != nil {
+		return x.Item
+	}
+	return nil
+}
+
+func (x *AIKnowledgeBaseExported) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseExported) GetFileName() string {
+	if x != nil {
+		return x.FileName
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseExported) GetContentType() string {
+	if x != nil {
+		return x.ContentType
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseExported) GetObjectStoreBucket() string {
+	if x != nil {
+		return x.ObjectStoreBucket
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseExported) GetObjectStoreKey() string {
+	if x != nil {
+		return x.ObjectStoreKey
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseExported) GetSizeBytes() uint64 {
+	if x != nil {
+		return x.SizeBytes
+	}
+	return 0
+}
+
+type AIKnowledgeBaseExportFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,3,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIKnowledgeBaseExportFailed) Reset() {
+	*x = AIKnowledgeBaseExportFailed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[158]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIKnowledgeBaseExportFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIKnowledgeBaseExportFailed) ProtoMessage() {}
+
+func (x *AIKnowledgeBaseExportFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[158]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIKnowledgeBaseExportFailed.ProtoReflect.Descriptor instead.
+func (*AIKnowledgeBaseExportFailed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{158}
+}
+
+func (x *AIKnowledgeBaseExportFailed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIKnowledgeBaseExportFailed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseExportFailed) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseExportFailed) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+type AIKnowledgeBaseEntryFilter struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	KnowledgeBaseId    int64                  `protobuf:"varint,1,opt,name=knowledge_base_id,json=knowledgeBaseId,proto3" json:"knowledge_base_id,omitempty"`
+	Keyword            string                 `protobuf:"bytes,2,opt,name=keyword,proto3" json:"keyword,omitempty"`
+	RelatedEntityUuids []string               `protobuf:"bytes,3,rep,name=related_entity_uuids,json=relatedEntityUuids,proto3" json:"related_entity_uuids,omitempty"`
+	HiddenIndex        []string               `protobuf:"bytes,4,rep,name=hidden_index,json=hiddenIndex,proto3" json:"hidden_index,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *AIKnowledgeBaseEntryFilter) Reset() {
+	*x = AIKnowledgeBaseEntryFilter{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[159]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIKnowledgeBaseEntryFilter) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIKnowledgeBaseEntryFilter) ProtoMessage() {}
+
+func (x *AIKnowledgeBaseEntryFilter) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[159]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIKnowledgeBaseEntryFilter.ProtoReflect.Descriptor instead.
+func (*AIKnowledgeBaseEntryFilter) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{159}
+}
+
+func (x *AIKnowledgeBaseEntryFilter) GetKnowledgeBaseId() int64 {
+	if x != nil {
+		return x.KnowledgeBaseId
+	}
+	return 0
+}
+
+func (x *AIKnowledgeBaseEntryFilter) GetKeyword() string {
+	if x != nil {
+		return x.Keyword
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseEntryFilter) GetRelatedEntityUuids() []string {
+	if x != nil {
+		return x.RelatedEntityUuids
+	}
+	return nil
+}
+
+func (x *AIKnowledgeBaseEntryFilter) GetHiddenIndex() []string {
+	if x != nil {
+		return x.HiddenIndex
+	}
+	return nil
+}
+
+type AIKnowledgeBaseEntryRecord struct {
+	state                    protoimpl.MessageState `protogen:"open.v1"`
+	Id                       int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	KnowledgeBaseId          int64                  `protobuf:"varint,2,opt,name=knowledge_base_id,json=knowledgeBaseId,proto3" json:"knowledge_base_id,omitempty"`
+	KnowledgeTitle           string                 `protobuf:"bytes,3,opt,name=knowledge_title,json=knowledgeTitle,proto3" json:"knowledge_title,omitempty"`
+	KnowledgeType            string                 `protobuf:"bytes,4,opt,name=knowledge_type,json=knowledgeType,proto3" json:"knowledge_type,omitempty"`
+	ImportanceScore          int32                  `protobuf:"varint,5,opt,name=importance_score,json=importanceScore,proto3" json:"importance_score,omitempty"`
+	Keywords                 []string               `protobuf:"bytes,6,rep,name=keywords,proto3" json:"keywords,omitempty"`
+	KnowledgeDetails         string                 `protobuf:"bytes,7,opt,name=knowledge_details,json=knowledgeDetails,proto3" json:"knowledge_details,omitempty"`
+	Summary                  string                 `protobuf:"bytes,8,opt,name=summary,proto3" json:"summary,omitempty"`
+	SourcePage               int32                  `protobuf:"varint,9,opt,name=source_page,json=sourcePage,proto3" json:"source_page,omitempty"`
+	PotentialQuestions       []string               `protobuf:"bytes,10,rep,name=potential_questions,json=potentialQuestions,proto3" json:"potential_questions,omitempty"`
+	PotentialQuestionsVector []float32              `protobuf:"fixed32,11,rep,packed,name=potential_questions_vector,json=potentialQuestionsVector,proto3" json:"potential_questions_vector,omitempty"`
+	HiddenIndex              string                 `protobuf:"bytes,12,opt,name=hidden_index,json=hiddenIndex,proto3" json:"hidden_index,omitempty"`
+	RelatedEntityUuids       string                 `protobuf:"bytes,13,opt,name=related_entity_uuids,json=relatedEntityUuids,proto3" json:"related_entity_uuids,omitempty"`
+	CreatedAt                int64                  `protobuf:"varint,14,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt                int64                  `protobuf:"varint,15,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	unknownFields            protoimpl.UnknownFields
+	sizeCache                protoimpl.SizeCache
+}
+
+func (x *AIKnowledgeBaseEntryRecord) Reset() {
+	*x = AIKnowledgeBaseEntryRecord{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[160]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIKnowledgeBaseEntryRecord) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIKnowledgeBaseEntryRecord) ProtoMessage() {}
+
+func (x *AIKnowledgeBaseEntryRecord) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[160]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIKnowledgeBaseEntryRecord.ProtoReflect.Descriptor instead.
+func (*AIKnowledgeBaseEntryRecord) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{160}
+}
+
+func (x *AIKnowledgeBaseEntryRecord) GetId() int64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *AIKnowledgeBaseEntryRecord) GetKnowledgeBaseId() int64 {
+	if x != nil {
+		return x.KnowledgeBaseId
+	}
+	return 0
+}
+
+func (x *AIKnowledgeBaseEntryRecord) GetKnowledgeTitle() string {
+	if x != nil {
+		return x.KnowledgeTitle
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseEntryRecord) GetKnowledgeType() string {
+	if x != nil {
+		return x.KnowledgeType
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseEntryRecord) GetImportanceScore() int32 {
+	if x != nil {
+		return x.ImportanceScore
+	}
+	return 0
+}
+
+func (x *AIKnowledgeBaseEntryRecord) GetKeywords() []string {
+	if x != nil {
+		return x.Keywords
+	}
+	return nil
+}
+
+func (x *AIKnowledgeBaseEntryRecord) GetKnowledgeDetails() string {
+	if x != nil {
+		return x.KnowledgeDetails
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseEntryRecord) GetSummary() string {
+	if x != nil {
+		return x.Summary
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseEntryRecord) GetSourcePage() int32 {
+	if x != nil {
+		return x.SourcePage
+	}
+	return 0
+}
+
+func (x *AIKnowledgeBaseEntryRecord) GetPotentialQuestions() []string {
+	if x != nil {
+		return x.PotentialQuestions
+	}
+	return nil
+}
+
+func (x *AIKnowledgeBaseEntryRecord) GetPotentialQuestionsVector() []float32 {
+	if x != nil {
+		return x.PotentialQuestionsVector
+	}
+	return nil
+}
+
+func (x *AIKnowledgeBaseEntryRecord) GetHiddenIndex() string {
+	if x != nil {
+		return x.HiddenIndex
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseEntryRecord) GetRelatedEntityUuids() string {
+	if x != nil {
+		return x.RelatedEntityUuids
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseEntryRecord) GetCreatedAt() int64 {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return 0
+}
+
+func (x *AIKnowledgeBaseEntryRecord) GetUpdatedAt() int64 {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return 0
+}
+
+type SearchAIKnowledgeBaseEntriesCommand struct {
+	state         protoimpl.MessageState      `protogen:"open.v1"`
+	Metadata      *v1.CommandMetadata         `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId  string                      `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId   string                      `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Filter        *AIKnowledgeBaseEntryFilter `protobuf:"bytes,4,opt,name=filter,proto3" json:"filter,omitempty"`
+	Pagination    *AIKnowledgeBasePagination  `protobuf:"bytes,5,opt,name=pagination,proto3" json:"pagination,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SearchAIKnowledgeBaseEntriesCommand) Reset() {
+	*x = SearchAIKnowledgeBaseEntriesCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[161]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SearchAIKnowledgeBaseEntriesCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SearchAIKnowledgeBaseEntriesCommand) ProtoMessage() {}
+
+func (x *SearchAIKnowledgeBaseEntriesCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[161]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SearchAIKnowledgeBaseEntriesCommand.ProtoReflect.Descriptor instead.
+func (*SearchAIKnowledgeBaseEntriesCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{161}
+}
+
+func (x *SearchAIKnowledgeBaseEntriesCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *SearchAIKnowledgeBaseEntriesCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *SearchAIKnowledgeBaseEntriesCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *SearchAIKnowledgeBaseEntriesCommand) GetFilter() *AIKnowledgeBaseEntryFilter {
+	if x != nil {
+		return x.Filter
+	}
+	return nil
+}
+
+func (x *SearchAIKnowledgeBaseEntriesCommand) GetPagination() *AIKnowledgeBasePagination {
+	if x != nil {
+		return x.Pagination
+	}
+	return nil
+}
+
+type AIKnowledgeBaseEntriesSearched struct {
+	state         protoimpl.MessageState        `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata             `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                        `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Items         []*AIKnowledgeBaseEntryRecord `protobuf:"bytes,3,rep,name=items,proto3" json:"items,omitempty"`
+	Pagination    *AIKnowledgeBasePagination    `protobuf:"bytes,4,opt,name=pagination,proto3" json:"pagination,omitempty"`
+	Total         int64                         `protobuf:"varint,5,opt,name=total,proto3" json:"total,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIKnowledgeBaseEntriesSearched) Reset() {
+	*x = AIKnowledgeBaseEntriesSearched{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[162]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIKnowledgeBaseEntriesSearched) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIKnowledgeBaseEntriesSearched) ProtoMessage() {}
+
+func (x *AIKnowledgeBaseEntriesSearched) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[162]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIKnowledgeBaseEntriesSearched.ProtoReflect.Descriptor instead.
+func (*AIKnowledgeBaseEntriesSearched) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{162}
+}
+
+func (x *AIKnowledgeBaseEntriesSearched) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIKnowledgeBaseEntriesSearched) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseEntriesSearched) GetItems() []*AIKnowledgeBaseEntryRecord {
+	if x != nil {
+		return x.Items
+	}
+	return nil
+}
+
+func (x *AIKnowledgeBaseEntriesSearched) GetPagination() *AIKnowledgeBasePagination {
+	if x != nil {
+		return x.Pagination
+	}
+	return nil
+}
+
+func (x *AIKnowledgeBaseEntriesSearched) GetTotal() int64 {
+	if x != nil {
+		return x.Total
+	}
+	return 0
+}
+
+type AIKnowledgeBaseEntriesSearchFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,3,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIKnowledgeBaseEntriesSearchFailed) Reset() {
+	*x = AIKnowledgeBaseEntriesSearchFailed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[163]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIKnowledgeBaseEntriesSearchFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIKnowledgeBaseEntriesSearchFailed) ProtoMessage() {}
+
+func (x *AIKnowledgeBaseEntriesSearchFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[163]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIKnowledgeBaseEntriesSearchFailed.ProtoReflect.Descriptor instead.
+func (*AIKnowledgeBaseEntriesSearchFailed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{163}
+}
+
+func (x *AIKnowledgeBaseEntriesSearchFailed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIKnowledgeBaseEntriesSearchFailed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseEntriesSearchFailed) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseEntriesSearchFailed) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+type QueryAIKnowledgeBaseByAICommand struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	Metadata            *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId        string                 `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId         string                 `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Query               string                 `protobuf:"bytes,4,opt,name=query,proto3" json:"query,omitempty"`
+	EnhancePlan         string                 `protobuf:"bytes,5,opt,name=enhance_plan,json=enhancePlan,proto3" json:"enhance_plan,omitempty"`
+	KnowledgeBaseId     int64                  `protobuf:"varint,6,opt,name=knowledge_base_id,json=knowledgeBaseId,proto3" json:"knowledge_base_id,omitempty"`
+	QueryAllCollections bool                   `protobuf:"varint,7,opt,name=query_all_collections,json=queryAllCollections,proto3" json:"query_all_collections,omitempty"`
+	AiService           string                 `protobuf:"bytes,8,opt,name=ai_service,json=aiService,proto3" json:"ai_service,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+func (x *QueryAIKnowledgeBaseByAICommand) Reset() {
+	*x = QueryAIKnowledgeBaseByAICommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[164]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *QueryAIKnowledgeBaseByAICommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*QueryAIKnowledgeBaseByAICommand) ProtoMessage() {}
+
+func (x *QueryAIKnowledgeBaseByAICommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[164]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use QueryAIKnowledgeBaseByAICommand.ProtoReflect.Descriptor instead.
+func (*QueryAIKnowledgeBaseByAICommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{164}
+}
+
+func (x *QueryAIKnowledgeBaseByAICommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *QueryAIKnowledgeBaseByAICommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *QueryAIKnowledgeBaseByAICommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *QueryAIKnowledgeBaseByAICommand) GetQuery() string {
+	if x != nil {
+		return x.Query
+	}
+	return ""
+}
+
+func (x *QueryAIKnowledgeBaseByAICommand) GetEnhancePlan() string {
+	if x != nil {
+		return x.EnhancePlan
+	}
+	return ""
+}
+
+func (x *QueryAIKnowledgeBaseByAICommand) GetKnowledgeBaseId() int64 {
+	if x != nil {
+		return x.KnowledgeBaseId
+	}
+	return 0
+}
+
+func (x *QueryAIKnowledgeBaseByAICommand) GetQueryAllCollections() bool {
+	if x != nil {
+		return x.QueryAllCollections
+	}
+	return false
+}
+
+func (x *QueryAIKnowledgeBaseByAICommand) GetAiService() string {
+	if x != nil {
+		return x.AiService
+	}
+	return ""
+}
+
+type CancelAIKnowledgeBaseByAIQueryCommand struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Metadata       *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId   string                 `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId    string                 `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	QueryCommandId string                 `protobuf:"bytes,4,opt,name=query_command_id,json=queryCommandId,proto3" json:"query_command_id,omitempty"`
+	Reason         string                 `protobuf:"bytes,5,opt,name=reason,proto3" json:"reason,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *CancelAIKnowledgeBaseByAIQueryCommand) Reset() {
+	*x = CancelAIKnowledgeBaseByAIQueryCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[165]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CancelAIKnowledgeBaseByAIQueryCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CancelAIKnowledgeBaseByAIQueryCommand) ProtoMessage() {}
+
+func (x *CancelAIKnowledgeBaseByAIQueryCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[165]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CancelAIKnowledgeBaseByAIQueryCommand.ProtoReflect.Descriptor instead.
+func (*CancelAIKnowledgeBaseByAIQueryCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{165}
+}
+
+func (x *CancelAIKnowledgeBaseByAIQueryCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *CancelAIKnowledgeBaseByAIQueryCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *CancelAIKnowledgeBaseByAIQueryCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *CancelAIKnowledgeBaseByAIQueryCommand) GetQueryCommandId() string {
+	if x != nil {
+		return x.QueryCommandId
+	}
+	return ""
+}
+
+func (x *CancelAIKnowledgeBaseByAIQueryCommand) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+type AIKnowledgeBaseQueryByAIChunk struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Message       string                 `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`
+	MessageType   string                 `protobuf:"bytes,4,opt,name=message_type,json=messageType,proto3" json:"message_type,omitempty"`
+	Data          string                 `protobuf:"bytes,5,opt,name=data,proto3" json:"data,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIKnowledgeBaseQueryByAIChunk) Reset() {
+	*x = AIKnowledgeBaseQueryByAIChunk{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[166]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIKnowledgeBaseQueryByAIChunk) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIKnowledgeBaseQueryByAIChunk) ProtoMessage() {}
+
+func (x *AIKnowledgeBaseQueryByAIChunk) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[166]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIKnowledgeBaseQueryByAIChunk.ProtoReflect.Descriptor instead.
+func (*AIKnowledgeBaseQueryByAIChunk) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{166}
+}
+
+func (x *AIKnowledgeBaseQueryByAIChunk) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIKnowledgeBaseQueryByAIChunk) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseQueryByAIChunk) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseQueryByAIChunk) GetMessageType() string {
+	if x != nil {
+		return x.MessageType
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseQueryByAIChunk) GetData() string {
+	if x != nil {
+		return x.Data
+	}
+	return ""
+}
+
+type AIKnowledgeBaseQueryByAICompleted struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Message       string                 `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIKnowledgeBaseQueryByAICompleted) Reset() {
+	*x = AIKnowledgeBaseQueryByAICompleted{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[167]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIKnowledgeBaseQueryByAICompleted) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIKnowledgeBaseQueryByAICompleted) ProtoMessage() {}
+
+func (x *AIKnowledgeBaseQueryByAICompleted) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[167]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIKnowledgeBaseQueryByAICompleted.ProtoReflect.Descriptor instead.
+func (*AIKnowledgeBaseQueryByAICompleted) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{167}
+}
+
+func (x *AIKnowledgeBaseQueryByAICompleted) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIKnowledgeBaseQueryByAICompleted) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseQueryByAICompleted) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type AIKnowledgeBaseQueryByAIFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,3,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIKnowledgeBaseQueryByAIFailed) Reset() {
+	*x = AIKnowledgeBaseQueryByAIFailed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[168]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIKnowledgeBaseQueryByAIFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIKnowledgeBaseQueryByAIFailed) ProtoMessage() {}
+
+func (x *AIKnowledgeBaseQueryByAIFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[168]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIKnowledgeBaseQueryByAIFailed.ProtoReflect.Descriptor instead.
+func (*AIKnowledgeBaseQueryByAIFailed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{168}
+}
+
+func (x *AIKnowledgeBaseQueryByAIFailed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIKnowledgeBaseQueryByAIFailed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseQueryByAIFailed) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseQueryByAIFailed) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+type GenerateAIKnowledgeBaseQuestionIndexCommand struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	Metadata          *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId      string                 `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId       string                 `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	KnowledgeBaseId   int64                  `protobuf:"varint,4,opt,name=knowledge_base_id,json=knowledgeBaseId,proto3" json:"knowledge_base_id,omitempty"`
+	KnowledgeBaseName string                 `protobuf:"bytes,5,opt,name=knowledge_base_name,json=knowledgeBaseName,proto3" json:"knowledge_base_name,omitempty"`
+	Force             bool                   `protobuf:"varint,6,opt,name=force,proto3" json:"force,omitempty"`
+	HiddenIndex       string                 `protobuf:"bytes,7,opt,name=hidden_index,json=hiddenIndex,proto3" json:"hidden_index,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *GenerateAIKnowledgeBaseQuestionIndexCommand) Reset() {
+	*x = GenerateAIKnowledgeBaseQuestionIndexCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[169]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GenerateAIKnowledgeBaseQuestionIndexCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GenerateAIKnowledgeBaseQuestionIndexCommand) ProtoMessage() {}
+
+func (x *GenerateAIKnowledgeBaseQuestionIndexCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[169]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GenerateAIKnowledgeBaseQuestionIndexCommand.ProtoReflect.Descriptor instead.
+func (*GenerateAIKnowledgeBaseQuestionIndexCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{169}
+}
+
+func (x *GenerateAIKnowledgeBaseQuestionIndexCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *GenerateAIKnowledgeBaseQuestionIndexCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *GenerateAIKnowledgeBaseQuestionIndexCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *GenerateAIKnowledgeBaseQuestionIndexCommand) GetKnowledgeBaseId() int64 {
+	if x != nil {
+		return x.KnowledgeBaseId
+	}
+	return 0
+}
+
+func (x *GenerateAIKnowledgeBaseQuestionIndexCommand) GetKnowledgeBaseName() string {
+	if x != nil {
+		return x.KnowledgeBaseName
+	}
+	return ""
+}
+
+func (x *GenerateAIKnowledgeBaseQuestionIndexCommand) GetForce() bool {
+	if x != nil {
+		return x.Force
+	}
+	return false
+}
+
+func (x *GenerateAIKnowledgeBaseQuestionIndexCommand) GetHiddenIndex() string {
+	if x != nil {
+		return x.HiddenIndex
+	}
+	return ""
+}
+
+type CancelAIKnowledgeBaseQuestionIndexCommand struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Metadata         *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId     string                 `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId      string                 `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	RequestCommandId string                 `protobuf:"bytes,4,opt,name=request_command_id,json=requestCommandId,proto3" json:"request_command_id,omitempty"`
+	Reason           string                 `protobuf:"bytes,5,opt,name=reason,proto3" json:"reason,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *CancelAIKnowledgeBaseQuestionIndexCommand) Reset() {
+	*x = CancelAIKnowledgeBaseQuestionIndexCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[170]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CancelAIKnowledgeBaseQuestionIndexCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CancelAIKnowledgeBaseQuestionIndexCommand) ProtoMessage() {}
+
+func (x *CancelAIKnowledgeBaseQuestionIndexCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[170]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CancelAIKnowledgeBaseQuestionIndexCommand.ProtoReflect.Descriptor instead.
+func (*CancelAIKnowledgeBaseQuestionIndexCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{170}
+}
+
+func (x *CancelAIKnowledgeBaseQuestionIndexCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *CancelAIKnowledgeBaseQuestionIndexCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *CancelAIKnowledgeBaseQuestionIndexCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *CancelAIKnowledgeBaseQuestionIndexCommand) GetRequestCommandId() string {
+	if x != nil {
+		return x.RequestCommandId
+	}
+	return ""
+}
+
+func (x *CancelAIKnowledgeBaseQuestionIndexCommand) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+type AIKnowledgeBaseQuestionIndexProgress struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Percent       float64                `protobuf:"fixed64,3,opt,name=percent,proto3" json:"percent,omitempty"`
+	Message       string                 `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`
+	MessageType   string                 `protobuf:"bytes,5,opt,name=message_type,json=messageType,proto3" json:"message_type,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIKnowledgeBaseQuestionIndexProgress) Reset() {
+	*x = AIKnowledgeBaseQuestionIndexProgress{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[171]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIKnowledgeBaseQuestionIndexProgress) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIKnowledgeBaseQuestionIndexProgress) ProtoMessage() {}
+
+func (x *AIKnowledgeBaseQuestionIndexProgress) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[171]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIKnowledgeBaseQuestionIndexProgress.ProtoReflect.Descriptor instead.
+func (*AIKnowledgeBaseQuestionIndexProgress) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{171}
+}
+
+func (x *AIKnowledgeBaseQuestionIndexProgress) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIKnowledgeBaseQuestionIndexProgress) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseQuestionIndexProgress) GetPercent() float64 {
+	if x != nil {
+		return x.Percent
+	}
+	return 0
+}
+
+func (x *AIKnowledgeBaseQuestionIndexProgress) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseQuestionIndexProgress) GetMessageType() string {
+	if x != nil {
+		return x.MessageType
+	}
+	return ""
+}
+
+type AIKnowledgeBaseQuestionIndexCompleted struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Message       string                 `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIKnowledgeBaseQuestionIndexCompleted) Reset() {
+	*x = AIKnowledgeBaseQuestionIndexCompleted{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[172]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIKnowledgeBaseQuestionIndexCompleted) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIKnowledgeBaseQuestionIndexCompleted) ProtoMessage() {}
+
+func (x *AIKnowledgeBaseQuestionIndexCompleted) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[172]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIKnowledgeBaseQuestionIndexCompleted.ProtoReflect.Descriptor instead.
+func (*AIKnowledgeBaseQuestionIndexCompleted) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{172}
+}
+
+func (x *AIKnowledgeBaseQuestionIndexCompleted) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIKnowledgeBaseQuestionIndexCompleted) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseQuestionIndexCompleted) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type AIKnowledgeBaseQuestionIndexFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,3,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIKnowledgeBaseQuestionIndexFailed) Reset() {
+	*x = AIKnowledgeBaseQuestionIndexFailed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[173]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIKnowledgeBaseQuestionIndexFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIKnowledgeBaseQuestionIndexFailed) ProtoMessage() {}
+
+func (x *AIKnowledgeBaseQuestionIndexFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[173]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIKnowledgeBaseQuestionIndexFailed.ProtoReflect.Descriptor instead.
+func (*AIKnowledgeBaseQuestionIndexFailed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{173}
+}
+
+func (x *AIKnowledgeBaseQuestionIndexFailed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIKnowledgeBaseQuestionIndexFailed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseQuestionIndexFailed) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseQuestionIndexFailed) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+type CreateAIKnowledgeBaseEntryCommand struct {
+	state                    protoimpl.MessageState `protogen:"open.v1"`
+	Metadata                 *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId             string                 `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId              string                 `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	KnowledgeBaseId          int64                  `protobuf:"varint,4,opt,name=knowledge_base_id,json=knowledgeBaseId,proto3" json:"knowledge_base_id,omitempty"`
+	KnowledgeTitle           string                 `protobuf:"bytes,5,opt,name=knowledge_title,json=knowledgeTitle,proto3" json:"knowledge_title,omitempty"`
+	KnowledgeType            string                 `protobuf:"bytes,6,opt,name=knowledge_type,json=knowledgeType,proto3" json:"knowledge_type,omitempty"`
+	ImportanceScore          int32                  `protobuf:"varint,7,opt,name=importance_score,json=importanceScore,proto3" json:"importance_score,omitempty"`
+	Keywords                 []string               `protobuf:"bytes,8,rep,name=keywords,proto3" json:"keywords,omitempty"`
+	KnowledgeDetails         string                 `protobuf:"bytes,9,opt,name=knowledge_details,json=knowledgeDetails,proto3" json:"knowledge_details,omitempty"`
+	Summary                  string                 `protobuf:"bytes,10,opt,name=summary,proto3" json:"summary,omitempty"`
+	SourcePage               int32                  `protobuf:"varint,11,opt,name=source_page,json=sourcePage,proto3" json:"source_page,omitempty"`
+	PotentialQuestions       []string               `protobuf:"bytes,12,rep,name=potential_questions,json=potentialQuestions,proto3" json:"potential_questions,omitempty"`
+	PotentialQuestionsVector []float32              `protobuf:"fixed32,13,rep,packed,name=potential_questions_vector,json=potentialQuestionsVector,proto3" json:"potential_questions_vector,omitempty"`
+	unknownFields            protoimpl.UnknownFields
+	sizeCache                protoimpl.SizeCache
+}
+
+func (x *CreateAIKnowledgeBaseEntryCommand) Reset() {
+	*x = CreateAIKnowledgeBaseEntryCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[174]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateAIKnowledgeBaseEntryCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateAIKnowledgeBaseEntryCommand) ProtoMessage() {}
+
+func (x *CreateAIKnowledgeBaseEntryCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[174]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateAIKnowledgeBaseEntryCommand.ProtoReflect.Descriptor instead.
+func (*CreateAIKnowledgeBaseEntryCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{174}
+}
+
+func (x *CreateAIKnowledgeBaseEntryCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *CreateAIKnowledgeBaseEntryCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *CreateAIKnowledgeBaseEntryCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *CreateAIKnowledgeBaseEntryCommand) GetKnowledgeBaseId() int64 {
+	if x != nil {
+		return x.KnowledgeBaseId
+	}
+	return 0
+}
+
+func (x *CreateAIKnowledgeBaseEntryCommand) GetKnowledgeTitle() string {
+	if x != nil {
+		return x.KnowledgeTitle
+	}
+	return ""
+}
+
+func (x *CreateAIKnowledgeBaseEntryCommand) GetKnowledgeType() string {
+	if x != nil {
+		return x.KnowledgeType
+	}
+	return ""
+}
+
+func (x *CreateAIKnowledgeBaseEntryCommand) GetImportanceScore() int32 {
+	if x != nil {
+		return x.ImportanceScore
+	}
+	return 0
+}
+
+func (x *CreateAIKnowledgeBaseEntryCommand) GetKeywords() []string {
+	if x != nil {
+		return x.Keywords
+	}
+	return nil
+}
+
+func (x *CreateAIKnowledgeBaseEntryCommand) GetKnowledgeDetails() string {
+	if x != nil {
+		return x.KnowledgeDetails
+	}
+	return ""
+}
+
+func (x *CreateAIKnowledgeBaseEntryCommand) GetSummary() string {
+	if x != nil {
+		return x.Summary
+	}
+	return ""
+}
+
+func (x *CreateAIKnowledgeBaseEntryCommand) GetSourcePage() int32 {
+	if x != nil {
+		return x.SourcePage
+	}
+	return 0
+}
+
+func (x *CreateAIKnowledgeBaseEntryCommand) GetPotentialQuestions() []string {
+	if x != nil {
+		return x.PotentialQuestions
+	}
+	return nil
+}
+
+func (x *CreateAIKnowledgeBaseEntryCommand) GetPotentialQuestionsVector() []float32 {
+	if x != nil {
+		return x.PotentialQuestionsVector
+	}
+	return nil
+}
+
+type AIKnowledgeBaseEntryCreated struct {
+	state         protoimpl.MessageState      `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata           `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                      `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Item          *AIKnowledgeBaseEntryRecord `protobuf:"bytes,3,opt,name=item,proto3" json:"item,omitempty"`
+	Message       string                      `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIKnowledgeBaseEntryCreated) Reset() {
+	*x = AIKnowledgeBaseEntryCreated{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[175]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIKnowledgeBaseEntryCreated) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIKnowledgeBaseEntryCreated) ProtoMessage() {}
+
+func (x *AIKnowledgeBaseEntryCreated) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[175]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIKnowledgeBaseEntryCreated.ProtoReflect.Descriptor instead.
+func (*AIKnowledgeBaseEntryCreated) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{175}
+}
+
+func (x *AIKnowledgeBaseEntryCreated) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIKnowledgeBaseEntryCreated) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseEntryCreated) GetItem() *AIKnowledgeBaseEntryRecord {
+	if x != nil {
+		return x.Item
+	}
+	return nil
+}
+
+func (x *AIKnowledgeBaseEntryCreated) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type AIKnowledgeBaseEntryCreateFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,3,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIKnowledgeBaseEntryCreateFailed) Reset() {
+	*x = AIKnowledgeBaseEntryCreateFailed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[176]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIKnowledgeBaseEntryCreateFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIKnowledgeBaseEntryCreateFailed) ProtoMessage() {}
+
+func (x *AIKnowledgeBaseEntryCreateFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[176]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIKnowledgeBaseEntryCreateFailed.ProtoReflect.Descriptor instead.
+func (*AIKnowledgeBaseEntryCreateFailed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{176}
+}
+
+func (x *AIKnowledgeBaseEntryCreateFailed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIKnowledgeBaseEntryCreateFailed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseEntryCreateFailed) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseEntryCreateFailed) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+type UpdateAIKnowledgeBaseEntryCommand struct {
+	state                         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata                      *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId                  string                 `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId                   string                 `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	KnowledgeBaseId               int64                  `protobuf:"varint,4,opt,name=knowledge_base_id,json=knowledgeBaseId,proto3" json:"knowledge_base_id,omitempty"`
+	KnowledgeBaseEntryId          int64                  `protobuf:"varint,5,opt,name=knowledge_base_entry_id,json=knowledgeBaseEntryId,proto3" json:"knowledge_base_entry_id,omitempty"`
+	KnowledgeBaseEntryHiddenIndex string                 `protobuf:"bytes,6,opt,name=knowledge_base_entry_hidden_index,json=knowledgeBaseEntryHiddenIndex,proto3" json:"knowledge_base_entry_hidden_index,omitempty"`
+	KnowledgeTitle                string                 `protobuf:"bytes,7,opt,name=knowledge_title,json=knowledgeTitle,proto3" json:"knowledge_title,omitempty"`
+	KnowledgeType                 string                 `protobuf:"bytes,8,opt,name=knowledge_type,json=knowledgeType,proto3" json:"knowledge_type,omitempty"`
+	ImportanceScore               int32                  `protobuf:"varint,9,opt,name=importance_score,json=importanceScore,proto3" json:"importance_score,omitempty"`
+	Keywords                      []string               `protobuf:"bytes,10,rep,name=keywords,proto3" json:"keywords,omitempty"`
+	KnowledgeDetails              string                 `protobuf:"bytes,11,opt,name=knowledge_details,json=knowledgeDetails,proto3" json:"knowledge_details,omitempty"`
+	Summary                       string                 `protobuf:"bytes,12,opt,name=summary,proto3" json:"summary,omitempty"`
+	SourcePage                    int32                  `protobuf:"varint,13,opt,name=source_page,json=sourcePage,proto3" json:"source_page,omitempty"`
+	PotentialQuestions            []string               `protobuf:"bytes,14,rep,name=potential_questions,json=potentialQuestions,proto3" json:"potential_questions,omitempty"`
+	unknownFields                 protoimpl.UnknownFields
+	sizeCache                     protoimpl.SizeCache
+}
+
+func (x *UpdateAIKnowledgeBaseEntryCommand) Reset() {
+	*x = UpdateAIKnowledgeBaseEntryCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[177]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateAIKnowledgeBaseEntryCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateAIKnowledgeBaseEntryCommand) ProtoMessage() {}
+
+func (x *UpdateAIKnowledgeBaseEntryCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[177]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateAIKnowledgeBaseEntryCommand.ProtoReflect.Descriptor instead.
+func (*UpdateAIKnowledgeBaseEntryCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{177}
+}
+
+func (x *UpdateAIKnowledgeBaseEntryCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *UpdateAIKnowledgeBaseEntryCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *UpdateAIKnowledgeBaseEntryCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *UpdateAIKnowledgeBaseEntryCommand) GetKnowledgeBaseId() int64 {
+	if x != nil {
+		return x.KnowledgeBaseId
+	}
+	return 0
+}
+
+func (x *UpdateAIKnowledgeBaseEntryCommand) GetKnowledgeBaseEntryId() int64 {
+	if x != nil {
+		return x.KnowledgeBaseEntryId
+	}
+	return 0
+}
+
+func (x *UpdateAIKnowledgeBaseEntryCommand) GetKnowledgeBaseEntryHiddenIndex() string {
+	if x != nil {
+		return x.KnowledgeBaseEntryHiddenIndex
+	}
+	return ""
+}
+
+func (x *UpdateAIKnowledgeBaseEntryCommand) GetKnowledgeTitle() string {
+	if x != nil {
+		return x.KnowledgeTitle
+	}
+	return ""
+}
+
+func (x *UpdateAIKnowledgeBaseEntryCommand) GetKnowledgeType() string {
+	if x != nil {
+		return x.KnowledgeType
+	}
+	return ""
+}
+
+func (x *UpdateAIKnowledgeBaseEntryCommand) GetImportanceScore() int32 {
+	if x != nil {
+		return x.ImportanceScore
+	}
+	return 0
+}
+
+func (x *UpdateAIKnowledgeBaseEntryCommand) GetKeywords() []string {
+	if x != nil {
+		return x.Keywords
+	}
+	return nil
+}
+
+func (x *UpdateAIKnowledgeBaseEntryCommand) GetKnowledgeDetails() string {
+	if x != nil {
+		return x.KnowledgeDetails
+	}
+	return ""
+}
+
+func (x *UpdateAIKnowledgeBaseEntryCommand) GetSummary() string {
+	if x != nil {
+		return x.Summary
+	}
+	return ""
+}
+
+func (x *UpdateAIKnowledgeBaseEntryCommand) GetSourcePage() int32 {
+	if x != nil {
+		return x.SourcePage
+	}
+	return 0
+}
+
+func (x *UpdateAIKnowledgeBaseEntryCommand) GetPotentialQuestions() []string {
+	if x != nil {
+		return x.PotentialQuestions
+	}
+	return nil
+}
+
+type AIKnowledgeBaseEntryUpdated struct {
+	state         protoimpl.MessageState      `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata           `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                      `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Item          *AIKnowledgeBaseEntryRecord `protobuf:"bytes,3,opt,name=item,proto3" json:"item,omitempty"`
+	Message       string                      `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIKnowledgeBaseEntryUpdated) Reset() {
+	*x = AIKnowledgeBaseEntryUpdated{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[178]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIKnowledgeBaseEntryUpdated) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIKnowledgeBaseEntryUpdated) ProtoMessage() {}
+
+func (x *AIKnowledgeBaseEntryUpdated) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[178]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIKnowledgeBaseEntryUpdated.ProtoReflect.Descriptor instead.
+func (*AIKnowledgeBaseEntryUpdated) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{178}
+}
+
+func (x *AIKnowledgeBaseEntryUpdated) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIKnowledgeBaseEntryUpdated) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseEntryUpdated) GetItem() *AIKnowledgeBaseEntryRecord {
+	if x != nil {
+		return x.Item
+	}
+	return nil
+}
+
+func (x *AIKnowledgeBaseEntryUpdated) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type AIKnowledgeBaseEntryUpdateFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,3,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIKnowledgeBaseEntryUpdateFailed) Reset() {
+	*x = AIKnowledgeBaseEntryUpdateFailed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[179]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIKnowledgeBaseEntryUpdateFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIKnowledgeBaseEntryUpdateFailed) ProtoMessage() {}
+
+func (x *AIKnowledgeBaseEntryUpdateFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[179]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIKnowledgeBaseEntryUpdateFailed.ProtoReflect.Descriptor instead.
+func (*AIKnowledgeBaseEntryUpdateFailed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{179}
+}
+
+func (x *AIKnowledgeBaseEntryUpdateFailed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIKnowledgeBaseEntryUpdateFailed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseEntryUpdateFailed) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseEntryUpdateFailed) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+type DeleteAIKnowledgeBaseEntryCommand struct {
+	state                         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata                      *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId                  string                 `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId                   string                 `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	KnowledgeBaseId               int64                  `protobuf:"varint,4,opt,name=knowledge_base_id,json=knowledgeBaseId,proto3" json:"knowledge_base_id,omitempty"`
+	KnowledgeBaseEntryId          int64                  `protobuf:"varint,5,opt,name=knowledge_base_entry_id,json=knowledgeBaseEntryId,proto3" json:"knowledge_base_entry_id,omitempty"`
+	KnowledgeBaseEntryHiddenIndex string                 `protobuf:"bytes,6,opt,name=knowledge_base_entry_hidden_index,json=knowledgeBaseEntryHiddenIndex,proto3" json:"knowledge_base_entry_hidden_index,omitempty"`
+	unknownFields                 protoimpl.UnknownFields
+	sizeCache                     protoimpl.SizeCache
+}
+
+func (x *DeleteAIKnowledgeBaseEntryCommand) Reset() {
+	*x = DeleteAIKnowledgeBaseEntryCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[180]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteAIKnowledgeBaseEntryCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteAIKnowledgeBaseEntryCommand) ProtoMessage() {}
+
+func (x *DeleteAIKnowledgeBaseEntryCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[180]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteAIKnowledgeBaseEntryCommand.ProtoReflect.Descriptor instead.
+func (*DeleteAIKnowledgeBaseEntryCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{180}
+}
+
+func (x *DeleteAIKnowledgeBaseEntryCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *DeleteAIKnowledgeBaseEntryCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *DeleteAIKnowledgeBaseEntryCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *DeleteAIKnowledgeBaseEntryCommand) GetKnowledgeBaseId() int64 {
+	if x != nil {
+		return x.KnowledgeBaseId
+	}
+	return 0
+}
+
+func (x *DeleteAIKnowledgeBaseEntryCommand) GetKnowledgeBaseEntryId() int64 {
+	if x != nil {
+		return x.KnowledgeBaseEntryId
+	}
+	return 0
+}
+
+func (x *DeleteAIKnowledgeBaseEntryCommand) GetKnowledgeBaseEntryHiddenIndex() string {
+	if x != nil {
+		return x.KnowledgeBaseEntryHiddenIndex
+	}
+	return ""
+}
+
+type AIKnowledgeBaseEntryDeleted struct {
+	state                         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata                      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId                   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	KnowledgeBaseId               int64                  `protobuf:"varint,3,opt,name=knowledge_base_id,json=knowledgeBaseId,proto3" json:"knowledge_base_id,omitempty"`
+	KnowledgeBaseEntryId          int64                  `protobuf:"varint,4,opt,name=knowledge_base_entry_id,json=knowledgeBaseEntryId,proto3" json:"knowledge_base_entry_id,omitempty"`
+	KnowledgeBaseEntryHiddenIndex string                 `protobuf:"bytes,5,opt,name=knowledge_base_entry_hidden_index,json=knowledgeBaseEntryHiddenIndex,proto3" json:"knowledge_base_entry_hidden_index,omitempty"`
+	Message                       string                 `protobuf:"bytes,6,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields                 protoimpl.UnknownFields
+	sizeCache                     protoimpl.SizeCache
+}
+
+func (x *AIKnowledgeBaseEntryDeleted) Reset() {
+	*x = AIKnowledgeBaseEntryDeleted{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[181]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIKnowledgeBaseEntryDeleted) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIKnowledgeBaseEntryDeleted) ProtoMessage() {}
+
+func (x *AIKnowledgeBaseEntryDeleted) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[181]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIKnowledgeBaseEntryDeleted.ProtoReflect.Descriptor instead.
+func (*AIKnowledgeBaseEntryDeleted) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{181}
+}
+
+func (x *AIKnowledgeBaseEntryDeleted) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIKnowledgeBaseEntryDeleted) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseEntryDeleted) GetKnowledgeBaseId() int64 {
+	if x != nil {
+		return x.KnowledgeBaseId
+	}
+	return 0
+}
+
+func (x *AIKnowledgeBaseEntryDeleted) GetKnowledgeBaseEntryId() int64 {
+	if x != nil {
+		return x.KnowledgeBaseEntryId
+	}
+	return 0
+}
+
+func (x *AIKnowledgeBaseEntryDeleted) GetKnowledgeBaseEntryHiddenIndex() string {
+	if x != nil {
+		return x.KnowledgeBaseEntryHiddenIndex
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseEntryDeleted) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type AIKnowledgeBaseEntryDeleteFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,3,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIKnowledgeBaseEntryDeleteFailed) Reset() {
+	*x = AIKnowledgeBaseEntryDeleteFailed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[182]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIKnowledgeBaseEntryDeleteFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIKnowledgeBaseEntryDeleteFailed) ProtoMessage() {}
+
+func (x *AIKnowledgeBaseEntryDeleteFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[182]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIKnowledgeBaseEntryDeleteFailed.ProtoReflect.Descriptor instead.
+func (*AIKnowledgeBaseEntryDeleteFailed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{182}
+}
+
+func (x *AIKnowledgeBaseEntryDeleteFailed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIKnowledgeBaseEntryDeleteFailed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseEntryDeleteFailed) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseEntryDeleteFailed) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+type BuildAIKnowledgeBaseVectorIndexCommand struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Metadata         *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId     string                 `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId      string                 `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	KnowledgeBaseId  int64                  `protobuf:"varint,4,opt,name=knowledge_base_id,json=knowledgeBaseId,proto3" json:"knowledge_base_id,omitempty"`
+	BaseUrl          string                 `protobuf:"bytes,5,opt,name=base_url,json=baseUrl,proto3" json:"base_url,omitempty"`
+	ApiKey           string                 `protobuf:"bytes,6,opt,name=api_key,json=apiKey,proto3" json:"api_key,omitempty"`
+	Proxy            string                 `protobuf:"bytes,7,opt,name=proxy,proto3" json:"proxy,omitempty"`
+	ModelName        string                 `protobuf:"bytes,8,opt,name=model_name,json=modelName,proto3" json:"model_name,omitempty"`
+	Dimension        int32                  `protobuf:"varint,9,opt,name=dimension,proto3" json:"dimension,omitempty"`
+	M                int32                  `protobuf:"varint,10,opt,name=m,proto3" json:"m,omitempty"`
+	Ml               float32                `protobuf:"fixed32,11,opt,name=ml,proto3" json:"ml,omitempty"`
+	EfSearch         int32                  `protobuf:"varint,12,opt,name=ef_search,json=efSearch,proto3" json:"ef_search,omitempty"`
+	EfConstruct      int32                  `protobuf:"varint,13,opt,name=ef_construct,json=efConstruct,proto3" json:"ef_construct,omitempty"`
+	DistanceFuncType string                 `protobuf:"bytes,14,opt,name=distance_func_type,json=distanceFuncType,proto3" json:"distance_func_type,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *BuildAIKnowledgeBaseVectorIndexCommand) Reset() {
+	*x = BuildAIKnowledgeBaseVectorIndexCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[183]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BuildAIKnowledgeBaseVectorIndexCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BuildAIKnowledgeBaseVectorIndexCommand) ProtoMessage() {}
+
+func (x *BuildAIKnowledgeBaseVectorIndexCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[183]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BuildAIKnowledgeBaseVectorIndexCommand.ProtoReflect.Descriptor instead.
+func (*BuildAIKnowledgeBaseVectorIndexCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{183}
+}
+
+func (x *BuildAIKnowledgeBaseVectorIndexCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *BuildAIKnowledgeBaseVectorIndexCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *BuildAIKnowledgeBaseVectorIndexCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *BuildAIKnowledgeBaseVectorIndexCommand) GetKnowledgeBaseId() int64 {
+	if x != nil {
+		return x.KnowledgeBaseId
+	}
+	return 0
+}
+
+func (x *BuildAIKnowledgeBaseVectorIndexCommand) GetBaseUrl() string {
+	if x != nil {
+		return x.BaseUrl
+	}
+	return ""
+}
+
+func (x *BuildAIKnowledgeBaseVectorIndexCommand) GetApiKey() string {
+	if x != nil {
+		return x.ApiKey
+	}
+	return ""
+}
+
+func (x *BuildAIKnowledgeBaseVectorIndexCommand) GetProxy() string {
+	if x != nil {
+		return x.Proxy
+	}
+	return ""
+}
+
+func (x *BuildAIKnowledgeBaseVectorIndexCommand) GetModelName() string {
+	if x != nil {
+		return x.ModelName
+	}
+	return ""
+}
+
+func (x *BuildAIKnowledgeBaseVectorIndexCommand) GetDimension() int32 {
+	if x != nil {
+		return x.Dimension
+	}
+	return 0
+}
+
+func (x *BuildAIKnowledgeBaseVectorIndexCommand) GetM() int32 {
+	if x != nil {
+		return x.M
+	}
+	return 0
+}
+
+func (x *BuildAIKnowledgeBaseVectorIndexCommand) GetMl() float32 {
+	if x != nil {
+		return x.Ml
+	}
+	return 0
+}
+
+func (x *BuildAIKnowledgeBaseVectorIndexCommand) GetEfSearch() int32 {
+	if x != nil {
+		return x.EfSearch
+	}
+	return 0
+}
+
+func (x *BuildAIKnowledgeBaseVectorIndexCommand) GetEfConstruct() int32 {
+	if x != nil {
+		return x.EfConstruct
+	}
+	return 0
+}
+
+func (x *BuildAIKnowledgeBaseVectorIndexCommand) GetDistanceFuncType() string {
+	if x != nil {
+		return x.DistanceFuncType
+	}
+	return ""
+}
+
+type AIKnowledgeBaseVectorIndexBuilt struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Metadata        *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId     string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	KnowledgeBaseId int64                  `protobuf:"varint,3,opt,name=knowledge_base_id,json=knowledgeBaseId,proto3" json:"knowledge_base_id,omitempty"`
+	Message         string                 `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *AIKnowledgeBaseVectorIndexBuilt) Reset() {
+	*x = AIKnowledgeBaseVectorIndexBuilt{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[184]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIKnowledgeBaseVectorIndexBuilt) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIKnowledgeBaseVectorIndexBuilt) ProtoMessage() {}
+
+func (x *AIKnowledgeBaseVectorIndexBuilt) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[184]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIKnowledgeBaseVectorIndexBuilt.ProtoReflect.Descriptor instead.
+func (*AIKnowledgeBaseVectorIndexBuilt) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{184}
+}
+
+func (x *AIKnowledgeBaseVectorIndexBuilt) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIKnowledgeBaseVectorIndexBuilt) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseVectorIndexBuilt) GetKnowledgeBaseId() int64 {
+	if x != nil {
+		return x.KnowledgeBaseId
+	}
+	return 0
+}
+
+func (x *AIKnowledgeBaseVectorIndexBuilt) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type AIKnowledgeBaseVectorIndexBuildFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,3,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIKnowledgeBaseVectorIndexBuildFailed) Reset() {
+	*x = AIKnowledgeBaseVectorIndexBuildFailed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[185]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIKnowledgeBaseVectorIndexBuildFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIKnowledgeBaseVectorIndexBuildFailed) ProtoMessage() {}
+
+func (x *AIKnowledgeBaseVectorIndexBuildFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[185]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIKnowledgeBaseVectorIndexBuildFailed.ProtoReflect.Descriptor instead.
+func (*AIKnowledgeBaseVectorIndexBuildFailed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{185}
+}
+
+func (x *AIKnowledgeBaseVectorIndexBuildFailed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIKnowledgeBaseVectorIndexBuildFailed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseVectorIndexBuildFailed) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseVectorIndexBuildFailed) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+type BuildAIKnowledgeBaseEntryVectorIndexCommand struct {
+	state                         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata                      *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId                  string                 `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId                   string                 `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	KnowledgeBaseId               int64                  `protobuf:"varint,4,opt,name=knowledge_base_id,json=knowledgeBaseId,proto3" json:"knowledge_base_id,omitempty"`
+	KnowledgeBaseEntryId          int64                  `protobuf:"varint,5,opt,name=knowledge_base_entry_id,json=knowledgeBaseEntryId,proto3" json:"knowledge_base_entry_id,omitempty"`
+	KnowledgeBaseEntryHiddenIndex string                 `protobuf:"bytes,6,opt,name=knowledge_base_entry_hidden_index,json=knowledgeBaseEntryHiddenIndex,proto3" json:"knowledge_base_entry_hidden_index,omitempty"`
+	RelatedEntityUuids            string                 `protobuf:"bytes,7,opt,name=related_entity_uuids,json=relatedEntityUuids,proto3" json:"related_entity_uuids,omitempty"`
+	BaseUrl                       string                 `protobuf:"bytes,8,opt,name=base_url,json=baseUrl,proto3" json:"base_url,omitempty"`
+	ApiKey                        string                 `protobuf:"bytes,9,opt,name=api_key,json=apiKey,proto3" json:"api_key,omitempty"`
+	Proxy                         string                 `protobuf:"bytes,10,opt,name=proxy,proto3" json:"proxy,omitempty"`
+	ModelName                     string                 `protobuf:"bytes,11,opt,name=model_name,json=modelName,proto3" json:"model_name,omitempty"`
+	Dimension                     int32                  `protobuf:"varint,12,opt,name=dimension,proto3" json:"dimension,omitempty"`
+	M                             int32                  `protobuf:"varint,13,opt,name=m,proto3" json:"m,omitempty"`
+	Ml                            float32                `protobuf:"fixed32,14,opt,name=ml,proto3" json:"ml,omitempty"`
+	EfSearch                      int32                  `protobuf:"varint,15,opt,name=ef_search,json=efSearch,proto3" json:"ef_search,omitempty"`
+	EfConstruct                   int32                  `protobuf:"varint,16,opt,name=ef_construct,json=efConstruct,proto3" json:"ef_construct,omitempty"`
+	DistanceFuncType              string                 `protobuf:"bytes,17,opt,name=distance_func_type,json=distanceFuncType,proto3" json:"distance_func_type,omitempty"`
+	unknownFields                 protoimpl.UnknownFields
+	sizeCache                     protoimpl.SizeCache
+}
+
+func (x *BuildAIKnowledgeBaseEntryVectorIndexCommand) Reset() {
+	*x = BuildAIKnowledgeBaseEntryVectorIndexCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[186]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BuildAIKnowledgeBaseEntryVectorIndexCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BuildAIKnowledgeBaseEntryVectorIndexCommand) ProtoMessage() {}
+
+func (x *BuildAIKnowledgeBaseEntryVectorIndexCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[186]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BuildAIKnowledgeBaseEntryVectorIndexCommand.ProtoReflect.Descriptor instead.
+func (*BuildAIKnowledgeBaseEntryVectorIndexCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{186}
+}
+
+func (x *BuildAIKnowledgeBaseEntryVectorIndexCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *BuildAIKnowledgeBaseEntryVectorIndexCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *BuildAIKnowledgeBaseEntryVectorIndexCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *BuildAIKnowledgeBaseEntryVectorIndexCommand) GetKnowledgeBaseId() int64 {
+	if x != nil {
+		return x.KnowledgeBaseId
+	}
+	return 0
+}
+
+func (x *BuildAIKnowledgeBaseEntryVectorIndexCommand) GetKnowledgeBaseEntryId() int64 {
+	if x != nil {
+		return x.KnowledgeBaseEntryId
+	}
+	return 0
+}
+
+func (x *BuildAIKnowledgeBaseEntryVectorIndexCommand) GetKnowledgeBaseEntryHiddenIndex() string {
+	if x != nil {
+		return x.KnowledgeBaseEntryHiddenIndex
+	}
+	return ""
+}
+
+func (x *BuildAIKnowledgeBaseEntryVectorIndexCommand) GetRelatedEntityUuids() string {
+	if x != nil {
+		return x.RelatedEntityUuids
+	}
+	return ""
+}
+
+func (x *BuildAIKnowledgeBaseEntryVectorIndexCommand) GetBaseUrl() string {
+	if x != nil {
+		return x.BaseUrl
+	}
+	return ""
+}
+
+func (x *BuildAIKnowledgeBaseEntryVectorIndexCommand) GetApiKey() string {
+	if x != nil {
+		return x.ApiKey
+	}
+	return ""
+}
+
+func (x *BuildAIKnowledgeBaseEntryVectorIndexCommand) GetProxy() string {
+	if x != nil {
+		return x.Proxy
+	}
+	return ""
+}
+
+func (x *BuildAIKnowledgeBaseEntryVectorIndexCommand) GetModelName() string {
+	if x != nil {
+		return x.ModelName
+	}
+	return ""
+}
+
+func (x *BuildAIKnowledgeBaseEntryVectorIndexCommand) GetDimension() int32 {
+	if x != nil {
+		return x.Dimension
+	}
+	return 0
+}
+
+func (x *BuildAIKnowledgeBaseEntryVectorIndexCommand) GetM() int32 {
+	if x != nil {
+		return x.M
+	}
+	return 0
+}
+
+func (x *BuildAIKnowledgeBaseEntryVectorIndexCommand) GetMl() float32 {
+	if x != nil {
+		return x.Ml
+	}
+	return 0
+}
+
+func (x *BuildAIKnowledgeBaseEntryVectorIndexCommand) GetEfSearch() int32 {
+	if x != nil {
+		return x.EfSearch
+	}
+	return 0
+}
+
+func (x *BuildAIKnowledgeBaseEntryVectorIndexCommand) GetEfConstruct() int32 {
+	if x != nil {
+		return x.EfConstruct
+	}
+	return 0
+}
+
+func (x *BuildAIKnowledgeBaseEntryVectorIndexCommand) GetDistanceFuncType() string {
+	if x != nil {
+		return x.DistanceFuncType
+	}
+	return ""
+}
+
+type AIKnowledgeBaseEntryVectorIndexBuilt struct {
+	state                         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata                      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId                   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	KnowledgeBaseId               int64                  `protobuf:"varint,3,opt,name=knowledge_base_id,json=knowledgeBaseId,proto3" json:"knowledge_base_id,omitempty"`
+	KnowledgeBaseEntryId          int64                  `protobuf:"varint,4,opt,name=knowledge_base_entry_id,json=knowledgeBaseEntryId,proto3" json:"knowledge_base_entry_id,omitempty"`
+	KnowledgeBaseEntryHiddenIndex string                 `protobuf:"bytes,5,opt,name=knowledge_base_entry_hidden_index,json=knowledgeBaseEntryHiddenIndex,proto3" json:"knowledge_base_entry_hidden_index,omitempty"`
+	Message                       string                 `protobuf:"bytes,6,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields                 protoimpl.UnknownFields
+	sizeCache                     protoimpl.SizeCache
+}
+
+func (x *AIKnowledgeBaseEntryVectorIndexBuilt) Reset() {
+	*x = AIKnowledgeBaseEntryVectorIndexBuilt{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[187]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIKnowledgeBaseEntryVectorIndexBuilt) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIKnowledgeBaseEntryVectorIndexBuilt) ProtoMessage() {}
+
+func (x *AIKnowledgeBaseEntryVectorIndexBuilt) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[187]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIKnowledgeBaseEntryVectorIndexBuilt.ProtoReflect.Descriptor instead.
+func (*AIKnowledgeBaseEntryVectorIndexBuilt) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{187}
+}
+
+func (x *AIKnowledgeBaseEntryVectorIndexBuilt) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIKnowledgeBaseEntryVectorIndexBuilt) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseEntryVectorIndexBuilt) GetKnowledgeBaseId() int64 {
+	if x != nil {
+		return x.KnowledgeBaseId
+	}
+	return 0
+}
+
+func (x *AIKnowledgeBaseEntryVectorIndexBuilt) GetKnowledgeBaseEntryId() int64 {
+	if x != nil {
+		return x.KnowledgeBaseEntryId
+	}
+	return 0
+}
+
+func (x *AIKnowledgeBaseEntryVectorIndexBuilt) GetKnowledgeBaseEntryHiddenIndex() string {
+	if x != nil {
+		return x.KnowledgeBaseEntryHiddenIndex
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseEntryVectorIndexBuilt) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type AIKnowledgeBaseEntryVectorIndexBuildFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,3,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIKnowledgeBaseEntryVectorIndexBuildFailed) Reset() {
+	*x = AIKnowledgeBaseEntryVectorIndexBuildFailed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[188]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIKnowledgeBaseEntryVectorIndexBuildFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIKnowledgeBaseEntryVectorIndexBuildFailed) ProtoMessage() {}
+
+func (x *AIKnowledgeBaseEntryVectorIndexBuildFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[188]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIKnowledgeBaseEntryVectorIndexBuildFailed.ProtoReflect.Descriptor instead.
+func (*AIKnowledgeBaseEntryVectorIndexBuildFailed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{188}
+}
+
+func (x *AIKnowledgeBaseEntryVectorIndexBuildFailed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIKnowledgeBaseEntryVectorIndexBuildFailed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseEntryVectorIndexBuildFailed) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AIKnowledgeBaseEntryVectorIndexBuildFailed) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+type AIMemoryFloatRange struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Enabled       bool                   `protobuf:"varint,1,opt,name=enabled,proto3" json:"enabled,omitempty"`
+	Min           float64                `protobuf:"fixed64,2,opt,name=min,proto3" json:"min,omitempty"`
+	Max           float64                `protobuf:"fixed64,3,opt,name=max,proto3" json:"max,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIMemoryFloatRange) Reset() {
+	*x = AIMemoryFloatRange{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[189]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIMemoryFloatRange) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIMemoryFloatRange) ProtoMessage() {}
+
+func (x *AIMemoryFloatRange) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[189]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIMemoryFloatRange.ProtoReflect.Descriptor instead.
+func (*AIMemoryFloatRange) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{189}
+}
+
+func (x *AIMemoryFloatRange) GetEnabled() bool {
+	if x != nil {
+		return x.Enabled
+	}
+	return false
+}
+
+func (x *AIMemoryFloatRange) GetMin() float64 {
+	if x != nil {
+		return x.Min
+	}
+	return 0
+}
+
+func (x *AIMemoryFloatRange) GetMax() float64 {
+	if x != nil {
+		return x.Max
+	}
+	return 0
+}
+
+type AIMemoryInt64Range struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Enabled       bool                   `protobuf:"varint,1,opt,name=enabled,proto3" json:"enabled,omitempty"`
+	Min           int64                  `protobuf:"varint,2,opt,name=min,proto3" json:"min,omitempty"`
+	Max           int64                  `protobuf:"varint,3,opt,name=max,proto3" json:"max,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIMemoryInt64Range) Reset() {
+	*x = AIMemoryInt64Range{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[190]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIMemoryInt64Range) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIMemoryInt64Range) ProtoMessage() {}
+
+func (x *AIMemoryInt64Range) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[190]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIMemoryInt64Range.ProtoReflect.Descriptor instead.
+func (*AIMemoryInt64Range) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{190}
+}
+
+func (x *AIMemoryInt64Range) GetEnabled() bool {
+	if x != nil {
+		return x.Enabled
+	}
+	return false
+}
+
+func (x *AIMemoryInt64Range) GetMin() int64 {
+	if x != nil {
+		return x.Min
+	}
+	return 0
+}
+
+func (x *AIMemoryInt64Range) GetMax() int64 {
+	if x != nil {
+		return x.Max
+	}
+	return 0
+}
+
+type AIMemoryPagination struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Page          int64                  `protobuf:"varint,1,opt,name=page,proto3" json:"page,omitempty"`
+	Limit         int64                  `protobuf:"varint,2,opt,name=limit,proto3" json:"limit,omitempty"`
+	OrderBy       string                 `protobuf:"bytes,3,opt,name=order_by,json=orderBy,proto3" json:"order_by,omitempty"`
+	Order         string                 `protobuf:"bytes,4,opt,name=order,proto3" json:"order,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIMemoryPagination) Reset() {
+	*x = AIMemoryPagination{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[191]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIMemoryPagination) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIMemoryPagination) ProtoMessage() {}
+
+func (x *AIMemoryPagination) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[191]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIMemoryPagination.ProtoReflect.Descriptor instead.
+func (*AIMemoryPagination) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{191}
+}
+
+func (x *AIMemoryPagination) GetPage() int64 {
+	if x != nil {
+		return x.Page
+	}
+	return 0
+}
+
+func (x *AIMemoryPagination) GetLimit() int64 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+func (x *AIMemoryPagination) GetOrderBy() string {
+	if x != nil {
+		return x.OrderBy
+	}
+	return ""
+}
+
+func (x *AIMemoryPagination) GetOrder() string {
+	if x != nil {
+		return x.Order
+	}
+	return ""
+}
+
+type AIMemoryTagCount struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Value         string                 `protobuf:"bytes,1,opt,name=value,proto3" json:"value,omitempty"`
+	Total         int32                  `protobuf:"varint,2,opt,name=total,proto3" json:"total,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIMemoryTagCount) Reset() {
+	*x = AIMemoryTagCount{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[192]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIMemoryTagCount) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIMemoryTagCount) ProtoMessage() {}
+
+func (x *AIMemoryTagCount) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[192]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIMemoryTagCount.ProtoReflect.Descriptor instead.
+func (*AIMemoryTagCount) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{192}
+}
+
+func (x *AIMemoryTagCount) GetValue() string {
+	if x != nil {
+		return x.Value
+	}
+	return ""
+}
+
+func (x *AIMemoryTagCount) GetTotal() int32 {
+	if x != nil {
+		return x.Total
+	}
+	return 0
+}
+
+type AIMemoryEntityRecord struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	Id                 int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	CreatedAt          int64                  `protobuf:"varint,2,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt          int64                  `protobuf:"varint,3,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	MemoryId           string                 `protobuf:"bytes,4,opt,name=memory_id,json=memoryId,proto3" json:"memory_id,omitempty"`
+	SessionId          string                 `protobuf:"bytes,5,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	Content            string                 `protobuf:"bytes,6,opt,name=content,proto3" json:"content,omitempty"`
+	Tags               []string               `protobuf:"bytes,7,rep,name=tags,proto3" json:"tags,omitempty"`
+	PotentialQuestions []string               `protobuf:"bytes,8,rep,name=potential_questions,json=potentialQuestions,proto3" json:"potential_questions,omitempty"`
+	CScore             float64                `protobuf:"fixed64,9,opt,name=c_score,json=cScore,proto3" json:"c_score,omitempty"`
+	OScore             float64                `protobuf:"fixed64,10,opt,name=o_score,json=oScore,proto3" json:"o_score,omitempty"`
+	RScore             float64                `protobuf:"fixed64,11,opt,name=r_score,json=rScore,proto3" json:"r_score,omitempty"`
+	EScore             float64                `protobuf:"fixed64,12,opt,name=e_score,json=eScore,proto3" json:"e_score,omitempty"`
+	PScore             float64                `protobuf:"fixed64,13,opt,name=p_score,json=pScore,proto3" json:"p_score,omitempty"`
+	AScore             float64                `protobuf:"fixed64,14,opt,name=a_score,json=aScore,proto3" json:"a_score,omitempty"`
+	TScore             float64                `protobuf:"fixed64,15,opt,name=t_score,json=tScore,proto3" json:"t_score,omitempty"`
+	CorePactVector     []float32              `protobuf:"fixed32,16,rep,packed,name=core_pact_vector,json=corePactVector,proto3" json:"core_pact_vector,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *AIMemoryEntityRecord) Reset() {
+	*x = AIMemoryEntityRecord{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[193]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIMemoryEntityRecord) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIMemoryEntityRecord) ProtoMessage() {}
+
+func (x *AIMemoryEntityRecord) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[193]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIMemoryEntityRecord.ProtoReflect.Descriptor instead.
+func (*AIMemoryEntityRecord) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{193}
+}
+
+func (x *AIMemoryEntityRecord) GetId() int64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *AIMemoryEntityRecord) GetCreatedAt() int64 {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return 0
+}
+
+func (x *AIMemoryEntityRecord) GetUpdatedAt() int64 {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return 0
+}
+
+func (x *AIMemoryEntityRecord) GetMemoryId() string {
+	if x != nil {
+		return x.MemoryId
+	}
+	return ""
+}
+
+func (x *AIMemoryEntityRecord) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *AIMemoryEntityRecord) GetContent() string {
+	if x != nil {
+		return x.Content
+	}
+	return ""
+}
+
+func (x *AIMemoryEntityRecord) GetTags() []string {
+	if x != nil {
+		return x.Tags
+	}
+	return nil
+}
+
+func (x *AIMemoryEntityRecord) GetPotentialQuestions() []string {
+	if x != nil {
+		return x.PotentialQuestions
+	}
+	return nil
+}
+
+func (x *AIMemoryEntityRecord) GetCScore() float64 {
+	if x != nil {
+		return x.CScore
+	}
+	return 0
+}
+
+func (x *AIMemoryEntityRecord) GetOScore() float64 {
+	if x != nil {
+		return x.OScore
+	}
+	return 0
+}
+
+func (x *AIMemoryEntityRecord) GetRScore() float64 {
+	if x != nil {
+		return x.RScore
+	}
+	return 0
+}
+
+func (x *AIMemoryEntityRecord) GetEScore() float64 {
+	if x != nil {
+		return x.EScore
+	}
+	return 0
+}
+
+func (x *AIMemoryEntityRecord) GetPScore() float64 {
+	if x != nil {
+		return x.PScore
+	}
+	return 0
+}
+
+func (x *AIMemoryEntityRecord) GetAScore() float64 {
+	if x != nil {
+		return x.AScore
+	}
+	return 0
+}
+
+func (x *AIMemoryEntityRecord) GetTScore() float64 {
+	if x != nil {
+		return x.TScore
+	}
+	return 0
+}
+
+func (x *AIMemoryEntityRecord) GetCorePactVector() []float32 {
+	if x != nil {
+		return x.CorePactVector
+	}
+	return nil
+}
+
+type AIMemoryEntityFilter struct {
+	state                    protoimpl.MessageState `protogen:"open.v1"`
+	SessionId                string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	MemoryIds                []string               `protobuf:"bytes,2,rep,name=memory_ids,json=memoryIds,proto3" json:"memory_ids,omitempty"`
+	ContentKeyword           string                 `protobuf:"bytes,3,opt,name=content_keyword,json=contentKeyword,proto3" json:"content_keyword,omitempty"`
+	Tags                     []string               `protobuf:"bytes,4,rep,name=tags,proto3" json:"tags,omitempty"`
+	TagMatchAll              bool                   `protobuf:"varint,5,opt,name=tag_match_all,json=tagMatchAll,proto3" json:"tag_match_all,omitempty"`
+	PotentialQuestionKeyword string                 `protobuf:"bytes,6,opt,name=potential_question_keyword,json=potentialQuestionKeyword,proto3" json:"potential_question_keyword,omitempty"`
+	CScore                   *AIMemoryFloatRange    `protobuf:"bytes,7,opt,name=c_score,json=cScore,proto3" json:"c_score,omitempty"`
+	OScore                   *AIMemoryFloatRange    `protobuf:"bytes,8,opt,name=o_score,json=oScore,proto3" json:"o_score,omitempty"`
+	RScore                   *AIMemoryFloatRange    `protobuf:"bytes,9,opt,name=r_score,json=rScore,proto3" json:"r_score,omitempty"`
+	EScore                   *AIMemoryFloatRange    `protobuf:"bytes,10,opt,name=e_score,json=eScore,proto3" json:"e_score,omitempty"`
+	PScore                   *AIMemoryFloatRange    `protobuf:"bytes,11,opt,name=p_score,json=pScore,proto3" json:"p_score,omitempty"`
+	AScore                   *AIMemoryFloatRange    `protobuf:"bytes,12,opt,name=a_score,json=aScore,proto3" json:"a_score,omitempty"`
+	TScore                   *AIMemoryFloatRange    `protobuf:"bytes,13,opt,name=t_score,json=tScore,proto3" json:"t_score,omitempty"`
+	CreatedAt                *AIMemoryInt64Range    `protobuf:"bytes,14,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt                *AIMemoryInt64Range    `protobuf:"bytes,15,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	SemanticQuery            string                 `protobuf:"bytes,20,opt,name=semantic_query,json=semanticQuery,proto3" json:"semantic_query,omitempty"`
+	CorePactQueryVector      []float32              `protobuf:"fixed32,21,rep,packed,name=core_pact_query_vector,json=corePactQueryVector,proto3" json:"core_pact_query_vector,omitempty"`
+	VectorTopK               int64                  `protobuf:"varint,22,opt,name=vector_top_k,json=vectorTopK,proto3" json:"vector_top_k,omitempty"`
+	unknownFields            protoimpl.UnknownFields
+	sizeCache                protoimpl.SizeCache
+}
+
+func (x *AIMemoryEntityFilter) Reset() {
+	*x = AIMemoryEntityFilter{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[194]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIMemoryEntityFilter) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIMemoryEntityFilter) ProtoMessage() {}
+
+func (x *AIMemoryEntityFilter) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[194]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIMemoryEntityFilter.ProtoReflect.Descriptor instead.
+func (*AIMemoryEntityFilter) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{194}
+}
+
+func (x *AIMemoryEntityFilter) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *AIMemoryEntityFilter) GetMemoryIds() []string {
+	if x != nil {
+		return x.MemoryIds
+	}
+	return nil
+}
+
+func (x *AIMemoryEntityFilter) GetContentKeyword() string {
+	if x != nil {
+		return x.ContentKeyword
+	}
+	return ""
+}
+
+func (x *AIMemoryEntityFilter) GetTags() []string {
+	if x != nil {
+		return x.Tags
+	}
+	return nil
+}
+
+func (x *AIMemoryEntityFilter) GetTagMatchAll() bool {
+	if x != nil {
+		return x.TagMatchAll
+	}
+	return false
+}
+
+func (x *AIMemoryEntityFilter) GetPotentialQuestionKeyword() string {
+	if x != nil {
+		return x.PotentialQuestionKeyword
+	}
+	return ""
+}
+
+func (x *AIMemoryEntityFilter) GetCScore() *AIMemoryFloatRange {
+	if x != nil {
+		return x.CScore
+	}
+	return nil
+}
+
+func (x *AIMemoryEntityFilter) GetOScore() *AIMemoryFloatRange {
+	if x != nil {
+		return x.OScore
+	}
+	return nil
+}
+
+func (x *AIMemoryEntityFilter) GetRScore() *AIMemoryFloatRange {
+	if x != nil {
+		return x.RScore
+	}
+	return nil
+}
+
+func (x *AIMemoryEntityFilter) GetEScore() *AIMemoryFloatRange {
+	if x != nil {
+		return x.EScore
+	}
+	return nil
+}
+
+func (x *AIMemoryEntityFilter) GetPScore() *AIMemoryFloatRange {
+	if x != nil {
+		return x.PScore
+	}
+	return nil
+}
+
+func (x *AIMemoryEntityFilter) GetAScore() *AIMemoryFloatRange {
+	if x != nil {
+		return x.AScore
+	}
+	return nil
+}
+
+func (x *AIMemoryEntityFilter) GetTScore() *AIMemoryFloatRange {
+	if x != nil {
+		return x.TScore
+	}
+	return nil
+}
+
+func (x *AIMemoryEntityFilter) GetCreatedAt() *AIMemoryInt64Range {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+func (x *AIMemoryEntityFilter) GetUpdatedAt() *AIMemoryInt64Range {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return nil
+}
+
+func (x *AIMemoryEntityFilter) GetSemanticQuery() string {
+	if x != nil {
+		return x.SemanticQuery
+	}
+	return ""
+}
+
+func (x *AIMemoryEntityFilter) GetCorePactQueryVector() []float32 {
+	if x != nil {
+		return x.CorePactQueryVector
+	}
+	return nil
+}
+
+func (x *AIMemoryEntityFilter) GetVectorTopK() int64 {
+	if x != nil {
+		return x.VectorTopK
+	}
+	return 0
+}
+
+type CreateAIMemoryEntityCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId  string                 `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	SessionId     string                 `protobuf:"bytes,4,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	FreeInput     string                 `protobuf:"bytes,5,opt,name=free_input,json=freeInput,proto3" json:"free_input,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateAIMemoryEntityCommand) Reset() {
+	*x = CreateAIMemoryEntityCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[195]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateAIMemoryEntityCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateAIMemoryEntityCommand) ProtoMessage() {}
+
+func (x *CreateAIMemoryEntityCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[195]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateAIMemoryEntityCommand.ProtoReflect.Descriptor instead.
+func (*CreateAIMemoryEntityCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{195}
+}
+
+func (x *CreateAIMemoryEntityCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *CreateAIMemoryEntityCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *CreateAIMemoryEntityCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *CreateAIMemoryEntityCommand) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *CreateAIMemoryEntityCommand) GetFreeInput() string {
+	if x != nil {
+		return x.FreeInput
+	}
+	return ""
+}
+
+type AIMemoryEntityCreated struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	SessionId     string                 `protobuf:"bytes,3,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	Message       string                 `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIMemoryEntityCreated) Reset() {
+	*x = AIMemoryEntityCreated{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[196]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIMemoryEntityCreated) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIMemoryEntityCreated) ProtoMessage() {}
+
+func (x *AIMemoryEntityCreated) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[196]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIMemoryEntityCreated.ProtoReflect.Descriptor instead.
+func (*AIMemoryEntityCreated) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{196}
+}
+
+func (x *AIMemoryEntityCreated) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIMemoryEntityCreated) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIMemoryEntityCreated) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *AIMemoryEntityCreated) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type AIMemoryEntityCreateFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	SessionId     string                 `protobuf:"bytes,3,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,4,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,5,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIMemoryEntityCreateFailed) Reset() {
+	*x = AIMemoryEntityCreateFailed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[197]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIMemoryEntityCreateFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIMemoryEntityCreateFailed) ProtoMessage() {}
+
+func (x *AIMemoryEntityCreateFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[197]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIMemoryEntityCreateFailed.ProtoReflect.Descriptor instead.
+func (*AIMemoryEntityCreateFailed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{197}
+}
+
+func (x *AIMemoryEntityCreateFailed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIMemoryEntityCreateFailed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIMemoryEntityCreateFailed) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *AIMemoryEntityCreateFailed) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AIMemoryEntityCreateFailed) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+type GetAIMemoryEntityCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId  string                 `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	MemoryId      string                 `protobuf:"bytes,4,opt,name=memory_id,json=memoryId,proto3" json:"memory_id,omitempty"`
+	SessionId     string                 `protobuf:"bytes,5,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetAIMemoryEntityCommand) Reset() {
+	*x = GetAIMemoryEntityCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[198]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetAIMemoryEntityCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetAIMemoryEntityCommand) ProtoMessage() {}
+
+func (x *GetAIMemoryEntityCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[198]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetAIMemoryEntityCommand.ProtoReflect.Descriptor instead.
+func (*GetAIMemoryEntityCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{198}
+}
+
+func (x *GetAIMemoryEntityCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *GetAIMemoryEntityCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *GetAIMemoryEntityCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *GetAIMemoryEntityCommand) GetMemoryId() string {
+	if x != nil {
+		return x.MemoryId
+	}
+	return ""
+}
+
+func (x *GetAIMemoryEntityCommand) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+type AIMemoryEntityFetched struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Item          *AIMemoryEntityRecord  `protobuf:"bytes,3,opt,name=item,proto3" json:"item,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIMemoryEntityFetched) Reset() {
+	*x = AIMemoryEntityFetched{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[199]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIMemoryEntityFetched) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIMemoryEntityFetched) ProtoMessage() {}
+
+func (x *AIMemoryEntityFetched) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[199]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIMemoryEntityFetched.ProtoReflect.Descriptor instead.
+func (*AIMemoryEntityFetched) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{199}
+}
+
+func (x *AIMemoryEntityFetched) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIMemoryEntityFetched) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIMemoryEntityFetched) GetItem() *AIMemoryEntityRecord {
+	if x != nil {
+		return x.Item
+	}
+	return nil
+}
+
+type AIMemoryEntityFetchFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,3,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIMemoryEntityFetchFailed) Reset() {
+	*x = AIMemoryEntityFetchFailed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[200]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIMemoryEntityFetchFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIMemoryEntityFetchFailed) ProtoMessage() {}
+
+func (x *AIMemoryEntityFetchFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[200]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIMemoryEntityFetchFailed.ProtoReflect.Descriptor instead.
+func (*AIMemoryEntityFetchFailed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{200}
+}
+
+func (x *AIMemoryEntityFetchFailed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIMemoryEntityFetchFailed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIMemoryEntityFetchFailed) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AIMemoryEntityFetchFailed) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+type QueryAIMemoryEntitiesCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId  string                 `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Pagination    *AIMemoryPagination    `protobuf:"bytes,4,opt,name=pagination,proto3" json:"pagination,omitempty"`
+	Filter        *AIMemoryEntityFilter  `protobuf:"bytes,5,opt,name=filter,proto3" json:"filter,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *QueryAIMemoryEntitiesCommand) Reset() {
+	*x = QueryAIMemoryEntitiesCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[201]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *QueryAIMemoryEntitiesCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*QueryAIMemoryEntitiesCommand) ProtoMessage() {}
+
+func (x *QueryAIMemoryEntitiesCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[201]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use QueryAIMemoryEntitiesCommand.ProtoReflect.Descriptor instead.
+func (*QueryAIMemoryEntitiesCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{201}
+}
+
+func (x *QueryAIMemoryEntitiesCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *QueryAIMemoryEntitiesCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *QueryAIMemoryEntitiesCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *QueryAIMemoryEntitiesCommand) GetPagination() *AIMemoryPagination {
+	if x != nil {
+		return x.Pagination
+	}
+	return nil
+}
+
+func (x *QueryAIMemoryEntitiesCommand) GetFilter() *AIMemoryEntityFilter {
+	if x != nil {
+		return x.Filter
+	}
+	return nil
+}
+
+type AIMemoryEntitiesQueried struct {
+	state         protoimpl.MessageState  `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata       `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                  `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Pagination    *AIMemoryPagination     `protobuf:"bytes,3,opt,name=pagination,proto3" json:"pagination,omitempty"`
+	Items         []*AIMemoryEntityRecord `protobuf:"bytes,4,rep,name=items,proto3" json:"items,omitempty"`
+	Total         int64                   `protobuf:"varint,5,opt,name=total,proto3" json:"total,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIMemoryEntitiesQueried) Reset() {
+	*x = AIMemoryEntitiesQueried{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[202]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIMemoryEntitiesQueried) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIMemoryEntitiesQueried) ProtoMessage() {}
+
+func (x *AIMemoryEntitiesQueried) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[202]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIMemoryEntitiesQueried.ProtoReflect.Descriptor instead.
+func (*AIMemoryEntitiesQueried) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{202}
+}
+
+func (x *AIMemoryEntitiesQueried) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIMemoryEntitiesQueried) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIMemoryEntitiesQueried) GetPagination() *AIMemoryPagination {
+	if x != nil {
+		return x.Pagination
+	}
+	return nil
+}
+
+func (x *AIMemoryEntitiesQueried) GetItems() []*AIMemoryEntityRecord {
+	if x != nil {
+		return x.Items
+	}
+	return nil
+}
+
+func (x *AIMemoryEntitiesQueried) GetTotal() int64 {
+	if x != nil {
+		return x.Total
+	}
+	return 0
+}
+
+type AIMemoryEntitiesQueryFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,3,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIMemoryEntitiesQueryFailed) Reset() {
+	*x = AIMemoryEntitiesQueryFailed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[203]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIMemoryEntitiesQueryFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIMemoryEntitiesQueryFailed) ProtoMessage() {}
+
+func (x *AIMemoryEntitiesQueryFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[203]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIMemoryEntitiesQueryFailed.ProtoReflect.Descriptor instead.
+func (*AIMemoryEntitiesQueryFailed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{203}
+}
+
+func (x *AIMemoryEntitiesQueryFailed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIMemoryEntitiesQueryFailed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIMemoryEntitiesQueryFailed) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AIMemoryEntitiesQueryFailed) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+type UpdateAIMemoryEntityCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId  string                 `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Item          *AIMemoryEntityRecord  `protobuf:"bytes,4,opt,name=item,proto3" json:"item,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateAIMemoryEntityCommand) Reset() {
+	*x = UpdateAIMemoryEntityCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[204]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateAIMemoryEntityCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateAIMemoryEntityCommand) ProtoMessage() {}
+
+func (x *UpdateAIMemoryEntityCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[204]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateAIMemoryEntityCommand.ProtoReflect.Descriptor instead.
+func (*UpdateAIMemoryEntityCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{204}
+}
+
+func (x *UpdateAIMemoryEntityCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *UpdateAIMemoryEntityCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *UpdateAIMemoryEntityCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *UpdateAIMemoryEntityCommand) GetItem() *AIMemoryEntityRecord {
+	if x != nil {
+		return x.Item
+	}
+	return nil
+}
+
+type AIMemoryEntityUpdated struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Item          *AIMemoryEntityRecord  `protobuf:"bytes,3,opt,name=item,proto3" json:"item,omitempty"`
+	Message       string                 `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIMemoryEntityUpdated) Reset() {
+	*x = AIMemoryEntityUpdated{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[205]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIMemoryEntityUpdated) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIMemoryEntityUpdated) ProtoMessage() {}
+
+func (x *AIMemoryEntityUpdated) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[205]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIMemoryEntityUpdated.ProtoReflect.Descriptor instead.
+func (*AIMemoryEntityUpdated) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{205}
+}
+
+func (x *AIMemoryEntityUpdated) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIMemoryEntityUpdated) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIMemoryEntityUpdated) GetItem() *AIMemoryEntityRecord {
+	if x != nil {
+		return x.Item
+	}
+	return nil
+}
+
+func (x *AIMemoryEntityUpdated) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type AIMemoryEntityUpdateFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,3,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIMemoryEntityUpdateFailed) Reset() {
+	*x = AIMemoryEntityUpdateFailed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[206]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIMemoryEntityUpdateFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIMemoryEntityUpdateFailed) ProtoMessage() {}
+
+func (x *AIMemoryEntityUpdateFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[206]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIMemoryEntityUpdateFailed.ProtoReflect.Descriptor instead.
+func (*AIMemoryEntityUpdateFailed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{206}
+}
+
+func (x *AIMemoryEntityUpdateFailed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIMemoryEntityUpdateFailed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIMemoryEntityUpdateFailed) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AIMemoryEntityUpdateFailed) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+type DeleteAIMemoryEntitiesCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId  string                 `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Filter        *AIMemoryEntityFilter  `protobuf:"bytes,4,opt,name=filter,proto3" json:"filter,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteAIMemoryEntitiesCommand) Reset() {
+	*x = DeleteAIMemoryEntitiesCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[207]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteAIMemoryEntitiesCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteAIMemoryEntitiesCommand) ProtoMessage() {}
+
+func (x *DeleteAIMemoryEntitiesCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[207]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteAIMemoryEntitiesCommand.ProtoReflect.Descriptor instead.
+func (*DeleteAIMemoryEntitiesCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{207}
+}
+
+func (x *DeleteAIMemoryEntitiesCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *DeleteAIMemoryEntitiesCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *DeleteAIMemoryEntitiesCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *DeleteAIMemoryEntitiesCommand) GetFilter() *AIMemoryEntityFilter {
+	if x != nil {
+		return x.Filter
+	}
+	return nil
+}
+
+type AIMemoryEntitiesDeleted struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	AffectedCount int64                  `protobuf:"varint,3,opt,name=affected_count,json=affectedCount,proto3" json:"affected_count,omitempty"`
+	Message       string                 `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIMemoryEntitiesDeleted) Reset() {
+	*x = AIMemoryEntitiesDeleted{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[208]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIMemoryEntitiesDeleted) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIMemoryEntitiesDeleted) ProtoMessage() {}
+
+func (x *AIMemoryEntitiesDeleted) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[208]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIMemoryEntitiesDeleted.ProtoReflect.Descriptor instead.
+func (*AIMemoryEntitiesDeleted) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{208}
+}
+
+func (x *AIMemoryEntitiesDeleted) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIMemoryEntitiesDeleted) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIMemoryEntitiesDeleted) GetAffectedCount() int64 {
+	if x != nil {
+		return x.AffectedCount
+	}
+	return 0
+}
+
+func (x *AIMemoryEntitiesDeleted) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type AIMemoryEntitiesDeleteFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,3,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIMemoryEntitiesDeleteFailed) Reset() {
+	*x = AIMemoryEntitiesDeleteFailed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[209]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIMemoryEntitiesDeleteFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIMemoryEntitiesDeleteFailed) ProtoMessage() {}
+
+func (x *AIMemoryEntitiesDeleteFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[209]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIMemoryEntitiesDeleteFailed.ProtoReflect.Descriptor instead.
+func (*AIMemoryEntitiesDeleteFailed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{209}
+}
+
+func (x *AIMemoryEntitiesDeleteFailed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIMemoryEntitiesDeleteFailed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIMemoryEntitiesDeleteFailed) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AIMemoryEntitiesDeleteFailed) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+type CountAIMemoryEntityTagsCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId  string                 `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	SessionId     string                 `protobuf:"bytes,4,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CountAIMemoryEntityTagsCommand) Reset() {
+	*x = CountAIMemoryEntityTagsCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[210]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CountAIMemoryEntityTagsCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CountAIMemoryEntityTagsCommand) ProtoMessage() {}
+
+func (x *CountAIMemoryEntityTagsCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[210]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CountAIMemoryEntityTagsCommand.ProtoReflect.Descriptor instead.
+func (*CountAIMemoryEntityTagsCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{210}
+}
+
+func (x *CountAIMemoryEntityTagsCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *CountAIMemoryEntityTagsCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *CountAIMemoryEntityTagsCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *CountAIMemoryEntityTagsCommand) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+type AIMemoryEntityTagsCounted struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	SessionId     string                 `protobuf:"bytes,3,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	TagsCount     []*AIMemoryTagCount    `protobuf:"bytes,4,rep,name=tags_count,json=tagsCount,proto3" json:"tags_count,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIMemoryEntityTagsCounted) Reset() {
+	*x = AIMemoryEntityTagsCounted{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[211]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIMemoryEntityTagsCounted) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIMemoryEntityTagsCounted) ProtoMessage() {}
+
+func (x *AIMemoryEntityTagsCounted) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[211]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIMemoryEntityTagsCounted.ProtoReflect.Descriptor instead.
+func (*AIMemoryEntityTagsCounted) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{211}
+}
+
+func (x *AIMemoryEntityTagsCounted) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIMemoryEntityTagsCounted) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIMemoryEntityTagsCounted) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *AIMemoryEntityTagsCounted) GetTagsCount() []*AIMemoryTagCount {
+	if x != nil {
+		return x.TagsCount
+	}
+	return nil
+}
+
+type AIMemoryEntityTagsCountFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	SessionId     string                 `protobuf:"bytes,3,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,4,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,5,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIMemoryEntityTagsCountFailed) Reset() {
+	*x = AIMemoryEntityTagsCountFailed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[212]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIMemoryEntityTagsCountFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIMemoryEntityTagsCountFailed) ProtoMessage() {}
+
+func (x *AIMemoryEntityTagsCountFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[212]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIMemoryEntityTagsCountFailed.ProtoReflect.Descriptor instead.
+func (*AIMemoryEntityTagsCountFailed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{212}
+}
+
+func (x *AIMemoryEntityTagsCountFailed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIMemoryEntityTagsCountFailed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIMemoryEntityTagsCountFailed) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *AIMemoryEntityTagsCountFailed) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AIMemoryEntityTagsCountFailed) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+type AIRuntimePagination struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Page          int64                  `protobuf:"varint,1,opt,name=page,proto3" json:"page,omitempty"`
+	Limit         int64                  `protobuf:"varint,2,opt,name=limit,proto3" json:"limit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIRuntimePagination) Reset() {
+	*x = AIRuntimePagination{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[213]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIRuntimePagination) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIRuntimePagination) ProtoMessage() {}
+
+func (x *AIRuntimePagination) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[213]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIRuntimePagination.ProtoReflect.Descriptor instead.
+func (*AIRuntimePagination) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{213}
+}
+
+func (x *AIRuntimePagination) GetPage() int64 {
+	if x != nil {
+		return x.Page
+	}
+	return 0
+}
+
+func (x *AIRuntimePagination) GetLimit() int64 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+type AIHTTPFlowRecord struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	RuntimeId     string                 `protobuf:"bytes,2,opt,name=runtime_id,json=runtimeId,proto3" json:"runtime_id,omitempty"`
+	HiddenIndex   string                 `protobuf:"bytes,3,opt,name=hidden_index,json=hiddenIndex,proto3" json:"hidden_index,omitempty"`
+	RawJson       []byte                 `protobuf:"bytes,4,opt,name=raw_json,json=rawJson,proto3" json:"raw_json,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIHTTPFlowRecord) Reset() {
+	*x = AIHTTPFlowRecord{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[214]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIHTTPFlowRecord) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIHTTPFlowRecord) ProtoMessage() {}
+
+func (x *AIHTTPFlowRecord) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[214]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIHTTPFlowRecord.ProtoReflect.Descriptor instead.
+func (*AIHTTPFlowRecord) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{214}
+}
+
+func (x *AIHTTPFlowRecord) GetId() int64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *AIHTTPFlowRecord) GetRuntimeId() string {
+	if x != nil {
+		return x.RuntimeId
+	}
+	return ""
+}
+
+func (x *AIHTTPFlowRecord) GetHiddenIndex() string {
+	if x != nil {
+		return x.HiddenIndex
+	}
+	return ""
+}
+
+func (x *AIHTTPFlowRecord) GetRawJson() []byte {
+	if x != nil {
+		return x.RawJson
+	}
+	return nil
+}
+
+type QueryAIHTTPFlowsCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId  string                 `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	RuntimeId     string                 `protobuf:"bytes,4,opt,name=runtime_id,json=runtimeId,proto3" json:"runtime_id,omitempty"`
+	HiddenIndex   string                 `protobuf:"bytes,5,opt,name=hidden_index,json=hiddenIndex,proto3" json:"hidden_index,omitempty"`
+	Pagination    *AIRuntimePagination   `protobuf:"bytes,6,opt,name=pagination,proto3" json:"pagination,omitempty"`
+	Method        string                 `protobuf:"bytes,7,opt,name=method,proto3" json:"method,omitempty"`
+	StatusCode    int64                  `protobuf:"varint,8,opt,name=status_code,json=statusCode,proto3" json:"status_code,omitempty"`
+	ContentType   string                 `protobuf:"bytes,9,opt,name=content_type,json=contentType,proto3" json:"content_type,omitempty"`
+	Keyword       string                 `protobuf:"bytes,10,opt,name=keyword,proto3" json:"keyword,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *QueryAIHTTPFlowsCommand) Reset() {
+	*x = QueryAIHTTPFlowsCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[215]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *QueryAIHTTPFlowsCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*QueryAIHTTPFlowsCommand) ProtoMessage() {}
+
+func (x *QueryAIHTTPFlowsCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[215]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use QueryAIHTTPFlowsCommand.ProtoReflect.Descriptor instead.
+func (*QueryAIHTTPFlowsCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{215}
+}
+
+func (x *QueryAIHTTPFlowsCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *QueryAIHTTPFlowsCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *QueryAIHTTPFlowsCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *QueryAIHTTPFlowsCommand) GetRuntimeId() string {
+	if x != nil {
+		return x.RuntimeId
+	}
+	return ""
+}
+
+func (x *QueryAIHTTPFlowsCommand) GetHiddenIndex() string {
+	if x != nil {
+		return x.HiddenIndex
+	}
+	return ""
+}
+
+func (x *QueryAIHTTPFlowsCommand) GetPagination() *AIRuntimePagination {
+	if x != nil {
+		return x.Pagination
+	}
+	return nil
+}
+
+func (x *QueryAIHTTPFlowsCommand) GetMethod() string {
+	if x != nil {
+		return x.Method
+	}
+	return ""
+}
+
+func (x *QueryAIHTTPFlowsCommand) GetStatusCode() int64 {
+	if x != nil {
+		return x.StatusCode
+	}
+	return 0
+}
+
+func (x *QueryAIHTTPFlowsCommand) GetContentType() string {
+	if x != nil {
+		return x.ContentType
+	}
+	return ""
+}
+
+func (x *QueryAIHTTPFlowsCommand) GetKeyword() string {
+	if x != nil {
+		return x.Keyword
+	}
+	return ""
+}
+
+type AIHTTPFlowsQueried struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Items         []*AIHTTPFlowRecord    `protobuf:"bytes,3,rep,name=items,proto3" json:"items,omitempty"`
+	Pagination    *AIRuntimePagination   `protobuf:"bytes,4,opt,name=pagination,proto3" json:"pagination,omitempty"`
+	Total         int64                  `protobuf:"varint,5,opt,name=total,proto3" json:"total,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIHTTPFlowsQueried) Reset() {
+	*x = AIHTTPFlowsQueried{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[216]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIHTTPFlowsQueried) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIHTTPFlowsQueried) ProtoMessage() {}
+
+func (x *AIHTTPFlowsQueried) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[216]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIHTTPFlowsQueried.ProtoReflect.Descriptor instead.
+func (*AIHTTPFlowsQueried) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{216}
+}
+
+func (x *AIHTTPFlowsQueried) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIHTTPFlowsQueried) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIHTTPFlowsQueried) GetItems() []*AIHTTPFlowRecord {
+	if x != nil {
+		return x.Items
+	}
+	return nil
+}
+
+func (x *AIHTTPFlowsQueried) GetPagination() *AIRuntimePagination {
+	if x != nil {
+		return x.Pagination
+	}
+	return nil
+}
+
+func (x *AIHTTPFlowsQueried) GetTotal() int64 {
+	if x != nil {
+		return x.Total
+	}
+	return 0
+}
+
+type AIHTTPFlowsQueryFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,3,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIHTTPFlowsQueryFailed) Reset() {
+	*x = AIHTTPFlowsQueryFailed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[217]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIHTTPFlowsQueryFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIHTTPFlowsQueryFailed) ProtoMessage() {}
+
+func (x *AIHTTPFlowsQueryFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[217]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIHTTPFlowsQueryFailed.ProtoReflect.Descriptor instead.
+func (*AIHTTPFlowsQueryFailed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{217}
+}
+
+func (x *AIHTTPFlowsQueryFailed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIHTTPFlowsQueryFailed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIHTTPFlowsQueryFailed) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AIHTTPFlowsQueryFailed) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+type AIRiskRecord struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            uint64                 `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	RuntimeId     string                 `protobuf:"bytes,2,opt,name=runtime_id,json=runtimeId,proto3" json:"runtime_id,omitempty"`
+	Title         string                 `protobuf:"bytes,3,opt,name=title,proto3" json:"title,omitempty"`
+	RawJson       []byte                 `protobuf:"bytes,4,opt,name=raw_json,json=rawJson,proto3" json:"raw_json,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIRiskRecord) Reset() {
+	*x = AIRiskRecord{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[218]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIRiskRecord) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIRiskRecord) ProtoMessage() {}
+
+func (x *AIRiskRecord) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[218]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIRiskRecord.ProtoReflect.Descriptor instead.
+func (*AIRiskRecord) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{218}
+}
+
+func (x *AIRiskRecord) GetId() uint64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *AIRiskRecord) GetRuntimeId() string {
+	if x != nil {
+		return x.RuntimeId
+	}
+	return ""
+}
+
+func (x *AIRiskRecord) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *AIRiskRecord) GetRawJson() []byte {
+	if x != nil {
+		return x.RawJson
+	}
+	return nil
+}
+
+type QueryAIRisksCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId  string                 `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	RuntimeId     string                 `protobuf:"bytes,4,opt,name=runtime_id,json=runtimeId,proto3" json:"runtime_id,omitempty"`
+	RiskId        uint64                 `protobuf:"varint,5,opt,name=risk_id,json=riskId,proto3" json:"risk_id,omitempty"`
+	Pagination    *AIRuntimePagination   `protobuf:"bytes,6,opt,name=pagination,proto3" json:"pagination,omitempty"`
+	Severity      string                 `protobuf:"bytes,7,opt,name=severity,proto3" json:"severity,omitempty"`
+	RiskType      string                 `protobuf:"bytes,8,opt,name=risk_type,json=riskType,proto3" json:"risk_type,omitempty"`
+	Network       string                 `protobuf:"bytes,9,opt,name=network,proto3" json:"network,omitempty"`
+	Title         string                 `protobuf:"bytes,10,opt,name=title,proto3" json:"title,omitempty"`
+	Keyword       string                 `protobuf:"bytes,11,opt,name=keyword,proto3" json:"keyword,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *QueryAIRisksCommand) Reset() {
+	*x = QueryAIRisksCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[219]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *QueryAIRisksCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*QueryAIRisksCommand) ProtoMessage() {}
+
+func (x *QueryAIRisksCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[219]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use QueryAIRisksCommand.ProtoReflect.Descriptor instead.
+func (*QueryAIRisksCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{219}
+}
+
+func (x *QueryAIRisksCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *QueryAIRisksCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *QueryAIRisksCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *QueryAIRisksCommand) GetRuntimeId() string {
+	if x != nil {
+		return x.RuntimeId
+	}
+	return ""
+}
+
+func (x *QueryAIRisksCommand) GetRiskId() uint64 {
+	if x != nil {
+		return x.RiskId
+	}
+	return 0
+}
+
+func (x *QueryAIRisksCommand) GetPagination() *AIRuntimePagination {
+	if x != nil {
+		return x.Pagination
+	}
+	return nil
+}
+
+func (x *QueryAIRisksCommand) GetSeverity() string {
+	if x != nil {
+		return x.Severity
+	}
+	return ""
+}
+
+func (x *QueryAIRisksCommand) GetRiskType() string {
+	if x != nil {
+		return x.RiskType
+	}
+	return ""
+}
+
+func (x *QueryAIRisksCommand) GetNetwork() string {
+	if x != nil {
+		return x.Network
+	}
+	return ""
+}
+
+func (x *QueryAIRisksCommand) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *QueryAIRisksCommand) GetKeyword() string {
+	if x != nil {
+		return x.Keyword
+	}
+	return ""
+}
+
+type AIRisksQueried struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	Items         []*AIRiskRecord        `protobuf:"bytes,3,rep,name=items,proto3" json:"items,omitempty"`
+	Pagination    *AIRuntimePagination   `protobuf:"bytes,4,opt,name=pagination,proto3" json:"pagination,omitempty"`
+	Total         int64                  `protobuf:"varint,5,opt,name=total,proto3" json:"total,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIRisksQueried) Reset() {
+	*x = AIRisksQueried{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[220]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIRisksQueried) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIRisksQueried) ProtoMessage() {}
+
+func (x *AIRisksQueried) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[220]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIRisksQueried.ProtoReflect.Descriptor instead.
+func (*AIRisksQueried) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{220}
+}
+
+func (x *AIRisksQueried) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIRisksQueried) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIRisksQueried) GetItems() []*AIRiskRecord {
+	if x != nil {
+		return x.Items
+	}
+	return nil
+}
+
+func (x *AIRisksQueried) GetPagination() *AIRuntimePagination {
+	if x != nil {
+		return x.Pagination
+	}
+	return nil
+}
+
+func (x *AIRisksQueried) GetTotal() int64 {
+	if x != nil {
+		return x.Total
+	}
+	return 0
+}
+
+type AIRisksQueryFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,3,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIRisksQueryFailed) Reset() {
+	*x = AIRisksQueryFailed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[221]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIRisksQueryFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIRisksQueryFailed) ProtoMessage() {}
+
+func (x *AIRisksQueryFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[221]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIRisksQueryFailed.ProtoReflect.Descriptor instead.
+func (*AIRisksQueryFailed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{221}
+}
+
+func (x *AIRisksQueryFailed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AIRisksQueryFailed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AIRisksQueryFailed) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AIRisksQueryFailed) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+type ExportAILogsCheckpointsCommand struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Metadata       *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId   string                 `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	OwnerUserId    string                 `protobuf:"bytes,3,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	SessionId      string                 `protobuf:"bytes,4,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	CoordinatorIds []string               `protobuf:"bytes,5,rep,name=coordinator_ids,json=coordinatorIds,proto3" json:"coordinator_ids,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *ExportAILogsCheckpointsCommand) Reset() {
+	*x = ExportAILogsCheckpointsCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[222]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ExportAILogsCheckpointsCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExportAILogsCheckpointsCommand) ProtoMessage() {}
+
+func (x *ExportAILogsCheckpointsCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[222]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExportAILogsCheckpointsCommand.ProtoReflect.Descriptor instead.
+func (*ExportAILogsCheckpointsCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{222}
+}
+
+func (x *ExportAILogsCheckpointsCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *ExportAILogsCheckpointsCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *ExportAILogsCheckpointsCommand) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *ExportAILogsCheckpointsCommand) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *ExportAILogsCheckpointsCommand) GetCoordinatorIds() []string {
+	if x != nil {
+		return x.CoordinatorIds
+	}
+	return nil
+}
+
+type AILogsCheckpointsExported struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Metadata        *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId     string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	SessionId       string                 `protobuf:"bytes,3,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	CheckpointsJson []byte                 `protobuf:"bytes,4,opt,name=checkpoints_json,json=checkpointsJson,proto3" json:"checkpoints_json,omitempty"`
+	Total           int64                  `protobuf:"varint,5,opt,name=total,proto3" json:"total,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *AILogsCheckpointsExported) Reset() {
+	*x = AILogsCheckpointsExported{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[223]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AILogsCheckpointsExported) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AILogsCheckpointsExported) ProtoMessage() {}
+
+func (x *AILogsCheckpointsExported) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[223]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AILogsCheckpointsExported.ProtoReflect.Descriptor instead.
+func (*AILogsCheckpointsExported) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{223}
+}
+
+func (x *AILogsCheckpointsExported) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AILogsCheckpointsExported) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AILogsCheckpointsExported) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *AILogsCheckpointsExported) GetCheckpointsJson() []byte {
+	if x != nil {
+		return x.CheckpointsJson
+	}
+	return nil
+}
+
+func (x *AILogsCheckpointsExported) GetTotal() int64 {
+	if x != nil {
+		return x.Total
+	}
+	return 0
+}
+
+type AILogsCheckpointsExportFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,2,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	SessionId     string                 `protobuf:"bytes,3,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,4,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,5,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AILogsCheckpointsExportFailed) Reset() {
+	*x = AILogsCheckpointsExportFailed{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[224]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AILogsCheckpointsExportFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AILogsCheckpointsExportFailed) ProtoMessage() {}
+
+func (x *AILogsCheckpointsExportFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[224]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AILogsCheckpointsExportFailed.ProtoReflect.Descriptor instead.
+func (*AILogsCheckpointsExportFailed) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{224}
+}
+
+func (x *AILogsCheckpointsExportFailed) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *AILogsCheckpointsExportFailed) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *AILogsCheckpointsExportFailed) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *AILogsCheckpointsExportFailed) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *AILogsCheckpointsExportFailed) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
 type AISessionReady struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	Metadata       *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
@@ -1292,7 +18144,7 @@ type AISessionReady struct {
 
 func (x *AISessionReady) Reset() {
 	*x = AISessionReady{}
-	mi := &file_legion_ai_v1_ai_proto_msgTypes[16]
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[225]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1304,7 +18156,7 @@ func (x *AISessionReady) String() string {
 func (*AISessionReady) ProtoMessage() {}
 
 func (x *AISessionReady) ProtoReflect() protoreflect.Message {
-	mi := &file_legion_ai_v1_ai_proto_msgTypes[16]
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[225]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1317,7 +18169,7 @@ func (x *AISessionReady) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AISessionReady.ProtoReflect.Descriptor instead.
 func (*AISessionReady) Descriptor() ([]byte, []int) {
-	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{16}
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{225}
 }
 
 func (x *AISessionReady) GetMetadata() *v1.EventMetadata {
@@ -1368,7 +18220,7 @@ type AISessionEvent struct {
 
 func (x *AISessionEvent) Reset() {
 	*x = AISessionEvent{}
-	mi := &file_legion_ai_v1_ai_proto_msgTypes[17]
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[226]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1380,7 +18232,7 @@ func (x *AISessionEvent) String() string {
 func (*AISessionEvent) ProtoMessage() {}
 
 func (x *AISessionEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_legion_ai_v1_ai_proto_msgTypes[17]
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[226]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1393,7 +18245,7 @@ func (x *AISessionEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AISessionEvent.ProtoReflect.Descriptor instead.
 func (*AISessionEvent) Descriptor() ([]byte, []int) {
-	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{17}
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{226}
 }
 
 func (x *AISessionEvent) GetMetadata() *v1.EventMetadata {
@@ -1443,7 +18295,7 @@ type AISessionDone struct {
 
 func (x *AISessionDone) Reset() {
 	*x = AISessionDone{}
-	mi := &file_legion_ai_v1_ai_proto_msgTypes[18]
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[227]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1455,7 +18307,7 @@ func (x *AISessionDone) String() string {
 func (*AISessionDone) ProtoMessage() {}
 
 func (x *AISessionDone) ProtoReflect() protoreflect.Message {
-	mi := &file_legion_ai_v1_ai_proto_msgTypes[18]
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[227]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1468,7 +18320,7 @@ func (x *AISessionDone) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AISessionDone.ProtoReflect.Descriptor instead.
 func (*AISessionDone) Descriptor() ([]byte, []int) {
-	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{18}
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{227}
 }
 
 func (x *AISessionDone) GetMetadata() *v1.EventMetadata {
@@ -1513,7 +18365,7 @@ type AISessionFailed struct {
 
 func (x *AISessionFailed) Reset() {
 	*x = AISessionFailed{}
-	mi := &file_legion_ai_v1_ai_proto_msgTypes[19]
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[228]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1525,7 +18377,7 @@ func (x *AISessionFailed) String() string {
 func (*AISessionFailed) ProtoMessage() {}
 
 func (x *AISessionFailed) ProtoReflect() protoreflect.Message {
-	mi := &file_legion_ai_v1_ai_proto_msgTypes[19]
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[228]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1538,7 +18390,7 @@ func (x *AISessionFailed) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AISessionFailed.ProtoReflect.Descriptor instead.
 func (*AISessionFailed) Descriptor() ([]byte, []int) {
-	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{19}
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{228}
 }
 
 func (x *AISessionFailed) GetMetadata() *v1.EventMetadata {
@@ -1595,7 +18447,7 @@ type AISessionCancelled struct {
 
 func (x *AISessionCancelled) Reset() {
 	*x = AISessionCancelled{}
-	mi := &file_legion_ai_v1_ai_proto_msgTypes[20]
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[229]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1607,7 +18459,7 @@ func (x *AISessionCancelled) String() string {
 func (*AISessionCancelled) ProtoMessage() {}
 
 func (x *AISessionCancelled) ProtoReflect() protoreflect.Message {
-	mi := &file_legion_ai_v1_ai_proto_msgTypes[20]
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[229]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1620,7 +18472,7 @@ func (x *AISessionCancelled) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AISessionCancelled.ProtoReflect.Descriptor instead.
 func (*AISessionCancelled) Descriptor() ([]byte, []int) {
-	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{20}
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{229}
 }
 
 func (x *AISessionCancelled) GetMetadata() *v1.EventMetadata {
@@ -1711,7 +18563,43 @@ const file_legion_ai_v1_ai_proto_rawDesc = "" +
 	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x124\n" +
 	"\asession\x18\x02 \x01(\v2\x1a.legion.ai.v1.AISessionRefR\asession\x12\"\n" +
 	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x12\x16\n" +
-	"\x06reason\x18\x04 \x01(\tR\x06reason\"\xda\x03\n" +
+	"\x06reason\x18\x04 \x01(\tR\x06reason\"\xf0\x01\n" +
+	"\x1bUpdateAISessionTitleCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x124\n" +
+	"\asession\x18\x04 \x01(\v2\x1a.legion.ai.v1.AISessionRefR\asession\x12\x14\n" +
+	"\x05title\x18\x05 \x01(\tR\x05title\"\xdc\x01\n" +
+	"\x15AISessionTitleUpdated\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x124\n" +
+	"\asession\x18\x03 \x01(\v2\x1a.legion.ai.v1.AISessionRefR\asession\x12\x14\n" +
+	"\x05title\x18\x04 \x01(\tR\x05title\x12\x18\n" +
+	"\amessage\x18\x05 \x01(\tR\amessage\"\xf5\x01\n" +
+	"\x1aAISessionTitleUpdateFailed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x124\n" +
+	"\asession\x18\x03 \x01(\v2\x1a.legion.ai.v1.AISessionRefR\asession\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x04 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x05 \x01(\tR\ferrorMessage\"\xd5\x01\n" +
+	"\x16DeleteAISessionCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x124\n" +
+	"\asession\x18\x04 \x01(\v2\x1a.legion.ai.v1.AISessionRefR\asession\"\xc9\x01\n" +
+	"\x18AISessionDeleteCompleted\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x124\n" +
+	"\asession\x18\x03 \x01(\v2\x1a.legion.ai.v1.AISessionRefR\asession\x12\x18\n" +
+	"\amessage\x18\x04 \x01(\tR\amessage\"\xf0\x01\n" +
+	"\x15AISessionDeleteFailed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x124\n" +
+	"\asession\x18\x03 \x01(\v2\x1a.legion.ai.v1.AISessionRefR\asession\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x04 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x05 \x01(\tR\ferrorMessage\"\xda\x03\n" +
 	"\x1fAIProviderPreviewConfigSnapshot\x12#\n" +
 	"\rprovider_type\x18\x01 \x01(\tR\fproviderType\x12\x19\n" +
 	"\bbase_url\x18\x02 \x01(\tR\abaseUrl\x12\x19\n" +
@@ -1771,7 +18659,1557 @@ const file_legion_ai_v1_ai_proto_rawDesc = "" +
 	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
 	"\n" +
 	"error_code\x18\x03 \x01(\tR\terrorCode\x12#\n" +
-	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"\x84\x02\n" +
+	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"8\n" +
+	"\x0eAIConfigKVPair\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value\"\xb6\x04\n" +
+	"%AIThirdPartyApplicationConfigSnapshot\x12\x12\n" +
+	"\x04type\x18\x01 \x01(\tR\x04type\x12\x17\n" +
+	"\aapi_key\x18\x02 \x01(\tR\x06apiKey\x12'\n" +
+	"\x0fuser_identifier\x18\x03 \x01(\tR\x0euserIdentifier\x12\x1f\n" +
+	"\vuser_secret\x18\x04 \x01(\tR\n" +
+	"userSecret\x12\x1c\n" +
+	"\tnamespace\x18\x05 \x01(\tR\tnamespace\x12\x16\n" +
+	"\x06domain\x18\x06 \x01(\tR\x06domain\x12\x1f\n" +
+	"\vwebhook_url\x18\a \x01(\tR\n" +
+	"webhookUrl\x12?\n" +
+	"\fextra_params\x18\b \x03(\v2\x1c.legion.ai.v1.AIConfigKVPairR\vextraParams\x12\x1a\n" +
+	"\bdisabled\x18\t \x01(\bR\bdisabled\x12\x14\n" +
+	"\x05proxy\x18\n" +
+	" \x01(\tR\x05proxy\x12\x19\n" +
+	"\bno_https\x18\v \x01(\bR\anoHttps\x12\x19\n" +
+	"\bapi_type\x18\f \x01(\tR\aapiType\x12\x19\n" +
+	"\bbase_url\x18\r \x01(\tR\abaseUrl\x12\x1a\n" +
+	"\bendpoint\x18\x0e \x01(\tR\bendpoint\x12'\n" +
+	"\x0fenable_endpoint\x18\x0f \x01(\bR\x0eenableEndpoint\x126\n" +
+	"\aheaders\x18\x10 \x03(\v2\x1c.legion.ai.v1.AIConfigKVPairR\aheaders\"\xe9\x01\n" +
+	"\x15AIModelConfigSnapshot\x12\x1f\n" +
+	"\vprovider_id\x18\x01 \x01(\x03R\n" +
+	"providerId\x12O\n" +
+	"\bprovider\x18\x02 \x01(\v23.legion.ai.v1.AIThirdPartyApplicationConfigSnapshotR\bprovider\x12\x1d\n" +
+	"\n" +
+	"model_name\x18\x03 \x01(\tR\tmodelName\x12?\n" +
+	"\fextra_params\x18\x04 \x03(\v2\x1c.legion.ai.v1.AIConfigKVPairR\vextraParams\"\xef\x03\n" +
+	"\x16AIGlobalConfigSnapshot\x12\x18\n" +
+	"\aenabled\x18\x01 \x01(\bR\aenabled\x12%\n" +
+	"\x0erouting_policy\x18\x02 \x01(\tR\rroutingPolicy\x12)\n" +
+	"\x10disable_fallback\x18\x03 \x01(\bR\x0fdisableFallback\x12(\n" +
+	"\x10default_model_id\x18\x04 \x01(\tR\x0edefaultModelId\x12#\n" +
+	"\rglobal_weight\x18\x05 \x01(\x01R\fglobalWeight\x12R\n" +
+	"\x12intelligent_models\x18\x06 \x03(\v2#.legion.ai.v1.AIModelConfigSnapshotR\x11intelligentModels\x12R\n" +
+	"\x12lightweight_models\x18\a \x03(\v2#.legion.ai.v1.AIModelConfigSnapshotR\x11lightweightModels\x12H\n" +
+	"\rvision_models\x18\b \x03(\v2#.legion.ai.v1.AIModelConfigSnapshotR\fvisionModels\x12(\n" +
+	"\x10ai_preset_prompt\x18\t \x01(\tR\x0eaiPresetPrompt\"\xa1\x01\n" +
+	"\x18GetAIGlobalConfigCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\"\xdf\x01\n" +
+	"\x18SetAIGlobalConfigCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x12<\n" +
+	"\x06config\x18\x04 \x01(\v2$.legion.ai.v1.AIGlobalConfigSnapshotR\x06config\"\xb4\x01\n" +
+	"\x15AIGlobalConfigFetched\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12<\n" +
+	"\x06config\x18\x03 \x01(\v2$.legion.ai.v1.AIGlobalConfigSnapshotR\x06config\"\xbe\x01\n" +
+	"\x19AIGlobalConfigFetchFailed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x03 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"\xb4\x01\n" +
+	"\x15AIGlobalConfigUpdated\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12<\n" +
+	"\x06config\x18\x03 \x01(\v2$.legion.ai.v1.AIGlobalConfigSnapshotR\x06config\"\xbf\x01\n" +
+	"\x1aAIGlobalConfigUpdateFailed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x03 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"\x88\x02\n" +
+	"\aAIFocus\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
+	"\vdescription\x18\x02 \x01(\tR\vdescription\x122\n" +
+	"\x15output_example_prompt\x18\x03 \x01(\tR\x13outputExamplePrompt\x12!\n" +
+	"\fusage_prompt\x18\x04 \x01(\tR\vusagePrompt\x12!\n" +
+	"\fverbose_name\x18\x05 \x01(\tR\vverboseName\x12&\n" +
+	"\x0fverbose_name_zh\x18\x06 \x01(\tR\rverboseNameZh\x12%\n" +
+	"\x0edescription_zh\x18\a \x01(\tR\rdescriptionZh\"\x9c\x01\n" +
+	"\x13QueryAIFocusCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\"\x9c\x01\n" +
+	"\x0eAIFocusQueried\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12+\n" +
+	"\x05items\x18\x03 \x03(\v2\x15.legion.ai.v1.AIFocusR\x05items\"\xb7\x01\n" +
+	"\x12AIFocusQueryFailed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x03 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"\xba\x01\n" +
+	"\x1bGetRandomAIMaterialsCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x12\x14\n" +
+	"\x05limit\x18\x04 \x01(\x03R\x05limit\"\xca\x02\n" +
+	"\x18AIMaterialsRandomQueried\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12^\n" +
+	"\x16knowledge_base_entries\x18\x03 \x03(\v2(.legion.ai.v1.AIKnowledgeBaseEntryRecordR\x14knowledgeBaseEntries\x125\n" +
+	"\bai_tools\x18\x04 \x03(\v2\x1a.legion.ai.v1.AIToolRecordR\aaiTools\x128\n" +
+	"\tai_forges\x18\x05 \x03(\v2\x1b.legion.ai.v1.AIForgeRecordR\baiForges\"\xc1\x01\n" +
+	"\x1cAIMaterialsRandomQueryFailed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x03 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"A\n" +
+	"\x15AIMCPServerPagination\x12\x12\n" +
+	"\x04page\x18\x01 \x01(\x03R\x04page\x12\x14\n" +
+	"\x05limit\x18\x02 \x01(\x03R\x05limit\"\xa1\x01\n" +
+	"\x14AIMCPServerToolParam\x12\x12\n" +
+	"\x04type\x18\x01 \x01(\tR\x04type\x12 \n" +
+	"\vdescription\x18\x02 \x01(\tR\vdescription\x12#\n" +
+	"\rdefault_value\x18\x03 \x01(\tR\fdefaultValue\x12\x1a\n" +
+	"\brequired\x18\x04 \x01(\bR\brequired\x12\x12\n" +
+	"\x04name\x18\x05 \x01(\tR\x04name\"\x83\x01\n" +
+	"\x0fAIMCPServerTool\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
+	"\vdescription\x18\x02 \x01(\tR\vdescription\x12:\n" +
+	"\x06params\x18\x03 \x03(\v2\".legion.ai.v1.AIMCPServerToolParamR\x06params\"\xb3\x03\n" +
+	"\x11AIMCPServerRecord\x12\x1b\n" +
+	"\tserver_id\x18\x01 \x01(\x03R\bserverId\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12%\n" +
+	"\x0etransport_type\x18\x03 \x01(\tR\rtransportType\x12\x10\n" +
+	"\x03url\x18\x04 \x01(\tR\x03url\x12\x18\n" +
+	"\acommand\x18\x05 \x01(\tR\acommand\x12\x18\n" +
+	"\aenabled\x18\x06 \x01(\bR\aenabled\x123\n" +
+	"\x05tools\x18\a \x03(\v2\x1d.legion.ai.v1.AIMCPServerToolR\x05tools\x12#\n" +
+	"\rerror_message\x18\b \x01(\tR\ferrorMessage\x120\n" +
+	"\x04envs\x18\t \x03(\v2\x1c.legion.ai.v1.AIConfigKVPairR\x04envs\x126\n" +
+	"\aheaders\x18\n" +
+	" \x03(\v2\x1c.legion.ai.v1.AIConfigKVPairR\aheaders\x12\x1d\n" +
+	"\n" +
+	"created_at\x18\v \x01(\x03R\tcreatedAt\x12\x1d\n" +
+	"\n" +
+	"updated_at\x18\f \x01(\x03R\tupdatedAt\"\xe4\x02\n" +
+	"\x17ListAIMCPServersCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x12\x14\n" +
+	"\x05query\x18\x04 \x01(\tR\x05query\x12\x1b\n" +
+	"\tserver_id\x18\x05 \x01(\x03R\bserverId\x12%\n" +
+	"\x0etransport_type\x18\x06 \x01(\tR\rtransportType\x12C\n" +
+	"\n" +
+	"pagination\x18\a \x01(\v2#.legion.ai.v1.AIMCPServerPaginationR\n" +
+	"pagination\x12#\n" +
+	"\rinclude_tools\x18\b \x01(\bR\fincludeTools\"\x85\x02\n" +
+	"\x12AIMCPServersListed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x125\n" +
+	"\x05items\x18\x03 \x03(\v2\x1f.legion.ai.v1.AIMCPServerRecordR\x05items\x12C\n" +
+	"\n" +
+	"pagination\x18\x04 \x01(\v2#.legion.ai.v1.AIMCPServerPaginationR\n" +
+	"pagination\x12\x14\n" +
+	"\x05total\x18\x05 \x01(\x03R\x05total\"\xbb\x01\n" +
+	"\x16AIMCPServersListFailed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x03 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"\x8c\x03\n" +
+	"\x18CreateAIMCPServerCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x12\x12\n" +
+	"\x04name\x18\x04 \x01(\tR\x04name\x12%\n" +
+	"\x0etransport_type\x18\x05 \x01(\tR\rtransportType\x12\x10\n" +
+	"\x03url\x18\x06 \x01(\tR\x03url\x12\x18\n" +
+	"\acommand\x18\a \x01(\tR\acommand\x12\x18\n" +
+	"\aenabled\x18\b \x01(\bR\aenabled\x120\n" +
+	"\x04envs\x18\t \x03(\v2\x1c.legion.ai.v1.AIConfigKVPairR\x04envs\x126\n" +
+	"\aheaders\x18\n" +
+	" \x03(\v2\x1c.legion.ai.v1.AIConfigKVPairR\aheaders\"\xc2\x01\n" +
+	"\x12AIMCPServerCreated\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x123\n" +
+	"\x04item\x18\x03 \x01(\v2\x1f.legion.ai.v1.AIMCPServerRecordR\x04item\x12\x18\n" +
+	"\amessage\x18\x04 \x01(\tR\amessage\"\xbc\x01\n" +
+	"\x17AIMCPServerCreateFailed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x03 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"\xa9\x03\n" +
+	"\x18UpdateAIMCPServerCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x12\x1b\n" +
+	"\tserver_id\x18\x04 \x01(\x03R\bserverId\x12\x12\n" +
+	"\x04name\x18\x05 \x01(\tR\x04name\x12%\n" +
+	"\x0etransport_type\x18\x06 \x01(\tR\rtransportType\x12\x10\n" +
+	"\x03url\x18\a \x01(\tR\x03url\x12\x18\n" +
+	"\acommand\x18\b \x01(\tR\acommand\x12\x18\n" +
+	"\aenabled\x18\t \x01(\bR\aenabled\x120\n" +
+	"\x04envs\x18\n" +
+	" \x03(\v2\x1c.legion.ai.v1.AIConfigKVPairR\x04envs\x126\n" +
+	"\aheaders\x18\v \x03(\v2\x1c.legion.ai.v1.AIConfigKVPairR\aheaders\"\xc2\x01\n" +
+	"\x12AIMCPServerUpdated\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x123\n" +
+	"\x04item\x18\x03 \x01(\v2\x1f.legion.ai.v1.AIMCPServerRecordR\x04item\x12\x18\n" +
+	"\amessage\x18\x04 \x01(\tR\amessage\"\xbc\x01\n" +
+	"\x17AIMCPServerUpdateFailed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x03 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"\xbe\x01\n" +
+	"\x18DeleteAIMCPServerCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x12\x1b\n" +
+	"\tserver_id\x18\x04 \x01(\x03R\bserverId\"\xc2\x01\n" +
+	"\x12AIMCPServerDeleted\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x123\n" +
+	"\x04item\x18\x03 \x01(\v2\x1f.legion.ai.v1.AIMCPServerRecordR\x04item\x12\x18\n" +
+	"\amessage\x18\x04 \x01(\tR\amessage\"\xbc\x01\n" +
+	"\x17AIMCPServerDeleteFailed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x03 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"\xcc\x03\n" +
+	"\x12AILocalModelStatus\x12\x16\n" +
+	"\x06status\x18\x01 \x01(\tR\x06status\x12\x12\n" +
+	"\x04host\x18\x02 \x01(\tR\x04host\x12\x12\n" +
+	"\x04port\x18\x03 \x01(\x05R\x04port\x12\x14\n" +
+	"\x05model\x18\x04 \x01(\tR\x05model\x12\x1d\n" +
+	"\n" +
+	"model_path\x18\x05 \x01(\tR\tmodelPath\x12*\n" +
+	"\x11llama_server_path\x18\x06 \x01(\tR\x0fllamaServerPath\x12!\n" +
+	"\fcontext_size\x18\a \x01(\x05R\vcontextSize\x12#\n" +
+	"\rcont_batching\x18\b \x01(\bR\fcontBatching\x12\x1d\n" +
+	"\n" +
+	"batch_size\x18\t \x01(\x05R\tbatchSize\x12\x18\n" +
+	"\athreads\x18\n" +
+	" \x01(\x05R\athreads\x12\x1a\n" +
+	"\bdetached\x18\v \x01(\bR\bdetached\x12\x14\n" +
+	"\x05debug\x18\f \x01(\bR\x05debug\x12\x18\n" +
+	"\apooling\x18\r \x01(\tR\apooling\x124\n" +
+	"\x16startup_timeout_second\x18\x0e \x01(\x05R\x14startupTimeoutSecond\x12\x12\n" +
+	"\x04args\x18\x0f \x03(\tR\x04args\"\xc5\x02\n" +
+	"\x12AILocalModelRecord\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
+	"\x04type\x18\x02 \x01(\tR\x04type\x12\x1b\n" +
+	"\tfile_name\x18\x03 \x01(\tR\bfileName\x12!\n" +
+	"\fdownload_url\x18\x04 \x01(\tR\vdownloadUrl\x12 \n" +
+	"\vdescription\x18\x05 \x01(\tR\vdescription\x12!\n" +
+	"\fdefault_port\x18\x06 \x01(\x05R\vdefaultPort\x12\x19\n" +
+	"\bis_local\x18\a \x01(\bR\aisLocal\x12\x19\n" +
+	"\bis_ready\x18\b \x01(\bR\aisReady\x12\x12\n" +
+	"\x04path\x18\t \x01(\tR\x04path\x128\n" +
+	"\x06status\x18\n" +
+	" \x01(\v2 .legion.ai.v1.AILocalModelStatusR\x06status\"\xa1\x01\n" +
+	"\x18ListAILocalModelsCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\"\xac\x01\n" +
+	"\x13AILocalModelsListed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x126\n" +
+	"\x05items\x18\x03 \x03(\v2 .legion.ai.v1.AILocalModelRecordR\x05items\"\xbc\x01\n" +
+	"\x17AILocalModelsListFailed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x03 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"\xa7\x01\n" +
+	"\x1eCheckAILlamaServerReadyCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\"\xa2\x01\n" +
+	"\x19AILlamaServerReadyChecked\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x0e\n" +
+	"\x02ok\x18\x03 \x01(\bR\x02ok\x12\x16\n" +
+	"\x06reason\x18\x04 \x01(\tR\x06reason\"\xc2\x01\n" +
+	"\x1dAILlamaServerReadyCheckFailed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x03 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"\xba\x01\n" +
+	"\x1bInstallAILlamaServerCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x12\x14\n" +
+	"\x05proxy\x18\x04 \x01(\tR\x05proxy\"\xa9\x01\n" +
+	"\x15AILocalModelOperation\x12!\n" +
+	"\foperation_id\x18\x01 \x01(\tR\voperationId\x12\x12\n" +
+	"\x04kind\x18\x02 \x01(\tR\x04kind\x12\x1d\n" +
+	"\n" +
+	"model_name\x18\x03 \x01(\tR\tmodelName\x12\x14\n" +
+	"\x05title\x18\x04 \x01(\tR\x05title\x12$\n" +
+	"\x0etarget_node_id\x18\x05 \x01(\tR\ftargetNodeId\"\xc1\x01\n" +
+	"\x1dAILocalModelOperationAccepted\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12A\n" +
+	"\toperation\x18\x03 \x01(\v2#.legion.ai.v1.AILocalModelOperationR\toperation\"\xc8\x02\n" +
+	"\x1fAILocalModelOperationProgressed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12A\n" +
+	"\toperation\x18\x03 \x01(\v2#.legion.ai.v1.AILocalModelOperationR\toperation\x12)\n" +
+	"\x10progress_percent\x18\x04 \x01(\x02R\x0fprogressPercent\x12\x18\n" +
+	"\amessage\x18\x05 \x01(\tR\amessage\x12\x1d\n" +
+	"\n" +
+	"is_message\x18\x06 \x01(\bR\tisMessage\x12\x1f\n" +
+	"\vraw_message\x18\a \x01(\tR\n" +
+	"rawMessage\"\xa0\x02\n" +
+	"\x1eAILocalModelOperationCompleted\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12A\n" +
+	"\toperation\x18\x03 \x01(\v2#.legion.ai.v1.AILocalModelOperationR\toperation\x12\x0e\n" +
+	"\x02ok\x18\x04 \x01(\bR\x02ok\x12\x16\n" +
+	"\x06reason\x18\x05 \x01(\tR\x06reason\x124\n" +
+	"\x04item\x18\x06 \x01(\v2 .legion.ai.v1.AILocalModelRecordR\x04item\"\xda\x01\n" +
+	"\x1eAILocalModelOperationCancelled\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12A\n" +
+	"\toperation\x18\x03 \x01(\v2#.legion.ai.v1.AILocalModelOperationR\toperation\x12\x16\n" +
+	"\x06reason\x18\x04 \x01(\tR\x06reason\"\x83\x02\n" +
+	"\x1bAILocalModelOperationFailed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12A\n" +
+	"\toperation\x18\x03 \x01(\v2#.legion.ai.v1.AILocalModelOperationR\toperation\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x04 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x05 \x01(\tR\ferrorMessage\"\x9f\x01\n" +
+	"\x16AILlamaServerInstalled\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x0e\n" +
+	"\x02ok\x18\x03 \x01(\bR\x02ok\x12\x16\n" +
+	"\x06reason\x18\x04 \x01(\tR\x06reason\"\xbf\x01\n" +
+	"\x1aAILlamaServerInstallFailed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x03 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"\x8b\x02\n" +
+	"\x19CreateAILocalModelCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x12\x12\n" +
+	"\x04name\x18\x04 \x01(\tR\x04name\x12\x1d\n" +
+	"\n" +
+	"model_type\x18\x05 \x01(\tR\tmodelType\x12 \n" +
+	"\vdescription\x18\x06 \x01(\tR\vdescription\x12\x12\n" +
+	"\x04path\x18\a \x01(\tR\x04path\"\xc4\x01\n" +
+	"\x13AILocalModelCreated\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x124\n" +
+	"\x04item\x18\x03 \x01(\v2 .legion.ai.v1.AILocalModelRecordR\x04item\x12\x18\n" +
+	"\amessage\x18\x04 \x01(\tR\amessage\"\xbd\x01\n" +
+	"\x18AILocalModelCreateFailed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x03 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"\x96\x02\n" +
+	"\x19UpdateAILocalModelCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"model_name\x18\x04 \x01(\tR\tmodelName\x12\x1d\n" +
+	"\n" +
+	"model_type\x18\x05 \x01(\tR\tmodelType\x12 \n" +
+	"\vdescription\x18\x06 \x01(\tR\vdescription\x12\x12\n" +
+	"\x04path\x18\a \x01(\tR\x04path\"\xc4\x01\n" +
+	"\x13AILocalModelUpdated\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x124\n" +
+	"\x04item\x18\x03 \x01(\v2 .legion.ai.v1.AILocalModelRecordR\x04item\x12\x18\n" +
+	"\amessage\x18\x04 \x01(\tR\amessage\"\xbd\x01\n" +
+	"\x18AILocalModelUpdateFailed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x03 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"\xef\x01\n" +
+	"\x19DeleteAILocalModelCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"model_name\x18\x04 \x01(\tR\tmodelName\x12,\n" +
+	"\x12delete_source_file\x18\x05 \x01(\bR\x10deleteSourceFile\"\xc4\x01\n" +
+	"\x13AILocalModelDeleted\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x124\n" +
+	"\x04item\x18\x03 \x01(\v2 .legion.ai.v1.AILocalModelRecordR\x04item\x12\x18\n" +
+	"\amessage\x18\x04 \x01(\tR\amessage\"\xbd\x01\n" +
+	"\x18AILocalModelDeleteFailed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x03 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"\xb6\x03\n" +
+	"\x18StartAILocalModelCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"model_name\x18\x04 \x01(\tR\tmodelName\x12\x12\n" +
+	"\x04host\x18\x05 \x01(\tR\x04host\x12\x12\n" +
+	"\x04port\x18\x06 \x01(\x05R\x04port\x12!\n" +
+	"\fcontext_size\x18\a \x01(\x05R\vcontextSize\x12\x1d\n" +
+	"\n" +
+	"batch_size\x18\b \x01(\x05R\tbatchSize\x12\x18\n" +
+	"\athreads\x18\t \x01(\x05R\athreads\x12\x14\n" +
+	"\x05debug\x18\n" +
+	" \x01(\bR\x05debug\x12\x18\n" +
+	"\apooling\x18\v \x01(\tR\apooling\x12,\n" +
+	"\x12startup_timeout_ms\x18\f \x01(\x03R\x10startupTimeoutMs\x12\x12\n" +
+	"\x04args\x18\r \x03(\tR\x04args\"\xc4\x01\n" +
+	"\x13AILocalModelStarted\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x124\n" +
+	"\x04item\x18\x03 \x01(\v2 .legion.ai.v1.AILocalModelRecordR\x04item\x12\x18\n" +
+	"\amessage\x18\x04 \x01(\tR\amessage\"\xbc\x01\n" +
+	"\x17AILocalModelStartFailed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x03 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"\xbf\x01\n" +
+	"\x17StopAILocalModelCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"model_name\x18\x04 \x01(\tR\tmodelName\"\xc4\x01\n" +
+	"\x13AILocalModelStopped\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x124\n" +
+	"\x04item\x18\x03 \x01(\v2 .legion.ai.v1.AILocalModelRecordR\x04item\x12\x18\n" +
+	"\amessage\x18\x04 \x01(\tR\amessage\"\xbb\x01\n" +
+	"\x16AILocalModelStopFailed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x03 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"\xd9\x01\n" +
+	"\x1bDownloadAILocalModelCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"model_name\x18\x04 \x01(\tR\tmodelName\x12\x14\n" +
+	"\x05proxy\x18\x05 \x01(\tR\x05proxy\"\xce\x01\n" +
+	"\"CancelAILocalModelOperationCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x12!\n" +
+	"\foperation_id\x18\x04 \x01(\tR\voperationId\"\xc7\x01\n" +
+	"\x16AILocalModelDownloaded\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x124\n" +
+	"\x04item\x18\x03 \x01(\v2 .legion.ai.v1.AILocalModelRecordR\x04item\x12\x18\n" +
+	"\amessage\x18\x04 \x01(\tR\amessage\"\xbf\x01\n" +
+	"\x1aAILocalModelDownloadFailed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x03 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"\xd0\x01\n" +
+	"\x19ClearAILocalModelsCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x12,\n" +
+	"\x12delete_source_file\x18\x04 \x01(\bR\x10deleteSourceFile\"\x9d\x01\n" +
+	"\x14AILocalModelsCleared\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x0e\n" +
+	"\x02ok\x18\x03 \x01(\bR\x02ok\x12\x16\n" +
+	"\x06reason\x18\x04 \x01(\tR\x06reason\"\xbd\x01\n" +
+	"\x18AILocalModelsClearFailed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x03 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"n\n" +
+	"\x11AIForgePagination\x12\x12\n" +
+	"\x04page\x18\x01 \x01(\x03R\x04page\x12\x14\n" +
+	"\x05limit\x18\x02 \x01(\x03R\x05limit\x12\x19\n" +
+	"\border_by\x18\x03 \x01(\tR\aorderBy\x12\x14\n" +
+	"\x05order\x18\x04 \x01(\tR\x05order\"\xde\x05\n" +
+	"\rAIForgeRecord\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x03R\x02id\x12\x1d\n" +
+	"\n" +
+	"forge_name\x18\x02 \x01(\tR\tforgeName\x12#\n" +
+	"\rforge_content\x18\x03 \x01(\tR\fforgeContent\x12\x1d\n" +
+	"\n" +
+	"forge_type\x18\x04 \x01(\tR\tforgeType\x12 \n" +
+	"\vdescription\x18\x05 \x01(\tR\vdescription\x12(\n" +
+	"\x10params_ui_config\x18\x06 \x01(\tR\x0eparamsUiConfig\x12\x16\n" +
+	"\x06params\x18\a \x01(\tR\x06params\x120\n" +
+	"\x14user_persistent_data\x18\b \x01(\tR\x12userPersistentData\x12\x1d\n" +
+	"\n" +
+	"tool_names\x18\t \x03(\tR\ttoolNames\x12#\n" +
+	"\rtool_keywords\x18\n" +
+	" \x03(\tR\ftoolKeywords\x12\x16\n" +
+	"\x06action\x18\v \x01(\tR\x06action\x12\x12\n" +
+	"\x04tags\x18\f \x03(\tR\x04tags\x12\x1f\n" +
+	"\vinit_prompt\x18\r \x01(\tR\n" +
+	"initPrompt\x12+\n" +
+	"\x11persistent_prompt\x18\x0e \x01(\tR\x10persistentPrompt\x12\x1f\n" +
+	"\vplan_prompt\x18\x0f \x01(\tR\n" +
+	"planPrompt\x12#\n" +
+	"\rresult_prompt\x18\x10 \x01(\tR\fresultPrompt\x12,\n" +
+	"\x12forge_verbose_name\x18\x11 \x01(\tR\x10forgeVerboseName\x12\x16\n" +
+	"\x06author\x18\x12 \x01(\tR\x06author\x12\x1d\n" +
+	"\n" +
+	"skill_path\x18\x13 \x01(\tR\tskillPath\x12\x1d\n" +
+	"\n" +
+	"created_at\x18\x14 \x01(\x03R\tcreatedAt\x12\x1d\n" +
+	"\n" +
+	"updated_at\x18\x15 \x01(\x03R\tupdatedAt\x12\x1d\n" +
+	"\n" +
+	"is_builtin\x18\x16 \x01(\bR\tisBuiltin\"\xa8\x03\n" +
+	"\x13ListAIForgesCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x12\x14\n" +
+	"\x05query\x18\x04 \x01(\tR\x05query\x12\x1d\n" +
+	"\n" +
+	"forge_name\x18\x05 \x01(\tR\tforgeName\x12\x1f\n" +
+	"\vforge_names\x18\x06 \x03(\tR\n" +
+	"forgeNames\x12\x1d\n" +
+	"\n" +
+	"forge_type\x18\a \x01(\tR\tforgeType\x12\x12\n" +
+	"\x04tags\x18\b \x03(\tR\x04tags\x12\x19\n" +
+	"\bforge_id\x18\t \x01(\x03R\aforgeId\x12%\n" +
+	"\x0eshow_temporary\x18\n" +
+	" \x01(\bR\rshowTemporary\x12?\n" +
+	"\n" +
+	"pagination\x18\v \x01(\v2\x1f.legion.ai.v1.AIForgePaginationR\n" +
+	"pagination\"\xf9\x01\n" +
+	"\x0eAIForgesListed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x121\n" +
+	"\x05items\x18\x03 \x03(\v2\x1b.legion.ai.v1.AIForgeRecordR\x05items\x12?\n" +
+	"\n" +
+	"pagination\x18\x04 \x01(\v2\x1f.legion.ai.v1.AIForgePaginationR\n" +
+	"pagination\x12\x14\n" +
+	"\x05total\x18\x05 \x01(\x03R\x05total\"\xb7\x01\n" +
+	"\x12AIForgesListFailed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x03 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"\xe7\x05\n" +
+	"\x14CreateAIForgeCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"forge_name\x18\x04 \x01(\tR\tforgeName\x12#\n" +
+	"\rforge_content\x18\x05 \x01(\tR\fforgeContent\x12\x1d\n" +
+	"\n" +
+	"forge_type\x18\x06 \x01(\tR\tforgeType\x12 \n" +
+	"\vdescription\x18\a \x01(\tR\vdescription\x12(\n" +
+	"\x10params_ui_config\x18\b \x01(\tR\x0eparamsUiConfig\x12\x16\n" +
+	"\x06params\x18\t \x01(\tR\x06params\x120\n" +
+	"\x14user_persistent_data\x18\n" +
+	" \x01(\tR\x12userPersistentData\x12\x1d\n" +
+	"\n" +
+	"tool_names\x18\v \x03(\tR\ttoolNames\x12#\n" +
+	"\rtool_keywords\x18\f \x03(\tR\ftoolKeywords\x12\x16\n" +
+	"\x06action\x18\r \x01(\tR\x06action\x12\x12\n" +
+	"\x04tags\x18\x0e \x03(\tR\x04tags\x12\x1f\n" +
+	"\vinit_prompt\x18\x0f \x01(\tR\n" +
+	"initPrompt\x12+\n" +
+	"\x11persistent_prompt\x18\x10 \x01(\tR\x10persistentPrompt\x12\x1f\n" +
+	"\vplan_prompt\x18\x11 \x01(\tR\n" +
+	"planPrompt\x12#\n" +
+	"\rresult_prompt\x18\x12 \x01(\tR\fresultPrompt\x12,\n" +
+	"\x12forge_verbose_name\x18\x13 \x01(\tR\x10forgeVerboseName\x12\x1d\n" +
+	"\n" +
+	"is_builtin\x18\x14 \x01(\bR\tisBuiltin\"\xba\x01\n" +
+	"\x0eAIForgeCreated\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12/\n" +
+	"\x04item\x18\x03 \x01(\v2\x1b.legion.ai.v1.AIForgeRecordR\x04item\x12\x18\n" +
+	"\amessage\x18\x04 \x01(\tR\amessage\"\xb8\x01\n" +
+	"\x13AIForgeCreateFailed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x03 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"\x82\x06\n" +
+	"\x14UpdateAIForgeCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x12\x19\n" +
+	"\bforge_id\x18\x04 \x01(\x03R\aforgeId\x12\x1d\n" +
+	"\n" +
+	"forge_name\x18\x05 \x01(\tR\tforgeName\x12#\n" +
+	"\rforge_content\x18\x06 \x01(\tR\fforgeContent\x12\x1d\n" +
+	"\n" +
+	"forge_type\x18\a \x01(\tR\tforgeType\x12 \n" +
+	"\vdescription\x18\b \x01(\tR\vdescription\x12(\n" +
+	"\x10params_ui_config\x18\t \x01(\tR\x0eparamsUiConfig\x12\x16\n" +
+	"\x06params\x18\n" +
+	" \x01(\tR\x06params\x120\n" +
+	"\x14user_persistent_data\x18\v \x01(\tR\x12userPersistentData\x12\x1d\n" +
+	"\n" +
+	"tool_names\x18\f \x03(\tR\ttoolNames\x12#\n" +
+	"\rtool_keywords\x18\r \x03(\tR\ftoolKeywords\x12\x16\n" +
+	"\x06action\x18\x0e \x01(\tR\x06action\x12\x12\n" +
+	"\x04tags\x18\x0f \x03(\tR\x04tags\x12\x1f\n" +
+	"\vinit_prompt\x18\x10 \x01(\tR\n" +
+	"initPrompt\x12+\n" +
+	"\x11persistent_prompt\x18\x11 \x01(\tR\x10persistentPrompt\x12\x1f\n" +
+	"\vplan_prompt\x18\x12 \x01(\tR\n" +
+	"planPrompt\x12#\n" +
+	"\rresult_prompt\x18\x13 \x01(\tR\fresultPrompt\x12,\n" +
+	"\x12forge_verbose_name\x18\x14 \x01(\tR\x10forgeVerboseName\x12\x1d\n" +
+	"\n" +
+	"is_builtin\x18\x15 \x01(\bR\tisBuiltin\"\xba\x01\n" +
+	"\x0eAIForgeUpdated\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12/\n" +
+	"\x04item\x18\x03 \x01(\v2\x1b.legion.ai.v1.AIForgeRecordR\x04item\x12\x18\n" +
+	"\amessage\x18\x04 \x01(\tR\amessage\"\xb8\x01\n" +
+	"\x13AIForgeUpdateFailed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x03 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"\xb8\x01\n" +
+	"\x14DeleteAIForgeCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x12\x19\n" +
+	"\bforge_id\x18\x04 \x01(\x03R\aforgeId\"\xa4\x01\n" +
+	"\x0eAIForgeDeleted\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x19\n" +
+	"\bforge_id\x18\x03 \x01(\tR\aforgeId\x12\x18\n" +
+	"\amessage\x18\x04 \x01(\tR\amessage\"\xb8\x01\n" +
+	"\x13AIForgeDeleteFailed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x03 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"\xf7\x03\n" +
+	"\x14ExportAIForgeCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x12\x14\n" +
+	"\x05query\x18\x04 \x01(\tR\x05query\x12\x1d\n" +
+	"\n" +
+	"forge_name\x18\x05 \x01(\tR\tforgeName\x12\x1f\n" +
+	"\vforge_names\x18\x06 \x03(\tR\n" +
+	"forgeNames\x12\x1d\n" +
+	"\n" +
+	"forge_type\x18\a \x01(\tR\tforgeType\x12\x12\n" +
+	"\x04tags\x18\b \x03(\tR\x04tags\x12\x19\n" +
+	"\bforge_id\x18\t \x01(\x03R\aforgeId\x12\x1f\n" +
+	"\voutput_name\x18\n" +
+	" \x01(\tR\n" +
+	"outputName\x12\x1a\n" +
+	"\bpassword\x18\v \x01(\tR\bpassword\x12\x1d\n" +
+	"\n" +
+	"tool_names\x18\f \x03(\tR\ttoolNames\x12.\n" +
+	"\x13object_store_bucket\x18\r \x01(\tR\x11objectStoreBucket\x12(\n" +
+	"\x10object_store_key\x18\x0e \x01(\tR\x0eobjectStoreKey\"\xcf\x01\n" +
+	"\x17AIForgeExportProgressed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x18\n" +
+	"\apercent\x18\x03 \x01(\x01R\apercent\x12\x18\n" +
+	"\amessage\x18\x04 \x01(\tR\amessage\x12!\n" +
+	"\fmessage_type\x18\x05 \x01(\tR\vmessageType\"\xc3\x02\n" +
+	"\x0fAIForgeExported\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1b\n" +
+	"\tfile_name\x18\x03 \x01(\tR\bfileName\x12!\n" +
+	"\fcontent_type\x18\x04 \x01(\tR\vcontentType\x12.\n" +
+	"\x13object_store_bucket\x18\x05 \x01(\tR\x11objectStoreBucket\x12(\n" +
+	"\x10object_store_key\x18\x06 \x01(\tR\x0eobjectStoreKey\x12\x1d\n" +
+	"\n" +
+	"size_bytes\x18\a \x01(\x04R\tsizeBytes\x12\x18\n" +
+	"\amessage\x18\b \x01(\tR\amessage\"\xb8\x01\n" +
+	"\x13AIForgeExportFailed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x03 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"\xa0\x01\n" +
+	"\x17AIForgeImportAttachment\x12#\n" +
+	"\rattachment_id\x18\x01 \x01(\tR\fattachmentId\x12\x1a\n" +
+	"\bfilename\x18\x02 \x01(\tR\bfilename\x12!\n" +
+	"\fcontent_type\x18\x03 \x01(\tR\vcontentType\x12!\n" +
+	"\fdownload_url\x18\x04 \x01(\tR\vdownloadUrl\"\xe7\x02\n" +
+	"\x14ImportAIForgeCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x12!\n" +
+	"\farchive_name\x18\x04 \x01(\tR\varchiveName\x12\x1c\n" +
+	"\toverwrite\x18\x05 \x01(\bR\toverwrite\x12$\n" +
+	"\x0enew_forge_name\x18\x06 \x01(\tR\fnewForgeName\x12\x1a\n" +
+	"\bpassword\x18\a \x01(\tR\bpassword\x12E\n" +
+	"\n" +
+	"attachment\x18\b \x01(\v2%.legion.ai.v1.AIForgeImportAttachmentR\n" +
+	"attachment\"\xcf\x01\n" +
+	"\x17AIForgeImportProgressed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x18\n" +
+	"\apercent\x18\x03 \x01(\x01R\apercent\x12\x18\n" +
+	"\amessage\x18\x04 \x01(\tR\amessage\x12!\n" +
+	"\fmessage_type\x18\x05 \x01(\tR\vmessageType\"\x7f\n" +
+	"\x11AIForgeImportItem\x12\x1d\n" +
+	"\n" +
+	"forge_name\x18\x01 \x01(\tR\tforgeName\x12\x19\n" +
+	"\bforge_id\x18\x02 \x01(\tR\aforgeId\x12\x16\n" +
+	"\x06status\x18\x03 \x01(\tR\x06status\x12\x18\n" +
+	"\amessage\x18\x04 \x01(\tR\amessage\"\x8f\x02\n" +
+	"\x0fAIForgeImported\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x18\n" +
+	"\acreated\x18\x03 \x01(\x03R\acreated\x12\x18\n" +
+	"\aupdated\x18\x04 \x01(\x03R\aupdated\x12\x18\n" +
+	"\askipped\x18\x05 \x01(\x03R\askipped\x125\n" +
+	"\x05items\x18\x06 \x03(\v2\x1f.legion.ai.v1.AIForgeImportItemR\x05items\x12\x18\n" +
+	"\amessage\x18\a \x01(\tR\amessage\"\xb8\x01\n" +
+	"\x13AIForgeImportFailed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x03 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"m\n" +
+	"\x10AIToolPagination\x12\x12\n" +
+	"\x04page\x18\x01 \x01(\x03R\x04page\x12\x14\n" +
+	"\x05limit\x18\x02 \x01(\x03R\x05limit\x12\x19\n" +
+	"\border_by\x18\x03 \x01(\tR\aorderBy\x12\x14\n" +
+	"\x05order\x18\x04 \x01(\tR\x05order\"\xe0\x02\n" +
+	"\fAIToolRecord\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x03R\x02id\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12!\n" +
+	"\fverbose_name\x18\x03 \x01(\tR\vverboseName\x12 \n" +
+	"\vdescription\x18\x04 \x01(\tR\vdescription\x12\x18\n" +
+	"\acontent\x18\x05 \x01(\tR\acontent\x12\x1b\n" +
+	"\ttool_path\x18\x06 \x01(\tR\btoolPath\x12\x1a\n" +
+	"\bkeywords\x18\a \x03(\tR\bkeywords\x12\x1f\n" +
+	"\vis_favorite\x18\b \x01(\bR\n" +
+	"isFavorite\x12\x16\n" +
+	"\x06author\x18\t \x01(\tR\x06author\x12\x1d\n" +
+	"\n" +
+	"created_at\x18\n" +
+	" \x01(\x03R\tcreatedAt\x12\x1d\n" +
+	"\n" +
+	"updated_at\x18\v \x01(\x03R\tupdatedAt\x12\x1d\n" +
+	"\n" +
+	"is_builtin\x18\f \x01(\bR\tisBuiltin\"\xce\x02\n" +
+	"\x12ListAIToolsCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x12\x14\n" +
+	"\x05query\x18\x04 \x01(\tR\x05query\x12\x1b\n" +
+	"\ttool_name\x18\x05 \x01(\tR\btoolName\x12\x17\n" +
+	"\atool_id\x18\x06 \x01(\x03R\x06toolId\x12>\n" +
+	"\n" +
+	"pagination\x18\a \x01(\v2\x1e.legion.ai.v1.AIToolPaginationR\n" +
+	"pagination\x12%\n" +
+	"\x0eonly_favorites\x18\b \x01(\bR\ronlyFavorites\"\xf6\x01\n" +
+	"\rAIToolsListed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x120\n" +
+	"\x05items\x18\x03 \x03(\v2\x1a.legion.ai.v1.AIToolRecordR\x05items\x12>\n" +
+	"\n" +
+	"pagination\x18\x04 \x01(\v2\x1e.legion.ai.v1.AIToolPaginationR\n" +
+	"pagination\x12\x14\n" +
+	"\x05total\x18\x05 \x01(\x03R\x05total\"\xb6\x01\n" +
+	"\x11AIToolsListFailed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x03 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"\xa5\x02\n" +
+	"\x13CreateAIToolCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x12\x12\n" +
+	"\x04name\x18\x04 \x01(\tR\x04name\x12 \n" +
+	"\vdescription\x18\x05 \x01(\tR\vdescription\x12\x18\n" +
+	"\acontent\x18\x06 \x01(\tR\acontent\x12\x1b\n" +
+	"\ttool_path\x18\a \x01(\tR\btoolPath\x12\x1a\n" +
+	"\bkeywords\x18\b \x03(\tR\bkeywords\"\xb8\x01\n" +
+	"\rAIToolCreated\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12.\n" +
+	"\x04item\x18\x03 \x01(\v2\x1a.legion.ai.v1.AIToolRecordR\x04item\x12\x18\n" +
+	"\amessage\x18\x04 \x01(\tR\amessage\"\xb7\x01\n" +
+	"\x12AIToolCreateFailed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x03 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"\xbe\x02\n" +
+	"\x13UpdateAIToolCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x12\x17\n" +
+	"\atool_id\x18\x04 \x01(\x03R\x06toolId\x12\x12\n" +
+	"\x04name\x18\x05 \x01(\tR\x04name\x12 \n" +
+	"\vdescription\x18\x06 \x01(\tR\vdescription\x12\x18\n" +
+	"\acontent\x18\a \x01(\tR\acontent\x12\x1b\n" +
+	"\ttool_path\x18\b \x01(\tR\btoolPath\x12\x1a\n" +
+	"\bkeywords\x18\t \x03(\tR\bkeywords\"\xb8\x01\n" +
+	"\rAIToolUpdated\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12.\n" +
+	"\x04item\x18\x03 \x01(\v2\x1a.legion.ai.v1.AIToolRecordR\x04item\x12\x18\n" +
+	"\amessage\x18\x04 \x01(\tR\amessage\"\xb7\x01\n" +
+	"\x12AIToolUpdateFailed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x03 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"\xdd\x01\n" +
+	"\x1dGenerateAIToolMetadataCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x12\x1b\n" +
+	"\ttool_name\x18\x04 \x01(\tR\btoolName\x12\x18\n" +
+	"\acontent\x18\x05 \x01(\tR\acontent\"\xca\x01\n" +
+	"\x17AIToolMetadataGenerated\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x12\n" +
+	"\x04name\x18\x03 \x01(\tR\x04name\x12 \n" +
+	"\vdescription\x18\x04 \x01(\tR\vdescription\x12\x1a\n" +
+	"\bkeywords\x18\x05 \x03(\tR\bkeywords\"\xc1\x01\n" +
+	"\x1cAIToolMetadataGenerateFailed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x03 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"\xbd\x01\n" +
+	"\x1bToggleAIToolFavoriteCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x12\x17\n" +
+	"\atool_id\x18\x04 \x01(\x03R\x06toolId\"\xca\x01\n" +
+	"\x15AIToolFavoriteToggled\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x17\n" +
+	"\atool_id\x18\x03 \x01(\x03R\x06toolId\x12\x1f\n" +
+	"\vis_favorite\x18\x04 \x01(\bR\n" +
+	"isFavorite\x12\x18\n" +
+	"\amessage\x18\x05 \x01(\tR\amessage\"\xbf\x01\n" +
+	"\x1aAIToolFavoriteToggleFailed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x03 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"\xb8\x01\n" +
+	"\x14DeleteAIToolsCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x12\x19\n" +
+	"\btool_ids\x18\x04 \x03(\x03R\atoolIds\"\xa4\x01\n" +
+	"\x0eAIToolsDeleted\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x19\n" +
+	"\btool_ids\x18\x03 \x03(\x03R\atoolIds\x12\x18\n" +
+	"\amessage\x18\x04 \x01(\tR\amessage\"\xb8\x01\n" +
+	"\x13AIToolsDeleteFailed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x03 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"v\n" +
+	"\x19AIKnowledgeBasePagination\x12\x12\n" +
+	"\x04page\x18\x01 \x01(\x03R\x04page\x12\x14\n" +
+	"\x05limit\x18\x02 \x01(\x03R\x05limit\x12\x19\n" +
+	"\border_by\x18\x03 \x01(\tR\aorderBy\x12\x14\n" +
+	"\x05order\x18\x04 \x01(\tR\x05order\"\xab\x03\n" +
+	"\x15AIKnowledgeBaseRecord\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x03R\x02id\x12.\n" +
+	"\x13knowledge_base_name\x18\x02 \x01(\tR\x11knowledgeBaseName\x12<\n" +
+	"\x1aknowledge_base_description\x18\x03 \x01(\tR\x18knowledgeBaseDescription\x12.\n" +
+	"\x13knowledge_base_type\x18\x04 \x01(\tR\x11knowledgeBaseType\x12\x12\n" +
+	"\x04tags\x18\x05 \x03(\tR\x04tags\x12\x1d\n" +
+	"\n" +
+	"is_default\x18\x06 \x01(\bR\tisDefault\x12&\n" +
+	"\x0fcreated_from_ui\x18\a \x01(\bR\rcreatedFromUi\x12\x1f\n" +
+	"\vis_imported\x18\b \x01(\bR\n" +
+	"isImported\x12*\n" +
+	"\x11serial_version_id\x18\t \x01(\tR\x0fserialVersionId\x12\x1d\n" +
+	"\n" +
+	"created_at\x18\n" +
+	" \x01(\x03R\tcreatedAt\x12\x1d\n" +
+	"\n" +
+	"updated_at\x18\v \x01(\x03R\tupdatedAt\"\x88\x03\n" +
+	"\x1bListAIKnowledgeBasesCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x12\x14\n" +
+	"\x05query\x18\x04 \x01(\tR\x05query\x12*\n" +
+	"\x11knowledge_base_id\x18\x05 \x01(\x03R\x0fknowledgeBaseId\x12/\n" +
+	"\x14only_created_from_ui\x18\x06 \x01(\bR\x11onlyCreatedFromUi\x12&\n" +
+	"\x0fonly_is_default\x18\a \x01(\bR\ronlyIsDefault\x12G\n" +
+	"\n" +
+	"pagination\x18\b \x01(\v2'.legion.ai.v1.AIKnowledgeBasePaginationR\n" +
+	"pagination\"\x91\x02\n" +
+	"\x16AIKnowledgeBasesListed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x129\n" +
+	"\x05items\x18\x03 \x03(\v2#.legion.ai.v1.AIKnowledgeBaseRecordR\x05items\x12G\n" +
+	"\n" +
+	"pagination\x18\x04 \x01(\v2'.legion.ai.v1.AIKnowledgeBasePaginationR\n" +
+	"pagination\x12\x14\n" +
+	"\x05total\x18\x05 \x01(\x03R\x05total\"\xbf\x01\n" +
+	"\x1aAIKnowledgeBasesListFailed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x03 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"\x9e\x03\n" +
+	"\x1cCreateAIKnowledgeBaseCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x12.\n" +
+	"\x13knowledge_base_name\x18\x04 \x01(\tR\x11knowledgeBaseName\x12<\n" +
+	"\x1aknowledge_base_description\x18\x05 \x01(\tR\x18knowledgeBaseDescription\x12.\n" +
+	"\x13knowledge_base_type\x18\x06 \x01(\tR\x11knowledgeBaseType\x12\x12\n" +
+	"\x04tags\x18\a \x03(\tR\x04tags\x12\x1d\n" +
+	"\n" +
+	"is_default\x18\b \x01(\bR\tisDefault\x12&\n" +
+	"\x0fcreated_from_ui\x18\t \x01(\bR\rcreatedFromUi\"\xa8\x01\n" +
+	"\x1fAIKnowledgeBaseImportAttachment\x12#\n" +
+	"\rattachment_id\x18\x01 \x01(\tR\fattachmentId\x12\x1a\n" +
+	"\bfilename\x18\x02 \x01(\tR\bfilename\x12!\n" +
+	"\fcontent_type\x18\x03 \x01(\tR\vcontentType\x12!\n" +
+	"\fdownload_url\x18\x04 \x01(\tR\vdownloadUrl\"\xca\x01\n" +
+	"\x16AIKnowledgeBaseCreated\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x127\n" +
+	"\x04item\x18\x03 \x01(\v2#.legion.ai.v1.AIKnowledgeBaseRecordR\x04item\x12\x18\n" +
+	"\amessage\x18\x04 \x01(\tR\amessage\"\xc0\x01\n" +
+	"\x1bAIKnowledgeBaseCreateFailed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x03 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"\xa4\x02\n" +
+	"\x1cImportAIKnowledgeBaseCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x12.\n" +
+	"\x13knowledge_base_name\x18\x04 \x01(\tR\x11knowledgeBaseName\x12M\n" +
+	"\n" +
+	"attachment\x18\x05 \x01(\v2-.legion.ai.v1.AIKnowledgeBaseImportAttachmentR\n" +
+	"attachment\"\xcb\x01\n" +
+	"\x17AIKnowledgeBaseImported\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x127\n" +
+	"\x04item\x18\x03 \x01(\v2#.legion.ai.v1.AIKnowledgeBaseRecordR\x04item\x12\x18\n" +
+	"\amessage\x18\x04 \x01(\tR\amessage\"\xc0\x01\n" +
+	"\x1bAIKnowledgeBaseImportFailed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x03 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"\xa2\x03\n" +
+	"\x1cUpdateAIKnowledgeBaseCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x12*\n" +
+	"\x11knowledge_base_id\x18\x04 \x01(\x03R\x0fknowledgeBaseId\x12.\n" +
+	"\x13knowledge_base_name\x18\x05 \x01(\tR\x11knowledgeBaseName\x12<\n" +
+	"\x1aknowledge_base_description\x18\x06 \x01(\tR\x18knowledgeBaseDescription\x12.\n" +
+	"\x13knowledge_base_type\x18\a \x01(\tR\x11knowledgeBaseType\x12\x12\n" +
+	"\x04tags\x18\b \x03(\tR\x04tags\x12\x1d\n" +
+	"\n" +
+	"is_default\x18\t \x01(\bR\tisDefault\"\xca\x01\n" +
+	"\x16AIKnowledgeBaseUpdated\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x127\n" +
+	"\x04item\x18\x03 \x01(\v2#.legion.ai.v1.AIKnowledgeBaseRecordR\x04item\x12\x18\n" +
+	"\amessage\x18\x04 \x01(\tR\amessage\"\xc0\x01\n" +
+	"\x1bAIKnowledgeBaseUpdateFailed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x03 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"\xd1\x01\n" +
+	"\x1cDeleteAIKnowledgeBaseCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x12*\n" +
+	"\x11knowledge_base_id\x18\x04 \x01(\x03R\x0fknowledgeBaseId\"\xca\x01\n" +
+	"\x16AIKnowledgeBaseDeleted\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x127\n" +
+	"\x04item\x18\x03 \x01(\v2#.legion.ai.v1.AIKnowledgeBaseRecordR\x04item\x12\x18\n" +
+	"\amessage\x18\x04 \x01(\tR\amessage\"\xc0\x01\n" +
+	"\x1bAIKnowledgeBaseDeleteFailed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x03 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"\xcc\x02\n" +
+	"\x1cExportAIKnowledgeBaseCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x12*\n" +
+	"\x11knowledge_base_id\x18\x04 \x01(\x03R\x0fknowledgeBaseId\x12\x1f\n" +
+	"\voutput_name\x18\x05 \x01(\tR\n" +
+	"outputName\x12.\n" +
+	"\x13object_store_bucket\x18\x06 \x01(\tR\x11objectStoreBucket\x12(\n" +
+	"\x10object_store_key\x18\a \x01(\tR\x0eobjectStoreKey\"\x84\x03\n" +
+	"\x17AIKnowledgeBaseExported\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x127\n" +
+	"\x04item\x18\x03 \x01(\v2#.legion.ai.v1.AIKnowledgeBaseRecordR\x04item\x12\x18\n" +
+	"\amessage\x18\x04 \x01(\tR\amessage\x12\x1b\n" +
+	"\tfile_name\x18\x05 \x01(\tR\bfileName\x12!\n" +
+	"\fcontent_type\x18\x06 \x01(\tR\vcontentType\x12.\n" +
+	"\x13object_store_bucket\x18\a \x01(\tR\x11objectStoreBucket\x12(\n" +
+	"\x10object_store_key\x18\b \x01(\tR\x0eobjectStoreKey\x12\x1d\n" +
+	"\n" +
+	"size_bytes\x18\t \x01(\x04R\tsizeBytes\"\xc0\x01\n" +
+	"\x1bAIKnowledgeBaseExportFailed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x03 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"\xb7\x01\n" +
+	"\x1aAIKnowledgeBaseEntryFilter\x12*\n" +
+	"\x11knowledge_base_id\x18\x01 \x01(\x03R\x0fknowledgeBaseId\x12\x18\n" +
+	"\akeyword\x18\x02 \x01(\tR\akeyword\x120\n" +
+	"\x14related_entity_uuids\x18\x03 \x03(\tR\x12relatedEntityUuids\x12!\n" +
+	"\fhidden_index\x18\x04 \x03(\tR\vhiddenIndex\"\xd9\x04\n" +
+	"\x1aAIKnowledgeBaseEntryRecord\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x03R\x02id\x12*\n" +
+	"\x11knowledge_base_id\x18\x02 \x01(\x03R\x0fknowledgeBaseId\x12'\n" +
+	"\x0fknowledge_title\x18\x03 \x01(\tR\x0eknowledgeTitle\x12%\n" +
+	"\x0eknowledge_type\x18\x04 \x01(\tR\rknowledgeType\x12)\n" +
+	"\x10importance_score\x18\x05 \x01(\x05R\x0fimportanceScore\x12\x1a\n" +
+	"\bkeywords\x18\x06 \x03(\tR\bkeywords\x12+\n" +
+	"\x11knowledge_details\x18\a \x01(\tR\x10knowledgeDetails\x12\x18\n" +
+	"\asummary\x18\b \x01(\tR\asummary\x12\x1f\n" +
+	"\vsource_page\x18\t \x01(\x05R\n" +
+	"sourcePage\x12/\n" +
+	"\x13potential_questions\x18\n" +
+	" \x03(\tR\x12potentialQuestions\x12<\n" +
+	"\x1apotential_questions_vector\x18\v \x03(\x02R\x18potentialQuestionsVector\x12!\n" +
+	"\fhidden_index\x18\f \x01(\tR\vhiddenIndex\x120\n" +
+	"\x14related_entity_uuids\x18\r \x01(\tR\x12relatedEntityUuids\x12\x1d\n" +
+	"\n" +
+	"created_at\x18\x0e \x01(\x03R\tcreatedAt\x12\x1d\n" +
+	"\n" +
+	"updated_at\x18\x0f \x01(\x03R\tupdatedAt\"\xb7\x02\n" +
+	"#SearchAIKnowledgeBaseEntriesCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x12@\n" +
+	"\x06filter\x18\x04 \x01(\v2(.legion.ai.v1.AIKnowledgeBaseEntryFilterR\x06filter\x12G\n" +
+	"\n" +
+	"pagination\x18\x05 \x01(\v2'.legion.ai.v1.AIKnowledgeBasePaginationR\n" +
+	"pagination\"\x9e\x02\n" +
+	"\x1eAIKnowledgeBaseEntriesSearched\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12>\n" +
+	"\x05items\x18\x03 \x03(\v2(.legion.ai.v1.AIKnowledgeBaseEntryRecordR\x05items\x12G\n" +
+	"\n" +
+	"pagination\x18\x04 \x01(\v2'.legion.ai.v1.AIKnowledgeBasePaginationR\n" +
+	"pagination\x12\x14\n" +
+	"\x05total\x18\x05 \x01(\x03R\x05total\"\xc7\x01\n" +
+	"\"AIKnowledgeBaseEntriesSearchFailed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x03 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"\xe0\x02\n" +
+	"\x1fQueryAIKnowledgeBaseByAICommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x12\x14\n" +
+	"\x05query\x18\x04 \x01(\tR\x05query\x12!\n" +
+	"\fenhance_plan\x18\x05 \x01(\tR\venhancePlan\x12*\n" +
+	"\x11knowledge_base_id\x18\x06 \x01(\x03R\x0fknowledgeBaseId\x122\n" +
+	"\x15query_all_collections\x18\a \x01(\bR\x13queryAllCollections\x12\x1d\n" +
+	"\n" +
+	"ai_service\x18\b \x01(\tR\taiService\"\xf0\x01\n" +
+	"%CancelAIKnowledgeBaseByAIQueryCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x12(\n" +
+	"\x10query_command_id\x18\x04 \x01(\tR\x0equeryCommandId\x12\x16\n" +
+	"\x06reason\x18\x05 \x01(\tR\x06reason\"\xcf\x01\n" +
+	"\x1dAIKnowledgeBaseQueryByAIChunk\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x18\n" +
+	"\amessage\x18\x03 \x01(\tR\amessage\x12!\n" +
+	"\fmessage_type\x18\x04 \x01(\tR\vmessageType\x12\x12\n" +
+	"\x04data\x18\x05 \x01(\tR\x04data\"\x9c\x01\n" +
+	"!AIKnowledgeBaseQueryByAICompleted\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x18\n" +
+	"\amessage\x18\x03 \x01(\tR\amessage\"\xc3\x01\n" +
+	"\x1eAIKnowledgeBaseQueryByAIFailed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x03 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"\xc9\x02\n" +
+	"+GenerateAIKnowledgeBaseQuestionIndexCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x12*\n" +
+	"\x11knowledge_base_id\x18\x04 \x01(\x03R\x0fknowledgeBaseId\x12.\n" +
+	"\x13knowledge_base_name\x18\x05 \x01(\tR\x11knowledgeBaseName\x12\x14\n" +
+	"\x05force\x18\x06 \x01(\bR\x05force\x12!\n" +
+	"\fhidden_index\x18\a \x01(\tR\vhiddenIndex\"\xf8\x01\n" +
+	")CancelAIKnowledgeBaseQuestionIndexCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x12,\n" +
+	"\x12request_command_id\x18\x04 \x01(\tR\x10requestCommandId\x12\x16\n" +
+	"\x06reason\x18\x05 \x01(\tR\x06reason\"\xdc\x01\n" +
+	"$AIKnowledgeBaseQuestionIndexProgress\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x18\n" +
+	"\apercent\x18\x03 \x01(\x01R\apercent\x12\x18\n" +
+	"\amessage\x18\x04 \x01(\tR\amessage\x12!\n" +
+	"\fmessage_type\x18\x05 \x01(\tR\vmessageType\"\xa0\x01\n" +
+	"%AIKnowledgeBaseQuestionIndexCompleted\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x18\n" +
+	"\amessage\x18\x03 \x01(\tR\amessage\"\xc7\x01\n" +
+	"\"AIKnowledgeBaseQuestionIndexFailed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x03 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"\xc4\x04\n" +
+	"!CreateAIKnowledgeBaseEntryCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x12*\n" +
+	"\x11knowledge_base_id\x18\x04 \x01(\x03R\x0fknowledgeBaseId\x12'\n" +
+	"\x0fknowledge_title\x18\x05 \x01(\tR\x0eknowledgeTitle\x12%\n" +
+	"\x0eknowledge_type\x18\x06 \x01(\tR\rknowledgeType\x12)\n" +
+	"\x10importance_score\x18\a \x01(\x05R\x0fimportanceScore\x12\x1a\n" +
+	"\bkeywords\x18\b \x03(\tR\bkeywords\x12+\n" +
+	"\x11knowledge_details\x18\t \x01(\tR\x10knowledgeDetails\x12\x18\n" +
+	"\asummary\x18\n" +
+	" \x01(\tR\asummary\x12\x1f\n" +
+	"\vsource_page\x18\v \x01(\x05R\n" +
+	"sourcePage\x12/\n" +
+	"\x13potential_questions\x18\f \x03(\tR\x12potentialQuestions\x12<\n" +
+	"\x1apotential_questions_vector\x18\r \x03(\x02R\x18potentialQuestionsVector\"\xd4\x01\n" +
+	"\x1bAIKnowledgeBaseEntryCreated\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12<\n" +
+	"\x04item\x18\x03 \x01(\v2(.legion.ai.v1.AIKnowledgeBaseEntryRecordR\x04item\x12\x18\n" +
+	"\amessage\x18\x04 \x01(\tR\amessage\"\xc5\x01\n" +
+	" AIKnowledgeBaseEntryCreateFailed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x03 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"\x87\x05\n" +
+	"!UpdateAIKnowledgeBaseEntryCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x12*\n" +
+	"\x11knowledge_base_id\x18\x04 \x01(\x03R\x0fknowledgeBaseId\x125\n" +
+	"\x17knowledge_base_entry_id\x18\x05 \x01(\x03R\x14knowledgeBaseEntryId\x12H\n" +
+	"!knowledge_base_entry_hidden_index\x18\x06 \x01(\tR\x1dknowledgeBaseEntryHiddenIndex\x12'\n" +
+	"\x0fknowledge_title\x18\a \x01(\tR\x0eknowledgeTitle\x12%\n" +
+	"\x0eknowledge_type\x18\b \x01(\tR\rknowledgeType\x12)\n" +
+	"\x10importance_score\x18\t \x01(\x05R\x0fimportanceScore\x12\x1a\n" +
+	"\bkeywords\x18\n" +
+	" \x03(\tR\bkeywords\x12+\n" +
+	"\x11knowledge_details\x18\v \x01(\tR\x10knowledgeDetails\x12\x18\n" +
+	"\asummary\x18\f \x01(\tR\asummary\x12\x1f\n" +
+	"\vsource_page\x18\r \x01(\x05R\n" +
+	"sourcePage\x12/\n" +
+	"\x13potential_questions\x18\x0e \x03(\tR\x12potentialQuestions\"\xd4\x01\n" +
+	"\x1bAIKnowledgeBaseEntryUpdated\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12<\n" +
+	"\x04item\x18\x03 \x01(\v2(.legion.ai.v1.AIKnowledgeBaseEntryRecordR\x04item\x12\x18\n" +
+	"\amessage\x18\x04 \x01(\tR\amessage\"\xc5\x01\n" +
+	" AIKnowledgeBaseEntryUpdateFailed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x03 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"\xd7\x02\n" +
+	"!DeleteAIKnowledgeBaseEntryCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x12*\n" +
+	"\x11knowledge_base_id\x18\x04 \x01(\x03R\x0fknowledgeBaseId\x125\n" +
+	"\x17knowledge_base_entry_id\x18\x05 \x01(\x03R\x14knowledgeBaseEntryId\x12H\n" +
+	"!knowledge_base_entry_hidden_index\x18\x06 \x01(\tR\x1dknowledgeBaseEntryHiddenIndex\"\xc3\x02\n" +
+	"\x1bAIKnowledgeBaseEntryDeleted\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12*\n" +
+	"\x11knowledge_base_id\x18\x03 \x01(\x03R\x0fknowledgeBaseId\x125\n" +
+	"\x17knowledge_base_entry_id\x18\x04 \x01(\x03R\x14knowledgeBaseEntryId\x12H\n" +
+	"!knowledge_base_entry_hidden_index\x18\x05 \x01(\tR\x1dknowledgeBaseEntryHiddenIndex\x12\x18\n" +
+	"\amessage\x18\x06 \x01(\tR\amessage\"\xc5\x01\n" +
+	" AIKnowledgeBaseEntryDeleteFailed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x03 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"\xee\x03\n" +
+	"&BuildAIKnowledgeBaseVectorIndexCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x12*\n" +
+	"\x11knowledge_base_id\x18\x04 \x01(\x03R\x0fknowledgeBaseId\x12\x19\n" +
+	"\bbase_url\x18\x05 \x01(\tR\abaseUrl\x12\x17\n" +
+	"\aapi_key\x18\x06 \x01(\tR\x06apiKey\x12\x14\n" +
+	"\x05proxy\x18\a \x01(\tR\x05proxy\x12\x1d\n" +
+	"\n" +
+	"model_name\x18\b \x01(\tR\tmodelName\x12\x1c\n" +
+	"\tdimension\x18\t \x01(\x05R\tdimension\x12\f\n" +
+	"\x01m\x18\n" +
+	" \x01(\x05R\x01m\x12\x0e\n" +
+	"\x02ml\x18\v \x01(\x02R\x02ml\x12\x1b\n" +
+	"\tef_search\x18\f \x01(\x05R\befSearch\x12!\n" +
+	"\fef_construct\x18\r \x01(\x05R\vefConstruct\x12,\n" +
+	"\x12distance_func_type\x18\x0e \x01(\tR\x10distanceFuncType\"\xc6\x01\n" +
+	"\x1fAIKnowledgeBaseVectorIndexBuilt\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12*\n" +
+	"\x11knowledge_base_id\x18\x03 \x01(\x03R\x0fknowledgeBaseId\x12\x18\n" +
+	"\amessage\x18\x04 \x01(\tR\amessage\"\xca\x01\n" +
+	"%AIKnowledgeBaseVectorIndexBuildFailed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x03 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"\xa6\x05\n" +
+	"+BuildAIKnowledgeBaseEntryVectorIndexCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x12*\n" +
+	"\x11knowledge_base_id\x18\x04 \x01(\x03R\x0fknowledgeBaseId\x125\n" +
+	"\x17knowledge_base_entry_id\x18\x05 \x01(\x03R\x14knowledgeBaseEntryId\x12H\n" +
+	"!knowledge_base_entry_hidden_index\x18\x06 \x01(\tR\x1dknowledgeBaseEntryHiddenIndex\x120\n" +
+	"\x14related_entity_uuids\x18\a \x01(\tR\x12relatedEntityUuids\x12\x19\n" +
+	"\bbase_url\x18\b \x01(\tR\abaseUrl\x12\x17\n" +
+	"\aapi_key\x18\t \x01(\tR\x06apiKey\x12\x14\n" +
+	"\x05proxy\x18\n" +
+	" \x01(\tR\x05proxy\x12\x1d\n" +
+	"\n" +
+	"model_name\x18\v \x01(\tR\tmodelName\x12\x1c\n" +
+	"\tdimension\x18\f \x01(\x05R\tdimension\x12\f\n" +
+	"\x01m\x18\r \x01(\x05R\x01m\x12\x0e\n" +
+	"\x02ml\x18\x0e \x01(\x02R\x02ml\x12\x1b\n" +
+	"\tef_search\x18\x0f \x01(\x05R\befSearch\x12!\n" +
+	"\fef_construct\x18\x10 \x01(\x05R\vefConstruct\x12,\n" +
+	"\x12distance_func_type\x18\x11 \x01(\tR\x10distanceFuncType\"\xcc\x02\n" +
+	"$AIKnowledgeBaseEntryVectorIndexBuilt\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12*\n" +
+	"\x11knowledge_base_id\x18\x03 \x01(\x03R\x0fknowledgeBaseId\x125\n" +
+	"\x17knowledge_base_entry_id\x18\x04 \x01(\x03R\x14knowledgeBaseEntryId\x12H\n" +
+	"!knowledge_base_entry_hidden_index\x18\x05 \x01(\tR\x1dknowledgeBaseEntryHiddenIndex\x12\x18\n" +
+	"\amessage\x18\x06 \x01(\tR\amessage\"\xcf\x01\n" +
+	"*AIKnowledgeBaseEntryVectorIndexBuildFailed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x03 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"R\n" +
+	"\x12AIMemoryFloatRange\x12\x18\n" +
+	"\aenabled\x18\x01 \x01(\bR\aenabled\x12\x10\n" +
+	"\x03min\x18\x02 \x01(\x01R\x03min\x12\x10\n" +
+	"\x03max\x18\x03 \x01(\x01R\x03max\"R\n" +
+	"\x12AIMemoryInt64Range\x12\x18\n" +
+	"\aenabled\x18\x01 \x01(\bR\aenabled\x12\x10\n" +
+	"\x03min\x18\x02 \x01(\x03R\x03min\x12\x10\n" +
+	"\x03max\x18\x03 \x01(\x03R\x03max\"o\n" +
+	"\x12AIMemoryPagination\x12\x12\n" +
+	"\x04page\x18\x01 \x01(\x03R\x04page\x12\x14\n" +
+	"\x05limit\x18\x02 \x01(\x03R\x05limit\x12\x19\n" +
+	"\border_by\x18\x03 \x01(\tR\aorderBy\x12\x14\n" +
+	"\x05order\x18\x04 \x01(\tR\x05order\">\n" +
+	"\x10AIMemoryTagCount\x12\x14\n" +
+	"\x05value\x18\x01 \x01(\tR\x05value\x12\x14\n" +
+	"\x05total\x18\x02 \x01(\x05R\x05total\"\xd8\x03\n" +
+	"\x14AIMemoryEntityRecord\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x03R\x02id\x12\x1d\n" +
+	"\n" +
+	"created_at\x18\x02 \x01(\x03R\tcreatedAt\x12\x1d\n" +
+	"\n" +
+	"updated_at\x18\x03 \x01(\x03R\tupdatedAt\x12\x1b\n" +
+	"\tmemory_id\x18\x04 \x01(\tR\bmemoryId\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x05 \x01(\tR\tsessionId\x12\x18\n" +
+	"\acontent\x18\x06 \x01(\tR\acontent\x12\x12\n" +
+	"\x04tags\x18\a \x03(\tR\x04tags\x12/\n" +
+	"\x13potential_questions\x18\b \x03(\tR\x12potentialQuestions\x12\x17\n" +
+	"\ac_score\x18\t \x01(\x01R\x06cScore\x12\x17\n" +
+	"\ao_score\x18\n" +
+	" \x01(\x01R\x06oScore\x12\x17\n" +
+	"\ar_score\x18\v \x01(\x01R\x06rScore\x12\x17\n" +
+	"\ae_score\x18\f \x01(\x01R\x06eScore\x12\x17\n" +
+	"\ap_score\x18\r \x01(\x01R\x06pScore\x12\x17\n" +
+	"\aa_score\x18\x0e \x01(\x01R\x06aScore\x12\x17\n" +
+	"\at_score\x18\x0f \x01(\x01R\x06tScore\x12(\n" +
+	"\x10core_pact_vector\x18\x10 \x03(\x02R\x0ecorePactVector\"\x90\a\n" +
+	"\x14AIMemoryEntityFilter\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x01 \x01(\tR\tsessionId\x12\x1d\n" +
+	"\n" +
+	"memory_ids\x18\x02 \x03(\tR\tmemoryIds\x12'\n" +
+	"\x0fcontent_keyword\x18\x03 \x01(\tR\x0econtentKeyword\x12\x12\n" +
+	"\x04tags\x18\x04 \x03(\tR\x04tags\x12\"\n" +
+	"\rtag_match_all\x18\x05 \x01(\bR\vtagMatchAll\x12<\n" +
+	"\x1apotential_question_keyword\x18\x06 \x01(\tR\x18potentialQuestionKeyword\x129\n" +
+	"\ac_score\x18\a \x01(\v2 .legion.ai.v1.AIMemoryFloatRangeR\x06cScore\x129\n" +
+	"\ao_score\x18\b \x01(\v2 .legion.ai.v1.AIMemoryFloatRangeR\x06oScore\x129\n" +
+	"\ar_score\x18\t \x01(\v2 .legion.ai.v1.AIMemoryFloatRangeR\x06rScore\x129\n" +
+	"\ae_score\x18\n" +
+	" \x01(\v2 .legion.ai.v1.AIMemoryFloatRangeR\x06eScore\x129\n" +
+	"\ap_score\x18\v \x01(\v2 .legion.ai.v1.AIMemoryFloatRangeR\x06pScore\x129\n" +
+	"\aa_score\x18\f \x01(\v2 .legion.ai.v1.AIMemoryFloatRangeR\x06aScore\x129\n" +
+	"\at_score\x18\r \x01(\v2 .legion.ai.v1.AIMemoryFloatRangeR\x06tScore\x12?\n" +
+	"\n" +
+	"created_at\x18\x0e \x01(\v2 .legion.ai.v1.AIMemoryInt64RangeR\tcreatedAt\x12?\n" +
+	"\n" +
+	"updated_at\x18\x0f \x01(\v2 .legion.ai.v1.AIMemoryInt64RangeR\tupdatedAt\x12%\n" +
+	"\x0esemantic_query\x18\x14 \x01(\tR\rsemanticQuery\x123\n" +
+	"\x16core_pact_query_vector\x18\x15 \x03(\x02R\x13corePactQueryVector\x12 \n" +
+	"\fvector_top_k\x18\x16 \x01(\x03R\n" +
+	"vectorTopK\"\xe2\x01\n" +
+	"\x1bCreateAIMemoryEntityCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x04 \x01(\tR\tsessionId\x12\x1d\n" +
+	"\n" +
+	"free_input\x18\x05 \x01(\tR\tfreeInput\"\xaf\x01\n" +
+	"\x15AIMemoryEntityCreated\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x03 \x01(\tR\tsessionId\x12\x18\n" +
+	"\amessage\x18\x04 \x01(\tR\amessage\"\xde\x01\n" +
+	"\x1aAIMemoryEntityCreateFailed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x03 \x01(\tR\tsessionId\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x04 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x05 \x01(\tR\ferrorMessage\"\xdd\x01\n" +
+	"\x18GetAIMemoryEntityCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x12\x1b\n" +
+	"\tmemory_id\x18\x04 \x01(\tR\bmemoryId\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x05 \x01(\tR\tsessionId\"\xae\x01\n" +
+	"\x15AIMemoryEntityFetched\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x126\n" +
+	"\x04item\x18\x03 \x01(\v2\".legion.ai.v1.AIMemoryEntityRecordR\x04item\"\xbe\x01\n" +
+	"\x19AIMemoryEntityFetchFailed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x03 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"\xa3\x02\n" +
+	"\x1cQueryAIMemoryEntitiesCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x12@\n" +
+	"\n" +
+	"pagination\x18\x04 \x01(\v2 .legion.ai.v1.AIMemoryPaginationR\n" +
+	"pagination\x12:\n" +
+	"\x06filter\x18\x05 \x01(\v2\".legion.ai.v1.AIMemoryEntityFilterR\x06filter\"\x8a\x02\n" +
+	"\x17AIMemoryEntitiesQueried\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12@\n" +
+	"\n" +
+	"pagination\x18\x03 \x01(\v2 .legion.ai.v1.AIMemoryPaginationR\n" +
+	"pagination\x128\n" +
+	"\x05items\x18\x04 \x03(\v2\".legion.ai.v1.AIMemoryEntityRecordR\x05items\x12\x14\n" +
+	"\x05total\x18\x05 \x01(\x03R\x05total\"\xc0\x01\n" +
+	"\x1bAIMemoryEntitiesQueryFailed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x03 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"\xdc\x01\n" +
+	"\x1bUpdateAIMemoryEntityCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x126\n" +
+	"\x04item\x18\x04 \x01(\v2\".legion.ai.v1.AIMemoryEntityRecordR\x04item\"\xc8\x01\n" +
+	"\x15AIMemoryEntityUpdated\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x126\n" +
+	"\x04item\x18\x03 \x01(\v2\".legion.ai.v1.AIMemoryEntityRecordR\x04item\x12\x18\n" +
+	"\amessage\x18\x04 \x01(\tR\amessage\"\xbf\x01\n" +
+	"\x1aAIMemoryEntityUpdateFailed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x03 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"\xe2\x01\n" +
+	"\x1dDeleteAIMemoryEntitiesCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x12:\n" +
+	"\x06filter\x18\x04 \x01(\v2\".legion.ai.v1.AIMemoryEntityFilterR\x06filter\"\xb9\x01\n" +
+	"\x17AIMemoryEntitiesDeleted\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12%\n" +
+	"\x0eaffected_count\x18\x03 \x01(\x03R\raffectedCount\x12\x18\n" +
+	"\amessage\x18\x04 \x01(\tR\amessage\"\xc1\x01\n" +
+	"\x1cAIMemoryEntitiesDeleteFailed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x03 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"\xc6\x01\n" +
+	"\x1eCountAIMemoryEntityTagsCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x04 \x01(\tR\tsessionId\"\xd8\x01\n" +
+	"\x19AIMemoryEntityTagsCounted\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x03 \x01(\tR\tsessionId\x12=\n" +
+	"\n" +
+	"tags_count\x18\x04 \x03(\v2\x1e.legion.ai.v1.AIMemoryTagCountR\ttagsCount\"\xe1\x01\n" +
+	"\x1dAIMemoryEntityTagsCountFailed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x03 \x01(\tR\tsessionId\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x04 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x05 \x01(\tR\ferrorMessage\"?\n" +
+	"\x13AIRuntimePagination\x12\x12\n" +
+	"\x04page\x18\x01 \x01(\x03R\x04page\x12\x14\n" +
+	"\x05limit\x18\x02 \x01(\x03R\x05limit\"\x7f\n" +
+	"\x10AIHTTPFlowRecord\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x03R\x02id\x12\x1d\n" +
+	"\n" +
+	"runtime_id\x18\x02 \x01(\tR\truntimeId\x12!\n" +
+	"\fhidden_index\x18\x03 \x01(\tR\vhiddenIndex\x12\x19\n" +
+	"\braw_json\x18\x04 \x01(\fR\arawJson\"\x9b\x03\n" +
+	"\x17QueryAIHTTPFlowsCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"runtime_id\x18\x04 \x01(\tR\truntimeId\x12!\n" +
+	"\fhidden_index\x18\x05 \x01(\tR\vhiddenIndex\x12A\n" +
+	"\n" +
+	"pagination\x18\x06 \x01(\v2!.legion.ai.v1.AIRuntimePaginationR\n" +
+	"pagination\x12\x16\n" +
+	"\x06method\x18\a \x01(\tR\x06method\x12\x1f\n" +
+	"\vstatus_code\x18\b \x01(\x03R\n" +
+	"statusCode\x12!\n" +
+	"\fcontent_type\x18\t \x01(\tR\vcontentType\x12\x18\n" +
+	"\akeyword\x18\n" +
+	" \x01(\tR\akeyword\"\x82\x02\n" +
+	"\x12AIHTTPFlowsQueried\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x124\n" +
+	"\x05items\x18\x03 \x03(\v2\x1e.legion.ai.v1.AIHTTPFlowRecordR\x05items\x12A\n" +
+	"\n" +
+	"pagination\x18\x04 \x01(\v2!.legion.ai.v1.AIRuntimePaginationR\n" +
+	"pagination\x12\x14\n" +
+	"\x05total\x18\x05 \x01(\x03R\x05total\"\xbb\x01\n" +
+	"\x16AIHTTPFlowsQueryFailed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x03 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"n\n" +
+	"\fAIRiskRecord\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x04R\x02id\x12\x1d\n" +
+	"\n" +
+	"runtime_id\x18\x02 \x01(\tR\truntimeId\x12\x14\n" +
+	"\x05title\x18\x03 \x01(\tR\x05title\x12\x19\n" +
+	"\braw_json\x18\x04 \x01(\fR\arawJson\"\x9a\x03\n" +
+	"\x13QueryAIRisksCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"runtime_id\x18\x04 \x01(\tR\truntimeId\x12\x17\n" +
+	"\arisk_id\x18\x05 \x01(\x04R\x06riskId\x12A\n" +
+	"\n" +
+	"pagination\x18\x06 \x01(\v2!.legion.ai.v1.AIRuntimePaginationR\n" +
+	"pagination\x12\x1a\n" +
+	"\bseverity\x18\a \x01(\tR\bseverity\x12\x1b\n" +
+	"\trisk_type\x18\b \x01(\tR\briskType\x12\x18\n" +
+	"\anetwork\x18\t \x01(\tR\anetwork\x12\x14\n" +
+	"\x05title\x18\n" +
+	" \x01(\tR\x05title\x12\x18\n" +
+	"\akeyword\x18\v \x01(\tR\akeyword\"\xfa\x01\n" +
+	"\x0eAIRisksQueried\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x120\n" +
+	"\x05items\x18\x03 \x03(\v2\x1a.legion.ai.v1.AIRiskRecordR\x05items\x12A\n" +
+	"\n" +
+	"pagination\x18\x04 \x01(\v2!.legion.ai.v1.AIRuntimePaginationR\n" +
+	"pagination\x12\x14\n" +
+	"\x05total\x18\x05 \x01(\x03R\x05total\"\xb7\x01\n" +
+	"\x12AIRisksQueryFailed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x03 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"\xef\x01\n" +
+	"\x1eExportAILogsCheckpointsCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\"\n" +
+	"\rowner_user_id\x18\x03 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x04 \x01(\tR\tsessionId\x12'\n" +
+	"\x0fcoordinator_ids\x18\x05 \x03(\tR\x0ecoordinatorIds\"\xda\x01\n" +
+	"\x19AILogsCheckpointsExported\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x03 \x01(\tR\tsessionId\x12)\n" +
+	"\x10checkpoints_json\x18\x04 \x01(\fR\x0fcheckpointsJson\x12\x14\n" +
+	"\x05total\x18\x05 \x01(\x03R\x05total\"\xe1\x01\n" +
+	"\x1dAILogsCheckpointsExportFailed\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12\"\n" +
+	"\rowner_user_id\x18\x02 \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x03 \x01(\tR\tsessionId\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x04 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x05 \x01(\tR\ferrorMessage\"\x84\x02\n" +
 	"\x0eAISessionReady\x129\n" +
 	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x124\n" +
 	"\asession\x18\x02 \x01(\v2\x1a.legion.ai.v1.AISessionRefR\asession\x12!\n" +
@@ -1806,7 +20244,7 @@ const file_legion_ai_v1_ai_proto_rawDesc = "" +
 	"\asession\x18\x02 \x01(\v2\x1a.legion.ai.v1.AISessionRefR\asession\x12;\n" +
 	"\vfinished_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"finishedAt\x12\x16\n" +
-	"\x06reason\x18\x04 \x01(\tR\x06reasonBDZBgithub.com/yaklang/yaklang/scannode/gen/legionpb/legion/ai/v1;aiv1b\x06proto3"
+	"\x06reason\x18\x04 \x01(\tR\x06reasonB$Z\"legion/gen/proto/legion/ai/v1;aiv1b\x06proto3"
 
 var (
 	file_legion_ai_v1_ai_proto_rawDescOnce sync.Once
@@ -1820,79 +20258,564 @@ func file_legion_ai_v1_ai_proto_rawDescGZIP() []byte {
 	return file_legion_ai_v1_ai_proto_rawDescData
 }
 
-var file_legion_ai_v1_ai_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
+var file_legion_ai_v1_ai_proto_msgTypes = make([]protoimpl.MessageInfo, 231)
 var file_legion_ai_v1_ai_proto_goTypes = []any{
-	(*AISessionRef)(nil),                    // 0: legion.ai.v1.AISessionRef
-	(*AISessionAttachmentRef)(nil),          // 1: legion.ai.v1.AISessionAttachmentRef
-	(*AISessionCredentialRef)(nil),          // 2: legion.ai.v1.AISessionCredentialRef
-	(*BindAISessionCommand)(nil),            // 3: legion.ai.v1.BindAISessionCommand
-	(*PushAISessionInputCommand)(nil),       // 4: legion.ai.v1.PushAISessionInputCommand
-	(*AppendAISessionContextCommand)(nil),   // 5: legion.ai.v1.AppendAISessionContextCommand
-	(*CancelAISessionCommand)(nil),          // 6: legion.ai.v1.CancelAISessionCommand
-	(*CloseAISessionCommand)(nil),           // 7: legion.ai.v1.CloseAISessionCommand
-	(*AIProviderPreviewConfigSnapshot)(nil), // 8: legion.ai.v1.AIProviderPreviewConfigSnapshot
-	(*ListAIProviderModelsCommand)(nil),     // 9: legion.ai.v1.ListAIProviderModelsCommand
-	(*AIProviderPreviewModel)(nil),          // 10: legion.ai.v1.AIProviderPreviewModel
-	(*AIProviderModelsListed)(nil),          // 11: legion.ai.v1.AIProviderModelsListed
-	(*AIProviderModelsFailed)(nil),          // 12: legion.ai.v1.AIProviderModelsFailed
-	(*HealthCheckAIProviderCommand)(nil),    // 13: legion.ai.v1.HealthCheckAIProviderCommand
-	(*AIProviderHealthCheckCompleted)(nil),  // 14: legion.ai.v1.AIProviderHealthCheckCompleted
-	(*AIProviderHealthCheckFailed)(nil),     // 15: legion.ai.v1.AIProviderHealthCheckFailed
-	(*AISessionReady)(nil),                  // 16: legion.ai.v1.AISessionReady
-	(*AISessionEvent)(nil),                  // 17: legion.ai.v1.AISessionEvent
-	(*AISessionDone)(nil),                   // 18: legion.ai.v1.AISessionDone
-	(*AISessionFailed)(nil),                 // 19: legion.ai.v1.AISessionFailed
-	(*AISessionCancelled)(nil),              // 20: legion.ai.v1.AISessionCancelled
-	nil,                                     // 21: legion.ai.v1.AIProviderPreviewConfigSnapshot.HeadersEntry
-	(*v1.CommandMetadata)(nil),              // 22: legion.node.v1.CommandMetadata
-	(*v1.EventMetadata)(nil),                // 23: legion.node.v1.EventMetadata
-	(*timestamppb.Timestamp)(nil),           // 24: google.protobuf.Timestamp
+	(*AISessionRef)(nil),                                // 0: legion.ai.v1.AISessionRef
+	(*AISessionAttachmentRef)(nil),                      // 1: legion.ai.v1.AISessionAttachmentRef
+	(*AISessionCredentialRef)(nil),                      // 2: legion.ai.v1.AISessionCredentialRef
+	(*BindAISessionCommand)(nil),                        // 3: legion.ai.v1.BindAISessionCommand
+	(*PushAISessionInputCommand)(nil),                   // 4: legion.ai.v1.PushAISessionInputCommand
+	(*AppendAISessionContextCommand)(nil),               // 5: legion.ai.v1.AppendAISessionContextCommand
+	(*CancelAISessionCommand)(nil),                      // 6: legion.ai.v1.CancelAISessionCommand
+	(*CloseAISessionCommand)(nil),                       // 7: legion.ai.v1.CloseAISessionCommand
+	(*UpdateAISessionTitleCommand)(nil),                 // 8: legion.ai.v1.UpdateAISessionTitleCommand
+	(*AISessionTitleUpdated)(nil),                       // 9: legion.ai.v1.AISessionTitleUpdated
+	(*AISessionTitleUpdateFailed)(nil),                  // 10: legion.ai.v1.AISessionTitleUpdateFailed
+	(*DeleteAISessionCommand)(nil),                      // 11: legion.ai.v1.DeleteAISessionCommand
+	(*AISessionDeleteCompleted)(nil),                    // 12: legion.ai.v1.AISessionDeleteCompleted
+	(*AISessionDeleteFailed)(nil),                       // 13: legion.ai.v1.AISessionDeleteFailed
+	(*AIProviderPreviewConfigSnapshot)(nil),             // 14: legion.ai.v1.AIProviderPreviewConfigSnapshot
+	(*ListAIProviderModelsCommand)(nil),                 // 15: legion.ai.v1.ListAIProviderModelsCommand
+	(*AIProviderPreviewModel)(nil),                      // 16: legion.ai.v1.AIProviderPreviewModel
+	(*AIProviderModelsListed)(nil),                      // 17: legion.ai.v1.AIProviderModelsListed
+	(*AIProviderModelsFailed)(nil),                      // 18: legion.ai.v1.AIProviderModelsFailed
+	(*HealthCheckAIProviderCommand)(nil),                // 19: legion.ai.v1.HealthCheckAIProviderCommand
+	(*AIProviderHealthCheckCompleted)(nil),              // 20: legion.ai.v1.AIProviderHealthCheckCompleted
+	(*AIProviderHealthCheckFailed)(nil),                 // 21: legion.ai.v1.AIProviderHealthCheckFailed
+	(*AIConfigKVPair)(nil),                              // 22: legion.ai.v1.AIConfigKVPair
+	(*AIThirdPartyApplicationConfigSnapshot)(nil),       // 23: legion.ai.v1.AIThirdPartyApplicationConfigSnapshot
+	(*AIModelConfigSnapshot)(nil),                       // 24: legion.ai.v1.AIModelConfigSnapshot
+	(*AIGlobalConfigSnapshot)(nil),                      // 25: legion.ai.v1.AIGlobalConfigSnapshot
+	(*GetAIGlobalConfigCommand)(nil),                    // 26: legion.ai.v1.GetAIGlobalConfigCommand
+	(*SetAIGlobalConfigCommand)(nil),                    // 27: legion.ai.v1.SetAIGlobalConfigCommand
+	(*AIGlobalConfigFetched)(nil),                       // 28: legion.ai.v1.AIGlobalConfigFetched
+	(*AIGlobalConfigFetchFailed)(nil),                   // 29: legion.ai.v1.AIGlobalConfigFetchFailed
+	(*AIGlobalConfigUpdated)(nil),                       // 30: legion.ai.v1.AIGlobalConfigUpdated
+	(*AIGlobalConfigUpdateFailed)(nil),                  // 31: legion.ai.v1.AIGlobalConfigUpdateFailed
+	(*AIFocus)(nil),                                     // 32: legion.ai.v1.AIFocus
+	(*QueryAIFocusCommand)(nil),                         // 33: legion.ai.v1.QueryAIFocusCommand
+	(*AIFocusQueried)(nil),                              // 34: legion.ai.v1.AIFocusQueried
+	(*AIFocusQueryFailed)(nil),                          // 35: legion.ai.v1.AIFocusQueryFailed
+	(*GetRandomAIMaterialsCommand)(nil),                 // 36: legion.ai.v1.GetRandomAIMaterialsCommand
+	(*AIMaterialsRandomQueried)(nil),                    // 37: legion.ai.v1.AIMaterialsRandomQueried
+	(*AIMaterialsRandomQueryFailed)(nil),                // 38: legion.ai.v1.AIMaterialsRandomQueryFailed
+	(*AIMCPServerPagination)(nil),                       // 39: legion.ai.v1.AIMCPServerPagination
+	(*AIMCPServerToolParam)(nil),                        // 40: legion.ai.v1.AIMCPServerToolParam
+	(*AIMCPServerTool)(nil),                             // 41: legion.ai.v1.AIMCPServerTool
+	(*AIMCPServerRecord)(nil),                           // 42: legion.ai.v1.AIMCPServerRecord
+	(*ListAIMCPServersCommand)(nil),                     // 43: legion.ai.v1.ListAIMCPServersCommand
+	(*AIMCPServersListed)(nil),                          // 44: legion.ai.v1.AIMCPServersListed
+	(*AIMCPServersListFailed)(nil),                      // 45: legion.ai.v1.AIMCPServersListFailed
+	(*CreateAIMCPServerCommand)(nil),                    // 46: legion.ai.v1.CreateAIMCPServerCommand
+	(*AIMCPServerCreated)(nil),                          // 47: legion.ai.v1.AIMCPServerCreated
+	(*AIMCPServerCreateFailed)(nil),                     // 48: legion.ai.v1.AIMCPServerCreateFailed
+	(*UpdateAIMCPServerCommand)(nil),                    // 49: legion.ai.v1.UpdateAIMCPServerCommand
+	(*AIMCPServerUpdated)(nil),                          // 50: legion.ai.v1.AIMCPServerUpdated
+	(*AIMCPServerUpdateFailed)(nil),                     // 51: legion.ai.v1.AIMCPServerUpdateFailed
+	(*DeleteAIMCPServerCommand)(nil),                    // 52: legion.ai.v1.DeleteAIMCPServerCommand
+	(*AIMCPServerDeleted)(nil),                          // 53: legion.ai.v1.AIMCPServerDeleted
+	(*AIMCPServerDeleteFailed)(nil),                     // 54: legion.ai.v1.AIMCPServerDeleteFailed
+	(*AILocalModelStatus)(nil),                          // 55: legion.ai.v1.AILocalModelStatus
+	(*AILocalModelRecord)(nil),                          // 56: legion.ai.v1.AILocalModelRecord
+	(*ListAILocalModelsCommand)(nil),                    // 57: legion.ai.v1.ListAILocalModelsCommand
+	(*AILocalModelsListed)(nil),                         // 58: legion.ai.v1.AILocalModelsListed
+	(*AILocalModelsListFailed)(nil),                     // 59: legion.ai.v1.AILocalModelsListFailed
+	(*CheckAILlamaServerReadyCommand)(nil),              // 60: legion.ai.v1.CheckAILlamaServerReadyCommand
+	(*AILlamaServerReadyChecked)(nil),                   // 61: legion.ai.v1.AILlamaServerReadyChecked
+	(*AILlamaServerReadyCheckFailed)(nil),               // 62: legion.ai.v1.AILlamaServerReadyCheckFailed
+	(*InstallAILlamaServerCommand)(nil),                 // 63: legion.ai.v1.InstallAILlamaServerCommand
+	(*AILocalModelOperation)(nil),                       // 64: legion.ai.v1.AILocalModelOperation
+	(*AILocalModelOperationAccepted)(nil),               // 65: legion.ai.v1.AILocalModelOperationAccepted
+	(*AILocalModelOperationProgressed)(nil),             // 66: legion.ai.v1.AILocalModelOperationProgressed
+	(*AILocalModelOperationCompleted)(nil),              // 67: legion.ai.v1.AILocalModelOperationCompleted
+	(*AILocalModelOperationCancelled)(nil),              // 68: legion.ai.v1.AILocalModelOperationCancelled
+	(*AILocalModelOperationFailed)(nil),                 // 69: legion.ai.v1.AILocalModelOperationFailed
+	(*AILlamaServerInstalled)(nil),                      // 70: legion.ai.v1.AILlamaServerInstalled
+	(*AILlamaServerInstallFailed)(nil),                  // 71: legion.ai.v1.AILlamaServerInstallFailed
+	(*CreateAILocalModelCommand)(nil),                   // 72: legion.ai.v1.CreateAILocalModelCommand
+	(*AILocalModelCreated)(nil),                         // 73: legion.ai.v1.AILocalModelCreated
+	(*AILocalModelCreateFailed)(nil),                    // 74: legion.ai.v1.AILocalModelCreateFailed
+	(*UpdateAILocalModelCommand)(nil),                   // 75: legion.ai.v1.UpdateAILocalModelCommand
+	(*AILocalModelUpdated)(nil),                         // 76: legion.ai.v1.AILocalModelUpdated
+	(*AILocalModelUpdateFailed)(nil),                    // 77: legion.ai.v1.AILocalModelUpdateFailed
+	(*DeleteAILocalModelCommand)(nil),                   // 78: legion.ai.v1.DeleteAILocalModelCommand
+	(*AILocalModelDeleted)(nil),                         // 79: legion.ai.v1.AILocalModelDeleted
+	(*AILocalModelDeleteFailed)(nil),                    // 80: legion.ai.v1.AILocalModelDeleteFailed
+	(*StartAILocalModelCommand)(nil),                    // 81: legion.ai.v1.StartAILocalModelCommand
+	(*AILocalModelStarted)(nil),                         // 82: legion.ai.v1.AILocalModelStarted
+	(*AILocalModelStartFailed)(nil),                     // 83: legion.ai.v1.AILocalModelStartFailed
+	(*StopAILocalModelCommand)(nil),                     // 84: legion.ai.v1.StopAILocalModelCommand
+	(*AILocalModelStopped)(nil),                         // 85: legion.ai.v1.AILocalModelStopped
+	(*AILocalModelStopFailed)(nil),                      // 86: legion.ai.v1.AILocalModelStopFailed
+	(*DownloadAILocalModelCommand)(nil),                 // 87: legion.ai.v1.DownloadAILocalModelCommand
+	(*CancelAILocalModelOperationCommand)(nil),          // 88: legion.ai.v1.CancelAILocalModelOperationCommand
+	(*AILocalModelDownloaded)(nil),                      // 89: legion.ai.v1.AILocalModelDownloaded
+	(*AILocalModelDownloadFailed)(nil),                  // 90: legion.ai.v1.AILocalModelDownloadFailed
+	(*ClearAILocalModelsCommand)(nil),                   // 91: legion.ai.v1.ClearAILocalModelsCommand
+	(*AILocalModelsCleared)(nil),                        // 92: legion.ai.v1.AILocalModelsCleared
+	(*AILocalModelsClearFailed)(nil),                    // 93: legion.ai.v1.AILocalModelsClearFailed
+	(*AIForgePagination)(nil),                           // 94: legion.ai.v1.AIForgePagination
+	(*AIForgeRecord)(nil),                               // 95: legion.ai.v1.AIForgeRecord
+	(*ListAIForgesCommand)(nil),                         // 96: legion.ai.v1.ListAIForgesCommand
+	(*AIForgesListed)(nil),                              // 97: legion.ai.v1.AIForgesListed
+	(*AIForgesListFailed)(nil),                          // 98: legion.ai.v1.AIForgesListFailed
+	(*CreateAIForgeCommand)(nil),                        // 99: legion.ai.v1.CreateAIForgeCommand
+	(*AIForgeCreated)(nil),                              // 100: legion.ai.v1.AIForgeCreated
+	(*AIForgeCreateFailed)(nil),                         // 101: legion.ai.v1.AIForgeCreateFailed
+	(*UpdateAIForgeCommand)(nil),                        // 102: legion.ai.v1.UpdateAIForgeCommand
+	(*AIForgeUpdated)(nil),                              // 103: legion.ai.v1.AIForgeUpdated
+	(*AIForgeUpdateFailed)(nil),                         // 104: legion.ai.v1.AIForgeUpdateFailed
+	(*DeleteAIForgeCommand)(nil),                        // 105: legion.ai.v1.DeleteAIForgeCommand
+	(*AIForgeDeleted)(nil),                              // 106: legion.ai.v1.AIForgeDeleted
+	(*AIForgeDeleteFailed)(nil),                         // 107: legion.ai.v1.AIForgeDeleteFailed
+	(*ExportAIForgeCommand)(nil),                        // 108: legion.ai.v1.ExportAIForgeCommand
+	(*AIForgeExportProgressed)(nil),                     // 109: legion.ai.v1.AIForgeExportProgressed
+	(*AIForgeExported)(nil),                             // 110: legion.ai.v1.AIForgeExported
+	(*AIForgeExportFailed)(nil),                         // 111: legion.ai.v1.AIForgeExportFailed
+	(*AIForgeImportAttachment)(nil),                     // 112: legion.ai.v1.AIForgeImportAttachment
+	(*ImportAIForgeCommand)(nil),                        // 113: legion.ai.v1.ImportAIForgeCommand
+	(*AIForgeImportProgressed)(nil),                     // 114: legion.ai.v1.AIForgeImportProgressed
+	(*AIForgeImportItem)(nil),                           // 115: legion.ai.v1.AIForgeImportItem
+	(*AIForgeImported)(nil),                             // 116: legion.ai.v1.AIForgeImported
+	(*AIForgeImportFailed)(nil),                         // 117: legion.ai.v1.AIForgeImportFailed
+	(*AIToolPagination)(nil),                            // 118: legion.ai.v1.AIToolPagination
+	(*AIToolRecord)(nil),                                // 119: legion.ai.v1.AIToolRecord
+	(*ListAIToolsCommand)(nil),                          // 120: legion.ai.v1.ListAIToolsCommand
+	(*AIToolsListed)(nil),                               // 121: legion.ai.v1.AIToolsListed
+	(*AIToolsListFailed)(nil),                           // 122: legion.ai.v1.AIToolsListFailed
+	(*CreateAIToolCommand)(nil),                         // 123: legion.ai.v1.CreateAIToolCommand
+	(*AIToolCreated)(nil),                               // 124: legion.ai.v1.AIToolCreated
+	(*AIToolCreateFailed)(nil),                          // 125: legion.ai.v1.AIToolCreateFailed
+	(*UpdateAIToolCommand)(nil),                         // 126: legion.ai.v1.UpdateAIToolCommand
+	(*AIToolUpdated)(nil),                               // 127: legion.ai.v1.AIToolUpdated
+	(*AIToolUpdateFailed)(nil),                          // 128: legion.ai.v1.AIToolUpdateFailed
+	(*GenerateAIToolMetadataCommand)(nil),               // 129: legion.ai.v1.GenerateAIToolMetadataCommand
+	(*AIToolMetadataGenerated)(nil),                     // 130: legion.ai.v1.AIToolMetadataGenerated
+	(*AIToolMetadataGenerateFailed)(nil),                // 131: legion.ai.v1.AIToolMetadataGenerateFailed
+	(*ToggleAIToolFavoriteCommand)(nil),                 // 132: legion.ai.v1.ToggleAIToolFavoriteCommand
+	(*AIToolFavoriteToggled)(nil),                       // 133: legion.ai.v1.AIToolFavoriteToggled
+	(*AIToolFavoriteToggleFailed)(nil),                  // 134: legion.ai.v1.AIToolFavoriteToggleFailed
+	(*DeleteAIToolsCommand)(nil),                        // 135: legion.ai.v1.DeleteAIToolsCommand
+	(*AIToolsDeleted)(nil),                              // 136: legion.ai.v1.AIToolsDeleted
+	(*AIToolsDeleteFailed)(nil),                         // 137: legion.ai.v1.AIToolsDeleteFailed
+	(*AIKnowledgeBasePagination)(nil),                   // 138: legion.ai.v1.AIKnowledgeBasePagination
+	(*AIKnowledgeBaseRecord)(nil),                       // 139: legion.ai.v1.AIKnowledgeBaseRecord
+	(*ListAIKnowledgeBasesCommand)(nil),                 // 140: legion.ai.v1.ListAIKnowledgeBasesCommand
+	(*AIKnowledgeBasesListed)(nil),                      // 141: legion.ai.v1.AIKnowledgeBasesListed
+	(*AIKnowledgeBasesListFailed)(nil),                  // 142: legion.ai.v1.AIKnowledgeBasesListFailed
+	(*CreateAIKnowledgeBaseCommand)(nil),                // 143: legion.ai.v1.CreateAIKnowledgeBaseCommand
+	(*AIKnowledgeBaseImportAttachment)(nil),             // 144: legion.ai.v1.AIKnowledgeBaseImportAttachment
+	(*AIKnowledgeBaseCreated)(nil),                      // 145: legion.ai.v1.AIKnowledgeBaseCreated
+	(*AIKnowledgeBaseCreateFailed)(nil),                 // 146: legion.ai.v1.AIKnowledgeBaseCreateFailed
+	(*ImportAIKnowledgeBaseCommand)(nil),                // 147: legion.ai.v1.ImportAIKnowledgeBaseCommand
+	(*AIKnowledgeBaseImported)(nil),                     // 148: legion.ai.v1.AIKnowledgeBaseImported
+	(*AIKnowledgeBaseImportFailed)(nil),                 // 149: legion.ai.v1.AIKnowledgeBaseImportFailed
+	(*UpdateAIKnowledgeBaseCommand)(nil),                // 150: legion.ai.v1.UpdateAIKnowledgeBaseCommand
+	(*AIKnowledgeBaseUpdated)(nil),                      // 151: legion.ai.v1.AIKnowledgeBaseUpdated
+	(*AIKnowledgeBaseUpdateFailed)(nil),                 // 152: legion.ai.v1.AIKnowledgeBaseUpdateFailed
+	(*DeleteAIKnowledgeBaseCommand)(nil),                // 153: legion.ai.v1.DeleteAIKnowledgeBaseCommand
+	(*AIKnowledgeBaseDeleted)(nil),                      // 154: legion.ai.v1.AIKnowledgeBaseDeleted
+	(*AIKnowledgeBaseDeleteFailed)(nil),                 // 155: legion.ai.v1.AIKnowledgeBaseDeleteFailed
+	(*ExportAIKnowledgeBaseCommand)(nil),                // 156: legion.ai.v1.ExportAIKnowledgeBaseCommand
+	(*AIKnowledgeBaseExported)(nil),                     // 157: legion.ai.v1.AIKnowledgeBaseExported
+	(*AIKnowledgeBaseExportFailed)(nil),                 // 158: legion.ai.v1.AIKnowledgeBaseExportFailed
+	(*AIKnowledgeBaseEntryFilter)(nil),                  // 159: legion.ai.v1.AIKnowledgeBaseEntryFilter
+	(*AIKnowledgeBaseEntryRecord)(nil),                  // 160: legion.ai.v1.AIKnowledgeBaseEntryRecord
+	(*SearchAIKnowledgeBaseEntriesCommand)(nil),         // 161: legion.ai.v1.SearchAIKnowledgeBaseEntriesCommand
+	(*AIKnowledgeBaseEntriesSearched)(nil),              // 162: legion.ai.v1.AIKnowledgeBaseEntriesSearched
+	(*AIKnowledgeBaseEntriesSearchFailed)(nil),          // 163: legion.ai.v1.AIKnowledgeBaseEntriesSearchFailed
+	(*QueryAIKnowledgeBaseByAICommand)(nil),             // 164: legion.ai.v1.QueryAIKnowledgeBaseByAICommand
+	(*CancelAIKnowledgeBaseByAIQueryCommand)(nil),       // 165: legion.ai.v1.CancelAIKnowledgeBaseByAIQueryCommand
+	(*AIKnowledgeBaseQueryByAIChunk)(nil),               // 166: legion.ai.v1.AIKnowledgeBaseQueryByAIChunk
+	(*AIKnowledgeBaseQueryByAICompleted)(nil),           // 167: legion.ai.v1.AIKnowledgeBaseQueryByAICompleted
+	(*AIKnowledgeBaseQueryByAIFailed)(nil),              // 168: legion.ai.v1.AIKnowledgeBaseQueryByAIFailed
+	(*GenerateAIKnowledgeBaseQuestionIndexCommand)(nil), // 169: legion.ai.v1.GenerateAIKnowledgeBaseQuestionIndexCommand
+	(*CancelAIKnowledgeBaseQuestionIndexCommand)(nil),   // 170: legion.ai.v1.CancelAIKnowledgeBaseQuestionIndexCommand
+	(*AIKnowledgeBaseQuestionIndexProgress)(nil),        // 171: legion.ai.v1.AIKnowledgeBaseQuestionIndexProgress
+	(*AIKnowledgeBaseQuestionIndexCompleted)(nil),       // 172: legion.ai.v1.AIKnowledgeBaseQuestionIndexCompleted
+	(*AIKnowledgeBaseQuestionIndexFailed)(nil),          // 173: legion.ai.v1.AIKnowledgeBaseQuestionIndexFailed
+	(*CreateAIKnowledgeBaseEntryCommand)(nil),           // 174: legion.ai.v1.CreateAIKnowledgeBaseEntryCommand
+	(*AIKnowledgeBaseEntryCreated)(nil),                 // 175: legion.ai.v1.AIKnowledgeBaseEntryCreated
+	(*AIKnowledgeBaseEntryCreateFailed)(nil),            // 176: legion.ai.v1.AIKnowledgeBaseEntryCreateFailed
+	(*UpdateAIKnowledgeBaseEntryCommand)(nil),           // 177: legion.ai.v1.UpdateAIKnowledgeBaseEntryCommand
+	(*AIKnowledgeBaseEntryUpdated)(nil),                 // 178: legion.ai.v1.AIKnowledgeBaseEntryUpdated
+	(*AIKnowledgeBaseEntryUpdateFailed)(nil),            // 179: legion.ai.v1.AIKnowledgeBaseEntryUpdateFailed
+	(*DeleteAIKnowledgeBaseEntryCommand)(nil),           // 180: legion.ai.v1.DeleteAIKnowledgeBaseEntryCommand
+	(*AIKnowledgeBaseEntryDeleted)(nil),                 // 181: legion.ai.v1.AIKnowledgeBaseEntryDeleted
+	(*AIKnowledgeBaseEntryDeleteFailed)(nil),            // 182: legion.ai.v1.AIKnowledgeBaseEntryDeleteFailed
+	(*BuildAIKnowledgeBaseVectorIndexCommand)(nil),      // 183: legion.ai.v1.BuildAIKnowledgeBaseVectorIndexCommand
+	(*AIKnowledgeBaseVectorIndexBuilt)(nil),             // 184: legion.ai.v1.AIKnowledgeBaseVectorIndexBuilt
+	(*AIKnowledgeBaseVectorIndexBuildFailed)(nil),       // 185: legion.ai.v1.AIKnowledgeBaseVectorIndexBuildFailed
+	(*BuildAIKnowledgeBaseEntryVectorIndexCommand)(nil), // 186: legion.ai.v1.BuildAIKnowledgeBaseEntryVectorIndexCommand
+	(*AIKnowledgeBaseEntryVectorIndexBuilt)(nil),        // 187: legion.ai.v1.AIKnowledgeBaseEntryVectorIndexBuilt
+	(*AIKnowledgeBaseEntryVectorIndexBuildFailed)(nil),  // 188: legion.ai.v1.AIKnowledgeBaseEntryVectorIndexBuildFailed
+	(*AIMemoryFloatRange)(nil),                          // 189: legion.ai.v1.AIMemoryFloatRange
+	(*AIMemoryInt64Range)(nil),                          // 190: legion.ai.v1.AIMemoryInt64Range
+	(*AIMemoryPagination)(nil),                          // 191: legion.ai.v1.AIMemoryPagination
+	(*AIMemoryTagCount)(nil),                            // 192: legion.ai.v1.AIMemoryTagCount
+	(*AIMemoryEntityRecord)(nil),                        // 193: legion.ai.v1.AIMemoryEntityRecord
+	(*AIMemoryEntityFilter)(nil),                        // 194: legion.ai.v1.AIMemoryEntityFilter
+	(*CreateAIMemoryEntityCommand)(nil),                 // 195: legion.ai.v1.CreateAIMemoryEntityCommand
+	(*AIMemoryEntityCreated)(nil),                       // 196: legion.ai.v1.AIMemoryEntityCreated
+	(*AIMemoryEntityCreateFailed)(nil),                  // 197: legion.ai.v1.AIMemoryEntityCreateFailed
+	(*GetAIMemoryEntityCommand)(nil),                    // 198: legion.ai.v1.GetAIMemoryEntityCommand
+	(*AIMemoryEntityFetched)(nil),                       // 199: legion.ai.v1.AIMemoryEntityFetched
+	(*AIMemoryEntityFetchFailed)(nil),                   // 200: legion.ai.v1.AIMemoryEntityFetchFailed
+	(*QueryAIMemoryEntitiesCommand)(nil),                // 201: legion.ai.v1.QueryAIMemoryEntitiesCommand
+	(*AIMemoryEntitiesQueried)(nil),                     // 202: legion.ai.v1.AIMemoryEntitiesQueried
+	(*AIMemoryEntitiesQueryFailed)(nil),                 // 203: legion.ai.v1.AIMemoryEntitiesQueryFailed
+	(*UpdateAIMemoryEntityCommand)(nil),                 // 204: legion.ai.v1.UpdateAIMemoryEntityCommand
+	(*AIMemoryEntityUpdated)(nil),                       // 205: legion.ai.v1.AIMemoryEntityUpdated
+	(*AIMemoryEntityUpdateFailed)(nil),                  // 206: legion.ai.v1.AIMemoryEntityUpdateFailed
+	(*DeleteAIMemoryEntitiesCommand)(nil),               // 207: legion.ai.v1.DeleteAIMemoryEntitiesCommand
+	(*AIMemoryEntitiesDeleted)(nil),                     // 208: legion.ai.v1.AIMemoryEntitiesDeleted
+	(*AIMemoryEntitiesDeleteFailed)(nil),                // 209: legion.ai.v1.AIMemoryEntitiesDeleteFailed
+	(*CountAIMemoryEntityTagsCommand)(nil),              // 210: legion.ai.v1.CountAIMemoryEntityTagsCommand
+	(*AIMemoryEntityTagsCounted)(nil),                   // 211: legion.ai.v1.AIMemoryEntityTagsCounted
+	(*AIMemoryEntityTagsCountFailed)(nil),               // 212: legion.ai.v1.AIMemoryEntityTagsCountFailed
+	(*AIRuntimePagination)(nil),                         // 213: legion.ai.v1.AIRuntimePagination
+	(*AIHTTPFlowRecord)(nil),                            // 214: legion.ai.v1.AIHTTPFlowRecord
+	(*QueryAIHTTPFlowsCommand)(nil),                     // 215: legion.ai.v1.QueryAIHTTPFlowsCommand
+	(*AIHTTPFlowsQueried)(nil),                          // 216: legion.ai.v1.AIHTTPFlowsQueried
+	(*AIHTTPFlowsQueryFailed)(nil),                      // 217: legion.ai.v1.AIHTTPFlowsQueryFailed
+	(*AIRiskRecord)(nil),                                // 218: legion.ai.v1.AIRiskRecord
+	(*QueryAIRisksCommand)(nil),                         // 219: legion.ai.v1.QueryAIRisksCommand
+	(*AIRisksQueried)(nil),                              // 220: legion.ai.v1.AIRisksQueried
+	(*AIRisksQueryFailed)(nil),                          // 221: legion.ai.v1.AIRisksQueryFailed
+	(*ExportAILogsCheckpointsCommand)(nil),              // 222: legion.ai.v1.ExportAILogsCheckpointsCommand
+	(*AILogsCheckpointsExported)(nil),                   // 223: legion.ai.v1.AILogsCheckpointsExported
+	(*AILogsCheckpointsExportFailed)(nil),               // 224: legion.ai.v1.AILogsCheckpointsExportFailed
+	(*AISessionReady)(nil),                              // 225: legion.ai.v1.AISessionReady
+	(*AISessionEvent)(nil),                              // 226: legion.ai.v1.AISessionEvent
+	(*AISessionDone)(nil),                               // 227: legion.ai.v1.AISessionDone
+	(*AISessionFailed)(nil),                             // 228: legion.ai.v1.AISessionFailed
+	(*AISessionCancelled)(nil),                          // 229: legion.ai.v1.AISessionCancelled
+	nil,                                                 // 230: legion.ai.v1.AIProviderPreviewConfigSnapshot.HeadersEntry
+	(*v1.CommandMetadata)(nil),                          // 231: legion.node.v1.CommandMetadata
+	(*v1.EventMetadata)(nil),                            // 232: legion.node.v1.EventMetadata
+	(*timestamppb.Timestamp)(nil),                       // 233: google.protobuf.Timestamp
 }
 var file_legion_ai_v1_ai_proto_depIdxs = []int32{
-	22, // 0: legion.ai.v1.BindAISessionCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	0,  // 1: legion.ai.v1.BindAISessionCommand.session:type_name -> legion.ai.v1.AISessionRef
-	1,  // 2: legion.ai.v1.BindAISessionCommand.attachments:type_name -> legion.ai.v1.AISessionAttachmentRef
-	2,  // 3: legion.ai.v1.BindAISessionCommand.credential_refs:type_name -> legion.ai.v1.AISessionCredentialRef
-	22, // 4: legion.ai.v1.PushAISessionInputCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	0,  // 5: legion.ai.v1.PushAISessionInputCommand.session:type_name -> legion.ai.v1.AISessionRef
-	22, // 6: legion.ai.v1.AppendAISessionContextCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	0,  // 7: legion.ai.v1.AppendAISessionContextCommand.session:type_name -> legion.ai.v1.AISessionRef
-	1,  // 8: legion.ai.v1.AppendAISessionContextCommand.attachments:type_name -> legion.ai.v1.AISessionAttachmentRef
-	2,  // 9: legion.ai.v1.AppendAISessionContextCommand.credential_refs:type_name -> legion.ai.v1.AISessionCredentialRef
-	22, // 10: legion.ai.v1.CancelAISessionCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	0,  // 11: legion.ai.v1.CancelAISessionCommand.session:type_name -> legion.ai.v1.AISessionRef
-	22, // 12: legion.ai.v1.CloseAISessionCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	0,  // 13: legion.ai.v1.CloseAISessionCommand.session:type_name -> legion.ai.v1.AISessionRef
-	21, // 14: legion.ai.v1.AIProviderPreviewConfigSnapshot.headers:type_name -> legion.ai.v1.AIProviderPreviewConfigSnapshot.HeadersEntry
-	22, // 15: legion.ai.v1.ListAIProviderModelsCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	8,  // 16: legion.ai.v1.ListAIProviderModelsCommand.provider:type_name -> legion.ai.v1.AIProviderPreviewConfigSnapshot
-	23, // 17: legion.ai.v1.AIProviderModelsListed.metadata:type_name -> legion.node.v1.EventMetadata
-	10, // 18: legion.ai.v1.AIProviderModelsListed.items:type_name -> legion.ai.v1.AIProviderPreviewModel
-	23, // 19: legion.ai.v1.AIProviderModelsFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	22, // 20: legion.ai.v1.HealthCheckAIProviderCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	8,  // 21: legion.ai.v1.HealthCheckAIProviderCommand.provider:type_name -> legion.ai.v1.AIProviderPreviewConfigSnapshot
-	23, // 22: legion.ai.v1.AIProviderHealthCheckCompleted.metadata:type_name -> legion.node.v1.EventMetadata
-	8,  // 23: legion.ai.v1.AIProviderHealthCheckCompleted.recommend_config:type_name -> legion.ai.v1.AIProviderPreviewConfigSnapshot
-	23, // 24: legion.ai.v1.AIProviderHealthCheckFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	23, // 25: legion.ai.v1.AISessionReady.metadata:type_name -> legion.node.v1.EventMetadata
-	0,  // 26: legion.ai.v1.AISessionReady.session:type_name -> legion.ai.v1.AISessionRef
-	24, // 27: legion.ai.v1.AISessionReady.ready_at:type_name -> google.protobuf.Timestamp
-	23, // 28: legion.ai.v1.AISessionEvent.metadata:type_name -> legion.node.v1.EventMetadata
-	0,  // 29: legion.ai.v1.AISessionEvent.session:type_name -> legion.ai.v1.AISessionRef
-	23, // 30: legion.ai.v1.AISessionDone.metadata:type_name -> legion.node.v1.EventMetadata
-	0,  // 31: legion.ai.v1.AISessionDone.session:type_name -> legion.ai.v1.AISessionRef
-	24, // 32: legion.ai.v1.AISessionDone.finished_at:type_name -> google.protobuf.Timestamp
-	23, // 33: legion.ai.v1.AISessionFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	0,  // 34: legion.ai.v1.AISessionFailed.session:type_name -> legion.ai.v1.AISessionRef
-	24, // 35: legion.ai.v1.AISessionFailed.finished_at:type_name -> google.protobuf.Timestamp
-	23, // 36: legion.ai.v1.AISessionCancelled.metadata:type_name -> legion.node.v1.EventMetadata
-	0,  // 37: legion.ai.v1.AISessionCancelled.session:type_name -> legion.ai.v1.AISessionRef
-	24, // 38: legion.ai.v1.AISessionCancelled.finished_at:type_name -> google.protobuf.Timestamp
-	39, // [39:39] is the sub-list for method output_type
-	39, // [39:39] is the sub-list for method input_type
-	39, // [39:39] is the sub-list for extension type_name
-	39, // [39:39] is the sub-list for extension extendee
-	0,  // [0:39] is the sub-list for field type_name
+	231, // 0: legion.ai.v1.BindAISessionCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	0,   // 1: legion.ai.v1.BindAISessionCommand.session:type_name -> legion.ai.v1.AISessionRef
+	1,   // 2: legion.ai.v1.BindAISessionCommand.attachments:type_name -> legion.ai.v1.AISessionAttachmentRef
+	2,   // 3: legion.ai.v1.BindAISessionCommand.credential_refs:type_name -> legion.ai.v1.AISessionCredentialRef
+	231, // 4: legion.ai.v1.PushAISessionInputCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	0,   // 5: legion.ai.v1.PushAISessionInputCommand.session:type_name -> legion.ai.v1.AISessionRef
+	231, // 6: legion.ai.v1.AppendAISessionContextCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	0,   // 7: legion.ai.v1.AppendAISessionContextCommand.session:type_name -> legion.ai.v1.AISessionRef
+	1,   // 8: legion.ai.v1.AppendAISessionContextCommand.attachments:type_name -> legion.ai.v1.AISessionAttachmentRef
+	2,   // 9: legion.ai.v1.AppendAISessionContextCommand.credential_refs:type_name -> legion.ai.v1.AISessionCredentialRef
+	231, // 10: legion.ai.v1.CancelAISessionCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	0,   // 11: legion.ai.v1.CancelAISessionCommand.session:type_name -> legion.ai.v1.AISessionRef
+	231, // 12: legion.ai.v1.CloseAISessionCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	0,   // 13: legion.ai.v1.CloseAISessionCommand.session:type_name -> legion.ai.v1.AISessionRef
+	231, // 14: legion.ai.v1.UpdateAISessionTitleCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	0,   // 15: legion.ai.v1.UpdateAISessionTitleCommand.session:type_name -> legion.ai.v1.AISessionRef
+	232, // 16: legion.ai.v1.AISessionTitleUpdated.metadata:type_name -> legion.node.v1.EventMetadata
+	0,   // 17: legion.ai.v1.AISessionTitleUpdated.session:type_name -> legion.ai.v1.AISessionRef
+	232, // 18: legion.ai.v1.AISessionTitleUpdateFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	0,   // 19: legion.ai.v1.AISessionTitleUpdateFailed.session:type_name -> legion.ai.v1.AISessionRef
+	231, // 20: legion.ai.v1.DeleteAISessionCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	0,   // 21: legion.ai.v1.DeleteAISessionCommand.session:type_name -> legion.ai.v1.AISessionRef
+	232, // 22: legion.ai.v1.AISessionDeleteCompleted.metadata:type_name -> legion.node.v1.EventMetadata
+	0,   // 23: legion.ai.v1.AISessionDeleteCompleted.session:type_name -> legion.ai.v1.AISessionRef
+	232, // 24: legion.ai.v1.AISessionDeleteFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	0,   // 25: legion.ai.v1.AISessionDeleteFailed.session:type_name -> legion.ai.v1.AISessionRef
+	230, // 26: legion.ai.v1.AIProviderPreviewConfigSnapshot.headers:type_name -> legion.ai.v1.AIProviderPreviewConfigSnapshot.HeadersEntry
+	231, // 27: legion.ai.v1.ListAIProviderModelsCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	14,  // 28: legion.ai.v1.ListAIProviderModelsCommand.provider:type_name -> legion.ai.v1.AIProviderPreviewConfigSnapshot
+	232, // 29: legion.ai.v1.AIProviderModelsListed.metadata:type_name -> legion.node.v1.EventMetadata
+	16,  // 30: legion.ai.v1.AIProviderModelsListed.items:type_name -> legion.ai.v1.AIProviderPreviewModel
+	232, // 31: legion.ai.v1.AIProviderModelsFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	231, // 32: legion.ai.v1.HealthCheckAIProviderCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	14,  // 33: legion.ai.v1.HealthCheckAIProviderCommand.provider:type_name -> legion.ai.v1.AIProviderPreviewConfigSnapshot
+	232, // 34: legion.ai.v1.AIProviderHealthCheckCompleted.metadata:type_name -> legion.node.v1.EventMetadata
+	14,  // 35: legion.ai.v1.AIProviderHealthCheckCompleted.recommend_config:type_name -> legion.ai.v1.AIProviderPreviewConfigSnapshot
+	232, // 36: legion.ai.v1.AIProviderHealthCheckFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	22,  // 37: legion.ai.v1.AIThirdPartyApplicationConfigSnapshot.extra_params:type_name -> legion.ai.v1.AIConfigKVPair
+	22,  // 38: legion.ai.v1.AIThirdPartyApplicationConfigSnapshot.headers:type_name -> legion.ai.v1.AIConfigKVPair
+	23,  // 39: legion.ai.v1.AIModelConfigSnapshot.provider:type_name -> legion.ai.v1.AIThirdPartyApplicationConfigSnapshot
+	22,  // 40: legion.ai.v1.AIModelConfigSnapshot.extra_params:type_name -> legion.ai.v1.AIConfigKVPair
+	24,  // 41: legion.ai.v1.AIGlobalConfigSnapshot.intelligent_models:type_name -> legion.ai.v1.AIModelConfigSnapshot
+	24,  // 42: legion.ai.v1.AIGlobalConfigSnapshot.lightweight_models:type_name -> legion.ai.v1.AIModelConfigSnapshot
+	24,  // 43: legion.ai.v1.AIGlobalConfigSnapshot.vision_models:type_name -> legion.ai.v1.AIModelConfigSnapshot
+	231, // 44: legion.ai.v1.GetAIGlobalConfigCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	231, // 45: legion.ai.v1.SetAIGlobalConfigCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	25,  // 46: legion.ai.v1.SetAIGlobalConfigCommand.config:type_name -> legion.ai.v1.AIGlobalConfigSnapshot
+	232, // 47: legion.ai.v1.AIGlobalConfigFetched.metadata:type_name -> legion.node.v1.EventMetadata
+	25,  // 48: legion.ai.v1.AIGlobalConfigFetched.config:type_name -> legion.ai.v1.AIGlobalConfigSnapshot
+	232, // 49: legion.ai.v1.AIGlobalConfigFetchFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	232, // 50: legion.ai.v1.AIGlobalConfigUpdated.metadata:type_name -> legion.node.v1.EventMetadata
+	25,  // 51: legion.ai.v1.AIGlobalConfigUpdated.config:type_name -> legion.ai.v1.AIGlobalConfigSnapshot
+	232, // 52: legion.ai.v1.AIGlobalConfigUpdateFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	231, // 53: legion.ai.v1.QueryAIFocusCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	232, // 54: legion.ai.v1.AIFocusQueried.metadata:type_name -> legion.node.v1.EventMetadata
+	32,  // 55: legion.ai.v1.AIFocusQueried.items:type_name -> legion.ai.v1.AIFocus
+	232, // 56: legion.ai.v1.AIFocusQueryFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	231, // 57: legion.ai.v1.GetRandomAIMaterialsCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	232, // 58: legion.ai.v1.AIMaterialsRandomQueried.metadata:type_name -> legion.node.v1.EventMetadata
+	160, // 59: legion.ai.v1.AIMaterialsRandomQueried.knowledge_base_entries:type_name -> legion.ai.v1.AIKnowledgeBaseEntryRecord
+	119, // 60: legion.ai.v1.AIMaterialsRandomQueried.ai_tools:type_name -> legion.ai.v1.AIToolRecord
+	95,  // 61: legion.ai.v1.AIMaterialsRandomQueried.ai_forges:type_name -> legion.ai.v1.AIForgeRecord
+	232, // 62: legion.ai.v1.AIMaterialsRandomQueryFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	40,  // 63: legion.ai.v1.AIMCPServerTool.params:type_name -> legion.ai.v1.AIMCPServerToolParam
+	41,  // 64: legion.ai.v1.AIMCPServerRecord.tools:type_name -> legion.ai.v1.AIMCPServerTool
+	22,  // 65: legion.ai.v1.AIMCPServerRecord.envs:type_name -> legion.ai.v1.AIConfigKVPair
+	22,  // 66: legion.ai.v1.AIMCPServerRecord.headers:type_name -> legion.ai.v1.AIConfigKVPair
+	231, // 67: legion.ai.v1.ListAIMCPServersCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	39,  // 68: legion.ai.v1.ListAIMCPServersCommand.pagination:type_name -> legion.ai.v1.AIMCPServerPagination
+	232, // 69: legion.ai.v1.AIMCPServersListed.metadata:type_name -> legion.node.v1.EventMetadata
+	42,  // 70: legion.ai.v1.AIMCPServersListed.items:type_name -> legion.ai.v1.AIMCPServerRecord
+	39,  // 71: legion.ai.v1.AIMCPServersListed.pagination:type_name -> legion.ai.v1.AIMCPServerPagination
+	232, // 72: legion.ai.v1.AIMCPServersListFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	231, // 73: legion.ai.v1.CreateAIMCPServerCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	22,  // 74: legion.ai.v1.CreateAIMCPServerCommand.envs:type_name -> legion.ai.v1.AIConfigKVPair
+	22,  // 75: legion.ai.v1.CreateAIMCPServerCommand.headers:type_name -> legion.ai.v1.AIConfigKVPair
+	232, // 76: legion.ai.v1.AIMCPServerCreated.metadata:type_name -> legion.node.v1.EventMetadata
+	42,  // 77: legion.ai.v1.AIMCPServerCreated.item:type_name -> legion.ai.v1.AIMCPServerRecord
+	232, // 78: legion.ai.v1.AIMCPServerCreateFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	231, // 79: legion.ai.v1.UpdateAIMCPServerCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	22,  // 80: legion.ai.v1.UpdateAIMCPServerCommand.envs:type_name -> legion.ai.v1.AIConfigKVPair
+	22,  // 81: legion.ai.v1.UpdateAIMCPServerCommand.headers:type_name -> legion.ai.v1.AIConfigKVPair
+	232, // 82: legion.ai.v1.AIMCPServerUpdated.metadata:type_name -> legion.node.v1.EventMetadata
+	42,  // 83: legion.ai.v1.AIMCPServerUpdated.item:type_name -> legion.ai.v1.AIMCPServerRecord
+	232, // 84: legion.ai.v1.AIMCPServerUpdateFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	231, // 85: legion.ai.v1.DeleteAIMCPServerCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	232, // 86: legion.ai.v1.AIMCPServerDeleted.metadata:type_name -> legion.node.v1.EventMetadata
+	42,  // 87: legion.ai.v1.AIMCPServerDeleted.item:type_name -> legion.ai.v1.AIMCPServerRecord
+	232, // 88: legion.ai.v1.AIMCPServerDeleteFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	55,  // 89: legion.ai.v1.AILocalModelRecord.status:type_name -> legion.ai.v1.AILocalModelStatus
+	231, // 90: legion.ai.v1.ListAILocalModelsCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	232, // 91: legion.ai.v1.AILocalModelsListed.metadata:type_name -> legion.node.v1.EventMetadata
+	56,  // 92: legion.ai.v1.AILocalModelsListed.items:type_name -> legion.ai.v1.AILocalModelRecord
+	232, // 93: legion.ai.v1.AILocalModelsListFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	231, // 94: legion.ai.v1.CheckAILlamaServerReadyCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	232, // 95: legion.ai.v1.AILlamaServerReadyChecked.metadata:type_name -> legion.node.v1.EventMetadata
+	232, // 96: legion.ai.v1.AILlamaServerReadyCheckFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	231, // 97: legion.ai.v1.InstallAILlamaServerCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	232, // 98: legion.ai.v1.AILocalModelOperationAccepted.metadata:type_name -> legion.node.v1.EventMetadata
+	64,  // 99: legion.ai.v1.AILocalModelOperationAccepted.operation:type_name -> legion.ai.v1.AILocalModelOperation
+	232, // 100: legion.ai.v1.AILocalModelOperationProgressed.metadata:type_name -> legion.node.v1.EventMetadata
+	64,  // 101: legion.ai.v1.AILocalModelOperationProgressed.operation:type_name -> legion.ai.v1.AILocalModelOperation
+	232, // 102: legion.ai.v1.AILocalModelOperationCompleted.metadata:type_name -> legion.node.v1.EventMetadata
+	64,  // 103: legion.ai.v1.AILocalModelOperationCompleted.operation:type_name -> legion.ai.v1.AILocalModelOperation
+	56,  // 104: legion.ai.v1.AILocalModelOperationCompleted.item:type_name -> legion.ai.v1.AILocalModelRecord
+	232, // 105: legion.ai.v1.AILocalModelOperationCancelled.metadata:type_name -> legion.node.v1.EventMetadata
+	64,  // 106: legion.ai.v1.AILocalModelOperationCancelled.operation:type_name -> legion.ai.v1.AILocalModelOperation
+	232, // 107: legion.ai.v1.AILocalModelOperationFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	64,  // 108: legion.ai.v1.AILocalModelOperationFailed.operation:type_name -> legion.ai.v1.AILocalModelOperation
+	232, // 109: legion.ai.v1.AILlamaServerInstalled.metadata:type_name -> legion.node.v1.EventMetadata
+	232, // 110: legion.ai.v1.AILlamaServerInstallFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	231, // 111: legion.ai.v1.CreateAILocalModelCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	232, // 112: legion.ai.v1.AILocalModelCreated.metadata:type_name -> legion.node.v1.EventMetadata
+	56,  // 113: legion.ai.v1.AILocalModelCreated.item:type_name -> legion.ai.v1.AILocalModelRecord
+	232, // 114: legion.ai.v1.AILocalModelCreateFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	231, // 115: legion.ai.v1.UpdateAILocalModelCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	232, // 116: legion.ai.v1.AILocalModelUpdated.metadata:type_name -> legion.node.v1.EventMetadata
+	56,  // 117: legion.ai.v1.AILocalModelUpdated.item:type_name -> legion.ai.v1.AILocalModelRecord
+	232, // 118: legion.ai.v1.AILocalModelUpdateFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	231, // 119: legion.ai.v1.DeleteAILocalModelCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	232, // 120: legion.ai.v1.AILocalModelDeleted.metadata:type_name -> legion.node.v1.EventMetadata
+	56,  // 121: legion.ai.v1.AILocalModelDeleted.item:type_name -> legion.ai.v1.AILocalModelRecord
+	232, // 122: legion.ai.v1.AILocalModelDeleteFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	231, // 123: legion.ai.v1.StartAILocalModelCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	232, // 124: legion.ai.v1.AILocalModelStarted.metadata:type_name -> legion.node.v1.EventMetadata
+	56,  // 125: legion.ai.v1.AILocalModelStarted.item:type_name -> legion.ai.v1.AILocalModelRecord
+	232, // 126: legion.ai.v1.AILocalModelStartFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	231, // 127: legion.ai.v1.StopAILocalModelCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	232, // 128: legion.ai.v1.AILocalModelStopped.metadata:type_name -> legion.node.v1.EventMetadata
+	56,  // 129: legion.ai.v1.AILocalModelStopped.item:type_name -> legion.ai.v1.AILocalModelRecord
+	232, // 130: legion.ai.v1.AILocalModelStopFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	231, // 131: legion.ai.v1.DownloadAILocalModelCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	231, // 132: legion.ai.v1.CancelAILocalModelOperationCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	232, // 133: legion.ai.v1.AILocalModelDownloaded.metadata:type_name -> legion.node.v1.EventMetadata
+	56,  // 134: legion.ai.v1.AILocalModelDownloaded.item:type_name -> legion.ai.v1.AILocalModelRecord
+	232, // 135: legion.ai.v1.AILocalModelDownloadFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	231, // 136: legion.ai.v1.ClearAILocalModelsCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	232, // 137: legion.ai.v1.AILocalModelsCleared.metadata:type_name -> legion.node.v1.EventMetadata
+	232, // 138: legion.ai.v1.AILocalModelsClearFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	231, // 139: legion.ai.v1.ListAIForgesCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	94,  // 140: legion.ai.v1.ListAIForgesCommand.pagination:type_name -> legion.ai.v1.AIForgePagination
+	232, // 141: legion.ai.v1.AIForgesListed.metadata:type_name -> legion.node.v1.EventMetadata
+	95,  // 142: legion.ai.v1.AIForgesListed.items:type_name -> legion.ai.v1.AIForgeRecord
+	94,  // 143: legion.ai.v1.AIForgesListed.pagination:type_name -> legion.ai.v1.AIForgePagination
+	232, // 144: legion.ai.v1.AIForgesListFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	231, // 145: legion.ai.v1.CreateAIForgeCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	232, // 146: legion.ai.v1.AIForgeCreated.metadata:type_name -> legion.node.v1.EventMetadata
+	95,  // 147: legion.ai.v1.AIForgeCreated.item:type_name -> legion.ai.v1.AIForgeRecord
+	232, // 148: legion.ai.v1.AIForgeCreateFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	231, // 149: legion.ai.v1.UpdateAIForgeCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	232, // 150: legion.ai.v1.AIForgeUpdated.metadata:type_name -> legion.node.v1.EventMetadata
+	95,  // 151: legion.ai.v1.AIForgeUpdated.item:type_name -> legion.ai.v1.AIForgeRecord
+	232, // 152: legion.ai.v1.AIForgeUpdateFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	231, // 153: legion.ai.v1.DeleteAIForgeCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	232, // 154: legion.ai.v1.AIForgeDeleted.metadata:type_name -> legion.node.v1.EventMetadata
+	232, // 155: legion.ai.v1.AIForgeDeleteFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	231, // 156: legion.ai.v1.ExportAIForgeCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	232, // 157: legion.ai.v1.AIForgeExportProgressed.metadata:type_name -> legion.node.v1.EventMetadata
+	232, // 158: legion.ai.v1.AIForgeExported.metadata:type_name -> legion.node.v1.EventMetadata
+	232, // 159: legion.ai.v1.AIForgeExportFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	231, // 160: legion.ai.v1.ImportAIForgeCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	112, // 161: legion.ai.v1.ImportAIForgeCommand.attachment:type_name -> legion.ai.v1.AIForgeImportAttachment
+	232, // 162: legion.ai.v1.AIForgeImportProgressed.metadata:type_name -> legion.node.v1.EventMetadata
+	232, // 163: legion.ai.v1.AIForgeImported.metadata:type_name -> legion.node.v1.EventMetadata
+	115, // 164: legion.ai.v1.AIForgeImported.items:type_name -> legion.ai.v1.AIForgeImportItem
+	232, // 165: legion.ai.v1.AIForgeImportFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	231, // 166: legion.ai.v1.ListAIToolsCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	118, // 167: legion.ai.v1.ListAIToolsCommand.pagination:type_name -> legion.ai.v1.AIToolPagination
+	232, // 168: legion.ai.v1.AIToolsListed.metadata:type_name -> legion.node.v1.EventMetadata
+	119, // 169: legion.ai.v1.AIToolsListed.items:type_name -> legion.ai.v1.AIToolRecord
+	118, // 170: legion.ai.v1.AIToolsListed.pagination:type_name -> legion.ai.v1.AIToolPagination
+	232, // 171: legion.ai.v1.AIToolsListFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	231, // 172: legion.ai.v1.CreateAIToolCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	232, // 173: legion.ai.v1.AIToolCreated.metadata:type_name -> legion.node.v1.EventMetadata
+	119, // 174: legion.ai.v1.AIToolCreated.item:type_name -> legion.ai.v1.AIToolRecord
+	232, // 175: legion.ai.v1.AIToolCreateFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	231, // 176: legion.ai.v1.UpdateAIToolCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	232, // 177: legion.ai.v1.AIToolUpdated.metadata:type_name -> legion.node.v1.EventMetadata
+	119, // 178: legion.ai.v1.AIToolUpdated.item:type_name -> legion.ai.v1.AIToolRecord
+	232, // 179: legion.ai.v1.AIToolUpdateFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	231, // 180: legion.ai.v1.GenerateAIToolMetadataCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	232, // 181: legion.ai.v1.AIToolMetadataGenerated.metadata:type_name -> legion.node.v1.EventMetadata
+	232, // 182: legion.ai.v1.AIToolMetadataGenerateFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	231, // 183: legion.ai.v1.ToggleAIToolFavoriteCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	232, // 184: legion.ai.v1.AIToolFavoriteToggled.metadata:type_name -> legion.node.v1.EventMetadata
+	232, // 185: legion.ai.v1.AIToolFavoriteToggleFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	231, // 186: legion.ai.v1.DeleteAIToolsCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	232, // 187: legion.ai.v1.AIToolsDeleted.metadata:type_name -> legion.node.v1.EventMetadata
+	232, // 188: legion.ai.v1.AIToolsDeleteFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	231, // 189: legion.ai.v1.ListAIKnowledgeBasesCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	138, // 190: legion.ai.v1.ListAIKnowledgeBasesCommand.pagination:type_name -> legion.ai.v1.AIKnowledgeBasePagination
+	232, // 191: legion.ai.v1.AIKnowledgeBasesListed.metadata:type_name -> legion.node.v1.EventMetadata
+	139, // 192: legion.ai.v1.AIKnowledgeBasesListed.items:type_name -> legion.ai.v1.AIKnowledgeBaseRecord
+	138, // 193: legion.ai.v1.AIKnowledgeBasesListed.pagination:type_name -> legion.ai.v1.AIKnowledgeBasePagination
+	232, // 194: legion.ai.v1.AIKnowledgeBasesListFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	231, // 195: legion.ai.v1.CreateAIKnowledgeBaseCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	232, // 196: legion.ai.v1.AIKnowledgeBaseCreated.metadata:type_name -> legion.node.v1.EventMetadata
+	139, // 197: legion.ai.v1.AIKnowledgeBaseCreated.item:type_name -> legion.ai.v1.AIKnowledgeBaseRecord
+	232, // 198: legion.ai.v1.AIKnowledgeBaseCreateFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	231, // 199: legion.ai.v1.ImportAIKnowledgeBaseCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	144, // 200: legion.ai.v1.ImportAIKnowledgeBaseCommand.attachment:type_name -> legion.ai.v1.AIKnowledgeBaseImportAttachment
+	232, // 201: legion.ai.v1.AIKnowledgeBaseImported.metadata:type_name -> legion.node.v1.EventMetadata
+	139, // 202: legion.ai.v1.AIKnowledgeBaseImported.item:type_name -> legion.ai.v1.AIKnowledgeBaseRecord
+	232, // 203: legion.ai.v1.AIKnowledgeBaseImportFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	231, // 204: legion.ai.v1.UpdateAIKnowledgeBaseCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	232, // 205: legion.ai.v1.AIKnowledgeBaseUpdated.metadata:type_name -> legion.node.v1.EventMetadata
+	139, // 206: legion.ai.v1.AIKnowledgeBaseUpdated.item:type_name -> legion.ai.v1.AIKnowledgeBaseRecord
+	232, // 207: legion.ai.v1.AIKnowledgeBaseUpdateFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	231, // 208: legion.ai.v1.DeleteAIKnowledgeBaseCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	232, // 209: legion.ai.v1.AIKnowledgeBaseDeleted.metadata:type_name -> legion.node.v1.EventMetadata
+	139, // 210: legion.ai.v1.AIKnowledgeBaseDeleted.item:type_name -> legion.ai.v1.AIKnowledgeBaseRecord
+	232, // 211: legion.ai.v1.AIKnowledgeBaseDeleteFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	231, // 212: legion.ai.v1.ExportAIKnowledgeBaseCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	232, // 213: legion.ai.v1.AIKnowledgeBaseExported.metadata:type_name -> legion.node.v1.EventMetadata
+	139, // 214: legion.ai.v1.AIKnowledgeBaseExported.item:type_name -> legion.ai.v1.AIKnowledgeBaseRecord
+	232, // 215: legion.ai.v1.AIKnowledgeBaseExportFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	231, // 216: legion.ai.v1.SearchAIKnowledgeBaseEntriesCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	159, // 217: legion.ai.v1.SearchAIKnowledgeBaseEntriesCommand.filter:type_name -> legion.ai.v1.AIKnowledgeBaseEntryFilter
+	138, // 218: legion.ai.v1.SearchAIKnowledgeBaseEntriesCommand.pagination:type_name -> legion.ai.v1.AIKnowledgeBasePagination
+	232, // 219: legion.ai.v1.AIKnowledgeBaseEntriesSearched.metadata:type_name -> legion.node.v1.EventMetadata
+	160, // 220: legion.ai.v1.AIKnowledgeBaseEntriesSearched.items:type_name -> legion.ai.v1.AIKnowledgeBaseEntryRecord
+	138, // 221: legion.ai.v1.AIKnowledgeBaseEntriesSearched.pagination:type_name -> legion.ai.v1.AIKnowledgeBasePagination
+	232, // 222: legion.ai.v1.AIKnowledgeBaseEntriesSearchFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	231, // 223: legion.ai.v1.QueryAIKnowledgeBaseByAICommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	231, // 224: legion.ai.v1.CancelAIKnowledgeBaseByAIQueryCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	232, // 225: legion.ai.v1.AIKnowledgeBaseQueryByAIChunk.metadata:type_name -> legion.node.v1.EventMetadata
+	232, // 226: legion.ai.v1.AIKnowledgeBaseQueryByAICompleted.metadata:type_name -> legion.node.v1.EventMetadata
+	232, // 227: legion.ai.v1.AIKnowledgeBaseQueryByAIFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	231, // 228: legion.ai.v1.GenerateAIKnowledgeBaseQuestionIndexCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	231, // 229: legion.ai.v1.CancelAIKnowledgeBaseQuestionIndexCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	232, // 230: legion.ai.v1.AIKnowledgeBaseQuestionIndexProgress.metadata:type_name -> legion.node.v1.EventMetadata
+	232, // 231: legion.ai.v1.AIKnowledgeBaseQuestionIndexCompleted.metadata:type_name -> legion.node.v1.EventMetadata
+	232, // 232: legion.ai.v1.AIKnowledgeBaseQuestionIndexFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	231, // 233: legion.ai.v1.CreateAIKnowledgeBaseEntryCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	232, // 234: legion.ai.v1.AIKnowledgeBaseEntryCreated.metadata:type_name -> legion.node.v1.EventMetadata
+	160, // 235: legion.ai.v1.AIKnowledgeBaseEntryCreated.item:type_name -> legion.ai.v1.AIKnowledgeBaseEntryRecord
+	232, // 236: legion.ai.v1.AIKnowledgeBaseEntryCreateFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	231, // 237: legion.ai.v1.UpdateAIKnowledgeBaseEntryCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	232, // 238: legion.ai.v1.AIKnowledgeBaseEntryUpdated.metadata:type_name -> legion.node.v1.EventMetadata
+	160, // 239: legion.ai.v1.AIKnowledgeBaseEntryUpdated.item:type_name -> legion.ai.v1.AIKnowledgeBaseEntryRecord
+	232, // 240: legion.ai.v1.AIKnowledgeBaseEntryUpdateFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	231, // 241: legion.ai.v1.DeleteAIKnowledgeBaseEntryCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	232, // 242: legion.ai.v1.AIKnowledgeBaseEntryDeleted.metadata:type_name -> legion.node.v1.EventMetadata
+	232, // 243: legion.ai.v1.AIKnowledgeBaseEntryDeleteFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	231, // 244: legion.ai.v1.BuildAIKnowledgeBaseVectorIndexCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	232, // 245: legion.ai.v1.AIKnowledgeBaseVectorIndexBuilt.metadata:type_name -> legion.node.v1.EventMetadata
+	232, // 246: legion.ai.v1.AIKnowledgeBaseVectorIndexBuildFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	231, // 247: legion.ai.v1.BuildAIKnowledgeBaseEntryVectorIndexCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	232, // 248: legion.ai.v1.AIKnowledgeBaseEntryVectorIndexBuilt.metadata:type_name -> legion.node.v1.EventMetadata
+	232, // 249: legion.ai.v1.AIKnowledgeBaseEntryVectorIndexBuildFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	189, // 250: legion.ai.v1.AIMemoryEntityFilter.c_score:type_name -> legion.ai.v1.AIMemoryFloatRange
+	189, // 251: legion.ai.v1.AIMemoryEntityFilter.o_score:type_name -> legion.ai.v1.AIMemoryFloatRange
+	189, // 252: legion.ai.v1.AIMemoryEntityFilter.r_score:type_name -> legion.ai.v1.AIMemoryFloatRange
+	189, // 253: legion.ai.v1.AIMemoryEntityFilter.e_score:type_name -> legion.ai.v1.AIMemoryFloatRange
+	189, // 254: legion.ai.v1.AIMemoryEntityFilter.p_score:type_name -> legion.ai.v1.AIMemoryFloatRange
+	189, // 255: legion.ai.v1.AIMemoryEntityFilter.a_score:type_name -> legion.ai.v1.AIMemoryFloatRange
+	189, // 256: legion.ai.v1.AIMemoryEntityFilter.t_score:type_name -> legion.ai.v1.AIMemoryFloatRange
+	190, // 257: legion.ai.v1.AIMemoryEntityFilter.created_at:type_name -> legion.ai.v1.AIMemoryInt64Range
+	190, // 258: legion.ai.v1.AIMemoryEntityFilter.updated_at:type_name -> legion.ai.v1.AIMemoryInt64Range
+	231, // 259: legion.ai.v1.CreateAIMemoryEntityCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	232, // 260: legion.ai.v1.AIMemoryEntityCreated.metadata:type_name -> legion.node.v1.EventMetadata
+	232, // 261: legion.ai.v1.AIMemoryEntityCreateFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	231, // 262: legion.ai.v1.GetAIMemoryEntityCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	232, // 263: legion.ai.v1.AIMemoryEntityFetched.metadata:type_name -> legion.node.v1.EventMetadata
+	193, // 264: legion.ai.v1.AIMemoryEntityFetched.item:type_name -> legion.ai.v1.AIMemoryEntityRecord
+	232, // 265: legion.ai.v1.AIMemoryEntityFetchFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	231, // 266: legion.ai.v1.QueryAIMemoryEntitiesCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	191, // 267: legion.ai.v1.QueryAIMemoryEntitiesCommand.pagination:type_name -> legion.ai.v1.AIMemoryPagination
+	194, // 268: legion.ai.v1.QueryAIMemoryEntitiesCommand.filter:type_name -> legion.ai.v1.AIMemoryEntityFilter
+	232, // 269: legion.ai.v1.AIMemoryEntitiesQueried.metadata:type_name -> legion.node.v1.EventMetadata
+	191, // 270: legion.ai.v1.AIMemoryEntitiesQueried.pagination:type_name -> legion.ai.v1.AIMemoryPagination
+	193, // 271: legion.ai.v1.AIMemoryEntitiesQueried.items:type_name -> legion.ai.v1.AIMemoryEntityRecord
+	232, // 272: legion.ai.v1.AIMemoryEntitiesQueryFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	231, // 273: legion.ai.v1.UpdateAIMemoryEntityCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	193, // 274: legion.ai.v1.UpdateAIMemoryEntityCommand.item:type_name -> legion.ai.v1.AIMemoryEntityRecord
+	232, // 275: legion.ai.v1.AIMemoryEntityUpdated.metadata:type_name -> legion.node.v1.EventMetadata
+	193, // 276: legion.ai.v1.AIMemoryEntityUpdated.item:type_name -> legion.ai.v1.AIMemoryEntityRecord
+	232, // 277: legion.ai.v1.AIMemoryEntityUpdateFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	231, // 278: legion.ai.v1.DeleteAIMemoryEntitiesCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	194, // 279: legion.ai.v1.DeleteAIMemoryEntitiesCommand.filter:type_name -> legion.ai.v1.AIMemoryEntityFilter
+	232, // 280: legion.ai.v1.AIMemoryEntitiesDeleted.metadata:type_name -> legion.node.v1.EventMetadata
+	232, // 281: legion.ai.v1.AIMemoryEntitiesDeleteFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	231, // 282: legion.ai.v1.CountAIMemoryEntityTagsCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	232, // 283: legion.ai.v1.AIMemoryEntityTagsCounted.metadata:type_name -> legion.node.v1.EventMetadata
+	192, // 284: legion.ai.v1.AIMemoryEntityTagsCounted.tags_count:type_name -> legion.ai.v1.AIMemoryTagCount
+	232, // 285: legion.ai.v1.AIMemoryEntityTagsCountFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	231, // 286: legion.ai.v1.QueryAIHTTPFlowsCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	213, // 287: legion.ai.v1.QueryAIHTTPFlowsCommand.pagination:type_name -> legion.ai.v1.AIRuntimePagination
+	232, // 288: legion.ai.v1.AIHTTPFlowsQueried.metadata:type_name -> legion.node.v1.EventMetadata
+	214, // 289: legion.ai.v1.AIHTTPFlowsQueried.items:type_name -> legion.ai.v1.AIHTTPFlowRecord
+	213, // 290: legion.ai.v1.AIHTTPFlowsQueried.pagination:type_name -> legion.ai.v1.AIRuntimePagination
+	232, // 291: legion.ai.v1.AIHTTPFlowsQueryFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	231, // 292: legion.ai.v1.QueryAIRisksCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	213, // 293: legion.ai.v1.QueryAIRisksCommand.pagination:type_name -> legion.ai.v1.AIRuntimePagination
+	232, // 294: legion.ai.v1.AIRisksQueried.metadata:type_name -> legion.node.v1.EventMetadata
+	218, // 295: legion.ai.v1.AIRisksQueried.items:type_name -> legion.ai.v1.AIRiskRecord
+	213, // 296: legion.ai.v1.AIRisksQueried.pagination:type_name -> legion.ai.v1.AIRuntimePagination
+	232, // 297: legion.ai.v1.AIRisksQueryFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	231, // 298: legion.ai.v1.ExportAILogsCheckpointsCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	232, // 299: legion.ai.v1.AILogsCheckpointsExported.metadata:type_name -> legion.node.v1.EventMetadata
+	232, // 300: legion.ai.v1.AILogsCheckpointsExportFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	232, // 301: legion.ai.v1.AISessionReady.metadata:type_name -> legion.node.v1.EventMetadata
+	0,   // 302: legion.ai.v1.AISessionReady.session:type_name -> legion.ai.v1.AISessionRef
+	233, // 303: legion.ai.v1.AISessionReady.ready_at:type_name -> google.protobuf.Timestamp
+	232, // 304: legion.ai.v1.AISessionEvent.metadata:type_name -> legion.node.v1.EventMetadata
+	0,   // 305: legion.ai.v1.AISessionEvent.session:type_name -> legion.ai.v1.AISessionRef
+	232, // 306: legion.ai.v1.AISessionDone.metadata:type_name -> legion.node.v1.EventMetadata
+	0,   // 307: legion.ai.v1.AISessionDone.session:type_name -> legion.ai.v1.AISessionRef
+	233, // 308: legion.ai.v1.AISessionDone.finished_at:type_name -> google.protobuf.Timestamp
+	232, // 309: legion.ai.v1.AISessionFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	0,   // 310: legion.ai.v1.AISessionFailed.session:type_name -> legion.ai.v1.AISessionRef
+	233, // 311: legion.ai.v1.AISessionFailed.finished_at:type_name -> google.protobuf.Timestamp
+	232, // 312: legion.ai.v1.AISessionCancelled.metadata:type_name -> legion.node.v1.EventMetadata
+	0,   // 313: legion.ai.v1.AISessionCancelled.session:type_name -> legion.ai.v1.AISessionRef
+	233, // 314: legion.ai.v1.AISessionCancelled.finished_at:type_name -> google.protobuf.Timestamp
+	315, // [315:315] is the sub-list for method output_type
+	315, // [315:315] is the sub-list for method input_type
+	315, // [315:315] is the sub-list for extension type_name
+	315, // [315:315] is the sub-list for extension extendee
+	0,   // [0:315] is the sub-list for field type_name
 }
 
 func init() { file_legion_ai_v1_ai_proto_init() }
@@ -1906,7 +20829,7 @@ func file_legion_ai_v1_ai_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_legion_ai_v1_ai_proto_rawDesc), len(file_legion_ai_v1_ai_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   22,
+			NumMessages:   231,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

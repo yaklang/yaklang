@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func TestDesiredSpecValidateRejectsUnknownTemporaryRuleEventType(t *testing.T) {
+func TestDesiredSpecValidateRejectsUnknownCustomRuleEventType(t *testing.T) {
 	t.Parallel()
 
 	spec := DesiredSpec{
@@ -19,7 +19,7 @@ func TestDesiredSpecValidateRejectsUnknownTemporaryRuleEventType(t *testing.T) {
 				WatchPaths: []string{"/tmp"},
 			},
 		},
-		TemporaryRules: []TemporaryRule{
+		CustomRules: []CustomRule{
 			{
 				RuleID:         "tmp-invalid-event",
 				Enabled:        true,
@@ -33,7 +33,7 @@ func TestDesiredSpecValidateRejectsUnknownTemporaryRuleEventType(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected validation error")
 	}
-	if got := err.Error(); got != `temporary_rules[0].match_event_type: unsupported event type "file.changed"` {
+	if got := err.Error(); got != `custom_rules[0].match_event_type: unsupported event type "file.changed"` {
 		t.Fatalf("unexpected validation error: %s", got)
 	}
 }
@@ -50,7 +50,7 @@ func TestDesiredSpecValidateRejectsCollectorCoverageMismatch(t *testing.T) {
 				WatchPaths: []string{"/tmp"},
 			},
 		},
-		TemporaryRules: []TemporaryRule{
+		CustomRules: []CustomRule{
 			{
 				RuleID:         "tmp-audit-without-auditd",
 				Enabled:        true,
@@ -64,12 +64,12 @@ func TestDesiredSpecValidateRejectsCollectorCoverageMismatch(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected validation error")
 	}
-	if got := err.Error(); got != `temporary_rules[0].match_event_type: event type "audit.event" is not producible by the enabled collectors` {
+	if got := err.Error(); got != `custom_rules[0].match_event_type: event type "audit.event" is not producible by the enabled collectors` {
 		t.Fatalf("unexpected validation error: %s", got)
 	}
 }
 
-func TestDesiredSpecValidateSkipsDisabledTemporaryRule(t *testing.T) {
+func TestDesiredSpecValidateSkipsDisabledCustomRule(t *testing.T) {
 	t.Parallel()
 
 	spec := DesiredSpec{
@@ -80,7 +80,7 @@ func TestDesiredSpecValidateSkipsDisabledTemporaryRule(t *testing.T) {
 				Backend: CollectorBackendEBPF,
 			},
 		},
-		TemporaryRules: []TemporaryRule{
+		CustomRules: []CustomRule{
 			{
 				RuleID:         "tmp-disabled-audit",
 				Enabled:        false,
@@ -91,11 +91,11 @@ func TestDesiredSpecValidateSkipsDisabledTemporaryRule(t *testing.T) {
 	}
 
 	if err := spec.Validate(); err != nil {
-		t.Fatalf("disabled temporary rule should not block desired spec validation: %v", err)
+		t.Fatalf("disabled custom rule should not block desired spec validation: %v", err)
 	}
 }
 
-func TestDesiredSpecValidateAcceptsCoveredTemporaryRuleEventType(t *testing.T) {
+func TestDesiredSpecValidateAcceptsCoveredCustomRuleEventType(t *testing.T) {
 	t.Parallel()
 
 	spec := DesiredSpec{
@@ -106,7 +106,7 @@ func TestDesiredSpecValidateAcceptsCoveredTemporaryRuleEventType(t *testing.T) {
 				Backend: CollectorBackendAuditd,
 			},
 		},
-		TemporaryRules: []TemporaryRule{
+		CustomRules: []CustomRule{
 			{
 				RuleID:         "tmp-audit",
 				Enabled:        true,

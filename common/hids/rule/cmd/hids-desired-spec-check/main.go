@@ -16,7 +16,7 @@ import (
 type checkOutput struct {
 	Mode                string `json:"mode"`
 	BuiltinRuleSetCount int    `json:"builtin_rule_set_count"`
-	TemporaryRuleCount  int    `json:"temporary_rule_count"`
+	CustomRuleCount     int    `json:"custom_rule_count"`
 }
 
 func main() {
@@ -51,7 +51,7 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 	return encoder.Encode(checkOutput{
 		Mode:                spec.Mode,
 		BuiltinRuleSetCount: len(spec.BuiltinRuleSets),
-		TemporaryRuleCount:  len(spec.TemporaryRules),
+		CustomRuleCount:     len(spec.CustomRules),
 	})
 }
 

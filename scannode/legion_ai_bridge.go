@@ -666,6 +666,9 @@ func normalizeAISessionInputPayload(inputType string, raw []byte) ([]byte, error
 	}
 	trimmed := strings.TrimSpace(string(raw))
 	if trimmed == "" {
+		if normalizedInputType == "sync_event" {
+			return nil, fmt.Errorf("ai session sync_event input_json must not be empty")
+		}
 		return json.Marshal(map[string]string{
 			"input_type": normalizedInputType,
 			"role":       "user",
@@ -675,6 +678,9 @@ func normalizeAISessionInputPayload(inputType string, raw []byte) ([]byte, error
 	var decoded any
 	if err := json.Unmarshal([]byte(trimmed), &decoded); err != nil {
 		return nil, fmt.Errorf("ai session input_json must be valid json: %w", err)
+	}
+	if normalizedInputType == "sync_event" {
+		return cloneBytes([]byte(trimmed)), nil
 	}
 	if object, ok := decoded.(map[string]any); ok {
 		object["input_type"] = normalizedInputType
