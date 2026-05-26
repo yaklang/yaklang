@@ -125,71 +125,6 @@ func init() {
 	// 确保在 ConfigureNetWork 之后执行，避免配置被覆盖
 }
 
-// EnsureAIBalanceConfig 检测全局配置中是否存在 aibalance 配置，如果不存在则添加默认配置
-// 这确保新安装的 yakit 可以使用免费的 AI 服务
-// 同时确保 aibalance 在 AI 优先级列表的最前面
-func EnsureAIBalanceConfig() {
-	config := GetNetworkConfig()
-	if config == nil {
-		config = GetDefaultNetworkConfig()
-	}
-
-	configChanged := false
-
-	// 检查是否已存在 aibalance 配置
-	hasAIBalance := false
-	for _, appConfig := range config.GetAppConfigs() {
-		if appConfig.GetType() == "aibalance" {
-			hasAIBalance = true
-			break
-		}
-	}
-
-	// 如果不存在 aibalance 配置，添加默认配置
-	if !hasAIBalance {
-		log.Infof("AIBalance config not found in global network config, adding default config...")
-
-		// 创建默认的 aibalance 配置
-		aibalanceConfig := &ypb.ThirdPartyApplicationConfig{
-			Type:   "aibalance",
-			APIKey: "free-user",
-			Domain: "aibalance.yaklang.com",
-			ExtraParams: []*ypb.KVPair{
-				{
-					Key:   "model",
-					Value: "memfit-light-free",
-				},
-			},
-		}
-
-		// 添加到配置中
-		config.AppConfigs = append([]*ypb.ThirdPartyApplicationConfig{aibalanceConfig}, config.AppConfigs...)
-		configChanged = true
-		log.Infof("Added default AIBalance config (key: free-user, model: memfit-light-free)")
-
-		// 确保新添加的 aibalance 在 AI 优先级列表的最前面
-		// 因为 GetGlobalNetworkConfig 可能会把新的 AI 类型添加到末尾
-		newPriority := []string{"aibalance"}
-		for _, aiType := range config.AiApiPriority {
-			if aiType != "aibalance" {
-				newPriority = append(newPriority, aiType)
-			}
-		}
-
-		// 检查顺序是否需要更新
-		if len(config.AiApiPriority) == 0 || config.AiApiPriority[0] != "aibalance" {
-			config.AiApiPriority = newPriority
-			configChanged = true
-			log.Infof("Moved aibalance to the top of AI priority list")
-		}
-	}
-
-	// 只有在配置发生变化时才保存
-	if configChanged {
-		ConfigureNetWork(config)
-		log.Infof("AIBalance config updated and saved")
-	}
-}
 
 // RefreshProcessEnv 在数据库初始化的时候执行这个，可以快速更新本进程的环境变量
 func RefreshProcessEnv(db *gorm.DB) {
@@ -415,8 +350,6 @@ func GetDefaultNetworkConfig() *ypb.GlobalNetworkConfig {
 		}
 	}
 
-	// 注意：AppConfigs 不在这里初始化，而是通过 EnsureAIBalanceConfig() 在运行时动态添加
-	// 这样可以保持向后兼容性，且不影响 TestInitNetworkConfig 测试
 
 	// ==================== Tiered AI Model Configuration ====================
 	// Enable tiered AI model configuration by default

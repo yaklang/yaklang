@@ -268,4 +268,5 @@ const (
 	RoutingPolicyBalance     = string(PolicyBalance)
 	DefaultRoutingPolicy     = RoutingPolicyBalance
 	ModelExtraParamKey       = "model"
+	BuildinModelExtraParamKey       = "isBuildin"
 )
