@@ -22,12 +22,14 @@ const (
 )
 
 var (
-	ErrHIDSResponseActionUnsupported      = errors.New("hids response action is not supported on this build")
-	ErrHIDSResponseActionProcessNotFound  = errors.New("target process is not running")
-	ErrHIDSResponseActionIdentityMismatch = errors.New("target process identity no longer matches current state")
-	ErrHIDSResponseActionProtectedProcess = errors.New("refusing to terminate protected process")
-	ErrHIDSResponseActionSignalFailed     = errors.New("failed to terminate target process")
-	ErrHIDSResponseActionStillRunning     = errors.New("target process is still running after termination")
+	ErrHIDSResponseActionUnsupported             = errors.New("hids response action is not supported on this build")
+	ErrHIDSResponseActionProcessNotFound         = errors.New("target process is not running")
+	ErrHIDSResponseActionIdentityMismatch        = errors.New("target process identity no longer matches current state")
+	ErrHIDSResponseActionProcessStateQueryFailed = errors.New("failed to query target process state")
+	ErrHIDSResponseActionProtectedProcess        = errors.New("refusing to terminate protected process")
+	ErrHIDSResponseActionSignalFailed            = errors.New("failed to terminate target process")
+	ErrHIDSResponseActionStillRunning            = errors.New("target process is still running after termination")
+	ErrHIDSResponseActionWaitInterrupted         = errors.New("target process exit confirmation was interrupted")
 )
 
 type hidsResponseActionProcess struct {
@@ -236,12 +238,16 @@ func mapHIDSResponseActionError(err error) (string, string) {
 		return "process_not_found", err.Error()
 	case errors.Is(err, ErrHIDSResponseActionIdentityMismatch):
 		return "process_identity_mismatch", err.Error()
+	case errors.Is(err, ErrHIDSResponseActionProcessStateQueryFailed):
+		return "process_state_query_failed", err.Error()
 	case errors.Is(err, ErrHIDSResponseActionProtectedProcess):
 		return "protected_process", err.Error()
 	case errors.Is(err, ErrHIDSResponseActionStillRunning):
 		return "process_still_running", err.Error()
 	case errors.Is(err, ErrHIDSResponseActionSignalFailed):
 		return "process_signal_failed", err.Error()
+	case errors.Is(err, ErrHIDSResponseActionWaitInterrupted):
+		return "process_wait_interrupted", err.Error()
 	default:
 		return "response_action_failed", err.Error()
 	}

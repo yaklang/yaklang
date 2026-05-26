@@ -5,7 +5,7 @@ package legion.ai.v1;
 import "google/protobuf/timestamp.proto";
 import "legion/node/v1/node.proto";
 
-option go_package = "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/ai/v1;aiv1";
+option go_package = "legion/gen/proto/legion/ai/v1;aiv1";
 
 message AISessionRef {
   string session_id = 1;
@@ -70,6 +70,52 @@ message CloseAISessionCommand {
   AISessionRef session = 2;
   string owner_user_id = 3;
   string reason = 4;
+}
+
+message UpdateAISessionTitleCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+  AISessionRef session = 4;
+  string title = 5;
+}
+
+message AISessionTitleUpdated {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  AISessionRef session = 3;
+  string title = 4;
+  string message = 5;
+}
+
+message AISessionTitleUpdateFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  AISessionRef session = 3;
+  string error_code = 4;
+  string error_message = 5;
+}
+
+message DeleteAISessionCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+  AISessionRef session = 4;
+}
+
+message AISessionDeleteCompleted {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  AISessionRef session = 3;
+  string message = 4;
+}
+
+message AISessionDeleteFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  AISessionRef session = 3;
+  string error_code = 4;
+  string error_message = 5;
 }
 
 message AIProviderPreviewConfigSnapshot {
@@ -138,6 +184,1753 @@ message AIProviderHealthCheckFailed {
   string owner_user_id = 2;
   string error_code = 3;
   string error_message = 4;
+}
+
+message AIConfigKVPair {
+  string key = 1;
+  string value = 2;
+}
+
+message AIThirdPartyApplicationConfigSnapshot {
+  string type = 1;
+  string api_key = 2;
+  string user_identifier = 3;
+  string user_secret = 4;
+  string namespace = 5;
+  string domain = 6;
+  string webhook_url = 7;
+  repeated AIConfigKVPair extra_params = 8;
+  bool disabled = 9;
+  string proxy = 10;
+  bool no_https = 11;
+  string api_type = 12;
+  string base_url = 13;
+  string endpoint = 14;
+  bool enable_endpoint = 15;
+  repeated AIConfigKVPair headers = 16;
+}
+
+message AIModelConfigSnapshot {
+  int64 provider_id = 1;
+  AIThirdPartyApplicationConfigSnapshot provider = 2;
+  string model_name = 3;
+  repeated AIConfigKVPair extra_params = 4;
+}
+
+message AIGlobalConfigSnapshot {
+  bool enabled = 1;
+  string routing_policy = 2;
+  bool disable_fallback = 3;
+  string default_model_id = 4;
+  double global_weight = 5;
+  repeated AIModelConfigSnapshot intelligent_models = 6;
+  repeated AIModelConfigSnapshot lightweight_models = 7;
+  repeated AIModelConfigSnapshot vision_models = 8;
+  string ai_preset_prompt = 9;
+}
+
+message GetAIGlobalConfigCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+}
+
+message SetAIGlobalConfigCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+  AIGlobalConfigSnapshot config = 4;
+}
+
+message AIGlobalConfigFetched {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  AIGlobalConfigSnapshot config = 3;
+}
+
+message AIGlobalConfigFetchFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string error_code = 3;
+  string error_message = 4;
+}
+
+message AIGlobalConfigUpdated {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  AIGlobalConfigSnapshot config = 3;
+}
+
+message AIGlobalConfigUpdateFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string error_code = 3;
+  string error_message = 4;
+}
+
+message AIFocus {
+  string name = 1;
+  string description = 2;
+  string output_example_prompt = 3;
+  string usage_prompt = 4;
+  string verbose_name = 5;
+  string verbose_name_zh = 6;
+  string description_zh = 7;
+}
+
+message QueryAIFocusCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+}
+
+message AIFocusQueried {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  repeated AIFocus items = 3;
+}
+
+message AIFocusQueryFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string error_code = 3;
+  string error_message = 4;
+}
+
+message GetRandomAIMaterialsCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+  int64 limit = 4;
+}
+
+message AIMaterialsRandomQueried {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  repeated AIKnowledgeBaseEntryRecord knowledge_base_entries = 3;
+  repeated AIToolRecord ai_tools = 4;
+  repeated AIForgeRecord ai_forges = 5;
+}
+
+message AIMaterialsRandomQueryFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string error_code = 3;
+  string error_message = 4;
+}
+
+message AIMCPServerPagination {
+  int64 page = 1;
+  int64 limit = 2;
+}
+
+message AIMCPServerToolParam {
+  string type = 1;
+  string description = 2;
+  string default_value = 3;
+  bool required = 4;
+  string name = 5;
+}
+
+message AIMCPServerTool {
+  string name = 1;
+  string description = 2;
+  repeated AIMCPServerToolParam params = 3;
+}
+
+message AIMCPServerRecord {
+  int64 server_id = 1;
+  string name = 2;
+  string transport_type = 3;
+  string url = 4;
+  string command = 5;
+  bool enabled = 6;
+  repeated AIMCPServerTool tools = 7;
+  string error_message = 8;
+  repeated AIConfigKVPair envs = 9;
+  repeated AIConfigKVPair headers = 10;
+  int64 created_at = 11;
+  int64 updated_at = 12;
+}
+
+message ListAIMCPServersCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+  string query = 4;
+  int64 server_id = 5;
+  string transport_type = 6;
+  AIMCPServerPagination pagination = 7;
+  bool include_tools = 8;
+}
+
+message AIMCPServersListed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  repeated AIMCPServerRecord items = 3;
+  AIMCPServerPagination pagination = 4;
+  int64 total = 5;
+}
+
+message AIMCPServersListFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string error_code = 3;
+  string error_message = 4;
+}
+
+message CreateAIMCPServerCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+  string name = 4;
+  string transport_type = 5;
+  string url = 6;
+  string command = 7;
+  bool enabled = 8;
+  repeated AIConfigKVPair envs = 9;
+  repeated AIConfigKVPair headers = 10;
+}
+
+message AIMCPServerCreated {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  AIMCPServerRecord item = 3;
+  string message = 4;
+}
+
+message AIMCPServerCreateFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string error_code = 3;
+  string error_message = 4;
+}
+
+message UpdateAIMCPServerCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+  int64 server_id = 4;
+  string name = 5;
+  string transport_type = 6;
+  string url = 7;
+  string command = 8;
+  bool enabled = 9;
+  repeated AIConfigKVPair envs = 10;
+  repeated AIConfigKVPair headers = 11;
+}
+
+message AIMCPServerUpdated {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  AIMCPServerRecord item = 3;
+  string message = 4;
+}
+
+message AIMCPServerUpdateFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string error_code = 3;
+  string error_message = 4;
+}
+
+message DeleteAIMCPServerCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+  int64 server_id = 4;
+}
+
+message AIMCPServerDeleted {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  AIMCPServerRecord item = 3;
+  string message = 4;
+}
+
+message AIMCPServerDeleteFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string error_code = 3;
+  string error_message = 4;
+}
+
+message AILocalModelStatus {
+  string status = 1;
+  string host = 2;
+  int32 port = 3;
+  string model = 4;
+  string model_path = 5;
+  string llama_server_path = 6;
+  int32 context_size = 7;
+  bool cont_batching = 8;
+  int32 batch_size = 9;
+  int32 threads = 10;
+  bool detached = 11;
+  bool debug = 12;
+  string pooling = 13;
+  int32 startup_timeout_second = 14;
+  repeated string args = 15;
+}
+
+message AILocalModelRecord {
+  string name = 1;
+  string type = 2;
+  string file_name = 3;
+  string download_url = 4;
+  string description = 5;
+  int32 default_port = 6;
+  bool is_local = 7;
+  bool is_ready = 8;
+  string path = 9;
+  AILocalModelStatus status = 10;
+}
+
+message ListAILocalModelsCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+}
+
+message AILocalModelsListed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  repeated AILocalModelRecord items = 3;
+}
+
+message AILocalModelsListFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string error_code = 3;
+  string error_message = 4;
+}
+
+message CheckAILlamaServerReadyCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+}
+
+message AILlamaServerReadyChecked {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  bool ok = 3;
+  string reason = 4;
+}
+
+message AILlamaServerReadyCheckFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string error_code = 3;
+  string error_message = 4;
+}
+
+message InstallAILlamaServerCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+  string proxy = 4;
+}
+
+message AILocalModelOperation {
+  string operation_id = 1;
+  string kind = 2;
+  string model_name = 3;
+  string title = 4;
+  string target_node_id = 5;
+}
+
+message AILocalModelOperationAccepted {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  AILocalModelOperation operation = 3;
+}
+
+message AILocalModelOperationProgressed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  AILocalModelOperation operation = 3;
+  float progress_percent = 4;
+  string message = 5;
+  bool is_message = 6;
+  string raw_message = 7;
+}
+
+message AILocalModelOperationCompleted {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  AILocalModelOperation operation = 3;
+  bool ok = 4;
+  string reason = 5;
+  AILocalModelRecord item = 6;
+}
+
+message AILocalModelOperationCancelled {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  AILocalModelOperation operation = 3;
+  string reason = 4;
+}
+
+message AILocalModelOperationFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  AILocalModelOperation operation = 3;
+  string error_code = 4;
+  string error_message = 5;
+}
+
+message AILlamaServerInstalled {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  bool ok = 3;
+  string reason = 4;
+}
+
+message AILlamaServerInstallFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string error_code = 3;
+  string error_message = 4;
+}
+
+message CreateAILocalModelCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+  string name = 4;
+  string model_type = 5;
+  string description = 6;
+  string path = 7;
+}
+
+message AILocalModelCreated {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  AILocalModelRecord item = 3;
+  string message = 4;
+}
+
+message AILocalModelCreateFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string error_code = 3;
+  string error_message = 4;
+}
+
+message UpdateAILocalModelCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+  string model_name = 4;
+  string model_type = 5;
+  string description = 6;
+  string path = 7;
+}
+
+message AILocalModelUpdated {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  AILocalModelRecord item = 3;
+  string message = 4;
+}
+
+message AILocalModelUpdateFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string error_code = 3;
+  string error_message = 4;
+}
+
+message DeleteAILocalModelCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+  string model_name = 4;
+  bool delete_source_file = 5;
+}
+
+message AILocalModelDeleted {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  AILocalModelRecord item = 3;
+  string message = 4;
+}
+
+message AILocalModelDeleteFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string error_code = 3;
+  string error_message = 4;
+}
+
+message StartAILocalModelCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+  string model_name = 4;
+  string host = 5;
+  int32 port = 6;
+  int32 context_size = 7;
+  int32 batch_size = 8;
+  int32 threads = 9;
+  bool debug = 10;
+  string pooling = 11;
+  int64 startup_timeout_ms = 12;
+  repeated string args = 13;
+}
+
+message AILocalModelStarted {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  AILocalModelRecord item = 3;
+  string message = 4;
+}
+
+message AILocalModelStartFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string error_code = 3;
+  string error_message = 4;
+}
+
+message StopAILocalModelCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+  string model_name = 4;
+}
+
+message AILocalModelStopped {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  AILocalModelRecord item = 3;
+  string message = 4;
+}
+
+message AILocalModelStopFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string error_code = 3;
+  string error_message = 4;
+}
+
+message DownloadAILocalModelCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+  string model_name = 4;
+  string proxy = 5;
+}
+
+message CancelAILocalModelOperationCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+  string operation_id = 4;
+}
+
+message AILocalModelDownloaded {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  AILocalModelRecord item = 3;
+  string message = 4;
+}
+
+message AILocalModelDownloadFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string error_code = 3;
+  string error_message = 4;
+}
+
+message ClearAILocalModelsCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+  bool delete_source_file = 4;
+}
+
+message AILocalModelsCleared {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  bool ok = 3;
+  string reason = 4;
+}
+
+message AILocalModelsClearFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string error_code = 3;
+  string error_message = 4;
+}
+
+message AIForgePagination {
+  int64 page = 1;
+  int64 limit = 2;
+  string order_by = 3;
+  string order = 4;
+}
+
+message AIForgeRecord {
+  int64 id = 1;
+  string forge_name = 2;
+  string forge_content = 3;
+  string forge_type = 4;
+  string description = 5;
+  string params_ui_config = 6;
+  string params = 7;
+  string user_persistent_data = 8;
+  repeated string tool_names = 9;
+  repeated string tool_keywords = 10;
+  string action = 11;
+  repeated string tags = 12;
+  string init_prompt = 13;
+  string persistent_prompt = 14;
+  string plan_prompt = 15;
+  string result_prompt = 16;
+  string forge_verbose_name = 17;
+  string author = 18;
+  string skill_path = 19;
+  int64 created_at = 20;
+  int64 updated_at = 21;
+  bool is_builtin = 22;
+}
+
+message ListAIForgesCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+  string query = 4;
+  string forge_name = 5;
+  repeated string forge_names = 6;
+  string forge_type = 7;
+  repeated string tags = 8;
+  int64 forge_id = 9;
+  bool show_temporary = 10;
+  AIForgePagination pagination = 11;
+}
+
+message AIForgesListed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  repeated AIForgeRecord items = 3;
+  AIForgePagination pagination = 4;
+  int64 total = 5;
+}
+
+message AIForgesListFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string error_code = 3;
+  string error_message = 4;
+}
+
+message CreateAIForgeCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+  string forge_name = 4;
+  string forge_content = 5;
+  string forge_type = 6;
+  string description = 7;
+  string params_ui_config = 8;
+  string params = 9;
+  string user_persistent_data = 10;
+  repeated string tool_names = 11;
+  repeated string tool_keywords = 12;
+  string action = 13;
+  repeated string tags = 14;
+  string init_prompt = 15;
+  string persistent_prompt = 16;
+  string plan_prompt = 17;
+  string result_prompt = 18;
+  string forge_verbose_name = 19;
+  bool is_builtin = 20;
+}
+
+message AIForgeCreated {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  AIForgeRecord item = 3;
+  string message = 4;
+}
+
+message AIForgeCreateFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string error_code = 3;
+  string error_message = 4;
+}
+
+message UpdateAIForgeCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+  int64 forge_id = 4;
+  string forge_name = 5;
+  string forge_content = 6;
+  string forge_type = 7;
+  string description = 8;
+  string params_ui_config = 9;
+  string params = 10;
+  string user_persistent_data = 11;
+  repeated string tool_names = 12;
+  repeated string tool_keywords = 13;
+  string action = 14;
+  repeated string tags = 15;
+  string init_prompt = 16;
+  string persistent_prompt = 17;
+  string plan_prompt = 18;
+  string result_prompt = 19;
+  string forge_verbose_name = 20;
+  bool is_builtin = 21;
+}
+
+message AIForgeUpdated {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  AIForgeRecord item = 3;
+  string message = 4;
+}
+
+message AIForgeUpdateFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string error_code = 3;
+  string error_message = 4;
+}
+
+message DeleteAIForgeCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+  int64 forge_id = 4;
+}
+
+message AIForgeDeleted {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string forge_id = 3;
+  string message = 4;
+}
+
+message AIForgeDeleteFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string error_code = 3;
+  string error_message = 4;
+}
+
+message ExportAIForgeCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+  string query = 4;
+  string forge_name = 5;
+  repeated string forge_names = 6;
+  string forge_type = 7;
+  repeated string tags = 8;
+  int64 forge_id = 9;
+  string output_name = 10;
+  string password = 11;
+  repeated string tool_names = 12;
+  string object_store_bucket = 13;
+  string object_store_key = 14;
+}
+
+message AIForgeExportProgressed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  double percent = 3;
+  string message = 4;
+  string message_type = 5;
+}
+
+message AIForgeExported {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string file_name = 3;
+  string content_type = 4;
+  string object_store_bucket = 5;
+  string object_store_key = 6;
+  uint64 size_bytes = 7;
+  string message = 8;
+}
+
+message AIForgeExportFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string error_code = 3;
+  string error_message = 4;
+}
+
+message AIForgeImportAttachment {
+  string attachment_id = 1;
+  string filename = 2;
+  string content_type = 3;
+  string download_url = 4;
+}
+
+message ImportAIForgeCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+  string archive_name = 4;
+  bool overwrite = 5;
+  string new_forge_name = 6;
+  string password = 7;
+  AIForgeImportAttachment attachment = 8;
+}
+
+message AIForgeImportProgressed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  double percent = 3;
+  string message = 4;
+  string message_type = 5;
+}
+
+message AIForgeImportItem {
+  string forge_name = 1;
+  string forge_id = 2;
+  string status = 3;
+  string message = 4;
+}
+
+message AIForgeImported {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  int64 created = 3;
+  int64 updated = 4;
+  int64 skipped = 5;
+  repeated AIForgeImportItem items = 6;
+  string message = 7;
+}
+
+message AIForgeImportFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string error_code = 3;
+  string error_message = 4;
+}
+
+message AIToolPagination {
+  int64 page = 1;
+  int64 limit = 2;
+  string order_by = 3;
+  string order = 4;
+}
+
+message AIToolRecord {
+  int64 id = 1;
+  string name = 2;
+  string verbose_name = 3;
+  string description = 4;
+  string content = 5;
+  string tool_path = 6;
+  repeated string keywords = 7;
+  bool is_favorite = 8;
+  string author = 9;
+  int64 created_at = 10;
+  int64 updated_at = 11;
+  bool is_builtin = 12;
+}
+
+message ListAIToolsCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+  string query = 4;
+  string tool_name = 5;
+  int64 tool_id = 6;
+  AIToolPagination pagination = 7;
+  bool only_favorites = 8;
+}
+
+message AIToolsListed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  repeated AIToolRecord items = 3;
+  AIToolPagination pagination = 4;
+  int64 total = 5;
+}
+
+message AIToolsListFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string error_code = 3;
+  string error_message = 4;
+}
+
+message CreateAIToolCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+  string name = 4;
+  string description = 5;
+  string content = 6;
+  string tool_path = 7;
+  repeated string keywords = 8;
+}
+
+message AIToolCreated {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  AIToolRecord item = 3;
+  string message = 4;
+}
+
+message AIToolCreateFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string error_code = 3;
+  string error_message = 4;
+}
+
+message UpdateAIToolCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+  int64 tool_id = 4;
+  string name = 5;
+  string description = 6;
+  string content = 7;
+  string tool_path = 8;
+  repeated string keywords = 9;
+}
+
+message AIToolUpdated {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  AIToolRecord item = 3;
+  string message = 4;
+}
+
+message AIToolUpdateFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string error_code = 3;
+  string error_message = 4;
+}
+
+message GenerateAIToolMetadataCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+  string tool_name = 4;
+  string content = 5;
+}
+
+message AIToolMetadataGenerated {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string name = 3;
+  string description = 4;
+  repeated string keywords = 5;
+}
+
+message AIToolMetadataGenerateFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string error_code = 3;
+  string error_message = 4;
+}
+
+message ToggleAIToolFavoriteCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+  int64 tool_id = 4;
+}
+
+message AIToolFavoriteToggled {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  int64 tool_id = 3;
+  bool is_favorite = 4;
+  string message = 5;
+}
+
+message AIToolFavoriteToggleFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string error_code = 3;
+  string error_message = 4;
+}
+
+message DeleteAIToolsCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+  repeated int64 tool_ids = 4;
+}
+
+message AIToolsDeleted {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  repeated int64 tool_ids = 3;
+  string message = 4;
+}
+
+message AIToolsDeleteFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string error_code = 3;
+  string error_message = 4;
+}
+
+message AIKnowledgeBasePagination {
+  int64 page = 1;
+  int64 limit = 2;
+  string order_by = 3;
+  string order = 4;
+}
+
+message AIKnowledgeBaseRecord {
+  int64 id = 1;
+  string knowledge_base_name = 2;
+  string knowledge_base_description = 3;
+  string knowledge_base_type = 4;
+  repeated string tags = 5;
+  bool is_default = 6;
+  bool created_from_ui = 7;
+  bool is_imported = 8;
+  string serial_version_id = 9;
+  int64 created_at = 10;
+  int64 updated_at = 11;
+}
+
+message ListAIKnowledgeBasesCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+  string query = 4;
+  int64 knowledge_base_id = 5;
+  bool only_created_from_ui = 6;
+  bool only_is_default = 7;
+  AIKnowledgeBasePagination pagination = 8;
+}
+
+message AIKnowledgeBasesListed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  repeated AIKnowledgeBaseRecord items = 3;
+  AIKnowledgeBasePagination pagination = 4;
+  int64 total = 5;
+}
+
+message AIKnowledgeBasesListFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string error_code = 3;
+  string error_message = 4;
+}
+
+message CreateAIKnowledgeBaseCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+  string knowledge_base_name = 4;
+  string knowledge_base_description = 5;
+  string knowledge_base_type = 6;
+  repeated string tags = 7;
+  bool is_default = 8;
+  bool created_from_ui = 9;
+}
+
+message AIKnowledgeBaseImportAttachment {
+  string attachment_id = 1;
+  string filename = 2;
+  string content_type = 3;
+  string download_url = 4;
+}
+
+message AIKnowledgeBaseCreated {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  AIKnowledgeBaseRecord item = 3;
+  string message = 4;
+}
+
+message AIKnowledgeBaseCreateFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string error_code = 3;
+  string error_message = 4;
+}
+
+message ImportAIKnowledgeBaseCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+  string knowledge_base_name = 4;
+  AIKnowledgeBaseImportAttachment attachment = 5;
+}
+
+message AIKnowledgeBaseImported {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  AIKnowledgeBaseRecord item = 3;
+  string message = 4;
+}
+
+message AIKnowledgeBaseImportFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string error_code = 3;
+  string error_message = 4;
+}
+
+message UpdateAIKnowledgeBaseCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+  int64 knowledge_base_id = 4;
+  string knowledge_base_name = 5;
+  string knowledge_base_description = 6;
+  string knowledge_base_type = 7;
+  repeated string tags = 8;
+  bool is_default = 9;
+}
+
+message AIKnowledgeBaseUpdated {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  AIKnowledgeBaseRecord item = 3;
+  string message = 4;
+}
+
+message AIKnowledgeBaseUpdateFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string error_code = 3;
+  string error_message = 4;
+}
+
+message DeleteAIKnowledgeBaseCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+  int64 knowledge_base_id = 4;
+}
+
+message AIKnowledgeBaseDeleted {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  AIKnowledgeBaseRecord item = 3;
+  string message = 4;
+}
+
+message AIKnowledgeBaseDeleteFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string error_code = 3;
+  string error_message = 4;
+}
+
+message ExportAIKnowledgeBaseCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+  int64 knowledge_base_id = 4;
+  string output_name = 5;
+  string object_store_bucket = 6;
+  string object_store_key = 7;
+}
+
+message AIKnowledgeBaseExported {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  AIKnowledgeBaseRecord item = 3;
+  string message = 4;
+  string file_name = 5;
+  string content_type = 6;
+  string object_store_bucket = 7;
+  string object_store_key = 8;
+  uint64 size_bytes = 9;
+}
+
+message AIKnowledgeBaseExportFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string error_code = 3;
+  string error_message = 4;
+}
+
+message AIKnowledgeBaseEntryFilter {
+  int64 knowledge_base_id = 1;
+  string keyword = 2;
+  repeated string related_entity_uuids = 3;
+  repeated string hidden_index = 4;
+}
+
+message AIKnowledgeBaseEntryRecord {
+  int64 id = 1;
+  int64 knowledge_base_id = 2;
+  string knowledge_title = 3;
+  string knowledge_type = 4;
+  int32 importance_score = 5;
+  repeated string keywords = 6;
+  string knowledge_details = 7;
+  string summary = 8;
+  int32 source_page = 9;
+  repeated string potential_questions = 10;
+  repeated float potential_questions_vector = 11;
+  string hidden_index = 12;
+  string related_entity_uuids = 13;
+  int64 created_at = 14;
+  int64 updated_at = 15;
+}
+
+message SearchAIKnowledgeBaseEntriesCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+  AIKnowledgeBaseEntryFilter filter = 4;
+  AIKnowledgeBasePagination pagination = 5;
+}
+
+message AIKnowledgeBaseEntriesSearched {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  repeated AIKnowledgeBaseEntryRecord items = 3;
+  AIKnowledgeBasePagination pagination = 4;
+  int64 total = 5;
+}
+
+message AIKnowledgeBaseEntriesSearchFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string error_code = 3;
+  string error_message = 4;
+}
+
+message QueryAIKnowledgeBaseByAICommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+  string query = 4;
+  string enhance_plan = 5;
+  int64 knowledge_base_id = 6;
+  bool query_all_collections = 7;
+  string ai_service = 8;
+}
+
+message CancelAIKnowledgeBaseByAIQueryCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+  string query_command_id = 4;
+  string reason = 5;
+}
+
+message AIKnowledgeBaseQueryByAIChunk {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string message = 3;
+  string message_type = 4;
+  string data = 5;
+}
+
+message AIKnowledgeBaseQueryByAICompleted {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string message = 3;
+}
+
+message AIKnowledgeBaseQueryByAIFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string error_code = 3;
+  string error_message = 4;
+}
+
+message GenerateAIKnowledgeBaseQuestionIndexCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+  int64 knowledge_base_id = 4;
+  string knowledge_base_name = 5;
+  bool force = 6;
+  string hidden_index = 7;
+}
+
+message CancelAIKnowledgeBaseQuestionIndexCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+  string request_command_id = 4;
+  string reason = 5;
+}
+
+message AIKnowledgeBaseQuestionIndexProgress {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  double percent = 3;
+  string message = 4;
+  string message_type = 5;
+}
+
+message AIKnowledgeBaseQuestionIndexCompleted {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string message = 3;
+}
+
+message AIKnowledgeBaseQuestionIndexFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string error_code = 3;
+  string error_message = 4;
+}
+
+message CreateAIKnowledgeBaseEntryCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+  int64 knowledge_base_id = 4;
+  string knowledge_title = 5;
+  string knowledge_type = 6;
+  int32 importance_score = 7;
+  repeated string keywords = 8;
+  string knowledge_details = 9;
+  string summary = 10;
+  int32 source_page = 11;
+  repeated string potential_questions = 12;
+  repeated float potential_questions_vector = 13;
+}
+
+message AIKnowledgeBaseEntryCreated {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  AIKnowledgeBaseEntryRecord item = 3;
+  string message = 4;
+}
+
+message AIKnowledgeBaseEntryCreateFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string error_code = 3;
+  string error_message = 4;
+}
+
+message UpdateAIKnowledgeBaseEntryCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+  int64 knowledge_base_id = 4;
+  int64 knowledge_base_entry_id = 5;
+  string knowledge_base_entry_hidden_index = 6;
+  string knowledge_title = 7;
+  string knowledge_type = 8;
+  int32 importance_score = 9;
+  repeated string keywords = 10;
+  string knowledge_details = 11;
+  string summary = 12;
+  int32 source_page = 13;
+  repeated string potential_questions = 14;
+}
+
+message AIKnowledgeBaseEntryUpdated {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  AIKnowledgeBaseEntryRecord item = 3;
+  string message = 4;
+}
+
+message AIKnowledgeBaseEntryUpdateFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string error_code = 3;
+  string error_message = 4;
+}
+
+message DeleteAIKnowledgeBaseEntryCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+  int64 knowledge_base_id = 4;
+  int64 knowledge_base_entry_id = 5;
+  string knowledge_base_entry_hidden_index = 6;
+}
+
+message AIKnowledgeBaseEntryDeleted {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  int64 knowledge_base_id = 3;
+  int64 knowledge_base_entry_id = 4;
+  string knowledge_base_entry_hidden_index = 5;
+  string message = 6;
+}
+
+message AIKnowledgeBaseEntryDeleteFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string error_code = 3;
+  string error_message = 4;
+}
+
+message BuildAIKnowledgeBaseVectorIndexCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+  int64 knowledge_base_id = 4;
+  string base_url = 5;
+  string api_key = 6;
+  string proxy = 7;
+  string model_name = 8;
+  int32 dimension = 9;
+  int32 m = 10;
+  float ml = 11;
+  int32 ef_search = 12;
+  int32 ef_construct = 13;
+  string distance_func_type = 14;
+}
+
+message AIKnowledgeBaseVectorIndexBuilt {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  int64 knowledge_base_id = 3;
+  string message = 4;
+}
+
+message AIKnowledgeBaseVectorIndexBuildFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string error_code = 3;
+  string error_message = 4;
+}
+
+message BuildAIKnowledgeBaseEntryVectorIndexCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+  int64 knowledge_base_id = 4;
+  int64 knowledge_base_entry_id = 5;
+  string knowledge_base_entry_hidden_index = 6;
+  string related_entity_uuids = 7;
+  string base_url = 8;
+  string api_key = 9;
+  string proxy = 10;
+  string model_name = 11;
+  int32 dimension = 12;
+  int32 m = 13;
+  float ml = 14;
+  int32 ef_search = 15;
+  int32 ef_construct = 16;
+  string distance_func_type = 17;
+}
+
+message AIKnowledgeBaseEntryVectorIndexBuilt {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  int64 knowledge_base_id = 3;
+  int64 knowledge_base_entry_id = 4;
+  string knowledge_base_entry_hidden_index = 5;
+  string message = 6;
+}
+
+message AIKnowledgeBaseEntryVectorIndexBuildFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string error_code = 3;
+  string error_message = 4;
+}
+
+message AIMemoryFloatRange {
+  bool enabled = 1;
+  double min = 2;
+  double max = 3;
+}
+
+message AIMemoryInt64Range {
+  bool enabled = 1;
+  int64 min = 2;
+  int64 max = 3;
+}
+
+message AIMemoryPagination {
+  int64 page = 1;
+  int64 limit = 2;
+  string order_by = 3;
+  string order = 4;
+}
+
+message AIMemoryTagCount {
+  string value = 1;
+  int32 total = 2;
+}
+
+message AIMemoryEntityRecord {
+  int64 id = 1;
+  int64 created_at = 2;
+  int64 updated_at = 3;
+  string memory_id = 4;
+  string session_id = 5;
+  string content = 6;
+  repeated string tags = 7;
+  repeated string potential_questions = 8;
+  double c_score = 9;
+  double o_score = 10;
+  double r_score = 11;
+  double e_score = 12;
+  double p_score = 13;
+  double a_score = 14;
+  double t_score = 15;
+  repeated float core_pact_vector = 16;
+}
+
+message AIMemoryEntityFilter {
+  string session_id = 1;
+  repeated string memory_ids = 2;
+  string content_keyword = 3;
+  repeated string tags = 4;
+  bool tag_match_all = 5;
+  string potential_question_keyword = 6;
+  AIMemoryFloatRange c_score = 7;
+  AIMemoryFloatRange o_score = 8;
+  AIMemoryFloatRange r_score = 9;
+  AIMemoryFloatRange e_score = 10;
+  AIMemoryFloatRange p_score = 11;
+  AIMemoryFloatRange a_score = 12;
+  AIMemoryFloatRange t_score = 13;
+  AIMemoryInt64Range created_at = 14;
+  AIMemoryInt64Range updated_at = 15;
+  string semantic_query = 20;
+  repeated float core_pact_query_vector = 21;
+  int64 vector_top_k = 22;
+}
+
+message CreateAIMemoryEntityCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+  string session_id = 4;
+  string free_input = 5;
+}
+
+message AIMemoryEntityCreated {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string session_id = 3;
+  string message = 4;
+}
+
+message AIMemoryEntityCreateFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string session_id = 3;
+  string error_code = 4;
+  string error_message = 5;
+}
+
+message GetAIMemoryEntityCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+  string memory_id = 4;
+  string session_id = 5;
+}
+
+message AIMemoryEntityFetched {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  AIMemoryEntityRecord item = 3;
+}
+
+message AIMemoryEntityFetchFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string error_code = 3;
+  string error_message = 4;
+}
+
+message QueryAIMemoryEntitiesCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+  AIMemoryPagination pagination = 4;
+  AIMemoryEntityFilter filter = 5;
+}
+
+message AIMemoryEntitiesQueried {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  AIMemoryPagination pagination = 3;
+  repeated AIMemoryEntityRecord items = 4;
+  int64 total = 5;
+}
+
+message AIMemoryEntitiesQueryFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string error_code = 3;
+  string error_message = 4;
+}
+
+message UpdateAIMemoryEntityCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+  AIMemoryEntityRecord item = 4;
+}
+
+message AIMemoryEntityUpdated {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  AIMemoryEntityRecord item = 3;
+  string message = 4;
+}
+
+message AIMemoryEntityUpdateFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string error_code = 3;
+  string error_message = 4;
+}
+
+message DeleteAIMemoryEntitiesCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+  AIMemoryEntityFilter filter = 4;
+}
+
+message AIMemoryEntitiesDeleted {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  int64 affected_count = 3;
+  string message = 4;
+}
+
+message AIMemoryEntitiesDeleteFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string error_code = 3;
+  string error_message = 4;
+}
+
+message CountAIMemoryEntityTagsCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+  string session_id = 4;
+}
+
+message AIMemoryEntityTagsCounted {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string session_id = 3;
+  repeated AIMemoryTagCount tags_count = 4;
+}
+
+message AIMemoryEntityTagsCountFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string session_id = 3;
+  string error_code = 4;
+  string error_message = 5;
+}
+
+message AIRuntimePagination {
+  int64 page = 1;
+  int64 limit = 2;
+}
+
+message AIHTTPFlowRecord {
+  int64 id = 1;
+  string runtime_id = 2;
+  string hidden_index = 3;
+  bytes raw_json = 4;
+}
+
+message QueryAIHTTPFlowsCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+  string runtime_id = 4;
+  string hidden_index = 5;
+  AIRuntimePagination pagination = 6;
+  string method = 7;
+  int64 status_code = 8;
+  string content_type = 9;
+  string keyword = 10;
+}
+
+message AIHTTPFlowsQueried {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  repeated AIHTTPFlowRecord items = 3;
+  AIRuntimePagination pagination = 4;
+  int64 total = 5;
+}
+
+message AIHTTPFlowsQueryFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string error_code = 3;
+  string error_message = 4;
+}
+
+message AIRiskRecord {
+  uint64 id = 1;
+  string runtime_id = 2;
+  string title = 3;
+  bytes raw_json = 4;
+}
+
+message QueryAIRisksCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+  string runtime_id = 4;
+  uint64 risk_id = 5;
+  AIRuntimePagination pagination = 6;
+  string severity = 7;
+  string risk_type = 8;
+  string network = 9;
+  string title = 10;
+  string keyword = 11;
+}
+
+message AIRisksQueried {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  repeated AIRiskRecord items = 3;
+  AIRuntimePagination pagination = 4;
+  int64 total = 5;
+}
+
+message AIRisksQueryFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string error_code = 3;
+  string error_message = 4;
+}
+
+message ExportAILogsCheckpointsCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string owner_user_id = 3;
+  string session_id = 4;
+  repeated string coordinator_ids = 5;
+}
+
+message AILogsCheckpointsExported {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string session_id = 3;
+  bytes checkpoints_json = 4;
+  int64 total = 5;
+}
+
+message AILogsCheckpointsExportFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string owner_user_id = 2;
+  string session_id = 3;
+  string error_code = 4;
+  string error_message = 5;
 }
 
 message AISessionReady {

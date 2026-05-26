@@ -232,13 +232,29 @@ func (s *ScanNode) appendKeyValueParams(params []string, keyValues map[string]an
 			continue
 		}
 		name := strings.TrimLeft(key, "-")
-		params = append(params, "--"+name, utils.InterfaceToString(value))
+		params = appendCLIParamValue(params, "--"+name, value)
+	}
+	return params
+}
+
+func appendCLIParamValue(params []string, flag string, value any) []string {
+	switch typed := value.(type) {
+	case []string:
+		for _, item := range typed {
+			params = append(params, flag, item)
+		}
+	case []any:
+		for _, item := range typed {
+			params = append(params, flag, utils.InterfaceToString(item))
+		}
+	default:
+		params = append(params, flag, utils.InterfaceToString(value))
 	}
 	return params
 }
 
 func (s *ScanNode) createTempScriptFile(content string) (string, error) {
-	f, err := consts.TempFile("distributed-yakcode-*.yak")
+	f, err := createDistributedScriptTempFile()
 	if err != nil {
 		return "", err
 	}
@@ -248,6 +264,27 @@ func (s *ScanNode) createTempScriptFile(content string) (string, error) {
 		return "", err
 	}
 	return f.Name(), nil
+}
+
+func createDistributedScriptTempFile() (*os.File, error) {
+	const pattern = "distributed-yakcode-*.yak"
+
+	f, err := consts.TempFile(pattern)
+	if err == nil {
+		return f, nil
+	}
+	yakitTempErr := err
+
+	f, err = os.CreateTemp("", pattern)
+	if err != nil {
+		return nil, utils.Errorf(
+			"create distributed script temp file failed: yakit temp: %v; system temp: %v",
+			yakitTempErr,
+			err,
+		)
+	}
+	log.Warnf("fallback to system temp for distributed script: yakit temp unavailable: %v", yakitTempErr)
+	return f, nil
 }
 
 func (s *ScanNode) executeScript(
