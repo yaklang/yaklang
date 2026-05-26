@@ -7,6 +7,17 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
+func (c *Compiler) restoreInsertPoint(bb llvm.BasicBlock) {
+	if c == nil || bb.IsNil() {
+		return
+	}
+	if c.blockHasTerminator(bb) {
+		c.setInsertPointBeforeTerminator(bb)
+		return
+	}
+	c.Builder.SetInsertPointAtEnd(bb)
+}
+
 func (c *Compiler) withLazyCompileInsertPoint(contextInst, targetInst ssa.Instruction, compile func() error) error {
 	restoreBB := c.restoreInsertBlock(contextInst)
 
@@ -31,7 +42,7 @@ func (c *Compiler) withLazyCompileInsertPoint(contextInst, targetInst ssa.Instru
 					c.setInsertPointBeforeTerminator(entryBB)
 					err := compile()
 					if !restoreBB.IsNil() {
-						c.Builder.SetInsertPointAtEnd(restoreBB)
+						c.restoreInsertPoint(restoreBB)
 					}
 					return err
 				}
@@ -42,7 +53,7 @@ func (c *Compiler) withLazyCompileInsertPoint(contextInst, targetInst ssa.Instru
 	c.setInsertPointBeforeTerminator(targetBB)
 	err := compile()
 	if !restoreBB.IsNil() {
-		c.Builder.SetInsertPointAtEnd(restoreBB)
+		c.restoreInsertPoint(restoreBB)
 	}
 	return err
 }

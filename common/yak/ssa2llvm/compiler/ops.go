@@ -294,11 +294,7 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 
 	// 15. Generic MemberCall
 	if mc, ok := valObj.(ssa.MemberCall); ok && mc.IsMember() {
-		targetInst, _ := valObj.(ssa.Instruction)
-		err := c.withLazyCompileInsertPoint(contextInst, targetInst, func() error {
-			return c.compileMemberCall(contextInst, valObj, mc)
-		})
-		if err != nil {
+		if err := c.compileMemberCall(contextInst, valObj, mc); err != nil {
 			return llvm.Value{}, err
 		}
 		if val, ok := c.getCachedValue(contextInst, id); ok {

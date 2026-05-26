@@ -79,7 +79,7 @@ func (c *Compiler) withEntryInsertPoint(fn *ssa.Function, fnDo func() error) err
 	c.setInsertPointBeforeTerminator(entryBB)
 	err := fnDo()
 	if !restoreBB.IsNil() {
-		c.Builder.SetInsertPointAtEnd(restoreBB)
+		c.restoreInsertPoint(restoreBB)
 	}
 	if c.function != nil {
 		c.function.activeBlockID = prevActive
