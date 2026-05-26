@@ -467,6 +467,11 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 		if !c.Unpack {
 			if hasError {
 				hasError := true
+				// return call(...) propagates the full multi-value result (including error)
+				// to the caller; check error handling at call sites of this function instead.
+				if callReturnsErrorToCaller(c) {
+					hasError = false
+				}
 				for key := range c.GetAllMember() {
 					if c, ok := ssa.ToConstInst(key); ok {
 						if c.IsNumber() {
@@ -496,4 +501,19 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 			return
 		}
 	}
+}
+
+// callReturnsErrorToCaller is true when every use of c is a return that passes the
+// full call result (including a trailing error) to the enclosing function's caller.
+func callReturnsErrorToCaller(c *ssa.Call) bool {
+	users := c.GetUsers()
+	if len(users) == 0 {
+		return false
+	}
+	for _, user := range users {
+		if _, ok := ssa.ToReturn(user); !ok {
+			return false
+		}
+	}
+	return true
 }
