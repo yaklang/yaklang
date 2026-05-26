@@ -446,13 +446,13 @@ func TestRenderWithFrozenBoundary_AllOpen_NoBoundary(t *testing.T) {
 	require.Equal(t, plain, out, "all-open: RenderWithFrozenBoundary must equal plain Render")
 }
 
-// TestRenderWithFrozenBoundary_AllFrozenReducerOnly 全 frozen (仅 reducer 没有
+// TestRenderWithFrozenBoundary_AllFrozenReducerOnly 全 frozen (仅 compressed head 没有
 // interval) 也不加边界 — 整段都是 frozen, 不需要切, hijacker 走退化路径。
-// 关键词: RenderWithFrozenBoundary, 全 reducer 退化, 无边界
+// 关键词: RenderWithFrozenBoundary, 全 frozen 退化, 无边界
 func TestRenderWithFrozenBoundary_AllFrozenReducerOnly(t *testing.T) {
 	bs := TimelineRenderableBlocks{
-		&TimelineReducerBlock{ReducerKeyID: 1, Text: "reducer-A"},
-		&TimelineReducerBlock{ReducerKeyID: 2, Text: "reducer-B"},
+		&TimelineCompressedHeadBlock{CoveredEndItemID: 1, Version: 1, Text: "reducer-A"},
+		&TimelineCompressedHeadBlock{CoveredEndItemID: 2, Version: 2, Text: "reducer-B"},
 	}
 	out := bs.RenderWithFrozenBoundary("TL", "", "")
 	plain := bs.Render("TL")
@@ -466,7 +466,7 @@ func TestRenderWithFrozenBoundary_AllFrozenReducerOnly(t *testing.T) {
 // 关键词: RenderWithFrozenBoundary, 混合段, frozen 包裹 + open 在外
 func TestRenderWithFrozenBoundary_MixFrozenOpen_HasBoundary(t *testing.T) {
 	bs := TimelineRenderableBlocks{
-		&TimelineReducerBlock{ReducerKeyID: 1, Text: "reducer-frozen"},
+		&TimelineCompressedHeadBlock{CoveredEndItemID: 1, Version: 1, Text: "reducer-frozen"},
 		&fakeFrozenInterval{nonce: "b3t100", body: "frozen-A"},
 		&fakeFrozenInterval{nonce: "b3t200", body: "frozen-B"},
 		&fakeOpenInterval{nonce: "b3t300", body: "open-tail"},
@@ -495,7 +495,7 @@ func TestRenderWithFrozenBoundary_MixFrozenOpen_HasBoundary(t *testing.T) {
 // 关键词: RenderWithFrozenBoundary, 字节稳定, frozen 不受 open 变化影响
 func TestRenderWithFrozenBoundary_ByteStableOnFrozenChange(t *testing.T) {
 	frozen := []TimelineRenderableBlock{
-		&TimelineReducerBlock{ReducerKeyID: 1, Text: "stable-reducer"},
+		&TimelineCompressedHeadBlock{CoveredEndItemID: 1, Version: 1, Text: "stable-reducer"},
 		&fakeFrozenInterval{nonce: "b3t100", body: "stable-frozen"},
 	}
 	r1 := append(append(TimelineRenderableBlocks{}, frozen...),
@@ -505,8 +505,8 @@ func TestRenderWithFrozenBoundary_ByteStableOnFrozenChange(t *testing.T) {
 		&fakeOpenInterval{nonce: "b3t999", body: "open-r2-different"}).
 		RenderWithFrozenBoundary("TL", "", "")
 
-	r1Frozen := r1[strings.Index(r1, frozenStartTag):strings.Index(r1, frozenEndTag)+len(frozenEndTag)]
-	r2Frozen := r2[strings.Index(r2, frozenStartTag):strings.Index(r2, frozenEndTag)+len(frozenEndTag)]
+	r1Frozen := r1[strings.Index(r1, frozenStartTag) : strings.Index(r1, frozenEndTag)+len(frozenEndTag)]
+	r2Frozen := r2[strings.Index(r2, frozenStartTag) : strings.Index(r2, frozenEndTag)+len(frozenEndTag)]
 	require.Equal(t, r1Frozen, r2Frozen,
 		"frozen boundary content must be byte-stable when frozen blocks unchanged")
 	require.NotEqual(t, r1, r2, "overall output should differ on open change")
@@ -517,7 +517,7 @@ func TestRenderWithFrozenBoundary_ByteStableOnFrozenChange(t *testing.T) {
 // 关键词: RenderWithFrozenBoundary, 自定义 boundary 标签
 func TestRenderWithFrozenBoundary_CustomBoundaryName(t *testing.T) {
 	bs := TimelineRenderableBlocks{
-		&TimelineReducerBlock{ReducerKeyID: 1, Text: "R"},
+		&TimelineCompressedHeadBlock{CoveredEndItemID: 1, Version: 1, Text: "R"},
 		&fakeOpenInterval{nonce: "b3t1", body: "O"},
 	}
 	out := bs.RenderWithFrozenBoundary("TL", "MY_FROZEN", "test-segment")
@@ -598,8 +598,8 @@ func TestRenderFrozenOnly_AllOpen(t *testing.T) {
 // 关键词: RenderFrozenOnly, 全 frozen, 等价 Render
 func TestRenderFrozenOnly_AllFrozen(t *testing.T) {
 	bs := TimelineRenderableBlocks{
-		&TimelineReducerBlock{ReducerKeyID: 1, Text: "reducer-A"},
-		&TimelineReducerBlock{ReducerKeyID: 2, Text: "reducer-B"},
+		&TimelineCompressedHeadBlock{CoveredEndItemID: 1, Version: 1, Text: "reducer-A"},
+		&TimelineCompressedHeadBlock{CoveredEndItemID: 2, Version: 2, Text: "reducer-B"},
 		&fakeFrozenInterval{nonce: "b3t100", body: "frozen-A"},
 	}
 	out := bs.RenderFrozenOnly("TL")
@@ -614,7 +614,7 @@ func TestRenderFrozenOnly_AllFrozen(t *testing.T) {
 // 关键词: RenderFrozenOnly, 混合段, 丢弃 open
 func TestRenderFrozenOnly_MixDropsOpen(t *testing.T) {
 	bs := TimelineRenderableBlocks{
-		&TimelineReducerBlock{ReducerKeyID: 1, Text: "reducer-frozen"},
+		&TimelineCompressedHeadBlock{CoveredEndItemID: 1, Version: 1, Text: "reducer-frozen"},
 		&fakeFrozenInterval{nonce: "b3t100", body: "frozen-A"},
 		&fakeOpenInterval{nonce: "b3t300", body: "open-tail"},
 	}
@@ -629,7 +629,7 @@ func TestRenderFrozenOnly_MixDropsOpen(t *testing.T) {
 // 关键词: RenderFrozenOnly, 字节稳定, 不受 open 干扰
 func TestRenderFrozenOnly_ByteStableOnOpenChange(t *testing.T) {
 	frozen := []TimelineRenderableBlock{
-		&TimelineReducerBlock{ReducerKeyID: 1, Text: "stable-reducer"},
+		&TimelineCompressedHeadBlock{CoveredEndItemID: 1, Version: 1, Text: "stable-reducer"},
 		&fakeFrozenInterval{nonce: "b3t100", body: "stable-frozen"},
 	}
 	r1 := append(append(TimelineRenderableBlocks{}, frozen...),
@@ -652,7 +652,7 @@ func TestRenderOpenOnly_Empty(t *testing.T) {
 // 关键词: RenderOpenOnly, 全 frozen, 空输出
 func TestRenderOpenOnly_AllFrozen(t *testing.T) {
 	bs := TimelineRenderableBlocks{
-		&TimelineReducerBlock{ReducerKeyID: 1, Text: "reducer-A"},
+		&TimelineCompressedHeadBlock{CoveredEndItemID: 1, Version: 1, Text: "reducer-A"},
 		&fakeFrozenInterval{nonce: "b3t100", body: "frozen-A"},
 	}
 	out := bs.RenderOpenOnly("TL")
@@ -675,7 +675,7 @@ func TestRenderOpenOnly_AllOpen(t *testing.T) {
 // 关键词: RenderOpenOnly, 混合段, 丢弃 frozen
 func TestRenderOpenOnly_MixDropsFrozen(t *testing.T) {
 	bs := TimelineRenderableBlocks{
-		&TimelineReducerBlock{ReducerKeyID: 1, Text: "reducer-frozen"},
+		&TimelineCompressedHeadBlock{CoveredEndItemID: 1, Version: 1, Text: "reducer-frozen"},
 		&fakeFrozenInterval{nonce: "b3t100", body: "frozen-A"},
 		&fakeOpenInterval{nonce: "b3t300", body: "open-tail"},
 	}
@@ -690,7 +690,7 @@ func TestRenderOpenOnly_MixDropsFrozen(t *testing.T) {
 // 关键词: RenderFrozenOnly, RenderOpenOnly, 与 Render 一致
 func TestRenderFrozenOpen_Recombines(t *testing.T) {
 	bs := TimelineRenderableBlocks{
-		&TimelineReducerBlock{ReducerKeyID: 1, Text: "R"},
+		&TimelineCompressedHeadBlock{CoveredEndItemID: 1, Version: 1, Text: "R"},
 		&fakeFrozenInterval{nonce: "b3t100", body: "F"},
 		&fakeOpenInterval{nonce: "b3t999", body: "O"},
 	}

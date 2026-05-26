@@ -25,7 +25,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/linktable"
 
 	"github.com/yaklang/yaklang/common/ai/ytoken"
 )
@@ -67,15 +66,9 @@ func (m *Timeline) findCompressSplitByRecentKeepTokens(keepTokens int64) int {
 	if m == nil || m.idToTimelineItem == nil {
 		return 0
 	}
-	total := m.idToTimelineItem.Len()
+	activeIDs := m.getActiveTimelineItemIDs()
+	total := len(activeIDs)
 	if total <= 1 {
-		return 0
-	}
-
-	// 关键词: idToTimelineItem.Keys, id 升序, 反向遍历
-	ids := m.idToTimelineItem.Keys()
-	if len(ids) != total {
-		// 防御性: Keys() 应与 Len() 一致
 		return 0
 	}
 
@@ -86,8 +79,8 @@ func (m *Timeline) findCompressSplitByRecentKeepTokens(keepTokens int64) int {
 
 	var acc int64
 	// 从最新端（数组尾部）向前累加 token
-	for i := len(ids) - 1; i >= 0; i-- {
-		id := ids[i]
+	for i := len(activeIDs) - 1; i >= 0; i-- {
+		id := activeIDs[i]
 		item, ok := m.idToTimelineItem.Get(id)
 		if !ok || item == nil {
 			continue
@@ -114,7 +107,8 @@ func (m *Timeline) compressForSizeLimit() {
 		return
 	}
 
-	total := m.idToTimelineItem.Len()
+	activeIDs := m.getActiveTimelineItemIDs()
+	total := len(activeIDs)
 	if total <= 1 {
 		return // 不能压缩到少于1个项目
 	}
@@ -149,14 +143,9 @@ func (m *Timeline) compressForSizeLimit() {
 	}
 
 	// 按 id 升序收集 toCompress / recentKeep 切片
-	ids := m.idToTimelineItem.Keys()
-	if len(ids) != total {
-		log.Warnf("compressForSizeLimit: ids length %d != total %d, skip", len(ids), total)
-		return
-	}
 	var toCompress []*TimelineItem
 	var recentKeep []*TimelineItem
-	for i, id := range ids {
+	for i, id := range activeIDs {
 		item, ok := m.idToTimelineItem.Get(id)
 		if !ok || item == nil {
 			continue
@@ -217,7 +206,7 @@ func (m *Timeline) batchCompressOldestWithRecent(toCompress []*TimelineItem, rec
 		return
 	}
 
-	total := int64(m.idToTimelineItem.Len())
+	total := int64(len(m.getActiveTimelineItemIDs()))
 	if total <= 1 {
 		return
 	}
@@ -252,7 +241,7 @@ func (m *Timeline) batchCompressOldestWithRecent(toCompress []*TimelineItem, rec
 
 	// 生成压缩提示（双段：RECENT_KEEP + ITEMS_TO_COMPRESS）
 	nonceStr := utils.RandStringBytes(4)
-	prompt := m.renderBatchCompressPrompt(toCompress, recentKeep, nonceStr)
+	prompt := m.renderBatchCompressPrompt(m.compressedHead, toCompress, recentKeep, nonceStr)
 	if prompt == "" {
 		// If prompt is empty, fall back to emergency compress
 		log.Warnf("batch compress: prompt is empty, falling back to emergency compress")
@@ -327,23 +316,17 @@ func (m *Timeline) batchCompressOldestWithRecent(toCompress []*TimelineItem, rec
 		return
 	}
 
-	// 存储压缩结果
+	// 存储压缩结果（单有效压缩段）
 	lastCompressedId := idsToRemove[len(idsToRemove)-1]
-	// 关键词: batchCompressOldestWithRecent, reducerTs, 缓存稳定
-	// 在删除 idToTs 之前先获取最末压缩 item 的原始 ts，写入 reducerTs
-	// 这样 DumpBefore / GroupByMinutes 渲染 reducer 行时能拿到稳定时间，避免 time.Now() 漂移
 	var lastCompressedTs int64
 	if ts, ok := m.idToTs.Get(lastCompressedId); ok {
 		lastCompressedTs = ts
 	}
-	if lt, ok := m.reducers.Get(lastCompressedId); ok {
-		lt.Push(compressedMemory)
-	} else {
-		m.reducers.Set(lastCompressedId, linktable.NewUnlimitedStringLinkTable(compressedMemory))
-	}
-	if lastCompressedTs > 0 {
-		m.reducerTs.Set(lastCompressedId, lastCompressedTs)
-	}
+	m.updateCompressedHead(&TimelineCompressedHead{
+		Text:             strings.TrimSpace(compressedMemory),
+		CoveredEndItemID: lastCompressedId,
+		CoveredEndAtMs:   lastCompressedTs,
+	})
 	m.attachArchiveRef(lastCompressedId, m.archiveForgottenBatch(
 		TimelineArchiveReasonBatchCompress,
 		lastCompressedId,
@@ -353,12 +336,10 @@ func (m *Timeline) batchCompressOldestWithRecent(toCompress []*TimelineItem, rec
 	))
 	log.Infof("batch compressed %d items into reducer at id: %v", len(toCompress), lastCompressedId)
 
-	// 删除被压缩的 items
+	// 标记被压缩的 items 为非活跃
 	for _, id := range idsToRemove {
-		m.idToTimelineItem.Delete(id)
-		if ts, ok := m.idToTs.Get(id); ok {
-			m.tsToTimelineItem.Delete(ts)
-			m.idToTs.Delete(id)
+		if item, ok := m.idToTimelineItem.Get(id); ok && item != nil {
+			item.deleted = true
 		}
 	}
 }
@@ -386,7 +367,7 @@ var timelineBatchCompress string
 //	ITEMS_TO_COMPRESS <= MaxBatchCompressPromptSize - actualRecentSize（再填，按时间顺序最旧到次新）
 //
 // 关键词: renderBatchCompressPrompt, RECENT_KEEP, ITEMS_TO_COMPRESS, prompt 预算分配
-func (m *Timeline) renderBatchCompressPrompt(toCompress []*TimelineItem, recentKeep []*TimelineItem, nonceStr string) string {
+func (m *Timeline) renderBatchCompressPrompt(currentHead *TimelineCompressedHead, toCompress []*TimelineItem, recentKeep []*TimelineItem, nonceStr string) string {
 	if len(toCompress) == 0 {
 		return ""
 	}
@@ -436,19 +417,68 @@ func (m *Timeline) renderBatchCompressPrompt(toCompress []*TimelineItem, recentK
 	}
 
 	err = ins.Execute(&buf, map[string]any{
-		"ExtraMetaInfo":   m.ExtraMetaInfo(),
-		"RecentKept":      recentStr,
-		"RecentKeptCount": recentCount,
-		"HasRecentKept":   recentCount > 0,
-		"ItemsToCompress": itemsStr,
-		"ItemCount":       actualItemCount,
-		"NONCE":           nonce,
+		"ExtraMetaInfo":      m.ExtraMetaInfo(),
+		"RecentKept":         recentStr,
+		"RecentKeptCount":    recentCount,
+		"HasRecentKept":      recentCount > 0,
+		"ItemsToCompress":    itemsStr,
+		"ItemCount":          actualItemCount,
+		"HasCompressedHead":  currentHead != nil && strings.TrimSpace(currentHead.Text) != "",
+		"CompressedHeadText": compressedHeadText(currentHead),
+		"CompressedHeadID":   compressedHeadCoveredID(currentHead),
+		"CompressedHeadAtMs": compressedHeadCoveredAtMs(currentHead),
+		"CompressedHeadVer":  compressedHeadVersion(currentHead),
+		"NONCE":              nonce,
 	})
 	if err != nil {
 		log.Errorf("BUG: batch compress prompt execution failed: %v", err)
 		return ""
 	}
 	return buf.String()
+}
+
+func (m *Timeline) getActiveTimelineItemIDs() []int64 {
+	if m == nil || m.idToTimelineItem == nil {
+		return nil
+	}
+	ids := m.idToTimelineItem.Keys()
+	out := make([]int64, 0, len(ids))
+	for _, id := range ids {
+		item, ok := m.idToTimelineItem.Get(id)
+		if !ok || item == nil || item.deleted {
+			continue
+		}
+		out = append(out, id)
+	}
+	return out
+}
+
+func compressedHeadText(head *TimelineCompressedHead) string {
+	if head == nil {
+		return ""
+	}
+	return strings.TrimSpace(head.Text)
+}
+
+func compressedHeadCoveredID(head *TimelineCompressedHead) int64 {
+	if head == nil {
+		return 0
+	}
+	return head.CoveredEndItemID
+}
+
+func compressedHeadCoveredAtMs(head *TimelineCompressedHead) int64 {
+	if head == nil {
+		return 0
+	}
+	return head.CoveredEndAtMs
+}
+
+func compressedHeadVersion(head *TimelineCompressedHead) int64 {
+	if head == nil {
+		return 0
+	}
+	return head.Version
 }
 
 // buildRecentKeptString 从最新向旧填充 recentKeep 段，受 budget 字节上限约束

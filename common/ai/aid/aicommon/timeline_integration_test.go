@@ -6,7 +6,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/utils/linktable"
 )
 
 // TestTimelineIntegration_CompressSerializeRestore 测试完整的压缩-序列化-恢复-重分配流程
@@ -40,7 +39,11 @@ func TestTimelineIntegration_CompressSerializeRestore(t *testing.T) {
 
 	compressedSummary := "Compressed summary of 60 items"
 	lastCompressedID := idsToCompress[len(idsToCompress)-1]
-	originalTimeline.reducers.Set(lastCompressedID, linktable.NewUnlimitedStringLinkTable(compressedSummary))
+	originalTimeline.compressedHead = &TimelineCompressedHead{
+		Text:             compressedSummary,
+		CoveredEndItemID: lastCompressedID,
+		Version:          1,
+	}
 
 	// 删除被压缩的条目
 	for _, id := range idsToCompress {
@@ -52,7 +55,7 @@ func TestTimelineIntegration_CompressSerializeRestore(t *testing.T) {
 	}
 
 	require.Equal(t, 40, originalTimeline.idToTimelineItem.Len())
-	require.Equal(t, 1, originalTimeline.reducers.Len())
+	require.NotNil(t, originalTimeline.compressedHead)
 
 	// 第三步：序列化
 	serialized, err := MarshalTimeline(originalTimeline)
@@ -68,7 +71,7 @@ func TestTimelineIntegration_CompressSerializeRestore(t *testing.T) {
 
 	// 验证恢复的数据
 	require.Equal(t, 40, restoredTimeline.idToTimelineItem.Len(), "Should have 40 items")
-	require.Equal(t, 1, restoredTimeline.reducers.Len(), "Should have 1 reducer")
+	require.NotNil(t, restoredTimeline.compressedHead, "Should have compressed head")
 
 	// 验证被压缩的条目确实不在恢复的 timeline 中
 	for _, id := range idsToCompress {
@@ -76,10 +79,8 @@ func TestTimelineIntegration_CompressSerializeRestore(t *testing.T) {
 		require.False(t, exists, "Compressed ID %d should not exist", id)
 	}
 
-	// 验证 reducer 被正确恢复
-	reducer, exists := restoredTimeline.reducers.Get(lastCompressedID)
-	require.True(t, exists)
-	require.Equal(t, compressedSummary, reducer.Value())
+	require.Equal(t, compressedSummary, restoredTimeline.compressedHead.Text)
+	require.Equal(t, lastCompressedID, restoredTimeline.compressedHead.CoveredEndItemID)
 
 	// 第五步：重新分配 ID（模拟 persistent session 恢复）
 	var idCounter int64 = 1000
@@ -157,7 +158,11 @@ func TestTimelineIntegration_MultipleSessionRestores(t *testing.T) {
 		idsToCompress = append(idsToCompress, i)
 	}
 
-	restored1.reducers.Set(30, linktable.NewUnlimitedStringLinkTable("Compressed"))
+	restored1.compressedHead = &TimelineCompressedHead{
+		Text:             "Compressed",
+		CoveredEndItemID: 30,
+		Version:          1,
+	}
 	for _, id := range idsToCompress {
 		if ts, ok := restored1.idToTs.Get(id); ok {
 			restored1.tsToTimelineItem.Delete(ts)
@@ -217,10 +222,10 @@ func TestTimelineIntegration_LargeScaleCompression(t *testing.T) {
 		idsToCompress = append(idsToCompress, i)
 	}
 
-	// 每100个创建一个 reducer
-	for i := 0; i < 9; i++ {
-		endID := int64((i + 1) * 100)
-		timeline.reducers.Set(endID, linktable.NewUnlimitedStringLinkTable("Compressed batch"))
+	timeline.compressedHead = &TimelineCompressedHead{
+		Text:             "Compressed batch",
+		CoveredEndItemID: 900,
+		Version:          1,
 	}
 
 	// 删除被压缩的条目
@@ -233,7 +238,7 @@ func TestTimelineIntegration_LargeScaleCompression(t *testing.T) {
 	}
 
 	require.Equal(t, 100, timeline.idToTimelineItem.Len())
-	require.Equal(t, 9, timeline.reducers.Len())
+	require.NotNil(t, timeline.compressedHead)
 
 	// 序列化
 	serialized, err := MarshalTimeline(timeline)
@@ -246,7 +251,7 @@ func TestTimelineIntegration_LargeScaleCompression(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, 100, restored.idToTimelineItem.Len())
-	require.Equal(t, 9, restored.reducers.Len())
+	require.NotNil(t, restored.compressedHead)
 
 	// 验证被压缩的条目不存在
 	for i := int64(1); i <= 900; i++ {
@@ -310,7 +315,11 @@ func TestTimelineIntegration_EmptyToCompressed(t *testing.T) {
 		idsToCompress = append(idsToCompress, i)
 	}
 
-	restored1.reducers.Set(150, linktable.NewUnlimitedStringLinkTable("Large compression"))
+	restored1.compressedHead = &TimelineCompressedHead{
+		Text:             "Large compression",
+		CoveredEndItemID: 150,
+		Version:          1,
+	}
 	for _, id := range idsToCompress {
 		if ts, ok := restored1.idToTs.Get(id); ok {
 			restored1.tsToTimelineItem.Delete(ts)
@@ -332,7 +341,7 @@ func TestTimelineIntegration_EmptyToCompressed(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, 50, restored2.idToTimelineItem.Len())
-	require.Equal(t, 1, restored2.reducers.Len())
+	require.NotNil(t, restored2.compressedHead)
 
 	// 重新分配 ID
 	idCounter = 5000

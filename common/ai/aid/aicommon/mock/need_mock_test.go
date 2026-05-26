@@ -18,17 +18,17 @@ import (
 
 // 关键词: countActiveTimelineItems, aitag dump 计数
 // 新 Dump 走 GroupByMinutes —— 每个活跃 item 渲染为 "HH:MM:SS [type/verbose]" 行头
-// 这里只统计活跃区（tool / user / text）行头，不计入 reducer block 的 "[reducer/memory]"
+// 这里只统计活跃区（tool / user / text）行头，不计入 compressed head block 的 "[compressed/head]"
 var activeTimelineItemRe = regexp.MustCompile(`(?m)^\d{2}:\d{2}:\d{2} \[(tool|user|text)/`)
 
 func countActiveTimelineItems(dump string) int {
 	return len(activeTimelineItemRe.FindAllString(dump, -1))
 }
 
-// hasTimelineReducer 判断 Dump 输出中是否包含 reducer block
-// 新格式下 reducer block 由 "[reducer/memory]" 标记
+// hasTimelineReducer 判断 Dump 输出中是否包含 compressed head block
+// 新格式下 compressed head 由 "[compressed/head]" 标记
 func hasTimelineReducer(dump string) bool {
-	return strings.Contains(dump, "[reducer/memory]")
+	return strings.Contains(dump, "[compressed/head]")
 }
 
 type mockedAI struct {
@@ -362,7 +362,7 @@ func TestCompressionRatio(t *testing.T) {
 
 	// 计算压缩前后的项目数
 	totalItems := countActiveTimelineItems(result)
-	compressionResults := strings.Count(result, "[reducer/memory]")
+	compressionResults := strings.Count(result, "[compressed/head]")
 
 	// 应该有显著的压缩效果
 	require.True(t, compressionResults > 0 || totalItems < 150, "Should have compression results")
@@ -437,7 +437,7 @@ func TestCompressionWithDifferentSizes(t *testing.T) {
 
 	// 计算最终的项目数
 	totalItems := countActiveTimelineItems(result)
-	compressionCount := strings.Count(result, "[reducer/memory]")
+	compressionCount := strings.Count(result, "[compressed/head]")
 
 	// 应该有合理的压缩效果
 	require.True(t, compressionCount > 0, "Should have compression")

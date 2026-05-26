@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aitag"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/utils/linktable"
 )
 
 // TestDumpBefore_ReducerTimeStable 验证 Dump 中 reducer block 使用稳定时间戳，多次调用字节级一致
@@ -28,8 +27,12 @@ func TestDumpBefore_ReducerTimeStable(t *testing.T) {
 	// 模拟批量压缩后只剩 reducer + 部分活跃条目
 	reducerKey := int64(2)
 	reducerTs := baseTs.UnixMilli()
-	tl.reducers.Set(reducerKey, linktable.NewUnlimitedStringLinkTable("compressed batch memory"))
-	tl.reducerTs.Set(reducerKey, reducerTs)
+	tl.compressedHead = &TimelineCompressedHead{
+		Text:             "compressed batch memory",
+		CoveredEndItemID: reducerKey,
+		CoveredEndAtMs:   reducerTs,
+		Version:          7,
+	}
 
 	dump1 := tl.Dump()
 	require.NotEmpty(t, dump1)
@@ -41,10 +44,10 @@ func TestDumpBefore_ReducerTimeStable(t *testing.T) {
 	require.Equal(t, dump1, dump2, "Dump reducer block MUST be byte-identical across consecutive calls")
 
 	// 必须使用基于 reducerTs 派生的稳定 unix 秒戳作为 nonce 与首行 ts
-	expectedNonce := fmt.Sprintf("r%dt%d", reducerKey, reducerTs/1000)
-	require.Contains(t, dump1, "<|TIMELINE_"+expectedNonce+"|>", "reducer block aitag wrapper should use stable nonce derived from reducerTs")
-	require.Contains(t, dump1, fmt.Sprintf("# reducer key=%d ts=%d", reducerKey, reducerTs/1000), "reducer block first line should include stable unix timestamp")
-	require.Contains(t, dump1, "[reducer/memory]")
+	expectedNonce := fmt.Sprintf("h%dv7", reducerTs/1000)
+	require.Contains(t, dump1, "<|TIMELINE_"+expectedNonce+"|>", "compressed head block aitag wrapper should use stable nonce")
+	require.Contains(t, dump1, fmt.Sprintf("# compressed_head covered_end_item_id=%d covered_end_at_ms=%d version=%d", reducerKey, reducerTs, int64(7)))
+	require.Contains(t, dump1, "[compressed/head]")
 	require.Contains(t, dump1, "compressed batch memory")
 }
 
@@ -59,7 +62,12 @@ func TestDumpBefore_ReducerNoLegacyNow(t *testing.T) {
 
 	// 仅设置 reducers，不设置 reducerTs（模拟老数据）
 	reducerKey := int64(1)
-	tl.reducers.Set(reducerKey, linktable.NewUnlimitedStringLinkTable("legacy memory"))
+	tl.compressedHead = &TimelineCompressedHead{
+		Text:             "legacy memory",
+		CoveredEndItemID: reducerKey,
+		CoveredEndAtMs:   0,
+		Version:          1,
+	}
 
 	dump1 := tl.Dump()
 	time.Sleep(50 * time.Millisecond)
@@ -67,9 +75,9 @@ func TestDumpBefore_ReducerNoLegacyNow(t *testing.T) {
 
 	require.Equal(t, dump1, dump2, "Dump must remain stable even when reducerTs is missing")
 	// 老数据 fallback：使用 ts=0 占位，aitag nonce 为 r<id>t0，行头时间为 00:00:00
-	require.Contains(t, dump1, fmt.Sprintf("<|TIMELINE_r%dt0|>", reducerKey))
-	require.Contains(t, dump1, fmt.Sprintf("# reducer key=%d ts=0", reducerKey))
-	require.Contains(t, dump1, "00:00:00 [reducer/memory]")
+	require.Contains(t, dump1, "<|TIMELINE_h0v1|>")
+	require.Contains(t, dump1, fmt.Sprintf("# compressed_head covered_end_item_id=%d covered_end_at_ms=0 version=1", reducerKey))
+	require.Contains(t, dump1, "[compressed/head]")
 	require.Contains(t, dump1, "legacy memory")
 }
 
@@ -80,47 +88,50 @@ func TestGroupByMinutes_ReducerBlock_Basic(t *testing.T) {
 	baseTs := time.Date(2024, 6, 1, 10, 30, 0, 0, time.UTC)
 	injectTimelineItem(tl, int64(1), baseTs.Add(time.Second), makeToolResult(1, "ls", true, "ok"))
 
-	tl.reducers.Set(int64(101), linktable.NewUnlimitedStringLinkTable("reducer text alpha"))
-	tl.reducerTs.Set(int64(101), baseTs.UnixMilli())
-	tl.reducers.Set(int64(102), linktable.NewUnlimitedStringLinkTable("reducer text beta"))
-	tl.reducerTs.Set(int64(102), baseTs.Add(2*time.Minute).UnixMilli())
+	tl.compressedHead = &TimelineCompressedHead{
+		Text:             "reducer text alpha",
+		CoveredEndItemID: 101,
+		CoveredEndAtMs:   baseTs.UnixMilli(),
+		Version:          2,
+	}
 
 	g := tl.GroupByMinutes(3)
 	require.NotNil(t, g)
 
-	rbs := g.GetReducerBlocks()
-	require.Len(t, rbs, 2)
-	// 按 ReducerKeyID 升序排列
-	require.Equal(t, int64(101), rbs[0].ReducerKeyID)
-	require.Equal(t, int64(102), rbs[1].ReducerKeyID)
-
-	body0 := rbs[0].Render()
+	all := g.GetAllRenderable()
+	require.GreaterOrEqual(t, len(all), 2)
+	hb, ok := all[0].(*TimelineCompressedHeadBlock)
+	require.True(t, ok)
+	require.Equal(t, int64(101), hb.CoveredEndItemID)
+	require.Equal(t, int64(2), hb.Version)
+	body0 := hb.Render()
 	require.Contains(t, body0, "reducer text alpha")
-	require.Contains(t, body0, "[reducer/memory]")
-	require.Contains(t, body0, "# reducer key=101 ts=")
+	require.Contains(t, body0, "[compressed/head]")
+	require.Contains(t, body0, "# compressed_head covered_end_item_id=101")
 }
 
 // TestGroupByMinutes_ReducerBlock_NonceStable 验证 reducer block 的 nonce 稳定且 aitag 兼容
 // 关键词: TimelineReducerBlock.StableNonce, aitag 兼容
 func TestGroupByMinutes_ReducerBlock_NonceStable(t *testing.T) {
 	ts := time.Date(2024, 6, 1, 10, 30, 0, 0, time.UTC)
-	rb := &TimelineReducerBlock{
-		ReducerKeyID: 42,
-		Ts:           ts,
-		Text:         "memory body",
+	rb := &TimelineCompressedHeadBlock{
+		CoveredEndItemID: 42,
+		CoveredEndAtMs:   ts.UnixMilli(),
+		Version:          9,
+		Text:             "memory body",
 	}
 	n1 := rb.StableNonce()
 	n2 := rb.StableNonce()
 	require.Equal(t, n1, n2)
 	require.NotContains(t, n1, "_", "nonce must not contain '_' to keep aitag tagName boundary correct")
-	require.Equal(t, "r42t1717237800", n1)
+	require.Equal(t, "h1717237800v9", n1)
 
 	// IsOpen 恒为 false
 	require.False(t, rb.IsOpen())
 
 	// 老数据：Ts 为零时仍稳定
-	rb2 := &TimelineReducerBlock{ReducerKeyID: 42, Text: "memory body"}
-	require.Equal(t, "r42t0", rb2.StableNonce())
+	rb2 := &TimelineCompressedHeadBlock{CoveredEndItemID: 42, Text: "memory body", Version: 1}
+	require.Equal(t, "h0v1", rb2.StableNonce())
 	require.False(t, rb2.IsOpen())
 }
 
@@ -132,8 +143,12 @@ func TestGroupByMinutes_ReducerBlock_AITagSplit(t *testing.T) {
 	injectTimelineItem(tl, int64(1), baseTs.Add(1*time.Second), makeToolResult(1, "ls", true, "out-1"))
 	injectTimelineItem(tl, int64(2), baseTs.Add(4*time.Minute), makeToolResult(2, "cat", true, "out-2"))
 
-	tl.reducers.Set(int64(50), linktable.NewUnlimitedStringLinkTable("reducer alpha"))
-	tl.reducerTs.Set(int64(50), baseTs.Add(-5*time.Minute).UnixMilli())
+	tl.compressedHead = &TimelineCompressedHead{
+		Text:             "reducer alpha",
+		CoveredEndItemID: 50,
+		CoveredEndAtMs:   baseTs.Add(-5 * time.Minute).UnixMilli(),
+		Version:          3,
+	}
 
 	g := tl.GroupByMinutes(3)
 	all := g.GetAllRenderable()
@@ -157,8 +172,12 @@ func TestGroupByMinutes_ReducerBlock_PrefixStability(t *testing.T) {
 	baseTs := time.Date(2024, 6, 1, 10, 30, 0, 0, time.UTC)
 	injectTimelineItem(tl, int64(1), baseTs.Add(1*time.Second), makeToolResult(1, "ls", true, "out-1"))
 	injectTimelineItem(tl, int64(2), baseTs.Add(4*time.Minute), makeToolResult(2, "cat", true, "out-2"))
-	tl.reducers.Set(int64(50), linktable.NewUnlimitedStringLinkTable("reducer alpha"))
-	tl.reducerTs.Set(int64(50), baseTs.Add(-5*time.Minute).UnixMilli())
+	tl.compressedHead = &TimelineCompressedHead{
+		Text:             "reducer alpha",
+		CoveredEndItemID: 50,
+		CoveredEndAtMs:   baseTs.Add(-5 * time.Minute).UnixMilli(),
+		Version:          3,
+	}
 
 	g1 := tl.GroupByMinutes(3)
 	g2 := tl.GroupByMinutes(3)
@@ -186,25 +205,27 @@ func TestSummaryFieldRemoved_BackwardCompat(t *testing.T) {
 	for i := int64(1); i <= 2; i++ {
 		tl.PushToolResult(makeToolResult(i, "tool", true, "data"))
 	}
-	tl.reducers.Set(int64(101), linktable.NewUnlimitedStringLinkTable("memory"))
-	tl.reducerTs.Set(int64(101), int64(1700000000000))
+	tl.compressedHead = &TimelineCompressedHead{
+		Text:             "memory",
+		CoveredEndItemID: 101,
+		CoveredEndAtMs:   int64(1700000000000),
+		Version:          2,
+	}
 
 	out, err := MarshalTimeline(tl)
 	require.NoError(t, err)
 	// 新数据中不应有 summary 字段
 	require.NotContains(t, out, "\"summary\":", "MarshalTimeline must not emit summary field anymore")
-	require.Contains(t, out, "\"reducer_ts\":")
+	require.Contains(t, out, "\"compressed_head\":")
 
 	// 模拟老数据 JSON：包含 summary 字段
-	legacy := strings.Replace(out, "\"reducer_ts\":", "\"summary\":{\"999\":{\"id\":999}},\"reducer_ts\":", 1)
+	legacy := strings.Replace(out, "\"compressed_head\":", "\"summary\":{\"999\":{\"id\":999}},\"compressed_head\":", 1)
 	tl2, err := UnmarshalTimeline(legacy)
 	require.NoError(t, err, "Unmarshal must tolerate legacy summary field")
 	require.NotNil(t, tl2)
-	// 反序列化后 reducers 与 reducerTs 仍应正常恢复
-	require.Equal(t, 1, tl2.reducers.Len())
-	gotTs, ok := tl2.reducerTs.Get(int64(101))
-	require.True(t, ok)
-	require.Equal(t, int64(1700000000000), gotTs)
+	require.NotNil(t, tl2.compressedHead)
+	require.Equal(t, int64(101), tl2.compressedHead.CoveredEndItemID)
+	require.Equal(t, int64(1700000000000), tl2.compressedHead.CoveredEndAtMs)
 }
 
 // 关键词: ToolResult 占位避免 import 警告（commonPrefixLen 在 timeline_groups_render_aitag_test.go 已定义，本文件复用）

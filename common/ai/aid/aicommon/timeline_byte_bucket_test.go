@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/utils/linktable"
 )
 
 // 关键词: byte bucket, 字节子桶测试
@@ -108,8 +107,12 @@ func TestByteBucket_StableUnderManualReducer(t *testing.T) {
 	injectTimelineItem(tl, 10, base.Add(30*time.Second), makeToolResult(10, "keep", true, "stable-a"))
 	injectTimelineItem(tl, 11, base.Add(4*time.Minute), makeToolResult(11, "tail", true, "tail-b"))
 
-	tl.reducers.Set(5, linktable.NewUnlimitedStringLinkTable("reducer-summary-line"))
-	tl.reducerTs.Set(5, base.Add(1*time.Minute).UnixMilli())
+	tl.compressedHead = &TimelineCompressedHead{
+		Text:             "reducer-summary-line",
+		CoveredEndItemID: 5,
+		CoveredEndAtMs:   base.Add(1 * time.Minute).UnixMilli(),
+		Version:          1,
+	}
 
 	r1 := tl.GroupByMinutesAndBytes(3, 8000).GetBlocks()[1].Render()
 

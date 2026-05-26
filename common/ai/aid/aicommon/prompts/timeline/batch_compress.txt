@@ -21,6 +21,16 @@
 <|RECENT_KEEP_END_{{ .NONCE }}|>
 {{ end }}
 
+{{ if .HasCompressedHead }}
+# 当前唯一有效压缩段（这部分是"截至 covered_end_at_ms 之前"的历史摘要，请与 ITEMS_TO_COMPRESS 一并重算为新的唯一压缩段）
+<|CURRENT_COMPRESSED_HEAD_{{ .NONCE }}|>
+covered_end_item_id={{ .CompressedHeadID }}
+covered_end_at_ms={{ .CompressedHeadAtMs }}
+version={{ .CompressedHeadVer }}
+{{ .CompressedHeadText }}
+<|CURRENT_COMPRESSED_HEAD_END_{{ .NONCE }}|>
+{{ end }}
+
 # 需要你压缩的过去步骤
 <|ITEMS_TO_COMPRESS_{{ .NONCE }}|>
 {{ .ItemsToCompress }}
