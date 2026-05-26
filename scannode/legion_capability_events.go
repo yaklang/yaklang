@@ -283,7 +283,7 @@ func (p *capabilityEventPublisher) publish(
 	if _, err := js.PublishMsg(msg, nats.MsgId(eventID)); err != nil {
 		return fmt.Errorf("publish capability event %s: %w", eventType, err)
 	}
-	if eventType == "hids.observation" {
+	if eventType == "hids.observation" || eventType == legionEventCapabilityAlert {
 		log.Debugf("published legion capability event: type=%s capability=%s", eventType, ref.CapabilityKey)
 		return nil
 	}

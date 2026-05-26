@@ -67,10 +67,20 @@ func executeProcessTerminate(
 
 	proc, err := gopsprocess.NewProcessWithContext(ctx, int32(target.PID))
 	if err != nil {
+		if errors.Is(err, gopsprocess.ErrorProcessNotRunning) {
+			return hidsResponseActionExecutionResult{
+				ObservedAt: now,
+				Process:    target,
+			}, ErrHIDSResponseActionProcessNotFound
+		}
 		return hidsResponseActionExecutionResult{
 			ObservedAt: now,
 			Process:    target,
-		}, ErrHIDSResponseActionProcessNotFound
+			DetailJSON: mustMarshalHIDSResponseActionJSON(map[string]any{
+				"stage": "resolve_process",
+				"error": err.Error(),
+			}),
+		}, fmt.Errorf("%w: %v", ErrHIDSResponseActionProcessStateQueryFailed, err)
 	}
 	current, err := loadCurrentResponseActionProcess(ctx, proc, target.BootID)
 	if err != nil {
@@ -102,10 +112,7 @@ func executeProcessTerminate(
 	}
 	terminated, waitErr := waitForProcessExit(ctx, proc, responseActionTerminateWait)
 	if waitErr != nil {
-		return hidsResponseActionExecutionResult{
-			ObservedAt: time.Now().UTC(),
-			Process:    current,
-		}, waitErr
+		return buildResponseActionWaitFailureResult(current, []string{"SIGTERM"}, waitErr)
 	}
 	if terminated {
 		return hidsResponseActionExecutionResult{
@@ -130,10 +137,7 @@ func executeProcessTerminate(
 	}
 	killed, waitErr := waitForProcessExit(ctx, proc, responseActionKillWait)
 	if waitErr != nil {
-		return hidsResponseActionExecutionResult{
-			ObservedAt: time.Now().UTC(),
-			Process:    current,
-		}, waitErr
+		return buildResponseActionWaitFailureResult(current, []string{"SIGTERM", "SIGKILL"}, waitErr)
 	}
 	if !killed {
 		return hidsResponseActionExecutionResult{
@@ -164,7 +168,13 @@ func loadCurrentResponseActionProcess(
 		return hidsResponseActionProcess{}, ErrHIDSResponseActionProcessNotFound
 	}
 	startTimeUnixMillis, err := process.CreateTimeWithContext(ctx)
-	if err != nil || startTimeUnixMillis <= 0 {
+	if errors.Is(err, gopsprocess.ErrorProcessNotRunning) {
+		return hidsResponseActionProcess{}, ErrHIDSResponseActionProcessNotFound
+	}
+	if err != nil {
+		return hidsResponseActionProcess{}, fmt.Errorf("%w: %v", ErrHIDSResponseActionProcessStateQueryFailed, err)
+	}
+	if startTimeUnixMillis <= 0 {
 		return hidsResponseActionProcess{}, ErrHIDSResponseActionProcessNotFound
 	}
 	name, _ := process.NameWithContext(ctx)
@@ -235,6 +245,32 @@ func isProcessEffectivelyRunning(
 		}
 	}
 	return true, nil
+}
+
+func buildResponseActionWaitFailureResult(
+	process hidsResponseActionProcess,
+	strategy []string,
+	err error,
+) (hidsResponseActionExecutionResult, error) {
+	detail := map[string]any{
+		"stage":    "wait_for_exit",
+		"strategy": strategy,
+		"error":    err.Error(),
+	}
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		detail["reason"] = "process_wait_interrupted"
+		return hidsResponseActionExecutionResult{
+			ObservedAt: time.Now().UTC(),
+			Process:    process,
+			DetailJSON: mustMarshalHIDSResponseActionJSON(detail),
+		}, fmt.Errorf("%w: %v", ErrHIDSResponseActionWaitInterrupted, err)
+	}
+	detail["reason"] = "process_state_query_failed"
+	return hidsResponseActionExecutionResult{
+		ObservedAt: time.Now().UTC(),
+		Process:    process,
+		DetailJSON: mustMarshalHIDSResponseActionJSON(detail),
+	}, fmt.Errorf("%w: %v", ErrHIDSResponseActionProcessStateQueryFailed, err)
 }
 
 func readCurrentBootID() string {

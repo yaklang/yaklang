@@ -10,7 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak"
 )
 
-type temporaryRuleActionResult struct {
+type customRuleActionResult struct {
 	Title            string
 	Severity         string
 	Tags             []string
@@ -31,41 +31,41 @@ func validateActionExpression(
 	if err != nil {
 		return err
 	}
-	result, err := parseTemporaryRuleActionResult(raw)
+	result, err := parseCustomRuleActionResult(raw)
 	if err != nil {
 		return err
 	}
-	return validateTemporaryRuleEvidenceRequestExpressions(sandbox, result.EvidenceRequests)
+	return validateCustomRuleEvidenceRequestExpressions(sandbox, result.EvidenceRequests)
 }
 
-func parseTemporaryRuleActionResult(raw any) (temporaryRuleActionResult, error) {
+func parseCustomRuleActionResult(raw any) (customRuleActionResult, error) {
 	if raw == nil {
-		return temporaryRuleActionResult{}, nil
+		return customRuleActionResult{}, nil
 	}
 
 	values := helperGeneralMap(raw)
 	if len(values) == 0 {
-		return temporaryRuleActionResult{}, fmt.Errorf("action must return an object")
+		return customRuleActionResult{}, fmt.Errorf("action must return an object")
 	}
 
-	severity, err := parseTemporaryRuleActionSeverity(values["severity"])
+	severity, err := parseCustomRuleActionSeverity(values["severity"])
 	if err != nil {
-		return temporaryRuleActionResult{}, err
+		return customRuleActionResult{}, err
 	}
-	detail, err := parseTemporaryRuleActionDetail(values["detail"])
+	detail, err := parseCustomRuleActionDetail(values["detail"])
 	if err != nil {
-		return temporaryRuleActionResult{}, err
+		return customRuleActionResult{}, err
 	}
-	evidenceRequests, err := parseTemporaryRuleEvidenceRequests(firstNonNil(
+	evidenceRequests, err := parseCustomRuleEvidenceRequests(firstNonNil(
 		values["evidence_requests"],
 		values["evidence_request"],
 		values["evidence"],
 	))
 	if err != nil {
-		return temporaryRuleActionResult{}, err
+		return customRuleActionResult{}, err
 	}
 
-	return temporaryRuleActionResult{
+	return customRuleActionResult{
 		Title:            strings.TrimSpace(helperStringField(values, "title")),
 		Severity:         severity,
 		Tags:             normalizeActionTags(values["tags"]),
@@ -99,7 +99,7 @@ func normalizeActionTags(value any) []string {
 	return normalized
 }
 
-func parseTemporaryRuleActionSeverity(value any) (string, error) {
+func parseCustomRuleActionSeverity(value any) (string, error) {
 	normalized := strings.ToLower(strings.TrimSpace(fmt.Sprint(firstNonNil(value, ""))))
 	switch normalized {
 	case "":
@@ -111,7 +111,7 @@ func parseTemporaryRuleActionSeverity(value any) (string, error) {
 	}
 }
 
-func parseTemporaryRuleActionDetail(value any) (map[string]any, error) {
+func parseCustomRuleActionDetail(value any) (map[string]any, error) {
 	if value == nil {
 		return nil, nil
 	}
@@ -130,7 +130,7 @@ func parseTemporaryRuleActionDetail(value any) (map[string]any, error) {
 	return cloneMapStringAny(detail), nil
 }
 
-func parseTemporaryRuleEvidenceRequests(value any) ([]map[string]any, error) {
+func parseCustomRuleEvidenceRequests(value any) ([]map[string]any, error) {
 	if value == nil {
 		return nil, nil
 	}
@@ -153,7 +153,7 @@ func parseTemporaryRuleEvidenceRequests(value any) ([]map[string]any, error) {
 
 	requests := make([]map[string]any, 0, len(items))
 	for index, item := range items {
-		request, err := parseTemporaryRuleEvidenceRequest(item)
+		request, err := parseCustomRuleEvidenceRequest(item)
 		if err != nil {
 			return nil, fmt.Errorf("evidence_requests[%d]: %w", index, err)
 		}
@@ -162,7 +162,7 @@ func parseTemporaryRuleEvidenceRequests(value any) ([]map[string]any, error) {
 	return requests, nil
 }
 
-func parseTemporaryRuleEvidenceRequest(value any) (map[string]any, error) {
+func parseCustomRuleEvidenceRequest(value any) (map[string]any, error) {
 	request := helperGeneralMap(value)
 	if len(request) == 0 {
 		return nil, fmt.Errorf("must be an object")
@@ -205,7 +205,7 @@ func parseTemporaryRuleEvidenceRequest(value any) (map[string]any, error) {
 	return normalized, nil
 }
 
-func temporaryRuleActionResultMap(result temporaryRuleActionResult) map[string]any {
+func customRuleActionResultMap(result customRuleActionResult) map[string]any {
 	actionResult := map[string]any{}
 	if result.Title != "" {
 		actionResult["title"] = result.Title
@@ -228,7 +228,7 @@ func temporaryRuleActionResultMap(result temporaryRuleActionResult) map[string]a
 	return actionResult
 }
 
-func validateTemporaryRuleEvidenceRequestExpressions(
+func validateCustomRuleEvidenceRequestExpressions(
 	sandbox *yak.Sandbox,
 	requests []map[string]any,
 ) error {
@@ -237,14 +237,14 @@ func validateTemporaryRuleEvidenceRequestExpressions(
 	}
 
 	for index, request := range requests {
-		if err := validateTemporaryRuleEvidenceRequestExpression(sandbox, request); err != nil {
+		if err := validateCustomRuleEvidenceRequestExpression(sandbox, request); err != nil {
 			return fmt.Errorf("evidence_requests[%d]: %w", index, err)
 		}
 	}
 	return nil
 }
 
-func validateTemporaryRuleEvidenceRequestExpression(
+func validateCustomRuleEvidenceRequestExpression(
 	sandbox *yak.Sandbox,
 	request map[string]any,
 ) error {
