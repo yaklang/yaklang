@@ -264,6 +264,49 @@ func TestHandleAISessionInputPublishesRuntimeEvent(t *testing.T) {
 	driver.assertInput(t, 0, "hello")
 }
 
+func TestHandleAISessionInputPublishesSyncEventPayload(t *testing.T) {
+	t.Parallel()
+
+	bridge, fakeJS, driver := newTestAISessionBridge(t)
+	if err := bridge.handleAISessionBind(context.Background(), mustMarshalProto(t, validAISessionBindCommand())); err != nil {
+		t.Fatalf("handle ai bind: %v", err)
+	}
+	resetPublishedMessages(fakeJS)
+
+	command := validAISessionInputCommand()
+	command.InputType = "sync_event"
+	command.InputJson = []byte(`{"sync_type":"recovery_plan_and_exec","sync_json_input":{"coordinator_id":"coor-1","start_task_index":"1-2"}}`)
+
+	if err := bridge.handleAISessionInput(context.Background(), mustMarshalProto(t, command)); err != nil {
+		t.Fatalf("handle ai input: %v", err)
+	}
+
+	msg := waitForPublishedMessage(t, fakeJS, 0)
+	if msg.Subject != "legion.event.ai.session.event" {
+		t.Fatalf("unexpected subject: %s", msg.Subject)
+	}
+
+	var event aiv1.AISessionEvent
+	if err := proto.Unmarshal(msg.Data, &event); err != nil {
+		t.Fatalf("unmarshal ai session event: %v", err)
+	}
+	if event.GetEventType() != aiSessionRuntimeEventInput {
+		t.Fatalf("unexpected runtime event type: %s", event.GetEventType())
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal(event.GetPayloadJson(), &payload); err != nil {
+		t.Fatalf("unmarshal payload: %v", err)
+	}
+	if payload["sync_type"] != "recovery_plan_and_exec" {
+		t.Fatalf("unexpected sync type: %#v", payload["sync_type"])
+	}
+	if _, exists := payload["input_type"]; exists {
+		t.Fatalf("sync_event payload should not be rewritten with input_type: %#v", payload)
+	}
+	driver.assertSyncEvent(t, 0, "recovery_plan_and_exec", `{"coordinator_id":"coor-1","start_task_index":"1-2"}`)
+}
+
 func TestAISessionPublisherUsesDistinctEventIDPerSequence(t *testing.T) {
 	t.Parallel()
 
@@ -761,6 +804,42 @@ func (d *recordingAISessionRuntimeDriver) assertContextReason(t *testing.T, inde
 		time.Sleep(10 * time.Millisecond)
 	}
 	t.Fatalf("timed out waiting for recorded context update at index %d", index)
+}
+
+func (d *recordingAISessionRuntimeDriver) assertSyncEvent(t *testing.T, index int, syncType string, syncJSONInput string) {
+	t.Helper()
+
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		d.mu.Lock()
+		if len(d.inputs) > index {
+			input := d.inputs[index]
+			d.mu.Unlock()
+			if input.InputType != "sync_event" {
+				t.Fatalf("unexpected recorded input type: %s", input.InputType)
+			}
+			var payload map[string]any
+			if err := json.Unmarshal(input.PayloadJSON, &payload); err != nil {
+				t.Fatalf("unmarshal recorded sync payload: %v", err)
+			}
+			if payload["sync_type"] != syncType {
+				t.Fatalf("unexpected recorded sync type: %#v", payload["sync_type"])
+			}
+			got, ok := payload["sync_json_input"]
+			if !ok {
+				t.Fatalf("missing sync_json_input: %#v", payload)
+			}
+			gotRaw, err := json.Marshal(got)
+			if err != nil {
+				t.Fatalf("marshal recorded sync_json_input: %v", err)
+			}
+			assertJSONEqual(t, gotRaw, syncJSONInput)
+			return
+		}
+		d.mu.Unlock()
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("timed out waiting for recorded sync input at index %d", index)
 }
 
 func (d *recordingAISessionRuntimeDriver) assertCancel(t *testing.T, index int, reason string) {

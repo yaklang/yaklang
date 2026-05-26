@@ -1371,6 +1371,8 @@ func buildArtifactDetail(artifact *model.Artifact) map[string]any {
 			"segment_count": artifact.ELF.SegmentCount,
 			"sections":      cloneStringSlice(artifact.ELF.Sections),
 			"segments":      cloneStringSlice(artifact.ELF.Segments),
+			"section_items": model.ELFSectionDetailItems(artifact.ELF.SectionItems),
+			"segment_items": model.ELFSegmentDetailItems(artifact.ELF.SegmentItems),
 		}
 	}
 	return detail
