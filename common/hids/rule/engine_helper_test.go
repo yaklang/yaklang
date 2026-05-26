@@ -13,7 +13,7 @@ func TestEngineEvaluateMatchesTemporaryPathWhitelistRule(t *testing.T) {
 	t.Parallel()
 
 	engine, err := NewEngine(model.DesiredSpec{
-		TemporaryRules: []model.TemporaryRule{
+		CustomRules: []model.CustomRule{
 			{
 				RuleID:         "tmp-process-path-whitelist",
 				Enabled:        true,
@@ -49,7 +49,7 @@ func TestEngineEvaluateSkipsTemporaryPathWhitelistRuleForAllowedBinary(t *testin
 	t.Parallel()
 
 	engine, err := NewEngine(model.DesiredSpec{
-		TemporaryRules: []model.TemporaryRule{
+		CustomRules: []model.CustomRule{
 			{
 				RuleID:         "tmp-process-path-whitelist",
 				Enabled:        true,
@@ -82,7 +82,7 @@ func TestEngineEvaluateMatchesTemporaryArtifactHashWhitelistRule(t *testing.T) {
 	t.Parallel()
 
 	engine, err := NewEngine(model.DesiredSpec{
-		TemporaryRules: []model.TemporaryRule{
+		CustomRules: []model.CustomRule{
 			{
 				RuleID:         "tmp-artifact-hash-whitelist",
 				Enabled:        true,
@@ -119,7 +119,7 @@ func TestEngineEvaluateMatchesTemporarySystemArtifactDriftRule(t *testing.T) {
 	t.Parallel()
 
 	engine, err := NewEngine(model.DesiredSpec{
-		TemporaryRules: []model.TemporaryRule{
+		CustomRules: []model.CustomRule{
 			{
 				RuleID:         "tmp-system-elf-drift",
 				Enabled:        true,
@@ -155,7 +155,7 @@ func TestEngineEvaluateMatchesTemporaryAuditRemoteLoginRule(t *testing.T) {
 	t.Parallel()
 
 	engine, err := NewEngine(model.DesiredSpec{
-		TemporaryRules: []model.TemporaryRule{
+		CustomRules: []model.CustomRule{
 			{
 				RuleID:         "tmp-audit-remote-login-failed",
 				Enabled:        true,
@@ -193,7 +193,7 @@ func TestEngineEvaluateMatchesTemporaryAuditSensitiveFileRule(t *testing.T) {
 	t.Parallel()
 
 	engine, err := NewEngine(model.DesiredSpec{
-		TemporaryRules: []model.TemporaryRule{
+		CustomRules: []model.CustomRule{
 			{
 				RuleID:         "tmp-audit-sensitive-file-access",
 				Enabled:        true,

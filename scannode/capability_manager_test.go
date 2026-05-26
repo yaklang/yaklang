@@ -67,6 +67,15 @@ func (s *sessionReadyHooksStub) DryRun(*CapabilityManager, capabilityHIDSApplyIn
 	return CapabilityDryRunResult{}, nil
 }
 
+func (s *sessionReadyHooksStub) CollectCurrentState(context.Context, string) error { return nil }
+
+func (s *sessionReadyHooksStub) CollectFileEvidence(
+	context.Context,
+	hidsFileEvidenceCollectInput,
+) (map[string]any, error) {
+	return nil, nil
+}
+
 func (s *sessionReadyHooksStub) Alerts() <-chan CapabilityRuntimeAlert { return nil }
 
 func (s *sessionReadyHooksStub) Observations() <-chan CapabilityRuntimeObservation { return nil }

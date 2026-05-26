@@ -4,6 +4,7 @@ package runtime
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/hids/model"
@@ -113,6 +114,22 @@ func (m *Manager) ReplayInventory(ctx context.Context) error {
 		return nil
 	}
 	return instance.replayInventory(ctx)
+}
+
+func (m *Manager) CollectCurrentState(ctx context.Context, collectType string) error {
+	if m == nil {
+		return nil
+	}
+	m.mu.Lock()
+	instance := m.instance
+	m.mu.Unlock()
+	if instance == nil {
+		return nil
+	}
+	if err := instance.collectCurrentState(ctx, collectType); err != nil {
+		return fmt.Errorf("collect hids current state: %w", err)
+	}
+	return nil
 }
 
 func (m *Manager) forwardAlerts(alerts <-chan model.Alert) {
