@@ -131,6 +131,7 @@ func ApplyAIGlobalConfig(db *gorm.DB, cfg *ypb.AIGlobalConfig) error {
 				Provider:    providerCfg,
 				ModelName:   model.GetModelName(),
 				ExtraParams: cloneKVPairs(model.GetExtraParams()),
+				IsOnline:    model.GetIsOnline(),
 			})
 		}
 		return result
@@ -154,7 +155,6 @@ func ApplyAIGlobalConfig(db *gorm.DB, cfg *ypb.AIGlobalConfig) error {
 		RoutingPolicy:   routing,
 		DefaultModelID:  cfg.GetDefaultModelId(),
 		GlobalWeight:    cfg.GetGlobalWeight(),
-		IsOnline:        cfg.GetIsOnline(),
 	}
 
 	tiered.IntelligentConfigs = buildModels(cfg.IntelligentModels)

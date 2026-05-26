@@ -65751,6 +65751,7 @@ type AIModelConfig struct {
 	Provider      *ThirdPartyApplicationConfig `protobuf:"bytes,2,opt,name=Provider,proto3" json:"Provider,omitempty"`
 	ModelName     string                       `protobuf:"bytes,3,opt,name=ModelName,proto3" json:"ModelName,omitempty"`
 	ExtraParams   []*KVPair                    `protobuf:"bytes,4,rep,name=ExtraParams,proto3" json:"ExtraParams,omitempty"`
+	IsOnline      bool                         `protobuf:"varint,5,opt,name=IsOnline,proto3" json:"IsOnline,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -65813,6 +65814,13 @@ func (x *AIModelConfig) GetExtraParams() []*KVPair {
 	return nil
 }
 
+func (x *AIModelConfig) GetIsOnline() bool {
+	if x != nil {
+		return x.IsOnline
+	}
+	return false
+}
+
 type AIGlobalConfig struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
 	Enabled           bool                   `protobuf:"varint,1,opt,name=Enabled,proto3" json:"Enabled,omitempty"`
@@ -65825,7 +65833,6 @@ type AIGlobalConfig struct {
 	VisionModels      []*AIModelConfig       `protobuf:"bytes,8,rep,name=VisionModels,proto3" json:"VisionModels,omitempty"`
 	AIPresetPrompt    string                 `protobuf:"bytes,9,opt,name=AIPresetPrompt,proto3" json:"AIPresetPrompt,omitempty"`
 	AIPlanPrompt      string                 `protobuf:"bytes,10,opt,name=AIPlanPrompt,proto3" json:"AIPlanPrompt,omitempty"`
-	IsOnline          bool                   `protobuf:"varint,11,opt,name=IsOnline,proto3" json:"IsOnline,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -65928,13 +65935,6 @@ func (x *AIGlobalConfig) GetAIPlanPrompt() string {
 		return x.AIPlanPrompt
 	}
 	return ""
-}
-
-func (x *AIGlobalConfig) GetIsOnline() bool {
-	if x != nil {
-		return x.IsOnline
-	}
-	return false
 }
 
 // Local Model Messages
@@ -74891,14 +74891,15 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x18UpsertAIProviderResponse\x12+\n" +
 	"\bProvider\x18\x01 \x01(\v2\x0f.ypb.AIProviderR\bProvider\")\n" +
 	"\x17DeleteAIProviderRequest\x12\x0e\n" +
-	"\x02Id\x18\x01 \x01(\x03R\x02Id\"\xba\x01\n" +
+	"\x02Id\x18\x01 \x01(\x03R\x02Id\"\xd6\x01\n" +
 	"\rAIModelConfig\x12\x1e\n" +
 	"\n" +
 	"ProviderId\x18\x01 \x01(\x03R\n" +
 	"ProviderId\x12<\n" +
 	"\bProvider\x18\x02 \x01(\v2 .ypb.ThirdPartyApplicationConfigR\bProvider\x12\x1c\n" +
 	"\tModelName\x18\x03 \x01(\tR\tModelName\x12-\n" +
-	"\vExtraParams\x18\x04 \x03(\v2\v.ypb.KVPairR\vExtraParams\"\xea\x03\n" +
+	"\vExtraParams\x18\x04 \x03(\v2\v.ypb.KVPairR\vExtraParams\x12\x1a\n" +
+	"\bIsOnline\x18\x05 \x01(\bR\bIsOnline\"\xce\x03\n" +
 	"\x0eAIGlobalConfig\x12\x18\n" +
 	"\aEnabled\x18\x01 \x01(\bR\aEnabled\x12$\n" +
 	"\rRoutingPolicy\x18\x02 \x01(\tR\rRoutingPolicy\x12(\n" +
@@ -74910,8 +74911,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\fVisionModels\x18\b \x03(\v2\x12.ypb.AIModelConfigR\fVisionModels\x12&\n" +
 	"\x0eAIPresetPrompt\x18\t \x01(\tR\x0eAIPresetPrompt\x12\"\n" +
 	"\fAIPlanPrompt\x18\n" +
-	" \x01(\tR\fAIPlanPrompt\x12\x1a\n" +
-	"\bIsOnline\x18\v \x01(\bR\bIsOnline\"D\n" +
+	" \x01(\tR\fAIPlanPrompt\"D\n" +
 	"\x1aIsLlamaServerReadyResponse\x12\x0e\n" +
 	"\x02Ok\x18\x01 \x01(\bR\x02Ok\x12\x16\n" +
 	"\x06Reason\x18\x02 \x01(\tR\x06Reason\"8\n" +
