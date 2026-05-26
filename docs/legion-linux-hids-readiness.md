@@ -64,7 +64,7 @@ The current HIDS desired spec is phase-1 and intentionally narrow:
   process/network collectors are only auto-required when rules or frozen
   baseline drift detection actually need them
 
-Temporary rules are compiled during apply-time by the HIDS rule engine backed by YakVM expression evaluation. Rollout should treat `temporary_rules[].condition` as an engine-validated expression, not as a free-form opaque blob or a classic YARA text payload.
+Custom rules are compiled during apply-time by the HIDS rule engine backed by YakVM expression evaluation. Rollout should treat `custom_rules[].condition` as an engine-validated expression, not as a free-form opaque blob or a classic YARA text payload.
 
 ## Runtime Performance Model
 
@@ -77,7 +77,7 @@ The node runtime is optimized for alert-first operation:
   baseline drift detection still works.
 - Detailed network enrichment (`source_scope`, `dest_scope`, service names,
   process roles, parent roles, lifecycle age fields) is enabled when snapshot
-  export is enabled or a builtin/temporary rule consumes network events.
+  export is enabled or a builtin/custom rule consumes network events.
 - Process, network, file, artifact, and baseline-drift context are TTL-bounded
   by `context_policy.short_term_window_minutes` and fixed entry ceilings.
 - The process and network trackers use lazy eviction order queues; network

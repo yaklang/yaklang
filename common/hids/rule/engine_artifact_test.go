@@ -13,7 +13,7 @@ func TestEngineEvaluateMatchesTemporaryProcessArtifactRule(t *testing.T) {
 	t.Parallel()
 
 	engine, err := NewEngine(model.DesiredSpec{
-		TemporaryRules: []model.TemporaryRule{
+		CustomRules: []model.CustomRule{
 			{
 				RuleID:         "tmp-process-artifact",
 				Enabled:        true,

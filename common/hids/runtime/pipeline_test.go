@@ -20,7 +20,7 @@ func TestPipelineRunPublishesRuleAlerts(t *testing.T) {
 	t.Parallel()
 
 	engine, err := rule.NewEngine(model.DesiredSpec{
-		TemporaryRules: []model.TemporaryRule{
+		CustomRules: []model.CustomRule{
 			{
 				RuleID:         "tmp-sensitive-write",
 				Enabled:        true,
@@ -65,7 +65,7 @@ func TestPipelineRunPublishesRuleAlerts(t *testing.T) {
 	}
 }
 
-func TestPipelineRunPublishesTemporaryRuleActionEvidenceRequests(t *testing.T) {
+func TestPipelineRunPublishesCustomRuleActionEvidenceRequests(t *testing.T) {
 	t.Parallel()
 
 	secretPath := fmt.Sprintf("%s/secret.txt", t.TempDir())
@@ -74,7 +74,7 @@ func TestPipelineRunPublishesTemporaryRuleActionEvidenceRequests(t *testing.T) {
 	}
 
 	engine, err := rule.NewEngine(model.DesiredSpec{
-		TemporaryRules: []model.TemporaryRule{
+		CustomRules: []model.CustomRule{
 			{
 				RuleID:         "tmp-sensitive-write-action",
 				Enabled:        true,
@@ -149,7 +149,7 @@ func TestPipelineRunExecutesProcessTreeEvidenceRequests(t *testing.T) {
 	t.Parallel()
 
 	engine, err := rule.NewEngine(model.DesiredSpec{
-		TemporaryRules: []model.TemporaryRule{
+		CustomRules: []model.CustomRule{
 			{
 				RuleID:         "tmp-process-tree-action",
 				Enabled:        true,
@@ -254,7 +254,7 @@ func TestPipelineRunExecutesProcessMemoryEvidenceRequests(t *testing.T) {
 	}
 
 	engine, err := rule.NewEngine(model.DesiredSpec{
-		TemporaryRules: []model.TemporaryRule{
+		CustomRules: []model.CustomRule{
 			{
 				RuleID:         "tmp-process-memory-action",
 				Enabled:        true,
@@ -339,7 +339,7 @@ func TestPipelineRunRejectsProcessMemoryEvidenceWhenPolicyDisabled(t *testing.T)
 	}
 
 	engine, err := rule.NewEngine(model.DesiredSpec{
-		TemporaryRules: []model.TemporaryRule{
+		CustomRules: []model.CustomRule{
 			{
 				RuleID:         "tmp-process-memory-disabled",
 				Enabled:        true,
@@ -404,7 +404,7 @@ func TestPipelineRunExecutesSingleFileScanEvidenceRequests(t *testing.T) {
 	}
 
 	engine, err := rule.NewEngine(model.DesiredSpec{
-		TemporaryRules: []model.TemporaryRule{
+		CustomRules: []model.CustomRule{
 			{
 				RuleID:         "tmp-single-file-scan",
 				Enabled:        true,
@@ -535,7 +535,7 @@ func TestPipelineRunExecutesDirectoryScanEvidenceRequests(t *testing.T) {
 	}
 
 	engine, err := rule.NewEngine(model.DesiredSpec{
-		TemporaryRules: []model.TemporaryRule{
+		CustomRules: []model.CustomRule{
 			{
 				RuleID:         "tmp-directory-scan",
 				Enabled:        true,
@@ -655,7 +655,7 @@ func TestPipelineRunExecutesWritableTmpELFTemplateAction(t *testing.T) {
 	}
 
 	engine, err := rule.NewEngine(model.DesiredSpec{
-		TemporaryRules: []model.TemporaryRule{
+		CustomRules: []model.CustomRule{
 			{
 				RuleID:         "tmp-writable-tmp-elf-template",
 				Enabled:        true,
@@ -753,7 +753,7 @@ func TestPromoteAlertFromEvidenceIgnoresEvidenceOnlyScanFindings(t *testing.T) {
 		RuleID:   "tmp-nonpromoted-scan",
 		Severity: "medium",
 		Title:    "scan only",
-		Tags:     []string{"temporary"},
+		Tags:     []string{"custom"},
 		Detail: map[string]any{
 			"evidence_results": []map[string]any{
 				{
@@ -778,7 +778,7 @@ func TestPromoteAlertFromEvidenceIgnoresEvidenceOnlyScanFindings(t *testing.T) {
 	if promoted.Severity != "medium" {
 		t.Fatalf("unexpected severity change: %q", promoted.Severity)
 	}
-	if len(promoted.Tags) != 1 || promoted.Tags[0] != "temporary" {
+	if len(promoted.Tags) != 1 || promoted.Tags[0] != "custom" {
 		t.Fatalf("unexpected tag change: %#v", promoted.Tags)
 	}
 	if _, exists := promoted.Detail["scan_promotion"]; exists {
@@ -813,11 +813,11 @@ func containsString(values []string, want string) bool {
 	return false
 }
 
-func TestPipelineRunEvaluatesTemporaryRulesAcrossEventFamilies(t *testing.T) {
+func TestPipelineRunEvaluatesCustomRulesAcrossEventFamilies(t *testing.T) {
 	t.Parallel()
 
 	engine, err := rule.NewEngine(model.DesiredSpec{
-		TemporaryRules: []model.TemporaryRule{
+		CustomRules: []model.CustomRule{
 			{
 				RuleID:         "tmp-process-family",
 				Title:          "Process family alert",
@@ -1092,7 +1092,7 @@ func TestPipelineRunEnrichesProcessExitFromTrackedLifecycle(t *testing.T) {
 	t.Parallel()
 
 	engine, err := rule.NewEngine(model.DesiredSpec{
-		TemporaryRules: []model.TemporaryRule{
+		CustomRules: []model.CustomRule{
 			{
 				RuleID:         "tmp-process-exit-bash",
 				Enabled:        true,
@@ -1343,7 +1343,7 @@ func TestPipelineRunEnrichesNetworkCloseFromTrackedLifecycle(t *testing.T) {
 	t.Parallel()
 
 	engine, err := rule.NewEngine(model.DesiredSpec{
-		TemporaryRules: []model.TemporaryRule{
+		CustomRules: []model.CustomRule{
 			{
 				RuleID:         "tmp-network-close",
 				Enabled:        true,
@@ -1458,7 +1458,7 @@ func TestPipelineRunPublishesNetworkAcceptObservationAndAlert(t *testing.T) {
 	t.Parallel()
 
 	engine, err := rule.NewEngine(model.DesiredSpec{
-		TemporaryRules: []model.TemporaryRule{
+		CustomRules: []model.CustomRule{
 			{
 				RuleID:         "tmp-network-accept",
 				Enabled:        true,
@@ -1537,7 +1537,7 @@ func TestPipelineRunPublishesNetworkStateObservationAndAlert(t *testing.T) {
 	t.Parallel()
 
 	engine, err := rule.NewEngine(model.DesiredSpec{
-		TemporaryRules: []model.TemporaryRule{
+		CustomRules: []model.CustomRule{
 			{
 				RuleID:         "tmp-network-state",
 				Enabled:        true,
@@ -1653,7 +1653,7 @@ func TestPipelineRunEnrichesNetworkObservationContext(t *testing.T) {
 	t.Parallel()
 
 	engine, err := rule.NewEngine(model.DesiredSpec{
-		TemporaryRules: []model.TemporaryRule{
+		CustomRules: []model.CustomRule{
 			{
 				RuleID:         "tmp-network-enrich",
 				Enabled:        true,
@@ -1782,7 +1782,7 @@ func TestPipelineRunMatchesBuiltinLongLivedPublicRemoteAdminSessionRule(t *testi
 	events <- model.Event{
 		Type:      model.EventTypeNetworkClose,
 		Source:    "ebpf.network",
-		Timestamp: time.Date(2026, 4, 13, 10, 10, 0, 0, time.UTC),
+		Timestamp: time.Date(2026, 4, 13, 10, 5, 0, 0, time.UTC),
 		Tags:      []string{"network", "ebpf", "close"},
 		Process: &model.Process{
 			PID: 42,
@@ -1803,6 +1803,111 @@ func TestPipelineRunMatchesBuiltinLongLivedPublicRemoteAdminSessionRule(t *testi
 	}
 	if !found {
 		t.Fatal("expected long-lived public remote admin builtin alert")
+	}
+}
+
+func TestPipelineFromSpecMatchesBuiltinLongLivedPublicRemoteAdminSessionRule(t *testing.T) {
+	t.Parallel()
+
+	spec := model.DesiredSpec{
+		BuiltinRuleSets: []string{"linux.network.baseline"},
+	}
+	engine, err := rule.NewEngine(spec)
+	if err != nil {
+		t.Fatalf("new engine: %v", err)
+	}
+
+	p := newPipelineFromSpec(engine, spec)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	events := make(chan model.Event, 2)
+	go p.Run(ctx, events)
+
+	events <- model.Event{
+		Type:      model.EventTypeNetworkConnect,
+		Source:    "ebpf.network",
+		Timestamp: time.Date(2026, 4, 13, 10, 0, 0, 0, time.UTC),
+		Tags:      []string{"network", "ebpf", "outbound"},
+		Process: &model.Process{
+			PID:      42,
+			Name:     "python3",
+			Image:    "/usr/bin/python3",
+			Command:  "python3 reverse.py",
+			Username: "root",
+		},
+		Network: &model.Network{
+			Protocol:        "tcp",
+			SourceAddress:   "10.0.0.5",
+			SourcePort:      41000,
+			DestAddress:     "203.0.113.10",
+			DestPort:        22,
+			ConnectionState: "ESTABLISHED",
+		},
+		Data: map[string]any{"fd": 7},
+	}
+	events <- model.Event{
+		Type:      model.EventTypeNetworkClose,
+		Source:    "ebpf.network",
+		Timestamp: time.Date(2026, 4, 13, 10, 5, 0, 0, time.UTC),
+		Tags:      []string{"network", "ebpf", "close"},
+		Process:   &model.Process{PID: 42},
+		Network:   &model.Network{ConnectionState: "closed"},
+		Data:      map[string]any{"fd": 7},
+	}
+	close(events)
+
+	for alert := range p.Alerts() {
+		if alert.RuleID == "linux.network.long_lived_public_remote_admin_session" {
+			return
+		}
+	}
+	t.Fatal("expected long-lived public remote admin builtin alert")
+}
+
+func TestPipelinePrepareEventPreservesLongLivedRemoteAdminMatchInputs(t *testing.T) {
+	t.Parallel()
+
+	spec := model.DesiredSpec{BuiltinRuleSets: []string{"linux.network.baseline"}}
+	engine, err := rule.NewEngine(spec)
+	if err != nil {
+		t.Fatalf("new engine: %v", err)
+	}
+
+	p := newPipelineFromSpec(engine, spec)
+	_ = p.prepareEvent(model.Event{
+		Type:      model.EventTypeNetworkConnect,
+		Source:    "ebpf.network",
+		Timestamp: time.Date(2026, 4, 13, 10, 0, 0, 0, time.UTC),
+		Process: &model.Process{
+			PID:     42,
+			Name:    "python3",
+			Image:   "/usr/bin/python3",
+			Command: "python3 reverse.py",
+		},
+		Network: &model.Network{
+			Protocol:        "tcp",
+			SourceAddress:   "10.0.0.5",
+			SourcePort:      41000,
+			DestAddress:     "203.0.113.10",
+			DestPort:        22,
+			ConnectionState: "ESTABLISHED",
+		},
+		Data: map[string]any{"fd": 7},
+	})
+
+	closeEvent := p.prepareEvent(model.Event{
+		Type:      model.EventTypeNetworkClose,
+		Source:    "ebpf.network",
+		Timestamp: time.Date(2026, 4, 13, 10, 5, 0, 0, time.UTC),
+		Process:   &model.Process{PID: 42},
+		Network:   &model.Network{ConnectionState: "closed"},
+		Data:      map[string]any{"fd": 7},
+	})
+
+	alerts := engine.Evaluate(closeEvent)
+	if len(alerts) == 0 {
+		t.Fatalf("expected close event to match builtin long-lived rule after pipeline enrichment: %#v", closeEvent)
 	}
 }
 
@@ -1841,7 +1946,7 @@ func TestPipelineRunSkipsAlertsForInventoryObservations(t *testing.T) {
 	t.Parallel()
 
 	engine, err := rule.NewEngine(model.DesiredSpec{
-		TemporaryRules: []model.TemporaryRule{
+		CustomRules: []model.CustomRule{
 			{
 				RuleID:         "tmp-shell-under-systemd",
 				Enabled:        true,
@@ -1940,7 +2045,7 @@ func TestPipelineRunSuppressesNonInventoryObservationsWhenSnapshotExportDisabled
 	t.Parallel()
 
 	engine, err := rule.NewEngine(model.DesiredSpec{
-		TemporaryRules: []model.TemporaryRule{
+		CustomRules: []model.CustomRule{
 			{
 				RuleID:         "tmp-shell-under-systemd",
 				Enabled:        true,

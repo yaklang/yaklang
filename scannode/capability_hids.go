@@ -29,6 +29,7 @@ type hidsCapabilityHooks struct {
 	observations chan CapabilityRuntimeObservation
 	config       hidsAlertConfig
 	appliedSpec  hidsAppliedSpecState
+	alertLimiter *hidsAlertLimiter
 }
 
 type hidsAlertConfig struct {
@@ -52,12 +53,15 @@ const (
 	hidsSnapshotObservationMaxPending    = 2048
 	hidsSnapshotObservationPublishedTTL  = 10 * time.Minute
 	hidsSnapshotObservationMaxPublished  = 4096
+	hidsAlertPublishMinInterval          = 30 * time.Second
+	hidsAlertPublishMaxKeys              = 4096
 )
 
 func newCapabilityHIDSHooks() capabilityHIDSHooks {
 	return &hidsCapabilityHooks{
 		alerts:       make(chan CapabilityRuntimeAlert, 64),
 		observations: make(chan CapabilityRuntimeObservation, 2048),
+		alertLimiter: newHIDSAlertLimiter(hidsAlertPublishMinInterval, hidsAlertPublishMaxKeys),
 	}
 }
 
@@ -199,6 +203,29 @@ func (h *hidsCapabilityHooks) DryRun(
 	}, nil
 }
 
+func (h *hidsCapabilityHooks) CollectCurrentState(ctx context.Context, collectType string) error {
+	if h == nil || h.manager == nil {
+		return nil
+	}
+	return h.manager.CollectCurrentState(ctx, collectType)
+}
+
+func (h *hidsCapabilityHooks) CollectFileEvidence(
+	ctx context.Context,
+	input hidsFileEvidenceCollectInput,
+) (map[string]any, error) {
+	if h == nil || h.manager == nil {
+		return nil, nil
+	}
+	return h.manager.ScanFileEvidence(ctx, hidsruntime.FileEvidenceScanInput{
+		Kind:       input.Kind,
+		Path:       input.Path,
+		Recursive:  input.Recursive,
+		MaxDepth:   input.MaxDepth,
+		MaxEntries: input.MaxEntries,
+	})
+}
+
 func (h *hidsCapabilityHooks) Close() error {
 	if h == nil || h.manager == nil {
 		return nil
@@ -264,6 +291,9 @@ func (h *hidsCapabilityHooks) forwardAlerts(alerts <-chan hidsmodel.Alert) {
 		return
 	}
 	for alert := range alerts {
+		if h.shouldSuppressAlert(alert) {
+			continue
+		}
 		capabilityAlert, ok := h.convertAlert(alert)
 		if !ok {
 			continue
@@ -273,6 +303,20 @@ func (h *hidsCapabilityHooks) forwardAlerts(alerts <-chan hidsmodel.Alert) {
 		default:
 		}
 	}
+}
+
+func (h *hidsCapabilityHooks) shouldSuppressAlert(alert hidsmodel.Alert) bool {
+	if h == nil {
+		return false
+	}
+	if h.alertLimiter == nil {
+		h.mu.Lock()
+		if h.alertLimiter == nil {
+			h.alertLimiter = newHIDSAlertLimiter(hidsAlertPublishMinInterval, hidsAlertPublishMaxKeys)
+		}
+		h.mu.Unlock()
+	}
+	return h.alertLimiter.ShouldSuppress(alert)
 }
 
 func (h *hidsCapabilityHooks) forwardObservations(observations <-chan hidsmodel.Event) {
@@ -575,6 +619,129 @@ func hidsSnapshotObservationNeedsNetworkEndpoint(eventType string) bool {
 	}
 }
 
+type hidsAlertLimiter struct {
+	mu          sync.Mutex
+	minInterval time.Duration
+	maxKeys     int
+	lastSeen    map[string]time.Time
+}
+
+func newHIDSAlertLimiter(minInterval time.Duration, maxKeys int) *hidsAlertLimiter {
+	return &hidsAlertLimiter{
+		minInterval: minInterval,
+		maxKeys:     maxKeys,
+		lastSeen:    make(map[string]time.Time),
+	}
+}
+
+func (l *hidsAlertLimiter) ShouldSuppress(alert hidsmodel.Alert) bool {
+	if l == nil || l.minInterval <= 0 {
+		return false
+	}
+	key := hidsAlertLimitKey(alert)
+	if key == "" {
+		return false
+	}
+	now := alert.ObservedAt.UTC()
+	if now.IsZero() {
+		now = time.Now().UTC()
+	}
+
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if last, ok := l.lastSeen[key]; ok && now.Sub(last) < l.minInterval {
+		return true
+	}
+	l.lastSeen[key] = now
+	l.pruneLocked(now)
+	return false
+}
+
+func (l *hidsAlertLimiter) pruneLocked(now time.Time) {
+	if l.maxKeys <= 0 || len(l.lastSeen) <= l.maxKeys {
+		return
+	}
+	cutoff := now.Add(-l.minInterval * 2)
+	for key, seenAt := range l.lastSeen {
+		if seenAt.Before(cutoff) {
+			delete(l.lastSeen, key)
+		}
+	}
+	if len(l.lastSeen) <= l.maxKeys {
+		return
+	}
+	for key := range l.lastSeen {
+		delete(l.lastSeen, key)
+		if len(l.lastSeen) <= l.maxKeys {
+			return
+		}
+	}
+}
+
+func hidsAlertLimitKey(alert hidsmodel.Alert) string {
+	parts := []string{
+		strings.TrimSpace(alert.RuleID),
+		strings.TrimSpace(alert.Title),
+		hidsAlertDetailString(alert.Detail, "match_event_type"),
+		hidsAlertEventTarget(alert.Detail),
+	}
+	return strings.Join(parts, "\x00")
+}
+
+func hidsAlertDetailString(detail map[string]any, key string) string {
+	if detail == nil {
+		return ""
+	}
+	value, _ := detail[key].(string)
+	return strings.TrimSpace(value)
+}
+
+func hidsAlertEventTarget(detail map[string]any) string {
+	if detail == nil {
+		return ""
+	}
+	event, _ := detail["event"].(map[string]any)
+	if len(event) == 0 {
+		return ""
+	}
+	if process, _ := event["process"].(map[string]any); len(process) > 0 {
+		if image, _ := process["image"].(string); strings.TrimSpace(image) != "" {
+			return "process:" + strings.TrimSpace(image)
+		}
+	}
+	if file, _ := event["file"].(map[string]any); len(file) > 0 {
+		if path, _ := file["path"].(string); strings.TrimSpace(path) != "" {
+			return "file:" + strings.TrimSpace(path)
+		}
+	}
+	if network, _ := event["network"].(map[string]any); len(network) > 0 {
+		return strings.Join([]string{
+			"network",
+			hidsAlertMapString(network, "direction"),
+			hidsAlertMapString(network, "protocol"),
+			hidsAlertMapString(network, "dest_ip"),
+			hidsAlertMapString(network, "dest_port"),
+		}, ":")
+	}
+	return ""
+}
+
+func hidsAlertMapString(values map[string]any, key string) string {
+	if values == nil {
+		return ""
+	}
+	switch value := values[key].(type) {
+	case string:
+		return strings.TrimSpace(value)
+	case fmt.Stringer:
+		return strings.TrimSpace(value.String())
+	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64:
+		return fmt.Sprint(value)
+	default:
+		return ""
+	}
+}
+
 func (h *hidsCapabilityHooks) convertAlert(alert hidsmodel.Alert) (CapabilityRuntimeAlert, bool) {
 	config := h.alertConfig()
 	if !config.emitCapabilityAlert {
@@ -798,7 +965,7 @@ func hidsDesiredSpecDryRunRuleEngineDetail(
 	compileErr error,
 ) map[string]any {
 	builtinRuleSetCount := len(spec.BuiltinRuleSets)
-	temporaryRuleCount, activeTemporaryRuleCount, inactiveTemporaryRuleCount := hidsTemporaryRuleCounts(spec)
+	customRuleCount, activeCustomRuleCount, inactiveCustomRuleCount := hidsCustomRuleCounts(spec)
 	activeBuiltinRuleCount, inactiveBuiltinRuleCount := hidsBuiltinRuleCounts(spec)
 
 	status := "compiled"
@@ -809,22 +976,22 @@ func hidsDesiredSpecDryRunRuleEngineDetail(
 	}
 
 	return map[string]any{
-		"status":                        status,
-		"builtin_rule_set_count":        builtinRuleSetCount,
-		"temporary_rule_count":          temporaryRuleCount,
-		"active_temporary_rule_count":   activeTemporaryRuleCount,
-		"inactive_temporary_rule_count": inactiveTemporaryRuleCount,
-		"active_rule_count":             activeBuiltinRuleCount + activeTemporaryRuleCount,
-		"inactive_rule_count":           inactiveBuiltinRuleCount + inactiveTemporaryRuleCount,
-		"compile_error_count":           compileErrorCount,
+		"status":                     status,
+		"builtin_rule_set_count":     builtinRuleSetCount,
+		"custom_rule_count":          customRuleCount,
+		"active_custom_rule_count":   activeCustomRuleCount,
+		"inactive_custom_rule_count": inactiveCustomRuleCount,
+		"active_rule_count":          activeBuiltinRuleCount + activeCustomRuleCount,
+		"inactive_rule_count":        inactiveBuiltinRuleCount + inactiveCustomRuleCount,
+		"compile_error_count":        compileErrorCount,
 	}
 }
 
-func hidsTemporaryRuleCounts(spec hidsmodel.DesiredSpec) (int, int, int) {
+func hidsCustomRuleCounts(spec hidsmodel.DesiredSpec) (int, int, int) {
 	configuredCount := 0
 	activeCount := 0
 	inactiveCount := 0
-	for _, rule := range spec.TemporaryRules {
+	for _, rule := range spec.CustomRules {
 		if rule.IsBlank() {
 			continue
 		}
@@ -871,10 +1038,10 @@ func hidsEnabledCollectorKeys(spec hidsmodel.DesiredSpec) []string {
 
 func hidsRuleEngineApplyDetail(detail map[string]any, spec hidsmodel.DesiredSpec) map[string]any {
 	builtinRuleSetCount := len(spec.BuiltinRuleSets)
-	temporaryRuleCount := 0
-	for _, rule := range spec.TemporaryRules {
+	customRuleCount := 0
+	for _, rule := range spec.CustomRules {
 		if !rule.IsBlank() {
-			temporaryRuleCount++
+			customRuleCount++
 		}
 	}
 
@@ -882,7 +1049,7 @@ func hidsRuleEngineApplyDetail(detail map[string]any, spec hidsmodel.DesiredSpec
 	return map[string]any{
 		"status":                 "compiled",
 		"builtin_rule_set_count": builtinRuleSetCount,
-		"temporary_rule_count":   temporaryRuleCount,
+		"custom_rule_count":      customRuleCount,
 		"active_rule_count":      activeRuleCount,
 		"inactive_rule_count":    inactiveRuleCount,
 		"compile_error_count":    0,
@@ -897,9 +1064,9 @@ func hidsRuntimeRuleCounts(detail map[string]any) (int, int) {
 
 	activeCount := readHIDSDetailInt(rules["active_count"])
 	inactiveCount := readHIDSDetailInt(rules["inactive_count"])
-	temporaryRules, _ := rules["temporary_rules"].(map[string]any)
-	activeCount += readHIDSDetailInt(temporaryRules["active_count"])
-	inactiveCount += readHIDSDetailInt(temporaryRules["inactive_count"])
+	customRules, _ := rules["custom_rules"].(map[string]any)
+	activeCount += readHIDSDetailInt(customRules["active_count"])
+	inactiveCount += readHIDSDetailInt(customRules["inactive_count"])
 	return activeCount, inactiveCount
 }
 

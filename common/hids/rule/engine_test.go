@@ -11,11 +11,11 @@ import (
 	"github.com/yaklang/yaklang/common/hids/model"
 )
 
-func TestNewEngineRejectsInvalidTemporaryRuleCondition(t *testing.T) {
+func TestNewEngineRejectsInvalidCustomRuleCondition(t *testing.T) {
 	t.Parallel()
 
 	_, err := NewEngine(model.DesiredSpec{
-		TemporaryRules: []model.TemporaryRule{
+		CustomRules: []model.CustomRule{
 			{
 				RuleID:         "bad-rule",
 				Enabled:        true,
@@ -33,16 +33,16 @@ func TestNewEngineRejectsInvalidTemporaryRuleCondition(t *testing.T) {
 	if !errors.As(err, &validationErr) {
 		t.Fatalf("expected validation error, got %v", err)
 	}
-	if validationErr.Field != "temporary_rules[0].condition" {
+	if validationErr.Field != "custom_rules[0].condition" {
 		t.Fatalf("unexpected validation field: %s", validationErr.Field)
 	}
 }
 
-func TestNewEngineSkipsDisabledTemporaryRuleCondition(t *testing.T) {
+func TestNewEngineSkipsDisabledCustomRuleCondition(t *testing.T) {
 	t.Parallel()
 
 	_, err := NewEngine(model.DesiredSpec{
-		TemporaryRules: []model.TemporaryRule{
+		CustomRules: []model.CustomRule{
 			{
 				RuleID:         "disabled-rule",
 				Enabled:        false,
@@ -53,7 +53,7 @@ func TestNewEngineSkipsDisabledTemporaryRuleCondition(t *testing.T) {
 		},
 	})
 	if err != nil {
-		t.Fatalf("disabled temporary rule should not block engine creation: %v", err)
+		t.Fatalf("disabled custom rule should not block engine creation: %v", err)
 	}
 }
 
@@ -76,11 +76,11 @@ func TestNewEngineRejectsUnknownBuiltinRuleSet(t *testing.T) {
 	}
 }
 
-func TestNewEngineAcceptsTemporaryRuleConditionWithKnownNetworkDataFields(t *testing.T) {
+func TestNewEngineAcceptsCustomRuleConditionWithKnownNetworkDataFields(t *testing.T) {
 	t.Parallel()
 
 	_, err := NewEngine(model.DesiredSpec{
-		TemporaryRules: []model.TemporaryRule{
+		CustomRules: []model.CustomRule{
 			{
 				RuleID:         "tmp-network-enrich-fields",
 				Enabled:        true,
@@ -91,15 +91,15 @@ func TestNewEngineAcceptsTemporaryRuleConditionWithKnownNetworkDataFields(t *tes
 		},
 	})
 	if err != nil {
-		t.Fatalf("temporary rule with known network data fields should validate: %v", err)
+		t.Fatalf("custom rule with known network data fields should validate: %v", err)
 	}
 }
 
-func TestNewEngineRejectsInvalidTemporaryRuleAction(t *testing.T) {
+func TestNewEngineRejectsInvalidCustomRuleAction(t *testing.T) {
 	t.Parallel()
 
 	_, err := NewEngine(model.DesiredSpec{
-		TemporaryRules: []model.TemporaryRule{
+		CustomRules: []model.CustomRule{
 			{
 				RuleID:         "tmp-invalid-action",
 				Enabled:        true,
@@ -118,16 +118,16 @@ func TestNewEngineRejectsInvalidTemporaryRuleAction(t *testing.T) {
 	if !errors.As(err, &validationErr) {
 		t.Fatalf("expected validation error, got %v", err)
 	}
-	if validationErr.Field != "temporary_rules[0].action" {
+	if validationErr.Field != "custom_rules[0].action" {
 		t.Fatalf("unexpected validation field: %s", validationErr.Field)
 	}
 }
 
-func TestNewEngineRejectsInvalidTemporaryRuleActionScanMatch(t *testing.T) {
+func TestNewEngineRejectsInvalidCustomRuleActionScanMatch(t *testing.T) {
 	t.Parallel()
 
 	_, err := NewEngine(model.DesiredSpec{
-		TemporaryRules: []model.TemporaryRule{
+		CustomRules: []model.CustomRule{
 			{
 				RuleID:         "tmp-invalid-scan-match",
 				Enabled:        true,
@@ -145,7 +145,7 @@ func TestNewEngineRejectsInvalidTemporaryRuleActionScanMatch(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected validation error, got %T", err)
 	}
-	if validationErr.Field != "temporary_rules[0].action" {
+	if validationErr.Field != "custom_rules[0].action" {
 		t.Fatalf("unexpected validation field: %s", validationErr.Field)
 	}
 	if !strings.Contains(validationErr.Reason, "entry_match") {
@@ -153,11 +153,11 @@ func TestNewEngineRejectsInvalidTemporaryRuleActionScanMatch(t *testing.T) {
 	}
 }
 
-func TestEngineEvaluateMatchesTemporaryProcessRule(t *testing.T) {
+func TestEngineEvaluateMatchesCustomProcessRule(t *testing.T) {
 	t.Parallel()
 
 	engine, err := NewEngine(model.DesiredSpec{
-		TemporaryRules: []model.TemporaryRule{
+		CustomRules: []model.CustomRule{
 			{
 				RuleID:         "tmp-suspicious-shell-under-nginx",
 				Enabled:        true,
@@ -231,11 +231,11 @@ func TestEngineEvaluateMatchesTemporaryProcessRule(t *testing.T) {
 	}
 }
 
-func TestEngineEvaluateUsesTemporaryRuleTitleAndMetadata(t *testing.T) {
+func TestEngineEvaluateUsesCustomRuleTitleAndMetadata(t *testing.T) {
 	t.Parallel()
 
 	engine, err := NewEngine(model.DesiredSpec{
-		TemporaryRules: []model.TemporaryRule{
+		CustomRules: []model.CustomRule{
 			{
 				RuleID:         "tmp-process-title-metadata",
 				Title:          "Unexpected shell under nginx",
@@ -244,7 +244,7 @@ func TestEngineEvaluateUsesTemporaryRuleTitleAndMetadata(t *testing.T) {
 				MatchEventType: model.EventTypeProcessExec,
 				Severity:       "high",
 				Condition:      "process.parent_name == 'nginx' && str.HasSuffix(process.image, 'sh')",
-				Tags:           []string{"temporary", "process", "shell"},
+				Tags:           []string{"custom", "process", "shell"},
 				Metadata: map[string]any{
 					"template_id": "process-path-whitelist",
 					"author":      "console",
@@ -277,7 +277,7 @@ func TestEngineEvaluateUsesTemporaryRuleTitleAndMetadata(t *testing.T) {
 	if alert.Title != "Unexpected shell under nginx" {
 		t.Fatalf("unexpected alert title: %q", alert.Title)
 	}
-	if alert.Detail["source"] != "temporary" {
+	if alert.Detail["source"] != "custom" {
 		t.Fatalf("unexpected alert source detail: %#v", alert.Detail["source"])
 	}
 	if alert.Detail["rule_description"] != "Capture shell execution under a web-facing parent process." {
@@ -292,11 +292,11 @@ func TestEngineEvaluateUsesTemporaryRuleTitleAndMetadata(t *testing.T) {
 	}
 }
 
-func TestEngineEvaluateAppliesTemporaryRuleActionOverrides(t *testing.T) {
+func TestEngineEvaluateAppliesCustomRuleActionOverrides(t *testing.T) {
 	t.Parallel()
 
 	engine, err := NewEngine(model.DesiredSpec{
-		TemporaryRules: []model.TemporaryRule{
+		CustomRules: []model.CustomRule{
 			{
 				RuleID:         "tmp-process-action",
 				Title:          "Base title",
@@ -306,7 +306,7 @@ func TestEngineEvaluateAppliesTemporaryRuleActionOverrides(t *testing.T) {
 				Severity:       "medium",
 				Condition:      "process.parent_name == 'nginx'",
 				Action:         `{"title":"Action title","severity":"critical","tags":["action-tag","triaged"],"detail":{"summary":"nginx spawned shell","owner":"rule-action"},"evidence_requests":[{"kind":"process_tree","target":"process","reason":"collect lineage","metadata":{"pid":process.pid}},{"kind":"file","reason":"capture executable","path":process.image}]}`,
-				Tags:           []string{"temporary", "process"},
+				Tags:           []string{"custom", "process"},
 			},
 		},
 	})
@@ -338,7 +338,7 @@ func TestEngineEvaluateAppliesTemporaryRuleActionOverrides(t *testing.T) {
 	if alert.Severity != "critical" {
 		t.Fatalf("unexpected alert severity: %q", alert.Severity)
 	}
-	if !containsString(alert.Tags, "temporary") || !containsString(alert.Tags, "action-tag") {
+	if !containsString(alert.Tags, "custom") || !containsString(alert.Tags, "action-tag") {
 		t.Fatalf("unexpected alert tags: %#v", alert.Tags)
 	}
 	if alert.Detail["action_script"] == "" {
@@ -1748,7 +1748,7 @@ func TestEngineEvaluateSkipsMismatchedEventType(t *testing.T) {
 	t.Parallel()
 
 	engine, err := NewEngine(model.DesiredSpec{
-		TemporaryRules: []model.TemporaryRule{
+		CustomRules: []model.CustomRule{
 			{
 				RuleID:         "tmp-file-only",
 				Enabled:        true,
@@ -1768,11 +1768,11 @@ func TestEngineEvaluateSkipsMismatchedEventType(t *testing.T) {
 	}
 }
 
-func TestEngineEvaluateMatchesTemporaryAuditRule(t *testing.T) {
+func TestEngineEvaluateMatchesCustomAuditRule(t *testing.T) {
 	t.Parallel()
 
 	engine, err := NewEngine(model.DesiredSpec{
-		TemporaryRules: []model.TemporaryRule{
+		CustomRules: []model.CustomRule{
 			{
 				RuleID:         "tmp-audit-login-fail",
 				Enabled:        true,

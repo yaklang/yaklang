@@ -24,6 +24,17 @@ func (hidsCapabilityHooksUnsupportedPlatform) DryRun(
 	return CapabilityDryRunResult{}, ErrHIDSCapabilityUnsupportedPlatform
 }
 
+func (hidsCapabilityHooksUnsupportedPlatform) CollectCurrentState(context.Context, string) error {
+	return ErrHIDSCapabilityUnsupportedPlatform
+}
+
+func (hidsCapabilityHooksUnsupportedPlatform) CollectFileEvidence(
+	context.Context,
+	hidsFileEvidenceCollectInput,
+) (map[string]any, error) {
+	return nil, ErrHIDSCapabilityUnsupportedPlatform
+}
+
 func (hidsCapabilityHooksUnsupportedPlatform) Alerts() <-chan CapabilityRuntimeAlert {
 	return nil
 }

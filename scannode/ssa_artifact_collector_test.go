@@ -163,3 +163,25 @@ func TestAppendKeyValueParams_SkipScannodeInternalKeys(t *testing.T) {
 	require.False(t, hasInternalObjectKey)
 	require.False(t, hasInternalCodec)
 }
+
+func TestAppendKeyValueParams_ExpandsStringSliceValues(t *testing.T) {
+	node := &ScanNode{}
+	args := node.appendKeyValueParams(nil, map[string]interface{}{
+		"port-preset": []string{"top100"},
+		"ports":       "2080",
+	})
+
+	require.Equal(t, []string{"top100"}, valuesAfterFlag(args, "--port-preset"))
+	require.NotContains(t, args, `["top100"]`)
+	require.Equal(t, []string{"2080"}, valuesAfterFlag(args, "--ports"))
+}
+
+func valuesAfterFlag(args []string, flag string) []string {
+	values := make([]string, 0)
+	for index := 0; index < len(args)-1; index++ {
+		if args[index] == flag {
+			values = append(values, args[index+1])
+		}
+	}
+	return values
+}
