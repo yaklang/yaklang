@@ -32,6 +32,10 @@ func dumpReactTimeline(t *testing.T, r *ReAct) string {
 	return buf.String()
 }
 
+func setVerificationTestCurrentTask(r *ReAct, ctx context.Context, taskID string) {
+	r.SetCurrentTask(aicommon.NewStatefulTaskBase(taskID, "verification test user input", ctx, r.config.GetEmitter(), true))
+}
+
 // TestEnforceTodoCompletionBeforeSatisfaction_OverridesWhenActive 验证兜底
 // 机制: 当 AI 声明 user_satisfied=true 但全局 TODO store 仍有 PENDING 项,
 // 必须把 Satisfied 强制回退为 false, 同时:
@@ -49,6 +53,7 @@ func TestEnforceTodoCompletionBeforeSatisfaction_OverridesWhenActive(t *testing.
 		}),
 	)
 	require.NoError(t, err)
+	setVerificationTestCurrentTask(react, context.Background(), "current-task")
 
 	react.AppendVerificationHistory(&aicommon.VerifySatisfactionResult{
 		Satisfied: false,
@@ -92,6 +97,7 @@ func TestEnforceTodoCompletionBeforeSatisfaction_OverridesEvenWhenReasoningEmpty
 		}),
 	)
 	require.NoError(t, err)
+	setVerificationTestCurrentTask(react, context.Background(), "current-task")
 
 	react.AppendVerificationHistory(&aicommon.VerifySatisfactionResult{
 		Satisfied: false,
@@ -129,6 +135,7 @@ func TestEnforceTodoCompletionBeforeSatisfaction_KeepsSatisfiedWhenAllClosed(t *
 		}),
 	)
 	require.NoError(t, err)
+	setVerificationTestCurrentTask(react, context.Background(), "current-task")
 
 	react.AppendVerificationHistory(&aicommon.VerifySatisfactionResult{
 		Satisfied: false,
@@ -176,6 +183,7 @@ func TestEnforceTodoCompletionBeforeSatisfaction_NoStoreNoChange(t *testing.T) {
 		}),
 	)
 	require.NoError(t, err)
+	setVerificationTestCurrentTask(react, context.Background(), "current-task")
 
 	result := &aicommon.VerifySatisfactionResult{
 		Satisfied: true,
@@ -201,6 +209,7 @@ func TestEnforceTodoCompletionBeforeSatisfaction_NoChangeWhenAlreadyUnsatisfied(
 		}),
 	)
 	require.NoError(t, err)
+	setVerificationTestCurrentTask(react, context.Background(), "current-task")
 
 	react.AppendVerificationHistory(&aicommon.VerifySatisfactionResult{
 		Satisfied: false,
@@ -241,6 +250,7 @@ func TestVerifyUserSatisfaction_OverridesSatisfiedEndToEnd(t *testing.T) {
 		}),
 	)
 	require.NoError(t, err)
+	setVerificationTestCurrentTask(react, context.Background(), "current-task")
 
 	react.AppendVerificationHistory(&aicommon.VerifySatisfactionResult{
 		Satisfied: false,
@@ -263,6 +273,37 @@ func TestVerifyUserSatisfaction_OverridesSatisfiedEndToEnd(t *testing.T) {
 	require.Contains(t, dumped, "[VERIFICATION_TODO_INCOMPLETE]")
 }
 
+func TestEnforceTodoCompletionBeforeSatisfaction_IgnoresSiblingTaskTodos(t *testing.T) {
+	react, err := NewTestReAct(
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action":"object"}`))
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+	require.NoError(t, err)
+
+	setVerificationTestCurrentTask(react, context.Background(), "sibling-task")
+	react.AppendVerificationHistory(&aicommon.VerifySatisfactionResult{
+		Satisfied: false,
+		NextMovements: []aicommon.VerifyNextMovement{
+			{Op: "add", ID: "sibling_only", Content: "兄弟任务的待办"},
+		},
+	})
+
+	setVerificationTestCurrentTask(react, context.Background(), "current-task")
+	result := &aicommon.VerifySatisfactionResult{
+		Satisfied: true,
+		Reasoning: "当前任务已完成",
+	}
+	react.enforceTodoCompletionBeforeSatisfaction(result)
+
+	require.True(t, result.Satisfied)
+	require.Equal(t, "当前任务已完成", result.Reasoning)
+	require.NotContains(t, dumpReactTimeline(t, react), "[VERIFICATION_TODO_INCOMPLETE]")
+}
+
 // TestVerifyUserSatisfaction_KeepsSatisfiedWhenAITouchesAllTodos 端到端
 // 验证: mock AI 在同一轮内通过 next_movements 显式关闭所有残留 TODO 并
 // 声明 user_satisfied=true 时, 结果应保持 Satisfied=true. 这是 prompt 中
@@ -281,6 +322,7 @@ func TestVerifyUserSatisfaction_KeepsSatisfiedWhenAITouchesAllTodos(t *testing.T
 		}),
 	)
 	require.NoError(t, err)
+	setVerificationTestCurrentTask(react, context.Background(), "current-task")
 
 	react.AppendVerificationHistory(&aicommon.VerifySatisfactionResult{
 		Satisfied: false,

@@ -29,19 +29,22 @@ type adjustTodolistTestConfig struct {
 	*mock.MockedAIConfig
 	mu              sync.Mutex
 	applyCalls      int
+	lastScope       aicommon.VerificationTodoScope
 	lastSatisfied   bool
 	lastMovements   []aicommon.VerifyNextMovement
 	snapshotItems   []aicommon.VerificationTodoItem
 	snapshotStats   aicommon.VerificationTodoStats
 	markdownReturn  string
 	markdownAsked   int
+	markdownScope   aicommon.VerificationTodoScope
 	markdownLastOps []aicommon.VerifyNextMovement
 }
 
-func (c *adjustTodolistTestConfig) ApplyVerificationTodoOps(satisfied bool, movements []aicommon.VerifyNextMovement) {
+func (c *adjustTodolistTestConfig) ApplyVerificationTodoOps(scope aicommon.VerificationTodoScope, satisfied bool, movements []aicommon.VerifyNextMovement) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.applyCalls++
+	c.lastScope = scope
 	c.lastSatisfied = satisfied
 	c.lastMovements = append([]aicommon.VerifyNextMovement(nil), movements...)
 }
@@ -58,10 +61,41 @@ func (c *adjustTodolistTestConfig) GetVerificationTodoStats() aicommon.Verificat
 	return c.snapshotStats
 }
 
-func (c *adjustTodolistTestConfig) GetVerificationTodoMarkdownDelta(satisfied bool, movements []aicommon.VerifyNextMovement) string {
+func (c *adjustTodolistTestConfig) SnapshotVerificationTodoItemsByScope(scope aicommon.VerificationTodoScope) []aicommon.VerificationTodoItem {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return append([]aicommon.VerificationTodoItem(nil), c.snapshotItems...)
+}
+
+func (c *adjustTodolistTestConfig) GetVerificationTodoStatsByScope(scope aicommon.VerificationTodoScope) aicommon.VerificationTodoStats {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.snapshotStats
+}
+
+func (c *adjustTodolistTestConfig) HasActiveVerificationTodosByScope(scope aicommon.VerificationTodoScope) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.snapshotStats.Pending+c.snapshotStats.Doing > 0
+}
+
+func (c *adjustTodolistTestConfig) ActiveVerificationTodoItemsByScope(scope aicommon.VerificationTodoScope) []aicommon.VerificationTodoItem {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	var out []aicommon.VerificationTodoItem
+	for _, item := range c.snapshotItems {
+		if item.Status == aicommon.VerificationTodoStatusPending || item.Status == aicommon.VerificationTodoStatusDoing {
+			out = append(out, item)
+		}
+	}
+	return out
+}
+
+func (c *adjustTodolistTestConfig) GetVerificationTodoMarkdownDelta(scope aicommon.VerificationTodoScope, satisfied bool, movements []aicommon.VerifyNextMovement) string {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.markdownAsked++
+	c.markdownScope = scope
 	c.markdownLastOps = append([]aicommon.VerifyNextMovement(nil), movements...)
 	return c.markdownReturn
 }
@@ -205,11 +239,14 @@ func TestAdjustTodolist_Handler_AppliesAddOpAndEmitsTodoListUpdate(t *testing.T)
 
 	cfg.mu.Lock()
 	applyCalls := cfg.applyCalls
+	lastScope := cfg.lastScope
 	lastSatisfied := cfg.lastSatisfied
 	lastMovements := append([]aicommon.VerifyNextMovement(nil), cfg.lastMovements...)
 	cfg.mu.Unlock()
 
 	require.Equal(t, 1, applyCalls, "handler must invoke ApplyVerificationTodoOps exactly once")
+	assert.Equal(t, task.GetId(), lastScope.TaskID)
+	assert.Equal(t, task.GetIndex(), lastScope.TaskIndex)
 	assert.False(t, lastSatisfied, "satisfied must be false: 主循环增量不抢 verification 收口")
 	require.Len(t, lastMovements, 2)
 	assert.Equal(t, "add", lastMovements[0].Op)
@@ -293,11 +330,14 @@ func TestAdjustTodolist_Handler_EmitsMarkdownSnapshotStream(t *testing.T) {
 	// 来验证调用关系.
 	cfg.mu.Lock()
 	markdownAsked := cfg.markdownAsked
+	markdownScope := cfg.markdownScope
 	applyCalls := cfg.applyCalls
 	markdownLastOps := append([]aicommon.VerifyNextMovement(nil), cfg.markdownLastOps...)
 	cfg.mu.Unlock()
 	require.Equal(t, 1, markdownAsked,
 		"handler should ask for markdown delta exactly once per round")
+	require.Equal(t, task.GetId(), markdownScope.TaskID)
+	require.Equal(t, task.GetIndex(), markdownScope.TaskIndex)
 	require.Equal(t, 1, applyCalls,
 		"handler should still apply movements exactly once")
 	require.Len(t, markdownLastOps, 2,

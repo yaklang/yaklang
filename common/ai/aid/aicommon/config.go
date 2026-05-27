@@ -153,9 +153,9 @@ type Config struct {
 	// session id
 	PersistentSessionId string
 	// SessionSource is persisted to ai_sessions_v1.source (e.g. ide, cli).
-	SessionSource string
-	SessionTitle  string
-	SessionPromptState  *SessionPromptState
+	SessionSource      string
+	SessionTitle       string
+	SessionPromptState *SessionPromptState
 
 	// memory triage id
 	MemoryTriageId string
@@ -2664,20 +2664,20 @@ func (c *Config) GetVerificationTodoRendered() string {
 // later — for now this only updates the in-memory SessionPromptState).
 //
 // 关键词: ApplyVerificationTodoOps, Verify 写入, SessionPromptState 同步
-func (c *Config) ApplyVerificationTodoOps(satisfied bool, movements []VerifyNextMovement) {
+func (c *Config) ApplyVerificationTodoOps(scope VerificationTodoScope, satisfied bool, movements []VerifyNextMovement) {
 	if c == nil {
 		return
 	}
 	// 即便没有 movements, satisfied=true 也可能触发 SKIPPED 状态转换；故不 early-return.
-	c.GetSessionPromptState().ApplyVerificationTodoOps(satisfied, movements)
+	c.GetSessionPromptState().ApplyVerificationTodoOps(scope, satisfied, movements)
 }
 
 // GetVerificationTodoMarkdownDelta returns the markdown snapshot computed
 // against the current state without mutating it. Use this when you need the
 // delta markers (new / done / deleted / skipped) for a markdown stream emitted
 // BEFORE you commit the ops via ApplyVerificationTodoOps.
-func (c *Config) GetVerificationTodoMarkdownDelta(satisfied bool, movements []VerifyNextMovement) string {
-	return c.GetSessionPromptState().GetVerificationTodoMarkdownDelta(satisfied, movements)
+func (c *Config) GetVerificationTodoMarkdownDelta(scope VerificationTodoScope, satisfied bool, movements []VerifyNextMovement) string {
+	return c.GetSessionPromptState().GetVerificationTodoMarkdownDelta(scope, satisfied, movements)
 }
 
 // SnapshotVerificationTodoItems returns a deep-copied slice of the current
@@ -2686,9 +2686,25 @@ func (c *Config) SnapshotVerificationTodoItems() []VerificationTodoItem {
 	return c.GetSessionPromptState().SnapshotVerificationTodoItems()
 }
 
+func (c *Config) SnapshotVerificationTodoItemsByScope(scope VerificationTodoScope) []VerificationTodoItem {
+	return c.GetSessionPromptState().SnapshotVerificationTodoItemsByScope(scope)
+}
+
 // GetVerificationTodoStats returns aggregated TODO stats.
 func (c *Config) GetVerificationTodoStats() VerificationTodoStats {
 	return c.GetSessionPromptState().GetVerificationTodoStats()
+}
+
+func (c *Config) GetVerificationTodoStatsByScope(scope VerificationTodoScope) VerificationTodoStats {
+	return c.GetSessionPromptState().GetVerificationTodoStatsByScope(scope)
+}
+
+func (c *Config) HasActiveVerificationTodosByScope(scope VerificationTodoScope) bool {
+	return c.GetSessionPromptState().HasActiveVerificationTodosByScope(scope)
+}
+
+func (c *Config) ActiveVerificationTodoItemsByScope(scope VerificationTodoScope) []VerificationTodoItem {
+	return c.GetSessionPromptState().ActiveVerificationTodoItemsByScope(scope)
 }
 
 // FlushRestoredSessionEvidence persists the in-memory session evidence (restored from

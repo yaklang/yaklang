@@ -17,6 +17,7 @@ type TodoListUpdatePayload struct {
 	Satisfied      bool                   `json:"satisfied"`
 	IterationIndex int                    `json:"iteration_index"`
 	TaskID         string                 `json:"task_id,omitempty"`
+	TaskIndex      string                 `json:"task_index,omitempty"`
 }
 
 // EmitTodoListUpdate emits a structured TODO list update event under

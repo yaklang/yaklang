@@ -86,16 +86,28 @@ func (t *transactionTestConfig) GetContextProviderManager() *ContextProviderMana
 func (t *transactionTestConfig) GetSessionEvidenceRendered() string          { return "" }
 func (t *transactionTestConfig) ApplySessionEvidenceOps([]EvidenceOperation) {}
 func (t *transactionTestConfig) GetVerificationTodoRendered() string         { return "" }
-func (t *transactionTestConfig) ApplyVerificationTodoOps(bool, []VerifyNextMovement) {
+func (t *transactionTestConfig) ApplyVerificationTodoOps(VerificationTodoScope, bool, []VerifyNextMovement) {
 }
-func (t *transactionTestConfig) GetVerificationTodoMarkdownDelta(bool, []VerifyNextMovement) string {
+func (t *transactionTestConfig) GetVerificationTodoMarkdownDelta(VerificationTodoScope, bool, []VerifyNextMovement) string {
 	return ""
 }
 func (t *transactionTestConfig) SnapshotVerificationTodoItems() []VerificationTodoItem {
 	return nil
 }
+func (t *transactionTestConfig) SnapshotVerificationTodoItemsByScope(VerificationTodoScope) []VerificationTodoItem {
+	return nil
+}
 func (t *transactionTestConfig) GetVerificationTodoStats() VerificationTodoStats {
 	return VerificationTodoStats{}
+}
+func (t *transactionTestConfig) GetVerificationTodoStatsByScope(VerificationTodoScope) VerificationTodoStats {
+	return VerificationTodoStats{}
+}
+func (t *transactionTestConfig) HasActiveVerificationTodosByScope(VerificationTodoScope) bool {
+	return false
+}
+func (t *transactionTestConfig) ActiveVerificationTodoItemsByScope(VerificationTodoScope) []VerificationTodoItem {
+	return nil
 }
 
 // --- tests ---

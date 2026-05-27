@@ -104,10 +104,10 @@ func (m *MockedAIConfig) GetVerificationTodoRendered() string {
 	return ""
 }
 
-func (m *MockedAIConfig) ApplyVerificationTodoOps(satisfied bool, movements []aicommon.VerifyNextMovement) {
+func (m *MockedAIConfig) ApplyVerificationTodoOps(scope aicommon.VerificationTodoScope, satisfied bool, movements []aicommon.VerifyNextMovement) {
 }
 
-func (m *MockedAIConfig) GetVerificationTodoMarkdownDelta(satisfied bool, movements []aicommon.VerifyNextMovement) string {
+func (m *MockedAIConfig) GetVerificationTodoMarkdownDelta(scope aicommon.VerificationTodoScope, satisfied bool, movements []aicommon.VerifyNextMovement) string {
 	return ""
 }
 
@@ -115,8 +115,24 @@ func (m *MockedAIConfig) SnapshotVerificationTodoItems() []aicommon.Verification
 	return nil
 }
 
+func (m *MockedAIConfig) SnapshotVerificationTodoItemsByScope(scope aicommon.VerificationTodoScope) []aicommon.VerificationTodoItem {
+	return nil
+}
+
 func (m *MockedAIConfig) GetVerificationTodoStats() aicommon.VerificationTodoStats {
 	return aicommon.VerificationTodoStats{}
+}
+
+func (m *MockedAIConfig) GetVerificationTodoStatsByScope(scope aicommon.VerificationTodoScope) aicommon.VerificationTodoStats {
+	return aicommon.VerificationTodoStats{}
+}
+
+func (m *MockedAIConfig) HasActiveVerificationTodosByScope(scope aicommon.VerificationTodoScope) bool {
+	return false
+}
+
+func (m *MockedAIConfig) ActiveVerificationTodoItemsByScope(scope aicommon.VerificationTodoScope) []aicommon.VerificationTodoItem {
+	return nil
 }
 
 func (m *MockedAIConfig) IsCtxDone() bool {

@@ -48,7 +48,7 @@ import (
 func ApplyVerificationNextMovementsAndEmit(
 	cfg AICallerConfigIf,
 	emitter *Emitter,
-	taskID string,
+	scope VerificationTodoScope,
 	iterationIndex int,
 	satisfied bool,
 	movements []VerifyNextMovement,
@@ -64,12 +64,13 @@ func ApplyVerificationNextMovementsAndEmit(
 	//    adjust_todolist 实现的 side effect 等价 (mock 测试用它做调用次数
 	//    探针).
 	// 关键词: apply 前算 markdown delta, snapshot 时序, side effect 等价
-	markdownSnapshot := cfg.GetVerificationTodoMarkdownDelta(satisfied, movements)
+	scope = scope.normalize()
+	markdownSnapshot := cfg.GetVerificationTodoMarkdownDelta(scope, satisfied, movements)
 	if emitter != nil && strings.TrimSpace(markdownSnapshot) != "" {
 		if _, err := emitter.EmitTextMarkdownStreamEvent(
 			"next_movements_snapshot",
 			strings.NewReader(markdownSnapshot),
-			taskID,
+			scope.TaskID,
 			func() {},
 		); err != nil {
 			log.Warnf("emit next_movements_snapshot markdown stream event failed: %v", err)
@@ -79,7 +80,7 @@ func ApplyVerificationNextMovementsAndEmit(
 	// 2. apply: 把 delta 写入共享 store, 后续任何 prompt 渲染都能看到.
 	//    无论 emitter 是否存在, store 都必须更新 — 这是契约的关键, 让
 	//    "apply 必有效果"的语义不依赖前端事件通道的可用性.
-	cfg.ApplyVerificationTodoOps(satisfied, movements)
+	cfg.ApplyVerificationTodoOps(scope, satisfied, movements)
 
 	// 3. emit 结构化 todo_list_update: 携带 apply 之后的全量 items + stats,
 	//    让前端 TODO 面板直接以最新快照渲染, 不需要二次拼接 history.
@@ -91,7 +92,8 @@ func ApplyVerificationNextMovementsAndEmit(
 			AppliedOps:     append([]VerifyNextMovement(nil), movements...),
 			Satisfied:      satisfied,
 			IterationIndex: iterationIndex,
-			TaskID:         taskID,
+			TaskID:         scope.TaskID,
+			TaskIndex:      scope.TaskIndex,
 		}
 		if _, err := emitter.EmitTodoListUpdate(payload); err != nil {
 			log.Warnf("emit todo_list_update event failed: %v", err)
