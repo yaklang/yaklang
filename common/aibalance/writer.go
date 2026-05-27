@@ -352,34 +352,50 @@ type writerWrapper struct {
 //
 // 关键词: writerWrapper.Write content 透传, 无 ReAct 反解析
 //
-// TPS 节流：当 writer.outputTPSLimiter 启用时，按 ytoken.CalcTokenCount(p)
-// 估算本次写入的 token 数，调用 Throttle 决定 sleep 时长，再继续推送。
-// 注意 Sleep 在持有 writer.mu 之前完成，避免阻塞 WriteToolCalls / WriteUsage
-// 等同期回调。reasoning_content 与 content 共用同一个 limiter，按统一吞吐口径节流。
+// TPS 节流：当 writer.outputTPSLimiter 启用时，走 pacedWrite 路径
+// （把本次写入按 UTF-8 rune 边界拆分成多个小段、逐段 sleep + 独立 SSE 帧），
+// 让限速变成"细水长流"而不是"长 sleep + 一次性 dump"。
+// reasoning_content 与 content 共用同一个 limiter，按统一吞吐口径节流。
 // 非流式（notStream=true）路径直接累积到 buf，不触发节流。
-// 关键词: writerWrapper.Write TPS 节流, ytoken 估算
+// 关键词: writerWrapper.Write TPS 节流, paced write 平滑限速
 func (w *writerWrapper) Write(p []byte) (n int, err error) {
 	if w.notStream {
 		return w.buf.Write(p)
 	}
-
-	if w.writer.outputTPSLimiter != nil && len(p) > 0 {
-		tokens := int64(ytoken.CalcTokenCount(string(p)))
-		if tokens > 0 {
-			if sleep := w.writer.outputTPSLimiter.Throttle(tokens); sleep > 0 {
-				time.Sleep(sleep)
-			}
-		}
+	if len(p) == 0 {
+		return 0, nil
 	}
 
+	limiter := w.writer.outputTPSLimiter
+	if limiter != nil && limiter.Limit() > 0 {
+		return w.pacedWrite(p, limiter)
+	}
+
+	if _, werr := w.writeFrame(p); werr != nil {
+		return 0, werr
+	}
+	return len(p), nil
+}
+
+// writeFrame 把一段已经对齐 UTF-8 边界的内容封装成一个 SSE chunked delta 帧
+// 发送给客户端。空内容直接返回 (0, nil)。该方法持有 writer.mu，与 WriteToolCalls
+// / WriteUsage 等回调串行化下行字节序。
+//
+// 关键词: writerWrapper writeFrame, 单帧 SSE 输出
+func (w *writerWrapper) writeFrame(p []byte) (int, error) {
+	if len(p) == 0 {
+		return 0, nil
+	}
 	delta, err := w.writer.buildDelta(w.reason, string(p))
 	if err != nil {
 		return 0, err
 	}
-
 	w.writer.mu.Lock()
 	defer w.writer.mu.Unlock()
-	buf := bytes.Buffer{}
+	if w.writer.closed {
+		return 0, nil
+	}
+	var buf bytes.Buffer
 	buf.WriteString("data: ")
 	buf.Write(delta)
 	buf.WriteString("\n\n")
@@ -387,6 +403,74 @@ func (w *writerWrapper) Write(p []byte) (n int, err error) {
 	w.writer.writerClose.Write(buf.Bytes())
 	w.writer.writerClose.Write([]byte("\r\n"))
 	utils.FlushWriter(w.writer.writerClose)
+	return len(p), nil
+}
+
+// pacedWrite 按 token-per-second 把本次写入平滑地"涓滴"出去：
+//   1. 用 ytoken 估算本次的 token 数 tokens（>=1）。
+//   2. 把 p 按 UTF-8 rune 边界拆分成最多 segments 段（segments 取 tokens 与
+//      字符段数的较小值），保证不切碎多字节字符。
+//   3. 逐段调用 limiter.Throttle 累计补偿 sleep（按本段近似 token 数推进），
+//      sleep 之后写出一个 SSE delta 帧，并立即 flush。
+//
+// 这样客户端能持续不断地收到小帧，而不是一次性等待 sleep 完毕后突然收到大段。
+// 关键词: pacedWrite, 平滑 TPS 限速, UTF-8 安全切分, 涓滴流式输出
+func (w *writerWrapper) pacedWrite(p []byte, limiter *OutputTPSLimiter) (int, error) {
+	if len(p) == 0 {
+		return 0, nil
+	}
+	tokens := int64(ytoken.CalcTokenCount(string(p)))
+	if tokens <= 0 {
+		// 没有可计费 token（纯空白/控制字符），按原样一帧发出但仍累计 0
+		if _, err := w.writeFrame(p); err != nil {
+			return 0, err
+		}
+		return len(p), nil
+	}
+
+	segments := splitByRuneSegments(p, int(tokens))
+	if len(segments) == 0 {
+		if _, err := w.writeFrame(p); err != nil {
+			return 0, err
+		}
+		return len(p), nil
+	}
+	if len(segments) == 1 {
+		// 只有一段（单字符或字符数 < tokens）：先 sleep 一次，再原样发出
+		if sleep := limiter.Throttle(tokens); sleep > 0 {
+			time.Sleep(sleep)
+		}
+		if _, err := w.writeFrame(segments[0]); err != nil {
+			return 0, err
+		}
+		return len(p), nil
+	}
+
+	// 把 tokens 均摊到 len(segments) 个分段；为避免漂移，最后一段吸收剩余余数。
+	// 关键词: pacedWrite token 均摊, 余数补偿
+	perSegment := tokens / int64(len(segments))
+	if perSegment <= 0 {
+		perSegment = 1
+	}
+	remaining := tokens
+	for i, seg := range segments {
+		var step int64
+		if i == len(segments)-1 {
+			step = remaining
+		} else {
+			step = perSegment
+			remaining -= step
+		}
+		if step <= 0 {
+			step = 1
+		}
+		if sleep := limiter.Throttle(step); sleep > 0 {
+			time.Sleep(sleep)
+		}
+		if _, err := w.writeFrame(seg); err != nil {
+			return 0, err
+		}
+	}
 	return len(p), nil
 }
 
