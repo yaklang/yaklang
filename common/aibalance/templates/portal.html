@@ -4,7 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI-Balancer Portal</title>
-    <link rel="stylesheet" href="/portal/static/portal.css">
+    <!-- 静态资源带 cache-busting 版本号: 每次显著修改 portal.js / portal.css 后
+         手动 bump 这个值, 旧浏览器缓存就会失效.
+         关键词: portal static asset cache busting -->
+    <link rel="stylesheet" href="/portal/static/portal.css?v=20260527-mirror-5">
 </head>
 <body>
     <!-- Loading Overlay -->
@@ -83,8 +86,43 @@
         </div>
     </div>
 
-    <div class="card">
-        <div class="tabs-container">
+    <!-- 旧的横向 tabs 已重构为左侧 sidebar + 右侧主体布局
+         分组依据: 概览 / 接口管理 / 限流与经营 / 第三方服务 / 数据处理
+         保留 .tabs / .tab / .tab-content 类名是为了让旧 JS 切换逻辑不破坏,
+         menu 项点击仍触发同样的 switchTab(tabId), 通过 .tab-content.active 控制可见性. -->
+    <div class="card portal-layout">
+        <aside class="sidebar">
+            <div class="sidebar-group">
+                <div class="group-title">概览</div>
+                <div class="menu-item active" data-tab="all">全部供应商</div>
+                <div class="menu-item" data-tab="models">模型信息</div>
+                <div class="menu-item" data-tab="dau-cache">日活与缓存</div>
+            </div>
+            <div class="sidebar-group">
+                <div class="group-title">接口管理</div>
+                <div class="menu-item" data-tab="add">添加接口</div>
+                <div class="menu-item" data-tab="api">API管理</div>
+                <div class="menu-item" data-tab="totp">TOTP认证</div>
+            </div>
+            <div class="sidebar-group">
+                <div class="group-title">限流与经营</div>
+                <div class="menu-item" data-tab="rate-limit">限流配置</div>
+                <div class="menu-item" data-tab="ops-users">运营用户</div>
+                <div class="menu-item" data-tab="ops-logs">操作日志</div>
+            </div>
+            <div class="sidebar-group">
+                <div class="group-title">第三方服务</div>
+                <div class="menu-item" data-tab="web-search">Web Search</div>
+                <div class="menu-item" data-tab="amap">高德</div>
+            </div>
+            <div class="sidebar-group">
+                <div class="group-title">数据处理</div>
+                <div class="menu-item" data-tab="mirror">流量镜像</div>
+            </div>
+        </aside>
+        <!-- 隐藏的旧 tabs 容器, 仅保留兼容性 (有 JS 依赖了 .tabs .tab 这种选择器)
+             实际不再渲染. -->
+        <div class="tabs-container" style="display:none;">
             <div class="tabs">
                 <div class="tab active" data-tab="all">全部供应商</div>
                 <div class="tab" data-tab="add">添加接口</div>
@@ -97,9 +135,11 @@
                 <div class="tab" data-tab="ops-logs">操作日志</div>
                 <div class="tab" data-tab="rate-limit">限流配置</div>
                 <div class="tab" data-tab="dau-cache">日活与缓存</div>
+                <div class="tab" data-tab="mirror">流量镜像</div>
             </div>
         </div>
-        
+        <main class="tab-pane-host">
+
         <div id="all" class="tab-content active">
             <div class="action-bar">
                 <div style="display: flex; align-items: center;">
@@ -1037,6 +1077,202 @@
                 </div>
             </div>
         </div>
+
+        <!-- ========== Mirror Rules Tab ==========
+             流量镜像规则管理: 创建/启停/编辑/试运行/查看最近调用日志
+             关键词: portal mirror tab, AiMirrorRule UI -->
+        <div id="mirror" class="tab-content">
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                    <h3 style="margin:0;">流量镜像规则</h3>
+                    <div style="display: flex; gap: 12px;">
+                        <button class="btn btn-primary" onclick="MirrorMgmt.openCreateModal()">新增镜像规则</button>
+                        <button class="btn" onclick="MirrorMgmt.refresh()">刷新</button>
+                    </div>
+                </div>
+                <p style="color: #666; margin-bottom: 16px;">
+                    每次 chat 请求完整结束之后, aibalance 会异步把响应快照分发给所有命中的镜像规则.
+                    每条规则对应一段 yak 脚本 (必须定义 <code>func handle(data) { ... }</code>),
+                    脚本在独立 worker pool 中执行, 队列满时丢弃; 绝不阻塞主请求.
+                </p>
+
+                <div class="mirror-kpi-row" style="display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 18px;">
+                    <div class="mirror-kpi" style="flex: 1 1 150px; background: #e3f2fd; border: 1px solid #90caf9; border-radius: 8px; padding: 12px;">
+                        <div style="color: #666; font-size: 12px;">启用规则数</div>
+                        <div style="font-size: 24px; font-weight: bold; color: #1565c0;" id="mirror-enabled-count">--</div>
+                    </div>
+                    <div class="mirror-kpi" style="flex: 1 1 150px; background: #e8f5e9; border: 1px solid #a5d6a7; border-radius: 8px; padding: 12px;">
+                        <div style="color: #666; font-size: 12px;">累计触发</div>
+                        <div style="font-size: 24px; font-weight: bold; color: #2e7d32;" id="mirror-total-triggered">--</div>
+                    </div>
+                    <div class="mirror-kpi" style="flex: 1 1 150px; background: #fff8e1; border: 1px solid #ffe082; border-radius: 8px; padding: 12px;">
+                        <div style="color: #666; font-size: 12px;">累计成功</div>
+                        <div style="font-size: 24px; font-weight: bold; color: #f57f17;" id="mirror-total-success">--</div>
+                    </div>
+                    <div class="mirror-kpi" style="flex: 1 1 150px; background: #ffebee; border: 1px solid #ef9a9a; border-radius: 8px; padding: 12px;">
+                        <div style="color: #666; font-size: 12px;">累计失败/丢弃</div>
+                        <div style="font-size: 24px; font-weight: bold; color: #c62828;" id="mirror-total-fail-drop">--</div>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <table cellspacing="0" cellpadding="0" id="mirror-rules-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>名称</th>
+                                <th>启用</th>
+                                <th>条件</th>
+                                <th>并发</th>
+                                <th>队列</th>
+                                <th>触发/成功/失败/丢弃</th>
+                                <th>最近触发</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="mirror-rules-tbody">
+                            <tr><td colspan="9" style="padding: 12px; text-align: center; color: #999;">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        </main> <!-- /.tab-pane-host -->
+    </div>
+
+    <!-- Mirror Rule Edit Modal -->
+    <!-- 关键词: mirror rule 编辑弹窗, 分 section 表单, data spec 帮助面板 -->
+    <div id="mirrorRuleModal" class="delete-confirmation-modal" style="display: none;">
+        <div class="modal-content mirror-modal-content">
+            <span class="close-modal" onclick="MirrorMgmt.closeModal()">&times;</span>
+            <h4 id="mirrorRuleModalTitle">新增镜像规则</h4>
+            <input type="hidden" id="mirrorRuleId" value="">
+
+            <div class="mirror-modal-grid">
+                <!-- 左列: 表单 -->
+                <div class="mirror-modal-form-col">
+                    <!-- Section 1: 基础信息 -->
+                    <section class="mirror-form-section">
+                        <div class="mirror-form-section-title">基础信息</div>
+                        <div class="mirror-form-row">
+                            <div class="mirror-form-field flex-2">
+                                <label>规则名称<span class="mirror-required">*</span></label>
+                                <input type="text" id="mirrorRuleName" class="form-control" placeholder="例如: log-call-tool-events">
+                            </div>
+                            <div class="mirror-form-field" style="align-self:flex-end;">
+                                <label class="mirror-checkbox-label">
+                                    <input type="checkbox" id="mirrorRuleEnabled" checked>
+                                    <span>启用此规则</span>
+                                </label>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Section 2: 触发条件 -->
+                    <section class="mirror-form-section">
+                        <div class="mirror-form-section-title">触发条件</div>
+                        <div class="mirror-form-row">
+                            <div class="mirror-form-field flex-1">
+                                <label>条件类型</label>
+                                <select id="mirrorRuleCondition" class="form-control" onchange="MirrorMgmt.onConditionChange()">
+                                    <option value="always">每次成功请求 (always)</option>
+                                    <option value="action_eq">@action 等于指定值 (action_eq)</option>
+                                    <option value="any_toolcall">任意 OpenAI tool_calls 出现 (any_toolcall)</option>
+                                    <option value="action_call_tool_eq">@action 是 call-tool 类且工具名匹配 (action_call_tool_eq)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mirror-form-row">
+                            <div class="mirror-form-field flex-1 mirror-cond-action" style="display:none;">
+                                <label>
+                                    Action 名称
+                                    <span id="mirrorRuleActionLabelHint" class="mirror-label-hint"></span>
+                                </label>
+                                <input type="text" id="mirrorRuleAction" class="form-control" placeholder="">
+                                <small id="mirrorRuleActionHelp" class="mirror-field-help"></small>
+                            </div>
+                            <div class="mirror-form-field flex-1 mirror-cond-tool" style="display:none;">
+                                <label>
+                                    Tool 名称<span class="mirror-required">*</span>
+                                </label>
+                                <input type="text" id="mirrorRuleTool" class="form-control" placeholder="例如: read-file">
+                                <small class="mirror-field-help">必填: 仅匹配该工具名的调用. 工具名取自 @action payload 中 tool / tool_require_payload 字段.</small>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Section 3: 并发与限制 -->
+                    <section class="mirror-form-section">
+                        <div class="mirror-form-section-title">并发与限制</div>
+                        <div class="mirror-form-row">
+                            <div class="mirror-form-field flex-1">
+                                <label>并发 (workers)</label>
+                                <input type="number" id="mirrorRuleConcurrency" class="form-control" min="1" max="256" value="4">
+                            </div>
+                            <div class="mirror-form-field flex-1">
+                                <label>队列长度</label>
+                                <input type="number" id="mirrorRuleQueueSize" class="form-control" min="1" max="1048576" value="1024">
+                            </div>
+                            <div class="mirror-form-field flex-1">
+                                <label>单次超时 (ms)</label>
+                                <input type="number" id="mirrorRuleTimeoutMs" class="form-control" min="100" max="600000" value="30000">
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Section 4: 回调脚本 -->
+                    <section class="mirror-form-section">
+                        <div class="mirror-form-section-title">
+                            回调脚本 (yak)
+                            <button type="button" class="mirror-link-btn" onclick="MirrorMgmt.resetToDefaultScript()" title="把脚本恢复成默认模板">恢复模板</button>
+                        </div>
+                        <textarea id="mirrorRuleScript" class="form-control mirror-script-editor"
+                                  rows="18"
+                                  spellcheck="false"
+                                  placeholder="func handle(data) { ... }"></textarea>
+                        <div class="mirror-script-help">
+                            必须定义 <code>func handle(data) { ... }</code>; 数据结构见右侧的 data 字段说明.
+                            末尾 <code>if YAK_MAIN { handle({...}) }</code> 是本地自测块, 复制脚本到任意 .yak 文件用 <code>yak xxx.yak</code> 直接跑 (aibalance 调度时不会进入该分支).
+                        </div>
+                    </section>
+
+                    <!-- 试运行结果 -->
+                    <div id="mirrorRuleTestResult" class="mirror-test-result" style="display:none;"></div>
+                </div>
+
+                <!-- 右列: data 字段说明 -->
+                <aside class="mirror-modal-spec-col">
+                    <div class="mirror-spec-header">
+                        <div class="mirror-spec-title">data 字段说明</div>
+                        <div class="mirror-spec-subtitle">handle(data) 的入参 spec, 不含原始 API Key 等敏感字段</div>
+                    </div>
+                    <div id="mirrorDataSpecHost" class="mirror-spec-host">
+                        <div style="color:#888; padding:12px; font-size:12px;">加载字段说明...</div>
+                    </div>
+                </aside>
+            </div>
+
+            <div class="modal-actions mirror-modal-actions">
+                <button class="btn" onclick="MirrorMgmt.testCurrent()">试运行</button>
+                <button class="btn" onclick="MirrorMgmt.closeModal()">取消</button>
+                <button class="btn btn-primary" onclick="MirrorMgmt.save()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mirror Rule Logs Modal -->
+    <div id="mirrorLogsModal" class="delete-confirmation-modal" style="display: none;">
+        <div class="modal-content" style="max-width: 880px; width: 92vw;">
+            <span class="close-modal" onclick="MirrorMgmt.closeLogs()">&times;</span>
+            <h4>最近调用日志 - <span id="mirrorLogsRuleName"></span></h4>
+            <div id="mirrorLogsList" style="max-height: 480px; overflow:auto; font-family: monospace; font-size: 12px;">
+                <div style="color:#999; padding: 12px;">Loading...</div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn" onclick="MirrorMgmt.closeLogs()">关闭</button>
+            </div>
+        </div>
     </div>
 
     <!-- Create OPS User Modal -->
@@ -1279,6 +1515,6 @@
         </div>
     </div>
 
-    <script src="/portal/static/portal.js"></script>
+    <script src="/portal/static/portal.js?v=20260527-mirror-5"></script>
 </body>
 </html>
