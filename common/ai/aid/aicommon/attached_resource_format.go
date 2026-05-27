@@ -1,6 +1,7 @@
 package aicommon
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"strconv"
@@ -37,19 +38,62 @@ func IsAttachedSelectedResource(data *AttachedResource) bool {
 	return normalizeAttachedResourceType(data.Type) == AttachedResourceTypeSelected
 }
 
-func attachedHTTPFlowIDFromResource(data *AttachedResource) (int64, error) {
+func attachedHTTPFlowIDsFromResource(data *AttachedResource) ([]int64, error) {
 	if data == nil {
-		return 0, utils.Error("attached resource is nil")
+		return nil, utils.Error("attached resource is nil")
 	}
 	raw := strings.TrimSpace(data.Value)
 	if raw == "" {
-		return 0, utils.Error("http flow id is empty")
+		return nil, utils.Error("http flow id list is empty")
 	}
-	id, err := strconv.ParseInt(raw, 10, 64)
-	if err != nil || id <= 0 {
-		return 0, utils.Errorf("invalid http flow id: %q", raw)
+
+	var directIDs []int64
+	if err := json.Unmarshal([]byte(raw), &directIDs); err == nil {
+		return normalizeAttachedHTTPFlowIDs(directIDs)
 	}
-	return id, nil
+
+	var payload struct {
+		IDs []int64 `json:"ids"`
+	}
+	if err := json.Unmarshal([]byte(raw), &payload); err == nil && len(payload.IDs) > 0 {
+		return normalizeAttachedHTTPFlowIDs(payload.IDs)
+	}
+
+	return nil, utils.Errorf("invalid http flow id list json: %q", raw)
+}
+
+func normalizeAttachedHTTPFlowIDs(ids []int64) ([]int64, error) {
+	if len(ids) == 0 {
+		return nil, utils.Error("http flow id list is empty")
+	}
+	seen := make(map[int64]struct{}, len(ids))
+	out := make([]int64, 0, len(ids))
+	for _, id := range ids {
+		if id <= 0 {
+			return nil, utils.Errorf("invalid http flow id: %d", id)
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		out = append(out, id)
+	}
+	if len(out) == 0 {
+		return nil, utils.Error("http flow id list is empty")
+	}
+	return out, nil
+}
+
+func FormatAttachedHTTPFlowIDsSummary(value string) string {
+	ids, err := attachedHTTPFlowIDsFromResource(&AttachedResource{Value: value})
+	if err != nil {
+		return strings.TrimSpace(value)
+	}
+	parts := make([]string, 0, len(ids))
+	for _, id := range ids {
+		parts = append(parts, strconv.FormatInt(id, 10))
+	}
+	return strings.Join(parts, ", ")
 }
 
 func attachedSelectedTextFromResource(data *AttachedResource) string {
@@ -243,15 +287,44 @@ func RenderAttachedHTTPFlowResource(db *gorm.DB, data *AttachedResource, emitter
 	if db == nil {
 		return "", utils.Error("project database is not available")
 	}
-	flowID, err := attachedHTTPFlowIDFromResource(data)
+	flowIDs, err := attachedHTTPFlowIDsFromResource(data)
 	if err != nil {
 		return "", err
 	}
-	flow, err := yakit.GetHTTPFlow(db, flowID)
-	if err != nil {
-		return "", utils.Wrap(err, "load attached http flow failed")
+
+	var sections []string
+	var loadErrors []string
+	for _, flowID := range flowIDs {
+		flow, loadErr := yakit.GetHTTPFlow(db, flowID)
+		if loadErr != nil {
+			loadErrors = append(loadErrors, fmt.Sprintf("- ID %d: load failed: %v", flowID, loadErr))
+			continue
+		}
+		sections = append(sections, FormatAttachedHTTPFlow(flow, emitter))
 	}
-	return FormatAttachedHTTPFlow(flow, emitter), nil
+
+	var builder strings.Builder
+	builder.WriteString("## Attached HTTP Flows\n\n")
+	builder.WriteString(fmt.Sprintf("Requested IDs: %s\n\n", FormatAttachedHTTPFlowIDsSummary(data.Value)))
+	if len(loadErrors) > 0 {
+		builder.WriteString("### Load Errors\n")
+		builder.WriteString(strings.Join(loadErrors, "\n"))
+		builder.WriteString("\n\n")
+	}
+	if len(sections) == 0 {
+		if len(loadErrors) > 0 {
+			return strings.TrimSpace(builder.String()), nil
+		}
+		return "", utils.Error("no attached http flows could be loaded")
+	}
+	builder.WriteString(strings.Join(sections, "\n\n---\n\n"))
+
+	full := strings.TrimSpace(builder.String())
+	inline, spillNote := inlineOrSpillAttachedText("attached_http_flow_list", full, AttachedHTTPFlowListInlineLimit, emitter)
+	if spillNote != "" {
+		return strings.TrimSpace(spillNote + "\n\nInline preview:\n" + inline), nil
+	}
+	return full, nil
 }
 
 func RenderAttachedSelectedResource(data *AttachedResource, emitter *Emitter) string {

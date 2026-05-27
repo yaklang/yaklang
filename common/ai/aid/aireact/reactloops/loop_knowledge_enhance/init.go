@@ -266,8 +266,8 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 		httpFlowIDs = dedupStrings(httpFlowIDs)
 		if len(httpFlowIDs) > 0 {
 			resourcesInfo.WriteString("### HTTP 流量 (HTTP Flows)\n")
-			for _, id := range httpFlowIDs {
-				resourcesInfo.WriteString(fmt.Sprintf("- ID: %s\n", id))
+			for _, raw := range httpFlowIDs {
+				resourcesInfo.WriteString(fmt.Sprintf("- IDs: %s\n", aicommon.FormatAttachedHTTPFlowIDsSummary(raw)))
 			}
 			resourcesInfo.WriteString("\n")
 		}

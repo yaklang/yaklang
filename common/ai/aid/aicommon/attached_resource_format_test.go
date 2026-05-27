@@ -19,6 +19,45 @@ func TestIsAttachedHTTPFlowResource(t *testing.T) {
 	require.False(t, IsAttachedHTTPFlowResource(NewAttachedResource(CONTEXT_PROVIDER_TYPE_FILE, CONTEXT_PROVIDER_KEY_FILE_PATH, "/tmp/a.txt")))
 }
 
+func TestAttachedHTTPFlowIDsFromResourceJSON(t *testing.T) {
+	ids, err := attachedHTTPFlowIDsFromResource(NewAttachedResource(AttachedResourceTypeHTTPFlowID, AttachedResourceKeyID, `[1,2,2,3]`))
+	require.NoError(t, err)
+	require.Equal(t, []int64{1, 2, 3}, ids)
+
+	ids, err = attachedHTTPFlowIDsFromResource(NewAttachedResource(AttachedResourceTypeHTTPFlowID, AttachedResourceKeyID, `{"ids":[4,5]}`))
+	require.NoError(t, err)
+	require.Equal(t, []int64{4, 5}, ids)
+
+	_, err = attachedHTTPFlowIDsFromResource(NewAttachedResource(AttachedResourceTypeHTTPFlowID, AttachedResourceKeyID, `not-json`))
+	require.Error(t, err)
+
+	_, err = attachedHTTPFlowIDsFromResource(NewAttachedResource(AttachedResourceTypeHTTPFlowID, AttachedResourceKeyID, `[]`))
+	require.Error(t, err)
+}
+
+func TestFormatAttachedHTTPFlowListSpillToFile(t *testing.T) {
+	var sections []string
+	for i := 0; i < 8; i++ {
+		flow := &schema.HTTPFlow{
+			Url:        fmt.Sprintf("https://example.com/%d", i),
+			Method:     "GET",
+			StatusCode: 200,
+		}
+		flow.ID = uint(i + 1)
+		flow.SetRequest(strings.Repeat("R", AttachedHTTPFlowRequestInlineLimit))
+		flow.SetResponse(strings.Repeat("S", AttachedHTTPFlowResponseInlineLimit))
+		sections = append(sections, FormatAttachedHTTPFlow(flow, nil))
+	}
+
+	full := strings.Join(sections, "\n\n---\n\n")
+	require.Greater(t, len(full), AttachedHTTPFlowListInlineLimit)
+
+	inline, note := inlineOrSpillAttachedText("attached_http_flow_list", full, AttachedHTTPFlowListInlineLimit, nil)
+	require.Contains(t, note, "attached_http_flow_list length")
+	require.Contains(t, note, "full content saved to file")
+	require.Len(t, inline, AttachedHTTPFlowListInlineLimit)
+}
+
 func TestFormatAttachedHTTPFlowInline(t *testing.T) {
 	flow := &schema.HTTPFlow{
 		Url:        "https://example.com/api",
@@ -97,16 +136,17 @@ func TestRenderAttachedHTTPFlowResourceFromDB(t *testing.T) {
 		_ = yakit.DeleteHTTPFlow(db, &ypb.DeleteHTTPFlowRequest{Id: []int64{int64(flow.ID)}})
 	})
 
-	_, err := RenderAttachedHTTPFlowResource(db, NewAttachedResource(AttachedResourceTypeHTTPFlowID, AttachedResourceKeyID, "not-a-number"), nil)
+	_, err := RenderAttachedHTTPFlowResource(db, NewAttachedResource(AttachedResourceTypeHTTPFlowID, AttachedResourceKeyID, `not-json`), nil)
 	require.Error(t, err)
 
-	_, err = RenderAttachedHTTPFlowResource(db, NewAttachedResource(AttachedResourceTypeHTTPFlowID, AttachedResourceKeyID, "999999999"), nil)
-	require.Error(t, err)
+	_, err = RenderAttachedHTTPFlowResource(db, NewAttachedResource(AttachedResourceTypeHTTPFlowID, AttachedResourceKeyID, `{"ids":[999999999]}`), nil)
+	require.NoError(t, err)
 
-	rendered, err := RenderAttachedHTTPFlowResource(db, NewAttachedResource(AttachedResourceTypeHTTPFlowID, AttachedResourceKeyID, fmt.Sprintf("%d", flow.ID)), nil)
+	rendered, err := RenderAttachedHTTPFlowResource(db, NewAttachedResource(AttachedResourceTypeHTTPFlowID, AttachedResourceKeyID, fmt.Sprintf(`{"ids":[%d]}`, flow.ID)), nil)
 	require.NoError(t, err)
 	require.Contains(t, rendered, token)
 	require.Contains(t, rendered, fmt.Sprintf("HTTP Flow #%d", flow.ID))
+	require.Contains(t, rendered, "Requested IDs:")
 }
 
 func TestInlineOrSpillAttachedTextCreatesFile(t *testing.T) {

@@ -9,6 +9,7 @@ const (
 
 	AttachedHTTPFlowRequestInlineLimit  = 3 * 1024
 	AttachedHTTPFlowResponseInlineLimit = 3 * 1024
+	AttachedHTTPFlowListInlineLimit     = 30 * 1024
 	AttachedSelectedTextInlineLimit     = 5 * 1024
 )
 
