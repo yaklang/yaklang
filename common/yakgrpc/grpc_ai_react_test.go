@@ -53,6 +53,9 @@ func TestConvertYPBAIStartParamsToReActConfig(t *testing.T) {
 		UserPlanPrompt:               userPlanPrompt,
 		DisableToolIntervalReview:    disableToolIntervalReview,
 		SyncPerceptionTrigger: syncPerceptionTrigger,
+		EnabledCapabilities: []*ypb.AIEnabledCapability{
+			{Name: "read_file", Type: "tool"},
+		},
 	}
 
 	opts := ConvertYPBAIStartParamsToReActConfig(start)
@@ -79,6 +82,9 @@ func TestConvertYPBAIStartParamsToReActConfig(t *testing.T) {
 	require.Equal(t, start.DisableToolIntervalReview, cfg.DisableIntervalReview)
 	require.Equal(t, start.SyncPerceptionTrigger, cfg.GetSyncPerceptionTrigger())
 	require.Equal(t, start.GetEnablePlan(), cfg.GetEnablePlanAndExec())
+	require.Equal(t, []aicommon.EnabledCapability{
+		{Name: "read_file", Type: aicommon.EnabledCapabilityTypeTool},
+	}, cfg.GetEnabledCapabilities())
 	// AiServerName is no longer set from frontend params (WithAIChatInfo deprecated),
 	// it is now auto-detected via ModelInfoCallback during actual AI gateway calls.
 }

@@ -14,6 +14,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aimem"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
@@ -282,6 +283,31 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 		}
 	}
 	react.promptManager = NewPromptManager(react, workdir)
+
+	cfg.SetSkillHotloadHandler(func(skillNames []string) {
+		if len(skillNames) == 0 {
+			return
+		}
+		if loop := react.GetCurrentLoop(); loop != nil {
+			if mgr := loop.GetSkillsContextManager(); mgr != nil {
+				results := mgr.LoadSkills(skillNames)
+				for name, err := range results {
+					if err != nil {
+						log.Warnf("hotload skill %q failed: %v", name, err)
+					}
+				}
+			}
+		}
+	})
+
+	cfg.SetForgeHotloadHandler(func(forgeNames []string) {
+		if len(forgeNames) == 0 {
+			return
+		}
+		if loop := react.GetCurrentLoop(); loop != nil {
+			reactloops.LoadEnabledForges(react.config, loop, forgeNames)
+		}
+	})
 
 	// Register pending context providers
 	react.promptManager.cpm = cfg.ContextProviderManager

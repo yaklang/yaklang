@@ -333,8 +333,44 @@ func OverlayAISessionStartParams(base, patch *ypb.AIStartParams) *ypb.AIStartPar
 	if patch.GetPreferSessionCachedConfig() {
 		next.PreferSessionCachedConfig = true
 	}
+	if len(patch.GetEnabledCapabilities()) > 0 {
+		next.EnabledCapabilities = overlayEnabledCapabilities(base, patch)
+	}
 
 	return next
+}
+
+func overlayEnabledCapabilities(base, patch *ypb.AIStartParams) []*ypb.AIEnabledCapability {
+	if patch == nil || len(patch.GetEnabledCapabilities()) == 0 {
+		return nil
+	}
+	merged := make([]*ypb.AIEnabledCapability, 0)
+	seen := make(map[string]struct{})
+	appendCap := func(item *ypb.AIEnabledCapability) {
+		if item == nil {
+			return
+		}
+		name := strings.TrimSpace(item.GetName())
+		capType := strings.ToLower(strings.TrimSpace(item.GetType()))
+		if name == "" || capType == "" {
+			return
+		}
+		key := capType + ":" + name
+		if _, ok := seen[key]; ok {
+			return
+		}
+		seen[key] = struct{}{}
+		merged = append(merged, &ypb.AIEnabledCapability{Name: name, Type: capType})
+	}
+	if base != nil {
+		for _, item := range base.GetEnabledCapabilities() {
+			appendCap(item)
+		}
+	}
+	for _, item := range patch.GetEnabledCapabilities() {
+		appendCap(item)
+	}
+	return merged
 }
 
 func GetAISessionMetaBySessionID(db *gorm.DB, sessionID string) (*schema.AISession, error) {

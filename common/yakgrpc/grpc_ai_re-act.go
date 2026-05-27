@@ -118,6 +118,10 @@ func ConvertYPBAIStartParamsToReActConfig(i *ypb.AIStartParams) []aicommon.Confi
 		opts = append(opts, aicommon.WithSessionSource(i.GetSource()))
 	}
 
+	if caps := aicommon.ParseEnabledCapabilitiesFromProto(i); len(caps) > 0 {
+		opts = append(opts, aicommon.WithEnabledCapabilities(caps...))
+	}
+
 	return opts
 }
 

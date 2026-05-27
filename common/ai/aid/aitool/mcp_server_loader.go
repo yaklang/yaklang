@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 	"sync"
 	"time"
 
@@ -288,4 +289,44 @@ func createToolCallback(mcpClient client.MCPClient, toolName string, serverName 
 
 		return resultContent, nil
 	}
+}
+
+// LoadAIToolsFromMCPCapability loads MCP tools for an enabled capability entry.
+// If name looks like a full AI tool name (mcp_{server}_{tool}), it resolves that tool;
+// otherwise name is treated as an MCP server name and all tools from that server are loaded.
+func LoadAIToolsFromMCPCapability(db *gorm.DB, ctx context.Context, name string) ([]*Tool, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return nil, utils.Error("mcp capability name is empty")
+	}
+	if strings.HasPrefix(name, "mcp_") {
+		tool, err := loadAIToolFromMCPServersByAIToolName(db, ctx, name)
+		if err != nil {
+			return nil, err
+		}
+		return []*Tool{tool}, nil
+	}
+	return LoadAIToolFromMCPServers(db, ctx, name)
+}
+
+func loadAIToolFromMCPServersByAIToolName(db *gorm.DB, ctx context.Context, aiToolName string) (*Tool, error) {
+	if db == nil {
+		db = consts.GetGormProfileDatabase()
+	}
+	if db == nil {
+		return nil, utils.Error("profile database is nil")
+	}
+	for server := range yakit.YieldEnabledMCPServers(ctx, db) {
+		tools, err := LoadAIToolFromMCPServers(db, ctx, server.Name)
+		if err != nil {
+			log.Warnf("load mcp server %q while resolving tool %q failed: %v", server.Name, aiToolName, err)
+			continue
+		}
+		for _, tool := range tools {
+			if tool != nil && tool.Name == aiToolName {
+				return tool, nil
+			}
+		}
+	}
+	return nil, utils.Errorf("mcp tool %q not found in enabled mcp servers", aiToolName)
 }
