@@ -141,6 +141,16 @@ func launchMcpServer(ctx context.Context, req *ypb.StartMcpServerRequest, send f
 		opts = append(opts, mcp.WithYakScriptTools(tools...))
 	}
 
+	// Apply per-tool enable/disable from the profile DB.
+	// Tools that were explicitly disabled by the user are filtered out here.
+	disabledTools, dbErr := GetDisabledMCPToolNamesFromDB()
+	if dbErr != nil {
+		log.Warnf("launchMcpServer: failed to load disabled tool list: %v", dbErr)
+	}
+	if len(disabledTools) > 0 {
+		opts = append(opts, mcp.WithDisabledToolNames(disabledTools))
+	}
+
 	// 创建 MCP 服务器
 	mcpServer, err := mcp.NewMCPServer(opts...)
 	if err != nil {

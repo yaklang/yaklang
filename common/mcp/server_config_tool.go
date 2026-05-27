@@ -49,3 +49,24 @@ func AddGlobalToolSet(setName string, opts ...ToolSetOption) {
 func GlobalToolSetList() []string {
 	return lo.Keys(globalToolSets)
 }
+
+// GlobalBuiltinTools returns a snapshot of all builtin tools registered via
+// AddGlobalToolSet. The returned map is a shallow copy — callers must not mutate it.
+func GlobalBuiltinTools() map[string]*ToolWithHandler {
+	snapshot := make(map[string]*ToolWithHandler, len(globalTools))
+	maps.Copy(snapshot, globalTools)
+	return snapshot
+}
+
+// GetBuiltinToolByName returns the builtin ToolWithHandler for the given tool
+// name, or nil if not found.
+func GetBuiltinToolByName(name string) *ToolWithHandler {
+	return globalTools[name]
+}
+
+// ToolWithHandler accessors — kept minimal to avoid leaking internals.
+
+// Tool returns the underlying mcp.Tool definition.
+func (t *ToolWithHandler) Tool() *mcp.Tool {
+	return t.tool
+}

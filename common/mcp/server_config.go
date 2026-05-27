@@ -22,6 +22,9 @@ type MCPServerConfig struct {
 	enableResources  map[string]*ResourceWithHandler
 	disableResources map[string]*ResourceWithHandler
 	dynamicScript    []string
+	// extraAITools holds aitool.Tool instances registered via WithAITools.
+	// They are merged last and override globalTools entries with the same name.
+	extraAITools map[string]*ToolWithHandler
 }
 
 func NewMCPServerConfig() *MCPServerConfig {
@@ -31,6 +34,7 @@ func NewMCPServerConfig() *MCPServerConfig {
 		disableTools:     make(map[string]*ToolWithHandler),
 		enableResources:  make(map[string]*ResourceWithHandler),
 		disableResources: make(map[string]*ResourceWithHandler),
+		extraAITools:     make(map[string]*ToolWithHandler),
 	}
 }
 
@@ -41,6 +45,12 @@ func (cfg *MCPServerConfig) ApplyConfig(s *MCPServer) {
 	}
 
 	for name, tool := range cfg.enableAITools {
+		tools[name] = tool
+	}
+
+	// extraAITools (registered via WithAITools) are merged last and override
+	// any global or enableAITools entry with the same name.
+	for name, tool := range cfg.extraAITools {
 		tools[name] = tool
 	}
 
@@ -283,6 +293,20 @@ func WithYakScriptTools(tools ...*mcp.Tool) McpServerOption {
 					return s.execYakScriptWrapper(tool.Name, tool.YakScript)
 				},
 			}
+		}
+		return nil
+	}
+}
+
+// WithDisabledToolNames registers a set of tool names that should be excluded
+// from the MCP server even if they are part of an enabled tool set. This is
+// used to apply per-tool enable/disable state stored in the profile DB.
+func WithDisabledToolNames(names map[string]struct{}) McpServerOption {
+	return func(cfg *MCPServerConfig) error {
+		for name := range names {
+			// We use a sentinel ToolWithHandler (nil tool) — ApplyConfig only
+			// checks key presence in disableTools to decide whether to skip.
+			cfg.disableTools[name] = &ToolWithHandler{}
 		}
 		return nil
 	}
