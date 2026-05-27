@@ -63,18 +63,28 @@ func SaveLowHTTPFlow(r *lowhttp.LowhttpResponse, forceSaveFlowSync bool) {
 	}
 	reqIns = r.RequestInstance
 
-	// db := consts.GetGormProjectDatabase()
-	flow, err := CreateHTTPFlowFromHTTPWithBodySavedFromRaw(
-		https,
-		req,
-		rsp,
-		"scan",
-		url,
-		remoteAddr,
+	wireRsp, displayRsp, keepWire := lowhttpResponsePackets(r)
+	saveOpts := []CreateHTTPFlowOptions{
 		CreateHTTPFlowWithRequestIns(reqIns),
 		CreateHTTPFlowWithTags(strings.Join(r.Tags, "|")),
 		CreateHTTPFlowWithDuration(duration),
 		CreateHTTPFlowWithAfterSave(r.AfterSaveHTTPFlowHandler...),
+		CreateHTTPFlowWithResponseRaw(displayRsp),
+	}
+	if len(wireRsp) > 0 {
+		saveOpts = append(saveOpts, CreateHTTPFlowWithBareResponseRaw(wireRsp))
+	}
+	if keepWire {
+		saveOpts = append(saveOpts, CreateHTTPFlowWithNoFixContentLength(true))
+	}
+	flow, err := CreateHTTPFlowFromHTTPWithBodySavedFromRaw(
+		https,
+		req,
+		displayRsp,
+		"scan",
+		url,
+		remoteAddr,
+		saveOpts...,
 	)
 	if err != nil {
 		log.Errorf("create httpflow from lowhttp failed: %s", err)
@@ -93,7 +103,9 @@ func SaveLowHTTPFlow(r *lowhttp.LowhttpResponse, forceSaveFlowSync bool) {
 	flow.RuntimeId = runtimeId
 	flow.HiddenIndex = hiddenIndex
 	flow.Payload = strings.Join(payloads, ",")
-	flow.Tags = strings.Join(tags, "|")
+	if len(tags) > 0 {
+		flow.AddTag(tags...)
+	}
 	err = InsertHTTPFlowEx(flow, forceSaveFlowSync)
 	if err != nil {
 		log.Errorf("insert httpflow failed: %s", err)
@@ -113,7 +125,9 @@ type CreateHTTPFlowConfig struct {
 	isHttps            bool
 	reqRaw             []byte
 	rspRaw             []byte
+	bareRspRaw         []byte // wire packet; sidecar KV when it differs from display response
 	fixRspRaw          []byte // 如果设置了，则不会再修复rspRaw
+	noFixContentLength bool   // keep wire in DB (NoFix / 不修复数据包)
 	source             string
 	url                string
 	remoteAddr         string
@@ -172,6 +186,20 @@ func CreateHTTPFlowWithRequestRaw(reqRaw []byte) CreateHTTPFlowOptions {
 func CreateHTTPFlowWithResponseRaw(rspRaw []byte) CreateHTTPFlowOptions {
 	return func(c *CreateHTTPFlowConfig) {
 		c.rspRaw = rspRaw
+	}
+}
+
+// CreateHTTPFlowWithBareResponseRaw sets wire-original response bytes (e.g. LowhttpResponse.BareResponse).
+func CreateHTTPFlowWithBareResponseRaw(bareRspRaw []byte) CreateHTTPFlowOptions {
+	return func(c *CreateHTTPFlowConfig) {
+		c.bareRspRaw = bareRspRaw
+	}
+}
+
+// CreateHTTPFlowWithNoFixContentLength keeps the wire response in DB (WebFuzzer「不修复数据包」).
+func CreateHTTPFlowWithNoFixContentLength(noFix bool) CreateHTTPFlowOptions {
+	return func(c *CreateHTTPFlowConfig) {
+		c.noFixContentLength = noFix
 	}
 }
 
@@ -296,11 +324,13 @@ func CreateHTTPFlow(opts ...CreateHTTPFlowOptions) (*schema.HTTPFlow, error) {
 	}
 
 	var (
-		isHttps            = c.isHttps
-		reqRaw             = c.reqRaw
-		rspRaw             = c.rspRaw
+		isHttps             = c.isHttps
+		reqRaw              = c.reqRaw
+		rspRaw              = c.rspRaw
+		bareRspRaw         = c.bareRspRaw
 		fixRspRaw          = c.fixRspRaw
-		source             = c.source
+		noFixContentLength = c.noFixContentLength
+		source              = c.source
 		url                = c.url
 		remoteAddr         = c.remoteAddr
 		reqIns             = c.reqIns
@@ -333,18 +363,12 @@ func CreateHTTPFlow(opts ...CreateHTTPFlowOptions) (*schema.HTTPFlow, error) {
 		log.Errorf("[BUG] requestRaw is invalid: %s", requestRaw)
 	}
 
-	// 如果已经修复过响应，则不会再修复
-	if len(fixRspRaw) == 0 {
-		rawNoGzip, _, _ := lowhttp.FixHTTPResponse(rspRaw)
-		if len(rawNoGzip) > 0 {
-			rspRaw = rawNoGzip
-		}
-	} else {
-		rspRaw = fixRspRaw
-	}
+	wireRsp := httpFlowWireResponse(bareRspRaw, rspRaw)
+	rspRaw = httpFlowDisplayResponse(wireRsp, rspRaw, fixRspRaw, noFixContentLength)
 	if rspRaw == nil {
 		rspRaw = make([]byte, 0)
 	}
+	storeBareWire := httpFlowShouldStoreBareWire(wireRsp, rspRaw, noFixContentLength)
 
 	var rspContentType string
 	rspRaw = truncateHTTPPacketBodyForStorage(rspRaw, maxStoredHTTPFlowResponseBodyBytes)
@@ -357,7 +381,12 @@ func CreateHTTPFlow(opts ...CreateHTTPFlowOptions) (*schema.HTTPFlow, error) {
 	_ = header
 	responseRaw := strconv.Quote(string(rspRaw))
 
+	if storeBareWire {
+		c.afterSaveHandlers = append(c.afterSaveHandlers, afterSaveHTTPFlowBareResponse(wireRsp))
+	}
+
 	flow := &schema.HTTPFlow{
+		NoFixContentLength:         noFixContentLength,
 		IsHTTPS:                    isHttps,
 		Url:                        url,
 		Path:                       requestUri,
@@ -378,6 +407,9 @@ func CreateHTTPFlow(opts ...CreateHTTPFlowOptions) (*schema.HTTPFlow, error) {
 		TooLargeResponseBodyFile:   tooLargeBodyFile,
 		TooLargeResponseHeaderFile: tooLargeHeaderFile,
 		FromPlugin:                 fromPlugin,
+	}
+	if storeBareWire {
+		flow.AddTagToFirst(HTTPFlowTagAutoFixResponse)
 	}
 	if len(c.afterSaveHandlers) > 0 {
 		flow.AfterSaveHandlers = append([]func(*schema.HTTPFlow){}, c.afterSaveHandlers...)
@@ -502,6 +534,12 @@ func createHTTPFlowFromHTTP(isHttps bool, req *http.Request, rsp *http.Response,
 	} else {
 		plainResponse = make([]byte, 0)
 	}
+
+	wireResponse := httpctx.GetBareResponseBytes(req)
+	if len(wireResponse) == 0 {
+		wireResponse = plainResponse
+	}
+	opts = append(opts, CreateHTTPFlowWithBareResponseRaw(wireResponse))
 
 	return CreateHTTPFlowFromHTTPWithBodySavedFromRaw(isHttps, plainRequest, plainResponse, source, urlRaw, remoteAddr, opts...)
 }
