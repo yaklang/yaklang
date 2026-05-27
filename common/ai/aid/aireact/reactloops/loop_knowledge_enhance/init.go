@@ -153,6 +153,8 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 		var files []string
 		var aiTools []string
 		var aiForges []string
+		var httpFlowIDs []string
+		var hasSelectedText bool
 		var knowledgeCoreSummary string
 
 		for _, data := range attachedDatas {
@@ -183,6 +185,10 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 				aiTools = append(aiTools, data.Value)
 			case aicommon.CONTEXT_PROVIDER_TYPE_AIFORGE:
 				aiForges = append(aiForges, data.Value)
+			case aicommon.AttachedResourceTypeHTTPFlowID:
+				httpFlowIDs = append(httpFlowIDs, data.Value)
+			case aicommon.AttachedResourceTypeSelected:
+				hasSelectedText = true
 			}
 		}
 
@@ -255,6 +261,20 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 				resourcesInfo.WriteString(fmt.Sprintf("- %s\n", f))
 			}
 			resourcesInfo.WriteString("\n")
+		}
+
+		httpFlowIDs = dedupStrings(httpFlowIDs)
+		if len(httpFlowIDs) > 0 {
+			resourcesInfo.WriteString("### HTTP 流量 (HTTP Flows)\n")
+			for _, id := range httpFlowIDs {
+				resourcesInfo.WriteString(fmt.Sprintf("- ID: %s\n", id))
+			}
+			resourcesInfo.WriteString("\n")
+		}
+
+		if hasSelectedText {
+			resourcesInfo.WriteString("### 用户选中文本 (Selected Text)\n")
+			resourcesInfo.WriteString("- (attached)\n\n")
 		}
 
 		loopDataDir := loop.GetLoopContentDir("data")

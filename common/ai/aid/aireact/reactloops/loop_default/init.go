@@ -16,6 +16,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 		if imagePaths := collectAttachedImagePaths(attachedDatas); len(imagePaths) > 0 {
 			RunAttachedImageVisionInDefaultInit(r, loop, task, imagePaths)
 		}
+		RunAttachedExtraResourcesInDefaultInit(r, loop, task, attachedDatas)
 
 		// Original logic: process attached data (knowledge bases, files, etc.)
 		mustProcessMentionedInfo := config.GetConfigBool("MustProcessAttachedData")
