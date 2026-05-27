@@ -27,6 +27,40 @@ func TestGetRateLimitConfig_DefaultValues(t *testing.T) {
 	assert.Equal(t, int64(3), cfg.FreeUserDelaySec, "default free user delay should be 3")
 	assert.Equal(t, "{}", cfg.ModelRPMOverrides, "default model RPM overrides should be empty JSON object")
 	assert.Equal(t, "{}", cfg.ModelDelayOverrides, "default model delay overrides should be empty JSON object")
+
+	// 新增的 5 个字段默认值
+	// 关键词: AiBalanceRateLimitConfig 默认值 软限额 TPS
+	assert.Equal(t, int64(0), cfg.FreeUserDelayMaxSec, "default delay max should be 0")
+	assert.Equal(t, int64(0), cfg.FreeUserOutputTPS, "default output TPS should be 0")
+	assert.Equal(t, "{}", cfg.ModelOutputTPSOverrides, "default model TPS overrides should be empty JSON object")
+	assert.Equal(t, int64(0), cfg.FreeUserTokenSoftLimitM, "default soft limit M should be 0")
+	assert.Equal(t, int64(0), cfg.FreeUserSoftLimitTPS, "default soft limit TPS should be 0")
+}
+
+// TestSaveRateLimitConfig_RoundtripNewFields 验证 5 个新字段的 roundtrip。
+// 关键词: SaveRateLimitConfig roundtrip 新字段
+func TestSaveRateLimitConfig_RoundtripNewFields(t *testing.T) {
+	EnsureRateLimitConfigTable()
+
+	cfg, err := GetRateLimitConfig()
+	require.NoError(t, err)
+
+	cfg.FreeUserDelayMaxSec = 5
+	cfg.FreeUserOutputTPS = 25
+	cfg.ModelOutputTPSOverrides = `{"slow-free":10,"fast-free":100}`
+	cfg.FreeUserTokenSoftLimitM = 600
+	cfg.FreeUserSoftLimitTPS = 15
+
+	require.NoError(t, SaveRateLimitConfig(cfg))
+
+	cfg2, err := GetRateLimitConfig()
+	require.NoError(t, err)
+
+	assert.Equal(t, int64(5), cfg2.FreeUserDelayMaxSec)
+	assert.Equal(t, int64(25), cfg2.FreeUserOutputTPS)
+	assert.Equal(t, `{"slow-free":10,"fast-free":100}`, cfg2.ModelOutputTPSOverrides)
+	assert.Equal(t, int64(600), cfg2.FreeUserTokenSoftLimitM)
+	assert.Equal(t, int64(15), cfg2.FreeUserSoftLimitTPS)
 }
 
 func TestSaveRateLimitConfig_Roundtrip(t *testing.T) {
@@ -106,17 +140,28 @@ func TestApplyRateLimitConfig_Integration(t *testing.T) {
 	cfg.applyRateLimitConfig(rlCfg2)
 
 	assert.Equal(t, int64(250), cfg.chatRateLimiter.defaultRPM.Load())
-	assert.Equal(t, int64(10), cfg.freeUserDelaySec)
+	assert.Equal(t, int64(10), cfg.freeUserDelayMinSec)
 	assert.Equal(t, int64(42), cfg.chatRateLimiter.getEffectiveRPM("special-model"))
 	assert.Equal(t, int64(250), cfg.chatRateLimiter.getEffectiveRPM("generic-model"))
 
-	assert.Equal(t, int64(30), cfg.chatRateLimiter.GetEffectiveDelay("slow-free", cfg.freeUserDelaySec),
-		"per-model delay override should win over the global free-user delay")
-	assert.Equal(t, int64(0), cfg.chatRateLimiter.GetEffectiveDelay("fast-free", cfg.freeUserDelaySec),
-		"explicit zero delay override should win over the global free-user delay")
-	assert.Equal(t, cfg.freeUserDelaySec,
-		cfg.chatRateLimiter.GetEffectiveDelay("generic-free", cfg.freeUserDelaySec),
-		"models without override should fall back to global free-user delay")
+	// per-model delay override should win over the global free-user delay
+	// 关键词: GetEffectiveDelay DelayRange 覆盖优先
+	slowMin, slowMax := cfg.chatRateLimiter.GetEffectiveDelay("slow-free",
+		cfg.freeUserDelayMinSec, cfg.freeUserDelayMaxSec)
+	assert.Equal(t, int64(30), slowMin, "per-model delay override min should win")
+	assert.Equal(t, int64(0), slowMax, "legacy numeric override stores Max=0")
+
+	fastMin, fastMax := cfg.chatRateLimiter.GetEffectiveDelay("fast-free",
+		cfg.freeUserDelayMinSec, cfg.freeUserDelayMaxSec)
+	assert.Equal(t, int64(0), fastMin, "explicit zero delay override should win over the global free-user delay")
+	assert.Equal(t, int64(0), fastMax)
+
+	genericMin, genericMax := cfg.chatRateLimiter.GetEffectiveDelay("generic-free",
+		cfg.freeUserDelayMinSec, cfg.freeUserDelayMaxSec)
+	assert.Equal(t, cfg.freeUserDelayMinSec, genericMin,
+		"models without override should fall back to global free-user delay min")
+	assert.Equal(t, cfg.freeUserDelayMaxSec, genericMax,
+		"models without override should fall back to global free-user delay max")
 }
 
 func TestApplyRateLimitConfig_NilSafe(t *testing.T) {
@@ -132,9 +177,11 @@ func TestApplyRateLimitConfig_EmptyOverrides(t *testing.T) {
 	defer cfg.Close()
 
 	cfg.chatRateLimiter.SetModelRPM("leftover-model", 99)
-	cfg.chatRateLimiter.SetModelDelay("leftover-free", 77)
+	cfg.chatRateLimiter.SetModelDelay("leftover-free", 77, 88)
 	assert.Equal(t, int64(99), cfg.chatRateLimiter.getEffectiveRPM("leftover-model"))
-	assert.Equal(t, int64(77), cfg.chatRateLimiter.GetEffectiveDelay("leftover-free", 1))
+	leftoverMin, leftoverMax := cfg.chatRateLimiter.GetEffectiveDelay("leftover-free", 1, 2)
+	assert.Equal(t, int64(77), leftoverMin)
+	assert.Equal(t, int64(88), leftoverMax)
 
 	rlCfg := &schema.AiBalanceRateLimitConfig{
 		DefaultRPM:          300,
@@ -146,6 +193,9 @@ func TestApplyRateLimitConfig_EmptyOverrides(t *testing.T) {
 
 	assert.Equal(t, int64(300), cfg.chatRateLimiter.getEffectiveRPM("leftover-model"),
 		"after applying empty overrides, old model RPM should be cleared")
-	assert.Equal(t, int64(1), cfg.chatRateLimiter.GetEffectiveDelay("leftover-free", 1),
-		"after applying empty delay overrides, old model delay should be cleared")
+	clearedMin, clearedMax := cfg.chatRateLimiter.GetEffectiveDelay("leftover-free", 1, 2)
+	assert.Equal(t, int64(1), clearedMin,
+		"after applying empty delay overrides, old model delay should be cleared (fallback Min)")
+	assert.Equal(t, int64(2), clearedMax,
+		"after applying empty delay overrides, old model delay should be cleared (fallback Max)")
 }

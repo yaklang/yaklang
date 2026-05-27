@@ -575,8 +575,22 @@ type ServerConfig struct {
 	amapHealthCheckStopCh chan struct{}
 
 	// RPM rate limiter for chat completions (per API key, with per-model overrides)
-	chatRateLimiter  *ChatRateLimiter
-	freeUserDelaySec int64 // cached from DB; actual delay is N~2N seconds random
+	chatRateLimiter *ChatRateLimiter
+	// 免费用户调用前延迟区间（秒）。
+	//   - freeUserDelayMaxSec <= 0 时按老语义 N~2N（其中 N = freeUserDelayMinSec）。
+	//   - freeUserDelayMinSec == 0 且 freeUserDelayMaxSec > 0 时为 [0, max]。
+	// 关键词: ServerConfig freeUserDelayMinSec freeUserDelayMaxSec, N~M 区间延迟
+	freeUserDelayMinSec int64
+	freeUserDelayMaxSec int64
+
+	// 输出 Token Per Second 限速（免费用户）。0 = 不限速。
+	// 关键词: ServerConfig freeUserOutputTPS, 全局输出 TPS 上限
+	freeUserOutputTPS int64
+
+	// 全局共享池软限额配置
+	// 关键词: ServerConfig freeUserTokenSoftLimitM, freeUserSoftLimitTPS
+	freeUserTokenSoftLimitM int64
+	freeUserSoftLimitTPS    int64
 
 	// inFlightTokens 维护"在途请求预扣 token 总量"，按 daily token 桶分组。
 	// 与 DB 的 bucket_db_used 加和后参与 daily check，硬卡死并发过冲。
@@ -618,7 +632,8 @@ func NewServerConfig() *ServerConfig {
 	config.amapHealthCheckStopCh = make(chan struct{})
 	// Initialize chat RPM rate limiter
 	config.chatRateLimiter = NewChatRateLimiter()
-	config.freeUserDelaySec = 3
+	config.freeUserDelayMinSec = 3
+	config.freeUserDelayMaxSec = 0 // 0 触发老语义 N~2N 兜底（即 3~6 秒）
 	// Initialize in-flight token tracker (overflow defense for daily token check)
 	// 关键词: NewServerConfig inFlightTokens 初始化
 	config.inFlightTokens = NewInFlightTokenTracker()
@@ -1010,13 +1025,19 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 	// Free user pre-call delay: applied BEFORE forwarding to providers so
 	// the client perceives the throttle (post-call sleep was ineffective
 	// because the response had already been delivered). Per-model delay
-	// overrides win over the global free-user delay.
+	// overrides (Min, Max) win over the global free-user delay range.
+	//
+	// 调用 computeJitterDelaySec 在 [Min, Max] 区间内均匀采样实际延迟秒数；
+	// 当模型/全局只填了 Min（Max=0），自动回退老 N~2N 行为，保证存量配置
+	// 不被破坏。
+	// 关键词: 免费用户调用前延迟, N~M 随机, 兼容老 N~2N
 	if isFreeModel && c.chatRateLimiter != nil {
-		delaySec := c.chatRateLimiter.GetEffectiveDelay(modelName, c.freeUserDelaySec)
-		if delaySec > 0 {
-			base := delaySec
-			jitter := time.Duration(base+(time.Now().UnixNano()%base+base)%base) * time.Second
-			c.logInfo("free user pre-call delay: sleeping %v before forwarding model %s", jitter, modelName)
+		minSec, maxSec := c.chatRateLimiter.GetEffectiveDelay(modelName, c.freeUserDelayMinSec, c.freeUserDelayMaxSec)
+		actual := computeJitterDelaySec(minSec, maxSec)
+		if actual > 0 {
+			jitter := time.Duration(actual) * time.Second
+			c.logInfo("free user pre-call delay: sleeping %v before forwarding model %s (range=%ds~%ds)",
+				jitter, modelName, minSec, maxSec)
 			time.Sleep(jitter)
 		}
 	}
@@ -1105,6 +1126,17 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 		// 在客户端 stream=false 时只累积到内部缓冲，不再向客户端管道吐 SSE 帧。
 		// 关键词: writer notStream 显式传递, 非流式 writer 行为
 		writer := NewChatJSONChunkWriterEx(conn, apiKeyForStat, modelName, !stream)
+
+		// 输出 TPS 限速：只对免费模型 + 流式 (stream=true) 生效。
+		// ResolveEffectiveOutputTPS 综合 模型级 / 全局 / 软限额 TPS 三档，
+		// 取最严（非零最小值）作为本次请求的 effective TPS。
+		// 关键词: writer SetOutputTPSLimit, 免费模型 + 流式 TPS 限速
+		if isFreeModel && stream {
+			if effectiveTPS := c.ResolveEffectiveOutputTPS(modelName, true); effectiveTPS > 0 {
+				writer.SetOutputTPSLimit(effectiveTPS)
+				c.logInfo("free user output TPS limited: model=%s tps=%d", modelName, effectiveTPS)
+			}
+		}
 
 		// cleanupResources is a helper function to properly close all resources
 		// to prevent memory leaks when switching to next provider or on failure

@@ -328,14 +328,28 @@ type AiBalanceRateLimitConfig struct {
 	gorm.Model
 
 	DefaultRPM          int64  `json:"default_rpm" gorm:"default:600"`         // Global default RPM per API key, default 600
-	FreeUserDelaySec    int64  `json:"free_user_delay_sec" gorm:"default:3"`   // Pre-call delay (seconds) for free users, actual delay is N~2N random
+	FreeUserDelaySec    int64  `json:"free_user_delay_sec" gorm:"default:3"`   // Pre-call delay (seconds) for free users, when FreeUserDelayMaxSec<=0 acts as N (legacy N~2N random)
 	ModelRPMOverrides   string `json:"model_rpm_overrides" gorm:"type:text"`   // JSON map: {"model-name": rpm_int, ...}
-	ModelDelayOverrides string `json:"model_delay_overrides" gorm:"type:text"` // JSON map: {"model-name": delay_sec_int, ...}, only applies to free users
+	ModelDelayOverrides string `json:"model_delay_overrides" gorm:"type:text"` // JSON map: legacy {"model-name": delay_sec_int} or new {"model-name": {"min": int, "max": int}}; only applies to free users
 
 	// 免费用户日 Token 限额相关字段
 	// 关键词: 免费用户 Token 日限额, 全局共享池, 模型级覆盖, 模型豁免
 	FreeUserTokenLimitM            int64  `json:"free_user_token_limit_m" gorm:"default:1200"` // 免费用户全局共享日 Token 限额，单位 M tokens，默认 1200M
 	FreeUserTokenModelOverrides    string `json:"free_user_token_model_overrides" gorm:"type:text"` // JSON map: {"model": {"limit_m": int, "exempt": bool}}; exempt=true 表示该 -free 模型不计费
+
+	// 免费延迟 N~M 区间随机改造
+	// 关键词: FreeUserDelayMaxSec, N~M 随机延迟, 老 N~2N 兼容
+	FreeUserDelayMaxSec int64 `json:"free_user_delay_max_sec" gorm:"default:0"` // 调用前延迟上限（秒）。0 时按老语义 N~2N
+
+	// 输出 Token Per Second 限速
+	// 关键词: FreeUserOutputTPS, ModelOutputTPSOverrides, token-per-second 节流
+	FreeUserOutputTPS       int64  `json:"free_user_output_tps" gorm:"default:0"`       // 免费用户全局输出 TPS 上限，0 = 不限速
+	ModelOutputTPSOverrides string `json:"model_output_tps_overrides" gorm:"type:text"` // JSON map: {"model-name": tps_int, ...}
+
+	// 全局共享池软限额（仅影响免费模型走共享池的请求；模型独立桶不受影响）
+	// 关键词: FreeUserTokenSoftLimitM, FreeUserSoftLimitTPS, 软限额 TPS 限速
+	FreeUserTokenSoftLimitM int64 `json:"free_user_token_soft_limit_m" gorm:"default:0"` // 软限额阈值（M token），>0 时启用
+	FreeUserSoftLimitTPS    int64 `json:"free_user_soft_limit_tps" gorm:"default:0"`     // 软限额触发后的输出 TPS，0 = 不限速
 }
 
 func (a *AiBalanceRateLimitConfig) TableName() string {

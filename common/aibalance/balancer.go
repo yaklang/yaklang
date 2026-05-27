@@ -209,8 +209,10 @@ func LoadProvidersFromDatabase(config *ServerConfig) error {
 		log.Warnf("Failed to load RateLimitConfig: %v", err)
 	} else {
 		config.applyRateLimitConfig(rlConfig)
-		log.Infof("Loaded rate limit config: default_rpm=%d, free_user_delay=%ds free_token_limit_m=%d",
-			rlConfig.DefaultRPM, rlConfig.FreeUserDelaySec, rlConfig.FreeUserTokenLimitM)
+		log.Infof("Loaded rate limit config: default_rpm=%d, free_user_delay=%d~%ds free_token_limit_m=%d output_tps=%d soft_limit_m=%d soft_tps=%d",
+			rlConfig.DefaultRPM, rlConfig.FreeUserDelaySec, rlConfig.FreeUserDelayMaxSec,
+			rlConfig.FreeUserTokenLimitM, rlConfig.FreeUserOutputTPS,
+			rlConfig.FreeUserTokenSoftLimitM, rlConfig.FreeUserSoftLimitTPS)
 	}
 
 	// Ensure DAU & cache stats tables exist and start daily cleanup + summary flusher.

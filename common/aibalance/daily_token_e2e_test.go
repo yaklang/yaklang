@@ -49,7 +49,8 @@ func startDailyTokenTestServer(t *testing.T, dayOffset int) (string, *ServerConf
 	cfg.AdminPassword = "test-admin-password-secure"
 	cfg.AuthMiddleware = NewAuthMiddleware(cfg, DefaultAuthConfig())
 	// 禁用免费用户预延迟，避免测试拖慢
-	cfg.freeUserDelaySec = 0
+	cfg.freeUserDelayMinSec = 0
+	cfg.freeUserDelayMaxSec = 0
 	// 较高的 RPM，避免 RPM 限流提前触发，保证我们能稳定测到 Token 限额
 	if cfg.chatRateLimiter != nil {
 		cfg.chatRateLimiter.SetDefaultRPM(10000)

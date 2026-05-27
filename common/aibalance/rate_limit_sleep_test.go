@@ -83,7 +83,8 @@ func TestFreeUserPreCallDelay_DelaysBeforeProvider(t *testing.T) {
 	cfg := NewServerConfig()
 	defer cfg.Close()
 	cfg.chatRateLimiter.SetDefaultRPM(100)
-	cfg.freeUserDelaySec = 1 // global fallback: 1s base, jitter to 1~2s
+	cfg.freeUserDelayMinSec = 1 // global fallback: 1s base, Max=0 -> 老语义 N~2N (1~2s)
+	cfg.freeUserDelayMaxSec = 0
 
 	raw := buildFreeModelRawHTTP("delay-precall-free")
 
@@ -107,8 +108,9 @@ func TestFreeUserPreCallDelay_PerModelOverride(t *testing.T) {
 	cfg := NewServerConfig()
 	defer cfg.Close()
 	cfg.chatRateLimiter.SetDefaultRPM(100)
-	cfg.freeUserDelaySec = 5 // global is 5s; would be very slow without override
-	cfg.chatRateLimiter.SetModelDelay("instant-free", 0)
+	cfg.freeUserDelayMinSec = 5 // global is 5s; would be very slow without override
+	cfg.freeUserDelayMaxSec = 0
+	cfg.chatRateLimiter.SetModelDelay("instant-free", 0, 0)
 
 	raw := buildFreeModelRawHTTP("instant-free")
 
@@ -131,8 +133,9 @@ func TestFreeUserPreCallDelay_PerModelOverrideHigher(t *testing.T) {
 	cfg := NewServerConfig()
 	defer cfg.Close()
 	cfg.chatRateLimiter.SetDefaultRPM(100)
-	cfg.freeUserDelaySec = 0 // disable global
-	cfg.chatRateLimiter.SetModelDelay("slow-free", 1)
+	cfg.freeUserDelayMinSec = 0 // disable global
+	cfg.freeUserDelayMaxSec = 0
+	cfg.chatRateLimiter.SetModelDelay("slow-free", 1, 0) // Max=0 -> 老语义 1~2s
 
 	raw := buildFreeModelRawHTTP("slow-free")
 
@@ -142,6 +145,85 @@ func TestFreeUserPreCallDelay_PerModelOverrideHigher(t *testing.T) {
 
 	assert.GreaterOrEqual(t, elapsed, 900*time.Millisecond,
 		"per-model override should override the global default")
+	assert.NotContains(t, resp, "429")
+}
+
+// TestFreeUserDelay_RangeMinMax 验证：当配置了 Min/Max 时延迟在 [Min, Max] 区间内随机。
+// 例如 Min=0, Max=2 -> 实际延迟 0~2 秒。
+// 关键词: FreeUserDelay N~M 随机延迟测试
+func TestFreeUserDelay_RangeMinMax(t *testing.T) {
+	persistDBRateLimitRPM(t, 100)
+	defer resetDBRateLimitRPM(t)
+
+	cfg := NewServerConfig()
+	defer cfg.Close()
+	cfg.chatRateLimiter.SetDefaultRPM(100)
+	// 配置 Max=2 让区间为 [0, 2] 秒
+	cfg.freeUserDelayMinSec = 0
+	cfg.freeUserDelayMaxSec = 2
+
+	raw := buildFreeModelRawHTTP("range-free")
+
+	start := time.Now()
+	resp := sendChatCompletionDirect(t, cfg, raw)
+	elapsed := time.Since(start)
+
+	// 上界稍宽：网络/调度开销允许 < 3s
+	assert.Less(t, elapsed, 3*time.Second,
+		"delay should not exceed Max + scheduler slack")
+	assert.NotContains(t, resp, "429")
+}
+
+// TestFreeUserDelay_BackwardCompatN2N 验证：Max=0 时按老语义 N~2N。
+// 关键词: FreeUserDelay 兼容 N~2N
+func TestFreeUserDelay_BackwardCompatN2N(t *testing.T) {
+	// 直接断言 computeJitterDelaySec：Min=2, Max=0 -> 区间 [2, 4]
+	for i := 0; i < 50; i++ {
+		got := computeJitterDelaySec(2, 0)
+		assert.GreaterOrEqual(t, got, int64(2))
+		assert.LessOrEqual(t, got, int64(4))
+	}
+
+	// Min=0, Max=5 -> 区间 [0, 5]
+	for i := 0; i < 50; i++ {
+		got := computeJitterDelaySec(0, 5)
+		assert.GreaterOrEqual(t, got, int64(0))
+		assert.LessOrEqual(t, got, int64(5))
+	}
+
+	// Min=3, Max=3 -> 固定 3
+	for i := 0; i < 10; i++ {
+		assert.Equal(t, int64(3), computeJitterDelaySec(3, 3))
+	}
+
+	// Min=0, Max=0 -> 0
+	assert.Equal(t, int64(0), computeJitterDelaySec(0, 0))
+
+	// 负值兜底归零
+	assert.Equal(t, int64(0), computeJitterDelaySec(-1, -1))
+}
+
+// TestFreeUserDelay_PerModelOverrideRange 验证：模型级 (Min, Max) 覆盖生效。
+// 关键词: FreeUserDelay 模型级 N~M 覆盖
+func TestFreeUserDelay_PerModelOverrideRange(t *testing.T) {
+	persistDBRateLimitRPM(t, 100)
+	defer resetDBRateLimitRPM(t)
+
+	cfg := NewServerConfig()
+	defer cfg.Close()
+	cfg.chatRateLimiter.SetDefaultRPM(100)
+	cfg.freeUserDelayMinSec = 10 // 全局很慢
+	cfg.freeUserDelayMaxSec = 20
+	cfg.chatRateLimiter.SetModelDelay("range-override-free", 0, 1) // 模型 0~1 秒
+
+	raw := buildFreeModelRawHTTP("range-override-free")
+
+	start := time.Now()
+	resp := sendChatCompletionDirect(t, cfg, raw)
+	elapsed := time.Since(start)
+
+	assert.Less(t, elapsed, 2*time.Second,
+		"per-model override [0,1] should win over global [10,20]; elapsed=%v", elapsed)
 	assert.NotContains(t, resp, "429")
 }
 
