@@ -1617,10 +1617,27 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 		// 把快照投递给所有命中条件的镜像规则的 worker pool. 非阻塞,
 		// 队列满时丢弃并记账, 主流程不感知任何镜像层的状态.
 		// 关键词: aibalance mirror trigger 接入, MirrorSnapshot 构造, 异步分发
-		if c.MirrorManager != nil {
+		// 关键词: aibalance mirror trigger 短路, HasActiveRules 节能,
+		//        NeedsActionParsing 跳过 ParseAction, MirrorSnapshot 构造延迟
+		//
+		// 三档短路:
+		//   1. MirrorManager 不存在或没有任何在跑规则 -> 整段跳过 (零开销)
+		//   2. 有规则但全是 always / any_toolcall -> 构造 snapshot 但不解析 @action
+		//      (避免对大文本响应做 jsonextractor 全文扫描)
+		//   3. 有规则需要 @action -> 走完整路径
+		//
+		// always 规则保证: 即使 @action 解析失败, Action="" / ActionPayload=nil
+		// 的 snapshot 仍会被分发 (MirrorRuleMatch 在 always 分支直接 return true).
+		if c.MirrorManager != nil && c.MirrorManager.HasActiveRules() {
 			respText := outputTextBuf.String()
 			reasonText := reasonTextBuf.String()
-			action, actionPayload := ParseActionFromText(respText)
+
+			var action string
+			var actionPayload map[string]interface{}
+			if c.MirrorManager.NeedsActionParsing() {
+				action, actionPayload = ParseActionFromText(respText)
+			}
+
 			// 关键词: aibalance mirror APIKeyFP 计算, 不可逆指纹, 防止 key 泄漏
 			// free-user 场景没有 key, 用字面量 "free-user" 让脚本能直接判别;
 			// 其他场景用 SHA256[:16] 不可逆指纹, 不再暴露 shrink 后的 key 头尾.

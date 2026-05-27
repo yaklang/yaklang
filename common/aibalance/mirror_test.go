@@ -90,6 +90,71 @@ func TestExtractToolFromActionPayload_NextAction(t *testing.T) {
 	assert.Equal(t, "grep-search", ExtractToolFromActionPayload("call-tool", payload))
 }
 
+// TestParseActionFromText_GracefulOnBroken 严重破损的 JSON 应该优雅返回空,
+// 不能 panic. 这是 aicommon 兼容策略的核心: 解析失败时上层 (always 规则)
+// 仍可继续 fire-and-forget.
+//
+// 关键词: ParseActionFromText graceful, broken JSON 不 panic
+func TestParseActionFromText_GracefulOnBroken(t *testing.T) {
+	cases := []string{
+		`{"@action": "directly_answer", "broken-no-close`,
+		`{{{{`,
+		`{"@action": 12345}`, // @action 不是字符串
+		`{"@action": ""}`,    // 空字符串
+	}
+	for _, text := range cases {
+		action, payload := ParseActionFromText(text)
+		// 关键是不 panic, 任意 (空, 空) 是合理结果
+		assert.Equal(t, "", action, "input: %q payload=%v", text, payload)
+	}
+}
+
+// TestParseActionFromText_MixedSSELikeStream 展示新实现 (ExtractObjectIndexes)
+// 比旧手写 brace counter 强的地方: 响应中混合多段 JSON 对象, 第一段不含 @action
+// (例如 SSE delta 累积) 但后面才出现真正的协议体. 旧 extractJSONObject 只截
+// 首个 { ... } 块, 会卡死; 新实现遍历所有对象, 找到含 @action 的为止.
+//
+// 关键词: ParseActionFromText SSE 混合流, 多对象遍历, ExtractObjectIndexes
+func TestParseActionFromText_MixedSSELikeStream(t *testing.T) {
+	text := `
+data: {"choices":[{"delta":{"content":"hel"}}]}
+data: {"choices":[{"delta":{"content":"lo"}}]}
+data: [DONE]
+
+{"@action": "directly_answer", "answer_payload": "hello"}
+`
+	action, payload := ParseActionFromText(text)
+	assert.Equal(t, "directly_answer", action)
+	require.NotNil(t, payload)
+	assert.Equal(t, "hello", payload["answer_payload"])
+}
+
+// TestParseActionFromText_MultipleObjects 覆盖响应中多段 JSON 时取第一个含
+// @action 的对象 (与 aicommon ExtractAllAction 行为一致).
+// 关键词: ParseActionFromText 多对象, 取第一个 @action
+func TestParseActionFromText_MultipleObjects(t *testing.T) {
+	text := `
+some preface {"unrelated": true}
+later block: {"@action": "call-tool", "tool": "read-file"}
+trailing: {"@action": "directly_answer"}
+`
+	action, payload := ParseActionFromText(text)
+	assert.Equal(t, "call-tool", action)
+	assert.Equal(t, "read-file", payload["tool"])
+}
+
+// TestParseActionFromText_NestedActionObject 覆盖 @action 字段是对象的兼容形态:
+// {"@action": {"name": "directly_answer"}}, 取第一个非空字符串值, 与 aicommon
+// fixParams 中的 fallback 行为对齐.
+// 关键词: ParseActionFromText @action 嵌套对象, aicommon 对齐
+func TestParseActionFromText_NestedActionObject(t *testing.T) {
+	text := `{"@action": {"name": "directly_answer"}, "answer_payload": "ok"}`
+	action, payload := ParseActionFromText(text)
+	assert.Equal(t, "directly_answer", action)
+	require.NotNil(t, payload)
+	assert.Equal(t, "ok", payload["answer_payload"])
+}
+
 // -------------------- MirrorRuleMatch --------------------
 
 func TestMirrorRuleMatch_Always(t *testing.T) {
@@ -548,4 +613,100 @@ func TestMirrorManager_ConcurrentTrigger(t *testing.T) {
 		}()
 	}
 	wg.Wait()
+}
+
+// -------------------- HasActiveRules / NeedsActionParsing --------------------
+//
+// 这两个 hint 给 server.go 在每次请求结束时做"零开销/低开销"分支判断:
+//   - HasActiveRules=false      -> 整段 MirrorSnapshot 构造跳过
+//   - NeedsActionParsing=false  -> 构造 snapshot 但不跑 ParseActionFromText
+//
+// 关键词: TestMirrorManager_Hints, HasActiveRules, NeedsActionParsing,
+//        mirror trigger 节能短路
+
+// fakeRuntime 直接往 m.runtime 里塞一个 stub, 不启 worker goroutine.
+// 这样测试只关心 hint 函数返回值, 不需要真正跑脚本.
+// 注意: cancel 必须给一个 no-op, 否则 RemoveRule 会 nil deref.
+//
+// 关键词: fakeRuntime, mirror manager stub, no-op cancel
+func fakeRuntime(m *MirrorManager, rule *schema.AiMirrorRule) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.runtime[rule.ID] = &mirrorRuleRuntime{
+		rule:   rule,
+		logs:   newMirrorLogRing(),
+		cancel: func() {},
+	}
+}
+
+func TestMirrorManager_HasActiveRules(t *testing.T) {
+	m := NewMirrorManager()
+	assert.False(t, m.HasActiveRules(), "fresh manager has no rules")
+
+	fakeRuntime(m, &schema.AiMirrorRule{Name: "a", ConditionType: MirrorConditionAlways})
+	assert.True(t, m.HasActiveRules())
+
+	// nil receiver 安全
+	var nilm *MirrorManager
+	assert.False(t, nilm.HasActiveRules())
+}
+
+func TestMirrorManager_NeedsActionParsing(t *testing.T) {
+	m := NewMirrorManager()
+	assert.False(t, m.NeedsActionParsing(), "fresh manager doesn't need parsing")
+
+	// 只挂一条 always: 不需要解析 action
+	always := &schema.AiMirrorRule{Name: "always", ConditionType: MirrorConditionAlways}
+	always.ID = 1
+	fakeRuntime(m, always)
+	assert.False(t, m.NeedsActionParsing(), "always rule alone doesn't need @action")
+
+	// 加一条 any_toolcall: 仍然不需要
+	tc := &schema.AiMirrorRule{Name: "tc", ConditionType: MirrorConditionAnyToolcall}
+	tc.ID = 2
+	fakeRuntime(m, tc)
+	assert.False(t, m.NeedsActionParsing(), "any_toolcall doesn't need @action either")
+
+	// 加一条 action_eq: 立刻需要解析
+	ae := &schema.AiMirrorRule{Name: "ae", ConditionType: MirrorConditionActionEq, ActionName: "foo"}
+	ae.ID = 3
+	fakeRuntime(m, ae)
+	assert.True(t, m.NeedsActionParsing(), "action_eq triggers parsing")
+
+	// 移除掉, 又回到不需要
+	m.RemoveRule(3)
+	assert.False(t, m.NeedsActionParsing())
+
+	// 单独挂 action_call_tool_eq 也需要解析
+	act := &schema.AiMirrorRule{Name: "act", ConditionType: MirrorConditionActionCallToolEq, ToolName: "x"}
+	act.ID = 4
+	fakeRuntime(m, act)
+	assert.True(t, m.NeedsActionParsing(), "action_call_tool_eq triggers parsing")
+
+	// nil receiver 安全
+	var nilm *MirrorManager
+	assert.False(t, nilm.NeedsActionParsing())
+}
+
+// -------------------- Always 命中即使解析失败 --------------------
+//
+// 用户诉求: every response 都保存的时候, 解析失败也需要保存.
+// 即: ConditionType=always 时, snapshot.Action 是空字符串也应当命中.
+//
+// 关键词: TestMirrorRuleMatch_AlwaysHitsEvenWithoutAction,
+//        always 规则解析失败兜底, ParseAction 失败不影响投递
+func TestMirrorRuleMatch_AlwaysHitsEvenWithoutAction(t *testing.T) {
+	rule := &schema.AiMirrorRule{ConditionType: MirrorConditionAlways}
+	// 1. 完全空的 snapshot
+	assert.True(t, MirrorRuleMatch(rule, &MirrorSnapshot{}))
+	// 2. 有响应但 action 解析失败 (action="")
+	assert.True(t, MirrorRuleMatch(rule, &MirrorSnapshot{
+		ResponseText:  "hello, no json here",
+		Action:        "", // 模拟 ParseActionFromText 失败
+		ActionPayload: nil,
+	}))
+	// 3. 有响应也有 action
+	assert.True(t, MirrorRuleMatch(rule, &MirrorSnapshot{
+		Action: "directly_answer",
+	}))
 }
