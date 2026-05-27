@@ -2,11 +2,28 @@ package reactloops
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils"
 )
+
+func buildExitBlockedByTodoMessage(actionName string, items []aicommon.VerificationTodoItem) string {
+	if len(items) == 0 {
+		return ""
+	}
+	lines := make([]string, 0, len(items))
+	for _, item := range items {
+		lines = append(lines, aicommon.FormatVerificationTodoLine(item))
+	}
+	return fmt.Sprintf(
+		"current task still has %d active TODO item(s); %s cannot exit until each one is explicitly closed via adjust_todolist or verification next_movements with op=done / op=delete / op=skip.\nRemaining TODOs:\n%s",
+		len(items),
+		actionName,
+		strings.Join(lines, "\n"),
+	)
+}
 
 var loopAction_Finish = &LoopAction{
 	ActionType: "finish",
@@ -15,17 +32,26 @@ var loopAction_Finish = &LoopAction{
 		"(tool outputs are captured automatically and the system will synthesize a summary). " +
 		"Do NOT precede this action with bash echo/cat/tee/printf calls that only restate facts " +
 		"already produced by earlier tool calls — that wastes iterations. " +
+		"CRITICAL: if the current task still owns active TODO items, finish will be rejected until those TODOs are explicitly closed. " +
 		"Use 'directly_answer' instead only when the user explicitly needs a structured Markdown " +
 		"answer emitted to the chat right now. Add 'human_readable_thought' only if a brief closing note is needed.",
 	ActionHandler: func(loop *ReActLoop, action *aicommon.Action, operator *LoopActionHandlerOperator) {
+		if items := aicommon.GetBlockingVerificationTodoItems(loop.GetConfig(), loop.GetCurrentTask()); len(items) > 0 {
+			msg := buildExitBlockedByTodoMessage("finish", items)
+			loop.invoker.AddToTimeline("[FINISH_BLOCKED_BY_TODO]", msg)
+			operator.Feedback(msg)
+			operator.Continue()
+			return
+		}
 		loop.invoker.AddToTimeline("finish", "AI decided mark the current Task is finished")
 		operator.Exit()
 	},
 }
 
 var loopAction_DirectlyAnswer = &LoopAction{
-	ActionType:  "directly_answer",
-	Description: "Answer the user directly via 'answer_payload' or FINAL_ANSWER tag. For simple direct answers, omit 'human_readable_thought'.",
+	ActionType: "directly_answer",
+	Description: "Answer the user directly via 'answer_payload' or FINAL_ANSWER tag. For simple direct answers, omit 'human_readable_thought'. " +
+		"CRITICAL: directly_answer is blocked while the current task still owns active TODO items; close them first with adjust_todolist or verification next_movements.",
 	Options: []aitool.ToolOption{
 		aitool.WithStringParam(
 			"answer_payload",
@@ -78,6 +104,13 @@ var loopAction_DirectlyAnswer = &LoopAction{
 
 		if payload == "" {
 			operator.Fail("directly_answer action must have 'answer_payload' field")
+			return
+		}
+		if items := aicommon.GetBlockingVerificationTodoItems(loop.GetConfig(), loop.GetCurrentTask()); len(items) > 0 {
+			msg := buildExitBlockedByTodoMessage("directly_answer", items)
+			invoker.AddToTimeline("[DIRECT_ANSWER_BLOCKED_BY_TODO]", msg)
+			operator.Feedback(msg)
+			operator.Continue()
 			return
 		}
 		invoker.EmitFileArtifactWithExt("directly_answer", ".md", payload)
