@@ -47,19 +47,56 @@ func attachedHTTPFlowIDsFromResource(data *AttachedResource) ([]int64, error) {
 		return nil, utils.Error("http flow id list is empty")
 	}
 
-	var directIDs []int64
-	if err := json.Unmarshal([]byte(raw), &directIDs); err == nil {
-		return normalizeAttachedHTTPFlowIDs(directIDs)
+	ids, err := parseAttachedHTTPFlowIDsJSON(raw)
+	if err != nil {
+		return nil, err
+	}
+	return normalizeAttachedHTTPFlowIDs(ids)
+}
+
+func parseAttachedHTTPFlowIDsJSON(raw string) ([]int64, error) {
+	var directItems []json.RawMessage
+	if err := json.Unmarshal([]byte(raw), &directItems); err == nil {
+		return parseAttachedHTTPFlowIDItems(directItems)
 	}
 
 	var payload struct {
-		IDs []int64 `json:"ids"`
+		IDs json.RawMessage `json:"ids"`
 	}
 	if err := json.Unmarshal([]byte(raw), &payload); err == nil && len(payload.IDs) > 0 {
-		return normalizeAttachedHTTPFlowIDs(payload.IDs)
+		var idItems []json.RawMessage
+		if err := json.Unmarshal(payload.IDs, &idItems); err == nil {
+			return parseAttachedHTTPFlowIDItems(idItems)
+		}
 	}
 
 	return nil, utils.Errorf("invalid http flow id list json: %q", raw)
+}
+
+func parseAttachedHTTPFlowIDItems(items []json.RawMessage) ([]int64, error) {
+	if len(items) == 0 {
+		return nil, utils.Error("http flow id list is empty")
+	}
+	ids := make([]int64, 0, len(items))
+	for _, item := range items {
+		item = json.RawMessage(strings.TrimSpace(string(item)))
+		var id int64
+		if err := json.Unmarshal(item, &id); err == nil {
+			ids = append(ids, id)
+			continue
+		}
+		var idStr string
+		if err := json.Unmarshal(item, &idStr); err == nil {
+			parsed, err := strconv.ParseInt(strings.TrimSpace(idStr), 10, 64)
+			if err != nil {
+				return nil, utils.Errorf("invalid http flow id string: %q", idStr)
+			}
+			ids = append(ids, parsed)
+			continue
+		}
+		return nil, utils.Errorf("invalid http flow id element: %s", string(item))
+	}
+	return ids, nil
 }
 
 func normalizeAttachedHTTPFlowIDs(ids []int64) ([]int64, error) {
