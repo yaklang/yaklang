@@ -105,7 +105,6 @@ const (
 	AI_REACT_LOOP_NAME_SYNTAXFLOW_CODE_AUDIT = "syntaxflow_code_audit"
 	AI_REACT_LOOP_NAME_SSA_RISK_OVERVIEW    = "ssa_risk_overview"
 	AI_REACT_LOOP_NAME_SSA_RISK_REVIEW      = "ssa_risk_review"
-	AI_REACT_LOOP_NAME_SYNTAXFLOW_AUDIT_ANALYST = "syntaxflow_audit_analyst"
 )
 
 const (

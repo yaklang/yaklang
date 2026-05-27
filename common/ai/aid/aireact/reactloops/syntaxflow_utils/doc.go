@@ -27,7 +27,10 @@
 //	sf_rule_full_quality	"true" 时规则全文质量
 //	ssa_risk_id	SSA 风险行主键（review 等）
 //	ssa_risks_filter_json	ypb.SSARisksFilter 的 protojson
-//	ssa_overview_filter_json	overview reload 时持久化的有效 filter
+//	ssa_overview_filter_json	overview query 时持久化的有效 filter
+//	ssa_risk_review_mode	analyze | analyze_dispose（review / 批量解读子环）
+//	ssa_risk_review_digest	子环 directly_answer 摘要累积
+//	ssa_risk_overview_analysis_summary	analyze_filtered_risks 短摘要
 //	sf_scan_config_json	与 yak code-scan --config 同族的完整 JSON
 //	project_path	可选，用于派生最小同进程 code-scan JSON
 //	sf_scan_pipeline_summary / sf_scan_scan_end_summary / …	管线与用户向阶段文（多阶段解释子环）

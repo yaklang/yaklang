@@ -4,7 +4,7 @@
 以下 JSON 与每轮 Prompt 中合并后的 Schema 字段一致；`WithReflectionOutputExample` 对仅通过 `WithRegisterLoopAction` 注册的 action 可能不会自动追加 OutputExamples，故附录集中放在本包并由各 Loop 拼接。
 
 * 刷新 SSA 风险总览列表（结构化过滤 / 复用上轮 filter）：
-  {"@action": "reload_ssa_risk_overview", "human_readable_thought": "需要按 program 重新拉取风险列表", "limit": 40, "program_name": "myapp"}
+  {"@action": "query_ssa_risk_overview", "human_readable_thought": "需要按 program 查询风险列表", "limit": 40, "program_name": "myapp"}
 
 * 单条解读中途切换目标 risk：
   {"@action": "set_ssa_risk_review_target", "human_readable_thought": "改看另一条 SSA 风险", "risk_id": 123}

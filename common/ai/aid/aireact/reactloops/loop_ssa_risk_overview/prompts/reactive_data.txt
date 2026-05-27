@@ -1,5 +1,13 @@
 ## 数据库抽样与统计提示
 - **approx_total**: {{ .TotalHint }}
+{{ if .FilterSummary }}
+- **last_query_filter**: {{ .FilterSummary }}
+{{ end }}
+
+{{ if .RecentActionsSummary }}
+## 本轮已执行动作（摘要）
+{{ .RecentActionsSummary }}
+{{ end }}
 
 <|SSA_RISK_OVERVIEW_PREFACE|>
 {{ .Preface }}

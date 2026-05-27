@@ -1,3 +1,4 @@
+// actions_transition.go：扫描后 handoff 的 ReAct action 工厂；With* 尚未在 syntaxflow_scan init 注册（见 init.go TODO）。
 package loop_syntaxflow_scan
 
 import (
@@ -8,57 +9,10 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	sfu "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/syntaxflow_utils"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-// WithHandoffSyntaxFlowAuditAnalystAction runs the syntaxflow_audit_analyst child loop once with current scan context.
-func WithHandoffSyntaxFlowAuditAnalystAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
-	return reactloops.WithRegisterLoopAction(
-		"handoff_syntaxflow_audit_analyst",
-		"Runs the **syntaxflow_audit_analyst** sub-loop once with the current task_id and risk digest (blocking until the child loop exits).",
-		[]aitool.ToolOption{
-			aitool.WithStringParam("extra_context", aitool.WithParam_Description("Optional focus or question for the analyst.")),
-		},
-		func(_ *reactloops.ReActLoop, _ *aicommon.Action) error { return nil },
-		func(loop *reactloops.ReActLoop, action *aicommon.Action, operator *reactloops.LoopActionHandlerOperator) {
-			if loop == nil {
-				operator.Continue()
-				return
-			}
-			parent := loop.GetCurrentTask()
-			if parent == nil {
-				operator.Feedback("handoff_syntaxflow_audit_analyst: no current task on loop")
-				operator.Continue()
-				return
-			}
-			tid := strings.TrimSpace(loop.Get(sfu.LoopVarSyntaxFlowTaskID))
-			ui := fmt.Sprintf("SyntaxFlow audit analyst handoff.\ntask_id=%s\nssa_risk_overview_preface (truncated):\n%s\nssa_risk_list_summary (truncated):\n%s\nExtra:\n%s",
-				tid,
-				utils.ShrinkTextBlock(loop.Get("ssa_risk_overview_preface"), 8000),
-				utils.ShrinkTextBlock(loop.Get("ssa_risk_list_summary"), 12000),
-				strings.TrimSpace(action.GetString("extra_context")),
-			)
-			child, err := reactloops.CreateLoopByName(schema.AI_REACT_LOOP_NAME_SYNTAXFLOW_AUDIT_ANALYST, r)
-			if err != nil {
-				operator.Feedback(fmt.Sprintf("handoff_syntaxflow_audit_analyst: CreateLoopByName: %v", err))
-				operator.Continue()
-				return
-			}
-			child.Set(sfu.LoopVarSyntaxFlowTaskID, tid)
-			child.Set("ssa_risk_overview_preface", loop.Get("ssa_risk_overview_preface"))
-
-			subID := fmt.Sprintf("%s-audit-analyst", parent.GetId())
-			sub := aicommon.NewSubTaskBase(parent, subID, ui, true)
-			if err := child.ExecuteWithExistedTask(sub); err != nil {
-				operator.Feedback(fmt.Sprintf("handoff_syntaxflow_audit_analyst: child loop error: %v", err))
-			} else {
-				operator.Feedback("[handoff_syntaxflow_audit_analyst] child loop finished.")
-			}
-			operator.Continue()
-		},
-	)
-}
+// TODO(syntaxflow_scan): 在 init.go 的 preset 中注册本文件各 With*，或删除并仅保留专注模式切换。
 
 // WithOpenReviewForRiskAction sets ssa_risk_id and records a handoff hint (user switches focus mode in Yakit to ssa_risk_review).
 func WithOpenReviewForRiskAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
@@ -154,9 +108,3 @@ func WithReadSSAProjectFileAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 	)
 }
 
-// SFAuditCodeSearchHint is appended to SyntaxFlow code-audit rule prompts so the model greps the tree before writing rules.
-func SFAuditCodeSearchHint() string {
-	return `
-
-【代码搜索 / 专注阅读】在编写或修改 SyntaxFlow 规则前，请使用 grep、read_file、find_file 在已探索的项目路径内缩小 Source/Sink 与框架入口，避免仅凭猜测写规则；优先在可疑目录（handler、controller、router）上缩小范围后再 grep。`
-}

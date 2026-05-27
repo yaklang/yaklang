@@ -40,18 +40,11 @@ func appendUniqueStr(slice []string, v string) []string {
 	return append(slice, v)
 }
 
-// MergeReloadSSARiskOverviewFilter builds the filter for reload_ssa_risk_overview from action params,
+// MergeQuerySSARiskOverviewFilter builds the filter for query_ssa_risk_overview from action params,
 // stored LoopVarSSAOverviewFilterJSON, or from BuildSSARisksFilterFromLoop after SyncSSARisksFilterFromIrifyToLoop.
-func MergeReloadSSARiskOverviewFilter(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, action *aicommon.Action) *ypb.SSARisksFilter {
-	rawFj := strings.TrimSpace(action.GetString("filter_json"))
+func MergeQuerySSARiskOverviewFilter(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, action *aicommon.Action) *ypb.SSARisksFilter {
 	var base *ypb.SSARisksFilter
-	if rawFj != "" {
-		base = &ypb.SSARisksFilter{}
-		if err := protojson.Unmarshal([]byte(rawFj), base); err != nil {
-			SyncSSARisksFilterFromIrifyToLoop(loop, task)
-			base = BuildSSARisksFilterFromLoop(loop, "")
-		}
-	} else if loop != nil {
+	if loop != nil {
 		if s := strings.TrimSpace(loop.Get(LoopVarSSAOverviewFilterJSON)); s != "" {
 			base = &ypb.SSARisksFilter{}
 			if err := protojson.Unmarshal([]byte(s), base); err != nil {
@@ -65,6 +58,9 @@ func MergeReloadSSARiskOverviewFilter(loop *reactloops.ReActLoop, task aicommon.
 		}
 		base = BuildSSARisksFilterFromLoop(loop, "")
 	}
+	if action == nil {
+		return base
+	}
 	if s := strings.TrimSpace(action.GetString("search")); s != "" {
 		base.Search = s
 	}
@@ -74,8 +70,23 @@ func MergeReloadSSARiskOverviewFilter(loop *reactloops.ReActLoop, task aicommon.
 			base.RuntimeID = appendUniqueStr(base.RuntimeID, part)
 		}
 	}
-	if p := strings.TrimSpace(action.GetString("program_name")); p != "" {
-		base.ProgramName = appendUniqueStr(base.ProgramName, p)
+	for _, part := range strings.Split(action.GetString("program_name"), ",") {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			base.ProgramName = appendUniqueStr(base.ProgramName, part)
+		}
+	}
+	for _, part := range strings.Split(action.GetString("severity"), ",") {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			base.Severity = appendUniqueStr(base.Severity, part)
+		}
+	}
+	for _, part := range strings.Split(action.GetString("risk_type"), ",") {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			base.RiskType = appendUniqueStr(base.RiskType, part)
+		}
 	}
 	return base
 }
@@ -118,7 +129,16 @@ func ApplySSARiskOverviewDB(loop *reactloops.ReActLoop, invoker aicommon.AIInvok
 	}
 
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("匹配条件 approximate count: %d；本页抽样 %d 条。\n\n", count, len(risks)))
+	sb.WriteString("查询条件: ")
+	sb.WriteString(FormatSSARisksFilterHuman(filter))
+	sb.WriteString("\n")
+	sb.WriteString(fmt.Sprintf("匹配条件 approximate count: %d；本页抽样 %d 条。", count, len(risks)))
+	if count == 0 && SSARisksFilterHasConstraints(filter) {
+		if total, err2 := yakit.QuerySSARiskCount(db, &ypb.SSARisksFilter{}); err2 == nil && total > 0 {
+			sb.WriteString(fmt.Sprintf("\n提示：当前过滤 0 条，但 SSA 库未过滤总量约 %d 条；可尝试 query_ssa_risk_overview 无参或放宽 runtime_id/program_name。", total))
+		}
+	}
+	sb.WriteString("\n\n")
 	for i, rk := range risks {
 		sb.WriteString(fmt.Sprintf("%d. id=%d | sev=%s | program=%s | rule=%s | title=%s\n",
 			i+1, rk.ID, rk.Severity, utils.ShrinkTextBlock(rk.ProgramName, 80),

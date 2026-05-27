@@ -15,9 +15,9 @@ import (
 
 func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, op *reactloops.InitTaskOperator) {
 	return func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, op *reactloops.InitTaskOperator) {
-		userInput := task.GetUserInput()
+		resetOverviewLoopTaskState(loop)
 		cfg := r.GetConfig()
-		// SSARisk 行 lives in the SSA 工程库（与 StartScanInBackground / reload_ssa_risk_overview 一致）；
+		// SSARisk 行 lives in the SSA 工程库（与 StartScanInBackground / query_ssa_risk_overview 一致）；
 		// 优先 GetSSADB，与 cfg.GetDB() 业务库不是同一套连接。
 		db := sfu.GetSSADB()
 		if db == nil {
@@ -32,7 +32,9 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 		}
 
 		sfu.SyncSSARisksFilterFromIrifyToLoop(loop, task)
-		filter := sfu.BuildSSARisksFilterFromLoop(loop, userInput)
+		// Init 只用 Irify 附件 / loop 上的 filter_json，不要把整句用户话塞进 Search（否则易 0 命中）。
+		// 语义检索由模型在 query_ssa_risk_overview 里显式传 search / program_name 等参数。
+		filter := sfu.BuildSSARisksFilterFromLoop(loop, "")
 		sfu.PersistEffectiveOverviewFilter(loop, filter)
 
 		count, err := yakit.QuerySSARiskCount(db, filter)
@@ -58,8 +60,20 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 			return
 		}
 
+		filterDesc := sfu.FormatSSARisksFilterHuman(filter)
+		loop.Set("ssa_overview_last_filter_summary", filterDesc)
+
 		var sb strings.Builder
-		sb.WriteString(fmt.Sprintf("匹配条件 approximate count: %d；本页抽样 %d 条。\n\n", count, len(risks)))
+		sb.WriteString("查询条件: ")
+		sb.WriteString(filterDesc)
+		sb.WriteString("\n")
+		sb.WriteString(fmt.Sprintf("匹配条件 approximate count: %d；本页抽样 %d 条。", count, len(risks)))
+		if count == 0 && sfu.SSARisksFilterHasConstraints(filter) {
+			if total, err2 := yakit.QuerySSARiskCount(db, &ypb.SSARisksFilter{}); err2 == nil && total > 0 {
+				sb.WriteString(fmt.Sprintf("\n提示：当前过滤 0 条，但 SSA 库未过滤总量约 %d 条；可尝试 query_ssa_risk_overview 无参或放宽 runtime_id/program_name。", total))
+			}
+		}
+		sb.WriteString("\n\n")
 		for i, rk := range risks {
 			sb.WriteString(fmt.Sprintf("%d. id=%d | sev=%s | program=%s | rule=%s | title=%s\n",
 				i+1, rk.ID, rk.Severity, utils.ShrinkTextBlock(rk.ProgramName, 80),
@@ -68,6 +82,10 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 		summary := sb.String()
 		loop.Set("ssa_risk_list_summary", summary)
 		loop.Set("ssa_risk_total_hint", fmt.Sprintf("%d", count))
+		recordMetaAction(loop, "init_overview", filterDesc, fmt.Sprintf("count=%d sample=%d", count, len(risks)))
+		if emitter := loop.GetEmitter(); emitter != nil && task != nil {
+			emitter.EmitThoughtStream(task.GetId(), "[init_overview] %s → count=%d", filterDesc, count)
+		}
 		r.AddToTimeline("ssa_risk_overview", utils.ShrinkTextBlock(summary, 4000))
 
 		preface := "下列摘要来自数据库查询，仅可在此基础上归纳、聚类、搜索建议；不得编造未列出的 risk_id。\n\n" + summary

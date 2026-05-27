@@ -19,6 +19,10 @@ func init() {
 			preset := []reactloops.ReActLoopOption{
 				reactloops.WithInitTask(buildSyntaxflowOrchestratorInit(r, state)),
 			}
+			// TODO(syntaxflow_scan): 扫描编排目前是纯 InitTask，无 ReAct 迭代。若增加 interpret 子环，在此注册
+			// actions_handoff.go 中的 handoff action（open_review_for_risk、open_rule_writer_from_scan、
+			// open_code_audit_from_scan、read_ssa_project_file）。用户侧 handoff 亦可直接切换专注模式
+			//（ssa_risk_review / write_syntaxflow_rule / syntaxflow_code_audit）。
 			preset = append(preset, opts...)
 			return reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_SYNTAXFLOW_SCAN, r, preset...)
 		},

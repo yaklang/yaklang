@@ -9,8 +9,14 @@ const (
 	LoopVarSFRuleFullQuality         = "sf_rule_full_quality"
 	LoopVarSSARiskID                 = "ssa_risk_id"
 	LoopVarSSARisksFilterJSON        = "ssa_risks_filter_json"
-	// LoopVarSSAOverviewFilterJSON stores the last effective SSARisksFilter (protojson) for reload_ssa_risk_overview without parameters.
+	// LoopVarSSAOverviewFilterJSON stores the last effective SSARisksFilter (protojson) for query_ssa_risk_overview without parameters.
 	LoopVarSSAOverviewFilterJSON = "ssa_overview_filter_json"
+	// LoopVarSSARiskReviewMode is analyze | analyze_dispose for review / batch-analyze sub-loops.
+	LoopVarSSARiskReviewMode = "ssa_risk_review_mode"
+	// LoopVarSSARiskReviewDigest accumulates per-risk directly_answer text from ssa_risk_review sub-loops.
+	LoopVarSSARiskReviewDigest = "ssa_risk_review_digest"
+	// LoopVarSSARiskOverviewAnalysisSummary is the short summary from analyze_filtered_risks (reactive).
+	LoopVarSSARiskOverviewAnalysisSummary = "ssa_risk_overview_analysis_summary"
 	LoopVarProjectPath           = "project_path"
 	LoopVarProjectName           = "project_name"
 	LoopVarProgramName           = "program_name"

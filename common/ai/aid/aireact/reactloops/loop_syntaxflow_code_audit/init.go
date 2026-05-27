@@ -9,7 +9,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
-	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_syntaxflow_scan"
 	sfu "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/syntaxflow_utils"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -92,7 +91,7 @@ func buildEnrichedRulePrompt(original string, state *SFCodeAuditState, reconPath
 - 技术栈摘要: %s
 - 入口点摘要: %s
 - 目录探索报告路径: %s
-%s`, strings.TrimSpace(original), state.ProjectPath, state.ProjectName, state.TechStack, state.EntryPoints, recon, loop_syntaxflow_scan.SFAuditCodeSearchHint())
+%s`, strings.TrimSpace(original), state.ProjectPath, state.ProjectName, state.TechStack, state.EntryPoints, recon, RuleWritingCodeSearchHint())
 }
 
 func buildRefFilesHint(files []string) string {
@@ -261,21 +260,6 @@ func buildOrchestratorInitTask(r aicommon.AIInvokeRuntime, state *SFCodeAuditSta
 		}
 		if sfPath := strings.TrimSpace(ruleLoop.Get("sf_filename")); sfPath != "" {
 			state.SetRulePath(sfPath)
-		}
-
-		// Phase 2a: syntaxflow_audit_analyst — SSA-backed triage after rule drafting (before optional new scan / attach).
-		analystInput := fmt.Sprintf(
-			"SyntaxFlow code audit — analyst pass.\nProject path: %s\nProject name: %s\nTech: %s\nEntry: %s\n\nUser goal:\n%s",
-			state.ProjectPath, state.ProjectName, state.TechStack, state.EntryPoints, strings.TrimSpace(userInput),
-		)
-		analystLoop, aerr := reactloops.CreateLoopByName(schema.AI_REACT_LOOP_NAME_SYNTAXFLOW_AUDIT_ANALYST, r)
-		if aerr != nil {
-			log.Warnf("[SFCodeAudit] create syntaxflow_audit_analyst: %v", aerr)
-		} else {
-			subAnalyst := newSubTaskWithInput(task, "phase2a_audit_analyst", analystInput)
-			if err := analystLoop.ExecuteWithExistedTask(subAnalyst); err != nil {
-				log.Warnf("[SFCodeAudit] Phase 2a syntaxflow_audit_analyst: %v (continuing)", err)
-			}
 		}
 
 		// Phase 2b (optional): when no irify task attachment but we have an explored project path, run syntaxflow_scan (new scan).

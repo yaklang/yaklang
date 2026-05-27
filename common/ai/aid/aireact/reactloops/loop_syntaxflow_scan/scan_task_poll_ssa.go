@@ -21,7 +21,7 @@ func AppendSfScanInterpretLog(loop *reactloops.ReActLoop, r aicommon.AIInvokeRun
 
 var (
 	PersistEffectiveOverviewFilter   = sfu.PersistEffectiveOverviewFilter
-	MergeReloadSSARiskOverviewFilter = sfu.MergeReloadSSARiskOverviewFilter
+	MergeQuerySSARiskOverviewFilter = sfu.MergeQuerySSARiskOverviewFilter
 	ApplySSARiskOverviewDB           = sfu.ApplySSARiskOverviewDB
 )
 

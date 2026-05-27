@@ -17,7 +17,6 @@ import (
 	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_smart_qa"
 	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_ssa_risk_overview"
 	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_ssa_risk_review"
-	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_syntaxflow_audit_analyst"
 	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_syntaxflow_code_audit"
 	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_syntaxflow_rule"
 	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_syntaxflow_scan"
