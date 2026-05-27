@@ -1,24 +1,23 @@
-package loop_default
+package reactloops
 
 import (
 	"fmt"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 )
 
-// RunAttachedExtraResourcesInDefaultInit renders HTTP flow and selected-text attachments
-// into the invoker timeline for the main ReAct loop.
-func RunAttachedExtraResourcesInDefaultInit(
+// RunAttachedExtraResourcesInit renders http_flow_id and selected attachments into the
+// invoker timeline so specialized loops (default, http flow analyze, http fuzztest, etc.)
+// can consume the same attached-resource payload.
+func RunAttachedExtraResourcesInit(
 	r aicommon.AIInvokeRuntime,
-	loop *reactloops.ReActLoop,
-	task aicommon.AIStatefulTask,
+	loop *ReActLoop,
 	attachedDatas []*aicommon.AttachedResource,
 ) {
-	if len(attachedDatas) == 0 || r == nil {
+	if len(attachedDatas) == 0 || r == nil || loop == nil {
 		return
 	}
 
@@ -40,7 +39,7 @@ func RunAttachedExtraResourcesInDefaultInit(
 			rendered, err := aicommon.RenderAttachedHTTPFlowResource(db, data, emitter)
 			if err != nil {
 				msg := fmt.Sprintf("failed to load attached HTTP flow %q: %v", strings.TrimSpace(data.Value), err)
-				log.Warnf("loop_default: %s", msg)
+				log.Warnf("attached extra resources: %s", msg)
 				httpFlowSections = append(httpFlowSections, fmt.Sprintf("## Attached HTTP Flow\n\n_Error: %s_", msg))
 				continue
 			}
@@ -57,13 +56,13 @@ func RunAttachedExtraResourcesInDefaultInit(
 	if len(httpFlowSections) > 0 {
 		payload := strings.Join(httpFlowSections, "\n\n---\n\n")
 		r.AddToTimeline("attached_http_flow", payload)
-		r.AddToTimeline("import notice", "attached_http_flow has been recorded from default-loop init; use it when reasoning about the user's HTTP traffic.")
+		r.AddToTimeline("import notice", "attached_http_flow has been recorded; use it when reasoning about the user's HTTP traffic.")
 	}
 
 	if len(selectedSections) > 0 {
 		payload := strings.Join(selectedSections, "\n\n---\n\n")
 		r.AddToTimeline("attached_selected_text", payload)
-		r.AddToTimeline("import notice", "attached_selected_text has been recorded from default-loop init; use it when reasoning about the user's UI selection.")
+		r.AddToTimeline("import notice", "attached_selected_text has been recorded; use it when reasoning about the user's UI selection.")
 	}
 
 	if len(httpFlowSections) > 0 || len(selectedSections) > 0 {

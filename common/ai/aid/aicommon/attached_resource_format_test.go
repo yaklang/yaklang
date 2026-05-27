@@ -28,6 +28,10 @@ func TestAttachedHTTPFlowIDsFromResourceJSON(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []int64{4, 5}, ids)
 
+	ids, err = attachedHTTPFlowIDsFromResource(NewAttachedResource(AttachedResourceTypeHTTPFlowID, AttachedResourceKeyID, `{"ids":["7895","7894","7896"]}`))
+	require.NoError(t, err)
+	require.Equal(t, []int64{7895, 7894, 7896}, ids)
+
 	_, err = attachedHTTPFlowIDsFromResource(NewAttachedResource(AttachedResourceTypeHTTPFlowID, AttachedResourceKeyID, `not-json`))
 	require.Error(t, err)
 

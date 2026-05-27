@@ -129,6 +129,8 @@ var urlPattern = regexp.MustCompile(`https?://[^\s"'<>]+`)
 // buildInitTask creates the initialization task handler
 func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
 	return func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
+		reactloops.RunAttachedExtraResourcesInit(r, loop, task.GetAttachedDatas())
+
 		emitter := r.GetConfig().GetEmitter()
 		config := r.GetConfig()
 
