@@ -1,11 +1,14 @@
 package mcp
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
 
 	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	mcptool "github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
@@ -35,6 +38,7 @@ var MCPCommand = &cli.Command{
 		cli.StringSliceFlag{Name: "script", Usage: "add the dynamic Yak script as a tool to the MCP server"},
 		cli.StringFlag{Name: "base-url", Usage: "if transport is http-based, the base url of the MCP server"},
 		cli.BoolFlag{Name: "enable-yak-aitool", Usage: "enable yak ai tool"},
+		cli.BoolFlag{Name: "enable-aitool-framework", Usage: "expose all built-in aitool-framework tools (fs, ssa, yakscript, etc.) and enabled external MCP server tools via the unified aitool layer"},
 	},
 	Action: func(c *cli.Context) error {
 		yakit.CallPostInitDatabase()
@@ -47,6 +51,7 @@ var MCPCommand = &cli.Command{
 		script := c.StringSlice("script")
 		baseURL := c.String("base-url")
 		enableYakAITool := c.Bool("enable-yak-aitool")
+		enableAIToolFramework := c.Bool("enable-aitool-framework")
 		toolSets := lo.FilterMap(strings.Split(tool, ","), func(item string, _ int) (string, bool) {
 			item = strings.TrimSpace(item)
 			return item, item != ""
@@ -108,6 +113,36 @@ var MCPCommand = &cli.Command{
 			}
 
 			opts = append(opts, WithYakScriptTools(tools...))
+		}
+
+		if enableAIToolFramework {
+			db := consts.GetGormProfileDatabase()
+
+			// Built-in framework tools: fs, ssa, yakscript, etc.
+			builtinTools := buildinaitools.GetAllToolsDynamically(db)
+			if len(builtinTools) > 0 {
+				opts = append(opts, WithAITools(builtinTools...))
+				log.Infof("loaded %d built-in aitool-framework tools", len(builtinTools))
+			}
+
+			// External MCP server tools bridged through the aitool layer.
+			externalTools, mcpErr := aitool.LoadAllEnabledAIToolsFromMCPServers(db, context.Background())
+			if mcpErr != nil {
+				log.Warnf("load aitool-framework external mcp tools failed: %v", mcpErr)
+			} else if len(externalTools) > 0 {
+				opts = append(opts, WithAITools(externalTools...))
+				log.Infof("loaded %d external mcp tools via aitool-framework", len(externalTools))
+			}
+		}
+
+		// Apply per-tool enable/disable state from the profile DB, matching the
+		// behaviour of grpc_mcp.go launchMcpServer.
+		disabledTools, dbErr := yakit.GetDisabledMCPToolNames(consts.GetGormProfileDatabase())
+		if dbErr != nil {
+			log.Warnf("mcp command: failed to load disabled tool list from DB: %v", dbErr)
+		}
+		if len(disabledTools) > 0 {
+			opts = append(opts, WithDisabledToolNames(disabledTools))
 		}
 
 		s, err := NewMCPServer(opts...)
