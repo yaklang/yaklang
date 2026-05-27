@@ -1868,6 +1868,13 @@ message McpConfig {
   string Url = 3;
 }
 
+message AIEnabledCapability {
+  // 能力名称：工具名 / 技能名 / 插件 ScriptName / 蓝图 ForgeName / MCP 服务名或 mcp_{server}_{tool} 工具名
+  string Name = 1;
+  // 能力类型：tool | skill | plugin | forge | mcp_tool
+  string Type = 2;
+}
+
 message AIStartParams {
   // if set will try recovery
   string CoordinatorId = 17;
@@ -1981,6 +1988,9 @@ message AIStartParams {
 
   // 会话来源（如 ide / cli / yak），写入项目库 ai_sessions_v1.source
   string Source = 41;
+
+  // 启动时预启用能力（工具 / 技能 / 插件），支持会话缓存与热加载
+  repeated AIEnabledCapability EnabledCapabilities = 42;
 }
 
 message AITaskFilter {

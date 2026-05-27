@@ -611,24 +611,22 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 				// Restore previously loaded skills from persistent session
 				if realConfig.InitStatus.IsPersistentSessionRestored() {
 					if names := realConfig.GetRestoredSkillNames(); len(names) > 0 {
-						results := mgr.LoadSkills(names)
-						var restored, failed []string
-						for name, err := range results {
-							if err != nil {
-								failed = append(failed, name)
-								log.Warnf("failed to restore skill %q from persistent session: %v", name, err)
-							} else {
-								restored = append(restored, name)
-							}
-						}
-						if len(restored) > 0 {
-							log.Infof("restored %d skills from persistent session: %v", len(restored), restored)
-						}
-						if len(failed) > 0 {
-							log.Warnf("failed to restore %d skills from persistent session: %v", len(failed), failed)
-						}
+						loadConfiguredSkills(mgr, names, "persistent session")
 					}
 				}
+
+				// Load user-specified skills from EnabledCapabilities (AIStartParams)
+				if names := realConfig.GetEnabledSkillNames(); len(names) > 0 {
+					loadConfiguredSkills(mgr, names, "enabled capabilities")
+				}
+			}
+		}
+	}
+
+	if config != nil {
+		if realConfig, ok := config.(*aicommon.Config); ok {
+			if names := realConfig.GetEnabledForgeNames(); len(names) > 0 {
+				LoadEnabledForges(realConfig, r, names)
 			}
 		}
 	}
@@ -942,4 +940,59 @@ func (r *ReActLoop) GetTimelineDiffWithoutUpdate() string {
 	}
 	// Return current content as diff representation since we don't want to update baseline
 	return current
+}
+
+func loadConfiguredSkills(mgr *aiskillloader.SkillsContextManager, names []string, source string) {
+	if mgr == nil || len(names) == 0 {
+		return
+	}
+	results := mgr.LoadSkills(names)
+	var loaded, failed []string
+	for name, err := range results {
+		if err != nil {
+			failed = append(failed, name)
+			log.Warnf("failed to load skill %q from %s: %v", name, source, err)
+		} else {
+			loaded = append(loaded, name)
+		}
+	}
+	if len(loaded) > 0 {
+		log.Infof("loaded %d skills from %s: %v", len(loaded), source, loaded)
+	}
+	if len(failed) > 0 {
+		log.Warnf("failed to load %d skills from %s: %v", len(failed), source, failed)
+	}
+}
+
+func LoadEnabledForges(cfg *aicommon.Config, loop *ReActLoop, names []string) {
+	if cfg == nil || loop == nil || len(names) == 0 {
+		return
+	}
+	forgeMgr := cfg.GetAIForgeManager()
+	if forgeMgr == nil {
+		log.Warnf("enabled forge capabilities skipped: ai forge manager is nil")
+		return
+	}
+	ecm := loop.GetExtraCapabilities()
+	if ecm == nil {
+		log.Warnf("enabled forge capabilities skipped: extra capabilities manager is nil")
+		return
+	}
+	var loaded []string
+	for _, name := range names {
+		forge, err := forgeMgr.GetAIForge(name)
+		if err != nil {
+			log.Warnf("enabled capability forge %q load failed: %v", name, err)
+			continue
+		}
+		ecm.AddForges(ExtraForgeInfo{
+			Name:        forge.ForgeName,
+			VerboseName: forge.ForgeVerboseName,
+			Description: forge.Description,
+		})
+		loaded = append(loaded, forge.ForgeName)
+	}
+	if len(loaded) > 0 {
+		log.Infof("loaded %d forges from enabled capabilities: %v", len(loaded), loaded)
+	}
 }

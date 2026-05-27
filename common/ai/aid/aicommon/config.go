@@ -387,6 +387,11 @@ type Config struct {
 	// These are loaded back into SkillsContextManager when a new ReActLoop starts.
 	restoredSkillNames []string
 
+	// enabledCapabilities holds startup/hotpatch pre-enabled capabilities.
+	enabledCapabilities []EnabledCapability
+	skillHotloadHandler skillHotloadHandler
+	forgeHotloadHandler forgeHotloadHandler
+
 	/*
 		Lazy WorkDir for semantic artifact directory naming
 	*/
@@ -461,6 +466,12 @@ func NewConfig(ctx context.Context, opts ...ConfigOption) *Config {
 		}
 	}
 	config.loadSkillMDForgesIntoSkillLoader()
+
+	if len(config.enabledCapabilities) > 0 {
+		if err := config.applyEnabledImmediateCapabilities(); err != nil {
+			log.Warnf("apply enabled capabilities failed: %v", err)
+		}
+	}
 
 	return config
 }

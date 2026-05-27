@@ -78,6 +78,7 @@ func (c *Config) SimpleInfoMap() map[string]interface{} {
 		"ForgeName":                   c.ForgeName,
 		"EnablePlan":            c.GetEnablePlanAndExec(),
 		"SyncPerceptionTrigger": c.GetSyncPerceptionTrigger(),
+		"EnabledCapabilities":   c.GetEnabledCapabilities(),
 	}
 }
 
@@ -174,6 +175,14 @@ func (c *Config) ProcessHotPatchMessage(e *ypb.AIInputEvent) []ConfigOption {
 		aiOption = append(aiOption, WithSyncPerceptionTrigger(hotPatchParams.GetSyncPerceptionTrigger()))
 	}
 
+	if e.HotpatchType == HotPatchType_EnabledCapabilities {
+		incoming := ParseEnabledCapabilitiesFromProto(hotPatchParams)
+		if len(incoming) > 0 {
+			merged := append(c.GetEnabledCapabilities(), incoming...)
+			aiOption = append(aiOption, WithEnabledCapabilities(merged...))
+		}
+	}
+
 	if e.HotpatchType == HotPatchType_ModelName {
 		serviceName := c.AiServerName
 		modelName := hotPatchParams.GetAIModelName()
@@ -229,6 +238,11 @@ func mergeHotpatchSessionStartParams(base *ypb.AIStartParams, e *ypb.AIInputEven
 		next.EnablePlan = p.GetEnablePlan()
 	case HotPatchType_SyncPerceptionTrigger:
 		next.SyncPerceptionTrigger = p.GetSyncPerceptionTrigger()
+	case HotPatchType_EnabledCapabilities:
+		if len(p.GetEnabledCapabilities()) == 0 {
+			return base, false
+		}
+		next.EnabledCapabilities = MergeEnabledCapabilitiesHotpatch(base, p)
 	case HotPatchType_AllowPlanUserInteract:
 		next.AllowPlanUserInteract = p.GetAllowPlanUserInteract()
 	case HotPatchType_AllowRequireForUserInteract:
