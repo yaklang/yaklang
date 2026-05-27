@@ -364,7 +364,7 @@ func CreateHTTPFlow(opts ...CreateHTTPFlowOptions) (*schema.HTTPFlow, error) {
 	}
 
 	wireRsp := httpFlowWireResponse(bareRspRaw, rspRaw)
-	rspRaw = httpFlowDisplayResponse(wireRsp, rspRaw, fixRspRaw, noFixContentLength)
+	rspRaw = resolveHTTPFlowStoredResponse(wireRsp, rspRaw, fixRspRaw, noFixContentLength)
 	if rspRaw == nil {
 		rspRaw = make([]byte, 0)
 	}
