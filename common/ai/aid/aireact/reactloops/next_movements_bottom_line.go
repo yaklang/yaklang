@@ -65,15 +65,12 @@ func applyNextMovementsBottomLine(
 		}
 	}
 
-	taskID := ""
-	if task != nil {
-		taskID = task.GetId()
-	}
+	scope := aicommon.BuildVerificationTodoScope(task)
 
 	aicommon.ApplyVerificationNextMovementsAndEmit(
 		cfg,
 		cfg.GetEmitter(),
-		taskID,
+		scope,
 		iterationCount,
 		false,
 		movements,

@@ -58,7 +58,7 @@ var loopAction_AdjustTodolist = &reactloops.LoopAction{
 				aitool.WithParam_Required(true),
 			),
 			aitool.WithStringParam("id",
-				aitool.WithParam_Description("Stable TODO identifier (snake_case ASCII, e.g. `recon_dns_whois`). The id is a machine handle, " +
+				aitool.WithParam_Description("Stable TODO identifier (snake_case ASCII, e.g. `recon_dns_whois`). The id is a machine handle, "+
 					"NOT user-facing text, so keep it ASCII regardless of the session language. For non-add ops it must refer to an existing TODO."),
 				aitool.WithParam_Required(true),
 			),
@@ -157,11 +157,11 @@ func applyAdjustTodolistMovements(
 	if cfg == nil || len(movements) == 0 {
 		return
 	}
-	taskID := ""
+	scope := aicommon.VerificationTodoScope{}
 	iterationIndex := 0
 	if loop != nil {
 		if task := loop.GetCurrentTask(); task != nil {
-			taskID = task.GetId()
+			scope = aicommon.BuildVerificationTodoScope(task)
 		}
 		iterationIndex = loop.GetCurrentIterationIndex()
 	}
@@ -178,7 +178,7 @@ func applyAdjustTodolistMovements(
 	aicommon.ApplyVerificationNextMovementsAndEmit(
 		cfg,
 		cfg.GetEmitter(),
-		taskID,
+		scope,
 		iterationIndex,
 		false,
 		movements,
@@ -220,4 +220,3 @@ func adjustTodolistNextMovementsStreamHandler(fieldReader io.Reader, emitWriter 
 		_, _ = io.Copy(io.Discard, fieldReader)
 	}
 }
-

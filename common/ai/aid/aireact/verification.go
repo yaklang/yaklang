@@ -366,9 +366,9 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 //  2. SessionPromptState 中 stats.Pending + stats.Doing > 0
 //
 // 副作用:
-//  - result.Satisfied 翻为 false
-//  - result.Reasoning 前缀注入 [OVERRIDE]，保留 AI 原文于 [AI ORIGINAL]
-//  - timeline 写入 [VERIFICATION_TODO_INCOMPLETE], 列出残留 TODO 摘要
+//   - result.Satisfied 翻为 false
+//   - result.Reasoning 前缀注入 [OVERRIDE]，保留 AI 原文于 [AI ORIGINAL]
+//   - timeline 写入 [VERIFICATION_TODO_INCOMPLETE], 列出残留 TODO 摘要
 //
 // 关键词: enforceTodoCompletionBeforeSatisfaction, Satisfied 兜底回退,
 //
@@ -383,20 +383,20 @@ func (r *ReAct) enforceTodoCompletionBeforeSatisfaction(result *aicommon.VerifyS
 	if r.config == nil {
 		return
 	}
-
-	stats := r.config.GetVerificationTodoStats()
-	activeTotal := stats.Pending + stats.Doing
-	if activeTotal == 0 {
+	currentTask := r.GetCurrentTask()
+	scope := aicommon.BuildVerificationTodoScope(currentTask)
+	if scope.IsZero() {
 		return
 	}
 
-	items := r.config.SnapshotVerificationTodoItems()
+	items := r.config.ActiveVerificationTodoItemsByScope(scope)
+	activeTotal := len(items)
+	if activeTotal == 0 {
+		return
+	}
+	stats := r.config.GetVerificationTodoStatsByScope(scope)
 	activeLines := make([]string, 0, activeTotal)
 	for _, item := range items {
-		if item.Status != aicommon.VerificationTodoStatusPending &&
-			item.Status != aicommon.VerificationTodoStatusDoing {
-			continue
-		}
 		activeLines = append(activeLines, aicommon.FormatVerificationTodoLine(item))
 	}
 
@@ -476,6 +476,7 @@ func (r *ReAct) emitTodoListUpdate(result *aicommon.VerifySatisfactionResult) {
 	}
 	if currentTask := r.GetCurrentTask(); currentTask != nil {
 		payload.TaskID = currentTask.GetId()
+		payload.TaskIndex = currentTask.GetIndex()
 	}
 
 	if _, err := emitter.EmitTodoListUpdate(payload); err != nil {

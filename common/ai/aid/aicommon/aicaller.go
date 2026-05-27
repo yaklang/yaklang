@@ -52,10 +52,14 @@ type AICallerConfigIf interface {
 	// 共享同一份状态。详见 verification_todo_store.go / session_prompt_state.go.
 	// 关键词: 全局 TODO, ApplyVerificationTodoOps, GetVerificationTodoRendered
 	GetVerificationTodoRendered() string
-	ApplyVerificationTodoOps(satisfied bool, movements []VerifyNextMovement)
-	GetVerificationTodoMarkdownDelta(satisfied bool, movements []VerifyNextMovement) string
+	ApplyVerificationTodoOps(scope VerificationTodoScope, satisfied bool, movements []VerifyNextMovement)
+	GetVerificationTodoMarkdownDelta(scope VerificationTodoScope, satisfied bool, movements []VerifyNextMovement) string
 	SnapshotVerificationTodoItems() []VerificationTodoItem
+	SnapshotVerificationTodoItemsByScope(scope VerificationTodoScope) []VerificationTodoItem
 	GetVerificationTodoStats() VerificationTodoStats
+	GetVerificationTodoStatsByScope(scope VerificationTodoScope) VerificationTodoStats
+	HasActiveVerificationTodosByScope(scope VerificationTodoScope) bool
+	ActiveVerificationTodoItemsByScope(scope VerificationTodoScope) []VerificationTodoItem
 }
 
 func AIChatToAICallbackType(cb func(prompt string, opts ...aispec.AIConfigOption) (string, error)) AICallbackType {

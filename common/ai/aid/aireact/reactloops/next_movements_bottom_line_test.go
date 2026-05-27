@@ -23,27 +23,31 @@ type nextMovementsTrackableConfig struct {
 
 	mu              sync.Mutex
 	applyCalls      int
+	lastScope       aicommon.VerificationTodoScope
 	lastSatisfied   bool
 	lastMovements   []aicommon.VerifyNextMovement
 	markdownAsked   int
+	markdownScope   aicommon.VerificationTodoScope
 	markdownLastOps []aicommon.VerifyNextMovement
 	markdownReturn  string
 	snapshotItems   []aicommon.VerificationTodoItem
 	snapshotStats   aicommon.VerificationTodoStats
 }
 
-func (c *nextMovementsTrackableConfig) ApplyVerificationTodoOps(satisfied bool, movements []aicommon.VerifyNextMovement) {
+func (c *nextMovementsTrackableConfig) ApplyVerificationTodoOps(scope aicommon.VerificationTodoScope, satisfied bool, movements []aicommon.VerifyNextMovement) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.applyCalls++
+	c.lastScope = scope
 	c.lastSatisfied = satisfied
 	c.lastMovements = append([]aicommon.VerifyNextMovement(nil), movements...)
 }
 
-func (c *nextMovementsTrackableConfig) GetVerificationTodoMarkdownDelta(satisfied bool, movements []aicommon.VerifyNextMovement) string {
+func (c *nextMovementsTrackableConfig) GetVerificationTodoMarkdownDelta(scope aicommon.VerificationTodoScope, satisfied bool, movements []aicommon.VerifyNextMovement) string {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.markdownAsked++
+	c.markdownScope = scope
 	c.markdownLastOps = append([]aicommon.VerifyNextMovement(nil), movements...)
 	return c.markdownReturn
 }
@@ -54,10 +58,40 @@ func (c *nextMovementsTrackableConfig) SnapshotVerificationTodoItems() []aicommo
 	return append([]aicommon.VerificationTodoItem(nil), c.snapshotItems...)
 }
 
+func (c *nextMovementsTrackableConfig) SnapshotVerificationTodoItemsByScope(scope aicommon.VerificationTodoScope) []aicommon.VerificationTodoItem {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return append([]aicommon.VerificationTodoItem(nil), c.snapshotItems...)
+}
+
 func (c *nextMovementsTrackableConfig) GetVerificationTodoStats() aicommon.VerificationTodoStats {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.snapshotStats
+}
+
+func (c *nextMovementsTrackableConfig) GetVerificationTodoStatsByScope(scope aicommon.VerificationTodoScope) aicommon.VerificationTodoStats {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.snapshotStats
+}
+
+func (c *nextMovementsTrackableConfig) HasActiveVerificationTodosByScope(scope aicommon.VerificationTodoScope) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.snapshotStats.Pending+c.snapshotStats.Doing > 0
+}
+
+func (c *nextMovementsTrackableConfig) ActiveVerificationTodoItemsByScope(scope aicommon.VerificationTodoScope) []aicommon.VerificationTodoItem {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	var out []aicommon.VerificationTodoItem
+	for _, item := range c.snapshotItems {
+		if item.Status == aicommon.VerificationTodoStatusPending || item.Status == aicommon.VerificationTodoStatusDoing {
+			out = append(out, item)
+		}
+	}
+	return out
 }
 
 // nextMovementsTrackableInvoker 包装 mock.MockInvoker, 把 GetConfig 重定向到

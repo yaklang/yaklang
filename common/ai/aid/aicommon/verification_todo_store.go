@@ -33,6 +33,23 @@ type VerificationTodoStats struct {
 	Skipped int `json:"skipped"`
 }
 
+// VerificationTodoScope identifies which task owns a TODO item while keeping
+// the underlying store session-scoped and globally visible.
+type VerificationTodoScope struct {
+	TaskID    string `json:"task_id,omitempty"`
+	TaskIndex string `json:"task_index,omitempty"`
+}
+
+func (s VerificationTodoScope) normalize() VerificationTodoScope {
+	s.TaskID = strings.TrimSpace(s.TaskID)
+	s.TaskIndex = strings.TrimSpace(s.TaskIndex)
+	return s
+}
+
+func (s VerificationTodoScope) IsZero() bool {
+	return strings.TrimSpace(s.TaskID) == ""
+}
+
 // VerificationTodoItem captures a single TODO entry tracked across rounds.
 type VerificationTodoItem struct {
 	ID        string                 `json:"id"`
@@ -40,6 +57,9 @@ type VerificationTodoItem struct {
 	Status    VerificationTodoStatus `json:"status"`
 	CreatedAt int                    `json:"created_at"`
 	UpdatedAt int                    `json:"updated_at"`
+
+	ScopeTaskID    string `json:"scope_task_id,omitempty"`
+	ScopeTaskIndex string `json:"scope_task_index,omitempty"`
 }
 
 // VerificationTodoStore is a session-scoped TODO store maintained incrementally
@@ -103,13 +123,14 @@ func (s *VerificationTodoStore) Clone() *VerificationTodoStore {
 // 调用方), 但不再触发任何状态变更.
 //
 // 关键词: Apply 取消自动翻 SKIPPED, 显式关闭, AI 主动 done/delete/skip
-func (s *VerificationTodoStore) Apply(satisfied bool, movements []VerifyNextMovement) {
+func (s *VerificationTodoStore) Apply(scope VerificationTodoScope, satisfied bool, movements []VerifyNextMovement) {
 	if s == nil {
 		return
 	}
 	_ = satisfied // 保留形参; 语义见上方注释, 不再触发自动翻转
 	s.Counter++
 	roundIndex := s.Counter
+	scope = scope.normalize()
 
 	for _, movement := range movements {
 		id := strings.TrimSpace(movement.ID)
@@ -123,36 +144,42 @@ func (s *VerificationTodoStore) Apply(satisfied bool, movements []VerifyNextMove
 			if content == "" {
 				continue
 			}
-			item := s.findItem(id)
+			item := s.findExactScopedItem(scope, id)
 			if item == nil {
 				item = &VerificationTodoItem{ID: id, CreatedAt: roundIndex}
+				item.applyScope(scope)
 				s.Items = append(s.Items, item)
+			} else {
+				item.applyScope(scope)
 			}
 			item.Content = content
 			item.Status = VerificationTodoStatusPending
 			item.UpdatedAt = roundIndex
 		case "doing", "pending":
-			item := s.findItem(id)
+			item := s.findItemForMutation(scope, id)
 			if item == nil {
 				continue
 			}
+			item.claimLegacyScope(scope)
 			if content := strings.TrimSpace(movement.Content); content != "" {
 				item.Content = content
 			}
 			item.Status = VerificationTodoStatusDoing
 			item.UpdatedAt = roundIndex
 		case "done":
-			item := s.findItem(id)
+			item := s.findItemForMutation(scope, id)
 			if item == nil {
 				continue
 			}
+			item.claimLegacyScope(scope)
 			item.Status = VerificationTodoStatusDone
 			item.UpdatedAt = roundIndex
 		case "delete":
-			item := s.findItem(id)
+			item := s.findItemForMutation(scope, id)
 			if item == nil {
 				continue
 			}
+			item.claimLegacyScope(scope)
 			if content := strings.TrimSpace(movement.Content); content != "" {
 				item.Content = content
 			}
@@ -163,10 +190,11 @@ func (s *VerificationTodoStore) Apply(satisfied bool, movements []VerifyNextMove
 			// 与 delete 的区别在于语义层面 — delete 表示"不再需要", skip 表
 			// 示"本次任务范围内不做". 状态上都是终态, 不再算 active TODO.
 			// 关键词: 显式 skip op, 主动跳过, 终态状态
-			item := s.findItem(id)
+			item := s.findItemForMutation(scope, id)
 			if item == nil {
 				continue
 			}
+			item.claimLegacyScope(scope)
 			if content := strings.TrimSpace(movement.Content); content != "" {
 				item.Content = content
 			}
@@ -176,16 +204,94 @@ func (s *VerificationTodoStore) Apply(satisfied bool, movements []VerifyNextMove
 	}
 }
 
-func (s *VerificationTodoStore) findItem(id string) *VerificationTodoItem {
+func (i *VerificationTodoItem) scope() VerificationTodoScope {
+	if i == nil {
+		return VerificationTodoScope{}
+	}
+	return VerificationTodoScope{
+		TaskID:    i.ScopeTaskID,
+		TaskIndex: i.ScopeTaskIndex,
+	}.normalize()
+}
+
+func (i *VerificationTodoItem) matchesScope(scope VerificationTodoScope) bool {
+	if i == nil {
+		return false
+	}
+	scope = scope.normalize()
+	if scope.IsZero() {
+		return strings.TrimSpace(i.ScopeTaskID) == ""
+	}
+	return strings.TrimSpace(i.ScopeTaskID) == scope.TaskID
+}
+
+func (i *VerificationTodoItem) isLegacyScope() bool {
+	return i != nil && strings.TrimSpace(i.ScopeTaskID) == ""
+}
+
+func (i *VerificationTodoItem) applyScope(scope VerificationTodoScope) {
+	if i == nil {
+		return
+	}
+	scope = scope.normalize()
+	if scope.IsZero() {
+		return
+	}
+	i.ScopeTaskID = scope.TaskID
+	i.ScopeTaskIndex = scope.TaskIndex
+}
+
+func (i *VerificationTodoItem) claimLegacyScope(scope VerificationTodoScope) {
+	if i == nil || !i.isLegacyScope() {
+		return
+	}
+	i.applyScope(scope)
+}
+
+func verificationTodoIdentityKey(scope VerificationTodoScope, id string) string {
+	scope = scope.normalize()
+	return scope.TaskID + "\x00" + strings.TrimSpace(id)
+}
+
+func (s *VerificationTodoStore) findExactScopedItem(scope VerificationTodoScope, id string) *VerificationTodoItem {
 	if s == nil {
 		return nil
 	}
+	scope = scope.normalize()
+	id = strings.TrimSpace(id)
 	for _, item := range s.Items {
-		if item != nil && item.ID == id {
+		if item != nil && strings.TrimSpace(item.ID) == id && item.matchesScope(scope) {
 			return item
 		}
 	}
 	return nil
+}
+
+func (s *VerificationTodoStore) findLegacyItem(id string) *VerificationTodoItem {
+	if s == nil {
+		return nil
+	}
+	id = strings.TrimSpace(id)
+	for _, item := range s.Items {
+		if item != nil && item.isLegacyScope() && strings.TrimSpace(item.ID) == id {
+			return item
+		}
+	}
+	return nil
+}
+
+func (s *VerificationTodoStore) findItemForMutation(scope VerificationTodoScope, id string) *VerificationTodoItem {
+	if s == nil {
+		return nil
+	}
+	scope = scope.normalize()
+	if item := s.findExactScopedItem(scope, id); item != nil {
+		return item
+	}
+	if scope.IsZero() {
+		return nil
+	}
+	return s.findLegacyItem(id)
 }
 
 // SnapshotItems returns a deep-copied slice of the current items, safe for
@@ -197,6 +303,23 @@ func (s *VerificationTodoStore) SnapshotItems() []VerificationTodoItem {
 	out := make([]VerificationTodoItem, 0, len(s.Items))
 	for _, item := range s.Items {
 		if item == nil {
+			continue
+		}
+		out = append(out, *item)
+	}
+	return out
+}
+
+// SnapshotItemsByScope returns a deep-copied slice of items belonging to the
+// given task scope. Legacy unscoped items are only returned when scope is zero.
+func (s *VerificationTodoStore) SnapshotItemsByScope(scope VerificationTodoScope) []VerificationTodoItem {
+	if s == nil {
+		return nil
+	}
+	scope = scope.normalize()
+	out := make([]VerificationTodoItem, 0)
+	for _, item := range s.Items {
+		if item == nil || !item.matchesScope(scope) {
 			continue
 		}
 		out = append(out, *item)
@@ -217,6 +340,23 @@ func (s *VerificationTodoStore) HasActiveTodos() bool {
 	}
 	for _, item := range s.Items {
 		if item == nil {
+			continue
+		}
+		if item.Status == VerificationTodoStatusPending || item.Status == VerificationTodoStatusDoing {
+			return true
+		}
+	}
+	return false
+}
+
+// HasActiveTodosByScope reports whether the given task scope still owns any
+// PENDING/DOING items. Legacy unscoped items do not block scoped queries.
+func (s *VerificationTodoStore) HasActiveTodosByScope(scope VerificationTodoScope) bool {
+	if s == nil {
+		return false
+	}
+	for _, item := range s.Items {
+		if item == nil || !item.matchesScope(scope) {
 			continue
 		}
 		if item.Status == VerificationTodoStatusPending || item.Status == VerificationTodoStatusDoing {
@@ -249,6 +389,27 @@ func (s *VerificationTodoStore) ActiveTodoItems() []VerificationTodoItem {
 	return out
 }
 
+// ActiveTodoItemsByScope returns only active TODOs owned by the given task
+// scope. Legacy items are intentionally excluded from scoped queries so old
+// session data does not block unrelated current tasks.
+func (s *VerificationTodoStore) ActiveTodoItemsByScope(scope VerificationTodoScope) []VerificationTodoItem {
+	if s == nil {
+		return nil
+	}
+	scope = scope.normalize()
+	out := make([]VerificationTodoItem, 0)
+	for _, item := range s.Items {
+		if item == nil || !item.matchesScope(scope) {
+			continue
+		}
+		if item.Status != VerificationTodoStatusPending && item.Status != VerificationTodoStatusDoing {
+			continue
+		}
+		out = append(out, *item)
+	}
+	return out
+}
+
 // Stats returns counts grouped by status.
 func (s *VerificationTodoStore) Stats() VerificationTodoStats {
 	stats := VerificationTodoStats{}
@@ -257,6 +418,33 @@ func (s *VerificationTodoStore) Stats() VerificationTodoStats {
 	}
 	for _, item := range s.Items {
 		if item == nil {
+			continue
+		}
+		switch item.Status {
+		case VerificationTodoStatusPending:
+			stats.Pending++
+		case VerificationTodoStatusDoing:
+			stats.Doing++
+		case VerificationTodoStatusDone:
+			stats.Done++
+		case VerificationTodoStatusDeleted:
+			stats.Deleted++
+		case VerificationTodoStatusSkipped:
+			stats.Skipped++
+		}
+	}
+	return stats
+}
+
+// StatsByScope returns counts grouped by status for a single task scope.
+func (s *VerificationTodoStore) StatsByScope(scope VerificationTodoScope) VerificationTodoStats {
+	stats := VerificationTodoStats{}
+	if s == nil {
+		return stats
+	}
+	scope = scope.normalize()
+	for _, item := range s.Items {
+		if item == nil || !item.matchesScope(scope) {
 			continue
 		}
 		switch item.Status {
@@ -346,20 +534,21 @@ func (s *VerificationTodoStore) Render() string {
 // 这些 marker, 让前端 markdown 通道能高亮本轮变化.
 //
 // 关键词: RenderMarkdownDelta, markdown 增量标记, frontend stream
-func (s *VerificationTodoStore) RenderMarkdownDelta(satisfied bool, movements []VerifyNextMovement) string {
+func (s *VerificationTodoStore) RenderMarkdownDelta(scope VerificationTodoScope, satisfied bool, movements []VerifyNextMovement) string {
 	previous := s
 	if previous == nil {
 		previous = NewVerificationTodoStore()
 	}
+	scope = scope.normalize()
 	previousIDs := make(map[string]struct{}, len(previous.Items))
 	for _, item := range previous.Items {
 		if item != nil {
-			previousIDs[item.ID] = struct{}{}
+			previousIDs[verificationTodoIdentityKey(item.scope(), item.ID)] = struct{}{}
 		}
 	}
 
 	cloned := previous.Clone()
-	cloned.Apply(satisfied, movements)
+	cloned.Apply(scope, satisfied, movements)
 	if len(cloned.Items) == 0 {
 		return ""
 	}
@@ -372,18 +561,19 @@ func (s *VerificationTodoStore) RenderMarkdownDelta(satisfied bool, movements []
 		if id == "" {
 			continue
 		}
+		identityKey := verificationTodoIdentityKey(scope, id)
 		switch strings.ToLower(strings.TrimSpace(movement.Op)) {
 		case "add":
-			if _, exists := previousIDs[id]; !exists {
-				currentNewIDs[id] = struct{}{}
+			if _, exists := previousIDs[identityKey]; !exists {
+				currentNewIDs[identityKey] = struct{}{}
 			}
 		case "done":
-			currentDoneIDs[id] = struct{}{}
+			currentDoneIDs[identityKey] = struct{}{}
 		case "skip":
 			// 本轮显式 skip 的 TODO, 在 markdown delta 中需要打上 (skipped)
 			// marker, 与 done / deleted 形成对偶的关闭信号.
 			// 关键词: RenderMarkdownDelta skip marker, 显式跳过高亮
-			currentSkippedIDs[id] = struct{}{}
+			currentSkippedIDs[identityKey] = struct{}{}
 		}
 	}
 
@@ -400,9 +590,10 @@ func (s *VerificationTodoStore) RenderMarkdownDelta(satisfied bool, movements []
 		if item == nil {
 			continue
 		}
+		identityKey := verificationTodoIdentityKey(item.scope(), item.ID)
 		switch item.Status {
 		case VerificationTodoStatusPending:
-			if _, isNew := currentNewIDs[item.ID]; isNew {
+			if _, isNew := currentNewIDs[identityKey]; isNew {
 				newPending = append(newPending, FormatVerificationTodoMarkdownLine(*item, "new"))
 			} else {
 				oldPending = append(oldPending, FormatVerificationTodoMarkdownLine(*item, ""))
@@ -410,7 +601,7 @@ func (s *VerificationTodoStore) RenderMarkdownDelta(satisfied bool, movements []
 		case VerificationTodoStatusDoing:
 			doingItems = append(doingItems, FormatVerificationTodoMarkdownLine(*item, "doing"))
 		case VerificationTodoStatusDone:
-			if _, isDone := currentDoneIDs[item.ID]; isDone {
+			if _, isDone := currentDoneIDs[identityKey]; isDone {
 				currentDone = append(currentDone, FormatVerificationTodoMarkdownLine(*item, "done"))
 			} else {
 				oldDone = append(oldDone, FormatVerificationTodoMarkdownLine(*item, ""))
@@ -418,7 +609,7 @@ func (s *VerificationTodoStore) RenderMarkdownDelta(satisfied bool, movements []
 		case VerificationTodoStatusDeleted:
 			deleted = append(deleted, FormatVerificationTodoMarkdownLine(*item, "deleted"))
 		case VerificationTodoStatusSkipped:
-			if _, isSkipped := currentSkippedIDs[item.ID]; isSkipped {
+			if _, isSkipped := currentSkippedIDs[identityKey]; isSkipped {
 				currentSkipped = append(currentSkipped, FormatVerificationTodoMarkdownLine(*item, "skipped"))
 			} else {
 				// 历史轮次已经被 skip 的 TODO 不应该每轮都带 (skipped)

@@ -46,7 +46,7 @@ func (r *ReAct) AppendVerificationHistory(result *aicommon.VerifySatisfactionRes
 	if r.config == nil {
 		return
 	}
-	r.config.ApplyVerificationTodoOps(result.Satisfied, result.NextMovements)
+	r.config.ApplyVerificationTodoOps(aicommon.BuildVerificationTodoScope(r.GetCurrentTask()), result.Satisfied, result.NextMovements)
 }
 
 // RenderVerificationTodoSnapshot returns the plain-text TODO snapshot built
@@ -76,9 +76,9 @@ func (r *ReAct) RenderVerificationTodoMarkdownSnapshot(current *aicommon.VerifyS
 	if current == nil {
 		// preserve old behaviour: when nothing new is supplied, still surface
 		// the current full snapshot via the markdown formatter.
-		return r.config.GetVerificationTodoMarkdownDelta(false, nil)
+		return r.config.GetVerificationTodoMarkdownDelta(aicommon.BuildVerificationTodoScope(r.GetCurrentTask()), false, nil)
 	}
-	return r.config.GetVerificationTodoMarkdownDelta(current.Satisfied, current.NextMovements)
+	return r.config.GetVerificationTodoMarkdownDelta(aicommon.BuildVerificationTodoScope(r.GetCurrentTask()), current.Satisfied, current.NextMovements)
 }
 
 func (r *ReAct) RenderVerificationOutputFilesMarkdown(outputFiles []string) string {
@@ -106,9 +106,9 @@ func renderVerificationTodoSnapshot(history []*aicommon.VerifySatisfactionResult
 func renderVerificationTodoMarkdownSnapshot(history []*aicommon.VerifySatisfactionResult, current *aicommon.VerifySatisfactionResult) string {
 	store := buildVerificationTodoStoreFromHistory(history)
 	if current == nil {
-		return store.RenderMarkdownDelta(false, nil)
+		return store.RenderMarkdownDelta(aicommon.VerificationTodoScope{}, false, nil)
 	}
-	return store.RenderMarkdownDelta(current.Satisfied, current.NextMovements)
+	return store.RenderMarkdownDelta(aicommon.VerificationTodoScope{}, current.Satisfied, current.NextMovements)
 }
 
 func buildVerificationTodoStoreFromHistory(history []*aicommon.VerifySatisfactionResult) *aicommon.VerificationTodoStore {
@@ -117,7 +117,7 @@ func buildVerificationTodoStoreFromHistory(history []*aicommon.VerifySatisfactio
 		if record == nil {
 			continue
 		}
-		store.Apply(record.Satisfied, record.NextMovements)
+		store.Apply(aicommon.VerificationTodoScope{}, record.Satisfied, record.NextMovements)
 	}
 	return store
 }

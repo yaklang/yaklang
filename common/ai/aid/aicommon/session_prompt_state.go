@@ -235,7 +235,7 @@ func (s *SessionPromptState) SetVerificationTodo(todoJSON string) {
 // callers can persist it (mirroring ApplySessionEvidenceOps).
 //
 // 关键词: ApplyVerificationTodoOps, 增量更新, satisfied -> SKIPPED, DB 持久化
-func (s *SessionPromptState) ApplyVerificationTodoOps(satisfied bool, movements []VerifyNextMovement) string {
+func (s *SessionPromptState) ApplyVerificationTodoOps(scope VerificationTodoScope, satisfied bool, movements []VerifyNextMovement) string {
 	if s == nil {
 		return ""
 	}
@@ -243,7 +243,7 @@ func (s *SessionPromptState) ApplyVerificationTodoOps(satisfied bool, movements 
 	defer s.m.Unlock()
 
 	store := UnmarshalVerificationTodoStore(s.todoJSON)
-	store.Apply(satisfied, movements)
+	store.Apply(scope, satisfied, movements)
 	s.todoJSON = store.Marshal()
 	return codec.StrConvQuote(s.todoJSON)
 }
@@ -270,14 +270,14 @@ func (s *SessionPromptState) GetVerificationTodoRendered() string {
 // are derived from the pre-apply state.
 //
 // 关键词: GetVerificationTodoMarkdownDelta, 预览模式, 不变更状态
-func (s *SessionPromptState) GetVerificationTodoMarkdownDelta(satisfied bool, movements []VerifyNextMovement) string {
+func (s *SessionPromptState) GetVerificationTodoMarkdownDelta(scope VerificationTodoScope, satisfied bool, movements []VerifyNextMovement) string {
 	if s == nil {
 		return ""
 	}
 	s.m.RLock()
 	defer s.m.RUnlock()
 	store := UnmarshalVerificationTodoStore(s.todoJSON)
-	return store.RenderMarkdownDelta(satisfied, movements)
+	return store.RenderMarkdownDelta(scope, satisfied, movements)
 }
 
 // SnapshotVerificationTodoItems returns a copy of the current TODO items for
@@ -293,6 +293,16 @@ func (s *SessionPromptState) SnapshotVerificationTodoItems() []VerificationTodoI
 	return store.SnapshotItems()
 }
 
+func (s *SessionPromptState) SnapshotVerificationTodoItemsByScope(scope VerificationTodoScope) []VerificationTodoItem {
+	if s == nil {
+		return nil
+	}
+	s.m.RLock()
+	defer s.m.RUnlock()
+	store := UnmarshalVerificationTodoStore(s.todoJSON)
+	return store.SnapshotItemsByScope(scope)
+}
+
 // GetVerificationTodoStats returns aggregated stats over the current TODO
 // store.
 func (s *SessionPromptState) GetVerificationTodoStats() VerificationTodoStats {
@@ -303,4 +313,34 @@ func (s *SessionPromptState) GetVerificationTodoStats() VerificationTodoStats {
 	defer s.m.RUnlock()
 	store := UnmarshalVerificationTodoStore(s.todoJSON)
 	return store.Stats()
+}
+
+func (s *SessionPromptState) GetVerificationTodoStatsByScope(scope VerificationTodoScope) VerificationTodoStats {
+	if s == nil {
+		return VerificationTodoStats{}
+	}
+	s.m.RLock()
+	defer s.m.RUnlock()
+	store := UnmarshalVerificationTodoStore(s.todoJSON)
+	return store.StatsByScope(scope)
+}
+
+func (s *SessionPromptState) HasActiveVerificationTodosByScope(scope VerificationTodoScope) bool {
+	if s == nil {
+		return false
+	}
+	s.m.RLock()
+	defer s.m.RUnlock()
+	store := UnmarshalVerificationTodoStore(s.todoJSON)
+	return store.HasActiveTodosByScope(scope)
+}
+
+func (s *SessionPromptState) ActiveVerificationTodoItemsByScope(scope VerificationTodoScope) []VerificationTodoItem {
+	if s == nil {
+		return nil
+	}
+	s.m.RLock()
+	defer s.m.RUnlock()
+	store := UnmarshalVerificationTodoStore(s.todoJSON)
+	return store.ActiveTodoItemsByScope(scope)
 }
