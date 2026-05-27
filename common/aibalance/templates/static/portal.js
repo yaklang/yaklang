@@ -6257,13 +6257,28 @@ curl '${metaApiUrl}?name=${modelName}'`;
                     if (rpmInput) rpmInput.value = cfg.default_rpm || 600;
                     const delayInput = document.getElementById('rl-free-user-delay');
                     if (delayInput) delayInput.value = cfg.free_user_delay_sec || 0;
-                    renderModelRPMOverrides(cfg.model_rpm_overrides || {}, cfg.model_delay_overrides || {});
+                    const delayMaxInput = document.getElementById('rl-free-user-delay-max');
+                    if (delayMaxInput) delayMaxInput.value = cfg.free_user_delay_max_sec || 0;
+                    const freeOutputTPSInput = document.getElementById('rl-free-output-tps');
+                    if (freeOutputTPSInput) freeOutputTPSInput.value = cfg.free_user_output_tps || 0;
+                    renderModelRPMOverrides(
+                        cfg.model_rpm_overrides || {},
+                        cfg.model_delay_overrides || {},
+                        cfg.model_output_tps_overrides || {}
+                    );
 
                     // 免费用户 Token 日限额：全局 + 模型级覆盖
                     // 关键词: loadRateLimitConfig free_user_token_limit_m
                     const tokLimitInput = document.getElementById('rl-free-token-limit-m-input');
                     if (tokLimitInput) tokLimitInput.value = (cfg.free_user_token_limit_m == null ? 1200 : cfg.free_user_token_limit_m);
                     renderFreeTokenModelOverrides(cfg.free_user_token_model_overrides || {});
+
+                    // 软限额阈值 / 软限额 TPS
+                    // 关键词: loadRateLimitConfig free_user_token_soft_limit_m
+                    const softLimitMInput = document.getElementById('rl-free-token-soft-limit-m');
+                    if (softLimitMInput) softLimitMInput.value = cfg.free_user_token_soft_limit_m || 0;
+                    const softLimitTPSInput = document.getElementById('rl-free-soft-limit-tps');
+                    if (softLimitTPSInput) softLimitTPSInput.value = cfg.free_user_soft_limit_tps || 0;
                 }
             } catch (error) {
                 console.error('Error loading rate limit config:', error);
@@ -6273,6 +6288,12 @@ curl '${metaApiUrl}?name=${modelName}'`;
         async function saveRateLimitConfig() {
             const defaultRPM = parseInt(document.getElementById('rl-default-rpm').value) || 600;
             const freeDelay = parseInt(document.getElementById('rl-free-user-delay').value) || 0;
+            const freeDelayMaxRaw = document.getElementById('rl-free-user-delay-max').value;
+            let freeDelayMax = parseInt(freeDelayMaxRaw);
+            if (isNaN(freeDelayMax) || freeDelayMax < 0) freeDelayMax = 0;
+            const freeOutputTPSRaw = document.getElementById('rl-free-output-tps').value;
+            let freeOutputTPS = parseInt(freeOutputTPSRaw);
+            if (isNaN(freeOutputTPS) || freeOutputTPS < 0) freeOutputTPS = 0;
             const collected = collectModelRPMOverrides();
 
             // 免费 Token 限额相关字段
@@ -6282,6 +6303,15 @@ curl '${metaApiUrl}?name=${modelName}'`;
             if (isNaN(freeTokenLimitM) || freeTokenLimitM < 0) freeTokenLimitM = 1200;
             const freeTokenOverrides = collectFreeTokenModelOverrides();
 
+            // 软限额相关字段
+            // 关键词: saveRateLimitConfig free_user_token_soft_limit_m
+            const softLimitMRaw = document.getElementById('rl-free-token-soft-limit-m').value;
+            let softLimitM = parseInt(softLimitMRaw);
+            if (isNaN(softLimitM) || softLimitM < 0) softLimitM = 0;
+            const softLimitTPSRaw = document.getElementById('rl-free-soft-limit-tps').value;
+            let softLimitTPS = parseInt(softLimitTPSRaw);
+            if (isNaN(softLimitTPS) || softLimitTPS < 0) softLimitTPS = 0;
+
             try {
                 const response = await fetch('/portal/api/rate-limit-config', {
                     method: 'POST',
@@ -6289,10 +6319,15 @@ curl '${metaApiUrl}?name=${modelName}'`;
                     body: JSON.stringify({
                         default_rpm: defaultRPM,
                         free_user_delay_sec: freeDelay,
+                        free_user_delay_max_sec: freeDelayMax,
                         model_rpm_overrides: collected.rpm,
                         model_delay_overrides: collected.delay,
                         free_user_token_limit_m: freeTokenLimitM,
-                        free_user_token_model_overrides: freeTokenOverrides
+                        free_user_token_model_overrides: freeTokenOverrides,
+                        free_user_output_tps: freeOutputTPS,
+                        model_output_tps_overrides: collected.tps,
+                        free_user_token_soft_limit_m: softLimitM,
+                        free_user_soft_limit_tps: softLimitTPS
                     })
                 });
                 const data = await response.json();
@@ -6431,15 +6466,18 @@ curl '${metaApiUrl}?name=${modelName}'`;
             }
         }
 
-        function renderModelRPMOverrides(rpmOverrides, delayOverrides) {
+        // 关键词: renderModelRPMOverrides RPM + 延迟区间 + TPS, 老数据兼容
+        function renderModelRPMOverrides(rpmOverrides, delayOverrides, tpsOverrides) {
             const container = document.getElementById('rl-model-overrides-list');
             if (!container) return;
             container.innerHTML = '';
             rpmOverrides = rpmOverrides || {};
             delayOverrides = delayOverrides || {};
+            tpsOverrides = tpsOverrides || {};
             const modelSet = new Set([
                 ...Object.keys(rpmOverrides),
-                ...Object.keys(delayOverrides)
+                ...Object.keys(delayOverrides),
+                ...Object.keys(tpsOverrides)
             ]);
             if (modelSet.size === 0) {
                 container.innerHTML = '<p style="color: #999; font-size: 13px;">暂无模型级覆盖配置。</p>';
@@ -6447,22 +6485,39 @@ curl '${metaApiUrl}?name=${modelName}'`;
             }
             Array.from(modelSet).sort().forEach((model, idx) => {
                 const rpm = rpmOverrides[model];
-                const hasDelay = Object.prototype.hasOwnProperty.call(delayOverrides, model);
-                const delay = hasDelay ? delayOverrides[model] : '';
-                appendModelRPMRow(container, model, rpm, delay, idx);
+                // 兼容老数据：delayOverrides[m] 可能是数字或 {min,max} 对象。
+                let delayMin = '';
+                let delayMax = '';
+                const raw = delayOverrides[model];
+                if (raw !== undefined && raw !== null) {
+                    if (typeof raw === 'number') {
+                        delayMin = raw;
+                        delayMax = 0;
+                    } else if (typeof raw === 'object') {
+                        if (raw.min !== undefined && raw.min !== null) delayMin = raw.min;
+                        if (raw.max !== undefined && raw.max !== null) delayMax = raw.max;
+                    }
+                }
+                const tps = tpsOverrides[model];
+                appendModelRPMRow(container, model, rpm, delayMin, delayMax, tps, idx);
             });
         }
 
-        function appendModelRPMRow(container, model, rpm, delay, idx) {
+        // 关键词: appendModelRPMRow 5 列布局, 模型/RPM/延迟Min/延迟Max/TPS
+        function appendModelRPMRow(container, model, rpm, delayMin, delayMax, tps, idx) {
             const row = document.createElement('div');
-            row.style.cssText = 'display: flex; gap: 10px; align-items: center; margin-bottom: 8px;';
+            row.style.cssText = 'display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap;';
             row.className = 'rl-model-row';
             const rpmVal = (rpm === undefined || rpm === null || rpm === '') ? '' : rpm;
-            const delayVal = (delay === undefined || delay === null || delay === '') ? '' : delay;
+            const delayMinVal = (delayMin === undefined || delayMin === null || delayMin === '') ? '' : delayMin;
+            const delayMaxVal = (delayMax === undefined || delayMax === null || delayMax === '') ? '' : delayMax;
+            const tpsVal = (tps === undefined || tps === null || tps === '') ? '' : tps;
             row.innerHTML = `
-                <input type="text" class="form-control rl-model-name" value="${model || ''}" placeholder="模型名称（对外）" style="flex: 1; font-family: monospace; font-size: 13px; padding: 6px 10px;">
-                <input type="number" class="form-control rl-model-rpm" value="${rpmVal}" placeholder="RPM" min="1" title="模型 RPM 上限（留空使用全局默认）" style="width: 110px; font-family: monospace; font-size: 13px; padding: 6px 10px;">
-                <input type="number" class="form-control rl-model-delay" value="${delayVal}" placeholder="免费延迟(秒)" min="0" title="免费用户调用前延迟基础值（秒），实际为 N~2N 随机；留空使用全局默认；填 0 表示该模型不延迟" style="width: 130px; font-family: monospace; font-size: 13px; padding: 6px 10px;">
+                <input type="text" class="form-control rl-model-name" value="${model || ''}" placeholder="模型名称（对外）" style="flex: 1; min-width: 180px; font-family: monospace; font-size: 13px; padding: 6px 10px;">
+                <input type="number" class="form-control rl-model-rpm" value="${rpmVal}" placeholder="RPM" min="1" title="模型 RPM 上限（留空使用全局默认）" style="width: 90px; font-family: monospace; font-size: 13px; padding: 6px 10px;">
+                <input type="number" class="form-control rl-model-delay-min" value="${delayMinVal}" placeholder="延迟Min" min="0" title="延迟最小值（秒）；留空使用全局默认" style="width: 100px; font-family: monospace; font-size: 13px; padding: 6px 10px;">
+                <input type="number" class="form-control rl-model-delay-max" value="${delayMaxVal}" placeholder="延迟Max" min="0" title="延迟最大值（秒）；留空或 0 时按老语义 N~2N（N=Min）" style="width: 100px; font-family: monospace; font-size: 13px; padding: 6px 10px;">
+                <input type="number" class="form-control rl-model-tps" value="${tpsVal}" placeholder="TPS" min="0" title="输出 TPS 限速（token/s）；留空或 0 表示不限速" style="width: 90px; font-family: monospace; font-size: 13px; padding: 6px 10px;">
                 <button class="btn btn-danger" onclick="this.parentElement.remove()" style="height: 32px; font-size: 12px; padding: 4px 10px;">删除</button>
             `;
             container.appendChild(row);
@@ -6473,27 +6528,41 @@ curl '${metaApiUrl}?name=${modelName}'`;
             if (!container) return;
             const placeholder = container.querySelector('p');
             if (placeholder) placeholder.remove();
-            appendModelRPMRow(container, '', '', '', container.children.length);
+            appendModelRPMRow(container, '', '', '', '', '', container.children.length);
         }
 
+        // 关键词: collectModelRPMOverrides 收集 RPM + 延迟区间 + TPS
         function collectModelRPMOverrides() {
             const rpm = {};
             const delay = {};
+            const tps = {};
             document.querySelectorAll('.rl-model-row').forEach(row => {
                 const name = row.querySelector('.rl-model-name').value.trim();
                 if (!name) return;
                 const rpmRaw = row.querySelector('.rl-model-rpm').value;
-                const delayRaw = row.querySelector('.rl-model-delay').value;
+                const delayMinRaw = row.querySelector('.rl-model-delay-min').value;
+                const delayMaxRaw = row.querySelector('.rl-model-delay-max').value;
+                const tpsRaw = row.querySelector('.rl-model-tps').value;
                 const rpmVal = parseInt(rpmRaw);
                 if (rpmRaw !== '' && !isNaN(rpmVal) && rpmVal > 0) {
                     rpm[name] = rpmVal;
                 }
-                const delayVal = parseInt(delayRaw);
-                if (delayRaw !== '' && !isNaN(delayVal) && delayVal >= 0) {
-                    delay[name] = delayVal;
+                const dmin = parseInt(delayMinRaw);
+                const dmax = parseInt(delayMaxRaw);
+                const hasMin = (delayMinRaw !== '' && !isNaN(dmin) && dmin >= 0);
+                const hasMax = (delayMaxRaw !== '' && !isNaN(dmax) && dmax >= 0);
+                if (hasMin || hasMax) {
+                    delay[name] = {
+                        min: hasMin ? dmin : 0,
+                        max: hasMax ? dmax : 0
+                    };
+                }
+                const tpsVal = parseInt(tpsRaw);
+                if (tpsRaw !== '' && !isNaN(tpsVal) && tpsVal > 0) {
+                    tps[name] = tpsVal;
                 }
             });
-            return { rpm: rpm, delay: delay };
+            return { rpm: rpm, delay: delay, tps: tps };
         }
 
         // ==================== Free user Token quota model overrides ====================

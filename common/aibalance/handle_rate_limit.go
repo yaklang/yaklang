@@ -41,12 +41,21 @@ func (c *ServerConfig) handleGetRateLimitConfig(conn net.Conn, request *http.Req
 		modelOverrides = make(map[string]int64)
 	}
 
-	var modelDelayOverrides map[string]int64
-	if config.ModelDelayOverrides != "" {
-		json.Unmarshal([]byte(config.ModelDelayOverrides), &modelDelayOverrides)
-	}
+	// model_delay_overrides 兼容老 int / 新 {min,max} 两种格式。
+	// 对外统一返回新格式 map[string]{min,max}，前端按对象解析；旧的
+	// 标量 N 自动展开为 {min:N, max:0}，前端识别 max==0 时显示"老 N~2N 兼容"。
+	// 关键词: handleGetRateLimitConfig model_delay_overrides 兼容输出
+	modelDelayOverrides := parseModelDelayOverrides(config.ModelDelayOverrides)
 	if modelDelayOverrides == nil {
-		modelDelayOverrides = make(map[string]int64)
+		modelDelayOverrides = make(map[string]DelayRange)
+	}
+
+	var modelOutputTPSOverrides map[string]int64
+	if config.ModelOutputTPSOverrides != "" {
+		json.Unmarshal([]byte(config.ModelOutputTPSOverrides), &modelOutputTPSOverrides)
+	}
+	if modelOutputTPSOverrides == nil {
+		modelOutputTPSOverrides = make(map[string]int64)
 	}
 
 	// 免费用户 Token 限额相关配置（全局 + 模型级覆盖）
@@ -58,12 +67,64 @@ func (c *ServerConfig) handleGetRateLimitConfig(conn net.Conn, request *http.Req
 		"config": map[string]interface{}{
 			"default_rpm":                     config.DefaultRPM,
 			"free_user_delay_sec":             config.FreeUserDelaySec,
+			"free_user_delay_max_sec":         config.FreeUserDelayMaxSec,
 			"model_rpm_overrides":             modelOverrides,
 			"model_delay_overrides":           modelDelayOverrides,
 			"free_user_token_limit_m":         config.FreeUserTokenLimitM,
 			"free_user_token_model_overrides": freeUserTokenOverrides,
+			"free_user_output_tps":            config.FreeUserOutputTPS,
+			"model_output_tps_overrides":      modelOutputTPSOverrides,
+			"free_user_token_soft_limit_m":    config.FreeUserTokenSoftLimitM,
+			"free_user_soft_limit_tps":        config.FreeUserSoftLimitTPS,
 		},
 	})
+}
+
+// parseModelDelayOverrides 解析 ModelDelayOverrides JSON 字符串，支持两种历史格式：
+//
+//	1) 老格式 map[string]int64  -> {"slow-free": 30}
+//	2) 新格式 map[string]DelayRange -> {"slow-free": {"min": 0, "max": 5}}
+//
+// 老格式自动转换为 DelayRange{Min: N, Max: 0}，前端展示时识别 Max=0 显示成
+// "N~2N 兼容"占位即可。任何异常都返回空 map，不阻塞业务。
+// 关键词: parseModelDelayOverrides, 老 int 兼容, 新 DelayRange
+func parseModelDelayOverrides(raw string) map[string]DelayRange {
+	out := make(map[string]DelayRange)
+	if strings.TrimSpace(raw) == "" {
+		return out
+	}
+	rawMap := make(map[string]json.RawMessage)
+	if err := json.Unmarshal([]byte(raw), &rawMap); err != nil {
+		return out
+	}
+	for k, v := range rawMap {
+		k = strings.TrimSpace(k)
+		if k == "" {
+			continue
+		}
+		var legacy int64
+		if err := json.Unmarshal(v, &legacy); err == nil {
+			if legacy < 0 {
+				legacy = 0
+			}
+			out[k] = DelayRange{Min: legacy, Max: 0}
+			continue
+		}
+		var rng struct {
+			Min int64 `json:"min"`
+			Max int64 `json:"max"`
+		}
+		if err := json.Unmarshal(v, &rng); err == nil {
+			if rng.Min < 0 {
+				rng.Min = 0
+			}
+			if rng.Max < 0 {
+				rng.Max = 0
+			}
+			out[k] = DelayRange{Min: rng.Min, Max: rng.Max}
+		}
+	}
+	return out
 }
 
 // handleSetRateLimitConfig updates the global rate-limit configuration.
@@ -86,10 +147,18 @@ func (c *ServerConfig) handleSetRateLimitConfig(conn net.Conn, request *http.Req
 	var reqBody struct {
 		DefaultRPM                  *int64           `json:"default_rpm,omitempty"`
 		FreeUserDelaySec            *int64           `json:"free_user_delay_sec,omitempty"`
+		FreeUserDelayMaxSec         *int64           `json:"free_user_delay_max_sec,omitempty"`
 		ModelRPMOverrides           map[string]int64 `json:"model_rpm_overrides,omitempty"`
-		ModelDelayOverrides         map[string]int64 `json:"model_delay_overrides,omitempty"`
-		FreeUserTokenLimitM         *int64           `json:"free_user_token_limit_m,omitempty"`
+		// ModelDelayOverrides 接受 map[string]any，按值类型动态处理：
+		//   - 数值       -> 视作 {min: n, max: 0}（老语义 N~2N 兜底）
+		//   - 对象 {min,max} -> 直接采用
+		ModelDelayOverrides         map[string]json.RawMessage            `json:"model_delay_overrides,omitempty"`
+		FreeUserTokenLimitM         *int64                                `json:"free_user_token_limit_m,omitempty"`
 		FreeUserTokenModelOverrides map[string]FreeUserTokenModelOverride `json:"free_user_token_model_overrides,omitempty"`
+		FreeUserOutputTPS           *int64                                `json:"free_user_output_tps,omitempty"`
+		ModelOutputTPSOverrides     map[string]int64                      `json:"model_output_tps_overrides,omitempty"`
+		FreeUserTokenSoftLimitM     *int64                                `json:"free_user_token_soft_limit_m,omitempty"`
+		FreeUserSoftLimitTPS        *int64                                `json:"free_user_soft_limit_tps,omitempty"`
 	}
 	if err := json.Unmarshal(bodyBytes, &reqBody); err != nil {
 		c.logError("failed to parse request body: %v", err)
@@ -110,12 +179,50 @@ func (c *ServerConfig) handleSetRateLimitConfig(conn net.Conn, request *http.Req
 	if reqBody.FreeUserDelaySec != nil {
 		config.FreeUserDelaySec = *reqBody.FreeUserDelaySec
 	}
+	if reqBody.FreeUserDelayMaxSec != nil {
+		if *reqBody.FreeUserDelayMaxSec < 0 {
+			config.FreeUserDelayMaxSec = 0
+		} else {
+			config.FreeUserDelayMaxSec = *reqBody.FreeUserDelayMaxSec
+		}
+	}
 	if reqBody.ModelRPMOverrides != nil {
 		overridesJSON, _ := json.Marshal(reqBody.ModelRPMOverrides)
 		config.ModelRPMOverrides = string(overridesJSON)
 	}
 	if reqBody.ModelDelayOverrides != nil {
-		delayJSON, _ := json.Marshal(reqBody.ModelDelayOverrides)
+		// 规整化：把每个 entry 强制成 {min,max} 形态写回 DB。
+		// 老 int 自动展开为 {min:n, max:0}；新对象保留原样。
+		// 关键词: handleSetRateLimitConfig 规整化 ModelDelayOverrides
+		cleaned := make(map[string]DelayRange, len(reqBody.ModelDelayOverrides))
+		for k, v := range reqBody.ModelDelayOverrides {
+			k = strings.TrimSpace(k)
+			if k == "" {
+				continue
+			}
+			var legacy int64
+			if err := json.Unmarshal(v, &legacy); err == nil {
+				if legacy < 0 {
+					legacy = 0
+				}
+				cleaned[k] = DelayRange{Min: legacy, Max: 0}
+				continue
+			}
+			var rng struct {
+				Min int64 `json:"min"`
+				Max int64 `json:"max"`
+			}
+			if err := json.Unmarshal(v, &rng); err == nil {
+				if rng.Min < 0 {
+					rng.Min = 0
+				}
+				if rng.Max < 0 {
+					rng.Max = 0
+				}
+				cleaned[k] = DelayRange{Min: rng.Min, Max: rng.Max}
+			}
+		}
+		delayJSON, _ := json.Marshal(cleaned)
 		config.ModelDelayOverrides = string(delayJSON)
 	}
 	if reqBody.FreeUserTokenLimitM != nil {
@@ -124,6 +231,42 @@ func (c *ServerConfig) handleSetRateLimitConfig(conn net.Conn, request *http.Req
 			config.FreeUserTokenLimitM = 0
 		} else {
 			config.FreeUserTokenLimitM = *reqBody.FreeUserTokenLimitM
+		}
+	}
+	if reqBody.FreeUserOutputTPS != nil {
+		if *reqBody.FreeUserOutputTPS < 0 {
+			config.FreeUserOutputTPS = 0
+		} else {
+			config.FreeUserOutputTPS = *reqBody.FreeUserOutputTPS
+		}
+	}
+	if reqBody.ModelOutputTPSOverrides != nil {
+		clean := make(map[string]int64, len(reqBody.ModelOutputTPSOverrides))
+		for k, v := range reqBody.ModelOutputTPSOverrides {
+			k = strings.TrimSpace(k)
+			if k == "" {
+				continue
+			}
+			if v < 0 {
+				v = 0
+			}
+			clean[k] = v
+		}
+		tpsJSON, _ := json.Marshal(clean)
+		config.ModelOutputTPSOverrides = string(tpsJSON)
+	}
+	if reqBody.FreeUserTokenSoftLimitM != nil {
+		if *reqBody.FreeUserTokenSoftLimitM < 0 {
+			config.FreeUserTokenSoftLimitM = 0
+		} else {
+			config.FreeUserTokenSoftLimitM = *reqBody.FreeUserTokenSoftLimitM
+		}
+	}
+	if reqBody.FreeUserSoftLimitTPS != nil {
+		if *reqBody.FreeUserSoftLimitTPS < 0 {
+			config.FreeUserSoftLimitTPS = 0
+		} else {
+			config.FreeUserSoftLimitTPS = *reqBody.FreeUserSoftLimitTPS
 		}
 	}
 	if reqBody.FreeUserTokenModelOverrides != nil {
@@ -152,8 +295,10 @@ func (c *ServerConfig) handleSetRateLimitConfig(conn net.Conn, request *http.Req
 	// Apply to in-memory rate limiter
 	c.applyRateLimitConfig(config)
 
-	c.logInfo("successfully updated rate limit config: default_rpm=%d, free_user_delay=%ds, free_user_token_limit_m=%d",
-		config.DefaultRPM, config.FreeUserDelaySec, config.FreeUserTokenLimitM)
+	c.logInfo("successfully updated rate limit config: default_rpm=%d, free_user_delay=%d~%ds, free_user_token_limit_m=%d, output_tps=%d, soft_limit_m=%d, soft_tps=%d",
+		config.DefaultRPM, config.FreeUserDelaySec, config.FreeUserDelayMaxSec,
+		config.FreeUserTokenLimitM, config.FreeUserOutputTPS,
+		config.FreeUserTokenSoftLimitM, config.FreeUserSoftLimitTPS)
 	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
 		"success": true,
 		"message": "rate limit config updated successfully",
@@ -264,16 +409,60 @@ func (c *ServerConfig) applyRateLimitConfig(cfg *schema.AiBalanceRateLimitConfig
 		}
 		c.chatRateLimiter.ClearModelDelay()
 		if cfg.ModelDelayOverrides != "" {
-			var delayOverrides map[string]int64
-			if err := json.Unmarshal([]byte(cfg.ModelDelayOverrides), &delayOverrides); err == nil {
-				for model, delay := range delayOverrides {
+			// 同时兼容两种 JSON 形态：
+			//   1) 老格式 map[string]int64       -> {"slow-free": 30}
+			//   2) 新格式 map[string]DelayRange  -> {"slow-free": {"min": 0, "max": 5}}
+			// 解析顺序：先尝试 raw -> map[string]json.RawMessage，逐项判别。
+			// 关键词: ModelDelayOverrides 解析, 老 int 兼容, 新 DelayRange
+			rawMap := make(map[string]json.RawMessage)
+			if err := json.Unmarshal([]byte(cfg.ModelDelayOverrides), &rawMap); err == nil {
+				for model, raw := range rawMap {
 					model = strings.TrimSpace(model)
-					if model != "" && delay >= 0 {
-						c.chatRateLimiter.SetModelDelay(model, delay)
+					if model == "" {
+						continue
+					}
+					var legacy int64
+					if err := json.Unmarshal(raw, &legacy); err == nil {
+						if legacy >= 0 {
+							c.chatRateLimiter.SetModelDelay(model, legacy, 0)
+						}
+						continue
+					}
+					var rng struct {
+						Min int64 `json:"min"`
+						Max int64 `json:"max"`
+					}
+					if err := json.Unmarshal(raw, &rng); err == nil {
+						if rng.Min < 0 {
+							rng.Min = 0
+						}
+						if rng.Max < 0 {
+							rng.Max = 0
+						}
+						c.chatRateLimiter.SetModelDelay(model, rng.Min, rng.Max)
+					}
+				}
+			}
+		}
+
+		// 模型级输出 TPS 覆盖
+		// 关键词: ModelOutputTPSOverrides applyRateLimitConfig
+		c.chatRateLimiter.ClearModelOutputTPS()
+		if cfg.ModelOutputTPSOverrides != "" {
+			var tpsOverrides map[string]int64
+			if err := json.Unmarshal([]byte(cfg.ModelOutputTPSOverrides), &tpsOverrides); err == nil {
+				for model, tps := range tpsOverrides {
+					model = strings.TrimSpace(model)
+					if model != "" && tps > 0 {
+						c.chatRateLimiter.SetModelOutputTPS(model, tps)
 					}
 				}
 			}
 		}
 	}
-	c.freeUserDelaySec = cfg.FreeUserDelaySec
+	c.freeUserDelayMinSec = cfg.FreeUserDelaySec
+	c.freeUserDelayMaxSec = cfg.FreeUserDelayMaxSec
+	c.freeUserOutputTPS = cfg.FreeUserOutputTPS
+	c.freeUserTokenSoftLimitM = cfg.FreeUserTokenSoftLimitM
+	c.freeUserSoftLimitTPS = cfg.FreeUserSoftLimitTPS
 }

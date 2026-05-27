@@ -367,22 +367,27 @@ func TestChatRateLimiter_ModelDelayOverride(t *testing.T) {
 	rl := NewChatRateLimiter()
 	defer rl.Stop()
 
-	const fallback int64 = 5
+	const fallbackMin int64 = 5
+	const fallbackMax int64 = 0
 
-	assert.Equal(t, fallback, rl.GetEffectiveDelay("any-model", fallback),
-		"without override the fallback should be returned")
+	gotMin, gotMax := rl.GetEffectiveDelay("any-model", fallbackMin, fallbackMax)
+	assert.Equal(t, fallbackMin, gotMin, "without override the fallback min should be returned")
+	assert.Equal(t, fallbackMax, gotMax, "without override the fallback max should be returned")
 
-	rl.SetModelDelay("slow-free", 30)
-	assert.Equal(t, int64(30), rl.GetEffectiveDelay("slow-free", fallback),
-		"override should win over fallback")
+	rl.SetModelDelay("slow-free", 30, 0)
+	slowMin, slowMax := rl.GetEffectiveDelay("slow-free", fallbackMin, fallbackMax)
+	assert.Equal(t, int64(30), slowMin, "override should win over fallback (min)")
+	assert.Equal(t, int64(0), slowMax, "legacy numeric override stores Max=0")
 
-	rl.SetModelDelay("fast-free", 0)
-	assert.Equal(t, int64(0), rl.GetEffectiveDelay("fast-free", fallback),
-		"explicit 0 override means no delay (overrides fallback)")
+	rl.SetModelDelay("fast-free", 0, 0)
+	fastMin, fastMax := rl.GetEffectiveDelay("fast-free", fallbackMin, fallbackMax)
+	assert.Equal(t, int64(0), fastMin, "explicit 0 override means no delay")
+	assert.Equal(t, int64(0), fastMax)
 
-	rl.SetModelDelay("slow-free", -1)
-	assert.Equal(t, fallback, rl.GetEffectiveDelay("slow-free", fallback),
-		"negative value should remove override")
+	rl.SetModelDelay("slow-free", -1, 0)
+	slowMin2, slowMax2 := rl.GetEffectiveDelay("slow-free", fallbackMin, fallbackMax)
+	assert.Equal(t, fallbackMin, slowMin2, "negative value should remove override (fallback min)")
+	assert.Equal(t, fallbackMax, slowMax2)
 }
 
 // TestChatRateLimiter_ClearModelDelay verifies that ClearModelDelay wipes
@@ -391,16 +396,18 @@ func TestChatRateLimiter_ClearModelDelay(t *testing.T) {
 	rl := NewChatRateLimiter()
 	defer rl.Stop()
 
-	rl.SetModelDelay("a-free", 10)
-	rl.SetModelDelay("b-free", 20)
-	assert.Equal(t, int64(10), rl.GetEffectiveDelay("a-free", 1))
-	assert.Equal(t, int64(20), rl.GetEffectiveDelay("b-free", 1))
+	rl.SetModelDelay("a-free", 10, 0)
+	rl.SetModelDelay("b-free", 20, 0)
+	aMin, _ := rl.GetEffectiveDelay("a-free", 1, 0)
+	bMin, _ := rl.GetEffectiveDelay("b-free", 1, 0)
+	assert.Equal(t, int64(10), aMin)
+	assert.Equal(t, int64(20), bMin)
 
 	rl.ClearModelDelay()
-	assert.Equal(t, int64(1), rl.GetEffectiveDelay("a-free", 1),
-		"after clear, fallback should be returned")
-	assert.Equal(t, int64(1), rl.GetEffectiveDelay("b-free", 1),
-		"after clear, fallback should be returned")
+	aMin2, _ := rl.GetEffectiveDelay("a-free", 1, 0)
+	bMin2, _ := rl.GetEffectiveDelay("b-free", 1, 0)
+	assert.Equal(t, int64(1), aMin2, "after clear, fallback should be returned (a)")
+	assert.Equal(t, int64(1), bMin2, "after clear, fallback should be returned (b)")
 }
 
 // ==================== Integration: ChatRateLimiter + ServerConfig ====================
@@ -413,7 +420,7 @@ func TestServerConfig_ChatRateLimiterInitialized(t *testing.T) {
 
 func TestServerConfig_FreeUserDelayDefault(t *testing.T) {
 	cfg := NewServerConfig()
-	assert.Equal(t, int64(3), cfg.freeUserDelaySec, "default free user delay should be 3")
+	assert.Equal(t, int64(3), cfg.freeUserDelayMinSec, "default free user delay min should be 3")
 }
 
 // ==================== Model RPM Stats Aggregation ====================

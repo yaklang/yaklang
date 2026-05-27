@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aispec"
+	"github.com/yaklang/yaklang/common/ai/ytoken"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bufpipe"
@@ -67,6 +68,26 @@ type chatJSONChunkWriter struct {
 	// 会读 env AIBALANCE_TOOL_CALL_AGG, 关闭时返回 nil, 全程 no-op).
 	// 关键词: chatJSONChunkWriter toolAgg, incremental tool_calls 聚合日志镜像
 	toolAgg *ToolCallAggregator
+
+	// outputTPSLimiter 为流式输出做 token-per-second 节流。
+	// 仅在 SetOutputTPSLimit 被显式调用且 limit>0 时生效；非流式 (notStream=true)
+	// 路径不会触发节流（writerWrapper.Write 在 notStream 分支直接写 buf）。
+	// 关键词: chatJSONChunkWriter outputTPSLimiter, 流式 TPS 限速
+	outputTPSLimiter *OutputTPSLimiter
+}
+
+// SetOutputTPSLimit 在 writer 创建后立即调用，启用 token-per-second 节流。
+// limit <=0 表示不限速；多次调用会替换之前的 limiter（reset 累计状态）。
+// 关键词: SetOutputTPSLimit, 流式输出节流入口
+func (w *chatJSONChunkWriter) SetOutputTPSLimit(limit int64) {
+	if w == nil {
+		return
+	}
+	if limit <= 0 {
+		w.outputTPSLimiter = nil
+		return
+	}
+	w.outputTPSLimiter = NewOutputTPSLimiter(limit)
 }
 
 // NewChatJSONChunkWriter creates a new chat JSON chunk writer
@@ -330,9 +351,25 @@ type writerWrapper struct {
 // 透明转发, 不再插入任何 ReAct 文本反解析的中间状态机。
 //
 // 关键词: writerWrapper.Write content 透传, 无 ReAct 反解析
+//
+// TPS 节流：当 writer.outputTPSLimiter 启用时，按 ytoken.CalcTokenCount(p)
+// 估算本次写入的 token 数，调用 Throttle 决定 sleep 时长，再继续推送。
+// 注意 Sleep 在持有 writer.mu 之前完成，避免阻塞 WriteToolCalls / WriteUsage
+// 等同期回调。reasoning_content 与 content 共用同一个 limiter，按统一吞吐口径节流。
+// 非流式（notStream=true）路径直接累积到 buf，不触发节流。
+// 关键词: writerWrapper.Write TPS 节流, ytoken 估算
 func (w *writerWrapper) Write(p []byte) (n int, err error) {
 	if w.notStream {
 		return w.buf.Write(p)
+	}
+
+	if w.writer.outputTPSLimiter != nil && len(p) > 0 {
+		tokens := int64(ytoken.CalcTokenCount(string(p)))
+		if tokens > 0 {
+			if sleep := w.writer.outputTPSLimiter.Throttle(tokens); sleep > 0 {
+				time.Sleep(sleep)
+			}
+		}
 	}
 
 	delta, err := w.writer.buildDelta(w.reason, string(p))

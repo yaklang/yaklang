@@ -29,6 +29,11 @@ func GetRateLimitConfig() (*schema.AiBalanceRateLimitConfig, error) {
 			ModelDelayOverrides:         "{}",
 			FreeUserTokenLimitM:         1200,
 			FreeUserTokenModelOverrides: "{}",
+			FreeUserDelayMaxSec:         0,
+			FreeUserOutputTPS:           0,
+			ModelOutputTPSOverrides:     "{}",
+			FreeUserTokenSoftLimitM:     0,
+			FreeUserSoftLimitTPS:        0,
 		}
 		config.ID = 1
 		if createErr := db.Create(&config).Error; createErr != nil {

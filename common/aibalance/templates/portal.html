@@ -935,13 +935,34 @@
                     <h4 style="margin-bottom: 10px;">免费用户调用前延迟</h4>
                     <div style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
                         <div class="form-group" style="margin-bottom: 0; flex: 0 0 200px;">
-                            <label>延迟基础值 (秒):</label>
+                            <label>延迟最小值 (秒):</label>
                             <input type="number" id="rl-free-user-delay" class="form-control" value="3" min="0" style="font-family: monospace; font-size: 13px;">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0; flex: 0 0 200px;">
+                            <label>延迟最大值 (秒):</label>
+                            <input type="number" id="rl-free-user-delay-max" class="form-control" value="0" min="0" style="font-family: monospace; font-size: 13px;">
                         </div>
                     </div>
                     <small style="color: #888; margin-top: 8px; display: block;">
-                        免费用户每次请求<strong>转发到上游之前</strong>，服务端会 sleep N~2N 秒（N 为配置值）。设为 0 则不延迟。
-                        <br>调用前延迟可有效降低客户端的实际请求频率（客户端会被强制等待）。
+                        免费用户每次请求<strong>转发到上游之前</strong>，服务端会在 <strong>[最小值, 最大值]</strong> 秒之间随机 sleep（含两端）。
+                        <br>例如最小值 0、最大值 5 → 0~5 秒随机延迟，让用户体验更平滑；最小值与最大值都为 0 则不延迟。
+                        <br><strong>兼容提示：</strong>最大值留空或填 0 时自动按老语义 N~2N（即最小值 = N → 实际 N~2N 随机）。
+                    </small>
+                </div>
+
+                <!-- Free user output TPS (token-per-second) limit -->
+                <!-- 关键词: 免费用户输出 TPS 限速, token per second -->
+                <div style="margin-bottom: 20px;">
+                    <h4 style="margin-bottom: 10px;">免费用户输出 TPS 限速</h4>
+                    <div style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
+                        <div class="form-group" style="margin-bottom: 0; flex: 0 0 220px;">
+                            <label>全局输出 TPS (token/s):</label>
+                            <input type="number" id="rl-free-output-tps" class="form-control" value="0" min="0" style="font-family: monospace; font-size: 13px;">
+                        </div>
+                    </div>
+                    <small style="color: #888; margin-top: 8px; display: block;">
+                        在<strong>流式响应</strong>下对免费模型按 token 数节流，上游若返回 50 token/s，可配置成 20 token/s 强制减速。
+                        <br>设为 0 表示不限速。模型级可单独覆盖（见下方"模型级限流覆盖"）。
                     </small>
                 </div>
 
@@ -974,14 +995,36 @@
                         </div>
                         <button class="btn" onclick="addFreeTokenModelOverride()" style="font-size: 12px; margin-top: 8px;">+ 添加模型覆盖</button>
                     </div>
+
+                    <!-- 全局共享池软限额 -->
+                    <!-- 关键词: 全局共享池软限额, 软限速 TPS -->
+                    <div style="margin-top: 16px; padding: 12px; background: #fff8e1; border: 1px solid #ffcc80; border-radius: 6px;">
+                        <strong style="font-size: 13px;">全局共享池软限额</strong>
+                        <small style="display: block; color: #6d4c41; margin-top: 4px;">
+                            当全局共享池累计 token 用量到达软限额阈值后，<strong>仅</strong>免费模型走共享池的请求会被进一步降速到
+                            "软限额 TPS"。模型独立桶 / 豁免模型不受影响。两项任一为 0 即关闭该机制。
+                        </small>
+                        <div style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin-top: 10px;">
+                            <div class="form-group" style="margin-bottom: 0; flex: 0 0 220px;">
+                                <label>软限额阈值 (M Token):</label>
+                                <input type="number" id="rl-free-token-soft-limit-m" class="form-control" value="0" min="0" step="1" style="font-family: monospace; font-size: 13px;">
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0; flex: 0 0 220px;">
+                                <label>软限额 TPS (token/s):</label>
+                                <input type="number" id="rl-free-soft-limit-tps" class="form-control" value="0" min="0" step="1" style="font-family: monospace; font-size: 13px;">
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-                <!-- Model rate-limit overrides (RPM + free-user delay) -->
+                <!-- Model rate-limit overrides (RPM + free-user delay range + output TPS) -->
+                <!-- 关键词: 模型级限流覆盖, 延迟Min/Max, 输出 TPS 模型覆盖 -->
                 <div style="margin-bottom: 20px;">
                     <h4 style="margin-bottom: 10px;">模型级限流覆盖</h4>
                     <small style="color: #888; margin-bottom: 10px; display: block;">
-                        为特定模型单独配置 RPM 上限和免费用户调用前延迟，优先级高于全局默认值。
-                        <br>RPM 留空使用全局默认；延迟留空使用全局默认（明确填 0 表示对该模型不延迟）。
+                        为特定模型单独配置 RPM 上限、免费用户调用前延迟区间、输出 TPS，优先级高于全局默认值。
+                        <br>RPM 留空使用全局默认；延迟最小/最大值留空使用全局默认；TPS 留空或 0 表示不限速。
+                        <br>延迟"最大值"留空或填 0 时按老语义 N~2N（"最小值"=N → 实际 N~2N 随机）。
                         <br><strong style="color: #d84315;">模型名称请填写对外名称（如 memfit-standard-free），而非转发后的内部名称。</strong>
                     </small>
                     <div id="rl-model-overrides-list" style="margin-bottom: 10px;">

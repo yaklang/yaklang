@@ -68,10 +68,19 @@ type ChatRateLimiter struct {
 	rejectResidenceMax time.Duration
 	defaultRPM         atomic.Int64
 	modelRPM           sync.Map // map[modelName]int64 RPM override
-	modelDelay         sync.Map // map[modelName]int64 free-user pre-call delay override (seconds)
+	modelDelay         sync.Map // map[modelName]DelayRange free-user pre-call delay override (seconds)
+	modelOutputTPS     sync.Map // map[modelName]int64 output TPS override (tokens per second)
 	stopCh             chan struct{}
 	stopOnce           sync.Once
 	startOnce          sync.Once
+}
+
+// DelayRange 描述免费用户调用前延迟的随机区间（包含 Min, 包含 Max）。
+// Min == Max 视作固定延迟；Max <= 0 且 Min > 0 时调用方按老语义 N~2N 兜底。
+// 关键词: DelayRange, N~M 随机延迟区间
+type DelayRange struct {
+	Min int64 `json:"min"`
+	Max int64 `json:"max"`
 }
 
 // NewChatRateLimiter creates a new chat rate limiter. The background cleanup
@@ -149,15 +158,27 @@ func (rl *ChatRateLimiter) ClearModelRPM() {
 }
 
 // SetModelDelay sets a free-user pre-call delay override (in seconds) for a
-// specific model. Passing a negative value removes the override so the
-// model falls back to the global free-user delay. Passing 0 stores an
-// explicit "no delay" override that wins over the global default.
-func (rl *ChatRateLimiter) SetModelDelay(model string, delaySec int64) {
-	if delaySec < 0 {
+// specific model with a [min, max] random range. Passing min < 0 removes the
+// override so the model falls back to the global free-user delay. Passing
+// min == 0 with max == 0 stores an explicit "no delay" override that wins
+// over the global default. When max < min, max is normalized to min.
+//
+// 兼容旧调用方 SetModelDelay(model, n)：通过 max=0 触发"老 N~2N 兜底"由
+// resolveDelayRange 在解析时映射；这里仅做存储。
+//
+// 关键词: SetModelDelay DelayRange, 模型级延迟区间覆盖
+func (rl *ChatRateLimiter) SetModelDelay(model string, minSec, maxSec int64) {
+	if minSec < 0 {
 		rl.modelDelay.Delete(model)
 		return
 	}
-	rl.modelDelay.Store(model, delaySec)
+	if maxSec < 0 {
+		maxSec = 0
+	}
+	if maxSec > 0 && maxSec < minSec {
+		maxSec = minSec
+	}
+	rl.modelDelay.Store(model, DelayRange{Min: minSec, Max: maxSec})
 }
 
 // ClearModelDelay removes all per-model delay overrides.
@@ -168,17 +189,50 @@ func (rl *ChatRateLimiter) ClearModelDelay() {
 	})
 }
 
-// GetEffectiveDelay returns the pre-call delay (in seconds) for a free-user
-// request to modelName, falling back to the provided global default if no
-// per-model override is configured. A configured override of 0 is also
-// honored as "no delay" because SetModelDelay deletes zero entries.
-func (rl *ChatRateLimiter) GetEffectiveDelay(modelName string, fallbackSec int64) int64 {
+// GetEffectiveDelay returns the pre-call delay range (in seconds) for a
+// free-user request to modelName. If no per-model override is configured,
+// the provided global fallback (min, max) is returned.
+//
+// 关键词: GetEffectiveDelay DelayRange, 兜底全局区间
+func (rl *ChatRateLimiter) GetEffectiveDelay(modelName string, fallbackMin, fallbackMax int64) (int64, int64) {
 	if v, ok := rl.modelDelay.Load(modelName); ok {
-		if delay, ok2 := v.(int64); ok2 {
-			return delay
+		if r, ok2 := v.(DelayRange); ok2 {
+			return r.Min, r.Max
 		}
 	}
-	return fallbackSec
+	return fallbackMin, fallbackMax
+}
+
+// SetModelOutputTPS sets an output TPS (tokens/sec) override for a specific
+// model. <=0 removes the override.
+// 关键词: SetModelOutputTPS, 模型级 TPS 覆盖
+func (rl *ChatRateLimiter) SetModelOutputTPS(model string, tps int64) {
+	if tps <= 0 {
+		rl.modelOutputTPS.Delete(model)
+		return
+	}
+	rl.modelOutputTPS.Store(model, tps)
+}
+
+// ClearModelOutputTPS removes all per-model output TPS overrides.
+// 关键词: ClearModelOutputTPS
+func (rl *ChatRateLimiter) ClearModelOutputTPS() {
+	rl.modelOutputTPS.Range(func(key, _ any) bool {
+		rl.modelOutputTPS.Delete(key)
+		return true
+	})
+}
+
+// GetEffectiveOutputTPS returns the per-model output TPS override if set,
+// otherwise returns the provided global fallback. 0 means "no limit".
+// 关键词: GetEffectiveOutputTPS, 模型级 TPS 兜底全局
+func (rl *ChatRateLimiter) GetEffectiveOutputTPS(modelName string, fallbackTPS int64) int64 {
+	if v, ok := rl.modelOutputTPS.Load(modelName); ok {
+		if tps, ok2 := v.(int64); ok2 {
+			return tps
+		}
+	}
+	return fallbackTPS
 }
 
 // trimRejectExpiredLocked drops rejection entries whose deadline is on or

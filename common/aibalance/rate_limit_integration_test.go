@@ -82,7 +82,8 @@ func TestChatCompletion_FreeUser_429_FullChain(t *testing.T) {
 	cfg := NewServerConfig()
 	defer cfg.Close()
 	cfg.chatRateLimiter.SetDefaultRPM(1)
-	cfg.freeUserDelaySec = 0 // disable pre-call delay so the test runs fast
+	cfg.freeUserDelayMinSec = 0 // disable pre-call delay so the test runs fast
+	cfg.freeUserDelayMaxSec = 0
 
 	raw := buildFreeModelRawHTTP("test-free")
 
@@ -103,7 +104,8 @@ func TestChatCompletion_FreeUser_RPM2_ThirdDenied(t *testing.T) {
 	cfg := NewServerConfig()
 	defer cfg.Close()
 	cfg.chatRateLimiter.SetDefaultRPM(2)
-	cfg.freeUserDelaySec = 0 // disable pre-call delay so the test runs fast
+	cfg.freeUserDelayMinSec = 0 // disable pre-call delay so the test runs fast
+	cfg.freeUserDelayMaxSec = 0
 
 	raw := buildFreeModelRawHTTP("test-free")
 
@@ -124,7 +126,8 @@ func TestChatCompletion_FreeUser_DifferentModels_IndependentBucket(t *testing.T)
 	cfg := NewServerConfig()
 	defer cfg.Close()
 	cfg.chatRateLimiter.SetDefaultRPM(1)
-	cfg.freeUserDelaySec = 0 // disable pre-call delay so the test runs fast
+	cfg.freeUserDelayMinSec = 0 // disable pre-call delay so the test runs fast
+	cfg.freeUserDelayMaxSec = 0
 
 	rawA := buildFreeModelRawHTTP("model-a-free")
 	rawB := buildFreeModelRawHTTP("model-b-free")
