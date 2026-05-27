@@ -14,8 +14,9 @@ name: Cross-Build-Yak
 # - 标准版本: 包含所有功能，使用默认 gzip_embed build tag，文件名前缀为 yak_
 #
 # Linux 兼容性:
-# - linux-amd64 / linux-arm64 在 manylinux2014 容器内原生编译，glibc 基线为 2.17（兼容 RHEL 7+）
-# - 不再使用 macOS 上的 x86_64-linux-gnu 交叉工具链（其 glibc 偏新，会导致 GLIBC_2.28 类错误）
+# - 仅在 go build 时用 docker run manylinux2014（glibc 2.17）；其余 CI 步骤在 Ubuntu runner 上执行
+#   （不能把 job 放进 manylinux 容器：Actions 的 Node 20 需要 GLIBC_2.27+，会在 checkout 阶段失败）
+# - 构建脚本: .github/scripts/build-linux-manylinux.sh
 # - github.com/yaklang/pcap 自带 libpcap.a，随主程序在同一 glibc 基线下链接，无需系统 libpcap
 
 on:
@@ -28,6 +29,8 @@ on:
   pull_request:
     paths:
       - '.github/workflows/exp-cross-build.yml'
+      - '.github/scripts/build-linux-manylinux.sh'
+      - '.github/scripts/verify-glibc-baseline.sh'
 
 jobs:
   check_commit_msg:
@@ -102,7 +105,7 @@ jobs:
             GOOS: linux
             GOARCH: amd64
             runs-on: ubuntu-22.04
-            container: quay.io/pypa/manylinux2014_x86_64
+            manylinux_image: quay.io/pypa/manylinux2014_x86_64
           - os: linux-arm64
             binary: yak_linux_arm64
             env: $GITHUB_ENV
@@ -110,9 +113,8 @@ jobs:
             GOOS: linux
             GOARCH: arm64
             runs-on: ubuntu-24.04-arm
-            container: quay.io/pypa/manylinux2014_aarch64
+            manylinux_image: quay.io/pypa/manylinux2014_aarch64
     runs-on: ${{ matrix.runs-on || (contains(matrix.os, 'windows') && 'windows-latest' || 'macos-14') }}
-    container: ${{ matrix.container }}
     steps:
       # build
       - uses: actions/checkout@v2
@@ -362,21 +364,9 @@ jobs:
           Get-Content "${{ github.workspace }}\.github\patch_go122\48042aa09c2f878c4faa576948b07fe625c4707a.diff" | patch --verbose -R -p 1
           cd ${{ github.workspace }}
 
-      - name: Prepare manylinux build environment (Linux)
+      - name: Go module download (Linux)
         if: startsWith(matrix.os, 'linux')
-        shell: bash
-        run: |
-          set -euo pipefail
-          if command -v yum >/dev/null 2>&1; then
-            yum install -y binutils || true
-          fi
-          if [ -f /opt/rh/devtoolset-10/enable ]; then
-            # shellcheck disable=SC1091
-            source /opt/rh/devtoolset-10/enable
-          fi
-          echo "CC=${CC:-$(command -v gcc)}"
-          gcc --version
-          ldd --version | head -1
+        run: go mod download
 
       - name: Generate Document
         run: go run -gcflags=all="-N -l" common/yak/yakdoc/generate_doc/generate_doc.go common/yak/yakdoc/doc/doc.gob.gzip
@@ -425,13 +415,6 @@ jobs:
           if [ -n "${{ matrix.GOARCH }}" ]; then
             export GOARCH="${{ matrix.GOARCH }}"
           fi
-          if [[ "${{ matrix.os }}" == linux-* ]]; then
-            if [ -f /opt/rh/devtoolset-10/enable ]; then
-              # shellcheck disable=SC1091
-              source /opt/rh/devtoolset-10/enable
-            fi
-          fi
-          
           # Verify environment variables are set
           echo "BUILD_TAGS=${BUILD_TAGS}"
           echo "OUTPUT_BINARY=${OUTPUT_BINARY}"
@@ -442,8 +425,17 @@ jobs:
             echo "Error: OUTPUT_BINARY is not set"
             exit 1
           fi
+
+          if [[ "${{ matrix.os }}" == linux-* ]]; then
+            bash .github/scripts/build-linux-manylinux.sh \
+              "${{ matrix.manylinux_image }}" \
+              "${OUTPUT_BINARY}" \
+              "${BUILD_TAGS}" \
+              "${YAK_TAG}"
+            exit 0
+          fi
           
-          # Build with proper tag handling
+          # Build with proper tag handling (Windows / macOS matrix on native runners)
           BUILD_CMD="go build"
           if [ -n "${BUILD_TAGS}" ]; then
             BUILD_CMD="${BUILD_CMD} -tags ${BUILD_TAGS}"
@@ -457,32 +449,7 @@ jobs:
 
       - name: Verify glibc baseline (Linux, manylinux2014)
         if: startsWith(matrix.os, 'linux')
-        shell: bash
-        run: |
-          set -euo pipefail
-          BIN="./${OUTPUT_BINARY}"
-          if ! command -v objdump >/dev/null 2>&1; then
-            yum install -y binutils
-          fi
-          mapfile -t GLIBC_SYMS < <(objdump -T "$BIN" 2>/dev/null | grep -oE 'GLIBC_[0-9]+(\.[0-9]+)?' || true)
-          if [ "${#GLIBC_SYMS[@]}" -eq 0 ]; then
-            mapfile -t GLIBC_SYMS < <(strings "$BIN" | grep -oE '^GLIBC_[0-9]+(\.[0-9]+)?' || true)
-          fi
-          printf '%s\n' "${GLIBC_SYMS[@]}" | sort -Vu
-          for sym in "${GLIBC_SYMS[@]}"; do
-            ver="${sym#GLIBC_}"
-            major="${ver%%.*}"
-            minor="${ver#*.}"
-            if [ "$minor" = "$ver" ]; then
-              minor=0
-            fi
-            if [ "$major" -gt 2 ] || { [ "$major" -eq 2 ] && [ "$minor" -gt 17 ]; }; then
-              echo "Error: $BIN requires $sym; max allowed is GLIBC_2.17 (RHEL 7 / manylinux2014)"
-              exit 1
-            fi
-          done
-          echo "glibc symbol check passed (<= GLIBC_2.17)"
-          ldd "$BIN" || true
+        run: bash .github/scripts/verify-glibc-baseline.sh "./${{ env.OUTPUT_BINARY }}"
 
       - name: Validate signing secrets
         if: ${{ contains(matrix.os, 'windows') && github.event_name != 'pull_request' }}

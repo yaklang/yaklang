@@ -46,7 +46,6 @@ on:
 jobs:
   build_and_upload_asset:
     runs-on: ${{ contains(inputs.os, 'windows') && 'windows-latest' || (inputs.os == 'linux-amd64' && 'ubuntu-22.04' || (inputs.os == 'linux-arm64' && 'ubuntu-24.04-arm' || 'macos-14')) }}
-    container: ${{ inputs.os == 'linux-amd64' && 'quay.io/pypa/manylinux2014_x86_64' || (inputs.os == 'linux-arm64' && 'quay.io/pypa/manylinux2014_aarch64' || null) }}
     steps:
       - uses: actions/checkout@v2
       
@@ -102,20 +101,9 @@ jobs:
           echo "BUILD_TAGS=$BUILD_TAGS" >> "$GITHUB_ENV"
           echo "OUTPUT_NAME_PREFIX=$OUTPUT_NAME_PREFIX" >> "$GITHUB_ENV" 
 
-      - name: Prepare manylinux build environment (Linux)
+      - name: Go module download (Linux)
         if: startsWith(inputs.os, 'linux')
-        shell: bash
-        run: |
-          set -euo pipefail
-          if command -v yum >/dev/null 2>&1; then
-            yum install -y binutils || true
-          fi
-          if [ -f /opt/rh/devtoolset-10/enable ]; then
-            # shellcheck disable=SC1091
-            source /opt/rh/devtoolset-10/enable
-          fi
-          gcc --version
-          ldd --version | head -1
+        run: go mod download
 
       - name: Generate Document
         run: go run -gcflags=all="-N -l" common/yak/yakdoc/generate_doc/generate_doc.go common/yak/yakdoc/doc/doc.gob.gzip
@@ -222,48 +210,32 @@ jobs:
           export GOARCH=$(echo ${{ inputs.os }} | cut -d'-' -f2)
           export OUTPUT_NAME="${OUTPUT_NAME_PREFIX}${GOOS}_${GOARCH}"
           export CGO_ENABLED=1
-          if [[ "${{ inputs.os }}" == linux-* ]]; then
-            if [ -f /opt/rh/devtoolset-10/enable ]; then
-              # shellcheck disable=SC1091
-              source /opt/rh/devtoolset-10/enable
-            fi
-          fi
 
           echo "Building with tags: ${BUILD_TAGS}"
           echo "Output file: ${OUTPUT_NAME}"
 
-          go build -tags "${BUILD_TAGS}" -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ env.YAK_TAG }}'" -o $OUTPUT_NAME -v common/yak/cmd/yak.go && ls
+          if [[ "${{ inputs.os }}" == linux-amd64 ]]; then
+            MANYLINUX_IMAGE=quay.io/pypa/manylinux2014_x86_64
+          elif [[ "${{ inputs.os }}" == linux-arm64 ]]; then
+            MANYLINUX_IMAGE=quay.io/pypa/manylinux2014_aarch64
+          fi
+
+          if [[ "${{ inputs.os }}" == linux-* ]]; then
+            bash .github/scripts/build-linux-manylinux.sh \
+              "${MANYLINUX_IMAGE}" \
+              "${OUTPUT_NAME}" \
+              "${BUILD_TAGS}" \
+              "${{ env.YAK_TAG }}"
+          else
+            go build -tags "${BUILD_TAGS}" -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ env.YAK_TAG }}'" -o $OUTPUT_NAME -v common/yak/cmd/yak.go
+          fi
+          ls -lh "$OUTPUT_NAME"
 
           echo "OUTPUT_NAME=$OUTPUT_NAME" >> $GITHUB_ENV
 
       - name: Verify glibc baseline (Linux, manylinux2014)
         if: startsWith(inputs.os, 'linux')
-        shell: bash
-        run: |
-          set -euo pipefail
-          BIN="./${OUTPUT_NAME}"
-          if ! command -v objdump >/dev/null 2>&1; then
-            yum install -y binutils
-          fi
-          GLIBC_SYMS=$(objdump -T "$BIN" 2>/dev/null | grep -oE 'GLIBC_[0-9]+(\.[0-9]+)?' || true)
-          if [ -z "$GLIBC_SYMS" ]; then
-            GLIBC_SYMS=$(strings "$BIN" | grep -oE '^GLIBC_[0-9]+(\.[0-9]+)?' || true)
-          fi
-          echo "$GLIBC_SYMS" | sort -Vu
-          while IFS= read -r sym; do
-            [ -z "$sym" ] && continue
-            ver="${sym#GLIBC_}"
-            major="${ver%%.*}"
-            minor="${ver#*.}"
-            if [ "$minor" = "$ver" ]; then
-              minor=0
-            fi
-            if [ "$major" -gt 2 ] || { [ "$major" -eq 2 ] && [ "$minor" -gt 17 ]; }; then
-              echo "Error: $BIN requires $sym; max allowed is GLIBC_2.17"
-              exit 1
-            fi
-          done <<< "$GLIBC_SYMS"
-          echo "glibc symbol check passed (<= GLIBC_2.17)"
+        run: bash .github/scripts/verify-glibc-baseline.sh "./${{ env.OUTPUT_NAME }}"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
