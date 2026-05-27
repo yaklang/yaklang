@@ -9252,9 +9252,10 @@ type AIStartParams struct {
 	// 会话来源（如 ide / cli / yak），写入项目库 ai_sessions_v1.source
 	Source string `protobuf:"bytes,41,opt,name=Source,proto3" json:"Source,omitempty"`
 	// 启动时预启用能力（工具 / 技能 / 插件），支持会话缓存与热加载
-	EnabledCapabilities []*AIEnabledCapability `protobuf:"bytes,42,rep,name=EnabledCapabilities,proto3" json:"EnabledCapabilities,omitempty"`
-	unknownFields       protoimpl.UnknownFields
-	sizeCache           protoimpl.SizeCache
+	EnabledCapabilities     []*AIEnabledCapability `protobuf:"bytes,42,rep,name=EnabledCapabilities,proto3" json:"EnabledCapabilities,omitempty"`
+	PlanExecTaskConcurrency int64                  `protobuf:"varint,45,opt,name=PlanExecTaskConcurrency,proto3" json:"PlanExecTaskConcurrency,omitempty"` // 计划执行任务的并发度
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
 }
 
 func (x *AIStartParams) Reset() {
@@ -9572,6 +9573,13 @@ func (x *AIStartParams) GetEnabledCapabilities() []*AIEnabledCapability {
 		return x.EnabledCapabilities
 	}
 	return nil
+}
+
+func (x *AIStartParams) GetPlanExecTaskConcurrency() int64 {
+	if x != nil {
+		return x.PlanExecTaskConcurrency
+	}
+	return 0
 }
 
 type AITaskFilter struct {
@@ -35866,13 +35874,13 @@ type StartBruteParams struct {
 	Concurrent int64 `protobuf:"varint,8,opt,name=Concurrent,proto3" json:"Concurrent,omitempty"`
 	Retry      int64 `protobuf:"varint,9,opt,name=Retry,proto3" json:"Retry,omitempty"`
 	// 目标任务内并发
-	TargetTaskConcurrent int64 `protobuf:"varint,10,opt,name=TargetTaskConcurrent,proto3" json:"TargetTaskConcurrent,omitempty"`
-	OkToStop         bool   `protobuf:"varint,11,opt,name=OkToStop,proto3" json:"OkToStop,omitempty"`
-	DelayMin         int64  `protobuf:"varint,12,opt,name=DelayMin,proto3" json:"DelayMin,omitempty"`
-	DelayMax         int64  `protobuf:"varint,13,opt,name=DelayMax,proto3" json:"DelayMax,omitempty"`
-	PluginScriptName string `protobuf:"bytes,14,opt,name=PluginScriptName,proto3" json:"PluginScriptName,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	TargetTaskConcurrent int64  `protobuf:"varint,10,opt,name=TargetTaskConcurrent,proto3" json:"TargetTaskConcurrent,omitempty"`
+	OkToStop             bool   `protobuf:"varint,11,opt,name=OkToStop,proto3" json:"OkToStop,omitempty"`
+	DelayMin             int64  `protobuf:"varint,12,opt,name=DelayMin,proto3" json:"DelayMin,omitempty"`
+	DelayMax             int64  `protobuf:"varint,13,opt,name=DelayMax,proto3" json:"DelayMax,omitempty"`
+	PluginScriptName     string `protobuf:"bytes,14,opt,name=PluginScriptName,proto3" json:"PluginScriptName,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *StartBruteParams) Reset() {
@@ -45453,8 +45461,8 @@ type ExecHistoryRecord struct {
 	// Uid
 	Id string `protobuf:"bytes,9,opt,name=Id,proto3" json:"Id,omitempty"`
 	// 展示界面内容
-	Stdout []byte `protobuf:"bytes,10,opt,name=Stdout,proto3" json:"Stdout,omitempty"`
-	Stderr []byte `protobuf:"bytes,11,opt,name=Stderr,proto3" json:"Stderr,omitempty"`
+	Stdout        []byte `protobuf:"bytes,10,opt,name=Stdout,proto3" json:"Stdout,omitempty"`
+	Stderr        []byte `protobuf:"bytes,11,opt,name=Stderr,proto3" json:"Stderr,omitempty"`
 	RuntimeId     string `protobuf:"bytes,12,opt,name=RuntimeId,proto3" json:"RuntimeId,omitempty"`
 	FromYakModule string `protobuf:"bytes,13,opt,name=FromYakModule,proto3" json:"FromYakModule,omitempty"`
 	StdoutLen     int64  `protobuf:"varint,14,opt,name=StdoutLen,proto3" json:"StdoutLen,omitempty"`
@@ -70384,7 +70392,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x03Url\x18\x03 \x01(\tR\x03Url\"=\n" +
 	"\x13AIEnabledCapability\x12\x12\n" +
 	"\x04Name\x18\x01 \x01(\tR\x04Name\x12\x12\n" +
-	"\x04Type\x18\x02 \x01(\tR\x04Type\"\xd3\x0f\n" +
+	"\x04Type\x18\x02 \x01(\tR\x04Type\"\x8d\x10\n" +
 	"\rAIStartParams\x12$\n" +
 	"\rCoordinatorId\x18\x11 \x01(\tR\rCoordinatorId\x12\x1a\n" +
 	"\bSequence\x18\x12 \x01(\x03R\bSequence\x12.\n" +
@@ -70431,7 +70439,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x19PreferSessionCachedConfig\x18' \x01(\bR\x19PreferSessionCachedConfig\x12&\n" +
 	"\x0eUserPlanPrompt\x18( \x01(\tR\x0eUserPlanPrompt\x12\x16\n" +
 	"\x06Source\x18) \x01(\tR\x06Source\x12J\n" +
-	"\x13EnabledCapabilities\x18* \x03(\v2\x18.ypb.AIEnabledCapabilityR\x13EnabledCapabilities\"\x9e\x01\n" +
+	"\x13EnabledCapabilities\x18* \x03(\v2\x18.ypb.AIEnabledCapabilityR\x13EnabledCapabilities\x128\n" +
+	"\x17PlanExecTaskConcurrency\x18- \x01(\x03R\x17PlanExecTaskConcurrency\"\x9e\x01\n" +
 	"\fAITaskFilter\x12\x12\n" +
 	"\x04Name\x18\x01 \x03(\tR\x04Name\x12\x18\n" +
 	"\aKeyword\x18\x02 \x03(\tR\aKeyword\x12\x1c\n" +

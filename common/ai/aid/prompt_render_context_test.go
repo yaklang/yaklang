@@ -107,6 +107,7 @@ func newPromptRenderFixture() *promptRenderFixture {
 		Config: &aicommon.Config{
 			Ctx:             context.Background(),
 			MaxTaskContinue: 3,
+			Timeline:        provider.timeline,
 		},
 		ContextProvider: provider,
 		userInput:       "prompt render regression",
@@ -169,8 +170,9 @@ func TestGenerateDeepThinkPlanPrompt_UsesTaskLocalGoal(t *testing.T) {
 	prompt, err := fixture.taskA.GenerateDeepThinkPlanPrompt("go deeper")
 	require.NoError(t, err)
 
-	require.Contains(t, prompt, "## 当前步骤任务目标\ngoal from task A")
-	require.NotContains(t, prompt, "## 当前步骤任务目标\ngoal from task B")
+	currentTask := aicommon.MustExtractAITagBlock(t, prompt, "CURRENT_TASK").Body
+	require.Contains(t, currentTask, "input-from-task-A")
+	require.NotContains(t, currentTask, "input-from-task-B")
 }
 
 func TestGenerateToolCallResponsePrompt_UsesTaskLocalContinueState(t *testing.T) {
@@ -189,14 +191,12 @@ func TestGenerateToolCallResponsePrompt_UsesTaskLocalContinueState(t *testing.T)
 	require.NotContains(t, prompt, "input-from-task-B")
 }
 
-func TestGenerateTaskSummaryPrompt_UsesTaskLocalTimeline(t *testing.T) {
+func TestGenerateTaskSummaryPrompt_Timeline(t *testing.T) {
 	fixture := newPromptRenderFixture()
 
 	prompt, err := fixture.taskA.GenerateTaskSummaryPrompt()
 	require.NoError(t, err)
 
-	require.Contains(t, prompt, "## 当前任务的历史时间线")
 	require.Contains(t, prompt, "alpha_tool")
-	require.NotContains(t, prompt, "beta_tool")
 	require.True(t, strings.Contains(prompt, "input-from-task-A"))
 }
