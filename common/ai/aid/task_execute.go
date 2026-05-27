@@ -778,7 +778,7 @@ func (t *AiTask) GenerateTaskSummaryPrompt() (string, error) {
 	if t == nil || t.Coordinator == nil || t.Coordinator.ContextProvider == nil {
 		return "", fmt.Errorf("context provider is nil")
 	}
-	cp := t.Coordinator.ContextProvider
+	cp := clonePromptContextForTask(t.ContextProvider, t)
 	return assembleTaskSummaryPrompt(
 		t.Coordinator.Config,
 		cp.Schema()["TaskSummarySchema"],
