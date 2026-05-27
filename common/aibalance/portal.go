@@ -870,6 +870,26 @@ func (c *ServerConfig) HandlePortalRequest(conn net.Conn, request *http.Request,
 	case uriIns.Path == "/portal/api/ops-stats" && request.Method == "GET":
 		c.handleGetOpsStats(conn, request)
 
+	// ========== Mirror Rules Routes (Admin Only) ==========
+	// 关键词: portal mirror rules 路由注册, AiMirrorRule HTTP API
+	// _meta 必须放在 {id} 这种泛匹配之前, 避免被 PUT/DELETE 的 prefix 抢走.
+	case uriIns.Path == "/portal/api/mirror-rules/_meta" && request.Method == "GET":
+		c.handleGetMirrorMeta(conn, request)
+	case uriIns.Path == "/portal/api/mirror-rules" && request.Method == "GET":
+		c.handleListMirrorRules(conn, request)
+	case uriIns.Path == "/portal/api/mirror-rules" && request.Method == "POST":
+		c.handleCreateMirrorRule(conn, request)
+	case strings.HasPrefix(uriIns.Path, "/portal/api/mirror-rules/") && strings.HasSuffix(uriIns.Path, "/toggle") && request.Method == "POST":
+		c.handleToggleMirrorRule(conn, request, uriIns.Path)
+	case strings.HasPrefix(uriIns.Path, "/portal/api/mirror-rules/") && strings.HasSuffix(uriIns.Path, "/logs") && request.Method == "GET":
+		c.handleGetMirrorRuleLogs(conn, request, uriIns.Path)
+	case strings.HasPrefix(uriIns.Path, "/portal/api/mirror-rules/") && strings.HasSuffix(uriIns.Path, "/test") && request.Method == "POST":
+		c.handleTestMirrorRule(conn, request, uriIns.Path)
+	case strings.HasPrefix(uriIns.Path, "/portal/api/mirror-rules/") && request.Method == "PUT":
+		c.handleUpdateMirrorRule(conn, request, uriIns.Path)
+	case strings.HasPrefix(uriIns.Path, "/portal/api/mirror-rules/") && request.Method == "DELETE":
+		c.handleDeleteMirrorRule(conn, request, uriIns.Path)
+
 	// ========== Default ==========
 	default:
 		c.servePortalWithAuth(conn)

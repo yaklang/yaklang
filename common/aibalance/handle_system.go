@@ -281,10 +281,17 @@ func (c *ServerConfig) serveStaticFile(conn net.Conn, path string) {
 	}
 
 	// Build HTTP response with caching headers
+	// 关键词: aibalance static cache header, must-revalidate, dev hot reload
+	// 把 portal.js / portal.css 的缓存策略改成 no-cache + must-revalidate:
+	// admin / portal 是低 QPS 内部界面, 但每次发版后用户经常忘记 Ctrl+Shift+R,
+	// 旧版 max-age=3600 会让前端 JS 模块/handler 改动延迟 1 小时才被浏览器看到,
+	// 表现为按钮点击没响应 / 新 tab 加载不出来 (ReferenceError on missing globals).
+	// 把过期时间打到 0 并要求 revalidate, 强制浏览器每次 GET 都带 If-Modified-Since,
+	// 后端目前没做 304 协商, 所以浏览器每次会真的拉一次 - 文件几百 KB 量级, 可接受.
 	header := fmt.Sprintf("HTTP/1.1 200 OK\r\n"+
 		"Content-Type: %s\r\n"+
 		"Content-Length: %d\r\n"+
-		"Cache-Control: public, max-age=3600\r\n"+
+		"Cache-Control: no-cache, must-revalidate, max-age=0\r\n"+
 		"\r\n",
 		contentType, len(fileContent))
 

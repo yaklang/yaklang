@@ -584,6 +584,11 @@ type ServerConfig struct {
 	// 关键词: ServerConfig.inFlightTokens 过冲防御, daily check 并发预扣
 	inFlightTokens *InFlightTokenTracker
 
+	// MirrorManager 负责把成功的 chat 请求快照异步分发给用户配置的
+	// 镜像规则 (yak 回调脚本). 设计为完全异步、绝不阻塞主请求链路.
+	// 关键词: ServerConfig.MirrorManager, mirror traffic hook, callback yak
+	MirrorManager *MirrorManager
+
 	closeOnce sync.Once
 }
 
@@ -617,6 +622,19 @@ func NewServerConfig() *ServerConfig {
 	// Initialize in-flight token tracker (overflow defense for daily token check)
 	// 关键词: NewServerConfig inFlightTokens 初始化
 	config.inFlightTokens = NewInFlightTokenTracker()
+
+	// Initialize mirror manager and load enabled rules from DB.
+	// Schema migration is best-effort (skipped if DB not yet initialized).
+	// 关键词: NewServerConfig MirrorManager 初始化, mirror rule 启动加载
+	config.MirrorManager = NewMirrorManager()
+	if db := GetDB(); db != nil {
+		if err := EnsureMirrorRuleTable(); err != nil {
+			log.Warnf("ensure mirror rule table failed: %v", err)
+		}
+		if err := config.MirrorManager.LoadRules(); err != nil {
+			log.Warnf("load mirror rules failed: %v", err)
+		}
+	}
 	return config
 }
 
@@ -637,6 +655,9 @@ func (c *ServerConfig) Close() {
 		}
 		if c.chatRateLimiter != nil {
 			c.chatRateLimiter.Stop()
+		}
+		if c.MirrorManager != nil {
+			c.MirrorManager.Close()
 		}
 	})
 }
@@ -1591,6 +1612,46 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 		writer.Close()
 		utils.FlushWriter(conn)
 		writer.Wait()
+
+		// 流量镜像异步分发：构造完整快照, 解析响应主输出中的 @action,
+		// 把快照投递给所有命中条件的镜像规则的 worker pool. 非阻塞,
+		// 队列满时丢弃并记账, 主流程不感知任何镜像层的状态.
+		// 关键词: aibalance mirror trigger 接入, MirrorSnapshot 构造, 异步分发
+		if c.MirrorManager != nil {
+			respText := outputTextBuf.String()
+			reasonText := reasonTextBuf.String()
+			action, actionPayload := ParseActionFromText(respText)
+			// 关键词: aibalance mirror APIKeyFP 计算, 不可逆指纹, 防止 key 泄漏
+			// free-user 场景没有 key, 用字面量 "free-user" 让脚本能直接判别;
+			// 其他场景用 SHA256[:16] 不可逆指纹, 不再暴露 shrink 后的 key 头尾.
+			apiKeyFP := ""
+			if isFreeModel {
+				apiKeyFP = "free-user"
+			} else if key != nil {
+				apiKeyFP = APIKeyFingerprint(key.Key)
+			}
+			snap := &MirrorSnapshot{
+				ReqID:           writer.uid,
+				TimestampMs:     start.UnixMilli(),
+				Model:           modelName,
+				TypeName:        successfulProvider.TypeName,
+				Domain:          successfulProvider.DomainOrURL,
+				APIKeyFP:        apiKeyFP,
+				IsFreeModel:     isFreeModel,
+				Stream:          stream,
+				RequestMessages: bodyIns.Messages,
+				ResponseText:    respText,
+				ResponseReason:  reasonText,
+				ToolCalls:       writer.SnapshotToolCalls(),
+				Action:          action,
+				ActionPayload:   actionPayload,
+				DurationMs:      endDuration.Milliseconds(),
+				InputBytes:      inputBytes,
+				OutputBytes:     outputBytes,
+				Usage:           writer.SnapshotUsage(),
+			}
+			go c.MirrorManager.Trigger(snap)
+		}
 
 		// Log at WARN level for production visibility
 		var ms runtime.MemStats

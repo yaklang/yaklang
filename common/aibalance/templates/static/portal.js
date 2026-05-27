@@ -952,12 +952,19 @@
         }
 
         // 标签页切换功能
+        // 关键词: switchTab, sidebar 菜单项激活, 兼容旧 .tab 顶部 tab
         function switchTab(tabId) {
-            // 更新标签页状态
+            // 更新顶部隐藏的 .tab (向后兼容旧选择器), 以及新左侧 .menu-item
             document.querySelectorAll('.tab').forEach(tab => {
                 tab.classList.remove('active');
                 if (tab.getAttribute('data-tab') === tabId) {
                     tab.classList.add('active');
+                }
+            });
+            document.querySelectorAll('.menu-item').forEach(mi => {
+                mi.classList.remove('active');
+                if (mi.getAttribute('data-tab') === tabId) {
+                    mi.classList.add('active');
                 }
             });
 
@@ -965,8 +972,11 @@
             document.querySelectorAll('.tab-content').forEach(content => {
                 content.classList.remove('active');
             });
-            document.getElementById(tabId).classList.add('active');
-            
+            const target = document.getElementById(tabId);
+            if (target) {
+                target.classList.add('active');
+            }
+
             // Store the active tab ID in localStorage
             localStorage.setItem('activeTabId', tabId);
             console.log(`Switched to tab: ${tabId}, saved to localStorage.`); // Debug log
@@ -1006,6 +1016,16 @@
             if (tabId === 'dau-cache') {
                 if (typeof refreshDauCacheTab === 'function') {
                     refreshDauCacheTab();
+                }
+            }
+            // Mirror tab 切换时刷新规则列表
+            // 关键词: switchTab mirror tab 初始化, MirrorMgmt.refresh
+            // 注意: 必须用 window.MirrorMgmt 访问, 不能用裸名 MirrorMgmt;
+            // MirrorMgmt 是文件末尾 const 声明的, 在 TDZ 阶段裸名访问 (即使 typeof)
+            // 会抛 ReferenceError: Cannot access 'MirrorMgmt' before initialization.
+            if (tabId === 'mirror') {
+                if (window.MirrorMgmt && typeof window.MirrorMgmt.refresh === 'function') {
+                    window.MirrorMgmt.refresh();
                 }
             }
         }
@@ -1835,6 +1855,20 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
                      tab.classList.remove('active');
                 }
             });
+            // 新左侧 sidebar menu-item 点击也走 switchTab
+            // 关键词: sidebar menu-item 点击绑定, switchTab 入口
+            document.querySelectorAll('.menu-item').forEach(mi => {
+                const currentTabId = mi.getAttribute('data-tab');
+                mi.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    switchTab(currentTabId);
+                });
+                if (currentTabId === initialTabId) {
+                    mi.classList.add('active');
+                } else {
+                    mi.classList.remove('active');
+                }
+            });
 
             document.querySelectorAll('.tab-content').forEach(content => {
                 if (content.id === initialTabId) {
@@ -1863,6 +1897,13 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
                 loadRateLimitConfig();
                 loadRateLimitStatus();
                 startRateLimitModelStatsAutoRefresh();
+            } else if (initialTabId === 'mirror') {
+                // mirror tab 在 page refresh 后保持的场景, 也需要主动拉数据
+                // 关键词: DOMContentLoaded initial mirror auto refresh, window.MirrorMgmt
+                // 必须用 window.MirrorMgmt, 不能 typeof MirrorMgmt (TDZ 抛错).
+                if (window.MirrorMgmt && typeof window.MirrorMgmt.refresh === 'function') {
+                    window.MirrorMgmt.refresh();
+                }
             }
             // --- END: Tab Initialization Logic ---
 
@@ -5710,133 +5751,158 @@ curl '${metaApiUrl}?name=${modelName}'`;
         }
         
         // ==================== 暴露删除和操作相关的全局函数 ====================
+        //
+        // 历史教训: 这块原本是大段 `window.X = X;` 直接赋值. 任意一个标识符未声明
+        // (例如曾经的 selectAllProviders / selectAllAPIKeys 占位名) 都会抛
+        // ReferenceError, 把整段顶层脚本执行掐断, 后果是:
+        //   - 后续所有 expose 不再绑定
+        //   - MirrorMgmt 等模块都不会被装配到 window
+        //   - HTML 内联 onclick="MirrorMgmt.xxx()" 全部 ReferenceError
+        //
+        // 解决方案: 用 __exposeFn(name, () => X) 形式. 由于 getter 是 lazy 求值,
+        // 内部出现 ReferenceError 只会被自身 try-catch 兜底, 不影响其他行.
+        // 同时 console.warn 出来便于排查到底哪个函数还没实现.
+        //
+        // 关键词: portal.js __exposeFn defensive global binding, ReferenceError safe,
+        // top-level script abort 防御, window inline onclick 绑定保护
+        function __exposeFn(name, getter) {
+            try {
+                const v = getter();
+                if (typeof v !== 'undefined') {
+                    window[name] = v;
+                }
+            } catch (e) {
+                console.warn('[expose] skip ' + name + ': ' + ((e && e.message) || e));
+            }
+        }
+
         // Provider 相关
-        window.confirmDeleteSelected = confirmDeleteSelected;
-        window.deleteProvider = deleteProvider;
-        window.deleteMultipleProviders = deleteMultipleProviders;
-        window.checkSingleProvider = checkSingleProvider;
-        window.checkAllProvidersHealth = checkAllProvidersHealth;
-        window.checkSelectedProvider = checkSelectedProvider;
-        window.selectAllProviders = selectAllProviders;
-        window.probeAllToolCalls = probeAllToolCalls;
-        window.probeSingleToolCalls = probeSingleToolCalls;
-        window.updateDeleteSelectedButton = updateDeleteSelectedButton;
-        
+        __exposeFn('confirmDeleteSelected', () => confirmDeleteSelected);
+        __exposeFn('deleteProvider', () => deleteProvider);
+        __exposeFn('deleteMultipleProviders', () => deleteMultipleProviders);
+        __exposeFn('checkSingleProvider', () => checkSingleProvider);
+        __exposeFn('checkAllProvidersHealth', () => checkAllProvidersHealth);
+        __exposeFn('checkSelectedProvider', () => checkSelectedProvider);
+        __exposeFn('selectAllProviders', () => selectAllProviders);
+        __exposeFn('probeAllToolCalls', () => probeAllToolCalls);
+        __exposeFn('probeSingleToolCalls', () => probeSingleToolCalls);
+        __exposeFn('updateDeleteSelectedButton', () => updateDeleteSelectedButton);
+
         // API Key 相关
-        window.confirmDeleteSelectedAPI = confirmDeleteSelectedAPI;
-        window.confirmDeleteSelectedAPIKeys = confirmDeleteSelectedAPI; // 别名，兼容 HTML 中的调用
-        window.deleteAPIKey = deleteAPIKey;
-        window.deleteMultipleAPIKeys = deleteMultipleAPIKeys;
-        window.toggleAPIKeyStatus = toggleAPIKeyStatus;
-        window.confirmDisableSelectedAPI = confirmDisableSelectedAPI;
-        window.confirmEnableSelectedAPI = confirmEnableSelectedAPI;
-        window.disableMultipleAPIKeys = disableMultipleAPIKeys;
-        window.enableMultipleAPIKeys = enableMultipleAPIKeys;
-        window.toggleSelectAllAPI = toggleSelectAllAPI;
-        window.selectAllAPIKeys = selectAllAPIKeys;
-        window.updateDeleteSelectedAPIButton = updateDeleteSelectedAPIButton;
-        
+        __exposeFn('confirmDeleteSelectedAPI', () => confirmDeleteSelectedAPI);
+        __exposeFn('confirmDeleteSelectedAPIKeys', () => confirmDeleteSelectedAPI); // 别名，兼容 HTML 中的调用
+        __exposeFn('deleteAPIKey', () => deleteAPIKey);
+        __exposeFn('deleteMultipleAPIKeys', () => deleteMultipleAPIKeys);
+        __exposeFn('toggleAPIKeyStatus', () => toggleAPIKeyStatus);
+        __exposeFn('confirmDisableSelectedAPI', () => confirmDisableSelectedAPI);
+        __exposeFn('confirmEnableSelectedAPI', () => confirmEnableSelectedAPI);
+        __exposeFn('disableMultipleAPIKeys', () => disableMultipleAPIKeys);
+        __exposeFn('enableMultipleAPIKeys', () => enableMultipleAPIKeys);
+        __exposeFn('toggleSelectAllAPI', () => toggleSelectAllAPI);
+        __exposeFn('selectAllAPIKeys', () => selectAllAPIKeys);
+        __exposeFn('updateDeleteSelectedAPIButton', () => updateDeleteSelectedAPIButton);
+
         // 流量限制相关
-        window.showTrafficLimitDialog = showTrafficLimitDialog;
-        window.showTrafficLimitModal = showTrafficLimitDialog; // 别名
-        window.closeTrafficLimitModal = closeTrafficLimitModal;
-        window.saveTrafficLimit = saveTrafficLimit;
-        window.closeTrafficLimitDialog = closeTrafficLimitModal; // 别名
+        __exposeFn('showTrafficLimitDialog', () => showTrafficLimitDialog);
+        __exposeFn('showTrafficLimitModal', () => showTrafficLimitDialog); // 别名
+        __exposeFn('closeTrafficLimitModal', () => closeTrafficLimitModal);
+        __exposeFn('saveTrafficLimit', () => saveTrafficLimit);
+        __exposeFn('closeTrafficLimitDialog', () => closeTrafficLimitModal); // 别名
         // 修正：之前赋值的是不存在的标识符 resetApiKeyTraffic（小写 pi），
         // 函数实际定义为 resetAPIKeyTraffic（大写 API）。统一指向真实函数。
         // 关键词: resetAPIKeyTraffic 名称大小写修复
-        window.resetApiKeyTraffic = resetAPIKeyTraffic;
-        window.resetAPIKeyTraffic = resetAPIKeyTraffic;
+        __exposeFn('resetApiKeyTraffic', () => resetAPIKeyTraffic);
+        __exposeFn('resetAPIKeyTraffic', () => resetAPIKeyTraffic);
 
         // Token 限额相关（推荐使用，替代字节限额）
         // 关键词: window.showTokenLimitDialog window.saveTokenLimit window.resetAPIKeyToken
-        window.showTokenLimitDialog = showTokenLimitDialog;
-        window.closeTokenLimitModal = closeTokenLimitModal;
-        window.saveTokenLimit = saveTokenLimit;
-        window.resetAPIKeyToken = resetAPIKeyToken;
-        window.formatTokenCount = formatTokenCount;
-        
+        __exposeFn('showTokenLimitDialog', () => showTokenLimitDialog);
+        __exposeFn('closeTokenLimitModal', () => closeTokenLimitModal);
+        __exposeFn('saveTokenLimit', () => saveTokenLimit);
+        __exposeFn('resetAPIKeyToken', () => resetAPIKeyToken);
+        __exposeFn('formatTokenCount', () => formatTokenCount);
+
         // 内存和系统监控相关
-        window.showMemoryDialog = showMemoryDialog;
-        window.closeMemoryDialog = closeMemoryDialog;
-        window.fetchMemoryStats = fetchMemoryStats;
-        window.forceGC = forceGC;
-        window.fetchGoroutineDump = fetchGoroutineDump;
-        
+        __exposeFn('showMemoryDialog', () => showMemoryDialog);
+        __exposeFn('closeMemoryDialog', () => closeMemoryDialog);
+        __exposeFn('fetchMemoryStats', () => fetchMemoryStats);
+        __exposeFn('forceGC', () => forceGC);
+        __exposeFn('fetchGoroutineDump', () => fetchGoroutineDump);
+
         // 筛选相关
-        window.filterProviders = filterProviders;
-        window.filterApiKeys = filterApiKeys;
-        
+        __exposeFn('filterProviders', () => filterProviders);
+        __exposeFn('filterApiKeys', () => filterApiKeys);
+
         // 其他操作函数
-        window.showToast = showToast;
-        window.hideContextMenu = hideContextMenu;
-        window.copyToClipboard = copyToClipboard;
-        window.generateNewApiKey = generateNewApiKey;
-        window.confirmAndGenerateApiKey = confirmAndGenerateApiKey;
-        window.showApiKeySuccessModal = showApiKeySuccessModal;
-        window.closeApiKeySuccessModal = closeApiKeySuccessModal;
-        window.copyGeneratedApiKey = copyGeneratedApiKey;
-        
+        __exposeFn('showToast', () => showToast);
+        __exposeFn('hideContextMenu', () => hideContextMenu);
+        __exposeFn('copyToClipboard', () => copyToClipboard);
+        __exposeFn('generateNewApiKey', () => generateNewApiKey);
+        __exposeFn('confirmAndGenerateApiKey', () => confirmAndGenerateApiKey);
+        __exposeFn('showApiKeySuccessModal', () => showApiKeySuccessModal);
+        __exposeFn('closeApiKeySuccessModal', () => closeApiKeySuccessModal);
+        __exposeFn('copyGeneratedApiKey', () => copyGeneratedApiKey);
+
         // 模型相关
-        window.openEditModelModal = openEditModelModal;
-        window.showCurlCommand = showCurlCommand;
-        if (typeof closeEditModelModal === 'function') window.closeEditModelModal = closeEditModelModal;
-        if (typeof saveModelMetadata === 'function') window.saveModelMetadata = saveModelMetadata;
-        if (typeof closeCurlModal === 'function') window.closeCurlModal = closeCurlModal;
-        if (typeof copyCurlCommand === 'function') window.copyCurlCommand = copyCurlCommand;
-        
+        __exposeFn('openEditModelModal', () => openEditModelModal);
+        __exposeFn('showCurlCommand', () => showCurlCommand);
+        __exposeFn('closeEditModelModal', () => closeEditModelModal);
+        __exposeFn('saveModelMetadata', () => saveModelMetadata);
+        __exposeFn('closeCurlModal', () => closeCurlModal);
+        __exposeFn('copyCurlCommand', () => copyCurlCommand);
+
         // 右键菜单相关（Provider）
-        window.quickAddProvider = quickAddProvider;
-        window.copySimilarProviderKeys = copySimilarProviderKeys;
-        window.deleteSelectedProvider = deleteSelectedProvider;
-        window.showContextMenu = showContextMenu;
-        window.initializeContextMenu = initializeContextMenu;
-        
+        __exposeFn('quickAddProvider', () => quickAddProvider);
+        __exposeFn('copySimilarProviderKeys', () => copySimilarProviderKeys);
+        __exposeFn('deleteSelectedProvider', () => deleteSelectedProvider);
+        __exposeFn('showContextMenu', () => showContextMenu);
+        __exposeFn('initializeContextMenu', () => initializeContextMenu);
+
         // 同类供应商 Keys 弹窗相关
-        if (typeof showSimilarKeysModal === 'function') window.showSimilarKeysModal = showSimilarKeysModal;
-        if (typeof closeCopySimilarKeysModal === 'function') window.closeCopySimilarKeysModal = closeCopySimilarKeysModal;
-        if (typeof copySimilarKeysToClipboard === 'function') window.copySimilarKeysToClipboard = copySimilarKeysToClipboard;
-        
+        __exposeFn('showSimilarKeysModal', () => showSimilarKeysModal);
+        __exposeFn('closeCopySimilarKeysModal', () => closeCopySimilarKeysModal);
+        __exposeFn('copySimilarKeysToClipboard', () => copySimilarKeysToClipboard);
+
         // 右键菜单相关（API Key）
-        window.triggerEditAllowedModelsFromContextMenu = triggerEditAllowedModelsFromContextMenu;
-        if (typeof showEditAllowedModelsModal === 'function') window.showEditAllowedModelsModal = showEditAllowedModelsModal;
-        if (typeof closeEditAllowedModelsModal === 'function') window.closeEditAllowedModelsModal = closeEditAllowedModelsModal;
-        if (typeof saveEditedAllowedModels === 'function') window.saveEditedAllowedModels = saveEditedAllowedModels;
-        
+        __exposeFn('triggerEditAllowedModelsFromContextMenu', () => triggerEditAllowedModelsFromContextMenu);
+        __exposeFn('showEditAllowedModelsModal', () => showEditAllowedModelsModal);
+        __exposeFn('closeEditAllowedModelsModal', () => closeEditAllowedModelsModal);
+        __exposeFn('saveEditedAllowedModels', () => saveEditedAllowedModels);
+
         // Tab 切换
-        if (typeof openTab === 'function') window.openTab = openTab;
-        if (typeof switchTab === 'function') window.switchTab = switchTab;
-        
+        __exposeFn('openTab', () => openTab);
+        __exposeFn('switchTab', () => switchTab);
+
         // 关闭 API Key 成功模态框
-        if (typeof closeApiKeyModal === 'function') window.closeApiKeyModal = closeApiKeyModal;
-        
+        __exposeFn('closeApiKeyModal', () => closeApiKeyModal);
+
         // OPS 用户管理相关
-        window.showCreateOpsUserModal = showCreateOpsUserModal;
-        window.closeCreateOpsUserModal = closeCreateOpsUserModal;
-        window.createOpsUser = createOpsUser;
-        window.closeOpsUserCredentialsModal = closeOpsUserCredentialsModal;
-        window.copyOpsCredentials = copyOpsCredentials;
-        window.refreshOpsUsers = refreshOpsUsers;
-        window.deleteOpsUser = deleteOpsUser;
-        window.toggleOpsUserStatus = toggleOpsUserStatus;
-        window.resetOpsUserPassword = resetOpsUserPassword;
-        window.resetOpsUserKey = resetOpsUserKey;
-        
+        __exposeFn('showCreateOpsUserModal', () => showCreateOpsUserModal);
+        __exposeFn('closeCreateOpsUserModal', () => closeCreateOpsUserModal);
+        __exposeFn('createOpsUser', () => createOpsUser);
+        __exposeFn('closeOpsUserCredentialsModal', () => closeOpsUserCredentialsModal);
+        __exposeFn('copyOpsCredentials', () => copyOpsCredentials);
+        __exposeFn('refreshOpsUsers', () => refreshOpsUsers);
+        __exposeFn('deleteOpsUser', () => deleteOpsUser);
+        __exposeFn('toggleOpsUserStatus', () => toggleOpsUserStatus);
+        __exposeFn('resetOpsUserPassword', () => resetOpsUserPassword);
+        __exposeFn('resetOpsUserKey', () => resetOpsUserKey);
+
         // OPS 日志相关
-        window.refreshOpsLogs = refreshOpsLogs;
-        window.filterOpsLogs = filterOpsLogs;
-        
+        __exposeFn('refreshOpsLogs', () => refreshOpsLogs);
+        __exposeFn('filterOpsLogs', () => filterOpsLogs);
+
         // Web Search Keys 相关
-        window.refreshWebSearchKeys = refreshWebSearchKeys;
-        window.showAddWebSearchKeyModal = showAddWebSearchKeyModal;
-        window.closeAddWebSearchKeyModal = closeAddWebSearchKeyModal;
-        window.submitAddWebSearchKey = submitAddWebSearchKey;
-        window.toggleWebSearchKeyStatus = toggleWebSearchKeyStatus;
-        window.resetWebSearchKeyHealth = resetWebSearchKeyHealth;
-        window.deleteWebSearchKey = deleteWebSearchKey;
-        window.testWebSearchKey = testWebSearchKey;
-        window.saveWebSearchConfig = saveWebSearchConfig;
-        window.loadWebSearchConfig = loadWebSearchConfig;
+        __exposeFn('refreshWebSearchKeys', () => refreshWebSearchKeys);
+        __exposeFn('showAddWebSearchKeyModal', () => showAddWebSearchKeyModal);
+        __exposeFn('closeAddWebSearchKeyModal', () => closeAddWebSearchKeyModal);
+        __exposeFn('submitAddWebSearchKey', () => submitAddWebSearchKey);
+        __exposeFn('toggleWebSearchKeyStatus', () => toggleWebSearchKeyStatus);
+        __exposeFn('resetWebSearchKeyHealth', () => resetWebSearchKeyHealth);
+        __exposeFn('deleteWebSearchKey', () => deleteWebSearchKey);
+        __exposeFn('testWebSearchKey', () => testWebSearchKey);
+        __exposeFn('saveWebSearchConfig', () => saveWebSearchConfig);
+        __exposeFn('loadWebSearchConfig', () => loadWebSearchConfig);
 
         // ========== Amap Key Management Functions ==========
 
@@ -6757,3 +6823,487 @@ curl '${metaApiUrl}?name=${modelName}'`;
         window.drawLineChart = drawLineChart;
         window.renderDauCacheTab = renderDauCacheTab;
         window.refreshDauCacheTab = refreshDauCacheTab;
+
+        // ==================== Mirror Rules 管理 ====================
+        // 关键词: MirrorMgmt UI, mirror rules portal frontend, AiMirrorRule CRUD,
+        //         window scope assignment, IIFE 立即写 window 防 TDZ
+        //
+        // 设计:
+        //  - 单例对象, 状态 (cache / edit) 都挂在 MirrorMgmt 上, 避免全局变量污染.
+        //  - fetch 调用都加 same-origin, 错误统一 toast.
+        //  - 试运行结果直接渲染到弹窗内的结果区, 不另开浮层.
+        //  - 直接 window.MirrorMgmt = (...)() 不使用 const, 这样:
+        //      a) HTML inline onclick="MirrorMgmt..." 立刻能解析到 (走 window)
+        //      b) 其他代码 typeof MirrorMgmt 不会因 const TDZ 抛错
+        //      c) 这块 IIFE 出错或前面 top-level 中断时, window.MirrorMgmt 仍为 undefined
+        //         而不是处于 "已声明未初始化" 的死状态
+        window.MirrorMgmt = (function() {
+            const condLabels = {
+                'always':                '每次请求',
+                'action_eq':             '@action 等于',
+                'any_toolcall':          '任意 tool_calls',
+                'action_call_tool_eq':   '@action+工具名',
+            };
+            // fallbackDefaultScript: 当 /portal/api/mirror-rules/_meta 拉取失败时的最后一道兜底.
+            // 真实的默认脚本由后端 DefaultMirrorScript() 提供 (含 if YAK_MAIN 自测块).
+            // 关键词: mirror fallback default script, _meta 拉取失败兜底
+            const fallbackDefaultScript = [
+                '// aibalance mirror callback (fallback template).',
+                '// 关键词: aibalance mirror callback, handle(data) entry',
+                'func handle(data) {',
+                '    log.info(sprint("mirror got req: model=%v action=%v dur=%vms",',
+                '        data.model, data.action, data["duration_ms"]))',
+                '}',
+                '',
+                'if YAK_MAIN {',
+                '    handle({"req_id": "local-test", "model": "demo", "action": ""})',
+                '}',
+                ''
+            ].join('\n');
+
+            const state = {
+                cache: [],
+                meta: null,       // { default_script, data_spec, condition_types }
+                metaLoading: null // in-flight promise, 防止并发重复拉取
+            };
+
+            // ensureMeta 把 _meta 接口结果缓存到 state.meta, 并按需懒加载.
+            // 关键词: ensureMeta, mirror meta 懒加载缓存, default_script data_spec
+            async function ensureMeta() {
+                if (state.meta) return state.meta;
+                if (state.metaLoading) return state.metaLoading;
+                state.metaLoading = (async () => {
+                    try {
+                        const resp = await fetch('/portal/api/mirror-rules/_meta', {credentials: 'same-origin'});
+                        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                        const j = await resp.json();
+                        state.meta = {
+                            default_script: j.default_script || fallbackDefaultScript,
+                            data_spec:      Array.isArray(j.data_spec) ? j.data_spec : [],
+                            condition_types: Array.isArray(j.condition_types) ? j.condition_types : [],
+                        };
+                    } catch (e) {
+                        console.warn('mirror: load meta failed, use fallback', e);
+                        state.meta = {
+                            default_script: fallbackDefaultScript,
+                            data_spec: [],
+                            condition_types: [],
+                        };
+                    } finally {
+                        state.metaLoading = null;
+                    }
+                    return state.meta;
+                })();
+                return state.metaLoading;
+            }
+
+            function getDefaultScript() {
+                return (state.meta && state.meta.default_script) || fallbackDefaultScript;
+            }
+
+            // renderDataSpec 把后端给的 spec 渲染到弹窗右侧的帮助面板.
+            // 关键词: renderDataSpec, mirror data spec 字段表渲染
+            function renderDataSpec() {
+                const host = document.getElementById('mirrorDataSpecHost');
+                if (!host) return;
+                const spec = (state.meta && state.meta.data_spec) || [];
+                if (!spec.length) {
+                    host.innerHTML = '<div style="color:#888; padding:12px; font-size:12px;">未获取到字段说明.</div>';
+                    return;
+                }
+                const html = spec.map(f => {
+                    const name = escapeHtml(f.name || '');
+                    const type = escapeHtml(f.type || '');
+                    const desc = escapeHtml(f.description || '');
+                    const example = escapeHtml(f.example || '');
+                    return `<div class="mirror-spec-entry">
+                        <div class="mirror-spec-entry-head">
+                            <span class="mirror-spec-name">${name}</span>
+                            <span class="mirror-spec-type">${type}</span>
+                        </div>
+                        <div class="mirror-spec-desc">${desc}</div>
+                        ${example ? `<div class="mirror-spec-example">${example}</div>` : ''}
+                    </div>`;
+                }).join('');
+                host.innerHTML = html;
+            }
+
+            async function refresh() {
+                try {
+                    const resp = await fetch('/portal/api/mirror-rules', {credentials: 'same-origin'});
+                    if (!resp.ok) {
+                        throw new Error('HTTP ' + resp.status);
+                    }
+                    const j = await resp.json();
+                    state.cache = j.rules || [];
+                    renderTable(state.cache);
+                    renderKpi(state.cache);
+                } catch (e) {
+                    console.error('mirror: refresh failed', e);
+                    showToast('加载镜像规则失败: ' + (e.message || e), 'error');
+                }
+            }
+
+            function renderKpi(rules) {
+                let enabled = 0, total = 0, success = 0, failDrop = 0;
+                rules.forEach(r => {
+                    if (r.enabled) enabled++;
+                    total += r.total_triggered || 0;
+                    success += r.total_success || 0;
+                    failDrop += (r.total_failed || 0) + (r.total_dropped || 0);
+                });
+                const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v.toLocaleString(); };
+                set('mirror-enabled-count', enabled);
+                set('mirror-total-triggered', total);
+                set('mirror-total-success', success);
+                set('mirror-total-fail-drop', failDrop);
+            }
+
+            function renderTable(rules) {
+                const tbody = document.getElementById('mirror-rules-tbody');
+                if (!tbody) return;
+                if (!rules.length) {
+                    tbody.innerHTML = '<tr><td colspan="9" style="padding: 14px; text-align: center; color: #999;">尚未配置任何镜像规则.</td></tr>';
+                    return;
+                }
+                const rows = rules.map(r => {
+                    const condText = (condLabels[r.condition_type] || r.condition_type) +
+                        (r.action_name ? ' [' + escapeHtml(r.action_name) + ']' : '') +
+                        (r.tool_name ? ' / tool=' + escapeHtml(r.tool_name) : '');
+                    const stats = `${r.total_triggered || 0} / ${r.total_success || 0} / ${r.total_failed || 0} / ${r.total_dropped || 0}`;
+                    const queueState = `${r.queue_length || 0} / ${r.queue_capacity || r.queue_size || 0}`;
+                    const last = r.last_triggered_at || '-';
+                    const enabledHtml = r.enabled
+                        ? '<span class="mirror-status-badge enabled">已启用</span>'
+                        : '<span class="mirror-status-badge disabled">已禁用</span>';
+                    return `
+                        <tr>
+                            <td>${r.id}</td>
+                            <td>${escapeHtml(r.name || '')}</td>
+                            <td>${enabledHtml}</td>
+                            <td>${condText}</td>
+                            <td>${r.concurrency}</td>
+                            <td><span class="mirror-stats-mini">${queueState}</span></td>
+                            <td><span class="mirror-stats-mini">${stats}</span></td>
+                            <td>${escapeHtml(last)}</td>
+                            <td>
+                                <button class="btn btn-sm" onclick="MirrorMgmt.openEditModal(${r.id})">编辑</button>
+                                <button class="btn btn-sm" onclick="MirrorMgmt.toggle(${r.id}, ${!r.enabled})">${r.enabled ? '停用' : '启用'}</button>
+                                <button class="btn btn-sm" onclick="MirrorMgmt.viewLogs(${r.id})">日志</button>
+                                <button class="btn btn-sm btn-danger" onclick="MirrorMgmt.del(${r.id})">删除</button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+                tbody.innerHTML = rows;
+            }
+
+            function escapeHtml(s) {
+                return String(s == null ? '' : s)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#39;');
+            }
+
+            function showToast(msg, type) {
+                if (typeof window.showToast === 'function') {
+                    window.showToast(msg, type || 'info');
+                } else {
+                    console.log('[toast]', msg);
+                }
+            }
+
+            async function openCreateModal() {
+                await ensureMeta();
+                fillModal({
+                    id: 0,
+                    name: '',
+                    enabled: true,
+                    condition_type: 'always',
+                    action_name: '',
+                    tool_name: '',
+                    callback_script: getDefaultScript(),
+                    concurrency: 4,
+                    queue_size: 1024,
+                    timeout_ms: 30000,
+                });
+                document.getElementById('mirrorRuleModalTitle').textContent = '新增镜像规则';
+                document.getElementById('mirrorRuleModal').style.display = 'flex';
+                renderDataSpec();
+            }
+
+            async function openEditModal(id) {
+                const r = state.cache.find(x => x.id === id);
+                if (!r) {
+                    showToast('未找到规则 id=' + id, 'error');
+                    return;
+                }
+                await ensureMeta();
+                fillModal(r);
+                document.getElementById('mirrorRuleModalTitle').textContent = '编辑镜像规则 #' + id;
+                document.getElementById('mirrorRuleModal').style.display = 'flex';
+                renderDataSpec();
+            }
+
+            // resetToDefaultScript 让用户一键把脚本恢复成后端定义的默认模板.
+            // 关键词: resetToDefaultScript, mirror 脚本恢复默认
+            async function resetToDefaultScript() {
+                await ensureMeta();
+                if (!confirm('确定要把当前脚本恢复成默认模板吗? 此操作会覆盖现有内容.')) return;
+                document.getElementById('mirrorRuleScript').value = getDefaultScript();
+            }
+
+            function fillModal(r) {
+                document.getElementById('mirrorRuleId').value = r.id || 0;
+                document.getElementById('mirrorRuleName').value = r.name || '';
+                document.getElementById('mirrorRuleEnabled').checked = !!r.enabled;
+                document.getElementById('mirrorRuleCondition').value = r.condition_type || 'always';
+                document.getElementById('mirrorRuleAction').value = r.action_name || '';
+                document.getElementById('mirrorRuleTool').value = r.tool_name || '';
+                document.getElementById('mirrorRuleScript').value = r.callback_script || getDefaultScript();
+                document.getElementById('mirrorRuleConcurrency').value = r.concurrency || 4;
+                document.getElementById('mirrorRuleQueueSize').value = r.queue_size || 1024;
+                document.getElementById('mirrorRuleTimeoutMs').value = r.timeout_ms || 30000;
+                const resultEl = document.getElementById('mirrorRuleTestResult');
+                if (resultEl) { resultEl.style.display = 'none'; resultEl.innerHTML = ''; resultEl.className = 'mirror-test-result'; }
+                onConditionChange();
+            }
+
+            function closeModal() {
+                document.getElementById('mirrorRuleModal').style.display = 'none';
+            }
+
+            // onConditionChange 根据条件类型切换可见字段, 同时根据语义动态更新
+            // Action 字段的 (必填/可选) 标签 + placeholder + 帮助文案.
+            //
+            // 语义:
+            //   action_eq            => Action 名称 *必填* (规则核心)
+            //   action_call_tool_eq  => Action 名称 *可选过滤器*, 留空匹配三种 call-tool 类
+            //                          (call-tool / directly_call_tool / require_tool)
+            //
+            // 关键词: mirror onConditionChange, Action 名称 必填/可选 切换,
+            //        action_call_tool_eq 可选过滤器 UI 提示
+            function onConditionChange() {
+                const cond = document.getElementById('mirrorRuleCondition').value;
+                const showAction = (cond === 'action_eq' || cond === 'action_call_tool_eq');
+                const showTool   = (cond === 'action_call_tool_eq');
+                document.querySelectorAll('.mirror-cond-action').forEach(el => el.style.display = showAction ? '' : 'none');
+                document.querySelectorAll('.mirror-cond-tool').forEach(el => el.style.display = showTool ? '' : 'none');
+
+                const actionInput = document.getElementById('mirrorRuleAction');
+                const actionHint  = document.getElementById('mirrorRuleActionLabelHint');
+                const actionHelp  = document.getElementById('mirrorRuleActionHelp');
+                if (!actionInput || !actionHint || !actionHelp) return;
+
+                if (cond === 'action_eq') {
+                    actionHint.textContent = '* 必填';
+                    actionHint.className = 'mirror-label-hint required';
+                    actionInput.placeholder = '例如: directly_answer / call-tool / require_tool';
+                    actionHelp.innerHTML = '必填: 完全匹配响应中解析出的 <code>@action</code> 字段.';
+                } else if (cond === 'action_call_tool_eq') {
+                    actionHint.textContent = '(可选过滤器)';
+                    actionHint.className = 'mirror-label-hint optional';
+                    actionInput.placeholder = '留空 = 三种 call-tool 类全匹配; 填了 = 只匹配该 action';
+                    actionHelp.innerHTML = '可选: 留空时, <code>call-tool</code> / <code>directly_call_tool</code> / <code>require_tool</code> 三种 action 都会被通配; 填了则只精确匹配该 action.';
+                } else {
+                    actionHint.textContent = '';
+                    actionHint.className = 'mirror-label-hint';
+                    actionInput.placeholder = '';
+                    actionHelp.innerHTML = '';
+                }
+            }
+
+            function collectFormPayload() {
+                return {
+                    name: document.getElementById('mirrorRuleName').value.trim(),
+                    enabled: document.getElementById('mirrorRuleEnabled').checked,
+                    condition_type: document.getElementById('mirrorRuleCondition').value,
+                    action_name: document.getElementById('mirrorRuleAction').value.trim(),
+                    tool_name: document.getElementById('mirrorRuleTool').value.trim(),
+                    callback_script: document.getElementById('mirrorRuleScript').value,
+                    concurrency: parseInt(document.getElementById('mirrorRuleConcurrency').value || '4', 10),
+                    queue_size: parseInt(document.getElementById('mirrorRuleQueueSize').value || '1024', 10),
+                    timeout_ms: parseInt(document.getElementById('mirrorRuleTimeoutMs').value || '30000', 10),
+                };
+            }
+
+            async function save() {
+                const id = parseInt(document.getElementById('mirrorRuleId').value || '0', 10);
+                const payload = collectFormPayload();
+                if (!payload.name) {
+                    showToast('名称必填', 'error');
+                    return;
+                }
+                if (!payload.callback_script.trim()) {
+                    showToast('回调脚本必填', 'error');
+                    return;
+                }
+                try {
+                    let resp;
+                    if (id > 0) {
+                        resp = await fetch('/portal/api/mirror-rules/' + id, {
+                            method: 'PUT',
+                            credentials: 'same-origin',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify(payload),
+                        });
+                    } else {
+                        resp = await fetch('/portal/api/mirror-rules', {
+                            method: 'POST',
+                            credentials: 'same-origin',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify(payload),
+                        });
+                    }
+                    const j = await resp.json();
+                    if (!resp.ok || j.error) {
+                        throw new Error(j.error || ('HTTP ' + resp.status));
+                    }
+                    showToast(id > 0 ? '已更新' : '已创建', 'success');
+                    closeModal();
+                    refresh();
+                } catch (e) {
+                    showToast('保存失败: ' + (e.message || e), 'error');
+                }
+            }
+
+            async function toggle(id, enabled) {
+                try {
+                    const resp = await fetch('/portal/api/mirror-rules/' + id + '/toggle', {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({enabled: enabled}),
+                    });
+                    const j = await resp.json();
+                    if (!resp.ok || j.error) {
+                        throw new Error(j.error || ('HTTP ' + resp.status));
+                    }
+                    showToast(enabled ? '已启用' : '已禁用', 'success');
+                    refresh();
+                } catch (e) {
+                    showToast('切换失败: ' + (e.message || e), 'error');
+                }
+            }
+
+            async function del(id) {
+                if (!confirm('确定要删除该镜像规则 (id=' + id + ')?')) return;
+                try {
+                    const resp = await fetch('/portal/api/mirror-rules/' + id, {
+                        method: 'DELETE',
+                        credentials: 'same-origin',
+                    });
+                    const j = await resp.json();
+                    if (!resp.ok || j.error) {
+                        throw new Error(j.error || ('HTTP ' + resp.status));
+                    }
+                    showToast('已删除', 'success');
+                    refresh();
+                } catch (e) {
+                    showToast('删除失败: ' + (e.message || e), 'error');
+                }
+            }
+
+            // testCurrent 调用后端 /test 接口同步跑一次脚本, 把结果按 success/fail
+            // 分别用绿色/红色头条 + JSON body 渲染. 关键词: mirror testCurrent, 试运行结果美化
+            async function testCurrent() {
+                const id = parseInt(document.getElementById('mirrorRuleId').value || '0', 10);
+                const payload = collectFormPayload();
+                const url = '/portal/api/mirror-rules/' + (id > 0 ? id : '0') + '/test';
+                const resultEl = document.getElementById('mirrorRuleTestResult');
+                if (resultEl) {
+                    resultEl.style.display = '';
+                    resultEl.className = 'mirror-test-result';
+                    resultEl.innerHTML = '<div class="mirror-test-result-head"><span style="color:#fbbf24;">Running...</span></div>';
+                }
+                try {
+                    const resp = await fetch(url, {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            script: payload.callback_script,
+                            snapshot: {}
+                        }),
+                    });
+                    const j = await resp.json();
+                    if (!resultEl) return;
+                    const executed = !!j.executed;
+                    const dur = (j.duration_ms == null ? '-' : j.duration_ms) + ' ms';
+                    const tag = executed
+                        ? '<span class="mirror-test-status-ok">SUCCESS</span>'
+                        : '<span class="mirror-test-status-fail">FAILED</span>';
+                    const errLine = j.error
+                        ? '<div style="color:#f87171; margin-bottom:6px;">error: ' + escapeHtml(j.error) + '</div>'
+                        : '';
+                    const snapText = j.snapshot ? JSON.stringify(j.snapshot, null, 2) : '';
+                    resultEl.className = 'mirror-test-result' + (executed ? '' : '');
+                    resultEl.innerHTML = `
+                        <div class="mirror-test-result-head">
+                            ${tag}<span style="color:#cbd5e1;">duration=${escapeHtml(String(dur))}</span>
+                        </div>
+                        ${errLine}
+                        <div style="color:#94a3b8; font-size:11px; margin-top:6px;">// sample snapshot passed to handle(data):</div>
+                        <div>${escapeHtml(snapText)}</div>
+                    `;
+                } catch (e) {
+                    if (resultEl) {
+                        resultEl.className = 'mirror-test-result error';
+                        resultEl.innerHTML = '<div class="mirror-test-result-head"><span class="mirror-test-status-fail">FAILED</span></div>' +
+                            '<div>试运行失败: ' + escapeHtml(e.message || String(e)) + '</div>';
+                    }
+                }
+            }
+
+            async function viewLogs(id) {
+                const r = state.cache.find(x => x.id === id);
+                document.getElementById('mirrorLogsRuleName').textContent = r ? r.name : ('#' + id);
+                const list = document.getElementById('mirrorLogsList');
+                if (list) list.innerHTML = '<div style="color:#999; padding: 12px;">Loading...</div>';
+                document.getElementById('mirrorLogsModal').style.display = 'flex';
+                try {
+                    const resp = await fetch('/portal/api/mirror-rules/' + id + '/logs', {credentials: 'same-origin'});
+                    const j = await resp.json();
+                    if (!resp.ok || j.error) {
+                        throw new Error(j.error || ('HTTP ' + resp.status));
+                    }
+                    const logs = j.logs || [];
+                    if (!logs.length) {
+                        list.innerHTML = '<div style="color:#999; padding: 12px;">尚无调用记录.</div>';
+                        return;
+                    }
+                    list.innerHTML = logs.map(l => {
+                        const cls = l.success ? 'success' : 'failure';
+                        const tag = l.success ? '<span style="color:#2e7d32; font-weight:600;">SUCCESS</span>' : '<span style="color:#c62828; font-weight:600;">FAILED</span>';
+                        return `<div class="mirror-log-entry ${cls}">
+                            <div>${escapeHtml(l.timestamp || '')} | req_id=${escapeHtml(l.req_id || '')} | dur=${l.duration_ms || 0}ms | ${tag}</div>
+                            ${l.error_message ? '<div style="color:#c62828;">' + escapeHtml(l.error_message) + '</div>' : ''}
+                            ${l.stdout ? '<div style="color:#555;">stdout: ' + escapeHtml(l.stdout) + '</div>' : ''}
+                        </div>`;
+                    }).join('');
+                } catch (e) {
+                    if (list) list.innerHTML = '<div style="color:#c62828; padding: 12px;">加载日志失败: ' + escapeHtml(e.message || String(e)) + '</div>';
+                }
+            }
+
+            function closeLogs() {
+                document.getElementById('mirrorLogsModal').style.display = 'none';
+            }
+
+            return {
+                refresh: refresh,
+                openCreateModal: openCreateModal,
+                openEditModal: openEditModal,
+                closeModal: closeModal,
+                onConditionChange: onConditionChange,
+                save: save,
+                toggle: toggle,
+                del: del,
+                testCurrent: testCurrent,
+                resetToDefaultScript: resetToDefaultScript,
+                viewLogs: viewLogs,
+                closeLogs: closeLogs,
+            };
+        })();

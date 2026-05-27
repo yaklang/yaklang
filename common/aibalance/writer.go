@@ -275,6 +275,44 @@ func (w *chatJSONChunkWriter) HasToolCalls() bool {
 	return w.hasAccumulatedToolCalls()
 }
 
+// SnapshotUsage 返回 writer 当前累积的 usage 深拷贝, 供 aibalance mirror 等
+// 外部观察者使用. 与 WriteUsage / WriteUsageEstimated 串行化, 拷贝后外部修改
+// 不影响 writer 内部状态; 未取到 usage 时返回 nil.
+//
+// 关键词: SnapshotUsage, mirror snapshot usage 导出
+func (w *chatJSONChunkWriter) SnapshotUsage() *aispec.ChatUsage {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.lastUsage == nil {
+		return nil
+	}
+	cp := *w.lastUsage
+	return &cp
+}
+
+// SnapshotToolCalls 把已累积的 tool_calls 深拷贝出来供 aibalance mirror 等
+// 外部观察者使用. 持有 mu, 与 accumulateToolCalls 写侧串行化, 拷贝出来后
+// 外部修改不会影响 writer 内部状态.
+//
+// 关键词: SnapshotToolCalls, mirror snapshot 工具调用导出
+func (w *chatJSONChunkWriter) SnapshotToolCalls() []*aispec.ToolCall {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if len(w.accumulatedToolCalls) == 0 {
+		return nil
+	}
+	out := make([]*aispec.ToolCall, 0, len(w.accumulatedToolCalls))
+	for _, idx := range w.toolCallOrder {
+		tc, ok := w.accumulatedToolCalls[idx]
+		if !ok || tc == nil {
+			continue
+		}
+		cp := *tc
+		out = append(out, &cp)
+	}
+	return out
+}
+
 // writerWrapper wraps the chatJSONChunkWriter to handle different types of messages
 type writerWrapper struct {
 	notStream bool
