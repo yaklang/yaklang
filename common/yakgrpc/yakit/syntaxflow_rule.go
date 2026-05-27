@@ -120,12 +120,22 @@ func FilterSyntaxFlowRule(db *gorm.DB, filter *ypb.SyntaxFlowRuleFilter, opt ...
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "rule_id", filter.GetRuleIds())
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "severity", filter.GetSeverity())
 	if len(filter.GetRuleNames()) > 0 {
-		var nameTerms []string
-		for _, name := range filter.GetRuleNames() {
-			nameTerms = append(nameTerms, splitSyntaxFlowSearchKeyword(name)...)
-		}
-		if len(nameTerms) > 0 {
-			db = bizhelper.FuzzSearchWithStringArrayOrEx(db, syntaxFlowRuleNameFields, nameTerms, false)
+		// When the caller passes a large list of rule names (e.g. a scan
+		// snapshot with hundreds of rules), fuzzy search generates >1000
+		// LIKE conditions and exceeds SQLite's max expression tree depth.
+		// Fallback to exact rule_name match for bulk filtering.
+		const maxFuzzyRuleNames = 100
+		ruleNames := filter.GetRuleNames()
+		if len(ruleNames) >= maxFuzzyRuleNames {
+			db = bizhelper.ExactOrQueryStringArrayOr(db, "rule_name", ruleNames)
+		} else {
+			var nameTerms []string
+			for _, name := range ruleNames {
+				nameTerms = append(nameTerms, splitSyntaxFlowSearchKeyword(name)...)
+			}
+			if len(nameTerms) > 0 {
+				db = bizhelper.FuzzSearchWithStringArrayOrEx(db, syntaxFlowRuleNameFields, nameTerms, false)
+			}
 		}
 	}
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "language", filter.GetLanguage())
