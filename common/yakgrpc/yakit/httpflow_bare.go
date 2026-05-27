@@ -25,10 +25,6 @@ func httpFlowWireResponse(wirePacket, rspHint []byte) []byte {
 	return rspHint
 }
 
-func httpFlowDisplayResponse(wire, rspHint, fixOverride []byte, noFixContentLength bool) []byte {
-	return resolveHTTPFlowStoredResponse(wire, rspHint, fixOverride, noFixContentLength)
-}
-
 func httpFlowShouldStoreBareWire(wire, display []byte, noFixContentLength bool) bool {
 	if noFixContentLength || len(wire) == 0 {
 		return false
