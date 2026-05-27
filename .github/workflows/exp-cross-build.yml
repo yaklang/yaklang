@@ -24,13 +24,9 @@ on:
   push:
     tags:
       - "v*"
-    branches:
-      - "ci/**"
   pull_request:
     paths:
       - '.github/workflows/exp-cross-build.yml'
-      - '.github/scripts/build-linux-manylinux.sh'
-      - '.github/scripts/verify-glibc-baseline.sh'
 
 jobs:
   check_commit_msg:
