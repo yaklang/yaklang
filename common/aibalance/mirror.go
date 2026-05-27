@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aispec"
+	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -151,98 +152,115 @@ func (s *MirrorSnapshot) ToScriptMap() map[string]any {
 }
 
 // ==================== Action 解析 ====================
+//
+// 设计参考: common/ai/aid/aicommon/action.go::ExtractAllAction
+//   - 用 jsonextractor.ExtractObjectIndexes 做字节级状态机扫描, 不再手写 brace
+//     counter. 这样能正确处理 markdown 代码块包裹 / 字符串内的花括号 / 多个
+//     连续 JSON 对象 / 不完整结尾被 LLM 截断等场景.
+//   - 用 jsonextractor.JsonValidObject 给"半破" JSON 做一次修复 (尾逗号 / 单引号
+//     等) 再 Unmarshal, 跟 aicommon 同一套兼容策略.
+//   - 唯一与 aicommon 不同的是: aicommon 是"生产者"语义 (强制要求 @action 字段
+//     存在), mirror 是"被动观察者"语义 (尽量识别, 失败时返回空串和 nil 而不是
+//     报错, 让上层规则决定要不要继续触发).
+//
+// 关键词: aibalance mirror 解析, 对齐 aicommon ExtractAllAction,
+//        jsonextractor.ExtractObjectIndexes, JsonValidObject 半破修复
 
-// ParseActionFromText 尝试从响应主输出中解析 yaklang JSON 协议:
-//   {"@action": "...", "next_action": {"type": "...", ...}, "tool": "...", ...}
+// ParseActionFromText 尝试从响应主输出中解析 yaklang JSON 协议中的 @action 字段.
 //
-// 解析策略 (兼容多种 yaklang 实际产出形态):
-//   1. 提取首个 { ... } JSON 块 (考虑代码块包裹 ```json ... ```)
-//   2. json.Unmarshal 到通用 map
-//   3. 优先级: top-level "@action" > "next_action.type" > 空串
+// 行为:
+//   - 扫出 text 中所有合法 / 可修复的 JSON 对象, 取第一个含非空 @action 的对象.
+//   - @action 字段也支持嵌套对象 (例如 {"@action": {"name": "directly_answer"}}),
+//     此时取该对象中第一个非空字符串值, 与 aicommon 行为对齐.
+//   - 兜底 fallback: 当所有对象都没有 @action 但存在 next_action.type (aireact
+//     早期协议形态), 退化取那个值. 此 fallback 是 mirror 专属松绑, aicommon 没有.
 //
-// 返回 (action, payload). action="" 表示解析失败, payload 此时也为 nil.
+// 返回 (action, payload):
+//   - 成功: action 是非空字符串, payload 是完整的 JSON 对象 map (包含 @action 字段本身).
+//   - 失败: action="", payload=nil. 调用方在 always 规则下仍应当继续投递快照.
 //
-// 关键词: ParseActionFromText, @action JSON 协议解析, aireact next_action
+// 关键词: ParseActionFromText, @action JSON 协议解析, aireact next_action 兼容,
+//        aicommon ExtractAllAction 对齐, mirror 被动观察者宽松解析
 func ParseActionFromText(text string) (string, map[string]interface{}) {
 	if text == "" {
 		return "", nil
 	}
-	// 1. 提取 ```json ... ``` 代码块或首个 { ... } 块.
-	candidate := extractJSONObject(text)
-	if candidate == "" {
-		return "", nil
-	}
-	// 2. json.Unmarshal.
-	var payload map[string]interface{}
-	if err := json.Unmarshal([]byte(candidate), &payload); err != nil {
-		return "", nil
-	}
-	// 3. 优先取 "@action".
-	if v, ok := payload["@action"]; ok {
-		if s, ok := v.(string); ok && s != "" {
-			return s, payload
+	var fallbackPayload map[string]interface{}
+	var fallbackAction string
+
+	for _, pair := range jsonextractor.ExtractObjectIndexes(text) {
+		start, end := pair[0], pair[1]
+		if start < 0 || end > len(text) || start >= end {
+			continue
+		}
+		raw := text[start:end]
+		payload, ok := unmarshalJSONObjectLoose([]byte(raw))
+		if !ok || payload == nil {
+			continue
+		}
+		// 1. 主路径: 顶层 @action 字段.
+		if name := extractActionNameFromPayload(payload); name != "" {
+			return name, payload
+		}
+		// 2. fallback 路径: next_action.type. 仅作为"找不到任何 @action 时的兜底",
+		//    所以先记下来, 不立刻返回, 让后续对象有机会胜出.
+		if fallbackAction == "" {
+			if next, ok := payload["next_action"].(map[string]interface{}); ok {
+				if t, ok := next["type"].(string); ok && t != "" {
+					fallbackAction = t
+					fallbackPayload = payload
+				}
+			}
 		}
 	}
-	// 4. fallback: next_action.type
-	if next, ok := payload["next_action"].(map[string]interface{}); ok {
-		if t, ok := next["type"].(string); ok && t != "" {
-			return t, payload
-		}
+	if fallbackAction != "" {
+		return fallbackAction, fallbackPayload
 	}
-	return "", payload
+	return "", nil
 }
 
-// extractJSONObject 截取首个平衡的 { ... } JSON 字符串.
-// 支持 markdown 代码块包裹: ```json\n{...}\n``` 形式.
+// unmarshalJSONObjectLoose 尝试把一段 JSON 子串解析成 map.
+//   - 优先直接 json.Unmarshal.
+//   - 失败时调 jsonextractor.JsonValidObject 做一次"半破修复" (尾逗号 / 单引号 /
+//     缺引号等) 后再 Unmarshal. 这与 aicommon 走的修复路径一致.
 //
-// 关键词: extractJSONObject, JSON 子串提取, markdown fenced code 兼容
-func extractJSONObject(text string) string {
-	t := text
-	// markdown fenced code 包裹
-	if idx := strings.Index(t, "```json"); idx >= 0 {
-		t = t[idx+len("```json"):]
-		if end := strings.Index(t, "```"); end >= 0 {
-			t = t[:end]
-		}
-	} else if idx := strings.Index(t, "```"); idx >= 0 {
-		// 通用 ``` 包裹
-		inner := t[idx+3:]
-		if end := strings.Index(inner, "```"); end >= 0 {
-			t = inner[:end]
-		}
+// 关键词: unmarshalJSONObjectLoose, JsonValidObject 半破修复, 鲁棒 JSON 解析
+func unmarshalJSONObjectLoose(raw []byte) (map[string]interface{}, bool) {
+	var payload map[string]interface{}
+	if err := json.Unmarshal(raw, &payload); err == nil {
+		return payload, true
 	}
-	t = strings.TrimSpace(t)
-	start := strings.Index(t, "{")
-	if start < 0 {
+	fixed, ok := jsonextractor.JsonValidObject(raw)
+	if !ok {
+		return nil, false
+	}
+	if err := json.Unmarshal(fixed, &payload); err != nil {
+		return nil, false
+	}
+	return payload, true
+}
+
+// extractActionNameFromPayload 从已解析的 map 中按 aicommon 语义抽 @action.
+//
+// 兼容形态:
+//   - {"@action": "directly_answer"}  (常规)
+//   - {"@action": {"name": "directly_answer"}} 等嵌套对象 (取第一个非空字符串)
+//
+// 关键词: extractActionNameFromPayload, @action 字段抽取, aicommon 嵌套对象兼容
+func extractActionNameFromPayload(payload map[string]interface{}) string {
+	v, ok := payload["@action"]
+	if !ok {
 		return ""
 	}
-	depth := 0
-	inString := false
-	escape := false
-	for i := start; i < len(t); i++ {
-		c := t[i]
-		if escape {
-			escape = false
-			continue
-		}
-		if c == '\\' && inString {
-			escape = true
-			continue
-		}
-		if c == '"' {
-			inString = !inString
-			continue
-		}
-		if inString {
-			continue
-		}
-		switch c {
-		case '{':
-			depth++
-		case '}':
-			depth--
-			if depth == 0 {
-				return t[start : i+1]
+	switch t := v.(type) {
+	case string:
+		return strings.TrimSpace(t)
+	case map[string]interface{}:
+		for _, vv := range t {
+			if s, ok := vv.(string); ok {
+				if s = strings.TrimSpace(s); s != "" {
+					return s
+				}
 			}
 		}
 	}
@@ -650,6 +668,56 @@ func (m *MirrorManager) Trigger(snap *MirrorSnapshot) {
 				rt.rule.ID, rt.rule.Name, snap.ReqID)
 		}
 	}
+}
+
+// ==================== Capability Hints (for server.go short-circuit) ====================
+//
+// server.go 在每次 chat completion 完成后会调用 Trigger 来分发快照. 但构造一个
+// 完整 MirrorSnapshot 不便宜 (要 deep copy ToolCalls / Usage, 解析 @action,
+// 拼字符串等). 如果当前一条镜像规则都没启用, 这些工作就是白做.
+//
+// 这里给 server 层提供两个**廉价**的提示:
+//   - HasActiveRules:      整个 manager 是否有任何在跑的规则. 没有 -> 整段跳过.
+//   - NeedsActionParsing:  在跑的规则里是否至少有一条需要 @action (action_eq /
+//                          action_call_tool_eq). 没有 -> 不调 ParseActionFromText.
+//
+// 两个方法都仅持读锁扫一遍 runtime map, O(N), 没有 IO. 关键词:
+//   MirrorManager.HasActiveRules, MirrorManager.NeedsActionParsing,
+//   mirror trigger 节能短路, 无规则跳过 snapshot 构造
+
+// HasActiveRules 返回当前是否有任何在跑的规则.
+//
+// 关键词: HasActiveRules, mirror 节能短路
+func (m *MirrorManager) HasActiveRules() bool {
+	if m == nil {
+		return false
+	}
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return len(m.runtime) > 0
+}
+
+// NeedsActionParsing 仅当至少一条在跑规则的 ConditionType 需要 @action 字段
+// (action_eq / action_call_tool_eq) 时才返回 true. 其它 condition (always /
+// any_toolcall) 不依赖 @action, 调用方可以跳过 ParseActionFromText.
+//
+// 关键词: NeedsActionParsing, mirror 是否需要解析 @action, ParseAction 节能
+func (m *MirrorManager) NeedsActionParsing() bool {
+	if m == nil {
+		return false
+	}
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	for _, rt := range m.runtime {
+		if rt == nil || rt.rule == nil {
+			continue
+		}
+		switch rt.rule.ConditionType {
+		case MirrorConditionActionEq, MirrorConditionActionCallToolEq:
+			return true
+		}
+	}
+	return false
 }
 
 // ==================== Public Read APIs (for handle_mirror.go) ====================
