@@ -75,6 +75,30 @@ func TestResolveHTTPFlowStoredResponse(t *testing.T) {
 	})
 }
 
+func TestHTTPFlowAutoFixedCharset(t *testing.T) {
+	t.Run("gbk_body", func(t *testing.T) {
+		wire := testHTTPFlowGBKWirePacket(t)
+		display, _, _ := lowhttp.FixHTTPResponse(wire)
+		require.True(t, httpFlowAutoFixedCharset(wire, display))
+	})
+
+	t.Run("header_only_no_tag", func(t *testing.T) {
+		token := uuid.NewString()
+		wire := []byte("HTTP/1.1 200 OK\r\n\r\n" + token)
+		display, _, err := lowhttp.FixHTTPResponse(wire)
+		require.NoError(t, err)
+		require.False(t, httpFlowAutoFixedCharset(wire, display))
+	})
+
+	t.Run("analyze_raw_packet_no_tag", func(t *testing.T) {
+		token := uuid.NewString()
+		wire := []byte(fmt.Sprintf("HTTP/1.1 200 OK\r\n\r\n%s", token))
+		display, _, err := lowhttp.FixHTTPResponse(wire)
+		require.NoError(t, err)
+		require.False(t, httpFlowShouldStoreBareWire(wire, display, false))
+	})
+}
+
 func TestCreateHTTPFlowBareSidecar(t *testing.T) {
 	db := consts.GetGormProjectDatabase()
 

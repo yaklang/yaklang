@@ -64,6 +64,9 @@ func SaveLowHTTPFlow(r *lowhttp.LowhttpResponse, forceSaveFlowSync bool) {
 	reqIns = r.RequestInstance
 
 	wireRsp, displayRsp, keepWire := lowhttpResponsePackets(r)
+	if r.TooLarge {
+		displayRsp = rsp
+	}
 	saveOpts := []CreateHTTPFlowOptions{
 		CreateHTTPFlowWithRequestIns(reqIns),
 		CreateHTTPFlowWithTags(strings.Join(r.Tags, "|")),
