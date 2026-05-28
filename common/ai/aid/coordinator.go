@@ -393,6 +393,12 @@ func (c *Coordinator) emitBaseCapabilityInventory() {
 }
 
 func (c *Coordinator) Run() error {
+	registerRunningCoordinator(c)
+	coordinatorID := ""
+	if c.Config != nil {
+		coordinatorID = c.Config.Id
+	}
+	defer unregisterRunningCoordinator(coordinatorID)
 	c.planLoadingStatus("初始化 / Initializing...")
 	defer c.planLoadingStatus("任务规划执行结束 / Plan Execution Finished")
 
