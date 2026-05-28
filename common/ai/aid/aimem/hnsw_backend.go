@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -243,6 +244,36 @@ func (b *AIMemoryHNSWBackend) SaveGraph() error {
 			Where("session_id = ?", b.sessionID).
 			Update("graph_binary", binaryData).Error
 	})
+}
+
+// HasMemoryID reports whether the graph already contains the memory id.
+func (b *AIMemoryHNSWBackend) HasMemoryID(memoryID string) bool {
+	memoryID = strings.TrimSpace(memoryID)
+	if memoryID == "" {
+		return false
+	}
+	b.graphMutex.RLock()
+	defer b.graphMutex.RUnlock()
+	graph := b.graph.Load()
+	if graph == nil {
+		return false
+	}
+	return graph.Has(memoryID)
+}
+
+// ListMemoryIDs returns all node keys currently present in layer 0.
+func (b *AIMemoryHNSWBackend) ListMemoryIDs() []string {
+	b.graphMutex.RLock()
+	defer b.graphMutex.RUnlock()
+	graph := b.graph.Load()
+	if graph == nil || len(graph.Layers) == 0 || graph.Layers[0] == nil {
+		return nil
+	}
+	ids := make([]string, 0, len(graph.Layers[0].Nodes))
+	for key := range graph.Layers[0].Nodes {
+		ids = append(ids, string(key))
+	}
+	return ids
 }
 
 // Add 添加记忆实体到HNSW索引
