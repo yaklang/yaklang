@@ -24,4 +24,5 @@ func init() {
 	// 写入全局动作表后由 NewReActLoop 默认 inject 给所有 loop.
 	// 关键词: adjust_todolist 全局注册, 默认所有 loop 可见
 	reactloops.RegisterAction(loopAction_AdjustTodolist)
+	reactloops.RegisterAction(loopAction_ListAsyncTasks)
 }
