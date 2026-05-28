@@ -13,6 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aimem"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -57,6 +58,7 @@ type AiTask struct {
 	taskTimelineDiffer *aicommon.TimelineDiffer // Timeline differ for tracking task execution timeline changes
 	taskStartTime      time.Time                // Task execution start time for duration calculation
 	timelineFork       *aicommon.TimelineFork
+	midtermFork        *aimem.MidtermMemoryFork
 }
 
 // GetSemanticIdentifier returns the semantic identifier for directory naming.

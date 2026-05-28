@@ -15,8 +15,7 @@ func TestBuildTimelineArchiveMemoryEntities_SplitsIntoChunkedMemories(t *testing
 	t.Cleanup(func() {
 		timelineArchiveSplitText = originSplitter
 	})
-
-	timelineArchiveSplitText = func(text string, maxLength int, opts ...any) ([]string, error) {
+	timelineArchiveSplitText = func(text string, maxLength int) ([]string, error) {
 		require.Equal(t, midtermArchiveChunkContentLimit, maxLength)
 		return []string{
 			strings.Repeat("A", midtermArchiveChunkContentLimit+120),
@@ -58,8 +57,8 @@ func TestBuildTimelineArchiveChunks_FallbackUsesPreMergeSourceChunks(t *testing.
 		timelineArchiveSplitText = originSplitter
 	})
 
-	timelineArchiveSplitText = func(text string, maxLength int, opts ...any) ([]string, error) {
-		return nil, errors.New("liteforge unavailable")
+	timelineArchiveSplitText = func(text string, maxLength int) ([]string, error) {
+		return nil, errors.New("splitter unavailable")
 	}
 
 	batch := &aicommon.TimelineArchiveBatch{

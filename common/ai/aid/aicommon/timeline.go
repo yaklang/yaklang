@@ -60,6 +60,8 @@ type Timeline struct {
 	forkProtectedMaxID   int64
 	autoCompressDisabled bool
 	branchTimeline       bool
+	branchArchiveStore   TimelineArchiveStore
+	branchPersistentSessionID string
 }
 
 type TimelineCompressedHead struct {
@@ -321,6 +323,17 @@ func (m *Timeline) markBranchTimeline(branch bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.branchTimeline = branch
+}
+
+// SetBranchArchiveContext binds an isolated midterm archive store for branch timelines.
+func (m *Timeline) SetBranchArchiveContext(store TimelineArchiveStore, persistentSessionID string) {
+	if m == nil {
+		return
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.branchArchiveStore = store
+	m.branchPersistentSessionID = strings.TrimSpace(persistentSessionID)
 }
 
 func (m *Timeline) SoftBindConfig(config AICallerConfigIf, aiCaller AICaller) {
@@ -1118,6 +1131,9 @@ func (m *Timeline) timelineArchiveStore() TimelineArchiveStore {
 	// NOTE: this function can be called while Timeline.mu is already held (e.g. compression apply path),
 	// so it must not call lock-taking helpers like IsBranchTimeline().
 	if m.branchTimeline {
+		if m.branchArchiveStore != nil {
+			return m.branchArchiveStore
+		}
 		return nil
 	}
 	if provider, ok := m.config.(interface{ GetTimelineArchiveStore() TimelineArchiveStore }); ok {
@@ -1132,6 +1148,9 @@ func (m *Timeline) timelinePersistentSessionID() string {
 	}
 	// NOTE: this function can be called while Timeline.mu is already held.
 	if m.branchTimeline {
+		if m.branchPersistentSessionID != "" {
+			return m.branchPersistentSessionID
+		}
 		return ""
 	}
 	if provider, ok := m.config.(interface{ GetPersistentSessionID() string }); ok {

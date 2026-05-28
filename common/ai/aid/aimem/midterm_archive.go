@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -28,7 +27,29 @@ const (
 	midtermArchiveChunkContentLimit = 760
 )
 
-var timelineArchiveSplitText = aiforge.SplitTextSafe
+// timelineArchiveSplitText can be replaced in tests.
+var timelineArchiveSplitText = defaultTimelineArchiveSplitText
+
+func defaultTimelineArchiveSplitText(input string, maxLength int) ([]string, error) {
+	input = strings.TrimSpace(input)
+	if input == "" {
+		return nil, nil
+	}
+	runes := []rune(input)
+	if len(runes) <= maxLength {
+		return []string{input}, nil
+	}
+	chunks := make([]string, 0, len(runes)/maxLength+1)
+	for len(runes) > 0 {
+		end := maxLength
+		if end > len(runes) {
+			end = len(runes)
+		}
+		chunks = append(chunks, string(runes[:end]))
+		runes = runes[end:]
+	}
+	return chunks, nil
+}
 
 func PersistentSessionToMidtermMemorySessionID(sessionID string) string {
 	sessionID = strings.TrimSpace(sessionID)
