@@ -97,6 +97,21 @@ func TestHTTPFlowAutoFixedCharset(t *testing.T) {
 		require.NoError(t, err)
 		require.False(t, httpFlowShouldStoreBareWire(wire, display, false))
 	})
+
+	t.Run("mitm_hijack_prefers_display", func(t *testing.T) {
+		wire := []byte("HTTP/1.1 200 OK\r\n\r\noriginal-token")
+		display := []byte("HTTP/1.1 200 OK\r\n\r\nreplaced-token")
+		stored := resolveHTTPFlowStoredResponse(wire, display, nil, false)
+		require.Contains(t, string(stored), "replaced-token")
+		require.NotContains(t, string(stored), "original-token")
+	})
+
+	t.Run("too_large_placeholder_prefers_display", func(t *testing.T) {
+		wire := []byte("HTTP/1.1 200 OK\r\nContent-Length: 100\r\n\r\n" + strings.Repeat("a", 100))
+		display := []byte("HTTP/1.1 200 OK\r\nContent-Length: 50\r\n\r\n[[response too large(4MB), truncated]] find more in web fuzzer history!")
+		stored := resolveHTTPFlowStoredResponse(wire, display, nil, false)
+		require.Contains(t, string(stored), "[[response too large")
+	})
 }
 
 func TestCreateHTTPFlowBareSidecar(t *testing.T) {

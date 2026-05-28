@@ -74,7 +74,7 @@ func SaveLowHTTPFlow(r *lowhttp.LowhttpResponse, forceSaveFlowSync bool) {
 		CreateHTTPFlowWithAfterSave(r.AfterSaveHTTPFlowHandler...),
 		CreateHTTPFlowWithResponseRaw(displayRsp),
 	}
-	if len(wireRsp) > 0 {
+	if len(wireRsp) > 0 && !r.TooLarge {
 		saveOpts = append(saveOpts, CreateHTTPFlowWithBareResponseRaw(wireRsp))
 	}
 	if keepWire {
