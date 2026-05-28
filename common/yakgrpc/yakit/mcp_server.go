@@ -2,6 +2,7 @@ package yakit
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 	"strings"
 
@@ -440,7 +441,13 @@ func UpsertMCPServerToolMetadata(db *gorm.DB, serverName, toolName, description,
 // upsertMCPServerToolConfigFields is the shared upsert helper. On insert it sets
 // Enable=true as default; on update it only touches the provided fields so that
 // the Enable flag and metadata are independently updatable.
+//
+// full_name is always kept in sync: it is set on insert and updated alongside
+// any metadata change, so that GetMCPServerToolConfigByFullName can find rows
+// written by this path.
 func upsertMCPServerToolConfigFields(db *gorm.DB, serverName, toolName string, fields map[string]interface{}) error {
+	fullName := fmt.Sprintf("mcp_%s_%s", serverName, toolName)
+
 	var existing schema.MCPServerToolConfig
 	err := db.Model(&schema.MCPServerToolConfig{}).
 		Where("server_name = ? AND tool_name = ?", serverName, toolName).
@@ -450,6 +457,7 @@ func upsertMCPServerToolConfigFields(db *gorm.DB, serverName, toolName string, f
 			cfg := &schema.MCPServerToolConfig{
 				ServerName: serverName,
 				ToolName:   toolName,
+				FullName:   fullName,
 				Enable:     true,
 			}
 			if desc, ok := fields["description"].(string); ok {
@@ -462,12 +470,15 @@ func upsertMCPServerToolConfigFields(db *gorm.DB, serverName, toolName string, f
 				return createErr
 			}
 			// Explicitly re-apply all fields including booleans (GORM skips false on Create).
+			fields["full_name"] = fullName
 			return db.Model(&schema.MCPServerToolConfig{}).
 				Where("id = ?", cfg.ID).
 				Updates(fields).Error
 		}
 		return utils.Errorf("query mcp server tool config failed: %s", err)
 	}
+	// Always keep full_name in sync in case the row predates the column.
+	fields["full_name"] = fullName
 	return db.Model(&schema.MCPServerToolConfig{}).
 		Where("server_name = ? AND tool_name = ?", serverName, toolName).
 		Updates(fields).Error
