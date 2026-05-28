@@ -11,6 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_plan"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 
@@ -172,8 +173,33 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 
 	// Set PlanPrompt to KeyValueConfig for Plan Loop to use
 	// This content appears only during plan initialization
+	appendPlanPrompt := func(tagName, prompt string) string {
+		if strings.TrimSpace(prompt) == "" {
+			return ""
+		}
+		nonce := utils.RandStringBytes(8)
+		return fmt.Sprintf(
+			"\n<|%s_%s|>\n"+
+				"%s\n"+
+				"<|%s_END_%s|>\n",
+			tagName, nonce, prompt, tagName, nonce)
+	}
+
+	var planPrompt string
+	if globalConfig := yakit.GetCachedAIGlobalConfig(); globalConfig != nil && globalConfig.GetAIPlanPrompt() != "" {
+		planPrompt += appendPlanPrompt(
+			"AI_PLAN",
+			globalConfig.GetAIPlanPrompt(),
+		)
+	}
 	if pr.cod.Config.PlanPrompt != "" {
-		pr.cod.Config.SetConfig(loop_plan.PLAN_PROMPT_KEY, pr.cod.Config.PlanPrompt)
+		planPrompt += appendPlanPrompt(
+			"USER_PLAN",
+			pr.cod.Config.PlanPrompt,
+		)
+	}
+	if planPrompt != "" {
+		pr.cod.Config.SetConfig(loop_plan.PLAN_PROMPT_KEY, planPrompt)
 	}
 
 	err := pr.cod.ExecuteLoopTask(
