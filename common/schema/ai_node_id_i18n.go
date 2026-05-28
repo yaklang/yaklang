@@ -771,6 +771,10 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "报告内容",
 		En: "Report Content",
 	},
+	"report-finish": {
+		Zh: "报告已完成",
+		En: "Report Finished",
+	},
 	"python-script": {
 		Zh: "Python 脚本",
 		En: "Python Script",
