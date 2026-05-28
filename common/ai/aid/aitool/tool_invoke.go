@@ -451,8 +451,14 @@ func applyDefault(schema *jsonschema.Schema, params map[string]any) {
 			params[key] = *prop.Default
 		}
 
-		// 处理嵌套对象
+		// prop.Types is nil when the schema property has no explicit "type" keyword,
+		// which is valid JSON Schema (means any type). Guard before calling String().
+		if prop.Types == nil {
+			continue
+		}
 		types := prop.Types.String()
+
+		// 处理嵌套对象
 		if types == "[object]" && prop.Properties != nil {
 			subParams, ok := params[key].(map[string]any)
 			if ok {
