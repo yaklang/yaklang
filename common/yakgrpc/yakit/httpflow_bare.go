@@ -63,15 +63,19 @@ func resolveHTTPFlowStoredResponse(wire, rspRaw, fixRspRaw []byte, noFixContentL
 		}
 		return rspRaw
 	}
-	if len(wire) == 0 {
-		wire = rspRaw
+	fixSource := wire
+	if len(rspRaw) > 0 && len(wire) > 0 && !bytes.Equal(wire, rspRaw) {
+		// MITM hijack/replacer, too-large placeholder, etc.: display packet is authoritative.
+		fixSource = rspRaw
+	} else if len(fixSource) == 0 {
+		fixSource = rspRaw
 	}
-	if len(wire) == 0 {
+	if len(fixSource) == 0 {
 		return nil
 	}
-	fixed, _, err := lowhttp.FixHTTPResponse(wire)
+	fixed, _, err := lowhttp.FixHTTPResponse(fixSource)
 	if err != nil || len(fixed) == 0 {
-		return wire
+		return fixSource
 	}
 	if len(rspRaw) > 0 && bytes.Equal(rspRaw, fixed) {
 		return rspRaw
