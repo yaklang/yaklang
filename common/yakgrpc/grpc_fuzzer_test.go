@@ -667,11 +667,12 @@ func TestGRPCMUSTPASS_HTTPFuzzer_ExtractUrl(t *testing.T) {
 	}
 
 	tests := []struct {
-		name       string
-		request    string
-		concurrent int
-		isHTTPS    bool
-		expected   string
+		name                    string
+		request                 string
+		concurrent              int
+		isHTTPS                 bool
+		expected                string
+		expectedWithoutQuery    string
 	}{
 		{
 			name: "HTTP Base64 Encoded",
@@ -682,8 +683,20 @@ Accept-Language: zh-CN,zh;q=0.9
 Connection: close
 
 `,
-			isHTTPS:  false,
-			expected: "http://www.baidu.com/" + base64.StdEncoding.EncodeToString([]byte("aaaaa")),
+			isHTTPS:              false,
+			expected:             "http://www.baidu.com/" + base64.StdEncoding.EncodeToString([]byte("aaaaa")),
+			expectedWithoutQuery: "http://www.baidu.com/" + base64.StdEncoding.EncodeToString([]byte("aaaaa")),
+		},
+		{
+			name: "HTTP with query string",
+			request: `GET /?a=11 HTTP/1.1
+Host: 127.0.0.1:18081
+Connection: close
+
+`,
+			isHTTPS:              false,
+			expected:             "http://127.0.0.1:18081/?a=11",
+			expectedWithoutQuery: "http://127.0.0.1:18081/",
 		},
 		{
 			name: "HTTPS Base64 Encoded with Int",
@@ -694,8 +707,9 @@ Accept-Language: zh-CN,zh;q=0.9
 Connection: close
 
 `,
-			isHTTPS:  true,
-			expected: "https://www.baidu.com/" + base64.StdEncoding.EncodeToString([]byte("aaaaa")) + "/1",
+			isHTTPS:              true,
+			expected:             "https://www.baidu.com/" + base64.StdEncoding.EncodeToString([]byte("aaaaa")) + "/1",
+			expectedWithoutQuery: "https://www.baidu.com/" + base64.StdEncoding.EncodeToString([]byte("aaaaa")) + "/1",
 		},
 	}
 
@@ -711,6 +725,13 @@ Connection: close
 
 			if client.GetUrl() != tt.expected {
 				t.Fatalf("extract url failed, got %s, want %s", client.GetUrl(), tt.expected)
+			}
+			wantWithoutQuery := tt.expectedWithoutQuery
+			if wantWithoutQuery == "" {
+				wantWithoutQuery = tt.expected
+			}
+			if client.GetUrlWithoutQuery() != wantWithoutQuery {
+				t.Fatalf("extract url without query failed, got %s, want %s", client.GetUrlWithoutQuery(), wantWithoutQuery)
 			}
 		})
 	}

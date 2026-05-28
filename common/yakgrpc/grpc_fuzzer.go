@@ -213,29 +213,35 @@ func buildFuzzerProxyList(req *ypb.FuzzerRequest) ([]string, error) {
 	return proxies, nil
 }
 
+func extractURLFromFuzzerRequest(req *ypb.FuzzerRequest) (*url.URL, error) {
+	requestText := req.GetRequest()
+	res, err := mutate.FuzzTagExec(requestText, mutate.Fuzz_WithEnableDangerousTag(), mutate.Fuzz_WithResultLimit(1))
+	raw := []byte(requestText)
+	if err == nil && len(res) > 0 {
+		raw = []byte(res[0])
+	}
+	return lowhttp.ExtractURLFromHTTPRequestRaw(raw, req.GetIsHTTPS())
+}
+
+func urlStringWithoutQuery(u *url.URL) string {
+	if u == nil {
+		return ""
+	}
+	cp := *u
+	cp.RawQuery = ""
+	cp.Fragment = ""
+	return cp.String()
+}
+
 func (s *Server) ExtractUrl(ctx context.Context, req *ypb.FuzzerRequest) (*ypb.ExtractedUrl, error) {
-	res, err := mutate.FuzzTagExec(req.GetRequest(), mutate.Fuzz_WithEnableDangerousTag(), mutate.Fuzz_WithResultLimit(1))
+	u, err := extractURLFromFuzzerRequest(req)
 	if err != nil {
 		return nil, err
 	}
-	var u *url.URL
-	if err != nil {
-		u, err = lowhttp.ExtractURLFromHTTPRequestRaw([]byte(req.Request), req.GetIsHTTPS())
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		render, err := lowhttp.ParseStringToHttpRequest(res[0])
-		if err != nil {
-			return nil, err
-		}
-		u, err = lowhttp.ExtractURLFromHTTPRequest(render, req.GetIsHTTPS())
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return &ypb.ExtractedUrl{Url: u.String()}, nil
+	return &ypb.ExtractedUrl{
+		Url:             u.String(),
+		UrlWithoutQuery: urlStringWithoutQuery(u),
+	}, nil
 }
 
 func (s *Server) StringFuzzer(rootCtx context.Context, req *ypb.StringFuzzerRequest) (*ypb.StringFuzzerResponse, error) {
