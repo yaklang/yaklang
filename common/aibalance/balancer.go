@@ -202,6 +202,12 @@ func LoadProvidersFromDatabase(config *ServerConfig) error {
 	if err := EnsureRateLimitConfigTable(); err != nil {
 		log.Warnf("Failed to ensure RateLimitConfig table exists: %v", err)
 	}
+
+	// Ensure client version stat table exists (for memfit version gate UI display)
+	// 关键词: EnsureClientVersionStatTable 初始化, memfit 版本控流统计表
+	if err := EnsureClientVersionStatTable(); err != nil {
+		log.Warnf("Failed to ensure ClientVersionStat table exists: %v", err)
+	}
 	if err := EnsureFreeUserDailyTokenUsageTable(); err != nil {
 		log.Warnf("Failed to ensure FreeUserDailyTokenUsage table exists: %v", err)
 	}

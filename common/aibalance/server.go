@@ -804,6 +804,30 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 			return
 		}
 		c.logInfo("Memfit TOTP authentication successful for model: %s", modelName)
+
+		// memfit-* 客户端版本控流：记录客户端版本统计 + 按配置可选拦截
+		// 关键词: serveChatCompletions memfit 版本控流入口, X-Yak-Version X-Yak-Build-Time, RecordClientVersion
+		yakVer := strings.TrimSpace(lowhttp.GetHTTPPacketHeader(rawPacket, "X-Yak-Version"))
+		yakBT := strings.TrimSpace(lowhttp.GetHTTPPacketHeader(rawPacket, "X-Yak-Build-Time"))
+		if yakVer == "" {
+			yakVer = "unknown"
+		}
+		go func(v, bt string) {
+			defer func() {
+				if r := recover(); r != nil {
+					log.Debugf("RecordClientVersion panic recovered: %v", r)
+				}
+			}()
+			_ = RecordClientVersion(v, bt)
+		}(yakVer, yakBT)
+
+		gateRes := c.checkMemfitVersionGate(yakVer, yakBT)
+		if gateRes.Blocked {
+			c.logWarn("Memfit version gate blocked request: model=%s version=%s buildTime=%s reason=%s minBuildTime=%s",
+				modelName, gateRes.ClientVersion, gateRes.ClientBuildTime, gateRes.Reason, gateRes.MinBuildTime)
+			c.writeMemfitVersionRateLimitResponse(conn, gateRes.Reason)
+			return
+		}
 	}
 
 	var key *Key

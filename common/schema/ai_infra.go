@@ -350,10 +350,32 @@ type AiBalanceRateLimitConfig struct {
 	// 关键词: FreeUserTokenSoftLimitM, FreeUserSoftLimitTPS, 软限额 TPS 限速
 	FreeUserTokenSoftLimitM int64 `json:"free_user_token_soft_limit_m" gorm:"default:0"` // 软限额阈值（M token），>0 时启用
 	FreeUserSoftLimitTPS    int64 `json:"free_user_soft_limit_tps" gorm:"default:0"`     // 软限额触发后的输出 TPS，0 = 不限速
+
+	// memfit-* 模型客户端版本控流配置
+	// 关键词: memfit 版本控流, 客户端版本网关, MemfitVersionGate
+	MemfitVersionGateEnabled  bool   `json:"memfit_version_gate_enabled" gorm:"default:false"` // 是否启用 memfit-* 客户端版本控流（默认关闭）
+	MemfitVersionMinBuildTime string `json:"memfit_version_min_build_time" gorm:"type:text"`   // 允许的最早客户端 BuildTime（RFC3339 字符串，空表示不按时间过滤）
 }
 
 func (a *AiBalanceRateLimitConfig) TableName() string {
 	return "ai_balance_rate_limit_configs"
+}
+
+// AiBalanceClientVersionStat 记录 aibalance 客户端按 Yak 版本聚合的请求统计。
+// 仅在 memfit-* 模型请求路径上写入；用于 portal 展示 Top N 客户端版本分布和最早出现时间。
+// 关键词: AiBalanceClientVersionStat 客户端版本统计, version upsert, ai_balance_client_versions 表
+type AiBalanceClientVersionStat struct {
+	gorm.Model
+
+	Version       string `json:"version" gorm:"uniqueIndex;not null"`     // X-Yak-Version 值（dev/unknown/v1.2.3 等）
+	BuildTime     string `json:"build_time"`                              // 最近一次上报的 X-Yak-Build-Time（原样保留）
+	FirstSeenUnix int64  `json:"first_seen_unix"`                         // 首次见到该版本的 Unix 时间
+	LastSeenUnix  int64  `json:"last_seen_unix" gorm:"index"`             // 最近一次见到该版本的 Unix 时间
+	RequestCount  int64  `json:"request_count"`                           // 累计请求数
+}
+
+func (a *AiBalanceClientVersionStat) TableName() string {
+	return "ai_balance_client_versions"
 }
 
 // WebSearchConfig stores global configuration for web search (singleton row, ID=1)

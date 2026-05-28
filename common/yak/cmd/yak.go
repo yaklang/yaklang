@@ -146,10 +146,12 @@ func init() {
 	if gitHash == "" {
 		gitHash = "-"
 	}
+	consts.SetYakGitHash(gitHash)
 
 	if buildTime == "" {
 		buildTime = time.Now().String()
 	}
+	consts.SetYakBuildTime(buildTime)
 
 	if goVersion == "" {
 		goVersion = runtime.Version()
@@ -1146,6 +1148,8 @@ func main() {
 	app.IgnoreUnknownFlags = true
 	consts.SetPalmVersion(yakVersion)
 	consts.SetYakVersion(yakVersion)
+	consts.SetYakBuildTime(buildTime)
+	consts.SetYakGitHash(gitHash)
 
 	// 启动 bridge
 	tunnelServerCliApp := cybertunnel.GetTunnelServerCommandCli()

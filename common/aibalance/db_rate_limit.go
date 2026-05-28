@@ -34,6 +34,10 @@ func GetRateLimitConfig() (*schema.AiBalanceRateLimitConfig, error) {
 			ModelOutputTPSOverrides:     "{}",
 			FreeUserTokenSoftLimitM:     0,
 			FreeUserSoftLimitTPS:        0,
+			// memfit-* 客户端版本控流默认关闭, 默认无最低 BuildTime
+			// 关键词: GetRateLimitConfig 默认值 MemfitVersionGate
+			MemfitVersionGateEnabled:  false,
+			MemfitVersionMinBuildTime: "",
 		}
 		config.ID = 1
 		if createErr := db.Create(&config).Error; createErr != nil {
