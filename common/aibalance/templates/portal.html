@@ -1017,6 +1017,57 @@
                     </div>
                 </div>
 
+                <!-- Memfit client version gate (only memfit-* models) -->
+                <!-- 关键词: portal memfit 客户端版本控流面板, X-Yak-Version, X-Yak-Build-Time -->
+                <div style="margin-bottom: 20px;">
+                    <h4 style="margin-bottom: 10px;">Memfit 客户端版本控流</h4>
+                    <small style="color: #888; margin-bottom: 10px; display: block;">
+                        仅对 <code>memfit-*</code> 模型生效。客户端会在每个请求带上 <code>X-Yak-Version</code> 与 <code>X-Yak-Build-Time</code>。
+                        <br>开发版本（<code>version</code> 含 <code>dev</code>）始终放行；缺失或未知版本按未知版本拦截。
+                        <br>命中拦截会返回 <code>429 memfit_client_version_limited</code>，文案统一提示"旧版本/未知版本使用量已达上限，请升级"。
+                    </small>
+                    <div style="display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 8px;">
+                        <div class="form-group" style="margin-bottom: 0; flex: 0 0 220px;">
+                            <label>
+                                <input type="checkbox" id="rl-memfit-version-gate-enabled" style="margin-right: 6px;">
+                                启用客户端版本控流
+                            </label>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0; flex: 0 0 320px;">
+                            <label>最早允许的 BuildTime (RFC3339):</label>
+                            <input type="text" id="rl-memfit-version-min-build-time" class="form-control"
+                                placeholder="2025-06-01T00:00:00Z (留空仅按缺头/未知拦截)"
+                                style="font-family: monospace; font-size: 13px;">
+                        </div>
+                    </div>
+                    <small style="color: #888; display: block;">
+                        填写格式建议：<code>2025-06-01T00:00:00Z</code> 或 <code>2025-06-01T08:00:00+08:00</code>。
+                        留空则只按「缺失版本头/未知版本」拦截，不按时间过滤。
+                    </small>
+
+                    <div style="margin-top: 14px;">
+                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+                            <strong style="font-size: 13px;">最近活跃客户端版本 (Top 20)</strong>
+                            <button class="btn" onclick="loadClientVersionStats()" style="font-size: 12px;">刷新</button>
+                            <span id="rl-client-version-total" style="color: #888; font-size: 12px;">--</span>
+                        </div>
+                        <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+                            <thead>
+                                <tr style="background: #fff3e0;">
+                                    <th style="text-align: left; padding: 8px 10px; border-bottom: 1px solid #ffcc80;">版本</th>
+                                    <th style="text-align: left; padding: 8px 10px; border-bottom: 1px solid #ffcc80;">BuildTime</th>
+                                    <th style="text-align: left; padding: 8px 10px; border-bottom: 1px solid #ffcc80;">首次出现</th>
+                                    <th style="text-align: left; padding: 8px 10px; border-bottom: 1px solid #ffcc80;">最近出现</th>
+                                    <th style="text-align: right; padding: 8px 10px; border-bottom: 1px solid #ffcc80;">请求数</th>
+                                </tr>
+                            </thead>
+                            <tbody id="rl-client-version-table-body">
+                                <tr><td colspan="5" style="padding: 12px; text-align: center; color: #999;">点击"刷新"加载</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
                 <!-- Model rate-limit overrides (RPM + free-user delay range + output TPS) -->
                 <!-- 关键词: 模型级限流覆盖, 延迟Min/Max, 输出 TPS 模型覆盖 -->
                 <div style="margin-bottom: 20px;">

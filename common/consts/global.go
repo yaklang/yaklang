@@ -28,6 +28,8 @@ var (
 	YAK_PROJECT_DATA_DB_NAME   = "default-yakit.db"
 	YAK_PROFILE_PLUGIN_DB_NAME = "yakit-profile-plugin.db"
 	YAK_VERSION                = "dev"
+	YAK_BUILD_TIME             = ""
+	YAK_GIT_HASH               = ""
 	YAK_ONLINE_BASEURL         = "https://www.yaklang.com"
 	YAK_ONLINE_BASEURL_PROXY   = ""
 
@@ -186,6 +188,28 @@ func IsDevMode() bool {
 
 func SetYakVersion(v string) {
 	YAK_VERSION = v
+}
+
+// GetYakBuildTime 返回 Yak 引擎构建时间字符串
+// 由 cmd/yak.go 在启动时通过 SetYakBuildTime 注入（ldflags 提供）
+// 关键词: YakBuildTime 全局存取, 客户端版本控流, X-Yak-Build-Time
+func GetYakBuildTime() string {
+	return YAK_BUILD_TIME
+}
+
+func SetYakBuildTime(v string) {
+	YAK_BUILD_TIME = v
+}
+
+// GetYakGitHash 返回 Yak 引擎构建对应的 Git Hash
+// 由 cmd/yak.go 在启动时通过 SetYakGitHash 注入（ldflags 提供）
+// 关键词: YakGitHash 全局存取
+func GetYakGitHash() string {
+	return YAK_GIT_HASH
+}
+
+func SetYakGitHash(v string) {
+	YAK_GIT_HASH = v
 }
 
 func GetDefaultPublicReverseServerPassword() string {

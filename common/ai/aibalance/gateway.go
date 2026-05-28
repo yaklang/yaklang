@@ -9,6 +9,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/aibalanceclient"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 )
@@ -439,6 +440,17 @@ func (g *GatewayClient) BuildHTTPOptions() ([]poc.PocConfigOption, error) {
 		"Accept":          "application/json",
 		"Accept-Encoding": "gzip, deflate, br", // enable compression for better network performance
 		"Authorization":   "Bearer " + g.config.APIKey,
+	}
+
+	// 注入客户端版本与构建时间，供 aibalance memfit 版本控流使用
+	// 关键词: X-Yak-Version X-Yak-Build-Time 客户端版本上报, memfit version gate
+	yakVer := consts.GetYakVersion()
+	if yakVer == "" {
+		yakVer = "unknown"
+	}
+	headers["X-Yak-Version"] = yakVer
+	if bt := consts.GetYakBuildTime(); bt != "" {
+		headers["X-Yak-Build-Time"] = bt
 	}
 
 	// Add TOTP header for memfit models

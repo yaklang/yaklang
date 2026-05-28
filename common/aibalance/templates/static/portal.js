@@ -6279,6 +6279,13 @@ curl '${metaApiUrl}?name=${modelName}'`;
                     if (softLimitMInput) softLimitMInput.value = cfg.free_user_token_soft_limit_m || 0;
                     const softLimitTPSInput = document.getElementById('rl-free-soft-limit-tps');
                     if (softLimitTPSInput) softLimitTPSInput.value = cfg.free_user_soft_limit_tps || 0;
+
+                    // memfit-* 客户端版本控流配置
+                    // 关键词: loadRateLimitConfig memfit_version_gate_enabled, memfit_version_min_build_time
+                    const gateEl = document.getElementById('rl-memfit-version-gate-enabled');
+                    if (gateEl) gateEl.checked = !!cfg.memfit_version_gate_enabled;
+                    const minBtEl = document.getElementById('rl-memfit-version-min-build-time');
+                    if (minBtEl) minBtEl.value = cfg.memfit_version_min_build_time || '';
                 }
             } catch (error) {
                 console.error('Error loading rate limit config:', error);
@@ -6312,6 +6319,13 @@ curl '${metaApiUrl}?name=${modelName}'`;
             let softLimitTPS = parseInt(softLimitTPSRaw);
             if (isNaN(softLimitTPS) || softLimitTPS < 0) softLimitTPS = 0;
 
+            // memfit-* 客户端版本控流配置
+            // 关键词: saveRateLimitConfig memfit_version_gate_enabled, memfit_version_min_build_time
+            const gateEl = document.getElementById('rl-memfit-version-gate-enabled');
+            const minBtEl = document.getElementById('rl-memfit-version-min-build-time');
+            const memfitGateEnabled = !!(gateEl && gateEl.checked);
+            const memfitMinBuildTime = minBtEl ? (minBtEl.value || '').trim() : '';
+
             try {
                 const response = await fetch('/portal/api/rate-limit-config', {
                     method: 'POST',
@@ -6327,7 +6341,9 @@ curl '${metaApiUrl}?name=${modelName}'`;
                         free_user_output_tps: freeOutputTPS,
                         model_output_tps_overrides: collected.tps,
                         free_user_token_soft_limit_m: softLimitM,
-                        free_user_soft_limit_tps: softLimitTPS
+                        free_user_soft_limit_tps: softLimitTPS,
+                        memfit_version_gate_enabled: memfitGateEnabled,
+                        memfit_version_min_build_time: memfitMinBuildTime
                     })
                 });
                 const data = await response.json();
@@ -6378,6 +6394,60 @@ curl '${metaApiUrl}?name=${modelName}'`;
             }
             // Clicking "刷新状态" should refresh hot-model stats as well.
             loadRateLimitModelStats();
+            // 同步刷新客户端版本统计（memfit 版本控流）
+            // 关键词: loadRateLimitStatus 关联刷新 loadClientVersionStats
+            loadClientVersionStats();
+        }
+
+        // ==================== Memfit Client Version Stats ====================
+        // 关键词: loadClientVersionStats memfit 客户端版本 Top20 渲染
+        function escapeHtml(s) {
+            if (s == null) return '';
+            return String(s)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        async function loadClientVersionStats() {
+            const tbody = document.getElementById('rl-client-version-table-body');
+            if (!tbody) return;
+            try {
+                const response = await fetch('/portal/api/client-version-stats?limit=20');
+                if (!response.ok) throw new Error('Failed to fetch client version stats');
+                const data = await response.json();
+                if (isAuthError(data)) { handleAuthError(); return; }
+                if (!data.success) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="padding: 12px; text-align: center; color: #c62828;">加载失败</td></tr>';
+                    return;
+                }
+                const totalEl = document.getElementById('rl-client-version-total');
+                if (totalEl) totalEl.textContent = '共 ' + (data.total || 0) + ' 条';
+                const items = Array.isArray(data.items) ? data.items : [];
+                if (items.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="padding: 12px; text-align: center; color: #999;">暂无 memfit-* 客户端版本上报记录</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = items.map(it => {
+                    const ver = escapeHtml(it.version || '');
+                    const bt = escapeHtml(it.build_time || '');
+                    const fs = escapeHtml(it.first_seen_text || '');
+                    const ls = escapeHtml(it.last_seen_text || '');
+                    const cnt = Number(it.request_count) || 0;
+                    return '<tr>'
+                        + '<td style="padding: 6px 10px; border-bottom: 1px solid #f0f0f0;"><code>' + ver + '</code></td>'
+                        + '<td style="padding: 6px 10px; border-bottom: 1px solid #f0f0f0; font-family: monospace; color: #555;">' + (bt || '-') + '</td>'
+                        + '<td style="padding: 6px 10px; border-bottom: 1px solid #f0f0f0;">' + fs + '</td>'
+                        + '<td style="padding: 6px 10px; border-bottom: 1px solid #f0f0f0;">' + ls + '</td>'
+                        + '<td style="padding: 6px 10px; border-bottom: 1px solid #f0f0f0; text-align: right;">' + cnt + '</td>'
+                        + '</tr>';
+                }).join('');
+            } catch (error) {
+                console.error('Error loading client version stats:', error);
+                tbody.innerHTML = '<tr><td colspan="5" style="padding: 12px; text-align: center; color: #c62828;">加载失败</td></tr>';
+            }
         }
 
         // ===== Hot-model RPM stats (cross-apiKey aggregated, recent 60s) =====
@@ -6628,6 +6698,9 @@ curl '${metaApiUrl}?name=${modelName}'`;
         window.loadRateLimitModelStats = loadRateLimitModelStats;
         window.startRateLimitModelStatsAutoRefresh = startRateLimitModelStatsAutoRefresh;
         window.stopRateLimitModelStatsAutoRefresh = stopRateLimitModelStatsAutoRefresh;
+        // memfit-* 客户端版本统计导出
+        // 关键词: window.loadClientVersionStats memfit 客户端版本控流
+        window.loadClientVersionStats = loadClientVersionStats;
         window.addModelRPMOverride = addModelRPMOverride;
         window.addFreeTokenModelOverride = addFreeTokenModelOverride;
 

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/yaklang/yaklang/common/schema"
 )
@@ -76,6 +77,10 @@ func (c *ServerConfig) handleGetRateLimitConfig(conn net.Conn, request *http.Req
 			"model_output_tps_overrides":      modelOutputTPSOverrides,
 			"free_user_token_soft_limit_m":    config.FreeUserTokenSoftLimitM,
 			"free_user_soft_limit_tps":        config.FreeUserSoftLimitTPS,
+			// memfit-* 客户端版本控流配置
+			// 关键词: handleGetRateLimitConfig memfit_version_gate_enabled, memfit_version_min_build_time
+			"memfit_version_gate_enabled":   config.MemfitVersionGateEnabled,
+			"memfit_version_min_build_time": config.MemfitVersionMinBuildTime,
 		},
 	})
 }
@@ -159,6 +164,10 @@ func (c *ServerConfig) handleSetRateLimitConfig(conn net.Conn, request *http.Req
 		ModelOutputTPSOverrides     map[string]int64                      `json:"model_output_tps_overrides,omitempty"`
 		FreeUserTokenSoftLimitM     *int64                                `json:"free_user_token_soft_limit_m,omitempty"`
 		FreeUserSoftLimitTPS        *int64                                `json:"free_user_soft_limit_tps,omitempty"`
+		// memfit-* 客户端版本控流配置
+		// 关键词: handleSetRateLimitConfig memfit_version_gate_enabled, memfit_version_min_build_time
+		MemfitVersionGateEnabled  *bool   `json:"memfit_version_gate_enabled,omitempty"`
+		MemfitVersionMinBuildTime *string `json:"memfit_version_min_build_time,omitempty"`
 	}
 	if err := json.Unmarshal(bodyBytes, &reqBody); err != nil {
 		c.logError("failed to parse request body: %v", err)
@@ -285,6 +294,14 @@ func (c *ServerConfig) handleSetRateLimitConfig(conn net.Conn, request *http.Req
 		ovJSON, _ := json.Marshal(clean)
 		config.FreeUserTokenModelOverrides = string(ovJSON)
 	}
+	// memfit-* 客户端版本控流配置写入
+	// 关键词: handleSetRateLimitConfig 写入 MemfitVersionGate 字段
+	if reqBody.MemfitVersionGateEnabled != nil {
+		config.MemfitVersionGateEnabled = *reqBody.MemfitVersionGateEnabled
+	}
+	if reqBody.MemfitVersionMinBuildTime != nil {
+		config.MemfitVersionMinBuildTime = strings.TrimSpace(*reqBody.MemfitVersionMinBuildTime)
+	}
 
 	if err := SaveRateLimitConfig(config); err != nil {
 		c.logError("failed to save rate limit config: %v", err)
@@ -385,6 +402,65 @@ func (c *ServerConfig) handleGetRateLimitModelStats(conn net.Conn, request *http
 		"models":         models,
 		"min_rpm":        minRPM,
 		"window_seconds": int64(rpmWindowDuration / 1e9),
+	})
+}
+
+// handleGetClientVersionStats returns the most recent client versions (Top N) seen
+// by memfit-* requests. Admin-only.
+//
+// Query params:
+//   - limit: optional int (1..200), default 20
+//
+// Response: {"success": true, "total": <int>, "items": [...]}
+// Each item: {version, build_time, first_seen_unix, last_seen_unix, request_count,
+//             first_seen_text, last_seen_text}
+// 关键词: handleGetClientVersionStats portal /portal/api/client-version-stats 返回结构
+func (c *ServerConfig) handleGetClientVersionStats(conn net.Conn, request *http.Request) {
+	c.logInfo("processing get client version stats request")
+
+	if !c.checkAuth(request) {
+		c.writeJSONResponse(conn, http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+		return
+	}
+
+	limit := 20
+	if raw := strings.TrimSpace(request.URL.Query().Get("limit")); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil && parsed >= 1 {
+			limit = parsed
+		}
+	}
+	if limit > 200 {
+		limit = 200
+	}
+
+	rows, err := QueryTopClientVersions(limit)
+	if err != nil {
+		c.logError("failed to query top client versions: %v", err)
+		c.writeJSONResponse(conn, http.StatusInternalServerError, map[string]string{"error": "failed to query client version stats"})
+		return
+	}
+	if rows == nil {
+		rows = []schema.AiBalanceClientVersionStat{}
+	}
+
+	items := make([]map[string]interface{}, 0, len(rows))
+	for _, r := range rows {
+		items = append(items, map[string]interface{}{
+			"version":         r.Version,
+			"build_time":      r.BuildTime,
+			"first_seen_unix": r.FirstSeenUnix,
+			"last_seen_unix":  r.LastSeenUnix,
+			"first_seen_text": time.Unix(r.FirstSeenUnix, 0).Format("2006-01-02 15:04:05"),
+			"last_seen_text":  time.Unix(r.LastSeenUnix, 0).Format("2006-01-02 15:04:05"),
+			"request_count":   r.RequestCount,
+		})
+	}
+
+	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
+		"success": true,
+		"total":   len(items),
+		"limit":   limit,
+		"items":   items,
 	})
 }
 

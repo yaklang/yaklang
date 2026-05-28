@@ -829,6 +829,10 @@ func (c *ServerConfig) HandlePortalRequest(conn net.Conn, request *http.Request,
 		c.handleGetRateLimitStatus(conn, request)
 	case uriIns.Path == "/portal/api/rate-limit-model-stats" && request.Method == "GET":
 		c.handleGetRateLimitModelStats(conn, request)
+	// memfit-* 客户端版本统计接口
+	// 关键词: portal /portal/api/client-version-stats 路由注册
+	case uriIns.Path == "/portal/api/client-version-stats" && request.Method == "GET":
+		c.handleGetClientVersionStats(conn, request)
 
 	// ========== Portal Data API Routes ==========
 	case uriIns.Path == "/portal/api/data":
