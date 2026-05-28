@@ -6,20 +6,20 @@ import (
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
 )
 
 func setupNameCacheDB(t *testing.T) (*gorm.DB, func()) {
 	t.Helper()
 
-	oldDB := GetDB()
 	db, err := gorm.Open("sqlite3", ":memory:")
 	require.NoError(t, err)
 	require.NoError(t, db.AutoMigrate(&IrNamePool{}).Error)
 	SetDB(db)
 
 	cleanup := func() {
-		SetDB(oldDB)
 		_ = db.Close()
+		require.NoError(t, RestoreDefaultDB())
 	}
 	return db, cleanup
 }
@@ -70,18 +70,23 @@ func TestNameCacheProgramIsolation(t *testing.T) {
 }
 
 func TestNameCachePreloadWhenDBBecomesAvailable(t *testing.T) {
-	oldDB := GetDB()
-	SetDB(nil)
-	cache := NewNameCache("progA")
+	require.NoError(t, consts.CloseGormSSAProjectDatabase())
+	t.Cleanup(func() {
+		require.NoError(t, RestoreDefaultDB())
+	})
+
+	// 勿用 NewNameCache：会立刻 Preload，而 GetDB() 会自动打开 default 库并标记 loaded=true。
+	cache := &NameCache{
+		program:  "progA",
+		nameToId: make(map[string]int64),
+		idToName: make(map[int64]string),
+	}
 
 	db, err := gorm.Open("sqlite3", ":memory:")
 	require.NoError(t, err)
-	defer func() {
-		SetDB(oldDB)
-		_ = db.Close()
-	}()
 	require.NoError(t, db.AutoMigrate(&IrNamePool{}).Error)
 	SetDB(db)
+	t.Cleanup(func() { _ = db.Close() })
 
 	require.NoError(t, db.Create(&IrNamePool{ProgramName: "progA", Name: "late"}).Error)
 	require.Len(t, cache.GetIDsByPattern("late", ExactCompare), 1)

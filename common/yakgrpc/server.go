@@ -94,6 +94,9 @@ func (s *Server) getAIMemoryVectorSingleton() *aiMemoryVectorSessionSingleton {
 }
 
 func (s *Server) GetSSADatabase() *gorm.DB {
+	if err := yakit.EnsureSSAProjectDatabaseReady(); err != nil {
+		log.Errorf("ensure SSA database failed: %s", err)
+	}
 	return ssadb.GetDB()
 }
 

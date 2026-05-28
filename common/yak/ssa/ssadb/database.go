@@ -131,6 +131,12 @@ func SetDB(db *gorm.DB) {
 	consts.SetGormSSAProjectDatabase(db)
 }
 
+// RestoreDefaultDB switches the global SSA IR connection back to the default database.
+// Tests that call SetDB with a temporary handle should restore via this in cleanup.
+func RestoreDefaultDB() error {
+	return consts.RestoreDefaultSSAProjectDatabase()
+}
+
 func DeleteProgram(db *gorm.DB, program string) {
 	utils.GormTransaction(db, func(tx *gorm.DB) error {
 		tx.Model(&IrProgram{}).Where("program_name = ?", program).Unscoped().Delete(&IrProgram{})

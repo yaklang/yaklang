@@ -1,6 +1,9 @@
 package yakit
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaproject"
 
@@ -34,14 +37,148 @@ func CreateSSAProject(db *gorm.DB, req *ypb.CreateSSAProjectRequest) (*schema.SS
 		return nil, utils.Errorf("create SSA project failed: project builder is nil")
 	}
 
+	bindMode := req.GetDatabaseBindMode()
+
+	if existing, err := loadExistingSSAProjectForCreate(db, projectBuilder, bindMode); err != nil {
+		return nil, err
+	} else if existing != nil {
+		return finalizeSSAProjectAfterCreate(db, existing, bindMode)
+	}
+
+	if err := prepareSSAProjectCreateHash(projectBuilder, bindMode); err != nil {
+		return nil, err
+	}
+
 	err = projectBuilder.SaveToDB(db)
 	if err != nil {
+		if isSSAProjectDuplicateDBError(err) {
+			if existing, loadErr := loadExistingSSAProjectForCreate(db, projectBuilder, bindMode); loadErr != nil {
+				return nil, loadErr
+			} else if existing != nil {
+				return finalizeSSAProjectAfterCreate(db, existing, bindMode)
+			}
+		}
 		return nil, utils.Errorf("save SSA project failed: %s", err)
 	}
 	if projectBuilder.SSAProject == nil {
 		return nil, utils.Errorf("create SSA project failed: schema project is nil")
 	}
-	return projectBuilder.SSAProject, nil
+	return finalizeSSAProjectAfterCreate(db, projectBuilder.SSAProject, bindMode)
+}
+
+func prepareSSAProjectCreateHash(builder *ssaproject.SSAProject, bindMode ypb.SSAProjectDatabaseBindMode) error {
+	if builder == nil || builder.Config == nil {
+		return utils.Errorf("prepare SSA project hash failed: project builder or config is nil")
+	}
+	projectName := builder.Config.GetProjectName()
+	codeURL := builder.Config.GetCodeSourceLocalFileOrURL()
+	if projectName == "" || codeURL == "" {
+		return nil
+	}
+	if builder.SSAProject == nil {
+		builder.SSAProject = &schema.SSAProject{}
+	}
+	builder.SSAProject.Hash = ssaproject.CalcProjectHash(codeURL, projectName, bindMode)
+	return nil
+}
+
+func loadExistingSSAProjectForCreate(profileDB *gorm.DB, builder *ssaproject.SSAProject, bindMode ypb.SSAProjectDatabaseBindMode) (*schema.SSAProject, error) {
+	if builder == nil || builder.Config == nil {
+		return nil, nil
+	}
+	if profileDB == nil {
+		profileDB = consts.GetGormProfileDatabase()
+	}
+
+	if id := builder.Config.GetProjectID(); id > 0 {
+		project, err := GetSSAProjectById(id)
+		if err == nil {
+			return project, nil
+		}
+	}
+
+	projectName := builder.Config.GetProjectName()
+	codeURL := builder.Config.GetCodeSourceLocalFileOrURL()
+	if projectName != "" && codeURL != "" {
+		if existing, err := ssaproject.LoadSSAProjectByNameAndURLForBindMode(projectName, codeURL, bindMode); err == nil && existing != nil {
+			return existing.SSAProject, nil
+		}
+	}
+
+	hash := ssaproject.CalcProjectHash(codeURL, projectName, bindMode)
+	if hash != "" {
+		var project schema.SSAProject
+		if err := profileDB.Where("hash = ?", hash).First(&project).Error; err == nil {
+			if ssaproject.MatchesBindMode(&project, bindMode) {
+				return &project, nil
+			}
+		}
+	}
+
+	if projectName != "" {
+		var candidates []schema.SSAProject
+		if err := profileDB.Where("project_name = ?", projectName).Find(&candidates).Error; err == nil {
+			for i := range candidates {
+				if ssaproject.MatchesBindMode(&candidates[i], bindMode) {
+					return &candidates[i], nil
+				}
+			}
+		}
+	}
+	return nil, nil
+}
+
+func isSSAProjectDuplicateDBError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "unique constraint") ||
+		strings.Contains(msg, "duplicate") ||
+		strings.Contains(msg, "constraint failed")
+}
+
+func finalizeSSAProjectAfterCreate(profileDB *gorm.DB, project *schema.SSAProject, mode ypb.SSAProjectDatabaseBindMode) (*schema.SSAProject, error) {
+	if project == nil || project.ID == 0 {
+		return nil, utils.Errorf("create SSA project failed: project is nil or has no id")
+	}
+	if err := ensureSSAProjectDatabaseBound(profileDB, project, mode); err != nil {
+		return nil, err
+	}
+	return project, nil
+}
+
+func ensureSSAProjectDatabaseBound(profileDB *gorm.DB, project *schema.SSAProject, mode ypb.SSAProjectDatabaseBindMode) error {
+	if project == nil || project.ID == 0 {
+		return utils.Errorf("bind SSA project database failed: project is nil or has no id")
+	}
+	switch mode {
+	case ypb.SSAProjectDatabaseBindMode_SSA_PROJECT_BIND_SHARED:
+		isShared, _, err := IsSharedSSAProfileCurrent(profileDB)
+		if err != nil {
+			return err
+		}
+		if !isShared {
+			return utils.Errorf("bind shared SSA database failed: current profile is not default or temporary")
+		}
+		return bindSSAProjectSharedDatabase(profileDB, project)
+	case ypb.SSAProjectDatabaseBindMode_SSA_PROJECT_BIND_DEDICATED:
+		return BindSSAProjectDatabase(profileDB, project)
+	default:
+		if isShared, _, err := IsSharedSSAProfileCurrent(profileDB); err != nil {
+			return err
+		} else if isShared {
+			return bindSSAProjectSharedDatabase(profileDB, project)
+		}
+		if project.DatabasePath == "" {
+			return BindSSAProjectDatabase(profileDB, project)
+		}
+		if err := OpenSSAProjectDatabase(project); err != nil {
+			return err
+		}
+		SetCurrentSSAProjectID(profileDB, uint64(project.ID))
+		return nil
+	}
 }
 
 func UpdateSSAProject(db *gorm.DB, project *ypb.SSAProject) (*schema.SSAProject, error) {
@@ -105,32 +242,61 @@ func DeleteSSAProject(db *gorm.DB, req *ypb.DeleteSSAProjectRequest) (int64, err
 		return 0, nil
 	}
 
-	ssaDB := consts.GetGormSSAProjectDataBase()
 	deleteMode := req.GetDeleteMode()
+	if deleteMode == "" {
+		deleteMode = string(SSAProjectDeleteAll)
+	}
+
 	var totalDeleted int64
+	var failReasons []string
 
 	for _, project := range projects {
+		if err := EnsureSSAProjectDatabaseOpen(uint64(project.ID)); err != nil {
+			failReasons = append(failReasons, fmt.Sprintf("%s(%d): %s", project.ProjectName, project.ID, err))
+			continue
+		}
+
+		var err error
+		switch deleteMode {
+		case string(SSAProjectClearCompileHistory):
+			err = resetDedicatedSSAProjectDatabase(db, project)
+		default:
+			err = deleteSSAProjectFully(db, project)
+		}
+		if err != nil {
+			log.Errorf("delete SSA project %d failed: %s", project.ID, err)
+			failReasons = append(failReasons, fmt.Sprintf("%s(%d): %s", project.ProjectName, project.ID, err))
+			continue
+		}
+		totalDeleted++
+	}
+
+	if len(failReasons) > 0 {
+		msg := strings.Join(failReasons, "; ")
+		if totalDeleted == 0 {
+			return 0, utils.Errorf("delete SSA project failed: %s", msg)
+		}
+		return totalDeleted, utils.Errorf("delete SSA project partially failed: %s", msg)
+	}
+	return totalDeleted, nil
+}
+
+func deleteSSAProjectFully(profileDB *gorm.DB, project *schema.SSAProject) error {
+	if project == nil {
+		return utils.Errorf("delete SSA project failed: project is nil")
+	}
+	if !ProjectUsesDedicatedSSADB(project) {
 		programFilter := &ypb.SSAProgramFilter{
 			ProjectIds: []uint64{uint64(project.ID)},
 		}
-		count, err := DeleteSSAProgram(ssaDB, programFilter)
-		if err != nil {
-			log.Errorf("delete SSA programs for project %d failed: %s", project.ID, err)
-			continue
-		}
-		switch deleteMode {
-		case string(SSAProjectClearCompileHistory):
-			totalDeleted += int64(count)
-		default:
-			result := db.Model(&schema.SSAProject{}).Where("id = ?", project.ID).Unscoped().Delete(&schema.SSAProject{})
-			if result.Error != nil {
-				log.Errorf("delete SSA project %d failed: %s", project.ID, result.Error)
-				continue
-			}
-			totalDeleted += result.RowsAffected
+		if _, err := DeleteSSAProgram(consts.GetGormSSAProjectDataBase(), programFilter); err != nil {
+			return utils.Errorf("delete SSA programs failed: %s", err)
 		}
 	}
-	return totalDeleted, nil
+	if err := removeDedicatedSSAProjectDatabaseFile(profileDB, project, true); err != nil {
+		return err
+	}
+	return deleteSSAProjectRecord(profileDB, project)
 }
 
 func QuerySSAProject(db *gorm.DB, req *ypb.QuerySSAProjectRequest) (*bizhelper.Paginator, []*schema.SSAProject, error) {
@@ -149,6 +315,11 @@ func QuerySSAProject(db *gorm.DB, req *ypb.QuerySSAProjectRequest) (*bizhelper.P
 	}
 
 	db = FilterSSAProject(db, req.GetFilter())
+	var scopeErr error
+	db, scopeErr = ApplySSAProjectActiveDatabaseScope(db, req.GetFilter())
+	if scopeErr != nil {
+		return nil, nil, scopeErr
+	}
 	projects := make([]*schema.SSAProject, 0)
 	paging, db := bizhelper.YakitPagingQuery(db, p, &projects)
 	if db.Error != nil {
@@ -158,11 +329,10 @@ func QuerySSAProject(db *gorm.DB, req *ypb.QuerySSAProjectRequest) (*bizhelper.P
 }
 
 func FilterSSAProject(db *gorm.DB, filter *ypb.SSAProjectFilter) *gorm.DB {
+	db = db.Model(&schema.SSAProject{})
 	if filter == nil {
 		return db
 	}
-
-	db = db.Model(&schema.SSAProject{})
 
 	db = bizhelper.ExactQueryInt64ArrayOr(db, "id", filter.GetIDs())
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "project_name", filter.GetProjectNames())

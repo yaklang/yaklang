@@ -403,14 +403,15 @@ func DoRiskDiff(context context.Context, base, compare *ypb.SSARiskDiffItem) (<-
 					Status:      CompareStatus(d.Status),
 				}
 
+				readProjectID := GetCurrentSSAProjectID()
 				if hash := d.BaseLineRiskHash; hash != "" {
-					if value, err := GetSSARiskByHash(consts.GetGormSSAProjectDataBase(), hash); err == nil {
+					if value, err := GetSSARiskByHashForProjectRead(readProjectID, hash); err == nil {
 						compareResult.BaseValue = value
 					}
 				}
 
 				if hash := d.CompareRiskHash; hash != "" {
-					if value, err := GetSSARiskByHash(consts.GetGormSSAProjectDataBase(), hash); err == nil {
+					if value, err := GetSSARiskByHashForProjectRead(readProjectID, hash); err == nil {
 						compareResult.NewValue = value
 					}
 				}

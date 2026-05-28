@@ -11,6 +11,7 @@ import (
 	_ "github.com/jinzhu/gorm/dialects/mysql"
 	_ "github.com/jinzhu/gorm/dialects/postgres"
 
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 
@@ -52,6 +53,22 @@ func GetSSADataBaseInfo() (string, string) {
 	return SSA_PROJECT_DB_DIALECT, SSA_PROJECT_DB_RAW
 }
 
+// GetCanonicalDefaultSSADatabasePath returns the configured legacy/default SSA IR database path.
+// Unlike GetSSADataBaseInfo, this is stable while dedicated project databases are opened.
+func GetCanonicalDefaultSSADatabasePath() string {
+	raw := GetSSADatabaseInfoFromEnv()
+	if raw == "" {
+		return filepath.Join(GetDefaultYakitBaseDir(), SSA_PROJECT_Default_DB_DEFAULT)
+	}
+	dialect, path := parseDatabaseURL(raw)
+	if dialect == SQLiteExtend || dialect == SQLite {
+		if !filepath.IsAbs(path) {
+			path = filepath.Join(GetDefaultYakitBaseDir(), path)
+		}
+	}
+	return path
+}
+
 func parseDatabaseURL(raw string) (string, string) {
 	// mysql://root:password@tcp()/<dbname>?charset=utf8&parseTime=True&loc=Local
 	parts := strings.SplitN(raw, "://", 2)
@@ -69,9 +86,6 @@ func parseDatabaseURL(raw string) (string, string) {
 			// Keep the full raw string to preserve URL scheme.
 			// lib/pq and gorm both accept URL DSNs like: postgres://user:pass@host:5432/db?sslmode=disable
 			return Postgres, raw
-		// Add other supported dialects here
-		// case "postgres", "postgresql":
-		// 	return PostgreSQL, connectionDetails // Assuming PostgreSQL constant exists
 		default:
 			// Default case for unknown schemes: treat as SQLite with the full raw string as path
 			return SQLiteExtend, raw
@@ -93,14 +107,14 @@ func SetSSADatabaseInfo(raw string) {
 }
 
 func SetGormSSAProjectDatabaseByInfo(raw string) error {
-	SetSSADatabaseInfo(raw)
-	db, err := CreateSSAProjectDatabaseRaw(raw)
+	if raw == "" {
+		return utils.Errorf("set SSA database failed: path is empty")
+	}
+	db, err := GetOrOpenSSADB(raw)
 	if err != nil {
 		return err
 	}
-	ssaDatabase = db
-	// 同步更新 schema 包中的默认 SSA 数据库
-	schema.SetDefaultSSADatabase(db)
+	setActiveSSADatabase(db, raw)
 	return nil
 }
 
@@ -130,14 +144,60 @@ func GetTempSSADataBase() (*gorm.DB, error) {
 }
 
 func SetGormSSAProjectDatabase(db *gorm.DB) {
-	ssaDatabase = db
-	// 同步更新 schema 包中的默认 SSA 数据库
-	schema.SetDefaultSSADatabase(db)
+	setActiveSSADatabase(db, "")
+}
+
+func isGormSSAProjectDatabaseUsable() bool {
+	if ssaDatabase == nil {
+		return false
+	}
+	sqlDB := ssaDatabase.DB()
+	if sqlDB == nil {
+		return false
+	}
+	return sqlDB.Ping() == nil
+}
+
+// CloseGormSSAProjectDatabase clears the active SSA IR handle without closing cached databases.
+func CloseGormSSAProjectDatabase() error {
+	ssaDatabase = nil
+	schema.SetDefaultSSADatabase(nil)
+	return nil
+}
+
+// GetActiveSSADatabaseRawPath returns the connection target of the current SSA database.
+func GetActiveSSADatabaseRawPath() string {
+	_, path := GetSSADataBaseInfo()
+	return path
+}
+
+// IsGormSSAProjectDatabaseOpen reports whether the global SSA IR database handle is open.
+func IsGormSSAProjectDatabaseOpen() bool {
+	return ssaDatabase != nil
+}
+
+func ensureGormSSAProjectDatabase() {
+	if isGormSSAProjectDatabaseUsable() {
+		return
+	}
+	ssaDatabase = nil
+	schema.SetDefaultSSADatabase(nil)
+	initYakitDatabase()
+	if isGormSSAProjectDatabaseUsable() {
+		return
+	}
+	path := GetCanonicalDefaultSSADatabasePath()
+	if err := SetGormSSAProjectDatabaseByInfo(path); err != nil {
+		log.Errorf("reopen default SSA database failed: %s", err)
+	}
 }
 
 func GetGormSSAProjectDataBase() *gorm.DB {
-	if ssaDatabase == nil {
-		initYakitDatabase()
-	}
+	ensureGormSSAProjectDatabase()
 	return ssaDatabase
+}
+
+// RestoreDefaultSSAProjectDatabase reopens the process default SSA IR database.
+func RestoreDefaultSSAProjectDatabase() error {
+	return SetGormSSAProjectDatabaseByInfo(GetCanonicalDefaultSSADatabasePath())
 }

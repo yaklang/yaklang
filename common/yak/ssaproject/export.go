@@ -1,7 +1,8 @@
 package ssaproject
 
 var Exports = map[string]interface{}{
-	"GetSSAProjectByNameAndURL": LoadSSAProjectByNameAndURL,
-	"GetSSAProjectByID":         LoadSSAProjectByID,
-	"NewSSAProject":             NewSSAProject,
+	"GetSSAProjectByNameAndURL":            LoadSSAProjectByNameAndURL,
+	"GetSSAProjectByNameAndURLForBindMode": LoadSSAProjectByNameAndURLForBindMode,
+	"GetSSAProjectByID":                    LoadSSAProjectByID,
+	"NewSSAProject":                        NewSSAProject,
 }

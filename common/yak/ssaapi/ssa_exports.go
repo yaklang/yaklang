@@ -173,7 +173,8 @@ var Exports = map[string]any{
 
 	// SSA Project operations
 	"GetSSAProjectByID":         ssaproject.LoadSSAProjectByID,
-	"GetSSAProjectByNameAndURL": ssaproject.LoadSSAProjectByNameAndURL,
+	"GetSSAProjectByNameAndURL":         ssaproject.LoadSSAProjectByNameAndURL,
+	"GetSSAProjectByNameAndURLForBindMode": ssaproject.LoadSSAProjectByNameAndURLForBindMode,
 	"NewSSAProject":             ssaproject.NewSSAProject,
 
 	// Query latest program name by project name
@@ -183,5 +184,12 @@ var Exports = map[string]any{
 		}
 		db := consts.GetGormProfileDatabase()
 		return yakit.QueryLatestSSAProgramNameByProjectName(db, projectName)
+	},
+	"GetLatestProgramNameByProjectID": func(projectID uint) (string, error) {
+		if projectID == 0 {
+			return "", nil
+		}
+		db := consts.GetGormProfileDatabase()
+		return yakit.QueryLatestSSAProgramNameByProjectId(db, uint64(projectID))
 	},
 }

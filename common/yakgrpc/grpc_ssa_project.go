@@ -26,7 +26,7 @@ func (s *Server) QuerySSAProject(ctx context.Context, req *ypb.QuerySSAProjectRe
 		Total:      int64(p.TotalRecord),
 	}
 	for _, d := range data {
-		model := SSAProjectToGRPCModel(d)
+		model := SSAProjectToGRPCModelWithStats(d)
 		if model == nil {
 			continue
 		}
@@ -48,7 +48,7 @@ func (s *Server) CreateSSAProject(ctx context.Context, req *ypb.CreateSSAProject
 		}, err
 	}
 	return &ypb.CreateSSAProjectResponse{
-		Project: SSAProjectToGRPCModel(project),
+		Project: SSAProjectToGRPCModelWithStats(project),
 		Message: &ypb.DbOperateMessage{
 			TableName:    "ssa_projects",
 			Operation:    DbOperationCreate,
@@ -75,7 +75,7 @@ func (s *Server) UpdateSSAProject(ctx context.Context, req *ypb.UpdateSSAProject
 		}, err
 	}
 	return &ypb.UpdateSSAProjectResponse{
-		Project: SSAProjectToGRPCModel(project),
+		Project: SSAProjectToGRPCModelBasic(project),
 		Message: &ypb.DbOperateMessage{
 			TableName:    "ssa_projects",
 			Operation:    DbOperationUpdate,
@@ -106,14 +106,30 @@ func (s *Server) DeleteSSAProject(ctx context.Context, req *ypb.DeleteSSAProject
 	}, nil
 }
 
-func SSAProjectToGRPCModel(p *schema.SSAProject) *ypb.SSAProject {
+func SSAProjectToGRPCModelBasic(p *schema.SSAProject) *ypb.SSAProject {
 	if p == nil {
 		return nil
 	}
-	db := consts.GetGormSSAProjectDataBase()
+	return p.ToGRPCModelBasic()
+}
+
+func SSAProjectToGRPCModelWithStats(p *schema.SSAProject) *ypb.SSAProject {
+	if p == nil {
+		return nil
+	}
 	project := p.ToGRPCModelBasic()
-	project.CompileTimes = yakit.QuerySSACompileTimesByProjectID(db, p.ID)
-	project.RiskNumber = yakit.QuerySSARiskNumberByProjectID(db, p.ID)
+	if project == nil {
+		return nil
+	}
+	project.DefaultDatabasePath, project.ResolvedDatabasePath = yakit.ResolveSSAProjectDisplayDatabasePaths(p)
+	if yakit.ProjectUsesDedicatedSSADB(p) {
+		project.CompileTimes = yakit.AggregateSSAProjectCompileTimes(p.ID)
+		project.RiskNumber = yakit.AggregateSSAProjectRiskNumber(p.ID)
+	} else {
+		db := consts.GetGormSSAProjectDataBase()
+		project.CompileTimes = yakit.QuerySSACompileTimesByProjectID(db, p.ID)
+		project.RiskNumber = yakit.QuerySSARiskNumberByProjectID(db, p.ID)
+	}
 	return project
 }
 

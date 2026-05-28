@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 
 	"github.com/jinzhu/gorm"
@@ -23,6 +22,8 @@ type SSAProject struct {
 	// 配置选项
 	Config []byte `json:"config"`
 	Hash   string `json:"hash" gorm:"unique_index"`
+	// DatabasePath 绑定该分析项目专用的 SSA IR 数据库文件路径；为空表示 legacy，使用 default-yakssa.db
+	DatabasePath string `json:"database_path" gorm:"type:text"`
 }
 
 func (p *SSAProject) GetTagsList() []string {
@@ -54,21 +55,6 @@ func (p *SSAProject) SetConfig(config *ssaconfig.Config) error {
 	return nil
 }
 
-func (p *SSAProject) BeforeCreate(tx *gorm.DB) error {
-	p.Hash = utils.CalcMd5(p.URL, p.ProjectName)
-	return nil
-}
-
-func (p *SSAProject) BeforeUpdate(tx *gorm.DB) error {
-	p.Hash = utils.CalcMd5(p.URL, p.ProjectName)
-	return nil
-}
-
-func (p *SSAProject) BeforeSave(tx *gorm.DB) error {
-	p.Hash = utils.CalcMd5(p.URL, p.ProjectName)
-	return nil
-}
-
 func (p *SSAProject) ToGRPCModelBasic() *ypb.SSAProject {
 	config, err := p.GetConfig()
 	if err != nil {
@@ -83,8 +69,9 @@ func (p *SSAProject) ToGRPCModelBasic() *ypb.SSAProject {
 		ProjectName: p.ProjectName,
 		Language:    string(p.Language),
 		Description: p.Description,
-		Tags:        p.GetTagsList(),
-		URL:         p.URL,
+		Tags:         p.GetTagsList(),
+		URL:          p.URL,
+		DatabasePath: p.DatabasePath,
 	}
 
 	if codeSource := config.CodeSource; codeSource != nil {

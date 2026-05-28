@@ -22,6 +22,13 @@ compile_immediately := cli.Bool(
     cli.setCliGroup("compile"), 
 )
 
+database_bind_mode = cli.Int(
+    "database_bind_mode",
+    cli.setDefault(0),
+    cli.setVerboseName("数据库绑定模式"),
+    cli.setHelp("0=按当前 Profile 推断；1=共享池(内部审计项目)；2=独立库(外部审计项目)"),
+)
+
 concurrency := cli.Int("concurrency", cli.setVerboseName("并发数"), cli.setCliGroup("compile"), cli.setDefault(10), cli.setHelp("编译时，同时进行编译的文件数量"))
 
 proxy = cli.String("proxy", cli.setHelp("remote url proxy"))
@@ -567,9 +574,16 @@ if params.info.local_file != "" {
 }
 
 
+bindMode = 0
+if database_bind_mode == 1 {
+    bindMode = 1
+} else if database_bind_mode == 2 {
+    bindMode = 2
+}
+
 var projectExists = false
 var config
-existingSSAProject, err = ssa.GetSSAProjectByNameAndURL(params.project_name, path)
+existingSSAProject, err = ssa.GetSSAProjectByNameAndURLForBindMode(params.project_name, path, bindMode)
 if err == nil && existingSSAProject != nil {
     projectExists = true
     config, err = existingSSAProject.GetConfig()

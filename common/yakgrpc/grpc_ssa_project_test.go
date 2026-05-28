@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -15,6 +17,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"github.com/google/uuid"
+	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -25,11 +28,12 @@ func TestGRPCMUSTPASS_SSAProjectCRUDOperations(t *testing.T) {
 	require.NoError(t, err)
 
 	ctx := context.Background()
+	localSrcDir := filepath.Join(t.TempDir(), "crud-src")
 
 	// 测试用的代码源配置
 	codeSourceConfig := &ssaconfig.CodeSourceInfo{
 		Kind:      ssaconfig.CodeSourceLocal,
-		LocalFile: "/tmp/test-project",
+		LocalFile: localSrcDir,
 		Auth: &ssaconfig.AuthConfigInfo{
 			Kind:     "password",
 			UserName: "test",
@@ -121,7 +125,7 @@ func TestGRPCMUSTPASS_SSAProjectCRUDOperations(t *testing.T) {
 		require.Equal(t, []string{"sql-injection", "xss"}, project.RuleConfig.RuleFilter.RuleNames)
 		require.False(t, project.ScanConfig.IgnoreLanguage)
 		require.Equal(t, []string{"test", "local"}, project.Tags)
-		require.Equal(t, "/tmp/test-project", project.URL)
+		require.Equal(t, localSrcDir, project.URL)
 
 		// 保存项目ID用于后续测试
 		projectID = uint64(project.ID)
@@ -238,6 +242,40 @@ func TestGRPCMUSTPASS_SSAProjectCRUDOperations(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, 0, len(queryResp.Projects))
 	})
+
+	t.Run("IdempotentWhenExists", func(t *testing.T) {
+		cfg, err := json.Marshal(&ssaconfig.CodeSourceInfo{
+			Kind:      ssaconfig.CodeSourceLocal,
+			LocalFile: filepath.Join(t.TempDir(), "idem-src"),
+		})
+		require.NoError(t, err)
+		projectName := fmt.Sprintf("idem-%s", uuid.NewString())
+
+		createReq := &ypb.CreateSSAProjectRequest{
+			Project: &ypb.SSAProject{
+				ProjectName:      projectName,
+				CodeSourceConfig: string(cfg),
+				Language:         "go",
+			},
+		}
+		first, err := client.CreateSSAProject(ctx, createReq)
+		require.NoError(t, err)
+		require.NotZero(t, first.GetProject().GetID())
+
+		second, err := client.CreateSSAProject(ctx, &ypb.CreateSSAProjectRequest{
+			JSONStringConfig: first.GetProject().GetJSONStringConfig(),
+		})
+		require.NoError(t, err)
+		require.Equal(t, first.GetProject().GetID(), second.GetProject().GetID())
+
+		t.Cleanup(func() {
+			schemaProj, err := yakit.GetSSAProjectById(uint64(first.GetProject().GetID()))
+			if err == nil && schemaProj.DatabasePath != "" {
+				_ = os.Remove(schemaProj.DatabasePath)
+			}
+			consts.GetGormProfileDatabase().Unscoped().Delete(&schema.SSAProject{}, first.GetProject().GetID())
+		})
+	})
 }
 
 func TestGRPCMUSTPASS_SSAProjectValidation(t *testing.T) {
@@ -294,6 +332,7 @@ func TestGRPCMUSTPASS_SSAProjectDifferentSourceTypes(t *testing.T) {
 	require.NoError(t, err)
 
 	ctx := context.Background()
+	tmpDir := t.TempDir()
 
 	testCases := []struct {
 		name   string
@@ -303,7 +342,7 @@ func TestGRPCMUSTPASS_SSAProjectDifferentSourceTypes(t *testing.T) {
 			name: "CompressionSource",
 			config: &ssaconfig.CodeSourceInfo{
 				Kind:      ssaconfig.CodeSourceCompression,
-				LocalFile: "/tmp/test.zip",
+				LocalFile: filepath.Join(tmpDir, "test.zip"),
 			},
 		},
 		{
@@ -376,6 +415,7 @@ func TestGRPCMUSTPASS_SSAProjectMigrateSSAProject(t *testing.T) {
 	require.NoError(t, err)
 
 	ctx := context.Background()
+	migrateLocalFile := filepath.Join(t.TempDir(), "migrate-src")
 
 	// 1. 准备测试数据：创建3个没有 projectId 的 IrProgram
 	testPrograms := []struct {
@@ -400,7 +440,7 @@ func TestGRPCMUSTPASS_SSAProjectMigrateSSAProject(t *testing.T) {
 			configInput: func() string {
 				config, _ := ssaconfig.New(ssaconfig.ModeCodeSource, ssaconfig.WithCodeSourceInfo(&ssaconfig.CodeSourceInfo{
 					Kind:      ssaconfig.CodeSourceLocal,
-					LocalFile: "/tmp/test2",
+					LocalFile: migrateLocalFile,
 				}))
 				str, _ := config.ToJSONString()
 				return str
@@ -525,4 +565,636 @@ func TestGRPCMUSTPASS_SSAProjectMigrateSSAProject(t *testing.T) {
 		})
 	}
 
+}
+
+func getDefaultSSAProfileProjectID(t *testing.T, profileDB *gorm.DB) int64 {
+	t.Helper()
+	var proj schema.Project
+	err := profileDB.Where("type = ? AND project_name = ?", yakit.TypeSSAProject, yakit.INIT_DATABASE_RECORD_NAME).First(&proj).Error
+	require.NoError(t, err)
+	return int64(proj.ID)
+}
+
+func switchToDedicatedSSAProfile(t *testing.T, client ypb.YakClient, ctx context.Context, profileDB *gorm.DB) func() {
+	t.Helper()
+	name := fmt.Sprintf("dedicated-profile-%s", uuid.NewString())
+	resp, err := client.NewProject(ctx, &ypb.NewProjectRequest{
+		ProjectName: name,
+		Type:        yakit.TypeSSAProject,
+	})
+	require.NoError(t, err)
+	_, err = client.SetCurrentProject(ctx, &ypb.SetCurrentProjectRequest{
+		Id:   resp.GetId(),
+		Type: yakit.TypeSSAProject,
+	})
+	require.NoError(t, err)
+	defaultID := getDefaultSSAProfileProjectID(t, profileDB)
+	return func() {
+		_, _ = client.SetCurrentProject(ctx, &ypb.SetCurrentProjectRequest{
+			Id:   defaultID,
+			Type: yakit.TypeSSAProject,
+		})
+	}
+}
+
+func setCurrentSSAProfileByID(t *testing.T, client ypb.YakClient, ctx context.Context, id int64) {
+	t.Helper()
+	_, err := client.SetCurrentProject(ctx, &ypb.SetCurrentProjectRequest{
+		Id:   id,
+		Type: yakit.TypeSSAProject,
+	})
+	require.NoError(t, err)
+}
+
+// TestGRPCMUSTPASS_SSAProjectDedicatedDatabase covers per-project SSA IR sqlite files:
+// cache/switch, multi-db read merge, delete modes, and legacy projects on default DB.
+func TestGRPCMUSTPASS_SSAProjectDedicatedDatabase(t *testing.T) {
+	client, err := NewLocalClient(true)
+	require.NoError(t, err)
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+	profileDB := consts.GetGormProfileDatabase()
+	t.Cleanup(switchToDedicatedSSAProfile(t, client, ctx, profileDB))
+
+	marshalLocalConfig := func(subdir string) []byte {
+		cfg, err := json.Marshal(&ssaconfig.CodeSourceInfo{
+			Kind:      ssaconfig.CodeSourceLocal,
+			LocalFile: filepath.Join(tmpDir, subdir),
+		})
+		require.NoError(t, err)
+		return cfg
+	}
+
+	createDedicatedProject := func(t *testing.T, namePrefix string) (projectID int64, dbPath string, configBytes []byte) {
+		t.Helper()
+		configBytes = marshalLocalConfig(namePrefix)
+		resp, err := client.CreateSSAProject(ctx, &ypb.CreateSSAProjectRequest{
+			Project: &ypb.SSAProject{
+				ProjectName:      fmt.Sprintf("%s-%s", namePrefix, uuid.NewString()),
+				CodeSourceConfig: string(configBytes),
+				Language:         "go",
+			},
+		})
+		require.NoError(t, err)
+		id := resp.GetProject().GetID()
+		path := resp.GetProject().GetDatabasePath()
+		require.NotEmpty(t, path)
+		_, err = os.Stat(path)
+		require.NoError(t, err)
+		return id, path, configBytes
+	}
+
+	openSSAProjectViaGRPC := func(projectID int64) {
+		_, err := client.QuerySSAPrograms(ctx, &ypb.QuerySSAProgramRequest{
+			Filter:     &ypb.SSAProgramFilter{ProjectIds: []uint64{uint64(projectID)}},
+			Pagination: &ypb.Paging{Page: 1, Limit: 1},
+		})
+		require.NoError(t, err)
+	}
+
+	requireSSADBCacheConnected := func(t *testing.T, dbPath string) *gorm.DB {
+		t.Helper()
+		db, err := consts.GetOrOpenSSADB(dbPath)
+		require.NoError(t, err)
+		require.NotNil(t, db.DB())
+		require.NoError(t, db.DB().Ping())
+		return db
+	}
+
+	cleanupDedicatedProject := func(projectID int64, dbPath string, programNames ...string) {
+		if projectID > 0 {
+			_ = yakit.EnsureSSAProjectDatabaseOpen(uint64(projectID))
+			for _, name := range programNames {
+				if name != "" {
+					ssadb.DeleteProgram(consts.GetGormSSAProjectDataBase(), name)
+				}
+			}
+		}
+		if dbPath != "" {
+			_ = consts.CloseSSADBPath(dbPath)
+			_ = os.Remove(dbPath)
+		}
+		profileDB.Unscoped().Delete(&schema.SSAProject{}, projectID)
+	}
+
+	t.Run("DatabaseBinding", func(t *testing.T) {
+		projectIDA, pathA, _ := createDedicatedProject(t, "bind-a")
+		projectIDB, pathB, _ := createDedicatedProject(t, "bind-b")
+		t.Cleanup(func() {
+			cleanupDedicatedProject(projectIDA, pathA)
+			cleanupDedicatedProject(projectIDB, pathB)
+		})
+
+		openSSAProjectViaGRPC(projectIDA)
+		dbA := requireSSADBCacheConnected(t, pathA)
+
+		openSSAProjectViaGRPC(projectIDB)
+		dbB := requireSSADBCacheConnected(t, pathB)
+
+		dbAAfterB, err := consts.GetOrOpenSSADB(pathA)
+		require.NoError(t, err)
+		require.Same(t, dbA, dbAAfterB)
+		require.NoError(t, dbAAfterB.DB().Ping())
+
+		_, err = consts.GetOrOpenSSADB(pathB)
+		require.NoError(t, err)
+		require.Same(t, dbB, consts.GetGormSSAProjectDataBase())
+	})
+
+	t.Run("MultiDBReadMerge", func(t *testing.T) {
+		configBytes := marshalLocalConfig("merge-src")
+		projectName := fmt.Sprintf("multi-db-%s", uuid.NewString())
+		legacyProgramName := projectName
+		dedicatedProgramName := fmt.Sprintf("dedicated-prog-%s", uuid.NewString())
+
+		require.NoError(t, yakit.EnsureSSAProjectDatabaseOpen(0))
+		_, err := ssaapi.Parse(`package main; func legacyMain() {}`,
+			ssaapi.WithProgramName(legacyProgramName),
+			ssaapi.WithLanguage(ssaconfig.GO),
+			ssaconfig.WithJsonRawConfig(configBytes),
+		)
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			_ = yakit.EnsureSSAProjectDatabaseOpen(0)
+			ssadb.DeleteProgram(consts.GetGormSSAProjectDataBase(), legacyProgramName)
+		})
+
+		createResp, err := client.CreateSSAProject(ctx, &ypb.CreateSSAProjectRequest{
+			Project: &ypb.SSAProject{
+				ProjectName:      projectName,
+				CodeSourceConfig: string(configBytes),
+				Description:      "multi-db read merge",
+				Language:         "go",
+			},
+		})
+		require.NoError(t, err)
+		projectID := createResp.GetProject().GetID()
+		dbPath := createResp.GetProject().GetDatabasePath()
+		t.Cleanup(func() {
+			cleanupDedicatedProject(projectID, dbPath, dedicatedProgramName)
+		})
+
+		require.NoError(t, yakit.EnsureSSAProjectDatabaseOpen(uint64(projectID)))
+		_, err = ssaapi.Parse(`package main; func dedicatedMain() {}`,
+			ssaapi.WithProgramName(dedicatedProgramName),
+			ssaapi.WithLanguage(ssaconfig.GO),
+			ssaconfig.WithProjectID(uint64(projectID)),
+		)
+		require.NoError(t, err)
+
+		progResp, err := client.QuerySSAPrograms(ctx, &ypb.QuerySSAProgramRequest{
+			Filter:     &ypb.SSAProgramFilter{ProjectIds: []uint64{uint64(projectID)}},
+			Pagination: &ypb.Paging{Page: 1, Limit: 100},
+		})
+		require.NoError(t, err)
+		require.GreaterOrEqual(t, len(progResp.Data), 2)
+
+		names := make(map[string]struct{}, len(progResp.Data))
+		for _, p := range progResp.Data {
+			names[p.Name] = struct{}{}
+		}
+		require.Contains(t, names, legacyProgramName)
+		require.Contains(t, names, dedicatedProgramName)
+	})
+
+	t.Run("DeleteClosesDatabase", func(t *testing.T) {
+		projectID, dbPath, _ := createDedicatedProject(t, "del")
+		progName := fmt.Sprintf("del-prog-%s", uuid.NewString())
+		t.Cleanup(func() {
+			cleanupDedicatedProject(projectID, dbPath)
+		})
+
+		_, err := ssaapi.Parse(`package main; func main() {}`,
+			ssaapi.WithProgramName(progName),
+			ssaapi.WithLanguage(ssaconfig.GO),
+			ssaconfig.WithProjectID(uint64(projectID)),
+		)
+		require.NoError(t, err)
+
+		_, err = client.DeleteSSAProject(ctx, &ypb.DeleteSSAProjectRequest{
+			Filter:     &ypb.SSAProjectFilter{IDs: []int64{projectID}},
+			DeleteMode: string(yakit.SSAProjectClearCompileHistory),
+		})
+		require.NoError(t, err)
+		_, err = os.Stat(dbPath)
+		require.NoError(t, err, "dedicated sqlite should remain after clear_compile_history")
+
+		progResp, err := client.QuerySSAPrograms(ctx, &ypb.QuerySSAProgramRequest{
+			Filter:     &ypb.SSAProgramFilter{ProjectIds: []uint64{uint64(projectID)}},
+			Pagination: &ypb.Paging{Page: 1, Limit: 10},
+		})
+		require.NoError(t, err)
+		require.Empty(t, progResp.Data)
+
+		_, err = client.DeleteSSAProject(ctx, &ypb.DeleteSSAProjectRequest{
+			Filter:     &ypb.SSAProjectFilter{IDs: []int64{projectID}},
+			DeleteMode: string(yakit.SSAProjectDeleteAll),
+		})
+		require.NoError(t, err)
+		_, err = os.Stat(dbPath)
+		require.True(t, os.IsNotExist(err), "dedicated sqlite should be removed after delete_all")
+
+		queryResp, err := client.QuerySSAProject(ctx, &ypb.QuerySSAProjectRequest{
+			Filter: &ypb.SSAProjectFilter{IDs: []int64{projectID}},
+		})
+		require.NoError(t, err)
+		require.Empty(t, queryResp.Projects)
+		require.Equal(t, uint64(0), yakit.GetCurrentSSAProjectID())
+	})
+
+	t.Run("LegacyOpenUsesDefaultDB", func(t *testing.T) {
+		legacyURL := filepath.Join(tmpDir, "legacy")
+		project := &schema.SSAProject{
+			ProjectName: fmt.Sprintf("legacy-%s", uuid.NewString()),
+			Language:    ssaconfig.GO,
+			Description: "legacy without dedicated db",
+			URL:         legacyURL,
+		}
+		require.NoError(t, profileDB.Create(project).Error)
+		require.Empty(t, project.DatabasePath)
+		t.Cleanup(func() {
+			profileDB.Unscoped().Delete(project)
+		})
+
+		require.NoError(t, yakit.OpenSSAProjectDatabase(project))
+		_, defaultPath := consts.GetSSADataBaseInfo()
+		require.Equal(t, defaultPath, yakit.ResolveSSAProjectDatabasePath(project))
+	})
+
+	t.Cleanup(func() {
+		_ = yakit.EnsureSSAProjectDatabaseOpen(0)
+	})
+}
+
+// TestGRPCMUSTPASS_SSAProjectSharedProfileScope verifies list/create scoping for default vs dedicated profiles.
+func TestGRPCMUSTPASS_SSAProjectSharedProfileScope(t *testing.T) {
+	client, err := NewLocalClient(true)
+	require.NoError(t, err)
+	ctx := context.Background()
+	profileDB := consts.GetGormProfileDatabase()
+	tmpDir := t.TempDir()
+
+	defaultProfileID := getDefaultSSAProfileProjectID(t, profileDB)
+	t.Cleanup(func() {
+		setCurrentSSAProfileByID(t, client, ctx, defaultProfileID)
+	})
+
+	marshalLocalConfig := func(subdir string) []byte {
+		cfg, err := json.Marshal(&ssaconfig.CodeSourceInfo{
+			Kind:      ssaconfig.CodeSourceLocal,
+			LocalFile: filepath.Join(tmpDir, subdir),
+		})
+		require.NoError(t, err)
+		return cfg
+	}
+
+	setCurrentSSAProfileByID(t, client, ctx, defaultProfileID)
+
+	sharedName := fmt.Sprintf("shared-scope-%s", uuid.NewString())
+	sharedCfg := marshalLocalConfig("shared")
+	sharedResp, err := client.CreateSSAProject(ctx, &ypb.CreateSSAProjectRequest{
+		Project: &ypb.SSAProject{
+			ProjectName:      sharedName,
+			CodeSourceConfig: string(sharedCfg),
+			Language:         "go",
+		},
+	})
+	require.NoError(t, err)
+	sharedID := sharedResp.GetProject().GetID()
+	require.Empty(t, sharedResp.GetProject().GetDatabasePath())
+
+	listBeforeCompile, err := client.QuerySSAProject(ctx, &ypb.QuerySSAProjectRequest{
+		Filter:     &ypb.SSAProjectFilter{ProjectNames: []string{sharedName}},
+		Pagination: &ypb.Paging{Page: 1, Limit: 20},
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, listBeforeCompile.Projects, "uncompiled shared project should appear in default profile list")
+
+	progName := fmt.Sprintf("shared-prog-%s", uuid.NewString())
+	require.NoError(t, yakit.EnsureSSAProjectDatabaseOpen(0))
+	_, err = ssaapi.Parse(`package main; func main() {}`,
+		ssaapi.WithProgramName(progName),
+		ssaapi.WithLanguage(ssaconfig.GO),
+		ssaconfig.WithProjectID(uint64(sharedID)),
+	)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		ssadb.DeleteProgram(consts.GetGormSSAProjectDataBase(), progName)
+		_, _ = client.DeleteSSAProject(ctx, &ypb.DeleteSSAProjectRequest{
+			Filter: &ypb.SSAProjectFilter{IDs: []int64{sharedID}},
+		})
+	})
+
+	restoreDedicatedProfile := switchToDedicatedSSAProfile(t, client, ctx, profileDB)
+	dedicatedName := fmt.Sprintf("dedicated-scope-%s", uuid.NewString())
+	dedicatedCfg := marshalLocalConfig("dedicated")
+	dedicatedResp, err := client.CreateSSAProject(ctx, &ypb.CreateSSAProjectRequest{
+		Project: &ypb.SSAProject{
+			ProjectName:      dedicatedName,
+			CodeSourceConfig: string(dedicatedCfg),
+			Language:         "go",
+		},
+	})
+	require.NoError(t, err)
+	dedicatedID := dedicatedResp.GetProject().GetID()
+	dedicatedPath := dedicatedResp.GetProject().GetDatabasePath()
+	require.NotEmpty(t, dedicatedPath)
+	t.Cleanup(func() {
+		restoreDedicatedProfile()
+		_, _ = client.DeleteSSAProject(ctx, &ypb.DeleteSSAProjectRequest{
+			Filter: &ypb.SSAProjectFilter{IDs: []int64{dedicatedID}},
+		})
+		_ = os.Remove(dedicatedPath)
+	})
+
+	setCurrentSSAProfileByID(t, client, ctx, defaultProfileID)
+	listDefault, err := client.QuerySSAProject(ctx, &ypb.QuerySSAProjectRequest{
+		Filter:     &ypb.SSAProjectFilter{ProjectNames: []string{sharedName, dedicatedName}},
+		Pagination: &ypb.Paging{Page: 1, Limit: 20},
+	})
+	require.NoError(t, err)
+	defaultNames := make(map[string]struct{})
+	for _, p := range listDefault.Projects {
+		defaultNames[p.ProjectName] = struct{}{}
+	}
+	require.Contains(t, defaultNames, sharedName)
+	require.NotContains(t, defaultNames, dedicatedName)
+
+	switchToDedicatedSSAProfile(t, client, ctx, profileDB)
+	listDedicated, err := client.QuerySSAProject(ctx, &ypb.QuerySSAProjectRequest{
+		Filter:     &ypb.SSAProjectFilter{ProjectNames: []string{sharedName, dedicatedName}},
+		Pagination: &ypb.Paging{Page: 1, Limit: 20},
+	})
+	require.NoError(t, err)
+	dedicatedNames := make(map[string]struct{})
+	for _, p := range listDedicated.Projects {
+		dedicatedNames[p.ProjectName] = struct{}{}
+	}
+	require.Contains(t, dedicatedNames, dedicatedName)
+	require.NotContains(t, dedicatedNames, sharedName)
+}
+
+// TestGRPCMUSTPASS_SSAProjectListPool verifies SHARED vs DEDICATED list filters are mutually exclusive.
+func TestGRPCMUSTPASS_SSAProjectListPool(t *testing.T) {
+	client, err := NewLocalClient(true)
+	require.NoError(t, err)
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+	profileDB := consts.GetGormProfileDatabase()
+
+	defaultProfileID := getDefaultSSAProfileProjectID(t, profileDB)
+	t.Cleanup(func() {
+		setCurrentSSAProfileByID(t, client, ctx, defaultProfileID)
+	})
+
+	marshalLocalConfig := func(subdir string) []byte {
+		cfg, err := json.Marshal(&ssaconfig.CodeSourceInfo{
+			Kind:      ssaconfig.CodeSourceLocal,
+			LocalFile: filepath.Join(tmpDir, subdir),
+		})
+		require.NoError(t, err)
+		return cfg
+	}
+
+	setCurrentSSAProfileByID(t, client, ctx, defaultProfileID)
+
+	sharedName := fmt.Sprintf("listpool-shared-%s", uuid.NewString())
+	sharedResp, err := client.CreateSSAProject(ctx, &ypb.CreateSSAProjectRequest{
+		Project: &ypb.SSAProject{
+			ProjectName:      sharedName,
+			CodeSourceConfig: string(marshalLocalConfig("shared")),
+			Language:         "go",
+		},
+		DatabaseBindMode: ypb.SSAProjectDatabaseBindMode_SSA_PROJECT_BIND_SHARED,
+	})
+	require.NoError(t, err)
+	sharedID := sharedResp.GetProject().GetID()
+	t.Cleanup(func() {
+		_, _ = client.DeleteSSAProject(ctx, &ypb.DeleteSSAProjectRequest{
+			Filter: &ypb.SSAProjectFilter{IDs: []int64{sharedID}},
+		})
+	})
+
+	dedicatedName := fmt.Sprintf("listpool-dedicated-%s", uuid.NewString())
+	dedicatedResp, err := client.CreateSSAProject(ctx, &ypb.CreateSSAProjectRequest{
+		Project: &ypb.SSAProject{
+			ProjectName:      dedicatedName,
+			CodeSourceConfig: string(marshalLocalConfig("dedicated")),
+			Language:         "go",
+		},
+		DatabaseBindMode: ypb.SSAProjectDatabaseBindMode_SSA_PROJECT_BIND_DEDICATED,
+	})
+	require.NoError(t, err)
+	dedicatedID := dedicatedResp.GetProject().GetID()
+	dedicatedPath := dedicatedResp.GetProject().GetDatabasePath()
+	require.NotEmpty(t, dedicatedPath)
+	t.Cleanup(func() {
+		_, _ = client.DeleteSSAProject(ctx, &ypb.DeleteSSAProjectRequest{
+			Filter:     &ypb.SSAProjectFilter{IDs: []int64{dedicatedID}},
+			DeleteMode: string(yakit.SSAProjectDeleteAll),
+		})
+		_ = os.Remove(dedicatedPath)
+	})
+
+	queryNames := func(pool ypb.SSAProjectListPool) map[string]struct{} {
+		resp, err := client.QuerySSAProject(ctx, &ypb.QuerySSAProjectRequest{
+			Filter: &ypb.SSAProjectFilter{
+				ProjectNames: []string{sharedName, dedicatedName},
+				ListPool:     pool,
+			},
+			Pagination: &ypb.Paging{Page: 1, Limit: 50},
+		})
+		require.NoError(t, err)
+		names := make(map[string]struct{})
+		for _, p := range resp.Projects {
+			names[p.ProjectName] = struct{}{}
+		}
+		return names
+	}
+
+	sharedNames := queryNames(ypb.SSAProjectListPool_SSA_PROJECT_LIST_SHARED)
+	require.Contains(t, sharedNames, sharedName)
+	require.NotContains(t, sharedNames, dedicatedName)
+
+	dedicatedNames := queryNames(ypb.SSAProjectListPool_SSA_PROJECT_LIST_DEDICATED)
+	require.Contains(t, dedicatedNames, dedicatedName)
+	require.NotContains(t, dedicatedNames, sharedName)
+
+	// ListPool takes precedence over profile: on default profile, DEDICATED still lists dedicated rows.
+	setCurrentSSAProfileByID(t, client, ctx, defaultProfileID)
+	dedicatedOnDefault := queryNames(ypb.SSAProjectListPool_SSA_PROJECT_LIST_DEDICATED)
+	require.Contains(t, dedicatedOnDefault, dedicatedName)
+
+	// SHARED create must appear in SHARED list (internal audit projects).
+	sharedOnly, err := client.QuerySSAProject(ctx, &ypb.QuerySSAProjectRequest{
+		Filter: &ypb.SSAProjectFilter{
+			ProjectNames: []string{sharedName},
+			ListPool:     ypb.SSAProjectListPool_SSA_PROJECT_LIST_SHARED,
+		},
+		Pagination: &ypb.Paging{Page: 1, Limit: 20},
+	})
+	require.NoError(t, err)
+	require.Len(t, sharedOnly.Projects, 1)
+	require.Empty(t, sharedOnly.Projects[0].GetDatabasePath())
+}
+
+// TestGRPCMUSTPASS_SSAProjectSameNameDualPool allows the same project name in shared and dedicated pools.
+func TestGRPCMUSTPASS_SSAProjectSameNameDualPool(t *testing.T) {
+	client, err := NewLocalClient(true)
+	require.NoError(t, err)
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+	defaultProfileID := getDefaultSSAProfileProjectID(t, consts.GetGormProfileDatabase())
+	t.Cleanup(func() {
+		setCurrentSSAProfileByID(t, client, ctx, defaultProfileID)
+	})
+
+	marshalLocalConfig := func(subdir string) []byte {
+		cfg, err := json.Marshal(&ssaconfig.CodeSourceInfo{
+			Kind:      ssaconfig.CodeSourceLocal,
+			LocalFile: filepath.Join(tmpDir, subdir),
+		})
+		require.NoError(t, err)
+		return cfg
+	}
+
+	setCurrentSSAProfileByID(t, client, ctx, defaultProfileID)
+	name := fmt.Sprintf("dual-pool-%s", uuid.NewString())
+
+	sharedResp, err := client.CreateSSAProject(ctx, &ypb.CreateSSAProjectRequest{
+		Project: &ypb.SSAProject{
+			ProjectName:      name,
+			CodeSourceConfig: string(marshalLocalConfig("same")),
+			Language:         "go",
+		},
+		DatabaseBindMode: ypb.SSAProjectDatabaseBindMode_SSA_PROJECT_BIND_SHARED,
+	})
+	require.NoError(t, err)
+	sharedID := sharedResp.GetProject().GetID()
+	require.Empty(t, sharedResp.GetProject().GetDatabasePath())
+	t.Cleanup(func() {
+		_, _ = client.DeleteSSAProject(ctx, &ypb.DeleteSSAProjectRequest{
+			Filter: &ypb.SSAProjectFilter{IDs: []int64{sharedID}},
+		})
+	})
+
+	dedicatedResp, err := client.CreateSSAProject(ctx, &ypb.CreateSSAProjectRequest{
+		Project: &ypb.SSAProject{
+			ProjectName:      name,
+			CodeSourceConfig: string(marshalLocalConfig("same")),
+			Language:         "go",
+		},
+		DatabaseBindMode: ypb.SSAProjectDatabaseBindMode_SSA_PROJECT_BIND_DEDICATED,
+	})
+	require.NoError(t, err)
+	dedicatedID := dedicatedResp.GetProject().GetID()
+	require.NotEqual(t, sharedID, dedicatedID)
+	require.NotEmpty(t, dedicatedResp.GetProject().GetDatabasePath())
+	t.Cleanup(func() {
+		_, _ = client.DeleteSSAProject(ctx, &ypb.DeleteSSAProjectRequest{
+			Filter:     &ypb.SSAProjectFilter{IDs: []int64{dedicatedID}},
+			DeleteMode: string(yakit.SSAProjectDeleteAll),
+		})
+	})
+
+	listShared, err := client.QuerySSAProject(ctx, &ypb.QuerySSAProjectRequest{
+		Filter:     &ypb.SSAProjectFilter{ProjectNames: []string{name}, ListPool: ypb.SSAProjectListPool_SSA_PROJECT_LIST_SHARED},
+		Pagination: &ypb.Paging{Page: 1, Limit: 20},
+	})
+	require.NoError(t, err)
+	require.Len(t, listShared.Projects, 1)
+	require.Equal(t, sharedID, listShared.Projects[0].ID)
+
+	listDedicated, err := client.QuerySSAProject(ctx, &ypb.QuerySSAProjectRequest{
+		Filter:     &ypb.SSAProjectFilter{ProjectNames: []string{name}, ListPool: ypb.SSAProjectListPool_SSA_PROJECT_LIST_DEDICATED},
+		Pagination: &ypb.Paging{Page: 1, Limit: 20},
+	})
+	require.NoError(t, err)
+	require.Len(t, listDedicated.Projects, 1)
+	require.Equal(t, dedicatedID, listDedicated.Projects[0].ID)
+}
+
+// TestGRPCMUSTPASS_SSAProjectCreateDatabaseBindMode verifies explicit bind modes on CreateSSAProject.
+func TestGRPCMUSTPASS_SSAProjectCreateDatabaseBindMode(t *testing.T) {
+	client, err := NewLocalClient(true)
+	require.NoError(t, err)
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+	profileDB := consts.GetGormProfileDatabase()
+
+	defaultProfileID := getDefaultSSAProfileProjectID(t, profileDB)
+	t.Cleanup(func() {
+		setCurrentSSAProfileByID(t, client, ctx, defaultProfileID)
+	})
+
+	marshalLocalConfig := func(subdir string) []byte {
+		cfg, err := json.Marshal(&ssaconfig.CodeSourceInfo{
+			Kind:      ssaconfig.CodeSourceLocal,
+			LocalFile: filepath.Join(tmpDir, subdir),
+		})
+		require.NoError(t, err)
+		return cfg
+	}
+
+	setCurrentSSAProfileByID(t, client, ctx, defaultProfileID)
+
+	t.Run("DefaultProfileForceDedicated", func(t *testing.T) {
+		name := fmt.Sprintf("bind-dedicated-%s", uuid.NewString())
+		cfg := marshalLocalConfig("dedicated")
+		resp, err := client.CreateSSAProject(ctx, &ypb.CreateSSAProjectRequest{
+			Project: &ypb.SSAProject{
+				ProjectName:      name,
+				CodeSourceConfig: string(cfg),
+				Language:         "go",
+			},
+			DatabaseBindMode: ypb.SSAProjectDatabaseBindMode_SSA_PROJECT_BIND_DEDICATED,
+		})
+		require.NoError(t, err)
+		require.NotEmpty(t, resp.GetProject().GetDatabasePath())
+		t.Cleanup(func() {
+			_, _ = client.DeleteSSAProject(ctx, &ypb.DeleteSSAProjectRequest{
+				Filter:     &ypb.SSAProjectFilter{IDs: []int64{resp.GetProject().GetID()}},
+				DeleteMode: string(yakit.SSAProjectDeleteAll),
+			})
+		})
+	})
+
+	t.Run("DefaultProfileForceShared", func(t *testing.T) {
+		name := fmt.Sprintf("bind-shared-%s", uuid.NewString())
+		cfg := marshalLocalConfig("shared")
+		resp, err := client.CreateSSAProject(ctx, &ypb.CreateSSAProjectRequest{
+			Project: &ypb.SSAProject{
+				ProjectName:      name,
+				CodeSourceConfig: string(cfg),
+				Language:         "go",
+			},
+			DatabaseBindMode: ypb.SSAProjectDatabaseBindMode_SSA_PROJECT_BIND_SHARED,
+		})
+		require.NoError(t, err)
+		require.Empty(t, resp.GetProject().GetDatabasePath())
+		t.Cleanup(func() {
+			_, _ = client.DeleteSSAProject(ctx, &ypb.DeleteSSAProjectRequest{
+				Filter:     &ypb.SSAProjectFilter{IDs: []int64{resp.GetProject().GetID()}},
+				DeleteMode: string(yakit.SSAProjectDeleteAll),
+			})
+		})
+	})
+
+	t.Run("DedicatedProfileForceSharedFails", func(t *testing.T) {
+		restore := switchToDedicatedSSAProfile(t, client, ctx, profileDB)
+		defer restore()
+
+		name := fmt.Sprintf("bind-shared-fail-%s", uuid.NewString())
+		cfg := marshalLocalConfig("fail")
+		_, err := client.CreateSSAProject(ctx, &ypb.CreateSSAProjectRequest{
+			Project: &ypb.SSAProject{
+				ProjectName:      name,
+				CodeSourceConfig: string(cfg),
+				Language:         "go",
+			},
+			DatabaseBindMode: ypb.SSAProjectDatabaseBindMode_SSA_PROJECT_BIND_SHARED,
+		})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "not default or temporary")
+	})
 }

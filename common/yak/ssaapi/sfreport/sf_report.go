@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
@@ -1301,19 +1300,11 @@ func loadProjectInfo(report *SSAProjectReport, programName string) error {
 
 // getRisks 通用风险获取函数，获取所有匹配条件的风险（无分页限制）
 func getRisks(filter *ypb.SSARisksFilter) ([]*schema.SSARisk, error) {
-	db := consts.GetGormSSAProjectDataBase()
-
-	// 直接使用FilterSSARisk进行查询，避免分页限制
-	db = db.Model(&schema.SSARisk{})
-	db = yakit.FilterSSARisk(db, filter)
-	// 使用多字段排序确保结果一致性：先按创建时间降序，再按ID升序
-	db = db.Order("created_at DESC, id ASC")
-
-	var risks []*schema.SSARisk
-	if err := db.Find(&risks).Error; err != nil {
+	projectID := yakit.ResolveSSAReadProjectIDForRiskFilter(filter)
+	risks, err := yakit.QueryAllSSARisksForProjectRead(projectID, filter)
+	if err != nil {
 		return nil, utils.Wrapf(err, "query ssa risks failed")
 	}
-
 	log.Infof("getRisks: found %d risks with filter", len(risks))
 	return risks, nil
 }

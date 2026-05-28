@@ -48,9 +48,18 @@ yakit.Info("程序名称: %s", programName)
 enableIncrementalCompile = config.GetEnableIncrementalCompile()
 baseProgramName = config.GetBaseProgramName()
 
-// 通过 projectName 从数据库中获取最新的 program name
+// 通过 project_id（优先）或 project_name 查询最新 program，避免同名内外部项目串库
 lastProgramName = ""
-if projectName != "" {
+if projectID > 0 {
+    lastProgramName, err = ssa.GetLatestProgramNameByProjectID(int(projectID))
+    if err != nil {
+        yakit.Warn("查询项目 ID %d 的最新程序名称失败: %v", projectID, err)
+    } else if lastProgramName != "" {
+        yakit.Info("从数据库查询到项目 ID %d 的最新程序名称: %s", projectID, lastProgramName)
+    } else {
+        yakit.Info("项目 ID %d 中没有已编译的程序", projectID)
+    }
+} else if projectName != "" {
     lastProgramName, err = ssa.GetLatestProgramNameByProjectName(projectName)
     if err != nil {
         yakit.Warn("查询项目 %s 的最新程序名称失败: %v", projectName, err)
@@ -60,7 +69,7 @@ if projectName != "" {
         yakit.Info("项目 %s 中没有已编译的程序", projectName)
     }
 } else {
-    yakit.Warn("项目名称为空，跳过查询最新程序名称")
+    yakit.Warn("项目 ID 与项目名均为空，跳过查询最新程序名称")
 }
 
 // 使用 withSetProgramName 覆盖 config 中可能存在的旧 program_names（同 project 多次编译时避免复用数据库中的旧 program）

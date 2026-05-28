@@ -109,9 +109,16 @@ func (s *SSAProject) SaveToDB(dbs ...*gorm.DB) (err error) {
 
 	// Create
 	if s.SSAProject == nil || s.SSAProject.ID == 0 {
+		pendingHash := ""
+		if s.SSAProject != nil {
+			pendingHash = s.SSAProject.Hash
+		}
 		s.SSAProject = &schema.SSAProject{}
 		if err := s.fillSchemaProjectFromConfig(s.SSAProject); err != nil {
 			return err
+		}
+		if pendingHash != "" {
+			s.SSAProject.Hash = pendingHash
 		}
 		if err := db.Create(s.SSAProject).Error; err != nil {
 			return err
@@ -236,13 +243,32 @@ func LoadSSAProjectByID(id uint) (*SSAProject, error) {
 }
 
 func LoadSSAProjectByNameAndURL(projectName, url string) (*SSAProject, error) {
+	return LoadSSAProjectByNameAndURLForBindMode(projectName, url, ypb.SSAProjectDatabaseBindMode_SSA_PROJECT_BIND_AUTO)
+}
+
+func LoadSSAProjectByNameAndURLForBindMode(projectName, url string, mode ypb.SSAProjectDatabaseBindMode) (*SSAProject, error) {
 	db := consts.GetGormProfileDatabase()
-	var project schema.SSAProject
-	err := db.Where("project_name = ? AND url = ?", projectName, url).First(&project).Error
-	if err != nil {
-		return nil, utils.Errorf("load SSA project failed: %s", err)
+	if projectName != "" && url != "" {
+		hash := CalcProjectHash(url, projectName, mode)
+		if hash != "" {
+			var project schema.SSAProject
+			if err := db.Where("hash = ?", hash).First(&project).Error; err == nil {
+				if MatchesBindMode(&project, mode) {
+					return loadSSAProjectBySchema(&project)
+				}
+			}
+		}
+		var candidates []schema.SSAProject
+		q := db.Where("project_name = ? AND url = ?", projectName, url)
+		if err := q.Find(&candidates).Error; err == nil {
+			for i := range candidates {
+				if MatchesBindMode(&candidates[i], mode) {
+					return loadSSAProjectBySchema(&candidates[i])
+				}
+			}
+		}
 	}
-	return loadSSAProjectBySchema(&project)
+	return nil, utils.Errorf("load SSA project failed: not found")
 }
 
 func (s *SSAProject) GetConfig() (*ssaconfig.Config, error) {

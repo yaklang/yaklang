@@ -111,46 +111,41 @@ func TestManager(t *testing.T) {
 	})
 
 	t.Run("test programs field saved when using ProjectID", func(t *testing.T) {
-		// 创建一个简单的程序并保存到数据库
-		programName := uuid.NewString()
-		prog, err := ssaapi.Parse(`print("test")`,
-			ssaapi.WithProgramName(programName),
-			ssaapi.WithLanguage(ssaconfig.Yak),
-		)
-		require.NoError(t, err)
-		require.NotNil(t, prog)
-		defer func() {
-			ssadb.DeleteProgram(ssadb.GetDB(), programName)
-		}()
-
-		// 获取程序的数据库记录 ID
-		progFromDB, err := ssadb.GetProgram(programName, ssadb.Application)
-		require.NoError(t, err)
-		require.NotNil(t, progFromDB)
-
-		// 创建一个 SSA Project
 		projectName := uuid.NewString()
-		projectReq := &ypb.CreateSSAProjectRequest{
+		project, err := yakit.CreateSSAProject(consts.GetGormProfileDatabase(), &ypb.CreateSSAProjectRequest{
 			Project: &ypb.SSAProject{
 				ProjectName: projectName,
 				Language:    "yak",
 			},
-		}
-		project, err := yakit.CreateSSAProject(consts.GetGormProfileDatabase(), projectReq)
+		})
 		require.NoError(t, err)
 		require.NotNil(t, project)
+		projectID := uint64(project.ID)
 		defer func() {
-			// 清理项目
-			yakit.DeleteSSAProject(consts.GetGormProfileDatabase(), &ypb.DeleteSSAProjectRequest{
-				Filter: &ypb.SSAProjectFilter{
-					IDs: []int64{int64(project.ID)},
-				},
+			_, _ = yakit.DeleteSSAProject(consts.GetGormProfileDatabase(), &ypb.DeleteSSAProjectRequest{
+				Filter: &ypb.SSAProjectFilter{IDs: []int64{int64(project.ID)}},
 			})
 		}()
 
-		// 更新程序的 ProjectID
-		err = yakit.UpdateIrProgramProjectID(ssadb.GetDB(), uint(progFromDB.ID), uint64(project.ID))
+		// Parse 不会自动切库，须先打开项目 IR 库再编译，否则 program 会落在 default 库。
+		programName := uuid.NewString()
+		require.NoError(t, yakit.EnsureSSAProjectDatabaseOpen(projectID))
+		prog, err := ssaapi.Parse(`print("test")`,
+			ssaapi.WithProgramName(programName),
+			ssaapi.WithLanguage(ssaconfig.Yak),
+			ssaconfig.WithProjectID(projectID),
+		)
 		require.NoError(t, err)
+		require.NotNil(t, prog)
+		defer func() {
+			_ = yakit.EnsureSSAProjectDatabaseOpen(projectID)
+			ssadb.DeleteProgram(ssadb.GetDB(), programName)
+		}()
+
+		progFromDB, err := ssadb.GetProgram(programName, ssadb.Application)
+		require.NoError(t, err)
+		require.NotNil(t, progFromDB)
+		require.Equal(t, projectID, progFromDB.ProjectID)
 
 		// 通过 ProjectID 创建扫描任务（不传 ProgramNames）
 		taskId := uuid.NewString()
@@ -158,7 +153,7 @@ func TestManager(t *testing.T) {
 			taskId,
 			newConfig(
 				ssaconfig.WithRuleFilterLanguage("yak"),
-				ssaconfig.WithProjectID(uint64(project.ID)),
+				ssaconfig.WithProjectID(projectID),
 				// 注意：这里不传 ProgramNames
 			),
 		)

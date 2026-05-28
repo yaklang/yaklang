@@ -39,7 +39,8 @@ func (s *Server) QuerySSARisks(ctx context.Context, req *ypb.QuerySSARisksReques
 			_ = re
 		}
 	}
-	p, risks, err = yakit.QuerySSARisk(s.GetSSADatabase(), filter, req.GetPagination())
+	projectID := yakit.ResolveSSAReadProjectIDForRiskFilter(filter)
+	p, risks, err = yakit.QuerySSARiskForProjectRead(projectID, filter, req.GetPagination())
 	if err != nil {
 		return nil, err
 	}
@@ -87,11 +88,11 @@ func FieldGroup2FiledGroupName(fgs []*ypb.FieldGroup, verbose func(string) strin
 }
 
 func (s *Server) GetSSARiskFieldGroup(ctx context.Context, req *ypb.Empty) (*ypb.SSARiskFieldGroupResponse, error) {
-	db := s.GetSSADatabase()
+	projectID := yakit.GetCurrentSSAProjectID()
 	return &ypb.SSARiskFieldGroupResponse{
-		FileField:     yakit.SSARiskColumnGroupCount(db, "code_source_url"),
-		SeverityField: FieldGroup2FiledGroupName(yakit.SSARiskColumnGroupCount(db, "severity"), severityVerbose),
-		RiskTypeField: FieldGroup2FiledGroupName(yakit.SSARiskColumnGroupCount(db, "risk_type"), schema.SSARiskTypeVerbose),
+		FileField:     yakit.SSARiskColumnGroupCountAcrossProject(projectID, nil, "code_source_url"),
+		SeverityField: FieldGroup2FiledGroupName(yakit.SSARiskColumnGroupCountAcrossProject(projectID, nil, "severity"), severityVerbose),
+		RiskTypeField: FieldGroup2FiledGroupName(yakit.SSARiskColumnGroupCountAcrossProject(projectID, nil, "risk_type"), schema.SSARiskTypeVerbose),
 	}, nil
 }
 
@@ -99,16 +100,17 @@ func (s *Server) GetSSARiskFieldGroupEx(ctx context.Context, req *ypb.GetSSARisk
 	if req == nil {
 		return nil, utils.Errorf("GetSSARiskFieldGroupRequest is nil")
 	}
-	db := yakit.FilterSSARisk(s.GetSSADatabase(), req.GetFilter())
+	projectID := yakit.ResolveSSAReadProjectIDForRiskFilter(req.GetFilter())
 	return &ypb.SSARiskFieldGroupResponse{
-		FileField:     yakit.SSARiskColumnGroupCount(db, "code_source_url"),
-		SeverityField: FieldGroup2FiledGroupName(yakit.SSARiskColumnGroupCount(db, "severity"), severityVerbose),
-		RiskTypeField: FieldGroup2FiledGroupName(yakit.SSARiskColumnGroupCount(db, "risk_type"), schema.SSARiskTypeVerbose),
+		FileField:     yakit.SSARiskColumnGroupCountAcrossProject(projectID, req.GetFilter(), "code_source_url"),
+		SeverityField: FieldGroup2FiledGroupName(yakit.SSARiskColumnGroupCountAcrossProject(projectID, req.GetFilter(), "severity"), severityVerbose),
+		RiskTypeField: FieldGroup2FiledGroupName(yakit.SSARiskColumnGroupCountAcrossProject(projectID, req.GetFilter(), "risk_type"), schema.SSARiskTypeVerbose),
 	}, nil
 }
 
 func (s *Server) NewSSARiskRead(ctx context.Context, req *ypb.NewSSARiskReadRequest) (*ypb.NewSSARiskReadResponse, error) {
-	err := yakit.NewSSARiskReadRequest(s.GetSSADatabase(), req.GetFilter())
+	projectID := yakit.ResolveSSAReadProjectIDForRiskFilter(req.GetFilter())
+	err := yakit.NewSSARiskReadRequestForProject(projectID, req.GetFilter())
 	if err != nil {
 		return nil, err
 	}
@@ -116,23 +118,19 @@ func (s *Server) NewSSARiskRead(ctx context.Context, req *ypb.NewSSARiskReadRequ
 }
 
 func (s *Server) QueryNewSSARisks(ctx context.Context, req *ypb.QueryNewSSARisksRequest) (*ypb.QueryNewSSARisksResponse, error) {
-	db := s.GetSSADatabase().Where("id > ?", req.GetAfterID())
-	// query new ssa-risk
-	p, data, err := yakit.QuerySSARisk(db, &ypb.SSARisksFilter{
-		IsRead: -1, // unread
-	}, &ypb.Paging{
+	projectID := yakit.GetCurrentSSAProjectID()
+	unreadFilter := &ypb.SSARisksFilter{IsRead: -1}
+	p, data, err := yakit.QuerySSARiskForProjectReadAfterID(projectID, unreadFilter, &ypb.Paging{
 		Limit:   5,
 		OrderBy: "id",
 		Order:   "desc",
-	})
+	}, req.GetAfterID())
 	if err != nil {
 		return nil, err
 	}
 
-	total, _ := yakit.QuerySSARiskCount(s.GetSSADatabase(), nil)
-	totalUnread, _ := yakit.QuerySSARiskCount(s.GetSSADatabase(), &ypb.SSARisksFilter{
-		IsRead: -1, // unread
-	})
+	total, _ := yakit.QuerySSARiskCountForProjectRead(projectID, nil)
+	totalUnread, _ := yakit.QuerySSARiskCountForProjectRead(projectID, unreadFilter)
 
 	// yakit.SSARiskColumnGroupCount()
 	return &ypb.QueryNewSSARisksResponse{
@@ -154,9 +152,8 @@ func (s *Server) SSARiskFeedbackToOnline(ctx context.Context, req *ypb.SSARiskFe
 	if req.Token == "" {
 		return nil, utils.Errorf("params empty")
 	}
-	db := s.GetSSADatabase()
-	db = yakit.FilterSSARisk(db, req.Filter)
-	data := yakit.YieldSSARisk(db, context.Background())
+	projectID := yakit.ResolveSSAReadProjectIDForRiskFilter(req.Filter)
+	data := yakit.YieldSSARiskAcrossProject(projectID, req.Filter, context.Background())
 	for k := range data {
 		content, err := json.Marshal(k)
 		if err != nil {
