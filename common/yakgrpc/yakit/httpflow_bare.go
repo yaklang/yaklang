@@ -3,6 +3,8 @@ package yakit
 import (
 	"bytes"
 	"strconv"
+	"strings"
+	"unicode/utf8"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
@@ -26,10 +28,29 @@ func httpFlowWireResponse(wirePacket, rspHint []byte) []byte {
 }
 
 func httpFlowShouldStoreBareWire(wire, display []byte, noFixContentLength bool) bool {
-	if noFixContentLength || len(wire) == 0 {
+	if noFixContentLength || len(wire) == 0 || httpFlowResponsePacketsEqual(wire, display) {
 		return false
 	}
-	return !httpFlowResponsePacketsEqual(wire, display)
+	return httpFlowAutoFixedCharset(wire, display)
+}
+
+// httpFlowAutoFixedCharset detects FixHTTPResponse charset/body conversion (not header-only or replacer edits).
+func httpFlowAutoFixedCharset(wire, display []byte) bool {
+	_, wireBody := lowhttp.SplitHTTPHeadersAndBodyFromPacket(wire)
+	_, displayBody := lowhttp.SplitHTTPHeadersAndBodyFromPacket(display)
+	if bytes.Equal(wireBody, displayBody) {
+		return false
+	}
+	if len(displayBody) > 0 && utf8.Valid(displayBody) && len(wireBody) > 0 && !utf8.Valid(wireBody) {
+		return true
+	}
+	wct := strings.ToLower(lowhttp.GetHTTPPacketHeader(wire, "Content-Type"))
+	dct := strings.ToLower(lowhttp.GetHTTPPacketHeader(display, "Content-Type"))
+	if wct == dct {
+		return false
+	}
+	return strings.Contains(dct, "charset=utf-8") &&
+		(strings.Contains(wct, "charset=gbk") || strings.Contains(wct, "charset=gb2312") || strings.Contains(wct, "charset:gbk"))
 }
 
 func resolveHTTPFlowStoredResponse(wire, rspRaw, fixRspRaw []byte, noFixContentLength bool) []byte {
