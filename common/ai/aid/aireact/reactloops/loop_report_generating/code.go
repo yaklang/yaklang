@@ -56,6 +56,7 @@ func init() {
 				reactloops.WithPersistentInstruction(instruction),
 				reactloops.WithReflectionOutputExample(outputExample),
 				modSuite.GetAITagOption(),
+				buildReportFinishHook(),
 				reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer, nonce string) (string, error) {
 					reportContent := loop.Get(modSuite.GetFullCodeVariableName())
 

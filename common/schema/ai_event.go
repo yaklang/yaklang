@@ -171,6 +171,8 @@ const (
 	EVENT_TYPE_YAKLANG_CODE_CHANGE      EventType = "yaklang_code_change"
 
 	EVENT_TYPE_HTTP_FLOW_FUZZ_STATUS = "http_flow_fuzz_status"
+	// report_generating 子 loop 写完报告后的终稿标记（不重复流正文，不表示会话结束）
+	EVENT_TYPE_REPORT_FINISH EventType = "report_finish"
 
 	// AI 推理过程通用事件类型
 	EVENT_TYPE_THOUGHT     EventType = "thought"     // AI 思考过程（适用于 ReAct、CoT 等推理模式）
