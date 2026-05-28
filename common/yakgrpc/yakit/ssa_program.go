@@ -172,6 +172,9 @@ func QuerySSAProgram(request *ypb.QuerySSAProgramRequest) (*bizhelper.Paginator,
 	if multi {
 		return querySSAProgramMultiDB(projectIDs, request)
 	}
+	if len(projectIDs) == 1 && projectIDs[0] > 0 {
+		return querySSAProgramsByProjectID(projectIDs[0], request)
+	}
 	if err := ensureSSAProjectDatabaseForResolvedProjectIDs(request.GetFilter(), projectIDs); err != nil {
 		return nil, nil, err
 	}
@@ -192,25 +195,20 @@ func querySSAProgramSingle(db *gorm.DB, request *ypb.QuerySSAProgramRequest) (*b
 	return paging, buildSSAProgramGRPCList(programs), nil
 }
 
+func querySSAProgramsByProjectID(projectID uint64, request *ypb.QuerySSAProgramRequest) (*bizhelper.Paginator, []*ypb.SSAProgram, error) {
+	if err := EnsureSSAProjectDatabaseOpen(projectID); err != nil {
+		return nil, nil, err
+	}
+	targets, err := ResolveSSAReadTargets(projectID)
+	if err != nil {
+		return nil, nil, err
+	}
+	return querySSAProgramReadTargets(targets, request)
+}
+
 func querySSAProgramMultiDB(projectIDs []uint64, request *ypb.QuerySSAProgramRequest) (*bizhelper.Paginator, []*ypb.SSAProgram, error) {
 	if len(projectIDs) == 0 {
 		return querySSAProgramSingle(consts.GetGormSSAProjectDataBase(), request)
-	}
-
-	if len(projectIDs) == 1 && projectIDs[0] > 0 {
-		if merge, err := ShouldMergeDefaultAndDedicatedForProject(projectIDs[0]); err != nil {
-			return nil, nil, err
-		} else if merge {
-			// Keep the global SSA write handle aligned with the selected project.
-			if err := EnsureSSAProjectDatabaseOpen(projectIDs[0]); err != nil {
-				return nil, nil, err
-			}
-			targets, err := ResolveSSAReadTargets(projectIDs[0])
-			if err != nil {
-				return nil, nil, err
-			}
-			return querySSAProgramReadTargets(targets, request)
-		}
 	}
 
 	p := request.GetPagination()
@@ -515,6 +513,12 @@ type incrementalInfo struct {
 }
 
 func QueryLatestSSAProgramNameByProjectId(db *gorm.DB, projectID uint64) (string, error) {
+	if projectID == 0 {
+		return "", nil
+	}
+	if err := EnsureSSAProjectDatabaseOpen(projectID); err != nil {
+		return "", err
+	}
 	var names []string
 	err := ssadb.GetDB().Model(&ssadb.IrProgram{}).
 		Where("project_id = ?", projectID).
@@ -522,6 +526,17 @@ func QueryLatestSSAProgramNameByProjectId(db *gorm.DB, projectID uint64) (string
 		Limit(1).
 		Pluck("program_name", &names).Error
 	if err != nil {
+		return "", err
+	}
+	if len(names) > 0 {
+		return names[0], nil
+	}
+	project, err := GetSSAProjectById(projectID)
+	if err != nil {
+		return "", nil
+	}
+	legacyDB := ApplyLegacySSAProjectProgramFilter(ssadb.GetDB(), project)
+	if err := legacyDB.Order("updated_at desc").Limit(1).Pluck("program_name", &names).Error; err != nil {
 		return "", err
 	}
 	if len(names) == 0 {

@@ -248,23 +248,29 @@ func LoadSSAProjectByNameAndURL(projectName, url string) (*SSAProject, error) {
 
 func LoadSSAProjectByNameAndURLForBindMode(projectName, url string, mode ypb.SSAProjectDatabaseBindMode) (*SSAProject, error) {
 	db := consts.GetGormProfileDatabase()
-	if projectName != "" && url != "" {
-		hash := CalcProjectHash(url, projectName, mode)
-		if hash != "" {
-			var project schema.SSAProject
-			if err := db.Where("hash = ?", hash).First(&project).Error; err == nil {
-				if MatchesBindMode(&project, mode) {
-					return loadSSAProjectBySchema(&project)
-				}
+	if projectName == "" {
+		return nil, utils.Errorf("load SSA project failed: not found")
+	}
+	hash := CalcProjectHash(url, projectName, mode)
+	if hash != "" {
+		var project schema.SSAProject
+		if err := db.Where("hash = ?", hash).First(&project).Error; err == nil {
+			if MatchesBindMode(&project, mode) {
+				return loadSSAProjectBySchema(&project)
 			}
 		}
-		var candidates []schema.SSAProject
-		q := db.Where("project_name = ? AND url = ?", projectName, url)
-		if err := q.Find(&candidates).Error; err == nil {
-			for i := range candidates {
-				if MatchesBindMode(&candidates[i], mode) {
-					return loadSSAProjectBySchema(&candidates[i])
-				}
+	}
+	var candidates []schema.SSAProject
+	q := db.Where("project_name = ?", projectName)
+	if url != "" {
+		q = q.Where("url = ?", url)
+	} else {
+		q = q.Where("(url = '' OR url IS NULL)")
+	}
+	if err := q.Find(&candidates).Error; err == nil {
+		for i := range candidates {
+			if MatchesBindMode(&candidates[i], mode) {
+				return loadSSAProjectBySchema(&candidates[i])
 			}
 		}
 	}

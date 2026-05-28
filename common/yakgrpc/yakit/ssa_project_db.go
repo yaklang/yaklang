@@ -251,11 +251,7 @@ func ResolveSSAProgramQueryProjectIDs(filter *ypb.SSAProgramFilter) (projectIDs 
 		return ids, true, nil
 	}
 	if len(ids) == 1 {
-		merge, err := ShouldMergeDefaultAndDedicatedForProject(ids[0])
-		if err != nil {
-			return nil, false, err
-		}
-		return ids, merge, nil
+		return ids, false, nil
 	}
 
 	names := filter.GetProgramNames()
@@ -411,6 +407,10 @@ func ApplySSAProjectActiveDatabaseScope(db *gorm.DB, filter *ypb.SSAProjectFilte
 	}
 
 	if isShared {
+		// No filter at all: legacy clients list every profile project (pre pool-split behavior).
+		if filter == nil {
+			return db, nil
+		}
 		return sharedPoolSSAProjectWhere(db), nil
 	}
 
@@ -437,25 +437,7 @@ func ApplySSAProjectActiveDatabaseScope(db *gorm.DB, filter *ypb.SSAProjectFilte
 }
 
 func pathCandidates(path string) []string {
-	raw := strings.TrimSpace(path)
-	if raw == "" {
-		return nil
-	}
-	norm := normalizeSSADBPath(raw)
-	clean := filepath.Clean(raw)
-	uniq := make([]string, 0, 3)
-	seen := make(map[string]struct{}, 3)
-	for _, p := range []string{raw, norm, clean} {
-		if p == "" {
-			continue
-		}
-		if _, ok := seen[p]; ok {
-			continue
-		}
-		seen[p] = struct{}{}
-		uniq = append(uniq, p)
-	}
-	return uniq
+	return ssaproject.SSADBPathCandidates(path)
 }
 
 // ResolveSSAProjectDisplayDatabasePaths returns default/resolved paths for GRPC list display.

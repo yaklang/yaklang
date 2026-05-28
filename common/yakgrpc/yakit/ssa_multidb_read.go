@@ -53,17 +53,31 @@ func ShouldMergeDefaultAndDedicatedForProject(projectID uint64) (bool, error) {
 	return ProjectUsesDedicatedSSADB(project), nil
 }
 
-func defaultMigratedReadTarget(projectID uint64, project *schema.SSAProject) (SSAReadTarget, error) {
-	db, err := consts.GetOrOpenSSADB(ResolveDefaultSSADatabasePath())
+func openDefaultSSADB() (*gorm.DB, error) {
+	return consts.GetOrOpenSSADB(ResolveDefaultSSADatabasePath())
+}
+
+func defaultDBReadTargets(projectID uint64, project *schema.SSAProject, includeLegacy bool) ([]SSAReadTarget, error) {
+	defaultDB, err := openDefaultSSADB()
 	if err != nil {
-		return SSAReadTarget{}, err
+		return nil, utils.Errorf("open default SSA database failed: %s", err)
 	}
-	return SSAReadTarget{
-		DB:        db,
+	targets := []SSAReadTarget{{
+		DB:        defaultDB,
 		Kind:      SSAReadTargetDefaultMigrated,
 		ProjectID: projectID,
 		Project:   project,
-	}, nil
+	}}
+	if includeLegacy && project != nil {
+		targets = append(targets, SSAReadTarget{
+			DB:          defaultDB,
+			Kind:        SSAReadTargetDefaultLegacy,
+			ProjectID:   projectID,
+			Project:     project,
+			LegacyMatch: true,
+		})
+	}
+	return targets, nil
 }
 
 func ensureSSADBForProjectRead(projectID uint64) error {
@@ -86,11 +100,7 @@ func ssaRiskIdentityKey(r *schema.SSARisk) string {
 // ResolveSSAReadTargets returns SSA IR databases to query for projectID (read path).
 func ResolveSSAReadTargets(projectID uint64) ([]SSAReadTarget, error) {
 	if projectID == 0 {
-		tg, err := defaultMigratedReadTarget(0, nil)
-		if err != nil {
-			return nil, err
-		}
-		return []SSAReadTarget{tg}, nil
+		return defaultDBReadTargets(0, nil, false)
 	}
 
 	project, err := GetSSAProjectById(projectID)
@@ -99,11 +109,7 @@ func ResolveSSAReadTargets(projectID uint64) ([]SSAReadTarget, error) {
 	}
 
 	if !ProjectUsesDedicatedSSADB(project) {
-		tg, err := defaultMigratedReadTarget(projectID, project)
-		if err != nil {
-			return nil, err
-		}
-		return []SSAReadTarget{tg}, nil
+		return defaultDBReadTargets(projectID, project, true)
 	}
 
 	dedicatedPath := ResolveSSAProjectDatabasePath(project)
@@ -111,32 +117,16 @@ func ResolveSSAReadTargets(projectID uint64) ([]SSAReadTarget, error) {
 	if err != nil {
 		return nil, utils.Errorf("open dedicated SSA database failed: %s", err)
 	}
-	defaultDB, err := consts.GetOrOpenSSADB(ResolveDefaultSSADatabasePath())
+	defaultTargets, err := defaultDBReadTargets(projectID, project, true)
 	if err != nil {
-		return nil, utils.Errorf("open default SSA database failed: %s", err)
+		return nil, err
 	}
-
-	return []SSAReadTarget{
-		{
-			DB:        dedicatedDB,
-			Kind:      SSAReadTargetDedicated,
-			ProjectID: projectID,
-			Project:   project,
-		},
-		{
-			DB:        defaultDB,
-			Kind:      SSAReadTargetDefaultMigrated,
-			ProjectID: projectID,
-			Project:   project,
-		},
-		{
-			DB:          defaultDB,
-			Kind:        SSAReadTargetDefaultLegacy,
-			ProjectID:   projectID,
-			Project:     project,
-			LegacyMatch: true,
-		},
-	}, nil
+	return append([]SSAReadTarget{{
+		DB:        dedicatedDB,
+		Kind:      SSAReadTargetDedicated,
+		ProjectID: projectID,
+		Project:   project,
+	}}, defaultTargets...), nil
 }
 
 // ApplyLegacySSAProjectProgramFilter scopes programs in the default DB to legacy rows for project.

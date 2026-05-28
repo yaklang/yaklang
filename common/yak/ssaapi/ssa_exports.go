@@ -189,7 +189,6 @@ var Exports = map[string]any{
 		if projectID == 0 {
 			return "", nil
 		}
-		db := consts.GetGormProfileDatabase()
-		return yakit.QueryLatestSSAProgramNameByProjectId(db, uint64(projectID))
+		return yakit.QueryLatestSSAProgramNameByProjectId(consts.GetGormProfileDatabase(), uint64(projectID))
 	},
 }

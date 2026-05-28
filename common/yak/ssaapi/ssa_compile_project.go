@@ -14,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 func ParseProjectFromPath(path string, opts ...ssaconfig.Option) (Programs, error) {
@@ -201,6 +202,12 @@ func ParseProject(opts ...ssaconfig.Option) (prog Programs, err error) {
 }
 
 func (c *Config) parseProject() (progs Programs, err error) {
+	if projectID := c.GetProjectID(); projectID > 0 {
+		if openErr := yakit.EnsureSSAProjectDatabaseOpen(projectID); openErr != nil {
+			return nil, utils.Errorf("open SSA database for project %d failed: %s", projectID, openErr)
+		}
+	}
+
 	// 添加defer清理逻辑，确保编译失败或panic时清理已保存的数据
 	programName := c.GetProgramName()
 	// 对于增量编译，需要删除最新的 layer，而不是第一个 layer

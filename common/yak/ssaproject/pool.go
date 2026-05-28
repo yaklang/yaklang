@@ -22,8 +22,9 @@ func normalizeSSADBPath(path string) string {
 	return abs
 }
 
-func defaultSSADBPathCandidates() []string {
-	raw := strings.TrimSpace(consts.GetCanonicalDefaultSSADatabasePath())
+// SSADBPathCandidates returns normalized path variants for SSA sqlite path matching.
+func SSADBPathCandidates(raw string) []string {
+	raw = strings.TrimSpace(raw)
 	if raw == "" {
 		return nil
 	}
@@ -40,6 +41,10 @@ func defaultSSADBPathCandidates() []string {
 		out = append(out, p)
 	}
 	return out
+}
+
+func defaultSSADBPathCandidates() []string {
+	return SSADBPathCandidates(consts.GetCanonicalDefaultSSADatabasePath())
 }
 
 // IsSharedPoolProject reports whether the SSA project row belongs to the shared default/temp IR pool.
@@ -60,8 +65,7 @@ func IsSharedPoolProject(p *schema.SSAProject) bool {
 	return false
 }
 
-// InferBindModeFromSchema maps a stored row to SHARED vs DEDICATED list pool.
-func InferBindModeFromSchema(p *schema.SSAProject) ypb.SSAProjectDatabaseBindMode {
+func inferBindModeFromSchema(p *schema.SSAProject) ypb.SSAProjectDatabaseBindMode {
 	if IsSharedPoolProject(p) {
 		return ypb.SSAProjectDatabaseBindMode_SSA_PROJECT_BIND_SHARED
 	}
@@ -104,6 +108,6 @@ func RefreshProjectHash(p *schema.SSAProject) {
 	if p == nil {
 		return
 	}
-	mode := InferBindModeFromSchema(p)
+	mode := inferBindModeFromSchema(p)
 	p.Hash = CalcProjectHash(p.URL, p.ProjectName, mode)
 }

@@ -173,11 +173,12 @@ func (s *Server) MigrateSSAProject(req *ypb.MigrateSSAProjectRequest, stream ypb
 			codeSourceURL = config.GetCodeSourceLocalFileOrURL()
 			codeSource = config.GetCodeSource()
 		}
-		// 查询是否存在相同的项目（只有在有 URL 时才查询）
+		// Legacy programs live in the shared IR pool; scope hash/lookup to SHARED bind.
+		migrateBindMode := ypb.SSAProjectDatabaseBindMode_SSA_PROJECT_BIND_SHARED
 		var project *ssaproject.SSAProject
 		var existingProject *ssaproject.SSAProject
 
-		existingProject, _ = ssaproject.LoadSSAProjectByNameAndURL(programName, codeSourceURL)
+		existingProject, _ = ssaproject.LoadSSAProjectByNameAndURLForBindMode(programName, codeSourceURL, migrateBindMode)
 		if existingProject != nil {
 			// 如果项目已存在，直接复用
 			project = existingProject
@@ -200,6 +201,10 @@ func (s *Server) MigrateSSAProject(req *ypb.MigrateSSAProjectRequest, stream ypb
 				)
 				continue
 			}
+			if project.SSAProject == nil {
+				project.SSAProject = &schema.SSAProject{}
+			}
+			project.SSAProject.Hash = ssaproject.CalcProjectHash(codeSourceURL, programName, migrateBindMode)
 			err = project.SaveToDB()
 			if err != nil {
 				sendProgress(

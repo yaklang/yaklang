@@ -1036,6 +1036,18 @@ func TestGRPCMUSTPASS_SSAProjectListPool(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, sharedOnly.Projects, 1)
 	require.Empty(t, sharedOnly.Projects[0].GetDatabasePath())
+
+	// Legacy clients omit Filter entirely: default profile lists both pools.
+	autoAll, err := client.QuerySSAProject(ctx, &ypb.QuerySSAProjectRequest{
+		Pagination: &ypb.Paging{Page: 1, Limit: 50},
+	})
+	require.NoError(t, err)
+	autoNames := make(map[string]struct{})
+	for _, p := range autoAll.Projects {
+		autoNames[p.ProjectName] = struct{}{}
+	}
+	require.Contains(t, autoNames, sharedName)
+	require.Contains(t, autoNames, dedicatedName)
 }
 
 // TestGRPCMUSTPASS_SSAProjectSameNameDualPool allows the same project name in shared and dedicated pools.

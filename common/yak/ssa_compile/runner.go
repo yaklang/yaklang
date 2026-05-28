@@ -11,7 +11,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yakgrpc"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -143,10 +142,6 @@ func detectProject(ctx context.Context, target, language string) (*AutoDetectInf
 func compileProject(ctx context.Context, config *ssaconfig.Config, forceProgramName, disableTimestampProgramName bool) (*ssaapi.Program, error) {
 	if config == nil {
 		return nil, utils.Errorf("config is nil")
-	}
-
-	if err := yakit.EnsureSSAProjectDatabaseOpen(config.GetProjectID()); err != nil {
-		return nil, utils.Errorf("open SSA project database failed: %s", err)
 	}
 
 	if shouldCompileInMemory(config) {
