@@ -1,308 +1,493 @@
-__DESC__ = "Report and document security vulnerabilities discovered during pentesting, security auditing, or code review. This tool MUST be called whenever a security issue is found - including SQL injection, XSS, RCE, weak passwords, misconfigurations, info disclosure, or any security risk. It creates structured vulnerability records with bilingual titles (EN/ZH), severity classification (high/middle/low/info), detailed descriptions, remediation guidance, and HTTP evidence. Essential for professional security reporting and vulnerability management."
+__DESC__ = "Create structured security risk records from a compact set of plain string parameters. This tool is for persisting verified or strongly-supported security findings while avoiding title-only records. It keeps the disclosure simple: target, title, summary, optional type/severity, small proof fields, and optional direct raw request/response or file references."
 __VERBOSE_NAME__ = "Cybersecurity Risk Output Tool"
-__KEYWORDS__ = "security risk,vulnerability report,risk output,security audit,risk management,pentest finding,cve,sqli,xss,rce,vulnerability assessment,security finding,risk record"
+__KEYWORDS__ = "security risk,vulnerability report,risk output,security audit,risk management,pentest finding,sqli,xss,rce,security finding,evidence,remediation"
 
 __USAGE__ = <<<USAGE_BLOCK
-Cybersecurity Risk Output Tool - Parameter Description for JSON Tool Calls
+Cybersecurity Risk Output Tool - Compact Parameter Disclosure Guide
 
-This tool creates structured security risk/vulnerability records in the database.
-Use it to document findings discovered during security testing, code auditing,
-or vulnerability assessment.
+Use this tool to persist a security finding into the risk database.
+The goal is **not** to expose every internal risk field. Instead, provide a
+small set of inputs that still makes the saved record actionable.
 
 ##############################################################################
-# CRITICAL RULE: USE AITAG FOR MULTI-LINE PARAMETERS                        #
+# HARD RULES FOR AI PARAMETER GENERATION                                     #
 ##############################################################################
 
-*** Parameters like "desc", "solution", "payload", "http-request", "http-response"
-    often contain multi-line text, code snippets, or raw HTTP packets. ***
+1. Never create a title-only risk.
+   `summary` is mandatory. It must explain:
+   - what is vulnerable
+   - where the issue is triggered
+   - why it matters / possible impact
 
-RULE: If a parameter value contains newlines, code blocks, or structured content,
-      you MUST use AITAG format instead of putting it in JSON params.
+2. Use a single top-level title.
+   Do not split titles into separate `title-en` / `title-zh` parameters.
+   If bilingual output is useful, format it as:
+       "中文标题 / English title"
+   The tool will compact it into the internal title fields automatically.
 
-  Via AITAG (multi-line / structured content):
-    desc         -> <|TOOL_PARAM_desc_{NONCE}|> ... <|TOOL_PARAM_desc_END_{NONCE}|>
-    solution     -> <|TOOL_PARAM_solution_{NONCE}|> ... <|TOOL_PARAM_solution_END_{NONCE}|>
-    payload      -> <|TOOL_PARAM_payload_{NONCE}|> ... <|TOOL_PARAM_payload_END_{NONCE}|>
-    http-request -> <|TOOL_PARAM_http-request_{NONCE}|> ... <|TOOL_PARAM_http-request_END_{NONCE}|>
-    http-response-> <|TOOL_PARAM_http-response_{NONCE}|> ... <|TOOL_PARAM_http-response_END_{NONCE}|>
+3. Do not use JSON/object-style complex parameters.
+   Use plain string parameters only. Keep the compact set:
+   - summary      required
+   - parameter    optional
+   - payload      optional
+   - evidence     optional
 
-  In JSON params (single-line values only):
-    target, title-en, title-zh, risktype, severity
+   Put endpoint details, impact, CVE, tags, and other supporting context into
+   `summary` or `evidence` instead of building nested objects.
 
----
+4. Use AITAG for multi-line `evidence`, `solution`, `request`, and `response`.
+   If a value contains multiple lines, code blocks, or request/response excerpts,
+   keep it outside JSON params:
 
-## Parameters
+   evidence -> <|TOOL_PARAM_evidence_{NONCE}|> ... <|TOOL_PARAM_evidence_END_{NONCE}|>
+   solution -> <|TOOL_PARAM_solution_{NONCE}|> ... <|TOOL_PARAM_solution_END_{NONCE}|>
+   request  -> <|TOOL_PARAM_request_{NONCE}|> ... <|TOOL_PARAM_request_END_{NONCE}|>
+   response -> <|TOOL_PARAM_response_{NONCE}|> ... <|TOOL_PARAM_response_END_{NONCE}|>
 
-Required Parameters:
-  target          (string)  The target affected by this security risk.
-                            Examples: "https://example.com", "192.168.1.1",
-                            "192.168.1.1:8080", "example.com:443".
-  title-en        (string)  One-line English title describing the vulnerability.
-                            Example: "SQL Injection in login form".
-  title-zh        (string)  One-line Chinese title describing the vulnerability.
-                            Example: "登录表单存在SQL注入漏洞".
+5. Prefer file references for large raw traffic.
+   If the full HTTP request/response is already saved by another tool
+   (for example do_http_request), pass:
+   - request-file
+   - response-file
 
-Optional Parameters:
-  risktype        (string)  Risk type identifier from the list below.
-                            Default: "baseline".
-                            Supported types:
-                              - sqli: SQL Injection
-                              - xss: Cross-Site Scripting
-                              - rce: Remote Code Execution
-                              - lfi: Local File Inclusion
-                              - file-read: Arbitrary File Read
-                              - file-download: Arbitrary File Download
-                              - rfi: Remote File Inclusion
-                              - file-write: Arbitrary File Write
-                              - file-upload: Arbitrary File Upload
-                              - xxe: XML External Entity Injection
-                              - ssti: Server-Side Template Injection
-                              - unserialize: Insecure Deserialization
-                              - deserialization: Insecure Deserialization
-                              - unauth-access: Unauthorized Access
-                              - auth-bypass: Authentication Bypass
-                              - privilege-escalation: Privilege Escalation
-                              - path-traversal: Path Traversal
-                              - info-exposure: Information Exposure
-                              - insecure-default: Insecure Default Configuration
-                              - weak-pass / weak-password / weak-credential: Weak Password
-                              - logic: Business Logic Vulnerability
-                              - compliance-test: Compliance Test Failure
-                              - cve-baseline: CVE Baseline Check
-                              - ssrf: Server-Side Request Forgery
-                              - csrf: Cross-Site Request Forgery
-                              - random-port-trigger[tcp]: TCP Random Port Trigger
-                              - random-port-trigger[udp]: UDP Random Port Trigger
-                              - baseline: General Security Baseline
+   Keep `evidence` for concise proof, excerpts, observations, or payload notes.
 
-  severity        (string)  Risk severity level. Supported values:
-                            "high", "middle", "low", "info", "debug".
-                            Default: "low".
-                            - high: Critical vulnerability, immediate remediation required
-                            - middle: Significant risk, should be addressed soon
-                            - low: Minor risk, recommended to fix
-                            - info: Informational finding
-                            - debug: Debug-level information
+## Top-Level Parameters
 
-  desc            (string)  Detailed description of the vulnerability.
-                            *** MUST use AITAG for multi-line descriptions ***
-                            Include: vulnerability details, attack scenario,
-                            potential impact, affected components.
+Required:
+    target          (string)  Affected target. URL, host, IP, or host:port.
+    title           (string)  One-line vulnerability title. Prefer Chinese, or
+                              `中文 / English` when bilingual context is helpful.
+    summary         (string)  Short but complete finding summary.
 
-  solution        (string)  Recommended remediation or mitigation steps.
-                            *** MUST use AITAG for multi-line solutions ***
-                            Include: specific fix recommendations, code examples,
-                            configuration changes, references.
+Optional:
+    type            (string)  Risk type such as sqli, xss, rce, ssrf, auth-bypass,
+                              unauth-access, weak-pass, info-exposure, path-traversal.
+                              If omitted, the backend falls back to a generic info risk.
+    severity        (string)  high / middle / low / info / debug. Default: low.
+    parameter       (string)  Triggering parameter / header / input point.
+    payload         (string)  Payload or verification input.
+    evidence        (string)  Multi-line proof, key observations, short traffic excerpts,
+                              payload notes, or verification steps. Use AITAG.
+    solution        (string)  Explicit remediation guidance. Use AITAG.
+    request         (string)  Raw HTTP request content. Use AITAG for multi-line packets.
+    response        (string)  Raw HTTP response content. Use AITAG for multi-line packets.
+    request-file    (string)  Path to a saved raw HTTP request file.
+    response-file   (string)  Path to a saved raw HTTP response file.
 
-  payload         (string)  Payload used to trigger or verify the vulnerability.
-                            *** MUST use AITAG for multi-line payloads ***
-                            Example: SQL injection payload, XSS payload, etc.
+## Suggested Minimal Call
 
-  http-request    (string)  Raw HTTP request content that demonstrates the vulnerability.
-                            *** MUST use AITAG - NEVER put HTTP packet in JSON params ***
-                            The complete HTTP request including method, headers, and body.
+If you only know the essentials, these 5 inputs are usually enough:
+    target + title + summary + type + severity
 
-  http-request-file (string)  File path containing the HTTP request content.
-                              Use this if the request was saved to a file.
-
-  http-response   (string)  Raw HTTP response content related to the finding.
-                            *** MUST use AITAG for multi-line responses ***
-
-  http-response-file (string)  File path containing the HTTP response content.
+The tool will:
+    - map a bilingual title into internal title/titleVerbose fields
+    - build a readable description from summary/parameter/payload/evidence
+    - store compact structured context in risk details
+    - accept direct raw request/response text when AI already has the packets
+    - generate a reasonable fallback solution when you did not provide one
 
 ## Few-Shot Examples
 
 Replace {NONCE} with the actual nonce from the response format section.
 
-### Example 1: Report SQL Injection with minimal info (no multi-line params)
-
-User intent: "Found a simple SQL injection, just need basic record"
+### Example 1: Minimal but complete SQL injection record
 
 ```json
 {
   "@action": "call-tool",
   "tool": "cybersecurity-risk",
-  "identifier": "sqli_finding_1",
+  "identifier": "sqli_login_finding",
   "params": {
     "target": "https://example.com/login",
-    "title-en": "SQL Injection in Login Form",
-    "title-zh": "登录表单SQL注入漏洞",
-    "risktype": "sqli",
-    "severity": "high"
+    "title": "登录接口 SQL 注入 / SQL Injection in Login Endpoint",
+    "type": "sqli",
+    "severity": "high",
+    "summary": "登录接口对 username 参数的输入未做安全约束，拼接进入 SQL 查询，导致可以通过构造输入绕过认证。",
+    "parameter": "username",
+    "payload": "' OR '1'='1"
   }
 }
 ```
 
-### Example 2: Report XSS with detailed description and solution (using AITAG)
-
-User intent: "Report an XSS vulnerability with full details"
+### Example 2: Add multi-line proof with AITAG
 
 ```json
 {
   "@action": "call-tool",
   "tool": "cybersecurity-risk",
-  "identifier": "xss_finding_detailed",
+  "identifier": "xss_search_finding",
   "params": {
-    "target": "https://example.com/search?q=test",
-    "title-en": "Reflected XSS in Search Parameter",
-    "title-zh": "搜索参数存在反射型XSS漏洞",
-    "risktype": "xss",
-    "severity": "high"
+    "target": "https://example.com/search",
+    "title": "搜索参数存在反射型 XSS",
+    "type": "xss",
+    "severity": "high",
+    "summary": "q 参数内容被原样回显到 HTML 响应中，未进行上下文相关编码，可执行任意脚本并影响用户会话安全。",
+    "parameter": "q",
+    "payload": "<script>alert(1)</script>"
   }
 }
 ```
-<|TOOL_PARAM_desc_{NONCE}|>
-The search functionality on the target website fails to properly sanitize user input
-in the 'q' query parameter. When a user searches for a term, the value is reflected
-directly in the response without HTML encoding.
 
-Attack Vector:
-https://example.com/search?q=<script>alert('XSS')</script>
+<|TOOL_PARAM_evidence_{NONCE}|>
+Baseline request reflects harmless input normally.
 
-Impact:
-- Session hijacking via cookie theft
-- Phishing attacks through page modification
-- Malware distribution through injected scripts
-<|TOOL_PARAM_desc_END_{NONCE}|>
-<|TOOL_PARAM_solution_{NONCE}|>
-1. Implement proper output encoding for all user-controllable data
-2. Use Content-Security-Policy (CSP) headers to mitigate XSS impact
-3. Apply HTML entity encoding: convert < to &lt;, > to &gt;, etc.
-4. Consider using a security library like DOMPurify for JavaScript
+When q=<script>alert(1)</script>, the response body contains the same script tag
+inside the rendered HTML without escaping.
 
-Example fix in PHP:
-echo htmlspecialchars($_GET['q'], ENT_QUOTES, 'UTF-8');
-<|TOOL_PARAM_solution_END_{NONCE}|>
+Browser execution was observed during verification.
+<|TOOL_PARAM_evidence_END_{NONCE}|>
 
-### Example 3: Report vulnerability with HTTP request/response evidence
-
-User intent: "Document a vulnerability with full HTTP traffic evidence"
+### Example 3: Attach full traffic by file path
 
 ```json
 {
   "@action": "call-tool",
   "tool": "cybersecurity-risk",
-  "identifier": "auth_bypass_with_evidence",
+  "identifier": "auth_bypass_with_files",
   "params": {
     "target": "https://api.example.com/admin",
-    "title-en": "Authentication Bypass via Header Manipulation",
-    "title-zh": "通过请求头绕过认证",
-    "risktype": "auth-bypass",
-    "severity": "high"
+    "title": "管理员接口存在认证绕过",
+    "type": "auth-bypass",
+    "severity": "high",
+    "summary": "通过伪造来源头部后，/admin 接口返回 200 且泄露管理数据，形成未授权访问。",
+    "parameter": "X-Forwarded-For",
+    "payload": "127.0.0.1",
+    "request-file": "/tmp/http-request-123.txt",
+    "response-file": "/tmp/http-response-123.txt"
   }
 }
 ```
-<|TOOL_PARAM_desc_{NONCE}|>
-The admin API endpoint can be accessed without proper authentication by manipulating
-the X-Forwarded-For header to spoof an internal IP address.
-<|TOOL_PARAM_desc_END_{NONCE}|>
-<|TOOL_PARAM_http-request_{NONCE}|>
-GET /admin HTTP/1.1
-Host: api.example.com
-X-Forwarded-For: 127.0.0.1
-User-Agent: Mozilla/5.0
-Accept: application/json
 
-<|TOOL_PARAM_http-request_END_{NONCE}|>
-<|TOOL_PARAM_http-response_{NONCE}|>
-HTTP/1.1 200 OK
-Content-Type: application/json
-Date: Mon, 10 Mar 2025 12:00:00 GMT
-
-{"status":"success","data":{"users":["admin","user1","user2"],"secrets":["..."]}}
-<|TOOL_PARAM_http-response_END_{NONCE}|>
-
-### Example 4: Report weak password finding
-
-User intent: "Document a weak/default credential finding"
+### Example 4: Write raw request/response directly
 
 ```json
 {
   "@action": "call-tool",
   "tool": "cybersecurity-risk",
-  "identifier": "weak_password_ssh",
+  "identifier": "idor_with_inline_packets",
   "params": {
-    "target": "192.168.1.100:22",
-    "title-en": "Weak Password on SSH Service",
-    "title-zh": "SSH服务存在弱口令",
-    "risktype": "weak-pass",
-    "severity": "high"
+    "target": "https://api.example.com/orders/1001",
+    "title": "订单接口存在越权访问",
+    "type": "unauth-access",
+    "severity": "high",
+    "summary": "将订单 ID 从 1001 改为 1002 后，接口直接返回其他用户订单数据，存在对象级越权访问。",
+    "parameter": "orderId"
   }
 }
 ```
-<|TOOL_PARAM_desc_{NONCE}|>
-The SSH service on the target server accepts weak credentials.
-Username: admin
-Password: admin123
 
-This allows unauthorized access to the server.
-<|TOOL_PARAM_desc_END_{NONCE}|>
+<|TOOL_PARAM_request_{NONCE}|>
+GET /orders/1002 HTTP/1.1
+Host: api.example.com
+Authorization: Bearer eyJ...
+Accept: application/json
+
+<|TOOL_PARAM_request_END_{NONCE}|>
+
+<|TOOL_PARAM_response_{NONCE}|>
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+{"id":1002,"owner":"other-user","amount":199}
+<|TOOL_PARAM_response_END_{NONCE}|>
+
+### Example 5: Weak password finding without HTTP traffic
+
+```json
+{
+  "@action": "call-tool",
+  "tool": "cybersecurity-risk",
+  "identifier": "ssh_weak_password",
+  "params": {
+    "target": "192.168.1.10:22",
+    "title": "SSH 服务存在弱口令",
+    "type": "weak-pass",
+    "severity": "high",
+    "summary": "SSH 服务允许使用弱口令登录，攻击者可通过已知弱凭据直接获得服务器访问权限。",
+    "parameter": "password",
+    "payload": "admin:admin123"
+  }
+}
+```
+
+### Example 6: SSRF with explicit remediation
+
+```json
+{
+  "@action": "call-tool",
+  "tool": "cybersecurity-risk",
+  "identifier": "ssrf_webhook_endpoint",
+  "params": {
+    "target": "https://example.com/api/webhook/test",
+    "title": "Webhook 测试接口存在 SSRF",
+    "type": "ssrf",
+    "severity": "high",
+    "summary": "url 参数可控制服务端发起请求，且能够访问内网地址与云元数据地址，存在服务端请求伪造风险。",
+    "parameter": "url",
+    "payload": "http://169.254.169.254/latest/meta-data/"
+  }
+}
+```
+
 <|TOOL_PARAM_solution_{NONCE}|>
-1. Immediately change the password to a strong, complex password
-2. Implement password policy requiring:
-   - Minimum 12 characters
-   - Mix of upper/lower case, numbers, special characters
-3. Enable SSH key-based authentication
-4. Disable password authentication if key-based auth is sufficient
-5. Implement fail2ban to prevent brute force attacks
+1. 对目标地址建立协议、端口、域名/IP 白名单
+2. 拦截内网、回环、链路本地与云元数据地址访问
+3. 禁止跟随任意重定向到非白名单目标
+4. 为出站请求增加审计与超时限制
 <|TOOL_PARAM_solution_END_{NONCE}|>
+
+### Example 7: Information exposure with inline response only
+
+```json
+{
+  "@action": "call-tool",
+  "tool": "cybersecurity-risk",
+  "identifier": "env_file_exposure",
+  "params": {
+    "target": "https://example.com/.env",
+    "title": ".env 文件敏感信息泄露",
+    "type": "info-exposure",
+    "severity": "high",
+    "summary": "公开可访问的 .env 文件泄露数据库和应用密钥配置，攻击者可直接获取敏感凭据。"
+  }
+}
+```
+
+<|TOOL_PARAM_response_{NONCE}|>
+HTTP/1.1 200 OK
+Content-Type: text/plain
+
+APP_ENV=production
+DB_PASSWORD=super-secret
+JWT_SECRET=very-secret-value
+<|TOOL_PARAM_response_END_{NONCE}|>
+
+### Example 8: Path traversal with inline request only
+
+```json
+{
+  "@action": "call-tool",
+  "tool": "cybersecurity-risk",
+  "identifier": "download_path_traversal",
+  "params": {
+    "target": "https://example.com/download",
+    "title": "下载接口存在路径遍历",
+    "type": "path-traversal",
+    "severity": "high",
+    "summary": "下载接口对 file 参数缺少路径约束，可读取站点目录外的系统文件。",
+    "parameter": "file",
+    "payload": "../../../../etc/passwd"
+  }
+}
+```
+
+<|TOOL_PARAM_request_{NONCE}|>
+GET /download?file=../../../../etc/passwd HTTP/1.1
+Host: example.com
+Accept: */*
+
+<|TOOL_PARAM_request_END_{NONCE}|>
+
+### Example 9: Informational baseline item with default low severity
+
+```json
+{
+  "@action": "call-tool",
+  "tool": "cybersecurity-risk",
+  "identifier": "missing_security_headers",
+  "params": {
+    "target": "https://example.com/",
+    "title": "站点缺少关键安全响应头",
+    "type": "insecure-default",
+    "summary": "首页响应中缺少 Content-Security-Policy、X-Frame-Options 和 Referrer-Policy 等关键安全头，降低整体安全基线。"
+  }
+}
+```
 USAGE_BLOCK
 
 yakit.AutoInitYakit()
-target := cli.String("target", cli.setHelp("你认为有安全漏洞或风险的目标（URL或者IP或者IP:PORT）"), cli.setRequired(true))
-// target = "www.example.com"
-titleEn := cli.String("title-en", cli.setHelp("一句话描述这是一个什么样的漏洞或者风险作为标题（English）"), cli.setRequired(true))
-// titleEn = "英文标题"
-titleZh := cli.String("title-zh", cli.setHelp("中文总结一句话作为信息安全标题（中文）"), cli.setRequired(true))
-// titleZh = "中文标题"
 
+normalizeTitle = func(rawTitle) {
+    normalized = str.TrimSpace(rawTitle)
+    title = normalized
+    titleVerbose = normalized
 
-riskType := cli.String("risktype", cli.setHelp(`从后面列表中选择一个你认为对的 [[sqli,xss,rce,lfi,file-read,file-download,rfi,file-write,file-upload,xxe,ssti,unserialize,deserialization,unauth-access,auth-bypass,privilege-escalation,path-traversal,info-exposure,insecure-default,weak-pass,weak-password,weak-credential,logic,compliance-test,cve-baseline,ssrf,csrf,random-port-trigger[tcp],random-port-trigger[udp],unkdown]]`), cli.setRequired(false), cli.setDefault("baseline"))
+    if str.Contains(normalized, " / ") {
+        parts = str.SplitN(normalized, " / ", 2)
+        if len(parts) == 2 {
+            zh = str.TrimSpace(parts[0])
+            en = str.TrimSpace(parts[1])
+            if zh != "" && en != "" {
+                title = en
+                titleVerbose = zh
+            }
+        }
+    }
 
-severity := cli.String("severity", cli.setHelp("风险严重级别：high/low/middle/info/debug"), cli.setDefault("low"))
-description := cli.String("desc", cli.setHelp("关于这个安全风险你有什么想解释的吗？"))
-solution := cli.String("solution", cli.setHelp("关于这个安全漏洞，你认为应该用什么方式解决或者缓解？"))
-payload := cli.String("payload", cli.setHelp("用于触发或验证该漏洞的payload（攻击载荷）"))
-httpRequest := cli.String("http-request", cli.setHelp("如果这个漏洞涉及某次HTTP通信，或者是通过某次HTTP通信发现的，数据包填在这里"))
-httpRequestFile := cli.String("http-request-file", cli.setHelp("如果数据包已经保存在文件里了，通过这个函数给我"))
-httpResponse := cli.String("http-response", cli.setHelp("如果一个HTTP响应可能涉及到风险判定，通过这个存储，如果响应太大，在这里输入文件系统路径"))
-httpResponseFile = cli.String("http-response-file", cli.setHelp("在这里保存响应信息（无法通过参数传递，只能放在这里了）"))
+    return title, titleVerbose
+}
+
+truncateForDescription = func(raw, limit) {
+    if raw == "" {
+        return ""
+    }
+    if len(raw) <= limit {
+        return raw
+    }
+    return raw[:limit] + "\n... (truncated, full evidence stored in details)"
+}
+
+buildDescription = func(summary, parameter, payload, evidence) {
+    parts = []string{}
+    if summary != "" {
+        parts.Push(summary)
+    }
+    if parameter != "" {
+        parts.Push(sprintf("Affected input: %s", parameter))
+    }
+    if payload != "" {
+        parts.Push(sprintf("Verification payload: %s", payload))
+    }
+
+    evidenceExcerpt = truncateForDescription(str.TrimSpace(evidence), 2000)
+    if evidenceExcerpt != "" {
+        parts.Push(sprintf("Evidence:\n%s", evidenceExcerpt))
+    }
+    return str.Join(parts, "\n\n")
+}
+
+defaultSolutionByType = func(riskType, parameter, target) {
+    focus = "受影响入口"
+    if parameter != "" {
+        focus = sprintf("参数/入口 %s", parameter)
+    } elif target != "" {
+        focus = sprintf("目标 %s", target)
+    }
+
+    switch str.ToLower(str.TrimSpace(riskType)) {
+    case "sqli":
+        return sprintf("对 %s 改用参数化查询或预编译语句，禁止将外部输入直接拼接进 SQL；同时补齐输入校验与异常审计。", focus)
+    case "xss":
+        return sprintf("对 %s 的可控输出执行上下文相关编码，并结合 CSP、模板自动转义等机制阻断脚本执行。", focus)
+    case "rce", "rce-command", "rce-code", "ssti":
+        return sprintf("移除或隔离 %s 对命令执行/模板执行能力的直接暴露，建立白名单约束并避免将用户输入拼接进入执行上下文。", focus)
+    case "xxe":
+        return sprintf("在解析 XML 的位置禁用外部实体与 DTD，限制协议访问范围，并对 %s 的输入来源做严格校验。", focus)
+    case "unserialize", "deserialization":
+        return sprintf("避免对不可信数据执行反序列化；如无法避免，应使用安全序列化方案、类型白名单与完整性校验保护 %s。", focus)
+    case "lfi", "file-read", "file-download", "path-traversal":
+        return sprintf("对 %s 涉及的路径输入做规范化与白名单约束，限制访问根目录并禁止跳目录访问敏感文件。", focus)
+    case "file-write", "file-upload", "rfi":
+        return sprintf("限制 %s 的文件写入/上传能力，校验文件类型与目标路径，将文件落盘到隔离目录并关闭危险解析行为。", focus)
+    case "unauth-access", "auth-bypass", "privilege-escalation":
+        return sprintf("在 %s 补齐身份认证、授权校验与服务端访问控制，避免仅依赖前端状态、来源头或可伪造标识决定权限。", focus)
+    case "ssrf":
+        return sprintf("对 %s 的外部请求能力建立协议/域名/IP 白名单，拦截内网与云元数据地址访问，并记录异常出站行为。", focus)
+    case "csrf":
+        return sprintf("为 %s 相关操作增加 CSRF Token、SameSite Cookie 与关键操作二次确认，并校验请求来源。", focus)
+    case "weak-pass", "weak-password", "weak-credential", "insecure-default":
+        return sprintf("立即替换 %s 使用的弱口令或默认配置，启用强凭据策略、最小权限与登录审计。", focus)
+    case "info-exposure", "cve-baseline", "compliance-test":
+        return sprintf("收敛 %s 暴露的敏感信息与不安全配置，按基线要求修复已识别问题，并复测确认不再泄露。", focus)
+    case "logic":
+        return sprintf("补齐 %s 对业务状态、对象归属与关键流程前后置条件的服务端校验，避免通过流程错位或参数组合绕过限制。", focus)
+    default:
+        return sprintf("结合当前风险摘要与证据，复核 %s 的输入校验、输出处理、访问控制和安全配置，并在修复后重新验证问题不再可复现。", focus)
+    }
+}
+
+target := cli.String("target", cli.setHelp("affected target: URL, host, IP, or host:port"), cli.setRequired(true))
+titleInput := cli.String("title", cli.setHelp("one-line risk title; use `中文标题 / English title` if bilingual context is useful"), cli.setRequired(true))
+summary := cli.Text("summary", cli.setHelp("required summary: what is vulnerable, where it is triggered, and why it matters"), cli.setRequired(true))
+riskType := cli.String("type", cli.setHelp("risk type such as sqli/xss/rce/ssrf/auth-bypass/unauth-access/path-traversal/info-exposure/weak-pass"), cli.setRequired(false))
+severity := cli.String("severity", cli.setHelp("risk severity: high/middle/low/info/debug"), cli.setDefault("low"))
+parameter := cli.String("parameter", cli.setHelp("triggering parameter, header, or input point"))
+payload := cli.Text("payload", cli.setHelp("payload or verification input; use AITAG when multi-line"))
+evidence := cli.Text("evidence", cli.setHelp("multi-line proof, verification notes, or concise traffic excerpts; use AITAG when needed"))
+solution := cli.Text("solution", cli.setHelp("optional explicit remediation guidance; use AITAG when multi-line"))
+requestRaw := cli.HTTPPacket("request", cli.setHelp("raw HTTP request content; use AITAG when multi-line"))
+responseRaw := cli.HTTPPacket("response", cli.setHelp("raw HTTP response content; use AITAG when multi-line"))
+requestFile := cli.String("request-file", cli.setHelp("path to a saved raw HTTP request file"))
+responseFile := cli.String("response-file", cli.setHelp("path to a saved raw HTTP response file"))
 cli.check()
 
+if summary == "" {
+    yakit.Error("summary is required and must not be empty")
+    return
+}
+
+title, titleVerbose = normalizeTitle(titleInput)
+description = buildDescription(summary, parameter, payload, evidence)
+
+finalSolution = str.TrimSpace(solution)
+if finalSolution == "" {
+    finalSolution = defaultSolutionByType(riskType, parameter, target)
+}
+
+details = {
+    "title_input": titleInput,
+    "summary": summary,
+}
+if parameter != "" {
+    details["parameter"] = parameter
+}
+if payload != "" {
+    details["payload"] = payload
+}
+if evidence != "" {
+    details["evidence"] = evidence
+}
+if finalSolution != "" {
+    details["solution"] = finalSolution
+}
+if requestRaw != "" {
+    details["request_source"] = "inline"
+} elif requestFile != "" {
+    details["request_source"] = "file"
+}
+if responseRaw != "" {
+    details["response_source"] = "inline"
+} elif responseFile != "" {
+    details["response_source"] = "file"
+}
+
 opts = []
+opts.Push(risk.title(title))
+opts.Push(risk.titleVerbose(titleVerbose))
 opts.Push(risk.type(riskType))
 opts.Push(risk.severity(severity))
 opts.Push(risk.description(description))
-opts.Push(risk.solution(solution))
-opts.Push(risk.payload(payload))
+opts.Push(risk.solution(finalSolution))
+opts.Push(risk.details(details))
 
-if string(httpRequest) != "" {
-    opts.Push(risk.request(httpRequest))
-} else if string(httpRequestFile) != "" {
-    req, err := file.ReadFile(httpRequestFile)
+if parameter != "" {
+    opts.Push(risk.parameter(parameter))
+}
+if payload != "" {
+    opts.Push(risk.payload(payload))
+}
+
+if requestRaw != "" {
+    opts.Push(risk.request(requestRaw))
+} elif requestFile != "" {
+    req, err := file.ReadFile(requestFile)
     if err != nil {
-        yakit.Error(err.Error())
-    } else {
-        opts.Push(risk.request(req))
+        yakit.Error("failed to read request-file %s: %v", requestFile, err)
+        return
     }
+    opts.Push(risk.request(req))
 }
 
-if titleZh != "" {
-    opts.Push(risk.titleVerbose(titleZh))
-}
-if titleEn != "" {
-    opts.Push(risk.title(titleEn))
-}
-
-if string(httpResponse) != "" {
-    opts.Push(risk.response(httpResponse))
-} else if string(httpResponseFile) != "" {
-    rsp, err := file.ReadFile(httpResponseFile)
+if responseRaw != "" {
+    opts.Push(risk.response(responseRaw))
+} elif responseFile != "" {
+    rsp, err := file.ReadFile(responseFile)
     if err != nil {
-        yakit.Error(err.Error())
-    } else {
-        opts.Push(risk.response(rsp))
+        yakit.Error("failed to read response-file %s: %v", responseFile, err)
+        return
     }
+    opts.Push(risk.response(rsp))
 }
 
 // @ssa-ignore
