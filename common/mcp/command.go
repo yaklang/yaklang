@@ -2,7 +2,6 @@ package mcp
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -11,11 +10,9 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
-	mcptool "github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 var MCPCommandUsage = `Start a mcp server for providing mcp service.
@@ -37,7 +34,6 @@ var MCPCommand = &cli.Command{
 		cli.StringFlag{Name: "dr,disable-resource", Usage: "disable resource sets, split by ','"},
 		cli.StringSliceFlag{Name: "script", Usage: "add the dynamic Yak script as a tool to the MCP server"},
 		cli.StringFlag{Name: "base-url", Usage: "if transport is http-based, the base url of the MCP server"},
-		cli.BoolFlag{Name: "enable-yak-aitool", Usage: "enable yak ai tool"},
 		cli.BoolFlag{Name: "enable-aitool-framework", Usage: "expose all built-in aitool-framework tools (fs, ssa, yakscript, etc.) and enabled external MCP server tools via the unified aitool layer"},
 	},
 	Action: func(c *cli.Context) error {
@@ -50,7 +46,6 @@ var MCPCommand = &cli.Command{
 		tool, disableTool := c.String("tool"), c.String("disable-tool")
 		script := c.StringSlice("script")
 		baseURL := c.String("base-url")
-		enableYakAITool := c.Bool("enable-yak-aitool")
 		enableAIToolFramework := c.Bool("enable-aitool-framework")
 		toolSets := lo.FilterMap(strings.Split(tool, ","), func(item string, _ int) (string, bool) {
 			item = strings.TrimSpace(item)
@@ -85,34 +80,6 @@ var MCPCommand = &cli.Command{
 		}
 		if len(script) > 0 {
 			opts = append(opts, WithDynamicScript(script))
-		}
-
-		if enableYakAITool {
-			_, yakitTools, err := yakit.SearchAIYakToolWithPagination(consts.GetGormProfileDatabase(), "", false, &ypb.Paging{
-				OrderBy: "updated_at",
-				Order:   "desc",
-				Limit:   200,
-			})
-			if err != nil {
-				log.Errorf("failed to search yakit tools: %s", err)
-			}
-
-			tools := make([]*mcptool.Tool, 0, len(yakitTools))
-			for _, aiTool := range yakitTools {
-				tool := mcptool.NewTool(aiTool.Name)
-				tool.Description = aiTool.Description
-				dataMap := map[string]any{}
-				err := json.Unmarshal([]byte(aiTool.Params), &dataMap)
-				if err != nil {
-					log.Errorf("unmarshal aiTool.Params failed: %v", err)
-					continue
-				}
-				tool.InputSchema.FromMap(dataMap)
-				tool.YakScript = aiTool.Content
-				tools = append(tools, tool)
-			}
-
-			opts = append(opts, WithYakScriptTools(tools...))
 		}
 
 		if enableAIToolFramework {

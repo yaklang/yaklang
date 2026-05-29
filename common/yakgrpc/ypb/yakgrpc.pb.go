@@ -12482,7 +12482,8 @@ type StartMcpServerRequest struct {
 	Script []string `protobuf:"bytes,7,rep,name=Script,proto3" json:"Script,omitempty"`
 	// enable all tool sets
 	EnableAll bool `protobuf:"varint,8,opt,name=EnableAll,proto3" json:"EnableAll,omitempty"`
-	// enable yak ai tool (user-authored Yak script tools stored in DB)
+	// Deprecated: use EnableAIToolFramework instead, which subsumes this path
+	// with better execution quality (stdout/stderr capture, multiple script types).
 	EnableYakAITool bool `protobuf:"varint,9,opt,name=EnableYakAITool,proto3" json:"EnableYakAITool,omitempty"`
 	// expose built-in aitool-framework tools (fs, ssa, yakscript, etc.) and
 	// enabled external MCP server tools bridged through the aitool layer

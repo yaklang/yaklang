@@ -8,8 +8,6 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
-	"github.com/yaklang/yaklang/common/mcp/mcp-go/server"
 	"github.com/yaklang/yaklang/common/mcp/yakcliconvert"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer"
@@ -17,7 +15,6 @@ import (
 
 type MCPServerConfig struct {
 	enableTools      map[string]*ToolWithHandler
-	enableAITools    map[string]*ToolWithHandler
 	disableTools     map[string]*ToolWithHandler
 	enableResources  map[string]*ResourceWithHandler
 	disableResources map[string]*ResourceWithHandler
@@ -30,7 +27,6 @@ type MCPServerConfig struct {
 func NewMCPServerConfig() *MCPServerConfig {
 	return &MCPServerConfig{
 		enableTools:      make(map[string]*ToolWithHandler),
-		enableAITools:    make(map[string]*ToolWithHandler),
 		disableTools:     make(map[string]*ToolWithHandler),
 		enableResources:  make(map[string]*ResourceWithHandler),
 		disableResources: make(map[string]*ResourceWithHandler),
@@ -44,12 +40,8 @@ func (cfg *MCPServerConfig) ApplyConfig(s *MCPServer) {
 		tools = globalTools
 	}
 
-	for name, tool := range cfg.enableAITools {
-		tools[name] = tool
-	}
-
 	// extraAITools (registered via WithAITools) are merged last and override
-	// any global or enableAITools entry with the same name.
+	// any global entry with the same name.
 	for name, tool := range cfg.extraAITools {
 		tools[name] = tool
 	}
@@ -282,20 +274,6 @@ func WithEnableSSAToolSet() McpServerOption {
 
 func WithDisableSSAToolSet() McpServerOption {
 	return WithDisableToolSet("ssa")
-}
-
-func WithYakScriptTools(tools ...*mcp.Tool) McpServerOption {
-	return func(cfg *MCPServerConfig) error {
-		for _, tool := range tools {
-			cfg.enableAITools[tool.Name] = &ToolWithHandler{
-				tool: tool,
-				handler: func(s *MCPServer) server.ToolHandlerFunc {
-					return s.execYakScriptWrapper(tool.Name, tool.YakScript)
-				},
-			}
-		}
-		return nil
-	}
 }
 
 // WithDisabledToolNames registers a set of tool names that should be excluded
