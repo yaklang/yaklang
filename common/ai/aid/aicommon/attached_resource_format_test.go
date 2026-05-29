@@ -117,6 +117,22 @@ func TestFormatAttachedSelectedTextInlineAndSpill(t *testing.T) {
 	require.Contains(t, spilled, strings.Repeat("X", 64))
 }
 
+func TestFormatAttachedCodeSelectionJSON(t *testing.T) {
+	payload := `{"path":"/tmp/foo.yak","startLine":10,"endLine":20,"language":"yak","content":"println(\"hi\")"}`
+	out := RenderAttachedSelectedResource(NewAttachedResource(AttachedResourceTypeSelected, AttachedResourceKeyContent, payload), nil)
+	require.Contains(t, out, "Attached Code Selection")
+	require.Contains(t, out, "/tmp/foo.yak")
+	require.Contains(t, out, "Lines: 10-20")
+	require.Contains(t, out, "```yak")
+	require.Contains(t, out, `println("hi")`)
+}
+
+func TestAttachedSelectedTextFromResourceJSON(t *testing.T) {
+	payload := `{"path":"/tmp/a.yak","startLine":1,"endLine":2,"language":"yak","content":"x=1"}`
+	text := attachedSelectedTextFromResource(NewAttachedResource(AttachedResourceTypeSelected, AttachedResourceKeyContent, payload))
+	require.Equal(t, "x=1", text)
+}
+
 func TestRenderAttachedHTTPFlowResourceFromDB(t *testing.T) {
 	db := consts.GetGormProjectDatabase()
 	if db == nil {

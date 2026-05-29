@@ -137,7 +137,28 @@ func attachedSelectedTextFromResource(data *AttachedResource) string {
 	if data == nil {
 		return ""
 	}
+	if sel, ok := parseAttachedCodeSelection(data); ok {
+		return sel.Content
+	}
 	return data.Value
+}
+
+func parseAttachedCodeSelection(data *AttachedResource) (*AttachedCodeSelection, bool) {
+	if data == nil {
+		return nil, false
+	}
+	raw := strings.TrimSpace(data.Value)
+	if raw == "" || !strings.HasPrefix(raw, "{") {
+		return nil, false
+	}
+	var sel AttachedCodeSelection
+	if err := json.Unmarshal([]byte(raw), &sel); err != nil {
+		return nil, false
+	}
+	if strings.TrimSpace(sel.Content) == "" {
+		return nil, false
+	}
+	return &sel, true
 }
 
 func attachedHTTPFlowRequest(flow *schema.HTTPFlow) string {
@@ -320,6 +341,46 @@ func FormatAttachedSelectedText(content string, emitter *Emitter) string {
 	return strings.TrimSpace(b.String())
 }
 
+func FormatAttachedCodeSelection(sel *AttachedCodeSelection, emitter *Emitter) string {
+	if sel == nil {
+		return FormatAttachedSelectedText("", emitter)
+	}
+	content := strings.TrimSpace(sel.Content)
+	if content == "" {
+		return FormatAttachedSelectedText("", emitter)
+	}
+
+	inline, spillNote := inlineOrSpillAttachedText("selected_text", content, AttachedSelectedTextInlineLimit, emitter)
+	lang := strings.TrimSpace(sel.Language)
+	if lang == "" {
+		lang = "text"
+	}
+
+	var b strings.Builder
+	b.WriteString("## Attached Code Selection\n\n")
+	if path := strings.TrimSpace(sel.Path); path != "" {
+		b.WriteString(fmt.Sprintf("- File: `%s`\n", path))
+	}
+	if sel.StartLine > 0 && sel.EndLine > 0 {
+		b.WriteString(fmt.Sprintf("- Lines: %d-%d\n", sel.StartLine, sel.EndLine))
+	}
+	if lang != "text" {
+		b.WriteString(fmt.Sprintf("- Language: %s\n", lang))
+	}
+	b.WriteString("\n")
+	if spillNote != "" {
+		b.WriteString(spillNote)
+		b.WriteString(fmt.Sprintf("\n\nInline preview:\n```%s\n", lang))
+		b.WriteString(inline)
+		b.WriteString("\n```\n")
+	} else {
+		b.WriteString(fmt.Sprintf("```%s\n", lang))
+		b.WriteString(inline)
+		b.WriteString("\n```\n")
+	}
+	return strings.TrimSpace(b.String())
+}
+
 func RenderAttachedHTTPFlowResource(db *gorm.DB, data *AttachedResource, emitter *Emitter) (string, error) {
 	if db == nil {
 		return "", utils.Error("project database is not available")
@@ -365,5 +426,8 @@ func RenderAttachedHTTPFlowResource(db *gorm.DB, data *AttachedResource, emitter
 }
 
 func RenderAttachedSelectedResource(data *AttachedResource, emitter *Emitter) string {
+	if sel, ok := parseAttachedCodeSelection(data); ok {
+		return FormatAttachedCodeSelection(sel, emitter)
+	}
 	return FormatAttachedSelectedText(attachedSelectedTextFromResource(data), emitter)
 }
