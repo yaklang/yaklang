@@ -25,6 +25,8 @@ const (
 	aiSessionRuntimeEventDelta              = "ai.session.delta"
 	aiSessionRuntimeEventMessage            = "ai.session.message"
 	aiSessionRuntimeEventThought            = "ai.session.thought"
+	aiSessionRuntimeEventSystem             = "ai.session.system"
+	aiSessionRuntimeEventReason             = "ai.session.reason"
 	aiSessionRuntimeEventInteractiveRequest = "ai.session.interactive_request"
 	aiSessionRuntimeEventToolCall           = "ai.session.tool_call"
 	aiSessionRuntimeEventToolResult         = "ai.session.tool_result"
@@ -842,6 +844,16 @@ func classifyYakAIEvent(event *schema.AiOutputEvent) string {
 	}
 	switch event.Type {
 	case schema.EVENT_TYPE_STREAM:
+		// 契约保真：STREAM 类型内部还有细分，不要全部拍平成 delta。
+		// IsSystem → 系统内部数据（memory/consumption/pressure），不进入 UI
+		// IsReason → 推理过程数据，可折叠展示
+		// 普通 STREAM → 用户可见的流式输出
+		if event.IsSystem {
+			return aiSessionRuntimeEventSystem
+		}
+		if event.IsReason {
+			return aiSessionRuntimeEventReason
+		}
 		return aiSessionRuntimeEventDelta
 	case schema.EVENT_TYPE_THOUGHT:
 		return aiSessionRuntimeEventThought
