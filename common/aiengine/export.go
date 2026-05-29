@@ -38,6 +38,7 @@ var Exports = map[string]interface{}{
 	"onFinished":                WithOnFinished,
 	"onInputRequiredRaw":        WithOnInputRequiredRaw,
 	"onInputRequired":           WithOnInputRequired,
+	"onSessionID":               WithOnSessionID,
 	"yoloMode":                  WithYOLOMode,
 	"manualMode":                WithManualMode,
 	"aiReviewMode":              WithAIReviewMode,

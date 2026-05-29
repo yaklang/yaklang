@@ -311,6 +311,7 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 
 	// Register pending context providers
 	react.promptManager.cpm = cfg.ContextProviderManager
+	react.installRunningSessionRegistry()
 	// Start the event loop in background
 	mainloopDone := make(chan struct{})
 	react.startEventLoop(cfg.Ctx, mainloopDone)
