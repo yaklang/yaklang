@@ -71,6 +71,21 @@ func RecordClientVersion(version string, buildTime string) error {
 	return nil
 }
 
+// ClearAllClientVersions 物理清空 ai_balance_client_versions 表，用于运维清理脏/老数据。
+// 用 Unscoped + WHERE 1=1 显式触发 GORM 全表删除（GORM v1 直接传 struct 会拒绝无条件删除）。
+// 返回删除行数。
+// 关键词: ClearAllClientVersions, 清空客户端版本记录, Unscoped 硬删除, 运维操作
+func ClearAllClientVersions() (int64, error) {
+	tx := GetDB().Unscoped().Where("1 = 1").Delete(&AiBalanceClientVersionStat{})
+	if tx.Error != nil {
+		return 0, fmt.Errorf("ClearAllClientVersions failed: %v", tx.Error)
+	}
+	if tx.RowsAffected > 0 {
+		log.Infof("ClearAllClientVersions removed %d client version rows", tx.RowsAffected)
+	}
+	return tx.RowsAffected, nil
+}
+
 // QueryTopClientVersions 按 last_seen_unix DESC, request_count DESC 排序取前 limit 条。
 // limit <= 0 时按 20 兜底, > 200 钳到 200, 避免 portal 误填爆库。
 // 关键词: QueryTopClientVersions Top N 版本, portal 客户端版本展示

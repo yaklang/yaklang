@@ -208,10 +208,10 @@ func QueryDAUTotalByDate(date string) (int64, error) {
 
 // CleanupOldUserSeen deletes ai_daily_user_seen rows whose date < (today - keepDays).
 // 用 Unscoped() 硬删除，避免软删除残留行触发 unique 约束冲突。
-// 关键词: CleanupOldUserSeen, 100 天保留, Unscoped 硬删除
+// 关键词: CleanupOldUserSeen, 180 天保留, Unscoped 硬删除
 func CleanupOldUserSeen(keepDays int) (int64, error) {
 	if keepDays <= 0 {
-		keepDays = 100
+		keepDays = 180
 	}
 	cutoff := time.Now().AddDate(0, 0, -keepDays).Format("2006-01-02")
 	tx := GetDB().Unscoped().Where("date < ?", cutoff).Delete(&AiDailyUserSeen{})

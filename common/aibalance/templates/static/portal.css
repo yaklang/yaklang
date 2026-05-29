@@ -1,22 +1,35 @@
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            line-height: 1.6;
+            line-height: 1.45;
             color: #333;
-            max-width: 1200px;
+            /* 宽屏动态变宽; 左右边距用 clamp: 最小可缩到 0, 随视口增长, 最多约 24px.
+               大屏不无限拉伸, 上限 2200px 防超宽屏行太长.
+               关键词: 页面放宽 边距可缩 0 clamp 动态宽度 */
+            max-width: 2200px;
             margin: 0 auto;
-            padding: 20px;
+            padding: 10px clamp(0px, 1.4vw, 24px);
             background-color: #f9f9f9;
         }
         h1, h2, h3 {
             color: #2c3e50;
         }
+        /* 压缩顶部 header: 更小标题 + 更窄间距, 给下方内容腾空间 */
+        /* 关键词: header 压缩 紧凑 dense */
         .header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 30px;
-            padding-bottom: 10px;
+            margin-bottom: 10px;
+            padding-bottom: 6px;
             border-bottom: 1px solid #eee;
+        }
+        .header h1 {
+            font-size: 20px;
+            margin: 0;
+        }
+        .header p {
+            margin: 0;
+            font-size: 13px;
         }
         .status-info {
             background-color: #e3f2fd;
@@ -28,8 +41,8 @@
             background: white;
             border-radius: 5px;
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-            padding: 20px;
-            margin-bottom: 20px;
+            padding: 12px 14px;
+            margin-bottom: 12px;
         }
         /* 表格样式优化 */
         table {
@@ -109,29 +122,37 @@
             display: flex;
             justify-content: space-between;
             flex-wrap: wrap;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
         }
         .stat-card {
             flex: 1;
-            min-width: 160px;
+            min-width: 110px;
             background-color: white;
             border-radius: 4px;
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-            padding: 8px 10px;
-            margin: 0 5px 5px 0;
+            padding: 5px 8px;
+            margin: 0 4px 4px 0;
             text-align: center;
         }
         .stat-card h3 {
             margin-top: 0;
-            margin-bottom: 3px;
+            margin-bottom: 1px;
             color: #777;
-            font-size: 13px;
+            font-size: 11px;
+            font-weight: 600;
+            white-space: nowrap;
         }
         .stat-card .value {
-            font-size: 20px;
+            font-size: 17px;
             font-weight: bold;
-            margin: 3px 0;
+            margin: 1px 0;
             color: #2c3e50;
+        }
+        /* 磁盘卡副行: 已用% / 总量 */
+        .stat-card .stat-sub {
+            font-size: 10px;
+            color: #999;
+            line-height: 1.3;
         }
         .footer {
             text-align: center;
@@ -1949,16 +1970,16 @@
 }
 
 .portal-layout .sidebar {
-    width: 220px;
-    flex: 0 0 220px;
+    width: 200px;
+    flex: 0 0 200px;
     border-right: 1px solid #e0e0e0;
-    padding: 16px 0;
+    padding: 8px 0;
     background: #fafafa;
     min-height: 480px;
 }
 
 .portal-layout .sidebar .sidebar-group {
-    margin-bottom: 12px;
+    margin-bottom: 6px;
 }
 
 .portal-layout .sidebar .group-title {
@@ -1966,12 +1987,12 @@
     color: #888;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    padding: 8px 18px 4px;
+    padding: 4px 16px 2px;
     font-weight: 600;
 }
 
 .portal-layout .sidebar .menu-item {
-    padding: 8px 18px;
+    padding: 6px 16px;
     cursor: pointer;
     font-size: 14px;
     color: #333;
@@ -1994,7 +2015,7 @@
 .portal-layout .tab-pane-host {
     flex: 1;
     min-width: 0;
-    padding: 16px 20px;
+    padding: 10px 14px;
     overflow-x: auto;
 }
 
@@ -2022,6 +2043,119 @@
     .portal-layout .sidebar .menu-item {
         padding: 6px 12px;
     }
+}
+
+/* ========== dau-cache 图表网格 ==========
+   6 张图用响应式网格并排, 宽屏 2~3 列, 窄屏单列, 大幅压缩纵向高度.
+   关键词: dc-charts-grid 图表网格 压缩高度 一屏 */
+.dc-charts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(440px, 1fr));
+    gap: 10px;
+    margin-bottom: 14px;
+}
+.dc-chart-cell {
+    min-width: 0;
+}
+.dc-chart-title {
+    margin: 0 0 4px 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: #2c3e50;
+}
+.dc-chart-title small {
+    color: #888;
+    font-weight: normal;
+    font-size: 11px;
+}
+.dc-chart-box {
+    position: relative;
+    background: #fafafa;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    padding: 6px;
+    cursor: pointer;
+    transition: box-shadow 0.15s;
+}
+.dc-chart-box:hover {
+    box-shadow: 0 0 0 2px #90caf9;
+}
+.dc-chart-box svg {
+    display: block;
+}
+/* 右上角放大提示, 不拦截点击 */
+.dc-chart-box::after {
+    content: '\2922 \653e\5927';
+    position: absolute;
+    top: 4px;
+    right: 6px;
+    font-size: 10px;
+    color: #90a4ae;
+    background: rgba(255, 255, 255, 0.75);
+    padding: 0 4px;
+    border-radius: 3px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+.dc-chart-box:hover::after {
+    opacity: 1;
+}
+@media (max-width: 900px) {
+    .dc-charts-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ========== 图表放大弹窗 (lightbox) ========== */
+/* 关键词: chart-zoom-modal 图表放大弹窗 lightbox */
+#chart-zoom-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 1100;
+    justify-content: center;
+    align-items: center;
+}
+#chart-zoom-modal.open {
+    display: flex;
+}
+.chart-zoom-inner {
+    background: #fff;
+    border-radius: 8px;
+    padding: 14px 16px;
+    width: 92vw;
+    max-width: 1700px;
+    height: 84vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+}
+.chart-zoom-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #eee;
+}
+.chart-zoom-head h3 {
+    margin: 0;
+    font-size: 15px;
+}
+.chart-zoom-body {
+    flex: 1;
+    min-height: 0;
+    background: #fafafa;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    padding: 8px;
+}
+.chart-zoom-body svg {
+    width: 100%;
+    height: 100%;
+    display: block;
 }
 
 /* ========== Mirror Rules UI ========== */

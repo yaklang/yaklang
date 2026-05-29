@@ -832,6 +832,9 @@ func (c *ServerConfig) HandlePortalRequest(conn net.Conn, request *http.Request,
 	// 关键词: portal /portal/api/client-version-stats 路由注册
 	case uriIns.Path == "/portal/api/client-version-stats" && request.Method == "GET":
 		c.handleGetClientVersionStats(conn, request)
+	// 关键词: portal /portal/api/client-version-stats/clear 清空记录路由
+	case uriIns.Path == "/portal/api/client-version-stats/clear" && request.Method == "POST":
+		c.handleClearClientVersionStats(conn, request)
 
 	// ========== Portal Data API Routes ==========
 	case uriIns.Path == "/portal/api/data":

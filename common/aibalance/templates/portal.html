@@ -7,7 +7,7 @@
     <!-- 静态资源带 cache-busting 版本号: 每次显著修改 portal.js / portal.css 后
          手动 bump 这个值, 旧浏览器缓存就会失效.
          关键词: portal static asset cache busting -->
-    <link rel="stylesheet" href="/portal/static/portal.css?v=20260527-mirror-5">
+    <link rel="stylesheet" href="/portal/static/portal.css?v=20260529-zoom-3">
 </head>
 <body>
     <!-- Loading Overlay -->
@@ -66,6 +66,13 @@
             <h3>内存状态</h3>
             <div class="value" id="memory-display">点击查看</div>
         </div>
+        <!-- 磁盘可用 KPI: 放在顶部信息条, 避免数据库写爆主机. -->
+        <!-- 关键词: 顶部磁盘 KPI, disk-card, disk_info -->
+        <div class="stat-card" id="disk-card" title="">
+            <h3>磁盘可用</h3>
+            <div class="value" id="disk-free-display">--</div>
+            <div class="stat-sub" id="disk-sub">--</div>
+        </div>
     </div>
 
     <!-- Memory Diagnostic Dialog -->
@@ -83,6 +90,18 @@
             </div>
             <div id="gc-result" style="margin-top: 15px; display: none; padding: 10px; border-radius: 5px;"></div>
             <div id="goroutine-dump-result" style="margin-top: 15px; display: none; max-height: 400px; overflow-y: auto;"></div>
+        </div>
+    </div>
+
+    <!-- 图表放大弹窗: 点击任意图表盒子时, 把其内部 SVG 克隆进来全屏展示.
+         关键词: chart-zoom-modal 图表点击放大 lightbox -->
+    <div id="chart-zoom-modal" onclick="closeChartZoom(event)">
+        <div class="chart-zoom-inner" onclick="event.stopPropagation()">
+            <div class="chart-zoom-head">
+                <h3 id="chart-zoom-title">图表</h3>
+                <button class="btn" onclick="closeChartZoom()" style="background:#666;">关闭</button>
+            </div>
+            <div id="chart-zoom-body" class="chart-zoom-body"></div>
         </div>
     </div>
 
@@ -1094,6 +1113,7 @@
                         <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
                             <strong style="font-size: 13px;">最近活跃客户端版本 (Top 20)</strong>
                             <button class="btn" onclick="loadClientVersionStats()" style="font-size: 12px;">刷新</button>
+                            <button class="btn btn-danger" onclick="clearClientVersionStats()" style="font-size: 12px;">清空记录</button>
                             <span id="rl-client-version-total" style="color: #888; font-size: 12px;">--</span>
                         </div>
                         <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
@@ -1206,57 +1226,87 @@
         <!-- DAU & Cache Stats Tab -->
         <div id="dau-cache" class="tab-content">
             <div class="card">
-                <h3>今日聚合 <span style="color: #888; font-weight: normal; font-size: 14px;">(date=<span id="dc-date">--</span>)</span></h3>
-                <p style="color: #666; margin-bottom: 15px;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 10px; margin-bottom: 8px;">
+                    <h3 style="margin: 0;">今日聚合 <span style="color: #888; font-weight: normal; font-size: 14px;">(date=<span id="dc-date">--</span>)</span></h3>
+                    <button class="btn" onclick="refreshDauCacheTab()" style="height: 30px; font-size: 12px;">刷新</button>
+                </div>
+                <p style="color: #888; margin: 0 0 8px 0; font-size: 11px; line-height: 1.4;">
                     所有数字均来自上游 LLM provider 在 SSE 末帧返回的 <code>usage</code>（含 <code>prompt_tokens_details.cached_tokens</code> 隐式缓存命中）。
-                    日活按 <code>(api_key | free_trace | free_ip)</code> 三类指纹去重，每天 0:00 重新开始计数；
-                    100 天前的数据由后台任务自动清理。
+                    日活按 <code>(api_key | free_trace | free_ip)</code> 三类指纹去重，每天 0:00 重新开始计数；180 天前的数据由后台任务自动清理。
                 </p>
 
-                <div class="dc-kpi-row" style="display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 25px;">
-                    <div class="dc-kpi" style="flex: 1 1 150px; background: #f5faff; border: 1px solid #d6e9ff; border-radius: 8px; padding: 12px;">
-                        <div style="color: #666; font-size: 12px;">总日活</div>
-                        <div style="font-size: 26px; font-weight: bold; color: #1565c0;" id="dc-dau-total">--</div>
+                <!-- 紧凑 KPI 行 (信息密度优先): 数值小一号, 多列, 单卡 padding 收紧.
+                     关键词: dc-kpi-row 紧凑布局, 信息密度优化, 磁盘 KPI -->
+                <div class="dc-kpi-row" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 6px; margin-bottom: 10px;">
+                    <div class="dc-kpi" style="background: #f5faff; border: 1px solid #d6e9ff; border-radius: 6px; padding: 8px 10px;">
+                        <div style="color: #666; font-size: 11px;">总日活</div>
+                        <div style="font-size: 20px; font-weight: bold; color: #1565c0;" id="dc-dau-total">--</div>
                     </div>
-                    <div class="dc-kpi" style="flex: 1 1 150px; background: #f1f8e9; border: 1px solid #c5e1a5; border-radius: 8px; padding: 12px;">
-                        <div style="color: #666; font-size: 12px;">API Key 日活</div>
-                        <div style="font-size: 26px; font-weight: bold; color: #558b2f;" id="dc-dau-apikey">--</div>
+                    <div class="dc-kpi" style="background: #f1f8e9; border: 1px solid #c5e1a5; border-radius: 6px; padding: 8px 10px;">
+                        <div style="color: #666; font-size: 11px;">API Key 日活</div>
+                        <div style="font-size: 20px; font-weight: bold; color: #558b2f;" id="dc-dau-apikey">--</div>
                     </div>
-                    <div class="dc-kpi" style="flex: 1 1 150px; background: #fff3e0; border: 1px solid #ffcc80; border-radius: 8px; padding: 12px;">
-                        <div style="color: #666; font-size: 12px;">Free Trace 日活</div>
-                        <div style="font-size: 26px; font-weight: bold; color: #ef6c00;" id="dc-dau-trace">--</div>
+                    <div class="dc-kpi" style="background: #fff3e0; border: 1px solid #ffcc80; border-radius: 6px; padding: 8px 10px;">
+                        <div style="color: #666; font-size: 11px;">Free Trace 日活</div>
+                        <div style="font-size: 20px; font-weight: bold; color: #ef6c00;" id="dc-dau-trace">--</div>
                     </div>
-                    <div class="dc-kpi" style="flex: 1 1 150px; background: #fce4ec; border: 1px solid #f8bbd0; border-radius: 8px; padding: 12px;">
-                        <div style="color: #666; font-size: 12px;">Free IP 日活</div>
-                        <div style="font-size: 26px; font-weight: bold; color: #c2185b;" id="dc-dau-ip">--</div>
+                    <div class="dc-kpi" style="background: #fce4ec; border: 1px solid #f8bbd0; border-radius: 6px; padding: 8px 10px;">
+                        <div style="color: #666; font-size: 11px;">Free IP 日活</div>
+                        <div style="font-size: 20px; font-weight: bold; color: #c2185b;" id="dc-dau-ip">--</div>
                     </div>
-                    <div class="dc-kpi" style="flex: 1 1 150px; background: #ede7f6; border: 1px solid #b39ddb; border-radius: 8px; padding: 12px;">
-                        <div style="color: #666; font-size: 12px;">总请求 (今日)</div>
-                        <div style="font-size: 26px; font-weight: bold; color: #4527a0;" id="dc-req-total">--</div>
+                    <div class="dc-kpi" style="background: #ede7f6; border: 1px solid #b39ddb; border-radius: 6px; padding: 8px 10px;">
+                        <div style="color: #666; font-size: 11px;">总请求 (今日)</div>
+                        <div style="font-size: 20px; font-weight: bold; color: #4527a0;" id="dc-req-total">--</div>
                     </div>
-                    <div class="dc-kpi" style="flex: 1 1 150px; background: #e0f2f1; border: 1px solid #80cbc4; border-radius: 8px; padding: 12px;">
-                        <div style="color: #666; font-size: 12px;">单用户平均请求</div>
-                        <div style="font-size: 26px; font-weight: bold; color: #00695c;" id="dc-avg-per-user">--</div>
+                    <div class="dc-kpi" style="background: #e0f2f1; border: 1px solid #80cbc4; border-radius: 6px; padding: 8px 10px;">
+                        <div style="color: #666; font-size: 11px;">单用户平均请求</div>
+                        <div style="font-size: 20px; font-weight: bold; color: #00695c;" id="dc-avg-per-user">--</div>
                     </div>
-                    <div class="dc-kpi" style="flex: 1 1 150px; background: #fffde7; border: 1px solid #fff176; border-radius: 8px; padding: 12px;">
-                        <div style="color: #666; font-size: 12px;">缓存命中比例</div>
-                        <div style="font-size: 26px; font-weight: bold; color: #f9a825;" id="dc-cache-ratio">--</div>
+                    <div class="dc-kpi" style="background: #fffde7; border: 1px solid #fff176; border-radius: 6px; padding: 8px 10px;">
+                        <div style="color: #666; font-size: 11px;">缓存命中比例 (avg)</div>
+                        <div style="font-size: 20px; font-weight: bold; color: #f9a825;" id="dc-cache-ratio">--</div>
                     </div>
                 </div>
 
-                <h3>近 60 天日活折线 <small style="color: #888; font-weight: normal;">(api_key / free_trace / free_ip / total)</small></h3>
-                <div style="background: #fafafa; border: 1px solid #e0e0e0; border-radius: 6px; padding: 8px; margin-bottom: 25px;">
-                    <svg id="dc-chart-dau" width="100%" height="240" viewBox="0 0 1200 240" preserveAspectRatio="none"></svg>
-                </div>
-
-                <h3>近 60 天单用户平均请求折线 <small style="color: #888; font-weight: normal;">(total_requests / total_dau)</small></h3>
-                <div style="background: #fafafa; border: 1px solid #e0e0e0; border-radius: 6px; padding: 8px; margin-bottom: 25px;">
-                    <svg id="dc-chart-avg" width="100%" height="180" viewBox="0 0 1200 180" preserveAspectRatio="none"></svg>
-                </div>
-
-                <h3>近 60 天缓存命中比例折线 <small style="color: #888; font-weight: normal;">(cached_tokens / prompt_tokens)</small></h3>
-                <div style="background: #fafafa; border: 1px solid #e0e0e0; border-radius: 6px; padding: 8px; margin-bottom: 25px;">
-                    <svg id="dc-chart-cache" width="100%" height="180" viewBox="0 0 1200 180" preserveAspectRatio="none"></svg>
+                <!-- ============ 图表区: 响应式 2 列网格, 宽屏并排, 窄屏自动单列 ============ -->
+                <!-- 关键词: dau-cache 图表网格 dc-charts-grid, 2 列布局 压缩高度, 180/60 天图 -->
+                <div class="dc-charts-grid">
+                    <div class="dc-chart-cell">
+                        <h4 class="dc-chart-title">近 180 天 每日 Token 使用 <small>(按对外模型堆叠 total_tokens)</small></h4>
+                        <div class="dc-chart-box">
+                            <svg id="dc-chart-token-stack" width="100%" height="170" viewBox="0 0 1400 200" preserveAspectRatio="none"></svg>
+                        </div>
+                    </div>
+                    <div class="dc-chart-cell">
+                        <h4 class="dc-chart-title">近 180 天 请求数 <small>(按对外模型堆叠 request_count)</small></h4>
+                        <div class="dc-chart-box">
+                            <svg id="dc-chart-req-stack" width="100%" height="170" viewBox="0 0 1400 200" preserveAspectRatio="none"></svg>
+                        </div>
+                    </div>
+                    <div class="dc-chart-cell">
+                        <h4 class="dc-chart-title">近 180 天 Prompt 成分 <small>(按对外模型堆叠 prompt_tokens)</small></h4>
+                        <div class="dc-chart-box">
+                            <svg id="dc-chart-prompt-stack" width="100%" height="170" viewBox="0 0 1400 200" preserveAspectRatio="none"></svg>
+                        </div>
+                    </div>
+                    <div class="dc-chart-cell">
+                        <h4 class="dc-chart-title">近 60 天日活折线 <small>(api_key / free_trace / free_ip / total)</small></h4>
+                        <div class="dc-chart-box">
+                            <svg id="dc-chart-dau" width="100%" height="170" viewBox="0 0 1200 200" preserveAspectRatio="none"></svg>
+                        </div>
+                    </div>
+                    <div class="dc-chart-cell">
+                        <h4 class="dc-chart-title">近 60 天单用户平均请求折线 <small>(total_requests / total_dau)</small></h4>
+                        <div class="dc-chart-box">
+                            <svg id="dc-chart-avg" width="100%" height="170" viewBox="0 0 1200 200" preserveAspectRatio="none"></svg>
+                        </div>
+                    </div>
+                    <div class="dc-chart-cell">
+                        <h4 class="dc-chart-title">近 60 天缓存命中比例折线 <small>(平均线 + 每模型 cached/prompt)</small></h4>
+                        <div class="dc-chart-box">
+                            <svg id="dc-chart-cache" width="100%" height="170" viewBox="0 0 1400 200" preserveAspectRatio="none"></svg>
+                        </div>
+                    </div>
                 </div>
 
                 <h3>今日 (model, provider, key) 拆分</h3>
@@ -1720,6 +1770,6 @@
         </div>
     </div>
 
-    <script src="/portal/static/portal.js?v=20260527-mirror-5"></script>
+    <script src="/portal/static/portal.js?v=20260529-zoom-3"></script>
 </body>
 </html>

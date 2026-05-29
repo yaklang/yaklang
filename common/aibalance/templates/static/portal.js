@@ -166,6 +166,9 @@
                 if (todayDauEl) {
                     todayDauEl.textContent = (data.today_dau || 0).toLocaleString();
                 }
+                if (typeof renderDiskCard === 'function') {
+                    renderDiskCard(data.disk_info || {});
+                }
                 if (typeof renderDauCacheTab === 'function') {
                     renderDauCacheTab(data);
                 }
@@ -6515,6 +6518,33 @@ curl '${metaApiUrl}?name=${modelName}'`;
             }
         }
 
+        // clearClientVersionStats 二次确认后调用后端清空接口, 成功后刷新表格.
+        // 关键词: clearClientVersionStats, portal 清空客户端版本记录前端
+        async function clearClientVersionStats() {
+            if (!confirm('确认清空所有客户端版本记录？此操作不可恢复（数据会被硬删除）。')) return;
+            try {
+                const response = await fetch('/portal/api/client-version-stats/clear', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'}
+                });
+                if (!response.ok) {
+                    alert('清空失败: HTTP ' + response.status);
+                    return;
+                }
+                const data = await response.json();
+                if (isAuthError(data)) { handleAuthError(); return; }
+                if (!data.success) {
+                    alert('清空失败: ' + (data.error || '未知错误'));
+                    return;
+                }
+                alert('已清空 ' + (data.removed || 0) + ' 条客户端版本记录');
+                loadClientVersionStats();
+            } catch (error) {
+                console.error('clearClientVersionStats failed:', error);
+                alert('清空失败: ' + error);
+            }
+        }
+
         // ===== Hot-model RPM stats (cross-apiKey aggregated, recent 60s) =====
         // NOTE: use `var` and a shared threshold helper instead of a
         // top-level `const` to avoid any TDZ risk (observed in production
@@ -6833,6 +6863,8 @@ curl '${metaApiUrl}?name=${modelName}'`;
         // memfit-* 客户端版本统计导出
         // 关键词: window.loadClientVersionStats memfit 客户端版本控流
         window.loadClientVersionStats = loadClientVersionStats;
+        // 关键词: window.clearClientVersionStats 清空客户端版本记录
+        window.clearClientVersionStats = clearClientVersionStats;
         window.addModelRPMOverride = addModelRPMOverride;
         window.addFreeTokenModelOverride = addFreeTokenModelOverride;
         // 模型用途降级规则导出
@@ -6996,6 +7028,306 @@ curl '${metaApiUrl}?name=${modelName}'`;
             });
         }
 
+        // ============ 模型堆叠图辅助函数 ============
+        // 关键词: dau-cache 模型堆叠, pivotModelTrend, drawStackedAreaChart
+
+        // MODEL_PRIORITY_ORDER 是堆叠/图例的优先级关键字, 命中前缀的模型先排.
+        // 顺序: standard -> basic -> light -> max, 其余按总量降序.
+        // 关键词: MODEL_PRIORITY_ORDER, 模型堆叠优先级 standard basic light max
+        var MODEL_PRIORITY_ORDER = ['standard', 'basic', 'light', 'max'];
+
+        // STACK_COLORS 是堆叠/多线图的默认色板, 与 sidebar 配色协调.
+        // 关键词: STACK_COLORS 模型堆叠色板
+        var STACK_COLORS = [
+            '#1565c0', '#558b2f', '#ef6c00', '#c2185b', '#4527a0', '#00695c',
+            '#f9a825', '#6a1b9a', '#00838f', '#283593', '#bf360c', '#37474f',
+            '#827717', '#ad1457', '#ffb300'
+        ];
+
+        // pickColor 按索引循环取色, 「其他」固定灰色.
+        function pickColor(idx, isOther) {
+            if (isOther) return '#9e9e9e';
+            return STACK_COLORS[idx % STACK_COLORS.length];
+        }
+
+        // modelPriorityRank 返回模型名的优先级 (越小越靠前). 未命中返回 999.
+        // 用小写包含匹配, 兼容 memfit-standard-free / memfit-basic-free 等命名.
+        // 关键词: modelPriorityRank, 模型排序 standard basic light max
+        function modelPriorityRank(name) {
+            var lower = String(name || '').toLowerCase();
+            for (var i = 0; i < MODEL_PRIORITY_ORDER.length; i++) {
+                if (lower.indexOf(MODEL_PRIORITY_ORDER[i]) >= 0) return i;
+            }
+            return 999;
+        }
+
+        // pivotModelTrend 把后端扁平行 [{date, model, <metric>}, ...] 透视成:
+        //   { labels: [date,...]                   // 全 days 日期轴 (升序)
+        //     series: [{label, color, points:[number,...], total}, ...]  // 每模型一条
+        //   }
+        // 处理:
+        //   - 自建 days 长度的日期轴, 缺失日期补 0
+        //   - 模型排序: 先按 MODEL_PRIORITY_ORDER 命中, 然后按 total 降序
+        //   - 超过 topN 的模型并入 "其他"
+        // 关键词: pivotModelTrend, 透视聚合 + 优先级排序 + Top-N 其他
+        function pivotModelTrend(rows, metricKey, options) {
+            options = options || {};
+            var days = options.days || 180;
+            var topN = options.topN || 8;
+            var endDate = options.endDate ? new Date(options.endDate) : new Date();
+
+            // 1. 构造连续日期轴 (从 days-1 天前到 endDate)
+            var labels = [];
+            var dateIdx = {};
+            for (var i = days - 1; i >= 0; i--) {
+                var d = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate() - i);
+                var key = d.getFullYear() + '-' +
+                    String(d.getMonth() + 1).padStart(2, '0') + '-' +
+                    String(d.getDate()).padStart(2, '0');
+                dateIdx[key] = labels.length;
+                labels.push(key);
+            }
+
+            // 2. 透视: model -> points[days]
+            var modelMap = {}; // name -> {points:Array(days).fill(0), total:0}
+            (rows || []).forEach(function (r) {
+                if (!r) return;
+                var name = r.model || '(unknown)';
+                var date = r.date;
+                var idx = dateIdx[date];
+                if (idx === undefined) return;
+                var v = Number(r[metricKey]) || 0;
+                if (!modelMap[name]) {
+                    modelMap[name] = { points: new Array(days).fill(0), total: 0 };
+                }
+                modelMap[name].points[idx] += v;
+                modelMap[name].total += v;
+            });
+
+            // 3. 排序: 优先级在前, 同优先级按 total 降序, 同 total 按名字字典序
+            var allModels = Object.keys(modelMap).map(function (name) {
+                return {
+                    name: name,
+                    total: modelMap[name].total,
+                    points: modelMap[name].points,
+                    rank: modelPriorityRank(name)
+                };
+            }).filter(function (m) { return m.total > 0; }); // 跳过完全 0 的模型
+            allModels.sort(function (a, b) {
+                if (a.rank !== b.rank) return a.rank - b.rank;
+                if (b.total !== a.total) return b.total - a.total;
+                return a.name.localeCompare(b.name);
+            });
+
+            // 4. Top-N 截断 + "其他" 聚合
+            var series = [];
+            var keep = allModels.slice(0, topN);
+            var rest = allModels.slice(topN);
+            keep.forEach(function (m, idx) {
+                series.push({
+                    label: m.name,
+                    color: pickColor(idx, false),
+                    points: m.points,
+                    total: m.total
+                });
+            });
+            if (rest.length > 0) {
+                var merged = new Array(days).fill(0);
+                var mergedTotal = 0;
+                rest.forEach(function (m) {
+                    for (var i = 0; i < days; i++) merged[i] += m.points[i] || 0;
+                    mergedTotal += m.total;
+                });
+                series.push({
+                    label: '其他 (' + rest.length + ' 个模型)',
+                    color: pickColor(0, true),
+                    points: merged,
+                    total: mergedTotal
+                });
+            }
+
+            return { labels: labels, series: series };
+        }
+
+        // drawStackedAreaChart 在 SVG 上绘制线性堆叠面积图.
+        // series 顺序 = 堆叠从底向上的顺序; 同时绘制顶部"总和"线方便读总量.
+        // 关键词: drawStackedAreaChart, 线性堆叠面积图, 纯 SVG
+        function drawStackedAreaChart(svgId, series, labels, options) {
+            var svg = document.getElementById(svgId);
+            if (!svg) return;
+            options = options || {};
+            var formatY = options.formatY || dauCacheFormatNumber;
+
+            while (svg.firstChild) svg.removeChild(svg.firstChild);
+
+            var vb = (svg.getAttribute('viewBox') || '0 0 1400 240').split(/\s+/).map(Number);
+            var W = vb[2] || 1400, H = vb[3] || 240;
+            var padL = 60, padR = 220, padT = 18, padB = 30;
+            var innerW = W - padL - padR;
+            var innerH = H - padT - padB;
+            var ns = 'http://www.w3.org/2000/svg';
+
+            var clean = (series || []).filter(function (s) { return s && s.points && s.points.length > 0; });
+            var n = (labels || []).length;
+            if (clean.length === 0 || n === 0) {
+                var t = document.createElementNS(ns, 'text');
+                t.setAttribute('x', W / 2);
+                t.setAttribute('y', H / 2);
+                t.setAttribute('text-anchor', 'middle');
+                t.setAttribute('fill', '#999');
+                t.setAttribute('font-size', '14');
+                t.textContent = '暂无数据';
+                svg.appendChild(t);
+                return;
+            }
+
+            // 计算每日堆叠总和 (= y 轴最大值参考)
+            var stackTotals = new Array(n).fill(0);
+            clean.forEach(function (s) {
+                for (var i = 0; i < n; i++) stackTotals[i] += (Number(s.points[i]) || 0);
+            });
+            var maxY = 0;
+            for (var i = 0; i < n; i++) { if (stackTotals[i] > maxY) maxY = stackTotals[i]; }
+            if (maxY <= 0) maxY = 1;
+            var yMax = maxY * 1.1;
+
+            // 坐标帧 + 网格 + Y 标签 (5 段)
+            var frame = document.createElementNS(ns, 'rect');
+            frame.setAttribute('x', padL); frame.setAttribute('y', padT);
+            frame.setAttribute('width', innerW); frame.setAttribute('height', innerH);
+            frame.setAttribute('fill', 'none'); frame.setAttribute('stroke', '#ddd');
+            svg.appendChild(frame);
+            for (var g = 0; g <= 4; g++) {
+                var yVal = yMax * (1 - g / 4);
+                var yPos = padT + innerH * g / 4;
+                var grid = document.createElementNS(ns, 'line');
+                grid.setAttribute('x1', padL); grid.setAttribute('x2', padL + innerW);
+                grid.setAttribute('y1', yPos); grid.setAttribute('y2', yPos);
+                grid.setAttribute('stroke', '#eee'); grid.setAttribute('stroke-width', '1');
+                svg.appendChild(grid);
+                var lbl = document.createElementNS(ns, 'text');
+                lbl.setAttribute('x', padL - 6); lbl.setAttribute('y', yPos + 4);
+                lbl.setAttribute('text-anchor', 'end');
+                lbl.setAttribute('fill', '#666'); lbl.setAttribute('font-size', '11');
+                lbl.textContent = formatY(yVal);
+                svg.appendChild(lbl);
+            }
+            // X 标签: 首/四分位/中/三分位/尾 5 个 (长窗口下更易读)
+            var xIdxs = n === 1 ? [0] : [0, Math.floor((n - 1) / 4), Math.floor((n - 1) / 2), Math.floor((n - 1) * 3 / 4), n - 1];
+            xIdxs.forEach(function (idx) {
+                var xPos = n === 1 ? padL + innerW / 2 : padL + innerW * idx / (n - 1);
+                var tt = document.createElementNS(ns, 'text');
+                tt.setAttribute('x', xPos); tt.setAttribute('y', padT + innerH + 18);
+                tt.setAttribute('text-anchor', 'middle');
+                tt.setAttribute('fill', '#666'); tt.setAttribute('font-size', '11');
+                tt.textContent = labels[idx] || '';
+                svg.appendChild(tt);
+            });
+
+            var xPosOf = function (i) { return n === 1 ? padL + innerW / 2 : padL + innerW * i / (n - 1); };
+            var yPosOf = function (v) { return padT + innerH * (1 - (Number(v) || 0) / yMax); };
+
+            // 自底向上累加, 每层用 polygon 填充 (lower-bound 上一层 cumulative).
+            var lower = new Array(n).fill(0);
+            clean.forEach(function (s, sIdx) {
+                var color = s.color || pickColor(sIdx, false);
+                var upper = new Array(n);
+                for (var i = 0; i < n; i++) upper[i] = lower[i] + (Number(s.points[i]) || 0);
+
+                var pts = [];
+                for (var i2 = 0; i2 < n; i2++) {
+                    pts.push(xPosOf(i2).toFixed(2) + ',' + yPosOf(upper[i2]).toFixed(2));
+                }
+                for (var j = n - 1; j >= 0; j--) {
+                    pts.push(xPosOf(j).toFixed(2) + ',' + yPosOf(lower[j]).toFixed(2));
+                }
+                var poly = document.createElementNS(ns, 'polygon');
+                poly.setAttribute('points', pts.join(' '));
+                poly.setAttribute('fill', color);
+                poly.setAttribute('fill-opacity', '0.85');
+                poly.setAttribute('stroke', color);
+                poly.setAttribute('stroke-width', '0.6');
+                poly.setAttribute('stroke-opacity', '0.9');
+                svg.appendChild(poly);
+
+                // 图例: 右侧栏, 显示总量
+                var legendY = padT + 14 + sIdx * 18;
+                if (legendY < padT + innerH - 4) {
+                    var swatch = document.createElementNS(ns, 'rect');
+                    swatch.setAttribute('x', padL + innerW + 14);
+                    swatch.setAttribute('y', legendY - 8);
+                    swatch.setAttribute('width', 12); swatch.setAttribute('height', 12);
+                    swatch.setAttribute('fill', color);
+                    svg.appendChild(swatch);
+                    var lt = document.createElementNS(ns, 'text');
+                    lt.setAttribute('x', padL + innerW + 32);
+                    lt.setAttribute('y', legendY + 2);
+                    lt.setAttribute('fill', '#333');
+                    lt.setAttribute('font-size', '11');
+                    var totalText = s.total != null ? ' (' + dauCacheFormatNumber(s.total) + ')' : '';
+                    lt.textContent = (s.label || ('series ' + (sIdx + 1))) + totalText;
+                    svg.appendChild(lt);
+                }
+
+                lower = upper;
+            });
+
+            // 顶部"总和"虚线 (堆叠最高 = 当日总量)
+            var topPath = '';
+            for (var k = 0; k < n; k++) {
+                topPath += (k === 0 ? 'M' : 'L') + xPosOf(k).toFixed(2) + ',' + yPosOf(stackTotals[k]).toFixed(2) + ' ';
+            }
+            var top = document.createElementNS(ns, 'path');
+            top.setAttribute('d', topPath.trim());
+            top.setAttribute('fill', 'none');
+            top.setAttribute('stroke', '#212121');
+            top.setAttribute('stroke-width', '1');
+            top.setAttribute('stroke-dasharray', '4,3');
+            top.setAttribute('opacity', '0.55');
+            svg.appendChild(top);
+        }
+
+        // formatBytesHuman 把字节数格式化成 KB/MB/GB/TB.
+        // 关键词: formatBytesHuman, dau-cache 磁盘 KPI
+        function formatBytesHuman(n) {
+            n = Number(n) || 0;
+            if (n < 1024) return n + ' B';
+            var units = ['KB', 'MB', 'GB', 'TB', 'PB'];
+            var u = -1;
+            do { n /= 1024; u++; } while (n >= 1024 && u < units.length - 1);
+            return n.toFixed(n >= 10 ? 0 : 1) + ' ' + units[u];
+        }
+
+        // renderDiskCard 渲染顶部信息条的「磁盘可用」KPI 卡。
+        // 主数字 = 可用空间; 副行 = 已用百分比 + 总量; 按已用百分比染色; path 进 title.
+        // 关键词: renderDiskCard, 顶部磁盘 KPI 渲染, disk_info
+        function renderDiskCard(disk) {
+            disk = disk || {};
+            const card = document.getElementById('disk-card');
+            const freeEl = document.getElementById('disk-free-display');
+            const subEl = document.getElementById('disk-sub');
+            if (!card || !freeEl || !subEl) return;
+            if (disk.available) {
+                const usedPct = Number(disk.used_percent) || 0;
+                freeEl.textContent = formatBytesHuman(disk.free || 0);
+                subEl.textContent = '已用 ' + usedPct.toFixed(1) + '% / 总 ' + formatBytesHuman(disk.total || 0);
+                card.title = '路径: ' + (disk.path || '-') +
+                    '\n总: ' + formatBytesHuman(disk.total || 0) +
+                    '\n可用: ' + formatBytesHuman(disk.free || 0) +
+                    '\n已用: ' + formatBytesHuman(disk.used || 0) + ' (' + usedPct.toFixed(2) + '%)';
+                // 按已用百分比染色 (仅染主数字, 卡片底色保持与其他卡一致)
+                let fg = '#2c3e50';
+                if (usedPct >= 90) fg = '#c62828';
+                else if (usedPct >= 75) fg = '#ef6c00';
+                freeEl.style.color = fg;
+            } else {
+                freeEl.textContent = 'N/A';
+                freeEl.style.color = '#999';
+                subEl.textContent = disk.path ? disk.path : '暂不可用';
+                card.title = '磁盘信息暂不可用';
+            }
+        }
+
         // renderDauCacheTab 把后端 portal data 一次性渲染到 dau-cache tab 的所有节点。
         // 关键词: renderDauCacheTab, KPI 数字 + 三张折线 + 拆分表
         function renderDauCacheTab(data) {
@@ -7047,12 +7379,41 @@ curl '${metaApiUrl}?name=${modelName}'`;
                 {label: 'requests / user', color: '#00695c', points: avgPoints},
             ], summaryLabels, {formatY: v => Number(v).toFixed(2)});
 
-            // 60 天缓存命中比例折线
+            // ============ 180 天按模型堆叠图 ============
+            // 关键词: dau-cache 180 天堆叠图渲染, model_trend_180_days
+            const modelRows = data.model_trend_180_days || [];
+            const tokenStack = pivotModelTrend(modelRows, 'total_tokens', {days: 180, topN: 8, endDate: todayDate});
+            drawStackedAreaChart('dc-chart-token-stack', tokenStack.series, tokenStack.labels);
+
+            const reqStack = pivotModelTrend(modelRows, 'request_count', {days: 180, topN: 8, endDate: todayDate});
+            drawStackedAreaChart('dc-chart-req-stack', reqStack.series, reqStack.labels);
+
+            const promptStack = pivotModelTrend(modelRows, 'prompt_tokens', {days: 180, topN: 8, endDate: todayDate});
+            drawStackedAreaChart('dc-chart-prompt-stack', promptStack.series, promptStack.labels);
+
+            // 60 天缓存命中比例: 平均线 + 每模型命中比例多线 (取近 60 天窗口的同一份 modelRows 透视)
+            // 关键词: dau-cache 缓存命中多线, 平均 + per-model hit ratio
             const trend = data.cache_trend_60_days || [];
             const trendLabels = trend.map(t => t.date);
-            drawLineChart('dc-chart-cache', [
-                {label: 'cache hit ratio', color: '#f9a825', points: trend.map(t => t.hit_ratio || 0)},
-            ], trendLabels, {formatY: v => (v * 100).toFixed(2) + '%'});
+            const promptPivot60 = pivotModelTrend(modelRows, 'prompt_tokens', {days: 60, topN: 6, endDate: todayDate});
+            const cachedPivot60 = pivotModelTrend(modelRows, 'cached_tokens', {days: 60, topN: 6, endDate: todayDate});
+            // 用同样的模型集合 (以 prompt 为准) 求 cached/prompt 比例点
+            const cachedByModel = {};
+            cachedPivot60.series.forEach(s => { cachedByModel[s.label] = s.points; });
+            const cacheSeries = [
+                {label: 'avg hit ratio', color: '#212121', points: trend.map(t => t.hit_ratio || 0)},
+            ];
+            promptPivot60.series.forEach((s, i) => {
+                const cp = cachedByModel[s.label] || [];
+                const ratios = s.points.map((p, idx) => {
+                    const c = Number(cp[idx]) || 0;
+                    return p > 0 ? (c / p) : 0;
+                });
+                cacheSeries.push({label: s.label, color: pickColor(i, s.label.indexOf('其他') === 0), points: ratios});
+            });
+            drawLineChart('dc-chart-cache', cacheSeries, promptPivot60.labels, {
+                formatY: v => (v * 100).toFixed(2) + '%'
+            });
 
             // 今日拆分表
             const tbody = document.getElementById('dc-breakdown-body');
@@ -7097,7 +7458,60 @@ curl '${metaApiUrl}?name=${modelName}'`;
             }
         }
 
+        // ==================== 图表点击放大 (lightbox) ====================
+        // 把被点图表盒子内的 SVG 克隆进放大弹窗, 设为 100% 充满, 标题取同格的标题.
+        // 克隆而非移动: 原图保持不动, 关闭弹窗直接清空克隆即可.
+        // 关键词: enlargeChart 图表放大, closeChartZoom, chart-zoom-modal lightbox
+        function enlargeChart(box) {
+            if (!box) return;
+            const svg = box.querySelector('svg');
+            const modal = document.getElementById('chart-zoom-modal');
+            const body = document.getElementById('chart-zoom-body');
+            const titleEl = document.getElementById('chart-zoom-title');
+            if (!svg || !modal || !body) return;
+            // 标题: 同 cell 内的 .dc-chart-title 文本
+            let title = '图表';
+            const cell = box.closest('.dc-chart-cell');
+            if (cell) {
+                const t = cell.querySelector('.dc-chart-title');
+                if (t) title = t.textContent.trim();
+            }
+            if (titleEl) titleEl.textContent = title;
+            // 克隆并放大: 去掉固定 height, 由 CSS 充满弹窗
+            const clone = svg.cloneNode(true);
+            clone.setAttribute('width', '100%');
+            clone.setAttribute('height', '100%');
+            body.innerHTML = '';
+            body.appendChild(clone);
+            modal.classList.add('open');
+        }
+
+        function closeChartZoom(evt) {
+            // 点遮罩或关闭按钮才关; 点内容区 (inner) 已 stopPropagation
+            const modal = document.getElementById('chart-zoom-modal');
+            if (!modal) return;
+            modal.classList.remove('open');
+            const body = document.getElementById('chart-zoom-body');
+            if (body) body.innerHTML = '';
+        }
+
+        // 事件委托: 点击任意 .dc-chart-box 触发放大 (图表会被重绘, 委托更稳妥)
+        document.addEventListener('click', function (e) {
+            const box = e.target.closest && e.target.closest('.dc-chart-box');
+            if (box) enlargeChart(box);
+        });
+        // Esc 关闭放大弹窗
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') closeChartZoom();
+        });
+
+        window.enlargeChart = enlargeChart;
+        window.closeChartZoom = closeChartZoom;
         window.drawLineChart = drawLineChart;
+        window.drawStackedAreaChart = drawStackedAreaChart;
+        window.pivotModelTrend = pivotModelTrend;
+        window.formatBytesHuman = formatBytesHuman;
+        window.renderDiskCard = renderDiskCard;
         window.renderDauCacheTab = renderDauCacheTab;
         window.refreshDauCacheTab = refreshDauCacheTab;
 

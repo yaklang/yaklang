@@ -1,6 +1,7 @@
 package aibalance
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -8,7 +9,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/healthinfo"
 )
 
 // PortalDataResponse is the JSON response structure for portal data API
@@ -40,6 +43,15 @@ type PortalDataResponse struct {
 	TodayCacheStats     TodayCacheStatsJSON  `json:"today_cache_stats"`
 	TodayCacheBreakdown []CacheBreakdownJSON `json:"today_cache_breakdown"`
 	CacheTrend60Days    []CacheTrendDayJSON  `json:"cache_trend_60_days"`
+
+	// 按对外模型 wrapper_name 聚合的 180 天趋势（扁平行），
+	// 前端按 180 天日期轴透视后绘制堆叠图与每模型缓存命中折线。
+	// 关键词: PortalDataResponse model_trend_180_days, 模型堆叠数据源
+	ModelTrend180Days []CacheModelDayJSON `json:"model_trend_180_days"`
+
+	// 主机/数据库分区磁盘空间，避免数据库写爆。
+	// 关键词: PortalDataResponse disk_info, 主机可用空间 KPI
+	Disk DiskInfoJSON `json:"disk_info"`
 }
 
 // DAUBreakdownJSON 是「今日日活按 source_kind 拆分」结构。
@@ -105,6 +117,31 @@ type CacheTrendDayJSON struct {
 	PromptTokens int64   `json:"prompt_tokens"`
 	CachedTokens int64   `json:"cached_tokens"`
 	HitRatio     float64 `json:"hit_ratio"`
+}
+
+// CacheModelDayJSON 是「(date, model) 二维聚合点」JSON 结构，
+// model 字段对应 ai_daily_cache_stats.wrapper_name（对外模型名）。
+// 关键词: model_trend_180_days, 按模型每日聚合 JSON
+type CacheModelDayJSON struct {
+	Date             string `json:"date"`
+	Model            string `json:"model"`
+	RequestCount     int64  `json:"request_count"`
+	PromptTokens     int64  `json:"prompt_tokens"`
+	CompletionTokens int64  `json:"completion_tokens"`
+	TotalTokens      int64  `json:"total_tokens"`
+	CachedTokens     int64  `json:"cached_tokens"`
+}
+
+// DiskInfoJSON 是主机/DB 分区可用空间快照。
+// 关键词: disk_info, 主机磁盘空间, healthinfo.DiskUsageWithContext
+type DiskInfoJSON struct {
+	Path        string  `json:"path"`
+	Total       uint64  `json:"total"`
+	Free        uint64  `json:"free"`
+	Used        uint64  `json:"used"`
+	UsedPercent float64 `json:"used_percent"`
+	FreePercent float64 `json:"free_percent"`
+	Available   bool    `json:"available"` // 取数成功则为 true; 失败时其余字段为零值
 }
 
 // ProviderDataJSON is the JSON representation of provider data
@@ -459,6 +496,69 @@ func (c *ServerConfig) fillDAUAndCacheStats(data *PortalDataResponse) {
 			})
 		}
 	}
+
+	// 按对外模型聚合的 180 天趋势 (扁平行)。前端透视成 series 后绘制堆叠图。
+	// 关键词: portal fill ModelTrend180Days, 按模型堆叠数据
+	if modelTrend, err := QueryCacheModelTrend180Days(); err != nil {
+		log.Warnf("portal QueryCacheModelTrend180Days failed: %v", err)
+		data.ModelTrend180Days = make([]CacheModelDayJSON, 0)
+	} else {
+		data.ModelTrend180Days = make([]CacheModelDayJSON, 0, len(modelTrend))
+		for _, m := range modelTrend {
+			data.ModelTrend180Days = append(data.ModelTrend180Days, CacheModelDayJSON{
+				Date:             m.Date,
+				Model:            m.WrapperName,
+				RequestCount:     m.RequestCount,
+				PromptTokens:     m.PromptTokens,
+				CompletionTokens: m.CompletionTokens,
+				TotalTokens:      m.TotalTokens,
+				CachedTokens:     m.CachedTokens,
+			})
+		}
+	}
+
+	// 主机/数据库分区磁盘可用空间, 避免 DB 写爆。
+	// 失败仅 Warn, 前端会按 available=false 显示「N/A」。
+	// 关键词: portal fill disk_info, healthinfo.DiskUsageWithContext, GetDefaultYakitBaseDir
+	data.Disk = collectDiskInfo()
+}
+
+// collectDiskInfo 探测「yakit base dir 所在分区」的磁盘空间，
+// 用 healthinfo 跨平台 Statfs 实现。任何失败一律 Warn 日志吞掉，
+// 返回 available=false 的零值结构以便前端友好降级。
+// 关键词: collectDiskInfo, healthinfo, GetDefaultYakitBaseDir 分区
+func collectDiskInfo() DiskInfoJSON {
+	out := DiskInfoJSON{Available: false}
+	defer func() {
+		if r := recover(); r != nil {
+			log.Warnf("collectDiskInfo recovered: %v", r)
+		}
+	}()
+
+	path := consts.GetDefaultYakitBaseDir()
+	if path == "" {
+		path = "."
+	}
+	out.Path = path
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	stat, err := healthinfo.DiskUsageWithContext(ctx, path)
+	if err != nil || stat == nil {
+		if err != nil {
+			log.Warnf("collectDiskInfo failed for path %s: %v", path, err)
+		}
+		return out
+	}
+	out.Available = true
+	out.Total = stat.Total
+	out.Free = stat.Free
+	out.Used = stat.Used
+	out.UsedPercent = stat.UsedPercent
+	if stat.Total > 0 {
+		out.FreePercent = float64(stat.Free) / float64(stat.Total) * 100.0
+	}
+	return out
 }
 
 // serveAvailableModelsAPI returns list of unique model wrapper names for dropdowns

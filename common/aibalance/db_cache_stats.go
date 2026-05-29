@@ -260,12 +260,85 @@ func QueryCacheTrendDays(days int, end time.Time) ([]*CacheTrendDay, error) {
 	return out, nil
 }
 
+// CacheModelDay 是「(date, wrapper_name) 二维聚合点」，
+// 由 QueryCacheModelTrendDays 用 GROUP BY 出来，给 portal dau-cache 的按模型堆叠图使用。
+// WrapperName 为空字符串时回落到 model_name（极少数老数据 wrapper 没记录）。
+// 关键词: CacheModelDay, 按模型每日聚合, 堆叠图数据源, 180 天窗口
+type CacheModelDay struct {
+	Date             string `json:"date"`
+	WrapperName      string `json:"wrapper_name"`
+	RequestCount     int64  `json:"request_count"`
+	PromptTokens     int64  `json:"prompt_tokens"`
+	CompletionTokens int64  `json:"completion_tokens"`
+	TotalTokens      int64  `json:"total_tokens"`
+	CachedTokens     int64  `json:"cached_tokens"`
+}
+
+// QueryCacheModelTrendDays 返回 [end-(days-1), end] 区间内
+// 按 (date, wrapper_name) 聚合的 token / 请求数明细行，未补 0；
+// 由前端按 180 天日期轴透视为 series 后再绘制。
+// 关键词: QueryCacheModelTrendDays, GROUP BY date wrapper_name, 模型堆叠数据
+func QueryCacheModelTrendDays(days int, end time.Time) ([]*CacheModelDay, error) {
+	if days <= 0 {
+		days = 180
+	}
+	startDate := end.AddDate(0, 0, -(days - 1)).Format("2006-01-02")
+
+	type aggRow struct {
+		Date             string
+		WrapperName      string
+		RequestCount     int64
+		PromptTokens     int64
+		CompletionTokens int64
+		TotalTokens      int64
+		CachedTokens     int64
+	}
+	rows := []aggRow{}
+	if err := cacheStatsDB().Table((&AiDailyCacheStat{}).TableName()).
+		Select("date, wrapper_name, " +
+			"COALESCE(SUM(request_count),0) AS request_count, " +
+			"COALESCE(SUM(prompt_tokens),0) AS prompt_tokens, " +
+			"COALESCE(SUM(completion_tokens),0) AS completion_tokens, " +
+			"COALESCE(SUM(total_tokens),0) AS total_tokens, " +
+			"COALESCE(SUM(cached_tokens),0) AS cached_tokens").
+		Where("date >= ?", startDate).
+		Group("date, wrapper_name").
+		Order("date ASC, wrapper_name ASC").
+		Scan(&rows).Error; err != nil {
+		return nil, fmt.Errorf("QueryCacheModelTrendDays failed: %v", err)
+	}
+
+	out := make([]*CacheModelDay, 0, len(rows))
+	for _, r := range rows {
+		name := r.WrapperName
+		if name == "" {
+			name = "(unknown)"
+		}
+		out = append(out, &CacheModelDay{
+			Date:             r.Date,
+			WrapperName:      name,
+			RequestCount:     r.RequestCount,
+			PromptTokens:     r.PromptTokens,
+			CompletionTokens: r.CompletionTokens,
+			TotalTokens:      r.TotalTokens,
+			CachedTokens:     r.CachedTokens,
+		})
+	}
+	return out, nil
+}
+
+// QueryCacheModelTrend180Days 是 QueryCacheModelTrendDays(180, time.Now()) 的薄包装。
+// 关键词: QueryCacheModelTrend180Days, 180 天按模型趋势
+func QueryCacheModelTrend180Days() ([]*CacheModelDay, error) {
+	return QueryCacheModelTrendDays(180, time.Now())
+}
+
 // CleanupOldCacheStats deletes ai_daily_cache_stats rows whose date < (today - keepDays).
 // 用 Unscoped() 硬删除，避免 GORM 软删除残留行触发 unique 约束冲突。
-// 关键词: CleanupOldCacheStats, 100 天保留窗, Unscoped 硬删除
+// 关键词: CleanupOldCacheStats, 180 天保留窗, Unscoped 硬删除
 func CleanupOldCacheStats(keepDays int) (int64, error) {
 	if keepDays <= 0 {
-		keepDays = 100
+		keepDays = 180
 	}
 	cutoff := time.Now().AddDate(0, 0, -keepDays).Format("2006-01-02")
 	tx := GetDB().Unscoped().Where("date < ?", cutoff).Delete(&AiDailyCacheStat{})

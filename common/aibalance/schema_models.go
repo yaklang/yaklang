@@ -306,7 +306,7 @@ func (a *AiProviderHealthRecord) TableName() string {
 // AiDailyCacheStat 是 aibalance 每日「细粒度上游 token 用量与缓存命中」聚合行。
 // 主键唯一约束 (date + wrapper_name + model_name + provider_type + provider_domain + api_key_hash)
 // 由 RecordDailyCacheStats 用 UPSERT (gorm.Expr + ?) 累加。
-// 100 天前的记录由 cleanup_scheduler 每天 0:01 删除，避免 SQLite 膨胀。
+// 180 天前的记录由 cleanup_scheduler 每天 0:01 删除，避免 SQLite 膨胀。
 // 关键词: ai_daily_cache_stats, cached_tokens 持久化, aibalance 缓存命中比例
 type AiDailyCacheStat struct {
 	gorm.Model
@@ -334,7 +334,7 @@ func (a *AiDailyCacheStat) TableName() string {
 // 一行 = 当天某 source_kind 下首次出现的 user_hash 指纹（INSERT IGNORE 重复不增行）。
 // source_kind 取 "api_key" / "free_trace" / "free_ip" 三类。
 // QueryDAU60Days 用 GROUP BY date,source_kind 统计 COUNT(DISTINCT user_hash)。
-// 100 天前记录由 cleanup_scheduler 删除；同时 RecordDailyUserSeen 内置
+// 180 天前记录由 cleanup_scheduler 删除；同时 RecordDailyUserSeen 内置
 // 1,000,000 行/天/source_kind 的硬上限做 DB 防爆。
 // 关键词: ai_daily_user_seen, DAU 去重指纹, 防爆 cap
 type AiDailyUserSeen struct {
