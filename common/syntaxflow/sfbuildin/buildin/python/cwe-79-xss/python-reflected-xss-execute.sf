@@ -1,0 +1,90 @@
+desc(
+	title: "Check Python Reflected XSS via Unescaped Response Output"
+	title_zh: "检测 Python 反射型 XSS（未转义响应输出）"
+	type: audit
+	level: low
+	risk: "跨站脚本（XSS）"
+	desc: <<<DESC
+该规则用于检测 Python Web 应用（如 Flask、Django）中将用户可控输入未经 HTML 转义或过滤，直接传入模板渲染或 HTTP 响应构造函数的场景，可能导致反射型跨站脚本（XSS）漏洞。
+
+常见危险 sink 包括 `render_template`、`jsonify`、`make_response`、`HttpResponse` 等。若用户输入来自 `request.args`、`request.form` 等不可信来源，且输出前未调用 `markupsafe.escape`、`html.escape`、`bleach.clean` 等净化函数，攻击者可在响应中注入恶意脚本，窃取 Cookie、劫持会话或篡改页面内容。
+
+与 `render_template_string` 引发的服务端模板注入（SSTI）不同，本规则关注用户输入被原样反射到客户端响应中的 XSS 风险。
+DESC
+	solution: <<<SOLUTION
+1. 优先使用 Jinja2 等模板引擎的默认自动转义，避免对用户数据使用 `|safe` 过滤器。
+2. 在将用户输入写入 HTML 响应前，使用 `markupsafe.escape()` 或 `html.escape()` 进行转义。
+3. 对 JSON 响应使用 `jsonify` 时，确保不将未转义的 HTML 片段拼入字符串字段；必要时对输出字段单独转义。
+4. 设置 Content-Security-Policy（CSP）等 HTTP 安全头，降低 XSS 成功后的危害。
+5. 对用户输入实施白名单校验，拒绝包含 `<script>` 等危险片段的输入。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-79: Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting')](https://cwe.mitre.org/data/definitions/79.html)
+[OWASP XSS Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html)
+REFERENCE
+	rule_id: "a8f3c2e1-4b5d-6a7e-8f90-1a2b3c4d5e6f"
+)
+
+<include("python-user-input")> as $input
+
+markupsafe.escape as $safe
+html.escape as $safe
+bleach.clean as $safe
+
+render_template as $func
+jsonify as $func
+make_response as $func
+HttpResponse as $func
+JsonResponse as $func
+
+$func(* #{
+	until: `* & $input`,
+	exclude_reachable: `$safe`,
+}->) as $low
+
+alert $low for {
+	title: "Python reflected XSS via unescaped output",
+	title_zh: "Python 反射型 XSS（未转义输出）",
+	level: "low",
+	type: "audit",
+	risk: "跨站脚本（XSS）",
+	message: "检测到用户可控输入可能未经转义即传入模板渲染或 HTTP 响应构造函数，存在反射型 XSS 风险。",
+	name: "sink",
+	solution: <<<SOLUTION
+1. 使用模板引擎默认转义，避免 `|safe`；2. 输出前调用 `markupsafe.escape` 或 `html.escape`；3. 配置 CSP 降低危害；4. 对用户输入做严格校验。
+SOLUTION
+	desc: <<<DESC
+用户可控输入未经 HTML 转义即传入 `render_template`、`jsonify`、`make_response` 或 `HttpResponse` 等响应输出点，恶意脚本可能在受害者浏览器中执行。
+DESC
+}
+
+desc(
+	lang: python
+	alert_low: 1
+	'file://unsafe_xss.py': <<<UNSAFE
+from flask import Flask, render_template, jsonify, make_response, request
+
+app = Flask(__name__)
+
+@app.route('/echo')
+def echo():
+    msg = request.args.get('msg', '')
+    return render_template('index.html', msg=msg)
+
+@app.route('/json')
+def json_echo():
+    return jsonify({'msg': request.args.get('msg', '')})
+
+@app.route('/raw')
+def raw():
+    return make_response(request.args.get('body', ''))
+UNSAFE
+	'safefile://safe_xss.py': <<<SAFE
+from flask import render_template, request
+import html
+
+def safe_echo():
+    msg = html.escape(request.args.get('msg', ''))
+    return render_template('index.html', msg=msg)
+SAFE
+)
