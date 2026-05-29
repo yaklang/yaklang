@@ -533,6 +533,36 @@ func (c *ServerConfig) handleGetClientVersionStats(conn net.Conn, request *http.
 	})
 }
 
+// handleClearClientVersionStats handles POST /portal/api/client-version-stats/clear.
+// 清空 ai_balance_client_versions 表，便于运维手动重置垃圾/陈旧数据。
+// 需要 portal admin 鉴权。
+//
+// Response: {"success": true, "removed": <int64>}
+//
+// 关键词: handleClearClientVersionStats, portal 清空客户端版本记录路由
+func (c *ServerConfig) handleClearClientVersionStats(conn net.Conn, request *http.Request) {
+	c.logInfo("processing clear client version stats request")
+
+	if !c.checkAuth(request) {
+		c.writeJSONResponse(conn, http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+		return
+	}
+
+	removed, err := ClearAllClientVersions()
+	if err != nil {
+		c.logError("clear client version stats failed: %v", err)
+		c.writeJSONResponse(conn, http.StatusInternalServerError, map[string]string{
+			"error": "failed to clear client version stats",
+		})
+		return
+	}
+
+	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
+		"success": true,
+		"removed": removed,
+	})
+}
+
 // applyRateLimitConfig applies the DB config to the in-memory rate limiter.
 func (c *ServerConfig) applyRateLimitConfig(cfg *AiBalanceRateLimitConfig) {
 	if cfg == nil {

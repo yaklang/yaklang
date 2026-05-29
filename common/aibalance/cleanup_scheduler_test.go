@@ -9,7 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-// 关键词: cleanup_scheduler_test, 100 天保留窗 + ai_daily_summary 不清理
+// 关键词: cleanup_scheduler_test, 180 天保留窗 + ai_daily_summary 不清理
 
 func TestRunCleanupOnce_RemovesOldDoesNotTouchSummary(t *testing.T) {
 	require.NoError(t, EnsureCacheStatsTable())

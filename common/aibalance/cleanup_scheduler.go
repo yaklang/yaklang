@@ -10,8 +10,8 @@ import (
 // StatsRetentionDays 是 ai_daily_cache_stats / ai_daily_user_seen 的保留窗口。
 // 超过这个窗口的行会被 daily 清理任务删除，
 // ai_daily_summary 表（每天 1 行）不参与清理。
-// 关键词: StatsRetentionDays, 100 天保留窗
-const StatsRetentionDays = 100
+// 关键词: StatsRetentionDays, 180 天保留窗
+const StatsRetentionDays = 180
 
 // runCleanupOnce 同步执行一次 daily 清理：
 //   - DELETE ai_daily_cache_stats WHERE date < today-StatsRetentionDays
