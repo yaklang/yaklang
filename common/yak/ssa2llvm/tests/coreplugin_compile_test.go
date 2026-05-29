@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/coreplugin"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/compiler"
@@ -54,4 +55,14 @@ func TestCorePlugin_CompileAll(t *testing.T) {
 	if len(failed) > 0 {
 		t.Fatalf("failed to compile %d coreplugins: %v", len(failed), failed)
 	}
+}
+
+func TestCorePlugin_RunResetKnowledgeBase(t *testing.T) {
+	code := string(coreplugin.GetCorePluginData("重置知识库"))
+	require.NotEmpty(t, code)
+
+	output := runBinaryWithEnv(t, code, "", map[string]string{
+		"YAKIT_HOME": t.TempDir(),
+	}, withCompilePluginType(compiler.YakPluginTypeYak))
+	require.Contains(t, output, "请确认重置操作")
 }
