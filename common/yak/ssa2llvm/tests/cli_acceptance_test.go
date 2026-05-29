@@ -101,6 +101,34 @@ check = () => {
 	require.Contains(t, run.Output, "run command ok")
 }
 
+func TestSSA2LLVMCLIRunYakPluginTypePassesArgs(t *testing.T) {
+	source := writeYakSourceFile(t, `
+name = cli.String("name", cli.setRequired(true))
+cli.check()
+println(name)
+`)
+
+	run := runSSA2LLVMCLI(t, "run", source, "--plugin-type", "yak", "--", "--name", "yak-cli")
+	require.Equal(t, 0, run.ExitCode, run.Output)
+	require.Contains(t, run.Output, "yak-cli")
+}
+
+func TestSSA2LLVMCLICompileCodecPluginTypeArtifact(t *testing.T) {
+	source := writeYakSourceFile(t, `
+handle = func(param) {
+	return codec.EncodeBase64(param)
+}
+`)
+	bin := filepath.Join(t.TempDir(), "codec.bin")
+
+	compile := runSSA2LLVMCLI(t, "compile", source, "-o", bin, "--plugin-type", "codec")
+	require.Equal(t, 0, compile.ExitCode, compile.Output)
+
+	run := runProcess(t, bin, nil, "--param", "yaklang")
+	require.Equal(t, 0, run.ExitCode, run.Output)
+	require.Contains(t, run.Output, "eWFrbGFuZw==")
+}
+
 // ---------------------------------------------------------------------------
 // Profile-file, virtualize, profile, and flag acceptance tests
 // ---------------------------------------------------------------------------

@@ -43,6 +43,7 @@ type CompileConfig struct {
 	SkipRuntimeLink   bool
 	RuntimeArchive    string
 	PrintEntryResult  bool
+	PluginType        string
 	Obfuscators       []string
 	StdlibCompile     bool
 	ProfileName       string
@@ -170,6 +171,10 @@ func WithCompilePrintEntryResult(enabled bool) CompileOption {
 	return func(c *CompileConfig) { c.PrintEntryResult = enabled }
 }
 
+func WithCompilePluginType(pluginType string) CompileOption {
+	return func(c *CompileConfig) { c.PluginType = strings.TrimSpace(pluginType) }
+}
+
 func WithCompileObfuscators(names ...string) CompileOption {
 	return func(c *CompileConfig) {
 		c.Obfuscators = appendObfuscatorNames(c.Obfuscators, names...)
@@ -235,6 +240,7 @@ func WithCompileConfig(cfg CompileConfig) CompileOption {
 		c.SkipRuntimeLink = cfg.SkipRuntimeLink
 		c.RuntimeArchive = cfg.RuntimeArchive
 		c.PrintEntryResult = cfg.PrintEntryResult
+		c.PluginType = cfg.PluginType
 		c.Obfuscators = append(c.Obfuscators, cfg.Obfuscators...)
 		c.StdlibCompile = cfg.StdlibCompile
 		c.ProfileName = cfg.ProfileName
@@ -293,6 +299,10 @@ func compileInputWithConfig(cfg *CompileConfig) (*ssaapi.Program, *Compiler, str
 	}
 
 	code, sourceLabel, language, err := resolveCompileInput(cfg.SourceFile, cfg.SourceCode, cfg.Language)
+	if err != nil {
+		return nil, nil, "", err
+	}
+	code, err = wrapYakPluginSource(code, cfg.PluginType)
 	if err != nil {
 		return nil, nil, "", err
 	}
