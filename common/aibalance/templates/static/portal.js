@@ -1009,6 +1009,11 @@
                 loadRateLimitConfig();
                 loadRateLimitStatus();
                 startRateLimitModelStatsAutoRefresh();
+                // 恢复上次选中的限流子 tab, 默认"频率与速率"
+                let savedSub = 'rl-sub-rate';
+                try { savedSub = localStorage.getItem('rateLimitSubTab') || 'rl-sub-rate'; } catch (e) {}
+                if (!document.getElementById(savedSub)) savedSub = 'rl-sub-rate';
+                switchRateLimitSubTab(savedSub);
             } else {
                 stopRateLimitModelStatsAutoRefresh();
             }
@@ -1029,6 +1034,27 @@
                 }
             }
         }
+
+        // 限流配置二级 tab 切换
+        // 关键词: rate-limit 子 tab 切换, switchRateLimitSubTab, rl-subpane
+        function switchRateLimitSubTab(paneId) {
+            document.querySelectorAll('.rl-subtab').forEach(function (t) {
+                t.classList.toggle('active', t.getAttribute('data-rlsub') === paneId);
+            });
+            document.querySelectorAll('.rl-subpane').forEach(function (p) {
+                p.classList.toggle('active', p.id === paneId);
+            });
+            try { localStorage.setItem('rateLimitSubTab', paneId); } catch (e) {}
+        }
+
+        // 事件委托绑定限流子 tab 点击, 避免依赖 DOMContentLoaded 加载顺序
+        // 关键词: rate-limit 子 tab 点击绑定, data-rlsub
+        document.addEventListener('click', function (e) {
+            const tab = e.target.closest ? e.target.closest('.rl-subtab') : null;
+            if (!tab) return;
+            const paneId = tab.getAttribute('data-rlsub');
+            if (paneId) switchRateLimitSubTab(paneId);
+        });
 
         // 添加接口表单
         function showAddProviderForm() {
