@@ -105,6 +105,7 @@ func checkPrintBinary(t *testing.T, code string, expectedVals ...int64) {
 
 type runBinaryConfig struct {
 	env             map[string]string
+	args            []string
 	compileOpts     []compiler.CompileOption
 	cleanup         []func()
 	useDebugRuntime bool
@@ -140,9 +141,23 @@ func withCompilePrintEntryResult(enabled bool) runBinaryOption {
 	}
 }
 
+func withCompilePluginType(pluginType string) runBinaryOption {
+	return func(cfg *runBinaryConfig) error {
+		cfg.compileOpts = append(cfg.compileOpts, compiler.WithCompilePluginType(pluginType))
+		return nil
+	}
+}
+
 func withCompileObfuscators(names ...string) runBinaryOption {
 	return func(cfg *runBinaryConfig) error {
 		cfg.compileOpts = append(cfg.compileOpts, compiler.WithCompileObfuscators(names...))
+		return nil
+	}
+}
+
+func withArgs(args ...string) runBinaryOption {
+	return func(cfg *runBinaryConfig) error {
+		cfg.args = append(cfg.args, args...)
 		return nil
 	}
 }
@@ -170,7 +185,7 @@ func runBinaryWithEnv(t *testing.T, code string, entry string, env map[string]st
 	tmpBin, cleanup := compileBinary(t, code, entry, cfg)
 	defer cleanup()
 
-	cmd := exec.Command(tmpBin)
+	cmd := exec.Command(tmpBin, cfg.args...)
 	if len(cfg.env) > 0 {
 		cmd.Env = append([]string{}, os.Environ()...)
 		for k, v := range cfg.env {
@@ -267,7 +282,7 @@ func runBinaryExitCodeWithEnv(t *testing.T, code string, entry string, env map[s
 	tmpBin, cleanup := compileBinary(t, code, entry, cfg)
 	defer cleanup()
 
-	cmd := exec.Command(tmpBin)
+	cmd := exec.Command(tmpBin, cfg.args...)
 	if len(cfg.env) > 0 {
 		cmd.Env = append([]string{}, os.Environ()...)
 		for k, v := range cfg.env {

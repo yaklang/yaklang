@@ -103,7 +103,7 @@ func runSSA2LLVMCLIInDir(t *testing.T, dir string, args ...string) processResult
 		if dir != "" {
 			prepareRuntimeArchiveForDir(t, dir)
 		}
-		args = append(args, "-a")
+		args = insertBeforeArgSeparator(args, "-a")
 	}
 
 	cliPath := buildSSA2LLVMCLI(t)
@@ -111,6 +111,20 @@ func runSSA2LLVMCLIInDir(t *testing.T, dir string, args ...string) processResult
 	return runProcessInDir(t, dir, cliPath, map[string]string{
 		"YAKIT_HOME": yakitHome,
 	}, args...)
+}
+
+func insertBeforeArgSeparator(args []string, item string) []string {
+	for i, arg := range args {
+		if arg != "--" {
+			continue
+		}
+		out := make([]string, 0, len(args)+1)
+		out = append(out, args[:i]...)
+		out = append(out, item)
+		out = append(out, args[i:]...)
+		return out
+	}
+	return append(args, item)
 }
 
 func writeYakSourceFile(t *testing.T, code string) string {

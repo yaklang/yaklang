@@ -47,6 +47,7 @@ type buildCommandConfig struct {
 	printIR    bool
 	obf        []string
 	profile    string
+	pluginType string
 	stdlibComp bool
 	trace      bool
 	force      bool
@@ -54,6 +55,7 @@ type buildCommandConfig struct {
 	llvmKind   string
 	llvmPasses []string
 	llvmPack   string
+	runArgs    []string
 }
 
 func sharedBuildFlags() []cli.Flag {
@@ -83,6 +85,10 @@ func sharedBuildFlags() []cli.Flag {
 		cli.StringFlag{
 			Name:  "profile",
 			Usage: fmt.Sprintf("Apply a built-in profile name or load a profile JSON file (%s)", strings.Join(profile.Names(), ", ")),
+		},
+		cli.StringFlag{
+			Name:  "plugin-type",
+			Usage: "Yak plugin type: yak, codec, or port-scan (mitm is not supported yet)",
 		},
 		cli.StringFlag{
 			Name:  "llvm-plugin",
@@ -143,7 +149,7 @@ var runCommand = cli.Command{
 	Name:      "run",
 	Aliases:   []string{"r"},
 	Usage:     "Compile and run the executable (use -o to keep the binary)",
-	ArgsUsage: "<source-file>",
+	ArgsUsage: "<source-file> [-- args...]",
 	Flags:     sharedBuildFlags(),
 	Action:    runAction,
 }
@@ -181,6 +187,7 @@ func compileAction(c *cli.Context) error {
 		compiler.WithCompileEmitAsm(emitAsm),
 		compiler.WithCompileOnly(compileOnly),
 		compiler.WithCompilePrintIR(cfg.printIR),
+		compiler.WithCompilePluginType(cfg.pluginType),
 		compiler.WithCompileObfuscators(cfg.obf...),
 		compiler.WithCompileProfile(cfg.profile),
 		compiler.WithCompileLLVMPlugin(cfg.llvmPlugin),
@@ -210,6 +217,7 @@ func runAction(c *cli.Context) error {
 		compiler.WithCompileLanguage(cfg.language),
 		compiler.WithCompileEntryFunction(cfg.function),
 		compiler.WithCompilePrintIR(cfg.printIR),
+		compiler.WithCompilePluginType(cfg.pluginType),
 		compiler.WithCompileObfuscators(cfg.obf...),
 		compiler.WithCompileProfile(cfg.profile),
 		compiler.WithCompileLLVMPlugin(cfg.llvmPlugin),
@@ -241,7 +249,7 @@ func runAction(c *cli.Context) error {
 		}
 	}
 
-	cmd := exec.Command(execPath)
+	cmd := exec.Command(execPath, cfg.runArgs...)
 	trace.PrintCmd(cmd)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
@@ -281,13 +289,14 @@ func newBuildCommandConfig(c *cli.Context) (*buildCommandConfig, error) {
 		return nil, fmt.Errorf("missing source file argument")
 	}
 
-	return &buildCommandConfig{
+	cfg := &buildCommandConfig{
 		sourceFile: c.Args().First(),
 		language:   c.String("language"),
 		function:   c.String("function"),
 		printIR:    c.Bool("print-ir"),
 		obf:        c.StringSlice("obf"),
 		profile:    c.String("profile"),
+		pluginType: c.String("plugin-type"),
 		stdlibComp: c.Bool("stdlib-compile"),
 		trace:      c.Bool("x"),
 		force:      c.Bool("a"),
@@ -295,7 +304,11 @@ func newBuildCommandConfig(c *cli.Context) (*buildCommandConfig, error) {
 		llvmKind:   c.String("llvm-plugin-kind"),
 		llvmPasses: splitCSVStrings(c.StringSlice("llvm-passes")),
 		llvmPack:   c.String("llvm-pack"),
-	}, nil
+	}
+	if c.Command.Name == "run" && c.NArg() > 1 {
+		cfg.runArgs = append(cfg.runArgs, c.Args().Tail()...)
+	}
+	return cfg, nil
 }
 
 func printObfuscatorGroup(title string, flagExample string, names []string) {

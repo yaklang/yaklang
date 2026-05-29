@@ -58,6 +58,7 @@ func cachedWorkKeyFromConfig(cfg *CompileConfig) (string, error) {
 	write("go=" + runtime.Version())
 	write("lang=" + strings.TrimSpace(cfg.Language))
 	write("entry=" + strings.TrimSpace(cfg.EntryFunctionName))
+	write("pluginType=" + strings.TrimSpace(cfg.PluginType))
 	write(fmt.Sprintf("emitLLVM=%t", cfg.EmitLLVM))
 	write(fmt.Sprintf("emitAsm=%t", cfg.EmitAsm))
 	write(fmt.Sprintf("compileOnly=%t", cfg.CompileOnly))

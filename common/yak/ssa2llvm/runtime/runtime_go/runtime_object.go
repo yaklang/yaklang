@@ -75,6 +75,15 @@ func runtimeDecodeArg(raw uint64, targetType reflect.Type) (reflect.Value, error
 		return reflect.Zero(targetType), nil
 	}
 
+	if intValue, ok := decoded.(int64); ok {
+		if shadowValue, ok := runtimeDecodeShadowArg(raw, targetType); ok {
+			return shadowValue, nil
+		}
+		if converted, ok := valueForSet(targetType, intValue); ok {
+			return converted, nil
+		}
+	}
+
 	value := reflect.ValueOf(decoded)
 	if value.IsValid() {
 		if value.Type().AssignableTo(targetType) {
@@ -88,15 +97,6 @@ func runtimeDecodeArg(raw uint64, targetType reflect.Type) (reflect.Value, error
 		}
 		if targetType.Kind() == reflect.Ptr && value.Kind() != reflect.Ptr && value.CanAddr() && value.Addr().Type().AssignableTo(targetType) {
 			return value.Addr(), nil
-		}
-	}
-
-	if intValue, ok := decoded.(int64); ok {
-		if converted, ok := valueForSet(targetType, intValue); ok {
-			return converted, nil
-		}
-		if shadowValue, ok := runtimeDecodeShadowArg(raw, targetType); ok {
-			return shadowValue, nil
 		}
 	}
 
