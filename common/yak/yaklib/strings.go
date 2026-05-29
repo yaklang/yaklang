@@ -585,6 +585,18 @@ var StringsExport = map[string]interface{}{
 	"AddPrefixLineNumber":         prefixLineNumber,
 	"AddPrefixLineNumberToReader": prefixLineNumberReader,
 	"RenderTemplate":              RenderTemplate,
+
+	// 流式 JSON 解析配套：UTF-8 安全 reader 与 JSON 字符串解码（配合 jsonstream / jsonextractor 字段流）
+	"NewUTF8Reader":       NewUTF8Reader,
+	"NewJSONStringReader": NewJSONStringReader,
+	"JsonStringDecode":    JsonStringDecode,
+
+	// AI 处理常用：基于 Qwen BPE 词表的 token 计算与编解码（复用 common/ai/ytoken）
+	"CalcTokenCount":         CalcTokenCount,
+	"CalcOrdinaryTokenCount": CalcOrdinaryTokenCount,
+	"EncodeTokens":           EncodeTokens,
+	"EncodeOrdinaryTokens":   EncodeOrdinaryTokens,
+	"DecodeTokens":           DecodeTokens,
 }
 
 func RenderTemplate(i string, m any) string {

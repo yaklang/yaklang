@@ -858,6 +858,117 @@ func TestJSONStringReader_StressTest(t *testing.T) {
 	})
 }
 
+// chunkReader 按预设分片返回数据，模拟网络流/io.Pipe 那样的逐块到达，
+// 用于复现转义序列跨 Read 边界的场景。
+type chunkReader struct {
+	chunks [][]byte
+	idx    int
+}
+
+func (c *chunkReader) Read(p []byte) (int, error) {
+	if c.idx >= len(c.chunks) {
+		return 0, io.EOF
+	}
+	chunk := c.chunks[c.idx]
+	c.idx++
+	n := copy(p, chunk)
+	// 若 p 装不下整块，剩余部分留到下一块前面（极小缓冲场景）
+	if n < len(chunk) {
+		c.chunks[c.idx-1] = chunk[n:]
+		c.idx--
+	}
+	return n, nil
+}
+
+func TestJSONStringReader_ChunkedEscapeAcrossBoundary(t *testing.T) {
+	// 回归测试：转义序列跨分片到达时不得重复输出已处理的前缀。
+	// 这类场景在 io.Pipe / 网络流（如 LLM 流式响应）中非常常见。
+	tests := []struct {
+		name     string
+		chunks   []string
+		expected string
+	}{
+		{
+			name:     "unicode转义跨分片",
+			chunks:   []string{`"Hello from Yak AI\u00`, `21"`},
+			expected: "Hello from Yak AI!",
+		},
+		{
+			name:     "十六进制转义跨分片",
+			chunks:   []string{`"hello\x`, `20world"`},
+			expected: "hello world",
+		},
+		{
+			name:     "代理对跨分片",
+			chunks:   []string{`"smile\ud8`, `3d\ude0a"`},
+			expected: "smile😊",
+		},
+		{
+			name:     "反斜杠转义跨分片",
+			chunks:   []string{`"line\`, `nbreak"`},
+			expected: "line\nbreak",
+		},
+		{
+			name:     "多个转义逐字符到达",
+			chunks:   []string{`"a\u00`, `41b\x`, `42c\u00`, `43"`},
+			expected: "aAbBcC",
+		},
+		{
+			name:     "中文unicode跨分片",
+			chunks:   []string{`"你好\u4e1`, `6\u754c"`},
+			expected: "你好世界",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			chunks := make([][]byte, 0, len(tt.chunks))
+			for _, c := range tt.chunks {
+				chunks = append(chunks, []byte(c))
+			}
+			reader := JSONStringReader(&chunkReader{chunks: chunks})
+			result, err := io.ReadAll(reader)
+			if err != nil {
+				t.Errorf("读取失败: %v", err)
+			}
+			if string(result) != tt.expected {
+				t.Errorf("期望: %q, 实际: %q", tt.expected, string(result))
+			}
+		})
+	}
+}
+
+func TestJSONStringReader_ChunkedViaPipe(t *testing.T) {
+	// 用真实 io.Pipe 复现：生产者分多片写出，消费者用小缓冲读取，转义恰好跨片
+	pr, pw := io.Pipe()
+	go func() {
+		defer pw.Close()
+		for _, chunk := range []string{`"Hello`, ` from`, ` Yak`, ` AI\u00`, `21"`} {
+			pw.Write([]byte(chunk))
+		}
+	}()
+
+	reader := JSONStringReader(pr)
+	var result []byte
+	buf := make([]byte, 4) // 小缓冲，逼出分片读取路径
+	for {
+		n, err := reader.Read(buf)
+		if n > 0 {
+			result = append(result, buf[:n]...)
+		}
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Errorf("读取失败: %v", err)
+			break
+		}
+	}
+	if string(result) != "Hello from Yak AI!" {
+		t.Errorf("期望: %q, 实际: %q", "Hello from Yak AI!", string(result))
+	}
+}
+
 func TestJSONStringReader_ExtremeCases(t *testing.T) {
 	// 极端情况测试
 	tests := []struct {

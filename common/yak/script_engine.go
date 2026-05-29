@@ -233,6 +233,9 @@ func initYaklangLib() {
 	// json
 	yaklang.Import("json", yaklib.JsonExports)
 
+	// jsonstream: 流式 JSON 解析（数据流 + 回调，复用 common/jsonextractor）
+	yaklang.Import("jsonstream", yaklib.JsonStreamExports)
+
 	// yaml
 	yaklang.Import("yaml", yaklib.YamlExports)
 
