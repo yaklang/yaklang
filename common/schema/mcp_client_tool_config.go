@@ -5,25 +5,26 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-// MCPToolSource identifies which category a tool belongs to.
+// MCPClientToolSource identifies which category a tool belongs to.
 const (
-	// MCPToolSourceBuiltin means the tool is registered via Go init() in common/mcp.
-	MCPToolSourceBuiltin = "builtin"
-	// MCPToolSourceBridge means the tool originates from an external MCPServer entry in the
+	// MCPClientToolSourceBuiltin means the tool is registered via Go init() in common/mcp.
+	MCPClientToolSourceBuiltin = "builtin"
+	// MCPClientToolSourceBridge means the tool originates from an external MCPServer entry in the
 	// DB and was bridged through the aitool layer (name format: mcp_{server}_{tool}).
-	MCPToolSourceBridge = "bridge"
+	MCPClientToolSourceBridge = "bridge"
 )
 
-// MCPToolConfig stores per-tool enable/disable state that is persisted across
-// MCP server restarts. One row per unique tool name.
-type MCPToolConfig struct {
+// MCPClientToolConfig stores per-tool enable/disable state for tools exposed by
+// Yaklang acting as an MCP server (i.e. tools provided to MCP clients).
+// One row per unique tool name, persisted across MCP server restarts.
+type MCPClientToolConfig struct {
 	gorm.Model
 
 	// ToolName is the canonical MCP tool name, e.g. "port_scan" or "mcp_IDA-MCP_decompile".
 	ToolName string `gorm:"uniqueIndex;not null" json:"tool_name"`
 
 	// Source distinguishes builtin tools from bridge tools.
-	// Values: MCPToolSourceBuiltin / MCPToolSourceBridge.
+	// Values: MCPClientToolSourceBuiltin / MCPClientToolSourceBridge.
 	Source string `gorm:"index;not null" json:"source"`
 
 	// ServerName is non-empty only for bridge tools; it equals the MCPServer.Name
@@ -41,12 +42,12 @@ type MCPToolConfig struct {
 	Description string `gorm:"type:text" json:"description"`
 }
 
-func (m *MCPToolConfig) TableName() string {
-	return "mcp_tool_configs"
+func (m *MCPClientToolConfig) TableName() string {
+	return "mcp_client_tool_configs"
 }
 
 // ToGRPC converts the model to the gRPC wire format.
-func (m *MCPToolConfig) ToGRPC() *ypb.MCPToolConfig {
+func (m *MCPClientToolConfig) ToGRPC() *ypb.MCPToolConfig {
 	return &ypb.MCPToolConfig{
 		ID:          int64(m.ID),
 		ToolName:    m.ToolName,
@@ -58,5 +59,5 @@ func (m *MCPToolConfig) ToGRPC() *ypb.MCPToolConfig {
 }
 
 func init() {
-	RegisterDatabaseSchema(KEY_SCHEMA_PROFILE_DATABASE, &MCPToolConfig{})
+	RegisterDatabaseSchema(KEY_SCHEMA_PROFILE_DATABASE, &MCPClientToolConfig{})
 }

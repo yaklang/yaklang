@@ -137,7 +137,7 @@ var MCPCommand = &cli.Command{
 
 		// Apply per-tool enable/disable state from the profile DB, matching the
 		// behaviour of grpc_mcp.go launchMcpServer.
-		disabledTools, dbErr := yakit.GetDisabledMCPToolNames(consts.GetGormProfileDatabase())
+		disabledTools, dbErr := yakit.GetDisabledMCPClientToolNames(consts.GetGormProfileDatabase())
 		if dbErr != nil {
 			log.Warnf("mcp command: failed to load disabled tool list from DB: %v", dbErr)
 		}

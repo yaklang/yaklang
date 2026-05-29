@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mcp"
@@ -139,6 +141,26 @@ func launchMcpServer(ctx context.Context, req *ypb.StartMcpServerRequest, send f
 			tools = append(tools, tool)
 		}
 		opts = append(opts, mcp.WithYakScriptTools(tools...))
+	}
+
+	if req.GetEnableAIToolFramework() {
+		db := consts.GetGormProfileDatabase()
+
+		// Built-in framework tools: fs, ssa, yakscript, etc.
+		builtinTools := buildinaitools.GetAllToolsDynamically(db)
+		if len(builtinTools) > 0 {
+			opts = append(opts, mcp.WithAITools(builtinTools...))
+			log.Infof("launchMcpServer: loaded %d built-in aitool-framework tools", len(builtinTools))
+		}
+
+		// External MCP server tools bridged through the aitool layer.
+		externalTools, mcpErr := aitool.LoadAllEnabledAIToolsFromMCPServers(db, ctx)
+		if mcpErr != nil {
+			log.Warnf("launchMcpServer: load external mcp tools via aitool-framework failed: %v", mcpErr)
+		} else if len(externalTools) > 0 {
+			opts = append(opts, mcp.WithAITools(externalTools...))
+			log.Infof("launchMcpServer: loaded %d external mcp tools via aitool-framework", len(externalTools))
+		}
 	}
 
 	// Apply per-tool enable/disable from the profile DB.
