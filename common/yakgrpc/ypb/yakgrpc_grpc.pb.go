@@ -1405,7 +1405,7 @@ type YakClient interface {
 	UpdateMCPServerToolConfig(ctx context.Context, in *UpdateMCPServerToolConfigRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
 	// MCP tool-level enable/disable management
 	GetMCPToolList(ctx context.Context, in *GetMCPToolListRequest, opts ...grpc.CallOption) (*GetMCPToolListResponse, error)
-	GetMCPToolDetail(ctx context.Context, in *GetMCPToolDetailRequest, opts ...grpc.CallOption) (*MCPToolConfig, error)
+	GetMCPToolDetail(ctx context.Context, in *GetMCPToolDetailRequest, opts ...grpc.CallOption) (*MCPClientToolConfig, error)
 	SetMCPToolEnabled(ctx context.Context, in *SetMCPToolEnabledRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
 	// RAG Collection Search
 	RAGCollectionSearch(ctx context.Context, in *RAGCollectionSearchRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[RAGCollectionSearchResponse], error)
@@ -8427,9 +8427,9 @@ func (c *yakClient) GetMCPToolList(ctx context.Context, in *GetMCPToolListReques
 	return out, nil
 }
 
-func (c *yakClient) GetMCPToolDetail(ctx context.Context, in *GetMCPToolDetailRequest, opts ...grpc.CallOption) (*MCPToolConfig, error) {
+func (c *yakClient) GetMCPToolDetail(ctx context.Context, in *GetMCPToolDetailRequest, opts ...grpc.CallOption) (*MCPClientToolConfig, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(MCPToolConfig)
+	out := new(MCPClientToolConfig)
 	err := c.cc.Invoke(ctx, Yak_GetMCPToolDetail_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -9255,7 +9255,7 @@ type YakServer interface {
 	UpdateMCPServerToolConfig(context.Context, *UpdateMCPServerToolConfigRequest) (*GeneralResponse, error)
 	// MCP tool-level enable/disable management
 	GetMCPToolList(context.Context, *GetMCPToolListRequest) (*GetMCPToolListResponse, error)
-	GetMCPToolDetail(context.Context, *GetMCPToolDetailRequest) (*MCPToolConfig, error)
+	GetMCPToolDetail(context.Context, *GetMCPToolDetailRequest) (*MCPClientToolConfig, error)
 	SetMCPToolEnabled(context.Context, *SetMCPToolEnabledRequest) (*GeneralResponse, error)
 	// RAG Collection Search
 	RAGCollectionSearch(*RAGCollectionSearchRequest, grpc.ServerStreamingServer[RAGCollectionSearchResponse]) error
@@ -11101,7 +11101,7 @@ func (UnimplementedYakServer) UpdateMCPServerToolConfig(context.Context, *Update
 func (UnimplementedYakServer) GetMCPToolList(context.Context, *GetMCPToolListRequest) (*GetMCPToolListResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetMCPToolList not implemented")
 }
-func (UnimplementedYakServer) GetMCPToolDetail(context.Context, *GetMCPToolDetailRequest) (*MCPToolConfig, error) {
+func (UnimplementedYakServer) GetMCPToolDetail(context.Context, *GetMCPToolDetailRequest) (*MCPClientToolConfig, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetMCPToolDetail not implemented")
 }
 func (UnimplementedYakServer) SetMCPToolEnabled(context.Context, *SetMCPToolEnabledRequest) (*GeneralResponse, error) {

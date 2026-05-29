@@ -47,8 +47,8 @@ func (m *MCPClientToolConfig) TableName() string {
 }
 
 // ToGRPC converts the model to the gRPC wire format.
-func (m *MCPClientToolConfig) ToGRPC() *ypb.MCPToolConfig {
-	return &ypb.MCPToolConfig{
+func (m *MCPClientToolConfig) ToGRPC() *ypb.MCPClientToolConfig {
+	return &ypb.MCPClientToolConfig{
 		ID:          int64(m.ID),
 		ToolName:    m.ToolName,
 		Source:      m.Source,
