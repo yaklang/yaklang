@@ -1884,7 +1884,23 @@ func (b *singleFileBuilder) VisitClassOrFuncDefStmt(raw *pythonparser.Class_or_f
 
 	// Check for function definition
 	if funcdef := raw.Funcdef(); funcdef != nil {
-		return b.VisitFuncdef(funcdef)
+		b.VisitFuncdef(funcdef)
+		if decorators := raw.AllDecorator(); len(decorators) > 0 {
+			funcdefCtx, ok := funcdef.(*pythonparser.FuncdefContext)
+			if ok && funcdefCtx.Name() != nil {
+				funcName := funcdefCtx.Name().GetText()
+				if funcVal := b.ReadValue(funcName); funcVal != nil {
+					wrapped := b.applyDecorators(decorators, funcVal)
+					if wrapped != nil && wrapped != funcVal {
+						funcVar := b.CreateVariable(funcName)
+						b.AssignVariable(funcVar, wrapped)
+						b.GetProgram().SetExportValue(funcName, wrapped)
+						b.syncPythonVirtualModuleExport(funcName, wrapped.GetType(), wrapped)
+					}
+				}
+			}
+		}
+		return nil
 	}
 
 	// Check for class definition
