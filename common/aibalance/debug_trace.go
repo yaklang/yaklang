@@ -13,15 +13,17 @@
 // 默认关闭, 不会污染生产 IO. 文件失败仅记 log, 绝不阻塞主流程.
 //
 // 每个请求一个目录, 目录名 = ${ts}-${reqID}, 内含:
-//   00.meta.json               请求元信息 (model, provider, route, tool mode 等)
-//   01.client_request.txt      客户端 POST /v1/chat/completions 的 raw HTTP body
-//   02.upstream_request.raw    aibalance -> 上游 wrapper 的 raw HTTP request bytes
-//   03.upstream_response.raw   上游 -> aibalance 的 raw HTTP response (header + 完整 body)
-//   04.downstream_response.sse aibalance -> 客户端 的 raw bytes (HTTP header + chunked SSE body)
-//   05.summary.txt             汇总 (开始/结束时间, 上下游字节数, finish_reason, tool_calls 数)
+//
+//	00.meta.json               请求元信息 (model, provider, route, tool mode 等)
+//	01.client_request.txt      客户端 POST /v1/chat/completions 的 raw HTTP body
+//	02.upstream_request.raw    aibalance -> 上游 wrapper 的 raw HTTP request bytes
+//	03.upstream_response.raw   上游 -> aibalance 的 raw HTTP response (header + 完整 body)
+//	04.downstream_response.sse aibalance -> 客户端 的 raw bytes (HTTP header + chunked SSE body)
+//	05.summary.txt             汇总 (开始/结束时间, 上下游字节数, finish_reason, tool_calls 数)
 //
 // 关键词: aibalance debug trace, 上下游字节对比, AIBALANCE_DEBUG_TRACE,
-//        RawHTTPRequestResponseCallback 接线, conn wrap dump
+//
+//	RawHTTPRequestResponseCallback 接线, conn wrap dump
 package aibalance
 
 import (

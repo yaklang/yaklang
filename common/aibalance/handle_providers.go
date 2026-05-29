@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aispec"
-	"github.com/yaklang/yaklang/common/schema"
 )
 
 // ==================== Provider Page Handlers ====================
@@ -214,7 +213,7 @@ func (c *ServerConfig) processAddProviders(conn net.Conn, request *http.Request)
 
 		// Create provider record
 		// 关键词: ActiveCacheControl 字段写入 db, 主动 cache_control 注入开关
-		provider := &schema.AiProvider{
+		provider := &AiProvider{
 			WrapperName:         p.WrapperName,
 			ModelName:           p.ModelName,
 			TypeName:            p.TypeName,

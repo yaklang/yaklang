@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"gopkg.in/yaml.v3"
 )
@@ -321,7 +320,7 @@ func TestLoadProvidersFromDatabase_ClearsRemovedWrapper(t *testing.T) {
 	cfg := NewServerConfig()
 	stale := &Provider{
 		ModelName: "x", TypeName: "openai",
-		DbProvider: &schema.AiProvider{WrapperName: ghost, IsHealthy: true, LastLatency: 100},
+		DbProvider: &AiProvider{WrapperName: ghost, IsHealthy: true, LastLatency: 100},
 	}
 	cfg.Models.models[ghost] = []*Provider{stale}
 	cfg.Entrypoints.providers[ghost] = []*Provider{stale}

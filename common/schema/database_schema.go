@@ -64,11 +64,10 @@ var ProfileTables = []interface{}{
 	&HotPatchTemplate{},
 	&AIForge{},
 
-	&AiProvider{},    // for aibalance
-	&AiApiKeys{},     // for aibalance
-	&LoginSession{},  // for aibalance
-	&OpsUser{},       // for aibalance - operations users
-	&OpsActionLog{},  // for aibalance - operations action logs
+	// aibalance 专属表（AiProvider/AiApiKeys/LoginSession/OpsUser/OpsActionLog）已搬回
+	// common/aibalance 包内自治迁移（见 aibalance.EnsureProviderTable 等），不再登记到
+	// 全局 ProfileTables，避免污染普通 yak 用户的 profile 数据库。
+	// 关键词: aibalance schema 归位, 不进 ProfileTables
 	&AIThirdPartyConfig{},
 	&AIYakTool{},
 	&AISkill{}, // AI Skills for aiskillloader BM25 search

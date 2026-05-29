@@ -9,7 +9,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/schema"
 )
 
 // capability_probe.go 实现 aibalance Tool Calls Capability Matrix v1 的能力探测.
@@ -294,7 +293,7 @@ func ProbeAndSaveByProviderID(providerID uint) (*ProbeResult, error) {
 
 // dbAiProviderToRuntimeProvider 把 schema.AiProvider 转成运行时 Provider 以便复用 GetAIClient.
 // 关键词: dbAiProviderToRuntimeProvider, capability probe helper
-func dbAiProviderToRuntimeProvider(db *schema.AiProvider) *Provider {
+func dbAiProviderToRuntimeProvider(db *AiProvider) *Provider {
 	return &Provider{
 		ModelName:           db.ModelName,
 		TypeName:            db.TypeName,

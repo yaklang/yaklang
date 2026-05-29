@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 )
@@ -256,9 +255,9 @@ func (c *ServerConfig) serveAmap(conn net.Conn, rawPacket []byte) {
 
 // tryAmapForwardWithKeys attempts to forward the request using the provided amap keys.
 // Keys are randomly shuffled; on key-related failure, the next key is tried.
-func (c *ServerConfig) tryAmapForwardWithKeys(keys []*schema.AmapApiKey, amapPath string) ([]byte, *schema.AmapApiKey, error) {
+func (c *ServerConfig) tryAmapForwardWithKeys(keys []*AmapApiKey, amapPath string) ([]byte, *AmapApiKey, error) {
 	// Shuffle keys
-	shuffled := make([]*schema.AmapApiKey, len(keys))
+	shuffled := make([]*AmapApiKey, len(keys))
 	copy(shuffled, keys)
 	rand.Shuffle(len(shuffled), func(i, j int) {
 		shuffled[i], shuffled[j] = shuffled[j], shuffled[i]
@@ -314,7 +313,7 @@ func (c *ServerConfig) tryAmapForwardWithKeys(keys []*schema.AmapApiKey, amapPat
 }
 
 // doAmapForward performs the actual HTTP forward to restapi.amap.com
-func (c *ServerConfig) doAmapForward(sk *schema.AmapApiKey, amapPath string) ([]byte, error) {
+func (c *ServerConfig) doAmapForward(sk *AmapApiKey, amapPath string) ([]byte, error) {
 	// Parse the path and query string
 	pathAndQuery := amapPath
 	if !strings.HasPrefix(pathAndQuery, "/") {

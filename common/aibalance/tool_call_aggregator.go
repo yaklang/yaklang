@@ -1,19 +1,20 @@
 // tool_call_aggregator.go - aibalance 工具调用聚合日志器
 //
 // 用途: OpenAI Chat Completions 流式 tool_calls 协议下, 上游每帧 SSE 只携带
-//   delta.tool_calls[*].function.arguments 的几字节增量, 客户端按 index 累积
-//   后才能拼出完整 tool_call. 这种 incremental 形态对客户端是合规的, 但对
-//   aibalance 运维而言, 在生产日志里只能看到"index=0 args='curl'"/"index=0
-//   args=' -'"/... 几十帧零碎片段, 几乎无法肉眼判断 "这一轮 model 究竟调了
-//   哪个工具、参数是什么".
 //
-//   ToolCallAggregator 在不破坏下行 SSE 透传的前提下镜像一份增量流到一个
-//   状态机, 按 OpenAI tool_calls 协议规则聚合, 在以下三个时机往系统日志输出
-//   一行 "完整 tool_call" 记录:
+//	delta.tool_calls[*].function.arguments 的几字节增量, 客户端按 index 累积
+//	后才能拼出完整 tool_call. 这种 incremental 形态对客户端是合规的, 但对
+//	aibalance 运维而言, 在生产日志里只能看到"index=0 args='curl'"/"index=0
+//	args=' -'"/... 几十帧零碎片段, 几乎无法肉眼判断 "这一轮 model 究竟调了
+//	哪个工具、参数是什么".
 //
-//     1. 某个 index 首次出现 (且 name 已知) → "tool_call_agg: started ..."
-//     2. 看到不同 index 出现 → flush 之前那个 index → "completed ..."
-//     3. Flush() 调用 (通常 writer.Close 触发) → 把所有未 flush 的 entry 一次性 flush
+//	ToolCallAggregator 在不破坏下行 SSE 透传的前提下镜像一份增量流到一个
+//	状态机, 按 OpenAI tool_calls 协议规则聚合, 在以下三个时机往系统日志输出
+//	一行 "完整 tool_call" 记录:
+//
+//	  1. 某个 index 首次出现 (且 name 已知) → "tool_call_agg: started ..."
+//	  2. 看到不同 index 出现 → flush 之前那个 index → "completed ..."
+//	  3. Flush() 调用 (通常 writer.Close 触发) → 把所有未 flush 的 entry 一次性 flush
 //
 // 设计原则:
 //   - 不影响下行 SSE 字节: Observe 仅做聚合, 不写 writerClose
@@ -23,7 +24,8 @@
 //   - 日志全英文, 严肃, 一行一记录, 便于 grep
 //
 // 关键词: ToolCallAggregator, incremental tool_calls 聚合日志, 镜像状态机,
-//        OpenAI 流式协议 index 累积, aibalance 运维可观测性
+//
+//	OpenAI 流式协议 index 累积, aibalance 运维可观测性
 package aibalance
 
 import (

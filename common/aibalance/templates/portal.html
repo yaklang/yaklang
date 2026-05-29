@@ -96,7 +96,6 @@
                 <div class="group-title">概览</div>
                 <div class="menu-item active" data-tab="all">全部供应商</div>
                 <div class="menu-item" data-tab="models">模型信息</div>
-                <div class="menu-item" data-tab="dau-cache">日活与缓存</div>
             </div>
             <div class="sidebar-group">
                 <div class="group-title">接口管理</div>
@@ -105,8 +104,12 @@
                 <div class="menu-item" data-tab="totp">TOTP认证</div>
             </div>
             <div class="sidebar-group">
-                <div class="group-title">限流与经营</div>
+                <div class="group-title">限流与统计</div>
                 <div class="menu-item" data-tab="rate-limit">限流配置</div>
+                <div class="menu-item" data-tab="dau-cache">日活与缓存</div>
+            </div>
+            <div class="sidebar-group">
+                <div class="group-title">经营管理</div>
                 <div class="menu-item" data-tab="ops-users">运营用户</div>
                 <div class="menu-item" data-tab="ops-logs">操作日志</div>
             </div>
@@ -1066,6 +1069,72 @@
                             </tbody>
                         </table>
                     </div>
+                </div>
+
+                <!-- Custom 429 / error notice -->
+                <!-- 关键词: portal 自定义 429 文案面板, custom_429_enabled, custom_429_notice, custom_429_kind_overrides -->
+                <div style="margin-bottom: 20px;">
+                    <h4 style="margin-bottom: 10px;">自定义 429 / 错误文案</h4>
+                    <small style="color: #888; margin-bottom: 10px; display: block;">
+                        关闭时（默认）完全保持系统内置的 429 文案。启用后：全局 <code>notice</code> 文案会注入到所有限流 429 响应体的 <code>notice</code> 字段；
+                        <br>各类型文案非空时会覆盖对应限流 429 的 <code>message</code>，留空表示沿用内置默认文案。
+                        <br><code>limit_kind</code> 取值：<code>rpm</code>(请求频率) / <code>daily_token</code>(免费日额度) / <code>traffic</code>(流量额度) / <code>token</code>(Token 额度) / <code>memfit_version</code>(客户端版本)。
+                    </small>
+                    <div class="form-group" style="margin-bottom: 10px;">
+                        <label>
+                            <input type="checkbox" id="rl-custom429-enabled" style="margin-right: 6px;">
+                            启用自定义 429 / 错误文案
+                        </label>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 10px;">
+                        <label>全局 notice 文案（注入所有限流 429 的 notice 字段）:</label>
+                        <textarea id="rl-custom429-notice" class="form-control" rows="2"
+                            placeholder="例如：如需提升额度请联系管理员 / 当前为高峰期，请稍后再试"
+                            style="font-size: 13px;"></textarea>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label>请求频率限流文案 (rpm):</label>
+                            <input type="text" id="rl-custom429-rpm" class="form-control" style="font-size: 13px;"
+                                placeholder="留空使用默认文案">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label>免费日额度文案 (daily_token):</label>
+                            <input type="text" id="rl-custom429-daily_token" class="form-control" style="font-size: 13px;"
+                                placeholder="留空使用默认文案">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label>流量额度文案 (traffic):</label>
+                            <input type="text" id="rl-custom429-traffic" class="form-control" style="font-size: 13px;"
+                                placeholder="留空使用默认文案">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label>Token 额度文案 (token):</label>
+                            <input type="text" id="rl-custom429-token" class="form-control" style="font-size: 13px;"
+                                placeholder="留空使用默认文案">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label>客户端版本控流文案 (memfit_version):</label>
+                            <input type="text" id="rl-custom429-memfit_version" class="form-control" style="font-size: 13px;"
+                                placeholder="留空使用默认文案">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Lightweight model downgrade rules -->
+                <!-- 关键词: portal 轻量降级规则面板, model_downgrade_rules, X-Yak-AI-Model-Usage-Type, 保护用量 -->
+                <div style="margin-bottom: 20px;">
+                    <h4 style="margin-bottom: 10px;">模型用途降级规则</h4>
+                    <small style="color: #888; margin-bottom: 10px; display: block;">
+                        客户端在调用时通过请求头 <code>X-Yak-AI-Model-Usage-Type</code> 上报本次是「高质 intelligent / 快速 lightweight / 视觉 vision」哪一档发起的。
+                        <br>命中规则（用途类型匹配且请求模型 == 源模型）时，服务端会自动把请求模型降级为目标模型，以保护用量。
+                        <br>用途类型选「任意」表示不限 tier。<strong style="color: #d84315;">模型名称请填写对外名称（如 memfit-standard-free）。</strong>
+                        <br>不添加任何规则即表示关闭降级（保存为空列表）。
+                    </small>
+                    <div id="rl-downgrade-rules-list" style="margin-bottom: 10px;">
+                        <!-- Dynamic rows -->
+                    </div>
+                    <button class="btn" onclick="addModelDowngradeRule()" style="font-size: 12px;">+ 添加降级规则</button>
                 </div>
 
                 <!-- Model rate-limit overrides (RPM + free-user delay range + output TPS) -->

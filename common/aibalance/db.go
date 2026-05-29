@@ -2,6 +2,7 @@ package aibalance
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/jinzhu/gorm"
@@ -9,16 +10,37 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 )
 
+// coreTablesMigrateOnce 保证 aibalance 专属基础表（原 schema.ProfileTables 中的
+// AiProvider/AiApiKeys/LoginSession/OpsUser/OpsActionLog）在首次访问 DB 时一定被迁移。
+// 这些类型已从全局 schema.ProfileTables 搬回本包，全局自动迁移不再覆盖它们，
+// 这里用 Once 恢复「访问即存在」的旧保证，且不污染普通 yak 用户的 profile 库。
+// 关键词: aibalance 核心表自治迁移, GetDB Once 迁移, 不进 ProfileTables
+var coreTablesMigrateOnce sync.Once
+
 func GetDB() *gorm.DB {
-	return schema.GetGormProfileDatabase()
+	db := schema.GetGormProfileDatabase()
+	if db != nil {
+		coreTablesMigrateOnce.Do(func() {
+			if err := db.AutoMigrate(
+				&AiProvider{},
+				&AiApiKeys{},
+				&LoginSession{},
+				&OpsUser{},
+				&OpsActionLog{},
+			).Error; err != nil {
+				log.Warnf("auto-migrate aibalance core tables failed: %v", err)
+			}
+		})
+	}
+	return db
 }
 
-func SaveAiProvider(provider *schema.AiProvider) error {
+func SaveAiProvider(provider *AiProvider) error {
 	return GetDB().Create(provider).Error
 }
 
-func GetOrCreateAiProvider(provider *schema.AiProvider) (*schema.AiProvider, error) {
-	var existingProvider schema.AiProvider
+func GetOrCreateAiProvider(provider *AiProvider) (*AiProvider, error) {
+	var existingProvider AiProvider
 	if err := GetDB().Where("wrapper_name = ? AND model_name = ? AND api_key = ?",
 		provider.WrapperName, provider.ModelName, provider.APIKey).First(&existingProvider).Error; err != nil {
 		// If record not found, create a new one
@@ -31,8 +53,8 @@ func GetOrCreateAiProvider(provider *schema.AiProvider) (*schema.AiProvider, err
 	return &existingProvider, nil
 }
 
-func GetAllAiProviders() ([]*schema.AiProvider, error) {
-	var providers []*schema.AiProvider
+func GetAllAiProviders() ([]*AiProvider, error) {
+	var providers []*AiProvider
 	if err := schema.GetGormProfileDatabase().Find(&providers).Error; err != nil {
 		return nil, err
 	}
@@ -40,8 +62,8 @@ func GetAllAiProviders() ([]*schema.AiProvider, error) {
 }
 
 // GetAiProvidersByModelName gets all providers with specified model name (WrapperName) from database
-func GetAiProvidersByModelName(modelName string) ([]*schema.AiProvider, error) {
-	var providers []*schema.AiProvider
+func GetAiProvidersByModelName(modelName string) ([]*AiProvider, error) {
+	var providers []*AiProvider
 	if err := GetDB().Where("wrapper_name = ?", modelName).Find(&providers).Error; err != nil {
 		return nil, err
 	}
@@ -49,8 +71,8 @@ func GetAiProvidersByModelName(modelName string) ([]*schema.AiProvider, error) {
 }
 
 // GetAiProvidersByModelType gets all providers with specified model type (TypeName) from database
-func GetAiProvidersByModelType(typeName string) ([]*schema.AiProvider, error) {
-	var providers []*schema.AiProvider
+func GetAiProvidersByModelType(typeName string) ([]*AiProvider, error) {
+	var providers []*AiProvider
 	if err := GetDB().Where("type_name = ?", typeName).Find(&providers).Error; err != nil {
 		return nil, err
 	}
@@ -64,9 +86,9 @@ func GetAiProvidersByModelType(typeName string) ([]*schema.AiProvider, error) {
 // domainOrUrl: API domain or URL
 // apiKey: API key
 // noHTTPS: whether to disable HTTPS
-func RegisterAiProvider(wrapperName, modelName, typeName, domainOrUrl, apiKey string, noHTTPS bool) (*schema.AiProvider, error) {
+func RegisterAiProvider(wrapperName, modelName, typeName, domainOrUrl, apiKey string, noHTTPS bool) (*AiProvider, error) {
 	// Create provider object
-	provider := &schema.AiProvider{
+	provider := &AiProvider{
 		WrapperName:           wrapperName,
 		ModelName:             modelName,
 		TypeName:              typeName,
@@ -85,7 +107,7 @@ func RegisterAiProvider(wrapperName, modelName, typeName, domainOrUrl, apiKey st
 	}
 
 	// Check if provider with same details exists
-	var existingProvider schema.AiProvider
+	var existingProvider AiProvider
 	if err := GetDB().Where("wrapper_name = ? AND model_name = ? AND api_key = ?",
 		wrapperName, modelName, apiKey).First(&existingProvider).Error; err == nil {
 		// If exists, return existing provider
@@ -104,13 +126,13 @@ func RegisterAiProvider(wrapperName, modelName, typeName, domainOrUrl, apiKey st
 	return provider, nil
 }
 
-func UpdateAiProvider(provider *schema.AiProvider) error {
+func UpdateAiProvider(provider *AiProvider) error {
 	return GetDB().Save(provider).Error
 }
 
 // SaveAiApiKey saves API key to database
 func SaveAiApiKey(apiKey string, allowedModels string) error {
-	key := &schema.AiApiKeys{
+	key := &AiApiKeys{
 		APIKey:        apiKey,
 		AllowedModels: allowedModels,
 		InputBytes:    0,
@@ -124,8 +146,8 @@ func SaveAiApiKey(apiKey string, allowedModels string) error {
 }
 
 // GetAiApiKey gets database record by API key
-func GetAiApiKey(apiKey string) (*schema.AiApiKeys, error) {
-	var key schema.AiApiKeys
+func GetAiApiKey(apiKey string) (*AiApiKeys, error) {
+	var key AiApiKeys
 	if err := GetDB().Where("api_key = ?", apiKey).First(&key).Error; err != nil {
 		return nil, err
 	}
@@ -133,8 +155,8 @@ func GetAiApiKey(apiKey string) (*schema.AiApiKeys, error) {
 }
 
 // GetAllAiApiKeys gets all API keys
-func GetAllAiApiKeys() ([]*schema.AiApiKeys, error) {
-	var keys []*schema.AiApiKeys
+func GetAllAiApiKeys() ([]*AiApiKeys, error) {
+	var keys []*AiApiKeys
 	if err := GetDB().Find(&keys).Error; err != nil {
 		return nil, err
 	}
@@ -143,18 +165,18 @@ func GetAllAiApiKeys() ([]*schema.AiApiKeys, error) {
 
 // DeleteAiApiKey deletes API key
 func DeleteAiApiKey(apiKey string) error {
-	return GetDB().Where("api_key = ?", apiKey).Delete(&schema.AiApiKeys{}).Error
+	return GetDB().Where("api_key = ?", apiKey).Delete(&AiApiKeys{}).Error
 }
 
 // UpdateAiApiKey updates allowed models for API key
 func UpdateAiApiKey(apiKey string, allowedModels string) error {
-	return GetDB().Model(&schema.AiApiKeys{}).Where("api_key = ?", apiKey).
+	return GetDB().Model(&AiApiKeys{}).Where("api_key = ?", apiKey).
 		Update("allowed_models", allowedModels).Error
 }
 
 // GetAiProviderByID gets single AI provider by ID
-func GetAiProviderByID(id uint) (*schema.AiProvider, error) {
-	var provider schema.AiProvider
+func GetAiProviderByID(id uint) (*AiProvider, error) {
+	var provider AiProvider
 	if err := GetDB().Where("id = ?", id).First(&provider).Error; err != nil {
 		return nil, err
 	}
@@ -170,7 +192,7 @@ func DeleteAiProviderByID(id uint) error {
 	}
 
 	// Execute delete operation
-	if err := GetDB().Delete(&schema.AiProvider{}, id).Error; err != nil {
+	if err := GetDB().Delete(&AiProvider{}, id).Error; err != nil {
 		return fmt.Errorf("Failed to delete provider: %v", err)
 	}
 
@@ -188,7 +210,7 @@ func DeleteAiProviderByID(id uint) error {
 // success：请求是否成功
 func UpdateAiApiKeyStats(apiKey string, inputBytes, outputBytes int64, success bool) error {
 	// 获取数据库中的 API Key 记录
-	var key schema.AiApiKeys
+	var key AiApiKeys
 	if err := GetDB().Where("api_key = ?", apiKey).First(&key).Error; err != nil {
 		return fmt.Errorf("Failed to find API key: %v", err)
 	}
@@ -211,7 +233,7 @@ func UpdateAiApiKeyStats(apiKey string, inputBytes, outputBytes int64, success b
 
 // IncrementAiApiKeyWebSearchCount increments the web search usage count for an API key
 func IncrementAiApiKeyWebSearchCount(apiKey string) error {
-	return GetDB().Model(&schema.AiApiKeys{}).Where("api_key = ?", apiKey).
+	return GetDB().Model(&AiApiKeys{}).Where("api_key = ?", apiKey).
 		UpdateColumn("web_search_count", gorm.Expr("web_search_count + ?", 1)).Error
 }
 
@@ -224,13 +246,13 @@ func UpdateFreeUserStats(inputBytes, outputBytes int64, success bool) error {
 	const freeUserKey = "free-user"
 
 	// 尝试获取 free-user 记录
-	var key schema.AiApiKeys
+	var key AiApiKeys
 	err := GetDB().Where("api_key = ?", freeUserKey).First(&key).Error
 
 	if err != nil {
 		if gorm.IsRecordNotFoundError(err) {
 			// 创建 free-user 记录
-			key = schema.AiApiKeys{
+			key = AiApiKeys{
 				APIKey:        freeUserKey,
 				AllowedModels: "*-free", // 允许所有免费模型
 				InputBytes:    0,
@@ -268,7 +290,7 @@ func UpdateFreeUserStats(inputBytes, outputBytes int64, success bool) error {
 
 // UpdateAiApiKeyStatus 更新单个 API Key 的激活状态
 func UpdateAiApiKeyStatus(id uint, active bool) error {
-	result := GetDB().Model(&schema.AiApiKeys{}).Where("id = ?", id).Update("active", active)
+	result := GetDB().Model(&AiApiKeys{}).Where("id = ?", id).Update("active", active)
 	if result.Error != nil {
 		return fmt.Errorf("failed to update status for API key ID %d: %w", id, result.Error)
 	}
@@ -289,7 +311,7 @@ func BatchUpdateAiApiKeyStatus(ids []uint, active bool) (int64, error) {
 	if len(ids) == 0 {
 		return 0, nil // 没有 ID 需要更新
 	}
-	result := GetDB().Model(&schema.AiApiKeys{}).Where("id IN (?)", ids).Update("active", active)
+	result := GetDB().Model(&AiApiKeys{}).Where("id IN (?)", ids).Update("active", active)
 	if result.Error != nil {
 		return 0, fmt.Errorf("failed to batch update status for %d API keys: %w", len(ids), result.Error)
 	}
@@ -303,7 +325,7 @@ func BatchUpdateAiApiKeyStatus(ids []uint, active bool) (int64, error) {
 
 // UpdateAiApiKeyAllowedModels updates allowed models for API key by ID
 func UpdateAiApiKeyAllowedModels(id uint, allowedModels string) error {
-	result := GetDB().Model(&schema.AiApiKeys{}).Where("id = ?", id).
+	result := GetDB().Model(&AiApiKeys{}).Where("id = ?", id).
 		Update("allowed_models", allowedModels)
 
 	if result.Error != nil {
@@ -483,7 +505,7 @@ func GetAllModelMetas() (map[string]*AiModelMeta, error) {
 
 // UpdateAiApiKeyTrafficLimit updates the traffic limit settings for an API key
 func UpdateAiApiKeyTrafficLimit(id uint, limit int64, enable bool) error {
-	result := GetDB().Model(&schema.AiApiKeys{}).Where("id = ?", id).Updates(map[string]interface{}{
+	result := GetDB().Model(&AiApiKeys{}).Where("id = ?", id).Updates(map[string]interface{}{
 		"traffic_limit":        limit,
 		"traffic_limit_enable": enable,
 	})
@@ -499,7 +521,7 @@ func UpdateAiApiKeyTrafficLimit(id uint, limit int64, enable bool) error {
 
 // ResetAiApiKeyTrafficUsed resets the traffic used counter for an API key
 func ResetAiApiKeyTrafficUsed(id uint) error {
-	result := GetDB().Model(&schema.AiApiKeys{}).Where("id = ?", id).Update("traffic_used", 0)
+	result := GetDB().Model(&AiApiKeys{}).Where("id = ?", id).Update("traffic_used", 0)
 	if result.Error != nil {
 		return fmt.Errorf("failed to reset traffic used for API key ID %d: %w", id, result.Error)
 	}
@@ -513,43 +535,43 @@ func ResetAiApiKeyTrafficUsed(id uint) error {
 // CheckAiApiKeyTrafficLimit checks if an API key has exceeded its traffic limit
 // Returns (isAllowed, error) - isAllowed is true if the key can be used
 func CheckAiApiKeyTrafficLimit(apiKey string) (bool, error) {
-	var key schema.AiApiKeys
+	var key AiApiKeys
 	if err := GetDB().Where("api_key = ?", apiKey).First(&key).Error; err != nil {
 		return false, fmt.Errorf("failed to find API key: %v", err)
 	}
-	
+
 	// If traffic limit is not enabled, always allow
 	if !key.TrafficLimitEnable {
 		return true, nil
 	}
-	
+
 	// If limit is 0, it means unlimited
 	if key.TrafficLimit <= 0 {
 		return true, nil
 	}
-	
+
 	// Check if used traffic exceeds limit
 	if key.TrafficUsed >= key.TrafficLimit {
 		return false, nil
 	}
-	
+
 	return true, nil
 }
 
 // UpdateAiApiKeyTrafficUsed adds to the traffic used counter for an API key
 func UpdateAiApiKeyTrafficUsed(apiKey string, additionalTraffic int64) error {
-	var key schema.AiApiKeys
+	var key AiApiKeys
 	if err := GetDB().Where("api_key = ?", apiKey).First(&key).Error; err != nil {
 		return fmt.Errorf("failed to find API key: %v", err)
 	}
-	
+
 	key.TrafficUsed += additionalTraffic
 	return GetDB().Save(&key).Error
 }
 
 // GetAiApiKeyByID retrieves an API key by its ID
-func GetAiApiKeyByID(id uint) (*schema.AiApiKeys, error) {
-	var key schema.AiApiKeys
+func GetAiApiKeyByID(id uint) (*AiApiKeys, error) {
+	var key AiApiKeys
 	if err := GetDB().Where("id = ?", id).First(&key).Error; err != nil {
 		return nil, err
 	}
@@ -565,7 +587,7 @@ func DeleteAiApiKeyByID(id uint) error {
 	}
 
 	// Execute delete operation
-	if err := GetDB().Delete(&schema.AiApiKeys{}, id).Error; err != nil {
+	if err := GetDB().Delete(&AiApiKeys{}, id).Error; err != nil {
 		return fmt.Errorf("failed to delete API key: %v", err)
 	}
 
@@ -583,7 +605,7 @@ func BatchDeleteAiApiKeys(ids []uint) (int64, error) {
 	if len(ids) == 0 {
 		return 0, nil
 	}
-	result := GetDB().Where("id IN (?)", ids).Delete(&schema.AiApiKeys{})
+	result := GetDB().Where("id IN (?)", ids).Delete(&AiApiKeys{})
 	if result.Error != nil {
 		return 0, fmt.Errorf("failed to batch delete API keys: %w", result.Error)
 	}
@@ -599,10 +621,10 @@ func BatchDeleteAiApiKeys(ids []uint) (int64, error) {
 // sortBy: field to sort by (created_at, usage_count, traffic_used, etc.)
 // sortOrder: "asc" or "desc"
 // Returns: keys, total count, error
-func GetAiApiKeysPaginated(page, pageSize int, sortBy, sortOrder string) ([]*schema.AiApiKeys, int64, error) {
-	var keys []*schema.AiApiKeys
+func GetAiApiKeysPaginated(page, pageSize int, sortBy, sortOrder string) ([]*AiApiKeys, int64, error) {
+	var keys []*AiApiKeys
 	var total int64
-	
+
 	// Validate and set defaults
 	if page < 1 {
 		page = 1
@@ -613,45 +635,45 @@ func GetAiApiKeysPaginated(page, pageSize int, sortBy, sortOrder string) ([]*sch
 	if pageSize > 100 {
 		pageSize = 100 // Max page size
 	}
-	
+
 	// Validate sort field to prevent SQL injection
 	allowedSortFields := map[string]bool{
-		"id":           true,
-		"created_at":   true,
-		"updated_at":   true,
-		"usage_count":  true,
-		"success_count": true,
-		"failure_count": true,
-		"input_bytes":  true,
-		"output_bytes": true,
-		"traffic_used": true,
-		"traffic_limit": true,
+		"id":             true,
+		"created_at":     true,
+		"updated_at":     true,
+		"usage_count":    true,
+		"success_count":  true,
+		"failure_count":  true,
+		"input_bytes":    true,
+		"output_bytes":   true,
+		"traffic_used":   true,
+		"traffic_limit":  true,
 		"last_used_time": true,
-		"active":       true,
+		"active":         true,
 	}
-	
+
 	if !allowedSortFields[sortBy] {
 		sortBy = "created_at"
 	}
-	
+
 	if sortOrder != "asc" && sortOrder != "desc" {
 		sortOrder = "desc"
 	}
-	
+
 	// Get total count
-	if err := GetDB().Model(&schema.AiApiKeys{}).Count(&total).Error; err != nil {
+	if err := GetDB().Model(&AiApiKeys{}).Count(&total).Error; err != nil {
 		return nil, 0, fmt.Errorf("failed to count API keys: %v", err)
 	}
-	
+
 	// Calculate offset
 	offset := (page - 1) * pageSize
-	
+
 	// Query with pagination and sorting
 	orderClause := fmt.Sprintf("%s %s", sortBy, sortOrder)
 	if err := GetDB().Order(orderClause).Offset(offset).Limit(pageSize).Find(&keys).Error; err != nil {
 		return nil, 0, fmt.Errorf("failed to get API keys: %v", err)
 	}
-	
+
 	return keys, total, nil
 }
 
@@ -659,17 +681,17 @@ func GetAiApiKeysPaginated(page, pageSize int, sortBy, sortOrder string) ([]*sch
 
 // EnsureHealthRecordTable ensures the AiProviderHealthRecord table exists
 func EnsureHealthRecordTable() error {
-	return GetDB().AutoMigrate(&schema.AiProviderHealthRecord{}).Error
+	return GetDB().AutoMigrate(&AiProviderHealthRecord{}).Error
 }
 
 // SaveHealthRecord saves a single health check record
-func SaveHealthRecord(record *schema.AiProviderHealthRecord) error {
+func SaveHealthRecord(record *AiProviderHealthRecord) error {
 	return GetDB().Create(record).Error
 }
 
 // GetHealthRecordsByModel retrieves health records for a specific model since a given time
-func GetHealthRecordsByModel(wrapperName string, since time.Time) ([]*schema.AiProviderHealthRecord, error) {
-	var records []*schema.AiProviderHealthRecord
+func GetHealthRecordsByModel(wrapperName string, since time.Time) ([]*AiProviderHealthRecord, error) {
+	var records []*AiProviderHealthRecord
 	err := GetDB().Where("wrapper_name = ? AND check_time >= ?", wrapperName, since).
 		Order("check_time ASC").Find(&records).Error
 	if err != nil {
@@ -691,12 +713,12 @@ func GetAllHealthSummary(since time.Time) ([]HealthSummary, error) {
 	start := time.Now()
 
 	var totalRecords int64
-	GetDB().Model(&schema.AiProviderHealthRecord{}).Where("check_time >= ?", since).Count(&totalRecords)
+	GetDB().Model(&AiProviderHealthRecord{}).Where("check_time >= ?", since).Count(&totalRecords)
 	log.Infof("GetAllHealthSummary: querying records since %v, total records in range: %d, count query took %v",
 		since.Format("2006-01-02 15:04:05"), totalRecords, time.Since(start))
 
 	var results []HealthSummary
-	rows, err := GetDB().Model(&schema.AiProviderHealthRecord{}).
+	rows, err := GetDB().Model(&AiProviderHealthRecord{}).
 		Select("wrapper_name, COUNT(*) as total_checks, SUM(CASE WHEN is_healthy THEN 1 ELSE 0 END) as healthy_count").
 		Where("check_time >= ?", since).
 		Group("wrapper_name").Rows()
@@ -767,7 +789,7 @@ func GetRecentLatencyByModel(limit int, modelNames []string) (map[string][]Laten
 	result := make(map[string][]LatencyPoint)
 	totalPoints := 0
 	for _, name := range names {
-		var records []schema.AiProviderHealthRecord
+		var records []AiProviderHealthRecord
 		if err := GetDB().Where("wrapper_name = ?", name).
 			Order("check_time DESC").Limit(limit).Find(&records).Error; err != nil {
 			continue
@@ -794,7 +816,7 @@ func GetRecentLatencyByModel(limit int, modelNames []string) (map[string][]Laten
 
 // CleanupOldHealthRecords removes health records older than the given time
 func CleanupOldHealthRecords(before time.Time) (int64, error) {
-	result := GetDB().Where("check_time < ?", before).Delete(&schema.AiProviderHealthRecord{})
+	result := GetDB().Where("check_time < ?", before).Delete(&AiProviderHealthRecord{})
 	if result.Error != nil {
 		return 0, result.Error
 	}

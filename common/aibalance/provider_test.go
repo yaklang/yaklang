@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/yaklang/yaklang/common/schema"
 )
 
 func TestProvider_GetAIClient(t *testing.T) {
@@ -207,7 +206,7 @@ func TestProviderConcurrentUpdate(t *testing.T) {
 
 	// 现在测试 UpdateDbProvider 方法的并发安全性
 	// 创建一个测试用的 Provider
-	testDbProvider := &schema.AiProvider{
+	testDbProvider := &AiProvider{
 		SuccessCount:  0,
 		FailureCount:  0,
 		TotalRequests: 0,

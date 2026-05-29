@@ -3,8 +3,6 @@ package aibalance
 import (
 	"testing"
 	"time"
-
-	"github.com/yaklang/yaklang/common/schema"
 )
 
 // TestIsProviderProblematic tests the isProviderProblematic logic
@@ -13,12 +11,12 @@ func TestIsProviderProblematic(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		provider *schema.AiProvider
+		provider *AiProvider
 		expected bool
 	}{
 		{
 			name: "first check not completed - should be problematic",
-			provider: &schema.AiProvider{
+			provider: &AiProvider{
 				IsHealthy:             true,
 				LastLatency:           500,
 				IsFirstCheckCompleted: false,
@@ -27,7 +25,7 @@ func TestIsProviderProblematic(t *testing.T) {
 		},
 		{
 			name: "healthy with good latency - should not be problematic",
-			provider: &schema.AiProvider{
+			provider: &AiProvider{
 				IsHealthy:             true,
 				LastLatency:           500,
 				IsFirstCheckCompleted: true,
@@ -36,7 +34,7 @@ func TestIsProviderProblematic(t *testing.T) {
 		},
 		{
 			name: "not healthy - should be problematic",
-			provider: &schema.AiProvider{
+			provider: &AiProvider{
 				IsHealthy:             false,
 				LastLatency:           500,
 				IsFirstCheckCompleted: true,
@@ -45,7 +43,7 @@ func TestIsProviderProblematic(t *testing.T) {
 		},
 		{
 			name: "zero latency - should be problematic",
-			provider: &schema.AiProvider{
+			provider: &AiProvider{
 				IsHealthy:             true,
 				LastLatency:           0,
 				IsFirstCheckCompleted: true,
@@ -54,7 +52,7 @@ func TestIsProviderProblematic(t *testing.T) {
 		},
 		{
 			name: "high latency (>= 10s) - should be problematic",
-			provider: &schema.AiProvider{
+			provider: &AiProvider{
 				IsHealthy:             true,
 				LastLatency:           10000, // 10 seconds
 				IsFirstCheckCompleted: true,
@@ -63,7 +61,7 @@ func TestIsProviderProblematic(t *testing.T) {
 		},
 		{
 			name: "latency just below threshold - should not be problematic",
-			provider: &schema.AiProvider{
+			provider: &AiProvider{
 				IsHealthy:             true,
 				LastLatency:           9999,
 				IsFirstCheckCompleted: true,

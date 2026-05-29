@@ -1,7 +1,7 @@
 // mock-dumb-upstream 模拟一个不识别 OpenAI tool_calls 协议的 wrapper:
 //   - 收到含 tools=[...] 的 round1 请求: 不调工具, 只回纯文本 (经典 z-deepseek 行为)
 //   - 收到含 assistant.tool_calls / role=tool 的 round2 请求: 立即 finish_reason=stop
-//     + content="" 空回 (复刻线上 z-deepseek-v4-pro round2 故障行为)
+//   - content="" 空回 (复刻线上 z-deepseek-v4-pro round2 故障行为)
 //   - 收到 ReAct flatten 后的请求 (没有 tools 字段 + 没有 role=tool + 出现
 //     [tool_call ...] / [tool_result ...] 文本): 走 ReAct 处理流程, 返回自然语言
 //

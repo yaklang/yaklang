@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"gopkg.in/yaml.v3"
 )
@@ -143,7 +142,7 @@ func fixHistoricalProviderHealthState() error {
 
 	// Find providers where: IsFirstCheckCompleted is false AND IsHealthy is true
 	// We don't need to check HealthCheckTime specifically, as IsHealthy=true implies a successful check happened.
-	result := db.Model(&schema.AiProvider{}).
+	result := db.Model(&AiProvider{}).
 		Where("is_first_check_completed = ? AND is_healthy = ?", false, true).
 		Update("is_first_check_completed", true)
 
@@ -167,6 +166,25 @@ func LoadProvidersFromDatabase(config *ServerConfig) error {
 	// 0. Initialize Memfit TOTP system
 	if err := InitMemfitTOTP(); err != nil {
 		log.Warnf("Failed to initialize Memfit TOTP: %v", err)
+	}
+
+	// Ensure aibalance 专属基础表存在（原先登记在 schema.ProfileTables，现已搬回本包自治迁移）。
+	// 必须在 GetAllAiProviders / API key / ops user 等查询之前完成，否则首启会因表不存在报错。
+	// 关键词: aibalance B 类表自治迁移, EnsureProviderTable, EnsureApiKeysTable, EnsureOpsUserTable
+	if err := EnsureProviderTable(); err != nil {
+		log.Warnf("Failed to ensure AiProvider table exists: %v", err)
+	}
+	if err := EnsureApiKeysTable(); err != nil {
+		log.Warnf("Failed to ensure AiApiKeys table exists: %v", err)
+	}
+	if err := EnsureLoginSessionTable(); err != nil {
+		log.Warnf("Failed to ensure LoginSession table exists: %v", err)
+	}
+	if err := EnsureOpsUserTable(); err != nil {
+		log.Warnf("Failed to ensure OpsUser table exists: %v", err)
+	}
+	if err := EnsureOpsActionLogTable(); err != nil {
+		log.Warnf("Failed to ensure OpsActionLog table exists: %v", err)
 	}
 
 	// 1. Load AI providers

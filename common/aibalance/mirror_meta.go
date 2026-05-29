@@ -158,7 +158,8 @@ func MirrorDataSpec() []MirrorDataField {
 //   - 示例字段都用 redacted / hash 形态, 不暴露任何敏感数据.
 //
 // 关键词: DefaultMirrorScript, mirror default template, YAK_MAIN guarded test,
-//        handle(data) entrypoint, 本地测试 yak xxx.yak
+//
+//	handle(data) entrypoint, 本地测试 yak xxx.yak
 func DefaultMirrorScript() string {
 	return defaultMirrorScriptTemplate
 }

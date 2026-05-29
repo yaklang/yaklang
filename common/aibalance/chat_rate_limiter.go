@@ -58,8 +58,8 @@ func (s *keyRPMState) trimExpired(now time.Time) {
 // 而不是 60s 固定窗口下的累计拒绝数。
 // 关键词: chat rate limiter queue residence, 排队驻留, 退避
 type ChatRateLimiter struct {
-	states     sync.Map // map[apiKey]*keyRPMState
-	rejectMu   sync.Mutex
+	states   sync.Map // map[apiKey]*keyRPMState
+	rejectMu sync.Mutex
 	// rejectExpiries 存放每次拒绝对应的过期时间戳（绝对时间）。
 	// 注意：由于每次插入的过期时间是 now + 随机驻留，因此切片整体并不严格有序，
 	// 修剪逻辑必须使用全量扫描的 in-place 过滤，而不能假设单调递增。

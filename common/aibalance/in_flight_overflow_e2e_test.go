@@ -15,9 +15,9 @@ import (
 // TestE2E_InFlight_BlocksNewRequest 模拟"前面已经有若干并发请求穿透了 daily
 // check 的 window、预扣堆到 limit"的状态，再发新请求验证：
 //
-//	1. 必须返回 429 daily_token（而不是 rpm 或其它）
-//	2. effective used = DB + in-flight >= limit，体现在 X-AIBalance-Token-Used 头
-//	3. RPM 桶不被污染（与改动 2 的契约一致）
+//  1. 必须返回 429 daily_token（而不是 rpm 或其它）
+//  2. effective used = DB + in-flight >= limit，体现在 X-AIBalance-Token-Used 头
+//  3. RPM 桶不被污染（与改动 2 的契约一致）
 //
 // 这是 "1200M 限额下却跑到 15009M" 这类过冲现象的硬卡死证据。
 // 关键词: 过冲防御 e2e 核心证据, in-flight 堆满 -> 429 daily_token, RPM 桶不脱 +1

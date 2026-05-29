@@ -32,14 +32,14 @@ type PortalDataResponse struct {
 
 	// 日活与缓存统计：portal 顶部「日活与缓存」单数字卡 + 同名 tab 的 60 天折线图所需。
 	// 关键词: PortalDataResponse 日活缓存扩展, today_dau, daily_summary_60_days, dau_60_days, today_cache_stats
-	TodayDate           string                 `json:"today_date"`
-	TodayDAU            int64                  `json:"today_dau"`
-	TodayDAUBreakdown   DAUBreakdownJSON       `json:"today_dau_breakdown"`
-	DailySummary60Days  []DailySummaryJSON     `json:"daily_summary_60_days"`
-	DAU60Days           []DAUDailyJSON         `json:"dau_60_days"`
-	TodayCacheStats     TodayCacheStatsJSON    `json:"today_cache_stats"`
-	TodayCacheBreakdown []CacheBreakdownJSON   `json:"today_cache_breakdown"`
-	CacheTrend60Days    []CacheTrendDayJSON    `json:"cache_trend_60_days"`
+	TodayDate           string               `json:"today_date"`
+	TodayDAU            int64                `json:"today_dau"`
+	TodayDAUBreakdown   DAUBreakdownJSON     `json:"today_dau_breakdown"`
+	DailySummary60Days  []DailySummaryJSON   `json:"daily_summary_60_days"`
+	DAU60Days           []DAUDailyJSON       `json:"dau_60_days"`
+	TodayCacheStats     TodayCacheStatsJSON  `json:"today_cache_stats"`
+	TodayCacheBreakdown []CacheBreakdownJSON `json:"today_cache_breakdown"`
+	CacheTrend60Days    []CacheTrendDayJSON  `json:"cache_trend_60_days"`
 }
 
 // DAUBreakdownJSON 是「今日日活按 source_kind 拆分」结构。

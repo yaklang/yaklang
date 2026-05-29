@@ -6286,6 +6286,22 @@ curl '${metaApiUrl}?name=${modelName}'`;
                     if (gateEl) gateEl.checked = !!cfg.memfit_version_gate_enabled;
                     const minBtEl = document.getElementById('rl-memfit-version-min-build-time');
                     if (minBtEl) minBtEl.value = cfg.memfit_version_min_build_time || '';
+
+                    // 自定义 429/错误文案配置
+                    // 关键词: loadRateLimitConfig custom_429_enabled, custom_429_notice, custom_429_kind_overrides
+                    const c429EnabledEl = document.getElementById('rl-custom429-enabled');
+                    if (c429EnabledEl) c429EnabledEl.checked = !!cfg.custom_429_enabled;
+                    const c429NoticeEl = document.getElementById('rl-custom429-notice');
+                    if (c429NoticeEl) c429NoticeEl.value = cfg.custom_429_notice || '';
+                    const c429Kinds = cfg.custom_429_kind_overrides || {};
+                    ['rpm', 'daily_token', 'traffic', 'token', 'memfit_version'].forEach(function (kind) {
+                        const el = document.getElementById('rl-custom429-' + kind);
+                        if (el) el.value = (c429Kinds[kind] != null ? c429Kinds[kind] : '');
+                    });
+
+                    // 轻量降级规则
+                    // 关键词: loadRateLimitConfig model_downgrade_rules
+                    renderModelDowngradeRules(cfg.model_downgrade_rules || []);
                 }
             } catch (error) {
                 console.error('Error loading rate limit config:', error);
@@ -6326,6 +6342,25 @@ curl '${metaApiUrl}?name=${modelName}'`;
             const memfitGateEnabled = !!(gateEl && gateEl.checked);
             const memfitMinBuildTime = minBtEl ? (minBtEl.value || '').trim() : '';
 
+            // 自定义 429/错误文案配置
+            // 关键词: saveRateLimitConfig custom_429_enabled, custom_429_notice, custom_429_kind_overrides
+            const c429EnabledEl = document.getElementById('rl-custom429-enabled');
+            const custom429Enabled = !!(c429EnabledEl && c429EnabledEl.checked);
+            const c429NoticeEl = document.getElementById('rl-custom429-notice');
+            const custom429Notice = c429NoticeEl ? (c429NoticeEl.value || '').trim() : '';
+            const custom429KindOverrides = {};
+            ['rpm', 'daily_token', 'traffic', 'token', 'memfit_version'].forEach(function (kind) {
+                const el = document.getElementById('rl-custom429-' + kind);
+                if (el) {
+                    const v = (el.value || '').trim();
+                    if (v !== '') custom429KindOverrides[kind] = v;
+                }
+            });
+
+            // 轻量降级规则（空列表表示显式关闭降级）
+            // 关键词: saveRateLimitConfig model_downgrade_rules
+            const modelDowngradeRules = collectModelDowngradeRules();
+
             try {
                 const response = await fetch('/portal/api/rate-limit-config', {
                     method: 'POST',
@@ -6343,7 +6378,11 @@ curl '${metaApiUrl}?name=${modelName}'`;
                         free_user_token_soft_limit_m: softLimitM,
                         free_user_soft_limit_tps: softLimitTPS,
                         memfit_version_gate_enabled: memfitGateEnabled,
-                        memfit_version_min_build_time: memfitMinBuildTime
+                        memfit_version_min_build_time: memfitMinBuildTime,
+                        custom_429_enabled: custom429Enabled,
+                        custom_429_notice: custom429Notice,
+                        custom_429_kind_overrides: custom429KindOverrides,
+                        model_downgrade_rules: modelDowngradeRules
                     })
                 });
                 const data = await response.json();
@@ -6635,6 +6674,73 @@ curl '${metaApiUrl}?name=${modelName}'`;
             return { rpm: rpm, delay: delay, tps: tps };
         }
 
+        // ==================== Lightweight model downgrade rules ====================
+        // 关键词: 模型用途降级规则, tier/from/to, X-Yak-AI-Model-Usage-Type 保护用量
+
+        function renderModelDowngradeRules(rules) {
+            const container = document.getElementById('rl-downgrade-rules-list');
+            if (!container) return;
+            container.innerHTML = '';
+            rules = Array.isArray(rules) ? rules : [];
+            if (rules.length === 0) {
+                container.innerHTML = '<p style="color: #999; font-size: 13px;">暂无降级规则（保存后表示关闭降级）。</p>';
+                return;
+            }
+            rules.forEach((rule, idx) => {
+                const r = rule || {};
+                appendModelDowngradeRow(container, r.tier || '', r.from || '', r.to || '', idx);
+            });
+        }
+
+        // tier 用途类型：空字符串表示「任意」，其余对齐 consts.Tier*。
+        // 关键词: appendModelDowngradeRow tier 下拉, from/to 模型
+        function appendModelDowngradeRow(container, tier, from, to, idx) {
+            const row = document.createElement('div');
+            row.style.cssText = 'display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap;';
+            row.className = 'rl-downgrade-row';
+            const tierOptions = [
+                { v: '', label: '任意' },
+                { v: 'lightweight', label: '快速 lightweight' },
+                { v: 'intelligent', label: '高质 intelligent' },
+                { v: 'vision', label: '视觉 vision' }
+            ];
+            const optsHtml = tierOptions.map(function (o) {
+                const sel = (o.v === (tier || '')) ? ' selected' : '';
+                return '<option value="' + o.v + '"' + sel + '>' + o.label + '</option>';
+            }).join('');
+            const fromVal = (from || '').replace(/"/g, '&quot;');
+            const toVal = (to || '').replace(/"/g, '&quot;');
+            row.innerHTML =
+                '<select class="form-control rl-downgrade-tier" title="客户端上报的模型用途类型；任意表示不限 tier" style="width: 160px; font-size: 13px; padding: 6px 10px;">' + optsHtml + '</select>' +
+                '<input type="text" class="form-control rl-downgrade-from" value="' + fromVal + '" placeholder="源模型（对外，如 memfit-standard-free）" style="flex: 1; min-width: 200px; font-family: monospace; font-size: 13px; padding: 6px 10px;">' +
+                '<span style="color: #888; font-size: 13px;">→</span>' +
+                '<input type="text" class="form-control rl-downgrade-to" value="' + toVal + '" placeholder="目标模型（如 memfit-light-free）" style="flex: 1; min-width: 180px; font-family: monospace; font-size: 13px; padding: 6px 10px;">' +
+                '<button class="btn btn-danger" onclick="this.parentElement.remove()" style="height: 32px; font-size: 12px; padding: 4px 10px;">删除</button>';
+            container.appendChild(row);
+        }
+
+        function addModelDowngradeRule() {
+            const container = document.getElementById('rl-downgrade-rules-list');
+            if (!container) return;
+            const placeholder = container.querySelector('p');
+            if (placeholder) placeholder.remove();
+            appendModelDowngradeRow(container, '', '', '', container.children.length);
+        }
+
+        // collectModelDowngradeRules 收集降级规则数组；from/to 任一为空的行被丢弃。
+        // 关键词: collectModelDowngradeRules tier/from/to 数组
+        function collectModelDowngradeRules() {
+            const out = [];
+            document.querySelectorAll('.rl-downgrade-row').forEach(row => {
+                const tier = (row.querySelector('.rl-downgrade-tier').value || '').trim();
+                const from = (row.querySelector('.rl-downgrade-from').value || '').trim();
+                const to = (row.querySelector('.rl-downgrade-to').value || '').trim();
+                if (!from || !to) return;
+                out.push({ tier: tier, from: from, to: to });
+            });
+            return out;
+        }
+
         // ==================== Free user Token quota model overrides ====================
         // 关键词: 免费用户 Token 限额 模型覆盖, exempt 复选框
 
@@ -6703,6 +6809,9 @@ curl '${metaApiUrl}?name=${modelName}'`;
         window.loadClientVersionStats = loadClientVersionStats;
         window.addModelRPMOverride = addModelRPMOverride;
         window.addFreeTokenModelOverride = addFreeTokenModelOverride;
+        // 模型用途降级规则导出
+        // 关键词: window.addModelDowngradeRule 轻量降级规则
+        window.addModelDowngradeRule = addModelDowngradeRule;
 
         // ==================== DAU & Cache Stats ====================
         // 关键词: DAU 与缓存 tab 渲染, 纯 SVG 折线, 无外部库依赖

@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/schema"
 )
 
 // ==================== SessionManager.RefreshSession ====================
@@ -31,7 +30,7 @@ func TestSessionManager_RefreshSession_Success(t *testing.T) {
 	// 把 ExpiresAt 调小到 5 分钟后，便于断言"被显著延长"。
 	original := time.Now().Add(5 * time.Minute)
 	require.NoError(t,
-		GetDB().Model(&schema.LoginSession{}).
+		GetDB().Model(&LoginSession{}).
 			Where("session_id = ?", sessionID).
 			Update("expires_at", original).Error,
 		"set up original expires_at",
@@ -51,7 +50,7 @@ func TestSessionManager_RefreshSession_Success(t *testing.T) {
 		got.ExpiresAt, original)
 
 	// 同步落盘验证。
-	var reloaded schema.LoginSession
+	var reloaded LoginSession
 	require.NoError(t,
 		GetDB().Where("session_id = ?", sessionID).First(&reloaded).Error)
 	assert.True(t, reloaded.ExpiresAt.After(original),
@@ -70,7 +69,7 @@ func TestSessionManager_RefreshSession_AlreadyExpired(t *testing.T) {
 
 	// 将 ExpiresAt 直接改成过去。
 	require.NoError(t,
-		GetDB().Model(&schema.LoginSession{}).
+		GetDB().Model(&LoginSession{}).
 			Where("session_id = ?", sessionID).
 			Update("expires_at", time.Now().Add(-1*time.Hour)).Error)
 
@@ -127,7 +126,7 @@ func TestPortalSessionRefresh_ExtendsExpiry(t *testing.T) {
 
 	original := time.Now().Add(2 * time.Minute)
 	require.NoError(t,
-		GetDB().Model(&schema.LoginSession{}).
+		GetDB().Model(&LoginSession{}).
 			Where("session_id = ?", session).
 			Update("expires_at", original).Error)
 
@@ -152,7 +151,7 @@ func TestPortalSessionRefresh_ExtendsExpiry(t *testing.T) {
 		"expires_in_seconds should be close to SessionLifetime (%.0fs), got %.0f",
 		lifetimeSec, expiresIn)
 
-	var reloaded schema.LoginSession
+	var reloaded LoginSession
 	require.NoError(t,
 		GetDB().Where("session_id = ?", session).First(&reloaded).Error)
 	assert.True(t, reloaded.ExpiresAt.After(original.Add(5*time.Minute)),
@@ -170,7 +169,7 @@ func TestPortalSessionRefresh_RejectsExpired(t *testing.T) {
 	require.NotEmpty(t, session)
 
 	require.NoError(t,
-		GetDB().Model(&schema.LoginSession{}).
+		GetDB().Model(&LoginSession{}).
 			Where("session_id = ?", session).
 			Update("expires_at", time.Now().Add(-1*time.Hour)).Error)
 

@@ -14,11 +14,11 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bot"
 
-	"github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/aibalance"
 	"github.com/yaklang/yaklang/common/aibalance/aiforwarder"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	cli "github.com/yaklang/yaklang/common/urfavecli"
 )
 
 // forceGCAndFreeMemory performs aggressive garbage collection

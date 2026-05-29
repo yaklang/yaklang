@@ -6,7 +6,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/schema"
 )
 
 func TestEnsureRateLimitConfigTable(t *testing.T) {
@@ -126,7 +125,7 @@ func TestApplyRateLimitConfig_Integration(t *testing.T) {
 	delayOverrides := map[string]int64{"slow-free": 30, "fast-free": 0}
 	delayJSON, _ := json.Marshal(delayOverrides)
 
-	rlCfg := &schema.AiBalanceRateLimitConfig{
+	rlCfg := &AiBalanceRateLimitConfig{
 		DefaultRPM:          250,
 		FreeUserDelaySec:    10,
 		ModelRPMOverrides:   string(overridesJSON),
@@ -183,7 +182,7 @@ func TestApplyRateLimitConfig_EmptyOverrides(t *testing.T) {
 	assert.Equal(t, int64(77), leftoverMin)
 	assert.Equal(t, int64(88), leftoverMax)
 
-	rlCfg := &schema.AiBalanceRateLimitConfig{
+	rlCfg := &AiBalanceRateLimitConfig{
 		DefaultRPM:          300,
 		FreeUserDelaySec:    1,
 		ModelRPMOverrides:   "{}",

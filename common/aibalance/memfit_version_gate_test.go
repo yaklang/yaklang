@@ -14,7 +14,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -255,11 +254,11 @@ func TestRecordClientVersion_Upsert(t *testing.T) {
 
 	// 用一个独一无二的 version 避免污染
 	ver := "mvg-test-" + time.Now().Format("150405.000000")
-	defer GetDB().Unscoped().Where("version = ?", ver).Delete(&schema.AiBalanceClientVersionStat{})
+	defer GetDB().Unscoped().Where("version = ?", ver).Delete(&AiBalanceClientVersionStat{})
 
 	require.NoError(t, RecordClientVersion(ver, "2025-06-01T00:00:00Z"))
 
-	var row1 schema.AiBalanceClientVersionStat
+	var row1 AiBalanceClientVersionStat
 	require.NoError(t, GetDB().Where("version = ?", ver).First(&row1).Error)
 	require.Equal(t, int64(1), row1.RequestCount)
 	require.NotZero(t, row1.FirstSeenUnix)
@@ -271,7 +270,7 @@ func TestRecordClientVersion_Upsert(t *testing.T) {
 
 	require.NoError(t, RecordClientVersion(ver, "2025-07-01T00:00:00Z"))
 
-	var row2 schema.AiBalanceClientVersionStat
+	var row2 AiBalanceClientVersionStat
 	require.NoError(t, GetDB().Where("version = ?", ver).First(&row2).Error)
 	assert.Equal(t, int64(2), row2.RequestCount, "request_count should increment")
 	assert.Equal(t, row1.FirstSeenUnix, row2.FirstSeenUnix, "first_seen should not change")
@@ -285,13 +284,13 @@ func TestRecordClientVersion_EmptyVersion(t *testing.T) {
 	require.NoError(t, EnsureClientVersionStatTable())
 
 	// 清理 unknown 行（仅本测试时段）
-	defer GetDB().Unscoped().Where("version = ?", "unknown").Delete(&schema.AiBalanceClientVersionStat{})
-	_ = GetDB().Unscoped().Where("version = ?", "unknown").Delete(&schema.AiBalanceClientVersionStat{}).Error
+	defer GetDB().Unscoped().Where("version = ?", "unknown").Delete(&AiBalanceClientVersionStat{})
+	_ = GetDB().Unscoped().Where("version = ?", "unknown").Delete(&AiBalanceClientVersionStat{}).Error
 
 	require.NoError(t, RecordClientVersion("", ""))
 	require.NoError(t, RecordClientVersion("   ", ""))
 
-	var row schema.AiBalanceClientVersionStat
+	var row AiBalanceClientVersionStat
 	require.NoError(t, GetDB().Where("version = ?", "unknown").First(&row).Error)
 	assert.Equal(t, int64(2), row.RequestCount)
 }
@@ -303,9 +302,9 @@ func TestQueryTopClientVersions_Order(t *testing.T) {
 
 	now := time.Now().Unix()
 	tag := fmt.Sprintf("topq-%d-", now)
-	defer GetDB().Unscoped().Where("version LIKE ?", tag+"%").Delete(&schema.AiBalanceClientVersionStat{})
+	defer GetDB().Unscoped().Where("version LIKE ?", tag+"%").Delete(&AiBalanceClientVersionStat{})
 
-	versions := []schema.AiBalanceClientVersionStat{
+	versions := []AiBalanceClientVersionStat{
 		{Version: tag + "older", BuildTime: "", FirstSeenUnix: now - 1000, LastSeenUnix: now - 1000, RequestCount: 100},
 		{Version: tag + "newer1", BuildTime: "", FirstSeenUnix: now - 500, LastSeenUnix: now - 1, RequestCount: 2},
 		{Version: tag + "newer2", BuildTime: "", FirstSeenUnix: now - 500, LastSeenUnix: now - 1, RequestCount: 5},
@@ -516,7 +515,7 @@ func TestE2E_Portal_ClientVersionStats_Roundtrip(t *testing.T) {
 
 	// 预先在 DB 里写一条统计行，确保接口能返回非空
 	versionTag := "portal-rt-" + time.Now().Format("150405.000000")
-	defer GetDB().Unscoped().Where("version = ?", versionTag).Delete(&schema.AiBalanceClientVersionStat{})
+	defer GetDB().Unscoped().Where("version = ?", versionTag).Delete(&AiBalanceClientVersionStat{})
 	require.NoError(t, RecordClientVersion(versionTag, "2025-08-01T00:00:00Z"))
 
 	// 未登录 -> 401

@@ -19,22 +19,22 @@ import (
 // PublicStatsResponse is the public (unauthenticated) stats response.
 // It intentionally excludes sensitive data like API keys, TOTP, domain URLs, etc.
 type PublicStatsResponse struct {
-	CurrentTime        string              `json:"current_time"`
-	TotalProviders     int                 `json:"total_providers"`
-	HealthyProviders   int                 `json:"healthy_providers"`
-	TotalRequests      int64               `json:"total_requests"`
-	SuccessRate        float64             `json:"success_rate"`
-	TotalTrafficStr    string              `json:"total_traffic_str"`
-	TotalTrafficBytes  int64               `json:"total_traffic_bytes"`
-	EstimatedTokens    string              `json:"estimated_tokens"`
-	ConcurrentRequests int64               `json:"concurrent_requests"`
-	QueueCount         int64               `json:"queue_count"`
-	WebSearchCount     int64               `json:"web_search_count"`
-	AmapCount          int64               `json:"amap_count"`
-	MemoryMB           uint64                        `json:"memory_mb"`
-	Models             []PublicModelInfo             `json:"models"`
-	UptimeSummary      []PublicUptimeEntry           `json:"uptime_summary"`
-	LatencyHistory     map[string][]LatencyPoint     `json:"latency_history"`
+	CurrentTime        string                    `json:"current_time"`
+	TotalProviders     int                       `json:"total_providers"`
+	HealthyProviders   int                       `json:"healthy_providers"`
+	TotalRequests      int64                     `json:"total_requests"`
+	SuccessRate        float64                   `json:"success_rate"`
+	TotalTrafficStr    string                    `json:"total_traffic_str"`
+	TotalTrafficBytes  int64                     `json:"total_traffic_bytes"`
+	EstimatedTokens    string                    `json:"estimated_tokens"`
+	ConcurrentRequests int64                     `json:"concurrent_requests"`
+	QueueCount         int64                     `json:"queue_count"`
+	WebSearchCount     int64                     `json:"web_search_count"`
+	AmapCount          int64                     `json:"amap_count"`
+	MemoryMB           uint64                    `json:"memory_mb"`
+	Models             []PublicModelInfo         `json:"models"`
+	UptimeSummary      []PublicUptimeEntry       `json:"uptime_summary"`
+	LatencyHistory     map[string][]LatencyPoint `json:"latency_history"`
 }
 
 // PublicModelInfo is a sanitized model entry for public display.

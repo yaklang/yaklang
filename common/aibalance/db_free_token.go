@@ -9,7 +9,6 @@ import (
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/schema"
 )
 
 // 关键词: db_free_token, 免费用户每日 Token 限额持久化, 全局共享池 + 模型覆盖
@@ -36,7 +35,7 @@ func freeTokenDB() *gorm.DB {
 // EnsureFreeUserDailyTokenUsageTable ensures the free_user_daily_token_usage table exists.
 // 关键词: EnsureFreeUserDailyTokenUsageTable
 func EnsureFreeUserDailyTokenUsageTable() error {
-	return GetDB().AutoMigrate(&schema.FreeUserDailyTokenUsage{}).Error
+	return GetDB().AutoMigrate(&FreeUserDailyTokenUsage{}).Error
 }
 
 // dailyTokenResetHour 是免费用户日 Token 限额的切日时点：北京时间每日 06:00 刷新。
@@ -142,10 +141,10 @@ func upsertFreeUserDailyTokenUsage(date, model string, delta int64) error {
 	}
 	db := freeTokenDB()
 
-	var row schema.FreeUserDailyTokenUsage
+	var row FreeUserDailyTokenUsage
 	err := db.Where("date = ? AND model_name = ?", date, model).First(&row).Error
 	if err == nil {
-		return db.Model(&schema.FreeUserDailyTokenUsage{}).
+		return db.Model(&FreeUserDailyTokenUsage{}).
 			Where("id = ?", row.ID).
 			UpdateColumn("tokens_used", gorm.Expr("tokens_used + ?", delta)).Error
 	}
@@ -153,16 +152,16 @@ func upsertFreeUserDailyTokenUsage(date, model string, delta int64) error {
 		return fmt.Errorf("upsertFreeUserDailyTokenUsage query failed: %v", err)
 	}
 
-	row = schema.FreeUserDailyTokenUsage{
+	row = FreeUserDailyTokenUsage{
 		Date:       date,
 		ModelName:  model,
 		TokensUsed: delta,
 	}
 	if createErr := db.Create(&row).Error; createErr != nil {
 		// 并发竞态：另一个 goroutine 已经先 Create，退化为 UPDATE 累加。
-		var existing schema.FreeUserDailyTokenUsage
+		var existing FreeUserDailyTokenUsage
 		if findErr := db.Where("date = ? AND model_name = ?", date, model).First(&existing).Error; findErr == nil {
-			return db.Model(&schema.FreeUserDailyTokenUsage{}).
+			return db.Model(&FreeUserDailyTokenUsage{}).
 				Where("id = ?", existing.ID).
 				UpdateColumn("tokens_used", gorm.Expr("tokens_used + ?", delta)).Error
 		}
@@ -175,7 +174,7 @@ func upsertFreeUserDailyTokenUsage(date, model string, delta int64) error {
 // 不存在视为 0；任何 DB 错误向上抛。
 // 关键词: GetFreeUserDailyTokenUsage
 func GetFreeUserDailyTokenUsage(date, model string) (int64, error) {
-	var row schema.FreeUserDailyTokenUsage
+	var row FreeUserDailyTokenUsage
 	err := freeTokenDB().Where("date = ? AND model_name = ?", date, model).First(&row).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -267,11 +266,11 @@ func CheckFreeUserDailyTokenLimit(modelName string) (*FreeUserTokenLimitDecision
 // 供 portal /portal/api/rate-limit-status 实时显示。
 // 关键词: QueryFreeUserTokenUsageSnapshot, portal 实时面板
 type FreeUserTokenBucketSnapshot struct {
-	Model      string `json:"model"` // "" = 全局共享池
-	TokensUsed int64  `json:"tokens_used"`
+	Model      string  `json:"model"` // "" = 全局共享池
+	TokensUsed int64   `json:"tokens_used"`
 	UsedM      float64 `json:"used_m"`
-	LimitM     int64  `json:"limit_m"`
-	Exempt     bool   `json:"exempt"`
+	LimitM     int64   `json:"limit_m"`
+	Exempt     bool    `json:"exempt"`
 }
 
 // QueryFreeUserTokenUsageSnapshot 返回当天 (global + per-model) 桶的快照。
@@ -285,7 +284,7 @@ func QueryFreeUserTokenUsageSnapshot() (global FreeUserTokenBucketSnapshot, perM
 	}
 	overrides := parseFreeUserTokenModelOverrides(cfg.FreeUserTokenModelOverrides)
 
-	var rows []schema.FreeUserDailyTokenUsage
+	var rows []FreeUserDailyTokenUsage
 	if scanErr := freeTokenDB().Where("date = ?", date).Find(&rows).Error; scanErr != nil {
 		err = fmt.Errorf("QueryFreeUserTokenUsageSnapshot find failed: %v", scanErr)
 		return
@@ -346,7 +345,7 @@ func CleanupOldFreeUserTokenUsage(keepDays int) (int64, error) {
 		keepDays = 100
 	}
 	cutoff := time.Now().AddDate(0, 0, -keepDays).Format("2006-01-02")
-	tx := freeTokenDB().Where("date < ?", cutoff).Delete(&schema.FreeUserDailyTokenUsage{})
+	tx := freeTokenDB().Where("date < ?", cutoff).Delete(&FreeUserDailyTokenUsage{})
 	if tx.Error != nil {
 		return 0, fmt.Errorf("CleanupOldFreeUserTokenUsage failed: %v", tx.Error)
 	}
@@ -365,7 +364,7 @@ func UpdateAiApiKeyTokenUsed(apiKey string, additionalToken int64) error {
 	if additionalToken <= 0 {
 		return nil
 	}
-	return GetDB().Model(&schema.AiApiKeys{}).
+	return GetDB().Model(&AiApiKeys{}).
 		Where("api_key = ?", apiKey).
 		UpdateColumn("token_used", gorm.Expr("token_used + ?", additionalToken)).Error
 }
@@ -374,7 +373,7 @@ func UpdateAiApiKeyTokenUsed(apiKey string, additionalToken int64) error {
 // 与 CheckAiApiKeyTrafficLimit 同结构（bool, error），便于上层调用对齐。
 // 关键词: CheckAiApiKeyTokenLimit, Token 限额前置检查
 func CheckAiApiKeyTokenLimit(apiKey string) (bool, error) {
-	var key schema.AiApiKeys
+	var key AiApiKeys
 	if err := GetDB().Where("api_key = ?", apiKey).First(&key).Error; err != nil {
 		return false, fmt.Errorf("failed to find API key: %v", err)
 	}
@@ -393,7 +392,7 @@ func CheckAiApiKeyTokenLimit(apiKey string) (bool, error) {
 // UpdateAiApiKeyTokenLimit updates the Token limit settings for an API key.
 // 关键词: UpdateAiApiKeyTokenLimit
 func UpdateAiApiKeyTokenLimit(id uint, limit int64, enable bool) error {
-	result := GetDB().Model(&schema.AiApiKeys{}).Where("id = ?", id).Updates(map[string]interface{}{
+	result := GetDB().Model(&AiApiKeys{}).Where("id = ?", id).Updates(map[string]interface{}{
 		"token_limit":        limit,
 		"token_limit_enable": enable,
 	})
@@ -410,7 +409,7 @@ func UpdateAiApiKeyTokenLimit(id uint, limit int64, enable bool) error {
 // ResetAiApiKeyTokenUsed resets the token used counter for an API key.
 // 关键词: ResetAiApiKeyTokenUsed
 func ResetAiApiKeyTokenUsed(id uint) error {
-	result := GetDB().Model(&schema.AiApiKeys{}).Where("id = ?", id).Update("token_used", 0)
+	result := GetDB().Model(&AiApiKeys{}).Where("id = ?", id).Update("token_used", 0)
 	if result.Error != nil {
 		return fmt.Errorf("failed to reset token used for API key ID %d: %w", id, result.Error)
 	}

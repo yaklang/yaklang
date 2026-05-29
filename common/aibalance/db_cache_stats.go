@@ -10,7 +10,6 @@ import (
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -26,7 +25,7 @@ func cacheStatsDB() *gorm.DB {
 // EnsureCacheStatsTable ensures the ai_daily_cache_stats table exists.
 // 关键词: ai_daily_cache_stats migrate, EnsureCacheStatsTable
 func EnsureCacheStatsTable() error {
-	return GetDB().AutoMigrate(&schema.AiDailyCacheStat{}).Error
+	return GetDB().AutoMigrate(&AiDailyCacheStat{}).Error
 }
 
 // hashAPIKeyForCache returns a stable 32-char fingerprint of an API key.
@@ -81,13 +80,13 @@ func RecordDailyCacheStats(provider *Provider, wrapperName string, usage *aispec
 	// 先尝试找到当天已有行；找到就用 UpdateColumn + gorm.Expr 累加，
 	// 没找到就 Create 一行新的（GORM v1 没有原生 OnConflict 语法，
 	// 这里用 SELECT-then-UPDATE/INSERT 两步实现 UPSERT 语义）。
-	var row schema.AiDailyCacheStat
+	var row AiDailyCacheStat
 	err := db.Where("date = ? AND wrapper_name = ? AND model_name = ? AND provider_type_name = ? AND provider_domain = ? AND api_key_hash = ?",
 		date, wrapperName, provider.ModelName, provider.TypeName, provider.DomainOrURL, apiKeyHash).
 		First(&row).Error
 
 	if err == nil {
-		return db.Model(&schema.AiDailyCacheStat{}).
+		return db.Model(&AiDailyCacheStat{}).
 			Where("id = ?", row.ID).
 			UpdateColumns(map[string]interface{}{
 				"request_count":     gorm.Expr("request_count + ?", 1),
@@ -103,7 +102,7 @@ func RecordDailyCacheStats(provider *Provider, wrapperName string, usage *aispec
 		return fmt.Errorf("RecordDailyCacheStats query failed: %v", err)
 	}
 
-	row = schema.AiDailyCacheStat{
+	row = AiDailyCacheStat{
 		Date:             date,
 		WrapperName:      wrapperName,
 		ModelName:        provider.ModelName,
@@ -120,11 +119,11 @@ func RecordDailyCacheStats(provider *Provider, wrapperName string, usage *aispec
 	if createErr := db.Create(&row).Error; createErr != nil {
 		// 并发场景：另一个 goroutine 已经先 Create 了同样唯一键的行，
 		// 此时退化为 UPDATE 累加一次即可。
-		var existing schema.AiDailyCacheStat
+		var existing AiDailyCacheStat
 		if findErr := db.Where("date = ? AND wrapper_name = ? AND model_name = ? AND provider_type_name = ? AND provider_domain = ? AND api_key_hash = ?",
 			date, wrapperName, provider.ModelName, provider.TypeName, provider.DomainOrURL, apiKeyHash).
 			First(&existing).Error; findErr == nil {
-			return db.Model(&schema.AiDailyCacheStat{}).
+			return db.Model(&AiDailyCacheStat{}).
 				Where("id = ?", existing.ID).
 				UpdateColumns(map[string]interface{}{
 					"request_count":     gorm.Expr("request_count + ?", 1),
@@ -160,7 +159,7 @@ func QueryTodayCacheStatsTotal() (*CacheTotalRow, error) {
 // 关键词: QueryCacheStatsTotalByDate, 测试友好
 func QueryCacheStatsTotalByDate(date string) (*CacheTotalRow, error) {
 	row := &CacheTotalRow{}
-	err := cacheStatsDB().Table((&schema.AiDailyCacheStat{}).TableName()).
+	err := cacheStatsDB().Table((&AiDailyCacheStat{}).TableName()).
 		Where("date = ?", date).
 		Select("COALESCE(SUM(request_count),0) AS request_count, COALESCE(SUM(prompt_tokens),0) AS prompt_tokens, COALESCE(SUM(completion_tokens),0) AS completion_tokens, COALESCE(SUM(total_tokens),0) AS total_tokens, COALESCE(SUM(cached_tokens),0) AS cached_tokens").
 		Row().Scan(&row.RequestCount, &row.PromptTokens, &row.CompletionTokens, &row.TotalTokens, &row.CachedTokens)
@@ -173,14 +172,14 @@ func QueryCacheStatsTotalByDate(date string) (*CacheTotalRow, error) {
 // QueryTodayCacheBreakdown returns today's per-(wrapper,model,provider,key) rows
 // sorted by request_count desc.
 // 关键词: QueryTodayCacheBreakdown, 今日明细表
-func QueryTodayCacheBreakdown() ([]*schema.AiDailyCacheStat, error) {
+func QueryTodayCacheBreakdown() ([]*AiDailyCacheStat, error) {
 	return QueryCacheBreakdownByDate(time.Now().Format("2006-01-02"))
 }
 
 // QueryCacheBreakdownByDate is the test-friendly variant of QueryTodayCacheBreakdown.
 // 关键词: QueryCacheBreakdownByDate
-func QueryCacheBreakdownByDate(date string) ([]*schema.AiDailyCacheStat, error) {
-	var rows []*schema.AiDailyCacheStat
+func QueryCacheBreakdownByDate(date string) ([]*AiDailyCacheStat, error) {
+	var rows []*AiDailyCacheStat
 	if err := cacheStatsDB().Where("date = ?", date).
 		Order("request_count DESC").
 		Find(&rows).Error; err != nil {
@@ -192,12 +191,12 @@ func QueryCacheBreakdownByDate(date string) ([]*schema.AiDailyCacheStat, error) 
 // CacheTrendDay 是 60 天缓存趋势的单日聚合点。
 // 关键词: CacheTrendDay, 缓存命中趋势
 type CacheTrendDay struct {
-	Date             string `json:"date"`
-	RequestCount     int64  `json:"request_count"`
-	PromptTokens     int64  `json:"prompt_tokens"`
-	CompletionTokens int64  `json:"completion_tokens"`
-	TotalTokens      int64  `json:"total_tokens"`
-	CachedTokens     int64  `json:"cached_tokens"`
+	Date             string  `json:"date"`
+	RequestCount     int64   `json:"request_count"`
+	PromptTokens     int64   `json:"prompt_tokens"`
+	CompletionTokens int64   `json:"completion_tokens"`
+	TotalTokens      int64   `json:"total_tokens"`
+	CachedTokens     int64   `json:"cached_tokens"`
 	HitRatio         float64 `json:"hit_ratio"`
 }
 
@@ -226,7 +225,7 @@ func QueryCacheTrendDays(days int, end time.Time) ([]*CacheTrendDay, error) {
 		CachedTokens     int64
 	}
 	rows := []aggRow{}
-	if err := cacheStatsDB().Table((&schema.AiDailyCacheStat{}).TableName()).
+	if err := cacheStatsDB().Table((&AiDailyCacheStat{}).TableName()).
 		Select("date, COALESCE(SUM(request_count),0) AS request_count, COALESCE(SUM(prompt_tokens),0) AS prompt_tokens, COALESCE(SUM(completion_tokens),0) AS completion_tokens, COALESCE(SUM(total_tokens),0) AS total_tokens, COALESCE(SUM(cached_tokens),0) AS cached_tokens").
 		Where("date >= ?", startDate).
 		Group("date").
@@ -269,7 +268,7 @@ func CleanupOldCacheStats(keepDays int) (int64, error) {
 		keepDays = 100
 	}
 	cutoff := time.Now().AddDate(0, 0, -keepDays).Format("2006-01-02")
-	tx := GetDB().Unscoped().Where("date < ?", cutoff).Delete(&schema.AiDailyCacheStat{})
+	tx := GetDB().Unscoped().Where("date < ?", cutoff).Delete(&AiDailyCacheStat{})
 	if tx.Error != nil {
 		return 0, fmt.Errorf("CleanupOldCacheStats failed: %v", tx.Error)
 	}

@@ -6,7 +6,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -19,7 +18,7 @@ func TestRunCleanupOnce_RemovesOldDoesNotTouchSummary(t *testing.T) {
 
 	wrapper := "wrap-clean-" + utils.RandStringBytes(6)
 	defer func() {
-		GetDB().Where("wrapper_name = ?", wrapper).Delete(&schema.AiDailyCacheStat{})
+		GetDB().Where("wrapper_name = ?", wrapper).Delete(&AiDailyCacheStat{})
 	}()
 
 	tagDate := time.Now().AddDate(0, 0, -200).Format("2006-01-02")
@@ -29,7 +28,7 @@ func TestRunCleanupOnce_RemovesOldDoesNotTouchSummary(t *testing.T) {
 	cleanupDailySummaryForDate(t, tagDate)
 
 	// cache stats 200 天前的应被删
-	require.NoError(t, GetDB().Create(&schema.AiDailyCacheStat{
+	require.NoError(t, GetDB().Create(&AiDailyCacheStat{
 		Date:             tagDate,
 		WrapperName:      wrapper,
 		ModelName:        "old-m",
@@ -40,7 +39,7 @@ func TestRunCleanupOnce_RemovesOldDoesNotTouchSummary(t *testing.T) {
 		RequestCount:     1,
 	}).Error)
 	// 1 天前的应保留
-	require.NoError(t, GetDB().Create(&schema.AiDailyCacheStat{
+	require.NoError(t, GetDB().Create(&AiDailyCacheStat{
 		Date:             tagDateRecent,
 		WrapperName:      wrapper,
 		ModelName:        "fresh-m",
@@ -52,15 +51,15 @@ func TestRunCleanupOnce_RemovesOldDoesNotTouchSummary(t *testing.T) {
 	}).Error)
 
 	// user_seen 200 天前的应被删
-	require.NoError(t, GetDB().Create(&schema.AiDailyUserSeen{
+	require.NoError(t, GetDB().Create(&AiDailyUserSeen{
 		Date: tagDate, SourceKind: SourceKindAPIKey, UserHash: "u-old", LastSeenAt: time.Now(),
 	}).Error)
-	require.NoError(t, GetDB().Create(&schema.AiDailyUserSeen{
+	require.NoError(t, GetDB().Create(&AiDailyUserSeen{
 		Date: tagDateRecent, SourceKind: SourceKindAPIKey, UserHash: "u-recent", LastSeenAt: time.Now(),
 	}).Error)
 
 	// daily_summary 200 天前的应被保留（不清理）
-	require.NoError(t, GetDB().Create(&schema.AiDailySummary{
+	require.NoError(t, GetDB().Create(&AiDailySummary{
 		Date:          tagDate,
 		TotalRequests: 99,
 	}).Error)
@@ -70,15 +69,15 @@ func TestRunCleanupOnce_RemovesOldDoesNotTouchSummary(t *testing.T) {
 	assert.GreaterOrEqual(t, userRows, int64(1))
 
 	var oldCache, oldUser, oldSummary, freshCache, freshUser int64
-	require.NoError(t, GetDB().Model(&schema.AiDailyCacheStat{}).
+	require.NoError(t, GetDB().Model(&AiDailyCacheStat{}).
 		Where("wrapper_name = ? AND date = ?", wrapper, tagDate).Count(&oldCache).Error)
-	require.NoError(t, GetDB().Model(&schema.AiDailyCacheStat{}).
+	require.NoError(t, GetDB().Model(&AiDailyCacheStat{}).
 		Where("wrapper_name = ? AND date = ?", wrapper, tagDateRecent).Count(&freshCache).Error)
-	require.NoError(t, GetDB().Model(&schema.AiDailyUserSeen{}).
+	require.NoError(t, GetDB().Model(&AiDailyUserSeen{}).
 		Where("date = ?", tagDate).Count(&oldUser).Error)
-	require.NoError(t, GetDB().Model(&schema.AiDailyUserSeen{}).
+	require.NoError(t, GetDB().Model(&AiDailyUserSeen{}).
 		Where("date = ?", tagDateRecent).Count(&freshUser).Error)
-	require.NoError(t, GetDB().Model(&schema.AiDailySummary{}).
+	require.NoError(t, GetDB().Model(&AiDailySummary{}).
 		Where("date = ?", tagDate).Count(&oldSummary).Error)
 
 	assert.Equal(t, int64(0), oldCache, "old cache row should be removed")

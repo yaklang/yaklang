@@ -14,7 +14,6 @@ import (
 
 	uuid "github.com/google/uuid"
 	"github.com/jinzhu/gorm"
-	"github.com/yaklang/yaklang/common/schema"
 )
 
 // ==================== API Key Page Handlers ====================
@@ -186,7 +185,7 @@ func (c *ServerConfig) generateAndStoreAPIKey(allowedModels []string) (string, e
 	sort.Strings(allowedModels)
 	allowedModelsStr := strings.Join(allowedModels, ",")
 
-	newKeyData := &schema.AiApiKeys{
+	newKeyData := &AiApiKeys{
 		APIKey:        apiKey,
 		AllowedModels: allowedModelsStr,
 		UsageCount:    0,
@@ -450,7 +449,7 @@ func (c *ServerConfig) handleUpdateAPIKeyAllowedModels(conn net.Conn, request *h
 
 	// Sort allowed models for consistent storage
 	sort.Strings(reqBody.AllowedModels)
-	
+
 	// Update allowed models
 	allowedModelsStr := strings.Join(reqBody.AllowedModels, ",")
 	err = UpdateAiApiKeyAllowedModels(uint(id), allowedModelsStr)

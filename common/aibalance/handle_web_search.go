@@ -13,7 +13,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/omnisearch/ostype"
 	"github.com/yaklang/yaklang/common/omnisearch/searchers"
-	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 )
@@ -318,7 +317,7 @@ func (c *ServerConfig) serveWebSearch(conn net.Conn, rawPacket []byte) {
 // resolveWebSearchKeys finds active search API keys for the given searcher type.
 // If searcherType is empty or has no available keys, it auto-selects any type that has active keys.
 // Returns: active keys, resolved searcher type, error
-func (c *ServerConfig) resolveWebSearchKeys(searcherType string) ([]*schema.WebSearchApiKey, string, error) {
+func (c *ServerConfig) resolveWebSearchKeys(searcherType string) ([]*WebSearchApiKey, string, error) {
 	// If a specific type is requested, try to find keys for that type first
 	if searcherType != "" {
 		keys, err := GetActiveWebSearchApiKeysByType(searcherType)
@@ -349,7 +348,7 @@ func (c *ServerConfig) resolveWebSearchKeys(searcherType string) ([]*schema.WebS
 	}
 
 	// Group active keys by type, pick the type with the most keys
-	typeKeys := map[string][]*schema.WebSearchApiKey{}
+	typeKeys := map[string][]*WebSearchApiKey{}
 	for _, k := range allActiveKeys {
 		typeKeys[k.SearcherType] = append(typeKeys[k.SearcherType], k)
 	}
@@ -369,8 +368,8 @@ func (c *ServerConfig) resolveWebSearchKeys(searcherType string) ([]*schema.WebS
 }
 
 // filterActiveKeys returns only active keys from the given list
-func filterActiveKeys(keys []*schema.WebSearchApiKey) []*schema.WebSearchApiKey {
-	active := make([]*schema.WebSearchApiKey, 0, len(keys))
+func filterActiveKeys(keys []*WebSearchApiKey) []*WebSearchApiKey {
+	active := make([]*WebSearchApiKey, 0, len(keys))
 	for _, k := range keys {
 		if k.Active {
 			active = append(active, k)
@@ -381,9 +380,9 @@ func filterActiveKeys(keys []*schema.WebSearchApiKey) []*schema.WebSearchApiKey 
 
 // tryWebSearchWithKeys attempts to perform a web search using the provided keys
 // Keys are randomly shuffled, and on failure, the next key is tried
-func (c *ServerConfig) tryWebSearchWithKeys(keys []*schema.WebSearchApiKey, req *WebSearchRequest) ([]*ostype.OmniSearchResult, error) {
+func (c *ServerConfig) tryWebSearchWithKeys(keys []*WebSearchApiKey, req *WebSearchRequest) ([]*ostype.OmniSearchResult, error) {
 	// Copy and randomly shuffle the keys
-	shuffled := make([]*schema.WebSearchApiKey, len(keys))
+	shuffled := make([]*WebSearchApiKey, len(keys))
 	copy(shuffled, keys)
 	rand.Shuffle(len(shuffled), func(i, j int) {
 		shuffled[i], shuffled[j] = shuffled[j], shuffled[i]
@@ -421,7 +420,7 @@ func (c *ServerConfig) tryWebSearchWithKeys(keys []*schema.WebSearchApiKey, req 
 }
 
 // doWebSearch performs the actual search using the appropriate searcher client
-func (c *ServerConfig) doWebSearch(sk *schema.WebSearchApiKey, req *WebSearchRequest) ([]*ostype.OmniSearchResult, error) {
+func (c *ServerConfig) doWebSearch(sk *WebSearchApiKey, req *WebSearchRequest) ([]*ostype.OmniSearchResult, error) {
 	// Determine proxy: key-level proxy takes priority, then global proxy
 	proxy := sk.Proxy
 	if proxy == "" {

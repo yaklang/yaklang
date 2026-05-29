@@ -17,7 +17,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
@@ -52,9 +51,9 @@ func TestRealAIBalanceFlow(t *testing.T) {
 
 	// 清理并创建测试 provider
 	testProviderName := "test-goroutine-leak-provider"
-	GetDB().Where("model_name = ?", testProviderName).Delete(&schema.AiProvider{})
+	GetDB().Where("model_name = ?", testProviderName).Delete(&AiProvider{})
 
-	provider := &schema.AiProvider{
+	provider := &AiProvider{
 		ModelName:    testProviderName,
 		TypeName:     "openai",
 		DomainOrURL:  fmt.Sprintf("http://%s/v1/chat/completions", mockProvider.Addr),
@@ -65,7 +64,7 @@ func TestRealAIBalanceFlow(t *testing.T) {
 	if err := GetDB().Create(provider).Error; err != nil {
 		t.Fatalf("Failed to create test provider: %v", err)
 	}
-	defer GetDB().Where("model_name = ?", testProviderName).Delete(&schema.AiProvider{})
+	defer GetDB().Where("model_name = ?", testProviderName).Delete(&AiProvider{})
 
 	// 启动服务器
 	serverCtx, serverCancel := withCancelCtx()

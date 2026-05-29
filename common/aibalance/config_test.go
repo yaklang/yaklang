@@ -8,7 +8,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/schema"
 )
 
 func init() {
@@ -396,7 +395,7 @@ func TestWrapperNameAndModelNameDistinction(t *testing.T) {
 	t.Logf("正在将 Provider 保存到数据库：WrapperName=%s, ModelName=%s",
 		providers[0].WrapperName, providers[0].ModelName)
 
-	dbProvider := &schema.AiProvider{
+	dbProvider := &AiProvider{
 		WrapperName:       providers[0].WrapperName,
 		ModelName:         providers[0].ModelName,
 		TypeName:          providers[0].TypeName,
@@ -428,7 +427,7 @@ func TestWrapperNameAndModelNameDistinction(t *testing.T) {
 	}
 
 	// 查找我们要测试的 provider
-	var testProvider *schema.AiProvider
+	var testProvider *AiProvider
 	for _, p := range dbProviders {
 		if p.APIKey == "test-key" && p.WrapperName == "user-facing-wrapper-name" {
 			testProvider = p

@@ -111,7 +111,8 @@ func IsTongyiExplicitCacheModel(providerType, modelName string) bool {
 // hijacker 自管注入。
 //
 // 关键词: IsCacheControlAwareProvider, provider 白名单, tongyi 仅识别 cc,
-//        cross-provider 安全, cc strip 触发条件
+//
+//	cross-provider 安全, cc strip 触发条件
 func IsCacheControlAwareProvider(providerType string) bool {
 	return strings.EqualFold(strings.TrimSpace(providerType), "tongyi")
 }
@@ -134,22 +135,23 @@ func ephemeralCacheControl() map[string]any {
 //
 //  1. **p.ActiveCacheControl == true** (Flag-on 路径):
 //     - 调 injectExplicitCacheUnconditional 走「客户端自带 cc -> pass-through;
-//       客户端无 cc -> 给最末 system 注入 ephemeral baseline」, 完全跳过
-//       dashscope 白名单 model 那一道 gate;
+//     客户端无 cc -> 给最末 system 注入 ephemeral baseline」, 完全跳过
+//     dashscope 白名单 model 那一道 gate;
 //     - 适合任意支持 ephemeral cc 的 provider (anthropic / 自建中转 /
-//       tongyi 没在白名单的新 model / 等等)。
+//     tongyi 没在白名单的新 model / 等等)。
 //
 //  2. **p.ActiveCacheControl == false** (Flag-off 兜底路径):
 //     - 直接复用 RewriteMessagesForProvider(messages, p.TypeName, p.ModelName);
 //     - 老 tongyi+dashscope 白名单 provider 即使 DB 里 ActiveCacheControl 仍为 false
-//       也能保留旧行为 (兼容优先);
+//     也能保留旧行为 (兼容优先);
 //     - 其它非 tongyi provider 仍然 StripCacheControlFromMessages, 跨 provider
-//       安全硬约束保留。
+//     安全硬约束保留。
 //
 // p == nil 时退化为 messages 原样返回 (零浅复制零副作用), 防御调用方传错。
 //
 // 关键词: RewriteMessagesForProviderInstance, ActiveCacheControl Flag 优先,
-//        compat_or always_inject, Provider 实例级 cc 路由
+//
+//	compat_or always_inject, Provider 实例级 cc 路由
 func RewriteMessagesForProviderInstance(messages []aispec.ChatDetail, p *Provider) []aispec.ChatDetail {
 	if len(messages) == 0 {
 		return messages
@@ -218,15 +220,15 @@ func injectExplicitCacheUnconditional(messages []aispec.ChatDetail) []aispec.Cha
 //     走 RewriteMessagesForExplicitCache, 行为见其文档:
 //     - 客户端任意位置自带 cc -> 完全 pass-through
 //     - 否则给最末 system 消息注入单 cc 作 baseline 兜底 (仅显式缓存
-//       白名单 model 才触发, 其他 model 也 pass-through)
+//     白名单 model 才触发, 其他 model 也 pass-through)
 //
 //  2. **不识别 cc 的 provider** (siliconflow / openai / openrouter /
 //     anthropic / azure / 等所有非 tongyi 的 provider):
 //     走 StripCacheControlFromMessages 强制 strip 所有位置的 cc 字段:
 //     - 兼容性: 部分 provider OpenAI 兼容层会因为 cache_control 未知字段
-//       直接 400 报错
+//     直接 400 报错
 //     - 安全性: 避免 dashscope 风格 cc 被误透传到其它 provider 引发
-//       意料外的计费/路由行为
+//     意料外的计费/路由行为
 //     这是硬约束, 无论 cc 来自客户端 SDK 还是来自 aicache hijacker 自管
 //     注入, 都必须移除。
 //
@@ -240,8 +242,9 @@ func injectExplicitCacheUnconditional(messages []aispec.ChatDetail) []aispec.Cha
 // 浅复制+剥离, 没有 cc 时直接返回原切片 (零分配)。
 //
 // 关键词: RewriteMessagesForProvider, aibalance cc 路由层主入口,
-//        provider-aware cc 处理, tongyi 保留 / 其他 strip,
-//        跨 provider 安全
+//
+//	provider-aware cc 处理, tongyi 保留 / 其他 strip,
+//	跨 provider 安全
 func RewriteMessagesForProvider(messages []aispec.ChatDetail, providerType, modelName string) []aispec.ChatDetail {
 	if len(messages) == 0 {
 		return messages
@@ -270,7 +273,8 @@ func RewriteMessagesForProvider(messages []aispec.ChatDetail, providerType, mode
 //     不可能承载 cc, 原样返回 (与 contentHasCacheControl 的"不识别"规则对齐)
 //
 // 关键词: StripCacheControlFromMessages, cc strip, 跨 provider 安全,
-//        浅复制零副作用
+//
+//	浅复制零副作用
 func StripCacheControlFromMessages(messages []aispec.ChatDetail) []aispec.ChatDetail {
 	if len(messages) == 0 {
 		return messages
@@ -398,15 +402,16 @@ func stripCacheControlOnContent(content any) (any, bool) {
 //   - 这避免了"双注入"风险, 也尊重了所有外部 SDK 客户端已经自管 cc 的场景。
 //
 // 兼容形态(同 injectCacheControlOnContent):
-//   1. string                -> 包成 []*ChatContent{Type:"text",Text,CacheControl}
-//   2. []*aispec.ChatContent -> 浅复制每项, 在最末 text 项加 CacheControl
-//   3. []map[string]any      -> 浅复制每项 map, 在最末 type=text 项加 cache_control
-//   4. []any                 -> 浅复制, 若末项是 map 则注入 cache_control, 否则 pass
-//   5. 其它类型(nil/数字/struct 等) -> pass-through 不动
+//  1. string                -> 包成 []*ChatContent{Type:"text",Text,CacheControl}
+//  2. []*aispec.ChatContent -> 浅复制每项, 在最末 text 项加 CacheControl
+//  3. []map[string]any      -> 浅复制每项 map, 在最末 type=text 项加 cache_control
+//  4. []any                 -> 浅复制, 若末项是 map 则注入 cache_control, 否则 pass
+//  5. 其它类型(nil/数字/struct 等) -> pass-through 不动
 //
 // 关键词: RewriteMessagesForExplicitCache, dashscope 显式缓存兜底注入,
-//        最末 system 单 cc, 客户端自带 cc 退让, §7.7.7 职责重排,
-//        浅复制零副作用
+//
+//	最末 system 单 cc, 客户端自带 cc 退让, §7.7.7 职责重排,
+//	浅复制零副作用
 func RewriteMessagesForExplicitCache(messages []aispec.ChatDetail, providerType, modelName string) []aispec.ChatDetail {
 	if len(messages) == 0 {
 		return messages
@@ -464,16 +469,17 @@ func pickLastSystemIndex(messages []aispec.ChatDetail) int {
 // 应当完全退让不做任何注入。
 //
 // 兼容 4 种 content 形态, 任一命中即返回 true:
-//   1. []*aispec.ChatContent: 任一非 nil 元素的 CacheControl != nil
-//   2. []map[string]any:      任一 map 含 "cache_control" 键且值非 nil
-//   3. []any:                 任一元素若是 map[string]any 含 "cache_control" 键
-//   4. 其它形态 (string / nil / 数字 / 自定义 struct):
-//      字符串无法承载 cc, 直接当作"无 cc"; 自定义 struct 走 reflect 风险大
-//      暂不识别 (这与 injectCacheControlOnContent 的"其它类型 pass-through"
-//      契约对齐, 不会出现 inject 不识别但 detect 识别的内部矛盾)
+//  1. []*aispec.ChatContent: 任一非 nil 元素的 CacheControl != nil
+//  2. []map[string]any:      任一 map 含 "cache_control" 键且值非 nil
+//  3. []any:                 任一元素若是 map[string]any 含 "cache_control" 键
+//  4. 其它形态 (string / nil / 数字 / 自定义 struct):
+//     字符串无法承载 cc, 直接当作"无 cc"; 自定义 struct 走 reflect 风险大
+//     暂不识别 (这与 injectCacheControlOnContent 的"其它类型 pass-through"
+//     契约对齐, 不会出现 inject 不识别但 detect 识别的内部矛盾)
 //
 // 关键词: messagesAlreadyHaveCacheControl, 客户端自带 cc 检测,
-//        cache_control 任意位置识别, 4 种 content 形态兼容
+//
+//	cache_control 任意位置识别, 4 种 content 形态兼容
 func messagesAlreadyHaveCacheControl(messages []aispec.ChatDetail) bool {
 	for _, msg := range messages {
 		if contentHasCacheControl(msg.Content) {

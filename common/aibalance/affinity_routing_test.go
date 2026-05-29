@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/yaklang/yaklang/common/schema"
 )
 
 // 关键词: aibalance, 亲和性路由, 单元测试
@@ -23,7 +22,7 @@ func newTestProvider(typeName, domain, apiKey string, latencyMs int64, healthy b
 		DomainOrURL: domain,
 		APIKey:      apiKey,
 		ModelName:   "test-model",
-		DbProvider: &schema.AiProvider{
+		DbProvider: &AiProvider{
 			TypeName:    typeName,
 			DomainOrURL: domain,
 			APIKey:      apiKey,

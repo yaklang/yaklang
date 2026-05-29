@@ -24,10 +24,11 @@ const inFlightCompletionTokenBudget = 8192
 // 用与 onUsageForward 正路一致的 ComputeWeightedTokens 倍率体系。
 //
 // 估算公式：
-//   estPromptTokens     = ytoken(promptText) + imageCount * fallbackImageTokenEstimate
-//   estCompletionTokens = inFlightCompletionTokenBudget  // 8192 保守
-//   estUsage            = ChatUsage{PromptTokens, CompletionTokens, TotalTokens}
-//   返回 ComputeWeightedTokens(meta, estUsage)
+//
+//	estPromptTokens     = ytoken(promptText) + imageCount * fallbackImageTokenEstimate
+//	estCompletionTokens = inFlightCompletionTokenBudget  // 8192 保守
+//	estUsage            = ChatUsage{PromptTokens, CompletionTokens, TotalTokens}
+//	返回 ComputeWeightedTokens(meta, estUsage)
 //
 // 入参 promptText 应该传 prompt.String() (chat 入口已拼好的文本)。
 // 关键词: computeInFlightTokenEstimate ytoken 预扣估算, 与 fallback 同体系
@@ -72,8 +73,8 @@ func resolveInFlightBucketKey(modelName string) (bucketKey string, exempt bool) 
 //   - exempt：透传（永远 Allowed=true）
 //   - TokensLimit<=0：透传（无限额）
 //   - 其它：effective_used = decision.TokensUsed + inFlightTokens.Get(bucket)
-//           decision.TokensUsed 被替换为 effective_used，
-//           decision.Allowed 重新按 effective_used < TokensLimit 计算
+//     decision.TokensUsed 被替换为 effective_used，
+//     decision.Allowed 重新按 effective_used < TokensLimit 计算
 //
 // 注意 decision.TokensUsed 字段在 429 响应里会被回写给客户端
 // (X-AIBalance-Token-Used 头)，把 in-flight 加上去能让客户端看到"真实压力"。

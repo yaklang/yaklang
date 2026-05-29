@@ -28,8 +28,8 @@ import (
 )
 
 const (
-	maxMirrorRequestBodySize = 256 * 1024  // 256KB, 脚本可能较长但远小于该阈值
-	maxMirrorScriptLength    = 200 * 1024  // 200KB, 单脚本最大长度
+	maxMirrorRequestBodySize = 256 * 1024 // 256KB, 脚本可能较长但远小于该阈值
+	maxMirrorScriptLength    = 200 * 1024 // 200KB, 单脚本最大长度
 	maxMirrorNameLength      = 128
 	maxMirrorActionToolLen   = 256
 )
@@ -195,7 +195,8 @@ func parseMirrorIDFromPath(path string) (uint, error) {
 // 路径以 _meta 开头, 避免与 /mirror-rules/{id} 冲突 (id 必为数字).
 //
 // 关键词: handleGetMirrorMeta, mirror rules /_meta API, portal 自描述,
-//        default script template 来自后端, data spec 渲染
+//
+//	default script template 来自后端, data spec 渲染
 func (c *ServerConfig) handleGetMirrorMeta(conn net.Conn, request *http.Request) {
 	c.logInfo("mirror: get meta")
 	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{

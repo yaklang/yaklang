@@ -27,10 +27,10 @@ type amapTraceIDState struct {
 // 进而触发 TestGoroutineTracing 的 leak 误报。
 // 关键词: AmapRateLimiter lazy cleanup, goroutine baseline 净化, TestGoroutineTracing 误报修复
 type AmapRateLimiter struct {
-	states     sync.Map // map[string]*amapTraceIDState
-	stopCh     chan struct{}
-	stopOnce   sync.Once
-	startOnce  sync.Once
+	states    sync.Map // map[string]*amapTraceIDState
+	stopCh    chan struct{}
+	stopOnce  sync.Once
+	startOnce sync.Once
 }
 
 // NewAmapRateLimiter creates a new rate limiter. The cleanup goroutine is NOT

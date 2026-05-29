@@ -694,7 +694,8 @@ func TestMirrorManager_NeedsActionParsing(t *testing.T) {
 // 即: ConditionType=always 时, snapshot.Action 是空字符串也应当命中.
 //
 // 关键词: TestMirrorRuleMatch_AlwaysHitsEvenWithoutAction,
-//        always 规则解析失败兜底, ParseAction 失败不影响投递
+//
+//	always 规则解析失败兜底, ParseAction 失败不影响投递
 func TestMirrorRuleMatch_AlwaysHitsEvenWithoutAction(t *testing.T) {
 	rule := &schema.AiMirrorRule{ConditionType: MirrorConditionAlways}
 	// 1. 完全空的 snapshot
