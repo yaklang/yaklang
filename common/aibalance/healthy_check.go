@@ -8,13 +8,12 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
 // HealthCheckResult stores health check results
 type HealthCheckResult struct {
-	Provider     *schema.AiProvider
+	Provider     *AiProvider
 	IsHealthy    bool
 	ResponseTime int64 // milliseconds
 	Error        error
@@ -294,7 +293,7 @@ func CheckAllProviders(checkManager *HealthCheckManager) ([]*HealthCheckResult, 
 		}
 
 		wg.Add(1)
-		go func(dbp *schema.AiProvider) {
+		go func(dbp *AiProvider) {
 			defer wg.Done()
 
 			// 创建 Provider 实例
@@ -640,7 +639,7 @@ func (m *HealthCheckManager) StopScheduler() {
 }
 
 // saveHealthCheckRecord persists a health check result for uptime history
-func saveHealthCheckRecord(dbProvider *schema.AiProvider, result *HealthCheckResult) {
+func saveHealthCheckRecord(dbProvider *AiProvider, result *HealthCheckResult) {
 	if dbProvider == nil || result == nil {
 		return
 	}
@@ -655,7 +654,7 @@ func saveHealthCheckRecord(dbProvider *schema.AiProvider, result *HealthCheckRes
 		errMsg = result.Error.Error()
 	}
 
-	record := &schema.AiProviderHealthRecord{
+	record := &AiProviderHealthRecord{
 		ProviderID:   dbProvider.ID,
 		WrapperName:  wrapperName,
 		IsHealthy:    result.IsHealthy,

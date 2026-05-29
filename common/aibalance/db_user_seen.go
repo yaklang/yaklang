@@ -9,7 +9,6 @@ import (
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/schema"
 )
 
 // userSeenDailyCap 限制 ai_daily_user_seen 表每天每 source_kind 写入的最大行数，
@@ -61,7 +60,7 @@ func userSeenDB() *gorm.DB {
 // EnsureUserSeenTable ensures the ai_daily_user_seen table exists.
 // 关键词: ai_daily_user_seen migrate
 func EnsureUserSeenTable() error {
-	return GetDB().AutoMigrate(&schema.AiDailyUserSeen{}).Error
+	return GetDB().AutoMigrate(&AiDailyUserSeen{}).Error
 }
 
 // RecordDailyUserSeen registers one user fingerprint for the given date / source_kind.
@@ -76,11 +75,11 @@ func RecordDailyUserSeen(date, sourceKind, userHash string) error {
 
 	db := userSeenDB()
 
-	var existing schema.AiDailyUserSeen
+	var existing AiDailyUserSeen
 	err := db.Where("date = ? AND source_kind = ? AND user_hash = ?", date, sourceKind, userHash).
 		First(&existing).Error
 	if err == nil {
-		return db.Model(&schema.AiDailyUserSeen{}).
+		return db.Model(&AiDailyUserSeen{}).
 			Where("id = ?", existing.ID).
 			UpdateColumn("last_seen_at", time.Now()).Error
 	}
@@ -98,17 +97,17 @@ func RecordDailyUserSeen(date, sourceKind, userHash string) error {
 		return nil
 	}
 
-	row := schema.AiDailyUserSeen{
+	row := AiDailyUserSeen{
 		Date:       date,
 		SourceKind: sourceKind,
 		UserHash:   userHash,
 		LastSeenAt: time.Now(),
 	}
 	if createErr := db.Create(&row).Error; createErr != nil {
-		var dup schema.AiDailyUserSeen
+		var dup AiDailyUserSeen
 		if findErr := db.Where("date = ? AND source_kind = ? AND user_hash = ?", date, sourceKind, userHash).
 			First(&dup).Error; findErr == nil {
-			return db.Model(&schema.AiDailyUserSeen{}).
+			return db.Model(&AiDailyUserSeen{}).
 				Where("id = ?", dup.ID).
 				UpdateColumn("last_seen_at", time.Now()).Error
 		}
@@ -121,11 +120,11 @@ func RecordDailyUserSeen(date, sourceKind, userHash string) error {
 // DAUDay 是「某一天 DAU 拆分」聚合行：包含 4 个数字（按 source_kind 拆 + total）。
 // 关键词: DAUDay, 日活拆分, total = sum source_kind
 type DAUDay struct {
-	Date       string `json:"date"`
-	APIKey     int64  `json:"api_key"`
-	FreeTrace  int64  `json:"free_trace"`
-	FreeIP     int64  `json:"free_ip"`
-	Total      int64  `json:"total"`
+	Date      string `json:"date"`
+	APIKey    int64  `json:"api_key"`
+	FreeTrace int64  `json:"free_trace"`
+	FreeIP    int64  `json:"free_ip"`
+	Total     int64  `json:"total"`
 }
 
 // QueryDAU60Days returns last 60 calendar days (today inclusive) of DAU per source_kind,
@@ -149,7 +148,7 @@ func QueryDAUDays(days int, end time.Time) ([]*DAUDay, error) {
 		Cnt        int64
 	}
 	var rows []row
-	if err := userSeenDB().Table((&schema.AiDailyUserSeen{}).TableName()).
+	if err := userSeenDB().Table((&AiDailyUserSeen{}).TableName()).
 		Select("date, source_kind, COUNT(DISTINCT user_hash) AS cnt").
 		Where("date >= ?", startDate).
 		Group("date, source_kind").
@@ -197,7 +196,7 @@ func QueryTodayDAUTotal() (int64, error) {
 // 关键词: QueryDAUTotalByDate
 func QueryDAUTotalByDate(date string) (int64, error) {
 	var total int64
-	err := userSeenDB().Table((&schema.AiDailyUserSeen{}).TableName()).
+	err := userSeenDB().Table((&AiDailyUserSeen{}).TableName()).
 		Where("date = ?", date).
 		Select("COUNT(DISTINCT (source_kind || '|' || user_hash))").
 		Row().Scan(&total)
@@ -215,7 +214,7 @@ func CleanupOldUserSeen(keepDays int) (int64, error) {
 		keepDays = 100
 	}
 	cutoff := time.Now().AddDate(0, 0, -keepDays).Format("2006-01-02")
-	tx := GetDB().Unscoped().Where("date < ?", cutoff).Delete(&schema.AiDailyUserSeen{})
+	tx := GetDB().Unscoped().Where("date < ?", cutoff).Delete(&AiDailyUserSeen{})
 	if tx.Error != nil {
 		return 0, fmt.Errorf("CleanupOldUserSeen failed: %v", tx.Error)
 	}

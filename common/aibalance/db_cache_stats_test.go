@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aispec"
-	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -26,7 +25,7 @@ func uniqueCacheTestProvider(nonce string) *Provider {
 
 // cleanupCacheStatsForWrapper 清空指定 wrapper_name 的所有行（硬删除，避免软删除残留触发 unique 约束）。
 func cleanupCacheStatsForWrapper(t *testing.T, wrapperName string) {
-	require.NoError(t, GetDB().Unscoped().Where("wrapper_name = ?", wrapperName).Delete(&schema.AiDailyCacheStat{}).Error)
+	require.NoError(t, GetDB().Unscoped().Where("wrapper_name = ?", wrapperName).Delete(&AiDailyCacheStat{}).Error)
 }
 
 func TestEnsureCacheStatsTable(t *testing.T) {
@@ -54,7 +53,7 @@ func TestRecordDailyCacheStats_Increment(t *testing.T) {
 	totals, err := QueryCacheStatsTotalByDate(time.Now().Format("2006-01-02"))
 	require.NoError(t, err)
 	// 注意：今日表里可能有别的 wrapper 行，所以仅比较「我们关心的 wrapper」的累计。
-	var rows []*schema.AiDailyCacheStat
+	var rows []*AiDailyCacheStat
 	require.NoError(t, GetDB().Where("wrapper_name = ?", wrapper).Find(&rows).Error)
 	require.Len(t, rows, 1, "same provider should be aggregated into a single row")
 	assert.Equal(t, int64(3), rows[0].RequestCount)
@@ -84,7 +83,7 @@ func TestRecordDailyCacheStats_NilUsageDetails(t *testing.T) {
 
 	rows, err := QueryCacheBreakdownByDate(time.Now().Format("2006-01-02"))
 	require.NoError(t, err)
-	var hit *schema.AiDailyCacheStat
+	var hit *AiDailyCacheStat
 	for _, r := range rows {
 		if r.WrapperName == wrapper {
 			hit = r
@@ -110,7 +109,7 @@ func TestRecordDailyCacheStats_DateBoundary(t *testing.T) {
 
 	// 手动伪造一行「昨天」的记录，确认不会与今天冲突
 	yesterday := time.Now().AddDate(0, 0, -1).Format("2006-01-02")
-	yRow := schema.AiDailyCacheStat{
+	yRow := AiDailyCacheStat{
 		Date:             yesterday,
 		WrapperName:      wrapper,
 		ModelName:        p.ModelName,
@@ -123,7 +122,7 @@ func TestRecordDailyCacheStats_DateBoundary(t *testing.T) {
 	}
 	require.NoError(t, GetDB().Create(&yRow).Error)
 
-	var rows []*schema.AiDailyCacheStat
+	var rows []*AiDailyCacheStat
 	require.NoError(t, GetDB().Where("wrapper_name = ?", wrapper).Order("date ASC").Find(&rows).Error)
 	require.Len(t, rows, 2, "today and yesterday should be two separate rows")
 
@@ -144,7 +143,7 @@ func TestQueryCacheTrendDays_FillZero(t *testing.T) {
 	// 在 5 天前 / 2 天前 各写一行，确保中间日期补 0
 	end := time.Now()
 	for _, offset := range []int{-5, -2} {
-		row := schema.AiDailyCacheStat{
+		row := AiDailyCacheStat{
 			Date:             end.AddDate(0, 0, offset).Format("2006-01-02"),
 			WrapperName:      wrapper,
 			ModelName:        "trend-model",
@@ -183,7 +182,7 @@ func TestCleanupOldCacheStats(t *testing.T) {
 	defer cleanupCacheStatsForWrapper(t, wrapper)
 
 	// 200 天前的行：应被清理
-	oldRow := schema.AiDailyCacheStat{
+	oldRow := AiDailyCacheStat{
 		Date:             time.Now().AddDate(0, 0, -200).Format("2006-01-02"),
 		WrapperName:      wrapper,
 		ModelName:        "cleanup-model",
@@ -206,7 +205,7 @@ func TestCleanupOldCacheStats(t *testing.T) {
 	require.NoError(t, err)
 	assert.GreaterOrEqual(t, removed, int64(1))
 
-	var rows []*schema.AiDailyCacheStat
+	var rows []*AiDailyCacheStat
 	require.NoError(t, GetDB().Where("wrapper_name = ?", wrapper).Find(&rows).Error)
 	require.Len(t, rows, 1, "should keep only the recent row")
 	assert.Equal(t, freshRow.Date, rows[0].Date)

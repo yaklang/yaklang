@@ -106,6 +106,12 @@ func AIChatToAICallbackType(cb func(prompt string, opts ...aispec.AIConfigOption
 			// 也能触达用户脚本.
 			// 关键词: AIChatToAICallbackType, OriginalAICallback usage 透传, ai.usageCallback
 			optList = append(optList, extractUserUsageCallbackOpts(aicf)...)
+			// 上报本次请求的模型用途类型(tier)，供 aibalance gateway 注入
+			// X-Yak-AI-Model-Usage-Type 头给中转层做用量保护降级。空 tier 不上报。
+			// 关键词: AIChatToAICallbackType tier 上报, WithModelUsageType, GetModelTier
+			if tier := strings.TrimSpace(req.GetModelTier()); tier != "" {
+				optList = append(optList, aispec.WithModelUsageType(tier))
+			}
 			output, err := cb(
 				req.GetPrompt(),
 				optList...,

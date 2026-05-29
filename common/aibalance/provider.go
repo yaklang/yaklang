@@ -12,7 +12,6 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/ai/embedding"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -56,7 +55,7 @@ type Provider struct {
 	WrapperName string `json:"wrapper_name"`
 
 	// Corresponding AiProvider object in the database
-	DbProvider *schema.AiProvider `json:"-"` // json:"-" means this field won't be serialized to JSON
+	DbProvider *AiProvider `json:"-"` // json:"-" means this field won't be serialized to JSON
 
 	// Mutex to protect concurrent updates
 	mutex sync.Mutex `json:"-"`
@@ -427,7 +426,7 @@ func (p *Provider) GetEmbeddingClient() (aispec.EmbeddingCaller, error) {
 
 // GetDbProvider gets the associated database AiProvider object
 // If no associated database object exists, try to query or create from database
-func (p *Provider) GetDbProvider() (*schema.AiProvider, error) {
+func (p *Provider) GetDbProvider() (*AiProvider, error) {
 	// Use mutex to protect reading and setting of DbProvider
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
@@ -438,7 +437,7 @@ func (p *Provider) GetDbProvider() (*schema.AiProvider, error) {
 	}
 
 	// Create a temporary AiProvider object for querying
-	dbProvider := &schema.AiProvider{
+	dbProvider := &AiProvider{
 		WrapperName:        p.WrapperName,
 		ModelName:          p.ModelName,
 		TypeName:           p.TypeName,

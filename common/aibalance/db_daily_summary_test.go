@@ -8,14 +8,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aispec"
-	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
 // 关键词: db_daily_summary_test, ai_daily_summary 单元测试
 
 func cleanupDailySummaryForDate(t *testing.T, date string) {
-	require.NoError(t, GetDB().Unscoped().Where("date = ?", date).Delete(&schema.AiDailySummary{}).Error)
+	require.NoError(t, GetDB().Unscoped().Where("date = ?", date).Delete(&AiDailySummary{}).Error)
 }
 
 func TestEnsureSummaryTable(t *testing.T) {
@@ -36,9 +35,9 @@ func TestRecordDailySummaryDelta_FlushUpsert(t *testing.T) {
 	defer func() { nowDateString = origNow }()
 
 	usage := &aispec.ChatUsage{
-		PromptTokens:     100,
-		CompletionTokens: 50,
-		TotalTokens:      150,
+		PromptTokens:        100,
+		CompletionTokens:    50,
+		TotalTokens:         150,
 		PromptTokensDetails: &aispec.PromptTokensDetails{CachedTokens: 30},
 	}
 	for i := 0; i < 5; i++ {
@@ -47,12 +46,12 @@ func TestRecordDailySummaryDelta_FlushUpsert(t *testing.T) {
 
 	// 还没 flush 时数据库应没有这一天的行
 	var count int64
-	require.NoError(t, GetDB().Model(&schema.AiDailySummary{}).Where("date = ?", date).Count(&count).Error)
+	require.NoError(t, GetDB().Model(&AiDailySummary{}).Where("date = ?", date).Count(&count).Error)
 	assert.Equal(t, int64(0), count)
 
 	require.NoError(t, flushSummaryAccumulator())
 
-	var row schema.AiDailySummary
+	var row AiDailySummary
 	require.NoError(t, GetDB().Where("date = ?", date).First(&row).Error)
 	assert.Equal(t, int64(5), row.TotalRequests)
 	assert.Equal(t, int64(500), row.PromptTokens)
@@ -97,14 +96,14 @@ func TestDailySummaryAccumulator_DayRollover(t *testing.T) {
 	RecordDailySummaryDelta(&aispec.ChatUsage{PromptTokens: 50, TotalTokens: 50})
 
 	// dayA 的数据应已经被 flush
-	var rowA schema.AiDailySummary
+	var rowA AiDailySummary
 	require.NoError(t, GetDB().Where("date = ?", dayA).First(&rowA).Error)
 	assert.Equal(t, int64(2), rowA.TotalRequests)
 	assert.Equal(t, int64(300), rowA.PromptTokens)
 
 	// dayB 还在内存，需要手动 flush
 	require.NoError(t, flushSummaryAccumulator())
-	var rowB schema.AiDailySummary
+	var rowB AiDailySummary
 	require.NoError(t, GetDB().Where("date = ?", dayB).First(&rowB).Error)
 	assert.Equal(t, int64(1), rowB.TotalRequests)
 	assert.Equal(t, int64(50), rowB.PromptTokens)
@@ -119,10 +118,10 @@ func TestQuerySummaryDays_FillZero(t *testing.T) {
 	defer cleanupDailySummaryForDate(t, dateA)
 	defer cleanupDailySummaryForDate(t, dateB)
 
-	require.NoError(t, GetDB().Create(&schema.AiDailySummary{
+	require.NoError(t, GetDB().Create(&AiDailySummary{
 		Date: dateA, TotalRequests: 9, PromptTokens: 90,
 	}).Error)
-	require.NoError(t, GetDB().Create(&schema.AiDailySummary{
+	require.NoError(t, GetDB().Create(&AiDailySummary{
 		Date: dateB, TotalRequests: 7, PromptTokens: 70,
 	}).Error)
 
@@ -160,7 +159,7 @@ func TestRecordDailySummaryDelta_NilUsageStillCountsRequest(t *testing.T) {
 	}
 	require.NoError(t, flushSummaryAccumulator())
 
-	var row schema.AiDailySummary
+	var row AiDailySummary
 	require.NoError(t, GetDB().Where("date = ?", date).First(&row).Error)
 	assert.Equal(t, int64(3), row.TotalRequests)
 	assert.Equal(t, int64(0), row.PromptTokens)
@@ -180,13 +179,13 @@ func TestFlushAccumulator_NoOpOnZero(t *testing.T) {
 	require.NoError(t, flushAccumulator(acc))
 
 	var count int64
-	require.NoError(t, GetDB().Model(&schema.AiDailySummary{}).Where("date = ?", date).Count(&count).Error)
+	require.NoError(t, GetDB().Model(&AiDailySummary{}).Where("date = ?", date).Count(&count).Error)
 	assert.Equal(t, int64(0), count, "all-zero accumulator should not insert any row")
 
 	// 让 atomic 计数器加上一些值，再 flush 一次（消耗它）
 	atomic.AddInt64(&acc.totalRequests, 2)
 	require.NoError(t, flushAccumulator(acc))
-	require.NoError(t, GetDB().Model(&schema.AiDailySummary{}).Where("date = ?", date).Count(&count).Error)
+	require.NoError(t, GetDB().Model(&AiDailySummary{}).Where("date = ?", date).Count(&count).Error)
 	assert.Equal(t, int64(1), count)
 
 	_ = utils.RandStringBytes

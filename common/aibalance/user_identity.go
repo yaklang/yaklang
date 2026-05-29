@@ -130,7 +130,8 @@ func lookupHeader(rawPacket []byte, candidates ...string) string {
 // XFF 形如 "client_ip, edge_ip, lb_ip", 客户端 IP 总在最左。
 //
 // 关键词: extractClientIP, 客户端真实 IP 提取, 反代头优先级,
-//        X-Forwarded-For 多值解析, 公网 IP 优先, 私有 IP 跳过
+//
+//	X-Forwarded-For 多值解析, 公网 IP 优先, 私有 IP 跳过
 func extractClientIP(rawPacket []byte, conn net.Conn) string {
 	// 优先级 1: 单值反代头 (CF-Connecting-IP / True-Client-IP / X-Real-IP 等)
 	for _, h := range clientIPHeaderCandidates {

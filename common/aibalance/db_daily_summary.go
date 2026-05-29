@@ -11,7 +11,6 @@ import (
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/schema"
 )
 
 // dailySummaryAccumulator 是「当天」内存聚合器。
@@ -44,7 +43,7 @@ func dailySummaryDB() *gorm.DB {
 // EnsureSummaryTable ensures the ai_daily_summary table exists.
 // 关键词: ai_daily_summary migrate
 func EnsureSummaryTable() error {
-	return GetDB().AutoMigrate(&schema.AiDailySummary{}).Error
+	return GetDB().AutoMigrate(&AiDailySummary{}).Error
 }
 
 // resetDailySummaryAccumulator 清空内存累加器，仅供测试使用。
@@ -145,10 +144,10 @@ func upsertDailySummaryDelta(date string, reqs, prompt, completion, cached int64
 		return fmt.Errorf("upsertDailySummaryDelta: date is empty")
 	}
 	db := dailySummaryDB()
-	var row schema.AiDailySummary
+	var row AiDailySummary
 	err := db.Where("date = ?", date).First(&row).Error
 	if err == nil {
-		return db.Model(&schema.AiDailySummary{}).
+		return db.Model(&AiDailySummary{}).
 			Where("id = ?", row.ID).
 			UpdateColumns(map[string]interface{}{
 				"total_requests":    gorm.Expr("total_requests + ?", reqs),
@@ -161,7 +160,7 @@ func upsertDailySummaryDelta(date string, reqs, prompt, completion, cached int64
 		return fmt.Errorf("upsertDailySummaryDelta query failed: %v", err)
 	}
 
-	row = schema.AiDailySummary{
+	row = AiDailySummary{
 		Date:             date,
 		TotalRequests:    reqs,
 		PromptTokens:     prompt,
@@ -169,9 +168,9 @@ func upsertDailySummaryDelta(date string, reqs, prompt, completion, cached int64
 		CachedTokens:     cached,
 	}
 	if createErr := db.Create(&row).Error; createErr != nil {
-		var existing schema.AiDailySummary
+		var existing AiDailySummary
 		if findErr := db.Where("date = ?", date).First(&existing).Error; findErr == nil {
-			return db.Model(&schema.AiDailySummary{}).
+			return db.Model(&AiDailySummary{}).
 				Where("id = ?", existing.ID).
 				UpdateColumns(map[string]interface{}{
 					"total_requests":    gorm.Expr("total_requests + ?", reqs),
@@ -215,35 +214,35 @@ func StartDailySummaryFlusher(ctx context.Context, interval time.Duration) {
 // QuerySummary60Days returns last 60 calendar days (today inclusive),
 // missing dates filled with zero rows.
 // 关键词: QuerySummary60Days, 缺失日期补 0
-func QuerySummary60Days() ([]*schema.AiDailySummary, error) {
+func QuerySummary60Days() ([]*AiDailySummary, error) {
 	return QuerySummaryDays(60, time.Now())
 }
 
 // QuerySummaryDays is the test-friendly variant of QuerySummary60Days.
 // 关键词: QuerySummaryDays
-func QuerySummaryDays(days int, end time.Time) ([]*schema.AiDailySummary, error) {
+func QuerySummaryDays(days int, end time.Time) ([]*AiDailySummary, error) {
 	if days <= 0 {
 		days = 60
 	}
 	startDate := end.AddDate(0, 0, -(days - 1)).Format("2006-01-02")
 
-	var rows []*schema.AiDailySummary
+	var rows []*AiDailySummary
 	if err := dailySummaryDB().Where("date >= ?", startDate).
 		Order("date ASC").
 		Find(&rows).Error; err != nil {
 		return nil, fmt.Errorf("QuerySummaryDays failed: %v", err)
 	}
-	idx := make(map[string]*schema.AiDailySummary, len(rows))
+	idx := make(map[string]*AiDailySummary, len(rows))
 	for _, r := range rows {
 		idx[r.Date] = r
 	}
-	out := make([]*schema.AiDailySummary, 0, days)
+	out := make([]*AiDailySummary, 0, days)
 	for i := 0; i < days; i++ {
 		d := end.AddDate(0, 0, -(days - 1 - i)).Format("2006-01-02")
 		if r, ok := idx[d]; ok {
 			out = append(out, r)
 		} else {
-			out = append(out, &schema.AiDailySummary{Date: d})
+			out = append(out, &AiDailySummary{Date: d})
 		}
 	}
 	return out, nil

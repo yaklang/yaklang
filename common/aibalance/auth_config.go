@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/schema"
 )
 
 // ==================== User Roles ====================
@@ -235,7 +234,7 @@ func (m *AuthMiddleware) GetAuthInfo(request *http.Request) *AuthInfo {
 	// existing, non-expired row in the database, rather than locking onto
 	// admin_session just because it has a non-empty value.
 	candidateCookies := []string{"admin_session", "ops_session"}
-	var dbSession *schema.LoginSession
+	var dbSession *LoginSession
 	var resolvedSessionID string
 	for _, name := range candidateCookies {
 		ck, cerr := request.Cookie(name)
@@ -287,7 +286,7 @@ func (m *AuthMiddleware) GetAuthInfo(request *http.Request) *AuthInfo {
 
 // resolveSession looks up a session by ID from the database and returns it
 // only if the session exists AND has not expired. Returns nil otherwise.
-func resolveSession(sessionID string) *schema.LoginSession {
+func resolveSession(sessionID string) *LoginSession {
 	if sessionID == "" {
 		return nil
 	}
@@ -295,7 +294,7 @@ func resolveSession(sessionID string) *schema.LoginSession {
 	if db == nil {
 		return nil
 	}
-	var dbSession schema.LoginSession
+	var dbSession LoginSession
 	if err := db.Where("session_id = ?", sessionID).First(&dbSession).Error; err != nil {
 		return nil
 	}

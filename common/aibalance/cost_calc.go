@@ -16,10 +16,10 @@ const (
 // resolvedMultipliers 是 AiModelMeta -> 实际 4 维倍率的解析结果。
 // 关键词: resolvedMultipliers, 倍率回落策略
 type resolvedMultipliers struct {
-	Input        float64
-	Output       float64
-	CacheCreate  float64
-	CacheHit     float64
+	Input         float64
+	Output        float64
+	CacheCreate   float64
+	CacheHit      float64
 	LegacyTraffic float64
 }
 
@@ -76,10 +76,12 @@ func resolveMultipliers(meta *AiModelMeta) resolvedMultipliers {
 // 计算本次请求实际消耗的"加权 token"（用于免费用户日限额扣费、付费 key Token 累加）。
 //
 // 公式：
-//   weighted = input_tokens   * inputMul
-//            + completion     * outputMul
-//            + cache_create   * cacheCreateMul
-//            + cached_tokens  * cacheHitMul
+//
+//	weighted = input_tokens   * inputMul
+//	         + completion     * outputMul
+//	         + cache_create   * cacheCreateMul
+//	         + cached_tokens  * cacheHitMul
+//
 // 其中 input_tokens = max(0, prompt_tokens - cached_tokens - cache_create)
 // 避免 prompt_tokens 与 cached/cache_create 字段重叠重复计费。
 //

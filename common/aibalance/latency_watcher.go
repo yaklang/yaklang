@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/schema"
 )
 
 // LatencyWatcher monitors provider latency and triggers health checks when issues are detected
@@ -168,7 +167,7 @@ func (w *LatencyWatcher) checkProviders(isNormalCheck bool) {
 }
 
 // isProviderProblematic checks if a provider is problematic based on latency and health status
-func (w *LatencyWatcher) isProviderProblematic(p *schema.AiProvider) bool {
+func (w *LatencyWatcher) isProviderProblematic(p *AiProvider) bool {
 	// Provider is problematic if:
 	// 1. First check not completed (highest priority - need to complete first check)
 	if !p.IsFirstCheckCompleted {

@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/ytoken"
-	"github.com/yaklang/yaklang/common/schema"
 )
 
 // 关键词: fallback_usage_estimate_test, ytoken 兜底扣费单元测试
@@ -27,7 +26,7 @@ func fallbackTestEnsureTables(t *testing.T) {
 	t.Helper()
 	require.NoError(t, EnsureFreeUserDailyTokenUsageTable())
 	require.NoError(t, EnsureRateLimitConfigTable())
-	require.NoError(t, GetDB().AutoMigrate(&schema.AiApiKeys{}).Error)
+	require.NoError(t, GetDB().AutoMigrate(&AiApiKeys{}).Error)
 }
 
 // TestApplyUsageFallbackEstimate_EmptyInput_NoBilling 空输入下应不扣费、不抛错。
@@ -162,9 +161,9 @@ func TestApplyUsageFallbackEstimate_APIKey_Billed(t *testing.T) {
 	fallbackTestEnsureTables(t)
 
 	apiKey := fmt.Sprintf("test-fallback-key-%d", time.Now().UnixNano())
-	defer GetDB().Unscoped().Where("api_key = ?", apiKey).Delete(&schema.AiApiKeys{})
+	defer GetDB().Unscoped().Where("api_key = ?", apiKey).Delete(&AiApiKeys{})
 
-	require.NoError(t, GetDB().Create(&schema.AiApiKeys{
+	require.NoError(t, GetDB().Create(&AiApiKeys{
 		APIKey:           apiKey,
 		Active:           true,
 		TokenLimit:       0,
@@ -183,7 +182,7 @@ func TestApplyUsageFallbackEstimate_APIKey_Billed(t *testing.T) {
 	assert.Equal(t, "apikey", res.Bucket)
 	assert.Greater(t, res.Weighted, int64(0))
 
-	var got schema.AiApiKeys
+	var got AiApiKeys
 	require.NoError(t, GetDB().Where("api_key = ?", apiKey).First(&got).Error)
 	assert.Equal(t, res.Weighted, got.TokenUsed,
 		"APIKey TokenUsed should be incremented by exactly weighted")

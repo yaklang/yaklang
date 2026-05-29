@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 )
 
@@ -95,7 +94,7 @@ func CheckAllAmapApiKeys() ([]AmapKeyHealthResult, error) {
 		wg.Add(1)
 		semaphore <- struct{}{}
 
-		go func(k *schema.AmapApiKey) {
+		go func(k *AmapApiKey) {
 			defer wg.Done()
 			defer func() { <-semaphore }()
 
@@ -109,7 +108,7 @@ func CheckAllAmapApiKeys() ([]AmapKeyHealthResult, error) {
 			// Update health status and statistics in DB
 			if healthy {
 				// Reset consecutive failures on success, increment stats
-				if dbErr := GetDB().Model(&schema.AmapApiKey{}).Where("id = ?", k.ID).
+				if dbErr := GetDB().Model(&AmapApiKey{}).Where("id = ?", k.ID).
 					Updates(map[string]interface{}{
 						"is_healthy":           true,
 						"health_check_time":    time.Now(),
@@ -127,7 +126,7 @@ func CheckAllAmapApiKeys() ([]AmapKeyHealthResult, error) {
 				newConsecutiveFailures := k.ConsecutiveFailures + 1
 				isHealthy := newConsecutiveFailures < 3
 
-				if dbErr := GetDB().Model(&schema.AmapApiKey{}).Where("id = ?", k.ID).
+				if dbErr := GetDB().Model(&AmapApiKey{}).Where("id = ?", k.ID).
 					Updates(map[string]interface{}{
 						"is_healthy":           isHealthy,
 						"health_check_time":    time.Now(),

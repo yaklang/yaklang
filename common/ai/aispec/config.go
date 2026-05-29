@@ -119,6 +119,22 @@ type AIConfig struct {
 	//
 	// 关键词: AIConfig.RawMessages, messages 完整透传, 隐式缓存前缀稳定
 	RawMessages []ChatDetail
+
+	// ModelUsageType 标识本次请求由调用方的哪一档「模型用途类型」(tier) 发起：
+	// "intelligent"(高质) / "lightweight"(快速) / "vision"(视觉)，对齐 consts.Tier*。
+	// 仅 aibalance gateway 会把它注入请求头 X-Yak-AI-Model-Usage-Type 上报给中转层，
+	// 用于服务端做用量保护降级；不复用通用 Headers，避免把内部头泄漏给第三方 provider。
+	// 关键词: AIConfig.ModelUsageType, X-Yak-AI-Model-Usage-Type, tier 上报
+	ModelUsageType string
+}
+
+// WithModelUsageType 设置本次请求的模型用途类型(tier)，由 aibalance gateway 注入
+// X-Yak-AI-Model-Usage-Type 请求头上报给中转层。空字符串表示不上报。
+// 关键词: WithModelUsageType, tier 上报 option
+func WithModelUsageType(usageType string) AIConfigOption {
+	return func(c *AIConfig) {
+		c.ModelUsageType = strings.TrimSpace(usageType)
+	}
 }
 
 func WithExtraHeader(headers map[string]string) AIConfigOption {

@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/yaklang/yaklang/common/schema"
 )
 
 func TestEntrypoint(t *testing.T) {
@@ -57,7 +56,7 @@ func TestSmartPeekProvider(t *testing.T) {
 
 	// 创建5个不同的 Provider，具有不同的请求数和延迟
 	providers := make([]*Provider, 5)
-	dbProviders := make([]*schema.AiProvider, 5)
+	dbProviders := make([]*AiProvider, 5)
 
 	for i := 0; i < 5; i++ {
 		providers[i] = &Provider{
@@ -68,7 +67,7 @@ func TestSmartPeekProvider(t *testing.T) {
 		}
 
 		// 模拟数据库对象
-		dbProviders[i] = &schema.AiProvider{
+		dbProviders[i] = &AiProvider{
 			WrapperName:       "test-wrapper",
 			ModelName:         "test-model",
 			TypeName:          "test-type",
@@ -131,7 +130,7 @@ func TestConcurrentPeekProvider(t *testing.T) {
 
 	// 创建5个不同的 Provider
 	providers := make([]*Provider, 5)
-	dbProviders := make([]*schema.AiProvider, 5)
+	dbProviders := make([]*AiProvider, 5)
 
 	for i := 0; i < 5; i++ {
 		providers[i] = &Provider{
@@ -142,7 +141,7 @@ func TestConcurrentPeekProvider(t *testing.T) {
 		}
 
 		// 模拟数据库对象
-		dbProviders[i] = &schema.AiProvider{
+		dbProviders[i] = &AiProvider{
 			WrapperName:       "test-wrapper",
 			ModelName:         "test-model",
 			TypeName:          "test-type",
@@ -202,7 +201,7 @@ func TestConcurrentPeekProvider(t *testing.T) {
 				TypeName:    "test-type",
 				DomainOrURL: fmt.Sprintf("http://new-test-%d.com", i),
 				APIKey:      fmt.Sprintf("new-key-%d", i),
-				DbProvider: &schema.AiProvider{
+				DbProvider: &AiProvider{
 					WrapperName:       "test-wrapper",
 					ModelName:         "test-model",
 					TypeName:          "test-type",
@@ -258,7 +257,7 @@ func TestDynamicUpdateWithConcurrency(t *testing.T) {
 		TypeName:    "test-type",
 		DomainOrURL: "http://initial.com",
 		APIKey:      "initial-key",
-		DbProvider: &schema.AiProvider{
+		DbProvider: &AiProvider{
 			WrapperName:       "test-wrapper",
 			ModelName:         "test-model",
 			TypeName:          "test-type",
@@ -304,7 +303,7 @@ func TestDynamicUpdateWithConcurrency(t *testing.T) {
 					TypeName:    "test-type",
 					DomainOrURL: fmt.Sprintf("http://dynamic-%d-%d.com", index, j),
 					APIKey:      fmt.Sprintf("dynamic-key-%d-%d", index, j),
-					DbProvider: &schema.AiProvider{
+					DbProvider: &AiProvider{
 						WrapperName:       "test-wrapper",
 						ModelName:         "test-model",
 						TypeName:          "test-type",

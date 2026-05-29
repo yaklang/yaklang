@@ -3,26 +3,33 @@ package aibalance
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/jinzhu/gorm"
-	"github.com/yaklang/yaklang/common/schema"
 )
+
+// defaultModelDowngradeRules 是轻量模型降级的内置默认规则：当客户端上报 tier=lightweight
+// 且请求 memfit-standard-free 时，自动降级到 memfit-light-free 以保护用量。
+// 老配置行（ModelDowngradeRules 为空）会回退到该默认值；管理员若想彻底关闭降级，
+// 在 portal 写入 "[]" 即可（空字符串视为未配置）。
+// 关键词: defaultModelDowngradeRules, 轻量降级内置规则, memfit-standard-free → memfit-light-free
+const defaultModelDowngradeRules = `[{"tier":"lightweight","from":"memfit-standard-free","to":"memfit-light-free"}]`
 
 // EnsureRateLimitConfigTable ensures the AiBalanceRateLimitConfig table exists.
 func EnsureRateLimitConfigTable() error {
 	db := GetDB()
-	return db.AutoMigrate(&schema.AiBalanceRateLimitConfig{}).Error
+	return db.AutoMigrate(&AiBalanceRateLimitConfig{}).Error
 }
 
 // GetRateLimitConfig returns the singleton rate-limit config (ID=1), creating with defaults if absent.
-func GetRateLimitConfig() (*schema.AiBalanceRateLimitConfig, error) {
-	var config schema.AiBalanceRateLimitConfig
+func GetRateLimitConfig() (*AiBalanceRateLimitConfig, error) {
+	var config AiBalanceRateLimitConfig
 	db := GetDB()
 	if err := db.Where("id = ?", 1).First(&config).Error; err != nil {
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, fmt.Errorf("failed to query rate limit config: %v", err)
 		}
-		config = schema.AiBalanceRateLimitConfig{
+		config = AiBalanceRateLimitConfig{
 			DefaultRPM:                  600,
 			FreeUserDelaySec:            3,
 			ModelRPMOverrides:           "{}",
@@ -38,6 +45,14 @@ func GetRateLimitConfig() (*schema.AiBalanceRateLimitConfig, error) {
 			// 关键词: GetRateLimitConfig 默认值 MemfitVersionGate
 			MemfitVersionGateEnabled:  false,
 			MemfitVersionMinBuildTime: "",
+			// 自定义 429 文案默认关闭（关闭时完全保持现有文案）
+			// 关键词: GetRateLimitConfig 默认值 Custom429
+			Custom429Enabled:       false,
+			Custom429Notice:        "",
+			Custom429KindOverrides: "{}",
+			// 轻量降级默认带内置规则（memfit-standard-free → memfit-light-free）
+			// 关键词: GetRateLimitConfig 默认值 ModelDowngradeRules
+			ModelDowngradeRules: defaultModelDowngradeRules,
 		}
 		config.ID = 1
 		if createErr := db.Create(&config).Error; createErr != nil {
@@ -49,11 +64,20 @@ func GetRateLimitConfig() (*schema.AiBalanceRateLimitConfig, error) {
 	if config.FreeUserTokenLimitM <= 0 {
 		config.FreeUserTokenLimitM = 1200
 	}
+	// 老行兼容：新字段为空时给出安全默认（不写库）。Custom429KindOverrides 至少为 "{}"，
+	// ModelDowngradeRules 为空回退内置降级规则（"[]" 表示管理员显式关闭，不回退）。
+	// 关键词: GetRateLimitConfig 老行兼容, Custom429KindOverrides 默认, ModelDowngradeRules 回退
+	if strings.TrimSpace(config.Custom429KindOverrides) == "" {
+		config.Custom429KindOverrides = "{}"
+	}
+	if strings.TrimSpace(config.ModelDowngradeRules) == "" {
+		config.ModelDowngradeRules = defaultModelDowngradeRules
+	}
 	return &config, nil
 }
 
 // SaveRateLimitConfig saves the global rate-limit config.
-func SaveRateLimitConfig(config *schema.AiBalanceRateLimitConfig) error {
+func SaveRateLimitConfig(config *AiBalanceRateLimitConfig) error {
 	config.ID = 1
 	return GetDB().Save(config).Error
 }

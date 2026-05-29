@@ -10,7 +10,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/schema"
 )
 
 // ==================== Input Validation Tests ====================
@@ -194,10 +193,10 @@ func TestSanitizeForOutput(t *testing.T) {
 
 func TestMaskAPIKeyDoesNotLeakFullKey(t *testing.T) {
 	tests := []struct {
-		name    string
-		key     string
-		masked  string
-		noLeak  bool // the full key should NOT appear in the masked version
+		name   string
+		key    string
+		masked string
+		noLeak bool // the full key should NOT appear in the masked version
 	}{
 		{
 			name:   "normal key",
@@ -269,10 +268,10 @@ func TestAmapEndpointsRejectMalformedSession(t *testing.T) {
 	config := NewServerConfig()
 
 	malformedTokens := []string{
-		"",                    // empty
-		"invalid-session-id", // non-existent session
+		"",                          // empty
+		"invalid-session-id",        // non-existent session
 		"<script>alert(1)</script>", // XSS attempt in session
-		strings.Repeat("A", 10000), // very long session
+		strings.Repeat("A", 10000),  // very long session
 	}
 
 	for _, token := range malformedTokens {
@@ -374,7 +373,7 @@ func TestAmapApiKeyCRUD(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create a test key
-	testKey := &schema.AmapApiKey{
+	testKey := &AmapApiKey{
 		APIKey:    "test-key-12345678",
 		Active:    true,
 		IsHealthy: true,
@@ -434,7 +433,7 @@ func TestAmapApiKeyConsecutiveFailures(t *testing.T) {
 	err := EnsureAmapApiKeyTable()
 	require.NoError(t, err)
 
-	testKey := &schema.AmapApiKey{
+	testKey := &AmapApiKey{
 		APIKey:    "test-failure-key-abcd",
 		Active:    true,
 		IsHealthy: true,

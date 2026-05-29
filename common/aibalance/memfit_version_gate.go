@@ -1,6 +1,7 @@
 package aibalance
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 	"strings"
@@ -129,15 +130,28 @@ func parseFlexibleBuildTime(s string) (time.Time, error) {
 //
 // 关键词: writeMemfitVersionRateLimitResponse, memfit 客户端版本控流 429, X-AIBalance-Limit-Kind memfit_client_version
 func (c *ServerConfig) writeMemfitVersionRateLimitResponse(conn net.Conn, reason string) {
-	const message = "针对旧版本的 Memfit/Yak 系统使用量已达到最大上限，最大上限为 1 亿。请更新最新版本 Yak 引擎或最新版本 Memfit/Yak Project 系统以提升用户体验。"
+	const defaultMessage = "针对旧版本的 Memfit/Yak 系统使用量已达到最大上限，最大上限为 1 亿。请更新最新版本 Yak 引擎或最新版本 Memfit/Yak Project 系统以提升用户体验。"
 	if reason == "" {
 		reason = "unknown"
 	}
-	// 显式手写 JSON 以避免对外部 marshaler 的依赖；message 全角标点本身在 JSON 字符串内合法。
-	body := fmt.Sprintf(
-		`{"error":{"type":"memfit_client_version_limited","limit_kind":"memfit_client_version","limit_kind_zh":"\u5ba2\u6237\u7aef\u7248\u672c\u9650\u6d41","reason":%q,"message":%q}}`,
-		reason, message,
-	)
+	// 默认文案保持历史不变；启用自定义 429 时按 kind=memfit_version 覆盖 message 并注入 notice。
+	// 关键词: writeMemfitVersionRateLimitResponse resolveLimit429, kind memfit_version, notice 注入
+	message, notice := c.resolveLimit429("memfit_version", defaultMessage)
+	errMap := map[string]interface{}{
+		"type":          "memfit_client_version_limited",
+		"limit_kind":    "memfit_client_version",
+		"limit_kind_zh": "客户端版本限流",
+		"reason":        reason,
+		"message":       message,
+	}
+	if notice != "" {
+		errMap["notice"] = notice
+	}
+	body, err := json.Marshal(map[string]interface{}{"error": errMap})
+	if err != nil {
+		log.Debugf("writeMemfitVersionRateLimitResponse marshal failed: %v", err)
+		body = []byte(`{"error":{"type":"memfit_client_version_limited","limit_kind":"memfit_client_version","message":"client version limited"}}`)
+	}
 	header := fmt.Sprintf(
 		"HTTP/1.1 429 Too Many Requests\r\n"+
 			"Content-Type: application/json; charset=utf-8\r\n"+
@@ -147,11 +161,11 @@ func (c *ServerConfig) writeMemfitVersionRateLimitResponse(conn net.Conn, reason
 			"\r\n",
 		reason, len(body),
 	)
-	if _, err := conn.Write([]byte(header)); err != nil {
-		log.Debugf("writeMemfitVersionRateLimitResponse: write header failed: %v", err)
+	if _, werr := conn.Write([]byte(header)); werr != nil {
+		log.Debugf("writeMemfitVersionRateLimitResponse: write header failed: %v", werr)
 		return
 	}
-	if _, err := conn.Write([]byte(body)); err != nil {
-		log.Debugf("writeMemfitVersionRateLimitResponse: write body failed: %v", err)
+	if _, werr := conn.Write(body); werr != nil {
+		log.Debugf("writeMemfitVersionRateLimitResponse: write body failed: %v", werr)
 	}
 }

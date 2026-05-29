@@ -7,8 +7,6 @@ import (
 	"sync"
 	"testing"
 	"time"
-
-	"github.com/yaklang/yaklang/common/schema"
 )
 
 func TestServeChatCompletions(t *testing.T) {
@@ -151,7 +149,7 @@ func TestServerProviderStatusUpdateConcurrency(t *testing.T) {
 	}
 
 	// 模拟数据库对象
-	dbProvider := &schema.AiProvider{
+	dbProvider := &AiProvider{
 		WrapperName:     "test-wrapper",
 		ModelName:       "test-model",
 		TypeName:        "test-type",

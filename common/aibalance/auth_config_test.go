@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/schema"
 )
 
 func init() {
@@ -746,7 +745,7 @@ func TestAuthMiddlewareGetAuthInfoWithOpsKey(t *testing.T) {
 
 	// Create a test OPS user
 	testOpsKey := "ops-test-" + "12345678-1234-1234-1234-123456789012"
-	testUser := &schema.OpsUser{
+	testUser := &OpsUser{
 		Username: "test_ops_user",
 		Password: "hashed_password",
 		OpsKey:   testOpsKey,
@@ -817,7 +816,7 @@ func TestAuthMiddlewareGetAuthInfoWithInactiveOpsUser(t *testing.T) {
 
 	// Create an inactive OPS user
 	testOpsKey := "ops-inactive-" + "12345678-1234-1234-1234-123456789012"
-	testUser := &schema.OpsUser{
+	testUser := &OpsUser{
 		Username: "inactive_ops_user",
 		Password: "hashed_password",
 		OpsKey:   testOpsKey,
@@ -853,7 +852,7 @@ func TestOpsKeyAuthenticationWithApiKeyCreation(t *testing.T) {
 
 	// Create a test OPS user
 	testOpsKey := "ops-apikey-test-" + "12345678-1234-1234-1234-123456789012"
-	testUser := &schema.OpsUser{
+	testUser := &OpsUser{
 		Username:     "apikey_test_user",
 		Password:     "hashed_password",
 		OpsKey:       testOpsKey,
@@ -899,7 +898,7 @@ func TestOpsKeyCreateApiKeyEndToEnd(t *testing.T) {
 
 	// Create a test OPS user
 	testOpsKey := "ops-e2e-test-" + "12345678-1234-1234-1234-123456789012"
-	testUser := &schema.OpsUser{
+	testUser := &OpsUser{
 		Username:     "e2e_test_ops_user",
 		Password:     "hashed_password",
 		OpsKey:       testOpsKey,
@@ -952,7 +951,7 @@ func TestLegacyFallbackOpsKeyAuth(t *testing.T) {
 
 	// Create a test OPS user
 	testOpsKey := "ops-legacy-test-" + "12345678-1234-1234-1234-123456789012"
-	testUser := &schema.OpsUser{
+	testUser := &OpsUser{
 		Username:     "legacy_test_ops_user",
 		Password:     "hashed_password",
 		OpsKey:       testOpsKey,
@@ -1229,7 +1228,7 @@ func initTestDB(t *testing.T) {
 		t.Skip("Database not initialized, skipping test")
 	}
 	// Auto-migrate schemas if needed
-	result := db.AutoMigrate(&schema.OpsUser{}, &schema.OpsActionLog{}, &schema.AiApiKeys{}, &schema.LoginSession{})
+	result := db.AutoMigrate(&OpsUser{}, &OpsActionLog{}, &AiApiKeys{}, &LoginSession{})
 	if result != nil && result.Error != nil {
 		t.Fatalf("Failed to auto-migrate schemas: %v", result.Error)
 	}

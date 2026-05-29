@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -36,14 +35,14 @@ func startDailyTokenTestServer(t *testing.T, dayOffset int) (string, *ServerConf
 	consts.InitializeYakitDatabase("", "", "")
 	require.NoError(t, EnsureFreeUserDailyTokenUsageTable())
 	require.NoError(t, EnsureRateLimitConfigTable())
-	require.NoError(t, GetDB().AutoMigrate(&schema.AiApiKeys{}).Error)
+	require.NoError(t, GetDB().AutoMigrate(&AiApiKeys{}).Error)
 
 	mockDate := time.Now().AddDate(0, 0, dayOffset).Format("2006-01-02")
 	origNow := freeTokenNowDate
 	freeTokenNowDate = func() string { return mockDate }
 
 	// 预清空本测试日期下的 token 桶 + 配置覆盖项，避免互相污染
-	require.NoError(t, freeTokenDB().Where("date = ?", mockDate).Delete(&schema.FreeUserDailyTokenUsage{}).Error)
+	require.NoError(t, freeTokenDB().Where("date = ?", mockDate).Delete(&FreeUserDailyTokenUsage{}).Error)
 
 	cfg := NewServerConfig()
 	cfg.AdminPassword = "test-admin-password-secure"
@@ -76,7 +75,7 @@ func startDailyTokenTestServer(t *testing.T, dayOffset int) (string, *ServerConf
 	cleanup := func() {
 		lis.Close()
 		freeTokenNowDate = origNow
-		_ = freeTokenDB().Where("date = ?", mockDate).Delete(&schema.FreeUserDailyTokenUsage{}).Error
+		_ = freeTokenDB().Where("date = ?", mockDate).Delete(&FreeUserDailyTokenUsage{}).Error
 		// 还原默认 rate limit 配置（防止跨测试污染）
 		if rlCfg, err := GetRateLimitConfig(); err == nil {
 			rlCfg.FreeUserTokenLimitM = 1200
@@ -307,10 +306,10 @@ func TestE2E_Portal_RateLimitConfig_RoundTrip(t *testing.T) {
 		"free_user_delay_sec":     0,
 		"free_user_token_limit_m": 777,
 		"free_user_token_model_overrides": map[string]map[string]interface{}{
-			"some-model-free":   {"limit_m": 50, "exempt": false},
-			"another-free":      {"limit_m": 0, "exempt": true},
-			"":                  {"limit_m": 999, "exempt": false}, // 应被过滤
-			"   ":               {"limit_m": 999, "exempt": false}, // 应被过滤
+			"some-model-free": {"limit_m": 50, "exempt": false},
+			"another-free":    {"limit_m": 0, "exempt": true},
+			"":                {"limit_m": 999, "exempt": false}, // 应被过滤
+			"   ":             {"limit_m": 999, "exempt": false}, // 应被过滤
 		},
 	}
 	pb, _ := json.Marshal(payload)
@@ -410,10 +409,10 @@ func TestE2E_PaidKey_TokenLimit_Enforced(t *testing.T) {
 	defer cleanup()
 
 	apiKey := "paid-token-test-" + time.Now().Format("150405.000000")
-	defer GetDB().Unscoped().Where("api_key = ?", apiKey).Delete(&schema.AiApiKeys{})
+	defer GetDB().Unscoped().Where("api_key = ?", apiKey).Delete(&AiApiKeys{})
 
 	// 直接创建一条 token used 已超额的 key
-	require.NoError(t, GetDB().Create(&schema.AiApiKeys{
+	require.NoError(t, GetDB().Create(&AiApiKeys{
 		APIKey:           apiKey,
 		Active:           true,
 		TokenLimit:       1000,
@@ -446,9 +445,9 @@ func TestE2E_PaidKey_TrafficLimit_StillWorks(t *testing.T) {
 	defer cleanup()
 
 	apiKey := "paid-traffic-test-" + time.Now().Format("150405.000000")
-	defer GetDB().Unscoped().Where("api_key = ?", apiKey).Delete(&schema.AiApiKeys{})
+	defer GetDB().Unscoped().Where("api_key = ?", apiKey).Delete(&AiApiKeys{})
 
-	require.NoError(t, GetDB().Create(&schema.AiApiKeys{
+	require.NoError(t, GetDB().Create(&AiApiKeys{
 		APIKey:             apiKey,
 		Active:             true,
 		TrafficLimit:       1024,
@@ -521,12 +520,12 @@ func TestE2E_FreeUser_ModelBucket_Exhausted_429(t *testing.T) {
 // 关键词: TestE2E_AiApiKeys_TokenFields_PersistedCorrectly, schema 持久化检查
 func TestE2E_AiApiKeys_TokenFields_PersistedCorrectly(t *testing.T) {
 	consts.InitializeYakitDatabase("", "", "")
-	require.NoError(t, GetDB().AutoMigrate(&schema.AiApiKeys{}).Error)
+	require.NoError(t, GetDB().AutoMigrate(&AiApiKeys{}).Error)
 
 	apiKey := "schema-token-test-" + time.Now().Format("150405.000000")
-	defer GetDB().Unscoped().Where("api_key = ?", apiKey).Delete(&schema.AiApiKeys{})
+	defer GetDB().Unscoped().Where("api_key = ?", apiKey).Delete(&AiApiKeys{})
 
-	require.NoError(t, GetDB().Create(&schema.AiApiKeys{
+	require.NoError(t, GetDB().Create(&AiApiKeys{
 		APIKey:           apiKey,
 		Active:           true,
 		TokenLimit:       12345,
@@ -534,7 +533,7 @@ func TestE2E_AiApiKeys_TokenFields_PersistedCorrectly(t *testing.T) {
 		TokenLimitEnable: true,
 	}).Error)
 
-	var k schema.AiApiKeys
+	var k AiApiKeys
 	require.NoError(t, GetDB().Where("api_key = ?", apiKey).First(&k).Error)
 	assert.Equal(t, int64(12345), k.TokenLimit)
 	assert.Equal(t, int64(678), k.TokenUsed)
@@ -544,7 +543,7 @@ func TestE2E_AiApiKeys_TokenFields_PersistedCorrectly(t *testing.T) {
 	require.NoError(t, UpdateAiApiKeyTokenLimit(k.ID, 55555, true))
 	require.NoError(t, ResetAiApiKeyTokenUsed(k.ID))
 
-	var k2 schema.AiApiKeys
+	var k2 AiApiKeys
 	require.NoError(t, GetDB().Where("id = ?", k.ID).First(&k2).Error)
 	assert.Equal(t, int64(55555), k2.TokenLimit)
 	assert.Equal(t, int64(0), k2.TokenUsed)

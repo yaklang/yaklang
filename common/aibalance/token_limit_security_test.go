@@ -24,7 +24,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/schema"
 )
 
 // opsLoginGetSession is a test helper that performs OPS login and returns
@@ -45,12 +44,12 @@ func opsLoginGetSession(t *testing.T, addr, username, plainPassword string) stri
 
 // createOpsUserWithPlain returns the user record together with the plaintext
 // password so test code can authenticate.
-func createOpsUserWithPlain(t *testing.T, prefix string) (*schema.OpsUser, string) {
+func createOpsUserWithPlain(t *testing.T, prefix string) (*OpsUser, string) {
 	t.Helper()
 	plain := fmt.Sprintf("ops-test-pwd-%d", time.Now().UnixNano())
 	hashed, err := HashPassword(plain)
 	require.NoError(t, err)
-	user := &schema.OpsUser{
+	user := &OpsUser{
 		Username:     fmt.Sprintf("%s-%d", prefix, time.Now().UnixNano()),
 		Password:     hashed,
 		OpsKey:       GenerateOpsKey(),
@@ -63,11 +62,11 @@ func createOpsUserWithPlain(t *testing.T, prefix string) (*schema.OpsUser, strin
 	return user, plain
 }
 
-func createApiKeyOwnedByOps(t *testing.T, ops *schema.OpsUser, apiKeySuffix string) *schema.AiApiKeys {
+func createApiKeyOwnedByOps(t *testing.T, ops *OpsUser, apiKeySuffix string) *AiApiKeys {
 	t.Helper()
 	db := GetDB()
 	require.NotNil(t, db)
-	apiKey := &schema.AiApiKeys{
+	apiKey := &AiApiKeys{
 		APIKey:           fmt.Sprintf("mf-token-sec-%s-%d", apiKeySuffix, time.Now().UnixNano()),
 		AllowedModels:    "gpt-3.5-turbo",
 		Active:           true,
@@ -113,7 +112,7 @@ func TestPortalTokenLimitEndpoints_AdminCanSetAndReset(t *testing.T) {
 		assert.Equal(t, true, parsed["success"], "success flag")
 
 		// Verify DB state
-		var reloaded schema.AiApiKeys
+		var reloaded AiApiKeys
 		require.NoError(t, GetDB().First(&reloaded, apiKey.ID).Error)
 		assert.Equal(t, int64(5000000), reloaded.TokenLimit)
 		assert.True(t, reloaded.TokenLimitEnable)
@@ -121,7 +120,7 @@ func TestPortalTokenLimitEndpoints_AdminCanSetAndReset(t *testing.T) {
 
 	t.Run("admin reset token used ok", func(t *testing.T) {
 		// 先确保 TokenUsed > 0
-		require.NoError(t, GetDB().Model(&schema.AiApiKeys{}).Where("id = ?", apiKey.ID).
+		require.NoError(t, GetDB().Model(&AiApiKeys{}).Where("id = ?", apiKey.ID).
 			Update("token_used", 999999).Error)
 
 		status, _, respBody := sendRawHTTPRequest(t, addr, "POST",
@@ -129,7 +128,7 @@ func TestPortalTokenLimitEndpoints_AdminCanSetAndReset(t *testing.T) {
 			authHeader, "{}")
 		require.Equal(t, http.StatusOK, status, "admin should be allowed, body=%s", respBody)
 
-		var reloaded schema.AiApiKeys
+		var reloaded AiApiKeys
 		require.NoError(t, GetDB().First(&reloaded, apiKey.ID).Error)
 		assert.Equal(t, int64(0), reloaded.TokenUsed, "TokenUsed should be reset to 0")
 	})
@@ -142,7 +141,7 @@ func TestPortalTokenLimitEndpoints_AdminCanSetAndReset(t *testing.T) {
 			authHeader, body)
 		require.Equal(t, http.StatusOK, status, "should still succeed, body=%s", respBody)
 
-		var reloaded schema.AiApiKeys
+		var reloaded AiApiKeys
 		require.NoError(t, GetDB().First(&reloaded, apiKey.ID).Error)
 		assert.Equal(t, int64(0), reloaded.TokenLimit, "negative should clamp to 0")
 		assert.False(t, reloaded.TokenLimitEnable)
@@ -182,7 +181,7 @@ func TestOpsResetToken_OwnerOnly(t *testing.T) {
 			"/ops/api/reset-token", authA, body)
 		require.Equal(t, http.StatusOK, status, "ops A should be allowed, body=%s", respBody)
 
-		var reloaded schema.AiApiKeys
+		var reloaded AiApiKeys
 		require.NoError(t, GetDB().First(&reloaded, keyA.ID).Error)
 		assert.Equal(t, int64(0), reloaded.TokenUsed)
 	})
@@ -196,7 +195,7 @@ func TestOpsResetToken_OwnerOnly(t *testing.T) {
 			"ops A must be forbidden to reset ops B's key, body=%s", respBody)
 
 		// Ensure keyB's token_used is unchanged
-		var reloaded schema.AiApiKeys
+		var reloaded AiApiKeys
 		require.NoError(t, GetDB().First(&reloaded, keyB.ID).Error)
 		assert.Equal(t, int64(12345), reloaded.TokenUsed,
 			"ops B's TokenUsed must remain untouched")
@@ -237,7 +236,7 @@ func TestOpsUpdateApiKey_TokenFieldOwnerOnly(t *testing.T) {
 			"/ops/api/update-api-key", authA, body)
 		require.Equal(t, http.StatusOK, status, "ops A should be allowed, body=%s", respBody)
 
-		var reloaded schema.AiApiKeys
+		var reloaded AiApiKeys
 		require.NoError(t, GetDB().First(&reloaded, keyA.ID).Error)
 		assert.Equal(t, int64(7777777), reloaded.TokenLimit)
 		assert.True(t, reloaded.TokenLimitEnable)
@@ -252,7 +251,7 @@ func TestOpsUpdateApiKey_TokenFieldOwnerOnly(t *testing.T) {
 			"ops A must be forbidden from updating ops B's key, body=%s", respBody)
 
 		// Verify ops B's key is unchanged
-		var reloaded schema.AiApiKeys
+		var reloaded AiApiKeys
 		require.NoError(t, GetDB().First(&reloaded, keyB.ID).Error)
 		assert.Equal(t, int64(0), reloaded.TokenLimit,
 			"ops B's TokenLimit must remain untouched")
@@ -266,7 +265,7 @@ func TestOpsUpdateApiKey_TokenFieldOwnerOnly(t *testing.T) {
 			"/ops/api/update-api-key", authA, body)
 		require.Equal(t, http.StatusOK, status, "ops A should be allowed, body=%s", respBody)
 
-		var reloaded schema.AiApiKeys
+		var reloaded AiApiKeys
 		require.NoError(t, GetDB().First(&reloaded, keyA.ID).Error)
 		assert.False(t, reloaded.TokenLimitEnable, "token_unlimited should turn off")
 		assert.Equal(t, int64(0), reloaded.TokenLimit)

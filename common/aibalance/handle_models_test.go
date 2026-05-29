@@ -9,7 +9,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/schema"
 )
 
 func modelsListBodyFromHTTP(t *testing.T, raw []byte) []byte {
@@ -53,20 +52,20 @@ func providerChat(mode string) *Provider {
 		ModelName:    "m",
 		TypeName:     "openai",
 		ProviderMode: mode,
-		DbProvider:   &schema.AiProvider{ProviderMode: mode},
+		DbProvider:   &AiProvider{ProviderMode: mode},
 	}
 }
 
 func TestServeModels_NilKey_OnlyFreeNonEmbedding(t *testing.T) {
 	cfg := NewServerConfig()
 	cfg.Entrypoints.providers = map[string][]*Provider{
-		"paid-1":               {providerChat("chat")},
-		"paid-2":               {providerChat("chat")},
-		"free-a-free":          {providerChat("chat")},
-		"free-b-free":          {providerChat("chat")},
-		"embedding-free":       {providerChat("chat")},
-		"text-embedding-free":  {providerChat("")},
-		"text-embedding-3":     {providerChat("chat")},
+		"paid-1":              {providerChat("chat")},
+		"paid-2":              {providerChat("chat")},
+		"free-a-free":         {providerChat("chat")},
+		"free-b-free":         {providerChat("chat")},
+		"embedding-free":      {providerChat("chat")},
+		"text-embedding-free": {providerChat("")},
+		"text-embedding-3":    {providerChat("chat")},
 	}
 
 	raw := runServeModels(t, cfg, nil)
@@ -127,8 +126,8 @@ func TestServeModels_StableSortAcrossCalls(t *testing.T) {
 func TestServeModels_EmbeddingExclusionByMode(t *testing.T) {
 	cfg := NewServerConfig()
 	cfg.Entrypoints.providers = map[string][]*Provider{
-		"chat-style-name":    {providerChat("embedding")},
-		"normal-chat-free":   {providerChat("chat")},
+		"chat-style-name":  {providerChat("embedding")},
+		"normal-chat-free": {providerChat("chat")},
 	}
 
 	raw := runServeModels(t, cfg, nil)

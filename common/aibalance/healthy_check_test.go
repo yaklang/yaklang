@@ -4,8 +4,6 @@ import (
 	"sync"
 	"testing"
 	"time"
-
-	"github.com/yaklang/yaklang/common/schema"
 )
 
 // TestHealthCheckManagerConcurrency tests the behavior of health check manager in concurrent environment
@@ -72,7 +70,7 @@ func TestHealthCheckManagerConcurrency(t *testing.T) {
 					} else {
 						// 一半协程写入
 						// 创建包含 gorm.Model 嵌入字段的 schema.AiProvider
-						dbProvider := &schema.AiProvider{}
+						dbProvider := &AiProvider{}
 						// 设置 ID 字段 (在 gorm.Model 中)
 						dbProvider.Model.ID = uint(providerID)
 
@@ -97,7 +95,7 @@ func TestHealthCheckManagerConcurrency(t *testing.T) {
 		// 先添加一些结果
 		for i := 0; i < 30; i++ {
 			// 创建包含 gorm.Model 嵌入字段的 schema.AiProvider
-			dbProvider := &schema.AiProvider{}
+			dbProvider := &AiProvider{}
 			// 设置 ID 字段 (在 gorm.Model 中)
 			dbProvider.Model.ID = uint(i)
 
@@ -162,7 +160,7 @@ func TestHealthCheckSchedulerConcurrency(t *testing.T) {
 // TestCheckProviderHealthConcurrency tests concurrent health checks for a single provider
 func TestCheckProviderHealthConcurrency(t *testing.T) {
 	// 创建模拟提供者
-	dbProvider := &schema.AiProvider{}
+	dbProvider := &AiProvider{}
 	dbProvider.Model.ID = 1
 	dbProvider.WrapperName = "test-provider"
 	dbProvider.ModelName = "test-model"

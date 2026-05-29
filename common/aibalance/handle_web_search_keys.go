@@ -9,8 +9,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/yaklang/yaklang/common/schema"
 )
 
 // handleGetWebSearchApiKeys lists all web search API keys, with optional filtering by searcher_type
@@ -25,7 +23,7 @@ func (c *ServerConfig) handleGetWebSearchApiKeys(conn net.Conn, request *http.Re
 	// Check for optional searcher_type filter from query params
 	searcherType := request.URL.Query().Get("searcher_type")
 
-	var keys []*schema.WebSearchApiKey
+	var keys []*WebSearchApiKey
 	var err error
 	if searcherType != "" {
 		keys, err = GetWebSearchApiKeysByType(searcherType)
@@ -133,7 +131,7 @@ func (c *ServerConfig) handleCreateWebSearchApiKey(conn net.Conn, request *http.
 	var addedCount int
 	var errors []string
 	for _, apiKey := range apiKeys {
-		key := &schema.WebSearchApiKey{
+		key := &WebSearchApiKey{
 			SearcherType: reqBody.SearcherType,
 			APIKey:       apiKey,
 			BaseURL:      reqBody.BaseURL,
@@ -409,10 +407,10 @@ func (c *ServerConfig) handleTestWebSearchApiKey(conn net.Conn, request *http.Re
 
 	c.logInfo("web search api key test passed ID=%d, returned %d results, latency=%dms", id, len(results), latencyMs)
 	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
-		"success":       true,
-		"message":       fmt.Sprintf("test passed, returned %d results", len(results)),
-		"latency_ms":    latencyMs,
-		"result_count":  len(results),
+		"success":      true,
+		"message":      fmt.Sprintf("test passed, returned %d results", len(results)),
+		"latency_ms":   latencyMs,
+		"result_count": len(results),
 	})
 }
 

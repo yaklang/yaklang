@@ -1,0 +1,353 @@
+package aibalance
+
+import (
+	"net"
+	"net/http"
+	"strings"
+	"time"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
+)
+
+// gates.go 把 serveChatCompletions / serveEmbeddings 里内联的鉴权与限流门控抽成
+// 独立方法，主流程顺序与判定口径与原内联实现完全一致：每个 gate 命中拦截时已在
+// 方法内部写好对应的 4xx/429 响应并返回 true（blocked），调用方只需 `if gate {return}`。
+//
+// 注意：免费用户 in-flight token 预扣的 defer c.inFlightTokens.Remove(...) 必须仍绑定在
+// serveChatCompletions 的调用栈上（见该函数内联实现），不能搬进 gate，否则会提前释放。
+//
+// 关键词: aibalance server 门控抽离, gate memfit/apikey/daily-token/RPM/delay, 行为等价重构
+
+// gateLightweightDowngrade 根据请求头 X-Yak-AI-Model-Usage-Type(客户端上报的模型用途类型)
+// 与配置的降级规则，可能把请求模型降级以保护用量（如 lightweight 调用 memfit-standard-free
+// 自动降级到 memfit-light-free）。返回（可能被改写后的）modelName。
+//
+// 与限流类 gate 不同：本方法从不拦截请求，只做模型名改写；命中时记录英文日志。
+// 须在 isFreeModel 判定 / memfit gate / provider 查找 / 计费之前调用，使全链路沿用降级后模型。
+// 关键词: gateLightweightDowngrade, X-Yak-AI-Model-Usage-Type, 轻量降级保护用量
+func (c *ServerConfig) gateLightweightDowngrade(rawPacket []byte, modelName string) string {
+	usageType := strings.TrimSpace(lowhttp.GetHTTPPacketHeader(rawPacket, ModelUsageTypeHeader))
+	if usageType == "" {
+		return modelName
+	}
+	newModel, downgraded := c.resolveModelDowngrade(usageType, modelName)
+	if downgraded {
+		c.logInfo("model usage-type downgrade applied: usage_type=%s from=%s to=%s",
+			usageType, modelName, newModel)
+		return newModel
+	}
+	return modelName
+}
+
+// writeKeyLimit429 统一写出 API key 流量/Token 维度的 429（注入自定义文案与 notice）。
+// kind 取 "traffic" 或 "token"；typ 为对外 error.type（traffic_limit_exceeded / token_limit_exceeded）。
+// 关键词: writeKeyLimit429, traffic/token 429, resolveLimit429 notice
+func (c *ServerConfig) writeKeyLimit429(conn net.Conn, kind, typ, defaultMessage string) {
+	message, notice := c.resolveLimit429(kind, defaultMessage)
+	errMap := map[string]interface{}{
+		"message":    message,
+		"type":       typ,
+		"limit_kind": kind,
+	}
+	if notice != "" {
+		errMap["notice"] = notice
+	}
+	c.writeJSONResponse(conn, http.StatusTooManyRequests, map[string]interface{}{"error": errMap})
+}
+
+// gateChatMemfitAuthAndVersion 处理 chat 入口的 memfit 模型 TOTP 鉴权 + 客户端版本控流。
+// 关键词: gateChatMemfitAuthAndVersion, memfit TOTP, X-Yak-Version 控流
+func (c *ServerConfig) gateChatMemfitAuthAndVersion(conn net.Conn, rawPacket []byte, modelName string) bool {
+	if !IsMemfitModel(modelName) {
+		return false
+	}
+	c.logInfo("Memfit model detected, checking TOTP authentication...")
+	totpHeader := lowhttp.GetHTTPPacketHeader(rawPacket, "X-Memfit-OTP-Auth")
+	if totpHeader == "" {
+		c.logError("Memfit model requires TOTP authentication, but X-Memfit-OTP-Auth header is missing")
+		c.writeJSONResponse(conn, http.StatusUnauthorized, map[string]interface{}{
+			"error": map[string]string{
+				"message": "Memfit TOTP authentication required. Please provide X-Memfit-OTP-Auth header with base64 encoded TOTP code.",
+				"type":    "memfit_totp_auth_required",
+			},
+		})
+		return true
+	}
+
+	verified, err := VerifyMemfitTOTP(totpHeader)
+	if err != nil || !verified {
+		c.logError("Memfit TOTP authentication failed: %v", err)
+		c.writeJSONResponse(conn, http.StatusUnauthorized, map[string]interface{}{
+			"error": map[string]string{
+				"message": "Memfit TOTP authentication failed. Please refresh your TOTP secret and try again.",
+				"type":    "memfit_totp_auth_failed",
+			},
+		})
+		return true
+	}
+	c.logInfo("Memfit TOTP authentication successful for model: %s", modelName)
+
+	// memfit-* 客户端版本控流：记录客户端版本统计 + 按配置可选拦截
+	// 关键词: serveChatCompletions memfit 版本控流入口, X-Yak-Version X-Yak-Build-Time, RecordClientVersion
+	yakVer := strings.TrimSpace(lowhttp.GetHTTPPacketHeader(rawPacket, "X-Yak-Version"))
+	yakBT := strings.TrimSpace(lowhttp.GetHTTPPacketHeader(rawPacket, "X-Yak-Build-Time"))
+	if yakVer == "" {
+		yakVer = "unknown"
+	}
+	go func(v, bt string) {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Debugf("RecordClientVersion panic recovered: %v", r)
+			}
+		}()
+		_ = RecordClientVersion(v, bt)
+	}(yakVer, yakBT)
+
+	gateRes := c.checkMemfitVersionGate(yakVer, yakBT)
+	if gateRes.Blocked {
+		c.logWarn("Memfit version gate blocked request: model=%s version=%s buildTime=%s reason=%s minBuildTime=%s",
+			modelName, gateRes.ClientVersion, gateRes.ClientBuildTime, gateRes.Reason, gateRes.MinBuildTime)
+		c.writeMemfitVersionRateLimitResponse(conn, gateRes.Reason)
+		return true
+	}
+	return false
+}
+
+// gateChatAPIKeyAndLimits 处理 chat 入口的 API key 解析、流量/Token 限额、允许模型校验。
+// 返回解析出的 key（免费模型为 nil）、用于统计的 apiKeyForStat、是否被拦截。
+// 关键词: gateChatAPIKeyAndLimits, CheckAiApiKeyTrafficLimit, CheckAiApiKeyTokenLimit, IsModelAllowed
+func (c *ServerConfig) gateChatAPIKeyAndLimits(conn net.Conn, auth, modelName string, isFreeModel bool) (key *Key, apiKeyForStat string, blocked bool) {
+	if isFreeModel {
+		apiKeyForStat = "free-user"
+		return nil, apiKeyForStat, false
+	}
+
+	value := strings.TrimPrefix(auth, "Bearer ")
+	c.logInfo("Extracted key from authentication info: %s", value)
+	if value == "" {
+		c.logError("No valid authentication info provided")
+		conn.Write([]byte("HTTP/1.1 401 Unauthorized\r\n\r\n"))
+		return nil, "", true
+	}
+
+	var ok bool
+	key, ok = c.Keys.Get(value)
+	if !ok {
+		c.logError("No matching key configuration found: %s", value)
+		conn.Write([]byte("HTTP/1.1 401 Unauthorized\r\n\r\n"))
+		return nil, "", true
+	}
+	apiKeyForStat = key.Key
+	c.logInfo("Successfully verified key: %s", key.Key)
+
+	// Check traffic limit before processing request
+	trafficAllowed, err := CheckAiApiKeyTrafficLimit(key.Key)
+	if err != nil {
+		c.logError("Failed to check traffic limit for key %s: %v", utils.ShrinkString(key.Key, 8), err)
+	} else if !trafficAllowed {
+		c.logError("API key %s has exceeded traffic limit", utils.ShrinkString(key.Key, 8))
+		c.writeKeyLimit429(conn, "traffic", "traffic_limit_exceeded",
+			"API key has exceeded traffic limit. Please contact administrator to increase limit or reset usage.")
+		return nil, "", true
+	}
+
+	// Token-dimension limit check (parallel to traffic limit).
+	// 与字节维度并行检查 Token 维度。任何 DB 错误降级为放行（不阻塞业务）。
+	// 关键词: CheckAiApiKeyTokenLimit hot path chat, token_limit_exceeded 429
+	tokenAllowed, tErr := CheckAiApiKeyTokenLimit(key.Key)
+	if tErr != nil {
+		c.logError("Failed to check token limit for key %s: %v", utils.ShrinkString(key.Key, 8), tErr)
+	} else if !tokenAllowed {
+		c.logError("API key %s has exceeded token limit", utils.ShrinkString(key.Key, 8))
+		c.writeKeyLimit429(conn, "token", "token_limit_exceeded",
+			"API key has exceeded token limit. Please contact administrator to increase limit or reset usage.")
+		return nil, "", true
+	}
+
+	// Authorization check with glob pattern support
+	allowedModels, ok := c.KeyAllowedModels.Get(key.Key)
+	if !ok {
+		c.logError("Key[%v] has no allowed models configured", key.Key)
+		conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
+		return nil, "", true
+	}
+
+	// Use IsModelAllowed which supports glob patterns
+	if !c.KeyAllowedModels.IsModelAllowed(key.Key, modelName) {
+		allowedModelKeys := make([]string, 0, len(allowedModels))
+		for k := range allowedModels {
+			allowedModelKeys = append(allowedModelKeys, k)
+		}
+		c.logError("Key[%v] requested model %s is not in allowed list (including glob patterns), allowed models/patterns: %v", key.Key, modelName, allowedModelKeys)
+		conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
+		return nil, "", true
+	}
+	return key, apiKeyForStat, false
+}
+
+// gateChatFreeUserDailyToken 处理 chat 入口免费用户日 Token 限额检查（含 in-flight 预扣份额）。
+// 注意：本 gate 仅做「是否超额」判定；真正的 in-flight Add + defer Remove 仍保留在
+// serveChatCompletions 调用栈内联实现，避免 defer 随本方法返回提前释放。
+// 关键词: gateChatFreeUserDailyToken, checkFreeUserDailyTokenLimitWithInFlight, daily token 429
+func (c *ServerConfig) gateChatFreeUserDailyToken(conn net.Conn, modelName string) bool {
+	if decision, dErr := c.checkFreeUserDailyTokenLimitWithInFlight(modelName); dErr != nil {
+		c.logError("CheckFreeUserDailyTokenLimit failed (model=%s): %v", modelName, dErr)
+	} else if decision != nil && !decision.Allowed {
+		c.logWarn("Daily token limit exceeded for free user (model=%s bucket=%s effective_used=%d limit=%d in_flight_included=true)",
+			modelName, decision.Bucket, decision.TokensUsed, decision.TokensLimit)
+		c.writeDailyTokenLimitResponse(conn, modelName, decision.Bucket, decision.TokensUsed, decision.TokensLimit)
+		return true
+	}
+	return false
+}
+
+// gateRPM 处理按 API key（含模型级覆盖）的 RPM 限流检查。
+// 关键词: gateRPM, chatRateLimiter.CheckRateLimit, RPM 429
+func (c *ServerConfig) gateRPM(conn net.Conn, apiKeyForStat, modelName string) bool {
+	if c.chatRateLimiter == nil {
+		return false
+	}
+	allowed, queueLen := c.chatRateLimiter.CheckRateLimit(apiKeyForStat, modelName)
+	if !allowed {
+		c.logWarn("RPM rate limit exceeded for key=%s model=%s, queue_length=%d",
+			utils.ShrinkString(apiKeyForStat, 8), modelName, queueLen)
+		c.writeRPMRateLimitResponse(conn, queueLen)
+		return true
+	}
+	return false
+}
+
+// applyFreeUserPreCallDelay 在转发上游之前对免费用户施加调用前延迟（N~M 随机，兼容老 N~2N）。
+// 关键词: applyFreeUserPreCallDelay, 免费用户调用前延迟, computeJitterDelaySec
+func (c *ServerConfig) applyFreeUserPreCallDelay(isFreeModel bool, modelName string) {
+	if !isFreeModel || c.chatRateLimiter == nil {
+		return
+	}
+	minSec, maxSec := c.chatRateLimiter.GetEffectiveDelay(modelName, c.freeUserDelayMinSec, c.freeUserDelayMaxSec)
+	actual := computeJitterDelaySec(minSec, maxSec)
+	if actual > 0 {
+		jitter := time.Duration(actual) * time.Second
+		c.logInfo("free user pre-call delay: sleeping %v before forwarding model %s (range=%ds~%ds)",
+			jitter, modelName, minSec, maxSec)
+		time.Sleep(jitter)
+	}
+}
+
+// gateEmbeddingMemfitTOTP 处理 embedding 入口 memfit 模型的 TOTP 鉴权（embedding 无版本控流）。
+// 关键词: gateEmbeddingMemfitTOTP, embedding memfit TOTP
+func (c *ServerConfig) gateEmbeddingMemfitTOTP(conn net.Conn, rawPacket []byte, modelName string) bool {
+	if !IsMemfitModel(modelName) {
+		return false
+	}
+	c.logInfo("Memfit embedding model detected, checking TOTP authentication...")
+	totpHeader := lowhttp.GetHTTPPacketHeader(rawPacket, "X-Memfit-OTP-Auth")
+	if totpHeader == "" {
+		c.logError("Memfit model requires TOTP authentication, but X-Memfit-OTP-Auth header is missing")
+		c.writeJSONResponse(conn, http.StatusUnauthorized, map[string]interface{}{
+			"error": map[string]string{
+				"message": "Memfit TOTP authentication required. Please provide X-Memfit-OTP-Auth header with base64 encoded TOTP code.",
+				"type":    "memfit_totp_auth_required",
+			},
+		})
+		return true
+	}
+
+	verified, err := VerifyMemfitTOTP(totpHeader)
+	if err != nil || !verified {
+		c.logError("Memfit TOTP authentication failed: %v", err)
+		c.writeJSONResponse(conn, http.StatusUnauthorized, map[string]interface{}{
+			"error": map[string]string{
+				"message": "Memfit TOTP authentication failed. Please refresh your TOTP secret and try again.",
+				"type":    "memfit_totp_auth_failed",
+			},
+		})
+		return true
+	}
+	c.logInfo("Memfit TOTP authentication successful for embedding model: %s", modelName)
+	return false
+}
+
+// gateEmbeddingAPIKeyAndLimits 处理 embedding 入口的 API key 解析、流量/Token 限额、允许模型校验。
+// 返回解析出的 key（免费模型为 nil，后续上游成功后用于统计）、是否被拦截。
+// 关键词: gateEmbeddingAPIKeyAndLimits, embedding traffic/token 限额, IsModelAllowed
+func (c *ServerConfig) gateEmbeddingAPIKeyAndLimits(conn net.Conn, auth, modelName string, isFreeModel bool) (key *Key, blocked bool) {
+	if isFreeModel {
+		return nil, false
+	}
+
+	value := strings.TrimPrefix(auth, "Bearer ")
+	c.logInfo("Extracted key from authentication info: %s", value)
+	if value == "" {
+		c.logError("No valid authentication info provided")
+		conn.Write([]byte("HTTP/1.1 401 Unauthorized\r\n\r\n"))
+		return nil, true
+	}
+
+	var ok bool
+	key, ok = c.Keys.Get(value)
+	if !ok {
+		c.logError("No matching key configuration found: %s", value)
+		conn.Write([]byte("HTTP/1.1 401 Unauthorized\r\n\r\n"))
+		return nil, true
+	}
+	c.logInfo("Successfully verified key: %s", key.Key)
+
+	// Check traffic limit before processing request
+	trafficAllowed, err := CheckAiApiKeyTrafficLimit(key.Key)
+	if err != nil {
+		c.logError("Failed to check traffic limit for key %s: %v", utils.ShrinkString(key.Key, 8), err)
+	} else if !trafficAllowed {
+		c.logError("API key %s has exceeded traffic limit", utils.ShrinkString(key.Key, 8))
+		c.writeKeyLimit429(conn, "traffic", "traffic_limit_exceeded",
+			"API key has exceeded traffic limit. Please contact administrator to increase limit or reset usage.")
+		return nil, true
+	}
+
+	// Token-dimension limit check (parallel to traffic limit).
+	// 关键词: CheckAiApiKeyTokenLimit hot path embedding, token_limit_exceeded 429
+	tokenAllowed, tErr := CheckAiApiKeyTokenLimit(key.Key)
+	if tErr != nil {
+		c.logError("Failed to check token limit (embedding) for key %s: %v", utils.ShrinkString(key.Key, 8), tErr)
+	} else if !tokenAllowed {
+		c.logError("API key %s has exceeded token limit (embedding)", utils.ShrinkString(key.Key, 8))
+		c.writeKeyLimit429(conn, "token", "token_limit_exceeded",
+			"API key has exceeded token limit. Please contact administrator to increase limit or reset usage.")
+		return nil, true
+	}
+
+	// Authorization check with glob pattern support
+	allowedModels, ok := c.KeyAllowedModels.Get(key.Key)
+	if !ok {
+		c.logError("Key[%v] has no allowed models configured", key.Key)
+		conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
+		return nil, true
+	}
+
+	// Use IsModelAllowed which supports glob patterns
+	if !c.KeyAllowedModels.IsModelAllowed(key.Key, modelName) {
+		allowedModelKeys := make([]string, 0, len(allowedModels))
+		for k := range allowedModels {
+			allowedModelKeys = append(allowedModelKeys, k)
+		}
+		c.logError("Key[%v] requested model %s is not in allowed list (including glob patterns), allowed models/patterns: %v", key.Key, modelName, allowedModelKeys)
+		conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
+		return nil, true
+	}
+	return key, false
+}
+
+// gateEmbeddingFreeUserDailyToken 处理 embedding 入口免费用户日 Token 限额前置检查（无 in-flight 预扣）。
+// 关键词: gateEmbeddingFreeUserDailyToken, CheckFreeUserDailyTokenLimit, embedding daily token 429
+func (c *ServerConfig) gateEmbeddingFreeUserDailyToken(conn net.Conn, modelName string) bool {
+	if decision, dErr := CheckFreeUserDailyTokenLimit(modelName); dErr != nil {
+		c.logError("CheckFreeUserDailyTokenLimit (embedding) failed (model=%s): %v", modelName, dErr)
+	} else if decision != nil && !decision.Allowed {
+		c.logWarn("Daily token limit exceeded for free embedding (model=%s bucket=%s used=%d limit=%d)",
+			modelName, decision.Bucket, decision.TokensUsed, decision.TokensLimit)
+		c.writeDailyTokenLimitResponse(conn, modelName, decision.Bucket, decision.TokensUsed, decision.TokensLimit)
+		return true
+	}
+	return false
+}

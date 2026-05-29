@@ -12,7 +12,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -39,7 +38,7 @@ func safeLikePattern(input string) string {
 // ==================== OPS User Database Operations ====================
 
 // SaveOpsUser saves an OpsUser to the database
-func SaveOpsUser(user *schema.OpsUser) error {
+func SaveOpsUser(user *OpsUser) error {
 	db := GetDB()
 	if db == nil {
 		return fmt.Errorf("database not initialized")
@@ -48,12 +47,12 @@ func SaveOpsUser(user *schema.OpsUser) error {
 }
 
 // GetOpsUserByID retrieves an OpsUser by ID
-func GetOpsUserByID(id uint) (*schema.OpsUser, error) {
+func GetOpsUserByID(id uint) (*OpsUser, error) {
 	db := GetDB()
 	if db == nil {
 		return nil, fmt.Errorf("database not initialized")
 	}
-	var user schema.OpsUser
+	var user OpsUser
 	if err := db.First(&user, id).Error; err != nil {
 		return nil, err
 	}
@@ -61,12 +60,12 @@ func GetOpsUserByID(id uint) (*schema.OpsUser, error) {
 }
 
 // GetOpsUserByUsername retrieves an OpsUser by username
-func GetOpsUserByUsername(username string) (*schema.OpsUser, error) {
+func GetOpsUserByUsername(username string) (*OpsUser, error) {
 	db := GetDB()
 	if db == nil {
 		return nil, fmt.Errorf("database not initialized")
 	}
-	var user schema.OpsUser
+	var user OpsUser
 	if err := db.Where("username = ?", username).First(&user).Error; err != nil {
 		return nil, err
 	}
@@ -74,12 +73,12 @@ func GetOpsUserByUsername(username string) (*schema.OpsUser, error) {
 }
 
 // GetOpsUserByOpsKey retrieves an OpsUser by OpsKey
-func GetOpsUserByOpsKey(opsKey string) (*schema.OpsUser, error) {
+func GetOpsUserByOpsKey(opsKey string) (*OpsUser, error) {
 	db := GetDB()
 	if db == nil {
 		return nil, fmt.Errorf("database not initialized")
 	}
-	var user schema.OpsUser
+	var user OpsUser
 	if err := db.Where("ops_key = ?", opsKey).First(&user).Error; err != nil {
 		return nil, err
 	}
@@ -87,12 +86,12 @@ func GetOpsUserByOpsKey(opsKey string) (*schema.OpsUser, error) {
 }
 
 // GetAllOpsUsers retrieves all OpsUsers
-func GetAllOpsUsers() ([]*schema.OpsUser, error) {
+func GetAllOpsUsers() ([]*OpsUser, error) {
 	db := GetDB()
 	if db == nil {
 		return nil, fmt.Errorf("database not initialized")
 	}
-	var users []*schema.OpsUser
+	var users []*OpsUser
 	if err := db.Find(&users).Error; err != nil {
 		return nil, err
 	}
@@ -100,7 +99,7 @@ func GetAllOpsUsers() ([]*schema.OpsUser, error) {
 }
 
 // GetOpsUsersPaginated retrieves OpsUsers with pagination and optional username filter
-func GetOpsUsersPaginated(page, pageSize int, username string) ([]*schema.OpsUser, int64, error) {
+func GetOpsUsersPaginated(page, pageSize int, username string) ([]*OpsUser, int64, error) {
 	db := GetDB()
 	if db == nil {
 		return nil, 0, fmt.Errorf("database not initialized")
@@ -118,7 +117,7 @@ func GetOpsUsersPaginated(page, pageSize int, username string) ([]*schema.OpsUse
 	}
 
 	// Build query
-	dbQuery := db.Model(&schema.OpsUser{})
+	dbQuery := db.Model(&OpsUser{})
 	if username != "" {
 		// Use safeLikePattern to escape special characters and prevent SQL injection
 		dbQuery = dbQuery.Where("username LIKE ?", safeLikePattern(username))
@@ -134,7 +133,7 @@ func GetOpsUsersPaginated(page, pageSize int, username string) ([]*schema.OpsUse
 	offset := (page - 1) * pageSize
 
 	// Query with pagination
-	var users []*schema.OpsUser
+	var users []*OpsUser
 	if err := dbQuery.Order("created_at DESC").Offset(offset).Limit(pageSize).Find(&users).Error; err != nil {
 		return nil, 0, err
 	}
@@ -148,7 +147,7 @@ func DeleteOpsUser(id uint) error {
 	if db == nil {
 		return fmt.Errorf("database not initialized")
 	}
-	return db.Delete(&schema.OpsUser{}, id).Error
+	return db.Delete(&OpsUser{}, id).Error
 }
 
 // ==================== Password Utilities ====================
@@ -341,7 +340,7 @@ func (c *ServerConfig) handleCreateOpsUser(conn net.Conn, request *http.Request)
 	}
 
 	// Create user
-	user := &schema.OpsUser{
+	user := &OpsUser{
 		Username:     reqBody.Username,
 		Password:     hashedPassword,
 		OpsKey:       opsKey,
@@ -823,7 +822,7 @@ func (c *ServerConfig) handleOpsGetMyInfo(conn net.Conn, request *http.Request) 
 
 	// Count API keys created by this user
 	var apiKeyCount int64
-	GetDB().Model(&schema.AiApiKeys{}).Where("created_by_ops_id = ?", user.ID).Count(&apiKeyCount)
+	GetDB().Model(&AiApiKeys{}).Where("created_by_ops_id = ?", user.ID).Count(&apiKeyCount)
 
 	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
 		"success":        true,
@@ -861,7 +860,7 @@ func LogOpsAction(operatorID uint, operatorName, action, targetType, targetID, d
 		}
 	}
 
-	logEntry := &schema.OpsActionLog{
+	logEntry := &OpsActionLog{
 		OperatorID:   operatorID,
 		OperatorName: operatorName,
 		Action:       action,
@@ -922,11 +921,11 @@ func (c *ServerConfig) handleOpsCreateApiKey(conn net.Conn, request *http.Reques
 
 	// 关键词: handleOpsCreateApiKey 新增 token_limit 字段, OPS 创建 API Key 支持 Token 限额
 	var reqBody struct {
-		AllowedModels    []string `json:"allowed_models"`
-		TrafficLimit     int64    `json:"traffic_limit"`      // Optional, 0 or negative means unlimited (legacy)
-		Unlimited        bool     `json:"unlimited"`          // Explicitly set unlimited traffic (legacy)
-		TokenLimit       int64    `json:"token_limit"`        // 推荐使用：Token 维度限额，0/负数表示不限制
-		TokenUnlimited   bool     `json:"token_unlimited"`    // 显式禁用 Token 限额
+		AllowedModels  []string `json:"allowed_models"`
+		TrafficLimit   int64    `json:"traffic_limit"`   // Optional, 0 or negative means unlimited (legacy)
+		Unlimited      bool     `json:"unlimited"`       // Explicitly set unlimited traffic (legacy)
+		TokenLimit     int64    `json:"token_limit"`     // 推荐使用：Token 维度限额，0/负数表示不限制
+		TokenUnlimited bool     `json:"token_unlimited"` // 显式禁用 Token 限额
 	}
 
 	if err := json.Unmarshal(bodyBytes, &reqBody); err != nil {
@@ -984,7 +983,7 @@ func (c *ServerConfig) handleOpsCreateApiKey(conn net.Conn, request *http.Reques
 
 	// Create API key record
 	allowedModelsStr := strings.Join(reqBody.AllowedModels, ",")
-	apiKeyRecord := &schema.AiApiKeys{
+	apiKeyRecord := &AiApiKeys{
 		APIKey:             apiKey,
 		AllowedModels:      allowedModelsStr,
 		Active:             true,
@@ -1095,7 +1094,7 @@ func (c *ServerConfig) handleOpsGetMyKeys(conn net.Conn, request *http.Request, 
 
 	// Count total API keys created by this OPS user
 	var total int64
-	if err := db.Model(&schema.AiApiKeys{}).Where("created_by_ops_id = ?", authInfo.UserID).Count(&total).Error; err != nil {
+	if err := db.Model(&AiApiKeys{}).Where("created_by_ops_id = ?", authInfo.UserID).Count(&total).Error; err != nil {
 		c.logError("Failed to count OPS user API keys: %v", err)
 		c.writeJSONResponse(conn, http.StatusInternalServerError, map[string]string{
 			"error": "Failed to retrieve API keys",
@@ -1107,7 +1106,7 @@ func (c *ServerConfig) handleOpsGetMyKeys(conn net.Conn, request *http.Request, 
 	offset := (page - 1) * pageSize
 
 	// Get API keys created by this OPS user with pagination
-	var apiKeys []schema.AiApiKeys
+	var apiKeys []AiApiKeys
 	if err := db.Where("created_by_ops_id = ?", authInfo.UserID).Order("created_at DESC").Offset(offset).Limit(pageSize).Find(&apiKeys).Error; err != nil {
 		c.logError("Failed to get OPS user API keys: %v", err)
 		c.writeJSONResponse(conn, http.StatusInternalServerError, map[string]string{
@@ -1206,7 +1205,7 @@ func (c *ServerConfig) handleOpsDeleteApiKey(conn net.Conn, request *http.Reques
 	}
 
 	// Find the API key and verify ownership
-	var apiKey schema.AiApiKeys
+	var apiKey AiApiKeys
 	if err := db.Where("api_key = ?", reqBody.ApiKey).First(&apiKey).Error; err != nil {
 		c.writeJSONResponse(conn, http.StatusNotFound, map[string]string{
 			"error": "API key not found",
@@ -1314,7 +1313,7 @@ func (c *ServerConfig) handleOpsUpdateApiKey(conn net.Conn, request *http.Reques
 	}
 
 	// Find the API key and verify ownership
-	var apiKey schema.AiApiKeys
+	var apiKey AiApiKeys
 	if err := db.Where("api_key = ?", reqBody.ApiKey).First(&apiKey).Error; err != nil {
 		c.writeJSONResponse(conn, http.StatusNotFound, map[string]string{
 			"error": "API key not found",
@@ -1448,7 +1447,7 @@ func (c *ServerConfig) handleOpsResetApiKeyTraffic(conn net.Conn, request *http.
 	}
 
 	// Find the API key and verify ownership
-	var apiKey schema.AiApiKeys
+	var apiKey AiApiKeys
 	if err := db.Where("api_key = ?", reqBody.ApiKey).First(&apiKey).Error; err != nil {
 		c.writeJSONResponse(conn, http.StatusNotFound, map[string]string{
 			"error": "API key not found",
@@ -1535,7 +1534,7 @@ func (c *ServerConfig) handleOpsResetApiKeyToken(conn net.Conn, request *http.Re
 		return
 	}
 
-	var apiKey schema.AiApiKeys
+	var apiKey AiApiKeys
 	if err := db.Where("api_key = ?", reqBody.ApiKey).First(&apiKey).Error; err != nil {
 		c.writeJSONResponse(conn, http.StatusNotFound, map[string]string{
 			"error": "API key not found",
@@ -1615,7 +1614,7 @@ func (c *ServerConfig) handleGetOpsLogs(conn net.Conn, request *http.Request) {
 	}
 
 	// Build query with safe LIKE pattern to prevent SQL injection
-	dbQuery := db.Model(&schema.OpsActionLog{})
+	dbQuery := db.Model(&OpsActionLog{})
 	if operatorName != "" {
 		// Use safeLikePattern to escape special characters in LIKE queries
 		dbQuery = dbQuery.Where("operator_name LIKE ?", safeLikePattern(operatorName))
@@ -1629,7 +1628,7 @@ func (c *ServerConfig) handleGetOpsLogs(conn net.Conn, request *http.Request) {
 	dbQuery.Count(&total)
 
 	// Get logs with pagination
-	var logs []schema.OpsActionLog
+	var logs []OpsActionLog
 	offset := (page - 1) * pageSize
 	if err := dbQuery.Order("created_at DESC").Offset(offset).Limit(pageSize).Find(&logs).Error; err != nil {
 		c.logError("Failed to get OPS logs: %v", err)
@@ -1726,20 +1725,20 @@ func (c *ServerConfig) handleGetOpsStats(conn net.Conn, request *http.Request) {
 
 		// Count API keys created by this user
 		var keyCount int64
-		db.Model(&schema.AiApiKeys{}).Where("created_by_ops_id = ?", u.ID).Count(&keyCount)
+		db.Model(&AiApiKeys{}).Where("created_by_ops_id = ?", u.ID).Count(&keyCount)
 		totalApiKeys += keyCount
 
 		// Calculate total traffic used by keys created by this user
 		var trafficSum struct {
 			Total int64
 		}
-		db.Model(&schema.AiApiKeys{}).
+		db.Model(&AiApiKeys{}).
 			Where("created_by_ops_id = ?", u.ID).
 			Select("COALESCE(SUM(traffic_used), 0) as total").
 			Scan(&trafficSum)
 
 		// Get last activity from logs
-		var lastLog schema.OpsActionLog
+		var lastLog OpsActionLog
 		lastActivity := ""
 		if err := db.Where("operator_id = ?", u.ID).Order("created_at DESC").First(&lastLog).Error; err == nil {
 			lastActivity = lastLog.CreatedAt.Format("2006-01-02 15:04:05")

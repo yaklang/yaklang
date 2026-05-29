@@ -7,7 +7,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -21,7 +20,7 @@ func uniqueTestDate(offsetDays int) string {
 
 // cleanupUserSeenForDate 清空指定 date 的所有 user_seen 行（硬删除）。
 func cleanupUserSeenForDate(t *testing.T, date string) {
-	require.NoError(t, GetDB().Unscoped().Where("date = ?", date).Delete(&schema.AiDailyUserSeen{}).Error)
+	require.NoError(t, GetDB().Unscoped().Where("date = ?", date).Delete(&AiDailyUserSeen{}).Error)
 }
 
 func TestEnsureUserSeenTable(t *testing.T) {
@@ -40,7 +39,7 @@ func TestRecordDailyUserSeen_InsertIgnore(t *testing.T) {
 	require.NoError(t, RecordDailyUserSeen(date, SourceKindAPIKey, hash))
 	require.NoError(t, RecordDailyUserSeen(date, SourceKindAPIKey, hash))
 
-	var rows []*schema.AiDailyUserSeen
+	var rows []*AiDailyUserSeen
 	require.NoError(t, GetDB().Where("date = ? AND source_kind = ? AND user_hash = ?", date, SourceKindAPIKey, hash).Find(&rows).Error)
 	require.Len(t, rows, 1, "duplicate (date,kind,hash) inserts should not create extra rows")
 }
@@ -57,7 +56,7 @@ func TestRecordDailyUserSeen_DifferentSourceKindIsolated(t *testing.T) {
 	require.NoError(t, RecordDailyUserSeen(date, SourceKindFreeTrace, hash))
 	require.NoError(t, RecordDailyUserSeen(date, SourceKindFreeIP, hash))
 
-	var rows []*schema.AiDailyUserSeen
+	var rows []*AiDailyUserSeen
 	require.NoError(t, GetDB().Where("date = ?", date).Find(&rows).Error)
 	require.Len(t, rows, 3, "same hash under different source_kind should produce 3 rows")
 }
@@ -77,7 +76,7 @@ func TestRecordDailyUserSeen_CapDropsAfterLimit(t *testing.T) {
 		require.NoError(t, RecordDailyUserSeen(date, SourceKindFreeIP, "after-cap-"+utils.RandStringBytes(6)))
 	}
 	var count int64
-	require.NoError(t, GetDB().Model(&schema.AiDailyUserSeen{}).
+	require.NoError(t, GetDB().Model(&AiDailyUserSeen{}).
 		Where("date = ? AND source_kind = ?", date, SourceKindFreeIP).Count(&count).Error)
 	assert.Equal(t, int64(0), count, "after cap reached, RecordDailyUserSeen should silently drop new rows")
 
@@ -172,10 +171,10 @@ func TestCleanupOldUserSeen(t *testing.T) {
 	defer cleanupUserSeenForDate(t, date)
 	defer cleanupUserSeenForDate(t, freshDate)
 
-	require.NoError(t, GetDB().Create(&schema.AiDailyUserSeen{
+	require.NoError(t, GetDB().Create(&AiDailyUserSeen{
 		Date: date, SourceKind: SourceKindAPIKey, UserHash: "u-old", LastSeenAt: time.Now(),
 	}).Error)
-	require.NoError(t, GetDB().Create(&schema.AiDailyUserSeen{
+	require.NoError(t, GetDB().Create(&AiDailyUserSeen{
 		Date: freshDate, SourceKind: SourceKindAPIKey, UserHash: "u-fresh", LastSeenAt: time.Now(),
 	}).Error)
 
@@ -184,8 +183,8 @@ func TestCleanupOldUserSeen(t *testing.T) {
 	assert.GreaterOrEqual(t, removed, int64(1))
 
 	var count int64
-	require.NoError(t, GetDB().Model(&schema.AiDailyUserSeen{}).Where("date = ?", date).Count(&count).Error)
+	require.NoError(t, GetDB().Model(&AiDailyUserSeen{}).Where("date = ?", date).Count(&count).Error)
 	assert.Equal(t, int64(0), count, "old row should have been deleted")
-	require.NoError(t, GetDB().Model(&schema.AiDailyUserSeen{}).Where("date = ?", freshDate).Count(&count).Error)
+	require.NoError(t, GetDB().Model(&AiDailyUserSeen{}).Where("date = ?", freshDate).Count(&count).Error)
 	assert.Equal(t, int64(1), count, "fresh row should be kept")
 }

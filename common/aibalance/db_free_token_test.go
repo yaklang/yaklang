@@ -6,13 +6,12 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/schema"
 )
 
 // 关键词: db_free_token_test, FreeUserDailyTokenUsage / 免费用户限额单元测试
 
 func cleanupFreeUserTokenForDate(t *testing.T, date string) {
-	require.NoError(t, freeTokenDB().Where("date = ?", date).Delete(&schema.FreeUserDailyTokenUsage{}).Error)
+	require.NoError(t, freeTokenDB().Where("date = ?", date).Delete(&FreeUserDailyTokenUsage{}).Error)
 }
 
 func setFreeTokenNowDate(date string) func() {
@@ -288,12 +287,12 @@ func TestFreeTokenNowDate_BeijingSixAMBoundary(t *testing.T) {
 }
 
 func TestUpdateAiApiKeyTokenUsedAndCheck(t *testing.T) {
-	require.NoError(t, GetDB().AutoMigrate(&schema.AiApiKeys{}).Error)
+	require.NoError(t, GetDB().AutoMigrate(&AiApiKeys{}).Error)
 
 	apiKey := "test-token-key-" + time.Now().Format("150405.000000")
-	defer GetDB().Unscoped().Where("api_key = ?", apiKey).Delete(&schema.AiApiKeys{})
+	defer GetDB().Unscoped().Where("api_key = ?", apiKey).Delete(&AiApiKeys{})
 
-	require.NoError(t, GetDB().Create(&schema.AiApiKeys{
+	require.NoError(t, GetDB().Create(&AiApiKeys{
 		APIKey:           apiKey,
 		Active:           true,
 		TokenLimit:       1000,
@@ -311,7 +310,7 @@ func TestUpdateAiApiKeyTokenUsedAndCheck(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, allowed2, "1000/1000 should be rejected")
 
-	var key schema.AiApiKeys
+	var key AiApiKeys
 	require.NoError(t, GetDB().Where("api_key = ?", apiKey).First(&key).Error)
 	assert.Equal(t, int64(1000), key.TokenUsed)
 }

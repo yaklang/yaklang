@@ -34,9 +34,9 @@ func TestInFlightTokenTracker_AddRemoveGet_Basic(t *testing.T) {
 // 关键词: InFlightTokenTracker 多桶隔离
 func TestInFlightTokenTracker_MultiBucket_Isolation(t *testing.T) {
 	tracker := NewInFlightTokenTracker()
-	tracker.Add("", 200)          // 全局桶
-	tracker.Add("model-a", 300)   // 模型 a 独立桶
-	tracker.Add("model-b", 1)     // 模型 b 独立桶
+	tracker.Add("", 200)        // 全局桶
+	tracker.Add("model-a", 300) // 模型 a 独立桶
+	tracker.Add("model-b", 1)   // 模型 b 独立桶
 	assert.Equal(t, int64(200), tracker.Get(""))
 	assert.Equal(t, int64(300), tracker.Get("model-a"))
 	assert.Equal(t, int64(1), tracker.Get("model-b"))
@@ -81,8 +81,8 @@ func TestInFlightTokenTracker_NoopOnZeroOrNegative(t *testing.T) {
 // 关键词: InFlightTokenTracker nil safety
 func TestInFlightTokenTracker_NilSafety(t *testing.T) {
 	var tracker *InFlightTokenTracker
-	tracker.Add("x", 100)         // no-op, no panic
-	tracker.Remove("x", 100)      // no-op, no panic
+	tracker.Add("x", 100)    // no-op, no panic
+	tracker.Remove("x", 100) // no-op, no panic
 	assert.Equal(t, int64(0), tracker.Get("x"))
 	snap := tracker.Snapshot()
 	assert.NotNil(t, snap)

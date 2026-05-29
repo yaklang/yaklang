@@ -11,10 +11,10 @@ import (
 // TestExplicitCache_PassthroughToUpstream 验证经 RewriteMessagesForExplicitCache
 // 改写后的 messages, 通过 GetAIClientWithRawMessages -> aispec.ChatBase -> mock
 // 上游链路, 上游收到的 HTTP body 里:
-//   1. cache_control:{"type":"ephemeral"} 字段实际出现在最末 system 消息的
-//      content 数组的最末一项里;
-//   2. messages 长度未被拍平;
-//   3. 其它消息不含 cache_control 字段(避免误注入到 user/assistant 上).
+//  1. cache_control:{"type":"ephemeral"} 字段实际出现在最末 system 消息的
+//     content 数组的最末一项里;
+//  2. messages 长度未被拍平;
+//  3. 其它消息不含 cache_control 字段(避免误注入到 user/assistant 上).
 //
 // 注意: 这里 mock 上游用 makePassthroughProvider (type=openai) 起的, 但因为
 // RawMessages 是直接逐字 JSON 序列化, 与上游协议无关, 仅用于验证「带
@@ -24,7 +24,8 @@ import (
 // /compatible-mode/v1/chat/completions 端点被上游识别。
 //
 // 关键词: dashscope 显式缓存端到端透传, cache_control passthrough,
-//        aispec ChatBase RawMessages 序列化保真
+//
+//	aispec ChatBase RawMessages 序列化保真
 func TestExplicitCache_PassthroughToUpstream(t *testing.T) {
 	url, get, closeFn := passthroughMockServer(t)
 	defer closeFn()

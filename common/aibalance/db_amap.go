@@ -7,31 +7,30 @@ import (
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/schema"
 )
 
 // EnsureAmapApiKeyTable ensures the AmapApiKey and AmapConfig tables exist
 func EnsureAmapApiKeyTable() error {
 	db := GetDB()
-	if err := db.AutoMigrate(&schema.AmapApiKey{}).Error; err != nil {
+	if err := db.AutoMigrate(&AmapApiKey{}).Error; err != nil {
 		return err
 	}
-	if err := db.AutoMigrate(&schema.AmapConfig{}).Error; err != nil {
+	if err := db.AutoMigrate(&AmapConfig{}).Error; err != nil {
 		return err
 	}
 	return nil
 }
 
 // GetAmapConfig returns the singleton amap config (ID=1), creating it if not exists
-func GetAmapConfig() (*schema.AmapConfig, error) {
-	var config schema.AmapConfig
+func GetAmapConfig() (*AmapConfig, error) {
+	var config AmapConfig
 	db := GetDB()
 	if err := db.Where("id = ?", 1).First(&config).Error; err != nil {
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, fmt.Errorf("failed to query amap config: %v", err)
 		}
 		// Record not found, create default
-		config = schema.AmapConfig{}
+		config = AmapConfig{}
 		config.ID = 1
 		config.AllowFreeUserAmap = true
 		if createErr := db.Create(&config).Error; createErr != nil {
@@ -42,19 +41,19 @@ func GetAmapConfig() (*schema.AmapConfig, error) {
 }
 
 // SaveAmapConfig saves the global amap config
-func SaveAmapConfig(config *schema.AmapConfig) error {
+func SaveAmapConfig(config *AmapConfig) error {
 	config.ID = 1 // Always use singleton ID
 	return GetDB().Save(config).Error
 }
 
 // SaveAmapApiKey creates a new amap API key record
-func SaveAmapApiKey(key *schema.AmapApiKey) error {
+func SaveAmapApiKey(key *AmapApiKey) error {
 	return GetDB().Create(key).Error
 }
 
 // GetAllAmapApiKeys returns all amap API keys
-func GetAllAmapApiKeys() ([]*schema.AmapApiKey, error) {
-	var keys []*schema.AmapApiKey
+func GetAllAmapApiKeys() ([]*AmapApiKey, error) {
+	var keys []*AmapApiKey
 	if err := GetDB().Find(&keys).Error; err != nil {
 		return nil, err
 	}
@@ -62,8 +61,8 @@ func GetAllAmapApiKeys() ([]*schema.AmapApiKey, error) {
 }
 
 // GetActiveAmapApiKeys returns active and healthy amap API keys
-func GetActiveAmapApiKeys() ([]*schema.AmapApiKey, error) {
-	var keys []*schema.AmapApiKey
+func GetActiveAmapApiKeys() ([]*AmapApiKey, error) {
+	var keys []*AmapApiKey
 	if err := GetDB().Where("active = ? AND is_healthy = ?", true, true).Find(&keys).Error; err != nil {
 		return nil, err
 	}
@@ -71,8 +70,8 @@ func GetActiveAmapApiKeys() ([]*schema.AmapApiKey, error) {
 }
 
 // GetAllActiveAmapApiKeys returns all active amap API keys regardless of health
-func GetAllActiveAmapApiKeys() ([]*schema.AmapApiKey, error) {
-	var keys []*schema.AmapApiKey
+func GetAllActiveAmapApiKeys() ([]*AmapApiKey, error) {
+	var keys []*AmapApiKey
 	if err := GetDB().Where("active = ?", true).Find(&keys).Error; err != nil {
 		return nil, err
 	}
@@ -80,8 +79,8 @@ func GetAllActiveAmapApiKeys() ([]*schema.AmapApiKey, error) {
 }
 
 // GetAmapApiKeyByID returns an amap API key by its ID
-func GetAmapApiKeyByID(id uint) (*schema.AmapApiKey, error) {
-	var key schema.AmapApiKey
+func GetAmapApiKeyByID(id uint) (*AmapApiKey, error) {
+	var key AmapApiKey
 	if err := GetDB().Where("id = ?", id).First(&key).Error; err != nil {
 		return nil, err
 	}
@@ -89,7 +88,7 @@ func GetAmapApiKeyByID(id uint) (*schema.AmapApiKey, error) {
 }
 
 // UpdateAmapApiKey updates an amap API key record
-func UpdateAmapApiKey(key *schema.AmapApiKey) error {
+func UpdateAmapApiKey(key *AmapApiKey) error {
 	return GetDB().Save(key).Error
 }
 
@@ -100,7 +99,7 @@ func DeleteAmapApiKeyByID(id uint) error {
 		return fmt.Errorf("failed to get amap api key: %v", err)
 	}
 
-	if err := GetDB().Delete(&schema.AmapApiKey{}, id).Error; err != nil {
+	if err := GetDB().Delete(&AmapApiKey{}, id).Error; err != nil {
 		return fmt.Errorf("failed to delete amap api key: %v", err)
 	}
 
@@ -110,7 +109,7 @@ func DeleteAmapApiKeyByID(id uint) error {
 
 // UpdateAmapApiKeyStats updates statistics for an amap API key (used during proxy requests)
 func UpdateAmapApiKeyStats(id uint, success bool, latencyMs int64) error {
-	var key schema.AmapApiKey
+	var key AmapApiKey
 	if err := GetDB().Where("id = ?", id).First(&key).Error; err != nil {
 		return fmt.Errorf("failed to find amap api key: %v", err)
 	}
@@ -137,7 +136,7 @@ func UpdateAmapApiKeyStats(id uint, success bool, latencyMs int64) error {
 
 // UpdateAmapApiKeyHealthStatus updates the health check status for an amap API key
 func UpdateAmapApiKeyHealthStatus(id uint, healthy bool, latencyMs int64, checkError string) error {
-	return GetDB().Model(&schema.AmapApiKey{}).Where("id = ?", id).
+	return GetDB().Model(&AmapApiKey{}).Where("id = ?", id).
 		Updates(map[string]interface{}{
 			"is_healthy":        healthy,
 			"health_check_time": time.Now(),
@@ -148,13 +147,13 @@ func UpdateAmapApiKeyHealthStatus(id uint, healthy bool, latencyMs int64, checkE
 
 // UpdateAmapApiKeyStatus updates the active status of an amap API key
 func UpdateAmapApiKeyStatus(id uint, active bool) error {
-	return GetDB().Model(&schema.AmapApiKey{}).Where("id = ?", id).
+	return GetDB().Model(&AmapApiKey{}).Where("id = ?", id).
 		Update("active", active).Error
 }
 
 // ResetAmapApiKeyHealth resets the health status of an amap API key to healthy
 func ResetAmapApiKeyHealth(id uint) error {
-	return GetDB().Model(&schema.AmapApiKey{}).Where("id = ?", id).
+	return GetDB().Model(&AmapApiKey{}).Where("id = ?", id).
 		Updates(map[string]interface{}{
 			"is_healthy":           true,
 			"failure_count":        0,
@@ -170,7 +169,7 @@ func IncrementAmapConfigTotalRequests() error {
 	if err != nil {
 		return fmt.Errorf("failed to ensure amap config: %v", err)
 	}
-	return db.Model(&schema.AmapConfig{}).Where("id = ?", 1).
+	return db.Model(&AmapConfig{}).Where("id = ?", 1).
 		UpdateColumn("total_amap_requests", gorm.Expr("total_amap_requests + ?", 1)).Error
 }
 

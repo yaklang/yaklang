@@ -407,11 +407,11 @@ func (w *writerWrapper) writeFrame(p []byte) (int, error) {
 }
 
 // pacedWrite 按 token-per-second 把本次写入平滑地"涓滴"出去：
-//   1. 用 ytoken 估算本次的 token 数 tokens（>=1）。
-//   2. 把 p 按 UTF-8 rune 边界拆分成最多 segments 段（segments 取 tokens 与
-//      字符段数的较小值），保证不切碎多字节字符。
-//   3. 逐段调用 limiter.Throttle 累计补偿 sleep（按本段近似 token 数推进），
-//      sleep 之后写出一个 SSE delta 帧，并立即 flush。
+//  1. 用 ytoken 估算本次的 token 数 tokens（>=1）。
+//  2. 把 p 按 UTF-8 rune 边界拆分成最多 segments 段（segments 取 tokens 与
+//     字符段数的较小值），保证不切碎多字节字符。
+//  3. 逐段调用 limiter.Throttle 累计补偿 sleep（按本段近似 token 数推进），
+//     sleep 之后写出一个 SSE delta 帧，并立即 flush。
 //
 // 这样客户端能持续不断地收到小帧，而不是一次性等待 sleep 完毕后突然收到大段。
 // 关键词: pacedWrite, 平滑 TPS 限速, UTF-8 安全切分, 涓滴流式输出

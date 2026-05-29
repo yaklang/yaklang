@@ -6,7 +6,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/schema"
 )
 
 // 关键词: soft_limit_test, 软限额触发与 TPS 综合判定
@@ -215,5 +214,5 @@ func TestSchema_AiBalanceRateLimitConfig_Defaults(t *testing.T) {
 	assert.Equal(t, int64(0), cfg.FreeUserTokenSoftLimitM)
 	assert.Equal(t, int64(0), cfg.FreeUserSoftLimitTPS)
 	// 确保旧字段没坏
-	_ = schema.AiBalanceRateLimitConfig{}
+	_ = AiBalanceRateLimitConfig{}
 }

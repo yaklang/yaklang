@@ -10,8 +10,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-
-	"github.com/yaklang/yaklang/common/schema"
 )
 
 const (
@@ -74,19 +72,19 @@ func (c *ServerConfig) handleGetAmapApiKeys(conn net.Conn, request *http.Request
 			lastUsedTimeStr = k.LastUsedTime.Format("2006-01-02 15:04:05")
 		}
 		keyData = append(keyData, map[string]interface{}{
-			"id":                  k.ID,
-			"api_key":             sanitizeForOutput(maskedKey),
-			"active":              k.Active,
-			"is_healthy":          k.IsHealthy,
-			"health_check_time":   healthCheckTimeStr,
-			"last_check_error":    sanitizeForOutput(k.LastCheckError),
-			"success_count":       k.SuccessCount,
-			"failure_count":       k.FailureCount,
+			"id":                   k.ID,
+			"api_key":              sanitizeForOutput(maskedKey),
+			"active":               k.Active,
+			"is_healthy":           k.IsHealthy,
+			"health_check_time":    healthCheckTimeStr,
+			"last_check_error":     sanitizeForOutput(k.LastCheckError),
+			"success_count":        k.SuccessCount,
+			"failure_count":        k.FailureCount,
 			"consecutive_failures": k.ConsecutiveFailures,
-			"total_requests":      k.TotalRequests,
-			"last_used_time":      lastUsedTimeStr,
-			"last_latency":        k.LastLatency,
-			"created_at":          k.CreatedAt.Format("2006-01-02 15:04:05"),
+			"total_requests":       k.TotalRequests,
+			"last_used_time":       lastUsedTimeStr,
+			"last_latency":         k.LastLatency,
+			"created_at":           k.CreatedAt.Format("2006-01-02 15:04:05"),
 		})
 	}
 
@@ -175,7 +173,7 @@ func (c *ServerConfig) handleCreateAmapApiKey(conn net.Conn, request *http.Reque
 			continue
 		}
 
-		key := &schema.AmapApiKey{
+		key := &AmapApiKey{
 			APIKey:    apiKey,
 			Active:    true,
 			IsHealthy: true,
@@ -541,4 +539,3 @@ func extractAmapIDFromPath(path string) (int, error) {
 	}
 	return 0, fmt.Errorf("no id found in path")
 }
-

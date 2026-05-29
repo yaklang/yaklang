@@ -227,9 +227,9 @@ func TestServeChatCompletions_PreservesToolCalls(t *testing.T) {
 // TestServeChatCompletions_ToolRoundTripPassthrough 验证「tool round-trip 第二轮」
 // 整条消息链 (user -> assistant{tool_calls} -> tool{tool_call_id, content})
 // 经 aibalance 透传后, 上游 mock 收到的 body 必须:
-//   1. messages 长度 == 3 (不丢、不合并)
-//   2. assistant.tool_calls 数组完整, id/name/arguments 字段都有
-//   3. tool 消息的 tool_call_id 与 assistant.tool_calls[0].id 严格匹配
+//  1. messages 长度 == 3 (不丢、不合并)
+//  2. assistant.tool_calls 数组完整, id/name/arguments 字段都有
+//  3. tool 消息的 tool_call_id 与 assistant.tool_calls[0].id 严格匹配
 //
 // 这正是 OpenAI Python SDK round-trip 的真实链路, 也是用户报告
 // "z-deepseek-v4-pro 经中转后空响应" 的根因排查覆盖。

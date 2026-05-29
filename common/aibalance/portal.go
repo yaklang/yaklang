@@ -16,7 +16,6 @@ import (
 	uuid "github.com/google/uuid"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -142,7 +141,7 @@ func (sm *SessionManager) CreateSessionWithRole(userID uint, username, role stri
 	sessionID := uuid.New().String()
 	expiresAt := time.Now().Add(SessionLifetime)
 
-	dbSession := schema.LoginSession{
+	dbSession := LoginSession{
 		SessionID: sessionID,
 		ExpiresAt: expiresAt,
 		UserID:    userID,
@@ -162,7 +161,7 @@ func (sm *SessionManager) CreateSessionWithRole(userID uint, username, role stri
 
 // GetSession retrieves a session from the database and checks its validity
 func (sm *SessionManager) GetSession(sessionID string) *Session {
-	var dbSession schema.LoginSession
+	var dbSession LoginSession
 	err := GetDB().Where("session_id = ?", sessionID).First(&dbSession).Error
 	if err != nil {
 		if err != gorm.ErrRecordNotFound {
@@ -202,7 +201,7 @@ func (sm *SessionManager) RefreshSession(sessionID string) *Session {
 	if sessionID == "" {
 		return nil
 	}
-	var dbSession schema.LoginSession
+	var dbSession LoginSession
 	err := GetDB().Where("session_id = ?", sessionID).First(&dbSession).Error
 	if err != nil {
 		if err != gorm.ErrRecordNotFound {
@@ -219,7 +218,7 @@ func (sm *SessionManager) RefreshSession(sessionID string) *Session {
 	}
 
 	newExpiry := time.Now().Add(SessionLifetime)
-	if err := GetDB().Model(&schema.LoginSession{}).
+	if err := GetDB().Model(&LoginSession{}).
 		Where("session_id = ?", sessionID).
 		Update("expires_at", newExpiry).Error; err != nil {
 		log.Errorf("Failed to refresh session %s: %v", sessionID, err)
@@ -238,7 +237,7 @@ func (sm *SessionManager) RefreshSession(sessionID string) *Session {
 // DeleteSession removes a session from the database
 func (sm *SessionManager) DeleteSession(sessionID string) {
 	log.Infof("Deleting session %s from database", sessionID)
-	result := GetDB().Where("session_id = ?", sessionID).Delete(&schema.LoginSession{})
+	result := GetDB().Where("session_id = ?", sessionID).Delete(&LoginSession{})
 	if result.Error != nil {
 		log.Errorf("Failed to delete session %s from database: %v", sessionID, result.Error)
 	} else if result.RowsAffected == 0 {
@@ -252,7 +251,7 @@ func (sm *SessionManager) DeleteSession(sessionID string) {
 func (sm *SessionManager) CleanupExpiredSessions() {
 	log.Infof("Running cleanup for expired sessions...")
 	now := time.Now()
-	result := GetDB().Where("expires_at < ?", now).Delete(&schema.LoginSession{})
+	result := GetDB().Where("expires_at < ?", now).Delete(&LoginSession{})
 	if result.Error != nil {
 		log.Errorf("Error cleaning up expired sessions: %v", result.Error)
 	} else if result.RowsAffected > 0 {

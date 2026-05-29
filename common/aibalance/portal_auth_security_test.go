@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -648,7 +647,7 @@ func TestOpsLoginWithStaleAdminCookie(t *testing.T) {
 	plainPwd := "ops-stale-cookie-pw-1"
 	hashed, err := HashPassword(plainPwd)
 	require.NoError(t, err)
-	user := &schema.OpsUser{
+	user := &OpsUser{
 		Username:     fmt.Sprintf("ops-stale-%d", time.Now().UnixNano()),
 		Password:     hashed,
 		OpsKey:       GenerateOpsKey(),

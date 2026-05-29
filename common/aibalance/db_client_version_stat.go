@@ -8,13 +8,12 @@ import (
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/schema"
 )
 
 // EnsureClientVersionStatTable ensures the AiBalanceClientVersionStat table exists.
 // 关键词: EnsureClientVersionStatTable 客户端版本统计表
 func EnsureClientVersionStatTable() error {
-	return GetDB().AutoMigrate(&schema.AiBalanceClientVersionStat{}).Error
+	return GetDB().AutoMigrate(&AiBalanceClientVersionStat{}).Error
 }
 
 // RecordClientVersion upserts a client-version statistics record.
@@ -34,7 +33,7 @@ func RecordClientVersion(version string, buildTime string) error {
 	nowUnix := time.Now().Unix()
 
 	db := GetDB()
-	var existing schema.AiBalanceClientVersionStat
+	var existing AiBalanceClientVersionStat
 	err := db.Where("version = ?", version).First(&existing).Error
 	if err != nil {
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -42,7 +41,7 @@ func RecordClientVersion(version string, buildTime string) error {
 			return err
 		}
 		// 新增记录
-		fresh := schema.AiBalanceClientVersionStat{
+		fresh := AiBalanceClientVersionStat{
 			Version:       version,
 			BuildTime:     buildTime,
 			FirstSeenUnix: nowUnix,
@@ -64,7 +63,7 @@ func RecordClientVersion(version string, buildTime string) error {
 	if buildTime != "" {
 		updates["build_time"] = buildTime
 	}
-	if updErr := db.Model(&schema.AiBalanceClientVersionStat{}).
+	if updErr := db.Model(&AiBalanceClientVersionStat{}).
 		Where("id = ?", existing.ID).Updates(updates).Error; updErr != nil {
 		log.Warnf("RecordClientVersion: update failed for version %s: %v", version, updErr)
 		return updErr
@@ -75,14 +74,14 @@ func RecordClientVersion(version string, buildTime string) error {
 // QueryTopClientVersions 按 last_seen_unix DESC, request_count DESC 排序取前 limit 条。
 // limit <= 0 时按 20 兜底, > 200 钳到 200, 避免 portal 误填爆库。
 // 关键词: QueryTopClientVersions Top N 版本, portal 客户端版本展示
-func QueryTopClientVersions(limit int) ([]schema.AiBalanceClientVersionStat, error) {
+func QueryTopClientVersions(limit int) ([]AiBalanceClientVersionStat, error) {
 	if limit <= 0 {
 		limit = 20
 	}
 	if limit > 200 {
 		limit = 200
 	}
-	var items []schema.AiBalanceClientVersionStat
+	var items []AiBalanceClientVersionStat
 	if err := GetDB().Order("last_seen_unix DESC, request_count DESC").
 		Limit(limit).Find(&items).Error; err != nil {
 		return nil, fmt.Errorf("query top client versions: %w", err)

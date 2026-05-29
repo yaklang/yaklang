@@ -453,6 +453,14 @@ func (g *GatewayClient) BuildHTTPOptions() ([]poc.PocConfigOption, error) {
 		headers["X-Yak-Build-Time"] = bt
 	}
 
+	// 注入本次请求的模型用途类型(tier)，供 aibalance 服务端做用量保护降级
+	// （如 lightweight 调用 memfit-standard-free 自动降级到 memfit-light-free）。
+	// 仅在 aibalance gateway 注入，不会泄漏给第三方 provider。
+	// 关键词: X-Yak-AI-Model-Usage-Type 上报, ModelUsageType tier, 用量降级
+	if usageType := strings.TrimSpace(g.config.ModelUsageType); usageType != "" {
+		headers["X-Yak-AI-Model-Usage-Type"] = usageType
+	}
+
 	// Add TOTP header for memfit models
 	if g.isMemfitModel() {
 		totpCode := g.generateTOTPCode()

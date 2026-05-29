@@ -14,7 +14,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -30,16 +29,16 @@ func setupTestDBForOps(t *testing.T) {
 	require.NotNil(t, db, "database should be initialized")
 
 	// Auto-migrate schemas if needed
-	err := db.AutoMigrate(&schema.OpsUser{}, &schema.OpsActionLog{}, &schema.AiApiKeys{}, &schema.LoginSession{})
+	err := db.AutoMigrate(&OpsUser{}, &OpsActionLog{}, &AiApiKeys{}, &LoginSession{})
 	require.NoError(t, err.Error)
 }
 
-func createTestOpsUserForTest(t *testing.T, username string) *schema.OpsUser {
+func createTestOpsUserForTest(t *testing.T, username string) *OpsUser {
 	password := GenerateRandomPassword()
 	hashedPassword, err := HashPassword(password)
 	require.NoError(t, err)
 
-	user := &schema.OpsUser{
+	user := &OpsUser{
 		Username:     username,
 		Password:     hashedPassword,
 		OpsKey:       GenerateOpsKey(),
@@ -166,14 +165,14 @@ func TestMUSTPASS_LogOpsAction(t *testing.T) {
 
 	// Verify log was created
 	db := GetDB()
-	var logs []schema.OpsActionLog
+	var logs []OpsActionLog
 	err := db.Where("operator_id = ?", user.ID).Find(&logs).Error
 	require.NoError(t, err)
 	assert.GreaterOrEqual(t, len(logs), 1)
 
 	// Clean up
 	t.Cleanup(func() {
-		db.Where("operator_id = ?", user.ID).Delete(&schema.OpsActionLog{})
+		db.Where("operator_id = ?", user.ID).Delete(&OpsActionLog{})
 	})
 }
 
@@ -295,7 +294,7 @@ func TestMUSTPASS_OpsSessionCreation(t *testing.T) {
 	user := createTestOpsUserForTest(t, username)
 
 	// Create session
-	session := &schema.LoginSession{
+	session := &LoginSession{
 		SessionID: utils.RandStringBytes(32),
 		UserID:    user.ID,
 		Username:  user.Username,
@@ -307,7 +306,7 @@ func TestMUSTPASS_OpsSessionCreation(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify session
-	var retrieved schema.LoginSession
+	var retrieved LoginSession
 	err = db.Where("session_id = ?", session.SessionID).First(&retrieved).Error
 	require.NoError(t, err)
 	assert.Equal(t, user.ID, retrieved.UserID)
@@ -401,7 +400,7 @@ func TestMUSTPASS_OpsPortalIntegration(t *testing.T) {
 	// Test with valid OPS session
 	t.Run("OPS API with valid session", func(t *testing.T) {
 		// Create a valid session
-		session := &schema.LoginSession{
+		session := &LoginSession{
 			SessionID: utils.RandStringBytes(32),
 			UserID:    user.ID,
 			Username:  user.Username,
@@ -440,7 +439,7 @@ func TestMUSTPASS_OpsPortalIntegration(t *testing.T) {
 
 	t.Run("Admin API denied with OPS session", func(t *testing.T) {
 		// Create a valid OPS session
-		session := &schema.LoginSession{
+		session := &LoginSession{
 			SessionID: utils.RandStringBytes(32),
 			UserID:    user.ID,
 			Username:  user.Username,
@@ -479,7 +478,7 @@ func TestMUSTPASS_OpsApiKeyManagement(t *testing.T) {
 	user := createTestOpsUserForTest(t, username)
 
 	// Create an API key as if created by OPS user
-	apiKey := &schema.AiApiKeys{
+	apiKey := &AiApiKeys{
 		APIKey:             fmt.Sprintf("mf-test-api-key-%d", time.Now().UnixNano()),
 		AllowedModels:      "gpt-4,gpt-3.5-turbo",
 		TrafficLimit:       52428800,
@@ -498,7 +497,7 @@ func TestMUSTPASS_OpsApiKeyManagement(t *testing.T) {
 	})
 
 	t.Run("Get API keys created by OPS user", func(t *testing.T) {
-		var keys []schema.AiApiKeys
+		var keys []AiApiKeys
 		err := db.Where("created_by_ops_id = ?", user.ID).Find(&keys).Error
 		require.NoError(t, err)
 		assert.GreaterOrEqual(t, len(keys), 1)
@@ -511,7 +510,7 @@ func TestMUSTPASS_OpsApiKeyManagement(t *testing.T) {
 		user2 := createTestOpsUserForTest(t, username2)
 
 		// Create key for user2
-		apiKey2 := &schema.AiApiKeys{
+		apiKey2 := &AiApiKeys{
 			APIKey:             fmt.Sprintf("mf-test-api-key-2-%d", time.Now().UnixNano()),
 			AllowedModels:      "gpt-4",
 			TrafficLimit:       52428800,
@@ -526,7 +525,7 @@ func TestMUSTPASS_OpsApiKeyManagement(t *testing.T) {
 		defer db.Delete(&apiKey2)
 
 		// User1 should only see their own keys
-		var user1Keys []schema.AiApiKeys
+		var user1Keys []AiApiKeys
 		err = db.Where("created_by_ops_id = ?", user.ID).Find(&user1Keys).Error
 		require.NoError(t, err)
 		for _, k := range user1Keys {
@@ -534,7 +533,7 @@ func TestMUSTPASS_OpsApiKeyManagement(t *testing.T) {
 		}
 
 		// User2 should only see their own keys
-		var user2Keys []schema.AiApiKeys
+		var user2Keys []AiApiKeys
 		err = db.Where("created_by_ops_id = ?", user2.ID).Find(&user2Keys).Error
 		require.NoError(t, err)
 		for _, k := range user2Keys {
@@ -723,7 +722,7 @@ func BenchmarkGetOpsUserByID(b *testing.B) {
 	}
 
 	password, _ := HashPassword("test")
-	user := &schema.OpsUser{
+	user := &OpsUser{
 		Username: fmt.Sprintf("bench-user-%d", time.Now().UnixNano()),
 		Password: password,
 		OpsKey:   GenerateOpsKey(),

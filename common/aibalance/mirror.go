@@ -48,7 +48,8 @@ import (
 // 字面量替代.
 //
 // 关键词: APIKeyFingerprint, mirror snapshot 不可逆脱敏, SHA256 fp,
-//        consume key but not leak
+//
+//	consume key but not leak
 func APIKeyFingerprint(raw string) string {
 	if raw == "" {
 		return ""
@@ -115,10 +116,10 @@ type MirrorSnapshot struct {
 	Action        string                 `json:"action"`
 	ActionPayload map[string]interface{} `json:"action_payload"`
 
-	DurationMs  int64               `json:"duration_ms"`
-	InputBytes  int64               `json:"input_bytes"`
-	OutputBytes int64               `json:"output_bytes"`
-	Usage       *aispec.ChatUsage   `json:"usage"`
+	DurationMs  int64             `json:"duration_ms"`
+	InputBytes  int64             `json:"input_bytes"`
+	OutputBytes int64             `json:"output_bytes"`
+	Usage       *aispec.ChatUsage `json:"usage"`
 }
 
 // ToScriptMap 把 snapshot 序列化为对脚本友好的 map[string]any 形态,
@@ -128,7 +129,8 @@ type MirrorSnapshot struct {
 // 到原始 key. 即使后来有人误改字段名, 也保住下游脚本不会拿到完整 key.
 //
 // 关键词: MirrorSnapshot ToScriptMap, JSON 往返脱壳, yak 脚本可见层,
-//        api_key redact defensive
+//
+//	api_key redact defensive
 func (s *MirrorSnapshot) ToScriptMap() map[string]any {
 	if s == nil {
 		return map[string]any{}
@@ -180,7 +182,8 @@ func (s *MirrorSnapshot) ToScriptMap() map[string]any {
 //   - 失败: action="", payload=nil. 调用方在 always 规则下仍应当继续投递快照.
 //
 // 关键词: ParseActionFromText, @action JSON 协议解析, aireact next_action 兼容,
-//        aicommon ExtractAllAction 对齐, mirror 被动观察者宽松解析
+//
+//	aicommon ExtractAllAction 对齐, mirror 被动观察者宽松解析
 func ParseActionFromText(text string) (string, map[string]interface{}) {
 	if text == "" {
 		return "", nil
@@ -724,10 +727,10 @@ func (m *MirrorManager) NeedsActionParsing() bool {
 
 // MirrorRuleStatus 给 portal 用的运行时态聚合视图.
 type MirrorRuleStatus struct {
-	Rule           *schema.AiMirrorRule `json:"rule"`
-	QueueLength    int                  `json:"queue_length"`
-	QueueCapacity  int                  `json:"queue_capacity"`
-	ActiveWorkers  int32                `json:"active_workers"`
+	Rule          *schema.AiMirrorRule `json:"rule"`
+	QueueLength   int                  `json:"queue_length"`
+	QueueCapacity int                  `json:"queue_capacity"`
+	ActiveWorkers int32                `json:"active_workers"`
 }
 
 // GetStatus 返回单条规则的运行时态, 不命中返回 nil.

@@ -603,6 +603,15 @@ type ServerConfig struct {
 	// 关键词: ServerConfig.MirrorManager, mirror traffic hook, callback yak
 	MirrorManager *MirrorManager
 
+	// 自定义 429/错误文案 + 模型降级规则缓存（由 applyRateLimitConfig 从 DB 配置刷新），
+	// 避免在限流拒绝 / 降级判定路径上反复读 DB。受 limitPolicyMu 保护。
+	// 关键词: ServerConfig custom429 缓存, resolveLimit429, modelDowngradeRules 缓存, resolveModelDowngrade
+	limitPolicyMu          sync.RWMutex
+	custom429Enabled       bool
+	custom429Notice        string
+	custom429KindOverrides map[string]string
+	modelDowngradeRules    []ModelDowngradeRule
+
 	closeOnce sync.Once
 }
 
@@ -772,138 +781,26 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 
 	modelName := bodyIns.Model
 	c.logInfo("Requested model: %s", modelName)
+	// 模型用途类型降级（保护用量）：按 X-Yak-AI-Model-Usage-Type + 配置规则可能改写 modelName。
+	// 须在 isFreeModel 判定 / memfit gate / provider 查找 / 计费之前完成，使全链路沿用降级后模型。
+	// 关键词: serveChatCompletions gateLightweightDowngrade, 轻量降级保护用量
+	modelName = c.gateLightweightDowngrade(rawPacket, modelName)
 	isFreeModel := strings.HasSuffix(modelName, "-free")
 	if isFreeModel {
 		c.logInfo("Request is for a free model, skipping key verification.")
 	}
 
-	// Check if this is a memfit model that requires TOTP authentication
-	if IsMemfitModel(modelName) {
-		c.logInfo("Memfit model detected, checking TOTP authentication...")
-		totpHeader := lowhttp.GetHTTPPacketHeader(rawPacket, "X-Memfit-OTP-Auth")
-		if totpHeader == "" {
-			c.logError("Memfit model requires TOTP authentication, but X-Memfit-OTP-Auth header is missing")
-			c.writeJSONResponse(conn, http.StatusUnauthorized, map[string]interface{}{
-				"error": map[string]string{
-					"message": "Memfit TOTP authentication required. Please provide X-Memfit-OTP-Auth header with base64 encoded TOTP code.",
-					"type":    "memfit_totp_auth_required",
-				},
-			})
-			return
-		}
-
-		verified, err := VerifyMemfitTOTP(totpHeader)
-		if err != nil || !verified {
-			c.logError("Memfit TOTP authentication failed: %v", err)
-			c.writeJSONResponse(conn, http.StatusUnauthorized, map[string]interface{}{
-				"error": map[string]string{
-					"message": "Memfit TOTP authentication failed. Please refresh your TOTP secret and try again.",
-					"type":    "memfit_totp_auth_failed",
-				},
-			})
-			return
-		}
-		c.logInfo("Memfit TOTP authentication successful for model: %s", modelName)
-
-		// memfit-* 客户端版本控流：记录客户端版本统计 + 按配置可选拦截
-		// 关键词: serveChatCompletions memfit 版本控流入口, X-Yak-Version X-Yak-Build-Time, RecordClientVersion
-		yakVer := strings.TrimSpace(lowhttp.GetHTTPPacketHeader(rawPacket, "X-Yak-Version"))
-		yakBT := strings.TrimSpace(lowhttp.GetHTTPPacketHeader(rawPacket, "X-Yak-Build-Time"))
-		if yakVer == "" {
-			yakVer = "unknown"
-		}
-		go func(v, bt string) {
-			defer func() {
-				if r := recover(); r != nil {
-					log.Debugf("RecordClientVersion panic recovered: %v", r)
-				}
-			}()
-			_ = RecordClientVersion(v, bt)
-		}(yakVer, yakBT)
-
-		gateRes := c.checkMemfitVersionGate(yakVer, yakBT)
-		if gateRes.Blocked {
-			c.logWarn("Memfit version gate blocked request: model=%s version=%s buildTime=%s reason=%s minBuildTime=%s",
-				modelName, gateRes.ClientVersion, gateRes.ClientBuildTime, gateRes.Reason, gateRes.MinBuildTime)
-			c.writeMemfitVersionRateLimitResponse(conn, gateRes.Reason)
-			return
-		}
+	// memfit 模型 TOTP 鉴权 + 客户端版本控流（gate 内部已写好 4xx/429 响应）
+	// 关键词: serveChatCompletions gate 抽离, gateChatMemfitAuthAndVersion
+	if c.gateChatMemfitAuthAndVersion(conn, rawPacket, modelName) {
+		return
 	}
 
-	var key *Key
-	var apiKeyForStat string
-
-	if isFreeModel {
-		apiKeyForStat = "free-user"
-	} else {
-		value := strings.TrimPrefix(auth, "Bearer ")
-		c.logInfo("Extracted key from authentication info: %s", value)
-		if value == "" {
-			c.logError("No valid authentication info provided")
-			conn.Write([]byte("HTTP/1.1 401 Unauthorized\r\n\r\n"))
-			return
-		}
-
-		var ok bool
-		key, ok = c.Keys.Get(value)
-		if !ok {
-			c.logError("No matching key configuration found: %s", value)
-			conn.Write([]byte("HTTP/1.1 401 Unauthorized\r\n\r\n"))
-			return
-		}
-		apiKeyForStat = key.Key
-		c.logInfo("Successfully verified key: %s", key.Key)
-
-		// Check traffic limit before processing request
-		trafficAllowed, err := CheckAiApiKeyTrafficLimit(key.Key)
-		if err != nil {
-			c.logError("Failed to check traffic limit for key %s: %v", utils.ShrinkString(key.Key, 8), err)
-		} else if !trafficAllowed {
-			c.logError("API key %s has exceeded traffic limit", utils.ShrinkString(key.Key, 8))
-			c.writeJSONResponse(conn, http.StatusTooManyRequests, map[string]interface{}{
-				"error": map[string]string{
-					"message": "API key has exceeded traffic limit. Please contact administrator to increase limit or reset usage.",
-					"type":    "traffic_limit_exceeded",
-				},
-			})
-			return
-		}
-
-		// Token-dimension limit check (parallel to traffic limit).
-		// 与字节维度并行检查 Token 维度。任何 DB 错误降级为放行（不阻塞业务）。
-		// 关键词: CheckAiApiKeyTokenLimit hot path chat, token_limit_exceeded 429
-		tokenAllowed, tErr := CheckAiApiKeyTokenLimit(key.Key)
-		if tErr != nil {
-			c.logError("Failed to check token limit for key %s: %v", utils.ShrinkString(key.Key, 8), tErr)
-		} else if !tokenAllowed {
-			c.logError("API key %s has exceeded token limit", utils.ShrinkString(key.Key, 8))
-			c.writeJSONResponse(conn, http.StatusTooManyRequests, map[string]interface{}{
-				"error": map[string]string{
-					"message": "API key has exceeded token limit. Please contact administrator to increase limit or reset usage.",
-					"type":    "token_limit_exceeded",
-				},
-			})
-			return
-		}
-
-		// Authorization check with glob pattern support
-		allowedModels, ok := c.KeyAllowedModels.Get(key.Key)
-		if !ok {
-			c.logError("Key[%v] has no allowed models configured", key.Key)
-			conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
-			return
-		}
-
-		// Use IsModelAllowed which supports glob patterns
-		if !c.KeyAllowedModels.IsModelAllowed(key.Key, modelName) {
-			allowedModelKeys := make([]string, 0, len(allowedModels))
-			for k := range allowedModels {
-				allowedModelKeys = append(allowedModelKeys, k)
-			}
-			c.logError("Key[%v] requested model %s is not in allowed list (including glob patterns), allowed models/patterns: %v", key.Key, modelName, allowedModelKeys)
-			conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
-			return
-		}
+	// API key 解析 + 流量/Token 限额 + 允许模型校验（gate 内部已写好 4xx/429 响应）
+	// 关键词: serveChatCompletions gate 抽离, gateChatAPIKeyAndLimits
+	key, apiKeyForStat, blocked := c.gateChatAPIKeyAndLimits(conn, auth, modelName, isFreeModel)
+	if blocked {
+		return
 	}
 
 	// 日活记录：在 apiKeyForStat 已经定型、且本次请求确认会进入下游处理（限流前）后，
@@ -1006,13 +903,11 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 	// DB 异常回放为允许，避免限额逻辑的可用性反噬业务。
 	// 关键词: 免费用户日 Token 限额前置, in-flight 预扣 Add defer Remove,
 	//          过冲防御, daily check 紧挨 add, RPM 桶不脱 +1
+	// 免费用户日 Token 限额检查（gate 内部已写好 429）。in-flight 预扣紧随其后内联，
+	// 其 defer Remove 必须保留在本函数栈上，故不并入 gate。
+	// 关键词: serveChatCompletions gate 抽离, gateChatFreeUserDailyToken
 	if isFreeModel {
-		if decision, dErr := c.checkFreeUserDailyTokenLimitWithInFlight(modelName); dErr != nil {
-			c.logError("CheckFreeUserDailyTokenLimit failed (model=%s): %v", modelName, dErr)
-		} else if decision != nil && !decision.Allowed {
-			c.logWarn("Daily token limit exceeded for free user (model=%s bucket=%s effective_used=%d limit=%d in_flight_included=true)",
-				modelName, decision.Bucket, decision.TokensUsed, decision.TokensLimit)
-			c.writeDailyTokenLimitResponse(conn, modelName, decision.Bucket, decision.TokensUsed, decision.TokensLimit)
+		if c.gateChatFreeUserDailyToken(conn, modelName) {
 			return
 		}
 	}
@@ -1036,14 +931,9 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 
 	// RPM rate limit check (per API key, with per-model overrides)
 	// 仍然放在 daily check 之后：被 daily token 挡的请求不会污染 RPM 桶。
-	if c.chatRateLimiter != nil {
-		allowed, queueLen := c.chatRateLimiter.CheckRateLimit(apiKeyForStat, modelName)
-		if !allowed {
-			c.logWarn("RPM rate limit exceeded for key=%s model=%s, queue_length=%d",
-				utils.ShrinkString(apiKeyForStat, 8), modelName, queueLen)
-			c.writeRPMRateLimitResponse(conn, queueLen)
-			return
-		}
+	// 关键词: serveChatCompletions gate 抽离, gateRPM
+	if c.gateRPM(conn, apiKeyForStat, modelName) {
+		return
 	}
 
 	// Free user pre-call delay: applied BEFORE forwarding to providers so
@@ -1055,16 +945,8 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 	// 当模型/全局只填了 Min（Max=0），自动回退老 N~2N 行为，保证存量配置
 	// 不被破坏。
 	// 关键词: 免费用户调用前延迟, N~M 随机, 兼容老 N~2N
-	if isFreeModel && c.chatRateLimiter != nil {
-		minSec, maxSec := c.chatRateLimiter.GetEffectiveDelay(modelName, c.freeUserDelayMinSec, c.freeUserDelayMaxSec)
-		actual := computeJitterDelaySec(minSec, maxSec)
-		if actual > 0 {
-			jitter := time.Duration(actual) * time.Second
-			c.logInfo("free user pre-call delay: sleeping %v before forwarding model %s (range=%ds~%ds)",
-				jitter, modelName, minSec, maxSec)
-			time.Sleep(jitter)
-		}
-	}
+	// 关键词: serveChatCompletions gate 抽离, applyFreeUserPreCallDelay
+	c.applyFreeUserPreCallDelay(isFreeModel, modelName)
 
 	// Log at WARN level for production visibility when processing large requests
 	if len(imageContent) > 0 || prompt.Len() > 10000 {
@@ -1798,6 +1680,10 @@ func (c *ServerConfig) serveEmbeddings(conn net.Conn, rawPacket []byte) {
 	inputText := reqBody.Input
 	c.logInfo("Requested embedding model: %s, input length: %d", modelName, len(inputText))
 
+	// 模型用途类型降级（保护用量）：与 chat 入口对齐，在 isFreeModel/memfit gate/计费之前改写 modelName。
+	// 关键词: serveEmbeddings gateLightweightDowngrade, 轻量降级保护用量
+	modelName = c.gateLightweightDowngrade(rawPacket, modelName)
+
 	if inputText == "" {
 		c.logError("Input text is empty")
 		conn.Write([]byte("HTTP/1.1 400 Bad Request\r\nX-Reason: empty input\r\n\r\n"))
@@ -1810,117 +1696,26 @@ func (c *ServerConfig) serveEmbeddings(conn net.Conn, rawPacket []byte) {
 		c.logInfo("Request is for a free embedding model, skipping key verification.")
 	}
 
-	// Check if this is a memfit model that requires TOTP authentication
-	if IsMemfitModel(modelName) {
-		c.logInfo("Memfit embedding model detected, checking TOTP authentication...")
-		totpHeader := lowhttp.GetHTTPPacketHeader(rawPacket, "X-Memfit-OTP-Auth")
-		if totpHeader == "" {
-			c.logError("Memfit model requires TOTP authentication, but X-Memfit-OTP-Auth header is missing")
-			c.writeJSONResponse(conn, http.StatusUnauthorized, map[string]interface{}{
-				"error": map[string]string{
-					"message": "Memfit TOTP authentication required. Please provide X-Memfit-OTP-Auth header with base64 encoded TOTP code.",
-					"type":    "memfit_totp_auth_required",
-				},
-			})
-			return
-		}
-
-		verified, err := VerifyMemfitTOTP(totpHeader)
-		if err != nil || !verified {
-			c.logError("Memfit TOTP authentication failed: %v", err)
-			c.writeJSONResponse(conn, http.StatusUnauthorized, map[string]interface{}{
-				"error": map[string]string{
-					"message": "Memfit TOTP authentication failed. Please refresh your TOTP secret and try again.",
-					"type":    "memfit_totp_auth_failed",
-				},
-			})
-			return
-		}
-		c.logInfo("Memfit TOTP authentication successful for embedding model: %s", modelName)
+	// memfit 模型 TOTP 鉴权（embedding 入口无版本控流，gate 内部已写好 4xx 响应）
+	// 关键词: serveEmbeddings gate 抽离, gateEmbeddingMemfitTOTP
+	if c.gateEmbeddingMemfitTOTP(conn, rawPacket, modelName) {
+		return
 	}
 
-	var key *Key
-
-	if !isFreeModel {
-		value := strings.TrimPrefix(auth, "Bearer ")
-		c.logInfo("Extracted key from authentication info: %s", value)
-		if value == "" {
-			c.logError("No valid authentication info provided")
-			conn.Write([]byte("HTTP/1.1 401 Unauthorized\r\n\r\n"))
-			return
-		}
-
-		var ok bool
-		key, ok = c.Keys.Get(value)
-		if !ok {
-			c.logError("No matching key configuration found: %s", value)
-			conn.Write([]byte("HTTP/1.1 401 Unauthorized\r\n\r\n"))
-			return
-		}
-		c.logInfo("Successfully verified key: %s", key.Key)
-
-		// Check traffic limit before processing request
-		trafficAllowed, err := CheckAiApiKeyTrafficLimit(key.Key)
-		if err != nil {
-			c.logError("Failed to check traffic limit for key %s: %v", utils.ShrinkString(key.Key, 8), err)
-		} else if !trafficAllowed {
-			c.logError("API key %s has exceeded traffic limit", utils.ShrinkString(key.Key, 8))
-			c.writeJSONResponse(conn, http.StatusTooManyRequests, map[string]interface{}{
-				"error": map[string]string{
-					"message": "API key has exceeded traffic limit. Please contact administrator to increase limit or reset usage.",
-					"type":    "traffic_limit_exceeded",
-				},
-			})
-			return
-		}
-
-		// Token-dimension limit check (parallel to traffic limit).
-		// 关键词: CheckAiApiKeyTokenLimit hot path embedding, token_limit_exceeded 429
-		tokenAllowed, tErr := CheckAiApiKeyTokenLimit(key.Key)
-		if tErr != nil {
-			c.logError("Failed to check token limit (embedding) for key %s: %v", utils.ShrinkString(key.Key, 8), tErr)
-		} else if !tokenAllowed {
-			c.logError("API key %s has exceeded token limit (embedding)", utils.ShrinkString(key.Key, 8))
-			c.writeJSONResponse(conn, http.StatusTooManyRequests, map[string]interface{}{
-				"error": map[string]string{
-					"message": "API key has exceeded token limit. Please contact administrator to increase limit or reset usage.",
-					"type":    "token_limit_exceeded",
-				},
-			})
-			return
-		}
-
-		// Authorization check with glob pattern support
-		allowedModels, ok := c.KeyAllowedModels.Get(key.Key)
-		if !ok {
-			c.logError("Key[%v] has no allowed models configured", key.Key)
-			conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
-			return
-		}
-
-		// Use IsModelAllowed which supports glob patterns
-		if !c.KeyAllowedModels.IsModelAllowed(key.Key, modelName) {
-			allowedModelKeys := make([]string, 0, len(allowedModels))
-			for k := range allowedModels {
-				allowedModelKeys = append(allowedModelKeys, k)
-			}
-			c.logError("Key[%v] requested model %s is not in allowed list (including glob patterns), allowed models/patterns: %v", key.Key, modelName, allowedModelKeys)
-			conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
-			return
-		}
+	// API key 解析 + 流量/Token 限额 + 允许模型校验（gate 内部已写好 4xx/429 响应）。
+	// key 在后续上游成功后用于统计（免费模型为 nil）。
+	// 关键词: serveEmbeddings gate 抽离, gateEmbeddingAPIKeyAndLimits
+	key, blocked := c.gateEmbeddingAPIKeyAndLimits(conn, auth, modelName, isFreeModel)
+	if blocked {
+		return
 	}
 
-	// 免费 embedding 模型同样受日 Token 限额保护（与 chat 入口对齐）。
+	// 免费 embedding 模型同样受日 Token 限额保护（与 chat 入口对齐，gate 内部已写好 429）。
 	// embedding 上游不返 ChatUsage，因此只做前置「是否已经超额」的检查，
 	// 真正扣费仍走老的 UpdateFreeUserStats 字节统计（embedding 体量极小可接受）。
-	// 关键词: embedding 免费用户日 Token 限额, 前置检查
+	// 关键词: serveEmbeddings gate 抽离, gateEmbeddingFreeUserDailyToken
 	if isFreeModel {
-		if decision, dErr := CheckFreeUserDailyTokenLimit(modelName); dErr != nil {
-			c.logError("CheckFreeUserDailyTokenLimit (embedding) failed (model=%s): %v", modelName, dErr)
-		} else if decision != nil && !decision.Allowed {
-			c.logWarn("Daily token limit exceeded for free embedding (model=%s bucket=%s used=%d limit=%d)",
-				modelName, decision.Bucket, decision.TokensUsed, decision.TokensLimit)
-			c.writeDailyTokenLimitResponse(conn, modelName, decision.Bucket, decision.TokensUsed, decision.TokensLimit)
+		if c.gateEmbeddingFreeUserDailyToken(conn, modelName) {
 			return
 		}
 	}
@@ -2624,7 +2419,25 @@ func (c *ServerConfig) writeRateLimitResponse(conn net.Conn, queueLength int64) 
 //
 // 关键词: writeRPMRateLimitResponse, RPM 限流 429, X-AIBalance-Limit-Kind
 func (c *ServerConfig) writeRPMRateLimitResponse(conn net.Conn, queueLength int64) {
-	body := fmt.Sprintf(`{"error":{"message":"Rate limit exceeded. You are in queue position %d. Please retry after 10 seconds.","type":"rate_limit_exceeded","limit_kind":"rpm","limit_kind_zh":"\u8bf7\u6c42\u9891\u7387\u9650\u6d41","queue_length":%d}}`, queueLength, queueLength)
+	// 默认文案保持历史不变；启用自定义 429 时按 kind=rpm 覆盖 message 并注入 notice。
+	// 关键词: writeRPMRateLimitResponse resolveLimit429, kind rpm, notice 注入
+	defaultMessage := fmt.Sprintf("Rate limit exceeded. You are in queue position %d. Please retry after 10 seconds.", queueLength)
+	message, notice := c.resolveLimit429("rpm", defaultMessage)
+	errMap := map[string]interface{}{
+		"message":       message,
+		"type":          "rate_limit_exceeded",
+		"limit_kind":    "rpm",
+		"limit_kind_zh": "请求频率限流",
+		"queue_length":  queueLength,
+	}
+	if notice != "" {
+		errMap["notice"] = notice
+	}
+	body, err := json.Marshal(map[string]interface{}{"error": errMap})
+	if err != nil {
+		c.logError("writeRPMRateLimitResponse marshal failed: %v", err)
+		body = []byte(`{"error":{"type":"rate_limit_exceeded","limit_kind":"rpm","message":"Rate limit exceeded."}}`)
+	}
 	header := fmt.Sprintf(
 		"HTTP/1.1 429 Too Many Requests\r\n"+
 			"Content-Type: application/json; charset=utf-8\r\n"+
@@ -2635,7 +2448,7 @@ func (c *ServerConfig) writeRPMRateLimitResponse(conn net.Conn, queueLength int6
 			"\r\n",
 		queueLength, len(body))
 	conn.Write([]byte(header))
-	conn.Write([]byte(body))
+	conn.Write(body)
 }
 
 // writeDailyTokenLimitResponse sends a 429 response when a free user has exceeded
@@ -2664,13 +2477,17 @@ func (c *ServerConfig) writeDailyTokenLimitResponse(conn net.Conn, modelName, bu
 	// 1 亿 = 1e8 token；同时拼接英文便于运维日志检索。
 	const yiUnit = 100_000_000
 	limitYi := float64(tokensLimit) / float64(yiUnit)
-	friendlyMessage := fmt.Sprintf(
+	defaultFriendlyMessage := fmt.Sprintf(
 		"今日免费词元额度 %.2f 亿已经全部消耗完毕，每日北京时间 06:00 准时刷新。"+
 			"Daily token quota exceeded (used=%d, limit=%d), refreshes daily at 06:00 Asia/Shanghai.",
 		limitYi, tokensUsed, tokensLimit)
+	// 默认文案保持历史不变；启用自定义 429 时按 kind=daily_token 覆盖 message 并注入 notice。
+	// 关键词: writeDailyTokenLimitResponse resolveLimit429, kind daily_token, notice 注入
+	friendlyMessage, notice := c.resolveLimit429("daily_token", defaultFriendlyMessage)
 	type errBody struct {
 		Type         string  `json:"type"`
 		Message      string  `json:"message"`
+		Notice       string  `json:"notice,omitempty"`
 		LimitKind    string  `json:"limit_kind"`
 		LimitKindZh  string  `json:"limit_kind_zh"`
 		Bucket       string  `json:"bucket"`
@@ -2686,6 +2503,7 @@ func (c *ServerConfig) writeDailyTokenLimitResponse(conn net.Conn, modelName, bu
 	payload := wrap{Error: errBody{
 		Type:         "daily_token_limit_exceeded",
 		Message:      friendlyMessage,
+		Notice:       notice,
 		LimitKind:    "daily_token_quota",
 		LimitKindZh:  "日限额已满",
 		Bucket:       bucket,

@@ -8,8 +8,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/yaklang/yaklang/common/schema"
 )
 
 // defaultModelStatsMinRPM is the default minimum RPM threshold used by the
@@ -63,6 +61,20 @@ func (c *ServerConfig) handleGetRateLimitConfig(conn net.Conn, request *http.Req
 	// 关键词: handleGetRateLimitConfig free_user_token_limit_m, model overrides
 	freeUserTokenOverrides := parseFreeUserTokenModelOverrides(config.FreeUserTokenModelOverrides)
 
+	// 自定义 429 文案：按 limit_kind 覆盖 map（关闭时仍返回当前配置值供前端回填）
+	// 关键词: handleGetRateLimitConfig custom_429_kind_overrides
+	var custom429Overrides map[string]string
+	if config.Custom429KindOverrides != "" {
+		json.Unmarshal([]byte(config.Custom429KindOverrides), &custom429Overrides)
+	}
+	if custom429Overrides == nil {
+		custom429Overrides = make(map[string]string)
+	}
+
+	// 轻量降级规则（tier + 源模型 -> 目标模型）
+	// 关键词: handleGetRateLimitConfig model_downgrade_rules
+	downgradeRules := parseModelDowngradeRules(config.ModelDowngradeRules)
+
 	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
 		"success": true,
 		"config": map[string]interface{}{
@@ -81,14 +93,22 @@ func (c *ServerConfig) handleGetRateLimitConfig(conn net.Conn, request *http.Req
 			// 关键词: handleGetRateLimitConfig memfit_version_gate_enabled, memfit_version_min_build_time
 			"memfit_version_gate_enabled":   config.MemfitVersionGateEnabled,
 			"memfit_version_min_build_time": config.MemfitVersionMinBuildTime,
+			// 自定义 429/错误文案配置
+			// 关键词: handleGetRateLimitConfig custom_429_enabled, custom_429_notice, custom_429_kind_overrides
+			"custom_429_enabled":        config.Custom429Enabled,
+			"custom_429_notice":         config.Custom429Notice,
+			"custom_429_kind_overrides": custom429Overrides,
+			// 轻量降级规则
+			// 关键词: handleGetRateLimitConfig model_downgrade_rules
+			"model_downgrade_rules": downgradeRules,
 		},
 	})
 }
 
 // parseModelDelayOverrides 解析 ModelDelayOverrides JSON 字符串，支持两种历史格式：
 //
-//	1) 老格式 map[string]int64  -> {"slow-free": 30}
-//	2) 新格式 map[string]DelayRange -> {"slow-free": {"min": 0, "max": 5}}
+//  1. 老格式 map[string]int64  -> {"slow-free": 30}
+//  2. 新格式 map[string]DelayRange -> {"slow-free": {"min": 0, "max": 5}}
 //
 // 老格式自动转换为 DelayRange{Min: N, Max: 0}，前端展示时识别 Max=0 显示成
 // "N~2N 兼容"占位即可。任何异常都返回空 map，不阻塞业务。
@@ -150,10 +170,10 @@ func (c *ServerConfig) handleSetRateLimitConfig(conn net.Conn, request *http.Req
 	defer request.Body.Close()
 
 	var reqBody struct {
-		DefaultRPM                  *int64           `json:"default_rpm,omitempty"`
-		FreeUserDelaySec            *int64           `json:"free_user_delay_sec,omitempty"`
-		FreeUserDelayMaxSec         *int64           `json:"free_user_delay_max_sec,omitempty"`
-		ModelRPMOverrides           map[string]int64 `json:"model_rpm_overrides,omitempty"`
+		DefaultRPM          *int64           `json:"default_rpm,omitempty"`
+		FreeUserDelaySec    *int64           `json:"free_user_delay_sec,omitempty"`
+		FreeUserDelayMaxSec *int64           `json:"free_user_delay_max_sec,omitempty"`
+		ModelRPMOverrides   map[string]int64 `json:"model_rpm_overrides,omitempty"`
 		// ModelDelayOverrides 接受 map[string]any，按值类型动态处理：
 		//   - 数值       -> 视作 {min: n, max: 0}（老语义 N~2N 兜底）
 		//   - 对象 {min,max} -> 直接采用
@@ -168,6 +188,14 @@ func (c *ServerConfig) handleSetRateLimitConfig(conn net.Conn, request *http.Req
 		// 关键词: handleSetRateLimitConfig memfit_version_gate_enabled, memfit_version_min_build_time
 		MemfitVersionGateEnabled  *bool   `json:"memfit_version_gate_enabled,omitempty"`
 		MemfitVersionMinBuildTime *string `json:"memfit_version_min_build_time,omitempty"`
+		// 自定义 429/错误文案配置
+		// 关键词: handleSetRateLimitConfig custom_429_enabled, custom_429_notice, custom_429_kind_overrides
+		Custom429Enabled       *bool             `json:"custom_429_enabled,omitempty"`
+		Custom429Notice        *string           `json:"custom_429_notice,omitempty"`
+		Custom429KindOverrides map[string]string `json:"custom_429_kind_overrides,omitempty"`
+		// 轻量降级规则（传入空数组 [] 表示显式关闭降级）
+		// 关键词: handleSetRateLimitConfig model_downgrade_rules
+		ModelDowngradeRules []ModelDowngradeRule `json:"model_downgrade_rules,omitempty"`
 	}
 	if err := json.Unmarshal(bodyBytes, &reqBody); err != nil {
 		c.logError("failed to parse request body: %v", err)
@@ -303,6 +331,45 @@ func (c *ServerConfig) handleSetRateLimitConfig(conn net.Conn, request *http.Req
 		config.MemfitVersionMinBuildTime = strings.TrimSpace(*reqBody.MemfitVersionMinBuildTime)
 	}
 
+	// 自定义 429/错误文案配置写入
+	// 关键词: handleSetRateLimitConfig 写入 Custom429 字段
+	if reqBody.Custom429Enabled != nil {
+		config.Custom429Enabled = *reqBody.Custom429Enabled
+	}
+	if reqBody.Custom429Notice != nil {
+		config.Custom429Notice = strings.TrimSpace(*reqBody.Custom429Notice)
+	}
+	if reqBody.Custom429KindOverrides != nil {
+		// 过滤空 kind；空字符串 value 表示该 kind 不覆盖（保持默认文案）
+		clean := make(map[string]string, len(reqBody.Custom429KindOverrides))
+		for k, v := range reqBody.Custom429KindOverrides {
+			k = strings.TrimSpace(k)
+			if k == "" {
+				continue
+			}
+			clean[k] = v
+		}
+		ovJSON, _ := json.Marshal(clean)
+		config.Custom429KindOverrides = string(ovJSON)
+	}
+
+	// 轻量降级规则写入：from/to 为空的规则被丢弃；空数组 [] 表示显式关闭（不回退内置默认）
+	// 关键词: handleSetRateLimitConfig 写入 ModelDowngradeRules
+	if reqBody.ModelDowngradeRules != nil {
+		clean := make([]ModelDowngradeRule, 0, len(reqBody.ModelDowngradeRules))
+		for _, r := range reqBody.ModelDowngradeRules {
+			r.Tier = strings.TrimSpace(r.Tier)
+			r.From = strings.TrimSpace(r.From)
+			r.To = strings.TrimSpace(r.To)
+			if r.From == "" || r.To == "" {
+				continue
+			}
+			clean = append(clean, r)
+		}
+		rulesJSON, _ := json.Marshal(clean)
+		config.ModelDowngradeRules = string(rulesJSON)
+	}
+
 	if err := SaveRateLimitConfig(config); err != nil {
 		c.logError("failed to save rate limit config: %v", err)
 		c.writeJSONResponse(conn, http.StatusInternalServerError, map[string]string{"error": "failed to save rate limit config"})
@@ -413,7 +480,9 @@ func (c *ServerConfig) handleGetRateLimitModelStats(conn net.Conn, request *http
 //
 // Response: {"success": true, "total": <int>, "items": [...]}
 // Each item: {version, build_time, first_seen_unix, last_seen_unix, request_count,
-//             first_seen_text, last_seen_text}
+//
+//	first_seen_text, last_seen_text}
+//
 // 关键词: handleGetClientVersionStats portal /portal/api/client-version-stats 返回结构
 func (c *ServerConfig) handleGetClientVersionStats(conn net.Conn, request *http.Request) {
 	c.logInfo("processing get client version stats request")
@@ -440,7 +509,7 @@ func (c *ServerConfig) handleGetClientVersionStats(conn net.Conn, request *http.
 		return
 	}
 	if rows == nil {
-		rows = []schema.AiBalanceClientVersionStat{}
+		rows = []AiBalanceClientVersionStat{}
 	}
 
 	items := make([]map[string]interface{}, 0, len(rows))
@@ -465,7 +534,7 @@ func (c *ServerConfig) handleGetClientVersionStats(conn net.Conn, request *http.
 }
 
 // applyRateLimitConfig applies the DB config to the in-memory rate limiter.
-func (c *ServerConfig) applyRateLimitConfig(cfg *schema.AiBalanceRateLimitConfig) {
+func (c *ServerConfig) applyRateLimitConfig(cfg *AiBalanceRateLimitConfig) {
 	if cfg == nil {
 		return
 	}
@@ -541,4 +610,51 @@ func (c *ServerConfig) applyRateLimitConfig(cfg *schema.AiBalanceRateLimitConfig
 	c.freeUserOutputTPS = cfg.FreeUserOutputTPS
 	c.freeUserTokenSoftLimitM = cfg.FreeUserTokenSoftLimitM
 	c.freeUserSoftLimitTPS = cfg.FreeUserSoftLimitTPS
+
+	// 刷新自定义 429 文案 + 模型降级规则缓存（供 resolveLimit429 / resolveModelDowngrade 使用）
+	// 关键词: applyRateLimitConfig 刷新 custom429 缓存, modelDowngradeRules 缓存
+	kindOverrides := make(map[string]string)
+	if cfg.Custom429KindOverrides != "" {
+		var parsed map[string]string
+		if err := json.Unmarshal([]byte(cfg.Custom429KindOverrides), &parsed); err == nil {
+			for k, v := range parsed {
+				k = strings.TrimSpace(k)
+				if k == "" {
+					continue
+				}
+				kindOverrides[k] = v
+			}
+		}
+	}
+	downgradeRules := parseModelDowngradeRules(cfg.ModelDowngradeRules)
+	c.limitPolicyMu.Lock()
+	c.custom429Enabled = cfg.Custom429Enabled
+	c.custom429Notice = cfg.Custom429Notice
+	c.custom429KindOverrides = kindOverrides
+	c.modelDowngradeRules = downgradeRules
+	c.limitPolicyMu.Unlock()
+}
+
+// resolveLimit429 统一解析某个限流类型(kind)对外返回的 429/错误文案：
+//   - 自定义文案关闭(默认)时：返回原始默认文案、空 notice，行为与历史完全一致；
+//   - 开启时：若该 kind 配置了非空 override 则替换 message，并附带全局 notice 文案。
+//
+// kind 取值与各写出点约定：rpm / daily_token / traffic / token / memfit_version。
+// 关键词: resolveLimit429, 自定义 429 文案, notice 注入, limit_kind 覆盖
+func (c *ServerConfig) resolveLimit429(kind, defaultMessage string) (message, notice string) {
+	message = defaultMessage
+	c.limitPolicyMu.RLock()
+	enabled := c.custom429Enabled
+	globalNotice := c.custom429Notice
+	override, ok := c.custom429KindOverrides[kind]
+	c.limitPolicyMu.RUnlock()
+	if !enabled {
+		return message, ""
+	}
+	if ok {
+		if v := strings.TrimSpace(override); v != "" {
+			message = v
+		}
+	}
+	return message, globalNotice
 }

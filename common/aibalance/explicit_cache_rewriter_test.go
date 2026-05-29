@@ -615,6 +615,7 @@ func TestStripCacheControl_DoesNotMutateInput(t *testing.T) {
 //   - cc 字段全部清空
 //   - text 内容完整保留
 //   - 切片结构与 message 顺序不变
+//
 // 这是"hijacker 一律打 cc + aibalance 跨 provider strip"分工的端到端验证。
 // 关键词: provider-aware, hijacker dual cc + non-tongyi strip 端到端
 func TestStripCacheControl_HijackerOutputBecomesPlain(t *testing.T) {
@@ -675,7 +676,8 @@ func TestStripCacheControl_NoCCReturnsSameSlice(t *testing.T) {
 // 原样到达 dashscope, 由其上游决定命中前 N 个 cache 锚点.
 //
 // 关键词: 4 段 hijacker 输出, P1 双 cache 边界, 客户端自带 3 cc pass-through,
-//        AI_CACHE_FROZEN + AI_CACHE_SEMI
+//
+//	AI_CACHE_FROZEN + AI_CACHE_SEMI
 func TestRewriteMessages_FourSegmentClientCCPassThrough(t *testing.T) {
 	in := []aispec.ChatDetail{
 		{Role: "system", Content: []*aispec.ChatContent{
