@@ -113,6 +113,19 @@ func (r *jsonStringReader) triggerFallback() {
 	r.buffer = r.buffer[:0]
 }
 
+// rewindIncompleteEscape 在转义序列（\uXXXX、代理对、\xNN）因缓冲区数据不足而无法完整解析时调用。
+// 此时 i 指向转义类型字符（紧跟反斜杠），i-1 即反斜杠位置。
+// 它把缓冲区回退到反斜杠处并复位为 stateInString：转义之前已处理的内容已写入 outputBuffer，
+// 应当从缓冲区丢弃；待更多数据到达后会从反斜杠重新完整解析该转义。
+// 修复点：此前这些路径直接 return 而不裁剪 buffer，导致分片 reader（如 io.Pipe、网络流）
+// 在转义跨 Read 边界时，下一轮从 i=0 重新处理而重复输出已写出的前缀。
+func (r *jsonStringReader) rewindIncompleteEscape(i int) {
+	if i >= 1 {
+		r.buffer = r.buffer[i-1:]
+	}
+	r.state = stateInString
+}
+
 func (r *jsonStringReader) processBuffer() bool {
 	if len(r.buffer) == 0 {
 		return false
@@ -211,7 +224,8 @@ func (r *jsonStringReader) processBuffer() bool {
 			case 'u':
 				// Unicode转义 - 增强边界检查
 				if i+4 >= len(r.buffer) {
-					// 缓冲区不够，等待更多数据
+					// 缓冲区不够，等待更多数据：回退到反斜杠，待数据补齐后重新解析
+					r.rewindIncompleteEscape(i)
 					return processed
 				}
 				// 安全检查：确保不会越界
@@ -228,7 +242,8 @@ func (r *jsonStringReader) processBuffer() bool {
 								// 这是代理对的高位，需要查找低位
 								// 增强边界检查：确保有足够的字节来读取低位代理
 								if i+10 >= len(r.buffer) {
-									// 缓冲区不够，等待更多数据
+									// 缓冲区不够，等待更多数据：回退到反斜杠，待数据补齐后重新解析
+									r.rewindIncompleteEscape(i)
 									return processed
 								}
 								// 安全检查：确保所有访问都在边界内
@@ -273,7 +288,8 @@ func (r *jsonStringReader) processBuffer() bool {
 								} else {
 									// 没有找到低位代理，缓冲区不够或格式不对
 									if i+10 >= len(r.buffer) {
-										// 缓冲区不够，等待更多数据
+										// 缓冲区不够，等待更多数据：回退到反斜杠，待数据补齐后重新解析
+										r.rewindIncompleteEscape(i)
 										return processed
 									} else {
 										// 格式不对，只处理高位
@@ -304,7 +320,8 @@ func (r *jsonStringReader) processBuffer() bool {
 			case 'x':
 				// 十六进制转义 \x20 - 增强边界检查
 				if i+2 >= len(r.buffer) {
-					// 缓冲区不够，等待更多数据
+					// 缓冲区不够，等待更多数据：回退到反斜杠，待数据补齐后重新解析
+					r.rewindIncompleteEscape(i)
 					return processed
 				}
 				// 安全检查：确保不会越界
