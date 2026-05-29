@@ -2258,39 +2258,33 @@ func (x *GetAllMCPServersResponse) GetTotal() int64 {
 	return 0
 }
 
-// MCPToolConfig represents the per-tool enable/disable configuration stored in the DB.
-type MCPToolConfig struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	ID    int64                  `protobuf:"varint,1,opt,name=ID,proto3" json:"ID,omitempty"`
-	// ToolName is the canonical MCP tool name (e.g. "port_scan" or "mcp_IDA-MCP_decompile").
-	ToolName string `protobuf:"bytes,2,opt,name=ToolName,proto3" json:"ToolName,omitempty"`
-	// Source is either "builtin" (registered in Go code) or "bridge" (from external MCPServer).
-	Source string `protobuf:"bytes,3,opt,name=Source,proto3" json:"Source,omitempty"`
-	// ServerName is non-empty only for bridge tools.
-	ServerName string `protobuf:"bytes,4,opt,name=ServerName,proto3" json:"ServerName,omitempty"`
-	Enable     bool   `protobuf:"varint,5,opt,name=Enable,proto3" json:"Enable,omitempty"`
-	// Description comes from the tool definition, not the DB row.
-	Description string `protobuf:"bytes,6,opt,name=Description,proto3" json:"Description,omitempty"`
-	// Params mirrors MCPServerTool.Params for tool detail display.
+type MCPClientToolConfig struct {
+	state         protoimpl.MessageState    `protogen:"open.v1"`
+	ID            int64                     `protobuf:"varint,1,opt,name=ID,proto3" json:"ID,omitempty"`
+	ToolName      string                    `protobuf:"bytes,2,opt,name=ToolName,proto3" json:"ToolName,omitempty"`
+	Source        string                    `protobuf:"bytes,3,opt,name=Source,proto3" json:"Source,omitempty"`
+	ServerName    string                    `protobuf:"bytes,4,opt,name=ServerName,proto3" json:"ServerName,omitempty"`
+	Enable        bool                      `protobuf:"varint,5,opt,name=Enable,proto3" json:"Enable,omitempty"`
+	Description   string                    `protobuf:"bytes,6,opt,name=Description,proto3" json:"Description,omitempty"`
 	Params        []*MCPServerToolParamInfo `protobuf:"bytes,7,rep,name=Params,proto3" json:"Params,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *MCPToolConfig) Reset() {
-	*x = MCPToolConfig{}
+func (x *MCPClientToolConfig) Reset() {
+	*x = MCPClientToolConfig{}
 	mi := &file_yakgrpc_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *MCPToolConfig) String() string {
+func (x *MCPClientToolConfig) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*MCPToolConfig) ProtoMessage() {}
+func (*MCPClientToolConfig) ProtoMessage() {}
 
-func (x *MCPToolConfig) ProtoReflect() protoreflect.Message {
+func (x *MCPClientToolConfig) ProtoReflect() protoreflect.Message {
 	mi := &file_yakgrpc_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -2302,54 +2296,54 @@ func (x *MCPToolConfig) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use MCPToolConfig.ProtoReflect.Descriptor instead.
-func (*MCPToolConfig) Descriptor() ([]byte, []int) {
+// Deprecated: Use MCPClientToolConfig.ProtoReflect.Descriptor instead.
+func (*MCPClientToolConfig) Descriptor() ([]byte, []int) {
 	return file_yakgrpc_proto_rawDescGZIP(), []int{27}
 }
 
-func (x *MCPToolConfig) GetID() int64 {
+func (x *MCPClientToolConfig) GetID() int64 {
 	if x != nil {
 		return x.ID
 	}
 	return 0
 }
 
-func (x *MCPToolConfig) GetToolName() string {
+func (x *MCPClientToolConfig) GetToolName() string {
 	if x != nil {
 		return x.ToolName
 	}
 	return ""
 }
 
-func (x *MCPToolConfig) GetSource() string {
+func (x *MCPClientToolConfig) GetSource() string {
 	if x != nil {
 		return x.Source
 	}
 	return ""
 }
 
-func (x *MCPToolConfig) GetServerName() string {
+func (x *MCPClientToolConfig) GetServerName() string {
 	if x != nil {
 		return x.ServerName
 	}
 	return ""
 }
 
-func (x *MCPToolConfig) GetEnable() bool {
+func (x *MCPClientToolConfig) GetEnable() bool {
 	if x != nil {
 		return x.Enable
 	}
 	return false
 }
 
-func (x *MCPToolConfig) GetDescription() string {
+func (x *MCPClientToolConfig) GetDescription() string {
 	if x != nil {
 		return x.Description
 	}
 	return ""
 }
 
-func (x *MCPToolConfig) GetParams() []*MCPServerToolParamInfo {
+func (x *MCPClientToolConfig) GetParams() []*MCPServerToolParamInfo {
 	if x != nil {
 		return x.Params
 	}
@@ -2357,21 +2351,13 @@ func (x *MCPToolConfig) GetParams() []*MCPServerToolParamInfo {
 }
 
 type GetMCPToolListRequest struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// Keyword filters by tool name or description (fuzzy).
-	Keyword string `protobuf:"bytes,1,opt,name=Keyword,proto3" json:"Keyword,omitempty"`
-	// Source filters by "builtin" or "bridge"; empty means all.
-	Source string `protobuf:"bytes,2,opt,name=Source,proto3" json:"Source,omitempty"`
-	// ServerName filters bridge tools by their origin server name.
-	ServerName string `protobuf:"bytes,3,opt,name=ServerName,proto3" json:"ServerName,omitempty"`
-	// OnlyEnabled when true returns only enabled tools.
-	OnlyEnabled bool    `protobuf:"varint,4,opt,name=OnlyEnabled,proto3" json:"OnlyEnabled,omitempty"`
-	Pagination  *Paging `protobuf:"bytes,5,opt,name=Pagination,proto3" json:"Pagination,omitempty"`
-	// ForceSync when true triggers a full reconcile against all enabled external
-	// MCP servers: new tools are added, removed tools are deleted from the DB.
-	// Without this flag, the sync is skipped for servers that already have all
-	// tools with descriptions, avoiding unnecessary network round-trips.
-	ForceSync     bool `protobuf:"varint,6,opt,name=ForceSync,proto3" json:"ForceSync,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Keyword       string                 `protobuf:"bytes,1,opt,name=Keyword,proto3" json:"Keyword,omitempty"`
+	Source        string                 `protobuf:"bytes,2,opt,name=Source,proto3" json:"Source,omitempty"`
+	ServerName    string                 `protobuf:"bytes,3,opt,name=ServerName,proto3" json:"ServerName,omitempty"`
+	OnlyEnabled   bool                   `protobuf:"varint,4,opt,name=OnlyEnabled,proto3" json:"OnlyEnabled,omitempty"`
+	Pagination    *Paging                `protobuf:"bytes,5,opt,name=Pagination,proto3" json:"Pagination,omitempty"`
+	ForceSync     bool                   `protobuf:"varint,6,opt,name=ForceSync,proto3" json:"ForceSync,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2450,7 +2436,7 @@ func (x *GetMCPToolListRequest) GetForceSync() bool {
 
 type GetMCPToolListResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Tools         []*MCPToolConfig       `protobuf:"bytes,1,rep,name=Tools,proto3" json:"Tools,omitempty"`
+	Tools         []*MCPClientToolConfig `protobuf:"bytes,1,rep,name=Tools,proto3" json:"Tools,omitempty"`
 	Pagination    *Paging                `protobuf:"bytes,2,opt,name=Pagination,proto3" json:"Pagination,omitempty"`
 	Total         int64                  `protobuf:"varint,3,opt,name=Total,proto3" json:"Total,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -2487,7 +2473,7 @@ func (*GetMCPToolListResponse) Descriptor() ([]byte, []int) {
 	return file_yakgrpc_proto_rawDescGZIP(), []int{29}
 }
 
-func (x *GetMCPToolListResponse) GetTools() []*MCPToolConfig {
+func (x *GetMCPToolListResponse) GetTools() []*MCPClientToolConfig {
 	if x != nil {
 		return x.Tools
 	}
@@ -2509,10 +2495,9 @@ func (x *GetMCPToolListResponse) GetTotal() int64 {
 }
 
 type SetMCPToolEnabledRequest struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// ToolName uniquely identifies the tool to update.
-	ToolName      string `protobuf:"bytes,1,opt,name=ToolName,proto3" json:"ToolName,omitempty"`
-	Enable        bool   `protobuf:"varint,2,opt,name=Enable,proto3" json:"Enable,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ToolName      string                 `protobuf:"bytes,1,opt,name=ToolName,proto3" json:"ToolName,omitempty"`
+	Enable        bool                   `protobuf:"varint,2,opt,name=Enable,proto3" json:"Enable,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -69808,8 +69793,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\n" +
 	"Pagination\x18\x02 \x01(\v2\v.ypb.PagingR\n" +
 	"Pagination\x12\x14\n" +
-	"\x05Total\x18\x03 \x01(\x03R\x05Total\"\xe2\x01\n" +
-	"\rMCPToolConfig\x12\x0e\n" +
+	"\x05Total\x18\x03 \x01(\x03R\x05Total\"\xe8\x01\n" +
+	"\x13MCPClientToolConfig\x12\x0e\n" +
 	"\x02ID\x18\x01 \x01(\x03R\x02ID\x12\x1a\n" +
 	"\bToolName\x18\x02 \x01(\tR\bToolName\x12\x16\n" +
 	"\x06Source\x18\x03 \x01(\tR\x06Source\x12\x1e\n" +
@@ -69829,9 +69814,9 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\n" +
 	"Pagination\x18\x05 \x01(\v2\v.ypb.PagingR\n" +
 	"Pagination\x12\x1c\n" +
-	"\tForceSync\x18\x06 \x01(\bR\tForceSync\"\x85\x01\n" +
-	"\x16GetMCPToolListResponse\x12(\n" +
-	"\x05Tools\x18\x01 \x03(\v2\x12.ypb.MCPToolConfigR\x05Tools\x12+\n" +
+	"\tForceSync\x18\x06 \x01(\bR\tForceSync\"\x8b\x01\n" +
+	"\x16GetMCPToolListResponse\x12.\n" +
+	"\x05Tools\x18\x01 \x03(\v2\x18.ypb.MCPClientToolConfigR\x05Tools\x12+\n" +
 	"\n" +
 	"Pagination\x18\x02 \x01(\v2\v.ypb.PagingR\n" +
 	"Pagination\x12\x14\n" +
@@ -75729,7 +75714,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\tAesBase64\x10\x03\x12\n" +
 	"\n" +
 	"\x06XorRaw\x10\x04\x12\r\n" +
-	"\tXorBase64\x10\x052\xba\xed\x02\n" +
+	"\tXorBase64\x10\x052\xc0\xed\x02\n" +
 	"\x03Yak\x12+\n" +
 	"\aVersion\x12\n" +
 	".ypb.Empty\x1a\x14.ypb.VersionResponse\x12H\n" +
@@ -76568,8 +76553,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x0fUpdateMCPServer\x12\x1b.ypb.UpdateMCPServerRequest\x1a\x14.ypb.GeneralResponse\x12O\n" +
 	"\x10GetAllMCPServers\x12\x1c.ypb.GetAllMCPServersRequest\x1a\x1d.ypb.GetAllMCPServersResponse\x12X\n" +
 	"\x19UpdateMCPServerToolConfig\x12%.ypb.UpdateMCPServerToolConfigRequest\x1a\x14.ypb.GeneralResponse\x12I\n" +
-	"\x0eGetMCPToolList\x12\x1a.ypb.GetMCPToolListRequest\x1a\x1b.ypb.GetMCPToolListResponse\x12D\n" +
-	"\x10GetMCPToolDetail\x12\x1c.ypb.GetMCPToolDetailRequest\x1a\x12.ypb.MCPToolConfig\x12H\n" +
+	"\x0eGetMCPToolList\x12\x1a.ypb.GetMCPToolListRequest\x1a\x1b.ypb.GetMCPToolListResponse\x12J\n" +
+	"\x10GetMCPToolDetail\x12\x1c.ypb.GetMCPToolDetailRequest\x1a\x18.ypb.MCPClientToolConfig\x12H\n" +
 	"\x11SetMCPToolEnabled\x12\x1d.ypb.SetMCPToolEnabledRequest\x1a\x14.ypb.GeneralResponse\x12Z\n" +
 	"\x13RAGCollectionSearch\x12\x1f.ypb.RAGCollectionSearchRequest\x1a .ypb.RAGCollectionSearchResponse0\x01\x12;\n" +
 	"\fDownloadRAGs\x12\x18.ypb.DownloadRAGsRequest\x1a\x0f.ypb.ExecResult0\x01B\aZ\x05/;ypbb\x06proto3"
@@ -76620,7 +76605,7 @@ var file_yakgrpc_proto_goTypes = []any{
 	(*MCPServerTool)(nil),                                     // 28: ypb.MCPServerTool
 	(*MCPServer)(nil),                                         // 29: ypb.MCPServer
 	(*GetAllMCPServersResponse)(nil),                          // 30: ypb.GetAllMCPServersResponse
-	(*MCPToolConfig)(nil),                                     // 31: ypb.MCPToolConfig
+	(*MCPClientToolConfig)(nil),                               // 31: ypb.MCPClientToolConfig
 	(*GetMCPToolListRequest)(nil),                             // 32: ypb.GetMCPToolListRequest
 	(*GetMCPToolListResponse)(nil),                            // 33: ypb.GetMCPToolListResponse
 	(*SetMCPToolEnabledRequest)(nil),                          // 34: ypb.SetMCPToolEnabledRequest
@@ -77593,9 +77578,9 @@ var file_yakgrpc_proto_depIdxs = []int32{
 	667,  // 17: ypb.MCPServer.Headers:type_name -> ypb.KVPair
 	29,   // 18: ypb.GetAllMCPServersResponse.MCPServers:type_name -> ypb.MCPServer
 	675,  // 19: ypb.GetAllMCPServersResponse.Pagination:type_name -> ypb.Paging
-	27,   // 20: ypb.MCPToolConfig.Params:type_name -> ypb.MCPServerToolParamInfo
+	27,   // 20: ypb.MCPClientToolConfig.Params:type_name -> ypb.MCPServerToolParamInfo
 	675,  // 21: ypb.GetMCPToolListRequest.Pagination:type_name -> ypb.Paging
-	31,   // 22: ypb.GetMCPToolListResponse.Tools:type_name -> ypb.MCPToolConfig
+	31,   // 22: ypb.GetMCPToolListResponse.Tools:type_name -> ypb.MCPClientToolConfig
 	675,  // 23: ypb.GetMCPToolListResponse.Pagination:type_name -> ypb.Paging
 	36,   // 24: ypb.ListEntityRepositoryResponse.EntityRepositories:type_name -> ypb.EntityRepository
 	667,  // 25: ypb.Entity.Attributes:type_name -> ypb.KVPair
@@ -79452,7 +79437,7 @@ var file_yakgrpc_proto_depIdxs = []int32{
 	30,   // 1876: ypb.Yak.GetAllMCPServers:output_type -> ypb.GetAllMCPServersResponse
 	6,    // 1877: ypb.Yak.UpdateMCPServerToolConfig:output_type -> ypb.GeneralResponse
 	33,   // 1878: ypb.Yak.GetMCPToolList:output_type -> ypb.GetMCPToolListResponse
-	31,   // 1879: ypb.Yak.GetMCPToolDetail:output_type -> ypb.MCPToolConfig
+	31,   // 1879: ypb.Yak.GetMCPToolDetail:output_type -> ypb.MCPClientToolConfig
 	6,    // 1880: ypb.Yak.SetMCPToolEnabled:output_type -> ypb.GeneralResponse
 	21,   // 1881: ypb.Yak.RAGCollectionSearch:output_type -> ypb.RAGCollectionSearchResponse
 	731,  // 1882: ypb.Yak.DownloadRAGs:output_type -> ypb.ExecResult

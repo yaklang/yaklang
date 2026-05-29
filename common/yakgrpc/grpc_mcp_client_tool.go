@@ -56,7 +56,7 @@ func (s *Server) GetMCPToolList(ctx context.Context, req *ypb.GetMCPToolListRequ
 		return nil, err
 	}
 
-	tools := make([]*ypb.MCPToolConfig, 0, len(cfgs))
+	tools := make([]*ypb.MCPClientToolConfig, 0, len(cfgs))
 	for _, cfg := range cfgs {
 		item := cfg.ToGRPC()
 		attachToolMeta(item, cfg.Source, cfg.ToolName, cfg.ServerName)
@@ -75,7 +75,7 @@ func (s *Server) GetMCPToolList(ctx context.Context, req *ypb.GetMCPToolListRequ
 
 // GetMCPToolDetail returns the full configuration and metadata for a single tool.
 // It always re-reads the live tool definition so that description/params are fresh.
-func (s *Server) GetMCPToolDetail(ctx context.Context, req *ypb.GetMCPToolDetailRequest) (*ypb.MCPToolConfig, error) {
+func (s *Server) GetMCPToolDetail(ctx context.Context, req *ypb.GetMCPToolDetailRequest) (*ypb.MCPClientToolConfig, error) {
 	if req.GetToolName() == "" {
 		return nil, utils.Errorf("tool name is required")
 	}
@@ -174,7 +174,7 @@ func syncMCPBridgeTools(ctx context.Context, s *Server, db *gorm.DB) {
 // message from the live in-memory tool definition (for builtin tools).
 // Bridge tool metadata is left empty here — the caller may enrich it separately
 // if a live connection is available.
-func attachToolMeta(item *ypb.MCPToolConfig, source, toolName, _ string) {
+func attachToolMeta(item *ypb.MCPClientToolConfig, source, toolName, _ string) {
 	if source != schema.MCPClientToolSourceBuiltin {
 		return
 	}

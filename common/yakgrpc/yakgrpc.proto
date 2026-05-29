@@ -1035,7 +1035,7 @@ service Yak {
 
   // MCP tool-level enable/disable management
   rpc GetMCPToolList(GetMCPToolListRequest) returns (GetMCPToolListResponse);
-  rpc GetMCPToolDetail(GetMCPToolDetailRequest) returns (MCPToolConfig);
+  rpc GetMCPToolDetail(GetMCPToolDetailRequest) returns (MCPClientToolConfig);
   rpc SetMCPToolEnabled(SetMCPToolEnabledRequest) returns (GeneralResponse);
 
   // RAG Collection Search
@@ -1181,47 +1181,32 @@ message GetAllMCPServersResponse {
   int64 Total = 3;
 }
 
-// MCPToolConfig represents the per-tool enable/disable configuration stored in the DB.
-message MCPToolConfig {
+message MCPClientToolConfig {
   int64 ID = 1;
-  // ToolName is the canonical MCP tool name (e.g. "port_scan" or "mcp_IDA-MCP_decompile").
   string ToolName = 2;
-  // Source is either "builtin" (registered in Go code) or "bridge" (from external MCPServer).
   string Source = 3;
-  // ServerName is non-empty only for bridge tools.
   string ServerName = 4;
   bool Enable = 5;
-  // Description comes from the tool definition, not the DB row.
   string Description = 6;
-  // Params mirrors MCPServerTool.Params for tool detail display.
   repeated MCPServerToolParamInfo Params = 7;
 }
 
 message GetMCPToolListRequest {
-  // Keyword filters by tool name or description (fuzzy).
   string Keyword = 1;
-  // Source filters by "builtin" or "bridge"; empty means all.
   string Source = 2;
-  // ServerName filters bridge tools by their origin server name.
   string ServerName = 3;
-  // OnlyEnabled when true returns only enabled tools.
   bool OnlyEnabled = 4;
   Paging Pagination = 5;
-  // ForceSync when true triggers a full reconcile against all enabled external
-  // MCP servers: new tools are added, removed tools are deleted from the DB.
-  // Without this flag, the sync is skipped for servers that already have all
-  // tools with descriptions, avoiding unnecessary network round-trips.
   bool ForceSync = 6;
 }
 
 message GetMCPToolListResponse {
-  repeated MCPToolConfig Tools = 1;
+  repeated MCPClientToolConfig Tools = 1;
   Paging Pagination = 2;
   int64 Total = 3;
 }
 
 message SetMCPToolEnabledRequest {
-  // ToolName uniquely identifies the tool to update.
   string ToolName = 1;
   bool Enable = 2;
 }
