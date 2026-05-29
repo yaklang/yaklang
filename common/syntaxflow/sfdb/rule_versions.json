@@ -2064,6 +2064,12 @@
     "version": "20260519.0001"
   },
   {
+    "rule_id": "a8f3c2e1-4b5d-6a7e-8f90-1a2b3c4d5e6f",
+    "rule_name": "检测 Python 反射型 XSS（未转义响应输出）",
+    "hash": "874f04dd6b66d73b8969ccf6b5a6dd00e441ea3af44ab4eea26c88cd8cd2dace",
+    "version": "20260529.0001"
+  },
+  {
     "rule_id": "6e64e380-374d-400b-8223-22dd2867e0de",
     "rule_name": "检测Python基于百分号格式化的SQL注入漏洞",
     "hash": "ff2ce3fc8f6449747e3b962f7717f6a8b0c113c9d2e44560a8eb28245d7fa3ba",
