@@ -895,6 +895,10 @@ func (c *YakitClient) YakitWarn(tmp string, items ...interface{}) {
 	c.YakitLog("warn", tmp, items...)
 }
 
+func (c *YakitClient) AIAgentSession(sessionID string) {
+	_ = c.YakitLog("ai_agent_session", sessionID)
+}
+
 // AIOutput writes AI-focused output that can be filtered for AI tool stdout.
 // aiLevel is an optional category for downstream consumers.
 func (c *YakitClient) AIOutput(tmp string, items ...interface{}) {

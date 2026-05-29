@@ -153,9 +153,9 @@ type Config struct {
 	// session id
 	PersistentSessionId string
 	// SessionSource is persisted to ai_sessions_v1.source (e.g. ide, cli).
-	SessionSource string
-	SessionTitle  string
-	SessionPromptState  *SessionPromptState
+	SessionSource      string
+	SessionTitle       string
+	SessionPromptState *SessionPromptState
 
 	// memory triage id
 	MemoryTriageId string
@@ -166,6 +166,8 @@ type Config struct {
 	// Input Event Loop
 	StartInputEventOnce sync.Once
 	EventInputChan      *chanx.UnlimitedChan[*ypb.AIInputEvent]
+	EventLoopStartHook  func()
+	EventLoopDoneHook   func()
 
 	InputEventManager *AIInputEventProcessor
 
@@ -1265,6 +1267,32 @@ func WithEventHandler(handler func(e *schema.AiOutputEvent)) ConfigOption {
 		}
 		c.m.Lock()
 		c.EventHandler = handler
+		c.m.Unlock()
+		return nil
+	}
+}
+
+// WithEventLoopStartHook registers a callback invoked when the ReAct input event loop starts.
+func WithEventLoopStartHook(hook func()) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		c.EventLoopStartHook = hook
+		c.m.Unlock()
+		return nil
+	}
+}
+
+// WithEventLoopDoneHook registers a callback invoked when the ReAct input event loop exits.
+func WithEventLoopDoneHook(hook func()) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		c.EventLoopDoneHook = hook
 		c.m.Unlock()
 		return nil
 	}

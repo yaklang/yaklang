@@ -3,6 +3,7 @@ package aiengine
 import (
 	"context"
 
+	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aispec"
@@ -64,6 +65,7 @@ type AIEngineConfig struct {
 	OnFinished           func(react aicommon.AIEngineOperator)                                                                  // 完成回调, 不返回结果
 	OnInputRequiredRaw   func(react aicommon.AIEngineOperator, event *schema.AiOutputEvent, question string) string             // 需要用户输入回调
 	OnInputRequired      func(react aicommon.AIEngineOperator, question string) string                                          // 需要用户输入回调
+	OnSessionID          func(sessionID string)                                                                               // 会话 ID 就绪回调
 
 	// 高级配置
 	Focus    string // 焦点，用于聚焦某个任务，如 yaklang_code
@@ -85,7 +87,7 @@ func NewAIEngineConfig(options ...AIEngineConfigOption) *AIEngineConfig {
 	config := &AIEngineConfig{
 		Context:               context.Background(),
 		MaxIteration:          10,
-		SessionID:             "default",
+		SessionID:             uuid.New().String(),
 		AllowUserInteract:     true,
 		ReviewPolicy:          "yolo",
 		EnableForgeSearchTool: true,
@@ -109,6 +111,14 @@ func NewAIEngineConfig(options ...AIEngineConfigOption) *AIEngineConfig {
 	}
 
 	return config
+}
+
+// notifySessionID 仅在引擎创建时通知一次 session，避免 SendMsg 内临时 config 重复生成 UUID 并二次通知前端。
+func notifySessionID(config *AIEngineConfig) {
+	if config == nil || config.OnSessionID == nil || config.SessionID == "" {
+		return
+	}
+	config.OnSessionID(config.SessionID)
 }
 
 // ========== 基础配置选项 ==========
@@ -319,6 +329,13 @@ func WithOnInputRequiredRaw(callback func(react aicommon.AIEngineOperator, event
 func WithOnInputRequired(callback func(react aicommon.AIEngineOperator, question string) string) AIEngineConfigOption {
 	return func(c *AIEngineConfig) {
 		c.OnInputRequired = callback
+	}
+}
+
+// WithOnSessionID 设置会话 ID 就绪回调
+func WithOnSessionID(callback func(sessionID string)) AIEngineConfigOption {
+	return func(c *AIEngineConfig) {
+		c.OnSessionID = callback
 	}
 }
 

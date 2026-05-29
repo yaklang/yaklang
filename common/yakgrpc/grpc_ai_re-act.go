@@ -220,6 +220,11 @@ func (s *Server) StartAIReAct(stream ypb.Yak_StartAIReActServer) error {
 	if persistentSession == "" {
 		persistentSession = "default"
 	}
+
+	if runningReAct, ok := aireact.GetRunningSession(persistentSession); ok {
+		return s.attachToRunningAIReActSession(stream, baseCtx, runningReAct, firstMsg, persistentSession, startParams)
+	}
+
 	resolvedStartParams, err := resolveAISessionStartParams(
 		s.GetProjectDatabase(),
 		persistentSession,
@@ -295,6 +300,81 @@ func (s *Server) StartAIReAct(stream ypb.Yak_StartAIReActServer) error {
 		}
 
 		inputEvent.SafeFeed(event)
+	}
+}
+
+func (s *Server) attachToRunningAIReActSession(
+	stream ypb.Yak_StartAIReActServer,
+	baseCtx context.Context,
+	runningReAct *aireact.ReAct,
+	firstMsg *ypb.AIInputEvent,
+	persistentSession string,
+	startParams *ypb.AIStartParams,
+) error {
+	log.Infof("attach grpc stream to running aireact session: %s", persistentSession)
+
+	if _, err := yakit.CreateOrUpdateAISessionMetaOnStart(s.GetProjectDatabase(), persistentSession, startParams, time.Now()); err != nil {
+		log.Warnf("persist ai session start meta failed for %s: %v", persistentSession, err)
+	}
+
+	var sendMu sync.Mutex
+	debugStreamPrinter := aicommon.GetDefaultDebugStreamPrinter()
+	aicommon.EnsureLogFlushWrapperInstalled()
+
+	feedback := func(e *schema.AiOutputEvent) {
+		if e.Timestamp <= 0 {
+			e.Timestamp = time.Now().Unix()
+		}
+
+		utils.Debug(func() {
+			if e.IsStream {
+				debugStreamPrinter.PrintStreamDelta(e)
+			} else {
+				debugStreamPrinter.FlushIfActive()
+			}
+		})
+
+		if stream.Context().Err() != nil {
+			return
+		}
+		sendMu.Lock()
+		defer sendMu.Unlock()
+		if err := stream.Send(e.ToGRPC()); err != nil {
+			log.Errorf("send re-act event to attached stream failed: %v", err)
+		}
+	}
+
+	unsubscribe, ok := aireact.SubscribeRunningSession(persistentSession, feedback)
+	if !ok {
+		return utils.Errorf("failed to subscribe running aireact session: %s", persistentSession)
+	}
+	defer unsubscribe()
+
+	if firstMsg != nil && !firstMsg.GetIsStart() {
+		if err := runningReAct.SendInputEvent(firstMsg); err != nil {
+			log.Warnf("forward first input to running session failed: %v", err)
+		}
+	}
+
+	for {
+		select {
+		case <-baseCtx.Done():
+			log.Info("attached AIReAct stream context done")
+			return nil
+		default:
+		}
+
+		event, err := stream.Recv()
+		if err != nil {
+			log.Infof("attached AIReAct stream recv ended: %v", err)
+			return nil
+		}
+		if event.GetIsStart() {
+			continue
+		}
+		if err := runningReAct.SendInputEvent(event); err != nil {
+			log.Warnf("forward input to running session failed: %v", err)
+		}
 	}
 }
 

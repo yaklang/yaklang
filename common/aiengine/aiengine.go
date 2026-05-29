@@ -40,12 +40,26 @@ type AIEngine struct {
 // NewAIEngine 创建新的 AI 引擎实例
 func NewAIEngine(options ...AIEngineConfigOption) (*AIEngine, error) {
 	config := NewAIEngineConfig(options...)
+	notifySessionID(config)
 
 	// 创建上下文
 	ctx, cancel := context.WithCancel(config.Context)
 
 	// 创建通道
 	outputChan := make(chan *schema.AiOutputEvent, 100)
+
+	// 创建 endpoint manager 用于任务同步
+	epm := aicommon.NewEndpointManagerContext(ctx)
+
+	engine := &AIEngine{
+		config:           config,
+		outputChan:       outputChan,
+		ctx:              ctx,
+		cancel:           cancel,
+		activeTasks:      make(map[string]aicommon.AITaskState),
+		allTasksEndpoint: epm.CreateEndpoint(),
+		taskEndpoints:    make(map[string]*aicommon.Endpoint),
+	}
 
 	// 构建 ReAct 配置选项
 	reactOptions := buildReActOptions(ctx, config, outputChan)
@@ -57,19 +71,7 @@ func NewAIEngine(options ...AIEngineConfigOption) (*AIEngine, error) {
 		return nil, utils.Errorf("failed to create ReAct AIEngineOperator instance: %v", err)
 	}
 
-	// 创建 endpoint manager 用于任务同步
-	epm := aicommon.NewEndpointManagerContext(ctx)
-
-	engine := &AIEngine{
-		config:           config,
-		operator:         operator,
-		outputChan:       outputChan,
-		ctx:              ctx,
-		cancel:           cancel,
-		activeTasks:      make(map[string]aicommon.AITaskState),
-		allTasksEndpoint: epm.CreateEndpoint(), // 所有任务完成信号
-		taskEndpoints:    make(map[string]*aicommon.Endpoint),
-	}
+	engine.operator = operator
 
 	// 启动输出处理器
 	engine.wg.Add(1)
@@ -78,6 +80,7 @@ func NewAIEngine(options ...AIEngineConfigOption) (*AIEngine, error) {
 	// 发送初始化配置
 	err = engine.sendInitConfig()
 	if err != nil {
+		cancel()
 		return nil, utils.Errorf("send init config failed: %v", err)
 	}
 	return engine, nil
@@ -151,7 +154,8 @@ func (e *AIEngine) sendMsgAndGetTaskName(input string, attachedResources ...*aic
 
 // SendMsg 执行 AI 任务（阻塞直到该任务完成）
 func (e *AIEngine) SendMsg(input string, options ...AIEngineConfigOption) error {
-	// 创建临时config
+	// 临时 config 仅提取 AttachedResources，复用引擎 session，避免重复生成 sessionID
+	options = append([]AIEngineConfigOption{WithSessionID(e.config.SessionID)}, options...)
 	config := NewAIEngineConfig(options...)
 
 	// 发送消息并获取任务名称
@@ -246,7 +250,7 @@ func (e *AIEngine) GetActiveTaskCount() int {
 
 // SendMsgAsync 异步执行 AI 任务（立即返回）
 func (e *AIEngine) SendMsgAsync(input string, options ...AIEngineConfigOption) error {
-	// 创建临时config
+	options = append([]AIEngineConfigOption{WithSessionID(e.config.SessionID)}, options...)
 	config := NewAIEngineConfig(options...)
 
 	// 发送消息后直接返回
@@ -276,6 +280,14 @@ func (e *AIEngine) Wait() {
 // IsFinished 检查任务是否完成
 func (e *AIEngine) IsFinished() bool {
 	return e.operator.IsFinished()
+}
+
+// SendInputEvent forwards an AI input event to the underlying operator.
+func (e *AIEngine) SendInputEvent(event *ypb.AIInputEvent) error {
+	if e == nil || e.operator == nil {
+		return utils.Error("ai engine is not initialized")
+	}
+	return e.operator.SendInputEvent(event)
 }
 
 // Close 关闭 AI 引擎，释放资源
