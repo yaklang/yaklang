@@ -440,6 +440,64 @@ func TestGRPC_StartMcpServer_ProjectDatabaseTools(t *testing.T) {
 	require.NotEmpty(t, contextData["current_project_db_path"])
 }
 
+func TestGRPC_StartMcpServer_WithAIToolFramework(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+
+	req := &ypb.StartMcpServerRequest{
+		Host:                  "127.0.0.1",
+		Port:                  0,
+		EnableAIToolFramework: true,
+	}
+
+	stream, err := client.StartMcpServer(ctx, req)
+	require.NoError(t, err)
+
+	var serverURL string
+	for i := 0; i < 5; i++ {
+		resp, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		require.NoError(t, err)
+		if resp.GetServerUrl() != "" {
+			serverURL = resp.GetServerUrl()
+		}
+		log.Infof("MCP Status: %s", resp.GetStatus())
+		if resp.GetStatus() == "running" {
+			break
+		}
+	}
+	require.NotEmpty(t, serverURL, "server URL must be set")
+
+	mcpClient, err := mcpclient.NewSSEMCPClient(serverURL)
+	require.NoError(t, err)
+	defer mcpClient.Close()
+
+	clientCtx, clientCancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer clientCancel()
+
+	require.NoError(t, mcpClient.Start(clientCtx))
+
+	initReq := rawmcp.InitializeRequest{}
+	initReq.Params.ProtocolVersion = rawmcp.LATEST_PROTOCOL_VERSION
+	initReq.Params.ClientInfo = rawmcp.Implementation{Name: "test-aitool-fw-client", Version: "1.0.0"}
+	_, err = mcpClient.Initialize(clientCtx, initReq)
+	require.NoError(t, err)
+
+	toolsResult, err := mcpClient.ListTools(clientCtx, rawmcp.ListToolsRequest{})
+	require.NoError(t, err)
+	require.NotNil(t, toolsResult)
+
+	// buildinaitools.GetAllToolsDynamically must register at least one tool.
+	assert.Greater(t, len(toolsResult.Tools), 0,
+		"EnableAIToolFramework must expose at least one built-in aitool-framework tool")
+	log.Infof("EnableAIToolFramework: got %d tools", len(toolsResult.Tools))
+}
+
 func mustExtractToolTextJSON(t *testing.T, result *rawmcp.CallToolResult) map[string]any {
 	t.Helper()
 	require.NotNil(t, result)

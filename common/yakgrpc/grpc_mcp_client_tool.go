@@ -18,33 +18,40 @@ import (
 //
 // Tool discovery strategy:
 //   - "builtin" tools: always synced from the in-memory global registry on each
-//     call; description/params come from the live Go definition.
-//   - "bridge" tools: upserted from enabled external MCP servers only on first
-//     encounter (i.e. when no row exists in the DB yet). Subsequent calls read
-//     directly from the DB to avoid expensive network round-trips on every page
-//     load. Callers that need a forced refresh can call SyncMCPBridgeTools (not
-//     yet exposed as an RPC — add if needed).
+//     call (pure in-memory, no network). Stale rows for removed/renamed tools
+//     are pruned immediately.
+//   - "bridge" tools: two modes controlled by ForceSync:
+//   - ForceSync=false (default): read entirely from the DB cache, no network.
+//     Stale rows may persist until the next ForceSync. Frontend should call
+//     with ForceSync=true whenever the user explicitly requests a refresh.
+//   - ForceSync=true: dial every enabled external MCP server, perform a full
+//     diff (insert new tools, refresh descriptions, delete removed tools).
 func (s *Server) GetMCPToolList(ctx context.Context, req *ypb.GetMCPToolListRequest) (*ypb.GetMCPToolListResponse, error) {
 	db := s.GetProfileDatabase()
 
-	// 1. Sync builtin tools into DB (cheap: in-memory map iteration + upsert).
-	// Description for builtin tools is always read from the live Go definition,
-	// so we don't store it — pass empty string here.
+	// 1. Sync builtin tools into DB (cheap: in-memory map iteration + upsert),
+	// then prune rows for tools that have been removed or renamed in the registry.
 	builtinTools := mcp.GlobalBuiltinTools()
+	builtinNames := make(map[string]struct{}, len(builtinTools))
 	for name := range builtinTools {
-		if _, err := yakit.GetOrCreateMCPToolConfig(db, name, schema.MCPToolSourceBuiltin, "", ""); err != nil {
+		builtinNames[name] = struct{}{}
+		if _, err := yakit.GetOrCreateMCPClientToolConfig(db, name, schema.MCPClientToolSourceBuiltin, "", ""); err != nil {
 			log.Warnf("GetMCPToolList: upsert builtin tool config %q: %v", name, err)
 		}
 	}
+	if err := yakit.DeleteStaleMCPClientBuiltinTools(db, builtinNames); err != nil {
+		log.Warnf("GetMCPToolList: prune stale builtin tools: %v", err)
+	}
 
-	// 2. Reconcile bridge tools from external MCP servers.
-	// ForceSync=true: always dial every server and do a full diff (add/update/delete).
-	// ForceSync=false: only dial servers that have at least one tool row with an
-	//   empty description, keeping the common case free of network round-trips.
-	syncMCPBridgeTools(ctx, s, db, req.GetForceSync())
+	// 2. Reconcile bridge tools only when explicitly requested.
+	// ForceSync=false: skip all network calls, serve from DB cache.
+	// ForceSync=true:  dial every server, full diff (insert/update/delete).
+	if req.GetForceSync() {
+		syncMCPBridgeTools(ctx, s, db)
+	}
 
 	// 3. Query the config table with the requested filters.
-	paginator, cfgs, err := yakit.QueryMCPToolConfigs(db, req)
+	paginator, cfgs, err := yakit.QueryMCPClientToolConfigs(db, req)
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +81,7 @@ func (s *Server) GetMCPToolDetail(ctx context.Context, req *ypb.GetMCPToolDetail
 	}
 
 	db := s.GetProfileDatabase()
-	cfg, err := yakit.GetMCPToolConfigByName(db, req.GetToolName())
+	cfg, err := yakit.GetMCPClientToolConfigByName(db, req.GetToolName())
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +90,7 @@ func (s *Server) GetMCPToolDetail(ctx context.Context, req *ypb.GetMCPToolDetail
 	attachToolMeta(item, cfg.Source, cfg.ToolName, cfg.ServerName)
 
 	// For bridge tools whose metadata is not in memory, try a live lookup.
-	if cfg.Source == schema.MCPToolSourceBridge && item.Description == "" {
+	if cfg.Source == schema.MCPClientToolSourceBridge && item.Description == "" {
 		srv, srvErr := yakit.GetMCPServerByName(db, cfg.ServerName)
 		if srvErr == nil && srv != nil {
 			tools, toolsErr := s.getMCPServerTools(ctx, srv)
@@ -109,7 +116,7 @@ func (s *Server) SetMCPToolEnabled(ctx context.Context, req *ypb.SetMCPToolEnabl
 	if req.GetToolName() == "" {
 		return &ypb.GeneralResponse{Ok: false, Reason: "tool name is required"}, nil
 	}
-	if err := yakit.SetMCPToolEnabled(s.GetProfileDatabase(), req.GetToolName(), req.GetEnable()); err != nil {
+	if err := yakit.SetMCPClientToolEnabled(s.GetProfileDatabase(), req.GetToolName(), req.GetEnable()); err != nil {
 		return &ypb.GeneralResponse{Ok: false, Reason: err.Error()}, nil
 	}
 	return &ypb.GeneralResponse{Ok: true}, nil
@@ -123,64 +130,41 @@ func GetDisabledMCPToolNamesFromDB() (map[string]struct{}, error) {
 	if db == nil {
 		return map[string]struct{}{}, nil
 	}
-	return yakit.GetDisabledMCPToolNames(db)
+	return yakit.GetDisabledMCPClientToolNames(db)
 }
 
 // ---------------------------------------------------------------------------
 // internal helpers
 // ---------------------------------------------------------------------------
 
-// syncMCPBridgeTools reconciles bridge tool rows against enabled external MCP servers.
+// syncMCPBridgeTools dials every enabled external MCP server and performs a
+// full reconciliation against the local DB:
 //
-// For each server:
-//   - tools present remotely but missing locally  → inserted
+//   - tools present remotely but missing locally  → inserted with description
 //   - tools present both remotely and locally      → description refreshed
 //   - tools present locally but gone from remote   → deleted
 //
-// When forceSync is false, a server is skipped if all its existing tool rows
-// already have a non-empty description (i.e. it was fully synced before).
-// When forceSync is true, every server is dialed regardless.
-//
-// If a server is unreachable, it is skipped to avoid false deletions.
-func syncMCPBridgeTools(ctx context.Context, s *Server, db *gorm.DB, forceSync bool) {
+// If a server is unreachable it is skipped entirely to avoid false deletions.
+// This function is only called when ForceSync=true; callers that want to read
+// from cache should skip this call altogether.
+func syncMCPBridgeTools(ctx context.Context, s *Server, db *gorm.DB) {
 	for srv := range yakit.YieldEnabledMCPServers(ctx, db) {
-		if !forceSync {
-			// Fast path: skip if all rows for this server have descriptions.
-			var emptyDescCount int
-			db.Model(&schema.MCPToolConfig{}).
-				Where("source = ? AND server_name = ? AND (description = '' OR description IS NULL)",
-					schema.MCPToolSourceBridge, srv.Name).
-				Count(&emptyDescCount)
-
-			var totalCount int
-			db.Model(&schema.MCPToolConfig{}).
-				Where("source = ? AND server_name = ?", schema.MCPToolSourceBridge, srv.Name).
-				Count(&totalCount)
-
-			if totalCount > 0 && emptyDescCount == 0 {
-				continue
-			}
-		}
-
 		remoteTools, err := s.getMCPServerTools(ctx, srv)
 		if err != nil {
-			// Server unreachable — leave existing rows untouched.
 			log.Warnf("syncMCPBridgeTools: get tools from server %q: %v, skipping", srv.Name, err)
 			continue
 		}
 
-		// Upsert every tool reported by the remote server.
 		keepNames := make(map[string]struct{}, len(remoteTools))
 		for _, t := range remoteTools {
 			canonicalName := buildBridgeToolName(srv.Name, t.Name)
 			keepNames[canonicalName] = struct{}{}
-			if err := yakit.UpsertMCPToolConfigDescription(db, canonicalName, schema.MCPToolSourceBridge, srv.Name, t.Description); err != nil {
+			if err := yakit.UpsertMCPClientToolConfigDescription(db, canonicalName, schema.MCPClientToolSourceBridge, srv.Name, t.Description); err != nil {
 				log.Warnf("syncMCPBridgeTools: upsert %q: %v", canonicalName, err)
 			}
 		}
 
-		// Prune rows for tools the remote server no longer provides.
-		if err := yakit.DeleteMCPToolConfigsByServerAndNames(db, srv.Name, keepNames); err != nil {
+		if err := yakit.DeleteMCPClientToolConfigsByServerAndNames(db, srv.Name, keepNames); err != nil {
 			log.Warnf("syncMCPBridgeTools: prune stale tools for server %q: %v", srv.Name, err)
 		}
 	}
@@ -191,7 +175,7 @@ func syncMCPBridgeTools(ctx context.Context, s *Server, db *gorm.DB, forceSync b
 // Bridge tool metadata is left empty here — the caller may enrich it separately
 // if a live connection is available.
 func attachToolMeta(item *ypb.MCPToolConfig, source, toolName, _ string) {
-	if source != schema.MCPToolSourceBuiltin {
+	if source != schema.MCPClientToolSourceBuiltin {
 		return
 	}
 	twh := mcp.GetBuiltinToolByName(toolName)

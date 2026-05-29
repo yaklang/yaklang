@@ -2390,8 +2390,11 @@ message StartMcpServerRequest {
   repeated string Script = 7;
   // enable all tool sets
   bool EnableAll = 8;
-  // enable yak ai tool
+  // enable yak ai tool (user-authored Yak script tools stored in DB)
   bool EnableYakAITool = 9;
+  // expose built-in aitool-framework tools (fs, ssa, yakscript, etc.) and
+  // enabled external MCP server tools bridged through the aitool layer
+  bool EnableAIToolFramework = 10;
 }
 
 message StartMcpServerResponse {
