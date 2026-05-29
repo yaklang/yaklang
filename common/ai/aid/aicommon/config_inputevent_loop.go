@@ -29,6 +29,9 @@ func (c *Config) StartEventLoopEx(ctx context.Context, startCall func(), doneCal
 			ticker := time.NewTicker(time.Second)
 			defer ticker.Stop()
 			defer func() {
+				if c.EventLoopDoneHook != nil {
+					c.EventLoopDoneHook()
+				}
 				if doneCall != nil {
 					log.Infof("event loop done call for config %s", c.id)
 					doneCall()
@@ -38,6 +41,9 @@ func (c *Config) StartEventLoopEx(ctx context.Context, startCall func(), doneCal
 			if startCall != nil {
 				log.Infof("event loop start call for config %s", c.id)
 				startCall()
+			}
+			if c.EventLoopStartHook != nil {
+				c.EventLoopStartHook()
 			}
 
 			consumptionNotification := func() {

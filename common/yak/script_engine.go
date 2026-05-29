@@ -721,6 +721,30 @@ func (e *ScriptEngine) exec(ctx context.Context, id string, code string, params 
 			})
 		}
 	}
+	if aimLib, ok := engine.GetVar("aim"); ok {
+		if _, ok := aimLib.(map[string]interface{}); ok {
+			aimExports := make(map[string]any, len(aiengine.Exports))
+			for k, v := range aiengine.Exports {
+				aimExports[k] = v
+			}
+			injectAIMSessionID := func(opts []aiengine.AIEngineConfigOption) []aiengine.AIEngineConfigOption {
+				return append([]aiengine.AIEngineConfigOption{
+					aiengine.WithOnSessionID(func(sessionID string) {
+						client.AIAgentSession(sessionID)
+					}),
+				}, opts...)
+			}
+			aimExports["InvokeReAct"] = func(input string, opts ...aiengine.AIEngineConfigOption) error {
+				return aiengine.InvokeReAct(input, injectAIMSessionID(opts)...)
+			}
+			aimExports["InvokeReActAsync"] = func(input string, opts ...aiengine.AIEngineConfigOption) (*aiengine.AIEngine, error) {
+				return aiengine.InvokeReActAsync(input, injectAIMSessionID(opts)...)
+			}
+			engine.SetVars(map[string]any{
+				"aim": aimExports,
+			})
+		}
+	}
 	for _, hook := range e.engineHooks {
 		err = hook(engine)
 		if err != nil {
