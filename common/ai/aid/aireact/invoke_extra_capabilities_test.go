@@ -78,6 +78,16 @@ func TestReAct_ExtraCapabilities_DeepIntent(t *testing.T) {
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := r.GetPrompt()
 
+			// 去 Exit 化后 directly_answer 只发答复并继续, 主循环收尾交给唯一终结器 finish.
+			// finish 会触发一次满意度校验, 这里统一放行.
+			// 关键词: directly_answer 永不 Exit, finish 唯一终结器, 满意度校验放行
+			if isVerifySatisfactionPrompt(prompt) {
+				rsp := i.NewAIResponse()
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action":"verify-satisfaction","user_satisfied":true,"reasoning":"answer delivered"}`))
+				rsp.Close()
+				return rsp, nil
+			}
+
 			// Capability catalog match helper used by query_capabilities.
 			// Return the forge identifier so deep intent can continue normally.
 			if utils.MatchAllOfSubString(prompt, "capability matcher", "matched_identifiers") ||
@@ -112,7 +122,7 @@ func TestReAct_ExtraCapabilities_DeepIntent(t *testing.T) {
 			if utils.MatchAllOfSubString(prompt, "directly_answer") &&
 				!utils.MatchAllOfSubString(prompt, "finalize_enrichment", "query_capabilities") &&
 				!utils.MatchAllOfSubString(prompt, `"const": "capability-catalog-match"`, "matched_identifiers") {
-				atomic.AddInt32(&mainLoopCalled, 1)
+				n := atomic.AddInt32(&mainLoopCalled, 1)
 
 				// Check whether EXTRA_CAPABILITIES block appears in the prompt
 				if strings.Contains(prompt, "EXTRA_CAPABILITIES_") {
@@ -129,9 +139,18 @@ func TestReAct_ExtraCapabilities_DeepIntent(t *testing.T) {
 				}
 
 				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(`
+				// 去 Exit 化: 第一轮主循环发 directly_answer (产出含 testNonce 的答复并写入
+				// timeline), 第二轮发唯一终结器 finish 收口整个任务.
+				// 关键词: directly_answer 永不 Exit, finish 唯一终结器, 答复后追加 finish
+				if n == 1 {
+					rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "directly_answer", "answer_payload": "Security assessment capabilities identified with ` + testNonce + `.", "human_readable_thought": "answering user query about security assessment", "cumulative_summary": "extra capabilities test completed"}
 `))
+				} else {
+					rsp.EmitOutputStream(bytes.NewBufferString(`
+{"@action": "object", "next_action": {"type": "finish"}, "human_readable_thought": "finish after answer delivered"}
+`))
+				}
 				rsp.Close()
 				return rsp, nil
 			}

@@ -36,15 +36,27 @@ func TestReActLoop_MainLoopEventsInheritAIModelInfoFromResponse(t *testing.T) {
 			mu.Unlock()
 		}),
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			// 去 Exit 化后 directly_answer 只发答复并继续循环, 真正收尾交给唯一终结器 finish.
+			// 第一轮发 directly_answer (产出 thought + answer-payload 节点), 第二轮发 finish 收口.
+			// 关键词: directly_answer 永不 Exit, finish 唯一终结器, 两轮收尾
+			count := aiCallCount
 			aiCallCount++
 
 			rsp := i.NewAIResponse()
 			rsp.SetModelInfo(expectedService, expectedModel)
-			rsp.EmitOutputStream(bytes.NewBufferString(`{
+			if count == 0 {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{
   "@action": "directly_answer",
   "human_readable_thought": "inspect model propagation in reactloop main loop",
   "answer_payload": "metadata propagated"
 }`))
+			} else {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{
+  "@action": "object",
+  "next_action": {"type": "finish"},
+  "human_readable_thought": "finish after answer delivered"
+}`))
+			}
 			rsp.Close()
 			return rsp, nil
 		}),
@@ -61,7 +73,7 @@ func TestReActLoop_MainLoopEventsInheritAIModelInfoFromResponse(t *testing.T) {
 	require.NoError(t, err)
 	loop.GetEmitter().WaitForStream()
 
-	require.Equal(t, 1, aiCallCount, "expected only the main loop AI callback to run")
+	require.Equal(t, 2, aiCallCount, "expected directly_answer then finish (two main loop AI callbacks)")
 
 	mu.Lock()
 	defer mu.Unlock()

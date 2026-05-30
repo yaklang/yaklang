@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -453,7 +454,11 @@ func TestReAct_PersistentSession_FreeInput(t *testing.T) {
 	round1Input := "first-round-path-/tmp/alpha-" + ksuid.New().String()
 	round2Input := "second-round-path-/tmp/beta-" + ksuid.New().String()
 
+	// 去 Exit 化后 directly_answer 只发答复并继续, 真正收尾交给唯一终结器 finish.
+	// 每个 round 新建一个 ReAct, 故在闭包内用独立计数器实现 "先答复再 finish" 两步式.
+	// 关键词: directly_answer 永不 Exit, finish 唯一终结器, 答复后追加 finish
 	newAnsweringReAct := func(inputChan chan *ypb.AIInputEvent, outputChan chan *ypb.AIOutputEvent) (*ReAct, error) {
+		var decisionCount int32
 		return NewTestReAct(
 			aicommon.WithEventInputChan(inputChan),
 			aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
@@ -463,7 +468,18 @@ func TestReAct_PersistentSession_FreeInput(t *testing.T) {
 				}
 			}),
 			aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+				prompt := r.GetPrompt()
 				rsp := i.NewAIResponse()
+				if isVerifySatisfactionPrompt(prompt) {
+					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action":"verify-satisfaction","user_satisfied":true,"reasoning":"done"}`))
+					rsp.Close()
+					return rsp, nil
+				}
+				if isPrimaryDecisionPrompt(prompt) && atomic.AddInt32(&decisionCount, 1) > 1 {
+					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "finish"}, "human_readable_thought": "finish after answer delivered"}`))
+					rsp.Close()
+					return rsp, nil
+				}
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "done"}, "human_readable_thought": "done", "cumulative_summary": "done"}`))
 				rsp.Close()
 				return rsp, nil

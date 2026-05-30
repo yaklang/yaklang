@@ -329,9 +329,20 @@ func TestLoopHTTPFuzztestExecute_DirectlyAnswerEmptyPayloadRetryWithAITAGHint(t 
 
 func TestLoopHTTPFuzztestExecute_DirectlyAnswerWithFinalAnswerAITag(t *testing.T) {
 	var prompts []string
+	var answered int32
 	invoker := newHTTPFuzztestAICallbackInvoker(t, func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		prompts = append(prompts, req.GetPrompt())
 		nonce := aicommon.MustExtractDynamicSectionNonce(t, req.GetPrompt())
+
+		// directly_answer 永不 Exit: 发完答复后循环继续, 必须由显式 finish
+		// 终结整个 loop. mock 先发一次结构化答复, 之后用 finish 收口.
+		// 关键词: directly_answer 永不 Exit, finish 唯一终结器, mock 迁移
+		if atomic.AddInt32(&answered, 1) > 1 {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action":"finish"}`))
+			rsp.Close()
+			return rsp, nil
+		}
 
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(

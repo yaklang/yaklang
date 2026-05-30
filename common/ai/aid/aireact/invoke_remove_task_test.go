@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"io"
+	"strings"
 	"testing"
 	"time"
 
@@ -20,17 +21,40 @@ import (
 )
 
 // mockedToolCallingForRemove 模拟AI响应，用于移除测试
+// 去 Exit 化后 directly_answer 只发答复并继续, 任务真正收尾由唯一终结器 finish 完成.
+// 因此每个任务采用 "先 directly_answer 发答复, 再 finish 收口" 两步式: 借助
+// directly_answer 在 timeline 留下的 "ai directly answer" 面包屑做无状态分流,
+// 第一轮决策(无面包屑)发 directly_answer, 第二轮(已有面包屑)发 finish.
+// 关键词: directly_answer 永不 Exit, finish 唯一终结器, 答复后追加 finish, 移除任务时序
 func mockedToolCallingForRemove(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
-	if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") {
+	if isVerifySatisfactionPrompt(prompt) {
 		rsp := i.NewAIResponse()
-		rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "directly_answer", "answer_payload": "Task completed"}
-`))
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action":"verify-satisfaction","user_satisfied":true,"reasoning":"task done"}`))
 		rsp.Close()
 		return rsp, nil
 	}
-	return nil, fmt.Errorf("unsupported prompt: %s", prompt)
+	if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") {
+		rsp := i.NewAIResponse()
+		if strings.Contains(prompt, "ai directly answer") {
+			rsp.EmitOutputStream(bytes.NewBufferString(`
+{"@action": "object", "next_action": {"type": "finish"}, "human_readable_thought": "task completed"}
+`))
+		} else {
+			rsp.EmitOutputStream(bytes.NewBufferString(`
+{"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "Task completed"}, "human_readable_thought": "answering"}
+`))
+		}
+		rsp.Close()
+		return rsp, nil
+	}
+	// finish 收口后系统会发起一次答复/摘要合成调用 (仅含 system 前缀, 不含动作菜单),
+	// 这类 prompt 既非满意度校验也非决策, 返回一个温和的答复让其顺利收尾.
+	// 关键词: finish 后合成答复, 兜底返回温和答复
+	rsp := i.NewAIResponse()
+	rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "Task completed"}`))
+	rsp.Close()
+	return rsp, nil
 }
 
 func TestReAct_RemoveTask_StatusChanges(t *testing.T) {

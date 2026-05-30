@@ -641,8 +641,14 @@ func TestExec_EdgeCase_RapidIterations(t *testing.T) {
 			iterCount++
 			rsp := i.NewAIResponse()
 
-			// directly_answer 应该一次就结束
-			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "Rapid task completed"}`))
+			// directly_answer 只发答复不终结, 循环继续; 真正结束由显式 finish 完成.
+			// 第一轮发答复, 第二轮用 finish 收口.
+			// 关键词: directly_answer 永不 Exit, finish 唯一终结器
+			if iterCount == 1 {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "Rapid task completed"}`))
+			} else {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish"}`))
+			}
 
 			rsp.Close()
 			return rsp, nil
@@ -667,8 +673,8 @@ func TestExec_EdgeCase_RapidIterations(t *testing.T) {
 		t.Fatalf("Execute failed: %v", err)
 	}
 
-	if iterCount != 1 {
-		t.Errorf("Expected 1 iteration (directly_answer should exit), got: %d", iterCount)
+	if iterCount != 2 {
+		t.Errorf("Expected 2 iterations (directly_answer emits, then finish ends), got: %d", iterCount)
 	}
 
 	t.Logf("Rapid iterations completed: %d iterations in %v", iterCount, duration)

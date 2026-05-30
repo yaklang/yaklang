@@ -151,10 +151,15 @@ func TestSchemaGeneration_WithDisallowExit(t *testing.T) {
 		},
 	}
 
+	// 用带引号的 enum token 精确匹配 finish "动作"自身, 而不是裸子串 "finish".
+	// directly_answer 的描述会合法地提到 'finish' 动作 (单引号), 裸子串匹配会误判.
+	// 关键词: schema finish 动作精确匹配, 避免 directly_answer 描述误命中
+	const finishEnumToken = `"finish"`
+
 	// 正常 schema
 	normalSchema := buildSchema(actions...)
-	if !strings.Contains(normalSchema, "finish") {
-		t.Error("Normal schema should contain finish")
+	if !strings.Contains(normalSchema, finishEnumToken) {
+		t.Error("Normal schema should contain finish action enum")
 	}
 
 	// 过滤掉 finish 的 schema（模拟 disallowExit 场景）
@@ -166,8 +171,8 @@ func TestSchemaGeneration_WithDisallowExit(t *testing.T) {
 	}
 
 	filteredSchema := buildSchema(filteredActions...)
-	if strings.Contains(filteredSchema, "finish") {
-		t.Error("Filtered schema should not contain finish")
+	if strings.Contains(filteredSchema, finishEnumToken) {
+		t.Error("Filtered schema should not contain finish action enum")
 	}
 
 	if !strings.Contains(filteredSchema, "directly_answer") {
