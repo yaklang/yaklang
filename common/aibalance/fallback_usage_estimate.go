@@ -147,6 +147,7 @@ type usageWriter interface {
 // 关键词: applyUsageFallbackEstimate, ytoken 兜底, fallback 扣费分发, usage 估算下发
 func (c *ServerConfig) applyUsageFallbackEstimate(
 	modelName string,
+	internalModelName string,
 	isFreeModel bool,
 	key *Key,
 	providerTypeName string,
@@ -171,8 +172,9 @@ func (c *ServerConfig) applyUsageFallbackEstimate(
 		TotalTokens:      int(result.EstPromptTokens + result.EstCompletionTokens),
 	}
 	result.EstimatedUsage = estUsage
-	meta, _ := GetModelMeta(modelName)
-	result.Weighted = ComputeWeightedTokens(meta, estUsage)
+	// 与 onUsageForward 正路一致：按 (外部暴露名 + 内部转发名) 双标识分层解析倍率。
+	// 关键词: fallback ComputeWeightedTokensWithRoute, 双标识倍率
+	result.Weighted = ComputeWeightedTokensWithRoute(modelName, internalModelName, estUsage)
 	if result.Weighted <= 0 {
 		return result
 	}

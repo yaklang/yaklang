@@ -501,6 +501,241 @@ func GetAllModelMetas() (map[string]*AiModelMeta, error) {
 	return result, nil
 }
 
+// ==================== Model Multiplier Override / Global Default ====================
+//
+// 倍率从「仅 WrapperName」升级为「(外部暴露名 WrapperName + 内部转发名 InternalModelName)」
+// 双标识的分层兜底体系。计费时逐维回落（见 cost_calc.go ResolveBillingMultipliers）：
+//
+//	(W,I) 覆盖行 -> AiModelMeta(W) 逐 wrapper 默认 -> 全局默认 -> 系统常量
+//
+// 关键词: 倍率双标识, 外部+内部, 分层兜底, 批量应用
+
+// AiModelMultiplierOverride 是 (外部暴露名 WrapperName + 内部转发名 InternalModelName)
+// 维度的四维 Token 倍率覆盖层，优先级高于 AiModelMeta(WrapperName) 的逐 wrapper 默认。
+// 用于精确控制「同一 WrapperName 下不同上游真实模型」的差异化计费。
+//
+// 回落策略（逐维，见 ResolveBillingMultipliers）：
+//   - 某维 > 0  -> 采用本表该维
+//   - 某维 <= 0 -> 回落到 AiModelMeta(WrapperName) -> 全局默认 -> 系统常量
+//
+// 关键词: AiModelMultiplierOverride, 外部+内部双标识倍率, 逐维回落
+type AiModelMultiplierOverride struct {
+	gorm.Model
+	WrapperName       string `gorm:"size:128;unique_index:idx_model_override;not null"` // 外部暴露名
+	InternalModelName string `gorm:"size:128;unique_index:idx_model_override;not null"` // 内部转发给上游的真实模型名
+
+	InputTokenMultiplier    float64 `gorm:"default:0"` // 输入 token 倍率（0 表示回落下一层）
+	OutputTokenMultiplier   float64 `gorm:"default:0"` // 输出 token 倍率
+	CacheCreationMultiplier float64 `gorm:"default:0"` // 缓存创建倍率
+	CacheHitMultiplier      float64 `gorm:"default:0"` // 缓存命中倍率
+}
+
+func (a *AiModelMultiplierOverride) TableName() string {
+	return "ai_model_multiplier_overrides"
+}
+
+// AiModelMultiplierConfig 是全局默认四维 Token 倍率的单例配置（ID=1）。
+// 当 override 与 wrapper 两层都缺该维时，回落到这里；本表也缺则用系统常量。
+// 关键词: AiModelMultiplierConfig, 全局默认倍率, singleton ID=1
+type AiModelMultiplierConfig struct {
+	gorm.Model
+	InputTokenMultiplier    float64 `gorm:"default:0"`
+	OutputTokenMultiplier   float64 `gorm:"default:0"`
+	CacheCreationMultiplier float64 `gorm:"default:0"`
+	CacheHitMultiplier      float64 `gorm:"default:0"`
+}
+
+func (a *AiModelMultiplierConfig) TableName() string {
+	return "ai_model_multiplier_configs"
+}
+
+// EnsureModelMultiplierOverrideTable ensures the AiModelMultiplierOverride table exists.
+func EnsureModelMultiplierOverrideTable() error {
+	return GetDB().AutoMigrate(&AiModelMultiplierOverride{}).Error
+}
+
+// EnsureModelMultiplierConfigTable ensures the AiModelMultiplierConfig table exists.
+func EnsureModelMultiplierConfigTable() error {
+	return GetDB().AutoMigrate(&AiModelMultiplierConfig{}).Error
+}
+
+// modelOverrideKey builds the in-memory map key for an override (wrapper + internal model).
+func modelOverrideKey(wrapperName, internalModelName string) string {
+	return wrapperName + "\x00" + internalModelName
+}
+
+// GetModelMultiplierOverride retrieves the override for (wrapperName, internalModelName);
+// returns (nil, nil) when not found.
+func GetModelMultiplierOverride(wrapperName, internalModelName string) (*AiModelMultiplierOverride, error) {
+	var o AiModelMultiplierOverride
+	err := GetDB().Where("wrapper_name = ? AND internal_model_name = ?", wrapperName, internalModelName).First(&o).Error
+	if err != nil {
+		if gorm.IsRecordNotFoundError(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &o, nil
+}
+
+// SaveModelMultiplierOverride upserts the four-dimensional multiplier override for
+// (wrapperName, internalModelName). Pass a value < 0 to skip updating that specific
+// dimension (creation uses 0 for skipped fields).
+// 关键词: SaveModelMultiplierOverride, 双标识倍率 upsert
+func SaveModelMultiplierOverride(wrapperName, internalModelName string, inputMul, outputMul, cacheCreateMul, cacheHitMul float64) error {
+	if wrapperName == "" || internalModelName == "" {
+		return fmt.Errorf("wrapperName and internalModelName are required")
+	}
+	var o AiModelMultiplierOverride
+	err := GetDB().Where("wrapper_name = ? AND internal_model_name = ?", wrapperName, internalModelName).First(&o).Error
+	if err != nil {
+		if gorm.IsRecordNotFoundError(err) {
+			o = AiModelMultiplierOverride{
+				WrapperName:       wrapperName,
+				InternalModelName: internalModelName,
+			}
+			if inputMul >= 0 {
+				o.InputTokenMultiplier = inputMul
+			}
+			if outputMul >= 0 {
+				o.OutputTokenMultiplier = outputMul
+			}
+			if cacheCreateMul >= 0 {
+				o.CacheCreationMultiplier = cacheCreateMul
+			}
+			if cacheHitMul >= 0 {
+				o.CacheHitMultiplier = cacheHitMul
+			}
+			return GetDB().Create(&o).Error
+		}
+		return err
+	}
+	if inputMul >= 0 {
+		o.InputTokenMultiplier = inputMul
+	}
+	if outputMul >= 0 {
+		o.OutputTokenMultiplier = outputMul
+	}
+	if cacheCreateMul >= 0 {
+		o.CacheCreationMultiplier = cacheCreateMul
+	}
+	if cacheHitMul >= 0 {
+		o.CacheHitMultiplier = cacheHitMul
+	}
+	return GetDB().Save(&o).Error
+}
+
+// DeleteModelMultiplierOverride removes the override for (wrapperName, internalModelName),
+// making it fall back to the wrapper-level default.
+func DeleteModelMultiplierOverride(wrapperName, internalModelName string) error {
+	return GetDB().Where("wrapper_name = ? AND internal_model_name = ?", wrapperName, internalModelName).
+		Delete(&AiModelMultiplierOverride{}).Error
+}
+
+// GetAllModelMultiplierOverrides returns all overrides indexed by (wrapper + internal model) key.
+func GetAllModelMultiplierOverrides() (map[string]*AiModelMultiplierOverride, error) {
+	var list []AiModelMultiplierOverride
+	if err := GetDB().Find(&list).Error; err != nil {
+		return nil, err
+	}
+	result := make(map[string]*AiModelMultiplierOverride)
+	for i := range list {
+		result[modelOverrideKey(list[i].WrapperName, list[i].InternalModelName)] = &list[i]
+	}
+	return result, nil
+}
+
+// GetGlobalMultiplierConfig retrieves the singleton global default multipliers (ID=1);
+// returns a zero-value instance (non-nil) when not yet configured.
+func GetGlobalMultiplierConfig() (*AiModelMultiplierConfig, error) {
+	var cfg AiModelMultiplierConfig
+	err := GetDB().Where("id = ?", 1).First(&cfg).Error
+	if err != nil {
+		if gorm.IsRecordNotFoundError(err) {
+			return &AiModelMultiplierConfig{}, nil
+		}
+		return nil, err
+	}
+	return &cfg, nil
+}
+
+// SaveGlobalMultiplierConfig upserts the singleton global default multipliers (ID=1).
+// Pass a value < 0 to skip updating that specific dimension.
+// 关键词: SaveGlobalMultiplierConfig, 全局默认倍率写库
+func SaveGlobalMultiplierConfig(inputMul, outputMul, cacheCreateMul, cacheHitMul float64) error {
+	var cfg AiModelMultiplierConfig
+	err := GetDB().Where("id = ?", 1).First(&cfg).Error
+	if err != nil {
+		if gorm.IsRecordNotFoundError(err) {
+			cfg = AiModelMultiplierConfig{}
+			cfg.ID = 1
+			if inputMul >= 0 {
+				cfg.InputTokenMultiplier = inputMul
+			}
+			if outputMul >= 0 {
+				cfg.OutputTokenMultiplier = outputMul
+			}
+			if cacheCreateMul >= 0 {
+				cfg.CacheCreationMultiplier = cacheCreateMul
+			}
+			if cacheHitMul >= 0 {
+				cfg.CacheHitMultiplier = cacheHitMul
+			}
+			return GetDB().Create(&cfg).Error
+		}
+		return err
+	}
+	if inputMul >= 0 {
+		cfg.InputTokenMultiplier = inputMul
+	}
+	if outputMul >= 0 {
+		cfg.OutputTokenMultiplier = outputMul
+	}
+	if cacheCreateMul >= 0 {
+		cfg.CacheCreationMultiplier = cacheCreateMul
+	}
+	if cacheHitMul >= 0 {
+		cfg.CacheHitMultiplier = cacheHitMul
+	}
+	return GetDB().Save(&cfg).Error
+}
+
+// ModelRoute 表示一个「实际模型」路由：外部暴露名 + 内部转发名。
+// 关键词: ModelRoute, 实际模型路由, 外部暴露名+内部转发名
+type ModelRoute struct {
+	WrapperName       string `json:"wrapper_name"`
+	InternalModelName string `json:"internal_model_name"`
+}
+
+// GetDistinctModelRoutes 从 AiProvider 表中枚举所有 distinct 的 (WrapperName, ModelName)。
+// 这是「实际模型」清单：同一 WrapperName 可能对应多个内部模型。WrapperName 为空时回落到 ModelName。
+// 关键词: GetDistinctModelRoutes, 实际模型枚举, 批量应用数据源
+func GetDistinctModelRoutes() ([]ModelRoute, error) {
+	providers, err := GetAllAiProviders()
+	if err != nil {
+		return nil, err
+	}
+	seen := make(map[string]bool)
+	var routes []ModelRoute
+	for _, p := range providers {
+		wrapper := p.WrapperName
+		if wrapper == "" {
+			wrapper = p.ModelName
+		}
+		internal := p.ModelName
+		if wrapper == "" || internal == "" {
+			continue
+		}
+		key := modelOverrideKey(wrapper, internal)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		routes = append(routes, ModelRoute{WrapperName: wrapper, InternalModelName: internal})
+	}
+	return routes, nil
+}
+
 // ==================== API Key Traffic Limit Functions ====================
 
 // UpdateAiApiKeyTrafficLimit updates the traffic limit settings for an API key

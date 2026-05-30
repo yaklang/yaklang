@@ -336,7 +336,11 @@
             <div class="card">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                     <h3 style="margin: 0;">模型信息管理</h3>
-                    <button class="reset-column-widths-btn" onclick="resetColumnWidths('models-table')" title="Reset column widths to default">Reset column widths</button>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <button class="btn btn-sm" style="background-color: #607d8b; color: #fff;" onclick="openGlobalDefaultMultiplierModal()" title="设置对所有实际模型生效的全局默认倍率（最低优先级，单独设置可覆盖）">全局默认倍率</button>
+                        <button class="btn btn-sm" style="background-color: #ff9800; color: #fff;" onclick="openApplyAllMultiplierModal()" title="把一组倍率一键写入到所有实际模型（外部+内部）的覆盖行">一键应用到所有实际模型</button>
+                        <button class="reset-column-widths-btn" onclick="resetColumnWidths('models-table')" title="Reset column widths to default">Reset column widths</button>
+                    </div>
                 </div>
                 <div class="table-container">
                     <table cellspacing="0" cellpadding="0" id="models-table">
@@ -1688,6 +1692,127 @@
             <div class="modal-actions">
                 <button class="btn" onclick="closeEditModelModal()">取消</button>
                 <button class="btn btn-primary" onclick="saveModelMeta()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 实际模型(外部+内部)倍率覆盖编辑 modal -->
+    <!-- 关键词: routeOverrideModal, 双标识倍率覆盖, 实际模型 -->
+    <div id="routeOverrideModal" class="delete-confirmation-modal" style="display: none;">
+        <div class="modal-content" style="width: 720px; max-width: 90vw;">
+            <span class="close-modal" onclick="closeRouteOverrideModal()">&times;</span>
+            <h4>编辑实际模型倍率（外部 + 内部双标识）</h4>
+            <div class="form-group">
+                <label>外部暴露名 (WrapperName):</label>
+                <input type="text" id="routeOverrideWrapper" class="form-control" readonly>
+            </div>
+            <div class="form-group">
+                <label>内部转发名 (上游真实模型):</label>
+                <input type="text" id="routeOverrideInternal" class="form-control" readonly>
+            </div>
+            <div class="form-group">
+                <label>Token 倍率覆盖 <small style="color:#888;font-weight:normal;">（某维填 0 表示该维不覆盖，回落到 wrapper 默认 / 全局默认 / 系统常量）</small></label>
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;">
+                    <div>
+                        <label style="font-size: 12px; color: #555;">输入</label>
+                        <input type="number" id="routeOverrideInput" class="form-control" min="0" step="0.05" value="0" style="font-family: monospace;">
+                    </div>
+                    <div>
+                        <label style="font-size: 12px; color: #555;">输出</label>
+                        <input type="number" id="routeOverrideOutput" class="form-control" min="0" step="0.05" value="0" style="font-family: monospace;">
+                    </div>
+                    <div>
+                        <label style="font-size: 12px; color: #555;">缓存创建</label>
+                        <input type="number" id="routeOverrideCacheCreate" class="form-control" min="0" step="0.05" value="0" style="font-family: monospace;">
+                    </div>
+                    <div>
+                        <label style="font-size: 12px; color: #555;">缓存命中</label>
+                        <input type="number" id="routeOverrideCacheHit" class="form-control" min="0" step="0.05" value="0" style="font-family: monospace;">
+                    </div>
+                </div>
+                <small class="form-text text-muted">
+                    覆盖优先级：(外部+内部) 覆盖 &gt; wrapper 默认 &gt; 全局默认 &gt; 系统常量（1.0/1.0/1.25/0.1）。
+                </small>
+            </div>
+            <div class="modal-actions">
+                <button class="btn" onclick="closeRouteOverrideModal()">取消</button>
+                <button class="btn" style="background-color: #f44336; color: #fff;" onclick="clearRouteOverride()">清除覆盖</button>
+                <button class="btn btn-primary" onclick="saveRouteOverride()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 全局默认倍率 modal -->
+    <!-- 关键词: globalDefaultMultiplierModal, 全局默认倍率 -->
+    <div id="globalDefaultMultiplierModal" class="delete-confirmation-modal" style="display: none;">
+        <div class="modal-content" style="width: 720px; max-width: 90vw;">
+            <span class="close-modal" onclick="closeGlobalDefaultMultiplierModal()">&times;</span>
+            <h4>全局默认倍率</h4>
+            <div class="form-group">
+                <label>Token 倍率 <small style="color:#888;font-weight:normal;">（对所有实际模型生效的最低优先级默认；某维填 0 表示该维不设全局默认，回落系统常量）</small></label>
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;">
+                    <div>
+                        <label style="font-size: 12px; color: #555;">输入</label>
+                        <input type="number" id="globalDefaultInput" class="form-control" min="0" step="0.05" value="0" style="font-family: monospace;">
+                    </div>
+                    <div>
+                        <label style="font-size: 12px; color: #555;">输出</label>
+                        <input type="number" id="globalDefaultOutput" class="form-control" min="0" step="0.05" value="0" style="font-family: monospace;">
+                    </div>
+                    <div>
+                        <label style="font-size: 12px; color: #555;">缓存创建</label>
+                        <input type="number" id="globalDefaultCacheCreate" class="form-control" min="0" step="0.05" value="0" style="font-family: monospace;">
+                    </div>
+                    <div>
+                        <label style="font-size: 12px; color: #555;">缓存命中</label>
+                        <input type="number" id="globalDefaultCacheHit" class="form-control" min="0" step="0.05" value="0" style="font-family: monospace;">
+                    </div>
+                </div>
+                <small class="form-text text-muted">
+                    全局默认仅在「实际模型未单独覆盖 且 wrapper 未配置该维」时生效。基准：输入/输出 = 1.0；缓存创建 = 1.25；缓存命中 = 0.1。
+                </small>
+            </div>
+            <div class="modal-actions">
+                <button class="btn" onclick="closeGlobalDefaultMultiplierModal()">取消</button>
+                <button class="btn btn-primary" onclick="saveGlobalDefaultMultiplier()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 一键应用到所有实际模型 modal -->
+    <!-- 关键词: applyAllMultiplierModal, 批量应用, 一键铺到所有实际模型 -->
+    <div id="applyAllMultiplierModal" class="delete-confirmation-modal" style="display: none;">
+        <div class="modal-content" style="width: 720px; max-width: 90vw;">
+            <span class="close-modal" onclick="closeApplyAllMultiplierModal()">&times;</span>
+            <h4>一键应用到所有实际模型</h4>
+            <div style="background:#fff3e0; color:#e65100; padding:10px 12px; border-radius:6px; margin-bottom:14px; font-size:13px;">
+                警告：这将给当前所有实际模型（外部暴露名 + 内部转发名 的每一个组合）写入倍率覆盖行，
+                会覆盖它们各自已单独设置的倍率覆盖。此操作针对计费，请谨慎确认。
+            </div>
+            <div class="form-group">
+                <label>Token 倍率 <small style="color:#888;font-weight:normal;">（某维填 0 表示该维写入「不覆盖」，回落 wrapper 默认 / 全局默认）</small></label>
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;">
+                    <div>
+                        <label style="font-size: 12px; color: #555;">输入</label>
+                        <input type="number" id="applyAllInput" class="form-control" min="0" step="0.05" value="1.0" style="font-family: monospace;">
+                    </div>
+                    <div>
+                        <label style="font-size: 12px; color: #555;">输出</label>
+                        <input type="number" id="applyAllOutput" class="form-control" min="0" step="0.05" value="1.0" style="font-family: monospace;">
+                    </div>
+                    <div>
+                        <label style="font-size: 12px; color: #555;">缓存创建</label>
+                        <input type="number" id="applyAllCacheCreate" class="form-control" min="0" step="0.05" value="1.25" style="font-family: monospace;">
+                    </div>
+                    <div>
+                        <label style="font-size: 12px; color: #555;">缓存命中</label>
+                        <input type="number" id="applyAllCacheHit" class="form-control" min="0" step="0.05" value="0.1" style="font-family: monospace;">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn" onclick="closeApplyAllMultiplierModal()">取消</button>
+                <button class="btn" style="background-color: #ff9800; color: #fff;" onclick="applyAllMultiplier()">应用到所有实际模型</button>
             </div>
         </div>
     </div>
