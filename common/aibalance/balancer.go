@@ -229,6 +229,11 @@ func LoadProvidersFromDatabase(config *ServerConfig) error {
 	if err := EnsureFreeUserDailyTokenUsageTable(); err != nil {
 		log.Warnf("Failed to ensure FreeUserDailyTokenUsage table exists: %v", err)
 	}
+	// 单 IP 免费模型每日用量限额表（防盗刷，保证公共免费接口公平）
+	// 关键词: EnsureFreeUserIPDailyUsageTable 初始化, 单 IP 每日限额
+	if err := EnsureFreeUserIPDailyUsageTable(); err != nil {
+		log.Warnf("Failed to ensure FreeUserIPDailyUsage table exists: %v", err)
+	}
 	if rlConfig, err := GetRateLimitConfig(); err != nil {
 		log.Warnf("Failed to load RateLimitConfig: %v", err)
 	} else {

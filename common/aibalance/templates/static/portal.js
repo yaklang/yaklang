@@ -6331,6 +6331,15 @@ curl '${metaApiUrl}?name=${modelName}'`;
                     // 轻量降级规则
                     // 关键词: loadRateLimitConfig model_downgrade_rules
                     renderModelDowngradeRules(cfg.model_downgrade_rules || []);
+
+                    // 单 IP 免费模型每日用量限额
+                    // 关键词: loadRateLimitConfig free_user_ip_limit
+                    const ipEnabledEl = document.getElementById('rl-free-ip-limit-enabled');
+                    if (ipEnabledEl) ipEnabledEl.checked = !!cfg.free_user_ip_limit_enable;
+                    const ipReqLimitEl = document.getElementById('rl-free-ip-daily-request-limit');
+                    if (ipReqLimitEl) ipReqLimitEl.value = (cfg.free_user_ip_daily_request_limit == null ? 0 : cfg.free_user_ip_daily_request_limit);
+                    const ipTokLimitEl = document.getElementById('rl-free-ip-daily-token-limit-m');
+                    if (ipTokLimitEl) ipTokLimitEl.value = (cfg.free_user_ip_daily_token_limit_m == null ? 0 : cfg.free_user_ip_daily_token_limit_m);
                 }
             } catch (error) {
                 console.error('Error loading rate limit config:', error);
@@ -6390,6 +6399,17 @@ curl '${metaApiUrl}?name=${modelName}'`;
             // 关键词: saveRateLimitConfig model_downgrade_rules
             const modelDowngradeRules = collectModelDowngradeRules();
 
+            // 单 IP 免费模型每日用量限额
+            // 关键词: saveRateLimitConfig free_user_ip_limit
+            const ipEnabledEl = document.getElementById('rl-free-ip-limit-enabled');
+            const freeIPLimitEnable = !!(ipEnabledEl && ipEnabledEl.checked);
+            const ipReqLimitRaw = document.getElementById('rl-free-ip-daily-request-limit');
+            let freeIPDailyRequestLimit = parseInt(ipReqLimitRaw ? ipReqLimitRaw.value : '');
+            if (isNaN(freeIPDailyRequestLimit) || freeIPDailyRequestLimit < 0) freeIPDailyRequestLimit = 0;
+            const ipTokLimitRaw = document.getElementById('rl-free-ip-daily-token-limit-m');
+            let freeIPDailyTokenLimitM = parseInt(ipTokLimitRaw ? ipTokLimitRaw.value : '');
+            if (isNaN(freeIPDailyTokenLimitM) || freeIPDailyTokenLimitM < 0) freeIPDailyTokenLimitM = 0;
+
             try {
                 const response = await fetch('/portal/api/rate-limit-config', {
                     method: 'POST',
@@ -6411,7 +6431,10 @@ curl '${metaApiUrl}?name=${modelName}'`;
                         custom_429_enabled: custom429Enabled,
                         custom_429_notice: custom429Notice,
                         custom_429_kind_overrides: custom429KindOverrides,
-                        model_downgrade_rules: modelDowngradeRules
+                        model_downgrade_rules: modelDowngradeRules,
+                        free_user_ip_limit_enable: freeIPLimitEnable,
+                        free_user_ip_daily_request_limit: freeIPDailyRequestLimit,
+                        free_user_ip_daily_token_limit_m: freeIPDailyTokenLimitM
                     })
                 });
                 const data = await response.json();
@@ -6456,6 +6479,10 @@ curl '${metaApiUrl}?name=${modelName}'`;
                     if (blockUsedEl) blockUsedEl.textContent = usedMText;
                     const blockLimitEl = document.getElementById('rl-free-token-global-limit');
                     if (blockLimitEl) blockLimitEl.textContent = limitMText;
+
+                    // 单 IP 免费模型用量快照（多少人在用 + Top IP 榜）
+                    // 关键词: loadRateLimitStatus free_ip_usage 渲染
+                    renderFreeIPUsage(data.free_ip_usage || {});
                 }
             } catch (error) {
                 console.error('Error loading rate limit status:', error);
@@ -6465,6 +6492,32 @@ curl '${metaApiUrl}?name=${modelName}'`;
             // 同步刷新客户端版本统计（memfit 版本控流）
             // 关键词: loadRateLimitStatus 关联刷新 loadClientVersionStats
             loadClientVersionStats();
+        }
+
+        // renderFreeIPUsage 渲染「今日免费 IP 用量」面板：多少 IP 在用 + Top 榜表格。
+        // 关键词: renderFreeIPUsage, 单 IP 免费用量, 防盗刷面板
+        function renderFreeIPUsage(usage) {
+            const countEl = document.getElementById('rl-free-ip-distinct-count');
+            if (countEl) countEl.textContent = (typeof usage.distinct_ip_count === 'number') ? usage.distinct_ip_count : '--';
+            const dateEl = document.getElementById('rl-free-ip-reset-date');
+            if (dateEl) dateEl.textContent = usage.reset_date || '--';
+            const tbody = document.getElementById('rl-free-ip-usage-tbody');
+            if (!tbody) return;
+            const top = Array.isArray(usage.top) ? usage.top : [];
+            if (top.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3" style="padding: 12px; text-align: center; color: #999;">今日暂无免费模型（计费部分）请求记录</td></tr>';
+                return;
+            }
+            tbody.innerHTML = top.map(it => {
+                const ip = escapeHtml(it.ip || '');
+                const req = Number(it.request_count) || 0;
+                const usedM = (typeof it.used_m === 'number') ? it.used_m.toFixed(3) : '0.000';
+                return '<tr>'
+                    + '<td style="padding: 6px 10px; border-bottom: 1px solid #e1f5fe;"><code>' + ip + '</code></td>'
+                    + '<td style="padding: 6px 10px; border-bottom: 1px solid #e1f5fe; text-align: right;">' + req + '</td>'
+                    + '<td style="padding: 6px 10px; border-bottom: 1px solid #e1f5fe; text-align: right;">' + usedM + '</td>'
+                    + '</tr>';
+            }).join('');
         }
 
         // ==================== Memfit Client Version Stats ====================

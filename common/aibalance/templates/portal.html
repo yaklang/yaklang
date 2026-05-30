@@ -947,6 +947,35 @@
                     </div>
                 </div>
 
+                <!-- Free model usage per client IP (today, anti-abuse) -->
+                <!-- 关键词: 单 IP 免费模型用量, 多少人在用, 防盗刷 Top 榜 -->
+                <div style="background: #e3f2fd; border: 1px solid #90caf9; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 10px;">
+                        <div>
+                            <span style="font-weight: bold; color: #1565c0;">免费 IP 用量（今日）</span>
+                            <small style="color: #888; margin-left: 8px;">
+                                今日共 <strong id="rl-free-ip-distinct-count">--</strong> 个 IP 在使用免费模型（计费部分）；
+                                按加权 Token 降序展示 Top 20。重置日期：<span id="rl-free-ip-reset-date">--</span>
+                            </small>
+                        </div>
+                        <button class="btn" onclick="loadRateLimitStatus()" style="height: 32px; font-size: 12px;">刷新</button>
+                    </div>
+                    <div style="overflow-x: auto;">
+                        <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                            <thead>
+                                <tr style="background: #e1f5fe;">
+                                    <th style="text-align: left; padding: 8px 10px; border-bottom: 1px solid #81d4fa;">客户端 IP</th>
+                                    <th style="text-align: right; padding: 8px 10px; border-bottom: 1px solid #81d4fa;">请求次数</th>
+                                    <th style="text-align: right; padding: 8px 10px; border-bottom: 1px solid #81d4fa;">加权 Token (M)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="rl-free-ip-usage-tbody">
+                                <tr><td colspan="3" style="padding: 12px; text-align: center; color: #999;">加载中...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
                 <!-- Model rate-limit overrides (RPM + free-user delay range + output TPS) -->
                 <!-- 关键词: 模型级限流覆盖, 延迟Min/Max, 输出 TPS 模型覆盖 -->
                 <div style="margin-bottom: 20px;">
@@ -1070,6 +1099,34 @@
                             <div class="form-group" style="margin-bottom: 0; flex: 0 0 220px;">
                                 <label>软限额 TPS (token/s):</label>
                                 <input type="number" id="rl-free-soft-limit-tps" class="form-control" value="0" min="0" step="1" style="font-family: monospace; font-size: 13px;">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 单 IP 免费模型每日用量限额 (防盗刷, 公共免费接口公平) -->
+                    <!-- 关键词: 单 IP 每日限额, 防盗刷, 免费接口公平 -->
+                    <div style="margin-top: 16px; padding: 12px; background: #e3f2fd; border: 1px solid #90caf9; border-radius: 6px;">
+                        <strong style="font-size: 13px; color: #1565c0;">单 IP 免费用量每日限额</strong>
+                        <small style="display: block; color: #455a64; margin-top: 4px;">
+                            按真实客户端 IP（支持 nginx / Cloudflare 反代头）统计每天对「计费免费模型」的请求次数与加权 Token，
+                            防止单个 IP 高频盗刷公共免费接口、侵占其他用户额度。豁免（不计费）模型不参与统计。
+                            <br>请求次数或 Token 任一超限即拦截，返回 <code>429 free_ip_limit_exceeded</code>，提示"当前环境免费用量已用尽，请自行配置 AI 后端使用"。
+                            <br>每日北京时间 06:00 随免费 Token 限额一起清零。两个上限填 0 表示该维度不限制。
+                        </small>
+                        <div style="display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap; margin-top: 10px;">
+                            <div class="form-group" style="margin-bottom: 0; flex: 0 0 220px;">
+                                <label>
+                                    <input type="checkbox" id="rl-free-ip-limit-enabled" style="margin-right: 6px;">
+                                    启用单 IP 每日限额
+                                </label>
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0; flex: 0 0 220px;">
+                                <label>每 IP 每日请求次数上限:</label>
+                                <input type="number" id="rl-free-ip-daily-request-limit" class="form-control" value="500" min="0" step="1" style="font-family: monospace; font-size: 13px;">
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0; flex: 0 0 220px;">
+                                <label>每 IP 每日 Token 上限 (M Token):</label>
+                                <input type="number" id="rl-free-ip-daily-token-limit-m" class="form-control" value="30" min="0" step="1" style="font-family: monospace; font-size: 13px;">
                             </div>
                         </div>
                     </div>
