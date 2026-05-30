@@ -10,8 +10,10 @@ import (
 )
 
 var loopActionDirectlyAnswerHTTPFlowAnalyze = &reactloops.LoopAction{
-	ActionType:  "directly_answer",
-	Description: "Answer the user's HTTP traffic analysis question or summarize analysis findings. Use answer_payload for short answers; use FINAL_ANSWER AITAG for longer Markdown reports with tables, lists, or structured content.",
+	ActionType: "directly_answer",
+	Description: "Answer the user's HTTP traffic analysis question or summarize analysis findings. Use answer_payload for short answers; use FINAL_ANSWER AITAG for longer Markdown reports with tables, lists, or structured content. " +
+		"IMPORTANT: directly_answer ONLY delivers the answer; the loop CONTINUES afterwards and this action does NOT end the task. Use the 'finish' action to terminate. " +
+		"OPTIONAL: carry a non-empty 'next_movements' delta alongside the answer to schedule follow-up TODO updates.",
 	Options: []aitool.ToolOption{
 		aitool.WithStringParam(
 			"answer_payload",
@@ -72,6 +74,10 @@ var loopActionDirectlyAnswerHTTPFlowAnalyze = &reactloops.LoopAction{
 		invoker.EmitFileArtifactWithExt("directly_answer", ".md", payload)
 		invoker.EmitResultAfterStream(payload)
 		invoker.AddToTimeline("directly_answer", "HTTP flow analysis directly answered: "+utils.ShrinkTextBlock(payload, 400))
-		operator.Exit()
+
+		// directly_answer 绝不 Exit: emit 完答复后统一交给 DirectlyAnswerContinue
+		// 追加 timeline + 续跑, 终结只能由显式 finish action 完成. 与 buildin 对齐.
+		// 关键词: directly_answer 永不 Exit, http_flow_analyze 复用单源, finish 唯一终结器
+		reactloops.DirectlyAnswerContinue(loop, action, operator)
 	},
 }

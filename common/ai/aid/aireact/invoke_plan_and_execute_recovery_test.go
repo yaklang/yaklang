@@ -147,10 +147,14 @@ func TestReAct_RecoveryPlanAndExec_SkipCompletedTasks(t *testing.T) {
 			}
 
 			rsp := cfg.NewAIResponse()
+			// 去 Exit 化后 directly_answer 只发答复并继续, 子任务 react 循环只能由唯一
+			// 终结器 finish 收口; 恢复流程只需每个未跳过任务触发 AI 调用并完成, 故决策
+			// 直接发 finish 让子任务循环收口.
+			// 关键词: directly_answer 永不 Exit, finish 唯一终结器, 子任务循环收口
 			if utils.MatchAllOfSubString(prompt, "status_summary", "task_long_summary", "task_short_summary") {
 				rsp.EmitOutputStream(strings.NewReader(`{"@action": "summary", "status_summary": "ok", "task_short_summary": "ok", "task_long_summary": "ok"}`))
 			} else if strings.Contains(prompt, "directly_answer") {
-				rsp.EmitOutputStream(strings.NewReader(`{"@action": "directly_answer", "answer_payload": "ok"}`))
+				rsp.EmitOutputStream(strings.NewReader(`{"@action": "object", "next_action": {"type": "finish"}, "human_readable_thought": "ok"}`))
 			} else {
 				rsp.EmitOutputStream(strings.NewReader(`{"@action": "direct-answer", "direct_answer": "ok", "direct_answer_long": "ok"}`))
 			}
@@ -317,10 +321,14 @@ func TestReAct_RecoveryPlanAndExec_StartFromSpecifiedTask(t *testing.T) {
 			mu.Unlock()
 
 			rsp := cfg.NewAIResponse()
+			// 去 Exit 化后 directly_answer 只发答复并继续, 子任务 react 循环只能由唯一
+			// 终结器 finish 收口; 恢复流程只需每个未跳过任务触发 AI 调用并完成, 故决策
+			// 直接发 finish 让子任务循环收口.
+			// 关键词: directly_answer 永不 Exit, finish 唯一终结器, 子任务循环收口
 			if utils.MatchAllOfSubString(prompt, "status_summary", "task_long_summary", "task_short_summary") {
 				rsp.EmitOutputStream(strings.NewReader(`{"@action": "summary", "status_summary": "ok", "task_short_summary": "ok", "task_long_summary": "ok"}`))
 			} else if strings.Contains(prompt, "directly_answer") {
-				rsp.EmitOutputStream(strings.NewReader(`{"@action": "directly_answer", "answer_payload": "ok"}`))
+				rsp.EmitOutputStream(strings.NewReader(`{"@action": "object", "next_action": {"type": "finish"}, "human_readable_thought": "ok"}`))
 			} else {
 				rsp.EmitOutputStream(strings.NewReader(`{"@action": "direct-answer", "direct_answer": "ok", "direct_answer_long": "ok"}`))
 			}

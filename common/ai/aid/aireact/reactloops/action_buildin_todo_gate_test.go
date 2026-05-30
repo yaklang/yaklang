@@ -98,7 +98,12 @@ func newTodoGateTestLoop(t *testing.T, active []aicommon.VerificationTodoItem) (
 	return loop, invoker, cfg, task
 }
 
-func TestDirectlyAnswer_BlockedByCurrentTaskTodos(t *testing.T) {
+// TestDirectlyAnswer_EmitsAndContinuesWithOpenTodos 验证去 Exit 化后的核心语义:
+// directly_answer 绝不再因为有未关闭 TODO 而拦截 emit. 即便当前任务仍有 open
+// TODO 且本动作未携带 next_movements, 答复仍必须 emit, operator 必须 Continue
+// (永不 Exit), 并通过 Feedback 提醒 AI 先关 TODO 再用 finish 收口.
+// 关键词: directly_answer 永不 Exit, 仍 emit + Continue, finish 唯一终结器
+func TestDirectlyAnswer_EmitsAndContinuesWithOpenTodos(t *testing.T) {
 	loop, invoker, _, task := newTodoGateTestLoop(t, []aicommon.VerificationTodoItem{
 		{ID: "collect_logs", Content: "收集日志", Status: aicommon.VerificationTodoStatusPending},
 	})
@@ -113,10 +118,14 @@ func TestDirectlyAnswer_BlockedByCurrentTaskTodos(t *testing.T) {
 	terminated, termErr := op.IsTerminated()
 	require.False(t, terminated)
 	require.NoError(t, termErr)
-	assert.Empty(t, invoker.results)
+	// 答复必须 emit, 不再被 blocked-by-todo 闸门拦下
+	require.Len(t, invoker.results, 1)
+	assert.Equal(t, "final", invoker.results[0])
+	// open TODO 且无增量 -> Feedback 提醒先关 TODO 再 finish
 	assert.Contains(t, op.GetFeedback().String(), "Remaining TODOs")
-	assert.Contains(t, invoker.timelineString(), "[DIRECT_ANSWER_BLOCKED_BY_TODO]")
-	assert.Contains(t, invoker.timelineString(), "collect_logs")
+	// 不再产生隐式收口拦截标记
+	assert.NotContains(t, invoker.timelineString(), "[DIRECT_ANSWER_BLOCKED_BY_TODO]")
+	assert.Contains(t, invoker.timelineString(), "directly_answer")
 }
 
 func TestFinish_BlockedByCurrentTaskTodos(t *testing.T) {
@@ -136,7 +145,10 @@ func TestFinish_BlockedByCurrentTaskTodos(t *testing.T) {
 	assert.Contains(t, invoker.timelineString(), "write_summary")
 }
 
-func TestDirectlyAnswer_ExitsWhenCurrentTaskTodosClosed(t *testing.T) {
+// TestDirectlyAnswer_EmitsAndContinuesWhenTodosClosed 验证无 open TODO 时
+// directly_answer 同样只 emit + Continue, 不再 Exit. 终结改由显式 finish 负责.
+// 关键词: directly_answer 永不 Exit, 无 TODO 也续跑
+func TestDirectlyAnswer_EmitsAndContinuesWhenTodosClosed(t *testing.T) {
 	loop, invoker, _, task := newTodoGateTestLoop(t, nil)
 	action, err := aicommon.ExtractAction(`{"@action":"directly_answer","answer_payload":"final"}`, "directly_answer")
 	require.NoError(t, err)
@@ -145,10 +157,66 @@ func TestDirectlyAnswer_ExitsWhenCurrentTaskTodosClosed(t *testing.T) {
 	op := NewActionHandlerOperator(task)
 	loopAction_DirectlyAnswer.ActionHandler(loop, action, op)
 
+	require.True(t, op.IsContinued())
 	terminated, termErr := op.IsTerminated()
-	require.True(t, terminated)
+	require.False(t, terminated)
 	require.NoError(t, termErr)
 	require.Len(t, invoker.results, 1)
 	assert.Equal(t, "final", invoker.results[0])
 	assert.Contains(t, invoker.timelineString(), "directly_answer")
+}
+
+// TestDirectlyAnswer_ContinuesWhenNextMovementsLeaveOpenTodos 验证携带
+// next_movements 且仍有 open TODO 时: 答复 emit + Continue 续跑推进剩余 TODO,
+// 永不 Exit.
+// 关键词: directly_answer 永不 Exit, 携带增量续跑
+func TestDirectlyAnswer_ContinuesWhenNextMovementsLeaveOpenTodos(t *testing.T) {
+	// active items 代表 "apply 之后" 仍有一条未关闭 TODO
+	loop, invoker, _, task := newTodoGateTestLoop(t, []aicommon.VerificationTodoItem{
+		{ID: "deep_scan", Content: "继续深入扫描", Status: aicommon.VerificationTodoStatusDoing},
+	})
+	action, err := aicommon.ExtractAction(
+		`{"@action":"directly_answer","answer_payload":"partial answer","next_movements":[{"op":"add","id":"deep_scan","content":"继续深入扫描"}]}`,
+		"directly_answer",
+	)
+	require.NoError(t, err)
+	require.NoError(t, loopAction_DirectlyAnswer.ActionVerifier(loop, action))
+
+	op := NewActionHandlerOperator(task)
+	loopAction_DirectlyAnswer.ActionHandler(loop, action, op)
+
+	// 携带增量且仍有 open -> 续跑, 且答复已 emit
+	require.True(t, op.IsContinued())
+	terminated, termErr := op.IsTerminated()
+	require.False(t, terminated)
+	require.NoError(t, termErr)
+	require.Len(t, invoker.results, 1)
+	assert.Equal(t, "partial answer", invoker.results[0])
+	assert.NotContains(t, invoker.timelineString(), "[DIRECT_ANSWER_BLOCKED_BY_TODO]")
+}
+
+// TestDirectlyAnswer_ContinuesEvenWhenNextMovementsCloseAllTodos 验证去 Exit 化:
+// 即便 next_movements 把活全 done/delete/skip 关掉、apply 之后已无 open TODO,
+// directly_answer 也只 emit + Continue, 绝不 Exit. 真正终结仅由显式 finish 完成.
+// 关键词: directly_answer 永不 Exit, 增量关全仍续跑, finish 唯一终结器
+func TestDirectlyAnswer_ContinuesEvenWhenNextMovementsCloseAllTodos(t *testing.T) {
+	// active items 为空, 代表 "apply 之后" 已无未关闭 TODO
+	loop, invoker, _, task := newTodoGateTestLoop(t, nil)
+	action, err := aicommon.ExtractAction(
+		`{"@action":"directly_answer","answer_payload":"all done","next_movements":[{"op":"done","id":"deep_scan"}]}`,
+		"directly_answer",
+	)
+	require.NoError(t, err)
+	require.NoError(t, loopAction_DirectlyAnswer.ActionVerifier(loop, action))
+
+	op := NewActionHandlerOperator(task)
+	loopAction_DirectlyAnswer.ActionHandler(loop, action, op)
+
+	// 即使增量关全, 也只续跑不收口; 答复已 emit
+	require.True(t, op.IsContinued())
+	terminated, termErr := op.IsTerminated()
+	require.False(t, terminated)
+	require.NoError(t, termErr)
+	require.Len(t, invoker.results, 1)
+	assert.Equal(t, "all done", invoker.results[0])
 }

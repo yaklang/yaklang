@@ -975,11 +975,20 @@ LOOP:
 			return nil
 		}
 
-		// 只有在 operator 没有明确终止时，才检查 context canceled
-		select {
-		case <-task.GetContext().Done():
-			return utils.Errorf("task context done in executing execute ReActLoop(after ActionHandler): %v", task.GetContext().Err())
-		default:
+		// 只有在 operator 没有明确终止时，才检查 context canceled.
+		// 例外: 动态 async 动作 (如 load_capability 触发 RequestAsyncMode) 已把
+		// task 置为 async, 并把 ctx 生命周期交给 forge 的异步执行. forge 若极快
+		// 完成会立刻 cancel 该 ctx, 此处若 early-return 就会跳过下面的 async 交接
+		// (effectiveAsyncMode 块里的 onAsyncTaskTrigger), 造成 async 生命周期事件
+		// 缺失 (与静态 async 路径不等价). 因此 async-mode 任务不在这里因 ctx done
+		// 提前返回, 交由 effectiveAsyncMode 块统一收口.
+		// 关键词: 动态 async ctx done 竞态, onAsyncTaskTrigger 漏触发, async 交接顺序
+		if !(operator.IsAsyncModeRequested() || task.IsAsyncMode()) {
+			select {
+			case <-task.GetContext().Done():
+				return utils.Errorf("task context done in executing execute ReActLoop(after ActionHandler): %v", task.GetContext().Err())
+			default:
+			}
 		}
 
 		// 执行自我反思 (如果启用且策略命中).

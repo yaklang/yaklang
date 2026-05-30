@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -33,8 +34,22 @@ func TestReAct_DirectlyWithMemory(t *testing.T) {
 	flag := ksuid.New().String()
 	in := make(chan *ypb.AIInputEvent, 10)
 	out := make(chan *ypb.AIOutputEvent, 10)
+	// 去 Exit 化后 directly_answer 只发答复并继续, 真正收尾交给唯一终结器 finish.
+	// 第一轮决策发 directly_answer (产出带 flag 的 result), 第二轮发 finish 收口.
+	// 关键词: directly_answer 永不 Exit, finish 唯一终结器, 答复后追加 finish
+	var decisionCount int32
 	ins, err := NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			prompt := r.GetPrompt()
+			if isVerifySatisfactionPrompt(prompt) {
+				return mockedLoopDirectlyAnswerOutput(i, `{"@action":"verify-satisfaction","user_satisfied":true,"reasoning":"answer delivered"}`)
+			}
+			if isPrimaryDecisionPrompt(prompt) {
+				if atomic.AddInt32(&decisionCount, 1) == 1 {
+					return mockedFreeInputOutputWithMemory(i, flag)
+				}
+				return mockedFinishOutput(i)
+			}
 			return mockedFreeInputOutputWithMemory(i, flag)
 		}),
 		aicommon.WithDebug(false),

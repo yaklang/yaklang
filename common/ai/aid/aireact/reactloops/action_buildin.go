@@ -28,13 +28,15 @@ func buildExitBlockedByTodoMessage(actionName string, items []aicommon.Verificat
 var loopAction_Finish = &LoopAction{
 	ActionType: "finish",
 	Description: "Mark the current task as finished and exit the loop IMMEDIATELY. " +
+		"This is the ONLY action that terminates the ReAct loop — no other action ends the task implicitly. " +
 		"PREFERRED completion action whenever evidence/results are already present in the timeline " +
 		"(tool outputs are captured automatically and the system will synthesize a summary). " +
 		"Do NOT precede this action with bash echo/cat/tee/printf calls that only restate facts " +
 		"already produced by earlier tool calls — that wastes iterations. " +
 		"CRITICAL: if the current task still owns active TODO items, finish will be rejected until those TODOs are explicitly closed. " +
-		"Use 'directly_answer' instead only when the user explicitly needs a structured Markdown " +
-		"answer emitted to the chat right now. Add 'human_readable_thought' only if a brief closing note is needed.",
+		"If the user needs a structured Markdown answer emitted to the chat, use 'directly_answer' first " +
+		"(it delivers the answer but does NOT end the task), then call 'finish'. " +
+		"Add 'human_readable_thought' only if a brief closing note is needed.",
 	ActionHandler: func(loop *ReActLoop, action *aicommon.Action, operator *LoopActionHandlerOperator) {
 		if items := aicommon.GetBlockingVerificationTodoItems(loop.GetConfig(), loop.GetCurrentTask()); len(items) > 0 {
 			msg := buildExitBlockedByTodoMessage("finish", items)
@@ -50,8 +52,10 @@ var loopAction_Finish = &LoopAction{
 
 var loopAction_DirectlyAnswer = &LoopAction{
 	ActionType: "directly_answer",
-	Description: "Answer the user directly via 'answer_payload' or FINAL_ANSWER tag. For simple direct answers, omit 'human_readable_thought'. " +
-		"CRITICAL: directly_answer is blocked while the current task still owns active TODO items; close them first with adjust_todolist or verification next_movements.",
+	Description: "Emit a direct answer to the user via 'answer_payload' or FINAL_ANSWER tag. For simple direct answers, omit 'human_readable_thought'. " +
+		"IMPORTANT: directly_answer ONLY delivers the answer; the loop CONTINUES afterwards and this action does NOT end the task. " +
+		"To terminate the ReAct loop you MUST use the 'finish' action (the only terminator). " +
+		"OPTIONAL: carry a non-empty 'next_movements' delta alongside the answer to schedule follow-up TODO updates.",
 	Options: []aitool.ToolOption{
 		aitool.WithStringParam(
 			"answer_payload",
@@ -106,13 +110,11 @@ var loopAction_DirectlyAnswer = &LoopAction{
 			operator.Fail("directly_answer action must have 'answer_payload' field")
 			return
 		}
-		if items := aicommon.GetBlockingVerificationTodoItems(loop.GetConfig(), loop.GetCurrentTask()); len(items) > 0 {
-			msg := buildExitBlockedByTodoMessage("directly_answer", items)
-			invoker.AddToTimeline("[DIRECT_ANSWER_BLOCKED_BY_TODO]", msg)
-			operator.Feedback(msg)
-			operator.Continue()
-			return
-		}
+
+		// directly_answer 绝不 Exit: 无论是否有未关闭 TODO, 都先把答复 emit
+		// 出去, 再交给 DirectlyAnswerContinue 追加 timeline + 续跑. 真正终结
+		// 整个 ReAct 只能由显式 finish action 完成, 不存在任何隐式 Exit.
+		// 关键词: directly_answer 永不 Exit, answer-then-continue, finish 唯一终结器
 		invoker.EmitFileArtifactWithExt("directly_answer", ".md", payload)
 		invoker.EmitResultAfterStream(payload)
 		invoker.AddToTimeline("directly_answer", fmt.Sprintf("user input: \n"+
@@ -122,6 +124,6 @@ var loopAction_DirectlyAnswer = &LoopAction{
 			utils.PrefixLines(loop.GetCurrentTask().GetUserInput(), "  > "),
 			utils.PrefixLines(payload, "  | "),
 		))
-		operator.Exit()
+		DirectlyAnswerContinue(loop, action, operator)
 	},
 }
