@@ -2,6 +2,7 @@ package aibalance
 
 import (
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 
@@ -501,28 +502,29 @@ func GetAllModelMetas() (map[string]*AiModelMeta, error) {
 	return result, nil
 }
 
-// ==================== Model Multiplier Override / Global Default ====================
+// ==================== Model Multiplier (实际模型计费) / Global Default ====================
 //
-// 倍率从「仅 WrapperName」升级为「(外部暴露名 WrapperName + 内部转发名 InternalModelName)」
-// 双标识的分层兜底体系。计费时逐维回落（见 cost_calc.go ResolveBillingMultipliers）：
+// 计费以「实际模型(内部转发名 InternalModelName)」为唯一标识：同一个实际模型无论被哪个
+// 对外 wrapper 暴露，单价都一致。这是 APIKEY 付费系统计费准确的基础。计费时逐维回落
+// （见 cost_calc.go ResolveModelMultipliers）：
 //
-//	(W,I) 覆盖行 -> AiModelMeta(W) 逐 wrapper 默认 -> 全局默认 -> 系统常量
+//	实际模型倍率(InternalModelName) -> 全局默认 -> 系统常量
 //
-// 关键词: 倍率双标识, 外部+内部, 分层兜底, 批量应用
+// wrapper(AiModelMeta) 级别的倍率不再参与计费，仅保留描述/标签/老 TrafficMultiplier 兼容字段。
+//
+// 关键词: 实际模型计费, 内部转发名, 分层兜底, 批量应用
 
-// AiModelMultiplierOverride 是 (外部暴露名 WrapperName + 内部转发名 InternalModelName)
-// 维度的四维 Token 倍率覆盖层，优先级高于 AiModelMeta(WrapperName) 的逐 wrapper 默认。
-// 用于精确控制「同一 WrapperName 下不同上游真实模型」的差异化计费。
+// AiModelMultiplier 是「实际模型(内部转发名 InternalModelName)」维度的四维 Token 倍率。
+// 这是计费的主维度：优先级高于全局默认，低于则回落全局默认/系统常量。
 //
-// 回落策略（逐维，见 ResolveBillingMultipliers）：
+// 回落策略（逐维，见 ResolveModelMultipliers）：
 //   - 某维 > 0  -> 采用本表该维
-//   - 某维 <= 0 -> 回落到 AiModelMeta(WrapperName) -> 全局默认 -> 系统常量
+//   - 某维 <= 0 -> 回落到 全局默认 -> 系统常量
 //
-// 关键词: AiModelMultiplierOverride, 外部+内部双标识倍率, 逐维回落
-type AiModelMultiplierOverride struct {
+// 关键词: AiModelMultiplier, 实际模型倍率, 内部转发名唯一, 逐维回落
+type AiModelMultiplier struct {
 	gorm.Model
-	WrapperName       string `gorm:"size:128;unique_index:idx_model_override;not null"` // 外部暴露名
-	InternalModelName string `gorm:"size:128;unique_index:idx_model_override;not null"` // 内部转发给上游的真实模型名
+	InternalModelName string `gorm:"size:128;unique_index:idx_model_multiplier;not null"` // 内部转发给上游的真实模型名（计费唯一标识）
 
 	InputTokenMultiplier    float64 `gorm:"default:0"` // 输入 token 倍率（0 表示回落下一层）
 	OutputTokenMultiplier   float64 `gorm:"default:0"` // 输出 token 倍率
@@ -530,12 +532,12 @@ type AiModelMultiplierOverride struct {
 	CacheHitMultiplier      float64 `gorm:"default:0"` // 缓存命中倍率
 }
 
-func (a *AiModelMultiplierOverride) TableName() string {
-	return "ai_model_multiplier_overrides"
+func (a *AiModelMultiplier) TableName() string {
+	return "ai_model_multipliers"
 }
 
 // AiModelMultiplierConfig 是全局默认四维 Token 倍率的单例配置（ID=1）。
-// 当 override 与 wrapper 两层都缺该维时，回落到这里；本表也缺则用系统常量。
+// 当实际模型层缺该维时，回落到这里；本表也缺则用系统常量。
 // 关键词: AiModelMultiplierConfig, 全局默认倍率, singleton ID=1
 type AiModelMultiplierConfig struct {
 	gorm.Model
@@ -549,9 +551,9 @@ func (a *AiModelMultiplierConfig) TableName() string {
 	return "ai_model_multiplier_configs"
 }
 
-// EnsureModelMultiplierOverrideTable ensures the AiModelMultiplierOverride table exists.
-func EnsureModelMultiplierOverrideTable() error {
-	return GetDB().AutoMigrate(&AiModelMultiplierOverride{}).Error
+// EnsureModelMultiplierTable ensures the AiModelMultiplier table exists.
+func EnsureModelMultiplierTable() error {
+	return GetDB().AutoMigrate(&AiModelMultiplier{}).Error
 }
 
 // EnsureModelMultiplierConfigTable ensures the AiModelMultiplierConfig table exists.
@@ -559,88 +561,83 @@ func EnsureModelMultiplierConfigTable() error {
 	return GetDB().AutoMigrate(&AiModelMultiplierConfig{}).Error
 }
 
-// modelOverrideKey builds the in-memory map key for an override (wrapper + internal model).
-func modelOverrideKey(wrapperName, internalModelName string) string {
-	return wrapperName + "\x00" + internalModelName
-}
-
-// GetModelMultiplierOverride retrieves the override for (wrapperName, internalModelName);
+// GetModelMultiplier retrieves the multiplier for an actual model (internalModelName);
 // returns (nil, nil) when not found.
-func GetModelMultiplierOverride(wrapperName, internalModelName string) (*AiModelMultiplierOverride, error) {
-	var o AiModelMultiplierOverride
-	err := GetDB().Where("wrapper_name = ? AND internal_model_name = ?", wrapperName, internalModelName).First(&o).Error
+// 关键词: GetModelMultiplier, 实际模型倍率读取
+func GetModelMultiplier(internalModelName string) (*AiModelMultiplier, error) {
+	var m AiModelMultiplier
+	err := GetDB().Where("internal_model_name = ?", internalModelName).First(&m).Error
 	if err != nil {
 		if gorm.IsRecordNotFoundError(err) {
 			return nil, nil
 		}
 		return nil, err
 	}
-	return &o, nil
+	return &m, nil
 }
 
-// SaveModelMultiplierOverride upserts the four-dimensional multiplier override for
-// (wrapperName, internalModelName). Pass a value < 0 to skip updating that specific
-// dimension (creation uses 0 for skipped fields).
-// 关键词: SaveModelMultiplierOverride, 双标识倍率 upsert
-func SaveModelMultiplierOverride(wrapperName, internalModelName string, inputMul, outputMul, cacheCreateMul, cacheHitMul float64) error {
-	if wrapperName == "" || internalModelName == "" {
-		return fmt.Errorf("wrapperName and internalModelName are required")
+// SaveModelMultiplier upserts the four-dimensional multiplier for an actual model
+// (internalModelName). Pass a value < 0 to skip updating that specific dimension
+// (creation uses 0 for skipped fields).
+// 关键词: SaveModelMultiplier, 实际模型倍率 upsert
+func SaveModelMultiplier(internalModelName string, inputMul, outputMul, cacheCreateMul, cacheHitMul float64) error {
+	if internalModelName == "" {
+		return fmt.Errorf("internalModelName is required")
 	}
-	var o AiModelMultiplierOverride
-	err := GetDB().Where("wrapper_name = ? AND internal_model_name = ?", wrapperName, internalModelName).First(&o).Error
+	var m AiModelMultiplier
+	err := GetDB().Where("internal_model_name = ?", internalModelName).First(&m).Error
 	if err != nil {
 		if gorm.IsRecordNotFoundError(err) {
-			o = AiModelMultiplierOverride{
-				WrapperName:       wrapperName,
-				InternalModelName: internalModelName,
-			}
+			m = AiModelMultiplier{InternalModelName: internalModelName}
 			if inputMul >= 0 {
-				o.InputTokenMultiplier = inputMul
+				m.InputTokenMultiplier = inputMul
 			}
 			if outputMul >= 0 {
-				o.OutputTokenMultiplier = outputMul
+				m.OutputTokenMultiplier = outputMul
 			}
 			if cacheCreateMul >= 0 {
-				o.CacheCreationMultiplier = cacheCreateMul
+				m.CacheCreationMultiplier = cacheCreateMul
 			}
 			if cacheHitMul >= 0 {
-				o.CacheHitMultiplier = cacheHitMul
+				m.CacheHitMultiplier = cacheHitMul
 			}
-			return GetDB().Create(&o).Error
+			return GetDB().Create(&m).Error
 		}
 		return err
 	}
 	if inputMul >= 0 {
-		o.InputTokenMultiplier = inputMul
+		m.InputTokenMultiplier = inputMul
 	}
 	if outputMul >= 0 {
-		o.OutputTokenMultiplier = outputMul
+		m.OutputTokenMultiplier = outputMul
 	}
 	if cacheCreateMul >= 0 {
-		o.CacheCreationMultiplier = cacheCreateMul
+		m.CacheCreationMultiplier = cacheCreateMul
 	}
 	if cacheHitMul >= 0 {
-		o.CacheHitMultiplier = cacheHitMul
+		m.CacheHitMultiplier = cacheHitMul
 	}
-	return GetDB().Save(&o).Error
+	return GetDB().Save(&m).Error
 }
 
-// DeleteModelMultiplierOverride removes the override for (wrapperName, internalModelName),
-// making it fall back to the wrapper-level default.
-func DeleteModelMultiplierOverride(wrapperName, internalModelName string) error {
-	return GetDB().Where("wrapper_name = ? AND internal_model_name = ?", wrapperName, internalModelName).
-		Delete(&AiModelMultiplierOverride{}).Error
+// DeleteModelMultiplier removes the multiplier for an actual model (internalModelName),
+// making it fall back to the global default.
+// 关键词: DeleteModelMultiplier, 实际模型倍率清除, 回落全局默认
+func DeleteModelMultiplier(internalModelName string) error {
+	return GetDB().Where("internal_model_name = ?", internalModelName).
+		Delete(&AiModelMultiplier{}).Error
 }
 
-// GetAllModelMultiplierOverrides returns all overrides indexed by (wrapper + internal model) key.
-func GetAllModelMultiplierOverrides() (map[string]*AiModelMultiplierOverride, error) {
-	var list []AiModelMultiplierOverride
+// GetAllModelMultipliers returns all actual-model multipliers indexed by InternalModelName.
+// 关键词: GetAllModelMultipliers, 实际模型倍率全量加载
+func GetAllModelMultipliers() (map[string]*AiModelMultiplier, error) {
+	var list []AiModelMultiplier
 	if err := GetDB().Find(&list).Error; err != nil {
 		return nil, err
 	}
-	result := make(map[string]*AiModelMultiplierOverride)
+	result := make(map[string]*AiModelMultiplier)
 	for i := range list {
-		result[modelOverrideKey(list[i].WrapperName, list[i].InternalModelName)] = &list[i]
+		result[list[i].InternalModelName] = &list[i]
 	}
 	return result, nil
 }
@@ -700,40 +697,68 @@ func SaveGlobalMultiplierConfig(inputMul, outputMul, cacheCreateMul, cacheHitMul
 	return GetDB().Save(&cfg).Error
 }
 
-// ModelRoute 表示一个「实际模型」路由：外部暴露名 + 内部转发名。
-// 关键词: ModelRoute, 实际模型路由, 外部暴露名+内部转发名
-type ModelRoute struct {
-	WrapperName       string `json:"wrapper_name"`
-	InternalModelName string `json:"internal_model_name"`
+// InternalModelInfo 表示一个「实际模型(内部转发名)」及其关联的对外 wrapper 列表。
+// 这是计费的主体单位：同一实际模型可被多个 wrapper 暴露，但只有一个计费单价。
+// 关键词: InternalModelInfo, 实际模型枚举, 关联 wrapper
+type InternalModelInfo struct {
+	InternalModelName string   `json:"internal_model_name"`
+	Wrappers          []string `json:"wrappers"`       // 暴露该实际模型的对外名（去重排序）
+	ProviderCount     int      `json:"provider_count"` // 路由到该实际模型的 provider 条目数
 }
 
-// GetDistinctModelRoutes 从 AiProvider 表中枚举所有 distinct 的 (WrapperName, ModelName)。
-// 这是「实际模型」清单：同一 WrapperName 可能对应多个内部模型。WrapperName 为空时回落到 ModelName。
-// 关键词: GetDistinctModelRoutes, 实际模型枚举, 批量应用数据源
-func GetDistinctModelRoutes() ([]ModelRoute, error) {
+// GetDistinctInternalModels 从 AiProvider 表枚举所有 distinct 的实际模型(内部转发名 ModelName)，
+// 并聚合每个实际模型关联的对外 wrapper 列表与 provider 数量。结果按内部模型名排序。
+// 这是「实际模型计费」表与批量应用（按模式/按勾选）的数据源。
+// 关键词: GetDistinctInternalModels, 实际模型枚举, 批量应用数据源
+func GetDistinctInternalModels() ([]InternalModelInfo, error) {
 	providers, err := GetAllAiProviders()
 	if err != nil {
 		return nil, err
 	}
-	seen := make(map[string]bool)
-	var routes []ModelRoute
+	type agg struct {
+		wrappers map[string]bool
+		count    int
+	}
+	byInternal := make(map[string]*agg)
 	for _, p := range providers {
+		internal := p.ModelName
+		if internal == "" {
+			continue
+		}
 		wrapper := p.WrapperName
 		if wrapper == "" {
-			wrapper = p.ModelName
+			wrapper = internal
 		}
-		internal := p.ModelName
-		if wrapper == "" || internal == "" {
-			continue
+		a := byInternal[internal]
+		if a == nil {
+			a = &agg{wrappers: make(map[string]bool)}
+			byInternal[internal] = a
 		}
-		key := modelOverrideKey(wrapper, internal)
-		if seen[key] {
-			continue
-		}
-		seen[key] = true
-		routes = append(routes, ModelRoute{WrapperName: wrapper, InternalModelName: internal})
+		a.wrappers[wrapper] = true
+		a.count++
 	}
-	return routes, nil
+
+	internals := make([]string, 0, len(byInternal))
+	for internal := range byInternal {
+		internals = append(internals, internal)
+	}
+	sort.Strings(internals)
+
+	result := make([]InternalModelInfo, 0, len(internals))
+	for _, internal := range internals {
+		a := byInternal[internal]
+		wrappers := make([]string, 0, len(a.wrappers))
+		for w := range a.wrappers {
+			wrappers = append(wrappers, w)
+		}
+		sort.Strings(wrappers)
+		result = append(result, InternalModelInfo{
+			InternalModelName: internal,
+			Wrappers:          wrappers,
+			ProviderCount:     a.count,
+		})
+	}
+	return result, nil
 }
 
 // ==================== API Key Traffic Limit Functions ====================

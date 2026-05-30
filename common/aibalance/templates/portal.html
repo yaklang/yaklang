@@ -333,12 +333,46 @@
         </div>
 
         <div id="models" class="tab-content">
+            <!-- 实际模型计费倍率：计费的真正主体（按内部转发名计费，同一实际模型单价一致）。 -->
+            <!-- 关键词: 实际模型计费倍率表, actual-models-table, 按模式批量, 勾选批量 -->
             <div class="card">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                    <h3 style="margin: 0;">模型信息管理</h3>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <h3 style="margin: 0;">实际模型计费倍率 <small style="color:#888;font-weight:normal;font-size:13px;">（按内部转发名计费，是 APIKEY 付费系统的计费主体）</small></h3>
                     <div style="display: flex; gap: 8px; align-items: center;">
                         <button class="btn btn-sm" style="background-color: #607d8b; color: #fff;" onclick="openGlobalDefaultMultiplierModal()" title="设置对所有实际模型生效的全局默认倍率（最低优先级，单独设置可覆盖）">全局默认倍率</button>
-                        <button class="btn btn-sm" style="background-color: #ff9800; color: #fff;" onclick="openApplyAllMultiplierModal()" title="把一组倍率一键写入到所有实际模型（外部+内部）的覆盖行">一键应用到所有实际模型</button>
+                        <button class="btn btn-sm" style="background-color: #3f51b5; color: #fff;" onclick="openPatternMultiplierModal()" title="按名称模式（glob 或子串，如 kimi2.5）把一组倍率批量应用到匹配的实际模型">按模式批量</button>
+                        <button class="btn btn-sm" style="background-color: #ff9800; color: #fff;" onclick="openSelectedMultiplierModal()" title="把一组倍率应用到下方勾选的实际模型">应用到勾选</button>
+                        <button class="reset-column-widths-btn" onclick="resetColumnWidths('actual-models-table')" title="Reset column widths to default">Reset column widths</button>
+                    </div>
+                </div>
+                <div style="font-size:12px; color:#888; margin-bottom:10px;">
+                    生效倍率优先级：实际模型倍率 &gt; 全局默认 &gt; 系统常量（输入/输出 1.0，缓存创建 1.25，缓存命中 0.1）。
+                </div>
+                <div class="table-container">
+                    <table cellspacing="0" cellpadding="0" id="actual-models-table">
+                        <thead>
+                            <tr>
+                                <th class="column-name text-center" style="width:36px;"><input type="checkbox" id="actual-models-select-all" onclick="toggleAllActualModels(this)" title="全选/全不选"></th>
+                                <th class="column-name">内部模型名 (计费标识)</th>
+                                <th class="column-name">关联对外名 (Wrapper)</th>
+                                <th class="column-name text-center">供应商数</th>
+                                <th class="column-name text-center">状态</th>
+                                <th class="column-name text-center">生效倍率<br><small style="color:#888;font-weight:normal;">入/出/建/命</small></th>
+                                <th class="column-name text-center">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="actual-models-table-body">
+                            <!-- Data will be populated by JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- wrapper 级元数据：仅描述/标签/老传统倍数（字节流量）。Token 计费倍率见上方实际模型表。 -->
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h3 style="margin: 0;">对外模型信息 (Wrapper) <small style="color:#888;font-weight:normal;font-size:13px;">（描述 / 标签 / 传统字节倍数，不含 Token 计费倍率）</small></h3>
+                    <div style="display: flex; gap: 8px; align-items: center;">
                         <button class="reset-column-widths-btn" onclick="resetColumnWidths('models-table')" title="Reset column widths to default">Reset column widths</button>
                     </div>
                 </div>
@@ -348,7 +382,7 @@
                             <tr>
                                 <th class="column-name">模型名 (WrapperName)</th>
                                 <th class="column-name text-center">供应商数量</th>
-                                <th class="column-name text-center">Token 倍率<br><small style="color:#888;font-weight:normal;">输入/输出/缓存创建/缓存命中</small></th>
+                                <th class="column-name text-center">传统倍数<br><small style="color:#888;font-weight:normal;">字节流量</small></th>
                                 <th class="column-name">描述</th>
                                 <th class="column-name">标签</th>
                                 <th class="column-name text-center">操作</th>
@@ -1657,36 +1691,8 @@
                 <input type="text" id="editModelTags" class="form-control">
             </div>
 
-            <!-- Token 倍率（4 维）-->
-            <!-- 关键词: 编辑模型信息 4 维 Token 倍率, 输入/输出/缓存创建/缓存命中 -->
             <div class="form-group">
-                <label>Token 倍率 <small style="color:#888;font-weight:normal;">（任一维度填 0 表示该维度回落到默认值；全部为 0 时整体回落到「传统倍数」）</small></label>
-                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;">
-                    <div>
-                        <label style="font-size: 12px; color: #555;">输入</label>
-                        <input type="number" id="editModelInputMul" class="form-control" min="0" step="0.05" value="1.0" style="font-family: monospace;">
-                    </div>
-                    <div>
-                        <label style="font-size: 12px; color: #555;">输出</label>
-                        <input type="number" id="editModelOutputMul" class="form-control" min="0" step="0.05" value="1.0" style="font-family: monospace;">
-                    </div>
-                    <div>
-                        <label style="font-size: 12px; color: #555;">缓存创建</label>
-                        <input type="number" id="editModelCacheCreateMul" class="form-control" min="0" step="0.05" value="1.25" style="font-family: monospace;">
-                    </div>
-                    <div>
-                        <label style="font-size: 12px; color: #555;">缓存命中</label>
-                        <input type="number" id="editModelCacheHitMul" class="form-control" min="0" step="0.05" value="0.1" style="font-family: monospace;">
-                    </div>
-                </div>
-                <small class="form-text text-muted">
-                    上游 SSE 末帧 usage 经四维倍率加权后，扣减免费用户日 Token 池或付费 key 的 Token 限额。
-                    基准：0.1 RMB / 1M Token；输入/输出 = 1.0；缓存创建 = 1.25；缓存命中 = 0.1（典型 dashscope 显式缓存）。
-                </small>
-            </div>
-
-            <div class="form-group">
-                <label>传统倍数 <small style="color:#888;font-weight:normal;">（兼容旧字节流量计费；为 0 时整体按 1.0 兜底）</small>:</label>
+                <label>传统倍数 <small style="color:#888;font-weight:normal;">（兼容旧字节流量计费；为 0 时整体按 1.0 兜底。Token 计费倍率请到「实际模型计费倍率」表设置）</small>:</label>
                 <input type="number" id="editModelTrafficMultiplier" class="form-control" min="0" step="0.1" value="1.0">
             </div>
             <div class="modal-actions">
@@ -1696,48 +1702,44 @@
         </div>
     </div>
 
-    <!-- 实际模型(外部+内部)倍率覆盖编辑 modal -->
-    <!-- 关键词: routeOverrideModal, 双标识倍率覆盖, 实际模型 -->
-    <div id="routeOverrideModal" class="delete-confirmation-modal" style="display: none;">
+    <!-- 实际模型倍率编辑 modal（按内部转发名计费） -->
+    <!-- 关键词: modelMultiplierModal, 实际模型倍率, 内部转发名计费 -->
+    <div id="modelMultiplierModal" class="delete-confirmation-modal" style="display: none;">
         <div class="modal-content" style="width: 720px; max-width: 90vw;">
-            <span class="close-modal" onclick="closeRouteOverrideModal()">&times;</span>
-            <h4>编辑实际模型倍率（外部 + 内部双标识）</h4>
+            <span class="close-modal" onclick="closeModelMultiplierModal()">&times;</span>
+            <h4>编辑实际模型计费倍率</h4>
             <div class="form-group">
-                <label>外部暴露名 (WrapperName):</label>
-                <input type="text" id="routeOverrideWrapper" class="form-control" readonly>
+                <label>内部模型名 (计费标识，上游真实模型):</label>
+                <input type="text" id="modelMultiplierInternal" class="form-control" readonly>
             </div>
             <div class="form-group">
-                <label>内部转发名 (上游真实模型):</label>
-                <input type="text" id="routeOverrideInternal" class="form-control" readonly>
-            </div>
-            <div class="form-group">
-                <label>Token 倍率覆盖 <small style="color:#888;font-weight:normal;">（某维填 0 表示该维不覆盖，回落到 wrapper 默认 / 全局默认 / 系统常量）</small></label>
+                <label>Token 倍率 <small style="color:#888;font-weight:normal;">（某维填 0 表示该维不单独设置，回落到 全局默认 / 系统常量）</small></label>
                 <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;">
                     <div>
                         <label style="font-size: 12px; color: #555;">输入</label>
-                        <input type="number" id="routeOverrideInput" class="form-control" min="0" step="0.05" value="0" style="font-family: monospace;">
+                        <input type="number" id="modelMultiplierInput" class="form-control" min="0" step="0.05" value="0" style="font-family: monospace;">
                     </div>
                     <div>
                         <label style="font-size: 12px; color: #555;">输出</label>
-                        <input type="number" id="routeOverrideOutput" class="form-control" min="0" step="0.05" value="0" style="font-family: monospace;">
+                        <input type="number" id="modelMultiplierOutput" class="form-control" min="0" step="0.05" value="0" style="font-family: monospace;">
                     </div>
                     <div>
                         <label style="font-size: 12px; color: #555;">缓存创建</label>
-                        <input type="number" id="routeOverrideCacheCreate" class="form-control" min="0" step="0.05" value="0" style="font-family: monospace;">
+                        <input type="number" id="modelMultiplierCacheCreate" class="form-control" min="0" step="0.05" value="0" style="font-family: monospace;">
                     </div>
                     <div>
                         <label style="font-size: 12px; color: #555;">缓存命中</label>
-                        <input type="number" id="routeOverrideCacheHit" class="form-control" min="0" step="0.05" value="0" style="font-family: monospace;">
+                        <input type="number" id="modelMultiplierCacheHit" class="form-control" min="0" step="0.05" value="0" style="font-family: monospace;">
                     </div>
                 </div>
                 <small class="form-text text-muted">
-                    覆盖优先级：(外部+内部) 覆盖 &gt; wrapper 默认 &gt; 全局默认 &gt; 系统常量（1.0/1.0/1.25/0.1）。
+                    生效优先级：实际模型倍率 &gt; 全局默认 &gt; 系统常量（1.0/1.0/1.25/0.1）。同一实际模型无论被哪个对外名暴露，单价一致。
                 </small>
             </div>
             <div class="modal-actions">
-                <button class="btn" onclick="closeRouteOverrideModal()">取消</button>
-                <button class="btn" style="background-color: #f44336; color: #fff;" onclick="clearRouteOverride()">清除覆盖</button>
-                <button class="btn btn-primary" onclick="saveRouteOverride()">保存</button>
+                <button class="btn" onclick="closeModelMultiplierModal()">取消</button>
+                <button class="btn" style="background-color: #f44336; color: #fff;" onclick="clearModelMultiplier()">清除</button>
+                <button class="btn btn-primary" onclick="saveModelMultiplier()">保存</button>
             </div>
         </div>
     </div>
@@ -1769,7 +1771,7 @@
                     </div>
                 </div>
                 <small class="form-text text-muted">
-                    全局默认仅在「实际模型未单独覆盖 且 wrapper 未配置该维」时生效。基准：输入/输出 = 1.0；缓存创建 = 1.25；缓存命中 = 0.1。
+                    全局默认仅在「实际模型未单独设置该维」时生效。基准：输入/输出 = 1.0；缓存创建 = 1.25；缓存命中 = 0.1。
                 </small>
             </div>
             <div class="modal-actions">
@@ -1779,40 +1781,80 @@
         </div>
     </div>
 
-    <!-- 一键应用到所有实际模型 modal -->
-    <!-- 关键词: applyAllMultiplierModal, 批量应用, 一键铺到所有实际模型 -->
-    <div id="applyAllMultiplierModal" class="delete-confirmation-modal" style="display: none;">
+    <!-- 按模式批量应用 modal -->
+    <!-- 关键词: patternMultiplierModal, 按模式批量, glob 子串匹配实际模型 -->
+    <div id="patternMultiplierModal" class="delete-confirmation-modal" style="display: none;">
         <div class="modal-content" style="width: 720px; max-width: 90vw;">
-            <span class="close-modal" onclick="closeApplyAllMultiplierModal()">&times;</span>
-            <h4>一键应用到所有实际模型</h4>
-            <div style="background:#fff3e0; color:#e65100; padding:10px 12px; border-radius:6px; margin-bottom:14px; font-size:13px;">
-                警告：这将给当前所有实际模型（外部暴露名 + 内部转发名 的每一个组合）写入倍率覆盖行，
-                会覆盖它们各自已单独设置的倍率覆盖。此操作针对计费，请谨慎确认。
+            <span class="close-modal" onclick="closePatternMultiplierModal()">&times;</span>
+            <h4>按模式批量应用倍率</h4>
+            <div style="background:#e8eaf6; color:#283593; padding:10px 12px; border-radius:6px; margin-bottom:14px; font-size:13px;">
+                按内部模型名匹配：含通配符时按 glob（如 <code>*kimi2.5*</code>），否则按大小写不敏感子串（如 <code>kimi2.5</code> 命中所有含该子串的 K2.5 模型）。
             </div>
             <div class="form-group">
-                <label>Token 倍率 <small style="color:#888;font-weight:normal;">（某维填 0 表示该维写入「不覆盖」，回落 wrapper 默认 / 全局默认）</small></label>
+                <label>名称模式:</label>
+                <input type="text" id="patternMultiplierPattern" class="form-control" placeholder="例如 kimi2.5 或 *kimi2.5*" style="font-family: monospace;">
+            </div>
+            <div class="form-group">
+                <label>Token 倍率 <small style="color:#888;font-weight:normal;">（某维填 0 表示该维写入「不设置」，回落 全局默认 / 系统常量）</small></label>
                 <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;">
                     <div>
                         <label style="font-size: 12px; color: #555;">输入</label>
-                        <input type="number" id="applyAllInput" class="form-control" min="0" step="0.05" value="1.0" style="font-family: monospace;">
+                        <input type="number" id="patternMultiplierInput" class="form-control" min="0" step="0.05" value="1.0" style="font-family: monospace;">
                     </div>
                     <div>
                         <label style="font-size: 12px; color: #555;">输出</label>
-                        <input type="number" id="applyAllOutput" class="form-control" min="0" step="0.05" value="1.0" style="font-family: monospace;">
+                        <input type="number" id="patternMultiplierOutput" class="form-control" min="0" step="0.05" value="1.0" style="font-family: monospace;">
                     </div>
                     <div>
                         <label style="font-size: 12px; color: #555;">缓存创建</label>
-                        <input type="number" id="applyAllCacheCreate" class="form-control" min="0" step="0.05" value="1.25" style="font-family: monospace;">
+                        <input type="number" id="patternMultiplierCacheCreate" class="form-control" min="0" step="0.05" value="1.25" style="font-family: monospace;">
                     </div>
                     <div>
                         <label style="font-size: 12px; color: #555;">缓存命中</label>
-                        <input type="number" id="applyAllCacheHit" class="form-control" min="0" step="0.05" value="0.1" style="font-family: monospace;">
+                        <input type="number" id="patternMultiplierCacheHit" class="form-control" min="0" step="0.05" value="0.1" style="font-family: monospace;">
                     </div>
                 </div>
             </div>
             <div class="modal-actions">
-                <button class="btn" onclick="closeApplyAllMultiplierModal()">取消</button>
-                <button class="btn" style="background-color: #ff9800; color: #fff;" onclick="applyAllMultiplier()">应用到所有实际模型</button>
+                <button class="btn" onclick="closePatternMultiplierModal()">取消</button>
+                <button class="btn" style="background-color: #3f51b5; color: #fff;" onclick="applyPatternMultiplier()">按模式应用</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 应用到勾选 modal -->
+    <!-- 关键词: selectedMultiplierModal, 勾选批量, 应用到选中实际模型 -->
+    <div id="selectedMultiplierModal" class="delete-confirmation-modal" style="display: none;">
+        <div class="modal-content" style="width: 720px; max-width: 90vw;">
+            <span class="close-modal" onclick="closeSelectedMultiplierModal()">&times;</span>
+            <h4>应用倍率到勾选的实际模型</h4>
+            <div style="background:#fff3e0; color:#e65100; padding:10px 12px; border-radius:6px; margin-bottom:14px; font-size:13px;">
+                将把下方倍率写入已勾选的 <span id="selectedMultiplierCount" style="font-weight:bold;">0</span> 个实际模型，覆盖它们当前各自的设置。
+            </div>
+            <div class="form-group">
+                <label>Token 倍率 <small style="color:#888;font-weight:normal;">（某维填 0 表示该维写入「不设置」，回落 全局默认 / 系统常量）</small></label>
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;">
+                    <div>
+                        <label style="font-size: 12px; color: #555;">输入</label>
+                        <input type="number" id="selectedMultiplierInput" class="form-control" min="0" step="0.05" value="1.0" style="font-family: monospace;">
+                    </div>
+                    <div>
+                        <label style="font-size: 12px; color: #555;">输出</label>
+                        <input type="number" id="selectedMultiplierOutput" class="form-control" min="0" step="0.05" value="1.0" style="font-family: monospace;">
+                    </div>
+                    <div>
+                        <label style="font-size: 12px; color: #555;">缓存创建</label>
+                        <input type="number" id="selectedMultiplierCacheCreate" class="form-control" min="0" step="0.05" value="1.25" style="font-family: monospace;">
+                    </div>
+                    <div>
+                        <label style="font-size: 12px; color: #555;">缓存命中</label>
+                        <input type="number" id="selectedMultiplierCacheHit" class="form-control" min="0" step="0.05" value="0.1" style="font-family: monospace;">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn" onclick="closeSelectedMultiplierModal()">取消</button>
+                <button class="btn" style="background-color: #ff9800; color: #fff;" onclick="applySelectedMultiplier()">应用到勾选</button>
             </div>
         </div>
     </div>
