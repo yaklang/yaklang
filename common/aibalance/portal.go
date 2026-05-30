@@ -811,15 +811,17 @@ func (c *ServerConfig) HandlePortalRequest(conn net.Conn, request *http.Request,
 	case uriIns.Path == "/portal/update-model-meta" && request.Method == "POST":
 		c.handleUpdateModelMeta(conn, request)
 
-	// ========== Model Multiplier (倍率双标识 + 批量应用) Routes ==========
-	case uriIns.Path == "/portal/update-model-override" && request.Method == "POST":
-		c.handleUpdateModelOverride(conn, request)
-	case uriIns.Path == "/portal/delete-model-override" && request.Method == "POST":
-		c.handleDeleteModelOverride(conn, request)
+	// ========== Model Multiplier (实际模型计费 + 批量应用) Routes ==========
+	case uriIns.Path == "/portal/update-model-multiplier" && request.Method == "POST":
+		c.handleUpdateModelMultiplier(conn, request)
+	case uriIns.Path == "/portal/delete-model-multiplier" && request.Method == "POST":
+		c.handleDeleteModelMultiplier(conn, request)
 	case uriIns.Path == "/portal/set-global-default-multiplier" && request.Method == "POST":
 		c.handleSetGlobalDefaultMultiplier(conn, request)
-	case uriIns.Path == "/portal/apply-multiplier-to-all" && request.Method == "POST":
-		c.handleApplyMultiplierToAll(conn, request)
+	case uriIns.Path == "/portal/apply-model-multiplier-by-pattern" && request.Method == "POST":
+		c.handleApplyModelMultiplierByPattern(conn, request)
+	case uriIns.Path == "/portal/apply-model-multiplier-to-models" && request.Method == "POST":
+		c.handleApplyModelMultiplierToModels(conn, request)
 
 	// ========== TOTP Routes ==========
 	case uriIns.Path == "/portal/totp-settings":

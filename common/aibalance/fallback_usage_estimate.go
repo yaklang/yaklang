@@ -20,19 +20,24 @@ const fallbackImageTokenEstimate = 4096
 // 关键词: inFlightCompletionTokenBudget, in-flight 预扣 completion 估算, 偏严过冲防御
 const inFlightCompletionTokenBudget = 8192
 
-// computeInFlightTokenEstimate 估算一次 free model 请求的 in-flight 预扣 token，
-// 用与 onUsageForward 正路一致的 ComputeWeightedTokens 倍率体系。
+// computeInFlightTokenEstimate 估算一次 free model 请求的 in-flight 预扣 token。
+//
+// in-flight 阶段 provider 尚未选定，无法得知本次请求会路由到哪个实际模型(内部转发名)，
+// 因此倍率只按「全局默认 + 系统常量」解析（跳过实际模型层）。这只影响 daily check
+// 闸门紧迫期的过冲防御判决；stream 结束后会用真实 usage 按实际模型倍率重新入账，
+// 预扣同步释放，不影响最终计费准确性。
 //
 // 估算公式：
 //
 //	estPromptTokens     = ytoken(promptText) + imageCount * fallbackImageTokenEstimate
 //	estCompletionTokens = inFlightCompletionTokenBudget  // 8192 保守
 //	estUsage            = ChatUsage{PromptTokens, CompletionTokens, TotalTokens}
-//	返回 ComputeWeightedTokens(meta, estUsage)
+//	返回 WeightUsage(全局默认+系统常量, estUsage)
 //
-// 入参 promptText 应该传 prompt.String() (chat 入口已拼好的文本)。
-// 关键词: computeInFlightTokenEstimate ytoken 预扣估算, 与 fallback 同体系
+// 入参 promptText 应该传 prompt.String() (chat 入口已拼好的文本)。modelName 仅用于诊断。
+// 关键词: computeInFlightTokenEstimate ytoken 预扣估算, 全局默认+系统常量, provider 未选定
 func computeInFlightTokenEstimate(modelName, promptText string, imageCount int) int64 {
+	_ = modelName
 	estPromptTokens := int64(ytoken.CalcTokenCount(promptText)) +
 		int64(imageCount)*fallbackImageTokenEstimate
 	estCompletionTokens := int64(inFlightCompletionTokenBudget)
@@ -41,8 +46,8 @@ func computeInFlightTokenEstimate(modelName, promptText string, imageCount int) 
 		CompletionTokens: int(estCompletionTokens),
 		TotalTokens:      int(estPromptTokens + estCompletionTokens),
 	}
-	meta, _ := GetModelMeta(modelName)
-	return ComputeWeightedTokens(meta, estUsage)
+	cfg, _ := GetGlobalMultiplierConfig()
+	return WeightUsage(resolveModelMultipliersFrom(cfg, nil), estUsage)
 }
 
 // resolveInFlightBucketKey 把 modelName 映射到 daily token 桶 key，与
@@ -108,7 +113,7 @@ type FallbackEstimateResult struct {
 	EstPromptTokens int64
 	// EstCompletionTokens 估算的 completion token 数 (output + reason BPE token 之和)
 	EstCompletionTokens int64
-	// Weighted 经过 ComputeWeightedTokens 四维倍率加权后的最终入账值
+	// Weighted 经过实际模型四维倍率加权后的最终入账值
 	Weighted int64
 	// Billed 实际是否扣过费 (exempt / 没 key / weighted=0 均不扣)
 	Billed bool
@@ -129,7 +134,7 @@ type usageWriter interface {
 }
 
 // applyUsageFallbackEstimate 用 ytoken (Qwen BPE) 估算 prompt + completion token，
-// 按与 onUsageForward 正路完全相同的 ComputeWeightedTokens 倍率与桶分发逻辑，
+// 按与 onUsageForward 正路完全相同的实际模型倍率与桶分发逻辑，
 // 在上游 SSE 末帧 usage 缺失或为 0 时兜底扣费。
 //
 // 估算口径：
@@ -172,9 +177,9 @@ func (c *ServerConfig) applyUsageFallbackEstimate(
 		TotalTokens:      int(result.EstPromptTokens + result.EstCompletionTokens),
 	}
 	result.EstimatedUsage = estUsage
-	// 与 onUsageForward 正路一致：按 (外部暴露名 + 内部转发名) 双标识分层解析倍率。
-	// 关键词: fallback ComputeWeightedTokensWithRoute, 双标识倍率
-	result.Weighted = ComputeWeightedTokensWithRoute(modelName, internalModelName, estUsage)
+	// 与 onUsageForward 正路一致：按「实际模型(内部转发名)」分层解析倍率。
+	// 关键词: fallback ComputeModelWeightedTokens, 实际模型计费
+	result.Weighted = ComputeModelWeightedTokens(internalModelName, estUsage)
 	if result.Weighted <= 0 {
 		return result
 	}

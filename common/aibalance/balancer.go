@@ -193,10 +193,10 @@ func LoadProvidersFromDatabase(config *ServerConfig) error {
 		log.Warnf("Failed to ensure AiModelMeta table exists: %v", err)
 	}
 
-	// Ensure model multiplier override / global default tables exist (倍率双标识 + 批量应用)
-	// 关键词: EnsureModelMultiplierOverrideTable, EnsureModelMultiplierConfigTable, 倍率双标识自治迁移
-	if err := EnsureModelMultiplierOverrideTable(); err != nil {
-		log.Warnf("Failed to ensure AiModelMultiplierOverride table exists: %v", err)
+	// Ensure actual-model multiplier / global default tables exist (实际模型计费 + 批量应用)
+	// 关键词: EnsureModelMultiplierTable, EnsureModelMultiplierConfigTable, 实际模型计费自治迁移
+	if err := EnsureModelMultiplierTable(); err != nil {
+		log.Warnf("Failed to ensure AiModelMultiplier table exists: %v", err)
 	}
 	if err := EnsureModelMultiplierConfigTable(); err != nil {
 		log.Warnf("Failed to ensure AiModelMultiplierConfig table exists: %v", err)

@@ -80,80 +80,37 @@ func applyMultiplierDim(dst *float64, v float64) {
 	}
 }
 
-// wrapperConfiguredDims 返回 wrapper (AiModelMeta) 级别「显式配置」的逐维倍率。
-// 返回结构中某维 == 0 表示「该维 wrapper 级未配置」，调用方应继续向下回落。
-//
-// 兼容策略（与老 resolveMultipliers 对齐，保证存量计费零破坏）：
-//   - 任一新四维 > 0：按新四维逐维取（未设的维返回 0 = 未配置）。
-//   - 四维全 0 且老 TrafficMultiplier 被显式设为非默认值（>0 且 !=1.0）：
-//     按老 legacy 公式视为「四维均已在 wrapper 级配置」。
-//   - 四维全 0 且 TrafficMultiplier 为默认 1.0/缺省：wrapper 级不配置任何维，
-//     交给全局默认 / 系统常量（这样新加的全局默认才能对存量 x1.00 模型生效）。
-//
-// 关键词: wrapperConfiguredDims, wrapper 级逐维配置, legacy 非默认才阻断
-func wrapperConfiguredDims(meta *AiModelMeta) resolvedMultipliers {
-	var r resolvedMultipliers // 全 0 = 该层什么都没配
-	if meta == nil {
-		return r
-	}
-	anyNew := meta.InputTokenMultiplier > 0 ||
-		meta.OutputTokenMultiplier > 0 ||
-		meta.CacheCreationMultiplier > 0 ||
-		meta.CacheHitMultiplier > 0
-	if anyNew {
-		if meta.InputTokenMultiplier > 0 {
-			r.Input = meta.InputTokenMultiplier
-		}
-		if meta.OutputTokenMultiplier > 0 {
-			r.Output = meta.OutputTokenMultiplier
-		}
-		if meta.CacheCreationMultiplier > 0 {
-			r.CacheCreate = meta.CacheCreationMultiplier
-		}
-		if meta.CacheHitMultiplier > 0 {
-			r.CacheHit = meta.CacheHitMultiplier
-		}
-		return r
-	}
-	if meta.TrafficMultiplier > 0 && meta.TrafficMultiplier != 1.0 {
-		r.Input = meta.TrafficMultiplier
-		r.Output = meta.TrafficMultiplier
-		r.CacheCreate = meta.TrafficMultiplier * defaultCacheCreationMultiplier
-		r.CacheHit = meta.TrafficMultiplier * defaultCacheHitMultiplier
-	}
-	return r
-}
-
-// ResolveBillingMultipliers 按 (外部暴露名 wrapperName + 内部转发名 internalModelName)
-// 双标识，逐维分层回落解析出最终生效的四维 Token 倍率。
+// ResolveModelMultipliers 按「实际模型(内部转发名 internalModelName)」逐维分层回落，
+// 解析出最终生效的四维 Token 倍率。这是计费的唯一标识：同一实际模型无论被哪个 wrapper
+// 暴露，单价都一致。
 //
 // 优先级（高 -> 低，逐维独立回落）：
 //
-//	(W,I) override 覆盖行 -> AiModelMeta(W) 逐 wrapper 默认 -> 全局默认 -> 系统常量
+//	实际模型倍率(internalModelName) -> 全局默认 -> 系统常量
 //
-// 某层某维 > 0 即采用该层该维，否则继续向下回落。internalModelName 为空时跳过 override 层。
+// 某层某维 > 0 即采用该层该维，否则继续向下回落。internalModelName 为空时跳过实际模型层
+// （仅全局默认 + 系统常量），用于 provider 尚未选定的 in-flight 预估。
 //
-// 关键词: ResolveBillingMultipliers, 倍率双标识, 四层逐维回落, 计费精确化
-func ResolveBillingMultipliers(wrapperName, internalModelName string) resolvedMultipliers {
+// 关键词: ResolveModelMultipliers, 实际模型计费, 三层逐维回落, 计费精确化
+func ResolveModelMultipliers(internalModelName string) resolvedMultipliers {
 	cfg, _ := GetGlobalMultiplierConfig()
-	meta, _ := GetModelMeta(wrapperName)
-	var override *AiModelMultiplierOverride
+	var m *AiModelMultiplier
 	if internalModelName != "" {
-		override, _ = GetModelMultiplierOverride(wrapperName, internalModelName)
+		m, _ = GetModelMultiplier(internalModelName)
 	}
-	return resolveBillingMultipliersFrom(cfg, meta, override)
+	return resolveModelMultipliersFrom(cfg, m)
 }
 
-// resolveBillingMultipliersFrom 是 ResolveBillingMultipliers 的纯内存版：按已加载好的
-// 全局默认 / wrapper meta / (W,I) override 三层数据做逐维分层回落，便于批量场景（如
-// portal data 构建）一次性加载后避免 N 次 DB 查询。任一入参为 nil 表示该层缺省。
+// resolveModelMultipliersFrom 是 ResolveModelMultipliers 的纯内存版：按已加载好的
+// 全局默认 / 实际模型倍率两层数据做逐维分层回落，便于批量场景（如 portal data 构建）
+// 一次性加载后避免 N 次 DB 查询。任一入参为 nil 表示该层缺省。
 //
 // 优先级（高 -> 低，逐维独立回落）：
 //
-//	override -> wrapper meta -> 全局默认 -> 系统常量
+//	实际模型倍率 -> 全局默认 -> 系统常量
 //
-// 关键词: resolveBillingMultipliersFrom, 内存分层回落, 批量解析
-func resolveBillingMultipliersFrom(globalCfg *AiModelMultiplierConfig, meta *AiModelMeta, override *AiModelMultiplierOverride) resolvedMultipliers {
+// 关键词: resolveModelMultipliersFrom, 内存分层回落, 批量解析
+func resolveModelMultipliersFrom(globalCfg *AiModelMultiplierConfig, m *AiModelMultiplier) resolvedMultipliers {
 	// 最底层：系统常量兜底
 	r := resolvedMultipliers{
 		Input:         defaultInputTokenMultiplier,
@@ -163,7 +120,7 @@ func resolveBillingMultipliersFrom(globalCfg *AiModelMultiplierConfig, meta *AiM
 		LegacyTraffic: 1.0,
 	}
 
-	// Layer 3: 全局默认
+	// Layer 2: 全局默认
 	if globalCfg != nil {
 		applyMultiplierDim(&r.Input, globalCfg.InputTokenMultiplier)
 		applyMultiplierDim(&r.Output, globalCfg.OutputTokenMultiplier)
@@ -171,19 +128,12 @@ func resolveBillingMultipliersFrom(globalCfg *AiModelMultiplierConfig, meta *AiM
 		applyMultiplierDim(&r.CacheHit, globalCfg.CacheHitMultiplier)
 	}
 
-	// Layer 2: wrapper meta (AiModelMeta(W)) 逐 wrapper 默认
-	w := wrapperConfiguredDims(meta)
-	applyMultiplierDim(&r.Input, w.Input)
-	applyMultiplierDim(&r.Output, w.Output)
-	applyMultiplierDim(&r.CacheCreate, w.CacheCreate)
-	applyMultiplierDim(&r.CacheHit, w.CacheHit)
-
-	// Layer 1: (W,I) override 覆盖行（最高优先）
-	if override != nil {
-		applyMultiplierDim(&r.Input, override.InputTokenMultiplier)
-		applyMultiplierDim(&r.Output, override.OutputTokenMultiplier)
-		applyMultiplierDim(&r.CacheCreate, override.CacheCreationMultiplier)
-		applyMultiplierDim(&r.CacheHit, override.CacheHitMultiplier)
+	// Layer 1: 实际模型倍率（最高优先）
+	if m != nil {
+		applyMultiplierDim(&r.Input, m.InputTokenMultiplier)
+		applyMultiplierDim(&r.Output, m.OutputTokenMultiplier)
+		applyMultiplierDim(&r.CacheCreate, m.CacheCreationMultiplier)
+		applyMultiplierDim(&r.CacheHit, m.CacheHitMultiplier)
 	}
 
 	return r
@@ -236,22 +186,22 @@ func WeightUsage(mul resolvedMultipliers, usage *aispec.ChatUsage) int64 {
 }
 
 // ComputeWeightedTokens 按上游 SSE 末帧 ChatUsage 与 AiModelMeta 的四维倍率
-// 计算本次请求实际消耗的"加权 token"（用于免费用户日限额扣费、付费 key Token 累加）。
-//
-// 仅按 wrapper(AiModelMeta) 单层解析，保留作为向后兼容入口（旧测试、provider
-// 未选定阶段的 in-flight 预估）。精确计费请优先用 ComputeWeightedTokensWithRoute。
+// 计算加权 token。这是仅按 wrapper(AiModelMeta) 单层解析的纯工具函数，
+// 不再参与计费正路（计费已切换为「实际模型」维度，见 ComputeModelWeightedTokens），
+// 仅保留供 wrapper meta 维度的单元测试与诊断使用。
 //
 // usage == nil 时返回 0；任何字段缺失按 0 处理。
 //
-// 关键词: ComputeWeightedTokens, 四维加权 token, wrapper 单层兼容入口
+// 关键词: ComputeWeightedTokens, 四维加权 token, wrapper meta 工具函数
 func ComputeWeightedTokens(meta *AiModelMeta, usage *aispec.ChatUsage) int64 {
 	return WeightUsage(resolveMultipliers(meta), usage)
 }
 
-// ComputeWeightedTokensWithRoute 按 (外部暴露名 + 内部转发名) 双标识分层解析倍率后，
-// 计算加权 token。这是计费正路（onUsageForward / fallback 估算）应当使用的入口。
+// ComputeModelWeightedTokens 按「实际模型(内部转发名 internalModelName)」分层解析倍率后，
+// 计算加权 token。这是计费正路（onUsageForward / fallback 估算）应当使用的唯一入口：
+// 同一实际模型单价一致，与对外 wrapper 无关。
 //
-// 关键词: ComputeWeightedTokensWithRoute, 双标识计费正路, 精确扣费
-func ComputeWeightedTokensWithRoute(wrapperName, internalModelName string, usage *aispec.ChatUsage) int64 {
-	return WeightUsage(ResolveBillingMultipliers(wrapperName, internalModelName), usage)
+// 关键词: ComputeModelWeightedTokens, 实际模型计费正路, 精确扣费
+func ComputeModelWeightedTokens(internalModelName string, usage *aispec.ChatUsage) int64 {
+	return WeightUsage(ResolveModelMultipliers(internalModelName), usage)
 }

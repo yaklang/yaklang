@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"sort"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -31,7 +30,11 @@ type PortalDataResponse struct {
 	APIKeys            []APIKeyDataJSON   `json:"api_keys"`
 	ModelMetas         []ModelInfoJSON    `json:"model_metas"`
 
-	// 全局默认四维倍率（倍率双标识分层兜底的 Layer 3）。
+	// ActualModels 是「实际模型(内部转发名)」计费倍率清单：计费的真正主体。
+	// 关键词: PortalDataResponse actual_models, 实际模型计费表数据源
+	ActualModels []ActualModelInfoJSON `json:"actual_models"`
+
+	// 全局默认四维倍率（实际模型计费分层兜底的 Layer 2）。
 	// 关键词: PortalDataResponse global_default_multiplier
 	GlobalDefaultMultiplier GlobalDefaultMultiplierJSON `json:"global_default_multiplier"`
 
@@ -191,38 +194,32 @@ type APIKeyDataJSON struct {
 	TrafficPercent        float64 `json:"traffic_percent"`
 }
 
-// ModelInfoJSON is the JSON representation of model metadata
+// ModelInfoJSON is the JSON representation of wrapper-level model metadata.
+// wrapper 级仅保留描述/标签/老 TrafficMultiplier（字节流量倍数）。Token 维度的四维计费倍率
+// 已迁移到「实际模型(内部转发名)」维度，见 ActualModelInfoJSON。
+// 关键词: ModelInfoJSON, wrapper 元数据, 不含 token 倍率
 type ModelInfoJSON struct {
 	Name              string  `json:"name"`
 	Description       string  `json:"description"`
 	Tags              string  `json:"tags"`
 	ProviderCount     int     `json:"provider_count"`
 	TrafficMultiplier float64 `json:"traffic_multiplier"`
-
-	// 4 \u7ef4 Token \u500d\u7387\uff080 \u8868\u793a\u672a\u914d\u7f6e\uff0cUI \u8868\u73b0\u4e3a\u300c\u9ed8\u8ba4\u300d\uff09
-	// \u5173\u952e\u8bcd: ModelInfoJSON Token \u500d\u7387\u66b4\u9732
-	InputTokenMultiplier    float64 `json:"input_token_multiplier"`
-	OutputTokenMultiplier   float64 `json:"output_token_multiplier"`
-	CacheCreationMultiplier float64 `json:"cache_creation_multiplier"`
-	CacheHitMultiplier      float64 `json:"cache_hit_multiplier"`
-
-	// Routes 是该 wrapper 下「实际模型(内部转发名)」列表，含每个路由的覆盖原始值与
-	// 最终生效倍率（经 (外部+内部) 双标识分层解析）。用于前端展开编辑单条 override。
-	// 关键词: ModelInfoJSON Routes, 实际模型列表, 双标识倍率展开
-	Routes []ModelRouteInfoJSON `json:"routes"`
 }
 
-// ModelRouteInfoJSON 是单个「实际模型」路由（外部暴露名下的某个内部转发名）的倍率信息。
-// 关键词: ModelRouteInfoJSON, 实际模型路由倍率
-type ModelRouteInfoJSON struct {
-	InternalModelName string `json:"internal_model_name"`
-	HasOverride       bool   `json:"has_override"`
+// ActualModelInfoJSON 是单个「实际模型(内部转发名)」的计费倍率信息：含关联的对外 wrapper、
+// 是否已显式配置倍率、配置原始值与最终生效倍率（经 实际模型 -> 全局默认 -> 系统常量 分层解析）。
+// 关键词: ActualModelInfoJSON, 实际模型计费倍率, 关联 wrapper, 生效倍率
+type ActualModelInfoJSON struct {
+	InternalModelName string   `json:"internal_model_name"`
+	Wrappers          []string `json:"wrappers"`
+	ProviderCount     int      `json:"provider_count"`
+	HasMultiplier     bool     `json:"has_multiplier"`
 
-	// 覆盖原始值（0 表示该维未覆盖，回落下层）
-	OverrideInput       float64 `json:"override_input"`
-	OverrideOutput      float64 `json:"override_output"`
-	OverrideCacheCreate float64 `json:"override_cache_create"`
-	OverrideCacheHit    float64 `json:"override_cache_hit"`
+	// 配置原始值（0 表示该维未配置，回落下层）
+	ConfigInput       float64 `json:"config_input"`
+	ConfigOutput      float64 `json:"config_output"`
+	ConfigCacheCreate float64 `json:"config_cache_create"`
+	ConfigCacheHit    float64 `json:"config_cache_hit"`
 
 	// 最终生效四维倍率（经分层解析）
 	EffectiveInput       float64 `json:"effective_input"`
@@ -259,6 +256,7 @@ func (c *ServerConfig) servePortalDataAPI(conn net.Conn, request *http.Request) 
 		Providers:     make([]ProviderDataJSON, 0),
 		APIKeys:       make([]APIKeyDataJSON, 0),
 		ModelMetas:    make([]ModelInfoJSON, 0),
+		ActualModels:  make([]ActualModelInfoJSON, 0),
 	}
 
 	// Process provider data
@@ -310,8 +308,8 @@ func (c *ServerConfig) servePortalDataAPI(conn net.Conn, request *http.Request) 
 	}
 
 	// Get Model Metadata
-	// 全局默认倍率 + 全部 (W,I) override 一次性加载，供逐路由内存解析（避免 N 次 DB 查询）。
-	// 关键词: portal data 全局默认/override 预加载, resolveBillingMultipliersFrom
+	// 全局默认倍率 + 全部实际模型倍率一次性加载，供逐模型内存解析（避免 N 次 DB 查询）。
+	// 关键词: portal data 全局默认/实际模型倍率预加载, resolveModelMultipliersFrom
 	globalCfg, gErr := GetGlobalMultiplierConfig()
 	if gErr != nil {
 		log.Errorf("Failed to get global default multiplier: %v", gErr)
@@ -323,19 +321,18 @@ func (c *ServerConfig) servePortalDataAPI(conn net.Conn, request *http.Request) 
 		CacheCreationMultiplier: globalCfg.CacheCreationMultiplier,
 		CacheHitMultiplier:      globalCfg.CacheHitMultiplier,
 	}
-	allOverrides, oErr := GetAllModelMultiplierOverrides()
-	if oErr != nil {
-		log.Errorf("Failed to get model multiplier overrides: %v", oErr)
-		allOverrides = make(map[string]*AiModelMultiplierOverride)
+	allMultipliers, mErr := GetAllModelMultipliers()
+	if mErr != nil {
+		log.Errorf("Failed to get model multipliers: %v", mErr)
+		allMultipliers = make(map[string]*AiModelMultiplier)
 	}
 
+	// wrapper 级元数据表（描述/标签/老 TrafficMultiplier）。
 	allMetas, err := GetAllModelMetas()
 	if err != nil {
 		log.Errorf("Failed to get model metas: %v", err)
 	} else {
 		modelCounts := make(map[string]int)
-		// wrapper -> set of distinct internal model names（实际模型路由）
-		wrapperRoutes := make(map[string]map[string]bool)
 		for _, p := range providers {
 			name := p.WrapperName
 			if name == "" {
@@ -345,14 +342,6 @@ func (c *ServerConfig) servePortalDataAPI(conn net.Conn, request *http.Request) 
 				continue
 			}
 			modelCounts[name]++
-			internal := p.ModelName
-			if internal == "" {
-				continue
-			}
-			if wrapperRoutes[name] == nil {
-				wrapperRoutes[name] = make(map[string]bool)
-			}
-			wrapperRoutes[name][internal] = true
 		}
 
 		for name, count := range modelCounts {
@@ -360,7 +349,6 @@ func (c *ServerConfig) servePortalDataAPI(conn net.Conn, request *http.Request) 
 				Name:              name,
 				ProviderCount:     count,
 				TrafficMultiplier: 1.0,
-				Routes:            make([]ModelRouteInfoJSON, 0),
 			}
 			meta := allMetas[name] // 可能为 nil
 			if meta != nil {
@@ -369,37 +357,37 @@ func (c *ServerConfig) servePortalDataAPI(conn net.Conn, request *http.Request) 
 				if meta.TrafficMultiplier > 0 {
 					info.TrafficMultiplier = meta.TrafficMultiplier
 				}
-				info.InputTokenMultiplier = meta.InputTokenMultiplier
-				info.OutputTokenMultiplier = meta.OutputTokenMultiplier
-				info.CacheCreationMultiplier = meta.CacheCreationMultiplier
-				info.CacheHitMultiplier = meta.CacheHitMultiplier
 			}
-
-			// 构建该 wrapper 下的实际模型路由（按内部名排序），并逐路由解析生效倍率。
-			internals := make([]string, 0, len(wrapperRoutes[name]))
-			for internal := range wrapperRoutes[name] {
-				internals = append(internals, internal)
-			}
-			sort.Strings(internals)
-			for _, internal := range internals {
-				routeInfo := ModelRouteInfoJSON{InternalModelName: internal}
-				override := allOverrides[modelOverrideKey(name, internal)]
-				if override != nil {
-					routeInfo.HasOverride = true
-					routeInfo.OverrideInput = override.InputTokenMultiplier
-					routeInfo.OverrideOutput = override.OutputTokenMultiplier
-					routeInfo.OverrideCacheCreate = override.CacheCreationMultiplier
-					routeInfo.OverrideCacheHit = override.CacheHitMultiplier
-				}
-				eff := resolveBillingMultipliersFrom(globalCfg, meta, override)
-				routeInfo.EffectiveInput = eff.Input
-				routeInfo.EffectiveOutput = eff.Output
-				routeInfo.EffectiveCacheCreate = eff.CacheCreate
-				routeInfo.EffectiveCacheHit = eff.CacheHit
-				info.Routes = append(info.Routes, routeInfo)
-			}
-
 			data.ModelMetas = append(data.ModelMetas, info)
+		}
+	}
+
+	// 构建「实际模型(内部转发名)」计费倍率清单：计费的真正主体。
+	// 关键词: portal data ActualModels, 实际模型计费表, 分层生效倍率
+	internalModels, imErr := GetDistinctInternalModels()
+	if imErr != nil {
+		log.Errorf("Failed to enumerate internal models: %v", imErr)
+	} else {
+		for _, im := range internalModels {
+			am := ActualModelInfoJSON{
+				InternalModelName: im.InternalModelName,
+				Wrappers:          im.Wrappers,
+				ProviderCount:     im.ProviderCount,
+			}
+			mul := allMultipliers[im.InternalModelName] // 可能为 nil
+			if mul != nil {
+				am.HasMultiplier = true
+				am.ConfigInput = mul.InputTokenMultiplier
+				am.ConfigOutput = mul.OutputTokenMultiplier
+				am.ConfigCacheCreate = mul.CacheCreationMultiplier
+				am.ConfigCacheHit = mul.CacheHitMultiplier
+			}
+			eff := resolveModelMultipliersFrom(globalCfg, mul)
+			am.EffectiveInput = eff.Input
+			am.EffectiveOutput = eff.Output
+			am.EffectiveCacheCreate = eff.CacheCreate
+			am.EffectiveCacheHit = eff.CacheHit
+			data.ActualModels = append(data.ActualModels, am)
 		}
 	}
 
