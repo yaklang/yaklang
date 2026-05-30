@@ -37,10 +37,10 @@
 
 ## 任务状态机制: next_movements (核心)
 
-`next_movements` 是贯穿全部动作的全局任务状态通道, 与 ReAct 主循环同级的一等机制. 不是某个动作的私有字段, 也不是仅 verification / adjust_todolist 才能写的特权字段.
+`next_movements` 是贯穿全部动作的全局任务状态通道, 与 ReAct 主循环同级的一等机制. 不是某个动作的私有字段, 也不是仅满意度校验或独立待办调整动作才能写的特权字段.
 
-- 全局贯通. 任意 `@action` 都可在自身 JSON 中顺带携带 `next_movements` 数组, 系统统一 apply 到全局 TODO store 并广播事件, 不必等到 verification 或 adjust_todolist 才能维护状态.
-- 用途. 表达 "本动作之外, 模型希望对全局 TODO 做的增量调整". 例如调用工具的同时声明本轮要落档的新 TODO, 或在 directly_answer 中标记部分 TODO 已 done.
+- 全局贯通. 任意动作都可在自身 JSON 中顺带携带 `next_movements` 数组, 系统统一 apply 到全局 TODO store 并广播事件, 不必等到满意度校验或独立待办调整动作才能维护状态.
+- 用途. 表达 "本动作之外, 模型希望对全局 TODO 做的增量调整". 例如调用工具的同时声明本轮要落档的新 TODO, 或在结构化答复(直答)动作中标记部分 TODO 已关闭.
 - 形态. 数组, 每项 `{op, id, content}`; `id` 为稳定 snake_case ASCII handle, 不是用户可见文案; `content` 写当前会话自然语言, 不强行翻译为英文.
 - op 枚举.
   - `add`: 新建一条 TODO, 必填 `content`.
@@ -54,8 +54,8 @@
   - 新增必须服务当前 `CURRENT-TASK` 或主任务目标, 不跨子任务.
   - 链路体量受控 (~10KB), 过长优先 `done` 关闭旧项.
   - 本轮无变更则不输出 `next_movements` 字段.
-- 与终结的关系. 终结整个循环只有唯一动作 `finish`; `directly_answer` 只发答复不终结, 发完答复循环必然继续. 任意动作 (含 `directly_answer`) 都可顺带携带 `next_movements` 增量在同一步维护状态, 不必单独发一轮 adjust_todolist; 答复完成且全部工作收尾后再用 `finish` 收口.
-- 与 verification 关系. verification 的 `next_movements` 与本字段共享同一份 store, 二者增量按时序合并; 没有 "verification 专用" 或 "action 专用" 之分.
+- 与终结的关系. 终结整个循环只有唯一的标记完成动作; 结构化答复(直答)只发答复不终结, 发完答复循环必然继续. 任意动作 (含直答) 都可顺带携带 `next_movements` 增量在同一步维护状态, 不必单独发一轮待办调整动作; 答复完成且全部工作收尾后再用标记完成动作收口.
+- 与满意度校验的关系. 满意度校验阶段的 `next_movements` 与本字段共享同一份 store, 二者增量按时序合并; 没有 "校验专用" 或 "动作专用" 之分.
 
 ## 沟通格式与信息密度
 
@@ -135,7 +135,7 @@ AITAG 只作为字段内容承载方式，不作为推理对象。
 
 ### TODO 形态
 
-- 通道. 复用核心段 `## 任务状态机制: next_movements`, 不是 verification / adjust_todolist 的私有形态.
+- 通道. 复用核心段 `## 任务状态机制: next_movements`, 不是满意度校验或待办调整动作的私有形态.
 - 增量维护. 只提交本轮增量, op 枚举见核心段; 不回放系统已重建的历史 TODO.
 - 满意时增量留空, 系统自动 SKIPPED 剩余项.
 
