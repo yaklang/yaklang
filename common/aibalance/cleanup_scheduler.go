@@ -13,6 +13,12 @@ import (
 // 关键词: StatsRetentionDays, 180 天保留窗
 const StatsRetentionDays = 180
 
+// FreeIPUsageRetentionDays 是 free_user_ip_daily_usage 的保留窗口。
+// 这张表按 (date, ip) 展开，行数随独立 IP 数增长，保留窗设短（仅够面板看今日），
+// 避免按 IP 维度膨胀 DB。
+// 关键词: FreeIPUsageRetentionDays, 单 IP 用量短保留窗
+const FreeIPUsageRetentionDays = 2
+
 // runCleanupOnce 同步执行一次 daily 清理：
 //   - DELETE ai_daily_cache_stats WHERE date < today-StatsRetentionDays
 //   - DELETE ai_daily_user_seen   WHERE date < today-StatsRetentionDays
@@ -32,8 +38,14 @@ func runCleanupOnce(keepDays int) (int64, int64) {
 	if err != nil {
 		log.Warnf("daily cleanup CleanupOldUserSeen failed: %v", err)
 	}
-	log.Infof("daily cleanup done: cache_stats_removed=%d user_seen_removed=%d keep_days=%d",
-		cacheRows, userRows, keepDays)
+	// 单 IP 免费用量表用独立的短保留窗清理（与计费/统计表的长保留窗解耦）。
+	// 关键词: runCleanupOnce CleanupOldFreeUserIPUsage, 单 IP 用量短保留窗
+	freeIPRows, err := CleanupOldFreeUserIPUsage(FreeIPUsageRetentionDays)
+	if err != nil {
+		log.Warnf("daily cleanup CleanupOldFreeUserIPUsage failed: %v", err)
+	}
+	log.Infof("daily cleanup done: cache_stats_removed=%d user_seen_removed=%d free_ip_usage_removed=%d keep_days=%d free_ip_keep_days=%d",
+		cacheRows, userRows, freeIPRows, keepDays, FreeIPUsageRetentionDays)
 	return cacheRows, userRows
 }
 

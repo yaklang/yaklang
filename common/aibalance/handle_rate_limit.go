@@ -101,6 +101,11 @@ func (c *ServerConfig) handleGetRateLimitConfig(conn net.Conn, request *http.Req
 			// 轻量降级规则
 			// 关键词: handleGetRateLimitConfig model_downgrade_rules
 			"model_downgrade_rules": downgradeRules,
+			// 单 IP 免费模型每日用量限额
+			// 关键词: handleGetRateLimitConfig free_user_ip_limit
+			"free_user_ip_limit_enable":        config.FreeUserIPLimitEnable,
+			"free_user_ip_daily_request_limit": config.FreeUserIPDailyRequestLimit,
+			"free_user_ip_daily_token_limit_m": config.FreeUserIPDailyTokenLimitM,
 		},
 	})
 }
@@ -196,6 +201,11 @@ func (c *ServerConfig) handleSetRateLimitConfig(conn net.Conn, request *http.Req
 		// 轻量降级规则（传入空数组 [] 表示显式关闭降级）
 		// 关键词: handleSetRateLimitConfig model_downgrade_rules
 		ModelDowngradeRules []ModelDowngradeRule `json:"model_downgrade_rules,omitempty"`
+		// 单 IP 免费模型每日用量限额
+		// 关键词: handleSetRateLimitConfig free_user_ip_limit
+		FreeUserIPLimitEnable       *bool  `json:"free_user_ip_limit_enable,omitempty"`
+		FreeUserIPDailyRequestLimit *int64 `json:"free_user_ip_daily_request_limit,omitempty"`
+		FreeUserIPDailyTokenLimitM  *int64 `json:"free_user_ip_daily_token_limit_m,omitempty"`
 	}
 	if err := json.Unmarshal(bodyBytes, &reqBody); err != nil {
 		c.logError("failed to parse request body: %v", err)
@@ -353,6 +363,26 @@ func (c *ServerConfig) handleSetRateLimitConfig(conn net.Conn, request *http.Req
 		config.Custom429KindOverrides = string(ovJSON)
 	}
 
+	// 单 IP 免费模型每日用量限额写入（负数钳到 0，0 = 不限）
+	// 关键词: handleSetRateLimitConfig 写入 FreeUserIPLimit
+	if reqBody.FreeUserIPLimitEnable != nil {
+		config.FreeUserIPLimitEnable = *reqBody.FreeUserIPLimitEnable
+	}
+	if reqBody.FreeUserIPDailyRequestLimit != nil {
+		if *reqBody.FreeUserIPDailyRequestLimit < 0 {
+			config.FreeUserIPDailyRequestLimit = 0
+		} else {
+			config.FreeUserIPDailyRequestLimit = *reqBody.FreeUserIPDailyRequestLimit
+		}
+	}
+	if reqBody.FreeUserIPDailyTokenLimitM != nil {
+		if *reqBody.FreeUserIPDailyTokenLimitM < 0 {
+			config.FreeUserIPDailyTokenLimitM = 0
+		} else {
+			config.FreeUserIPDailyTokenLimitM = *reqBody.FreeUserIPDailyTokenLimitM
+		}
+	}
+
 	// 轻量降级规则写入：from/to 为空的规则被丢弃；空数组 [] 表示显式关闭（不回退内置默认）
 	// 关键词: handleSetRateLimitConfig 写入 ModelDowngradeRules
 	if reqBody.ModelDowngradeRules != nil {
@@ -430,11 +460,32 @@ func (c *ServerConfig) handleGetRateLimitStatus(conn net.Conn, request *http.Req
 		c.logWarn("QueryFreeUserTokenUsageSnapshot failed: %v", err)
 	}
 
+	// 单 IP 免费模型用量快照：今日有多少个 IP 在用 + Top-N 用量榜
+	// 关键词: handleGetRateLimitStatus free_ip_usage 快照
+	freeIPUsage := map[string]interface{}{}
+	if distinctCount, top, date, err := QueryFreeUserIPUsageSnapshot(20); err == nil {
+		freeIPUsage["reset_date"] = date
+		freeIPUsage["distinct_ip_count"] = distinctCount
+		topOut := make([]map[string]interface{}, 0, len(top))
+		for _, r := range top {
+			topOut = append(topOut, map[string]interface{}{
+				"ip":            r.IP,
+				"request_count": r.RequestCount,
+				"tokens_used":   r.TokensUsed,
+				"used_m":        r.UsedM,
+			})
+		}
+		freeIPUsage["top"] = topOut
+	} else {
+		c.logWarn("QueryFreeUserIPUsageSnapshot failed: %v", err)
+	}
+
 	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
 		"success":               true,
 		"queue_count":           queueCount,
 		"default_rpm":           defaultRPM,
 		"free_user_token_usage": freeTokenUsage,
+		"free_ip_usage":         freeIPUsage,
 	})
 }
 

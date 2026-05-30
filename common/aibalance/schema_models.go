@@ -194,6 +194,18 @@ type AiBalanceRateLimitConfig struct {
 	// JSON 数组：[{"tier":"lightweight","from":"memfit-standard-free","to":"memfit-light-free"}]
 	// server 在解析出 modelName 后，按请求头 X-Yak-AI-Model-Usage-Type 命中规则即改写 modelName。
 	ModelDowngradeRules string `json:"model_downgrade_rules" gorm:"type:text"`
+
+	// 单 IP 免费模型每日用量限额（保护公共免费接口公平，防单 IP 高频盗刷）
+	// 关键词: FreeUserIPLimit, 单 IP 每日限额, 公共免费接口公平, 防盗刷
+	//
+	//   - FreeUserIPLimitEnable       是否启用单 IP 每日限额（默认开启）
+	//   - FreeUserIPDailyRequestLimit 每个 IP 每日「计费免费模型」请求次数上限，0 = 不限
+	//   - FreeUserIPDailyTokenLimitM  每个 IP 每日「计费免费模型」加权 Token 上限（M 单位），0 = 不限
+	//
+	// 仅统计计费免费模型（-free 后缀且未被 exempt 标记）；切日点与免费 Token 限额一致（北京时间每日 06:00）。
+	FreeUserIPLimitEnable       bool  `json:"free_user_ip_limit_enable" gorm:"default:true"`
+	FreeUserIPDailyRequestLimit int64 `json:"free_user_ip_daily_request_limit" gorm:"default:500"`
+	FreeUserIPDailyTokenLimitM  int64 `json:"free_user_ip_daily_token_limit_m" gorm:"default:30"`
 }
 
 func (a *AiBalanceRateLimitConfig) TableName() string {
@@ -382,6 +394,26 @@ type FreeUserDailyTokenUsage struct {
 
 func (a *FreeUserDailyTokenUsage) TableName() string {
 	return "free_user_daily_token_usage"
+}
+
+// FreeUserIPDailyUsage 持久化单个客户端 IP 的「每日免费模型用量」聚合行。
+// 一行 = (date, ip) 唯一；聚合该 IP 当天所有「计费免费模型」的请求数与加权 Token。
+// 用以限制单 IP 高频盗刷公共免费接口，保证免费额度对所有用户公平。
+// 跨日由 date 维度天然拆分；旧日数据由 cleanup 任务每日清理（保留窗很短，仅够面板看今日），
+// 避免按 IP 维度展开导致 DB 行数膨胀。
+// 关键词: free_user_ip_daily_usage, 单 IP 每日免费用量, 防盗刷, 公平限额
+type FreeUserIPDailyUsage struct {
+	gorm.Model
+
+	Date         string    `json:"date" gorm:"size:10;unique_index:idx_free_ip;index:idx_free_ip_date;not null"`
+	IP           string    `json:"ip" gorm:"size:64;unique_index:idx_free_ip;index:idx_free_ip_ip;not null"`
+	RequestCount int64     `json:"request_count"`
+	TokensUsed   int64     `json:"tokens_used"`
+	LastSeenAt   time.Time `json:"last_seen_at"`
+}
+
+func (a *FreeUserIPDailyUsage) TableName() string {
+	return "free_user_ip_daily_usage"
 }
 
 // ==================== B 类表自动迁移 ====================

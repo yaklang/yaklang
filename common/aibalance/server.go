@@ -829,6 +829,11 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 		}
 	}
 
+	// 真实客户端 IP：用于「单 IP 免费模型每日用量限额」(gate + Token 计费)。
+	// 在此函数作用域内解析一次，供后续 gate 与 onUsageForward / fallback 计费闭包复用。
+	// 关键词: serveChatCompletions clientIP 复用, 单 IP 免费限额
+	clientIP := extractClientIP(rawPacket, conn)
+
 	// 免费用户限流三件套（daily check + RPM check + free user delay）整体搬
 	// 到 prompt 构造之后，目的是让 daily check 能用 prompt.String() + image
 	// 数立刻做 in-flight 预扣并参与本次判决，硬卡死并发过冲；同时维持
@@ -908,6 +913,15 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 	// 关键词: serveChatCompletions gate 抽离, gateChatFreeUserDailyToken
 	if isFreeModel {
 		if c.gateChatFreeUserDailyToken(conn, modelName) {
+			return
+		}
+	}
+
+	// 单 IP 免费模型每日用量限额：防止单个客户端 IP 高频盗刷公共免费接口，
+	// 保证免费额度对所有用户公平。仅对计费免费模型生效；检查通过即累加请求计数。
+	// 关键词: serveChatCompletions gateChatFreeUserIPLimit, 单 IP 每日限额, 防盗刷
+	if isFreeModel {
+		if c.gateChatFreeUserIPLimit(conn, clientIP, modelName) {
 			return
 		}
 	}
@@ -1167,6 +1181,12 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 							c.logInfo("Free user token usage updated: model=%s weighted=%d bucket_kind=%s",
 								modelName, weighted, ternaryStr(modelHasOwnBucket, "model", "global"))
 						}
+						// 单 IP 维度累加加权 Token（与全局/模型桶并行，用于单 IP 每日限额）。
+						// 关键词: onUsageForward AddFreeUserIPDailyTokens, 单 IP Token 计费
+						if ipErr := AddFreeUserIPDailyTokens(clientIP, weighted); ipErr != nil {
+							c.logWarn("AddFreeUserIPDailyTokens failed (ip=%s model=%s weighted=%d): %v",
+								clientIP, modelName, weighted, ipErr)
+						}
 					}
 				} else if key != nil {
 					if err := UpdateAiApiKeyTokenUsed(key.Key, weighted); err != nil {
@@ -1395,6 +1415,15 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 			)
 			if fbResult.EstimatedUsage != nil {
 				writer.WriteUsageEstimated(fbResult.EstimatedUsage)
+			}
+			// 单 IP 维度累加 fallback 估算的加权 Token（仅免费模型且确实扣费、非 apikey 桶）。
+			// 与 onUsageForward 正路口径一致：exempt / 未扣费不累加。
+			// 关键词: fallback AddFreeUserIPDailyTokens, 单 IP Token 兜底计费
+			if isFreeModel && fbResult.Billed && fbResult.Bucket != "apikey" && fbResult.Weighted > 0 {
+				if ipErr := AddFreeUserIPDailyTokens(clientIP, fbResult.Weighted); ipErr != nil {
+					c.logWarn("fallback AddFreeUserIPDailyTokens failed (ip=%s model=%s weighted=%d): %v",
+						clientIP, modelName, fbResult.Weighted, ipErr)
+				}
 			}
 			usageBilled.Store(true) // 防止 1499 段二次执行 (估算口径已记账)
 		}
@@ -2528,6 +2557,76 @@ func (c *ServerConfig) writeDailyTokenLimitResponse(conn net.Conn, modelName, bu
 			"Content-Length: %d\r\n"+
 			"\r\n",
 		tokensUsed, tokensLimit, len(body))
+	conn.Write([]byte(header))
+	conn.Write(body)
+}
+
+// writeFreeIPLimitResponse sends a 429 response when a single client IP has exceeded
+// its daily free-model quota (request count or weighted token). Body carries the固定
+// 友好提示与 used/limit 明细，供客户端展示与运维核对。
+//
+// 字段对应：
+//   - type            "free_ip_limit_exceeded"
+//   - limit_kind      "free_ip_quota"
+//   - limit_kind_zh   "免费用量已用尽"
+//   - exceeded_kind   "request" | "token"
+//   - request_used / request_limit  当天请求数与上限
+//   - tokens_used / tokens_limit    当天加权 token 与上限
+//
+// HTTP header: X-AIBalance-Limit-Kind: free_ip + Retry-After: 3600
+// （建议客户端等到次日北京时间 06:00 附近重试）
+//
+// 关键词: writeFreeIPLimitResponse, 单 IP 免费用量 429, 当前环境免费用量已用尽, resolveLimit429 free_ip
+func (c *ServerConfig) writeFreeIPLimitResponse(conn net.Conn, decision *FreeUserIPLimitDecision) {
+	if decision == nil {
+		decision = &FreeUserIPLimitDecision{}
+	}
+	// 默认固定文案：提示用户当前环境免费额度已耗尽，请自行配置 AI 后端。
+	// 关键词: 免费 IP 限额提示词, 当前环境免费用量已用尽
+	const defaultFriendlyMessage = "当前环境免费用量已用尽，请自行配置 AI 后端使用。" +
+		"Free quota for this environment has been used up, please configure your own AI backend."
+	// 默认文案保持固定；启用自定义 429 时按 kind=free_ip 覆盖 message 并注入 notice。
+	friendlyMessage, notice := c.resolveLimit429("free_ip", defaultFriendlyMessage)
+	type errBody struct {
+		Type         string `json:"type"`
+		Message      string `json:"message"`
+		Notice       string `json:"notice,omitempty"`
+		LimitKind    string `json:"limit_kind"`
+		LimitKindZh  string `json:"limit_kind_zh"`
+		ExceededKind string `json:"exceeded_kind"`
+		RequestUsed  int64  `json:"request_used"`
+		RequestLimit int64  `json:"request_limit"`
+		TokensUsed   int64  `json:"tokens_used"`
+		TokensLimit  int64  `json:"tokens_limit"`
+	}
+	type wrap struct {
+		Error errBody `json:"error"`
+	}
+	payload := wrap{Error: errBody{
+		Type:         "free_ip_limit_exceeded",
+		Message:      friendlyMessage,
+		Notice:       notice,
+		LimitKind:    "free_ip_quota",
+		LimitKindZh:  "免费用量已用尽",
+		ExceededKind: decision.ExceededKind,
+		RequestUsed:  decision.RequestUsed,
+		RequestLimit: decision.RequestLimit,
+		TokensUsed:   decision.TokensUsed,
+		TokensLimit:  decision.TokensLimit,
+	}}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		c.logError("writeFreeIPLimitResponse marshal failed: %v", err)
+		body = []byte(`{"error":{"type":"free_ip_limit_exceeded","limit_kind":"free_ip_quota","message":"Free quota for this environment has been used up, please configure your own AI backend."}}`)
+	}
+	header := fmt.Sprintf(
+		"HTTP/1.1 429 Too Many Requests\r\n"+
+			"Content-Type: application/json; charset=utf-8\r\n"+
+			"X-AIBalance-Limit-Kind: free_ip\r\n"+
+			"Retry-After: 3600\r\n"+
+			"Content-Length: %d\r\n"+
+			"\r\n",
+		len(body))
 	conn.Write([]byte(header))
 	conn.Write(body)
 }

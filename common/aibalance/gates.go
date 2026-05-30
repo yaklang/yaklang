@@ -203,6 +203,52 @@ func (c *ServerConfig) gateChatFreeUserDailyToken(conn net.Conn, modelName strin
 	return false
 }
 
+// gateChatFreeUserIPLimit 处理 chat 入口的「单 IP 免费模型每日用量限额」：
+// 防止单个客户端 IP 高频盗刷公共免费接口，保证免费额度对所有用户公平。
+//
+// 仅统计「计费免费模型」：exempt（不计费）模型直接放行不计数；IP 不可识别（空/unknown）
+// 也直接放行。检查通过即累加一次请求计数；超限则写 429 固定提示并拦截。
+// Token 维度的累加在 onUsageForward / fallback 计费分流处完成（与请求计数分离）。
+// 关键词: gateChatFreeUserIPLimit, 单 IP 每日限额, 防盗刷, 计费免费模型, 请求计数
+func (c *ServerConfig) gateChatFreeUserIPLimit(conn net.Conn, clientIP, modelName string) bool {
+	if freeIPUsageIgnoredIP(clientIP) {
+		return false
+	}
+	// 模型豁免计费时不参与单 IP 限额（与 onUsageForward 计费分流口径一致）。
+	if isFreeModelBillingExempt(modelName) {
+		return false
+	}
+
+	decision, err := CheckFreeUserIPDailyLimit(clientIP)
+	if err != nil {
+		c.logError("CheckFreeUserIPDailyLimit failed (ip=%s model=%s): %v", clientIP, modelName, err)
+	} else if decision != nil && !decision.Allowed {
+		c.logWarn("Free IP daily limit exceeded (ip=%s model=%s kind=%s request_used=%d/%d tokens_used=%d/%d)",
+			clientIP, modelName, decision.ExceededKind,
+			decision.RequestUsed, decision.RequestLimit,
+			decision.TokensUsed, decision.TokensLimit)
+		c.writeFreeIPLimitResponse(conn, decision)
+		return true
+	}
+
+	// 检查通过：累加一次请求计数（Token 在计费分流处累加）。失败仅 logWarn，不阻塞业务。
+	if addErr := AddFreeUserIPDailyRequest(clientIP); addErr != nil {
+		c.logWarn("AddFreeUserIPDailyRequest failed (ip=%s model=%s): %v", clientIP, modelName, addErr)
+	}
+	return false
+}
+
+// isFreeModelBillingExempt 判断某个免费模型是否被配置为「豁免计费」(exempt=true)。
+// 与 onUsageForward / resolveInFlightBucketKey 的 exempt 判定保持一致。
+// 关键词: isFreeModelBillingExempt, 免费模型豁免计费判定
+func isFreeModelBillingExempt(modelName string) bool {
+	overrides := parseFreeUserTokenModelOverridesFromConfig()
+	if ov, ok := overrides[modelName]; ok && ov.Exempt {
+		return true
+	}
+	return false
+}
+
 // gateRPM 处理按 API key（含模型级覆盖）的 RPM 限流检查。
 // 关键词: gateRPM, chatRateLimiter.CheckRateLimit, RPM 429
 func (c *ServerConfig) gateRPM(conn net.Conn, apiKeyForStat, modelName string) bool {
