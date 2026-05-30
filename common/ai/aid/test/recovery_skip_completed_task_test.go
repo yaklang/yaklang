@@ -203,9 +203,14 @@ func TestRecovery_SkipCompletedTasks(t *testing.T) {
     "task_long_summary": "ok"
 }`))
 			} else {
+				// 去 Exit 化后 directly_answer 只发答复并继续, 子任务 react 循环只能由
+				// 唯一终结器 finish 收口; 恢复流程只需每个未跳过任务触发 AI 调用并完成,
+				// 故决策直接发 finish 让子任务循环收口.
+				// 关键词: directly_answer 永不 Exit, finish 唯一终结器, 子任务循环收口
 				rsp.EmitOutputStream(strings.NewReader(`{
-    "@action": "directly_answer",
-    "answer_payload": "ok"
+    "@action": "object",
+    "next_action": {"type": "finish"},
+    "human_readable_thought": "ok"
 }`))
 			}
 			rsp.Close()
@@ -367,9 +372,14 @@ func TestRecovery_StartFromSpecifiedTask(t *testing.T) {
     "task_long_summary": "ok"
 }`))
 			} else {
+				// 去 Exit 化后 directly_answer 只发答复并继续, 子任务 react 循环只能由
+				// 唯一终结器 finish 收口; 恢复流程只需每个未跳过任务触发 AI 调用并完成,
+				// 故决策直接发 finish 让子任务循环收口.
+				// 关键词: directly_answer 永不 Exit, finish 唯一终结器, 子任务循环收口
 				rsp.EmitOutputStream(strings.NewReader(`{
-    "@action": "directly_answer",
-    "answer_payload": "ok"
+    "@action": "object",
+    "next_action": {"type": "finish"},
+    "human_readable_thought": "ok"
 }`))
 			}
 			rsp.Close()
@@ -550,9 +560,14 @@ func TestRecovery_StartEarlierThanPreviousCursorResetsCompletedTasks(t *testing.
     "task_long_summary": "ok"
 }`))
 			} else {
+				// 去 Exit 化后 directly_answer 只发答复并继续, 子任务 react 循环只能由
+				// 唯一终结器 finish 收口; 恢复流程只需每个未跳过任务触发 AI 调用并完成,
+				// 故决策直接发 finish 让子任务循环收口.
+				// 关键词: directly_answer 永不 Exit, finish 唯一终结器, 子任务循环收口
 				rsp.EmitOutputStream(strings.NewReader(`{
-    "@action": "directly_answer",
-    "answer_payload": "ok"
+    "@action": "object",
+    "next_action": {"type": "finish"},
+    "human_readable_thought": "ok"
 }`))
 			}
 			rsp.Close()
@@ -645,9 +660,14 @@ func TestRecovery_CancelledTaskPersistsAbortedState(t *testing.T) {
     "task_long_summary": "ok"
 }`))
 			} else {
+				// 去 Exit 化后 directly_answer 只发答复并继续, 子任务 react 循环只能由
+				// 唯一终结器 finish 收口; 恢复流程只需每个未跳过任务触发 AI 调用并完成,
+				// 故决策直接发 finish 让子任务循环收口.
+				// 关键词: directly_answer 永不 Exit, finish 唯一终结器, 子任务循环收口
 				rsp.EmitOutputStream(strings.NewReader(`{
-    "@action": "directly_answer",
-    "answer_payload": "ok"
+    "@action": "object",
+    "next_action": {"type": "finish"},
+    "human_readable_thought": "ok"
 }`))
 			}
 			rsp.Close()
