@@ -179,4 +179,11 @@ var SynxPortScanExports = map[string]interface{}{
 	"iface":              synscanx.WithIface,
 	"shuffle":            synscanx.WithShuffle,
 	"maxPorts":           synscanx.WithMaxOpenPorts,
+
+	// context 注入可取消 ctx: cancel 时 syn 发包/提交/结果投递循环都会通过
+	// s.ctx.Done() 立刻短路退出 (见 synscanx.Scannerx). 这是让上层 (如 AI 插件)
+	// 取消任务时, syn 扫描能尽快停止、不再对异常目标 (tarpit/全端口响应) 持续
+	// 发包刷屏的关键. 缺省为 context.Background().
+	// 关键词: synscan context 注入, syn 扫描可取消, AI 插件 cancel 传播
+	"context": synscanx.WithCtx,
 }
