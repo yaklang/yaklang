@@ -40,6 +40,59 @@ func GetInFlightFingerprintScans() int64 {
 	return fingerprintInFlight.Load()
 }
 
+// maxOpenPortsPerHost 是单主机"开放端口数"熔断阈值. 在一次扫描中, 如果同一个
+// 主机被识别出的开放端口数量达到该阈值, 几乎可以确定这是一个异常目标 (例如
+// tarpit / 防火墙 / NAT 设备对所有端口都回 SYN-ACK, 或处于 198.18.0.0/15 这类
+// benchmark 保留段的"全开放"主机). 这种主机会让 fingerprint inner goroutine 与
+// 日志无限增长, 拖垮整个系统. 命中阈值后直接强制停止整条扫描流, 保护系统健康.
+//
+// 关键词: scan port 单主机端口熔断阈值, 150 端口, tarpit 防护
+const maxOpenPortsPerHost = 150
+
+// hostPortGuard 是 servicescan 的"单主机端口数熔断器". 它统计一次扫描流里每个
+// 主机出现的端口数, 当任意主机达到 limit 时触发熔断 (tripped). 上层据此强制
+// 停止整条扫描流, 避免对异常目标 (tarpit/全端口响应) 无限扫描刷屏.
+//
+// 注意: 这里采用"单主机累计端口数"而非严格的"连续端口数"作为判据. 累计计数对
+// 多主机交错的结果流更鲁棒, 且异常主机 (单点全开放) 在累计语义下同样会命中,
+// 不会漏判; 而严格"连续"语义在多主机交错时容易被打断而失效.
+//
+// 关键词: servicescan 单主机端口熔断, hostPortGuard, scan port 健康保护
+type hostPortGuard struct {
+	mu      sync.Mutex
+	limit   int
+	count   map[string]int
+	tripped bool
+}
+
+// newHostPortGuard 创建一个熔断器. limit <= 0 表示禁用熔断 (observe 恒返回 false).
+func newHostPortGuard(limit int) *hostPortGuard {
+	return &hostPortGuard{
+		limit: limit,
+		count: make(map[string]int),
+	}
+}
+
+// observe 记录 host 的一次端口出现, 返回 true 表示已触发熔断 (该主机端口数达到
+// limit, 或之前已经触发过). 一旦触发, 后续对任何主机的 observe 都返回 true,
+// 保证上层能稳定地走到"强制停止"分支.
+func (g *hostPortGuard) observe(host string) bool {
+	if g == nil || g.limit <= 0 {
+		return false
+	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.tripped {
+		return true
+	}
+	g.count[host]++
+	if g.count[host] >= g.limit {
+		g.tripped = true
+		return true
+	}
+	return false
+}
+
 // sendMatchResultOrDrop 把 fingerprint 结果送入 outC. 当 ctx 已 cancel
 // 时主动放弃, 防止下游已停止消费时 inner goroutine 永久阻塞 (chan send hang).
 //
@@ -143,11 +196,34 @@ func _scanFingerprint(ctx context.Context, config *fp.Config, concurrent int, ho
 		outCBuf = 1
 	}
 	outC := make(chan *fp.MatchResult, outCBuf)
+
+	// scanCtx / guard 含义同 _scanFromTargetStream. 区别在于: 这里是 TCP 全连接
+	// 扫描, 派发循环遍历的是"待探测端口"(attempt)而非"已开放端口", 因此熔断必须按
+	// "开放结果"计数, 否则像 1-65535 这种合法全端口扫描会在第 150 个 attempt 就被
+	// 误杀. 所以 guard.observe 放在 inner goroutine 判定 result.IsOpen() 之后.
+	// 关键词: _scanFingerprint ctx 短路, TCP 扫描按开放端口熔断
+	scanCtx, scanCancel := context.WithCancel(ctx)
+	guard := newHostPortGuard(maxOpenPortsPerHost)
+
+	// tripGuard 在 inner goroutine 判定端口开放后调用, 命中阈值则强制停止整条流.
+	tripGuard := func(h string) {
+		if guard.observe(h) {
+			log.Errorf("host [%s] reached scan-port safety threshold (%d open ports in one scan); likely a tarpit/firewall responding on all ports, force stopping the scan to keep the system healthy", h, maxOpenPortsPerHost)
+			scanCancel()
+		}
+	}
+
 	go func() {
+		defer scanCancel()
 		swg := utils.NewSizedWaitGroup(concurrent)
 		portsInt := utils.ParseStringToPorts(port)
+	dispatch:
 		for _, p := range portsInt {
 			for _, hRaw := range utils.ParseStringToHosts(host) {
+				// ctx 短路: cancel / 熔断后立即停止派发, 不再继续遍历端口与打印日志.
+				if scanCtx.Err() != nil {
+					break dispatch
+				}
 				h := utils.ExtractHost(hRaw)
 				if h != hRaw {
 					buildinHost, buildinPort, _ := utils.ParseStringToHostPort(hRaw)
@@ -157,6 +233,9 @@ func _scanFingerprint(ctx context.Context, config *fp.Config, concurrent int, ho
 							defer swg.Done()
 							fingerprintInFlight.Add(1)
 							defer fingerprintInFlight.Add(-1)
+							if scanCtx.Err() != nil {
+								return
+							}
 							proto, portWithoutProto := utils.ParsePortToProtoPort(buildinPort) // 这里将协议和端口分开，便于后面打印日志
 							addr := utils.HostPort(buildinHost, buildinPort)
 							if filter.Exist(addr) {
@@ -164,7 +243,7 @@ func _scanFingerprint(ctx context.Context, config *fp.Config, concurrent int, ho
 							}
 							filter.Insert(addr)
 							log.Infof("start task to scan: [%s://%s]", proto, utils.HostPort(buildinHost, portWithoutProto))
-							result, err := matcher.MatchWithContext(ctx, buildinHost, buildinPort)
+							result, err := matcher.MatchWithContext(scanCtx, buildinHost, buildinPort)
 							if err != nil {
 								if len(portsInt) <= 0 {
 									if strings.Contains(fmt.Sprint(err), "excludeHosts/Ports") {
@@ -179,7 +258,10 @@ func _scanFingerprint(ctx context.Context, config *fp.Config, concurrent int, ho
 								return
 							}
 
-							sendMatchResultOrDrop(ctx, outC, result)
+							if result.IsOpen() {
+								tripGuard(buildinHost)
+							}
+							sendMatchResultOrDrop(scanCtx, outC, result)
 						}()
 					}
 				}
@@ -193,6 +275,9 @@ func _scanFingerprint(ctx context.Context, config *fp.Config, concurrent int, ho
 					fingerprintInFlight.Add(1)
 					defer fingerprintInFlight.Add(-1)
 
+					if scanCtx.Err() != nil {
+						return
+					}
 					addr := utils.HostPort(rawHost, rawPort)
 					if filter.Exist(addr) {
 						return
@@ -200,13 +285,16 @@ func _scanFingerprint(ctx context.Context, config *fp.Config, concurrent int, ho
 					filter.Insert(addr)
 
 					//log.Infof("start task to scan: [%s://%s]", proto, utils.HostPort(rawHost, portWithoutProto))
-					result, err := matcher.MatchWithContext(ctx, rawHost, rawPort)
+					result, err := matcher.MatchWithContext(scanCtx, rawHost, rawPort)
 					if err != nil {
 						log.Errorf("failed to scan [%s://%s]: %v", proto, utils.HostPort(rawHost, portWithoutProto), err)
 						return
 					}
 
-					sendMatchResultOrDrop(ctx, outC, result)
+					if result.IsOpen() {
+						tripGuard(rawHost)
+					}
+					sendMatchResultOrDrop(scanCtx, outC, result)
 				}()
 			}
 		}
@@ -406,9 +494,36 @@ func _scanFromTargetStream(res interface{}, opts ...fp.ConfigOption) (chan *fp.M
 		outCBuf = 1
 	}
 	outC := make(chan *fp.MatchResult, outCBuf)
+
+	// scanCtx 派生自调用方 ctx, 额外承担"内部熔断"职责: 当命中单主机端口数熔断,
+	// 或调用方 cancel 时, 通过 scanCancel 让派发循环与所有 inner goroutine 一起
+	// 退出, 而不是把 synResults 里剩余目标全部"派发 + 打印"一遍.
+	// 关键词: _scanFromTargetStream 派发 ctx 短路, 单主机端口熔断 cancel
+	scanCtx, scanCancel := context.WithCancel(ctx)
+
+	// guard 单主机端口数熔断器. 这里 synResults 中的每个元素都是"已开放端口"
+	// (synscan 只投递开放端口, SpaceEngine/Ping 等输入也都是已确认的目标),
+	// 因此在派发处计数即等价于"单主机开放端口数", 语义正确.
+	guard := newHostPortGuard(maxOpenPortsPerHost)
+
 	go func() {
+		defer scanCancel()
 		swg := utils.NewSizedWaitGroup(concurrent)
 		for synRes := range synResults {
+			// ctx 短路: 历史 bug 的根因之一是这个派发循环从不检查 ctx. cancel 后
+			// MatchWithContext / sendMatchResultOrDrop 虽然会快速返回, 但
+			// "start task to scan" 日志在调用 MatchWithContext 之前就打印了, 循环
+			// 又不提前退出, 于是 cancel 之后仍会把剩余目标全部刷屏. 这里提前 break.
+			if scanCtx.Err() != nil {
+				break
+			}
+			// 单主机端口数熔断: 命中阈值视为异常目标 (tarpit/防火墙全端口响应),
+			// 强制停止整条扫描流, 保护系统健康.
+			if guard.observe(synRes.Host) {
+				log.Errorf("host [%s] reached scan-port safety threshold (%d open ports in one scan); likely a tarpit/firewall responding on all ports, force stopping the scan to keep the system healthy", synRes.Host, maxOpenPortsPerHost)
+				scanCancel()
+				break
+			}
 			swg.Add()
 			rawPort := synRes.Port
 			rawHost := synRes.Host
@@ -418,16 +533,28 @@ func _scanFromTargetStream(res interface{}, opts ...fp.ConfigOption) (chan *fp.M
 				fingerprintInFlight.Add(1)
 				defer fingerprintInFlight.Add(-1)
 
+				// 派发到真正执行之间也可能已 cancel, 再次短路, 避免无谓的日志与扫描.
+				if scanCtx.Err() != nil {
+					return
+				}
 				log.Infof("start task to scan: [%s://%s]", proto, utils.HostPort(rawHost, portWithoutProto))
-				result, err := matcher.MatchWithContext(ctx, rawHost, rawPort)
+				result, err := matcher.MatchWithContext(scanCtx, rawHost, rawPort)
 				if err != nil {
 					log.Errorf("failed to scan [%s://%s]: %v", proto, utils.HostPort(rawHost, portWithoutProto), err)
 					return
 				}
 
-				sendMatchResultOrDrop(ctx, outC, result)
+				sendMatchResultOrDrop(scanCtx, outC, result)
 			}()
 		}
+
+		// 退出派发循环后 (无论是正常结束 / cancel / 熔断), 都把 synResults 抽干,
+		// 防止上游 producer goroutine 永久阻塞在 `synResults <- r` 上而泄漏.
+		// 关键词: synResults drain on exit, producer 不阻塞
+		go func() {
+			for range synResults {
+			}
+		}()
 
 		go func() {
 			swg.Wait()

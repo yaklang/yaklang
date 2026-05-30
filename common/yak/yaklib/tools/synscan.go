@@ -39,6 +39,14 @@ type _yakPortScanConfig struct {
 	excludeHosts *hostsparser.HostsParser
 	excludePorts filter.Filterable
 
+	// ctx 是本次 syn 扫描的取消上下文. 历史上 synscan 内部硬编码
+	// context.Background(), 导致一旦目标是 tarpit / 全端口响应的异常主机, 即使上层
+	// (如 AI 插件) 取消任务, syn 扫描仍会把全部端口扫完, 持续刷屏 + 占用网卡/CPU,
+	// 形成资源泄漏. 注入可取消 ctx 后, cancel 会一路传到 hybridscan / synscan.Scanner,
+	// 让发包循环与结果投递立刻短路退出.
+	// 关键词: synscan ctx 注入, syn 扫描可取消, AI 插件 cancel 传播
+	ctx context.Context
+
 	callback           func(result *synscan.SynScanResult)
 	submitTaskCallback func(i string)
 }
@@ -464,8 +472,16 @@ func runScan(sampleTarget string, filteredTargetChan chan string, ports string, 
 	// Fingerprint scan switch
 	scanCenterConfig.DisableFingerprintMatch = true // !config.enableFingerprint
 
+	// scanCtx 取自调用方注入的可取消 ctx (缺省退化为 background). 把它一路透传给
+	// hybridscan / synscan.Scanner, 让 cancel 能真正停下发包与等待, 而不是只能等
+	// 整段端口扫完. 关键词: synscan runScan ctx 透传, cancel 快速收敛
+	scanCtx := config.ctx
+	if scanCtx == nil {
+		scanCtx = context.Background()
+	}
+
 	log.Info("start create hyper scan center...")
-	scanCenter, err := hybridscan.NewHyperScanCenter(context.Background(), scanCenterConfig)
+	scanCenter, err := hybridscan.NewHyperScanCenter(scanCtx, scanCenterConfig)
 	if err != nil {
 		return utils.Errorf("create hyper scan center failed: %s", err)
 	}
@@ -544,8 +560,12 @@ func runScan(sampleTarget string, filteredTargetChan chan string, ports string, 
 		}
 		config.callCallback(result)
 
+		// ctx 短路: cancel 后下游可能已停止消费 openResult, 这里不能死等, 否则
+		// 持有 openPortLock 永久阻塞, 拖死整个扫描中心.
 		select {
 		case openResult <- result:
+		case <-scanCtx.Done():
+			return
 		}
 
 		if outputFile != nil {
@@ -570,6 +590,11 @@ func runScan(sampleTarget string, filteredTargetChan chan string, ports string, 
 
 	ports = utils.ConcatPorts(portInts)
 	for target := range filteredTargetChan {
+		// ctx 短路: cancel 后立即停止提交后续目标, 避免对异常主机继续全端口扫描.
+		if scanCtx.Err() != nil {
+			log.Infof("syn scan submit loop stopped early: context canceled")
+			break
+		}
 		if config.IsFiltered(target, 0) {
 			continue
 		}
@@ -597,8 +622,11 @@ func runScan(sampleTarget string, filteredTargetChan chan string, ports string, 
 	log.Infof("finished submitting.")
 
 	log.Infof("waiting last packet (SYN) for %v seconds", config.waiting)
+	// ctx 短路: cancel 后无需再等待 waiting 收尾, 立即返回让 defer 关闭资源.
 	select {
 	case <-time.After(config.waiting):
+	case <-scanCtx.Done():
+		log.Infof("syn scan wait stage stopped early: context canceled")
 	}
 
 	log.Infof("total %v open port(s) found", openPortCount)
@@ -728,6 +756,27 @@ func _scanOptCallback(i func(i *synscan.SynScanResult)) scanOpt {
 	}
 }
 
+// context syn scan 的配置选项，设置扫描的取消上下文。当 ctx 被取消时，syn 扫描会
+// 尽快停止发包与结果投递，释放网卡/协程资源，避免对异常目标（如 tarpit/全端口响应
+// 主机）持续扫描造成资源浪费与泄漏。
+// @param {context.Context} ctx 取消上下文
+// @return {scanOpt} 返回配置选项
+// Example:
+// ```
+// ctx, cancel = context.WithCancel(context.Background())
+// defer cancel()
+// res, err = synscan.Scan("127.0.0.1", "1-65535", synscan.context(ctx))
+// die(err)
+// ```
+func _scanOptContext(ctx context.Context) scanOpt {
+	return func(config *_yakPortScanConfig) {
+		if ctx == nil {
+			return
+		}
+		config.ctx = ctx
+	}
+}
+
 // submitTaskCallback syn scan 的配置选项，设置一个回调函数，每提交一个探测数据包的时候，这个回调会执行一次
 // @param {func(string)} i 回调函数
 // @return {scanOpt} 返回配置选项
@@ -758,6 +807,7 @@ var SynPortScanExports = map[string]interface{}{
 
 	"callback":           _scanOptCallback,
 	"submitTaskCallback": _scanOptSubmitTaskCallback,
+	"context":            _scanOptContext,
 	"excludePorts":       _scanOptExcludePorts,
 	"excludeHosts":       _scanOptExcludeHosts,
 	"wait":               _scanOptWaiting,
