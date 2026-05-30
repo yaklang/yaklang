@@ -38,7 +38,7 @@ func TestApplyUsageFallbackEstimate_EmptyInput_NoBilling(t *testing.T) {
 	defer cfg.Close()
 
 	res := cfg.applyUsageFallbackEstimate(
-		"empty-free", true, nil, "mock-provider",
+		"empty-free", "", true, nil, "mock-provider",
 		"", 0, "", "",
 	)
 	assert.Equal(t, int64(0), res.EstPromptTokens)
@@ -67,7 +67,7 @@ func TestApplyUsageFallbackEstimate_FreeUser_GlobalBucket(t *testing.T) {
 	reasonText := "short reason"
 
 	res := cfg.applyUsageFallbackEstimate(
-		"fallback-test-free", true, nil, "mock-provider",
+		"fallback-test-free", "", true, nil, "mock-provider",
 		promptText, 0, outputText, reasonText,
 	)
 	require.True(t, res.Billed, "free model without override should bill via fallback")
@@ -105,7 +105,7 @@ func TestApplyUsageFallbackEstimate_FreeUser_ModelBucket(t *testing.T) {
 	defer cfg.Close()
 
 	res := cfg.applyUsageFallbackEstimate(
-		"fallback-iso-free", true, nil, "mock-provider",
+		"fallback-iso-free", "", true, nil, "mock-provider",
 		strings.Repeat("prompt ", 50), 0,
 		strings.Repeat("output ", 80), "",
 	)
@@ -137,7 +137,7 @@ func TestApplyUsageFallbackEstimate_FreeUser_Exempt(t *testing.T) {
 	defer cfg.Close()
 
 	res := cfg.applyUsageFallbackEstimate(
-		"fallback-exempt-free", true, nil, "mock-provider",
+		"fallback-exempt-free", "", true, nil, "mock-provider",
 		strings.Repeat("prompt ", 100), 0,
 		strings.Repeat("output ", 100), "",
 	)
@@ -174,7 +174,7 @@ func TestApplyUsageFallbackEstimate_APIKey_Billed(t *testing.T) {
 	defer cfg.Close()
 
 	res := cfg.applyUsageFallbackEstimate(
-		"paid-model-x", false, &Key{Key: apiKey}, "mock-provider",
+		"paid-model-x", "", false, &Key{Key: apiKey}, "mock-provider",
 		strings.Repeat("prompt ", 100), 0,
 		strings.Repeat("output ", 100), "",
 	)
@@ -197,7 +197,7 @@ func TestApplyUsageFallbackEstimate_APIKey_Missing(t *testing.T) {
 	defer cfg.Close()
 
 	res := cfg.applyUsageFallbackEstimate(
-		"paid-model-y", false, nil, "mock-provider",
+		"paid-model-y", "", false, nil, "mock-provider",
 		strings.Repeat("prompt ", 50), 0,
 		strings.Repeat("output ", 50), "",
 	)
@@ -225,7 +225,7 @@ func TestApplyUsageFallbackEstimate_ImagePreCharge(t *testing.T) {
 	promptText := "describe these images"
 
 	res := cfg.applyUsageFallbackEstimate(
-		"vision-fallback-free", true, nil, "mock-provider",
+		"vision-fallback-free", "", true, nil, "mock-provider",
 		promptText, imageCount, "the photos show ...", "",
 	)
 	require.True(t, res.Billed)
@@ -256,7 +256,7 @@ func TestApplyUsageFallbackEstimate_PureImageOnly_StillBills(t *testing.T) {
 	defer cfg.Close()
 
 	res := cfg.applyUsageFallbackEstimate(
-		"vision-only-free", true, nil, "mock-provider",
+		"vision-only-free", "", true, nil, "mock-provider",
 		"", 2, "", "",
 	)
 	require.True(t, res.Billed,

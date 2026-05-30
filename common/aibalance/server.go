@@ -1157,12 +1157,12 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 			}
 			RecordDailySummaryDelta(usage)
 
-			// Token 维度计费：按模型四维倍率对上游 usage 加权后，
+			// Token 维度计费：按 (外部暴露名 modelName + 内部转发名 provider.ModelName)
+			// 双标识分层解析四维倍率后对上游 usage 加权，
 			// 免费用户累加到日 Token 桶（全局/模型独立），付费 key 累加到 AiApiKeys.TokenUsed。
 			// 与既有「字节维度」计费并行，互不干扰。
-			// 关键词: onUsageForward Token 计费分流, ComputeWeightedTokens, AddFreeUserDailyTokenUsage
-			meta, _ := GetModelMeta(modelName)
-			weighted := ComputeWeightedTokens(meta, usage)
+			// 关键词: onUsageForward Token 计费分流, ComputeWeightedTokensWithRoute, 双标识倍率, AddFreeUserDailyTokenUsage
+			weighted := ComputeWeightedTokensWithRoute(modelName, provider.ModelName, usage)
 			if weighted > 0 {
 				// 标记本次请求已通过上游真实 usage 完成扣费，禁止 fallback 再扣一次。
 				// 仅在 weighted>0 时置位：上游返了空 usage (prompt=completion=0) 时仍走 fallback。
@@ -1409,7 +1409,7 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 		// Vercel AI SDK usage 兼容, OpenAI include_usage 兼容
 		if preSucceeded && !usageBilled.Load() {
 			fbResult := c.applyUsageFallbackEstimate(
-				modelName, isFreeModel, key, provider.TypeName,
+				modelName, provider.ModelName, isFreeModel, key, provider.TypeName,
 				prompt.String(), len(imageContent),
 				outputTextBuf.String(), reasonTextBuf.String(),
 			)

@@ -450,14 +450,18 @@
                     return;
                 }
                 
+                // 4 维 Token 倍率 badge：0 表示未配置，UI 显示"默认"
+                // 关键词: renderModels Token 倍率 badge 拆分
+                const fmt = (v) => (typeof v === 'number' && v > 0) ? v.toFixed(2) : '默认';
+                // 生效倍率始终为正，固定 2 位
+                const fmtEff = (v) => (typeof v === 'number') ? v.toFixed(2) : '-';
+                const self = this;
+
                 data.model_metas.forEach(model => {
                     const row = document.createElement('tr');
                     row.dataset.modelName = model.name;
                     row.dataset.trafficMultiplier = (model.traffic_multiplier || 0).toFixed(2);
 
-                    // 4 维 Token 倍率 badge：0 表示未配置，UI 显示"默认"
-                    // 关键词: renderModels Token 倍率 badge 拆分
-                    const fmt = (v) => (typeof v === 'number' && v > 0) ? v.toFixed(2) : '默认';
                     const inMul = model.input_token_multiplier;
                     const outMul = model.output_token_multiplier;
                     const ccMul = model.cache_creation_multiplier;
@@ -469,7 +473,7 @@
                         let badgeColor = '#2196f3';
                         if (model.traffic_multiplier > 1.5) badgeColor = '#ff9800';
                         else if (model.traffic_multiplier > 1.0) badgeColor = '#4caf50';
-                        badgeHTML = '<span class="traffic-multiplier-badge" style="background: ' + badgeColor + '; color: white; padding: 2px 8px; border-radius: 10px; font-size: 12px;" title="未配置 4 维 Token 倍率，整体按传统倍数 x' + (model.traffic_multiplier || 1).toFixed(2) + ' 计费">x' + (model.traffic_multiplier || 1).toFixed(2) + '</span>';
+                        badgeHTML = '<span class="traffic-multiplier-badge" style="background: ' + badgeColor + '; color: white; padding: 2px 8px; border-radius: 10px; font-size: 12px;" title="未配置 wrapper 级 4 维 Token 倍率，按传统倍数/全局默认计费">x' + (model.traffic_multiplier || 1).toFixed(2) + '</span>';
                     } else {
                         badgeHTML =
                             '<div style="display: flex; gap: 4px; flex-wrap: wrap; justify-content: center; font-family: monospace; font-size: 11px;">' +
@@ -480,18 +484,75 @@
                             '</div>';
                     }
 
+                    const routes = model.routes || [];
+                    const hasRoutes = routes.length > 0;
+                    const toggle = hasRoutes
+                        ? '<span class="model-routes-toggle" style="cursor:pointer; user-select:none; margin-right:6px; color:#1565c0; font-size:11px;" onclick="toggleModelRoutes(this)" title="展开/收起实际模型(内部名)">&#9654;</span>'
+                        : '<span style="display:inline-block; width:14px;"></span>';
+
                     row.innerHTML =
-                        '<td class="copyable" data-full-text="' + this.escapeHtml(model.name) + '">' + this.escapeHtml(model.name) + '</td>' +
+                        '<td class="copyable" data-full-text="' + self.escapeHtml(model.name) + '">' + toggle + self.escapeHtml(model.name) + '</td>' +
                         '<td class="text-center">' + model.provider_count + '</td>' +
                         '<td class="text-center">' + badgeHTML + '</td>' +
-                        '<td class="copyable" data-full-text="' + this.escapeHtml(model.description || '') + '">' + (model.description || '-') + '</td>' +
-                        '<td class="copyable" data-full-text="' + this.escapeHtml(model.tags || '') + '">' + (model.tags || '-') + '</td>' +
+                        '<td class="copyable" data-full-text="' + self.escapeHtml(model.description || '') + '">' + (model.description || '-') + '</td>' +
+                        '<td class="copyable" data-full-text="' + self.escapeHtml(model.tags || '') + '">' + (model.tags || '-') + '</td>' +
                         '<td class="text-center">' +
-                        '<button class="btn btn-sm" onclick="openEditModelModal(\'' + this.escapeHtml(model.name) + '\', \'' + this.escapeHtml(model.description || '') + '\', \'' + this.escapeHtml(model.tags || '') + '\', ' + (model.traffic_multiplier || 1) + ', ' + (inMul || 0) + ', ' + (outMul || 0) + ', ' + (ccMul || 0) + ', ' + (chMul || 0) + ')" title="编辑模型信息">编辑</button>' +
-                        '<button class="btn btn-sm" style="background-color: #4caf50; margin-left: 5px;" onclick="showCurlCommand(\'' + this.escapeHtml(model.name) + '\')" title="查看 curl 命令">curl</button>' +
+                        '<button class="btn btn-sm" onclick="openEditModelModal(\'' + self.escapeHtml(model.name) + '\', \'' + self.escapeHtml(model.description || '') + '\', \'' + self.escapeHtml(model.tags || '') + '\', ' + (model.traffic_multiplier || 1) + ', ' + (inMul || 0) + ', ' + (outMul || 0) + ', ' + (ccMul || 0) + ', ' + (chMul || 0) + ')" title="编辑 wrapper 级默认/描述/标签">编辑</button>' +
+                        '<button class="btn btn-sm" style="background-color: #4caf50; margin-left: 5px;" onclick="showCurlCommand(\'' + self.escapeHtml(model.name) + '\')" title="查看 curl 命令">curl</button>' +
                         '</td>';
 
                     tbody.appendChild(row);
+
+                    // 详情行：该 wrapper 下的实际模型(内部转发名)路由，含生效倍率与单条覆盖编辑/清除
+                    // 关键词: renderModels 实际模型展开行, 双标识倍率, 生效倍率
+                    if (hasRoutes) {
+                        const detailRow = document.createElement('tr');
+                        detailRow.className = 'model-routes-detail';
+                        detailRow.style.display = 'none';
+
+                        let routesHTML = '<td colspan="6" style="background:#fafafa; padding:10px 16px;">' +
+                            '<div style="font-size:12px; color:#666; margin-bottom:6px;">实际模型（内部转发名）生效倍率 —— 覆盖优先级：(外部+内部)覆盖 &gt; wrapper默认 &gt; 全局默认 &gt; 系统常量</div>' +
+                            '<table style="width:100%; border-collapse:collapse; font-size:12px;">' +
+                            '<thead><tr style="color:#888;">' +
+                            '<th style="text-align:left; padding:4px 8px;">内部模型名</th>' +
+                            '<th style="padding:4px 8px;">状态</th>' +
+                            '<th style="padding:4px 8px;">生效倍率 (入/出/建/命)</th>' +
+                            '<th style="padding:4px 8px;">操作</th>' +
+                            '</tr></thead><tbody>';
+
+                        routes.forEach(rt => {
+                            const statusBadge = rt.has_override
+                                ? '<span style="background:#fff3e0; color:#ef6c00; padding:1px 6px; border-radius:8px;">已覆盖</span>'
+                                : '<span style="background:#eee; color:#888; padding:1px 6px; border-radius:8px;">继承</span>';
+                            const effBadges =
+                                '<span style="background:#e3f2fd; color:#1565c0; padding:1px 6px; border-radius:8px;">入 ' + fmtEff(rt.effective_input) + '</span> ' +
+                                '<span style="background:#e8f5e9; color:#2e7d32; padding:1px 6px; border-radius:8px;">出 ' + fmtEff(rt.effective_output) + '</span> ' +
+                                '<span style="background:#fff3e0; color:#ef6c00; padding:1px 6px; border-radius:8px;">建 ' + fmtEff(rt.effective_cache_create) + '</span> ' +
+                                '<span style="background:#fce4ec; color:#c2185b; padding:1px 6px; border-radius:8px;">命 ' + fmtEff(rt.effective_cache_hit) + '</span>';
+                            const wEsc = self.escapeHtml(model.name);
+                            const iEsc = self.escapeHtml(rt.internal_model_name);
+                            const editArgs = "'" + wEsc + "','" + iEsc + "'," +
+                                (rt.override_input || 0) + ',' + (rt.override_output || 0) + ',' +
+                                (rt.override_cache_create || 0) + ',' + (rt.override_cache_hit || 0);
+                            const clearBtn = rt.has_override
+                                ? '<button class="btn btn-sm" style="background-color:#f44336; color:#fff; margin-left:5px;" onclick="clearRouteOverrideDirect(\'' + wEsc + '\',\'' + iEsc + '\')" title="清除该实际模型的倍率覆盖">清除</button>'
+                                : '';
+                            routesHTML +=
+                                '<tr>' +
+                                '<td style="text-align:left; padding:4px 8px; font-family:monospace;" class="copyable" data-full-text="' + iEsc + '">' + iEsc + '</td>' +
+                                '<td style="text-align:center; padding:4px 8px;">' + statusBadge + '</td>' +
+                                '<td style="text-align:center; padding:4px 8px; font-family:monospace;">' + effBadges + '</td>' +
+                                '<td style="text-align:center; padding:4px 8px;">' +
+                                '<button class="btn btn-sm" onclick="openRouteOverrideModal(' + editArgs + ')" title="编辑该实际模型的倍率覆盖">编辑倍率</button>' +
+                                clearBtn +
+                                '</td>' +
+                                '</tr>';
+                        });
+
+                        routesHTML += '</tbody></table></td>';
+                        detailRow.innerHTML = routesHTML;
+                        tbody.appendChild(detailRow);
+                    }
                 });
             },
             
@@ -4134,6 +4195,201 @@ curl '${metaApiUrl}?name=${modelName}'`;
             .catch(error => {
                 console.error('Error:', error);
                 showToast('保存失败', 'error');
+            });
+        }
+
+        // ==================== 倍率双标识 + 批量应用 ====================
+        // 关键词: toggleModelRoutes, 实际模型展开
+
+        // 展开/收起某 wrapper 行下的实际模型(内部名)详情行
+        function toggleModelRoutes(el) {
+            const row = el.closest('tr');
+            if (!row) return;
+            const detail = row.nextElementSibling;
+            if (!detail || !detail.classList.contains('model-routes-detail')) return;
+            const hidden = detail.style.display === 'none' || detail.style.display === '';
+            detail.style.display = hidden ? 'table-row' : 'none';
+            el.innerHTML = hidden ? '&#9660;' : '&#9654;';
+        }
+
+        // ---- (外部+内部) 倍率覆盖编辑 ----
+        // 关键词: openRouteOverrideModal, 双标识倍率覆盖
+        function openRouteOverrideModal(wrapper, internal, ovIn, ovOut, ovCc, ovCh) {
+            document.getElementById('routeOverrideWrapper').value = wrapper;
+            document.getElementById('routeOverrideInternal').value = internal;
+            const setv = (id, v) => {
+                const el = document.getElementById(id);
+                if (el) el.value = (typeof v === 'number' && v > 0) ? v : 0;
+            };
+            setv('routeOverrideInput', ovIn);
+            setv('routeOverrideOutput', ovOut);
+            setv('routeOverrideCacheCreate', ovCc);
+            setv('routeOverrideCacheHit', ovCh);
+            document.getElementById('routeOverrideModal').style.display = 'flex';
+        }
+
+        function closeRouteOverrideModal() {
+            document.getElementById('routeOverrideModal').style.display = 'none';
+        }
+
+        function readMulValue(id) {
+            const el = document.getElementById(id);
+            if (!el) return 0;
+            const v = parseFloat(el.value);
+            return (isNaN(v) || v < 0) ? 0 : v;
+        }
+
+        function saveRouteOverride() {
+            const wrapper = document.getElementById('routeOverrideWrapper').value;
+            const internal = document.getElementById('routeOverrideInternal').value;
+            fetch('/portal/update-model-override', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    wrapper_name: wrapper,
+                    internal_model_name: internal,
+                    input_token_multiplier: readMulValue('routeOverrideInput'),
+                    output_token_multiplier: readMulValue('routeOverrideOutput'),
+                    cache_creation_multiplier: readMulValue('routeOverrideCacheCreate'),
+                    cache_hit_multiplier: readMulValue('routeOverrideCacheHit')
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showToast('覆盖已保存', 'success');
+                    closeRouteOverrideModal();
+                    setTimeout(() => window.location.reload(), 800);
+                } else {
+                    showToast('保存失败: ' + data.message, 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showToast('保存失败', 'error');
+            });
+        }
+
+        function clearRouteOverride() {
+            const wrapper = document.getElementById('routeOverrideWrapper').value;
+            const internal = document.getElementById('routeOverrideInternal').value;
+            clearRouteOverrideDirect(wrapper, internal);
+        }
+
+        // 直接清除某 (外部+内部) 覆盖（详情行的「清除」按钮调用）
+        function clearRouteOverrideDirect(wrapper, internal) {
+            if (!confirm('确定清除该实际模型的倍率覆盖？清除后将回落到 wrapper 默认 / 全局默认。')) {
+                return;
+            }
+            fetch('/portal/delete-model-override', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    wrapper_name: wrapper,
+                    internal_model_name: internal
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showToast('覆盖已清除', 'success');
+                    if (document.getElementById('routeOverrideModal').style.display === 'flex') {
+                        closeRouteOverrideModal();
+                    }
+                    setTimeout(() => window.location.reload(), 800);
+                } else {
+                    showToast('清除失败: ' + data.message, 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showToast('清除失败', 'error');
+            });
+        }
+
+        // ---- 全局默认倍率 ----
+        // 关键词: openGlobalDefaultMultiplierModal, 全局默认倍率
+        function openGlobalDefaultMultiplierModal() {
+            const g = (typeof portalData === 'object' && portalData && portalData.global_default_multiplier) || {};
+            const setv = (id, v) => {
+                const el = document.getElementById(id);
+                if (el) el.value = (typeof v === 'number' && v > 0) ? v : 0;
+            };
+            setv('globalDefaultInput', g.input_token_multiplier);
+            setv('globalDefaultOutput', g.output_token_multiplier);
+            setv('globalDefaultCacheCreate', g.cache_creation_multiplier);
+            setv('globalDefaultCacheHit', g.cache_hit_multiplier);
+            document.getElementById('globalDefaultMultiplierModal').style.display = 'flex';
+        }
+
+        function closeGlobalDefaultMultiplierModal() {
+            document.getElementById('globalDefaultMultiplierModal').style.display = 'none';
+        }
+
+        function saveGlobalDefaultMultiplier() {
+            fetch('/portal/set-global-default-multiplier', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    input_token_multiplier: readMulValue('globalDefaultInput'),
+                    output_token_multiplier: readMulValue('globalDefaultOutput'),
+                    cache_creation_multiplier: readMulValue('globalDefaultCacheCreate'),
+                    cache_hit_multiplier: readMulValue('globalDefaultCacheHit')
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showToast('全局默认倍率已保存', 'success');
+                    closeGlobalDefaultMultiplierModal();
+                    setTimeout(() => window.location.reload(), 800);
+                } else {
+                    showToast('保存失败: ' + data.message, 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showToast('保存失败', 'error');
+            });
+        }
+
+        // ---- 一键应用到所有实际模型 ----
+        // 关键词: openApplyAllMultiplierModal, applyAllMultiplier, 批量应用
+        function openApplyAllMultiplierModal() {
+            document.getElementById('applyAllMultiplierModal').style.display = 'flex';
+        }
+
+        function closeApplyAllMultiplierModal() {
+            document.getElementById('applyAllMultiplierModal').style.display = 'none';
+        }
+
+        function applyAllMultiplier() {
+            if (!confirm('这将给所有实际模型(外部+内部)写入倍率覆盖行，覆盖它们当前各自的单独设置。此操作针对计费，确定继续？')) {
+                return;
+            }
+            fetch('/portal/apply-multiplier-to-all', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    input_token_multiplier: readMulValue('applyAllInput'),
+                    output_token_multiplier: readMulValue('applyAllOutput'),
+                    cache_creation_multiplier: readMulValue('applyAllCacheCreate'),
+                    cache_hit_multiplier: readMulValue('applyAllCacheHit')
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showToast('已应用到 ' + (data.applied || 0) + ' 个实际模型', 'success');
+                    closeApplyAllMultiplierModal();
+                    setTimeout(() => window.location.reload(), 1000);
+                } else {
+                    showToast('应用失败: ' + data.message, 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showToast('应用失败', 'error');
             });
         }
 

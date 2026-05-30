@@ -811,6 +811,16 @@ func (c *ServerConfig) HandlePortalRequest(conn net.Conn, request *http.Request,
 	case uriIns.Path == "/portal/update-model-meta" && request.Method == "POST":
 		c.handleUpdateModelMeta(conn, request)
 
+	// ========== Model Multiplier (倍率双标识 + 批量应用) Routes ==========
+	case uriIns.Path == "/portal/update-model-override" && request.Method == "POST":
+		c.handleUpdateModelOverride(conn, request)
+	case uriIns.Path == "/portal/delete-model-override" && request.Method == "POST":
+		c.handleDeleteModelOverride(conn, request)
+	case uriIns.Path == "/portal/set-global-default-multiplier" && request.Method == "POST":
+		c.handleSetGlobalDefaultMultiplier(conn, request)
+	case uriIns.Path == "/portal/apply-multiplier-to-all" && request.Method == "POST":
+		c.handleApplyMultiplierToAll(conn, request)
+
 	// ========== TOTP Routes ==========
 	case uriIns.Path == "/portal/totp-settings":
 		c.serveTOTPSettingsPage(conn)

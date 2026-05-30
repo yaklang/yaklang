@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"sort"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -29,9 +30,14 @@ type PortalDataResponse struct {
 	Providers          []ProviderDataJSON `json:"providers"`
 	APIKeys            []APIKeyDataJSON   `json:"api_keys"`
 	ModelMetas         []ModelInfoJSON    `json:"model_metas"`
-	TOTPSecret         string             `json:"totp_secret"`
-	TOTPWrapped        string             `json:"totp_wrapped"`
-	TOTPCode           string             `json:"totp_code"`
+
+	// 全局默认四维倍率（倍率双标识分层兜底的 Layer 3）。
+	// 关键词: PortalDataResponse global_default_multiplier
+	GlobalDefaultMultiplier GlobalDefaultMultiplierJSON `json:"global_default_multiplier"`
+
+	TOTPSecret  string `json:"totp_secret"`
+	TOTPWrapped string `json:"totp_wrapped"`
+	TOTPCode    string `json:"totp_code"`
 
 	// 日活与缓存统计：portal 顶部「日活与缓存」单数字卡 + 同名 tab 的 60 天折线图所需。
 	// 关键词: PortalDataResponse 日活缓存扩展, today_dau, daily_summary_60_days, dau_60_days, today_cache_stats
@@ -199,6 +205,39 @@ type ModelInfoJSON struct {
 	OutputTokenMultiplier   float64 `json:"output_token_multiplier"`
 	CacheCreationMultiplier float64 `json:"cache_creation_multiplier"`
 	CacheHitMultiplier      float64 `json:"cache_hit_multiplier"`
+
+	// Routes 是该 wrapper 下「实际模型(内部转发名)」列表，含每个路由的覆盖原始值与
+	// 最终生效倍率（经 (外部+内部) 双标识分层解析）。用于前端展开编辑单条 override。
+	// 关键词: ModelInfoJSON Routes, 实际模型列表, 双标识倍率展开
+	Routes []ModelRouteInfoJSON `json:"routes"`
+}
+
+// ModelRouteInfoJSON 是单个「实际模型」路由（外部暴露名下的某个内部转发名）的倍率信息。
+// 关键词: ModelRouteInfoJSON, 实际模型路由倍率
+type ModelRouteInfoJSON struct {
+	InternalModelName string `json:"internal_model_name"`
+	HasOverride       bool   `json:"has_override"`
+
+	// 覆盖原始值（0 表示该维未覆盖，回落下层）
+	OverrideInput       float64 `json:"override_input"`
+	OverrideOutput      float64 `json:"override_output"`
+	OverrideCacheCreate float64 `json:"override_cache_create"`
+	OverrideCacheHit    float64 `json:"override_cache_hit"`
+
+	// 最终生效四维倍率（经分层解析）
+	EffectiveInput       float64 `json:"effective_input"`
+	EffectiveOutput      float64 `json:"effective_output"`
+	EffectiveCacheCreate float64 `json:"effective_cache_create"`
+	EffectiveCacheHit    float64 `json:"effective_cache_hit"`
+}
+
+// GlobalDefaultMultiplierJSON 是全局默认四维倍率的 JSON 表示（0 表示未配置）。
+// 关键词: GlobalDefaultMultiplierJSON, 全局默认倍率暴露
+type GlobalDefaultMultiplierJSON struct {
+	InputTokenMultiplier    float64 `json:"input_token_multiplier"`
+	OutputTokenMultiplier   float64 `json:"output_token_multiplier"`
+	CacheCreationMultiplier float64 `json:"cache_creation_multiplier"`
+	CacheHitMultiplier      float64 `json:"cache_hit_multiplier"`
 }
 
 // servePortalDataAPI handles the /portal/api/data endpoint
@@ -271,19 +310,49 @@ func (c *ServerConfig) servePortalDataAPI(conn net.Conn, request *http.Request) 
 	}
 
 	// Get Model Metadata
+	// 全局默认倍率 + 全部 (W,I) override 一次性加载，供逐路由内存解析（避免 N 次 DB 查询）。
+	// 关键词: portal data 全局默认/override 预加载, resolveBillingMultipliersFrom
+	globalCfg, gErr := GetGlobalMultiplierConfig()
+	if gErr != nil {
+		log.Errorf("Failed to get global default multiplier: %v", gErr)
+		globalCfg = &AiModelMultiplierConfig{}
+	}
+	data.GlobalDefaultMultiplier = GlobalDefaultMultiplierJSON{
+		InputTokenMultiplier:    globalCfg.InputTokenMultiplier,
+		OutputTokenMultiplier:   globalCfg.OutputTokenMultiplier,
+		CacheCreationMultiplier: globalCfg.CacheCreationMultiplier,
+		CacheHitMultiplier:      globalCfg.CacheHitMultiplier,
+	}
+	allOverrides, oErr := GetAllModelMultiplierOverrides()
+	if oErr != nil {
+		log.Errorf("Failed to get model multiplier overrides: %v", oErr)
+		allOverrides = make(map[string]*AiModelMultiplierOverride)
+	}
+
 	allMetas, err := GetAllModelMetas()
 	if err != nil {
 		log.Errorf("Failed to get model metas: %v", err)
 	} else {
 		modelCounts := make(map[string]int)
+		// wrapper -> set of distinct internal model names（实际模型路由）
+		wrapperRoutes := make(map[string]map[string]bool)
 		for _, p := range providers {
 			name := p.WrapperName
 			if name == "" {
 				name = p.ModelName
 			}
-			if name != "" {
-				modelCounts[name]++
+			if name == "" {
+				continue
 			}
+			modelCounts[name]++
+			internal := p.ModelName
+			if internal == "" {
+				continue
+			}
+			if wrapperRoutes[name] == nil {
+				wrapperRoutes[name] = make(map[string]bool)
+			}
+			wrapperRoutes[name][internal] = true
 		}
 
 		for name, count := range modelCounts {
@@ -291,8 +360,10 @@ func (c *ServerConfig) servePortalDataAPI(conn net.Conn, request *http.Request) 
 				Name:              name,
 				ProviderCount:     count,
 				TrafficMultiplier: 1.0,
+				Routes:            make([]ModelRouteInfoJSON, 0),
 			}
-			if meta, ok := allMetas[name]; ok {
+			meta := allMetas[name] // 可能为 nil
+			if meta != nil {
 				info.Description = meta.Description
 				info.Tags = meta.Tags
 				if meta.TrafficMultiplier > 0 {
@@ -303,6 +374,31 @@ func (c *ServerConfig) servePortalDataAPI(conn net.Conn, request *http.Request) 
 				info.CacheCreationMultiplier = meta.CacheCreationMultiplier
 				info.CacheHitMultiplier = meta.CacheHitMultiplier
 			}
+
+			// 构建该 wrapper 下的实际模型路由（按内部名排序），并逐路由解析生效倍率。
+			internals := make([]string, 0, len(wrapperRoutes[name]))
+			for internal := range wrapperRoutes[name] {
+				internals = append(internals, internal)
+			}
+			sort.Strings(internals)
+			for _, internal := range internals {
+				routeInfo := ModelRouteInfoJSON{InternalModelName: internal}
+				override := allOverrides[modelOverrideKey(name, internal)]
+				if override != nil {
+					routeInfo.HasOverride = true
+					routeInfo.OverrideInput = override.InputTokenMultiplier
+					routeInfo.OverrideOutput = override.OutputTokenMultiplier
+					routeInfo.OverrideCacheCreate = override.CacheCreationMultiplier
+					routeInfo.OverrideCacheHit = override.CacheHitMultiplier
+				}
+				eff := resolveBillingMultipliersFrom(globalCfg, meta, override)
+				routeInfo.EffectiveInput = eff.Input
+				routeInfo.EffectiveOutput = eff.Output
+				routeInfo.EffectiveCacheCreate = eff.CacheCreate
+				routeInfo.EffectiveCacheHit = eff.CacheHit
+				info.Routes = append(info.Routes, routeInfo)
+			}
+
 			data.ModelMetas = append(data.ModelMetas, info)
 		}
 	}
