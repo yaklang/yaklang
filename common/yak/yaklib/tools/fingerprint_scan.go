@@ -214,7 +214,12 @@ func _scanFingerprint(ctx context.Context, config *fp.Config, concurrent int, ho
 	}
 
 	go func() {
-		defer scanCancel()
+		// 注意: 这里绝对不能 defer scanCancel(). 派发循环只负责"派发任务", 它结束时
+		// 仍有最多 concurrent 个 inner goroutine 在执行 (swg 限流). 若派发一结束就
+		// cancel, 会把这些在途扫描连同结果一起取消/丢弃 —— 当端口数 <= 并发时甚至
+		// 会取消全部任务, 导致扫描"零结果". scanCancel 只在: (1) 熔断命中时主动调用;
+		// (2) swg.Wait 之后 (所有任务真正结束) 调用以释放派生 ctx.
+		// 关键词: scanCancel 时机, 不能在派发结束时取消, 在途结果保护
 		swg := utils.NewSizedWaitGroup(concurrent)
 		portsInt := utils.ParseStringToPorts(port)
 	dispatch:
@@ -300,6 +305,7 @@ func _scanFingerprint(ctx context.Context, config *fp.Config, concurrent int, ho
 		}
 		go func() {
 			swg.Wait()
+			scanCancel() // 所有任务结束后再释放派生 ctx
 			filter.Close()
 			close(outC)
 		}()
@@ -507,7 +513,10 @@ func _scanFromTargetStream(res interface{}, opts ...fp.ConfigOption) (chan *fp.M
 	guard := newHostPortGuard(maxOpenPortsPerHost)
 
 	go func() {
-		defer scanCancel()
+		// 注意: 不能在这里 defer scanCancel(). 派发循环结束时仍有最多 concurrent 个
+		// inner goroutine 在执行, 过早 cancel 会丢弃这些在途结果. scanCancel 只在
+		// 熔断命中时主动调用, 以及 swg.Wait 之后调用以释放派生 ctx.
+		// 关键词: scanCancel 时机, 在途结果保护
 		swg := utils.NewSizedWaitGroup(concurrent)
 		for synRes := range synResults {
 			// ctx 短路: 历史 bug 的根因之一是这个派发循环从不检查 ctx. cancel 后
@@ -558,6 +567,7 @@ func _scanFromTargetStream(res interface{}, opts ...fp.ConfigOption) (chan *fp.M
 
 		go func() {
 			swg.Wait()
+			scanCancel() // 所有任务结束后再释放派生 ctx
 			close(outC)
 		}()
 	}()
