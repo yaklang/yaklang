@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -120,6 +121,11 @@ func tryHandleNewPlanFlowPrompt(t *testing.T, config aicommon.AICallerConfigIf, 
 }
 
 func MockAICallback(t *testing.T, initFlag, persistentFlag, planFlag string) aicommon.AICallbackType {
+	// 去 Exit 化后 directly_answer 只发答复并继续循环, 真正终结整个 ReAct 循环
+	// 只能由唯一终结器 finish 完成. 主决策第一次发 directly_answer 交付答案,
+	// 第二次发 finish 收口, 避免 directly_answer 无限循环导致测试超时.
+	// 关键词: directly_answer 永不 Exit, finish 唯一终结器, 答复后追加 finish 收尾
+	var primaryDecisionCount int32
 	return func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		prompt := req.GetPrompt()
 		rsp := i.NewAIResponse()
@@ -175,9 +181,16 @@ func MockAICallback(t *testing.T, initFlag, persistentFlag, planFlag string) aic
 		}
 
 		if utils.MatchAllOfSubString(prompt, "directly_answer", "require_tool") {
-			rsp.EmitOutputStream(bytes.NewBufferString(`
+			if atomic.AddInt32(&primaryDecisionCount, 1) == 1 {
+				rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "directly_answer", "answer_payload": "result is 2" },
 "human_readable_thought": "mocked thought for tool calling", "cumulative_summary": "..cumulative-mocked for tool calling.."}
+`))
+				return rsp, nil
+			}
+			rsp.EmitOutputStream(bytes.NewBufferString(`
+{"@action": "object", "next_action": { "type": "finish" },
+"human_readable_thought": "finish after answer delivered", "cumulative_summary": "..cumulative-mocked for finish.."}
 `))
 			return rsp, nil
 		}
