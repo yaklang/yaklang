@@ -60,8 +60,20 @@ die(caller.LoadPlugin(name2))
 host, port = str.ParseStringToHostPort(getParam("VULINBOX"))~
 addr = f"${host}:${port}"
 
+// 去除外网依赖: 历史上第二个扫描目标用 www.xxxx.com, 它依赖外网 DNS/连接,
+// 在 CI 中不稳定, 会导致 port-scan 的 handle 少调一次, token_5 断言偶发失败.
+// 这里改用与 VULINBOX 指向同一本地监听、但主机名字符串不同的 altHost
+// (127.0.0.1 <-> localhost): 端口扫描必然命中 (本地 vulinbox 一定 open),
+// 且因 host 字符串不同会产生不同的 target hash, 维持"两个不同目标"的去重语义.
+// 关键词: mixcaller2 去外网依赖, target+port hash 去重, 本地等价主机名
+altHost = "localhost"
+if host == "localhost" {
+    altHost = "127.0.0.1"
+}
+altAddr = f"${altHost}:${port}"
+
 for url in [
-    f"https://www.xxxx.com/abc/14?a=2&&c=1",
+    f"https://${altAddr}/abc/14?a=2&&c=1",
     f"https://${addr}/abc/",
     f"https://${addr}/abc/12",
     f"https://${addr}/abc/13",
