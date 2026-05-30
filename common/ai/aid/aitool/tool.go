@@ -401,13 +401,8 @@ func WithArrayParamEx(name string, opts []PropertyOption, itemsOpt ToolOption) T
 }
 
 func WithStructParam(name string, opts []PropertyOption, itemsOpt ...ToolOption) ToolOption {
-	schema := map[string]any{
-		"type": "object",
-	}
+	// temp 在构造期生成一次 (单线程), 之后只读不写; 它持有嵌套 properties.
 	temp := newTool("", itemsOpt...)
-	if temp.InputSchema.Properties != nil && temp.InputSchema.Properties.Len() > 0 {
-		schema["properties"] = temp.InputSchema.Properties
-	}
 
 	// Save the nested required array (required fields inside this struct)
 	var nestedRequired []string
@@ -417,6 +412,18 @@ func WithStructParam(name string, opts []PropertyOption, itemsOpt ...ToolOption)
 
 	// Create a ToolOption that applies PropertyOptions and preserves nested required
 	return func(t *Tool) {
+		// 关键: schema map 必须在闭包内部新建, 不能在构造期捕获后复用. 否则同一个
+		// ToolOption 被并发复用应用时 (如 reactloops.buildSchema 每次重新应用
+		// action.Options), 多个 goroutine 会并发写同一个 schema map, 触发
+		// "fatal error: concurrent map writes". 嵌套 properties 只读引用, 并发安全.
+		// 关键词: WithStructParam 并发安全, schema map 闭包内新建, concurrent map writes 修复
+		schema := map[string]any{
+			"type": "object",
+		}
+		if temp.InputSchema.Properties != nil && temp.InputSchema.Properties.Len() > 0 {
+			schema["properties"] = temp.InputSchema.Properties
+		}
+
 		// Apply PropertyOptions to the schema
 		for _, opt := range opts {
 			opt(schema)
@@ -534,15 +541,26 @@ func WithKVPairsParam(name string, opts ...PropertyOption) ToolOption {
 // It accepts property options to configure the object property's behavior and constraints.
 func WithRawParam(name string, object map[string]any, opts ...PropertyOption) ToolOption {
 	return func(t *Tool) {
+		// 关键: 绝对不能直接修改传入/闭包捕获的 object map. 同一个 ToolOption 闭包会被
+		// 复用并发应用 (例如 reactloops.buildSchema 缓存了 action.Options, 每次生成
+		// prompt 都重新应用一遍; agent 存在并发 loop 时会被多 goroutine 同时执行).
+		// 直接写 object 既会让多个 tool 共享同一个 map, 又会与其他 goroutine 的写/序列化
+		// 冲突, 触发 "fatal error: concurrent map writes". 这里对 object 做一次浅拷贝,
+		// 所有 opt 写入副本, 保证闭包可重入且并发安全.
+		// 关键词: WithRawParam 并发安全, schema map 浅拷贝, concurrent map writes 修复
+		merged := make(map[string]any, len(object)+1)
+		for k, v := range object {
+			merged[k] = v
+		}
 		for _, opt := range opts {
-			opt(object)
+			opt(merged)
 		}
 
 		// Handle required field - can be bool (for simple params) or []string (for nested structs)
-		if requiredVal, exists := object["required"]; exists {
+		if requiredVal, exists := merged["required"]; exists {
 			// Check if it's a bool (simple parameter)
 			if required, ok := requiredVal.(bool); ok && required {
-				delete(object, "required")
+				delete(merged, "required")
 				if t.InputSchema.Required == nil {
 					t.InputSchema.Required = []string{name}
 				} else {
@@ -553,7 +571,7 @@ func WithRawParam(name string, object map[string]any, opts ...PropertyOption) To
 			// It will be handled by buildStructOptionsFromMap during rebuild
 		}
 
-		t.InputSchema.Properties.Set(name, object)
+		t.InputSchema.Properties.Set(name, merged)
 	}
 }
 
