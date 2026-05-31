@@ -5,6 +5,9 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -19,16 +22,41 @@ import (
 // noise 事件类型与 nodeId, 这些对用户无意义, SSE 中一律丢弃
 // 关键词: noise event filter, drop stream/consumption/pong/pressure
 var chatNoiseTypes = map[string]bool{
-	"stream":               true,
-	"stream_start":         true,
-	"stream_finished":      true,
-	"consumption":          true,
-	"pong":                 true,
-	"pressure":             true,
+	"stream":                true,
+	"stream_start":          true,
+	"stream_finished":       true,
+	"consumption":           true,
+	"pong":                  true,
+	"pressure":              true,
 	"ai_first_byte_cost_ms": true,
-	"ai_total_cost_ms":     true,
-	"ai_call_summary":      true,
-	"prompt_profile":       true,
+	"ai_total_cost_ms":      true,
+	"ai_call_summary":       true,
+	"prompt_profile":        true,
+	// 以下事件要么泄漏本地路径, 要么是额度/通知噪声, 一律不下发前端
+	// 关键词: drop local path leak, notify quota spam, session title noise
+	"notify":                   true,
+	"filesystem_pin_directory": true,
+	"filesystem_pin_filename":  true,
+	"session_title":            true,
+	"pin_filename":             true,
+	"pin_directory":            true,
+}
+
+// absLocalPathRe 匹配常见的本地绝对路径 (含 yakit-projects/aispace 等), 用于脱敏
+// 关键词: sanitize local path, avoid filesystem leak
+var absLocalPathRe = regexp.MustCompile(`(?:[A-Za-z]:\\[^\s"']+|/(?:Users|home|root|var|tmp|opt|private|data)/[^\s"':,)]+)`)
+
+// sanitizeTraceMessage 将消息中的本地绝对路径替换为占位符, 防止文件系统信息泄漏
+func sanitizeTraceMessage(s string) string {
+	if s == "" {
+		return s
+	}
+	out := absLocalPathRe.ReplaceAllString(s, "[local-path]")
+	// 兜底: 任意残留含 yakit-projects 的串也屏蔽
+	if strings.Contains(out, "yakit-projects") || strings.Contains(out, "aispace") {
+		return "[local-path]"
+	}
+	return out
 }
 
 var chatNoiseNodeIds = map[string]bool{
@@ -97,7 +125,26 @@ func (s *RAGHTTPServer) handleChat(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(s.config.Timeout)*time.Second)
 	defer cancel()
 
+	// 为本次会话分配独立临时工作目录, 结束后整体删除, 避免 aispace session 产物堆积撑爆磁盘
+	// 关键词: ephemeral workdir, cleanup artifacts, avoid disk explosion
+	workdir := filepath.Join(os.TempDir(), "airaghttp-sessions", sessionID)
+	if err := os.MkdirAll(workdir, 0o755); err != nil {
+		log.Warnf("create session workdir failed: %v", err)
+		workdir = ""
+	} else {
+		defer func() {
+			if rmErr := os.RemoveAll(workdir); rmErr != nil {
+				log.Warnf("cleanup session workdir failed: %v", rmErr)
+			} else {
+				log.Infof("session workdir cleaned: %s", workdir)
+			}
+		}()
+	}
+
 	opts := s.buildAIEngineOptions(ctx, sessionID, emitter)
+	if workdir != "" {
+		opts = append(opts, aiengine.WithWorkdir(workdir))
+	}
 
 	log.Infof("invoking aiengine.InvokeReAct for %s ...", clientAddr)
 	var invokeErr error
@@ -179,6 +226,16 @@ func (s *RAGHTTPServer) buildAIEngineOptions(ctx context.Context, sessionID stri
 			aiOpts = append(aiOpts, aispec.WithDomain(s.config.AI.Domain))
 		}
 		opts = append(opts, aiengine.WithAIConfig(s.config.AI.Type, aiOpts...))
+	} else if s.config.UseBasicTier() {
+		// 默认档位: 全程使用轻量(basic)模型, 避免高质(standard)模型过重/超额.
+		// ExtOptions 在最后应用, 覆盖 aiengine 默认的分级回调(质量优先=高质模型).
+		// 关键词: default basic tier, override quality/speed callback, lightweight
+		if cb := aicommon.MustGetLightweightAIModelCallback(); cb != nil {
+			opts = append(opts, aiengine.WithExtOptions(
+				aicommon.WithQualityPriorityAICallback(cb),
+				aicommon.WithSpeedPriorityAICallback(cb),
+			))
+		}
 	}
 
 	opts = append(opts,
@@ -234,6 +291,18 @@ func (s *RAGHTTPServer) onChatEvent(emitter *sseEmitter, event *schema.AiOutputE
 	if message == "" {
 		return
 	}
+	// 路径脱敏: 若整条消息被判定为本地路径, 直接丢弃, 否则替换内嵌路径
+	message = sanitizeTraceMessage(message)
+	if message == "" || message == "[local-path]" {
+		return
+	}
+	// progress 消息形如 "执行搜索中 - search_knowledge:semantic / executing search ...", 仅保留前半段中文短语
+	if kind == "progress" {
+		message = cleanProgressMessage(message)
+		if message == "" {
+			return
+		}
+	}
 	emitter.safeEmit("log", map[string]interface{}{
 		"kind":    kind,
 		"label":   label,
@@ -241,6 +310,25 @@ func (s *RAGHTTPServer) onChatEvent(emitter *sseEmitter, event *schema.AiOutputE
 		"type":    evtType,
 		"nodeId":  nodeID,
 	})
+}
+
+// cleanProgressMessage 清洗 loading status 文案, 去掉英文副本与技术后缀, 保留简洁短语
+// 形如: "执行搜索中 - search_knowledge:semantic / executing search - mode:semantic" -> "执行搜索中"
+//
+//	"初始化 / initializing..." -> "初始化"
+//	"压缩搜索结果中 - compressing search result" -> "压缩搜索结果中"
+func cleanProgressMessage(s string) string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return ""
+	}
+	if idx := strings.Index(s, " / "); idx >= 0 {
+		s = s[:idx]
+	}
+	if idx := strings.Index(s, " - "); idx >= 0 {
+		s = s[:idx]
+	}
+	return strings.TrimSpace(s)
 }
 
 // extractEventMessage 从结构化内容中提取可读消息
@@ -270,7 +358,9 @@ func classifyEvent(evtType, nodeID string) (kind string, label string) {
 	if evtType == "structured" {
 		switch {
 		case nodeID == "re-act-loading-status-key" || nodeID == "status":
-			return "", ""
+			// loading status 是有意义的进度: 搜索中/压缩中/评估中, 作为 progress 步骤下发
+			// 关键词: surface loading status, progress step, 获取资料/正在压缩
+			return "progress", "progress"
 		case nodeID == "timeline_item":
 			return "timeline", "timeline"
 		case nodeID == "session_title":

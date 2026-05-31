@@ -2,6 +2,7 @@ package airaghttp
 
 import (
 	"os"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"gopkg.in/yaml.v2"
@@ -45,6 +46,15 @@ type RAGServerConfig struct {
 	// AI 服务配置
 	AI AIServiceConfig `yaml:"ai"`
 
+	// AITier 走全局分级 aiconfig 时的模型档位偏好.
+	// "basic"/"lightweight"(默认) = 全程使用轻量模型, 更省 token;
+	// "standard"/"intelligent" = 沿用分级默认(质量优先用高质模型).
+	// 仅在未配置自定义 AI (UseCustomAIConfig=false) 时生效.
+	AITier string `yaml:"ai_tier"`
+
+	// ServeFrontend 是否在根路径 serve 内置只读搜索前端页面 (默认 true)
+	ServeFrontend bool `yaml:"serve_frontend"`
+
 	// Debug 调试模式 (打印 prompt/event)
 	Debug bool `yaml:"debug"`
 }
@@ -69,6 +79,8 @@ func NewDefaultConfig() *RAGServerConfig {
 			APIKey: "",
 			Domain: "",
 		},
+		AITier:        "basic",
+		ServeFrontend: true,
 	}
 }
 
@@ -113,6 +125,21 @@ func (c *RAGServerConfig) fillDefaults() {
 	}
 	if c.AI.Type == "" {
 		c.AI.Type = "aibalance"
+	}
+	if c.AITier == "" {
+		c.AITier = "basic"
+	}
+}
+
+// UseBasicTier 判断是否全程使用轻量(basic)模型档位
+// 关键词: basic tier default, lightweight model, save token
+func (c *RAGServerConfig) UseBasicTier() bool {
+	switch strings.ToLower(strings.TrimSpace(c.AITier)) {
+	case "standard", "intelligent", "quality", "high":
+		return false
+	default:
+		// basic / lightweight / 空 = 默认走轻量档
+		return true
 	}
 }
 
@@ -225,5 +252,19 @@ func WithAIService(typ, model, apiKey, domain string) Option {
 func WithDebug(debug bool) Option {
 	return func(c *RAGServerConfig) {
 		c.Debug = debug
+	}
+}
+
+func WithServeFrontend(enable bool) Option {
+	return func(c *RAGServerConfig) {
+		c.ServeFrontend = enable
+	}
+}
+
+func WithAITier(tier string) Option {
+	return func(c *RAGServerConfig) {
+		if tier != "" {
+			c.AITier = tier
+		}
 	}
 }

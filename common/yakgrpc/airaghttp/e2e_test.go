@@ -167,6 +167,68 @@ func TestE2E_SearchReturnsResults(t *testing.T) {
 		result.Total, result.Results[0].Source, result.Results[0].Score)
 }
 
+// TestE2E_FrontendServed 内置只读前端页面可访问且注入了路由前缀
+func TestE2E_FrontendServed(t *testing.T) {
+	db, embedder, collectionName, cleanup := setupMockKnowledgeBase(t)
+	defer cleanup()
+
+	server := newE2EServer(t, db, embedder, collectionName, "")
+	if !server.IsFrontendEnabled() {
+		t.Fatal("frontend should be enabled by default")
+	}
+	ts := httptest.NewServer(server)
+	defer ts.Close()
+
+	resp, err := http.Get(ts.URL + "/")
+	if err != nil {
+		t.Fatalf("GET / failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("GET / expected 200, got %d", resp.StatusCode)
+	}
+	if ct := resp.Header.Get("Content-Type"); !strings.Contains(ct, "text/html") {
+		t.Fatalf("GET / content-type expected html, got %q", ct)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	html := string(body)
+	if !strings.Contains(html, "RAG 知识库") {
+		t.Fatalf("frontend html missing expected title")
+	}
+	// 占位符必须已被替换为实际前缀
+	if strings.Contains(html, "__RAG_ROUTE_PREFIX__") {
+		t.Fatalf("frontend route prefix placeholder was not replaced")
+	}
+	if !strings.Contains(html, "/api/rag-server") {
+		t.Fatalf("frontend html missing injected route prefix")
+	}
+}
+
+// TestE2E_FrontendDisabled 关闭前端时根路径应 404
+func TestE2E_FrontendDisabled(t *testing.T) {
+	db, embedder, collectionName, cleanup := setupMockKnowledgeBase(t)
+	defer cleanup()
+
+	cfg := NewDefaultConfig()
+	cfg.Collections = []string{collectionName}
+	cfg.ServeFrontend = false
+	server, err := newRAGHTTPServerWithDeps(cfg, db, embedder)
+	if err != nil {
+		t.Fatalf("create server failed: %v", err)
+	}
+	ts := httptest.NewServer(server)
+	defer ts.Close()
+
+	resp, err := http.Get(ts.URL + "/")
+	if err != nil {
+		t.Fatalf("GET / failed: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("frontend disabled, GET / expected 404, got %d", resp.StatusCode)
+	}
+}
+
 // TestE2E_AuthEnforced 真实回环下的 Bearer 鉴权
 func TestE2E_AuthEnforced(t *testing.T) {
 	db, embedder, collectionName, cleanup := setupMockKnowledgeBase(t)
