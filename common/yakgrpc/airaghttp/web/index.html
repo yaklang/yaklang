@@ -81,12 +81,25 @@
   [data-theme="dark"] .theme-btn .sun { display: none; }
   [data-theme="dark"] .theme-btn .moon { display: inline; }
 
-  /* ---------- composer (置顶) ---------- */
+  /* ---------- composer ---------- */
+  /* 默认(有内容)态: 置顶 sticky 条 */
   .composer-wrap {
     flex: 0 0 auto; position: sticky; top: 0; z-index: 10;
     background: var(--bg); border-bottom: 1px solid var(--line);
     padding: 16px 20px 14px;
+    transition: padding .2s ease;
   }
+  /* 首次打开(空)态: 输入框居中展示, 上方带标题 */
+  .landing-hero { display: none; max-width: var(--maxw); margin: 0 auto 22px; text-align: center; }
+  .landing-hero h1 { font-size: 30px; font-weight: 650; margin: 0 0 10px; letter-spacing: -.01em; }
+  .landing-hero p { color: var(--muted); margin: 0; font-size: 15px; }
+  .app:not(.has-msg) .composer-wrap {
+    flex: 1 1 auto; position: static; border-bottom: none;
+    display: flex; flex-direction: column; justify-content: center;
+    padding-bottom: 9vh;
+  }
+  .app:not(.has-msg) .landing-hero { display: block; }
+  .app:not(.has-msg) main { display: none; }
   .composer {
     max-width: var(--maxw); margin: 0 auto;
     border: 1px solid var(--line-strong); border-radius: var(--radius);
@@ -114,12 +127,6 @@
   /* ---------- main scroll ---------- */
   main { flex: 1 1 auto; overflow-y: auto; scroll-behavior: smooth; }
   .wrap { max-width: var(--maxw); margin: 0 auto; padding: 26px 20px 60px; }
-
-  /* hero (empty state) */
-  .hero { text-align: center; padding: 9vh 0 4vh; }
-  .hero h1 { font-size: 26px; font-weight: 650; margin: 0 0 10px; letter-spacing: -.01em; }
-  .hero p { color: var(--muted); margin: 0; font-size: 14.5px; }
-  .app.has-msg .hero { display: none; }
 
   /* ---------- turns ---------- */
   .turn { margin-bottom: 32px; }
@@ -172,32 +179,44 @@
   .thinking.done .thinking-title {
     animation: none; -webkit-text-fill-color: var(--muted); color: var(--muted);
   }
-  .thinking-head .elapsed { color: var(--faint); font-size: 12px; }
-  .thinking-head .chev { margin-left: auto; color: var(--faint); transition: transform .2s; font-size: 12px; }
-  .thinking.collapsed .chev { transform: rotate(-90deg); }
-  .thinking-body {
-    border-top: 1px solid var(--line);
-    padding: 8px 14px 12px;
-    max-height: 320px; overflow-y: auto;
-    transition: max-height .3s ease, padding .3s ease, opacity .2s ease;
-  }
-  .thinking.collapsed .thinking-body { max-height: 0; padding-top: 0; padding-bottom: 0; opacity: 0; border-top-color: transparent; }
+  .thinking-head .elapsed { margin-left: auto; color: var(--faint); font-size: 12px; }
+  .thinking-head .chev { margin-left: 8px; color: var(--faint); transition: transform .2s; font-size: 11px; }
+  .thinking.expanded .chev { transform: rotate(180deg); }
   @keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  .step {
-    display: flex; gap: 10px; align-items: baseline; padding: 4px 0;
-    font-size: 13px; color: var(--muted); animation: stepin .25s ease;
+  /* 折叠态: 动态过程只展示最新的一行, 单行省略, 不堆叠 */
+  .thinking-live {
+    border-top: 1px solid var(--line);
+    padding: 8px 14px;
+    display: flex; align-items: center; gap: 9px;
+    font-size: 13px; color: var(--muted);
+    overflow: hidden;
   }
-  @keyframes stepin { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: none; } }
-  .step .tag {
-    flex: 0 0 auto; min-width: 56px; font-size: 11px; padding: 1px 8px; border-radius: 999px;
+  .thinking.expanded .thinking-live,
+  .thinking.done .thinking-live { display: none; }
+  .thinking-live .ltag {
+    flex: 0 0 auto; font-size: 11px; padding: 1px 8px; border-radius: 999px;
     border: 1px solid var(--line-strong); color: var(--fg); font-weight: 600;
-    text-align: center; white-space: nowrap; background: var(--bg);
+    white-space: nowrap; background: var(--bg);
   }
-  .step.thought .tag { background: var(--fg); color: var(--bg); border-color: var(--fg); }
-  .step .txt { word-break: break-word; flex: 1 1 auto; }
-  .step.thought .txt { white-space: pre-wrap; color: var(--fg); }
+  .thinking-live .ltxt {
+    flex: 1 1 auto; min-width: 0;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  /* 展开态: 展示全部步骤, 限高滚动 */
+  .thinking-body { display: none; border-top: 1px solid var(--line); padding: 8px 14px; max-height: 180px; overflow-y: auto; }
+  .thinking.expanded .thinking-body { display: block; }
+  .tstep { display: flex; gap: 9px; align-items: baseline; padding: 3px 0; font-size: 13px; color: var(--muted); animation: stepin .2s ease; }
+  @keyframes stepin { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: none; } }
+  .tstep .ttag {
+    flex: 0 0 auto; min-width: 52px; text-align: center; font-size: 11px; padding: 1px 8px; border-radius: 999px;
+    border: 1px solid var(--line-strong); color: var(--fg); font-weight: 600; white-space: nowrap; background: var(--bg);
+  }
+  .tstep.thought .ttag { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+  .tstep .ttxt { flex: 1 1 auto; min-width: 0; word-break: break-word; }
+  .tstep.thought .ttxt { white-space: pre-wrap; color: var(--fg); }
 
   /* ---------- answer markdown ---------- */
   .answer { font-size: 16px; word-break: break-word; }
@@ -259,6 +278,10 @@
   </header>
 
   <div class="composer-wrap">
+    <div class="landing-hero">
+      <h1>有什么可以帮你？</h1>
+      <p>基于本地知识库的智能问答 · 输入问题后回车开始</p>
+    </div>
     <div class="composer">
       <textarea id="input" rows="1" placeholder="向知识库提问..." autofocus></textarea>
       <button class="send-btn" id="send" title="发送 (Enter)" aria-label="发送">
@@ -270,10 +293,6 @@
 
   <main id="main">
     <div class="wrap">
-      <div class="hero">
-        <h1>有什么可以帮你？</h1>
-        <p>基于本地知识库的智能问答 · 在上方输入问题后回车开始</p>
-      </div>
       <div id="transcript"></div>
     </div>
   </main>
@@ -472,7 +491,15 @@
     return line;
   }
 
-  var MAX_STEPS = 40; // 保留参考资料但限制 DOM 体量
+  var MAX_BODY_STEPS = 200; // 展开态步骤上限, 防 DOM 爆炸
+
+  // 单行化: 折行/超长截断, 动态过程只显示一行
+  function oneLine(s, fromEnd, max) {
+    s = String(s).replace(/\s+/g, " ").trim();
+    max = max || 90;
+    if (s.length > max) s = fromEnd ? "…" + s.slice(-max) : s.slice(0, max) + "…";
+    return s;
+  }
 
   // ---------- one assistant turn controller ----------
   function newTurn(question) {
@@ -488,20 +515,27 @@
 
     var thinking = el("div", "thinking");
     var head = el("div", "thinking-head");
+    head.title = "点击展开 / 收起思考过程";
     head.innerHTML =
       '<svg class="spark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg>' +
       '<span class="thinking-title">思考中</span>' +
       '<span class="elapsed"></span>' +
       '<span class="chev">&#9662;</span>';
+    // 折叠态: 单行实时进度
+    var live = el("div", "thinking-live");
+    var liveTag = el("span", "ltag", "思考");
+    var liveTxt = el("span", "ltxt");
+    live.appendChild(liveTag);
+    live.appendChild(liveTxt);
+    // 展开态: 全部步骤 (限高滚动)
     var body = el("div", "thinking-body");
-    var steps = el("div", "steps");
-    body.appendChild(steps);
     thinking.appendChild(head);
+    thinking.appendChild(live);
     thinking.appendChild(body);
     thinking.style.display = "none";
     a.appendChild(thinking);
 
-    head.addEventListener("click", function () { thinking.classList.toggle("collapsed"); });
+    head.addEventListener("click", function () { thinking.classList.toggle("expanded"); });
 
     var answer = el("div", "answer empty caret");
     a.appendChild(answer);
@@ -512,11 +546,11 @@
 
     var titleEl = head.querySelector(".thinking-title");
     var elapsedEl = head.querySelector(".elapsed");
-    var thoughtRow = null;   // "思考" 行, 原地更新
     var thoughtRaw = "";
     var answerRaw = "";
-    var stepCount = 0;
     var lastStepKey = "";
+    var thoughtRow = null;   // 展开态里的"思考"行, 原地更新
+    var stepCount = 0;
     var shown = false;
     var startedAt = Date.now();
     var timer = setInterval(function () {
@@ -525,25 +559,28 @@
 
     function showThinking() { if (!shown) { shown = true; thinking.style.display = ""; } }
     function setTitle(t) { if (titleEl && !thinking.classList.contains("done")) titleEl.textContent = t; }
-    function makeStep(labelText, txt, isThought) {
-      var item = el("div", isThought ? "step thought" : "step");
-      item.appendChild(el("span", "tag", escapeHtml(labelText)));
-      item.appendChild(el("span", "txt", escapeHtml(txt)));
+    // 折叠态: 只更新单行 (标签 + 单行文本)
+    function setLive(labelText, txt) {
+      showThinking();
+      liveTag.textContent = labelText;
+      liveTxt.textContent = txt;
+      scrollDown();
+    }
+    function makeBodyStep(labelText, txt, isThought) {
+      var item = el("div", isThought ? "tstep thought" : "tstep");
+      item.appendChild(el("span", "ttag", escapeHtml(labelText)));
+      item.appendChild(el("span", "ttxt", escapeHtml(txt)));
       return item;
     }
 
     return {
       onThought: function (chunk) {
-        showThinking();
         thoughtRaw += chunk;
-        if (!thoughtRow) {
-          thoughtRow = makeStep("思考", thoughtRaw, true);
-          steps.appendChild(thoughtRow);
-        } else {
-          thoughtRow.querySelector(".txt").textContent = thoughtRaw;
-        }
         setTitle("思考中");
-        scrollDown();
+        setLive("思考", oneLine(thoughtRaw, true)); // 思考流取末尾, 体现实时进行
+        // 展开态保留完整思考文本, 原地更新
+        if (!thoughtRow) { thoughtRow = makeBodyStep("思考", thoughtRaw, true); body.appendChild(thoughtRow); }
+        else { thoughtRow.querySelector(".ttxt").textContent = thoughtRaw; }
       },
       onStep: function (kind, message) {
         if (isNoiseStep(kind, message)) return;
@@ -553,17 +590,17 @@
         var key = labelText + "|" + txt;
         if (key === lastStepKey) return; // 跳过连续重复
         lastStepKey = key;
-        showThinking();
         setTitle(labelText);
-        steps.appendChild(makeStep(labelText, txt, false));
+        setLive(labelText, oneLine(txt, false));
+        // 展开态累积完整步骤列表 (限量防 DOM 爆炸)
+        body.appendChild(makeBodyStep(labelText, txt, false));
         stepCount++;
-        // 控制体量: 超量时移除最早的非思考步骤
-        while (stepCount > MAX_STEPS) {
-          var first = steps.querySelector(".step:not(.thought)");
+        while (stepCount > MAX_BODY_STEPS) {
+          var first = body.querySelector(".tstep:not(.thought)");
           if (!first) break;
-          steps.removeChild(first); stepCount--;
+          body.removeChild(first); stepCount--;
         }
-        scrollDown();
+        if (thinking.classList.contains("expanded")) body.scrollTop = body.scrollHeight;
       },
       onAnswer: function (chunk) {
         answerRaw += chunk;
@@ -571,7 +608,7 @@
         answer.innerHTML = renderMarkdown(answerRaw);
         answer.classList.add("caret");
         setTitle("正在输出结果");
-        if (shown && !thinking.classList.contains("collapsed")) thinking.classList.add("collapsed");
+        setLive("输出结果", "正在生成回答…");
         scrollDown();
       },
       onError: function (msg) {
@@ -588,13 +625,12 @@
           answer.classList.remove("empty");
           answer.innerHTML = '<p style="color:var(--muted)">没有得到回答内容。</p>';
         }
-        // 完成后折叠思考过程(保留可展开查看"参考了哪些资料"), 不再撑大界面
-        thinking.classList.add("done");
+        // 完成后隐藏动态行, 标题收敛为"已完成思考", 不再撑大界面
         if (shown) {
           var secs = ((Date.now() - startedAt) / 1000).toFixed(0);
           if (titleEl) titleEl.textContent = "已完成思考 · 用时 " + secs + "s";
           if (elapsedEl) elapsedEl.textContent = "";
-          thinking.classList.add("collapsed");
+          thinking.classList.add("done");
         } else if (thinking.parentNode) {
           thinking.parentNode.removeChild(thinking);
         }

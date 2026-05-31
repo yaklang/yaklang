@@ -52,6 +52,8 @@ ai:
 
 命令行参数可覆盖 yaml：`--host --port --prefix --auth-token --rag-files --concurrent --ai-type --ai-model --ai-apikey --ai-domain --debug`。
 
+> 快速生成配置模板：`yak rag-server --gen-config rag-server.yaml`（已存在则需加 `--gen-config-force` 覆盖）。生成的模板带注释，修改其中 `ai.api_key` 等字段后用 `yak rag-server --config rag-server.yaml` 启动。
+
 ## 3. HTTP 接口
 
 所有接口均在前缀 `/api/rag-server` 下。下文示例假设服务监听 `http://127.0.0.1:9093`。
@@ -75,7 +77,10 @@ curl http://127.0.0.1:9093/api/rag-server/health
   "maxIteration": 1,
   "timeout": 180,
   "authRequired": false,
-  "ai": { "mode": "tiered", "type": "aibalance" }
+  "ai": {
+    "quality": { "mode": "lightweight", "type": "aibalance", "model": "memfit-light-free" },
+    "speed":   { "mode": "lightweight", "type": "aibalance", "model": "memfit-light-free" }
+  }
 }
 ```
 
@@ -153,7 +158,9 @@ curl -N -X POST http://127.0.0.1:9093/api/rag-server/chat \
 
 并发超限时直接返回 HTTP `429`，并发送一条 `error`（code=429）+ `end`（reason=server_busy）。
 
-`log.kind` 可能的取值：`search`（检索）、`thought`（思考）、`task`（任务）、`plan`（计划）、`timeline`（时间线）、`title`（会话标题）、`event`（其它）。
+`log.kind` 可能的取值：`progress`（实时进度，如"执行搜索中""压缩搜索结果中""评估"）、`search`（检索）、`thought`（思考）、`task`（任务）、`plan`（计划）、`timeline`（时间线，含搜索条件/结果摘要）、`title`（会话标题）、`event`（其它）。
+
+> 内置只读前端会把这些过程统一归并为"思考过程"，并映射为中文步骤标签（思考 / 获取资料 / 正在压缩 / 评估 …）。后端已对所有 `message` 做本地路径脱敏，并过滤 `notify`、`filesystem_pin_*`、`session_title` 等噪声事件。
 
 ### SSE 解析示例（浏览器）
 
@@ -206,8 +213,13 @@ while (true) {
 
 ## 4. AI 模式说明
 
-- `ai.model` / `ai.api_key` / `ai.domain` 三者全部为空：走本机全局**分级** aiconfig（`TieredAIConfig`，由 yakit-projects 全局配置决定 lightweight / intelligent 模型）。
-- 任意一个非空：切换为**单 callback 覆盖模式**，用 `ai.type` + 指定 model/apikey/domain 覆盖全部 tier。独立部署到无全局 aiconfig 的机器时，建议在此显式配置。
+模型分为两个相互独立的通道（已移除 `ai_tier`），各自由对应配置块的 `api_key` 是否填写决定：
+
+- **`ai`（质量优先 / 高质模型）**：关键推理与最终回答走此通道。填了 `ai.api_key` → 使用你的 `ai.type` + `ai.model`（+ 可选 `domain`）；未填 → 回退内置轻量模型 `memfit-light-free`。`/health` 中 `ai.quality.mode = custom | lightweight`。
+- **`ai_lightweight`（速度优先 / 小尺寸模型）**：ReAct 循环里的搜索 / 记忆 / 压缩等高频调用走此通道，用小模型省成本。填了 `ai_lightweight.api_key` → 使用你配置的小模型；未填 → 回退内置 `memfit-light-free`。`/health` 中 `ai.speed.mode = custom | lightweight`。
+
+> 设计意图：高频的速度调用别烧高质模型的 token，只有真正需要质量的关键推理才用高质模型。
+> 启动时后端会检测并打印两个通道当前所用模型（`AI Model:` 行 / 日志）。任一块只填 `model` / `domain` 但缺 `api_key` 都视为未配置，回退到轻量模型。
 
 ## 5. 安全提示
 

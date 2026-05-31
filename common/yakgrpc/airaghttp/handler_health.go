@@ -6,24 +6,29 @@ import (
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 )
 
-// aiModeInfo 返回当前 AI 模式信息
+// aiModeInfo 返回当前 AI 模式信息: quality(质量优先) 与 speed(速度优先) 两个通道
 func (s *RAGHTTPServer) aiModeInfo() map[string]interface{} {
-	if s.config.UseCustomAIConfig() {
-		return map[string]interface{}{
-			"mode":   "single",
+	quality := map[string]interface{}{"mode": "lightweight", "type": "aibalance", "model": LightweightModelName}
+	if s.config.IsAIConfigured() {
+		quality = map[string]interface{}{
+			"mode":   "custom",
 			"type":   s.config.AI.Type,
 			"model":  s.config.AI.Model,
 			"domain": s.config.AI.Domain,
 		}
 	}
-	tier := "standard"
-	if s.config.UseBasicTier() {
-		tier = "basic"
+	speed := map[string]interface{}{"mode": "lightweight", "type": "aibalance", "model": LightweightModelName}
+	if s.config.IsLightweightAIConfigured() {
+		speed = map[string]interface{}{
+			"mode":   "custom",
+			"type":   s.config.AILightweight.Type,
+			"model":  s.config.AILightweight.Model,
+			"domain": s.config.AILightweight.Domain,
+		}
 	}
 	return map[string]interface{}{
-		"mode": "tiered",
-		"type": s.config.AI.Type,
-		"tier": tier,
+		"quality": quality,
+		"speed":   speed,
 	}
 }
 

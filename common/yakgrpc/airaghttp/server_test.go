@@ -185,6 +185,7 @@ collections:
 ai:
   type: "openai"
   model: "gpt-4o"
+  api_key: "sk-test-123"
 `
 	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
 		t.Fatalf("write config failed: %v", err)
@@ -206,8 +207,8 @@ ai:
 	if len(cfg.Collections) != 2 || cfg.Collections[0] != "kb-a" {
 		t.Fatalf("unexpected collections: %v", cfg.Collections)
 	}
-	if !cfg.UseCustomAIConfig() {
-		t.Fatal("expected UseCustomAIConfig true (model set)")
+	if !cfg.IsAIConfigured() {
+		t.Fatal("expected IsAIConfigured true (api_key set)")
 	}
 }
 
@@ -216,7 +217,7 @@ func TestDefaultConfig(t *testing.T) {
 	if cfg.Port != 9093 || cfg.RoutePrefix != "/api/rag-server" {
 		t.Fatalf("unexpected default config: %+v", cfg)
 	}
-	if cfg.UseCustomAIConfig() {
-		t.Fatal("default config should use tiered ai (no custom)")
+	if cfg.IsAIConfigured() {
+		t.Fatal("default config should not be AI-configured (no api_key), falling back to lightweight")
 	}
 }
