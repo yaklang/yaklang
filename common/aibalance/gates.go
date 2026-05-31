@@ -251,6 +251,29 @@ func isFreeModelBillingExempt(modelName string) bool {
 	return false
 }
 
+// gateChatThrottledIPRPM 处理「一键限流 IP」的按 IP 维度 RPM 限流。
+// 与 gateRPM（按 apiKey|model）正交：只要该 IP 被管理员一键限流且配置了 RPM，
+// 无论免费/付费请求都按该 IP 的低 RPM 滑动窗口限流，命中即写 429（复用 rpm 文案）。
+// 未被限流 / IP 不可识别 / RPM<=0 一律放行。
+// 关键词: gateChatThrottledIPRPM, 一键限流 IP, per-IP RPM 429
+func (c *ServerConfig) gateChatThrottledIPRPM(conn net.Conn, clientIP, modelName string) bool {
+	if c.chatRateLimiter == nil || freeIPUsageIgnoredIP(clientIP) {
+		return false
+	}
+	rpm, _, ok := lookupThrottledIP(clientIP)
+	if !ok || rpm <= 0 {
+		return false
+	}
+	allowed, queueLen := c.chatRateLimiter.CheckIPRateLimit(clientIP, rpm)
+	if !allowed {
+		c.logWarn("throttled IP RPM limit exceeded: ip=%s model=%s rpm=%d queue_length=%d",
+			clientIP, modelName, rpm, queueLen)
+		c.writeRPMRateLimitResponse(conn, queueLen)
+		return true
+	}
+	return false
+}
+
 // gateRPM 处理按 API key（含模型级覆盖）的 RPM 限流检查。
 // 关键词: gateRPM, chatRateLimiter.CheckRateLimit, RPM 429
 func (c *ServerConfig) gateRPM(conn net.Conn, apiKeyForStat, modelName string) bool {

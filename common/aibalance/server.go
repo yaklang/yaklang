@@ -943,6 +943,13 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 		}
 	}
 
+	// 一键限流 IP：按 IP 维度的 RPM 限流（独立于下面按 apiKey|model 的 RPM），
+	// 对被管理员一键限流的滥用 IP 生效，免费/付费请求都受限。
+	// 关键词: serveChatCompletions gateChatThrottledIPRPM, 一键限流 IP
+	if c.gateChatThrottledIPRPM(conn, clientIP, modelName) {
+		return
+	}
+
 	// RPM rate limit check (per API key, with per-model overrides)
 	// 仍然放在 daily check 之后：被 daily token 挡的请求不会污染 RPM 桶。
 	// 关键词: serveChatCompletions gate 抽离, gateRPM
@@ -1047,14 +1054,22 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 		// 关键词: writer notStream 显式传递, 非流式 writer 行为
 		writer := NewChatJSONChunkWriterEx(conn, apiKeyForStat, modelName, !stream)
 
-		// 输出 TPS 限速：只对免费模型 + 流式 (stream=true) 生效。
-		// ResolveEffectiveOutputTPS 综合 模型级 / 全局 / 软限额 TPS 三档，
-		// 取最严（非零最小值）作为本次请求的 effective TPS。
-		// 关键词: writer SetOutputTPSLimit, 免费模型 + 流式 TPS 限速
-		if isFreeModel && stream {
-			if effectiveTPS := c.ResolveEffectiveOutputTPS(modelName, true); effectiveTPS > 0 {
+		// 输出 TPS 限速（仅流式 stream=true 生效）：
+		//   - 免费模型走 ResolveEffectiveOutputTPS（模型级 / 全局 / 软限额三档取最严）；
+		//   - 一键限流 IP 额外叠加该 IP 的 TPS，与上面结果取最严（非零最小值），
+		//     使被限流 IP 即便走付费模型也会被压低输出速率。
+		// 关键词: writer SetOutputTPSLimit, 免费模型 + 流式 TPS 限速, 一键限流 IP TPS
+		if stream {
+			effectiveTPS := int64(0)
+			if isFreeModel {
+				effectiveTPS = c.ResolveEffectiveOutputTPS(modelName, true)
+			}
+			if _, ipTPS, throttled := lookupThrottledIP(clientIP); throttled && ipTPS > 0 {
+				effectiveTPS = pickStricterTPS(effectiveTPS, ipTPS)
+			}
+			if effectiveTPS > 0 {
 				writer.SetOutputTPSLimit(effectiveTPS)
-				c.logInfo("free user output TPS limited: model=%s tps=%d", modelName, effectiveTPS)
+				c.logInfo("output TPS limited: model=%s ip=%s tps=%d", modelName, clientIP, effectiveTPS)
 			}
 		}
 

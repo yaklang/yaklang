@@ -6175,6 +6175,8 @@ curl '${metaApiUrl}?name=${modelName}'`;
         __exposeFn('formatTokenCount', () => formatTokenCount);
         // 1 RMB=10M 计费 Token 实时换算提示
         __exposeFn('updateRMBHint', () => updateRMBHint);
+        // 模型级免费 Token 覆盖行的金额限制换算提示
+        __exposeFn('updateFreeTokenRowRMB', () => updateFreeTokenRowRMB);
 
         // 内存和系统监控相关
         __exposeFn('showMemoryDialog', () => showMemoryDialog);
@@ -6720,6 +6722,18 @@ curl '${metaApiUrl}?name=${modelName}'`;
                     if (ipReqLimitEl) ipReqLimitEl.value = (cfg.free_user_ip_daily_request_limit == null ? 0 : cfg.free_user_ip_daily_request_limit);
                     const ipTokLimitEl = document.getElementById('rl-free-ip-daily-token-limit-m');
                     if (ipTokLimitEl) ipTokLimitEl.value = (cfg.free_user_ip_daily_token_limit_m == null ? 0 : cfg.free_user_ip_daily_token_limit_m);
+
+                    // 刷新免费额度相关「金额限制」换算提示（单 IP 每日 Token 上限 / 软限额阈值）
+                    // 关键词: loadRateLimitConfig 金额限制 RMB 提示, 单 IP Token 上限, 软限额阈值
+                    updateRMBHint('rl-free-ip-daily-token-limit-m', 'rl-free-ip-daily-token-limit-rmb');
+                    updateRMBHint('rl-free-token-soft-limit-m', 'rl-free-token-soft-limit-rmb');
+
+                    // 一键限流 IP 默认参数（RPM / 输出 TPS）
+                    // 关键词: loadRateLimitConfig throttled_ip_default_rpm/tps
+                    const thrRpmEl = document.getElementById('rl-throttled-ip-default-rpm');
+                    if (thrRpmEl) thrRpmEl.value = (cfg.throttled_ip_default_rpm == null ? 3 : cfg.throttled_ip_default_rpm);
+                    const thrTpsEl = document.getElementById('rl-throttled-ip-default-tps');
+                    if (thrTpsEl) thrTpsEl.value = (cfg.throttled_ip_default_tps == null ? 15 : cfg.throttled_ip_default_tps);
                 }
             } catch (error) {
                 console.error('Error loading rate limit config:', error);
@@ -6796,6 +6810,15 @@ curl '${metaApiUrl}?name=${modelName}'`;
             let freeIPDailyTokenLimitM = parseInt(ipTokLimitRaw ? ipTokLimitRaw.value : '');
             if (isNaN(freeIPDailyTokenLimitM) || freeIPDailyTokenLimitM < 0) freeIPDailyTokenLimitM = 0;
 
+            // 一键限流 IP 默认参数（RPM / 输出 TPS），<=0 由后端按 3/15 兜底
+            // 关键词: saveRateLimitConfig throttled_ip_default_rpm/tps
+            const thrRpmRaw = document.getElementById('rl-throttled-ip-default-rpm');
+            let throttledIPDefaultRPM = parseInt(thrRpmRaw ? thrRpmRaw.value : '');
+            if (isNaN(throttledIPDefaultRPM) || throttledIPDefaultRPM < 0) throttledIPDefaultRPM = 0;
+            const thrTpsRaw = document.getElementById('rl-throttled-ip-default-tps');
+            let throttledIPDefaultTPS = parseInt(thrTpsRaw ? thrTpsRaw.value : '');
+            if (isNaN(throttledIPDefaultTPS) || throttledIPDefaultTPS < 0) throttledIPDefaultTPS = 0;
+
             try {
                 const response = await fetch('/portal/api/rate-limit-config', {
                     method: 'POST',
@@ -6821,7 +6844,9 @@ curl '${metaApiUrl}?name=${modelName}'`;
                         model_downgrade_rules: modelDowngradeRules,
                         free_user_ip_limit_enable: freeIPLimitEnable,
                         free_user_ip_daily_request_limit: freeIPDailyRequestLimit,
-                        free_user_ip_daily_token_limit_m: freeIPDailyTokenLimitM
+                        free_user_ip_daily_token_limit_m: freeIPDailyTokenLimitM,
+                        throttled_ip_default_rpm: throttledIPDefaultRPM,
+                        throttled_ip_default_tps: throttledIPDefaultTPS
                     })
                 });
                 const data = await response.json();
@@ -6893,30 +6918,136 @@ curl '${metaApiUrl}?name=${modelName}'`;
             loadClientVersionStats();
         }
 
-        // renderFreeIPUsage 渲染「今日免费 IP 用量」面板：多少 IP 在用 + Top 榜表格。
-        // 关键词: renderFreeIPUsage, 单 IP 免费用量, 防盗刷面板
+        // renderFreeIPUsage 渲染「今日免费 IP 用量」面板：多少 IP 在用 + Top 榜（仅 >10M）+ 一键限流。
+        // 关键词: renderFreeIPUsage, 单 IP 免费用量, 防盗刷面板, 一键限流
         function renderFreeIPUsage(usage) {
             const countEl = document.getElementById('rl-free-ip-distinct-count');
             if (countEl) countEl.textContent = (typeof usage.distinct_ip_count === 'number') ? usage.distinct_ip_count : '--';
             const dateEl = document.getElementById('rl-free-ip-reset-date');
             if (dateEl) dateEl.textContent = usage.reset_date || '--';
+
+            // 已限流 IP 列表（独立于今日用量榜，可随时解除）
+            renderThrottledIPList(Array.isArray(usage.throttled_ips) ? usage.throttled_ips : []);
+
             const tbody = document.getElementById('rl-free-ip-usage-tbody');
             if (!tbody) return;
             const top = Array.isArray(usage.top) ? usage.top : [];
             if (top.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="3" style="padding: 12px; text-align: center; color: #999;">今日暂无免费模型（计费部分）请求记录</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="5" style="padding: 12px; text-align: center; color: #999;">今日暂无加权 Token 超过 10M 的免费 IP</td></tr>';
+                bindFreeIPActionButtons();
                 return;
             }
             tbody.innerHTML = top.map(it => {
                 const ip = escapeHtml(it.ip || '');
                 const req = Number(it.request_count) || 0;
-                const usedM = (typeof it.used_m === 'number') ? it.used_m.toFixed(3) : '0.000';
+                const usedMNum = (typeof it.used_m === 'number') ? it.used_m : 0;
+                const usedM = usedMNum.toFixed(3);
+                // 加权 Token 折算 RMB：1 RMB = 10M 计费 Token（BILLING_TOKEN_M_PER_RMB）。
+                const rmb = '¥' + (usedMNum / BILLING_TOKEN_M_PER_RMB).toFixed(2);
+                const throttled = !!it.throttled;
+                const btn = throttled
+                    ? '<button class="rl-ip-unthrottle-btn btn" data-ip="' + ip + '" style="height:26px; font-size:12px; background:#c62828; color:#fff;">解除</button>'
+                    : '<button class="rl-ip-throttle-btn btn" data-ip="' + ip + '" style="height:26px; font-size:12px; background:#ef6c00; color:#fff;">限流</button>';
+                const tag = throttled ? ' <span style="color:#c62828; font-size:11px;">(已限流)</span>' : '';
                 return '<tr>'
-                    + '<td style="padding: 6px 10px; border-bottom: 1px solid #e1f5fe;"><code>' + ip + '</code></td>'
+                    + '<td style="padding: 6px 10px; border-bottom: 1px solid #e1f5fe;"><code>' + ip + '</code>' + tag + '</td>'
                     + '<td style="padding: 6px 10px; border-bottom: 1px solid #e1f5fe; text-align: right;">' + req + '</td>'
                     + '<td style="padding: 6px 10px; border-bottom: 1px solid #e1f5fe; text-align: right;">' + usedM + '</td>'
+                    + '<td style="padding: 6px 10px; border-bottom: 1px solid #e1f5fe; text-align: right; color:#1565c0;">' + rmb + '</td>'
+                    + '<td style="padding: 6px 10px; border-bottom: 1px solid #e1f5fe; text-align: center;">' + btn + '</td>'
                     + '</tr>';
             }).join('');
+            bindFreeIPActionButtons();
+        }
+
+        // renderThrottledIPList 渲染「已限流 IP」列表（带 RPM/TPS 与解除按钮）；空列表时隐藏整块。
+        // 关键词: renderThrottledIPList, 已限流 IP 列表, 解除限流
+        function renderThrottledIPList(list) {
+            const wrap = document.getElementById('rl-throttled-ip-wrap');
+            const listEl = document.getElementById('rl-throttled-ip-list');
+            const countEl = document.getElementById('rl-throttled-ip-count');
+            if (!wrap || !listEl) return;
+            if (!list.length) {
+                wrap.style.display = 'none';
+                listEl.innerHTML = '';
+                if (countEl) countEl.textContent = '0';
+                return;
+            }
+            wrap.style.display = 'block';
+            if (countEl) countEl.textContent = String(list.length);
+            listEl.innerHTML = list.map(it => {
+                const ip = escapeHtml(it.ip || '');
+                const rpm = Number(it.rpm) || 0;
+                const tps = Number(it.tps) || 0;
+                const reason = it.reason ? (' · ' + escapeHtml(it.reason)) : '';
+                return '<div style="display:flex; align-items:center; gap:10px; font-size:12px; background:#ffebee; border:1px solid #ffcdd2; border-radius:4px; padding:4px 8px;">'
+                    + '<code style="flex:0 0 auto;">' + ip + '</code>'
+                    + '<span style="color:#555;">RPM ' + rpm + ' · TPS ' + tps + reason + '</span>'
+                    + '<button class="rl-ip-unthrottle-btn btn" data-ip="' + ip + '" style="margin-left:auto; height:24px; font-size:11px; background:#c62828; color:#fff;">解除</button>'
+                    + '</div>';
+            }).join('');
+            bindFreeIPActionButtons();
+        }
+
+        // bindFreeIPActionButtons 给「限流 / 解除」按钮绑定点击事件（用 onclick 赋值，幂等可重复调用）。
+        // 关键词: bindFreeIPActionButtons, 一键限流按钮绑定
+        function bindFreeIPActionButtons() {
+            document.querySelectorAll('.rl-ip-throttle-btn').forEach(function (b) {
+                b.onclick = function () { throttleIP(this.getAttribute('data-ip')); };
+            });
+            document.querySelectorAll('.rl-ip-unthrottle-btn').forEach(function (b) {
+                b.onclick = function () { unthrottleIP(this.getAttribute('data-ip')); };
+            });
+        }
+
+        // throttleIP 一键限流某 IP：后端按配置默认 RPM/TPS 套用。
+        // 关键词: throttleIP, 一键限流 IP 请求
+        async function throttleIP(ip) {
+            if (!ip) return;
+            if (!confirm('确定要限流 IP ' + ip + ' 吗？\n该 IP 的请求频率(RPM)与输出速率(TPS)将被压到配置的默认值，且持久保留直到手动解除。')) return;
+            try {
+                const response = await fetch('/portal/api/throttle-ip', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ip: ip })
+                });
+                const data = await response.json();
+                if (isAuthError(data)) { handleAuthError(); return; }
+                if (data.success) {
+                    showToast('已限流 IP ' + ip + '（RPM ' + data.rpm + ' / TPS ' + data.tps + '）', 'success');
+                    loadRateLimitStatus();
+                } else {
+                    showToast(data.error || '限流失败', 'error');
+                }
+            } catch (e) {
+                console.error('throttleIP failed:', e);
+                showToast('限流请求失败', 'error');
+            }
+        }
+
+        // unthrottleIP 解除某 IP 的限流。
+        // 关键词: unthrottleIP, 解除限流请求
+        async function unthrottleIP(ip) {
+            if (!ip) return;
+            if (!confirm('确定要解除对 IP ' + ip + ' 的限流吗？')) return;
+            try {
+                const response = await fetch('/portal/api/unthrottle-ip', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ip: ip })
+                });
+                const data = await response.json();
+                if (isAuthError(data)) { handleAuthError(); return; }
+                if (data.success) {
+                    showToast('已解除 IP ' + ip + ' 的限流', 'success');
+                    loadRateLimitStatus();
+                } else {
+                    showToast(data.error || '解除失败', 'error');
+                }
+            } catch (e) {
+                console.error('unthrottleIP failed:', e);
+                showToast('解除限流请求失败', 'error');
+            }
         }
 
         // ==================== Memfit Client Version Stats ====================
@@ -7275,12 +7406,29 @@ curl '${metaApiUrl}?name=${modelName}'`;
             const limitVal = (limitM === undefined || limitM === null || limitM === '') ? '' : limitM;
             row.innerHTML =
                 '<input type="text" class="form-control rl-free-token-name" value="' + (model || '').replace(/"/g, '&quot;') + '" placeholder="模型名称（对外，例如 memfit-light-free）" style="flex: 1; font-family: monospace; font-size: 13px; padding: 6px 10px;">' +
-                '<input type="number" class="form-control rl-free-token-limit-m" value="' + limitVal + '" placeholder="限额(M)" min="0" title="该模型独立桶限额（M Token）；留空或 0 = 与全局共享池合并" style="width: 130px; font-family: monospace; font-size: 13px; padding: 6px 10px;">' +
+                '<input type="number" class="form-control rl-free-token-limit-m" value="' + limitVal + '" placeholder="限额(M)" min="0" title="该模型独立桶限额（M Token）；留空或 0 = 与全局共享池合并" oninput="updateFreeTokenRowRMB(this)" style="width: 130px; font-family: monospace; font-size: 13px; padding: 6px 10px;">' +
+                '<small class="rl-free-token-rmb" title="金额限制：1 RMB = 10M 计费 Token" style="font-size: 11px; color: #1565c0; white-space: nowrap; min-width: 64px;"></small>' +
                 '<label style="display: flex; align-items: center; gap: 4px; font-size: 12px; color: #555; padding: 0 6px; white-space: nowrap;">' +
                 '<input type="checkbox" class="rl-free-token-exempt"' + (exempt ? ' checked' : '') + ' title="勾选表示该模型完全豁免计费（不进入任何桶）"> 不计费' +
                 '</label>' +
                 '<button class="btn btn-danger" onclick="this.parentElement.remove()" style="height: 32px; font-size: 12px; padding: 4px 10px;">删除</button>';
             container.appendChild(row);
+            // 初始化该行「金额限制」换算提示
+            updateFreeTokenRowRMB(row.querySelector('.rl-free-token-limit-m'));
+        }
+
+        // updateFreeTokenRowRMB 把某个模型级覆盖行的「限额(M)」换算成 RMB 写到同行提示里。
+        // 1 RMB = 10M 计费 Token（BILLING_TOKEN_M_PER_RMB）。0 / 空 = 不显示金额。
+        // 关键词: updateFreeTokenRowRMB, 模型级覆盖金额限制
+        function updateFreeTokenRowRMB(inputEl) {
+            if (!inputEl) return;
+            const row = inputEl.closest ? inputEl.closest('.rl-free-token-row') : null;
+            if (!row) return;
+            const span = row.querySelector('.rl-free-token-rmb');
+            if (!span) return;
+            const m = parseInt(inputEl.value);
+            const mm = isNaN(m) ? 0 : m;
+            span.textContent = mm > 0 ? ('≈ ¥' + (mm / BILLING_TOKEN_M_PER_RMB).toFixed(2)) : '';
         }
 
         function addFreeTokenModelOverride() {

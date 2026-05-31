@@ -221,6 +221,14 @@ type AiBalanceRateLimitConfig struct {
 	FreeUserIPLimitEnable       bool  `json:"free_user_ip_limit_enable" gorm:"default:true"`
 	FreeUserIPDailyRequestLimit int64 `json:"free_user_ip_daily_request_limit" gorm:"default:500"`
 	FreeUserIPDailyTokenLimitM  int64 `json:"free_user_ip_daily_token_limit_m" gorm:"default:30"`
+
+	// 一键限流 IP 的默认参数（管理员在面板「频率与速率」配置里可改）
+	// 关键词: ThrottledIPDefaultRPM, ThrottledIPDefaultTPS, 一键限流默认值
+	//
+	// 一键限流某个 IP 时套用的默认 RPM（按 IP 维度的请求频率上限）与输出 TPS（流式 token/秒）。
+	// 实际被限流的 IP 列表持久化在 AiBalanceThrottledIP 表，每条可单独覆盖这两个值。
+	ThrottledIPDefaultRPM int64 `json:"throttled_ip_default_rpm" gorm:"default:3"`  // 一键限流默认 RPM（<=0 兜底 3）
+	ThrottledIPDefaultTPS int64 `json:"throttled_ip_default_tps" gorm:"default:15"` // 一键限流默认输出 TPS（<=0 兜底 15）
 }
 
 func (a *AiBalanceRateLimitConfig) TableName() string {
@@ -429,6 +437,24 @@ type FreeUserIPDailyUsage struct {
 
 func (a *FreeUserIPDailyUsage) TableName() string {
 	return "free_user_ip_daily_usage"
+}
+
+// AiBalanceThrottledIP 持久化「被一键限流的客户端 IP」及其生效的 RPM / 输出 TPS 上限。
+// 一行 = 一个被限流的 IP（IP 唯一）。与按日重置的免费 IP 用量表不同：限流是管理员
+// 主动施加的持久动作，不随每日切日清空，需在面板手动解除（删除该行）。
+// 命中后：按 IP 维度的 RPM 滑动窗口（独立于 apiKey|model 桶）+ 流式输出 TPS 限速同时生效。
+// 关键词: ai_balance_throttled_ips, 一键限流 IP, per-IP RPM/TPS, 持久限流
+type AiBalanceThrottledIP struct {
+	gorm.Model
+
+	IP     string `json:"ip" gorm:"size:64;unique_index;not null"` // 被限流的客户端 IP
+	RPM    int64  `json:"rpm"`                                     // 该 IP 的请求频率上限（每分钟），<=0 表示不限 RPM
+	TPS    int64  `json:"tps"`                                     // 该 IP 流式输出 TPS 上限（token/秒），<=0 表示不限 TPS
+	Reason string `json:"reason" gorm:"type:text"`                 // 限流原因 / 备注（可选）
+}
+
+func (a *AiBalanceThrottledIP) TableName() string {
+	return "ai_balance_throttled_ips"
 }
 
 // ==================== B 类表自动迁移 ====================

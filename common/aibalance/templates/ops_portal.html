@@ -10,12 +10,15 @@
     <div class="header">
         <div style="display: flex; align-items: center;">
             <h1>AIBalancer</h1>
-            <span class="badge">OPS Portal</span>
+            <span class="badge" data-i18n="header.badge">OPS Portal</span>
         </div>
         <div class="header-right">
-            <span class="user-info">Welcome, <strong id="username-display">Loading...</strong></span>
-            <a href="/" class="btn" style="background: #4373BB; color: #fff;">Homepage</a>
-            <a href="/ops/logout" class="btn btn-secondary">Logout</a>
+            <span class="user-info"><span data-i18n="header.welcome">Welcome, </span><strong id="username-display">Loading...</strong></span>
+            <!-- 语言切换：默认中文，点击在中/英之间切换，选择记忆到 localStorage。 -->
+            <!-- 关键词: OPS portal 语言切换按钮 toggleOpsLang -->
+            <button id="lang-toggle" class="btn btn-secondary" onclick="toggleOpsLang()">English</button>
+            <a href="/" class="btn" style="background: #4373BB; color: #fff;" data-i18n="header.homepage">Homepage</a>
+            <a href="/ops/logout" class="btn btn-secondary" data-i18n="header.logout">Logout</a>
         </div>
     </div>
     
@@ -23,15 +26,15 @@
         <!-- Stats -->
         <div class="stats-grid">
             <div class="stat-card">
-                <h3>API Keys Created</h3>
+                <h3 data-i18n="stats.apiKeys">API Keys Created</h3>
                 <div class="value" id="stat-api-keys">--</div>
             </div>
             <div class="stat-card">
-                <h3>Default Traffic Limit</h3>
+                <h3 data-i18n="stats.defaultLimit">Default Traffic Limit</h3>
                 <div class="value" id="stat-default-limit">--</div>
             </div>
             <div class="stat-card">
-                <h3>Account Status</h3>
+                <h3 data-i18n="stats.status">Account Status</h3>
                 <div class="value" id="stat-status">--</div>
             </div>
         </div>
@@ -39,11 +42,11 @@
         <!-- Main Content -->
         <div class="card">
             <div class="tabs">
-                <div class="tab active" data-tab="create-key">Create API Key</div>
-                <div class="tab" data-tab="my-keys">My API Keys</div>
-                <div class="tab" data-tab="api-usage">API Usage</div>
-                <div class="tab" data-tab="my-info">My Info</div>
-                <div class="tab" data-tab="settings">Settings</div>
+                <div class="tab active" data-tab="create-key" data-i18n="tab.createKey">Create API Key</div>
+                <div class="tab" data-tab="my-keys" data-i18n="tab.myKeys">My API Keys</div>
+                <div class="tab" data-tab="api-usage" data-i18n="tab.apiUsage">API Usage</div>
+                <div class="tab" data-tab="my-info" data-i18n="tab.myInfo">My Info</div>
+                <div class="tab" data-tab="settings" data-i18n="tab.settings">Settings</div>
             </div>
             
             <!-- Create API Key Tab -->
@@ -54,17 +57,17 @@
                     <form id="create-key-form">
                         <!-- Model Selection -->
                         <div class="form-group">
-                            <label>Allowed Models</label>
+                            <label data-i18n="create.allowedModels">Allowed Models</label>
                             <div class="model-selection">
                                 <div class="model-selection-header">
-                                    <span class="title">Select Models</span>
+                                    <span class="title" data-i18n="common.selectModels">Select Models</span>
                                     <div class="actions">
-                                        <button type="button" class="btn-text" onclick="selectAllModels()">Select All</button>
-                                        <button type="button" class="btn-text" onclick="clearAllModels()">Clear</button>
+                                        <button type="button" class="btn-text" onclick="selectAllModels()" data-i18n="common.selectAll">Select All</button>
+                                        <button type="button" class="btn-text" onclick="clearAllModels()" data-i18n="common.clear">Clear</button>
                                     </div>
                                 </div>
                                 <div class="model-list" id="model-list">
-                                    <div style="padding: 20px; text-align: center; color: #888;">Loading models...</div>
+                                    <div style="padding: 20px; text-align: center; color: #888;" data-i18n="common.loadingModels">Loading models...</div>
                                 </div>
                                 <div class="glob-input-section">
                                     <div class="title">
@@ -72,12 +75,12 @@
                                             <circle cx="11" cy="11" r="8"></circle>
                                             <path d="M21 21l-4.35-4.35"></path>
                                         </svg>
-                                        Glob Patterns (Advanced)
+                                        <span data-i18n="common.globAdvanced">Glob Patterns (Advanced)</span>
                                     </div>
-                                    <input type="text" id="glob-patterns" placeholder="e.g., memfit-*,qwen*,gpt-4*">
-                                    <div class="hint">Comma-separated glob patterns. Use <code>*</code> as wildcard. Example: <code>memfit-*</code> matches all memfit models.</div>
+                                    <input type="text" id="glob-patterns" placeholder="e.g., memfit-*,qwen*,gpt-4*" data-i18n-placeholder="create.globPh">
+                                    <div class="hint" data-i18n-html="create.globHint">Comma-separated glob patterns. Use <code>*</code> as wildcard. Example: <code>memfit-*</code> matches all memfit models.</div>
                                 </div>
-                                <div class="selected-preview" id="selected-preview">
+                                <div class="selected-preview" id="selected-preview" data-i18n-html="preview.empty">
                                     <strong>Selected:</strong> <span id="selected-count">0</span> models
                                 </div>
                             </div>
@@ -86,39 +89,41 @@
                         <!-- 绑定用户信息（可选）：用户名(可重复)/备注/metainfo -->
                         <!-- 关键词: OPS create-api-key Username Remark MetaInfo 绑定信息输入 -->
                         <div class="form-group">
-                            <label>User Binding (optional)</label>
+                            <label data-i18n="create.userBinding">User Binding (optional)</label>
                             <div style="display:flex; gap:10px; flex-wrap:wrap;">
-                                <input type="text" id="create-username" placeholder="Username (repeatable)" style="flex:1 1 200px;">
-                                <input type="text" id="create-remark" placeholder="Remark (free text)" style="flex:1 1 200px;">
+                                <input type="text" id="create-username" placeholder="Username (repeatable)" data-i18n-placeholder="create.usernamePh" style="flex:1 1 200px;">
+                                <input type="text" id="create-remark" placeholder="Remark (free text)" data-i18n-placeholder="create.remarkPh" style="flex:1 1 200px;">
                             </div>
-                            <textarea id="create-metainfo" rows="2" placeholder='metainfo (JSON text, for OAuth/external binding, optional)' style="margin-top:8px; width:100%; font-family:monospace; font-size:12px;"></textarea>
+                            <textarea id="create-metainfo" rows="2" placeholder='metainfo (JSON text, for OAuth/external binding, optional)' data-i18n-placeholder="create.metainfoPh" style="margin-top:8px; width:100%; font-family:monospace; font-size:12px;"></textarea>
                         </div>
                         
                         <!-- Token Settings (Recommended) -->
-                        <!-- 关键词: OPS create-api-key Token 限额, 推荐使用替代字节流量 -->
+                        <!-- 关键词: OPS create-api-key Token 限额, 推荐使用替代字节流量, RMB 换算提示 -->
                         <div class="form-group" style="border-left: 3px solid #1976d2; padding-left: 10px; background: #f5faff;">
-                            <label>Token Settings <span style="color:#1976d2;font-weight:normal;">(Recommended)</span></label>
+                            <label><span data-i18n="create.tokenSettings">Token Settings</span> <span style="color:#1976d2;font-weight:normal;" data-i18n="create.recommended">(Recommended)</span></label>
                             <div class="toggle-group active" id="token-unlimited-toggle">
                                 <label class="toggle-switch">
                                     <input type="checkbox" id="unlimited-token" checked>
                                     <span class="toggle-slider"></span>
                                 </label>
                                 <div class="toggle-label">
-                                    <div class="title">Unlimited Token</div>
-                                    <div class="desc" id="token-desc">API Key will have no token restrictions</div>
+                                    <div class="title" data-i18n="create.unlimitedToken">Unlimited Token</div>
+                                    <div class="desc" id="token-desc" data-i18n="tokenDesc.unlimited">API Key will have no token restrictions</div>
                                 </div>
                             </div>
                             <div id="token-limit-group" style="display: none;">
                                 <div class="traffic-input-group">
                                     <input type="number" id="token-limit-value" placeholder="10" min="0" step="0.1" value="10">
                                     <select id="token-limit-unit">
-                                        <option value="1000000" selected>M tokens</option>
-                                        <option value="1000">K tokens</option>
-                                        <option value="1">tokens</option>
+                                        <option value="1000000" selected data-i18n="unit.mTokens">M tokens</option>
+                                        <option value="1000" data-i18n="unit.kTokens">K tokens</option>
+                                        <option value="1" data-i18n="unit.tokens">tokens</option>
                                     </select>
                                 </div>
-                                <p class="form-hint">Recommended billing dimension. Aggregated by weighted multipliers (input/output/cache).</p>
+                                <p class="form-hint" data-i18n="create.tokenBillingHint">Recommended billing dimension. Aggregated by weighted multipliers (input/output/cache).</p>
                                 <p class="form-hint calculated-bytes" id="token-calculated">Calculated: 10000000 tokens (10 M)</p>
+                                <!-- RMB 换算提示：1 RMB = 10M 计费 Token，与管理端口径一致。-->
+                                <p class="form-hint calculated-bytes" id="token-calculated-rmb" style="color:#1976d2;"></p>
                             </div>
                         </div>
 
@@ -153,16 +158,16 @@
                             </div>
                         </div>
                         
-                        <button type="submit" class="btn btn-primary">Generate API Key</button>
+                        <button type="submit" class="btn btn-primary" data-i18n="create.generate">Generate API Key</button>
                     </form>
                     
                     <div id="api-key-result" class="api-key-display">
-                        <p><strong>Your new API Key:</strong></p>
+                        <p><strong data-i18n="create.newKeyLabel">Your new API Key:</strong></p>
                         <code id="generated-key"></code>
-                        <p style="margin-top: 10px; color: #666; font-size: 12px;">
+                        <p style="margin-top: 10px; color: #666; font-size: 12px;" data-i18n="create.saveNotice">
                             Please save this key securely. It will only be shown once!
                         </p>
-                        <button class="btn btn-secondary copy-btn" onclick="copyApiKey()">Copy to Clipboard</button>
+                        <button class="btn btn-secondary copy-btn" onclick="copyApiKey()" data-i18n="create.copyClipboard">Copy to Clipboard</button>
                     </div>
                 </div>
             </div>
@@ -171,27 +176,27 @@
             <div id="my-keys" class="tab-content">
                 <div class="card-body">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                        <h3 style="margin: 0;">My API Keys</h3>
-                        <button class="btn btn-secondary btn-sm" onclick="loadMyApiKeys()">Refresh</button>
+                        <h3 style="margin: 0;" data-i18n="myKeys.title">My API Keys</h3>
+                        <button class="btn btn-secondary btn-sm" onclick="loadMyApiKeys()" data-i18n="common.refresh">Refresh</button>
                     </div>
                     
-                    <div id="my-keys-loading" class="loading">Loading API Keys</div>
+                    <div id="my-keys-loading" class="loading" data-i18n="myKeys.loading">Loading API Keys</div>
                     <div id="my-keys-content" class="hidden">
                         <div class="table-wrapper">
                             <table class="api-keys-table" id="my-keys-table">
                                 <thead>
                                     <tr>
-                                        <th>API Key</th>
+                                        <th data-i18n="myKeys.thApiKey">API Key</th>
                                         <!-- 绑定用户信息列：用户名(可重复)/备注 -->
                                         <!-- 关键词: OPS my-keys 用户名 备注 列 -->
-                                        <th title="Bound username (repeatable) / remark">User / Remark</th>
-                                        <th>Models</th>
+                                        <th data-i18n-title="myKeys.titleUserRemark" data-i18n="myKeys.thUserRemark" title="Bound username (repeatable) / remark">User / Remark</th>
+                                        <th data-i18n="myKeys.thModels">Models</th>
                                         <!-- 字节流量列已停用：计费体系统一为 Token 维度（计费用量） -->
                                         <!-- 关键词: OPS my-keys 表格 Token 计费用量列, Token 限额列, 字节流量停用 -->
-                                        <th title="Token billing usage (weighted by multipliers)">Token Used (Billing)</th>
-                                        <th title="Token limit (the only billing dimension)">Token Limit *</th>
-                                        <th>Created At</th>
-                                        <th>Actions</th>
+                                        <th data-i18n-title="myKeys.titleTokenUsed" data-i18n="myKeys.thTokenUsed" title="Token billing usage (weighted by multipliers)">Token Used (Billing)</th>
+                                        <th data-i18n-title="myKeys.titleTokenLimit" data-i18n="myKeys.thTokenLimit" title="Token limit (the only billing dimension)">Token Limit *</th>
+                                        <th data-i18n="myKeys.thCreatedAt">Created At</th>
+                                        <th data-i18n="myKeys.thActions">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody id="my-keys-tbody">
@@ -199,8 +204,8 @@
                             </table>
                         </div>
                         <div id="my-keys-empty" class="empty-state hidden">
-                            <p>You haven't created any API keys yet.</p>
-                            <button class="btn btn-primary" onclick="switchToTab('create-key')">Create Your First API Key</button>
+                            <p data-i18n="myKeys.empty">You haven't created any API keys yet.</p>
+                            <button class="btn btn-primary" onclick="switchToTab('create-key')" data-i18n="myKeys.createFirst">Create Your First API Key</button>
                         </div>
                     </div>
                 </div>
@@ -209,16 +214,16 @@
             <!-- API Usage Tab -->
             <div id="api-usage" class="tab-content">
                 <div class="card-body">
-                    <h3 style="margin-bottom: 20px;">API Usage Guide</h3>
+                    <h3 style="margin-bottom: 20px;" data-i18n="usage.title">API Usage Guide</h3>
                     
                     <div class="api-section">
-                        <h4>1. Create API Key with Traffic Limit</h4>
-                        <p>Create an API key with a specific traffic limit (e.g., 50 MB = 52428800 bytes):</p>
+                        <h4 data-i18n="usage.s1.h">1. Create API Key with Traffic Limit</h4>
+                        <p data-i18n="usage.s1.p">Create an API key with a specific traffic limit (e.g., 50 MB = 52428800 bytes):</p>
                         
                         <div class="code-block">
                             <div class="code-header">
-                                <span>cURL - Create Key with 50MB Limit</span>
-                                <button class="btn btn-sm" onclick="copyCurlExample('curl-create-limited')">Copy</button>
+                                <span data-i18n="usage.s1.code">cURL - Create Key with 50MB Limit</span>
+                                <button class="btn btn-sm" onclick="copyCurlExample('curl-create-limited')" data-i18n="common.copy">Copy</button>
                             </div>
                             <pre id="curl-create-limited">curl -X POST '<span class="api-endpoint-dynamic">http://localhost:8223</span>/ops/api/create-api-key' \
   -H 'Content-Type: application/json' \
@@ -231,13 +236,13 @@
                     </div>
                     
                     <div class="api-section">
-                        <h4>2. Create API Key with Unlimited Traffic</h4>
-                        <p>Create an API key without traffic restrictions:</p>
+                        <h4 data-i18n="usage.s2.h">2. Create API Key with Unlimited Traffic</h4>
+                        <p data-i18n="usage.s2.p">Create an API key without traffic restrictions:</p>
                         
                         <div class="code-block">
                             <div class="code-header">
-                                <span>cURL - Create Unlimited Key</span>
-                                <button class="btn btn-sm" onclick="copyCurlExample('curl-create-unlimited')">Copy</button>
+                                <span data-i18n="usage.s2.code">cURL - Create Unlimited Key</span>
+                                <button class="btn btn-sm" onclick="copyCurlExample('curl-create-unlimited')" data-i18n="common.copy">Copy</button>
                             </div>
                             <pre id="curl-create-unlimited">curl -X POST '<span class="api-endpoint-dynamic">http://localhost:8223</span>/ops/api/create-api-key' \
   -H 'Content-Type: application/json' \
@@ -250,13 +255,13 @@
                     </div>
                     
                     <div class="api-section">
-                        <h4>3. Create API Key with Glob Patterns</h4>
-                        <p>Use glob patterns to match multiple models (e.g., <code>gpt-*</code> matches all GPT models):</p>
+                        <h4 data-i18n="usage.s3.h">3. Create API Key with Glob Patterns</h4>
+                        <p data-i18n-html="usage.s3.p">Use glob patterns to match multiple models (e.g., <code>gpt-*</code> matches all GPT models):</p>
                         
                         <div class="code-block">
                             <div class="code-header">
-                                <span>cURL - Create Key with Glob Patterns</span>
-                                <button class="btn btn-sm" onclick="copyCurlExample('curl-create-glob')">Copy</button>
+                                <span data-i18n="usage.s3.code">cURL - Create Key with Glob Patterns</span>
+                                <button class="btn btn-sm" onclick="copyCurlExample('curl-create-glob')" data-i18n="common.copy">Copy</button>
                             </div>
                             <pre id="curl-create-glob">curl -X POST '<span class="api-endpoint-dynamic">http://localhost:8223</span>/ops/api/create-api-key' \
   -H 'Content-Type: application/json' \
@@ -269,13 +274,13 @@
                     </div>
                     
                     <div class="api-section">
-                        <h4>4. List My API Keys</h4>
-                        <p>Get all API keys created by your OPS account:</p>
+                        <h4 data-i18n="usage.s4.h">4. List My API Keys</h4>
+                        <p data-i18n="usage.s4.p">Get all API keys created by your OPS account:</p>
                         
                         <div class="code-block">
                             <div class="code-header">
-                                <span>cURL - List Keys</span>
-                                <button class="btn btn-sm" onclick="copyCurlExample('curl-list-keys')">Copy</button>
+                                <span data-i18n="usage.s4.code">cURL - List Keys</span>
+                                <button class="btn btn-sm" onclick="copyCurlExample('curl-list-keys')" data-i18n="common.copy">Copy</button>
                             </div>
                             <pre id="curl-list-keys">curl -X GET '<span class="api-endpoint-dynamic">http://localhost:8223</span>/ops/api/my-keys' \
   -H 'X-Ops-Key: <span class="ops-key-dynamic">YOUR_OPS_KEY</span>'</pre>
@@ -283,13 +288,13 @@
                     </div>
                     
                     <div class="api-section">
-                        <h4>5. Update API Key Settings</h4>
-                        <p>Update allowed models or traffic settings for an existing API key:</p>
+                        <h4 data-i18n="usage.s5.h">5. Update API Key Settings</h4>
+                        <p data-i18n="usage.s5.p">Update allowed models or traffic settings for an existing API key:</p>
                         
                         <div class="code-block">
                             <div class="code-header">
-                                <span>cURL - Update Key</span>
-                                <button class="btn btn-sm" onclick="copyCurlExample('curl-update-key')">Copy</button>
+                                <span data-i18n="usage.s5.code">cURL - Update Key</span>
+                                <button class="btn btn-sm" onclick="copyCurlExample('curl-update-key')" data-i18n="common.copy">Copy</button>
                             </div>
                             <pre id="curl-update-key">curl -X POST '<span class="api-endpoint-dynamic">http://localhost:8223</span>/ops/api/update-api-key' \
   -H 'Content-Type: application/json' \
@@ -304,13 +309,13 @@
                     </div>
                     
                     <div class="api-section">
-                        <h4>6. Delete API Key</h4>
-                        <p>Delete an API key you created:</p>
+                        <h4 data-i18n="usage.s6.h">6. Delete API Key</h4>
+                        <p data-i18n="usage.s6.p">Delete an API key you created:</p>
                         
                         <div class="code-block">
                             <div class="code-header">
-                                <span>cURL - Delete Key</span>
-                                <button class="btn btn-sm" onclick="copyCurlExample('curl-delete-key')">Copy</button>
+                                <span data-i18n="usage.s6.code">cURL - Delete Key</span>
+                                <button class="btn btn-sm" onclick="copyCurlExample('curl-delete-key')" data-i18n="common.copy">Copy</button>
                             </div>
                             <pre id="curl-delete-key">curl -X POST '<span class="api-endpoint-dynamic">http://localhost:8223</span>/ops/api/delete-api-key' \
   -H 'Content-Type: application/json' \
@@ -322,13 +327,13 @@
                     </div>
                     
                     <div class="api-section">
-                        <h4>7. Use the Created API Key</h4>
-                        <p>Use the generated API key with OpenAI-compatible endpoints:</p>
+                        <h4 data-i18n="usage.s7.h">7. Use the Created API Key</h4>
+                        <p data-i18n="usage.s7.p">Use the generated API key with OpenAI-compatible endpoints:</p>
                         
                         <div class="code-block">
                             <div class="code-header">
-                                <span>cURL - Chat Completion</span>
-                                <button class="btn btn-sm" onclick="copyCurlExample('curl-chat')">Copy</button>
+                                <span data-i18n="usage.s7.code">cURL - Chat Completion</span>
+                                <button class="btn btn-sm" onclick="copyCurlExample('curl-chat')" data-i18n="common.copy">Copy</button>
                             </div>
                             <pre id="curl-chat">curl -X POST '<span class="api-endpoint-dynamic">http://localhost:8223</span>/v1/chat/completions' \
   -H 'Content-Type: application/json' \
@@ -341,33 +346,33 @@
                     </div>
                     
                     <div class="api-section">
-                        <h4>Request Parameters Reference</h4>
+                        <h4 data-i18n="usage.params.h">Request Parameters Reference</h4>
                         <table class="params-table">
                             <tr>
                                 <td><code>allowed_models</code></td>
-                                <td>Array of model names or glob patterns (required). Examples: <code>["gpt-4"]</code>, <code>["gpt-*", "claude-*"]</code></td>
+                                <td data-i18n-html="usage.params.allowedModels">Array of model names or glob patterns (required). Examples: <code>["gpt-4"]</code>, <code>["gpt-*", "claude-*"]</code></td>
                             </tr>
                             <tr>
                                 <td><code>traffic_limit</code></td>
-                                <td>Traffic limit in bytes (optional). Examples: 52428800 (50MB), 104857600 (100MB), 1073741824 (1GB)</td>
+                                <td data-i18n="usage.params.trafficLimit">Traffic limit in bytes (optional). Examples: 52428800 (50MB), 104857600 (100MB), 1073741824 (1GB)</td>
                             </tr>
                             <tr>
                                 <td><code>unlimited</code></td>
-                                <td>Set to <code>true</code> for unlimited traffic (optional, default: false)</td>
+                                <td data-i18n-html="usage.params.unlimited">Set to <code>true</code> for unlimited traffic (optional, default: false)</td>
                             </tr>
                         </table>
                     </div>
                     
                     <div class="api-section">
-                        <h4>Authentication Headers</h4>
+                        <h4 data-i18n="usage.auth.h">Authentication Headers</h4>
                         <table class="params-table">
                             <tr>
                                 <td><code>X-Ops-Key</code></td>
-                                <td>Your OPS Key for management API calls (create/update/delete keys)</td>
+                                <td data-i18n="usage.auth.opsKey">Your OPS Key for management API calls (create/update/delete keys)</td>
                             </tr>
                             <tr>
                                 <td><code>Authorization: Bearer</code></td>
-                                <td>API Key for AI service calls (chat completions, etc.)</td>
+                                <td data-i18n="usage.auth.bearer">API Key for AI service calls (chat completions, etc.)</td>
                             </tr>
                         </table>
                     </div>
@@ -377,36 +382,36 @@
             <!-- My Info Tab -->
             <div id="my-info" class="tab-content">
                 <div class="card-body">
-                    <div id="my-info-loading" class="loading">Loading user info</div>
+                    <div id="my-info-loading" class="loading" data-i18n="info.loading">Loading user info</div>
                     <div id="my-info-content" class="hidden">
                         <div class="info-grid">
-                            <div class="info-label">User ID</div>
+                            <div class="info-label" data-i18n="info.userId">User ID</div>
                             <div class="info-value" id="info-user-id">--</div>
                             
-                            <div class="info-label">Username</div>
+                            <div class="info-label" data-i18n="info.username">Username</div>
                             <div class="info-value" id="info-username">--</div>
                             
-                            <div class="info-label">Role</div>
+                            <div class="info-label" data-i18n="info.role">Role</div>
                             <div class="info-value" id="info-role">--</div>
                             
-                            <div class="info-label">Status</div>
+                            <div class="info-label" data-i18n="info.status">Status</div>
                             <div class="info-value" id="info-status">--</div>
                             
-                            <div class="info-label">OPS Key</div>
+                            <div class="info-label" data-i18n="info.opsKey">OPS Key</div>
                             <div class="info-value"><code id="info-ops-key">--</code></div>
                             
-                            <div class="info-label">Default Limit</div>
+                            <div class="info-label" data-i18n="info.defaultLimit">Default Limit</div>
                             <div class="info-value" id="info-default-limit">--</div>
                             
-                            <div class="info-label">API Keys Created</div>
+                            <div class="info-label" data-i18n="info.apiKeysCount">API Keys Created</div>
                             <div class="info-value" id="info-api-keys-count">--</div>
                             
-                            <div class="info-label">Created At</div>
+                            <div class="info-label" data-i18n="info.createdAt">Created At</div>
                             <div class="info-value" id="info-created-at">--</div>
                         </div>
                         
                         <div style="margin-top: 25px;">
-                            <button class="btn btn-secondary" onclick="resetOpsKey()">Reset OPS Key</button>
+                            <button class="btn btn-secondary" onclick="resetOpsKey()" data-i18n="info.resetOpsKey">Reset OPS Key</button>
                         </div>
                     </div>
                 </div>
@@ -415,28 +420,28 @@
             <!-- Settings Tab -->
             <div id="settings" class="tab-content">
                 <div class="card-body">
-                    <h3 style="margin-bottom: 20px;">Change Password</h3>
+                    <h3 style="margin-bottom: 20px;" data-i18n="settings.changePassword">Change Password</h3>
                     
                     <div id="settings-alert" class="alert hidden"></div>
                     
                     <form id="change-password-form">
                         <div class="form-group">
-                            <label for="old-password">Current Password</label>
+                            <label for="old-password" data-i18n="settings.currentPassword">Current Password</label>
                             <input type="password" id="old-password" required autocomplete="current-password">
                         </div>
                         
                         <div class="form-group">
-                            <label for="new-password">New Password</label>
+                            <label for="new-password" data-i18n="settings.newPassword">New Password</label>
                             <input type="password" id="new-password" required minlength="8" autocomplete="new-password">
-                            <p class="form-hint">Minimum 8 characters</p>
+                            <p class="form-hint" data-i18n="settings.minChars">Minimum 8 characters</p>
                         </div>
                         
                         <div class="form-group">
-                            <label for="confirm-password">Confirm New Password</label>
+                            <label for="confirm-password" data-i18n="settings.confirmPassword">Confirm New Password</label>
                             <input type="password" id="confirm-password" required minlength="8" autocomplete="new-password">
                         </div>
                         
-                        <button type="submit" class="btn btn-primary">Change Password</button>
+                        <button type="submit" class="btn btn-primary" data-i18n="settings.submit">Change Password</button>
                     </form>
                 </div>
             </div>
@@ -448,30 +453,30 @@
         <div class="modal-overlay" onclick="closeEditKeyModal()"></div>
         <div class="modal-content">
             <div class="modal-header">
-                <h3>Edit API Key</h3>
+                <h3 data-i18n="edit.title">Edit API Key</h3>
                 <button class="modal-close" onclick="closeEditKeyModal()">&times;</button>
             </div>
             <div class="modal-body">
                 <input type="hidden" id="edit-key-api-key">
                 
                 <div class="form-group">
-                    <label>API Key</label>
+                    <label data-i18n="edit.apiKey">API Key</label>
                     <input type="text" id="edit-key-display" readonly class="form-control-readonly">
                 </div>
                 
                 <!-- Model Selection -->
                 <div class="form-group">
-                    <label>Allowed Models</label>
+                    <label data-i18n="create.allowedModels">Allowed Models</label>
                     <div class="model-selection">
                         <div class="model-selection-header">
-                            <span class="title">Select Models</span>
+                            <span class="title" data-i18n="common.selectModels">Select Models</span>
                             <div class="actions">
-                                <button type="button" class="btn-text" onclick="editSelectAllModels()">Select All</button>
-                                <button type="button" class="btn-text" onclick="editClearAllModels()">Clear</button>
+                                <button type="button" class="btn-text" onclick="editSelectAllModels()" data-i18n="common.selectAll">Select All</button>
+                                <button type="button" class="btn-text" onclick="editClearAllModels()" data-i18n="common.clear">Clear</button>
                             </div>
                         </div>
                         <div class="model-list" id="edit-model-list">
-                            <div style="padding: 20px; text-align: center; color: #888;">Loading models...</div>
+                            <div style="padding: 20px; text-align: center; color: #888;" data-i18n="common.loadingModels">Loading models...</div>
                         </div>
                         <div class="glob-input-section">
                             <div class="title">
@@ -479,12 +484,12 @@
                                     <circle cx="11" cy="11" r="8"></circle>
                                     <path d="M21 21l-4.35-4.35"></path>
                                 </svg>
-                                Glob Patterns (Advanced)
+                                <span data-i18n="common.globAdvanced">Glob Patterns (Advanced)</span>
                             </div>
-                            <input type="text" id="edit-glob-patterns" placeholder="e.g., memfit-*,qwen*,gpt-4*">
-                            <div class="hint">Comma-separated glob patterns. Use <code>*</code> as wildcard.</div>
+                            <input type="text" id="edit-glob-patterns" placeholder="e.g., memfit-*,qwen*,gpt-4*" data-i18n-placeholder="create.globPh">
+                            <div class="hint" data-i18n-html="edit.globHint">Comma-separated glob patterns. Use <code>*</code> as wildcard.</div>
                         </div>
-                        <div class="selected-preview" id="edit-selected-preview">
+                        <div class="selected-preview" id="edit-selected-preview" data-i18n-html="preview.empty">
                             <strong>Selected:</strong> <span>0</span> models
                         </div>
                     </div>
@@ -493,39 +498,41 @@
                 <!-- 绑定用户信息（可选）：用户名(可重复)/备注/metainfo -->
                 <!-- 关键词: OPS edit modal Username Remark MetaInfo 绑定信息 -->
                 <div class="form-group">
-                    <label>User Binding (optional)</label>
+                    <label data-i18n="create.userBinding">User Binding (optional)</label>
                     <div style="display:flex; gap:10px; flex-wrap:wrap;">
-                        <input type="text" id="edit-username" placeholder="Username (repeatable)" style="flex:1 1 200px;">
-                        <input type="text" id="edit-remark" placeholder="Remark (free text)" style="flex:1 1 200px;">
+                        <input type="text" id="edit-username" placeholder="Username (repeatable)" data-i18n-placeholder="create.usernamePh" style="flex:1 1 200px;">
+                        <input type="text" id="edit-remark" placeholder="Remark (free text)" data-i18n-placeholder="create.remarkPh" style="flex:1 1 200px;">
                     </div>
-                    <textarea id="edit-metainfo" rows="3" placeholder='metainfo (JSON text, OAuth/external binding)' style="margin-top:8px; width:100%; font-family:monospace; font-size:12px;"></textarea>
+                    <textarea id="edit-metainfo" rows="3" placeholder='metainfo (JSON text, OAuth/external binding)' data-i18n-placeholder="create.metainfoPh" style="margin-top:8px; width:100%; font-family:monospace; font-size:12px;"></textarea>
                 </div>
                 
                 <!-- Token Settings (recommended over byte traffic) -->
-                <!-- 关键词: OPS edit modal Token 限额设置, 推荐替代字节流量限制 -->
+                <!-- 关键词: OPS edit modal Token 限额设置, 推荐替代字节流量限制, RMB 换算提示 -->
                 <div class="form-group" style="border-left: 3px solid #1976d2; padding-left: 10px; background: #f5faff;">
-                    <label>Token Settings <span style="color:#1976d2;font-weight:normal;">(Recommended)</span></label>
+                    <label><span data-i18n="create.tokenSettings">Token Settings</span> <span style="color:#1976d2;font-weight:normal;" data-i18n="create.recommended">(Recommended)</span></label>
                     <div class="toggle-group" id="edit-token-unlimited-toggle">
                         <label class="toggle-switch">
                             <input type="checkbox" id="edit-token-unlimited">
                             <span class="toggle-slider"></span>
                         </label>
                         <div class="toggle-label">
-                            <div class="title">Unlimited Token</div>
-                            <div class="desc" id="edit-token-desc">API Key will have no token restrictions</div>
+                            <div class="title" data-i18n="create.unlimitedToken">Unlimited Token</div>
+                            <div class="desc" id="edit-token-desc" data-i18n="tokenDesc.unlimited">API Key will have no token restrictions</div>
                         </div>
                     </div>
                     <div id="edit-token-limit-group" style="display: none; margin-top: 10px;">
                         <div class="traffic-input-group">
                             <input type="number" id="edit-token-limit-value" placeholder="10" min="0" step="0.1" value="10">
                             <select id="edit-token-limit-unit">
-                                <option value="1000000" selected>M tokens</option>
-                                <option value="1000">K tokens</option>
-                                <option value="1">tokens</option>
+                                <option value="1000000" selected data-i18n="unit.mTokens">M tokens</option>
+                                <option value="1000" data-i18n="unit.kTokens">K tokens</option>
+                                <option value="1" data-i18n="unit.tokens">tokens</option>
                             </select>
                         </div>
                         <p class="form-hint calculated-bytes" id="edit-token-calculated">Calculated: 10000000 tokens (10 M)</p>
-                        <p class="form-hint">Current usage: <span id="edit-token-used">0</span> tokens</p>
+                        <!-- RMB 换算提示：1 RMB = 10M 计费 Token，与管理端口径一致。-->
+                        <p class="form-hint calculated-bytes" id="edit-token-calculated-rmb" style="color:#1976d2;"></p>
+                        <p class="form-hint"><span data-i18n="edit.currentUsagePrefix">Current usage: </span><span id="edit-token-used">0</span><span data-i18n="edit.currentUsageSuffix"> tokens</span></p>
                     </div>
                 </div>
 
@@ -561,10 +568,10 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="resetEditKeyToken()">Reset Token</button>
+                <button class="btn btn-secondary" onclick="resetEditKeyToken()" data-i18n="edit.resetToken">Reset Token</button>
                 <button class="btn btn-secondary" onclick="resetEditKeyTraffic()" style="display:none;">Reset Traffic</button>
-                <button class="btn btn-secondary" onclick="closeEditKeyModal()">Cancel</button>
-                <button class="btn btn-primary" onclick="saveEditKey()">Save Changes</button>
+                <button class="btn btn-secondary" onclick="closeEditKeyModal()" data-i18n="common.cancel">Cancel</button>
+                <button class="btn btn-primary" onclick="saveEditKey()" data-i18n="edit.save">Save Changes</button>
             </div>
         </div>
     </div>

@@ -5,6 +5,471 @@ let userInfo = null;
 let availableModels = [];
 let myApiKeys = [];
 
+// ==================== i18n（国际化：默认中文，可切换英文）====================
+// 关键词: OPS portal i18n, 默认中文 default zh, 可切换英文 toggle en, localStorage 记忆
+// 设计：
+//   - I18N 字典持有 zh / en 两套文案；t(key, params) 取当前语言文案，支持 ${name} 占位替换；
+//   - 静态 HTML 通过 data-i18n / data-i18n-html / data-i18n-placeholder / data-i18n-title 注解，
+//     applyI18n() 统一回填；动态渲染处直接调用 t()；
+//   - 默认 zh，选择记忆到 localStorage('ops_portal_lang')。
+const OPS_LANG_KEY = 'ops_portal_lang';
+let currentLang = 'zh';
+
+const I18N = {
+    zh: {
+        'header.badge': '运营门户',
+        'header.welcome': '欢迎，',
+        'header.homepage': '主页',
+        'header.logout': '退出登录',
+        'lang.toggleToEn': 'English',
+        'lang.toggleToZh': '中文',
+
+        'stats.apiKeys': '已创建 API Key',
+        'stats.defaultLimit': '默认流量额度',
+        'stats.status': '账户状态',
+
+        'tab.createKey': '创建 API Key',
+        'tab.myKeys': '我的 API Key',
+        'tab.apiUsage': 'API 使用指南',
+        'tab.myInfo': '我的信息',
+        'tab.settings': '设置',
+
+        'common.selectModels': '选择模型',
+        'common.selectAll': '全选',
+        'common.clear': '清空',
+        'common.loadingModels': '正在加载模型...',
+        'common.noModels': '暂无可用模型',
+        'common.loadModelsFailed': '加载模型失败',
+        'common.globAdvanced': 'Glob 模式匹配（高级）',
+        'common.selectedLabel': '已选：',
+        'common.modelsUnit': ' 个模型',
+        'common.noneSelected': '未选择',
+        'preview.empty': '<strong>已选：</strong> <span style="color: #888;">未选择</span>',
+        'common.moreSuffix': ' 个',
+        'common.refresh': '刷新',
+        'common.cancel': '取消',
+        'common.active': '正常',
+        'common.inactive': '已禁用',
+        'common.unlimited': '不限制',
+        'common.networkError': '网络错误',
+        'common.copy': '复制',
+
+        'create.allowedModels': '允许的模型',
+        'create.globHint': '逗号分隔的 glob 模式。使用 <code>*</code> 作为通配符。例如：<code>memfit-*</code> 匹配所有 memfit 模型。',
+        'create.globPh': '例如：memfit-*,qwen*,gpt-4*',
+        'create.userBinding': '绑定用户信息（可选）',
+        'create.usernamePh': '用户名（可重复）',
+        'create.remarkPh': '备注（自由文本）',
+        'create.metainfoPh': 'metainfo（JSON 文本，用于 OAuth/外部系统绑定，可选）',
+        'create.tokenSettings': 'Token 设置',
+        'create.recommended': '（推荐）',
+        'create.unlimitedToken': '不限制 Token',
+        'tokenDesc.unlimited': 'API Key 将不受 Token 限制',
+        'tokenDesc.custom': '在下方设置自定义 Token 额度',
+        'create.tokenBillingHint': '推荐的计费维度，按加权倍率（输入/输出/缓存）聚合计算。',
+        'unit.mTokens': 'M tokens',
+        'unit.kTokens': 'K tokens',
+        'unit.tokens': 'tokens',
+        'create.generate': '生成 API Key',
+        'create.newKeyLabel': '你的新 API Key：',
+        'create.saveNotice': '请妥善保存此 Key，它只会显示一次！',
+        'create.copyClipboard': '复制到剪贴板',
+
+        'myKeys.title': '我的 API Key',
+        'myKeys.loading': '正在加载 API Key',
+        'myKeys.thApiKey': 'API Key',
+        'myKeys.thUserRemark': '用户名 / 备注',
+        'myKeys.thModels': '模型',
+        'myKeys.thTokenUsed': 'Token 计费用量',
+        'myKeys.thTokenLimit': 'Token 额度 *',
+        'myKeys.thCreatedAt': '创建时间',
+        'myKeys.thActions': '操作',
+        'myKeys.titleUserRemark': '绑定用户名（可重复）/ 备注',
+        'myKeys.titleTokenUsed': 'Token 计费用量（按倍率加权）',
+        'myKeys.titleTokenLimit': 'Token 额度（唯一计费维度）',
+        'myKeys.empty': '你还没有创建任何 API Key。',
+        'myKeys.createFirst': '创建你的第一个 API Key',
+        'myKeys.edit': '编辑',
+        'myKeys.delete': '删除',
+        'myKeys.loadFailed': '加载 Key 失败',
+
+        'pag.total': '共 ${total} 个 Key，第 ${page}/${pages} 页',
+        'pag.first': '首页',
+        'pag.prev': '上一页',
+        'pag.next': '下一页',
+        'pag.last': '末页',
+        'pag.gotoPrefix': '跳转到',
+        'pag.go': '跳转',
+        'pag.perPage': '${n}/页',
+
+        'usage.title': 'API 使用指南',
+        'usage.s1.h': '1. 创建带流量限制的 API Key',
+        'usage.s1.p': '创建带指定流量额度的 API Key（例如 50 MB = 52428800 字节）：',
+        'usage.s1.code': 'cURL - 创建 50MB 限额 Key',
+        'usage.s2.h': '2. 创建不限流量的 API Key',
+        'usage.s2.p': '创建一个不受流量限制的 API Key：',
+        'usage.s2.code': 'cURL - 创建不限额 Key',
+        'usage.s3.h': '3. 使用 Glob 模式创建 API Key',
+        'usage.s3.p': '使用 glob 模式匹配多个模型（例如 <code>gpt-*</code> 匹配所有 GPT 模型）：',
+        'usage.s3.code': 'cURL - 使用 Glob 模式创建 Key',
+        'usage.s4.h': '4. 列出我的 API Key',
+        'usage.s4.p': '获取由你的运营账户创建的全部 API Key：',
+        'usage.s4.code': 'cURL - 列出 Key',
+        'usage.s5.h': '5. 更新 API Key 设置',
+        'usage.s5.p': '更新已有 API Key 的允许模型或流量设置：',
+        'usage.s5.code': 'cURL - 更新 Key',
+        'usage.s6.h': '6. 删除 API Key',
+        'usage.s6.p': '删除你创建的某个 API Key：',
+        'usage.s6.code': 'cURL - 删除 Key',
+        'usage.s7.h': '7. 使用创建好的 API Key',
+        'usage.s7.p': '在兼容 OpenAI 的接口中使用生成的 API Key：',
+        'usage.s7.code': 'cURL - 对话补全',
+        'usage.params.h': '请求参数说明',
+        'usage.params.allowedModels': '模型名或 glob 模式数组（必填）。例如：<code>["gpt-4"]</code>、<code>["gpt-*", "claude-*"]</code>',
+        'usage.params.trafficLimit': '流量额度，单位字节（可选）。例如：52428800（50MB）、104857600（100MB）、1073741824（1GB）',
+        'usage.params.unlimited': '设为 <code>true</code> 表示不限流量（可选，默认 false）',
+        'usage.auth.h': '认证请求头',
+        'usage.auth.opsKey': '用于管理类 API 调用（创建/更新/删除 Key）的运营 Key',
+        'usage.auth.bearer': '用于 AI 服务调用（对话补全等）的 API Key',
+
+        'info.loading': '正在加载用户信息',
+        'info.userId': '用户 ID',
+        'info.username': '用户名',
+        'info.role': '角色',
+        'info.status': '状态',
+        'info.opsKey': '运营 Key',
+        'info.defaultLimit': '默认额度',
+        'info.apiKeysCount': '已创建 API Key',
+        'info.createdAt': '创建时间',
+        'info.resetOpsKey': '重置运营 Key',
+
+        'settings.changePassword': '修改密码',
+        'settings.currentPassword': '当前密码',
+        'settings.newPassword': '新密码',
+        'settings.minChars': '至少 8 位字符',
+        'settings.confirmPassword': '确认新密码',
+        'settings.submit': '修改密码',
+
+        'edit.title': '编辑 API Key',
+        'edit.apiKey': 'API Key',
+        'edit.globHint': '逗号分隔的 glob 模式。使用 <code>*</code> 作为通配符。',
+        'edit.currentUsagePrefix': '当前用量：',
+        'edit.currentUsageSuffix': ' tokens',
+        'edit.resetToken': '重置 Token',
+        'edit.save': '保存修改',
+        'trafficDesc.unlimited': 'API Key 将不受流量限制',
+        'trafficDesc.custom': '在下方设置自定义流量额度',
+
+        // 模板：计费换算 / RMB / 创建结果 / 各类提示
+        'calc.tokens': '换算：${n} tokens（${f}）',
+        'calc.bytes': '换算：${n} bytes（${f}）',
+        'calc.rmb': '约合 ${rmb} RMB（1 RMB = 10M 计费 Token）',
+        'create.successAlert': 'API Key 已创建！流量：${traffic}，Token：${token}',
+        'auth.sessionExpired': '会话已过期，请重新登录。',
+
+        'toast.keyDeleted': 'API Key 删除成功',
+        'toast.keyDeleteFailed': '删除 API Key 失败',
+        'toast.keyNotFound': '未找到该 API Key',
+        'toast.selectModel': '请至少选择一个模型或输入一个 glob 模式',
+        'toast.validTraffic': '请输入有效的流量额度，或启用不限流量',
+        'toast.validToken': '请输入有效的 Token 额度，或启用不限 Token',
+        'toast.keyUpdated': 'API Key 更新成功',
+        'toast.keyUpdateFailed': '更新 API Key 失败',
+        'toast.trafficReset': '流量已重置',
+        'toast.trafficResetFailed': '重置流量失败',
+        'toast.tokenReset': 'Token 用量已重置',
+        'toast.tokenResetFailed': '重置 Token 失败',
+        'toast.curlCopied': 'cURL 命令已复制到剪贴板！',
+        'toast.keyCopied': 'API Key 已复制到剪贴板！',
+        'toast.copyFailed': '复制到剪贴板失败',
+        'confirm.deleteKey': '确定要删除此 API Key 吗？此操作不可撤销。',
+        'confirm.resetTraffic': '确定要重置此 API Key 的流量计数吗？',
+        'confirm.resetToken': '确定要重置此 API Key 的 Token 用量吗？',
+        'confirm.resetOpsKey': '确定要重置你的运营 Key 吗？使用旧 Key 的应用都需要更新。',
+        'alert.createKeyFailed': '创建 API Key 失败',
+        'alert.networkRetry': '网络错误，请重试。',
+        'alert.passwordMismatch': '两次输入的新密码不一致',
+        'alert.passwordTooShort': '新密码至少需要 8 位字符',
+        'alert.passwordChanged': '密码修改成功！',
+        'alert.passwordChangeFailed': '修改密码失败',
+        'opsKey.resetSuccess': '运营 Key 重置成功！\n\n新 Key：',
+        'opsKey.resetFailed': '重置运营 Key 失败：',
+        'opsKey.unknownError': '未知错误',
+    },
+    en: {
+        'header.badge': 'OPS Portal',
+        'header.welcome': 'Welcome, ',
+        'header.homepage': 'Homepage',
+        'header.logout': 'Logout',
+        'lang.toggleToEn': 'English',
+        'lang.toggleToZh': '中文',
+
+        'stats.apiKeys': 'API Keys Created',
+        'stats.defaultLimit': 'Default Traffic Limit',
+        'stats.status': 'Account Status',
+
+        'tab.createKey': 'Create API Key',
+        'tab.myKeys': 'My API Keys',
+        'tab.apiUsage': 'API Usage',
+        'tab.myInfo': 'My Info',
+        'tab.settings': 'Settings',
+
+        'common.selectModels': 'Select Models',
+        'common.selectAll': 'Select All',
+        'common.clear': 'Clear',
+        'common.loadingModels': 'Loading models...',
+        'common.noModels': 'No models available',
+        'common.loadModelsFailed': 'Failed to load models',
+        'common.globAdvanced': 'Glob Patterns (Advanced)',
+        'common.selectedLabel': 'Selected: ',
+        'common.modelsUnit': ' models',
+        'common.noneSelected': 'None selected',
+        'preview.empty': '<strong>Selected: </strong> <span style="color: #888;">None selected</span>',
+        'common.moreSuffix': ' more',
+        'common.refresh': 'Refresh',
+        'common.cancel': 'Cancel',
+        'common.active': 'Active',
+        'common.inactive': 'Inactive',
+        'common.unlimited': 'Unlimited',
+        'common.networkError': 'Network error',
+        'common.copy': 'Copy',
+
+        'create.allowedModels': 'Allowed Models',
+        'create.globHint': 'Comma-separated glob patterns. Use <code>*</code> as wildcard. Example: <code>memfit-*</code> matches all memfit models.',
+        'create.globPh': 'e.g., memfit-*,qwen*,gpt-4*',
+        'create.userBinding': 'User Binding (optional)',
+        'create.usernamePh': 'Username (repeatable)',
+        'create.remarkPh': 'Remark (free text)',
+        'create.metainfoPh': 'metainfo (JSON text, for OAuth/external binding, optional)',
+        'create.tokenSettings': 'Token Settings',
+        'create.recommended': '(Recommended)',
+        'create.unlimitedToken': 'Unlimited Token',
+        'tokenDesc.unlimited': 'API Key will have no token restrictions',
+        'tokenDesc.custom': 'Set a custom token limit below',
+        'create.tokenBillingHint': 'Recommended billing dimension. Aggregated by weighted multipliers (input/output/cache).',
+        'unit.mTokens': 'M tokens',
+        'unit.kTokens': 'K tokens',
+        'unit.tokens': 'tokens',
+        'create.generate': 'Generate API Key',
+        'create.newKeyLabel': 'Your new API Key:',
+        'create.saveNotice': 'Please save this key securely. It will only be shown once!',
+        'create.copyClipboard': 'Copy to Clipboard',
+
+        'myKeys.title': 'My API Keys',
+        'myKeys.loading': 'Loading API Keys',
+        'myKeys.thApiKey': 'API Key',
+        'myKeys.thUserRemark': 'User / Remark',
+        'myKeys.thModels': 'Models',
+        'myKeys.thTokenUsed': 'Token Used (Billing)',
+        'myKeys.thTokenLimit': 'Token Limit *',
+        'myKeys.thCreatedAt': 'Created At',
+        'myKeys.thActions': 'Actions',
+        'myKeys.titleUserRemark': 'Bound username (repeatable) / remark',
+        'myKeys.titleTokenUsed': 'Token billing usage (weighted by multipliers)',
+        'myKeys.titleTokenLimit': 'Token limit (the only billing dimension)',
+        'myKeys.empty': "You haven't created any API keys yet.",
+        'myKeys.createFirst': 'Create Your First API Key',
+        'myKeys.edit': 'Edit',
+        'myKeys.delete': 'Delete',
+        'myKeys.loadFailed': 'Failed to load keys',
+
+        'pag.total': 'Total ${total} keys, Page ${page}/${pages}',
+        'pag.first': 'First',
+        'pag.prev': 'Prev',
+        'pag.next': 'Next',
+        'pag.last': 'Last',
+        'pag.gotoPrefix': 'Go to',
+        'pag.go': 'Go',
+        'pag.perPage': '${n}/page',
+
+        'usage.title': 'API Usage Guide',
+        'usage.s1.h': '1. Create API Key with Traffic Limit',
+        'usage.s1.p': 'Create an API key with a specific traffic limit (e.g., 50 MB = 52428800 bytes):',
+        'usage.s1.code': 'cURL - Create Key with 50MB Limit',
+        'usage.s2.h': '2. Create API Key with Unlimited Traffic',
+        'usage.s2.p': 'Create an API key without traffic restrictions:',
+        'usage.s2.code': 'cURL - Create Unlimited Key',
+        'usage.s3.h': '3. Create API Key with Glob Patterns',
+        'usage.s3.p': 'Use glob patterns to match multiple models (e.g., <code>gpt-*</code> matches all GPT models):',
+        'usage.s3.code': 'cURL - Create Key with Glob Patterns',
+        'usage.s4.h': '4. List My API Keys',
+        'usage.s4.p': 'Get all API keys created by your OPS account:',
+        'usage.s4.code': 'cURL - List Keys',
+        'usage.s5.h': '5. Update API Key Settings',
+        'usage.s5.p': 'Update allowed models or traffic settings for an existing API key:',
+        'usage.s5.code': 'cURL - Update Key',
+        'usage.s6.h': '6. Delete API Key',
+        'usage.s6.p': 'Delete an API key you created:',
+        'usage.s6.code': 'cURL - Delete Key',
+        'usage.s7.h': '7. Use the Created API Key',
+        'usage.s7.p': 'Use the generated API key with OpenAI-compatible endpoints:',
+        'usage.s7.code': 'cURL - Chat Completion',
+        'usage.params.h': 'Request Parameters Reference',
+        'usage.params.allowedModels': 'Array of model names or glob patterns (required). Examples: <code>["gpt-4"]</code>, <code>["gpt-*", "claude-*"]</code>',
+        'usage.params.trafficLimit': 'Traffic limit in bytes (optional). Examples: 52428800 (50MB), 104857600 (100MB), 1073741824 (1GB)',
+        'usage.params.unlimited': 'Set to <code>true</code> for unlimited traffic (optional, default: false)',
+        'usage.auth.h': 'Authentication Headers',
+        'usage.auth.opsKey': 'Your OPS Key for management API calls (create/update/delete keys)',
+        'usage.auth.bearer': 'API Key for AI service calls (chat completions, etc.)',
+
+        'info.loading': 'Loading user info',
+        'info.userId': 'User ID',
+        'info.username': 'Username',
+        'info.role': 'Role',
+        'info.status': 'Status',
+        'info.opsKey': 'OPS Key',
+        'info.defaultLimit': 'Default Limit',
+        'info.apiKeysCount': 'API Keys Created',
+        'info.createdAt': 'Created At',
+        'info.resetOpsKey': 'Reset OPS Key',
+
+        'settings.changePassword': 'Change Password',
+        'settings.currentPassword': 'Current Password',
+        'settings.newPassword': 'New Password',
+        'settings.minChars': 'Minimum 8 characters',
+        'settings.confirmPassword': 'Confirm New Password',
+        'settings.submit': 'Change Password',
+
+        'edit.title': 'Edit API Key',
+        'edit.apiKey': 'API Key',
+        'edit.globHint': 'Comma-separated glob patterns. Use <code>*</code> as wildcard.',
+        'edit.currentUsagePrefix': 'Current usage: ',
+        'edit.currentUsageSuffix': ' tokens',
+        'edit.resetToken': 'Reset Token',
+        'edit.save': 'Save Changes',
+        'trafficDesc.unlimited': 'API Key will have no traffic restrictions',
+        'trafficDesc.custom': 'Set a custom traffic limit below',
+
+        'calc.tokens': 'Calculated: ${n} tokens (${f})',
+        'calc.bytes': 'Calculated: ${n} bytes (${f})',
+        'calc.rmb': '\u2248 ${rmb} RMB (1 RMB = 10M billing tokens)',
+        'create.successAlert': 'API Key created! Traffic: ${traffic}, Token: ${token}',
+        'auth.sessionExpired': 'Session expired, please login again.',
+
+        'toast.keyDeleted': 'API Key deleted successfully',
+        'toast.keyDeleteFailed': 'Failed to delete API key',
+        'toast.keyNotFound': 'API Key not found',
+        'toast.selectModel': 'Please select at least one model or enter a glob pattern',
+        'toast.validTraffic': 'Please enter a valid traffic limit or enable unlimited traffic',
+        'toast.validToken': 'Please enter a valid token limit or enable unlimited token',
+        'toast.keyUpdated': 'API Key updated successfully',
+        'toast.keyUpdateFailed': 'Failed to update API key',
+        'toast.trafficReset': 'Traffic reset successfully',
+        'toast.trafficResetFailed': 'Failed to reset traffic',
+        'toast.tokenReset': 'Token usage reset successfully',
+        'toast.tokenResetFailed': 'Failed to reset token',
+        'toast.curlCopied': 'cURL command copied to clipboard!',
+        'toast.keyCopied': 'API Key copied to clipboard!',
+        'toast.copyFailed': 'Failed to copy to clipboard',
+        'confirm.deleteKey': 'Are you sure you want to delete this API key? This action cannot be undone.',
+        'confirm.resetTraffic': 'Are you sure you want to reset the traffic counter for this API key?',
+        'confirm.resetToken': 'Are you sure you want to reset the token usage for this API key?',
+        'confirm.resetOpsKey': 'Are you sure you want to reset your OPS Key? You will need to update any applications using the current key.',
+        'alert.createKeyFailed': 'Failed to create API key',
+        'alert.networkRetry': 'Network error. Please try again.',
+        'alert.passwordMismatch': 'New passwords do not match',
+        'alert.passwordTooShort': 'New password must be at least 8 characters',
+        'alert.passwordChanged': 'Password changed successfully!',
+        'alert.passwordChangeFailed': 'Failed to change password',
+        'opsKey.resetSuccess': 'OPS Key reset successfully!\n\nNew Key: ',
+        'opsKey.resetFailed': 'Failed to reset OPS key: ',
+        'opsKey.unknownError': 'Unknown error',
+    },
+};
+
+// t 取当前语言文案；支持 ${name} 占位替换；缺失时回退到 zh，再回退到 key 本身。
+// 关键词: ops i18n t(), 占位替换, 回退
+function t(key, params) {
+    const table = I18N[currentLang] || I18N.zh;
+    let s = table[key];
+    if (s === undefined) s = (I18N.zh[key] !== undefined ? I18N.zh[key] : key);
+    if (params) {
+        s = s.replace(/\$\{(\w+)\}/g, function (_, name) {
+            return (params[name] !== undefined && params[name] !== null) ? String(params[name]) : '';
+        });
+    }
+    return s;
+}
+
+// applyI18n 回填所有带 data-i18n* 注解的静态元素，并刷新页头切换按钮与 <html lang>。
+// 关键词: ops applyI18n, data-i18n 回填
+function applyI18n() {
+    document.querySelectorAll('[data-i18n]').forEach(function (el) {
+        el.textContent = t(el.getAttribute('data-i18n'));
+    });
+    document.querySelectorAll('[data-i18n-html]').forEach(function (el) {
+        el.innerHTML = t(el.getAttribute('data-i18n-html'));
+    });
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(function (el) {
+        el.setAttribute('placeholder', t(el.getAttribute('data-i18n-placeholder')));
+    });
+    document.querySelectorAll('[data-i18n-title]').forEach(function (el) {
+        el.setAttribute('title', t(el.getAttribute('data-i18n-title')));
+    });
+    document.documentElement.lang = (currentLang === 'zh') ? 'zh-CN' : 'en';
+    const lt = document.getElementById('lang-toggle');
+    if (lt) lt.textContent = (currentLang === 'zh') ? t('lang.toggleToEn') : t('lang.toggleToZh');
+}
+
+// initI18n 启动时读取 localStorage 语言（默认 zh）并应用。
+// 关键词: ops initI18n, 默认中文, localStorage 记忆
+function initI18n() {
+    let saved = 'zh';
+    try { saved = localStorage.getItem(OPS_LANG_KEY) || 'zh'; } catch (e) { saved = 'zh'; }
+    currentLang = (saved === 'en') ? 'en' : 'zh';
+    applyI18n();
+}
+
+// setOpsLang 切换语言：记忆选择、回填静态文案、并刷新动态视图（统计/信息/表格/分页/预览/换算）。
+// 关键词: ops setOpsLang, toggleOpsLang, 切换后刷新动态视图
+function setOpsLang(lang) {
+    currentLang = (lang === 'en') ? 'en' : 'zh';
+    try { localStorage.setItem(OPS_LANG_KEY, currentLang); } catch (e) { /* ignore */ }
+    applyI18n();
+    refreshDynamicI18n();
+}
+
+function toggleOpsLang() {
+    setOpsLang(currentLang === 'zh' ? 'en' : 'zh');
+}
+
+// syncToggleDescs 依据各 toggle 当前勾选状态回填「不限制/自定义」描述文案。
+// applyI18n 会把 data-i18n 描述统一回填为「不限制」版本，这里再按实际状态纠正，
+// 避免用户在「自定义额度」状态下切换语言时描述被错误重置。
+// 关键词: ops syncToggleDescs, toggle 描述按状态纠正
+function syncToggleDescs() {
+    const pairs = [
+        ['unlimited-token', 'token-desc', 'tokenDesc'],
+        ['edit-token-unlimited', 'edit-token-desc', 'tokenDesc'],
+        ['unlimited-traffic', 'traffic-desc', 'trafficDesc'],
+        ['edit-unlimited-traffic', 'edit-traffic-desc', 'trafficDesc'],
+    ];
+    pairs.forEach(function (p) {
+        const cb = document.getElementById(p[0]);
+        const desc = document.getElementById(p[1]);
+        if (cb && desc) {
+            desc.textContent = cb.checked ? t(p[2] + '.unlimited') : t(p[2] + '.custom');
+        }
+    });
+}
+
+// refreshDynamicI18n 重渲染由 JS 生成、含文案的动态片段，使语言切换即时生效。
+function refreshDynamicI18n() {
+    try { if (userInfo) updateUI(); } catch (e) { /* ignore */ }
+    try { renderModelList(); } catch (e) { /* ignore */ }
+    try { updateSelectedPreview(); } catch (e) { /* ignore */ }
+    try { syncToggleDescs(); } catch (e) { /* ignore */ }
+    try { if (typeof updateEditSelectedPreview === 'function') updateEditSelectedPreview(); } catch (e) { /* ignore */ }
+    try {
+        const content = document.getElementById('my-keys-content');
+        if (content && !content.classList.contains('hidden') && Array.isArray(myApiKeys) && myApiKeys.length > 0) {
+            renderApiKeysTable();
+        }
+    } catch (e) { /* ignore */ }
+    try { calculateTokenBytes(); } catch (e) { /* ignore */ }
+    try { if (document.getElementById('edit-token-limit-group')) calculateEditTokenBytes(); } catch (e) { /* ignore */ }
+}
+
 // HTML 转义助手：渲染用户名/备注/metainfo 等用户可控文本时防止 XSS。
 // 关键词: ops_portal escapeHtml, Username Remark MetaInfo 安全渲染
 function escapeHtml(str) {
@@ -39,7 +504,7 @@ function handleAuthError() {
     // Clear ops_session cookie
     document.cookie = 'ops_session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT;';
     // Show a brief message before redirecting
-    alert('Session expired, please login again.');
+    alert(t('auth.sessionExpired'));
     // Redirect to login page
     window.location.href = '/ops/login';
 }
@@ -120,6 +585,8 @@ function startSessionAutoRefresh() {
 // ==================== Initialize ====================
 
 document.addEventListener('DOMContentLoaded', function() {
+    // 先应用语言（默认中文，记忆到 localStorage），再加载数据，保证首屏即为目标语言。
+    initI18n();
     initTabs();
     loadUserInfo();
     loadModels();
@@ -200,7 +667,7 @@ function updateUI() {
     document.getElementById('stat-default-limit').textContent = formatBytes(userInfo.default_limit);
     
     const statusEl = document.getElementById('stat-status');
-    statusEl.textContent = userInfo.active ? 'Active' : 'Inactive';
+    statusEl.textContent = userInfo.active ? t('common.active') : t('common.inactive');
     statusEl.style.color = userInfo.active ? '#28a745' : '#dc3545';
     
     // Default limit hint (may not exist in new UI)
@@ -218,7 +685,7 @@ function updateUI() {
     document.getElementById('info-role').textContent = userInfo.role.toUpperCase();
     
     const infoStatus = document.getElementById('info-status');
-    infoStatus.textContent = userInfo.active ? 'Active' : 'Inactive';
+    infoStatus.textContent = userInfo.active ? t('common.active') : t('common.inactive');
     infoStatus.style.color = userInfo.active ? '#28a745' : '#dc3545';
     
     document.getElementById('info-ops-key').textContent = userInfo.ops_key;
@@ -243,11 +710,11 @@ async function loadModels() {
             availableModels = data.data.map(m => m.id).sort();
             renderModelList();
         } else {
-            modelList.innerHTML = '<div style="padding: 20px; text-align: center; color: #888;">No models available</div>';
+            modelList.innerHTML = `<div style="padding: 20px; text-align: center; color: #888;">${t('common.noModels')}</div>`;
         }
     } catch (error) {
         console.error('Error loading models:', error);
-        modelList.innerHTML = '<div style="padding: 20px; text-align: center; color: #dc3545;">Failed to load models</div>';
+        modelList.innerHTML = `<div style="padding: 20px; text-align: center; color: #dc3545;">${t('common.loadModelsFailed')}</div>`;
     }
 }
 
@@ -290,16 +757,16 @@ function updateSelectedPreview() {
     const globInput = document.getElementById('glob-patterns');
     const globPatterns = globInput ? globInput.value.trim() : '';
     
-    let html = '<strong>Selected:</strong> ';
+    let html = `<strong>${t('common.selectedLabel')}</strong> `;
     
     // Show selected models (sorted)
     const modelArray = Array.from(selectedModels).sort();
     if (modelArray.length > 0) {
         if (modelArray.length <= 5) {
-            html += modelArray.map(m => `<span class="tag">${m}</span>`).join('');
+            html += modelArray.map(m => `<span class="tag">${escapeHtml(m)}</span>`).join('');
         } else {
-            html += modelArray.slice(0, 3).map(m => `<span class="tag">${m}</span>`).join('');
-            html += `<span class="tag">+${modelArray.length - 3} more</span>`;
+            html += modelArray.slice(0, 3).map(m => `<span class="tag">${escapeHtml(m)}</span>`).join('');
+            html += `<span class="tag">+${modelArray.length - 3}${t('common.moreSuffix')}</span>`;
         }
     }
     
@@ -307,12 +774,12 @@ function updateSelectedPreview() {
     if (globPatterns) {
         const patterns = globPatterns.split(',').map(p => p.trim()).filter(p => p);
         patterns.forEach(p => {
-            html += `<span class="tag glob">${p}</span>`;
+            html += `<span class="tag glob">${escapeHtml(p)}</span>`;
         });
     }
     
     if (modelArray.length === 0 && !globPatterns) {
-        html += '<span style="color: #888;">None selected</span>';
+        html += `<span style="color: #888;">${t('common.noneSelected')}</span>`;
     }
     
     preview.innerHTML = html;
@@ -364,13 +831,13 @@ async function loadMyApiKeys(page, pageSize) {
                 renderApiKeysTable();
             }
         } else {
-            tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #dc3545;">Error: ${data.error || 'Failed to load keys'}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #dc3545;">${escapeHtml(data.error || t('myKeys.loadFailed'))}</td></tr>`;
         }
     } catch (error) {
         console.error('Error loading API keys:', error);
         loading.classList.add('hidden');
         content.classList.remove('hidden');
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: #dc3545;">Network error</td></tr>';
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #dc3545;">${t('common.networkError')}</td></tr>`;
     }
 }
 
@@ -405,7 +872,7 @@ function renderApiKeysTable() {
         }
         const tokenUsedDisplay = formatTokenCount(tokenUsedRaw);
         const tokenLimitDisplay = tokenIsUnlimited
-            ? '<span style="color: #28a745; font-weight: 500;">Unlimited</span>'
+            ? `<span style="color: #28a745; font-weight: 500;">${t('common.unlimited')}</span>`
             : formatTokenCount(tokenLimitRaw);
         
         // Display models (sorted)
@@ -424,14 +891,14 @@ function renderApiKeysTable() {
             <tr>
                 <td><code>${key.api_key.substring(0, 20)}...</code></td>
                 <td title="${escapeHtml(key.remark || '')}">${uname}${remarkHtml}</td>
-                <td title="${models.join(', ')}">${modelsDisplay || '-'}</td>
-                <td style="color: ${tokenColor}" title="Token billing usage (weighted by multipliers)">${tokenUsedDisplay}</td>
-                <td title="Token limit (the only billing dimension)">${tokenLimitDisplay}</td>
+                <td title="${escapeHtml(models.join(', '))}">${escapeHtml(modelsDisplay) || '-'}</td>
+                <td style="color: ${tokenColor}" title="${t('myKeys.titleTokenUsed')}">${tokenUsedDisplay}</td>
+                <td title="${t('myKeys.titleTokenLimit')}">${tokenLimitDisplay}</td>
                 <td>${key.created_at || '--'}</td>
                 <td>
                     <div style="display: flex; gap: 5px; flex-wrap: wrap;">
-                        <button class="btn btn-sm" onclick="openEditKeyModal('${key.api_key}')" style="background: #4285f4;">Edit</button>
-                        <button class="btn btn-sm btn-danger" onclick="deleteApiKey('${key.api_key}')">Delete</button>
+                        <button class="btn btn-sm" onclick="openEditKeyModal('${key.api_key}')" style="background: #4285f4;">${t('myKeys.edit')}</button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteApiKey('${key.api_key}')">${t('myKeys.delete')}</button>
                     </div>
                 </td>
             </tr>
@@ -468,29 +935,29 @@ function renderMyKeysPagination() {
     
     paginationContainer.innerHTML = `
         <div class="pagination-info">
-            Total ${total} keys, Page ${page}/${total_pages || 1}
+            ${t('pag.total', { total: total, page: page, pages: total_pages || 1 })}
         </div>
         <div class="pagination-buttons" style="display: flex; gap: 5px; align-items: center;">
-            <button class="btn btn-sm" ${page <= 1 ? 'disabled' : ''} onclick="changeMyKeysPage(1)">First</button>
-            <button class="btn btn-sm" ${page <= 1 ? 'disabled' : ''} onclick="changeMyKeysPage(${page - 1})">Prev</button>
+            <button class="btn btn-sm" ${page <= 1 ? 'disabled' : ''} onclick="changeMyKeysPage(1)">${t('pag.first')}</button>
+            <button class="btn btn-sm" ${page <= 1 ? 'disabled' : ''} onclick="changeMyKeysPage(${page - 1})">${t('pag.prev')}</button>
             <span style="margin: 0 10px;">
-                Go to <input type="number" id="myKeysPageInput" min="1" max="${total_pages}" value="${page}" style="width: 50px; text-align: center;"> 
-                <button class="btn btn-sm" onclick="changeMyKeysPage(parseInt(document.getElementById('myKeysPageInput').value))">Go</button>
+                ${t('pag.gotoPrefix')} <input type="number" id="myKeysPageInput" min="1" max="${total_pages}" value="${page}" style="width: 50px; text-align: center;"> 
+                <button class="btn btn-sm" onclick="changeMyKeysPage(parseInt(document.getElementById('myKeysPageInput').value))">${t('pag.go')}</button>
             </span>
-            <button class="btn btn-sm" ${page >= total_pages ? 'disabled' : ''} onclick="changeMyKeysPage(${page + 1})">Next</button>
-            <button class="btn btn-sm" ${page >= total_pages ? 'disabled' : ''} onclick="changeMyKeysPage(${total_pages})">Last</button>
+            <button class="btn btn-sm" ${page >= total_pages ? 'disabled' : ''} onclick="changeMyKeysPage(${page + 1})">${t('pag.next')}</button>
+            <button class="btn btn-sm" ${page >= total_pages ? 'disabled' : ''} onclick="changeMyKeysPage(${total_pages})">${t('pag.last')}</button>
             <select onchange="changeMyKeysPageSize(this.value)" style="margin-left: 10px;">
-                <option value="10" ${page_size === 10 ? 'selected' : ''}>10/page</option>
-                <option value="20" ${page_size === 20 ? 'selected' : ''}>20/page</option>
-                <option value="50" ${page_size === 50 ? 'selected' : ''}>50/page</option>
-                <option value="100" ${page_size === 100 ? 'selected' : ''}>100/page</option>
+                <option value="10" ${page_size === 10 ? 'selected' : ''}>${t('pag.perPage', { n: 10 })}</option>
+                <option value="20" ${page_size === 20 ? 'selected' : ''}>${t('pag.perPage', { n: 20 })}</option>
+                <option value="50" ${page_size === 50 ? 'selected' : ''}>${t('pag.perPage', { n: 50 })}</option>
+                <option value="100" ${page_size === 100 ? 'selected' : ''}>${t('pag.perPage', { n: 100 })}</option>
             </select>
         </div>
     `;
 }
 
 async function deleteApiKey(apiKey) {
-    if (!confirm('Are you sure you want to delete this API key? This action cannot be undone.')) {
+    if (!confirm(t('confirm.deleteKey'))) {
         return;
     }
     
@@ -506,15 +973,15 @@ async function deleteApiKey(apiKey) {
         const data = await response.json();
         
         if (data.success) {
-            showToast('API Key deleted successfully', 'success');
+            showToast(t('toast.keyDeleted'), 'success');
             loadMyApiKeys();
             loadUserInfo(); // Refresh stats
         } else {
-            showToast(data.error || 'Failed to delete API key', 'error');
+            showToast(data.error || t('toast.keyDeleteFailed'), 'error');
         }
     } catch (error) {
         console.error('Error deleting API key:', error);
-        showToast('Network error', 'error');
+        showToast(t('common.networkError'), 'error');
     }
 }
 
@@ -527,7 +994,7 @@ function openEditKeyModal(apiKey) {
     // Find the key data
     currentEditKey = myApiKeys.find(k => k.api_key === apiKey);
     if (!currentEditKey) {
-        showToast('API Key not found', 'error');
+        showToast(t('toast.keyNotFound'), 'error');
         return;
     }
     
@@ -578,11 +1045,11 @@ function openEditKeyModal(apiKey) {
     if (isUnlimited) {
         trafficLimitGroup.style.display = 'none';
         unlimitedToggle.classList.add('active');
-        trafficDesc.textContent = 'API Key will have no traffic restrictions';
+        trafficDesc.textContent = t('trafficDesc.unlimited');
     } else {
         trafficLimitGroup.style.display = 'block';
         unlimitedToggle.classList.remove('active');
-        trafficDesc.textContent = 'Set a custom traffic limit below';
+        trafficDesc.textContent = t('trafficDesc.custom');
         
         // Convert bytes to value and unit
         const trafficBytes = currentEditKey.traffic_limit || 0;
@@ -612,11 +1079,11 @@ function openEditKeyModal(apiKey) {
         if (this.checked) {
             trafficLimitGroup.style.display = 'none';
             unlimitedToggle.classList.add('active');
-            trafficDesc.textContent = 'API Key will have no traffic restrictions';
+            trafficDesc.textContent = t('trafficDesc.unlimited');
         } else {
             trafficLimitGroup.style.display = 'block';
             unlimitedToggle.classList.remove('active');
-            trafficDesc.textContent = 'Set a custom traffic limit below';
+            trafficDesc.textContent = t('trafficDesc.custom');
             calculateEditTrafficBytes();
         }
     };
@@ -644,11 +1111,11 @@ function openEditKeyModal(apiKey) {
         if (tokenIsUnlimited) {
             if (tokenLimitGroup) tokenLimitGroup.style.display = 'none';
             if (tokenUnlimitedToggle) tokenUnlimitedToggle.classList.add('active');
-            if (tokenDesc) tokenDesc.textContent = 'API Key will have no token restrictions';
+            if (tokenDesc) tokenDesc.textContent = t('tokenDesc.unlimited');
         } else {
             if (tokenLimitGroup) tokenLimitGroup.style.display = 'block';
             if (tokenUnlimitedToggle) tokenUnlimitedToggle.classList.remove('active');
-            if (tokenDesc) tokenDesc.textContent = 'Set a custom token limit below';
+            if (tokenDesc) tokenDesc.textContent = t('tokenDesc.custom');
 
             const tokenRaw = Number(currentEditKey.token_limit) || 0;
             const tokenValueInput = document.getElementById('edit-token-limit-value');
@@ -672,11 +1139,11 @@ function openEditKeyModal(apiKey) {
             if (this.checked) {
                 if (tokenLimitGroup) tokenLimitGroup.style.display = 'none';
                 if (tokenUnlimitedToggle) tokenUnlimitedToggle.classList.add('active');
-                if (tokenDesc) tokenDesc.textContent = 'API Key will have no token restrictions';
+                if (tokenDesc) tokenDesc.textContent = t('tokenDesc.unlimited');
             } else {
                 if (tokenLimitGroup) tokenLimitGroup.style.display = 'block';
                 if (tokenUnlimitedToggle) tokenUnlimitedToggle.classList.remove('active');
-                if (tokenDesc) tokenDesc.textContent = 'Set a custom token limit below';
+                if (tokenDesc) tokenDesc.textContent = t('tokenDesc.custom');
                 calculateEditTokenBytes();
             }
         };
@@ -695,18 +1162,31 @@ function openEditKeyModal(apiKey) {
     document.getElementById('edit-key-modal').style.display = 'flex';
 }
 
-// 关键词: calculateEditTokenBytes, OPS Token 限额输入实时换算
+// 计费 Token 与 RMB 换算：1 RMB = 10M 计费 Token（与管理端口径一致）。
+// 关键词: OPS formatRMBFromTokens, 1 RMB=10M 计费 Token, 换算文案
+const OPS_BILLING_TOKENS_PER_RMB = 10000000; // 10M 计费 Token / RMB
+function formatRMBFromTokens(tokens) {
+    const n = Number(tokens) || 0;
+    const rmb = n / OPS_BILLING_TOKENS_PER_RMB;
+    return (rmb % 1 === 0) ? rmb.toFixed(0) : rmb.toFixed(2);
+}
+
+// 关键词: calculateEditTokenBytes, OPS Token 限额输入实时换算, RMB 换算提示
 function calculateEditTokenBytes() {
     const valueInput = document.getElementById('edit-token-limit-value');
     const unitSelect = document.getElementById('edit-token-limit-unit');
     const calculatedDisplay = document.getElementById('edit-token-calculated');
+    const rmbDisplay = document.getElementById('edit-token-calculated-rmb');
     if (!valueInput || !unitSelect) return 0;
     const value = parseFloat(valueInput.value) || 0;
     const multiplier = parseInt(unitSelect.value) || 1;
     const tokens = Math.floor(value * multiplier);
     if (calculatedDisplay) {
         const formatted = formatTokenCount(tokens);
-        calculatedDisplay.textContent = `Calculated: ${tokens.toLocaleString()} tokens (${formatted})`;
+        calculatedDisplay.textContent = t('calc.tokens', { n: tokens.toLocaleString(), f: formatted });
+    }
+    if (rmbDisplay) {
+        rmbDisplay.textContent = t('calc.rmb', { rmb: formatRMBFromTokens(tokens) });
     }
     return tokens;
 }
@@ -725,7 +1205,7 @@ function calculateEditTrafficBytes() {
     
     if (calculatedDisplay) {
         const formatted = formatBytes(bytes);
-        calculatedDisplay.textContent = `Calculated: ${bytes.toLocaleString()} bytes (${formatted})`;
+        calculatedDisplay.textContent = t('calc.bytes', { n: bytes.toLocaleString(), f: formatted });
     }
     
     return bytes;
@@ -782,27 +1262,27 @@ function updateEditSelectedPreview() {
     const globInput = document.getElementById('edit-glob-patterns');
     const globPatterns = globInput ? globInput.value.trim() : '';
     
-    let html = '<strong>Selected:</strong> ';
+    let html = `<strong>${t('common.selectedLabel')}</strong> `;
     
     const modelArray = Array.from(editSelectedModels).sort();
     if (modelArray.length > 0) {
         if (modelArray.length <= 5) {
-            html += modelArray.map(m => `<span class="tag">${m}</span>`).join('');
+            html += modelArray.map(m => `<span class="tag">${escapeHtml(m)}</span>`).join('');
         } else {
-            html += modelArray.slice(0, 3).map(m => `<span class="tag">${m}</span>`).join('');
-            html += `<span class="tag">+${modelArray.length - 3} more</span>`;
+            html += modelArray.slice(0, 3).map(m => `<span class="tag">${escapeHtml(m)}</span>`).join('');
+            html += `<span class="tag">+${modelArray.length - 3}${t('common.moreSuffix')}</span>`;
         }
     }
     
     if (globPatterns) {
         const patterns = globPatterns.split(',').map(p => p.trim()).filter(p => p);
         patterns.forEach(p => {
-            html += `<span class="tag glob">${p}</span>`;
+            html += `<span class="tag glob">${escapeHtml(p)}</span>`;
         });
     }
     
     if (modelArray.length === 0 && !globPatterns) {
-        html += '<span style="color: #888;">None selected</span>';
+        html += `<span style="color: #888;">${t('common.noneSelected')}</span>`;
     }
     
     preview.innerHTML = html;
@@ -831,7 +1311,7 @@ async function saveEditKey() {
     const allModels = [...modelArray, ...globArray].sort();
     
     if (allModels.length === 0) {
-        showToast('Please select at least one model or enter a glob pattern', 'error');
+        showToast(t('toast.selectModel'), 'error');
         return;
     }
     
@@ -840,7 +1320,7 @@ async function saveEditKey() {
     const trafficLimit = calculateEditTrafficBytes();
     
     if (!isUnlimited && trafficLimit <= 0) {
-        showToast('Please enter a valid traffic limit or enable unlimited traffic', 'error');
+        showToast(t('toast.validTraffic'), 'error');
         return;
     }
 
@@ -849,7 +1329,7 @@ async function saveEditKey() {
     const tokenIsUnlimited = tokenUnlimitedEl ? tokenUnlimitedEl.checked : true;
     const tokenLimit = tokenIsUnlimited ? 0 : calculateEditTokenBytes();
     if (!tokenIsUnlimited && tokenLimit <= 0) {
-        showToast('Please enter a valid token limit or enable unlimited token', 'error');
+        showToast(t('toast.validToken'), 'error');
         return;
     }
     
@@ -887,22 +1367,22 @@ async function saveEditKey() {
         const data = await response.json();
         
         if (data.success) {
-            showToast('API Key updated successfully', 'success');
+            showToast(t('toast.keyUpdated'), 'success');
             closeEditKeyModal();
             loadMyApiKeys();
         } else {
-            showToast(data.error || 'Failed to update API key', 'error');
+            showToast(data.error || t('toast.keyUpdateFailed'), 'error');
         }
     } catch (error) {
         console.error('Error updating API key:', error);
-        showToast('Network error', 'error');
+        showToast(t('common.networkError'), 'error');
     }
 }
 
 async function resetEditKeyTraffic() {
     const apiKey = document.getElementById('edit-key-api-key').value;
     
-    if (!confirm('Are you sure you want to reset the traffic counter for this API key?')) {
+    if (!confirm(t('confirm.resetTraffic'))) {
         return;
     }
     
@@ -918,22 +1398,22 @@ async function resetEditKeyTraffic() {
         const data = await response.json();
         
         if (data.success) {
-            showToast('Traffic reset successfully', 'success');
+            showToast(t('toast.trafficReset'), 'success');
             document.getElementById('edit-traffic-used').textContent = '0 B';
             loadMyApiKeys();
         } else {
-            showToast(data.error || 'Failed to reset traffic', 'error');
+            showToast(data.error || t('toast.trafficResetFailed'), 'error');
         }
     } catch (error) {
         console.error('Error resetting traffic:', error);
-        showToast('Network error', 'error');
+        showToast(t('common.networkError'), 'error');
     }
 }
 
 // 关键词: resetEditKeyToken, OPS 用户重置自己 Key 的 Token 用量
 async function resetEditKeyToken() {
     const apiKey = document.getElementById('edit-key-api-key').value;
-    if (!confirm('Are you sure you want to reset the token usage for this API key?')) {
+    if (!confirm(t('confirm.resetToken'))) {
         return;
     }
     try {
@@ -944,16 +1424,16 @@ async function resetEditKeyToken() {
         });
         const data = await response.json();
         if (data.success) {
-            showToast('Token usage reset successfully', 'success');
+            showToast(t('toast.tokenReset'), 'success');
             const usedEl = document.getElementById('edit-token-used');
             if (usedEl) usedEl.textContent = '0';
             loadMyApiKeys();
         } else {
-            showToast(data.error || 'Failed to reset token', 'error');
+            showToast(data.error || t('toast.tokenResetFailed'), 'error');
         }
     } catch (error) {
         console.error('Error resetting token:', error);
-        showToast('Network error', 'error');
+        showToast(t('common.networkError'), 'error');
     }
 }
 
@@ -973,7 +1453,7 @@ function calculateTrafficBytes() {
     
     if (calculatedDisplay) {
         const formatted = formatBytes(bytes);
-        calculatedDisplay.textContent = `Calculated: ${bytes.toLocaleString()} bytes (${formatted})`;
+        calculatedDisplay.textContent = t('calc.bytes', { n: bytes.toLocaleString(), f: formatted });
     }
     
     return bytes;
@@ -997,11 +1477,11 @@ function initForms() {
             if (this.checked) {
                 trafficLimitGroup.style.display = 'none';
                 unlimitedToggle.classList.add('active');
-                trafficDesc.textContent = 'API Key will have no traffic restrictions';
+                trafficDesc.textContent = t('trafficDesc.unlimited');
             } else {
                 trafficLimitGroup.style.display = 'block';
                 unlimitedToggle.classList.remove('active');
-                trafficDesc.textContent = 'Set a custom traffic limit below';
+                trafficDesc.textContent = t('trafficDesc.custom');
                 calculateTrafficBytes();
             }
         });
@@ -1029,11 +1509,11 @@ function initForms() {
             if (this.checked) {
                 tokenLimitGroup.style.display = 'none';
                 if (tokenUnlimitedToggle) tokenUnlimitedToggle.classList.add('active');
-                if (tokenDesc) tokenDesc.textContent = 'API Key will have no token restrictions';
+                if (tokenDesc) tokenDesc.textContent = t('tokenDesc.unlimited');
             } else {
                 tokenLimitGroup.style.display = 'block';
                 if (tokenUnlimitedToggle) tokenUnlimitedToggle.classList.remove('active');
-                if (tokenDesc) tokenDesc.textContent = 'Set a custom token limit below';
+                if (tokenDesc) tokenDesc.textContent = t('tokenDesc.custom');
                 calculateTokenBytes();
             }
         });
@@ -1050,18 +1530,22 @@ function initForms() {
     }
 }
 
-// 关键词: calculateTokenBytes, OPS Create API Key Token 限额输入实时换算
+// 关键词: calculateTokenBytes, OPS Create API Key Token 限额输入实时换算, RMB 换算提示
 function calculateTokenBytes() {
     const valueInput = document.getElementById('token-limit-value');
     const unitSelect = document.getElementById('token-limit-unit');
     const calculatedDisplay = document.getElementById('token-calculated');
+    const rmbDisplay = document.getElementById('token-calculated-rmb');
     if (!valueInput || !unitSelect) return 0;
     const value = parseFloat(valueInput.value) || 0;
     const multiplier = parseInt(unitSelect.value) || 1;
     const tokens = Math.floor(value * multiplier);
     if (calculatedDisplay) {
         const formatted = (typeof formatTokenCount === 'function') ? formatTokenCount(tokens) : tokens.toString();
-        calculatedDisplay.textContent = `Calculated: ${tokens.toLocaleString()} tokens (${formatted})`;
+        calculatedDisplay.textContent = t('calc.tokens', { n: tokens.toLocaleString(), f: formatted });
+    }
+    if (rmbDisplay) {
+        rmbDisplay.textContent = t('calc.rmb', { rmb: formatRMBFromTokens(tokens) });
     }
     return tokens;
 }
@@ -1092,17 +1576,17 @@ async function handleCreateApiKey(e) {
     const tokenLimit = tokenIsUnlimited ? 0 : calculateTokenBytes();
     
     if (allModels.length === 0) {
-        showAlert('create-key-alert', 'Please select at least one model or enter a glob pattern', 'error');
+        showAlert('create-key-alert', t('toast.selectModel'), 'error');
         return;
     }
     
     // Validate traffic limit if not unlimited
     if (!isUnlimited && trafficLimit <= 0) {
-        showAlert('create-key-alert', 'Please enter a valid traffic limit or enable unlimited traffic', 'error');
+        showAlert('create-key-alert', t('toast.validTraffic'), 'error');
         return;
     }
     if (!tokenIsUnlimited && tokenLimit <= 0) {
-        showAlert('create-key-alert', 'Please enter a valid token limit or enable unlimited token', 'error');
+        showAlert('create-key-alert', t('toast.validToken'), 'error');
         return;
     }
     
@@ -1140,11 +1624,11 @@ async function handleCreateApiKey(e) {
         const data = await response.json();
         
         if (data.success) {
-            const trafficInfo = data.unlimited ? 'Unlimited' : formatBytes(data.traffic_limit);
+            const trafficInfo = data.unlimited ? t('common.unlimited') : formatBytes(data.traffic_limit);
             const tokenInfo = (data.token_limit_enable && data.token_limit > 0)
                 ? formatTokenCount(data.token_limit)
-                : 'Unlimited';
-            showAlert('create-key-alert', `API Key created! Traffic: ${trafficInfo}, Token: ${tokenInfo}`, 'success');
+                : t('common.unlimited');
+            showAlert('create-key-alert', t('create.successAlert', { traffic: trafficInfo, token: tokenInfo }), 'success');
             document.getElementById('generated-key').textContent = data.api_key;
             document.getElementById('api-key-result').classList.add('show');
             
@@ -1164,11 +1648,11 @@ async function handleCreateApiKey(e) {
             // Refresh user info to update stats (async, don't wait)
             loadUserInfo().catch(err => console.error('Error refreshing user info:', err));
         } else {
-            showAlert('create-key-alert', data.error || 'Failed to create API key', 'error');
+            showAlert('create-key-alert', data.error || t('alert.createKeyFailed'), 'error');
         }
     } catch (error) {
         console.error('Error creating API key:', error);
-        showAlert('create-key-alert', 'Network error. Please try again.', 'error');
+        showAlert('create-key-alert', t('alert.networkRetry'), 'error');
     }
 }
 
@@ -1180,12 +1664,12 @@ async function handleChangePassword(e) {
     const confirmPassword = document.getElementById('confirm-password').value;
     
     if (newPassword !== confirmPassword) {
-        showAlert('settings-alert', 'New passwords do not match', 'error');
+        showAlert('settings-alert', t('alert.passwordMismatch'), 'error');
         return;
     }
     
     if (newPassword.length < 8) {
-        showAlert('settings-alert', 'New password must be at least 8 characters', 'error');
+        showAlert('settings-alert', t('alert.passwordTooShort'), 'error');
         return;
     }
     
@@ -1204,21 +1688,21 @@ async function handleChangePassword(e) {
         const data = await response.json();
         
         if (data.success) {
-            showAlert('settings-alert', 'Password changed successfully!', 'success');
+            showAlert('settings-alert', t('alert.passwordChanged'), 'success');
             document.getElementById('change-password-form').reset();
         } else {
-            showAlert('settings-alert', data.error || 'Failed to change password', 'error');
+            showAlert('settings-alert', data.error || t('alert.passwordChangeFailed'), 'error');
         }
     } catch (error) {
         console.error('Error changing password:', error);
-        showAlert('settings-alert', 'Network error. Please try again.', 'error');
+        showAlert('settings-alert', t('alert.networkRetry'), 'error');
     }
 }
 
 // ==================== OPS Key Management ====================
 
 async function resetOpsKey() {
-    if (!confirm('Are you sure you want to reset your OPS Key? You will need to update any applications using the current key.')) {
+    if (!confirm(t('confirm.resetOpsKey'))) {
         return;
     }
     
@@ -1230,14 +1714,14 @@ async function resetOpsKey() {
         const data = await response.json();
         
         if (data.success) {
-            alert('OPS Key reset successfully!\n\nNew Key: ' + data.new_ops_key);
+            alert(t('opsKey.resetSuccess') + data.new_ops_key);
             loadUserInfo();
         } else {
-            alert('Failed to reset OPS key: ' + (data.error || 'Unknown error'));
+            alert(t('opsKey.resetFailed') + (data.error || t('opsKey.unknownError')));
         }
     } catch (error) {
         console.error('Error resetting OPS key:', error);
-        alert('Network error. Please try again.');
+        alert(t('alert.networkRetry'));
     }
 }
 
@@ -1329,10 +1813,10 @@ function copyCurlExample(elementId) {
     const curlCommand = curlCommands[elementId] || curlCommands['curl-create-limited'];
     
     copyToClipboard(curlCommand).then(() => {
-        showToast('cURL command copied to clipboard!', 'success');
+        showToast(t('toast.curlCopied'), 'success');
     }).catch(err => {
         console.error('Failed to copy:', err);
-        showToast('Failed to copy to clipboard', 'error');
+        showToast(t('toast.copyFailed'), 'error');
     });
 }
 
@@ -1341,10 +1825,10 @@ function copyCurlExample(elementId) {
 function copyApiKey() {
     const key = document.getElementById('generated-key').textContent;
     copyToClipboard(key).then(() => {
-        showToast('API Key copied to clipboard!', 'success');
+        showToast(t('toast.keyCopied'), 'success');
     }).catch(err => {
         console.error('Failed to copy:', err);
-        showToast('Failed to copy to clipboard', 'error');
+        showToast(t('toast.copyFailed'), 'error');
     });
 }
 
@@ -1465,3 +1949,7 @@ window.formatTokenCount = formatTokenCount;
 // My Keys pagination functions
 window.changeMyKeysPage = changeMyKeysPage;
 window.changeMyKeysPageSize = changeMyKeysPageSize;
+// 关键词: OPS i18n window 导出, 页头语言切换按钮 onclick 调用 toggleOpsLang
+window.toggleOpsLang = toggleOpsLang;
+window.setOpsLang = setOpsLang;
+window.t = t;

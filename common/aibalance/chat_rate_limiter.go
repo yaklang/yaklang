@@ -70,7 +70,11 @@ type ChatRateLimiter struct {
 	modelRPM           sync.Map // map[modelName]int64 RPM override
 	modelDelay         sync.Map // map[modelName]DelayRange free-user pre-call delay override (seconds)
 	modelOutputTPS     sync.Map // map[modelName]int64 output TPS override (tokens per second)
-	stopCh             chan struct{}
+	// ipStates 是「一键限流 IP」的独立 RPM 滑动窗口，按客户端 IP（而非 apiKey|model）分桶，
+	// 不参与 GetModelRPMStats 的 per-model 聚合，避免污染热门模型榜单。
+	// 关键词: ChatRateLimiter ipStates, per-IP RPM 桶, 一键限流
+	ipStates sync.Map // map[ip]*keyRPMState
+	stopCh   chan struct{}
 	stopOnce           sync.Once
 	startOnce          sync.Once
 }
@@ -336,6 +340,37 @@ func (rl *ChatRateLimiter) CheckRateLimit(apiKey string, modelName string) (bool
 	return true, rl.GetQueueCount()
 }
 
+// CheckIPRateLimit 对「一键限流 IP」做按 IP 维度的 RPM 滑动窗口检查。
+// 与 CheckRateLimit 的区别：分桶键只用 IP（跨所有模型共享一个桶），rpm 由调用方
+// 显式传入（来自该 IP 的限流配置），而不是按模型解析。rpm<=0 直接放行（不限）。
+// 返回 (allowed, currentQueueLength)；命中限流时复用全局排队驻留计数。
+// 关键词: CheckIPRateLimit, per-IP RPM, 一键限流
+func (rl *ChatRateLimiter) CheckIPRateLimit(ip string, rpm int64) (bool, int64) {
+	if rpm <= 0 || strings.TrimSpace(ip) == "" {
+		return true, rl.GetQueueCount()
+	}
+	rl.ensureCleanupStarted()
+	now := time.Now()
+
+	newState := &keyRPMState{requests: []time.Time{now}}
+	val, loaded := rl.ipStates.LoadOrStore(ip, newState)
+	if !loaded {
+		return true, rl.GetQueueCount()
+	}
+
+	state := val.(*keyRPMState)
+	state.mu.Lock()
+	defer state.mu.Unlock()
+
+	state.trimExpired(now)
+	if int64(len(state.requests)) >= rpm {
+		qLen := rl.recordRejection(now)
+		return false, qLen
+	}
+	state.requests = append(state.requests, now)
+	return true, rl.GetQueueCount()
+}
+
 // cleanupLoop periodically removes stale API key entries.
 func (rl *ChatRateLimiter) cleanupLoop() {
 	ticker := time.NewTicker(cleanupInterval)
@@ -367,6 +402,27 @@ func (rl *ChatRateLimiter) cleanupLoop() {
 			})
 			if count > 0 {
 				log.Infof("chat rate limiter: cleaned up %d stale api-key entries", count)
+			}
+
+			// 同步清理「一键限流 IP」的陈旧 RPM 桶（窗口口径与上面一致）。
+			// 关键词: cleanupLoop ipStates 清理
+			ipCount := 0
+			rl.ipStates.Range(func(key, value any) bool {
+				state := value.(*keyRPMState)
+				state.mu.Lock()
+				latest := time.Time{}
+				if len(state.requests) > 0 {
+					latest = state.requests[len(state.requests)-1]
+				}
+				state.mu.Unlock()
+				if latest.Before(cutoff) {
+					rl.ipStates.Delete(key)
+					ipCount++
+				}
+				return true
+			})
+			if ipCount > 0 {
+				log.Infof("chat rate limiter: cleaned up %d stale throttled-ip entries", ipCount)
 			}
 		case <-rl.stopCh:
 			return
