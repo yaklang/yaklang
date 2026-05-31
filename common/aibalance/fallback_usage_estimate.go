@@ -221,6 +221,12 @@ func (c *ServerConfig) applyUsageFallbackEstimate(
 			utils.ShrinkString(key.Key, 8), result.Weighted, err)
 		return result
 	}
+	// 付费用户全局日 Token 总额度（第二道硬门）累加：fallback 路径与正路保持一致。
+	// 关键词: fallback AddPaidUserDailyTokenUsage, 付费全局额度累加
+	if err := AddPaidUserDailyTokenUsage(result.Weighted); err != nil {
+		c.logWarn("fallback AddPaidUserDailyTokenUsage failed (key=%s weighted=%d): %v",
+			utils.ShrinkString(key.Key, 8), result.Weighted, err)
+	}
 	result.Billed = true
 	result.Bucket = "apikey"
 	c.logInfo("fallback API key token usage updated: key=%s model=%s weighted=%d",

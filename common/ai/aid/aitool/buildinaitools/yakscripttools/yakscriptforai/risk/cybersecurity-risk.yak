@@ -13,6 +13,22 @@ small set of inputs that still makes the saved record actionable.
 # HARD RULES FOR AI PARAMETER GENERATION                                     #
 ##############################################################################
 
+0. WHEN TO CALL (resident tool, report immediately).
+   This is a super-important resident reporting tool. Call it the moment a
+   vulnerability or any potentially harmful security risk is confirmed by
+   first-hand evidence (request/response diff, command echo, sensitive data
+   returned, scan result, file evidence) - do NOT wait until the test phase or
+   whole task is finished.
+   - Report each independent risk instance with its own separate call. Never
+     batch multiple findings into one record and never defer reporting into a
+     separate "fill-in-later" task.
+   - During bulk enumeration (e.g. IDOR over many IDs), report the first
+     confirmed instance immediately, then keep enumerating.
+   - For large raw traffic, persist it via request-file / response-file (or a
+     result file) so nothing is lost if the session is interrupted.
+   - A confirmed risk that is neither saved here nor written to an output file
+     counts as NOT delivered.
+
 1. Never create a title-only risk.
    `summary` is mandatory. It must explain:
    - what is vulnerable

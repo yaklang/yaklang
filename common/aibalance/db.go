@@ -3,6 +3,7 @@ package aibalance
 import (
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -173,6 +174,39 @@ func DeleteAiApiKey(apiKey string) error {
 func UpdateAiApiKey(apiKey string, allowedModels string) error {
 	return GetDB().Model(&AiApiKeys{}).Where("api_key = ?", apiKey).
 		Update("allowed_models", allowedModels).Error
+}
+
+// SaveAiApiKeyRecord 直接落库一条完整 API Key 记录（含 Username/Remark/MetaInfo 等扩展字段）。
+// 与 SaveAiApiKey 的区别：后者只支持 api_key + allowed_models，本函数支持任意字段。
+// 关键词: SaveAiApiKeyRecord, API Key 创建携带 Username Remark MetaInfo
+func SaveAiApiKeyRecord(key *AiApiKeys) error {
+	if key == nil {
+		return fmt.Errorf("SaveAiApiKeyRecord: key is nil")
+	}
+	if key.LastUsedTime.IsZero() {
+		key.LastUsedTime = time.Now()
+	}
+	return GetDB().Create(key).Error
+}
+
+// UpdateAiApiKeyMeta 更新 API Key 的用户绑定与管理元信息字段。
+// 仅更新 username/remark/metainfo 三个字段，其他统计/限额字段保持不变。
+// 关键词: UpdateAiApiKeyMeta, 更新 Username Remark MetaInfo
+func UpdateAiApiKeyMeta(id uint, username, remark, metainfo string) error {
+	// 注意：GORM v1 默认按字段名 snake_case 推导列名，MetaInfo -> meta_info（而非 json tag 的 metainfo）。
+	// 关键词: UpdateAiApiKeyMeta 列名 meta_info, GORM 默认列名推导
+	result := GetDB().Model(&AiApiKeys{}).Where("id = ?", id).Updates(map[string]interface{}{
+		"username":  strings.TrimSpace(username),
+		"remark":    remark,
+		"meta_info": metainfo,
+	})
+	if result.Error != nil {
+		return fmt.Errorf("failed to update API key meta: %v", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("API key not found: id=%d", id)
+	}
+	return nil
 }
 
 // GetAiProviderByID gets single AI provider by ID
@@ -352,7 +386,7 @@ type AiModelMeta struct {
 	ModelName         string  `gorm:"uniqueIndex;not null"` // The platform model name (WrapperName)
 	Description       string  `gorm:"type:text"`
 	Tags              string  `gorm:"type:text"`   // Comma-separated tags or JSON
-	TrafficMultiplier float64 `gorm:"default:1.0"` // 老字段：字节流量倍数（保留兼容），0/缺省时按 1.0
+	TrafficMultiplier float64 `gorm:"default:1.0"` // 老字段：字节流量倍数（已停用，DB 列保留兼容）
 
 	// 四维 Token 倍率（与上游 SSE 末帧 ChatUsage 字段一一对应）
 	InputTokenMultiplier    float64 `gorm:"default:0"` // 输入 token 倍率（=prompt_tokens - cached - cache_create）
@@ -384,7 +418,7 @@ func SaveModelMetaWithMultiplier(modelName, description, tags string, trafficMul
 //
 // 入参语义：
 //   - trafficMultiplier < 0  -> 不更新老 TrafficMultiplier；新建时按 1.0
-//   - input/output/cacheCreate/cacheHit < 0  -> 不更新该维度；新建时按 0（依赖 ComputeWeightedTokens 的回落）
+//   - input/output/cacheCreate/cacheHit < 0  -> 不更新该维度；新建时按 0
 //
 // 关键词: SaveModelMetaWithMultipliers, 四维 Token 倍率写库
 func SaveModelMetaWithMultipliers(
@@ -530,6 +564,13 @@ type AiModelMultiplier struct {
 	OutputTokenMultiplier   float64 `gorm:"default:0"` // 输出 token 倍率
 	CacheCreationMultiplier float64 `gorm:"default:0"` // 缓存创建倍率
 	CacheHitMultiplier      float64 `gorm:"default:0"` // 缓存命中倍率
+
+	// IsFree 把该实际模型标记为「计费豁免」：开启后无论四维倍率如何设置，
+	// ComputeModelWeightedTokens 一律返回 0，免费用户日桶、付费 key Token、
+	// 付费用户全局日 Token 三道计费都因 weighted=0 而自动豁免。
+	// 这是替代旧 config per-model exempt 的统一计费豁免开关，便于用户理解「免费模型」。
+	// 关键词: AiModelMultiplier IsFree, 实际模型免费计费豁免, 倍率失效
+	IsFree bool `gorm:"default:false"` // true=该实际模型完全免费（不计费）
 }
 
 func (a *AiModelMultiplier) TableName() string {
@@ -578,9 +619,22 @@ func GetModelMultiplier(internalModelName string) (*AiModelMultiplier, error) {
 
 // SaveModelMultiplier upserts the four-dimensional multiplier for an actual model
 // (internalModelName). Pass a value < 0 to skip updating that specific dimension
-// (creation uses 0 for skipped fields).
+// (creation uses 0 for skipped fields). The IsFree flag is left unchanged on update
+// and defaults to false on creation; use SaveModelMultiplierWithFree to control it.
 // 关键词: SaveModelMultiplier, 实际模型倍率 upsert
 func SaveModelMultiplier(internalModelName string, inputMul, outputMul, cacheCreateMul, cacheHitMul float64) error {
+	return SaveModelMultiplierWithFree(internalModelName, inputMul, outputMul, cacheCreateMul, cacheHitMul, -1)
+}
+
+// SaveModelMultiplierWithFree upserts the four-dimensional multiplier plus the IsFree flag
+// for an actual model (internalModelName).
+//
+// 入参语义：
+//   - input/output/cacheCreate/cacheHit < 0 -> 不更新该维度；新建时按 0
+//   - isFree < 0  -> 不更新 IsFree（新建时按 false）；isFree == 0 -> false；isFree >= 1 -> true
+//
+// 关键词: SaveModelMultiplierWithFree, 实际模型倍率 + IsFree upsert, 免费计费豁免写库
+func SaveModelMultiplierWithFree(internalModelName string, inputMul, outputMul, cacheCreateMul, cacheHitMul float64, isFree int) error {
 	if internalModelName == "" {
 		return fmt.Errorf("internalModelName is required")
 	}
@@ -601,6 +655,9 @@ func SaveModelMultiplier(internalModelName string, inputMul, outputMul, cacheCre
 			if cacheHitMul >= 0 {
 				m.CacheHitMultiplier = cacheHitMul
 			}
+			if isFree >= 1 {
+				m.IsFree = true
+			}
 			return GetDB().Create(&m).Error
 		}
 		return err
@@ -616,6 +673,9 @@ func SaveModelMultiplier(internalModelName string, inputMul, outputMul, cacheCre
 	}
 	if cacheHitMul >= 0 {
 		m.CacheHitMultiplier = cacheHitMul
+	}
+	if isFree >= 0 {
+		m.IsFree = isFree >= 1
 	}
 	return GetDB().Save(&m).Error
 }
@@ -882,6 +942,14 @@ func BatchDeleteAiApiKeys(ids []uint) (int64, error) {
 // sortOrder: "asc" or "desc"
 // Returns: keys, total count, error
 func GetAiApiKeysPaginated(page, pageSize int, sortBy, sortOrder string) ([]*AiApiKeys, int64, error) {
+	return GetAiApiKeysPaginatedFiltered(page, pageSize, sortBy, sortOrder, "")
+}
+
+// GetAiApiKeysPaginatedFiltered 在分页基础上支持按绑定用户名过滤。
+// usernameFilter 为空时等价于不过滤；非空时按精确用户名匹配（用户名可重复，
+// 因此一个用户名可能对应多条 API Key）。
+// 关键词: GetAiApiKeysPaginatedFiltered, username 过滤, 按用户查看 API Key
+func GetAiApiKeysPaginatedFiltered(page, pageSize int, sortBy, sortOrder, usernameFilter string) ([]*AiApiKeys, int64, error) {
 	var keys []*AiApiKeys
 	var total int64
 
@@ -908,8 +976,11 @@ func GetAiApiKeysPaginated(page, pageSize int, sortBy, sortOrder string) ([]*AiA
 		"output_bytes":   true,
 		"traffic_used":   true,
 		"traffic_limit":  true,
+		"token_used":     true,
+		"token_limit":    true,
 		"last_used_time": true,
 		"active":         true,
+		"username":       true,
 	}
 
 	if !allowedSortFields[sortBy] {
@@ -920,8 +991,17 @@ func GetAiApiKeysPaginated(page, pageSize int, sortBy, sortOrder string) ([]*AiA
 		sortOrder = "desc"
 	}
 
+	// 基础查询：按用户名过滤（如有）
+	countQuery := GetDB().Model(&AiApiKeys{})
+	listQuery := GetDB().Model(&AiApiKeys{})
+	usernameFilter = strings.TrimSpace(usernameFilter)
+	if usernameFilter != "" {
+		countQuery = countQuery.Where("username = ?", usernameFilter)
+		listQuery = listQuery.Where("username = ?", usernameFilter)
+	}
+
 	// Get total count
-	if err := GetDB().Model(&AiApiKeys{}).Count(&total).Error; err != nil {
+	if err := countQuery.Count(&total).Error; err != nil {
 		return nil, 0, fmt.Errorf("failed to count API keys: %v", err)
 	}
 
@@ -930,7 +1010,7 @@ func GetAiApiKeysPaginated(page, pageSize int, sortBy, sortOrder string) ([]*AiA
 
 	// Query with pagination and sorting
 	orderClause := fmt.Sprintf("%s %s", sortBy, sortOrder)
-	if err := GetDB().Order(orderClause).Offset(offset).Limit(pageSize).Find(&keys).Error; err != nil {
+	if err := listQuery.Order(orderClause).Offset(offset).Limit(pageSize).Find(&keys).Error; err != nil {
 		return nil, 0, fmt.Errorf("failed to get API keys: %v", err)
 	}
 

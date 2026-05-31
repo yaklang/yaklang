@@ -85,6 +85,7 @@ func (c *ServerConfig) handleGetRateLimitConfig(conn net.Conn, request *http.Req
 			"model_delay_overrides":           modelDelayOverrides,
 			"free_user_token_limit_m":         config.FreeUserTokenLimitM,
 			"free_user_token_model_overrides": freeUserTokenOverrides,
+			"paid_user_token_limit_m":         config.PaidUserTokenLimitM,
 			"free_user_output_tps":            config.FreeUserOutputTPS,
 			"model_output_tps_overrides":      modelOutputTPSOverrides,
 			"free_user_token_soft_limit_m":    config.FreeUserTokenSoftLimitM,
@@ -98,6 +99,9 @@ func (c *ServerConfig) handleGetRateLimitConfig(conn net.Conn, request *http.Req
 			"custom_429_enabled":        config.Custom429Enabled,
 			"custom_429_notice":         config.Custom429Notice,
 			"custom_429_kind_overrides": custom429Overrides,
+			// 各 limit_kind 的默认文案/中文名/触发原因（唯一真相源），供前端编辑时展示默认文案。
+			// 关键词: handleGetRateLimitConfig custom_429_kind_defaults, Custom429Kinds
+			"custom_429_kind_defaults": Custom429Kinds(),
 			// 轻量降级规则
 			// 关键词: handleGetRateLimitConfig model_downgrade_rules
 			"model_downgrade_rules": downgradeRules,
@@ -185,6 +189,7 @@ func (c *ServerConfig) handleSetRateLimitConfig(conn net.Conn, request *http.Req
 		ModelDelayOverrides         map[string]json.RawMessage            `json:"model_delay_overrides,omitempty"`
 		FreeUserTokenLimitM         *int64                                `json:"free_user_token_limit_m,omitempty"`
 		FreeUserTokenModelOverrides map[string]FreeUserTokenModelOverride `json:"free_user_token_model_overrides,omitempty"`
+		PaidUserTokenLimitM         *int64                                `json:"paid_user_token_limit_m,omitempty"`
 		FreeUserOutputTPS           *int64                                `json:"free_user_output_tps,omitempty"`
 		ModelOutputTPSOverrides     map[string]int64                      `json:"model_output_tps_overrides,omitempty"`
 		FreeUserTokenSoftLimitM     *int64                                `json:"free_user_token_soft_limit_m,omitempty"`
@@ -278,6 +283,14 @@ func (c *ServerConfig) handleSetRateLimitConfig(conn net.Conn, request *http.Req
 			config.FreeUserTokenLimitM = 0
 		} else {
 			config.FreeUserTokenLimitM = *reqBody.FreeUserTokenLimitM
+		}
+	}
+	if reqBody.PaidUserTokenLimitM != nil {
+		// 付费用户全局日 Token 总额度：<0 归零（0=不限制）
+		if *reqBody.PaidUserTokenLimitM < 0 {
+			config.PaidUserTokenLimitM = 0
+		} else {
+			config.PaidUserTokenLimitM = *reqBody.PaidUserTokenLimitM
 		}
 	}
 	if reqBody.FreeUserOutputTPS != nil {
@@ -460,6 +473,18 @@ func (c *ServerConfig) handleGetRateLimitStatus(conn net.Conn, request *http.Req
 		c.logWarn("QueryFreeUserTokenUsageSnapshot failed: %v", err)
 	}
 
+	// 付费用户全局日 Token 总额度快照（第二道硬门），供实时面板展示
+	// 关键词: handleGetRateLimitStatus paid_user_token_usage 快照
+	paidTokenUsage := map[string]interface{}{}
+	if snap, err := QueryPaidUserTokenUsageSnapshot(); err == nil {
+		paidTokenUsage["reset_date"] = snap.Date
+		paidTokenUsage["tokens_used"] = snap.TokensUsed
+		paidTokenUsage["used_m"] = snap.UsedM
+		paidTokenUsage["limit_m"] = snap.LimitM
+	} else {
+		c.logWarn("QueryPaidUserTokenUsageSnapshot failed: %v", err)
+	}
+
 	// 单 IP 免费模型用量快照：今日有多少个 IP 在用 + Top-N 用量榜
 	// 关键词: handleGetRateLimitStatus free_ip_usage 快照
 	freeIPUsage := map[string]interface{}{}
@@ -485,6 +510,7 @@ func (c *ServerConfig) handleGetRateLimitStatus(conn net.Conn, request *http.Req
 		"queue_count":           queueCount,
 		"default_rpm":           defaultRPM,
 		"free_user_token_usage": freeTokenUsage,
+		"paid_user_token_usage": paidTokenUsage,
 		"free_ip_usage":         freeIPUsage,
 	})
 }
@@ -720,7 +746,8 @@ func (c *ServerConfig) applyRateLimitConfig(cfg *AiBalanceRateLimitConfig) {
 //   - 自定义文案关闭(默认)时：返回原始默认文案、空 notice，行为与历史完全一致；
 //   - 开启时：若该 kind 配置了非空 override 则替换 message，并附带全局 notice 文案。
 //
-// kind 取值与各写出点约定：rpm / daily_token / traffic / token / memfit_version。
+// kind 取值与各写出点约定（详见 custom_429.go Custom429Kinds）：
+// rpm / token / daily_token / free_ip / paid_daily_token / memfit_version。
 // 关键词: resolveLimit429, 自定义 429 文案, notice 注入, limit_kind 覆盖
 func (c *ServerConfig) resolveLimit429(kind, defaultMessage string) (message, notice string) {
 	message = defaultMessage

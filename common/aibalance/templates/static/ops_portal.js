@@ -5,6 +5,18 @@ let userInfo = null;
 let availableModels = [];
 let myApiKeys = [];
 
+// HTML 转义助手：渲染用户名/备注/metainfo 等用户可控文本时防止 XSS。
+// 关键词: ops_portal escapeHtml, Username Remark MetaInfo 安全渲染
+function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
 // ==================== Authentication Error Handler ====================
 
 // Check if response indicates authentication error
@@ -352,13 +364,13 @@ async function loadMyApiKeys(page, pageSize) {
                 renderApiKeysTable();
             }
         } else {
-            tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #dc3545;">Error: ${data.error || 'Failed to load keys'}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #dc3545;">Error: ${data.error || 'Failed to load keys'}</td></tr>`;
         }
     } catch (error) {
         console.error('Error loading API keys:', error);
         loading.classList.add('hidden');
         content.classList.remove('hidden');
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #dc3545;">Network error</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: #dc3545;">Network error</td></tr>';
     }
 }
 
@@ -382,17 +394,7 @@ function renderApiKeysTable() {
     const tbody = document.getElementById('my-keys-tbody');
     
     tbody.innerHTML = myApiKeys.map(key => {
-        const isUnlimited = !key.traffic_limit_enable || !key.traffic_limit || key.traffic_limit <= 0;
-        let trafficColor = '#28a745';
-        let trafficUsedDisplay = formatBytes(key.traffic_used || 0);
-        let trafficLimitDisplay = isUnlimited ? '<span style="color: #28a745; font-weight: 500;">Unlimited</span>' : formatBytes(key.traffic_limit);
-        
-        if (!isUnlimited && key.traffic_limit > 0) {
-            const trafficPercent = Math.min(100, ((key.traffic_used || 0) / key.traffic_limit) * 100);
-            trafficColor = trafficPercent > 80 ? '#dc3545' : trafficPercent > 50 ? '#ffc107' : '#28a745';
-        }
-
-        // 关键词: OPS my-keys 渲染 Token 用量/限额列, 推荐使用 token 替代 traffic
+        // 关键词: OPS my-keys 渲染 Token 计费用量/限额列, 字节流量停用, 计费视图
         const tokenUsedRaw = Number(key.token_used) || 0;
         const tokenLimitRaw = Number(key.token_limit) || 0;
         const tokenIsUnlimited = !key.token_limit_enable || tokenLimitRaw <= 0;
@@ -411,15 +413,20 @@ function renderApiKeysTable() {
         const modelsDisplay = models.length > 3 
             ? models.slice(0, 3).join(', ') + ` (+${models.length - 3})`
             : models.join(', ');
+
+        // 绑定用户信息：用户名(可重复) + 备注
+        const uname = key.username ? escapeHtml(key.username) : '<span style="color:#bbb;">-</span>';
+        const remarkHtml = key.remark
+            ? `<small style="display:block;color:#888;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(key.remark)}</small>`
+            : '';
         
         return `
             <tr>
                 <td><code>${key.api_key.substring(0, 20)}...</code></td>
+                <td title="${escapeHtml(key.remark || '')}">${uname}${remarkHtml}</td>
                 <td title="${models.join(', ')}">${modelsDisplay || '-'}</td>
-                <td style="color: ${trafficColor}">${trafficUsedDisplay}</td>
-                <td>${trafficLimitDisplay}</td>
-                <td style="color: ${tokenColor}" title="Token usage (recommended billing dimension)">${tokenUsedDisplay}</td>
-                <td title="Token limit (recommended over byte traffic)">${tokenLimitDisplay}</td>
+                <td style="color: ${tokenColor}" title="Token billing usage (weighted by multipliers)">${tokenUsedDisplay}</td>
+                <td title="Token limit (the only billing dimension)">${tokenLimitDisplay}</td>
                 <td>${key.created_at || '--'}</td>
                 <td>
                     <div style="display: flex; gap: 5px; flex-wrap: wrap;">
@@ -550,6 +557,15 @@ function openEditKeyModal(apiKey) {
     // Render model list
     renderEditModelList();
     updateEditSelectedPreview();
+
+    // 填充绑定用户信息（用户名/备注/metainfo）
+    // 关键词: openEditKeyModal username remark metainfo 回填
+    const editUsernameEl = document.getElementById('edit-username');
+    const editRemarkEl = document.getElementById('edit-remark');
+    const editMetaEl = document.getElementById('edit-metainfo');
+    if (editUsernameEl) editUsernameEl.value = currentEditKey.username || '';
+    if (editRemarkEl) editRemarkEl.value = currentEditKey.remark || '';
+    if (editMetaEl) editMetaEl.value = currentEditKey.metainfo || '';
     
     // Set traffic settings
     const isUnlimited = !currentEditKey.traffic_limit_enable || !currentEditKey.traffic_limit || currentEditKey.traffic_limit <= 0;
@@ -837,6 +853,12 @@ async function saveEditKey() {
         return;
     }
     
+    // 绑定用户信息（用户名/备注/metainfo）始终发送，后端用 *string 区分未提供与置空
+    // 关键词: OPS saveEditKey username remark metainfo 携带
+    const editUsernameEl = document.getElementById('edit-username');
+    const editRemarkEl = document.getElementById('edit-remark');
+    const editMetaEl = document.getElementById('edit-metainfo');
+
     try {
         const requestBody = {
             api_key: apiKey,
@@ -844,7 +866,10 @@ async function saveEditKey() {
             unlimited: isUnlimited,
             // Token 字段始终发送, 让后端基于 token_unlimited / token_limit 判定
             token_unlimited: tokenIsUnlimited,
-            token_limit: tokenLimit
+            token_limit: tokenLimit,
+            username: editUsernameEl ? editUsernameEl.value.trim() : '',
+            remark: editRemarkEl ? editRemarkEl.value : '',
+            metainfo: editMetaEl ? editMetaEl.value : ''
         };
         
         if (!isUnlimited && trafficLimit > 0) {
@@ -1081,11 +1106,20 @@ async function handleCreateApiKey(e) {
         return;
     }
     
+    // 绑定用户信息（可选）：用户名(可重复)/备注/metainfo
+    // 关键词: OPS handleCreateApiKey username remark metainfo 携带
+    const createUsernameEl = document.getElementById('create-username');
+    const createRemarkEl = document.getElementById('create-remark');
+    const createMetaEl = document.getElementById('create-metainfo');
+
     try {
         const requestBody = {
             allowed_models: allModels,
             unlimited: isUnlimited,
-            token_unlimited: tokenIsUnlimited
+            token_unlimited: tokenIsUnlimited,
+            username: createUsernameEl ? createUsernameEl.value.trim() : '',
+            remark: createRemarkEl ? createRemarkEl.value : '',
+            metainfo: createMetaEl ? createMetaEl.value : ''
         };
         
         if (!isUnlimited && trafficLimit > 0) {
@@ -1120,6 +1154,9 @@ async function handleCreateApiKey(e) {
                 renderModelList();
                 if (globInput) globInput.value = '';
                 updateSelectedPreview();
+                if (createUsernameEl) createUsernameEl.value = '';
+                if (createRemarkEl) createRemarkEl.value = '';
+                if (createMetaEl) createMetaEl.value = '';
             } catch (clearError) {
                 console.error('Error clearing form:', clearError);
             }

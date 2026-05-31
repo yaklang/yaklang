@@ -764,6 +764,10 @@ func (c *ServerConfig) HandlePortalRequest(conn net.Conn, request *http.Request,
 		c.handleUpdateAPIKeyTokenLimit(conn, request, uriIns.Path)
 	case strings.HasPrefix(uriIns.Path, "/portal/reset-api-key-token/") && request.Method == "POST":
 		c.handleResetAPIKeyToken(conn, request, uriIns.Path)
+	// API Key 绑定用户信息（用户名/备注/metainfo）更新
+	// 关键词: portal api-key-meta 路由注册, Username Remark MetaInfo
+	case strings.HasPrefix(uriIns.Path, "/portal/api-key-meta/") && request.Method == "POST":
+		c.handleUpdateAPIKeyMeta(conn, request, uriIns.Path)
 
 	// ========== Web Search API Key Routes ==========
 	case uriIns.Path == "/portal/api/web-search-keys" && request.Method == "GET":

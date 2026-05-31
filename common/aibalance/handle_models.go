@@ -99,12 +99,14 @@ func (c *ServerConfig) handleUpdateModelMeta(conn net.Conn, request *http.Reques
 // ==================== Model Multiplier (倍率双标识 + 批量应用) Handlers ====================
 
 // multiplierBody 是倍率四维入参的通用结构。指针为 nil 表示「不更新该维」。
-// 关键词: multiplierBody, 倍率四维入参
+// IsFree 指针为 nil 表示「不更新免费标志」。
+// 关键词: multiplierBody, 倍率四维入参, IsFree 免费标志入参
 type multiplierBody struct {
 	InputTokenMultiplier    *float64 `json:"input_token_multiplier,omitempty"`
 	OutputTokenMultiplier   *float64 `json:"output_token_multiplier,omitempty"`
 	CacheCreationMultiplier *float64 `json:"cache_creation_multiplier,omitempty"`
 	CacheHitMultiplier      *float64 `json:"cache_hit_multiplier,omitempty"`
+	IsFree                  *bool    `json:"is_free,omitempty"`
 }
 
 // pickMultiplier 把指针四维转成 SaveXxx 约定的 float 入参：
@@ -121,6 +123,22 @@ func pickMultiplier(p *float64) float64 {
 		return 0
 	}
 	return *p
+}
+
+// pickIsFree 把 *bool 转成 SaveModelMultiplierWithFree 约定的 int 入参：
+//   - nil   -> -1（不更新 IsFree）
+//   - false -> 0
+//   - true  -> 1
+//
+// 关键词: pickIsFree, nil 不更新免费标志
+func pickIsFree(p *bool) int {
+	if p == nil {
+		return -1
+	}
+	if *p {
+		return 1
+	}
+	return 0
 }
 
 // handleUpdateModelMultiplier writes the four-dimensional multiplier for one actual model
@@ -157,10 +175,11 @@ func (c *ServerConfig) handleUpdateModelMultiplier(conn net.Conn, request *http.
 	outputMul := pickMultiplier(reqBody.OutputTokenMultiplier)
 	cacheCreateMul := pickMultiplier(reqBody.CacheCreationMultiplier)
 	cacheHitMul := pickMultiplier(reqBody.CacheHitMultiplier)
+	isFree := pickIsFree(reqBody.IsFree)
 
-	if err := SaveModelMultiplier(
+	if err := SaveModelMultiplierWithFree(
 		reqBody.InternalModelName,
-		inputMul, outputMul, cacheCreateMul, cacheHitMul,
+		inputMul, outputMul, cacheCreateMul, cacheHitMul, isFree,
 	); err != nil {
 		c.logError("Failed to save model multiplier: %v", err)
 		c.writeJSONResponse(conn, http.StatusInternalServerError, map[string]interface{}{
@@ -170,8 +189,8 @@ func (c *ServerConfig) handleUpdateModelMultiplier(conn net.Conn, request *http.
 		return
 	}
 
-	c.logInfo("Successfully saved model multiplier for internal=%s (input=%.2f output=%.2f cache_create=%.2f cache_hit=%.2f)",
-		reqBody.InternalModelName, inputMul, outputMul, cacheCreateMul, cacheHitMul)
+	c.logInfo("Successfully saved model multiplier for internal=%s (input=%.2f output=%.2f cache_create=%.2f cache_hit=%.2f is_free=%d)",
+		reqBody.InternalModelName, inputMul, outputMul, cacheCreateMul, cacheHitMul, isFree)
 	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
 		"success": true,
 		"message": "Model multiplier saved successfully",
@@ -315,6 +334,7 @@ func (c *ServerConfig) handleApplyModelMultiplierByPattern(conn net.Conn, reques
 	outputMul := pickMultiplier(reqBody.OutputTokenMultiplier)
 	cacheCreateMul := pickMultiplier(reqBody.CacheCreationMultiplier)
 	cacheHitMul := pickMultiplier(reqBody.CacheHitMultiplier)
+	isFree := pickIsFree(reqBody.IsFree)
 
 	models, err := GetDistinctInternalModels()
 	if err != nil {
@@ -334,8 +354,8 @@ func (c *ServerConfig) handleApplyModelMultiplierByPattern(conn net.Conn, reques
 			continue
 		}
 		matched = append(matched, m.InternalModelName)
-		if err := SaveModelMultiplier(
-			m.InternalModelName, inputMul, outputMul, cacheCreateMul, cacheHitMul,
+		if err := SaveModelMultiplierWithFree(
+			m.InternalModelName, inputMul, outputMul, cacheCreateMul, cacheHitMul, isFree,
 		); err != nil {
 			failed++
 			c.logWarn("apply-by-pattern failed for internal=%s: %v", m.InternalModelName, err)
@@ -344,8 +364,8 @@ func (c *ServerConfig) handleApplyModelMultiplierByPattern(conn net.Conn, reques
 		applied++
 	}
 
-	c.logInfo("Apply model multiplier by pattern completed: pattern=%q matched=%d applied=%d failed=%d (input=%.2f output=%.2f cache_create=%.2f cache_hit=%.2f)",
-		reqBody.Pattern, len(matched), applied, failed, inputMul, outputMul, cacheCreateMul, cacheHitMul)
+	c.logInfo("Apply model multiplier by pattern completed: pattern=%q matched=%d applied=%d failed=%d (input=%.2f output=%.2f cache_create=%.2f cache_hit=%.2f is_free=%d)",
+		reqBody.Pattern, len(matched), applied, failed, inputMul, outputMul, cacheCreateMul, cacheHitMul, isFree)
 	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
 		"success": true,
 		"message": fmt.Sprintf("Applied to %d actual models matching %q (%d failed)", applied, reqBody.Pattern, failed),
@@ -389,6 +409,7 @@ func (c *ServerConfig) handleApplyModelMultiplierToModels(conn net.Conn, request
 	outputMul := pickMultiplier(reqBody.OutputTokenMultiplier)
 	cacheCreateMul := pickMultiplier(reqBody.CacheCreationMultiplier)
 	cacheHitMul := pickMultiplier(reqBody.CacheHitMultiplier)
+	isFree := pickIsFree(reqBody.IsFree)
 
 	applied := 0
 	failed := 0
@@ -396,8 +417,8 @@ func (c *ServerConfig) handleApplyModelMultiplierToModels(conn net.Conn, request
 		if strings.TrimSpace(internal) == "" {
 			continue
 		}
-		if err := SaveModelMultiplier(
-			internal, inputMul, outputMul, cacheCreateMul, cacheHitMul,
+		if err := SaveModelMultiplierWithFree(
+			internal, inputMul, outputMul, cacheCreateMul, cacheHitMul, isFree,
 		); err != nil {
 			failed++
 			c.logWarn("apply-to-models failed for internal=%s: %v", internal, err)
@@ -406,8 +427,8 @@ func (c *ServerConfig) handleApplyModelMultiplierToModels(conn net.Conn, request
 		applied++
 	}
 
-	c.logInfo("Apply model multiplier to selected completed: applied=%d failed=%d total=%d (input=%.2f output=%.2f cache_create=%.2f cache_hit=%.2f)",
-		applied, failed, len(reqBody.InternalModelNames), inputMul, outputMul, cacheCreateMul, cacheHitMul)
+	c.logInfo("Apply model multiplier to selected completed: applied=%d failed=%d total=%d (input=%.2f output=%.2f cache_create=%.2f cache_hit=%.2f is_free=%d)",
+		applied, failed, len(reqBody.InternalModelNames), inputMul, outputMul, cacheCreateMul, cacheHitMul, isFree)
 	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
 		"success": true,
 		"message": fmt.Sprintf("Applied to %d selected actual models (%d failed)", applied, failed),

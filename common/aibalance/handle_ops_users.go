@@ -920,12 +920,16 @@ func (c *ServerConfig) handleOpsCreateApiKey(conn net.Conn, request *http.Reques
 	defer request.Body.Close()
 
 	// 关键词: handleOpsCreateApiKey 新增 token_limit 字段, OPS 创建 API Key 支持 Token 限额
+	// 关键词: handleOpsCreateApiKey username remark metainfo, OPS 绑定用户信息
 	var reqBody struct {
 		AllowedModels  []string `json:"allowed_models"`
 		TrafficLimit   int64    `json:"traffic_limit"`   // Optional, 0 or negative means unlimited (legacy)
 		Unlimited      bool     `json:"unlimited"`       // Explicitly set unlimited traffic (legacy)
 		TokenLimit     int64    `json:"token_limit"`     // 推荐使用：Token 维度限额，0/负数表示不限制
 		TokenUnlimited bool     `json:"token_unlimited"` // 显式禁用 Token 限额
+		Username       string   `json:"username"`        // 绑定用户名（可重复）
+		Remark         string   `json:"remark"`          // 备注
+		MetaInfo       string   `json:"metainfo"`        // 绑定信息（JSON 文本）
 	}
 
 	if err := json.Unmarshal(bodyBytes, &reqBody); err != nil {
@@ -995,6 +999,9 @@ func (c *ServerConfig) handleOpsCreateApiKey(conn net.Conn, request *http.Reques
 		TokenUsed:          0,
 		CreatedByOpsID:     user.ID,
 		CreatedByOpsName:   user.Username,
+		Username:           strings.TrimSpace(reqBody.Username),
+		Remark:             reqBody.Remark,
+		MetaInfo:           reqBody.MetaInfo,
 	}
 
 	db := GetDB()
@@ -1135,6 +1142,10 @@ func (c *ServerConfig) handleOpsGetMyKeys(conn net.Conn, request *http.Request, 
 			"token_limit_enable": key.TokenLimitEnable,
 			"active":             key.Active,
 			"created_at":         key.CreatedAt.Format("2006-01-02 15:04:05"),
+			// 关键词: OPS my-keys 暴露 Username Remark MetaInfo 绑定信息
+			"username": key.Username,
+			"remark":   key.Remark,
+			"metainfo": key.MetaInfo,
 		})
 	}
 
@@ -1280,6 +1291,8 @@ func (c *ServerConfig) handleOpsUpdateApiKey(conn net.Conn, request *http.Reques
 	//   - TokenLimit>0              -> 启用并设置 token 限额；
 	//   - 两者都未提供              -> token 限额保持不变。
 	// 使用 *int64 / *bool 让"未提供"可被区分；JSON 中字段缺省即为 nil。
+	// 关键词: handleOpsUpdateApiKey username remark metainfo, OPS 更新绑定用户信息
+	// Username/Remark/MetaInfo 用 *string 区分"未提供"(nil=保持不变) 与"显式置空"。
 	var reqBody struct {
 		ApiKey         string   `json:"api_key"`
 		AllowedModels  []string `json:"allowed_models"`
@@ -1287,6 +1300,9 @@ func (c *ServerConfig) handleOpsUpdateApiKey(conn net.Conn, request *http.Reques
 		Unlimited      bool     `json:"unlimited"`
 		TokenLimit     *int64   `json:"token_limit,omitempty"`
 		TokenUnlimited *bool    `json:"token_unlimited,omitempty"`
+		Username       *string  `json:"username,omitempty"`
+		Remark         *string  `json:"remark,omitempty"`
+		MetaInfo       *string  `json:"metainfo,omitempty"`
 	}
 
 	if err := json.Unmarshal(bodyBytes, &reqBody); err != nil {
@@ -1358,6 +1374,17 @@ func (c *ServerConfig) handleOpsUpdateApiKey(conn net.Conn, request *http.Reques
 		apiKey.TokenLimit = 0
 	}
 
+	// Update 绑定用户信息（仅当字段被显式提供时更新）
+	if reqBody.Username != nil {
+		apiKey.Username = strings.TrimSpace(*reqBody.Username)
+	}
+	if reqBody.Remark != nil {
+		apiKey.Remark = *reqBody.Remark
+	}
+	if reqBody.MetaInfo != nil {
+		apiKey.MetaInfo = *reqBody.MetaInfo
+	}
+
 	// Save changes
 	if err := db.Save(&apiKey).Error; err != nil {
 		c.logError("Failed to update API key: %v", err)
@@ -1392,6 +1419,9 @@ func (c *ServerConfig) handleOpsUpdateApiKey(conn net.Conn, request *http.Reques
 		"token_limit":          apiKey.TokenLimit,
 		"token_limit_enable":   apiKey.TokenLimitEnable,
 		"allowed_models":       reqBody.AllowedModels,
+		"username":             apiKey.Username,
+		"remark":               apiKey.Remark,
+		"metainfo":             apiKey.MetaInfo,
 	})
 }
 
@@ -1707,12 +1737,14 @@ func (c *ServerConfig) handleGetOpsStats(conn net.Conn, request *http.Request) {
 		return
 	}
 
+	// 关键词: OPS user stats 计费(Token)视图, total_token_used 聚合
 	type UserStats struct {
 		UserID           uint   `json:"user_id"`
 		Username         string `json:"username"`
 		Active           bool   `json:"active"`
 		ApiKeysCreated   int64  `json:"api_keys_created"`
-		TotalTrafficUsed int64  `json:"total_traffic_used"`
+		TotalTrafficUsed int64  `json:"total_traffic_used"` // legacy 字节用量（仅统计展示，已不计费）
+		TotalTokenUsed   int64  `json:"total_token_used"`   // 计费 Token 加权用量（计费体系唯一口径）
 		LastActivity     string `json:"last_activity"`
 	}
 
@@ -1728,7 +1760,7 @@ func (c *ServerConfig) handleGetOpsStats(conn net.Conn, request *http.Request) {
 		db.Model(&AiApiKeys{}).Where("created_by_ops_id = ?", u.ID).Count(&keyCount)
 		totalApiKeys += keyCount
 
-		// Calculate total traffic used by keys created by this user
+		// Calculate total traffic used by keys created by this user (legacy 字节，仅展示)
 		var trafficSum struct {
 			Total int64
 		}
@@ -1736,6 +1768,16 @@ func (c *ServerConfig) handleGetOpsStats(conn net.Conn, request *http.Request) {
 			Where("created_by_ops_id = ?", u.ID).
 			Select("COALESCE(SUM(traffic_used), 0) as total").
 			Scan(&trafficSum)
+
+		// Calculate total token (billing) used by keys created by this user
+		// 关键词: OPS user stats SUM(token_used) 计费 Token 聚合
+		var tokenSum struct {
+			Total int64
+		}
+		db.Model(&AiApiKeys{}).
+			Where("created_by_ops_id = ?", u.ID).
+			Select("COALESCE(SUM(token_used), 0) as total").
+			Scan(&tokenSum)
 
 		// Get last activity from logs
 		var lastLog OpsActionLog
@@ -1750,6 +1792,7 @@ func (c *ServerConfig) handleGetOpsStats(conn net.Conn, request *http.Request) {
 			Active:           u.Active,
 			ApiKeysCreated:   keyCount,
 			TotalTrafficUsed: trafficSum.Total,
+			TotalTokenUsed:   tokenSum.Total,
 			LastActivity:     lastActivity,
 		})
 	}

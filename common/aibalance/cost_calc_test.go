@@ -49,10 +49,12 @@ func TestComputeWeightedTokens_FourDimensionMultipliers(t *testing.T) {
 	assert.Equal(t, int64(1955), ComputeWeightedTokens(meta, usage))
 }
 
-func TestComputeWeightedTokens_FallbackToLegacyTrafficMultiplier(t *testing.T) {
-	// 四维全为 0 -> 整体回落到老 TrafficMultiplier=2.0
+func TestComputeWeightedTokens_LegacyTrafficMultiplierIgnored(t *testing.T) {
+	// 老 TrafficMultiplier 字节倍率体系已停用：四维全为 0 时不再回落到 TrafficMultiplier，
+	// 而是直接采用标准默认倍率（input=1.0/output=1.0/cache_create=1.25/cache_hit=0.1）。
+	// 关键词: 老 TrafficMultiplier 停用, 四维默认回落
 	meta := &AiModelMeta{
-		TrafficMultiplier: 2.0,
+		TrafficMultiplier: 2.0, // 即便设置也应被忽略
 	}
 	usage := &aispec.ChatUsage{
 		PromptTokens:     100,
@@ -63,9 +65,8 @@ func TestComputeWeightedTokens_FallbackToLegacyTrafficMultiplier(t *testing.T) {
 		},
 	}
 	// pureInput = 100 - 10 - 5 = 85
-	// 回落后 input/output = 2.0; cache_create = 2.0*1.25=2.5; cache_hit = 2.0*0.1=0.2
-	// weighted = 85*2.0 + 50*2.0 + 5*2.5 + 10*0.2 = 170 + 100 + 12.5 + 2 = 284.5 -> 285 (rounded)
-	assert.Equal(t, int64(285), ComputeWeightedTokens(meta, usage))
+	// 标准默认倍率：weighted = 85*1.0 + 50*1.0 + 5*1.25 + 10*0.1 = 85 + 50 + 6.25 + 1 = 142.25 -> 142
+	assert.Equal(t, int64(142), ComputeWeightedTokens(meta, usage))
 }
 
 func TestComputeWeightedTokens_PartialFieldFallback(t *testing.T) {
@@ -136,12 +137,14 @@ func TestComputeWeightedTokens_ZeroUsage(t *testing.T) {
 	assert.Equal(t, int64(0), ComputeWeightedTokens(meta, usage))
 }
 
-func TestResolveMultipliers_FullFallback(t *testing.T) {
+func TestResolveMultipliers_LegacyTrafficIgnored(t *testing.T) {
+	// 老 TrafficMultiplier 已停用：四维全 0 时回落到标准默认倍率，不再受 TrafficMultiplier 影响。
+	// 关键词: resolveMultipliers 老 TrafficMultiplier 停用
 	r := resolveMultipliers(&AiModelMeta{TrafficMultiplier: 3.0})
-	assert.Equal(t, 3.0, r.Input)
-	assert.Equal(t, 3.0, r.Output)
-	assert.Equal(t, 3.0*1.25, r.CacheCreate)
-	assert.InDelta(t, 3.0*0.1, r.CacheHit, 1e-9)
+	assert.Equal(t, 1.0, r.Input)
+	assert.Equal(t, 1.0, r.Output)
+	assert.Equal(t, 1.25, r.CacheCreate)
+	assert.InDelta(t, 0.1, r.CacheHit, 1e-9)
 }
 
 func TestResolveMultipliers_NilMeta(t *testing.T) {
@@ -150,5 +153,4 @@ func TestResolveMultipliers_NilMeta(t *testing.T) {
 	assert.Equal(t, 1.0, r.Output)
 	assert.Equal(t, 1.25, r.CacheCreate)
 	assert.Equal(t, 0.1, r.CacheHit)
-	assert.Equal(t, 1.0, r.LegacyTraffic)
 }

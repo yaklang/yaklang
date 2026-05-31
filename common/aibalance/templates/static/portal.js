@@ -14,6 +14,9 @@
         let apiKeysPageSize = 20;
         let apiKeysPagination = null;
         let apiKeysData = [];
+        // 当前 API Key 列表按用户名过滤值（空=不过滤）
+        // 关键词: apiKeyUsernameFilterValue, API Key 列表 username 过滤状态
+        let apiKeyUsernameFilterValue = '';
         
         // ==================== Authentication Error Handler ====================
         
@@ -307,9 +310,6 @@
                     const row = document.createElement('tr');
                     row.dataset.apiId = key.id;
                     row.dataset.apiStatus = key.active ? 'active' : 'inactive';
-                    row.dataset.trafficLimit = key.traffic_limit;
-                    row.dataset.trafficUsed = key.traffic_used;
-                    row.dataset.trafficEnabled = key.traffic_limit_enable;
                     row.dataset.tokenLimit = key.token_limit || 0;
                     row.dataset.tokenUsed = key.token_used || 0;
                     row.dataset.tokenEnabled = !!key.token_limit_enable;
@@ -318,26 +318,8 @@
                         ? '<span class="health-badge healthy" style="font-size:12px;">激活</span>'
                         : '<span class="health-badge unhealthy" style="font-size:12px;">禁用</span>';
                     
-                    let trafficLimitCell = '';
-                    if (key.traffic_limit_enable) {
-                        const percent = key.traffic_percent;
-                        let barColor = '#4caf50';
-                        if (percent > 90) barColor = '#f44336';
-                        else if (percent > 70) barColor = '#ff9800';
-                        
-                        trafficLimitCell = `
-                            <div class="traffic-limit-info" title="已用/限额: ${key.traffic_used_formatted}/${key.traffic_limit_formatted} (${percent.toFixed(1)}%)">
-                                <div class="traffic-progress" style="width: 80px; height: 8px; background: #e0e0e0; border-radius: 4px; overflow: hidden;">
-                                    <div style="width: ${Math.min(percent, 100)}%; height: 100%; background: ${barColor};"></div>
-                                </div>
-                                <small>${key.traffic_used_formatted}/${key.traffic_limit_formatted}</small>
-                            </div>
-                        `;
-                    } else {
-                        trafficLimitCell = '<span style="color: #999;">未限制</span>';
-                    }
-                    
-                    // 关键词: API Key Token 用量列 + Token 限额列渲染, 推荐 token over traffic
+                    // 字节流量限额列已停用：统一改用 Token 维度计费/限额
+                    // 关键词: API Key Token 用量列 + Token 限额列渲染, 字节流量限额停用
                     const tokenUsedRaw = Number(key.token_used) || 0;
                     const tokenLimitRaw = Number(key.token_limit) || 0;
                     const tokenUsedDisplay = formatTokenCount(tokenUsedRaw);
@@ -386,16 +368,14 @@
                                 <span title="输出流量">↑ ${key.output_bytes_formatted}</span>
                             </div>
                         </td>
-                        <td class="text-center">${trafficLimitCell}</td>
-                        <td class="text-center" title="Token 用量（推荐计费维度）">${tokenUsedDisplay}</td>
+                        <td class="text-center" title="Token 计费用量">${tokenUsedDisplay}</td>
                         <td class="text-center">${tokenLimitCell}</td>
                         <td class="text-center">${this.escapeHtml(creatorName)}</td>
                         <td>${key.last_used_at || '-'}</td>
                         <td class="text-center">
                             <div style="display: flex; gap: 2px; justify-content: center; flex-wrap: wrap;">
                                 ${actionButtons}
-                                <button class="btn btn-sm" onclick="showTokenLimitDialog(${key.id}, ${tokenLimitRaw}, ${tokenUsedRaw}, ${!!key.token_limit_enable})" title="Token 限额设置（推荐）" style="padding:2px 4px;font-size:11px;background:#1976d2;color:#fff;">Token★</button>
-                                <button class="btn btn-sm" onclick="showTrafficLimitDialog(${key.id}, ${key.traffic_limit}, ${key.traffic_used}, ${key.traffic_limit_enable})" title="流量设置（已弃用，推荐使用 Token）" style="padding:2px 4px;font-size:11px;opacity:0.85;">流量</button>
+                                <button class="btn btn-sm" onclick="showTokenLimitDialog(${key.id}, ${tokenLimitRaw}, ${tokenUsedRaw}, ${!!key.token_limit_enable})" title="Token 限额设置" style="padding:2px 4px;font-size:11px;background:#1976d2;color:#fff;">Token★</button>
                                 <button class="btn btn-sm btn-danger" onclick="deleteAPIKey(${key.id})" title="删除" style="padding:2px 4px;font-size:11px;">删除</button>
                             </div>
                         </td>
@@ -438,8 +418,8 @@
                 });
             },
             
-            // 渲染对外模型(Wrapper)信息表格：仅描述/标签/传统字节倍数，不含 Token 计费倍率
-            // 关键词: renderModels wrapper 元数据, 传统倍数, 不含 token 倍率
+            // 渲染对外模型(Wrapper)信息表格：仅描述/标签，不含传统字节倍数与 Token 计费倍率
+            // 关键词: renderModels wrapper 元数据, 仅描述标签, 传统倍数列已移除
             renderModels: function(data) {
                 const tbody = document.getElementById('models-table-body');
                 if (!tbody) return;
@@ -447,7 +427,7 @@
                 tbody.innerHTML = '';
 
                 if (!data.model_metas || data.model_metas.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="6" class="text-center">No models found</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="5" class="text-center">No models found</td></tr>';
                     return;
                 }
 
@@ -456,21 +436,14 @@
                 data.model_metas.forEach(model => {
                     const row = document.createElement('tr');
                     row.dataset.modelName = model.name;
-                    row.dataset.trafficMultiplier = (model.traffic_multiplier || 0).toFixed(2);
-
-                    let badgeColor = '#2196f3';
-                    if (model.traffic_multiplier > 1.5) badgeColor = '#ff9800';
-                    else if (model.traffic_multiplier > 1.0) badgeColor = '#4caf50';
-                    const badgeHTML = '<span class="traffic-multiplier-badge" style="background: ' + badgeColor + '; color: white; padding: 2px 8px; border-radius: 10px; font-size: 12px;" title="传统字节流量倍数（与 Token 计费无关）">x' + (model.traffic_multiplier || 1).toFixed(2) + '</span>';
 
                     row.innerHTML =
                         '<td class="copyable" data-full-text="' + self.escapeHtml(model.name) + '">' + self.escapeHtml(model.name) + '</td>' +
                         '<td class="text-center">' + model.provider_count + '</td>' +
-                        '<td class="text-center">' + badgeHTML + '</td>' +
                         '<td class="copyable" data-full-text="' + self.escapeHtml(model.description || '') + '">' + (model.description || '-') + '</td>' +
                         '<td class="copyable" data-full-text="' + self.escapeHtml(model.tags || '') + '">' + (model.tags || '-') + '</td>' +
                         '<td class="text-center">' +
-                        '<button class="btn btn-sm" onclick="openEditModelModal(\'' + self.escapeHtml(model.name) + '\', \'' + self.escapeHtml(model.description || '') + '\', \'' + self.escapeHtml(model.tags || '') + '\', ' + (model.traffic_multiplier || 1) + ')" title="编辑描述/标签/传统倍数">编辑</button>' +
+                        '<button class="btn btn-sm" onclick="openEditModelModal(\'' + self.escapeHtml(model.name) + '\', \'' + self.escapeHtml(model.description || '') + '\', \'' + self.escapeHtml(model.tags || '') + '\')" title="编辑描述/标签">编辑</button>' +
                         '<button class="btn btn-sm" style="background-color: #4caf50; margin-left: 5px;" onclick="showCurlCommand(\'' + self.escapeHtml(model.name) + '\')" title="查看 curl 命令">curl</button>' +
                         '</td>';
 
@@ -506,15 +479,18 @@
                         ? '<span style="background:#fff3e0; color:#ef6c00; padding:1px 6px; border-radius:8px;">已设</span>'
                         : '<span style="background:#eee; color:#888; padding:1px 6px; border-radius:8px;">继承默认</span>';
 
-                    const effBadges =
-                        '<span style="background:#e3f2fd; color:#1565c0; padding:1px 6px; border-radius:8px;">入 ' + fmtEff(m.effective_input) + '</span> ' +
-                        '<span style="background:#e8f5e9; color:#2e7d32; padding:1px 6px; border-radius:8px;">出 ' + fmtEff(m.effective_output) + '</span> ' +
-                        '<span style="background:#fff3e0; color:#ef6c00; padding:1px 6px; border-radius:8px;">建 ' + fmtEff(m.effective_cache_create) + '</span> ' +
-                        '<span style="background:#fce4ec; color:#c2185b; padding:1px 6px; border-radius:8px;">命 ' + fmtEff(m.effective_cache_hit) + '</span>';
+                    // 免费模型：倍率失效，加权计费 Token 恒为 0，单独用绿色徽标提示
+                    const effBadges = m.is_free
+                        ? '<span style="background:#e8f5e9; color:#2e7d32; padding:1px 8px; border-radius:8px; font-weight:600;">免费 (不计费)</span>'
+                        : ('<span style="background:#e3f2fd; color:#1565c0; padding:1px 6px; border-radius:8px;">入 ' + fmtEff(m.effective_input) + '</span> ' +
+                           '<span style="background:#e8f5e9; color:#2e7d32; padding:1px 6px; border-radius:8px;">出 ' + fmtEff(m.effective_output) + '</span> ' +
+                           '<span style="background:#fff3e0; color:#ef6c00; padding:1px 6px; border-radius:8px;">建 ' + fmtEff(m.effective_cache_create) + '</span> ' +
+                           '<span style="background:#fce4ec; color:#c2185b; padding:1px 6px; border-radius:8px;">命 ' + fmtEff(m.effective_cache_hit) + '</span>');
 
                     const editArgs = "'" + iEsc + "'," +
                         (m.config_input || 0) + ',' + (m.config_output || 0) + ',' +
-                        (m.config_cache_create || 0) + ',' + (m.config_cache_hit || 0);
+                        (m.config_cache_create || 0) + ',' + (m.config_cache_hit || 0) + ',' +
+                        (m.is_free ? 'true' : 'false');
                     const clearBtn = m.has_multiplier
                         ? '<button class="btn btn-sm" style="background-color:#f44336; color:#fff; margin-left:5px;" onclick="clearModelMultiplierDirect(\'' + iEsc + '\')" title="清除该实际模型倍率，回落全局默认">清除</button>'
                         : '';
@@ -664,7 +640,10 @@
         // Load API keys with pagination
         async function loadAPIKeysPaginated(page = 1, pageSize = 20) {
             try {
-                const url = `/portal/api/api-keys?page=${page}&pageSize=${pageSize}&sortBy=created_at&sortOrder=desc`;
+                let url = `/portal/api/api-keys?page=${page}&pageSize=${pageSize}&sortBy=created_at&sortOrder=desc`;
+                if (apiKeyUsernameFilterValue) {
+                    url += `&username=${encodeURIComponent(apiKeyUsernameFilterValue)}`;
+                }
                 const response = await authFetch(url);
                 if (!response) return; // Auth error handled
                 
@@ -689,7 +668,86 @@
                 showToast('Error loading API keys', 'error');
             }
         }
-        
+
+        // 按用户名过滤 API Key 列表（精确匹配，用户名可重复）
+        // 关键词: applyApiKeyUsernameFilter, clearApiKeyUsernameFilter
+        function applyApiKeyUsernameFilter() {
+            const el = document.getElementById('apiKeyUsernameFilter');
+            apiKeyUsernameFilterValue = el ? el.value.trim() : '';
+            loadAPIKeysPaginated(1, apiKeysPageSize);
+        }
+        function clearApiKeyUsernameFilter() {
+            const el = document.getElementById('apiKeyUsernameFilter');
+            if (el) el.value = '';
+            apiKeyUsernameFilterValue = '';
+            loadAPIKeysPaginated(1, apiKeysPageSize);
+        }
+
+        // ==================== API Key 绑定用户信息编辑 ====================
+        // 关键词: openApiKeyMetaModal saveApiKeyMeta closeApiKeyMetaModal, Username Remark MetaInfo
+        // 通过 id 从 apiKeysData 查找当前行，避免把含引号的文本内联进 onclick 属性导致 HTML 破坏。
+        function openApiKeyMetaModal(apiKeyId) {
+            const row = (apiKeysData || []).find(k => String(k.id) === String(apiKeyId)) || {};
+            const username = row.username || '';
+            const remark = row.remark || '';
+            const metainfo = row.metainfo || '';
+            const existing = document.getElementById('apiKeyMetaModal');
+            if (existing) existing.remove();
+            const html = `
+                <div id="apiKeyMetaModal" class="delete-confirmation-modal" style="display: flex;">
+                    <div class="modal-content" style="width: 520px; max-width: 92vw;">
+                        <span class="close-modal" onclick="closeApiKeyMetaModal()">&times;</span>
+                        <h4>编辑绑定用户信息 <small style="color:#6a1b9a;font-weight:normal;">（API Key ID: ${apiKeyId}）</small></h4>
+                        <div class="form-group">
+                            <label for="metaUsernameInput">用户名（可重复）:</label>
+                            <input type="text" id="metaUsernameInput" class="form-control" value="${escapeHtml(username || '')}" placeholder="用于按用户聚合，可重复">
+                        </div>
+                        <div class="form-group">
+                            <label for="metaRemarkInput">备注:</label>
+                            <input type="text" id="metaRemarkInput" class="form-control" value="${escapeHtml(remark || '')}" placeholder="自由文本备注">
+                        </div>
+                        <div class="form-group">
+                            <label for="metaMetaInfoInput">metainfo（JSON 文本，OAuth 等外部系统绑定信息）:</label>
+                            <textarea id="metaMetaInfoInput" class="form-control" rows="4" style="font-family: monospace; font-size: 12px;" placeholder='{"oauth_provider":"...","sub":"..."}'>${escapeHtml(metainfo || '')}</textarea>
+                        </div>
+                        <div class="modal-actions">
+                            <span style="flex:1;"></span>
+                            <button class="btn" onclick="closeApiKeyMetaModal()">取消</button>
+                            <button class="btn btn-primary" onclick="saveApiKeyMeta(${apiKeyId})">保存</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.insertAdjacentHTML('beforeend', html);
+        }
+        function closeApiKeyMetaModal() {
+            const modal = document.getElementById('apiKeyMetaModal');
+            if (modal) modal.remove();
+        }
+        async function saveApiKeyMeta(apiKeyId) {
+            const username = (document.getElementById('metaUsernameInput') || {}).value || '';
+            const remark = (document.getElementById('metaRemarkInput') || {}).value || '';
+            const metainfo = (document.getElementById('metaMetaInfoInput') || {}).value || '';
+            try {
+                const response = await fetch(`/portal/api-key-meta/${apiKeyId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: username.trim(), remark: remark, metainfo: metainfo })
+                });
+                const data = await response.json();
+                if (isAuthError(data)) { handleAuthError(); return; }
+                if (!response.ok || !data.success) {
+                    throw new Error(data.message || '保存绑定信息失败');
+                }
+                showToast('绑定信息已保存', 'success');
+                closeApiKeyMetaModal();
+                loadAPIKeysPaginated(apiKeysPage, apiKeysPageSize);
+            } catch (error) {
+                showToast('保存绑定信息失败: ' + error.message, 'error');
+                console.error('Error saving api key meta:', error);
+            }
+        }
+
         // Render API keys table with paginated data
         function renderAPIKeysTablePaginated(keys) {
             const tbody = document.getElementById('api-table-body');
@@ -698,7 +756,7 @@
             tbody.innerHTML = '';
             
             if (!keys || keys.length === 0) {
-                // 关键词: API Key 列表 colspan 修复, 新增 Token 用量列 + Token 限额列后 12 -> 14
+                // 关键词: API Key 列表 colspan 修复, 移除字节流量列后 15 -> 14
                 tbody.innerHTML = '<tr><td colspan="14" class="text-center">No API keys found</td></tr>';
                 return;
             }
@@ -707,9 +765,6 @@
                 const row = document.createElement('tr');
                 row.dataset.apiId = key.id;
                 row.dataset.apiStatus = key.active ? 'active' : 'inactive';
-                row.dataset.trafficLimit = key.traffic_limit;
-                row.dataset.trafficUsed = key.traffic_used;
-                row.dataset.trafficEnabled = key.traffic_limit_enable;
                 row.dataset.tokenLimit = key.token_limit || 0;
                 row.dataset.tokenUsed = key.token_used || 0;
                 row.dataset.tokenEnabled = !!key.token_limit_enable;
@@ -718,33 +773,8 @@
                     ? '<span class="health-badge healthy" style="font-size:12px;">激活</span>'
                     : '<span class="health-badge unhealthy" style="font-size:12px;">禁用</span>';
                 
-                // Format traffic data
-                const inputFormatted = formatBytes(key.input_bytes || 0);
-                const outputFormatted = formatBytes(key.output_bytes || 0);
-                
-                let trafficLimitCell = '';
-                if (key.traffic_limit_enable) {
-                    const percent = key.traffic_limit > 0 ? (key.traffic_used / key.traffic_limit * 100) : 0;
-                    let barColor = '#4caf50';
-                    if (percent > 90) barColor = '#f44336';
-                    else if (percent > 70) barColor = '#ff9800';
-                    
-                    const usedFormatted = formatBytes(key.traffic_used || 0);
-                    const limitFormatted = formatBytes(key.traffic_limit || 0);
-                    
-                    trafficLimitCell = `
-                        <div class="traffic-limit-info" title="已用/限额: ${usedFormatted}/${limitFormatted} (${percent.toFixed(1)}%)">
-                            <div class="traffic-progress" style="width: 80px; height: 8px; background: #e0e0e0; border-radius: 4px; overflow: hidden;">
-                                <div style="width: ${Math.min(percent, 100)}%; height: 100%; background: ${barColor};"></div>
-                            </div>
-                            <small>${usedFormatted}/${limitFormatted}</small>
-                        </div>
-                    `;
-                } else {
-                    trafficLimitCell = '<span style="color: #999;">未限制</span>';
-                }
-                
-                // 关键词: paginated 渲染 Token 用量列, Token 限额列, 推荐 token over traffic
+                // 字节流量列已彻底移除：统一改用 Token 维度计费/限额，不再展示字节收发量
+                // 关键词: paginated 渲染 Token 用量列, Token 限额列, 字节流量列已移除
                 const tokenUsedRaw = Number(key.token_used) || 0;
                 const tokenLimitRaw = Number(key.token_limit) || 0;
                 const tokenUsedDisplay = formatTokenCount(tokenUsedRaw);
@@ -780,6 +810,10 @@
                     <td class="text-center">${key.id}</td>
                     <td class="text-center">${statusBadge}</td>
                     <td class="copyable api-key-cell" data-full-text="${escapeHtml(key.api_key)}">${escapeHtml(key.display_key)}</td>
+                    <td class="text-center" title="${escapeHtml(key.remark || '')}">
+                        <span>${key.username ? escapeHtml(key.username) : '<span style=\'color:#bbb;\'>-</span>'}</span>
+                        ${key.remark ? `<small style="display:block;color:#888;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(key.remark)}</small>` : ''}
+                    </td>
                     <td class="copyable editable-allowed-models" data-api-id="${key.id}" data-current-models="${escapeHtml(key.allowed_models)}" data-full-text="${escapeHtml(key.allowed_models)}" title="右键点击修改允许的模型">${renderAllowedModelsCellContent(key.allowed_models)}</td>
                     <td class="text-center">${key.usage_count || 0}</td>
                     <td class="text-center">${key.web_search_count || 0}</td>
@@ -787,22 +821,15 @@
                         <span class="health-badge healthy">${key.success_count || 0}</span>
                         <span class="health-badge unhealthy">${key.failure_count || 0}</span>
                     </td>
-                    <td class="text-center">
-                        <div class="traffic-data">
-                            <span title="输入流量">↓ ${inputFormatted}</span>
-                            <span title="输出流量">↑ ${outputFormatted}</span>
-                        </div>
-                    </td>
-                    <td class="text-center">${trafficLimitCell}</td>
-                    <td class="text-center" title="Token 用量（推荐计费维度）">${tokenUsedDisplay}</td>
+                    <td class="text-center" title="Token 计费用量">${tokenUsedDisplay}</td>
                     <td class="text-center">${tokenLimitCell}</td>
                     <td class="text-center">${escapeHtml(creatorName)}</td>
                     <td>${key.last_used_time || key.created_at || '-'}</td>
                     <td class="text-center">
                         <div style="display: flex; gap: 2px; justify-content: center; flex-wrap: wrap;">
                             ${actionButtons}
-                            <button class="btn btn-sm" onclick="showTokenLimitDialog(${key.id}, ${tokenLimitRaw}, ${tokenUsedRaw}, ${!!key.token_limit_enable})" title="Token 限额设置（推荐）" style="padding:2px 4px;font-size:11px;background:#1976d2;color:#fff;">Token★</button>
-                            <button class="btn btn-sm" onclick="showTrafficLimitDialog(${key.id}, ${key.traffic_limit || 0}, ${key.traffic_used || 0}, ${key.traffic_limit_enable})" title="流量设置（已弃用，推荐使用 Token）" style="padding:2px 4px;font-size:11px;opacity:0.85;">流量</button>
+                            <button class="btn btn-sm" onclick="showTokenLimitDialog(${key.id}, ${tokenLimitRaw}, ${tokenUsedRaw}, ${!!key.token_limit_enable})" title="Token 限额设置" style="padding:2px 4px;font-size:11px;background:#1976d2;color:#fff;">Token★</button>
+                            <button class="btn btn-sm" onclick="openApiKeyMetaModal(${key.id})" title="编辑绑定用户信息（用户名/备注/metainfo）" style="padding:2px 4px;font-size:11px;background:#6a1b9a;color:#fff;">绑定</button>
                             <button class="btn btn-sm btn-danger" onclick="deleteAPIKey(${key.id})" title="删除" style="padding:2px 4px;font-size:11px;">删除</button>
                         </div>
                     </td>
@@ -940,6 +967,25 @@
             if (abs < 1_000_000) return (num / 1000).toFixed(num % 1000 === 0 ? 0 : 1) + 'K';
             if (abs < 1_000_000_000) return (num / 1_000_000).toFixed(num % 1_000_000 === 0 ? 0 : 2) + 'M';
             return (num / 1_000_000_000).toFixed(2) + 'B';
+        }
+
+        // 计费 Token 与 RMB 换算：1 RMB = 10M 计费 Token。
+        // updateRMBHint 读取某个「M Token」数值输入框，实时把换算后的 RMB 写入提示元素。
+        // 关键词: updateRMBHint, 1 RMB=10M 计费 Token, 换算文案
+        var BILLING_TOKEN_M_PER_RMB = 10; // 10M 计费 Token / RMB
+        function formatRMBFromTokenM(mTokens) {
+            const m = Number(mTokens) || 0;
+            if (m <= 0) return '不限制 / 不计费';
+            const rmb = m / BILLING_TOKEN_M_PER_RMB;
+            const rmbStr = (rmb % 1 === 0) ? rmb.toFixed(0) : rmb.toFixed(2);
+            return '约合 ' + rmbStr + ' RMB（1 RMB = 10M 计费 Token）';
+        }
+        function updateRMBHint(inputId, hintId) {
+            const input = document.getElementById(inputId);
+            const hint = document.getElementById(hintId);
+            if (!input || !hint) return;
+            const m = parseInt(input.value);
+            hint.textContent = formatRMBFromTokenM(isNaN(m) ? 0 : m);
         }
         
         // Helper: escape HTML
@@ -2646,14 +2692,23 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
                 return;
             }
             
+            // 读取可选的绑定用户信息（用户名/备注/metainfo）
+            // 关键词: generateNewApiKey username remark metainfo 携带
+            const unameEl = document.getElementById('apiKeyUsernameInput');
+            const remarkEl = document.getElementById('apiKeyRemarkInput');
+            const metaEl = document.getElementById('apiKeyMetaInfoInput');
+            const username = unameEl ? unameEl.value.trim() : '';
+            const remark = remarkEl ? remarkEl.value : '';
+            const metainfo = metaEl ? metaEl.value : '';
+
             try {
                 const response = await fetch('/portal/generate-api-key', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    // 将选中的模型包含在请求体中
-                    body: JSON.stringify({ allowed_models: selectedModels })
+                    // 将选中的模型与绑定信息包含在请求体中
+                    body: JSON.stringify({ allowed_models: selectedModels, username: username, remark: remark, metainfo: metainfo })
                 });
 
                 if (!response.ok) {
@@ -4092,16 +4147,12 @@ curl '${metaApiUrl}?name=${modelName}'`;
         }
 
         // Model Metadata Edit Logic
-        // 关键词: openEditModelModal 4 维 Token 倍率, 输入/输出/缓存创建/缓存命中
-        function openEditModelModal(name, description, tags, trafficMultiplier) {
+        // wrapper 级仅编辑 描述/标签；传统倍数(字节流量)已彻底移除，Token 计费倍率在「实际模型计费倍率」表设置
+        // 关键词: openEditModelModal wrapper 描述标签, 传统倍数字段已移除
+        function openEditModelModal(name, description, tags) {
             document.getElementById('editModelName').value = name;
             document.getElementById('editModelDescription').value = description;
             document.getElementById('editModelTags').value = tags;
-
-            const multiplierInput = document.getElementById('editModelTrafficMultiplier');
-            if (multiplierInput) {
-                multiplierInput.value = trafficMultiplier !== undefined ? trafficMultiplier : 1.0;
-            }
 
             // 修复定位 bug: .delete-confirmation-modal 依赖 flex 居中。
             // 关键词: editModelMetaModal display flex 居中
@@ -4117,11 +4168,9 @@ curl '${metaApiUrl}?name=${modelName}'`;
             const description = document.getElementById('editModelDescription').value;
             const tags = document.getElementById('editModelTags').value;
 
-            const multiplierInput = document.getElementById('editModelTrafficMultiplier');
-            const trafficMultiplier = multiplierInput ? parseFloat(multiplierInput.value) || 1.0 : 1.0;
-
-            // wrapper 级仅提交描述/标签/传统字节倍数；Token 计费倍率在「实际模型计费倍率」表设置。
-            // 关键词: saveModelMeta wrapper 元数据提交, 不含 token 倍率
+            // wrapper 级仅提交描述/标签；不再提交传统字节倍数（后端缺省时保持原值不变）。
+            // Token 计费倍率在「实际模型计费倍率」表设置。
+            // 关键词: saveModelMeta wrapper 元数据提交, 不含 traffic_multiplier, 不含 token 倍率
             fetch('/portal/update-model-meta', {
                 method: 'POST',
                 headers: {
@@ -4130,8 +4179,7 @@ curl '${metaApiUrl}?name=${modelName}'`;
                 body: JSON.stringify({
                     model_name: name,
                     description: description,
-                    tags: tags,
-                    traffic_multiplier: trafficMultiplier
+                    tags: tags
                 })
             })
             .then(response => response.json())
@@ -4162,7 +4210,7 @@ curl '${metaApiUrl}?name=${modelName}'`;
 
         // ---- 单个实际模型倍率编辑 ----
         // 关键词: openModelMultiplierModal, 实际模型倍率编辑
-        function openModelMultiplierModal(internal, cfgIn, cfgOut, cfgCc, cfgCh) {
+        function openModelMultiplierModal(internal, cfgIn, cfgOut, cfgCc, cfgCh, isFree) {
             document.getElementById('modelMultiplierInternal').value = internal;
             const setv = (id, v) => {
                 const el = document.getElementById(id);
@@ -4172,6 +4220,8 @@ curl '${metaApiUrl}?name=${modelName}'`;
             setv('modelMultiplierOutput', cfgOut);
             setv('modelMultiplierCacheCreate', cfgCc);
             setv('modelMultiplierCacheHit', cfgCh);
+            const freeEl = document.getElementById('modelMultiplierIsFree');
+            if (freeEl) freeEl.checked = !!isFree;
             document.getElementById('modelMultiplierModal').style.display = 'flex';
         }
 
@@ -4181,6 +4231,7 @@ curl '${metaApiUrl}?name=${modelName}'`;
 
         function saveModelMultiplier() {
             const internal = document.getElementById('modelMultiplierInternal').value;
+            const freeEl = document.getElementById('modelMultiplierIsFree');
             fetch('/portal/update-model-multiplier', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -4189,7 +4240,8 @@ curl '${metaApiUrl}?name=${modelName}'`;
                     input_token_multiplier: readMulValue('modelMultiplierInput'),
                     output_token_multiplier: readMulValue('modelMultiplierOutput'),
                     cache_creation_multiplier: readMulValue('modelMultiplierCacheCreate'),
-                    cache_hit_multiplier: readMulValue('modelMultiplierCacheHit')
+                    cache_hit_multiplier: readMulValue('modelMultiplierCacheHit'),
+                    is_free: freeEl ? !!freeEl.checked : false
                 })
             })
             .then(response => response.json())
@@ -4706,7 +4758,8 @@ curl '${metaApiUrl}?name=${modelName}'`;
                         </div>
                         <div class="form-group">
                             <label for="tokenLimitMInput">Token 限额（单位：M tokens）:</label>
-                            <input type="number" id="tokenLimitMInput" class="form-control" value="${limitM}" min="0" step="0.1">
+                            <input type="number" id="tokenLimitMInput" class="form-control" value="${limitM}" min="0" step="0.1" oninput="updateRMBHint('tokenLimitMInput','tokenLimitRmbHint')">
+                            <small id="tokenLimitRmbHint" style="color:#2e7d32; font-size:12px; display:block; margin-top:4px;"></small>
                             <small class="form-text text-muted">
                                 设置为 0 表示不限制。Token 维度按上游 SSE 末帧 usage 经四维倍率
                                 加权后累加 (input/output/cache_creation/cache_hit)，更贴近真实计费。
@@ -4728,6 +4781,8 @@ curl '${metaApiUrl}?name=${modelName}'`;
                 </div>
             `;
             document.body.insertAdjacentHTML('beforeend', html);
+            // 初始化 1 RMB=10M 计费 Token 换算提示
+            updateRMBHint('tokenLimitMInput', 'tokenLimitRmbHint');
         }
 
         function closeTokenLimitModal() {
@@ -6092,6 +6147,12 @@ curl '${metaApiUrl}?name=${modelName}'`;
         __exposeFn('toggleSelectAllAPI', () => toggleSelectAllAPI);
         __exposeFn('selectAllAPIKeys', () => selectAllAPIKeys);
         __exposeFn('updateDeleteSelectedAPIButton', () => updateDeleteSelectedAPIButton);
+        // API Key 绑定用户信息编辑 + 用户名过滤
+        __exposeFn('openApiKeyMetaModal', () => openApiKeyMetaModal);
+        __exposeFn('closeApiKeyMetaModal', () => closeApiKeyMetaModal);
+        __exposeFn('saveApiKeyMeta', () => saveApiKeyMeta);
+        __exposeFn('applyApiKeyUsernameFilter', () => applyApiKeyUsernameFilter);
+        __exposeFn('clearApiKeyUsernameFilter', () => clearApiKeyUsernameFilter);
 
         // 流量限制相关
         __exposeFn('showTrafficLimitDialog', () => showTrafficLimitDialog);
@@ -6112,6 +6173,8 @@ curl '${metaApiUrl}?name=${modelName}'`;
         __exposeFn('saveTokenLimit', () => saveTokenLimit);
         __exposeFn('resetAPIKeyToken', () => resetAPIKeyToken);
         __exposeFn('formatTokenCount', () => formatTokenCount);
+        // 1 RMB=10M 计费 Token 实时换算提示
+        __exposeFn('updateRMBHint', () => updateRMBHint);
 
         // 内存和系统监控相关
         __exposeFn('showMemoryDialog', () => showMemoryDialog);
@@ -6536,6 +6599,55 @@ curl '${metaApiUrl}?name=${modelName}'`;
 
         // ==================== Rate Limit Config ====================
 
+        // 自定义 429 文案：后端 custom_429_kind_defaults（各 limit_kind 的默认文案/中文名/触发原因）缓存
+        // 关键词: custom429KindDefaults, custom_429_kind_defaults 缓存
+        let custom429KindDefaults = [];
+
+        // 渲染「自定义 429 文案」各 limit_kind 编辑器：展示中文名/触发原因/默认文案，并提供可编辑覆盖框
+        // 关键词: renderCustom429Kinds, 每个 kind 可编辑 + 编辑时可见默认文案
+        function renderCustom429Kinds(defaults, overrides) {
+            const container = document.getElementById('rl-custom429-kinds-list');
+            if (!container) return;
+            overrides = overrides || {};
+            if (!Array.isArray(defaults) || defaults.length === 0) {
+                container.innerHTML = '<small style="color:#999;">无可配置的限流类型</small>';
+                return;
+            }
+            container.innerHTML = defaults.map(function (meta) {
+                const kind = meta.kind || '';
+                const labelZh = meta.label_zh || kind;
+                const type = meta.type || '';
+                const def = meta.default_message || '';
+                const desc = meta.description || '';
+                const dynamicBadge = meta.dynamic
+                    ? '<span style="background:#ff9800;color:#fff;padding:1px 6px;border-radius:8px;font-size:11px;margin-left:6px;" title="动态类型：实际返回会在默认文案后追加运行时数值（如排队位置 / 已用量）">动态</span>'
+                    : '';
+                const ov = overrides[kind] != null ? overrides[kind] : '';
+                return ''
+                    + '<div class="form-group" style="margin-bottom:0;border:1px solid #eee;border-radius:6px;padding:10px;background:#fafafa;">'
+                    +   '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">'
+                    +     '<label style="margin:0;font-weight:600;">' + escapeHtml(labelZh)
+                    +       ' <small style="color:#888;font-weight:normal;">(' + escapeHtml(kind) + (type ? ' &middot; ' + escapeHtml(type) : '') + ')</small>'
+                    +       dynamicBadge
+                    +     '</label>'
+                    +     '<button type="button" class="btn btn-sm" style="font-size:11px;padding:2px 8px;" onclick="applyCustom429Default(\'' + escapeHtml(kind) + '\')" title="将默认文案填入下方编辑框">套用默认</button>'
+                    +   '</div>'
+                    +   (desc ? '<div style="color:#999;font-size:12px;margin:4px 0;">触发原因：' + escapeHtml(desc) + '</div>' : '')
+                    +   '<div style="color:#555;font-size:12px;margin:4px 0;"><span style="color:#1976d2;">默认文案：</span>' + escapeHtml(def) + '</div>'
+                    +   '<textarea id="rl-custom429-kind-' + escapeHtml(kind) + '" class="form-control" rows="2" style="font-size:13px;" placeholder="' + escapeHtml(def) + '">' + escapeHtml(ov) + '</textarea>'
+                    + '</div>';
+            }).join('');
+        }
+
+        // 套用默认：将某个 limit_kind 的默认文案填入对应编辑框（方便在默认基础上微调）
+        // 关键词: applyCustom429Default, 套用默认文案
+        function applyCustom429Default(kind) {
+            const meta = (custom429KindDefaults || []).find(function (m) { return m.kind === kind; });
+            if (!meta) return;
+            const el = document.getElementById('rl-custom429-kind-' + kind);
+            if (el) el.value = meta.default_message || '';
+        }
+
         async function loadRateLimitConfig() {
             try {
                 const response = await fetch('/portal/api/rate-limit-config');
@@ -6564,6 +6676,15 @@ curl '${metaApiUrl}?name=${modelName}'`;
                     if (tokLimitInput) tokLimitInput.value = (cfg.free_user_token_limit_m == null ? 1200 : cfg.free_user_token_limit_m);
                     renderFreeTokenModelOverrides(cfg.free_user_token_model_overrides || {});
 
+                    // 付费用户全局日 Token 总额度（第二道硬门），0=不限制
+                    // 关键词: loadRateLimitConfig paid_user_token_limit_m
+                    const paidTokLimitInput = document.getElementById('rl-paid-token-limit-m-input');
+                    if (paidTokLimitInput) paidTokLimitInput.value = (cfg.paid_user_token_limit_m == null ? 0 : cfg.paid_user_token_limit_m);
+
+                    // 刷新 1 RMB=10M 计费 Token 换算提示
+                    updateRMBHint('rl-free-token-limit-m-input', 'rl-free-token-limit-rmb');
+                    updateRMBHint('rl-paid-token-limit-m-input', 'rl-paid-token-limit-rmb');
+
                     // 软限额阈值 / 软限额 TPS
                     // 关键词: loadRateLimitConfig free_user_token_soft_limit_m
                     const softLimitMInput = document.getElementById('rl-free-token-soft-limit-m');
@@ -6578,17 +6699,14 @@ curl '${metaApiUrl}?name=${modelName}'`;
                     const minBtEl = document.getElementById('rl-memfit-version-min-build-time');
                     if (minBtEl) minBtEl.value = cfg.memfit_version_min_build_time || '';
 
-                    // 自定义 429/错误文案配置
-                    // 关键词: loadRateLimitConfig custom_429_enabled, custom_429_notice, custom_429_kind_overrides
+                    // 自定义 429/错误文案配置：按后端默认列表动态渲染各 kind 编辑器，并回填已保存覆盖
+                    // 关键词: loadRateLimitConfig custom_429_enabled, custom_429_notice, custom_429_kind_defaults
                     const c429EnabledEl = document.getElementById('rl-custom429-enabled');
                     if (c429EnabledEl) c429EnabledEl.checked = !!cfg.custom_429_enabled;
                     const c429NoticeEl = document.getElementById('rl-custom429-notice');
                     if (c429NoticeEl) c429NoticeEl.value = cfg.custom_429_notice || '';
-                    const c429Kinds = cfg.custom_429_kind_overrides || {};
-                    ['rpm', 'daily_token', 'traffic', 'token', 'memfit_version'].forEach(function (kind) {
-                        const el = document.getElementById('rl-custom429-' + kind);
-                        if (el) el.value = (c429Kinds[kind] != null ? c429Kinds[kind] : '');
-                    });
+                    custom429KindDefaults = Array.isArray(cfg.custom_429_kind_defaults) ? cfg.custom_429_kind_defaults : [];
+                    renderCustom429Kinds(custom429KindDefaults, cfg.custom_429_kind_overrides || {});
 
                     // 轻量降级规则
                     // 关键词: loadRateLimitConfig model_downgrade_rules
@@ -6626,6 +6744,12 @@ curl '${metaApiUrl}?name=${modelName}'`;
             if (isNaN(freeTokenLimitM) || freeTokenLimitM < 0) freeTokenLimitM = 1200;
             const freeTokenOverrides = collectFreeTokenModelOverrides();
 
+            // 付费用户全局日 Token 总额度（第二道硬门），0=不限制
+            // 关键词: saveRateLimitConfig paid_user_token_limit_m
+            const paidTokLimitInputEl = document.getElementById('rl-paid-token-limit-m-input');
+            let paidTokenLimitM = parseInt(paidTokLimitInputEl ? paidTokLimitInputEl.value : '');
+            if (isNaN(paidTokenLimitM) || paidTokenLimitM < 0) paidTokenLimitM = 0;
+
             // 软限额相关字段
             // 关键词: saveRateLimitConfig free_user_token_soft_limit_m
             const softLimitMRaw = document.getElementById('rl-free-token-soft-limit-m').value;
@@ -6649,11 +6773,11 @@ curl '${metaApiUrl}?name=${modelName}'`;
             const c429NoticeEl = document.getElementById('rl-custom429-notice');
             const custom429Notice = c429NoticeEl ? (c429NoticeEl.value || '').trim() : '';
             const custom429KindOverrides = {};
-            ['rpm', 'daily_token', 'traffic', 'token', 'memfit_version'].forEach(function (kind) {
-                const el = document.getElementById('rl-custom429-' + kind);
+            (custom429KindDefaults || []).forEach(function (meta) {
+                const el = document.getElementById('rl-custom429-kind-' + meta.kind);
                 if (el) {
                     const v = (el.value || '').trim();
-                    if (v !== '') custom429KindOverrides[kind] = v;
+                    if (v !== '') custom429KindOverrides[meta.kind] = v;
                 }
             });
 
@@ -6684,6 +6808,7 @@ curl '${metaApiUrl}?name=${modelName}'`;
                         model_delay_overrides: collected.delay,
                         free_user_token_limit_m: freeTokenLimitM,
                         free_user_token_model_overrides: freeTokenOverrides,
+                        paid_user_token_limit_m: paidTokenLimitM,
                         free_user_output_tps: freeOutputTPS,
                         model_output_tps_overrides: collected.tps,
                         free_user_token_soft_limit_m: softLimitM,
@@ -6741,6 +6866,18 @@ curl '${metaApiUrl}?name=${modelName}'`;
                     if (blockUsedEl) blockUsedEl.textContent = usedMText;
                     const blockLimitEl = document.getElementById('rl-free-token-global-limit');
                     if (blockLimitEl) blockLimitEl.textContent = limitMText;
+
+                    // 付费用户全局日 Token 总额度快照（第二道硬门）
+                    // 关键词: loadRateLimitStatus paid_user_token_usage 实时显示
+                    const paidUsage = data.paid_user_token_usage || {};
+                    const paidUsedMText = (typeof paidUsage.used_m === 'number') ? paidUsage.used_m.toFixed(2) : '--';
+                    const paidLimitMText = (typeof paidUsage.limit_m === 'number')
+                        ? (paidUsage.limit_m > 0 ? String(paidUsage.limit_m) : '不限制')
+                        : '--';
+                    const paidUsedEl = document.getElementById('rl-paid-token-global-used');
+                    if (paidUsedEl) paidUsedEl.textContent = paidUsedMText;
+                    const paidLimitEl = document.getElementById('rl-paid-token-global-limit');
+                    if (paidLimitEl) paidLimitEl.textContent = paidLimitMText;
 
                     // 单 IP 免费模型用量快照（多少人在用 + Top IP 榜）
                     // 关键词: loadRateLimitStatus free_ip_usage 渲染
@@ -7171,6 +7308,7 @@ curl '${metaApiUrl}?name=${modelName}'`;
         // Rate Limit exports
         window.loadRateLimitConfig = loadRateLimitConfig;
         window.saveRateLimitConfig = saveRateLimitConfig;
+        window.applyCustom429Default = applyCustom429Default;
         window.loadRateLimitStatus = loadRateLimitStatus;
         window.loadRateLimitModelStats = loadRateLimitModelStats;
         window.startRateLimitModelStatsAutoRefresh = startRateLimitModelStatsAutoRefresh;

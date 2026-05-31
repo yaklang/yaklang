@@ -105,6 +105,12 @@ type AiApiKeys struct {
 	// Creator tracking (for OPS user audit)
 	CreatedByOpsID   uint   `json:"created_by_ops_id" gorm:"index"`   // Creator OpsUser.ID (0 means admin created)
 	CreatedByOpsName string `json:"created_by_ops_name" gorm:"index"` // Creator username
+
+	// 用户绑定与管理元信息字段（为 OAuth 等外部系统接入预留）
+	// 关键词: AiApiKeys Username Remark MetaInfo, OAuth 绑定, 用户名可重复
+	Username string `json:"username" gorm:"index"` // 绑定用户名（可重复，用于按用户聚合查询）
+	Remark   string `json:"remark" gorm:"type:text"`     // 备注（自由文本）
+	MetaInfo string `json:"metainfo" gorm:"type:text"`   // 绑定信息（JSON 文本，存储 OAuth 等外部系统的用户信息）
 }
 
 type LoginSession struct {
@@ -158,6 +164,14 @@ type AiBalanceRateLimitConfig struct {
 	FreeUserTokenLimitM         int64  `json:"free_user_token_limit_m" gorm:"default:1200"`      // 免费用户全局共享日 Token 限额，单位 M tokens，默认 1200M
 	FreeUserTokenModelOverrides string `json:"free_user_token_model_overrides" gorm:"type:text"` // JSON map: {"model": {"limit_m": int, "exempt": bool}}; exempt=true 表示该 -free 模型不计费
 
+	// 付费用户全局日 Token 总额度限额（与免费日限额并列的第二道硬门）
+	// 关键词: PaidUserTokenLimitM, 付费用户全局日 Token 总额度, 第二道硬门, 429 余额不足
+	//
+	// 聚合所有付费 API Key 当天产生的加权计费 Token；超过此上限则所有付费请求返回 429。
+	// 单位 M tokens（1 RMB = 10M 计费 Token）。0 = 不限制（仅靠单 key TokenLimit 控制）。
+	// 与免费日限额一样在北京时间每日 06:00 清零。
+	PaidUserTokenLimitM int64 `json:"paid_user_token_limit_m" gorm:"default:0"` // 付费用户全局共享日 Token 总额度，单位 M tokens，0=不限制
+
 	// 免费延迟 N~M 区间随机改造
 	// 关键词: FreeUserDelayMaxSec, N~M 随机延迟, 老 N~2N 兼容
 	FreeUserDelayMaxSec int64 `json:"free_user_delay_max_sec" gorm:"default:0"` // 调用前延迟上限（秒）。0 时按老语义 N~2N
@@ -182,7 +196,8 @@ type AiBalanceRateLimitConfig struct {
 	//
 	//   - Custom429Enabled       关闭时（默认）完全保持现有 429 文案，开启后才注入自定义内容
 	//   - Custom429Notice        全局总文案，注入到所有限流 429 JSON body 的 notice 字段
-	//   - Custom429KindOverrides JSON map：{"rpm":"...","daily_token":"...","traffic":"...","token":"...","memfit_version":"..."}
+	//   - Custom429KindOverrides JSON map：按 limit_kind 覆盖文案，键取值见 custom_429.go Custom429Kinds：
+	//                            {"rpm":"...","token":"...","daily_token":"...","free_ip":"...","paid_daily_token":"...","memfit_version":"..."}
 	//                            按 limit_kind 覆盖对应 message
 	Custom429Enabled       bool   `json:"custom_429_enabled" gorm:"default:false"`
 	Custom429Notice        string `json:"custom_429_notice" gorm:"type:text"`
