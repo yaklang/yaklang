@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
@@ -110,25 +109,28 @@ func UpsertThrottledIP(ip string, rpm, tps int64, reason string) error {
 	}
 	db := GetDB()
 
+	// 用 Unscoped 查找以命中软删除残留行：本表 IP 唯一索引对软删除行依然生效，
+	// 若只用普通 First（排除软删除）会查不到残留行而走 Create，撞 UNIQUE 约束。
+	// 命中软删除行时复活（DeletedAt 置 nil）。与 SaveModelMultiplierWithFree 同套路。
+	// 关键词: UpsertThrottledIP Unscoped 查找, 软删除复活, 避免 UNIQUE 冲突
 	var row AiBalanceThrottledIP
-	qErr := db.Where("ip = ?", ip).First(&row).Error
-	if qErr == nil {
-		updates := map[string]interface{}{
-			"rpm":        rpm,
-			"tps":        tps,
-			"reason":     reason,
-			"updated_at": time.Now(),
-		}
-		if uErr := db.Model(&AiBalanceThrottledIP{}).Where("id = ?", row.ID).Updates(updates).Error; uErr != nil {
-			return fmt.Errorf("UpsertThrottledIP update failed: %v", uErr)
-		}
-	} else if errors.Is(qErr, gorm.ErrRecordNotFound) {
+	qErr := db.Unscoped().Where("ip = ?", ip).First(&row).Error
+	if qErr != nil && !errors.Is(qErr, gorm.ErrRecordNotFound) {
+		return fmt.Errorf("UpsertThrottledIP query failed: %v", qErr)
+	}
+	if errors.Is(qErr, gorm.ErrRecordNotFound) {
 		row = AiBalanceThrottledIP{IP: ip, RPM: rpm, TPS: tps, Reason: reason}
 		if cErr := db.Create(&row).Error; cErr != nil {
 			return fmt.Errorf("UpsertThrottledIP create failed: %v", cErr)
 		}
 	} else {
-		return fmt.Errorf("UpsertThrottledIP query failed: %v", qErr)
+		row.RPM = rpm
+		row.TPS = tps
+		row.Reason = reason
+		row.DeletedAt = nil // 复活软删除残留行
+		if uErr := db.Unscoped().Save(&row).Error; uErr != nil {
+			return fmt.Errorf("UpsertThrottledIP update failed: %v", uErr)
+		}
 	}
 
 	throttledIPMu.Lock()
@@ -144,7 +146,10 @@ func DeleteThrottledIP(ip string) error {
 	if ip == "" {
 		return fmt.Errorf("DeleteThrottledIP: ip is empty")
 	}
-	if err := GetDB().Where("ip = ?", ip).Delete(&AiBalanceThrottledIP{}).Error; err != nil {
+	// 硬删除（Unscoped）：这是配置型单值表，软删除残留会让同名 IP 再次限流时撞 UNIQUE。
+	// 与 DeleteModelMultiplier 同套路。
+	// 关键词: DeleteThrottledIP Unscoped 硬删除, 避免软删除残留
+	if err := GetDB().Unscoped().Where("ip = ?", ip).Delete(&AiBalanceThrottledIP{}).Error; err != nil {
 		return fmt.Errorf("DeleteThrottledIP failed: %v", err)
 	}
 	throttledIPMu.Lock()

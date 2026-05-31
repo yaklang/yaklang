@@ -2163,6 +2163,96 @@
     vertical-align: middle;
 }
 
+/* ========== Mirror Records (镜像数据) UI ========== */
+.mirror-rec-card {
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    padding: 12px 14px;
+    margin-bottom: 12px;
+    background: #fff;
+}
+
+.mirror-rec-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.mirror-rec-idx {
+    color: #90a4ae;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.mirror-rec-model {
+    color: #1565c0;
+    font-weight: 600;
+}
+
+.mirror-rec-ts {
+    margin-left: auto;
+    color: #90a4ae;
+    font-size: 12px;
+}
+
+.mirror-rec-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+
+.mirror-rec-chip {
+    display: inline-block;
+    padding: 1px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    background: #f1f8ff;
+    border: 1px solid #cfe3ff;
+    color: #37474f;
+}
+
+.mirror-rec-line {
+    font-size: 13px;
+    color: #455a64;
+    margin: 4px 0;
+    line-height: 1.5;
+    word-break: break-word;
+}
+
+.mirror-rec-label {
+    color: #90a4ae;
+    font-weight: 600;
+    margin-right: 4px;
+}
+
+.mirror-rec-toggle {
+    display: inline-block;
+    margin-top: 6px;
+    font-size: 12px;
+    color: #1565c0;
+    cursor: pointer;
+    user-select: none;
+}
+
+.mirror-rec-toggle:hover {
+    text-decoration: underline;
+}
+
+.mirror-rec-raw {
+    margin-top: 8px;
+    padding: 10px;
+    background: #f7f9fa;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    font-size: 12px;
+    max-height: 360px;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
 .mirror-status-badge {
     display: inline-block;
     padding: 2px 8px;

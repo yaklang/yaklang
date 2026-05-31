@@ -73,6 +73,13 @@
             <div class="value" id="disk-free-display">--</div>
             <div class="stat-sub" id="disk-sub">--</div>
         </div>
+        <!-- 存储采集数据 KPI: 镜像数据落盘条数 + 占用. -->
+        <!-- 关键词: 顶部存储 KPI, storage-card, storage_info -->
+        <div class="stat-card" id="storage-card" title="">
+            <h3>存储采集数据</h3>
+            <div class="value" id="storage-records-display">--</div>
+            <div class="stat-sub" id="storage-sub">--</div>
+        </div>
     </div>
 
     <!-- Memory Diagnostic Dialog -->
@@ -140,6 +147,7 @@
             <div class="sidebar-group">
                 <div class="group-title">数据处理</div>
                 <div class="menu-item" data-tab="mirror">流量镜像</div>
+                <div class="menu-item" data-tab="mirror-records">镜像数据</div>
             </div>
         </aside>
         <!-- 隐藏的旧 tabs 容器, 仅保留兼容性 (有 JS 依赖了 .tabs .tab 这种选择器)
@@ -158,6 +166,7 @@
                 <div class="tab" data-tab="rate-limit">限流配置</div>
                 <div class="tab" data-tab="dau-cache">日活与缓存</div>
                 <div class="tab" data-tab="mirror">流量镜像</div>
+                <div class="tab" data-tab="mirror-records">镜像数据</div>
             </div>
         </div>
         <main class="tab-pane-host">
@@ -1521,6 +1530,40 @@
                     </div>
                 </div>
 
+                <!-- 数据落盘设置: 控制脚本里 save() 是否落盘, 及落盘目录容量治理参数 -->
+                <!-- 关键词: 镜像数据落盘设置, save 落盘开关, 容量上限/回收/巡检 -->
+                <div class="card" style="background:#fafafa; border:1px solid #e0e0e0; margin-bottom:18px; padding:14px 16px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                        <div>
+                            <span style="font-weight:bold; color:#37474f;">数据落盘设置</span>
+                            <span style="color:#90a4ae; font-size:12px; margin-left:8px;">脚本中调用 <code>save()</code> 可把镜像数据落盘归档; 超容量按最旧分片自动清理</span>
+                        </div>
+                        <button class="btn btn-primary" onclick="MirrorMgmt.saveStorageConfig()">保存设置</button>
+                    </div>
+                    <div style="display:flex; flex-wrap:wrap; gap:16px; align-items:flex-end;">
+                        <label class="mirror-checkbox-label" style="flex:0 0 auto;">
+                            <input type="checkbox" id="mirror-storage-enabled">
+                            <span>启用 save() 落盘</span>
+                        </label>
+                        <div style="display:flex; flex-direction:column; gap:4px;">
+                            <label style="font-size:12px; color:#666;">容量上限 (GiB)</label>
+                            <input type="number" id="mirror-storage-max-gib" class="form-control" min="0.1" step="0.1" style="width:120px;" value="6">
+                        </div>
+                        <div style="display:flex; flex-direction:column; gap:4px;">
+                            <label style="font-size:12px; color:#666;">单次回收 (GiB)</label>
+                            <input type="number" id="mirror-storage-reclaim-gib" class="form-control" min="0.1" step="0.1" style="width:120px;" value="2">
+                        </div>
+                        <div style="display:flex; flex-direction:column; gap:4px;">
+                            <label style="font-size:12px; color:#666;">巡检间隔 (秒)</label>
+                            <input type="number" id="mirror-storage-check-sec" class="form-control" min="5" step="5" style="width:120px;" value="60">
+                        </div>
+                        <div style="margin-left:auto; text-align:right; font-size:12px; color:#789;">
+                            <div>当前已存: <span id="mirror-storage-records" style="font-weight:bold; color:#1565c0;">--</span> 条</div>
+                            <div>占用: <span id="mirror-storage-bytes" style="font-weight:bold; color:#1565c0;">--</span></div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="table-container">
                     <table cellspacing="0" cellpadding="0" id="mirror-rules-table">
                         <thead>
@@ -1541,6 +1584,29 @@
                         </tbody>
                     </table>
                 </div>
+            </div>
+        </div>
+
+        <!-- 镜像数据: 查看最近落盘的内容, 人性化展示关键字段 + 可展开原始 JSON -->
+        <!-- 关键词: mirror-records tab, 最近落盘记录查看 -->
+        <div id="mirror-records" class="tab-content">
+            <div class="content-section">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                    <div>
+                        <h3 style="margin:0;">镜像数据</h3>
+                        <div style="color:#90a4ae; font-size:12px; margin-top:4px;">查看最近落盘的镜像记录, 便于确认采集到的内容是否符合预期</div>
+                    </div>
+                    <div style="display:flex; gap:10px; align-items:center;">
+                        <select id="mirror-records-count" class="form-control" style="width:120px;">
+                            <option value="20" selected>最近 20 条</option>
+                            <option value="50">最近 50 条</option>
+                            <option value="100">最近 100 条</option>
+                        </select>
+                        <button class="btn btn-primary" onclick="MirrorRecords.load()">加载</button>
+                    </div>
+                </div>
+                <div id="mirror-records-status" style="color:#789; font-size:12px; margin-bottom:10px;">点击「加载」获取最近落盘的记录.</div>
+                <div id="mirror-records-list"></div>
             </div>
         </div>
 

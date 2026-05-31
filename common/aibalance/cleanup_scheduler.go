@@ -44,6 +44,13 @@ func runCleanupOnce(keepDays int) (int64, int64) {
 	if err != nil {
 		log.Warnf("daily cleanup CleanupOldFreeUserIPUsage failed: %v", err)
 	}
+	// 单 IP 按模型用量表（仅展示用）同样走短保留窗清理。
+	// 关键词: runCleanupOnce CleanupOldFreeUserIPModelUsage, 单 IP 按模型用量短保留窗
+	if freeIPModelRows, mErr := CleanupOldFreeUserIPModelUsage(FreeIPUsageRetentionDays); mErr != nil {
+		log.Warnf("daily cleanup CleanupOldFreeUserIPModelUsage failed: %v", mErr)
+	} else if freeIPModelRows > 0 {
+		log.Infof("daily cleanup free_user_ip_model_daily_usage removed=%d", freeIPModelRows)
+	}
 	// 免费/付费每日 Token 聚合表清理（长保留窗，与统计表一致）。
 	// 关键词: runCleanupOnce CleanupOldFreeUserTokenUsage CleanupOldPaidUserDailyTokenUsage
 	if freeTokRows, fErr := CleanupOldFreeUserTokenUsage(keepDays); fErr != nil {
