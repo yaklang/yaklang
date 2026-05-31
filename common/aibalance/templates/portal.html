@@ -1016,7 +1016,7 @@
                             <span style="font-weight: bold; color: #1565c0;">免费 IP 用量（今日）</span>
                             <small style="color: #888; margin-left: 8px;">
                                 今日共 <strong id="rl-free-ip-distinct-count">--</strong> 个 IP 在使用免费模型（计费部分）；
-                                按加权 Token 降序展示 Top 20。重置日期：<span id="rl-free-ip-reset-date">--</span>
+                                仅展示加权 Token 超过 <strong>10M</strong> 的 IP（按降序）。重置日期：<span id="rl-free-ip-reset-date">--</span>
                             </small>
                         </div>
                         <button class="btn" onclick="loadRateLimitStatus()" style="height: 32px; font-size: 12px;">刷新</button>
@@ -1028,12 +1028,23 @@
                                     <th style="text-align: left; padding: 8px 10px; border-bottom: 1px solid #81d4fa;">客户端 IP</th>
                                     <th style="text-align: right; padding: 8px 10px; border-bottom: 1px solid #81d4fa;">请求次数</th>
                                     <th style="text-align: right; padding: 8px 10px; border-bottom: 1px solid #81d4fa;">加权 Token (M)</th>
+                                    <th style="text-align: right; padding: 8px 10px; border-bottom: 1px solid #81d4fa;">≈ RMB (元)</th>
+                                    <th style="text-align: center; padding: 8px 10px; border-bottom: 1px solid #81d4fa;">操作</th>
                                 </tr>
                             </thead>
                             <tbody id="rl-free-ip-usage-tbody">
-                                <tr><td colspan="3" style="padding: 12px; text-align: center; color: #999;">加载中...</td></tr>
+                                <tr><td colspan="5" style="padding: 12px; text-align: center; color: #999;">加载中...</td></tr>
                             </tbody>
                         </table>
+                    </div>
+                    <!-- 已限流 IP 列表（可解除）；仅当存在限流 IP 时展示 -->
+                    <!-- 关键词: 已限流 IP 列表, 解除限流 -->
+                    <div id="rl-throttled-ip-wrap" style="margin-top: 12px; display: none;">
+                        <div style="font-weight: bold; color: #c62828; font-size: 13px; margin-bottom: 6px;">
+                            已限流 IP（<span id="rl-throttled-ip-count">0</span>）
+                            <small style="color:#888; font-weight: normal;">限流持久保留，点击"解除"恢复正常</small>
+                        </div>
+                        <div id="rl-throttled-ip-list" style="display: flex; flex-direction: column; gap: 4px;"></div>
                     </div>
                 </div>
 
@@ -1157,7 +1168,9 @@
                         <div style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin-top: 10px;">
                             <div class="form-group" style="margin-bottom: 0; flex: 0 0 220px;">
                                 <label>软限额阈值 (M Token):</label>
-                                <input type="number" id="rl-free-token-soft-limit-m" class="form-control" value="0" min="0" step="1" style="font-family: monospace; font-size: 13px;">
+                                <input type="number" id="rl-free-token-soft-limit-m" class="form-control" value="0" min="0" step="1" oninput="updateRMBHint('rl-free-token-soft-limit-m','rl-free-token-soft-limit-rmb')" style="font-family: monospace; font-size: 13px;">
+                                <!-- 金额限制：1 RMB = 10M 计费 Token 换算提示 -->
+                                <small id="rl-free-token-soft-limit-rmb" style="color:#6d4c41; font-size:12px;"></small>
                             </div>
                             <div class="form-group" style="margin-bottom: 0; flex: 0 0 220px;">
                                 <label>软限额 TPS (token/s):</label>
@@ -1189,7 +1202,28 @@
                             </div>
                             <div class="form-group" style="margin-bottom: 0; flex: 0 0 220px;">
                                 <label>每 IP 每日 Token 上限 (M Token):</label>
-                                <input type="number" id="rl-free-ip-daily-token-limit-m" class="form-control" value="30" min="0" step="1" style="font-family: monospace; font-size: 13px;">
+                                <input type="number" id="rl-free-ip-daily-token-limit-m" class="form-control" value="30" min="0" step="1" oninput="updateRMBHint('rl-free-ip-daily-token-limit-m','rl-free-ip-daily-token-limit-rmb')" style="font-family: monospace; font-size: 13px;">
+                                <!-- 金额限制：1 RMB = 10M 计费 Token 换算提示 -->
+                                <small id="rl-free-ip-daily-token-limit-rmb" style="color:#1565c0; font-size:12px;"></small>
+                            </div>
+                        </div>
+                        <!-- 一键限流 IP 默认参数（上方"免费 IP 用量"榜单的"限流"按钮套用这两个值） -->
+                        <!-- 关键词: 一键限流 IP 默认 RPM/TPS 配置 -->
+                        <div style="margin-top: 12px; padding-top: 10px; border-top: 1px dashed #90caf9;">
+                            <strong style="font-size: 13px; color: #1565c0;">一键限流 IP 默认参数</strong>
+                            <small style="display: block; color: #455a64; margin-top: 4px;">
+                                在上方"免费 IP 用量（今日）"榜单中点击某 IP 的"限流"按钮时，会把该 IP 的请求频率压到下面的 RPM，
+                                流式输出速率压到下面的输出 TPS（token/秒）。限流会持久保留，可在榜单中点击"解除"恢复。
+                            </small>
+                            <div style="display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap; margin-top: 10px;">
+                                <div class="form-group" style="margin-bottom: 0; flex: 0 0 220px;">
+                                    <label>限流后 RPM（每分钟请求上限）:</label>
+                                    <input type="number" id="rl-throttled-ip-default-rpm" class="form-control" value="3" min="0" step="1" style="font-family: monospace; font-size: 13px;">
+                                </div>
+                                <div class="form-group" style="margin-bottom: 0; flex: 0 0 220px;">
+                                    <label>限流后输出 TPS（token/秒）:</label>
+                                    <input type="number" id="rl-throttled-ip-default-tps" class="form-control" value="15" min="0" step="1" style="font-family: monospace; font-size: 13px;">
+                                </div>
                             </div>
                         </div>
                     </div>

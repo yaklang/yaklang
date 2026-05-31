@@ -248,6 +248,14 @@ func LoadProvidersFromDatabase(config *ServerConfig) error {
 	if err := EnsureFreeUserIPDailyUsageTable(); err != nil {
 		log.Warnf("Failed to ensure FreeUserIPDailyUsage table exists: %v", err)
 	}
+	// 一键限流 IP 表（持久化被限流 IP + 加载到进程内缓存供热路径查询）
+	// 关键词: EnsureThrottledIPTable 初始化, ReloadThrottledIPCache 一键限流
+	if err := EnsureThrottledIPTable(); err != nil {
+		log.Warnf("Failed to ensure ThrottledIP table exists: %v", err)
+	}
+	if err := ReloadThrottledIPCache(); err != nil {
+		log.Warnf("Failed to load throttled IP cache: %v", err)
+	}
 	if rlConfig, err := GetRateLimitConfig(); err != nil {
 		log.Warnf("Failed to load RateLimitConfig: %v", err)
 	} else {

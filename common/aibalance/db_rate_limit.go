@@ -53,6 +53,10 @@ func GetRateLimitConfig() (*AiBalanceRateLimitConfig, error) {
 			// 轻量降级默认带内置规则（memfit-standard-free → memfit-light-free）
 			// 关键词: GetRateLimitConfig 默认值 ModelDowngradeRules
 			ModelDowngradeRules: defaultModelDowngradeRules,
+			// 一键限流 IP 默认参数（RPM=3 / TPS=15）
+			// 关键词: GetRateLimitConfig 默认值 ThrottledIPDefault
+			ThrottledIPDefaultRPM: 3,
+			ThrottledIPDefaultTPS: 15,
 		}
 		config.ID = 1
 		if createErr := db.Create(&config).Error; createErr != nil {
@@ -72,6 +76,14 @@ func GetRateLimitConfig() (*AiBalanceRateLimitConfig, error) {
 	}
 	if strings.TrimSpace(config.ModelDowngradeRules) == "" {
 		config.ModelDowngradeRules = defaultModelDowngradeRules
+	}
+	// 老行兼容：一键限流默认参数 <=0 视作未配置，按 3/15 兜底（不写库）。
+	// 关键词: GetRateLimitConfig 老行兼容, ThrottledIPDefault 兜底
+	if config.ThrottledIPDefaultRPM <= 0 {
+		config.ThrottledIPDefaultRPM = 3
+	}
+	if config.ThrottledIPDefaultTPS <= 0 {
+		config.ThrottledIPDefaultTPS = 15
 	}
 	return &config, nil
 }

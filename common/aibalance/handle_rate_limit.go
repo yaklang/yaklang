@@ -16,6 +16,11 @@ import (
 // the threshold was lowered to 3 to expose anything beyond trivial traffic.
 const defaultModelStatsMinRPM int64 = 3
 
+// freeIPUsageDisplayThresholdM 是「免费 IP 用量」面板的展示阈值（单位 M token）。
+// 仅当某 IP 当日加权 Token 严格超过该值时才在面板展示，避免低用量 IP 把列表撑得过长。
+// 关键词: freeIPUsageDisplayThresholdM, 免费 IP 用量展示阈值, >10M 才展示
+const freeIPUsageDisplayThresholdM float64 = 10
+
 // handleGetRateLimitConfig returns the global rate-limit configuration.
 func (c *ServerConfig) handleGetRateLimitConfig(conn net.Conn, request *http.Request) {
 	c.logInfo("processing get rate limit config request")
@@ -110,6 +115,10 @@ func (c *ServerConfig) handleGetRateLimitConfig(conn net.Conn, request *http.Req
 			"free_user_ip_limit_enable":        config.FreeUserIPLimitEnable,
 			"free_user_ip_daily_request_limit": config.FreeUserIPDailyRequestLimit,
 			"free_user_ip_daily_token_limit_m": config.FreeUserIPDailyTokenLimitM,
+			// 一键限流 IP 默认参数（RPM / 输出 TPS）
+			// 关键词: handleGetRateLimitConfig throttled_ip_default_rpm/tps
+			"throttled_ip_default_rpm": config.ThrottledIPDefaultRPM,
+			"throttled_ip_default_tps": config.ThrottledIPDefaultTPS,
 		},
 	})
 }
@@ -211,6 +220,10 @@ func (c *ServerConfig) handleSetRateLimitConfig(conn net.Conn, request *http.Req
 		FreeUserIPLimitEnable       *bool  `json:"free_user_ip_limit_enable,omitempty"`
 		FreeUserIPDailyRequestLimit *int64 `json:"free_user_ip_daily_request_limit,omitempty"`
 		FreeUserIPDailyTokenLimitM  *int64 `json:"free_user_ip_daily_token_limit_m,omitempty"`
+		// 一键限流 IP 默认参数
+		// 关键词: handleSetRateLimitConfig throttled_ip_default_rpm/tps
+		ThrottledIPDefaultRPM *int64 `json:"throttled_ip_default_rpm,omitempty"`
+		ThrottledIPDefaultTPS *int64 `json:"throttled_ip_default_tps,omitempty"`
 	}
 	if err := json.Unmarshal(bodyBytes, &reqBody); err != nil {
 		c.logError("failed to parse request body: %v", err)
@@ -396,6 +409,23 @@ func (c *ServerConfig) handleSetRateLimitConfig(conn net.Conn, request *http.Req
 		}
 	}
 
+	// 一键限流 IP 默认参数写入（<=0 视作未配置，GetRateLimitConfig 会按 3/15 兜底）
+	// 关键词: handleSetRateLimitConfig 写入 ThrottledIPDefault
+	if reqBody.ThrottledIPDefaultRPM != nil {
+		if *reqBody.ThrottledIPDefaultRPM < 0 {
+			config.ThrottledIPDefaultRPM = 0
+		} else {
+			config.ThrottledIPDefaultRPM = *reqBody.ThrottledIPDefaultRPM
+		}
+	}
+	if reqBody.ThrottledIPDefaultTPS != nil {
+		if *reqBody.ThrottledIPDefaultTPS < 0 {
+			config.ThrottledIPDefaultTPS = 0
+		} else {
+			config.ThrottledIPDefaultTPS = *reqBody.ThrottledIPDefaultTPS
+		}
+	}
+
 	// 轻量降级规则写入：from/to 为空的规则被丢弃；空数组 [] 表示显式关闭（不回退内置默认）
 	// 关键词: handleSetRateLimitConfig 写入 ModelDowngradeRules
 	if reqBody.ModelDowngradeRules != nil {
@@ -485,19 +515,54 @@ func (c *ServerConfig) handleGetRateLimitStatus(conn net.Conn, request *http.Req
 		c.logWarn("QueryPaidUserTokenUsageSnapshot failed: %v", err)
 	}
 
-	// 单 IP 免费模型用量快照：今日有多少个 IP 在用 + Top-N 用量榜
-	// 关键词: handleGetRateLimitStatus free_ip_usage 快照
-	freeIPUsage := map[string]interface{}{}
-	if distinctCount, top, date, err := QueryFreeUserIPUsageSnapshot(20); err == nil {
+	// 一键限流 IP：默认参数 + 当前已限流 IP 列表（用于面板展示/解除/标记）。
+	// 关键词: handleGetRateLimitStatus throttled_ips, throttle 默认值
+	throttleDefaultRPM := int64(3)
+	throttleDefaultTPS := int64(15)
+	if cfg, err := GetRateLimitConfig(); err == nil {
+		throttleDefaultRPM = cfg.ThrottledIPDefaultRPM
+		throttleDefaultTPS = cfg.ThrottledIPDefaultTPS
+	}
+	throttledSet := map[string]bool{}
+	throttledOut := make([]map[string]interface{}, 0)
+	if rows, err := ListThrottledIPs(); err == nil {
+		for _, r := range rows {
+			throttledSet[r.IP] = true
+			throttledOut = append(throttledOut, map[string]interface{}{
+				"ip":     r.IP,
+				"rpm":    r.RPM,
+				"tps":    r.TPS,
+				"reason": r.Reason,
+			})
+		}
+	} else {
+		c.logWarn("ListThrottledIPs failed: %v", err)
+	}
+
+	// 单 IP 免费模型用量快照：今日有多少个 IP 在用 + Top 用量榜。
+	// 仅展示加权 Token 超过阈值（freeIPUsageDisplayThresholdM=10M）的 IP，减少前端噪声；
+	// 同时标注每个 IP 是否已被一键限流。
+	// 关键词: handleGetRateLimitStatus free_ip_usage 快照, >10M 过滤, throttled 标记
+	freeIPUsage := map[string]interface{}{
+		"display_threshold_m":  freeIPUsageDisplayThresholdM,
+		"throttle_default_rpm": throttleDefaultRPM,
+		"throttle_default_tps": throttleDefaultTPS,
+		"throttled_ips":        throttledOut,
+	}
+	if distinctCount, top, date, err := QueryFreeUserIPUsageSnapshot(50); err == nil {
 		freeIPUsage["reset_date"] = date
 		freeIPUsage["distinct_ip_count"] = distinctCount
 		topOut := make([]map[string]interface{}, 0, len(top))
 		for _, r := range top {
+			if r.UsedM <= freeIPUsageDisplayThresholdM {
+				continue
+			}
 			topOut = append(topOut, map[string]interface{}{
 				"ip":            r.IP,
 				"request_count": r.RequestCount,
 				"tokens_used":   r.TokensUsed,
 				"used_m":        r.UsedM,
+				"throttled":     throttledSet[r.IP],
 			})
 		}
 		freeIPUsage["top"] = topOut
@@ -512,6 +577,118 @@ func (c *ServerConfig) handleGetRateLimitStatus(conn net.Conn, request *http.Req
 		"free_user_token_usage": freeTokenUsage,
 		"paid_user_token_usage": paidTokenUsage,
 		"free_ip_usage":         freeIPUsage,
+	})
+}
+
+// handleThrottleIP 一键限流某个 IP：把该 IP 的 RPM / 输出 TPS 压到指定值
+// （默认取配置的 ThrottledIPDefaultRPM / ThrottledIPDefaultTPS）。Admin only。
+//
+// 请求体：{"ip":"1.2.3.4", "rpm":3, "tps":15, "reason":"..."}（rpm/tps/reason 可选）。
+// rpm/tps 省略或 <=0 时回退配置默认值。写入持久化 + 刷新进程内缓存。
+// 关键词: handleThrottleIP, 一键限流 IP, POST /portal/api/throttle-ip
+func (c *ServerConfig) handleThrottleIP(conn net.Conn, request *http.Request) {
+	c.logInfo("processing throttle ip request")
+
+	if !c.checkAuth(request) {
+		c.writeJSONResponse(conn, http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+		return
+	}
+
+	bodyBytes, err := io.ReadAll(request.Body)
+	if err != nil {
+		c.logError("failed to read throttle ip request body: %v", err)
+		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]string{"error": "failed to read request body"})
+		return
+	}
+	var reqBody struct {
+		IP     string `json:"ip"`
+		RPM    *int64 `json:"rpm,omitempty"`
+		TPS    *int64 `json:"tps,omitempty"`
+		Reason string `json:"reason,omitempty"`
+	}
+	if err := json.Unmarshal(bodyBytes, &reqBody); err != nil {
+		c.logError("failed to parse throttle ip request body: %v", err)
+		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]string{"error": "invalid request format"})
+		return
+	}
+
+	ip := strings.TrimSpace(reqBody.IP)
+	if ip == "" {
+		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]string{"error": "ip is required"})
+		return
+	}
+
+	// 默认值取自配置；请求显式给正值则覆盖。
+	rpm := int64(3)
+	tps := int64(15)
+	if cfg, cErr := GetRateLimitConfig(); cErr == nil {
+		rpm = cfg.ThrottledIPDefaultRPM
+		tps = cfg.ThrottledIPDefaultTPS
+	}
+	if reqBody.RPM != nil && *reqBody.RPM > 0 {
+		rpm = *reqBody.RPM
+	}
+	if reqBody.TPS != nil && *reqBody.TPS > 0 {
+		tps = *reqBody.TPS
+	}
+
+	if err := UpsertThrottledIP(ip, rpm, tps, strings.TrimSpace(reqBody.Reason)); err != nil {
+		c.logError("UpsertThrottledIP failed (ip=%s): %v", ip, err)
+		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+
+	c.logInfo("throttled ip applied: ip=%s rpm=%d tps=%d", ip, rpm, tps)
+	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
+		"success": true,
+		"ip":      ip,
+		"rpm":     rpm,
+		"tps":     tps,
+	})
+}
+
+// handleUnthrottleIP 解除某个 IP 的一键限流（删除持久化行 + 缓存条目）。Admin only。
+// 请求体：{"ip":"1.2.3.4"}。
+// 关键词: handleUnthrottleIP, 解除限流, POST /portal/api/unthrottle-ip
+func (c *ServerConfig) handleUnthrottleIP(conn net.Conn, request *http.Request) {
+	c.logInfo("processing unthrottle ip request")
+
+	if !c.checkAuth(request) {
+		c.writeJSONResponse(conn, http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+		return
+	}
+
+	bodyBytes, err := io.ReadAll(request.Body)
+	if err != nil {
+		c.logError("failed to read unthrottle ip request body: %v", err)
+		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]string{"error": "failed to read request body"})
+		return
+	}
+	var reqBody struct {
+		IP string `json:"ip"`
+	}
+	if err := json.Unmarshal(bodyBytes, &reqBody); err != nil {
+		c.logError("failed to parse unthrottle ip request body: %v", err)
+		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]string{"error": "invalid request format"})
+		return
+	}
+
+	ip := strings.TrimSpace(reqBody.IP)
+	if ip == "" {
+		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]string{"error": "ip is required"})
+		return
+	}
+
+	if err := DeleteThrottledIP(ip); err != nil {
+		c.logError("DeleteThrottledIP failed (ip=%s): %v", ip, err)
+		c.writeJSONResponse(conn, http.StatusInternalServerError, map[string]string{"error": "failed to unthrottle ip"})
+		return
+	}
+
+	c.logInfo("throttled ip removed: ip=%s", ip)
+	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
+		"success": true,
+		"ip":      ip,
 	})
 }
 

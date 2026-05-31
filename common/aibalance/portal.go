@@ -844,6 +844,12 @@ func (c *ServerConfig) HandlePortalRequest(conn net.Conn, request *http.Request,
 		c.handleGetRateLimitStatus(conn, request)
 	case uriIns.Path == "/portal/api/rate-limit-model-stats" && request.Method == "GET":
 		c.handleGetRateLimitModelStats(conn, request)
+	// 一键限流 IP / 解除限流接口
+	// 关键词: portal /portal/api/throttle-ip /portal/api/unthrottle-ip 路由注册
+	case uriIns.Path == "/portal/api/throttle-ip" && request.Method == "POST":
+		c.handleThrottleIP(conn, request)
+	case uriIns.Path == "/portal/api/unthrottle-ip" && request.Method == "POST":
+		c.handleUnthrottleIP(conn, request)
 	// memfit-* 客户端版本统计接口
 	// 关键词: portal /portal/api/client-version-stats 路由注册
 	case uriIns.Path == "/portal/api/client-version-stats" && request.Method == "GET":
