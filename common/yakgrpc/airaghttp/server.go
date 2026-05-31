@@ -198,6 +198,19 @@ func (s *RAGHTTPServer) registerRoutes() {
 	sub.HandleFunc("/collections", s.handleCollections).Methods(http.MethodGet, http.MethodOptions)
 	sub.HandleFunc("/search", s.handleSearch).Methods(http.MethodPost, http.MethodOptions)
 	sub.HandleFunc("/chat", s.handleChat).Methods(http.MethodGet, http.MethodPost, http.MethodOptions)
+
+	// 内置只读前端页面 (不走鉴权, 便于浏览器直接打开; API 调用仍按配置鉴权)
+	if s.config.ServeFrontend {
+		s.router.HandleFunc("/", s.handleFrontend).Methods(http.MethodGet)
+		s.router.HandleFunc("/index.html", s.handleFrontend).Methods(http.MethodGet)
+	}
+}
+
+// handleFrontend 返回内置的只读搜索页面 (路由前缀注入)
+func (s *RAGHTTPServer) handleFrontend(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-cache")
+	_, _ = w.Write([]byte(renderFrontendHTML(s.config.RoutePrefix)))
 }
 
 // Start 启动 HTTP 服务 (阻塞)
@@ -253,6 +266,11 @@ func (s *RAGHTTPServer) GetAddr() string {
 // GetRoutePrefix 返回路由前缀
 func (s *RAGHTTPServer) GetRoutePrefix() string {
 	return s.config.RoutePrefix
+}
+
+// IsFrontendEnabled 返回是否启用了内置前端页面
+func (s *RAGHTTPServer) IsFrontendEnabled() bool {
+	return s.config.ServeFrontend
 }
 
 // GetReadyCollections 返回当前可用的知识库集合 (拷贝)

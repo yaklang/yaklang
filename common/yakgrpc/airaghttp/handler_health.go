@@ -16,9 +16,14 @@ func (s *RAGHTTPServer) aiModeInfo() map[string]interface{} {
 			"domain": s.config.AI.Domain,
 		}
 	}
+	tier := "standard"
+	if s.config.UseBasicTier() {
+		tier = "basic"
+	}
 	return map[string]interface{}{
 		"mode": "tiered",
 		"type": s.config.AI.Type,
+		"tier": tier,
 	}
 }
 

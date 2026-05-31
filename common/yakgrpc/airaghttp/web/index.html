@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>RAG 知识库</title>
+<style>
+  /* 纯黑白主题: 浅色为默认, [data-theme=dark] 为夜间模式 */
+  :root {
+    --bg: #ffffff;
+    --fg: #111111;
+    --muted: #6b6b6b;
+    --faint: #9b9b9b;
+    --line: #e6e6e6;
+    --line-strong: #d0d0d0;
+    --user-bg: #f5f5f5;
+    --panel-bg: #fafafa;
+    --code-bg: #f6f6f6;
+    --accent: #111111;       /* 强调色=前景, 用于按钮/链接 */
+    --on-accent: #ffffff;    /* 强调色上的文字 */
+    --radius: 16px;
+    --shadow: 0 1px 2px rgba(0,0,0,.05), 0 6px 24px rgba(0,0,0,.06);
+    --maxw: 780px;
+  }
+  [data-theme="dark"] {
+    --bg: #0e0e0e;
+    --fg: #ededed;
+    --muted: #9a9a9a;
+    --faint: #6f6f6f;
+    --line: #262626;
+    --line-strong: #3a3a3a;
+    --user-bg: #1a1a1a;
+    --panel-bg: #151515;
+    --code-bg: #161616;
+    --accent: #ededed;
+    --on-accent: #0e0e0e;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 6px 24px rgba(0,0,0,.5);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+      "Hiragino Sans GB", "Microsoft YaHei", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 16px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+    transition: background .2s ease, color .2s ease;
+  }
+  .app { display: flex; flex-direction: column; height: 100vh; }
+
+  /* ---------- header ---------- */
+  header {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 13px 20px;
+    border-bottom: 1px solid var(--line);
+    background: var(--bg);
+    position: sticky; top: 0; z-index: 20;
+  }
+  .brand { display: flex; align-items: center; gap: 9px; font-weight: 600; font-size: 15px; }
+  .brand .dot {
+    width: 9px; height: 9px; border-radius: 50%;
+    background: var(--faint); transition: background .3s, box-shadow .3s;
+  }
+  .brand .dot.ok { background: var(--fg); box-shadow: 0 0 0 3px var(--user-bg); }
+  .brand .dot.bad { background: var(--faint); opacity: .5; }
+  .header-right { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 13px; }
+  .kb-count { white-space: nowrap; }
+  .theme-btn {
+    border: 1px solid var(--line-strong); background: var(--bg); color: var(--muted);
+    border-radius: 9px; width: 34px; height: 34px; cursor: pointer; display: inline-flex;
+    align-items: center; justify-content: center; transition: all .15s;
+  }
+  .theme-btn:hover { color: var(--fg); border-color: var(--faint); }
+  .theme-btn .moon { display: none; }
+  [data-theme="dark"] .theme-btn .sun { display: none; }
+  [data-theme="dark"] .theme-btn .moon { display: inline; }
+
+  /* ---------- composer (置顶) ---------- */
+  .composer-wrap {
+    flex: 0 0 auto; position: sticky; top: 0; z-index: 10;
+    background: var(--bg); border-bottom: 1px solid var(--line);
+    padding: 16px 20px 14px;
+  }
+  .composer {
+    max-width: var(--maxw); margin: 0 auto;
+    border: 1px solid var(--line-strong); border-radius: var(--radius);
+    box-shadow: var(--shadow); background: var(--bg);
+    display: flex; align-items: flex-end; gap: 8px; padding: 9px 9px 9px 16px;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .composer:focus-within { border-color: var(--fg); box-shadow: 0 0 0 3px var(--user-bg); }
+  .composer textarea {
+    flex: 1 1 auto; border: none; outline: none; resize: none;
+    font: inherit; line-height: 1.6; max-height: 180px; padding: 6px 0;
+    background: transparent; color: var(--fg);
+  }
+  .composer textarea::placeholder { color: var(--faint); }
+  .send-btn {
+    flex: 0 0 auto; width: 38px; height: 38px; border-radius: 10px; border: none;
+    background: var(--accent); color: var(--on-accent); cursor: pointer; display: inline-flex;
+    align-items: center; justify-content: center; transition: opacity .15s, transform .1s;
+  }
+  .send-btn:hover { opacity: .85; }
+  .send-btn:active { transform: scale(.94); }
+  .send-btn:disabled { background: var(--line-strong); cursor: not-allowed; }
+  .composer-hint { max-width: var(--maxw); margin: 8px auto 0; text-align: center; color: var(--faint); font-size: 12px; }
+
+  /* ---------- main scroll ---------- */
+  main { flex: 1 1 auto; overflow-y: auto; scroll-behavior: smooth; }
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 26px 20px 60px; }
+
+  /* hero (empty state) */
+  .hero { text-align: center; padding: 9vh 0 4vh; }
+  .hero h1 { font-size: 26px; font-weight: 650; margin: 0 0 10px; letter-spacing: -.01em; }
+  .hero p { color: var(--muted); margin: 0; font-size: 14.5px; }
+  .app.has-msg .hero { display: none; }
+
+  /* ---------- turns ---------- */
+  .turn { margin-bottom: 32px; }
+  .user-msg {
+    margin: 0 0 18px auto;
+    max-width: 88%;
+    width: fit-content;
+    background: var(--user-bg);
+    border: 1px solid var(--line);
+    border-radius: 14px 14px 4px 14px;
+    padding: 10px 14px;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .assistant .role {
+    display: flex; align-items: center; gap: 8px;
+    color: var(--muted); font-size: 13px; margin-bottom: 10px;
+  }
+  .assistant .role .badge {
+    width: 22px; height: 22px; border-radius: 6px;
+    background: var(--accent); color: var(--on-accent); font-size: 12px;
+    display: inline-flex; align-items: center; justify-content: center; font-weight: 700;
+  }
+
+  /* ---------- thinking / 思考过程 ---------- */
+  .thinking {
+    margin: 2px 0 16px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--panel-bg);
+    overflow: hidden;
+  }
+  .thinking-head {
+    display: flex; align-items: center; gap: 9px;
+    padding: 10px 14px; font-size: 14px; cursor: pointer; user-select: none;
+  }
+  .thinking-head .spark {
+    width: 14px; height: 14px; flex: 0 0 auto; color: var(--fg);
+    animation: spin 1.4s linear infinite;
+  }
+  .thinking.done .spark { animation: none; color: var(--faint); }
+  /* shimmer 文字 (流动高亮), 体现"在思考" */
+  .thinking-title {
+    font-weight: 600; letter-spacing: .01em;
+    background: linear-gradient(90deg, var(--faint) 20%, var(--fg) 50%, var(--faint) 80%);
+    background-size: 200% 100%;
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    animation: shimmer 1.8s linear infinite;
+  }
+  .thinking.done .thinking-title {
+    animation: none; -webkit-text-fill-color: var(--muted); color: var(--muted);
+  }
+  .thinking-head .elapsed { color: var(--faint); font-size: 12px; }
+  .thinking-head .chev { margin-left: auto; color: var(--faint); transition: transform .2s; font-size: 12px; }
+  .thinking.collapsed .chev { transform: rotate(-90deg); }
+  .thinking-body {
+    border-top: 1px solid var(--line);
+    padding: 8px 14px 12px;
+    max-height: 320px; overflow-y: auto;
+    transition: max-height .3s ease, padding .3s ease, opacity .2s ease;
+  }
+  .thinking.collapsed .thinking-body { max-height: 0; padding-top: 0; padding-bottom: 0; opacity: 0; border-top-color: transparent; }
+  @keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .step {
+    display: flex; gap: 10px; align-items: baseline; padding: 4px 0;
+    font-size: 13px; color: var(--muted); animation: stepin .25s ease;
+  }
+  @keyframes stepin { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: none; } }
+  .step .tag {
+    flex: 0 0 auto; min-width: 56px; font-size: 11px; padding: 1px 8px; border-radius: 999px;
+    border: 1px solid var(--line-strong); color: var(--fg); font-weight: 600;
+    text-align: center; white-space: nowrap; background: var(--bg);
+  }
+  .step.thought .tag { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+  .step .txt { word-break: break-word; flex: 1 1 auto; }
+  .step.thought .txt { white-space: pre-wrap; color: var(--fg); }
+
+  /* ---------- answer markdown ---------- */
+  .answer { font-size: 16px; word-break: break-word; }
+  .answer.empty { display: none; }
+  .answer p { margin: 0 0 12px; }
+  .answer h1,.answer h2,.answer h3,.answer h4 { line-height: 1.35; margin: 20px 0 10px; font-weight: 650; }
+  .answer h1 { font-size: 22px; } .answer h2 { font-size: 19px; }
+  .answer h3 { font-size: 17px; } .answer h4 { font-size: 15px; }
+  .answer ul,.answer ol { margin: 0 0 12px; padding-left: 22px; }
+  .answer li { margin: 4px 0; }
+  .answer code {
+    background: var(--code-bg); border: 1px solid var(--line);
+    padding: 1px 5px; border-radius: 5px; font-size: 13.5px;
+    font-family: "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  .answer pre {
+    background: var(--code-bg); border: 1px solid var(--line);
+    border-radius: 10px; padding: 13px 15px; overflow-x: auto; margin: 0 0 14px;
+  }
+  .answer pre code { background: none; border: none; padding: 0; font-size: 13px; }
+  .answer a { color: var(--fg); text-decoration: underline; text-underline-offset: 2px; }
+  .answer a:hover { opacity: .7; }
+  .answer blockquote {
+    margin: 0 0 12px; padding: 4px 14px; border-left: 3px solid var(--line-strong); color: var(--muted);
+  }
+  .answer hr { border: none; border-top: 1px solid var(--line); margin: 18px 0; }
+  .answer table { border-collapse: collapse; width: 100%; margin: 0 0 14px; font-size: 14px; display: block; overflow-x: auto; }
+  .answer th, .answer td { border: 1px solid var(--line); padding: 7px 11px; text-align: left; }
+  .answer th { background: var(--panel-bg); font-weight: 650; }
+  /* streaming caret */
+  .caret::after {
+    content: ""; display: inline-block; width: 7px; height: 1.05em;
+    background: var(--fg); margin-left: 2px; vertical-align: text-bottom;
+    animation: caret 1s steps(1) infinite; border-radius: 1px;
+  }
+  @keyframes caret { 50% { opacity: 0; } }
+
+  .error-box {
+    background: var(--user-bg); border: 1px solid var(--line-strong); color: var(--fg);
+    border-left: 3px solid var(--fg);
+    border-radius: 8px; padding: 10px 14px; font-size: 14px; margin: 6px 0 0;
+  }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header>
+    <div class="brand">
+      <span class="dot" id="health-dot" title="服务状态"></span>
+      <span>RAG 知识库</span>
+    </div>
+    <div class="header-right">
+      <span class="kb-count" id="kb-count">连接中...</span>
+      <button class="theme-btn" id="theme-btn" title="切换夜间模式" aria-label="切换夜间模式">
+        <svg class="sun" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+        <svg class="moon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="composer-wrap">
+    <div class="composer">
+      <textarea id="input" rows="1" placeholder="向知识库提问..." autofocus></textarea>
+      <button class="send-btn" id="send" title="发送 (Enter)" aria-label="发送">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+      </button>
+    </div>
+    <div class="composer-hint">Enter 发送 · Shift+Enter 换行</div>
+  </div>
+
+  <main id="main">
+    <div class="wrap">
+      <div class="hero">
+        <h1>有什么可以帮你？</h1>
+        <p>基于本地知识库的智能问答 · 在上方输入问题后回车开始</p>
+      </div>
+      <div id="transcript"></div>
+    </div>
+  </main>
+</div>
+
+<script>
+"use strict";
+(function () {
+  // 路由前缀由服务端在 serve 时注入; 直接打开文件时回退默认值
+  var RAW_PREFIX = "__RAG_ROUTE_PREFIX__";
+  var PREFIX = RAW_PREFIX.indexOf("__RAG_ROUTE") === 0 ? "/api/rag-server" : RAW_PREFIX;
+  var API = (location.origin && location.origin !== "null" ? location.origin : "") + PREFIX;
+
+  // ---------- theme (黑白 + 夜间模式) ----------
+  var THEME_KEY = "airaghttp_theme";
+  function applyTheme(t) {
+    if (t === "dark") document.documentElement.setAttribute("data-theme", "dark");
+    else document.documentElement.removeAttribute("data-theme");
+  }
+  (function initTheme() {
+    var saved = "";
+    try { saved = localStorage.getItem(THEME_KEY) || ""; } catch (e) {}
+    if (!saved) {
+      saved = (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light";
+    }
+    applyTheme(saved);
+  })();
+  document.getElementById("theme-btn").addEventListener("click", function () {
+    var cur = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+    applyTheme(cur);
+    try { localStorage.setItem(THEME_KEY, cur); } catch (e) {}
+  });
+
+  var app = document.getElementById("app");
+  var main = document.getElementById("main");
+  var transcript = document.getElementById("transcript");
+  var input = document.getElementById("input");
+  var sendBtn = document.getElementById("send");
+  var healthDot = document.getElementById("health-dot");
+  var kbCount = document.getElementById("kb-count");
+
+  var busy = false;
+  var aborter = null;
+
+  // ---------- utils ----------
+  function el(tag, cls, html) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (html != null) e.innerHTML = html;
+    return e;
+  }
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function nearBottom() { return main.scrollHeight - main.scrollTop - main.clientHeight < 140; }
+  function scrollDown(force) { if (force || nearBottom()) main.scrollTop = main.scrollHeight; }
+
+  // ---------- 自包含 markdown 渲染 (完全静态, 无外部依赖) ----------
+  function renderMarkdown(src) {
+    if (!src) return "";
+    var codeBlocks = [];
+    src = src.replace(/```([\w-]*)\n?([\s\S]*?)```/g, function (_, lang, code) {
+      var idx = codeBlocks.length;
+      codeBlocks.push('<pre><code>' + escapeHtml(code.replace(/\n$/, "")) + '</code></pre>');
+      return "\u0000CB" + idx + "\u0000";
+    });
+
+    var lines = src.split("\n");
+    var out = [];
+    var listType = null;
+    var para = [];
+
+    function flushPara() {
+      if (!para.length) return;
+      out.push("<p>" + inline(para.join(" ")) + "</p>");
+      para = [];
+    }
+    function closeList() { if (listType) { out.push("</" + listType + ">"); listType = null; } }
+    function inline(t) {
+      t = escapeHtml(t);
+      t = t.replace(/`([^`]+)`/g, function (_, c) { return "<code>" + c + "</code>"; });
+      t = t.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+      t = t.replace(/__([^_]+)__/g, "<strong>$1</strong>");
+      t = t.replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<em>$2</em>");
+      t = t.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
+        '<a href="$2" target="_blank" rel="noopener">$1</a>');
+      t = t.replace(/\u0000CB(\d+)\u0000/g, function (_, i) { return codeBlocks[+i] || ""; });
+      return t;
+    }
+    function splitRow(row) {
+      row = row.trim().replace(/^\|/, "").replace(/\|$/, "");
+      return row.split("|").map(function (c) { return c.trim(); });
+    }
+
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+      var cb = line.match(/^\u0000CB(\d+)\u0000$/);
+      if (cb) { flushPara(); closeList(); out.push(codeBlocks[+cb[1]] || ""); continue; }
+      if (/^\s*$/.test(line)) { flushPara(); closeList(); continue; }
+
+      // 水平分割线
+      if (/^\s*([-*_])\s*(\1\s*){2,}$/.test(line)) { flushPara(); closeList(); out.push("<hr>"); continue; }
+
+      // 表格 (GFM): 当前行含 | 且下一行为分隔行
+      if (line.indexOf("|") >= 0 && i + 1 < lines.length &&
+          /^\s*\|?\s*:?-{1,}:?\s*(\|\s*:?-{1,}:?\s*)+\|?\s*$/.test(lines[i + 1])) {
+        flushPara(); closeList();
+        var header = splitRow(line);
+        i++; // 跳过分隔行
+        var rows = [];
+        while (i + 1 < lines.length && lines[i + 1].indexOf("|") >= 0 && !/^\s*$/.test(lines[i + 1])) {
+          i++; rows.push(splitRow(lines[i]));
+        }
+        var tb = ["<table><thead><tr>"];
+        for (var hi = 0; hi < header.length; hi++) tb.push("<th>" + inline(header[hi]) + "</th>");
+        tb.push("</tr></thead><tbody>");
+        for (var ri = 0; ri < rows.length; ri++) {
+          tb.push("<tr>");
+          for (var ci = 0; ci < header.length; ci++) tb.push("<td>" + inline(rows[ri][ci] || "") + "</td>");
+          tb.push("</tr>");
+        }
+        tb.push("</tbody></table>");
+        out.push(tb.join(""));
+        continue;
+      }
+
+      var h = line.match(/^(#{1,4})\s+(.*)$/);
+      if (h) { flushPara(); closeList(); out.push("<h" + h[1].length + ">" + inline(h[2]) + "</h" + h[1].length + ">"); continue; }
+
+      var quote = line.match(/^>\s?(.*)$/);
+      if (quote) { flushPara(); closeList(); out.push("<blockquote>" + inline(quote[1]) + "</blockquote>"); continue; }
+
+      var ul = line.match(/^\s*[-*+]\s+(.*)$/);
+      var ol = line.match(/^\s*\d+\.\s+(.*)$/);
+      if (ul || ol) {
+        flushPara();
+        var want = ul ? "ul" : "ol";
+        if (listType && listType !== want) closeList();
+        if (!listType) { listType = want; out.push("<" + want + ">"); }
+        out.push("<li>" + inline(ul ? ul[1] : ol[1]) + "</li>");
+        continue;
+      }
+      closeList();
+      para.push(line);
+    }
+    flushPara(); closeList();
+    return out.join("\n");
+  }
+
+  // ---------- 步骤标签 (执行轨迹本质也是思考过程) ----------
+  var LOCAL_PATH_RE = /(?:[A-Za-z]:\\[^\s"']+|\/(?:Users|home|root|var|tmp|opt|private|data)\/[^\s"':,)]+|yakit-projects|aispace)/;
+  function isNoiseStep(kind, message) {
+    if (!message) return true;
+    if (LOCAL_PATH_RE.test(message)) return true;
+    var k = (kind || "").toLowerCase();
+    if (k.indexOf("filesystem") >= 0 || k.indexOf("pin_") >= 0 || k === "notify" || k === "title" || k === "session_title") return true;
+    return false;
+  }
+  // 把后端 kind/message 归一为中文标签: 思考 / 获取资料 / 正在压缩 / 评估 / 规划 ...
+  function stepLabel(kind, message) {
+    var m = message || "";
+    if (kind === "thought") return "思考";
+    if (kind === "progress") {
+      if (/压缩|compress/i.test(m)) return "正在压缩";
+      if (/评估|下一步|eval|next/i.test(m)) return "评估";
+      if (/搜索|检索|资料|知识|收集|search|collect/i.test(m)) return "获取资料";
+      if (/初始|准备|加载|init|load/i.test(m)) return "准备";
+      if (/验证|校验|valid/i.test(m)) return "校验";
+      if (/生成|总结|summary|generat/i.test(m)) return "整理";
+      return "进展";
+    }
+    if (kind === "search") return "获取资料";
+    if (kind === "timeline") {
+      if (/压缩|compress/i.test(m)) return "正在压缩";
+      if (/搜索|检索|资料|知识|knowledge|collect/i.test(m)) return "获取资料";
+      if (/初始|init/i.test(m)) return "准备";
+      return "进展";
+    }
+    if (kind === "plan") return "规划";
+    if (kind === "task") return "任务";
+    return "进展";
+  }
+  // 提炼简洁文案: 取首条有意义行, 去掉装饰符号并截断
+  function cleanStepMessage(msg) {
+    var parts = String(msg).split("\n");
+    var line = "";
+    for (var i = 0; i < parts.length; i++) {
+      var s = parts[i].replace(/^[\s=#>*\-]+/, "").replace(/[\s=*\-]+$/, "").trim();
+      if (s) { line = s; break; }
+    }
+    if (!line) line = String(msg).trim();
+    line = line.replace(/\s+/g, " ");
+    if (line.length > 110) line = line.slice(0, 110) + "…";
+    return line;
+  }
+
+  var MAX_STEPS = 40; // 保留参考资料但限制 DOM 体量
+
+  // ---------- one assistant turn controller ----------
+  function newTurn(question) {
+    app.classList.add("has-msg");
+
+    var turn = el("div", "turn");
+    var u = el("div", "user-msg");
+    u.textContent = question;
+    turn.appendChild(u);
+
+    var a = el("div", "assistant");
+    a.appendChild(el("div", "role", '<span class="badge">R</span><span>知识库助手</span>'));
+
+    var thinking = el("div", "thinking");
+    var head = el("div", "thinking-head");
+    head.innerHTML =
+      '<svg class="spark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg>' +
+      '<span class="thinking-title">思考中</span>' +
+      '<span class="elapsed"></span>' +
+      '<span class="chev">&#9662;</span>';
+    var body = el("div", "thinking-body");
+    var steps = el("div", "steps");
+    body.appendChild(steps);
+    thinking.appendChild(head);
+    thinking.appendChild(body);
+    thinking.style.display = "none";
+    a.appendChild(thinking);
+
+    head.addEventListener("click", function () { thinking.classList.toggle("collapsed"); });
+
+    var answer = el("div", "answer empty caret");
+    a.appendChild(answer);
+
+    turn.appendChild(a);
+    transcript.appendChild(turn);
+    scrollDown(true);
+
+    var titleEl = head.querySelector(".thinking-title");
+    var elapsedEl = head.querySelector(".elapsed");
+    var thoughtRow = null;   // "思考" 行, 原地更新
+    var thoughtRaw = "";
+    var answerRaw = "";
+    var stepCount = 0;
+    var lastStepKey = "";
+    var shown = false;
+    var startedAt = Date.now();
+    var timer = setInterval(function () {
+      if (elapsedEl) elapsedEl.textContent = ((Date.now() - startedAt) / 1000).toFixed(0) + "s";
+    }, 500);
+
+    function showThinking() { if (!shown) { shown = true; thinking.style.display = ""; } }
+    function setTitle(t) { if (titleEl && !thinking.classList.contains("done")) titleEl.textContent = t; }
+    function makeStep(labelText, txt, isThought) {
+      var item = el("div", isThought ? "step thought" : "step");
+      item.appendChild(el("span", "tag", escapeHtml(labelText)));
+      item.appendChild(el("span", "txt", escapeHtml(txt)));
+      return item;
+    }
+
+    return {
+      onThought: function (chunk) {
+        showThinking();
+        thoughtRaw += chunk;
+        if (!thoughtRow) {
+          thoughtRow = makeStep("思考", thoughtRaw, true);
+          steps.appendChild(thoughtRow);
+        } else {
+          thoughtRow.querySelector(".txt").textContent = thoughtRaw;
+        }
+        setTitle("思考中");
+        scrollDown();
+      },
+      onStep: function (kind, message) {
+        if (isNoiseStep(kind, message)) return;
+        var labelText = stepLabel(kind, message);
+        var txt = cleanStepMessage(message);
+        if (!txt) return;
+        var key = labelText + "|" + txt;
+        if (key === lastStepKey) return; // 跳过连续重复
+        lastStepKey = key;
+        showThinking();
+        setTitle(labelText);
+        steps.appendChild(makeStep(labelText, txt, false));
+        stepCount++;
+        // 控制体量: 超量时移除最早的非思考步骤
+        while (stepCount > MAX_STEPS) {
+          var first = steps.querySelector(".step:not(.thought)");
+          if (!first) break;
+          steps.removeChild(first); stepCount--;
+        }
+        scrollDown();
+      },
+      onAnswer: function (chunk) {
+        answerRaw += chunk;
+        answer.classList.remove("empty");
+        answer.innerHTML = renderMarkdown(answerRaw);
+        answer.classList.add("caret");
+        setTitle("正在输出结果");
+        if (shown && !thinking.classList.contains("collapsed")) thinking.classList.add("collapsed");
+        scrollDown();
+      },
+      onError: function (msg) {
+        answer.classList.remove("caret");
+        var box = el("div", "error-box");
+        box.textContent = msg;
+        a.appendChild(box);
+        scrollDown();
+      },
+      finish: function () {
+        clearInterval(timer);
+        answer.classList.remove("caret");
+        if (!answerRaw && !a.querySelector(".error-box")) {
+          answer.classList.remove("empty");
+          answer.innerHTML = '<p style="color:var(--muted)">没有得到回答内容。</p>';
+        }
+        // 完成后折叠思考过程(保留可展开查看"参考了哪些资料"), 不再撑大界面
+        thinking.classList.add("done");
+        if (shown) {
+          var secs = ((Date.now() - startedAt) / 1000).toFixed(0);
+          if (titleEl) titleEl.textContent = "已完成思考 · 用时 " + secs + "s";
+          if (elapsedEl) elapsedEl.textContent = "";
+          thinking.classList.add("collapsed");
+        } else if (thinking.parentNode) {
+          thinking.parentNode.removeChild(thinking);
+        }
+        scrollDown();
+      }
+    };
+  }
+
+  // ---------- SSE streaming over fetch ----------
+  function parseSSEChunk(buffer, onEvent) {
+    var blocks = buffer.split("\n\n");
+    var rest = blocks.pop();
+    for (var i = 0; i < blocks.length; i++) {
+      var block = blocks[i];
+      var ev = null, data = null;
+      var bl = block.split("\n");
+      for (var j = 0; j < bl.length; j++) {
+        var line = bl[j];
+        if (line.indexOf("event:") === 0) ev = line.slice(6).trim();
+        else if (line.indexOf("data:") === 0) data = line.slice(5).trim();
+      }
+      if (ev) {
+        var parsed = null;
+        if (data) { try { parsed = JSON.parse(data); } catch (e) { parsed = { message: data }; } }
+        onEvent(ev, parsed);
+      }
+    }
+    return rest;
+  }
+
+  async function ask(question) {
+    if (busy) return;
+    busy = true;
+    setSendStop(true);
+    input.value = "";
+    autosize();
+
+    var turn = newTurn(question);
+    aborter = new AbortController();
+
+    var res;
+    try {
+      res = await fetch(API + "/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: question }),
+        signal: aborter.signal
+      });
+    } catch (e) {
+      turn.onError("无法连接到服务: " + e.message);
+      turn.finish(); doneState(); return;
+    }
+
+    if (res.status === 401) {
+      turn.onError("未授权 (401): 服务端启用了访问令牌, 当前前端为只读公开模式, 无法访问。");
+      turn.finish(); doneState(); return;
+    }
+    if (!res.ok && res.status !== 200) {
+      var txt = "";
+      try { txt = await res.text(); } catch (e) {}
+      turn.onError("请求失败 (" + res.status + ") " + txt);
+      turn.finish(); doneState(); return;
+    }
+
+    var reader = res.body.getReader();
+    var decoder = new TextDecoder();
+    var buffer = "";
+    var ended = false;
+
+    function handle(ev, d) {
+      switch (ev) {
+        case "start": break;
+        case "thought": turn.onThought((d && d.chunk) || ""); break;
+        case "answer": turn.onAnswer((d && d.chunk) || ""); break;
+        case "log": if (d) turn.onStep(d.kind || "event", d.message || ""); break;
+        case "error": turn.onError((d && d.message) || "发生错误"); break;
+        case "end": ended = true; break;
+      }
+    }
+
+    try {
+      while (true) {
+        var r = await reader.read();
+        if (r.done) break;
+        buffer += decoder.decode(r.value, { stream: true });
+        buffer = parseSSEChunk(buffer, handle);
+        if (ended) break;
+      }
+    } catch (e) {
+      if (!(aborter && aborter.signal.aborted)) turn.onError("流式连接中断: " + e.message);
+    }
+
+    turn.finish();
+    doneState();
+  }
+
+  function doneState() { busy = false; aborter = null; setSendStop(false); input.focus(); }
+
+  // ---------- send / stop ----------
+  function setSendStop(isStop) {
+    if (isStop) {
+      sendBtn.title = "停止";
+      sendBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
+    } else {
+      sendBtn.title = "发送 (Enter)";
+      sendBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>';
+    }
+  }
+  function trigger() {
+    if (busy) { if (aborter) aborter.abort(); return; }
+    var q = input.value.trim();
+    if (!q) return;
+    ask(q);
+  }
+  sendBtn.addEventListener("click", trigger);
+  input.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); trigger(); }
+  });
+
+  function autosize() {
+    input.style.height = "auto";
+    input.style.height = Math.min(input.scrollHeight, 180) + "px";
+  }
+  input.addEventListener("input", autosize);
+
+  // ---------- health ----------
+  async function refreshHealth() {
+    try {
+      var res = await fetch(API + "/health");
+      if (res.status === 401) { healthDot.className = "dot bad"; kbCount.textContent = "需令牌(只读模式)"; return; }
+      if (!res.ok) throw new Error(String(res.status));
+      var h = await res.json();
+      healthDot.className = "dot ok";
+      var n = h.collectionCount != null ? h.collectionCount : (h.collections ? h.collections.length : 0);
+      kbCount.textContent = n + " 个知识库";
+    } catch (e) {
+      healthDot.className = "dot bad";
+      kbCount.textContent = "服务不可用";
+    }
+  }
+
+  refreshHealth();
+  setInterval(refreshHealth, 15000);
+  autosize();
+})();
+</script>
+</body>
+</html>

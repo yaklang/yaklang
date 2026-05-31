@@ -150,6 +150,11 @@ var ragServerCommand = &cli.Command{
 			Usage: "max simultaneous chat requests (override config)",
 		},
 		cli.StringFlag{
+			Name:  "ai-tier",
+			Value: "basic",
+			Usage: "model tier when using global tiered aiconfig: basic (lightweight, default) or standard (intelligent)",
+		},
+		cli.StringFlag{
 			Name:  "ai-type",
 			Usage: "AI service type (override config)",
 		},
@@ -164,6 +169,10 @@ var ragServerCommand = &cli.Command{
 		cli.StringFlag{
 			Name:  "ai-domain",
 			Usage: "AI service domain (override config)",
+		},
+		cli.BoolTFlag{
+			Name:  "fe",
+			Usage: "serve the built-in read-only search web UI at the root path (default: on; use --fe=false to disable)",
 		},
 		cli.BoolFlag{
 			Name:  "debug",
@@ -191,6 +200,8 @@ var ragServerCommand = &cli.Command{
 			airaghttp.WithAuthToken(c.String("auth-token")),
 			airaghttp.WithConcurrent(c.Int("concurrent")),
 			airaghttp.WithAIService(c.String("ai-type"), c.String("ai-model"), c.String("ai-apikey"), c.String("ai-domain")),
+			airaghttp.WithAITier(c.String("ai-tier")),
+			airaghttp.WithServeFrontend(c.Bool("fe")),
 			airaghttp.WithDebug(c.Bool("debug")),
 		}
 		if ragFiles := c.String("rag-files"); ragFiles != "" {
@@ -233,6 +244,9 @@ func printRAGServerStartupInfo(server *airaghttp.RAGHTTPServer) {
 	fmt.Printf("  Collections:  http://%s%s/collections\n", addr, prefix)
 	fmt.Printf("  Search:       http://%s%s/search\n", addr, prefix)
 	fmt.Printf("  Chat (SSE):   http://%s%s/chat?q=...\n", addr, prefix)
+	if server.IsFrontendEnabled() {
+		fmt.Printf("  Web UI:       http://%s/   (built-in read-only search page)\n", addr)
+	}
 	fmt.Printf("  Ready KBs:    %d\n", len(server.GetReadyCollections()))
 	fmt.Println()
 	fmt.Println("Press Ctrl+C to stop.")
