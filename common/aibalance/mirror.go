@@ -358,6 +358,12 @@ type MirrorRunLog struct {
 	Success      bool      `json:"success"`
 	ErrorMessage string    `json:"error_message"`
 	Stdout       string    `json:"stdout"`
+
+	// save() 调用反馈: 让运行日志也能看出这次有没有落盘、落了多少。
+	// 关键词: MirrorRunLog save_calls/save_persisted/save_bytes, save 可观测
+	SaveCalls     int   `json:"save_calls"`
+	SavePersisted int   `json:"save_persisted"`
+	SaveBytes     int64 `json:"save_bytes"`
 }
 
 const mirrorLogRingCap = 100
@@ -562,6 +568,7 @@ func (m *MirrorManager) runOnce(parentCtx context.Context, rt *mirrorRuleRuntime
 	start := time.Now()
 	var execErr error
 	var stdout string
+	var saveStat saveOutcome
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -569,16 +576,22 @@ func (m *MirrorManager) runOnce(parentCtx context.Context, rt *mirrorRuleRuntime
 		}
 		dur := time.Since(start)
 		runLog := MirrorRunLog{
-			Timestamp:  start,
-			ReqID:      snap.ReqID,
-			DurationMs: dur.Milliseconds(),
-			Success:    execErr == nil,
-			Stdout:     stdout,
+			Timestamp:     start,
+			ReqID:         snap.ReqID,
+			DurationMs:    dur.Milliseconds(),
+			Success:       execErr == nil,
+			Stdout:        stdout,
+			SaveCalls:     saveStat.Calls,
+			SavePersisted: saveStat.Persisted,
+			SaveBytes:     saveStat.Bytes,
 		}
 		if execErr != nil {
 			runLog.ErrorMessage = execErr.Error()
 			log.Warnf("mirror: rule id=%d name=%q req_id=%s failed: %v",
 				rule.ID, rule.Name, snap.ReqID, execErr)
+		} else if saveStat.Calls > 0 {
+			log.Infof("mirror: rule id=%d name=%q req_id=%s save calls=%d persisted=%d bytes=%d",
+				rule.ID, rule.Name, snap.ReqID, saveStat.Calls, saveStat.Persisted, saveStat.Bytes)
 		}
 		rt.logs.push(runLog)
 		// 写库: 触发 +1, 成功 / 失败 +1 (二者只有一个会真正写)
@@ -593,7 +606,7 @@ func (m *MirrorManager) runOnce(parentCtx context.Context, rt *mirrorRuleRuntime
 		}
 	}()
 
-	execErr, stdout = executeMirrorScript(ctx, rule.CallbackScript, snap, true)
+	execErr, stdout, saveStat = executeMirrorScript(ctx, rule.CallbackScript, snap, true)
 }
 
 // executeMirrorScript 真正调用 yak ScriptEngine.
@@ -602,15 +615,33 @@ func (m *MirrorManager) runOnce(parentCtx context.Context, rt *mirrorRuleRuntime
 // 通过 yak ScriptEngine 的 params 传入 (用户脚本里也可以通过
 // getParam("MIRROR_DATA") 自行获取).
 //
+// saveOutcome 汇总单次脚本执行里 save() 的调用情况, 供试运行面板与运行日志展示,
+// 让用户清楚 save 调没调、写了多少、生产是否会真落盘。
+// 关键词: saveOutcome, save 可观测性, 试运行/日志反馈
+type saveOutcome struct {
+	Calls     int    `json:"calls"`     // save() 被调用次数
+	Persisted int    `json:"persisted"` // 实际写盘成功次数 (试运行恒为 0)
+	Bytes     int64  `json:"bytes"`     // 序列化后总字节 (即将/已写入)
+	Enabled   bool   `json:"enabled"`   // 落盘子系统当前是否启用 (生产是否会真落)
+	Preview   string `json:"preview"`   // 首次 save 的内容预览 (截断)
+}
+
+// savePreviewLimit 是 save 预览的截断长度。
+const savePreviewLimit = 800
+
 // allowPersist 控制注入的 save() 是否真正落盘: 生产触发为 true; 面板「试运行」为 false,
-// 避免试运行污染落盘数据。save() 注入为可直接调用的全局函数 (SetVars), 语义:
+// 避免试运行污染落盘数据。无论是否落盘, 都会记录 save() 的调用情况 (saveOutcome) 以反馈给用户。
+// save() 注入为可直接调用的全局函数 (SetVars), 语义:
 //   - save()      落盘当前镜像数据 (即 handle 的入参 data)
 //   - save(x)     落盘任意可序列化对象 x
 //
-// 关键词: executeMirrorScript, yak engine ExecuteExWithContext, handle 调用, save 注入落盘
-func executeMirrorScript(ctx context.Context, script string, snap *MirrorSnapshot, allowPersist bool) (error, string) {
+// 返回值: (执行错误, stdout, save 调用汇总)。
+//
+// 关键词: executeMirrorScript, yak engine ExecuteExWithContext, handle 调用, save 注入落盘, saveOutcome 反馈
+func executeMirrorScript(ctx context.Context, script string, snap *MirrorSnapshot, allowPersist bool) (error, string, saveOutcome) {
+	outcome := saveOutcome{Enabled: dataSinkEnabled()}
 	if strings.TrimSpace(script) == "" {
-		return fmt.Errorf("empty script"), ""
+		return fmt.Errorf("empty script"), "", outcome
 	}
 	dataMap := snap.ToScriptMap()
 	const tail = "\n\n// auto-injected by aibalance mirror runner\n" +
@@ -618,19 +649,43 @@ func executeMirrorScript(ctx context.Context, script string, snap *MirrorSnapsho
 		"handle(__mirror_data)\n"
 	wrapped := script + tail
 
-	// save() 闭包: 默认落盘当前快照, 也可传入自定义内容。受 allowPersist 与全局 sink 双重控制。
+	// save() 闭包: 默认落盘当前快照, 也可传入自定义内容。无论是否真正落盘, 都记录调用情况。
+	// 试运行 (allowPersist=false) 时不写盘, 返回值按「生产是否启用」回放, 便于脚本逻辑分支贴近真实。
+	var saveMu sync.Mutex
 	saveFn := func(args ...any) bool {
-		if !allowPersist {
-			return false
-		}
 		var payload any = dataMap
 		if len(args) > 0 && args[0] != nil {
 			payload = args[0]
+		}
+		raw, mErr := json.Marshal(payload)
+
+		saveMu.Lock()
+		outcome.Calls++
+		if mErr == nil {
+			outcome.Bytes += int64(len(raw))
+			if outcome.Preview == "" {
+				preview := string(raw)
+				if len(preview) > savePreviewLimit {
+					preview = preview[:savePreviewLimit] + "...(truncated)"
+				}
+				outcome.Preview = preview
+			}
+		}
+		saveMu.Unlock()
+
+		if !allowPersist {
+			// 试运行: 不落盘, 返回「生产环境是否会落盘」, 让脚本里的 if save() 分支贴近真实。
+			return outcome.Enabled
 		}
 		ok, err := dataSinkAppend(payload)
 		if err != nil {
 			log.Warnf("mirror: save record failed (req_id=%s): %v", snap.ReqID, err)
 			return false
+		}
+		if ok {
+			saveMu.Lock()
+			outcome.Persisted++
+			saveMu.Unlock()
 		}
 		return ok
 	}
@@ -647,9 +702,9 @@ func executeMirrorScript(ctx context.Context, script string, snap *MirrorSnapsho
 	}
 	_, err := engine.ExecuteExWithContext(ctx, wrapped, params)
 	if err != nil {
-		return err, ""
+		return err, "", outcome
 	}
-	return nil, ""
+	return nil, "", outcome
 }
 
 // ==================== Trigger / Dispatch ====================
@@ -788,9 +843,19 @@ func (m *MirrorManager) GetRecentLogs(id uint) []MirrorRunLog {
 	return rt.logs.snapshot()
 }
 
-// RunOnceForTest 直接同步执行一次回调脚本 (不入 ch, 不计 DB 计数).
-// 供 /portal/api/mirror-rules/{id}/test 试运行用.
-func (m *MirrorManager) RunOnceForTest(script string, snap *MirrorSnapshot, timeoutMs int64) (success bool, errMsg string, durationMs int64) {
+// MirrorTestResult 是试运行的结构化结果, 除成功/耗时外, 额外带 save() 调用反馈,
+// 让用户在面板上直观看到 save 调没调、会写多少、生产是否会真落盘。
+// 关键词: MirrorTestResult, 试运行 save 反馈
+type MirrorTestResult struct {
+	Executed     bool
+	ErrorMessage string
+	DurationMs   int64
+	Save         saveOutcome
+}
+
+// RunOnceForTest 直接同步执行一次回调脚本 (不入 ch, 不计 DB 计数, 不真正落盘).
+// 供 /portal/api/mirror-rules/{id}/test 试运行用; 返回结果含 save() 调用汇总。
+func (m *MirrorManager) RunOnceForTest(script string, snap *MirrorSnapshot, timeoutMs int64) (result MirrorTestResult) {
 	if timeoutMs <= 0 {
 		timeoutMs = 30000
 	}
@@ -799,19 +864,24 @@ func (m *MirrorManager) RunOnceForTest(script string, snap *MirrorSnapshot, time
 	start := time.Now()
 	defer func() {
 		if r := recover(); r != nil {
-			success = false
-			errMsg = fmt.Sprintf("script panic: %v", r)
+			result.Executed = false
+			result.ErrorMessage = fmt.Sprintf("script panic: %v", r)
+			result.DurationMs = time.Since(start).Milliseconds()
 		}
 	}()
 	if snap == nil {
 		snap = &MirrorSnapshot{ReqID: utils.RandStringBytes(8), TimestampMs: time.Now().UnixMilli()}
 	}
-	err, _ := executeMirrorScript(ctx, script, snap, false)
-	durationMs = time.Since(start).Milliseconds()
+	err, _, saveStat := executeMirrorScript(ctx, script, snap, false)
+	result.DurationMs = time.Since(start).Milliseconds()
+	result.Save = saveStat
 	if err != nil {
-		return false, err.Error(), durationMs
+		result.Executed = false
+		result.ErrorMessage = err.Error()
+		return result
 	}
-	return true, "", durationMs
+	result.Executed = true
+	return result
 }
 
 // Close 关停所有规则的 worker, 用于服务退出.

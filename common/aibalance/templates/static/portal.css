@@ -2253,6 +2253,73 @@
     word-break: break-word;
 }
 
+/* 折叠触发条: 多个 toggle 并排 */
+.mirror-rec-toggle-bar {
+    display: flex;
+    gap: 16px;
+    margin-top: 6px;
+}
+
+/* 请求/响应对照: 两列并排, 窄屏自动换行 */
+.mirror-rec-compare {
+    display: flex;
+    gap: 12px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+}
+
+.mirror-rec-col {
+    flex: 1 1 320px;
+    min-width: 280px;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.mirror-rec-col-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 5px 10px;
+    background: #eef2f6;
+    border-bottom: 1px solid #e0e0e0;
+    font-size: 12px;
+    font-weight: 600;
+    color: #37474f;
+}
+
+.mirror-rec-copy-btn {
+    height: 22px;
+    padding: 0 10px;
+    font-size: 11px;
+    border: 1px solid #cfd8dc;
+    border-radius: 3px;
+    background: #fff;
+    color: #1565c0;
+    cursor: pointer;
+}
+
+.mirror-rec-copy-btn:hover {
+    background: #f1f8ff;
+    border-color: #90caf9;
+}
+
+.mirror-rec-text {
+    margin: 0;
+    padding: 10px;
+    background: #0b1220;
+    color: #e2e8f0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    max-height: 360px;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
 .mirror-status-badge {
     display: inline-block;
     padding: 2px 8px;
@@ -2597,6 +2664,29 @@
 
 .mirror-test-status-ok   { color: #4ade80; }
 .mirror-test-status-fail { color: #f87171; }
+
+/* save() 试运行反馈块 */
+.mirror-test-save {
+    margin: 8px 0;
+    padding: 6px 10px;
+    background: rgba(148, 163, 184, 0.08);
+    border-left: 3px solid #64748b;
+    border-radius: 3px;
+}
+
+.mirror-test-save-preview {
+    margin: 4px 0 0 0;
+    padding: 6px 8px;
+    background: #0b1220;
+    border: 1px solid #1e293b;
+    border-radius: 3px;
+    color: #cbd5e1;
+    font-size: 11px;
+    max-height: 140px;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
 
 .mirror-modal-actions {
     margin-top: 18px;

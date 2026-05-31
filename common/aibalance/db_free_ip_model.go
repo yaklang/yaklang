@@ -31,15 +31,17 @@ func EnsureFreeUserIPModelDailyUsageTable() error {
 
 // upsertFreeUserIPModelDailyUsage 是 (date, ip, model) 维度的 UPSERT 累加。
 // 空 IP / unknown 直接放行；空 model 也跳过（无法归类）。
-// 关键词: upsertFreeUserIPModelDailyUsage, gorm.Expr 累加, 并发竞态 fallback
-func upsertFreeUserIPModelDailyUsage(date, ip, model string, deltaReq, deltaTokens int64) error {
+// deltaRawTokens 是原始 Token 数量（数量，所有免费模型都累加）；
+// deltaWeighted 是加权/计费 Token（金额基准，仅计费模型 >0，不计费模型传 0）。
+// 关键词: upsertFreeUserIPModelDailyUsage, gorm.Expr 累加, 原始Token+加权Token, 并发竞态 fallback
+func upsertFreeUserIPModelDailyUsage(date, ip, model string, deltaReq, deltaRawTokens, deltaWeighted int64) error {
 	if date == "" {
 		return fmt.Errorf("upsertFreeUserIPModelDailyUsage: date is empty")
 	}
 	if freeIPUsageIgnoredIP(ip) || model == "" {
 		return nil
 	}
-	if deltaReq <= 0 && deltaTokens <= 0 {
+	if deltaReq <= 0 && deltaRawTokens <= 0 && deltaWeighted <= 0 {
 		return nil
 	}
 	db := freeIPModelDB()
@@ -51,8 +53,11 @@ func upsertFreeUserIPModelDailyUsage(date, ip, model string, deltaReq, deltaToke
 		if deltaReq > 0 {
 			updates["request_count"] = gorm.Expr("request_count + ?", deltaReq)
 		}
-		if deltaTokens > 0 {
-			updates["tokens_used"] = gorm.Expr("tokens_used + ?", deltaTokens)
+		if deltaRawTokens > 0 {
+			updates["tokens_used"] = gorm.Expr("tokens_used + ?", deltaRawTokens)
+		}
+		if deltaWeighted > 0 {
+			updates["weighted_tokens"] = gorm.Expr("weighted_tokens + ?", deltaWeighted)
 		}
 		return db.Model(&FreeUserIPModelDailyUsage{}).Where("id = ?", id).Updates(updates).Error
 	}
@@ -67,12 +72,13 @@ func upsertFreeUserIPModelDailyUsage(date, ip, model string, deltaReq, deltaToke
 	}
 
 	row = FreeUserIPModelDailyUsage{
-		Date:         date,
-		IP:           ip,
-		ModelName:    model,
-		RequestCount: deltaReq,
-		TokensUsed:   deltaTokens,
-		LastSeenAt:   time.Now(),
+		Date:           date,
+		IP:             ip,
+		ModelName:      model,
+		RequestCount:   deltaReq,
+		TokensUsed:     deltaRawTokens,
+		WeightedTokens: deltaWeighted,
+		LastSeenAt:     time.Now(),
 	}
 	if createErr := db.Create(&row).Error; createErr != nil {
 		// 并发竞态：另一个 goroutine 已先 Create，退化为 UPDATE 累加。
@@ -91,25 +97,35 @@ func AddFreeUserIPModelDailyRequest(ip, model string) error {
 	if freeIPUsageIgnoredIP(ip) || model == "" {
 		return nil
 	}
-	return upsertFreeUserIPModelDailyUsage(freeTokenNowDate(), ip, model, 1, 0)
+	return upsertFreeUserIPModelDailyUsage(freeTokenNowDate(), ip, model, 1, 0, 0)
 }
 
-// AddFreeUserIPModelDailyTokens 为某 (IP, model) 当天累加加权 Token。
-// 关键词: AddFreeUserIPModelDailyTokens, 按模型加权 Token 计费
-func AddFreeUserIPModelDailyTokens(ip, model string, weighted int64) error {
-	if weighted <= 0 || freeIPUsageIgnoredIP(ip) || model == "" {
+// AddFreeUserIPModelDailyUsageTokens 为某 (IP, model) 当天累加用量：
+// rawTokens 是原始 Token 数量（数量，所有免费模型都传真实值，含不计费模型）；
+// weighted 是加权/计费 Token（金额基准，不计费/豁免模型传 0）。
+// 这样面板能对不计费模型「计数量、不算钱」(¥0)。
+// 关键词: AddFreeUserIPModelDailyUsageTokens, 按模型 原始Token+加权Token, 不计费计数量
+func AddFreeUserIPModelDailyUsageTokens(ip, model string, rawTokens, weighted int64) error {
+	if freeIPUsageIgnoredIP(ip) || model == "" {
 		return nil
 	}
-	return upsertFreeUserIPModelDailyUsage(freeTokenNowDate(), ip, model, 0, weighted)
+	if rawTokens <= 0 && weighted <= 0 {
+		return nil
+	}
+	return upsertFreeUserIPModelDailyUsage(freeTokenNowDate(), ip, model, 0, rawTokens, weighted)
 }
 
 // FreeIPModelUsageRow 是单个 IP 的某个模型用量行，供面板「TOP 模型」展示。
-// 关键词: FreeIPModelUsageRow, per-IP 模型用量
+// TokensUsed/UsedM 是原始 Token 数量（数量，含不计费模型）；
+// WeightedTokens/WeightedM 是加权/计费 Token（金额基准，不计费模型为 0）。
+// 关键词: FreeIPModelUsageRow, per-IP 模型用量, 数量 vs 金额
 type FreeIPModelUsageRow struct {
-	Model        string  `json:"model"`
-	RequestCount int64   `json:"request_count"`
-	TokensUsed   int64   `json:"tokens_used"`
-	UsedM        float64 `json:"used_m"`
+	Model          string  `json:"model"`
+	RequestCount   int64   `json:"request_count"`
+	TokensUsed     int64   `json:"tokens_used"`
+	UsedM          float64 `json:"used_m"`
+	WeightedTokens int64   `json:"weighted_tokens"`
+	WeightedM      float64 `json:"weighted_m"`
 }
 
 // QueryFreeIPTopModelsBatch 一次取回当天给定若干 IP 的「按模型用量」并在内存里分组，
@@ -136,16 +152,23 @@ func QueryFreeIPTopModelsBatch(ips []string, topN int) (map[string][]FreeIPModel
 	grouped := make(map[string][]FreeIPModelUsageRow)
 	for _, r := range rows {
 		grouped[r.IP] = append(grouped[r.IP], FreeIPModelUsageRow{
-			Model:        r.ModelName,
-			RequestCount: r.RequestCount,
-			TokensUsed:   r.TokensUsed,
-			UsedM:        float64(r.TokensUsed) / float64(FreeUserTokenMUnit),
+			Model:          r.ModelName,
+			RequestCount:   r.RequestCount,
+			TokensUsed:     r.TokensUsed,
+			UsedM:          float64(r.TokensUsed) / float64(FreeUserTokenMUnit),
+			WeightedTokens: r.WeightedTokens,
+			WeightedM:      float64(r.WeightedTokens) / float64(FreeUserTokenMUnit),
 		})
 	}
 	for ip, list := range grouped {
+		// 按「原始 Token 数量」降序（数量是 TOP 排序依据，不计费模型也能凭真实用量上榜），
+		// 数量相同再看加权(金额)，最后看请求次数。
 		sort.Slice(list, func(i, j int) bool {
 			if list[i].TokensUsed != list[j].TokensUsed {
 				return list[i].TokensUsed > list[j].TokensUsed
+			}
+			if list[i].WeightedTokens != list[j].WeightedTokens {
+				return list[i].WeightedTokens > list[j].WeightedTokens
 			}
 			return list[i].RequestCount > list[j].RequestCount
 		})

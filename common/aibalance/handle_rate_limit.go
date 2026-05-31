@@ -575,10 +575,12 @@ func (c *ServerConfig) handleGetRateLimitStatus(conn net.Conn, request *http.Req
 			models := make([]map[string]interface{}, 0, 3)
 			for _, m := range topModelsByIP[r.IP] {
 				models = append(models, map[string]interface{}{
-					"model":         m.Model,
-					"request_count": m.RequestCount,
-					"tokens_used":   m.TokensUsed,
-					"used_m":        m.UsedM,
+					"model":           m.Model,
+					"request_count":   m.RequestCount,
+					"tokens_used":     m.TokensUsed,
+					"used_m":          m.UsedM,
+					"weighted_tokens": m.WeightedTokens,
+					"weighted_m":      m.WeightedM,
 				})
 			}
 			topOut = append(topOut, map[string]interface{}{

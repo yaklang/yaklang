@@ -242,7 +242,7 @@
                         <td class="copyable api-key-cell" data-full-text="${this.escapeHtml(p.api_key)}">
                             <div class="api-key-container">
                                 <span class="api-key-display">${p.api_key ? '•••••••' : ''}</span>
-                                <button class="btn btn-sm btn-copy" onclick="copyToClipboard('${this.escapeHtml(p.api_key)}')" title="复制 API Key">
+                                <button class="btn btn-sm btn-copy" onclick="copyToClipboard('${escapeJsInHtmlAttr(p.api_key)}')" title="复制 API Key">
                                     <svg viewBox="0 0 24 24" width="14" height="14">
                                         <path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
                                     </svg>
@@ -446,8 +446,8 @@
                         '<td class="copyable" data-full-text="' + self.escapeHtml(model.description || '') + '">' + (model.description || '-') + '</td>' +
                         '<td class="copyable" data-full-text="' + self.escapeHtml(model.tags || '') + '">' + (model.tags || '-') + '</td>' +
                         '<td class="text-center">' +
-                        '<button class="btn btn-sm" onclick="openEditModelModal(\'' + self.escapeHtml(model.name) + '\', \'' + self.escapeHtml(model.description || '') + '\', \'' + self.escapeHtml(model.tags || '') + '\')" title="编辑描述/标签">编辑</button>' +
-                        '<button class="btn btn-sm" style="background-color: #4caf50; margin-left: 5px;" onclick="showCurlCommand(\'' + self.escapeHtml(model.name) + '\')" title="查看 curl 命令">curl</button>' +
+                        '<button class="btn btn-sm" onclick="openEditModelModal(\'' + escapeJsInHtmlAttr(model.name) + '\', \'' + escapeJsInHtmlAttr(model.description || '') + '\', \'' + escapeJsInHtmlAttr(model.tags || '') + '\')" title="编辑描述/标签">编辑</button>' +
+                        '<button class="btn btn-sm" style="background-color: #4caf50; margin-left: 5px;" onclick="showCurlCommand(\'' + escapeJsInHtmlAttr(model.name) + '\')" title="查看 curl 命令">curl</button>' +
                         '</td>';
 
                     tbody.appendChild(row);
@@ -476,6 +476,9 @@
                 models.forEach(m => {
                     const row = document.createElement('tr');
                     const iEsc = self.escapeHtml(m.internal_model_name);
+                    // iJs 专供 onclick 内联字符串实参使用（实际模型名可能来自上游模型列表，
+                    // 含引号会闭合处理器导致 XSS），HTML 属性/正文展示仍用 iEsc。
+                    const iJs = escapeJsInHtmlAttr(m.internal_model_name);
                     const wrappers = (m.wrappers || []).join(', ');
 
                     const statusBadge = m.has_multiplier
@@ -490,18 +493,18 @@
                            '<span style="background:#fff3e0; color:#ef6c00; padding:1px 6px; border-radius:8px;">建 ' + fmtEff(m.effective_cache_create) + '</span> ' +
                            '<span style="background:#fce4ec; color:#c2185b; padding:1px 6px; border-radius:8px;">命 ' + fmtEff(m.effective_cache_hit) + '</span>');
 
-                    const editArgs = "'" + iEsc + "'," +
+                    const editArgs = "'" + iJs + "'," +
                         (m.config_input || 0) + ',' + (m.config_output || 0) + ',' +
                         (m.config_cache_create || 0) + ',' + (m.config_cache_hit || 0) + ',' +
                         (m.is_free ? 'true' : 'false');
                     const clearBtn = m.has_multiplier
-                        ? '<button class="btn btn-sm" style="background-color:#f44336; color:#fff; margin-left:5px;" onclick="clearModelMultiplierDirect(\'' + iEsc + '\')" title="清除该实际模型倍率，回落全局默认">清除</button>'
+                        ? '<button class="btn btn-sm" style="background-color:#f44336; color:#fff; margin-left:5px;" onclick="clearModelMultiplierDirect(\'' + iJs + '\')" title="清除该实际模型倍率，回落全局默认">清除</button>'
                         : '';
 
                     row.innerHTML =
                         '<td class="text-center"><input type="checkbox" class="actual-model-check" value="' + iEsc + '"></td>' +
                         '<td class="copyable" data-full-text="' + iEsc + '" style="font-family:monospace;">' + iEsc + '</td>' +
-                        '<td class="copyable" data-full-text="' + self.escapeHtml(wrappers) + '">' + (wrappers || '-') + '</td>' +
+                        '<td class="copyable" data-full-text="' + self.escapeHtml(wrappers) + '">' + (self.escapeHtml(wrappers) || '-') + '</td>' +
                         '<td class="text-center">' + (m.provider_count || 0) + '</td>' +
                         '<td class="text-center">' + statusBadge + '</td>' +
                         '<td class="text-center" style="font-family:monospace;">' + effBadges + '</td>' +
@@ -1000,6 +1003,26 @@
                 .replace(/>/g, '&gt;')
                 .replace(/"/g, '&quot;')
                 .replace(/'/g, '&#039;');
+        }
+
+        // escapeJsInHtmlAttr 生成可安全放入 onclick="fn('<value>')" 这类双引号属性内
+        // 单引号 JS 字符串实参的文本。注意：浏览器会先对属性值做 HTML 实体解码，再把结果
+        // 当成 JS 源码解析，所以单独的 escapeHtml 不足以防御（&#39; 会被解码回 '，仍可闭合
+        // 字符串注入代码）。这里必须两层转义：先做 JS 字符串字面量转义（防闭合单引号/插代码），
+        // 再做 HTML 属性转义（防闭合双引号属性 / 保证解码后还原成预期 JS 源）。
+        // 关键词: escapeJsInHtmlAttr, onclick 内联实参 XSS 防护, 双层转义
+        function escapeJsInHtmlAttr(value) {
+            var s = (value === null || value === undefined) ? '' : String(value);
+            // 1) JS 单引号字符串字面量转义
+            s = s.replace(/\\/g, '\\\\')
+                 .replace(/'/g, "\\'")
+                 .replace(/\r/g, '\\r')
+                 .replace(/\n/g, '\\n')
+                 .replace(/</g, '\\x3C')
+                 .replace(/>/g, '\\x3E');
+            // 2) HTML 双引号属性转义（& 与 " 必须编码；解码后还原为合法 JS 源）
+            s = s.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+            return s;
         }
 
         // Render compact allowed-models cell content (used by API key list).
@@ -2266,19 +2289,25 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
                     iconPath = 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z';
             }
             
+            // 仅图标与关闭按钮是固定模板（无外部数据），可安全用 innerHTML；
+            // message 可能来自外部可控数据（如客户端 IP/错误信息），必须经 textContent 写入，
+            // 严禁拼接进 innerHTML，避免 XSS 打穿管理后台。
+            // 关键词: showToast XSS 防护, message 走 textContent
             toast.innerHTML = `
                 <div class="toast-icon">
                     <svg viewBox="0 0 24 24" width="24" height="24">
                         <path d="${iconPath}"></path>
                     </svg>
     </div>
-                <div class="toast-content">${message}</div>
+                <div class="toast-content"></div>
                 <div class="toast-close" onclick="this.parentElement.remove()">
                     <svg viewBox="0 0 24 24" width="16" height="16">
                         <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path>
                     </svg>
                 </div>
             `;
+            const toastContentEl = toast.querySelector('.toast-content');
+            if (toastContentEl) toastContentEl.textContent = (message == null ? '' : String(message));
             
             container.appendChild(toast);
             
@@ -2608,14 +2637,23 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
                 return;
             }
             
-            modelList.innerHTML = portalAvailableModels.map(model => `
-                <div class="model-item ${portalSelectedModels.has(model) ? 'selected' : ''}" onclick="portalToggleModel('${model}')">
-                    <input type="checkbox" ${portalSelectedModels.has(model) ? 'checked' : ''} onclick="event.stopPropagation(); portalToggleModel('${model}')">
-                    <label>${model}</label>
+            // 模型名通过索引回查（portalToggleModelByIndex），不内联进 onclick 字符串，
+            // 彻底规避模型名含引号导致的属性/处理器注入；展示文本仍走 escapeHtml。
+            // 关键词: portalRenderModelList XSS 防护, 索引法 onclick
+            modelList.innerHTML = portalAvailableModels.map((model, idx) => `
+                <div class="model-item ${portalSelectedModels.has(model) ? 'selected' : ''}" onclick="portalToggleModelByIndex(${idx})">
+                    <input type="checkbox" ${portalSelectedModels.has(model) ? 'checked' : ''} onclick="event.stopPropagation(); portalToggleModelByIndex(${idx})">
+                    <label>${escapeHtml(model)}</label>
                 </div>
             `).join('');
             
             portalUpdateSelectedPreview();
+        }
+
+        // portalToggleModelByIndex 用列表索引回查模型名后再切换选中，避免内联模型名进 onclick。
+        function portalToggleModelByIndex(idx) {
+            const model = portalAvailableModels[idx];
+            if (model != null) portalToggleModel(model);
         }
         
         function portalToggleModel(model) {
@@ -3763,14 +3801,23 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
             // Store available models for this modal
             window.editModalAvailableModels = availableModels;
             
-            modelList.innerHTML = availableModels.map(model => `
-                <div class="model-item ${editModalSelectedModels.has(model) ? 'selected' : ''}" onclick="editModalToggleModel('${model}')">
-                    <input type="checkbox" ${editModalSelectedModels.has(model) ? 'checked' : ''} onclick="event.stopPropagation(); editModalToggleModel('${model}')">
-                    <label>${model}</label>
+            // 同 portalRenderModelList：模型名按索引回查，避免内联进 onclick 造成注入。
+            // 关键词: editModalRenderModelList XSS 防护, 索引法 onclick
+            modelList.innerHTML = availableModels.map((model, idx) => `
+                <div class="model-item ${editModalSelectedModels.has(model) ? 'selected' : ''}" onclick="editModalToggleModelByIndex(${idx})">
+                    <input type="checkbox" ${editModalSelectedModels.has(model) ? 'checked' : ''} onclick="event.stopPropagation(); editModalToggleModelByIndex(${idx})">
+                    <label>${escapeHtml(model)}</label>
                 </div>
             `).join('');
             
             editModalUpdateSelectedPreview();
+        }
+
+        // editModalToggleModelByIndex 用索引从当前模型列表回查模型名后切换选中。
+        function editModalToggleModelByIndex(idx) {
+            const list = window.editModalAvailableModels || [];
+            const model = list[idx];
+            if (model != null) editModalToggleModel(model);
         }
         
         function editModalToggleModel(model) {
@@ -5477,8 +5524,8 @@ curl '${metaApiUrl}?name=${modelName}'`;
             tbody.innerHTML = opsUsersData.map(user => `
                 <tr>
                     <td>${user.id}</td>
-                    <td>${user.username}</td>
-                    <td><span style="background: #e3f2fd; color: #1565c0; padding: 2px 8px; border-radius: 4px; font-size: 12px;">${user.role.toUpperCase()}</span></td>
+                    <td>${escapeHtml(user.username)}</td>
+                    <td><span style="background: #e3f2fd; color: #1565c0; padding: 2px 8px; border-radius: 4px; font-size: 12px;">${escapeHtml(String(user.role || '').toUpperCase())}</span></td>
                     <td>
                         <span style="background: ${user.active ? '#d4edda' : '#f8d7da'}; color: ${user.active ? '#155724' : '#721c24'}; padding: 2px 8px; border-radius: 4px; font-size: 12px;">
                             ${user.active ? '激活' : '禁用'}
@@ -5703,16 +5750,19 @@ curl '${metaApiUrl}?name=${modelName}'`;
                 'change_password': '修改密码'
             };
             
+            // 日志各字段（操作者名/目标/详情/IP）可能含用户可控内容（如绑定用户名、X-Forwarded-For），
+            // 一律 escapeHtml 后再渲染，title 属性同样转义，避免存储型 XSS 打穿后台。
+            // 关键词: renderOpsLogsTable XSS 防护, detail/ip 转义
             tbody.innerHTML = opsLogsData.map(log => `
                 <tr>
-                    <td>${log.id}</td>
-                    <td>${log.operator_name}</td>
-                    <td><span style="background: #e3f2fd; color: #1565c0; padding: 2px 8px; border-radius: 4px; font-size: 12px;">${actionLabels[log.action] || log.action}</span></td>
-                    <td>${log.target_type}</td>
-                    <td>${log.target_id}</td>
-                    <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${log.detail}">${log.detail || '-'}</td>
-                    <td>${log.ip_address || '-'}</td>
-                    <td>${log.created_at}</td>
+                    <td>${escapeHtml(log.id)}</td>
+                    <td>${escapeHtml(log.operator_name)}</td>
+                    <td><span style="background: #e3f2fd; color: #1565c0; padding: 2px 8px; border-radius: 4px; font-size: 12px;">${escapeHtml(actionLabels[log.action] || log.action)}</span></td>
+                    <td>${escapeHtml(log.target_type)}</td>
+                    <td>${escapeHtml(log.target_id)}</td>
+                    <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(log.detail || '')}">${escapeHtml(log.detail) || '-'}</td>
+                    <td>${escapeHtml(log.ip_address) || '-'}</td>
+                    <td>${escapeHtml(log.created_at)}</td>
                 </tr>
             `).join('');
         }
@@ -6959,22 +7009,30 @@ curl '${metaApiUrl}?name=${modelName}'`;
                     ? '<button class="rl-ip-unthrottle-btn btn" data-ip="' + ip + '" style="height:26px; font-size:12px; background:#c62828; color:#fff;">解除</button>'
                     : '<button class="rl-ip-throttle-btn btn" data-ip="' + ip + '" style="height:26px; font-size:12px; background:#ef6c00; color:#fff;">限流</button>';
                 const tag = throttled ? ' <span style="color:#c62828; font-size:11px;">(已限流)</span>' : '';
-                // 该 IP 用得最多的 TOP3 模型（小字子行）；含加权 Token(M) 与 RMB 折算。
-                // 关键词: renderFreeIPUsage top_models, per-IP TOP3 模型子行
+                // 该 IP 用得最多的 TOP3 模型（小字子行）。
+                // 数量(M) 用原始 Token（used_m，含不计费模型）；金额(¥) 用加权 Token（weighted_m）折算，
+                // 不计费模型 weighted_m=0 -> ¥0.00（计数量、不算钱）。
+                // 关键词: renderFreeIPUsage top_models, per-IP TOP3 模型子行, 数量 vs 金额
                 const models = Array.isArray(it.top_models) ? it.top_models : [];
                 let modelsRow = '';
                 if (models.length > 0) {
-                    const chips = models.map(function (m) {
+                    const chips = models.map(function (m, mi) {
                         const name = escapeHtml(m.model || '');
                         const mm = (typeof m.used_m === 'number') ? m.used_m : 0;
                         const mReq = Number(m.request_count) || 0;
-                        const mRmb = '¥' + (mm / BILLING_TOKEN_M_PER_RMB).toFixed(2);
+                        // 金额按加权 Token 折算；旧数据无 weighted_m 时回退 0（避免把数量误当金额）。
+                        const wM = (typeof m.weighted_m === 'number') ? m.weighted_m : 0;
+                        const mRmb = '¥' + (wM / BILLING_TOKEN_M_PER_RMB).toFixed(2);
+                        const free = wM <= 0;
+                        const rank = 'TOP' + (mi + 1);
                         return '<span style="display:inline-block; margin:2px 6px 2px 0; padding:1px 6px; background:#f1f8ff; border:1px solid #cfe3ff; border-radius:10px; color:#37474f;">'
-                            + '<code style="color:#1565c0;">' + name + '</code> · ' + mm.toFixed(2) + 'M · ' + mReq + '次 · <span style="color:#1565c0;">' + mRmb + '</span>'
+                            + '<span style="color:#90a4ae;">' + rank + ' </span>'
+                            + '<code style="color:#1565c0;">' + name + '</code> · ' + mm.toFixed(2) + 'M · ' + mReq + '次 · '
+                            + '<span style="color:' + (free ? '#2e7d32' : '#1565c0') + ';">' + mRmb + (free ? ' 不计费' : '') + '</span>'
                             + '</span>';
                     }).join('');
                     modelsRow = '<tr><td colspan="5" style="padding: 0 10px 8px 22px; border-bottom: 1px solid #e1f5fe; font-size: 11px; color:#789;">'
-                        + '<span style="color:#90a4ae;">TOP 模型: </span>' + chips
+                        + '<span style="color:#90a4ae;">TOP 模型(数量): </span>' + chips
                         + '</td></tr>';
                 }
                 return '<tr>'
@@ -8626,6 +8684,45 @@ curl '${metaApiUrl}?name=${modelName}'`;
                 }
             }
 
+            // fmtSaveBytes 把字节数格式化为人类可读单位 (B/KiB/MiB).
+            function fmtSaveBytes(n) {
+                n = Number(n) || 0;
+                if (n >= 1024 * 1024) return (n / (1024 * 1024)).toFixed(2) + ' MiB';
+                if (n >= 1024) return (n / 1024).toFixed(2) + ' KiB';
+                return n + ' B';
+            }
+
+            // renderTestSaveBlock 渲染试运行里 save() 的调用反馈块:
+            //   - 没调 save(): 中性提示。
+            //   - 调了但落盘未启用: 黄色提示 (生产也不会落盘, 引导去开启)。
+            //   - 调了且已启用: 绿色提示 (生产会落盘, 试运行本身不写)。
+            // 关键词: renderTestSaveBlock, save 试运行反馈
+            function renderTestSaveBlock(j) {
+                const calls = Number(j.save_calls) || 0;
+                const bytes = Number(j.save_bytes) || 0;
+                const enabled = !!j.save_enabled;
+                if (calls === 0) {
+                    return '<div class="mirror-test-save" style="border-left-color:#64748b;">'
+                        + '<div style="color:#94a3b8;">save(): 本次脚本未调用 save()，不会落盘归档。</div>'
+                        + '</div>';
+                }
+                const head = enabled
+                    ? '<span style="color:#34d399; font-weight:600;">save() 已调用 ' + calls + ' 次</span> <span style="color:#cbd5e1;">将写入 ' + escapeHtml(fmtSaveBytes(bytes)) + '</span> <span style="color:#94a3b8;">(试运行不实际写盘)</span>'
+                    : '<span style="color:#fbbf24; font-weight:600;">save() 已调用 ' + calls + ' 次</span> <span style="color:#cbd5e1;">将写入 ' + escapeHtml(fmtSaveBytes(bytes)) + '</span>';
+                const hint = enabled
+                    ? '<div style="color:#94a3b8; font-size:11px; margin-top:2px;">落盘已启用：生产环境命中此规则时会把内容写入归档。</div>'
+                    : '<div style="color:#fbbf24; font-size:11px; margin-top:2px;">注意：落盘当前<strong>未启用</strong>，生产环境也不会真正写入。请到「流量镜像 → 数据落盘设置」勾选「启用 save() 落盘」。</div>';
+                let preview = '';
+                if (j.save_preview) {
+                    preview = '<div style="color:#94a3b8; font-size:11px; margin-top:6px;">// save() 首次写入内容预览:</div>'
+                        + '<pre class="mirror-test-save-preview">' + escapeHtml(j.save_preview) + '</pre>';
+                }
+                const border = enabled ? '#34d399' : '#fbbf24';
+                return '<div class="mirror-test-save" style="border-left-color:' + border + ';">'
+                    + '<div>' + head + '</div>' + hint + preview
+                    + '</div>';
+            }
+
             // testCurrent 调用后端 /test 接口同步跑一次脚本, 把结果按 success/fail
             // 分别用绿色/红色头条 + JSON body 渲染. 关键词: mirror testCurrent, 试运行结果美化
             async function testCurrent() {
@@ -8659,12 +8756,16 @@ curl '${metaApiUrl}?name=${modelName}'`;
                         ? '<div style="color:#f87171; margin-bottom:6px;">error: ' + escapeHtml(j.error) + '</div>'
                         : '';
                     const snapText = j.snapshot ? JSON.stringify(j.snapshot, null, 2) : '';
+                    // save() 调用反馈: 让用户知道 save 调没调、会写多少、生产是否会真落盘。
+                    // 关键词: testCurrent save 反馈展示
+                    const saveBlock = renderTestSaveBlock(j);
                     resultEl.className = 'mirror-test-result' + (executed ? '' : '');
                     resultEl.innerHTML = `
                         <div class="mirror-test-result-head">
                             ${tag}<span style="color:#cbd5e1;">duration=${escapeHtml(String(dur))}</span>
                         </div>
                         ${errLine}
+                        ${saveBlock}
                         <div style="color:#94a3b8; font-size:11px; margin-top:6px;">// sample snapshot passed to handle(data):</div>
                         <div>${escapeHtml(snapText)}</div>
                     `;
@@ -8697,9 +8798,24 @@ curl '${metaApiUrl}?name=${modelName}'`;
                     list.innerHTML = logs.map(l => {
                         const cls = l.success ? 'success' : 'failure';
                         const tag = l.success ? '<span style="color:#2e7d32; font-weight:600;">SUCCESS</span>' : '<span style="color:#c62828; font-weight:600;">FAILED</span>';
+                        // save() 反馈: 这次调了几次 / 落盘几次 / 字节数, 让生产环境也能确认。
+                        // 关键词: viewLogs save_calls 展示
+                        const calls = Number(l.save_calls) || 0;
+                        const persisted = Number(l.save_persisted) || 0;
+                        const sbytes = Number(l.save_bytes) || 0;
+                        let saveLine = '';
+                        if (calls > 0) {
+                            const ok = persisted > 0;
+                            const color = ok ? '#2e7d32' : '#ef6c00';
+                            const fmt = (sbytes >= 1024 * 1024) ? (sbytes / (1024 * 1024)).toFixed(2) + ' MiB'
+                                : (sbytes >= 1024) ? (sbytes / 1024).toFixed(2) + ' KiB' : sbytes + ' B';
+                            saveLine = '<div style="color:' + color + ';">save: 调用 ' + calls + ' 次 / 落盘 ' + persisted + ' 次 / ' + escapeHtml(fmt)
+                                + (ok ? '' : '（未落盘，可能落盘未启用）') + '</div>';
+                        }
                         return `<div class="mirror-log-entry ${cls}">
                             <div>${escapeHtml(l.timestamp || '')} | req_id=${escapeHtml(l.req_id || '')} | dur=${l.duration_ms || 0}ms | ${tag}</div>
                             ${l.error_message ? '<div style="color:#c62828;">' + escapeHtml(l.error_message) + '</div>' : ''}
+                            ${saveLine}
                             ${l.stdout ? '<div style="color:#555;">stdout: ' + escapeHtml(l.stdout) + '</div>' : ''}
                         </div>`;
                     }).join('');
@@ -8760,6 +8876,87 @@ curl '${metaApiUrl}?name=${modelName}'`;
                 return s.slice(0, n) + '…';
             }
 
+            // asText 把任意值转纯文本: 字符串原样, 其它 JSON 缩进序列化。
+            function asText(v) {
+                if (v == null) return '';
+                if (typeof v === 'string') return v;
+                try { return JSON.stringify(v, null, 2); } catch (e) { return String(v); }
+            }
+
+            // buildRequestText 把 request_messages 渲染成可读纯文本 (按 role 分段)。
+            // 关键词: buildRequestText, 请求纯文本对照
+            function buildRequestText(rec) {
+                const msgs = rec && rec.request_messages;
+                if (!Array.isArray(msgs) || !msgs.length) return '(no request_messages)';
+                return msgs.map(function (m) {
+                    m = m || {};
+                    const role = m.role || 'unknown';
+                    let block = '===== ' + role + ' =====\n' + asText(m.content);
+                    if (Array.isArray(m.tool_calls) && m.tool_calls.length) {
+                        block += '\n[tool_calls]\n' + asText(m.tool_calls);
+                    }
+                    return block;
+                }).join('\n\n');
+            }
+
+            // buildResponseText 把响应渲染成可读纯文本 (reasoning + answer + tool_calls)。
+            // 关键词: buildResponseText, 响应纯文本对照
+            function buildResponseText(rec) {
+                const parts = [];
+                if (rec.response_reason) {
+                    parts.push('===== reasoning =====\n' + asText(rec.response_reason));
+                }
+                parts.push('===== answer =====\n' + asText(rec.response_text));
+                if (Array.isArray(rec.tool_calls) && rec.tool_calls.length) {
+                    parts.push('===== tool_calls =====\n' + asText(rec.tool_calls));
+                }
+                return parts.join('\n\n');
+            }
+
+            // copyEl 复制某个元素的纯文本内容到剪贴板, 并在按钮上给出短暂反馈。
+            // 关键词: copyEl, 一键复制, navigator.clipboard 带 textarea 兜底
+            function copyEl(id, btn) {
+                const el = document.getElementById(id);
+                if (!el) return;
+                const text = el.textContent || '';
+                const feedback = function (ok) {
+                    if (!btn) return;
+                    const orig = btn.getAttribute('data-label') || btn.textContent;
+                    btn.setAttribute('data-label', orig);
+                    btn.textContent = ok ? '已复制' : '复制失败';
+                    setTimeout(function () { btn.textContent = orig; }, 1500);
+                };
+                const fallback = function () {
+                    try {
+                        const ta = document.createElement('textarea');
+                        ta.value = text;
+                        ta.style.position = 'fixed';
+                        ta.style.opacity = '0';
+                        document.body.appendChild(ta);
+                        ta.focus();
+                        ta.select();
+                        const ok = document.execCommand('copy');
+                        document.body.removeChild(ta);
+                        feedback(ok);
+                    } catch (e) { feedback(false); }
+                };
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(text).then(function () { feedback(true); }, fallback);
+                } else {
+                    fallback();
+                }
+            }
+
+            // toggleEl 通用展开/收起: 切换目标元素显隐并在触发器上切换文案。
+            // 关键词: toggleEl, 通用展开收起
+            function toggleEl(id, el, showLabel, hideLabel) {
+                const target = document.getElementById(id);
+                if (!target) return;
+                const show = target.style.display === 'none' || target.style.display === '';
+                target.style.display = show ? 'flex' : 'none';
+                if (el && showLabel && hideLabel) el.textContent = show ? hideLabel : showLabel;
+            }
+
             // renderRecord 把一条记录渲染为一张卡: 人性化关键字段 + 可展开原始 JSON.
             function renderRecord(rec, idx) {
                 const id = 'mirror-rec-raw-' + (seq++) ;
@@ -8786,6 +8983,27 @@ curl '${metaApiUrl}?name=${modelName}'`;
                 let raw = '';
                 try { raw = JSON.stringify(rec, null, 2); } catch (e) { raw = String(rec); }
 
+                // 请求/响应对照: 纯文本代码块, 各带一键复制, 便于核对真实内容。
+                // 关键词: renderRecord 请求/响应对照, 纯文本 + 复制
+                const s = (seq++);
+                const cmpId = 'mirror-rec-cmp-' + s;
+                const reqId = 'mirror-rec-req-' + s;
+                const respId = 'mirror-rec-resp-' + s;
+                const reqFull = escapeHtml(buildRequestText(rec));
+                const respFull = escapeHtml(buildResponseText(rec));
+                const compareBlock = '<div id="' + cmpId + '" class="mirror-rec-compare" style="display:none;">'
+                    + '<div class="mirror-rec-col">'
+                    +   '<div class="mirror-rec-col-head"><span>Request</span>'
+                    +     '<button class="mirror-rec-copy-btn" onclick="MirrorRecords.copyEl(\'' + reqId + '\', this)">复制</button></div>'
+                    +   '<pre id="' + reqId + '" class="mirror-rec-text">' + reqFull + '</pre>'
+                    + '</div>'
+                    + '<div class="mirror-rec-col">'
+                    +   '<div class="mirror-rec-col-head"><span>Response</span>'
+                    +     '<button class="mirror-rec-copy-btn" onclick="MirrorRecords.copyEl(\'' + respId + '\', this)">复制</button></div>'
+                    +   '<pre id="' + respId + '" class="mirror-rec-text">' + respFull + '</pre>'
+                    + '</div>'
+                    + '</div>';
+
                 const chips = [];
                 chips.push('<span class="mirror-rec-chip">' + free + '</span>');
                 chips.push('<span class="mirror-rec-chip">' + stream + '</span>');
@@ -8804,7 +9022,11 @@ curl '${metaApiUrl}?name=${modelName}'`;
                     + '<div class="mirror-rec-chips">' + chips.join('') + '</div>'
                     + (userMsg ? '<div class="mirror-rec-line"><span class="mirror-rec-label">请求:</span> ' + userMsg + '</div>' : '')
                     + (respText ? '<div class="mirror-rec-line"><span class="mirror-rec-label">响应:</span> ' + respText + '</div>' : '')
-                    + '<div class="mirror-rec-toggle" onclick="MirrorRecords.toggleRaw(\'' + id + '\', this)">展开原始 JSON</div>'
+                    + '<div class="mirror-rec-toggle-bar">'
+                    +   '<span class="mirror-rec-toggle" onclick="MirrorRecords.toggleEl(\'' + cmpId + '\', this, \'展开 请求/响应对照\', \'收起 请求/响应对照\')">展开 请求/响应对照</span>'
+                    +   '<span class="mirror-rec-toggle" onclick="MirrorRecords.toggleRaw(\'' + id + '\', this)">展开原始 JSON</span>'
+                    + '</div>'
+                    + compareBlock
                     + '<pre id="' + id + '" class="mirror-rec-raw" style="display:none;">' + escapeHtml(raw) + '</pre>'
                     + '</div>';
             }
@@ -8845,6 +9067,6 @@ curl '${metaApiUrl}?name=${modelName}'`;
                 }
             }
 
-            return { load: load, toggleRaw: toggleRaw };
+            return { load: load, toggleRaw: toggleRaw, toggleEl: toggleEl, copyEl: copyEl };
         })();
         window.MirrorRecords = MirrorRecords;

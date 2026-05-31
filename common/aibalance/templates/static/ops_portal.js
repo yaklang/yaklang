@@ -721,14 +721,22 @@ async function loadModels() {
 function renderModelList() {
     const modelList = document.getElementById('model-list');
     
-    modelList.innerHTML = availableModels.map(model => `
-        <div class="model-item ${selectedModels.has(model) ? 'selected' : ''}" onclick="toggleModel('${model}')">
-            <input type="checkbox" id="model-${model}" ${selectedModels.has(model) ? 'checked' : ''} onclick="event.stopPropagation(); toggleModel('${model}')">
-            <label for="model-${model}">${model}</label>
+    // 模型名按索引回查（toggleModelByIndex），不内联进 onclick；展示文本与 id/for 走 escapeHtml。
+    // 关键词: ops renderModelList XSS 防护, 索引法 onclick
+    modelList.innerHTML = availableModels.map((model, idx) => `
+        <div class="model-item ${selectedModels.has(model) ? 'selected' : ''}" onclick="toggleModelByIndex(${idx})">
+            <input type="checkbox" id="model-${escapeHtml(model)}" ${selectedModels.has(model) ? 'checked' : ''} onclick="event.stopPropagation(); toggleModelByIndex(${idx})">
+            <label for="model-${escapeHtml(model)}">${escapeHtml(model)}</label>
         </div>
     `).join('');
     
     updateSelectedPreview();
+}
+
+// toggleModelByIndex 用索引回查模型名后切换选中，避免内联模型名进 onclick。
+function toggleModelByIndex(idx) {
+    const model = availableModels[idx];
+    if (model != null) toggleModel(model);
 }
 
 function toggleModel(model) {
@@ -1225,12 +1233,20 @@ function renderEditModelList() {
         return;
     }
     
-    modelList.innerHTML = availableModels.map(model => `
-        <div class="model-item ${editSelectedModels.has(model) ? 'selected' : ''}" onclick="editToggleModel('${model}')">
-            <input type="checkbox" ${editSelectedModels.has(model) ? 'checked' : ''} onclick="event.stopPropagation(); editToggleModel('${model}')">
-            <label>${model}</label>
+    // 模型名按索引回查（editToggleModelByIndex），不内联进 onclick；展示文本走 escapeHtml。
+    // 关键词: ops renderEditModelList XSS 防护, 索引法 onclick
+    modelList.innerHTML = availableModels.map((model, idx) => `
+        <div class="model-item ${editSelectedModels.has(model) ? 'selected' : ''}" onclick="editToggleModelByIndex(${idx})">
+            <input type="checkbox" ${editSelectedModels.has(model) ? 'checked' : ''} onclick="event.stopPropagation(); editToggleModelByIndex(${idx})">
+            <label>${escapeHtml(model)}</label>
         </div>
     `).join('');
+}
+
+// editToggleModelByIndex 用索引回查模型名后切换选中，避免内联模型名进 onclick。
+function editToggleModelByIndex(idx) {
+    const model = availableModels[idx];
+    if (model != null) editToggleModel(model);
 }
 
 function editToggleModel(model) {

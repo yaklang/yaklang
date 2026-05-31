@@ -452,13 +452,21 @@ func (c *ServerConfig) handleTestMirrorRule(conn net.Conn, request *http.Request
 		c.writeJSONResponse(conn, http.StatusInternalServerError, map[string]string{"error": "mirror manager not initialized"})
 		return
 	}
-	success, errMsg, duration := c.MirrorManager.RunOnceForTest(script, snap, timeoutMs)
+	result := c.MirrorManager.RunOnceForTest(script, snap, timeoutMs)
 	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
 		"success":     true,
-		"executed":    success,
-		"error":       errMsg,
-		"duration_ms": duration,
+		"executed":    result.Executed,
+		"error":       result.ErrorMessage,
+		"duration_ms": result.DurationMs,
 		"snapshot":    snap.ToScriptMap(),
+		// save() 调用反馈: 试运行不真正落盘 (save_persisted 恒为 0),
+		// save_enabled 表示生产环境当前是否会落盘。
+		// 关键词: handleTestMirrorRule save 反馈字段
+		"save_calls":     result.Save.Calls,
+		"save_persisted": result.Save.Persisted,
+		"save_bytes":     result.Save.Bytes,
+		"save_enabled":   result.Save.Enabled,
+		"save_preview":   result.Save.Preview,
 	})
 }
 

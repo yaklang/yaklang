@@ -131,13 +131,57 @@ func handle(data) {
 	snap := &MirrorSnapshot{ReqID: "save-smoke", Model: "m-smoke"}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	err, _ := executeMirrorScript(ctx, script, snap, true)
+	err, _, outcome := executeMirrorScript(ctx, script, snap, true)
 	if err != nil {
 		t.Skipf("yak script engine not available in test env: %v", err)
 	}
+	// save() 调用反馈应被正确记录。
+	assert.Equal(t, 1, outcome.Calls)
+	assert.Equal(t, 1, outcome.Persisted)
+	assert.Greater(t, outcome.Bytes, int64(0))
+	assert.True(t, outcome.Enabled)
+	assert.NotEmpty(t, outcome.Preview)
 
 	recent, rerr := tmp.recentRecords(1)
 	require.NoError(t, rerr)
 	require.Len(t, recent, 1)
 	assert.Equal(t, "m-smoke", recent[0]["model"])
+}
+
+// TestExecuteMirrorScript_SaveDryRunNoPersist 验证试运行 (allowPersist=false):
+// save() 被记录但不真正落盘。
+// 关键词: save 试运行 dry-run, 不落盘只记录
+func TestExecuteMirrorScript_SaveDryRunNoPersist(t *testing.T) {
+	dir := t.TempDir()
+	tmp := newDataSink(dir)
+	tmp.applyConfig(true, 6<<30, 2<<30, 60)
+
+	globalDataSinkMu.Lock()
+	orig := globalDataSink
+	globalDataSink = tmp
+	globalDataSinkMu.Unlock()
+	defer func() {
+		globalDataSinkMu.Lock()
+		globalDataSink = orig
+		globalDataSinkMu.Unlock()
+	}()
+
+	script := `
+func handle(data) {
+    save()
+}
+`
+	snap := &MirrorSnapshot{ReqID: "dry-run", Model: "m-dry"}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	err, _, outcome := executeMirrorScript(ctx, script, snap, false)
+	if err != nil {
+		t.Skipf("yak script engine not available in test env: %v", err)
+	}
+	assert.Equal(t, 1, outcome.Calls)
+	assert.Equal(t, 0, outcome.Persisted, "dry-run must not persist")
+
+	recent, rerr := tmp.recentRecords(1)
+	require.NoError(t, rerr)
+	assert.Empty(t, recent, "dry-run must not write any record")
 }

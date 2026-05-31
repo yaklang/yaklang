@@ -217,7 +217,12 @@ func (c *ServerConfig) gateChatFreeUserIPLimit(conn net.Conn, clientIP, modelNam
 		return false
 	}
 	// 模型豁免计费时不参与单 IP 限额（与 onUsageForward 计费分流口径一致）。
+	// 但仍记录「按模型请求计数」用于面板展示——不计费模型也要能看到用量（计数量、不算钱）。
+	// 关键词: 不计费模型 仅展示请求计数, 不参与限额
 	if isFreeModelBillingExempt(modelName) {
+		if addErr := AddFreeUserIPModelDailyRequest(clientIP, modelName); addErr != nil {
+			c.logWarn("AddFreeUserIPModelDailyRequest (exempt) failed (ip=%s model=%s): %v", clientIP, modelName, addErr)
+		}
 		return false
 	}
 
