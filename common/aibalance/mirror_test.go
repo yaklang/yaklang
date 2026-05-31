@@ -330,7 +330,7 @@ func handle(data) {
 	snap := &MirrorSnapshot{ReqID: "test1", Model: "m1"}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	err, _ := executeMirrorScript(ctx, script, snap, false)
+	err, _, _ := executeMirrorScript(ctx, script, snap, false)
 	if err != nil {
 		t.Logf("script engine not available in test env: %v", err)
 		t.Skip("yak script engine not available in test env")
@@ -339,7 +339,7 @@ func handle(data) {
 
 func TestExecuteMirrorScript_EmptyScript(t *testing.T) {
 	ctx := context.Background()
-	err, _ := executeMirrorScript(ctx, "", &MirrorSnapshot{ReqID: "x"}, false)
+	err, _, _ := executeMirrorScript(ctx, "", &MirrorSnapshot{ReqID: "x"}, false)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "empty script")
 }

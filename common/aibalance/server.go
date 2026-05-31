@@ -1100,6 +1100,10 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 		var outputTextBuf bytes.Buffer
 		var reasonTextBuf bytes.Buffer
 		var usageBilled atomic.Bool
+		// ipModelUsageRecorded 保证「单 IP 按模型用量」每个请求只记一次：
+		// 正路(onUsageForward 真实 usage) 与 兜底(fallback 估算) 二选一，避免重复累加。
+		// 关键词: ipModelUsageRecorded, per-IP 按模型用量 幂等
+		var ipModelUsageRecorded atomic.Bool
 
 		// client 构造统一走 GetAIClientWithRawMessages：把 bodyIns.Messages
 		// 完整透传给上游 LLM，image_url 已经在 messages 内的 content 数组里
@@ -1203,12 +1207,6 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 							c.logWarn("AddFreeUserIPDailyTokens failed (ip=%s model=%s weighted=%d): %v",
 								clientIP, modelName, weighted, ipErr)
 						}
-						// 单 IP 按模型拆分的加权 Token（仅展示用，不参与限额）。
-						// 关键词: onUsageForward AddFreeUserIPModelDailyTokens, per-IP 按模型 Token
-						if ipErr := AddFreeUserIPModelDailyTokens(clientIP, modelName, weighted); ipErr != nil {
-							c.logWarn("AddFreeUserIPModelDailyTokens failed (ip=%s model=%s weighted=%d): %v",
-								clientIP, modelName, weighted, ipErr)
-						}
 					}
 				} else if key != nil {
 					if err := UpdateAiApiKeyTokenUsed(key.Key, weighted); err != nil {
@@ -1223,6 +1221,29 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 					if err := AddPaidUserDailyTokenUsage(weighted); err != nil {
 						c.logWarn("AddPaidUserDailyTokenUsage failed (key=%s weighted=%d): %v",
 							utils.ShrinkString(key.Key, 8), weighted, err)
+					}
+				}
+			}
+
+			// 单 IP 按模型用量（仅展示，不参与限额）：对所有免费(对客户端免费)模型累加原始 Token 数量；
+			// 计费模型额外累加加权 Token 供 RMB 折算。不计费/豁免模型加权记 0 -> 金额 ¥0（计数量、不算钱）。
+			// 用 ipModelUsageRecorded 幂等，避免与 fallback 估算路径重复累加。
+			// 此处 usage 必非 nil（onUsageForward 入口已对 nil 提前返回）。
+			// 关键词: onUsageForward per-IP 按模型 原始Token+加权Token, 不计费也计数量
+			if isFreeModel && !ipModelUsageRecorded.Load() {
+				rawTokens := int64(usage.TotalTokens)
+				if rawTokens <= 0 {
+					rawTokens = int64(usage.PromptTokens) + int64(usage.CompletionTokens)
+				}
+				billedWeighted := int64(0)
+				if weighted > 0 && !isFreeModelBillingExempt(modelName) {
+					billedWeighted = weighted
+				}
+				if rawTokens > 0 || billedWeighted > 0 {
+					ipModelUsageRecorded.Store(true)
+					if ipErr := AddFreeUserIPModelDailyUsageTokens(clientIP, modelName, rawTokens, billedWeighted); ipErr != nil {
+						c.logWarn("AddFreeUserIPModelDailyUsageTokens failed (ip=%s model=%s raw=%d weighted=%d): %v",
+							clientIP, modelName, rawTokens, billedWeighted, ipErr)
 					}
 				}
 			}
@@ -1452,11 +1473,29 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 					c.logWarn("fallback AddFreeUserIPDailyTokens failed (ip=%s model=%s weighted=%d): %v",
 						clientIP, modelName, fbResult.Weighted, ipErr)
 				}
-				// 单 IP 按模型拆分的 fallback 加权 Token（仅展示用）。
-				// 关键词: fallback AddFreeUserIPModelDailyTokens, per-IP 按模型 Token
-				if ipErr := AddFreeUserIPModelDailyTokens(clientIP, modelName, fbResult.Weighted); ipErr != nil {
-					c.logWarn("fallback AddFreeUserIPModelDailyTokens failed (ip=%s model=%s weighted=%d): %v",
-						clientIP, modelName, fbResult.Weighted, ipErr)
+			}
+			// 单 IP 按模型用量（仅展示，不参与限额）：所有免费模型都记原始 Token 数量；
+			// 仅真正计费的模型记加权 Token。不计费/豁免模型加权 0 -> ¥0（计数量、不算钱）。
+			// 用 ipModelUsageRecorded 幂等，避免与 onUsageForward 正路重复累加。
+			// 关键词: fallback per-IP 按模型 原始Token+加权Token, 不计费也计数量
+			if isFreeModel && !ipModelUsageRecorded.Load() {
+				rawTokens := int64(0)
+				if fbResult.EstimatedUsage != nil {
+					rawTokens = int64(fbResult.EstimatedUsage.TotalTokens)
+					if rawTokens <= 0 {
+						rawTokens = int64(fbResult.EstimatedUsage.PromptTokens) + int64(fbResult.EstimatedUsage.CompletionTokens)
+					}
+				}
+				billedWeighted := int64(0)
+				if fbResult.Billed && fbResult.Bucket != "apikey" && fbResult.Weighted > 0 {
+					billedWeighted = fbResult.Weighted
+				}
+				if rawTokens > 0 || billedWeighted > 0 {
+					ipModelUsageRecorded.Store(true)
+					if ipErr := AddFreeUserIPModelDailyUsageTokens(clientIP, modelName, rawTokens, billedWeighted); ipErr != nil {
+						c.logWarn("fallback AddFreeUserIPModelDailyUsageTokens failed (ip=%s model=%s raw=%d weighted=%d): %v",
+							clientIP, modelName, rawTokens, billedWeighted, ipErr)
+					}
 				}
 			}
 			usageBilled.Store(true) // 防止 1499 段二次执行 (估算口径已记账)

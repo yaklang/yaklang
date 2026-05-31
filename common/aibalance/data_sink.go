@@ -540,6 +540,19 @@ func dataSinkAppend(obj any) (bool, error) {
 	return sink.appendRecord(obj)
 }
 
+// dataSinkEnabled 返回落盘是否处于启用状态（用于试运行预判生产是否会真正落盘）。
+// 未装配 / 未启用都返回 false。
+// 关键词: dataSinkEnabled, 落盘启用状态预判
+func dataSinkEnabled() bool {
+	sink := getDataSink()
+	if sink == nil {
+		return false
+	}
+	sink.mu.Lock()
+	defer sink.mu.Unlock()
+	return sink.enabled
+}
+
 // dataSinkStats 返回 (records, bytes, available)。未装配时 available=false。
 // 关键词: dataSinkStats, 面板计数
 func dataSinkStats() (int64, int64, bool) {

@@ -451,10 +451,16 @@ type FreeUserIPModelDailyUsage struct {
 	Date string `json:"date" gorm:"size:10;unique_index:idx_free_ip_model;index:idx_free_ip_model_date;not null"`
 	IP   string `json:"ip" gorm:"size:64;unique_index:idx_free_ip_model;index:idx_free_ip_model_ip;not null"`
 	// ModelName 用列名 model；Go 字段不能叫 Model（与内嵌 gorm.Model 冲突）。
-	ModelName    string    `json:"model" gorm:"column:model;size:128;unique_index:idx_free_ip_model;not null"`
-	RequestCount int64     `json:"request_count"`
-	TokensUsed   int64     `json:"tokens_used"`
-	LastSeenAt   time.Time `json:"last_seen_at"`
+	ModelName    string `json:"model" gorm:"column:model;size:128;unique_index:idx_free_ip_model;not null"`
+	RequestCount int64  `json:"request_count"`
+	// TokensUsed 是「原始 Token 数量」(prompt+completion 实际消耗)，对所有免费模型都累加，
+	// 包括不计费/豁免模型——用于面板展示「用了多少」（数量），是 TOP 模型排序依据。
+	TokensUsed int64 `json:"tokens_used"`
+	// WeightedTokens 是「加权/计费 Token」，仅对真正计费的模型累加，用于 RMB 金额折算；
+	// 不计费(IsFree)/豁免(exempt)模型恒为 0，从而金额展示为 ¥0（计数量、不算钱）。
+	// 关键词: WeightedTokens, 计费金额基准, 不计费模型记 0
+	WeightedTokens int64     `json:"weighted_tokens"`
+	LastSeenAt     time.Time `json:"last_seen_at"`
 }
 
 func (a *FreeUserIPModelDailyUsage) TableName() string {
