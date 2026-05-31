@@ -192,11 +192,17 @@ func (f *Filter) alternateIndex(fp fingerprint, i uint) uint {
 	return uint(uint64(i)^(hash*magicNumber)) % f.capacity
 }
 
-// clear padding zero
+// Clear 复位过滤器, 使其等价于一个全新过滤器, 以便安全地从对象池中复用.
+// 注意: 空槽的哨兵必须是 nil, 而不是 []byte{}. bucket.insert/delete 都以 fprint == nil
+// 判断槽位是否空闲, 若这里写成 []byte{} (非 nil 空切片), 复用后的 filter 永远找不到空槽,
+// 会退化到使用 rand 的 relocationInsert, 导致插入/查找结果非确定, 偶发假阴性 ——
+// 在 MITM 去重场景下表现为同一站点被重复判定为新站点, 计数在高并发(池复用频繁)下抖动.
+// 关键词: cuckoo Clear nil 哨兵, 池复用脏 filter, mirror dedup 计数抖动修复
 func (f *Filter) Clear() {
 	for i := range f.buckets {
 		for j := range f.buckets[i] {
-			f.buckets[i][j] = []byte{}
+			f.buckets[i][j] = nil
 		}
 	}
+	f.count = 0
 }
