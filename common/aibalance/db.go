@@ -638,29 +638,29 @@ func SaveModelMultiplierWithFree(internalModelName string, inputMul, outputMul, 
 	if internalModelName == "" {
 		return fmt.Errorf("internalModelName is required")
 	}
+	// 用 Unscoped 查找：连「软删除残留行」也命中。
+	// 否则之前对该模型执行过「清除」(旧实现是 GORM 软删除，仅置 deleted_at) 后，
+	// 默认作用域的 First 查不到它，于是走 Create；而库级 UNIQUE 索引 idx_model_multiplier
+	// 并不区分 deleted_at，残留行仍占用 internal_model_name 唯一键，导致
+	// "UNIQUE constraint failed: ai_model_multipliers.internal_model_name"。
+	// 这里命中残留行后直接复活并按「新建基线」重置，自愈历史脏数据。
+	// 关键词: SaveModelMultiplierWithFree Unscoped 复活软删除行, UNIQUE constraint 自愈
 	var m AiModelMultiplier
-	err := GetDB().Where("internal_model_name = ?", internalModelName).First(&m).Error
-	if err != nil {
-		if gorm.IsRecordNotFoundError(err) {
-			m = AiModelMultiplier{InternalModelName: internalModelName}
-			if inputMul >= 0 {
-				m.InputTokenMultiplier = inputMul
-			}
-			if outputMul >= 0 {
-				m.OutputTokenMultiplier = outputMul
-			}
-			if cacheCreateMul >= 0 {
-				m.CacheCreationMultiplier = cacheCreateMul
-			}
-			if cacheHitMul >= 0 {
-				m.CacheHitMultiplier = cacheHitMul
-			}
-			if isFree >= 1 {
-				m.IsFree = true
-			}
-			return GetDB().Create(&m).Error
-		}
+	err := GetDB().Unscoped().Where("internal_model_name = ?", internalModelName).First(&m).Error
+	if err != nil && !gorm.IsRecordNotFoundError(err) {
 		return err
+	}
+	if gorm.IsRecordNotFoundError(err) {
+		m = AiModelMultiplier{InternalModelName: internalModelName}
+	} else if m.DeletedAt != nil {
+		// 命中软删除残留行：清空 deleted_at 复活，并按新建基线归零四维 + IsFree，
+		// 避免沿用历史脏值（与全新建表语义一致）。
+		m.DeletedAt = nil
+		m.InputTokenMultiplier = 0
+		m.OutputTokenMultiplier = 0
+		m.CacheCreationMultiplier = 0
+		m.CacheHitMultiplier = 0
+		m.IsFree = false
 	}
 	if inputMul >= 0 {
 		m.InputTokenMultiplier = inputMul
@@ -677,14 +677,22 @@ func SaveModelMultiplierWithFree(internalModelName string, inputMul, outputMul, 
 	if isFree >= 0 {
 		m.IsFree = isFree >= 1
 	}
-	return GetDB().Save(&m).Error
+	if m.ID == 0 {
+		return GetDB().Create(&m).Error
+	}
+	// Unscoped().Save 才能把 deleted_at 写回 NULL（复活），并按主键全字段更新。
+	return GetDB().Unscoped().Save(&m).Error
 }
 
 // DeleteModelMultiplier removes the multiplier for an actual model (internalModelName),
 // making it fall back to the global default.
-// 关键词: DeleteModelMultiplier, 实际模型倍率清除, 回落全局默认
+//
+// 这是配置表：删除语义就是「回落全局默认」，没有「恢复已删除倍率」的需求，
+// 因此用 Unscoped 硬删除，避免软删除残留行占用 internal_model_name 唯一键，
+// 进而导致下次保存同名模型撞 UNIQUE 约束。
+// 关键词: DeleteModelMultiplier, 实际模型倍率清除, 硬删除避免唯一键残留
 func DeleteModelMultiplier(internalModelName string) error {
-	return GetDB().Where("internal_model_name = ?", internalModelName).
+	return GetDB().Unscoped().Where("internal_model_name = ?", internalModelName).
 		Delete(&AiModelMultiplier{}).Error
 }
 

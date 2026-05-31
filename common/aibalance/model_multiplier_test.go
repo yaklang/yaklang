@@ -141,6 +141,78 @@ func TestSaveModelMultiplier_RequiresKey(t *testing.T) {
 	assert.Error(t, SaveModelMultiplier("", 1, 1, 1, 1))
 }
 
+// TestSaveModelMultiplier_ReviveSoftDeleted 复现并验证修复：
+// 旧实现「清除」是 GORM 软删除（仅置 deleted_at），库级 UNIQUE 索引不区分 deleted_at，
+// 残留行仍占用 internal_model_name 唯一键；再次保存同名模型时若走 Create 会撞
+// "UNIQUE constraint failed: ai_model_multipliers.internal_model_name"。
+// 修复后 SaveModelMultiplierWithFree 用 Unscoped 命中残留行并复活，保存应成功。
+// 关键词: TestSaveModelMultiplier_ReviveSoftDeleted, 软删除残留唯一键, 自愈
+func TestSaveModelMultiplier_ReviveSoftDeleted(t *testing.T) {
+	ensureMultiplierTables(t)
+
+	internal := fmt.Sprintf("Qwen/Qwen3-Embedding-%d", time.Now().UnixNano())
+	defer GetDB().Unscoped().Where("internal_model_name = ?", internal).Delete(&AiModelMultiplier{})
+
+	// 先建一行
+	require.NoError(t, SaveModelMultiplier(internal, 2.0, 3.0, -1, -1))
+
+	// 手动制造「软删除残留行」：模拟旧实现的软删除（不带 Unscoped）。
+	require.NoError(t, GetDB().Where("internal_model_name = ?", internal).Delete(&AiModelMultiplier{}).Error)
+
+	// 默认作用域查不到（被软删除），但残留行仍占用唯一键
+	gone, err := GetModelMultiplier(internal)
+	require.NoError(t, err)
+	require.Nil(t, gone)
+	var residue int
+	require.NoError(t, GetDB().Unscoped().Model(&AiModelMultiplier{}).
+		Where("internal_model_name = ?", internal).Count(&residue).Error)
+	require.Equal(t, 1, residue, "soft-deleted residue row should still occupy the unique key")
+
+	// 关键断言：再次保存同名模型（标记免费）不应再撞 UNIQUE 约束
+	require.NoError(t, SaveModelMultiplierWithFree(internal, 0, 0, 0, 0, 1),
+		"re-saving a previously soft-deleted model must not hit UNIQUE constraint")
+
+	m, err := GetModelMultiplier(internal)
+	require.NoError(t, err)
+	require.NotNil(t, m, "row should be revived and visible under default scope")
+	assert.True(t, m.IsFree, "is_free should be applied on revive")
+	// 复活按新建基线归零，再应用本次入参（四维均 0）
+	assert.Equal(t, 0.0, m.InputTokenMultiplier)
+	assert.Equal(t, 0.0, m.OutputTokenMultiplier)
+
+	// 复活后仍是同一唯一键、且只有一行存活
+	var live int
+	require.NoError(t, GetDB().Model(&AiModelMultiplier{}).
+		Where("internal_model_name = ?", internal).Count(&live).Error)
+	assert.Equal(t, 1, live)
+}
+
+// TestDeleteModelMultiplier_HardDelete 验证删除为硬删除：不留软删除残留行，
+// 避免再次保存同名模型撞唯一键。
+// 关键词: TestDeleteModelMultiplier_HardDelete, 硬删除无残留
+func TestDeleteModelMultiplier_HardDelete(t *testing.T) {
+	ensureMultiplierTables(t)
+
+	internal := fmt.Sprintf("real-model-harddel-%d", time.Now().UnixNano())
+	defer GetDB().Unscoped().Where("internal_model_name = ?", internal).Delete(&AiModelMultiplier{})
+
+	require.NoError(t, SaveModelMultiplier(internal, 1.0, 1.0, -1, -1))
+	require.NoError(t, DeleteModelMultiplier(internal))
+
+	// 硬删除：Unscoped 也查不到任何残留行
+	var residue int
+	require.NoError(t, GetDB().Unscoped().Model(&AiModelMultiplier{}).
+		Where("internal_model_name = ?", internal).Count(&residue).Error)
+	assert.Equal(t, 0, residue, "delete should be a hard delete leaving no residue")
+
+	// 删除后再次保存应成功
+	require.NoError(t, SaveModelMultiplier(internal, 5.0, -1, -1, -1))
+	m, err := GetModelMultiplier(internal)
+	require.NoError(t, err)
+	require.NotNil(t, m)
+	assert.Equal(t, 5.0, m.InputTokenMultiplier)
+}
+
 func TestGlobalMultiplierConfig_SaveGet(t *testing.T) {
 	ensureMultiplierTables(t)
 	// 用例后清掉单例，避免污染其它用例
