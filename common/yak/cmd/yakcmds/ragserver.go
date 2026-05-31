@@ -122,6 +122,14 @@ var ragServerCommand = &cli.Command{
 	Usage: "Start the standalone RAG knowledge base HTTP server (search only, no admin)",
 	Flags: []cli.Flag{
 		cli.StringFlag{
+			Name:  "gen-config",
+			Usage: "generate a commented config template to the given path and exit (edit it to set api_key etc.)",
+		},
+		cli.BoolFlag{
+			Name:  "gen-config-force",
+			Usage: "overwrite the target file when using --gen-config",
+		},
+		cli.StringFlag{
 			Name:  "config",
 			Usage: "path to rag-server.yaml (optional; uses default config if omitted)",
 		},
@@ -150,11 +158,6 @@ var ragServerCommand = &cli.Command{
 			Usage: "max simultaneous chat requests (override config)",
 		},
 		cli.StringFlag{
-			Name:  "ai-tier",
-			Value: "basic",
-			Usage: "model tier when using global tiered aiconfig: basic (lightweight, default) or standard (intelligent)",
-		},
-		cli.StringFlag{
 			Name:  "ai-type",
 			Usage: "AI service type (override config)",
 		},
@@ -170,6 +173,22 @@ var ragServerCommand = &cli.Command{
 			Name:  "ai-domain",
 			Usage: "AI service domain (override config)",
 		},
+		cli.StringFlag{
+			Name:  "ai-lite-type",
+			Usage: "lightweight (speed channel) AI service type (override config)",
+		},
+		cli.StringFlag{
+			Name:  "ai-lite-model",
+			Usage: "lightweight (speed channel) AI model name (override config)",
+		},
+		cli.StringFlag{
+			Name:  "ai-lite-apikey",
+			Usage: "lightweight (speed channel) AI API key (override config)",
+		},
+		cli.StringFlag{
+			Name:  "ai-lite-domain",
+			Usage: "lightweight (speed channel) AI service domain (override config)",
+		},
 		cli.BoolTFlag{
 			Name:  "fe",
 			Usage: "serve the built-in read-only search web UI at the root path (default: on; use --fe=false to disable)",
@@ -180,6 +199,17 @@ var ragServerCommand = &cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) error {
+		// --gen-config: 生成带注释的配置模板后直接退出, 方便用户修改 api_key 等再启动
+		if genPath := c.String("gen-config"); genPath != "" {
+			if err := airaghttp.SaveConfigTemplateToFile(genPath, c.Bool("gen-config-force")); err != nil {
+				return fmt.Errorf("generate config failed: %w", err)
+			}
+			fmt.Printf("config template written to: %s\n", genPath)
+			fmt.Println("edit it (set ai.api_key etc.), then start with:")
+			fmt.Printf("  yak rag-server --config %s\n", genPath)
+			return nil
+		}
+
 		var config *airaghttp.RAGServerConfig
 		if cfgPath := c.String("config"); cfgPath != "" {
 			loaded, err := airaghttp.LoadConfigFromFile(cfgPath)
@@ -200,7 +230,7 @@ var ragServerCommand = &cli.Command{
 			airaghttp.WithAuthToken(c.String("auth-token")),
 			airaghttp.WithConcurrent(c.Int("concurrent")),
 			airaghttp.WithAIService(c.String("ai-type"), c.String("ai-model"), c.String("ai-apikey"), c.String("ai-domain")),
-			airaghttp.WithAITier(c.String("ai-tier")),
+			airaghttp.WithLightweightAIService(c.String("ai-lite-type"), c.String("ai-lite-model"), c.String("ai-lite-apikey"), c.String("ai-lite-domain")),
 			airaghttp.WithServeFrontend(c.Bool("fe")),
 			airaghttp.WithDebug(c.Bool("debug")),
 		}
@@ -247,6 +277,7 @@ func printRAGServerStartupInfo(server *airaghttp.RAGHTTPServer) {
 	if server.IsFrontendEnabled() {
 		fmt.Printf("  Web UI:       http://%s/   (built-in read-only search page)\n", addr)
 	}
+	fmt.Printf("  AI Model:     %s\n", server.GetAIModeDescription())
 	fmt.Printf("  Ready KBs:    %d\n", len(server.GetReadyCollections()))
 	fmt.Println()
 	fmt.Println("Press Ctrl+C to stop.")

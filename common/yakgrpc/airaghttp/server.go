@@ -85,6 +85,19 @@ func newRAGHTTPServerWithDeps(config *RAGServerConfig, db *gorm.DB, embeddingCli
 		return nil, err
 	}
 
+	// 启动检测: 高质/轻量两个通道分别是否配置好(api_key); 未配置则回退内置轻量模型.
+	// 关键词: startup ai check, quality/speed channel, fallback lightweight
+	if config.IsAIConfigured() {
+		log.Infof("quality channel: using custom high-quality model [%s:%s]", config.AI.Type, modelOrDefault(config.AI.Model))
+	} else {
+		log.Warnf("quality channel: ai.api_key empty, falling back to lightweight model [%s]", LightweightModelName)
+	}
+	if config.IsLightweightAIConfigured() {
+		log.Infof("speed channel: using custom lightweight model [%s:%s]", config.AILightweight.Type, modelOrDefault(config.AILightweight.Model))
+	} else {
+		log.Infof("speed channel: using built-in lightweight model [%s]", LightweightModelName)
+	}
+
 	s.registerRoutes()
 	return s, nil
 }
@@ -278,6 +291,28 @@ func (s *RAGHTTPServer) GetReadyCollections() []string {
 	out := make([]string, len(s.readyCollections))
 	copy(out, s.readyCollections)
 	return out
+}
+
+// modelOrDefault 模型名为空时返回占位描述
+func modelOrDefault(model string) string {
+	if model == "" {
+		return "(type default)"
+	}
+	return model
+}
+
+// GetAIModeDescription 返回当前 AI 模型的人类可读描述 (用于启动信息展示)
+// 展示 质量优先 / 速度优先 两个通道当前所用模型.
+func (s *RAGHTTPServer) GetAIModeDescription() string {
+	quality := fmt.Sprintf("lightweight %s", LightweightModelName)
+	if s.config.IsAIConfigured() {
+		quality = fmt.Sprintf("custom %s:%s", s.config.AI.Type, modelOrDefault(s.config.AI.Model))
+	}
+	speed := fmt.Sprintf("built-in %s", LightweightModelName)
+	if s.config.IsLightweightAIConfigured() {
+		speed = fmt.Sprintf("custom %s:%s", s.config.AILightweight.Type, modelOrDefault(s.config.AILightweight.Model))
+	}
+	return fmt.Sprintf("quality=[%s] speed=[%s]", quality, speed)
 }
 
 // ========== 并发信号量 ==========

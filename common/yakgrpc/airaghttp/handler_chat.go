@@ -11,12 +11,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/aiengine"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 // noise 事件类型与 nodeId, 这些对用户无意义, SSE 中一律丢弃
@@ -32,15 +36,21 @@ var chatNoiseTypes = map[string]bool{
 	"ai_total_cost_ms":      true,
 	"ai_call_summary":       true,
 	"prompt_profile":        true,
-	// 以下事件要么泄漏本地路径, 要么是额度/通知噪声, 一律不下发前端
-	// 关键词: drop local path leak, notify quota spam, session title noise
+	// 以下事件要么泄漏本地路径/内部 prompt, 要么是额度/通知噪声, 一律不下发前端
+	// 关键词: drop local path leak, notify quota spam, session title noise, reference_material prompt leak
 	"notify":                   true,
 	"filesystem_pin_directory": true,
 	"filesystem_pin_filename":  true,
 	"session_title":            true,
 	"pin_filename":             true,
 	"pin_directory":            true,
+	// reference_material 会把注入的技能/系统 prompt 缓存原文 (<|AI_CACHE_SYSTEM|>...) 透出, 属内部信息泄漏
+	"reference_material": true,
 }
+
+// internalMarkerRe 命中内部 prompt / 缓存 / SCHEMA 等标记, 这些是引擎内部内容, 不应泄漏给前端
+// 关键词: internal prompt marker, AI_CACHE_SYSTEM, TRAITS, avoid leak
+var internalMarkerRe = regexp.MustCompile(`<\|[A-Z]|AI_CACHE_SYSTEM|TRAITS|高静态|high-static`)
 
 // absLocalPathRe 匹配常见的本地绝对路径 (含 yakit-projects/aispace 等), 用于脱敏
 // 关键词: sanitize local path, avoid filesystem leak
@@ -50,6 +60,10 @@ var absLocalPathRe = regexp.MustCompile(`(?:[A-Za-z]:\\[^\s"']+|/(?:Users|home|r
 func sanitizeTraceMessage(s string) string {
 	if s == "" {
 		return s
+	}
+	// 命中引擎内部 prompt/缓存标记的整条丢弃 (防系统 prompt 泄漏)
+	if internalMarkerRe.MatchString(s) {
+		return ""
 	}
 	out := absLocalPathRe.ReplaceAllString(s, "[local-path]")
 	// 兜底: 任意残留含 yakit-projects 的串也屏蔽
@@ -66,6 +80,7 @@ var chatNoiseNodeIds = map[string]bool{
 	"ai_call_summary":       true,
 	"pressure":              true,
 	"system":                true,
+	"reference_material":    true,
 }
 
 // handleChat GET|POST /chat SSE Agentic RAG 流式问答
@@ -112,6 +127,9 @@ func (s *RAGHTTPServer) handleChat(w http.ResponseWriter, r *http.Request) {
 			emitter.safeEmit("error", map[string]interface{}{"code": 500, "message": utils.InterfaceToString(rec)})
 		}
 		s.releaseSlot()
+		// 会话结束: 删除本次 session 在数据库中的全部痕迹 (会话/运行时/检查点/事件/计划), 避免数据爆炸
+		// 关键词: cleanup ai session, delete session data, avoid data explosion
+		cleanupSessionData(consts.GetGormProjectDatabase(), sessionID)
 		log.Infof("/chat finished for %s session=%s inflight=%d", clientAddr, sessionID, s.getInflight())
 	}()
 
@@ -166,6 +184,33 @@ func (s *RAGHTTPServer) handleChat(w http.ResponseWriter, r *http.Request) {
 	emitter.safeEmit("end", map[string]interface{}{"durationMs": durationMs, "ok": invokeErr == nil})
 }
 
+// buildCustomAICallback 根据自定义 AI 配置构造统一回调, 用于覆盖 React loop 的质量/速度优先回调.
+// 与 aiengine.WithAIConfig 内部构造方式一致 (LoadChater + AIChatToAICallbackType).
+// 关键词: build custom ai callback, LoadChater, override tiered callback
+func buildCustomAICallback(typ string, opts []aispec.AIConfigOption) aicommon.AICallbackType {
+	chatter, err := ai.LoadChater(typ, opts...)
+	if err != nil {
+		log.Warnf("load custom ai chatter (type=%s) failed: %v", typ, err)
+		return nil
+	}
+	return aicommon.AIChatToAICallbackType(chatter)
+}
+
+// cleanupSessionData 删除某次会话在项目库中的全部关联数据 (会话元信息/运行时/检查点/输出事件/计划执行).
+// 用于 /chat 结束后立即清理, 防止只读问答服务长期堆积 session 数据撑爆磁盘.
+// 关键词: DeleteAISession, cleanup session, avoid data explosion
+func cleanupSessionData(db *gorm.DB, sessionID string) {
+	if db == nil || sessionID == "" {
+		return
+	}
+	runtimes, events, err := yakit.DeleteAISession(db, sessionID)
+	if err != nil {
+		log.Warnf("cleanup ai session %s failed: %v", sessionID, err)
+		return
+	}
+	log.Infof("ai session cleaned: session=%s runtimes=%d events=%d", sessionID, runtimes, events)
+}
+
 // readQuestion 从 query 参数 q 或 POST body {question}/{q} 中读取问题
 func (s *RAGHTTPServer) readQuestion(r *http.Request) string {
 	if q := strings.TrimSpace(r.URL.Query().Get("q")); q != "" {
@@ -213,29 +258,40 @@ func (s *RAGHTTPServer) buildAIEngineOptions(ctx context.Context, sessionID stri
 		opts = append(opts, aiengine.WithAttachedKnowledgeBase(kb))
 	}
 
-	// AI 服务: 自定义模式覆盖, 否则走全局分级 aiconfig (aiengine 默认启用 TieredAICallback)
-	if s.config.UseCustomAIConfig() {
-		aiOpts := make([]aispec.AIConfigOption, 0)
-		if s.config.AI.Model != "" {
-			aiOpts = append(aiOpts, aispec.WithModel(s.config.AI.Model))
-		}
-		if s.config.AI.APIKey != "" {
-			aiOpts = append(aiOpts, aispec.WithAPIKey(s.config.AI.APIKey))
-		}
-		if s.config.AI.Domain != "" {
-			aiOpts = append(aiOpts, aispec.WithDomain(s.config.AI.Domain))
-		}
+	// AI 服务选择 (按优先级分档以节约成本):
+	//   - 速度优先(speed): React loop 内搜索/记忆/压缩等高频调用走此通道. 用 ai_lightweight
+	//     配置的小尺寸模型; 未配置则回退内置 memfit-light-free. 避免高质模型带来的高成本.
+	//   - 质量优先(quality): 关键推理/最终回答. 用 ai 配置的高质模型; 未配置则回退轻量模型.
+	// 关键: 仅 WithAIConfig 不足以覆盖 React loop 内部按"质量/速度优先"取的分级回调,
+	//       必须同时通过 ExtOptions 注入对应优先级回调才能真正生效.
+	// 关键词: quality vs speed channel, ai_lightweight, cost saving
+	var lightCb aicommon.AICallbackType
+	if s.config.IsLightweightAIConfigured() {
+		lwOpts := s.config.LightweightAISpecOptions()
+		lightCb = buildCustomAICallback(s.config.AILightweight.Type, lwOpts)
+	}
+	if lightCb == nil {
+		lightCb = aicommon.MustGetLightweightAIModelCallback()
+	}
+
+	qualityCb := lightCb
+	if s.config.IsAIConfigured() {
+		aiOpts := s.config.AISpecOptions()
 		opts = append(opts, aiengine.WithAIConfig(s.config.AI.Type, aiOpts...))
-	} else if s.config.UseBasicTier() {
-		// 默认档位: 全程使用轻量(basic)模型, 避免高质(standard)模型过重/超额.
-		// ExtOptions 在最后应用, 覆盖 aiengine 默认的分级回调(质量优先=高质模型).
-		// 关键词: default basic tier, override quality/speed callback, lightweight
-		if cb := aicommon.MustGetLightweightAIModelCallback(); cb != nil {
-			opts = append(opts, aiengine.WithExtOptions(
-				aicommon.WithQualityPriorityAICallback(cb),
-				aicommon.WithSpeedPriorityAICallback(cb),
-			))
+		if cb := buildCustomAICallback(s.config.AI.Type, aiOpts); cb != nil {
+			qualityCb = cb
 		}
+	}
+
+	extOpts := make([]aicommon.ConfigOption, 0, 2)
+	if qualityCb != nil {
+		extOpts = append(extOpts, aicommon.WithQualityPriorityAICallback(qualityCb))
+	}
+	if lightCb != nil {
+		extOpts = append(extOpts, aicommon.WithSpeedPriorityAICallback(lightCb))
+	}
+	if len(extOpts) > 0 {
+		opts = append(opts, aiengine.WithExtOptions(extOpts...))
 	}
 
 	opts = append(opts,
