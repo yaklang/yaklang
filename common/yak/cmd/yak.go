@@ -1301,6 +1301,7 @@ func main() {
 	app.Commands = append(app.Commands, cliGroup("Systemd Service Management", yakcmds.SystemdCommands...)...)
 	app.Commands = append(app.Commands, cliGroup("Remote Operations", yakcmds.SSHCommands...)...)
 	app.Commands = append(app.Commands, cliGroup("TUN Device Utils", yakcmds.TunCommands...)...)
+	app.Commands = append(app.Commands, cliGroup("RAG Server", yakcmds.RAGServerCommands...)...)
 
 	app.Flags = []cli.Flag{
 		cli.StringFlag{

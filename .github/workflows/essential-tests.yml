@@ -558,7 +558,8 @@ jobs:
                 {"package": "./common/aiforge/aibp", "timeout": "2m30s", "parallel": 1, "run": "^(TestBuildForgeFromYak|TestNewForgeExecutor)$"},
                 {"package": "./common/aiforge", "timeout": "3m", "parallel": 1},
                 {"package": "./common/aibalance/...", "timeout": "2m", "parallel": 1},
-                {"package": "./common/yakgrpc/aihttp/tests/...", "timeout": "1m"}
+                {"package": "./common/yakgrpc/aihttp/tests/...", "timeout": "1m"},
+                {"package": "./common/yakgrpc/airaghttp/...", "timeout": "2m", "parallel": 1}
               ]
     steps:
       - name: Checkout
