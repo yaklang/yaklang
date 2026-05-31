@@ -552,10 +552,34 @@ func (c *ServerConfig) handleGetRateLimitStatus(conn net.Conn, request *http.Req
 	if distinctCount, top, date, err := QueryFreeUserIPUsageSnapshot(50); err == nil {
 		freeIPUsage["reset_date"] = date
 		freeIPUsage["distinct_ip_count"] = distinctCount
-		topOut := make([]map[string]interface{}, 0, len(top))
+		// 先筛出超阈值（>10M）的展示 IP，再批量取这些 IP 的「按模型 TOP3 用量」附给每行，
+		// 避免 N 次小查询。top_models 仅展示用，不影响任何限额逻辑。
+		// 关键词: handleGetRateLimitStatus top_models, per-IP TOP3 模型展示
+		displayedIPs := make([]string, 0, len(top))
 		for _, r := range top {
 			if r.UsedM <= freeIPUsageDisplayThresholdM {
 				continue
+			}
+			displayedIPs = append(displayedIPs, r.IP)
+		}
+		topModelsByIP, tmErr := QueryFreeIPTopModelsBatch(displayedIPs, 3)
+		if tmErr != nil {
+			c.logWarn("QueryFreeIPTopModelsBatch failed: %v", tmErr)
+			topModelsByIP = map[string][]FreeIPModelUsageRow{}
+		}
+		topOut := make([]map[string]interface{}, 0, len(displayedIPs))
+		for _, r := range top {
+			if r.UsedM <= freeIPUsageDisplayThresholdM {
+				continue
+			}
+			models := make([]map[string]interface{}, 0, 3)
+			for _, m := range topModelsByIP[r.IP] {
+				models = append(models, map[string]interface{}{
+					"model":         m.Model,
+					"request_count": m.RequestCount,
+					"tokens_used":   m.TokensUsed,
+					"used_m":        m.UsedM,
+				})
 			}
 			topOut = append(topOut, map[string]interface{}{
 				"ip":            r.IP,
@@ -563,6 +587,7 @@ func (c *ServerConfig) handleGetRateLimitStatus(conn net.Conn, request *http.Req
 				"tokens_used":   r.TokensUsed,
 				"used_m":        r.UsedM,
 				"throttled":     throttledSet[r.IP],
+				"top_models":    models,
 			})
 		}
 		freeIPUsage["top"] = topOut

@@ -35,6 +35,7 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 )
 
 // APIKeyFingerprint 计算原始 API Key 的不可逆指纹 (SHA256[:16] hex).
@@ -592,7 +593,7 @@ func (m *MirrorManager) runOnce(parentCtx context.Context, rt *mirrorRuleRuntime
 		}
 	}()
 
-	execErr, stdout = executeMirrorScript(ctx, rule.CallbackScript, snap)
+	execErr, stdout = executeMirrorScript(ctx, rule.CallbackScript, snap, true)
 }
 
 // executeMirrorScript 真正调用 yak ScriptEngine.
@@ -601,8 +602,13 @@ func (m *MirrorManager) runOnce(parentCtx context.Context, rt *mirrorRuleRuntime
 // 通过 yak ScriptEngine 的 params 传入 (用户脚本里也可以通过
 // getParam("MIRROR_DATA") 自行获取).
 //
-// 关键词: executeMirrorScript, yak engine ExecuteExWithContext, handle 调用, getParam
-func executeMirrorScript(ctx context.Context, script string, snap *MirrorSnapshot) (error, string) {
+// allowPersist 控制注入的 save() 是否真正落盘: 生产触发为 true; 面板「试运行」为 false,
+// 避免试运行污染落盘数据。save() 注入为可直接调用的全局函数 (SetVars), 语义:
+//   - save()      落盘当前镜像数据 (即 handle 的入参 data)
+//   - save(x)     落盘任意可序列化对象 x
+//
+// 关键词: executeMirrorScript, yak engine ExecuteExWithContext, handle 调用, save 注入落盘
+func executeMirrorScript(ctx context.Context, script string, snap *MirrorSnapshot, allowPersist bool) (error, string) {
 	if strings.TrimSpace(script) == "" {
 		return fmt.Errorf("empty script"), ""
 	}
@@ -612,7 +618,29 @@ func executeMirrorScript(ctx context.Context, script string, snap *MirrorSnapsho
 		"handle(__mirror_data)\n"
 	wrapped := script + tail
 
+	// save() 闭包: 默认落盘当前快照, 也可传入自定义内容。受 allowPersist 与全局 sink 双重控制。
+	saveFn := func(args ...any) bool {
+		if !allowPersist {
+			return false
+		}
+		var payload any = dataMap
+		if len(args) > 0 && args[0] != nil {
+			payload = args[0]
+		}
+		ok, err := dataSinkAppend(payload)
+		if err != nil {
+			log.Warnf("mirror: save record failed (req_id=%s): %v", snap.ReqID, err)
+			return false
+		}
+		return ok
+	}
+
 	engine := yak.NewScriptEngine(1)
+	// 把 save 注入为脚本可直接调用的全局函数。
+	engine.RegisterEngineHooks(func(ng *antlr4yak.Engine) error {
+		ng.SetVars(map[string]any{"save": saveFn})
+		return nil
+	})
 	params := map[string]any{
 		"MIRROR_DATA": dataMap,
 		"runtime_id":  "mirror-" + snap.ReqID,
@@ -778,7 +806,7 @@ func (m *MirrorManager) RunOnceForTest(script string, snap *MirrorSnapshot, time
 	if snap == nil {
 		snap = &MirrorSnapshot{ReqID: utils.RandStringBytes(8), TimestampMs: time.Now().UnixMilli()}
 	}
-	err, _ := executeMirrorScript(ctx, script, snap)
+	err, _ := executeMirrorScript(ctx, script, snap, false)
 	durationMs = time.Since(start).Milliseconds()
 	if err != nil {
 		return false, err.Error(), durationMs

@@ -237,6 +237,11 @@ func (c *ServerConfig) gateChatFreeUserIPLimit(conn net.Conn, clientIP, modelNam
 	if addErr := AddFreeUserIPDailyRequest(clientIP); addErr != nil {
 		c.logWarn("AddFreeUserIPDailyRequest failed (ip=%s model=%s): %v", clientIP, modelName, addErr)
 	}
+	// 按模型拆分的请求计数（仅展示用，不参与限额）。失败仅 logWarn。
+	// 关键词: AddFreeUserIPModelDailyRequest, per-IP 按模型计数
+	if addErr := AddFreeUserIPModelDailyRequest(clientIP, modelName); addErr != nil {
+		c.logWarn("AddFreeUserIPModelDailyRequest failed (ip=%s model=%s): %v", clientIP, modelName, addErr)
+	}
 	return false
 }
 

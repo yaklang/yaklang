@@ -177,6 +177,10 @@ func handle(data) {
     }
     log.info(f"mirror got req: model=${data.model} action=${data.action} duration=${data["duration_ms"]}ms tool_calls=${toolCallCount}")
 
+    // 示例: 调用内置 save 把本次镜像数据落盘归档 (容量受限, 超限自动清理旧数据).
+    //   save()        // 落盘当前 data
+    //   save(data)    // 等价写法, 也可传入自定义对象 save({"k": "v"})
+
     // 示例: 把命中条件的请求落到本地文件 (按需打开).
     //   file.SaveAndAppend("/tmp/mirror.log", json.dumps(data) + "\n")
 

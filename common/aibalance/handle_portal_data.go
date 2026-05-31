@@ -61,6 +61,10 @@ type PortalDataResponse struct {
 	// 主机/数据库分区磁盘空间，避免数据库写爆。
 	// 关键词: PortalDataResponse disk_info, 主机可用空间 KPI
 	Disk DiskInfoJSON `json:"disk_info"`
+
+	// 镜像数据落盘的实时计数（条数 + 字节），供顶部「存储采集数据」卡片展示。
+	// 关键词: PortalDataResponse storage_info, 落盘条数/占用 KPI
+	Storage StorageInfoJSON `json:"storage_info"`
 }
 
 // DAUBreakdownJSON 是「今日日活按 source_kind 拆分」结构。
@@ -151,6 +155,14 @@ type DiskInfoJSON struct {
 	UsedPercent float64 `json:"used_percent"`
 	FreePercent float64 `json:"free_percent"`
 	Available   bool    `json:"available"` // 取数成功则为 true; 失败时其余字段为零值
+}
+
+// StorageInfoJSON 是镜像数据落盘的实时计数快照。
+// 关键词: storage_info, 落盘条数/占用字节
+type StorageInfoJSON struct {
+	Records   int64 `json:"records"`   // 已落盘记录条数
+	Bytes     int64 `json:"bytes"`     // 已落盘占用字节
+	Available bool  `json:"available"` // 落盘子系统已装配则为 true
 }
 
 // ProviderDataJSON is the JSON representation of provider data
@@ -610,6 +622,11 @@ func (c *ServerConfig) fillDAUAndCacheStats(data *PortalDataResponse) {
 	// 失败仅 Warn, 前端会按 available=false 显示「N/A」。
 	// 关键词: portal fill disk_info, healthinfo.DiskUsageWithContext, GetDefaultYakitBaseDir
 	data.Disk = collectDiskInfo()
+
+	// 镜像数据落盘的实时计数（条数 + 字节）。未装配落盘子系统时 available=false。
+	// 关键词: portal fill storage_info, dataSinkStats
+	records, bytes, available := dataSinkStats()
+	data.Storage = StorageInfoJSON{Records: records, Bytes: bytes, Available: available}
 }
 
 // collectDiskInfo 探测「yakit base dir 所在分区」的磁盘空间，

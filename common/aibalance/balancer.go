@@ -248,6 +248,11 @@ func LoadProvidersFromDatabase(config *ServerConfig) error {
 	if err := EnsureFreeUserIPDailyUsageTable(); err != nil {
 		log.Warnf("Failed to ensure FreeUserIPDailyUsage table exists: %v", err)
 	}
+	// 单 IP 按模型用量表（仅面板「每个 IP 用得最多的模型」展示用，不参与限额）
+	// 关键词: EnsureFreeUserIPModelDailyUsageTable 初始化, per-IP TOP 模型
+	if err := EnsureFreeUserIPModelDailyUsageTable(); err != nil {
+		log.Warnf("Failed to ensure FreeUserIPModelDailyUsage table exists: %v", err)
+	}
 	// 一键限流 IP 表（持久化被限流 IP + 加载到进程内缓存供热路径查询）
 	// 关键词: EnsureThrottledIPTable 初始化, ReloadThrottledIPCache 一键限流
 	if err := EnsureThrottledIPTable(); err != nil {
@@ -278,11 +283,26 @@ func LoadProvidersFromDatabase(config *ServerConfig) error {
 	if err := EnsureSummaryTable(); err != nil {
 		log.Warnf("Failed to ensure ai_daily_summary table exists: %v", err)
 	}
+	// 镜像数据落盘配置表 + 装配落盘子系统（save() 落盘 + 容量治理）。
+	// 关键词: EnsureMirrorStorageConfigTable 初始化, initDataSink 装配, 落盘子系统
+	if err := EnsureMirrorStorageConfigTable(); err != nil {
+		log.Warnf("Failed to ensure AiMirrorStorageConfig table exists: %v", err)
+	}
+	if storageCfg, err := GetMirrorStorageConfig(); err != nil {
+		log.Warnf("Failed to load mirror storage config: %v", err)
+	} else {
+		applyMirrorStorageConfig(storageCfg)
+		log.Infof("Loaded mirror storage config: enabled=%v max_bytes=%d reclaim_bytes=%d check_interval_sec=%d",
+			storageCfg.Enabled, storageCfg.MaxBytes, storageCfg.ReclaimBytes, storageCfg.CheckIntervalSec)
+	}
 	statsSchedulerOnce.Do(func() {
 		statsSchedulerCtx, statsSchedulerCancel = context.WithCancel(context.Background())
 		StartDailyCleanupScheduler(statsSchedulerCtx)
 		StartDailySummaryFlusher(statsSchedulerCtx, 30*time.Second)
-		log.Infof("DAU & cache stats schedulers started: cleanup=daily@0:01 flusher=30s")
+		// 镜像数据落盘容量巡检（每分钟，超限按最旧分片整文件淘汰）。
+		// 关键词: StartDataSinkGovernor 启动, 容量巡检调度
+		StartDataSinkGovernor(statsSchedulerCtx)
+		log.Infof("DAU & cache stats schedulers started: cleanup=daily@0:01 flusher=30s sink_governor=on")
 	})
 
 	// Start amap health check scheduler (checks every 1 hour)

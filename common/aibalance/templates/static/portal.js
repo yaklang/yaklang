@@ -172,6 +172,9 @@
                 if (typeof renderDiskCard === 'function') {
                     renderDiskCard(data.disk_info || {});
                 }
+                if (typeof renderStorageCard === 'function') {
+                    renderStorageCard(data.storage_info || {});
+                }
                 if (typeof renderDauCacheTab === 'function') {
                     renderDauCacheTab(data);
                 }
@@ -1121,6 +1124,13 @@
             if (tabId === 'mirror') {
                 if (window.MirrorMgmt && typeof window.MirrorMgmt.refresh === 'function') {
                     window.MirrorMgmt.refresh();
+                }
+            }
+            // 镜像数据 tab 切换时自动加载最近记录
+            // 关键词: switchTab mirror-records 初始化, MirrorRecords.load
+            if (tabId === 'mirror-records') {
+                if (window.MirrorRecords && typeof window.MirrorRecords.load === 'function') {
+                    window.MirrorRecords.load();
                 }
             }
         }
@@ -6949,13 +6959,32 @@ curl '${metaApiUrl}?name=${modelName}'`;
                     ? '<button class="rl-ip-unthrottle-btn btn" data-ip="' + ip + '" style="height:26px; font-size:12px; background:#c62828; color:#fff;">解除</button>'
                     : '<button class="rl-ip-throttle-btn btn" data-ip="' + ip + '" style="height:26px; font-size:12px; background:#ef6c00; color:#fff;">限流</button>';
                 const tag = throttled ? ' <span style="color:#c62828; font-size:11px;">(已限流)</span>' : '';
+                // 该 IP 用得最多的 TOP3 模型（小字子行）；含加权 Token(M) 与 RMB 折算。
+                // 关键词: renderFreeIPUsage top_models, per-IP TOP3 模型子行
+                const models = Array.isArray(it.top_models) ? it.top_models : [];
+                let modelsRow = '';
+                if (models.length > 0) {
+                    const chips = models.map(function (m) {
+                        const name = escapeHtml(m.model || '');
+                        const mm = (typeof m.used_m === 'number') ? m.used_m : 0;
+                        const mReq = Number(m.request_count) || 0;
+                        const mRmb = '¥' + (mm / BILLING_TOKEN_M_PER_RMB).toFixed(2);
+                        return '<span style="display:inline-block; margin:2px 6px 2px 0; padding:1px 6px; background:#f1f8ff; border:1px solid #cfe3ff; border-radius:10px; color:#37474f;">'
+                            + '<code style="color:#1565c0;">' + name + '</code> · ' + mm.toFixed(2) + 'M · ' + mReq + '次 · <span style="color:#1565c0;">' + mRmb + '</span>'
+                            + '</span>';
+                    }).join('');
+                    modelsRow = '<tr><td colspan="5" style="padding: 0 10px 8px 22px; border-bottom: 1px solid #e1f5fe; font-size: 11px; color:#789;">'
+                        + '<span style="color:#90a4ae;">TOP 模型: </span>' + chips
+                        + '</td></tr>';
+                }
                 return '<tr>'
                     + '<td style="padding: 6px 10px; border-bottom: 1px solid #e1f5fe;"><code>' + ip + '</code>' + tag + '</td>'
                     + '<td style="padding: 6px 10px; border-bottom: 1px solid #e1f5fe; text-align: right;">' + req + '</td>'
                     + '<td style="padding: 6px 10px; border-bottom: 1px solid #e1f5fe; text-align: right;">' + usedM + '</td>'
                     + '<td style="padding: 6px 10px; border-bottom: 1px solid #e1f5fe; text-align: right; color:#1565c0;">' + rmb + '</td>'
                     + '<td style="padding: 6px 10px; border-bottom: 1px solid #e1f5fe; text-align: center;">' + btn + '</td>'
-                    + '</tr>';
+                    + '</tr>'
+                    + modelsRow;
             }).join('');
             bindFreeIPActionButtons();
         }
@@ -7929,6 +7958,30 @@ curl '${metaApiUrl}?name=${modelName}'`;
             }
         }
 
+        // renderStorageCard 渲染顶部信息条的「存储采集数据」KPI 卡。
+        // 主数字 = 已落盘条数; 副行 = 占用大小; 未启用/未装配时显示「未启用」。
+        // 关键词: renderStorageCard, 顶部存储 KPI 渲染, storage_info
+        function renderStorageCard(storage) {
+            storage = storage || {};
+            const card = document.getElementById('storage-card');
+            const recEl = document.getElementById('storage-records-display');
+            const subEl = document.getElementById('storage-sub');
+            if (!card || !recEl || !subEl) return;
+            if (storage.available) {
+                const records = Number(storage.records) || 0;
+                const bytes = Number(storage.bytes) || 0;
+                recEl.textContent = records.toLocaleString() + ' 条';
+                recEl.style.color = '#1565c0';
+                subEl.textContent = '占用 ' + formatBytesHuman(bytes);
+                card.title = '已采集落盘 ' + records.toLocaleString() + ' 条 / 占用 ' + formatBytesHuman(bytes);
+            } else {
+                recEl.textContent = '未启用';
+                recEl.style.color = '#999';
+                subEl.textContent = '在「流量镜像」中开启落盘';
+                card.title = '数据落盘未启用';
+            }
+        }
+
         // renderDauCacheTab 把后端 portal data 一次性渲染到 dau-cache tab 的所有节点。
         // 关键词: renderDauCacheTab, KPI 数字 + 三张折线 + 拆分表
         function renderDauCacheTab(data) {
@@ -8113,6 +8166,7 @@ curl '${metaApiUrl}?name=${modelName}'`;
         window.pivotModelTrend = pivotModelTrend;
         window.formatBytesHuman = formatBytesHuman;
         window.renderDiskCard = renderDiskCard;
+        window.renderStorageCard = renderStorageCard;
         window.renderDauCacheTab = renderDauCacheTab;
         window.refreshDauCacheTab = refreshDauCacheTab;
 
@@ -8233,6 +8287,80 @@ curl '${metaApiUrl}?name=${modelName}'`;
                 } catch (e) {
                     console.error('mirror: refresh failed', e);
                     showToast('加载镜像规则失败: ' + (e.message || e), 'error');
+                }
+                // 顺带刷新落盘设置与实时用量。
+                loadStorageConfig();
+            }
+
+            // GiB 与字节互转辅助 (1 GiB = 1<<30)。
+            const GIB = 1024 * 1024 * 1024;
+            function fmtBytes(n) {
+                n = Number(n) || 0;
+                if (n >= GIB) return (n / GIB).toFixed(2) + ' GiB';
+                if (n >= 1024 * 1024) return (n / (1024 * 1024)).toFixed(2) + ' MiB';
+                if (n >= 1024) return (n / 1024).toFixed(2) + ' KiB';
+                return n + ' B';
+            }
+
+            // loadStorageConfig 读取落盘配置 + 实时计数, 填充到 mirror tab 的「数据落盘设置」卡。
+            // 关键词: loadStorageConfig, 落盘配置读取
+            async function loadStorageConfig() {
+                try {
+                    const resp = await fetch('/portal/api/mirror-storage-config', {credentials: 'same-origin'});
+                    if (!resp.ok) return;
+                    const j = await resp.json();
+                    if (!j || !j.success) return;
+                    const en = document.getElementById('mirror-storage-enabled');
+                    if (en) en.checked = !!j.enabled;
+                    const maxEl = document.getElementById('mirror-storage-max-gib');
+                    if (maxEl) maxEl.value = ((Number(j.max_bytes) || 0) / GIB).toFixed(2);
+                    const recEl = document.getElementById('mirror-storage-reclaim-gib');
+                    if (recEl) recEl.value = ((Number(j.reclaim_bytes) || 0) / GIB).toFixed(2);
+                    const secEl = document.getElementById('mirror-storage-check-sec');
+                    if (secEl) secEl.value = Number(j.check_interval_sec) || 60;
+                    const recordsEl = document.getElementById('mirror-storage-records');
+                    if (recordsEl) recordsEl.textContent = (Number(j.records) || 0).toLocaleString();
+                    const bytesEl = document.getElementById('mirror-storage-bytes');
+                    if (bytesEl) bytesEl.textContent = fmtBytes(j.bytes);
+                } catch (e) {
+                    console.error('mirror: loadStorageConfig failed', e);
+                }
+            }
+
+            // saveStorageConfig 保存落盘配置 (GiB 转字节后提交)。
+            // 关键词: saveStorageConfig, 落盘配置保存
+            async function saveStorageConfig() {
+                const en = document.getElementById('mirror-storage-enabled');
+                const maxEl = document.getElementById('mirror-storage-max-gib');
+                const recEl = document.getElementById('mirror-storage-reclaim-gib');
+                const secEl = document.getElementById('mirror-storage-check-sec');
+                const maxGib = parseFloat(maxEl && maxEl.value) || 0;
+                const recGib = parseFloat(recEl && recEl.value) || 0;
+                const sec = parseInt(secEl && secEl.value, 10) || 0;
+                const body = {
+                    enabled: !!(en && en.checked),
+                    max_bytes: Math.round(maxGib * GIB),
+                    reclaim_bytes: Math.round(recGib * GIB),
+                    check_interval_sec: sec,
+                };
+                try {
+                    const resp = await fetch('/portal/api/mirror-storage-config', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        credentials: 'same-origin',
+                        body: JSON.stringify(body),
+                    });
+                    const j = await resp.json();
+                    if (isAuthError(j)) { handleAuthError(); return; }
+                    if (j && j.success) {
+                        showToast('落盘设置已保存', 'success');
+                        loadStorageConfig();
+                    } else {
+                        showToast((j && (j.message || j.error)) || '保存失败', 'error');
+                    }
+                } catch (e) {
+                    console.error('mirror: saveStorageConfig failed', e);
+                    showToast('保存落盘设置失败', 'error');
                 }
             }
 
@@ -8597,5 +8725,126 @@ curl '${metaApiUrl}?name=${modelName}'`;
                 resetToDefaultScript: resetToDefaultScript,
                 viewLogs: viewLogs,
                 closeLogs: closeLogs,
+                saveStorageConfig: saveStorageConfig,
             };
         })();
+
+        // MirrorRecords: 「镜像数据」页面逻辑, 加载最近落盘记录并人性化展示.
+        // 关键词: MirrorRecords, 最近落盘记录查看, 人性化字段 + 原始 JSON 折叠
+        const MirrorRecords = (function () {
+            let seq = 0;
+
+            // tsHuman 把毫秒时间戳转成本地可读时间.
+            function tsHuman(ms) {
+                const n = Number(ms) || 0;
+                if (n <= 0) return '-';
+                try { return new Date(n).toLocaleString(); } catch (e) { return String(n); }
+            }
+
+            // pickUserMessage 从 request_messages 里取最后一条 user 文本片段.
+            function pickUserMessage(rec) {
+                const msgs = rec && rec.request_messages;
+                if (!Array.isArray(msgs) || !msgs.length) return '';
+                for (let i = msgs.length - 1; i >= 0; i--) {
+                    const m = msgs[i] || {};
+                    const role = (m.role || '').toLowerCase();
+                    if (role === 'user' && m.content) return String(m.content);
+                }
+                const last = msgs[msgs.length - 1] || {};
+                return last.content ? String(last.content) : '';
+            }
+
+            function clip(s, n) {
+                s = (s == null) ? '' : String(s);
+                if (s.length <= n) return s;
+                return s.slice(0, n) + '…';
+            }
+
+            // renderRecord 把一条记录渲染为一张卡: 人性化关键字段 + 可展开原始 JSON.
+            function renderRecord(rec, idx) {
+                const id = 'mirror-rec-raw-' + (seq++) ;
+                const model = escapeHtml(rec.model || rec.type_name || '(未知模型)');
+                const action = rec.action ? escapeHtml(rec.action) : '';
+                const ts = escapeHtml(tsHuman(rec.timestamp_ms));
+                const free = rec.is_free_model ? '免费' : '计费';
+                const stream = rec.stream ? '流式' : '非流式';
+                const dur = (Number(rec.duration_ms) || 0);
+                const inB = (Number(rec.input_bytes) || 0);
+                const outB = (Number(rec.output_bytes) || 0);
+                const toolCalls = Array.isArray(rec.tool_calls) ? rec.tool_calls.length : 0;
+                const userMsg = escapeHtml(clip(pickUserMessage(rec), 200));
+                const respText = escapeHtml(clip(rec.response_text, 200));
+
+                let usageStr = '';
+                if (rec.usage && typeof rec.usage === 'object') {
+                    const pt = rec.usage.prompt_tokens || rec.usage.PromptTokens || 0;
+                    const ct = rec.usage.completion_tokens || rec.usage.CompletionTokens || 0;
+                    const tt = rec.usage.total_tokens || rec.usage.TotalTokens || 0;
+                    if (pt || ct || tt) usageStr = 'tokens ' + pt + '/' + ct + ' (合计 ' + tt + ')';
+                }
+
+                let raw = '';
+                try { raw = JSON.stringify(rec, null, 2); } catch (e) { raw = String(rec); }
+
+                const chips = [];
+                chips.push('<span class="mirror-rec-chip">' + free + '</span>');
+                chips.push('<span class="mirror-rec-chip">' + stream + '</span>');
+                if (action) chips.push('<span class="mirror-rec-chip" style="background:#fff3e0; border-color:#ffcc80;">action: ' + action + '</span>');
+                if (toolCalls > 0) chips.push('<span class="mirror-rec-chip">tool_calls: ' + toolCalls + '</span>');
+                chips.push('<span class="mirror-rec-chip">耗时 ' + dur + 'ms</span>');
+                chips.push('<span class="mirror-rec-chip">收/发 ' + formatBytesHuman(inB) + ' / ' + formatBytesHuman(outB) + '</span>');
+                if (usageStr) chips.push('<span class="mirror-rec-chip">' + escapeHtml(usageStr) + '</span>');
+
+                return '<div class="mirror-rec-card">'
+                    + '<div class="mirror-rec-head">'
+                    + '<span class="mirror-rec-idx">#' + (idx + 1) + '</span>'
+                    + '<code class="mirror-rec-model">' + model + '</code>'
+                    + '<span class="mirror-rec-ts">' + ts + '</span>'
+                    + '</div>'
+                    + '<div class="mirror-rec-chips">' + chips.join('') + '</div>'
+                    + (userMsg ? '<div class="mirror-rec-line"><span class="mirror-rec-label">请求:</span> ' + userMsg + '</div>' : '')
+                    + (respText ? '<div class="mirror-rec-line"><span class="mirror-rec-label">响应:</span> ' + respText + '</div>' : '')
+                    + '<div class="mirror-rec-toggle" onclick="MirrorRecords.toggleRaw(\'' + id + '\', this)">展开原始 JSON</div>'
+                    + '<pre id="' + id + '" class="mirror-rec-raw" style="display:none;">' + escapeHtml(raw) + '</pre>'
+                    + '</div>';
+            }
+
+            function toggleRaw(id, el) {
+                const pre = document.getElementById(id);
+                if (!pre) return;
+                const show = pre.style.display === 'none';
+                pre.style.display = show ? 'block' : 'none';
+                if (el) el.textContent = show ? '收起原始 JSON' : '展开原始 JSON';
+            }
+
+            async function load() {
+                const statusEl = document.getElementById('mirror-records-status');
+                const listEl = document.getElementById('mirror-records-list');
+                const countEl = document.getElementById('mirror-records-count');
+                const n = (countEl && parseInt(countEl.value, 10)) || 20;
+                if (statusEl) statusEl.textContent = '加载中…';
+                if (listEl) listEl.innerHTML = '';
+                try {
+                    const resp = await fetch('/portal/api/mirror-records/recent?n=' + n, {credentials: 'same-origin'});
+                    const j = await resp.json();
+                    if (isAuthError(j)) { handleAuthError(); return; }
+                    if (!j || !j.success) {
+                        if (statusEl) statusEl.textContent = (j && (j.message || j.error)) || '加载失败';
+                        return;
+                    }
+                    const records = Array.isArray(j.records) ? j.records : [];
+                    if (!records.length) {
+                        if (statusEl) statusEl.textContent = '暂无落盘记录 (可能未启用落盘, 或还没有命中的镜像规则调用 save()).';
+                        return;
+                    }
+                    if (statusEl) statusEl.textContent = '共 ' + records.length + ' 条 (最新在前)';
+                    if (listEl) listEl.innerHTML = records.map(renderRecord).join('');
+                } catch (e) {
+                    console.error('mirror-records: load failed', e);
+                    if (statusEl) statusEl.textContent = '加载失败: ' + (e.message || e);
+                }
+            }
+
+            return { load: load, toggleRaw: toggleRaw };
+        })();
+        window.MirrorRecords = MirrorRecords;

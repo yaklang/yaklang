@@ -108,9 +108,9 @@ type AiApiKeys struct {
 
 	// 用户绑定与管理元信息字段（为 OAuth 等外部系统接入预留）
 	// 关键词: AiApiKeys Username Remark MetaInfo, OAuth 绑定, 用户名可重复
-	Username string `json:"username" gorm:"index"` // 绑定用户名（可重复，用于按用户聚合查询）
-	Remark   string `json:"remark" gorm:"type:text"`     // 备注（自由文本）
-	MetaInfo string `json:"metainfo" gorm:"type:text"`   // 绑定信息（JSON 文本，存储 OAuth 等外部系统的用户信息）
+	Username string `json:"username" gorm:"index"`     // 绑定用户名（可重复，用于按用户聚合查询）
+	Remark   string `json:"remark" gorm:"type:text"`   // 备注（自由文本）
+	MetaInfo string `json:"metainfo" gorm:"type:text"` // 绑定信息（JSON 文本，存储 OAuth 等外部系统的用户信息）
 }
 
 type LoginSession struct {
@@ -439,6 +439,28 @@ func (a *FreeUserIPDailyUsage) TableName() string {
 	return "free_user_ip_daily_usage"
 }
 
+// FreeUserIPModelDailyUsage 持久化单个客户端 IP 当天「按模型拆分」的免费模型用量聚合行。
+// 一行 = (date, ip, model) 唯一。它与 FreeUserIPDailyUsage 并行：后者只到 (date, ip)
+// 维度、给限额硬门用；本表多带一个 model 维度，仅用于面板「每个 IP 用得最多的模型」展示，
+// 不参与任何限额判定，保持限额逻辑零改动。
+// 行数随 (IP, model) 组合增长，因此保留窗与 FreeUserIPDailyUsage 一样很短，由 cleanup 清理。
+// 关键词: free_user_ip_model_daily_usage, 单 IP 按模型每日用量, per-IP TOP 模型展示
+type FreeUserIPModelDailyUsage struct {
+	gorm.Model
+
+	Date string `json:"date" gorm:"size:10;unique_index:idx_free_ip_model;index:idx_free_ip_model_date;not null"`
+	IP   string `json:"ip" gorm:"size:64;unique_index:idx_free_ip_model;index:idx_free_ip_model_ip;not null"`
+	// ModelName 用列名 model；Go 字段不能叫 Model（与内嵌 gorm.Model 冲突）。
+	ModelName    string    `json:"model" gorm:"column:model;size:128;unique_index:idx_free_ip_model;not null"`
+	RequestCount int64     `json:"request_count"`
+	TokensUsed   int64     `json:"tokens_used"`
+	LastSeenAt   time.Time `json:"last_seen_at"`
+}
+
+func (a *FreeUserIPModelDailyUsage) TableName() string {
+	return "free_user_ip_model_daily_usage"
+}
+
 // AiBalanceThrottledIP 持久化「被一键限流的客户端 IP」及其生效的 RPM / 输出 TPS 上限。
 // 一行 = 一个被限流的 IP（IP 唯一）。与按日重置的免费 IP 用量表不同：限流是管理员
 // 主动施加的持久动作，不随每日切日清空，需在面板手动解除（删除该行）。
@@ -455,6 +477,23 @@ type AiBalanceThrottledIP struct {
 
 func (a *AiBalanceThrottledIP) TableName() string {
 	return "ai_balance_throttled_ips"
+}
+
+// AiMirrorStorageConfig 是镜像数据落盘的单例配置 (ID=1)。
+// 控制镜像回调脚本里 save() 是否真正落盘, 以及落盘目录的容量上限 / 单次回收量 /
+// 容量巡检间隔。容量治理超限时按最旧分片整文件淘汰。
+// 关键词: ai_mirror_storage_configs, 落盘开关, 容量上限/回收/巡检, 单例
+type AiMirrorStorageConfig struct {
+	gorm.Model
+
+	Enabled          bool  `json:"enabled" gorm:"default:false"`            // 是否启用 save() 落盘（默认关闭）
+	MaxBytes         int64 `json:"max_bytes" gorm:"default:6442450944"`     // 落盘目录容量上限（字节，默认 6 GiB）
+	ReclaimBytes     int64 `json:"reclaim_bytes" gorm:"default:2147483648"` // 超限时单次至少回收（字节，默认 2 GiB）
+	CheckIntervalSec int64 `json:"check_interval_sec" gorm:"default:60"`    // 容量巡检间隔（秒，默认 60）
+}
+
+func (a *AiMirrorStorageConfig) TableName() string {
+	return "ai_mirror_storage_configs"
 }
 
 // ==================== B 类表自动迁移 ====================

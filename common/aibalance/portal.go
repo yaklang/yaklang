@@ -918,6 +918,15 @@ func (c *ServerConfig) HandlePortalRequest(conn net.Conn, request *http.Request,
 	case strings.HasPrefix(uriIns.Path, "/portal/api/mirror-rules/") && request.Method == "DELETE":
 		c.handleDeleteMirrorRule(conn, request, uriIns.Path)
 
+	// ========== Mirror Data Storage Routes (Admin Only) ==========
+	// 关键词: portal 镜像数据落盘路由注册, 落盘配置 + 最近记录查看
+	case uriIns.Path == "/portal/api/mirror-storage-config" && request.Method == "GET":
+		c.handleGetMirrorStorageConfig(conn, request)
+	case uriIns.Path == "/portal/api/mirror-storage-config" && request.Method == "POST":
+		c.handleSetMirrorStorageConfig(conn, request)
+	case uriIns.Path == "/portal/api/mirror-records/recent" && request.Method == "GET":
+		c.handleGetMirrorRecentRecords(conn, request)
+
 	// ========== Default ==========
 	default:
 		c.servePortalWithAuth(conn)

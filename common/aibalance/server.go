@@ -1203,6 +1203,12 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 							c.logWarn("AddFreeUserIPDailyTokens failed (ip=%s model=%s weighted=%d): %v",
 								clientIP, modelName, weighted, ipErr)
 						}
+						// 单 IP 按模型拆分的加权 Token（仅展示用，不参与限额）。
+						// 关键词: onUsageForward AddFreeUserIPModelDailyTokens, per-IP 按模型 Token
+						if ipErr := AddFreeUserIPModelDailyTokens(clientIP, modelName, weighted); ipErr != nil {
+							c.logWarn("AddFreeUserIPModelDailyTokens failed (ip=%s model=%s weighted=%d): %v",
+								clientIP, modelName, weighted, ipErr)
+						}
 					}
 				} else if key != nil {
 					if err := UpdateAiApiKeyTokenUsed(key.Key, weighted); err != nil {
@@ -1444,6 +1450,12 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 			if isFreeModel && fbResult.Billed && fbResult.Bucket != "apikey" && fbResult.Weighted > 0 {
 				if ipErr := AddFreeUserIPDailyTokens(clientIP, fbResult.Weighted); ipErr != nil {
 					c.logWarn("fallback AddFreeUserIPDailyTokens failed (ip=%s model=%s weighted=%d): %v",
+						clientIP, modelName, fbResult.Weighted, ipErr)
+				}
+				// 单 IP 按模型拆分的 fallback 加权 Token（仅展示用）。
+				// 关键词: fallback AddFreeUserIPModelDailyTokens, per-IP 按模型 Token
+				if ipErr := AddFreeUserIPModelDailyTokens(clientIP, modelName, fbResult.Weighted); ipErr != nil {
+					c.logWarn("fallback AddFreeUserIPModelDailyTokens failed (ip=%s model=%s weighted=%d): %v",
 						clientIP, modelName, fbResult.Weighted, ipErr)
 				}
 			}
