@@ -82,6 +82,17 @@
                                 </div>
                             </div>
                         </div>
+
+                        <!-- 绑定用户信息（可选）：用户名(可重复)/备注/metainfo -->
+                        <!-- 关键词: OPS create-api-key Username Remark MetaInfo 绑定信息输入 -->
+                        <div class="form-group">
+                            <label>User Binding (optional)</label>
+                            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                                <input type="text" id="create-username" placeholder="Username (repeatable)" style="flex:1 1 200px;">
+                                <input type="text" id="create-remark" placeholder="Remark (free text)" style="flex:1 1 200px;">
+                            </div>
+                            <textarea id="create-metainfo" rows="2" placeholder='metainfo (JSON text, for OAuth/external binding, optional)' style="margin-top:8px; width:100%; font-family:monospace; font-size:12px;"></textarea>
+                        </div>
                         
                         <!-- Token Settings (Recommended) -->
                         <!-- 关键词: OPS create-api-key Token 限额, 推荐使用替代字节流量 -->
@@ -112,7 +123,9 @@
                         </div>
 
                         <!-- Traffic Limit Toggle (legacy) -->
-                        <div class="form-group">
+                        <!-- 字节流量限额已停用：计费体系统一为 Token 维度。隐藏但保留元素以兼容历史 JS。 -->
+                        <!-- 关键词: OPS 字节流量限额停用, 隐藏 legacy traffic settings -->
+                        <div class="form-group" style="display: none;">
                             <label>Traffic Settings <small style="color:#888;">(legacy, prefer Token)</small></label>
                             <div class="toggle-group active" id="unlimited-toggle">
                                 <label class="toggle-switch">
@@ -169,12 +182,14 @@
                                 <thead>
                                     <tr>
                                         <th>API Key</th>
+                                        <!-- 绑定用户信息列：用户名(可重复)/备注 -->
+                                        <!-- 关键词: OPS my-keys 用户名 备注 列 -->
+                                        <th title="Bound username (repeatable) / remark">User / Remark</th>
                                         <th>Models</th>
-                                        <th>Traffic Used</th>
-                                        <th>Traffic Limit</th>
-                                        <!-- 关键词: OPS my-keys 表格 Token 用量列, Token 限额列, 推荐 token over traffic -->
-                                        <th title="Token usage (recommended billing dimension)">Token Used</th>
-                                        <th title="Token limit (recommended over byte traffic)">Token Limit *</th>
+                                        <!-- 字节流量列已停用：计费体系统一为 Token 维度（计费用量） -->
+                                        <!-- 关键词: OPS my-keys 表格 Token 计费用量列, Token 限额列, 字节流量停用 -->
+                                        <th title="Token billing usage (weighted by multipliers)">Token Used (Billing)</th>
+                                        <th title="Token limit (the only billing dimension)">Token Limit *</th>
                                         <th>Created At</th>
                                         <th>Actions</th>
                                     </tr>
@@ -474,6 +489,17 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- 绑定用户信息（可选）：用户名(可重复)/备注/metainfo -->
+                <!-- 关键词: OPS edit modal Username Remark MetaInfo 绑定信息 -->
+                <div class="form-group">
+                    <label>User Binding (optional)</label>
+                    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                        <input type="text" id="edit-username" placeholder="Username (repeatable)" style="flex:1 1 200px;">
+                        <input type="text" id="edit-remark" placeholder="Remark (free text)" style="flex:1 1 200px;">
+                    </div>
+                    <textarea id="edit-metainfo" rows="3" placeholder='metainfo (JSON text, OAuth/external binding)' style="margin-top:8px; width:100%; font-family:monospace; font-size:12px;"></textarea>
+                </div>
                 
                 <!-- Token Settings (recommended over byte traffic) -->
                 <!-- 关键词: OPS edit modal Token 限额设置, 推荐替代字节流量限制 -->
@@ -503,8 +529,10 @@
                     </div>
                 </div>
 
-                <!-- Traffic Settings (legacy, will be deprecated) -->
-                <div class="form-group">
+                <!-- Traffic Settings (legacy, deprecated) -->
+                <!-- 字节流量限额已停用：计费体系统一为 Token 维度。隐藏但保留元素以兼容历史 JS。 -->
+                <!-- 关键词: OPS edit modal 字节流量停用, 隐藏 legacy traffic settings -->
+                <div class="form-group" style="display: none;">
                     <label>Traffic Settings <small style="color:#888;">(legacy, prefer Token)</small></label>
                     <div class="toggle-group" id="edit-unlimited-toggle">
                         <label class="toggle-switch">
@@ -534,7 +562,7 @@
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="resetEditKeyToken()">Reset Token</button>
-                <button class="btn btn-secondary" onclick="resetEditKeyTraffic()">Reset Traffic</button>
+                <button class="btn btn-secondary" onclick="resetEditKeyTraffic()" style="display:none;">Reset Traffic</button>
                 <button class="btn btn-secondary" onclick="closeEditKeyModal()">Cancel</button>
                 <button class="btn btn-primary" onclick="saveEditKey()">Save Changes</button>
             </div>

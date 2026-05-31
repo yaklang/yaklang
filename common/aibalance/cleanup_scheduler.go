@@ -44,6 +44,18 @@ func runCleanupOnce(keepDays int) (int64, int64) {
 	if err != nil {
 		log.Warnf("daily cleanup CleanupOldFreeUserIPUsage failed: %v", err)
 	}
+	// 免费/付费每日 Token 聚合表清理（长保留窗，与统计表一致）。
+	// 关键词: runCleanupOnce CleanupOldFreeUserTokenUsage CleanupOldPaidUserDailyTokenUsage
+	if freeTokRows, fErr := CleanupOldFreeUserTokenUsage(keepDays); fErr != nil {
+		log.Warnf("daily cleanup CleanupOldFreeUserTokenUsage failed: %v", fErr)
+	} else if freeTokRows > 0 {
+		log.Infof("daily cleanup free_user_daily_token_usage removed=%d", freeTokRows)
+	}
+	if paidTokRows, pErr := CleanupOldPaidUserDailyTokenUsage(keepDays); pErr != nil {
+		log.Warnf("daily cleanup CleanupOldPaidUserDailyTokenUsage failed: %v", pErr)
+	} else if paidTokRows > 0 {
+		log.Infof("daily cleanup paid_user_daily_token_usage removed=%d", paidTokRows)
+	}
 	log.Infof("daily cleanup done: cache_stats_removed=%d user_seen_removed=%d free_ip_usage_removed=%d keep_days=%d free_ip_keep_days=%d",
 		cacheRows, userRows, freeIPRows, keepDays, FreeIPUsageRetentionDays)
 	return cacheRows, userRows

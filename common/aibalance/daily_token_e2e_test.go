@@ -440,7 +440,11 @@ func TestE2E_PaidKey_TokenLimit_Enforced(t *testing.T) {
 // ==================== I. 字节维度 traffic limit 与 Token 维度互不影响 ====================
 
 // 关键词: TestE2E_PaidKey_TrafficLimit_StillWorks, 字节限额仍生效
-func TestE2E_PaidKey_TrafficLimit_StillWorks(t *testing.T) {
+// TestE2E_PaidKey_TrafficLimit_NoLongerEnforced 验证字节流量限额已停用：
+// 即便 TrafficUsed >= TrafficLimit 且 TrafficLimitEnable=true，请求也不再因字节流量被
+// 拦截（计费体系已统一切换为 Token 维度，旧字节倍率/限额体系完全移除）。
+// 关键词: 字节流量限额停用, traffic_limit_exceeded 不再触发, Token 维度计费
+func TestE2E_PaidKey_TrafficLimit_NoLongerEnforced(t *testing.T) {
 	addr, cfg, _, cleanup := startDailyTokenTestServer(t, 409)
 	defer cleanup()
 
@@ -451,7 +455,7 @@ func TestE2E_PaidKey_TrafficLimit_StillWorks(t *testing.T) {
 		APIKey:             apiKey,
 		Active:             true,
 		TrafficLimit:       1024,
-		TrafficUsed:        2048,
+		TrafficUsed:        2048, // 已超字节限额，旧体系下会 429，新体系下应放行
 		TrafficLimitEnable: true,
 		TokenLimit:         0,
 		TokenLimitEnable:   false,
@@ -462,10 +466,12 @@ func TestE2E_PaidKey_TrafficLimit_StillWorks(t *testing.T) {
 	}
 	cfg.KeyAllowedModels.allowedModels[apiKey] = map[string]bool{"paid-test": true}
 
-	status, _, body := sendChatCompletionHTTP(t, addr, apiKey, "paid-test")
-	assert.Equal(t, http.StatusTooManyRequests, status,
-		"paid key with TrafficUsed>=TrafficLimit should be rejected; got %d body=%s", status, body)
-	assert.Contains(t, body, "traffic_limit_exceeded")
+	status, headers, body := sendChatCompletionHTTP(t, addr, apiKey, "paid-test")
+	// 关键断言：不再因字节流量限额被拒绝。
+	assert.NotContains(t, body, "traffic_limit_exceeded",
+		"byte traffic limit must no longer gate requests; got %d body=%s", status, body)
+	assert.NotEqual(t, "traffic", headers["x-aibalance-limit-kind"],
+		"limit kind must not be byte traffic anymore")
 }
 
 // ==================== J. 默认 limit_m=1200 兜底 ====================

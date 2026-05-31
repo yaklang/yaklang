@@ -263,7 +263,22 @@
                             </div>
                         </div>
                     </div>
-                    
+
+                    <!-- API Key 绑定用户信息（可选）：用户名(可重复)/备注/metainfo -->
+                    <!-- 关键词: 创建 API Key 绑定 Username Remark MetaInfo, OAuth 接入预留 -->
+                    <div class="form-group">
+                        <label>绑定用户信息（可选）:</label>
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                            <div style="flex: 1 1 200px;">
+                                <input type="text" id="apiKeyUsernameInput" class="form-control" placeholder="用户名（可重复，用于按用户聚合）">
+                            </div>
+                            <div style="flex: 1 1 200px;">
+                                <input type="text" id="apiKeyRemarkInput" class="form-control" placeholder="备注（自由文本）">
+                            </div>
+                        </div>
+                        <textarea id="apiKeyMetaInfoInput" class="form-control" rows="2" placeholder='metainfo（JSON 文本，存储 OAuth 等外部系统绑定信息，可留空）' style="margin-top: 8px; font-family: monospace; font-size: 12px;"></textarea>
+                    </div>
+
                     <div class="action-bar" style="margin-top: 20px;">
                         <div>
                             <h4>API密钥列表</h4>
@@ -272,6 +287,13 @@
                                 <button class="filter-btn" data-filter="active" onclick="filterApiKeys('active')">激活</button>
                                 <button class="filter-btn" data-filter="inactive" onclick="filterApiKeys('inactive')">禁用</button>
                             </div>
+                            <!-- 按绑定用户名精确过滤（用户名可重复，便于查看某个用户的所有 Key） -->
+                            <!-- 关键词: API Key 列表 username 过滤输入 -->
+                            <span style="margin-left: 10px; display: inline-flex; align-items: center; gap: 4px;">
+                                <input type="text" id="apiKeyUsernameFilter" placeholder="按用户名过滤" style="height: 28px; font-size: 12px; padding: 0 8px;" onkeydown="if(event.key==='Enter'){applyApiKeyUsernameFilter();}">
+                                <button class="filter-btn" onclick="applyApiKeyUsernameFilter()">查询</button>
+                                <button class="filter-btn" onclick="clearApiKeyUsernameFilter()">清除</button>
+                            </span>
                         </div>
                         <div style="display: flex; gap: 5px;">
                             <button class="btn btn-success btn-sm" id="enable-selected-api" onclick="confirmEnableSelectedAPI()" disabled title="启用选中的API密钥">
@@ -299,15 +321,17 @@
                                     <th>ID</th>
                                     <th class="column-name">状态</th>
                                     <th class="column-name">API密钥</th>
+                                    <!-- 绑定用户信息列：用户名(可重复)/备注 -->
+                                    <!-- 关键词: API Key 列表 用户名 备注 列 -->
+                                    <th class="column-name" title="绑定用户名（可重复），右键/点击可编辑绑定信息">用户名/备注</th>
                                     <th class="column-name">允许模型</th>
                                     <th class="column-name">使用统计</th>
                                     <th class="column-name">Web Search</th>
                                     <th class="column-name">成功/失败</th>
-                                    <th class="column-name">流量(输入/输出)</th>
-                                    <th class="column-name">流量限制</th>
-                                    <!-- 关键词: API Key 列表 Token 用量列, Token 维度限额, 推荐 token over traffic -->
-                                    <th class="column-name" title="Token 维度用量（按上游 SSE 末帧 usage 经倍率加权后累加）">Token 用量</th>
-                                    <th class="column-name" title="Token 维度限额（推荐使用，替代字节流量限制）">Token 限额 ★</th>
+                                    <!-- 字节流量列已彻底移除：计费体系统一为 Token 维度，不再展示字节收发量 -->
+                                    <!-- 关键词: API Key 列表 Token 计费用量列, Token 维度限额, 字节流量列已移除 -->
+                                    <th class="column-name" title="Token 维度用量（按上游 SSE 末帧 usage 经倍率加权后累加，即计费用量）">Token 计费用量</th>
+                                    <th class="column-name" title="Token 维度限额（计费体系唯一限额）">Token 限额 ★</th>
                                     <th class="column-name">创建者</th>
                                     <th class="column-name">最后使用</th>
                                     <th class="column-name">操作</th>
@@ -368,10 +392,10 @@
                 </div>
             </div>
 
-            <!-- wrapper 级元数据：仅描述/标签/老传统倍数（字节流量）。Token 计费倍率见上方实际模型表。 -->
+            <!-- wrapper 级元数据：仅描述/标签。Token 计费倍率见上方实际模型表。传统字节倍数已彻底移除。 -->
             <div class="card">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                    <h3 style="margin: 0;">对外模型信息 (Wrapper) <small style="color:#888;font-weight:normal;font-size:13px;">（描述 / 标签 / 传统字节倍数，不含 Token 计费倍率）</small></h3>
+                    <h3 style="margin: 0;">对外模型信息 (Wrapper) <small style="color:#888;font-weight:normal;font-size:13px;">（描述 / 标签，Token 计费倍率见上方实际模型表）</small></h3>
                     <div style="display: flex; gap: 8px; align-items: center;">
                         <button class="reset-column-widths-btn" onclick="resetColumnWidths('models-table')" title="Reset column widths to default">Reset column widths</button>
                     </div>
@@ -382,7 +406,6 @@
                             <tr>
                                 <th class="column-name">模型名 (WrapperName)</th>
                                 <th class="column-name text-center">供应商数量</th>
-                                <th class="column-name text-center">传统倍数<br><small style="color:#888;font-weight:normal;">字节流量</small></th>
                                 <th class="column-name">描述</th>
                                 <th class="column-name">标签</th>
                                 <th class="column-name text-center">操作</th>
@@ -1104,7 +1127,9 @@
                     <div style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 12px;">
                         <div class="form-group" style="margin-bottom: 0; flex: 0 0 220px;">
                             <label>全局共享池日限额 (M Token):</label>
-                            <input type="number" id="rl-free-token-limit-m-input" class="form-control" value="1200" min="0" step="1" style="font-family: monospace; font-size: 13px;">
+                            <input type="number" id="rl-free-token-limit-m-input" class="form-control" value="1200" min="0" step="1" oninput="updateRMBHint('rl-free-token-limit-m-input','rl-free-token-limit-rmb')" style="font-family: monospace; font-size: 13px;">
+                            <!-- 1 RMB = 10M 计费 Token 换算提示 -->
+                            <small id="rl-free-token-limit-rmb" style="color:#2e7d32; font-size:12px;"></small>
                         </div>
                         <div style="font-size: 12px; color: #555;">
                             当前已用：<strong id="rl-free-token-global-used">--</strong> M / <span id="rl-free-token-global-limit">--</span> M
@@ -1166,6 +1191,27 @@
                                 <label>每 IP 每日 Token 上限 (M Token):</label>
                                 <input type="number" id="rl-free-ip-daily-token-limit-m" class="form-control" value="30" min="0" step="1" style="font-family: monospace; font-size: 13px;">
                             </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 付费用户全局日 Token 总额度（第二道硬门，与免费日限额并列） -->
+                <!-- 关键词: 付费用户全局日 Token 总额度, 第二道硬门, paid_user_token_limit_m, 1 RMB=10M -->
+                <div style="margin-bottom: 20px; padding: 12px; background: #fce4ec; border: 1px solid #f48fb1; border-radius: 6px;">
+                    <h4 style="margin-bottom: 10px; color:#ad1457;">付费用户 Token 日总额度（硬门）</h4>
+                    <small style="color: #6a1b3a; margin-bottom: 10px; display: block;">
+                        聚合所有付费 API Key 当天产生的加权计费 Token。超过此上限时，<strong>所有付费请求</strong>一律返回
+                        <code>429 paid_daily_token_limit_exceeded</code>。这是与"免费用户日限额"并列的第二道硬门，让付费额度也可控、计费系统更稳定。
+                        <br>换算基准：<strong>1 RMB = 10M 计费 Token</strong>。每日北京时间 06:00 清零。<strong>填 0 = 不限制</strong>（仅靠单 Key Token 限额控制）。
+                    </small>
+                    <div style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
+                        <div class="form-group" style="margin-bottom: 0; flex: 0 0 240px;">
+                            <label>付费全局日总额度 (M Token):</label>
+                            <input type="number" id="rl-paid-token-limit-m-input" class="form-control" value="0" min="0" step="1" oninput="updateRMBHint('rl-paid-token-limit-m-input','rl-paid-token-limit-rmb')" style="font-family: monospace; font-size: 13px;">
+                            <small id="rl-paid-token-limit-rmb" style="color:#ad1457; font-size:12px;"></small>
+                        </div>
+                        <div style="font-size: 12px; color: #555;">
+                            当前已用：<strong id="rl-paid-token-global-used">--</strong> M / <span id="rl-paid-token-global-limit">--</span> M
                         </div>
                     </div>
                 </div>
@@ -1240,8 +1286,8 @@
                     <h4 style="margin-bottom: 10px;">自定义 429 / 错误文案</h4>
                     <small style="color: #888; margin-bottom: 10px; display: block;">
                         关闭时（默认）完全保持系统内置的 429 文案。启用后：全局 <code>notice</code> 文案会注入到所有限流 429 响应体的 <code>notice</code> 字段；
-                        <br>各类型文案非空时会覆盖对应限流 429 的 <code>message</code>，留空表示沿用内置默认文案。
-                        <br><code>limit_kind</code> 取值：<code>rpm</code>(请求频率) / <code>daily_token</code>(免费日额度) / <code>traffic</code>(流量额度) / <code>token</code>(Token 额度) / <code>memfit_version</code>(客户端版本)。
+                        <br>各类型文案非空时会覆盖对应限流 429 的 <code>message</code>，留空表示沿用下方展示的「默认文案」。
+                        <br>每个类型都已写明触发原因与默认文案，方便编辑时对照；动态类型（如 rpm / daily_token）的实际返回会再追加具体数值。
                     </small>
                     <div class="form-group" style="margin-bottom: 10px;">
                         <label>
@@ -1255,33 +1301,9 @@
                             placeholder="例如：如需提升额度请联系管理员 / 当前为高峰期，请稍后再试"
                             style="font-size: 13px;"></textarea>
                     </div>
-                    <div style="display: flex; flex-direction: column; gap: 8px;">
-                        <div class="form-group" style="margin-bottom: 0;">
-                            <label>请求频率限流文案 (rpm):</label>
-                            <input type="text" id="rl-custom429-rpm" class="form-control" style="font-size: 13px;"
-                                placeholder="留空使用默认文案">
-                        </div>
-                        <div class="form-group" style="margin-bottom: 0;">
-                            <label>免费日额度文案 (daily_token):</label>
-                            <input type="text" id="rl-custom429-daily_token" class="form-control" style="font-size: 13px;"
-                                placeholder="留空使用默认文案">
-                        </div>
-                        <div class="form-group" style="margin-bottom: 0;">
-                            <label>流量额度文案 (traffic):</label>
-                            <input type="text" id="rl-custom429-traffic" class="form-control" style="font-size: 13px;"
-                                placeholder="留空使用默认文案">
-                        </div>
-                        <div class="form-group" style="margin-bottom: 0;">
-                            <label>Token 额度文案 (token):</label>
-                            <input type="text" id="rl-custom429-token" class="form-control" style="font-size: 13px;"
-                                placeholder="留空使用默认文案">
-                        </div>
-                        <div class="form-group" style="margin-bottom: 0;">
-                            <label>客户端版本控流文案 (memfit_version):</label>
-                            <input type="text" id="rl-custom429-memfit_version" class="form-control" style="font-size: 13px;"
-                                placeholder="留空使用默认文案">
-                        </div>
-                    </div>
+                    <!-- 各 limit_kind 文案编辑器：由 renderCustom429Kinds 按后端 custom_429_kind_defaults 动态渲染 -->
+                    <!-- 关键词: rl-custom429-kinds-list, 每个 kind 可编辑 + 展示默认文案 -->
+                    <div id="rl-custom429-kinds-list" style="display: flex; flex-direction: column; gap: 12px;"></div>
                 </div>
 
                 </div>
@@ -1690,11 +1712,7 @@
                 <label>标签 (逗号分隔):</label>
                 <input type="text" id="editModelTags" class="form-control">
             </div>
-
-            <div class="form-group">
-                <label>传统倍数 <small style="color:#888;font-weight:normal;">（兼容旧字节流量计费；为 0 时整体按 1.0 兜底。Token 计费倍率请到「实际模型计费倍率」表设置）</small>:</label>
-                <input type="number" id="editModelTrafficMultiplier" class="form-control" min="0" step="0.1" value="1.0">
-            </div>
+            <!-- 传统倍数（字节流量）字段已彻底移除：Token 计费倍率请到「实际模型计费倍率」表设置 -->
             <div class="modal-actions">
                 <button class="btn" onclick="closeEditModelModal()">取消</button>
                 <button class="btn btn-primary" onclick="saveModelMeta()">保存</button>
@@ -1734,6 +1752,15 @@
                 </div>
                 <small class="form-text text-muted">
                     生效优先级：实际模型倍率 &gt; 全局默认 &gt; 系统常量（1.0/1.0/1.25/0.1）。同一实际模型无论被哪个对外名暴露，单价一致。
+                </small>
+            </div>
+            <div class="form-group">
+                <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                    <input type="checkbox" id="modelMultiplierIsFree" style="width:auto; margin:0;">
+                    <span>标记为免费模型（计费豁免）</span>
+                </label>
+                <small class="form-text text-muted">
+                    勾选后该实际模型完全免费：无论上面四维倍率如何设置都不生效，加权计费 Token 恒为 0。
                 </small>
             </div>
             <div class="modal-actions">

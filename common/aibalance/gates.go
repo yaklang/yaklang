@@ -41,9 +41,11 @@ func (c *ServerConfig) gateLightweightDowngrade(rawPacket []byte, modelName stri
 	return modelName
 }
 
-// writeKeyLimit429 统一写出 API key 流量/Token 维度的 429（注入自定义文案与 notice）。
-// kind 取 "traffic" 或 "token"；typ 为对外 error.type（traffic_limit_exceeded / token_limit_exceeded）。
-// 关键词: writeKeyLimit429, traffic/token 429, resolveLimit429 notice
+// writeKeyLimit429 统一写出 API key Token 维度的 429（注入自定义文案与 notice）。
+// kind 取 "token"（单 Key Token 额度）或 "paid_daily_token"（付费用户全局日总额度）；
+// typ 为对外 error.type（token_limit_exceeded / paid_daily_token_limit_exceeded）。
+// defaultMessage 统一传 custom_429.go 中的 Default429Message* 常量，保证与编辑界面默认文案一致。
+// 关键词: writeKeyLimit429, token/paid_daily_token 429, resolveLimit429 notice
 func (c *ServerConfig) writeKeyLimit429(conn net.Conn, kind, typ, defaultMessage string) {
 	message, notice := c.resolveLimit429(kind, defaultMessage)
 	errMap := map[string]interface{}{
@@ -142,27 +144,27 @@ func (c *ServerConfig) gateChatAPIKeyAndLimits(conn net.Conn, auth, modelName st
 	apiKeyForStat = key.Key
 	c.logInfo("Successfully verified key: %s", key.Key)
 
-	// Check traffic limit before processing request
-	trafficAllowed, err := CheckAiApiKeyTrafficLimit(key.Key)
-	if err != nil {
-		c.logError("Failed to check traffic limit for key %s: %v", utils.ShrinkString(key.Key, 8), err)
-	} else if !trafficAllowed {
-		c.logError("API key %s has exceeded traffic limit", utils.ShrinkString(key.Key, 8))
-		c.writeKeyLimit429(conn, "traffic", "traffic_limit_exceeded",
-			"API key has exceeded traffic limit. Please contact administrator to increase limit or reset usage.")
-		return nil, "", true
-	}
-
-	// Token-dimension limit check (parallel to traffic limit).
-	// 与字节维度并行检查 Token 维度。任何 DB 错误降级为放行（不阻塞业务）。
-	// 关键词: CheckAiApiKeyTokenLimit hot path chat, token_limit_exceeded 429
+	// 字节流量限额已停用：统一改用 Token 维度限额（CheckAiApiKeyTokenLimit）。
+	// 任何 DB 错误降级为放行（不阻塞业务）。
+	// 关键词: 字节流量限额停用, CheckAiApiKeyTokenLimit hot path chat, token_limit_exceeded 429
 	tokenAllowed, tErr := CheckAiApiKeyTokenLimit(key.Key)
 	if tErr != nil {
 		c.logError("Failed to check token limit for key %s: %v", utils.ShrinkString(key.Key, 8), tErr)
 	} else if !tokenAllowed {
 		c.logError("API key %s has exceeded token limit", utils.ShrinkString(key.Key, 8))
-		c.writeKeyLimit429(conn, "token", "token_limit_exceeded",
-			"API key has exceeded token limit. Please contact administrator to increase limit or reset usage.")
+		c.writeKeyLimit429(conn, "token", "token_limit_exceeded", Default429MessageToken)
+		return nil, "", true
+	}
+
+	// 付费用户全局日 Token 总额度（第二道硬门）：聚合所有付费 key 当天用量，超额一律 429。
+	// 任何 DB 错误降级为放行（不阻塞业务）。
+	// 关键词: gateChatPaidUserDailyToken, CheckPaidUserDailyTokenLimit, paid_daily_token 429
+	if pd, pErr := CheckPaidUserDailyTokenLimit(); pErr != nil {
+		c.logError("CheckPaidUserDailyTokenLimit failed (key=%s): %v", utils.ShrinkString(key.Key, 8), pErr)
+	} else if pd != nil && !pd.Allowed {
+		c.logWarn("Paid user global daily token limit exceeded (key=%s used=%d limit=%d date=%s)",
+			utils.ShrinkString(key.Key, 8), pd.TokensUsed, pd.TokensLimit, pd.Date)
+		c.writeKeyLimit429(conn, "paid_daily_token", "paid_daily_token_limit_exceeded", Default429MessagePaidDailyToken)
 		return nil, "", true
 	}
 
@@ -340,26 +342,25 @@ func (c *ServerConfig) gateEmbeddingAPIKeyAndLimits(conn net.Conn, auth, modelNa
 	}
 	c.logInfo("Successfully verified key: %s", key.Key)
 
-	// Check traffic limit before processing request
-	trafficAllowed, err := CheckAiApiKeyTrafficLimit(key.Key)
-	if err != nil {
-		c.logError("Failed to check traffic limit for key %s: %v", utils.ShrinkString(key.Key, 8), err)
-	} else if !trafficAllowed {
-		c.logError("API key %s has exceeded traffic limit", utils.ShrinkString(key.Key, 8))
-		c.writeKeyLimit429(conn, "traffic", "traffic_limit_exceeded",
-			"API key has exceeded traffic limit. Please contact administrator to increase limit or reset usage.")
-		return nil, true
-	}
-
-	// Token-dimension limit check (parallel to traffic limit).
-	// 关键词: CheckAiApiKeyTokenLimit hot path embedding, token_limit_exceeded 429
+	// 字节流量限额已停用：embedding 同样统一改用 Token 维度限额。
+	// 关键词: 字节流量限额停用 embedding, CheckAiApiKeyTokenLimit hot path embedding, token_limit_exceeded 429
 	tokenAllowed, tErr := CheckAiApiKeyTokenLimit(key.Key)
 	if tErr != nil {
 		c.logError("Failed to check token limit (embedding) for key %s: %v", utils.ShrinkString(key.Key, 8), tErr)
 	} else if !tokenAllowed {
 		c.logError("API key %s has exceeded token limit (embedding)", utils.ShrinkString(key.Key, 8))
-		c.writeKeyLimit429(conn, "token", "token_limit_exceeded",
-			"API key has exceeded token limit. Please contact administrator to increase limit or reset usage.")
+		c.writeKeyLimit429(conn, "token", "token_limit_exceeded", Default429MessageToken)
+		return nil, true
+	}
+
+	// 付费用户全局日 Token 总额度（第二道硬门）：embedding 同样校验。
+	// 关键词: gateEmbeddingPaidUserDailyToken, CheckPaidUserDailyTokenLimit, paid_daily_token 429
+	if pd, pErr := CheckPaidUserDailyTokenLimit(); pErr != nil {
+		c.logError("CheckPaidUserDailyTokenLimit (embedding) failed (key=%s): %v", utils.ShrinkString(key.Key, 8), pErr)
+	} else if pd != nil && !pd.Allowed {
+		c.logWarn("Paid user global daily token limit exceeded (embedding key=%s used=%d limit=%d date=%s)",
+			utils.ShrinkString(key.Key, 8), pd.TokensUsed, pd.TokensLimit, pd.Date)
+		c.writeKeyLimit429(conn, "paid_daily_token", "paid_daily_token_limit_exceeded", Default429MessagePaidDailyToken)
 		return nil, true
 	}
 

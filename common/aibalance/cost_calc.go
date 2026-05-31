@@ -14,46 +14,29 @@ const (
 )
 
 // resolvedMultipliers 是 AiModelMeta -> 实际 4 维倍率的解析结果。
-// 关键词: resolvedMultipliers, 倍率回落策略
+// 关键词: resolvedMultipliers, 倍率解析
 type resolvedMultipliers struct {
-	Input         float64
-	Output        float64
-	CacheCreate   float64
-	CacheHit      float64
-	LegacyTraffic float64
+	Input       float64
+	Output      float64
+	CacheCreate float64
+	CacheHit    float64
 }
 
 // resolveMultipliers 根据 AiModelMeta 解析出实际生效的四维 Token 倍率：
-//   - 若四维新字段全部 ≤ 0，则整体回落到老 TrafficMultiplier（保持存量行为）。
 //   - 若某一维 ≤ 0，则用该维的默认值（input=1.0/output=1.0/cache_create=1.25/cache_hit=0.1）。
 //   - meta == nil 时全部按默认值。
 //
-// 关键词: resolveMultipliers, 四维倍率回落, 老 TrafficMultiplier 兜底
+// 老的 TrafficMultiplier 字节倍率体系已停用：四维全 0 时直接回落到标准默认倍率，
+// 不再受 TrafficMultiplier 影响。
+// 关键词: resolveMultipliers, 四维倍率, 老 TrafficMultiplier 停用
 func resolveMultipliers(meta *AiModelMeta) resolvedMultipliers {
 	r := resolvedMultipliers{
-		Input:         defaultInputTokenMultiplier,
-		Output:        defaultOutputTokenMultiplier,
-		CacheCreate:   defaultCacheCreationMultiplier,
-		CacheHit:      defaultCacheHitMultiplier,
-		LegacyTraffic: 1.0,
+		Input:       defaultInputTokenMultiplier,
+		Output:      defaultOutputTokenMultiplier,
+		CacheCreate: defaultCacheCreationMultiplier,
+		CacheHit:    defaultCacheHitMultiplier,
 	}
 	if meta == nil {
-		return r
-	}
-	if meta.TrafficMultiplier > 0 {
-		r.LegacyTraffic = meta.TrafficMultiplier
-	}
-
-	// 全部新字段为 0/缺省 -> 整体回落到老 TrafficMultiplier
-	allZero := meta.InputTokenMultiplier <= 0 &&
-		meta.OutputTokenMultiplier <= 0 &&
-		meta.CacheCreationMultiplier <= 0 &&
-		meta.CacheHitMultiplier <= 0
-	if allZero {
-		r.Input = r.LegacyTraffic
-		r.Output = r.LegacyTraffic
-		r.CacheCreate = r.LegacyTraffic * defaultCacheCreationMultiplier
-		r.CacheHit = r.LegacyTraffic * defaultCacheHitMultiplier
 		return r
 	}
 
@@ -113,11 +96,10 @@ func ResolveModelMultipliers(internalModelName string) resolvedMultipliers {
 func resolveModelMultipliersFrom(globalCfg *AiModelMultiplierConfig, m *AiModelMultiplier) resolvedMultipliers {
 	// 最底层：系统常量兜底
 	r := resolvedMultipliers{
-		Input:         defaultInputTokenMultiplier,
-		Output:        defaultOutputTokenMultiplier,
-		CacheCreate:   defaultCacheCreationMultiplier,
-		CacheHit:      defaultCacheHitMultiplier,
-		LegacyTraffic: 1.0,
+		Input:       defaultInputTokenMultiplier,
+		Output:      defaultOutputTokenMultiplier,
+		CacheCreate: defaultCacheCreationMultiplier,
+		CacheHit:    defaultCacheHitMultiplier,
 	}
 
 	// Layer 2: 全局默认
@@ -201,7 +183,23 @@ func ComputeWeightedTokens(meta *AiModelMeta, usage *aispec.ChatUsage) int64 {
 // 计算加权 token。这是计费正路（onUsageForward / fallback 估算）应当使用的唯一入口：
 // 同一实际模型单价一致，与对外 wrapper 无关。
 //
-// 关键词: ComputeModelWeightedTokens, 实际模型计费正路, 精确扣费
+// 若该实际模型被标记为「免费(IsFree)」，则无论四维倍率如何设置，一律返回 0（不计费）。
+// 这是替代旧 config per-model exempt 的统一计费豁免开关：免费用户日桶、付费 key Token、
+// 付费用户全局日 Token 三道计费都因 weighted=0 而自动豁免。
+//
+// 关键词: ComputeModelWeightedTokens, 实际模型计费正路, 精确扣费, IsFree 计费豁免
 func ComputeModelWeightedTokens(internalModelName string, usage *aispec.ChatUsage) int64 {
-	return WeightUsage(ResolveModelMultipliers(internalModelName), usage)
+	if usage == nil {
+		return 0
+	}
+	var m *AiModelMultiplier
+	if internalModelName != "" {
+		m, _ = GetModelMultiplier(internalModelName)
+	}
+	// IsFree 实际模型计费豁免：倍率怎么设都不生效，直接返回 0。
+	if m != nil && m.IsFree {
+		return 0
+	}
+	cfg, _ := GetGlobalMultiplierConfig()
+	return WeightUsage(resolveModelMultipliersFrom(cfg, m), usage)
 }

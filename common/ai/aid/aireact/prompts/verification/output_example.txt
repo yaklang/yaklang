@@ -174,3 +174,19 @@
 {"@action": "verify-satisfaction", "user_satisfied": true, "completed_task_index": "1-1", "reasoning": "目标达成：已获取操作系统类型为 Darwin；同时清理残留 TODO", "next_movements": [{"op": "done", "id": "collect_uptime"}, {"op": "skip", "id": "verify_kernel_version"}]}
 ```
 正确原因：`done` 关闭已经完成的 TODO，`skip` 主动跳过本次范围内不再推进的 TODO。两类操作都属于"显式关闭"，关闭后 store 中不再有 PENDING / DOING，`user_satisfied=true` 才能稳定生效。
+
+### 示例14：已确认安全风险但尚未上报/留档（必须先落档）
+
+**场景**：当前子任务是验证登录接口的 SQL 注入。已用真实请求 `username=' OR '1'='1` 拿到与基线不同的响应（认证被绕过），漏洞已被一手数据确认。但此时既没有调用 `cybersecurity-risk` 落库，也没有把证据写入任何 output 结果文件。
+
+**错误判断（系统视同未交付）**：
+```json
+{"@action": "verify-satisfaction", "user_satisfied": true, "completed_task_index": "1-1", "reasoning": "目标达成：已确认登录接口存在 SQL 注入"}
+```
+错误原因：漏洞已确认却既未落库也未留档，属于"视同未交付"。确认 != 交付，此时不允许宣告完成。
+
+**正确判断（保持未完成并新增上报/留档动作）**：
+```json
+{"@action": "verify-satisfaction", "user_satisfied": false, "completed_task_index": "", "reasoning": "风险已确认但未落档：登录接口 SQL 注入需先经 cybersecurity-risk 上报或写入结果文件", "next_movements": [{"op": "add", "id": "report_sqli_risk", "content": "立即用 cybersecurity-risk 上报已确认的登录接口 SQL 注入，或写入结果文件留档"}]}
+```
+正确原因：把"上报/留档"作为必须完成的交付动作显式列入 `next_movements`，落档完成后才可在后续轮宣告该子任务完成。每个独立风险实例都单独上报，不攒到末尾批量补录。

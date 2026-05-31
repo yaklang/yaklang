@@ -215,6 +215,10 @@ type ActualModelInfoJSON struct {
 	ProviderCount     int      `json:"provider_count"`
 	HasMultiplier     bool     `json:"has_multiplier"`
 
+	// IsFree 该实际模型是否被标记为「免费(计费豁免)」：true 时倍率全部失效，加权计费 Token 恒为 0。
+	// 关键词: ActualModelInfoJSON IsFree, 免费模型计费豁免展示
+	IsFree bool `json:"is_free"`
+
 	// 配置原始值（0 表示该维未配置，回落下层）
 	ConfigInput       float64 `json:"config_input"`
 	ConfigOutput      float64 `json:"config_output"`
@@ -377,6 +381,7 @@ func (c *ServerConfig) servePortalDataAPI(conn net.Conn, request *http.Request) 
 			mul := allMultipliers[im.InternalModelName] // 可能为 nil
 			if mul != nil {
 				am.HasMultiplier = true
+				am.IsFree = mul.IsFree
 				am.ConfigInput = mul.InputTokenMultiplier
 				am.ConfigOutput = mul.OutputTokenMultiplier
 				am.ConfigCacheCreate = mul.CacheCreationMultiplier

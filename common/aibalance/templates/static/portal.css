@@ -1791,13 +1791,12 @@
             font-size: 12px;
         }
 
-        /* 优化的默认列宽配置 - 模型信息表格 */
+        /* 优化的默认列宽配置 - 模型信息表格（传统倍数列已移除，现 5 列） */
         #models-table th:nth-child(1), #models-table td:nth-child(1) { min-width: 100px; width: 140px; } /* 模型名 */
         #models-table th:nth-child(2), #models-table td:nth-child(2) { min-width: 65px; width: 75px; } /* 供应商数量 */
-        #models-table th:nth-child(3), #models-table td:nth-child(3) { min-width: 65px; width: 75px; } /* 流量倍数 */
-        #models-table th:nth-child(4), #models-table td:nth-child(4) { min-width: 140px; width: 180px; } /* 描述 */
-        #models-table th:nth-child(5), #models-table td:nth-child(5) { min-width: 90px; width: 110px; } /* 标签 */
-        #models-table th:nth-child(6), #models-table td:nth-child(6) { min-width: 90px; width: 110px; } /* 操作 */
+        #models-table th:nth-child(3), #models-table td:nth-child(3) { min-width: 140px; width: 180px; } /* 描述 */
+        #models-table th:nth-child(4), #models-table td:nth-child(4) { min-width: 90px; width: 110px; } /* 标签 */
+        #models-table th:nth-child(5), #models-table td:nth-child(5) { min-width: 90px; width: 110px; } /* 操作 */
 }
 
 /* ==================== Model Selection (Shared Styles) ==================== */

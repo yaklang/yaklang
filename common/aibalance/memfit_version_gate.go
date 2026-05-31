@@ -130,13 +130,13 @@ func parseFlexibleBuildTime(s string) (time.Time, error) {
 //
 // 关键词: writeMemfitVersionRateLimitResponse, memfit 客户端版本控流 429, X-AIBalance-Limit-Kind memfit_client_version
 func (c *ServerConfig) writeMemfitVersionRateLimitResponse(conn net.Conn, reason string) {
-	const defaultMessage = "针对旧版本的 Memfit/Yak 系统使用量已达到最大上限，最大上限为 1 亿。请更新最新版本 Yak 引擎或最新版本 Memfit/Yak Project 系统以提升用户体验。"
 	if reason == "" {
 		reason = "unknown"
 	}
-	// 默认文案保持历史不变；启用自定义 429 时按 kind=memfit_version 覆盖 message 并注入 notice。
-	// 关键词: writeMemfitVersionRateLimitResponse resolveLimit429, kind memfit_version, notice 注入
-	message, notice := c.resolveLimit429("memfit_version", defaultMessage)
+	// 默认文案集中在 custom_429.go（Default429MessageMemfitVersion），保证与编辑界面默认文案一致；
+	// 启用自定义 429 时按 kind=memfit_version 覆盖 message 并注入 notice。
+	// 关键词: writeMemfitVersionRateLimitResponse resolveLimit429, kind memfit_version, Default429MessageMemfitVersion, notice 注入
+	message, notice := c.resolveLimit429("memfit_version", Default429MessageMemfitVersion)
 	errMap := map[string]interface{}{
 		"type":          "memfit_client_version_limited",
 		"limit_kind":    "memfit_client_version",

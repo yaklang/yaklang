@@ -192,16 +192,17 @@ func (c *ServerConfig) serveWebSearch(conn net.Conn, rawPacket []byte) {
 		}
 		apiKey = key
 
-		// Check traffic limit for API key users
-		trafficAllowed, err := CheckAiApiKeyTrafficLimit(key.Key)
+		// 字节流量限额已停用：web search 同样改用 Token 维度限额。
+		// 关键词: web search 字节流量限额停用, CheckAiApiKeyTokenLimit
+		tokenAllowed, err := CheckAiApiKeyTokenLimit(key.Key)
 		if err != nil {
-			c.logError("failed to check traffic limit for key %s: %v", utils.ShrinkString(key.Key, 8), err)
-		} else if !trafficAllowed {
-			c.logError("API key %s has exceeded traffic limit", utils.ShrinkString(key.Key, 8))
+			c.logError("failed to check token limit for key %s: %v", utils.ShrinkString(key.Key, 8), err)
+		} else if !tokenAllowed {
+			c.logError("API key %s has exceeded token limit", utils.ShrinkString(key.Key, 8))
 			c.writeJSONResponse(conn, http.StatusTooManyRequests, map[string]interface{}{
 				"error": map[string]string{
-					"message": "API key has exceeded traffic limit",
-					"type":    "traffic_limit_exceeded",
+					"message": "API key has exceeded token limit",
+					"type":    "token_limit_exceeded",
 				},
 			})
 			return
@@ -489,16 +490,8 @@ func (c *ServerConfig) sendWebSearchResponse(conn net.Conn, results []*ostype.Om
 		if err := IncrementAiApiKeyWebSearchCount(apiKey); err != nil {
 			log.Errorf("failed to increment web search count for api key: %v", err)
 		}
-		// Update traffic usage with model multiplier for "web-search"
-		multiplier := GetModelTrafficMultiplier("web-search")
-		totalTraffic := inputBytes + outputBytes
-		adjustedTraffic := int64(float64(totalTraffic) * multiplier)
-		if err := UpdateAiApiKeyTrafficUsed(apiKey, adjustedTraffic); err != nil {
-			log.Errorf("failed to update traffic usage for web search: %v", err)
-		} else {
-			log.Infof("web-search traffic usage updated: key=%s, input=%d, output=%d, multiplier=%.2f, adjusted=%d bytes",
-				utils.ShrinkString(apiKey, 8), inputBytes, outputBytes, multiplier, adjustedTraffic)
-		}
+		// 字节流量计费已停用：web search 不再按字节 * TrafficMultiplier 累加 TrafficUsed。
+		// 关键词: web search 字节流量计费停用
 	}()
 
 	c.writeJSONResponse(conn, http.StatusOK, resp)

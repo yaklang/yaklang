@@ -1197,6 +1197,12 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 						c.logInfo("API key token usage updated: key=%s model=%s weighted=%d",
 							utils.ShrinkString(key.Key, 8), modelName, weighted)
 					}
+					// 付费用户全局日 Token 总额度（第二道硬门）累加：聚合所有付费 key 当天用量。
+					// 关键词: onUsageForward AddPaidUserDailyTokenUsage, 付费全局额度累加
+					if err := AddPaidUserDailyTokenUsage(weighted); err != nil {
+						c.logWarn("AddPaidUserDailyTokenUsage failed (key=%s weighted=%d): %v",
+							utils.ShrinkString(key.Key, 8), weighted, err)
+					}
 				}
 			}
 
@@ -1544,7 +1550,7 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 				}
 			}()
 		} else {
-			// Update API key statistics
+			// Update API key statistics (InputBytes/OutputBytes 仅用于展示统计，保留)
 			go func() {
 				if err := UpdateAiApiKeyStats(key.Key, inputBytes, outputBytes, requestSucceeded); err != nil {
 					c.logError("Failed to update API key statistics: %v", err)
@@ -1554,20 +1560,9 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 				}
 			}()
 
-			// Update traffic usage with model multiplier
-			go func() {
-				// Get the traffic multiplier for this model
-				multiplier := GetModelTrafficMultiplier(modelName)
-				totalTraffic := inputBytes + outputBytes
-				adjustedTraffic := int64(float64(totalTraffic) * multiplier)
-
-				if err := UpdateAiApiKeyTrafficUsed(key.Key, adjustedTraffic); err != nil {
-					c.logError("Failed to update traffic usage for key %s: %v", utils.ShrinkString(key.Key, 8), err)
-				} else {
-					c.logInfo("Traffic usage updated: key=%s, raw=%d bytes, multiplier=%.2f, adjusted=%d bytes",
-						utils.ShrinkString(key.Key, 8), totalTraffic, multiplier, adjustedTraffic)
-				}
-			}()
+			// 字节流量计费已停用：统一改用 Token 计费体系（ComputeModelWeightedTokens
+			// + AiApiKeys.TokenUsed），不再按字节 * TrafficMultiplier 累加 TrafficUsed。
+			// 关键词: 字节流量计费停用, Token 体系统一计费
 		}
 
 		bandwidth := float64(0)
@@ -1833,7 +1828,7 @@ func (c *ServerConfig) serveEmbeddings(conn net.Conn, rawPacket []byte) {
 				}
 			}()
 		} else {
-			// Update API key statistics
+			// Update API key statistics (InputBytes/OutputBytes 仅用于展示统计，保留)
 			go func() {
 				if err := UpdateAiApiKeyStats(key.Key, inputBytesEmbed, outputBytesEmbed, true); err != nil {
 					c.logError("Failed to update API key statistics: %v", err)
@@ -1843,19 +1838,8 @@ func (c *ServerConfig) serveEmbeddings(conn net.Conn, rawPacket []byte) {
 				}
 			}()
 
-			// Update traffic usage with model multiplier
-			go func() {
-				multiplier := GetModelTrafficMultiplier(modelName)
-				totalTraffic := inputBytesEmbed + outputBytesEmbed
-				adjustedTraffic := int64(float64(totalTraffic) * multiplier)
-
-				if err := UpdateAiApiKeyTrafficUsed(key.Key, adjustedTraffic); err != nil {
-					c.logError("Failed to update traffic usage for key %s: %v", utils.ShrinkString(key.Key, 8), err)
-				} else {
-					c.logInfo("Traffic usage updated: key=%s, raw=%d bytes, multiplier=%.2f, adjusted=%d bytes",
-						utils.ShrinkString(key.Key, 8), totalTraffic, multiplier, adjustedTraffic)
-				}
-			}()
+			// 字节流量计费已停用：embedding 同样统一改用 Token 计费体系，不再累加 TrafficUsed。
+			// 关键词: embedding 字节流量计费停用, Token 体系统一计费
 		}
 
 		break // Success, exit loop
@@ -2449,9 +2433,10 @@ func (c *ServerConfig) writeRateLimitResponse(conn net.Conn, queueLength int64) 
 //
 // 关键词: writeRPMRateLimitResponse, RPM 限流 429, X-AIBalance-Limit-Kind
 func (c *ServerConfig) writeRPMRateLimitResponse(conn net.Conn, queueLength int64) {
-	// 默认文案保持历史不变；启用自定义 429 时按 kind=rpm 覆盖 message 并注入 notice。
-	// 关键词: writeRPMRateLimitResponse resolveLimit429, kind rpm, notice 注入
-	defaultMessage := fmt.Sprintf("Rate limit exceeded. You are in queue position %d. Please retry after 10 seconds.", queueLength)
+	// 默认文案集中在 custom_429.go（Default429MessageRPM），运行时追加排队位置，保证与编辑界面默认文案一致；
+	// 启用自定义 429 时按 kind=rpm 覆盖 message 并注入 notice。
+	// 关键词: writeRPMRateLimitResponse resolveLimit429, kind rpm, Default429MessageRPM, notice 注入
+	defaultMessage := fmt.Sprintf("%s（当前排队位置 %d / queue position %d）", Default429MessageRPM, queueLength, queueLength)
 	message, notice := c.resolveLimit429("rpm", defaultMessage)
 	errMap := map[string]interface{}{
 		"message":       message,
@@ -2507,12 +2492,12 @@ func (c *ServerConfig) writeDailyTokenLimitResponse(conn net.Conn, modelName, bu
 	// 1 亿 = 1e8 token；同时拼接英文便于运维日志检索。
 	const yiUnit = 100_000_000
 	limitYi := float64(tokensLimit) / float64(yiUnit)
+	// 默认文案集中在 custom_429.go（Default429MessageDailyToken），运行时追加具体用量数值，
+	// 保证与编辑界面默认文案一致；启用自定义 429 时按 kind=daily_token 覆盖 message 并注入 notice。
+	// 关键词: writeDailyTokenLimitResponse resolveLimit429, kind daily_token, Default429MessageDailyToken, notice 注入
 	defaultFriendlyMessage := fmt.Sprintf(
-		"今日免费词元额度 %.2f 亿已经全部消耗完毕，每日北京时间 06:00 准时刷新。"+
-			"Daily token quota exceeded (used=%d, limit=%d), refreshes daily at 06:00 Asia/Shanghai.",
-		limitYi, tokensUsed, tokensLimit)
-	// 默认文案保持历史不变；启用自定义 429 时按 kind=daily_token 覆盖 message 并注入 notice。
-	// 关键词: writeDailyTokenLimitResponse resolveLimit429, kind daily_token, notice 注入
+		"%s（已用 %d / 上限 %d，约 %.2f 亿 / used=%d limit=%d）",
+		Default429MessageDailyToken, tokensUsed, tokensLimit, limitYi, tokensUsed, tokensLimit)
 	friendlyMessage, notice := c.resolveLimit429("daily_token", defaultFriendlyMessage)
 	type errBody struct {
 		Type         string  `json:"type"`
@@ -2582,12 +2567,10 @@ func (c *ServerConfig) writeFreeIPLimitResponse(conn net.Conn, decision *FreeUse
 	if decision == nil {
 		decision = &FreeUserIPLimitDecision{}
 	}
-	// 默认固定文案：提示用户当前环境免费额度已耗尽，请自行配置 AI 后端。
-	// 关键词: 免费 IP 限额提示词, 当前环境免费用量已用尽
-	const defaultFriendlyMessage = "当前环境免费用量已用尽，请自行配置 AI 后端使用。" +
-		"Free quota for this environment has been used up, please configure your own AI backend."
-	// 默认文案保持固定；启用自定义 429 时按 kind=free_ip 覆盖 message 并注入 notice。
-	friendlyMessage, notice := c.resolveLimit429("free_ip", defaultFriendlyMessage)
+	// 默认文案集中在 custom_429.go（Default429MessageFreeIP），保证与编辑界面默认文案一致；
+	// 启用自定义 429 时按 kind=free_ip 覆盖 message 并注入 notice。
+	// 关键词: 免费 IP 限额提示词, Default429MessageFreeIP, 当前环境免费用量已用尽
+	friendlyMessage, notice := c.resolveLimit429("free_ip", Default429MessageFreeIP)
 	type errBody struct {
 		Type         string `json:"type"`
 		Message      string `json:"message"`
