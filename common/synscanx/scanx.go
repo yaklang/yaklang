@@ -198,7 +198,7 @@ func (s *Scannerx) SubmitTarget(targets, ports string) (<-chan *SynxTarget, erro
 			if s.config.maxOpenPorts > 0 {
 				v, ok := s.ipOpenPortMap.Load(host)
 				if ok {
-					if v.(uint16) >= s.config.maxOpenPorts {
+					if count, cok := v.(uint16); cok && count >= s.config.maxOpenPorts {
 						break
 					}
 				}
@@ -264,14 +264,14 @@ func (s *Scannerx) SubmitTargetFromPing(res chan string, ports string) <-chan *S
 				}
 				for _, port := range nonExcludedPorts {
 					s.rateLimit()
-					if s.config.maxOpenPorts > 0 {
-						v, ok := s.ipOpenPortMap.Load(host)
-						if ok {
-							if v.(uint16) >= s.config.maxOpenPorts {
-								break
-							}
+				if s.config.maxOpenPorts > 0 {
+					v, ok := s.ipOpenPortMap.Load(host)
+					if ok {
+						if count, cok := v.(uint16); cok && count >= s.config.maxOpenPorts {
+							break
 						}
 					}
+				}
 					s.callOnSubmitTask(host, port)
 					proto, p := utils.ParsePortToProtoPort(port)
 					target := &SynxTarget{
@@ -366,8 +366,9 @@ func (s *Scannerx) Scan(targetCh <-chan *SynxTarget) (chan *synscan.SynScanResul
 				return
 			}
 			if s.config.maxOpenPorts > 0 {
-				v, _ := s.ipOpenPortMap.LoadOrStore(host.String(), 1)
-				s.ipOpenPortMap.Store(host.String(), v.(uint16)+1)
+				v, _ := s.ipOpenPortMap.LoadOrStore(host.String(), uint16(0))
+				count, _ := v.(uint16)
+				s.ipOpenPortMap.Store(host.String(), count+1)
 			}
 
 			if _, exists := ipCountMap[host.String()]; !exists {
