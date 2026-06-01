@@ -1270,7 +1270,7 @@ func applyFuzzVerificationOutcome(loop *reactloops.ReActLoop, operator *reactloo
 		verifyResult.EvidenceOps,
 	)
 
-	if verifyResult.Satisfied {
+	if verifyResult.Satisfied && !aicommon.HasNewTodoAddOps(verifyResult.NextMovements) {
 		operator.Exit()
 		return
 	}

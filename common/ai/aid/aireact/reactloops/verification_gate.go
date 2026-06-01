@@ -530,7 +530,7 @@ func (r *ReActLoop) triggerVerificationWatchdog(task aicommon.AIStatefulTask) {
 	if result == nil {
 		return
 	}
-	if result.Satisfied {
+	if result.Satisfied && !aicommon.HasNewTodoAddOps(result.NextMovements) {
 		task.Finish(nil)
 		r.stopVerificationWatchdogForTask(task)
 		return

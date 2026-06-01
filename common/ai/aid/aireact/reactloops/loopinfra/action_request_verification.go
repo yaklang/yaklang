@@ -90,7 +90,7 @@ var loopAction_RequestVerification = &reactloops.LoopAction{
 			operator.Continue()
 			return
 		}
-		if verifyResult.Satisfied {
+		if verifyResult.Satisfied && !aicommon.HasNewTodoAddOps(verifyResult.NextMovements) {
 			operator.Exit()
 			return
 		}
