@@ -795,6 +795,24 @@ func (s *SQLiteVectorStoreHNSW) UnSafeCount() (int, error) {
 	return count, nil
 }
 
+func (s *SQLiteVectorStoreHNSW) SampleDocuments(n int) ([]*Document, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var docs []schema.VectorStoreDocument
+	if err := s.db.Where("collection_id = ?", s.collection.ID).
+		Where("document_id <> ?", DocumentTypeCollectionInfo).
+		Limit(n).Find(&docs).Error; err != nil {
+		return nil, utils.Errorf("sample documents failed: %v", err)
+	}
+
+	results := make([]*Document, len(docs))
+	for i, doc := range docs {
+		results[i] = s.toDocument(&doc)
+	}
+	return results, nil
+}
+
 func (s *SQLiteVectorStoreHNSW) PerformanceDiagnostics() map[string]interface{} {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
