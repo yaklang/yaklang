@@ -223,7 +223,7 @@ func (s *RAGHTTPServer) registerRoutes() {
 func (s *RAGHTTPServer) handleFrontend(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache")
-	_, _ = w.Write([]byte(renderFrontendHTML(s.config.RoutePrefix)))
+	_, _ = w.Write([]byte(renderFrontendHTML(s.config.RoutePrefix, s.config.Title)))
 }
 
 // Start 启动 HTTP 服务 (阻塞)
@@ -300,6 +300,15 @@ func modelOrDefault(model string) string {
 	}
 	return model
 }
+
+// GetTitle 返回前端标题
+func (s *RAGHTTPServer) GetTitle() string { return s.config.Title }
+
+// GetMaxIteration 返回知识增强迭代次数配置
+func (s *RAGHTTPServer) GetMaxIteration() int { return s.config.MaxIteration }
+
+// IsMemoryDisabled 返回记忆系统是否被禁用
+func (s *RAGHTTPServer) IsMemoryDisabled() bool { return s.config.DisableMemory }
 
 // GetAIModeDescription 返回当前 AI 模型的人类可读描述 (用于启动信息展示)
 // 展示 质量优先 / 速度优先 两个通道当前所用模型.

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	_ "embed"
+	"html"
 	"io"
 	"strings"
 	"sync"
@@ -26,6 +27,9 @@ var frontendHTMLGzip []byte
 
 // 页面中用于注入实际路由前缀的占位符
 const frontendPrefixPlaceholder = "__RAG_ROUTE_PREFIX__"
+
+// 页面中用于注入自定义标题(页面标题+左上角品牌名)的占位符
+const frontendTitlePlaceholder = "__RAG_TITLE__"
 
 var (
 	frontendHTMLOnce sync.Once
@@ -51,10 +55,16 @@ func frontendHTML() string {
 	return frontendHTMLTpl
 }
 
-// renderFrontendHTML 将占位符替换为实际路由前缀后返回完整 HTML
-func renderFrontendHTML(routePrefix string) string {
+// renderFrontendHTML 将占位符替换为实际路由前缀与自定义标题后返回完整 HTML
+func renderFrontendHTML(routePrefix, title string) string {
 	if routePrefix == "" {
 		routePrefix = "/api/rag-server"
 	}
-	return strings.ReplaceAll(frontendHTML(), frontendPrefixPlaceholder, routePrefix)
+	if strings.TrimSpace(title) == "" {
+		title = DefaultTitle
+	}
+	out := strings.ReplaceAll(frontendHTML(), frontendPrefixPlaceholder, routePrefix)
+	// 标题来自服务端配置, 注入前做 HTML 转义, 防止破坏页面结构
+	out = strings.ReplaceAll(out, frontendTitlePlaceholder, html.EscapeString(title))
+	return out
 }

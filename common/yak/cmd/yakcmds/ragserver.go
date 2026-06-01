@@ -157,6 +157,22 @@ var ragServerCommand = &cli.Command{
 			Name:  "concurrent",
 			Usage: "max simultaneous chat requests (override config)",
 		},
+		cli.IntFlag{
+			Name:  "max-iteration",
+			Usage: "knowledge-enhance iterations (override config; effective range 1-10, 1 = fastest)",
+		},
+		cli.StringFlag{
+			Name:  "title",
+			Usage: "web page title and top-left brand name (override config)",
+		},
+		cli.BoolFlag{
+			Name:  "enable-memory",
+			Usage: "enable the memory system (default off; memory is disabled by default for speed/cost)",
+		},
+		cli.StringFlag{
+			Name:  "system-prompt",
+			Usage: "custom preset prompt injected into every request (override config)",
+		},
 		cli.StringFlag{
 			Name:  "ai-type",
 			Usage: "AI service type (override config)",
@@ -229,10 +245,17 @@ var ragServerCommand = &cli.Command{
 			airaghttp.WithRoutePrefix(c.String("prefix")),
 			airaghttp.WithAuthToken(c.String("auth-token")),
 			airaghttp.WithConcurrent(c.Int("concurrent")),
+			airaghttp.WithMaxIteration(c.Int("max-iteration")),
+			airaghttp.WithTitle(c.String("title")),
+			airaghttp.WithSystemPrompt(c.String("system-prompt")),
 			airaghttp.WithAIService(c.String("ai-type"), c.String("ai-model"), c.String("ai-apikey"), c.String("ai-domain")),
 			airaghttp.WithLightweightAIService(c.String("ai-lite-type"), c.String("ai-lite-model"), c.String("ai-lite-apikey"), c.String("ai-lite-domain")),
 			airaghttp.WithServeFrontend(c.Bool("fe")),
 			airaghttp.WithDebug(c.Bool("debug")),
+		}
+		// 记忆默认关闭; 仅当显式 --enable-memory 时覆盖为开启 (避免覆盖配置文件里的 disable_memory)
+		if c.IsSet("enable-memory") {
+			opts = append(opts, airaghttp.WithDisableMemory(!c.Bool("enable-memory")))
 		}
 		if ragFiles := c.String("rag-files"); ragFiles != "" {
 			files := make([]string, 0)
@@ -278,6 +301,13 @@ func printRAGServerStartupInfo(server *airaghttp.RAGHTTPServer) {
 		fmt.Printf("  Web UI:       http://%s/   (built-in read-only search page)\n", addr)
 	}
 	fmt.Printf("  AI Model:     %s\n", server.GetAIModeDescription())
+	fmt.Printf("  Title:        %s\n", server.GetTitle())
+	fmt.Printf("  Iterations:   %d\n", server.GetMaxIteration())
+	memState := "enabled"
+	if server.IsMemoryDisabled() {
+		memState = "disabled"
+	}
+	fmt.Printf("  Memory:       %s\n", memState)
 	fmt.Printf("  Ready KBs:    %d\n", len(server.GetReadyCollections()))
 	fmt.Println()
 	fmt.Println("Press Ctrl+C to stop.")

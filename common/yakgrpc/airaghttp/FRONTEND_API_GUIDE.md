@@ -69,12 +69,14 @@ curl http://127.0.0.1:9093/api/rag-server/health
 ```json
 {
   "ok": true,
+  "title": "RAG 知识库",
   "collectionCount": 2,
   "collections": ["rag_ab12cd34_cwe", "syntaxflow-aikb-rag"],
   "concurrent": 3,
   "inflight": 0,
   "language": "zh",
   "maxIteration": 1,
+  "memoryDisabled": true,
   "timeout": 180,
   "authRequired": false,
   "ai": {
@@ -83,6 +85,8 @@ curl http://127.0.0.1:9093/api/rag-server/health
   }
 }
 ```
+
+> `title` 为服务端配置的页面/品牌标题，前端可直接用于自有页面的标题展示；`memoryDisabled` 表示记忆系统是否被禁用。
 
 ### 3.2 GET /collections 列出可用知识库
 
@@ -220,6 +224,17 @@ while (true) {
 
 > 设计意图：高频的速度调用别烧高质模型的 token，只有真正需要质量的关键推理才用高质模型。
 > 启动时后端会检测并打印两个通道当前所用模型（`AI Model:` 行 / 日志）。任一块只填 `model` / `domain` 但缺 `api_key` 都视为未配置，回退到轻量模型。
+
+## 4.1 其它定制项 (rag-server.yaml)
+
+| 配置项 | 默认 | 说明 |
+| --- | --- | --- |
+| `title` | `"RAG 知识库"` | 页面 `<title>` 与左上角品牌名；同时通过 `/health` 的 `title` 返回，供自有前端复用。CLI 可用 `--title` 覆盖。 |
+| `max_iteration` | `1` | 知识增强检索的迭代轮数，有效范围 1-10（1 最快）。CLI 可用 `--max-iteration` 覆盖。 |
+| `disable_memory` | `true` | 默认禁用记忆系统（不构建/不入库/不检索），更快更省。设为 `false` 可让引擎累积并复用记忆；CLI 用 `--enable-memory` 显式开启。 |
+| `system_prompt` | `""` | 自定义预设提示词，作为 `USER_PRESET` 注入每次请求（约 4000 token 上限，超长自动截断），用于设定角色/回答规则。CLI 可用 `--system-prompt` 覆盖。 |
+
+> 用 `yak rag-server --gen-config <file>` 生成的模板已包含上述带注释字段，改完用 `--config <file>` 启动即可。
 
 ## 5. 安全提示
 
