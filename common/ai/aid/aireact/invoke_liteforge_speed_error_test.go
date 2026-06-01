@@ -17,7 +17,7 @@ import (
 )
 
 // TestInvokeSpeedPriorityLiteForge_EmitsStructuredErrorOnFailure verifies that when
-// SpeedPriorityAICallback is configured and LiteForge execution fails, a fixed system
+// speed priority AI callback is configured and LiteForge execution fails, a fixed system
 // JSON event is emitted so clients can prompt users to fix lightweight model config.
 func TestInvokeSpeedPriorityLiteForge_EmitsStructuredErrorOnFailure(t *testing.T) {
 	var mu sync.Mutex

@@ -55,7 +55,7 @@ func (r *ReAct) invokeLiteForgeWithCallback(cb aicommon.AICallbackType, ctx cont
 	}
 	execCb := cb
 	if utils.IsNil(execCb) {
-		execCb = r.config.OriginalAICallback
+		execCb = r.config.GetOriginalAICallback()
 	}
 	// 关键词: invokeLiteForgeWithCallback, ai.usageCallback 透传, WithUserUsageCallback
 	// 子 coordinator 走 WithFastAICallback path, 必须把父 ReAct 的 user UsageCallback
@@ -93,14 +93,14 @@ func (r *ReAct) InvokeSpeedPriorityLiteForge(
 	ctx context.Context, actionName string, prompt string,
 	outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption,
 ) (*aicommon.Action, error) {
-	return r.invokeLiteForgeWithCallback(r.config.SpeedPriorityAICallback, ctx, actionName, prompt, outputs, opts...)
+	return r.invokeLiteForgeWithCallback(r.config.GetSpeedPriorityAICallback(), ctx, actionName, prompt, outputs, opts...)
 }
 
 func (r *ReAct) InvokeQualityPriorityLiteForge(
 	ctx context.Context, actionName string, prompt string,
 	outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption,
 ) (*aicommon.Action, error) {
-	return r.invokeLiteForgeWithCallback(r.config.QualityPriorityAICallback, ctx, actionName, prompt, outputs, opts...)
+	return r.invokeLiteForgeWithCallback(r.config.GetQualityPriorityAICallback(), ctx, actionName, prompt, outputs, opts...)
 }
 
 func (r *ReAct) InvokeLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption) (*aicommon.Action, error) {

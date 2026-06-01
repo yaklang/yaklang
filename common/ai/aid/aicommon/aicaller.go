@@ -102,10 +102,10 @@ func AIChatToAICallbackType(cb func(prompt string, opts ...aispec.AIConfigOption
 				}
 			}
 			// 从 caller config 读取 user 注册的 UsageCallback,
-			// 把 ai.usageCallback(...) 透传到 OriginalAICallback / WithAICallback /
+			// 把 ai.usageCallback(...) 透传到 GetOriginalAICallback / WithAICallback /
 			// WithFastAICallback 路径, 让 raw ai.Chat 末帧 token usage (含 cached_tokens)
 			// 也能触达用户脚本.
-			// 关键词: AIChatToAICallbackType, OriginalAICallback usage 透传, ai.usageCallback
+			// 关键词: AIChatToAICallbackType, original callback usage 透传, ai.usageCallback
 			optList = append(optList, extractUserUsageCallbackOpts(aicf)...)
 			// 上报本次请求的模型用途类型(tier)，供 aibalance gateway 注入
 			// X-Yak-AI-Model-Usage-Type 头给中转层做用量保护降级。空 tier 不上报。

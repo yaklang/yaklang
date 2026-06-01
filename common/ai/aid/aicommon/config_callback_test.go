@@ -20,15 +20,15 @@ func TestWithAICallback_WrapsTieredCallbacks(t *testing.T) {
 	}
 
 	require.NoError(t, WithAICallback(cb)(cfg))
-	require.NotNil(t, cfg.OriginalAICallback)
-	require.NotNil(t, cfg.QualityPriorityAICallback)
-	require.NotNil(t, cfg.SpeedPriorityAICallback)
+	require.NotNil(t, cfg.GetOriginalAICallback())
+	require.NotNil(t, cfg.GetQualityPriorityAICallback())
+	require.NotNil(t, cfg.GetSpeedPriorityAICallback())
 
-	_, err := cfg.OriginalAICallback(cfg, NewAIRequest("original"))
+	_, err := cfg.GetOriginalAICallback()(cfg, NewAIRequest("original"))
 	require.NoError(t, err)
-	_, err = cfg.QualityPriorityAICallback(cfg, NewAIRequest("quality"))
+	_, err = cfg.GetQualityPriorityAICallback()(cfg, NewAIRequest("quality"))
 	require.NoError(t, err)
-	_, err = cfg.SpeedPriorityAICallback(cfg, NewAIRequest("speed"))
+	_, err = cfg.GetSpeedPriorityAICallback()(cfg, NewAIRequest("speed"))
 	require.NoError(t, err)
 
 	origCfg, ok := seen["original"].(*Config)
@@ -58,15 +58,15 @@ func TestWithAICallback_WithAICallbackNegative(t *testing.T) {
 			return rsp, nil
 		}))
 
-	require.NotNil(t, cfg.OriginalAICallback)
-	require.NotNil(t, cfg.QualityPriorityAICallback)
-	require.NotNil(t, cfg.SpeedPriorityAICallback)
+	require.NotNil(t, cfg.GetOriginalAICallback())
+	require.NotNil(t, cfg.GetQualityPriorityAICallback())
+	require.NotNil(t, cfg.GetSpeedPriorityAICallback())
 
-	_, err := cfg.OriginalAICallback(cfg, NewAIRequest("original"))
+	_, err := cfg.GetOriginalAICallback()(cfg, NewAIRequest("original"))
 	require.NoError(t, err)
-	_, err = cfg.QualityPriorityAICallback(cfg, NewAIRequest("quality"))
+	_, err = cfg.GetQualityPriorityAICallback()(cfg, NewAIRequest("quality"))
 	require.NoError(t, err)
-	_, err = cfg.SpeedPriorityAICallback(cfg, NewAIRequest("speed"))
+	_, err = cfg.GetSpeedPriorityAICallback()(cfg, NewAIRequest("speed"))
 	require.NoError(t, err)
 
 	origCfg, ok := seen["original"].(*Config)
@@ -94,11 +94,11 @@ func TestWithFastAICallback_OnlySetsOriginal(t *testing.T) {
 	}
 
 	require.NoError(t, WithFastAICallback(cb)(cfg))
-	require.NotNil(t, cfg.OriginalAICallback)
-	require.Nil(t, cfg.QualityPriorityAICallback)
-	require.Nil(t, cfg.SpeedPriorityAICallback)
+	require.NotNil(t, cfg.GetOriginalAICallback())
+	require.Nil(t, cfg.GetQualityPriorityAICallback())
+	require.Nil(t, cfg.GetSpeedPriorityAICallback())
 
-	_, err := cfg.OriginalAICallback(cfg, NewAIRequest("original"))
+	_, err := cfg.GetOriginalAICallback()(cfg, NewAIRequest("original"))
 	require.NoError(t, err)
 
 	_, ok := gotConfig.(*Config)
@@ -123,13 +123,13 @@ func TestWithAutoTieredAICallback_FallbackWhenTieredDisabled(t *testing.T) {
 	}
 
 	require.NoError(t, WithAutoTieredAICallback(cb)(cfg))
-	require.NotNil(t, cfg.OriginalAICallback)
-	require.NotNil(t, cfg.QualityPriorityAICallback)
-	require.NotNil(t, cfg.SpeedPriorityAICallback)
+	require.NotNil(t, cfg.GetOriginalAICallback())
+	require.NotNil(t, cfg.GetQualityPriorityAICallback())
+	require.NotNil(t, cfg.GetSpeedPriorityAICallback())
 
-	_, err := cfg.QualityPriorityAICallback(cfg, NewAIRequest("quality"))
+	_, err := cfg.GetQualityPriorityAICallback()(cfg, NewAIRequest("quality"))
 	require.NoError(t, err)
-	_, err = cfg.SpeedPriorityAICallback(cfg, NewAIRequest("speed"))
+	_, err = cfg.GetSpeedPriorityAICallback()(cfg, NewAIRequest("speed"))
 	require.NoError(t, err)
 
 	qualityCfg, ok := seen["quality"].(*tierAwareConsumptionCaller)

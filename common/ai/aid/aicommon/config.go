@@ -185,10 +185,7 @@ type Config struct {
 	/*
 		AI Call
 	*/
-	// call back
-	OriginalAICallback        AICallbackType // 原始 ai 回调, 用于 异步任务，不占用id
-	QualityPriorityAICallback AICallbackType // 质量优先 ai 回调
-	SpeedPriorityAICallback   AICallbackType // 速度优先 ai 回调
+	AICallbacks *AICallbacks
 
 	// userUsageCallback 由用户脚本通过 ai.usageCallback(...) 注册并经
 	// aiengine.WithAIConfig 透传. Tiered AI 路径
@@ -406,6 +403,115 @@ type Config struct {
 	artifactsPinned bool
 }
 
+type AICallbacks struct {
+	Original           AICallbackType
+	QualityPriorityRaw AICallbackType
+	SpeedPriorityRaw   AICallbackType
+	QualityPriority    AICallbackType
+	SpeedPriority      AICallbackType
+}
+
+func (callbacks *AICallbacks) RawClone() *AICallbacks {
+	if callbacks == nil {
+		return &AICallbacks{}
+	}
+	return &AICallbacks{
+		Original:           callbacks.Original,
+		QualityPriorityRaw: callbacks.QualityPriorityRaw,
+		SpeedPriorityRaw:   callbacks.SpeedPriorityRaw,
+	}
+}
+
+func (c *Config) ensureAICallbacks() *AICallbacks {
+	if c.AICallbacks == nil {
+		c.AICallbacks = &AICallbacks{}
+	}
+	return c.AICallbacks
+}
+
+func (c *Config) setOriginalAICallbackLocked(cb AICallbackType) {
+	callbacks := c.ensureAICallbacks()
+	callbacks.Original = cb
+}
+
+func (c *Config) setQualityPriorityAICallbackLocked(cb AICallbackType) {
+	callbacks := c.ensureAICallbacks()
+	callbacks.QualityPriorityRaw = cb
+	callbacks.QualityPriority = c.wrapper(cb, consts.TierIntelligent)
+}
+
+func (c *Config) setSpeedPriorityAICallbackLocked(cb AICallbackType) {
+	callbacks := c.ensureAICallbacks()
+	callbacks.SpeedPriorityRaw = cb
+	callbacks.SpeedPriority = c.wrapper(cb, consts.TierLightweight)
+}
+
+func (c *Config) setFastAICallbackLocked(cb AICallbackType) {
+	callbacks := c.ensureAICallbacks()
+	callbacks.Original = cb
+	callbacks.QualityPriorityRaw = nil
+	callbacks.SpeedPriorityRaw = nil
+	callbacks.QualityPriority = nil
+	callbacks.SpeedPriority = nil
+}
+
+func (c *Config) setAICallbacksLocked(callbacks *AICallbacks) {
+	c.AICallbacks = &AICallbacks{}
+	if callbacks == nil {
+		return
+	}
+	c.setOriginalAICallbackLocked(callbacks.Original)
+	c.setQualityPriorityAICallbackLocked(callbacks.QualityPriorityRaw)
+	c.setSpeedPriorityAICallbackLocked(callbacks.SpeedPriorityRaw)
+}
+
+func (c *Config) GetRawAICallbacks() *AICallbacks {
+	if c == nil {
+		return &AICallbacks{}
+	}
+	return c.ensureAICallbacks().RawClone()
+}
+
+func (c *Config) GetOriginalAICallback() AICallbackType {
+	if c == nil {
+		return nil
+	}
+	callbacks := c.ensureAICallbacks()
+	return callbacks.Original
+}
+
+func (c *Config) GetQualityPriorityAICallback() AICallbackType {
+	if c == nil {
+		return nil
+	}
+	callbacks := c.ensureAICallbacks()
+	return callbacks.QualityPriority
+}
+
+func (c *Config) GetSpeedPriorityAICallback() AICallbackType {
+	if c == nil {
+		return nil
+	}
+	callbacks := c.ensureAICallbacks()
+	return callbacks.SpeedPriority
+}
+
+func (c *Config) GetQualityPriorityRawAICallback() AICallbackType {
+	if c == nil {
+		return nil
+	}
+	callbacks := c.ensureAICallbacks()
+	return callbacks.QualityPriorityRaw
+}
+
+func (c *Config) GetSpeedPriorityRawAICallback() AICallbackType {
+	if c == nil {
+		return nil
+	}
+	callbacks := c.ensureAICallbacks()
+	return callbacks.SpeedPriorityRaw
+}
+
 // NewConfig creates a new Config with options
 func NewConfig(ctx context.Context, opts ...ConfigOption) *Config {
 	config := newConfig(ctx)
@@ -559,7 +665,7 @@ func newConfig(ctx context.Context) *Config {
 		return e, nil
 	})
 
-	if config.SpeedPriorityAICallback != nil {
+	if config.GetSpeedPriorityAICallback() != nil {
 		config.Emitter.SetStreamNodeIdI18nProvider(
 			config.buildStreamNodeIdI18nProvider(),
 		)
@@ -675,12 +781,10 @@ func WithAICallback(cb AICallbackType) ConfigOption {
 		}
 
 		oCb := cb
-		qualityCb := c.wrapper(cb, consts.TierIntelligent)
-		speedCb := c.wrapper(cb, consts.TierLightweight)
 		c.m.Lock()
-		c.OriginalAICallback = oCb
-		c.QualityPriorityAICallback = qualityCb
-		c.SpeedPriorityAICallback = speedCb
+		c.setOriginalAICallbackLocked(oCb)
+		c.setQualityPriorityAICallbackLocked(cb)
+		c.setSpeedPriorityAICallbackLocked(cb)
 		c.m.Unlock()
 		return nil
 	}
@@ -693,14 +797,21 @@ func WithFastAICallback(cb AICallbackType) ConfigOption {
 			c.m = &sync.Mutex{}
 		}
 
-		var qualityCb AICallbackType
-		var speedCb AICallbackType
-
 		c.m.Lock()
 		defer c.m.Unlock()
-		c.OriginalAICallback = cb
-		c.QualityPriorityAICallback = qualityCb
-		c.SpeedPriorityAICallback = speedCb
+		c.setFastAICallbackLocked(cb)
+		return nil
+	}
+}
+
+func WithAICallbacks(callbacks *AICallbacks) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		c.setAICallbacksLocked(callbacks)
+		c.m.Unlock()
 		return nil
 	}
 }
@@ -722,9 +833,8 @@ func WithQualityPriorityAICallback(cb AICallbackType) ConfigOption {
 		if c.m == nil {
 			c.m = &sync.Mutex{}
 		}
-		cb = c.wrapper(cb, consts.TierIntelligent)
 		c.m.Lock()
-		c.QualityPriorityAICallback = cb
+		c.setQualityPriorityAICallbackLocked(cb)
 		c.m.Unlock()
 		return nil
 	}
@@ -735,9 +845,8 @@ func WithSpeedPriorityAICallback(cb AICallbackType) ConfigOption {
 		if c.m == nil {
 			c.m = &sync.Mutex{}
 		}
-		cb = c.wrapper(cb, consts.TierLightweight)
 		c.m.Lock()
-		c.SpeedPriorityAICallback = cb
+		c.setSpeedPriorityAICallbackLocked(cb)
 		c.m.Unlock()
 		return nil
 	}
@@ -769,9 +878,8 @@ func WithTieredAICallback() ConfigOption {
 		// Configure quality priority callback (uses intelligent model)
 		intelligentCB, err := GetIntelligentAIModelCallback()
 		if err == nil {
-			intelligentCB = c.wrapper(intelligentCB, consts.TierIntelligent)
 			c.m.Lock()
-			c.QualityPriorityAICallback = intelligentCB
+			c.setQualityPriorityAICallbackLocked(intelligentCB)
 			c.m.Unlock()
 			log.Debugf("Configured quality priority callback from intelligent model")
 		} else {
@@ -780,51 +888,12 @@ func WithTieredAICallback() ConfigOption {
 
 		lightweightCB, err := GetLightweightAIModelCallback()
 		if err == nil {
-			lightweightCB = c.wrapper(lightweightCB, consts.TierLightweight)
 			c.m.Lock()
-			c.SpeedPriorityAICallback = lightweightCB
+			c.setSpeedPriorityAICallbackLocked(lightweightCB)
 			c.m.Unlock()
 			log.Debugf("Configured speed priority callback from lightweight model")
 		} else {
 			log.Warnf("Failed to load lightweight model callback: %v", err)
-		}
-
-		return nil
-	}
-}
-
-// WithInheritTieredAICallback inherits tiered AI callbacks from a parent config if tiered config is enabled
-// This is used for child invokers to inherit the same tiered callbacks as the parent coordinator, ensuring consistent AI behavior across the call hierarchy.
-// If tiered config is not enabled, it falls back to inheriting the original callback for both priorities.
-func WithInheritTieredAICallback(parentConfig *Config, force bool) ConfigOption {
-	return func(c *Config) error {
-		if c.m == nil {
-			c.m = &sync.Mutex{}
-		}
-		if parentConfig == nil {
-			return utils.Error("parent config cannot be nil for inheriting tiered AI callbacks")
-		}
-		c.m.Lock()
-		c.OriginalAICallback = parentConfig.OriginalAICallback
-		c.m.Unlock()
-
-		if consts.IsTieredAIModelConfigEnabled() && !force {
-			if err := WithTieredAICallback()(c); err != nil {
-				log.Errorf("Failed to configure tiered AI callbacks: %v", err)
-			}
-		} else {
-			c.m.Lock()
-			c.QualityPriorityAICallback = parentConfig.QualityPriorityAICallback
-			c.SpeedPriorityAICallback = parentConfig.SpeedPriorityAICallback
-			c.m.Unlock()
-		}
-
-		// 子 Config 继承父 Config 注册的 user UsageCallback, 否则子 coordinator
-		// 通过 OriginalAICallback path 调用 raw chat 时, extractUserUsageCallbackOpts
-		// 会从子 Config 取不到 callback, ai.usageCallback(...) 不会被触发.
-		// 关键词: WithInheritTieredAICallback, userUsageCallback 继承, ai.usageCallback 透传
-		if cb := parentConfig.GetUserUsageCallback(); cb != nil {
-			c.SetUserUsageCallback(cb)
 		}
 
 		return nil
@@ -931,7 +1000,7 @@ func WithAutoTieredAICallback(defaultCallback AICallbackType) ConfigOption {
 				// Also set the original callback if not already set
 				if defaultCallback != nil { // force set original callback to default if tiered config is enabled, to ensure async tasks have a valid callback
 					c.m.Lock()
-					c.OriginalAICallback = defaultCallback
+					c.setOriginalAICallbackLocked(defaultCallback)
 					c.m.Unlock()
 				}
 				return nil
@@ -940,13 +1009,10 @@ func WithAutoTieredAICallback(defaultCallback AICallbackType) ConfigOption {
 
 		// Fall back to default callback for all priorities
 		if defaultCallback != nil {
-			originalCb := defaultCallback
-			qualityCb := c.wrapper(defaultCallback, consts.TierIntelligent)
-			speedCb := c.wrapper(defaultCallback, consts.TierLightweight)
 			c.m.Lock()
-			c.OriginalAICallback = originalCb
-			c.QualityPriorityAICallback = qualityCb
-			c.SpeedPriorityAICallback = speedCb
+			c.setOriginalAICallbackLocked(defaultCallback)
+			c.setQualityPriorityAICallbackLocked(defaultCallback)
+			c.setSpeedPriorityAICallbackLocked(defaultCallback)
 			c.m.Unlock()
 		}
 		return nil
@@ -2541,9 +2607,9 @@ func WithForges(forge ...*schema.AIForge) ConfigOption {
 
 func (c *Config) CallAI(request *AIRequest) (*AIResponse, error) {
 	for _, cb := range []AICallbackType{
-		c.QualityPriorityAICallback,
-		c.SpeedPriorityAICallback,
-		c.OriginalAICallback,
+		c.GetQualityPriorityAICallback(),
+		c.GetSpeedPriorityAICallback(),
+		c.GetOriginalAICallback(),
 	} {
 		if cb == nil {
 			continue
@@ -2555,7 +2621,7 @@ func (c *Config) CallAI(request *AIRequest) (*AIResponse, error) {
 
 func (c *Config) CallOriginalAI(request *AIRequest) (*AIResponse, error) {
 	for _, cb := range []AICallbackType{
-		c.OriginalAICallback,
+		c.GetOriginalAICallback(),
 	} {
 		if cb == nil {
 			continue
@@ -2567,8 +2633,8 @@ func (c *Config) CallOriginalAI(request *AIRequest) (*AIResponse, error) {
 
 func (c *Config) CallQualityPriorityAI(request *AIRequest) (*AIResponse, error) {
 	for _, cb := range []AICallbackType{
-		c.QualityPriorityAICallback,
-		c.OriginalAICallback,
+		c.GetQualityPriorityAICallback(),
+		c.GetOriginalAICallback(),
 	} {
 		if cb == nil {
 			continue
@@ -2580,8 +2646,8 @@ func (c *Config) CallQualityPriorityAI(request *AIRequest) (*AIResponse, error) 
 
 func (c *Config) CallSpeedPriorityAI(request *AIRequest) (*AIResponse, error) {
 	for _, cb := range []AICallbackType{
-		c.SpeedPriorityAICallback,
-		c.OriginalAICallback,
+		c.GetSpeedPriorityAICallback(),
+		c.GetOriginalAICallback(),
 	} {
 		if cb == nil {
 			continue
@@ -3421,6 +3487,13 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 		opts = append(opts, WithEventHandler(i.EventHandler))
 	}
 
+	if i.AICallbacks != nil {
+		opts = append(opts, WithAICallbacks(i.AICallbacks.RawClone()))
+	}
+	if i.GetUserUsageCallback() != nil {
+		opts = append(opts, WithUserUsageCallback(i.GetUserUsageCallback()))
+	}
+
 	if i.HotPatchBroadcaster != nil {
 		hotPatchChan := i.HotPatchBroadcaster.Subscribe()
 		opts = append(opts, WithHotPatchOptionChan(hotPatchChan))
@@ -3512,14 +3585,16 @@ func (c *Config) OriginOptions() []ConfigOption {
 }
 
 func (c *Config) AICallbackAvailable() bool {
-	return !(c.QualityPriorityAICallback == nil && c.SpeedPriorityAICallback == nil && c.OriginalAICallback == nil)
+	return !(c.GetQualityPriorityAICallback() == nil && c.GetSpeedPriorityAICallback() == nil && c.GetOriginalAICallback() == nil)
 }
 
 func (c *Config) InvokeLiteForge(prompt string, opts ...any) (*ForgeResult, error) {
-	if c.SpeedPriorityAICallback != nil {
-		opts = append(opts, WithFastAICallback(c.SpeedPriorityAICallback))
+	if cb := c.GetSpeedPriorityAICallback(); cb != nil {
+		opts = append(opts, WithFastAICallback(cb))
+	} else if cb := c.GetQualityPriorityAICallback(); cb != nil {
+		opts = append(opts, WithFastAICallback(cb))
 	} else {
-		opts = append(opts, WithFastAICallback(c.QualityPriorityAICallback))
+		opts = append(opts, WithFastAICallback(c.GetOriginalAICallback()))
 	}
 	opts = append(opts, WithDisableCreateDBRuntime(true)) // Avoid creating runtime records for lite forge calls
 	return InvokeLiteForge(prompt, opts...)

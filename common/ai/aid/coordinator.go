@@ -158,7 +158,7 @@ func (c *Coordinator) enableTaskAnalyze() {
 			// task-analyst 子 coordinator 走 WithFastAICallback path, 需把父 Coordinator
 			// 注册的 user UsageCallback 一并继承, 否则 token usage 不会触达 ai.usageCallback.
 			analystOpts := []aicommon.ConfigOption{
-				aicommon.WithFastAICallback(c.OriginalAICallback),
+				aicommon.WithFastAICallback(c.GetOriginalAICallback()),
 			}
 			if userUsageCb := c.Config.GetUserUsageCallback(); userUsageCb != nil {
 				analystOpts = append(analystOpts, aicommon.WithUserUsageCallback(userUsageCb))

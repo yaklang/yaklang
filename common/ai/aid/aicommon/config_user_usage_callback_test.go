@@ -109,21 +109,19 @@ func TestAIChatToAICallbackType_NoCallbackWhenUserUsageNil(t *testing.T) {
 		"AIChatToAICallbackType must NOT inject WithUsageCallback when user did not register one")
 }
 
-// TestWithInheritTieredAICallback_InheritsUserUsageCallback 验证 P1-D2 修复:
-// 子 Config 通过 WithInheritTieredAICallback 继承父 Config 时, 父注册的
-// userUsageCallback 也必须被同步继承, 否则子 coordinator 走 OriginalAICallback
+// TestConvertConfigToOptions_InheritsUserUsageCallback 验证 P1-D2 修复:
+// 子 Config 通过 ConvertConfigToOptions 继承父 Config 时, 父注册的
+// userUsageCallback 也必须被同步继承, 否则子 coordinator 走 original callback
 // 路径时 extractUserUsageCallbackOpts 取不到 callback, ai.usageCallback 不触发.
 //
-// 关键词: WithInheritTieredAICallback, userUsageCallback 继承, P1-D2 回归
-func TestWithInheritTieredAICallback_InheritsUserUsageCallback(t *testing.T) {
+// 关键词: ConvertConfigToOptions, userUsageCallback 继承, P1-D2 回归
+func TestConvertConfigToOptions_InheritsUserUsageCallback(t *testing.T) {
 	parent := NewTestConfig(context.Background())
 	parent.SetUserUsageCallback(func(u *aispec.ChatUsage) {})
 	require.NotNil(t, parent.GetUserUsageCallback(), "parent must register usage callback")
 
-	child := NewTestConfig(context.Background())
-	require.Nil(t, child.GetUserUsageCallback(), "child must start without usage callback")
+	child := NewConfig(context.Background(), ConvertConfigToOptions(parent)...)
 
-	require.NoError(t, WithInheritTieredAICallback(parent, true)(child))
 	require.NotNil(t, child.GetUserUsageCallback(),
-		"child must inherit parent's userUsageCallback after WithInheritTieredAICallback")
+		"child must inherit parent's userUsageCallback after ConvertConfigToOptions")
 }
