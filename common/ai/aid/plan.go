@@ -44,9 +44,9 @@ func (pr *planRequest) GetInteractCount() int64 {
 
 func (pr *planRequest) CallAI(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 	for _, cb := range []aicommon.AICallbackType{
-		pr.cod.QualityPriorityAICallback,
-		pr.cod.SpeedPriorityAICallback,
-		pr.cod.OriginalAICallback,
+		pr.cod.GetQualityPriorityAICallback(),
+		pr.cod.GetSpeedPriorityAICallback(),
+		pr.cod.GetOriginalAICallback(),
 	} {
 		if cb == nil {
 			continue
@@ -58,8 +58,8 @@ func (pr *planRequest) CallAI(request *aicommon.AIRequest) (*aicommon.AIResponse
 
 func (pr *planRequest) CallSpeedPriorityAI(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 	for _, cb := range []aicommon.AICallbackType{
-		pr.cod.SpeedPriorityAICallback,
-		pr.cod.OriginalAICallback,
+		pr.cod.GetSpeedPriorityAICallback(),
+		pr.cod.GetOriginalAICallback(),
 	} {
 		if cb == nil {
 			continue
@@ -71,8 +71,8 @@ func (pr *planRequest) CallSpeedPriorityAI(request *aicommon.AIRequest) (*aicomm
 
 func (pr *planRequest) CallQualityPriorityAI(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 	for _, cb := range []aicommon.AICallbackType{
-		pr.cod.QualityPriorityAICallback,
-		pr.cod.OriginalAICallback,
+		pr.cod.GetQualityPriorityAICallback(),
+		pr.cod.GetOriginalAICallback(),
 	} {
 		if cb == nil {
 			continue

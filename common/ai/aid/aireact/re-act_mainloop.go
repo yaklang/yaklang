@@ -431,7 +431,7 @@ func (r *ReAct) ensureWorkDirectory(userInput string) {
 
 	// try LiteForge to generate both folder_name and session_title
 	// use a tight timeout to avoid blocking the main flow
-	if trimmedInput != "" && !cfg.GetConfigBool(sessionTitleDisableKey) && cfg.OriginalAICallback != nil {
+	if trimmedInput != "" && !cfg.GetConfigBool(sessionTitleDisableKey) && cfg.GetOriginalAICallback() != nil {
 		func() {
 			defer func() {
 				if err := recover(); err != nil {

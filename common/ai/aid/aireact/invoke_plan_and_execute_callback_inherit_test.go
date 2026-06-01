@@ -243,8 +243,8 @@ LOOP:
 		"expected quality model %q after plan start, got: %v", qualityModel, modelsAfterPlan)
 
 	// Original model must NOT appear after plan start.
-	// If it does, it means the child Coordinator lost QualityPriority and fell back
-	// to a callback derived from OriginalAICallback — which is exactly the old bug.
+	// If it does, it means the child Coordinator lost quality callback and fell back
+	// to a callback derived from the original callback, which is exactly the old bug.
 	require.False(t, sawOriginalAfterPlan,
 		"original model %q must NOT appear after plan start (would mean Quality callback was lost), got: %v",
 		originalModel, modelsAfterPlan)

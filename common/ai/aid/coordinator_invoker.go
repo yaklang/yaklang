@@ -39,8 +39,7 @@ func (c *Coordinator) ExecuteLoopTask(taskTypeName string, task aicommon.AIState
 	baseOpts := aicommon.ConvertConfigToOptions(c.Config)
 	baseOpts = append(baseOpts,
 		aicommon.WithID(c.Config.Id), // pe -> react should use same id
-		// 在深度规划（PlanAndExecute）场景中，原子任务Loop强制继承父级的智能回调配置，确保规划执行过程中 AI Callback 的Wrapper Config一致，维护流输出的同步性和Seq计数器存Checkpoint的正确递增。
-		aicommon.WithInheritTieredAICallback(c.Config, true),
+		aicommon.WithAICallbacks(c.Config.GetRawAICallbacks()),
 		aicommon.WithAllowPlanUserInteract(true),
 		aicommon.WithEventInputChanx(inputChannel),
 		aicommon.WithContext(ctx),
