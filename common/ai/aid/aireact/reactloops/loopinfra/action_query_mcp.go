@@ -41,9 +41,6 @@ var loopAction_QueryMCPServers = &reactloops.LoopAction{
 			aitool.WithParam_Description(fmt.Sprintf("Optional page size. Default %d.", defaultMCPServerQueryLimit)),
 		),
 	},
-	StreamFields: []*reactloops.LoopStreamField{
-		{FieldName: "keyword", AINodeId: "query_mcp_servers"},
-	},
 	ActionVerifier: func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
 		if !reactloops.IsMCPServersAllowed(loop.GetInvoker()) {
 			return utils.Error("MCP servers are disabled for this runtime")
@@ -97,9 +94,6 @@ var loopAction_QueryMCPTools = &reactloops.LoopAction{
 			"limit",
 			aitool.WithParam_Description(fmt.Sprintf("Optional page size. Default %d.", defaultMCPToolQueryLimit)),
 		),
-	},
-	StreamFields: []*reactloops.LoopStreamField{
-		{FieldName: "server_name", AINodeId: "query_mcp_tools"},
 	},
 	ActionVerifier: func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
 		if !reactloops.IsMCPServersAllowed(loop.GetInvoker()) {
