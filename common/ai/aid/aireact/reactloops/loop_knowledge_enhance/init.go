@@ -111,11 +111,11 @@ func knowledgeEnhanceMaxIterations(r aicommon.AIInvokeRuntime) int {
 	return clampKnowledgeEnhanceIterations(int(r.GetConfig().GetMaxIterationCount()))
 }
 
-// clampKnowledgeEnhanceIterations 默认 3 轮(支持多轮单条搜索); 仅当调用方显式配置了较小的
-// 迭代数 (1-10) 时遵循该配置, 避免全局默认值 (100) 导致循环过多.
-// 关键词: clamp max iterations, honor small config, default 3
+// clampKnowledgeEnhanceIterations 默认 2 轮(1 语义 + 1 关键词/换角度); 仅当调用方显式
+// 配置了较小的迭代数 (1-10) 时遵循该配置, 避免全局默认值 (100) 导致循环过多.
+// 关键词: clamp max iterations, honor small config, default 2
 func clampKnowledgeEnhanceIterations(cfgMax int) int {
-	const defaultIterations = 3
+	const defaultIterations = 2
 	if cfgMax > 0 && cfgMax <= 10 {
 		return cfgMax
 	}

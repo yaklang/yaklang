@@ -96,11 +96,11 @@ func (r *ReAct) CompressLongTextWithDestination(
 	var emergencyLimit = targetTokenSize / 2
 	fallbackResult := utils.ShrinkTextBlock(rawText, int(emergencyLimit))
 
-	// 关键词: compress chunk, maxChunkSize, ~20K tokens
-	// 大文本分片处理：单分片 80KB（约 20K tokens），LiteForge 速度优先模型一次可吃掉
-	// 真实生效的分片重叠由后续 chunk.DumpWithOverlap(128) 控制
-	const maxChunkSize = 80 * 1024 // 80KB per chunk, ~20K tokens
-	const maxChunks = 20           // max 20 chunks
+	// 关键词: compress chunk, maxChunkSize, ~10K tokens
+	// 大文本分片处理：单分片 40KB（约 10K tokens），Speed 模型单次可消化
+	// 搜索结果 Limit=10 典型总量 10-30KB，1-2 片即可处理
+	const maxChunkSize = 40 * 1024 // 40KB per chunk, ~10K tokens
+	const maxChunks = 5            // hard cap: max 5 AI calls per compression
 
 	editor := memedit.NewMemEditor(rawText)
 
