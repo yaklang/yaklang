@@ -857,7 +857,7 @@ func detectLanguageFromExt(filename string) string {
 }
 
 func buildSSAOptions(language string) []ssaconfig.Option {
-	var opts []ssaconfig.Option
+	opts := yakCompileSSAOptions()
 
 	if language != "" {
 		lang, err := ssaconfig.ValidateLanguage(language)

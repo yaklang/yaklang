@@ -31,6 +31,12 @@ func (c *Compiler) resolveValueName(fn *ssa.Function, val ssa.Value) string {
 	if val == nil {
 		return ""
 	}
+	if extern, ok := ssa.ToExternLib(val); ok && extern != nil {
+		if name := strings.TrimSpace(extern.LibraryName); name != "" {
+			return name
+		}
+		return normalizeResolvedValueName(extern.GetName())
+	}
 	if ssaFn, ok := ssa.ToFunction(val); ok {
 		if name := normalizeResolvedValueName(ssaFn.GetName()); name != "" {
 			return name

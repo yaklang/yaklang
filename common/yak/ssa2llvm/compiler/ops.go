@@ -99,6 +99,13 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 		}
 	}
 
+	// ExternLib values are compile-time module handles; they are not runtime objects.
+	if extern, ok := ssa.ToExternLib(valObj); ok && extern != nil {
+		val := llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)
+		c.cacheValue(id, val)
+		return c.finishGetValue(contextInst, id)
+	}
+
 	// 3. Lazy compile if ConstInst
 	if constInst, ok := valObj.(*ssa.ConstInst); ok {
 		if err := c.compileConst(constInst); err != nil {
@@ -160,12 +167,33 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 	}
 
 	// 5. Treat unresolved globals / placeholders as nil i64 for compile-through.
+	// Extern member values (e.g. ssa.ModeAll) are Undefined placeholders; lower them via
+	// MemberCall / yaklib export instead of folding to zero here.
 	if undef, ok := valObj.(*ssa.Undefined); ok && undef != nil {
-		switch undef.Kind {
-		case ssa.UndefinedValueValid, ssa.UndefinedValueInValid, ssa.UndefinedMemberInValid:
-			val := llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)
-			c.cacheValue(id, val)
-			return val, nil
+		if undef.IsExtern() {
+			if mc, ok := valObj.(ssa.MemberCall); ok && mc.IsMember() {
+				// fall through to MemberCall lowering
+			} else if pkg, key, ok := splitExternValueName(undef.GetName()); ok {
+				if err := c.compileYaklibExportMember(contextInst, undef, pkg, key); err == nil {
+					if val, ok := c.getCachedValue(contextInst, id); ok {
+						return val, nil
+					}
+				}
+			} else {
+				switch undef.Kind {
+				case ssa.UndefinedValueValid, ssa.UndefinedValueInValid, ssa.UndefinedMemberInValid:
+					val := llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)
+					c.cacheValue(id, val)
+					return val, nil
+				}
+			}
+		} else {
+			switch undef.Kind {
+			case ssa.UndefinedValueValid, ssa.UndefinedValueInValid, ssa.UndefinedMemberInValid:
+				val := llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)
+				c.cacheValue(id, val)
+				return val, nil
+			}
 		}
 	}
 

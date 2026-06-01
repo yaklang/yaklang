@@ -116,6 +116,12 @@ func resolveSSAValueName(fn *ssa.Function, val ssa.Value) string {
 	if val == nil {
 		return ""
 	}
+	if extern, ok := ssa.ToExternLib(val); ok && extern != nil {
+		if name := strings.TrimSpace(extern.LibraryName); name != "" {
+			return name
+		}
+		return normalizeSSAResolvedValueName(extern.GetName())
+	}
 	if ssaFn, ok := ssa.ToFunction(val); ok && ssaFn != nil {
 		if name := normalizeSSAResolvedValueName(ssaFn.GetName()); name != "" {
 			return name

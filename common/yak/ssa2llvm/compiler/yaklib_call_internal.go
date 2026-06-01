@@ -33,11 +33,17 @@ func (c *Compiler) shouldUseYaklibDispatch(calleeName string) bool {
 	if !ok || method == "" {
 		return false
 	}
-	if !yaklang.HasModule(pkg) {
-		return false
+	if _, ok := yaklang.LookupExport(pkg, method); ok {
+		return true
 	}
-	_, ok = yaklang.LookupExport(pkg, method)
-	return ok
+	// Some stdlib tables are only visible via the interpreter Fntable map.
+	if table, ok := yaklang.New().GetFntable()[pkg]; ok {
+		if exports, ok := table.(map[string]any); ok {
+			_, ok := exports[method]
+			return ok
+		}
+	}
+	return false
 }
 
 func (c *Compiler) newYaklibDispatchSpec(inst *ssa.Call, pkg, method string) (contextCallSpec, error) {

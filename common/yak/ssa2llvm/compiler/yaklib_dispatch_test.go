@@ -63,3 +63,10 @@ func TestYaklibDispatch_PrintlnUsesBuiltinFuncIDNotGenericPath(t *testing.T) {
 	require.NotContains(t, ir, "yaklib_pkg_")
 	require.GreaterOrEqual(t, strings.Count(ir, "call void @"+abi.InvokeSymbol), 1)
 }
+
+func TestYaklibExtern_ModeAllConstantInIR(t *testing.T) {
+	code := `check = () => { if ssa.ModeAll == 0 { return -1 }; return ssa.ModeAll }`
+	_, _, ir, err := compileToIRFromCodeWithExternBindings(code, "yak", nil)
+	require.NoError(t, err)
+	require.Contains(t, ir, "i64 127")
+}
