@@ -181,7 +181,6 @@ func (c *Config) handle429RateLimit(rsp *AIResponse) (is429 bool, ctxDone bool) 
 					"预计等待约 %d 秒，感谢您的耐心",
 				queueCount, waitSec)
 			waitDuration = time.Duration(waitSec) * time.Second
-			c.EmitDefaultStreamEvent("rate-limit", strings.NewReader(msg), "")
 			c.EmitNotify("rate-limit", msg, waitDuration)
 			c.EmitError("AIBalance 429 rate limit: %s", msg)
 			log.Infof("AIBalance 429: queue=%d, waiting %ds", queueCount, waitSec)
@@ -190,7 +189,6 @@ func (c *Config) handle429RateLimit(rsp *AIResponse) (is429 bool, ctxDone bool) 
 				"您的任务同样重要，我不想敷衍任何一位\n" +
 				"预计等待一段时间后自动请求，感谢您的耐心"
 			waitDuration = 15 * time.Second
-			c.EmitDefaultStreamEvent("rate-limit", strings.NewReader(msg), "")
 			c.EmitNotify("rate-limit", msg, waitDuration)
 			c.EmitError("AIBalance 429 rate limit: %s", msg)
 			log.Infof("AIBalance 429: queue info unparseable (%q), waiting 15s", queueInfo)
@@ -200,7 +198,6 @@ func (c *Config) handle429RateLimit(rsp *AIResponse) (is429 bool, ctxDone bool) 
 			"Current request was rate-limited (HTTP 429), retrying shortly..."
 		sleepSec := 5 + rand.Intn(11)
 		waitDuration = time.Duration(sleepSec) * time.Second
-		c.EmitDefaultStreamEvent("rate-limit", strings.NewReader(msg), "")
 		c.EmitNotify("rate-limit", msg, waitDuration)
 		log.Infof("generic 429 rate limit, waiting %ds", sleepSec)
 	}
