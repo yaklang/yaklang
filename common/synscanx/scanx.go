@@ -67,6 +67,40 @@ var routeCache struct {
 	once      sync.Once
 }
 
+// toUint16 safely converts any numeric interface{} value to uint16.
+// Handles int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64.
+// Returns 0 for nil or non-numeric types.
+func toUint16(v interface{}) uint16 {
+	switch n := v.(type) {
+	case uint16:
+		return n
+	case int:
+		return uint16(n)
+	case int8:
+		return uint16(n)
+	case int16:
+		return uint16(n)
+	case int32:
+		return uint16(n)
+	case int64:
+		return uint16(n)
+	case uint:
+		return uint16(n)
+	case uint8:
+		return uint16(n)
+	case uint32:
+		return uint16(n)
+	case uint64:
+		return uint16(n)
+	case float32:
+		return uint16(n)
+	case float64:
+		return uint16(n)
+	default:
+		return 0
+	}
+}
+
 func getRoute(sampleIP string) (*net.Interface, net.IP, net.IP, error) {
 	routeCache.once.Do(func() {
 		routeCache.iface, routeCache.gatewayIP, routeCache.srcIP, routeCache.err = netutil.Route(time.Second*2, sampleIP)
@@ -197,10 +231,8 @@ func (s *Scannerx) SubmitTarget(targets, ports string) (<-chan *SynxTarget, erro
 			s.rateLimit()
 			if s.config.maxOpenPorts > 0 {
 				v, ok := s.ipOpenPortMap.Load(host)
-				if ok {
-					if count, cok := v.(uint16); cok && count >= s.config.maxOpenPorts {
-						break
-					}
+				if ok && toUint16(v) >= s.config.maxOpenPorts {
+					break
 				}
 			}
 
@@ -266,10 +298,8 @@ func (s *Scannerx) SubmitTargetFromPing(res chan string, ports string) <-chan *S
 					s.rateLimit()
 				if s.config.maxOpenPorts > 0 {
 					v, ok := s.ipOpenPortMap.Load(host)
-					if ok {
-						if count, cok := v.(uint16); cok && count >= s.config.maxOpenPorts {
-							break
-						}
+					if ok && toUint16(v) >= s.config.maxOpenPorts {
+						break
 					}
 				}
 					s.callOnSubmitTask(host, port)
@@ -367,8 +397,7 @@ func (s *Scannerx) Scan(targetCh <-chan *SynxTarget) (chan *synscan.SynScanResul
 			}
 			if s.config.maxOpenPorts > 0 {
 				v, _ := s.ipOpenPortMap.LoadOrStore(host.String(), uint16(0))
-				count, _ := v.(uint16)
-				s.ipOpenPortMap.Store(host.String(), count+1)
+				s.ipOpenPortMap.Store(host.String(), toUint16(v)+1)
 			}
 
 			if _, exists := ipCountMap[host.String()]; !exists {
