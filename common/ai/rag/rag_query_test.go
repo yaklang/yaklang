@@ -483,9 +483,16 @@ func TestMUSTPASS_RAGQuery(t *testing.T) {
 		}
 	}()
 
-	t.Run("test low", func(t *testing.T) {
+	allEnhancePlans := []string{
+		vectorstore.EnhancePlanHypotheticalAnswer,
+		vectorstore.EnhancePlanGeneralizeQuery,
+		vectorstore.EnhancePlanSplitQuery,
+	}
+
+	t.Run("test_low", func(t *testing.T) {
 		results, err := SimpleQuery(db, uuid.NewString(), 5,
 			WithRAGEnhanceSearchHandler(enhanceHandler),
+			WithRAGEnhance(allEnhancePlans...),
 			WithEmbeddingClient(mockEmbedding),
 			WithRAGSimilarityThreshold(LowSimilarThresh))
 		require.NoError(t, err)
@@ -495,9 +502,10 @@ func TestMUSTPASS_RAGQuery(t *testing.T) {
 		}), uuidHypotheticalAnswer, uuidGeneralizeQuery, uuidSplitQuery)
 	})
 
-	t.Run("test mid", func(t *testing.T) {
+	t.Run("test_mid", func(t *testing.T) {
 		results, err := SimpleQuery(db, uuid.NewString(), 5,
 			WithRAGEnhanceSearchHandler(enhanceHandler),
+			WithRAGEnhance(allEnhancePlans...),
 			WithEmbeddingClient(mockEmbedding),
 			WithRAGSimilarityThreshold(MidSimilarThresh))
 		require.NoError(t, err)
@@ -507,9 +515,10 @@ func TestMUSTPASS_RAGQuery(t *testing.T) {
 		}), uuidHypotheticalAnswer, uuidGeneralizeQuery)
 	})
 
-	t.Run("test high", func(t *testing.T) {
+	t.Run("test_high", func(t *testing.T) {
 		results, err := SimpleQuery(db, uuid.NewString(), 5,
 			WithRAGEnhanceSearchHandler(enhanceHandler),
+			WithRAGEnhance(allEnhancePlans...),
 			WithEmbeddingClient(mockEmbedding),
 			WithRAGSimilarityThreshold(HighSimilarThresh))
 		require.NoError(t, err)
