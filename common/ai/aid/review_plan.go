@@ -267,7 +267,7 @@ func (pr *planRequest) generateCreateSubtaskPlan(extraPrompt string, targetPlans
 			return utils.Errorf("create subtask failed, no subtask found (<=1)")
 		}
 		return nil
-	})
+	}, aicommon.WithAIRequest_CallerLabel("create-subtasks"))
 	if err != nil {
 		return nil, err
 	}
@@ -295,7 +295,7 @@ func (pr *planRequest) freedomReviewGenerateNewPlan(extraPrompt string, rsp *Pla
 			return utils.Errorf("error extracting task from raw response: %v", err)
 		}
 		return nil
-	})
+	}, aicommon.WithAIRequest_CallerLabel("freedom-plan-review"))
 	if err != nil {
 		return nil, utils.Error(err.Error())
 	}
@@ -324,7 +324,7 @@ func (pr *planRequest) generateNewPlan(suggestion string, extraPrompt string, rs
 			return utils.Errorf("error extracting task from raw response: %v", err)
 		}
 		return nil
-	})
+	}, aicommon.WithAIRequest_CallerLabel("dynamic-plan-review"))
 	if err != nil {
 		return nil, utils.Error(err.Error())
 	}

@@ -294,7 +294,7 @@ func (m *Timeline) batchCompressOldestWithRecent(toCompress []*TimelineItem, rec
 			log.Warn("batch compress got empty reducer memory in json field")
 		}
 		return nil
-	})
+	}, WithAIRequest_CallerLabel("timeline-batch-compress"))
 	if err != nil {
 		log.Warnf("batch compress call ai failed: %v", err)
 		return

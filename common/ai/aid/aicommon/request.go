@@ -20,6 +20,7 @@ type AIRequest struct {
 	onAcquireSeq           func(int64)
 	imageDataList          []*ImageData
 	modelTier              string
+	callerLabel            string
 }
 
 func (a *AIRequest) GetStartTime() time.Time {
@@ -152,4 +153,24 @@ func (a *AIRequest) SetModelTier(tier string) {
 		return
 	}
 	a.modelTier = tier
+}
+
+func (a *AIRequest) GetCallerLabel() string {
+	if a == nil {
+		return ""
+	}
+	return a.callerLabel
+}
+
+func (a *AIRequest) SetCallerLabel(label string) {
+	if a == nil {
+		return
+	}
+	a.callerLabel = label
+}
+
+func WithAIRequest_CallerLabel(label string) AIRequestOption {
+	return func(req *AIRequest) {
+		req.callerLabel = label
+	}
 }

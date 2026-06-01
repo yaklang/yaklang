@@ -123,7 +123,8 @@ REDO:
 				return utils.Errorf("unknown action type: %s", action.ActionType())
 			}
 			return nil
-		})
+		},
+		aicommon.WithAIRequest_CallerLabel("toolcall-review-wrongtool"))
 	if transErr != nil {
 		return oldTool, true, transErr
 	}

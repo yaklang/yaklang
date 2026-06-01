@@ -404,6 +404,7 @@ func (r *ReActLoop) performAIReflection(ctx context.Context, reflection *ActionR
 
 			return nil
 		},
+		aicommon.WithAIRequest_CallerLabel("reflection"),
 	)
 
 	if err != nil {

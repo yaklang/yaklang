@@ -142,6 +142,7 @@ func (r *ReAct) _invokeToolCall_IntervalReviewWithContext(
 			}
 			return nil
 		},
+		aicommon.WithAIRequest_CallerLabel("toolcall-interval-review"),
 	)
 
 	if transErr != nil {

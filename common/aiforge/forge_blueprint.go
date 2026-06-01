@@ -192,7 +192,7 @@ func (f *ForgeBlueprint) GenerateFirstPromptWithMemoryOption(
 				return
 			}
 			config := cod.Config
-			rsp, err := config.CallAI(aicommon.NewAIRequest(prompt))
+			rsp, err := config.CallAI(aicommon.NewAIRequest(prompt, aicommon.WithAIRequest_CallerLabel("forge-blueprint")))
 			if err != nil {
 				f.ResultHandler("", utils.Errorf("render result failed: %v", err))
 				return

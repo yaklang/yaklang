@@ -183,7 +183,7 @@ func (t *AiTask) toolReviewPolicy_wrongTool(ctx context.Context, oldTool *aitool
 			return utils.Errorf("unknown action type: %s", action.ActionType())
 		}
 		return nil
-	})
+	}, aicommon.WithAIRequest_CallerLabel("tool-select"))
 	if transErr != nil {
 		return oldTool, true, transErr
 	}
@@ -231,7 +231,7 @@ func (t *AiTask) toolReviewPolicy_wrongParam(ctx context.Context, tool *aitool.T
 			invokeParams.Set(k, v)
 		}
 		return nil
-	})
+	}, aicommon.WithAIRequest_CallerLabel("tool-params"))
 	if transErr != nil || len(invokeParams) <= 0 {
 		return oldParam, transErr
 	}

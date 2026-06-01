@@ -94,6 +94,7 @@ func (t *AiTask) DeepThink(suggestion string) error {
 			}
 			return utils.Error("no any ai callback is set, cannot found ai config")
 		},
+		aicommon.WithAIRequest_CallerLabel("subtask-decomposition"),
 	)
 	if err != nil {
 		t.EmitError(err.Error())
@@ -158,6 +159,7 @@ func (t *AiTask) AdjustPlan(suggestion string) error {
 			}
 			return nil
 		},
+		aicommon.WithAIRequest_CallerLabel("dynamic-plan"),
 	)
 	if err != nil {
 		t.EmitError("error calling AI transaction: %v", err)

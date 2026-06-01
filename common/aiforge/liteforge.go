@@ -313,6 +313,14 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 	if l.PreferSpeedPriority {
 		aiCallback = cod.CallSpeedPriorityAI
 	}
+	forgeLabelName := l.ForgeName
+	if forgeLabelName == "" {
+		forgeLabelName = "LiteForge"
+	}
+	reqOpts := lo.Map(imageData, func(item *aicommon.ImageData, _ int) aicommon.AIRequestOption {
+		return aicommon.WithAIRequest_ImageData(item)
+	})
+	reqOpts = append(reqOpts, aicommon.WithAIRequest_CallerLabel(fmt.Sprintf("liteforge[%v]", forgeLabelName)))
 	transactionErr := aicommon.CallAITransactionWithFailureExtra(cod, rendered, aiCallback,
 		func(response *aicommon.AIResponse) error {
 			boundEmitter := response.BindEmitter(l.emitter)
@@ -373,9 +381,7 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 		map[string]any{
 			"liteforge_action": l.ForgeName,
 		},
-		lo.Map(imageData, func(item *aicommon.ImageData, _ int) aicommon.AIRequestOption {
-			return aicommon.WithAIRequest_ImageData(item)
-		})...,
+		reqOpts...,
 	)
 	if transactionErr != nil {
 		return nil, utils.Errorf("liteforge execute failed: %v", transactionErr)
