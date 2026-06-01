@@ -311,8 +311,8 @@ func SignServerCrtNKeyWithParams(ca []byte, key []byte, cn string, notAfter time
 		IsCA:                  false,
 	}
 
-	if !authClient {
-		template.ExtKeyUsage = nil
+	if authClient {
+		template.ExtKeyUsage = append(template.ExtKeyUsage, x509.ExtKeyUsageClientAuth)
 	}
 
 	caCertBlock, _ := pem.Decode(ca)

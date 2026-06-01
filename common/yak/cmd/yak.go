@@ -624,12 +624,19 @@ var startGRPCServerCommand = cli.Command{
 			}
 
 			if cert != nil {
-				log.Infof("use current Root CA to login (For Yakit)\n\n%v\n\n", string(cert))
+				log.Infof("Root CA (For Yakit)\n\n%v\n\n", string(cert))
 			}
 
 			serverCert, serverKey, err := tlsutils.SignServerCrtNKeyWithParams(cert, key, cn, time.Now().Add(100*365*24*time.Hour), false)
 			if err != nil {
 				return err
+			}
+			serverCertIns, err := tlsutils.ParseCertificate(serverCert)
+			if err == nil {
+				text, err := tlsutils.CertificateText(serverCertIns)
+				if err == nil {
+					log.Infof("Server Certificate Fields \n\n%s\n\n", text)
+				}
 			}
 
 			tlsConfig, err := tlsutils.GetX509ServerTlsConfig(cert, serverCert, serverKey)
