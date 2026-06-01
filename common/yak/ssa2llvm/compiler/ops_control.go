@@ -191,15 +191,6 @@ func (c *Compiler) resolvePhi(inst *ssa.Phi) error {
 		return fmt.Errorf("resolvePhi: llvm block %d not found", blockID)
 	}
 
-	llvmPreds := c.gatherLLVMPredecessors(phiBB)
-	if len(llvmPreds) == 0 {
-		for _, predBlockID := range preds {
-			if blk, ok := c.Blocks[predBlockID]; ok && !blk.IsNil() {
-				llvmPreds = append(llvmPreds, blk)
-			}
-		}
-	}
-
 	zero := llvm.ConstInt(c.inferPhiType(inst), 0, false)
 
 	prevActive := int64(0)
@@ -212,25 +203,55 @@ func (c *Compiler) resolvePhi(inst *ssa.Phi) error {
 		}
 	}()
 
-	for _, predBB := range llvmPreds {
-		val := zero
-		predID := c.blockIDForLLVM(predBB)
-		c.setInsertPointBeforeTerminator(predBB)
-		if predID > 0 {
-			if c.function != nil {
-				c.function.activeBlockID = predID
-			}
-			if edgeValID, ok := edgeByPred[predID]; ok {
-				if edgeObj, ok := fn.GetValueById(edgeValID); ok && edgeObj != nil {
-					if _, isUndef := edgeObj.(*ssa.Undefined); !isUndef {
-						if resolved, err := c.resolvePhiIncomingValue(inst, fn, predID, edgeValID); err == nil {
-							val = resolved
-						}
-					}
-				}
+	resolveEdge := func(predBlockID int64, edgeValID int64) llvm.Value {
+		if edgeValID <= 0 {
+			return zero
+		}
+		edgeObj, ok := fn.GetValueById(edgeValID)
+		if !ok || edgeObj == nil {
+			return zero
+		}
+		if undef, ok := edgeObj.(*ssa.Undefined); ok && undef != nil {
+			switch undef.Kind {
+			case ssa.UndefinedValueInValid, ssa.UndefinedMemberInValid:
+				return zero
 			}
 		}
-		c.storeSSAValue(phiID, val)
+		resolved, err := c.resolvePhiIncomingValue(inst, fn, predBlockID, edgeValID)
+		if err != nil || resolved.IsNil() {
+			return zero
+		}
+		return resolved
+	}
+
+	emitPredStore := func(predBlockID int64, edgeValID int64) {
+		predBB, ok := c.Blocks[predBlockID]
+		if !ok || predBB.IsNil() {
+			return
+		}
+		c.setInsertPointBeforeTerminator(predBB)
+		if c.function != nil {
+			c.function.activeBlockID = predBlockID
+		}
+		c.storeSSAValue(phiID, resolveEdge(predBlockID, edgeValID))
+	}
+
+	// Prefer SSA predecessor order (aligned with phi edges) over LLVM CFG discovery.
+	if len(preds) > 0 {
+		for i, predBlockID := range preds {
+			edgeValID := edgeByPred[predBlockID]
+			if edgeValID == 0 && i < len(edges) {
+				edgeValID = edges[i]
+			}
+			emitPredStore(predBlockID, edgeValID)
+		}
+		return nil
+	}
+
+	llvmPreds := c.gatherLLVMPredecessors(phiBB)
+	for _, predBB := range llvmPreds {
+		predID := c.blockIDForLLVM(predBB)
+		emitPredStore(predID, edgeByPred[predID])
 	}
 
 	return nil
