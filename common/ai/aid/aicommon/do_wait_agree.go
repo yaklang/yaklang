@@ -269,6 +269,6 @@ func DefaultAIAssistantRiskControl(ctx context.Context, config *Config, ep *Endp
 			score = 1.0
 		}
 		return nil
-	})
+	}, WithAIRequest_CallerLabel("user-satisfaction-review"))
 	return action, err
 }

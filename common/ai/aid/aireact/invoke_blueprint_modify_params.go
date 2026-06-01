@@ -50,6 +50,7 @@ func (r *ReAct) invokeBlueprintReviewModifyParams(
 			}
 			return nil
 		},
+		aicommon.WithAIRequest_CallerLabel("blueprint-modify-params"),
 	)
 	if err != nil {
 		return nil, nil, false, err

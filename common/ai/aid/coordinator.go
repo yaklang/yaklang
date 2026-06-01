@@ -273,7 +273,8 @@ func (c *Coordinator) HandleSearch(query string, items *omap.OrderedMap[string, 
 				return nil
 			}
 			return utils.Errorf("no tool found")
-		})
+		},
+		aicommon.WithAIRequest_CallerLabel("keyword-search"))
 	if err != nil {
 		return nil, err
 	}

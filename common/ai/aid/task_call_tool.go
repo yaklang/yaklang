@@ -138,7 +138,7 @@ func (t *AiTask) toolResultDecision(result *aitool.ToolResult, targetTool *aitoo
 		t.EmitInfo("tool[%v] and next do the action: %v", targetTool.Name, action.Name())
 		t.EmitToolCallDecision(result.ToolCallID, action.Name(), t.GetSummary())
 		return nil
-	})
+	}, aicommon.WithAIRequest_CallerLabel("tool-decision"))
 	if err != nil {
 		t.EmitWarning("no action found, using default action, finished")
 		return "", err

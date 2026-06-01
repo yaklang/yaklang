@@ -324,6 +324,12 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 			c.AiAutoRetry = 1
 		}
 
+		callerLabel := request.GetCallerLabel()
+		if callerLabel == "" {
+			callerLabel = "unknown"
+			log.Warn("untracked AI communication detected (no callerLabel set), caller should use WithAIRequest_CallerLabel")
+		}
+
 		start := time.Now()
 		for _idx := 0; _idx < int(c.AiAutoRetry); {
 			rsp, err = i(wrapCallerWithTierConsumption(outConfig, tier), request)
@@ -374,8 +380,8 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 				now := time.Now()
 				du := now.Sub(start)
 				origRsp.SetFirstOutputByteTime(now)
-				c.EmitInfo("ai response from %v:%v first byte cost: %v",
-					origRsp.GetProviderName(), origRsp.GetModelName(), du.String())
+				c.EmitInfo("[%s] ai response from %v:%v first byte cost: %v",
+					callerLabel, origRsp.GetProviderName(), origRsp.GetModelName(), du.String())
 
 				outConfig.Add(1)
 				go func() {
@@ -389,6 +395,7 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 					"model_name":    origRsp.GetModelName(),
 					"provider_name": origRsp.GetProviderName(),
 					"model_tier":    string(tier),
+					"caller_label":  callerLabel,
 				})
 			}, func() {
 				usageMetrics := c.finalizeTierConsumption(tier, int64(tokenSize), origRsp)
@@ -409,8 +416,8 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 				if outputDuration.Seconds() > 0 {
 					tokenRate = float64(outputTokens) / outputDuration.Seconds()
 				}
-				c.EmitInfo("ai response from %v:%v cost: %v, output duration: %v, %.1f token/s",
-					provider, model, du, outputDuration, tokenRate)
+				c.EmitInfo("[%s] ai response from %v:%v cost: %v, output duration: %v, %.1f token/s",
+					callerLabel, provider, model, du, outputDuration, tokenRate)
 				c.EmitJSON(schema.EVENT_TYPE_PRESSURE, "system", map[string]any{
 					"current_cost_token_size": inputTokens,
 					"pressure_token_size":     c.AiCallTokenLimit,
@@ -435,6 +442,7 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 					"cache_hit_token":         cacheHitTokens,
 					"token_source":            usageMetrics.TokenSource,
 					"output_duration_ms":      outputDuration.Milliseconds(),
+					"caller_label":            callerLabel,
 				})
 				firstByteCostMs := int64(0)
 				if !firstByteTime.IsZero() {
@@ -456,6 +464,7 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 					"total_tokens":            totalTokens,
 					"cache_hit_token":         cacheHitTokens,
 					"token_source":            usageMetrics.TokenSource,
+					"caller_label":            callerLabel,
 				})
 				if outputBytes == 0 {
 					rawDump := origRsp.GetRawHTTPResponseDump()

@@ -610,7 +610,7 @@ func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) 
 		}
 
 		return nil
-	})
+	}, WithAIRequest_CallerLabel("toolcall-params"))
 	if err != nil {
 		emitter.EmitError("error calling AI for tool[%v] params: %v", tool.Name, err)
 		handleError(fmt.Sprintf("error calling AI for tool[%v] params: %v", tool.Name, err))

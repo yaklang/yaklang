@@ -415,7 +415,7 @@ func (t *AiTask) generateTaskSummary(summary, nextMovements string) error {
 			return utils.Errorf("error: short summary ,stats summary ,long summary are empty, retry it until summary finished")
 		}
 		return nil
-	})
+	}, aicommon.WithAIRequest_CallerLabel("task-summary"))
 	if longSummary == "" && taskSummary != "" {
 		var event *schema.AiOutputEvent
 		event, err = t.EmitTextMarkdownStreamEvent("summary-long", strings.NewReader(taskSummary), t.GetIndex())

@@ -81,6 +81,7 @@ func (r *ReAct) invokeBlueprintReviewChangeBlueprint(
 			selectedForge = selected
 			return nil
 		},
+		aicommon.WithAIRequest_CallerLabel("blueprint-re-select"),
 	)
 	if err != nil {
 		return nil, nil, false, err
@@ -120,6 +121,7 @@ func (r *ReAct) invokeBlueprintReviewChangeBlueprint(
 			}
 			return nil
 		},
+		aicommon.WithAIRequest_CallerLabel("blueprint-re-select-params"),
 	)
 	if err != nil {
 		return nil, nil, false, err

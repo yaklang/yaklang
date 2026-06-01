@@ -302,7 +302,7 @@ func DefaultAIPlanReviewControl(ctx context.Context, config *Config, ep *Endpoin
 		suggestion = action.GetString("suggestion")
 		reason = action.GetString("reason")
 		return nil
-	})
+	}, WithAIRequest_CallerLabel("plan-review"))
 	if err != nil {
 		return nil, fmt.Errorf("plan review AI transaction failed: %w", err)
 	}
@@ -368,7 +368,7 @@ func DefaultAITaskReviewControl(ctx context.Context, config *Config, ep *Endpoin
 		taskDeltaSummary = action.GetString("task_delta_summary")
 		taskDeltasArray = action.GetInvokeParamsArray("task_deltas")
 		return nil
-	})
+	}, WithAIRequest_CallerLabel("task-review"))
 	if err != nil {
 		return nil, fmt.Errorf("task review AI transaction failed: %w", err)
 	}

@@ -223,6 +223,7 @@ func (r *ReAct) invokeBlueprint(forgeName string) (*schema.AIForge, aitool.Invok
 				fmt.Sprintf("Parameters for '%s': %v", forgeName, utils.ShrinkString(utils.InterfaceToString(forgeParams), 200)))
 			return nil
 		},
+		aicommon.WithAIRequest_CallerLabel("blueprint"),
 	)
 	if err != nil {
 		r.Emitter.EmitError(fmt.Sprintf("Failed to prepare AI Blueprint '%s': %v", forgeName, err))

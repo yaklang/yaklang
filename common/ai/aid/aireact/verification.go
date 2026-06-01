@@ -320,6 +320,7 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 			emitVerificationReferenceMaterials(boundEmitter, rawResponse.String())
 			return nil
 		},
+		aicommon.WithAIRequest_CallerLabel("verification"),
 	)
 	if transErr != nil {
 		log.Errorf("AI transaction failed during verification: %v", transErr)
