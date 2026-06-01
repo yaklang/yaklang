@@ -36,11 +36,13 @@ func init() {
 				reactloops.WithAllowPlanAndExec(false),
 				reactloops.WithAllowToolCall(false),
 				reactloops.WithInitTask(buildInitTask(r)),
-				reactloops.WithMaxIterations(int(r.GetConfig().GetMaxIterationCount())),
 				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
 				reactloops.WithPersistentInstruction(instruction),
 				reactloops.WithReflectionOutputExample(outputExample),
-				reactloops.WithMaxIterations(3), // 支持多轮单条搜索
+				// 默认 3 轮(支持多轮单条搜索); 当调用方显式配置了较小的迭代数(1-10)时遵循该配置.
+				// 全局默认 MaxIterationCount=100, 此时 clamp 不命中, 仍保持原有 3 轮行为.
+				// 关键词: knowledge_enhance max iterations, honor config, clamp 1-10
+				reactloops.WithMaxIterations(knowledgeEnhanceMaxIterations(r)),
 				reactloops.WithActionFilter(func(action *reactloops.LoopAction) bool {
 					allowActionNames := []string{
 						"search_knowledge_semantic",
@@ -102,6 +104,22 @@ AI会根据用户问题从附加资源中尽可能多地收集相关信息，这
 	if err != nil {
 		log.Errorf("register reactloop: %v failed: %v", schema.AI_REACT_LOOP_NAME_KNOWLEDGE_ENHANCE, err)
 	}
+}
+
+// knowledgeEnhanceMaxIterations 计算知识增强循环的最大迭代次数.
+func knowledgeEnhanceMaxIterations(r aicommon.AIInvokeRuntime) int {
+	return clampKnowledgeEnhanceIterations(int(r.GetConfig().GetMaxIterationCount()))
+}
+
+// clampKnowledgeEnhanceIterations 默认 3 轮(支持多轮单条搜索); 仅当调用方显式配置了较小的
+// 迭代数 (1-10) 时遵循该配置, 避免全局默认值 (100) 导致循环过多.
+// 关键词: clamp max iterations, honor small config, default 3
+func clampKnowledgeEnhanceIterations(cfgMax int) int {
+	const defaultIterations = 3
+	if cfgMax > 0 && cfgMax <= 10 {
+		return cfgMax
+	}
+	return defaultIterations
 }
 
 // DefaultKnowledgeSampleCount 默认获取的知识库样本数量

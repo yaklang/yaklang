@@ -283,12 +283,22 @@ func (s *RAGHTTPServer) buildAIEngineOptions(ctx context.Context, sessionID stri
 		}
 	}
 
-	extOpts := make([]aicommon.ConfigOption, 0, 2)
+	extOpts := make([]aicommon.ConfigOption, 0, 4)
 	if qualityCb != nil {
 		extOpts = append(extOpts, aicommon.WithQualityPriorityAICallback(qualityCb))
 	}
 	if lightCb != nil {
 		extOpts = append(extOpts, aicommon.WithSpeedPriorityAICallback(lightCb))
+	}
+	// 禁用记忆系统: 用 no-op triage 替换默认 aimem, 彻底关闭记忆构建/入库/检索, 更快更省
+	// 关键词: disable memory, NoOpMemoryTriage, no memory build/store/search
+	if s.config.DisableMemory {
+		extOpts = append(extOpts, aicommon.WithNoOpMemoryTriage())
+	}
+	// 自定义系统/预设提示词: 作为 USER_PRESET 注入每次请求 (超长由引擎自动截断)
+	// 关键词: custom system prompt, WithUserPresetPrompt, persona
+	if prompt := strings.TrimSpace(s.config.SystemPrompt); prompt != "" {
+		extOpts = append(extOpts, aicommon.WithUserPresetPrompt(prompt))
 	}
 	if len(extOpts) > 0 {
 		opts = append(opts, aiengine.WithExtOptions(extOpts...))

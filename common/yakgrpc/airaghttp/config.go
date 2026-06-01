@@ -58,6 +58,16 @@ type RAGServerConfig struct {
 	// 回答语言偏好
 	Language string `yaml:"language"`
 
+	// Title 前端页面标题与左上角品牌名 (默认 "RAG 知识库")
+	Title string `yaml:"title"`
+
+	// DisableMemory 是否禁用记忆系统 (默认 true: 不构建/不入库/不检索记忆, 更快更省)
+	DisableMemory bool `yaml:"disable_memory"`
+
+	// SystemPrompt 自定义系统/预设提示词, 作为 USER_PRESET 注入每次请求
+	// 超长(>约4000 token)由引擎自动截断.
+	SystemPrompt string `yaml:"system_prompt"`
+
 	// 知识库来源
 	// Collections 为空时使用 profile DB 内全部已存在集合.
 	Collections []string `yaml:"collections"`
@@ -89,10 +99,13 @@ func NewDefaultConfig() *RAGServerConfig {
 		AuthToken:    "",
 		Concurrent:   3,
 		Timeout:      180,
-		MaxIteration: 1,
-		Language:     "zh",
-		Collections:  nil,
-		RagFiles:     nil,
+		MaxIteration:  1,
+		Language:      "zh",
+		Title:         DefaultTitle,
+		DisableMemory: true,
+		SystemPrompt:  "",
+		Collections:   nil,
+		RagFiles:      nil,
 		AI: AIServiceConfig{
 			Type:   "aibalance",
 			Model:  "",
@@ -112,6 +125,9 @@ func NewDefaultConfig() *RAGServerConfig {
 // LightweightModelName 未配置自定义 AI 时使用的默认轻量模型 (aibalance)
 // 关键词: lightweight default model, memfit-light-free, fallback standard
 const LightweightModelName = "memfit-light-free"
+
+// DefaultTitle 前端默认标题
+const DefaultTitle = "RAG 知识库"
 
 // LoadConfigFromFile 从 yaml 文件加载配置 (缺省字段以默认值兜底)
 // 关键词: rag-server.yaml load, yaml.Unmarshal, default fallback
@@ -151,10 +167,19 @@ auth_token: %q
 # ---------- Concurrency & timeout ----------
 concurrent: %d        # max simultaneous chat (SSE) requests
 timeout: %d          # per chat request timeout in seconds
-max_iteration: %d      # ReAct max iterations
+max_iteration: %d      # knowledge-enhance iterations (effective range 1-10; 1 = fastest)
 
 # ---------- Answer language ----------
 language: %q          # zh or en
+
+# ---------- Customization ----------
+title: %q   # web page title and top-left brand name
+# disable_memory: true (default) skips memory build/store/search -> faster & cheaper.
+#   set to false to let the engine accumulate and reuse memories.
+disable_memory: %t
+# system_prompt: extra preset prompt injected into every request (USER_PRESET,
+#   ~4000 tokens max, auto-truncated). Use it to set persona / answering rules.
+system_prompt: ""
 
 # ---------- Knowledge sources ----------
 # collections: leave empty ([]) to use ALL existing collections in the profile DB
@@ -193,6 +218,8 @@ debug: false
 		c.AuthToken,
 		c.Concurrent, c.Timeout, c.MaxIteration,
 		c.Language,
+		c.Title,
+		c.DisableMemory,
 		LightweightModelName,
 		c.AI.Type,
 		c.AILightweight.Type,
@@ -239,6 +266,9 @@ func (c *RAGServerConfig) fillDefaults() {
 	}
 	if c.Language == "" {
 		c.Language = "zh"
+	}
+	if c.Title == "" {
+		c.Title = DefaultTitle
 	}
 	if c.AI.Type == "" {
 		c.AI.Type = "aibalance"
@@ -335,6 +365,28 @@ func WithLanguage(lang string) Option {
 	return func(c *RAGServerConfig) {
 		if lang != "" {
 			c.Language = lang
+		}
+	}
+}
+
+func WithTitle(title string) Option {
+	return func(c *RAGServerConfig) {
+		if title != "" {
+			c.Title = title
+		}
+	}
+}
+
+func WithDisableMemory(disable bool) Option {
+	return func(c *RAGServerConfig) {
+		c.DisableMemory = disable
+	}
+}
+
+func WithSystemPrompt(prompt string) Option {
+	return func(c *RAGServerConfig) {
+		if prompt != "" {
+			c.SystemPrompt = prompt
 		}
 	}
 }

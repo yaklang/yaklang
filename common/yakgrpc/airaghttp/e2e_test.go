@@ -204,6 +204,51 @@ func TestE2E_FrontendServed(t *testing.T) {
 	}
 }
 
+// TestE2E_FrontendCustomTitle 自定义 title 应注入页面与 /health, 且占位符被替换
+func TestE2E_FrontendCustomTitle(t *testing.T) {
+	db, embedder, collectionName, cleanup := setupMockKnowledgeBase(t)
+	defer cleanup()
+
+	const customTitle = "Yak Project QA"
+	cfg := NewDefaultConfig()
+	cfg.Collections = []string{collectionName}
+	cfg.Title = customTitle
+	server, err := newRAGHTTPServerWithDeps(cfg, db, embedder)
+	if err != nil {
+		t.Fatalf("create server failed: %v", err)
+	}
+	ts := httptest.NewServer(server)
+	defer ts.Close()
+
+	resp, err := http.Get(ts.URL + "/")
+	if err != nil {
+		t.Fatalf("GET / failed: %v", err)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	page := string(body)
+	if !strings.Contains(page, customTitle) {
+		t.Fatalf("frontend html missing custom title %q", customTitle)
+	}
+	if strings.Contains(page, "__RAG_TITLE__") {
+		t.Fatalf("frontend title placeholder was not replaced")
+	}
+	if strings.Contains(page, "RAG 知识库") {
+		t.Fatalf("default title should have been replaced by custom title")
+	}
+
+	// /health 也应返回该 title
+	hResp, err := http.Get(ts.URL + "/api/rag-server/health")
+	if err != nil {
+		t.Fatalf("GET /health failed: %v", err)
+	}
+	hBody, _ := io.ReadAll(hResp.Body)
+	hResp.Body.Close()
+	if !strings.Contains(string(hBody), customTitle) {
+		t.Fatalf("/health missing custom title, got %s", string(hBody))
+	}
+}
+
 // TestE2E_FrontendDisabled 关闭前端时根路径应 404
 func TestE2E_FrontendDisabled(t *testing.T) {
 	db, embedder, collectionName, cleanup := setupMockKnowledgeBase(t)

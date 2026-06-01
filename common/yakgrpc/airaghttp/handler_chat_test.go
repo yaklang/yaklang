@@ -104,6 +104,9 @@ func TestGenerateConfigTemplate(t *testing.T) {
 	require.Contains(t, tpl, "api_key")
 	require.Contains(t, tpl, "route_prefix")
 	require.Contains(t, tpl, "ai_lightweight", "template should expose lightweight ai block")
+	require.Contains(t, tpl, "title:", "template should expose title")
+	require.Contains(t, tpl, "disable_memory:", "template should expose disable_memory")
+	require.Contains(t, tpl, "system_prompt:", "template should expose system_prompt")
 	require.NotContains(t, tpl, "ai_tier", "ai_tier should be removed")
 
 	dir := t.TempDir()
@@ -122,6 +125,9 @@ func TestGenerateConfigTemplate(t *testing.T) {
 	require.Equal(t, 9093, cfg.Port)
 	require.Equal(t, "/api/rag-server", cfg.RoutePrefix)
 	require.True(t, cfg.ServeFrontend)
+	require.Equal(t, DefaultTitle, cfg.Title)
+	require.True(t, cfg.DisableMemory, "memory disabled by default")
+	require.Equal(t, 1, cfg.MaxIteration, "default 1 iteration")
 	// 默认模板未填 api_key -> 未配置 -> 回退轻量模型
 	require.False(t, cfg.IsAIConfigured())
 

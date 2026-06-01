@@ -37,12 +37,14 @@ func (s *RAGHTTPServer) aiModeInfo() map[string]interface{} {
 func (s *RAGHTTPServer) handleHealth(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"ok":              true,
+		"title":           s.config.Title,
 		"collectionCount": len(s.readyCollections),
 		"collections":     s.readyCollections,
 		"concurrent":      s.config.Concurrent,
 		"inflight":        s.getInflight(),
 		"language":        s.config.Language,
 		"maxIteration":    s.config.MaxIteration,
+		"memoryDisabled":  s.config.DisableMemory,
 		"timeout":         s.config.Timeout,
 		"authRequired":    s.config.AuthToken != "",
 		"ai":              s.aiModeInfo(),
