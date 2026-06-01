@@ -1,0 +1,10 @@
+{"id":"q01","query":"密码重置漏洞如何利用","mode":"semantic","kb":["逻辑漏洞"],"expected":[]}
+{"id":"q02","query":"验证码绕过攻击方法","mode":"semantic","kb":["逻辑漏洞"],"expected":[]}
+{"id":"q03","query":"未授权访问漏洞检测","mode":"semantic","kb":["逻辑漏洞"],"expected":[]}
+{"id":"q04","query":"越权操作","mode":"keyword","kb":["逻辑漏洞"],"expected":[]}
+{"id":"q05","query":"短信轰炸","mode":"keyword","kb":["逻辑漏洞"],"expected":[]}
+{"id":"q06","query":"支付逻辑漏洞","mode":"semantic","kb":["逻辑漏洞"],"expected":[]}
+{"id":"q07","query":"会话固定攻击","mode":"semantic","kb":["逻辑漏洞"],"expected":[]}
+{"id":"q08","query":"IDOR 漏洞如何测试","mode":"semantic","kb":["逻辑漏洞"],"expected":[]}
+{"id":"q09","query":"权限绕过","mode":"keyword","kb":["逻辑漏洞"],"expected":[]}
+{"id":"q10","query":"业务逻辑缺陷导致的安全问题有哪些","mode":"semantic","kb":["逻辑漏洞"],"expected":[]}

@@ -523,7 +523,7 @@ func NewRAGQueryConfig(opts ...CollectionQueryOption) *CollectionQueryConfig {
 		MsgCallBack:          nil,
 		CollectionNumLimit:   5,
 		CollectionScoreLimit: 0.3,
-		EnhancePlan:          []string{EnhancePlanHypotheticalAnswer, EnhancePlanGeneralizeQuery, EnhancePlanSplitQuery, EnhancePlanExactKeywordSearch},
+		EnhancePlan:          []string{EnhancePlanHypotheticalAnswer, EnhancePlanExactKeywordSearch},
 		Ctx:                  context.Background(),
 		EnhanceSearchHandler: enhancesearch.NewDefaultSearchHandler(),
 	}

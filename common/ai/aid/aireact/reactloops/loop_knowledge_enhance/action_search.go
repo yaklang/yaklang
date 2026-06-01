@@ -67,24 +67,21 @@ func makeSearchAction(r aicommon.AIInvokeRuntime, mode string) reactloops.ReActL
 			return nil
 		},
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
-			// 记录新知识
+			// 记录新知识：独立存储每轮结果，仅拼接截断预览到 summary，不再二次压缩
 			feedNewKnowledge := func(knowledge string, query string) {
-				var finalKnowledge string
-				oldKnowledges := loop.Get("search_results_summary")
-				if oldKnowledges == "" {
-					finalKnowledge = knowledge
-				} else {
-					newKnowledge := oldKnowledges + "\n\n" + knowledge
-					ctx := loop.GetCurrentTask().GetContext()
-					compressNewKnowledge, err := loop.GetInvoker().CompressLongTextWithDestination(ctx, newKnowledge, query, 10*1024)
-					if err != nil {
-						log.Warnf("failed to compress accumulated knowledge: %v", err)
-						finalKnowledge = newKnowledge
-					} else {
-						finalKnowledge = compressNewKnowledge
-					}
+				searchCountStr := loop.Get("search_count")
+				loop.Set(fmt.Sprintf("round_result_%s", searchCountStr), knowledge)
+
+				oldSummary := loop.Get("search_results_summary")
+				preview := knowledge
+				if len(preview) > 2000 {
+					preview = preview[:2000] + "\n...(truncated)"
 				}
-				loop.Set("search_results_summary", finalKnowledge)
+				if oldSummary != "" {
+					loop.Set("search_results_summary", oldSummary+"\n\n---\n\n"+preview)
+				} else {
+					loop.Set("search_results_summary", preview)
+				}
 			}
 
 			loop.LoadingStatus(fmt.Sprintf("执行搜索中 - search_knowledge:%s / executing search - mode:%s", mode, mode))
@@ -133,8 +130,8 @@ func makeSearchAction(r aicommon.AIInvokeRuntime, mode string) reactloops.ReActL
 				// 关键字模式：关键字已在 action 中提供，跳过关键字生成，仅使用精准关键词搜索
 				enhancePlans = []string{"exact_keyword_search"}
 			} else {
-				// 语义模式：使用完整增强流程（HyDE、泛化查询、拆分查询）
-				enhancePlans = []string{"hypothetical_answer", "generalize_query", "split_query"}
+			// 语义模式：HyDE 语义召回 + 精准关键词结构化召回，砍掉 ROI 低的泛化/拆分
+			enhancePlans = []string{"hypothetical_answer", "exact_keyword_search"}
 			}
 
 			log.Infof("prepared for queryToUse: %s", queryToUse)
@@ -178,7 +175,7 @@ func makeSearchAction(r aicommon.AIInvokeRuntime, mode string) reactloops.ReActL
 				if mode == "keyword" {
 					searchTechDesc = "关键字精准搜索(exact_keyword_search)"
 				} else {
-					searchTechDesc = "语义搜索(hypothetical_answer, generalize_query, split_query)"
+					searchTechDesc = "语义搜索(hypothetical_answer, exact_keyword_search)"
 				}
 				feedback := fmt.Sprintf("搜索条件: '%s'\n搜索技术: %s\n结果: 无法从知识库中挑选出与用户需求相关的知识片段。\n\n请 rewrite 搜索条件，尝试使用不同的关键词或表述方式重新搜索。", queryToUse, searchTechDesc)
 				op.Feedback(feedback)
@@ -406,7 +403,7 @@ func evaluateNextMovements(
 		return EvaluateResult{Finished: true, Summary: "template render failed"}
 	}
 
-	forgeResult, err := invoker.InvokeLiteForge(
+	forgeResult, err := invoker.InvokeSpeedPriorityLiteForge(
 		ctx,
 		"evaluate-next-movements",
 		materials,

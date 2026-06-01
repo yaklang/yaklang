@@ -1,0 +1,337 @@
+// bench_knowledge_optimize.yak
+//
+// knowledge_enhance loop optimization benchmark script.
+// Runs 3 queries against different knowledge bases, collects AI call count,
+// end-to-end latency, artifact count and final document size.
+// Outputs a JSON report file and prints a human-readable summary table.
+//
+// When --compare is provided, loads a previous baseline JSON and prints
+// a side-by-side diff table.
+//
+// Usage (from yaklang repo root):
+//   go run common/yak/cmd/yak.go \
+//       common/ai/aid/aireact/reactloops/loop_knowledge_enhance/examples/bench_knowledge_optimize.yak \
+//       --output baseline.json
+//
+//   go run common/yak/cmd/yak.go \
+//       common/ai/aid/aireact/reactloops/loop_knowledge_enhance/examples/bench_knowledge_optimize.yak \
+//       --output optimized.json --compare baseline.json
+
+outputFile = cli.String("output", cli.setDefault("bench_knowledge_result.json"),
+    cli.setHelp("output JSON file path for benchmark results"))
+compareFile = cli.String("compare", cli.setDefault(""),
+    cli.setHelp("path to a previous baseline JSON to compare against"))
+timeoutSec = cli.Int("timeout", cli.setDefault(300),
+    cli.setHelp("timeout in seconds for each query"))
+aiType = cli.String("ai-type", cli.setDefault("aibalance"),
+    cli.setHelp("AI provider name"))
+cli.check()
+
+// =========================================================================
+// Test cases: 3 queries x different knowledge bases
+// =========================================================================
+testCases = []
+
+tc1 = {"id": "Q1", "kb": "CWE KnowledgeBase", "query": "CWE-89 SQL Injection detection and remediation methods"}
+tc1["prompt"] = "Please search the attached knowledge base for information about CWE-89 SQL Injection.\n\nRequirements:\n1. Detection methods for SQL injection vulnerabilities\n2. Remediation and prevention techniques\n3. Concrete examples or code patterns"
+testCases = append(testCases, tc1)
+
+tc2 = {"id": "Q2", "kb": "AI Tools and Skills", "query": "How to use AI for code auditing and vulnerability analysis"}
+tc2["prompt"] = "Please search the attached knowledge base for information about using AI in security analysis.\n\nRequirements:\n1. AI-assisted code auditing techniques\n2. Vulnerability analysis with AI tools\n3. Practical workflows and best practices"
+testCases = append(testCases, tc2)
+
+tc3 = {"id": "Q3", "kb": "Yaklang AI KnowledgeBase", "query": "Yaklang SSA compilation and SyntaxFlow query syntax"}
+tc3["prompt"] = "Please search the attached knowledge base for information about Yaklang SSA and SyntaxFlow.\n\nRequirements:\n1. SSA compilation mechanism in Yaklang\n2. SyntaxFlow query language syntax and usage\n3. Examples of SyntaxFlow rules"
+testCases = append(testCases, tc3)
+
+// =========================================================================
+// Run a single test case and return metrics
+// =========================================================================
+func runSingleBenchmark(tc) {
+    id = tc["id"]
+    kb = tc["kb"]
+    prompt = tc["prompt"]
+
+    log.info("============================================================")
+    log.info("  [%s] KB=%s", id, kb)
+    log.info("  Query: %s", tc["query"])
+    log.info("============================================================")
+
+    aiCallCount = 0
+    artifactFiles = []
+    finalDocFilename = ""
+    mu = sync.NewMutex()
+
+    startTime = time.Now()
+
+    err = aim.InvokeReAct(
+        prompt,
+        aim.focus("knowledge_enhance"),
+        aim.aiConfig(aiType),
+        aim.timeout(timeoutSec),
+        aim.maxIteration(5),
+        aim.yoloMode(),
+        aim.allowUserInteract(false),
+        aim.attachedKnowledgeBase(kb),
+        aim.onEvent(func(react, event) {
+            eventType = string(event.Type)
+            contentText = string(event.Content)
+
+            if eventType == "ai_first_byte_cost_ms" {
+                mu.Lock()
+                aiCallCount++
+                mu.Unlock()
+            }
+
+            if eventType == "filesystem_pin_filename" {
+                try {
+                    jsonData = json.loads(contentText)
+                    if jsonData != nil && jsonData["path"] != nil {
+                        path = jsonData["path"]
+                        mu.Lock()
+                        if str.Contains(path, "knowledge_round_") {
+                            artifactFiles = append(artifactFiles, path)
+                        }
+                        if str.Contains(path, "knowledge_enhance_final_") {
+                            finalDocFilename = path
+                        }
+                        mu.Unlock()
+                    }
+                } catch e {
+                    // ignore parse errors
+                }
+            }
+        }),
+        aim.onFinished(func(react) {
+            log.info("[%s] finished callback fired", id)
+        }),
+    )
+
+    endTime = time.Now()
+    durationSec = endTime.Unix() - startTime.Unix()
+
+    if err != nil {
+        log.warn("[%s] InvokeReAct returned error: %v", id, err)
+    }
+
+    // Collect artifact bytes
+    artifactTotalBytes = 0
+    for fi = 0; fi < len(artifactFiles); fi++ {
+        f = artifactFiles[fi]
+        if file.IsExisted(f) {
+            content, readErr = file.ReadFile(f)
+            if readErr == nil {
+                artifactTotalBytes += len(content)
+            }
+        }
+    }
+
+    // Collect final doc bytes
+    finalDocBytes = 0
+    hasFinalDoc = false
+    if finalDocFilename != "" && file.IsExisted(finalDocFilename) {
+        content, readErr = file.ReadFile(finalDocFilename)
+        if readErr == nil {
+            finalDocBytes = len(content)
+            hasFinalDoc = true
+        }
+    }
+
+    result = {
+        "id":                  id,
+        "kb":                  kb,
+        "query":               tc["query"],
+        "ai_call_count":       aiCallCount,
+        "total_duration_sec":  durationSec,
+        "artifact_count":      len(artifactFiles),
+        "artifact_total_bytes": artifactTotalBytes,
+        "has_final_doc":       hasFinalDoc,
+        "final_doc_bytes":     finalDocBytes,
+        "error":               sprintf("%v", err),
+    }
+
+    log.info("[%s] AI calls=%d, duration=%ds, artifacts=%d (%d bytes), final_doc=%v (%d bytes)",
+        id, aiCallCount, durationSec, len(artifactFiles), artifactTotalBytes, hasFinalDoc, finalDocBytes)
+
+    return result
+}
+
+// =========================================================================
+// Print summary table
+// =========================================================================
+func printSummaryTable(results) {
+    log.info("============================================================")
+    log.info("  Benchmark Results: knowledge_enhance optimization")
+    log.info("============================================================")
+    log.info("  %-5s | %8s | %11s | %9s | %9s", "Query", "AI Calls", "Duration(s)", "Artifacts", "Final(KB)")
+    log.info("  %s", str.Repeat("-", 55))
+
+    totalCalls = 0
+    totalDuration = 0
+    totalArtifacts = 0
+    totalFinalKB = 0.0
+
+    for ri = 0; ri < len(results); ri++ {
+        r = results[ri]
+        finalKB = float(r["final_doc_bytes"]) / 1024.0
+        log.info("  %-5s | %8d | %11d | %9d | %9.1f",
+            r["id"], r["ai_call_count"], r["total_duration_sec"],
+            r["artifact_count"], finalKB)
+        totalCalls += r["ai_call_count"]
+        totalDuration += r["total_duration_sec"]
+        totalArtifacts += r["artifact_count"]
+        totalFinalKB += finalKB
+    }
+
+    log.info("  %s", str.Repeat("-", 55))
+    log.info("  %-5s | %8d | %11d | %9d | %9.1f",
+        "TOTAL", totalCalls, totalDuration, totalArtifacts, totalFinalKB)
+    log.info("============================================================")
+}
+
+// =========================================================================
+// Compare with baseline
+// =========================================================================
+func printCompareTable(current, baseline) {
+    log.info("")
+    log.info("============================================================")
+    log.info("  COMPARISON: baseline vs optimized")
+    log.info("============================================================")
+    log.info("  %-5s | %18s | %18s | %8s", "Query", "AI Calls (B -> O)", "Duration (B -> O)", "Change")
+    log.info("  %s", str.Repeat("-", 62))
+
+    baseMap = {}
+    for bi = 0; bi < len(baseline); bi++ {
+        b = baseline[bi]
+        baseMap[b["id"]] = b
+    }
+
+    totalBaseCalls = 0
+    totalOptCalls = 0
+    totalBaseDur = 0
+    totalOptDur = 0
+
+    for ci = 0; ci < len(current); ci++ {
+        c = current[ci]
+        id = c["id"]
+        b = baseMap[id]
+        if b == nil {
+            log.info("  %-5s | %18s | %18s | %8s", id, "N/A", "N/A", "N/A")
+            continue
+        }
+        bCalls = b["ai_call_count"]
+        cCalls = c["ai_call_count"]
+        bDur = b["total_duration_sec"]
+        cDur = c["total_duration_sec"]
+
+        callChange = 0.0
+        if bCalls > 0 {
+            callChange = float(cCalls - bCalls) / float(bCalls) * 100.0
+        }
+
+        log.info("  %-5s | %7d -> %-7d | %7d -> %-7d | %+.0f%%",
+            id, bCalls, cCalls, bDur, cDur, callChange)
+
+        totalBaseCalls += bCalls
+        totalOptCalls += cCalls
+        totalBaseDur += bDur
+        totalOptDur += cDur
+    }
+
+    log.info("  %s", str.Repeat("-", 62))
+    totalCallChange = 0.0
+    if totalBaseCalls > 0 {
+        totalCallChange = float(totalOptCalls - totalBaseCalls) / float(totalBaseCalls) * 100.0
+    }
+    totalDurChange = 0.0
+    if totalBaseDur > 0 {
+        totalDurChange = float(totalOptDur - totalBaseDur) / float(totalBaseDur) * 100.0
+    }
+    log.info("  %-5s | %7d -> %-7d | %7d -> %-7d | calls %+.0f%%, dur %+.0f%%",
+        "TOTAL", totalBaseCalls, totalOptCalls, totalBaseDur, totalOptDur, totalCallChange, totalDurChange)
+    log.info("============================================================")
+
+    // Acceptance criteria check
+    log.info("")
+    log.info("  ACCEPTANCE CRITERIA:")
+    callReduction = -totalCallChange
+    durReduction = -totalDurChange
+    passCall = callReduction >= 60.0
+    passDur = durReduction >= 50.0
+    callStatus = "FAIL"
+    if passCall { callStatus = "PASS" }
+    durStatus = "FAIL"
+    if passDur { durStatus = "PASS" }
+    log.info("    AI call reduction: %.0f%% (target >= 60%%) %s", callReduction, callStatus)
+    log.info("    Duration reduction: %.0f%% (target >= 50%%) %s", durReduction, durStatus)
+
+    allArtifactsOk = true
+    allFinalDocOk = true
+    for ci2 = 0; ci2 < len(current); ci2++ {
+        c = current[ci2]
+        if c["artifact_count"] < 1 || c["artifact_total_bytes"] <= 50 {
+            allArtifactsOk = false
+        }
+        if !c["has_final_doc"] {
+            allFinalDocOk = false
+        }
+    }
+    artStatus = "FAIL"
+    if allArtifactsOk { artStatus = "PASS" }
+    docStatus = "FAIL"
+    if allFinalDocOk { docStatus = "PASS" }
+    log.info("    All queries have artifacts: %s", artStatus)
+    log.info("    All queries have final doc: %s", docStatus)
+    log.info("")
+}
+
+// =========================================================================
+// Main
+// =========================================================================
+log.info("knowledge_enhance optimization benchmark starting...")
+log.info("output: %s, compare: %s, ai-type: %s, timeout: %ds",
+    outputFile, compareFile, aiType, timeoutSec)
+
+results = []
+
+for i = 0; i < len(testCases); i++ {
+    tc = testCases[i]
+    log.info("running test case %d/%d ...", i+1, len(testCases))
+    r = runSingleBenchmark(tc)
+    results = append(results, r)
+}
+
+// Print summary
+printSummaryTable(results)
+
+// Save JSON output
+report = {
+    "timestamp": time.Now().Format("2006-01-02T15:04:05"),
+    "ai_type":   aiType,
+    "timeout":   timeoutSec,
+    "results":   results,
+}
+jsonBytes = json.dumps(report)
+err = file.Save(outputFile, jsonBytes)
+if err != nil {
+    log.error("failed to save report to %s: %v", outputFile, err)
+} else {
+    log.info("benchmark report saved to: %s", outputFile)
+}
+
+// Compare with baseline if provided
+if compareFile != "" && file.IsExisted(compareFile) {
+    baselineContent, readErr = file.ReadFile(compareFile)
+    if readErr != nil {
+        log.error("failed to read baseline file %s: %v", compareFile, readErr)
+    } else {
+        baselineReport = json.loads(string(baselineContent))
+        if baselineReport != nil && baselineReport["results"] != nil {
+            printCompareTable(results, baselineReport["results"])
+        } else {
+            log.error("baseline file does not contain valid results")
+        }
+    }
+}
+
+log.info("benchmark completed.")
