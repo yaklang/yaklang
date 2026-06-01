@@ -760,11 +760,10 @@ func (pc *persistConn) readLoop() {
 
 			go func(reader io.Reader, handler func([]byte, io.ReadCloser)) {
 				defer func() {
-					close(streamHandlerDone)
-					if err := recover(); err != nil {
-						log.Errorf("BodyStreamReaderHandler panic in conn pool: %v", err)
-						utils.PrintCurrentGoroutineRuntimeStack()
+					if r := recover(); r != nil {
+						log.Errorf("BodyStreamReaderHandler panic in conn pool: %v", r)
 					}
+					close(streamHandlerDone)
 				}()
 
 				// Parse header and body from stream

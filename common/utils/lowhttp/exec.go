@@ -342,9 +342,16 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 			waitStreamHandlerDone(streamHandlerDone, streamBodyReaderCh, 2*time.Second, "non-pool stream handler")
 		}
 		if option != nil && option.BodyStreamReaderHandler != nil && !bodyStreamReaderHandled.IsSet() {
-			r, w := utils.NewPipe()
-			w.Close()
-			option.BodyStreamReaderHandler([]byte{}, r)
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						log.Errorf("BodyStreamReaderHandler fallback panic: %v", r)
+					}
+				}()
+				r, w := utils.NewPipe()
+				w.Close()
+				option.BodyStreamReaderHandler([]byte{}, r)
+			}()
 		}
 	}()
 
@@ -1025,12 +1032,11 @@ RECONNECT:
 				default:
 				}
 				defer func() {
+					if r := recover(); r != nil {
+						log.Errorf("BodyStreamReaderHandler panic: %v", r)
+					}
 					bodyWriter.Close()
 					close(streamHandlerDone)
-					if err := recover(); err != nil {
-						log.Errorf("BodyStreamReaderHandler panic: %v", err)
-						utils.PrintCurrentGoroutineRuntimeStack()
-					}
 				}()
 
 				packetReader := bufio.NewReader(reader)
