@@ -57,6 +57,22 @@ func TestCorePlugin_CompileAll(t *testing.T) {
 	}
 }
 
+func TestCorePlugin_RunSSADetectNewConfig(t *testing.T) {
+	code := `
+yakit.AutoInitYakit()
+config, err = ssa.NewConfig(ssa.ModeAll, ssa.withProgramName("t"), ssa.withLanguage("php"))
+if err != nil { die("new config: %v", err) }
+if config == nil { die("config nil") }
+_, err = config.ToJSONString()
+if err != nil { die("to json: %v", err) }
+println("detect-config-ok")
+`
+	output := runBinaryWithEnv(t, code, "", map[string]string{
+		"YAKIT_HOME": t.TempDir(),
+	}, withCompilePluginType(compiler.YakPluginTypeYak))
+	require.Contains(t, output, "detect-config-ok")
+}
+
 func TestCorePlugin_RunResetKnowledgeBase(t *testing.T) {
 	code := string(coreplugin.GetCorePluginData("重置知识库"))
 	require.NotEmpty(t, code)
