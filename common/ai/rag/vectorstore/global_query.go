@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/rag/enhancesearch"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -783,7 +785,16 @@ func _query(db *gorm.DB, query string, queryId string, opts ...CollectionQueryOp
 		}
 		cols = append(cols, r)
 	}
-	status("RAG预加载用时", fmt.Sprintf("%.2fs", time.Since(start).Seconds()))
+	loadCost := time.Since(start)
+	status("RAG预加载用时", fmt.Sprintf("%.2fs", loadCost.Seconds()))
+
+	if config.CollectionNumLimit > 0 && len(cols) > config.CollectionNumLimit {
+		log.Infof("RAG collection count %d exceeds limit %d, invoking smart selection (loaded in %.2fs)",
+			len(cols), config.CollectionNumLimit, loadCost.Seconds())
+		cols = smartSelectCollections(config.Ctx, cols, query, config.CollectionNumLimit, status)
+	}
+	log.Infof("RAG query will fan out to %d collections (limit=%d, loaded in %.2fs)",
+		len(cols), config.CollectionNumLimit, loadCost.Seconds())
 
 	type subQuery struct {
 		Method      string
@@ -1051,6 +1062,7 @@ func _query(db *gorm.DB, query string, queryId string, opts ...CollectionQueryOp
 			logWriter.Write([]byte(fmt.Sprintf("%v", subquery.Query)))
 
 			currentSearchCount := int64(0)
+			subQueryStart := time.Now()
 			var queryWg sync.WaitGroup
 			for _, collectionMg := range cols { // 一个子查询的不同集合查询至少是可以并行的，
 				queryWg.Add(1)
@@ -1141,6 +1153,10 @@ func _query(db *gorm.DB, query string, queryId string, opts ...CollectionQueryOp
 				}()
 			}
 			queryWg.Wait()
+			subQueryCost := time.Since(subQueryStart)
+			log.Infof("subquery [%s] %q completed: %d results from %d collections in %.2fs",
+				subquery.Method, utils.ShrinkString(subquery.Query, 60),
+				len(subQueryResults), len(cols), subQueryCost.Seconds())
 
 			// Update sub-query info with results
 			subQueryInfo.Results = subQueryResults
@@ -1305,4 +1321,172 @@ func SimpleQuery(db *gorm.DB, query string, limit int, opts ...CollectionQueryOp
 	}
 
 	return results, nil
+}
+
+type collectionProfile struct {
+	col         *SQLiteVectorStoreHNSW
+	name        string
+	description string
+	docCount    int
+	samples     []string
+}
+
+const minDocCountThreshold = 1
+
+func smartSelectCollections(
+	ctx context.Context,
+	cols []*SQLiteVectorStoreHNSW,
+	query string,
+	limit int,
+	status func(string, string),
+) []*SQLiteVectorStoreHNSW {
+	if len(cols) <= limit {
+		return cols
+	}
+
+	status("STATUS", "智能选择知识库")
+
+	var profiles []*collectionProfile
+	for _, col := range cols {
+		info := col.GetCollectionInfo()
+		count, err := col.Count()
+		if err != nil {
+			log.Warnf("smart select: count collection %s failed: %v", info.Name, err)
+			continue
+		}
+		if count < minDocCountThreshold {
+			log.Infof("smart select: skip collection %q (count=%d < %d)", info.Name, count, minDocCountThreshold)
+			continue
+		}
+
+		var sampleTexts []string
+		docs, err := col.SampleDocuments(2)
+		if err != nil {
+			log.Warnf("smart select: sample collection %s failed: %v", info.Name, err)
+		} else {
+			for _, doc := range docs {
+				text := aicommon.ShrinkByTokens(doc.Content, 100)
+				sampleTexts = append(sampleTexts, text)
+			}
+		}
+
+		profiles = append(profiles, &collectionProfile{
+			col:         col,
+			name:        info.Name,
+			description: info.Description,
+			docCount:    count,
+			samples:     sampleTexts,
+		})
+	}
+
+	if len(profiles) <= limit {
+		result := make([]*SQLiteVectorStoreHNSW, len(profiles))
+		for i, p := range profiles {
+			result[i] = p.col
+		}
+		return result
+	}
+
+	var sb strings.Builder
+	for i, p := range profiles {
+		sb.WriteString(fmt.Sprintf("[%d] name=%q, description=%q, doc_count=%d",
+			i, p.name, p.description, p.docCount))
+		if len(p.samples) > 0 {
+			sb.WriteString(fmt.Sprintf(", sample_1=%q", p.samples[0]))
+		}
+		if len(p.samples) > 1 {
+			sb.WriteString(fmt.Sprintf(", sample_2=%q", p.samples[1]))
+		}
+		sb.WriteString("\n")
+	}
+
+	nameIndex := make(map[string]*collectionProfile, len(profiles))
+	for _, p := range profiles {
+		nameIndex[p.name] = p
+	}
+
+	promptText := fmt.Sprintf(
+		"User query: %s\n\nKnowledge base candidates:\n%s\nSelect the top %d most relevant knowledge bases for the query. "+
+			"Consider: relevance to the query topic, document count (more is better), and sample content quality. "+
+			"Return the exact name strings of the selected knowledge bases, ordered by relevance (most relevant first).",
+		query, sb.String(), limit,
+	)
+
+	forgeResult, err := aicommon.InvokeLiteForge(
+		promptText,
+		aicommon.WithContext(ctx),
+		aicommon.LiteForgeStaticInstruction(
+			"You are a knowledge base selector. Given a user query and a list of knowledge base candidates "+
+				"(each with name, description, document count, and sample entries), select the most relevant ones. "+
+				"Return the exact name strings of the selected knowledge bases as a string array, ordered by relevance."),
+		aicommon.WithLiteForgeOutputSchemaFromAIToolOptions(
+			aitool.WithStringArrayParam(
+				"selected_names",
+				aitool.WithParam_Description("Array of selected knowledge base name strings, ordered by relevance"),
+				aitool.WithParam_Required(true),
+			),
+		),
+		aicommon.WithAICallback(aicommon.MustGetSpeedPriorityAIModelCallback()),
+	)
+
+	if err != nil {
+		log.Warnf("smart select: AI ranking failed: %v, falling back to doc count sort", err)
+		return fallbackSortByDocCount(profiles, limit)
+	}
+
+	selectedNames := forgeResult.GetStringSlice("selected_names")
+	if len(selectedNames) == 0 {
+		log.Warnf("smart select: AI returned empty selection, falling back to doc count sort")
+		return fallbackSortByDocCount(profiles, limit)
+	}
+
+	seen := make(map[string]bool)
+	var selected []*SQLiteVectorStoreHNSW
+	for _, name := range selectedNames {
+		if seen[name] {
+			continue
+		}
+		p, ok := nameIndex[name]
+		if !ok {
+			log.Debugf("smart select: AI returned unknown collection name %q, skipping", name)
+			continue
+		}
+		seen[name] = true
+		selected = append(selected, p.col)
+		if len(selected) >= limit {
+			break
+		}
+	}
+
+	if len(selected) == 0 {
+		log.Warnf("smart select: no valid collections from AI response, falling back to doc count sort")
+		return fallbackSortByDocCount(profiles, limit)
+	}
+
+	chosenNames := make([]string, len(selected))
+	for i, col := range selected {
+		chosenNames[i] = col.GetName()
+	}
+	log.Infof("smart select: AI chose %d/%d collections: %v", len(selected), len(profiles), chosenNames)
+	status("STATUS", fmt.Sprintf("已选择 %d 个最相关知识库", len(selected)))
+
+	return selected
+}
+
+func fallbackSortByDocCount(profiles []*collectionProfile, limit int) []*SQLiteVectorStoreHNSW {
+	for i := 0; i < len(profiles); i++ {
+		for j := i + 1; j < len(profiles); j++ {
+			if profiles[j].docCount > profiles[i].docCount {
+				profiles[i], profiles[j] = profiles[j], profiles[i]
+			}
+		}
+	}
+	if len(profiles) > limit {
+		profiles = profiles[:limit]
+	}
+	result := make([]*SQLiteVectorStoreHNSW, len(profiles))
+	for i, p := range profiles {
+		result[i] = p.col
+	}
+	return result
 }
