@@ -40,7 +40,11 @@ func TestDNSLogServer(t *testing.T) {
 
 		if !check1 {
 			if strings.Contains(rsp.GetDomain(), token1) {
-				netx.LookupFirst(rsp.GetDomain(), netx.WithDNSServers("127.0.0.1:"+fmt.Sprint(randInt)))
+				netx.LookupFirst(rsp.GetDomain(),
+					netx.WithDNSServers("127.0.0.1:"+fmt.Sprint(randInt)),
+					netx.WithDNSDisableSystemResolver(true),
+					netx.WithDNSNoCache(true),
+				)
 				dnslogResult, err := client.QueryExistedDNSLog(context.Background(), &tpb.QueryExistedDNSLogParams{
 					Token: rsp.GetToken(),
 					Mode:  "",
@@ -55,7 +59,11 @@ func TestDNSLogServer(t *testing.T) {
 
 		if !check2 {
 			if strings.Contains(rsp.GetDomain(), token2) {
-				netx.LookupFirst(rsp.GetDomain(), netx.WithDNSServers("127.0.0.1:"+fmt.Sprint(randInt)))
+				netx.LookupFirst(rsp.GetDomain(),
+					netx.WithDNSServers("127.0.0.1:"+fmt.Sprint(randInt)),
+					netx.WithDNSDisableSystemResolver(true),
+					netx.WithDNSNoCache(true),
+				)
 				dnslogResult, err := client.QueryExistedDNSLog(context.Background(), &tpb.QueryExistedDNSLogParams{
 					Token: rsp.GetToken(),
 				})
@@ -69,7 +77,11 @@ func TestDNSLogServer(t *testing.T) {
 
 		if !check3 {
 			if strings.Contains(rsp.GetDomain(), token3) {
-				netx.LookupFirst(rsp.GetDomain(), netx.WithDNSServers("127.0.0.1:"+fmt.Sprint(randInt)))
+				netx.LookupFirst(rsp.GetDomain(),
+					netx.WithDNSServers("127.0.0.1:"+fmt.Sprint(randInt)),
+					netx.WithDNSDisableSystemResolver(true),
+					netx.WithDNSNoCache(true),
+				)
 				dnslogResult, err := client.QueryExistedDNSLog(context.Background(), &tpb.QueryExistedDNSLogParams{
 					Token: rsp.GetToken(),
 				})
