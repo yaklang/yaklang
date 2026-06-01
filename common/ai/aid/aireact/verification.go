@@ -383,9 +383,26 @@ func (r *ReAct) enforceTodoCompletionBeforeSatisfaction(result *aicommon.VerifyS
 	if r.config == nil {
 		return
 	}
+
+	if aicommon.HasNewTodoAddOps(result.NextMovements) {
+		msg := "AI declared user_satisfied=true but simultaneously added new TODO(s) via next_movements. " +
+			"This is contradictory: user_satisfied has been force-overridden to false."
+		result.Satisfied = false
+		originalReasoning := strings.TrimSpace(result.Reasoning)
+		if originalReasoning == "" {
+			result.Reasoning = "[OVERRIDE] " + msg
+		} else {
+			result.Reasoning = "[OVERRIDE] " + msg + "\n\n[AI ORIGINAL] " + originalReasoning
+		}
+		r.AddToTimeline("[VERIFICATION_TODO_INCOMPLETE]", msg)
+		log.Warnf("verification satisfied override: new TODO add ops found in next_movements, forcing user_satisfied=false")
+		return
+	}
+
 	currentTask := r.GetCurrentTask()
 	scope := aicommon.BuildVerificationTodoScope(currentTask)
 	if scope.IsZero() {
+		log.Infof("enforceTodoCompletion: scope is zero (no task id), skipping store-based check")
 		return
 	}
 
@@ -588,3 +605,4 @@ func normalizeEvidenceOperations(action *aicommon.Action) []aicommon.EvidenceOpe
 func normalizeVerifyNextMovements(action *aicommon.Action) []aicommon.VerifyNextMovement {
 	return aicommon.NormalizeVerifyNextMovements(action)
 }
+

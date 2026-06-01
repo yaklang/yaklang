@@ -129,10 +129,14 @@ var loopAction_EnhanceKnowledgeAnswer = &reactloops.LoopAction{
 			loop.GetConfig().ApplySessionEvidenceOps(verifyResult.EvidenceOps)
 		}
 
-		if verifyResult.Satisfied {
+		if verifyResult.Satisfied && !aicommon.HasNewTodoAddOps(verifyResult.NextMovements) {
 			invoker.AddToTimeline("knowledge_enhance_satisfied", `** 知识增强结果已经初步满足用户需求(Knowledge enhancement results have initially met the user's needs) **`)
 			op.Exit()
 			return
+		}
+		if verifyResult.Satisfied {
+			log.Warnf("knowledge_enhance: AI said satisfied but new TODOs were added, continuing instead of exiting")
+			verifyResult.Satisfied = false
 		}
 
 		nextStepsSummary := aicommon.FormatVerifyNextMovementsSummary(verifyResult.NextMovements)
@@ -147,3 +151,4 @@ var loopAction_EnhanceKnowledgeAnswer = &reactloops.LoopAction{
 		op.Continue()
 	},
 }
+

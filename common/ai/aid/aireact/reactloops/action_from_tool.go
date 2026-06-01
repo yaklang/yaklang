@@ -210,7 +210,7 @@ func ConvertAIToolToLoopAction(tool *aitool.Tool) *LoopAction {
 				operator.Fail(err)
 				return
 			}
-			if triggered && verifyResult != nil && verifyResult.Satisfied {
+			if triggered && verifyResult != nil && verifyResult.Satisfied && !aicommon.HasNewTodoAddOps(verifyResult.NextMovements) {
 				operator.Exit()
 				return
 			}

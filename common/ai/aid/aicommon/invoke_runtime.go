@@ -51,6 +51,15 @@ func NewVerifySatisfactionResultWithNextMovements(satisfied bool, reasoning stri
 	}
 }
 
+func HasNewTodoAddOps(movements []VerifyNextMovement) bool {
+	for _, m := range movements {
+		if strings.EqualFold(strings.TrimSpace(m.Op), "add") && strings.TrimSpace(m.Content) != "" {
+			return true
+		}
+	}
+	return false
+}
+
 func FormatVerifyNextMovementsSummary(nextMovements []VerifyNextMovement) string {
 	if len(nextMovements) == 0 {
 		return ""

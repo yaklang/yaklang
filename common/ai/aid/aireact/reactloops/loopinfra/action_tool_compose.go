@@ -306,7 +306,7 @@ Example - Sequential file operations(With AI-Tag tags):
 				loop.GetConfig().ApplySessionEvidenceOps(verifyResult.EvidenceOps)
 			}
 
-			if verifyResult.Satisfied {
+			if verifyResult.Satisfied && !aicommon.HasNewTodoAddOps(verifyResult.NextMovements) {
 				operator.Exit()
 				return
 			}

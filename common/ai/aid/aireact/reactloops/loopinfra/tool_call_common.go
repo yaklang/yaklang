@@ -99,7 +99,7 @@ func handleToolCallResult(
 		return
 	}
 
-	if verifyResult.Satisfied {
+	if verifyResult.Satisfied && !aicommon.HasNewTodoAddOps(verifyResult.NextMovements) {
 		operator.Exit()
 		return
 	}
