@@ -201,9 +201,8 @@ func (s *http2ClientStream) startBodyStreamHandler(headerRaw []byte) {
 	s.bodyStreamOnce.Do(func() {
 		go func() {
 			defer func() {
-				if err := recover(); err != nil {
-					log.Errorf("BodyStreamReaderHandler panic in http2: %v", err)
-					utils.PrintCurrentGoroutineRuntimeStack()
+				if r := recover(); r != nil {
+					log.Errorf("BodyStreamReaderHandler panic in http2: %v", r)
 				}
 			}()
 			handler(headerCopy, reader)
