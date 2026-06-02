@@ -9,6 +9,8 @@ yakmisc-*
 .idea/*
 .DS_Store
 *.db
+*.db-shm
+*.db-wal
 *.sock
 *.exe
 *.out

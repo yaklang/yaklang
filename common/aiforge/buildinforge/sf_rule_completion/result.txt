@@ -1,0 +1,71 @@
+# 结果输出
+
+补全结果通过结构化 JSON 提交，由系统合并到原始规则。使用简体中文填写描述性字段；title 保持英文。
+
+{{ .ContextProvider.OS }}-{{ .ContextProvider.Arch }}-{{ .ContextProvider.Now }}
+{{ .ContextProvider.Progress }}
+{{ .ContextProvider.PersistentMemory }}
+
+## 输出格式规范
+
+根据任务参数中的规则正文与持久化标准，按照下面 Schema 输出相应的 JSON 内容（**只输出 JSON，不需要额外解释**）。
+
+**必须确保**：
+1. `@action` 必须为 `sf_rule_completion_result`
+2. `alert` 数组条数与原文 alert 数量一致，每条 `name` 与原文一致
+3. 不要输出完整合并后的 `.sf` 正文（`rule_content` 由系统生成）
+
+```schema
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["@action", "title", "title_zh", "desc", "solution", "reference", "alert"],
+  "properties": {
+    "@action": {
+      "enum": ["sf_rule_completion_result"]
+    },
+    "title": {
+      "type": "string",
+      "description": "规则英文标题"
+    },
+    "title_zh": {
+      "type": "string",
+      "description": "规则中文标题"
+    },
+    "desc": {
+      "type": "string",
+      "description": "规则描述（以中文为主）"
+    },
+    "solution": {
+      "type": "string",
+      "description": "漏洞修复方式或安全建议（以中文为主）"
+    },
+    "reference": {
+      "type": "string",
+      "description": "参考链接或文档，无则 none"
+    },
+    "cwe": {
+      "type": "number",
+      "description": "CWE 编号，非漏洞规则可省略"
+    },
+    "alert": {
+      "type": "array",
+      "description": "与原文 alert 数量一致的数组",
+      "items": {
+        "type": "object",
+        "required": ["name", "title", "title_zh", "desc", "level", "message", "risk", "solution"],
+        "properties": {
+          "name": { "type": "string", "description": "alert 变量名，与原文一致" },
+          "title": { "type": "string", "description": "英文标题" },
+          "title_zh": { "type": "string", "description": "中文标题" },
+          "desc": { "type": "string", "description": "漏洞描述" },
+          "level": { "type": "string", "description": "critical/high/middle/low/info" },
+          "message": { "type": "string", "description": "简短提示" },
+          "risk": { "type": "string", "description": "中文风险类型" },
+          "solution": { "type": "string", "description": "修复建议" }
+        }
+      }
+    }
+  }
+}
+```

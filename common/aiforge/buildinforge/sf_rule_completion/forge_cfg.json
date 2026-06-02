@@ -1,0 +1,9 @@
+{
+	"name": "sf_rule_completion",
+	"verbose_name": "SyntaxFlow 规则补全",
+	"description": "蓝图协调：子任务 syntaxflow_rule_completion 读规则、补全、合并并落盘；Result 输出 sf_rule_completion_result。",
+	"tool_keywords": "语法流,规则补全,desc补全,alert补全,代码审计规则,SyntaxFlow,规则美化",
+	"tools": "syntaxflow_rule_completion,write_file,check_syntaxflow_syntax",
+	"actions": "sf_rule_completion_result",
+	"tags": "SyntaxFlow,规则补全,desc,alert,语法流"
+}

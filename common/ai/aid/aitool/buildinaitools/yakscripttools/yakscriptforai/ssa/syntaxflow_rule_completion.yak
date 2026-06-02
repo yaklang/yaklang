@@ -1,0 +1,269 @@
+__DESC__ = "【sf_rule_completion 子任务专用】读规则、liteforge 补全 desc/alert、内存合并并写入 suggested_path（默认 ~/yakit-projects/code/*-completed.sf）。勿在此脚本内 ExecuteForge。推荐外层走 sf_rule_completion 蓝图。"
+__VERBOSE_NAME__ = "SyntaxFlow 规则补全"
+__KEYWORDS__ = "syntaxflow,规则补全,desc,alert,sf_rule_completion,SyntaxFlow"
+
+__USAGE__ = <<<USAGE_BLOCK
+Leaf tool for sf_rule_completion forge subtask 1.
+At least one of: rule_name, file_path, file_content.
+Returns rule_content, suggested_path, written_path. By default persists merged rule to suggested_path.
+USAGE_BLOCK
+
+yakit.AutoInitYakit()
+
+ruleName = cli.String("rule_name", cli.setHelp("按名称从库查询规则"))
+filePath = cli.String("file_path", cli.setHelp("本地 .sf 路径"))
+fileContent = cli.String("file_content", cli.setHelp("规则正文（大文本用 AITAG）"))
+query = cli.String("query", cli.setHelp("可选补全说明"))
+sourceName = cli.String("source_name", cli.setHelp("用于生成输出路径的文件名"))
+writeOutput = cli.Bool("write_output", cli.setDefault(true), cli.setHelp("是否将合并结果写入 suggested_path，默认 true"))
+cli.check()
+
+persistMergedRule = func(path, content) {
+    if path == "" || content == "" {
+        return "empty path or content"
+    }
+    dir = file.GetDirPath(path)
+    if dir != "" && !file.IsExisted(dir) {
+        err = file.MkdirAll(dir)
+        if err != nil {
+            return sprintf("mkdir failed: %v", err)
+        }
+    }
+    err = file.Save(path, content)
+    if err != nil {
+        return sprintf("save failed: %v", err)
+    }
+    return ""
+}
+
+suggestedPaths = func(name) {
+    outName = "rule-completed.sf"
+    base = file.GetBase(name)
+    if base != "" {
+        if str.HasSuffix(base, ".sf") {
+            outName = base[:len(base)-3] + "-completed.sf"
+        } else {
+            outName = base + "-completed.sf"
+        }
+    }
+    dir = file.Join(yakit.GetHomeDir(), "code")
+    return outName, file.Join(dir, outName)
+}
+
+extractCompletionAction = func(res) {
+    if res == nil {
+        return nil, nil, "completion returned nil"
+    }
+    action = res.Action
+    if action == nil {
+        m = json.loads(json.dumps(res)~)
+        if m != nil {
+            action = m["Action"]
+        }
+    }
+    if action == nil {
+        return nil, nil, "completion result has no Action"
+    }
+    alertItems = action.GetInvokeParamsArray("alert")
+    if alertItems == nil {
+        alertItems = []
+    }
+    descParams = {
+        "title": action.GetString("title"),
+        "title_zh": action.GetString("title_zh"),
+        "desc": action.GetString("desc"),
+        "solution": action.GetString("solution"),
+        "reference": action.GetString("reference"),
+        "cwe": action.GetInt("cwe"),
+    }
+    if descParams["title"] == "" && descParams["title_zh"] == "" && descParams["desc"] == "" && len(alertItems) == 0 {
+        return nil, nil, "empty desc/alert in completion result"
+    }
+    return descParams, alertItems, ""
+}
+
+loadRule = func() {
+    if ruleName != "" {
+        for r := range syntaxflow.QuerySyntaxFlowRules(ruleName) {
+            return r.RuleName, r.Content, ""
+        }
+        return "", "", sprintf("未找到规则: %s", ruleName)
+    }
+    if filePath != "" {
+        if !file.IsExisted(filePath) {
+            return "", "", sprintf("文件不存在: %s", filePath)
+        }
+        raw, err = file.ReadFile(filePath)
+        if err != nil {
+            return "", "", sprintf("读取失败: %v", err)
+        }
+        if len(raw) == 0 {
+            return "", "", sprintf("文件为空: %s", filePath)
+        }
+        return filePath, string(raw), ""
+    }
+    if fileContent != "" {
+        name = filePath
+        if name == "" {
+            name = "rule.sf"
+        }
+        return name, fileContent, ""
+    }
+    return "", "", "需要 rule_name、file_path 或 file_content"
+}
+
+// 与 sfbuildin/buildin 归纳一致的中文 risk 预设（维护在本脚本，勿放到 Go）
+riskEnum = [
+    "SQL注入", "SQL 注入", "命令注入", "操作系统命令注入",
+    "远程代码执行", "远程代码执行（RCE）", "本地代码执行",
+    "代码注入", "表达式注入", "模板注入", "服务器端模板注入（SSTI）", "SPEL表达式注入",
+    "JSON注入", "XPath注入", "CRLF注入",
+    "路径遍历", "路径穿越", "目录遍历", "目录穿越",
+    "任意文件读取", "任意文件写入", "任意文件上传", "文件上传漏洞", "文件上传", "文件操作",
+    "本地文件包含", "远程文件包含",
+    "XML外部实体（XXE）", "XXE",
+    "跨站脚本（XSS）", "跨站请求伪造（CSRF）",
+    "开放重定向", "开放重定向（Open Redirect）", "URL重定向",
+    "服务端请求伪造（SSRF）", "服务端请求伪造（SSRF）/ 非预期外连",
+    "点击劫持", "会话固定", "会话劫持", "会话劫持/敏感信息明文传输", "敏感Cookie明文传输",
+    "身份认证缺陷", "身份验证绕过", "认证绕过", "身份验证不当",
+    "访问控制缺陷", "越权访问", "权限提升",
+    "敏感信息泄露", "信息泄露", "信息泄露（Information Exposure）", "隐私数据泄露",
+    "反序列化漏洞", "反序列化", "不安全反序列化", "不安全反序列化链路", "反序列化（Unserialize）",
+    "业务逻辑缺陷", "依赖组件风险", "软件成分分析（SCA）",
+    "不安全加密", "不安全加密算法", "弱加密（Risky Crypt）", "弱加密漏洞", "弱随机数",
+    "弱密码", "硬编码凭据", "硬编码凭据（Hardcoded Credentials）", "硬编码密钥", "硬编码密码",
+    "证书校验缺失", "不安全的TLS配置", "弱口令", "安全配置错误",
+    "拒绝服务（DoS）", "DDOS",
+    "资源泄漏", "错误处理", "错误处理（Error Handling）", "API误用", "api-abuse",
+    "空指针", "输入校验不当", "数据完整性",
+    "缓冲区溢出", "缓冲区溢出（Buffer Overflow）", "格式化字符串漏洞",
+    "不安全实现", "不安全内容加载", "DNS查询依赖", "审计（Audit）", "信息",
+]
+
+formatRiskPresetsForPrompt = func() {
+    lines = []
+    for i, v := range riskEnum {
+        lines = append(lines, sprintf("- %s", v))
+    }
+    return str.Join(lines, "\n")
+}
+
+completionSchema = jsonschema.NewObjectSchema(
+    jsonschema.action("sf_rule_completion_result"),
+    jsonschema.paramString("title", jsonschema.description("规则英文标题"), jsonschema.required(true)),
+    jsonschema.paramString("title_zh", jsonschema.description("规则中文标题，必填中文"), jsonschema.required(true)),
+    jsonschema.paramString("desc", jsonschema.description("规则描述，中文 markdown，≥100字"), jsonschema.required(true)),
+    jsonschema.paramString("solution", jsonschema.description("中文修复建议，≥100字；非漏洞填 none"), jsonschema.required(true)),
+    jsonschema.paramString("reference", jsonschema.description("参考链接，无则 none")),
+    jsonschema.paramNumber("cwe", jsonschema.description("CWE 编号，可选")),
+    jsonschema.paramObjectArray("alert", nil,
+        jsonschema.paramString("name", jsonschema.required(true)),
+        jsonschema.paramString("title", jsonschema.required(true)),
+        jsonschema.paramString("title_zh", jsonschema.required(true)),
+        jsonschema.paramString("desc", jsonschema.required(true)),
+        jsonschema.paramString("message", jsonschema.required(true)),
+        jsonschema.paramString("risk", jsonschema.required(true), jsonschema.enum(riskEnum...)),
+        jsonschema.paramString("solution", jsonschema.required(true)),
+    ),
+)
+
+buildCompletionPrompt = func(fileName, content, userQuery) {
+    riskList = formatRiskPresetsForPrompt()
+    return sprintf(<<<PROMPT
+你是 SyntaxFlow 规则元数据补全专家。只补全 desc/alert 描述字段，禁止修改规则体 SyntaxFlow 语法。
+
+【语言-强制】
+- title：英文
+- title_zh、desc、solution、message、risk：必须中文，禁止整段英文 desc/solution
+- 若原文 desc 为英文，请翻译并扩写为中文（≥100字），不要照抄英文
+
+【level】不要输出 level 字段，原文 level 由系统保留。
+
+【risk-强制】
+- desc 与每个 alert 的 risk 必须从下列预设中择一（中文，与 buildin 规则库一致）
+- 都不合适时可自拟简短中文风险名
+- 禁止纯英文 slug：file-upload、XXE、sca、auth-bypass、format-string 等
+
+【risk 预设值】
+%s
+
+【rule_id】不要在 JSON 中输出 rule_id（由工具 uuid 生成并合并）。
+
+file_name: %s
+
+规则正文:
+%s
+
+用户说明: %s
+PROMPT, riskList, fileName, content, userQuery)
+}
+
+fileName, content, loadErr = loadRule()
+if loadErr != "" {
+    die(loadErr)
+}
+
+hint = sourceName
+if hint == "" {
+    hint = fileName
+}
+
+q = query
+if q == "" {
+    q = sprintf("SyntaxFlow 规则 desc/alert 补全: %s", fileName)
+}
+
+// 工具侧生成 rule_id，合并时写入（原文已有则保留）
+newRuleID = uuid()
+
+println(sprintf("规则已加载: %s (%d bytes)，rule_id=%s，正在补全...", fileName, len(content), newRuleID))
+
+prompt = buildCompletionPrompt(fileName, content, q)
+liteResult, err = liteforge.Execute(
+    prompt,
+    liteforge.output(completionSchema),
+    liteforge.action("sf_rule_completion_result"),
+    liteforge.speedPriority(),
+)
+if err != nil {
+    die(sprintf("liteforge completion failed: %v", err))
+}
+
+descParams, alertItems, extractErr = extractCompletionAction(liteResult)
+if extractErr != "" {
+    die(extractErr)
+}
+descParams["rule_id"] = newRuleID
+
+merged, err = syntaxflow.MergeBeautificationResults(descParams, {"alert": alertItems}, content)
+if err != nil {
+    die(sprintf("merge failed: %v", err))
+}
+if merged == "" {
+    die("merge returned empty rule")
+}
+
+suggestedFile, suggestedPath = suggestedPaths(hint)
+written = false
+writtenPath = ""
+if writeOutput {
+    saveErr = persistMergedRule(suggestedPath, merged)
+    if saveErr != "" {
+        die(sprintf("write output failed: %s", saveErr))
+    }
+    written = true
+    writtenPath = suggestedPath
+}
+println(json.dumps({
+    "success": true,
+    "rule_content": merged,
+    "merged_length": len(merged),
+    "rule_name": fileName,
+    "rule_id": newRuleID,
+    "suggested_file": suggestedFile,
+    "suggested_path": suggestedPath,
+    "written": written,
+    "written_path": writtenPath,
+})~)
+

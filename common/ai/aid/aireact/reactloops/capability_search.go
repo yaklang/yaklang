@@ -673,7 +673,7 @@ func dedupeCapabilityDetails(details []CapabilityDetail) []CapabilityDetail {
 	return result
 }
 
-func GenerateYakToolsCatalog(sb *strings.Builder){
+func GenerateYakToolsCatalog(sb *strings.Builder) {
 	db := consts.GetGormProfileDatabase()
 	if db == nil {
 		return

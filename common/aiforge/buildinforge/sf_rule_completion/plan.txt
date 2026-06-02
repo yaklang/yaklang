@@ -1,0 +1,12 @@
+{
+  "@action": "plan",
+  "query": "-",
+  "main_task": "SyntaxFlow 规则 desc/alert 补全",
+  "main_task_goal": "子任务 1 由 syntaxflow_rule_completion 完成读规则、AI 补全 desc/alert、内存合并并默认写入 suggested_path；Result 阶段输出 sf_rule_completion_result JSON。",
+  "tasks": [
+    {
+      "subtask_name": "规则补全（syntaxflow_rule_completion）",
+      "subtask_goal": "调用 syntaxflow_rule_completion：传入 rule_name、file_path 或 file_content（至少其一）。工具内部读文件、补全、合并并写入 suggested_path；从返回 JSON 确认 written=true 与 written_path。勿再 read_file 或 write_file。"
+    }
+  ]
+}

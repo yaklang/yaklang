@@ -1,0 +1,54 @@
+# SyntaxFlow 规则 desc/alert 补全标准
+
+## 处理步骤
+
+1. 阅读理解 `file_name` 与 `file_content` 中的规则正文。
+2. 补全第一个 desc 块的描述信息（见「描述信息标准」）。
+3. 统计原文 alert 数量，输出 alert 数组前后数量必须相等。
+4. 每个 alert 需补全：name、title、title_zh、desc、message、risk、solution（**不要输出 level**，level 由原文保留）。
+5. 所有描述性字段（title_zh、desc、message、risk、solution）**必须使用中文**（除 title 保持英文外）。
+6. **risk** 必须从「risk 预设值」中选最贴切的一项（中文）；禁止 `file-upload`、`XXE`、`sca` 等纯英文 slug。
+
+## 描述信息标准
+
+- **title**：规则英文标题，动词+语言+目的，如 Check Python XXE in Standard Library
+- **title_zh**：规则中文标题，必填，如 检测 Python 标准库 XXE 漏洞
+- **cwe**：CWE 编号，纯数字；非漏洞规则可无
+- **desc**：不少于 100 字，**中文** markdown，写清漏洞原理、触发场景、潜在影响
+- **solution**：不少于 100 字，**中文** markdown 修复建议；非漏洞规则填 `none`
+- **reference**：无则 `none`
+- **rule_id**：由工具/合并层生成，**不要在 JSON 里编造 rule_id**
+
+## 语言要求（强制）
+
+1. **title_zh、desc、solution、message、risk 必须为中文**（可保留 XML、XXE、API 等术语）。
+2. **禁止**用整段英文填写 desc/solution/risk（不要照抄原文英文 desc）。
+3. 仅 **title** 字段使用英文。
+
+## risk 预设值（优先选用，与 buildin 规则库一致）
+
+- SQL注入 / SQL 注入
+- 命令注入 / 操作系统命令注入
+- 远程代码执行 / 远程代码执行（RCE）
+- 代码注入 / 表达式注入 / 模板注入 / 服务器端模板注入（SSTI）
+- JSON注入 / XPath注入 / CRLF注入
+- 路径遍历 / 路径穿越 / 目录遍历 / 目录穿越
+- 任意文件读取 / 任意文件写入 / 任意文件上传 / 文件上传漏洞
+- XML外部实体（XXE）/ XXE（alert 与 desc 的 risk 优先写「XML外部实体（XXE）」）
+- 跨站脚本（XSS）/ 跨站请求伪造（CSRF）
+- 开放重定向 / URL重定向
+- 服务端请求伪造（SSRF）
+- 会话劫持 / 敏感Cookie明文传输 / 身份验证绕过 / 认证绕过
+- 敏感信息泄露 / 信息泄露 / 信息泄露（Information Exposure）
+- 反序列化漏洞 / 不安全反序列化
+- 软件成分分析（SCA）
+- 不安全加密 / 不安全加密算法 / 弱加密漏洞
+- 硬编码凭据 / 硬编码密钥 / 弱密码
+- 资源泄漏 / API误用 / 空指针 / 输入校验不当
+- 缓冲区溢出 / 格式化字符串漏洞 / 拒绝服务（DoS）
+- 信息（仅用于库/辅助规则）
+
+## 输出约束
+
+- `@action` 必须为 `sf_rule_completion_result`
+- 只输出 JSON，不要输出完整 .sf 正文
