@@ -606,20 +606,9 @@ func hashData(data []byte, h crypto.Hash) []byte {
 // hashName: "MD5" | "SHA-1" | "SHA-256" | "SHA-384" | "SHA-512"
 func PemSignRSA(pemBytes []byte, data interface{}, scheme string, hashName string) ([]byte, error) {
 	dataBytes := utils.InterfaceToBytes(data)
-	block, _ := pem.Decode(pemBytes)
-	if block == nil {
-		return nil, utils.Error("parse PEM: no block found")
-	}
-	pri, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+	pkey, err := GetRSAPrivateKey(pemBytes)
 	if err != nil {
-		pri, err = x509.ParsePKCS1PrivateKey(block.Bytes)
-		if err != nil {
-			return nil, utils.Errorf("parse private key (PKCS8/PKCS1) failed: %s", err)
-		}
-	}
-	pkey, ok := pri.(*rsa.PrivateKey)
-	if !ok {
-		return nil, utils.Errorf("need *rsa.PrivateKey, got %T", pri)
+		return nil, utils.Errorf("parse private key failed: %s", err)
 	}
 	hashAlg := getCryptoHash(hashName)
 	hashed := hashData(dataBytes, hashAlg)
@@ -640,11 +629,7 @@ func PemSignRSA(pemBytes []byte, data interface{}, scheme string, hashName strin
 // scheme: "PKCS1v15" | "PSS", hashName 同 PemSignRSA
 func PemVerifyRSA(pemBytes []byte, data interface{}, sign []byte, scheme string, hashName string) error {
 	dataBytes := utils.InterfaceToBytes(data)
-	block, _ := pem.Decode(pemBytes)
-	if block == nil {
-		return utils.Error("parse PEM: no block found")
-	}
-	pub, err := ParseRsaPublicKeyFromPemBlock(block)
+	pub, err := GetRSAPubKey(pemBytes)
 	if err != nil {
 		return utils.Errorf("parse public key failed: %s", err)
 	}
