@@ -1,6 +1,7 @@
 package codegrpc
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/json"
 	"testing"
@@ -122,6 +123,22 @@ func TestAESGCMDecryptFallback(t *testing.T) {
 	require.Equal(t, plaintext, flow.Text)
 }
 
+func TestAESDecryptKeyTryDecode(t *testing.T) {
+	plaintext := []byte("try decode aes key and iv")
+	key := "1234567890123456"
+	iv := "abcdefghijklmnop"
+
+	flow := NewCodecExecFlow(plaintext, nil)
+	err := flow.AESEncrypt(key, "raw", iv, "raw", "CBC", "hex", "pkcs")
+	require.NoError(t, err)
+	encryptedHex := string(flow.Text)
+
+	flow = NewCodecExecFlow([]byte(encryptedHex), nil)
+	err = flow.AESDecrypt(codec.EncodeBase64([]byte(key)), "hex", codec.EncodeBase64([]byte(iv)), "hex", "CBC", "hex", "pkcs")
+	require.NoError(t, err)
+	require.Equal(t, plaintext, flow.Text)
+}
+
 // TestRSADecryptFallback 测试 RSA 解密的兜底机制
 // RSA 有密文长度验证，可以安全地自动尝试多种编码
 func TestRSADecryptFallback(t *testing.T) {
@@ -179,6 +196,38 @@ func TestRSADecryptFallback(t *testing.T) {
 			require.Equal(t, plaintext, flow.Text, "hex fallback failed for %s", tc.name)
 		})
 	}
+}
+
+func TestRSAKeyAndSignatureTryDecode(t *testing.T) {
+	msg := []byte("rsa key try decode")
+	pubKeyPEM, priKeyPEM, err := tlsutils.RSAGenerateKeyPair(2048)
+	require.NoError(t, err)
+
+	flow := NewCodecExecFlow(msg, nil)
+	err = flow.RSASign(codec.EncodeBase64(priKeyPEM), "PKCS1v15", "SHA-256", "base64")
+	require.NoError(t, err)
+	signBase64 := string(flow.Text)
+
+	flow = NewCodecExecFlow(msg, nil)
+	err = flow.RSAVerify(codec.EncodeBase64(pubKeyPEM), "PKCS1v15", "SHA-256", signBase64)
+	require.NoError(t, err)
+	require.Equal(t, []byte("验证成功"), flow.Text)
+}
+
+func TestRSAJSEncryptStyleFlow(t *testing.T) {
+	plaintext := bytes.Repeat([]byte("js-encrypt-style-"), 20)
+	pubKeyPEM, priKeyPEM, err := tlsutils.RSAGenerateKeyPair(1024)
+	require.NoError(t, err)
+
+	flow := NewCodecExecFlow(plaintext, nil)
+	err = flow.RSAEncrypt(codec.EncodeBase64(pubKeyPEM), "JSEncrypt", "SHA-256")
+	require.NoError(t, err)
+	encrypted := codec.EncodeBase64(flow.Text)
+
+	flow = NewCodecExecFlow([]byte(encrypted), nil)
+	err = flow.RSADecrypt(codec.EncodeBase64(priKeyPEM), "JSEncrypt", "SHA-256")
+	require.NoError(t, err)
+	require.Equal(t, plaintext, flow.Text)
 }
 
 // TestSM2DecryptFallback 测试 SM2 解密的兜底机制
@@ -246,4 +295,18 @@ func TestSM2DecryptFallback(t *testing.T) {
 			require.Equal(t, plaintext, flow.Text, "hex fallback failed for %s", tc.name)
 		})
 	}
+}
+
+func TestSM2PrivateKeyTryDecode(t *testing.T) {
+	plaintext := []byte("sm2 private key try decode")
+	priKey, pubKey, err := codec.GenerateSM2PrivateKeyHEX()
+	require.NoError(t, err)
+
+	encrypted, err := codec.SM2EncryptC1C2C3(pubKey, plaintext)
+	require.NoError(t, err)
+
+	flow := NewCodecExecFlow(encrypted, nil)
+	err = flow.SM2Decrypt(codec.EncodeBase64(priKey), "C1C2C3")
+	require.NoError(t, err)
+	require.Equal(t, plaintext, flow.Text)
 }

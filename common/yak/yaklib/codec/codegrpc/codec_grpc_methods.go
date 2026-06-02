@@ -240,6 +240,170 @@ func decodeData(text []byte, input outputType) []byte {
 	return data
 }
 
+func decodeFormat(text []byte, input outputType) ([]byte, error) {
+	raw := strings.TrimSpace(utils.InterfaceToString(text))
+	switch input {
+	case OUTPUT_RAW:
+		return text, nil
+	case OUTPUT_HEX:
+		return codec.DecodeHex(strings.Join(strings.Fields(raw), ""))
+	case OUTPUT_BASE64:
+		return codec.DecodeBase64(raw)
+	default:
+		return text, nil
+	}
+}
+
+func isSupportedDataFormat(input outputType) bool {
+	switch input {
+	case OUTPUT_RAW, OUTPUT_HEX, OUTPUT_BASE64:
+		return true
+	default:
+		return false
+	}
+}
+
+func likelyHexEncoded(raw string) bool {
+	raw = strings.TrimSpace(raw)
+	if strings.HasPrefix(raw, "0x") || strings.HasPrefix(raw, "0X") {
+		raw = raw[2:]
+	}
+	raw = strings.Join(strings.Fields(raw), "")
+	if len(raw) == 0 || len(raw)%2 != 0 {
+		return false
+	}
+	for _, r := range raw {
+		if !((r >= '0' && r <= '9') || (r >= 'a' && r <= 'f') || (r >= 'A' && r <= 'F')) {
+			return false
+		}
+	}
+	return true
+}
+
+func likelyBase64Encoded(raw string) bool {
+	raw = strings.TrimSpace(raw)
+	if len(raw) == 0 {
+		return false
+	}
+	for _, r := range raw {
+		if (r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			continue
+		}
+		switch r {
+		case '+', '/', '-', '_', '=', '%':
+			continue
+		default:
+			return false
+		}
+	}
+	_, err := codec.DecodeBase64(raw)
+	return err == nil
+}
+
+func decodeFormatOrder(text []byte, preferred outputType) []outputType {
+	raw := strings.TrimSpace(utils.InterfaceToString(text))
+	formats := []outputType{OUTPUT_RAW, OUTPUT_BASE64, OUTPUT_HEX}
+	score := map[outputType]int{
+		OUTPUT_RAW: 10,
+	}
+	if strings.Contains(raw, "-----BEGIN ") || strings.ContainsAny(raw, "\r\n\t ") {
+		score[OUTPUT_RAW] = 100
+	}
+	if likelyBase64Encoded(raw) {
+		score[OUTPUT_BASE64] = 80
+	}
+	if likelyHexEncoded(raw) {
+		score[OUTPUT_HEX] = 90
+	}
+
+	var order []outputType
+	push := func(format outputType) {
+		if !isSupportedDataFormat(format) {
+			return
+		}
+		for _, exist := range order {
+			if exist == format {
+				return
+			}
+		}
+		order = append(order, format)
+	}
+	push(preferred)
+	for len(order) < len(formats) {
+		var best outputType
+		bestScore := -1
+		for _, format := range formats {
+			exists := false
+			for _, exist := range order {
+				if exist == format {
+					exists = true
+					break
+				}
+			}
+			if exists {
+				continue
+			}
+			if score[format] > bestScore {
+				best = format
+				bestScore = score[format]
+			}
+		}
+		push(best)
+	}
+	return order
+}
+
+func decodeDataCandidates(text []byte, preferred outputType) [][]byte {
+	if len(text) == 0 {
+		return [][]byte{nil}
+	}
+
+	var out [][]byte
+	seen := make(map[string]struct{})
+	push := func(b []byte) {
+		key := string(b)
+		if _, ok := seen[key]; ok {
+			return
+		}
+		seen[key] = struct{}{}
+		out = append(out, b)
+	}
+
+	for _, format := range decodeFormatOrder(text, preferred) {
+		data, err := decodeFormat(text, format)
+		if err != nil {
+			continue
+		}
+		push(data)
+	}
+	return out
+}
+
+func trySymmetricDecrypt(key string, keyType string, iv string, ivType string, blockSize int, inputText []byte, decrypt func([]byte, []byte, []byte) ([]byte, error), paddingType string) ([]byte, error) {
+	keyCandidates := decodeDataCandidates([]byte(key), keyType)
+	ivCandidates := decodeDataCandidates([]byte(iv), ivType)
+
+	var lastErr error
+	for _, decodeKey := range keyCandidates {
+		for _, decodeIV := range ivCandidates {
+			dec, err := decrypt(decodeKey, inputText, codec.FixIV(decodeIV, decodeKey, blockSize))
+			if err != nil {
+				lastErr = err
+				continue
+			}
+			dec, err = unPadding(paddingType, dec)
+			if err == nil {
+				return dec, nil
+			}
+			lastErr = err
+		}
+	}
+	if lastErr == nil {
+		lastErr = utils.Error("no decrypt candidate")
+	}
+	return nil, lastErr
+}
+
 func padding(paddingType string, data []byte, size int) ([]byte, error) {
 	switch paddingType {
 	case "pkcs":
@@ -426,15 +590,10 @@ func (flow *CodecExecFlow) AESEncrypt(key string, keyType string, IV string, ivT
 // { Name = "paddingType", Type = "select", DefaultValue = "pkcs", Options = ["pkcs", "zeroPadding"], Required = true,Label = "填充方式"}
 // ]
 func (flow *CodecExecFlow) AESDecrypt(key string, keyType string, IV string, ivType string, mode string, input outputType, paddingType string) error {
-	var err error
-	decodeKey := decodeData([]byte(key), keyType)
-	decodeIV := codec.FixIV(decodeData([]byte(IV), ivType), decodeKey, 16)
 	inputText := decodeData(flow.Text, input)
-	dec, err := codec.AESDec(decodeKey, inputText, decodeIV, mode)
-	if err != nil {
-		return err
-	}
-	dec, err = unPadding(paddingType, dec)
+	dec, err := trySymmetricDecrypt(key, keyType, IV, ivType, 16, inputText, func(decodeKey, text, decodeIV []byte) ([]byte, error) {
+		return codec.AESDec(decodeKey, text, decodeIV, mode)
+	}, paddingType)
 	if err != nil {
 		return err
 	}
@@ -484,9 +643,6 @@ func (flow *CodecExecFlow) AESGCMEncrypt(key string, keyType string, nonce strin
 // { Name = "input", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true,Label = "输入格式"}
 // ]
 func (flow *CodecExecFlow) AESGCMDecrypt(key string, keyType string, nonce string, nonceType string, nonceSize string, input outputType) error {
-	decodeKey := decodeData([]byte(key), keyType)
-	decodeNonce := decodeData([]byte(nonce), nonceType)
-
 	var nonceSizeInt int
 	switch nonceSize {
 	case "12":
@@ -507,14 +663,18 @@ func (flow *CodecExecFlow) AESGCMDecrypt(key string, keyType string, nonce strin
 		err error
 	)
 
-	for _, inputText := range cands {
-		dec, err = codec.AESGCMDecryptWithNonceSize(decodeKey, inputText, decodeNonce, nonceSizeInt)
-		if err == nil {
-			flow.Text = dec
-			return nil
+	for _, decodeKey := range decodeDataCandidates([]byte(key), keyType) {
+		for _, decodeNonce := range decodeDataCandidates([]byte(nonce), nonceType) {
+			for _, inputText := range cands {
+				dec, err = codec.AESGCMDecryptWithNonceSize(decodeKey, inputText, decodeNonce, nonceSizeInt)
+				if err == nil {
+					flow.Text = dec
+					return nil
+				}
+			}
 		}
 	}
-	return utils.Errorf("AES-GCM 解密失败（已尝试原文/Base64/Hex）：%v", err)
+	return utils.Errorf("AES-GCM 解密失败（已尝试参数原文/Base64/Hex）：%v", err)
 }
 
 // Tag = "加密"
@@ -555,15 +715,10 @@ func (flow *CodecExecFlow) SM4Encrypt(key string, keyType string, IV string, ivT
 // { Name = "paddingType", Type = "select", DefaultValue = "pkcs", Options = ["pkcs", "zeroPadding"], Required = true,Label = "填充方式"}
 // ]
 func (flow *CodecExecFlow) SM4Decrypt(key string, keyType string, IV string, ivType string, mode string, input outputType, paddingType string) error {
-	var err error
-	decodeKey := decodeData([]byte(key), keyType)
-	decodeIV := codec.FixIV(decodeData([]byte(IV), ivType), decodeKey, 16)
 	inputText := decodeData(flow.Text, input)
-	dec, err := codec.SM4Dec(decodeKey, inputText, decodeIV, mode)
-	if err != nil {
-		return err
-	}
-	dec, err = unPadding(paddingType, dec)
+	dec, err := trySymmetricDecrypt(key, keyType, IV, ivType, 16, inputText, func(decodeKey, text, decodeIV []byte) ([]byte, error) {
+		return codec.SM4Dec(decodeKey, text, decodeIV, mode)
+	}, paddingType)
 	if err != nil {
 		return err
 	}
@@ -609,14 +764,10 @@ func (flow *CodecExecFlow) DESEncrypt(key string, keyType string, IV string, ivT
 // { Name = "paddingType", Type = "select", DefaultValue = "pkcs", Options = ["pkcs", "zeroPadding"], Required = true,Label = "填充方式"}
 // ]
 func (flow *CodecExecFlow) DESDecrypt(key string, keyType string, IV string, ivType string, mode string, input outputType, paddingType string) error {
-	decodeKey := decodeData([]byte(key), keyType)
-	decodeIV := codec.FixIV(decodeData([]byte(IV), ivType), decodeKey, 8)
 	inputText := decodeData(flow.Text, input)
-	dec, err := codec.DESDec(decodeKey, inputText, decodeIV, mode)
-	if err != nil {
-		return err
-	}
-	dec, err = unPadding(paddingType, dec)
+	dec, err := trySymmetricDecrypt(key, keyType, IV, ivType, 8, inputText, func(decodeKey, text, decodeIV []byte) ([]byte, error) {
+		return codec.DESDec(decodeKey, text, decodeIV, mode)
+	}, paddingType)
 	if err != nil {
 		return err
 	}
@@ -662,14 +813,10 @@ func (flow *CodecExecFlow) TripleDESEncrypt(key string, keyType string, IV strin
 // { Name = "paddingType", Type = "select", DefaultValue = "pkcs", Options = ["pkcs", "zeroPadding"], Required = true,Label = "填充方式"}
 // ]
 func (flow *CodecExecFlow) TripleDESDecrypt(key string, keyType string, IV string, ivType string, mode string, input outputType, paddingType string) error {
-	decodeKey := decodeData([]byte(key), keyType)
-	decodeIV := codec.FixIV(decodeData([]byte(IV), ivType), decodeKey, 8)
 	inputText := decodeData(flow.Text, input)
-	dec, err := codec.TripleDesDec(decodeKey, inputText, decodeIV, mode)
-	if err != nil {
-		return err
-	}
-	dec, err = unPadding(paddingType, dec)
+	dec, err := trySymmetricDecrypt(key, keyType, IV, ivType, 8, inputText, func(decodeKey, text, decodeIV []byte) ([]byte, error) {
+		return codec.TripleDesDec(decodeKey, text, decodeIV, mode)
+	}, paddingType)
 	if err != nil {
 		return err
 	}
@@ -716,29 +863,32 @@ func (flow *CodecExecFlow) SM2Decrypt(priKey string, decryptSchema string) error
 	if len(cands) == 0 {
 		return utils.Error("SM2 decrypt error: 空的密文输入")
 	}
+	keyCandidates := decodeDataCandidates([]byte(priKey), OUTPUT_RAW)
 
 	var (
 		data []byte
 		err  error
 	)
 
-	for _, inputText := range cands {
-		switch decryptSchema { // choose alg
-		case "ASN1":
-			data, err = codec.SM2DecryptASN1([]byte(priKey), inputText)
-		case "C1C2C3":
-			data, err = codec.SM2DecryptC1C2C3([]byte(priKey), inputText)
-		case "C1C3C2":
-			data, err = codec.SM2DecryptC1C3C2([]byte(priKey), inputText)
-		default:
-			return utils.Error("SM2 decrypt error: 未知的编码格式")
-		}
-		if err == nil {
-			flow.Text = data
-			return nil
+	for _, keyCandidate := range keyCandidates {
+		for _, inputText := range cands {
+			switch decryptSchema { // choose alg
+			case "ASN1":
+				data, err = codec.SM2DecryptASN1(keyCandidate, inputText)
+			case "C1C2C3":
+				data, err = codec.SM2DecryptC1C2C3(keyCandidate, inputText)
+			case "C1C3C2":
+				data, err = codec.SM2DecryptC1C3C2(keyCandidate, inputText)
+			default:
+				return utils.Error("SM2 decrypt error: 未知的编码格式")
+			}
+			if err == nil {
+				flow.Text = data
+				return nil
+			}
 		}
 	}
-	return utils.Errorf("SM2 解密失败（已尝试原文/Base64/Hex）：%v", err)
+	return utils.Errorf("SM2 解密失败（已尝试参数原文/Base64/Hex）：%v", err)
 }
 
 // Tag = "加密"
@@ -746,7 +896,7 @@ func (flow *CodecExecFlow) SM2Decrypt(priKey string, decryptSchema string) error
 // Desc = """RSA加密算法是一种非对称加密算法，在公开密钥加密和电子商业中被广泛使用。RSA是被研究得最广泛的公钥算法，从提出后经历了各种攻击的考验，逐渐为人们接受，普遍认为是目前最优秀的公钥方案之一。"""
 // Params = [
 // { Name = "pubKey", Type = "text", Required = true,Label = "公钥"},
-// { Name = "encryptSchema", Type = "select",DefaultValue = "RSA-OAEP", Options = ["RSA-OAEP", "PKCS1v15"], Required = true, Label = "填充方式"},
+// { Name = "encryptSchema", Type = "select",DefaultValue = "RSA-OAEP", Options = ["RSA-OAEP", "PKCS1v15", "JSEncrypt"], Required = true, Label = "填充方式"},
 // { Name = "algorithm", Type = "select",DefaultValue = "SHA-256", Options = ["SHA-1", "SHA-256","SHA-384","SHA-512","MD5"], Required = true ,Label = "hash算法"}
 // ]
 func (flow *CodecExecFlow) RSAEncrypt(pubKey string, encryptSchema string, algorithm string) error {
@@ -769,16 +919,22 @@ func (flow *CodecExecFlow) RSAEncrypt(pubKey string, encryptSchema string, algor
 		hashFunc = sha1.New()
 	}
 
-	switch encryptSchema {
-	case "RSA-OAEP":
-		data, err = tlsutils.PkcsOAEPEncryptWithHash([]byte(pubKey), flow.Text, hashFunc)
-	case "PKCS1v15":
-		data, err = tlsutils.Pkcs1v15Encrypt([]byte(pubKey), flow.Text)
-	default:
-		return utils.Error("RSA encrypt error: 未知的填充方式")
-	}
-	if err == nil {
-		flow.Text = data
+	for _, pubKeyBytes := range decodeDataCandidates([]byte(pubKey), OUTPUT_RAW) {
+		switch encryptSchema {
+		case "RSA-OAEP":
+			hashFunc.Reset()
+			data, err = tlsutils.PkcsOAEPEncryptWithHash(pubKeyBytes, flow.Text, hashFunc)
+		case "PKCS1v15":
+			data, err = tlsutils.Pkcs1v15Encrypt(pubKeyBytes, flow.Text)
+		case "JSEncrypt", "JSEncryptStyle", "PKCS1v15Block":
+			data, err = tlsutils.RSAEncryptWithJSEncryptStyle(string(pubKeyBytes), flow.Text)
+		default:
+			return utils.Error("RSA encrypt error: 未知的填充方式")
+		}
+		if err == nil {
+			flow.Text = data
+			return nil
+		}
 	}
 	return err
 }
@@ -788,11 +944,10 @@ func (flow *CodecExecFlow) RSAEncrypt(pubKey string, encryptSchema string, algor
 // Desc = """RSA加密算法是一种非对称加密算法，在公开密钥加密和电子商业中被广泛使用。RSA是被研究得最广泛的公钥算法，从提出后经历了各种攻击的考验，逐渐为人们接受，普遍认为是目前最优秀的公钥方案之一。"""
 // Params = [
 // { Name = "priKey", Type = "text", Required = true,Label = "私钥"},
-// { Name = "decryptSchema", Type = "select",DefaultValue = "RSA-OAEP", Options = ["RSA-OAEP", "PKCS1v15"], Required = true, Label = "填充方式"},
+// { Name = "decryptSchema", Type = "select",DefaultValue = "RSA-OAEP", Options = ["RSA-OAEP", "PKCS1v15", "JSEncrypt"], Required = true, Label = "填充方式"},
 // { Name = "algorithm", Type = "select",DefaultValue = "SHA-256", Options = ["SHA-1", "SHA-256","SHA-384","SHA-512","MD5"], Required = true ,Label = "hash算法"}
 // ]
 func (flow *CodecExecFlow) RSADecrypt(priKey string, decryptSchema string, algorithm string) error {
-	priKeyBytes := []byte(priKey)
 	hashFunc := getHash("SHA-1")
 	if f := getHash(algorithm); f != nil {
 		hashFunc = f
@@ -807,26 +962,42 @@ func (flow *CodecExecFlow) RSADecrypt(priKey string, decryptSchema string, algor
 		data []byte
 		err  error
 	)
+	keyCandidates := decodeDataCandidates([]byte(priKey), OUTPUT_RAW)
 
 	switch decryptSchema {
 	case "RSA-OAEP":
-		for _, c := range cands {
-			hashFunc.Reset()
-			if data, err = tlsutils.PkcsOAEPDecryptWithHash(priKeyBytes, c, hashFunc); err == nil {
-				flow.Text = data
-				return nil
+		for _, priKeyBytes := range keyCandidates {
+			for _, c := range cands {
+				hashFunc.Reset()
+				if data, err = tlsutils.PkcsOAEPDecryptWithHash(priKeyBytes, c, hashFunc); err == nil {
+					flow.Text = data
+					return nil
+				}
 			}
 		}
-		return utils.Errorf("RSA-OAEP 解密失败（已尝试原文/Base64/Hex）：%v", err)
+		return utils.Errorf("RSA-OAEP 解密失败（已尝试参数原文/Base64/Hex）：%v", err)
 
 	case "PKCS1v15":
-		for _, c := range cands {
-			if data, err = tlsutils.Pkcs1v15Decrypt(priKeyBytes, c); err == nil {
-				flow.Text = data
-				return nil
+		for _, priKeyBytes := range keyCandidates {
+			for _, c := range cands {
+				if data, err = tlsutils.Pkcs1v15Decrypt(priKeyBytes, c); err == nil {
+					flow.Text = data
+					return nil
+				}
 			}
 		}
-		return utils.Errorf("PKCS1v15 解密失败（已尝试原文/Base64/Hex）：%v", err)
+		return utils.Errorf("PKCS1v15 解密失败（已尝试参数原文/Base64/Hex）：%v", err)
+
+	case "JSEncrypt", "JSEncryptStyle", "PKCS1v15Block":
+		for _, priKeyBytes := range keyCandidates {
+			for _, c := range cands {
+				if data, err = tlsutils.RSADecryptWithJSEncryptStyle(string(priKeyBytes), c); err == nil {
+					flow.Text = data
+					return nil
+				}
+			}
+		}
+		return utils.Errorf("JSEncrypt 解密失败（已尝试参数原文/Base64/Hex）：%v", err)
 
 	default:
 		return utils.Error("RSA decrypt error: 未知的填充方式")
@@ -843,7 +1014,14 @@ func (flow *CodecExecFlow) RSADecrypt(priKey string, decryptSchema string, algor
 // { Name = "output", Type = "select", DefaultValue = "hex", Options = ["hex", "base64"], Required = true, Label = "输出格式"},
 // ]
 func (flow *CodecExecFlow) RSASign(priKey string, signSchema string, algorithm string, output string) error {
-	sig, err := tlsutils.PemSignRSA([]byte(priKey), flow.Text, signSchema, algorithm)
+	var sig []byte
+	var err error
+	for _, priKeyBytes := range decodeDataCandidates([]byte(priKey), OUTPUT_RAW) {
+		sig, err = tlsutils.PemSignRSA(priKeyBytes, flow.Text, signSchema, algorithm)
+		if err == nil {
+			break
+		}
+	}
 	if err != nil {
 		return err
 	}
@@ -872,20 +1050,18 @@ func (flow *CodecExecFlow) RSAVerify(pubKey string, signSchema string, algorithm
 	if len(sigRaw) == 0 {
 		return utils.Error("RSA verify error: 签名为空")
 	}
-	// 尝试 Hex 解码，失败则尝试 Base64
-	sig, err := codec.DecodeHex(string(sigRaw))
-	if err != nil {
-		sig, err = codec.DecodeBase64(string(sigRaw))
-		if err != nil {
-			return utils.Errorf("RSA verify error: 签名无法解析为 Hex 或 Base64: %v", err)
+	var lastErr error
+	for _, pubKeyBytes := range decodeDataCandidates([]byte(pubKey), OUTPUT_RAW) {
+		for _, sig := range decodeDataCandidates(sigRaw, OUTPUT_HEX) {
+			err := tlsutils.PemVerifyRSA(pubKeyBytes, flow.Text, sig, signSchema, algorithm)
+			if err == nil {
+				flow.Text = []byte("验证成功")
+				return nil
+			}
+			lastErr = err
 		}
 	}
-	err = tlsutils.PemVerifyRSA([]byte(pubKey), flow.Text, sig, signSchema, algorithm)
-	if err != nil {
-		return err
-	}
-	flow.Text = []byte("验证成功")
-	return nil
+	return lastErr
 }
 
 // Tag = "Java"
