@@ -222,9 +222,10 @@ func launchMcpServer(ctx context.Context, req *ypb.StartMcpServerRequest, send f
 		}
 		// 发送启动状态
 		err = send(&ypb.StartMcpServerResponse{
-			Status:    "running",
-			Message:   fmt.Sprintf("MCP server started with SSE transport on %s/sse and Streamable HTTP transport on %s/mcp", urlStr, urlStr),
-			ServerUrl: urlStr + "/sse",
+			Status:            "running",
+			Message:           fmt.Sprintf("MCP server started with SSE transport on %s/sse and Streamable HTTP transport on %s/mcp", urlStr, urlStr),
+			ServerUrl:         urlStr + "/sse",
+			StreamableHttpUrl: urlStr + "/mcp",
 		})
 		if err != nil {
 			log.Errorf("Failed to send running status: %v", err)
