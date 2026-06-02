@@ -11,12 +11,15 @@ import (
 )
 
 func NewTestConfig(ctx context.Context, opts ...ConfigOption) *Config {
-	return NewConfig(ctx,
-		append([]ConfigOption{
-			WithDisableDynamicPlanning(true),
-		}, append(opts, WithAICallback(func(i AICallerConfigIf, req *AIRequest) (*AIResponse, error) {
+	baseOpts := []ConfigOption{
+		WithDisableDynamicPlanning(true),
+		WithAICallback(func(i AICallerConfigIf, req *AIRequest) (*AIResponse, error) {
 			return &AIResponse{}, nil
-		}))...)...,
+		}),
+	}
+	baseOpts = append(baseOpts, opts...)
+	return NewConfig(ctx,
+		baseOpts...,
 	)
 }
 

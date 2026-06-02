@@ -3487,9 +3487,6 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 		opts = append(opts, WithEventHandler(i.EventHandler))
 	}
 
-	if i.AICallbacks != nil {
-		opts = append(opts, WithAICallbacks(i.AICallbacks.RawClone()))
-	}
 	if i.GetUserUsageCallback() != nil {
 		opts = append(opts, WithUserUsageCallback(i.GetUserUsageCallback()))
 	}
