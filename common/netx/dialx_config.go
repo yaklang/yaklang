@@ -20,6 +20,10 @@ type DialXTraceInfo struct {
 	TCPtime time.Duration
 	// tls 握手耗时
 	TLSHandshakeTime time.Duration
+	// tls retry count
+	TLSRetryCount int
+	// tls retry tips
+	TLSRetryTips []string
 }
 
 func NewDialXTraceInfo() *DialXTraceInfo {
@@ -47,6 +51,18 @@ func (d *DialXTraceInfo) SetTCPDuration(t time.Duration) {
 	d.TCPtime = t
 }
 
+func (d *DialXTraceInfo) AddTLSRetryTip(tip string) {
+	if d == nil || tip == "" {
+		return
+	}
+	for _, exists := range d.TLSRetryTips {
+		if exists == tip {
+			return
+		}
+	}
+	d.TLSRetryTips = append(d.TLSRetryTips, tip)
+}
+
 type dialXConfig struct {
 	Timeout           time.Duration
 	ForceDisableProxy bool
@@ -63,14 +79,14 @@ type dialXConfig struct {
 	TLSConfig               *gmtls.Config
 	//ShouldOverrideGMTLSConfig bool
 	//GMTLSConfig               *gmtls.Config
-	GMTLSSupport               bool
-	GMTLSPrefer                bool
-	GMTLSOnly                  bool
-	GMTLSDisableCompatMode     bool // 关闭国密兼容模式；默认 false 表示兼容开启（四套 → ECC×2 → ECDHE×2）
-	TLSTimeout        time.Duration
-	ShouldOverrideSNI bool // High priority (will overwrite TlsConfig)
-	SNI               string
-	TLSNextProto      []string
+	GMTLSSupport           bool
+	GMTLSPrefer            bool
+	GMTLSOnly              bool
+	GMTLSDisableCompatMode bool // 关闭国密兼容模式；默认 false 表示兼容开启（四套 → ECC×2 → ECDHE×2）
+	TLSTimeout             time.Duration
+	ShouldOverrideSNI      bool // High priority (will overwrite TlsConfig)
+	SNI                    string
+	TLSNextProto           []string
 
 	// Retry
 	EnableTimeoutRetry  bool
