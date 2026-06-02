@@ -12255,10 +12255,12 @@ type StartMcpServerResponse struct {
 	Status string `protobuf:"bytes,1,opt,name=Status,proto3" json:"Status,omitempty"`
 	// server message or error message
 	Message string `protobuf:"bytes,2,opt,name=Message,proto3" json:"Message,omitempty"`
-	// server URL
-	ServerUrl     string `protobuf:"bytes,3,opt,name=ServerUrl,proto3" json:"ServerUrl,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	// SSE endpoint URL, e.g. http://host:port/sse
+	ServerUrl string `protobuf:"bytes,3,opt,name=ServerUrl,proto3" json:"ServerUrl,omitempty"`
+	// Streamable HTTP endpoint URL, e.g. http://host:port/mcp
+	StreamableHttpUrl string `protobuf:"bytes,4,opt,name=StreamableHttpUrl,proto3" json:"StreamableHttpUrl,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *StartMcpServerResponse) Reset() {
@@ -12308,6 +12310,13 @@ func (x *StartMcpServerResponse) GetMessage() string {
 func (x *StartMcpServerResponse) GetServerUrl() string {
 	if x != nil {
 		return x.ServerUrl
+	}
+	return ""
+}
+
+func (x *StartMcpServerResponse) GetStreamableHttpUrl() string {
+	if x != nil {
+		return x.StreamableHttpUrl
 	}
 	return ""
 }
@@ -35514,13 +35523,13 @@ type StartBruteParams struct {
 	Concurrent int64 `protobuf:"varint,8,opt,name=Concurrent,proto3" json:"Concurrent,omitempty"`
 	Retry      int64 `protobuf:"varint,9,opt,name=Retry,proto3" json:"Retry,omitempty"`
 	// 目标任务内并发
-	TargetTaskConcurrent int64 `protobuf:"varint,10,opt,name=TargetTaskConcurrent,proto3" json:"TargetTaskConcurrent,omitempty"`
-	OkToStop         bool   `protobuf:"varint,11,opt,name=OkToStop,proto3" json:"OkToStop,omitempty"`
-	DelayMin         int64  `protobuf:"varint,12,opt,name=DelayMin,proto3" json:"DelayMin,omitempty"`
-	DelayMax         int64  `protobuf:"varint,13,opt,name=DelayMax,proto3" json:"DelayMax,omitempty"`
-	PluginScriptName string `protobuf:"bytes,14,opt,name=PluginScriptName,proto3" json:"PluginScriptName,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	TargetTaskConcurrent int64  `protobuf:"varint,10,opt,name=TargetTaskConcurrent,proto3" json:"TargetTaskConcurrent,omitempty"`
+	OkToStop             bool   `protobuf:"varint,11,opt,name=OkToStop,proto3" json:"OkToStop,omitempty"`
+	DelayMin             int64  `protobuf:"varint,12,opt,name=DelayMin,proto3" json:"DelayMin,omitempty"`
+	DelayMax             int64  `protobuf:"varint,13,opt,name=DelayMax,proto3" json:"DelayMax,omitempty"`
+	PluginScriptName     string `protobuf:"bytes,14,opt,name=PluginScriptName,proto3" json:"PluginScriptName,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *StartBruteParams) Reset() {
@@ -45101,8 +45110,8 @@ type ExecHistoryRecord struct {
 	// Uid
 	Id string `protobuf:"bytes,9,opt,name=Id,proto3" json:"Id,omitempty"`
 	// 展示界面内容
-	Stdout []byte `protobuf:"bytes,10,opt,name=Stdout,proto3" json:"Stdout,omitempty"`
-	Stderr []byte `protobuf:"bytes,11,opt,name=Stderr,proto3" json:"Stderr,omitempty"`
+	Stdout        []byte `protobuf:"bytes,10,opt,name=Stdout,proto3" json:"Stdout,omitempty"`
+	Stderr        []byte `protobuf:"bytes,11,opt,name=Stderr,proto3" json:"Stderr,omitempty"`
 	RuntimeId     string `protobuf:"bytes,12,opt,name=RuntimeId,proto3" json:"RuntimeId,omitempty"`
 	FromYakModule string `protobuf:"bytes,13,opt,name=FromYakModule,proto3" json:"FromYakModule,omitempty"`
 	StdoutLen     int64  `protobuf:"varint,14,opt,name=StdoutLen,proto3" json:"StdoutLen,omitempty"`
@@ -70320,11 +70329,12 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x0fDisableResource\x18\x06 \x03(\tR\x0fDisableResource\x12\x16\n" +
 	"\x06Script\x18\a \x03(\tR\x06Script\x12\x1c\n" +
 	"\tEnableAll\x18\b \x01(\bR\tEnableAll\x12(\n" +
-	"\x0fEnableYakAITool\x18\t \x01(\bR\x0fEnableYakAITool\"h\n" +
+	"\x0fEnableYakAITool\x18\t \x01(\bR\x0fEnableYakAITool\"\x96\x01\n" +
 	"\x16StartMcpServerResponse\x12\x16\n" +
 	"\x06Status\x18\x01 \x01(\tR\x06Status\x12\x18\n" +
 	"\aMessage\x18\x02 \x01(\tR\aMessage\x12\x1c\n" +
-	"\tServerUrl\x18\x03 \x01(\tR\tServerUrl\"|\n" +
+	"\tServerUrl\x18\x03 \x01(\tR\tServerUrl\x12,\n" +
+	"\x11StreamableHttpUrl\x18\x04 \x01(\tR\x11StreamableHttpUrl\"|\n" +
 	"\"GetSpaceEngineAccountStatusRequest\x12\x12\n" +
 	"\x04Type\x18\x01 \x01(\tR\x04Type\x12\x10\n" +
 	"\x03Key\x18\x02 \x01(\tR\x03Key\x12\x18\n" +

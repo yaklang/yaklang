@@ -2345,8 +2345,10 @@ message StartMcpServerResponse {
   string Status = 1;
   // server message or error message
   string Message = 2;
-  // server URL
+  // SSE endpoint URL, e.g. http://host:port/sse
   string ServerUrl = 3;
+  // Streamable HTTP endpoint URL, e.g. http://host:port/mcp
+  string StreamableHttpUrl = 4;
 }
 
 message GetSpaceEngineAccountStatusRequest {
