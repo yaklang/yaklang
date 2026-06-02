@@ -1,0 +1,13 @@
+{
+  "version": "0",
+  "base_program_name": "ci-golang-base",
+  "main_sha": "",
+  "yak_version": "",
+  "database": {
+    "url": "https://PLACEHOLDER/not-published-yet.db.zst",
+    "sha256": "",
+    "size_bytes": 0,
+    "compression": "zst"
+  },
+  "updated_at": ""
+}
