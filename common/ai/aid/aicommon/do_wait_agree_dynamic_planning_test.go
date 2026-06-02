@@ -80,10 +80,13 @@ func mockAICallbackForReview(actionName, suggestion string) AICallbackType {
 }
 
 func newDynamicPlanningTestConfig(ctx context.Context, aiCallback AICallbackType, opts ...ConfigOption) *Config {
-	return NewTestConfig(ctx, append(opts, WithAICallbacks(&AICallbacks{
-		Original:           aiCallback,
-		QualityPriorityRaw: aiCallback,
-	}))...)
+	baseOpts := []ConfigOption{
+		WithAIAutoRetry(1),
+		WithAITransactionRetry(1),
+	}
+	baseOpts = append(baseOpts, opts...)
+	baseOpts = append(baseOpts, WithAICallback(aiCallback))
+	return NewTestConfig(ctx, baseOpts...)
 }
 
 func collectRequestAndResponseReferenceMaterials(t *testing.T, events <-chan *schema.AiOutputEvent, deadline <-chan time.Time) (string, string, string, string, map[string]bool) {
