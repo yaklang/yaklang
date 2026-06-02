@@ -1564,6 +1564,24 @@ func TestNoBodyBuffer_NoErrorLog(t *testing.T) {
 	require.NotNil(t, rsp)
 }
 
+func TestLowhttpTraceInfo_ParseDialXTraceInfo(t *testing.T) {
+	dialTrace := &netx.DialXTraceInfo{
+		TotalTime:        123 * time.Millisecond,
+		TCPtime:          45 * time.Millisecond,
+		TLSHandshakeTime: 67 * time.Millisecond,
+		TLSRetryCount:    2,
+		TLSRetryTips:     []string{"tip-a", "tip-b"},
+	}
+	trace := &LowhttpTraceInfo{}
+
+	trace.ParseDialXTraceInfo(dialTrace)
+
+	require.Same(t, dialTrace, trace.DialTraceInfo)
+	require.Equal(t, dialTrace.TotalTime, trace.ConnTime)
+	require.Equal(t, dialTrace.TCPtime, trace.TCPTime)
+	require.Equal(t, dialTrace.TLSHandshakeTime, trace.TLSHandshakeTime)
+}
+
 // TestNoBodyBuffer_NormalRequestsUnaffected verifies normal requests still work correctly
 func TestNoBodyBuffer_NormalRequestsUnaffected(t *testing.T) {
 	// This test ensures that the NoBodyBuffer condition in FixHTTPResponse doesn't affect normal requests

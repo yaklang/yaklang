@@ -343,12 +343,15 @@ type LowhttpTraceInfo struct {
 	TLSHandshakeTime time.Duration
 	// tcp dial 耗时
 	TCPTime time.Duration
+	// 原始 dial trace，保留底层更细的连接耗时与重试信息
+	DialTraceInfo *netx.DialXTraceInfo
 }
 
 func (l *LowhttpTraceInfo) ParseDialXTraceInfo(info *netx.DialXTraceInfo) {
 	if info == nil {
 		return
 	}
+	l.DialTraceInfo = info
 	l.ConnTime = info.TotalTime
 	l.TCPTime = info.TCPtime
 	l.TLSHandshakeTime = info.TLSHandshakeTime
