@@ -161,7 +161,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_SNI(t *testing.T) {
 				}
 				t.Fatal(err)
 			}
-			if strings.Contains(recv.Reason, "all tls strategy failed") {
+			if strings.Contains(recv.Reason, "TLS连接失败") {
 				handShankErrorCheck = true
 			}
 		}
@@ -187,7 +187,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_SNI(t *testing.T) {
 				}
 				t.Fatal(err)
 			}
-			if strings.Contains(recv.Reason, "all tls strategy failed") || strings.Contains(recv.Reason, token) {
+			if strings.Contains(recv.Reason, "TLS连接失败") || strings.Contains(recv.Reason, token) {
 				handShankErrorCheck = true
 			}
 		}
