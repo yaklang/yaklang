@@ -536,6 +536,12 @@ func buildReActOptions(ctx context.Context, config *AIEngineConfig, outputChan c
 			options = append(options, aicommon.WithAutoTieredAICallback(cb))
 		}
 	}
+	if config.QualityPriorityAICallback != nil {
+		options = append(options, aicommon.WithQualityPriorityAICallback(config.QualityPriorityAICallback))
+	}
+	if config.SpeedPriorityAICallback != nil {
+		options = append(options, aicommon.WithSpeedPriorityAICallback(config.SpeedPriorityAICallback))
+	}
 
 	// 把 user 端 ai.usageCallback(...) 透传到 React Config 上, Tiered AI
 	// 路径会从 Config.GetUserUsageCallback() 取出再注入到上游 chat opts.

@@ -20,8 +20,10 @@ type AIEngineConfig struct {
 	Timeout float64
 
 	// AI 服务配置
-	AIService  string // AI 服务名称，如 "openai", "deepseek" 等
-	AICallback aicommon.AICallbackType
+	AIService                 string // AI 服务名称，如 "openai", "deepseek" 等
+	AICallback                aicommon.AICallbackType
+	QualityPriorityAICallback aicommon.AICallbackType
+	SpeedPriorityAICallback   aicommon.AICallbackType
 
 	// UserUsageCallback 是用户脚本通过 ai.usageCallback(...) 注册的 token usage 回调.
 	// 由 WithAIConfig 从 aispec.AIConfigOption 列表中探测出来, 经 buildReActOptions
@@ -355,6 +357,18 @@ func WithAICallback(callback aicommon.AICallbackType) AIEngineConfigOption {
 	}
 }
 
+func WithQualityPriorityAICallback(callback aicommon.AICallbackType) AIEngineConfigOption {
+	return func(c *AIEngineConfig) {
+		c.QualityPriorityAICallback = callback
+	}
+}
+
+func WithSpeedPriorityAICallback(callback aicommon.AICallbackType) AIEngineConfigOption {
+	return func(c *AIEngineConfig) {
+		c.SpeedPriorityAICallback = callback
+	}
+}
+
 // WithAttachedResources 设置附加资源
 func WithAttachedResource(typ string, key string, value string) AIEngineConfigOption {
 	return func(c *AIEngineConfig) {
@@ -392,22 +406,50 @@ func WithAttachedAIForge(aiForgeName string) AIEngineConfigOption {
 	}
 }
 
+func loadAICallbackFromAIConfig(typeName string, opts ...aispec.AIConfigOption) aicommon.AICallbackType {
+	chatter, err := ai.LoadChater(typeName, opts...)
+	if err != nil {
+		log.Errorf("load ai service failed: %v", err)
+		return nil
+	}
+	return aicommon.AIChatToAICallbackType(chatter)
+}
+
+func applyUserUsageCallbackFromAIConfig(c *AIEngineConfig, opts ...aispec.AIConfigOption) {
+	// 探测 opts 中的 UsageCallback, 透传给 React Config 让 Tiered AI 路径
+	// (GetXxxAIModelCallback) 重新构造 chat opts 时能再次注入, 修复
+	// ai.usageCallback(...) 在 React loop 内不触发的 bug.
+	// 关键词: WithAIConfig UsageCallback 探测透传
+	if probe := aispec.NewDefaultAIConfig(opts...); probe != nil && probe.UsageCallback != nil {
+		c.UserUsageCallback = probe.UsageCallback
+	}
+}
+
 // WithAIConfig 设置 AI 配置
 func WithAIConfig(typeName string, opts ...aispec.AIConfigOption) AIEngineConfigOption {
 	return func(c *AIEngineConfig) {
-		chatter, err := ai.LoadChater(typeName, opts...)
-		if err != nil {
-			log.Errorf("load ai service failed: %v", err)
+		if cb := loadAICallbackFromAIConfig(typeName, opts...); cb != nil {
+			c.AICallback = cb
 		}
-		c.AICallback = aicommon.AIChatToAICallbackType(chatter)
+		applyUserUsageCallbackFromAIConfig(c, opts...)
+	}
+}
 
-		// 探测 opts 中的 UsageCallback, 透传给 React Config 让 Tiered AI 路径
-		// (GetXxxAIModelCallback) 重新构造 chat opts 时能再次注入, 修复
-		// ai.usageCallback(...) 在 React loop 内不触发的 bug.
-		// 关键词: WithAIConfig UsageCallback 探测透传
-		if probe := aispec.NewDefaultAIConfig(opts...); probe != nil && probe.UsageCallback != nil {
-			c.UserUsageCallback = probe.UsageCallback
+func WithQualityPriorityAIConfig(typeName string, opts ...aispec.AIConfigOption) AIEngineConfigOption {
+	return func(c *AIEngineConfig) {
+		if cb := loadAICallbackFromAIConfig(typeName, opts...); cb != nil {
+			c.QualityPriorityAICallback = cb
 		}
+		applyUserUsageCallbackFromAIConfig(c, opts...)
+	}
+}
+
+func WithSpeedPriorityAIConfig(typeName string, opts ...aispec.AIConfigOption) AIEngineConfigOption {
+	return func(c *AIEngineConfig) {
+		if cb := loadAICallbackFromAIConfig(typeName, opts...); cb != nil {
+			c.SpeedPriorityAICallback = cb
+		}
+		applyUserUsageCallbackFromAIConfig(c, opts...)
 	}
 }
 
