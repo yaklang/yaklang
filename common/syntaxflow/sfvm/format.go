@@ -156,6 +156,53 @@ func FormatRule(ruleContent string, opts ...RuleFormatOption) (rule string, err 
 	return rule, nil
 }
 
+// FormatRuleForBeautification 与 FormatRule 相同，但不在 SyntaxFlow 解析报错时失败；
+// 仅用于 desc/alert 文本合并，不校验整条规则语法。
+func FormatRuleForBeautification(ruleContent string, opts ...RuleFormatOption) (rule string, err error) {
+	defer func() {
+		if e := recover(); e != nil {
+			err = utils.Wrapf(utils.Error(e), "Panic for SyntaxFlow beautification format")
+		}
+	}()
+	compileErrors := make([]error, 0)
+	errHandler := antlr4util.SimpleSyntaxErrorHandler(func(msg string, start, end *memedit.Position) {
+		compileErrors = append(compileErrors, antlr4util.NewSourceCodeError(msg, start, end))
+	})
+	errLis := antlr4util.NewErrorListener(func(self *antlr4util.ErrorListener, recognizer antlr.Recognizer, offendingSymbol interface{}, line, column int, msg string, e antlr.RecognitionException) {
+		antlr4util.StringSyntaxErrorHandler(self, recognizer, offendingSymbol, line, column, msg, e)
+		errHandler(self, recognizer, offendingSymbol, line, column, msg, e)
+	})
+
+	lexer := sf.NewSyntaxFlowLexer(antlr.NewInputStream(ruleContent))
+	lexer.RemoveErrorListeners()
+	lexer.AddErrorListener(errLis)
+	astParser := sf.NewSyntaxFlowParser(antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel))
+	astParser.RemoveErrorListeners()
+	astParser.AddErrorListener(errLis)
+
+	flow := astParser.Flow()
+	if flow == nil {
+		return ruleContent, nil
+	}
+	if len(errLis.GetErrors()) > 0 {
+		log.Debugf("FormatRuleForBeautification: ignore %d syntax errors for desc/alert merge", len(errLis.GetErrors()))
+	}
+
+	editor := memedit.NewMemEditor(ruleContent)
+	var buf strings.Builder
+	format := NewRuleFormat(&buf)
+	format.editor = editor
+	for _, opt := range opts {
+		opt(format)
+	}
+	format.Visit(flow, editor)
+	rule = buf.String()
+	if rule == "" {
+		return ruleContent, nil
+	}
+	return rule, nil
+}
+
 func (f *RuleFormat) Visit(flow sf.IFlowContext, editor *memedit.MemEditor) {
 	i, _ := flow.(*sf.FlowContext)
 	if i == nil {
@@ -369,7 +416,13 @@ func (f *RuleFormat) VisitInfoDescription(desc sf.IDescriptionStatementContext) 
 			}
 
 			if keyType == SFDescKeyType_Rule_Id {
-				f.Write("\t%s: \"%s\"\n", string(keyType), f.ruleID)
+				rid := f.ruleID
+				if f.descHandler != nil {
+					if v := f.descHandler(string(keyType), ""); v != "" {
+						rid = v
+					}
+				}
+				f.Write("\t%s: \"%s\"\n", string(keyType), rid)
 				continue
 			}
 			if f.descHandler != nil {

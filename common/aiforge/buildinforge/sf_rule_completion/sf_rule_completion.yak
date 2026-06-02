@@ -1,0 +1,13 @@
+rule_name = cli.String("rule_name", cli.setVerboseName("规则名称"), cli.setHelp("规则名称，用于从数据库查询规则"))
+file_path = cli.String("file_path", cli.setVerboseName("规则文件路径"), cli.setHelp("规则文件路径，用于读取本地文件"))
+file_content = cli.String("file_content", cli.setVerboseName("规则文件内容"), cli.setHelp("规则文件内容（直接传入文本）"))
+query = cli.String("query", cli.setVerboseName("用户输入"), cli.setRequired(false), cli.setHelp("可选；未传时由协调器根据任务参数生成"))
+cli.check()
+
+forgeHandle = func(params, opts...) {
+    res, err = __DEFAULT_FORGE_HANDLE__(params, opts...)
+    if err != nil {
+        return nil, err
+    }
+    return res
+}
