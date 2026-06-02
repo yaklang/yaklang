@@ -1,0 +1,112 @@
+name: CI Infra Smoke
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/ci-infra-smoke.yml"
+      - "scripts/ci-ssa/**"
+      - "docs/ci-infra/**"
+
+concurrency:
+  group: ci-infra-smoke-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  hosted-smoke:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Runner environment
+        run: |
+          echo "::group::System"
+          uname -a
+          echo "::endgroup::"
+          echo "::group::Disk"
+          df -h
+          echo "::endgroup::"
+
+      - name: Public network (curl)
+        run: |
+          curl -fsSI "https://api.github.com/zen" | head -5
+          echo "curl ok"
+
+      - name: Probe get-yak-version.sh (no install)
+        run: |
+          if [ ! -f "./scripts/get-yak-version.sh" ]; then
+            echo "::error::scripts/get-yak-version.sh not found"
+            exit 1
+          fi
+          chmod +x ./scripts/get-yak-version.sh
+          SELECTED_VERSION=$(bash ./scripts/get-yak-version.sh --pattern '.*-beta[0-9]+$' --quiet || true)
+          if [ -z "$SELECTED_VERSION" ]; then
+            echo "::notice::No beta version matched; script ran but no version selected (non-fatal for smoke)"
+          else
+            echo "Selected yak version (probe only): $SELECTED_VERSION"
+          fi
+
+  storage-probe:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Read SSA manifest and probe storage URL
+        run: |
+          MANIFEST="./scripts/ci-ssa/manifest.example.json"
+          if [ ! -f "$MANIFEST" ]; then
+            echo "::error::Manifest not found: $MANIFEST"
+            exit 1
+          fi
+
+          URL=$(jq -r '.database.url // empty' "$MANIFEST")
+          if [ -z "$URL" ] || [ "$URL" = "null" ]; then
+            echo "::error::database.url missing in manifest"
+            exit 1
+          fi
+
+          if echo "$URL" | grep -q 'PLACEHOLDER'; then
+            echo "::notice::SSA database URL is placeholder; storage probe skipped (expected for v1)"
+            exit 0
+          fi
+
+          echo "Probing database URL: $URL"
+          HTTP_CODE=$(curl -sS -o /dev/null -w "%{http_code}" -I -L --max-time 30 "$URL" || echo "000")
+          echo "HTTP status: $HTTP_CODE"
+          case "$HTTP_CODE" in
+            200|301|302|307|308)
+              echo "Storage URL reachable"
+              ;;
+            *)
+              echo "::error::Storage URL not reachable (HTTP $HTTP_CODE)"
+              exit 1
+              ;;
+          esac
+
+  self-hosted-smoke:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: [self-hosted, linux, ssa-ci]
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Self-hosted runner environment
+        env:
+          SSA_CI_DATA_DIR: ${{ vars.SSA_CI_DATA_DIR || '/data/ci-ssa' }}
+        run: |
+          echo "::group::Host"
+          hostname
+          uname -a
+          echo "::endgroup::"
+          echo "::group::Disk"
+          df -h
+          echo "::endgroup::"
+          echo "SSA_CI_DATA_DIR=$SSA_CI_DATA_DIR"
+          if [ -d "$SSA_CI_DATA_DIR" ]; then
+            echo "Data directory exists: $SSA_CI_DATA_DIR"
+            ls -la "$SSA_CI_DATA_DIR" | head -20
+          else
+            echo "::warning::Data directory not found: $SSA_CI_DATA_DIR (create before v2 full compile)"
+          fi
