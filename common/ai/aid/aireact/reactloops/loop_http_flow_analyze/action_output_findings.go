@@ -8,13 +8,17 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+const outputFindingsActionDescription = "Persist reusable intermediate findings to the FINDINGS document. Use this SPARINGLY only when you have a durable observation worth carrying across later iterations, such as a confirmed suspicious pattern, cross-flow correlation, evidence gap, or rationale for dispatching fuzz tests. Provide the content either via the JSON field `findings` or the `FINDINGS` AITag block, but ONLY when `@action=\"output_findings\"`. NEVER attach `findings` to `directly_answer`, `finish`, `filter_and_match_http_flows`, `match_http_flows_with_matcher`, `get_http_flow_detail`, or `dispatch_fuzz_test`. Do not dump ordinary query results or duplicate final-answer prose here."
+
+const outputFindingsParamDescription = "Reusable findings in Markdown format. USE THIS FIELD ONLY IF `@action` IS `output_findings`. Keep it concise and durable: record stable conclusions, correlations, evidence gaps, or fuzz rationale. Do not use it for raw hit dumps, routine search summaries, or final answer text. Use ## headings to categorize (for example: ## Suspicious Patterns, ## Security Issues). Content is merged with existing findings and duplicates are removed automatically."
+
 var outputFindingsAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 	return reactloops.WithRegisterLoopActionWithStreamField(
 		"output_findings",
-		"Record intermediate analysis findings to the FINDINGS document. Use this when you discover noteworthy patterns, suspicious traffic, security issues, or any valuable observations during the analysis process. FINDINGS accumulate across iterations and prevent redundant searches. You can output findings via JSON field 'findings' or via FINDINGS AITag.",
+		outputFindingsActionDescription,
 		[]aitool.ToolOption{
 			aitool.WithStringParam(findingsFieldName,
-				aitool.WithParam_Description("Analysis findings in Markdown format. Use ## headings to categorize (e.g. ## Suspicious Patterns, ## Security Issues). Content is merged with existing findings, duplicates are automatically removed."),
+				aitool.WithParam_Description(outputFindingsParamDescription),
 				aitool.WithParam_Required(true),
 			),
 		},

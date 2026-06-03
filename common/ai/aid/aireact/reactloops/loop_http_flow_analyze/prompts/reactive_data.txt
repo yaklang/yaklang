@@ -7,7 +7,7 @@
 {{ if .Findings }}
 ### Accumulated Findings (FINDINGS)
 
-These are discoveries accumulated during analysis. They persist across iterations and help avoid redundant searches. When you discover new valuable information, use `output_findings` or include a `findings` field to append to this document.
+These are discoveries accumulated during analysis. They persist across iterations and help avoid redundant searches. Record them with the dedicated `output_findings` action only. The `findings` field is exclusive to `@action="output_findings"`; do not attach a `findings` field to `directly_answer` or any other action.
 
 <|FINDINGS_{{ .Nonce }}|>
 {{ .Findings }}
