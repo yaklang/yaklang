@@ -7,9 +7,11 @@ on:
     paths:
       - "common/**"
       - ".github/workflows/diff-code-check.yml"
+      - ".github/workflows/ci-ssa-base-weekly.yml"
       - ".github/actions/security-commenter/action.yml"
       - "common/ssa_bootstrapping/ci_rule/**"
       - "scripts/ssa-risk-tools/**"
+      - "scripts/ci-ssa/**"
       - "scripts/get-yak-version.sh"
 
 concurrency:
@@ -36,9 +38,12 @@ jobs:
           cache-key-prefix: 'diff-code-check'
 
   setup:
-    runs-on: ubuntu-22.04
+    runs-on: [self-hosted, linux, ssa-ci]
     needs: [check-wip]
-    if: needs.check-wip.outputs.should_run_tests == 'true'
+    if: >-
+      needs.check-wip.outputs.should_run_tests == 'true' &&
+      (github.event_name != 'pull_request' ||
+       github.event.pull_request.head.repo.full_name == github.repository)
     permissions:
       contents: read
       pull-requests: write
@@ -112,85 +117,17 @@ jobs:
 
       - name: Install Yak
         if: steps.validate.outputs.should_skip != 'true'
-        env: 
+        env:
           SKIP_SYNC_EMBED_RULE_IN_GITHUB: "true"
+        run: bash ./scripts/ci-ssa/install-yak-ci.sh
+
+      - name: Export SSA database paths
+        if: steps.validate.outputs.should_skip != 'true'
         run: |
-          echo "::group::Finding latest Yak version"
-          
-          # 使用脚本获取合适的版本（匹配 alpha-diff-check / alpha-code-scan / beta，排除 -yakit- 和 -irify-）
-          SELECTED_VERSION=$(bash ./scripts/get-yak-version.sh --pattern '.*-alpha.*-diff-check|.*-alpha.*-code-scan|.*-beta[0-9]+$')
-          
-          if [ -z "$SELECTED_VERSION" ]; then
-            echo "::error::No suitable version found (alpha-diff-check / alpha-code-scan / beta)"
-            exit 1
-          fi
-          
-          echo "Selected version: $SELECTED_VERSION"
-          echo "SELECTED_VERSION=$SELECTED_VERSION" >> $GITHUB_ENV
-          echo "::endgroup::"
-          
-          echo "::group::Downloading Yak binary"
-          
-          # 检测操作系统和架构
-          OS=""
-          ARCH=""
-          case "$(uname -s)" in
-            Linux*)   OS="linux" ;;
-            Darwin*)  OS="darwin" ;;
-            MINGW*)   OS="windows" ;;
-            *)        echo "::error::Unsupported OS: $(uname -s)"; exit 1 ;;
-          esac
-          
-          case "$(uname -m)" in
-            x86_64)   ARCH="amd64" ;;
-            aarch64)  ARCH="arm64" ;;
-            arm64)    ARCH="arm64" ;;
-            *)        echo "::error::Unsupported architecture: $(uname -m)"; exit 1 ;;
-          esac
-          
-          # Windows 需要 .exe 后缀
-          BINARY_NAME="yak_${OS}_${ARCH}"
-          if [ "$OS" = "windows" ]; then
-            BINARY_NAME="${BINARY_NAME}.exe"
-          fi
-          
-          DOWNLOAD_URL="https://aliyun-oss.yaklang.com/yak/${SELECTED_VERSION}/${BINARY_NAME}"
-          echo "Downloading from: $DOWNLOAD_URL"
-          
-          if ! curl -sS -L "$DOWNLOAD_URL" -o yak; then
-            echo "::error::Failed to download Yak binary"
-            exit 1
-          fi
-          
-          chmod +x yak
-          echo "::endgroup::"
-          
-          echo "::group::Verifying Yak installation"
-          if ! ./yak version; then
-            echo "::error::Yak installation verification failed"
-            exit 1
-          fi
-          
-          # 将 yak 移动到 PATH
-          if command -v sudo >/dev/null 2>&1; then
-            sudo mv yak /usr/local/bin/yak || sudo mv yak /usr/bin/yak || mv yak ~/.local/bin/yak
-          else
-            mv yak /usr/local/bin/yak 2>/dev/null || mv yak /usr/bin/yak 2>/dev/null || mv yak ~/.local/bin/yak
-          fi
-          
-          # 确保 yak 在 PATH 中
-          if ! command -v yak >/dev/null 2>&1; then
-            export PATH="$HOME/.local/bin:$PATH"
-          fi
-          
-          # 最终验证
-          if ! yak version; then
-            echo "::error::Yak installation verification failed after moving to PATH"
-            exit 1
-          fi
-          
-          echo "Yak installed successfully: $(yak version)"
-          echo "::endgroup::"
+          chmod +x ./scripts/ci-ssa/*.sh
+          source ./scripts/ci-ssa/export-ssa-db-env.sh
+          echo "SSA_CI_DATA_DIR=$SSA_CI_DATA_DIR" >> $GITHUB_ENV
+          echo "SSA_DATABASE_RAW=$SSA_DATABASE_RAW" >> $GITHUB_ENV
 
       - name: Generate Prog
         if: steps.validate.outputs.should_skip != 'true'
@@ -260,11 +197,21 @@ jobs:
         if: steps.validate.outputs.should_skip != 'true'
         id: scan
         run: |
-          echo "::group::Running security scan"
+          echo "::group::Running security scan (incremental)"
+          source ./scripts/ci-ssa/export-ssa-db-env.sh
+          ./scripts/ci-ssa/ensure-base-program.sh
+
+          SHORT_SHA="${{ env.HEAD_SHA }}"
+          SHORT_SHA="${SHORT_SHA:0:8}"
+          bash ./scripts/ci-ssa/generate-diff-scan-config.sh "${{ env.PR_NUMBER }}" "$SHORT_SHA" ./scan-config.json
+
           yak sync-rule
-          
-          # 运行扫描并捕获输出
-          SCAN_OUTPUT=$(yak code-scan -t ./fs.zip -l golang --rule-keyword golang --format irify-full -o risk --memory --file-perf-log --rule-perf-log --exclude-file **/vendor/**,vendor/**,**/classes/**,**/target/**,**include/**,**caches/**,**cache/**,**tmp/**,**alipay/**,**includes/**,**temp/**,**zh_cn/**,**zh_en/**,**plugins/**,**PHPExcel/**,**/tests/**,**/test/**,*.pb.go,*_test.go,**vulinbox/** 2>&1) || SCAN_EXIT_CODE=$?
+
+          SCAN_OUTPUT=$(yak code-scan \
+            --config ./scan-config.json \
+            --database "$SSA_DATABASE_RAW" \
+            --file-perf-log \
+            --rule-perf-log 2>&1) || SCAN_EXIT_CODE=$?
           
           if [ ! -z "$SCAN_EXIT_CODE" ] && [ "$SCAN_EXIT_CODE" != "0" ]; then
             echo "$SCAN_OUTPUT"

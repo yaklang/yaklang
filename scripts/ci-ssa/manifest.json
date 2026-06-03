@@ -4,10 +4,10 @@
   "main_sha": "",
   "yak_version": "",
   "database": {
-    "url": "https://PLACEHOLDER/not-published-yet.db.zst",
+    "url": "local://PLACEHOLDER/run-ci-ssa-base-weekly-first",
     "sha256": "",
     "size_bytes": 0,
-    "compression": "zst"
+    "compression": "none"
   },
   "updated_at": ""
 }

@@ -1,0 +1,39 @@
+{
+  "BaseInfo": {
+    "program_names": ["ci-yaklang-base"],
+    "language": "golang"
+  },
+  "CodeSource": {
+    "kind": "local",
+    "local_file": "."
+  },
+  "SSACompile": {
+    "enable_incremental_compile": false,
+    "re_compile": true,
+    "memory_compile": false,
+    "compile_concurrency": 4,
+    "file_performance_log": true,
+    "exclude_files": [
+      "**/vendor/**",
+      "vendor/**",
+      "**/classes/**",
+      "**/target/**",
+      "**include/**",
+      "**caches/**",
+      "**cache/**",
+      "**tmp/**",
+      "**alipay/**",
+      "**includes/**",
+      "**temp/**",
+      "**zh_cn/**",
+      "**zh_en/**",
+      "**plugins/**",
+      "**PHPExcel/**",
+      "**/tests/**",
+      "**/test/**",
+      "*.pb.go",
+      "*_test.go",
+      "**vulinbox/**"
+    ]
+  }
+}
