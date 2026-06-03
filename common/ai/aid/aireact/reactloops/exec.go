@@ -62,8 +62,8 @@ func isJSONEmbeddedAITagPrefix(peeked []byte, wrapperToken string) bool {
 // waitReadableStream blocks until the stream yields at least one byte or closes.
 // It lets callers avoid creating frontend stream cards for empty streams while
 // still preserving the first byte for later emit.
-func waitReadableStream(reader io.Reader) (*utils.BufferedPeekableReader, bool, error) {
-	peekedReader := utils.NewPeekableReader(utils.UTF8Reader(reader))
+func waitReadableStream(reader io.Reader) (*utils.BufferedUTF8PeekableReader, bool, error) {
+	peekedReader := utils.NewUTF8PeekableReader(reader)
 	firstByte, err := peekedReader.Peek(1)
 	if err != nil && len(firstByte) == 0 {
 		if errors.Is(err, io.EOF) {
