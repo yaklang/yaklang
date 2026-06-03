@@ -5,6 +5,7 @@ on:
   pull_request:
     paths:
       - ".github/workflows/ci-infra-smoke.yml"
+      - ".github/workflows/ci-ssa-base-weekly.yml"
       - "scripts/ci-ssa/**"
       - "docs/ci-infra/**"
 
