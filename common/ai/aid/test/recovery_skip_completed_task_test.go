@@ -17,7 +17,9 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/chanx"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func newRawTaskForRecovery(name, goal string) *aid.AiTask {
@@ -61,6 +63,7 @@ func coordinatorRootTaskForTest(t *testing.T, cod *aid.Coordinator) *aid.AiTask 
 
 func TestRecovery_SkipCompletedTasks(t *testing.T) {
 	sessionID := uuid.NewString()
+	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 100)
 
 	root := newRawTaskForRecovery("root", "root-goal")
 	doneMarker := uuid.NewString()
@@ -104,6 +107,9 @@ func TestRecovery_SkipCompletedTasks(t *testing.T) {
 		popped                  = make(map[string]int)
 		firstPlanTaskProgress   map[string]string
 		firstPlanProgressRecord bool
+		abortedPlanSyncID       = uuid.NewString()
+		abortedPlanRequested    bool
+		abortedSeenProcessing   bool
 		aiDoneCalls             int
 		aiAbortedCalls          int
 		aiTodoCalls             int
@@ -117,6 +123,7 @@ func TestRecovery_SkipCompletedTasks(t *testing.T) {
 		aicommon.WithContext(ctx),
 		aicommon.WithID(coordinatorID),
 		aicommon.WithDisableIntentRecognition(true),
+		aicommon.WithEventInputChanx(inputChan),
 		aicommon.WithPersistentSessionId(sessionID),
 		aicommon.WithGenerateReport(false),
 		aicommon.WithDisableAutoSkills(true),
@@ -140,6 +147,13 @@ func TestRecovery_SkipCompletedTasks(t *testing.T) {
 					firstPlanTaskProgress = make(map[string]string)
 					collectTaskProgressByIndex(rootTask, firstPlanTaskProgress)
 					firstPlanProgressRecord = true
+				}
+				if event.SyncID == abortedPlanSyncID {
+					currentPlanTaskProgress := make(map[string]string)
+					collectTaskProgressByIndex(rootTask, currentPlanTaskProgress)
+					if currentPlanTaskProgress[abortedTask.Index] == string(aicommon.AITaskState_Processing) {
+						abortedSeenProcessing = true
+					}
 				}
 				mu.Unlock()
 				return
@@ -165,16 +179,25 @@ func TestRecovery_SkipCompletedTasks(t *testing.T) {
 				return
 			}
 			idx := utils.InterfaceToString(taskMap["index"])
+			name := utils.InterfaceToString(taskMap["name"])
 			if idx == "" {
 				return
 			}
+			feedAbortedPlanSync := false
 			mu.Lock()
 			if eventType == "push_task" {
 				pushed[idx]++
+				if name == abortedTask.Name && !abortedPlanRequested {
+					abortedPlanRequested = true
+					feedAbortedPlanSync = true
+				}
 			} else if eventType == "pop_task" {
 				popped[idx]++
 			}
 			mu.Unlock()
+			if feedAbortedPlanSync {
+				inputChan.SafeFeed(SyncInputEventEx(aicommon.SYNC_TYPE_PLAN, abortedPlanSyncID))
+			}
 		}),
 		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := request.GetPrompt()
@@ -235,6 +258,8 @@ func TestRecovery_SkipCompletedTasks(t *testing.T) {
 	require.Equal(t, 1, popped["1-3"], "pending task should be popped exactly once in recovery")
 	require.Equal(t, string(aicommon.AITaskState_Completed), firstPlanTaskProgress["1-1"], "completed task should stay completed in recovered task tree")
 	require.Equal(t, string(aicommon.AITaskState_Aborted), firstPlanTaskProgress["1-2"], "aborted task should stay aborted in recovered task tree before retry")
+	require.True(t, abortedPlanRequested, "aborted task push should trigger a sync plan request during recovery")
+	require.True(t, abortedSeenProcessing, "sync plan triggered after aborted task push should show the task as processing")
 
 	require.Equal(t, 0, aiDoneCalls, "completed task should not trigger AI calls in recovery")
 	require.Greater(t, aiAbortedCalls, 0, "aborted task should trigger AI calls in recovery")
