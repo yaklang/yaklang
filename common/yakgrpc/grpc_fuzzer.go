@@ -353,6 +353,7 @@ func (s *Server) RedirectRequest(ctx context.Context, req *ypb.RedirectRequestPa
 	// 匹配响应
 	var httpTPLmatchersResult bool
 	var hitColor []string
+	var matcherFailed bool
 	if len(req.GetMatchers()) != 0 {
 		httpTplMatcher := make([]*YakFuzzerMatcher, 0)
 		for _, matcher := range req.GetMatchers() {
@@ -374,7 +375,7 @@ func (s *Server) RedirectRequest(ctx context.Context, req *ypb.RedirectRequestPa
 		}
 
 		matcherParams := utils.CopyMapInterface(mergedParams)
-		httpTPLmatchersResult, hitColor, _ = MatchColor(httpTplMatcher, &httptpl.RespForMatch{
+		httpTPLmatchersResult, hitColor, _, matcherFailed = MatchColor(httpTplMatcher, &httptpl.RespForMatch{
 			RawPacket:     rspRaw,
 			RequestPacket: rspIns.RawRequest,
 		}, matcherParams)
@@ -429,6 +430,10 @@ func (s *Server) RedirectRequest(ctx context.Context, req *ypb.RedirectRequestPa
 				})
 			}
 		}
+	}
+	if matcherFailed && rsp.Ok {
+		rsp.Ok = false
+		rsp.Reason = matcherActionFailReason
 	}
 	return rsp, nil
 }
@@ -711,7 +716,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 					}
 					var httpTPLmatchersResult bool
 					var hitColor []string
-					var discard bool
+					var discard, matcherFailed bool
 					for mergedParams := range s.PreRenderVariables(stream.Context(), req.GetParams(), req.GetIsHTTPS(), req.GetIsGmTLS(), false) {
 						existedParams := make(map[string]string) // 传入的参数
 						if mergedParams != nil {
@@ -730,7 +735,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 						for _, kv := range extractorResults { // 合并
 							matcherParams[kv.GetKey()] = kv.GetValue()
 						}
-						httpTPLmatchersResult, hitColor, discard = MatchColor(httpTplMatcher,
+						httpTPLmatchersResult, hitColor, discard, matcherFailed = MatchColor(httpTplMatcher,
 							&httptpl.RespForMatch{
 								RawPacket:     respModel.ResponseRaw,
 								Duration:      float64(respModel.DurationMs),
@@ -741,6 +746,10 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 							respModel.MatchedByMatcher = true
 							respModel.HitColor = strings.Join(hitColor, "|")
 							respModel.Discard = discard
+							if matcherFailed && respModel.Ok {
+								respModel.Ok = false
+								respModel.Reason = matcherActionFailReason
+							}
 							break
 						}
 					}
@@ -1256,7 +1265,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				)
 			}
 
-			var httpTPLmatchersResult, discard bool
+			var httpTPLmatchersResult, discard, matcherFailed bool
 			var hitColor []string
 			lowhttpResponse := result.LowhttpResponse
 
@@ -1277,7 +1286,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 					matcherParams[kv.GetKey()] = kv.GetValue()
 				}
 				matchColorStart := time.Now()
-				httpTPLmatchersResult, hitColor, discard = MatchColor(httpTplMatcher, &httptpl.RespForMatch{
+				httpTPLmatchersResult, hitColor, discard, matcherFailed = MatchColor(httpTplMatcher, &httptpl.RespForMatch{
 					RawPacket:     result.ResponseRaw,
 					Duration:      lowhttpResponse.GetDurationFloat(),
 					RequestPacket: result.RequestRaw,
@@ -1320,7 +1329,6 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			}
 
 			feedbackNormalResponseStart := time.Now()
-			task.HTTPFlowSuccessCount++
 			isAutoFixContentType := false
 			originContentType := ""
 			fixContentType := ""
@@ -1389,6 +1397,10 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				rsp.Ok = false
 				rsp.Reason = "empty response"
 			}
+			if matcherFailed && rsp.Ok {
+				rsp.Ok = false
+				rsp.Reason = matcherActionFailReason
+			}
 			if rsp.ResponseRaw != nil {
 				// 处理结果，相似度
 				header, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(rsp.ResponseRaw)
@@ -1440,6 +1452,11 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 					}
 				}
 			}
+			if rsp.Ok {
+				task.HTTPFlowSuccessCount++
+			} else {
+				task.HTTPFlowFailedCount++
+			}
 
 			if rsp.StatusCode > 0 {
 				// 通过长度过滤
@@ -1470,14 +1487,14 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				for i := 0; i < len(redirectPacket)-1; i++ {
 					redirectRes := redirectPacket[i].RespRecord
 					method, _, _ := lowhttp.GetHTTPPacketFirstLine(redirectRes.RawRequest)
-					var redirectMatchersResult, redirectDiscard bool
+					var redirectMatchersResult, redirectDiscard, redirectMatcherFailed bool
 					var redirectHitColor []string
 					if haveHTTPTplMatcher {
 						matcherParams := utils.CopyMapInterface(mergedParams)
 						for _, kv := range extractorResultsOrigin {
 							matcherParams[kv.GetKey()] = kv.GetValue()
 						}
-						redirectMatchersResult, redirectHitColor, redirectDiscard = MatchColor(httpTplMatcher, &httptpl.RespForMatch{
+						redirectMatchersResult, redirectHitColor, redirectDiscard, redirectMatcherFailed = MatchColor(httpTplMatcher, &httptpl.RespForMatch{
 							RawPacket:     redirectRes.RawPacket,
 							Duration:      redirectRes.GetDurationFloat(),
 							RequestPacket: redirectRes.RawRequest,
@@ -1489,7 +1506,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 							continue
 						} else {
 							if redirectMatchersResult {
-								redirectRes.Tags = append(redirectRes.Tags, hitColor...)
+								redirectRes.Tags = append(redirectRes.Tags, redirectHitColor...)
 							}
 						}
 
@@ -1541,6 +1558,10 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 								})
 							}
 						}
+					}
+					if redirectMatcherFailed && redirectRsp.Ok {
+						redirectRsp.Ok = false
+						redirectRsp.Reason = matcherActionFailReason
 					}
 
 					if redirectRsp.StatusCode > 0 {
@@ -2119,6 +2140,7 @@ func (s *Server) GetSystemDefaultDnsServers(ctx context.Context, req *ypb.Empty)
 var (
 	Action_Retain  = "retain"
 	Action_Discard = "discard"
+	Action_Fail    = "fail"
 )
 
 type YakFuzzerMatcher struct { // Added some display fields
@@ -2126,6 +2148,8 @@ type YakFuzzerMatcher struct { // Added some display fields
 	Color   string
 	Action  string
 }
+
+const matcherActionFailReason = "request failed intentionally by matcher action"
 
 func NewHttpFlowMatcherFromGRPCModel(m *ypb.HTTPResponseMatcher) *YakFuzzerMatcher {
 	res := &YakFuzzerMatcher{
@@ -2146,7 +2170,7 @@ func NewHttpFlowMatcherFromGRPCModel(m *ypb.HTTPResponseMatcher) *YakFuzzerMatch
 	return res
 }
 
-func MatchColor(m []*YakFuzzerMatcher, rsp *httptpl.RespForMatch, vars map[string]interface{}, suf ...string) (matched bool, hitColor []string, discard bool) {
+func MatchColor(m []*YakFuzzerMatcher, rsp *httptpl.RespForMatch, vars map[string]interface{}, suf ...string) (matched bool, hitColor []string, discard bool, markFailed bool) {
 	for _, flowMatcher := range m {
 		startTime := time.Now()
 		res, err := flowMatcher.Matcher.Execute(rsp, vars, suf...)
@@ -2156,6 +2180,10 @@ func MatchColor(m []*YakFuzzerMatcher, rsp *httptpl.RespForMatch, vars map[strin
 		}
 		if err != nil {
 			log.Errorf("yak match err :%s", err)
+		}
+
+		if CheckShouldMarkFailed(flowMatcher.Action, res) {
+			markFailed = true
 		}
 
 		if CheckShouldDiscard(flowMatcher.Action, res) { // if should discard, return directly
@@ -2175,6 +2203,10 @@ func MatchColor(m []*YakFuzzerMatcher, rsp *httptpl.RespForMatch, vars map[strin
 
 func CheckShouldDiscard(action string, matchRes bool) bool {
 	return (action == Action_Retain && !matchRes) || (action == Action_Discard && matchRes)
+}
+
+func CheckShouldMarkFailed(action string, matchRes bool) bool {
+	return action == Action_Fail && matchRes
 }
 
 func SetFuzzerRespTraceInfo(resp *ypb.FuzzerResponse, traceInfo *lowhttp.LowhttpTraceInfo) {

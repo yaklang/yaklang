@@ -3,12 +3,17 @@ package yakgrpc
 import (
 	"context"
 	"net"
+	"strconv"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -142,4 +147,135 @@ Host: ` + utils.HostPort(targetHost, targetPort) + `
 	if taskData.BasicInfo.HTTPFlowTotal != 5 && taskData.BasicInfo.HTTPFlowSuccessCount != 5 {
 		t.Fatalf("task check failed: %#v", taskData.BasicInfo)
 	}
+}
+
+func TestGRPCMUSTPASS_HTTPFuzzer_MatcherActionFailRetry(t *testing.T) {
+	c, err := NewLocalClient()
+	require.NoError(t, err)
+
+	retryToken := "retry-" + uuid.NewString()[:8]
+	okToken := "ok-" + uuid.NewString()[:8]
+	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		index, _ := strconv.Atoi(lowhttp.GetHTTPRequestQueryParam(req, "a"))
+		body := okToken
+		if index%2 == 1 {
+			body = retryToken
+		}
+		return []byte("HTTP/1.1 200 OK\r\nContent-Length: " + strconv.Itoa(len(body)) + "\r\n\r\n" + body)
+	})
+
+	stream, err := c.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
+		ForceFuzz: true,
+		Request:   "GET /?a={{i(0-5)}} HTTP/1.1\r\nHost: " + utils.HostPort(host, port) + "\r\n\r\n",
+		Matchers: []*ypb.HTTPResponseMatcher{
+			{
+				MatcherType: "word",
+				Scope:       "body",
+				Condition:   "and",
+				Group:       []string{retryToken},
+				ExprType:    "nuclei-dsl",
+				Action:      Action_Fail,
+				HitColor:    "orange",
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	var taskID int64
+	totalCount := 0
+	failedCount := 0
+	for {
+		rsp, err := stream.Recv()
+		if err != nil {
+			break
+		}
+		totalCount++
+		taskID = rsp.GetTaskId()
+		if strings.Contains(string(rsp.ResponseRaw), retryToken) {
+			require.False(t, rsp.Ok)
+			require.Equal(t, matcherActionFailReason, rsp.Reason)
+			require.True(t, rsp.MatchedByMatcher)
+			require.Equal(t, "orange", rsp.HitColor)
+			failedCount++
+		} else {
+			require.True(t, rsp.Ok)
+		}
+	}
+	require.Equal(t, 6, totalCount)
+	require.Equal(t, 3, failedCount)
+	require.NotZero(t, taskID)
+
+	require.NoError(t, utils.AttemptWithDelay(10, 200*time.Millisecond, func() error {
+		responseRsp, err := c.QueryHTTPFuzzerResponseByTaskId(context.Background(), &ypb.QueryHTTPFuzzerResponseByTaskIdRequest{
+			TaskId: taskID,
+			Pagination: &ypb.Paging{
+				Page:    1,
+				Limit:   20,
+				OrderBy: "id",
+				Order:   "desc",
+			},
+		})
+		if err != nil {
+			return err
+		}
+		if responseRsp.GetTotal() != 6 {
+			return utils.Errorf("unexpected response total: %d", responseRsp.GetTotal())
+		}
+		savedFailedCount := 0
+		for _, item := range responseRsp.GetData() {
+			if !item.GetOk() {
+				savedFailedCount++
+			}
+		}
+		if savedFailedCount != 3 {
+			return utils.Errorf("unexpected saved failed count: %d", savedFailedCount)
+		}
+
+		taskRsp, err := c.QueryHistoryHTTPFuzzerTaskEx(context.Background(), &ypb.QueryHistoryHTTPFuzzerTaskExParams{
+			Pagination: &ypb.Paging{
+				Page:    1,
+				Limit:   20,
+				OrderBy: "id",
+				Order:   "desc",
+			},
+		})
+		if err != nil {
+			return err
+		}
+		for _, item := range taskRsp.GetData() {
+			if int64(item.GetBasicInfo().GetId()) != taskID {
+				continue
+			}
+			if item.GetBasicInfo().GetHTTPFlowFailedCount() != 3 || item.GetBasicInfo().GetHTTPFlowSuccessCount() != 3 {
+				return utils.Errorf("unexpected task stats: %#v", item.GetBasicInfo())
+			}
+			return nil
+		}
+		return utils.Errorf("task %d not found", taskID)
+	}))
+
+	retryStream, err := c.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
+		RetryTaskID: taskID,
+	})
+	require.NoError(t, err)
+
+	retryCount := 0
+	for {
+		rsp, err := retryStream.Recv()
+		if err != nil {
+			break
+		}
+		if len(rsp.GetRequestRaw()) == 0 {
+			continue
+		}
+		index, _ := strconv.Atoi(lowhttp.GetHTTPRequestQueryParam(rsp.GetRequestRaw(), "a"))
+		if index%2 == 0 {
+			require.True(t, rsp.Ok)
+			continue
+		}
+		retryCount++
+		require.True(t, rsp.Ok)
+		require.Contains(t, string(rsp.ResponseRaw), retryToken)
+	}
+	require.Equal(t, 3, retryCount)
 }
