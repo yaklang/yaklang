@@ -4,6 +4,82 @@
 - 缺口：注明缺失的证据或需要收紧的过滤器。
 - 下一步：列出要调用的下一个操作（filter_and_match_http_flows/match_http_flows_with_matcher/get_http_flow_detail）及具体参数。
 
+## findings 字段使用约束
+
+- `findings` 只允许出现在 `@action` 为 `output_findings` 的输出中；它是这个 action 的专用 payload。
+- `findings` **绝不能**附带到 `directly_answer`、`finish`、`filter_and_match_http_flows`、`match_http_flows_with_matcher`、`get_http_flow_detail`、`dispatch_fuzz_test`。
+- `directly_answer` 只能使用 `answer_payload` 或 `FINAL_ANSWER`；不要混入 `findings`，否则容易让最终答复字段丢失。
+- 只有当内容属于“值得跨迭代保留的中间结论”时，才调用 `output_findings`。普通查询结果、一次性命中列表、临时推测、最终总结不要重复写入 FINDINGS。
+
+## 克制使用 findings 的范例
+
+### 示例 A - 普通查询，不带 findings
+```json
+{
+  "@action": "filter_and_match_http_flows",
+  "human_readable_thought": "先缩小到登录流量",
+  "methods": "POST",
+  "url_contains": "/login,/auth",
+  "status_code": "200,302",
+  "limit": 20
+}
+```
+
+### 示例 B - 发现可复用结论时，单独调用 output_findings
+```json
+{
+  "@action": "output_findings",
+  "human_readable_thought": "记录已确认的登录线索",
+  "findings": "## 可疑登录接口\n- flow_id: 18273\n- URL: /api/auth/login\n- 结论: 响应体出现 token 与 userId，说明该接口返回认证凭据。\n- 证据缺口: 还需要查看同一会话下 refresh/logout 是否存在。"
+}
+```
+
+### 示例 C - findings 内容较长时，用 FINDINGS AITag，不再内联 findings 字段
+```json
+{
+  "@action": "output_findings",
+  "human_readable_thought": "补充登录链路结论"
+}
+```
+
+<|FINDINGS_CURRENT_NONCE|>
+## 认证链路初步结论
+
+- flow_id: 18273
+- URL: /api/auth/login
+- 结论: 登录成功响应会下发 token 与 userId，属于后续认证链路的核心入口。
+- 关联线索: 同批流量中已看到 `/api/auth/refresh` 与 `/api/auth/logout` 路径，但还未读取详情。
+- 证据缺口: 需要进一步确认 refresh 是否续签同一 token、logout 是否真正失效服务端会话。
+<|FINDINGS_END_CURRENT_NONCE|>
+
+### 示例 D - 最终答复时必须给 answer_payload，不带 findings
+```json
+{
+  "@action": "directly_answer",
+  "answer_payload": "当前已确认 /api/auth/login 会返回 token 和 userId。下一步建议继续查看 refresh/logout 相关 flow，确认 token 生命周期与注销行为。"
+}
+```
+
+### 示例 E - 最终答复较长时，用 FINAL_ANSWER AITag，不带 findings
+```json
+{
+  "@action": "directly_answer"
+}
+```
+
+<|FINAL_ANSWER_CURRENT_NONCE|>
+## 当前阶段结论
+
+- 已确认 `/api/auth/login` 是认证入口，成功响应会返回 token 与 userId。
+- 已在同批流量中看到 `/api/auth/refresh`、`/api/auth/logout` 的路径线索，但还缺少详情证据。
+
+## 下一步建议
+
+1. 读取 refresh flow，确认是否续签同一身份上下文。
+2. 读取 logout flow，确认注销后 token 是否失效。
+3. 对比同一用户在三条链路中的 Cookie / Authorization 头是否一致。
+<|FINAL_ANSWER_END_CURRENT_NONCE|>
+
 **重要提示**：当 action 输出内容过大时，系统会自动将完整结果保存到文件中，并在反馈消息中显示文件名和预览内容。此时你必须使用 `read_file` 工具读取保存的文件以获取关键信息。
 
 ## 工具选择建议

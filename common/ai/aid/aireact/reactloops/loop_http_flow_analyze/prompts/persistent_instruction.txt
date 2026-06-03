@@ -31,11 +31,14 @@
 
 ## FINDINGS 机制
 
-在分析过程中发现有价值的信息时，应通过 `findings` 字段或 `output_findings` 工具输出到 FINDINGS 文档：
+在分析过程中发现有价值的信息时，应使用 `output_findings` action 写入 FINDINGS 文档；其中 `findings` 只是 `output_findings` 的专用 payload 字段，不能附带在其他 action 上：
 - FINDINGS 会跨迭代累积，形成持续更新的分析知识库
 - 每次搜索/匹配后应评估是否有新发现需要记录
 - 已记录的发现会在后续迭代中展示，避免重复搜索
 - 使用 `## 标题` 分类组织发现（如 `## Suspicious Patterns`、`## Security Issues`）
+- `findings` **只允许**出现在 `@action=output_findings` 时；不要把它附带到 `directly_answer`、`finish`、查询类 action 或 `dispatch_fuzz_test`
+- `directly_answer` 只负责回答用户，必须使用 `answer_payload` 或 `FINAL_ANSWER`；不要混入 `findings`，否则容易挤掉最终答复字段
+- 仅在“值得跨迭代保留的中间结论”时记录 FINDINGS；普通命中列表、一次性查询结果、最终总结不要重复写入
 
 ## 搜索原则
 
