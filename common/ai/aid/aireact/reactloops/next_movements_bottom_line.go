@@ -9,9 +9,8 @@ import (
 //
 // 任何 action (除了 adjust_todolist 自己, 它的 ActionHandler 会单独调
 // applyAdjustTodolistMovements) 如果在 JSON 中携带了 next_movements 字段,
-// 都立即 apply 到全局 TODO store 并广播完整事件三联 (snapshot /
-// todo_list_update / NEXT_MOVEMENTS timeline breadcrumb), 与 adjust_todolist
-// / verification 路径字节级一致.
+// 都立即 apply 到全局 TODO store 并广播 todo_list_update + NEXT_MOVEMENTS
+// timeline breadcrumb, 与 adjust_todolist / verification 路径字节级一致.
 //
 // 设计动机:
 //
@@ -21,9 +20,8 @@ import (
 //	处理 apply + emit, 其他 action 的 next_movements 只走了 stream handler
 //	这一支 (因为 streamFields["next_movements"] 被全局共享注册, 见
 //	callAITransaction), 导致前端"待办事项"显示已出现, 但 store 没更新,
-//	"待办" (next_movements_snapshot) 不刷新, EVENT_TYPE_TODO_LIST_UPDATE
-//	永远缺席, 下一轮 prompt 的 TODO snapshot 也看不到这些 id — 用户看到
-//	的是孤儿待办.
+//	EVENT_TYPE_TODO_LIST_UPDATE 永远缺席, 下一轮 prompt 的 TODO snapshot
+//	也看不到这些 id — 用户看到的是孤儿待办.
 //
 // 实现:
 //   - actionType == adjust_todolist 时跳过 (避免与 adjust_todolist 自己的

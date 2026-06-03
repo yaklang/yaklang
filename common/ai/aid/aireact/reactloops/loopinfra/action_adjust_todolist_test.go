@@ -282,103 +282,10 @@ func TestAdjustTodolist_Handler_AppliesAddOpAndEmitsTodoListUpdate(t *testing.T)
 	assert.Contains(t, tlString, "DONE[cleanup_temp]")
 }
 
-// TestAdjustTodolist_Handler_EmitsMarkdownSnapshotStream 验证: handler 在
-// apply 之前会调用 GetVerificationTodoMarkdownDelta 拿到 markdown 预览, 并把
-// 它以 next_movements_snapshot 节点 + text/markdown content-type 的流事件发出,
-// 与 verification 路径同名同形, 让前端 markdown 渲染器无需感知来源.
-//
-// 关键词: adjust_todolist markdown 伪流测试, next_movements_snapshot 节点对齐,
-//
-//	text/markdown content-type, apply 前算 delta
-func TestAdjustTodolist_Handler_EmitsMarkdownSnapshotStream(t *testing.T) {
-	ctx := context.Background()
-	captured := make([]*schema.AiOutputEvent, 0, 8)
-	mu := new(sync.Mutex)
-	captureFn := func(e *schema.AiOutputEvent) {
-		mu.Lock()
-		captured = append(captured, e)
-		mu.Unlock()
-	}
-	invoker, cfg := newAdjustTodolistInvoker(t, ctx, captureFn)
-	cfg.markdownReturn = "- [+]: [id: create_file]: create A.md\n- [DONE]: [id: cleanup_temp]"
-
-	task := newTestTask(ctx)
-	invoker.testInvoker.currentTask = task
-
-	loop := reactloops.NewMinimalReActLoop(invoker.GetConfig(), invoker)
-	loop.SetCurrentTask(task)
-
-	action := buildAdjustTodolistAction(t, `{
-		"@action": "adjust_todolist",
-		"next_movements": [
-			{"op": "add", "id": "create_file", "content": "create A.md"},
-			{"op": "done", "id": "cleanup_temp"}
-		]
-	}`)
-
-	require.NoError(t, loopAction_AdjustTodolist.ActionVerifier(loop, action))
-	op := reactloops.NewActionHandlerOperator(task)
-	loopAction_AdjustTodolist.ActionHandler(loop, action, op)
-
-	// 等待 stream 异步派发完毕, 否则下方对 captured 的断言可能在 chunk
-	// 写入前就跑了, 测试会出现概率性失败.
-	// 关键词: WaitForStream 同步, stream chunk 时序
-	cfg.MockedAIConfig.Emitter.WaitForStream()
-
-	// markdown delta 必须在 apply 之前算: cfg.markdownAsked 应该在 applyCalls
-	// 增加之前就已经被调用. 由于 mock 是同步串行, 我们通过两个计数都为 >= 1
-	// 来验证调用关系.
-	cfg.mu.Lock()
-	markdownAsked := cfg.markdownAsked
-	markdownScope := cfg.markdownScope
-	applyCalls := cfg.applyCalls
-	markdownLastOps := append([]aicommon.VerifyNextMovement(nil), cfg.markdownLastOps...)
-	cfg.mu.Unlock()
-	require.Equal(t, 1, markdownAsked,
-		"handler should ask for markdown delta exactly once per round")
-	require.Equal(t, task.GetId(), markdownScope.TaskID)
-	require.Equal(t, task.GetIndex(), markdownScope.TaskIndex)
-	require.Equal(t, 1, applyCalls,
-		"handler should still apply movements exactly once")
-	require.Len(t, markdownLastOps, 2,
-		"markdown delta must be computed against the round's movements")
-	assert.Equal(t, "add", markdownLastOps[0].Op)
-	assert.Equal(t, "done", markdownLastOps[1].Op)
-
-	mu.Lock()
-	defer mu.Unlock()
-	var (
-		markdownChunk *schema.AiOutputEvent
-		streamBody    strings.Builder
-	)
-	for _, e := range captured {
-		if e.NodeId != "next_movements_snapshot" {
-			continue
-		}
-		if e.Type != schema.EVENT_TYPE_STREAM {
-			continue
-		}
-		if markdownChunk == nil {
-			markdownChunk = e
-		}
-		streamBody.Write(e.StreamDelta)
-	}
-	require.NotNil(t, markdownChunk,
-		"expected at least one next_movements_snapshot stream chunk")
-	assert.Equal(t, "text/markdown", markdownChunk.ContentType,
-		"snapshot stream must be tagged as text/markdown for the frontend markdown renderer")
-	assembled := streamBody.String()
-	assert.Contains(t, assembled, "create_file",
-		"assembled markdown stream should contain the new TODO id")
-	assert.Contains(t, assembled, "cleanup_temp",
-		"assembled markdown stream should contain the done TODO id")
-}
-
-// TestAdjustTodolist_Handler_SkipsMarkdownStreamWhenEmpty 验证: 当 markdown
-// delta 渲染结果为空字符串时, handler 必须**不**发布伪流事件, 避免给前端
-// 喂空 chunk 触发面板抖动. 这是一种降噪契约.
-// 关键词: adjust_todolist 空 markdown 不发流, 降噪契约
-func TestAdjustTodolist_Handler_SkipsMarkdownStreamWhenEmpty(t *testing.T) {
+// TestAdjustTodolist_Handler_DoesNotEmitNextMovementsSnapshotStream 验证:
+// handler 只广播 todo_list_update, 不再 emit next_movements_snapshot 聊天卡片.
+// 关键词: adjust_todolist 不发待办流, todo_list_update 单通道
+func TestAdjustTodolist_Handler_DoesNotEmitNextMovementsSnapshotStream(t *testing.T) {
 	ctx := context.Background()
 	captured := make([]*schema.AiOutputEvent, 0, 4)
 	mu := new(sync.Mutex)
@@ -388,7 +295,6 @@ func TestAdjustTodolist_Handler_SkipsMarkdownStreamWhenEmpty(t *testing.T) {
 		mu.Unlock()
 	}
 	invoker, cfg := newAdjustTodolistInvoker(t, ctx, captureFn)
-	cfg.markdownReturn = "   \n  " // 全空白, 走 TrimSpace 之后等于空
 
 	task := newTestTask(ctx)
 	invoker.testInvoker.currentTask = task
@@ -409,7 +315,7 @@ func TestAdjustTodolist_Handler_SkipsMarkdownStreamWhenEmpty(t *testing.T) {
 	defer mu.Unlock()
 	for _, e := range captured {
 		assert.NotEqual(t, "next_movements_snapshot", e.NodeId,
-			"empty markdown delta must not emit a next_movements_snapshot stream")
+			"adjust_todolist must not emit next_movements_snapshot stream")
 	}
 }
 
