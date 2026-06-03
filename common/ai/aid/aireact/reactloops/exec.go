@@ -1,7 +1,6 @@
 package reactloops
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"errors"
@@ -58,6 +57,21 @@ func isJSONEmbeddedAITagPrefix(peeked []byte, wrapperToken string) bool {
 		break
 	}
 	return bytes.HasPrefix(peeked[i:], []byte(wrapperToken))
+}
+
+// waitReadableStream blocks until the stream yields at least one byte or closes.
+// It lets callers avoid creating frontend stream cards for empty streams while
+// still preserving the first byte for later emit.
+func waitReadableStream(reader io.Reader) (*utils.BufferedPeekableReader, bool, error) {
+	peekedReader := utils.NewPeekableReader(utils.UTF8Reader(reader))
+	firstByte, err := peekedReader.Peek(1)
+	if err != nil && len(firstByte) == 0 {
+		if errors.Is(err, io.EOF) {
+			return nil, false, nil
+		}
+		return nil, false, err
+	}
+	return peekedReader, true, nil
 }
 
 func (r *ReActLoop) buildActionTagOption(emitter *aicommon.Emitter, streamWG *sync.WaitGroup, taskIndex string, nonce string) []aicommon.ActionMakerOption {
@@ -119,6 +133,19 @@ func (r *ReActLoop) buildActionTagOption(emitter *aicommon.Emitter, streamWG *sy
 					contentType = "text/plain"
 				}
 
+				// check empty tag
+				peekedReader, readable, err := waitReadableStream(fieldReader)
+				if err != nil {
+					log.Warnf("field stream handler[%s]: failed waiting first byte before emit: %v", v.TagName, err)
+					r.Set(v.VariableName, "")
+					return
+				}
+				if !readable {
+					log.Debugf("field stream handler[%s]: stream closed before first byte, skipping empty emit", v.TagName)
+					r.Set(v.VariableName, "")
+					return
+				}
+
 				// JSON-embedded AITag wrapper de-dup:
 				// 同一个字段 (例如 facts) 会被 ActionMaker 同时通过 JSON 字段流和 AITag
 				// 流两条路径推到当前 handler 里, 各 emit 一次, 导致前端"事实"事件重复.
@@ -139,7 +166,6 @@ func (r *ReActLoop) buildActionTagOption(emitter *aicommon.Emitter, streamWG *sy
 				//
 				// 关键词: 字段流去重, JSON-embedded AITag, FACTS 重复 emit 修复,
 				//        peek 检测 <|TagName_ 前缀, 兼容 JSON 外层引号, drain 静默丢弃
-				peekedReader := bufio.NewReaderSize(utils.UTF8Reader(fieldReader), 4096)
 				wrapperToken := "<|" + v.TagName + "_"
 				const peekWindow = 32
 				peeked, _ := peekedReader.Peek(peekWindow)
@@ -157,7 +183,7 @@ func (r *ReActLoop) buildActionTagOption(emitter *aicommon.Emitter, streamWG *sy
 				teedReader := io.TeeReader(peekedReader, &result)
 				wg := sync.WaitGroup{}
 				wg.Add(1)
-				emitter.EmitStreamEventWithContentType(
+				_, eventErr := emitter.EmitStreamEventWithContentType(
 					nodeId, teedReader, taskIndex, contentType,
 					func() {
 						defer wg.Done()
@@ -177,6 +203,12 @@ func (r *ReActLoop) buildActionTagOption(emitter *aicommon.Emitter, streamWG *sy
 						}
 					},
 				)
+				if eventErr != nil {
+					wg.Done()
+					r.Set(v.VariableName, result.String())
+					log.Errorf("tag[%s] EmitStreamEventWithContentType failed: %v", v.TagName, eventErr)
+					return
+				}
 				wg.Wait()
 			}),
 		)
@@ -304,7 +336,18 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 						log.Debugf("stream handler started for field [%s]", key)
 						r.loadingStatus(fmt.Sprintf("处理流字段 [%s] / Processing Stream Field [%s]", key, key))
 
-						reader = utils.JSONStringReader(reader)
+						preparedReader, readable, readableErr := waitReadableStream(utils.JSONStringReader(reader))
+						if readableErr != nil {
+							log.Warnf("stream handler for field [%s] failed waiting first byte: %v", key, readableErr)
+							done()
+							return
+						}
+						if !readable {
+							log.Debugf("stream handler for field [%s] got empty stream, skipping empty emit", key)
+							done()
+							return
+						}
+
 						fieldIns, ok := streamFields.Get(key)
 						if !ok {
 							log.Warnf("stream field [%s] not found in streamFields, skipping", key)
@@ -320,13 +363,13 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 								log.Debugf("stream copy goroutine for field [%s] completed, took %v", key, time.Since(copyStartTime))
 							}()
 							if field.StreamHandler != nil {
-								field.StreamHandler(reader, pw)
+								field.StreamHandler(preparedReader, pw)
 								return
 							}
 							if field.Prefix != "" {
 								pw.WriteString(field.Prefix + ": ")
 							}
-							n, copyErr := io.Copy(pw, reader)
+							n, copyErr := io.Copy(pw, preparedReader)
 							if copyErr != nil {
 								log.Warnf("stream copy for field [%s] error: %v (copied %d bytes)", key, copyErr, n)
 							} else {
