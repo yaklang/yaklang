@@ -41,18 +41,18 @@ func collectIterationFindings(loop *reactloops.ReActLoop) {
 	if lastAction == nil {
 		return
 	}
-	if lastAction.ActionType == "output_findings" || lastAction.ActionType == "" {
+	if lastAction.ActionType == httpFlowEvidenceActionName || lastAction.ActionType == "" {
 		return
 	}
 	if lastAction.ActionParams == nil {
 		return
 	}
-	incoming := normalizeFindings(utils.InterfaceToString(lastAction.ActionParams[findingsFieldName]))
+	incoming := normalizeHTTPFlowEvidence(utils.InterfaceToString(lastAction.ActionParams[httpFlowEvidenceFieldName]))
 	if incoming == "" {
 		return
 	}
-	if _, changed := appendFindings(loop, incoming); changed {
-		log.Infof("http_flow_analyze: post-iteration findings hook merged findings after action=%s", lastAction.ActionType)
+	if _, changed := appendHTTPFlowEvidence(loop, incoming); changed {
+		log.Infof("http_flow_analyze: post-iteration evidence hook merged evidence after action=%s", lastAction.ActionType)
 	}
 }
 
@@ -69,9 +69,9 @@ func collectFinalizeContextMaterials(loop *reactloops.ReActLoop, reason any) str
 		}
 	}
 
-	if findings := strings.TrimSpace(loop.Get(findingsKey)); findings != "" {
-		ctx.WriteString("## Accumulated Findings\n\n")
-		ctx.WriteString(findings)
+	if evidence := strings.TrimSpace(loop.Get(httpFlowEvidenceKey)); evidence != "" {
+		ctx.WriteString("## Accumulated HTTP Flow Evidence\n\n")
+		ctx.WriteString(evidence)
 		ctx.WriteString("\n\n")
 	}
 
@@ -134,7 +134,7 @@ func deliverFinalAnswerFallback(loop *reactloops.ReActLoop, invoker aicommon.AII
 You are an HTTP traffic analysis expert. Based on the analysis context below, generate a complete analysis report for the user.
 
 Requirements:
-1. Summarize all collected traffic information and findings
+1. Summarize all collected traffic information and HTTP flow evidence
 2. Answer the user's question based on available evidence
 3. If information is insufficient, explain what was attempted and possible reasons
 4. Provide concrete discoveries and actionable recommendations

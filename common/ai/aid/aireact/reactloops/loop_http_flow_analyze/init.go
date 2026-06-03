@@ -45,7 +45,7 @@ func init() {
 					renderMap := map[string]any{
 						"Nonce":                nonce,
 						"UserInput":            loop.GetCurrentTask().GetUserInput(),
-						"Findings":             loop.Get(findingsKey),
+						"HTTPFlowEvidence":     loop.Get(httpFlowEvidenceKey),
 						"RecentActionsSummary": buildRecentActionsPrompt(loop),
 						"LastQuerySummary":     loop.Get("last_query_summary"),
 						"LastMatchSummary":     loop.Get("last_match_summary"),
@@ -59,7 +59,7 @@ func init() {
 				getHTTPFlowDetailAction(r),
 				filterAndMatchHTTPFlowsAction(r),
 				matchHTTPFlowsWithSimpleMatcherAction(r),
-				outputFindingsAction(r),
+				recordHTTPFlowEvidenceAction(r),
 				dispatchFuzzTestAction(r),
 				buildPostIterationHook(r),
 			}
