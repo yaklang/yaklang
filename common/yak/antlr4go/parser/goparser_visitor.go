@@ -34,6 +34,9 @@ type GoParserVisitor interface {
 	// Visit a parse tree produced by GoParser#constSpec.
 	VisitConstSpec(ctx *ConstSpecContext) interface{}
 
+	// Visit a parse tree produced by GoParser#identifier.
+	VisitIdentifier(ctx *IdentifierContext) interface{}
+
 	// Visit a parse tree produced by GoParser#identifierList.
 	VisitIdentifierList(ctx *IdentifierListContext) interface{}
 

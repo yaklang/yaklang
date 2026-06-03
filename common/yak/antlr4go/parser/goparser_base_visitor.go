@@ -43,6 +43,10 @@ func (v *BaseGoParserVisitor) VisitConstSpec(ctx *ConstSpecContext) interface{} 
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseGoParserVisitor) VisitIdentifier(ctx *IdentifierContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseGoParserVisitor) VisitIdentifierList(ctx *IdentifierListContext) interface{} {
 	return v.VisitChildren(ctx)
 }

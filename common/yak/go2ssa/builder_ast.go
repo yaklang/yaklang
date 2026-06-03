@@ -388,11 +388,12 @@ func (b *astbuilder) buildConstSpec(constSpec *gol.ConstSpecContext, defaul ssa.
 	var rightvl []ssa.Value
 	var isiota bool = false
 
-	leftList := constSpec.IdentifierList().(*gol.IdentifierListContext).AllIDENTIFIER()
+	leftList := constSpec.IdentifierList().(*gol.IdentifierListContext).AllIdentifier()
 	for _, value := range leftList {
-		leftv := b.CreateLocalVariable(value.GetText())
+		name := gol.IdentifierName(value)
+		leftv := b.CreateLocalVariable(name)
 		leftvl = append(leftvl, leftv)
-		b.AddToCmap(value.GetText())
+		b.AddToCmap(name)
 	}
 
 	expList := constSpec.ExpressionList()
@@ -405,9 +406,12 @@ func (b *astbuilder) buildConstSpec(constSpec *gol.ConstSpecContext, defaul ssa.
 	} else {
 		if defaul != nil && len(leftList) == 1 {
 			rightvl = append(rightvl, defaul)
-		} else {
-			b.NewError(ssa.Error, TAG, MissInitExpr(leftList[0].GetText()))
+		} else if len(leftList) > 0 {
+			b.NewError(ssa.Error, TAG, MissInitExpr(gol.IdentifierName(leftList[0])))
 		}
+	}
+	if len(rightvl) == 0 {
+		return nil, false
 	}
 	if rightvl[0].String() == goIotaName {
 		rightvl[0] = b.EmitConstInst(0)
@@ -436,7 +440,7 @@ func (b *astbuilder) buildVarSpec(varSpec *gol.VarSpecContext, isglobal bool) {
 		ssaTyp = b.buildType(typ.(*gol.Type_Context))
 	}
 
-	leftList := varSpec.IdentifierList().(*gol.IdentifierListContext).AllIDENTIFIER()
+	leftList := varSpec.IdentifierList().(*gol.IdentifierListContext).AllIdentifier()
 	hasAssign := varSpec.ASSIGN() != nil
 
 	checkCannotAssign := func(id string) {
@@ -468,8 +472,8 @@ func (b *astbuilder) buildVarSpec(varSpec *gol.VarSpecContext, isglobal bool) {
 
 		if !hasAssign {
 			for _, ident := range leftList {
-				recoverRange := b.SetRangeFromTerminalNode(ident)
-				registerDefault(ident.GetText())
+				recoverRange := b.SetRange(ident.(*gol.IdentifierContext).BaseParserRuleContext)
+				registerDefault(gol.IdentifierName(ident))
 				recoverRange()
 			}
 			return
@@ -477,7 +481,7 @@ func (b *astbuilder) buildVarSpec(varSpec *gol.VarSpecContext, isglobal bool) {
 
 		rightList := varSpec.ExpressionList().(*gol.ExpressionListContext).AllExpression()
 		for i, r := range rightList {
-			registerExpr(leftList[i].GetText(), r.(*gol.ExpressionContext))
+			registerExpr(gol.IdentifierName(leftList[i]), r.(*gol.ExpressionContext))
 		}
 		return
 	}
@@ -486,8 +490,8 @@ func (b *astbuilder) buildVarSpec(varSpec *gol.VarSpecContext, isglobal bool) {
 	var leftvl []*ssa.Variable
 	if !hasAssign {
 		for _, ident := range leftList {
-			recoverRange := b.SetRangeFromTerminalNode(ident)
-			id := ident.GetText()
+			recoverRange := b.SetRange(ident.(*gol.IdentifierContext).BaseParserRuleContext)
+			id := gol.IdentifierName(ident)
 			checkCannotAssign(id)
 
 			leftv := b.CreateLocalVariable(id)
@@ -501,8 +505,9 @@ func (b *astbuilder) buildVarSpec(varSpec *gol.VarSpecContext, isglobal bool) {
 	rightList := varSpec.ExpressionList().(*gol.ExpressionListContext).AllExpression()
 	var rightvl []ssa.Value
 	for _, ident := range leftList {
-		checkCannotAssign(ident.GetText())
-		leftv := b.CreateLocalVariable(ident.GetText())
+		id := gol.IdentifierName(ident)
+		checkCannotAssign(id)
+		leftv := b.CreateLocalVariable(id)
 		leftvl = append(leftvl, leftv)
 	}
 	for _, r := range rightList {
@@ -686,8 +691,8 @@ func (b *astbuilder) buildTypeParameterDecl(typ *gol.TypeParameterDeclContext) [
 	}
 
 	if idl, ok := typ.IdentifierList().(*gol.IdentifierListContext); ok {
-		for _, id := range idl.AllIDENTIFIER() {
-			name := id.GetText()
+		for _, id := range idl.AllIdentifier() {
+			name := gol.IdentifierName(id)
 			aliast := ssa.NewAliasType(name, ssatyp.PkgPathString(), ssatyp)
 			alias = append(alias, aliast)
 		}
@@ -1067,8 +1072,8 @@ func (b *astbuilder) buildParamList(idList *gol.IdentifierListContext) []*ssa.Pa
 
 	var pList []*ssa.Parameter
 
-	for _, id := range idList.AllIDENTIFIER() {
-		p := b.NewParam(id.GetText())
+	for _, id := range idList.AllIdentifier() {
+		p := b.NewParam(gol.IdentifierName(id))
 		pList = append(pList, p)
 	}
 
@@ -1081,8 +1086,8 @@ func (b *astbuilder) buildStructList(idList *gol.IdentifierListContext) []ssa.Va
 
 	var pList []ssa.Value
 
-	for _, id := range idList.AllIDENTIFIER() {
-		p := b.EmitConstInst(id.GetText())
+	for _, id := range idList.AllIdentifier() {
+		p := b.EmitConstInst(gol.IdentifierName(id))
 		pList = append(pList, p)
 	}
 
@@ -1095,8 +1100,8 @@ func (b *astbuilder) buildIdentifierList(idList *gol.IdentifierListContext, isLo
 
 	var vList []*ssa.Variable
 
-	for _, id := range idList.AllIDENTIFIER() {
-		text := id.GetText()
+	for _, id := range idList.AllIdentifier() {
+		text := gol.IdentifierName(id)
 		if isLocal {
 			vList = append(vList, b.CreateLocalVariable(text))
 		} else {
@@ -1537,8 +1542,8 @@ func (b *astbuilder) buildRecvStmt(stmt *gol.RecvStmtContext) []ssa.Value {
 	}
 
 	if idl := stmt.IdentifierList(); idl != nil {
-		for _, id := range idl.(*gol.IdentifierListContext).AllIDENTIFIER() {
-			leftv := b.CreateLocalVariable(id.GetText())
+		for _, id := range idl.(*gol.IdentifierListContext).AllIdentifier() {
+			leftv := b.CreateLocalVariable(gol.IdentifierName(id))
 			b.AssignVariable(leftv, recvv)
 		}
 	}
@@ -1964,17 +1969,18 @@ func (b *astbuilder) buildIncDecStmt(stmt *gol.IncDecStmtContext) []ssa.Value {
 }
 
 func (b *astbuilder) buildShortVarDecl(stmt *gol.ShortVarDeclContext) []ssa.Value {
-	leftList := stmt.IdentifierList().(*gol.IdentifierListContext).AllIDENTIFIER()
+	leftList := stmt.IdentifierList().(*gol.IdentifierListContext).AllIdentifier()
 	rightList := stmt.ExpressionList().(*gol.ExpressionListContext).AllExpression()
 
 	var leftvl []*ssa.Variable
 	var rightvl []ssa.Value
 
 	for _, value := range leftList {
-		if b.GetFromCmap(value.GetText()) {
+		name := gol.IdentifierName(value)
+		if b.GetFromCmap(name) {
 			b.NewError(ssa.Error, TAG, CannotAssign())
 		}
-		leftv := b.CreateLocalVariable(value.GetText())
+		leftv := b.CreateLocalVariable(name)
 		leftvl = append(leftvl, leftv)
 	}
 	for _, value := range rightList {
