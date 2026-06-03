@@ -356,6 +356,59 @@ func TestUTF8Reader_InternalValidation(t *testing.T) {
 	}
 }
 
+func TestUTF8PeekableReader_PeekOnePreservesChinese(t *testing.T) {
+	text := "中文abc"
+	reader := NewUTF8PeekableReader(&mockBytewiseReader{data: []byte(text)})
+
+	peeked, err := reader.Peek(1)
+	if err != nil && err != io.EOF {
+		t.Fatalf("unexpected peek error: %v", err)
+	}
+	if len(peeked) == 0 {
+		t.Fatal("expected at least one peeked byte")
+	}
+
+	got, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatalf("failed to read from utf8 peekable reader: %v", err)
+	}
+	if string(got) != text {
+		t.Fatalf("expected %q, got %q", text, string(got))
+	}
+	if !utf8.Valid(got) {
+		t.Fatal("utf8 peekable reader output is not valid UTF-8")
+	}
+}
+
+func TestUTF8PeekableReader_PeekOneThenExpandWindow(t *testing.T) {
+	text := "\"<|FACTS_CURRENT_NONCE|>中文内容<|FACTS_END_CURRENT_NONCE|>\""
+	reader := NewUTF8PeekableReader(&mockBytewiseReader{data: []byte(text)})
+
+	first, err := reader.Peek(1)
+	if err != nil && err != io.EOF {
+		t.Fatalf("unexpected first peek error: %v", err)
+	}
+	if len(first) == 0 {
+		t.Fatal("expected first peek to read data")
+	}
+
+	window, err := reader.Peek(32)
+	if err != nil && err != io.EOF {
+		t.Fatalf("unexpected second peek error: %v", err)
+	}
+	if !strings.HasPrefix(string(window), "\"<|FACTS_CURRENT_NONCE|>") {
+		t.Fatalf("unexpected expanded peek content: %q", string(window))
+	}
+
+	got, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatalf("failed to read after peek expansion: %v", err)
+	}
+	if string(got) != text {
+		t.Fatalf("expected %q, got %q", text, string(got))
+	}
+}
+
 func BenchmarkUTF8Reader(b *testing.B) {
 	text := strings.Repeat("Hello 世界 🌍 测试", 100)
 

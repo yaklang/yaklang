@@ -13,6 +13,11 @@ type utf8Reader struct {
 	buffer []byte // 内部缓冲区，存储未完整读取的字节
 }
 
+type BufferedUTF8PeekableReader struct {
+	io.Reader
+	buf []byte
+}
+
 func (r *utf8Reader) Read(p []byte) (n int, err error) {
 	if len(p) == 0 {
 		return 0, nil
@@ -148,6 +153,63 @@ func UTF8Reader(r io.Reader) io.Reader {
 	}
 
 	return &utf8Reader{r: r, buffer: make([]byte, 0)}
+}
+
+func NewUTF8PeekableReader(r io.Reader) *BufferedUTF8PeekableReader {
+	if reader, ok := r.(*BufferedUTF8PeekableReader); ok {
+		return reader
+	}
+	return &BufferedUTF8PeekableReader{
+		Reader: UTF8Reader(r),
+	}
+}
+
+func (b *BufferedUTF8PeekableReader) Peek(i int) ([]byte, error) {
+	if i <= 0 {
+		return []byte{}, nil
+	}
+	if i <= len(b.buf) {
+		buf := make([]byte, i)
+		copy(buf, b.buf[:i])
+		return buf, nil
+	}
+
+	readSize := i - len(b.buf)
+	for len(b.buf) < i {
+		if readSize < utf8.UTFMax {
+			readSize = utf8.UTFMax
+		}
+
+		buf := make([]byte, readSize)
+		n, err := b.Reader.Read(buf)
+		if n > 0 {
+			b.buf = append(b.buf, buf[:n]...)
+		}
+		if err != nil {
+			return append([]byte(nil), b.buf...), err
+		}
+		if n == 0 {
+			continue
+		}
+		readSize = i - len(b.buf)
+	}
+	return append([]byte(nil), b.buf...), nil
+}
+
+func (b *BufferedUTF8PeekableReader) Read(buf []byte) (int, error) {
+	return _peekableRead(b, buf)
+}
+
+func (b *BufferedUTF8PeekableReader) GetReader() io.Reader {
+	return b.Reader
+}
+
+func (b *BufferedUTF8PeekableReader) SetBuf(buf []byte) {
+	b.buf = buf
+}
+
+func (b *BufferedUTF8PeekableReader) GetBuf() []byte {
+	return b.buf
 }
 
 func CreateUTF8StreamMirror(r io.Reader, cb ...func(reader io.Reader)) io.Reader {
