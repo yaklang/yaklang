@@ -414,7 +414,22 @@ func (s *AIStatefulTaskBase) GetStatus() AITaskState {
 }
 
 func (s *AIStatefulTaskBase) SetStatus(status AITaskState) {
-	if s.IsFinished() {
+	s.setStatus(status, false)
+}
+
+// ForceSetStatus bypasses the finished-state guard while preserving
+// lifecycle side effects such as event emission and cancellation when
+// entering a terminal state. Callers must ensure the task has a usable
+// context when reviving a previously finished task.
+func (s *AIStatefulTaskBase) ForceSetStatus(status AITaskState) {
+	s.setStatus(status, true)
+}
+
+func (s *AIStatefulTaskBase) setStatus(status AITaskState, force bool) {
+	if s == nil {
+		return
+	}
+	if !force && s.IsFinished() {
 		return // 已完成的任务状态不可更改
 	}
 	old := s.status

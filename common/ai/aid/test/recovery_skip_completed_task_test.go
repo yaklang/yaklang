@@ -220,6 +220,9 @@ func TestRecovery_SkipCompletedTasks(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NoError(t, ins.Run())
+	inMemoryRoot := coordinatorRootTaskForTest(t, ins)
+	require.NotNil(t, inMemoryRoot)
+	require.Len(t, inMemoryRoot.Subtasks, 3)
 
 	mu.Lock()
 	defer mu.Unlock()
@@ -236,6 +239,9 @@ func TestRecovery_SkipCompletedTasks(t *testing.T) {
 	require.Equal(t, 0, aiDoneCalls, "completed task should not trigger AI calls in recovery")
 	require.Greater(t, aiAbortedCalls, 0, "aborted task should trigger AI calls in recovery")
 	require.Greater(t, aiTodoCalls, 0, "pending task should trigger AI calls in recovery")
+	require.Equal(t, aicommon.AITaskState_Completed, inMemoryRoot.Subtasks[0].GetStatus(), "completed task should remain completed after recovery run")
+	require.Equal(t, aicommon.AITaskState_Completed, inMemoryRoot.Subtasks[1].GetStatus(), "aborted task should be able to re-enter processing and finish during recovery")
+	require.Equal(t, aicommon.AITaskState_Completed, inMemoryRoot.Subtasks[2].GetStatus(), "pending task should finish during recovery")
 }
 
 func TestRecovery_StartFromSpecifiedTask(t *testing.T) {
