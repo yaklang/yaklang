@@ -89,7 +89,6 @@ func newRecoveryPlanExecTask(ctx context.Context, emitter *aicommon.Emitter, coo
 		coordinatorID,
 		ctx,
 		emitter,
-		true,
 	)
 }
 
