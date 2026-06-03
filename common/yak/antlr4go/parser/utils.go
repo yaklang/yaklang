@@ -21,3 +21,22 @@ func (p *GoParser) SetInterpreter(atn *antlr.ATN, decisionToDFA []*antlr.DFA, pr
 	// do nothing, just to override the method
 	p.Interpreter = antlr.NewParserATNSimulator(p, atn, decisionToDFA, predictionContextCache)
 }
+
+func IdentifierName(id IIdentifierContext) string {
+	if id == nil {
+		return ""
+	}
+	return id.GetText()
+}
+
+func IdentifierListNames(list *IdentifierListContext) []string {
+	if list == nil {
+		return nil
+	}
+	ids := list.AllIdentifier()
+	names := make([]string, 0, len(ids))
+	for _, id := range ids {
+		names = append(names, IdentifierName(id))
+	}
+	return names
+}
