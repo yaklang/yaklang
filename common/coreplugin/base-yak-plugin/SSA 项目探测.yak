@@ -193,7 +193,94 @@ javaFiles = ["web.xml", "pom.xml", "application.properties", "struts.xml", "appl
 pythonFiles = ["requirements.txt", "setup.py", "pyproject.toml", "pipfile", "manage.py", "setup.cfg"]
 // 后缀名 -> 语言，用于统一从文件扩展名推断语言
 extToLanguage = {"js": "js", "mjs": "js", "cjs": "js", "ts": "ts", "tsx": "ts", "php": "php", "java": "java", "go": "go", "yak": "yak", "py": "python", "pyi": "python", "pyw": "python"}
-var countMap = map[string]int{"php": 0, "go": 0, "java": 0, "yak": 0, "js": 0, "ts": 0, "python": 0}
+var scoreMap = map[string]int{"php": 0, "go": 0, "java": 0, "yak": 0, "js": 0, "ts": 0, "python": 0}
+
+// 语言探测：跳过目录（不参与计分）
+skipDirNames = [
+    "node_modules", "vendor", "vendors", "docs", "doc", "documentation",
+    "example", "examples", "dist", "build", "out", "target",
+    "test", "tests", ".git", "third_party", "third-party",
+    "__pycache__", ".venv", "venv", "static", "assets",
+]
+// 高权重源码目录
+highDirNames = [
+    "src", "internal", "pkg", "cmd", "app", "lib", "main",
+    "common", "api", "service", "services",
+]
+// 低权重辅助目录
+lowDirNames = ["scripts", "tools", "hack", "deploy", "misc", "demo", "demos"]
+// 不参与语言得分的扩展名（特征文件仍通过文件名列表单独锁定语言）
+ignoredExts = ["html", "htm", "css", "json", "xml", "md", "txt"]
+lowExtNames = ["js", "mjs", "cjs"]
+
+func pathSegments(path) {
+    path = str.ReplaceAll(path, "\\", "/")
+    return str.Split(path, "/")
+}
+
+func shouldSkipPath(path) {
+    for _, seg := range pathSegments(path) {
+        seg = str.TrimSpace(seg).Lower()
+        if seg == "" {
+            continue
+        }
+        if seg in skipDirNames {
+            return true
+        }
+    }
+    return false
+}
+
+func getDirWeight(path) {
+    hasHigh = false
+    hasLow = false
+    for _, seg := range pathSegments(path) {
+        seg = str.TrimSpace(seg).Lower()
+        if seg == "" {
+            continue
+        }
+        if seg in highDirNames {
+            hasHigh = true
+        }
+        if seg in lowDirNames {
+            hasLow = true
+        }
+    }
+    if hasHigh {
+        return 3
+    }
+    if hasLow {
+        return 1
+    }
+    return 2
+}
+
+func getExtScoreWeight(ext) {
+    if ext in ignoredExts {
+        return 0
+    }
+    if ext not in extToLanguage {
+        return 0
+    }
+    if ext in lowExtNames {
+        return 3
+    }
+    return 10
+}
+
+func addLanguageScore(path) {
+    if shouldSkipPath(path) {
+        return
+    }
+    ext = file.GetExt(path).Lower().TrimLeft(".")
+    ew = getExtScoreWeight(ext)
+    if ew == 0 {
+        return
+    }
+    lang = extToLanguage[ext]
+    dw = getDirWeight(path)
+    scoreMap[lang] = scoreMap[lang] + dw*ew
+}
 
 params = {"program_name": "", "project_name": "", "language": "", "info": {"kind": "", "local_file": "", "url": "", "proxy": {"proxy": false, "url": ""}, "branch": "", "path": ""}, "description": "", "file_count": 0, "error": {"kind": "", "msg": ""}, "compile_immediately": false}
 func setLanguage(language) {
@@ -271,7 +358,7 @@ func generateFileName(kind, filename) {
 }
 func AutoParseLanguage() {
     maxinfo = {"key": "", "value": 0}
-    for key, value := range countMap {
+    for key, value := range scoreMap {
         if maxinfo.value < value {
             maxinfo.key = key
             maxinfo.value = value
@@ -304,10 +391,8 @@ func getZipinfo(basePath) {
                 params.file_count++
             }
 
-            ext = file.GetExt(path).Lower().TrimLeft(".")
-            if ext in extToLanguage {
-                lang = extToLanguage[ext]
-                countMap[lang] = countMap[lang] + 1
+            if !info.IsDir() {
+                addLanguageScore(path)
             }
 
             if params.language == "" {
@@ -380,11 +465,7 @@ func getLocalInfo(localFile) {
             }), 
             filesys.onFileStat(func(path, info) {
                 params.file_count++
-                ext = file.GetExt(path).Lower().TrimLeft(".")
-                if ext in extToLanguage {
-                    lang = extToLanguage[ext]
-                    countMap[lang] = countMap[lang] + 1
-                }
+                addLanguageScore(path)
 
                 if params.language == "" {
                     switch  {

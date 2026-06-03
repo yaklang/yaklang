@@ -133,6 +133,48 @@ func TestSSAAutoDetective(t *testing.T) {
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "connect fail")
 	})
+
+	t.Run("weighted detect go over docs js", func(t *testing.T) {
+		tempDir, cleanup := setupTempDirWithFiles(t, map[string]string{
+			"src/main.go":  "package main\nfunc main() {}\n",
+			"docs/a.js":    "console.log(1)\n",
+			"docs/b.js":    "console.log(2)\n",
+			"docs/c.js":    "console.log(3)\n",
+			"docs/d.js":    "console.log(4)\n",
+			"docs/e.js":    "console.log(5)\n",
+		})
+		defer cleanup()
+
+		config, err := check(t, tempDir)
+		require.NoError(t, err)
+		require.Equal(t, "golang", string(config.GetLanguage()), "src/main.go should win over skipped docs/*.js")
+	})
+
+	t.Run("weighted detect java over vendor js", func(t *testing.T) {
+		tempDir, cleanup := setupTempDirWithFiles(t, map[string]string{
+			"src/Main.java":    "public class Main { public static void main(String[] args) {} }\n",
+			"vendor/lib.js":    "module.exports = {}\n",
+			"vendor/bundle.js": "console.log('vendor')\n",
+			"vendor/app.js":    "console.log('app')\n",
+		})
+		defer cleanup()
+
+		config, err := check(t, tempDir)
+		require.NoError(t, err)
+		require.Equal(t, "java", string(config.GetLanguage()), "src/*.java should win over skipped vendor/*.js")
+	})
+}
+
+func setupTempDirWithFiles(t *testing.T, files map[string]string) (string, func()) {
+	t.Helper()
+	tempDir := path.Join(os.TempDir(), uuid.NewString())
+	require.NoError(t, os.MkdirAll(tempDir, 0755))
+	for relPath, content := range files {
+		fullPath := path.Join(tempDir, relPath)
+		require.NoError(t, os.MkdirAll(path.Dir(fullPath), 0755))
+		require.NoError(t, os.WriteFile(fullPath, []byte(content), 0644))
+	}
+	return tempDir, func() { _ = os.RemoveAll(tempDir) }
 }
 
 func setupTempDirWithJavaFile(t *testing.T, filename, code string) (string, func()) {
