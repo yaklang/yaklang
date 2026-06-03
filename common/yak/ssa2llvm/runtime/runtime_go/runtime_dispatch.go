@@ -39,6 +39,7 @@ var runtimeDispatchHandlers = map[abi.FuncID]runtimeDispatchFunc{
 	abi.IDYaklibCall:          runtimeDispatchYaklibCall,
 	abi.IDRuntimeNext:         runtimeDispatchNext,
 	abi.IDRuntimeIn:           runtimeDispatchIn,
+	abi.IDRuntimeEq:           runtimeDispatchEq,
 	abi.IDRuntimeChanRecv:     runtimeDispatchChanRecv,
 }
 

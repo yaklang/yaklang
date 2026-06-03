@@ -20,6 +20,13 @@ func (c *Compiler) restoreInsertPoint(bb llvm.BasicBlock) {
 
 func (c *Compiler) withLazyCompileInsertPoint(contextInst, targetInst ssa.Instruction, compile func() error) error {
 	restoreBB := c.restoreInsertBlock(contextInst)
+	prevActive := int64(0)
+	if c != nil && c.function != nil {
+		prevActive = c.function.activeBlockID
+		defer func() {
+			c.function.activeBlockID = prevActive
+		}()
+	}
 
 	if c == nil || targetInst == nil || targetInst.GetBlock() == nil {
 		return compile()
@@ -39,6 +46,7 @@ func (c *Compiler) withLazyCompileInsertPoint(contextInst, targetInst ssa.Instru
 			// Forward reference: emit in the entry block so the value dominates all uses.
 			if fn := c.function.current; fn != nil && fn.EnterBlock > 0 {
 				if entryBB, ok := c.Blocks[fn.EnterBlock]; ok && !entryBB.IsNil() {
+					c.function.activeBlockID = fn.EnterBlock
 					c.setInsertPointBeforeTerminator(entryBB)
 					err := compile()
 					if !restoreBB.IsNil() {
@@ -49,6 +57,9 @@ func (c *Compiler) withLazyCompileInsertPoint(contextInst, targetInst ssa.Instru
 			}
 			return compile()
 		}
+	}
+	if c.function != nil {
+		c.function.activeBlockID = targetBlockID
 	}
 	c.setInsertPointBeforeTerminator(targetBB)
 	err := compile()

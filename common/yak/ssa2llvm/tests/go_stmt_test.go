@@ -201,7 +201,9 @@ func TestSync_Map_StoreLoad(t *testing.T) {
 func main() {
 	m = sync.NewMap()
 	m.Store("a", 12)
-	println(m.Load("a"))
+	v, ok = m.Load("a")
+	if !ok { die("missing key") }
+	println(v)
 }
 `
 	output := runBinaryWithEnv(t, code, "main", nil)

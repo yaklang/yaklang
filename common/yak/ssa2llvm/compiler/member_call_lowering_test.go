@@ -35,3 +35,20 @@ check = () => {
 	require.NoError(t, err)
 	require.Contains(t, ir, "call i64 @")
 }
+
+func TestMemberCallLowering_LazyCallResultSlotStoreDominatesUse(t *testing.T) {
+	code := `
+check = () => {
+	raw = "/api/v1"
+	trimmed = raw.TrimLeft("/")
+	parts = str.Split(trimmed, "/")
+	first = parts[0]
+	return len(first)
+}
+`
+	_, _, ir, err := compileToIRFromCodeWithExternBindings(code, "yak", nil)
+	require.NoError(t, err)
+	require.Contains(t, ir, "yak_method_dispatch_ctx")
+	require.Contains(t, ir, "yak_yaklib_ctx")
+	requireIRContainsSlotLowering(t, ir)
+}

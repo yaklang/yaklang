@@ -60,3 +60,15 @@ check = () => {
 `, "check", nil)
 	require.Equal(t, 7, exitCode)
 }
+
+func TestRuntimeOperator_YakitCodePrintsReadableTerminalOutput(t *testing.T) {
+	output := runBinaryWithEnv(t, `
+check = () => {
+	yakit.Code(`+"`"+`{"ok":true}`+"`"+`)
+	return 0
+}
+`, "check", nil)
+
+	require.Contains(t, output, `[code] {"ok":true}`)
+	require.NotContains(t, output, "IsMessage:true")
+}

@@ -49,6 +49,11 @@ type Compiler struct {
 	// runtimeSym maps canonical runtime symbol → link symbol (linkprep).
 	runtimeSym map[string]string
 
+	initialMemberValueIDs      map[int64]struct{}
+	initializingMemberValueIDs map[int64]int
+	emittedMemberVariableSets  map[string]struct{}
+	materializingCallableIDs   map[int64]int
+
 	function *functionCompileContext
 }
 
@@ -110,16 +115,19 @@ func (c *Compiler) runtimeSymName(canonical string) string {
 func NewCompiler(ctx context.Context, prog *ssa.Program, opts ...CompilerOption) *Compiler {
 	c := llvm.NewContext()
 	comp := &Compiler{
-		Ctx:            ctx,
-		LLVMCtx:        c,
-		Mod:            c.NewModule(prog.Name),
-		Builder:        c.NewBuilder(),
-		Values:         make(map[int64]llvm.Value),
-		Blocks:         make(map[int64]llvm.BasicBlock),
-		Funcs:          make(map[int64]llvm.Value),
-		Program:        prog,
-		TypeConverter:  types.NewTypeConverter(c),
-		ExternBindings: cloneExternBindings(defaultExternBindings),
+		Ctx:                       ctx,
+		LLVMCtx:                   c,
+		Mod:                       c.NewModule(prog.Name),
+		Builder:                   c.NewBuilder(),
+		Values:                    make(map[int64]llvm.Value),
+		Blocks:                    make(map[int64]llvm.BasicBlock),
+		Funcs:                     make(map[int64]llvm.Value),
+		Program:                   prog,
+		TypeConverter:             types.NewTypeConverter(c),
+		ExternBindings:            cloneExternBindings(defaultExternBindings),
+		initialMemberValueIDs:     make(map[int64]struct{}),
+		emittedMemberVariableSets: make(map[string]struct{}),
+		materializingCallableIDs:  make(map[int64]int),
 	}
 	for _, opt := range opts {
 		if opt != nil {
@@ -177,6 +185,7 @@ func (c *Compiler) CompileFunction(fn *ssa.Function) error {
 	if err := c.prepareErrorHandling(fn); err != nil {
 		return err
 	}
+	c.function.switchHandlers = collectSwitchHandlers(fn)
 
 	// 2. Register the InvokeContext parameter.
 	if llvmFn.ParamsCount() < 1 {
@@ -272,7 +281,7 @@ func (c *Compiler) CompileFunction(fn *ssa.Function) error {
 			if !ok || instVal == nil {
 				continue
 			}
-			if instVal.IsLazy() {
+			if _, isSideEffect := instVal.(*ssa.SideEffect); !isSideEffect && instVal.IsLazy() {
 				instVal = instVal.Self()
 			}
 			if instVal == nil {
@@ -281,7 +290,7 @@ func (c *Compiler) CompileFunction(fn *ssa.Function) error {
 			inst := instVal
 			isTerminator := false
 			switch inst.(type) {
-			case *ssa.Return, *ssa.Jump, *ssa.If, *ssa.Loop, *ssa.Panic:
+			case *ssa.Return, *ssa.Jump, *ssa.If, *ssa.Loop, *ssa.Switch, *ssa.Panic:
 				isTerminator = true
 			}
 

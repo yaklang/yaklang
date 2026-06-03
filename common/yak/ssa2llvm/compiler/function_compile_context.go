@@ -20,12 +20,31 @@ type functionCompileContext struct {
 	activeHandlerByBlock map[int64]int64
 	catchBodyByHandler   map[int64]int64
 	catchTargetByBlock   map[int64]int64
+	switchHandlers       map[int64]*switchHandlerInfo
+	pendingMemberSets    map[string]pendingMemberSet
+	pendingMemberSetKeys []string
+}
+
+type switchHandlerInfo struct {
+	condID       int64
+	labelIDs     []int64
+	trueBlockID  int64
+	falseBlockID int64
+}
+
+type pendingMemberSet struct {
+	source   ssa.Value
+	resultID int64
+	obj      ssa.Value
+	key      ssa.Value
+	direct   bool
 }
 
 func newFunctionCompileContext(fn *ssa.Function) *functionCompileContext {
 	return &functionCompileContext{
-		current:        fn,
-		compiledBlocks: make(map[int64]struct{}),
+		current:           fn,
+		compiledBlocks:    make(map[int64]struct{}),
+		pendingMemberSets: make(map[string]pendingMemberSet),
 	}
 }
 

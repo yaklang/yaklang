@@ -9,6 +9,7 @@ import (
 func CanonicalRuntimeSymbols() []string {
 	return []string{
 		abi.InvokeSymbol,
+		abi.MakeCallableSymbol,
 		abi.MakeSliceSymbol,
 		abi.InternalPrintIntSymbol,
 		abi.InternalMallocSymbol,

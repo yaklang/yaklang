@@ -83,6 +83,11 @@ func (c *Compiler) compileExternLibMember(
 	}
 
 	if memberValID != 0 {
+		if memberValID == memberID {
+			zero := llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)
+			c.cacheValue(memberID, zero)
+			return c.maybeEmitMemberSet(contextInst, val, memberID)
+		}
 		if memberVal, ok := contextInst.GetFunc().GetValueById(memberValID); ok {
 			if undef, ok := ssa.ToUndefined(memberVal); ok && undef != nil && undef.IsExtern() {
 				if err := c.compileYaklibExportMember(contextInst, val, pkg, keyStr); err != nil {
