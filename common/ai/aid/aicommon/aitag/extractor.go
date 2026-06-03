@@ -262,10 +262,30 @@ func (p *Parser) parseStream(reader io.Reader) error {
 					n, err := reader.Read(nextByte)
 					if n > 0 {
 						pendingBytes.WriteByte(nextByte[0])
+						tagPrefix := ""
 						if nextByte[0] == '|' {
+							tagPrefix = "<|"
+						} else if nextByte[0] == '/' {
+							n, err := reader.Read(nextByte)
+							if n > 0 {
+								pendingBytes.WriteByte(nextByte[0])
+								if nextByte[0] == '|' {
+									tagPrefix = "</|"
+								}
+							}
+							if err != nil {
+								if err == io.EOF {
+									contentPipe.Write(pendingBytes.Bytes())
+									pendingBytes.Reset()
+									continue
+								}
+								return fmt.Errorf("failed to read stream: %w", err)
+							}
+						}
+						if tagPrefix != "" {
 							// We have <|, now scan for the full end tag
 							tagBuffer := &bytes.Buffer{}
-							tagBuffer.WriteString("<|")
+							tagBuffer.WriteString(tagPrefix)
 
 							found := false
 							for i := 0; i < 200; i++ {
@@ -344,7 +364,7 @@ func (p *Parser) parseStream(reader io.Reader) error {
 							}
 
 						} else {
-							// Not a tag start, write pending content (includes <ch>)
+							// Not a tag start, write pending content as-is
 							contentPipe.Write(pendingBytes.Bytes())
 							pendingBytes.Reset()
 						}
@@ -449,10 +469,13 @@ func parseStartTagLiteral(tagStr string) (string, string) {
 }
 
 // parseEndTagLiteral parses an end tag literal and returns tagName and nonce
-// Expected format: <|TAGNAME_END_NONCE|>
+// Expected format: <|TAGNAME_END_NONCE|> or </|TAGNAME_END_NONCE|>
 // 包级纯函数，无状态依赖，供 Parser 与 splitter 共用
 // 关键词: aitag, parseEndTagLiteral, 结束标签解析
 func parseEndTagLiteral(tagStr string) (string, string) {
+	if len(tagStr) >= 3 && tagStr[:3] == "</|" {
+		tagStr = "<|" + tagStr[3:]
+	}
 	if len(tagStr) < 9 || tagStr[:2] != "<|" || tagStr[len(tagStr)-2:] != "|>" {
 		return "", ""
 	}
