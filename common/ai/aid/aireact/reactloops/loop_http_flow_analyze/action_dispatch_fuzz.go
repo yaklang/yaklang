@@ -133,11 +133,11 @@ var dispatchFuzzTestAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 
 			execErr := fuzzLoop.ExecuteWithExistedTask(subTask)
 
-			// Step 6: Collect results and write to findings
+			// Step 6: Collect results and write to HTTP flow evidence
 			fuzzResult := collectFuzzSubLoopResult(fuzzLoop, locatorDesc, vulnType, flow)
-			if _, changed := appendFindings(loop, fuzzResult); changed {
+			if _, changed := appendHTTPFlowEvidence(loop, fuzzResult); changed {
 				emitter.EmitThoughtStream(taskID,
-					"[dispatch_fuzz_test] fuzztest 结果已合并到 FINDINGS")
+					"[dispatch_fuzz_test] fuzztest 结果已合并到 HTTP_FLOW_EVIDENCE")
 			}
 
 			// Record to dispatched_fuzz_tasks for reactive_data rendering
@@ -190,7 +190,7 @@ func buildFuzzSubTaskUserInput(rawRequest, vulnType, taskDesc string, flow *sche
 	return sb.String()
 }
 
-// collectFuzzSubLoopResult extracts results from the completed fuzztest sub-loop and formats as findings snippet.
+// collectFuzzSubLoopResult extracts results from the completed fuzztest sub-loop and formats them as HTTP flow evidence.
 func collectFuzzSubLoopResult(fuzzLoop *reactloops.ReActLoop, locator, vulnType string, flow *schema.HTTPFlow) string {
 	diffResult := strings.TrimSpace(fuzzLoop.Get("diff_result"))
 	verResult := strings.TrimSpace(fuzzLoop.Get("verification_result"))

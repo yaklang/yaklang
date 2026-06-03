@@ -4,14 +4,14 @@
 {{ .UserInput }}
 <|USER_INPUT_END_{{ .Nonce }}|>
 
-{{ if .Findings }}
-### Accumulated Findings (FINDINGS)
+{{ if .HTTPFlowEvidence }}
+### Accumulated HTTP Flow Evidence (HTTP_FLOW_EVIDENCE)
 
-These are discoveries accumulated during analysis. They persist across iterations and help avoid redundant searches. Record them with the dedicated `output_findings` action only. The `findings` field is exclusive to `@action="output_findings"`; do not attach a `findings` field to `directly_answer` or any other action.
+These are reusable HTTP flow analysis evidence notes accumulated during analysis. They persist across iterations and help avoid redundant searches. Record them with the dedicated `record_http_flow_evidence` action only. The `http_flow_evidence` field is exclusive to `@action="record_http_flow_evidence"`; do not attach an `http_flow_evidence` field to `directly_answer` or any other action.
 
-<|FINDINGS_{{ .Nonce }}|>
-{{ .Findings }}
-<|FINDINGS_END_{{ .Nonce }}|>
+<|HTTP_FLOW_EVIDENCE_{{ .Nonce }}|>
+{{ .HTTPFlowEvidence }}
+<|HTTP_FLOW_EVIDENCE_END_{{ .Nonce }}|>
 {{ end }}
 
 {{ if .RecentActionsSummary }}
@@ -51,7 +51,7 @@ Review these to avoid repeating searches with identical parameters. Each entry s
 {{ if .DispatchedFuzzTasks }}
 ### 已派发 Fuzz 测试任务
 
-以下任务已通过 dispatch_fuzz_test 启动。结果已合并到 FINDINGS，此处仅展示摘要。
+以下任务已通过 dispatch_fuzz_test 启动。结果已合并到 HTTP_FLOW_EVIDENCE，此处仅展示摘要。
 
 <|DISPATCHED_FUZZ_TASKS_{{ .Nonce }}|>
 {{ .DispatchedFuzzTasks }}
@@ -72,11 +72,11 @@ Review these to avoid repeating searches with identical parameters. Each entry s
 Think about the next step based on the above context:
 
 1. **Language**: You MUST respond in the same language as the user's query above. Chinese query → Chinese response. English query → English response.
-2. **Findings check**: Have you discovered something new that should be recorded to FINDINGS via `output_findings`?
+2. **Evidence check**: Have you discovered something new that should be recorded to HTTP_FLOW_EVIDENCE via `record_http_flow_evidence`?
 3. **Search precision**: Are search conditions specific enough? Can you add more filters (URL, status, method, keyword) to narrow results?
 4. **Avoid repetition**: Check Recent Action History. Do not repeat the same search with identical parameters.
 5. **Deep dive vs. broaden**: Should you inspect a specific flow in detail, or broaden the search with different conditions?
 6. **Scope discipline**: This mode is for traffic analysis only. Do not attempt to modify packets, send requests, or perform fuzz testing.
-7. **Fuzz 派发判断**: 如果当前 FINDINGS 中有识别出可疑漏洞点但尚未派发 fuzz 测试，评估是否应调用 `dispatch_fuzz_test`。已派发的任务避免重复。{{ if .IsLastIteration }}
+7. **Fuzz 派发判断**: 如果当前 HTTP_FLOW_EVIDENCE 中有识别出可疑漏洞点但尚未派发 fuzz 测试，评估是否应调用 `dispatch_fuzz_test`。已派发的任务避免重复。{{ if .IsLastIteration }}
 
-**WARNING: This is the LAST iteration.** You must provide a final answer now using `directly_answer`. Summarize all findings and answer the user's question based on collected evidence.{{ end }}
+**WARNING: This is the LAST iteration.** You must provide a final answer now using `directly_answer`. Summarize all collected HTTP flow evidence and answer the user's question based on it.{{ end }}

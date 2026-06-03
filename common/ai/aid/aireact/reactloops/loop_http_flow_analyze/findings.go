@@ -8,43 +8,44 @@ import (
 )
 
 const (
-	findingsKey       = "flow_analyze_findings"
-	findingsFieldName = "findings"
-	findingsAITagName = "FINDINGS"
-	findingsAINodeID  = "flow-findings"
+	httpFlowEvidenceKey        = "http_flow_analysis_evidence"
+	httpFlowEvidenceActionName = "record_http_flow_evidence"
+	httpFlowEvidenceFieldName  = "http_flow_evidence"
+	httpFlowEvidenceAITagName  = "HTTP_FLOW_EVIDENCE"
+	httpFlowEvidenceAINodeID   = "http-flow-analysis-evidence"
 
-	findingsGeneralSection = "## General Findings"
+	httpFlowEvidenceGeneralSection = "## HTTP Flow Analysis Evidence"
 )
 
-type findingsSection struct {
+type httpFlowEvidenceSection struct {
 	Title string
 	Lines []string
 	seen  map[string]struct{}
 }
 
-func normalizeFindings(content string) string {
+func normalizeHTTPFlowEvidence(content string) string {
 	content = strings.ReplaceAll(content, "\r\n", "\n")
 	return strings.TrimSpace(content)
 }
 
-func parseFindingsSections(content string) []*findingsSection {
-	content = normalizeFindings(content)
+func parseHTTPFlowEvidenceSections(content string) []*httpFlowEvidenceSection {
+	content = normalizeHTTPFlowEvidence(content)
 	if content == "" {
 		return nil
 	}
 
-	sections := make([]*findingsSection, 0)
-	sectionMap := make(map[string]*findingsSection)
+	sections := make([]*httpFlowEvidenceSection, 0)
+	sectionMap := make(map[string]*httpFlowEvidenceSection)
 	currentTitle := ""
 
-	getSection := func(title string) *findingsSection {
+	getSection := func(title string) *httpFlowEvidenceSection {
 		if title == "" {
-			title = findingsGeneralSection
+			title = httpFlowEvidenceGeneralSection
 		}
 		if sec, ok := sectionMap[title]; ok {
 			return sec
 		}
-		sec := &findingsSection{
+		sec := &httpFlowEvidenceSection{
 			Title: title,
 			Lines: make([]string, 0),
 			seen:  make(map[string]struct{}),
@@ -72,7 +73,7 @@ func parseFindingsSections(content string) []*findingsSection {
 		sec.Lines = append(sec.Lines, line)
 	}
 
-	filtered := make([]*findingsSection, 0, len(sections))
+	filtered := make([]*httpFlowEvidenceSection, 0, len(sections))
 	for _, sec := range sections {
 		if len(sec.Lines) == 0 {
 			continue
@@ -82,17 +83,17 @@ func parseFindingsSections(content string) []*findingsSection {
 	return filtered
 }
 
-func mergeFindingsDocuments(existing, incoming string) string {
-	sections := parseFindingsSections(existing)
-	sectionMap := make(map[string]*findingsSection, len(sections))
+func mergeHTTPFlowEvidenceDocuments(existing, incoming string) string {
+	sections := parseHTTPFlowEvidenceSections(existing)
+	sectionMap := make(map[string]*httpFlowEvidenceSection, len(sections))
 	for _, sec := range sections {
 		sectionMap[sec.Title] = sec
 	}
 
-	for _, inc := range parseFindingsSections(incoming) {
+	for _, inc := range parseHTTPFlowEvidenceSections(incoming) {
 		target, ok := sectionMap[inc.Title]
 		if !ok {
-			target = &findingsSection{
+			target = &httpFlowEvidenceSection{
 				Title: inc.Title,
 				Lines: make([]string, 0, len(inc.Lines)),
 				seen:  make(map[string]struct{}, len(inc.Lines)),
@@ -119,24 +120,24 @@ func mergeFindingsDocuments(existing, incoming string) string {
 	return strings.TrimSpace(strings.Join(blocks, "\n\n"))
 }
 
-func appendFindings(loop *reactloops.ReActLoop, incoming string) (string, bool) {
-	incoming = normalizeFindings(incoming)
+func appendHTTPFlowEvidence(loop *reactloops.ReActLoop, incoming string) (string, bool) {
+	incoming = normalizeHTTPFlowEvidence(incoming)
 	if incoming == "" {
-		return loop.Get(findingsKey), false
+		return loop.Get(httpFlowEvidenceKey), false
 	}
 
-	existing := loop.Get(findingsKey)
-	merged := mergeFindingsDocuments(existing, incoming)
-	if merged == normalizeFindings(existing) {
+	existing := loop.Get(httpFlowEvidenceKey)
+	merged := mergeHTTPFlowEvidenceDocuments(existing, incoming)
+	if merged == normalizeHTTPFlowEvidence(existing) {
 		return merged, false
 	}
-	loop.Set(findingsKey, merged)
+	loop.Set(httpFlowEvidenceKey, merged)
 	return merged, true
 }
 
-func emitFindingsMarkdown(loop *reactloops.ReActLoop, findings string) {
-	findings = normalizeFindings(findings)
-	if findings == "" {
+func emitHTTPFlowEvidenceMarkdown(loop *reactloops.ReActLoop, evidence string) {
+	evidence = normalizeHTTPFlowEvidence(evidence)
+	if evidence == "" {
 		return
 	}
 
@@ -145,8 +146,8 @@ func emitFindingsMarkdown(loop *reactloops.ReActLoop, findings string) {
 		taskIndex = task.GetId()
 	}
 	if emitter := loop.GetEmitter(); emitter != nil {
-		if _, err := emitter.EmitTextMarkdownStreamEvent(findingsAINodeID, strings.NewReader(findings), taskIndex, func() {}); err != nil {
-			log.Warnf("http_flow_analyze: emit findings markdown failed: %v", err)
+		if _, err := emitter.EmitTextMarkdownStreamEvent(httpFlowEvidenceAINodeID, strings.NewReader(evidence), taskIndex, func() {}); err != nil {
+			log.Warnf("http_flow_analyze: emit HTTP flow evidence markdown failed: %v", err)
 		}
 	}
 }

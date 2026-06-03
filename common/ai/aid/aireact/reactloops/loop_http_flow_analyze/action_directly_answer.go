@@ -11,7 +11,7 @@ import (
 
 var loopActionDirectlyAnswerHTTPFlowAnalyze = &reactloops.LoopAction{
 	ActionType: "directly_answer",
-	Description: "Answer the user's HTTP traffic analysis question or summarize analysis findings. Use answer_payload for short answers; use FINAL_ANSWER AITAG for longer Markdown reports with tables, lists, or structured content. " +
+	Description: "Answer the user's HTTP traffic analysis question or summarize collected HTTP flow evidence. Use answer_payload for short answers; use FINAL_ANSWER AITAG for longer Markdown reports with tables, lists, or structured content. " +
 		"IMPORTANT: directly_answer ONLY delivers the answer; the loop CONTINUES afterwards and this action does NOT end the task. Use the 'finish' action to terminate. " +
 		"OPTIONAL: carry a non-empty 'next_movements' delta alongside the answer to schedule follow-up TODO updates.",
 	Options: []aitool.ToolOption{
