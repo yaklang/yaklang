@@ -36,6 +36,9 @@ func (c *Compiler) ssaDefBlock(id int64) (int64, llvm.BasicBlock, bool) {
 	}
 	if c.function.compiledBlocks != nil {
 		if _, compiled := c.function.compiledBlocks[defBlockID]; !compiled && fn.EnterBlock > 0 {
+			if c.function.activeBlockID == defBlockID {
+				return defBlockID, targetBB, true
+			}
 			if entryBB, ok := c.Blocks[fn.EnterBlock]; ok && !entryBB.IsNil() {
 				targetBB = entryBB
 				defBlockID = fn.EnterBlock

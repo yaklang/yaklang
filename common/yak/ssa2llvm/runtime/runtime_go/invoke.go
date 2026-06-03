@@ -94,7 +94,55 @@ func invokeCallable(ctx unsafe.Pointer) {
 	if target == 0 {
 		return
 	}
+	if closure, ok := runtimeCallableClosureValueFromRaw(target); ok {
+		invokeCallableClosure(ctx, closure)
+		return
+	}
 	C.yak_invoke_callable(C.uintptr_t(target), ctx)
+}
+
+func runtimeCallableClosureValueFromRaw(raw uint64) (runtimeCallableClosure, bool) {
+	raw &^= yakTaggedPointerMask
+	ptr := unsafe.Pointer(uintptr(raw))
+	if ptr == nil {
+		return runtimeCallableClosure{}, false
+	}
+	handle, ok := handleFromShadow(ptr)
+	if !ok {
+		return runtimeCallableClosure{}, false
+	}
+	return runtimeCallableClosureValue(handle.Value())
+}
+
+func invokeCallableClosure(ctx unsafe.Pointer, closure runtimeCallableClosure) {
+	if ctx == nil || closure.fn == 0 {
+		return
+	}
+	argc := ctxArgc(ctx)
+	if argc < 0 {
+		return
+	}
+	inArgs := ctxArgsSlice(ctx, argc)
+	outArgc := argc + closure.paramMemberCount + len(closure.freeValues)
+	words := make([]uint64, abi.HeaderWords+outArgc*2)
+	childCtx := unsafe.Pointer(&words[0])
+	ctxInit(childCtx, abi.KindCallable, closure.fn, outArgc)
+	for index, raw := range inArgs {
+		runtimeStoreCallableContextArg(childCtx, outArgc, index, raw)
+	}
+	for i := 0; i < closure.paramMemberCount; i++ {
+		runtimeStoreCallableContextArg(childCtx, outArgc, argc+i, 0)
+	}
+	for i, capture := range closure.freeValues {
+		runtimeStoreCallableContextArg(childCtx, outArgc, argc+closure.paramMemberCount+i, capture)
+	}
+	C.yak_invoke_callable(C.uintptr_t(closure.fn), childCtx)
+	ctxSetRet(ctx, int64(ctxLoadWord(childCtx, abi.WordRet)))
+	ctxStoreWord(ctx, abi.WordPanic, ctxLoadWord(childCtx, abi.WordPanic))
+	ctxClearFlags(ctx, abi.FlagPanicTaggedPointer)
+	if ctxLoadWord(childCtx, abi.WordFlags)&abi.FlagPanicTaggedPointer != 0 {
+		ctxSetFlags(ctx, abi.FlagPanicTaggedPointer)
+	}
 }
 
 func executeInvoke(ctx unsafe.Pointer) {

@@ -167,8 +167,8 @@ func BuildCallFrameArgIDs(program *ssa.Program, call *ssa.Call, calleeFn *ssa.Fu
 				argIDs = append(argIDs, zero)
 			}
 		case FrameInputParamMember:
-			if input.Index < len(call.ArgMember) && call.ArgMember[input.Index] > 0 {
-				actualID := call.ArgMember[input.Index]
+			actualID := resolveCallArgMemberID(call, calleeFn, input)
+			if actualID > 0 {
 				if shouldDeferParameterMemberArg(call, calleeFn, input, actualID) {
 					argIDs = append(argIDs, zero)
 				} else {
@@ -185,18 +185,20 @@ func BuildCallFrameArgIDs(program *ssa.Program, call *ssa.Call, calleeFn *ssa.Fu
 			}
 			callerFn := call.GetFunc()
 			if name != "" && callerFn != nil {
-				if actualID, ok := call.Binding[name]; ok && actualID > 0 {
-					if _, exists := callerFn.GetValueById(actualID); exists {
-						argIDs = append(argIDs, actualID)
-						resolved = true
-					}
-				}
 				if !resolved {
 					for variable, valueID := range callerFn.FreeValues {
 						if variable != nil && variable.GetName() == name && valueID > 0 {
 							argIDs = append(argIDs, valueID)
 							resolved = true
 							break
+						}
+					}
+				}
+				if !resolved {
+					if actualID, ok := call.Binding[name]; ok && actualID > 0 {
+						if valueBelongsToFunctionOrParent(callerFn, actualID) {
+							argIDs = append(argIDs, actualID)
+							resolved = true
 						}
 					}
 				}
@@ -209,6 +211,114 @@ func BuildCallFrameArgIDs(program *ssa.Program, call *ssa.Call, calleeFn *ssa.Fu
 		}
 	}
 	return argIDs
+}
+
+func valueBelongsToFunctionOrParent(fn *ssa.Function, valueID int64) bool {
+	for current := fn; current != nil; current = current.GetParent() {
+		if value, ok := current.GetValueById(valueID); ok && value != nil {
+			return true
+		}
+	}
+	return false
+}
+
+func resolveCallArgMemberID(call *ssa.Call, calleeFn *ssa.Function, input FrameInput) int64 {
+	if call == nil || input.Kind != FrameInputParamMember {
+		return 0
+	}
+
+	if formal, ok := ssa.ToParameterMember(input.Value); ok && formal != nil {
+		if actualID := findMatchingCallArgMember(call, calleeFn, formal); actualID > 0 {
+			return actualID
+		}
+	}
+
+	if input.Index < len(call.ArgMember) && call.ArgMember[input.Index] > 0 {
+		return call.ArgMember[input.Index]
+	}
+	return 0
+}
+
+func findMatchingCallArgMember(call *ssa.Call, calleeFn *ssa.Function, formal *ssa.ParameterMember) int64 {
+	if call == nil || calleeFn == nil || formal == nil {
+		return 0
+	}
+	callerFn := call.GetFunc()
+	if callerFn == nil {
+		return 0
+	}
+
+	formalRoot, formalKey := formalMemberRootNameAndKey(calleeFn, formal)
+	if formalRoot == "" || formalKey == "" {
+		return 0
+	}
+
+	boundRootID := boundRootValueID(call, callerFn, formalRoot)
+	for _, actualID := range call.ArgMember {
+		if actualID <= 0 {
+			continue
+		}
+		actual, ok := callerFn.GetValueById(actualID)
+		if !ok || actual == nil || !actual.IsMember() || actual.GetObject() == nil || actual.GetKey() == nil {
+			continue
+		}
+		if boundRootID > 0 && actual.GetObject().GetId() != boundRootID {
+			continue
+		}
+		if memberKeyString(actual.GetKey()) == formalKey {
+			return actualID
+		}
+	}
+	return 0
+}
+
+func boundRootValueID(call *ssa.Call, callerFn *ssa.Function, name string) int64 {
+	if call == nil || callerFn == nil || name == "" {
+		return 0
+	}
+	if actualID, ok := call.Binding[name]; ok && actualID > 0 {
+		if _, exists := callerFn.GetValueById(actualID); exists {
+			return actualID
+		}
+	}
+	for variable, valueID := range callerFn.FreeValues {
+		if variable != nil && variable.GetName() == name && valueID > 0 {
+			return valueID
+		}
+	}
+	return 0
+}
+
+func formalMemberRootNameAndKey(fn *ssa.Function, formal *ssa.ParameterMember) (string, string) {
+	if fn == nil || formal == nil || formal.GetKey() == nil {
+		return "", ""
+	}
+	key := memberKeyString(formal.GetKey())
+	if key == "" {
+		return "", ""
+	}
+	obj := formal.GetObject()
+	for obj != nil {
+		if param, ok := ssa.ToParameter(obj); ok && param != nil {
+			return param.GetName(), key
+		}
+		if pm, ok := ssa.ToParameterMember(obj); ok && pm != nil {
+			obj = pm.GetObject()
+			continue
+		}
+		return obj.GetName(), key
+	}
+	return "", key
+}
+
+func memberKeyString(key ssa.Value) string {
+	if key == nil {
+		return ""
+	}
+	if cinst, ok := ssa.ToConstInst(key); ok && cinst != nil {
+		return strings.Trim(cinst.String(), "\"")
+	}
+	return strings.Trim(key.GetName(), "\"")
 }
 
 func shouldDeferParameterMemberArg(call *ssa.Call, calleeFn *ssa.Function, input FrameInput, actualID int64) bool {

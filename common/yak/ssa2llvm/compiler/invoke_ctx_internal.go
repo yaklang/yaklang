@@ -122,20 +122,26 @@ func (c *Compiler) bindParamsFromContext(fn *ssa.Function) error {
 		c.cacheValue(paramID, val)
 	}
 
-	for i, memberID := range fn.ParameterMembers {
-		paramIndex := int64(len(fn.Params) + i)
-		idx := llvm.ConstInt(i64, uint64(argBase+paramIndex), false)
-		elemPtr := c.Builder.CreateGEP(i64, ctxPtr, []llvm.Value{idx}, "")
-		val := c.Builder.CreateLoad(i64, elemPtr, fmt.Sprintf("pm_%d", memberID))
-		c.cacheValue(memberID, val)
-	}
-
 	freeValueBase := int64(len(fn.Params) + len(fn.ParameterMembers))
 	for i, binding := range callframe.OrderedFreeValueBindings(fn) {
 		idx := llvm.ConstInt(i64, uint64(argBase+freeValueBase+int64(i)), false)
 		elemPtr := c.Builder.CreateGEP(i64, ctxPtr, []llvm.Value{idx}, "")
 		val := c.Builder.CreateLoad(i64, elemPtr, fmt.Sprintf("fv_%d", binding.ValueID))
 		c.cacheValue(binding.ValueID, val)
+	}
+
+	for _, paramID := range fn.Params {
+		value, ok := fn.GetValueById(paramID)
+		if !ok || value == nil {
+			continue
+		}
+		ssaVal, ok := value.(ssa.Value)
+		if !ok {
+			continue
+		}
+		if err := c.maybeEmitMemberSet(nil, ssaVal, paramID); err != nil {
+			return err
+		}
 	}
 
 	return nil

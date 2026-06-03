@@ -2,16 +2,38 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"reflect"
 	"strings"
 	"sync"
 	"unsafe"
 
 	"github.com/yaklang/yaklang/common/yak/yaklang"
+	"github.com/yaklang/yaklang/common/yak/yaklib"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 // Trigger yaklang stdlib registration via yak package init.
 import _ "github.com/yaklang/yaklang/common/yak"
+
+func init() {
+	client := yaklib.NewVirtualYakitClient(func(result *ypb.ExecResult) error {
+		if msg := yaklib.ConvertExecResultIntoAIToolCallStdoutLog(result); msg != "" {
+			fmt.Fprintln(os.Stdout, msg)
+		}
+		return nil
+	})
+	yaklib.InitYakit(client)
+
+	exports := make(map[string]interface{}, len(yaklib.YakitExports))
+	for name, value := range yaklib.YakitExports {
+		exports[name] = value
+	}
+	for name, value := range yaklib.GetExtYakitLibByClient(client) {
+		exports[name] = value
+	}
+	yaklang.Import("yakit", exports)
+}
 
 func runtimeDispatchYaklibCall(args []uint64) (int64, error) {
 	if len(args) < 2 {
@@ -241,6 +263,87 @@ func runtimeDispatchIn(args []uint64) (int64, error) {
 	left := decodeTaggedArg(args[0])
 	right := decodeTaggedArg(args[1])
 	if runtimeMatchInContainer(left, right) {
+		return 1, nil
+	}
+	return 0, nil
+}
+
+func runtimeDecodeEqValue(raw uint64) any {
+	if (raw & yakTaggedPointerMask) != 0 {
+		raw &^= yakTaggedPointerMask
+		ptr := unsafe.Pointer(uintptr(raw))
+		if ptr == nil {
+			return nil
+		}
+		if h, ok := handleFromShadow(ptr); ok {
+			return h.Value()
+		}
+		return runtimeCStringToGoString(ptr)
+	}
+
+	if raw == 0 {
+		return nil
+	}
+	if h, ok := handleFromShadow(unsafe.Pointer(uintptr(raw))); ok {
+		return h.Value()
+	}
+	return int64(raw)
+}
+
+func runtimeNumericValue(v any) (float64, bool) {
+	switch value := v.(type) {
+	case int:
+		return float64(value), true
+	case int8:
+		return float64(value), true
+	case int16:
+		return float64(value), true
+	case int32:
+		return float64(value), true
+	case int64:
+		return float64(value), true
+	case uint:
+		return float64(value), true
+	case uint8:
+		return float64(value), true
+	case uint16:
+		return float64(value), true
+	case uint32:
+		return float64(value), true
+	case uint64:
+		return float64(value), true
+	case uintptr:
+		return float64(value), true
+	case float32:
+		return float64(value), true
+	case float64:
+		return value, true
+	default:
+		return 0, false
+	}
+}
+
+func runtimeValuesEqual(left, right any) bool {
+	if reflect.DeepEqual(left, right) {
+		return true
+	}
+	if ln, ok := runtimeNumericValue(left); ok {
+		if rn, ok := runtimeNumericValue(right); ok {
+			return ln == rn
+		}
+	}
+	return false
+}
+
+func runtimeDispatchEq(args []uint64) (int64, error) {
+	if len(args) < 2 {
+		return 0, fmt.Errorf("runtime eq expects left and right operands")
+	}
+	equal := runtimeValuesEqual(runtimeDecodeEqValue(args[0]), runtimeDecodeEqValue(args[1]))
+	if len(args) > 2 && args[2] != 0 {
+		equal = !equal
+	}
+	if equal {
 		return 1, nil
 	}
 	return 0, nil

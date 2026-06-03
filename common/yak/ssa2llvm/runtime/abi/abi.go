@@ -32,8 +32,10 @@ const (
 )
 
 const (
-	InvokeSymbol    = "yak_runtime_invoke"
-	MakeSliceSymbol = "yak_runtime_make_slice"
+	InvokeSymbol       = "yak_runtime_invoke"
+	MakeCallableSymbol = "yak_runtime_make_callable"
+	MakeObjectSymbol   = "yak_runtime_make_object"
+	MakeSliceSymbol    = "yak_runtime_make_slice"
 
 	// C-archive symbols exported by runtime_go (keep in sync with //export names).
 	InternalPrintIntSymbol      = "yak_internal_print_int"
@@ -60,6 +62,8 @@ const (
 const (
 	FlagAsync              uint64 = 1 << 0
 	FlagPanicTaggedPointer uint64 = 1 << 1
+	FlagFieldBool          uint64 = 1 << 2
+	FlagFieldString        uint64 = 1 << 3
 )
 
 const (
@@ -132,6 +136,9 @@ const (
 
 	// Channel receive for `<-ch`.
 	IDRuntimeChanRecv FuncID = 26
+
+	// Dynamic equality for pointer-backed Yak values such as strings and objects.
+	IDRuntimeEq FuncID = 27
 )
 
 type SliceElemKind int64

@@ -90,3 +90,27 @@ func (c *Compiler) newRuntimeInDispatchSpec(inst *ssa.BinOp) (contextCallSpec, e
 		errPrefix: "emitRuntimeInDispatch",
 	}, nil
 }
+
+func (c *Compiler) newRuntimeEqDispatchSpec(inst *ssa.BinOp, negate bool) (contextCallSpec, error) {
+	if inst == nil {
+		return contextCallSpec{}, fmt.Errorf("newRuntimeEqDispatchSpec: missing binop instruction")
+	}
+	negateValue := uint64(0)
+	if negate {
+		negateValue = 1
+	}
+	args := []contextCallArg{
+		{ssaID: inst.X, tagPointerArg: true},
+		{ssaID: inst.Y, tagPointerArg: true},
+		{value: llvm.ConstInt(c.LLVMCtx.Int64Type(), negateValue, false)},
+	}
+	return contextCallSpec{
+		inst:      inst,
+		kind:      abi.KindDispatch,
+		target:    llvm.ConstInt(c.LLVMCtx.Int64Type(), uint64(abi.IDRuntimeEq), false),
+		args:      args,
+		async:     false,
+		ctxName:   "yak_eq_ctx",
+		errPrefix: "emitRuntimeEqDispatch",
+	}, nil
+}

@@ -2,13 +2,18 @@ package main
 
 /*
 #include <stdint.h>
+void yak_invoke_callable(uintptr_t fn, void* ctx);
 */
 import "C"
 
 import (
 	"fmt"
 	"reflect"
+	"strings"
+	"unicode"
 	"unsafe"
+
+	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/abi"
 )
 
 func runtimeCStringToGoString(ptr unsafe.Pointer) string {
@@ -56,6 +61,12 @@ func runtimeResolveMethod(obj any, name string) (reflect.Value, error) {
 		}
 	}
 
+	if value.IsValid() && value.Kind() == reflect.String {
+		if method, ok := runtimeResolveStringMethod(value.String(), name); ok {
+			return method, nil
+		}
+	}
+
 	if value.IsValid() && value.Kind() != reflect.Ptr && value.CanAddr() {
 		if method := value.Addr().MethodByName(name); method.IsValid() {
 			return method, nil
@@ -65,9 +76,73 @@ func runtimeResolveMethod(obj any, name string) (reflect.Value, error) {
 	return reflect.Value{}, fmt.Errorf("method %q not found", name)
 }
 
+func runtimeResolveStringMethod(s string, name string) (reflect.Value, bool) {
+	switch name {
+	case "Trim":
+		return reflect.ValueOf(func(cutset ...string) string {
+			if len(cutset) == 0 {
+				return strings.TrimSpace(s)
+			}
+			return strings.Trim(s, strings.Join(cutset, ""))
+		}), true
+	case "TrimLeft":
+		return reflect.ValueOf(func(cutset ...string) string {
+			if len(cutset) == 0 {
+				return strings.TrimLeftFunc(s, unicode.IsSpace)
+			}
+			return strings.TrimLeft(s, strings.Join(cutset, ""))
+		}), true
+	case "TrimRight":
+		return reflect.ValueOf(func(cutset ...string) string {
+			if len(cutset) == 0 {
+				return strings.TrimRightFunc(s, unicode.IsSpace)
+			}
+			return strings.TrimRight(s, strings.Join(cutset, ""))
+		}), true
+	case "Lower":
+		return reflect.ValueOf(func() string { return strings.ToLower(s) }), true
+	case "Upper":
+		return reflect.ValueOf(func() string { return strings.ToUpper(s) }), true
+	case "Contains":
+		return reflect.ValueOf(func(substr string) bool { return substr == "" || strings.Contains(s, substr) }), true
+	case "HasPrefix", "StartsWith":
+		return reflect.ValueOf(func(prefix string) bool { return strings.HasPrefix(s, prefix) }), true
+	case "HasSuffix", "EndsWith":
+		return reflect.ValueOf(func(suffix string) bool { return strings.HasSuffix(s, suffix) }), true
+	case "RemovePrefix":
+		return reflect.ValueOf(func(prefix string) string { return strings.TrimPrefix(s, prefix) }), true
+	case "RemoveSuffix":
+		return reflect.ValueOf(func(suffix string) string { return strings.TrimSuffix(s, suffix) }), true
+	case "Split":
+		return reflect.ValueOf(func(sep string) []string { return strings.Split(s, sep) }), true
+	case "SplitN":
+		return reflect.ValueOf(func(sep string, n int) []string { return strings.SplitN(s, sep, n) }), true
+	case "Count":
+		return reflect.ValueOf(func(substr string) int { return strings.Count(s, substr) }), true
+	case "Find", "IndexOf":
+		return reflect.ValueOf(func(substr string) int { return strings.Index(s, substr) }), true
+	case "Rfind", "LastIndexOf":
+		return reflect.ValueOf(func(substr string) int { return strings.LastIndex(s, substr) }), true
+	default:
+		return reflect.Value{}, false
+	}
+}
+
+type runtimeCallableClosure struct {
+	fn               uint64
+	paramMemberCount int
+	freeValues       []uint64
+}
+
 func runtimeDecodeArg(raw uint64, targetType reflect.Type) (reflect.Value, error) {
 	if targetType == nil {
 		return reflect.Value{}, fmt.Errorf("missing target type")
+	}
+
+	if targetType.Kind() == reflect.Func {
+		if fn, ok := runtimeDecodeCallableArg(raw, targetType); ok {
+			return fn, nil
+		}
 	}
 
 	decoded := decodeTaggedArg(raw)
@@ -101,6 +176,94 @@ func runtimeDecodeArg(raw uint64, targetType reflect.Type) (reflect.Value, error
 	}
 
 	return reflect.Value{}, fmt.Errorf("cannot use %T as %s", decoded, targetType)
+}
+
+func runtimeDecodeCallableArg(raw uint64, targetType reflect.Type) (reflect.Value, bool) {
+	if targetType == nil || targetType.Kind() != reflect.Func {
+		return reflect.Value{}, false
+	}
+	if (raw & yakTaggedPointerMask) != 0 {
+		raw &^= yakTaggedPointerMask
+	}
+	ptr := unsafe.Pointer(uintptr(raw))
+	if ptr == nil {
+		return reflect.Zero(targetType), true
+	}
+	if handle, ok := handleFromShadow(ptr); ok {
+		handleValue := handle.Value()
+		if closure, ok := runtimeCallableClosureValue(handleValue); ok {
+			return runtimeMakeCallableWrapper(closure.fn, closure.paramMemberCount, closure.freeValues, targetType), true
+		}
+		value := reflect.ValueOf(handleValue)
+		if value.IsValid() && value.Type().AssignableTo(targetType) {
+			return value, true
+		}
+		if value.IsValid() && value.Type().ConvertibleTo(targetType) {
+			return value.Convert(targetType), true
+		}
+	}
+
+	return runtimeMakeCallableWrapper(raw, 0, nil, targetType), true
+}
+
+func runtimeCallableClosureValue(value any) (runtimeCallableClosure, bool) {
+	switch closure := value.(type) {
+	case runtimeCallableClosure:
+		return closure, true
+	case *runtimeCallableClosure:
+		if closure != nil {
+			return *closure, true
+		}
+	}
+	return runtimeCallableClosure{}, false
+}
+
+func runtimeMakeCallableWrapper(raw uint64, paramMemberCount int, freeValues []uint64, targetType reflect.Type) reflect.Value {
+	captures := append([]uint64(nil), freeValues...)
+	return reflect.MakeFunc(targetType, func(args []reflect.Value) []reflect.Value {
+		paramc := len(args)
+		argc := paramc + paramMemberCount + len(captures)
+		words := make([]uint64, abi.HeaderWords+argc*2)
+		ctx := unsafe.Pointer(&words[0])
+		ctxInit(ctx, abi.KindCallable, raw, argc)
+		for i, arg := range args {
+			rawArg := uint64(runtimeValueToInt64(arg))
+			runtimeStoreCallableContextArg(ctx, argc, i, rawArg)
+		}
+		for i := 0; i < paramMemberCount; i++ {
+			runtimeStoreCallableContextArg(ctx, argc, paramc+i, 0)
+		}
+		for i, capture := range captures {
+			runtimeStoreCallableContextArg(ctx, argc, paramc+paramMemberCount+i, capture)
+		}
+
+		C.yak_invoke_callable(C.uintptr_t(raw), ctx)
+		return runtimeDecodeCallableReturns(ctx, targetType)
+	})
+}
+
+func runtimeStoreCallableContextArg(ctx unsafe.Pointer, argc int, index int, raw uint64) {
+	ctxStoreWord(ctx, abi.HeaderWords+index, raw)
+	ctxStoreWord(ctx, abi.HeaderWords+argc+index, raw&^yakTaggedPointerMask)
+}
+
+func runtimeDecodeCallableReturns(ctx unsafe.Pointer, targetType reflect.Type) []reflect.Value {
+	if targetType == nil || targetType.NumOut() == 0 {
+		return nil
+	}
+
+	out := make([]reflect.Value, targetType.NumOut())
+	ret := ctxLoadWord(ctx, abi.WordRet)
+	for i := range out {
+		if i == 0 {
+			if value, err := runtimeDecodeArg(ret, targetType.Out(i)); err == nil {
+				out[i] = value
+				continue
+			}
+		}
+		out[i] = reflect.Zero(targetType.Out(i))
+	}
+	return out
 }
 
 func runtimeDecodeShadowArg(raw uint64, targetType reflect.Type) (reflect.Value, bool) {
@@ -263,12 +426,11 @@ func runtimeCallReturnValue(results []reflect.Value) int64 {
 	}
 
 	errorType := reflect.TypeOf((*error)(nil)).Elem()
-	last := results[len(results)-1]
-	if last.IsValid() && last.Type().Implements(errorType) && !last.IsNil() {
-		panic(last.Interface().(error))
-	}
-
 	if len(results) == 1 {
+		last := results[0]
+		if last.IsValid() && last.Type().Implements(errorType) && !last.IsNil() {
+			panic(last.Interface().(error))
+		}
 		return runtimeValueToInt64(results[0])
 	}
 

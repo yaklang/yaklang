@@ -64,9 +64,51 @@ func TestYaklibDispatch_PrintlnUsesBuiltinFuncIDNotGenericPath(t *testing.T) {
 	require.GreaterOrEqual(t, strings.Count(ir, "call void @"+abi.InvokeSymbol), 1)
 }
 
+func TestYaklibDispatch_FunctionReturnArgsAreRooted(t *testing.T) {
+	code := `
+check = () => {
+	opt = ssa.withProjectName("probe")
+	config, err = ssa.NewConfig(ssa.ModeAll, opt)
+	if err != nil { return -1 }
+	if config == nil { return -2 }
+	return 0
+}
+`
+	_, _, ir, err := compileToIRFromCodeWithExternBindings(code, "yak", nil)
+	require.NoError(t, err)
+
+	require.Regexp(t, `store i64 %yak_ctx_arg_tag[0-9]*, ptr %[0-9]+, align 4
+  %[0-9]+ = getelementptr i64, ptr %yak_yaklib_ctx_i64p[0-9]*, i64 [0-9]+
+  store i64 %yak_load_[0-9]+, ptr %[0-9]+, align 4`, ir)
+}
+
+func TestYaklibDispatch_StringEqualityUsesRuntimeDispatch(t *testing.T) {
+	code := `check = () => { if "php" == "php" { return 1 }; return 0 }`
+	_, _, ir, err := compileToIRFromCodeWithExternBindings(code, "yak", nil)
+	require.NoError(t, err)
+
+	require.Contains(t, ir, "i64 27")
+	require.Contains(t, ir, "yak_eq_ctx")
+}
+
 func TestYaklibExtern_ModeAllConstantInIR(t *testing.T) {
 	code := `check = () => { if ssa.ModeAll == 0 { return -1 }; return ssa.ModeAll }`
 	_, _, ir, err := compileToIRFromCodeWithExternBindings(code, "yak", nil)
 	require.NoError(t, err)
 	require.Contains(t, ir, "i64 127")
+}
+
+func TestYaklibExtern_FunctionMemberValueDoesNotRecurse(t *testing.T) {
+	code := `
+check = () => {
+	callable = codec.EncodeToHex
+	if callable == nil {
+		return 0
+	}
+	return 1
+}
+`
+	_, _, ir, err := compileToIRFromCodeWithExternBindings(code, "yak", nil)
+	require.NoError(t, err)
+	require.Contains(t, ir, "yak_eq_ctx")
 }

@@ -44,12 +44,28 @@ func (c *Compiler) emitRuntimeInvoke(ctxI8 llvm.Value) {
 }
 
 func (c *Compiler) resolveContextCallArg(inst ssa.Instruction, argID int64, tagPointerArgs bool) (llvm.Value, llvm.Value, error) {
+	i64 := c.LLVMCtx.Int64Type()
+	if inst != nil {
+		if fn := inst.GetFunc(); fn != nil {
+			if ssaFn, ok := c.functionValueForArg(fn, argID); ok && ssaFn != nil {
+				closure, err := c.materializeCallableClosure(inst, ssaFn)
+				if err != nil {
+					return llvm.Value{}, llvm.Value{}, err
+				}
+				if tagPointerArgs {
+					tag := llvm.ConstInt(i64, yakTaggedPointerMask, false)
+					return c.Builder.CreateOr(closure, tag, "yak_ctx_callable_tag"), closure, nil
+				}
+				return closure, closure, nil
+			}
+		}
+	}
+
 	argVal, err := c.resolveSSAValueAsInt64(inst, argID, "yak_ctx_fn")
 	if err != nil {
 		return llvm.Value{}, llvm.Value{}, err
 	}
 
-	i64 := c.LLVMCtx.Int64Type()
 	argI64 := argVal
 	root := llvm.ConstInt(i64, 0, false)
 	if !tagPointerArgs || inst == nil {
@@ -100,6 +116,20 @@ func (c *Compiler) emitContextCall(spec contextCallSpec) (llvm.Value, error) {
 		return llvm.Value{}, fmt.Errorf("emitContextCall: missing target for call %d", spec.inst.GetId())
 	}
 
+	callBB := c.restoreInsertBlock(spec.inst)
+	callBlockID := int64(0)
+	if spec.inst.GetBlock() != nil {
+		callBlockID = spec.inst.GetBlock().GetId()
+	}
+	restoreCallInsertPoint := func() {
+		if c.function != nil && callBlockID > 0 {
+			c.function.activeBlockID = callBlockID
+		}
+		if !callBB.IsNil() {
+			c.restoreInsertPoint(callBB)
+		}
+	}
+
 	argc := len(spec.args)
 	ctxName := spec.ctxName
 	if ctxName == "" {
@@ -127,8 +157,10 @@ func (c *Compiler) emitContextCall(spec contextCallSpec) (llvm.Value, error) {
 			if prefix == "" {
 				prefix = "emitContextCall"
 			}
+			restoreCallInsertPoint()
 			return llvm.Value{}, fmt.Errorf("%s: failed to resolve argument %d: %w", prefix, index, err)
 		}
+		restoreCallInsertPoint()
 		if err := c.storeInvokeContextArg(ctxI64, index, argI64); err != nil {
 			return llvm.Value{}, err
 		}
@@ -137,10 +169,15 @@ func (c *Compiler) emitContextCall(spec contextCallSpec) (llvm.Value, error) {
 		}
 	}
 
+	restoreCallInsertPoint()
 	c.emitRuntimeInvoke(ctxI8)
 
 	zero := llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)
 	if spec.async {
+		if spec.inst.GetId() > 0 {
+			c.setActiveBlockFromInstruction(spec.inst)
+			c.storeSSAValue(spec.inst.GetId(), zero)
+		}
 		return zero, nil
 	}
 
@@ -148,7 +185,19 @@ func (c *Compiler) emitContextCall(spec contextCallSpec) (llvm.Value, error) {
 	if err != nil {
 		return llvm.Value{}, err
 	}
-	return c.coerceToInt64(ret), nil
+	ret = c.coerceToInt64(ret)
+	if spec.inst.GetId() > 0 {
+		c.setActiveBlockFromInstruction(spec.inst)
+		c.storeSSAValue(spec.inst.GetId(), ret)
+	}
+	return ret, nil
+}
+
+func (c *Compiler) setActiveBlockFromInstruction(inst ssa.Instruction) {
+	if c == nil || c.function == nil || inst == nil || inst.GetBlock() == nil {
+		return
+	}
+	c.function.activeBlockID = inst.GetBlock().GetId()
 }
 
 func (c *Compiler) finishContextCall(inst ssa.Instruction, result llvm.Value) error {
@@ -156,9 +205,16 @@ func (c *Compiler) finishContextCall(inst ssa.Instruction, result llvm.Value) er
 		return nil
 	}
 	result = c.coerceToInt64(result)
-	c.cacheValue(inst.GetId(), result)
+	if !c.isSSAValueStored(inst.GetId()) {
+		c.cacheValue(inst.GetId(), result)
+	}
 	if val, ok := inst.(ssa.Value); ok {
-		return c.maybeEmitMemberSet(inst, val, inst.GetId())
+		if err := c.maybeEmitMemberSet(inst, val, inst.GetId()); err != nil {
+			return err
+		}
+		if err := c.emitMemberVariableSetsForCompiledObject(inst, val); err != nil {
+			return err
+		}
 	}
 	return nil
 }

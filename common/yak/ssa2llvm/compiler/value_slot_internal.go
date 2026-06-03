@@ -26,6 +26,17 @@ func buildAlloca(b llvm.Builder, t llvm.Type, name string) llvm.Value {
 	return out
 }
 
+func (c *Compiler) currentInsertBlock() llvm.BasicBlock {
+	if c == nil {
+		return llvm.BasicBlock{}
+	}
+	cb := (C.LLVMBuilderRef)(unsafe.Pointer(c.Builder.C))
+	res := C.LLVMGetInsertBlock(cb)
+	var out llvm.BasicBlock
+	*(*unsafe.Pointer)(unsafe.Pointer(&out)) = unsafe.Pointer(res)
+	return out
+}
+
 func (c *Compiler) isSlotBackedValue(id int64) bool {
 	if c == nil || id <= 0 || c.function == nil || c.function.current == nil {
 		return false
@@ -64,7 +75,10 @@ func (c *Compiler) ensureValueSlot(id int64) llvm.Value {
 		return llvm.Value{}
 	}
 
-	restoreBB := c.restoreInsertBlock(nil)
+	restoreBB := c.currentInsertBlock()
+	if restoreBB.IsNil() {
+		restoreBB = c.restoreInsertBlock(nil)
+	}
 	prevActive := c.function.activeBlockID
 	c.function.activeBlockID = fn.EnterBlock
 	if first := entryBB.FirstInstruction(); first.IsNil() {
@@ -86,6 +100,14 @@ func (c *Compiler) ensureValueSlot(id int64) llvm.Value {
 	}
 	c.function.activeBlockID = prevActive
 	return slot
+}
+
+func (c *Compiler) hasValueSlot(id int64) bool {
+	if c == nil || c.function == nil || c.function.valueSlots == nil || id <= 0 {
+		return false
+	}
+	slot, ok := c.function.valueSlots[id]
+	return ok && !slot.IsNil()
 }
 
 func (c *Compiler) loadSSAValue(id int64) llvm.Value {

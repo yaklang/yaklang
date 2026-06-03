@@ -95,12 +95,16 @@ func (c *Compiler) newRuntimeMethodDispatchSpec(inst *ssa.Call, fn *ssa.Function
 
 	methodNamePtr := c.Builder.CreateGlobalStringPtr(methodName, fmt.Sprintf("yak_method_name_%d", inst.GetId()))
 	methodNameI64 := llvm.ConstPtrToInt(methodNamePtr, c.LLVMCtx.Int64Type())
-	args := make([]contextCallArg, 0, len(inst.Args)+2)
+	callArgs := append([]int64{}, inst.Args...)
+	if len(callArgs) > 0 && callArgs[0] == obj.GetId() {
+		callArgs = callArgs[1:]
+	}
+	args := make([]contextCallArg, 0, len(callArgs)+2)
 	args = append(args,
 		contextCallArg{ssaID: obj.GetId()},
 		contextCallArg{value: methodNameI64},
 	)
-	for _, argID := range inst.Args {
+	for _, argID := range callArgs {
 		args = append(args, contextCallArg{ssaID: argID, tagPointerArg: true})
 	}
 	return contextCallSpec{
@@ -117,8 +121,8 @@ func (c *Compiler) newRuntimeMethodDispatchSpec(inst *ssa.Call, fn *ssa.Function
 // compileCall compiles a ssa.Call instruction to LLVM IR.
 func (c *Compiler) compileCall(inst *ssa.Call) error {
 	if inst != nil {
-		if _, ok := c.getCachedValue(inst, inst.GetId()); ok {
-			return nil
+		if cached, ok := c.getCachedValue(inst, inst.GetId()); ok {
+			return c.finishContextCall(inst, cached)
 		}
 	}
 	if handled, err := c.compileTaggedObfCall(inst); handled || err != nil {

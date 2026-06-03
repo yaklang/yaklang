@@ -374,12 +374,21 @@ func compileInputWithConfig(cfg *CompileConfig) (*ssaapi.Program, *Compiler, str
 		return nil, nil, "", utils.Errorf("LLVM obfuscation failed: %v", err)
 	}
 
+	ir := comp.Mod.String()
 	if err := llvm.VerifyModule(comp.Mod, llvm.PrintMessageAction); err != nil {
+		if cfg.EmitLLVM {
+			if out, writeErr := writeLLVMIRArtifact(cfg, ir); writeErr != nil {
+				comp.Dispose()
+				return nil, nil, "", utils.Errorf("LLVM verification failed: %v; additionally failed to write LLVM IR: %v", err, writeErr)
+			} else {
+				log.Infof("LLVM IR written to: %s", out)
+			}
+		}
 		comp.Dispose()
 		return nil, nil, "", utils.Errorf("LLVM verification failed: %v", err)
 	}
 
-	return progBundle, comp, comp.Mod.String(), nil
+	return progBundle, comp, ir, nil
 }
 
 func resolveCompileInput(sourceFile, sourceCode, language string) (string, string, string, error) {
@@ -616,6 +625,14 @@ func compileWithConfig(cfg *CompileConfig) (CompileResult, error) {
 
 	// Verify again after emitting the wrapper entrypoint.
 	if err := llvm.VerifyModule(comp.Mod, llvm.PrintMessageAction); err != nil {
+		if cfg.EmitLLVM {
+			ir = comp.Mod.String()
+			if out, writeErr := writeLLVMIRArtifact(cfg, ir); writeErr != nil {
+				return CompileResult{}, utils.Errorf("LLVM verification failed after adding main wrapper: %v; additionally failed to write LLVM IR: %v", err, writeErr)
+			} else {
+				log.Infof("LLVM IR written to: %s", out)
+			}
+		}
 		return CompileResult{}, utils.Errorf("LLVM verification failed after adding main wrapper: %v", err)
 	}
 
@@ -664,23 +681,16 @@ func compileWithConfig(cfg *CompileConfig) (CompileResult, error) {
 	}
 
 	if cfg.EmitLLVM {
-		if outputFile == cfg.OutputFile && outputFile != "" {
-		} else {
-			outputFile = replaceExt(cfg.SourceFile, ".ll")
-		}
 		data, err := os.ReadFile(finalLL)
 		if err != nil {
 			return CompileResult{}, utils.Errorf("failed to read final LLVM IR: %v", err)
 		}
-		if err := os.WriteFile(outputFile, data, 0644); err != nil {
+		if out, err := writeLLVMIRArtifact(cfg, string(data)); err != nil {
 			return CompileResult{}, utils.Errorf("failed to write LLVM IR: %v", err)
+		} else {
+			outputFile = out
 		}
 		log.Infof("LLVM IR written to: %s", outputFile)
-		if dst := finalOutputPath(cfg); strings.TrimSpace(dst) != "" {
-			if err := CopyFilePreserveMode(outputFile, dst); err != nil {
-				return CompileResult{}, err
-			}
-		}
 		return CompileResult{WorkDir: cfg.WorkDir, Artifact: outputFile, CacheHit: false}, nil
 	}
 
@@ -788,6 +798,40 @@ func finalOutputPath(cfg *CompileConfig) string {
 		}
 		return "a.out"
 	}
+}
+
+func llvmOutputPath(cfg *CompileConfig) string {
+	if cfg == nil {
+		return "ssa2llvm.ll"
+	}
+	if out := strings.TrimSpace(cfg.OutputFile); out != "" {
+		return out
+	}
+	if src := strings.TrimSpace(cfg.SourceFile); src != "" {
+		return replaceExt(src, ".ll")
+	}
+	if workDir := strings.TrimSpace(cfg.WorkDir); workDir != "" {
+		return filepath.Join(workDir, "ssa2llvm.ll")
+	}
+	return "ssa2llvm.ll"
+}
+
+func writeLLVMIRArtifact(cfg *CompileConfig, ir string) (string, error) {
+	outputFile := llvmOutputPath(cfg)
+	if dir := filepath.Dir(outputFile); dir != "" && dir != "." {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return "", err
+		}
+	}
+	if err := os.WriteFile(outputFile, []byte(ir), 0o644); err != nil {
+		return "", err
+	}
+	if dst := finalOutputPath(cfg); strings.TrimSpace(dst) != "" && filepath.Clean(dst) != filepath.Clean(outputFile) {
+		if err := CopyFilePreserveMode(outputFile, dst); err != nil {
+			return "", err
+		}
+	}
+	return outputFile, nil
 }
 
 func addMainWrapper(ir, entryFunc string, printEntryResult bool) string {
