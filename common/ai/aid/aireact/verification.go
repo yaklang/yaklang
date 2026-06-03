@@ -260,11 +260,7 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 			//   1. 全局 TODO 列表已由 SessionPromptState.VerificationTodoStore
 			//      在 loop prompt 的 timeline-open 段独立渲染 (任何 iteration
 			//      都能看到), Timeline 中的逐轮 JSON 流水属于重复表达;
-			//   2. RenderVerificationTodoMarkdownSnapshot 已在下方通过
-			//      EmitTextMarkdownStreamEvent 把 markdown 形式的快照同步给
-			//      前端, 用于事件流回放; Timeline 里的旧 JSON 不再被任何
-			//      消费者依赖;
-			//   3. 同步发出的 EVENT_TYPE_TODO_LIST_UPDATE 结构化事件 (见
+			//   2. EVENT_TYPE_TODO_LIST_UPDATE 结构化事件 (见
 			//      AppendVerificationHistory 之后) 携带完整 items + stats +
 			//      applied_ops, 是前端 TODO 面板的权威来源.
 			// 但保留一条 NEXT_MOVEMENTS delta breadcrumb, 形态是 "OP[id]:
@@ -277,23 +273,6 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 			// 时序敏感.
 			result.NextMovements = nextMovements
 			r.addNextMovementsBreadcrumb(result)
-
-			markdownSnapshot := r.RenderVerificationTodoMarkdownSnapshot(result)
-			if strings.TrimSpace(markdownSnapshot) != "" {
-				var out bytes.Buffer
-				var outputReader = io.TeeReader(strings.NewReader(markdownSnapshot), &out)
-				var event *schema.AiOutputEvent
-				event, err = boundEmitter.EmitTextMarkdownStreamEvent(
-					"next_movements_snapshot",
-					outputReader,
-					taskID,
-					func() {},
-				)
-				if err != nil {
-					return utils.Errorf("failed to emit next_movements snapshot markdown stream event: %v", err)
-				}
-				captureReferenceAnchor(event)
-			}
 
 			deliveryFilesMarkdown := r.RenderVerificationOutputFilesMarkdown(result.OutputFiles)
 			if strings.TrimSpace(deliveryFilesMarkdown) != "" {

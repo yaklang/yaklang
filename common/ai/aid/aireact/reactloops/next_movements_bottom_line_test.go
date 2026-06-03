@@ -212,15 +212,12 @@ func TestApplyNextMovementsBottomLine_FiresForNonAdjustTodolistAction(t *testing
 	applyCalls := cfg.applyCalls
 	lastSatisfied := cfg.lastSatisfied
 	lastMovements := append([]aicommon.VerifyNextMovement(nil), cfg.lastMovements...)
-	markdownAsked := cfg.markdownAsked
 	cfg.mu.Unlock()
 
 	require.Equal(t, 1, applyCalls,
 		"bottom-line MUST apply movements exactly once when a non-adjust_todolist action carries next_movements")
 	assert.False(t, lastSatisfied,
 		"bottom-line satisfied flag must be false; main loop never claims verification outcome")
-	require.Equal(t, 1, markdownAsked,
-		"bottom-line must ask for markdown delta exactly once (apply 前算)")
 	require.Len(t, lastMovements, 2)
 	assert.Equal(t, "add", lastMovements[0].Op)
 	assert.Equal(t, "test_employee_idor", lastMovements[0].ID)
@@ -230,24 +227,18 @@ func TestApplyNextMovementsBottomLine_FiresForNonAdjustTodolistAction(t *testing
 	// 2. EVENT_TYPE_TODO_LIST_UPDATE 必须 emit, 携带 movements
 	mu.Lock()
 	defer mu.Unlock()
-	var (
-		todoUpdateEvt   *schema.AiOutputEvent
-		markdownEvtSeen bool
-	)
+	var todoUpdateEvt *schema.AiOutputEvent
 	for _, e := range captured {
 		if e.Type == schema.EVENT_TYPE_TODO_LIST_UPDATE {
 			todoUpdateEvt = e
 		}
-		if e.NodeId == "next_movements_snapshot" && e.Type == schema.EVENT_TYPE_STREAM {
-			markdownEvtSeen = true
-		}
+		assert.NotEqual(t, "next_movements_snapshot", e.NodeId,
+			"bottom-line must not emit next_movements_snapshot chat card; frontend uses todo_list_update only")
 	}
 	require.NotNil(t, todoUpdateEvt,
 		"bottom-line MUST emit EVENT_TYPE_TODO_LIST_UPDATE so the frontend TODO panel refreshes (this is the missing piece in the orphan-todo bug)")
 	assert.Contains(t, string(todoUpdateEvt.Content), "test_employee_idor",
 		"todo_list_update payload should carry the snapshot items containing the new id")
-	assert.True(t, markdownEvtSeen,
-		"bottom-line MUST emit next_movements_snapshot markdown stream so the frontend '待办' panel renders the delta")
 
 	// 3. NEXT_MOVEMENTS timeline breadcrumb 必须写入, 与 verification 路径
 	//    使用同一个 timeline 类别
@@ -291,13 +282,10 @@ func TestApplyNextMovementsBottomLine_SkipsForAdjustTodolistAction(t *testing.T)
 
 	cfg.mu.Lock()
 	applyCalls := cfg.applyCalls
-	markdownAsked := cfg.markdownAsked
 	cfg.mu.Unlock()
 
 	assert.Equal(t, 0, applyCalls,
 		"bottom-line MUST skip adjust_todolist action; adjust_todolist's own ActionHandler is responsible for apply")
-	assert.Equal(t, 0, markdownAsked,
-		"bottom-line MUST not ask for markdown delta when skipping; otherwise the snapshot would be computed twice")
 
 	mu.Lock()
 	defer mu.Unlock()
@@ -341,13 +329,10 @@ func TestApplyNextMovementsBottomLine_NoopWhenNoMovements(t *testing.T) {
 
 	cfg.mu.Lock()
 	applyCalls := cfg.applyCalls
-	markdownAsked := cfg.markdownAsked
 	cfg.mu.Unlock()
 
 	assert.Equal(t, 0, applyCalls,
 		"bottom-line MUST be no-op when action carries no next_movements")
-	assert.Equal(t, 0, markdownAsked,
-		"bottom-line MUST not ask for markdown delta when there is nothing to apply")
 
 	mu.Lock()
 	defer mu.Unlock()

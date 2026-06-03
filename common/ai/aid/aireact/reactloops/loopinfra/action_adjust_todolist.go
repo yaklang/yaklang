@@ -80,11 +80,9 @@ var loopAction_AdjustTodolist = &reactloops.LoopAction{
 			// 行 (`- [+]: [id: x]: y`), 前端不再看到裸 JSON, 与 verification.
 			// next_movements 字节级对齐.
 			//
-			// markdown 形态的全量快照仍然走独立的 next_movements_snapshot
-			// 节点 (apply 前由 aicommon.ApplyVerificationNextMovementsAndEmit
-			// 发出), 与 verification 路径同位 — 前端 TODO 面板因此能在
-			// adjust / verification / 主循环兜底三条通道之间自动联动,
-			// 不需要区分来源.
+			// 结构化 todo_list_update 由 aicommon.ApplyVerificationNextMovementsAndEmit
+			// 发出 — 前端顶部「待办清单」在 adjust / verification / 主循环兜底
+			// 三条通道之间自动联动, 不需要区分来源.
 			//
 			// 关键词: adjust_todolist next_movements StreamHandler, 不裸 JSON,
 			//   verification 字节对齐, 待办事项 i18n 不破坏
