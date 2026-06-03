@@ -63,3 +63,15 @@ func TestAIStatefulTaskBase_TaskCannotUpdateFinishStatus(t *testing.T) {
 	task.SetStatus(AITaskState_Completed)
 	require.Equal(t, AITaskState_Aborted, task.GetStatus(), "status should not change to Finished after being Aborted")
 }
+
+func TestAIStatefulTaskBase_ForceSetStatusAllowsRecoveryFromFinishedState(t *testing.T) {
+	task := NewStatefulTaskBase("task-1", "input", nil, nil, true)
+	task.SetStatus(AITaskState_Aborted)
+	require.Equal(t, AITaskState_Aborted, task.GetStatus())
+
+	task.ForceSetStatus(AITaskState_Processing)
+	require.Equal(t, AITaskState_Processing, task.GetStatus(), "force set should allow retrying a recovered aborted task")
+
+	task.Finish(nil)
+	require.Equal(t, AITaskState_Completed, task.GetStatus(), "task should be able to finish after being forced back to processing")
+}

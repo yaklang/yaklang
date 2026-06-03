@@ -240,7 +240,7 @@ func (r *runtime) Invoke(task *AiTask, startTaskIndex string) (retErr error) {
 
 		r.config.EmitInfo("invoke subtask: %v", current.Name)
 		if len(current.Subtasks) == 0 {
-			current.SetStatus(aicommon.AITaskState_Processing) // 设置为执行中
+			current.ForceSetStatus(aicommon.AITaskState_Processing) // recovery 时允许从终态强制回到执行中
 		}
 		r.config.EmitPushTask(current)
 		defer func() {
