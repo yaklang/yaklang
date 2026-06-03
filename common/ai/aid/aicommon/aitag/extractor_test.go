@@ -217,3 +217,40 @@ func TestParseWithCallbacks(t *testing.T) {
 		t.Fatalf("ParseWithCallbacks failed: %v", err)
 	}
 }
+
+func TestParseEndTagWithExtraSlash(t *testing.T) {
+	input := `<|FINAL_ANSWER_wPsV|>
+## 功能测试点任务清单
+
+- 保留这部分内容
+</|FINAL_ANSWER_END_wPsV|>
+
+{
+  "@action": "directly_answer"
+}`
+
+	var capturedContent string
+	err := Parse(strings.NewReader(input), WithCallback("FINAL_ANSWER", "wPsV", func(reader io.Reader) {
+		content, _ := io.ReadAll(reader)
+		capturedContent = string(content)
+	}))
+
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+
+	if !strings.Contains(capturedContent, "功能测试点任务清单") {
+		t.Fatalf("Expected tagged content to be captured, got: %s", capturedContent)
+	}
+
+	if strings.Contains(capturedContent, `"@action": "directly_answer"`) {
+		t.Fatalf("Trailing content after malformed end tag should not be captured: %s", capturedContent)
+	}
+}
+
+func TestParseEndTagLiteralAllowsExtraSlash(t *testing.T) {
+	tagName, nonce := parseEndTagLiteral("</|FINAL_ANSWER_END_wPsV|>")
+	if tagName != "FINAL_ANSWER" || nonce != "wPsV" {
+		t.Fatalf("Expected FINAL_ANSWER/wPsV, got %q/%q", tagName, nonce)
+	}
+}
