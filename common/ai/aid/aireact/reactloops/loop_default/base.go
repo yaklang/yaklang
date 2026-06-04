@@ -3,6 +3,7 @@ package loop_default
 import (
 	"bytes"
 	_ "embed"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
@@ -71,6 +72,10 @@ func init() {
 					}
 					if loop.GetLastAction().ActionType == schema.AI_REACT_LOOP_ACTION_DIRECTLY_ANSWER {
 						log.Infof("iteration %d: action is directly answer, exiting loop and returning final answer", iteration)
+						return
+					}
+					if strings.TrimSpace(loop.Get("intent_hint")) == "simple_query" {
+						log.Infof("iteration %d: simple query task, skip post-iteration summary", iteration)
 						return
 					}
 

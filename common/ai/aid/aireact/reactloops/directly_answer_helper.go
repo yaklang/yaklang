@@ -30,6 +30,31 @@ import (
 // 关键词: directly_answer 永不 Exit, answer-then-continue, finish 唯一终结器,
 //
 //	directly_answer 改起来很简单
+const loopIntentHintSimpleQuery = "simple_query"
+
+// ShouldAutoFinishAfterSimpleQueryDirectlyAnswer reports whether a directly_answer
+// on a greeting/status (simple_query) task should terminate the loop immediately
+// after emitting the user-visible answer. No extra LLM round for finish/post-summary.
+func ShouldAutoFinishAfterSimpleQueryDirectlyAnswer(loop *ReActLoop, action *aicommon.Action) bool {
+	if loop == nil || action == nil {
+		return false
+	}
+	if strings.TrimSpace(loop.Get("intent_hint")) != loopIntentHintSimpleQuery {
+		return false
+	}
+	if len(aicommon.NormalizeVerifyNextMovements(action)) > 0 {
+		return false
+	}
+	cfg := loop.GetConfig()
+	task := loop.GetCurrentTask()
+	if cfg != nil && task != nil {
+		if len(aicommon.GetBlockingVerificationTodoItems(cfg, task)) > 0 {
+			return false
+		}
+	}
+	return true
+}
+
 func DirectlyAnswerContinue(loop *ReActLoop, action *aicommon.Action, operator *LoopActionHandlerOperator) {
 	if operator == nil {
 		return
@@ -48,10 +73,22 @@ func DirectlyAnswerContinue(loop *ReActLoop, action *aicommon.Action, operator *
 		operator.Continue()
 		return
 	}
+	if ShouldAutoFinishAfterSimpleQueryDirectlyAnswer(loop, action) {
+		if !utils.IsNil(invoker) {
+			invoker.AddToTimeline(
+				"directly_answer_continue",
+				"simple query: greeting reply delivered to the user; CURRENT-TASK has no further work. "+
+					"Terminating the ReAct loop (do not call directly_answer again for the same greeting).",
+			)
+		}
+		operator.Exit()
+		return
+	}
 	if !utils.IsNil(invoker) {
 		invoker.AddToTimeline("directly_answer_continue",
 			"answer delivered; this directly_answer does NOT end the task. "+
-				"Use the 'finish' action to terminate the ReAct loop when the task is complete.")
+				"When the entire CURRENT-TASK is complete, use the 'finish' action to terminate the ReAct loop. "+
+				"Do not repeat the same directly_answer payload; continue with tools, next_movements, or finish.")
 	}
 	if items := aicommon.GetBlockingVerificationTodoItems(loop.GetConfig(), loop.GetCurrentTask()); len(items) > 0 {
 		operator.Feedback(buildExitBlockedByTodoMessage("finish", items))
