@@ -53,6 +53,30 @@ go build -o ./ssa2llvm ./common/yak/ssa2llvm/cmd
 ./ssa2llvm run demo.yak
 ```
 
+### Yak 插件类型（`--plugin-type`）
+
+把 Yakit 插件脚本编成带 CLI 的原生二进制时，可指定插件外壳：
+
+| `--plugin-type` | 说明 |
+|-----------------|------|
+| `yak`（默认） | 不包外壳；适合 coreplugin、完整脚本 |
+| `codec` | 读 `--param`，调用 `handle(param)`，打印结果 |
+| `port-scan` | 用 CLI 拼扫描结果对象，调用 `handle(result)` |
+| `mitm` | **不支持**（编译报错） |
+
+```bash
+# codec 示例
+./ssa2llvm compile -o codec.bin plugin.yak --plugin-type codec
+./codec.bin --param "hello"
+
+# 原生 Yak / coreplugin 示例
+./ssa2llvm compile -o detect.bin "./path/to/SSA 项目探测.yak" --plugin-type yak
+export YAKIT_HOME="$PWD/.db"
+./detect.bin --target /path/to/project --language php
+```
+
+`yakit.Info` / `yakit.Code` 等在二进制中会输出到 stdout（如 `[yakit][info]`、`[code] {...}`）。细节见 **`docs/yak-plugin-types.md`**。
+
 ## 运行时交付模式
 
 ### 1. 默认模式：链接本地 `libyak.a`
@@ -91,13 +115,15 @@ go build -tags ssa2llvm_gzip_embed -o ./ssa2llvm ./common/yak/ssa2llvm/cmd
 
 ## 当前覆盖的关键能力
 
-- 普通函数调用、递归调用、`go` 异步调用
+- 普通函数调用、递归调用、`go` 异步调用（含异步 `SideEffect` 延后到同步点再读值）
 - `defer` / `panic` / `recover` / `try-catch-finally`
 - `sync.NewWaitGroup` / `NewSizedWaitGroup` / `NewLock` / `NewMutex` / `NewRWMutex`
 - `sync.NewMap` / `NewPool` / `NewOnce` / `NewCond` 构造入口
 - Go shadow object 反射方法分发
 - `make([]int)` / `make([]int, n)` / `append(a, x)` 这类 slice 基础能力
 - closure freevalue / parameter capture 基线
+- **Yak 插件类型**：`cli` 收参、`yakit` 日志/`Code`、`codec` / `port-scan` 外壳（见 `docs/yak-plugin-types.md`）
+- **yaklib 导出**：`ssa.NewConfig`、`codec.*` 等经 runtime 派发；map 成员写、side-effect / phi 有回归测试
 
 ## 测试与验证
 
@@ -106,13 +132,21 @@ go build -tags ssa2llvm_gzip_embed -o ./ssa2llvm ./common/yak/ssa2llvm/cmd
 ```bash
 mkdir -p .db
 export YAKIT_HOME="$PWD/.db"
-go test ./common/yak/ssa2llvm/... -count=1
+./common/yak/ssa2llvm/scripts/build_runtime_go.sh
+go test ./common/yak/ssa2llvm/... -count=1 -timeout=30m
 ```
 
 如果出现 `runtime library not found`，通常说明还没先构建 `common/yak/ssa2llvm/runtime/libyak.a`。
 
+全量 `tests` 包在 Linux 上约需 8–10 分钟；Go 默认 10 分钟包超时可能不够，请使用 `-timeout=30m`。插件与 `yakit.Code` 可单独跑：
+
+```bash
+go test ./common/yak/ssa2llvm/tests/ -run 'TestYakPluginType|TestYaklibSSA_|TestCorePlugin_RunSSADetect' -count=1
+```
+
 ## 机制文档
 
+- Yak 插件类型、`cli`、`yakit`：`common/yak/ssa2llvm/docs/yak-plugin-types.md`
 - `link_prep`、运行时符号重命名与 profile 默认：`common/yak/ssa2llvm/docs/link-prep.md`
 - builtin ID、stdlib 与 runtime shadow method：`common/yak/ssa2llvm/docs/dispatch-and-stdlib.md`
 - `InvokeContext`、函数调用、closure binding 与 goroutine：`common/yak/ssa2llvm/docs/context-call-and-goroutine.md`

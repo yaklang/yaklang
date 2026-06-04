@@ -30,7 +30,8 @@ builtin ID 现在定义在：
 当前已覆盖：
 
 - `print / printf / println`
-- `yakit.*`
+- `yakit.Info` / `yakit.Warn` / `yakit.Error` / `yakit.Debug`（专用 FuncID，见 `externs.go`）
+- `yakit.Code` 及未单独绑定的 `yakit.*`（经 `IDYaklibCall` 走 `runtime_yaklib.go` 的 yaklib 派发）
 - `os.Getenv`
 - `poc.*`
 - `sync.NewWaitGroup / NewSizedWaitGroup / NewLock / NewMutex / NewRWMutex`
@@ -139,3 +140,7 @@ Yak 自己的 object-factor `a.set()` / `a.get()` 仍然走本地函数调用 lo
 4. 如参数需要 tagged pointer，在 `shouldTagStdlibArgPointers` 中补该 ID
 
 如果新增的是 **Go shadow object 方法**，优先复用 `runtime_object.go` 的反射分发，而不是再为具体类型/方法继续加特判。
+
+## 8. Yak 插件与 `yakit.Code`
+
+AOT 二进制通过 `VirtualYakitClient` 把 `yakit` 调用打印到 stdout，供 CLI 与自动化测试使用。插件类型（`codec` / `port-scan` 外壳、`cli` 传参）见 **`yak-plugin-types.md`**。

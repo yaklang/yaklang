@@ -169,6 +169,7 @@ runtime 里的复杂对象由 Go 持有真实状态，LLVM/C 侧只持有 shadow
 
 ## 相关文档
 
+- `common/yak/ssa2llvm/docs/yak-plugin-types.md`
 - `common/yak/ssa2llvm/docs/dispatch-and-stdlib.md`
 - `common/yak/ssa2llvm/docs/context-call-and-goroutine.md`
 - `common/yak/ssa2llvm/docs/error-handling.md`

@@ -48,6 +48,16 @@
 - runtime shadow method 反射分发
 - slice shadow object 运行时表示
 - runtime 嵌入与 `--stdlib-compile` 模式
+- 原生进程内 `cli`（`runtime_cli.go` 注入 `os.Args`）
+- `yakit.Info/Warn/Error/Debug` 经专用 FuncID；`yakit.Code` 经 yaklib + `VirtualYakitClient` 输出 `[code] ...`
+
+### Yak 插件类型（AOT）
+
+- `--plugin-type yak`：默认，不包外壳
+- `--plugin-type codec`：`handle(param)` + `--param`
+- `--plugin-type port-scan`：`handle(result)` + 扫描结果形 CLI 字段
+- `--plugin-type mitm`：**未实现**
+- 实现：`compiler/plugin_type.go`；说明见 `docs/yak-plugin-types.md`
 
 ### 测试
 
@@ -55,11 +65,13 @@
 
 - 基础算术与控制流
 - 函数调用与递归
-- `go` 语句与 sync 系列标准库
+- `go` 语句与 sync 系列标准库（含 goroutine 内 side-effect 延后编译）
 - 复杂 object-factor 场景
 - closure freevalue / parameter capture
 - `make([]int)` / `append` / 越界 panic
 - 编译缓存与 runtime 嵌入
+- `TestYakPluginType*`、`TestYaklibSSA_*`（map / side-effect / `yakit.Code` / `ssa.NewConfig`）
+- `TestCorePlugin_RunSSADetectProject`、coreplugin 全量编译（`TestCorePlugin_CompileAll`，较慢）
 
 ## 当前限制
 
@@ -82,13 +94,21 @@
 - 复杂 object-factor + freevalue + side-effect 组合还需要继续补强
 - function compile metadata 已经开始收口，但 compiler 文件布局还可以继续整理
 
+### 插件与 YakVM 语义
+
+- **不是**完整 YakVM 替代：未覆盖的语法/库可能编译或运行失败
+- **port-scan 外壳**只传递 CLI 拼好的结果对象，不自动发包
+- **mitm** 插件类型尚未支持
+- CLI 短选项须在脚本里用 `cli.setShortName` 声明；编译器不会自动映射 `-t` → `target`
+- 主路径 **Linux**；Windows 上部分链接/测试跳过
+
 ## 推荐验证方式
 
 ```bash
 mkdir -p .db
 export YAKIT_HOME="$PWD/.db"
 ./common/yak/ssa2llvm/scripts/build_runtime_go.sh
-go test ./common/yak/ssa2llvm/... -count=1
+go test ./common/yak/ssa2llvm/... -count=1 -timeout=30m
 ```
 
 如需验证最终产物链路，再额外执行：
@@ -98,9 +118,16 @@ go build -o ./ssa2llvm ./common/yak/ssa2llvm/cmd
 ./ssa2llvm run demo.yak
 ```
 
+插件类型与 coreplugin 探测：
+
+```bash
+go test ./common/yak/ssa2llvm/tests/ -run 'TestYakPluginType|TestCorePlugin_RunSSADetect' -v -count=1
+```
+
 ## 后续建议
 
 - 继续收口 compile/function/runtime 三层边界
 - 继续把 compiler 内的机制文件按职责拆清楚
 - 补强 slice / map / blueprint / member / side-effect 的真实运行覆盖
 - 维持“最终二进制可运行且输出正确”的测试标准，不只验证 IR
+- 视需求实现 `mitm` 插件外壳；port-scan 真发包仍依赖用户脚本内库调用
