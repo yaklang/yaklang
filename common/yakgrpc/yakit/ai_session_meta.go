@@ -20,6 +20,35 @@ const aiSessionMetaMigrationKey = "yakit.ai_session_meta.migrated.v1"
 const defaultAISessionTitle = "<未命名>"
 const emptyRelatedRuntimeIDsJSON = "[]"
 
+// RegisterAIAgentSession ensures project DB has a row for a yak/aim ReAct session id.
+// source is optional (e.g. yak, cli) and is written when the session row is first created.
+func RegisterAIAgentSession(db *gorm.DB, sessionID string, source ...string) error {
+	if db == nil {
+		return utils.Errorf("database is nil")
+	}
+	sessionID = strings.TrimSpace(sessionID)
+	if sessionID == "" {
+		return utils.Errorf("session_id is empty")
+	}
+	record, err := CreateOrUpdateAISessionMeta(db, sessionID, defaultAISessionTitle)
+	if err != nil {
+		return err
+	}
+	src := ""
+	if len(source) > 0 {
+		src = strings.TrimSpace(source[0])
+	}
+	if src == "" || record == nil {
+		return nil
+	}
+	if strings.TrimSpace(record.Source) != "" {
+		return nil
+	}
+	return db.Model(&schema.AISession{}).
+		Where("session_id = ?", sessionID).
+		UpdateColumn("source", src).Error
+}
+
 func CreateOrUpdateAISessionMeta(db *gorm.DB, sessionID, title string) (*schema.AISession, error) {
 	if db == nil {
 		return nil, utils.Errorf("database is nil")

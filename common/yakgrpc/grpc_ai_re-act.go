@@ -229,6 +229,14 @@ func (s *Server) StartAIReAct(stream ypb.Yak_StartAIReActServer) error {
 		persistentSession = "default"
 	}
 
+	if startParams.GetAttach() {
+		runningReAct, err := aireact.WaitRunningSession(persistentSession, time.Minute)
+		if err != nil {
+			return err
+		}
+		return s.attachToRunningAIReActSession(stream, baseCtx, runningReAct, firstMsg, persistentSession, startParams)
+	}
+
 	if runningReAct, ok := aireact.GetRunningSession(persistentSession); ok {
 		return s.attachToRunningAIReActSession(stream, baseCtx, runningReAct, firstMsg, persistentSession, startParams)
 	}

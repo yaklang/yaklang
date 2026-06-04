@@ -116,6 +116,7 @@ var YakitExports = map[string]interface{}{
 	"Output":        emptyVirtualClient.Output,
 	"SetProgress":   emptyVirtualClient.YakitSetProgress,
 	"SetProgressEx": emptyVirtualClient.YakitSetProgressEx,
+	"AIAgentSession": emptyVirtualClient.AIAgentSession,
 }
 
 func GetExtYakitLibByOutput(Output func(d any) error) map[string]interface{} {
@@ -191,8 +192,9 @@ func GetExtYakitLibByClient(client *YakitClient) map[string]interface{} {
 		"Report":        client.YakitReport,
 		"File":          client.YakitFile,
 		"Output":        client.Output,
-		"AIOutput":      client.AIOutput,
-		"SetProgress":   client.YakitSetProgress,
+		"AIOutput":       client.AIOutput,
+		"AIAgentSession": client.AIAgentSession,
+		"SetProgress":    client.YakitSetProgress,
 		"SetProgressEx": client.YakitSetProgressEx,
 		"Stream":        client.Stream,
 		// SSA stream events: a dedicated channel that ScanNode can hook to, avoiding
@@ -895,8 +897,17 @@ func (c *YakitClient) YakitWarn(tmp string, items ...interface{}) {
 	c.YakitLog("warn", tmp, items...)
 }
 
-func (c *YakitClient) AIAgentSession(sessionID string) {
+func (c *YakitClient) AIAgentSession(sessionID string, source ...string) {
+	sessionID = strings.TrimSpace(sessionID)
+	if sessionID == "" {
+		return
+	}
 	_ = c.YakitLog("ai_agent_session", sessionID)
+	if db := consts.GetGormProjectDatabase(); db != nil {
+		if err := yakit.RegisterAIAgentSession(db, sessionID, source...); err != nil {
+			log.Warnf("register ai agent session in yakit db failed: %v", err)
+		}
+	}
 }
 
 // AIOutput writes AI-focused output that can be filtered for AI tool stdout.
