@@ -29,7 +29,7 @@ func (c *Compiler) compileInstruction(inst ssa.Instruction) error {
 	case *ssa.Call:
 		return c.compileCall(op)
 	case *ssa.SideEffect:
-		return c.compileSideEffect(op)
+		return c.compileSideEffectInstruction(op)
 	case *ssa.Panic:
 		return c.compilePanic(op)
 	case *ssa.Recover:
@@ -94,7 +94,7 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 	}
 	if se, ok := valObj.(*ssa.SideEffect); ok {
 		err := c.withLazyCompileInsertPoint(contextInst, se, func() error {
-			return c.compileSideEffect(se)
+			return c.compileSideEffectValue(se)
 		})
 		if err != nil {
 			return llvm.Value{}, err

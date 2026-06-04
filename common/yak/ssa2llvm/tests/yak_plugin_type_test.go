@@ -28,6 +28,24 @@ if enabled {
 	require.Contains(t, output, "42\n")
 }
 
+func TestYakPluginTypeNativeCLIFlagDefaultsFalse(t *testing.T) {
+	code := `
+enabled = cli.Bool("enabled")
+cli.check()
+if enabled {
+	println("enabled")
+} else {
+	println("disabled")
+}
+`
+
+	output := runBinaryWithEnv(t, code, "", nil,
+		withCompilePluginType(compiler.YakPluginTypeYak),
+	)
+	require.Contains(t, output, "disabled\n")
+	require.NotContains(t, output, "enabled\n")
+}
+
 func TestYakPluginTypeCodecWrapper(t *testing.T) {
 	code := `
 handle = func(param) {
