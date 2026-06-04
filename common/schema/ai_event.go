@@ -244,6 +244,13 @@ const (
 	//
 	// 关键词: EVENT_TYPE_TODO_LIST_UPDATE, 全局 TODO 事件, 结构化前端通道
 	EVENT_TYPE_TODO_LIST_UPDATE EventType = "todo_list_update"
+
+	// EVENT_TYPE_CURRENT_TASK_TODO_LIST_UPDATE emits a structured TODO snapshot
+	// scoped to the current task only (items/stats filtered by task scope).
+	// Payload schema matches EVENT_TYPE_TODO_LIST_UPDATE (TodoListUpdatePayload).
+	//
+	// 关键词: EVENT_TYPE_CURRENT_TASK_TODO_LIST_UPDATE, 当前任务 TODO 事件
+	EVENT_TYPE_CURRENT_TASK_TODO_LIST_UPDATE EventType = "current_task_todo_list_update"
 )
 
 type AiOutputEvent struct {
