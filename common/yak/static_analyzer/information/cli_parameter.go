@@ -510,66 +510,50 @@ func ParseCliParameter(prog *ssaapi.Program) ([]*CliParameter, []*UIInfo, []stri
 		})
 	}
 
-	parseCliParameterFunc := func(v *ssaapi.Value, typ, methodTyp string) {
-		v.GetUsers().Filter(
-			func(v *ssaapi.Value) bool {
-				// only function call and must be reachable
-				return v.IsCall() && v.IsReachable() != -1
-			},
-		).ForEach(func(v *ssaapi.Value) {
-			// cli.String("arg1", opt...)
-			// op(0) => cli.String
-			// op(1) => "arg1"
-			// op(2...) => opt
-
-			nameValue := v.GetOperand(1)
-			name := ""
-			if nameValue.IsConstInst() {
-				if c := nameValue.GetConst(); c.IsString() {
-					name = c.VarString()
-				}
-			} else {
-				name = nameValue.String()
-			}
-
-			if name == "" {
-				return
-			}
-			cli := newCliParameter(name, typ, methodTyp)
-			opLen := len(v.GetOperands())
-			// handler option
-			shouldSkip := false
-			for i := 2; i < opLen; i++ {
-				if handleOption(cli, v.GetOperand(i)) {
-					shouldSkip = true
-				}
-			}
-			if shouldSkip {
-				return
-			}
-			params = append(params, cli)
-		})
-	}
-
-	prog.Ref("cli").GetOperands().ForEach(func(v *ssaapi.Value) {
-		if !v.IsFunction() {
-			return
-		}
-		// ui info
-		funcName := v.GetName()
-		if funcName == "cli.UI" {
-			parseUiFunc(v)
-			return
-		}
-
-		// cli parameter
-		pair, ok := methodMap[funcName]
-		if ok {
-			parseCliParameterFunc(v, pair.typ, pair.methodTyp)
-		}
+	prog.SyntaxFlowChain("cli.UI").ForEach(func(v *ssaapi.Value) {
+		parseUiFunc(v)
 	})
 
-	// handle effect group
+	prog.SyntaxFlowChain("cli.*()").ForEach(func(v *ssaapi.Value) {
+		callName := v.GetOperand(0).GetName()
+		p, ok := methodMap[callName]
+		if !ok {
+			return
+		}
+
+		if !(v.IsCall() && v.IsReachable() != -1) {
+			return
+		}
+
+		nameValue := v.GetOperand(1)
+		name := ""
+		if nameValue.IsConstInst() {
+			if c := nameValue.GetConst(); c.IsString() {
+				name = c.VarString()
+			}
+		} else {
+			name = nameValue.String()
+		}
+
+		if name == "" {
+			return
+		}
+
+		cli := newCliParameter(name, p.typ, p.methodTyp)
+		opLen := len(v.GetOperands())
+		// handler option
+		shouldSkip := false
+		for i := 2; i < opLen; i++ {
+			if handleOption(cli, v.GetOperand(i)) {
+				shouldSkip = true
+			}
+		}
+		if shouldSkip {
+			return
+		}
+		params = append(params, cli)
+	})
+
 	for _, info := range uiInfos {
 		for _, name := range info.effectGroup {
 			group, ok := groups[name]
