@@ -68,6 +68,7 @@ func applyNextMovementsBottomLine(
 	aicommon.ApplyVerificationNextMovementsAndEmit(
 		cfg,
 		cfg.GetEmitter(),
+		task,
 		scope,
 		iterationCount,
 		false,

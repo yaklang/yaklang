@@ -125,3 +125,29 @@ func TestEmitter_EmitCurrentTaskTodoList_ScopedItemsOnly(t *testing.T) {
 	allItems := cfg.SnapshotVerificationTodoItems()
 	require.Len(t, allItems, 3, "session store should still hold all tasks' TODOs")
 }
+
+func TestEmitter_EmitTodoListUpdates_EmitsBothEventTypes(t *testing.T) {
+	cfg := NewConfig(context.Background())
+	task := NewStatefulTaskBase("task-emit-pair", "pair", nil, nil, true)
+	scope := BuildVerificationTodoScope(task)
+	cfg.ApplyVerificationTodoOps(scope, false, []VerifyNextMovement{
+		{Op: "add", ID: "x", Content: "scoped todo"},
+	})
+
+	var captured []schema.EventType
+	emitter := NewEmitter("test-emitter", func(e *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
+		captured = append(captured, e.Type)
+		return e, nil
+	})
+
+	emitter.EmitTodoListUpdates(cfg, task, TodoListUpdatePayload{
+		Items:          cfg.SnapshotVerificationTodoItems(),
+		Stats:          cfg.GetVerificationTodoStats(),
+		AppliedOps:     []VerifyNextMovement{{Op: "add", ID: "x", Content: "scoped todo"}},
+		IterationIndex: 1,
+		TaskID:         task.GetId(),
+	})
+
+	require.Contains(t, captured, schema.EVENT_TYPE_TODO_LIST_UPDATE)
+	require.Contains(t, captured, schema.EVENT_TYPE_CURRENT_TASK_TODO_LIST_UPDATE)
+}
