@@ -1,6 +1,6 @@
-__DESC__ = "跨平台Shell命令执行工具，支持bash/cmd/powershell，具备超时控制和输出捕获。bash 默认以登录 shell 执行以加载系统和用户 profile 中的 PATH/环境变量，不额外启用 set -e 或命令追踪，行为更接近原生终端执行。"
+__DESC__ = "跨平台Shell命令执行工具，支持bash/cmd/powershell，具备超时控制和输出捕获。bash 默认以登录 shell 执行以加载系统和用户 profile 中的 PATH/环境变量，不额外启用 set -e 或命令追踪，行为更接近原生终端执行。注意：对于文件创建/写入操作，应优先使用 write_file 工具；对于文件局部修改，应优先使用 modify_file 工具。仅当专用工具无法满足需求时，才使用 bash 的 cat/echo 重定向操作文件。"
 __VERBOSE_NAME__ = "跨平台Shell命令执行工具"
-__KEYWORDS__ = "shell command,bash,cmd,powershell,命令行工具,系统管理,自动化脚本,运维工具,shell script,command execution,系统操作,终端命令,system administration,automation tools,操作系统,跨平台命令,timeout,超时控制,python script,pandas,data analysis,excel analysis,csv cache,data cache,批量分析"
+__KEYWORDS__ = "shell command,bash,cmd,powershell,命令行工具,系统管理,自动化脚本,运维工具,shell script,command execution,系统操作,终端命令,system administration,automation tools,操作系统,跨平台命令,timeout,超时控制,python script,pandas,data analysis,excel analysis,csv cache,data cache,批量分析,write_file优先,文件操作优先,modify_file优先"
 
 __USAGE__ = <<<USAGE_BLOCK
 Cross-Platform Shell Command Execution Tool - Usage Guide for AI Parameter Generation
@@ -138,27 +138,29 @@ else
 fi
 <|TOOL_PARAM_command_END_{NONCE}|>
 
-### Example 5: Python script execution (WRITE-THEN-RUN pattern - MANDATORY)
+### Example 5: Python script execution (MANDATORY - use write_file first)
 
 IMPORTANT: For Python scripts longer than 5 lines, NEVER pipe code directly via
-heredoc (python3 << 'EOF'). This causes shell parse errors with Python shebangs,
-docstrings, and complex string formatting.
+heredoc (python3 << 'EOF') or use cat/echo redirect. This causes shell parse errors
+with Python shebangs, docstrings, and complex string formatting.
 
-Instead, use cat to WRITE the script to a .py file first, then EXECUTE it:
+Instead, use the `write_file` tool to write the script file FIRST, then use bash
+to execute it:
 
+Step 1 - Write the script via write_file:
 ```json
 {
   "@action": "call-tool",
-  "tool": "bash",
-  "identifier": "python_data_analysis",
+  "tool": "write_file",
+  "identifier": "write_python_script",
   "params": {
-    "timeout": 120
+    "file": "analysis_script.py",
+    "force": true
   }
 }
 ```
 
-<|TOOL_PARAM_command_{NONCE}|>
-cat > analysis_script.py << 'PYEOF'
+<|TOOL_PARAM_content_{NONCE}|>
 #!/usr/bin/env python3
 """This script analyzes data - docstrings are safe here."""
 import json
@@ -171,16 +173,25 @@ with open(data_file) as f:
 print(f"Records: {len(data)}")
 for key, value in data.items():
     print(f"  {key}: {value}")
-PYEOF
+<|TOOL_PARAM_content_END_{NONCE}|>
 
-python3 analysis_script.py
-<|TOOL_PARAM_command_END_{NONCE}|>
+Step 2 - Execute via bash:
+```json
+{
+  "@action": "call-tool",
+  "tool": "bash",
+  "identifier": "run_python_script",
+  "params": {
+    "command": "python3 analysis_script.py",
+    "timeout": 120
+  }
+}
+```
 
 Key points:
-  - cat > file.py << 'PYEOF' safely writes ANY Python syntax (shebangs, docstrings, f-strings)
-  - The PYEOF delimiter must be on its own line with no leading whitespace
-  - After writing, execute with: python3 file.py
-  - Both steps happen in ONE bash tool call, no need to call write_file separately
+  - ALWAYS use write_file tool first to create scripts, THEN use bash to execute
+  - write_file safely handles multi-line content with AITAG blocks
+  - DO NOT use cat/echo heredoc in bash to create files — use write_file/modify_file instead
   - For multi-step data analysis on large files, prefer Python pandas over repeated query_excel_data calls
 
 For short Python one-liners (< 5 lines without docstrings), you may use:
@@ -197,24 +208,26 @@ For short Python one-liners (< 5 lines without docstrings), you may use:
 }
 ```
 
-### Example 6: Python data analysis with caching (RECOMMENDED for large files)
+### Example 6: Python data analysis with caching (write_file + bash execution)
 
 For Excel/CSV files > 10MB or analysis spanning multiple bash tool calls,
-use a cache-first pattern to avoid re-reading large files every time:
+use a cache-first pattern to avoid re-reading large files every time.
+ALWAYS use write_file to create the script, then bash to execute:
 
+Step 1 - Write the analysis script via write_file:
 ```json
 {
   "@action": "call-tool",
-  "tool": "bash",
-  "identifier": "cached_data_analysis",
+  "tool": "write_file",
+  "identifier": "write_cached_analysis",
   "params": {
-    "timeout": 120
+    "file": "/tmp/analysis_with_cache.py",
+    "force": true
   }
 }
 ```
 
-<|TOOL_PARAM_command_{NONCE}|>
-cat > /tmp/analysis_with_cache.py << 'PYEOF'
+<|TOOL_PARAM_content_{NONCE}|>
 import pandas as pd, json, os
 
 EXCEL_FILE = "/path/to/large_data.xlsx"
@@ -237,15 +250,27 @@ print(json.dumps(results, ensure_ascii=False, indent=2, default=str))
 with open("/tmp/analysis_results.json", "w") as f:
     json.dump(results, f, ensure_ascii=False, indent=2, default=str)
 print(f"Results saved to /tmp/analysis_results.json")
-PYEOF
-python3 /tmp/analysis_with_cache.py
-<|TOOL_PARAM_command_END_{NONCE}|>
+<|TOOL_PARAM_content_END_{NONCE}|>
+
+Step 2 - Execute via bash:
+```json
+{
+  "@action": "call-tool",
+  "tool": "bash",
+  "identifier": "run_cached_analysis",
+  "params": {
+    "command": "python3 /tmp/analysis_with_cache.py",
+    "timeout": 120
+  }
+}
+```
 
 Key caching rules:
   - First script: pd.read_excel() + df.to_csv() to create cache
   - All subsequent scripts: pd.read_csv() from cache (10x faster)
   - Save analysis results to JSON files for downstream tasks to read
   - Use /tmp/ for cache files (auto-cleaned on reboot)
+  - Use write_file to create scripts, NOT cat heredoc in bash
 
 ### Example 7: Windows CMD one-line command (explicit shell)
 
@@ -305,14 +330,19 @@ Get-Service |
 4. Limit output: pipe through | head -N; limit search: add -maxdepth to find
 5. Use fallback chains for cross-platform: cmd1 2>/dev/null || cmd2 || echo "not available"
 6. NEVER generate indefinite commands (no tail -f, no watch, no ping without -c)
-7. ** PYTHON SCRIPTS ** -- For Python scripts > 5 lines, ALWAYS use the WRITE-THEN-RUN
-   pattern: cat > script.py << 'PYEOF' to write the file, then python3 script.py to run.
-   NEVER pipe Python code directly via python3 << 'EOF'. This avoids shell parse errors
-   with shebangs, docstrings, and complex string formatting.
+7. ** PYTHON SCRIPTS ** -- For Python scripts > 5 lines, ALWAYS use write_file tool
+   to create the script file first, then bash to execute it. NEVER use cat/echo heredoc
+   to write files in bash. This avoids shell parse errors and follows the principle of
+   using dedicated tools for file operations.
 8. ** DATA CACHING ** -- When analyzing large data files (Excel > 10MB), save a CSV cache
    after the first read. Subsequent scripts should check for and use the cache.
    Save analysis results to JSON files so downstream tasks can reuse them.
-9. ** WINDOWS TARGETS ** -- The tool prefers bash on Windows when Git Bash/MSYS/Cygwin
+9. ** FILE OPERATIONS PREFERENCE ** -- When you need to create or write files (scripts,
+   configs, documents, etc.), ALWAYS use `write_file` tool instead of bash heredoc/cat.
+   When modifying existing files, ALWAYS use `modify_file` tool instead of bash sed/echo.
+   Only use bash for file operations as a fallback when write_file/modify_file cannot
+   handle the specific requirement.
+10. ** WINDOWS TARGETS ** -- The tool prefers bash on Windows when Git Bash/MSYS/Cygwin
    bash is available. Set shell explicitly to "cmd" or "powershell" when generating
    Windows-native commands. This avoids mixing Bash syntax with Windows command syntax.
 USAGE_BLOCK

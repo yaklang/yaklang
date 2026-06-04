@@ -1,6 +1,6 @@
-__DESC__ = "Excel file structure exploration tool. Reads an Excel file and outputs sheet list, column names with inferred data types, row counts, and preview rows. Use this FIRST to understand data layout. IMPORTANT: For subsequent multi-step data analysis (3+ queries), prefer writing a Python pandas script via bash tool instead of calling query_excel_data repeatedly - each query_excel_data call re-parses the entire file."
+__DESC__ = "Excel file structure exploration tool. Reads an Excel file and outputs sheet list, column names with inferred data types, row counts, and preview rows. Use this FIRST to understand data layout. IMPORTANT: This tool is for structure exploration only. For transaction data, financial records, bank statements, invoice data, or any case investigation data analysis (3+ queries), use ExcelCLI (excelcli-analysis skill) for proper data import, database storage, and structured SQL analysis via bash tool. Python pandas via bash is a fallback only when ExcelCLI is unavailable or cannot handle the file format."
 __VERBOSE_NAME__ = "Excel Structure Explorer"
-__KEYWORDS__ = "excel,xlsx,xls,spreadsheet,data exploration,column names,sheet list,data types,row count,preview,schema,structure,data analysis,excel info,excel schema"
+__KEYWORDS__ = "excel,xlsx,xls,spreadsheet,data exploration,column names,sheet list,data types,row count,preview,schema,structure,data analysis,excel info,excel schema,transaction data,financial analysis,bank statement,excelcli,数据入库,案件分析,办案数据,银行流水,发票数据"
 
 __USAGE__ = <<<USAGE_BLOCK
 Excel Structure Explorer Tool - Parameter Description for JSON Tool Calls
@@ -8,6 +8,23 @@ Excel Structure Explorer Tool - Parameter Description for JSON Tool Calls
 Reads an Excel file and outputs structured information: sheet names, column headers,
 inferred data types, row counts, and preview data. Use this tool FIRST before
 query_excel_data to understand the data layout.
+
+## Important: When to Use ExcelCLI vs Python
+
+This tool is for structure exploration ONLY. For subsequent data analysis:
+
+1. **EXCELCLI (PREFERRED)** — For transaction data, financial records, bank statements,
+   invoice data, or any case investigation data that requires 3+ analysis steps:
+   Use the ExcelCLI skill (excelcli-analysis) to import data into a structured database,
+   then use bash tool with SQL queries for analysis. This is the recommended workflow
+   for all financial/case analysis tasks.
+
+2. **Python pandas (FALLBACK)** — Only use Python pandas via bash when ExcelCLI is
+   unavailable or cannot handle the specific file format. Python is NOT the default
+   approach for transaction/financial data analysis.
+
+3. **query_excel_data** — Suitable for 1-2 simple queries. Avoid for complex analysis
+   as each call re-parses the entire file.
 
 Required Parameters:
   input           (string)  Path to the Excel file (.xls or .xlsx).
@@ -340,17 +357,12 @@ if totalRows > 500 {
     yakit.Info("[NEXT STEP RECOMMENDATION] This file has %v data rows across %v sheet(s).", totalRows, len(sheetNames))
     yakit.Info("  Sheet names: %v", str.Join(sheetNames, ", "))
     yakit.Info("  Option A (1-2 simple queries): Use query_excel_data for a single filter or aggregation.")
-    yakit.Info("  Option B (complex analysis, STRONGLY RECOMMENDED): Use bash tool with Python pandas.")
+    yakit.Info("  Option B (multi-step analysis, RECOMMENDED): Use ExcelCLI skill to import data into database")
+    yakit.Info("           and then use structured SQL analysis via bash tool. This is the PREFERRED approach")
+    yakit.Info("           for transaction data, financial records, bank statements, invoice data, or any")
+    yakit.Info("           case investigation data that requires 3+ analysis steps.")
+    yakit.Info("  Option C (fallback): Only if ExcelCLI is unavailable, use Python pandas via bash tool.")
     yakit.Info("")
-    yakit.Info("[DATA CACHING TIP] Your FIRST Python script should create a CSV cache for 10x faster subsequent reads:")
-    yakit.Info("  import pandas as pd, os")
-    yakit.Info("  CACHE = '/tmp/%v_cache.csv'", baseName)
-    yakit.Info("  if os.path.exists(CACHE):")
-    yakit.Info("      df = pd.read_csv(CACHE)  # ~1 second")
-    yakit.Info("  else:")
-    yakit.Info("      df = pd.read_excel('%v', sheet_name='%v')  # ~30s for large files", inputFile, firstSheet)
-    yakit.Info("      df.to_csv(CACHE, index=False)")
+    yakit.Info("[IMPORTANT] For transaction/financial/case data analysis tasks, ALWAYS prefer ExcelCLI")
+    yakit.Info("  data import + database analysis. Python pandas is a fallback mechanism, NOT the default.")
     yakit.Info("")
-    yakit.Info("  RULE: If your analysis requires 3+ statistics, ALWAYS use Python via bash with caching.")
-    yakit.Info("  Schema reference file: %v", schemaFile)
-}
