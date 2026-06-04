@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+	"sync"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/filesys"
@@ -16,10 +17,13 @@ import (
 )
 
 var (
-	globalTempDir     string
-	globalIncludeDirs []string
-	commonCLibraries  []string
-	headerCache       = make(map[string]bool)
+	preprocessMu        sync.Mutex
+	globalTempOnce      sync.Once
+	globalTempInitErr   error
+	globalTempDir       string
+	globalIncludeDirs   []string
+	commonCLibraries    []string
+	headerCache         = make(map[string]bool)
 
 	// reAngleIncludeAnywhere matches #include <path> anywhere on a logical line (after comment strip).
 	reAngleIncludeAnywhere = regexp.MustCompile(`#\s*include\s*<([^>]+)>`)
@@ -55,20 +59,21 @@ func newCPreprocessFS(underlying fi.FileSystem) fi.FileSystem {
 	return hookFS
 }
 
-func initTemp() error {
-	tmpDir, err := os.MkdirTemp("", "c_headers_*")
-	if err != nil {
-		return fmt.Errorf("failed to create temp directory: %w", err)
-	}
-	globalTempDir = tmpDir
-	return nil
+func initGlobalTemp() error {
+	globalTempOnce.Do(func() {
+		tmpDir, err := os.MkdirTemp("", "c_headers_*")
+		if err != nil {
+			globalTempInitErr = fmt.Errorf("failed to create temp directory: %w", err)
+			return
+		}
+		globalTempDir = tmpDir
+	})
+	return globalTempInitErr
 }
 
 func ensureIncludeBase() (string, error) {
-	if globalTempDir == "" {
-		if err := initTemp(); err != nil {
-			return "", err
-		}
+	if err := initGlobalTemp(); err != nil {
+		return "", err
 	}
 	includeDir := filepath.Join(globalTempDir, "include")
 	if err := os.MkdirAll(includeDir, 0o755); err != nil {
@@ -83,21 +88,39 @@ func addIncludeDir(dir string) {
 	if dir == "" {
 		return
 	}
+	preprocessMu.Lock()
+	defer preprocessMu.Unlock()
 	if !containsDir(globalIncludeDirs, dir) {
 		globalIncludeDirs = append(globalIncludeDirs, dir)
 	}
+}
+
+func snapshotIncludeDirs() []string {
+	preprocessMu.Lock()
+	defer preprocessMu.Unlock()
+	if len(globalIncludeDirs) == 0 {
+		return nil
+	}
+	out := make([]string, len(globalIncludeDirs))
+	copy(out, globalIncludeDirs)
+	return out
 }
 
 func ensureHeaderFileExists(relPath string) error {
 	if relPath == "" {
 		return nil
 	}
+
+	preprocessMu.Lock()
+	if headerCache[relPath] {
+		preprocessMu.Unlock()
+		return nil
+	}
+	preprocessMu.Unlock()
+
 	includeDir, err := ensureIncludeBase()
 	if err != nil {
 		return err
-	}
-	if headerCache[relPath] {
-		return nil
 	}
 	targetPath := filepath.Join(includeDir, relPath)
 	if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
@@ -112,7 +135,10 @@ func ensureHeaderFileExists(relPath string) error {
 			return err
 		}
 	}
+
+	preprocessMu.Lock()
 	headerCache[relPath] = true
+	preprocessMu.Unlock()
 	return nil
 }
 
@@ -255,10 +281,8 @@ func filterSystemIncludes(src string) string {
 func setupHeaderFiles(underlying fi.FileSystem) error {
 	headerDirs := make(map[string]bool)
 
-	if globalTempDir == "" {
-		if err := initTemp(); err != nil {
-			return err
-		}
+	if err := initGlobalTemp(); err != nil {
+		return err
 	}
 
 	var walkDir func(string) error
@@ -306,7 +330,9 @@ func setupHeaderFiles(underlying fi.FileSystem) error {
 	}
 
 	// Build includeDirs list once, combining all header directories
+	preprocessMu.Lock()
 	globalIncludeDirs = nil
+	preprocessMu.Unlock()
 	addIncludeDir(globalTempDir)
 	for dir := range headerDirs {
 		addIncludeDir(dir)
@@ -318,12 +344,10 @@ func setupHeaderFiles(underlying fi.FileSystem) error {
 // preprocessCSource performs C macro preprocessing on source code
 func preprocessCSource(src string) (string, error) {
 	var preprocessorCmd string
-	if globalTempDir == "" {
-		if err := initTemp(); err != nil {
-			return "", err
-		}
+	if err := initGlobalTemp(); err != nil {
+		return "", err
 	}
-	if len(globalIncludeDirs) == 0 {
+	if len(snapshotIncludeDirs()) == 0 {
 		if err := ensureCommonIncludeDirs(); err != nil {
 			return "", err
 		}
@@ -362,7 +386,7 @@ func preprocessCSource(src string) (string, error) {
 	}
 
 	// Add all include directories
-	for _, includeDir := range globalIncludeDirs {
+	for _, includeDir := range snapshotIncludeDirs() {
 		preprocessorArgs = append(preprocessorArgs, "-I", includeDir)
 	}
 

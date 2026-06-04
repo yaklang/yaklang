@@ -2,6 +2,7 @@ package c2ssa
 
 import (
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -87,4 +88,33 @@ func TestStripCCommentsFromPhysicalLine(t *testing.T) {
 	require.True(t, inBlock)
 	require.Equal(t, " after ", stripCCommentsFromPhysicalLine(" */ after ", &inBlock))
 	require.False(t, inBlock)
+}
+
+func TestEnsureHeaderFileExistsConcurrent(t *testing.T) {
+	headers := []string{
+		"stdint.h", "stddef.h", "stdio.h", "stdlib.h", "string.h",
+		"llvm/Support/DataTypes.h", "clang/Config/config.h",
+	}
+	const workers = 64
+	const rounds = 8
+
+	var wg sync.WaitGroup
+	wg.Add(workers)
+	for i := 0; i < workers; i++ {
+		go func() {
+			defer wg.Done()
+			for r := 0; r < rounds; r++ {
+				for _, h := range headers {
+					require.NoError(t, ensureHeaderFileExists(h))
+				}
+			}
+		}()
+	}
+	wg.Wait()
+
+	preprocessMu.Lock()
+	defer preprocessMu.Unlock()
+	for _, h := range headers {
+		require.True(t, headerCache[h], "header %q should be cached", h)
+	}
 }
