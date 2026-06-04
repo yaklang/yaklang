@@ -1,12 +1,13 @@
 yakit.AutoInitYakit()
 
 # Input your code!
-__DESC__ = "根据 YakScript 的脚本名、类型、帮助信息、标签、参数和源码，生成 AI 可用的 ai_desc、ai_keywords、ai_usage 三个元数据字段。"
-__VERBOSE_NAME__ = "YakScript AI元数据生成"
-__KEYWORDS__ = "yakscript,ai元数据,ai_desc,ai_keywords,ai_usage,metadata,liteforge"
+__DESC__ = "根据 YakScript 的脚本名、类型、帮助信息、标签、参数和源码，生成插件名称/描述/标签，或生成 AI 可用的 ai_desc、ai_keywords、ai_usage 元数据字段。"
+__VERBOSE_NAME__ = "YakScript 元数据生成"
+__KEYWORDS__ = "yakscript,插件名,描述,标签,ai元数据,ai_desc,ai_keywords,ai_usage,metadata,liteforge"
 
 yakit.AutoInitYakit()
 
+mode = cli.String("mode", cli.setVerboseName("生成模式"), cli.setDefault("AI元数据"), cli.setSelectOption("基础信息", "AI元数据"))
 scriptName = cli.String("script_name", cli.setVerboseName("脚本名"), cli.setDefault("script.yak"))
 scriptType = cli.String("type", cli.setVerboseName("脚本类型"), cli.setDefault("yak"))
 descText = cli.Text("desc", cli.setVerboseName("插件描述"))
@@ -14,7 +15,17 @@ tags = cli.String("tags", cli.setVerboseName("标签"))
 content = cli.Text("content", cli.setRequired(true), cli.setVerboseName("脚本源码"))
 cli.check()
 
-prompt = <<<PROMPT
+query = sprintf("ScriptName: %s\nType: %s\n", scriptName, scriptType)
+if descText != "" {
+    query += sprintf("Description: %s\n", descText)
+}
+if tags != "" {
+    query += sprintf("Tags: %s\n", tags)
+}
+query += sprintf("\nCode:\n```yak\n%s\n```", content)
+
+if mode == "AI元数据" {
+    prompt = <<<PROMPT
 你是 YakScript 的 AI 元数据生成器。
 请只根据插件的真实功能、输入输出和适用场景，生成适合 AI 检索与调用的元数据。
 
@@ -26,31 +37,55 @@ prompt = <<<PROMPT
 5. 忽略夸张注释，优先依据代码行为、参数、help、tags 进行判断。
 PROMPT
 
-schema = jsonschema.ActionObject(
-    jsonschema.paramString("ai_desc", jsonschema.description("A concise description of what this YakScript does.")),
-    jsonschema.paramStringArray("ai_keywords", jsonschema.description("Keywords for AI retrieval, including technical aliases when helpful.")),
-    jsonschema.paramString("ai_usage", jsonschema.description("Usage guidance for AI agents, including when to use it, important parameters, and expected output."))
-)
+    schema = jsonschema.ActionObject(
+        jsonschema.paramString("ai_desc", jsonschema.description("A concise description of what this YakScript does.")),
+        jsonschema.paramStringArray("ai_keywords", jsonschema.description("Keywords for AI retrieval, including technical aliases when helpful.")),
+        jsonschema.paramString("ai_usage", jsonschema.description("Usage guidance for AI agents, including when to use it, important parameters, and expected output."))
+    )
 
-query = sprintf("ScriptName: %s\nType: %s\n", scriptName, scriptType)
-if descText != "" {
-    query += sprintf("Description: %s\n", descText)
-}
-if tags != "" {
-    query += sprintf("Tags: %s\n", tags)
-}
-query += sprintf("\nCode:\n```yak\n%s\n```", content)
+    res = liteforge.Execute(
+        sprintf("%s\n\ninput:\n%s", prompt, query),
+        liteforge.output(schema),
+        liteforge.speedPriority(),
+    )~
 
-res = liteforge.Execute(
-    sprintf("%s\n\ninput:\n%s", prompt, query),
-    liteforge.output(schema),
-    liteforge.speedPriority(),
-)~
+    result = {
+        "ai_desc": res.GetString("ai_desc"),
+        "ai_keywords": res.GetStringSlice("ai_keywords"),
+        "ai_usage": res.GetString("ai_usage"),
+    }
+} else {
+    prompt = <<<PROMPT
+你是一位 YakScript 插件分析专家。
+请仔细阅读输入的插件源码，根据其实际功能和行为，生成插件的基础元信息。
 
-result = {
-    "ai_desc": res.GetString("ai_desc"),
-    "ai_keywords": res.GetStringSlice("ai_keywords"),
-    "ai_usage": res.GetString("ai_usage"),
+输出要求：
+1. name：插件的展示名称，简洁明了，2-8 个汉字或英文单词，准确体现核心功能，不要带"插件"二字。
+2. description：功能描述，1-3 句话，说明插件能做什么、适用场景和主要用途，语言简练，不涉及实现细节。
+3. tags：3-8 个分类标签，用逗号分隔，优先使用技术领域词汇（如 web安全、信息收集、漏洞检测、端口扫描、编解码、爬虫等），保持简短精确。
+
+注意：
+- 只依据代码的实际行为进行判断，忽略注释中的夸张描述。
+- name 和 description 使用中文，tags 可中英文混用。
+PROMPT
+
+    schema = jsonschema.ActionObject(
+        jsonschema.paramString("name", jsonschema.description("Plugin display name, concise and accurate.")),
+        jsonschema.paramString("description", jsonschema.description("A brief description of what the plugin does and its use cases.")),
+        jsonschema.paramString("tags", jsonschema.description("Comma-separated category tags for the plugin."))
+    )
+
+    res = liteforge.Execute(
+        sprintf("%s\n\ninput:\n%s", prompt, query),
+        liteforge.output(schema),
+        liteforge.speedPriority(),
+    )~
+
+    result = {
+        "name": res.GetString("name"),
+        "description": res.GetString("description"),
+        "tags": res.GetString("tags"),
+    }
 }
 
 yakit.Output(json.dumps(result))
