@@ -336,6 +336,7 @@ func (r *ReAct) ExecuteLoopTask(taskTypeName string, task aicommon.AIStatefulTas
 
 	if r.GetCurrentPlanExecutionTask() != nil {
 		// have async plan execution task running, disable plan and exec in main loop
+		mainloop.RemoveAction(schema.AI_REACT_LOOP_ACTION_REQUEST_PLAN)
 		mainloop.RemoveAction(schema.AI_REACT_LOOP_ACTION_REQUEST_PLAN_EXECUTION)
 		mainloop.RemoveAction(schema.AI_REACT_LOOP_ACTION_REQUIRE_AI_BLUEPRINT)
 	}

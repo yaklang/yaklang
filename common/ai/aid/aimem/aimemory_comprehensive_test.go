@@ -210,6 +210,9 @@ func (m *AdvancedMockInvoker) VerifyUserSatisfaction(ctx context.Context, query 
 func (m *AdvancedMockInvoker) RequireAIForgeAndAsyncExecute(ctx context.Context, forgeName string, onFinish func(error)) {
 }
 
+func (m *AdvancedMockInvoker) AsyncPlanOnly(ctx context.Context, planPayload string, onFinish func(error)) {
+}
+
 func (m *AdvancedMockInvoker) AsyncPlanAndExecute(ctx context.Context, planPayload string, onFinish func(error)) {
 }
 

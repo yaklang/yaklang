@@ -106,6 +106,10 @@ func (i *httpFuzztestTestInvoker) RequireAIForgeAndAsyncExecute(ctx context.Cont
 	i.base.RequireAIForgeAndAsyncExecute(ctx, forgeName, onFinish)
 }
 
+func (i *httpFuzztestTestInvoker) AsyncPlanOnly(ctx context.Context, planPayload string, onFinish func(error)) {
+	i.base.AsyncPlanOnly(ctx, planPayload, onFinish)
+}
+
 func (i *httpFuzztestTestInvoker) AsyncPlanAndExecute(ctx context.Context, planPayload string, onFinish func(error)) {
 	i.base.AsyncPlanAndExecute(ctx, planPayload, onFinish)
 }

@@ -724,11 +724,17 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 	}
 
 	if r.allowPlanAndExec == nil || r.allowPlanAndExec() {
-		plan, ok := GetLoopAction(schema.AI_REACT_LOOP_ACTION_REQUEST_PLAN_EXECUTION)
+		planOnly, ok := GetLoopAction(schema.AI_REACT_LOOP_ACTION_REQUEST_PLAN)
+		if !ok {
+			return nil, utils.Errorf("loop action %s not found", schema.AI_REACT_LOOP_ACTION_REQUEST_PLAN)
+		}
+		r.actions.Set(planOnly.ActionType, planOnly)
+
+		planExec, ok := GetLoopAction(schema.AI_REACT_LOOP_ACTION_REQUEST_PLAN_EXECUTION)
 		if !ok {
 			return nil, utils.Errorf("loop action %s not found", schema.AI_REACT_LOOP_ACTION_REQUEST_PLAN_EXECUTION)
 		}
-		r.actions.Set(plan.ActionType, plan)
+		r.actions.Set(planExec.ActionType, planExec)
 	}
 
 	if r.allowUserInteract == nil || r.allowUserInteract() {

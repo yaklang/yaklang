@@ -433,6 +433,9 @@ func (r *testRuntime) VerifyUserSatisfaction(ctx context.Context, query string, 
 func (r *testRuntime) RequireAIForgeAndAsyncExecute(ctx context.Context, forgeName string, onFinish func(error)) {
 }
 
+func (r *testRuntime) AsyncPlanOnly(ctx context.Context, planPayload string, onFinish func(error)) {
+}
+
 func (r *testRuntime) AsyncPlanAndExecute(ctx context.Context, planPayload string, onFinish func(error)) {
 }
 
