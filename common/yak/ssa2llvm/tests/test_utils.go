@@ -185,10 +185,16 @@ func runBinaryWithEnv(t *testing.T, code string, entry string, env map[string]st
 	tmpBin, cleanup := compileBinary(t, code, entry, cfg)
 	defer cleanup()
 
-	cmd := exec.Command(tmpBin, cfg.args...)
-	if len(cfg.env) > 0 {
+	return runCompiledBinaryWithEnv(t, tmpBin, cfg.env, cfg.args...)
+}
+
+func runCompiledBinaryWithEnv(t *testing.T, bin string, env map[string]string, args ...string) string {
+	t.Helper()
+
+	cmd := exec.Command(bin, args...)
+	if len(env) > 0 {
 		cmd.Env = append([]string{}, os.Environ()...)
-		for k, v := range cfg.env {
+		for k, v := range env {
 			cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, v))
 		}
 	}
@@ -196,7 +202,6 @@ func runBinaryWithEnv(t *testing.T, code string, entry string, env map[string]st
 	if err != nil {
 		t.Fatalf("Binary execution failed: %v\nOutput: %s", err, output)
 	}
-
 	return string(output)
 }
 

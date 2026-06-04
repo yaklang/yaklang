@@ -123,6 +123,22 @@ yakit.Code(resultJSON)
 	output := runBinaryWithEnv(t, code, "", nil)
 	require.Contains(t, output, `[code]`)
 	require.Contains(t, output, `"project_exists": "aa"`)
+	require.NotContains(t, output, "IsMessage:true")
+	require.NotContains(t, output, "YakVM Code DIE")
+}
+
+// TestYaklibSSA_YakitCodeAndLogSmoke bundles the minimal yakit.Code / yakit.Info
+// runtime checks used across map and side-effect regression tests.
+func TestYaklibSSA_YakitCodeAndLogSmoke(t *testing.T) {
+	output := runBinaryWithEnv(t, `
+yakit.AutoInitYakit()
+yakit.Info("probe-ok")
+yakit.Code(json.dumps({"ok": true, "n": 1}))
+`, "", nil)
+	require.Contains(t, output, "[yakit][info] probe-ok")
+	require.Contains(t, output, `[code]`)
+	require.Contains(t, output, `"ok": true`)
+	require.NotContains(t, output, "IsMessage:true")
 	require.NotContains(t, output, "YakVM Code DIE")
 }
 
