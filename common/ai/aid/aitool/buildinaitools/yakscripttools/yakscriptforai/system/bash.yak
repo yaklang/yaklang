@@ -3,52 +3,52 @@ __VERBOSE_NAME__ = "跨平台Shell命令执行工具"
 __KEYWORDS__ = "shell command,bash,cmd,powershell,命令行工具,系统管理,自动化脚本,运维工具,shell script,command execution,系统操作,终端命令,system administration,automation tools,操作系统,跨平台命令,timeout,超时控制,python script,pandas,data analysis,excel analysis,csv cache,data cache,批量分析,write_file优先,文件操作优先,modify_file优先"
 
 __USAGE__ = <<<USAGE_BLOCK
-Cross-Platform Shell Command Execution Tool - Usage Guide for AI Parameter Generation
+跨平台 Shell 命令执行工具 —— AI 参数生成使用指南
 
-## Parameters
+## 参数说明
 
-Required:
-  command   (string)  The shell command or script to execute.
-                      Single-line commands: put directly in JSON params.command
-                      Multi-line scripts: MUST use AITAG format for the command parameter
+必填：
+  command   (string)  要执行的 Shell 命令或脚本。
+                      单行命令：直接在 JSON params.command 中填写。
+                      多行脚本：必须使用 AITAG 格式传递 command 参数。
 
-Optional:
-  timeout   (int)     *** CRITICAL: YOU MUST ALWAYS SET THIS PARAMETER ***
-                      Max execution time in seconds. Process is KILLED when timeout is reached.
-                      Default: 60 (but DO NOT rely on the default -- always set explicitly!)
-                      If the command hangs or runs forever, the entire tool call blocks.
-                      Recommended values:
-                        - Quick queries (ls, cat, echo, uname, whoami): 10-15
-                        - File operations (find, grep, du): 15-30
-                        - Network commands (curl, wget, ping -c N): 30-60
-                        - Build/compile/install (make, go build, pip install): 120-300
-  shell     (string)  Shell type: "bash" | "cmd" | "powershell"
-                      Default: auto-detect (linux/mac -> bash,
-                      windows -> bash if Git Bash/MSYS/Cygwin bash exists,
-                      otherwise powershell/cmd)
+可选：
+  timeout   (int)     *** 关键：必须始终设置此参数 ***
+                      最大执行时间（秒）。超时后进程将被强制终止。
+                      默认值：60（但不要依赖默认值——始终显式设置！）
+                      如果命令挂起或永远运行，整个工具调用将被阻塞。
+                      推荐值：
+                        - 快速查询（ls, cat, echo, uname, whoami）：10-15
+                        - 文件操作（find, grep, du）：15-30
+                        - 网络命令（curl, wget, ping -c N）：30-60
+                        - 构建/编译/安装（make, go build, pip install）：120-300
+  shell     (string)  Shell 类型："bash" | "cmd" | "powershell"
+                      默认：自动检测（linux/mac -> bash，
+                      windows -> 如果存在 Git Bash/MSYS/Cygwin bash 则用 bash，
+                      否则用 powershell/cmd）
 
-## Execution Characteristics
+## 执行特性
 
-bash:  executes a temporary script via "bash --login <script>" so /etc/profile
-       and user bash profile files can populate default PATH/environment.
-       It does not force set -e or command tracing.
-cmd:   executes via "cmd.exe /d /s /c <command>", backslashes MUST be escaped:
-       "C:\\Users"
-powershell: executes a temporary script via PowerShell with normal profile loading;
-            it does not force $ErrorActionPreference or command tracing.
+bash：  通过 "bash --login <script>" 执行临时脚本，使 /etc/profile
+        和用户的 bash profile 文件可以加载默认 PATH/环境变量。
+        不会强制启用 set -e 或命令追踪。
+cmd：   通过 "cmd.exe /d /s /c <command>" 执行，反斜杠必须转义：
+        "C:\\Users"
+powershell：通过 PowerShell 执行临时脚本，正常加载 profile；
+            不会强制 $ErrorActionPreference 或命令追踪。
 
-## Safety Rules
+## 安全规则
 
-FORBIDDEN: find / , ls -R / , sudo, su, chmod 777, rm -rf /, access to /etc/shadow
-MUST have limits: ping -c N, find ... -maxdepth N, tail -n N (never -f), pipe | head -N
+禁止：find / , ls -R / , sudo, su, chmod 777, rm -rf /, 访问 /etc/shadow
+必须加限制：ping -c N, find ... -maxdepth N, tail -n N（不能用 -f）, 管道 | head -N
 
-## Few-Shot Examples
+## 少样本示例
 
-Replace {NONCE} with the actual nonce from the response format section.
+将 {NONCE} 替换为响应格式部分中的实际 nonce。
 
-### Example 1: Simple one-line command (JSON params, explicit timeout)
+### 示例 1：简单单行命令（JSON 参数，显式设置超时）
 
-User intent: "Check disk space"
+用户意图："检查磁盘空间"
 
 ```json
 {
@@ -62,9 +62,9 @@ User intent: "Check disk space"
 }
 ```
 
-### Example 2: Multi-line diagnostic script (AITAG for command)
+### 示例 2：多行诊断脚本（使用 AITAG 传递命令）
 
-User intent: "Show system status: OS, memory, and top processes"
+用户意图："显示系统状态：操作系统、内存和 top 进程"
 
 ```json
 {
@@ -88,9 +88,9 @@ echo "=== Top 5 CPU Processes ==="
 ps aux --sort=-%cpu 2>/dev/null | head -6 || ps aux | head -6
 <|TOOL_PARAM_command_END_{NONCE}|>
 
-### Example 3: File search with safety limits (AITAG for command)
+### 示例 3：带安全限制的文件搜索（使用 AITAG 传递命令）
 
-User intent: "Find large log files in /var/log"
+用户意图："在 /var/log 中查找大日志文件"
 
 ```json
 {
@@ -110,9 +110,9 @@ echo ""
 du -sh /var/log 2>/dev/null || echo "Cannot access /var/log"
 <|TOOL_PARAM_command_END_{NONCE}|>
 
-### Example 4: Complex script with conditional logic (AITAG for command)
+### 示例 4：带条件逻辑的复杂脚本（使用 AITAG 传递命令）
 
-User intent: "Check if Python3 is installed, show version and packages"
+用户意图："检查是否安装了 Python3，显示版本和包列表"
 
 ```json
 {
@@ -138,16 +138,15 @@ else
 fi
 <|TOOL_PARAM_command_END_{NONCE}|>
 
-### Example 5: Python script execution (MANDATORY - use write_file first)
+### 示例 5：Python 脚本执行（必须——先用 write_file 写入）
 
-IMPORTANT: For Python scripts longer than 5 lines, NEVER pipe code directly via
-heredoc (python3 << 'EOF') or use cat/echo redirect. This causes shell parse errors
-with Python shebangs, docstrings, and complex string formatting.
+重要：对于超过 5 行的 Python 脚本，绝对不要通过 heredoc（python3 << 'EOF'）
+或 cat/echo 重定向直接传递代码。这会导致 Shell 解析错误，特别是在包含
+Python shebang、docstring 和复杂字符串格式化时。
 
-Instead, use the `write_file` tool to write the script file FIRST, then use bash
-to execute it:
+正确的做法：先使用 `write_file` 工具写入脚本文件，再用 bash 执行：
 
-Step 1 - Write the script via write_file:
+步骤 1 - 通过 write_file 写入脚本：
 ```json
 {
   "@action": "call-tool",
@@ -175,7 +174,7 @@ for key, value in data.items():
     print(f"  {key}: {value}")
 <|TOOL_PARAM_content_END_{NONCE}|>
 
-Step 2 - Execute via bash:
+步骤 2 - 通过 bash 执行：
 ```json
 {
   "@action": "call-tool",
@@ -188,13 +187,14 @@ Step 2 - Execute via bash:
 }
 ```
 
-Key points:
-  - ALWAYS use write_file tool first to create scripts, THEN use bash to execute
-  - write_file safely handles multi-line content with AITAG blocks
-  - DO NOT use cat/echo heredoc in bash to create files — use write_file/modify_file instead
-  - For multi-step data analysis on large files, prefer ExcelCLI query (data imported) or Python pandas (fallback) over repeated query_excel_data calls
+要点：
+  - 始终先用 write_file 工具创建脚本，再用 bash 执行
+  - write_file 通过 AITAG 块安全处理多行内容
+  - 不要在 bash 中使用 cat/echo heredoc 创建文件——改用 write_file/modify_file
+  - 对于大文件的多步骤数据分析，优先使用 ExcelCLI query（数据已入库时）或 Python pandas（兜底），
+    避免重复调用 query_excel_data
 
-For short Python one-liners (< 5 lines without docstrings), you may use:
+对于短小 Python 单行代码（< 5 行，不含 docstring），可以直接使用：
 
 ```json
 {
@@ -208,13 +208,13 @@ For short Python one-liners (< 5 lines without docstrings), you may use:
 }
 ```
 
-### Example 6: Python data analysis with caching (write_file + bash execution)
+### 示例 6：带缓存的 Python 数据分析（write_file + bash 执行）
 
-For Excel/CSV files > 10MB or analysis spanning multiple bash tool calls,
-use a cache-first pattern to avoid re-reading large files every time.
-ALWAYS use write_file to create the script, then bash to execute:
+对于超过 10MB 的 Excel/CSV 文件，或需要跨多次 bash 调用的分析，
+使用缓存优先模式避免重复读取大文件。
+始终使用 write_file 创建脚本，再用 bash 执行：
 
-Step 1 - Write the analysis script via write_file:
+步骤 1 - 通过 write_file 写入分析脚本：
 ```json
 {
   "@action": "call-tool",
@@ -252,7 +252,7 @@ with open("/tmp/analysis_results.json", "w") as f:
 print(f"Results saved to /tmp/analysis_results.json")
 <|TOOL_PARAM_content_END_{NONCE}|>
 
-Step 2 - Execute via bash:
+步骤 2 - 通过 bash 执行：
 ```json
 {
   "@action": "call-tool",
@@ -265,17 +265,17 @@ Step 2 - Execute via bash:
 }
 ```
 
-Key caching rules:
-  - PREFERRED (data imported via ExcelCLI): Use `excelcli query` with SQL for batch analysis
-  - FALLBACK (ExcelCLI unavailable): First script uses pd.read_excel() + df.to_csv() to create cache
-  - All subsequent scripts: pd.read_csv() from cache (10x faster)
-  - Save analysis results to JSON files for downstream tasks to read
-  - Use /tmp/ for cache files (auto-cleaned on reboot)
-  - Use write_file to create scripts, NOT cat heredoc in bash
+缓存规则：
+  - 首选（数据已通过 ExcelCLI 入库）：使用 `excelcli query` 通过 SQL 进行批量分析
+  - 兜底（ExcelCLI 不可用）：第一个脚本使用 pd.read_excel() + df.to_csv() 创建缓存
+  - 后续所有脚本：从缓存 pd.read_csv() 读取（快 10 倍）
+  - 将分析结果保存到 JSON 文件供下游任务复用
+  - 使用 /tmp/ 存放缓存文件（重启后自动清理）
+  - 使用 write_file 创建脚本，不要在 bash 中用 cat heredoc
 
-### Example 7: Windows CMD one-line command (explicit shell)
+### 示例 7：Windows CMD 单行命令（显式指定 shell）
 
-User intent: "On a Windows host, show OS version, current user, and a system directory"
+用户意图："在 Windows 主机上显示操作系统版本、当前用户和系统目录"
 
 ```json
 {
@@ -290,9 +290,9 @@ User intent: "On a Windows host, show OS version, current user, and a system dir
 }
 ```
 
-### Example 8: Windows PowerShell diagnostic script (AITAG + explicit shell)
+### 示例 8：Windows PowerShell 诊断脚本（AITAG + 显式指定 shell）
 
-User intent: "On a Windows host, show top memory processes and running services"
+用户意图："在 Windows 主机上显示内存占用最高的进程和正在运行的服务"
 
 ```json
 {
@@ -321,32 +321,30 @@ Get-Service |
   Select-Object -First 10 Name, DisplayName, Status
 <|TOOL_PARAM_command_END_{NONCE}|>
 
-## Key Rules
+## 核心规则
 
-1. ** TIMEOUT IS MANDATORY ** -- Always set timeout explicitly. Do NOT rely on the default 60s.
-   Estimate how long the command should take, and set timeout to ~1.5x that estimate.
-   A command that hangs without timeout will block the entire agent workflow.
-2. Multi-line commands -> ALWAYS use AITAG for the command parameter
-3. Single-line commands -> Use JSON params.command directly
-4. Limit output: pipe through | head -N; limit search: add -maxdepth to find
-5. Use fallback chains for cross-platform: cmd1 2>/dev/null || cmd2 || echo "not available"
-6. NEVER generate indefinite commands (no tail -f, no watch, no ping without -c)
-7. ** PYTHON SCRIPTS ** -- For Python scripts > 5 lines, ALWAYS use write_file tool
-   to create the script file first, then bash to execute it. NEVER use cat/echo heredoc
-   to write files in bash. This avoids shell parse errors and follows the principle of
-   using dedicated tools for file operations.
-8. ** DATA CACHING ** -- When analyzing large data files (Excel > 10MB):
-   PREFERRED: If data has been imported via ExcelCLI, use `excelcli query` with SQL for batch analysis.
-   FALLBACK: Use Python pandas with CSV cache (pd.read_excel + pd.to_csv for cache, pd.read_csv for subsequent reads).
-   Save analysis results to JSON files so downstream tasks can reuse them.
-9. ** FILE OPERATIONS PREFERENCE ** -- When you need to create or write files (scripts,
-   configs, documents, etc.), ALWAYS use `write_file` tool instead of bash heredoc/cat.
-   When modifying existing files, ALWAYS use `modify_file` tool instead of bash sed/echo.
-   Only use bash for file operations as a fallback when write_file/modify_file cannot
-   handle the specific requirement.
-10. ** WINDOWS TARGETS ** -- The tool prefers bash on Windows when Git Bash/MSYS/Cygwin
-   bash is available. Set shell explicitly to "cmd" or "powershell" when generating
-   Windows-native commands. This avoids mixing Bash syntax with Windows command syntax.
+1. **必须设置超时（TIMEOUT）** —— 始终显式设置 timeout。不要依赖默认的 60 秒。
+   预估命令应执行的时间，将 timeout 设为该预估值的约 1.5 倍。
+   没有超时的命令如果挂起，将阻塞整个 agent 工作流。
+2. 多行命令 -> 始终使用 AITAG 格式传递 command 参数
+3. 单行命令 -> 直接在 JSON params.command 中填写
+4. 限制输出：通过管道 | head -N；限制搜索：为 find 添加 -maxdepth
+5. 跨平台使用降级链：cmd1 2>/dev/null || cmd2 || echo "not available"
+6. 绝对不要生成无限期命令（不要 tail -f, 不要 watch, 不要不带 -c 的 ping）
+7. **Python 脚本** —— 对于超过 5 行的 Python 脚本，始终使用 write_file 工具
+   先创建脚本文件，再用 bash 执行。绝不要在 bash 中使用 cat/echo heredoc
+   来写文件。这可以避免 Shell 解析错误，遵循使用专用工具进行文件操作的原则。
+8. **数据缓存** —— 分析大文件（Excel > 10MB）时：
+   首选：如果数据已通过 ExcelCLI 入库，使用 `excelcli query` 通过 SQL 进行批量分析。
+   兜底：使用 Python pandas 配合 CSV 缓存（首次 pd.read_excel + pd.to_csv 创建缓存，
+   后续使用 pd.read_csv 读取）。将分析结果保存到 JSON 文件供下游任务复用。
+9. **文件操作优先级** —— 需要创建或写入文件（脚本、配置、文档等）时，
+   始终使用 `write_file` 工具代替 bash heredoc/cat。
+   修改现有文件时，始终使用 `modify_file` 工具代替 bash sed/echo。
+   仅在 write_file/modify_file 无法满足特定需求时，才使用 bash 进行文件操作。
+10. **Windows 目标** —— 在 Windows 上，当 Git Bash/MSYS/Cygwin bash 可用时，
+   工具优先使用 bash。生成 Windows 原生命令时，显式将 shell 设为 "cmd" 或 "powershell"。
+   这可以避免 Bash 语法与 Windows 命令语法混用。
 USAGE_BLOCK
 
 yakit.AutoInitYakit()
