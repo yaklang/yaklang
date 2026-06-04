@@ -2043,6 +2043,9 @@ message AIStartParams {
   repeated AIEnabledCapability EnabledCapabilities = 42;
 
   int64 PlanExecTaskConcurrency = 45; // 计划执行任务的并发度
+  // 为 true 时 StartAIReAct 不新建 ReAct，最多等待 1 分钟直到同 TimelineSessionID 的会话
+  // 在进程内注册后再将 gRPC 输入流 attach 到该运行中会话。
+  bool Attach = 46;
 }
 
 message AITaskFilter {

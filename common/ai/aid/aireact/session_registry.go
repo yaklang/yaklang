@@ -3,9 +3,11 @@ package aireact
 import (
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type eventSubscriber func(*schema.AiOutputEvent)
@@ -40,6 +42,29 @@ func unregisterRunningSession(sessionID string) {
 		return
 	}
 	globalRunningSessions.Delete(sessionID)
+}
+
+const defaultWaitRunningSessionTimeout = time.Minute
+
+// WaitRunningSession polls until a session is registered or timeout elapses.
+func WaitRunningSession(sessionID string, timeout time.Duration) (*ReAct, error) {
+	sessionID = strings.TrimSpace(sessionID)
+	if sessionID == "" {
+		return nil, utils.Error("session id is empty")
+	}
+	if timeout <= 0 {
+		timeout = defaultWaitRunningSessionTimeout
+	}
+	deadline := time.Now().Add(timeout)
+	for {
+		if react, ok := GetRunningSession(sessionID); ok {
+			return react, nil
+		}
+		if time.Now().After(deadline) {
+			return nil, utils.Errorf("wait running aireact session timeout: %s", sessionID)
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
 }
 
 // GetRunningSession returns a running ReAct instance by persistent session ID.
