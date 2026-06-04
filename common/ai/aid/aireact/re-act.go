@@ -104,6 +104,9 @@ type ReAct struct {
 	pendingMidtermPerception     *midtermPerceptionSnapshot
 
 	pureInvokerMode bool // 纯调用者模式，不启动事件循环和队列处理器
+
+	browserSessionsMu sync.Mutex
+	browserSessionIDs map[string]struct{}
 }
 
 func (r *ReAct) SetCurrentTask(task aicommon.AIStatefulTask) {
@@ -221,7 +224,10 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 		saveTimelineThrottle: utils.NewThrottleEx(3, true, true),
 		artifacts:            nil, // lazy: created in ensureWorkDirectory
 		wg:                   new(sync.WaitGroup),
+		browserSessionIDs:    make(map[string]struct{}),
 	}
+
+	cfg.SetBrowserSessionTracker(react)
 
 	if cfg.PersistentSessionId != "" && cfg.GetDB() != nil {
 		meta, err := yakit.EnsureAISessionMeta(cfg.GetDB(), cfg.PersistentSessionId, cfg.SessionSource)
@@ -522,6 +528,7 @@ func (r *ReAct) startEventLoop(ctx context.Context, done chan struct{}) {
 		},
 		func() {
 			r.UnRegisterReActSyncEvent()
+			r.CloseTrackedBrowserSessions()
 			doneOnce.Do(func() {
 				if done != nil {
 					close(done)

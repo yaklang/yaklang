@@ -60,6 +60,8 @@ type AICallerConfigIf interface {
 	GetVerificationTodoStatsByScope(scope VerificationTodoScope) VerificationTodoStats
 	HasActiveVerificationTodosByScope(scope VerificationTodoScope) bool
 	ActiveVerificationTodoItemsByScope(scope VerificationTodoScope) []VerificationTodoItem
+
+	GetBrowserSessionTracker() BrowserSessionTracker
 }
 
 func AIChatToAICallbackType(cb func(prompt string, opts ...aispec.AIConfigOption) (string, error)) AICallbackType {

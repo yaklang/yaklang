@@ -230,6 +230,9 @@ type Config struct {
 	// tool manager
 	AiToolManager *buildinaitools.AiToolManager
 
+	// browserSessionTracker records browser ids opened by yak tools for session cleanup.
+	browserSessionTracker BrowserSessionTracker
+
 	// tool config
 	DisableToolUse      bool
 	AiToolManagerOption []buildinaitools.ToolManagerOption
@@ -2965,6 +2968,20 @@ func (c *Config) GetContext() context.Context {
 		ctx = WithUserUsageCallbackContext(ctx, cb)
 	}
 	return ctx
+}
+
+func (c *Config) GetBrowserSessionTracker() BrowserSessionTracker {
+	if c == nil {
+		return nil
+	}
+	return c.browserSessionTracker
+}
+
+func (c *Config) SetBrowserSessionTracker(tracker BrowserSessionTracker) {
+	if c == nil {
+		return
+	}
+	c.browserSessionTracker = tracker
 }
 
 func (c *Config) CallAIResponseConsumptionCallback(i int) {

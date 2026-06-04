@@ -281,17 +281,14 @@ func (a *ToolCaller) invoke(
 		refreshRiskCount()
 	}()
 
-	execResult, execErr := tool.InvokeWithParams(
-		params,
-		aitool.WithStdout(stdoutWriter),
-		aitool.WithStderr(stderrWriter),
-		aitool.WithContext(ctx),
-		aitool.WithErrorCallback(toolCallErr),
-		aitool.WithResultCallback(toolCallSuccess),
-		aitool.WithCancelCallback(toolCallCancel),
-		aitool.WithRuntimeConfig(&aitool.ToolRuntimeConfig{
-			RuntimeID: a.callToolId,
-			FeedBacker: func(result *ypb.ExecResult) error {
+	var browserTracker interface{ TrackBrowserSession(id string) }
+	if c != nil {
+		browserTracker = c.GetBrowserSessionTracker()
+	}
+	runtimeCfg := &aitool.ToolRuntimeConfig{
+		RuntimeID:             a.callToolId,
+		BrowserSessionTracker: browserTracker,
+		FeedBacker: func(result *ypb.ExecResult) error {
 				// 处理 risk 消息
 				risk, _ := handleRiskMessage(result)
 				if risk != nil {
@@ -309,7 +306,16 @@ func (a *ToolCaller) invoke(
 				e.EmitYakitExecResult(result)
 				return nil
 			},
-		}),
+	}
+	execResult, execErr := tool.InvokeWithParams(
+		params,
+		aitool.WithStdout(stdoutWriter),
+		aitool.WithStderr(stderrWriter),
+		aitool.WithContext(ctx),
+		aitool.WithErrorCallback(toolCallErr),
+		aitool.WithResultCallback(toolCallSuccess),
+		aitool.WithCancelCallback(toolCallCancel),
+		aitool.WithRuntimeConfig(runtimeCfg),
 	)
 	ep.ActiveWithParams(ctx, map[string]any{"suggestion": "finish"})
 	reqs := map[string]any{"suggestion": "finish"}

@@ -81,6 +81,11 @@ func YakTool2AITool(aitools []*schema.AIYakTool) []*aitool.Tool {
 
 				}
 				cliApp := GetHookCliApp(args)
+				var browserTracker browserSessionTracker
+				if runtimeConfig != nil {
+					browserTracker = runtimeConfig.BrowserSessionTracker
+				}
+				registerBrowserSessionHooks(engine, browserTracker)
 				engine.RegisterEngineHooks(func(ae *antlr4yak.Engine) error {
 					pluginContext := CreateYakitPluginContext(
 						runtimeId,

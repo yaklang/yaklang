@@ -50,8 +50,14 @@ func (m *BrowserManager) Open(opts ...BrowserOption) (*BrowserInstance, error) {
 	defer m.mu.Unlock()
 
 	if inst, ok := m.browsers[id]; ok && !inst.IsClosed() {
-		log.Infof("reusing existing browser instance %q", id)
-		return inst, nil
+		if err := inst.healthCheck(); err != nil {
+			log.Warnf("browser instance %q unhealthy (%v), recreating", id, err)
+			delete(m.browsers, id)
+			_ = inst.Close()
+		} else {
+			log.Infof("reusing existing browser instance %q", id)
+			return inst, nil
+		}
 	}
 
 	inst, err := newBrowserInstance(id, config)
@@ -108,6 +114,20 @@ func (m *BrowserManager) CloseByID(opts ...BrowserOption) error {
 	err := inst.Close()
 	delete(m.browsers, id)
 	return err
+}
+
+// Evict removes a browser instance from the manager and closes it.
+// Used when CDP is dead but IsClosed() is still false (zombie instance).
+func (m *BrowserManager) Evict(id string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	inst, ok := m.browsers[id]
+	if !ok {
+		return
+	}
+	delete(m.browsers, id)
+	log.Warnf("evicting broken browser instance %q from manager", id)
+	_ = inst.Close()
 }
 
 func (m *BrowserManager) CloseAll() {

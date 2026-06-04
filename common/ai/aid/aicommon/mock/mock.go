@@ -148,6 +148,10 @@ func (m *MockedAIConfig) GetContext() context.Context {
 	return m.Ctx
 }
 
+func (m *MockedAIConfig) GetBrowserSessionTracker() aicommon.BrowserSessionTracker {
+	return nil
+}
+
 func (m *MockedAIConfig) CallAIResponseConsumptionCallback(current int) {
 	// Mock implementation - do nothing
 }
