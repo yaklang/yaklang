@@ -1,48 +1,49 @@
-__DESC__ = "Excel data query tool for SIMPLE one-off lookups: column selection, row filtering, sorting, single aggregation, pagination. PERFORMANCE WARNING: Each call re-parses the entire file (30+ seconds for large files). For multi-step analysis requiring 2+ queries on the same file, strongly prefer using bash tool to write a Python pandas script instead - it reads the file once and runs all computations in-memory, which is 10x faster for batch analysis."
-__VERBOSE_NAME__ = "Excel Data Query"
-__KEYWORDS__ = "excel query,data filter,sort,aggregate,sum,count,avg,group by,xlsx,spreadsheet,data analysis,column select,pagination,excel search,transaction analysis,financial data,excel read"
+__DESC__ = "Excel 数据查询工具，适用于简单的一次性查询：列选择、行过滤、排序、单维度聚合、分页。性能警告：每次调用都会重新解析整个文件（40MB 文件约需 30 秒）。对于需要 3 次以上查询的多步骤分析，如果数据已通过 ExcelCLI 入库，应优先使用 `excelcli query` 命令通过 SQL 进行批量分析。仅当 ExcelCLI 不可用时，才使用 Python pandas 作为兜底方案。"
+__VERBOSE_NAME__ = "Excel 数据查询"
+__KEYWORDS__ = "excel query,data filter,sort,aggregate,sum,count,avg,group by,xlsx,spreadsheet,data analysis,column select,pagination,excel search,transaction analysis,financial data,excel read,excelcli,query,SQL 分析,excelcli query,数据库查询,批量分析"
 
 __USAGE__ = <<<USAGE_BLOCK
-Excel Data Query Tool - Parameter Description for JSON Tool Calls
+Excel 数据查询工具 —— 用于 JSON 工具调用的参数说明
 
-Queries Excel data with filtering, sorting, aggregation, and pagination.
-Use read_excel_info first to understand the data schema.
+对 Excel 数据执行过滤、排序、聚合和分页查询。
+请先使用 read_excel_info 了解数据结构。
 
-## CRITICAL: Performance & Tool Selection Guide
+## ⚠️ 性能与工具选择指南
 
-Each call to this tool re-parses the ENTIRE Excel file from disk.
-For a 40MB file, parsing alone takes ~30 seconds per call.
+每次调用本工具都会从磁盘**重新解析整个 Excel 文件**。
+对于 40MB 的文件，单次解析约需 30 秒。
 
-### When to use this tool (GOOD):
-- Single one-off query: quick filter, lookup specific rows, verify data
-- Simple aggregation: one group-by with one metric
-- You only need 1-2 calls total on this file
+### ✅ 何时使用本工具（适合）：
+- 一次性的简单查询：快速过滤、查看特定行、验证数据
+- 单维度聚合：一个 group-by + 一个指标
+- 仅需对该文件执行 1-2 次查询
 
-### When NOT to use this tool (use Python via bash instead):
-- You need 3+ different statistics from the same file
-  (e.g., count by type AND sum by type AND yearly trend AND top-10 etc.)
-- You need derived field grouping (e.g., group by YEAR extracted from datetime)
-- You need cross-file joins or correlations (e.g., match transactions across 2 files)
-- You need complex analytics (percentiles, pivot tables, Union-Find clustering)
-- You need multi-dimensional aggregation in one pass
+### ❌ 何时不应使用本工具：
 
-### Recommended: Python script for batch analysis
+#### 场景一：数据已通过 ExcelCLI 入库（数据库分析优先）
 
-When you need comprehensive analysis, write ONE Python script via bash tool:
+如果数据已通过 `excelcli import` 导入到 SQLite 数据库，应优先使用 `excelcli query` 通过 SQL 进行批量分析：
+
+```
+excelcli query "<数据库路径>" --sql "SELECT account_name, COUNT(*) as cnt, SUM(amount) as total FROM bank_transactions GROUP BY account_name" --json
+```
+
+对于一个 SQL 查询即可覆盖多个维度的场景，`excelcli query` 是最高效的方式，无需反复解析 Excel 文件。
+
+#### 场景二：ExcelCLI 不可用或数据未入库（Python pandas 兜底）
+
+仅在 ExcelCLI 不可用、不支持当前文件格式、或数据未入库的情况下，才使用 Python pandas 通过 bash 工具编写分析脚本：
 
 ```python
-import pandas as pd
-import json
+import pandas as pd, json
 
 df = pd.read_excel('/path/to/data.xlsx')
 results = {}
 
-# Multiple aggregations in one pass (replaces 5+ query_excel_data calls)
+# 一次读取，批量计算（替代多次 query_excel_data 调用）
 results['total_rows'] = len(df)
 results['by_type_count'] = df.groupby('Type')['Amount'].count().to_dict()
 results['by_type_sum'] = df.groupby('Type')['Amount'].sum().to_dict()
-results['by_year'] = df.groupby(df['Date'].dt.year)['Amount'].agg(['count','sum']).to_dict()
-results['top10_by_amount'] = df.nlargest(10, 'Amount')[['Name','Amount','Date']].to_dict('records')
 results['amount_max'] = float(df['Amount'].max())
 results['amount_min'] = float(df['Amount'].min())
 results['amount_mean'] = float(df['Amount'].mean())
@@ -50,41 +51,49 @@ results['amount_mean'] = float(df['Amount'].mean())
 print(json.dumps(results, ensure_ascii=False, indent=2, default=str))
 ```
 
-This reads the file ONCE (~30s) and computes EVERYTHING in-memory (milliseconds).
-Compared to 7 separate query_excel_data calls (7x30s = 210s), this saves ~180 seconds.
+Python 方案将文件读取一次（~30s），所有计算在内存中完成（毫秒级）。
+相比多次 query_excel_data 调用（7×30s = 210s），可节省约 180 秒。
 
-## Parameters
+### 工具选择优先级总结
 
-Required Parameters:
-  input           (string)  Path to the Excel file (.xls or .xlsx).
+| 场景 | 推荐工具 | 说明 |
+|------|---------|------|
+| 1-2 次简单查询 | `query_excel_data` | 单次过滤/聚合，简单直接 |
+| 数据已入库，需批量分析 | `excelcli query` + SQL | 首选方案，无需重复解析文件 |
+| ExcelCLI 不可用 | Python pandas via bash | 兜底方案 |
 
-Optional Parameters:
-  sheet           (string)  Sheet name to query. If omitted, uses the first sheet.
-  columns         (string)  Comma-separated column names to select.
-                            Example: "Name,Amount,Date"
-                            If omitted, all columns are returned.
-  filter          (string)  Filter expression. Supports multiple conditions separated by AND.
-                            Operators: ==, !=, >, <, >=, <=, contains, !contains, startswith, endswith
-                            Examples:
+## 参数说明
+
+必填参数：
+  input           (string)  Excel 文件路径（.xls 或 .xlsx）。
+
+可选参数：
+  sheet           (string)  要查询的工作表名称。省略则使用第一个工作表。
+  columns         (string)  逗号分隔的列名列表。
+                            示例："Name,Amount,Date"
+                            省略则返回所有列。
+  filter          (string)  过滤表达式。支持多个条件以 AND 分隔。
+                            运算符：==, !=, >, <, >=, <=, contains, !contains, startswith, endswith
+                            示例：
                               "Amount>50000"
                               "Status==completed"
                               "Name contains Zhang"
                               "Amount>10000 AND Type==income"
-                            Column names and values are trimmed automatically.
-  sort_by         (string)  Column name to sort by.
-  sort_desc       (bool)    Sort in descending order. Default: false.
-  limit           (int)     Max rows to return. Default: 50.
-  offset          (int)     Number of rows to skip (for pagination). Default: 0.
-  group_by        (string)  Column name to group by for aggregation.
-  agg             (string)  Aggregation function: count, sum, avg, min, max.
-                            Requires group_by to be set.
-  agg_column      (string)  Column to aggregate on. Required for sum/avg/min/max.
-  output_format   (string)  Output format: table (default), csv, json.
-  output          (string)  Output file path. If omitted, prints to stdout.
+                            列名和值会自动去除首尾空格。
+  sort_by         (string)  排序列名。
+  sort_desc       (bool)    降序排序。默认：false。
+  limit           (int)     最大返回行数。默认：50。
+  offset          (int)     跳过的行数（用于分页）。默认：0。
+  group_by        (string)  分组聚合的列名。
+  agg             (string)  聚合函数：count, sum, avg, min, max。
+                            需要设置 group_by。
+  agg_column      (string)  聚合目标列。sum/avg/min/max 必须设置。
+  output_format   (string)  输出格式：table（默认）、csv、json。
+  output          (string)  输出文件路径。省略则打印到标准输出。
 
-Examples:
+示例：
 
-1. Basic query with filter (GOOD - single query):
+1. 带过滤的基本查询（适合——单次查询）：
 ```json
 {
   "@action": "call-tool",
@@ -100,7 +109,7 @@ Examples:
 }
 ```
 
-2. Aggregation query (GOOD - single aggregation):
+2. 聚合查询（适合——单次聚合）：
 ```json
 {
   "@action": "call-tool",
@@ -117,9 +126,10 @@ Examples:
 }
 ```
 
-3. BAD PRACTICE - DO NOT DO THIS:
-   Calling this tool 5+ times on the same large file for different aggregations.
-   Each call re-parses the file (~30s each). Write ONE Python script via bash instead.
+3. 不推荐的做法——不要这样做：
+   对同一个大文件反复调用本工具 5 次以上做不同维度的聚合。
+   每次调用都会重新解析文件（~30s/次）。应优先使用 ExcelCLI query（数据已入库时）
+   或 Python pandas 方案（ExcelCLI 不可用时）。
 USAGE_BLOCK
 
 yakit.AutoInitYakit()
@@ -756,8 +766,10 @@ cacheHint = sprintf("/tmp/%v_cache.csv", baseName)
 if totalDataRows > 500 {
     yakit.Info("Query completed: %v rows returned (source: %v total data rows)", len(filteredRows), totalDataRows)
     yakit.Info("[PERFORMANCE NOTICE] This file has %v rows. Each query_excel_data call re-parses the entire file from disk (~30s for large files).", totalDataRows)
-    yakit.Info("  If you need additional statistics from this same file, DO NOT call this tool again.")
-    yakit.Info("  Instead, use bash tool with a Python pandas script that reads the file once and computes all metrics.")
+    yakit.Info("  If you need additional statistics, DO NOT call this tool again.")
+    yakit.Info("  Option A (PREFERRED if data was imported via ExcelCLI): Use `excelcli query` with SQL for batch analysis.")
+    yakit.Info("    Example: excelcli query \"<db_path>\" --sql \"SELECT ... FROM bank_transactions GROUP BY ...\" --json")
+    yakit.Info("  Option B (FALLBACK): Use Python pandas via bash to read file once and compute all metrics.")
     yakit.Info("[CACHING TIP] Check if a CSV cache exists at: %v", cacheHint)
     yakit.Info("  If it exists, use pd.read_csv('%v') in your Python script (~1s vs ~30s for Excel).", cacheHint)
     yakit.Info("  If not, create one: df = pd.read_excel('%v'); df.to_csv('%v', index=False)", inputFile, cacheHint)

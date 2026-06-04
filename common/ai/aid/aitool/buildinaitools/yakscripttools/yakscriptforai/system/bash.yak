@@ -1,4 +1,4 @@
-__DESC__ = "跨平台Shell命令执行工具，支持bash/cmd/powershell，具备超时控制和输出捕获。bash 默认以登录 shell 执行以加载系统和用户 profile 中的 PATH/环境变量，不额外启用 set -e 或命令追踪，行为更接近原生终端执行。注意：对于文件创建/写入操作，应优先使用 write_file 工具；对于文件局部修改，应优先使用 modify_file 工具。仅当专用工具无法满足需求时，才使用 bash 的 cat/echo 重定向操作文件。"
+__DESC__ = "跨平台Shell命令执行工具，支持bash/cmd/powershell，具备超时控制和输出捕获。bash 默认以登录 shell 执行以加载系统和用户 profile 中的 PATH/环境变量，不额外启用 set -e 或命令追踪，行为更接近原生终端执行。注意：对于文件创建/写入操作，应优先使用 write_file 工具；对于文件局部修改，应优先使用 modify_file 工具。仅当专用工具无法满足需求时，才使用 bash 的 cat/echo 重定向操作文件。对于已通过 ExcelCLI 入库的数据分析任务，应优先使用 `excelcli query` 命令通过 SQL 分析，而非编写 Python 脚本。"
 __VERBOSE_NAME__ = "跨平台Shell命令执行工具"
 __KEYWORDS__ = "shell command,bash,cmd,powershell,命令行工具,系统管理,自动化脚本,运维工具,shell script,command execution,系统操作,终端命令,system administration,automation tools,操作系统,跨平台命令,timeout,超时控制,python script,pandas,data analysis,excel analysis,csv cache,data cache,批量分析,write_file优先,文件操作优先,modify_file优先"
 
@@ -192,7 +192,7 @@ Key points:
   - ALWAYS use write_file tool first to create scripts, THEN use bash to execute
   - write_file safely handles multi-line content with AITAG blocks
   - DO NOT use cat/echo heredoc in bash to create files — use write_file/modify_file instead
-  - For multi-step data analysis on large files, prefer Python pandas over repeated query_excel_data calls
+  - For multi-step data analysis on large files, prefer ExcelCLI query (data imported) or Python pandas (fallback) over repeated query_excel_data calls
 
 For short Python one-liners (< 5 lines without docstrings), you may use:
 
@@ -266,7 +266,8 @@ Step 2 - Execute via bash:
 ```
 
 Key caching rules:
-  - First script: pd.read_excel() + df.to_csv() to create cache
+  - PREFERRED (data imported via ExcelCLI): Use `excelcli query` with SQL for batch analysis
+  - FALLBACK (ExcelCLI unavailable): First script uses pd.read_excel() + df.to_csv() to create cache
   - All subsequent scripts: pd.read_csv() from cache (10x faster)
   - Save analysis results to JSON files for downstream tasks to read
   - Use /tmp/ for cache files (auto-cleaned on reboot)
@@ -334,8 +335,9 @@ Get-Service |
    to create the script file first, then bash to execute it. NEVER use cat/echo heredoc
    to write files in bash. This avoids shell parse errors and follows the principle of
    using dedicated tools for file operations.
-8. ** DATA CACHING ** -- When analyzing large data files (Excel > 10MB), save a CSV cache
-   after the first read. Subsequent scripts should check for and use the cache.
+8. ** DATA CACHING ** -- When analyzing large data files (Excel > 10MB):
+   PREFERRED: If data has been imported via ExcelCLI, use `excelcli query` with SQL for batch analysis.
+   FALLBACK: Use Python pandas with CSV cache (pd.read_excel + pd.to_csv for cache, pd.read_csv for subsequent reads).
    Save analysis results to JSON files so downstream tasks can reuse them.
 9. ** FILE OPERATIONS PREFERENCE ** -- When you need to create or write files (scripts,
    configs, documents, etc.), ALWAYS use `write_file` tool instead of bash heredoc/cat.
