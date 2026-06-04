@@ -74,42 +74,42 @@ println("detect-config-ok")
 	require.Contains(t, output, "detect-config-ok")
 }
 
-func TestCorePlugin_RunSSADetectLocalProject(t *testing.T) {
+func TestCorePlugin_RunSSADetectProject(t *testing.T) {
 	projectDir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(projectDir, "index.php"), []byte("<?php echo 'ok';"), 0o644))
 
 	code := string(coreplugin.GetCorePluginData("SSA 项目探测"))
 	require.NotEmpty(t, code)
 
-	output := runBinaryWithEnv(t, code, "", map[string]string{
-		"YAKIT_HOME": t.TempDir(),
-	}, withCompilePluginType(compiler.YakPluginTypeYak), withArgs("--target", projectDir, "--compile-immediately", "--language", "php"))
-	require.Contains(t, output, `"compile_immediately": true`)
-	require.Contains(t, output, `"kind": "local"`)
-	require.Contains(t, output, `"language": "php"`)
-	require.Contains(t, output, `"local_file": "`+projectDir+`"`)
-	require.Contains(t, output, `"file_count": 1`)
-	require.Contains(t, output, `"program_names": [`)
-	require.Contains(t, output, `"project_name": "001"`)
-	require.Contains(t, output, `"project_exists": false`)
-	require.NotContains(t, output, "YakVM Code DIE")
-	require.NotContains(t, output, "unexpected end of JSON input")
-}
+	yakitHome := t.TempDir()
+	env := map[string]string{"YAKIT_HOME": yakitHome}
+	cfg := newRunBinaryConfig(t, withCompilePluginType(compiler.YakPluginTypeYak))
+	bin, cleanup := compileBinary(t, code, "", cfg)
+	defer cleanup()
 
-func TestCorePlugin_RunSSADetectDefaultCompileImmediatelyFalse(t *testing.T) {
-	projectDir := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(projectDir, "index.php"), []byte("<?php echo 'ok';"), 0o644))
-
-	code := string(coreplugin.GetCorePluginData("SSA 项目探测"))
-	require.NotEmpty(t, code)
-
-	output := runBinaryWithEnv(t, code, "", map[string]string{
-		"YAKIT_HOME": t.TempDir(),
-	}, withCompilePluginType(compiler.YakPluginTypeYak), withArgs("--target", projectDir, "--language", "php"))
-	require.Contains(t, output, `"compile_immediately": false`)
-	require.NotContains(t, output, `"compile_immediately": true`)
-	require.NotContains(t, output, "YakVM Code DIE")
-	require.NotContains(t, output, "unexpected end of JSON input")
+	t.Run("default_compile_immediately_false", func(t *testing.T) {
+		output := runCompiledBinaryWithEnv(t, bin, env, "--target", projectDir, "--language", "php")
+		require.Contains(t, output, "[code]")
+		require.Contains(t, output, `"compile_immediately": false`)
+		require.NotContains(t, output, `"compile_immediately": true`)
+		require.NotContains(t, output, "配置对象为 nil")
+		require.NotContains(t, output, "YakVM Code DIE")
+		require.NotContains(t, output, "unexpected end of JSON input")
+	})
+	t.Run("compile_immediately_true", func(t *testing.T) {
+		output := runCompiledBinaryWithEnv(t, bin, env, "--target", projectDir, "--compile-immediately", "--language", "php")
+		require.Contains(t, output, "[code]")
+		require.Contains(t, output, `"compile_immediately": true`)
+		require.Contains(t, output, `"kind": "local"`)
+		require.Contains(t, output, `"language": "php"`)
+		require.Contains(t, output, `"local_file": "`+projectDir+`"`)
+		require.Contains(t, output, `"file_count": 1`)
+		require.Contains(t, output, `"program_names": [`)
+		require.Contains(t, output, `"project_name": "001"`)
+		require.Contains(t, output, `"project_exists": false`)
+		require.NotContains(t, output, "YakVM Code DIE")
+		require.NotContains(t, output, "unexpected end of JSON input")
+	})
 }
 
 func TestCorePlugin_RunResetKnowledgeBase(t *testing.T) {
