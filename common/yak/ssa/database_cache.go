@@ -152,9 +152,9 @@ func (c *ProgramCache) AddClassInstance(name string, inst Instruction) {
 	c.indexes.AddClassInstance(name, inst)
 }
 
-func (c *ProgramCache) SaveToDatabase(cb ...func(int)) {
+func (c *ProgramCache) SaveToDatabase(cb ...func(int)) error {
 	if !c.HaveDatabaseBackend() {
-		return
+		return nil
 	}
 	progress := func(int) {}
 	if len(cb) > 0 && cb[0] != nil {
@@ -177,7 +177,9 @@ func (c *ProgramCache) SaveToDatabase(cb ...func(int)) {
 		},
 		func() error {
 			if c.instructions != nil {
-				c.instructions.Close(progress)
+				if err := c.instructions.Close(progress); err != nil {
+					return err
+				}
 				log.Infof("Instruction cache closed")
 			}
 			return nil
@@ -196,7 +198,7 @@ func (c *ProgramCache) SaveToDatabase(cb ...func(int)) {
 			return nil
 		},
 	}
-	c.diagnosticsTrack("ssa.ProgramCache.SaveToDatabase", steps...)
+	return c.diagnosticsTrackErr("ssa.ProgramCache.SaveToDatabase", steps...)
 }
 
 func (c *ProgramCache) CountInstruction() int {

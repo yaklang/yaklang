@@ -161,6 +161,27 @@ func GetIrCodeById(db *gorm.DB, progName string, id int64) *IrCode {
 	return result.(*IrCode)
 }
 
+// ExistsIrCodeById checks whether a row exists for (program_name, code_id) without loading the full payload.
+func ExistsIrCodeById(db *gorm.DB, progName string, id int64) bool {
+	if id <= 0 || db == nil || progName == "" {
+		return false
+	}
+	cache := GetIrCodeCache(progName)
+	if cache != nil {
+		if _, ok := cache.Get(id); ok {
+			return true
+		}
+	}
+	var count int64
+	if err := db.Model(&IrCode{}).
+		Where("program_name = ? AND code_id = ?", progName, id).
+		Limit(1).
+		Count(&count).Error; err != nil {
+		return false
+	}
+	return count > 0
+}
+
 // GetIrCodeByIdFast loads ir code without neighbor prefetch, useful for hot paths that only need extra info.
 func GetIrCodeByIdFast(db *gorm.DB, progName string, id int64) *IrCode {
 	if id == -1 {

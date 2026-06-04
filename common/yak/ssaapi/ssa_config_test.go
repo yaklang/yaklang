@@ -747,7 +747,7 @@ func TestIrSaveProgressCallback_emitsDeltaAndUpdatesProcess(t *testing.T) {
 	prog.ProcessInfof = func(s string, v ...any) {
 		messages = append(messages, fmt.Sprintf(s, v...))
 	}
-	cb := irSaveProgressCallback(prog, 100_000, 0.90, 1.0, func(p float64) { lastP = p })
+	cb := irSaveProgressCallback(prog, 100_000, 0, 0.90, 1.0, func(p float64) { lastP = p })
 	cb(6000)
 	require.Greater(t, lastP, 0.90)
 	require.GreaterOrEqual(t, len(messages), 1)
@@ -758,7 +758,7 @@ func TestIrSaveProgressCallback_emitsDeltaAndUpdatesProcess(t *testing.T) {
 func TestIrSaveProgressCallback_totalZeroNoPanic(t *testing.T) {
 	prog := ssa.NewTmpProgram("test-ir-zero")
 	prog.ProcessInfof = func(s string, v ...any) {}
-	cb := irSaveProgressCallback(prog, 0, 0.0, 1.0, func(p float64) {
+	cb := irSaveProgressCallback(prog, 0, 0, 0.0, 1.0, func(p float64) {
 		require.Equal(t, 1.0, p)
 	})
 	cb(1)

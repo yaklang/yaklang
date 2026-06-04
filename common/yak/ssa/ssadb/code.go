@@ -111,6 +111,95 @@ func EmptyIrCode(progName string, id int64) *IrCode {
 	}
 }
 
+func cloneInt64Slice(s Int64Slice) Int64Slice {
+	if len(s) == 0 {
+		return nil
+	}
+	return append(Int64Slice(nil), s...)
+}
+
+func cloneInt64Map(s Int64Map) Int64Map {
+	if len(s) == 0 {
+		return nil
+	}
+	return append(Int64Map(nil), s...)
+}
+
+func cloneStringSlice(s StringSlice) StringSlice {
+	if len(s) == 0 {
+		return nil
+	}
+	return append(StringSlice(nil), s...)
+}
+
+// CopyPersistPayloadTo copies persisted IR payload fields onto dst without gorm metadata.
+func (src *IrCode) CopyPersistPayloadTo(dst *IrCode) {
+	if src == nil || dst == nil {
+		return
+	}
+	dst.ProgramName = src.ProgramName
+	dst.CodeID = src.CodeID
+	dst.Version = src.Version
+	dst.SourceCodeStartOffset = src.SourceCodeStartOffset
+	dst.SourceCodeEndOffset = src.SourceCodeEndOffset
+	dst.SourceCodeHash = src.SourceCodeHash
+	dst.Opcode = src.Opcode
+	dst.OpcodeName = src.OpcodeName
+	dst.OpcodeOperator = src.OpcodeOperator
+	dst.Name = src.Name
+	dst.VerboseName = src.VerboseName
+	dst.ShortVerboseName = src.ShortVerboseName
+	dst.String = src.String
+	dst.ReadableName = src.ReadableName
+	dst.ReadableNameShort = src.ReadableNameShort
+	dst.CurrentBlock = src.CurrentBlock
+	dst.CurrentFunction = src.CurrentFunction
+	dst.IsFunction = src.IsFunction
+	dst.FormalArgs = cloneInt64Slice(src.FormalArgs)
+	dst.FreeValues = cloneInt64Slice(src.FreeValues)
+	dst.MemberCallArgs = cloneInt64Slice(src.MemberCallArgs)
+	dst.SideEffects = cloneInt64Slice(src.SideEffects)
+	dst.IsVariadic = src.IsVariadic
+	dst.ReturnCodes = cloneInt64Slice(src.ReturnCodes)
+	dst.IsExternal = src.IsExternal
+	dst.CodeBlocks = cloneInt64Slice(src.CodeBlocks)
+	dst.EnterBlock = src.EnterBlock
+	dst.ExitBlock = src.ExitBlock
+	dst.DeferBlock = src.DeferBlock
+	dst.ChildrenFunction = cloneInt64Slice(src.ChildrenFunction)
+	dst.ParentFunction = src.ParentFunction
+	dst.IsBlock = src.IsBlock
+	dst.PredBlock = cloneInt64Slice(src.PredBlock)
+	dst.SuccBlock = cloneInt64Slice(src.SuccBlock)
+	dst.Phis = cloneInt64Slice(src.Phis)
+	dst.HasDefs = src.HasDefs
+	dst.Users = cloneInt64Slice(src.Users)
+	dst.Occulatation = cloneInt64Slice(src.Occulatation)
+	dst.IsObject = src.IsObject
+	dst.ObjectMembers = cloneInt64Map(src.ObjectMembers)
+	dst.IsObjectMember = src.IsObjectMember
+	dst.ObjectParent = src.ObjectParent
+	dst.ObjectKey = src.ObjectKey
+	dst.MaskedCodes = cloneInt64Slice(src.MaskedCodes)
+	dst.IsMasked = src.IsMasked
+	dst.Variable = cloneStringSlice(src.Variable)
+	dst.ProgramCompileHash = src.ProgramCompileHash
+	dst.TypeID = src.TypeID
+	dst.Point = src.Point
+	dst.Pointer = cloneInt64Slice(src.Pointer)
+	dst.ExtraInformation = src.ExtraInformation
+	dst.ConstType = src.ConstType
+}
+
+func (ir *IrCode) ClampSourceOffsets(editor *memedit.MemEditor) {
+	if ir == nil || editor == nil {
+		return
+	}
+	start, end := memedit.ClampOffsetPair(editor, int(ir.SourceCodeStartOffset), int(ir.SourceCodeEndOffset))
+	ir.SourceCodeStartOffset = int64(start)
+	ir.SourceCodeEndOffset = int64(end)
+}
+
 func GetIrCodeItemById(db *gorm.DB, progName string, id int64) *IrCode {
 	if id == -1 {
 		return nil
@@ -208,23 +297,34 @@ func (r *IrCode) GetStartAndEndPositions() (*memedit.MemEditor, *memedit.Positio
 		}
 		return nil, nil, nil, utils.Errorf("GetStartAndEndPositions failed: %v", err)
 	}
-	start, end := editor.GetPositionByOffset(int(r.SourceCodeStartOffset)), editor.GetPositionByOffset(int(r.SourceCodeEndOffset))
+	startOff, endOff := memedit.ClampOffsetPair(editor, int(r.SourceCodeStartOffset), int(r.SourceCodeEndOffset))
+	start, _ := editor.GetPositionByOffsetWithError(startOff)
+	end, _ := editor.GetPositionByOffsetWithError(endOff)
 	return editor, start, end, nil
 }
 
 func (r *IrCode) GetSourceCode() string {
-	editor, start, end, err := r.GetStartAndEndPositions()
+	if r.IsEmptySourceCodeHash() {
+		return ""
+	}
+	editor, err := GetEditorByHash(r.SourceCodeHash)
 	if err != nil {
 		log.Warnf("GetSourceCode failed: %v", err)
 		return ""
 	}
-	return editor.GetWordTextFromRange(editor.GetRangeByPosition(start, end))
+	codeRange := memedit.NewRangeFromOffsets(editor, int(r.SourceCodeStartOffset), int(r.SourceCodeEndOffset))
+	if codeRange == nil {
+		return ""
+	}
+	return editor.GetWordTextFromRange(codeRange)
 }
 
 func (r *IrCode) GetSourceCodeContext(n int) string {
 	editor, start, end, err := r.GetStartAndEndPositions()
-	if err != nil {
-		log.Warnf("GetSourceCodeContext failed: %v", err)
+	if err != nil || editor == nil || start == nil || end == nil {
+		if err != nil {
+			log.Warnf("GetSourceCodeContext failed: %v", err)
+		}
 		return ""
 	}
 	result, err := editor.GetContextAroundRange(start, end, n)

@@ -214,7 +214,7 @@ func TestLazyInstructionSaveAgain(t *testing.T) {
 	if prog.DatabaseKind != ProgramCacheMemory { // save program
 		prog.UpdateToDatabase()
 	}
-	prog.Cache.SaveToDatabase()
+	_ = prog.Cache.SaveToDatabase()
 
 	{
 		// check database
@@ -263,7 +263,7 @@ func TestCache_with_lazyBuilder(t *testing.T) {
 	if prog.DatabaseKind != ProgramCacheMemory { // save program
 		prog.UpdateToDatabase()
 	}
-	prog.Cache.SaveToDatabase()
+	_ = prog.Cache.SaveToDatabase()
 
 	require.Greater(t, undefineId, int64(0))
 	require.True(t, builded)
@@ -340,7 +340,7 @@ func TestLazySaveType(t *testing.T) {
 	if prog.DatabaseKind != ProgramCacheMemory {
 		prog.UpdateToDatabase()
 	}
-	prog.Cache.SaveToDatabase()
+	_ = prog.Cache.SaveToDatabase()
 }
 
 // TestSetVirtualRegister tests SetVirtualRegister which calls LazySaveType
@@ -379,7 +379,7 @@ func TestSetVirtualRegister(t *testing.T) {
 	if prog.DatabaseKind != ProgramCacheMemory {
 		prog.UpdateToDatabase()
 	}
-	prog.Cache.SaveToDatabase()
+	_ = prog.Cache.SaveToDatabase()
 }
 
 func TestGetTypeFromDBFallsBackToResidentTypeCache(t *testing.T) {
@@ -856,7 +856,7 @@ func TestEmitExCallsSetVirtualRegister(t *testing.T) {
 	if prog.DatabaseKind != ProgramCacheMemory {
 		prog.UpdateToDatabase()
 	}
-	prog.Cache.SaveToDatabase()
+	_ = prog.Cache.SaveToDatabase()
 }
 
 func TestInstructionCache_TTLReloadFromDB(t *testing.T) {
@@ -884,7 +884,7 @@ func TestInstructionCache_TTLReloadFromDB(t *testing.T) {
 
 	prog.Finish()
 	prog.UpdateToDatabase()
-	prog.Cache.SaveToDatabase()
+	_ = prog.Cache.SaveToDatabase()
 }
 
 func TestInstructionCache_DeleteDoesNotPersist(t *testing.T) {
@@ -942,7 +942,7 @@ func TestInstructionCache_TTLUpsertsDirtyLazyInstruction(t *testing.T) {
 
 	prog.Finish()
 	prog.UpdateToDatabase()
-	prog.Cache.SaveToDatabase()
+	_ = prog.Cache.SaveToDatabase()
 }
 
 func TestInstructionCache_SaveDeduplicatesSourcesWithinBatch(t *testing.T) {
@@ -964,7 +964,7 @@ func TestInstructionCache_SaveDeduplicatesSourcesWithinBatch(t *testing.T) {
 
 	prog.Finish()
 	prog.UpdateToDatabase()
-	prog.Cache.SaveToDatabase()
+	_ = prog.Cache.SaveToDatabase()
 
 	var count int
 	err := ssadb.GetDB().Model(&ssadb.IrSource{}).

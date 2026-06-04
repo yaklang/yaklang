@@ -459,7 +459,7 @@ func (lz *LazyInstruction) getRange(inst Instruction) *memedit.Range {
 		return nil
 	}
 	if inst.GetRange() == nil {
-		editor, start, end, err := getIRCodeRange(lz.prog, lz.ir)
+		_, codeRange, err := getIRCodeRange(lz.prog, lz.ir)
 		if err != nil {
 			switch ret := inst.(type) {
 			case *BasicBlock:
@@ -538,8 +538,8 @@ func (lz *LazyInstruction) getRange(inst Instruction) *memedit.Range {
 			log.Warnf("LazyInstruction(%T).GetRange failed: %v", inst, err)
 			return nil
 		}
-		if editor != nil && start != nil && end != nil {
-			inst.SetRange(editor.GetRangeByPosition(start, end))
+		if codeRange != nil {
+			inst.SetRange(codeRange)
 		}
 	}
 	return inst.GetRange()

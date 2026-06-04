@@ -35,6 +35,8 @@ type instructionStore struct {
 	flushResidentOnClose bool
 	saveSize             int
 
+	persistedCount atomic.Int64
+
 	progressMu sync.RWMutex
 	progressFn func(int)
 }
@@ -276,41 +278,49 @@ func (s *instructionStore) Stats() dbcache.CacheStats {
 	}
 }
 
-func (s *instructionStore) Close(progress func(int)) {
+func (s *instructionStore) Close(progress func(int)) error {
 	if s == nil {
-		return
+		return nil
 	}
 	s.setProgress(progress)
 
 	switch {
 	case s.writer != nil:
-		s.writer.Close()
+		if err := s.writer.Close(); err != nil {
+			return err
+		}
 	case s.flushResidentOnClose:
-		s.flushResidentOnCloseOnly()
+		if err := s.flushResidentOnCloseOnly(); err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
-func (s *instructionStore) flushResidentOnCloseOnly() {
+func (s *instructionStore) flushResidentOnCloseOnly() error {
 	if s == nil || s.resident == nil || s.db == nil {
-		return
+		return nil
 	}
 
 	saveBatch := saveInstructionIrCodesFast(s.program, s.db, s.notifyProgress)
 	batch := make([]*ssadb.IrCode, 0, s.saveSize)
+	var flushErr error
 	flush := func() {
 		if len(batch) == 0 {
 			return
 		}
 		if err := saveBatch(batch); err != nil {
 			log.Errorf("save ir code batch fast path failed: %v", err)
+			flushErr = utils.JoinErrors(flushErr, err)
 		}
 		batch = make([]*ssadb.IrCode, 0, s.saveSize)
 	}
 
 	s.resident.ForEach(func(_ int64, inst Instruction) bool {
-		irCode, err := marshalIrCode(inst)
-		if err != nil {
+		irCode, err := marshalIrCodeWithReason(inst, utils.EvictionReasonDeleted)
+		if err := s.reconcileCloseFlushNilMarshal(inst, irCode, utils.EvictionReasonDeleted, err); err != nil {
 			log.Errorf("marshal ir code failed: %v", err)
+			flushErr = utils.JoinErrors(flushErr, err)
 			return true
 		}
 		if irCode == nil {
@@ -323,6 +333,7 @@ func (s *instructionStore) flushResidentOnCloseOnly() {
 		return true
 	})
 	flush()
+	return flushErr
 }
 
 func (s *instructionStore) PreloadByIDsFast(ids []int64) {
@@ -367,9 +378,12 @@ func (s *instructionStore) loadInstruction(id int64) (Instruction, error) {
 }
 
 func (s *instructionStore) marshalInstructionRecord(inst Instruction, reason utils.EvictionReason) (*instructionPersistRecord, error) {
-	irCode, err := marshalIrCode(inst)
-	if err != nil {
+	irCode, err := marshalIrCodeWithReason(inst, reason)
+	if err := s.reconcileCloseFlushNilMarshal(inst, irCode, reason, err); err != nil {
 		return nil, err
+	}
+	if irCode == nil {
+		return nil, nil
 	}
 
 	updateExisting := false
@@ -380,18 +394,6 @@ func (s *instructionStore) marshalInstructionRecord(inst Instruction, reason uti
 		updateExisting = lz.ShouldSave()
 	}
 
-	if irCode == nil {
-		if instructionCacheEventDebugEnabled() {
-			log.Debugf("[ssa-ir-cache] save-skip: program=%s id=%d opcode=%s reason=%s",
-				s.program.GetProgramName(),
-				inst.GetId(),
-				inst.GetOpcode().String(),
-				evictionReasonName(reason),
-			)
-		}
-		return nil, nil
-	}
-
 	return &instructionPersistRecord{
 		IrCode:         irCode,
 		Opcode:         inst.GetOpcode(),
@@ -399,6 +401,54 @@ func (s *instructionStore) marshalInstructionRecord(inst Instruction, reason uti
 		UpdateExisting: updateExisting,
 		CodeID:         inst.GetId(),
 	}, nil
+}
+
+func errCloseFlushNotPersisted(inst Instruction) error {
+	return utils.Errorf("close flush: instruction id=%d opcode=%s not marshaled and not found in database",
+		inst.GetId(), inst.GetOpcode())
+}
+
+// instructionPersistedInDB reports whether inst already has a DB-backed IR row without querying.
+// Unmodified lazy instructions loaded from the database always carry lz.ir; close flush must not
+// re-fetch hundreds of thousands of rows one-by-one.
+func instructionPersistedInDB(inst Instruction) bool {
+	lz, ok := ToLazyInstruction(inst)
+	if !ok || lz == nil || lz.Modify || lz.ShouldSave() {
+		return false
+	}
+	if lz.ir != nil && lz.ir.Opcode != 0 {
+		return true
+	}
+	return false
+}
+
+// reconcileCloseFlushNilMarshal treats nil marshal on close as success when the row already exists.
+func (s *instructionStore) reconcileCloseFlushNilMarshal(inst Instruction, irCode *ssadb.IrCode, reason utils.EvictionReason, marshalErr error) error {
+	if marshalErr != nil {
+		return marshalErr
+	}
+	if irCode != nil {
+		return nil
+	}
+	if reason != utils.EvictionReasonDeleted {
+		return nil
+	}
+	if instructionPersistedInDB(inst) {
+		s.notifyProgress(1)
+		return nil
+	}
+	if s.instructionExistsInDB(inst.GetId()) {
+		s.notifyProgress(1)
+		return nil
+	}
+	return errCloseFlushNotPersisted(inst)
+}
+
+func (s *instructionStore) instructionExistsInDB(id int64) bool {
+	if s == nil || s.db == nil || s.program == nil || id <= 0 {
+		return false
+	}
+	return ssadb.ExistsIrCodeById(s.db, s.program.Name, id)
 }
 
 func (s *instructionStore) saveInstructionPersistRecords(records []*instructionPersistRecord) error {
@@ -437,6 +487,7 @@ func (s *instructionStore) saveInstructionPersistRecords(records []*instructionP
 		return saveErr
 	}
 
+	s.persistedCount.Add(int64(len(records)))
 	cost := time.Since(start)
 	perItemCost := cost / time.Duration(len(records))
 	if perItemCost <= 0 {
@@ -547,8 +598,12 @@ func instructionLocationIDs(inst Instruction) (funcID, blockID int64) {
 }
 
 func marshalIrCode(inst Instruction) (*ssadb.IrCode, error) {
+	return marshalIrCodeWithReason(inst, 0)
+}
+
+func marshalIrCodeWithReason(inst Instruction, reason utils.EvictionReason) (*ssadb.IrCode, error) {
 	ret := ssadb.EmptyIrCode(inst.GetProgramName(), inst.GetId())
-	if ok := marshalInstruction(inst, ret); !ok {
+	if ok := marshalInstruction(inst, ret, reason); !ok {
 		return nil, nil
 	}
 	return ret, nil
@@ -565,4 +620,18 @@ func evictionReasonName(reason utils.EvictionReason) string {
 	default:
 		return "unknown"
 	}
+}
+
+func (s *instructionStore) PersistedCount() int64 {
+	if s == nil {
+		return 0
+	}
+	return s.persistedCount.Load()
+}
+
+func (c *ProgramCache) InstructionPersistedCount() int {
+	if c == nil || c.instructions == nil {
+		return 0
+	}
+	return int(c.instructions.PersistedCount())
 }

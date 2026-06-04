@@ -79,10 +79,55 @@ func (r *Range) SetEditor(editor *MemEditor) {
 		return
 	}
 	r.editor = editor
-	if editor != nil {
-		r.startOffset = editor.GetOffsetByPosition(r.start)
-		r.endOffset = editor.GetOffsetByPosition(r.end)
+	if editor != nil && r.start != nil && r.end != nil {
+		startOff, startErr := editor.GetOffsetByPositionWithError(r.start.GetLine(), r.start.GetColumn())
+		endOff, endErr := editor.GetOffsetByPositionWithError(r.end.GetLine(), r.end.GetColumn())
+		if startErr == nil && endErr == nil {
+			r.startOffset, r.endOffset = ClampOffsetPair(editor, startOff, endOff)
+		}
 	}
+}
+
+// ClampOffsetPair clamps byte offsets to the editor content bounds.
+func ClampOffsetPair(editor *MemEditor, startOffset, endOffset int) (int, int) {
+	if editor == nil {
+		return startOffset, endOffset
+	}
+	maxOff := editor.CodeLength()
+	if startOffset < 0 {
+		startOffset = 0
+	}
+	if endOffset < 0 {
+		endOffset = 0
+	}
+	if startOffset > maxOff {
+		startOffset = maxOff
+	}
+	if endOffset > maxOff {
+		endOffset = maxOff
+	}
+	if startOffset > endOffset {
+		endOffset = startOffset
+	}
+	return startOffset, endOffset
+}
+
+// NewRangeFromOffsets builds a range from byte offsets without recomputing offsets from positions.
+func NewRangeFromOffsets(editor *MemEditor, startOffset, endOffset int) *Range {
+	if editor == nil {
+		return nil
+	}
+	startOffset, endOffset = ClampOffsetPair(editor, startOffset, endOffset)
+	start, _ := editor.GetPositionByOffsetWithError(startOffset)
+	end, _ := editor.GetPositionByOffsetWithError(endOffset)
+	r := NewRange(start, end)
+	if r == nil {
+		return nil
+	}
+	r.editor = editor
+	r.startOffset = startOffset
+	r.endOffset = endOffset
+	return r
 }
 
 func (r *Range) GetEditor() *MemEditor {

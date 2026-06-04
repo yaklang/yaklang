@@ -321,7 +321,7 @@ func (ve *MemEditor) GetOffsetByPositionWithError(line, col int) (int, error) {
 	adjustedCol := col - 1
 
 	// 检查行号是否超出范围
-	if adjustedLine >= len(ve.lineStartOffsetMap) {
+	if adjustedLine >= len(ve.lineStartOffsetMap) || adjustedLine >= len(ve.lineLensMap) {
 		return ve.safeSourceCode.Len(), errors.New("line number out of range")
 	}
 
@@ -433,6 +433,9 @@ func (ve *MemEditor) GetPositionByLine(line, column int) *Position {
 
 func (ve *MemEditor) GetPositionByOffsetWithError(offset int) (*Position, error) {
 	ve.ensureLineMappings()
+	if len(ve.lineStartOffsetMap) == 0 || len(ve.lineLensMap) == 0 {
+		return NewPosition(1, 1), errors.New("empty source editor")
+	}
 	if offset < 0 {
 		// 偏移量为负，返回最初位置
 		return NewPosition(1, 1), errors.New("offset is negative")
@@ -440,6 +443,9 @@ func (ve *MemEditor) GetPositionByOffsetWithError(offset int) (*Position, error)
 	if offset >= ve.safeSourceCode.Len() {
 		// 偏移量超出最大范围，返回最后位置
 		lastLine := len(ve.lineStartOffsetMap) - 1 // 最后一行的索引（从0开始）
+		if lastLine < 0 || lastLine >= len(ve.lineLensMap) {
+			return NewPosition(1, 1), utils.Errorf("offset %d is out of range", offset)
+		}
 		lastLineStart := ve.lineStartOffsetMap[lastLine]
 		lastLineLen := ve.lineLensMap[lastLine]
 		outOfRange := utils.Errorf("offset %d is out of range", offset)
@@ -459,7 +465,7 @@ func (ve *MemEditor) GetPositionByOffsetWithError(offset int) (*Position, error)
 		if startOffset == offset {
 			return NewPosition(mid+1, 1), nil
 		} else if startOffset < offset {
-			if mid == high || ve.lineStartOffsetMap[mid+1] > offset {
+			if mid == high || mid+1 >= len(ve.lineStartOffsetMap) || ve.lineStartOffsetMap[mid+1] > offset {
 				column := offset - startOffset
 				return NewPosition(mid+1, column+1), nil
 			}
@@ -474,15 +480,24 @@ func (ve *MemEditor) GetPositionByOffsetWithError(offset int) (*Position, error)
 }
 
 func (ve *MemEditor) GetRangeOffset(start, end int) *Range {
-	ret := NewRange(ve.GetPositionByOffset(start), ve.GetPositionByOffset(end))
-	ret.SetEditor(ve)
-	return ret
+	start, end = ClampOffsetPair(ve, start, end)
+	return NewRangeFromOffsets(ve, start, end)
 }
 
 func (ve *MemEditor) GetRangeByPosition(start, end *Position) *Range {
-	ret := NewRange(start, end)
-	ret.SetEditor(ve)
-	return ret
+	if ve == nil || start == nil || end == nil {
+		return NewRange(start, end)
+	}
+	startOff, startErr := ve.GetOffsetByPositionWithError(start.GetLine(), start.GetColumn())
+	endOff, endErr := ve.GetOffsetByPositionWithError(end.GetLine(), end.GetColumn())
+	if startErr != nil || endErr != nil {
+		ret := NewRange(start, end)
+		if ret != nil {
+			ret.editor = ve
+		}
+		return ret
+	}
+	return NewRangeFromOffsets(ve, startOff, endOff)
 }
 
 func (ve *MemEditor) GetFullRange() *Range {

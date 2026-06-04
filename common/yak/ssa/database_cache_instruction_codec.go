@@ -7,7 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
-func marshalInstruction(inst Instruction, irCode *ssadb.IrCode) bool {
+func marshalInstruction(inst Instruction, irCode *ssadb.IrCode, reason utils.EvictionReason) bool {
 	if utils.IsNil(inst) || utils.IsNil(irCode) {
 		log.Errorf("BUG: marshalInstruction called with nil instruction")
 		return false
@@ -17,16 +17,15 @@ func marshalInstruction(inst Instruction, irCode *ssadb.IrCode) bool {
 		return false
 	}
 
-	// all instruction from database will be lazy instruction
-	if lz, ok := ToLazyInstruction(inst); ok {
-		// Reloaded instructions are not persisted again unless the lazy wrapper
-		// was materialized and marked dirty.
-		if !lz.ShouldSave() {
+	if lz, isLazy := ToLazyInstruction(inst); isLazy {
+		resolved, payloadCopied, ok := resolveLazyMarshalInst(lz, irCode, reason)
+		if !ok {
 			return false
 		}
-		if !utils.IsNil(lz.Instruction) {
-			inst = lz.Instruction
+		if payloadCopied {
+			return irCode.Opcode != 0
 		}
+		inst = resolved
 	}
 
 	err := Instruction2IrCode(inst, irCode)
@@ -39,6 +38,37 @@ func marshalInstruction(inst Instruction, irCode *ssadb.IrCode) bool {
 		log.Errorf("BUG: saveInstruction called with empty opcode: %v", inst.GetName())
 	}
 	return true
+}
+
+// resolveLazyMarshalInst handles lazy wrappers on close flush vs normal eviction.
+// payloadCopied means irCode already contains a DB-ready snapshot and Instruction2IrCode should be skipped.
+func resolveLazyMarshalInst(lz *LazyInstruction, irCode *ssadb.IrCode, reason utils.EvictionReason) (Instruction, bool, bool) {
+	if lz.ShouldSave() {
+		if !utils.IsNil(lz.Instruction) {
+			return lz.Instruction, false, true
+		}
+		return lz, false, true
+	}
+	if reason != utils.EvictionReasonDeleted {
+		return nil, false, false
+	}
+	if !utils.IsNil(lz.Instruction) {
+		return lz.Instruction, false, true
+	}
+	if lz.ir != nil {
+		lz.ir.CopyPersistPayloadTo(irCode)
+		if prog := lz.GetProgram(); prog != nil {
+			if editor, ok := prog.GetEditorByHash(irCode.SourceCodeHash); ok {
+				irCode.ClampSourceOffsets(editor)
+			}
+		}
+		return lz, true, true
+	}
+	lz.check()
+	if utils.IsNil(lz.Instruction) {
+		return nil, false, false
+	}
+	return lz.Instruction, false, true
 }
 
 // Instruction2IrCode : marshal instruction to ir code, used in cache, to save to database
@@ -61,12 +91,6 @@ func Instruction2IrCode(inst Instruction, ir *ssadb.IrCode) error {
 
 // IrCodeToInstruction : unmarshal ir code to instruction, used in LazyInstruction
 func (c *ProgramCache) IrCodeToInstruction(inst Instruction, ir *ssadb.IrCode, cache *ProgramCache) Instruction {
-	defer func() {
-		if err := recover(); err != nil {
-			utils.PrintCurrentGoroutineRuntimeStack()
-			log.Errorf("err: %v", err)
-		}
-	}()
 	instructionFromIrCode(inst, ir)
 	c.valueFromIrCode(cache, inst, ir)
 	basicBlockFromIrCode(inst, ir)
@@ -95,9 +119,9 @@ func fitRange(c *ssadb.IrCode, rangeIns *memedit.Range, inst Instruction) {
 		log.Debugf("fitRange: instruction=%s, opcode=%s, hash=%s, program=%s, path=%s",
 			c.Name, c.OpcodeName, hash, editor.GetProgramName(), editor.GetFolderPath()+editor.GetFilename())
 	}
-	// start, end := rangeIns.GetOffsetRange()
-	c.SourceCodeStartOffset = int64(rangeIns.GetStartOffset())
-	c.SourceCodeEndOffset = int64(rangeIns.GetEndOffset())
+	startOff, endOff := memedit.ClampOffsetPair(editor, rangeIns.GetStartOffset(), rangeIns.GetEndOffset())
+	c.SourceCodeStartOffset = int64(startOff)
+	c.SourceCodeEndOffset = int64(endOff)
 }
 
 func instruction2IrCode(inst Instruction, ir *ssadb.IrCode) {
@@ -183,9 +207,11 @@ func instructionFromIrCode(inst Instruction, ir *ssadb.IrCode) {
 			inst.SetBlock(block)
 		}
 	}
-	editor, start, end, err := getIRCodeRange(inst.GetProgram(), ir)
-	if err == nil {
-		inst.SetRange(editor.GetRangeByPosition(start, end))
+	_, codeRange, err := getIRCodeRange(inst.GetProgram(), ir)
+	if err != nil {
+		log.Warnf("instructionFromIrCode: skip range for id=%d: %v", ir.GetIdInt64(), err)
+	} else if codeRange != nil {
+		inst.SetRange(codeRange)
 	}
 
 	inst.SetExtern(ir.IsExternal)
@@ -195,18 +221,26 @@ func setInstructionLocationIDs(inst Instruction, funcID, blockID int64) {
 	inst.getAnInstruction().setLocationIDs(funcID, blockID)
 }
 
-func getIRCodeRange(prog *Program, ir *ssadb.IrCode) (*memedit.MemEditor, *memedit.Position, *memedit.Position, error) {
+func getIRCodeRange(prog *Program, ir *ssadb.IrCode) (*memedit.MemEditor, *memedit.Range, error) {
 	if ir == nil {
-		return nil, nil, nil, nil
+		return nil, nil, utils.Error("ir is nil")
 	}
+	var editor *memedit.MemEditor
 	if prog != nil {
-		if editor, ok := prog.GetEditorByHash(ir.SourceCodeHash); ok && editor != nil {
-			start := editor.GetPositionByOffset(int(ir.SourceCodeStartOffset))
-			end := editor.GetPositionByOffset(int(ir.SourceCodeEndOffset))
-			return editor, start, end, nil
+		editor, _ = prog.GetEditorByHash(ir.SourceCodeHash)
+	}
+	if editor == nil {
+		var err error
+		editor, _, _, err = ir.GetStartAndEndPositions()
+		if err != nil {
+			return nil, nil, err
 		}
 	}
-	return ir.GetStartAndEndPositions()
+	if editor == nil {
+		return nil, nil, nil
+	}
+	startOff, endOff := memedit.ClampOffsetPair(editor, int(ir.SourceCodeStartOffset), int(ir.SourceCodeEndOffset))
+	return editor, memedit.NewRangeFromOffsets(editor, startOff, endOff), nil
 }
 
 func value2IrCode(inst Instruction, ir *ssadb.IrCode) {

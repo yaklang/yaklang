@@ -73,16 +73,17 @@ func (c *Config) parseFile() (ret *Program, err error) {
 		// prog.ProcessInfof("[SSA/persist] program %s program metadata saved, cost %v", prog.Name, time.Since(metaStart))
 	}
 	total := prog.Cache.CountInstruction()
+	persisted := prog.Cache.InstructionPersistedCount()
+	totalExpected := total + persisted
 	if prog.DatabaseKind != ssa.ProgramCacheMemory {
-		prog.ProcessInfof("[SSA/persist] program %s flushing IR cache (instructions=%d) to database", prog.Name, total)
+		prog.ProcessInfof("[SSA/persist] program %s flushing IR cache (remaining=%d persisted=%d total=%d) to database",
+			prog.Name, total, persisted, totalExpected)
 	} else {
 		prog.ProcessInfof("[SSA/persist] program %s finishing cache instruction(len:%d) (memory only, not saved)", prog.Name, total)
 	}
-	// saveStart := time.Now()
-	prog.Cache.SaveToDatabase(irSaveProgressCallback(prog, total, 0.0, 1.0, nil))
-	// if prog.DatabaseKind != ssa.ProgramCacheMemory {
-	// 	prog.ProcessInfof("[SSA/persist] program %s IR cache close/save finished, cost %v", prog.Name, time.Since(saveStart))
-	// }
+	if err := prog.Cache.SaveToDatabase(irSaveProgressCallback(prog, totalExpected, persisted, 0.0, 1.0, nil)); err != nil {
+		return nil, utils.Errorf("persist IR to database failed: %w", err)
+	}
 	wait()
 	p := NewProgram(prog, c)
 	SaveConfig(c, p)
