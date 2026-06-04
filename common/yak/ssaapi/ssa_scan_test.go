@@ -17,6 +17,7 @@ func TestScanProjectFiles(t *testing.T) {
 	fs.AddFile("src/utils.go", "package main")
 	fs.AddFile("src/vendor/lib.go", "package lib")
 	fs.AddFile("src/test/test.go", "package test")
+	fs.AddFile("src/testdata/issue47704.go", "package main")
 	fs.AddFile("src/.git/config", "git config")
 	fs.AddFile("src/ignored.txt", "ignored")
 
@@ -41,10 +42,10 @@ func TestScanProjectFiles(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
-		// Expected files: src/main.go, src/utils.go, src/vendor/lib.go
-		expectedFiles := []string{"src/main.go", "src/utils.go", "src/vendor/lib.go"}
+		// Default excludes skip vendor/, test/, testdata/, .git/
+		expectedFiles := []string{"src/main.go", "src/utils.go"}
 		require.ElementsMatch(t, expectedFiles, result.HandlerFiles)
-		require.Equal(t, 3, result.HandlerTotal)
+		require.Equal(t, 2, result.HandlerTotal)
 		require.GreaterOrEqual(t, len(result.Folders), 1)
 	})
 
@@ -92,5 +93,19 @@ func TestScanProjectFiles(t *testing.T) {
 		require.Equal(t, 1, result.PreHandlerTotal)
 		_, ok := result.HandlerFilesMap["src/utils.go"]
 		require.True(t, ok)
+	})
+
+	t.Run("Skip testdata directory", func(t *testing.T) {
+		result, err := ScanProjectFiles(ScanConfig{
+			ProgramName:     "test_prog",
+			ProgramPath:     "src",
+			FileSystem:      fs,
+			ExcludeFunc:     nil,
+			CheckLanguage:   checkLanguage,
+			CheckPreHandler: nil,
+			Context:         context.Background(),
+		})
+		require.NoError(t, err)
+		require.NotContains(t, result.HandlerFiles, "src/testdata/issue47704.go")
 	})
 }

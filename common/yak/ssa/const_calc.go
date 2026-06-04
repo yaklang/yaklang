@@ -255,6 +255,9 @@ func CalcConstBinary(x, y *ConstInst, op BinaryOpcode) *ConstInst {
 		}
 	case OpMod:
 		if x.IsNumber() && y.IsNumber() {
+			if y.Number() == 0 {
+				return NewConst(0)
+			}
 			return NewConst(x.Number() % y.Number())
 		}
 	case OpGt:

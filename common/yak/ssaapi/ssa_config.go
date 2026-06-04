@@ -3,9 +3,7 @@ package ssaapi
 import (
 	"context"
 	"fmt"
-	"strings"
 
-	"github.com/gobwas/glob"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
@@ -15,7 +13,6 @@ import (
 )
 
 type ProcessFunc func(msg string, process float64)
-type ExcludeFunc func(path string) bool
 
 type Config struct {
 	*ssaconfig.Config // config
@@ -81,86 +78,22 @@ func (c *Config) CalcHash() string {
 
 var WithConfigInfo = ssaconfig.WithCodeSourceMap
 
-var DefaultExcludeFiles = []string{
-	"**/Vendor/**",
-	"Vendor/**",
-	"**/vendor/**",
-	"vendor/**",
-	"**/target/**",
-	"**include/**",
-	"**caches/**",
-	"**cache/**",
-	"**tmp/**",
-	"**alipay/**",
-	"**includes/**",
-	"**temp/**",
-	"**zh_cn/**",
-	"**zh_en/**",
-	"**plugins/**",
-	"**PHPExcel/**",
-}
+type ExcludeFunc = ssaconfig.CompileExcludeFunc
+
+// DefaultExcludeFiles is kept for backward compatibility.
+var DefaultExcludeFiles = ssaconfig.DefaultCompileExcludeGlobs
 
 func newExcludeFunc(patterns []string, basePath string) ExcludeFunc {
-	var compile []glob.Glob
-	seenPatterns := make(map[string]bool)
-	patterns = append(patterns, DefaultExcludeFiles...)
-	addPattern := func(pattern string) {
-		pattern = strings.TrimSpace(pattern)
-		if pattern == "" {
-			return
-		}
-		if seenPatterns[pattern] {
-			return
-		}
-		seenPatterns[pattern] = true
-		g, err := glob.Compile(pattern)
-		if err != nil {
-			log.Warnf("failed to compile exclude pattern: %v, pattern: %s", err, pattern)
-			return
-		}
-		compile = append(compile, g)
-	}
-
-	// normalizePattern handles folder patterns:
-	// "vendor/" -> ["vendor", "vendor/**"] to match folder and all contents
-	normalizePattern := func(pattern string) []string {
-		if strings.HasSuffix(pattern, "/") {
-			base := strings.TrimSuffix(pattern, "/")
-			return []string{base, base + "/**"}
-		}
-		return []string{pattern}
-	}
-
-	for _, pattern := range patterns {
-		// Apply normalization for folder patterns
-		for _, p := range normalizePattern(pattern) {
-			addPattern(p)
-		}
-
-		// 普通化分隔符（处理不同系统）
-		relPattern := strings.TrimPrefix(pattern, basePath)
-		relPattern = strings.TrimLeft(relPattern, "/")
-		if relPattern != pattern {
-			for _, p := range normalizePattern(relPattern) {
-				addPattern(p)
-			}
-		}
-	}
-
-	return func(path string) bool {
-		for _, g := range compile {
-			if match := g.Match(path); match {
-				return true
-			}
-		}
-		return false
-	}
+	return ssaconfig.BuildCompileExcludeFunc(patterns, basePath)
 }
 
-// CompileExcludeFunc returns a path exclude matcher that merges DefaultExcludeFiles with extraPatterns.
-// Same behavior as compile-time exclude construction in DefaultConfig; exported for external test packages.
+// CompileExcludeFunc returns a matcher that merges user patterns with built-in compile excludes.
 func CompileExcludeFunc(extraPatterns []string, basePath string) ExcludeFunc {
-	return newExcludeFunc(extraPatterns, basePath)
+	return ssaconfig.BuildCompileExcludeFunc(extraPatterns, basePath)
+}
+
+func resolveCompileExcludeFunc(exclude ExcludeFunc) ExcludeFunc {
+	return ssaconfig.ResolveCompileExcludeFunc(exclude)
 }
 
 func (c *Config) Processf(process float64, format string, arg ...any) {
@@ -347,17 +280,14 @@ func DefaultConfig(opts ...ssaconfig.Option) (*Config, error) {
 		defineFunc:                 make(map[string]any),
 		DatabaseProgramCacheHitter: func(any) {},
 		ctx:                        sc.GetContext(),
-		excludeFile: func(path string) bool {
-			return false
-		},
-		logLevel: "error",
-		Config:   sc,
+		logLevel:                   "error",
+		Config:                     sc,
 	}
-	if !utils.IsNil(sc.SSACompile) {
-		if exclude := sc.SSACompile.ExcludeFiles; exclude != nil {
-			c.excludeFile = newExcludeFunc(exclude, sc.GetCodeSourceLocalFile())
-		}
+	var userExclude []string
+	if sc.SSACompile != nil {
+		userExclude = sc.SSACompile.ExcludeFiles
 	}
+	c.excludeFile = ssaconfig.BuildCompileExcludeFunc(userExclude, sc.GetCodeSourceLocalFile())
 
 	ssaconfig.ApplyExtraOptions(c, c.Config)
 

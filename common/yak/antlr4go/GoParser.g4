@@ -93,10 +93,9 @@ constDecl
     ;
 
 constSpec
-    : identifierList ws* (
-        ASSIGN ws* expressionList
-        | type_ ws* (ASSIGN ws* expressionList)?
-      )?
+    : identifierList ws* ASSIGN ws* expressionList
+    | identifierList ws* type_ ws* ASSIGN ws* expressionList
+    | identifierList
     ;
 
 identifier
