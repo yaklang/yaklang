@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/log"
 	"sort"
 	"strings"
 	"time"
@@ -1031,7 +1032,7 @@ func executeFuzzAndCompare(loop *reactloops.ReActLoop, fuzzResult mutate.FuzzHTT
 		if result.Error != nil {
 			overview.observeError()
 			reportData.observeError(resultIndex, result.Error)
-			emitFuzzStage(loop, streamTaskID, fmt.Sprintf("%s 第 %d 个测试请求执行失败：%v", actionName, resultIndex, result.Error))
+			log.Errorf(fmt.Sprintf("%s 第 %d 个测试请求执行失败：%v", actionName, resultIndex, result.Error))
 			progressEmitter.emitProgress(overview, 0, false)
 			continue
 		}
