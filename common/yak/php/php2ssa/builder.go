@@ -159,6 +159,9 @@ func (s *SSABuilder) BuildFromAST(raw ssa.FrontAST, b *ssa.FunctionBuilder) erro
 		}, true)
 		if b.GetProgram().PreHandler() {
 			startParse(functionBuilder)
+			if ssa.SkeletonTopLevelEnabled() {
+				registerPHPBuildPass2RootTask(ast, b)
+			}
 		}
 	} else {
 		//模拟preHandler和正式handler
@@ -180,10 +183,37 @@ func (*SSABuilder) FilterFile(path string) bool {
 	return ext == ".php"
 }
 
-// SelfRegistersTopLevel stays false: pass2 must use the pipeline RegisterRootTopLevel
-// closure (sub-program lazy + editor push). pass1 DetachAST still runs when enabled.
+// SelfRegistersTopLevel: pass1 emits class/function shells + detaches file AST; pass2
+// full module build is scheduled via registerPHPBuildPass2RootTask (Java/Python pattern).
 func (*SSABuilder) SelfRegistersTopLevel() bool {
-	return false
+	return ssa.SkeletonTopLevelEnabled()
+}
+
+func registerPHPBuildPass2RootTask(ast phpparser.IHtmlDocumentContext, b *ssa.FunctionBuilder) {
+	if ast == nil || b == nil || !ssa.SkeletonTopLevelEnabled() {
+		return
+	}
+	prog := b.GetProgram()
+	if prog == nil {
+		return
+	}
+	app := prog.GetApplication()
+	if app == nil {
+		app = prog
+	}
+	editor := b.GetEditor()
+	if editor == nil {
+		editor = app.GetCurrentEditor()
+	}
+	path := "php"
+	if editor != nil && editor.GetUrl() != "" {
+		path = editor.GetUrl()
+	}
+	capturedAST := ast
+	capturedBuilder := b
+	app.RegisterRootTopLevel(path, editor, capturedBuilder, func(rootFb *ssa.FunctionBuilder) {
+		_ = CreateBuilder().BuildFromAST(capturedAST, rootFb)
+	})
 }
 
 func (*SSABuilder) GetLanguage() ssaconfig.Language {
