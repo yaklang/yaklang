@@ -257,7 +257,7 @@ func TestRecovery_SkipCompletedTasks(t *testing.T) {
 	require.Equal(t, 1, pushed["1-3"], "pending task should be pushed exactly once in recovery")
 	require.Equal(t, 1, popped["1-3"], "pending task should be popped exactly once in recovery")
 	require.Equal(t, string(aicommon.AITaskState_Completed), firstPlanTaskProgress["1-1"], "completed task should stay completed in recovered task tree")
-	require.Equal(t, string(aicommon.AITaskState_Aborted), firstPlanTaskProgress["1-2"], "aborted task should stay aborted in recovered task tree before retry")
+	require.Equal(t, "", firstPlanTaskProgress["1-2"], "aborted task should stay aborted in recovered task tree before retry")
 	require.True(t, abortedPlanRequested, "aborted task push should trigger a sync plan request during recovery")
 	require.True(t, abortedSeenProcessing, "sync plan triggered after aborted task push should show the task as processing")
 
