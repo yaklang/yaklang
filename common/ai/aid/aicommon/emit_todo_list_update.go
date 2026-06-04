@@ -1,6 +1,7 @@
 package aicommon
 
 import (
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 )
 
@@ -93,11 +94,23 @@ func (r *Emitter) EmitTodoListUpdate(payload TodoListUpdatePayload) (*schema.AiO
 	if r == nil {
 		return nil, nil
 	}
-	if payload.Items == nil {
-		payload.Items = []VerificationTodoItem{}
-	}
-	if payload.AppliedOps == nil {
-		payload.AppliedOps = []VerifyNextMovement{}
-	}
+	payload = normalizeTodoListUpdatePayload(payload)
 	return r.EmitJSON(schema.EVENT_TYPE_TODO_LIST_UPDATE, "todo_list", payload)
+}
+
+// EmitTodoListUpdates emits session-wide todo_list_update and task-scoped
+// current_task_todo_list_update. Call sites that previously used only
+// EmitTodoListUpdate should use this helper so both panels stay in sync.
+//
+// 关键词: EmitTodoListUpdates, 双通道 TODO emit, 全量 + 当前任务
+func (r *Emitter) EmitTodoListUpdates(cfg AICallerConfigIf, task AIStatefulTask, payload TodoListUpdatePayload) {
+	if r == nil {
+		return
+	}
+	if _, err := r.EmitTodoListUpdate(payload); err != nil {
+		log.Warnf("emit todo_list_update event failed: %v", err)
+	}
+	if _, err := r.EmitCurrentTaskTodoList(cfg, task, payload.IterationIndex, payload.Satisfied, payload.AppliedOps); err != nil {
+		log.Warnf("emit current_task_todo_list_update event failed: %v", err)
+	}
 }

@@ -1,18 +1,14 @@
 package aicommon
 
-import (
-	"github.com/yaklang/yaklang/common/log"
-)
-
 // ApplyVerificationNextMovementsAndEmit is the single-source-of-truth helper
 // that wires a `next_movements` delta through to the shared
 // VerificationTodoStore and fires the canonical events consumed by the
 // frontend TODO panel:
 //
 //  1. ApplyVerificationTodoOps mutates the global TODO store.
-//  2. EVENT_TYPE_TODO_LIST_UPDATE structured event carrying the post-apply
-//     items + stats + applied_ops + minimal context (satisfied / iteration /
-//     task) so the frontend can render the top "待办清单" panel as-is.
+//  2. EVENT_TYPE_TODO_LIST_UPDATE and EVENT_TYPE_CURRENT_TASK_TODO_LIST_UPDATE
+//     structured events carrying the post-apply snapshot (session-wide and
+//     current-task scoped) plus applied_ops and minimal context.
 //  3. Optional NEXT_MOVEMENTS timeline breadcrumb (via timelineHook) — written
 //     in the same chronological position as the verification path's own
 //     breadcrumb so log/test consumers see one unified TODO timeline
@@ -45,6 +41,7 @@ import (
 func ApplyVerificationNextMovementsAndEmit(
 	cfg AICallerConfigIf,
 	emitter *Emitter,
+	task AIStatefulTask,
 	scope VerificationTodoScope,
 	iterationIndex int,
 	satisfied bool,
@@ -62,8 +59,7 @@ func ApplyVerificationNextMovementsAndEmit(
 	//    "apply 必有效果"的语义不依赖前端事件通道的可用性.
 	cfg.ApplyVerificationTodoOps(scope, satisfied, movements)
 
-	// 2. emit 结构化 todo_list_update: 携带 apply 之后的全量 items + stats,
-	//    让前端 TODO 面板直接以最新快照渲染, 不需要二次拼接 history.
+	// 2. emit 结构化 todo_list_update + current_task_todo_list_update.
 	//    emitter 为 nil 时跳过 (例如部分单元测试).
 	if emitter != nil {
 		payload := TodoListUpdatePayload{
@@ -75,9 +71,7 @@ func ApplyVerificationNextMovementsAndEmit(
 			TaskID:         scope.TaskID,
 			TaskIndex:      scope.TaskIndex,
 		}
-		if _, err := emitter.EmitTodoListUpdate(payload); err != nil {
-			log.Warnf("emit todo_list_update event failed: %v", err)
-		}
+		emitter.EmitTodoListUpdates(cfg, task, payload)
 	}
 
 	// 3. timeline breadcrumb: delta-only 一行一个 op, 与 verification 路径

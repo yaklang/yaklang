@@ -157,8 +157,10 @@ func applyAdjustTodolistMovements(
 	}
 	scope := aicommon.VerificationTodoScope{}
 	iterationIndex := 0
+	var task aicommon.AIStatefulTask
 	if loop != nil {
-		if task := loop.GetCurrentTask(); task != nil {
+		task = loop.GetCurrentTask()
+		if task != nil {
 			scope = aicommon.BuildVerificationTodoScope(task)
 		}
 		iterationIndex = loop.GetCurrentIterationIndex()
@@ -176,6 +178,7 @@ func applyAdjustTodolistMovements(
 	aicommon.ApplyVerificationNextMovementsAndEmit(
 		cfg,
 		cfg.GetEmitter(),
+		task,
 		scope,
 		iterationIndex,
 		false,

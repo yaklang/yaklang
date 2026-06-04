@@ -458,9 +458,7 @@ func (r *ReAct) emitTodoListUpdate(result *aicommon.VerifySatisfactionResult) {
 		payload.TaskIndex = currentTask.GetIndex()
 	}
 
-	if _, err := emitter.EmitTodoListUpdate(payload); err != nil {
-		log.Warnf("emit todo_list_update event failed: %v", err)
-	}
+	emitter.EmitTodoListUpdates(r.config, r.GetCurrentTask(), payload)
 }
 
 // writeNextMovementsDisplayStream / formatNextMovementDisplayLine 都已经
