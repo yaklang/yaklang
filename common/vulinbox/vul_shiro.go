@@ -130,6 +130,8 @@ var randKey []byte
 
 var randGadget string
 
+const shiroRandomKeyLimit = 10
+
 func isVersionCommand() bool {
 	if len(os.Args) <= 1 {
 		return false
@@ -143,14 +145,26 @@ func isVersionCommand() bool {
 	}
 }
 
+func selectRandomShiroKey(r *rand.Rand) string {
+	limit := shiroRandomKeyLimit
+	if len(keyList) < limit {
+		limit = len(keyList)
+	}
+	return keyList[r.Intn(limit)]
+}
+
+func selectRandomShiroGadget(r *rand.Rand) string {
+	return gadgetList[r.Intn(len(gadgetList))]
+}
+
 func init() {
 	if isVersionCommand() {
 		return
 	}
-	rand.NewSource(time.Now().UnixNano())
-	key := keyList[rand.Intn(len(keyList))]
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	key := selectRandomShiroKey(r)
 	//key := keyList[0]
-	randGadget = gadgetList[rand.Intn(len(gadgetList))]
+	randGadget = selectRandomShiroGadget(r)
 	//randGadget = gadgetList[3]
 	log.Infof("Use RandKey: %s , Use GadGet :%s ", key, randGadget)
 	randKey, _ = codec.DecodeBase64(key)
