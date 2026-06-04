@@ -1987,15 +1987,29 @@ func (b *singleFileBuilder) VisitFuncdef(raw pythonparser.IFuncdefContext) inter
 	if newFunc == nil {
 		newFunc = b.NewFunc(funcName)
 	}
-	b.FunctionBuilder = b.PushFunction(newFunc)
 
-	if params := funcdef.Typedargslist(); params != nil {
-		b.buildFuncParams(params)
+	if b.PreHandler() && ssa.SkeletonTopLevelEnabled() {
+		store := b.StoreFunctionBuilder()
+		newFunc.AddLazyBuilder(func() {
+			switchHandler := b.SwitchFunctionBuilder(store)
+			defer switchHandler()
+			b.FunctionBuilder = b.PushFunction(newFunc)
+			if params := funcdef.Typedargslist(); params != nil {
+				b.buildFuncParams(params)
+			}
+			b.VisitSuite(suite)
+			b.Finish()
+			b.FunctionBuilder = b.PopFunction()
+		}, false)
+	} else {
+		b.FunctionBuilder = b.PushFunction(newFunc)
+		if params := funcdef.Typedargslist(); params != nil {
+			b.buildFuncParams(params)
+		}
+		b.VisitSuite(suite)
+		b.Finish()
+		b.FunctionBuilder = b.PopFunction()
 	}
-
-	b.VisitSuite(suite)
-	b.Finish()
-	b.FunctionBuilder = b.PopFunction()
 
 	funcVar := b.CreateVariable(funcName)
 	b.AssignVariable(funcVar, newFunc)

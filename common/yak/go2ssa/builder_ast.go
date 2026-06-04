@@ -39,8 +39,13 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 	_ = exportHandler
 
 	if b.PreHandler() {
+		// Stage 1 capture: package library key + import use-names as plain strings,
+		// so the deferred cross-file linking task below holds no AST.
+		var pkgLibName string
+		var importUseNames []string
 		if packag, ok := ast.PackageClause().(*gol.PackageClauseContext); ok {
 			pkgPath := b.buildPackage(packag)
+			pkgLibName = pkgPath[0]
 			if b.GetProgram().ExtraFile["go.mod"] != "" {
 				pkgNameCurrent = b.GetProgram().ExtraFile["go.mod"] + "/" + pkgPath[0]
 			} else {
@@ -114,7 +119,45 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 			for i, name := range names {
 				pathl := strings.Split(paths[i], "/")
 				b.SetImportPackage(name, pathl[len(pathl)-1], paths[i], impo.(*gol.ImportDeclContext).ImportSpec(i))
+				importUseNames = append(importUseNames, name)
 			}
+		}
+
+		// Stage 1: the only genuinely-deferred top-level work is cross-file
+		// ImportAll (must run after every package skeleton exists). Register it as
+		// a data-driven root task capturing only strings (package + import names),
+		// never the file AST. It runs in pass2 (RunRootBuilds) before function
+		// bodies (LazyBuild/Finish), matching the original ordering. This replaces
+		// the pass2 BuildFromAST(whole-ast) top-level closure for Go. In legacy
+		// mode the closure still runs and links imports in the else-branch below,
+		// so skip this task to avoid a redundant (idempotent) ImportAll.
+		if prog := b.GetProgram(); ssa.SkeletonTopLevelEnabled() && prog != nil && pkgLibName != "" && len(importUseNames) > 0 {
+			app := prog.GetApplication()
+			if app == nil {
+				app = prog
+			}
+			fileEditor := app.GetCurrentEditor()
+			capturedPkg := pkgLibName
+			capturedImports := importUseNames
+			taskKey := capturedPkg
+			if fileEditor != nil {
+				taskKey = fileEditor.GetUrl()
+			}
+			prog.RegisterRootTask(ssa.RootBuildKindTopLevel, "go-import-link:"+taskKey, func() {
+				if fileEditor != nil {
+					app.PushEditor(fileEditor)
+					defer app.PopEditor(true)
+				}
+				lib, _ := app.GetLibrary(capturedPkg)
+				if lib == nil {
+					return
+				}
+				for _, name := range capturedImports {
+					if il, _ := app.GetOrCreateLibrary(name); il != nil {
+						lib.ImportAll(il)
+					}
+				}
+			})
 		}
 
 		// Ensure imported packages are materialized as ExternLib deterministically.
@@ -205,6 +248,29 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 			}
 		}
 		exportHandler()
+
+		// Stage 2 — detached subtree (docs/ssa-ast-to-ssa-skeleton-plan.md §4 方案 A).
+		// Every deferred unit has now been captured by a lazy hook: function and
+		// method bodies (via `fun`), package-global initializers (via the
+		// expression subtree in AddGlobalVariable), and import specs (via
+		// b.importMap[].Pos). ANTLR's BaseRuleContext.parentCtx means any one of
+		// those captured descendants otherwise pins the ENTIRE file AST alive
+		// (docs §2.1). Severing every top-level child from the file root cuts the
+		// root->child edge, so once the shared pipeline drops fileContent.AST the
+		// root and all non-captured nodes become collectable, while each captured
+		// subtree survives on its own and is freed as its lazy hook completes.
+		// Detaching the top-level children (rather than each captured node) is
+		// sufficient because every captured node is a descendant of one of them.
+		// Safe: no Go lazy hook walks upward — go2ssa contains zero GetParent
+		// calls, so cutting parentCtx never affects a body/initializer build.
+		// Skipped in legacy mode: there the pass2 closure holds the file root
+		// directly and reaches every node downward, so detaching parentCtx frees
+		// nothing and only muddies the A/B baseline.
+		if ssa.SkeletonTopLevelEnabled() {
+			for _, child := range ast.GetChildren() {
+				ssa.DetachAST(child)
+			}
+		}
 	} else {
 		if packag, ok := ast.PackageClause().(*gol.PackageClauseContext); ok {
 			pkgPath := b.buildPackage(packag)
@@ -780,6 +846,10 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) {
 	}
 
 	store := b.StoreFunctionBuilder()
+	// NB: the file root is detached wholesale at the end of pass1 (see build()),
+	// which severs this `fun` subtree from the parse tree so capturing it below
+	// does not pin the whole file AST via parentCtx. The body build only descends
+	// into fun's own children, never GetParent().
 	log.Debugf("add function funcName = %s", funcName)
 	newFunc.AddLazyBuilder(func() {
 		log.Debugf("build function funcName = %s", funcName)
@@ -944,6 +1014,10 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) {
 	}
 
 	store := b.StoreFunctionBuilder()
+	// NB: the file root is detached wholesale at the end of pass1 (see build()),
+	// which severs this `fun` subtree from the parse tree so capturing it below
+	// does not pin the whole file AST via parentCtx. The body build only descends
+	// into fun's own children, never GetParent().
 	log.Debugf("add method funcName = %s", funcName)
 	newFunc.AddLazyBuilder(func() {
 		log.Debugf("build method funcName = %s", funcName)

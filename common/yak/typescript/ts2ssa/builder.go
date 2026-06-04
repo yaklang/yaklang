@@ -98,7 +98,7 @@ func (*SSABuilder) ParseAST(src string, cache *ssa.AntlrCache) (ssa.FrontAST, er
 	return Frontend(src)
 }
 
-func (*SSABuilder) BuildFromAST(raw ssa.FrontAST, b *ssa.FunctionBuilder) error {
+func (s *SSABuilder) BuildFromAST(raw ssa.FrontAST, b *ssa.FunctionBuilder) error {
 	jsAST, ok := raw.(*ast.SourceFile)
 	if !ok {
 		return utils.Errorf("invalid AST type: expected *ast.SourceFile, got %T", raw)
@@ -116,4 +116,11 @@ func (*SSABuilder) BuildFromAST(raw ssa.FrontAST, b *ssa.FunctionBuilder) error 
 	}
 	build.VisitSourceFile(jsAST)
 	return nil
+}
+
+// SelfRegistersTopLevel: pass1 emits declaration skeleton; pass2 full statement build
+// is scheduled via RegisterRootTopLevel in VisitSourceFile (TypeScript AST has no
+// ANTLR parent chain, so DetachAST does not apply).
+func (*SSABuilder) SelfRegistersTopLevel() bool {
+	return ssa.SkeletonTopLevelEnabled()
 }

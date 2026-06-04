@@ -86,6 +86,29 @@ func (b *builder) VisitSourceFile(sourcefile *ast.SourceFile) interface{} {
 			}
 		}
 
+		if ssa.SkeletonTopLevelEnabled() {
+			editor := b.GetEditor()
+			path := fileUrl
+			if editor != nil && editor.GetUrl() != "" {
+				path = editor.GetUrl()
+			}
+			capturedSF := sourcefile
+			capturedBuilder := b.FunctionBuilder
+			prog.RegisterRootTopLevel(path, editor, capturedBuilder, func(root *ssa.FunctionBuilder) {
+				nb := &builder{
+					FunctionBuilder:   root,
+					sourceFile:        capturedSF,
+					useStrict:         false,
+					contextLabelStack: make([]string, 0),
+					namedValueExports: make(map[string]ssa.Value),
+					namedTypeExports:  make(map[string]ssa.Type),
+					reExports:         make(map[string]map[string]string),
+					importTbl:         make(map[string]map[string]string),
+				}
+				nb.VisitSourceFile(capturedSF)
+			})
+		}
+
 		return nil
 	}
 

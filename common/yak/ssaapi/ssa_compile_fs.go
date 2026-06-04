@@ -2,6 +2,8 @@ package ssaapi
 
 import (
 	"fmt"
+	"os"
+	"runtime"
 	"sync"
 	"time"
 
@@ -11,6 +13,20 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssareducer"
 )
+
+// heapLogEnabled gates retained-heap phase logging (docs/ssa-ast-to-ssa-skeleton-plan.md
+// §5 阶段0). Set YAK_SSA_HEAP_LOG=1 to print GC'd HeapInuse after each compile phase.
+var heapLogEnabled = os.Getenv("YAK_SSA_HEAP_LOG") != ""
+
+func logPhaseHeap(tag string) {
+	if !heapLogEnabled {
+		return
+	}
+	runtime.GC()
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+	fmt.Fprintf(os.Stderr, "[ssa.heap] %-16s retained_HeapInuse=%7.1fMB HeapObjects=%d\n", tag, float64(m.HeapInuse)/(1024*1024), m.HeapObjects)
+}
 
 type SaveFolder struct {
 	name string
@@ -248,6 +264,14 @@ func (c *Config) parseProjectWithFS(
 		c.filePerformanceRecorder = diagnostics.NewRecorder()
 	}
 	filePerfRecorder := c.filePerformanceRecorder
+	// When the language builder emits its full skeleton + its own deferred root
+	// tasks in pass1, the pipeline must NOT capture the whole file AST in a
+	// pass2 top-level closure (that closure is the main heap pin). See
+	// docs/ssa-ast-to-ssa-skeleton-plan.md §1/§3.
+	selfRegistersTopLevel := false
+	if sr, ok := c.LanguageBuilder.(interface{ SelfRegistersTopLevel() bool }); ok {
+		selfRegistersTopLevel = sr.SelfRegistersTopLevel()
+	}
 	// pre handler  0-40%
 	f1 := func() error {
 		if prog.Cache != nil {
@@ -319,7 +343,9 @@ func (c *Config) parseProjectWithFS(
 				}()
 			}
 			if _, needBuild := handlerFilesMap[fileContent.Path]; needBuild {
-				if _, needsCompile := handlerFileSet[fileContent.Path]; needsCompile && fileContent.AST != nil {
+				_, needsCompile := handlerFileSet[fileContent.Path]
+				switch {
+				case needsCompile && fileContent.AST != nil && !selfRegistersTopLevel:
 					ast := fileContent.AST
 					path := fileContent.Path
 					prog.RegisterRootTopLevel(path, editor, builder, func(rootBuilder *ssa.FunctionBuilder) {
@@ -337,7 +363,7 @@ func (c *Config) parseProjectWithFS(
 							log.Errorf("root build [%s] failed: %v", path, err)
 						}
 					})
-				} else if !needsCompile && fileContent.Editor != nil {
+				case !needsCompile && fileContent.Editor != nil:
 					rootEditor := fileContent.Editor
 					prog.RegisterRootTask(ssa.RootBuildKindHelper, "extra-file:"+rootEditor.GetUrl(), func() {
 						prog.PushEditor(rootEditor)
@@ -345,6 +371,9 @@ func (c *Config) parseProjectWithFS(
 					})
 				}
 			}
+			// Once skeleton + deferred tasks are registered (pass1), drop the file
+			// AST root reference. For self-registering languages the body subtrees
+			// are detached, so the rest of the parse tree becomes collectable here.
 			fileContent.AST = nil
 			if enableFilePerfLog {
 				recordFilePerformance(filePerfRecorder, "AST", "AST parse", fileContent.Path, time.Since(fileASTStart))
@@ -468,7 +497,9 @@ func (c *Config) parseProjectWithFS(
 		return func() error {
 			compilePhase = phase
 			log.Debugf("ssa.compile.phase enter %s", compilePhase)
-			return fn()
+			stepErr := fn()
+			logPhaseHeap(phase)
+			return stepErr
 		}
 	}
 	phaseSteps := []func() error{

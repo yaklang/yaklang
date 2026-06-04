@@ -3,6 +3,7 @@ package python2ssa
 import (
 	"github.com/yaklang/yaklang/common/log"
 	pythonparser "github.com/yaklang/yaklang/common/yak/python/parser"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
 // VisitRoot visits the root node of the Python AST.
@@ -24,6 +25,12 @@ func (b *singleFileBuilder) VisitRoot(raw pythonparser.IRootContext) interface{}
 	// For now, we'll handle file_input which is the most common case
 	if fileInput := root.File_input(); fileInput != nil {
 		b.VisitFileInput(fileInput)
+		if b.PreHandler() && ssa.SkeletonTopLevelEnabled() {
+			for _, child := range root.GetChildren() {
+				ssa.DetachAST(child)
+			}
+			b.registerPythonPass2RootTask(root)
+		}
 	} else if singleInput := root.Single_input(); singleInput != nil {
 		b.VisitSingleInput(singleInput)
 	} else if evalInput := root.Eval_input(); evalInput != nil {
@@ -48,8 +55,21 @@ func (b *singleFileBuilder) VisitFileInput(raw pythonparser.IFile_inputContext) 
 		return nil
 	}
 
-	// Visit all statements in the file
 	stmts := fileInput.AllStmt()
+	if b.PreHandler() {
+		b.predeclareTopLevelFuncShells(stmts)
+		defer func() {
+			b.topLevelFuncShells = nil
+		}()
+		for _, stmt := range stmts {
+			b.visitFileInputStmtSkeleton(stmt)
+			if b.shouldStopStatementWalk() {
+				break
+			}
+		}
+		return nil
+	}
+
 	b.predeclareTopLevelFuncShells(stmts)
 	defer func() {
 		b.topLevelFuncShells = nil
@@ -62,6 +82,45 @@ func (b *singleFileBuilder) VisitFileInput(raw pythonparser.IFile_inputContext) 
 	}
 
 	return nil
+}
+
+func (b *singleFileBuilder) visitFileInputStmtSkeleton(stmt pythonparser.IStmtContext) {
+	if stmt == nil {
+		return
+	}
+	stmtCtx, ok := stmt.(*pythonparser.StmtContext)
+	if !ok || stmtCtx == nil {
+		return
+	}
+	if compoundStmt := stmtCtx.Compound_stmt(); compoundStmt != nil {
+		if cfdCtx, ok := compoundStmt.(*pythonparser.Class_or_func_def_stmtContext); ok {
+			b.VisitClassOrFuncDefStmt(cfdCtx)
+		}
+	}
+}
+
+func (b *singleFileBuilder) registerPythonPass2RootTask(root pythonparser.IRootContext) {
+	if b == nil || root == nil || !ssa.SkeletonTopLevelEnabled() {
+		return
+	}
+	prog := b.GetProgram()
+	if prog == nil {
+		return
+	}
+	app := prog.GetApplication()
+	if app == nil {
+		app = prog
+	}
+	editor := b.GetEditor()
+	path := "python"
+	if editor != nil && editor.GetUrl() != "" {
+		path = editor.GetUrl()
+	}
+	captured := root
+	capturedBuilder := b.FunctionBuilder
+	app.RegisterRootTopLevel(path, editor, capturedBuilder, func(rootFb *ssa.FunctionBuilder) {
+		_ = CreateBuilder().BuildFromAST(captured, rootFb)
+	})
 }
 
 // VisitSingleInput visits a single_input node (a single statement).

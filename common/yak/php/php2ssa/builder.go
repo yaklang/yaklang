@@ -155,7 +155,6 @@ func (s *SSABuilder) BuildFromAST(raw ssa.FrontAST, b *ssa.FunctionBuilder) erro
 		childProgram := b.GetProgram().GetSubProgram(b.GetEditor().GetPureSourceHash())
 		functionBuilder := childProgram.GetAndCreateFunctionBuilder("", string(ssa.MainFunctionName))
 		functionBuilder.AddLazyBuilder(func() {
-			// b.GetProgram().SetPreHandler(false)
 			startParse(functionBuilder)
 		}, true)
 		if b.GetProgram().PreHandler() {
@@ -179,6 +178,12 @@ func (s *SSABuilder) WrapWithPreprocessedFS(fs fi.FileSystem, _ bool) fi.FileSys
 func (*SSABuilder) FilterFile(path string) bool {
 	ext := filepath.Ext(path)
 	return ext == ".php"
+}
+
+// SelfRegistersTopLevel stays false: pass2 must use the pipeline RegisterRootTopLevel
+// closure (sub-program lazy + editor push). pass1 DetachAST still runs when enabled.
+func (*SSABuilder) SelfRegistersTopLevel() bool {
+	return false
 }
 
 func (*SSABuilder) GetLanguage() ssaconfig.Language {
