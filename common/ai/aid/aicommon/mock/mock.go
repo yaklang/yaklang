@@ -446,6 +446,9 @@ func (m *MockInvoker) VerifyUserSatisfaction(ctx context.Context, query string, 
 func (m *MockInvoker) RequireAIForgeAndAsyncExecute(ctx context.Context, forgeName string, onFinish func(error)) {
 }
 
+func (m *MockInvoker) AsyncPlanOnly(ctx context.Context, planPayload string, onFinish func(error)) {
+}
+
 func (m *MockInvoker) AsyncPlanAndExecute(ctx context.Context, planPayload string, onFinish func(error)) {
 }
 

@@ -5,7 +5,6 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/utils"
 )
 
 var loopAction_RequestPlanAndExecution = &reactloops.LoopAction{
@@ -22,25 +21,7 @@ var loopAction_RequestPlanAndExecution = &reactloops.LoopAction{
 		{FieldName: `plan_request_payload`, AINodeId: "plan"},
 	},
 	ActionVerifier: func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
-		// Check if there's already a plan execution task running
-		invoker := loop.GetInvoker()
-		if reactInvoker, ok := invoker.(interface {
-			GetCurrentPlanExecutionTask() aicommon.AIStatefulTask
-		}); ok {
-			if reactInvoker.GetCurrentPlanExecutionTask() != nil {
-				return utils.Errorf("another plan execution task is already running, please wait for it to complete or use directly_answer to provide the result")
-			}
-		}
-
-		improveQuery := action.GetString("plan_request_payload")
-		if improveQuery == "" {
-			improveQuery = action.GetInvokeParams("next_action").GetString("plan_request_payload")
-		}
-		if improveQuery == "" {
-			return utils.Errorf("request_plan_and_execution action must have 'plan_request_payload' field")
-		}
-		loop.Set("plan_request_payload", improveQuery)
-		return nil
+		return verifyPlanRequestPayload(loop, action, schema.AI_REACT_LOOP_ACTION_REQUEST_PLAN_EXECUTION)
 	},
 	ActionHandler: func(loop *reactloops.ReActLoop, action *aicommon.Action, operator *reactloops.LoopActionHandlerOperator) {
 		task := operator.GetTask()

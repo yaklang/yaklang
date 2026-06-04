@@ -581,6 +581,9 @@ func (m *mockInvokerForMemoryTest) RequireAIForgeAndAsyncExecute(ctx context.Con
 	// no-op
 }
 
+func (m *mockInvokerForMemoryTest) AsyncPlanOnly(ctx context.Context, planPayload string, onFinish func(error)) {
+}
+
 func (m *mockInvokerForMemoryTest) AsyncPlanAndExecute(ctx context.Context, planPayload string, onFinish func(error)) {
 	// no-op
 }

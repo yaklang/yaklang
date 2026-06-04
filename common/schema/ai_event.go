@@ -71,6 +71,7 @@ const (
 	AI_REACT_LOOP_ACTION_DIRECTLY_ANSWER          = "directly_answer"
 	AI_REACT_LOOP_ACTION_KNOWLEDGE_ENHANCE        = "knowledge_enhance_answer"
 	AI_REACT_LOOP_ACTION_REQUIRE_AI_BLUEPRINT     = "require_ai_blueprint"
+	AI_REACT_LOOP_ACTION_REQUEST_PLAN             = "request_plan"
 	AI_REACT_LOOP_ACTION_REQUEST_PLAN_EXECUTION   = "request_plan_and_execution"
 	AI_REACT_LOOP_ACTION_HTTP_FLOW_ANALYZE        = "http_flow_analyze"
 	AI_REACT_LOOP_ACTION_TOOL_COMPOSE             = "tool_compose"

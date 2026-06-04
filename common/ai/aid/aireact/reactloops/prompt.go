@@ -62,6 +62,7 @@ func (r *ReActLoop) generateSchemaString(disallowExit bool) (string, error) {
 		disableActionList = append(disableActionList, schema.AI_REACT_LOOP_ACTION_REQUIRE_AI_BLUEPRINT)
 	}
 	if r.allowPlanAndExec != nil && !r.allowPlanAndExec() {
+		disableActionList = append(disableActionList, schema.AI_REACT_LOOP_ACTION_REQUEST_PLAN)
 		disableActionList = append(disableActionList, schema.AI_REACT_LOOP_ACTION_REQUEST_PLAN_EXECUTION)
 	}
 

@@ -376,149 +376,22 @@ func (c *Coordinator) Run() error {
 	c.EmitCurrentConfigInfo()
 	c.emitBaseCapabilityInventory()
 
-	executeRoot := func(root *AiTask, startTaskIndex string) error {
-		// Phase 6: Executing tasks
-		c.planLoadingStatus("执行任务中 / Executing Tasks...")
-		c.EmitInfo("start to create runtime")
-		rt := c.createRuntime()
-		c.runtime = rt
-		err := rt.Invoke(root, startTaskIndex)
-		if err != nil {
-			c.planLoadingStatus("任务执行失败 / Task Execution Failed")
-			return err
-		}
-		return nil
-	}
-
-	// Recovery: try resume from persisted plan-exec state
-	recovered := false
 	recoveryStartTaskIndex := c.getRecoveryStartTaskIndex()
-	if recoveredRoot, _, ok, err := c.tryRecoverPlanAndExec(recoveryStartTaskIndex); ok {
-		if err != nil {
-			c.planLoadingStatus("恢复执行失败 / Recovery Failed")
-			c.EmitError("recover plan-and-exec failed: %v", err)
-			return utils.Errorf("coordinator: recover plan-and-exec failed: %v", err)
-		}
-		c.planLoadingStatus("恢复执行 / Recovering Execution...")
-		c.rootTask = recoveredRoot
-		c.ContextProvider.StoreRootTask(recoveredRoot)
-		if len(recoveredRoot.Subtasks) <= 0 {
-			c.planLoadingStatus("无有效子任务 / No Valid Subtasks")
-			c.EmitError("no subtasks found in recovered task tree")
-			return utils.Errorf("coordinator: no subtasks found in recovered task tree")
-		}
-		if err := executeRoot(recoveredRoot, recoveryStartTaskIndex); err != nil {
-			return err
-		}
-		recovered = true
+	recovered, err := c.tryRecoverAndExecute(recoveryStartTaskIndex)
+	if err != nil {
+		return err
 	}
 
 	if !recovered {
-		// Phase 1: Creating plan
-		c.planLoadingStatus("创建任务规划 / Creating Plan...")
-		c.EmitInfo("start to create plan request")
-		planReq, err := c.createPlanRequest(c.userInput)
-		if err != nil {
-			c.planLoadingStatus("任务规划创建失败 / Plan Creation Failed")
-			c.EmitError("create planRequest failed: %v", err)
-			return utils.Errorf("coordinator: create planRequest failed: %v", err)
+		if err := c.runPlanPhaseThroughReview(); err != nil {
+			return err
 		}
-
-		// Phase 2: Invoking plan (AI generating plan)
-		c.planLoadingStatus("任务规划中... / Waiting AI to Generate Plan...")
-		c.EmitInfo("start to invoke plan request")
-		rsp, err := planReq.Invoke()
-		if err != nil {
-			c.planLoadingStatus("任务规划失败 / Plan Generation Failed")
-			c.EmitError("invoke planRequest failed(first): %v", err)
-			return utils.Errorf("coordinator: invoke planRequest failed: %v", err)
-		}
-
-		// Phase 3: Waiting for user review
-		c.planLoadingStatus("任务规划等待用户审查 / Waiting User to Review Plan...")
-		ep := c.Epm.CreateEndpointWithEventType(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE)
-		ep.SetDefaultSuggestionContinue()
-
-		c.EmitRequireReviewForPlan(rsp, ep.GetId())
-		c.DoWaitAgree(c.GetContext(), ep)
-		params := ep.GetParams()
-		c.ReleaseInteractiveEvent(ep.GetId(), params)
-		// 价值评估 (review_decision): 监控计划审批通路, 区分人工与策略自动放行.
-		c.SubmitReviewValueFeedbackFromEndpoint(ep, aicommon.ReviewFocusModePlan, "请审查任务规划")
-		if params == nil {
-			c.planLoadingStatus("用户审查失败 / User Review Failed")
-			c.EmitError("user review params is nil, plan failed")
-			return utils.Errorf("coordinator: user review params is nil")
-		}
-
-		// Phase 4: Processing user review
-		c.planLoadingStatus("处理用户审查结果 / Processing User Review...")
-		c.EmitInfo("start to handle review plan response")
-		rsp, err = planReq.handleReviewPlanResponse(rsp, params)
-		if err != nil {
-			c.planLoadingStatus("处理审查结果失败 / Review Processing Failed")
-			c.EmitError("handle review plan response failed: %v", err)
-			return utils.Errorf("coordinator: handle review plan response failed: %v", err)
-		}
-
-		if rsp.RootTask == nil {
-			c.planLoadingStatus("任务计划无效 / Invalid Task Plan")
-			c.EmitError("root aiTask is nil, plan failed")
-			return utils.Errorf("coordinator: root aiTask is nil")
-		}
-
-		// Phase 5: Initializing tasks
-		c.planLoadingStatus("初始化任务队列 / Initializing Task Queue...")
-		root := rsp.RootTask
-		c.rootTask = root
-		c.ContextProvider.StoreRootTask(root)
-		c.savePlanAndExecState("plan_ready", nil)
-		if len(root.Subtasks) <= 0 {
-			c.planLoadingStatus("无有效子任务 / No Valid Subtasks")
-			c.EmitError("no subtasks found, this task is not a valid task")
-			return utils.Errorf("coordinator: no subtasks found")
-		}
-		log.Infof("create aiTask pipeline: %v", root.Name)
-		for stepIdx, taskIns := range root.Subtasks {
-			log.Infof("step %d: %v", stepIdx, taskIns.Name)
-		}
-		alltools, err := c.AiToolManager.GetEnableTools()
-		if err != nil {
-			log.Warnf("coordinator: get all tools failed: %v", err)
-		}
-		if len(alltools) <= 0 {
-			log.Warnf("coordinator: no tools enable")
-		}
-
-		if err := executeRoot(root, ""); err != nil {
+		if err := c.runExecuteRoot(""); err != nil {
 			return err
 		}
 	}
 
-	// Phase 7: Generating result/report
-	c.planLoadingStatus("生成执行结果 / Generating Results...")
-	/*
-		Result Handler
-		Result Handler 是用户自定义的回调函数，用于处理 AI 的输出结果。
-		用户可以在这个回调函数中处理 AI 的输出结果，或者将结果存储到数据库中。
-	*/
-	if c.ResultHandler != nil {
-		c.ResultHandler(c)
-	} else if c.GenerateReport {
-		c.planLoadingStatus("进入报告生成专注模式 / Entering Report Generation Focus Mode...")
-		c.EmitInfo("start report generation via focus mode loop")
-		if err := c.generateReportViaFocusMode(); err != nil {
-			c.planLoadingStatus("报告生成失败 / Report Generation Failed")
-			c.EmitError("report generation via focus mode failed: %v", err)
-			return utils.Errorf("coordinator: report generation failed: %v", err)
-		}
-	}
-
-	// Phase 8: Completed
-	c.planLoadingStatus("执行完成 / Execution Completed")
-	c.EmitInfo("coordinator run finished")
-	c.Wait()
-	return nil
+	return c.runReportAndFinishPhases()
 }
 
 func (c *Coordinator) GetPromptContextProvider() *PromptContextProvider {

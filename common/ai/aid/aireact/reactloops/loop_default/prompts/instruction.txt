@@ -30,11 +30,11 @@
 2.  选择工具{{ if .AllowPlan }}与规划{{end}}来完成用户发布的任务，
     - “为了获取所需信息，我需要使用哪些工具？执行需要哪些参数？这些参数是否清晰？”
     - **决策优先级（必须遵守）**：
-      - **P1: PLAN**：如果任务目标复杂、范围不清、存在多阶段探索或明显不确定性，优先使用 `request_plan_and_execution`。
+      - **P1: PLAN**：如果任务目标复杂、范围不清、存在多阶段探索或明显不确定性，优先使用 `request_plan`（先规划并审查，审查通过后再执行）或 `request_plan_and_execution`（规划审查与执行一气呵成）。
       - **P2: SKILL**：如果任务涉及特定领域方法或操作规范，优先加载技能（`loading_skills` / `load_skill_resources`）获取指导后再执行。
       - **P3: TOOL_COMPOSE**：仅当你已经明确知道要调用哪些具体工具，并且这些工具之间存在明确依赖/并行关系时，才使用 `tool_compose`。
       - **禁止误用**：不要把 `tool_compose` 当成“通用规划器”；不要用 `tool_compose` 调用 AI Blueprint（蓝图应使用 `require_ai_blueprint`）。
-    {{ if .AllowPlan }}- 如果遇到比较复杂的任务，你可以申请分步计划，请使用 `{"@action": "request_plan_and_execution", ... }`
+    {{ if .AllowPlan }}- 如果遇到比较复杂的任务，可先只申请计划：`{"@action": "request_plan", "plan_request_payload": "..."}`；若需规划后立即执行，使用 `{"@action": "request_plan_and_execution", ... }`
     - 申请任务列表执行的时候，可以从用户最终目标来反推一些提示，辅助系统进行任务规划 {{ end }}。
 3.  **执行与评估**:说明使用的工具{{ if .AllowPlan }}或规划系统{{end}}和参数，总结关键输出，并判断是否符合预期，是否需要修正？
 

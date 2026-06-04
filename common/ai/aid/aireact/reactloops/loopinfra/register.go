@@ -9,6 +9,7 @@ func init() {
 	reactloops.RegisterAction(loopAction_directlyCallTool)
 	reactloops.RegisterAction(loopAction_AskForClarification)
 	reactloops.RegisterAction(loopAction_EnhanceKnowledgeAnswer)
+	reactloops.RegisterAction(loopAction_RequestPlan)
 	reactloops.RegisterAction(loopAction_RequestPlanAndExecution)
 	reactloops.RegisterAction(loopAction_RequireAIBlueprintForge)
 	reactloops.RegisterAction(loopAction_toolCompose)
