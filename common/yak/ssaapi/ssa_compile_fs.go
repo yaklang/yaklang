@@ -415,18 +415,26 @@ func (c *Config) parseProjectWithFS(
 
 	f5 := func() error {
 		saveStart := time.Now()
-		total := prog.Cache.CountInstruction()
+		remaining := prog.Cache.CountInstruction()
+		persisted := prog.Cache.InstructionPersistedCount()
+		total := remaining + persisted
 		process = 0.90
 		if prog.DatabaseKind != ssa.ProgramCacheMemory {
-			prog.ProcessInfof("[SSA/persist] program %s flushing IR cache (instructions=%d) to database", prog.Name, total)
+			prog.ProcessInfof("[SSA/persist] program %s flushing IR cache (remaining=%d persisted=%d total=%d) to database",
+				prog.Name, remaining, persisted, total)
 		} else {
-			prog.ProcessInfof("[SSA/persist] program %s finishing cache instruction(len:%d) (memory only, not saved)", prog.Name, total)
+			prog.ProcessInfof("[SSA/persist] program %s finishing cache instruction(len:%d) (memory only, not saved)", prog.Name, remaining)
 		}
 
-		prog.Cache.SaveToDatabase(irSaveProgressCallback(prog, total, 0.90, 1.0, func(p float64) {
+		if err := prog.Cache.SaveToDatabase(irSaveProgressCallback(prog, total, persisted, 0.90, 1.0, func(p float64) {
 			process = p
-		}))
+		})); err != nil {
+			return utils.Errorf("persist IR to database failed: %w", err)
+		}
 		saveTime = time.Since(saveStart)
+		if prog.DatabaseKind != ssa.ProgramCacheMemory {
+			prog.ProcessInfof("[SSA/persist] program %s IR cache flush finished, cost %v", prog.Name, saveTime)
+		}
 		return nil
 	}
 	f6 := func() error {
@@ -494,19 +502,23 @@ const irSaveHeartbeatInterval = 5 * time.Second
 // irSaveProgressCallback builds a SaveToDatabase progress func: updates optional
 // compile bar in [processMin, processMax], logs delta steps (>0.0001 on that
 // range), and emits a heartbeat every irSaveHeartbeatInterval while work advances.
-func irSaveProgressCallback(prog *ssa.Program, total int, processMin, processMax float64, setProcess func(float64)) func(int) {
+func irSaveProgressCallback(prog *ssa.Program, total int, baseSaved int, processMin, processMax float64, setProcess func(float64)) func(int) {
 	var mu sync.Mutex
 	var index int
 	prevP := processMin
+	if total > 0 && baseSaved > 0 {
+		prevP = processMin + (float64(baseSaved)/float64(total))*(processMax-processMin)
+	}
 	lastHB := time.Now()
 	lastIdxAtHB := 0
 	return func(size int) {
 		mu.Lock()
 		defer mu.Unlock()
 		index += size
+		effective := baseSaved + index
 		var p float64
 		if total > 0 {
-			p = processMin + (float64(index)/float64(total))*(processMax-processMin)
+			p = processMin + (float64(effective)/float64(total))*(processMax-processMin)
 		} else {
 			p = processMax
 		}
@@ -514,7 +526,7 @@ func irSaveProgressCallback(prog *ssa.Program, total int, processMin, processMax
 			setProcess(p)
 		}
 		if total > 0 && (p-prevP) > 0.0001 {
-			prog.ProcessInfof("[SSA/persist] Saving instructions: %d / %d", index, total)
+			prog.ProcessInfof("[SSA/persist] Saving instructions: %d / %d", effective, total)
 			prevP = p
 		}
 		now := time.Now()
@@ -524,7 +536,7 @@ func irSaveProgressCallback(prog *ssa.Program, total int, processMin, processMax
 				elapsed = 1e-9
 			}
 			rate := float64(index-lastIdxAtHB) / elapsed
-			prog.ProcessInfof("[SSA/persist] IR save heartbeat: %d / %d (~%.0f inst/s over %.0fs)", index, total, rate, elapsed)
+			prog.ProcessInfof("[SSA/persist] IR save heartbeat: %d / %d (~%.0f inst/s over %.0fs)", effective, total, rate, elapsed)
 			lastHB = now
 			lastIdxAtHB = index
 		}

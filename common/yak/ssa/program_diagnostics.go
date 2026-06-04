@@ -17,43 +17,53 @@ func (prog *Program) DiagnosticsRecorder() *diagnostics.Recorder {
 }
 
 func (prog *Program) DiagnosticsTrack(name string, steps ...func() error) {
+	_ = prog.DiagnosticsTrackErr(name, steps...)
+}
+
+func (prog *Program) DiagnosticsTrackErr(name string, steps ...func() error) error {
 	if len(steps) == 0 {
-		return
+		return nil
 	}
 	if prog == nil {
 		for _, step := range steps {
 			if step != nil {
-				step()
+				if err := step(); err != nil {
+					return err
+				}
 			}
 		}
-		return
+		return nil
 	}
-	rec := prog.DiagnosticsRecorder()
-	if rec != nil {
-		rec.Track(name, steps...)
-		return
+	if rec := prog.DiagnosticsRecorder(); rec != nil {
+		return rec.Track(name, steps...)
 	}
 	for _, step := range steps {
 		if step != nil {
-			step()
+			if err := step(); err != nil {
+				return err
+			}
 		}
 	}
+	return nil
 }
 
 func (c *ProgramCache) diagnosticsTrack(name string, steps ...func() error) {
-	if len(steps) == 0 {
-		return
-	}
-	if c == nil {
-		return
+	_ = c.diagnosticsTrackErr(name, steps...)
+}
+
+func (c *ProgramCache) diagnosticsTrackErr(name string, steps ...func() error) error {
+	if c == nil || len(steps) == 0 {
+		return nil
 	}
 	if prog := c.program; prog != nil {
-		prog.DiagnosticsTrack(name, steps...)
-		return
+		return prog.DiagnosticsTrackErr(name, steps...)
 	}
 	for _, step := range steps {
 		if step != nil {
-			step()
+			if err := step(); err != nil {
+				return err
+			}
 		}
 	}
+	return nil
 }

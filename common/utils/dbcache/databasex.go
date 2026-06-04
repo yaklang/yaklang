@@ -230,9 +230,9 @@ func (c *Cache[T, D]) ForEach(f func(int64, T) bool) {
 	c.resident.ForEach(f)
 }
 
-func (c *Cache[T, D]) Close() {
+func (c *Cache[T, D]) Close() error {
 	if c == nil {
-		return
+		return nil
 	}
 
 	if c.resident != nil {
@@ -248,13 +248,19 @@ func (c *Cache[T, D]) Close() {
 	if c.saver != nil {
 		c.saver.Close()
 	}
+	remaining := 0
 	if c.resident != nil {
 		c.resident.Wait()
+		remaining = c.resident.Count()
 		c.resident.CloseWithoutSave()
 	}
 	if c.cancel != nil {
 		c.cancel()
 	}
+	if remaining > 0 {
+		return utils.Errorf("dbcache: %d resident items were not persisted on close", remaining)
+	}
+	return nil
 }
 
 func (c *Cache[T, D]) enqueueCloseRequests() {

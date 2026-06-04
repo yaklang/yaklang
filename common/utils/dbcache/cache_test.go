@@ -240,7 +240,7 @@ func TestResidencyCache_ZeroTTLZeroMaxKeepsItemsUntilClose(t *testing.T) {
 	_, ok = cache.GetResident(1)
 	require.True(t, ok)
 
-	cache.Close()
+	require.NoError(t, cache.Close())
 	value, ok := database.Get(1)
 	require.True(t, ok)
 	require.Equal(t, "1", value)
@@ -362,7 +362,7 @@ func TestResidencyCache_SkipEvictionKeepsHotItemsResidentUntilClose(t *testing.T
 	require.True(t, ok)
 	require.Equal(t, "cold", value)
 
-	cache.Close()
+	require.NoError(t, cache.Close())
 	value, ok = database.Get(1)
 	require.True(t, ok, "hot items must still flush on close")
 	require.Equal(t, "hot", value)
@@ -388,7 +388,7 @@ func TestCacheCloseFlushesWithoutTimeout(t *testing.T) {
 	cache.Set(&closeFlushItem{id: 2})
 
 	start := time.Now()
-	cache.Close()
+	require.NoError(t, cache.Close())
 	require.Less(t, time.Since(start), time.Second)
 	require.Equal(t, 2, saved)
 }
@@ -420,7 +420,7 @@ func TestCacheCloseFlushesRejectingLateSet(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		cache.Close()
+		require.NoError(t, cache.Close())
 	}()
 
 	select {
@@ -458,7 +458,7 @@ func TestCacheCloseFlushesAllItemsWithPersistLimit(t *testing.T) {
 		cache.Set(&closeFlushItem{id: int64(i)})
 	}
 
-	cache.Close()
+	require.NoError(t, cache.Close())
 
 	require.Len(t, saved, total, "close should flush every resident item even when persistLimit forces batching")
 }
