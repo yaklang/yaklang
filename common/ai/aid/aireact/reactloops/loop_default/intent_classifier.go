@@ -466,7 +466,10 @@ func applyFastMatchResult(r aicommon.AIInvokeRuntime, loop *reactloops.ReActLoop
 	if result.IsSimpleQuery {
 		loop.Set("intent_hint", "simple_query")
 		loop.Set("intent_scale", "micro_or_small")
-		r.AddToTimeline("intent_classification", "Input classified as simple query (greeting/status). Prefer directly_answer action.")
+		r.AddToTimeline("intent_classification",
+			"Input classified as simple query (greeting/status). "+
+				"Use directly_answer once to reply to the user. "+
+				"If that reply is already in the timeline and CURRENT-TASK has no other goal, use finish — do not repeat directly_answer.")
 		log.Infof("intent classification: simple query, hint set to directly_answer")
 		return
 	}

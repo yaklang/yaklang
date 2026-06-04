@@ -50,23 +50,36 @@
 
 ### 任务完成原则（必须遵守，避免浪费迭代）
 
-当你判断本轮任务的目标已经达成、关键证据已经通过前序工具调用落入 timeline 后，**必须在下一次动作直接结束**，不允许再做任何"包装性"调用。
+当你判断**整个当前任务**已经达成、且无需再调用工具或继续推进时，用 `finish` 收口，不允许再做任何"包装性"调用。
 
-**结束动作二选一**：
+**两个动作职责不同（不要混为一谈）**：
 
-1. **`{"@action": "finish"}`** —— **首选**（尤其是 Plan-Execution 子任务、扫描/检查类执行任务）。
-   - 工具输出已经自动写入 timeline，系统会基于 timeline + evidence 自动生成结构化总结。
-   - 你不需要、也不应该自己再写一份总结文本。
-2. **`{"@action": "directly_answer"}` + `<|FINAL_ANSWER_CURRENT_NONCE|> ... <|FINAL_ANSWER_END_CURRENT_NONCE|>` Markdown** —— 仅当用户**当下**就需要看到一段结构化 Markdown 结论（对话式问答、需要立刻把结论呈现给用户的场景）。**一次性输出完整内容，不允许在之前再追加任何 echo / cat / tee / printf 的准备动作**。
+1. **`directly_answer`** —— **向用户投递答复**（`answer_payload` 或 `<|FINAL_ANSWER_CURRENT_NONCE|> ... <|FINAL_ANSWER_END_CURRENT_NONCE|>`）。
+   - 作用：把结论、说明、问候等**立刻呈现给用户**。
+   - **任务不会因此结束**；ReAct 循环**会继续**，你还可以调用工具、维护 `next_movements`、做后续步骤。
+   - **不要**把 `directly_answer` 当成结束任务的动作；答完不等于收口。
+2. **`finish`** —— **结束当前任务并退出 ReAct 循环**（整个循环的唯一终结动作）。
+   - 作用：声明当前任务已完成。
+   - 适用：timeline 中证据已足够、且后续无需再执行工具或再对用户投递新答复时（Plan-Execution 子任务、扫描/检查等执行类任务常用）。
+   - 调用后系统可基于 timeline + evidence 合成总结；你不需要、也不应该再手写一份重复总结。
+
+二者可先后出现（先对用户 `directly_answer`，后续若还有工作则继续执行；全部做完后再 `finish`），但**不是**「每次 `directly_answer` 后都必须立刻 `finish`」。
 
 **严禁的反模式（会被判定为浪费迭代）**：
 
+- **禁止**误以为 `directly_answer` 会结束任务，因而反复用相同内容 `directly_answer` 代替 `finish` 或代替继续执行。
 - **禁止**在 `finish` / `directly_answer` 之前，用 `bash` / `directly_call_tool bash` 执行仅包含 `echo "=== Summary ==="`、`cat << EOF`、`printf "..."`、`tee` 等只是复述前面工具结果的命令。这些命令不会产生任何新信息，只会徒增一次迭代。
 - **禁止**把已经出现在 timeline 里的事实，再用 `bash echo` 打印一遍当作"保存"。Timeline 就是系统的记忆，echo 不等于持久化。
 - **禁止**先 `directly_call_tool bash` 拼一段 summary 文本，再 `directly_answer` 复述同一份文本——这是最典型的冗余两步。
-- 如果确实有需要长期留存的关键结论，使用 `output_evidence`（若可用）或让 `finish` / `directly_answer` 自身触发系统总结，而不是用 bash echo 来"存"。
+- **禁止**对**同一用户问题**重复投递已交付过的相同答复（timeline 已有 `directly_answer` / `directly_answer_continue` 时，勿再次 `directly_answer` 同文；若任务仍未完成，应继续工具/状态推进，或在做完剩余工作后 `finish`）。
+- 如果确实有需要长期留存的关键结论，使用 `output_evidence`（若可用），或在任务全部完成后 `finish` 由系统总结，而不是用 bash echo 来"存"。
 
-**判断标准**：如果你即将发起的动作只是在"重新组织 / 复述 / 回显"已经存在的事实，没有获取任何新信息、也没有产生任何副作用，就应该改成 `finish`。
+**判断标准**：若**整个任务**已做完 → `finish`。若仅需让用户看到阶段性答复、任务仍要继续 → `directly_answer`，然后推进下一步（工具 / `next_movements` 等），不要重复同文 `directly_answer`。
+
+**简单问候 / 状态查询（simple query）**：
+
+- 当前 `CURRENT-TASK` 仅为寒暄、打招呼或单次短问（如「你好」），无工具调用、无待办时：**一次** `directly_answer` 即完成对用户交付；**禁止**为「等待用户下次说话」而再次 `directly_answer` 同一句问候。
+- 答复已在时间线中、且本任务无其它目标时 → 用 `finish` 结束**本任务**（不是会话里未来的新消息）。不要把「循环会继续」理解成「同一问候要再答一遍」。
 
 **安全风险上报/留档例外（必须遵守）**：
 
