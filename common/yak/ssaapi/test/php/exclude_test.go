@@ -36,12 +36,16 @@ func TestExcludeFile(t *testing.T) {
 	fs.AddFile("/var/www/html/1.php", `<?php
 phpinfo();
 `)
+	fs.AddFile("/var/www/html/app/main.php", `<?php
+println(1);
+`)
 	fs.AddFile("/var/www/html/vendor/src/main/3.php", `<?php
 println(2);
 `)
 	fs.AddFile("/vendor/src/main/3.php", `<?php
-println(2);
+println(3);
 `)
+	// Built-in excludes already skip vendor/; app/main.php should still compile.
 	prog, err := ssaapi.ParseProjectWithFS(fs, ssaapi.WithLanguage(ssaconfig.PHP))
 	require.NoError(t, err)
 	result, err := prog.SyntaxFlowWithError(`println(* #-> * as $param)`, ssaapi.QueryWithEnableDebug())
@@ -49,7 +53,8 @@ println(2);
 	values := result.GetValues("param")
 	require.True(t, values.Len() != 0)
 
-	prog, err = ssaapi.ParseProjectWithFS(fs, ssaapi.WithLanguage(ssaconfig.PHP), ssaapi.WithExcludeFunc("**/vendor/**", "vendor/**"))
+	// User exclude on top of defaults removes the remaining println source.
+	prog, err = ssaapi.ParseProjectWithFS(fs, ssaapi.WithLanguage(ssaconfig.PHP), ssaapi.WithExcludeFunc("**/app/**"))
 	require.NoError(t, err)
 	prog.Show()
 	result, err = prog.SyntaxFlowWithError(`println(* #-> * as $param)`, ssaapi.QueryWithEnableDebug())

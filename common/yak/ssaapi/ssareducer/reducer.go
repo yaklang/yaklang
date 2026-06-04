@@ -10,6 +10,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 var SkippedError error = utils.Error("compiling skipped")
@@ -93,8 +94,7 @@ func ReducerCompile(base string, opts ...Option) error {
 			return nil
 		}
 		folder, name := c.fs.PathSplit(path)
-		// if test or .git, skip
-		if name == "test" || name == ".git" || name == ".svn" || name == ".vscode" || name == ".idea" {
+		if ssaconfig.ShouldSkipCompileDirName(name) {
 			return filesys.SkipDir
 		}
 		// if have Database, save folder

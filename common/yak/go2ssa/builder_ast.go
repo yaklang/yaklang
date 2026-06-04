@@ -404,8 +404,10 @@ func (b *astbuilder) buildConstSpec(constSpec *gol.ConstSpecContext, defaul ssa.
 			rightvl = append(rightvl, rightv)
 		}
 	} else {
-		if defaul != nil && len(leftList) == 1 {
-			rightvl = append(rightvl, defaul)
+		if defaul != nil {
+			for range leftList {
+				rightvl = append(rightvl, defaul)
+			}
 		} else if len(leftList) > 0 {
 			b.NewError(ssa.Error, TAG, MissInitExpr(gol.IdentifierName(leftList[0])))
 		}

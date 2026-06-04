@@ -276,6 +276,9 @@ func checkCanMemberCallExist(value, key Value, function ...bool) (ret checkMembe
 }
 
 func getMemberVerboseName(obj, key Value) string {
+	if utils.IsNil(obj) {
+		return GetKeyString(key)
+	}
 	return fmt.Sprintf("%s.%s", obj.GetVerboseName(), GetKeyString(key))
 }
 

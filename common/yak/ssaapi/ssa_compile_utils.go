@@ -14,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssareducer"
 )
 
@@ -241,17 +242,13 @@ func ScanProjectFiles(cfg ScanConfig) (*ScanResult, error) {
 		HandlerFilesMap: make(map[string]struct{}),
 		Folders:         make([][]string, 0),
 	}
+	exclude := ssaconfig.ResolveCompileExcludeFunc(cfg.ExcludeFunc)
 
 	err := filesys.Recursive(cfg.ProgramPath,
 		filesys.WithFileSystem(cfg.FileSystem),
 		filesys.WithContext(cfg.Context),
 		filesys.WithDirStat(func(fullPath string, fi fs.FileInfo) error {
-			// check folder folderName
-			_, folderName := cfg.FileSystem.PathSplit(fullPath)
-			if folderName == "test" || folderName == ".git" {
-				return filesys.SkipDir
-			}
-			if cfg.ExcludeFunc != nil && cfg.ExcludeFunc(fullPath) {
+			if exclude(fullPath) {
 				return filesys.SkipDir
 			}
 
@@ -271,7 +268,7 @@ func ScanProjectFiles(cfg ScanConfig) (*ScanResult, error) {
 			if fi.Size() == 0 {
 				return nil
 			}
-			if cfg.ExcludeFunc != nil && cfg.ExcludeFunc(path) {
+			if exclude(path) {
 				return nil
 			}
 			if cfg.CheckLanguage != nil && cfg.CheckLanguage(path) == nil {
