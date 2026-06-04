@@ -1,6 +1,7 @@
 package aicommon
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 
@@ -77,4 +78,50 @@ func TestEmitter_EmitTodoListUpdate_NormalizesNilSlices(t *testing.T) {
 	body := string(captured.Content)
 	require.Contains(t, body, `"items":[]`)
 	require.Contains(t, body, `"applied_ops":[]`)
+}
+
+// TestEmitter_EmitCurrentTaskTodoList_ScopedItemsOnly 验证 EmitCurrentTaskTodoList
+// 只携带当前 task scope 下的 items/stats, 不包含兄弟任务或 legacy 无 scope 项。
+func TestEmitter_EmitCurrentTaskTodoList_ScopedItemsOnly(t *testing.T) {
+	cfg := NewConfig(context.Background())
+	taskOne := NewStatefulTaskBase("task-1", "one", nil, nil, true)
+	taskTwo := NewStatefulTaskBase("task-2", "two", nil, nil, true)
+
+	scopeOne := BuildVerificationTodoScope(taskOne)
+	scopeTwo := BuildVerificationTodoScope(taskTwo)
+	cfg.ApplyVerificationTodoOps(scopeOne, false, []VerifyNextMovement{
+		{Op: "add", ID: "a", Content: "task one todo"},
+	})
+	cfg.ApplyVerificationTodoOps(scopeTwo, false, []VerifyNextMovement{
+		{Op: "add", ID: "b", Content: "task two todo"},
+	})
+	cfg.ApplyVerificationTodoOps(VerificationTodoScope{}, false, []VerifyNextMovement{
+		{Op: "add", ID: "legacy", Content: "legacy todo"},
+	})
+
+	var captured *schema.AiOutputEvent
+	emitter := NewEmitter("test-emitter", func(e *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
+		captured = e
+		return e, nil
+	})
+
+	_, err := emitter.EmitCurrentTaskTodoList(cfg, taskOne, 3, false, []VerifyNextMovement{
+		{Op: "add", ID: "a", Content: "task one todo"},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, captured)
+
+	require.Equal(t, schema.EVENT_TYPE_CURRENT_TASK_TODO_LIST_UPDATE, captured.Type)
+	require.Equal(t, "current_task_todo_list", captured.NodeId)
+
+	var decoded TodoListUpdatePayload
+	require.NoError(t, json.Unmarshal(captured.Content, &decoded))
+	require.Equal(t, "task-1", decoded.TaskID)
+	require.Len(t, decoded.Items, 1)
+	require.Equal(t, "a", decoded.Items[0].ID)
+	require.Equal(t, 1, decoded.Stats.Pending)
+	require.Equal(t, 3, decoded.IterationIndex)
+
+	allItems := cfg.SnapshotVerificationTodoItems()
+	require.Len(t, allItems, 3, "session store should still hold all tasks' TODOs")
 }
