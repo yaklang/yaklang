@@ -37,7 +37,7 @@ type _yakFile struct {
 // file.Save("/tmp/test.txt", "hello yak")
 // ```
 func _saveFile(fileName string, i interface{}) error {
-	file, err := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE, os.ModePerm)
+	file, err := os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.ModePerm)
 	if err != nil {
 		return err
 	}
