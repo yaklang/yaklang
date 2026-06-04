@@ -481,7 +481,18 @@ func (b *astbuilder) buildVarSpec(varSpec *gol.VarSpecContext, isglobal bool) {
 
 		rightList := varSpec.ExpressionList().(*gol.ExpressionListContext).AllExpression()
 		for i, r := range rightList {
+			if i >= len(leftList) {
+				break
+			}
 			registerExpr(gol.IdentifierName(leftList[i]), r.(*gol.ExpressionContext))
+		}
+		if len(leftList) > len(rightList) {
+			for i := len(rightList); i < len(leftList); i++ {
+				registerDefault(gol.IdentifierName(leftList[i]))
+			}
+		}
+		if len(leftList) != len(rightList) {
+			b.NewError(ssa.Error, TAG, MultipleAssignFailed(len(leftList), len(rightList)))
 		}
 		return
 	}
@@ -617,7 +628,15 @@ func (b *astbuilder) buildAliasDecl(alias *gol.AliasDeclContext) {
 	recoverRange := b.SetRange(alias.BaseParserRuleContext)
 	defer recoverRange()
 
+	if param := alias.TypeParameters(); param != nil {
+		tpHandler := b.buildTypeParameters(param.(*gol.TypeParametersContext))
+		defer tpHandler()
+	}
+
 	name := alias.IDENTIFIER().GetText()
+	if alias.Type_() == nil {
+		return
+	}
 	ssatyp := b.buildType(alias.Type_().(*gol.Type_Context))
 
 	aliast := ssa.NewAliasType(name, ssatyp.PkgPathString(), ssatyp)
@@ -634,6 +653,9 @@ func (b *astbuilder) buildTypeDef(typedef *gol.TypeDefContext) {
 	}
 
 	name := typedef.IDENTIFIER().GetText()
+	if typedef.Type_() == nil {
+		return
+	}
 	ssatyp := b.buildType(typedef.Type_().(*gol.Type_Context))
 
 	var handleType func(ssa.Type)
@@ -856,8 +878,12 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) {
 		methodName = Name.GetText()
 		if recove := fun.Receiver(); recove != nil {
 			ssatypName = b.getReceiver(recove.(*gol.ReceiverContext))
-			funcName = fmt.Sprintf("%s$%s", ssatypName[0], methodName)
 		}
+	}
+	if len(ssatypName) > 0 && ssatypName[0] != "" {
+		funcName = fmt.Sprintf("%s$%s", ssatypName[0], methodName)
+	} else {
+		funcName = methodName
 	}
 
 	newFunc := b.NewFunc(funcName)

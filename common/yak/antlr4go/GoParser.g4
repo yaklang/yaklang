@@ -122,7 +122,7 @@ typeSpec
     ;
 
 aliasDecl
-    : IDENTIFIER ws* ASSIGN ws* type_
+    : IDENTIFIER typeParameters? ws* ASSIGN ws* type_
     ;
 
 typeDef
