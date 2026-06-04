@@ -189,6 +189,54 @@ func TestGRPCMUSTPASS_LANGUAGE_InspectInformation_Cli(t *testing.T) {
 		)
 	})
 
+	t.Run("cli parameter keep code order", func(t *testing.T) {
+		check(
+			`
+		cli.String("first", cli.setVerboseName("第一个"))
+		cli.Int("second", cli.setDefault(2))
+		cli.Bool("third", cli.setHelp("third help"))
+		cli.String("fourth", cli.setCliGroup("group4"))
+	`,
+			[]*ypb.YakScriptParam{
+				{
+					Field:        "first",
+					TypeVerbose:  "string",
+					FieldVerbose: "第一个",
+					MethodType:   "string",
+				},
+				{
+					Field:        "second",
+					DefaultValue: "2",
+					TypeVerbose:  "uint",
+					FieldVerbose: "second",
+					MethodType:   "uint",
+				},
+				{
+					Field:        "third",
+					TypeVerbose:  "boolean",
+					FieldVerbose: "third",
+					Help:         "third help",
+					MethodType:   "boolean",
+				},
+				{
+					Field:        "fourth",
+					TypeVerbose:  "string",
+					FieldVerbose: "fourth",
+					Group:        "group4",
+					MethodType:   "string",
+				},
+			},
+			t,
+			func(t *testing.T, params []*ypb.YakScriptParam) {
+				gotFields := make([]string, 0, len(params))
+				for _, param := range params {
+					gotFields = append(gotFields, param.Field)
+				}
+				assert.Equal(t, []string{"first", "second", "third", "fourth"}, gotFields)
+			},
+		)
+	})
+
 	t.Run("cli parameter with select", func(t *testing.T) {
 		check(
 			`
@@ -805,20 +853,20 @@ cli.check()
 	want := []*ypb.YakScriptParam{
 		{Field: "target", DefaultValue: "172.24.145.120", TypeVerbose: "string", FieldVerbose: "爬虫扫描目标", Help: "设置爬虫的目标信息，可以支持比较自由的格式，支持逗号分隔，可以输入 IP / 域名 / 主机名 / URL ", Required: true, MethodType: "string"},
 		{Field: "proxy", TypeVerbose: "string", FieldVerbose: "设置代理", Help: "设置代理", Group: "网络参数", MethodType: "string"},
-		{Field: "login-user", DefaultValue: "admin", TypeVerbose: "string", FieldVerbose: "尝试登录名", Help: "如果遇到了登录名的话，可以通过这个登陆自动设置，但是无法保证成功", Group: "登陆", MethodType: "string"},
-		{Field: "login-pass", DefaultValue: "password", TypeVerbose: "string", FieldVerbose: "尝试登陆密码", Help: "如果遇到登陆密码，也许这个可以帮助你登陆，但是这个登陆并不一定能生效", Group: "登陆", MethodType: "string"},
-		{Field: "cookie", TypeVerbose: "string", FieldVerbose: "原始 Cookie", Help: "设置原始 Cookie，一般用来解决登陆以后的情况", Group: "登陆", MethodType: "string"},
-		{Field: "user-agent", DefaultValue: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.116 Safari/537.36", TypeVerbose: "string", FieldVerbose: "用户代理", MethodType: "string"},
-		{Field: "basic-auth-user", TypeVerbose: "string", FieldVerbose: "基础认证用户名", MethodType: "string"},
-		{Field: "basic-auth-pass", TypeVerbose: "string", FieldVerbose: "基础认证密码", MethodType: "string"},
 		{Field: "timeout", DefaultValue: "10", TypeVerbose: "uint", FieldVerbose: "超时时间", Help: "每个请求的最大超时时间", Group: "网络参数", MethodType: "uint"},
 		{Field: "max-depth", DefaultValue: "4", TypeVerbose: "uint", FieldVerbose: "最大深度", Help: "设置爬虫的最大深度（逻辑深度，并不是级数）", Group: "速率与限制", MethodType: "uint"},
 		{Field: "concurrent", DefaultValue: "50", TypeVerbose: "uint", FieldVerbose: "并发量", Help: "爬虫的并发请求量（可以理解为线程数）", Group: "速率与限制", MethodType: "uint"},
 		{Field: "max-links", DefaultValue: "10000", TypeVerbose: "uint", FieldVerbose: "最大URL数", Help: "爬虫获取到的最大量URL（这个选项一般用来限制无限制的爬虫，一般不需要改动）\n", Group: "速率与限制", MethodType: "uint"},
 		{Field: "max-requests", DefaultValue: "2000", TypeVerbose: "uint", FieldVerbose: "最大请求数", Help: "本次爬虫最多发出多少个请求？（一般用于限制爬虫行为）", Group: "速率与限制", MethodType: "uint"},
+		{Field: "login-user", DefaultValue: "admin", TypeVerbose: "string", FieldVerbose: "尝试登录名", Help: "如果遇到了登录名的话，可以通过这个登陆自动设置，但是无法保证成功", Group: "登陆", MethodType: "string"},
+		{Field: "login-pass", DefaultValue: "password", TypeVerbose: "string", FieldVerbose: "尝试登陆密码", Help: "如果遇到登陆密码，也许这个可以帮助你登陆，但是这个登陆并不一定能生效", Group: "登陆", MethodType: "string"},
+		{Field: "cookie", TypeVerbose: "string", FieldVerbose: "原始 Cookie", Help: "设置原始 Cookie，一般用来解决登陆以后的情况", Group: "登陆", MethodType: "string"},
+		{Field: "user-agent", DefaultValue: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.116 Safari/537.36", TypeVerbose: "string", FieldVerbose: "用户代理", MethodType: "string"},
 		{Field: "retry", DefaultValue: "2", TypeVerbose: "uint", FieldVerbose: "重试次数", MethodType: "uint"},
 		{Field: "redirectTimes", DefaultValue: "3", TypeVerbose: "uint", FieldVerbose: "重定向次数", MethodType: "uint"},
 		{Field: "basic-auth", DefaultValue: "false", TypeVerbose: "boolean", FieldVerbose: "基础认证开关", Help: "是否开启基础认证", MethodType: "boolean"},
+		{Field: "basic-auth-user", TypeVerbose: "string", FieldVerbose: "基础认证用户名", MethodType: "string"},
+		{Field: "basic-auth-pass", TypeVerbose: "string", FieldVerbose: "基础认证密码", MethodType: "string"},
 	}
 
 	test.Nil(CompareScriptParams(got, want))
@@ -838,7 +886,7 @@ func TestGRPCMUSTPASS_LANGUAGE_GetCliGRPC(t *testing.T) {
 		id := script.ID
 
 		_, err = local.SaveYakScript(context.Background(), &ypb.YakScript{
-			Id: int64(id),
+			Id:         int64(id),
 			ScriptName: name,
 			Content:    code,
 			Type:       "yak",
