@@ -1,41 +1,37 @@
-__DESC__ = "Excel file structure exploration tool. Reads an Excel file and outputs sheet list, column names with inferred data types, row counts, and preview rows. Use this FIRST to understand data layout. IMPORTANT: This tool is for structure exploration only. For transaction data, financial records, bank statements, invoice data, or any case investigation data analysis (3+ queries), use ExcelCLI (excelcli-analysis skill) for proper data import, database storage, and structured SQL analysis via bash tool. Python pandas via bash is a fallback only when ExcelCLI is unavailable or cannot handle the file format."
-__VERBOSE_NAME__ = "Excel Structure Explorer"
+__DESC__ = "Excel 文件结构探索工具。读取 Excel 文件并输出工作表列表、列名及推断数据类型、行数和预览行。先用此工具了解数据布局。重要：本工具仅用于结构探索。对于交易数据、银行流水、发票数据、金融记录或任何案件调查数据的多步骤分析（3 次以上查询），应使用 ExcelCLI（excelcli-analysis 技能）进行数据导入入库，然后通过 bash 工具执行结构化 SQL 分析。仅当 ExcelCLI 不可用时，Python pandas 才作为兜底方案。"
+__VERBOSE_NAME__ = "Excel 结构探索"
 __KEYWORDS__ = "excel,xlsx,xls,spreadsheet,data exploration,column names,sheet list,data types,row count,preview,schema,structure,data analysis,excel info,excel schema,transaction data,financial analysis,bank statement,excelcli,数据入库,案件分析,办案数据,银行流水,发票数据"
 
 __USAGE__ = <<<USAGE_BLOCK
-Excel Structure Explorer Tool - Parameter Description for JSON Tool Calls
+Excel 文件结构探索工具 —— 用于 JSON 工具调用的参数说明
 
-Reads an Excel file and outputs structured information: sheet names, column headers,
-inferred data types, row counts, and preview data. Use this tool FIRST before
-query_excel_data to understand the data layout.
+读取 Excel 文件并输出结构化信息：工作表名称、列头、推断的数据类型、行数和预览数据。
+在执行 query_excel_data 之前，请先使用此工具了解数据布局。
 
-## Important: When to Use ExcelCLI vs Python
+## 重要：何时使用 ExcelCLI vs Python
 
-This tool is for structure exploration ONLY. For subsequent data analysis:
+本工具仅用于结构探索。后续数据分析的优先级：
 
-1. **EXCELCLI (PREFERRED)** — For transaction data, financial records, bank statements,
-   invoice data, or any case investigation data that requires 3+ analysis steps:
-   Use the ExcelCLI skill (excelcli-analysis) to import data into a structured database,
-   then use bash tool with SQL queries for analysis. This is the recommended workflow
-   for all financial/case analysis tasks.
+1. **ExcelCLI（首选）** — 对于交易数据、银行流水、发票数据、金融记录或任何需要
+   3 次以上分析步骤的案件调查数据：使用 ExcelCLI 技能（excelcli-analysis）将数据
+   导入到结构化数据库，然后通过 bash 工具执行 SQL 查询进行分析。这是所有金融/案件
+   分析任务的首选工作流。
 
-2. **Python pandas (FALLBACK)** — Only use Python pandas via bash when ExcelCLI is
-   unavailable or cannot handle the specific file format. Python is NOT the default
-   approach for transaction/financial data analysis.
+2. **Python pandas（兜底）** — 仅在 ExcelCLI 不可用或不支持当前文件格式时，
+   才使用 Python pandas 通过 bash 工具进行分析。Python 不是交易/金融数据分析的默认方案。
 
-3. **query_excel_data** — Suitable for 1-2 simple queries. Avoid for complex analysis
-   as each call re-parses the entire file.
+3. **query_excel_data** — 适合 1-2 次简单查询。避免用于复杂分析，因为每次调用都会
+   重新解析整个文件。
 
-Required Parameters:
-  input           (string)  Path to the Excel file (.xls or .xlsx).
+必填参数：
+  input           (string)  Excel 文件路径（.xls 或 .xlsx）。
 
-Optional Parameters:
-  sheet           (string)  Specific sheet name to inspect. If omitted, all sheets are shown.
-  preview_rows    (int)     Number of preview rows to display. Default: 5.
-                            Set to 0 to skip preview.
-  output          (string)  Output file path. If omitted, results are printed to stdout.
+可选参数：
+  sheet           (string)  要检查的特定工作表名称。省略则显示所有工作表。
+  preview_rows    (int)     预览行数。默认：5。设为 0 跳过预览。
+  output          (string)  输出文件路径。省略则打印到标准输出。
 
-Example:
+示例：
 
 ```json
 {
@@ -366,3 +362,4 @@ if totalRows > 500 {
     yakit.Info("[IMPORTANT] For transaction/financial/case data analysis tasks, ALWAYS prefer ExcelCLI")
     yakit.Info("  data import + database analysis. Python pandas is a fallback mechanism, NOT the default.")
     yakit.Info("")
+}
