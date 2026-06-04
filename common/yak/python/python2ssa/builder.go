@@ -99,6 +99,12 @@ func (*SSABuilder) GetLanguage() ssaconfig.Language {
 	return ssaconfig.PYTHON
 }
 
+// SelfRegistersTopLevel: pass1 emits class/function shells (lazy bodies); pass2 runs
+// the full module via RegisterRootTopLevel (visit_entry.go).
+func (*SSABuilder) SelfRegistersTopLevel() bool {
+	return ssa.SkeletonTopLevelEnabled()
+}
+
 // ========================================== PreHandlerAnalyzer Implementation ==========================================
 
 var _ ssa.PreHandlerAnalyzer = &SSABuilder{}
@@ -150,9 +156,7 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, ast ssa.FrontAS
 
 	switch ext {
 	case ".py":
-		// Python files are built by PreHandlerFile, not here
-		// This prevents double compilation
-		return nil
+		return prog.Build(ast, editor, fb)
 	case ".jpg", ".png", ".gif", ".jpeg", ".css", ".js", ".avi", ".mp4", ".mp3", ".pdf", ".doc":
 		// Skip binary/media files
 		return nil

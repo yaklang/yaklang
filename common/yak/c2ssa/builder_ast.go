@@ -40,6 +40,13 @@ func (b *astbuilder) build(ast *cparser.CompilationUnitContext) {
 			b.prebuildTranslationUnit(unit.(*cparser.TranslationUnitContext))
 		}
 		exportHandler()
+		// Stage 2: sever top-level children so lazy function bodies / globals do not
+		// pin the file AST via parentCtx once fileContent.AST is dropped (docs §2.1).
+		if ssa.SkeletonTopLevelEnabled() {
+			for _, child := range ast.GetChildren() {
+				ssa.DetachAST(child)
+			}
+		}
 	} else {
 		if unit := ast.TranslationUnit(); unit != nil {
 			b.buildTranslationUnitRuntime(unit.(*cparser.TranslationUnitContext))
@@ -62,6 +69,13 @@ func (b *astbuilder) prebuildExternalDeclaration(ast *cparser.ExternalDeclaratio
 
 	if f := ast.FunctionDefinition(); f != nil {
 		b.buildFunctionDefinition(f.(*cparser.FunctionDefinitionContext))
+		return
+	}
+	// Stage 1: in skeleton mode, finish all non-function external decls in pass1 so
+	// pass2 does not need a whole-file BuildFromAST closure (legacy runs the partial
+	// prebuild above + buildTranslationUnitRuntime in pass2 instead).
+	if ssa.SkeletonTopLevelEnabled() {
+		b.buildExternalDeclaration(ast)
 		return
 	}
 	if ds := ast.DeclarationSpecifier(); ds != nil {

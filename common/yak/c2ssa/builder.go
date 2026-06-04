@@ -106,6 +106,14 @@ func (*SSABuilder) FilterFile(path string) bool {
 	return filepath.Ext(path) == ".c" // || filepath.Ext(path) == ".h"
 }
 
+// SelfRegistersTopLevel: c2ssa emits function shells + non-function top-level decls in
+// pass1, severs top-level children from the file root so lazy hooks do not pin the
+// whole AST (ssa.DetachAST), and skips the legacy pass2 whole-file closure. See
+// docs/ssa-ast-to-ssa-skeleton-plan.md and ssa.SkeletonTopLevelEnabled().
+func (*SSABuilder) SelfRegistersTopLevel() bool {
+	return ssa.SkeletonTopLevelEnabled()
+}
+
 func (*SSABuilder) GetLanguage() ssaconfig.Language {
 	return ssaconfig.C
 }

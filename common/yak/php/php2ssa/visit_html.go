@@ -27,6 +27,11 @@ func (y *builder) VisitHtmlDocument(raw phpparser.IHtmlDocumentContext) interfac
 			y.VisitPhpBlock(current)
 		}
 	}
+	if y.PreHandler() && ssa.SkeletonTopLevelEnabled() {
+		for _, child := range i.GetChildren() {
+			ssa.DetachAST(child)
+		}
+	}
 	return nil
 }
 
