@@ -7,7 +7,14 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
-func (c *Compiler) compileSideEffect(inst *ssa.SideEffect) error {
+func (c *Compiler) compileSideEffectInstruction(inst *ssa.SideEffect) error {
+	if c.isAsyncSideEffect(inst) {
+		return nil
+	}
+	return c.compileSideEffectValue(inst)
+}
+
+func (c *Compiler) compileSideEffectValue(inst *ssa.SideEffect) error {
 	if inst == nil {
 		return nil
 	}
@@ -63,6 +70,23 @@ func (c *Compiler) compileSideEffect(inst *ssa.SideEffect) error {
 	}
 
 	return c.maybeEmitMemberSet(inst, inst, inst.GetId())
+}
+
+func (c *Compiler) isAsyncSideEffect(inst *ssa.SideEffect) bool {
+	callInst, ok := c.sideEffectCallSite(inst)
+	return ok && callInst.Async
+}
+
+func (c *Compiler) sideEffectCallSite(inst *ssa.SideEffect) (*ssa.Call, bool) {
+	if inst == nil || inst.CallSite <= 0 || inst.GetFunc() == nil {
+		return nil, false
+	}
+	callInstAny, ok := inst.GetFunc().GetInstructionById(inst.CallSite)
+	if !ok || callInstAny == nil {
+		return nil, false
+	}
+	callInst, ok := callInstAny.(*ssa.Call)
+	return callInst, ok && callInst != nil
 }
 
 func (c *Compiler) resolveSideEffectActualID(inst *ssa.SideEffect) (int64, error) {

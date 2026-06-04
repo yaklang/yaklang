@@ -205,6 +205,34 @@ func TestIR_GoStmtCallableUsesAsyncInvoke(t *testing.T) {
 	requireIRAvoidsLegacyCallEntrypoints(t, ir)
 }
 
+func TestIR_AsyncSideEffectMemberReadAfterWait(t *testing.T) {
+	code := `
+		func update(obj, wg) {
+			obj.key = 2
+			wg.Done()
+		}
+
+		func main() {
+			a = {
+				"key": 1,
+			}
+			wg = sync.NewWaitGroup()
+			wg.Add(1)
+			go update(a, wg)
+			wg.Wait()
+			println(a.key)
+		}
+		`
+	_, _, ir, err := compileToIRFromCodeWithExternBindings(code, "yak", nil)
+	require.NoError(t, err)
+	requireIRContainsInOrder(t, ir,
+		"ptr @yak_method_name_33",
+		"call void @"+abi.InvokeSymbol,
+		"call i64 @"+abi.RuntimeGetFieldSymbol,
+	)
+	requireIRAvoidsLegacyCallEntrypoints(t, ir)
+}
+
 func TestIR_InternalCallDoesNotMaterializeShadowMethodsAsFields(t *testing.T) {
 	code := `
 		func worker(mu, value) {

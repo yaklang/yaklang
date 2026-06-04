@@ -96,6 +96,22 @@ func TestCorePlugin_RunSSADetectLocalProject(t *testing.T) {
 	require.NotContains(t, output, "unexpected end of JSON input")
 }
 
+func TestCorePlugin_RunSSADetectDefaultCompileImmediatelyFalse(t *testing.T) {
+	projectDir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(projectDir, "index.php"), []byte("<?php echo 'ok';"), 0o644))
+
+	code := string(coreplugin.GetCorePluginData("SSA 项目探测"))
+	require.NotEmpty(t, code)
+
+	output := runBinaryWithEnv(t, code, "", map[string]string{
+		"YAKIT_HOME": t.TempDir(),
+	}, withCompilePluginType(compiler.YakPluginTypeYak), withArgs("--target", projectDir, "--language", "php"))
+	require.Contains(t, output, `"compile_immediately": false`)
+	require.NotContains(t, output, `"compile_immediately": true`)
+	require.NotContains(t, output, "YakVM Code DIE")
+	require.NotContains(t, output, "unexpected end of JSON input")
+}
+
 func TestCorePlugin_RunResetKnowledgeBase(t *testing.T) {
 	code := string(coreplugin.GetCorePluginData("重置知识库"))
 	require.NotEmpty(t, code)

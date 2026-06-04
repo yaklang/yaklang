@@ -410,7 +410,7 @@ func (c *Compiler) resolvePhiIncomingValue(contextInst *ssa.Phi, fn *ssa.Functio
 	}
 	if sideEffect, ok := edgeObj.(*ssa.SideEffect); ok && sideEffect != nil && sideEffect.GetBlock() != nil &&
 		sideEffect.GetBlock().GetId() == predID {
-		if err := c.compileSideEffect(sideEffect); err != nil {
+		if err := c.compileSideEffectValue(sideEffect); err != nil {
 			return llvm.Value{}, err
 		}
 		if resolved, ok := c.getCachedValue(sideEffect, edgeValID); ok && !resolved.IsNil() {
