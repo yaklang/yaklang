@@ -75,6 +75,7 @@ func (t *transactionTestConfig) RetryPromptBuilder(prompt string, err error) str
 	return fmt.Sprintf("retry for: %v\n%s", err, prompt)
 }
 func (t *transactionTestConfig) GetEmitter() *Emitter                            { return t.emitter }
+func (t *transactionTestConfig) GetBrowserSessionTracker() BrowserSessionTracker { return nil }
 func (t *transactionTestConfig) NewAIResponse() *AIResponse                      { return NewAIResponse(t) }
 func (t *transactionTestConfig) CallAIResponseOutputFinishedCallback(string)     {}
 func (t *transactionTestConfig) GetAiToolManager() *buildinaitools.AiToolManager { return nil }
