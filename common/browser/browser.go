@@ -156,13 +156,19 @@ func (inst *BrowserInstance) Navigate(urlStr string) (*BrowserPage, error) {
 
 	page, err := inst.browser.Page(proto.TargetCreateTarget{URL: "about:blank"})
 	if err != nil {
+		if isBrokenCDPError(err) {
+			globalManager.Evict(inst.id)
+		}
 		return nil, fmt.Errorf("create page: %w", err)
 	}
 
 	bp := newBrowserPage(page, inst, inst.config.timeout)
 	err = bp.Navigate(urlStr)
 	if err != nil {
-		page.Close()
+		_ = page.Close()
+		if isBrokenCDPError(err) {
+			globalManager.Evict(inst.id)
+		}
 		return nil, err
 	}
 
@@ -300,4 +306,17 @@ func (inst *BrowserInstance) IsClosed() bool {
 	inst.mu.Lock()
 	defer inst.mu.Unlock()
 	return inst.closed
+}
+
+func (inst *BrowserInstance) healthCheck() error {
+	inst.mu.Lock()
+	defer inst.mu.Unlock()
+	if inst.closed {
+		return fmt.Errorf("browser instance %q is closed", inst.id)
+	}
+	if inst.browser == nil {
+		return fmt.Errorf("browser instance %q has no rod client", inst.id)
+	}
+	_, err := inst.browser.Version()
+	return err
 }
