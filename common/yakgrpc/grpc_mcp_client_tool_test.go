@@ -20,8 +20,13 @@ func init() {
 	// (e.g. leftover full_name NOT NULL column from MCPServerToolConfig) does
 	// not interfere. AutoMigrate re-creates it with the correct structure.
 	db.DropTableIfExists(&schema.MCPClientToolConfig{})
-	db.AutoMigrate(&schema.MCPClientToolConfig{})
-	db.AutoMigrate(&schema.MCPServer{})
+	if err := db.AutoMigrate(
+		&schema.MCPServer{},
+		&schema.MCPServerToolConfig{},
+		&schema.MCPClientToolConfig{},
+	).Error; err != nil {
+		panic(err)
+	}
 }
 
 // newStreamableMCPServer spins up an in-process MCP server over Streamable HTTP

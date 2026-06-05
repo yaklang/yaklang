@@ -12,7 +12,8 @@ import (
 func newMCPUpdateTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
 	db := newMCPSyncTestDB(t)
-	require.NoError(t, db.AutoMigrate(&schema.MCPServer{}, &schema.MCPServerToolConfig{}, &schema.MCPClientToolConfig{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.MCPServer{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.MCPClientToolConfig{}).Error)
 	return db
 }
 
