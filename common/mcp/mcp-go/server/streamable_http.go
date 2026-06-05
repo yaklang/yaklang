@@ -184,6 +184,12 @@ func (s *StreamableHTTPServer) startNotificationDispatcher() {
 						return
 					}
 					if notification.Context.SessionID == "" {
+						s.sessions.Range(func(_, value any) bool {
+							if session, ok := value.(*streamableHTTPSession); ok {
+								_ = session.send(notification.Notification)
+							}
+							return true
+						})
 						continue
 					}
 

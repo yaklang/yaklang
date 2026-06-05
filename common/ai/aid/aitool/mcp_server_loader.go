@@ -39,7 +39,7 @@ func mapStringAnyToStringMap(input schema.MapStringAny) map[string]string {
 }
 
 func LoadAllEnabledAIToolsFromMCPServers(db *gorm.DB, ctx context.Context) ([]*Tool, error) {
-	return LoadAllEnabledAIToolsFromMCPServersWithCallback(db, ctx, nil, nil, nil)
+	return LoadAllEnabledAIToolsFromMCPServersWithCallback(db, ctx, nil, nil, nil, nil)
 }
 
 func LoadAllEnabledAIToolsFromMCPServersWithCallback(
@@ -47,6 +47,7 @@ func LoadAllEnabledAIToolsFromMCPServersWithCallback(
 	onStart func(mcpServer *schema.MCPServer),
 	onDone func(mcpServer *schema.MCPServer, tools []*Tool, err error),
 	onAllDone func(tools []*Tool, err error),
+	onToolsListChanged MCPToolsListChangedHandler,
 ) ([]*Tool, error) {
 	swg := utils.NewSizedWaitGroup(10)
 	var results []*Tool
@@ -77,7 +78,7 @@ func LoadAllEnabledAIToolsFromMCPServersWithCallback(
 					}
 				})
 			}()
-			tools, err := LoadAIToolFromMCPServers(db, ctx, mcpServer.Name)
+			tools, err := LoadAIToolFromMCPServers(db, ctx, mcpServer.Name, onToolsListChanged)
 			done.Do(func() {
 				if onDone != nil {
 					onDone(mcpServer, tools, err)
@@ -99,8 +100,13 @@ func LoadAllEnabledAIToolsFromMCPServersWithCallback(
 // LoadAIToolFromMCPServers 从数据库中加载指定名称的 MCP 服务器，并将其工具转换为 AITool
 // name: MCP 服务器名称
 // db: 数据库连接，如果为 nil 则使用默认的 profile 数据库
+// onToolsListChanged: optional handler for notifications/tools/list_changed from the remote server
 // 返回: 从该 MCP 服务器加载的所有 AITool 列表
-func LoadAIToolFromMCPServers(db *gorm.DB, ctx context.Context, name string) ([]*Tool, error) {
+func LoadAIToolFromMCPServers(db *gorm.DB, ctx context.Context, name string, onToolsListChanged ...MCPToolsListChangedHandler) ([]*Tool, error) {
+	var listChangedHandler MCPToolsListChangedHandler
+	if len(onToolsListChanged) > 0 {
+		listChangedHandler = onToolsListChanged[0]
+	}
 	if db == nil {
 		// 使用默认的 profile 数据库
 		db = consts.GetGormProfileDatabase()
@@ -134,6 +140,11 @@ func LoadAIToolFromMCPServers(db *gorm.DB, ctx context.Context, name string) ([]
 	initRequest.Params.ClientInfo = mcp.Implementation{
 		Name:    "yaklang-aitool-loader",
 		Version: "1.0.0",
+	}
+
+	var listChangedState *mcpToolsListChangedState
+	if listChangedHandler != nil {
+		listChangedState = registerMCPToolsListChangedHandler(mcpClient, db, mcpServer, nil, listChangedHandler)
 	}
 
 	_, err = mcpClient.Initialize(ctx, initRequest)
@@ -188,6 +199,10 @@ func LoadAIToolFromMCPServers(db *gorm.DB, ctx context.Context, name string) ([]
 
 	if len(aiTools) == 0 {
 		return nil, utils.Errorf("no tools found in mcp server: %s", name)
+	}
+
+	if listChangedState != nil {
+		SyncMCPToolsListChangedState(listChangedState, aiTools)
 	}
 
 	return aiTools, nil
@@ -262,6 +277,7 @@ func convertMCPToolToAITool(mcpTool *mcp.Tool, server *schema.MCPServer, mcpClie
 	}
 
 	aiTool.Name = toolName
+	aiTool.BridgeMCPClient = mcpClient
 	return aiTool, nil
 }
 
@@ -380,7 +396,7 @@ func LoadAIToolsFromMCPCapability(db *gorm.DB, ctx context.Context, name string)
 		}
 		return []*Tool{tool}, nil
 	}
-	return LoadAIToolFromMCPServers(db, ctx, name)
+	return LoadAIToolFromMCPServers(db, ctx, name, nil)
 }
 
 func loadAIToolFromMCPServersByAIToolName(db *gorm.DB, ctx context.Context, aiToolName string) (*Tool, error) {
@@ -391,7 +407,7 @@ func loadAIToolFromMCPServersByAIToolName(db *gorm.DB, ctx context.Context, aiTo
 		return nil, utils.Error("profile database is nil")
 	}
 	for server := range yakit.YieldEnabledMCPServers(ctx, db) {
-		tools, err := LoadAIToolFromMCPServers(db, ctx, server.Name)
+		tools, err := LoadAIToolFromMCPServers(db, ctx, server.Name, nil)
 		if err != nil {
 			log.Warnf("load mcp server %q while resolving tool %q failed: %v", server.Name, aiToolName, err)
 			continue

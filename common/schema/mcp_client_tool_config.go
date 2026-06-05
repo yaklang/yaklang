@@ -9,6 +9,8 @@ import (
 const (
 	// MCPClientToolSourceBuiltin means the tool is registered via Go init() in common/mcp.
 	MCPClientToolSourceBuiltin = "builtin"
+	// MCPClientToolSourceAITool means the tool comes from the aitool-framework builtin registry.
+	MCPClientToolSourceAITool = "aitool"
 	// MCPClientToolSourceBridge means the tool originates from an external MCPServer entry in the
 	// DB and was bridged through the aitool layer (name format: mcp_{server}_{tool}).
 	MCPClientToolSourceBridge = "bridge"
@@ -24,7 +26,7 @@ type MCPClientToolConfig struct {
 	ToolName string `gorm:"uniqueIndex;not null" json:"tool_name"`
 
 	// Source distinguishes builtin tools from bridge tools.
-	// Values: MCPClientToolSourceBuiltin / MCPClientToolSourceBridge.
+	// Values: MCPClientToolSourceBuiltin / MCPClientToolSourceAITool / MCPClientToolSourceBridge.
 	Source string `gorm:"index;not null" json:"source"`
 
 	// ServerName is non-empty only for bridge tools; it equals the MCPServer.Name

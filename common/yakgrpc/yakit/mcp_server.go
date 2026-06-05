@@ -266,6 +266,60 @@ func CreateMCPServer(db *gorm.DB, server *schema.MCPServer) error {
 	return nil
 }
 
+// MCPServerToolFullName returns the canonical AI/runtime tool name for an MCP tool row.
+func MCPServerToolFullName(serverName, toolName string) string {
+	return fmt.Sprintf("mcp_%s_%s", serverName, toolName)
+}
+
+// mcpServerEndpointChanged reports whether connection-target fields changed enough
+// that cached tool metadata from the previous endpoint should be discarded.
+func mcpServerEndpointChanged(before, after *schema.MCPServer) bool {
+	if before == nil || after == nil {
+		return true
+	}
+	return before.Type != after.Type ||
+		before.URL != after.URL ||
+		before.Command != after.Command
+}
+
+// MigrateMCPServerToolConfigsServerName rewrites tool cache rows when the parent
+// MCP server display name changes but the remote endpoint is unchanged.
+func MigrateMCPServerToolConfigsServerName(db *gorm.DB, oldServerName, newServerName string) error {
+	if db == nil {
+		return utils.Errorf("database connection is nil")
+	}
+	oldServerName = strings.TrimSpace(oldServerName)
+	newServerName = strings.TrimSpace(newServerName)
+	if oldServerName == "" || newServerName == "" {
+		return utils.Errorf("mcp server name cannot be empty")
+	}
+	if oldServerName == newServerName {
+		return nil
+	}
+
+	var cfgs []*schema.MCPServerToolConfig
+	if err := db.Model(&schema.MCPServerToolConfig{}).
+		Where("server_name = ?", oldServerName).
+		Find(&cfgs).Error; err != nil {
+		return utils.Errorf("query tool configs for server %q failed: %s", oldServerName, err)
+	}
+	for _, cfg := range cfgs {
+		newFullName := MCPServerToolFullName(newServerName, cfg.ToolName)
+		if err := db.Model(&schema.MCPServerToolConfig{}).
+			Where("id = ?", cfg.ID).
+			Updates(map[string]interface{}{
+				"server_name": newServerName,
+				"full_name":   newFullName,
+			}).Error; err != nil {
+			return utils.Errorf(
+				"migrate tool config %s/%s to server %q failed: %s",
+				oldServerName, cfg.ToolName, newServerName, err,
+			)
+		}
+	}
+	return nil
+}
+
 // UpdateMCPServer 更新MCP服务器
 func UpdateMCPServer(db *gorm.DB, id int64, server *schema.MCPServer) error {
 	if db == nil {
@@ -274,26 +328,90 @@ func UpdateMCPServer(db *gorm.DB, id int64, server *schema.MCPServer) error {
 	if server == nil {
 		return utils.Errorf("mcp server is nil")
 	}
-
-	updateData := map[string]interface{}{
-		"name":    server.Name,
-		"type":    server.Type,
-		"url":     server.URL,
-		"command": server.Command,
-		"enable":  server.Enable,
-		"envs":    server.Envs,
-		"headers": server.Headers,
+	if strings.TrimSpace(server.Name) == "" {
+		return utils.Errorf("mcp server name cannot be empty")
 	}
-	return db.Model(&schema.MCPServer{}).Where("id = ?", id).Updates(updateData).Error
+	if strings.TrimSpace(server.Type) == "" {
+		return utils.Errorf("mcp server type cannot be empty")
+	}
+
+	existing, err := GetMCPServer(db, id)
+	if err != nil {
+		return err
+	}
+
+	if server.Name != existing.Name {
+		var conflict schema.MCPServer
+		qErr := db.Model(&schema.MCPServer{}).
+			Where("name = ? AND id != ?", server.Name, id).
+			First(&conflict).Error
+		if qErr == nil {
+			return utils.Errorf("mcp server name %q already exists", server.Name)
+		}
+		if !gorm.IsRecordNotFoundError(qErr) {
+			return utils.Errorf("check mcp server name conflict failed: %s", qErr)
+		}
+	}
+
+	endpointChanged := mcpServerEndpointChanged(existing, server)
+	nameChanged := server.Name != existing.Name
+
+	return utils.GormTransaction(db, func(tx *gorm.DB) error {
+		if endpointChanged {
+			if err := DeleteMCPServerToolConfigs(tx, existing.Name); err != nil {
+				return err
+			}
+			if err := DeleteAllMCPClientBridgeToolConfigsForServer(tx, existing.Name); err != nil {
+				return err
+			}
+		} else if nameChanged {
+			if err := MigrateMCPServerToolConfigsServerName(tx, existing.Name, server.Name); err != nil {
+				return err
+			}
+			if err := MigrateMCPClientBridgeToolConfigsServerName(tx, existing.Name, server.Name); err != nil {
+				return err
+			}
+		}
+
+		updateData := map[string]interface{}{
+			"name":    server.Name,
+			"type":    server.Type,
+			"url":     server.URL,
+			"command": server.Command,
+			"enable":  server.Enable,
+			"envs":    server.Envs,
+			"headers": server.Headers,
+		}
+		if err := tx.Model(&schema.MCPServer{}).Where("id = ?", id).Updates(updateData).Error; err != nil {
+			return utils.Errorf("update mcp server failed: %s", err)
+		}
+		return nil
+	})
 }
 
-// DeleteMCPServer 删除MCP服务器
+// DeleteMCPServer 删除MCP服务器及其缓存的工具配置行。
 func DeleteMCPServer(db *gorm.DB, id int64) error {
 	if db == nil {
 		return utils.Errorf("database connection is nil")
 	}
 
-	return db.Model(&schema.MCPServer{}).Where("id = ?", id).Unscoped().Delete(&schema.MCPServer{}).Error
+	existing, err := GetMCPServer(db, id)
+	if err != nil {
+		return err
+	}
+
+	return utils.GormTransaction(db, func(tx *gorm.DB) error {
+		if err := DeleteMCPServerToolConfigs(tx, existing.Name); err != nil {
+			return err
+		}
+		if err := DeleteAllMCPClientBridgeToolConfigsForServer(tx, existing.Name); err != nil {
+			return err
+		}
+		if err := tx.Model(&schema.MCPServer{}).Where("id = ?", id).Unscoped().Delete(&schema.MCPServer{}).Error; err != nil {
+			return utils.Errorf("delete mcp server failed: %s", err)
+		}
+		return nil
+	})
 }
 
 // GetMCPServer 根据ID获取MCP服务器
