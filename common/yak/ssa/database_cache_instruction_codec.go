@@ -18,14 +18,21 @@ func marshalInstruction(inst Instruction, irCode *ssadb.IrCode, reason utils.Evi
 	}
 
 	if lz, isLazy := ToLazyInstruction(inst); isLazy {
-		resolved, payloadCopied, ok := resolveLazyMarshalInst(lz, irCode, reason)
-		if !ok {
+		switch {
+		case lz.ShouldSave():
+			if !utils.IsNil(lz.Instruction) {
+				inst = lz.Instruction
+			}
+		case reason != utils.EvictionReasonDeleted:
+			// Compile-time eviction: unmodified lazy rows stay in DB.
 			return false
+		default:
+			lz.check()
+			if utils.IsNil(lz.Instruction) {
+				return false
+			}
+			inst = lz.Instruction
 		}
-		if payloadCopied {
-			return irCode.Opcode != 0
-		}
-		inst = resolved
 	}
 
 	err := Instruction2IrCode(inst, irCode)
@@ -38,37 +45,6 @@ func marshalInstruction(inst Instruction, irCode *ssadb.IrCode, reason utils.Evi
 		log.Errorf("BUG: saveInstruction called with empty opcode: %v", inst.GetName())
 	}
 	return true
-}
-
-// resolveLazyMarshalInst handles lazy wrappers on close flush vs normal eviction.
-// payloadCopied means irCode already contains a DB-ready snapshot and Instruction2IrCode should be skipped.
-func resolveLazyMarshalInst(lz *LazyInstruction, irCode *ssadb.IrCode, reason utils.EvictionReason) (Instruction, bool, bool) {
-	if lz.ShouldSave() {
-		if !utils.IsNil(lz.Instruction) {
-			return lz.Instruction, false, true
-		}
-		return lz, false, true
-	}
-	if reason != utils.EvictionReasonDeleted {
-		return nil, false, false
-	}
-	if !utils.IsNil(lz.Instruction) {
-		return lz.Instruction, false, true
-	}
-	if lz.ir != nil {
-		lz.ir.CopyPersistPayloadTo(irCode)
-		if prog := lz.GetProgram(); prog != nil {
-			if editor, ok := prog.GetEditorByHash(irCode.SourceCodeHash); ok {
-				irCode.ClampSourceOffsets(editor)
-			}
-		}
-		return lz, true, true
-	}
-	lz.check()
-	if utils.IsNil(lz.Instruction) {
-		return nil, false, false
-	}
-	return lz.Instruction, false, true
 }
 
 // Instruction2IrCode : marshal instruction to ir code, used in cache, to save to database
