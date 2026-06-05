@@ -436,6 +436,9 @@ func (m *AiToolManager) AppendTools(tools ...*aitool.Tool) error {
 // Session-scoped MCP mounts use this so the agent cannot reach builtin/profile
 // tools (e.g. the local "ssa-risk" yak tool) and is limited to the injected set.
 func (m *AiToolManager) RestrictToTools(names ...string) {
+	if m == nil {
+		return
+	}
 	m.enableAllTools = false
 	m.enableSearchTool = false
 	m.enableForgeSearchTool = false

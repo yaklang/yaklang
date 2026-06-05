@@ -47,8 +47,13 @@ type AIEngineConfig struct {
 	ExcludeToolNames      []string // 排除的工具名称
 	Keywords              []string // 关键词，用于工具搜索
 
+	// ExtraMCPServers 会话级显式挂载的 MCP server（内存态，不读 profile DB、
+	// 不进全局列表）。RestrictToSessionMCP 依赖此列表才能生效。
+	ExtraMCPServers []*aicommon.ExtraMCPServer
+
 	// RestrictToSessionMCP 为 true 时，工具集被钳制为仅会话注入的 MCP 工具，
 	// 禁用内置工具/搜索/forge，避免 agent 误用本地 yak 工具（如 ssa-risk）。
+	// 仅在配置了 ExtraMCPServers 时才有意义。
 	RestrictToSessionMCP bool
 
 	// 交互配置
@@ -71,7 +76,7 @@ type AIEngineConfig struct {
 	OnFinished           func(react aicommon.AIEngineOperator)                                                                  // 完成回调, 不返回结果
 	OnInputRequiredRaw   func(react aicommon.AIEngineOperator, event *schema.AiOutputEvent, question string) string             // 需要用户输入回调
 	OnInputRequired      func(react aicommon.AIEngineOperator, question string) string                                          // 需要用户输入回调
-	OnSessionID          func(sessionID string)                                                                               // 会话 ID 就绪回调
+	OnSessionID          func(sessionID string)                                                                                 // 会话 ID 就绪回调
 
 	// 高级配置
 	Focus    string // 焦点，用于聚焦某个任务，如 yaklang_code
@@ -202,6 +207,13 @@ func WithDisableAIForge(disable bool) AIEngineConfigOption {
 func WithDisableMCPServers(disable bool) AIEngineConfigOption {
 	return func(c *AIEngineConfig) {
 		c.DisableMCPServers = disable
+	}
+}
+
+// WithExtraMCPServers 注入会话级 MCP server（内存态，不读 profile DB）。
+func WithExtraMCPServers(servers ...*aicommon.ExtraMCPServer) AIEngineConfigOption {
+	return func(c *AIEngineConfig) {
+		c.ExtraMCPServers = append(c.ExtraMCPServers, servers...)
 	}
 }
 
