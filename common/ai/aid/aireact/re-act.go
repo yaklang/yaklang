@@ -348,7 +348,13 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 	cfg.FlushRestoredSessionEvidence()
 	// EmitPinDirectory is deferred to ensureWorkDirectory when user input arrives
 
-	if !react.config.DisallowMCPServers {
+	// When the session is restricted to its injected MCP servers, the profile/DB
+	// MCP machinery must NOT run: its background goroutine (and the
+	// tools-list-changed handler) would re-enable profile tools via
+	// OverrideToolByName AFTER loadExtraMCPServers calls RestrictToTools,
+	// silently defeating the restriction (fail-open) and racing the tool
+	// manager's enable map. Skipping it keeps the restriction authoritative.
+	if !react.config.DisallowMCPServers && !react.config.RestrictToolsToExtraMCPServers {
 		// Synchronously pre-load MCP stub tools from DB into the tool manager
 		// so they appear in the system prompt on the very first request, before
 		// the background connection goroutine has finished.
@@ -689,6 +695,10 @@ func (r *ReAct) preloadMCPStubsFromDB() {
 // 并按 AllowedTools 在 client 侧做白名单过滤后 AppendTools。
 func (r *ReAct) loadExtraMCPServers(servers []*aicommon.ExtraMCPServer) {
 	mng := r.config.GetAiToolManager()
+	if mng == nil {
+		log.Errorf("cannot mount session-scoped mcp servers: tool manager is nil")
+		return
+	}
 	var mountedNames []string
 	for _, s := range servers {
 		if s == nil || s.Server == nil {

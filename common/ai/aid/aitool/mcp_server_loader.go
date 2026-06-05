@@ -222,13 +222,26 @@ func LoadAIToolsFromMCPServer(ctx context.Context, server *schema.MCPServer, all
 	if server == nil {
 		return nil, utils.Errorf("mcp server is nil")
 	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
 
 	mcpClient, err := createMCPClient(server)
 	if err != nil {
 		return nil, utils.Errorf("create mcp client failed: %v", err)
 	}
+	// createMCPClient already opened a live connection (sse) or spawned a
+	// subprocess (stdio). On any failure path below we must close it; only when
+	// tools are returned does ownership transfer to the caller (the returned
+	// tools' callbacks keep using the client), so we must NOT close it then.
+	success := false
+	defer func() {
+		if !success {
+			_ = mcpClient.Close()
+		}
+	}()
 
-	initCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	initCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
 	initRequest := mcp.InitializeRequest{}
@@ -266,6 +279,7 @@ func LoadAIToolsFromMCPServer(ctx context.Context, server *schema.MCPServer, all
 	if len(aiTools) == 0 {
 		return nil, utils.Errorf("no tools loaded from mcp server %s (allowlist=%v)", server.Name, allowedTools)
 	}
+	success = true
 	return aiTools, nil
 }
 
