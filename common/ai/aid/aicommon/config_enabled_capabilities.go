@@ -189,6 +189,13 @@ func (c *Config) applyEnabledImmediateCapabilities() error {
 	if c == nil {
 		return nil
 	}
+	// A session restricted to its injected MCP servers must stay restricted:
+	// re-enabling tools/plugins/mcp_tools here (incl. via the EnabledCapabilities
+	// hotpatch, which runs after RestrictToTools) would silently defeat the
+	// restriction. Skip capability application entirely under restriction.
+	if c.RestrictToolsToExtraMCPServers {
+		return nil
+	}
 	caps := c.GetEnabledCapabilities()
 	if len(caps) == 0 {
 		return nil
