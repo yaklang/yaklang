@@ -149,6 +149,18 @@ func WithEnableToolSet(name string) McpServerOption {
 	}
 }
 
+// WithEnableAllToolSets registers every legacy tool set, matching StartMcpServer EnableAll.
+func WithEnableAllToolSets() McpServerOption {
+	return func(cfg *MCPServerConfig) error {
+		for _, name := range GlobalToolSetList() {
+			if err := WithEnableToolSet(name)(cfg); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+}
+
 func WithDisableTool(name string) McpServerOption {
 	return func(cfg *MCPServerConfig) error {
 		tool, ok := globalTools[name]
