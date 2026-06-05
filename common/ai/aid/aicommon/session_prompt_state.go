@@ -249,9 +249,10 @@ func (s *SessionPromptState) ApplyVerificationTodoOps(scope VerificationTodoScop
 }
 
 // GetVerificationTodoRendered returns the plain-text TODO snapshot ready for
-// loop prompt injection. Empty string when no TODO has been tracked yet, so
-// the prompt template can naturally skip the block.
-func (s *SessionPromptState) GetVerificationTodoRendered() string {
+// loop prompt injection. When currentScope is set, the snapshot groups items
+// into CURRENT TASK vs OTHER TASKS sections. Empty string when no TODO has been
+// tracked yet, so the prompt template can naturally skip the block.
+func (s *SessionPromptState) GetVerificationTodoRendered(currentScope VerificationTodoScope) string {
 	if s == nil {
 		return ""
 	}
@@ -261,7 +262,7 @@ func (s *SessionPromptState) GetVerificationTodoRendered() string {
 	if store.IsEmpty() {
 		return ""
 	}
-	return store.Render()
+	return store.RenderWithCurrentScope(currentScope)
 }
 
 // GetVerificationTodoMarkdownDelta returns the markdown snapshot computed

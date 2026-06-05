@@ -234,7 +234,7 @@ func (r *ReActLoop) generateLoopPrompt(
 	// VerifyUserSatisfaction 通过 ApplyVerificationTodoOps 增量写入.
 	// 关键词: TodoSnapshot 渲染, timeline-open 全局可见, SessionPromptState
 	var todoSnapshot string
-	if todoContent := r.config.GetVerificationTodoRendered(); todoContent != "" {
+	if todoContent := r.config.GetVerificationTodoRendered(aicommon.BuildVerificationTodoScope(r.GetCurrentTask())); todoContent != "" {
 		todoSnapshot, err = utils.RenderTemplate(todoListTemplate, map[string]any{
 			"Nonce": nonce,
 			"Todo":  todoContent,

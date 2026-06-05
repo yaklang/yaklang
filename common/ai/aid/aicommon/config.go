@@ -2675,8 +2675,8 @@ func (c *Config) ApplySessionEvidenceOps(ops []EvidenceOperation) {
 // section). Returns empty string when no TODO has been tracked yet.
 //
 // 关键词: GetVerificationTodoRendered, prompt 注入, 全局 TODO
-func (c *Config) GetVerificationTodoRendered() string {
-	return c.GetSessionPromptState().GetVerificationTodoRendered()
+func (c *Config) GetVerificationTodoRendered(currentScope VerificationTodoScope) string {
+	return c.GetSessionPromptState().GetVerificationTodoRendered(currentScope)
 }
 
 // ApplyVerificationTodoOps applies one verification round's next_movements to

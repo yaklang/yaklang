@@ -471,27 +471,123 @@ func (s *VerificationTodoStore) Render() string {
 	if s == nil || len(s.Items) == 0 {
 		return "- no tracked TODO items"
 	}
+	return truncateVerificationTodoLines(renderVerificationTodoItemLines(s.SnapshotItems()))
+}
 
-	pending := make([]VerificationTodoItem, 0)
-	doing := make([]VerificationTodoItem, 0)
-	closed := make([]VerificationTodoItem, 0)
+// RenderWithCurrentScope renders the session TODO snapshot grouped by task
+// ownership. When currentScope is zero the output matches Render(). Otherwise
+// items are split into a CURRENT TASK section (mutable by the model) and an
+// OTHER TASKS section (read-only context from sibling or finished tasks).
+//
+// 关键词: RenderWithCurrentScope, 当前任务 vs 其它任务, prompt 分组渲染
+func (s *VerificationTodoStore) RenderWithCurrentScope(currentScope VerificationTodoScope) string {
+	if s == nil || len(s.Items) == 0 {
+		return "- no tracked TODO items"
+	}
+	currentScope = currentScope.normalize()
+	if currentScope.IsZero() {
+		return s.Render()
+	}
+
+	currentItems := make([]VerificationTodoItem, 0)
+	otherItems := make([]VerificationTodoItem, 0)
 	for _, item := range s.Items {
 		if item == nil {
 			continue
 		}
+		copyItem := *item
+		if item.matchesScope(currentScope) {
+			currentItems = append(currentItems, copyItem)
+		} else {
+			otherItems = append(otherItems, copyItem)
+		}
+	}
+
+	lines := make([]string, 0, len(s.Items)+8)
+	lines = append(lines, formatVerificationTodoCurrentTaskHeader(currentScope))
+	if len(currentItems) == 0 {
+		lines = append(lines, "- (no TODO items tracked for the current task yet)")
+	} else {
+		lines = append(lines, "- You MUST advance or close ONLY the TODOs in this section via adjust_todolist / verification next_movements.")
+		lines = append(lines, renderVerificationTodoItemLines(currentItems)...)
+	}
+
+	if len(otherItems) > 0 {
+		lines = append(lines, "")
+		lines = append(lines, "### OTHER TASKS (read-only context)")
+		lines = append(lines, "- TODOs below belong to sibling or finished tasks. Do NOT mutate them; use them only as history/context.")
+		lines = append(lines, renderVerificationTodoOtherTaskSections(otherItems)...)
+	}
+
+	return truncateVerificationTodoLines(lines)
+}
+
+func formatVerificationTodoCurrentTaskHeader(scope VerificationTodoScope) string {
+	scope = scope.normalize()
+	switch {
+	case scope.TaskIndex != "" && scope.TaskID != "":
+		return fmt.Sprintf("### CURRENT TASK [task_index=%s, task_id=%s]", scope.TaskIndex, scope.TaskID)
+	case scope.TaskIndex != "":
+		return fmt.Sprintf("### CURRENT TASK [task_index=%s]", scope.TaskIndex)
+	default:
+		return fmt.Sprintf("### CURRENT TASK [task_id=%s]", scope.TaskID)
+	}
+}
+
+func renderVerificationTodoOtherTaskSections(items []VerificationTodoItem) []string {
+	if len(items) == 0 {
+		return nil
+	}
+	grouped := make(map[string][]VerificationTodoItem)
+	order := make([]string, 0)
+	for _, item := range items {
+		key := formatVerificationTodoOtherTaskGroupKey(item)
+		if _, exists := grouped[key]; !exists {
+			order = append(order, key)
+		}
+		grouped[key] = append(grouped[key], item)
+	}
+
+	lines := make([]string, 0, len(items)+len(order))
+	for _, key := range order {
+		lines = append(lines, "")
+		lines = append(lines, "#### "+key)
+		lines = append(lines, renderVerificationTodoItemLines(grouped[key])...)
+	}
+	return lines
+}
+
+func formatVerificationTodoOtherTaskGroupKey(item VerificationTodoItem) string {
+	scope := item.scope().normalize()
+	switch {
+	case scope.TaskIndex != "" && scope.TaskID != "":
+		return fmt.Sprintf("task_index=%s, task_id=%s", scope.TaskIndex, scope.TaskID)
+	case scope.TaskIndex != "":
+		return fmt.Sprintf("task_index=%s", scope.TaskIndex)
+	case scope.TaskID != "":
+		return fmt.Sprintf("task_id=%s", scope.TaskID)
+	default:
+		return "unscoped legacy task"
+	}
+}
+
+func renderVerificationTodoItemLines(items []VerificationTodoItem) []string {
+	pending := make([]VerificationTodoItem, 0)
+	doing := make([]VerificationTodoItem, 0)
+	closed := make([]VerificationTodoItem, 0)
+	for _, item := range items {
 		switch item.Status {
 		case VerificationTodoStatusPending:
-			pending = append(pending, *item)
+			pending = append(pending, item)
 		case VerificationTodoStatusDoing:
-			doing = append(doing, *item)
+			doing = append(doing, item)
 		default:
-			closed = append(closed, *item)
+			closed = append(closed, item)
 		}
 	}
 
 	// 倒序输出每组, 让"最近更新"先被 LLM 看到
-	// 关键词: 倒序展示, 最近优先
-	lines := make([]string, 0, len(s.Items)+1)
+	lines := make([]string, 0, len(items))
 	for index := len(doing) - 1; index >= 0; index-- {
 		lines = append(lines, FormatVerificationTodoLine(doing[index]))
 	}
@@ -500,6 +596,13 @@ func (s *VerificationTodoStore) Render() string {
 	}
 	for index := len(closed) - 1; index >= 0; index-- {
 		lines = append(lines, FormatVerificationTodoLine(closed[index]))
+	}
+	return lines
+}
+
+func truncateVerificationTodoLines(lines []string) string {
+	if len(lines) == 0 {
+		return "- no tracked TODO items"
 	}
 
 	note := "- NOTE: TODO history exceeded 10K tokens; older closed items were truncated because this ReAct chain is too long. Prioritize finishing or dropping stale TODOs."

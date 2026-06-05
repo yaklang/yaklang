@@ -85,7 +85,9 @@ func (t *transactionTestConfig) GetContextProviderManager() *ContextProviderMana
 }
 func (t *transactionTestConfig) GetSessionEvidenceRendered() string          { return "" }
 func (t *transactionTestConfig) ApplySessionEvidenceOps([]EvidenceOperation) {}
-func (t *transactionTestConfig) GetVerificationTodoRendered() string         { return "" }
+func (t *transactionTestConfig) GetVerificationTodoRendered(_ VerificationTodoScope) string {
+	return ""
+}
 func (t *transactionTestConfig) ApplyVerificationTodoOps(VerificationTodoScope, bool, []VerifyNextMovement) {
 }
 func (t *transactionTestConfig) GetVerificationTodoMarkdownDelta(VerificationTodoScope, bool, []VerifyNextMovement) string {
