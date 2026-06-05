@@ -317,8 +317,8 @@ func (s *instructionStore) flushResidentOnCloseOnly() error {
 	}
 
 	s.resident.ForEach(func(_ int64, inst Instruction) bool {
-		irCode, err := marshalIrCodeWithReason(inst, utils.EvictionReasonDeleted)
-		if err := s.reconcileCloseFlushNilMarshal(inst, irCode, utils.EvictionReasonDeleted, err); err != nil {
+		irCode, err := s.marshalIrCodeWithReason(inst, utils.EvictionReasonDeleted)
+		if err != nil {
 			log.Errorf("marshal ir code failed: %v", err)
 			flushErr = utils.JoinErrors(flushErr, err)
 			return true
@@ -378,8 +378,8 @@ func (s *instructionStore) loadInstruction(id int64) (Instruction, error) {
 }
 
 func (s *instructionStore) marshalInstructionRecord(inst Instruction, reason utils.EvictionReason) (*instructionPersistRecord, error) {
-	irCode, err := marshalIrCodeWithReason(inst, reason)
-	if err := s.reconcileCloseFlushNilMarshal(inst, irCode, reason, err); err != nil {
+	irCode, err := s.marshalIrCodeWithReason(inst, reason)
+	if err != nil {
 		return nil, err
 	}
 	if irCode == nil {
@@ -408,47 +408,19 @@ func errCloseFlushNotPersisted(inst Instruction) error {
 		inst.GetId(), inst.GetOpcode())
 }
 
-// instructionPersistedInDB reports whether inst already has a DB-backed IR row without querying.
-// Unmodified lazy instructions loaded from the database always carry lz.ir; close flush must not
-// re-fetch hundreds of thousands of rows one-by-one.
-func instructionPersistedInDB(inst Instruction) bool {
-	lz, ok := ToLazyInstruction(inst)
-	if !ok || lz == nil || lz.Modify || lz.ShouldSave() {
-		return false
-	}
-	if lz.ir != nil && lz.ir.Opcode != 0 {
-		return true
-	}
-	return false
-}
-
-// reconcileCloseFlushNilMarshal treats nil marshal on close as success when the row already exists.
-func (s *instructionStore) reconcileCloseFlushNilMarshal(inst Instruction, irCode *ssadb.IrCode, reason utils.EvictionReason, marshalErr error) error {
-	if marshalErr != nil {
-		return marshalErr
-	}
-	if irCode != nil {
-		return nil
-	}
-	if reason != utils.EvictionReasonDeleted {
-		return nil
-	}
-	if instructionPersistedInDB(inst) {
-		s.notifyProgress(1)
-		return nil
-	}
-	if s.instructionExistsInDB(inst.GetId()) {
-		s.notifyProgress(1)
-		return nil
-	}
-	return errCloseFlushNotPersisted(inst)
-}
-
 func (s *instructionStore) instructionExistsInDB(id int64) bool {
 	if s == nil || s.db == nil || s.program == nil || id <= 0 {
 		return false
 	}
 	return ssadb.ExistsIrCodeById(s.db, s.program.Name, id)
+}
+
+func (s *instructionStore) acknowledgeCloseFlushIfPersisted(inst Instruction) bool {
+	if !s.instructionExistsInDB(inst.GetId()) {
+		return false
+	}
+	s.notifyProgress(1)
+	return true
 }
 
 func (s *instructionStore) saveInstructionPersistRecords(records []*instructionPersistRecord) error {
@@ -598,15 +570,26 @@ func instructionLocationIDs(inst Instruction) (funcID, blockID int64) {
 }
 
 func marshalIrCode(inst Instruction) (*ssadb.IrCode, error) {
-	return marshalIrCodeWithReason(inst, 0)
-}
-
-func marshalIrCodeWithReason(inst Instruction, reason utils.EvictionReason) (*ssadb.IrCode, error) {
 	ret := ssadb.EmptyIrCode(inst.GetProgramName(), inst.GetId())
-	if ok := marshalInstruction(inst, ret, reason); !ok {
+	if !marshalInstruction(inst, ret, 0) {
 		return nil, nil
 	}
 	return ret, nil
+}
+
+func (s *instructionStore) marshalIrCodeWithReason(inst Instruction, reason utils.EvictionReason) (*ssadb.IrCode, error) {
+	ret := ssadb.EmptyIrCode(inst.GetProgramName(), inst.GetId())
+	if marshalInstruction(inst, ret, reason) {
+		return ret, nil
+	}
+
+	if reason == utils.EvictionReasonDeleted {
+		if s.acknowledgeCloseFlushIfPersisted(inst) {
+			return nil, nil
+		}
+		return nil, errCloseFlushNotPersisted(inst)
+	}
+	return nil, nil
 }
 
 func evictionReasonName(reason utils.EvictionReason) string {
