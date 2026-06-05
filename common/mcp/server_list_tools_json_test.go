@@ -18,7 +18,7 @@ import (
 func TestMCPServerListToolsJSONFormat(t *testing.T) {
 	log.SetLevel(log.FatalLevel)
 
-	s, err := NewMCPServer()
+	s, err := NewMCPServer(WithEnableAllToolSets())
 	require.NoError(t, err)
 
 	testServer := mcpserver.NewTestServer(s.server)
