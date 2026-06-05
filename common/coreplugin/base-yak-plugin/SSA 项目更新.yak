@@ -238,7 +238,7 @@ if err != nil {
     return
 }
 
-yakit.Info("成功加载项目: %s (ID: %d)", project.ProjectName, project.ID)
+yakit.Info("成功加载项目: %s (ID: %d)", project.ProjectName, project.SSAProject.ID)
 
 yakit.Info("更新项目配置...")
 configBytes, err = json.Marshal(configData)
@@ -261,7 +261,7 @@ yakit.Info("SSA项目更新成功!")
 // 这里返回数据，前端收到会进行前端更新
 yakit.Output({
     "success": true,
-    "project_id": project.ID,
+    "project_id": project.SSAProject.ID,
     "project_name": project.ProjectName,
     "description": project.Description,
     "path": project.URL,

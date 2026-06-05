@@ -19,11 +19,12 @@ import (
 type SyntaxFlowQueryInstance interface {
 	SyntaxFlowWithError(i string, opts ...QueryOption) (*SyntaxFlowResult, error)
 	SyntaxFlowRule(rule *schema.SyntaxFlowRule, opts ...QueryOption) (*SyntaxFlowResult, error)
+	GetLanguage() ssaconfig.Language
+	IsIncrementalCompile() bool
 }
 
 var _ SyntaxFlowQueryInstance = (*Program)(nil)
 var _ SyntaxFlowQueryInstance = (*ProgramOverLay)(nil)
-var _ SyntaxFlowQueryInstance = (Programs)(nil)
 
 var DefaultInputVar = "input"
 

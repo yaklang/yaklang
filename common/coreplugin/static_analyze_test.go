@@ -11,7 +11,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/result"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 func staticCheck(code, pluginType string, t *testing.T) {
@@ -28,7 +27,7 @@ func staticCheck(code, pluginType string, t *testing.T) {
 
 func TestAnalyzeMustPASSCorePlugin(t *testing.T) {
 	// for i := 0; i < 20; i++ {
-	yakit.CallPostInitDatabase()
+	coreplugin.ForceSyncCorePlugin()
 	for _, plugin := range coreplugin.GetAllCorePluginWithType() {
 		t.Run(fmt.Sprintf("plugin(%s) %s", plugin.Type, plugin.ScriptName), func(t *testing.T) {
 			staticCheck(plugin.Content, plugin.Type, t)
@@ -43,7 +42,7 @@ func TestAnalyzeMustPASSCorePlugin_Debug(t *testing.T) {
 		t.Skip("Skip in Github Actions")
 	}
 	target := "SSA 项目探测"
-	yakit.CallPostInitDatabase()
+	coreplugin.ForceSyncCorePlugin()
 	for _, plugin := range coreplugin.GetAllCorePluginWithType() {
 		if plugin.ScriptName != target {
 			continue
