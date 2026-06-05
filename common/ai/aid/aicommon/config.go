@@ -239,6 +239,14 @@ type Config struct {
 	DisableWebSearch    bool // disable enhanced web search tool, default false (enabled)
 	DisallowMCPServers  bool // 禁用 MCP Servers，默认为 false（即默认启用）
 
+	// ExtraMCPServers 会话级显式挂载的 MCP server（不读 profile DB、不进全局列表）。
+	// 仅在本字段非空时激活，默认 nil，对现有流程零影响。
+	ExtraMCPServers []*ExtraMCPServer
+
+	// RestrictToolsToExtraMCPServers 为 true 时，会话的工具集被钳制为仅 ExtraMCPServers
+	// 暴露的工具：禁用工具搜索/forge/内置工具，使 agent 无法触达本地 yak 工具（如 ssa-risk）。
+	RestrictToolsToExtraMCPServers bool
+
 	// Interactive(review/require_user/sync) features
 	// endpoint manager
 	Epm *EndpointManager
@@ -1571,6 +1579,45 @@ func WithDisallowMCPServers(disallow bool) ConfigOption {
 			c.AiToolManagerOption = make([]buildinaitools.ToolManagerOption, 0)
 		}
 		c.AiToolManagerOption = append(c.AiToolManagerOption, buildinaitools.WithDisallowMCPServers(disallow))
+		return nil
+	}
+}
+
+// ExtraMCPServer 描述一个会话级显式挂载的 MCP server。
+// AllowedTools 非空时，client 侧只保留名字在白名单内的工具，server 多暴露的一律丢弃。
+type ExtraMCPServer struct {
+	Server       *schema.MCPServer
+	AllowedTools []string
+}
+
+// WithExtraMCPServers 为本会话挂载额外的 MCP server（内存态，不落 profile DB、不进全局列表）。
+func WithExtraMCPServers(servers ...*ExtraMCPServer) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		defer c.m.Unlock()
+		for _, s := range servers {
+			if s == nil || s.Server == nil {
+				continue
+			}
+			c.ExtraMCPServers = append(c.ExtraMCPServers, s)
+		}
+		return nil
+	}
+}
+
+// WithRestrictToolsToExtraMCPServers 钳制会话工具集为仅 ExtraMCPServers 暴露的工具，
+// 禁用工具搜索/forge/内置工具，确保 agent 只能调用注入的 session MCP 工具。
+func WithRestrictToolsToExtraMCPServers(restrict bool) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		defer c.m.Unlock()
+		c.RestrictToolsToExtraMCPServers = restrict
 		return nil
 	}
 }
