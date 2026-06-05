@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
@@ -23,16 +24,23 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+func migrateMCPServerRelatedTables(db *gorm.DB) error {
+	return db.AutoMigrate(
+		&schema.MCPServer{},
+		&schema.MCPServerToolConfig{},
+		&schema.MCPClientToolConfig{},
+	).Error
+}
+
 func init() {
-	// 确保 MCP 服务器表存在
+	// 确保 MCP 相关表存在（Update/Delete 会联动 tool config 表）
 	db := consts.GetGormProfileDatabase()
-	db.AutoMigrate(&schema.MCPServer{})
+	_ = migrateMCPServerRelatedTables(db)
 }
 
 func TestMCPServerCRUD(t *testing.T) {
-	// 确保数据库表存在
 	db := consts.GetGormProfileDatabase()
-	db.AutoMigrate(&schema.MCPServer{})
+	require.NoError(t, migrateMCPServerRelatedTables(db))
 
 	// 清理可能存在的测试数据
 	db.Unscoped().Where("name LIKE ?", "test-%").Delete(&schema.MCPServer{})
@@ -284,8 +292,8 @@ func TestMCPServerDatabase(t *testing.T) {
 	if err != nil {
 		t.Fatalf("创建临时数据库失败: %v", err)
 	}
-	// 确保数据库表存在
-	db.AutoMigrate(&schema.MCPServer{})
+	// 确保数据库表存在（UpdateMCPServer/DeleteMCPServer 会联动 tool config 表）
+	require.NoError(t, migrateMCPServerRelatedTables(db))
 
 	// 测试数据库直接操作
 	t.Run("DirectDatabaseOperations", func(t *testing.T) {
@@ -401,8 +409,7 @@ func TestMCPServerDatabase(t *testing.T) {
 
 func TestMCPServerPagination(t *testing.T) {
 	db := consts.GetGormProfileDatabase()
-	// 确保数据库表存在
-	db.AutoMigrate(&schema.MCPServer{})
+	require.NoError(t, migrateMCPServerRelatedTables(db))
 
 	// 创建多个测试服务器
 	servers := []*schema.MCPServer{
@@ -488,7 +495,7 @@ func TestMCPServerToolsRetrieval(t *testing.T) {
 
 	// 启动 MCP 服务器
 	go func() {
-		mcpServer, err := mcp.NewMCPServer()
+		mcpServer, err := mcp.NewMCPServer(mcp.WithEnableAllToolSets())
 		if err != nil {
 			t.Errorf("创建 MCP 服务器失败: %v", err)
 			return
