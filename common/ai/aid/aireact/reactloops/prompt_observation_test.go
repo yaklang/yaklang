@@ -111,6 +111,7 @@ func TestGenerateLoopPrompt_RecordsObservation(t *testing.T) {
 	})(loop)
 
 	task := &mockSimpleTask{id: "test-task", index: "test-index"}
+	loop.SetCurrentTask(task)
 	operator := NewActionHandlerOperator(task)
 
 	prompt, err := loop.generateLoopPrompt("nonce1", "raw user input", "", nil, "memory content", operator)

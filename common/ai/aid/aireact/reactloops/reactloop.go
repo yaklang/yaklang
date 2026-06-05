@@ -450,13 +450,30 @@ func (r *ReActLoop) DisallowAskForClarification() {
 	}
 }
 
+func (r *ReActLoop) ensureTaskMutex() {
+	if r == nil {
+		return
+	}
+	if r.taskMutex == nil {
+		r.taskMutex = new(sync.Mutex)
+	}
+}
+
 func (r *ReActLoop) GetCurrentTask() aicommon.AIStatefulTask {
+	if r == nil {
+		return nil
+	}
+	r.ensureTaskMutex()
 	r.taskMutex.Lock()
 	defer r.taskMutex.Unlock()
 	return r.currentTask
 }
 
 func (r *ReActLoop) SetCurrentTask(t aicommon.AIStatefulTask) {
+	if r == nil || t == nil {
+		return
+	}
+	r.ensureTaskMutex()
 	r.taskMutex.Lock()
 	defer r.taskMutex.Unlock()
 	r.currentTask = t
