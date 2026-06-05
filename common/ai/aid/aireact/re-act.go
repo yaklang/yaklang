@@ -717,7 +717,10 @@ func (r *ReAct) loadExtraMCPServers(servers []*aicommon.ExtraMCPServer) {
 			log.Infof("session-scoped mcp server %s mounted %d tool(s)", s.Server.Name, len(tools))
 		}
 	}
-	if r.config.RestrictToolsToExtraMCPServers && len(mountedNames) > 0 {
+	// Restrict unconditionally (deny-all when nothing mounted): if a restricted
+	// session's MCP servers are unreachable/empty, falling back to the full
+	// builtin/search toolset would be a fail-open, defeating the restriction.
+	if r.config.RestrictToolsToExtraMCPServers {
 		mng.RestrictToTools(mountedNames...)
 		log.Infof("session tools restricted to %d session-scoped mcp tool(s): %v", len(mountedNames), mountedNames)
 	}
