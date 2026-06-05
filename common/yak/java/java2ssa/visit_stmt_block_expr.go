@@ -351,7 +351,22 @@ func (y *singleFileBuilder) VisitExpression(raw javaparser.IExpressionContext) s
 			log.Errorf("javaast %s: %s", y.CurrentRange.String(), yak2ssa.BinaryOperatorNotSupport(ret.GetText()))
 			return y.EmitUndefined(raw.GetText())
 		}
-		return y.EmitBinOp(opcode, op1, op2)
+		value := y.EmitBinOp(opcode, op1, op2)
+		if opcode == ssa.OpAdd && !utils.IsNil(value) {
+			isStringValue := func(v ssa.Value) bool {
+				if utils.IsNil(v) {
+					return false
+				}
+				typ := v.GetType()
+				return typ != nil && typ.GetTypeKind() == ssa.StringTypeKind
+			}
+			if isStringValue(op1) || isStringValue(op2) {
+				stringType := ssa.CreateStringType()
+				stringType.AddFullTypeName(stringType.String())
+				value.SetType(stringType)
+			}
+		}
+		return value
 	case *javaparser.ShiftExpressionContext:
 		// 处理位移表达式
 		op1 := y.VisitExpression(ret.Expression(0))

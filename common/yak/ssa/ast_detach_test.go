@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestDetachAST_CutsParentButKeepsChildren(t *testing.T) {
+func TestDetachAST_SlimsRootButKeepsDownwardChildren(t *testing.T) {
 	parent := antlr.NewBaseParserRuleContext(nil, -1)
 	child := antlr.NewBaseParserRuleContext(parent, -1)
 	parent.AddChild(child)
@@ -31,9 +31,7 @@ func TestDetachAST_NilSafe(t *testing.T) {
 	})
 }
 
-func TestDetachAST_TerminalNodeIsSkippedSafely(t *testing.T) {
-	// TerminalNodeImpl.SetParent panics on a nil argument; DetachAST must skip
-	// terminals (they are never captured by a lazy builder) rather than panic.
+func TestDetachAST_TerminalNodeIsNilSafe(t *testing.T) {
 	term := antlr.NewTerminalNodeImpl(nil)
 	require.NotPanics(t, func() {
 		DetachAST[antlr.Tree](term)

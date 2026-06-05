@@ -10,9 +10,9 @@ package tests
 //      再将真正的编译逻辑注册为 lazy task（不立刻执行）。
 //   2. 所有 AST 遍历完成后，统一执行所有 lazy task。
 //
-// StoredFunctionBuilder 有两个字段：
+// StoredFunctionBuilder 保存两类状态：
 //   - Current *FunctionBuilder  活指针，指向父函数的 builder 对象本身
-//   - Store   *FunctionBuilder  值快照，保存注册时 builder 的部分字段（含 CurrentBlock）
+//   - 字段快照，保存注册时 builder 的部分字段（含 CurrentBlock）
 //
 // 问题时间线（以三层嵌套为例）：
 //
@@ -22,7 +22,7 @@ package tests
 //       执行 `zipEntry.async(...).then(innerArrow)` → 调用 VisitArrowFunction(innerArrow)
 //       → store3 = StoreFunctionBuilder()
 //         store3.Current = b.FunctionBuilder          (活指针)
-//         store3.Store.CurrentBlock = b.CurrentBlock  (快照 = SubBlock，含 sanitizedName)
+//         store3.CurrentBlock() = b.CurrentBlock      (快照 = SubBlock，含 sanitizedName)
 //       → 注册第三层 lazy task，暂时返回
 //
 //   T2: 第二层 closure 继续编译：
@@ -37,7 +37,7 @@ package tests
 //       getParentFunctionVariable("sanitizedName") → 找不到 → 生成 Undefined
 //
 // 修复方案：
-//   在 PushFunction 调用前，用 store.Store.CurrentBlock（注册时快照的 SubBlock）
+//   在 PushFunction 调用前，用 store.CurrentBlock()（注册时快照的 SubBlock）
 //   临时替换活指针上已失效的 EndBlock，确保 parentScope 正确包含父函数体内的 local 变量。
 
 import (

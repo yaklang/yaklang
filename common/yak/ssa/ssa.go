@@ -278,9 +278,10 @@ type Program struct {
 
 	Cache *ProgramCache
 
-	finished      bool
-	rootBuildSeq  []RootBuildRunner
-	rootBuildByID map[string]RootBuildRunner
+	finished       bool
+	rootBuildSeq   []RootBuildRunner
+	rootBuildByID  map[string]RootBuildRunner
+	rootBuildTotal int
 
 	//consts
 	Consts map[string]Value

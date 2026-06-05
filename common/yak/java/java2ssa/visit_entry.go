@@ -58,21 +58,8 @@ func (y *singleFileBuilder) VisitCompilationUnit(raw javaparser.ICompilationUnit
 			y.VisitTypeDeclaration(declarationContext)
 		}
 		if ssa.SkeletonTopLevelEnabled() {
-			prog := y.GetProgram()
-			app := prog.GetApplication()
-			editor := app.GetCurrentEditor()
-			path := "java"
-			if editor != nil && editor.GetUrl() != "" {
-				path = editor.GetUrl()
-			}
-			capturedCU := i
-			capturedBuilder := y.FunctionBuilder
-			prog.RegisterRootTopLevel(path, editor, capturedBuilder, func(root *ssa.FunctionBuilder) {
-				_ = CreateBuilder().BuildFromAST(capturedCU, root)
-			})
-			for _, child := range i.GetChildren() {
-				ssa.DetachAST(child)
-			}
+			y.registerPostSkeletonImportTask(i)
+			ssa.DetachASTRootChildren(i)
 		}
 	}
 	y.GetProgram().VisitAst(i)

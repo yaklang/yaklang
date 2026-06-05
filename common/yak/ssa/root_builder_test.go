@@ -33,6 +33,36 @@ func TestRunRootTopLevelBuildsOnce(t *testing.T) {
 	prog.RunRootBuilds()
 	prog.RunRootBuilds()
 	require.Equal(t, 1, count)
+	require.Equal(t, 1, prog.RootBuildCount())
+	require.Nil(t, task.program)
+	require.Nil(t, task.editor)
+	require.Nil(t, task.builder)
+	require.Nil(t, task.LazyBuilder)
+	require.Nil(t, prog.rootBuildSeq)
+	require.Nil(t, prog.rootBuildByID)
+}
+
+func TestRunRootBuildsKeepsTasksRegisteredDuringBuild(t *testing.T) {
+	prog := newRootBuildTestProgram(t, "root-build-register-during-build")
+
+	var ran []string
+	first := prog.RegisterRootTask(RootBuildKindTopLevel, "first", func() {
+		ran = append(ran, "first")
+		prog.RegisterRootTask(RootBuildKindTopLevel, "second", func() {
+			ran = append(ran, "second")
+		})
+	})
+
+	prog.RunRootBuilds()
+	require.Equal(t, []string{"first"}, ran)
+	require.Equal(t, 2, prog.RootBuildCount())
+	require.NotNil(t, prog.rootBuildSeq)
+	require.Nil(t, first.LazyBuilder)
+
+	prog.RunRootBuilds()
+	require.Equal(t, []string{"first", "second"}, ran)
+	require.Nil(t, prog.rootBuildSeq)
+	require.Nil(t, prog.rootBuildByID)
 }
 
 func TestFinishAllowsLazyLibraryExpansion(t *testing.T) {

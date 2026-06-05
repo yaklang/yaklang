@@ -3,7 +3,10 @@ package ssaapi
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"runtime"
+	"runtime/pprof"
+	"strings"
 	"sync"
 	"time"
 
@@ -16,16 +19,40 @@ import (
 
 // heapLogEnabled gates retained-heap phase logging (docs/ssa-ast-to-ssa-skeleton-plan.md
 // §5 阶段0). Set YAK_SSA_HEAP_LOG=1 to print GC'd HeapInuse after each compile phase.
+// Set YAK_SSA_HEAP_PROFILE_DIR=<dir> to write a heap profile (pprof) after each phase (GC first).
 var heapLogEnabled = os.Getenv("YAK_SSA_HEAP_LOG") != ""
 
 func logPhaseHeap(tag string) {
-	if !heapLogEnabled {
+	if !heapLogEnabled && os.Getenv("YAK_SSA_HEAP_PROFILE_DIR") == "" {
 		return
 	}
 	runtime.GC()
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
-	fmt.Fprintf(os.Stderr, "[ssa.heap] %-16s retained_HeapInuse=%7.1fMB HeapObjects=%d\n", tag, float64(m.HeapInuse)/(1024*1024), m.HeapObjects)
+	if heapLogEnabled {
+		fmt.Fprintf(os.Stderr, "[ssa.heap] %-16s retained_HeapInuse=%7.1fMB HeapObjects=%d\n", tag, float64(m.HeapInuse)/(1024*1024), m.HeapObjects)
+	}
+	if dir := os.Getenv("YAK_SSA_HEAP_PROFILE_DIR"); dir != "" {
+		_ = os.MkdirAll(dir, 0o755)
+		target := filepath.Join(dir, normalizeHeapProfileName(tag)+".heap.pb.gz")
+		f, err := os.Create(target)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "[ssa.heap] profile write failed %s: %v\n", target, err)
+			return
+		}
+		if err := pprof.WriteHeapProfile(f); err != nil {
+			fmt.Fprintf(os.Stderr, "[ssa.heap] profile write failed %s: %v\n", target, err)
+		}
+		_ = f.Close()
+		if heapLogEnabled {
+			fmt.Fprintf(os.Stderr, "[ssa.heap] profile saved %s\n", target)
+		}
+	}
+}
+
+func normalizeHeapProfileName(tag string) string {
+	replacer := strings.NewReplacer("/", "_", " ", "_", ".", "_")
+	return replacer.Replace(tag)
 }
 
 type SaveFolder struct {

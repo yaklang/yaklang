@@ -108,15 +108,16 @@ func (y *singleFileBuilder) VisitClassDeclaration(raw javaparser.IClassDeclarati
 	if i.EXTENDS() != nil {
 		if extend := i.TypeType(); extend != nil {
 			extendName = extend.GetText()
+			extend = ssa.DetachAST(extend)
+			tokenMap[extendName] = extend
 		}
 		parents = append(parents, extendName)
-		tokenMap[extendName] = i.TypeType()
 	}
 
 	if i.IMPLEMENTS() != nil {
 		for _, val := range i.AllTypeList() {
 			implNames = append(implNames, val.GetText())
-			tokenMap[val.GetText()] = val
+			tokenMap[val.GetText()] = ssa.DetachAST(val)
 		}
 	}
 
@@ -219,24 +220,30 @@ func (y *singleFileBuilder) VisitMemberDeclaration(raw javaparser.IMemberDeclara
 			setMember = class.RegisterStaticMember
 		}
 		field := i.FieldDeclaration().(*javaparser.FieldDeclarationContext)
+		var fieldTypeContext javaparser.ITypeTypeContext
+		if ret := field.TypeType(); ret != nil {
+			fieldTypeContext = ssa.DetachAST(ret)
+		}
 		variableDeclarators := field.VariableDeclarators().(*javaparser.VariableDeclaratorsContext).AllVariableDeclarator()
+		capturedDeclarators := make([]javaparser.IVariableDeclaratorContext, 0, len(variableDeclarators))
 		for _, name := range variableDeclarators {
 			namex := y.OnlyVisitVariableDeclaratorName(name)
 			undefined := y.EmitUndefined(namex)
 			setMember(namex, undefined, false)
+			capturedDeclarators = append(capturedDeclarators, ssa.DetachAST(name))
 		}
 		store := y.StoreFunctionBuilder()
 		class.AddLazyBuilder(func() {
 			switchHandler := y.SwitchFunctionBuilder(store)
 			defer switchHandler()
 			var fieldType ssa.Type
-			if field.TypeType() != nil {
-				typex := field.TypeType().GetText()
+			if fieldTypeContext != nil {
+				typex := fieldTypeContext.GetText()
 				_ = typex
-				fieldType = y.VisitTypeType(field.TypeType())
+				fieldType = y.VisitTypeType(fieldTypeContext)
 			}
 			_ = fieldType
-			for _, variableDeclarator := range variableDeclarators {
+			for _, variableDeclarator := range capturedDeclarators {
 				v := variableDeclarator.(*javaparser.VariableDeclaratorContext)
 				name, value := y.VisitVariableDeclarator(v, nil)
 				if utils.IsNil(value) {
@@ -539,11 +546,12 @@ func (y *singleFileBuilder) VisitClassBodyDeclaration(
 	}
 
 	if ret := i.Block(); ret != nil {
+		block := ssa.DetachAST(ret)
 		store := y.StoreFunctionBuilder()
 		class.AddLazyBuilder(func() {
 			switchHandler := y.SwitchFunctionBuilder(store)
 			defer switchHandler()
-			y.VisitBlock(i.Block())
+			y.VisitBlock(block)
 		})
 	} else if ret := i.MemberDeclaration(); ret != nil {
 		if class != nil {
@@ -617,22 +625,25 @@ func (y *singleFileBuilder) VisitMethodDeclaration(
 		log.Debugf("def: %s %s ", funcName, key)
 		def(newFunc)
 	}
+	typeTypeOrVoid := ssa.DetachAST(i.TypeTypeOrVoid())
+	formalParameters := ssa.DetachAST(i.FormalParameters())
+	methodBody := ssa.DetachAST(i.MethodBody())
 	newFunc.AddLazyBuilder(func() {
 		log.Debugf("lazybuild: %s %s ", funcName, key)
 		switchHandler := y.SwitchFunctionBuilder(store)
 		defer switchHandler()
 		y.FunctionBuilder = y.PushFunction(newFunc)
 		if isStatic {
-			y.SetType(y.VisitTypeTypeOrVoid(i.TypeTypeOrVoid()))
+			y.SetType(y.VisitTypeTypeOrVoid(typeTypeOrVoid))
 		}
 		if !isStatic {
-			this := y.NewParam("this", raw)
+			this := y.NewParam("this", formalParameters)
 			this.SetType(class)
 		}
 		y.MarkedThisClassBlueprint = class
-		y.SetCurrentReturnType(y.VisitTypeTypeOrVoid(i.TypeTypeOrVoid()))
-		y.VisitFormalParameters(i.FormalParameters())
-		y.VisitMethodBody(i.MethodBody())
+		y.SetCurrentReturnType(y.VisitTypeTypeOrVoid(typeTypeOrVoid))
+		y.VisitFormalParameters(formalParameters)
+		y.VisitMethodBody(methodBody)
 		y.Finish()
 		// framework support for spring boot
 		y.ResetUIModel()
@@ -886,6 +897,8 @@ func (y *singleFileBuilder) VisitConstructorDeclaration(raw javaparser.IConstruc
 	newFunc.AddThrow(y.VisitThrowsClause(i)...)
 	class.RegisterMagicMethod(ssa.Constructor, newFunc)
 	store := y.StoreFunctionBuilder()
+	formalParameters := ssa.DetachAST(i.FormalParameters())
+	block := ssa.DetachAST(i.Block())
 	newFunc.AddLazyBuilder(func() {
 		switchHandler := y.SwitchFunctionBuilder(store)
 		defer switchHandler()
@@ -896,8 +909,8 @@ func (y *singleFileBuilder) VisitConstructorDeclaration(raw javaparser.IConstruc
 			variable := y.CreateVariable("this")
 			y.AssignVariable(variable, container)
 			container.SetType(class)
-			y.VisitFormalParameters(i.FormalParameters())
-			y.VisitBlock(i.Block())
+			y.VisitFormalParameters(formalParameters)
+			y.VisitBlock(block)
 			y.EmitReturn([]ssa.Value{container})
 			y.Finish()
 		}
