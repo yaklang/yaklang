@@ -23,7 +23,7 @@ if tags != "" {
     query += sprintf("Tags: %s\n", tags)
 }
 query += sprintf("\nCode:\n```yak\n%s\n```", content)
-
+result := {}
 if mode == "AI元数据" {
     prompt = <<<PROMPT
 你是 YakScript 的 AI 元数据生成器。

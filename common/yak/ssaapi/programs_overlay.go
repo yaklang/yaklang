@@ -60,6 +60,12 @@ type ProgramOverLay struct {
 	language    ssaconfig.Language
 }
 
+// IsIncrementalCompile 判断这个 program 是否是增量编译的
+// program overlay 本质上就是增量编译的虚拟视图，所以返回 true
+func (o *ProgramOverLay) IsIncrementalCompile() bool {
+	return true
+}
+
 // GetLayerProgramNames 获取所有 layer 的 program names（按顺序，从底层到上层）
 func (o *ProgramOverLay) GetLayerProgramNames() []string {
 	if o == nil || len(o.Layers) == 0 {
