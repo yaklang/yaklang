@@ -20,6 +20,16 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+// defaultMCPClientInfo is the implementation identity yaklang advertises during
+// the MCP initialize handshake (akin to a User-Agent). The version tracks the
+// running yaklang build so MCP servers can tell client versions apart.
+func defaultMCPClientInfo() mcp.Implementation {
+	return mcp.Implementation{
+		Name:    "yaklang-aitool-loader",
+		Version: consts.GetYakVersion(),
+	}
+}
+
 // mcpToolParamInfo is a lightweight representation of a tool parameter used for
 // JSON serialization into MCPServerToolConfig.ParamsJSON.
 type mcpToolParamInfo struct {
@@ -137,10 +147,7 @@ func LoadAIToolFromMCPServers(db *gorm.DB, ctx context.Context, name string, onT
 
 	initRequest := mcp.InitializeRequest{}
 	initRequest.Params.ProtocolVersion = mcp.LATEST_PROTOCOL_VERSION
-	initRequest.Params.ClientInfo = mcp.Implementation{
-		Name:    "yaklang-aitool-loader",
-		Version: "1.0.0",
-	}
+	initRequest.Params.ClientInfo = defaultMCPClientInfo()
 
 	var listChangedState *mcpToolsListChangedState
 	if listChangedHandler != nil {
@@ -226,10 +233,7 @@ func LoadAIToolsFromMCPServer(ctx context.Context, server *schema.MCPServer, all
 
 	initRequest := mcp.InitializeRequest{}
 	initRequest.Params.ProtocolVersion = mcp.LATEST_PROTOCOL_VERSION
-	initRequest.Params.ClientInfo = mcp.Implementation{
-		Name:    "yaklang-aitool-loader",
-		Version: "1.0.0",
-	}
+	initRequest.Params.ClientInfo = defaultMCPClientInfo()
 	if _, err = mcpClient.Initialize(initCtx, initRequest); err != nil {
 		return nil, utils.Errorf("initialize mcp client failed: %v", err)
 	}
