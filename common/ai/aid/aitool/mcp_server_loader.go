@@ -208,6 +208,63 @@ func LoadAIToolFromMCPServers(db *gorm.DB, ctx context.Context, name string, onT
 	return aiTools, nil
 }
 
+// LoadAIToolsFromMCPServer 从单个显式 MCP server（不查 DB）加载工具，用于会话级挂载。
+// allowedTools 非空时在 client 侧按裸工具名做白名单过滤，server 多暴露的工具一律丢弃，
+// 不依赖 server 自觉只暴露。客户端生命周期随返回的 Tool（Callback 持有 client）。
+func LoadAIToolsFromMCPServer(ctx context.Context, server *schema.MCPServer, allowedTools []string) ([]*Tool, error) {
+	if server == nil {
+		return nil, utils.Errorf("mcp server is nil")
+	}
+
+	mcpClient, err := createMCPClient(server)
+	if err != nil {
+		return nil, utils.Errorf("create mcp client failed: %v", err)
+	}
+
+	initCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	initRequest := mcp.InitializeRequest{}
+	initRequest.Params.ProtocolVersion = mcp.LATEST_PROTOCOL_VERSION
+	initRequest.Params.ClientInfo = mcp.Implementation{
+		Name:    "yaklang-aitool-loader",
+		Version: "1.0.0",
+	}
+	if _, err = mcpClient.Initialize(initCtx, initRequest); err != nil {
+		return nil, utils.Errorf("initialize mcp client failed: %v", err)
+	}
+
+	toolsResult, err := mcpClient.ListTools(initCtx, mcp.ListToolsRequest{})
+	if err != nil {
+		return nil, utils.Errorf("list tools failed: %v", err)
+	}
+
+	allow := make(map[string]bool, len(allowedTools))
+	for _, name := range allowedTools {
+		if name != "" {
+			allow[name] = true
+		}
+	}
+
+	var aiTools []*Tool
+	for _, mcpTool := range toolsResult.Tools {
+		if len(allow) > 0 && !allow[mcpTool.Name] {
+			continue
+		}
+		aiTool, err := convertMCPToolToAITool(mcpTool, server, mcpClient)
+		if err != nil {
+			log.Errorf("convert mcp tool to aitool failed: %v", err)
+			continue
+		}
+		aiTools = append(aiTools, aiTool)
+	}
+
+	if len(aiTools) == 0 {
+		return nil, utils.Errorf("no tools loaded from mcp server %s (allowlist=%v)", server.Name, allowedTools)
+	}
+	return aiTools, nil
+}
+
 // createMCPClient 根据 MCP 服务器配置创建客户端
 func createMCPClient(server *schema.MCPServer) (client.MCPClient, error) {
 	switch server.Type {

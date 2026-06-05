@@ -519,6 +519,10 @@ func buildReActOptions(ctx context.Context, config *AIEngineConfig, outputChan c
 		options = append(options, aicommon.WithKeywords(config.Keywords...))
 	}
 
+	if config.RestrictToSessionMCP {
+		options = append(options, aicommon.WithRestrictToolsToExtraMCPServers(true))
+	}
+
 	// 交互配置
 	if !config.AllowUserInteract {
 		options = append(options, aicommon.WithAllowRequireForUserInteract(false))

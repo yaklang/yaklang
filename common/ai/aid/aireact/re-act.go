@@ -360,6 +360,12 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 		react.loadMCPServers()
 	}
 
+	// 会话级显式挂载（内存态，不读 profile DB、不进全局列表）。
+	// 同步加载，保证首轮推理前工具已就绪。
+	if len(react.config.ExtraMCPServers) > 0 {
+		react.loadExtraMCPServers(react.config.ExtraMCPServers)
+	}
+
 	return react, nil
 }
 
@@ -675,6 +681,35 @@ func (r *ReAct) preloadMCPStubsFromDB() {
 	if len(stubs) > 0 {
 		mng.AppendTools(stubs...)
 		log.Infof("preloaded %d MCP tool stubs from DB cache into tool manager", len(stubs))
+	}
+}
+
+// loadExtraMCPServers mounts session-scoped MCP servers at construction time.
+// 每个 server 经 aitool.LoadAIToolsFromMCPServer 取工具（不查 profile DB），
+// 并按 AllowedTools 在 client 侧做白名单过滤后 AppendTools。
+func (r *ReAct) loadExtraMCPServers(servers []*aicommon.ExtraMCPServer) {
+	mng := r.config.GetAiToolManager()
+	var mountedNames []string
+	for _, s := range servers {
+		if s == nil || s.Server == nil {
+			continue
+		}
+		tools, err := aitool.LoadAIToolsFromMCPServer(r.config.Ctx, s.Server, s.AllowedTools)
+		if err != nil {
+			log.Errorf("load session-scoped mcp server %s failed: %v", s.Server.Name, err)
+			continue
+		}
+		if len(tools) > 0 {
+			mng.AppendTools(tools...)
+			for _, tool := range tools {
+				mountedNames = append(mountedNames, tool.Name)
+			}
+			log.Infof("session-scoped mcp server %s mounted %d tool(s)", s.Server.Name, len(tools))
+		}
+	}
+	if r.config.RestrictToolsToExtraMCPServers && len(mountedNames) > 0 {
+		mng.RestrictToTools(mountedNames...)
+		log.Infof("session tools restricted to %d session-scoped mcp tool(s): %v", len(mountedNames), mountedNames)
 	}
 }
 
