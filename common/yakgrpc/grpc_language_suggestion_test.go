@@ -558,7 +558,7 @@ rsp.Ba`,
 		id, token := utils.RandStringBytes(16), utils.RandStringBytes(16)
 		checkCompletionWithIDCallbacks(t, fmt.Sprintf(`m = {"%s":"d"}
 defer m.`, token), &ypb.Range{
-			Code: "m.", StartLine: 2, StartColumn: 7, EndLine: 8, EndColumn: 9,
+			Code: "m.", StartLine: 2, StartColumn: 7, EndLine: 2, EndColumn: 9,
 		}, id,
 			labelsContainsCallback(t, []string{"Delete", "Keys", token}),
 		)
