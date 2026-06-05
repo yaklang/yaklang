@@ -57,7 +57,7 @@ func (r *ReAct) RenderVerificationTodoSnapshot() string {
 	if r == nil || r.config == nil {
 		return "- no tracked TODO items"
 	}
-	rendered := r.config.GetVerificationTodoRendered()
+	rendered := r.config.GetVerificationTodoRendered(aicommon.BuildVerificationTodoScope(r.GetCurrentTask()))
 	if rendered == "" {
 		return "- no tracked TODO items"
 	}

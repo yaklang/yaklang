@@ -52,7 +52,7 @@ type AICallerConfigIf interface {
 	// 全局 TODO List：维持在 SessionPromptState 中，loop prompt 与 verify 路径
 	// 共享同一份状态。详见 verification_todo_store.go / session_prompt_state.go.
 	// 关键词: 全局 TODO, ApplyVerificationTodoOps, GetVerificationTodoRendered
-	GetVerificationTodoRendered() string
+	GetVerificationTodoRendered(currentScope VerificationTodoScope) string
 	ApplyVerificationTodoOps(scope VerificationTodoScope, satisfied bool, movements []VerifyNextMovement)
 	GetVerificationTodoMarkdownDelta(scope VerificationTodoScope, satisfied bool, movements []VerifyNextMovement) string
 	SnapshotVerificationTodoItems() []VerificationTodoItem

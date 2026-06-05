@@ -100,7 +100,7 @@ func (m *MockedAIConfig) GetSessionEvidenceRendered() string {
 func (m *MockedAIConfig) ApplySessionEvidenceOps(ops []aicommon.EvidenceOperation) {
 }
 
-func (m *MockedAIConfig) GetVerificationTodoRendered() string {
+func (m *MockedAIConfig) GetVerificationTodoRendered(_ aicommon.VerificationTodoScope) string {
 	return ""
 }
 

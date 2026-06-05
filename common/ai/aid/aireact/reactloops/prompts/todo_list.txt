@@ -2,12 +2,17 @@
 <|TODO_LIST_{{ .Nonce }}|>
 ## 待办清单（TODO）
 
-以下 TODO 由历轮 Verify 累计维护，在每一次 loop iteration 中保持可见。它代表当前会话内"应该推进、应该跳过、已经关闭"的可执行项集合。
+以下 TODO 由历轮 Verify / adjust_todolist 累计维护，在每一次 loop iteration 中保持可见。列表已按任务归属分组：
+
+- **CURRENT TASK（当前任务）**：属于你正在执行的任务。你必须只在这里推进、关闭 TODO。
+- **OTHER TASKS（其它任务）**：属于已完成或并行的兄弟任务，仅供上下文参考，**不要修改**其中的 TODO。
 
 在选择下一步动作前：
+- 只操作 CURRENT TASK 区块内的 TODO
 - 优先沿 [DOING] 项继续推进，不要平行开第二条线
 - 不要重复创建已存在的 [ ] 项；只有真正新增的子目标才用 add
 - [DELETED] / [SKIPPED] 已显式放弃，不要再尝试
+- 不要误改 OTHER TASKS 区块中的历史 TODO
 
 {{ .Todo }}
 <|TODO_LIST_END_{{ .Nonce }}|>

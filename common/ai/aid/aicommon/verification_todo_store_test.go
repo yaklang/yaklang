@@ -298,7 +298,7 @@ func TestSessionPromptState_ApplyVerificationTodoOps_AccumulatesAndRenders(t *te
 		{Op: "doing", ID: "step1"},
 	})
 
-	rendered := state.GetVerificationTodoRendered()
+	rendered := state.GetVerificationTodoRendered(VerificationTodoScope{})
 	require.Contains(t, rendered, "- [DOING]: [id: step1]: 第一步")
 	require.Contains(t, rendered, "- [ ]: [id: step2]: 第二步")
 
@@ -312,8 +312,31 @@ func TestSessionPromptState_ApplyVerificationTodoOps_AccumulatesAndRenders(t *te
 
 func TestSessionPromptState_GetVerificationTodoRendered_EmptyReturnsEmpty(t *testing.T) {
 	state := NewSessionPromptState()
-	require.Equal(t, "", state.GetVerificationTodoRendered(),
+	require.Equal(t, "", state.GetVerificationTodoRendered(VerificationTodoScope{}),
 		"empty state should render empty string so the prompt template can skip the block")
+}
+
+func TestVerificationTodoStore_RenderWithCurrentScope_SplitsCurrentAndOther(t *testing.T) {
+	store := NewVerificationTodoStore()
+	scopeOne := VerificationTodoScope{TaskID: "task-1", TaskIndex: "1-1"}
+	scopeTwo := VerificationTodoScope{TaskID: "task-2", TaskIndex: "1-2"}
+
+	store.Apply(scopeOne, false, []VerifyNextMovement{
+		{Op: "add", ID: "todo_1_1", Content: "子任务 1-1 的待办"},
+		{Op: "done", ID: "todo_1_1"},
+	})
+	store.Apply(scopeTwo, false, []VerifyNextMovement{
+		{Op: "add", ID: "todo_1_2", Content: "子任务 1-2 的待办"},
+		{Op: "doing", ID: "todo_1_2"},
+	})
+
+	rendered := store.RenderWithCurrentScope(scopeTwo)
+	require.Contains(t, rendered, "### CURRENT TASK [task_index=1-2, task_id=task-2]")
+	require.Contains(t, rendered, "- [DOING]: [id: todo_1_2]: 子任务 1-2 的待办")
+	require.Contains(t, rendered, "### OTHER TASKS (read-only context)")
+	require.Contains(t, rendered, "#### task_index=1-1, task_id=task-1")
+	require.Contains(t, rendered, "- [x]: [id: todo_1_1]: 子任务 1-1 的待办")
+	require.NotContains(t, rendered, "- [DOING]: [id: todo_1_1]")
 }
 
 func TestSessionPromptState_GetVerificationTodoMarkdownDelta_IsPreview(t *testing.T) {
