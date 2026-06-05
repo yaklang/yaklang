@@ -488,15 +488,10 @@ func (ve *MemEditor) GetRangeByPosition(start, end *Position) *Range {
 	if ve == nil || start == nil || end == nil {
 		return NewRange(start, end)
 	}
-	startOff, startErr := ve.GetOffsetByPositionWithError(start.GetLine(), start.GetColumn())
-	endOff, endErr := ve.GetOffsetByPositionWithError(end.GetLine(), end.GetColumn())
-	if startErr != nil || endErr != nil {
-		ret := NewRange(start, end)
-		if ret != nil {
-			ret.editor = ve
-		}
-		return ret
-	}
+	// Use best-effort offsets even when line/column is slightly out of range.
+	// Clients (e.g. Monaco/LSP) may send stale end positions; clamp instead of dropping offsets.
+	startOff := ve.GetOffsetByPositionRaw(start.GetLine(), start.GetColumn())
+	endOff := ve.GetOffsetByPositionRaw(end.GetLine(), end.GetColumn())
 	return NewRangeFromOffsets(ve, startOff, endOff)
 }
 
