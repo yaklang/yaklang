@@ -227,6 +227,10 @@ func (b *FunctionBuilder) PopFunction() *FunctionBuilder {
 
 // function param
 func (b FunctionBuilder) HandlerEllipsis() {
+	if len(b.Params) == 0 {
+		b.hasEllipsis = true
+		return
+	}
 	if inst, ok := b.GetInstructionById(b.Params[len(b.Params)-1]); ok && inst != nil {
 		if ins, ok := ToParameter(inst); ok {
 			ins.SetType(NewSliceType(CreateAnyType()))
