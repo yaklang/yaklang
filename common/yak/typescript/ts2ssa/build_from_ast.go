@@ -4174,6 +4174,53 @@ func (b *builder) ProcessArrayBindingPattern(pattern *ast.BindingPattern, source
 	}
 }
 
+func (b *builder) functionParamSlotName(index int) string {
+	return fmt.Sprintf("__ts_param_%d", index)
+}
+
+func (b *builder) applyFunctionParamMeta(p *ssa.Parameter, paramNode *ast.ParameterDeclaration) {
+	if paramNode.Type != nil {
+		paramType := b.VisitTypeNode(paramNode.Type)
+		p.SetType(paramType)
+	}
+	if paramNode.Initializer != nil {
+		defaultValue := b.VisitRightValueExpression(paramNode.Initializer)
+		if defaultValue != nil {
+			p.SetDefault(defaultValue)
+		}
+	}
+}
+
+// processFunctionParameter registers one formal parameter. Binding patterns get a
+// synthetic slot parameter, then locals are introduced via destructuring.
+func (b *builder) processFunctionParameter(paramNode *ast.ParameterDeclaration, index int) bool {
+	paramNodeName := paramNode.Name()
+	if paramNodeName == nil {
+		b.NewError(ssa.Error, TAG, FunctionParamNameEmpty())
+		return false
+	}
+
+	switch paramNodeName.Kind {
+	case ast.KindIdentifier:
+		p := b.NewParam(paramNodeName.AsIdentifier().Text)
+		b.applyFunctionParamMeta(p, paramNode)
+		return true
+	case ast.KindArrayBindingPattern:
+		p := b.NewParam(b.functionParamSlotName(index))
+		b.applyFunctionParamMeta(p, paramNode)
+		b.ProcessArrayBindingPattern(paramNodeName.AsBindingPattern(), p, true, false)
+		return true
+	case ast.KindObjectBindingPattern:
+		p := b.NewParam(b.functionParamSlotName(index))
+		b.applyFunctionParamMeta(p, paramNode)
+		b.ProcessObjectBindingPattern(paramNodeName.AsBindingPattern(), p, true, false)
+		return true
+	default:
+		b.NewError(ssa.Error, TAG, FunctionParamNameEmpty())
+		return false
+	}
+}
+
 func (b *builder) ProcessFunctionParams(params *ast.NodeList) {
 	if params == nil || len(params.Nodes) == 0 || b.IsStop() {
 		return
@@ -4184,42 +4231,8 @@ func (b *builder) ProcessFunctionParams(params *ast.NodeList) {
 
 	for index, param := range params.Nodes {
 		paramNode := param.AsParameterDeclaration()
-		paramName := ""
-
-		paramNodeName := paramNode.Name()
-		if paramNodeName != nil {
-			switch paramNodeName.Kind {
-			case ast.KindIdentifier:
-				paramName = paramNodeName.AsIdentifier().Text
-			// TODO: 这里的函数参数中的绑定需要额外处理
-			case ast.KindArrayBindingPattern:
-			case ast.KindObjectBindingPattern:
-			default:
-			}
-		}
-
-		if paramName != "" {
-			// 创建参数
-			p := b.NewParam(paramName)
-
-			// 设置参数类型（如果有显式类型注解）
-			if paramNode.Type != nil {
-				paramType := b.VisitTypeNode(paramNode.Type)
-				p.SetType(paramType)
-			}
-
-			// 处理默认值
-			if paramNode.Initializer != nil {
-				defaultValue := b.VisitRightValueExpression(paramNode.Initializer)
-				if defaultValue != nil {
-					p.SetDefault(defaultValue)
-				}
-			}
-		} else {
-			b.NewError(ssa.Error, TAG, FunctionParamNameEmpty())
-		}
-
-		if index == len(params.Nodes)-1 && paramNode.DotDotDotToken != nil {
+		added := b.processFunctionParameter(paramNode, index)
+		if paramNode.DotDotDotToken != nil && added {
 			b.HandlerEllipsis()
 		}
 	}
