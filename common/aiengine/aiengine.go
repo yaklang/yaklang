@@ -519,6 +519,10 @@ func buildReActOptions(ctx context.Context, config *AIEngineConfig, outputChan c
 		options = append(options, aicommon.WithKeywords(config.Keywords...))
 	}
 
+	if len(config.ExtraMCPServers) > 0 {
+		options = append(options, aicommon.WithExtraMCPServers(config.ExtraMCPServers...))
+	}
+
 	if config.RestrictToSessionMCP {
 		options = append(options, aicommon.WithRestrictToolsToExtraMCPServers(true))
 	}
