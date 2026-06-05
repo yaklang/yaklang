@@ -37,6 +37,26 @@ func TestRestrictToTools(t *testing.T) {
 	assert.False(t, mgr.enableForgeSearchTool, "forge search must be disabled under restriction")
 }
 
+// RestrictToTools with no names must deny all (fail-closed), not fall back to
+// the builtin/search toolset. This guards the "restricted mount yielded zero
+// tools" path in loadExtraMCPServers.
+func TestRestrictToTools_EmptyDeniesAll(t *testing.T) {
+	builtinA := aitool.NewWithoutCallback("builtin_a")
+	builtinB := aitool.NewWithoutCallback("builtin_b")
+
+	mgr := NewToolManagerByToolGetter(func() []*aitool.Tool {
+		return []*aitool.Tool{builtinA, builtinB}
+	}, WithExtendTools([]*aitool.Tool{builtinA, builtinB}, true))
+
+	mgr.RestrictToTools()
+
+	tools, err := mgr.GetEnableTools()
+	require.NoError(t, err)
+	assert.Empty(t, tools, "restricting to no tools must enable nothing")
+	assert.False(t, mgr.enableSearchTool)
+	assert.False(t, mgr.enableForgeSearchTool)
+}
+
 // A nil receiver must be a safe no-op (defensive guard for loadExtraMCPServers).
 func TestRestrictToTools_NilReceiver(t *testing.T) {
 	var mgr *AiToolManager
