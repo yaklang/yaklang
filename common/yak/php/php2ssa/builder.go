@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 
+	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/sca"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 
@@ -125,43 +127,25 @@ func (s *SSABuilder) BuildFromAST(raw ssa.FrontAST, b *ssa.FunctionBuilder) erro
 	}
 	// log.Infof("parse AST FrontEnd success: %s", ast.ToStringTree(ast.GetParser().GetRuleNames(), ast.GetParser()))
 	b.WithExternValue(phpBuildIn)
-	startParse := func(functionBuilder *ssa.FunctionBuilder) {
-		var id = 0
-		build := builder{
-			constMap:        make(map[string]ssa.Value),
-			FunctionBuilder: functionBuilder,
-			fetchDollarId: func() int {
-				defer func() {
-					id++
-				}()
-				return id
-			},
-			currentInclude: make(map[string]struct{}),
-		}
-		build.callback = func(str string, filename string) {
-			files, ok := b.GetProgram().GetApplication().LibraryFile[str]
-			if ok {
-				files = append(files, filename)
-			} else {
-				files = []string{filename}
-			}
-			build.GetProgram().GetApplication().LibraryFile[str] = files
-		}
-		build.VisitHtmlDocument(ast)
-		build.Finish()
-	}
+	startParse := func(functionBuilder *ssa.FunctionBuilder) { startParsePHPDocument(functionBuilder, b, ast) }
 	mainApp := b.GetProgram().GetApplication()
 	if mainApp.CurrentIncludingStack.Len() <= 0 {
 		childProgram := b.GetProgram().GetSubProgram(b.GetEditor().GetPureSourceHash())
 		functionBuilder := childProgram.GetAndCreateFunctionBuilder("", string(ssa.MainFunctionName))
-		functionBuilder.AddLazyBuilder(func() {
-			startParse(functionBuilder)
-		}, true)
 		if b.GetProgram().PreHandler() {
 			startParse(functionBuilder)
 			if ssa.SkeletonTopLevelEnabled() {
 				registerPHPBuildPass2RootTask(ast, b)
+				ssa.DetachASTRootChildren(ast)
+			} else {
+				functionBuilder.AddLazyBuilder(func() {
+					startParse(functionBuilder)
+				}, true)
 			}
+		} else {
+			functionBuilder.AddLazyBuilder(func() {
+				startParse(functionBuilder)
+			}, true)
 		}
 	} else {
 		//模拟preHandler和正式handler
@@ -171,6 +155,53 @@ func (s *SSABuilder) BuildFromAST(raw ssa.FrontAST, b *ssa.FunctionBuilder) erro
 		startParse(b)
 	}
 	return nil
+}
+
+func newPHPFileBuilder(functionBuilder *ssa.FunctionBuilder, callbackBuilder *ssa.FunctionBuilder) builder {
+	var id = 0
+	build := builder{
+		constMap:        make(map[string]ssa.Value),
+		FunctionBuilder: functionBuilder,
+		fetchDollarId: func() int {
+			defer func() {
+				id++
+			}()
+			return id
+		},
+		currentInclude: make(map[string]struct{}),
+	}
+	if callbackBuilder == nil {
+		callbackBuilder = functionBuilder
+	}
+	build.callback = func(str string, filename string) {
+		if callbackBuilder == nil || callbackBuilder.GetProgram() == nil {
+			return
+		}
+		app := callbackBuilder.GetProgram().GetApplication()
+		if app == nil {
+			app = callbackBuilder.GetProgram()
+		}
+		files, ok := app.LibraryFile[str]
+		if ok {
+			files = append(files, filename)
+		} else {
+			files = []string{filename}
+		}
+		app.LibraryFile[str] = files
+	}
+	return build
+}
+
+func startParsePHPDocument(functionBuilder *ssa.FunctionBuilder, callbackBuilder *ssa.FunctionBuilder, ast phpparser.IHtmlDocumentContext) {
+	build := newPHPFileBuilder(functionBuilder, callbackBuilder)
+	build.VisitHtmlDocument(ast)
+	build.Finish()
+}
+
+func startParsePHPDocumentChildren(functionBuilder *ssa.FunctionBuilder, callbackBuilder *ssa.FunctionBuilder, children []antlr.Tree) {
+	build := newPHPFileBuilder(functionBuilder, callbackBuilder)
+	build.VisitHtmlDocumentChildren(children)
+	build.Finish()
 }
 
 func (s *SSABuilder) WrapWithPreprocessedFS(fs fi.FileSystem, _ bool) fi.FileSystem {
@@ -183,14 +214,27 @@ func (*SSABuilder) FilterFile(path string) bool {
 	return ext == ".php"
 }
 
-// SelfRegistersTopLevel: pass1 emits class/function shells + detaches file AST; pass2
-// full module build is scheduled via registerPHPBuildPass2RootTask (Java/Python pattern).
+// SelfRegistersTopLevel: pass1 emits class/function shells with slimmed lazy
+// body subtrees; pass2 captures HtmlDocument children instead of retaining the
+// whole file AST root.
 func (*SSABuilder) SelfRegistersTopLevel() bool {
 	return ssa.SkeletonTopLevelEnabled()
 }
 
 func registerPHPBuildPass2RootTask(ast phpparser.IHtmlDocumentContext, b *ssa.FunctionBuilder) {
 	if ast == nil || b == nil || !ssa.SkeletonTopLevelEnabled() {
+		return
+	}
+	html, ok := ast.(*phpparser.HtmlDocumentContext)
+	if !ok || html == nil {
+		return
+	}
+	children := html.GetChildren()
+	capturedChildren := make([]antlr.Tree, 0, len(children))
+	for _, child := range children {
+		capturedChildren = append(capturedChildren, ssa.DetachAST(child))
+	}
+	if len(capturedChildren) == 0 {
 		return
 	}
 	prog := b.GetProgram()
@@ -209,10 +253,24 @@ func registerPHPBuildPass2RootTask(ast phpparser.IHtmlDocumentContext, b *ssa.Fu
 	if editor != nil && editor.GetUrl() != "" {
 		path = editor.GetUrl()
 	}
-	capturedAST := ast
+	sourceHash := ""
+	if editor != nil {
+		sourceHash = editor.GetPureSourceHash()
+	}
 	capturedBuilder := b
+	childProgram := app.GetSubProgram(sourceHash)
+	functionBuilder := childProgram.GetAndCreateFunctionBuilder("", string(ssa.MainFunctionName))
+	var buildOnce sync.Once
+	buildCapturedChildren := func(callbackBuilder *ssa.FunctionBuilder) {
+		buildOnce.Do(func() {
+			startParsePHPDocumentChildren(functionBuilder, callbackBuilder, capturedChildren)
+		})
+	}
+	functionBuilder.AddLazyBuilder(func() {
+		buildCapturedChildren(capturedBuilder)
+	}, true)
 	app.RegisterRootTopLevel(path, editor, capturedBuilder, func(rootFb *ssa.FunctionBuilder) {
-		_ = CreateBuilder().BuildFromAST(capturedAST, rootFb)
+		buildCapturedChildren(rootFb)
 	})
 }
 
@@ -512,5 +570,5 @@ func (b *builder) SwitchFunctionBuilder(s *ssa.StoredFunctionBuilder) func() {
 
 func (b *builder) LoadBuilder(s *ssa.StoredFunctionBuilder) {
 	b.FunctionBuilder = s.Current
-	b.LoadFunctionBuilder(s.Store)
+	b.LoadFunctionBuilder(s)
 }

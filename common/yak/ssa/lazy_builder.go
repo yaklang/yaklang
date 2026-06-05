@@ -95,6 +95,10 @@ type RootBuildRunner interface {
 	Build()
 }
 
+type releasableRootBuildRunner interface {
+	Release()
+}
+
 type RootBuildTask struct {
 	kind RootBuildKind
 	name string
@@ -118,6 +122,13 @@ func (r *RootBuildTask) ID() string {
 		return ""
 	}
 	return string(r.kind) + ":" + r.name
+}
+
+func (r *RootBuildTask) Release() {
+	if r == nil {
+		return
+	}
+	r.LazyBuilder = nil
 }
 
 func (p *Program) VisitAst(ast ASTIF) {

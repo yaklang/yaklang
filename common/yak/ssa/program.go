@@ -378,11 +378,15 @@ func (prog *Program) registerRootBuildTask(task RootBuildRunner) RootBuildRunner
 	if app == nil {
 		app = prog
 	}
+	if app.rootBuildByID == nil {
+		app.rootBuildByID = make(map[string]RootBuildRunner)
+	}
 	if existing, ok := app.rootBuildByID[task.ID()]; ok {
 		return existing
 	}
 	app.rootBuildByID[task.ID()] = task
 	app.rootBuildSeq = append(app.rootBuildSeq, task)
+	app.rootBuildTotal++
 	return task
 }
 
@@ -431,7 +435,7 @@ func (prog *Program) RootBuildCount() int {
 	if app == nil {
 		app = prog
 	}
-	return len(app.rootBuildSeq)
+	return app.rootBuildTotal
 }
 
 func (prog *Program) RunRootBuildsWithCallback(afterEach func(index int, total int) bool) bool {
@@ -448,13 +452,31 @@ func (prog *Program) RunRootBuildsWithCallback(afterEach func(index int, total i
 			continue
 		}
 		task.Build()
+		if releasable, ok := task.(releasableRootBuildRunner); ok {
+			releasable.Release()
+		}
 		if afterEach != nil {
 			if !afterEach(index+1, total) {
 				return false
 			}
 		}
 	}
+	if len(app.rootBuildSeq) == total {
+		app.releaseRootBuildTasks()
+	}
 	return true
+}
+
+func (prog *Program) releaseRootBuildTasks() {
+	if prog == nil {
+		return
+	}
+	app := prog.GetApplication()
+	if app == nil {
+		app = prog
+	}
+	app.rootBuildSeq = nil
+	app.rootBuildByID = nil
 }
 
 func (prog *Program) SearchIndexAndOffsetByOffset(searchOffset int) (index int, offset int) {

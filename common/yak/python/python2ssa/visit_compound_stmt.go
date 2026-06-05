@@ -1990,14 +1990,16 @@ func (b *singleFileBuilder) VisitFuncdef(raw pythonparser.IFuncdefContext) inter
 
 	if b.PreHandler() && ssa.SkeletonTopLevelEnabled() {
 		store := b.StoreFunctionBuilder()
+		params := ssa.DetachAST(funcdef.Typedargslist())
+		bodySuite := ssa.DetachAST(suite)
 		newFunc.AddLazyBuilder(func() {
 			switchHandler := b.SwitchFunctionBuilder(store)
 			defer switchHandler()
 			b.FunctionBuilder = b.PushFunction(newFunc)
-			if params := funcdef.Typedargslist(); params != nil {
+			if params != nil {
 				b.buildFuncParams(params)
 			}
-			b.VisitSuite(suite)
+			b.VisitSuite(bodySuite)
 			b.Finish()
 			b.FunctionBuilder = b.PopFunction()
 		}, false)

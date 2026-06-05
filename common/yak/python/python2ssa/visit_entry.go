@@ -26,10 +26,8 @@ func (b *singleFileBuilder) VisitRoot(raw pythonparser.IRootContext) interface{}
 	if fileInput := root.File_input(); fileInput != nil {
 		b.VisitFileInput(fileInput)
 		if b.PreHandler() && ssa.SkeletonTopLevelEnabled() {
-			for _, child := range root.GetChildren() {
-				ssa.DetachAST(child)
-			}
-			b.registerPythonPass2RootTask(root)
+			b.registerPythonPass2RootTask(fileInput)
+			ssa.DetachASTRootChildren(root)
 		}
 	} else if singleInput := root.Single_input(); singleInput != nil {
 		b.VisitSingleInput(singleInput)
@@ -99,8 +97,22 @@ func (b *singleFileBuilder) visitFileInputStmtSkeleton(stmt pythonparser.IStmtCo
 	}
 }
 
-func (b *singleFileBuilder) registerPythonPass2RootTask(root pythonparser.IRootContext) {
-	if b == nil || root == nil || !ssa.SkeletonTopLevelEnabled() {
+func (b *singleFileBuilder) registerPythonPass2RootTask(fileInput pythonparser.IFile_inputContext) {
+	if b == nil || fileInput == nil || !ssa.SkeletonTopLevelEnabled() {
+		return
+	}
+	fileInputCtx, ok := fileInput.(*pythonparser.File_inputContext)
+	if !ok || fileInputCtx == nil {
+		return
+	}
+	capturedStmts := make([]pythonparser.IStmtContext, 0)
+	for _, stmt := range fileInputCtx.AllStmt() {
+		if isTopLevelClassOrFuncDefStmt(stmt) {
+			continue
+		}
+		capturedStmts = append(capturedStmts, ssa.DetachAST(stmt))
+	}
+	if len(capturedStmts) == 0 {
 		return
 	}
 	prog := b.GetProgram()
@@ -116,11 +128,34 @@ func (b *singleFileBuilder) registerPythonPass2RootTask(root pythonparser.IRootC
 	if editor != nil && editor.GetUrl() != "" {
 		path = editor.GetUrl()
 	}
-	captured := root
 	capturedBuilder := b.FunctionBuilder
 	app.RegisterRootTopLevel(path, editor, capturedBuilder, func(rootFb *ssa.FunctionBuilder) {
-		_ = CreateBuilder().BuildFromAST(captured, rootFb)
+		build := &singleFileBuilder{
+			FunctionBuilder: rootFb,
+			constMap:        make(map[string]ssa.Value),
+			globalNames:     make(map[string]bool),
+		}
+		build.SupportClosure = true
+		for _, stmt := range capturedStmts {
+			build.VisitStmt(stmt)
+			if build.shouldStopStatementWalk() {
+				break
+			}
+		}
 	})
+}
+
+func isTopLevelClassOrFuncDefStmt(stmt pythonparser.IStmtContext) bool {
+	stmtCtx, ok := stmt.(*pythonparser.StmtContext)
+	if !ok || stmtCtx == nil {
+		return false
+	}
+	compoundStmt := stmtCtx.Compound_stmt()
+	if compoundStmt == nil {
+		return false
+	}
+	_, ok = compoundStmt.(*pythonparser.Class_or_func_def_stmtContext)
+	return ok
 }
 
 // VisitSingleInput visits a single_input node (a single statement).

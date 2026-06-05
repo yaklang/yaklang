@@ -25,8 +25,9 @@ func (y *singleFileBuilder) VisitInterfaceDeclaration(raw javaparser.IInterfaceD
 	tokenMap := make(map[string]ssa.CanStartStopToken)
 	if i.EXTENDS() != nil {
 		for _, extend := range i.AllTypeList() {
-			extendNames = append(extendNames, extend.GetText())
-			tokenMap[extend.GetText()] = extend
+			extendName := extend.GetText()
+			extendNames = append(extendNames, extendName)
+			tokenMap[extendName] = ssa.DetachAST(extend)
 		}
 	}
 

@@ -105,7 +105,10 @@ func (y *singleFileBuilder) registerPostSkeletonImportTask(i *javaparser.Compila
 		app = prog
 	}
 	fileEditor := app.GetCurrentEditor()
-	capturedDecls := append([]javaparser.IImportDeclarationContext(nil), decls...)
+	capturedDecls := make([]javaparser.IImportDeclarationContext, 0, len(decls))
+	for _, decl := range decls {
+		capturedDecls = append(capturedDecls, ssa.DetachAST(decl))
+	}
 	capturedFullType := make(map[string][]string, len(y.fullTypeNameMap))
 	for k, v := range y.fullTypeNameMap {
 		capturedFullType[k] = append([]string(nil), v...)

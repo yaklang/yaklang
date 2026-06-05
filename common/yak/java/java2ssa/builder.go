@@ -178,7 +178,7 @@ func (b *singleFileBuilder) SwitchFunctionBuilder(s *ssa.StoredFunctionBuilder) 
 
 func (b *singleFileBuilder) LoadBuilder(s *ssa.StoredFunctionBuilder) {
 	b.FunctionBuilder = s.Current
-	b.LoadFunctionBuilder(s.Store)
+	b.LoadFunctionBuilder(s)
 }
 
 func (b *singleFileBuilder) initImport() {

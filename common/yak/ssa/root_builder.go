@@ -62,3 +62,13 @@ func (t *TopLevelBuilder) ID() string {
 	}
 	return string(RootBuildKindTopLevel) + ":" + t.name
 }
+
+func (t *TopLevelBuilder) Release() {
+	if t == nil {
+		return
+	}
+	t.program = nil
+	t.editor = nil
+	t.builder = nil
+	t.LazyBuilder = nil
+}

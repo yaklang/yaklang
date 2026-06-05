@@ -175,7 +175,7 @@ func (b *astbuilder) SwitchFunctionBuilder(s *ssa.StoredFunctionBuilder) func() 
 
 func (b *astbuilder) LoadBuilder(s *ssa.StoredFunctionBuilder) {
 	b.FunctionBuilder = s.Current
-	b.LoadFunctionBuilder(s.Store)
+	b.LoadFunctionBuilder(s)
 }
 
 func (b *astbuilder) GetStructAll() map[string]ssa.Type {

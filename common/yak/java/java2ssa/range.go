@@ -11,6 +11,7 @@ func (y *singleFileBuilder) SetRange(token ssa.CanStartStopToken) func() {
 		return func() {}
 	}
 	r := ssa.GetRange(editor, token)
+	ssa.SlimRangeToken(token)
 	if r == nil {
 		return func() {}
 	}

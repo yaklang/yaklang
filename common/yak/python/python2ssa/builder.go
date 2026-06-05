@@ -99,8 +99,9 @@ func (*SSABuilder) GetLanguage() ssaconfig.Language {
 	return ssaconfig.PYTHON
 }
 
-// SelfRegistersTopLevel: pass1 emits class/function shells (lazy bodies); pass2 runs
-// the full module via RegisterRootTopLevel (visit_entry.go).
+// SelfRegistersTopLevel: pass1 emits class/function shells with slimmed lazy
+// body subtrees; pass2 only replays captured top-level statements that are not
+// class/function definitions.
 func (*SSABuilder) SelfRegistersTopLevel() bool {
 	return ssa.SkeletonTopLevelEnabled()
 }
@@ -125,10 +126,10 @@ func (*SSABuilder) FilterPreHandlerFile(path string) bool {
 }
 
 // PreHandlerFile handles preprocessing of a single file.
-// For Python, we don't need to call Build here as the framework calls it automatically.
-// This is used for any pre-processing before the main build.
 func (s *SSABuilder) PreHandlerFile(ast ssa.FrontAST, editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {
-	// Empty - the framework calls Build automatically
+	if ssa.SkeletonTopLevelEnabled() {
+		builder.GetProgram().GetApplication().Build(ast, editor, builder)
+	}
 }
 
 // PreHandlerProject handles preprocessing at the project level.
@@ -763,7 +764,7 @@ func (b *singleFileBuilder) SwitchFunctionBuilder(s *ssa.StoredFunctionBuilder) 
 // LoadBuilder restores the FunctionBuilder from a stored state.
 func (b *singleFileBuilder) LoadBuilder(s *ssa.StoredFunctionBuilder) {
 	b.FunctionBuilder = s.Current
-	b.LoadFunctionBuilder(s.Store)
+	b.LoadFunctionBuilder(s)
 }
 
 // FrontendWithCache parses Python source code and returns the root AST node.
