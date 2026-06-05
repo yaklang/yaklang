@@ -37,9 +37,11 @@ func SaveConfig(c *Config, prog *Program) {
 	}
 }
 
-// 已弃用
-// recompile from Profile SSAProgram
-func (prog *Program) Recompile(inputOpt ...ssaconfig.Option) error {
+// recompileProgramLayer 对单个 program 层执行重编译（使用该层自己的 ConfigInput，不会触发 overlay 其它层）。
+func recompileProgramLayer(prog *Program, inputOpt ...ssaconfig.Option) error {
+	if prog == nil {
+		return utils.Error("program is nil")
+	}
 	opt := make([]ssaconfig.Option, 0)
 	// get file system
 	hasFS := false
@@ -59,16 +61,21 @@ func (prog *Program) Recompile(inputOpt ...ssaconfig.Option) error {
 		// return utils.Errorf("The project compilation engine version is too old to recompile.\n该项目编译时引擎版本过旧，无法重新编译。")
 	}
 
+	layerName := prog.GetProgramName()
+	if layerName == "" && prog.Program != nil {
+		layerName = prog.Program.Name
+	}
+
 	// 检测是否是增量编译的 program
-	// 如果当前 program 是增量编译的，重编译时应该自动启用增量编译，使用当前 program 作为 base program
+	// 如果当前 program 是增量编译的，重编译时应该自动启用增量编译，使用当前层 program 作为 base program
 	if prog.IsIncrementalCompile() {
-		log.Infof("检测到增量编译 program，自动启用增量编译，base program: %s", prog.Program.Name)
-		opt = append(opt, WithBaseProgramName(prog.Program.Name))
+		log.Infof("检测到增量编译 program，自动启用增量编译，base program: %s", layerName)
+		opt = append(opt, WithBaseProgramName(layerName))
 		// 增量编译时，不设置 WithProgramName，让调用者通过 inputOpt 传入新的 program name
 		// 这样可以确保每次重新编译都会创建一个新的 diff program，而不是覆盖现有的
 	} else {
 		// 非增量编译时，使用相同的 program name（重新编译会覆盖）
-		opt = append(opt, WithProgramName(prog.Program.Name))
+		opt = append(opt, WithProgramName(layerName))
 	}
 
 	// append other options
@@ -81,4 +88,19 @@ func (prog *Program) Recompile(inputOpt ...ssaconfig.Option) error {
 	_ = newProg
 
 	return err
+}
+
+// 已弃用
+// recompile from Profile SSAProgram
+func (prog *Program) Recompile(inputOpt ...ssaconfig.Option) error {
+	return recompileProgramLayer(prog, inputOpt...)
+}
+
+// Recompile 仅重编译 overlay 的当前层（最上层），不会重编译底层/父层 program。
+func (o *ProgramOverLay) Recompile(inputOpt ...ssaconfig.Option) error {
+	layerProg := o.getCurrentLayerProgram()
+	if layerProg == nil {
+		return utils.Error("overlay program has no current layer")
+	}
+	return recompileProgramLayer(layerProg, inputOpt...)
 }

@@ -66,6 +66,44 @@ func (o *ProgramOverLay) IsIncrementalCompile() bool {
 	return true
 }
 
+// getCurrentLayerProgram 返回 overlay 当前层（最上层）对应的 *Program，而不是底层/父层。
+// 优先按 overlay.GetProgramName() 匹配；未设置时回退到 Layers 最后一项。
+func (p *ProgramOverLay) getCurrentLayerProgram() *Program {
+	if p == nil || len(p.Layers) == 0 {
+		return nil
+	}
+	currentName := p.GetProgramName()
+	if currentName != "" {
+		for i := len(p.Layers) - 1; i >= 0; i-- {
+			layer := p.Layers[i]
+			if layer != nil && layer.Program != nil && layer.Program.GetProgramName() == currentName {
+				return layer.Program
+			}
+		}
+	}
+	layer := p.Layers[len(p.Layers)-1]
+	if layer == nil {
+		return nil
+	}
+	return layer.Program
+}
+
+// IsBaseProgram 反映当前层（最上层）是否为 base program
+func (p *ProgramOverLay) IsBaseProgram() bool {
+	if prog := p.getCurrentLayerProgram(); prog != nil {
+		return prog.IsBaseProgram()
+	}
+	return false
+}
+
+// GetBaseProgramName 返回当前层（最上层）记录的 base program 名
+func (p *ProgramOverLay) GetBaseProgramName() string {
+	if prog := p.getCurrentLayerProgram(); prog != nil {
+		return prog.GetBaseProgramName()
+	}
+	return ""
+}
+
 // GetLayerProgramNames 获取所有 layer 的 program names（按顺序，从底层到上层）
 func (o *ProgramOverLay) GetLayerProgramNames() []string {
 	if o == nil || len(o.Layers) == 0 {

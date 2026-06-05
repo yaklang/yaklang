@@ -21,7 +21,7 @@ if isIncremental {
     if isBaseProgram {
         yakit.Info("检测到增量编译 program（base program，第一个全量编译的 program）")
     } else {
-        baseProgramName = prog.Program.BaseProgramName
+        baseProgramName = prog.GetBaseProgramName()
         yakit.Info("检测到增量编译 program（差量 program），基础程序: %s", baseProgramName)
     }
     yakit.Info("重编译时将自动启用增量编译，使用当前 program 作为新的 base program")
