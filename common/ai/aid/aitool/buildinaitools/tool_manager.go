@@ -431,6 +431,21 @@ func (m *AiToolManager) AppendTools(tools ...*aitool.Tool) error {
 	return nil
 }
 
+// RestrictToTools confines the manager to exactly the named tools: it clears the
+// "enable all" shortcut and both searchers, then enables only the given names.
+// Session-scoped MCP mounts use this so the agent cannot reach builtin/profile
+// tools (e.g. the local "ssa-risk" yak tool) and is limited to the injected set.
+func (m *AiToolManager) RestrictToTools(names ...string) {
+	m.enableAllTools = false
+	m.enableSearchTool = false
+	m.enableForgeSearchTool = false
+	enabled := make(map[string]bool, len(names))
+	for _, name := range names {
+		enabled[name] = true
+	}
+	m.toolEnabled = enabled
+}
+
 // OverrideToolByName replaces all tools with the given name, keeping only the new one.
 // If no tool with that name exists, the new tool is appended.
 func (m *AiToolManager) OverrideToolByName(newTool *aitool.Tool) {

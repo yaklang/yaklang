@@ -47,6 +47,10 @@ type AIEngineConfig struct {
 	ExcludeToolNames      []string // 排除的工具名称
 	Keywords              []string // 关键词，用于工具搜索
 
+	// RestrictToSessionMCP 为 true 时，工具集被钳制为仅会话注入的 MCP 工具，
+	// 禁用内置工具/搜索/forge，避免 agent 误用本地 yak 工具（如 ssa-risk）。
+	RestrictToSessionMCP bool
+
 	// 交互配置
 	AllowUserInteract bool   // 允许用户交互
 	ReviewPolicy      string // 审批策略: "yolo", "ai", "manual"
@@ -198,6 +202,13 @@ func WithDisableAIForge(disable bool) AIEngineConfigOption {
 func WithDisableMCPServers(disable bool) AIEngineConfigOption {
 	return func(c *AIEngineConfig) {
 		c.DisableMCPServers = disable
+	}
+}
+
+// WithRestrictToSessionMCP 将工具集钳制为仅会话注入的 MCP 工具（禁用内置工具/搜索/forge）。
+func WithRestrictToSessionMCP(restrict bool) AIEngineConfigOption {
+	return func(c *AIEngineConfig) {
+		c.RestrictToSessionMCP = restrict
 	}
 }
 
