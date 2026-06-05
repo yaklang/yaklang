@@ -21,6 +21,9 @@ type SyntaxFlowQueryInstance interface {
 	SyntaxFlowRule(rule *schema.SyntaxFlowRule, opts ...QueryOption) (*SyntaxFlowResult, error)
 	GetLanguage() ssaconfig.Language
 	IsIncrementalCompile() bool
+	IsBaseProgram() bool
+	GetBaseProgramName() string
+	Recompile(inputOpt ...ssaconfig.Option) error
 }
 
 var _ SyntaxFlowQueryInstance = (*Program)(nil)
