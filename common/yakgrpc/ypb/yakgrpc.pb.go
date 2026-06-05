@@ -12503,11 +12503,12 @@ type StartMcpServerRequest struct {
 	// Deprecated: use EnableAIToolFramework instead, which subsumes this path
 	// with better execution quality (stdout/stderr capture, multiple script types).
 	EnableYakAITool bool `protobuf:"varint,9,opt,name=EnableYakAITool,proto3" json:"EnableYakAITool,omitempty"`
-	// expose built-in aitool-framework tools (fs, ssa, yakscript, etc.) and
-	// enabled external MCP server tools bridged through the aitool layer
+	// expose built-in aitool-framework tools (fs, ssa, yakscript, etc.)
 	EnableAIToolFramework bool `protobuf:"varint,10,opt,name=EnableAIToolFramework,proto3" json:"EnableAIToolFramework,omitempty"`
-	unknownFields         protoimpl.UnknownFields
-	sizeCache             protoimpl.SizeCache
+	// bridge external MCP servers already enabled in AI Agent
+	EnableBridgeExternalMCP bool `protobuf:"varint,11,opt,name=EnableBridgeExternalMCP,proto3" json:"EnableBridgeExternalMCP,omitempty"`
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
 }
 
 func (x *StartMcpServerRequest) Reset() {
@@ -12606,6 +12607,13 @@ func (x *StartMcpServerRequest) GetEnableYakAITool() bool {
 func (x *StartMcpServerRequest) GetEnableAIToolFramework() bool {
 	if x != nil {
 		return x.EnableAIToolFramework
+	}
+	return false
+}
+
+func (x *StartMcpServerRequest) GetEnableBridgeExternalMCP() bool {
+	if x != nil {
+		return x.EnableBridgeExternalMCP
 	}
 	return false
 }
@@ -35884,13 +35892,13 @@ type StartBruteParams struct {
 	Concurrent int64 `protobuf:"varint,8,opt,name=Concurrent,proto3" json:"Concurrent,omitempty"`
 	Retry      int64 `protobuf:"varint,9,opt,name=Retry,proto3" json:"Retry,omitempty"`
 	// 目标任务内并发
-	TargetTaskConcurrent int64 `protobuf:"varint,10,opt,name=TargetTaskConcurrent,proto3" json:"TargetTaskConcurrent,omitempty"`
-	OkToStop         bool   `protobuf:"varint,11,opt,name=OkToStop,proto3" json:"OkToStop,omitempty"`
-	DelayMin         int64  `protobuf:"varint,12,opt,name=DelayMin,proto3" json:"DelayMin,omitempty"`
-	DelayMax         int64  `protobuf:"varint,13,opt,name=DelayMax,proto3" json:"DelayMax,omitempty"`
-	PluginScriptName string `protobuf:"bytes,14,opt,name=PluginScriptName,proto3" json:"PluginScriptName,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	TargetTaskConcurrent int64  `protobuf:"varint,10,opt,name=TargetTaskConcurrent,proto3" json:"TargetTaskConcurrent,omitempty"`
+	OkToStop             bool   `protobuf:"varint,11,opt,name=OkToStop,proto3" json:"OkToStop,omitempty"`
+	DelayMin             int64  `protobuf:"varint,12,opt,name=DelayMin,proto3" json:"DelayMin,omitempty"`
+	DelayMax             int64  `protobuf:"varint,13,opt,name=DelayMax,proto3" json:"DelayMax,omitempty"`
+	PluginScriptName     string `protobuf:"bytes,14,opt,name=PluginScriptName,proto3" json:"PluginScriptName,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *StartBruteParams) Reset() {
@@ -45471,8 +45479,8 @@ type ExecHistoryRecord struct {
 	// Uid
 	Id string `protobuf:"bytes,9,opt,name=Id,proto3" json:"Id,omitempty"`
 	// 展示界面内容
-	Stdout []byte `protobuf:"bytes,10,opt,name=Stdout,proto3" json:"Stdout,omitempty"`
-	Stderr []byte `protobuf:"bytes,11,opt,name=Stderr,proto3" json:"Stderr,omitempty"`
+	Stdout        []byte `protobuf:"bytes,10,opt,name=Stdout,proto3" json:"Stdout,omitempty"`
+	Stderr        []byte `protobuf:"bytes,11,opt,name=Stderr,proto3" json:"Stderr,omitempty"`
 	RuntimeId     string `protobuf:"bytes,12,opt,name=RuntimeId,proto3" json:"RuntimeId,omitempty"`
 	FromYakModule string `protobuf:"bytes,13,opt,name=FromYakModule,proto3" json:"FromYakModule,omitempty"`
 	StdoutLen     int64  `protobuf:"varint,14,opt,name=StdoutLen,proto3" json:"StdoutLen,omitempty"`
@@ -70714,7 +70722,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x1eCountAIMemoryEntityTagsRequest\x12\x1c\n" +
 	"\tSessionID\x18\x01 \x01(\tR\tSessionID\"N\n" +
 	"\x1fCountAIMemoryEntityTagsResponse\x12+\n" +
-	"\tTagsCount\x18\x01 \x03(\v2\r.ypb.TagsCodeR\tTagsCount\"\xd1\x02\n" +
+	"\tTagsCount\x18\x01 \x03(\v2\r.ypb.TagsCodeR\tTagsCount\"\x8b\x03\n" +
 	"\x15StartMcpServerRequest\x12\x12\n" +
 	"\x04Host\x18\x01 \x01(\tR\x04Host\x12\x12\n" +
 	"\x04Port\x18\x02 \x01(\x05R\x04Port\x12\x12\n" +
@@ -70726,7 +70734,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\tEnableAll\x18\b \x01(\bR\tEnableAll\x12(\n" +
 	"\x0fEnableYakAITool\x18\t \x01(\bR\x0fEnableYakAITool\x124\n" +
 	"\x15EnableAIToolFramework\x18\n" +
-	" \x01(\bR\x15EnableAIToolFramework\"\x96\x01\n" +
+	" \x01(\bR\x15EnableAIToolFramework\x128\n" +
+	"\x17EnableBridgeExternalMCP\x18\v \x01(\bR\x17EnableBridgeExternalMCP\"\x96\x01\n" +
 	"\x16StartMcpServerResponse\x12\x16\n" +
 	"\x06Status\x18\x01 \x01(\tR\x06Status\x12\x18\n" +
 	"\aMessage\x18\x02 \x01(\tR\aMessage\x12\x1c\n" +

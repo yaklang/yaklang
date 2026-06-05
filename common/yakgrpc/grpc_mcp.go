@@ -122,14 +122,16 @@ func launchMcpServer(ctx context.Context, req *ypb.StartMcpServerRequest, send f
 			opts = append(opts, mcp.WithAITools(builtinTools...))
 			log.Infof("launchMcpServer: loaded %d built-in aitool-framework tools", len(builtinTools))
 		}
+	}
 
-		// External MCP server tools bridged through the aitool layer.
+	if req.GetEnableBridgeExternalMCP() {
+		db := consts.GetGormProfileDatabase()
 		externalTools, mcpErr := aitool.LoadAllEnabledAIToolsFromMCPServers(db, ctx)
 		if mcpErr != nil {
-			log.Warnf("launchMcpServer: load external mcp tools via aitool-framework failed: %v", mcpErr)
+			log.Warnf("launchMcpServer: load external mcp tools via bridge failed: %v", mcpErr)
 		} else if len(externalTools) > 0 {
 			opts = append(opts, mcp.WithAITools(externalTools...))
-			log.Infof("launchMcpServer: loaded %d external mcp tools via aitool-framework", len(externalTools))
+			log.Infof("launchMcpServer: loaded %d external mcp tools via bridge", len(externalTools))
 		}
 	}
 

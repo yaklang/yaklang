@@ -110,19 +110,8 @@ func (s *Server) DeleteMCPServer(ctx context.Context, req *ypb.DeleteMCPServerRe
 
 	db := s.GetProfileDatabase()
 
-	// Resolve server name so we can clean up tool configs.
-	server, err := yakit.GetMCPServer(db, req.GetID())
-	if err != nil {
-		return &ypb.GeneralResponse{Ok: false, Reason: err.Error()}, nil
-	}
-
 	if err := yakit.DeleteMCPServer(db, req.GetID()); err != nil {
 		return &ypb.GeneralResponse{Ok: false, Reason: err.Error()}, nil
-	}
-
-	// Best-effort cleanup of per-tool configs; non-fatal if it fails.
-	if cleanErr := yakit.DeleteMCPServerToolConfigs(db, server.Name); cleanErr != nil {
-		log.Warnf("cleanup tool configs for server %s failed: %v", server.Name, cleanErr)
 	}
 
 	return &ypb.GeneralResponse{
@@ -337,6 +326,60 @@ func (s *Server) getMCPServerTools(ctx context.Context, server *schema.MCPServer
 	return tools, nil
 }
 
+// parseMCPToolParamsJSON converts the compact JSON stored in MCPServerToolConfig.ParamsJSON
+// into the unified MCPServerToolParamInfo wire format used by all MCP tool list APIs.
+func parseMCPToolParamsJSON(paramsJSON string) []*ypb.MCPServerToolParamInfo {
+	if paramsJSON == "" || paramsJSON == "[]" {
+		return nil
+	}
+	type paramEntry struct {
+		Name        string `json:"name"`
+		Type        string `json:"type"`
+		Description string `json:"description"`
+		Default     string `json:"default"`
+		Required    bool   `json:"required"`
+	}
+	var entries []paramEntry
+	if jsonErr := json.Unmarshal([]byte(paramsJSON), &entries); jsonErr != nil {
+		log.Warnf("parseMCPToolParamsJSON: %v", jsonErr)
+		return nil
+	}
+	params := make([]*ypb.MCPServerToolParamInfo, 0, len(entries))
+	for _, e := range entries {
+		if e.Name == "" {
+			continue
+		}
+		params = append(params, &ypb.MCPServerToolParamInfo{
+			Name:        e.Name,
+			Type:        e.Type,
+			Description: e.Description,
+			Default:     e.Default,
+			Required:    e.Required,
+		})
+	}
+	return params
+}
+
+func formatJSONSchemaType(raw any) string {
+	switch t := raw.(type) {
+	case string:
+		return t
+	case []any:
+		parts := make([]string, 0, len(t))
+		for _, item := range t {
+			parts = append(parts, utils.InterfaceToString(item))
+		}
+		return strings.Join(parts, "|")
+	default:
+		return utils.InterfaceToString(raw)
+	}
+}
+
+func asSchemaPropertyMap(paramValue any) (map[string]any, bool) {
+	m, ok := paramValue.(map[string]any)
+	return m, ok
+}
+
 func parseMCPToolInputSchema(inputSchema *mcp.ToolInputSchema) ([]*ypb.MCPServerToolParamInfo, error) {
 	if inputSchema == nil {
 		return []*ypb.MCPServerToolParamInfo{}, nil
@@ -365,10 +408,10 @@ func parseMCPToolInputSchema(inputSchema *mcp.ToolInputSchema) ([]*ypb.MCPServer
 		param.Required = requiredMap[paramName]
 
 		// 解析参数详细信息
-		if paramMap, ok := paramValue.(map[string]interface{}); ok {
+		if paramMap, ok := asSchemaPropertyMap(paramValue); ok {
 			// 参数类型
 			if paramType, exists := paramMap["type"]; exists {
-				param.Type = utils.InterfaceToString(paramType)
+				param.Type = formatJSONSchemaType(paramType)
 			}
 
 			// 参数描述
@@ -522,29 +565,7 @@ func (s *Server) getMCPServerToolsFromCache(server *schema.MCPServer) []*ypb.MCP
 		if cfg.Description == "" && cfg.ParamsJSON == "" {
 			continue
 		}
-		var params []*ypb.MCPServerToolParamInfo
-		if cfg.ParamsJSON != "" && cfg.ParamsJSON != "[]" {
-			// Parse the compact JSON back into proto structs.
-			type paramEntry struct {
-				Name        string `json:"name"`
-				Type        string `json:"type"`
-				Description string `json:"description"`
-				Default     string `json:"default"`
-				Required    bool   `json:"required"`
-			}
-			var entries []paramEntry
-			if jsonErr := json.Unmarshal([]byte(cfg.ParamsJSON), &entries); jsonErr == nil {
-				for _, e := range entries {
-					params = append(params, &ypb.MCPServerToolParamInfo{
-						Name:        e.Name,
-						Type:        e.Type,
-						Description: e.Description,
-						Default:     e.Default,
-						Required:    e.Required,
-					})
-				}
-			}
-		}
+		params := parseMCPToolParamsJSON(cfg.ParamsJSON)
 		tools = append(tools, &ypb.MCPServerTool{
 			Name:        cfg.ToolName,
 			Description: cfg.Description,

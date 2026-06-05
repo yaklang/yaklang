@@ -456,6 +456,24 @@ func (m *AiToolManager) OverrideToolByName(newTool *aitool.Tool) {
 	m.EnableTool(newTool.Name)
 }
 
+// RemoveToolByName drops every tool with the given name from the in-memory registry.
+func (m *AiToolManager) RemoveToolByName(name string) {
+	if name == "" {
+		return
+	}
+	originGetter := m.toolsGetter
+	m.toolsGetter = func() []*aitool.Tool {
+		var result []*aitool.Tool
+		for _, t := range originGetter() {
+			if t.Name != name {
+				result = append(result, t)
+			}
+		}
+		return result
+	}
+	m.DisableTool(name)
+}
+
 func (m *AiToolManager) EnableAIToolSearch(searcher searchtools.AISearcher[*aitool.Tool]) error {
 	m.enableSearchTool = true
 	m.aiToolsSearcher = searcher

@@ -34,7 +34,8 @@ var MCPCommand = &cli.Command{
 		cli.StringFlag{Name: "dr,disable-resource", Usage: "disable resource sets, split by ','"},
 		cli.StringSliceFlag{Name: "script", Usage: "add the dynamic Yak script as a tool to the MCP server"},
 		cli.StringFlag{Name: "base-url", Usage: "if transport is http-based, the base url of the MCP server"},
-		cli.BoolFlag{Name: "enable-aitool-framework", Usage: "expose all built-in aitool-framework tools (fs, ssa, yakscript, etc.) and enabled external MCP server tools via the unified aitool layer"},
+		cli.BoolFlag{Name: "enable-aitool-framework", Usage: "expose built-in aitool-framework tools (fs, ssa, yakscript, etc.)"},
+		cli.BoolFlag{Name: "enable-bridge-external-mcp", Usage: "bridge external MCP servers already enabled in AI Agent"},
 	},
 	Action: func(c *cli.Context) error {
 		yakit.CallPostInitDatabase()
@@ -47,6 +48,7 @@ var MCPCommand = &cli.Command{
 		script := c.StringSlice("script")
 		baseURL := c.String("base-url")
 		enableAIToolFramework := c.Bool("enable-aitool-framework")
+		enableBridgeExternalMCP := c.Bool("enable-bridge-external-mcp")
 		toolSets := lo.FilterMap(strings.Split(tool, ","), func(item string, _ int) (string, bool) {
 			item = strings.TrimSpace(item)
 			return item, item != ""
@@ -91,14 +93,16 @@ var MCPCommand = &cli.Command{
 				opts = append(opts, WithAITools(builtinTools...))
 				log.Infof("loaded %d built-in aitool-framework tools", len(builtinTools))
 			}
+		}
 
-			// External MCP server tools bridged through the aitool layer.
+		if enableBridgeExternalMCP {
+			db := consts.GetGormProfileDatabase()
 			externalTools, mcpErr := aitool.LoadAllEnabledAIToolsFromMCPServers(db, context.Background())
 			if mcpErr != nil {
-				log.Warnf("load aitool-framework external mcp tools failed: %v", mcpErr)
+				log.Warnf("load external mcp tools via bridge failed: %v", mcpErr)
 			} else if len(externalTools) > 0 {
 				opts = append(opts, WithAITools(externalTools...))
-				log.Infof("loaded %d external mcp tools via aitool-framework", len(externalTools))
+				log.Infof("loaded %d external mcp tools via bridge", len(externalTools))
 			}
 		}
 

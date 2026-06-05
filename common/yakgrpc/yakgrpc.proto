@@ -2383,9 +2383,10 @@ message StartMcpServerRequest {
   // Deprecated: use EnableAIToolFramework instead, which subsumes this path
   // with better execution quality (stdout/stderr capture, multiple script types).
   bool EnableYakAITool = 9;
-  // expose built-in aitool-framework tools (fs, ssa, yakscript, etc.) and
-  // enabled external MCP server tools bridged through the aitool layer
+  // expose built-in aitool-framework tools (fs, ssa, yakscript, etc.)
   bool EnableAIToolFramework = 10;
+  // bridge external MCP servers already enabled in AI Agent
+  bool EnableBridgeExternalMCP = 11;
 }
 
 message StartMcpServerResponse {

@@ -14,8 +14,8 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aimem"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/ai/rag/rag_search_tool"
@@ -565,6 +565,27 @@ func (r *ReAct) loadMCPServers() {
 		promptStartLoadingOnce := utils.NewOnce()
 		promptDoneLoadingOnce := utils.NewOnce()
 
+		onToolsListChanged := func(serverName string, tools []*aitool.Tool, removed []string) {
+			mng := r.config.GetAiToolManager()
+			if mng == nil {
+				return
+			}
+			for _, t := range tools {
+				if t != nil {
+					mng.OverrideToolByName(t)
+				}
+			}
+			for _, name := range removed {
+				mng.RemoveToolByName(name)
+			}
+			if len(tools) > 0 || len(removed) > 0 {
+				log.Infof(
+					"MCP server %q tools list_changed: refreshed %d tool(s), removed %d",
+					serverName, len(tools), len(removed),
+				)
+			}
+		}
+
 		tools, err := aitool.LoadAllEnabledAIToolsFromMCPServersWithCallback(
 			consts.GetGormProfileDatabase(),
 			r.config.Ctx,
@@ -600,6 +621,7 @@ func (r *ReAct) loadMCPServers() {
 				startLoadingPW.Close()
 				doneLoadingPW.Close()
 			},
+			onToolsListChanged,
 		)
 		if err != nil {
 			log.Errorf("load tools failed: %v", err)

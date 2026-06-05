@@ -22,6 +22,9 @@ type MCPServerConfig struct {
 	// extraAITools holds aitool.Tool instances registered via WithAITools.
 	// They are merged last and override globalTools entries with the same name.
 	extraAITools map[string]*ToolWithHandler
+	// bridgeClientClosers holds outbound MCP clients for bridged aitools; each
+	// client is closed once when the Yak MCP server shuts down.
+	bridgeClientClosers []io.Closer
 }
 
 func NewMCPServerConfig() *MCPServerConfig {
@@ -34,28 +37,47 @@ func NewMCPServerConfig() *MCPServerConfig {
 	}
 }
 
+func (cfg *MCPServerConfig) trackBridgeClientCloser(c io.Closer) {
+	if c == nil {
+		return
+	}
+	for _, existing := range cfg.bridgeClientClosers {
+		if existing == c {
+			return
+		}
+	}
+	cfg.bridgeClientClosers = append(cfg.bridgeClientClosers, c)
+}
+
 func (cfg *MCPServerConfig) ApplyConfig(s *MCPServer) {
-	tools := maps.Clone(globalTools)
-	if len(tools) == 0 {
-		tools = globalTools
+	// Legacy MCP tools are only exposed when at least one tool set was enabled
+	// via WithEnableToolSet (typically driven by StartMcpServerRequest.EnableAll).
+	tools := make(map[string]*ToolWithHandler)
+	if len(cfg.enableTools) > 0 {
+		for name, tool := range cfg.enableTools {
+			if _, disabled := cfg.disableTools[name]; disabled {
+				continue
+			}
+			tools[name] = tool
+		}
 	}
 
 	// extraAITools (registered via WithAITools) are merged last and override
-	// any global entry with the same name.
+	// any legacy entry with the same name.
 	for name, tool := range cfg.extraAITools {
+		if _, disabled := cfg.disableTools[name]; disabled {
+			continue
+		}
 		tools[name] = tool
 	}
 
-	for name, tool := range tools {
-		if _, ok := cfg.disableTools[name]; ok {
-			continue
-		}
+	for _, tool := range tools {
 		s.server.AddTool(tool.tool, tool.handler(s))
 	}
 
 	resources := cfg.enableResources
 	if len(resources) == 0 {
-		resources = globalResources
+		resources = nil
 	}
 	for name, resource := range resources {
 		if _, ok := cfg.disableResources[name]; ok {

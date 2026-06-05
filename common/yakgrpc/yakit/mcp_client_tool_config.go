@@ -1,12 +1,29 @@
 package yakit
 
 import (
+	"strings"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	bizhelper "github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
+
+// MCPBridgeToolCanonicalName is the tool_name stored in mcp_client_tool_configs for
+// bridge tools (same convention as MCPServerToolFullName / aitool loader).
+func MCPBridgeToolCanonicalName(serverName, remoteToolName string) string {
+	return MCPServerToolFullName(serverName, remoteToolName)
+}
+
+// MCPBridgeToolOriginalName reverses MCPBridgeToolCanonicalName for a given server name.
+func MCPBridgeToolOriginalName(canonicalName, serverName string) string {
+	prefix := "mcp_" + serverName + "_"
+	if strings.HasPrefix(canonicalName, prefix) {
+		return canonicalName[len(prefix):]
+	}
+	return ""
+}
 
 // GetOrCreateMCPClientToolConfig returns the MCPClientToolConfig row for the given tool,
 // creating it (with Enable=true) if it does not yet exist.
@@ -74,10 +91,19 @@ func SetMCPClientToolEnabled(db *gorm.DB, toolName string, enable bool) error {
 // not present in the provided keepNames set. Called after syncing the live
 // builtin registry so that renamed/removed tools do not persist in the DB.
 func DeleteStaleMCPClientBuiltinTools(db *gorm.DB, keepNames map[string]struct{}) error {
+	return deleteStaleMCPClientToolsBySource(db, schema.MCPClientToolSourceBuiltin, keepNames)
+}
+
+// DeleteStaleMCPClientAITools removes aitool-framework builtin rows whose tool_name
+// is not present in the provided keepNames set.
+func DeleteStaleMCPClientAITools(db *gorm.DB, keepNames map[string]struct{}) error {
+	return deleteStaleMCPClientToolsBySource(db, schema.MCPClientToolSourceAITool, keepNames)
+}
+
+func deleteStaleMCPClientToolsBySource(db *gorm.DB, source string, keepNames map[string]struct{}) error {
 	var existing []*schema.MCPClientToolConfig
-	if err := db.Where("source = ?", schema.MCPClientToolSourceBuiltin).
-		Find(&existing).Error; err != nil {
-		return utils.Errorf("fetch builtin tool configs: %s", err)
+	if err := db.Where("source = ?", source).Find(&existing).Error; err != nil {
+		return utils.Errorf("fetch %s tool configs: %s", source, err)
 	}
 
 	var toDelete []uint
@@ -90,6 +116,78 @@ func DeleteStaleMCPClientBuiltinTools(db *gorm.DB, keepNames map[string]struct{}
 		return nil
 	}
 	return db.Where("id IN (?)", toDelete).Delete(&schema.MCPClientToolConfig{}).Error
+}
+
+// EnsureMCPClientToolConfigSource updates the source column when a tool migrates
+// between registries (e.g. legacy builtin vs aitool-framework builtin).
+func EnsureMCPClientToolConfigSource(db *gorm.DB, toolName, source string) error {
+	result := db.Model(&schema.MCPClientToolConfig{}).
+		Where("tool_name = ? AND source <> ?", toolName, source).
+		UpdateColumn("source", source)
+	if result.Error != nil {
+		return utils.Errorf("update mcp client tool source failed: %s", result.Error)
+	}
+	return nil
+}
+
+// DeleteAllMCPClientBridgeToolConfigsForServer removes every bridge tool row for serverName.
+// Used when the upstream MCP server is deleted or its endpoint changes.
+func DeleteAllMCPClientBridgeToolConfigsForServer(db *gorm.DB, serverName string) error {
+	return DeleteMCPClientToolConfigsByServerAndNames(db, serverName, nil)
+}
+
+// MigrateMCPClientBridgeToolConfigsServerName rewrites outbound bridge tool rows when the
+// parent MCP server name changes but the remote endpoint is unchanged.
+func MigrateMCPClientBridgeToolConfigsServerName(db *gorm.DB, oldServerName, newServerName string) error {
+	if db == nil {
+		return utils.Errorf("database connection is nil")
+	}
+	oldServerName = strings.TrimSpace(oldServerName)
+	newServerName = strings.TrimSpace(newServerName)
+	if oldServerName == "" || newServerName == "" {
+		return utils.Errorf("mcp server name cannot be empty")
+	}
+	if oldServerName == newServerName {
+		return nil
+	}
+
+	var cfgs []*schema.MCPClientToolConfig
+	if err := db.Where("source = ? AND server_name = ?", schema.MCPClientToolSourceBridge, oldServerName).
+		Find(&cfgs).Error; err != nil {
+		return utils.Errorf("query bridge tool configs for server %q failed: %s", oldServerName, err)
+	}
+
+	for _, cfg := range cfgs {
+		remoteTool := MCPBridgeToolOriginalName(cfg.ToolName, oldServerName)
+		if remoteTool == "" {
+			return utils.Errorf(
+				"bridge tool %q does not match server %q naming convention",
+				cfg.ToolName, oldServerName,
+			)
+		}
+		newToolName := MCPBridgeToolCanonicalName(newServerName, remoteTool)
+
+		var conflict schema.MCPClientToolConfig
+		qErr := db.Where("tool_name = ? AND id != ?", newToolName, cfg.ID).First(&conflict).Error
+		if qErr == nil {
+			return utils.Errorf("bridge tool name %q already exists", newToolName)
+		}
+		if !gorm.IsRecordNotFoundError(qErr) {
+			return utils.Errorf("check bridge tool name conflict failed: %s", qErr)
+		}
+
+		if err := db.Model(&schema.MCPClientToolConfig{}).Where("id = ?", cfg.ID).
+			Updates(map[string]interface{}{
+				"tool_name":   newToolName,
+				"server_name": newServerName,
+			}).Error; err != nil {
+			return utils.Errorf(
+				"migrate bridge tool config %s to server %q failed: %s",
+				cfg.ToolName, newServerName, err,
+			)
+		}
+	}
+	return nil
 }
 
 // DeleteMCPClientToolConfigsByServerAndNames removes tool rows for the given server

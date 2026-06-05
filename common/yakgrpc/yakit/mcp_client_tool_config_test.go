@@ -138,6 +138,45 @@ func TestGetDisabledMCPClientToolNames(t *testing.T) {
 	assert.NotContains(t, disabled, "t3")
 }
 
+func TestMUSTPASS_MigrateMCPClientBridgeToolConfigsServerName(t *testing.T) {
+	db := newToolConfigDB(t)
+	oldSrv := "srv-old-bridge-migrate"
+	newSrv := "srv-new-bridge-migrate"
+
+	_, err := GetOrCreateMCPClientToolConfig(db, MCPBridgeToolCanonicalName(oldSrv, "tool1"), schema.MCPClientToolSourceBridge, oldSrv, "d1")
+	require.NoError(t, err)
+	require.NoError(t, SetMCPClientToolEnabled(db, MCPBridgeToolCanonicalName(oldSrv, "tool1"), false))
+
+	require.NoError(t, MigrateMCPClientBridgeToolConfigsServerName(db, oldSrv, newSrv))
+
+	got, err := GetMCPClientToolConfigByName(db, MCPBridgeToolCanonicalName(newSrv, "tool1"))
+	require.NoError(t, err)
+	assert.Equal(t, newSrv, got.ServerName)
+	assert.False(t, got.Enable)
+	assert.Equal(t, "d1", got.Description)
+
+	_, err = GetMCPClientToolConfigByName(db, MCPBridgeToolCanonicalName(oldSrv, "tool1"))
+	require.Error(t, err)
+}
+
+func TestMUSTPASS_MigrateMCPClientBridgeToolConfigsServerName_Conflict(t *testing.T) {
+	db := newToolConfigDB(t)
+	oldSrv := "conflict-old"
+	newSrv := "conflict-new"
+
+	require.Error(t, MigrateMCPClientBridgeToolConfigsServerName(db, "", "x"))
+	require.Error(t, MigrateMCPClientBridgeToolConfigsServerName(db, "a", ""))
+
+	_, err := GetOrCreateMCPClientToolConfig(db, MCPBridgeToolCanonicalName(newSrv, "dup"), schema.MCPClientToolSourceBridge, newSrv, "")
+	require.NoError(t, err)
+	_, err = GetOrCreateMCPClientToolConfig(db, MCPBridgeToolCanonicalName(oldSrv, "dup"), schema.MCPClientToolSourceBridge, oldSrv, "")
+	require.NoError(t, err)
+
+	err = MigrateMCPClientBridgeToolConfigsServerName(db, oldSrv, newSrv)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "already exists")
+}
+
 func TestDeleteMCPClientToolConfigsByServerAndNames(t *testing.T) {
 	db := newToolConfigDB(t)
 

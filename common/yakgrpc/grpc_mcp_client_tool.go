@@ -4,6 +4,8 @@ import (
 	"context"
 
 	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mcp"
@@ -17,9 +19,9 @@ import (
 // their per-tool enable/disable state. The result is paged and filterable.
 //
 // Tool discovery strategy:
-//   - "builtin" tools: always synced from the in-memory global registry on each
-//     call (pure in-memory, no network). Stale rows for removed/renamed tools
-//     are pruned immediately.
+//   - "builtin" tools: legacy MCP registry (common/mcp globalTools).
+//   - "aitool" tools: aitool-framework builtin registry.
+//     Both are synced in-memory on each call; stale rows are pruned per source.
 //   - "bridge" tools: two modes controlled by ForceSync:
 //   - ForceSync=false (default): read entirely from the DB cache, no network.
 //     Stale rows may persist until the next ForceSync. Frontend should call
@@ -29,19 +31,8 @@ import (
 func (s *Server) GetMCPToolList(ctx context.Context, req *ypb.GetMCPToolListRequest) (*ypb.GetMCPToolListResponse, error) {
 	db := s.GetProfileDatabase()
 
-	// 1. Sync builtin tools into DB (cheap: in-memory map iteration + upsert),
-	// then prune rows for tools that have been removed or renamed in the registry.
-	builtinTools := mcp.GlobalBuiltinTools()
-	builtinNames := make(map[string]struct{}, len(builtinTools))
-	for name := range builtinTools {
-		builtinNames[name] = struct{}{}
-		if _, err := yakit.GetOrCreateMCPClientToolConfig(db, name, schema.MCPClientToolSourceBuiltin, "", ""); err != nil {
-			log.Warnf("GetMCPToolList: upsert builtin tool config %q: %v", name, err)
-		}
-	}
-	if err := yakit.DeleteStaleMCPClientBuiltinTools(db, builtinNames); err != nil {
-		log.Warnf("GetMCPToolList: prune stale builtin tools: %v", err)
-	}
+	// 1. Sync legacy builtin and aitool-framework builtin rows separately.
+	aitoolBuiltinMap := syncMCPToolConfigSources(db)
 
 	// 2. Reconcile bridge tools only when explicitly requested.
 	// ForceSync=false: skip all network calls, serve from DB cache.
@@ -59,7 +50,10 @@ func (s *Server) GetMCPToolList(ctx context.Context, req *ypb.GetMCPToolListRequ
 	tools := make([]*ypb.MCPClientToolConfig, 0, len(cfgs))
 	for _, cfg := range cfgs {
 		item := cfg.ToGRPC()
-		attachToolMeta(item, cfg.Source, cfg.ToolName, cfg.ServerName)
+		attachToolMeta(item, cfg.Source, cfg.ToolName, cfg.ServerName, aitoolBuiltinMap)
+		if cfg.Source == schema.MCPClientToolSourceBridge {
+			attachBridgeToolMeta(db, item)
+		}
 		tools = append(tools, item)
 	}
 
@@ -87,10 +81,13 @@ func (s *Server) GetMCPToolDetail(ctx context.Context, req *ypb.GetMCPToolDetail
 	}
 
 	item := cfg.ToGRPC()
-	attachToolMeta(item, cfg.Source, cfg.ToolName, cfg.ServerName)
+	attachToolMeta(item, cfg.Source, cfg.ToolName, cfg.ServerName, lookupAIToolFrameworkBuiltin(db, cfg.ToolName))
+	if cfg.Source == schema.MCPClientToolSourceBridge {
+		attachBridgeToolMeta(db, item)
+	}
 
-	// For bridge tools whose metadata is not in memory, try a live lookup.
-	if cfg.Source == schema.MCPClientToolSourceBridge && item.Description == "" {
+	// For bridge tools whose metadata is still missing, try a live lookup.
+	if cfg.Source == schema.MCPClientToolSourceBridge && (item.Description == "" || len(item.Params) == 0) {
 		srv, srvErr := yakit.GetMCPServerByName(db, cfg.ServerName)
 		if srvErr == nil && srv != nil {
 			tools, toolsErr := s.getMCPServerTools(ctx, srv)
@@ -170,46 +167,120 @@ func syncMCPBridgeTools(ctx context.Context, s *Server, db *gorm.DB) {
 	}
 }
 
+// syncBuiltinMCPToolConfigs upserts builtin tool rows from both the legacy MCP
+// registry and the aitool-framework builtin registry, then prunes stale rows.
+// Returns a name→tool map for live metadata attachment in the same request.
+func lookupAIToolFrameworkBuiltin(db *gorm.DB, toolName string) map[string]*aitool.Tool {
+	result := make(map[string]*aitool.Tool)
+	for _, t := range buildinaitools.GetAllToolsDynamically(db) {
+		if t != nil && t.Name == toolName {
+			result[toolName] = t
+			break
+		}
+	}
+	return result
+}
+
+func syncMCPToolConfigSources(db *gorm.DB) map[string]*aitool.Tool {
+	legacyNames := make(map[string]struct{})
+	aitoolNames := make(map[string]struct{})
+	aitoolBuiltinMap := make(map[string]*aitool.Tool)
+
+	for name := range mcp.GlobalBuiltinTools() {
+		legacyNames[name] = struct{}{}
+		if _, err := yakit.GetOrCreateMCPClientToolConfig(db, name, schema.MCPClientToolSourceBuiltin, "", ""); err != nil {
+			log.Warnf("GetMCPToolList: upsert legacy builtin tool config %q: %v", name, err)
+		}
+	}
+
+	for _, t := range buildinaitools.GetAllToolsDynamically(db) {
+		if t == nil || t.Name == "" {
+			continue
+		}
+		aitoolNames[t.Name] = struct{}{}
+		aitoolBuiltinMap[t.Name] = t
+		desc := ""
+		if t.Tool != nil {
+			desc = t.Description
+		}
+		if _, err := yakit.GetOrCreateMCPClientToolConfig(db, t.Name, schema.MCPClientToolSourceAITool, "", desc); err != nil {
+			log.Warnf("GetMCPToolList: upsert aitool-framework builtin %q: %v", t.Name, err)
+		} else if err := yakit.EnsureMCPClientToolConfigSource(db, t.Name, schema.MCPClientToolSourceAITool); err != nil {
+			log.Warnf("GetMCPToolList: migrate aitool source for %q: %v", t.Name, err)
+		}
+	}
+
+	if err := yakit.DeleteStaleMCPClientBuiltinTools(db, legacyNames); err != nil {
+		log.Warnf("GetMCPToolList: prune stale legacy builtin tools: %v", err)
+	}
+	if err := yakit.DeleteStaleMCPClientAITools(db, aitoolNames); err != nil {
+		log.Warnf("GetMCPToolList: prune stale aitool-framework tools: %v", err)
+	}
+	return aitoolBuiltinMap
+}
+
 // attachToolMeta fills in Description and Params on an MCPToolConfig proto
 // message from the live in-memory tool definition (for builtin tools).
 // Bridge tool metadata is left empty here — the caller may enrich it separately
 // if a live connection is available.
-func attachToolMeta(item *ypb.MCPClientToolConfig, source, toolName, _ string) {
-	if source != schema.MCPClientToolSourceBuiltin {
+// attachBridgeToolMeta fills bridge tool description/params from the MCPServerToolConfig
+// metadata cache populated by getMCPServerTools / ForceSync.
+func attachBridgeToolMeta(db *gorm.DB, item *ypb.MCPClientToolConfig) {
+	if item == nil || item.GetToolName() == "" {
 		return
 	}
-	twh := mcp.GetBuiltinToolByName(toolName)
-	if twh == nil {
+	cached, err := yakit.GetMCPServerToolConfigByFullName(db, item.GetToolName())
+	if err != nil || cached == nil {
 		return
 	}
-	t := twh.Tool()
-	if t == nil {
-		return
+	if item.GetDescription() == "" && cached.Description != "" {
+		item.Description = cached.Description
 	}
-	item.Description = t.Description
-	params, err := parseMCPToolInputSchema(&t.InputSchema)
-	if err != nil {
-		log.Warnf("attachToolMeta: parse schema for %q: %v", toolName, err)
-		return
+	if len(item.GetParams()) == 0 {
+		item.Params = parseMCPToolParamsJSON(cached.ParamsJSON)
 	}
-	item.Params = params
 }
 
-// buildBridgeToolName produces the canonical name for a bridge tool, matching
-// the convention in common/ai/aid/aitool/mcp_server_loader.go:
-//
-//	mcp_{ServerName}_{ToolName}
+func attachToolMeta(item *ypb.MCPClientToolConfig, source, toolName, _ string, aitoolBuiltin map[string]*aitool.Tool) {
+	switch source {
+	case schema.MCPClientToolSourceBuiltin:
+		twh := mcp.GetBuiltinToolByName(toolName)
+		if twh == nil {
+			return
+		}
+		t := twh.Tool()
+		if t == nil {
+			return
+		}
+		item.Description = t.Description
+		params, err := parseMCPToolInputSchema(&t.InputSchema)
+		if err != nil {
+			log.Warnf("attachToolMeta: parse legacy schema for %q: %v", toolName, err)
+			return
+		}
+		item.Params = params
+	case schema.MCPClientToolSourceAITool:
+		at, ok := aitoolBuiltin[toolName]
+		if !ok || at == nil || at.Tool == nil {
+			return
+		}
+		item.Description = at.Description
+		params, err := parseMCPToolInputSchema(&at.InputSchema)
+		if err != nil {
+			log.Warnf("attachToolMeta: parse aitool-framework schema for %q: %v", toolName, err)
+			return
+		}
+		item.Params = params
+	}
+}
+
 func buildBridgeToolName(serverName, toolName string) string {
-	return "mcp_" + serverName + "_" + toolName
+	return yakit.MCPBridgeToolCanonicalName(serverName, toolName)
 }
 
-// extractOriginalToolName reverses buildBridgeToolName:
-//
-//	"mcp_IDA-MCP_decompile" + "IDA-MCP" → "decompile"
 func extractOriginalToolName(canonicalName, serverName string) string {
-	prefix := "mcp_" + serverName + "_"
-	if len(canonicalName) > len(prefix) {
-		return canonicalName[len(prefix):]
+	if orig := yakit.MCPBridgeToolOriginalName(canonicalName, serverName); orig != "" {
+		return orig
 	}
 	return canonicalName
 }

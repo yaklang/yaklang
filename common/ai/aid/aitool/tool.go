@@ -29,6 +29,12 @@ type ToolRuntimeConfig struct {
 // NoRuntimeInvokeCallback 定义工具调用回调函数的签名
 type NoRuntimeInvokeCallback func(ctx context.Context, params InvokeParams, stdout io.Writer, stderr io.Writer) (any, error)
 type InvokeCallback func(ctx context.Context, params InvokeParams, invokeExConfig *ToolRuntimeConfig, stdout io.Writer, stderr io.Writer) (any, error)
+
+// MCPClientCloser closes an outbound MCP client kept alive for bridge tool callbacks.
+type MCPClientCloser interface {
+	Close() error
+}
+
 type Tool struct {
 	*mcp.Tool
 	// A list of keywords for tool indexing and searching.
@@ -41,6 +47,9 @@ type Tool struct {
 	// MCPPendingStub marks a placeholder MCP tool loaded from DB cache before the
 	// remote server connection completes. Invokers should wait for a live replacement.
 	MCPPendingStub bool `json:"-"`
+	// BridgeMCPClient is the live outbound MCP client for tools bridged from an
+	// external server. The hosting Yak MCP server closes it on shutdown.
+	BridgeMCPClient MCPClientCloser `json:"-"`
 }
 
 // ToolOption 定义工具选项函数的类型

@@ -122,6 +122,14 @@ func (s *SSEServer) startNotificationDispatcher() {
 						return
 					}
 					if serverNotification.Context.SessionID == "" {
+						// Broadcast server-initiated notifications (e.g. tools/list_changed
+						// from AddTool) to every active SSE session.
+						s.sessions.Range(func(key, _ any) bool {
+							if sessionID, ok := key.(string); ok {
+								_ = s.SendEventToSession(sessionID, serverNotification.Notification)
+							}
+							return true
+						})
 						continue
 					}
 					_ = s.SendEventToSession(

@@ -125,6 +125,9 @@ func WithAITools(tools ...*aitool.Tool) McpServerOption {
 				tool:    t.Tool, // *mcp.Tool embedded in aitool.Tool
 				handler: convertAIToolToMCPHandler(t),
 			}
+			if t.BridgeMCPClient != nil {
+				cfg.trackBridgeClientCloser(t.BridgeMCPClient)
+			}
 		}
 		return nil
 	}

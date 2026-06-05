@@ -59,7 +59,7 @@ func findRow(rows []*schema.MCPServerToolConfig, toolName string) *schema.MCPSer
 
 // TestSyncAndCache_InitialLoad verifies that a first-time sync inserts all live
 // tools with enable=true, correct metadata, and a pre-computed full_name.
-func TestSyncAndCache_InitialLoad(t *testing.T) {
+func TestMUSTPASS_SyncAndCache_InitialLoad(t *testing.T) {
 	db := newMCPSyncTestDB(t)
 	srv := newMCPSyncServerName()
 
@@ -88,7 +88,7 @@ func TestSyncAndCache_InitialLoad(t *testing.T) {
 
 // TestSyncAndCache_RemovedToolIsHardDeleted verifies that a tool absent from the
 // live list is hard-deleted and does not appear in subsequent queries.
-func TestSyncAndCache_RemovedToolIsHardDeleted(t *testing.T) {
+func TestMUSTPASS_SyncAndCache_RemovedToolIsHardDeleted(t *testing.T) {
 	db := newMCPSyncTestDB(t)
 	srv := newMCPSyncServerName()
 
@@ -117,7 +117,7 @@ func TestSyncAndCache_RemovedToolIsHardDeleted(t *testing.T) {
 
 // TestSyncAndCache_MetadataUpdated verifies that description and params_json are
 // refreshed when the remote server reports changed values.
-func TestSyncAndCache_MetadataUpdated(t *testing.T) {
+func TestMUSTPASS_SyncAndCache_MetadataUpdated(t *testing.T) {
 	db := newMCPSyncTestDB(t)
 	srv := newMCPSyncServerName()
 
@@ -138,7 +138,7 @@ func TestSyncAndCache_MetadataUpdated(t *testing.T) {
 
 // TestSyncAndCache_EnableFlagPreservedOnMetadataUpdate verifies that the
 // user-controlled enable flag is NOT touched when metadata changes.
-func TestSyncAndCache_EnableFlagPreservedOnMetadataUpdate(t *testing.T) {
+func TestMUSTPASS_SyncAndCache_EnableFlagPreservedOnMetadataUpdate(t *testing.T) {
 	db := newMCPSyncTestDB(t)
 	srv := newMCPSyncServerName()
 
@@ -164,7 +164,7 @@ func TestSyncAndCache_EnableFlagPreservedOnMetadataUpdate(t *testing.T) {
 
 // TestSyncAndCache_ToolRename simulates a rename: the old name disappears and a
 // new name appears. The old row must be deleted and a new row inserted.
-func TestSyncAndCache_ToolRename(t *testing.T) {
+func TestMUSTPASS_SyncAndCache_ToolRename(t *testing.T) {
 	db := newMCPSyncTestDB(t)
 	srv := newMCPSyncServerName()
 
@@ -191,7 +191,7 @@ func TestSyncAndCache_ToolRename(t *testing.T) {
 
 // TestSyncAndCache_EmptyLiveList removes all tools when the server returns an
 // empty tool list (e.g. all tools were unregistered).
-func TestSyncAndCache_EmptyLiveList(t *testing.T) {
+func TestMUSTPASS_SyncAndCache_EmptyLiveList(t *testing.T) {
 	db := newMCPSyncTestDB(t)
 	srv := newMCPSyncServerName()
 
@@ -209,7 +209,7 @@ func TestSyncAndCache_EmptyLiveList(t *testing.T) {
 
 // TestSyncAndCache_NoChangeSkipsUpdate verifies that an identical sync does not
 // alter the row (updated_at stays the same within the same second).
-func TestSyncAndCache_NoChangeSkipsUpdate(t *testing.T) {
+func TestMUSTPASS_SyncAndCache_NoChangeSkipsUpdate(t *testing.T) {
 	db := newMCPSyncTestDB(t)
 	srv := newMCPSyncServerName()
 
@@ -231,7 +231,7 @@ func TestSyncAndCache_NoChangeSkipsUpdate(t *testing.T) {
 
 // TestSyncAndCache_MultipleServersIsolated verifies that syncing one server does
 // not affect rows belonging to another server.
-func TestSyncAndCache_MultipleServersIsolated(t *testing.T) {
+func TestMUSTPASS_SyncAndCache_MultipleServersIsolated(t *testing.T) {
 	db := newMCPSyncTestDB(t)
 	srv1 := newMCPSyncServerName()
 	srv2 := newMCPSyncServerName()
@@ -254,7 +254,7 @@ func TestSyncAndCache_MultipleServersIsolated(t *testing.T) {
 
 // TestSyncAndCache_NewToolDefaultEnable verifies that tools added in a subsequent
 // sync (not initial) also get enable=true by default.
-func TestSyncAndCache_NewToolDefaultEnable(t *testing.T) {
+func TestMUSTPASS_SyncAndCache_NewToolDefaultEnable(t *testing.T) {
 	db := newMCPSyncTestDB(t)
 	srv := newMCPSyncServerName()
 
@@ -278,7 +278,7 @@ func TestSyncAndCache_NewToolDefaultEnable(t *testing.T) {
 // TestGetMCPServerToolConfigByFullName_ExactLookup verifies that the full_name
 // column enables O(1) lookup without ambiguity, even when server or tool names
 // contain underscores.
-func TestGetMCPServerToolConfigByFullName_ExactLookup(t *testing.T) {
+func TestMUSTPASS_GetMCPServerToolConfigByFullName_ExactLookup(t *testing.T) {
 	db := newMCPSyncTestDB(t)
 
 	// Use server and tool names that both contain underscores to exercise the
