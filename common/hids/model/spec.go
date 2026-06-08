@@ -204,6 +204,12 @@ func (s DesiredSpec) Validate() error {
 			if !filepath.IsAbs(watchPath) {
 				return invalidField("collectors.file.watch_paths", "all watch_paths must be absolute")
 			}
+			if IsUnsafeFilewatchRoot(watchPath) {
+				return invalidField(
+					"collectors.file.watch_paths",
+					fmt.Sprintf("%s is too broad for recursive filewatch", watchPath),
+				)
+			}
 		}
 	}
 	if s.Collectors.Audit.Enabled && s.Collectors.Audit.Backend != CollectorBackendAuditd {
@@ -565,6 +571,53 @@ func normalizePaths(paths []string) []string {
 		normalized = append(normalized, path)
 	}
 	return normalized
+}
+
+// IsUnsafeFilewatchRoot reports whether path is too broad for recursive
+// filewatch collection. The filewatch backend adds one OS watch per directory,
+// so host/workspace roots can exhaust WSL watcher resources.
+func IsUnsafeFilewatchRoot(path string) bool {
+	cleaned := filepath.Clean(strings.TrimSpace(path))
+	if cleaned == "." || cleaned == "/" {
+		return true
+	}
+	switch cleaned {
+	case "/home", "/Users", "/root", "/tmp", "/var", "/usr", "/opt":
+		return true
+	}
+	parts := strings.Split(strings.Trim(cleaned, string(filepath.Separator)), string(filepath.Separator))
+	if len(parts) == 2 && (parts[0] == "home" || parts[0] == "Users") {
+		return true
+	}
+	if len(parts) == 3 && (parts[0] == "home" || parts[0] == "Users") && isWorkspaceRootName(parts[2]) {
+		return true
+	}
+	if len(parts) >= 2 && parts[0] == "mnt" && isWindowsDriveMount(parts[1]) {
+		if len(parts) == 2 {
+			return true
+		}
+		if len(parts) == 4 && parts[2] == "Users" {
+			return true
+		}
+		if len(parts) == 5 && parts[2] == "Users" && isWorkspaceRootName(parts[4]) {
+			return true
+		}
+	}
+	return false
+}
+
+func isWindowsDriveMount(name string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(name))
+	return len(normalized) == 1 && normalized[0] >= 'a' && normalized[0] <= 'z'
+}
+
+func isWorkspaceRootName(name string) bool {
+	switch strings.ToLower(strings.TrimSpace(name)) {
+	case "code", "src", "source", "sources", "workspace", "workspaces", "projects", "dev", "repos", "repositories":
+		return true
+	default:
+		return false
+	}
 }
 
 func normalizeStringList(values []string) []string {

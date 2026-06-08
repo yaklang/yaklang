@@ -66,6 +66,35 @@ The current HIDS desired spec is phase-1 and intentionally narrow:
 
 Custom rules are compiled during apply-time by the HIDS rule engine backed by YakVM expression evaluation. Rollout should treat `custom_rules[].condition` as an engine-validated expression, not as a free-form opaque blob or a classic YARA text payload.
 
+## Runtime Status Capability Detail
+
+HIDS runtime status detail is part of the Legion northbound contract. Nodes
+emit stable capability declarations under `collectors.<kind>.detail.capabilities`
+so the platform can explain which runtime component proves each acceptance item:
+
+- `supported_event_types` lists event types the collector can emit.
+- `supported_payloads` lists evidence payload families the collector can
+  provide or summarize.
+- `required_privileges` lists Linux capabilities normally required by the
+  backend.
+- `feature_flags` lists named feature surfaces with explicit `supported`,
+  `status`, and optional `reason` fields.
+
+Phase-1 collector declarations are conservative:
+
+- `process` and `network` use the `ebpf` backend and require `CAP_BPF` and
+  `CAP_PERFMON`; network payload inspection is declared `metadata_only`.
+- `file` uses the `filewatch` backend and declares file metadata, ELF summary,
+  and hash payload support; arbitrary payload DLP is declared unsupported.
+- `audit` uses the `auditd` backend and requires `CAP_AUDIT_READ` and
+  `CAP_AUDIT_CONTROL`; managed audit rules are declared supported.
+
+The node also emits `sensors.suricata` and `sensors.dlp` declarations in
+runtime status detail. Suricata is `planned` and optional for phase-1; DLP is
+`unsupported` until a payload/content inspection plane exists. These entries
+are intentional product contract data for platform acceptance and UI evidence,
+not frontend-only placeholders.
+
 ## Runtime Performance Model
 
 The node runtime is optimized for alert-first operation:
