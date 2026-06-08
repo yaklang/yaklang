@@ -7,6 +7,8 @@ import (
 	"github.com/yaklang/yaklang/common/yak/httptpl"
 	"io"
 	"net/http"
+	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -180,6 +182,137 @@ func TestGRPCMUSTPASS_HTTPFuzzer_ReMatcher(t *testing.T) {
 		}
 		require.Equal(t, 1, count, "feedback count is not 1")
 
+	})
+
+	t.Run("re_matcher_with_fail_can_retry_by_rematch_task_id", func(t *testing.T) {
+		retryToken := "retry-" + utils.RandStringBytes(8)
+		okToken := "ok-" + utils.RandStringBytes(8)
+		retryCtx, retryCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer retryCancel()
+		host, port := utils.DebugMockHTTPHandlerFuncContext(retryCtx, func(w http.ResponseWriter, r *http.Request) {
+			index, _ := strconv.Atoi(r.URL.Query().Get("a"))
+			body := okToken
+			if index%2 == 1 {
+				body = retryToken
+			}
+			_, _ = w.Write([]byte(body))
+		})
+
+		historyStream, err := client.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
+			Request:   "GET /?marker=" + retryToken + "&a={{i(0-5)}} HTTP/1.1\r\nHost: " + utils.HostPort(host, port) + "\r\n\r\n",
+			ForceFuzz: true,
+		})
+		require.NoError(t, err)
+
+		var historyTaskID int64
+		historyCount := 0
+		for {
+			resp, err := historyStream.Recv()
+			if err != nil {
+				break
+			}
+			historyCount++
+			historyTaskID = resp.GetTaskId()
+			require.True(t, resp.Ok)
+		}
+		require.Equal(t, 6, historyCount)
+		require.NotZero(t, historyTaskID)
+
+		require.NoError(t, utils.AttemptWithDelay(5, 200*time.Millisecond, func() error {
+			taskRespCount, err := yakit.CountWebFuzzerResponses(consts.GetGormProjectDatabase(), int(historyTaskID))
+			if err != nil {
+				return err
+			}
+			if taskRespCount != 6 {
+				return utils.Errorf("want 6 history task resp, but got %d", taskRespCount)
+			}
+			return nil
+		}))
+
+		matcher := &ypb.HTTPResponseMatcher{
+			MatcherType: "word",
+			Scope:       "body",
+			Condition:   "and",
+			Group:       []string{retryToken},
+			ExprType:    "nuclei-dsl",
+			Action:      Action_Fail,
+			HitColor:    "orange",
+		}
+
+		rematchStream, err := client.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
+			Matchers:           []*ypb.HTTPResponseMatcher{matcher},
+			HistoryWebFuzzerId: int32(historyTaskID),
+			ReMatch:            true,
+		})
+		require.NoError(t, err)
+
+		var rematchTaskID int64
+		rematchCount := 0
+		failedIndexes := make([]int, 0, 3)
+		for {
+			resp, err := rematchStream.Recv()
+			if err != nil {
+				break
+			}
+			rematchCount++
+			require.NotZero(t, resp.GetTaskId())
+			if rematchTaskID == 0 {
+				rematchTaskID = resp.GetTaskId()
+			} else {
+				require.Equal(t, rematchTaskID, resp.GetTaskId())
+			}
+
+			index, _ := strconv.Atoi(lowhttp.GetHTTPRequestQueryParam(resp.GetRequestRaw(), "a"))
+			if strings.Contains(string(resp.GetResponseRaw()), retryToken) {
+				require.False(t, resp.Ok)
+				require.Equal(t, matcherActionFailReason, resp.Reason)
+				require.True(t, resp.MatchedByMatcher)
+				require.Equal(t, "orange", resp.HitColor)
+				failedIndexes = append(failedIndexes, index)
+				continue
+			}
+			require.True(t, resp.Ok)
+		}
+		require.Equal(t, 6, rematchCount)
+		require.ElementsMatch(t, []int{1, 3, 5}, failedIndexes)
+		require.NotZero(t, rematchTaskID)
+
+		require.NoError(t, utils.AttemptWithDelay(5, 200*time.Millisecond, func() error {
+			taskRespCount, err := yakit.CountWebFuzzerResponses(consts.GetGormProjectDatabase(), int(rematchTaskID))
+			if err != nil {
+				return err
+			}
+			if taskRespCount != 6 {
+				return utils.Errorf("want 6 rematch task resp, but got %d", taskRespCount)
+			}
+			return nil
+		}))
+
+		retryStream, err := client.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
+			RetryTaskID: rematchTaskID,
+		})
+		require.NoError(t, err)
+
+		retriedIndexes := make(map[int]int)
+		for {
+			resp, err := retryStream.Recv()
+			if err != nil {
+				break
+			}
+			if lowhttp.GetHTTPRequestQueryParam(resp.GetRequestRaw(), "marker") != retryToken {
+				continue
+			}
+
+			index, _ := strconv.Atoi(lowhttp.GetHTTPRequestQueryParam(resp.GetRequestRaw(), "a"))
+			if index%2 == 0 {
+				require.True(t, resp.Ok)
+				continue
+			}
+			retriedIndexes[index]++
+			require.True(t, resp.Ok)
+			require.Contains(t, string(resp.GetResponseRaw()), retryToken)
+		}
+		require.Equal(t, map[int]int{1: 1, 3: 1, 5: 1}, retriedIndexes)
 	})
 }
 
