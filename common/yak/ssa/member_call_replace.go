@@ -70,7 +70,7 @@ func ReplaceMemberCall(old, replacement Value) map[string]Value {
 				return
 			}
 
-			trueKey := GetLatestKey(member)
+			trueKey := pickMemberKey(member, key)
 			if _, ok := GetLatestMemberByKey(container, key); ok {
 				container.DeleteMember(key)
 			}
@@ -79,6 +79,7 @@ func ReplaceMemberCall(old, replacement Value) map[string]Value {
 			trueRes := checkCanMemberCallExist(replacement, trueKey)
 			name, typ := res.name, res.typ
 			toMember := builder.PeekValue(trueRes.name)
+			var mergedMember Value
 
 			if member.GetOpcode() != SSAOpcodeUndefined {
 				member.SetName(name)
@@ -90,7 +91,11 @@ func ReplaceMemberCall(old, replacement Value) map[string]Value {
 					if res.typ != nil {
 						toMember.SetType(res.typ)
 					}
-					holderRet[name] = createPhi(name, []Value{toMember, member})
+					mergedMember = createPhi(name, []Value{toMember, member})
+					if !utils.IsNil(mergedMember) {
+						setMemberCallRelationship(replacement, key, mergedMember)
+						holderRet[name] = mergedMember
+					}
 				}
 			}
 
@@ -172,8 +177,10 @@ func ReplaceMemberCall(old, replacement Value) map[string]Value {
 
 			// 替换 member 的值引用
 			memberT := member
-			switch member.GetOpcode() {
-			case SSAOpcodeBinOp, SSAOpcodeUnOp:
+			switch {
+			case !utils.IsNil(mergedMember):
+				memberT = mergedMember
+			case member.GetOpcode() == SSAOpcodeBinOp || member.GetOpcode() == SSAOpcodeUnOp:
 				// 保留原始指令供后续替换
 			default:
 				ReplaceAllValue(member, toMember)

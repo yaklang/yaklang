@@ -329,6 +329,43 @@ func value2IrCode(inst Instruction, ir *ssadb.IrCode) {
 	}
 }
 
+func relationInstructionIDs(ir *ssadb.IrCode) []int64 {
+	if ir == nil {
+		return nil
+	}
+	ids := make([]int64, 0, 8)
+	appendID := func(id int64) {
+		if id > 0 {
+			ids = append(ids, id)
+		}
+	}
+	ir.ObjectMemberPairs.ForEach(func(key, member int64) {
+		appendID(key)
+		appendID(member)
+	})
+	ir.ObjectMembers.ForEach(func(key, member int64) {
+		appendID(key)
+		appendID(member)
+	})
+	ir.ObjectOwnerPairs.ForEach(func(object, key int64) {
+		appendID(object)
+		appendID(key)
+	})
+	appendID(ir.ObjectParent)
+	appendID(ir.ObjectKey)
+	return ids
+}
+
+func preloadRelationInstructionIDs(cache *ProgramCache, ir *ssadb.IrCode) {
+	if cache == nil || ir == nil {
+		return
+	}
+	ids := relationInstructionIDs(ir)
+	if len(ids) > 0 {
+		cache.PreloadInstructionsByIDsFast(ids)
+	}
+}
+
 func (c *ProgramCache) valueFromIrCode(cache *ProgramCache, inst Instruction, ir *ssadb.IrCode) {
 	value, ok := ToValue(inst)
 	if !ok {
@@ -362,12 +399,13 @@ func (c *ProgramCache) valueFromIrCode(cache *ProgramCache, inst Instruction, ir
 	} else if ir.ObjectParent > 0 && ir.ObjectKey > 0 {
 		anValue.appendOwnerPairIDs(ir.ObjectParent, ir.ObjectKey)
 	}
+	preloadRelationInstructionIDs(cache, ir)
 
 	// variable
 	for _, name := range ir.Variable {
 		progName := ""
 		if cache != nil && cache.program != nil {
-			progName = cache.program.GetProgramName()
+			progName = applicationProgramName(cache.program)
 		}
 		value.AddVariable(GetVariableFromDB(ir.GetIdInt64(), name, progName))
 	}

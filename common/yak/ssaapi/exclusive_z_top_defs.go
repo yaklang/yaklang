@@ -82,6 +82,38 @@ func resolveMembersForKey(actx *AnalyzeContext, object, key, exclude *Value, all
 	return matches
 }
 
+func resolveNamedMemberTopDefs(actx *AnalyzeContext, value *Value, opt ...OperationOption) Values {
+	if actx == nil || actx.Query == nil || value == nil {
+		return nil
+	}
+	names := []string{value.GetName(), value.GetVerboseName()}
+	seen := make(map[string]struct{}, len(names))
+	ret := make(Values, 0)
+	for _, name := range names {
+		name = strings.TrimPrefix(strings.TrimSpace(name), "Undefined-")
+		if index := strings.Index(name, "("); index >= 0 {
+			name = name[:index]
+		}
+		if !isQueryableSyntaxFlowBase(name) || !strings.Contains(name, ".") {
+			continue
+		}
+		if _, ok := seen[name]; ok {
+			continue
+		}
+		seen[name] = struct{}{}
+		for _, candidate := range filterOutMember(actx.Query(name), value) {
+			if candidate == nil {
+				continue
+			}
+			ret = append(ret, candidate.getTopDefs(actx, opt...)...)
+		}
+		if len(ret) > 0 {
+			break
+		}
+	}
+	return MergeValues(ret)
+}
+
 func filterStaticPropertyCarrier(results Values, object, key *Value) Values {
 	if object == nil || key == nil || len(results) <= 1 {
 		return results
@@ -344,12 +376,12 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 								results = append(results, resolveMembersFromObjectDefs(obj, key)...)
 							}
 						}
-						if len(results) == 0 {
-							objResults := actx.withObject(obj, key, i, func() Values {
-								return obj.getTopDefs(actx, opt...)
-							})
-							results = append(results, filterStaticPropertyCarrier(objResults, obj, key)...)
-						}
+					}
+					if len(results) == 0 && (!calledAsMethod || obj.IsObject()) {
+						objResults := actx.withObject(obj, key, i, func() Values {
+							return obj.getTopDefs(actx, opt...)
+						})
+						results = append(results, filterStaticPropertyCarrier(objResults, obj, key)...)
 					}
 					if len(results) == 0 {
 						results = append(results, filterOutMember(obj.lookupMembersOnType(key), i)...)
@@ -396,7 +428,11 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 		if inst.Kind == ssa.UndefinedValueReturn {
 			return Values{}
 		}
-		return getMemberCall(i, inst, actx)
+		result := getMemberCall(i, inst, actx)
+		if len(result) > 0 {
+			return result
+		}
+		return resolveNamedMemberTopDefs(actx, i, opt...)
 	case *ssa.ConstInst:
 		return i.visitedDefs(actx, opt...)
 	case *ssa.Phi:

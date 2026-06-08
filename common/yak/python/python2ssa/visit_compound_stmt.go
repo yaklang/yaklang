@@ -2022,6 +2022,43 @@ func extractNameFromNamedParameter(np pythonparser.INamed_parameterContext) stri
 	return ""
 }
 
+func extractAnnotationTextFromNamedParameter(np pythonparser.INamed_parameterContext) string {
+	ctx, ok := np.(*pythonparser.Named_parameterContext)
+	if !ok || ctx == nil || ctx.COLON() == nil || ctx.Test() == nil {
+		return ""
+	}
+	return strings.TrimSpace(ctx.Test().GetText())
+}
+
+func (b *singleFileBuilder) resolveAnnotationType(annotation string) ssa.Type {
+	if b == nil || annotation == "" {
+		return nil
+	}
+	annotation = strings.Trim(annotation, "\"'")
+	if annotation == "" {
+		return nil
+	}
+	if bp := b.GetBluePrint(annotation); bp != nil {
+		return bp
+	}
+	if typ, ok := b.GetProgram().ReadImportType(annotation); ok {
+		return typ
+	}
+	parts := strings.FieldsFunc(annotation, func(r rune) bool {
+		return r == '.' || r == '/' || r == '\\'
+	})
+	if len(parts) > 0 {
+		shortName := parts[len(parts)-1]
+		if bp := b.GetBluePrint(shortName); bp != nil {
+			return bp
+		}
+		if typ, ok := b.GetProgram().ReadImportType(shortName); ok {
+			return typ
+		}
+	}
+	return nil
+}
+
 // collectParamNames collects parameter names from a typedargslist.
 // *args names are prefixed with "*", **kwargs names with "**".
 func collectParamNames(paramsCtx *pythonparser.TypedargslistContext) []string {
@@ -2069,13 +2106,18 @@ func collectParamNames(paramsCtx *pythonparser.TypedargslistContext) []string {
 }
 
 // registerParam strips the leading "*"/"**" prefix and registers the name as an SSA parameter.
-func (b *singleFileBuilder) registerParam(name string) {
+func (b *singleFileBuilder) registerParam(name string, typ ...ssa.Type) {
 	rawName := name
 	clean := strings.TrimLeft(name, "*")
 	if clean != "" {
 		param := b.NewParam(clean)
-		if param != nil && param.GetType() == nil {
-			param.SetType(ssa.CreateAnyType())
+		if param != nil {
+			switch {
+			case len(typ) > 0 && typ[0] != nil:
+				param.SetType(typ[0])
+			case param.GetType() == nil:
+				param.SetType(ssa.CreateAnyType())
+			}
 		}
 		if strings.HasPrefix(rawName, "**") {
 			// Keep the formal parameter for call-argument alignment, but bind the
@@ -2089,6 +2131,14 @@ func (b *singleFileBuilder) registerParam(name string) {
 	}
 }
 
+func (b *singleFileBuilder) registerNamedParameter(np pythonparser.INamed_parameterContext, prefix string) {
+	name := extractNameFromNamedParameter(np)
+	if name == "" {
+		return
+	}
+	b.registerParam(prefix+name, b.resolveAnnotationType(extractAnnotationTextFromNamedParameter(np)))
+}
+
 // buildFuncParams builds function parameters from typedargslist.
 // Handles: positional params, params with defaults, *args, **kwargs, type annotations.
 func (b *singleFileBuilder) buildFuncParams(params pythonparser.ITypedargslistContext) {
@@ -2099,8 +2149,56 @@ func (b *singleFileBuilder) buildFuncParams(params pythonparser.ITypedargslistCo
 	if !ok {
 		return
 	}
-	for _, name := range collectParamNames(paramsCtx) {
-		b.registerParam(name)
+	b.buildFuncParamsFromIndex(paramsCtx, 0)
+}
+
+func (b *singleFileBuilder) buildFuncParamsFromIndex(paramsCtx *pythonparser.TypedargslistContext, start int) {
+	if paramsCtx == nil {
+		return
+	}
+	index := 0
+	addFromDefParams := func(dp pythonparser.IDef_parametersContext) {
+		ctx, ok := dp.(*pythonparser.Def_parametersContext)
+		if !ok {
+			return
+		}
+		for _, defParam := range ctx.AllDef_parameter() {
+			dp2, ok := defParam.(*pythonparser.Def_parameterContext)
+			if !ok {
+				continue
+			}
+			if np := dp2.Named_parameter(); np != nil {
+				if index >= start {
+					b.registerNamedParameter(np, "")
+				}
+				index++
+			}
+		}
+	}
+
+	for _, dp := range paramsCtx.AllDef_parameters() {
+		addFromDefParams(dp)
+	}
+
+	if argsCtx := paramsCtx.Args(); argsCtx != nil {
+		if ac, ok := argsCtx.(*pythonparser.ArgsContext); ok {
+			if np := ac.Named_parameter(); np != nil {
+				if index >= start {
+					b.registerNamedParameter(np, "*")
+				}
+				index++
+			}
+		}
+	}
+
+	if kwargsCtx := paramsCtx.Kwargs(); kwargsCtx != nil {
+		if kc, ok := kwargsCtx.(*pythonparser.KwargsContext); ok {
+			if np := kc.Named_parameter(); np != nil {
+				if index >= start {
+					b.registerNamedParameter(np, "**")
+				}
+			}
+		}
 	}
 }
 
@@ -2114,8 +2212,5 @@ func (b *singleFileBuilder) buildFuncParamsSkipFirst(params pythonparser.ITypeda
 	if !ok {
 		return
 	}
-	names := collectParamNames(paramsCtx)
-	for _, name := range names[1:] { // skip self / cls
-		b.registerParam(name)
-	}
+	b.buildFuncParamsFromIndex(paramsCtx, 1)
 }

@@ -363,8 +363,7 @@ func (b *singleFileBuilder) resolvePythonSubmoduleImport(bindingName, sourceName
 		if exportVal == nil || isPythonImportPlaceholderValue(exportVal) {
 			continue
 		}
-		ex.MemberMap[exportName] = exportVal.GetId()
-		ex.Member = append(ex.Member, exportVal.GetId())
+		ex.AddMember(b.EmitConstInst(exportName), exportVal)
 	}
 	return ex
 }

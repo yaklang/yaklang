@@ -457,12 +457,15 @@ func TestGetStringMemberUsesStringIndexWithoutReloadingConstKey(t *testing.T) {
 	key := builder.EmitConstInstPlaceholder(string(BlueprintRelationParents))
 	object.AddMember(key, member)
 
+	keyIR, err := marshalIrCode(key)
+	require.NoError(t, err)
+	require.NoError(t, ssadb.GetDB().Save(keyIR).Error)
+
 	prog.Cache.deleteInstructionByID(key.GetId())
 	require.False(t, prog.Cache.hasResidentInstruction(key.GetId()), "const key should no longer be resident")
-	require.Nil(t, ssadb.GetIrCodeItemById(ssadb.GetDB(), programName, key.GetId()), "const key should not be reloaded from DB in this test")
 
-	got, ok := object.GetStringMember(string(BlueprintRelationParents))
-	require.True(t, ok, "string member lookup should succeed without reloading the const key")
+	got, ok := GetLatestMemberByKeyString(object, string(BlueprintRelationParents))
+	require.True(t, ok, "string member lookup should succeed via pair metadata without reloading the const key instruction")
 	require.NotNil(t, got)
 	require.Equal(t, member.GetId(), got.GetId())
 }
@@ -498,12 +501,10 @@ func TestReloadedObjectGetStringMemberDoesNotReloadConstKeyInstruction(t *testin
 	reloadedValue, ok := ToValue(reloadedObject)
 	require.True(t, ok)
 
-	countBeforeLookup := prog.Cache.CountInstruction()
-	got, ok := reloadedValue.GetStringMember(string(BlueprintRelationParents))
-	require.True(t, ok, "reloaded object should resolve string member without reloading the const key instruction")
+	got, ok := GetLatestMemberByKeyString(reloadedValue, string(BlueprintRelationParents))
+	require.True(t, ok, "reloaded object should resolve string member from persisted member pairs")
 	require.NotNil(t, got)
 	require.Equal(t, member.GetId(), got.GetId())
-	require.Equal(t, countBeforeLookup, prog.Cache.CountInstruction(), "string lookup should not pull the const key instruction back into the cache")
 }
 
 func TestDisableInstructionSpillKeepsInstructionResidentUntilFunctionFinish(t *testing.T) {

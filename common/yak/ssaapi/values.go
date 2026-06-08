@@ -1195,7 +1195,7 @@ func (value Values) Ref(name string) Values {
 			if len(pair) != 2 || pair[0] == nil || pair[1] == nil {
 				continue
 			}
-			if pair[0].getValue() != nil && pair[0].getValue().String() == name {
+			if pair[0].getValue() != nil && ssa.GetKeyString(pair[0].getValue()) == name {
 				ret = append(ret, pair[1])
 			}
 		}

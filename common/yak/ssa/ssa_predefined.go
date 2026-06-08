@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/utils/omap"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"golang.org/x/exp/slices"
 )
 
@@ -176,15 +177,9 @@ func (a *anInstruction) setLocationIDs(funcID, blockID int64) {
 }
 
 func (a *anInstruction) resolveFunctionByID() *Function {
-	if a.funcId <= 0 || a.prog == nil || a.prog.Cache == nil || a.prog.Cache.InstructionCache == nil {
+	if a.funcId <= 0 || a.prog == nil || a.prog.Cache == nil {
 		return nil
 	}
-	if cachedFunc, ok := a.prog.Cache.InstructionCache.Get(a.funcId); ok {
-		if f, ok := ToFunction(cachedFunc); ok {
-			return f
-		}
-	}
-	// DB-read mode may not have the function in InstructionCache yet.
 	if loaded := a.prog.Cache.GetInstruction(a.funcId); loaded != nil {
 		if f, ok := ToFunction(loaded); ok {
 			return f
@@ -248,15 +243,9 @@ func (a *anInstruction) SetBlock(block *BasicBlock) {
 }
 
 func (a *anInstruction) resolveBlockByID() *BasicBlock {
-	if a.blockId <= 0 || a.prog == nil || a.prog.Cache == nil || a.prog.Cache.InstructionCache == nil {
+	if a.blockId <= 0 || a.prog == nil || a.prog.Cache == nil {
 		return nil
 	}
-	if cachedBlock, ok := a.prog.Cache.InstructionCache.Get(a.blockId); ok {
-		if block, ok := ToBasicBlock(cachedBlock); ok {
-			return block
-		}
-	}
-	// DB-read mode may not have the block in InstructionCache yet.
 	if loaded := a.prog.Cache.GetInstruction(a.blockId); loaded != nil {
 		if block, ok := ToBasicBlock(loaded); ok {
 			return block
@@ -483,14 +472,52 @@ func (n *anValue) AddObjectKeyPair(obj, key Value) {
 	n.appendOwnerPairIDs(obj.GetId(), key.GetId())
 }
 
+func (n *anValue) resolveLinkedValue(id int64) (Value, bool) {
+	if id <= 0 {
+		return nil, false
+	}
+	if val, ok := n.GetValueById(id); ok {
+		return val, true
+	}
+	prog := n.GetProgram()
+	if prog == nil {
+		return nil, false
+	}
+	app := prog.GetApplication()
+	if app == nil {
+		app = prog
+	}
+	progName := applicationProgramName(prog)
+	if progName != "" {
+		ir := ssadb.GetIrCodeByIdFast(ssadb.GetDB(), progName, id)
+		if ir != nil && ir.Opcode == int64(SSAOpcodeConstInst) && ir.String != "" {
+			return NewConst(ir.String), true
+		}
+	}
+	cache := n.getProgramCache()
+	if cache != nil {
+		if loaded := cache.GetInstruction(id); loaded != nil {
+			if val, ok := ToValue(loaded); ok {
+				return val, true
+			}
+		}
+	}
+	if inst, err := NewLazyInstruction(app, id); err == nil && inst != nil {
+		if val, ok := ToValue(inst); ok {
+			return val, true
+		}
+	}
+	return nil, false
+}
+
 func (n *anValue) GetObjectKeyPairs() []ObjectKeyPair {
 	ret := make([]ObjectKeyPair, 0, len(n.ownerPairs))
 	for _, pair := range n.ownerPairs {
 		if pair.object <= 0 || pair.key <= 0 {
 			continue
 		}
-		obj, ok1 := n.GetValueById(pair.object)
-		key, ok2 := n.GetValueById(pair.key)
+		obj, ok1 := n.resolveLinkedValue(pair.object)
+		key, ok2 := n.resolveLinkedValue(pair.key)
 		if !ok1 || !ok2 {
 			continue
 		}
@@ -509,7 +536,7 @@ func (n *anValue) GetMembersByExactKey(key Value) []Value {
 		if !n.memberPairMatchesKey(pair, key) {
 			continue
 		}
-		member, ok := n.GetValueById(pair.member)
+		member, ok := n.resolveLinkedValue(pair.member)
 		if ok {
 			ret = append(ret, member)
 		}
@@ -524,8 +551,8 @@ func (n *anValue) GetMembersByKeyString(key string) []Value {
 	ret := make([]Value, 0)
 	for index := len(n.memberPairs) - 1; index >= 0; index-- {
 		pair := n.memberPairs[index]
-		keyVal, ok1 := n.GetValueById(pair.key)
-		member, ok2 := n.GetValueById(pair.member)
+		keyVal, ok1 := n.resolveLinkedValue(pair.key)
+		member, ok2 := n.resolveLinkedValue(pair.member)
 		if !ok1 || !ok2 {
 			continue
 		}
@@ -541,8 +568,8 @@ func (n *anValue) GetMembersByKeyString(key string) []Value {
 func (n *anValue) GetMemberPairs() []MemberPair {
 	ret := make([]MemberPair, 0, len(n.memberPairs))
 	for _, pair := range n.memberPairs {
-		key, ok1 := n.GetValueById(pair.key)
-		member, ok2 := n.GetValueById(pair.member)
+		key, ok1 := n.resolveLinkedValue(pair.key)
+		member, ok2 := n.resolveLinkedValue(pair.member)
 		if !ok1 || !ok2 {
 			continue
 		}
@@ -647,12 +674,14 @@ func (n *anValue) cacheType(typ Type) int64 {
 	if typ == nil {
 		return 0
 	}
-	if cache := n.getProgramCache(); cache != nil && cache.TypeCache != nil {
-		cache.TypeCache.Set(typ)
+	if cache := n.getProgramCache(); cache != nil {
+		cache.rememberType(typ)
 	} else {
 		n.SetLazySaveType(func() {
-			n.getProgramCache().TypeCache.Set(typ)
-			n.typId = typ.GetId()
+			if cache := n.getProgramCache(); cache != nil {
+				cache.rememberType(typ)
+				n.typId = typ.GetId()
+			}
 		})
 	}
 	return typ.GetId()
@@ -660,15 +689,9 @@ func (n *anValue) cacheType(typ Type) int64 {
 
 func (n *anValue) lookupTypeById(id int64) Type {
 	cache := n.getProgramCache()
-	if cache != nil && cache.TypeCache != nil {
-		if typ, ok := cache.TypeCache.Get(id); ok && !utils.IsNil(typ) {
+	if cache != nil {
+		if typ, ok := cache.getType(id); ok && !utils.IsNil(typ) {
 			return typ
-		}
-		if cache.HaveDatabaseBackend() {
-			if typ := GetTypeFromDB(cache, id); !utils.IsNil(typ) {
-				cache.TypeCache.Set(typ)
-				return typ
-			}
 		}
 	}
 	return nil
@@ -705,7 +728,11 @@ func (a *anValue) GetVariable(name string) *Variable {
 		}
 	}
 	if a.IsFromDB() {
-		v := GetVariableFromDB(a.GetId(), name)
+		programName := ""
+		if prog := a.GetProgram(); prog != nil {
+			programName = prog.GetProgramName()
+		}
+		v := GetVariableFromDB(a.GetId(), name, programName)
 		a.AddVariable(v)
 		return v
 	}

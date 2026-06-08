@@ -302,6 +302,26 @@ func (s *instructionStore) flushResidentOnCloseOnly() error {
 		return nil
 	}
 
+	relationIDs := make(map[int64]struct{})
+	s.resident.ForEach(func(_ int64, inst Instruction) bool {
+		ir, err := marshalIrCode(inst)
+		if err != nil || ir == nil {
+			return true
+		}
+		for _, id := range relationInstructionIDs(ir) {
+			relationIDs[id] = struct{}{}
+		}
+		return true
+	})
+	for id := range relationIDs {
+		if _, ok := s.resident.Get(id); ok {
+			continue
+		}
+		if inst, err := s.loadInstruction(id); err == nil && inst != nil {
+			s.resident.Set(id, inst)
+		}
+	}
+
 	saveBatch := saveInstructionIrCodesFast(s.program, s.db, s.notifyProgress)
 	batch := make([]*ssadb.IrCode, 0, s.saveSize)
 	var flushErr error
@@ -423,10 +443,63 @@ func (s *instructionStore) acknowledgeCloseFlushIfPersisted(inst Instruction) bo
 	return true
 }
 
+func (s *instructionStore) expandRelationPersistRecords(records []*instructionPersistRecord) []*instructionPersistRecord {
+	if s == nil || s.program == nil || s.program.Cache == nil || len(records) == 0 {
+		return records
+	}
+	expanded := make([]*instructionPersistRecord, 0, len(records)*2)
+	queued := make(map[int64]struct{}, len(records)*2)
+	appendRecord := func(record *instructionPersistRecord) {
+		if record == nil || record.IrCode == nil {
+			return
+		}
+		if _, ok := queued[record.CodeID]; ok {
+			return
+		}
+		queued[record.CodeID] = struct{}{}
+		expanded = append(expanded, record)
+	}
+	var walk func(record *instructionPersistRecord)
+	walk = func(record *instructionPersistRecord) {
+		appendRecord(record)
+		if record == nil || record.IrCode == nil {
+			return
+		}
+		for _, id := range relationInstructionIDs(record.IrCode) {
+			if _, ok := queued[id]; ok {
+				continue
+			}
+			linked := s.program.Cache.GetInstruction(id)
+			if linked == nil {
+				continue
+			}
+			linkedIr, err := marshalIrCode(linked)
+			if err != nil || linkedIr == nil {
+				continue
+			}
+			if progName := applicationProgramName(s.program); progName != "" {
+				linkedIr.ProgramName = progName
+			}
+			relRecord := &instructionPersistRecord{
+				IrCode: linkedIr,
+				Opcode: linked.GetOpcode(),
+				Reason: record.Reason,
+				CodeID: linked.GetId(),
+			}
+			walk(relRecord)
+		}
+	}
+	for _, record := range records {
+		walk(record)
+	}
+	return expanded
+}
+
 func (s *instructionStore) saveInstructionPersistRecords(records []*instructionPersistRecord) error {
 	if len(records) == 0 {
 		return nil
 	}
+	records = s.expandRelationPersistRecords(records)
 
 	start := time.Now()
 	var saveErr error

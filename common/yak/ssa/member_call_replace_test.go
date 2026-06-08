@@ -107,6 +107,31 @@ func TestReplaceMemberCallKeepsUndefinedMembers(t *testing.T) {
 	require.True(t, ok, "undefined member should remain undefined after replacement")
 }
 
+func TestReplaceMemberCallMergesMemberWithoutResolvedOwner(t *testing.T) {
+	_, builder := newTestBuilder(t)
+
+	holder := emitObject(builder, "holder")
+	replacement := emitObject(builder, "replacement")
+	key := builder.EmitConstInst("field")
+	existing := builder.ReadMemberCallValue(replacement, key)
+	member := builder.EmitConstInst("payload")
+
+	require.NotNil(t, existing)
+	holder.AddMember(key, member)
+
+	name := checkCanMemberCallExist(replacement, key).name
+	result := ReplaceMemberCall(holder, replacement)
+
+	require.Contains(t, result, name)
+	updated := result[name]
+	_, ok := ToPhi(updated)
+	require.True(t, ok, "replacement should merge existing and moved members")
+
+	latest, ok := GetLatestMemberByKey(replacement, key)
+	require.True(t, ok)
+	require.Equal(t, updated.GetId(), latest.GetId())
+}
+
 func TestReplaceMemberCallOnExternLib(t *testing.T) {
 	prog, builder := newTestBuilder(t)
 

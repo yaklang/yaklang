@@ -6,6 +6,16 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+func applicationProgramName(prog *Program) string {
+	if prog == nil {
+		return ""
+	}
+	if app := prog.GetApplication(); app != nil && app.Name != "" {
+		return app.Name
+	}
+	return prog.Name
+}
+
 func AddObjectKeyPair(member, object, key Value) {
 	if utils.IsNil(member) || utils.IsNil(object) || utils.IsNil(key) {
 		return

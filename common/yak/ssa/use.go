@@ -139,8 +139,13 @@ func (e *ExternLib) HasValues() bool { return len(GetMemberPairs(e)) > 0 }
 func (e *ExternLib) GetValues() Values {
 	pairs := GetMemberPairs(e)
 	ret := make(Values, 0, len(pairs))
+	seen := make(map[int64]struct{}, len(pairs))
 	for _, pair := range pairs {
 		if !utils.IsNil(pair.Member) {
+			if _, ok := seen[pair.Member.GetId()]; ok {
+				continue
+			}
+			seen[pair.Member.GetId()] = struct{}{}
 			ret = append(ret, pair.Member)
 		}
 	}

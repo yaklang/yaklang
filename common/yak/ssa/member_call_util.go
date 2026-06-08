@@ -21,6 +21,13 @@ func setMemberCallRelationship(obj, key, member Value) {
 	if user, ok := obj.(User); ok {
 		key.AddUser(user)
 	}
+	if next, ok := obj.(*Next); ok && next.Iter > 0 {
+		if iter, ok := next.GetValueById(next.Iter); ok && iter != nil && iter.GetId() != obj.GetId() {
+			if _, exists := GetLatestMemberByKey(iter, key); !exists {
+				setMemberCallRelationship(iter, key, member)
+			}
+		}
+	}
 	//todo：fix one value for more object-key
 
 	handlerMemberCall := func(phi *Phi) {
@@ -33,11 +40,10 @@ func setMemberCallRelationship(obj, key, member Value) {
 				continue
 			}
 
-			// Only propagate to call/invalid-undefined edges.
-			// Avoid scanning member relations for irrelevant edges to reduce overhead
-			// when large Phi nodes have many inputs.
-			shouldPropagate := false
+			shouldPropagate := edgeValue.IsObject()
 			switch ins := edgeValue.(type) {
+			case *Make, *Next:
+				shouldPropagate = true
 			case *Call:
 				shouldPropagate = true
 			case *Undefined:

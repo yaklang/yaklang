@@ -744,7 +744,7 @@ func (b *singleFileBuilder) bindImportedName(bindingName, sourceName, packagePat
 	}
 	if value == nil {
 		if t, ok := lib.GetExportType(bindingName); ok {
-			if bp, ok := ssa.ToClassBluePrintType(t); ok && bp != nil {
+			if bp, ok := ssa.ToBluePrintType(t); ok && bp != nil {
 				if c := bp.Container(); c != nil {
 					value = c
 					lib.SetExportValue(bindingName, value)
@@ -759,7 +759,7 @@ func (b *singleFileBuilder) bindImportedName(bindingName, sourceName, packagePat
 		if v := app.GetExportValue(bindingName); v != nil && !isPythonImportPlaceholderValue(v) {
 			value = v
 		} else if t, ok := app.GetExportType(bindingName); ok {
-			if bp, ok := ssa.ToClassBluePrintType(t); ok && bp != nil {
+			if bp, ok := ssa.ToBluePrintType(t); ok && bp != nil {
 				if c := bp.Container(); c != nil {
 					value = c
 				}

@@ -1,19 +1,28 @@
 package ssa
 
 import (
-	"context"
 	"testing"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils/filesys"
+	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
+func newMemberRelationsTestProgram(t *testing.T, programName string, kind ProgramCacheKind, fs fi.FileSystem) *Program {
+	t.Helper()
+	cfg, err := ssaconfig.New(ssaconfig.ModeSSACompile, ssaconfig.WithSetProgramName(programName))
+	require.NoError(t, err)
+	if fs == nil {
+		fs = filesys.NewVirtualFs()
+	}
+	return NewProgram(cfg, kind, Application, fs, "", 0)
+}
+
 func TestMemberRelations_MultipleMembersSameKey(t *testing.T) {
-	prog := NewProgram(context.Background(), t.Name(), ProgramCacheMemory, Application, nil, "", 0)
-	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
+	_, builder := newTestBuilder(t)
 
 	obj := builder.EmitEmptyContainer()
 	key := builder.EmitConstInst("cmd")
@@ -38,8 +47,7 @@ func TestMemberRelations_MultipleMembersSameKey(t *testing.T) {
 }
 
 func TestMemberRelations_SharedMemberAcrossObjects(t *testing.T) {
-	prog := NewProgram(context.Background(), t.Name(), ProgramCacheMemory, Application, nil, "", 0)
-	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
+	_, builder := newTestBuilder(t)
 
 	obj1 := builder.EmitEmptyContainer()
 	obj2 := builder.EmitEmptyContainer()
@@ -58,8 +66,7 @@ func TestMemberRelations_SharedMemberAcrossObjects(t *testing.T) {
 }
 
 func TestMemberRelations_ReadLegacyObjectMembers(t *testing.T) {
-	prog := NewProgram(context.Background(), t.Name(), ProgramCacheMemory, Application, nil, "", 0)
-	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
+	prog, builder := newTestBuilder(t)
 
 	key := builder.EmitConstInst("cmd")
 	member := builder.EmitUndefined("legacy")
@@ -77,8 +84,7 @@ func TestMemberRelations_ReadLegacyObjectMembers(t *testing.T) {
 }
 
 func TestMemberRelations_ReadLegacyObjectOwner(t *testing.T) {
-	prog := NewProgram(context.Background(), t.Name(), ProgramCacheMemory, Application, nil, "", 0)
-	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
+	prog, builder := newTestBuilder(t)
 
 	obj := builder.EmitEmptyContainer()
 	key := builder.EmitConstInst("cmd")
@@ -101,7 +107,7 @@ func TestMemberRelations_PersistPairsToDatabase(t *testing.T) {
 	programName := uuid.NewString()
 	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
 
-	prog := NewProgram(context.Background(), programName, ProgramCacheDBWrite, Application, filesys.NewVirtualFs(), "", 0, time.Millisecond*100)
+	prog := newMemberRelationsTestProgram(t, programName, ProgramCacheDBWrite, filesys.NewVirtualFs())
 	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
 
 	obj := builder.EmitEmptyContainer()
