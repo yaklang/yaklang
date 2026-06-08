@@ -294,22 +294,103 @@
                     </div>
                     
                     <div class="api-section">
-                        <h4 data-i18n="usage.s4.h">4. List My API Keys</h4>
-                        <p data-i18n="usage.s4.p">Get all API keys created by your OPS account:</p>
-                        
+                        <h4 data-i18n="usage.s4.h">4. List & Search My API Keys</h4>
+                        <p data-i18n="usage.s4.p">Get all API keys created by your OPS account. Supports pagination, keyword search and status filtering. You can only ever see keys created by your own OPS account.</p>
+
                         <div class="code-block">
                             <div class="code-header">
                                 <span data-i18n="usage.s4.code">cURL - List Keys</span>
                                 <button class="btn btn-sm" onclick="copyCurlExample('curl-list-keys')" data-i18n="common.copy">Copy</button>
                             </div>
-                            <pre id="curl-list-keys">curl -X GET '<span class="api-endpoint-dynamic">http://localhost:8223</span>/ops/api/my-keys' \
+                            <pre id="curl-list-keys">curl -X GET '<span class="api-endpoint-dynamic">http://localhost:8223</span>/ops/api/my-keys?page=1&amp;page_size=20' \
   -H 'X-Ops-Key: <span class="ops-key-dynamic">YOUR_OPS_KEY</span>'</pre>
                         </div>
+
+                        <!-- 关键词: OPS my-keys 查询过滤 cURL 示例, q/username/active 参数 -->
+                        <p style="margin-top: 15px;" data-i18n="usage.s4.filter.p">Search by keyword (matches bound username / remark / api_key) and filter by status. The example below finds active keys whose username, remark or key contains "alice":</p>
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span data-i18n="usage.s4.filter.code">cURL - Search & Filter Keys</span>
+                                <button class="btn btn-sm" onclick="copyCurlExample('curl-list-keys-filtered')" data-i18n="common.copy">Copy</button>
+                            </div>
+                            <pre id="curl-list-keys-filtered">curl -G '<span class="api-endpoint-dynamic">http://localhost:8223</span>/ops/api/my-keys' \
+  -H 'X-Ops-Key: <span class="ops-key-dynamic">YOUR_OPS_KEY</span>' \
+  --data-urlencode 'q=alice' \
+  --data-urlencode 'active=true' \
+  --data-urlencode 'page=1' \
+  --data-urlencode 'page_size=20'</pre>
+                        </div>
+
+                        <!-- 关键词: OPS my-keys 查询参数说明表, q/username/active/page/page_size -->
+                        <h4 style="margin-top: 20px;" data-i18n="usage.s4.queryParams.h">Query Parameters (List & Search)</h4>
+                        <table class="params-table">
+                            <tr>
+                                <td><code>q</code></td>
+                                <td data-i18n-html="usage.s4.queryParams.q">Broad keyword search (optional). Partial match over <code>username</code>, <code>remark</code> and <code>api_key</code>. Special characters are escaped (SQL-injection safe).</td>
+                            </tr>
+                            <tr>
+                                <td><code>username</code></td>
+                                <td data-i18n="usage.s4.queryParams.username">Filter by bound username (optional, partial match).</td>
+                            </tr>
+                            <tr>
+                                <td><code>active</code></td>
+                                <td data-i18n-html="usage.s4.queryParams.active">Filter by status (optional). <code>true</code>/<code>1</code> = enabled only, <code>false</code>/<code>0</code> = disabled only, omit = all.</td>
+                            </tr>
+                            <tr>
+                                <td><code>page</code></td>
+                                <td data-i18n="usage.s4.queryParams.page">Page number (optional, default 1).</td>
+                            </tr>
+                            <tr>
+                                <td><code>page_size</code></td>
+                                <td data-i18n="usage.s4.queryParams.pageSize">Items per page (optional, default 20, max 100).</td>
+                            </tr>
+                        </table>
+
+                        <!-- 关键词: OPS my-keys 响应字段说明表, 用量统计/绑定信息/状态 -->
+                        <h4 style="margin-top: 20px;" data-i18n="usage.s4.respFields.h">Response Fields (per key)</h4>
+                        <table class="params-table">
+                            <tr>
+                                <td><code>api_key</code> / <code>id</code></td>
+                                <td data-i18n="usage.s4.respFields.idKey">The API key string and its numeric record ID.</td>
+                            </tr>
+                            <tr>
+                                <td><code>active</code></td>
+                                <td data-i18n-html="usage.s4.respFields.active">Whether the key is enabled. A disabled key (<code>false</code>) is rejected on every request.</td>
+                            </tr>
+                            <tr>
+                                <td><code>allowed_models</code></td>
+                                <td data-i18n="usage.s4.respFields.allowedModels">List of model names / glob patterns this key may call.</td>
+                            </tr>
+                            <tr>
+                                <td><code>username</code> / <code>remark</code> / <code>metainfo</code></td>
+                                <td data-i18n="usage.s4.respFields.binding">Bound user info: business username, free-text remark, and JSON metainfo (e.g. OAuth / external binding).</td>
+                            </tr>
+                            <tr>
+                                <td><code>token_used</code> / <code>token_limit</code></td>
+                                <td data-i18n="usage.s4.respFields.token">Token billing usage and the token limit (the recommended billing dimension).</td>
+                            </tr>
+                            <tr>
+                                <td><code>traffic_used</code> / <code>traffic_limit</code></td>
+                                <td data-i18n="usage.s4.respFields.traffic">Byte-traffic usage and limit (legacy dimension).</td>
+                            </tr>
+                            <tr>
+                                <td><code>usage_count</code> / <code>success_count</code> / <code>failure_count</code></td>
+                                <td data-i18n="usage.s4.respFields.counts">Total / successful / failed request counts for this key.</td>
+                            </tr>
+                            <tr>
+                                <td><code>input_bytes</code> / <code>output_bytes</code> / <code>web_search_count</code></td>
+                                <td data-i18n="usage.s4.respFields.io">Aggregated input / output bytes and web-search invocation count.</td>
+                            </tr>
+                            <tr>
+                                <td><code>last_used_time</code> / <code>created_at</code> / <code>created_by_ops_name</code></td>
+                                <td data-i18n="usage.s4.respFields.meta">Last-used time (omitted if never used), creation time, and the OPS account name that created the key.</td>
+                            </tr>
+                        </table>
                     </div>
                     
                     <div class="api-section">
                         <h4 data-i18n="usage.s5.h">5. Update API Key Settings</h4>
-                        <p data-i18n="usage.s5.p">Update allowed models or traffic settings for an existing API key:</p>
+                        <p data-i18n="usage.s5.p">Update an existing API key. Only the fields you include are changed; omitted fields keep their current values. You can update models, limits, bound user info and status.</p>
                         
                         <div class="code-block">
                             <div class="code-header">
@@ -322,19 +403,44 @@
   -d '{
     "api_key": "mf-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
     "allowed_models": ["gpt-4", "claude-*"],
+    "token_limit": 1000000,
     "traffic_limit": 209715200,
-    "unlimited": false
+    "unlimited": false,
+    "username": "alice",
+    "remark": "team-a quota",
+    "metainfo": "{\"team\":\"a\"}",
+    "active": true
   }'</pre>
                         </div>
                     </div>
-                    
+
+                    <!-- 关键词: OPS API 指南 启用/禁用 章节, update-api-key active 字段, 禁用即时生效 -->
                     <div class="api-section">
-                        <h4 data-i18n="usage.s6.h">6. Delete API Key</h4>
-                        <p data-i18n="usage.s6.p">Delete an API key you created:</p>
+                        <h4 data-i18n="usage.s6.h">6. Enable / Disable an API Key</h4>
+                        <p data-i18n="usage.s6.p">Enable or disable a key without deleting it by sending only the <code>active</code> field. Disabling takes effect immediately: a disabled key is removed from the active set and every request using it is rejected. Re-enable it the same way with <code>active: true</code>.</p>
+
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span data-i18n="usage.s6.code">cURL - Disable Key</span>
+                                <button class="btn btn-sm" onclick="copyCurlExample('curl-toggle-key')" data-i18n="common.copy">Copy</button>
+                            </div>
+                            <pre id="curl-toggle-key">curl -X POST '<span class="api-endpoint-dynamic">http://localhost:8223</span>/ops/api/update-api-key' \
+  -H 'Content-Type: application/json' \
+  -H 'X-Ops-Key: <span class="ops-key-dynamic">YOUR_OPS_KEY</span>' \
+  -d '{
+    "api_key": "mf-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+    "active": false
+  }'</pre>
+                        </div>
+                    </div>
+
+                    <div class="api-section">
+                        <h4 data-i18n="usage.s7.h">7. Delete API Key</h4>
+                        <p data-i18n="usage.s7.p">Delete an API key you created:</p>
                         
                         <div class="code-block">
                             <div class="code-header">
-                                <span data-i18n="usage.s6.code">cURL - Delete Key</span>
+                                <span data-i18n="usage.s7.code">cURL - Delete Key</span>
                                 <button class="btn btn-sm" onclick="copyCurlExample('curl-delete-key')" data-i18n="common.copy">Copy</button>
                             </div>
                             <pre id="curl-delete-key">curl -X POST '<span class="api-endpoint-dynamic">http://localhost:8223</span>/ops/api/delete-api-key' \
@@ -347,12 +453,12 @@
                     </div>
                     
                     <div class="api-section">
-                        <h4 data-i18n="usage.s7.h">7. Use the Created API Key</h4>
-                        <p data-i18n="usage.s7.p">Use the generated API key with OpenAI-compatible endpoints:</p>
+                        <h4 data-i18n="usage.s8.h">8. Use the Created API Key</h4>
+                        <p data-i18n="usage.s8.p">Use the generated API key with OpenAI-compatible endpoints:</p>
                         
                         <div class="code-block">
                             <div class="code-header">
-                                <span data-i18n="usage.s7.code">cURL - Chat Completion</span>
+                                <span data-i18n="usage.s8.code">cURL - Chat Completion</span>
                                 <button class="btn btn-sm" onclick="copyCurlExample('curl-chat')" data-i18n="common.copy">Copy</button>
                             </div>
                             <pre id="curl-chat">curl -X POST '<span class="api-endpoint-dynamic">http://localhost:8223</span>/v1/chat/completions' \
@@ -379,6 +485,18 @@
                             <tr>
                                 <td><code>unlimited</code></td>
                                 <td data-i18n-html="usage.params.unlimited">Set to <code>true</code> for unlimited traffic (optional, default: false)</td>
+                            </tr>
+                            <tr>
+                                <td><code>token_limit</code></td>
+                                <td data-i18n-html="usage.params.tokenLimit">Token limit (optional, recommended billing dimension). <code>0</code> or omitted means no token limit; set <code>token_unlimited: true</code> to explicitly disable it.</td>
+                            </tr>
+                            <tr>
+                                <td><code>username</code> / <code>remark</code> / <code>metainfo</code></td>
+                                <td data-i18n="usage.params.binding">Bound user info (optional). Business username, free-text remark, and JSON metainfo for external/OAuth binding.</td>
+                            </tr>
+                            <tr>
+                                <td><code>active</code></td>
+                                <td data-i18n-html="usage.params.active">Enable/disable status, update only (optional). <code>true</code> = enabled, <code>false</code> = disabled and immediately unusable. Omit to keep the current status unchanged.</td>
                             </tr>
                         </table>
                     </div>

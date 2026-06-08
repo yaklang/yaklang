@@ -5443,6 +5443,29 @@ curl '${metaApiUrl}?name=${modelName}'`;
             document.getElementById('opsUserCredentialsModal').style.display = 'none';
         }
         
+        // 显示可复制的敏感结果弹窗（如重置后的新密码 / 新 OPS Key）
+        // 关键词: showSecretResult 可复制结果弹窗, 替代 alert 不可复制问题, 自动选中便于复制
+        function showSecretResult(title, label, value) {
+            document.getElementById('secretResultTitle').textContent = title;
+            document.getElementById('secretResultLabel').textContent = label + ':';
+            const input = document.getElementById('secretResultValue');
+            input.value = value;
+            document.getElementById('secretResultModal').style.display = 'flex';
+            // 自动聚焦并选中，方便直接 Ctrl/Cmd+C 复制
+            setTimeout(function() { input.focus(); input.select(); }, 50);
+        }
+
+        // 关闭敏感结果弹窗
+        function closeSecretResultModal() {
+            document.getElementById('secretResultModal').style.display = 'none';
+        }
+
+        // 复制敏感结果弹窗中的值
+        function copySecretResult() {
+            const value = document.getElementById('secretResultValue').value;
+            copyToClipboard(value);
+        }
+
         // 复制 OPS 凭据
         function copyOpsCredentials() {
             const username = document.getElementById('createdOpsUsername').value;
@@ -5627,7 +5650,7 @@ curl '${metaApiUrl}?name=${modelName}'`;
                 const data = await response.json();
                 
                 if (data.success) {
-                    alert('Password reset successfully!\n\nNew Password: ' + data.new_password);
+                    showSecretResult('密码重置成功', '新密码', data.new_password);
                     refreshOpsUsers();
                 } else {
                     showToast(data.error || 'Failed to reset password', 'error');
@@ -5650,7 +5673,7 @@ curl '${metaApiUrl}?name=${modelName}'`;
                 const data = await response.json();
                 
                 if (data.success) {
-                    alert('OPS Key reset successfully!\n\nNew OPS Key: ' + data.new_ops_key);
+                    showSecretResult('OPS Key 重置成功', '新 OPS Key', data.new_ops_key);
                     refreshOpsUsers();
                 } else {
                     showToast(data.error || 'Failed to reset OPS Key', 'error');
