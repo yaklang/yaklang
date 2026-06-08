@@ -3,6 +3,7 @@
 package model
 
 import (
+	"fmt"
 	"testing"
 	"time"
 )
@@ -16,7 +17,7 @@ func TestDesiredSpecValidateRejectsUnknownCustomRuleEventType(t *testing.T) {
 			File: FileCollectorSpec{
 				Enabled:    true,
 				Backend:    CollectorBackendFileWatch,
-				WatchPaths: []string{"/tmp"},
+				WatchPaths: []string{"/tmp/hids-spec-test"},
 			},
 		},
 		CustomRules: []CustomRule{
@@ -47,7 +48,7 @@ func TestDesiredSpecValidateRejectsCollectorCoverageMismatch(t *testing.T) {
 			File: FileCollectorSpec{
 				Enabled:    true,
 				Backend:    CollectorBackendFileWatch,
-				WatchPaths: []string{"/tmp"},
+				WatchPaths: []string{"/tmp/hids-spec-test"},
 			},
 		},
 		CustomRules: []CustomRule{
@@ -66,6 +67,44 @@ func TestDesiredSpecValidateRejectsCollectorCoverageMismatch(t *testing.T) {
 	}
 	if got := err.Error(); got != `custom_rules[0].match_event_type: event type "audit.event" is not producible by the enabled collectors` {
 		t.Fatalf("unexpected validation error: %s", got)
+	}
+}
+
+func TestDesiredSpecValidateRejectsBroadFileWatchRoot(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		path string
+	}{
+		{name: "workspace root", path: "/home/go0p/code"},
+		{name: "wsl windows drive root", path: "/mnt/c"},
+		{name: "wsl windows workspace", path: "/mnt/c/Users/go0p/source"},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			_, err := ParseDesiredSpec([]byte(fmt.Sprintf(`{
+				"mode": "observe",
+				"collectors": {
+					"file": {
+						"enabled": true,
+						"backend": "filewatch",
+						"watch_paths": [%q]
+					}
+				}
+			}`, tt.path)))
+			if err == nil {
+				t.Fatal("expected validation error")
+			}
+			expected := fmt.Sprintf("collectors.file.watch_paths: %s is too broad for recursive filewatch", tt.path)
+			if got := err.Error(); got != expected {
+				t.Fatalf("unexpected validation error: %s", got)
+			}
+		})
 	}
 }
 
