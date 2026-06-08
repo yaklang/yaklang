@@ -1306,7 +1306,15 @@ func (s *FunctionType) RawString() string {
 
 	paras := make([]string, 0, s.ParameterLen)
 	for i := 0; i < s.ParameterLen; i++ {
-		paras = append(paras, s.Parameter[i].String())
+		var para Type
+		if i < len(s.Parameter) {
+			para = s.Parameter[i]
+		}
+		if para == nil {
+			paras = append(paras, "any")
+			continue
+		}
+		paras = append(paras, para.String())
 	}
 	returnTypeStr := ""
 	if s.ReturnType != nil {

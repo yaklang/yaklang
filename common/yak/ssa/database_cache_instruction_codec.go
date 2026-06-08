@@ -69,10 +69,11 @@ func Instruction2IrCode(inst Instruction, ir *ssadb.IrCode) error {
 func (c *ProgramCache) IrCodeToInstruction(inst Instruction, ir *ssadb.IrCode, cache *ProgramCache) Instruction {
 	instructionFromIrCode(inst, ir)
 	c.valueFromIrCode(cache, inst, ir)
-	basicBlockFromIrCode(inst, ir)
 
 	// extern info
 	unmarshalExtraInformation(cache, inst, ir)
+	functionFromIrCode(inst, ir)
+	basicBlockFromIrCode(inst, ir)
 
 	return inst
 }
@@ -431,6 +432,47 @@ func function2IrCode(inst Instruction, ir *ssadb.IrCode) {
 	}
 }
 
+func basicBlockFromIrCode(inst Instruction, ir *ssadb.IrCode) {
+	if ir == nil || !ir.IsBlock {
+		return
+	}
+	block, ok := ToBasicBlock(inst)
+	if !ok || block == nil {
+		return
+	}
+	if len(ir.PredBlock) > 0 {
+		block.Preds = append([]int64(nil), ir.PredBlock...)
+	}
+	if len(ir.SuccBlock) > 0 {
+		block.Succs = append([]int64(nil), ir.SuccBlock...)
+	}
+	if len(ir.Phis) > 0 {
+		block.Phis = append([]int64(nil), ir.Phis...)
+	}
+}
+
+func functionFromIrCode(inst Instruction, ir *ssadb.IrCode) {
+	if ir == nil || !ir.IsFunction {
+		return
+	}
+	f, ok := ToFunction(inst)
+	if !ok || f == nil {
+		return
+	}
+	if len(ir.FormalArgs) > 0 {
+		f.Params = append([]int64(nil), ir.FormalArgs...)
+	}
+	if len(ir.ReturnCodes) > 0 {
+		f.Return = append([]int64(nil), ir.ReturnCodes...)
+	}
+	if len(ir.CodeBlocks) > 0 {
+		f.Blocks = append([]int64(nil), ir.CodeBlocks...)
+	}
+	if len(ir.ChildrenFunction) > 0 {
+		f.ChildFuncs = append([]int64(nil), ir.ChildrenFunction...)
+	}
+}
+
 func basicBlock2IrCode(inst Instruction, ir *ssadb.IrCode) {
 	block, ok := ToBasicBlock(inst)
 	if !ok {
@@ -452,7 +494,4 @@ func basicBlock2IrCode(inst Instruction, ir *ssadb.IrCode) {
 	for _, phi := range block.Phis {
 		ir.Phis = append(ir.Phis, phi)
 	}
-}
-
-func basicBlockFromIrCode(inst Instruction, ir *ssadb.IrCode) {
 }

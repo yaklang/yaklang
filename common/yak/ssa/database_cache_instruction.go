@@ -432,10 +432,16 @@ func (s *instructionStore) saveInstructionPersistRecords(records []*instructionP
 	var saveErr error
 	saveStep := func() error {
 		saveErr = utils.GormTransaction(s.db, func(tx *gorm.DB) error {
+			programName := ""
+			if s.program != nil {
+				programName = s.program.GetProgramName()
+			}
+			var largeFieldLogs int
 			for _, record := range records {
 				if record == nil || record.IrCode == nil {
 					continue
 				}
+				ssadb.PrepareIrCodeForPersist(record.IrCode, programName, &largeFieldLogs)
 				if record.UpdateExisting {
 					if err := ssadb.UpsertIrCode(tx, record.IrCode); err != nil {
 						return err
