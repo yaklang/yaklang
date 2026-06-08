@@ -278,10 +278,10 @@ type Program struct {
 
 	Cache *ProgramCache
 
-	finished       bool
-	rootBuildSeq   []RootBuildRunner
-	rootBuildByID  map[string]RootBuildRunner
-	rootBuildTotal int
+	finished           bool
+	deferredBuildSeq   []*deferredBuildTask
+	deferredBuildByID  map[string]*deferredBuildTask
+	deferredBuildTotal int
 
 	//consts
 	Consts map[string]Value

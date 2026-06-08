@@ -56,8 +56,8 @@ func NewProgram(
 		config:                  NewLanguageConfig(),
 		NameCache:               ssadb.NewNameCache(programName),
 		compileConfig:           cfg,
-		rootBuildSeq:            make([]RootBuildRunner, 0),
-		rootBuildByID:           make(map[string]RootBuildRunner),
+		deferredBuildSeq:        make([]*deferredBuildTask, 0),
+		deferredBuildByID:       make(map[string]*deferredBuildTask),
 	}
 
 	prog.GlobalVariablesBlueprint = NewBlueprint("__GlobalVariables__")
@@ -105,8 +105,8 @@ func NewTmpProgram(ProgramName string) *Program {
 		CurrentIncludingStack:   utils.NewStack[string](),
 		config:                  NewLanguageConfig(),
 		NameCache:               ssadb.NewNameCache(ProgramName),
-		rootBuildSeq:            make([]RootBuildRunner, 0),
-		rootBuildByID:           make(map[string]RootBuildRunner),
+		deferredBuildSeq:        make([]*deferredBuildTask, 0),
+		deferredBuildByID:       make(map[string]*deferredBuildTask),
 	}
 	prog.Application = prog
 	prog.DatabaseKind = ProgramCacheMemory
@@ -370,7 +370,16 @@ func (prog *Program) Finish() {
 	}
 }
 
-func (prog *Program) registerRootBuildTask(task RootBuildRunner) RootBuildRunner {
+type DeferredBuildKind string
+
+const (
+	DeferredBuildKindFunction  DeferredBuildKind = "function"
+	DeferredBuildKindBlueprint DeferredBuildKind = "blueprint"
+	DeferredBuildKindFile      DeferredBuildKind = "file"
+	DeferredBuildKindHelper    DeferredBuildKind = "helper"
+)
+
+func (prog *Program) registerDeferredBuildTask(task *deferredBuildTask) *deferredBuildTask {
 	if prog == nil || task == nil {
 		return nil
 	}
@@ -378,56 +387,54 @@ func (prog *Program) registerRootBuildTask(task RootBuildRunner) RootBuildRunner
 	if app == nil {
 		app = prog
 	}
-	if app.rootBuildByID == nil {
-		app.rootBuildByID = make(map[string]RootBuildRunner)
+	if app.deferredBuildByID == nil {
+		app.deferredBuildByID = make(map[string]*deferredBuildTask)
 	}
-	if existing, ok := app.rootBuildByID[task.ID()]; ok {
+	if existing, ok := app.deferredBuildByID[task.id]; ok {
 		return existing
 	}
-	app.rootBuildByID[task.ID()] = task
-	app.rootBuildSeq = append(app.rootBuildSeq, task)
-	app.rootBuildTotal++
+	app.deferredBuildByID[task.id] = task
+	app.deferredBuildSeq = append(app.deferredBuildSeq, task)
+	app.deferredBuildTotal++
 	return task
 }
 
-func (prog *Program) RegisterRootTask(kind RootBuildKind, name string, work func()) *RootBuildTask {
-	task, _ := prog.registerRootBuildTask(NewRootBuildTask(kind, name, work)).(*RootBuildTask)
-	return task
+func (prog *Program) RegisterDeferredBuild(kind DeferredBuildKind, name string, work func()) {
+	prog.registerDeferredBuildTask(newDeferredBuildTask(kind, name, work))
 }
 
-func (prog *Program) RegisterRootFunction(name string, fun *Function) *RootBuildTask {
+func (prog *Program) RegisterDeferredFunction(name string, fun *Function) {
 	if fun == nil {
-		return nil
+		return
 	}
-	task, _ := prog.registerRootBuildTask(NewRootBuildTask(RootBuildKindFunction, name, func() {
+	prog.RegisterDeferredBuild(DeferredBuildKindFunction, name, func() {
 		fun.Build()
-	})).(*RootBuildTask)
-	return task
+	})
 }
 
-func (prog *Program) RegisterRootBlueprint(name string, blueprint *Blueprint) *RootBuildTask {
+func (prog *Program) RegisterDeferredBlueprint(name string, blueprint *Blueprint) {
 	if blueprint == nil {
-		return nil
+		return
 	}
-	task, _ := prog.registerRootBuildTask(NewRootBuildTask(RootBuildKindBlueprint, name, func() {
+	prog.RegisterDeferredBuild(DeferredBuildKindBlueprint, name, func() {
 		blueprint.Build()
-	})).(*RootBuildTask)
-	return task
+	})
 }
 
-func (prog *Program) RegisterRootTopLevel(name string, editor *memedit.MemEditor, builder *FunctionBuilder, work func(*FunctionBuilder)) *TopLevelBuilder {
+func (prog *Program) RegisterFileBuild(name string, editor *memedit.MemEditor, builder *FunctionBuilder, work func(*FunctionBuilder)) {
 	if builder == nil {
-		return nil
+		return
 	}
-	task, _ := prog.registerRootBuildTask(NewTopLevelBuilder(name, prog, editor, builder, work)).(*TopLevelBuilder)
-	return task
+	prog.RegisterDeferredBuild(DeferredBuildKindFile, name, func() {
+		buildWithEditor(prog, editor, builder, work)
+	})
 }
 
-func (prog *Program) RunRootBuilds() {
-	_ = prog.RunRootBuildsWithCallback(nil)
+func (prog *Program) RunDeferredBuilds() {
+	_ = prog.RunDeferredBuildsWithCallback(nil)
 }
 
-func (prog *Program) RootBuildCount() int {
+func (prog *Program) DeferredBuildCount() int {
 	if prog == nil {
 		return 0
 	}
@@ -435,10 +442,10 @@ func (prog *Program) RootBuildCount() int {
 	if app == nil {
 		app = prog
 	}
-	return app.rootBuildTotal
+	return app.deferredBuildTotal
 }
 
-func (prog *Program) RunRootBuildsWithCallback(afterEach func(index int, total int) bool) bool {
+func (prog *Program) RunDeferredBuildsWithCallback(afterEach func(index int, total int) bool) bool {
 	if prog == nil {
 		return true
 	}
@@ -446,28 +453,26 @@ func (prog *Program) RunRootBuildsWithCallback(afterEach func(index int, total i
 	if app == nil {
 		app = prog
 	}
-	total := len(app.rootBuildSeq)
-	for index, task := range app.rootBuildSeq {
+	total := len(app.deferredBuildSeq)
+	for index, task := range app.deferredBuildSeq {
 		if task == nil {
 			continue
 		}
 		task.Build()
-		if releasable, ok := task.(releasableRootBuildRunner); ok {
-			releasable.Release()
-		}
+		task.release()
 		if afterEach != nil {
 			if !afterEach(index+1, total) {
 				return false
 			}
 		}
 	}
-	if len(app.rootBuildSeq) == total {
-		app.releaseRootBuildTasks()
+	if len(app.deferredBuildSeq) == total {
+		app.releaseDeferredBuildTasks()
 	}
 	return true
 }
 
-func (prog *Program) releaseRootBuildTasks() {
+func (prog *Program) releaseDeferredBuildTasks() {
 	if prog == nil {
 		return
 	}
@@ -475,8 +480,8 @@ func (prog *Program) releaseRootBuildTasks() {
 	if app == nil {
 		app = prog
 	}
-	app.rootBuildSeq = nil
-	app.rootBuildByID = nil
+	app.deferredBuildSeq = nil
+	app.deferredBuildByID = nil
 }
 
 func (prog *Program) SearchIndexAndOffsetByOffset(searchOffset int) (index int, offset int) {

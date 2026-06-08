@@ -40,9 +40,10 @@ const (
 	LabelDone  = "label.done"
 
 	// for &&  || ?: expression
-	AndExpressionVariable     = "and_expression"
-	OrExpressionVariable      = "or_expression"
-	TernaryExpressionVariable = "ternary_expression"
+	AndExpressionVariable       = "and_expression"
+	OrExpressionVariable        = "or_expression"
+	TernaryExpressionVariable   = "ternary_expression"
+	SpaceshipExpressionVariable = "spaceship_expression"
 )
 
 func (b *BasicBlock) IsBlock(name string) bool {

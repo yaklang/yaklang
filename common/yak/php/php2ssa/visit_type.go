@@ -85,6 +85,14 @@ func (y *builder) VisitTypeRef(raw phpparser.ITypeRefContext) (*ssa.Blueprint, s
 		}
 		name, s := y.VisitQualifiedNamespaceName(i.QualifiedNamespaceName())
 		if len(name) == 1 && name[0] == s {
+			if prog := y.GetProgram(); prog != nil {
+				if typ, ok := prog.ReadImportType(s); ok {
+					bluePrint, ok := ssa.ToClassBluePrintType(typ)
+					if ok && !utils.IsNil(bluePrint) {
+						return bluePrint, s
+					}
+				}
+			}
 			name = []string{""}
 		}
 		if library, _ := y.GetProgram().GetApplication().GetOrCreateLibrary(strings.Join(name, ".")); !utils.IsNil(library) {

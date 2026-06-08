@@ -22,20 +22,20 @@ import (
 )
 
 type compileStats struct {
-	Label          string  `json:"label"`
-	Mode           string  `json:"mode"`
-	Path           string  `json:"path"`
-	ProgramName    string  `json:"program_name"`
-	CompileSeconds float64 `json:"compile_seconds"`
-	Funcs          int     `json:"funcs"`
-	Blueprints     int     `json:"blueprints"`
-	SubPrograms    int     `json:"sub_programs"`
-	Instructions   int     `json:"instructions"`
-	RootBuildTasks int     `json:"root_build_tasks"`
-	LineCount      int     `json:"line_count"`
-	HeapInuseEndMB float64 `json:"heap_inuse_end_mb"`
-	HeapObjectsEnd uint64  `json:"heap_objects_end"`
-	RssEndMB       float64 `json:"rss_end_mb"`
+	Label              string  `json:"label"`
+	Mode               string  `json:"mode"`
+	Path               string  `json:"path"`
+	ProgramName        string  `json:"program_name"`
+	CompileSeconds     float64 `json:"compile_seconds"`
+	Funcs              int     `json:"funcs"`
+	Blueprints         int     `json:"blueprints"`
+	SubPrograms        int     `json:"sub_programs"`
+	Instructions       int     `json:"instructions"`
+	DeferredBuildTasks int     `json:"deferred_build_tasks"`
+	LineCount          int     `json:"line_count"`
+	HeapInuseEndMB     float64 `json:"heap_inuse_end_mb"`
+	HeapObjectsEnd     uint64  `json:"heap_objects_end"`
+	RssEndMB           float64 `json:"rss_end_mb"`
 }
 
 func readProcRSSKB() uint64 {
@@ -91,7 +91,7 @@ func collectStats(prog *ssa.Program) compileStats {
 	if app == nil {
 		app = prog
 	}
-	st.RootBuildTasks = app.RootBuildCount()
+	st.DeferredBuildTasks = app.DeferredBuildCount()
 	st.LineCount = app.LineCount
 	st.Funcs = app.Funcs.Len()
 	st.Blueprints = app.Blueprint.Len()
@@ -171,8 +171,8 @@ func main() {
 
 	logMem("after_compile")
 	diagnostics.LogHeapSnapshot("measure_after", true)
-	fmt.Fprintf(os.Stderr, "[measure] stats funcs=%d blueprints=%d instructions=%d root_builds=%d sub_programs=%d lines=%d compile=%v\n",
-		stats.Funcs, stats.Blueprints, stats.Instructions, stats.RootBuildTasks, stats.SubPrograms, stats.LineCount, elapsed)
+	fmt.Fprintf(os.Stderr, "[measure] stats funcs=%d blueprints=%d instructions=%d deferred_builds=%d sub_programs=%d lines=%d compile=%v\n",
+		stats.Funcs, stats.Blueprints, stats.Instructions, stats.DeferredBuildTasks, stats.SubPrograms, stats.LineCount, elapsed)
 	fmt.Fprintf(os.Stderr, "[measure] done label=%s program=%s\n", *label, progName)
 
 	if *statsOut != "" {

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/javaclassparser"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaproject"
@@ -23,8 +24,16 @@ func getUnifiedSeparatorFs(fs fi.FileSystem) fi.FileSystem {
 		return nil
 	}
 
+	unifiedOptions := []filesys.UnifiedFsOption{
+		filesys.WithUnifiedFsSeparator(ssadb.IrSourceFsSeparators),
+	}
+
 	// 如果已经是 UnifiedFS 且分隔符匹配，直接返回，避免重复包装
 	if unifiedFS, ok := fs.(*filesys.UnifiedFS); ok {
+		if _, ok := unifiedFS.GetFileSystem().(*javaclassparser.JarFS); ok {
+			unifiedOptions = append(unifiedOptions, filesys.WithUnifiedFsExtMap(".class", ".java"))
+			return filesys.NewUnifiedFS(unifiedFS.GetFileSystem(), unifiedOptions...)
+		}
 		if unifiedFS.GetSeparators() == ssadb.IrSourceFsSeparators {
 			return fs
 		}
@@ -32,9 +41,11 @@ func getUnifiedSeparatorFs(fs fi.FileSystem) fi.FileSystem {
 		fs = unifiedFS.GetFileSystem()
 	}
 
-	return filesys.NewUnifiedFS(fs,
-		filesys.WithUnifiedFsSeparator(ssadb.IrSourceFsSeparators),
-	)
+	if _, ok := fs.(*javaclassparser.JarFS); ok {
+		unifiedOptions = append(unifiedOptions, filesys.WithUnifiedFsExtMap(".class", ".java"))
+	}
+
+	return filesys.NewUnifiedFS(fs, unifiedOptions...)
 }
 
 var ttlSSAParseCache = createCache(30 * time.Minute)

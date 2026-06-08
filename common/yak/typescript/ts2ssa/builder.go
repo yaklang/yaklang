@@ -117,10 +117,3 @@ func (s *SSABuilder) BuildFromAST(raw ssa.FrontAST, b *ssa.FunctionBuilder) erro
 	build.VisitSourceFile(jsAST)
 	return nil
 }
-
-// SelfRegistersTopLevel: pass1 emits declaration skeleton; pass2 full statement build
-// is scheduled via RegisterRootTopLevel in VisitSourceFile (TypeScript AST has no
-// ANTLR parent chain, so DetachAST does not apply).
-func (*SSABuilder) SelfRegistersTopLevel() bool {
-	return ssa.SkeletonTopLevelEnabled()
-}

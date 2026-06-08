@@ -145,16 +145,6 @@ func (*SSABuilder) FilterFile(path string) bool {
 	return filepath.Ext(path) == ".go"
 }
 
-// SelfRegistersTopLevel: go2ssa emits the full skeleton in pass1 (PreHandlerProject
-// -> build with PreHandler()=true), severs every top-level child from the file
-// root at the end of pass1 so no lazy hook pins the whole file AST (see
-// ssa.DetachAST and build()), and registers the only genuinely-deferred top-level
-// work — cross-file ImportAll — as a data-driven root task that holds no AST. So
-// the shared pipeline must not capture the whole file AST in a pass2 closure.
-func (*SSABuilder) SelfRegistersTopLevel() bool {
-	return ssa.SkeletonTopLevelEnabled()
-}
-
 type astbuilder struct {
 	*ssa.FunctionBuilder
 	cmap           []map[string]struct{}

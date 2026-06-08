@@ -44,13 +44,6 @@ func (s *SSABuilder) FilterParseAST(path string) bool {
 	return extension == ".java"
 }
 
-// SelfRegistersTopLevel: pass1 emits type shells + detaches file AST; pass2 static
-// import resolution uses registerPostSkeletonImportTask instead of a whole-file AST
-// closure (see visit_import.go).
-func (*SSABuilder) SelfRegistersTopLevel() bool {
-	return ssa.SkeletonTopLevelEnabled()
-}
-
 func (s *SSABuilder) GetAntlrCache() *ssa.AntlrCache {
 	return s.CreateAntlrCache(javaparser.GetJavaLexerSerializedATN(), javaparser.GetJavaParserSerializedATN())
 }

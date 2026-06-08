@@ -135,8 +135,7 @@ func (s *SSABuilder) BuildFromAST(raw ssa.FrontAST, b *ssa.FunctionBuilder) erro
 		if b.GetProgram().PreHandler() {
 			startParse(functionBuilder)
 			if ssa.SkeletonTopLevelEnabled() {
-				registerPHPBuildPass2RootTask(ast, b)
-				ssa.DetachASTRootChildren(ast)
+				registerPHPFileBuild(ast, b)
 			} else {
 				functionBuilder.AddLazyBuilder(func() {
 					startParse(functionBuilder)
@@ -214,14 +213,7 @@ func (*SSABuilder) FilterFile(path string) bool {
 	return ext == ".php"
 }
 
-// SelfRegistersTopLevel: pass1 emits class/function shells with slimmed lazy
-// body subtrees; pass2 captures HtmlDocument children instead of retaining the
-// whole file AST root.
-func (*SSABuilder) SelfRegistersTopLevel() bool {
-	return ssa.SkeletonTopLevelEnabled()
-}
-
-func registerPHPBuildPass2RootTask(ast phpparser.IHtmlDocumentContext, b *ssa.FunctionBuilder) {
+func registerPHPFileBuild(ast phpparser.IHtmlDocumentContext, b *ssa.FunctionBuilder) {
 	if ast == nil || b == nil || !ssa.SkeletonTopLevelEnabled() {
 		return
 	}
@@ -269,8 +261,8 @@ func registerPHPBuildPass2RootTask(ast phpparser.IHtmlDocumentContext, b *ssa.Fu
 	functionBuilder.AddLazyBuilder(func() {
 		buildCapturedChildren(capturedBuilder)
 	}, true)
-	app.RegisterRootTopLevel(path, editor, capturedBuilder, func(rootFb *ssa.FunctionBuilder) {
-		buildCapturedChildren(rootFb)
+	app.RegisterFileBuild(path, editor, capturedBuilder, func(fileFb *ssa.FunctionBuilder) {
+		buildCapturedChildren(fileFb)
 	})
 }
 

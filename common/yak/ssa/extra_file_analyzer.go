@@ -142,6 +142,7 @@ func (d *PreHandlerBase) WithLanguageConfigOpts(opts ...LanguageConfigOpt) *PreH
 	d.languageConfigOpts = opts
 	return d
 }
+
 func (d *PreHandlerBase) WithPreInitHandler(fs ...initHanlderFunc) *PreHandlerBase {
 	d.beforeInitHandlerFunc = fs
 	return d
@@ -184,24 +185,6 @@ func (d *PreHandlerBase) FilterPreHandlerFile(string) bool {
 
 func (d *PreHandlerBase) PreHandlerProject(fi.FileSystem, FrontAST, *FunctionBuilder, *memedit.MemEditor) error {
 	return nil
-}
-
-// SelfRegistersTopLevel reports whether a language builder emits its full SSA
-// skeleton and registers all of its own deferred root-build work during pass1
-// (PreHandlerProject), so the shared compile pipeline must NOT register a
-// whole-file-AST top-level closure for it.
-//
-// Default false keeps the legacy behavior (pipeline registers a RootTopLevel
-// closure that re-runs BuildFromAST over the whole file AST in pass2). A
-// language opts in by overriding this to true once its PreHandlerProject:
-//   - emits the skeleton (package/types/signatures/globals/imports) in pass1, and
-//   - detaches + lazily builds each body subtree, and
-//   - registers any genuinely-deferred top-level work (e.g. cross-file linking)
-//     as data-driven root tasks that do not capture the file AST.
-//
-// This is the per-language switch from docs/ssa-ast-to-ssa-skeleton-plan.md §7.
-func (d *PreHandlerBase) SelfRegistersTopLevel() bool {
-	return false
 }
 
 func (d *PreHandlerBase) Clearup() {
