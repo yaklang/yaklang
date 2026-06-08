@@ -53,6 +53,7 @@ go test -timeout 30s ./common/yak/antlr4c/...
 go test -timeout 2m ./common/yak/ssaapi/test/c
 
 echo "Start to Test SSAAPI"
+go test -timeout 20s ./common/utils/pipeline
 go test -timeout 20s ./common/yak/ssa/...
 go test -timeout 1m ./common/yak/ssaapi
 go test -timeout 1m ./common/yak/ssaapi/ssareducer
