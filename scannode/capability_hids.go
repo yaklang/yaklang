@@ -857,7 +857,7 @@ func (h *hidsCapabilityHooks) convertStatus(
 	config hidsAlertConfig,
 ) (CapabilityRuntimeStatus, bool) {
 	appliedSpec := h.appliedSpecState()
-	statusDetail := state.Detail
+	statusDetail := enrichHIDSRuntimeStatusDetail(state.Detail, state.UpdatedAt)
 	if len(appliedSpec.spec) > 0 {
 		desiredSpec, _ := hidsmodel.ParseDesiredSpec(appliedSpec.spec)
 		statusDetail = enrichHIDSApplyStatusDetail(statusDetail, appliedSpec, desiredSpec)
@@ -888,6 +888,7 @@ func enrichHIDSApplyStatusDetail(
 	appliedSpec hidsAppliedSpecState,
 	spec hidsmodel.DesiredSpec,
 ) map[string]any {
+	detail = enrichHIDSRuntimeStatusDetail(detail, appliedSpec.appliedAt)
 	if len(appliedSpec.spec) == 0 && strings.TrimSpace(appliedSpec.specVersion) == "" {
 		return detail
 	}
@@ -910,6 +911,117 @@ func enrichHIDSApplyStatusDetail(
 		"rule_engine":          hidsRuleEngineApplyDetail(enriched, spec),
 	}
 	return enriched
+}
+
+func enrichHIDSRuntimeStatusDetail(detail map[string]any, observedAt time.Time) map[string]any {
+	if len(detail) == 0 {
+		detail = map[string]any{}
+	}
+	enriched := make(map[string]any, len(detail)+1)
+	for key, value := range detail {
+		enriched[key] = value
+	}
+	if sensors := hidsRuntimeSensorDeclarations(observedAt); len(sensors) > 0 {
+		enriched["sensors"] = sensors
+	}
+	return enriched
+}
+
+func hidsRuntimeSensorDeclarations(updatedAt time.Time) map[string]any {
+	if updatedAt.IsZero() {
+		updatedAt = time.Now().UTC()
+	} else {
+		updatedAt = updatedAt.UTC()
+	}
+	return map[string]any{
+		"suricata": map[string]any{
+			"name":       "suricata",
+			"backend":    "suricata",
+			"status":     "planned",
+			"message":    "optional Suricata-compatible sensor is not enabled by this desired spec",
+			"updated_at": updatedAt,
+			"detail": map[string]any{
+				"stats": hidsEmptyRuntimeStats(),
+				"capabilities": hidsRuntimeCapabilityDeclaration(
+					[]string{"network.signature.alert"},
+					[]string{"eve", "pcap", "flow_summary"},
+					[]string{"CAP_NET_RAW"},
+					[]map[string]any{
+						hidsRuntimeFeatureCapability("payload_inspection", true, "optional", ""),
+						hidsRuntimeFeatureCapability(
+							"inline_prevention",
+							false,
+							"disabled",
+							"inline IPS is outside phase-1 HIDS runtime",
+						),
+					},
+				),
+			},
+		},
+		"dlp": map[string]any{
+			"name":       "dlp",
+			"backend":    "none",
+			"status":     "unsupported",
+			"message":    "DLP payload inspection is not implemented in this runtime",
+			"updated_at": updatedAt,
+			"detail": map[string]any{
+				"stats": hidsEmptyRuntimeStats(),
+				"capabilities": hidsRuntimeCapabilityDeclaration(
+					nil,
+					nil,
+					nil,
+					[]map[string]any{
+						hidsRuntimeFeatureCapability(
+							"payload_inspection",
+							false,
+							"unsupported",
+							"DLP requires a future payload/content inspection plane",
+						),
+					},
+				),
+			},
+		},
+	}
+}
+
+func hidsRuntimeCapabilityDeclaration(
+	eventTypes []string,
+	payloads []string,
+	privileges []string,
+	features []map[string]any,
+) map[string]any {
+	return map[string]any{
+		"supported_event_types": cloneHIDSRuntimeStringSlice(eventTypes),
+		"supported_payloads":    cloneHIDSRuntimeStringSlice(payloads),
+		"required_privileges":   cloneHIDSRuntimeStringSlice(privileges),
+		"feature_flags":         cloneHIDSFeatureCapabilities(features),
+	}
+}
+
+func hidsRuntimeFeatureCapability(
+	key string,
+	supported bool,
+	status string,
+	reason string,
+) map[string]any {
+	feature := map[string]any{
+		"key":       key,
+		"supported": supported,
+		"status":    status,
+	}
+	if strings.TrimSpace(reason) != "" {
+		feature["reason"] = reason
+	}
+	return feature
+}
+
+func hidsEmptyRuntimeStats() map[string]any {
+	return map[string]any{
+		"received": 0,
+		"emitted":  0,
+		"errors":   0,
+		"dropped":  0,
+	}
 }
 
 func hidsDesiredSpecSHA256(spec []byte) string {
@@ -1101,5 +1213,29 @@ func cloneStringSlice(values []string) []string {
 	}
 	cloned := make([]string, len(values))
 	copy(cloned, values)
+	return cloned
+}
+
+func cloneHIDSRuntimeStringSlice(values []string) []string {
+	if len(values) == 0 {
+		return []string{}
+	}
+	cloned := make([]string, len(values))
+	copy(cloned, values)
+	return cloned
+}
+
+func cloneHIDSFeatureCapabilities(values []map[string]any) []map[string]any {
+	if len(values) == 0 {
+		return []map[string]any{}
+	}
+	cloned := make([]map[string]any, 0, len(values))
+	for _, value := range values {
+		item := make(map[string]any, len(value))
+		for key, entry := range value {
+			item[key] = entry
+		}
+		cloned = append(cloned, item)
+	}
 	return cloned
 }

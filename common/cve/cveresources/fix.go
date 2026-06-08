@@ -34,6 +34,9 @@ func FixProductName(ProductName string, db *gorm.DB) ([]string, error) {
 	if len(Products) > 0 {
 		return []string{ProductName}, nil
 	} else {
+		if productExistsInCVEs(ProductName, db) {
+			return []string{ProductName}, nil
+		}
 		rule, _ := regexp.Compile(`[a-zA-Z]{3,}(-[a-zA-Z]{3,})*`)
 		ProductNameWords := rule.FindAllString(ProductName, -1)
 		if len(ProductNameWords) > 0 {
@@ -42,6 +45,9 @@ func FixProductName(ProductName string, db *gorm.DB) ([]string, error) {
 				log.Errorf("query database failed: %s", resDb.Error)
 			}
 			if len(Products) > 0 {
+				return []string{ProductNameWords[0]}, nil
+			}
+			if productExistsInCVEs(ProductNameWords[0], db) {
 				return []string{ProductNameWords[0]}, nil
 			}
 		}
@@ -82,6 +88,18 @@ func FixProductName(ProductName string, db *gorm.DB) ([]string, error) {
 
 		}
 	}
+}
+
+func productExistsInCVEs(product string, db *gorm.DB) bool {
+	var count int
+	resDb := db.Model(&CVE{}).
+		Where("product = ? OR product LIKE ? OR product LIKE ? OR product LIKE ?", product, "%,"+product, "%,"+product+",%", product+",%").
+		Count(&count)
+	if resDb.Error != nil {
+		log.Errorf("query database failed: %s", resDb.Error)
+		return false
+	}
+	return count > 0
 }
 
 // 可能有的情况 lib5 -> lib 剔除不必要的数字以及其他符号
