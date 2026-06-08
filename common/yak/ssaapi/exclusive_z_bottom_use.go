@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"context"
+	"strconv"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -53,6 +54,40 @@ func (v Values) GetBottomUses(opts ...OperationOption) Values {
 	return MergeValues(ret)
 }
 
+type returnMemberPair struct {
+	key    *Value
+	member *Value
+}
+
+func getCallReturnMemberPairs(call *Value, returnIndex int) []returnMemberPair {
+	if call == nil {
+		return nil
+	}
+	keyText := strconv.Itoa(returnIndex)
+	ret := make([]returnMemberPair, 0)
+	for _, pair := range call.GetMembers() {
+		if len(pair) != 2 || pair[0] == nil || pair[1] == nil || pair[0].getValue() == nil {
+			continue
+		}
+		if ssa.GetKeyString(pair[0].getValue()) == keyText {
+			ret = append(ret, returnMemberPair{key: pair[0], member: pair[1]})
+		}
+	}
+	if len(ret) > 0 {
+		return ret
+	}
+	returnKey := call.NewValue(ssa.NewConst(returnIndex))
+	if returnKey == nil {
+		return nil
+	}
+	for _, member := range call.GetMember(returnKey) {
+		if member != nil {
+			ret = append(ret, returnMemberPair{key: returnKey, member: member})
+		}
+	}
+	return ret
+}
+
 func (v *Value) bottomUsesThroughReturn(retValue *Value, retInst *ssa.Return, actx *AnalyzeContext, opt ...OperationOption) Values {
 	if v == nil || retValue == nil || retInst == nil {
 		return nil
@@ -88,11 +123,9 @@ func (v *Value) bottomUsesThroughReturn(retValue *Value, retInst *ssa.Return, ac
 			continue
 		}
 		for _, returnIndex := range returnIndexes {
-			returnKey := retValue.NewValue(ssa.NewConst(returnIndex))
-			members := call.GetMember(returnKey)
-			for _, member := range members {
-				ret = append(ret, actx.withObject(call, returnKey, member, func() Values {
-					return member.getBottomUses(actx, opt...)
+			for _, pair := range getCallReturnMemberPairs(call, returnIndex) {
+				ret = append(ret, actx.withObject(call, pair.key, pair.member, func() Values {
+					return pair.member.getBottomUses(actx, opt...)
 				})...)
 			}
 		}
@@ -332,7 +365,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 					vals = append(vals, val.getBottomUses(actx, opt...)...)
 				}
 			}
-			if len(vals) == 0 && len(trackedSources) > 0 {
+			if len(trackedSources) > 0 {
 				returnIndexes := map[int]struct{}{}
 				for _, source := range trackedSources {
 					if source == nil {
@@ -366,13 +399,22 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 				}
 				precise := make(Values, 0)
 				for returnIndex := range returnIndexes {
-					if members := v.GetMember(v.NewValue(ssa.NewConst(returnIndex))); members != nil {
-						for _, member := range members {
-							precise = append(precise, member.getBottomUses(actx, opt...)...)
-						}
+					for _, pair := range getCallReturnMemberPairs(v, returnIndex) {
+						precise = append(precise, actx.withObject(v, pair.key, pair.member, func() Values {
+							return pair.member.getBottomUses(actx, opt...)
+						})...)
 					}
 				}
-				vals = append(vals, precise...)
+				if len(precise) > 0 {
+					filtered := make(Values, 0, len(vals)+len(precise))
+					for _, val := range vals {
+						if !ValueCompare(val, v) {
+							filtered = append(filtered, val)
+						}
+					}
+					vals = filtered
+					vals = append(vals, precise...)
+				}
 			}
 		}
 		if len(vals) > 0 {
@@ -418,14 +460,9 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 			}
 			ret := make(Values, 0)
 			for _, returnIndex := range returnIndexes {
-				returnKey := v.NewValue(ssa.NewConst(returnIndex))
-				members := call.GetMember(returnKey)
-				if members == nil {
-					continue
-				}
-				for _, member := range members {
-					ret = append(ret, actx.withObject(call, returnKey, member, func() Values {
-						return member.getBottomUses(actx, opt...)
+				for _, pair := range getCallReturnMemberPairs(call, returnIndex) {
+					ret = append(ret, actx.withObject(call, pair.key, pair.member, func() Values {
+						return pair.member.getBottomUses(actx, opt...)
 					})...)
 				}
 			}
