@@ -401,6 +401,9 @@ func QueryCVE(db *gorm.DB, req *ypb.QueryCVERequest) (*bizhelper.Paginator, []*C
 	db = db.Model(&CVE{})
 
 	params := req.GetPagination()
+	if params == nil {
+		params = &ypb.Paging{}
+	}
 	if params.OrderBy == "" {
 		params.OrderBy = "published_date"
 	}
@@ -417,7 +420,7 @@ func QueryCVE(db *gorm.DB, req *ypb.QueryCVERequest) (*bizhelper.Paginator, []*C
 	db = FilterCVE(db, req)
 
 	var ret []*CVE
-	paging, db := bizhelper.Paging(db, int(params.GetPage()), int(params.Limit), &ret)
+	paging, db := bizhelper.Paging(db, int(params.GetPage()), int(params.GetLimit()), &ret)
 	if db.Error != nil {
 		return nil, nil, utils.Errorf("paging failed: %s", db.Error)
 	}

@@ -1,11 +1,13 @@
 package mcp
 
 import (
+	"context"
 	"maps"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/server"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type ToolWithHandler struct {
@@ -69,4 +71,28 @@ func GetBuiltinToolByName(name string) *ToolWithHandler {
 // Tool returns the underlying mcp.Tool definition.
 func (t *ToolWithHandler) Tool() *mcp.Tool {
 	return t.tool
+}
+
+// Invoke runs the tool handler with the given arguments. It is intended for tests.
+func (t *ToolWithHandler) Invoke(ctx context.Context, srv *MCPServer, arguments map[string]any) (*mcp.CallToolResult, error) {
+	req := mcp.CallToolRequest{}
+	if t.tool != nil {
+		req.Params.Name = t.tool.Name
+	}
+	req.Params.Arguments = arguments
+	return t.handler(srv)(ctx, req)
+}
+
+// InvokeBuiltinTool runs a registered legacy builtin tool by name.
+func InvokeBuiltinTool(ctx context.Context, srv *MCPServer, toolName string, arguments map[string]any) (*mcp.CallToolResult, error) {
+	tool := GetBuiltinToolByName(toolName)
+	if tool == nil {
+		return nil, utils.Errorf("undefined tool: %s", toolName)
+	}
+	return tool.Invoke(ctx, srv, arguments)
+}
+
+// LegacyBuiltinToolNames returns sorted names of all legacy builtin tools.
+func LegacyBuiltinToolNames() []string {
+	return lo.Keys(globalTools)
 }

@@ -8,7 +8,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/cve/cvequeryops"
 	"github.com/yaklang/yaklang/common/cve/cveresources"
-	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 //go:embed CIDate.db
@@ -22,6 +22,49 @@ type productWithVersion struct {
 	name    string
 	version string
 	target  string
+}
+
+func openEmbeddedCVEDatabase(t *testing.T) *cveresources.SqliteManager {
+	t.Helper()
+
+	DbFp, err := DbFs.Open("CIDate.db")
+	if err != nil {
+		t.Fatalf("open embedded cve db failed: %v", err)
+	}
+	defer DbFp.Close()
+
+	tempFp, err := os.CreateTemp("", "Date.db")
+	if err != nil {
+		t.Fatalf("create temp cve db failed: %v", err)
+	}
+	t.Cleanup(func() {
+		tempFp.Close()
+		os.Remove(tempFp.Name())
+	})
+
+	if _, err = io.Copy(tempFp, DbFp); err != nil {
+		t.Fatalf("copy embedded cve db failed: %v", err)
+	}
+
+	return cveresources.GetManager(tempFp.Name(), true)
+}
+
+func TestQueryCVEWithoutPagination(t *testing.T) {
+	manager := openEmbeddedCVEDatabase(t)
+
+	// MCP query_cve often omits pagination; this must not panic the engine.
+	paging, data, err := cveresources.QueryCVE(manager.DB, &ypb.QueryCVERequest{
+		Keywords: "apache",
+	})
+	if err != nil {
+		t.Fatalf("QueryCVE without pagination failed: %v", err)
+	}
+	if paging == nil {
+		t.Fatal("expected non-nil paginator")
+	}
+	if len(data) == 0 {
+		t.Fatal("expected at least one CVE result")
+	}
 }
 
 func TestQueryCVEWithFixName(t *testing.T) {
@@ -48,26 +91,7 @@ func TestQueryCVEWithFixName(t *testing.T) {
 		},
 	}
 
-	// 读 embed 文件
-	DbFp, err := DbFs.Open("CIDate.db")
-	if err != nil {
-		log.Errorf("%v", err)
-	}
-	defer DbFp.Close()
-
-	// 写到临时目录
-	tempFp, err := os.CreateTemp("", "Date.db")
-	if err != nil {
-		log.Errorf("%v", err)
-	}
-	defer tempFp.Close()
-
-	_, err = io.Copy(tempFp, DbFp)
-	if err != nil {
-		log.Errorf("%v", err)
-	}
-
-	M := cveresources.GetManager(tempFp.Name(), true)
+	M := openEmbeddedCVEDatabase(t)
 	for _, datum := range data {
 		cve := cvequeryops.QueryCVEYields(M.DB, cvequeryops.ProductWithVersion(datum.name, datum.version))
 		count := 0

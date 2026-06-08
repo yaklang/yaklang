@@ -163,3 +163,8 @@ func (s *MCPServer) ensureLocalClient() error {
 	s.grpcClient = client
 	return nil
 }
+
+// BindLocalGRPCClient wires the in-process yak gRPC client for legacy tool handlers.
+func (s *MCPServer) BindLocalGRPCClient() error {
+	return s.ensureLocalClient()
+}
