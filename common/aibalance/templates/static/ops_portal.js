@@ -92,6 +92,15 @@ const I18N = {
         'myKeys.edit': '编辑',
         'myKeys.delete': '删除',
         'myKeys.loadFailed': '加载 Key 失败',
+        'myKeys.thStatus': '状态',
+        'myKeys.searchPh': '搜索用户名 / 备注 / Key',
+        'myKeys.statusAll': '全部状态',
+        'myKeys.statusActive': '仅启用',
+        'myKeys.statusInactive': '仅禁用',
+        'myKeys.search': '搜索',
+        'myKeys.clearFilter': '清除',
+        'myKeys.enable': '启用',
+        'myKeys.disable': '禁用',
 
         'pag.total': '共 ${total} 个 Key，第 ${page}/${pages} 页',
         'pag.first': '首页',
@@ -157,6 +166,10 @@ const I18N = {
         'edit.currentUsageSuffix': ' tokens',
         'edit.resetToken': '重置 Token',
         'edit.save': '保存修改',
+        'edit.statusLabel': '状态',
+        'edit.activeTitle': '启用',
+        'edit.activeDescOn': 'API Key 已启用，可正常使用',
+        'edit.activeDescOff': 'API Key 已禁用，将无法使用',
         'trafficDesc.unlimited': 'API Key 将不受流量限制',
         'trafficDesc.custom': '在下方设置自定义流量额度',
 
@@ -169,6 +182,9 @@ const I18N = {
 
         'toast.keyDeleted': 'API Key 删除成功',
         'toast.keyDeleteFailed': '删除 API Key 失败',
+        'toast.keyEnabled': 'API Key 已启用',
+        'toast.keyDisabled': 'API Key 已禁用',
+        'toast.keyStatusFailed': '更新 API Key 状态失败',
         'toast.keyNotFound': '未找到该 API Key',
         'toast.selectModel': '请至少选择一个模型或输入一个 glob 模式',
         'toast.validTraffic': '请输入有效的流量额度，或启用不限流量',
@@ -183,6 +199,8 @@ const I18N = {
         'toast.keyCopied': 'API Key 已复制到剪贴板！',
         'toast.copyFailed': '复制到剪贴板失败',
         'confirm.deleteKey': '确定要删除此 API Key 吗？此操作不可撤销。',
+        'confirm.disableKey': '确定要禁用此 API Key 吗？禁用后该 Key 将立即无法使用。',
+        'confirm.enableKey': '确定要启用此 API Key 吗？',
         'confirm.resetTraffic': '确定要重置此 API Key 的流量计数吗？',
         'confirm.resetToken': '确定要重置此 API Key 的 Token 用量吗？',
         'confirm.resetOpsKey': '确定要重置你的运营 Key 吗？使用旧 Key 的应用都需要更新。',
@@ -272,6 +290,15 @@ const I18N = {
         'myKeys.edit': 'Edit',
         'myKeys.delete': 'Delete',
         'myKeys.loadFailed': 'Failed to load keys',
+        'myKeys.thStatus': 'Status',
+        'myKeys.searchPh': 'Search username / remark / key',
+        'myKeys.statusAll': 'All status',
+        'myKeys.statusActive': 'Active only',
+        'myKeys.statusInactive': 'Inactive only',
+        'myKeys.search': 'Search',
+        'myKeys.clearFilter': 'Clear',
+        'myKeys.enable': 'Enable',
+        'myKeys.disable': 'Disable',
 
         'pag.total': 'Total ${total} keys, Page ${page}/${pages}',
         'pag.first': 'First',
@@ -337,6 +364,10 @@ const I18N = {
         'edit.currentUsageSuffix': ' tokens',
         'edit.resetToken': 'Reset Token',
         'edit.save': 'Save Changes',
+        'edit.statusLabel': 'Status',
+        'edit.activeTitle': 'Enabled',
+        'edit.activeDescOn': 'API Key is active and usable',
+        'edit.activeDescOff': 'API Key is disabled and cannot be used',
         'trafficDesc.unlimited': 'API Key will have no traffic restrictions',
         'trafficDesc.custom': 'Set a custom traffic limit below',
 
@@ -348,6 +379,9 @@ const I18N = {
 
         'toast.keyDeleted': 'API Key deleted successfully',
         'toast.keyDeleteFailed': 'Failed to delete API key',
+        'toast.keyEnabled': 'API Key enabled',
+        'toast.keyDisabled': 'API Key disabled',
+        'toast.keyStatusFailed': 'Failed to update API key status',
         'toast.keyNotFound': 'API Key not found',
         'toast.selectModel': 'Please select at least one model or enter a glob pattern',
         'toast.validTraffic': 'Please enter a valid traffic limit or enable unlimited traffic',
@@ -362,6 +396,8 @@ const I18N = {
         'toast.keyCopied': 'API Key copied to clipboard!',
         'toast.copyFailed': 'Failed to copy to clipboard',
         'confirm.deleteKey': 'Are you sure you want to delete this API key? This action cannot be undone.',
+        'confirm.disableKey': 'Are you sure you want to disable this API key? It will become unusable immediately.',
+        'confirm.enableKey': 'Are you sure you want to enable this API key?',
         'confirm.resetTraffic': 'Are you sure you want to reset the traffic counter for this API key?',
         'confirm.resetToken': 'Are you sure you want to reset the token usage for this API key?',
         'confirm.resetOpsKey': 'Are you sure you want to reset your OPS Key? You will need to update any applications using the current key.',
@@ -806,6 +842,10 @@ document.addEventListener('DOMContentLoaded', function() {
 let myKeysPage = 1;
 let myKeysPageSize = 20;
 let myKeysPagination = null;
+// 当前过滤条件：关键字（用户名/备注/Key）与状态（''=全部, 'true'/'false'）。
+// 关键词: OPS my-keys 过滤状态保持, q/active 查询参数
+let myKeysSearch = '';
+let myKeysStatus = '';
 
 async function loadMyApiKeys(page, pageSize) {
     if (page !== undefined) myKeysPage = page;
@@ -820,7 +860,11 @@ async function loadMyApiKeys(page, pageSize) {
     content.classList.add('hidden');
     
     try {
-        const response = await fetch(`/ops/api/my-keys?page=${myKeysPage}&page_size=${myKeysPageSize}`);
+        // 拼接分页 + 过滤查询参数；过滤条件为空则不附加。
+        let url = `/ops/api/my-keys?page=${myKeysPage}&page_size=${myKeysPageSize}`;
+        if (myKeysSearch) url += `&q=${encodeURIComponent(myKeysSearch)}`;
+        if (myKeysStatus === 'true' || myKeysStatus === 'false') url += `&active=${myKeysStatus}`;
+        const response = await fetch(url);
         const data = await response.json();
         
         loading.classList.add('hidden');
@@ -839,13 +883,13 @@ async function loadMyApiKeys(page, pageSize) {
                 renderApiKeysTable();
             }
         } else {
-            tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #dc3545;">${escapeHtml(data.error || t('myKeys.loadFailed'))}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: #dc3545;">${escapeHtml(data.error || t('myKeys.loadFailed'))}</td></tr>`;
         }
     } catch (error) {
         console.error('Error loading API keys:', error);
         loading.classList.add('hidden');
         content.classList.remove('hidden');
-        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #dc3545;">${t('common.networkError')}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: #dc3545;">${t('common.networkError')}</td></tr>`;
     }
 }
 
@@ -894,7 +938,17 @@ function renderApiKeysTable() {
         const remarkHtml = key.remark
             ? `<small style="display:block;color:#888;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(key.remark)}</small>`
             : '';
-        
+
+        // 状态徽标与启用/禁用切换：active=true 显示绿色徽标并提供"禁用"按钮；反之红色徽标 + "启用"按钮。
+        // 关键词: OPS my-keys 状态徽标 enable/disable 按钮
+        const isActive = key.active !== false;
+        const statusBadge = isActive
+            ? `<span style="display:inline-block;padding:2px 8px;border-radius:10px;background:#e6f4ea;color:#137333;font-size:12px;font-weight:500;">${t('common.active')}</span>`
+            : `<span style="display:inline-block;padding:2px 8px;border-radius:10px;background:#fce8e6;color:#c5221f;font-size:12px;font-weight:500;">${t('common.inactive')}</span>`;
+        const toggleBtn = isActive
+            ? `<button class="btn btn-sm" onclick="toggleApiKeyActive('${key.api_key}', false)" style="background:#fbbc04;color:#3c4043;">${t('myKeys.disable')}</button>`
+            : `<button class="btn btn-sm" onclick="toggleApiKeyActive('${key.api_key}', true)" style="background:#34a853;color:#fff;">${t('myKeys.enable')}</button>`;
+
         return `
             <tr>
                 <td><code>${key.api_key.substring(0, 20)}...</code></td>
@@ -902,10 +956,12 @@ function renderApiKeysTable() {
                 <td title="${escapeHtml(models.join(', '))}">${escapeHtml(modelsDisplay) || '-'}</td>
                 <td style="color: ${tokenColor}" title="${t('myKeys.titleTokenUsed')}">${tokenUsedDisplay}</td>
                 <td title="${t('myKeys.titleTokenLimit')}">${tokenLimitDisplay}</td>
+                <td>${statusBadge}</td>
                 <td>${key.created_at || '--'}</td>
                 <td>
                     <div style="display: flex; gap: 5px; flex-wrap: wrap;">
                         <button class="btn btn-sm" onclick="openEditKeyModal('${key.api_key}')" style="background: #4285f4;">${t('myKeys.edit')}</button>
+                        ${toggleBtn}
                         <button class="btn btn-sm btn-danger" onclick="deleteApiKey('${key.api_key}')">${t('myKeys.delete')}</button>
                     </div>
                 </td>
@@ -991,6 +1047,60 @@ async function deleteApiKey(apiKey) {
         console.error('Error deleting API key:', error);
         showToast(t('common.networkError'), 'error');
     }
+}
+
+// 启用/禁用 API Key：调用 update-api-key 仅提交 active 字段（后端用 *bool 区分未提供）。
+// 禁用后该 Key 立即从内存可用集合移除，请求会被拒绝。
+// 关键词: OPS toggleApiKeyActive 启用禁用, update-api-key active 字段
+async function toggleApiKeyActive(apiKey, nextActive) {
+    const confirmMsg = nextActive ? t('confirm.enableKey') : t('confirm.disableKey');
+    if (!confirm(confirmMsg)) {
+        return;
+    }
+
+    try {
+        const response = await fetch('/ops/api/update-api-key', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ api_key: apiKey, active: nextActive })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            showToast(nextActive ? t('toast.keyEnabled') : t('toast.keyDisabled'), 'success');
+            loadMyApiKeys();
+        } else {
+            showToast(data.error || t('toast.keyStatusFailed'), 'error');
+        }
+    } catch (error) {
+        console.error('Error toggling API key status:', error);
+        showToast(t('common.networkError'), 'error');
+    }
+}
+
+// 应用 my-keys 过滤：读取搜索框与状态下拉，重置到第一页后重新加载。
+// 关键词: OPS applyMyKeysFilter 应用过滤
+function applyMyKeysFilter() {
+    const searchEl = document.getElementById('my-keys-search');
+    const statusEl = document.getElementById('my-keys-status-filter');
+    myKeysSearch = searchEl ? searchEl.value.trim() : '';
+    myKeysStatus = statusEl ? statusEl.value : '';
+    loadMyApiKeys(1);
+}
+
+// 清除 my-keys 过滤条件并重新加载。
+// 关键词: OPS clearMyKeysFilter 清除过滤
+function clearMyKeysFilter() {
+    const searchEl = document.getElementById('my-keys-search');
+    const statusEl = document.getElementById('my-keys-status-filter');
+    if (searchEl) searchEl.value = '';
+    if (statusEl) statusEl.value = '';
+    myKeysSearch = '';
+    myKeysStatus = '';
+    loadMyApiKeys(1);
 }
 
 // ==================== Edit API Key ====================
@@ -1165,7 +1275,24 @@ function openEditKeyModal(apiKey) {
     if (tokenUsedEl) {
         tokenUsedEl.textContent = (Number(currentEditKey.token_used) || 0).toString();
     }
-    
+
+    // ==================== Active(启用/禁用) 初始化 ====================
+    // 关键词: openEditKeyModal active 启用禁用回填, 描述随勾选切换
+    const editActiveCheckbox = document.getElementById('edit-active');
+    const editActiveDesc = document.getElementById('edit-active-desc');
+    if (editActiveCheckbox) {
+        const isActive = currentEditKey.active !== false;
+        editActiveCheckbox.checked = isActive;
+        if (editActiveDesc) {
+            editActiveDesc.textContent = isActive ? t('edit.activeDescOn') : t('edit.activeDescOff');
+        }
+        editActiveCheckbox.onchange = function() {
+            if (editActiveDesc) {
+                editActiveDesc.textContent = this.checked ? t('edit.activeDescOn') : t('edit.activeDescOff');
+            }
+        };
+    }
+
     // Show modal
     document.getElementById('edit-key-modal').style.display = 'flex';
 }
@@ -1355,6 +1482,10 @@ async function saveEditKey() {
     const editRemarkEl = document.getElementById('edit-remark');
     const editMetaEl = document.getElementById('edit-metainfo');
 
+    // 启用/禁用状态：后端用 *bool 区分未提供，这里始终显式携带当前勾选值
+    // 关键词: OPS saveEditKey active 启用禁用携带
+    const editActiveEl = document.getElementById('edit-active');
+
     try {
         const requestBody = {
             api_key: apiKey,
@@ -1365,7 +1496,8 @@ async function saveEditKey() {
             token_limit: tokenLimit,
             username: editUsernameEl ? editUsernameEl.value.trim() : '',
             remark: editRemarkEl ? editRemarkEl.value : '',
-            metainfo: editMetaEl ? editMetaEl.value : ''
+            metainfo: editMetaEl ? editMetaEl.value : '',
+            active: editActiveEl ? editActiveEl.checked : true
         };
         
         if (!isUnlimited && trafficLimit > 0) {
@@ -1942,6 +2074,10 @@ window.copyApiKey = copyApiKey;
 window.copyCurlExample = copyCurlExample;
 window.deleteApiKey = deleteApiKey;
 window.loadMyApiKeys = loadMyApiKeys;
+// 关键词: OPS my-keys 启用禁用/过滤 window 导出
+window.toggleApiKeyActive = toggleApiKeyActive;
+window.applyMyKeysFilter = applyMyKeysFilter;
+window.clearMyKeysFilter = clearMyKeysFilter;
 window.switchToTab = switchToTab;
 window.showAlert = showAlert;
 window.showToast = showToast;

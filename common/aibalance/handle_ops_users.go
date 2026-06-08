@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/crypto/bcrypt"
@@ -1058,10 +1059,17 @@ func (c *ServerConfig) handleOpsCreateApiKey(conn net.Conn, request *http.Reques
 }
 
 // handleOpsGetMyKeys handles GET /ops/api/my-keys
-// Returns API keys created by the current OPS user with pagination support
+// Returns API keys created by the current OPS user with pagination and filtering support.
+// 越权隔离：始终强制 created_by_ops_id = 当前 OPS 用户，任何过滤条件都叠加在该基础之上，
+// OPS 用户永远看不到他人创建的 Key。
 // Query parameters:
 //   - page: page number (default: 1)
 //   - page_size: items per page (default: 20, max: 100)
+//   - username: filter by bound username (partial, SQL-injection-safe LIKE)
+//   - active: filter by status, "true"/"1" -> active only, "false"/"0" -> inactive only
+//   - q: broad keyword search over username/remark/api_key (partial, SQL-injection-safe LIKE)
+//
+// 关键词: handleOpsGetMyKeys 过滤查询, username/active/q 搜索, 标记用户名/用户需求, 越权隔离
 func (c *ServerConfig) handleOpsGetMyKeys(conn net.Conn, request *http.Request, authInfo *AuthInfo) {
 	c.logInfo("Handling OPS get my keys request")
 
@@ -1099,9 +1107,36 @@ func (c *ServerConfig) handleOpsGetMyKeys(conn net.Conn, request *http.Request, 
 		}
 	}
 
-	// Count total API keys created by this OPS user
+	// Parse filter parameters（均为可选；空值即不过滤）。
+	// 关键词: OPS my-keys username/active/q 过滤参数解析
+	usernameFilter := strings.TrimSpace(query.Get("username"))
+	activeFilter := strings.TrimSpace(query.Get("active"))
+	keyword := strings.TrimSpace(query.Get("q"))
+
+	// buildQuery 构造带过滤条件的查询：始终以 created_by_ops_id 为越权隔离基础，
+	// 其余过滤条件按 AND 叠加；LIKE 一律使用 safeLikePattern 转义防 SQL 注入。
+	// 关键词: OPS my-keys buildQuery, created_by_ops_id 强制隔离, safeLikePattern 防注入
+	buildQuery := func() *gorm.DB {
+		q := db.Model(&AiApiKeys{}).Where("created_by_ops_id = ?", authInfo.UserID)
+		if usernameFilter != "" {
+			q = q.Where("username LIKE ?", safeLikePattern(usernameFilter))
+		}
+		switch activeFilter {
+		case "true", "1":
+			q = q.Where("active = ?", true)
+		case "false", "0":
+			q = q.Where("active = ?", false)
+		}
+		if keyword != "" {
+			p := safeLikePattern(keyword)
+			q = q.Where("(username LIKE ? OR remark LIKE ? OR api_key LIKE ?)", p, p, p)
+		}
+		return q
+	}
+
+	// Count total API keys (with filters) created by this OPS user
 	var total int64
-	if err := db.Model(&AiApiKeys{}).Where("created_by_ops_id = ?", authInfo.UserID).Count(&total).Error; err != nil {
+	if err := buildQuery().Count(&total).Error; err != nil {
 		c.logError("Failed to count OPS user API keys: %v", err)
 		c.writeJSONResponse(conn, http.StatusInternalServerError, map[string]string{
 			"error": "Failed to retrieve API keys",
@@ -1112,9 +1147,9 @@ func (c *ServerConfig) handleOpsGetMyKeys(conn net.Conn, request *http.Request, 
 	// Calculate offset
 	offset := (page - 1) * pageSize
 
-	// Get API keys created by this OPS user with pagination
+	// Get API keys (with filters) created by this OPS user with pagination
 	var apiKeys []AiApiKeys
-	if err := db.Where("created_by_ops_id = ?", authInfo.UserID).Order("created_at DESC").Offset(offset).Limit(pageSize).Find(&apiKeys).Error; err != nil {
+	if err := buildQuery().Order("created_at DESC").Offset(offset).Limit(pageSize).Find(&apiKeys).Error; err != nil {
 		c.logError("Failed to get OPS user API keys: %v", err)
 		c.writeJSONResponse(conn, http.StatusInternalServerError, map[string]string{
 			"error": "Failed to retrieve API keys",
@@ -1129,7 +1164,7 @@ func (c *ServerConfig) handleOpsGetMyKeys(conn net.Conn, request *http.Request, 
 		models := strings.Split(key.AllowedModels, ",")
 		sort.Strings(models)
 
-		keys = append(keys, map[string]interface{}{
+		entry := map[string]interface{}{
 			"id":                   key.ID,
 			"api_key":              key.APIKey,
 			"allowed_models":       models,
@@ -1146,7 +1181,19 @@ func (c *ServerConfig) handleOpsGetMyKeys(conn net.Conn, request *http.Request, 
 			"username": key.Username,
 			"remark":   key.Remark,
 			"metainfo": key.MetaInfo,
-		})
+			// 关键词: OPS my-keys 暴露完整用量统计字段, 完善"查"覆盖
+			"usage_count":         key.UsageCount,
+			"success_count":       key.SuccessCount,
+			"failure_count":       key.FailureCount,
+			"input_bytes":         key.InputBytes,
+			"output_bytes":        key.OutputBytes,
+			"web_search_count":    key.WebSearchCount,
+			"created_by_ops_name": key.CreatedByOpsName,
+		}
+		if !key.LastUsedTime.IsZero() {
+			entry["last_used_time"] = key.LastUsedTime.Format("2006-01-02 15:04:05")
+		}
+		keys = append(keys, entry)
 	}
 
 	// Calculate total pages
@@ -1293,6 +1340,9 @@ func (c *ServerConfig) handleOpsUpdateApiKey(conn net.Conn, request *http.Reques
 	// 使用 *int64 / *bool 让"未提供"可被区分；JSON 中字段缺省即为 nil。
 	// 关键词: handleOpsUpdateApiKey username remark metainfo, OPS 更新绑定用户信息
 	// Username/Remark/MetaInfo 用 *string 区分"未提供"(nil=保持不变) 与"显式置空"。
+	// 关键词: handleOpsUpdateApiKey active 启用禁用, OPS 停用/恢复自己创建的 API Key
+	// Active 用 *bool 区分"未提供"(nil=保持不变) 与"显式启用/禁用"，
+	// 这样前端的"快速启用/禁用"按钮只需发送 {api_key, active} 即可，不会误改其它字段。
 	var reqBody struct {
 		ApiKey         string   `json:"api_key"`
 		AllowedModels  []string `json:"allowed_models"`
@@ -1303,6 +1353,7 @@ func (c *ServerConfig) handleOpsUpdateApiKey(conn net.Conn, request *http.Reques
 		Username       *string  `json:"username,omitempty"`
 		Remark         *string  `json:"remark,omitempty"`
 		MetaInfo       *string  `json:"metainfo,omitempty"`
+		Active         *bool    `json:"active,omitempty"`
 	}
 
 	if err := json.Unmarshal(bodyBytes, &reqBody); err != nil {
@@ -1385,6 +1436,12 @@ func (c *ServerConfig) handleOpsUpdateApiKey(conn net.Conn, request *http.Reques
 		apiKey.MetaInfo = *reqBody.MetaInfo
 	}
 
+	// Update 启用/禁用状态（仅当字段被显式提供时更新）
+	// 关键词: OPS update-api-key active 启用禁用落库, 停用后该 Key 立即不可用
+	if reqBody.Active != nil {
+		apiKey.Active = *reqBody.Active
+	}
+
 	// Save changes
 	if err := db.Save(&apiKey).Error; err != nil {
 		c.logError("Failed to update API key: %v", err)
@@ -1401,6 +1458,7 @@ func (c *ServerConfig) handleOpsUpdateApiKey(conn net.Conn, request *http.Reques
 		"traffic_limit_enable": apiKey.TrafficLimitEnable,
 		"token_limit":          apiKey.TokenLimit,
 		"token_limit_enable":   apiKey.TokenLimitEnable,
+		"active":               apiKey.Active,
 	})
 	LogOpsAction(authInfo.UserID, authInfo.Username, "update_api_key", "api_key", fmt.Sprintf("%d", apiKey.ID), string(detailJSON), request)
 
@@ -1422,6 +1480,7 @@ func (c *ServerConfig) handleOpsUpdateApiKey(conn net.Conn, request *http.Reques
 		"username":             apiKey.Username,
 		"remark":               apiKey.Remark,
 		"metainfo":             apiKey.MetaInfo,
+		"active":               apiKey.Active,
 	})
 }
 
