@@ -63596,6 +63596,7 @@ type HotPatchTemplate struct {
 	Name          string                 `protobuf:"bytes,1,opt,name=Name,proto3" json:"Name,omitempty"`
 	Content       string                 `protobuf:"bytes,2,opt,name=Content,proto3" json:"Content,omitempty"`
 	Type          string                 `protobuf:"bytes,3,opt,name=Type,proto3" json:"Type,omitempty"` // fuzzer/mitm/httpflow-analyze/global
+	Tags          []string               `protobuf:"bytes,4,rep,name=Tags,proto3" json:"Tags,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -63651,12 +63652,20 @@ func (x *HotPatchTemplate) GetType() string {
 	return ""
 }
 
+func (x *HotPatchTemplate) GetTags() []string {
+	if x != nil {
+		return x.Tags
+	}
+	return nil
+}
+
 type HotPatchTemplateRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	Id             []int64                `protobuf:"varint,1,rep,packed,name=Id,proto3" json:"Id,omitempty"`
 	Name           []string               `protobuf:"bytes,2,rep,name=Name,proto3" json:"Name,omitempty"`
 	ContentKeyword []string               `protobuf:"bytes,3,rep,name=ContentKeyword,proto3" json:"ContentKeyword,omitempty"`
 	Type           string                 `protobuf:"bytes,4,opt,name=Type,proto3" json:"Type,omitempty"` // fuzzer/mitm/httpflow-analyze/global
+	Tags           []string               `protobuf:"bytes,5,rep,name=Tags,proto3" json:"Tags,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -63717,6 +63726,13 @@ func (x *HotPatchTemplateRequest) GetType() string {
 		return x.Type
 	}
 	return ""
+}
+
+func (x *HotPatchTemplateRequest) GetTags() []string {
+	if x != nil {
+		return x.Tags
+	}
+	return nil
 }
 
 type UpdateHotPatchTemplateRequest struct {
@@ -75233,16 +75249,18 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\bPassword\x18\x02 \x01(\tR\bPassword\"K\n" +
 	"\x13SyntaxflowsProgress\x12\x1a\n" +
 	"\bProgress\x18\x01 \x01(\x01R\bProgress\x12\x18\n" +
-	"\aVerbose\x18\x02 \x01(\tR\aVerbose\"T\n" +
+	"\aVerbose\x18\x02 \x01(\tR\aVerbose\"h\n" +
 	"\x10HotPatchTemplate\x12\x12\n" +
 	"\x04Name\x18\x01 \x01(\tR\x04Name\x12\x18\n" +
 	"\aContent\x18\x02 \x01(\tR\aContent\x12\x12\n" +
-	"\x04Type\x18\x03 \x01(\tR\x04Type\"y\n" +
+	"\x04Type\x18\x03 \x01(\tR\x04Type\x12\x12\n" +
+	"\x04Tags\x18\x04 \x03(\tR\x04Tags\"\x8d\x01\n" +
 	"\x17HotPatchTemplateRequest\x12\x0e\n" +
 	"\x02Id\x18\x01 \x03(\x03R\x02Id\x12\x12\n" +
 	"\x04Name\x18\x02 \x03(\tR\x04Name\x12&\n" +
 	"\x0eContentKeyword\x18\x03 \x03(\tR\x0eContentKeyword\x12\x12\n" +
-	"\x04Type\x18\x04 \x01(\tR\x04Type\"\x86\x01\n" +
+	"\x04Type\x18\x04 \x01(\tR\x04Type\x12\x12\n" +
+	"\x04Tags\x18\x05 \x03(\tR\x04Tags\"\x86\x01\n" +
 	"\x1dUpdateHotPatchTemplateRequest\x12:\n" +
 	"\tCondition\x18\x01 \x01(\v2\x1c.ypb.HotPatchTemplateRequestR\tCondition\x12)\n" +
 	"\x04Data\x18\x02 \x01(\v2\x15.ypb.HotPatchTemplateR\x04Data\"m\n" +

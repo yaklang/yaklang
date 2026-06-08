@@ -8513,6 +8513,7 @@ message HotPatchTemplate {
   string Name = 1;
   string Content = 2;
   string Type = 3; // fuzzer/mitm/httpflow-analyze/global
+  repeated string Tags = 4;
 }
 
 message HotPatchTemplateRequest {
@@ -8520,6 +8521,7 @@ message HotPatchTemplateRequest {
   repeated string Name = 2;
   repeated string ContentKeyword = 3;
   string Type = 4; // fuzzer/mitm/httpflow-analyze/global
+  repeated string Tags = 5;
 }
 
 message UpdateHotPatchTemplateRequest {

@@ -20,9 +20,10 @@ type DownloadHotPatchTemplateRequest struct {
 }
 
 type HotPatchTemplate struct {
-	Name         string `json:"name"`
-	Content      string `json:"content"`
-	TemplateType string `json:"type"`
+	Name         string   `json:"name"`
+	Content      string   `json:"content"`
+	TemplateType string   `json:"type"`
+	Tags         []string `json:"tags,omitempty"`
 }
 
 type ResponseErr struct {
