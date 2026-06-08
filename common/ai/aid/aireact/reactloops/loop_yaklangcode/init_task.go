@@ -19,6 +19,13 @@ import (
 func buildInitTask(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearcher, ragSearcher *rag.RAGSystem) func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
 	return func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
 		emitter := r.GetConfig().GetEmitter()
+		attachedDatas := task.GetAttachedDatas()
+		reactloops.RunAttachedExtraResourcesInit(r, loop, attachedDatas)
+		editorCtx := initYaklangEditorContextFromAttached(r, loop, attachedDatas)
+		attachedFilePath := ""
+		if editorCtx != nil {
+			attachedFilePath = editorCtx.EditorFile
+		}
 
 		// Step 1: 分析用户需求，生成搜索关键字和判断文件路径
 		log.Infof("init task step 1: analyzing user requirements and generating search patterns")
@@ -392,11 +399,13 @@ Bad: "端口扫描" - 不完整句式
 		}
 
 		// Step 3: 处理文件路径
-		// 完全依赖 existed 参数来决定行为，createNewFile 参数已退化
-		// 如果提供了 existed 路径，使用该路径（无论 createNewFile 是什么）
-		if existed != "" {
-			targetPath := existed
-			log.Infof("identified target path: %s", targetPath)
+		// 优先使用前端 attached 传入的路径（selected / file_path），其次才使用 LiteForge 推断的 existed。
+		targetPath := attachedFilePath
+		if targetPath == "" {
+			targetPath = existed
+		}
+		if targetPath != "" {
+			log.Infof("identified target path: %s (attached=%v)", targetPath, attachedFilePath != "")
 			filename := utils.GetFirstExistedFile(targetPath)
 			if filename == "" {
 				// 文件不存在，创建新文件

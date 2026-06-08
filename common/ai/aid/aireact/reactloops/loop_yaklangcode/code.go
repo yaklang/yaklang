@@ -148,6 +148,8 @@ func init() {
 					renderMap := map[string]any{
 						"Code":                      yakCode,
 						"CurrentCodeWithLineNumber": codeWithLine,
+						"WorkspacePath":             loop.Get("workspace_path"),
+						"EditorFilePath":            loop.Get("editor_file_path"),
 						"Nonce":                     nonce,
 						"FeedbackMessages":          feedbacks,
 					}
