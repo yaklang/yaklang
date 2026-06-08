@@ -23,6 +23,15 @@ func (r *ReAct) handleFreeValue(event *ypb.AIInputEvent) error {
 	for _, path := range event.AttachedFilePath {
 		r.config.ContextProviderManager.RegisterTracedContent(path, aicommon.FileContextProvider(path, userInput))
 	}
+	for _, resource := range event.AttachedResourceInfo {
+		if resource.GetType() == aicommon.CONTEXT_PROVIDER_TYPE_FILE &&
+			resource.GetKey() == aicommon.CONTEXT_PROVIDER_KEY_FILE_PATH {
+			path := strings.TrimSpace(resource.GetValue())
+			if path != "" {
+				r.config.ContextProviderManager.RegisterTracedContent(path, aicommon.FileContextProvider(path, userInput))
+			}
+		}
+	}
 	// 现已经被 knowledge enhance loop 替代
 	// for _, resource := range event.AttachedResourceInfo {
 	// 	registrationKey := resource.GetType() + "_" + resource.GetKey() + resource.GetValue()
