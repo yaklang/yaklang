@@ -513,7 +513,19 @@ func (c *ServerConfig) LoadAPIKeysFromDB() error {
 	c.Keys.keys = make(map[string]*Key) // 同时清空 Keys 结构
 
 	// 加载到内存配置
+	// 关键词: LoadAPIKeysFromDB 跳过禁用 key, Active=false 不入内存, 禁用即时生效
+	// 请求时通过 c.Keys.Get(apiKey) 判定 key 是否有效（见 gateChatAPIKeyAndLimits /
+	// gateEmbeddingAPIKeyAndLimits）。因此被禁用(Active=false)的 key 不应进入内存生效集合，
+	// 否则禁用动作对实际请求无效。管理员 deactivate / OPS update active=false 落库后调用
+	// 本函数即可让禁用即时生效。注意：schema 中 active 默认 true，迁移时存量行已被置为 true，
+	// 因此不会误伤历史 key。
+	skippedInactive := 0
 	for _, key := range apiKeys {
+		if !key.Active {
+			skippedInactive++
+			log.Infof("Skip inactive API key (not loaded into memory): %s", utils.ShrinkString(key.APIKey, 8))
+			continue
+		}
 		// 解析允许的模型列表
 		modelNames := strings.Split(key.AllowedModels, ",")
 		modelMap := make(map[string]bool)
@@ -544,7 +556,7 @@ func (c *ServerConfig) LoadAPIKeysFromDB() error {
 		log.Infof("Loaded API key: %s with allowed models: %v", utils.ShrinkString(key.APIKey, 8), modelMap)
 	}
 
-	log.Infof("Successfully loaded %d API keys from database", len(apiKeys))
+	log.Infof("Successfully loaded %d active API keys from database (skipped %d inactive)", len(apiKeys)-skippedInactive, skippedInactive)
 	return nil
 }
 

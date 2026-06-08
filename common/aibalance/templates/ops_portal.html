@@ -179,7 +179,25 @@
                         <h3 style="margin: 0;" data-i18n="myKeys.title">My API Keys</h3>
                         <button class="btn btn-secondary btn-sm" onclick="loadMyApiKeys()" data-i18n="common.refresh">Refresh</button>
                     </div>
-                    
+
+                    <!-- 搜索过滤工具栏：按用户名/备注/Key 关键字搜索 + 按状态筛选 -->
+                    <!-- 关键词: OPS my-keys 搜索过滤工具栏, username/remark/key 关键字, 状态筛选 -->
+                    <div id="my-keys-filter-bar" style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:15px;">
+                        <input type="text" id="my-keys-search" data-i18n-placeholder="myKeys.searchPh"
+                            placeholder="Search username / remark / key"
+                            style="flex:1; min-width:200px; padding:8px; border:1px solid #ddd; border-radius:4px;"
+                            onkeydown="if(event.key==='Enter'){applyMyKeysFilter();}">
+                        <select id="my-keys-status-filter"
+                            style="padding:8px; border:1px solid #ddd; border-radius:4px;"
+                            onchange="applyMyKeysFilter()">
+                            <option value="" data-i18n="myKeys.statusAll">All status</option>
+                            <option value="true" data-i18n="myKeys.statusActive">Active only</option>
+                            <option value="false" data-i18n="myKeys.statusInactive">Inactive only</option>
+                        </select>
+                        <button class="btn btn-primary btn-sm" onclick="applyMyKeysFilter()" data-i18n="myKeys.search">Search</button>
+                        <button class="btn btn-secondary btn-sm" onclick="clearMyKeysFilter()" data-i18n="myKeys.clearFilter">Clear</button>
+                    </div>
+
                     <div id="my-keys-loading" class="loading" data-i18n="myKeys.loading">Loading API Keys</div>
                     <div id="my-keys-content" class="hidden">
                         <div class="table-wrapper">
@@ -195,6 +213,8 @@
                                         <!-- 关键词: OPS my-keys 表格 Token 计费用量列, Token 限额列, 字节流量停用 -->
                                         <th data-i18n-title="myKeys.titleTokenUsed" data-i18n="myKeys.thTokenUsed" title="Token billing usage (weighted by multipliers)">Token Used (Billing)</th>
                                         <th data-i18n-title="myKeys.titleTokenLimit" data-i18n="myKeys.thTokenLimit" title="Token limit (the only billing dimension)">Token Limit *</th>
+                                        <!-- 关键词: OPS my-keys 状态列, 启用/禁用展示 -->
+                                        <th data-i18n="myKeys.thStatus">Status</th>
                                         <th data-i18n="myKeys.thCreatedAt">Created At</th>
                                         <th data-i18n="myKeys.thActions">Actions</th>
                                     </tr>
@@ -505,7 +525,23 @@
                     </div>
                     <textarea id="edit-metainfo" rows="3" placeholder='metainfo (JSON text, OAuth/external binding)' data-i18n-placeholder="create.metainfoPh" style="margin-top:8px; width:100%; font-family:monospace; font-size:12px;"></textarea>
                 </div>
-                
+
+                <!-- 启用/禁用：禁用后该 API Key 立即不可用（请求被拒绝）。 -->
+                <!-- 关键词: OPS edit modal active 启用禁用开关, 禁用即时生效 -->
+                <div class="form-group">
+                    <label data-i18n="edit.statusLabel">Status</label>
+                    <div class="toggle-group" id="edit-active-toggle">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="edit-active" checked>
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <div class="toggle-label">
+                            <div class="title" data-i18n="edit.activeTitle">Enabled</div>
+                            <div class="desc" id="edit-active-desc" data-i18n="edit.activeDescOn">API Key is active and usable</div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Token Settings (recommended over byte traffic) -->
                 <!-- 关键词: OPS edit modal Token 限额设置, 推荐替代字节流量限制, RMB 换算提示 -->
                 <div class="form-group" style="border-left: 3px solid #1976d2; padding-left: 10px; background: #f5faff;">
