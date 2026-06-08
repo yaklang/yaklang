@@ -9,9 +9,10 @@ var HotPatchTemplateTableName = "hot_patch_template"
 
 type HotPatchTemplate struct {
 	gorm.Model
-	Name    string `json:"name"`
-	Content string `json:"content"`
-	Type    string `json:"type"`
+	Name    string      `json:"name"`
+	Content string      `json:"content"`
+	Type    string      `json:"type"`
+	Tags    StringSlice `gorm:"type:text" json:"tags"`
 }
 
 // TableName overrides the table name used by User to `profiles`
@@ -24,5 +25,6 @@ func (t *HotPatchTemplate) ToGRPCModel() *ypb.HotPatchTemplate {
 		Name:    t.Name,
 		Content: t.Content,
 		Type:    t.Type,
+		Tags:    []string(t.Tags),
 	}
 }
