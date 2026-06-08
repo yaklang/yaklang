@@ -7,6 +7,8 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -115,4 +117,31 @@ func TestCollectorHealthSnapshotTracksWatchRootsAndEvents(t *testing.T) {
 	}
 
 	t.Fatal("timed out waiting for filewatch health snapshot update")
+}
+
+func TestCollectorStartRejectsTooManyDirectories(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	const testDirectoryLimit = 2
+	for i := 0; i <= testDirectoryLimit; i++ {
+		if err := os.Mkdir(filepath.Join(root, "dir-"+strconv.Itoa(i)), 0o755); err != nil {
+			t.Fatalf("create directory %d: %v", i, err)
+		}
+	}
+
+	collector := &Collector{
+		spec:                  model.FileCollectorSpec{WatchPaths: []string{root}},
+		state:                 newFilewatchCollectorState([]string{root}),
+		maxWatchedDirectories: testDirectoryLimit,
+	}
+	defer collector.Close()
+
+	err := collector.Start(context.Background(), make(chan model.Event, 1))
+	if err == nil {
+		t.Fatal("expected Start to reject oversized watch tree")
+	}
+	if !strings.Contains(err.Error(), "filewatch directory limit exceeded") {
+		t.Fatalf("unexpected error: %v", err)
+	}
 }

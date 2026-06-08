@@ -2,7 +2,6 @@ package cvequeryops
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/cve/cveresources"
@@ -43,7 +42,7 @@ func QueryCVEYields(db *gorm.DB, opts ...CVEOption) chan *cveresources.CVE {
 				var level = 0.0
 				var config cveresources.Configurations
 
-				err := json.Unmarshal(c.CPEConfigurations, &config)
+				config, err := cveresources.ParseCPEConfigurations(c.CPEConfigurations)
 				if err != nil {
 					continue
 				}

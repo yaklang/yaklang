@@ -209,13 +209,21 @@ func (i *Instance) collectorStatusDetail() map[string]any {
 	collectors := make(map[string]any, len(i.collectors))
 	for _, collector := range i.collectors {
 		snapshot := collector.healthSnapshot()
+		detail := cloneCollectorDetailMap(snapshot.Detail)
+		collectorCapabilities := hidsCollectorCapabilityDeclaration(snapshot.Name, snapshot.Backend)
+		if len(collectorCapabilities) > 0 {
+			if detail == nil {
+				detail = map[string]any{}
+			}
+			detail["capabilities"] = collectorCapabilities
+		}
 		collectors[snapshot.Name] = map[string]any{
 			"name":       snapshot.Name,
 			"backend":    snapshot.Backend,
 			"status":     snapshot.Status,
 			"message":    snapshot.Message,
 			"updated_at": snapshot.UpdatedAt,
-			"detail":     cloneCollectorDetailMap(snapshot.Detail),
+			"detail":     detail,
 		}
 	}
 	if len(collectors) == 0 {
@@ -430,6 +438,164 @@ func cloneCollectorDetailMap(input map[string]any) map[string]any {
 	cloned := make(map[string]any, len(input))
 	for key, value := range input {
 		cloned[key] = value
+	}
+	return cloned
+}
+
+func hidsCollectorCapabilityDeclaration(name string, backend string) map[string]any {
+	switch strings.ToLower(strings.TrimSpace(name)) {
+	case "process":
+		return hidsCapabilityDeclaration(
+			[]string{
+				model.EventTypeProcessExec,
+				model.EventTypeProcessExit,
+				model.EventTypeProcessState,
+			},
+			[]string{
+				"process_metadata",
+				"process_tree",
+				"artifact_reference",
+			},
+			hidsCollectorRequiredPrivileges(backend),
+			[]map[string]any{
+				hidsFeatureCapability("process_tree", true, "supported", ""),
+				hidsFeatureCapability(
+					"memory_scan",
+					false,
+					"on_demand_only",
+					"process memory capture is exposed through explicit evidence collection, not continuous collection",
+				),
+			},
+		)
+	case "network":
+		return hidsCapabilityDeclaration(
+			[]string{
+				model.EventTypeNetworkAccept,
+				model.EventTypeNetworkConnect,
+				model.EventTypeNetworkClose,
+				model.EventTypeNetworkSocket,
+			},
+			[]string{
+				"socket_metadata",
+				"flow_summary",
+			},
+			hidsCollectorRequiredPrivileges(backend),
+			[]map[string]any{
+				hidsFeatureCapability(
+					"payload_inspection",
+					false,
+					"metadata_only",
+					"network collector reports socket metadata and flow summaries only",
+				),
+			},
+		)
+	case "file":
+		return hidsCapabilityDeclaration(
+			[]string{
+				model.EventTypeFileChange,
+				"file.access",
+				"file.state",
+			},
+			[]string{
+				"file_metadata",
+				"elf_summary",
+				"hash",
+			},
+			nil,
+			[]map[string]any{
+				hidsFeatureCapability("content_signature_scan", true, "supported", ""),
+				hidsFeatureCapability(
+					"payload_dlp",
+					false,
+					"unsupported",
+					"file collector does not inspect arbitrary payload content",
+				),
+			},
+		)
+	case "audit":
+		return hidsCapabilityDeclaration(
+			[]string{
+				model.EventTypeAudit,
+				model.EventTypeAuditLoss,
+			},
+			[]string{
+				"audit_record",
+				"login_event",
+				"command_event",
+				"file_access_event",
+			},
+			hidsCollectorRequiredPrivileges(backend),
+			[]map[string]any{
+				hidsFeatureCapability("managed_audit_rules", true, "supported", ""),
+			},
+		)
+	default:
+		return nil
+	}
+}
+
+func hidsCollectorRequiredPrivileges(backend string) []string {
+	switch strings.ToLower(strings.TrimSpace(backend)) {
+	case model.CollectorBackendEBPF:
+		return []string{"CAP_BPF", "CAP_PERFMON"}
+	case model.CollectorBackendAuditd:
+		return []string{"CAP_AUDIT_READ", "CAP_AUDIT_CONTROL"}
+	default:
+		return nil
+	}
+}
+
+func hidsCapabilityDeclaration(
+	eventTypes []string,
+	payloads []string,
+	privileges []string,
+	features []map[string]any,
+) map[string]any {
+	return map[string]any{
+		"supported_event_types": cloneRuntimeStringSlice(eventTypes),
+		"supported_payloads":    cloneRuntimeStringSlice(payloads),
+		"required_privileges":   cloneRuntimeStringSlice(privileges),
+		"feature_flags":         cloneRuntimeFeatureCapabilities(features),
+	}
+}
+
+func hidsFeatureCapability(
+	key string,
+	supported bool,
+	status string,
+	reason string,
+) map[string]any {
+	feature := map[string]any{
+		"key":       key,
+		"supported": supported,
+		"status":    status,
+	}
+	if strings.TrimSpace(reason) != "" {
+		feature["reason"] = reason
+	}
+	return feature
+}
+
+func cloneRuntimeStringSlice(values []string) []string {
+	if len(values) == 0 {
+		return []string{}
+	}
+	cloned := make([]string, len(values))
+	copy(cloned, values)
+	return cloned
+}
+
+func cloneRuntimeFeatureCapabilities(values []map[string]any) []map[string]any {
+	if len(values) == 0 {
+		return []map[string]any{}
+	}
+	cloned := make([]map[string]any, 0, len(values))
+	for _, value := range values {
+		item := make(map[string]any, len(value))
+		for key, entry := range value {
+			item[key] = entry
+		}
+		cloned = append(cloned, item)
 	}
 	return cloned
 }

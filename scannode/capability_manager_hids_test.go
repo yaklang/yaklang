@@ -760,6 +760,59 @@ func TestCapabilityManagerRuntimeStatusesExposeStructuredDetail(t *testing.T) {
 	if filewatch["status"] != capabilityStatusRunning {
 		t.Fatalf("unexpected collector status: %#v", filewatch["status"])
 	}
+	fileDetail, ok := filewatch["detail"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected file collector detail map, got %#v", filewatch["detail"])
+	}
+	fileCapabilities, ok := fileDetail["capabilities"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected file collector capability declaration, got %#v", fileDetail["capabilities"])
+	}
+	if !hidsTestStringSliceContains(fileCapabilities["supported_event_types"], "file.change") {
+		t.Fatalf(
+			"expected file.change support declaration, got %#v",
+			fileCapabilities["supported_event_types"],
+		)
+	}
+	if !hidsTestStringSliceContains(fileCapabilities["supported_payloads"], "elf_summary") {
+		t.Fatalf(
+			"expected file ELF payload support declaration, got %#v",
+			fileCapabilities["supported_payloads"],
+		)
+	}
+
+	sensors, ok := detail["sensors"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected sensor capability declarations, got %#v", detail["sensors"])
+	}
+	suricata, ok := sensors["suricata"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected suricata sensor declaration, got %#v", sensors)
+	}
+	if suricata["status"] != "planned" {
+		t.Fatalf("unexpected suricata sensor status: %#v", suricata["status"])
+	}
+	suricataDetail, ok := suricata["detail"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected suricata detail map, got %#v", suricata["detail"])
+	}
+	suricataCapabilities, ok := suricataDetail["capabilities"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected suricata capabilities, got %#v", suricataDetail["capabilities"])
+	}
+	if !hidsTestStringSliceContains(suricataCapabilities["supported_payloads"], "pcap") {
+		t.Fatalf(
+			"expected suricata PCAP payload support declaration, got %#v",
+			suricataCapabilities["supported_payloads"],
+		)
+	}
+	dlp, ok := sensors["dlp"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected dlp sensor declaration, got %#v", sensors)
+	}
+	if dlp["status"] != "unsupported" {
+		t.Fatalf("unexpected dlp sensor status: %#v", dlp["status"])
+	}
 }
 
 func TestHIDSObservationForwarderPublishesSnapshotsAndSkipsUnknownTerminalEvents(t *testing.T) {
@@ -893,4 +946,22 @@ func TestHIDSObservationForwarderDropsInvalidNetworkInventoryWithoutEndpoint(t *
 	); ok {
 		t.Fatal("expected invalid network inventory without endpoint to be dropped")
 	}
+}
+
+func hidsTestStringSliceContains(value any, expected string) bool {
+	switch typed := value.(type) {
+	case []string:
+		for _, item := range typed {
+			if item == expected {
+				return true
+			}
+		}
+	case []any:
+		for _, item := range typed {
+			if item == expected {
+				return true
+			}
+		}
+	}
+	return false
 }
