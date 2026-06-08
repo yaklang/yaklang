@@ -125,8 +125,8 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 
 		// Stage 1: the only genuinely-deferred top-level work is cross-file
 		// ImportAll (must run after every package skeleton exists). Register it as
-		// a data-driven root task capturing only strings (package + import names),
-		// never the file AST. It runs in pass2 (RunRootBuilds) before function
+		// a data-driven deferred task capturing only strings (package + import names),
+		// never the file AST. It runs in pass2 before function
 		// bodies (LazyBuild/Finish), matching the original ordering. This replaces
 		// the pass2 BuildFromAST(whole-ast) top-level closure for Go. In legacy
 		// mode the closure still runs and links imports in the else-branch below,
@@ -143,7 +143,7 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 			if fileEditor != nil {
 				taskKey = fileEditor.GetUrl()
 			}
-			prog.RegisterRootTask(ssa.RootBuildKindTopLevel, "go-import-link:"+taskKey, func() {
+			prog.RegisterDeferredBuild(ssa.DeferredBuildKindHelper, "go-import-link:"+taskKey, func() {
 				if fileEditor != nil {
 					app.PushEditor(fileEditor)
 					defer app.PopEditor(true)

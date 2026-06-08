@@ -291,14 +291,10 @@ func (c *Config) parseProjectWithFS(
 		c.filePerformanceRecorder = diagnostics.NewRecorder()
 	}
 	filePerfRecorder := c.filePerformanceRecorder
-	// When the language builder emits its full skeleton + its own deferred root
-	// tasks in pass1, the pipeline must NOT capture the whole file AST in a
-	// pass2 top-level closure (that closure is the main heap pin). See
-	// docs/ssa-ast-to-ssa-skeleton-plan.md §1/§3.
-	selfRegistersTopLevel := false
-	if sr, ok := c.LanguageBuilder.(interface{ SelfRegistersTopLevel() bool }); ok {
-		selfRegistersTopLevel = sr.SelfRegistersTopLevel()
-	}
+	// When pre-handler already emits file skeletons and schedules remaining file
+	// work, the shared pipeline must not capture the whole file AST in another
+	// closure. See docs/ssa-ast-to-ssa-skeleton-plan.md §1/§3.
+	preHandlerBuildsFiles := languagePreHandlerBuildsFiles(c.GetLanguage())
 	// pre handler  0-40%
 	f1 := func() error {
 		if prog.Cache != nil {
@@ -369,13 +365,16 @@ func (c *Config) parseProjectWithFS(
 					}
 				}()
 			}
+			if preHandlerBuildsFiles {
+				ssa.ReleaseASTRoot(fileContent.AST)
+			}
 			if _, needBuild := handlerFilesMap[fileContent.Path]; needBuild {
 				_, needsCompile := handlerFileSet[fileContent.Path]
 				switch {
-				case needsCompile && fileContent.AST != nil && !selfRegistersTopLevel:
+				case needsCompile && fileContent.AST != nil && !preHandlerBuildsFiles:
 					ast := fileContent.AST
 					path := fileContent.Path
-					prog.RegisterRootTopLevel(path, editor, builder, func(rootBuilder *ssa.FunctionBuilder) {
+					prog.RegisterFileBuild(path, editor, builder, func(fileBuilder *ssa.FunctionBuilder) {
 						fileBuildStart := time.Now()
 						defer func() {
 							if enableFilePerfLog && filePerfRecorder != nil {
@@ -386,13 +385,13 @@ func (c *Config) parseProjectWithFS(
 								}
 							}
 						}()
-						if err := c.LanguageBuilder.BuildFromAST(ast, rootBuilder); err != nil {
-							log.Errorf("root build [%s] failed: %v", path, err)
+						if err := c.LanguageBuilder.BuildFromAST(ast, fileBuilder); err != nil {
+							log.Errorf("file build [%s] failed: %v", path, err)
 						}
 					})
 				case !needsCompile && fileContent.Editor != nil:
 					rootEditor := fileContent.Editor
-					prog.RegisterRootTask(ssa.RootBuildKindHelper, "extra-file:"+rootEditor.GetUrl(), func() {
+					prog.RegisterDeferredBuild(ssa.DeferredBuildKindHelper, "extra-file:"+rootEditor.GetUrl(), func() {
 						prog.PushEditor(rootEditor)
 						prog.PopEditor(true)
 					})
@@ -432,11 +431,11 @@ func (c *Config) parseProjectWithFS(
 			prog.Cache.EnableInstructionSpill()
 		}
 		process = 0.4 // 40%
-		prog.ProcessInfof("root build start")
+		prog.ProcessInfof("deferred build start")
 		prog.SetPreHandler(false)
 		start = time.Now()
-		rootBuildTotal := prog.RootBuildCount()
-		completed := prog.RunRootBuildsWithCallback(func(index int, total int) bool {
+		deferredBuildTotal := prog.DeferredBuildCount()
+		completed := prog.RunDeferredBuildsWithCallback(func(index int, total int) bool {
 			if total <= 0 {
 				return !c.isStop()
 			}
@@ -445,10 +444,10 @@ func (c *Config) parseProjectWithFS(
 			if process > 0.88 {
 				process = 0.88
 			}
-			prog.ProcessInfof("root build progress(%d/%d)", index, total)
+			prog.ProcessInfof("deferred build progress(%d/%d)", index, total)
 			return !c.isStop()
 		})
-		if rootBuildTotal == 0 {
+		if deferredBuildTotal == 0 {
 			process = 0.88
 		}
 		if !completed {

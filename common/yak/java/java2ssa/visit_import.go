@@ -17,8 +17,7 @@ func (y *singleFileBuilder) VisitAllImport(i *javaparser.CompilationUnitContext)
 }
 
 // visitImportDeclarations links imported packages/types. resolveStaticTypes is false
-// during pass1 skeleton (same as legacy PreHandler) and true for the deferred pass2
-// root task registered when SkeletonTopLevelEnabled.
+// during pass1 skeleton (same as legacy PreHandler) and true for the deferred pass.
 func (y *singleFileBuilder) visitImportDeclarations(decls []javaparser.IImportDeclarationContext, resolveStaticTypes bool) {
 	if y == nil || len(decls) == 0 || y.IsStop() {
 		return
@@ -122,7 +121,7 @@ func (y *singleFileBuilder) registerPostSkeletonImportTask(i *javaparser.Compila
 			taskKey = u
 		}
 	}
-	prog.RegisterRootTask(ssa.RootBuildKindTopLevel, "java-static-import:"+taskKey, func() {
+	prog.RegisterDeferredBuild(ssa.DeferredBuildKindHelper, "java-static-import:"+taskKey, func() {
 		if fileEditor != nil {
 			app.PushEditor(fileEditor)
 			defer app.PopEditor(true)

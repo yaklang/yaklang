@@ -31,11 +31,13 @@ const (
 var (
 	antlrCacheResetEveryFilesOnce   sync.Once
 	antlrCacheResetEveryFilesCached int
+	antlrCacheResetEveryBytesOnce   sync.Once
+	antlrCacheResetEveryBytesCached int64
 )
 
 func antlrCacheResetEveryFiles() int {
 	antlrCacheResetEveryFilesOnce.Do(func() {
-		antlrCacheResetEveryFilesCached = 100
+		antlrCacheResetEveryFilesCached = 25
 		if raw := strings.TrimSpace(os.Getenv("YAK_ANTLR_CACHE_RESET_FILES")); raw != "" {
 			if v, err := strconv.Atoi(raw); err == nil {
 				antlrCacheResetEveryFilesCached = v
@@ -46,6 +48,28 @@ func antlrCacheResetEveryFiles() int {
 		}
 	})
 	return antlrCacheResetEveryFilesCached
+}
+
+func antlrCacheResetEveryBytes() int64 {
+	antlrCacheResetEveryBytesOnce.Do(func() {
+		antlrCacheResetEveryBytesCached = 8 * 1024 * 1024
+		if raw := strings.TrimSpace(os.Getenv("YAK_ANTLR_CACHE_RESET_BYTES")); raw != "" {
+			switch strings.ToLower(raw) {
+			case "0", "false", "no", "off", "disable", "disabled":
+				antlrCacheResetEveryBytesCached = 0
+			default:
+				if v, err := utils.ToBytes(raw); err == nil {
+					antlrCacheResetEveryBytesCached = int64(v)
+				} else if v, err := strconv.ParseInt(raw, 10, 64); err == nil {
+					antlrCacheResetEveryBytesCached = v
+				}
+			}
+		}
+		if antlrCacheResetEveryBytesCached <= 0 {
+			antlrCacheResetEveryBytesCached = 0
+		}
+	})
+	return antlrCacheResetEveryBytesCached
 }
 
 func largeProjectCompileConcurrency() int {
@@ -61,15 +85,29 @@ func largeProjectCompileConcurrency() int {
 	return concurrency
 }
 
+func languagePreHandlerBuildsFiles(language ssaconfig.Language) bool {
+	if !ssa.SkeletonTopLevelEnabled() {
+		return false
+	}
+	switch language {
+	case ssaconfig.C, ssaconfig.GO, ssaconfig.JAVA, ssaconfig.PHP, ssaconfig.JS, ssaconfig.TS, ssaconfig.PYTHON:
+		return true
+	default:
+		return false
+	}
+}
+
 type antlrWorkerState struct {
-	cache       *ssa.AntlrCache
-	filesParsed int
+	cache           *ssa.AntlrCache
+	filesParsed     int
+	bytesSinceReset int64
 }
 
 type antlrASTParseWorker struct {
 	language        ssa.PreHandlerAnalyzer
 	languageName    string
 	resetEveryFiles int
+	resetEveryBytes int64
 }
 
 func newAntlrASTParseWorker(c *Config) *antlrASTParseWorker {
@@ -80,6 +118,7 @@ func newAntlrASTParseWorker(c *Config) *antlrASTParseWorker {
 		language:        c.LanguageBuilder,
 		languageName:    string(c.GetLanguage()),
 		resetEveryFiles: antlrCacheResetEveryFiles(),
+		resetEveryBytes: antlrCacheResetEveryBytes(),
 	}
 }
 
@@ -129,12 +168,16 @@ func (p *antlrASTParseWorker) parseFileAST(path string, source string, store *ut
 
 	state := p.workerState(store)
 	ast, err := p.language.ParseAST(source, state.cache)
-	if state.cache == nil || p.resetEveryFiles <= 0 {
+	if state.cache == nil || (p.resetEveryFiles <= 0 && p.resetEveryBytes <= 0) {
 		return ast, err
 	}
 	state.filesParsed++
-	if state.filesParsed%p.resetEveryFiles == 0 {
+	state.bytesSinceReset += int64(len(source))
+	resetByFiles := p.resetEveryFiles > 0 && state.filesParsed%p.resetEveryFiles == 0
+	resetByBytes := p.resetEveryBytes > 0 && state.bytesSinceReset >= p.resetEveryBytes
+	if resetByFiles || resetByBytes {
 		state.cache.ResetRuntimeCaches()
+		state.bytesSinceReset = 0
 	}
 	if err != nil {
 		log.Debugf("parsed file[%s] parse [%s]AST error[%s]", path, p.languageName, err)

@@ -99,13 +99,6 @@ func (*SSABuilder) GetLanguage() ssaconfig.Language {
 	return ssaconfig.PYTHON
 }
 
-// SelfRegistersTopLevel: pass1 emits class/function shells with slimmed lazy
-// body subtrees; pass2 only replays captured top-level statements that are not
-// class/function definitions.
-func (*SSABuilder) SelfRegistersTopLevel() bool {
-	return ssa.SkeletonTopLevelEnabled()
-}
-
 // ========================================== PreHandlerAnalyzer Implementation ==========================================
 
 var _ ssa.PreHandlerAnalyzer = &SSABuilder{}

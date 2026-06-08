@@ -59,7 +59,6 @@ func (y *singleFileBuilder) VisitCompilationUnit(raw javaparser.ICompilationUnit
 		}
 		if ssa.SkeletonTopLevelEnabled() {
 			y.registerPostSkeletonImportTask(i)
-			ssa.DetachASTRootChildren(i)
 		}
 	}
 	y.GetProgram().VisitAst(i)

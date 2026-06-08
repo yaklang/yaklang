@@ -330,6 +330,10 @@ func (y *builder) VisitUseDeclaration(raw phpparser.IUseDeclarationContext) inte
 				if namespace != nil {
 					if err := prog.ImportTypeFromLib(namespace, realName, listContext); err != nil {
 						log.Errorf("get namespace type fail: %s", err)
+					} else if typ, ok := prog.ReadImportType(realName); ok {
+						if bluePrint, ok := typ.(*ssa.Blueprint); ok && !utils.IsNil(bluePrint) {
+							prog.Blueprint.Set(currentName, bluePrint)
+						}
 					}
 				}
 

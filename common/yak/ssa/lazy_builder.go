@@ -81,56 +81,6 @@ type ASTIF interface {
 	GetText() string
 }
 
-type RootBuildKind string
-
-const (
-	RootBuildKindFunction  RootBuildKind = "function"
-	RootBuildKindBlueprint RootBuildKind = "blueprint"
-	RootBuildKindTopLevel  RootBuildKind = "top-level"
-	RootBuildKindHelper    RootBuildKind = "helper"
-)
-
-type RootBuildRunner interface {
-	ID() string
-	Build()
-}
-
-type releasableRootBuildRunner interface {
-	Release()
-}
-
-type RootBuildTask struct {
-	kind RootBuildKind
-	name string
-	*LazyBuilder
-}
-
-func NewRootBuildTask(kind RootBuildKind, name string, work func()) *RootBuildTask {
-	task := &RootBuildTask{
-		kind:        kind,
-		name:        name,
-		LazyBuilder: NewLazyBuilder("RootBuild:" + string(kind) + ":" + name),
-	}
-	if work != nil {
-		task.AddLazyBuilder(work)
-	}
-	return task
-}
-
-func (r *RootBuildTask) ID() string {
-	if r == nil {
-		return ""
-	}
-	return string(r.kind) + ":" + r.name
-}
-
-func (r *RootBuildTask) Release() {
-	if r == nil {
-		return
-	}
-	r.LazyBuilder = nil
-}
-
 func (p *Program) VisitAst(ast ASTIF) {
 	_ = ast
 }

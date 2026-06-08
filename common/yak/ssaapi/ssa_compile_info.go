@@ -6,6 +6,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/javaclassparser"
 	"github.com/yaklang/yaklang/common/utils"
@@ -32,7 +33,11 @@ func (c *Config) parseFSFromInfo() (fi.FileSystem, error) {
 		if err != nil {
 			return nil, err
 		}
-		baseFS = zipfs
+		if isJavaArchiveCodeSource(c) {
+			baseFS = javaclassparser.NewJarFSWithOptions(zipfs, c.GetCodeSourceJarRecursiveParse())
+		} else {
+			baseFS = zipfs
+		}
 	case ssaconfig.CodeSourceJar:
 		zipfs, err := getZipFile(c)
 		if err != nil {
@@ -59,6 +64,15 @@ func (c *Config) parseFSFromInfo() (fi.FileSystem, error) {
 	}
 
 	return baseFS, nil
+}
+
+func isJavaArchiveCodeSource(c *Config) bool {
+	source := c.GetCodeSourceLocalFile()
+	if source == "" {
+		source = c.GetCodeSourceURL()
+	}
+	ext := strings.ToLower(filepath.Ext(source))
+	return ext == ".jar" || ext == ".war"
 }
 
 func getZipFile(codeSource *Config) (*filesys.ZipFS, error) {

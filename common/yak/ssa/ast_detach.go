@@ -32,3 +32,11 @@ func DetachAST[T antlr.Tree](node T) T {
 func DetachASTRootChildren(node antlr.Tree) {
 	antlr4util.DetachParserTreeChildren(node)
 }
+
+func ReleaseASTRoot(node any) {
+	tree, ok := node.(antlr.Tree)
+	if !ok || tree == nil {
+		return
+	}
+	DetachASTRootChildren(tree)
+}

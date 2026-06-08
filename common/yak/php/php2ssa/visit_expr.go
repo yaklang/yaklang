@@ -372,21 +372,24 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) (v ssa.Value
 	case *phpparser.DefinedOrScanDefinedExpressionContext:
 		return y.VisitDefineExpr(ret.DefineExpr())
 	case *phpparser.SpaceshipExpressionContext:
-		var result ssa.Value
+		left := y.VisitExpression(ret.Expression(0))
+		right := y.VisitExpression(ret.Expression(1))
+		variableName := ssa.SpaceshipExpressionVariable
+		y.AssignVariable(y.CreateVariable(variableName), y.EmitUndefined(variableName))
 		y.CreateIfBuilder().SetCondition(func() ssa.Value {
-			return y.EmitBinOp(ssa.OpEq, y.VisitExpression(ret.Expression(0)), y.VisitExpression(ret.Expression(1)))
+			return y.EmitBinOp(ssa.OpEq, left, right)
 		}, func() {
-			result = y.EmitConstInst(0)
+			y.AssignVariable(y.CreateVariable(variableName), y.EmitConstInst(0))
 		}).SetElse(func() {
 			y.CreateIfBuilder().SetCondition(func() ssa.Value {
-				return y.EmitBinOp(ssa.OpLt, y.VisitExpression(ret.Expression(0)), y.VisitExpression(ret.Expression(1)))
+				return y.EmitBinOp(ssa.OpLt, left, right)
 			}, func() {
-				result = y.EmitConstInst(-1)
+				y.AssignVariable(y.CreateVariable(variableName), y.EmitConstInst(-1))
 			}).SetElse(func() {
-				result = y.EmitConstInst(1)
-			})
-		})
-		return result
+				y.AssignVariable(y.CreateVariable(variableName), y.EmitConstInst(1))
+			}).Build()
+		}).Build()
+		return y.ReadValue(variableName)
 	case *phpparser.ArrayCreationUnpackExpressionContext:
 		// [$1, $2, $3] = $arr;
 		// unpacking

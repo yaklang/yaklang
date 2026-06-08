@@ -14,15 +14,28 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/ssa"
-	"golang.org/x/exp/slices"
 )
 
 var _ ssa.PreHandlerAnalyzer = &SSABuilder{}
 
 func (*SSABuilder) FilterPreHandlerFile(path string) bool {
-	extension := filepath.Ext(path)
-	fileList := []string{".jpg", ".png", ".gif", ".jpeg", ".css", ".js", ".avi", ".mp4", ".mp3", ".pdf", ".doc", ".php", ".go"}
-	return !slices.Contains(fileList, extension)
+	extension := strings.ToLower(filepath.Ext(path))
+	path = strings.TrimLeft(filepath.ToSlash(path), "/")
+	lowerPath := strings.ToLower(path)
+	if extension == ".class" {
+		return !strings.Contains(path, "/")
+	}
+	if strings.HasPrefix(lowerPath, ".github/") ||
+		strings.HasPrefix(lowerPath, ".mvn/") ||
+		strings.HasPrefix(lowerPath, "docs/") ||
+		strings.HasPrefix(lowerPath, "eclipse/") {
+		return false
+	}
+	switch extension {
+	case ".java", ".properties", ".yaml", ".yml", ".json", ".xml", ".jsp", ".jspx", ".ftl", ".ftlh", ".ftlx", ".vm", ".html", ".htm":
+		return true
+	}
+	return strings.EqualFold(path, "pom.xml") || strings.HasSuffix(lowerPath, "/pom.xml")
 }
 
 func (s *SSABuilder) PreHandlerFile(ast ssa.FrontAST, editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {

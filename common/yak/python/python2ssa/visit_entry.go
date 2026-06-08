@@ -26,8 +26,7 @@ func (b *singleFileBuilder) VisitRoot(raw pythonparser.IRootContext) interface{}
 	if fileInput := root.File_input(); fileInput != nil {
 		b.VisitFileInput(fileInput)
 		if b.PreHandler() && ssa.SkeletonTopLevelEnabled() {
-			b.registerPythonPass2RootTask(fileInput)
-			ssa.DetachASTRootChildren(root)
+			b.registerPythonFileBuild(fileInput)
 		}
 	} else if singleInput := root.Single_input(); singleInput != nil {
 		b.VisitSingleInput(singleInput)
@@ -97,7 +96,7 @@ func (b *singleFileBuilder) visitFileInputStmtSkeleton(stmt pythonparser.IStmtCo
 	}
 }
 
-func (b *singleFileBuilder) registerPythonPass2RootTask(fileInput pythonparser.IFile_inputContext) {
+func (b *singleFileBuilder) registerPythonFileBuild(fileInput pythonparser.IFile_inputContext) {
 	if b == nil || fileInput == nil || !ssa.SkeletonTopLevelEnabled() {
 		return
 	}
@@ -119,19 +118,15 @@ func (b *singleFileBuilder) registerPythonPass2RootTask(fileInput pythonparser.I
 	if prog == nil {
 		return
 	}
-	app := prog.GetApplication()
-	if app == nil {
-		app = prog
-	}
 	editor := b.GetEditor()
 	path := "python"
 	if editor != nil && editor.GetUrl() != "" {
 		path = editor.GetUrl()
 	}
 	capturedBuilder := b.FunctionBuilder
-	app.RegisterRootTopLevel(path, editor, capturedBuilder, func(rootFb *ssa.FunctionBuilder) {
+	prog.RegisterFileBuild(path, editor, capturedBuilder, func(fileFb *ssa.FunctionBuilder) {
 		build := &singleFileBuilder{
-			FunctionBuilder: rootFb,
+			FunctionBuilder: fileFb,
 			constMap:        make(map[string]ssa.Value),
 			globalNames:     make(map[string]bool),
 		}

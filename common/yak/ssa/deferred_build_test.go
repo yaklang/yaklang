@@ -10,7 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
-func newRootBuildTestProgram(t *testing.T, programName string) *Program {
+func newDeferredBuildTestProgram(t *testing.T, programName string) *Program {
 	t.Helper()
 
 	cfg, err := ssaconfig.New(ssaconfig.ModeSSACompile, ssaconfig.WithSetProgramName(programName))
@@ -18,55 +18,49 @@ func newRootBuildTestProgram(t *testing.T, programName string) *Program {
 	return NewProgram(cfg, ProgramCacheMemory, Application, filesys.NewVirtualFs(), "/tmp/project", 0)
 }
 
-func TestRunRootTopLevelBuildsOnce(t *testing.T) {
-	prog := newRootBuildTestProgram(t, "root-build-once")
+func TestRunDeferredFileBuildsOnce(t *testing.T) {
+	prog := newDeferredBuildTestProgram(t, "deferred-build-once")
 	editor := prog.CreateEditor([]byte("a = 1"), "/tmp/project/main.yak")
 	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
 
 	count := 0
-	task := prog.RegisterRootTopLevel("main.yak", editor, builder, func(root *FunctionBuilder) {
+	prog.RegisterFileBuild("main.yak", editor, builder, func(fileBuilder *FunctionBuilder) {
 		count++
-		root.EmitConstInst(1)
+		fileBuilder.EmitConstInst(1)
 	})
-	require.NotNil(t, task)
 
-	prog.RunRootBuilds()
-	prog.RunRootBuilds()
+	prog.RunDeferredBuilds()
+	prog.RunDeferredBuilds()
 	require.Equal(t, 1, count)
-	require.Equal(t, 1, prog.RootBuildCount())
-	require.Nil(t, task.program)
-	require.Nil(t, task.editor)
-	require.Nil(t, task.builder)
-	require.Nil(t, task.LazyBuilder)
-	require.Nil(t, prog.rootBuildSeq)
-	require.Nil(t, prog.rootBuildByID)
+	require.Equal(t, 1, prog.DeferredBuildCount())
+	require.Nil(t, prog.deferredBuildSeq)
+	require.Nil(t, prog.deferredBuildByID)
 }
 
-func TestRunRootBuildsKeepsTasksRegisteredDuringBuild(t *testing.T) {
-	prog := newRootBuildTestProgram(t, "root-build-register-during-build")
+func TestRunDeferredBuildsKeepsTasksRegisteredDuringBuild(t *testing.T) {
+	prog := newDeferredBuildTestProgram(t, "deferred-build-register-during-build")
 
 	var ran []string
-	first := prog.RegisterRootTask(RootBuildKindTopLevel, "first", func() {
+	prog.RegisterDeferredBuild(DeferredBuildKindFile, "first", func() {
 		ran = append(ran, "first")
-		prog.RegisterRootTask(RootBuildKindTopLevel, "second", func() {
+		prog.RegisterDeferredBuild(DeferredBuildKindFile, "second", func() {
 			ran = append(ran, "second")
 		})
 	})
 
-	prog.RunRootBuilds()
+	prog.RunDeferredBuilds()
 	require.Equal(t, []string{"first"}, ran)
-	require.Equal(t, 2, prog.RootBuildCount())
-	require.NotNil(t, prog.rootBuildSeq)
-	require.Nil(t, first.LazyBuilder)
+	require.Equal(t, 2, prog.DeferredBuildCount())
+	require.NotNil(t, prog.deferredBuildSeq)
 
-	prog.RunRootBuilds()
+	prog.RunDeferredBuilds()
 	require.Equal(t, []string{"first", "second"}, ran)
-	require.Nil(t, prog.rootBuildSeq)
-	require.Nil(t, prog.rootBuildByID)
+	require.Nil(t, prog.deferredBuildSeq)
+	require.Nil(t, prog.deferredBuildByID)
 }
 
 func TestFinishAllowsLazyLibraryExpansion(t *testing.T) {
-	prog := newRootBuildTestProgram(t, "finish-expansion")
+	prog := newDeferredBuildTestProgram(t, "finish-expansion")
 	editor := prog.CreateEditor([]byte("package main"), "/tmp/project/main.go")
 	prog.PushEditor(editor)
 	defer prog.PopEditor(false)

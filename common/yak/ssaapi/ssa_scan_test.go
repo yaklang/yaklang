@@ -19,6 +19,9 @@ func TestScanProjectFiles(t *testing.T) {
 	fs.AddFile("src/test/test.go", "package test")
 	fs.AddFile("src/testdata/issue47704.go", "package main")
 	fs.AddFile("src/.git/config", "git config")
+	fs.AddFile("src/.git/objects/pack/pack.go", "package ignored")
+	fs.AddFile("src/target/generated.go", "package ignored")
+	fs.AddFile("src/node_modules/pkg/index.go", "package ignored")
 	fs.AddFile("src/ignored.txt", "ignored")
 
 	// Define language checker (simulate handling Go files)
@@ -42,10 +45,10 @@ func TestScanProjectFiles(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
-		// Default excludes skip vendor/, test/, testdata/, .git/
-		expectedFiles := []string{"src/main.go", "src/utils.go"}
+		// Default excludes skip dependency/build/VCS roots, but keep test inputs.
+		expectedFiles := []string{"src/main.go", "src/utils.go", "src/test/test.go", "src/testdata/issue47704.go"}
 		require.ElementsMatch(t, expectedFiles, result.HandlerFiles)
-		require.Equal(t, 2, result.HandlerTotal)
+		require.Equal(t, 4, result.HandlerTotal)
 		require.GreaterOrEqual(t, len(result.Folders), 1)
 	})
 
@@ -63,10 +66,10 @@ func TestScanProjectFiles(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		// Expected files: src/main.go, src/utils.go
-		expectedFiles := []string{"src/main.go", "src/utils.go"}
+		// Expected files: default excludes still skip generated roots; explicit exclude skips vendor.
+		expectedFiles := []string{"src/main.go", "src/utils.go", "src/test/test.go", "src/testdata/issue47704.go"}
 		require.ElementsMatch(t, expectedFiles, result.HandlerFiles)
-		require.Equal(t, 2, result.HandlerTotal)
+		require.Equal(t, 4, result.HandlerTotal)
 	})
 
 	t.Run("Check PreHandler", func(t *testing.T) {
@@ -95,7 +98,7 @@ func TestScanProjectFiles(t *testing.T) {
 		require.True(t, ok)
 	})
 
-	t.Run("Skip testdata directory", func(t *testing.T) {
+	t.Run("Keep testdata directory by default", func(t *testing.T) {
 		result, err := ScanProjectFiles(ScanConfig{
 			ProgramName:     "test_prog",
 			ProgramPath:     "src",
@@ -106,6 +109,61 @@ func TestScanProjectFiles(t *testing.T) {
 			Context:         context.Background(),
 		})
 		require.NoError(t, err)
+		require.Contains(t, result.HandlerFiles, "src/testdata/issue47704.go")
+	})
+
+	t.Run("Skip testdata directory with explicit exclude", func(t *testing.T) {
+		excludeFunc := newExcludeFunc([]string{"src/testdata/"}, "")
+
+		result, err := ScanProjectFiles(ScanConfig{
+			ProgramName:     "test_prog",
+			ProgramPath:     "src",
+			FileSystem:      fs,
+			ExcludeFunc:     excludeFunc,
+			CheckLanguage:   checkLanguage,
+			CheckPreHandler: nil,
+			Context:         context.Background(),
+		})
+		require.NoError(t, err)
 		require.NotContains(t, result.HandlerFiles, "src/testdata/issue47704.go")
+	})
+
+	t.Run("Skip default excluded roots", func(t *testing.T) {
+		result, err := ScanProjectFiles(ScanConfig{
+			ProgramName:     "test_prog",
+			ProgramPath:     "src",
+			FileSystem:      fs,
+			ExcludeFunc:     nil,
+			CheckLanguage:   checkLanguage,
+			CheckPreHandler: nil,
+			Context:         context.Background(),
+		})
+		require.NoError(t, err)
+		require.NotContains(t, result.HandlerFiles, "src/.git/objects/pack/pack.go")
+		require.NotContains(t, result.HandlerFiles, "src/target/generated.go")
+		require.NotContains(t, result.HandlerFiles, "src/node_modules/pkg/index.go")
+	})
+
+	t.Run("Skip root default excluded directories", func(t *testing.T) {
+		rootFS := filesys.NewVirtualFs()
+		rootFS.AddFile("main.go", "package main")
+		rootFS.AddFile(".git/objects/pack/pack.go", "package ignored")
+		rootFS.AddFile("target/generated.go", "package ignored")
+		rootFS.AddFile("node_modules/pkg/index.go", "package ignored")
+
+		result, err := ScanProjectFiles(ScanConfig{
+			ProgramName:     "test_prog",
+			ProgramPath:     ".",
+			FileSystem:      rootFS,
+			ExcludeFunc:     nil,
+			CheckLanguage:   checkLanguage,
+			CheckPreHandler: nil,
+			Context:         context.Background(),
+		})
+		require.NoError(t, err)
+		require.Contains(t, result.HandlerFiles, "main.go")
+		require.NotContains(t, result.HandlerFiles, ".git/objects/pack/pack.go")
+		require.NotContains(t, result.HandlerFiles, "target/generated.go")
+		require.NotContains(t, result.HandlerFiles, "node_modules/pkg/index.go")
 	})
 }
