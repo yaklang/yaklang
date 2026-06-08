@@ -4,6 +4,7 @@ package filewatch
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -19,16 +20,22 @@ import (
 )
 
 type Collector struct {
-	spec    model.FileCollectorSpec
-	mu      sync.RWMutex
-	watcher *fsnotify.Watcher
-	state   filewatchCollectorState
+	spec                  model.FileCollectorSpec
+	mu                    sync.RWMutex
+	watcher               *fsnotify.Watcher
+	state                 filewatchCollectorState
+	maxWatchedDirectories int
 }
+
+const defaultMaxWatchedDirectories = 8192
+
+var errFilewatchDirectoryLimitExceeded = errors.New("filewatch directory limit exceeded")
 
 func New(spec model.FileCollectorSpec) hidscollector.Instance {
 	return &Collector{
-		spec:  spec,
-		state: newFilewatchCollectorState(spec.WatchPaths),
+		spec:                  spec,
+		state:                 newFilewatchCollectorState(spec.WatchPaths),
+		maxWatchedDirectories: defaultMaxWatchedDirectories,
 	}
 }
 
@@ -43,7 +50,7 @@ func (c *Collector) Start(ctx context.Context, sink chan<- model.Event) error {
 	}
 
 	for _, watchPath := range c.spec.WatchPaths {
-		if err := c.addRecursive(watcher, watchPath); err != nil {
+		if err := c.addRecursive(ctx, watcher, watchPath); err != nil {
 			_ = watcher.Close()
 			return err
 		}
@@ -88,7 +95,7 @@ func (c *Collector) run(
 			}
 			c.state.observeReceived()
 			if event.Op&fsnotify.Create != 0 {
-				c.tryWatchNewDirectory(watcher, event.Name)
+				c.tryWatchNewDirectory(ctx, watcher, event.Name)
 			}
 			c.publish(ctx, sink, c.toEvent(event))
 		case err, ok := <-watcher.Errors:
@@ -100,13 +107,22 @@ func (c *Collector) run(
 	}
 }
 
-func (c *Collector) addRecursive(watcher *fsnotify.Watcher, root string) error {
+func (c *Collector) addRecursive(ctx context.Context, watcher *fsnotify.Watcher, root string) error {
 	return filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return ctxErr
+		}
 		if err != nil {
 			return err
 		}
 		if !d.IsDir() {
 			return nil
+		}
+		if shouldSkipDirectory(d) {
+			return filepath.SkipDir
+		}
+		if c.watchedDirectoryCount() >= c.maxWatchedDirectoryLimit() {
+			return fmt.Errorf("%w: max_directories=%d root=%s", errFilewatchDirectoryLimitExceeded, c.maxWatchedDirectoryLimit(), root)
 		}
 		if err := watcher.Add(path); err != nil {
 			return fmt.Errorf("watch path %s: %w", path, err)
@@ -116,12 +132,41 @@ func (c *Collector) addRecursive(watcher *fsnotify.Watcher, root string) error {
 	})
 }
 
-func (c *Collector) tryWatchNewDirectory(watcher *fsnotify.Watcher, path string) {
+func (c *Collector) tryWatchNewDirectory(ctx context.Context, watcher *fsnotify.Watcher, path string) {
 	info, err := os.Stat(path)
 	if err != nil || !info.IsDir() {
 		return
 	}
-	_ = c.addRecursive(watcher, path)
+	if err := c.addRecursive(ctx, watcher, path); err != nil {
+		c.state.observeError(err)
+	}
+}
+
+func (c *Collector) watchedDirectoryCount() int {
+	c.state.mu.RLock()
+	defer c.state.mu.RUnlock()
+
+	return len(c.state.dirs)
+}
+
+func (c *Collector) maxWatchedDirectoryLimit() int {
+	if c == nil || c.maxWatchedDirectories <= 0 {
+		return defaultMaxWatchedDirectories
+	}
+	return c.maxWatchedDirectories
+}
+
+func shouldSkipDirectory(entry fs.DirEntry) bool {
+	if entry == nil {
+		return false
+	}
+	name := entry.Name()
+	switch name {
+	case ".git", ".hg", ".svn", "node_modules", "vendor", ".venv", "venv", "__pycache__", ".cache":
+		return true
+	default:
+		return false
+	}
 }
 
 func (c *Collector) toEvent(event fsnotify.Event) model.Event {

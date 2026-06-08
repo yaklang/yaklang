@@ -505,6 +505,177 @@ func TestInstanceStartAllowsCollectorLevelDegradation(t *testing.T) {
 	}
 }
 
+func TestInstanceRuntimeStateDeclaresCollectorCapabilities(t *testing.T) {
+	t.Parallel()
+
+	instance := &Instance{
+		spec: model.DesiredSpec{Mode: model.ModeObserve},
+		collectors: []collectorBinding{
+			{
+				kind:    "process",
+				backend: model.CollectorBackendEBPF,
+				collector: &collectorStub{
+					name: "process",
+					snapshot: hidscollector.HealthSnapshot{
+						Name:    "process",
+						Backend: model.CollectorBackendEBPF,
+						Status:  "running",
+					},
+				},
+				started: true,
+			},
+			{
+				kind:    "network",
+				backend: model.CollectorBackendEBPF,
+				collector: &collectorStub{
+					name: "network",
+					snapshot: hidscollector.HealthSnapshot{
+						Name:    "network",
+						Backend: model.CollectorBackendEBPF,
+						Status:  "running",
+					},
+				},
+				started: true,
+			},
+			{
+				kind:    "file",
+				backend: model.CollectorBackendFileWatch,
+				collector: &collectorStub{
+					name: "file",
+					snapshot: hidscollector.HealthSnapshot{
+						Name:    "file",
+						Backend: model.CollectorBackendFileWatch,
+						Status:  "running",
+					},
+				},
+				started: true,
+			},
+			{
+				kind:    "audit",
+				backend: model.CollectorBackendAuditd,
+				collector: &collectorStub{
+					name: "audit",
+					snapshot: hidscollector.HealthSnapshot{
+						Name:    "audit",
+						Backend: model.CollectorBackendAuditd,
+						Status:  "running",
+					},
+				},
+				started: true,
+			},
+		},
+		events: make(chan model.Event, 4),
+	}
+
+	state := instance.runtimeState()
+	collectors, ok := state.Detail["collectors"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected collectors detail, got %#v", state.Detail["collectors"])
+	}
+
+	tests := []struct {
+		name               string
+		eventType          string
+		payload            string
+		requiredPrivilege  string
+		featureKey         string
+		featureSupported   bool
+		featureStatus      string
+		featureReasonEmpty bool
+	}{
+		{
+			name:               "process",
+			eventType:          model.EventTypeProcessExec,
+			payload:            "process_metadata",
+			requiredPrivilege:  "CAP_BPF",
+			featureKey:         "process_tree",
+			featureSupported:   true,
+			featureStatus:      "supported",
+			featureReasonEmpty: true,
+		},
+		{
+			name:              "network",
+			eventType:         model.EventTypeNetworkSocket,
+			payload:           "flow_summary",
+			requiredPrivilege: "CAP_PERFMON",
+			featureKey:        "payload_inspection",
+			featureSupported:  false,
+			featureStatus:     "metadata_only",
+		},
+		{
+			name:               "file",
+			eventType:          model.EventTypeFileChange,
+			payload:            "elf_summary",
+			featureKey:         "content_signature_scan",
+			featureSupported:   true,
+			featureStatus:      "supported",
+			featureReasonEmpty: true,
+		},
+		{
+			name:              "audit",
+			eventType:         model.EventTypeAudit,
+			payload:           "audit_record",
+			requiredPrivilege: "CAP_AUDIT_READ",
+			featureKey:        "managed_audit_rules",
+			featureSupported:  true,
+			featureStatus:     "supported",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			collector, ok := collectors[tt.name].(map[string]any)
+			if !ok {
+				t.Fatalf("expected %s collector detail, got %#v", tt.name, collectors[tt.name])
+			}
+			detail, ok := collector["detail"].(map[string]any)
+			if !ok {
+				t.Fatalf("expected %s detail map, got %#v", tt.name, collector["detail"])
+			}
+			capabilities, ok := detail["capabilities"].(map[string]any)
+			if !ok {
+				t.Fatalf("expected %s capability declaration, got %#v", tt.name, detail["capabilities"])
+			}
+			if !testStringSliceContains(capabilities["supported_event_types"], tt.eventType) {
+				t.Fatalf(
+					"expected %s event type %s, got %#v",
+					tt.name,
+					tt.eventType,
+					capabilities["supported_event_types"],
+				)
+			}
+			if !testStringSliceContains(capabilities["supported_payloads"], tt.payload) {
+				t.Fatalf(
+					"expected %s payload %s, got %#v",
+					tt.name,
+					tt.payload,
+					capabilities["supported_payloads"],
+				)
+			}
+			if tt.requiredPrivilege != "" &&
+				!testStringSliceContains(capabilities["required_privileges"], tt.requiredPrivilege) {
+				t.Fatalf(
+					"expected %s privilege %s, got %#v",
+					tt.name,
+					tt.requiredPrivilege,
+					capabilities["required_privileges"],
+				)
+			}
+			feature := testFeatureCapability(t, capabilities["feature_flags"], tt.featureKey)
+			if feature["supported"] != tt.featureSupported {
+				t.Fatalf("unexpected %s feature support: %#v", tt.name, feature["supported"])
+			}
+			if feature["status"] != tt.featureStatus {
+				t.Fatalf("unexpected %s feature status: %#v", tt.name, feature["status"])
+			}
+			if tt.featureReasonEmpty {
+				if reason, _ := feature["reason"].(string); reason != "" {
+					t.Fatalf("expected empty %s feature reason, got %q", tt.name, reason)
+				}
+			}
+		})
+	}
+}
+
 func TestInstanceStartFailsWhenNoCollectorStarts(t *testing.T) {
 	t.Parallel()
 
@@ -530,4 +701,54 @@ func TestInstanceStartFailsWhenNoCollectorStarts(t *testing.T) {
 	if !strings.Contains(err.Error(), "no hids collector started successfully") {
 		t.Fatalf("unexpected error: %v", err)
 	}
+}
+
+func testStringSliceContains(value any, expected string) bool {
+	switch typed := value.(type) {
+	case []string:
+		for _, item := range typed {
+			if item == expected {
+				return true
+			}
+		}
+	case []any:
+		for _, item := range typed {
+			if item == expected {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func testFeatureCapability(
+	t *testing.T,
+	value any,
+	key string,
+) map[string]any {
+	t.Helper()
+
+	items, ok := value.([]map[string]any)
+	if ok {
+		for _, item := range items {
+			if item["key"] == key {
+				return item
+			}
+		}
+	}
+	rawItems, ok := value.([]any)
+	if !ok {
+		t.Fatalf("expected feature flags list, got %#v", value)
+	}
+	for _, rawItem := range rawItems {
+		item, ok := rawItem.(map[string]any)
+		if !ok {
+			t.Fatalf("expected feature flag map, got %#v", rawItem)
+		}
+		if item["key"] == key {
+			return item
+		}
+	}
+	t.Fatalf("expected feature flag %q, got %#v", key, value)
+	return nil
 }
