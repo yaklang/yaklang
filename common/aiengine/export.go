@@ -1,12 +1,15 @@
 package aiengine
 
+import "github.com/yaklang/yaklang/common/yakgrpc/yakit"
+
 var Exports = map[string]interface{}{
 	// invoke re-act
 	"InvokeReAct":      InvokeReAct,
 	"InvokeReActAsync": InvokeReActAsync,
 
 	// new ai engine
-	"NewAIEngine": NewAIEngine,
+	"NewAIEngine":         NewAIEngine,
+	"GetSessionRuntimeID": yakit.GetAISessionRuntimeIDsBySessionID,
 
 	// config options
 	"focus":                     WithFocus,

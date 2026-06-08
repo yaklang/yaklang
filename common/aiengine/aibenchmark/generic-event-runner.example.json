@@ -1,0 +1,32 @@
+{
+  "target": {
+    "base_url": "http://127.0.0.1:18083/",
+    "entry_path": "/mall",
+    "task_prompt": "商城交易、订单履约与支付回调模块、检测安全问题"
+  },
+  "quality_priority_ai_config": {
+    "provider": "aibalance",
+    "model": "memfit-qwen3.7-max",
+    "base_url": "https://aibalance.yaklang.com/v1",
+    "api_key": "{{AIBALANCE_PREMIUM_API_KEY}}",
+    "temperature": 0.2,
+    "max_tokens": 8192
+  },
+  "speed_priority_ai_config": {
+    "provider": "aibalance",
+    "model": "memfit-light-free",
+    "base_url": "https://aibalance.yaklang.com/v1",
+    "api_key": "free-user",
+    "temperature": 0.2,
+    "max_tokens": 8192
+  },
+  "limits": {
+    "step_budget": 25,
+    "time_budget_sec": 1800,
+    "samples": 2
+  },
+  "run_config": {
+    "mode": "blackbox",
+    "agent_profile": "realworld-web"
+  }
+}

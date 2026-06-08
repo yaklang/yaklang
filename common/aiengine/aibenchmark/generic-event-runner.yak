@@ -1,0 +1,662 @@
+// =============================================================================
+// Generic AI Security Runner
+//
+// This runner is a single execution unit. Its input is only:
+//   target + quality_priority_ai_config + speed_priority_ai_config + limits + run_config
+//
+// It does not know expected vulnerabilities, public/private status, vuln_id,
+// module_id, task_id, or unit_id. It only emits discovered risks and run
+// metrics. Registry/analyzer code must classify public/private/unexpected/false
+// positive results later.
+// =============================================================================
+
+configFile = cli.String("config", cli.setDefault(""), cli.setHelp("Runner input JSON path"))
+outputDir = cli.String("output-dir", cli.setDefault("./benchmark-reports/generic-event-runner"), cli.setHelp("Runner output directory"))
+reportPrefix = cli.String("report-prefix", cli.setDefault("generic-event-runner"), cli.setHelp("Output report filename prefix"))
+apiKeyOverride = cli.String("api-key", cli.setDefault(""), cli.setHelp("Optional model API key override"))
+varParams = cli.StringSlice("var", cli.setHelp("Set template variable key=value, repeatable"))
+
+cli.check()
+
+globalVars = {}
+
+func isNil(value) {
+    return value == nil || value == undefined
+}
+
+func toString(value) {
+    if isNil(value) {
+        return ""
+    }
+    return str.TrimSpace(sprintf("%v", value))
+}
+
+func toIntWithDefault(value, defaultValue) {
+    if isNil(value) {
+        return defaultValue
+    }
+    text = toString(value)
+    if text == "" {
+        return defaultValue
+    }
+    return parseInt(text)
+}
+
+func toFloatWithDefault(value, defaultValue) {
+    if isNil(value) {
+        return defaultValue
+    }
+    text = toString(value)
+    if text == "" {
+        return defaultValue
+    }
+    return parseFloat(text)
+}
+
+func truncateText(raw, limit) {
+    if isNil(raw) {
+        return ""
+    }
+    text = sprintf("%v", raw)
+    if limit <= 0 || len(text) <= limit {
+        return text
+    }
+    return text[:limit] + "..."
+}
+
+func parseGlobalVars() {
+    for varParam in varParams {
+        if !str.Contains(varParam, "=") {
+            log.warn("Invalid variable format (expected key=value): %s", varParam)
+            continue
+        }
+        parts = str.SplitN(varParam, "=", 2)
+        if len(parts) != 2 {
+            continue
+        }
+        key = str.TrimSpace(parts[0])
+        value = str.TrimSpace(parts[1])
+        if key == "" {
+            continue
+        }
+        globalVars[key] = value
+        log.info("Variable set: %s=***", key)
+    }
+}
+
+func replaceVariables(text) {
+    if isNil(text) {
+        return text
+    }
+    result = sprintf("%v", text)
+    for key, value in globalVars {
+        placeholder = sprintf("{{%s}}", key)
+        result = str.ReplaceAll(result, placeholder, value)
+    }
+    return result
+}
+
+func requireString(obj, fieldPath) {
+    value = toString(obj)
+    if value == "" {
+        die(sprintf("missing required field: %s", fieldPath))
+    }
+    return value
+}
+
+func sanitizePathPart(value) {
+    text = toString(value)
+    if text == "" {
+        return "unknown"
+    }
+    text = str.ReplaceAll(text, "://", "-")
+    text = str.ReplaceAll(text, "/", "-")
+    text = str.ReplaceAll(text, "\\", "-")
+    text = str.ReplaceAll(text, ":", "-")
+    text = str.ReplaceAll(text, " ", "-")
+    text = str.Trim(text, "-")
+    if text == "" {
+        return "unknown"
+    }
+    return text
+}
+
+func joinURL(baseURL, entryPath) {
+    base = str.TrimRight(toString(baseURL), "/")
+    pathValue = toString(entryPath)
+    if pathValue == "" {
+        return base
+    }
+    if str.HasPrefix(pathValue, "http://") || str.HasPrefix(pathValue, "https://") {
+        return pathValue
+    }
+    if !str.HasPrefix(pathValue, "/") {
+        pathValue = "/" + pathValue
+    }
+    return base + pathValue
+}
+
+func normalizeAIConfig(rawConfig, fieldPath) {
+    return {
+        "provider": requireString(rawConfig["provider"], fieldPath + ".provider"),
+        "model": requireString(rawConfig["model"], fieldPath + ".model"),
+        "base_url": requireString(rawConfig["base_url"], fieldPath + ".base_url"),
+        "temperature": toFloatWithDefault(rawConfig["temperature"], 0.0),
+        "max_tokens": toIntWithDefault(rawConfig["max_tokens"], 0),
+        "api_key": toString(rawConfig["api_key"]),
+    }
+}
+
+func buildAIConfigRef(aiConfig) {
+    return {
+        "provider": aiConfig["provider"],
+        "model": aiConfig["model"],
+    }
+}
+
+func buildAIConfigLabel(aiConfig) {
+    return sprintf("%s/%s", aiConfig["provider"], aiConfig["model"])
+}
+
+func buildAIConfigSlug(aiConfig) {
+    return sanitizePathPart(aiConfig["provider"] + "-" + aiConfig["model"])
+}
+
+// 读取并归一化 runner 输入；这个脚本只接受双 AI config 结构。
+func loadRunnerInput() {
+    if configFile == "" {
+        die("Please provide --config")
+    }
+    content, err = file.ReadFile(configFile)
+    if err != nil {
+        die(sprintf("Failed to read config file: %v", err))
+    }
+    if len(globalVars) > 0 {
+        content = replaceVariables(content)
+    }
+    raw = json.loads(content)
+    if isNil(raw) {
+        die("runner input must be a JSON object")
+    }
+
+    target = raw["target"]
+    qualityPriorityAIConfig = raw["quality_priority_ai_config"]
+    speedPriorityAIConfig = raw["speed_priority_ai_config"]
+    limits = raw["limits"]
+    runConfig = raw["run_config"]
+    if isNil(target) {
+        die("missing required object: target")
+    }
+    if isNil(qualityPriorityAIConfig) {
+        die("missing required object: quality_priority_ai_config")
+    }
+    if isNil(speedPriorityAIConfig) {
+        die("missing required object: speed_priority_ai_config")
+    }
+    if isNil(limits) {
+        die("missing required object: limits")
+    }
+    if isNil(runConfig) {
+        die("missing required object: run_config")
+    }
+
+    normalized = {
+        "target": {
+            "base_url": requireString(target["base_url"], "target.base_url"),
+            "entry_path": requireString(target["entry_path"], "target.entry_path"),
+            "task_prompt": requireString(target["task_prompt"], "target.task_prompt"),
+        },
+        "quality_priority_ai_config": normalizeAIConfig(qualityPriorityAIConfig, "quality_priority_ai_config"),
+        "speed_priority_ai_config": normalizeAIConfig(speedPriorityAIConfig, "speed_priority_ai_config"),
+        "limits": {
+            "step_budget": toIntWithDefault(limits["step_budget"], 0),
+            "time_budget_sec": toIntWithDefault(limits["time_budget_sec"], 0),
+            "samples": toIntWithDefault(limits["samples"], 0),
+        },
+        "run_config": {
+            "mode": requireString(runConfig["mode"], "run_config.mode"),
+            "agent_profile": requireString(runConfig["agent_profile"], "run_config.agent_profile"),
+        },
+    }
+
+    if normalized["limits"]["step_budget"] <= 0 {
+        die("limits.step_budget must be greater than 0")
+    }
+    if normalized["limits"]["time_budget_sec"] <= 0 {
+        die("limits.time_budget_sec must be greater than 0")
+    }
+    if normalized["limits"]["samples"] <= 0 {
+        die("limits.samples must be greater than 0")
+    }
+
+    if apiKeyOverride != "" {
+        normalized["quality_priority_ai_config"]["api_key"] = apiKeyOverride
+        normalized["speed_priority_ai_config"]["api_key"] = apiKeyOverride
+    }
+
+    return normalized
+}
+
+func consumptionToTokens(consumption) {
+    inputTokens = toIntWithDefault(consumption["input_consumption"], 0)
+    outputTokens = toIntWithDefault(consumption["output_consumption"], 0)
+    cacheTokens = toIntWithDefault(consumption["cache_hit_token"], 0)
+    return {
+        "input": inputTokens,
+        "output": outputTokens,
+        "cache": cacheTokens,
+        "total": inputTokens + outputTokens,
+    }
+}
+
+func mergeTokens(a, b) {
+    return {
+        "input": toIntWithDefault(a["input"], 0) + toIntWithDefault(b["input"], 0),
+        "output": toIntWithDefault(a["output"], 0) + toIntWithDefault(b["output"], 0),
+        "cache": toIntWithDefault(a["cache"], 0) + toIntWithDefault(b["cache"], 0),
+        "total": toIntWithDefault(a["total"], 0) + toIntWithDefault(b["total"], 0),
+    }
+}
+
+func appendEvidenceLine(lines, obj) {
+    return append(lines, json.dumps(obj))
+}
+
+func saveEvidenceLines(evidencePath, lines) {
+    err = file.Save(evidencePath, str.Join(lines, "\n") + "\n")
+    if err != nil {
+        log.warn("save evidence failed: %v", err)
+    }
+}
+
+func buildConsumptionSnapshot(consumption) {
+    return {
+        "input_consumption": toIntWithDefault(consumption["input_consumption"], 0),
+        "output_consumption": toIntWithDefault(consumption["output_consumption"], 0),
+        "cache_hit_token": toIntWithDefault(consumption["cache_hit_token"], 0),
+        "consumption_uuid": toString(consumption["consumption_uuid"]),
+    }
+}
+
+func jsonifyRisk(riskInstance) {
+    try {
+        return json.loads(json.dumps(riskInstance))
+    } catch e {
+        log.warn("jsonify risk failed: %v", e)
+        return {
+            "id": toIntWithDefault(riskInstance.ID, 0),
+            "hash": toString(riskInstance.Hash),
+            "title": toString(riskInstance.Title),
+            "title_verbose": toString(riskInstance.TitleVerbose),
+            "risk_type": toString(riskInstance.RiskType),
+            "risk_verbose": toString(riskInstance.RiskTypeVerbose),
+            "severity": toString(riskInstance.Severity),
+            "description": toString(riskInstance.Description),
+            "runtime_id": toString(riskInstance.RuntimeId),
+        }
+    }
+}
+
+// risks 不再做 findings 归一化，而是回查本次 session 关联 runtime 下保存过的 risk 并直接 JSON 化。
+func collectTrialRisks(sessionID) {
+    runtimeIDs = []
+    runtimeSeen = {}
+    rawRuntimeIDs = aim.GetSessionRuntimeID(sessionID)
+    for rawRuntimeID in rawRuntimeIDs {
+        runtimeID = str.TrimSpace(toString(rawRuntimeID))
+        if runtimeID == "" || runtimeSeen[runtimeID] == true {
+            continue
+        }
+        runtimeSeen[runtimeID] = true
+        runtimeIDs = append(runtimeIDs, runtimeID)
+    }
+
+    risks = []
+    for runtimeID in runtimeIDs {
+        for riskInstance = range risk.YieldRiskByRuntimeId(runtimeID) {
+            if isNil(riskInstance) {
+                continue
+            }
+            risks = append(risks, jsonifyRisk(riskInstance))
+        }
+    }
+    return {
+        "runtime_ids": runtimeIDs,
+        "risks": risks,
+    }
+}
+
+func buildPrompt(input, sampleIndex) {
+    target = input["target"]
+    qualityPriorityAIConfig = input["quality_priority_ai_config"]
+    speedPriorityAIConfig = input["speed_priority_ai_config"]
+    limits = input["limits"]
+    runConfig = input["run_config"]
+    entry = joinURL(target["base_url"], target["entry_path"])
+
+    prompt = ""
+    prompt += "You are running one blackbox web security benchmark trial.\n"
+    prompt += "Do not classify saved risks against any hidden registry. Do not mention public/private/expected/unexpected/false-positive categories.\n"
+    prompt += "Your job is only to inspect the target entry and report vulnerabilities you discovered.\n\n"
+    prompt += sprintf("Target base URL: %s\n", target["base_url"])
+    prompt += sprintf("Target entry URL: %s\n", entry)
+    prompt += sprintf("Task: %s\n", target["task_prompt"])
+    prompt += sprintf("Run mode: %s\n", runConfig["mode"])
+    prompt += sprintf("Agent profile: %s\n", runConfig["agent_profile"])
+    prompt += sprintf("Step budget: %d\n", limits["step_budget"])
+    prompt += sprintf("Sample index: %d\n\n", sampleIndex)
+    prompt += sprintf("Quality-priority provider/model: %s\n", buildAIConfigLabel(qualityPriorityAIConfig))
+    prompt += sprintf("Speed-priority provider/model: %s\n", buildAIConfigLabel(speedPriorityAIConfig))
+    prompt += "Keep each saved risk complete with title, type, description, affected target, and request/response evidence when available.\n"
+    prompt += "If you cannot confirm an issue, do not save a risk.\n"
+    return prompt
+}
+
+func buildModelOptions(modelConfig) {
+    aiOpts = []
+    if modelConfig["base_url"] != "" {
+        aiOpts = append(aiOpts, ai.baseURL(modelConfig["base_url"]))
+    }
+    if modelConfig["model"] != "" {
+        aiOpts = append(aiOpts, ai.model(modelConfig["model"]))
+    }
+    if modelConfig["api_key"] != "" {
+        aiOpts = append(aiOpts, ai.apiKey(modelConfig["api_key"]))
+    }
+    if modelConfig["temperature"] != 0.0 {
+        aiOpts = append(aiOpts, ai.temperature(modelConfig["temperature"]))
+    }
+    if modelConfig["max_tokens"] > 0 {
+        aiOpts = append(aiOpts, ai.maxTokens(modelConfig["max_tokens"]))
+    }
+    return aiOpts
+}
+
+// 每个 sample 就是一条独立 trial：启动一次 ReAct，消费事件流，结束后固化 evidence 与 risks。
+func runTrial(input, sampleIndex, runID, runDir, evidenceDir) {
+    target = input["target"]
+    qualityPriorityAIConfig = input["quality_priority_ai_config"]
+    speedPriorityAIConfig = input["speed_priority_ai_config"]
+    limits = input["limits"]
+
+    trialID = sprintf("trial-%04d", sampleIndex)
+    entry = joinURL(target["base_url"], target["entry_path"])
+    evidencePath = file.Join(evidenceDir, sprintf("%s.jsonl", trialID))
+    evidenceLines = []
+    startAt = time.Now()
+    status = "finished"
+    errorText = ""
+    eventCount = 0
+    stepCount = 0
+    tokens = {
+        "input": 0,
+        "output": 0,
+        "cache": 0,
+        "total": 0,
+    }
+
+    evidenceLines = appendEvidenceLine(evidenceLines, {
+        "kind": "trial_start",
+        "trial_id": trialID,
+        "sample_index": sampleIndex,
+        "entry": entry,
+        "quality_priority_ai_config": buildAIConfigRef(qualityPriorityAIConfig),
+        "speed_priority_ai_config": buildAIConfigRef(speedPriorityAIConfig),
+        "ts": startAt.Format("2006-01-02 15:04:05"),
+    })
+
+    captureEvent = func(react, event) {
+        eventCount++
+        eventType = string(event.Type)
+        contentText = string(event.Content)
+        if eventType == "task_status_changed" || str.Contains(contentText, "react_task_now_status") {
+            stepCount++
+        }
+        if eventType == "consumption" {
+            try {
+                consumption = json.loads(contentText)
+                if !isNil(consumption) {
+                    // consumption 事件已经是累计值，直接取外层字段即可。
+                    consumptionSnapshot = buildConsumptionSnapshot(consumption)
+                    tokens = consumptionToTokens(consumptionSnapshot)
+                    evidenceLines = appendEvidenceLine(evidenceLines, {
+                        "kind": "consumption",
+                        "trial_id": trialID,
+                        "tokens": tokens,
+                        "raw": consumptionSnapshot,
+                        "ts": time.Now().Unix(),
+                    })
+                }
+            } catch e {
+                log.warn("parse consumption event failed: %v", e)
+            }
+        }
+        evidenceLines = appendEvidenceLine(evidenceLines, {
+            "kind": "event",
+            "trial_id": trialID,
+            "index": eventCount,
+            "type": eventType,
+            "node_id": string(event.NodeId),
+            "content": contentText,
+            "ts": time.Now().Unix(),
+        })
+    }
+
+    captureStream = func(react, event, nodeId, data) {
+        if len(data) == 0 {
+            return
+        }
+        contentText = string(data)
+        evidenceLines = appendEvidenceLine(evidenceLines, {
+            "kind": "stream",
+            "trial_id": trialID,
+            "node_id": nodeId,
+            "content": contentText,
+            "ts": time.Now().Unix(),
+        })
+    }
+
+    benchCtx, benchCancel = context.WithCancel(context.Background())
+    defer benchCancel()
+
+    prompt = buildPrompt(input, sampleIndex)
+    qualityAIOpts = buildModelOptions(qualityPriorityAIConfig)
+    speedAIOpts = buildModelOptions(speedPriorityAIConfig)
+    sessionID = sprintf("%s-%s", runID, trialID)
+
+    opts = [
+        aim.context(benchCtx),
+        aim.qualityPriorityAIConfig(qualityPriorityAIConfig["provider"], qualityAIOpts...),
+        aim.speedPriorityAIConfig(speedPriorityAIConfig["provider"], speedAIOpts...),
+        aim.sessionID(sessionID),
+        aim.timeout(limits["time_budget_sec"]),
+        aim.maxIteration(limits["step_budget"]),
+        aim.yoloMode(),
+        aim.allowUserInteract(false),
+        aim.onEvent(captureEvent),
+        aim.onStreamContent(captureStream),
+    ]
+
+    err = aim.InvokeReAct(prompt, opts...)
+    if err != nil {
+        status = "failed"
+        errorText = sprintf("%v", err)
+        evidenceLines = appendEvidenceLine(evidenceLines, {
+            "kind": "error",
+            "trial_id": trialID,
+            "error": errorText,
+            "ts": time.Now().Unix(),
+        })
+    }
+
+    endAt = time.Now()
+    durationMs = (endAt.UnixNano() - startAt.UnixNano()) / 1000000
+    riskCollection = collectTrialRisks(sessionID)
+    runtimeIDs = riskCollection["runtime_ids"]
+    risks = riskCollection["risks"]
+    evidenceLines = appendEvidenceLine(evidenceLines, {
+        "kind": "risk_collection",
+        "trial_id": trialID,
+        "session_id": sessionID,
+        "runtime_ids": runtimeIDs,
+        "risk_count": len(risks),
+        "ts": endAt.Unix(),
+    })
+
+    evidenceLines = appendEvidenceLine(evidenceLines, {
+        "kind": "trial_end",
+        "trial_id": trialID,
+        "status": status,
+        "duration_ms": durationMs,
+        "steps": stepCount,
+        "tokens": tokens,
+        "risk_count": len(risks),
+        "ts": endAt.Format("2006-01-02 15:04:05"),
+    })
+    saveEvidenceLines(evidencePath, evidenceLines)
+
+    return {
+        "trial_id": trialID,
+        "input_ref": {
+            "entry": entry,
+            "quality_priority_ai_config": buildAIConfigRef(qualityPriorityAIConfig),
+            "speed_priority_ai_config": buildAIConfigRef(speedPriorityAIConfig),
+        },
+        "sample_index": sampleIndex,
+        "status": status,
+        "duration_ms": durationMs,
+        "steps": stepCount,
+        "tokens": tokens,
+        "cost_usd": nil,
+        "risks": risks,
+        "evidence": evidencePath,
+        "error": errorText,
+    }
+}
+
+// 汇总所有 trial 的状态、耗时、token 和 risk 数量，生成 run 级概览。
+func buildSummary(trials) {
+    total = len(trials)
+    finished = 0
+    failed = 0
+    risksCount = 0
+    durationMs = 0
+    tokens = {
+        "input": 0,
+        "output": 0,
+        "cache": 0,
+        "total": 0,
+    }
+    for trial in trials {
+        if trial["status"] == "finished" {
+            finished++
+        } else {
+            failed++
+        }
+        risksCount += len(trial["risks"])
+        durationMs += toIntWithDefault(trial["duration_ms"], 0)
+        tokens = mergeTokens(tokens, trial["tokens"])
+    }
+    return {
+        "total_trials": total,
+        "finished_trials": finished,
+        "failed_trials": failed,
+        "risks_count": risksCount,
+        "duration_ms": durationMs,
+        "tokens": tokens,
+    }
+}
+
+// 全量 run 结束后一次性落 JSON/Markdown 总报告；每条 trial 的原始 evidence 已单独写入 evidence 目录。
+func saveReports(input, runID, runDir, trials) {
+    summary = buildSummary(trials)
+    report = {
+        "report_type": "generic-event-runner",
+        "run_id": runID,
+        "generated_at": time.Now().Format("2006-01-02 15:04:05"),
+        "config_file": configFile,
+        "input": input,
+        "summary": summary,
+        "trials": trials,
+    }
+
+    jsonPath = file.Join(runDir, sprintf("%s-%s.json", reportPrefix, runID))
+    mdPath = file.Join(runDir, sprintf("%s-%s.md", reportPrefix, runID))
+    err = file.Save(jsonPath, json.dumps(report, json.withIndent("  ")))
+    if err != nil {
+        die(sprintf("Failed to save JSON report: %v", err))
+    }
+
+    md = "# Generic Event Runner Report\n\n"
+    md += sprintf("- Run ID: `%s`\n", runID)
+    md += sprintf("- Target: `%s`\n", joinURL(input["target"]["base_url"], input["target"]["entry_path"]))
+    md += sprintf("- Quality Priority Provider / Model: `%s`\n", buildAIConfigLabel(input["quality_priority_ai_config"]))
+    md += sprintf("- Speed Priority Provider / Model: `%s`\n", buildAIConfigLabel(input["speed_priority_ai_config"]))
+    md += sprintf("- Trials: %d finished, %d failed\n", summary["finished_trials"], summary["failed_trials"])
+    md += sprintf("- Risks: %d\n", summary["risks_count"])
+    md += sprintf("- Duration: %d ms\n", summary["duration_ms"])
+    md += sprintf("- Tokens: input=%d output=%d cache=%d total=%d\n\n",
+        summary["tokens"]["input"], summary["tokens"]["output"], summary["tokens"]["cache"], summary["tokens"]["total"])
+    md += "## Trials\n\n"
+    md += "| Trial | Status | Sample | Steps | Risks | Duration(ms) | Evidence |\n"
+    md += "| --- | --- | --- | --- | --- | --- | --- |\n"
+    for trial in trials {
+        md += sprintf("| %s | %s | %d | %d | %d | %d | `%s` |\n",
+            trial["trial_id"], trial["status"], trial["sample_index"], trial["steps"],
+            len(trial["risks"]), trial["duration_ms"], trial["evidence"])
+    }
+    err = file.Save(mdPath, md)
+    if err != nil {
+        die(sprintf("Failed to save Markdown report: %v", err))
+    }
+    return jsonPath, mdPath, summary
+}
+
+func printSummary(summary) {
+    println("")
+    println("=" * 90)
+    println("Generic Event Runner Summary")
+    println("=" * 90)
+    printf("%-18s %-12s %-12s %-12s %-12s\n", "Trials", "Finished", "Failed", "Risks", "Tokens")
+    println("-" * 90)
+    printf("%-18d %-12d %-12d %-12d %-12d\n",
+        summary["total_trials"], summary["finished_trials"], summary["failed_trials"],
+        summary["risks_count"], summary["tokens"]["total"])
+    println("-" * 90)
+    println("")
+}
+
+parseGlobalVars()
+input = loadRunnerInput()
+
+runID = sprintf("%s-%s-%d",
+    sanitizePathPart("q-" + buildAIConfigSlug(input["quality_priority_ai_config"]) + "-s-" + buildAIConfigSlug(input["speed_priority_ai_config"])),
+    sanitizePathPart(input["target"]["entry_path"]),
+    time.Now().Unix())
+runDir = file.Join(outputDir, runID)
+evidenceDir = file.Join(runDir, "evidence")
+err = file.MkdirAll(evidenceDir)
+if err != nil {
+    die(sprintf("Failed to create evidence dir: %v", err))
+}
+
+log.info("Generic runner loaded: entry=%s quality=%s speed=%s samples=%d step_budget=%d time_budget_sec=%d",
+    joinURL(input["target"]["base_url"], input["target"]["entry_path"]),
+    buildAIConfigLabel(input["quality_priority_ai_config"]),
+    buildAIConfigLabel(input["speed_priority_ai_config"]),
+    input["limits"]["samples"],
+    input["limits"]["step_budget"],
+    input["limits"]["time_budget_sec"])
+
+trials = []
+for i = 1; i <= input["limits"]["samples"]; i++ {
+    log.info("running sample %d/%d", i, input["limits"]["samples"])
+    trials = append(trials, runTrial(input, i, runID, runDir, evidenceDir))
+}
+
+jsonPath, mdPath, summary = saveReports(input, runID, runDir, trials)
+printSummary(summary)
+
+log.info("JSON report saved to: %s", jsonPath)
+log.info("Markdown report saved to: %s", mdPath)
+log.info("Evidence dir: %s", evidenceDir)

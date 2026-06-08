@@ -1137,6 +1137,8 @@ var Exports = map[string]any{
 	"proxy":                          aispec.WithProxy,
 	"model":                          aispec.WithModel,
 	"apiKey":                         aispec.WithAPIKey,
+	"maxTokens":                      aispec.WithMaxTokens,
+	"temperature":                    aispec.WithTemperature,
 	"noHttps":                        aispec.WithNoHttps,
 	"funcCallRetryTimes":             aispec.WithFunctionCallRetryTimes,
 	"domain":                         aispec.WithDomain,

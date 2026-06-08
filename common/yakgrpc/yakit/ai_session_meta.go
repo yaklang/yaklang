@@ -729,3 +729,24 @@ func init() {
 		return err
 	}, "migrate-ai-session-meta-from-events")
 }
+
+func GetAISessionRuntimeIDsBySessionID(sessionID string) []string {
+	db := consts.GetGormProjectDatabase()
+	sessionID = strings.TrimSpace(sessionID)
+	if sessionID == "" {
+		return nil
+	}
+
+	var meta schema.AISession
+	if err := db.Model(&schema.AISession{}).Where("session_id = ?", sessionID).First(&meta).Error; err != nil {
+		return nil
+	}
+	var runtimeIDs []string
+	if strings.TrimSpace(meta.RelatedRuntimeIDS) != "" {
+		if err := json.Unmarshal([]byte(meta.RelatedRuntimeIDS), &runtimeIDs); err != nil {
+			log.Errorf("unmarshal related_runtime_ids failed: %v", err)
+			return nil
+		}
+	}
+	return runtimeIDs
+}

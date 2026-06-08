@@ -39,6 +39,11 @@ func TestDashscope_Search(t *testing.T) {
 	client.Chat("你是谁？输出一个400字故事")
 }
 
+func TestExportsExposeSamplingOptions(t *testing.T) {
+	assert.Contains(t, Exports, "maxTokens")
+	assert.Contains(t, Exports, "temperature")
+}
+
 func TestAIBalanceLatest(t *testing.T) {
 	if utils.InGithubActions() {
 		return
