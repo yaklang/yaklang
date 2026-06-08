@@ -108,6 +108,41 @@ func (s *VerificationTodoStore) Clone() *VerificationTodoStore {
 	return cloned
 }
 
+// VerificationTodoApplyError reports one next_movements op that could not be
+// applied under the supplied task scope.
+type VerificationTodoApplyError struct {
+	Movement VerifyNextMovement
+	Reason   string
+}
+
+// FormatVerificationTodoApplyErrors renders apply failures for timeline /
+// feedback consumers. Empty input yields an empty string.
+func FormatVerificationTodoApplyErrors(errors []VerificationTodoApplyError) string {
+	if len(errors) == 0 {
+		return ""
+	}
+	lines := make([]string, 0, len(errors))
+	for _, e := range errors {
+		op := strings.ToUpper(strings.TrimSpace(e.Movement.Op))
+		if op == "" {
+			op = "UNKNOWN"
+		}
+		id := strings.TrimSpace(e.Movement.ID)
+		reason := strings.TrimSpace(e.Reason)
+		switch {
+		case id != "" && reason != "":
+			lines = append(lines, fmt.Sprintf("FAILED %s[%s]: %s", op, id, reason))
+		case id != "":
+			lines = append(lines, fmt.Sprintf("FAILED %s[%s]", op, id))
+		case reason != "":
+			lines = append(lines, fmt.Sprintf("FAILED %s: %s", op, reason))
+		default:
+			lines = append(lines, fmt.Sprintf("FAILED %s", op))
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
 // Apply incrementally updates the store with one verification round's
 // `next_movements` operations.
 //
@@ -122,19 +157,31 @@ func (s *VerificationTodoStore) Clone() *VerificationTodoStore {
 // 每一个 TODO. satisfied 形参保留是为了接口稳定 (DB 反序列化 + 兼容旧
 // 调用方), 但不再触发任何状态变更.
 //
+// 无法应用的 op (跨作用域修改、缺失 id/content、未知 op 等) 会收集到返回值,
+// 由上层写入 timeline 的 [NEXT_MOVEMENTS_ERROR] 类别, 不再静默吞掉.
+//
 // 关键词: Apply 取消自动翻 SKIPPED, 显式关闭, AI 主动 done/delete/skip
-func (s *VerificationTodoStore) Apply(scope VerificationTodoScope, satisfied bool, movements []VerifyNextMovement) {
+func (s *VerificationTodoStore) Apply(scope VerificationTodoScope, satisfied bool, movements []VerifyNextMovement) []VerificationTodoApplyError {
 	if s == nil {
-		return
+		return nil
 	}
 	_ = satisfied // 保留形参; 语义见上方注释, 不再触发自动翻转
 	s.Counter++
 	roundIndex := s.Counter
 	scope = scope.normalize()
 
+	var applyErrors []VerificationTodoApplyError
+	appendApplyError := func(movement VerifyNextMovement, reason string) {
+		applyErrors = append(applyErrors, VerificationTodoApplyError{
+			Movement: movement,
+			Reason:   reason,
+		})
+	}
+
 	for _, movement := range movements {
 		id := strings.TrimSpace(movement.ID)
 		if id == "" {
+			appendApplyError(movement, "missing id")
 			continue
 		}
 		op := strings.ToLower(strings.TrimSpace(movement.Op))
@@ -142,6 +189,7 @@ func (s *VerificationTodoStore) Apply(scope VerificationTodoScope, satisfied boo
 		case "add":
 			content := strings.TrimSpace(movement.Content)
 			if content == "" {
+				appendApplyError(movement, "add requires non-empty content")
 				continue
 			}
 			item := s.findExactScopedItem(scope, id)
@@ -158,6 +206,7 @@ func (s *VerificationTodoStore) Apply(scope VerificationTodoScope, satisfied boo
 		case "doing", "pending":
 			item := s.findItemForMutation(scope, id)
 			if item == nil {
+				appendApplyError(movement, s.mutationFailureReason(scope, id))
 				continue
 			}
 			item.claimLegacyScope(scope)
@@ -169,6 +218,7 @@ func (s *VerificationTodoStore) Apply(scope VerificationTodoScope, satisfied boo
 		case "done":
 			item := s.findItemForMutation(scope, id)
 			if item == nil {
+				appendApplyError(movement, s.mutationFailureReason(scope, id))
 				continue
 			}
 			item.claimLegacyScope(scope)
@@ -177,6 +227,7 @@ func (s *VerificationTodoStore) Apply(scope VerificationTodoScope, satisfied boo
 		case "delete":
 			item := s.findItemForMutation(scope, id)
 			if item == nil {
+				appendApplyError(movement, s.mutationFailureReason(scope, id))
 				continue
 			}
 			item.claimLegacyScope(scope)
@@ -192,6 +243,7 @@ func (s *VerificationTodoStore) Apply(scope VerificationTodoScope, satisfied boo
 			// 关键词: 显式 skip op, 主动跳过, 终态状态
 			item := s.findItemForMutation(scope, id)
 			if item == nil {
+				appendApplyError(movement, s.mutationFailureReason(scope, id))
 				continue
 			}
 			item.claimLegacyScope(scope)
@@ -200,8 +252,11 @@ func (s *VerificationTodoStore) Apply(scope VerificationTodoScope, satisfied boo
 			}
 			item.Status = VerificationTodoStatusSkipped
 			item.UpdatedAt = roundIndex
+		default:
+			appendApplyError(movement, fmt.Sprintf("unsupported op %q; allowed: add, doing, pending, done, delete, skip", op))
 		}
 	}
+	return applyErrors
 }
 
 func (i *VerificationTodoItem) scope() VerificationTodoScope {
@@ -292,6 +347,41 @@ func (s *VerificationTodoStore) findItemForMutation(scope VerificationTodoScope,
 		return nil
 	}
 	return s.findLegacyItem(id)
+}
+
+func (s *VerificationTodoStore) findItemByID(id string) *VerificationTodoItem {
+	if s == nil {
+		return nil
+	}
+	id = strings.TrimSpace(id)
+	for _, item := range s.Items {
+		if item != nil && strings.TrimSpace(item.ID) == id {
+			return item
+		}
+	}
+	return nil
+}
+
+func (s *VerificationTodoStore) mutationFailureReason(scope VerificationTodoScope, id string) string {
+	scope = scope.normalize()
+	item := s.findItemByID(id)
+	if item == nil {
+		return "todo not found"
+	}
+	if !item.matchesScope(scope) && !item.isLegacyScope() {
+		itemScope := item.scope()
+		return fmt.Sprintf(
+			"todo belongs to another task scope (task_id=%s, task_index=%s), cannot mutate from current scope (task_id=%s, task_index=%s)",
+			itemScope.TaskID, itemScope.TaskIndex, scope.TaskID, scope.TaskIndex,
+		)
+	}
+	if scope.IsZero() {
+		return "todo not found"
+	}
+	return fmt.Sprintf(
+		"todo not found in current task scope (task_id=%s, task_index=%s)",
+		scope.TaskID, scope.TaskIndex,
+	)
 }
 
 // SnapshotItems returns a deep-copied slice of the current items, safe for
@@ -651,7 +741,7 @@ func (s *VerificationTodoStore) RenderMarkdownDelta(scope VerificationTodoScope,
 	}
 
 	cloned := previous.Clone()
-	cloned.Apply(scope, satisfied, movements)
+	_ = cloned.Apply(scope, satisfied, movements)
 	if len(cloned.Items) == 0 {
 		return ""
 	}

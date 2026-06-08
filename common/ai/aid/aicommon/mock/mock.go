@@ -104,7 +104,8 @@ func (m *MockedAIConfig) GetVerificationTodoRendered(_ aicommon.VerificationTodo
 	return ""
 }
 
-func (m *MockedAIConfig) ApplyVerificationTodoOps(scope aicommon.VerificationTodoScope, satisfied bool, movements []aicommon.VerifyNextMovement) {
+func (m *MockedAIConfig) ApplyVerificationTodoOps(scope aicommon.VerificationTodoScope, satisfied bool, movements []aicommon.VerifyNextMovement) []aicommon.VerificationTodoApplyError {
+	return nil
 }
 
 func (m *MockedAIConfig) GetVerificationTodoMarkdownDelta(scope aicommon.VerificationTodoScope, satisfied bool, movements []aicommon.VerifyNextMovement) string {

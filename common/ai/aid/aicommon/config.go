@@ -2846,12 +2846,12 @@ func (c *Config) GetVerificationTodoRendered(currentScope VerificationTodoScope)
 // later — for now this only updates the in-memory SessionPromptState).
 //
 // 关键词: ApplyVerificationTodoOps, Verify 写入, SessionPromptState 同步
-func (c *Config) ApplyVerificationTodoOps(scope VerificationTodoScope, satisfied bool, movements []VerifyNextMovement) {
+func (c *Config) ApplyVerificationTodoOps(scope VerificationTodoScope, satisfied bool, movements []VerifyNextMovement) []VerificationTodoApplyError {
 	if c == nil {
-		return
+		return nil
 	}
 	// 即便没有 movements, satisfied=true 也可能触发 SKIPPED 状态转换；故不 early-return.
-	c.GetSessionPromptState().ApplyVerificationTodoOps(scope, satisfied, movements)
+	return c.GetSessionPromptState().ApplyVerificationTodoOps(scope, satisfied, movements)
 }
 
 // GetVerificationTodoMarkdownDelta returns the markdown snapshot computed

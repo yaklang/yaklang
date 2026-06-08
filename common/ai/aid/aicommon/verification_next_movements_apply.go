@@ -57,7 +57,7 @@ func ApplyVerificationNextMovementsAndEmit(
 	// 1. apply: 把 delta 写入共享 store, 后续任何 prompt 渲染都能看到.
 	//    无论 emitter 是否存在, store 都必须更新 — 这是契约的关键, 让
 	//    "apply 必有效果"的语义不依赖前端事件通道的可用性.
-	cfg.ApplyVerificationTodoOps(scope, satisfied, movements)
+	applyErrors := cfg.ApplyVerificationTodoOps(scope, satisfied, movements)
 
 	// 2. emit 结构化 todo_list_update + current_task_todo_list_update.
 	//    emitter 为 nil 时跳过 (例如部分单元测试).
@@ -81,5 +81,17 @@ func ApplyVerificationNextMovementsAndEmit(
 		if line := FormatNextMovementsBreadcrumb(movements); line != "" {
 			timelineHook("NEXT_MOVEMENTS", line)
 		}
+		emitVerificationTodoApplyErrors(timelineHook, applyErrors)
+	}
+}
+
+const verificationTodoApplyErrorTimelineCategory = "[NEXT_MOVEMENTS_ERROR]"
+
+func emitVerificationTodoApplyErrors(timelineHook func(category, line string), errors []VerificationTodoApplyError) {
+	if timelineHook == nil || len(errors) == 0 {
+		return
+	}
+	if line := FormatVerificationTodoApplyErrors(errors); line != "" {
+		timelineHook(verificationTodoApplyErrorTimelineCategory, line)
 	}
 }

@@ -40,13 +40,14 @@ type adjustTodolistTestConfig struct {
 	markdownLastOps []aicommon.VerifyNextMovement
 }
 
-func (c *adjustTodolistTestConfig) ApplyVerificationTodoOps(scope aicommon.VerificationTodoScope, satisfied bool, movements []aicommon.VerifyNextMovement) {
+func (c *adjustTodolistTestConfig) ApplyVerificationTodoOps(scope aicommon.VerificationTodoScope, satisfied bool, movements []aicommon.VerifyNextMovement) []aicommon.VerificationTodoApplyError {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.applyCalls++
 	c.lastScope = scope
 	c.lastSatisfied = satisfied
 	c.lastMovements = append([]aicommon.VerifyNextMovement(nil), movements...)
+	return nil
 }
 
 func (c *adjustTodolistTestConfig) SnapshotVerificationTodoItems() []aicommon.VerificationTodoItem {
