@@ -412,6 +412,53 @@ func TestVerificationTodoStore_ActiveTodoItemsByScope_IgnoresSiblingAndLegacy(t 
 	require.True(t, store.HasActiveTodosByScope(currentScope))
 }
 
+func TestVerificationTodoStore_Apply_ReportsCrossScopeMutationFailure(t *testing.T) {
+	currentScope := VerificationTodoScope{TaskID: "task-current", TaskIndex: "2-1"}
+	siblingScope := VerificationTodoScope{TaskID: "task-sibling", TaskIndex: "2-2"}
+
+	store := NewVerificationTodoStore()
+	store.Apply(siblingScope, false, []VerifyNextMovement{
+		{Op: "add", ID: "sibling_todo", Content: "兄弟任务 TODO"},
+	})
+
+	errors := store.Apply(currentScope, false, []VerifyNextMovement{
+		{Op: "done", ID: "sibling_todo"},
+	})
+	require.Len(t, errors, 1)
+	require.Contains(t, errors[0].Reason, "another task scope")
+	require.Contains(t, errors[0].Reason, "task-sibling")
+
+	siblingItems := store.SnapshotItemsByScope(siblingScope)
+	require.Len(t, siblingItems, 1)
+	require.Equal(t, VerificationTodoStatusPending, siblingItems[0].Status)
+}
+
+func TestVerificationTodoStore_Apply_ReportsValidationFailures(t *testing.T) {
+	store := NewVerificationTodoStore()
+	errors := store.Apply(VerificationTodoScope{}, false, []VerifyNextMovement{
+		{Op: "add", Content: "missing id"},
+		{Op: "add", ID: "empty_content"},
+		{Op: "noop", ID: "x"},
+	})
+	require.Len(t, errors, 3)
+	require.Contains(t, errors[0].Reason, "missing id")
+	require.Contains(t, errors[1].Reason, "non-empty content")
+	require.Contains(t, errors[2].Reason, "unsupported op")
+}
+
+func TestFormatVerificationTodoApplyErrors_RendersFailures(t *testing.T) {
+	got := FormatVerificationTodoApplyErrors([]VerificationTodoApplyError{
+		{
+			Movement: VerifyNextMovement{Op: "done", ID: "sibling_todo"},
+			Reason:   "todo belongs to another task scope (task_id=task-sibling, task_index=2-2)",
+		},
+	})
+	require.Equal(t,
+		"FAILED DONE[sibling_todo]: todo belongs to another task scope (task_id=task-sibling, task_index=2-2)",
+		got,
+	)
+}
+
 func TestVerificationTodoStore_MutationCanClaimLegacyItemIntoScope(t *testing.T) {
 	scope := VerificationTodoScope{TaskID: "task-claim", TaskIndex: "3-1"}
 

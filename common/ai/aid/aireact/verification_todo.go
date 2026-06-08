@@ -46,7 +46,16 @@ func (r *ReAct) AppendVerificationHistory(result *aicommon.VerifySatisfactionRes
 	if r.config == nil {
 		return
 	}
-	r.config.ApplyVerificationTodoOps(aicommon.BuildVerificationTodoScope(r.GetCurrentTask()), result.Satisfied, result.NextMovements)
+	applyErrors := r.config.ApplyVerificationTodoOps(
+		aicommon.BuildVerificationTodoScope(r.GetCurrentTask()),
+		result.Satisfied,
+		result.NextMovements,
+	)
+	if len(applyErrors) > 0 {
+		if line := aicommon.FormatVerificationTodoApplyErrors(applyErrors); line != "" {
+			r.AddToTimeline("[NEXT_MOVEMENTS_ERROR]", line)
+		}
+	}
 }
 
 // RenderVerificationTodoSnapshot returns the plain-text TODO snapshot built
@@ -117,7 +126,7 @@ func buildVerificationTodoStoreFromHistory(history []*aicommon.VerifySatisfactio
 		if record == nil {
 			continue
 		}
-		store.Apply(aicommon.VerificationTodoScope{}, record.Satisfied, record.NextMovements)
+		_ = store.Apply(aicommon.VerificationTodoScope{}, record.Satisfied, record.NextMovements)
 	}
 	return store
 }

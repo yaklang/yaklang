@@ -34,13 +34,14 @@ type nextMovementsTrackableConfig struct {
 	snapshotStats   aicommon.VerificationTodoStats
 }
 
-func (c *nextMovementsTrackableConfig) ApplyVerificationTodoOps(scope aicommon.VerificationTodoScope, satisfied bool, movements []aicommon.VerifyNextMovement) {
+func (c *nextMovementsTrackableConfig) ApplyVerificationTodoOps(scope aicommon.VerificationTodoScope, satisfied bool, movements []aicommon.VerifyNextMovement) []aicommon.VerificationTodoApplyError {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.applyCalls++
 	c.lastScope = scope
 	c.lastSatisfied = satisfied
 	c.lastMovements = append([]aicommon.VerifyNextMovement(nil), movements...)
+	return nil
 }
 
 func (c *nextMovementsTrackableConfig) GetVerificationTodoMarkdownDelta(scope aicommon.VerificationTodoScope, satisfied bool, movements []aicommon.VerifyNextMovement) string {

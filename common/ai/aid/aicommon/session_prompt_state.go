@@ -231,21 +231,21 @@ func (s *SessionPromptState) SetVerificationTodo(todoJSON string) {
 
 // ApplyVerificationTodoOps applies one verification round's next_movements
 // operations (and the round's satisfied flag) to the persisted TODO store,
-// then re-serializes back to todoJSON. Returns the quoted serialized JSON so
-// callers can persist it (mirroring ApplySessionEvidenceOps).
+// then re-serializes back to todoJSON. Returns any ops that could not be
+// applied under the supplied scope.
 //
 // 关键词: ApplyVerificationTodoOps, 增量更新, satisfied -> SKIPPED, DB 持久化
-func (s *SessionPromptState) ApplyVerificationTodoOps(scope VerificationTodoScope, satisfied bool, movements []VerifyNextMovement) string {
+func (s *SessionPromptState) ApplyVerificationTodoOps(scope VerificationTodoScope, satisfied bool, movements []VerifyNextMovement) []VerificationTodoApplyError {
 	if s == nil {
-		return ""
+		return nil
 	}
 	s.m.Lock()
 	defer s.m.Unlock()
 
 	store := UnmarshalVerificationTodoStore(s.todoJSON)
-	store.Apply(scope, satisfied, movements)
+	applyErrors := store.Apply(scope, satisfied, movements)
 	s.todoJSON = store.Marshal()
-	return codec.StrConvQuote(s.todoJSON)
+	return applyErrors
 }
 
 // GetVerificationTodoRendered returns the plain-text TODO snapshot ready for
