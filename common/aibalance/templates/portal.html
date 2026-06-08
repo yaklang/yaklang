@@ -1795,6 +1795,28 @@
         </div>
     </div>
 
+    <!-- 通用敏感结果弹窗：用于重置密码 / 重置 OPS Key 等只显示一次的内容 -->
+    <!-- 关键词: secretResultModal 可复制结果弹窗, 替代不可复制的 alert, 重置密码/重置Key复制 -->
+    <div id="secretResultModal" class="delete-confirmation-modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closeSecretResultModal()">&times;</span>
+            <h4 id="secretResultTitle">操作成功</h4>
+            <div style="background: #d4edda; border: 1px solid #c3e6cb; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+                <p style="margin: 0; color: #155724;"><strong id="secretResultHint">请妥善保存以下信息，该信息仅显示一次！</strong></p>
+            </div>
+            <div class="form-group">
+                <label id="secretResultLabel">内容:</label>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <input type="text" id="secretResultValue" class="form-control" readonly style="flex: 1; font-family: monospace;" onclick="this.select()">
+                    <button class="btn btn-primary" onclick="copySecretResult()" style="white-space: nowrap;">复制</button>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-primary" onclick="closeSecretResultModal()">确定</button>
+            </div>
+        </div>
+    </div>
+
     <div id="editModelMetaModal" class="delete-confirmation-modal" style="display: none;">
         <!-- 关键词: 编辑模型信息 modal 宽度修复 width:720px (max-width 单独不生效, 默认 .modal-content width:400px) -->
         <div class="modal-content" style="width: 720px; max-width: 90vw;">
