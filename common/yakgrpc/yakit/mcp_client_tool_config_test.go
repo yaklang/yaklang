@@ -218,6 +218,24 @@ func TestDeleteMCPClientToolConfigsByServerAndNames(t *testing.T) {
 		_, err = GetMCPClientToolConfigByName(db, "mcp_empty-keep-srv_x")
 		assert.Error(t, err)
 	})
+
+	t.Run("hard-deleted tool can be recreated with same name", func(t *testing.T) {
+		const srvRecycle = "recycle-srv"
+		const toolName = "mcp_recycle-srv_tool"
+		_, err := GetOrCreateMCPClientToolConfig(db, toolName, schema.MCPClientToolSourceBridge, srvRecycle, "v1")
+		require.NoError(t, err)
+
+		require.NoError(t, DeleteMCPClientToolConfigsByServerAndNames(db, srvRecycle, map[string]struct{}{}))
+
+		var ghostCount int
+		require.NoError(t, db.Unscoped().Model(&schema.MCPClientToolConfig{}).
+			Where("tool_name = ?", toolName).Count(&ghostCount).Error)
+		assert.Equal(t, 0, ghostCount)
+
+		cfg, err := GetOrCreateMCPClientToolConfig(db, toolName, schema.MCPClientToolSourceBridge, srvRecycle, "v2")
+		require.NoError(t, err)
+		assert.Equal(t, "v2", cfg.Description)
+	})
 }
 
 func TestQueryMCPClientToolConfigs(t *testing.T) {

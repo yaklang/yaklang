@@ -115,7 +115,7 @@ func deleteStaleMCPClientToolsBySource(db *gorm.DB, source string, keepNames map
 	if len(toDelete) == 0 {
 		return nil
 	}
-	return db.Where("id IN (?)", toDelete).Delete(&schema.MCPClientToolConfig{}).Error
+	return db.Where("id IN (?)", toDelete).Unscoped().Delete(&schema.MCPClientToolConfig{}).Error
 }
 
 // EnsureMCPClientToolConfigSource updates the source column when a tool migrates
@@ -197,7 +197,7 @@ func DeleteMCPClientToolConfigsByServerAndNames(db *gorm.DB, serverName string, 
 	if len(keepNames) == 0 {
 		// Remove all bridge tools for this server.
 		return db.Where("source = ? AND server_name = ?", schema.MCPClientToolSourceBridge, serverName).
-			Delete(&schema.MCPClientToolConfig{}).Error
+			Unscoped().Delete(&schema.MCPClientToolConfig{}).Error
 	}
 
 	// Fetch all rows for this server, then delete those not in keepNames.
@@ -216,7 +216,7 @@ func DeleteMCPClientToolConfigsByServerAndNames(db *gorm.DB, serverName string, 
 	if len(toDelete) == 0 {
 		return nil
 	}
-	return db.Where("id IN (?)", toDelete).Delete(&schema.MCPClientToolConfig{}).Error
+	return db.Where("id IN (?)", toDelete).Unscoped().Delete(&schema.MCPClientToolConfig{}).Error
 }
 
 // GetDisabledMCPClientToolNames returns the set of tool names that are explicitly
