@@ -688,6 +688,10 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		} else {
 			// 重匹配的分支
 			if reMatch {
+				task, err := yakit.SaveWebFuzzerTask(s.GetProjectDatabase(), req, 0, false, "rematch")
+				if err != nil {
+					return utils.Errorf("save to web fuzzer to database failed: %s", err)
+				}
 				if len(oldIDs) == 0 { // 尝试修复
 					oldIDs = []uint{uint(historyID)}
 				}
@@ -758,8 +762,9 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 						doFuzzerServerPushThrottle()
 						continue
 					}
-					respModel.TaskId = int64(historyID)
+					respModel.TaskId = int64(task.ID)
 					respModel.ExtractedResults = extractorResults
+					yakit.SaveWebFuzzerResponseEx(int(task.ID), resp.HiddenIndex, respModel)
 					feedbackResponse(respModel, true, false)
 				}
 
