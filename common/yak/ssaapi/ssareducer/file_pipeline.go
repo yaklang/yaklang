@@ -6,12 +6,12 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/utils/memedit"
+	"github.com/yaklang/yaklang/common/utils/pipeline"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
@@ -25,13 +25,14 @@ const (
 	defaultPipeConcurrency      = 10
 	defaultOrderedASTBufferFile = 1024
 	maxSourceQueueSize          = 8192
+	parsedASTQueueSize          = 0
 )
 
 const maxFileSize = 5 * 1024 * 1024 // 5MB
 
-// pipeInitBufSize caps source-content queue capacity before AST parse. AST
-// output itself is unbuffered in OutOfOrder mode, so parsed trees cannot queue
-// ahead of the pre-handler consumer.
+// pipeInitBufSize caps source-content queue capacity before AST parse. Parsed
+// AST output is unbuffered in OutOfOrder mode, so trees cannot queue ahead of
+// the pre-handler consumer by total project file count.
 func pipeInitBufSize(pathCount, compileConcurrency int) int {
 	if pathCount < 1 {
 		pathCount = 1
@@ -172,7 +173,27 @@ func FilesHandler(
 		return fileContent
 	}
 
-	parseOut := runBoundedFilePipeline(ctx, paths, bufSize, concurrency, readFile, parseFile, initWorker)
+	readPipe := pipeline.NewBoundedPipe[string, *FileContent](
+		ctx,
+		bufSize,
+		func(path string) (*FileContent, error) {
+			return readFile(path), nil
+		},
+		concurrency,
+	)
+	readPipe.FeedSlice(paths)
+
+	parsePipe := pipeline.NewBoundedPipeWithStore[*FileContent, *FileContent](
+		ctx,
+		parsedASTQueueSize,
+		func(fileContent *FileContent, store *utils.SafeMap[any]) (*FileContent, error) {
+			return parseFile(fileContent, store), nil
+		},
+		initWorker,
+		concurrency,
+	)
+	parsePipe.FeedChannel(readPipe.Out())
+	parseOut := parsePipe.Out()
 
 	sort := func(index int) <-chan *FileContent {
 		out := make([]*FileContent, 0, len(paths))
@@ -232,91 +253,4 @@ func effectiveASTSequence(orderType ASTSequenceType, pathCount int) ASTSequenceT
 		limit,
 	)
 	return OutOfOrder
-}
-
-func runBoundedFilePipeline(
-	ctx context.Context,
-	paths []string,
-	bufSize int,
-	concurrency int,
-	readFile func(string) *FileContent,
-	parseFile func(*FileContent, *utils.SafeMap[any]) *FileContent,
-	initWorker func() *utils.SafeMap[any],
-) <-chan *FileContent {
-	pathCh := make(chan string, bufSize)
-	readCh := make(chan *FileContent, bufSize)
-	parseCh := make(chan *FileContent)
-
-	go func() {
-		defer close(pathCh)
-		for _, path := range paths {
-			select {
-			case <-ctx.Done():
-				return
-			case pathCh <- path:
-			}
-		}
-	}()
-
-	var readWG sync.WaitGroup
-	readWG.Add(concurrency)
-	for i := 0; i < concurrency; i++ {
-		go func() {
-			defer readWG.Done()
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case path, ok := <-pathCh:
-					if !ok {
-						return
-					}
-					fileContent := readFile(path)
-					select {
-					case <-ctx.Done():
-						return
-					case readCh <- fileContent:
-					}
-				}
-			}
-		}()
-	}
-	go func() {
-		readWG.Wait()
-		close(readCh)
-	}()
-
-	var parseWG sync.WaitGroup
-	parseWG.Add(concurrency)
-	for i := 0; i < concurrency; i++ {
-		go func() {
-			defer parseWG.Done()
-			var store *utils.SafeMap[any]
-			if initWorker != nil {
-				store = initWorker()
-			}
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case fileContent, ok := <-readCh:
-					if !ok {
-						return
-					}
-					fileContent = parseFile(fileContent, store)
-					select {
-					case <-ctx.Done():
-						return
-					case parseCh <- fileContent:
-					}
-				}
-			}
-		}()
-	}
-	go func() {
-		parseWG.Wait()
-		close(parseCh)
-	}()
-
-	return parseCh
 }
