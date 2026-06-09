@@ -4907,6 +4907,8 @@ message QueryRiskRequest {
 message PacketPair {
   int64 HttpflowId = 1;
   string Url = 2;
+  string Request = 3;
+  string Response = 4;
 }
 
 message Risk {
