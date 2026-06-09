@@ -70,10 +70,14 @@ func BuildCapabilityInventoryPayload(cfg *aicommon.Config, loop *ReActLoop) aico
 }
 
 func EmitCapabilityInventorySnapshot(cfg *aicommon.Config, loop *ReActLoop) {
-	if cfg == nil || cfg.GetEmitter() == nil {
+	emitter := cfg.GetEmitter()
+	if loop != nil && loop.GetEmitter() != nil {
+		emitter = loop.GetEmitter()
+	}
+	if emitter == nil {
 		return
 	}
-	_, _ = cfg.GetEmitter().EmitSystemStructured(
+	_, _ = emitter.EmitSystemStructured(
 		aicommon.CapabilityInventoryNodeID,
 		BuildCapabilityInventoryPayload(cfg, loop),
 	)

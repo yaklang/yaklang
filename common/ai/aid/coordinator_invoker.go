@@ -47,6 +47,9 @@ func (c *Coordinator) ExecuteLoopTask(taskTypeName string, task aicommon.AIState
 		aicommon.WithEnablePlanAndExec(false),
 		aicommon.WithHotPatchOptionChan(hotpatchChan),
 	)
+	if taskEmitter := task.GetEmitter(); taskEmitter != nil {
+		baseOpts = append(baseOpts, aicommon.WithEmitter(taskEmitter))
+	}
 
 	invoker, err := aicommon.AIRuntimeInvokerGetter(c.GetContext(), baseOpts...)
 	if err != nil {

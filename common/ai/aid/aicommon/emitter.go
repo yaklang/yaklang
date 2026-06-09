@@ -246,6 +246,10 @@ func (r *Emitter) EmitAPIRequestFailed(id string, payload map[string]any) (*sche
 }
 
 func (r *Emitter) EmitSyncJSON(typeName schema.EventType, id string, i any, syncID string) (*schema.AiOutputEvent, error) {
+	return r.EmitSyncJSONWithTaskIndex(typeName, id, i, syncID, "")
+}
+
+func (r *Emitter) EmitSyncJSONWithTaskIndex(typeName schema.EventType, id string, i any, syncID, taskIndex string) (*schema.AiOutputEvent, error) {
 	event := &schema.AiOutputEvent{
 		CoordinatorId: r.id,
 		Type:          typeName,
@@ -255,6 +259,7 @@ func (r *Emitter) EmitSyncJSON(typeName schema.EventType, id string, i any, sync
 		Content:       utils.Jsonify(i),
 		Timestamp:     time.Now().Unix(),
 		SyncID:        syncID,
+		TaskIndex:     taskIndex,
 	}
 	return r.emit(event)
 }
