@@ -462,11 +462,12 @@ func (c *ServerConfig) handleTestMirrorRule(conn net.Conn, request *http.Request
 		// save() 调用反馈: 试运行不真正落盘 (save_persisted 恒为 0),
 		// save_enabled 表示生产环境当前是否会落盘。
 		// 关键词: handleTestMirrorRule save 反馈字段
-		"save_calls":     result.Save.Calls,
-		"save_persisted": result.Save.Persisted,
-		"save_bytes":     result.Save.Bytes,
-		"save_enabled":   result.Save.Enabled,
-		"save_preview":   result.Save.Preview,
+		"save_calls":        result.Save.Calls,
+		"save_tagged_calls": result.Save.TaggedCalls,
+		"save_persisted":    result.Save.Persisted,
+		"save_bytes":        result.Save.Bytes,
+		"save_enabled":      result.Save.Enabled,
+		"save_preview":      result.Save.Preview,
 	})
 }
 

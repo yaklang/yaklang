@@ -178,8 +178,13 @@ func handle(data) {
     log.info(f"mirror got req: model=${data.model} action=${data.action} duration=${data["duration_ms"]}ms tool_calls=${toolCallCount}")
 
     // 示例: 调用内置 save 把本次镜像数据落盘归档 (容量受限, 超限自动清理旧数据).
-    //   save()        // 落盘当前 data
+    //   save()        // 落盘当前 data 到按天日分片
     //   save(data)    // 等价写法, 也可传入自定义对象 save({"k": "v"})
+    //
+    // 示例: save 带 tag 时落到独立的"永久留存区" ({tag}-${date}.jsonl), 永不被容量清理,
+    //       适合必须长期保留的重要数据. tag 仅允许 [A-Za-z0-9_-].
+    //   save("vulns-found")          // 落盘当前 data 到 vulns-found-${date}.jsonl
+    //   save("vulns-found", payload) // 落盘自定义对象到该 tag 分片
 
     // 示例: 把命中条件的请求落到本地文件 (按需打开).
     //   file.SaveAndAppend("/tmp/mirror.log", json.dumps(data) + "\n")

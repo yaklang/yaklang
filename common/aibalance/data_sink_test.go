@@ -125,6 +125,61 @@ func TestDataSink_IgnoresNonShardFiles(t *testing.T) {
 	assert.Equal(t, int64(1), records, "only the dated shard should be counted")
 }
 
+// TestDataSink_TaggedAppendIsPermanent 验证带 tag 落盘:
+//   - 写到 {tag}-{date}.jsonl
+//   - 不计入 records/bytes (与日分片预算隔离)
+//   - 不出现在 recentRecords (面板只看日分片)
+//   - 不被容量治理删除 (永久留存)
+// 关键词: 带 tag 永久留存, appendTaggedRecord, 不计容量不清理
+func TestDataSink_TaggedAppendIsPermanent(t *testing.T) {
+	dir := t.TempDir()
+	s := newDataSink(dir)
+	s.applyConfig(true, 6<<30, 2<<30, 60)
+
+	ok, err := s.appendTaggedRecord("vulns-found", map[string]any{"model": "vuln", "k": "v"})
+	require.NoError(t, err)
+	assert.True(t, ok)
+
+	// 文件名形如 vulns-found-YYYY-MM-DD.jsonl。
+	tagPath := filepath.Join(dir, taggedShardName("vulns-found", nowDate()))
+	_, statErr := os.Stat(tagPath)
+	require.NoError(t, statErr, "tagged shard file must exist")
+
+	// 不计入日分片计数。
+	records, bytes := s.stats()
+	assert.Equal(t, int64(0), records, "tagged record must not count into records")
+	assert.Equal(t, int64(0), bytes)
+
+	// 不出现在最近记录 (面板只读日分片), 也不被识别为日分片。
+	shards, lerr := s.listShardsLocked()
+	require.NoError(t, lerr)
+	assert.Empty(t, shards, "tagged shard must not be treated as a daily shard")
+	recent, rerr := s.recentRecords(10)
+	require.NoError(t, rerr)
+	assert.Empty(t, recent, "tagged record must not appear in recent records")
+
+	// 容量治理 (即便阈值极小) 也绝不删除带 tag 文件。
+	s.applyConfig(true, 1, 1, 60)
+	require.NoError(t, s.enforceCapacity())
+	_, statErr2 := os.Stat(tagPath)
+	assert.NoError(t, statErr2, "tagged shard must never be reclaimed by capacity governor")
+}
+
+// TestDataSink_TaggedTagValidation 验证非法 tag 被拒绝 (防文件名注入)。
+// 关键词: validDataSinkTag, 非法 tag 拒绝, 防路径穿越
+func TestDataSink_TaggedTagValidation(t *testing.T) {
+	s := newDataSink(t.TempDir())
+	s.applyConfig(true, 6<<30, 2<<30, 60)
+	for _, bad := range []string{"", "  ", "../etc", "a/b", "a b", "tag.name", "中文"} {
+		ok, err := s.appendTaggedRecord(bad, map[string]any{"x": 1})
+		assert.Error(t, err, "tag %q should be rejected", bad)
+		assert.False(t, ok)
+	}
+	for _, good := range []string{"vulns-found", "vulns_found", "Vulns123", "a"} {
+		assert.True(t, validDataSinkTag(good), "tag %q should be valid", good)
+	}
+}
+
 func TestDataSink_InitCountFromDiskRecount(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, nowDate()+dataSinkFileSuffix)
@@ -179,6 +234,48 @@ func handle(data) {
 	require.NoError(t, rerr)
 	require.Len(t, recent, 1)
 	assert.Equal(t, "m-smoke", recent[0]["model"])
+}
+
+// TestExecuteMirrorScript_SaveTagPermanent 端到端验证 mirror 脚本里 save("tag")
+// 把数据落到永久留存分片 ({tag}-{date}.jsonl), 且不计入日分片计数。
+// 关键词: save tag 端到端, 永久留存分片, executeMirrorScript
+func TestExecuteMirrorScript_SaveTagPermanent(t *testing.T) {
+	dir := t.TempDir()
+	tmp := newDataSink(dir)
+	tmp.applyConfig(true, 6<<30, 2<<30, 60)
+
+	globalDataSinkMu.Lock()
+	orig := globalDataSink
+	globalDataSink = tmp
+	globalDataSinkMu.Unlock()
+	defer func() {
+		globalDataSinkMu.Lock()
+		globalDataSink = orig
+		globalDataSinkMu.Unlock()
+	}()
+
+	script := `
+func handle(data) {
+    save("vulns-found")
+}
+`
+	snap := &MirrorSnapshot{ReqID: "tag-e2e", Model: "m-tag"}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	err, _, outcome := executeMirrorScript(ctx, script, snap, true)
+	if err != nil {
+		t.Skipf("yak script engine not available in test env: %v", err)
+	}
+	assert.Equal(t, 1, outcome.Calls)
+	assert.Equal(t, 1, outcome.TaggedCalls)
+	assert.Equal(t, 1, outcome.Persisted)
+
+	// 永久留存分片应存在; 日分片计数应保持 0 (与容量预算隔离)。
+	tagPath := filepath.Join(dir, taggedShardName("vulns-found", nowDate()))
+	_, statErr := os.Stat(tagPath)
+	require.NoError(t, statErr, "tagged shard must be created by save(\"tag\")")
+	records, _ := tmp.stats()
+	assert.Equal(t, int64(0), records, "tagged save must not bump daily records")
 }
 
 // TestExecuteMirrorScript_SaveDryRunNoPersist 验证试运行 (allowPersist=false):
