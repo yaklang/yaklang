@@ -20,6 +20,38 @@ type YaklibDependency struct {
 	Methods []string
 }
 
+func ValidatePrunedRuntimeDependencies(deps []YaklibDependency) error {
+	unsupported := UnsupportedPrunedRuntimeDependencies(deps)
+	if len(unsupported) == 0 {
+		return nil
+	}
+	dep := unsupported[0]
+	method := ""
+	if len(dep.Methods) > 0 {
+		method = dep.Methods[0]
+	}
+	return formatUnsupportedPrunedRuntimeDependency(dep.Module, method)
+}
+
+func UnsupportedPrunedRuntimeDependencies(deps []YaklibDependency) []YaklibDependency {
+	out := make([]YaklibDependency, 0)
+	for _, dep := range normalizeYaklibDependencies(deps) {
+		methods := make([]string, 0, len(dep.Methods))
+		for _, method := range dep.Methods {
+			if !isPrunedRuntimeDependencySupported(dep.Module, method) {
+				methods = append(methods, method)
+			}
+		}
+		if len(methods) > 0 {
+			out = append(out, YaklibDependency{
+				Module:  dep.Module,
+				Methods: methods,
+			})
+		}
+	}
+	return out
+}
+
 func BuildPrunedRuntimeArchiveFromEmbeddedSource(buildDir string, deps []YaklibDependency) (archivePath string, gcLibDir string, err error) {
 	srcDir := filepath.Join(buildDir, "ssa2llvm-stdlib-src")
 	if _, err := ExtractRuntimeSourceToDir(srcDir); err != nil {
@@ -230,7 +262,7 @@ func writePrunedRuntimeImports(runtimeDir string, deps []YaklibDependency) error
 			for _, method := range methods {
 				expr, ok := prunedBuiltinGlobalExportExpr(method)
 				if !ok {
-					return fmt.Errorf("%w: global.%s", ErrUnsupportedPrunedRuntime, method)
+					return formatUnsupportedPrunedRuntimeDependency(module, method)
 				}
 				globals[method] = expr
 			}
@@ -238,7 +270,7 @@ func writePrunedRuntimeImports(runtimeDir string, deps []YaklibDependency) error
 			for _, method := range methods {
 				expr, ok := prunedCodecExportExpr(method)
 				if !ok {
-					return fmt.Errorf("%w: codec.%s", ErrUnsupportedPrunedRuntime, method)
+					return formatUnsupportedPrunedRuntimeDependency(module, method)
 				}
 				imports["codec"] = goImportSpec{Alias: "codec", Path: "github.com/yaklang/yaklang/common/yak/yaklib/codec"}
 				modules[module] = setModuleExport(modules[module], method, expr)
@@ -253,7 +285,7 @@ func writePrunedRuntimeImports(runtimeDir string, deps []YaklibDependency) error
 			imports["yakhttp"] = goImportSpec{Alias: "yakhttp", Path: "github.com/yaklang/yaklang/common/yak/yaklib/yakhttp"}
 			modules[module] = setModuleExport(modules[module], "*", "yakhttp.HttpExports")
 		default:
-			return fmt.Errorf("%w: %s", ErrUnsupportedPrunedRuntime, module)
+			return formatUnsupportedPrunedRuntimeDependency(module, "")
 		}
 	}
 
@@ -320,6 +352,41 @@ func setModuleExport(exports map[string]string, name, expr string) map[string]st
 	}
 	exports[name] = expr
 	return exports
+}
+
+func isPrunedRuntimeDependencySupported(module, method string) bool {
+	module = strings.TrimSpace(module)
+	method = strings.TrimSpace(method)
+	if method == "" {
+		return false
+	}
+	switch module {
+	case "":
+		_, ok := prunedBuiltinGlobalExportExpr(method)
+		return ok
+	case "codec":
+		_, ok := prunedCodecExportExpr(method)
+		return ok
+	case "cli", "poc", "http":
+		return true
+	default:
+		return false
+	}
+}
+
+func formatUnsupportedPrunedRuntimeDependency(module, method string) error {
+	module = strings.TrimSpace(module)
+	method = strings.TrimSpace(method)
+	switch {
+	case module == "" && method != "":
+		return fmt.Errorf("%w: global.%s", ErrUnsupportedPrunedRuntime, method)
+	case module != "" && method != "":
+		return fmt.Errorf("%w: %s.%s", ErrUnsupportedPrunedRuntime, module, method)
+	case module != "":
+		return fmt.Errorf("%w: %s", ErrUnsupportedPrunedRuntime, module)
+	default:
+		return fmt.Errorf("%w: empty dependency", ErrUnsupportedPrunedRuntime)
+	}
 }
 
 func prunedBuiltinGlobalExportExpr(method string) (string, bool) {

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -76,6 +77,28 @@ func TestWritePrunedRuntimeImports_UnsupportedDependency(t *testing.T) {
 	err := writePrunedRuntimeImports(t.TempDir(), []YaklibDependency{
 		{Module: "json", Methods: []string{"dumps"}},
 	})
+	if !errors.Is(err, ErrUnsupportedPrunedRuntime) {
+		t.Fatalf("expected ErrUnsupportedPrunedRuntime, got %v", err)
+	}
+}
+
+func TestUnsupportedPrunedRuntimeDependencies(t *testing.T) {
+	got := UnsupportedPrunedRuntimeDependencies([]YaklibDependency{
+		{Module: "codec", Methods: []string{"EncodeBase64", "Missing"}},
+		{Module: "", Methods: []string{"len", "sprintf"}},
+		{Module: "json", Methods: []string{"dumps", "loads"}},
+		{Module: "cli", Methods: []string{"String", "check"}},
+	})
+	want := []YaklibDependency{
+		{Module: "", Methods: []string{"sprintf"}},
+		{Module: "codec", Methods: []string{"Missing"}},
+		{Module: "json", Methods: []string{"dumps", "loads"}},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("unexpected unsupported deps:\nwant=%#v\n got=%#v", want, got)
+	}
+
+	err := ValidatePrunedRuntimeDependencies(got)
 	if !errors.Is(err, ErrUnsupportedPrunedRuntime) {
 		t.Fatalf("expected ErrUnsupportedPrunedRuntime, got %v", err)
 	}
