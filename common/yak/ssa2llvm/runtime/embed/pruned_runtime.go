@@ -3,6 +3,7 @@ package embed
 import (
 	"errors"
 	"fmt"
+	"go/format"
 	"io"
 	"os"
 	"os/exec"
@@ -34,11 +35,12 @@ func ValidatePrunedRuntimeDependencies(deps []YaklibDependency) error {
 }
 
 func UnsupportedPrunedRuntimeDependencies(deps []YaklibDependency) []YaklibDependency {
+	registry, _ := scriptEngineRegistryFromLocalSource()
 	out := make([]YaklibDependency, 0)
 	for _, dep := range normalizeYaklibDependencies(deps) {
 		methods := make([]string, 0, len(dep.Methods))
 		for _, method := range dep.Methods {
-			if !isPrunedRuntimeDependencySupported(dep.Module, method) {
+			if !isPrunedRuntimeDependencySupportedWithRegistry(registry, dep.Module, method) {
 				methods = append(methods, method)
 			}
 		}
@@ -181,6 +183,7 @@ func copyPrunedRuntimeBuildTagSources(root, srcDir string) error {
 	files := []string{
 		filepath.Join("common", "yak", "ssa2llvm", "runtime", "runtime_go", "runtime_yaklib_builtins_pruned.go"),
 		filepath.Join("common", "yak", "ssa2llvm", "runtime", "runtime_go", "runtime_yaklib_lookup_pruned.go"),
+		filepath.Join("common", "yak", "ssa2llvm", "runtime", "runtime_go", "runtime_yaklib_yakit_pruned.go"),
 		filepath.Join("common", "yak", "ssa2llvm", "runtime", "runtime_go", "runtime_sync_pruned.go"),
 	}
 	for _, rel := range files {
@@ -250,9 +253,11 @@ type goImportSpec struct {
 }
 
 func writePrunedRuntimeImports(runtimeDir string, deps []YaklibDependency) error {
+	registry, registryErr := scriptEngineRegistryForRuntimeDir(runtimeDir)
 	imports := map[string]goImportSpec{}
 	modules := map[string]map[string]string{}
 	globals := map[string]string{}
+	globalTables := map[string]scriptEngineExport{}
 
 	for _, dep := range normalizeYaklibDependencies(deps) {
 		module := dep.Module
@@ -261,10 +266,18 @@ func writePrunedRuntimeImports(runtimeDir string, deps []YaklibDependency) error
 		case "":
 			for _, method := range methods {
 				expr, ok := prunedBuiltinGlobalExportExpr(method)
+				if ok {
+					globals[method] = expr
+					continue
+				}
+				export, ok := registry.globalForMethod(method)
 				if !ok {
 					return formatUnsupportedPrunedRuntimeDependency(module, method)
 				}
-				globals[method] = expr
+				if err := addExportImports(imports, export); err != nil {
+					return err
+				}
+				globalTables[export.Expr] = export
 			}
 		case "codec":
 			for _, method := range methods {
@@ -284,8 +297,20 @@ func writePrunedRuntimeImports(runtimeDir string, deps []YaklibDependency) error
 		case "http":
 			imports["yakhttp"] = goImportSpec{Alias: "yakhttp", Path: "github.com/yaklang/yaklang/common/yak/yaklib/yakhttp"}
 			modules[module] = setModuleExport(modules[module], "*", "yakhttp.HttpExports")
+		case "yakit":
+			modules[module] = setModuleExport(modules[module], "*", "runtimePrunedYakitExports()")
 		default:
-			return formatUnsupportedPrunedRuntimeDependency(module, "")
+			if registryErr != nil {
+				return fmt.Errorf("%w: %s: %v", ErrUnsupportedPrunedRuntime, module, registryErr)
+			}
+			export, ok := registry.module(module)
+			if !ok {
+				return formatUnsupportedPrunedRuntimeDependency(module, "")
+			}
+			if err := addExportImports(imports, export); err != nil {
+				return err
+			}
+			modules[module] = setModuleExport(modules[module], "*", export.Expr)
 		}
 	}
 
@@ -306,6 +331,11 @@ func writePrunedRuntimeImports(runtimeDir string, deps []YaklibDependency) error
 		b.WriteString(")\n\n")
 	}
 	b.WriteString("func init() {\n")
+	if len(globalTables) > 0 {
+		for _, expr := range orderedGlobalTableExprs(registry, globalTables) {
+			b.WriteString(fmt.Sprintf("\truntimeRegisterYaklibGlobals(%s)\n", expr))
+		}
+	}
 	if len(globals) > 0 {
 		names := make([]string, 0, len(globals))
 		for name := range globals {
@@ -343,7 +373,55 @@ func writePrunedRuntimeImports(runtimeDir string, deps []YaklibDependency) error
 	b.WriteString("}\n")
 
 	path := filepath.Join(runtimeDir, "runtime_imports_generated.go")
-	return os.WriteFile(path, []byte(b.String()), 0o644)
+	src := []byte(b.String())
+	if formatted, err := format.Source(src); err == nil {
+		src = formatted
+	}
+	return os.WriteFile(path, src, 0o644)
+}
+
+func addExportImports(imports map[string]goImportSpec, export scriptEngineExport) error {
+	for _, spec := range export.Imports {
+		if err := addImportSpec(imports, spec); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func addImportSpec(imports map[string]goImportSpec, spec goImportSpec) error {
+	if spec.Alias == "" || spec.Path == "" {
+		return nil
+	}
+	existing, ok := imports[spec.Alias]
+	if ok && existing.Path != spec.Path {
+		return fmt.Errorf("build pruned runtime archive failed: import alias %s maps to both %s and %s", spec.Alias, existing.Path, spec.Path)
+	}
+	imports[spec.Alias] = spec
+	return nil
+}
+
+func orderedGlobalTableExprs(registry *scriptEngineLibRegistry, selected map[string]scriptEngineExport) []string {
+	out := make([]string, 0, len(selected))
+	seen := make(map[string]struct{}, len(selected))
+	if registry != nil {
+		for _, export := range registry.Globals {
+			if _, ok := selected[export.Expr]; !ok {
+				continue
+			}
+			out = append(out, export.Expr)
+			seen[export.Expr] = struct{}{}
+		}
+	}
+	extras := make([]string, 0)
+	for expr := range selected {
+		if _, ok := seen[expr]; ok {
+			continue
+		}
+		extras = append(extras, expr)
+	}
+	sort.Strings(extras)
+	return append(out, extras...)
 }
 
 func setModuleExport(exports map[string]string, name, expr string) map[string]string {
@@ -355,6 +433,11 @@ func setModuleExport(exports map[string]string, name, expr string) map[string]st
 }
 
 func isPrunedRuntimeDependencySupported(module, method string) bool {
+	registry, _ := scriptEngineRegistryFromLocalSource()
+	return isPrunedRuntimeDependencySupportedWithRegistry(registry, module, method)
+}
+
+func isPrunedRuntimeDependencySupportedWithRegistry(registry *scriptEngineLibRegistry, module, method string) bool {
 	module = strings.TrimSpace(module)
 	method = strings.TrimSpace(method)
 	if method == "" {
@@ -362,15 +445,19 @@ func isPrunedRuntimeDependencySupported(module, method string) bool {
 	}
 	switch module {
 	case "":
-		_, ok := prunedBuiltinGlobalExportExpr(method)
+		if _, ok := prunedBuiltinGlobalExportExpr(method); ok {
+			return true
+		}
+		_, ok := registry.globalForMethod(method)
 		return ok
 	case "codec":
 		_, ok := prunedCodecExportExpr(method)
 		return ok
-	case "cli", "poc", "http":
+	case "cli", "poc", "http", "yakit":
 		return true
 	default:
-		return false
+		_, ok := registry.module(module)
+		return ok
 	}
 }
 

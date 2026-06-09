@@ -74,6 +74,8 @@ cp "${REPO_ROOT}/common/yak/ssa2llvm/runtime/runtime_go/runtime_yaklib_builtins_
   "${SRC_STAGE_DIR}/common/yak/ssa2llvm/runtime/runtime_go/runtime_yaklib_builtins_pruned.go"
 cp "${REPO_ROOT}/common/yak/ssa2llvm/runtime/runtime_go/runtime_yaklib_lookup_pruned.go" \
   "${SRC_STAGE_DIR}/common/yak/ssa2llvm/runtime/runtime_go/runtime_yaklib_lookup_pruned.go"
+cp "${REPO_ROOT}/common/yak/ssa2llvm/runtime/runtime_go/runtime_yaklib_yakit_pruned.go" \
+  "${SRC_STAGE_DIR}/common/yak/ssa2llvm/runtime/runtime_go/runtime_yaklib_yakit_pruned.go"
 cp "${REPO_ROOT}/common/yak/ssa2llvm/runtime/runtime_go/runtime_sync_pruned.go" \
   "${SRC_STAGE_DIR}/common/yak/ssa2llvm/runtime/runtime_go/runtime_sync_pruned.go"
 

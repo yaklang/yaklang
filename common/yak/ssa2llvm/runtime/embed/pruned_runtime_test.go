@@ -24,7 +24,8 @@ func TestWritePrunedRuntimeImports_CodecDependency(t *testing.T) {
 	assertContains(t, got, `codec "github.com/yaklang/yaklang/common/yak/yaklib/codec"`)
 	assertContains(t, got, `runtimeRegisterYaklibModule("codec", map[string]any{`)
 	assertContains(t, got, `"EncodeBase64": codec.EncodeBase64,`)
-	assertContains(t, got, `"Sha256": codec.Sha256,`)
+	assertContains(t, got, `"Sha256":`)
+	assertContains(t, got, `codec.Sha256,`)
 	assertNotContains(t, got, `_ "github.com/yaklang/yaklang/common/yak"`)
 	if count := strings.Count(got, `"EncodeBase64": codec.EncodeBase64,`); count != 1 {
 		t.Fatalf("EncodeBase64 should be generated once, got %d occurrences in:\n%s", count, got)
@@ -66,7 +67,7 @@ func TestWritePrunedRuntimeImports_GlobalBuiltinDependency(t *testing.T) {
 
 func TestWritePrunedRuntimeImports_UnsupportedGlobalDependency(t *testing.T) {
 	err := writePrunedRuntimeImports(t.TempDir(), []YaklibDependency{
-		{Module: "", Methods: []string{"sprint"}},
+		{Module: "", Methods: []string{"definitelyMissingGlobal"}},
 	})
 	if !errors.Is(err, ErrUnsupportedPrunedRuntime) {
 		t.Fatalf("expected ErrUnsupportedPrunedRuntime, got %v", err)
@@ -75,24 +76,145 @@ func TestWritePrunedRuntimeImports_UnsupportedGlobalDependency(t *testing.T) {
 
 func TestWritePrunedRuntimeImports_UnsupportedDependency(t *testing.T) {
 	err := writePrunedRuntimeImports(t.TempDir(), []YaklibDependency{
-		{Module: "json", Methods: []string{"dumps"}},
+		{Module: "definitelyMissingModule", Methods: []string{"Call"}},
 	})
 	if !errors.Is(err, ErrUnsupportedPrunedRuntime) {
 		t.Fatalf("expected ErrUnsupportedPrunedRuntime, got %v", err)
 	}
 }
 
+func TestScriptEngineLibRegistry(t *testing.T) {
+	registry, err := scriptEngineRegistryFromLocalSource()
+	if err != nil {
+		t.Fatalf("load script engine registry failed: %v", err)
+	}
+
+	jsonExport, ok := registry.module("json")
+	if !ok {
+		t.Fatalf("missing json module in script engine registry")
+	}
+	if jsonExport.Expr != "yaklib.JsonExports" {
+		t.Fatalf("unexpected json export expression: %q", jsonExport.Expr)
+	}
+
+	fileExport, ok := registry.module("file")
+	if !ok {
+		t.Fatalf("missing file module in script engine registry")
+	}
+	if fileExport.Expr != "yaklib.FileExport" {
+		t.Fatalf("unexpected file export expression: %q", fileExport.Expr)
+	}
+
+	filesysExport, ok := registry.module("filesys")
+	if !ok {
+		t.Fatalf("missing filesys module in script engine registry")
+	}
+	if filesysExport.Expr != "filesys.Exports" {
+		t.Fatalf("unexpected filesys export expression: %q", filesysExport.Expr)
+	}
+
+	ssaExport, ok := registry.module("ssa")
+	if !ok {
+		t.Fatalf("missing ssa module in script engine registry")
+	}
+	assertContains(t, ssaExport.Expr, "lo.Assign(")
+	assertContains(t, ssaExport.Expr, "ssaapi.Exports")
+	assertContains(t, ssaExport.Expr, "ssaproject.Exports")
+	assertContains(t, ssaExport.Expr, "ssaconfig.Exports")
+	assertNotContains(t, ssaExport.Expr, "ssaExports")
+
+	sprintfExport, ok := registry.globalForMethod("sprintf")
+	if !ok {
+		t.Fatalf("missing sprintf global in script engine registry")
+	}
+	if sprintfExport.Expr != "builtin.YaklangBaseLib" {
+		t.Fatalf("unexpected sprintf export expression: %q", sprintfExport.Expr)
+	}
+
+	atoiExport, ok := registry.globalForMethod("atoi")
+	if !ok {
+		t.Fatalf("missing atoi global in script engine registry")
+	}
+	if atoiExport.Expr != "yaklib.GlobalExport" {
+		t.Fatalf("unexpected atoi export expression: %q", atoiExport.Expr)
+	}
+}
+
+func TestWritePrunedRuntimeImports_ScriptEngineModuleDependencies(t *testing.T) {
+	dir := t.TempDir()
+
+	err := writePrunedRuntimeImports(dir, []YaklibDependency{
+		{Module: "json", Methods: []string{"dumps", "loads"}},
+		{Module: "file", Methods: []string{"GetExt"}},
+		{Module: "filesys", Methods: []string{"Recursive"}},
+		{Module: "ssa", Methods: []string{"NewConfig", "withProgramName"}},
+	})
+	if err != nil {
+		t.Fatalf("writePrunedRuntimeImports failed: %v", err)
+	}
+
+	got := readGeneratedRuntimeImports(t, dir)
+	assertContains(t, got, `yaklib "github.com/yaklang/yaklang/common/yak/yaklib"`)
+	assertContains(t, got, `filesys "github.com/yaklang/yaklang/common/utils/filesys"`)
+	assertContains(t, got, `lo "github.com/samber/lo"`)
+	assertContains(t, got, `ssaapi "github.com/yaklang/yaklang/common/yak/ssaapi"`)
+	assertContains(t, got, `ssaconfig "github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"`)
+	assertContains(t, got, `ssaproject "github.com/yaklang/yaklang/common/yak/ssaproject"`)
+	assertContains(t, got, `runtimeRegisterYaklibModule("json", yaklib.JsonExports)`)
+	assertContains(t, got, `runtimeRegisterYaklibModule("file", yaklib.FileExport)`)
+	assertContains(t, got, `runtimeRegisterYaklibModule("filesys", filesys.Exports)`)
+	assertContains(t, got, `runtimeRegisterYaklibModule("ssa", lo.Assign(ssaapi.Exports,`)
+	assertContains(t, got, `ssaproject.Exports,`)
+	assertContains(t, got, `ssaconfig.Exports,`)
+}
+
+func TestWritePrunedRuntimeImports_ScriptEngineGlobalDependencies(t *testing.T) {
+	dir := t.TempDir()
+
+	err := writePrunedRuntimeImports(dir, []YaklibDependency{
+		{Module: "", Methods: []string{"atoi", "sprintf"}},
+	})
+	if err != nil {
+		t.Fatalf("writePrunedRuntimeImports failed: %v", err)
+	}
+
+	got := readGeneratedRuntimeImports(t, dir)
+	assertContains(t, got, `builtin "github.com/yaklang/yaklang/common/yak/yaklang/lib/builtin"`)
+	assertContains(t, got, `yaklib "github.com/yaklang/yaklang/common/yak/yaklib"`)
+	assertContains(t, got, `runtimeRegisterYaklibGlobals(builtin.YaklangBaseLib)`)
+	assertContains(t, got, `runtimeRegisterYaklibGlobals(yaklib.GlobalExport)`)
+}
+
+func TestWritePrunedRuntimeImports_YakitDependencyUsesRuntimeClient(t *testing.T) {
+	dir := t.TempDir()
+
+	err := writePrunedRuntimeImports(dir, []YaklibDependency{
+		{Module: "yakit", Methods: []string{"Code"}},
+	})
+	if err != nil {
+		t.Fatalf("writePrunedRuntimeImports failed: %v", err)
+	}
+
+	got := readGeneratedRuntimeImports(t, dir)
+	assertContains(t, got, `runtimeRegisterYaklibModule("yakit", runtimePrunedYakitExports())`)
+	assertNotContains(t, got, `yaklib "github.com/yaklang/yaklang/common/yak/yaklib"`)
+}
+
 func TestUnsupportedPrunedRuntimeDependencies(t *testing.T) {
 	got := UnsupportedPrunedRuntimeDependencies([]YaklibDependency{
 		{Module: "codec", Methods: []string{"EncodeBase64", "Missing"}},
-		{Module: "", Methods: []string{"len", "sprintf"}},
+		{Module: "", Methods: []string{"definitelyMissingGlobal", "len", "sprintf"}},
 		{Module: "json", Methods: []string{"dumps", "loads"}},
+		{Module: "file", Methods: []string{"GetExt"}},
+		{Module: "ssa", Methods: []string{"NewConfig"}},
+		{Module: "yakit", Methods: []string{"Code"}},
 		{Module: "cli", Methods: []string{"String", "check"}},
+		{Module: "definitelyMissingModule", Methods: []string{"Call"}},
 	})
 	want := []YaklibDependency{
-		{Module: "", Methods: []string{"sprintf"}},
+		{Module: "", Methods: []string{"definitelyMissingGlobal"}},
 		{Module: "codec", Methods: []string{"Missing"}},
-		{Module: "json", Methods: []string{"dumps", "loads"}},
+		{Module: "definitelyMissingModule", Methods: []string{"Call"}},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("unexpected unsupported deps:\nwant=%#v\n got=%#v", want, got)
