@@ -1,6 +1,8 @@
 package ssaapi
 
 import (
+	"time"
+
 	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
@@ -13,12 +15,26 @@ func (c *Config) DiagnosticsEnabled() bool {
 	return c != nil && c.diagnosticsEnabled
 }
 
+func (c *Config) applyNestedSettings(rec *diagnostics.Recorder) {
+	if rec == nil {
+		return
+	}
+	min := time.Second
+	if c.Config != nil && c.Config.GetCompileFilePerformanceLog() {
+		min = 100 * time.Millisecond
+	}
+	rec.SetNested(true)
+	rec.SetNestedLog(true, min, nil)
+}
+
 func (c *Config) DiagnosticsRecorder() *diagnostics.Recorder {
 	if !c.DiagnosticsEnabled() {
 		return nil
 	}
 	if c.diagnosticsRecorder == nil {
-		c.diagnosticsRecorder = diagnostics.NewRecorder()
+		rec := diagnostics.NewRecorder()
+		c.applyNestedSettings(rec)
+		c.diagnosticsRecorder = rec
 	}
 	return c.diagnosticsRecorder
 }

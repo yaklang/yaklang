@@ -196,6 +196,9 @@ func (c *Config) parseProjectWithFS(
 	if err != nil {
 		return nil, err
 	}
+	if rec := c.DiagnosticsRecorder(); rec != nil {
+		prog.SetDiagnosticsRecorder(rec)
+	}
 
 	wg.Add(1)
 	go func() {
