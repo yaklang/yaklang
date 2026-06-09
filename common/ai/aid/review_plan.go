@@ -111,7 +111,7 @@ func (pr *planRequest) handleReviewPlanResponse(rsp *PlanResponse, param aitool.
 		ep.SetDefaultSuggestionContinue()
 
 		pr.cod.EmitRequireReviewForPlan(newPlan, ep.GetId())
-		pr.cod.DoWaitAgree(nil, ep)
+		pr.cod.waitPlanReviewAgree(nil, ep)
 		params := ep.GetParams()
 		pr.cod.ReleaseInteractiveEvent(ep.GetId(), params)
 		if params == nil {
@@ -138,7 +138,7 @@ func (pr *planRequest) handleReviewPlanResponse(rsp *PlanResponse, param aitool.
 		ep.SetDefaultSuggestionContinue()
 
 		pr.cod.EmitRequireReviewForPlan(newPlan, ep.GetId())
-		pr.cod.DoWaitAgree(nil, ep)
+		pr.cod.waitPlanReviewAgree(nil, ep)
 		params := ep.GetParams()
 		pr.cod.ReleaseInteractiveEvent(ep.GetId(), params)
 		if params == nil {
@@ -171,7 +171,7 @@ func (pr *planRequest) handleReviewPlanResponse(rsp *PlanResponse, param aitool.
 		ep.SetDefaultSuggestionContinue()
 
 		pr.cod.EmitRequireReviewForPlan(newPlan, ep.GetId())
-		pr.cod.DoWaitAgree(nil, ep)
+		pr.cod.waitPlanReviewAgree(nil, ep)
 		params := ep.GetParams()
 		pr.cod.ReleaseInteractiveEvent(ep.GetId(), params)
 		if params == nil {
@@ -200,7 +200,7 @@ func (pr *planRequest) handleReviewPlanResponse(rsp *PlanResponse, param aitool.
 		ep.SetDefaultSuggestionContinue()
 
 		pr.cod.EmitRequireReviewForPlan(newPlan, ep.GetId())
-		pr.cod.DoWaitAgree(nil, ep)
+		pr.cod.waitPlanReviewAgree(nil, ep)
 		params := ep.GetParams()
 		pr.cod.ReleaseInteractiveEvent(ep.GetId(), params)
 		if params == nil {

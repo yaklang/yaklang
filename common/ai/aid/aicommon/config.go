@@ -295,6 +295,7 @@ type Config struct {
 	*/
 	// Plan manager
 	AllowPlanUserInteract    bool
+	ForceManualPlanReview    bool
 	PlanUserInteractMaxCount int64
 
 	// PlanPrompt: Additional context that will be injected into the Plan phase only.
@@ -827,6 +828,28 @@ func WithAICallbacks(callbacks *AICallbacks) ConfigOption {
 		}
 		c.m.Lock()
 		c.setAICallbacksLocked(callbacks)
+		c.m.Unlock()
+		return nil
+	}
+}
+
+func WithInheritTieredAICallback(parent *Config, force bool) ConfigOption {
+	return func(c *Config) error {
+		if parent == nil {
+			return nil
+		}
+		raw := parent.GetRawAICallbacks()
+		if raw == nil {
+			return nil
+		}
+		if raw.QualityPriorityRaw == nil && raw.SpeedPriorityRaw == nil && !force {
+			return nil
+		}
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		c.setAICallbacksLocked(raw)
 		c.m.Unlock()
 		return nil
 	}
@@ -1844,6 +1867,22 @@ func WithAllowPlanUserInteract(v bool) ConfigOption {
 		}
 		c.m.Lock()
 		c.AllowPlanUserInteract = v
+		c.m.Unlock()
+		return nil
+	}
+}
+
+func WithForceManualPlanReview(b ...bool) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		if len(b) > 0 {
+			c.ForceManualPlanReview = b[0]
+		} else {
+			c.ForceManualPlanReview = true
+		}
 		c.m.Unlock()
 		return nil
 	}

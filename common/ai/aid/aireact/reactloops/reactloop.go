@@ -68,9 +68,10 @@ type ReActLoop struct {
 	reflectionOutputExampleProvider ContextProviderFunc
 	reactiveDataBuilder             FeedbackProviderFunc
 
-	allowAIForge      func() bool
-	allowPlanAndExec  func() bool
-	allowRAG          func() bool
+	allowAIForge       func() bool
+	allowPlanAndExec   func() bool
+	planExecActionType string
+	allowRAG           func() bool
 	allowToolCall     func() bool
 	allowUserInteract func() bool
 
@@ -730,11 +731,17 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		}
 		r.actions.Set(planOnly.ActionType, planOnly)
 
-		planExec, ok := GetLoopAction(schema.AI_REACT_LOOP_ACTION_REQUEST_PLAN_EXECUTION)
-		if !ok {
-			return nil, utils.Errorf("loop action %s not found", schema.AI_REACT_LOOP_ACTION_REQUEST_PLAN_EXECUTION)
+		planExecType := schema.AI_REACT_LOOP_ACTION_REQUEST_PLAN_EXECUTION
+		if r.planExecActionType != "" {
+			planExecType = r.planExecActionType
 		}
-		r.actions.Set(planExec.ActionType, planExec)
+		if planExecType != schema.AI_REACT_LOOP_ACTION_REQUEST_PLAN {
+			planExec, ok := GetLoopAction(planExecType)
+			if !ok {
+				return nil, utils.Errorf("loop action %s not found", planExecType)
+			}
+			r.actions.Set(planExec.ActionType, planExec)
+		}
 	}
 
 	if r.allowUserInteract == nil || r.allowUserInteract() {

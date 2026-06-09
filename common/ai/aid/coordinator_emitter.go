@@ -33,6 +33,9 @@ func (c *Coordinator) EmitRequireReviewForPlan(rsp *PlanResponse, id string) {
 		"plans":     rsp,
 		"plans_id":  uuid.New().String(),
 	}
+	if c != nil && c.ForceManualPlanReview {
+		reqs["force_manual_review"] = true
+	}
 	if ep, ok := c.Epm.LoadEndpoint(id); ok {
 		ep.SetReviewMaterials(reqs)
 		err := c.SubmitCheckpointRequest(ep.GetCheckpoint(), reqs)

@@ -588,6 +588,17 @@ func (m *mockInvokerForMemoryTest) AsyncPlanAndExecute(ctx context.Context, plan
 	// no-op
 }
 
+func (m *mockInvokerForMemoryTest) ReviewExecutePlan(ctx context.Context, input *aicommon.ExecutePlanInput) (*aicommon.ExecutePlanInput, error) {
+	return input, nil
+}
+
+func (m *mockInvokerForMemoryTest) ForceReviewExecutePlan(ctx context.Context, input *aicommon.ExecutePlanInput) (*aicommon.ExecutePlanInput, error) {
+	return input, nil
+}
+
+func (m *mockInvokerForMemoryTest) AsyncExecutePlan(ctx context.Context, input *aicommon.ExecutePlanInput, onFinish func(error)) {
+}
+
 func (m *mockInvokerForMemoryTest) AddToTimeline(entry, content string) {
 	// no-op for testing
 }

@@ -253,6 +253,14 @@ type LoopPromptAssemblyResult struct {
 	Sections any
 }
 
+// ExecutePlanInput carries an approved plan generated outside Coordinator plan loop.
+type ExecutePlanInput struct {
+	PlanPayload  string
+	PlanData     string
+	PlanFacts    string
+	PlanDocument string
+}
+
 type AIInvokeRuntime interface {
 	GetBasicPromptInfo(tools []*aitool.Tool) (string, map[string]any, error)
 	AssembleLoopPrompt(tools []*aitool.Tool, input *LoopPromptAssemblyInput) (*LoopPromptAssemblyResult, error)
@@ -278,6 +286,9 @@ type AIInvokeRuntime interface {
 	RequireAIForgeAndAsyncExecute(ctx context.Context, forgeName string, onFinish func(error))
 	AsyncPlanOnly(ctx context.Context, planPayload string, onFinish func(error))
 	AsyncPlanAndExecute(ctx context.Context, planPayload string, onFinish func(error))
+	ReviewExecutePlan(ctx context.Context, input *ExecutePlanInput) (*ExecutePlanInput, error)
+	ForceReviewExecutePlan(ctx context.Context, input *ExecutePlanInput) (*ExecutePlanInput, error)
+	AsyncExecutePlan(ctx context.Context, input *ExecutePlanInput, onFinish func(error))
 	InvokeLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...GeneralKVConfigOption) (*Action, error)
 	InvokeSpeedPriorityLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...GeneralKVConfigOption) (*Action, error)
 	InvokeQualityPriorityLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...GeneralKVConfigOption) (*Action, error)
