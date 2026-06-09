@@ -118,6 +118,9 @@ func DeleteSSAProject(db *gorm.DB, req *ypb.DeleteSSAProjectRequest) (int64, err
 			log.Errorf("delete SSA programs for project %d failed: %s", project.ID, err)
 			continue
 		}
+		if err := DeleteSSARisksByProjectID(ssaDB, project.ID); err != nil {
+			log.Errorf("delete SSA risks for project %d failed: %s", project.ID, err)
+		}
 		switch deleteMode {
 		case string(SSAProjectClearCompileHistory):
 			totalDeleted += int64(count)
