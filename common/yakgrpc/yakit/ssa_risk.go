@@ -284,6 +284,17 @@ func DeleteSSARisks(DB *gorm.DB, filter *ypb.SSARisksFilter) error {
 	return nil
 }
 
+func DeleteSSARisksByProjectID(db *gorm.DB, projectID uint) error {
+	if projectID == 0 {
+		return nil
+	}
+	result := db.Model(&schema.SSARisk{}).
+		Where("ssa_project_id = ?", projectID).
+		Unscoped().
+		Delete(&schema.SSARisk{})
+	return result.Error
+}
+
 func UpdateSSARiskTags(DB *gorm.DB, id int64, tags []string) error {
 	db := DB.Model(&schema.SSARisk{})
 	if db := db.Where("id = ?", id).Update("tags", strings.Join(tags, "|")); db.Error != nil {

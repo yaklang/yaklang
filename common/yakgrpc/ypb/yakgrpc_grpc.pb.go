@@ -499,6 +499,7 @@ const (
 	Yak_DeleteSSAProject_FullMethodName                           = "/ypb.Yak/DeleteSSAProject"
 	Yak_QuerySSAProject_FullMethodName                            = "/ypb.Yak/QuerySSAProject"
 	Yak_MigrateSSAProject_FullMethodName                          = "/ypb.Yak/MigrateSSAProject"
+	Yak_GetSSAWorkbenchDashboard_FullMethodName                   = "/ypb.Yak/GetSSAWorkbenchDashboard"
 	Yak_GetAllPluginEnv_FullMethodName                            = "/ypb.Yak/GetAllPluginEnv"
 	Yak_QueryPluginEnv_FullMethodName                             = "/ypb.Yak/QueryPluginEnv"
 	Yak_CreatePluginEnv_FullMethodName                            = "/ypb.Yak/CreatePluginEnv"
@@ -1254,6 +1255,8 @@ type YakClient interface {
 	DeleteSSAProject(ctx context.Context, in *DeleteSSAProjectRequest, opts ...grpc.CallOption) (*DeleteSSAProjectResponse, error)
 	QuerySSAProject(ctx context.Context, in *QuerySSAProjectRequest, opts ...grpc.CallOption) (*QuerySSAProjectResponse, error)
 	MigrateSSAProject(ctx context.Context, in *MigrateSSAProjectRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[MigrateSSAProjectResponse], error)
+	// SSA/irify 代码审计工作台仪表盘数据
+	GetSSAWorkbenchDashboard(ctx context.Context, in *GetSSAWorkbenchDashboardRequest, opts ...grpc.CallOption) (*GetSSAWorkbenchDashboardResponse, error)
 	GetAllPluginEnv(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*PluginEnvData, error)
 	QueryPluginEnv(ctx context.Context, in *QueryPluginEnvRequest, opts ...grpc.CallOption) (*PluginEnvData, error)
 	CreatePluginEnv(ctx context.Context, in *PluginEnvData, opts ...grpc.CallOption) (*Empty, error)
@@ -6926,6 +6929,16 @@ func (c *yakClient) MigrateSSAProject(ctx context.Context, in *MigrateSSAProject
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Yak_MigrateSSAProjectClient = grpc.ServerStreamingClient[MigrateSSAProjectResponse]
 
+func (c *yakClient) GetSSAWorkbenchDashboard(ctx context.Context, in *GetSSAWorkbenchDashboardRequest, opts ...grpc.CallOption) (*GetSSAWorkbenchDashboardResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetSSAWorkbenchDashboardResponse)
+	err := c.cc.Invoke(ctx, Yak_GetSSAWorkbenchDashboard_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) GetAllPluginEnv(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*PluginEnvData, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(PluginEnvData)
@@ -9104,6 +9117,8 @@ type YakServer interface {
 	DeleteSSAProject(context.Context, *DeleteSSAProjectRequest) (*DeleteSSAProjectResponse, error)
 	QuerySSAProject(context.Context, *QuerySSAProjectRequest) (*QuerySSAProjectResponse, error)
 	MigrateSSAProject(*MigrateSSAProjectRequest, grpc.ServerStreamingServer[MigrateSSAProjectResponse]) error
+	// SSA/irify 代码审计工作台仪表盘数据
+	GetSSAWorkbenchDashboard(context.Context, *GetSSAWorkbenchDashboardRequest) (*GetSSAWorkbenchDashboardResponse, error)
 	GetAllPluginEnv(context.Context, *Empty) (*PluginEnvData, error)
 	QueryPluginEnv(context.Context, *QueryPluginEnvRequest) (*PluginEnvData, error)
 	CreatePluginEnv(context.Context, *PluginEnvData) (*Empty, error)
@@ -10710,6 +10725,9 @@ func (UnimplementedYakServer) QuerySSAProject(context.Context, *QuerySSAProjectR
 }
 func (UnimplementedYakServer) MigrateSSAProject(*MigrateSSAProjectRequest, grpc.ServerStreamingServer[MigrateSSAProjectResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method MigrateSSAProject not implemented")
+}
+func (UnimplementedYakServer) GetSSAWorkbenchDashboard(context.Context, *GetSSAWorkbenchDashboardRequest) (*GetSSAWorkbenchDashboardResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetSSAWorkbenchDashboard not implemented")
 }
 func (UnimplementedYakServer) GetAllPluginEnv(context.Context, *Empty) (*PluginEnvData, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetAllPluginEnv not implemented")
@@ -19113,6 +19131,24 @@ func _Yak_MigrateSSAProject_Handler(srv interface{}, stream grpc.ServerStream) e
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Yak_MigrateSSAProjectServer = grpc.ServerStreamingServer[MigrateSSAProjectResponse]
 
+func _Yak_GetSSAWorkbenchDashboard_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetSSAWorkbenchDashboardRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).GetSSAWorkbenchDashboard(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_GetSSAWorkbenchDashboard_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).GetSSAWorkbenchDashboard(ctx, req.(*GetSSAWorkbenchDashboardRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_GetAllPluginEnv_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Empty)
 	if err := dec(in); err != nil {
@@ -22898,6 +22934,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "QuerySSAProject",
 			Handler:    _Yak_QuerySSAProject_Handler,
+		},
+		{
+			MethodName: "GetSSAWorkbenchDashboard",
+			Handler:    _Yak_GetSSAWorkbenchDashboard_Handler,
 		},
 		{
 			MethodName: "GetAllPluginEnv",

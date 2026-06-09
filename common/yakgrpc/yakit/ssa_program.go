@@ -72,7 +72,9 @@ func DeleteSSAProgram(DB *gorm.DB, filter *ypb.SSAProgramFilter) (int, error) {
 		programNames = append(programNames, prog.ProgramName)
 	}
 	// delete risk create by this program
-	DeleteSSARisks(ssadb.GetDB(), &ypb.SSARisksFilter{ProgramName: programNames})
+	if len(programNames) > 0 {
+		DeleteSSARisks(ssadb.GetDB(), &ypb.SSARisksFilter{ProgramName: programNames})
+	}
 	// DeleteRisk()
 	return len(programs), result.Error
 }
@@ -198,7 +200,7 @@ func QuerySSAProgram(db *gorm.DB, request *ypb.QuerySSAProgramRequest) (*bizhelp
 				overlayLayers = prog.OverlayLayers
 			}
 			programIncrementalInfo[prog.ProgramName] = &incrementalInfo{
-				isIncremental:  isIncremental,
+				isIncremental:   isIncremental,
 				groupId:         groupId,
 				headProgramName: headProgram.ProgramName,
 				overlayLayers:   overlayLayers,
@@ -210,7 +212,7 @@ func QuerySSAProgram(db *gorm.DB, request *ypb.QuerySSAProgramRequest) (*bizhelp
 	for _, prog := range programs {
 		if _, exists := programIncrementalInfo[prog.ProgramName]; !exists {
 			programIncrementalInfo[prog.ProgramName] = &incrementalInfo{
-				isIncremental:  false,
+				isIncremental:   false,
 				groupId:         prog.ProgramName,
 				headProgramName: prog.ProgramName,
 				overlayLayers:   nil,
@@ -235,10 +237,10 @@ func QuerySSAProgram(db *gorm.DB, request *ypb.QuerySSAProgramRequest) (*bizhelp
 
 // incrementalInfo 存储增量编译信息
 type incrementalInfo struct {
-	isIncremental  bool
-	groupId        string
+	isIncremental   bool
+	groupId         string
 	headProgramName string
-	overlayLayers  []string
+	overlayLayers   []string
 }
 
 func QueryLatestSSAProgramNameByProjectId(db *gorm.DB, projectID uint64) (string, error) {

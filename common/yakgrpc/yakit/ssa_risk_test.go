@@ -137,3 +137,28 @@ func TestSSARisk_NewPaging(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, risks, 4)
 }
+
+func TestDeleteSSAProgram_NoMatchedProgramMustNotDeleteAllRisks(t *testing.T) {
+	db, err := consts.GetTempSSADataBase()
+	require.NoError(t, err)
+
+	programName := "delete-program-guard-" + utils.RandStringBytes(8)
+	require.NoError(t, CreateSSARisk(db, &schema.SSARisk{
+		ProgramName: programName,
+		Index:       1,
+	}))
+	t.Cleanup(func() {
+		_ = DeleteSSARisks(db, &ypb.SSARisksFilter{ProgramName: []string{programName}})
+	})
+
+	before, err := QuerySSARiskCount(db, &ypb.SSARisksFilter{ProgramName: []string{programName}})
+	require.NoError(t, err)
+	require.Equal(t, 1, before)
+
+	_, err = DeleteSSAProgram(db, &ypb.SSAProgramFilter{ProjectIds: []uint64{999999999}})
+	require.NoError(t, err)
+
+	after, err := QuerySSARiskCount(db, &ypb.SSARisksFilter{ProgramName: []string{programName}})
+	require.NoError(t, err)
+	require.Equal(t, before, after)
+}
