@@ -938,6 +938,9 @@ func coverType(ityp, iwantTyp ssa.Type) {
 }
 
 func (b *astbuilder) GetDefaultValue(ityp ssa.Type) ssa.Value {
+	if ityp == nil {
+		return b.EmitUndefined("default")
+	}
 	switch ityp.GetTypeKind() {
 	case ssa.NumberTypeKind:
 		return b.EmitConstInst(0)

@@ -18,7 +18,10 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 )
 
-const envHeapDumpDir = "YAK_DIAGNOSTICS_HEAP_DUMP_DIR"
+const (
+	envHeapDumpDir     = "YAK_DIAGNOSTICS_HEAP_DUMP_DIR"
+	envHeapSnapshotLog = "YAK_DIAGNOSTICS_HEAP_SNAPSHOT"
+)
 
 type heapDumpConfig struct {
 	memThreshold uint64
@@ -166,7 +169,9 @@ func performHeapDump(cfg heapDumpConfig, saveFile bool) bool {
 		if cfg.memThreshold > 0 && stats.Alloc < cfg.memThreshold {
 			return
 		}
-		logHeapStats(withPhaseName(cfg.name, phase), stats)
+		if !cfg.disable {
+			logHeapStats(withPhaseName(cfg.name, phase), stats)
+		}
 		if cfg.disable || !saveFile {
 			saved = true
 			return
@@ -285,8 +290,11 @@ func resolveHeapProfileTarget(cfg heapDumpConfig, alloc uint64, phase string) st
 	return trimmed + ".pb.gz"
 }
 
-// LogHeapSnapshot logs heap memory usage, and optionally logs the GC-before/after delta.
+// LogHeapSnapshot logs heap memory usage when YAK_DIAGNOSTICS_HEAP_SNAPSHOT is set.
 func LogHeapSnapshot(name string, withRuntimeGC bool) {
+	if strings.TrimSpace(os.Getenv(envHeapSnapshotLog)) == "" {
+		return
+	}
 	DumpHeap(
 		WithName(name),
 		WithRuntimeGC(withRuntimeGC),

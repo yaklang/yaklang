@@ -1,49 +1,72 @@
 package diagnostics
 
-import "testing"
+import (
+	"testing"
 
-func TestTraceLevelSkipsWhenDisabled(t *testing.T) {
+	"github.com/stretchr/testify/require"
+)
+
+func TestLevelHighBlocksLowAndNormal(t *testing.T) {
+	origLevel := GetLevel()
+	origRec := ReplaceDefault(NewRecorder())
+	defer SetLevel(origLevel)
+	defer ReplaceDefault(origRec)
+
+	// minimum tier = high → trace/measure are below threshold and should not record.
+	SetLevel(LevelHigh)
+
+	require.NoError(t, Track("low-tier", func() error { return nil }))
+	require.NoError(t, TrackLow("trace-tier", func() error { return nil }))
+	require.Empty(t, DefaultRecorder().Snapshot(), "LevelNormal/LevelLow must not record when floor is LevelHigh")
+}
+
+func TestLevelHighRecordsHighTier(t *testing.T) {
 	origLevel := GetLevel()
 	origRec := ReplaceDefault(NewRecorder())
 	defer SetLevel(origLevel)
 	defer ReplaceDefault(origRec)
 
 	SetLevel(LevelHigh)
-	run := false
-	if err := Track("trace-skip", func() error {
-		run = true
-		return nil
-	}); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !run {
-		t.Fatalf("expected step to run even if tracing is disabled")
-	}
-	if snaps := DefaultRecorder().Snapshot(); len(snaps) != 0 {
-		t.Fatalf("expected no measurements when level blocks recording, got %d", len(snaps))
-	}
+	require.NoError(t, TrackHigh("critical-only", func() error { return nil }))
+
+	snaps := DefaultRecorder().Snapshot()
+	require.Len(t, snaps, 1)
+	require.Equal(t, "critical-only", snaps[0].Name)
+	require.Equal(t, uint64(1), snaps[0].Count)
 }
 
-func TestTraceLevelRecordsWhenAllowed(t *testing.T) {
+func TestLevelLowRecordsTraceAndMeasure(t *testing.T) {
 	origLevel := GetLevel()
 	origRec := ReplaceDefault(NewRecorder())
 	defer SetLevel(origLevel)
 	defer ReplaceDefault(origRec)
 
 	SetLevel(LevelLow)
-	if err := Track("measure-allowed", func() error { return nil }); err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	require.NoError(t, Track("measure-allowed", func() error { return nil }))
+	require.NoError(t, TrackLow("trace-allowed", func() error { return nil }))
+
+	names := map[string]bool{}
+	for _, m := range DefaultRecorder().Snapshot() {
+		names[m.Name] = true
 	}
-	snaps := DefaultRecorder().Snapshot()
-	if len(snaps) != 1 {
-		t.Fatalf("expected exactly one measurement, got %d", len(snaps))
-	}
-	if snaps[0].Name != "measure-allowed" {
-		t.Fatalf("expected measurement name capture, got %s", snaps[0].Name)
-	}
-	if snaps[0].Count != 1 {
-		t.Fatalf("expected count 1, got %d", snaps[0].Count)
-	}
+	require.True(t, names["measure-allowed"])
+	require.True(t, names["trace-allowed"])
+}
+
+func TestLevelOffBlocksRecordingButRunsSteps(t *testing.T) {
+	origLevel := GetLevel()
+	origRec := ReplaceDefault(NewRecorder())
+	defer SetLevel(origLevel)
+	defer ReplaceDefault(origRec)
+
+	SetLevel(LevelOff)
+	ran := false
+	require.NoError(t, Track("off-tier", func() error {
+		ran = true
+		return nil
+	}))
+	require.True(t, ran)
+	require.Empty(t, DefaultRecorder().Snapshot())
 }
 
 func TestEnabledTierOrdering(t *testing.T) {
@@ -51,10 +74,12 @@ func TestEnabledTierOrdering(t *testing.T) {
 	defer SetLevel(orig)
 
 	SetLevel(LevelNormal)
-	if Enabled(LevelLow) {
-		t.Fatalf("trace should be disabled when minimum tier is measure")
-	}
-	if !Enabled(LevelNormal) {
-		t.Fatalf("focus should be enabled when minimum tier is measure")
-	}
+	require.False(t, Enabled(LevelLow), "trace tier below measure floor")
+	require.True(t, Enabled(LevelNormal))
+	require.True(t, Enabled(LevelHigh))
+
+	SetLevel(LevelHigh)
+	require.False(t, Enabled(LevelLow))
+	require.False(t, Enabled(LevelNormal))
+	require.True(t, Enabled(LevelHigh))
 }

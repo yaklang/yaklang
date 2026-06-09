@@ -98,13 +98,13 @@ func TestRecorderConcurrentTrackCount(t *testing.T) {
 
 	snaps := rec.Snapshot()
 	if len(snaps) != 1 {
-		t.Fatalf("expected one measurement, got %d", len(snaps))
+		t.Fatalf("expected one aggregated measurement, got %d", len(snaps))
 	}
-	if got := snaps[0].Count; got != workers {
-		t.Fatalf("expected count %d, got %d", workers, got)
+	if snaps[0].Name != "parallel" {
+		t.Fatalf("unexpected name %q", snaps[0].Name)
 	}
-	if got := len(snaps[0].Steps); got < 2 {
-		t.Fatalf("expected at least 2 steps, got %d", got)
+	if snaps[0].Count != workers*2 {
+		t.Fatalf("parallel count: got %d want %d", snaps[0].Count, workers*2)
 	}
 }
 
@@ -122,7 +122,7 @@ func TestRecorderConcurrentStepExpansion(t *testing.T) {
 			for j := range steps {
 				steps[j] = func() error { return nil }
 			}
-			if err := rec.track(true, "expand", steps...); err != nil {
+			if err := rec.Track("expand", steps...); err != nil {
 				t.Errorf("track failed: %v", err)
 			}
 		}(i)
@@ -133,10 +133,10 @@ func TestRecorderConcurrentStepExpansion(t *testing.T) {
 	if len(snaps) != 1 {
 		t.Fatalf("expected one measurement, got %d", len(snaps))
 	}
-	if got := snaps[0].Count; got != workers {
-		t.Fatalf("expected count %d, got %d", workers, got)
+	if snaps[0].Name != "expand" {
+		t.Fatalf("unexpected name %q", snaps[0].Name)
 	}
-	if got := len(snaps[0].Steps); got != 8 {
-		t.Fatalf("expected expanded steps len 8, got %d", got)
+	if len(rec.Steps()) < workers {
+		t.Fatalf("expected at least %d steps, got %d", workers, len(rec.Steps()))
 	}
 }

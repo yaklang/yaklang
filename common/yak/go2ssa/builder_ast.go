@@ -455,6 +455,9 @@ func (b *astbuilder) buildVarSpec(varSpec *gol.VarSpecContext, isglobal bool) {
 		// Global vars are registered via blueprint; local SSA assignment is not emitted here.
 		store := b.StoreFunctionBuilder()
 		registerDefault := func(id string) {
+			if id == "_" {
+				return
+			}
 			checkCannotAssign(id)
 			b.AddGlobalVariable(id, func() ssa.Value {
 				switchHandler := b.SwitchFunctionBuilder(store)

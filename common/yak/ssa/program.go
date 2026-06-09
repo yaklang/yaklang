@@ -9,6 +9,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/diagnostics"
 
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/utils/memedit"
@@ -122,7 +123,7 @@ func (prog *Program) createSubProgram(name string, kind ssadb.ProgramKind, path 
 	subProg := NewProgram(cloneProgramConfig(prog.compileConfig, name), prog.DatabaseKind, kind, fs, programPath, 0)
 	subProg.Application = prog.Application
 	subProg.config = prog.config
-	subProg.SetDiagnosticsRecorder(prog.DiagnosticsRecorder())
+	subProg.SetDiagnosticsRecorder(prog.diagnosticsRecorderForChild())
 
 	subProg.Loader.AddIncludePath(prog.Loader.GetIncludeFiles()...)
 	subProg.Language = prog.Language
@@ -555,4 +556,83 @@ func (p *Program) SetTemplate(path string, info tl.TemplateGeneratedInfo) {
 		return
 	}
 	p.Template[path] = info
+}
+
+func (prog *Program) SetDiagnosticsRecorder(rec *diagnostics.Recorder) {
+	if prog == nil {
+		return
+	}
+	prog.diagnosticsRecorder = rec
+	root := prog.Application
+	if root == nil {
+		root = prog
+	}
+	if prog != root {
+		return
+	}
+	root.UpStream.ForEach(func(_ string, sub *Program) bool {
+		if sub != nil {
+			sub.diagnosticsRecorder = rec
+		}
+		return true
+	})
+}
+
+func (prog *Program) DiagnosticsRecorder() *diagnostics.Recorder {
+	if prog == nil {
+		return nil
+	}
+	return prog.diagnosticsRecorder
+}
+
+func (prog *Program) diagnosticsRecorderForChild() *diagnostics.Recorder {
+	if rec := prog.DiagnosticsRecorder(); rec != nil {
+		return rec
+	}
+	if app := prog.Application; app != nil && app != prog {
+		return app.DiagnosticsRecorder()
+	}
+	return nil
+}
+
+func (prog *Program) DiagnosticsTrack(name string, steps ...func() error) {
+	_ = prog.DiagnosticsTrackErr(name, steps...)
+}
+
+func (prog *Program) DiagnosticsTrackErr(name string, steps ...func() error) error {
+	if len(steps) == 0 {
+		return nil
+	}
+	if prog == nil {
+		return runDiagnosticSteps(steps)
+	}
+	if rec := prog.DiagnosticsRecorder(); rec != nil {
+		return rec.Track(name, steps...)
+	}
+	return runDiagnosticSteps(steps)
+}
+
+func runDiagnosticSteps(steps []func() error) error {
+	for _, step := range steps {
+		if step != nil {
+			if err := step(); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (c *ProgramCache) diagnosticsTrack(name string, steps ...func() error) {
+	_ = c.diagnosticsTrackErr(name, steps...)
+}
+
+func (c *ProgramCache) diagnosticsTrackErr(name string, steps ...func() error) error {
+	if c == nil || len(steps) == 0 {
+		return nil
+	}
+	if prog := c.program; prog != nil {
+		return prog.DiagnosticsTrackErr(name, steps...)
+	}
+	return runDiagnosticSteps(steps)
 }
