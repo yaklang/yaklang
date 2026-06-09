@@ -452,6 +452,17 @@ func (m *MockInvoker) AsyncPlanOnly(ctx context.Context, planPayload string, onF
 func (m *MockInvoker) AsyncPlanAndExecute(ctx context.Context, planPayload string, onFinish func(error)) {
 }
 
+func (m *MockInvoker) ReviewExecutePlan(ctx context.Context, input *aicommon.ExecutePlanInput) (*aicommon.ExecutePlanInput, error) {
+	return input, nil
+}
+
+func (m *MockInvoker) ForceReviewExecutePlan(ctx context.Context, input *aicommon.ExecutePlanInput) (*aicommon.ExecutePlanInput, error) {
+	return input, nil
+}
+
+func (m *MockInvoker) AsyncExecutePlan(ctx context.Context, input *aicommon.ExecutePlanInput, onFinish func(error)) {
+}
+
 func (m *MockInvoker) AddToTimeline(entry, content string) {
 }
 

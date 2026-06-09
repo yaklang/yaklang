@@ -161,6 +161,32 @@ func (c *Coordinator) RunPlanOnly() error {
 	return nil
 }
 
+// RunExecuteApprovedPlan executes an in-memory approved plan without running the plan loop.
+func (c *Coordinator) RunExecuteApprovedPlan() error {
+	c.planLoadingStatus("初始化 / Initializing...")
+	defer c.planLoadingStatus("任务规划执行结束 / Plan Execution Finished")
+
+	c.registerPEModeInputEventCallback()
+	c.EmitCurrentConfigInfo()
+	c.emitBaseCapabilityInventory()
+
+	if c.rootTask == nil {
+		c.planLoadingStatus("无已批准计划 / No Approved Plan")
+		c.EmitError("no approved plan found for execution")
+		return utils.Errorf("coordinator: no approved plan to execute for %s", c.GetRuntimeId())
+	}
+	if len(c.rootTask.Subtasks) <= 0 {
+		c.planLoadingStatus("无有效子任务 / No Valid Subtasks")
+		c.EmitError("no subtasks found, this task is not a valid task")
+		return utils.Errorf("coordinator: no subtasks found")
+	}
+
+	if err := c.runExecuteRoot(""); err != nil {
+		return err
+	}
+	return c.runReportAndFinishPhases()
+}
+
 // RunExecuteOnly executes a previously approved plan (plan_ready in DB) without re-running plan loop.
 func (c *Coordinator) RunExecuteOnly() error {
 	c.planLoadingStatus("初始化 / Initializing...")

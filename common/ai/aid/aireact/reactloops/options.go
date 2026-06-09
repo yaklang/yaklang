@@ -50,6 +50,12 @@ func WithAllowPlanAndExec(b ...bool) ReActLoopOption {
 	})
 }
 
+func WithPlanExecActionType(actionType string) ReActLoopOption {
+	return func(r *ReActLoop) {
+		r.planExecActionType = actionType
+	}
+}
+
 func WithAllowAIForge(b ...bool) ReActLoopOption {
 	if len(b) > 0 {
 		return WithAllowAIForgeGetter(func() bool {

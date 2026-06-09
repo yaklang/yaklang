@@ -216,6 +216,17 @@ func (m *AdvancedMockInvoker) AsyncPlanOnly(ctx context.Context, planPayload str
 func (m *AdvancedMockInvoker) AsyncPlanAndExecute(ctx context.Context, planPayload string, onFinish func(error)) {
 }
 
+func (m *AdvancedMockInvoker) ReviewExecutePlan(ctx context.Context, input *aicommon.ExecutePlanInput) (*aicommon.ExecutePlanInput, error) {
+	return input, nil
+}
+
+func (m *AdvancedMockInvoker) ForceReviewExecutePlan(ctx context.Context, input *aicommon.ExecutePlanInput) (*aicommon.ExecutePlanInput, error) {
+	return input, nil
+}
+
+func (m *AdvancedMockInvoker) AsyncExecutePlan(ctx context.Context, input *aicommon.ExecutePlanInput, onFinish func(error)) {
+}
+
 func (m *AdvancedMockInvoker) AddToTimeline(entry, content string) {
 }
 

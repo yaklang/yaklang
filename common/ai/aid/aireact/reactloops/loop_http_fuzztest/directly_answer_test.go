@@ -114,6 +114,18 @@ func (i *httpFuzztestTestInvoker) AsyncPlanAndExecute(ctx context.Context, planP
 	i.base.AsyncPlanAndExecute(ctx, planPayload, onFinish)
 }
 
+func (i *httpFuzztestTestInvoker) ReviewExecutePlan(ctx context.Context, input *aicommon.ExecutePlanInput) (*aicommon.ExecutePlanInput, error) {
+	return i.base.ReviewExecutePlan(ctx, input)
+}
+
+func (i *httpFuzztestTestInvoker) ForceReviewExecutePlan(ctx context.Context, input *aicommon.ExecutePlanInput) (*aicommon.ExecutePlanInput, error) {
+	return i.base.ForceReviewExecutePlan(ctx, input)
+}
+
+func (i *httpFuzztestTestInvoker) AsyncExecutePlan(ctx context.Context, input *aicommon.ExecutePlanInput, onFinish func(error)) {
+	i.base.AsyncExecutePlan(ctx, input, onFinish)
+}
+
 func (i *httpFuzztestTestInvoker) InvokeLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption) (*aicommon.Action, error) {
 	return i.base.InvokeLiteForge(ctx, actionName, prompt, outputs, opts...)
 }

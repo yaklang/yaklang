@@ -28,12 +28,13 @@ var (
 )
 
 type invokePlanAndExecuteOptions struct {
-	task           aicommon.AIStatefulTask
-	planPayload    string
-	forgeName      string
-	forgeParams    any
-	coordinatorID  string
-	startTaskIndex string
+	task             aicommon.AIStatefulTask
+	planPayload      string
+	forgeName        string
+	forgeParams      any
+	coordinatorID    string
+	startTaskIndex   string
+	executePlanInput *aicommon.ExecutePlanInput
 }
 
 type InvokePlanAndExecuteOption func(*invokePlanAndExecuteOptions)
@@ -66,6 +67,12 @@ func WithInvokePlanAndExecuteCoordinatorID(coordinatorID string) InvokePlanAndEx
 func WithInvokePlanAndExecuteStartTaskIndex(startTaskIndex string) InvokePlanAndExecuteOption {
 	return func(cfg *invokePlanAndExecuteOptions) {
 		cfg.startTaskIndex = startTaskIndex
+	}
+}
+
+func WithInvokePlanAndExecuteExecutePlanInput(input *aicommon.ExecutePlanInput) InvokePlanAndExecuteOption {
+	return func(cfg *invokePlanAndExecuteOptions) {
+		cfg.executePlanInput = input
 	}
 }
 
