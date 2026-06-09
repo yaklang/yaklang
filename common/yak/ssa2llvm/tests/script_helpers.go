@@ -75,6 +75,8 @@ func EnsureRuntimeArchive(t *testing.T, repoRoot string) {
 	}
 
 	cmd := exec.Command("go", "build",
+		"-trimpath",
+		"-ldflags=-s -w",
 		"-buildmode=c-archive",
 		"-o", archiveFile,
 		"./common/yak/ssa2llvm/runtime/runtime_go",

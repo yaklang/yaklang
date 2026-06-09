@@ -24,6 +24,30 @@ func TestYaklibDispatch_CodecUsesGenericYaklibPath(t *testing.T) {
 	requireIRAvoidsLegacyCallEntrypoints(t, ir)
 }
 
+func TestYaklibDispatch_RecordsRuntimeDependencies(t *testing.T) {
+	deps := compileYaklibDependencies(t, `check = () => { if codec.EncodeBase64("yak") == "eWFr" { return 0 }; return 1 }`)
+	require.Equal(t, map[string][]string{
+		"codec": {"EncodeBase64"},
+	}, deps)
+}
+
+func TestYaklibDispatch_RecordsGlobalBuiltinRuntimeDependencies(t *testing.T) {
+	deps := compileYaklibDependencies(t, `check = () => { return len("yak") }`)
+	require.Equal(t, map[string][]string{
+		"": {"len"},
+	}, deps)
+}
+
+func TestYaklibDispatch_BuiltinsDoNotRecordRuntimeDependencies(t *testing.T) {
+	deps := compileYaklibDependencies(t, `check = () => { println(1); return 0 }`)
+	require.Empty(t, deps)
+}
+
+func TestYaklibExtern_ModeAllConstantDoesNotRecordRuntimeDependency(t *testing.T) {
+	deps := compileYaklibDependencies(t, `check = () => { if ssa.ModeAll == 0 { return -1 }; return ssa.ModeAll }`)
+	require.Empty(t, deps)
+}
+
 func TestYaklibDispatch_YakitInfoUsesDedicatedFuncID(t *testing.T) {
 	code := `check = () => { yakit.Info("ok"); return 1 }`
 	_, _, ir, err := compileToIRFromCodeWithExternBindings(code, "yak", nil)
@@ -89,6 +113,15 @@ func TestYaklibDispatch_StringEqualityUsesRuntimeDispatch(t *testing.T) {
 
 	require.Contains(t, ir, "i64 27")
 	require.Contains(t, ir, "yak_eq_ctx")
+}
+
+func compileYaklibDependencies(t *testing.T, code string) map[string][]string {
+	t.Helper()
+	_, comp, _, err := compileInput("", code, "yak", nil, "", nil)
+	require.NoError(t, err)
+	require.NotNil(t, comp)
+	defer comp.Dispose()
+	return comp.YaklibDependencies()
 }
 
 func TestYaklibExtern_ModeAllConstantInIR(t *testing.T) {

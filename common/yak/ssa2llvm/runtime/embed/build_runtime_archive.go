@@ -38,7 +38,7 @@ func BuildRuntimeArchiveFromSourceTree(buildDir, srcDir string) (archivePath str
 	}
 
 	archivePath = filepath.Join(buildDir, "libyak.a")
-	cmd := exec.Command(goPath, "build", "-buildmode=c-archive", "-o", archivePath, "./common/yak/ssa2llvm/runtime/runtime_go")
+	cmd := exec.Command(goPath, "build", "-trimpath", "-ldflags=-s -w", "-buildmode=c-archive", "-o", archivePath, "./common/yak/ssa2llvm/runtime/runtime_go")
 	cmd.Dir = srcDir
 	cmd.Env = append(os.Environ(),
 		"CGO_ENABLED=1",
@@ -69,14 +69,58 @@ func BuildRuntimeArchiveFromEmbeddedSource(buildDir string) (archivePath string,
 	return BuildRuntimeArchiveFromSourceTree(buildDir, srcDir)
 }
 
+func BuildRuntimeArchiveFromLocalSource(buildDir string) (archivePath string, gcLibDir string, err error) {
+	buildDir = strings.TrimSpace(buildDir)
+	if buildDir == "" {
+		return "", "", fmt.Errorf("build runtime archive failed: empty buildDir")
+	}
+	root, err := localGoModuleRoot()
+	if err != nil {
+		return "", "", err
+	}
+	srcDir := filepath.Join(buildDir, "ssa2llvm-stdlib-src")
+	_ = os.RemoveAll(srcDir)
+	goPath, err := exec.LookPath("go")
+	if err != nil {
+		return "", "", fmt.Errorf("go toolchain not found in PATH: %w", err)
+	}
+	cmd := exec.Command(goPath, "run", "./common/utils/gomodsrc/cmd",
+		"--pkg", "./common/yak/ssa2llvm/runtime/runtime_go",
+		"--dst", srcDir,
+	)
+	cmd.Dir = root
+	cmd.Env = append(os.Environ(), "GOWORK=off")
+	trace.PrintCmd(cmd)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", "", fmt.Errorf("build runtime archive failed: gomodsrc: %v\n%s", err, out)
+	}
+	if err := copyLocalLibgc(srcDir); err != nil {
+		return "", "", err
+	}
+	if err := copyPrunedRuntimeBuildTagSources(root, srcDir); err != nil {
+		return "", "", err
+	}
+	return BuildRuntimeArchiveFromSourceTree(buildDir, srcDir)
+}
+
 func writeRuntimeLinkArgsFile(buildDir, srcDir string) (string, error) {
+	return writeRuntimeLinkArgsFileWithTags(buildDir, srcDir)
+}
+
+func writeRuntimeLinkArgsFileWithTags(buildDir, srcDir string, tags ...string) (string, error) {
 	goPath, err := exec.LookPath("go")
 	if err != nil {
 		return "", fmt.Errorf("go toolchain not found in PATH: %w", err)
 	}
 
 	runtimeDir := filepath.Join(srcDir, "common", "yak", "ssa2llvm", "runtime", "runtime_go")
-	cmd := exec.Command(goPath, "list", "-deps", "-f", "{{if .CgoLDFLAGS}}{{range .CgoLDFLAGS}}{{printf \"%s\\n\" .}}{{end}}{{end}}", ".")
+	args := []string{"list", "-deps"}
+	if len(tags) > 0 {
+		args = append(args, "-tags="+strings.Join(tags, ","))
+	}
+	args = append(args, "-f", "{{if .CgoLDFLAGS}}{{range .CgoLDFLAGS}}{{printf \"%s\\n\" .}}{{end}}{{end}}", ".")
+	cmd := exec.Command(goPath, args...)
 	cmd.Dir = runtimeDir
 	cmd.Env = append(os.Environ(),
 		"CGO_ENABLED=1",

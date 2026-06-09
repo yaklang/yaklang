@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"maps"
+	"sort"
+	"strings"
 
 	"github.com/yaklang/go-llvm"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -48,6 +50,10 @@ type Compiler struct {
 
 	// runtimeSym maps canonical runtime symbol → link symbol (linkprep).
 	runtimeSym map[string]string
+
+	// yaklibDeps tracks module.method pairs that were actually lowered to
+	// runtime yaklib dispatch. It drives pruned runtime source generation.
+	yaklibDeps map[string]map[string]struct{}
 
 	initialMemberValueIDs      map[int64]struct{}
 	initializingMemberValueIDs map[int64]int
@@ -125,6 +131,7 @@ func NewCompiler(ctx context.Context, prog *ssa.Program, opts ...CompilerOption)
 		Program:                   prog,
 		TypeConverter:             types.NewTypeConverter(c),
 		ExternBindings:            cloneExternBindings(defaultExternBindings),
+		yaklibDeps:                make(map[string]map[string]struct{}),
 		initialMemberValueIDs:     make(map[int64]struct{}),
 		emittedMemberVariableSets: make(map[string]struct{}),
 		materializingCallableIDs:  make(map[int64]int),
@@ -135,6 +142,39 @@ func NewCompiler(ctx context.Context, prog *ssa.Program, opts ...CompilerOption)
 		}
 	}
 	return comp
+}
+
+func (c *Compiler) recordYaklibDependency(module, method string) {
+	module = strings.TrimSpace(module)
+	method = strings.TrimSpace(method)
+	if c == nil || method == "" {
+		return
+	}
+	if c.yaklibDeps == nil {
+		c.yaklibDeps = make(map[string]map[string]struct{})
+	}
+	methods := c.yaklibDeps[module]
+	if methods == nil {
+		methods = make(map[string]struct{})
+		c.yaklibDeps[module] = methods
+	}
+	methods[method] = struct{}{}
+}
+
+func (c *Compiler) YaklibDependencies() map[string][]string {
+	out := make(map[string][]string)
+	if c == nil || len(c.yaklibDeps) == 0 {
+		return out
+	}
+	for module, methods := range c.yaklibDeps {
+		list := make([]string, 0, len(methods))
+		for method := range methods {
+			list = append(list, method)
+		}
+		sort.Strings(list)
+		out[module] = list
+	}
+	return out
 }
 
 // Dispose releases LLVM resources.

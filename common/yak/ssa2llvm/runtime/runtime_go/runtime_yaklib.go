@@ -2,38 +2,11 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"reflect"
 	"strings"
 	"sync"
 	"unsafe"
-
-	"github.com/yaklang/yaklang/common/yak/yaklang"
-	"github.com/yaklang/yaklang/common/yak/yaklib"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
-
-// Trigger yaklang stdlib registration via yak package init.
-import _ "github.com/yaklang/yaklang/common/yak"
-
-func init() {
-	client := yaklib.NewVirtualYakitClient(func(result *ypb.ExecResult) error {
-		if msg := yaklib.ConvertExecResultIntoAIToolCallStdoutLog(result); msg != "" {
-			fmt.Fprintln(os.Stdout, msg)
-		}
-		return nil
-	})
-	yaklib.InitYakit(client)
-
-	exports := make(map[string]interface{}, len(yaklib.YakitExports))
-	for name, value := range yaklib.YakitExports {
-		exports[name] = value
-	}
-	for name, value := range yaklib.GetExtYakitLibByClient(client) {
-		exports[name] = value
-	}
-	yaklang.Import("yakit", exports)
-}
 
 func runtimeDispatchYaklibCall(args []uint64) (int64, error) {
 	if len(args) < 2 {
@@ -41,13 +14,7 @@ func runtimeDispatchYaklibCall(args []uint64) (int64, error) {
 	}
 	pkg := runtimeCStringToGoString(unsafe.Pointer(uintptr(args[0])))
 	method := runtimeCStringToGoString(unsafe.Pointer(uintptr(args[1])))
-	var fn any
-	var ok bool
-	if pkg == "" {
-		fn, ok = yaklang.LookupGlobalCallable(method)
-	} else {
-		fn, ok = yaklang.LookupExport(pkg, method)
-	}
+	fn, ok := runtimeLookupYaklibCallable(pkg, method)
 	if !ok || fn == nil {
 		if pkg == "" {
 			return 0, fmt.Errorf("yaklib global callable %q not found", method)

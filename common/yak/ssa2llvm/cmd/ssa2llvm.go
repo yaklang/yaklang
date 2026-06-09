@@ -110,7 +110,11 @@ func sharedBuildFlags() []cli.Flag {
 		},
 		cli.BoolFlag{
 			Name:  "stdlib-compile",
-			Usage: "Build libyak.a from embedded runtime source in the work dir and link against it (future: compile+obfuscate stdlib together with user code)",
+			Usage: "Build the runtime from embedded source before linking (default; kept for compatibility)",
+		},
+		cli.BoolFlag{
+			Name:  "full-stdlib",
+			Usage: "Disable pruned runtime generation and link the full embedded libyak.a",
 		},
 		cli.BoolFlag{
 			Name:  "x",
@@ -297,7 +301,7 @@ func newBuildCommandConfig(c *cli.Context) (*buildCommandConfig, error) {
 		obf:        c.StringSlice("obf"),
 		profile:    c.String("profile"),
 		pluginType: c.String("plugin-type"),
-		stdlibComp: c.Bool("stdlib-compile"),
+		stdlibComp: !c.Bool("full-stdlib"),
 		trace:      c.Bool("x"),
 		force:      c.Bool("a"),
 		llvmPlugin: c.String("llvm-plugin"),

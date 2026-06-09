@@ -15,6 +15,9 @@ func prepareCompileConfig(cfg *CompileConfig) error {
 	if cfg == nil {
 		return fmt.Errorf("compile failed: nil config")
 	}
+	if !cfg.StdlibCompileSet {
+		cfg.StdlibCompile = true
+	}
 	if err := applyCompilePluginType(cfg); err != nil {
 		return err
 	}
