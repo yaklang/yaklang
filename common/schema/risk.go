@@ -179,6 +179,8 @@ func (p *Risk) ToGRPCModel() *ypb.Risk {
 		packetPairs = append(packetPairs, &ypb.PacketPair{
 			HttpflowId: pp.HTTPFlowId,
 			Url:        pp.Url,
+			Request:    utils.EscapeInvalidUTF8Byte([]byte(pp.Request)),
+			Response:   utils.EscapeInvalidUTF8Byte([]byte(pp.Response)),
 		})
 	}
 
