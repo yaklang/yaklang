@@ -469,7 +469,7 @@ jobs:
                 {"package": "./common/utils/cli", "timeout": "1m"},
                 {"package": "./common/mcp/yakcliconvert", "timeout": "1m"},
                 {"package": "./common/mcp", "timeout": "2m", "run": "^TestLegacy.*$"},
-                {"package": "./common/mcp/...", "timeout": "2m", "skip": "^TestLegacy.*$"},
+                {"package": "./common/mcp/...", "timeout": "2m", "skip": "^TestLegacy.*$", "exclude_packages": ["./common/mcp"]},
                 {"package": "./common/yak/yakdoc/...", "timeout": "3m"},
                 {"package": "./common/utils/yakgit/yakdiff/...", "timeout": "20s"},
                 {"package": "./common/yak/ssaapi/ssaconfig", "timeout": "20s"}

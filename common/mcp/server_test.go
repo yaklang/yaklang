@@ -21,14 +21,7 @@ func init() {
 }
 
 func TestMCPServerEx(t *testing.T) {
-	if _, err := NewLocalClient(); err != nil {
-		t.Skipf("skipping: NewLocalClient not registered (%v)", err)
-	}
-	s, _ := NewMCPServer()
-
-	if err := s.ServeSSE(":18083", "http://localhost:18083"); err != nil {
-		panic(err)
-	}
+	t.Skip("manual integration test: ServeSSE blocks forever; use TestMCPClient instead")
 }
 
 func TestMCPClient(t *testing.T) {
@@ -39,8 +32,10 @@ func TestMCPClient(t *testing.T) {
 
 	port := utils.GetRandomAvailableTCPPort()
 	go func() {
-		s, _ := NewMCPServer()
-
+		s, err := NewMCPServer(WithEnableAllToolSets())
+		if err != nil {
+			panic(err)
+		}
 		if err := s.ServeSSE(fmt.Sprintf(":%d", port), fmt.Sprintf("http://localhost:%d", port)); err != nil {
 			panic(err)
 		}
@@ -52,7 +47,7 @@ func TestMCPClient(t *testing.T) {
 
 	defer c.Close()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	err = c.Start(ctx)
@@ -64,20 +59,19 @@ func TestMCPClient(t *testing.T) {
 		Name:    "test-client",
 		Version: "1.0.0",
 	}
-	c.Initialize(context.Background(), initRequest)
+	_, err = c.Initialize(ctx, initRequest)
+	require.NoError(t, err)
 
 	request := mcp.CallToolRequest{}
 	data := `{
-  "target": "www.example.com" 
+  "text": "hello",
+  "workFlow": [{"codecType": "Base64Encode"}]
 }`
-	request.Params.Name = "subdomain_collection"
+	request.Params.Name = "exec_codec"
 	err = json.Unmarshal([]byte(data), &request.Params.Arguments)
 	require.NoError(t, err)
-	c.OnNotification(func(notification mcp.JSONRPCNotification) {
-		fmt.Println("Call notification:", notification)
-	})
 
-	result, err := c.CallTool(context.Background(), request)
+	result, err := c.CallTool(ctx, request)
 	require.NoError(t, err)
 	for _, r := range result.Content {
 		switch result := r.(type) {
