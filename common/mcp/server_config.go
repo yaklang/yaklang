@@ -19,6 +19,8 @@ type MCPServerConfig struct {
 	enableResources  map[string]*ResourceWithHandler
 	disableResources map[string]*ResourceWithHandler
 	dynamicScript    []string
+	// grpcClient, when set, is used instead of NewLocalClient() (integration tests).
+	grpcClient YakClientInterface
 	// extraAITools holds aitool.Tool instances registered via WithAITools.
 	// They are merged last and override globalTools entries with the same name.
 	extraAITools map[string]*ToolWithHandler
@@ -308,6 +310,22 @@ func WithEnableSSAToolSet() McpServerOption {
 
 func WithDisableSSAToolSet() McpServerOption {
 	return WithDisableToolSet("ssa")
+}
+
+func WithEnableGlobalHotPatchToolSet() McpServerOption {
+	return WithEnableToolSet("global_hotpatch")
+}
+
+func WithDisableGlobalHotPatchToolSet() McpServerOption {
+	return WithDisableToolSet("global_hotpatch")
+}
+
+// WithGRPCClient pins the MCP server to a specific gRPC client (integration tests).
+func WithGRPCClient(client YakClientInterface) McpServerOption {
+	return func(cfg *MCPServerConfig) error {
+		cfg.grpcClient = client
+		return nil
+	}
 }
 
 // WithDisabledToolNames registers a set of tool names that should be excluded
