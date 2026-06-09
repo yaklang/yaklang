@@ -2,6 +2,7 @@ package crawler
 
 var Exports = map[string]interface{}{
 	"Start":               StartCrawler,
+	"context":             WithContext,
 	"basicAuth":           WithBasicAuth,
 	"bodySize":            WithBodySize,
 	"concurrent":          WithConcurrent,

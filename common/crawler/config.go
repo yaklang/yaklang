@@ -2,6 +2,7 @@ package crawler
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -48,6 +49,7 @@ type cookie struct {
 }
 
 func (c *Config) init() {
+	c.ctx = context.Background()
 	c.BasicAuth = false
 	c.concurrent = 20
 	c.maxRedirectTimes = 5
@@ -74,6 +76,7 @@ func (c *Config) init() {
 }
 
 type Config struct {
+	ctx context.Context
 	// 基础认证
 	BasicAuth    bool
 	AuthUsername string
@@ -167,6 +170,9 @@ func (c *Config) GetLowhttpConfig() []lowhttp.LowhttpOpt {
 		opts = append(opts, lowhttp.WithRedirectTimes(c.maxRedirectTimes))
 	}
 	opts = append(opts, lowhttp.WithVerifyCertificate(c.verifyCertificate))
+	if c.ctx != nil {
+		opts = append(opts, lowhttp.WithContext(c.ctx))
+	}
 	if c.connectTimeout > 0 {
 		opts = append(opts, lowhttp.WithTimeout(c.connectTimeout))
 	}
@@ -272,6 +278,16 @@ func (c *Config) CheckShouldBeHandledURL(u *url.URL) bool {
 }
 
 type ConfigOpt func(c *Config)
+
+func WithContext(ctx context.Context) ConfigOpt {
+	return func(c *Config) {
+		if ctx == nil {
+			ctx = context.Background()
+		}
+		c.ctx = ctx
+		c._cachedOpts = nil
+	}
+}
 
 // disallowSuffix 是一个选项函数，用于指定爬虫时的后缀黑名单
 // Example:

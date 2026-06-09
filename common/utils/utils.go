@@ -407,7 +407,7 @@ func FixHTTPRequestForHTTPDoWithHttps(r *http.Request, isHttps bool) (*http.Requ
 }
 
 func CallWithCtx(ctx context.Context, cb func()) error {
-	sig := make(chan struct{})
+	sig := make(chan struct{}, 1)
 	go func() {
 		cb()
 		sig <- struct{}{}
@@ -423,7 +423,7 @@ func CallWithCtx(ctx context.Context, cb func()) error {
 func CallWithTimeout(timeout float64, cb func()) error {
 	ctx, cancel := context.WithCancel(TimeoutContextSeconds(timeout))
 	defer cancel()
-	sig := make(chan struct{})
+	sig := make(chan struct{}, 1)
 	go func() {
 		cb()
 		sig <- struct{}{}
