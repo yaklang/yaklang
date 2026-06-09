@@ -124,6 +124,7 @@ func init() {
 				loopinfra.WithActionSuffix("code"),
 				loopinfra.WithAITagConfig("GEN_CODE", "yak_code", "yaklang-code", "code/yaklang"),
 				loopinfra.WithFileExtension(".yak"),
+				loopinfra.WithExitWhenSyntaxClean(true),
 				loopinfra.WithFileChanged(func(content string, op *reactloops.LoopActionHandlerOperator) (string, bool) {
 					return checkCodeAndFormatErrors(content)
 				}),
