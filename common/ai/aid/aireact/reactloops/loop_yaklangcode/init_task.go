@@ -3,12 +3,10 @@ package loop_yaklangcode
 import (
 	"bytes"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -22,125 +20,74 @@ func buildInitTask(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearc
 		attachedDatas := task.GetAttachedDatas()
 		reactloops.RunAttachedExtraResourcesInit(r, loop, attachedDatas)
 		editorCtx := initYaklangEditorContextFromAttached(r, loop, attachedDatas)
-		attachedFilePath := ""
+		hasAttachedPath := editorCtx != nil && editorCtx.HasEditorFile()
+		attachedPath := ""
+		workspacePath := ""
 		if editorCtx != nil {
-			attachedFilePath = editorCtx.EditorFile
+			if editorCtx.HasEditorFile() {
+				attachedPath = editorCtx.EditorFile
+			}
+			if editorCtx.HasWorkspace() {
+				workspacePath = editorCtx.WorkspacePath
+			}
 		}
 
 		// Step 1: 分析用户需求，生成搜索关键字和判断文件路径
 		log.Infof("init task step 1: analyzing user requirements and generating search patterns")
 
-		// 判断是否需要搜索代码样例
-		hasSearcher := docSearcher != nil || ragSearcher != nil
+		hasGrepSearcher := docSearcher != nil
+		hasRAGSearcher := ragSearcher != nil
+		hasSearcher := hasGrepSearcher || hasRAGSearcher
+		needLiteforge := hasSearcher || !hasAttachedPath
 
-		// 使用模板构建动态 prompt
-		promptTemplate := `
-你的目标是分析用户需求，完成以下任务：
-
-【任务1：判断文件操作类型】
-判断这是创建新文件还是修改已有文件：
-- 如果用户明确提到文件路径（如"修改 /tmp/test.yak"），则是修改已有文件
-- 如果用户只描述功能需求，没有提到具体文件，则是创建新文件
-{{ if .hasGrepSearcher }}
-【任务2：生成精确代码搜索关键字(Grep模式)】
-根据用户需求，生成 2-4 个搜索模式（search_patterns），用于在 Yaklang 代码样例库中进行精确文本搜索：
-
-搜索模式类型：
-1. 函数名搜索：如 "servicescan\\.Scan", "poc\\.Get", "str\\.Split"
-2. 关键词搜索：如 "端口扫描", "HTTP请求", "JSON解析"
-3. 混合搜索：如 "mitm.*证书", "fuzz.*参数"
-
-注意事项：
-- 优先使用函数名搜索（使用 \\.  转义点号）
-- 每个pattern要具体且相关，避免过于宽泛
-- 如果涉及多个功能点，可以为每个功能点生成一个pattern
-- 搜索模式需要是正则表达式或关键词
-{{ end }}{{ if .hasRAGSearcher }}
-【任务{{ if .hasGrepSearcher }}3{{ else }}2{{ end }}：生成语义搜索问题(RAG向量搜索)】
-根据用户需求，生成 2-4 个完整的问题（semantic_questions），用于语义向量搜索相关代码样例：
-
-问题格式要求：
-1. 必须是完整的主谓宾句式
-2. 禁止使用代词（它、这个、那个等）
-3. 明确指明 Yaklang 语言
-4. 每个问题要从不同角度描述需求
-
-问题示例：
-Good: "Yaklang中如何发送HTTP请求？"
-Good: "Yaklang中如何进行端口扫描？"
-Good: "Yaklang中如何处理JSON数据？"
-Good: "Yaklang中如何调用爬虫功能？"
-Bad: "如何发送请求？" - 缺少主语
-Bad: "它如何使用？" - 使用代词
-Bad: "端口扫描" - 不完整句式
-{{ end }}
-<|USER_INPUT_{{ .nonce }}|>
-{{ .data }}
-<|USER_INPUT_END_{{ .nonce }}|>
-`
-
-		// 构建动态 tool options
-		toolOptions := []aitool.ToolOption{
-			aitool.WithBoolParam("create_new_file", aitool.WithParam_Description("Is this task to create a new file or modify an existing file? If user mentions specific file path, set to false."), aitool.WithParam_Required(true)),
-			aitool.WithStringParam("existed_filepath", aitool.WithParam_Description("Only when create_new_file is false. The file path to modify.")),
+		analyzeOpts := yaklangAnalyzeRequirementOptions{
+			userInput:       task.GetUserInput(),
+			hasAttachedPath: hasAttachedPath,
+			attachedPath:    attachedPath,
+			workspacePath:   workspacePath,
+			hasGrepSearcher: hasGrepSearcher,
+			hasRAGSearcher:  hasRAGSearcher,
 		}
 
-		// 根据 docSearcher 是否存在添加 search_patterns
-		if docSearcher != nil {
-			toolOptions = append(toolOptions,
-				aitool.WithStringArrayParam("search_patterns", aitool.WithParam_Description("2-4 search patterns for finding relevant Yaklang code examples. Each pattern should be a regex or keyword."), aitool.WithParam_Required(true)),
-			)
-		}
-
-		// 根据 ragSearcher 是否存在添加 semantic_questions
-		if ragSearcher != nil {
-			toolOptions = append(toolOptions,
-				aitool.WithStringArrayParam("semantic_questions", aitool.WithParam_Description("2-4 complete questions for semantic search of Yaklang code examples. Each question must be a complete sentence with subject-predicate-object structure and explicitly mention 'Yaklang'."), aitool.WithParam_Required(true)),
-			)
-		}
-
-		// 只有在有搜索器时才添加 reason 参数
-		if hasSearcher {
-			toolOptions = append(toolOptions,
-				aitool.WithStringParam("reason", aitool.WithParam_Description("Explain your decision and why these search patterns/questions are chosen."), aitool.WithParam_Required(true)),
-			)
-		}
-
-		// 渲染 prompt 模板
-		renderedPrompt := utils.MustRenderTemplate(
-			promptTemplate,
-			map[string]any{
-				"nonce":           utils.RandStringBytes(4),
-				"data":            task.GetUserInput(),
-				"hasGrepSearcher": docSearcher != nil,
-				"hasRAGSearcher":  ragSearcher != nil,
-			})
-
-		// 构建 InvokeLiteForge 选项
-		forgeOptions := []aicommon.GeneralKVConfigOption{}
-		if hasSearcher {
-			forgeOptions = append(forgeOptions, aicommon.WithGeneralConfigStreamableFieldWithNodeId("init-search-code-sample", "reason"))
-		}
-
-		loop.LoadingStatus("开始分析用户需求... / Analyzing user requirements...")
-		step1Result, err := r.InvokeSpeedPriorityLiteForge(
-			task.GetContext(),
-			"analyze-requirement-and-search",
-			renderedPrompt,
-			toolOptions,
-			forgeOptions...,
+		var (
+			existed           string
+			reason            string
+			searchPatterns    []string
+			semanticQuestions []string
 		)
-		if err != nil {
-			log.Errorf("failed to invoke liteforge step 1: %v", err)
-			operator.Failed(utils.Errorf("failed to analyze requirement: %v", err))
-			return
-		}
 
-		createNewFile := step1Result.GetBool("create_new_file")
-		existed := step1Result.GetString("existed_filepath")
-		reason := step1Result.GetString("reason")
-		searchPatterns := step1Result.GetStringSlice("search_patterns")
-		semanticQuestions := step1Result.GetStringSlice("semantic_questions")
+		if needLiteforge {
+			renderedPrompt := buildYaklangAnalyzeRequirementPrompt(analyzeOpts)
+			toolOptions := buildYaklangAnalyzeRequirementToolOptions(analyzeOpts, hasSearcher)
+
+			forgeOptions := []aicommon.GeneralKVConfigOption{}
+			if hasSearcher {
+				forgeOptions = append(forgeOptions, aicommon.WithGeneralConfigStreamableFieldWithNodeId("init-search-code-sample", "reason"))
+			}
+
+			loop.LoadingStatus("开始分析用户需求... / Analyzing user requirements...")
+			step1Result, err := r.InvokeSpeedPriorityLiteForge(
+				task.GetContext(),
+				"analyze-requirement-and-search",
+				renderedPrompt,
+				toolOptions,
+				forgeOptions...,
+			)
+			if err != nil {
+				log.Errorf("failed to invoke liteforge step 1: %v", err)
+				operator.Failed(utils.Errorf("failed to analyze requirement: %v", err))
+				return
+			}
+
+			if !hasAttachedPath {
+				existed = step1Result.GetString("existed_filepath")
+			}
+			reason = step1Result.GetString("reason")
+			searchPatterns = step1Result.GetStringSlice("search_patterns")
+			semanticQuestions = step1Result.GetStringSlice("semantic_questions")
+		} else {
+			log.Infof("skip liteforge file detection: target path already attached (%s)", attachedPath)
+		}
 		for _, question := range semanticQuestions {
 			emitter.EmitDefaultStreamEvent("thought", bytes.NewBufferString(question), task.GetIndex())
 		}
@@ -160,8 +107,8 @@ Bad: "端口扫描" - 不完整句式
 			"nonce":  utils.RandStringBytes(4),
 		})
 
-		log.Infof("identified create_new_file: %v, search_patterns count: %d, semantic_questions count: %d",
-			createNewFile, len(searchPatterns), len(semanticQuestions))
+		log.Infof("identified search_patterns count: %d, semantic_questions count: %d, has_attached_path: %v",
+			len(searchPatterns), len(semanticQuestions), hasAttachedPath)
 
 		// Step 2: 执行代码样例搜索（Grep + RAG 语义搜索）
 		var initialSamples string
@@ -398,41 +345,7 @@ Bad: "端口扫描" - 不完整句式
 			log.Infof("no search results found from any searcher")
 		}
 
-		// Step 3: 处理文件路径
-		// 优先使用前端 attached 传入的路径（selected / file_path），其次才使用 LiteForge 推断的 existed。
-		targetPath := attachedFilePath
-		if targetPath == "" {
-			targetPath = existed
-		}
-		if targetPath != "" {
-			log.Infof("identified target path: %s (attached=%v)", targetPath, attachedFilePath != "")
-			filename := utils.GetFirstExistedFile(targetPath)
-			if filename == "" {
-				// 文件不存在，创建新文件
-				createFileErr := os.WriteFile(targetPath, []byte(""), 0644)
-				if createFileErr != nil {
-					operator.Failed(utils.Errorf("cannot create file to disk, failed: %v", createFileErr))
-					return
-				}
-				filename = targetPath
-			}
-			// 读取已有文件内容（如果存在）
-			content, _ := os.ReadFile(targetPath)
-			if len(content) > 0 {
-				log.Infof("identified target file: %s, file size: %v", targetPath, len(content))
-				loop.Set("full_code", string(content))
-			}
-			emitter.EmitPinFilename(filename)
-			loop.Set("filename", filename)
-			operator.Continue()
-			return
-		}
-
-		// 如果没有提供 existed 路径，创建新文件（无论 createNewFile 是什么）
-		filename := r.EmitFileArtifactWithExt("gen_code", ".yak", "")
-		emitter.EmitPinFilename(filename)
-		loop.Set("filename", filename)
-		// Default: Continue with normal loop execution
-		operator.Continue()
+		// Step 3: 处理文件路径与初始代码（附件选区优先于磁盘读取）
+		finalizeYaklangInitFileTarget(r, loop, emitter, operator, editorCtx, existed)
 	}
 }
