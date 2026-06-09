@@ -1,3 +1,5 @@
+//go:build !ssa2llvm_pruned_runtime
+
 package main
 
 import (

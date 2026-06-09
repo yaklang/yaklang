@@ -50,6 +50,7 @@ func yaklibDispatchNames(calleeName string) (pkg, method string) {
 
 func (c *Compiler) lowerYaklibDispatchCall(inst *ssa.Call, calleeName string) error {
 	pkg, method := yaklibDispatchNames(calleeName)
+	c.recordYaklibDependency(pkg, method)
 	spec, err := c.newYaklibDispatchSpec(inst, pkg, method)
 	if err != nil {
 		return err

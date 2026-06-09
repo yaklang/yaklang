@@ -18,7 +18,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/embed"
 )
 
-const cachedCompileVersion = "ssa2llvm-cache-v1"
+const cachedCompileVersion = "ssa2llvm-cache-v2"
 
 var toolVersionMemo sync.Map // map[string]string
 
@@ -66,6 +66,7 @@ func cachedWorkKeyFromConfig(cfg *CompileConfig) (string, error) {
 	write(fmt.Sprintf("printEntryResult=%t", cfg.PrintEntryResult))
 	write(fmt.Sprintf("skipRuntimeLink=%t", cfg.SkipRuntimeLink))
 	write(fmt.Sprintf("stdlibCompile=%t", cfg.StdlibCompile))
+	write(fmt.Sprintf("stdlibCompileSet=%t", cfg.StdlibCompileSet))
 	write("profile=" + strings.TrimSpace(cfg.ProfileName))
 	if cfg.resolvedProfile != nil {
 		if data, err := json.Marshal(cfg.resolvedProfile); err != nil {

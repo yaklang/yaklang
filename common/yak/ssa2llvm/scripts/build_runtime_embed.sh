@@ -68,6 +68,15 @@ go run "${REPO_ROOT}/common/utils/gomodsrc/cmd" \
   --pkg ./common/yak/ssa2llvm/runtime/runtime_go \
   --dst "${SRC_STAGE_DIR}"
 
+# gomodsrc follows default build tags, so explicitly include files that are
+# only compiled for per-script pruned runtime builds.
+cp "${REPO_ROOT}/common/yak/ssa2llvm/runtime/runtime_go/runtime_yaklib_builtins_pruned.go" \
+  "${SRC_STAGE_DIR}/common/yak/ssa2llvm/runtime/runtime_go/runtime_yaklib_builtins_pruned.go"
+cp "${REPO_ROOT}/common/yak/ssa2llvm/runtime/runtime_go/runtime_yaklib_lookup_pruned.go" \
+  "${SRC_STAGE_DIR}/common/yak/ssa2llvm/runtime/runtime_go/runtime_yaklib_lookup_pruned.go"
+cp "${REPO_ROOT}/common/yak/ssa2llvm/runtime/runtime_go/runtime_sync_pruned.go" \
+  "${SRC_STAGE_DIR}/common/yak/ssa2llvm/runtime/runtime_go/runtime_sync_pruned.go"
+
 # Bundle libgc.a into the extracted source tree so runtime_go can build without system libgc.
 mkdir -p "${SRC_STAGE_DIR}/common/yak/ssa2llvm/runtime/runtime_go/libs"
 cp "${LIBGC_PATH}" "${SRC_STAGE_DIR}/common/yak/ssa2llvm/runtime/runtime_go/libs/libgc.a"
