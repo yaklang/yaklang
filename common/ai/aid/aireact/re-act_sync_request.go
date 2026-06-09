@@ -360,7 +360,8 @@ func (r *ReAct) HandleSyncTypeReactClearTaskEvent(event *ypb.AIInputEvent) error
 
 func (r *ReAct) HandleSyncTypeCapabilityInventoryEvent(event *ypb.AIInputEvent) error {
 	payload := reactloops.BuildCapabilityInventoryPayload(r.config, r.GetCurrentLoop())
-	_, _ = r.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, aicommon.CapabilityInventoryNodeID, payload, event.SyncID)
+	taskIndex := aicommon.BuildVerificationTodoScope(r.GetCurrentTask()).TaskIndex
+	_, _ = r.EmitSyncJSONWithTaskIndex(schema.EVENT_TYPE_STRUCTURED, aicommon.CapabilityInventoryNodeID, payload, event.SyncID, taskIndex)
 	return nil
 }
 

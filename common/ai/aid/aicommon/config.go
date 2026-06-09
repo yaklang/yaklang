@@ -1352,6 +1352,18 @@ func WithHotPatchOptionChan(ch *chanx.UnlimitedChan[ConfigOption]) ConfigOption 
 	}
 }
 
+// WithEmitter reuses an existing emitter instead of creating a fresh one in NewConfig.
+// PE task execution passes the task-scoped emitter so child invokers inherit TaskIndex
+// processors and other stacked event metadata from the parent coordinator.
+func WithEmitter(emitter *Emitter) ConfigOption {
+	return func(c *Config) error {
+		if emitter != nil {
+			c.Emitter = emitter
+		}
+		return nil
+	}
+}
+
 // Event / output
 func WithEventHandler(handler func(e *schema.AiOutputEvent)) ConfigOption {
 	return func(c *Config) error {

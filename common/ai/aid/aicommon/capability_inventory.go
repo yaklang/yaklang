@@ -13,11 +13,10 @@ import (
 const CapabilityInventoryNodeID = "capability_inventory"
 
 type CapabilityInventoryToolItem struct {
-	Name        string   `json:"name"`
-	VerboseName string   `json:"verbose_name,omitempty"`
-	Description string   `json:"description,omitempty"`
-	Category    string   `json:"category"`
-	Keywords    []string `json:"keywords,omitempty"`
+	Name        string `json:"name"`
+	VerboseName string `json:"verbose_name,omitempty"`
+	Description string `json:"description,omitempty"`
+	Category    string `json:"category"`
 }
 
 // Skill load states for capability_inventory.skills entries (SkillLoadState field).
@@ -107,7 +106,6 @@ func convertToolItem(tool *aitool.Tool) CapabilityInventoryToolItem {
 		VerboseName: tool.VerboseName,
 		Description: tool.Description,
 		Category:    classifyToolCategory(tool),
-		Keywords:    tool.Keywords,
 	}
 }
 
