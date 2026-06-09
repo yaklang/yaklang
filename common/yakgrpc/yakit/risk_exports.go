@@ -278,7 +278,8 @@ func WithRiskParam_Response(i interface{}) RiskParamsOpt {
 }
 
 // appendPacketPairs 是一个追加形式的选项参数，用于向风险记录中追加一对请求/响应报文
-// 会将报文保存为 HTTPFlow，并在 PacketPairs 中记录 httpflow_id 与 url，前端可展示 url 再按 id 查询详情
+// 会将报文保存为 HTTPFlow，并在 PacketPairs 中记录 httpflow_id、url 以及请求/响应快照，
+// 前端可优先按 id 查询详情；HTTPFlow 被删除后仍可使用 PacketPairs 中的快照展示流量。
 // 支持 string / []byte / 任意可转成字符串的类型
 // Example:
 // ```
@@ -323,6 +324,8 @@ func WithRiskParam_AppendPacketPairs(req, resp interface{}) RiskParamsOpt {
 				r.PacketPairs = append(r.PacketPairs, &schema.PacketPair{
 					HTTPFlowId: int64(flow.ID),
 					Url:        urlStr,
+					Request:    reqStr,
+					Response:   respStr,
 				})
 			} else {
 				log.Warnf("appendPacketPairs: save httpflow failed, skip: %v", err)

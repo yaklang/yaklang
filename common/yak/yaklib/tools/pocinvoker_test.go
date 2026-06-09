@@ -161,12 +161,16 @@ func TestPocVulToRisk_MultiPacketPairsSaveAndLoad(t *testing.T) {
 	expectedRsps := []string{string(rsp1), string(rsp2)}
 	expectedHosts := []string{"pair-1.example", "pair-2.example"}
 	expectedPaths := []string{"/pair-1", "/pair-2"}
+	var flowIds []int64
 
 	for i, pp := range gotRisk.PacketPairs {
 		require.NotNil(t, pp)
 		require.Greater(t, pp.HTTPFlowId, int64(0))
+		flowIds = append(flowIds, pp.HTTPFlowId)
 		require.Contains(t, pp.Url, expectedHosts[i])
 		require.Contains(t, pp.Url, expectedPaths[i])
+		require.Equal(t, expectedReqs[i], pp.Request)
+		require.Equal(t, expectedRsps[i], pp.Response)
 
 		flow, err := yakit.GetHTTPFlow(db, pp.HTTPFlowId)
 		require.NoError(t, err)
@@ -175,6 +179,20 @@ func TestPocVulToRisk_MultiPacketPairsSaveAndLoad(t *testing.T) {
 		require.Contains(t, flow.Url, expectedPaths[i])
 		require.Equal(t, expectedReqs[i], flow.GetRequest())
 		require.Equal(t, expectedRsps[i], flow.GetResponse())
+	}
+
+	for _, id := range flowIds {
+		require.NoError(t, yakit.DeleteHTTPFlowByID(db, id))
+	}
+
+	gotRiskAfterFlowDelete, err := yakit.GetRiskByHash(db, risk.Hash)
+	require.NoError(t, err)
+	require.Len(t, gotRiskAfterFlowDelete.PacketPairs, 2)
+	for i, pp := range gotRiskAfterFlowDelete.PacketPairs {
+		require.NotNil(t, pp)
+		require.Equal(t, flowIds[i], pp.HTTPFlowId)
+		require.Equal(t, expectedReqs[i], pp.Request)
+		require.Equal(t, expectedRsps[i], pp.Response)
 	}
 }
 

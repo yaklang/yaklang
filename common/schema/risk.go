@@ -74,10 +74,13 @@ type Risk struct {
 	ProgramName string `json:"program_name"`
 }
 
-// PacketPair 表示风险关联的一条 HTTP 流量引用：前端可展示 Url，再通过 HTTPFlowId 查询详情
+// PacketPair 表示风险关联的一条 HTTP 流量：优先可通过 HTTPFlowId 查询详情，
+// 即使 HTTPFlow 被删除，也可以用 Request/Response 展示保存时的报文快照。
 type PacketPair struct {
 	HTTPFlowId int64  `json:"httpflow_id"`
 	Url        string `json:"url"`
+	Request    string `json:"request"`
+	Response   string `json:"response"`
 }
 
 // PacketPairList 是 PacketPair 的集合，用于 JSON 持久化到数据库
