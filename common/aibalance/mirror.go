@@ -619,11 +619,12 @@ func (m *MirrorManager) runOnce(parentCtx context.Context, rt *mirrorRuleRuntime
 // 让用户清楚 save 调没调、写了多少、生产是否会真落盘。
 // 关键词: saveOutcome, save 可观测性, 试运行/日志反馈
 type saveOutcome struct {
-	Calls     int    `json:"calls"`     // save() 被调用次数
-	Persisted int    `json:"persisted"` // 实际写盘成功次数 (试运行恒为 0)
-	Bytes     int64  `json:"bytes"`     // 序列化后总字节 (即将/已写入)
-	Enabled   bool   `json:"enabled"`   // 落盘子系统当前是否启用 (生产是否会真落)
-	Preview   string `json:"preview"`   // 首次 save 的内容预览 (截断)
+	Calls       int    `json:"calls"`        // save() 被调用次数 (含带 tag)
+	TaggedCalls int    `json:"tagged_calls"` // 其中带 tag (永久留存) 的调用次数
+	Persisted   int    `json:"persisted"`    // 实际写盘成功次数 (试运行恒为 0)
+	Bytes       int64  `json:"bytes"`        // 序列化后总字节 (即将/已写入)
+	Enabled     bool   `json:"enabled"`      // 落盘子系统当前是否启用 (生产是否会真落)
+	Preview     string `json:"preview"`      // 首次 save 的内容预览 (截断)
 }
 
 // savePreviewLimit 是 save 预览的截断长度。
@@ -632,12 +633,17 @@ const savePreviewLimit = 800
 // allowPersist 控制注入的 save() 是否真正落盘: 生产触发为 true; 面板「试运行」为 false,
 // 避免试运行污染落盘数据。无论是否落盘, 都会记录 save() 的调用情况 (saveOutcome) 以反馈给用户。
 // save() 注入为可直接调用的全局函数 (SetVars), 语义:
-//   - save()      落盘当前镜像数据 (即 handle 的入参 data)
-//   - save(x)     落盘任意可序列化对象 x
+//   - save()             落盘当前镜像数据 (即 handle 的入参 data) 到按天日分片 (容量受限, 超限清理旧数据)
+//   - save(x)            落盘任意可序列化对象 x 到按天日分片 (x 为非字符串)
+//   - save("tag")        落盘当前镜像数据到带 tag 的永久留存分片 ({tag}-{date}.jsonl, 永不清理)
+//   - save("tag", x)     落盘对象 x 到带 tag 的永久留存分片
+//
+// tag 用途: 重要数据 (如人工确认须长期保留的样本) 单列一个独立留存区, 不参与日分片的
+// 容量治理 (永不被删), 也不计入容量预算。tag 仅允许 [A-Za-z0-9_-] (会拼入文件名)。
 //
 // 返回值: (执行错误, stdout, save 调用汇总)。
 //
-// 关键词: executeMirrorScript, yak engine ExecuteExWithContext, handle 调用, save 注入落盘, saveOutcome 反馈
+// 关键词: executeMirrorScript, yak engine ExecuteExWithContext, handle 调用, save 注入落盘, save tag 永久留存, saveOutcome 反馈
 func executeMirrorScript(ctx context.Context, script string, snap *MirrorSnapshot, allowPersist bool) (error, string, saveOutcome) {
 	outcome := saveOutcome{Enabled: dataSinkEnabled()}
 	if strings.TrimSpace(script) == "" {
@@ -653,14 +659,30 @@ func executeMirrorScript(ctx context.Context, script string, snap *MirrorSnapsho
 	// 试运行 (allowPersist=false) 时不写盘, 返回值按「生产是否启用」回放, 便于脚本逻辑分支贴近真实。
 	var saveMu sync.Mutex
 	saveFn := func(args ...any) bool {
+		// 解析调用形态:
+		//   - 首参为字符串 => 当作 tag (永久留存), 第二参可选为自定义 payload, 缺省落当前快照。
+		//   - 首参为非字符串 => 当作要落盘的 payload (无 tag, 走按天日分片)。
+		//   - 无参 => 落当前快照到按天日分片。
+		// 关键词: save tag 语义解析, 字符串首参视为 tag
+		tag := ""
 		var payload any = dataMap
 		if len(args) > 0 && args[0] != nil {
-			payload = args[0]
+			if s, ok := args[0].(string); ok {
+				tag = strings.TrimSpace(s)
+				if len(args) > 1 && args[1] != nil {
+					payload = args[1]
+				}
+			} else {
+				payload = args[0]
+			}
 		}
 		raw, mErr := json.Marshal(payload)
 
 		saveMu.Lock()
 		outcome.Calls++
+		if tag != "" {
+			outcome.TaggedCalls++
+		}
 		if mErr == nil {
 			outcome.Bytes += int64(len(raw))
 			if outcome.Preview == "" {
@@ -677,9 +699,15 @@ func executeMirrorScript(ctx context.Context, script string, snap *MirrorSnapsho
 			// 试运行: 不落盘, 返回「生产环境是否会落盘」, 让脚本里的 if save() 分支贴近真实。
 			return outcome.Enabled
 		}
-		ok, err := dataSinkAppend(payload)
+		var ok bool
+		var err error
+		if tag != "" {
+			ok, err = dataSinkAppendTagged(tag, payload)
+		} else {
+			ok, err = dataSinkAppend(payload)
+		}
 		if err != nil {
-			log.Warnf("mirror: save record failed (req_id=%s): %v", snap.ReqID, err)
+			log.Warnf("mirror: save record failed (req_id=%s tag=%q): %v", snap.ReqID, tag, err)
 			return false
 		}
 		if ok {

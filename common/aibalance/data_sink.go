@@ -64,11 +64,24 @@ type dataSink struct {
 	curDate string
 	curFile *os.File
 
+	// tagFiles 维护带 tag 的永久留存分片句柄 (tag -> 当天句柄)。
+	// 带 tag 的数据属于"必须永久保留"的独立留存区: 既不计入容量预算
+	// (records/bytes 只统计按天日分片), 也永不被容量治理删除。
+	// 关键词: dataSink.tagFiles, 带 tag 永久留存, 与日分片隔离
+	tagFiles map[string]*taggedShardHandle
+
 	records int64
 	bytes   int64
 	counted bool // records/bytes 是否已从磁盘初始化
 
 	lastIndexFlush time.Time
+}
+
+// taggedShardHandle 是单个 tag 当天分片的打开句柄 + 其日期 (用于跨天滚动)。
+// 关键词: taggedShardHandle, 带 tag 分片句柄
+type taggedShardHandle struct {
+	date string
+	file *os.File
 }
 
 // dataSinkIndex 是 sidecar 的 JSON 结构。
@@ -138,6 +151,40 @@ func shardName(date string) string {
 
 // dataSinkDateLayout 是按天分片文件名的日期布局, 与 nowDate 保持一致。
 const dataSinkDateLayout = "2006-01-02"
+
+// maxDataSinkTagLen 是 save(tag) 中 tag 的最大长度。
+const maxDataSinkTagLen = 64
+
+// validDataSinkTag 校验 save(tag) 的 tag 合法性。
+//
+// tag 会被直接拼进文件名 ({tag}-{date}.jsonl), 因此必须严格白名单字符集,
+// 杜绝路径穿越 (../)、空白、分隔符等注入文件系统的风险; 同时白名单确保拼出的
+// 文件名长度恒 > 10 字符, 永远不会与按天日分片 (YYYY-MM-DD.jsonl) 命名冲突。
+//
+// 关键词: validDataSinkTag, tag 文件名白名单, 防路径穿越, 不与日分片冲突
+func validDataSinkTag(tag string) bool {
+	if tag == "" || len(tag) > maxDataSinkTagLen {
+		return false
+	}
+	for i := 0; i < len(tag); i++ {
+		c := tag[i]
+		switch {
+		case c >= 'a' && c <= 'z':
+		case c >= 'A' && c <= 'Z':
+		case c >= '0' && c <= '9':
+		case c == '_' || c == '-':
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+// taggedShardName 返回某 tag 某天的永久留存分片文件名 ({tag}-{date}.jsonl)。
+// 关键词: taggedShardName, 带 tag 分片命名
+func taggedShardName(tag, date string) string {
+	return tag + "-" + date + dataSinkFileSuffix
+}
 
 // isDailyShardName 判断文件名是否是 save() 生成的按天分片 (YYYY-MM-DD.jsonl)。
 //
@@ -214,6 +261,66 @@ func (s *dataSink) appendRecord(obj any) (bool, error) {
 	s.records++
 	s.bytes += int64(n)
 	s.maybeFlushIndexLocked(false)
+	return true, nil
+}
+
+// rotateTaggedLocked 确保某 tag 当天的永久留存分片句柄就绪 (调用方需持锁)。
+// 跨天自动关旧开新, 与日分片的 rotateLocked 同构。
+// 关键词: rotateTaggedLocked, 带 tag 分片跨天滚动
+func (s *dataSink) rotateTaggedLocked(tag string) (*os.File, error) {
+	date := nowDate()
+	if s.tagFiles == nil {
+		s.tagFiles = make(map[string]*taggedShardHandle)
+	}
+	if h := s.tagFiles[tag]; h != nil && h.file != nil {
+		if h.date == date {
+			return h.file, nil
+		}
+		_ = h.file.Close()
+	}
+	if err := os.MkdirAll(s.dir, 0o755); err != nil {
+		return nil, fmt.Errorf("mkdir data dir failed: %w", err)
+	}
+	path := filepath.Join(s.dir, taggedShardName(tag, date))
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	if err != nil {
+		return nil, fmt.Errorf("open tagged shard failed: %w", err)
+	}
+	s.tagFiles[tag] = &taggedShardHandle{date: date, file: f}
+	return f, nil
+}
+
+// appendTaggedRecord 把一条记录追加到带 tag 的永久留存分片 ({tag}-{date}.jsonl)。
+//
+// 与 appendRecord (无 tag 日分片) 的关键差异:
+//   - 永久留存: 该类文件不计入容量预算 (不动 records/bytes), 也永不被容量治理删除。
+//   - 必须显式指定合法 tag, 否则报错 (tag 进文件名, 严格白名单防注入)。
+//
+// 返回 (written, error)。enabled=false / sink 未装配时不写, 返回 (false, nil)。
+// 关键词: dataSink.appendTaggedRecord, 带 tag 永久落盘, 不计容量不清理
+func (s *dataSink) appendTaggedRecord(tag string, obj any) (bool, error) {
+	tag = strings.TrimSpace(tag)
+	if !validDataSinkTag(tag) {
+		return false, fmt.Errorf("invalid save tag %q: only [A-Za-z0-9_-] and 1..%d chars allowed", tag, maxDataSinkTagLen)
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !s.enabled {
+		return false, nil
+	}
+	raw, err := json.Marshal(obj)
+	if err != nil {
+		return false, fmt.Errorf("marshal tagged record failed: %w", err)
+	}
+	line := append(raw, '\n')
+	f, err := s.rotateTaggedLocked(tag)
+	if err != nil {
+		return false, err
+	}
+	if _, werr := f.Write(line); werr != nil {
+		return false, fmt.Errorf("write tagged record failed: %w", werr)
+	}
+	// 刻意不累加 records/bytes: 带 tag 数据是独立永久留存区, 不参与日分片容量统计与治理。
 	return true, nil
 }
 
@@ -564,6 +671,17 @@ func dataSinkAppend(obj any) (bool, error) {
 		return false, nil
 	}
 	return sink.appendRecord(obj)
+}
+
+// dataSinkAppendTagged 给镜像 save(tag, ...) 用: 落盘一条带 tag 的永久留存记录。
+// sink 未装配/未启用时安全 no-op; tag 非法返回错误。
+// 关键词: dataSinkAppendTagged, save 带 tag 永久落盘入口
+func dataSinkAppendTagged(tag string, obj any) (bool, error) {
+	sink := getDataSink()
+	if sink == nil {
+		return false, nil
+	}
+	return sink.appendTaggedRecord(tag, obj)
 }
 
 // dataSinkEnabled 返回落盘是否处于启用状态（用于试运行预判生产是否会真正落盘）。
