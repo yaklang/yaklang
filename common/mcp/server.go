@@ -45,6 +45,9 @@ func NewMCPServer(opts ...McpServerOption) (*MCPServer, error) {
 	}
 	s.bridgeClientClosers = cfg.bridgeClientClosers
 	cfg.ApplyConfig(s)
+	if cfg.grpcClient != nil {
+		s.grpcClient = cfg.grpcClient
+	}
 
 	s.server.AddNotificationHandler("notification", s.handleNotification)
 	return s, nil

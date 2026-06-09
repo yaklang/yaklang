@@ -17,7 +17,7 @@ import (
 
 var MCPCommandUsage = `Start a mcp server for providing mcp service.
 
-Available ToolSets: codec, cve, httpflow, hybrid_scan, payload, port_scan, yak_document, yak_script, reverse_shell, http_fuzzer, brute, subdomain, crawler, dynamic, ssa, project_database
+Available ToolSets: codec, cve, httpflow, hybrid_scan, payload, port_scan, yak_document, yak_script, reverse_shell, http_fuzzer, brute, subdomain, crawler, dynamic, ssa, project_database, global_hotpatch, system_proxy
 
 Available ResourceSets: codec`
 
