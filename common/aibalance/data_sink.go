@@ -136,9 +136,34 @@ func shardName(date string) string {
 	return date + dataSinkFileSuffix
 }
 
+// dataSinkDateLayout 是按天分片文件名的日期布局, 与 nowDate 保持一致。
+const dataSinkDateLayout = "2006-01-02"
+
+// isDailyShardName 判断文件名是否是 save() 生成的按天分片 (YYYY-MM-DD.jsonl)。
+//
+// 只认这种严格日期命名的分片, 是为了避免落盘目录里混入的其它 .jsonl 文件
+// (用户手动拷入 / 其它工具写入 / 编辑器临时文件等) 干扰镜像数据展示与容量统计:
+// 这些"野文件"既不是合法快照, 也没有日期顺序, 一旦被当作分片读取就会让
+// "镜像数据"面板出现未知模型 / 0ms / 0B 之类的脏记录, 还会污染 records/bytes 计数。
+//
+// 关键词: isDailyShardName, 日期分片白名单, 镜像数据防干扰, 非法 jsonl 过滤
+func isDailyShardName(name string) bool {
+	if !strings.HasSuffix(name, dataSinkFileSuffix) {
+		return false
+	}
+	datePart := strings.TrimSuffix(name, dataSinkFileSuffix)
+	if len(datePart) != len(dataSinkDateLayout) {
+		return false
+	}
+	if _, err := time.Parse(dataSinkDateLayout, datePart); err != nil {
+		return false
+	}
+	return true
+}
+
 // nowDate 返回本地当天日期 (YYYY-MM-DD)。落盘按本地日切片, 与文件名可读性对齐。
 func nowDate() string {
-	return time.Now().Format("2006-01-02")
+	return time.Now().Format(dataSinkDateLayout)
 }
 
 // rotateLocked 确保当天分片文件句柄已就绪 (调用方需持锁)。
@@ -236,11 +261,12 @@ func (s *dataSink) listShardsLocked() ([]string, error) {
 		if e.IsDir() {
 			continue
 		}
-		name := e.Name()
-		if strings.HasSuffix(name, dataSinkFileSuffix) {
-			names = append(names, name)
+		// 只收按天分片 (YYYY-MM-DD.jsonl), 其它 jsonl 文件视为干扰一律忽略。
+		if isDailyShardName(e.Name()) {
+			names = append(names, e.Name())
 		}
 	}
+	// 日期命名天然可按字典序排序得到从旧到新的时间顺序。
 	sort.Strings(names)
 	return names, nil
 }
@@ -344,7 +370,7 @@ func (s *dataSink) dirSizeLocked() (int64, error) {
 	}
 	var total int64
 	for _, e := range entries {
-		if e.IsDir() || !strings.HasSuffix(e.Name(), dataSinkFileSuffix) {
+		if e.IsDir() || !isDailyShardName(e.Name()) {
 			continue
 		}
 		if info, ierr := e.Info(); ierr == nil {

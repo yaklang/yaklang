@@ -92,6 +92,39 @@ func TestDataSink_EnforceCapacityDeletesOldest(t *testing.T) {
 	assert.NoError(t, err, "today shard must be preserved")
 }
 
+// TestDataSink_IgnoresNonShardFiles 验证落盘目录里混入的非日期分片 .jsonl 文件
+// (以及其它后缀文件) 不会被当作镜像数据读取, 也不计入容量统计。
+// 关键词: 镜像数据防干扰, isDailyShardName, 非法 jsonl 忽略
+func TestDataSink_IgnoresNonShardFiles(t *testing.T) {
+	dir := t.TempDir()
+	write := func(name, content string) {
+		require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644))
+	}
+	// 合法当天分片: 一条真实记录。
+	write(nowDate()+dataSinkFileSuffix, `{"model":"real","i":1}`+"\n")
+	// 各类干扰文件: 都不应被读取/统计。
+	write("notes.jsonl", `{"model":"junk-a"}`+"\n")            // 非日期命名
+	write("2020-1-2.jsonl", `{"model":"junk-b"}`+"\n")        // 日期格式不规范
+	write("2020-01-02.jsonl.tmp", `{"model":"junk-c"}`+"\n")  // 临时文件后缀
+	write("export.json", `{"model":"junk-d"}`+"\n")           // 非 jsonl
+	write(dataSinkIndexFile, `{"records":1,"bytes":1}`)       // sidecar
+
+	s := newDataSink(dir)
+	shards, err := s.listShardsLocked()
+	require.NoError(t, err)
+	require.Len(t, shards, 1, "only the dated daily shard should be recognized")
+	assert.Equal(t, nowDate()+dataSinkFileSuffix, shards[0])
+
+	recent, err := s.recentRecords(10)
+	require.NoError(t, err)
+	require.Len(t, recent, 1, "interfering files must not appear in recent records")
+	assert.Equal(t, "real", recent[0]["model"])
+
+	s.initCountFromDisk()
+	records, _ := s.stats()
+	assert.Equal(t, int64(1), records, "only the dated shard should be counted")
+}
+
 func TestDataSink_InitCountFromDiskRecount(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, nowDate()+dataSinkFileSuffix)
