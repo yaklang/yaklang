@@ -634,7 +634,7 @@ func newConfig(ctx context.Context) *Config {
 		AiAgreeRiskControl:                 DefaultAIAssistantRiskControl,
 		AiPlanReviewControl:                DefaultAIPlanReviewControl,
 		AiTaskReviewControl:                DefaultAITaskReviewControl,
-		MaxIterationCount:                  100,
+		MaxIterationCount:                  50,
 		Language:                           "zh", // Default to Chinese
 		TopToolsCount:                      100,
 		ContextProviderManager:             NewContextProviderManager(),

@@ -45,7 +45,8 @@ type SingleFileModificationSuiteFactory struct {
 	eventType string
 
 	// Behavior flags
-	exitAfterWrite bool // whether to call operator.Exit() after successful write (default: true)
+	exitAfterWrite        bool // whether to call operator.Exit() after successful write (default: true)
+	exitWhenSyntaxClean   bool // whether to call operator.Exit() after modify/insert/delete when syntax check passes
 }
 
 // SingleFileModificationOption is an option for configuring the factory
@@ -157,6 +158,36 @@ func WithExitAfterWrite(exit bool) SingleFileModificationOption {
 // ShouldExitAfterWrite returns whether the loop should exit after a successful write action
 func (f *SingleFileModificationSuiteFactory) ShouldExitAfterWrite() bool {
 	return f.exitAfterWrite
+}
+
+// WithExitWhenSyntaxClean controls whether modify/insert/delete should exit the loop
+// once OnFileChanged reports no blocking syntax errors (e.g. Yak Runner static analysis).
+func WithExitWhenSyntaxClean(exit bool) SingleFileModificationOption {
+	return func(f *SingleFileModificationSuiteFactory) {
+		f.exitWhenSyntaxClean = exit
+	}
+}
+
+func (f *SingleFileModificationSuiteFactory) ShouldExitWhenSyntaxClean() bool {
+	return f.exitWhenSyntaxClean
+}
+
+func (f *SingleFileModificationSuiteFactory) applySyntaxLintResult(
+	loop *reactloops.ReActLoop,
+	op *reactloops.LoopActionHandlerOperator,
+	hasBlockingErrors bool,
+	exitOnClean bool,
+) {
+	lintStatusVar := f.GetLintStatusVariableName()
+	if hasBlockingErrors {
+		loop.Set(lintStatusVar, "false")
+		op.DisallowNextLoopExit()
+		return
+	}
+	loop.Set(lintStatusVar, "true")
+	if exitOnClean {
+		op.Exit()
+	}
 }
 
 // GetAITagOption returns the ReActLoopOption for configuring AI tag extraction

@@ -75,16 +75,7 @@ func (f *SingleFileModificationSuiteFactory) buildWriteAction() reactloops.ReAct
 
 			// Call file changed callback
 			errMsg, blocking := f.OnFileChanged(code, operator)
-			lintStatusVar := f.GetLintStatusVariableName()
-			if blocking {
-				loop.Set(lintStatusVar, "false")
-				operator.DisallowNextLoopExit()
-			} else {
-				loop.Set(lintStatusVar, "true")
-				if f.ShouldExitAfterWrite() {
-					operator.Exit()
-				}
-			}
+			f.applySyntaxLintResult(loop, operator, blocking, f.ShouldExitAfterWrite() || f.ShouldExitWhenSyntaxClean())
 
 			msg := utils.ShrinkTextBlock(code, 256)
 			if errMsg != "" {
@@ -206,13 +197,7 @@ func (f *SingleFileModificationSuiteFactory) buildModifyAction() reactloops.ReAc
 
 			// Call file changed callback
 			errMsg, hasBlockingErrors := f.OnFileChanged(fullCode, op)
-			lintStatusVar := f.GetLintStatusVariableName()
-			if hasBlockingErrors {
-				loop.Set(lintStatusVar, "false")
-				op.DisallowNextLoopExit()
-			} else {
-				loop.Set(lintStatusVar, "true")
-			}
+			f.applySyntaxLintResult(loop, op, hasBlockingErrors, f.ShouldExitWhenSyntaxClean())
 
 			// Check for spinning behavior
 			isSpinning, spinReason := f.DetectSpinning(loop, modifyStartLine, modifyEndLine)
@@ -339,13 +324,7 @@ func (f *SingleFileModificationSuiteFactory) buildInsertAction() reactloops.ReAc
 
 			// Call file changed callback
 			errMsg, hasBlockingErrors := f.OnFileChanged(fullCode, op)
-			lintStatusVar := f.GetLintStatusVariableName()
-			if hasBlockingErrors {
-				loop.Set(lintStatusVar, "false")
-				op.DisallowNextLoopExit()
-			} else {
-				loop.Set(lintStatusVar, "true")
-			}
+			f.applySyntaxLintResult(loop, op, hasBlockingErrors, f.ShouldExitWhenSyntaxClean())
 			msg = utils.ShrinkTextBlock(fmt.Sprintf("inserted at line[%v]:\n", insertLine)+partialCode, 256)
 			if errMsg != "" {
 				msg += "\n\n--[linter]--\nWriting Code Linter Check:\n" + utils.PrefixLines(utils.ShrinkTextBlock(errMsg, 2048), "  ")
@@ -480,13 +459,7 @@ func (f *SingleFileModificationSuiteFactory) buildDeleteAction() reactloops.ReAc
 
 			// Call file changed callback
 			errMsg, hasBlockingErrors := f.OnFileChanged(fullCode, op)
-			lintStatusVar := f.GetLintStatusVariableName()
-			if hasBlockingErrors {
-				loop.Set(lintStatusVar, "false")
-				op.DisallowNextLoopExit()
-			} else {
-				loop.Set(lintStatusVar, "true")
-			}
+			f.applySyntaxLintResult(loop, op, hasBlockingErrors, f.ShouldExitWhenSyntaxClean())
 
 			if deleteEndLine > 0 {
 				msg = fmt.Sprintf("deleted lines[%v-%v]", deleteStartLine, deleteEndLine)

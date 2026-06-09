@@ -74,11 +74,31 @@ func (r *testRuntimeForSingleFile) timelineContentContains(entry, needle string)
 	return false
 }
 
+func (r *testRuntimeForSingleFile) wireEmitterCapture(capture *capturedEvents) {
+	cfg := r.GetConfig().(*mock.MockedAIConfig)
+	cfg.Emitter = aicommon.NewEmitter("single-file-test-emitter", func(e *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
+		capture.appendEvent(e)
+		return e, nil
+	})
+}
+
 func newTestTaskForSingleFile(ctx context.Context) *aicommon.AIStatefulTaskBase {
 	emitter := aicommon.NewEmitter("single-file-test-emitter", func(e *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
 		return e, nil
 	})
 	return aicommon.NewStatefulTaskBase("single-file-task", "single file test", ctx, emitter, true)
+}
+
+func newLoopAndFactoryWithEvents(t *testing.T, runtime *testRuntimeForSingleFile, opts ...SingleFileModificationOption) (*reactloops.ReActLoop, *SingleFileModificationSuiteFactory, aicommon.AIStatefulTask, *capturedEvents) {
+	t.Helper()
+	capture := &capturedEvents{}
+	runtime.wireEmitterCapture(capture)
+	factory := NewSingleFileModificationSuiteFactory(runtime, opts...)
+	loop, err := reactloops.NewReActLoop("single-file-actions-test", runtime, factory.GetActions()...)
+	require.NoError(t, err)
+	task := newTestTaskForSingleFile(context.Background())
+	loop.SetCurrentTask(task)
+	return loop, factory, task, capture
 }
 
 func mustBuildAction(t *testing.T, actionName string, fields map[string]any) *aicommon.Action {
@@ -94,6 +114,15 @@ func mustBuildAction(t *testing.T, actionName string, fields map[string]any) *ai
 	action, err := aicommon.ExtractAction(string(raw), actionName)
 	require.NoError(t, err)
 	return action
+}
+
+func yaklangSingleFileOpts(extra ...SingleFileModificationOption) []SingleFileModificationOption {
+	opts := []SingleFileModificationOption{
+		WithActionSuffix("code"),
+		WithFileExtension(".yak"),
+		WithAITagConfig("GEN_CODE", "yak_code", "yaklang-code", "code/yaklang"),
+	}
+	return append(opts, extra...)
 }
 
 func newLoopAndFactory(t *testing.T, runtime *testRuntimeForSingleFile, opts ...SingleFileModificationOption) (*reactloops.ReActLoop, *SingleFileModificationSuiteFactory, aicommon.AIStatefulTask) {
@@ -229,6 +258,31 @@ func TestModifyAction_Verifier_InvalidParams(t *testing.T) {
 	})
 	verifyErr := ac.ActionVerifier(loop, action)
 	assert.Error(t, verifyErr)
+}
+
+func TestModifyAction_ExitWhenSyntaxClean(t *testing.T) {
+	runtime := newTestRuntimeForSingleFile(t)
+	loop, factory, task := newLoopAndFactory(t, runtime,
+		WithActionSuffix("code"),
+		WithExitAfterWrite(false),
+		WithExitWhenSyntaxClean(true),
+	)
+	filename := filepath.Join(runtime.tmpDir, "clean.yak")
+	loop.Set(factory.GetFilenameVariableName(), filename)
+	loop.Set(factory.GetFullCodeVariableName(), "a\nb\nc")
+	loop.Set(factory.GetCodeVariableName(), "B")
+
+	ac, _ := loop.GetActionHandler(factory.GetActionName("modify"))
+	op := reactloops.NewActionHandlerOperator(task)
+	ac.ActionHandler(loop, mustBuildAction(t, factory.GetActionName("modify"), map[string]any{
+		"modify_start_line": 2,
+		"modify_end_line":   2,
+	}), op)
+
+	terminated, failErr := op.IsTerminated()
+	assert.True(t, terminated)
+	assert.NoError(t, failErr)
+	assert.Equal(t, "true", loop.Get(factory.GetLintStatusVariableName()))
 }
 
 func TestModifyAction_Success_ReplacesLines(t *testing.T) {
@@ -370,6 +424,90 @@ func TestDeleteAction_VerifierAndSuccess(t *testing.T) {
 	require.NoError(t, readErr)
 	assert.Equal(t, "a\nc", string(content))
 	assert.True(t, runtime.timelineContains("delete_success"))
+}
+
+func TestWriteAction_Yaklang_CodeChangeEventMatchesDiskOverwrite(t *testing.T) {
+	runtime := newTestRuntimeForSingleFile(t)
+	loop, factory, task, capture := newLoopAndFactoryWithEvents(t, runtime, yaklangSingleFileOpts()...)
+	actionName := factory.GetActionName("write")
+	code := "println(\"overwrite\")"
+	loop.Set(factory.GetCodeVariableName(), code)
+
+	ac, err := loop.GetActionHandler(actionName)
+	require.NoError(t, err)
+	op := reactloops.NewActionHandlerOperator(task)
+	ac.ActionHandler(loop, mustBuildAction(t, actionName, nil), op)
+
+	filename := loop.Get(factory.GetFilenameVariableName())
+	require.NotEmpty(t, filename)
+
+	diskContent, readErr := os.ReadFile(filename)
+	require.NoError(t, readErr)
+	assert.Equal(t, code, string(diskContent))
+
+	events := capture.byType(schema.EVENT_TYPE_YAKLANG_CODE_CHANGE)
+	require.Len(t, events, 1)
+	payload := parseYaklangCodeChangeEvent(t, events[0])
+	assert.Equal(t, loopYaklangCodeEventOpReplace, payload.Op)
+	assert.Equal(t, code, payload.Code.Content)
+	assert.Equal(t, filename, payload.Code.Path)
+	assert.Equal(t, actionName, payload.SourceAction)
+	assert.Equal(t, code, payload.Code.Content)
+	assert.Equal(t, string(diskContent), payload.Code.Content)
+}
+
+func TestModifyAction_Yaklang_CodeChangeEventMatchesDiskOverwrite(t *testing.T) {
+	runtime := newTestRuntimeForSingleFile(t)
+	loop, factory, task, capture := newLoopAndFactoryWithEvents(t, runtime, yaklangSingleFileOpts(WithExitAfterWrite(false))...)
+	actionName := factory.GetActionName("modify")
+
+	filename := filepath.Join(runtime.tmpDir, "overwrite.yak")
+	require.NoError(t, os.WriteFile(filename, []byte("a\nold\nc"), 0644))
+	loop.Set(factory.GetFilenameVariableName(), filename)
+	loop.Set(factory.GetFullCodeVariableName(), "a\nold\nc")
+	loop.Set(factory.GetCodeVariableName(), "new")
+
+	ac, err := loop.GetActionHandler(actionName)
+	require.NoError(t, err)
+	op := reactloops.NewActionHandlerOperator(task)
+	ac.ActionHandler(loop, mustBuildAction(t, actionName, map[string]any{
+		"modify_start_line": 2,
+		"modify_end_line":   2,
+		"modify_code_reason": "replace middle line",
+	}), op)
+
+	expected := "a\nnew\nc"
+	diskContent, readErr := os.ReadFile(filename)
+	require.NoError(t, readErr)
+	assert.Equal(t, expected, string(diskContent))
+	assert.Equal(t, expected, loop.Get(factory.GetFullCodeVariableName()))
+
+	events := capture.byType(schema.EVENT_TYPE_YAKLANG_CODE_CHANGE)
+	require.Len(t, events, 1)
+	payload := parseYaklangCodeChangeEvent(t, events[0])
+	assert.Equal(t, loopYaklangCodeEventOpReplace, payload.Op)
+	assert.Equal(t, expected, payload.Code.Content)
+	assert.Equal(t, filename, payload.Code.Path)
+	assert.Equal(t, actionName, payload.SourceAction)
+	assert.Equal(t, "replace middle line", payload.Reason)
+	assert.Equal(t, string(diskContent), payload.Code.Content)
+}
+
+func TestWriteAction_NonYaklangContentType_DoesNotEmitCodeChange(t *testing.T) {
+	runtime := newTestRuntimeForSingleFile(t)
+	loop, factory, task, capture := newLoopAndFactoryWithEvents(t, runtime, WithActionSuffix("code"), WithFileExtension(".yak"))
+	loop.Set(factory.GetCodeVariableName(), "println(\"plain\")")
+
+	ac, err := loop.GetActionHandler(factory.GetActionName("write"))
+	require.NoError(t, err)
+	op := reactloops.NewActionHandlerOperator(task)
+	ac.ActionHandler(loop, mustBuildAction(t, factory.GetActionName("write"), nil), op)
+
+	filename := loop.Get(factory.GetFilenameVariableName())
+	content, readErr := os.ReadFile(filename)
+	require.NoError(t, readErr)
+	assert.Equal(t, "println(\"plain\")", string(content))
+	assert.Empty(t, capture.byType(schema.EVENT_TYPE_YAKLANG_CODE_CHANGE))
 }
 
 func TestDeleteAction_DeleteRangeAndErrorTimeline(t *testing.T) {
