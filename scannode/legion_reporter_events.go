@@ -35,7 +35,7 @@ func (r *ScannerAgentReporter) publishJobProgress(process float64) error {
 	return publisher.PublishProgress(
 		r.agent.node.GetRootContext(),
 		*ref,
-		"yak_script",
+		r.stageOrDefault(),
 		fmt.Sprintf("%.2f%%", process*100),
 		progressUnits(process),
 		legionProgressTotalUnits,

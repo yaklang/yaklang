@@ -163,11 +163,25 @@ func (s *ScanNode) handleJSONLog(
 }
 
 func (s *ScanNode) handleStatusCardLog(
-	_ *ScannerAgentReporter,
+	reporter *ScannerAgentReporter,
 	info string,
 ) {
-	if utils.InDebugMode() {
-		log.Infof("skip feature-status-card-data for legion event projection: %s", info)
+	var card struct {
+		ID   string          `json:"id"`
+		Data json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(info), &card); err != nil {
+		return
+	}
+	if card.ID != "ssa-phase" {
+		return
+	}
+	var stage string
+	if err := json.Unmarshal(card.Data, &stage); err != nil {
+		stage = strings.Trim(string(card.Data), `"`)
+	}
+	if reporter != nil {
+		reporter.SetStage(stage)
 	}
 }
 

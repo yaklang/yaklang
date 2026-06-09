@@ -6,6 +6,7 @@ import (
 	"net"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/jinzhu/gorm/dialects/postgres"
@@ -28,6 +29,9 @@ type ScannerAgentReporter struct {
 	progressCheckpoint attemptProgressCheckpoint
 	ssaCollector       *SSAArtifactCollector
 	ssaUploadCfg       *SSAArtifactUploadConfig
+
+	stageMu      sync.Mutex
+	currentStage string
 }
 
 // convertRawToString 将原始数据转换为字符串，处理 JSON 反序列化后的各种数据格式
@@ -337,6 +341,50 @@ func (r *ScannerAgentReporter) ReportTCPOpenPort(host interface{}, port interfac
 
 func (r *ScannerAgentReporter) ReportStatusCard(_ []byte) error {
 	return nil
+}
+
+// SetStage records the current execution phase (e.g. compile / load-program /
+// scan) reported by the yak script via a status card, and publishes a progress
+// event immediately so the platform reflects the phase even when the numeric
+// progress has not advanced.
+func (r *ScannerAgentReporter) SetStage(stage string) {
+	stage = strings.TrimSpace(stage)
+	if stage == "" {
+		return
+	}
+	r.stageMu.Lock()
+	changed := r.currentStage != stage
+	r.currentStage = stage
+	r.stageMu.Unlock()
+	if !changed {
+		return
+	}
+	logReporterEventError("job stage", r.publishStageCheckpoint())
+}
+
+func (r *ScannerAgentReporter) stageOrDefault() string {
+	r.stageMu.Lock()
+	defer r.stageMu.Unlock()
+	if r.currentStage == "" {
+		return "yak_script"
+	}
+	return r.currentStage
+}
+
+// publishStageCheckpoint emits a JobProgressed carrying the current stage at the
+// last observed progress, bypassing the rate-limit checkpoint so phase
+// transitions surface promptly.
+func (r *ScannerAgentReporter) publishStageCheckpoint() error {
+	if r == nil {
+		return nil
+	}
+	r.progressCheckpoint.mu.Lock()
+	process := r.progressCheckpoint.lastObservedProcess
+	r.progressCheckpoint.mu.Unlock()
+	if process < 0 {
+		process = 0
+	}
+	return r.publishJobProgress(process)
 }
 
 var nonIdentifierChars = regexp.MustCompile(`[^a-z0-9]+`)
