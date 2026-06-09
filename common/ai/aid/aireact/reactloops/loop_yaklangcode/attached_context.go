@@ -48,7 +48,7 @@ func yaklangEditorContextFromAttached(attachedDatas []*aicommon.AttachedResource
 				if sel, ok := aicommon.ParseAttachedCodeSelection(data); ok {
 					ctx.Selection = sel
 					if path := strings.TrimSpace(sel.Path); path != "" {
-						ctx.EditorFile = path
+						ctx.EditorFile = filepath.Clean(path)
 					}
 				}
 			}

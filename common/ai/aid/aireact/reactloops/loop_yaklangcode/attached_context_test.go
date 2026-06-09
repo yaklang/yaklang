@@ -1,6 +1,7 @@
 package loop_yaklangcode
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -15,8 +16,8 @@ func TestYaklangEditorContextFromAttachedFull(t *testing.T) {
 		aicommon.NewAttachedResource(aicommon.AttachedResourceTypeSelected, aicommon.AttachedResourceKeyContent, payload),
 	})
 	require.NotNil(t, ctx)
-	require.Equal(t, "/tmp/project", ctx.WorkspacePath)
-	require.Equal(t, "/tmp/project/foo.yak", ctx.EditorFile)
+	require.Equal(t, filepath.Clean("/tmp/project"), ctx.WorkspacePath)
+	require.Equal(t, filepath.Clean("/tmp/project/foo.yak"), ctx.EditorFile)
 	require.NotNil(t, ctx.Selection)
 	require.Equal(t, 3, ctx.Selection.StartLine)
 }
