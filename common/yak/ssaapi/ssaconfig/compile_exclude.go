@@ -25,6 +25,8 @@ var DefaultCompileExcludeDirNames = []string{
 	"node_modules",
 	"out",
 	"target",
+	"test",
+	"testdata",
 }
 
 // DefaultCompileExcludeGlobs are built-in glob patterns merged into every compile exclude matcher.

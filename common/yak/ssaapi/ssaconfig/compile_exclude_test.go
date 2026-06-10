@@ -14,8 +14,10 @@ func TestDefaultCompileExcludePatterns(t *testing.T) {
 	require.Contains(t, patterns, "**/.git/**")
 	require.Contains(t, patterns, "node_modules/**")
 	require.Contains(t, patterns, "target/**")
-	require.NotContains(t, patterns, "**/testdata")
-	require.NotContains(t, patterns, "**/testdata/**")
+	require.Contains(t, patterns, "**/test")
+	require.Contains(t, patterns, "**/test/**")
+	require.Contains(t, patterns, "**/testdata")
+	require.Contains(t, patterns, "**/testdata/**")
 	require.Contains(t, patterns, "**/vendor/**")
 }
 
@@ -31,10 +33,11 @@ func TestBuildCompileExcludeFunc(t *testing.T) {
 		require.True(t, exclude("src/cmd/compile/internal/syntax/testdata/issue47704.go"))
 	})
 
-	t.Run("default keeps test inputs", func(t *testing.T) {
+	t.Run("default test inputs", func(t *testing.T) {
 		exclude := BuildCompileExcludeFunc(nil, "")
-		require.False(t, exclude("src/test/service_test.go"))
-		require.False(t, exclude("src/testdata/issue47704.go"))
+		require.True(t, exclude("src/test/service_test.go"))
+		require.True(t, exclude("src/testdata/issue47704.go"))
+		require.False(t, exclude("src/testing/service.go"))
 	})
 
 	t.Run("default vendor", func(t *testing.T) {
@@ -65,8 +68,8 @@ func TestBuildCompileExcludeFunc(t *testing.T) {
 }
 
 func TestShouldSkipCompileDirName(t *testing.T) {
-	require.False(t, ShouldSkipCompileDirName("testdata"))
-	require.False(t, ShouldSkipCompileDirName("test"))
+	require.True(t, ShouldSkipCompileDirName("testdata"))
+	require.True(t, ShouldSkipCompileDirName("test"))
 	require.True(t, ShouldSkipCompileDirName(".git"))
 	require.True(t, ShouldSkipCompileDirName("node_modules"))
 	require.True(t, ShouldSkipCompileDirName("target"))
