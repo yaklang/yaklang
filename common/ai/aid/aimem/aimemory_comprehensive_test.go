@@ -224,7 +224,14 @@ func (m *AdvancedMockInvoker) ForceReviewExecutePlan(ctx context.Context, input 
 	return input, nil
 }
 
+func (m *AdvancedMockInvoker) BeginPlanCoordinatorSession(ctx context.Context, input *aicommon.ExecutePlanInput, forceManualReview bool) (aicommon.PlanCoordinatorSession, error) {
+	return nil, nil
+}
+
 func (m *AdvancedMockInvoker) AsyncExecutePlan(ctx context.Context, input *aicommon.ExecutePlanInput, onFinish func(error)) {
+}
+
+func (m *AdvancedMockInvoker) AsyncExecuteCod(ctx context.Context, coordinatorID string, onFinish func(error)) {
 }
 
 func (m *AdvancedMockInvoker) AddToTimeline(entry, content string) {
