@@ -439,6 +439,7 @@ jobs:
                 {"package": "./common/yak/cartesian", "timeout": "20s"},
                 {"package": "./common/utils/omap/...", "timeout": "30s", "race": true},
                 {"package": "./common/utils", "timeout": "1m"},
+                {"package": "./common/utils/dbcache", "timeout": "1m"},
                 {"package": "./common/utils/imageutils/...", "timeout": "20s"},
                 {"package": "./common/utils/xml2", "timeout": "10s"},
                 {"package": "./common/utils/tlsutils/...", "timeout": "20s"},

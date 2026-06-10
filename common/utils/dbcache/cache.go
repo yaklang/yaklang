@@ -436,18 +436,23 @@ func (c *ResidencyCacheWithKey[K, T]) ForEach(f func(K, T) bool) {
 	}
 }
 
-func (c *ResidencyCacheWithKey[K, T]) Close() {
+func (c *ResidencyCacheWithKey[K, T]) Close() error {
 	if c == nil {
-		return
+		return nil
 	}
 	c.closed.Store(true)
 	c.EnableSave()
 	c.QueueAll(utils.EvictionReasonDeleted)
 	c.Wait()
+	remaining := c.Count()
 	c.DisableSave()
 	if c.evictionCache != nil {
 		c.evictionCache.Close()
 	}
+	if remaining > 0 {
+		return utils.Errorf("dbcache: %d resident items were not persisted on close", remaining)
+	}
+	return nil
 }
 
 func (c *ResidencyCacheWithKey[K, T]) CloseWithoutSave() {
