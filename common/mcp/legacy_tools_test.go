@@ -21,8 +21,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/mcp"
 	rawmcp "github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
-	_ "github.com/yaklang/yaklang/common/yakgrpc"
+	"github.com/yaklang/yaklang/common/yakgrpc"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func init() {
@@ -209,6 +210,36 @@ func uniqueName(prefix string) string {
 	return fmt.Sprintf("%s-%d", prefix, time.Now().UnixNano())
 }
 
+func createLegacyGlobalHotPatchTemplate(t *testing.T) string {
+	t.Helper()
+	client, err := yakgrpc.NewLocalClient(true)
+	require.NoError(t, err)
+
+	tplName := uniqueName("legacy-global-hotpatch")
+	_, err = client.CreateHotPatchTemplate(context.Background(), &ypb.HotPatchTemplate{
+		Name: tplName,
+		Type: "global",
+		Content: `
+beforeRequest = func(isHttps, originReq, req) { return req }
+afterRequest = func(isHttps, originReq, req, originRsp, rsp) { return rsp }
+`,
+	})
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		_, _ = client.ResetGlobalHotPatchConfig(context.Background(), &ypb.Empty{})
+	})
+	return tplName
+}
+
+func legacyGlobalHotPatchEnabled(cfg map[string]any) bool {
+	if cfg == nil {
+		return false
+	}
+	enabled, ok := cfg["Enabled"].(bool)
+	return ok && enabled
+}
+
 var legacyToolIntegrationCases = map[string][]legacyToolCase{
 	"codec_method_details": {
 		{
@@ -377,6 +408,73 @@ var legacyToolIntegrationCases = map[string][]legacyToolCase{
 		{
 			name: "toggle_disable_without_proxy_value",
 			args: map[string]any{"httpProxy": "", "enable": false},
+			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+				assert.NotEmpty(t, strings.TrimSpace(text))
+			},
+		},
+	},
+	"get_global_hotpatch_config": {
+		{
+			name: "returns_config_json",
+			args: map[string]any{},
+			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+				var cfg map[string]any
+				decodeToolResultJSON(t, text, &cfg)
+				assert.False(t, legacyGlobalHotPatchEnabled(cfg))
+			},
+		},
+	},
+	"enable_global_hotpatch": {
+		{
+			name:        "missing_template_name",
+			args:        map[string]any{},
+			wantErr:     true,
+			errContains: []string{"templateName is required"},
+		},
+		{
+			name:        "unknown_template",
+			args:        map[string]any{"templateName": "legacy-mcp-missing-global-template"},
+			wantErr:     true,
+			errContains: []string{"failed", "template"},
+		},
+		{
+			name: "enable_existing_template",
+			buildArgs: func(t *testing.T, _ *mcp.MCPServer) map[string]any {
+				return map[string]any{"templateName": createLegacyGlobalHotPatchTemplate(t)}
+			},
+			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+				var cfg map[string]any
+				decodeToolResultJSON(t, text, &cfg)
+				assert.True(t, legacyGlobalHotPatchEnabled(cfg))
+			},
+		},
+	},
+	"disable_global_hotpatch": {
+		{
+			name: "disable_when_already_off",
+			args: map[string]any{},
+			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+				var cfg map[string]any
+				decodeToolResultJSON(t, text, &cfg)
+				assert.False(t, legacyGlobalHotPatchEnabled(cfg))
+			},
+		},
+	},
+	"reset_global_hotpatch_config": {
+		{
+			name: "reset_to_default",
+			args: map[string]any{},
+			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+				var cfg map[string]any
+				decodeToolResultJSON(t, text, &cfg)
+				assert.False(t, legacyGlobalHotPatchEnabled(cfg))
+			},
+		},
+	},
+	"query_hotpatch_template_list": {
+		{
+			name: "list_global_templates",
+			args: map[string]any{"type": "global"},
 			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
 				assert.NotEmpty(t, strings.TrimSpace(text))
 			},
@@ -814,6 +912,7 @@ func TestLegacyBuiltinToolSetsRegistered(t *testing.T) {
 		"codec", "cve", "httpflow", "hybrid_scan", "payload", "port_scan",
 		"yak_document", "yak_script", "reverse_shell", "http_fuzzer", "brute",
 		"subdomain", "crawler", "dynamic", "ssa", "project_database", "system_proxy",
+		"global_hotpatch",
 	}
 	registered := mcp.GlobalToolSetList()
 	for _, setName := range expectedSets {
