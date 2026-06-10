@@ -385,8 +385,9 @@ func (s *Server) HTTPFlowsFieldGroup(ctx context.Context, req *ypb.HTTPFlowsFiel
 	}
 	for _, v := range tags {
 		tagsCode.Tags = append(tagsCode.Tags, &ypb.TagsCode{
-			Value: v.Value,
-			Total: int32(v.Count),
+			Value:   v.Value,
+			Total:   int32(v.Count),
+			Builtin: v.Builtin,
 		})
 	}
 

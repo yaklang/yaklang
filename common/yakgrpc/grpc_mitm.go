@@ -1510,7 +1510,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 					log.Debugf("yakit.CreateHTTPFlowFromHTTPWithBodySaved for %v cost: %s", truncate(originReqIns.URL.String()), time.Now().Sub(startCreateFlow))
 					// Hidden Index 用来标注 MITM 劫持的顺序
 					flow.Hash = flow.CalcHash()
-					flow.AddTagToFirst("[被丢弃]")
+					flow.AddTagToFirst(yakit.HTTPFlowTagDiscarded)
 					flow.Purple()
 
 					log.Debugf("mitmPluginCaller.HijackSaveHTTPFlow for %v cost: %s", truncate(originReqIns.URL.String()), time.Now().Sub(startCreateFlow))
@@ -1686,23 +1686,23 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 
 		// Check if response was mocked
 		if httpctx.GetShouldMockResponse(req) {
-			flow.AddTagToFirst("[MOCK响应]")
+			flow.AddTagToFirst(yakit.HTTPFlowTagMockResponse)
 			flow.Blue()
 		}
 
 		if isModified {
 			if isViewed {
-				flow.AddTagToFirst("[手动修改]")
+				flow.AddTagToFirst(yakit.HTTPFlowTagManualEdit)
 			} else {
-				flow.AddTagToFirst("[规则修改]")
+				flow.AddTagToFirst(yakit.HTTPFlowTagRuleEdit)
 			}
 			flow.Orange()
 		} else if isViewed {
-			flow.AddTagToFirst("[手动劫持]")
+			flow.AddTagToFirst(yakit.HTTPFlowTagManualHijack)
 			flow.Yellow()
 		}
 		if isResponseDropped {
-			flow.AddTagToFirst("[响应被丢弃]")
+			flow.AddTagToFirst(yakit.HTTPFlowTagResponseDiscarded)
 			flow.Purple()
 		}
 

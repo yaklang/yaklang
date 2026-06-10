@@ -1336,10 +1336,10 @@ func (m *MitmReplacer) Hook(isRequest, isResponse bool, url string, origin []byt
 				lowhttp.WithRedirectTimes(0),
 			}
 			for _, tag := range matchedRule.ExtraTag {
-				opts = append(opts, lowhttp.WithAppendHTTPFlowTag("[重发]"+tag))
+				opts = append(opts, lowhttp.WithAppendHTTPFlowTag(HTTPFlowTagResend+tag))
 			}
 			if len(matchedRule.ExtraTag) == 0 {
-				opts = append(opts, lowhttp.WithAppendHTTPFlowTag("[重发]"))
+				opts = append(opts, lowhttp.WithAppendHTTPFlowTag(HTTPFlowTagResend))
 			}
 			if matchedRule.Color != "" {
 				opts = append(opts, lowhttp.WithAppendHTTPFlowTag(schema.COLORPREFIX+matchedRule.Color))

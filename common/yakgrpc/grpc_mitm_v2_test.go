@@ -1061,8 +1061,8 @@ func TestGRPCMUSTPASS_MITMV2_HijackTags(t *testing.T) {
 	}, 1)
 	require.NoError(t, err)
 	flow := flows.Data[0]
-	require.Contains(t, flow.Tags, "[手动修改]")
-	require.NotContains(t, flow.Tags, "[手动劫持]")
+	require.Contains(t, flow.Tags, yakit.HTTPFlowTagManualEdit)
+	require.NotContains(t, flow.Tags, yakit.HTTPFlowTagManualHijack)
 	// check no modified
 	flows, err = QueryHTTPFlows(utils.TimeoutContextSeconds(2), client, &ypb.QueryHTTPFlowRequest{
 		Keyword: token2,
@@ -1074,8 +1074,8 @@ func TestGRPCMUSTPASS_MITMV2_HijackTags(t *testing.T) {
 	}, 1)
 	require.NoError(t, err)
 	flow = flows.Data[0]
-	require.Contains(t, flow.Tags, "[手动劫持]")
-	require.NotContains(t, flow.Tags, "[手动修改]")
+	require.Contains(t, flow.Tags, yakit.HTTPFlowTagManualHijack)
+	require.NotContains(t, flow.Tags, yakit.HTTPFlowTagManualEdit)
 }
 func TestGRPCMUSTPASS_MITMV2_MutProxy(t *testing.T) {
 	client, err := NewLocalClient()
@@ -1582,10 +1582,10 @@ func TestGRPCMUSTPASS_MITMV2_Replacer_AutoForward_BarePacket(t *testing.T) {
 	flow := flows.GetData()[0]
 	t.Logf("flow tags: %s", flow.GetTags())
 
-	// 检查标签：应该是 [规则修改] 而不是 [手动修改] 或 [手动劫持]
-	require.Contains(t, flow.GetTags(), "[规则修改]")
-	require.NotContains(t, flow.GetTags(), "[手动修改]")
-	require.NotContains(t, flow.GetTags(), "[手动劫持]")
+	// 检查标签：应该是 HTTPFlowTagRuleEdit，而不是 HTTPFlowTagManualEdit 或 HTTPFlowTagManualHijack
+	require.Contains(t, flow.GetTags(), yakit.HTTPFlowTagRuleEdit)
+	require.NotContains(t, flow.GetTags(), yakit.HTTPFlowTagManualEdit)
+	require.NotContains(t, flow.GetTags(), yakit.HTTPFlowTagManualHijack)
 
 	// 检查 Bare Response 是否保存成功
 	bareCtx := utils.TimeoutContextSeconds(5)

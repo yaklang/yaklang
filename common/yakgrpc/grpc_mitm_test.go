@@ -2024,8 +2024,8 @@ func TestGRPCMUSTPASS_MITM_HijackTags(t *testing.T) {
 	}, 1)
 	require.NoError(t, err)
 	flow := flows.Data[0]
-	require.Contains(t, flow.Tags, "[手动修改]")
-	require.NotContains(t, flow.Tags, "[手动劫持]")
+	require.Contains(t, flow.Tags, yakit.HTTPFlowTagManualEdit)
+	require.NotContains(t, flow.Tags, yakit.HTTPFlowTagManualHijack)
 	// check no modified
 	flows, err = QueryHTTPFlows(utils.TimeoutContextSeconds(2), client, &ypb.QueryHTTPFlowRequest{
 		Keyword: token2,
@@ -2037,8 +2037,8 @@ func TestGRPCMUSTPASS_MITM_HijackTags(t *testing.T) {
 	}, 1)
 	require.NoError(t, err)
 	flow = flows.Data[0]
-	require.Contains(t, flow.Tags, "[手动劫持]")
-	require.NotContains(t, flow.Tags, "[手动修改]")
+	require.Contains(t, flow.Tags, yakit.HTTPFlowTagManualHijack)
+	require.NotContains(t, flow.Tags, yakit.HTTPFlowTagManualEdit)
 }
 
 func TestGRPCMUSTPASS_MITM_ModifyHost(t *testing.T) {
