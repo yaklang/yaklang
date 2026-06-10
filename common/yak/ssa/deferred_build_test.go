@@ -37,8 +37,8 @@ func TestRunDeferredFileBuildsOnce(t *testing.T) {
 	require.Nil(t, prog.deferredBuildByID)
 }
 
-func TestRunDeferredBuildsKeepsTasksRegisteredDuringBuild(t *testing.T) {
-	prog := newDeferredBuildTestProgram(t, "deferred-build-register-during-build")
+func TestRunDeferredBuildsDrainsTasksRegisteredDuringBuild(t *testing.T) {
+	prog := newDeferredBuildTestProgram(t, "deferred-build-drains-register-during-build")
 
 	var ran []string
 	prog.RegisterDeferredBuild(DeferredBuildKindFile, "first", func() {
@@ -49,14 +49,13 @@ func TestRunDeferredBuildsKeepsTasksRegisteredDuringBuild(t *testing.T) {
 	})
 
 	prog.RunDeferredBuilds()
-	require.Equal(t, []string{"first"}, ran)
+	require.Equal(t, []string{"first", "second"}, ran)
 	require.Equal(t, 2, prog.DeferredBuildCount())
-	require.NotNil(t, prog.deferredBuildSeq)
+	require.Nil(t, prog.deferredBuildSeq)
+	require.Nil(t, prog.deferredBuildByID)
 
 	prog.RunDeferredBuilds()
 	require.Equal(t, []string{"first", "second"}, ran)
-	require.Nil(t, prog.deferredBuildSeq)
-	require.Nil(t, prog.deferredBuildByID)
 }
 
 func TestFinishAllowsLazyLibraryExpansion(t *testing.T) {

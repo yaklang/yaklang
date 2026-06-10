@@ -454,21 +454,23 @@ func (prog *Program) RunDeferredBuildsWithCallback(afterEach func(index int, tot
 		app = prog
 	}
 	total := len(app.deferredBuildSeq)
-	for index, task := range app.deferredBuildSeq {
+	for index := 0; index < len(app.deferredBuildSeq); index++ {
+		task := app.deferredBuildSeq[index]
 		if task == nil {
 			continue
 		}
 		task.Build()
 		task.release()
 		if afterEach != nil {
+			if len(app.deferredBuildSeq) > total {
+				total = len(app.deferredBuildSeq)
+			}
 			if !afterEach(index+1, total) {
 				return false
 			}
 		}
 	}
-	if len(app.deferredBuildSeq) == total {
-		app.releaseDeferredBuildTasks()
-	}
+	app.releaseDeferredBuildTasks()
 	return true
 }
 

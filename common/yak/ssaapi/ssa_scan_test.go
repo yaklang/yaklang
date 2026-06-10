@@ -45,10 +45,10 @@ func TestScanProjectFiles(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
-		// Default excludes skip dependency/build/VCS roots, but keep test inputs.
-		expectedFiles := []string{"src/main.go", "src/utils.go", "src/test/test.go", "src/testdata/issue47704.go"}
+		// Default excludes skip dependency/build/VCS roots and test inputs.
+		expectedFiles := []string{"src/main.go", "src/utils.go"}
 		require.ElementsMatch(t, expectedFiles, result.HandlerFiles)
-		require.Equal(t, 4, result.HandlerTotal)
+		require.Equal(t, 2, result.HandlerTotal)
 		require.GreaterOrEqual(t, len(result.Folders), 1)
 	})
 
@@ -66,10 +66,10 @@ func TestScanProjectFiles(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		// Expected files: default excludes still skip generated roots; explicit exclude skips vendor.
-		expectedFiles := []string{"src/main.go", "src/utils.go", "src/test/test.go", "src/testdata/issue47704.go"}
+		// Expected files: default excludes still skip generated/test roots; explicit exclude skips vendor.
+		expectedFiles := []string{"src/main.go", "src/utils.go"}
 		require.ElementsMatch(t, expectedFiles, result.HandlerFiles)
-		require.Equal(t, 4, result.HandlerTotal)
+		require.Equal(t, 2, result.HandlerTotal)
 	})
 
 	t.Run("Check PreHandler", func(t *testing.T) {
@@ -98,7 +98,7 @@ func TestScanProjectFiles(t *testing.T) {
 		require.True(t, ok)
 	})
 
-	t.Run("Keep testdata directory by default", func(t *testing.T) {
+	t.Run("Skip testdata directory by default", func(t *testing.T) {
 		result, err := ScanProjectFiles(ScanConfig{
 			ProgramName:     "test_prog",
 			ProgramPath:     "src",
@@ -109,7 +109,8 @@ func TestScanProjectFiles(t *testing.T) {
 			Context:         context.Background(),
 		})
 		require.NoError(t, err)
-		require.Contains(t, result.HandlerFiles, "src/testdata/issue47704.go")
+		require.NotContains(t, result.HandlerFiles, "src/testdata/issue47704.go")
+		require.NotContains(t, result.HandlerFiles, "src/test/test.go")
 	})
 
 	t.Run("Skip testdata directory with explicit exclude", func(t *testing.T) {
