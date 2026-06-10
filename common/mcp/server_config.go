@@ -53,7 +53,8 @@ func (cfg *MCPServerConfig) trackBridgeClientCloser(c io.Closer) {
 
 func (cfg *MCPServerConfig) ApplyConfig(s *MCPServer) {
 	// Legacy MCP tools are only exposed when at least one tool set was enabled
-	// via WithEnableToolSet (typically driven by StartMcpServerRequest.EnableAll).
+	// via WithEnableToolSet / WithEnableAllToolSets (CLI defaults to all enabled;
+	// Yakit uses StartMcpServerRequest.EnableAll).
 	tools := make(map[string]*ToolWithHandler)
 	if len(cfg.enableTools) > 0 {
 		for name, tool := range cfg.enableTools {
