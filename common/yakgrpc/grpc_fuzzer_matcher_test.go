@@ -17,12 +17,59 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
+
+func TestHTTPFuzzerMode_ReMatchRequiresHistoryID(t *testing.T) {
+	req := &ypb.FuzzerRequest{ReMatch: true}
+	mode := detectHTTPFuzzerMode(req)
+	require.Equal(t, httpFuzzerModeReMatch, mode)
+
+	run := &httpFuzzerRun{req: req, mode: mode}
+	err := run.handleHistory()
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "HistoryWebFuzzerId")
+}
+
+func TestFuzzerMatcherResultApplyAndReset(t *testing.T) {
+	resp := &ypb.FuzzerResponse{Ok: true}
+	ApplyFuzzerMatcherResultToResponse(resp, FuzzerMatcherResult{
+		Matched:    true,
+		HitColor:   []string{"red", "blue"},
+		Discard:    true,
+		MarkFailed: true,
+	})
+	require.False(t, resp.Ok)
+	require.True(t, resp.MatcherMarkFail)
+	require.Equal(t, matcherActionFailReason, resp.Reason)
+	require.True(t, resp.MatchedByMatcher)
+	require.Equal(t, "red|blue", resp.HitColor)
+	require.True(t, resp.Discard)
+
+	ResetFuzzerResponseMatcherStateForRematch(resp, nil)
+	require.True(t, resp.Ok)
+	require.False(t, resp.MatcherMarkFail)
+	require.Empty(t, resp.Reason)
+	require.False(t, resp.MatchedByMatcher)
+	require.Empty(t, resp.HitColor)
+	require.False(t, resp.Discard)
+
+	requestFailed := &ypb.FuzzerResponse{Ok: false, Reason: "dial tcp failed"}
+	ApplyFuzzerMatcherResultToResponse(requestFailed, FuzzerMatcherResult{Matched: true, MarkFailed: true})
+	require.False(t, requestFailed.Ok)
+	require.False(t, requestFailed.MatcherMarkFail)
+	require.Equal(t, "dial tcp failed", requestFailed.Reason)
+
+	storedMatcherFailed := &ypb.FuzzerResponse{Ok: false, Reason: "old failure"}
+	ResetFuzzerResponseMatcherStateForRematch(storedMatcherFailed, &schema.WebFuzzerResponse{MatchFail: true})
+	require.True(t, storedMatcherFailed.Ok)
+	require.Empty(t, storedMatcherFailed.Reason)
+}
 
 func TestGRPCMUSTPASS_HTTPFuzzer_ReMatcher(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -313,6 +360,43 @@ func TestGRPCMUSTPASS_HTTPFuzzer_ReMatcher(t *testing.T) {
 			require.Contains(t, string(resp.GetResponseRaw()), retryToken)
 		}
 		require.Equal(t, map[int]int{1: 1, 3: 1, 5: 1}, retriedIndexes)
+
+		clearMatcher := &ypb.HTTPResponseMatcher{
+			MatcherType: "word",
+			Scope:       "body",
+			Condition:   "and",
+			Group:       []string{"missing-" + retryToken},
+			ExprType:    "nuclei-dsl",
+			Action:      Action_Fail,
+			HitColor:    "green",
+		}
+		clearStream, err := client.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
+			Matchers:           []*ypb.HTTPResponseMatcher{clearMatcher},
+			HistoryWebFuzzerId: int32(rematchTaskID),
+			ReMatch:            true,
+		})
+		require.NoError(t, err)
+
+		clearCount := 0
+		clearedIndexes := make([]int, 0, 3)
+		for {
+			resp, err := clearStream.Recv()
+			if err != nil {
+				break
+			}
+			clearCount++
+			index, _ := strconv.Atoi(lowhttp.GetHTTPRequestQueryParam(resp.GetRequestRaw(), "a"))
+			require.True(t, resp.Ok)
+			require.False(t, resp.MatcherMarkFail)
+			require.NotEqual(t, matcherActionFailReason, resp.Reason)
+			require.False(t, resp.MatchedByMatcher)
+			require.Empty(t, resp.HitColor)
+			if index%2 == 1 {
+				clearedIndexes = append(clearedIndexes, index)
+			}
+		}
+		require.Equal(t, 6, clearCount)
+		require.ElementsMatch(t, []int{1, 3, 5}, clearedIndexes)
 	})
 }
 

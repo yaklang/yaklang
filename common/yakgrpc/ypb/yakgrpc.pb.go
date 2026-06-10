@@ -48017,6 +48017,7 @@ type FuzzerResponse struct {
 	MatchedByMatcher bool                `protobuf:"varint,46,opt,name=MatchedByMatcher,proto3" json:"MatchedByMatcher,omitempty"`
 	HitColor         string              `protobuf:"bytes,47,opt,name=HitColor,proto3" json:"HitColor,omitempty"`
 	RedirectFlows    []*RedirectHTTPFlow `protobuf:"bytes,48,rep,name=RedirectFlows,proto3" json:"RedirectFlows,omitempty"`
+	MatcherMarkFail  bool                `protobuf:"varint,63,opt,name=MatcherMarkFail,proto3" json:"MatcherMarkFail,omitempty"`
 	// too large file operators
 	IsTooLargeResponse         bool                     `protobuf:"varint,49,opt,name=IsTooLargeResponse,proto3" json:"IsTooLargeResponse,omitempty"`
 	TooLargeResponseHeaderFile string                   `protobuf:"bytes,50,opt,name=TooLargeResponseHeaderFile,proto3" json:"TooLargeResponseHeaderFile,omitempty"`
@@ -48292,6 +48293,13 @@ func (x *FuzzerResponse) GetRedirectFlows() []*RedirectHTTPFlow {
 		return x.RedirectFlows
 	}
 	return nil
+}
+
+func (x *FuzzerResponse) GetMatcherMarkFail() bool {
+	if x != nil {
+		return x.MatcherMarkFail
+	}
+	return false
 }
 
 func (x *FuzzerResponse) GetIsTooLargeResponse() bool {
@@ -73846,7 +73854,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x0fUrlWithoutQuery\x18\x02 \x01(\tR\x0fUrlWithoutQuery\"w\n" +
 	"\x16FuzzerSequenceResponse\x12,\n" +
 	"\aRequest\x18\x01 \x01(\v2\x12.ypb.FuzzerRequestR\aRequest\x12/\n" +
-	"\bResponse\x18\x02 \x01(\v2\x13.ypb.FuzzerResponseR\bResponse\"\xc3\r\n" +
+	"\bResponse\x18\x02 \x01(\v2\x13.ypb.FuzzerResponseR\bResponse\"\xed\r\n" +
 	"\x0eFuzzerResponse\x12\x16\n" +
 	"\x06Method\x18\x01 \x01(\tR\x06Method\x12\x1e\n" +
 	"\n" +
@@ -73891,7 +73899,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x10ExtractedResults\x18- \x03(\v2\v.ypb.KVPairR\x10ExtractedResults\x12*\n" +
 	"\x10MatchedByMatcher\x18. \x01(\bR\x10MatchedByMatcher\x12\x1a\n" +
 	"\bHitColor\x18/ \x01(\tR\bHitColor\x12;\n" +
-	"\rRedirectFlows\x180 \x03(\v2\x15.ypb.RedirectHTTPFlowR\rRedirectFlows\x12.\n" +
+	"\rRedirectFlows\x180 \x03(\v2\x15.ypb.RedirectHTTPFlowR\rRedirectFlows\x12(\n" +
+	"\x0fMatcherMarkFail\x18? \x01(\bR\x0fMatcherMarkFail\x12.\n" +
 	"\x12IsTooLargeResponse\x181 \x01(\bR\x12IsTooLargeResponse\x12>\n" +
 	"\x1aTooLargeResponseHeaderFile\x182 \x01(\tR\x1aTooLargeResponseHeaderFile\x12:\n" +
 	"\x18TooLargeResponseBodyFile\x183 \x01(\tR\x18TooLargeResponseBodyFile\x120\n" +

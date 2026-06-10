@@ -351,9 +351,7 @@ func (s *Server) RedirectRequest(ctx context.Context, req *ypb.RedirectRequestPa
 		}
 	}
 	// 匹配响应
-	var httpTPLmatchersResult bool
-	var hitColor []string
-	var matcherFailed bool
+	var matchResult FuzzerMatcherResult
 	if len(req.GetMatchers()) != 0 {
 		httpTplMatcher := make([]*YakFuzzerMatcher, 0)
 		for _, matcher := range req.GetMatchers() {
@@ -375,12 +373,12 @@ func (s *Server) RedirectRequest(ctx context.Context, req *ypb.RedirectRequestPa
 		}
 
 		matcherParams := utils.CopyMapInterface(mergedParams)
-		httpTPLmatchersResult, hitColor, _, matcherFailed = MatchColor(httpTplMatcher, &httptpl.RespForMatch{
+		matchResult = ProcessYakMatch(httpTplMatcher, &httptpl.RespForMatch{
 			RawPacket:     rspRaw,
 			RequestPacket: rspIns.RawRequest,
 		}, matcherParams)
-		if httpTPLmatchersResult {
-			err := yakit.AppendHTTPFlowTagsByHiddenIndexEx(rspIns.HiddenIndex, hitColor...)
+		if matchResult.Matched {
+			err := yakit.AppendHTTPFlowTagsByHiddenIndexEx(rspIns.HiddenIndex, matchResult.HitColor...)
 			if err != nil {
 				log.Errorf("append http flow tags failed: %s", err)
 			}
@@ -393,8 +391,6 @@ func (s *Server) RedirectRequest(ctx context.Context, req *ypb.RedirectRequestPa
 		GuessResponseEncoding: Chardet(rspRaw),
 		RequestRaw:            resultRequest,
 		ExtractedResults:      extractResults,
-		MatchedByMatcher:      httpTPLmatchersResult,
-		HitColor:              strings.Join(hitColor, "|"),
 	}
 	rsp.UUID = uuid.New().String()
 	rsp.Timestamp = start.Unix()
@@ -431,10 +427,7 @@ func (s *Server) RedirectRequest(ctx context.Context, req *ypb.RedirectRequestPa
 			}
 		}
 	}
-	if matcherFailed && rsp.Ok {
-		rsp.Ok = false
-		rsp.Reason = matcherActionFailReason
-	}
+	ApplyFuzzerMatcherResultToResponse(rsp, matchResult)
 	return rsp, nil
 }
 
@@ -465,14 +458,60 @@ type fuzzerServerPush struct {
 	DiscardCount        int    `json:"discard_count"`
 }
 
-func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerServer) (finalError error) {
-	defer func() {
-		if err := recover(); err != nil {
-			finalError = utils.Errorf("panic from httpfuzzer: %v", err)
-			utils.PrintCurrentGoroutineRuntimeStack()
-		}
-	}()
-	// runtimeID
+type httpFuzzerMode int
+
+const (
+	httpFuzzerModeNew httpFuzzerMode = iota
+	httpFuzzerModeRetry
+	httpFuzzerModePauseControl
+	httpFuzzerModeHistoryView
+	httpFuzzerModeReMatch
+)
+
+func detectHTTPFuzzerMode(req *ypb.FuzzerRequest) httpFuzzerMode {
+	if req.GetPauseTaskID() > 0 && req.GetSetPauseStatus() {
+		return httpFuzzerModePauseControl
+	}
+	if req.GetReMatch() {
+		return httpFuzzerModeReMatch
+	}
+	if req.GetHistoryWebFuzzerId() > 0 {
+		return httpFuzzerModeHistoryView
+	}
+	if req.GetRetryTaskID() > 0 {
+		return httpFuzzerModeRetry
+	}
+	return httpFuzzerModeNew
+}
+
+type httpFuzzerRun struct {
+	server *Server
+	req    *ypb.FuzzerRequest
+	stream ypb.Yak_HTTPFuzzerServer
+
+	mode             httpFuzzerMode
+	runtimeID        string
+	engineDropPacket bool
+	discardCount     *atomic.Int64
+
+	sw            *utils.Switch
+	rawRequest    []byte
+	hotPatchChain yak.HotPatchChain
+	extraOpt      []mutate.FuzzConfigOpt
+
+	httpTplMatcher       []*YakFuzzerMatcher
+	httpTplExtractor     []*httptpl.YakExtractor
+	haveHTTPTplMatcher   bool
+	haveHTTPTplExtractor bool
+
+	feedbackResponse           func(rsp *ypb.FuzzerResponse, skipPoC bool, skipSend bool) error
+	doFuzzerServerPushThrottle func()
+	feedbackWg                 *sync.WaitGroup
+	feedbackLock               *sync.Mutex
+	pocSwg                     *utils.SizedWaitGroup
+}
+
+func (s *Server) newHTTPFuzzerRun(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerServer) *httpFuzzerRun {
 	var runtimeID string
 	if wrapperStream, ok := stream.(*WrapperHTTPFuzzerStream); ok {
 		// runtimeID from webfuzzer sequence
@@ -481,118 +520,152 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		runtimeID = uuid.NewString()
 	}
 
-	// server push info
-	engineDropPacket := req.GetEngineDropPacket()
-
-	discardCount := new(atomic.Int64)
-	fuzzerTabIndex := req.GetFuzzerTabIndex()
-	fuzzerIndex := req.GetFuzzerIndex()
-	fuzzerSequenceIndex := req.GetFuzzerSequenceIndex()
-	doFuzzerServerPush := func() {
-		yakit.BroadcastData(yakit.ServerPushType_Fuzzer, &fuzzerServerPush{
-			FuzzerTabIndex:      fuzzerTabIndex,
-			FuzzerIndex:         fuzzerIndex,
-			FuzzerSequenceIndex: fuzzerSequenceIndex,
-			DiscardCount:        int(discardCount.Load()),
-		})
+	return &httpFuzzerRun{
+		server:           s,
+		req:              req,
+		stream:           stream,
+		mode:             detectHTTPFuzzerMode(req),
+		runtimeID:        runtimeID,
+		engineDropPacket: req.GetEngineDropPacket(),
+		discardCount:     new(atomic.Int64),
 	}
+}
 
-	throttle := utils.NewThrottle(1)
-	doFuzzerServerPushThrottle := func() {
-		throttle(doFuzzerServerPush)
-	}
-	defer doFuzzerServerPush()
+func (r *httpFuzzerRun) isRetry() bool {
+	return r.req.GetRetryTaskID() > 0
+}
 
-	// retry
-	isRetry := req.GetRetryTaskID() > 0
-	// pause
-	pauseTaskID := req.GetPauseTaskID()
+func (r *httpFuzzerRun) initPauseSwitch() (handled bool, err error) {
+	pauseTaskID := r.req.GetPauseTaskID()
 	isPause := pauseTaskID > 0
-	// 暂停任务
-	var sw *utils.Switch
 	if !isPause {
-		sw = utils.NewSwitch(true)
+		r.sw = utils.NewSwitch(true)
 		go func() {
 			select {
-			case <-stream.Context().Done():
-				sw.SwitchTo(true)
+			case <-r.stream.Context().Done():
+				r.sw.SwitchTo(true)
 			}
 		}()
-	} else if req.GetSetPauseStatus() {
+		return false, nil
+	}
+	if r.req.GetSetPauseStatus() {
 		i, ok := _FuzzerTaskSwitchMap.Load(uint(pauseTaskID))
 		if ok {
-			sw = i.(*utils.Switch)
-			sw.SwitchTo(!req.GetIsPause())
-			return nil
-		} else {
-			return utils.Errorf("pause task[%d] not found", pauseTaskID)
+			r.sw = i.(*utils.Switch)
+			r.sw.SwitchTo(!r.req.GetIsPause())
+			return true, nil
 		}
+		return true, utils.Errorf("pause task[%d] not found", pauseTaskID)
 	}
-	// rawRequest
-	var rawRequest []byte
-	if !isRetry {
-		if len(req.GetRequestRaw()) > 0 {
-			rawRequest = req.GetRequestRaw()
-		} else {
-			rawRequest = []byte(req.GetRequest())
-		}
-	}
+	return false, nil
+}
 
-	// hot code
-	var extraOpt []mutate.FuzzConfigOpt
-	hotPatchChain := buildHTTPFuzzerHotPatchChain(req)
-	if strings.TrimSpace(hotPatchChain.GlobalCode) != "" || strings.TrimSpace(hotPatchChain.ModuleCode) != "" {
-		extraOpt = append(extraOpt, yak.Fuzz_WithAllHotPatchChained(stream.Context(), hotPatchChain)...)
-		extraOpt = append(extraOpt, mutate.Fuzz_WithExtraFuzzTagHandler("request", func(s string) []string {
-			return []string{utils.UnsafeBytesToString(rawRequest)}
-		}))
+func (r *httpFuzzerRun) initRawRequest() {
+	if r.isRetry() {
+		return
 	}
-
-	/*
-		Plugins
-	*/
-	var pocs []*schema.YakScript
-	for _, i := range req.GetYamlPoCNames() {
-		poc, err := yakit.GetYakScriptByName(consts.GetGormProfileDatabase(), i)
-		if err != nil {
-			log.Errorf("get yaml poc[%v] failed: %s", i, err)
-			continue
-		}
-		if poc.Type != "nuclei" {
-			log.Errorf("poc[%s] is not yaml poc: %s", i, poc.Type)
-			continue
-		}
-		pocs = append(pocs, poc)
+	if len(r.req.GetRequestRaw()) > 0 {
+		r.rawRequest = r.req.GetRequestRaw()
+		return
 	}
+	r.rawRequest = []byte(r.req.GetRequest())
+}
 
-	var batchTarget string
-	if req.GetBatchTargetFile() {
-		if ret := utils.GetFirstExistedFile(string(req.BatchTarget)); ret != "" {
-			fp, err := os.Open(ret)
-			if err != nil {
-				return utils.Errorf("open batch target file failed: %s", err)
-			}
-			raw, _ := io.ReadAll(fp)
-			fp.Close()
-			batchTarget = strings.TrimSpace(string(raw))
-		} else {
-			return utils.Errorf("batch target file not found: %s", req.GetBatchTarget())
-		}
-	} else {
-		batchTarget = string(req.GetBatchTarget())
+func (r *httpFuzzerRun) initHotPatch() {
+	r.hotPatchChain = buildHTTPFuzzerHotPatchChain(r.req)
+	if strings.TrimSpace(r.hotPatchChain.GlobalCode) == "" && strings.TrimSpace(r.hotPatchChain.ModuleCode) == "" {
+		return
 	}
+	r.extraOpt = append(r.extraOpt, yak.Fuzz_WithAllHotPatchChained(r.stream.Context(), r.hotPatchChain)...)
+	r.extraOpt = append(r.extraOpt, mutate.Fuzz_WithExtraFuzzTagHandler("request", func(s string) []string {
+		return []string{utils.UnsafeBytesToString(r.rawRequest)}
+	}))
+}
 
-	// feedback
-	swg := utils.NewSizedWaitGroup(int(req.GetConcurrent()))
-	defer swg.Wait()
-	feedbackWg := new(sync.WaitGroup)
-	defer func() {
-		feedbackWg.Wait()
-	}()
-	feedbackLock := new(sync.Mutex)
-	feedbackResponse := func(rsp *ypb.FuzzerResponse, skipPoC bool, skipSend bool) error {
-		feedbackLock.Lock()
-		defer feedbackLock.Unlock()
+func (r *httpFuzzerRun) initMatchersAndExtractors() {
+	r.httpTplMatcher = make([]*YakFuzzerMatcher, len(r.req.GetMatchers()))
+	r.httpTplExtractor = make([]*httptpl.YakExtractor, len(r.req.GetExtractors()))
+	r.haveHTTPTplMatcher = len(r.httpTplMatcher) > 0
+	r.haveHTTPTplExtractor = len(r.httpTplExtractor) > 0
+
+	if r.haveHTTPTplExtractor {
+		for i, e := range r.req.GetExtractors() {
+			r.httpTplExtractor[i] = httptpl.NewExtractorFromGRPCModel(e)
+		}
+	}
+	if r.haveHTTPTplMatcher {
+		for i, m := range r.req.GetMatchers() {
+			r.httpTplMatcher[i] = NewHttpFlowMatcherFromGRPCModel(m)
+		}
+	}
+}
+
+func (r *httpFuzzerRun) pushFuzzerServerStatus() {
+	yakit.BroadcastData(yakit.ServerPushType_Fuzzer, &fuzzerServerPush{
+		FuzzerTabIndex:      r.req.GetFuzzerTabIndex(),
+		FuzzerIndex:         r.req.GetFuzzerIndex(),
+		FuzzerSequenceIndex: r.req.GetFuzzerSequenceIndex(),
+		DiscardCount:        int(r.discardCount.Load()),
+	})
+}
+
+func (r *httpFuzzerRun) initServerPushThrottle() {
+	throttle := utils.NewThrottle(1)
+	r.doFuzzerServerPushThrottle = func() {
+		throttle(r.pushFuzzerServerStatus)
+	}
+}
+
+func (r *httpFuzzerRun) handle() error {
+	switch r.mode {
+	case httpFuzzerModePauseControl:
+		return r.handlePauseControl()
+	case httpFuzzerModeHistoryView:
+		return r.handleHistoryViewMode()
+	case httpFuzzerModeReMatch:
+		return r.handleReMatchMode()
+	case httpFuzzerModeRetry, httpFuzzerModeNew:
+		return r.handleExecutionMode()
+	default:
+		return utils.Errorf("unknown http fuzzer mode: %d", r.mode)
+	}
+}
+
+func (r *httpFuzzerRun) handlePauseControl() error {
+	pauseTaskID := r.req.GetPauseTaskID()
+	i, ok := _FuzzerTaskSwitchMap.Load(uint(pauseTaskID))
+	if !ok {
+		return utils.Errorf("pause task[%d] not found", pauseTaskID)
+	}
+	sw := i.(*utils.Switch)
+	sw.SwitchTo(!r.req.GetIsPause())
+	return nil
+}
+
+func (r *httpFuzzerRun) handleHistoryViewMode() error {
+	if handled, err := r.initPauseSwitch(); handled || err != nil {
+		return err
+	}
+	r.initFeedback(nil)
+	defer r.waitFeedback()
+	return r.handleHistory()
+}
+
+func (r *httpFuzzerRun) handleReMatchMode() error {
+	r.initHotPatch()
+	r.initMatchersAndExtractors()
+	r.initFeedback(nil)
+	defer r.waitFeedback()
+	return r.handleHistory()
+}
+
+func (r *httpFuzzerRun) initFeedback(pocs []*schema.YakScript) {
+	r.pocSwg = utils.NewSizedWaitGroup(int(r.req.GetConcurrent()))
+	r.feedbackWg = new(sync.WaitGroup)
+	r.feedbackLock = new(sync.Mutex)
+	r.feedbackResponse = func(rsp *ypb.FuzzerResponse, skipPoC bool, skipSend bool) error {
+		r.feedbackLock.Lock()
+		defer r.feedbackLock.Unlock()
 		startTime := time.Now()
 		defer func() {
 			duration := time.Now().Sub(startTime)
@@ -601,12 +674,12 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			}
 		}()
 
-		if !req.GetReMatch() {
-			sw.WaitUntilOpen()
+		if !r.req.GetReMatch() && r.sw != nil {
+			r.sw.WaitUntilOpen()
 		}
 
 		if !skipSend {
-			err := stream.Send(rsp)
+			err := r.stream.Send(rsp)
 			if err != nil {
 				return err
 			}
@@ -616,17 +689,17 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			return nil
 		}
 
-		feedbackWg.Add(1)
+		r.feedbackWg.Add(1)
 		go func() {
-			defer feedbackWg.Done()
+			defer r.feedbackWg.Done()
 			for _, p := range pocs {
 				poc := p
-				err := swg.AddWithContext(stream.Context())
+				err := r.pocSwg.AddWithContext(r.stream.Context())
 				if err != nil {
 					break
 				}
 				go func() {
-					defer swg.Done()
+					defer r.pocSwg.Done()
 					defer func() {
 						if err := recover(); err != nil {
 							spew.Dump(err)
@@ -637,7 +710,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 						rsp.RequestRaw, lowhttp.WithHttps(rsp.IsHTTPS),
 						httptpl.WithTemplateRaw(poc.Content),
 						lowhttp.WithSaveHTTPFlowHandler(func(i *lowhttp.LowhttpResponse) {
-							err := stream.Send(ConvertLowhttpResponseToFuzzerResponseBase(i))
+							err := r.stream.Send(ConvertLowhttpResponseToFuzzerResponseBase(i))
 							if err != nil {
 								log.Errorf("yaml poc send failed")
 							}
@@ -652,149 +725,225 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		}()
 		return nil
 	}
+}
 
-	historyID := req.GetHistoryWebFuzzerId()
-	reMatch := req.GetReMatch()
-
-	httpTplMatcher := make([]*YakFuzzerMatcher, len(req.GetMatchers()))
-	httpTplExtractor := make([]*httptpl.YakExtractor, len(req.GetExtractors()))
-	haveHTTPTplMatcher := len(httpTplMatcher) > 0
-	haveHTTPTplExtractor := len(httpTplExtractor) > 0
-	if haveHTTPTplExtractor {
-		for i, e := range req.GetExtractors() {
-			httpTplExtractor[i] = httptpl.NewExtractorFromGRPCModel(e)
-		}
+func (r *httpFuzzerRun) waitFeedback() {
+	if r.feedbackWg != nil {
+		r.feedbackWg.Wait()
 	}
-
-	if haveHTTPTplMatcher {
-		for i, m := range req.GetMatchers() {
-			httpTplMatcher[i] = NewHttpFlowMatcherFromGRPCModel(m)
-		}
+	if r.pocSwg != nil {
+		r.pocSwg.Wait()
 	}
+}
 
-	if historyID > 0 {
-		// 回溯找到所有之前的包，进行整合
-		oldIDs, err := yakit.GetWebFuzzerTasksIDByRetryRootID(s.GetProjectDatabase(), uint(historyID))
-		// 找到最新的任务并排除
-		latestID := lo.Max(oldIDs)
-		if !reMatch {
-			oldIDs = lo.Filter(oldIDs, func(item uint, _ int) bool {
-				return item != latestID
-			})
-		}
-
+func (r *httpFuzzerRun) loadYamlPoCs() []*schema.YakScript {
+	var pocs []*schema.YakScript
+	for _, i := range r.req.GetYamlPoCNames() {
+		poc, err := yakit.GetYakScriptByName(consts.GetGormProfileDatabase(), i)
 		if err != nil {
-			log.Errorf("get old web fuzzer success response failed: %s", err)
-		} else {
-			// 重匹配的分支
-			if reMatch {
-				task, err := yakit.SaveWebFuzzerTask(s.GetProjectDatabase(), req, 0, false, "rematch")
+			log.Errorf("get yaml poc[%v] failed: %s", i, err)
+			continue
+		}
+		if poc.Type != "nuclei" {
+			log.Errorf("poc[%s] is not yaml poc: %s", i, poc.Type)
+			continue
+		}
+		pocs = append(pocs, poc)
+	}
+	return pocs
+}
+
+func (r *httpFuzzerRun) resolveBatchTarget() (string, error) {
+	if !r.req.GetBatchTargetFile() {
+		return string(r.req.GetBatchTarget()), nil
+	}
+	if ret := utils.GetFirstExistedFile(string(r.req.BatchTarget)); ret != "" {
+		fp, err := os.Open(ret)
+		if err != nil {
+			return "", utils.Errorf("open batch target file failed: %s", err)
+		}
+		raw, _ := io.ReadAll(fp)
+		fp.Close()
+		return strings.TrimSpace(string(raw)), nil
+	}
+	return "", utils.Errorf("batch target file not found: %s", r.req.GetBatchTarget())
+}
+
+func (r *httpFuzzerRun) handleHistory() error {
+	historyID := r.req.GetHistoryWebFuzzerId()
+	if historyID <= 0 {
+		if r.mode == httpFuzzerModeReMatch {
+			return utils.Error("rematch requires HistoryWebFuzzerId")
+		}
+		return utils.Error("history view requires HistoryWebFuzzerId")
+	}
+	oldIDs, err := yakit.GetWebFuzzerTasksIDByRetryRootID(r.server.GetProjectDatabase(), uint(historyID))
+	latestID := lo.Max(oldIDs)
+	if r.mode == httpFuzzerModeHistoryView {
+		oldIDs = lo.Filter(oldIDs, func(item uint, _ int) bool {
+			return item != latestID
+		})
+	}
+
+	if err != nil {
+		log.Errorf("get old web fuzzer success response failed: %s", err)
+		return nil
+	}
+	if r.mode == httpFuzzerModeReMatch {
+		return r.handleReMatch(oldIDs, historyID)
+	}
+	return r.handleHistoryView(oldIDs, latestID)
+}
+
+func (r *httpFuzzerRun) handleReMatch(oldIDs []uint, historyID int32) error {
+	task, err := yakit.SaveWebFuzzerTask(r.server.GetProjectDatabase(), r.req, 0, false, "rematch")
+	if err != nil {
+		return utils.Errorf("save to web fuzzer to database failed: %s", err)
+	}
+	if len(oldIDs) == 0 { // 尝试修复
+		oldIDs = []uint{uint(historyID)}
+	}
+	_, _, getMirrorHTTPFlowParams, _, _, _ := yak.MutateHookCallerChained(r.stream.Context(), r.hotPatchChain, nil)
+	for resp := range yakit.YieldWebFuzzerResponseByTaskIDs(r.server.GetProjectDatabase(), r.stream.Context(), oldIDs) {
+		var extractorResults []*ypb.KVPair
+		respModel, err := resp.ToGRPCModel()
+		if err != nil || respModel == nil {
+			log.Errorf("convert web fuzzer response to grpc model failed: %s", err)
+			continue
+		}
+		ResetFuzzerResponseMatcherStateForRematch(respModel, resp)
+
+		if r.haveHTTPTplExtractor { // 提取器提取参数
+			params := make(map[string]any)
+			for _, extractor := range r.httpTplExtractor {
+				vars, err := extractor.ExecuteWithRequest(respModel.ResponseRaw, respModel.RequestRaw, respModel.IsHTTPS, params)
 				if err != nil {
-					return utils.Errorf("save to web fuzzer to database failed: %s", err)
+					log.Errorf("extractor execute failed: %s", err)
+					continue
 				}
-				if len(oldIDs) == 0 { // 尝试修复
-					oldIDs = []uint{uint(historyID)}
-				}
-				_, _, getMirrorHTTPFlowParams, _, _, _ := yak.MutateHookCallerChained(stream.Context(), hotPatchChain, nil)
-				for resp := range yakit.YieldWebFuzzerResponseByTaskIDs(s.GetProjectDatabase(), stream.Context(), oldIDs, true) {
-					var extractorResults []*ypb.KVPair
-					respModel, err := resp.ToGRPCModel()
-					if err != nil || respModel == nil {
-						log.Errorf("convert web fuzzer response to grpc model failed: %s", err)
-						continue
-					}
-
-					if haveHTTPTplExtractor { // 提取器提取参数
-						params := make(map[string]any)
-						for _, extractor := range httpTplExtractor {
-							vars, err := extractor.ExecuteWithRequest(respModel.ResponseRaw, respModel.RequestRaw, respModel.IsHTTPS, params)
-							if err != nil {
-								log.Errorf("extractor execute failed: %s", err)
-								continue
-							}
-							for k, v := range vars {
-								params[k] = v
-								extractorResults = append(extractorResults, &ypb.KVPair{Key: k, Value: httptpl.ExtractResultToString(v), MarshalValue: marshalValue(v)}) // 提取器 参数
-							}
-						}
-					}
-					var httpTPLmatchersResult bool
-					var hitColor []string
-					var discard, matcherFailed bool
-					for mergedParams := range s.PreRenderVariables(stream.Context(), req.GetParams(), req.GetIsHTTPS(), req.GetIsGmTLS(), false) {
-						existedParams := make(map[string]string) // 传入的参数
-						if mergedParams != nil {
-							for k, v := range utils.InterfaceToMap(mergedParams) {
-								existedParams[k] = strings.Join(v, ",")
-							}
-						}
-
-						if getMirrorHTTPFlowParams != nil {
-							for k, v := range getMirrorHTTPFlowParams(respModel.RequestRaw, respModel.ResponseRaw, existedParams) { // 热加载的参数
-								extractorResults = append(extractorResults, &ypb.KVPair{Key: utils.EscapeInvalidUTF8Byte([]byte(k)), Value: utils.EscapeInvalidUTF8Byte([]byte(v)), MarshalValue: marshalValue(v)})
-							}
-						}
-
-						matcherParams := utils.CopyMapInterface(mergedParams)
-						for _, kv := range extractorResults { // 合并
-							matcherParams[kv.GetKey()] = kv.GetValue()
-						}
-						httpTPLmatchersResult, hitColor, discard, matcherFailed = MatchColor(httpTplMatcher,
-							&httptpl.RespForMatch{
-								RawPacket:     respModel.ResponseRaw,
-								Duration:      float64(respModel.DurationMs),
-								RequestPacket: respModel.RequestRaw,
-							},
-							matcherParams)
-						if httpTPLmatchersResult {
-							respModel.MatchedByMatcher = true
-							respModel.HitColor = strings.Join(hitColor, "|")
-							respModel.Discard = discard
-							if matcherFailed && respModel.Ok {
-								respModel.Ok = false
-								respModel.Reason = matcherActionFailReason
-							}
-							break
-						}
-					}
-					if discard && engineDropPacket {
-						discardCount.Add(1)
-						doFuzzerServerPushThrottle()
-						continue
-					}
-					respModel.TaskId = int64(task.ID)
-					respModel.ExtractedResults = extractorResults
-					yakit.SaveWebFuzzerResponseEx(int(task.ID), resp.HiddenIndex, respModel)
-					feedbackResponse(respModel, true, false)
-				}
-
-			} else {
-				// 只展示之前成功的包
-				if len(oldIDs) > 0 {
-					for resp := range yakit.YieldWebFuzzerResponseByTaskIDs(s.GetProjectDatabase(), stream.Context(), oldIDs, true) {
-						respModel, err := resp.ToGRPCModel()
-						if err != nil {
-							log.Errorf("convert web fuzzer response to grpc model failed: %s", err)
-							continue
-						}
-						feedbackResponse(respModel, true, false)
-					}
-				}
-
-				// 展示最新任务的所有包
-				for resp := range yakit.YieldWebFuzzerResponses(s.GetProjectDatabase(), stream.Context(), int(latestID)) {
-					respModel, err := resp.ToGRPCModel()
-					if err != nil {
-						log.Errorf("convert web fuzzer response to grpc model failed: %s", err)
-						continue
-					}
-					feedbackResponse(respModel, true, false)
+				for k, v := range vars {
+					params[k] = v
+					extractorResults = append(extractorResults, &ypb.KVPair{Key: k, Value: httptpl.ExtractResultToString(v), MarshalValue: marshalValue(v)}) // 提取器 参数
 				}
 			}
 		}
-		return nil
+		var matchResult FuzzerMatcherResult
+		for mergedParams := range r.server.PreRenderVariables(r.stream.Context(), r.req.GetParams(), r.req.GetIsHTTPS(), r.req.GetIsGmTLS(), false) {
+			existedParams := make(map[string]string) // 传入的参数
+			if mergedParams != nil {
+				for k, v := range utils.InterfaceToMap(mergedParams) {
+					existedParams[k] = strings.Join(v, ",")
+				}
+			}
+
+			if getMirrorHTTPFlowParams != nil {
+				for k, v := range getMirrorHTTPFlowParams(respModel.RequestRaw, respModel.ResponseRaw, existedParams) { // 热加载的参数
+					extractorResults = append(extractorResults, &ypb.KVPair{Key: utils.EscapeInvalidUTF8Byte([]byte(k)), Value: utils.EscapeInvalidUTF8Byte([]byte(v)), MarshalValue: marshalValue(v)})
+				}
+			}
+
+			matcherParams := utils.CopyMapInterface(mergedParams)
+			for _, kv := range extractorResults { // 合并
+				matcherParams[kv.GetKey()] = kv.GetValue()
+			}
+			matchResult = ProcessYakMatch(r.httpTplMatcher,
+				&httptpl.RespForMatch{
+					RawPacket:     respModel.ResponseRaw,
+					Duration:      float64(respModel.DurationMs),
+					RequestPacket: respModel.RequestRaw,
+				},
+				matcherParams)
+			if matchResult.Matched {
+				break
+			}
+		}
+		ApplyFuzzerMatcherResultToResponse(respModel, matchResult)
+		respModel.TaskId = int64(task.ID)
+		respModel.ExtractedResults = extractorResults
+		yakit.SaveWebFuzzerResponseEx(int(task.ID), resp.HiddenIndex, respModel)
+		if matchResult.Discard && r.engineDropPacket {
+			r.discardCount.Add(1)
+			r.doFuzzerServerPushThrottle()
+			continue
+		}
+		r.feedbackResponse(respModel, true, false)
 	}
-	if !isRetry && len(rawRequest) <= 0 {
+	return nil
+}
+
+func (r *httpFuzzerRun) handleHistoryView(oldIDs []uint, latestID uint) error {
+	// 只展示之前成功的包
+	if len(oldIDs) > 0 {
+		for resp := range yakit.YieldWebFuzzerResponseByTaskIDs(r.server.GetProjectDatabase(), r.stream.Context(), oldIDs, true) {
+			respModel, err := resp.ToGRPCModel()
+			if err != nil {
+				log.Errorf("convert web fuzzer response to grpc model failed: %s", err)
+				continue
+			}
+			r.feedbackResponse(respModel, true, false)
+		}
+	}
+
+	// 展示最新任务的所有包
+	for resp := range yakit.YieldWebFuzzerResponses(r.server.GetProjectDatabase(), r.stream.Context(), int(latestID)) {
+		respModel, err := resp.ToGRPCModel()
+		if err != nil {
+			log.Errorf("convert web fuzzer response to grpc model failed: %s", err)
+			continue
+		}
+		r.feedbackResponse(respModel, true, false)
+	}
+	return nil
+}
+
+func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerServer) (finalError error) {
+	defer func() {
+		if err := recover(); err != nil {
+			finalError = utils.Errorf("panic from httpfuzzer: %v", err)
+			utils.PrintCurrentGoroutineRuntimeStack()
+		}
+	}()
+	run := s.newHTTPFuzzerRun(req, stream)
+	run.initServerPushThrottle()
+	defer run.pushFuzzerServerStatus()
+	return run.handle()
+}
+
+func (r *httpFuzzerRun) handleExecutionMode() error {
+	s := r.server
+	req := r.req
+	stream := r.stream
+	runtimeID := r.runtimeID
+	engineDropPacket := r.engineDropPacket
+	discardCount := r.discardCount
+	doFuzzerServerPushThrottle := r.doFuzzerServerPushThrottle
+	isRetry := r.isRetry()
+	if handled, err := r.initPauseSwitch(); handled || err != nil {
+		return err
+	}
+	sw := r.sw
+	isPause := req.GetPauseTaskID() > 0
+
+	r.initRawRequest()
+	r.initHotPatch()
+	extraOpt := r.extraOpt
+	hotPatchChain := r.hotPatchChain
+	pocs := r.loadYamlPoCs()
+	batchTarget, err := r.resolveBatchTarget()
+	if err != nil {
+		return err
+	}
+	r.initFeedback(pocs)
+	defer r.waitFeedback()
+
+	r.initMatchersAndExtractors()
+	httpTplMatcher := r.httpTplMatcher
+	httpTplExtractor := r.httpTplExtractor
+	haveHTTPTplMatcher := r.haveHTTPTplMatcher
+	haveHTTPTplExtractor := r.haveHTTPTplExtractor
+	feedbackResponse := r.feedbackResponse
+
+	if !isRetry && len(r.rawRequest) <= 0 {
 		return utils.Errorf("empty request is not allowed")
 	}
 	log.Infof("build fuzzer proxy list: %s", req.GetProxyRuleId())
@@ -862,7 +1011,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		if req.GetActualAddr() != "" {
 			task.Host = req.GetActualAddr()
 		} else {
-			results := extractHostRegexp.FindStringSubmatch(string(rawRequest))
+			results := extractHostRegexp.FindStringSubmatch(string(r.rawRequest))
 			if len(results) > 1 {
 				task.Host = results[1]
 				if len(task.Host) > 40 {
@@ -885,10 +1034,10 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		if req.GetRepeatTimes() > 0 {
 			var buf bytes.Buffer
 			buf.WriteString("{{repeat(" + fmt.Sprint(req.GetRepeatTimes()) + ")}}")
-			buf.Write(rawRequest)
-			rawRequest = buf.Bytes()
+			buf.Write(r.rawRequest)
+			r.rawRequest = buf.Bytes()
 		}
-		iInput = rawRequest
+		iInput = r.rawRequest
 	} else {
 		// 找到上次任务的包
 		failedResponses := make([]*schema.WebFuzzerResponse, 0)
@@ -1270,8 +1419,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				)
 			}
 
-			var httpTPLmatchersResult, discard, matcherFailed bool
-			var hitColor []string
+			var matchResult FuzzerMatcherResult
 			lowhttpResponse := result.LowhttpResponse
 
 			if haveHTTPTplMatcher && lowhttpResponse != nil {
@@ -1291,7 +1439,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 					matcherParams[kv.GetKey()] = kv.GetValue()
 				}
 				matchColorStart := time.Now()
-				httpTPLmatchersResult, hitColor, discard, matcherFailed = MatchColor(httpTplMatcher, &httptpl.RespForMatch{
+				matchResult = ProcessYakMatch(httpTplMatcher, &httptpl.RespForMatch{
 					RawPacket:     result.ResponseRaw,
 					Duration:      lowhttpResponse.GetDurationFloat(),
 					RequestPacket: result.RequestRaw,
@@ -1300,13 +1448,13 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 					log.Warnf("match color and append httpflow tags cost too much time, can someone investigate it? cost: %v", du)
 				}
 
-				if discard && engineDropPacket {
+				if matchResult.Discard && engineDropPacket {
 					discardCount.Add(1)
 					doFuzzerServerPushThrottle()
 					continue
 				} else {
-					if httpTPLmatchersResult {
-						result.LowhttpResponse.Tags = append(result.LowhttpResponse.Tags, hitColor...)
+					if matchResult.Matched {
+						result.LowhttpResponse.Tags = append(result.LowhttpResponse.Tags, matchResult.HitColor...)
 					}
 				}
 			}
@@ -1354,8 +1502,6 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				Payloads:                   payloads,
 				IsHTTPS:                    strings.HasPrefix(strings.ToLower(result.Url), "https://"),
 				ExtractedResults:           extractorResults,
-				MatchedByMatcher:           httpTPLmatchersResult,
-				HitColor:                   strings.Join(hitColor, "|"),
 				IsTooLargeResponse:         tooLarge,
 				TooLargeResponseBodyFile:   tooLargeBodyFile,
 				TooLargeResponseHeaderFile: tooLargeHeaderFile,
@@ -1402,10 +1548,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				rsp.Ok = false
 				rsp.Reason = "empty response"
 			}
-			if matcherFailed && rsp.Ok {
-				rsp.Ok = false
-				rsp.Reason = matcherActionFailReason
-			}
+			ApplyFuzzerMatcherResultToResponse(rsp, matchResult)
 			if rsp.ResponseRaw != nil {
 				// 处理结果，相似度
 				header, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(rsp.ResponseRaw)
@@ -1492,26 +1635,25 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				for i := 0; i < len(redirectPacket)-1; i++ {
 					redirectRes := redirectPacket[i].RespRecord
 					method, _, _ := lowhttp.GetHTTPPacketFirstLine(redirectRes.RawRequest)
-					var redirectMatchersResult, redirectDiscard, redirectMatcherFailed bool
-					var redirectHitColor []string
+					var redirectMatchResult FuzzerMatcherResult
 					if haveHTTPTplMatcher {
 						matcherParams := utils.CopyMapInterface(mergedParams)
 						for _, kv := range extractorResultsOrigin {
 							matcherParams[kv.GetKey()] = kv.GetValue()
 						}
-						redirectMatchersResult, redirectHitColor, redirectDiscard, redirectMatcherFailed = MatchColor(httpTplMatcher, &httptpl.RespForMatch{
+						redirectMatchResult = ProcessYakMatch(httpTplMatcher, &httptpl.RespForMatch{
 							RawPacket:     redirectRes.RawPacket,
 							Duration:      redirectRes.GetDurationFloat(),
 							RequestPacket: redirectRes.RawRequest,
 						}, matcherParams)
 
-						if redirectDiscard && engineDropPacket {
+						if redirectMatchResult.Discard && engineDropPacket {
 							discardCount.Add(1)
 							doFuzzerServerPushThrottle()
 							continue
 						} else {
-							if redirectMatchersResult {
-								redirectRes.Tags = append(redirectRes.Tags, redirectHitColor...)
+							if redirectMatchResult.Matched {
+								redirectRes.Tags = append(redirectRes.Tags, redirectMatchResult.HitColor...)
 							}
 						}
 
@@ -1529,10 +1671,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 						RequestRaw:            redirectRes.RawRequest,
 						Payloads:              payloads,
 						IsHTTPS:               redirectRes.Https,
-						MatchedByMatcher:      redirectMatchersResult,
-						HitColor:              strings.Join(redirectHitColor, "|"),
 						RuntimeID:             runtimeID,
-						Discard:               redirectDiscard,
 					}
 					if redirectRes != nil && redirectRes.TraceInfo != nil {
 						SetFuzzerRespTraceInfo(redirectRsp, redirectRes.TraceInfo)
@@ -1564,10 +1703,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 							}
 						}
 					}
-					if redirectMatcherFailed && redirectRsp.Ok {
-						redirectRsp.Ok = false
-						redirectRsp.Reason = matcherActionFailReason
-					}
+					ApplyFuzzerMatcherResultToResponse(redirectRsp, redirectMatchResult)
 
 					if redirectRsp.StatusCode > 0 {
 						// 通过长度过滤
@@ -1609,7 +1745,6 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			// yakit.SaveWebFuzzerResponse(s.GetProjectDatabase(), int(task.ID), result.LowhttpResponse.Uuid, rsp)
 			yakit.SaveWebFuzzerResponseEx(int(task.ID), result.LowhttpResponse.HiddenIndex, rsp)
 			rsp.TaskId = int64(taskID)
-			rsp.Discard = discard
 			err := feedbackResponse(rsp, false, skipSendForSSEFinal)
 			if du := time.Now().Sub(feedbackNormalResponseStart); du > time.Second {
 				log.Warnf("feedbackNormalResponse cost too much time, try investigate it, cost: %v", du)
@@ -2156,6 +2291,50 @@ type YakFuzzerMatcher struct { // Added some display fields
 
 const matcherActionFailReason = "request failed intentionally by matcher action"
 
+type FuzzerMatcherResult struct {
+	Matched    bool
+	HitColor   []string
+	Discard    bool
+	MarkFailed bool
+}
+
+func (r FuzzerMatcherResult) HitColorString() string {
+	return strings.Join(r.HitColor, "|")
+}
+
+func ApplyFuzzerMatcherResultToResponse(resp *ypb.FuzzerResponse, result FuzzerMatcherResult) {
+	if resp == nil {
+		return
+	}
+	resp.MatchedByMatcher = result.Matched
+	resp.HitColor = result.HitColorString()
+	resp.Discard = result.Discard
+	resp.MatcherMarkFail = false
+	if result.MarkFailed && resp.Ok {
+		resp.MatcherMarkFail = true
+		resp.Ok = false
+		resp.Reason = matcherActionFailReason
+	}
+}
+
+func ResetFuzzerResponseMatcherStateForRematch(resp *ypb.FuzzerResponse, stored *schema.WebFuzzerResponse) {
+	if resp == nil {
+		return
+	}
+	wasMatcherMarkedFail := resp.GetMatcherMarkFail() || resp.GetReason() == matcherActionFailReason
+	if stored != nil && stored.MatchFail {
+		wasMatcherMarkedFail = true
+	}
+	resp.MatchedByMatcher = false
+	resp.HitColor = ""
+	resp.Discard = false
+	resp.MatcherMarkFail = false
+	if wasMatcherMarkedFail {
+		resp.Ok = true
+		resp.Reason = ""
+	}
+}
+
 func NewHttpFlowMatcherFromGRPCModel(m *ypb.HTTPResponseMatcher) *YakFuzzerMatcher {
 	res := &YakFuzzerMatcher{
 		Matcher: &httptpl.YakMatcher{
@@ -2175,7 +2354,7 @@ func NewHttpFlowMatcherFromGRPCModel(m *ypb.HTTPResponseMatcher) *YakFuzzerMatch
 	return res
 }
 
-func MatchColor(m []*YakFuzzerMatcher, rsp *httptpl.RespForMatch, vars map[string]interface{}, suf ...string) (matched bool, hitColor []string, discard bool, markFailed bool) {
+func ProcessYakMatch(m []*YakFuzzerMatcher, rsp *httptpl.RespForMatch, vars map[string]interface{}, suf ...string) (result FuzzerMatcherResult) {
 	for _, flowMatcher := range m {
 		startTime := time.Now()
 		res, err := flowMatcher.Matcher.Execute(rsp, vars, suf...)
@@ -2188,19 +2367,19 @@ func MatchColor(m []*YakFuzzerMatcher, rsp *httptpl.RespForMatch, vars map[strin
 		}
 
 		if CheckShouldMarkFailed(flowMatcher.Action, res) {
-			markFailed = true
+			result.MarkFailed = true
 		}
 
 		if CheckShouldDiscard(flowMatcher.Action, res) { // if should discard, return directly
-			matched = res
+			result.Matched = res
 			if res {
-				hitColor = append(hitColor, flowMatcher.Color)
+				result.HitColor = append(result.HitColor, flowMatcher.Color)
 			}
-			discard = true
+			result.Discard = true
 			return
 		} else if res { // has not action and match success ,update match info
-			matched = true
-			hitColor = append(hitColor, flowMatcher.Color)
+			result.Matched = true
+			result.HitColor = append(result.HitColor, flowMatcher.Color)
 		}
 	}
 	return

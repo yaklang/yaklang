@@ -92,6 +92,7 @@ type WebFuzzerResponse struct {
 
 	WebFuzzerTaskId int    `json:"web_fuzzer_task_id" gorm:"index"`
 	OK              bool   `json:"ok"`
+	MatchFail       bool   `json:"match_fail"`
 	Request         string `json:"request"`
 	Content         string `json:"content"`
 	Payload         string `json:"payload"`
@@ -103,7 +104,7 @@ type WebFuzzerResponse struct {
 }
 
 func (w *WebFuzzerResponse) CalcCacheHash() string {
-	return utils.CalcSha1(w.ID, w.WebFuzzerTaskId, w.OK, w.Request, w.Content, w.Payload, w.Url, w.StatusCode, w.DurationMs, w.Timestamp)
+	return utils.CalcSha1(w.ID, w.WebFuzzerTaskId, w.OK, w.Request, w.Content, w.Payload, w.Url, w.StatusCode, w.DurationMs, w.Timestamp, w.MatchFail)
 }
 
 func (w *WebFuzzerResponse) getCacheGRPCModel() *ypb.FuzzerResponse {
@@ -128,6 +129,9 @@ func (w *WebFuzzerResponse) ToGRPCModel() (*ypb.FuzzerResponse, error) {
 	if err != nil {
 		log.Errorf("unmarshal fuzzer failed: %s", err)
 		return nil, err
+	}
+	if w.MatchFail {
+		rsp.MatcherMarkFail = true
 	}
 	w.setCacheGRPCModel(&rsp)
 	return &rsp, nil
