@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -42,8 +43,9 @@ type Cache[T MemoryItem, D any] struct {
 	save         SaveFunc[D]
 	persistLimit int64
 
-	cancel context.CancelFunc
-	wg     sync.WaitGroup
+	closing atomic.Bool
+	cancel  context.CancelFunc
+	wg      sync.WaitGroup
 }
 
 func NewCache[T MemoryItem, D any](
@@ -72,7 +74,7 @@ func NewCache[T MemoryItem, D any](
 			resident.FinishPersist(key, generation, true)
 			return true
 		}
-		if cache.persistLimit > 0 && resident.PendingCount() > cache.persistLimit {
+		if !cache.closing.Load() && cache.persistLimit > 0 && resident.PendingCount() > cache.persistLimit {
 			return false
 		}
 		cache.marshalPipe.Feed(evictionRequest{
@@ -234,15 +236,18 @@ func (c *Cache[T, D]) Close() error {
 	if c == nil {
 		return nil
 	}
+	var closeErr error
 
 	if c.resident != nil {
 		c.resident.MarkClosed()
 		c.resident.DisableSave()
 	}
+	c.closing.Store(true)
 
 	if c.marshalPipe != nil {
 		c.enqueueCloseRequests()
 		c.marshalPipe.Close()
+		closeErr = utils.JoinErrors(closeErr, c.marshalPipe.Error())
 	}
 	c.wg.Wait()
 	if c.saver != nil {
@@ -258,9 +263,9 @@ func (c *Cache[T, D]) Close() error {
 		c.cancel()
 	}
 	if remaining > 0 {
-		return utils.Errorf("dbcache: %d resident items were not persisted on close", remaining)
+		closeErr = utils.JoinErrors(closeErr, utils.Errorf("dbcache: %d resident items were not persisted on close", remaining))
 	}
-	return nil
+	return closeErr
 }
 
 func (c *Cache[T, D]) enqueueCloseRequests() {

@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"context"
+	"sync"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -12,6 +13,9 @@ type Pipe[T, U any] struct {
 	ctx        context.Context
 	in         *chanx.UnlimitedChan[T]
 	out        *chanx.UnlimitedChan[U]
+	boundedIn  chan T
+	boundedOut chan U
+	errMu      sync.Mutex
 	err        error
 	swg        *utils.SizedWaitGroup
 	handler    func(item T, store *utils.SafeMap[any]) (U, error)
@@ -195,7 +199,9 @@ func (p *Pipe[T, U]) worker() {
 			if err == nil {
 				p.out.SafeFeed(result)
 			} else {
+				p.errMu.Lock()
 				p.err = utils.JoinErrors(p.err, err)
+				p.errMu.Unlock()
 			}
 		}
 	}
@@ -208,5 +214,7 @@ func (p *Pipe[T, U]) Close() {
 }
 
 func (p *Pipe[T, U]) Error() error {
+	p.errMu.Lock()
+	defer p.errMu.Unlock()
 	return p.err
 }

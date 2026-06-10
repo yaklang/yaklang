@@ -368,6 +368,27 @@ func TestResidencyCache_SkipEvictionKeepsHotItemsResidentUntilClose(t *testing.T
 	require.Equal(t, "hot", value)
 }
 
+func TestResidencyCacheCloseReportsUnpersistedItems(t *testing.T) {
+	var cache *dbcache.ResidencyCacheWithKey[int, string]
+	cache = dbcache.NewResidencyCacheWithKey[int, string](
+		0,
+		0,
+		func(key int, generation uint64, reason utils.EvictionReason) bool {
+			cache.FinishPersist(key, generation, false)
+			return true
+		},
+		func(key int) (string, error) {
+			return "", utils.Errorf("missing key")
+		},
+	)
+
+	cache.Set(1, "keep")
+
+	err := cache.Close()
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "dbcache: 1 resident items were not persisted on close")
+}
+
 func TestCacheCloseFlushesWithoutTimeout(t *testing.T) {
 	saved := 0
 	cache := dbcache.NewCache[*closeFlushItem, int](
@@ -391,6 +412,28 @@ func TestCacheCloseFlushesWithoutTimeout(t *testing.T) {
 	require.NoError(t, cache.Close())
 	require.Less(t, time.Since(start), time.Second)
 	require.Equal(t, 2, saved)
+}
+
+func TestCacheCloseReportsMarshalError(t *testing.T) {
+	cache := dbcache.NewCache[*closeFlushItem, int](
+		10*time.Second,
+		0,
+		func(item *closeFlushItem, _ utils.EvictionReason) (int, error) {
+			return 0, utils.Errorf("marshal failed for %d", item.id)
+		},
+		func(items []int) error {
+			return nil
+		},
+		nil,
+		dbcache.WithSaveTimeout(5*time.Second),
+	)
+
+	cache.Set(&closeFlushItem{id: 7})
+
+	err := cache.Close()
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "marshal failed for 7")
+	require.Contains(t, err.Error(), "dbcache: 1 resident items were not persisted on close")
 }
 
 func TestCacheCloseFlushesRejectingLateSet(t *testing.T) {
@@ -449,7 +492,7 @@ func TestCacheCloseFlushesAllItemsWithPersistLimit(t *testing.T) {
 			return nil
 		},
 		nil,
-		dbcache.WithSaveTimeout(5*time.Second),
+		dbcache.WithSaveTimeout(20*time.Millisecond),
 		dbcache.WithSaveSize(2),
 		dbcache.WithPersistLimit(3),
 	)
@@ -461,6 +504,60 @@ func TestCacheCloseFlushesAllItemsWithPersistLimit(t *testing.T) {
 	require.NoError(t, cache.Close())
 
 	require.Len(t, saved, total, "close should flush every resident item even when persistLimit forces batching")
+}
+
+func TestCacheCloseFlushesWhilePersistLimitAlreadyReached(t *testing.T) {
+	var saved atomic.Int32
+	saveStarted := make(chan struct{})
+	releaseSave := make(chan struct{})
+	var started atomic.Bool
+
+	cache := dbcache.NewCache[*closeFlushItem, int](
+		10*time.Millisecond,
+		0,
+		func(item *closeFlushItem, _ utils.EvictionReason) (int, error) {
+			return int(item.id), nil
+		},
+		func(items []int) error {
+			if started.CompareAndSwap(false, true) {
+				close(saveStarted)
+			}
+			<-releaseSave
+			saved.Add(int32(len(items)))
+			return nil
+		},
+		nil,
+		dbcache.WithSaveTimeout(10*time.Millisecond),
+		dbcache.WithPersistLimit(1),
+	)
+
+	cache.Set(&closeFlushItem{id: 1})
+	require.Eventually(t, func() bool {
+		select {
+		case <-saveStarted:
+			return true
+		default:
+			return false
+		}
+	}, time.Second, 10*time.Millisecond)
+
+	cache.Set(&closeFlushItem{id: 2})
+
+	done := make(chan error, 1)
+	go func() {
+		done <- cache.Close()
+	}()
+
+	time.Sleep(20 * time.Millisecond)
+	close(releaseSave)
+
+	select {
+	case err := <-done:
+		require.NoError(t, err)
+	case <-time.After(2 * time.Second):
+		t.Fatal("cache.Close hung while flushing with a full persist limit")
+	}
+	require.Equal(t, int32(2), saved.Load())
 }
 
 func TestResidencyCache_RejectingPersistLeavesItemResident(t *testing.T) {
