@@ -125,7 +125,7 @@ assert !rsp.RawPacket.Contains(mockToken), "Normal response should NOT contain m
 				t.Fatal(err)
 			}
 
-			// Test 3: Verify HTTPFlow is saved with [MOCK响应] tag
+			// Test 3: Verify HTTPFlow is saved with HTTPFlowTagMockResponse tag
 			time.Sleep(500 * time.Millisecond) // Wait for flow to be saved
 			queryCtx, queryCancel := context.WithTimeout(ctx, 2*time.Second)
 			defer queryCancel()
@@ -140,7 +140,7 @@ assert !rsp.RawPacket.Contains(mockToken), "Normal response should NOT contain m
 			foundMockTag := false
 			for _, flow := range flows.Data {
 				if strings.Contains(flow.Url, "/mock") {
-					if strings.Contains(flow.Tags, "[MOCK响应]") {
+					if strings.Contains(flow.Tags, yakit.HTTPFlowTagMockResponse) {
 						foundMockTag = true
 						break
 					}
@@ -148,7 +148,7 @@ assert !rsp.RawPacket.Contains(mockToken), "Normal response should NOT contain m
 			}
 
 			if !foundMockTag {
-				t.Fatal("HTTPFlow with mock response should have [MOCK响应] tag")
+				t.Fatal("HTTPFlow with mock response should have " + yakit.HTTPFlowTagMockResponse + " tag")
 			}
 
 			cancel()

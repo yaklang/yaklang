@@ -13,9 +13,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 )
 
-// HTTPFlowTagAutoFixResponse: DB Response is fixed; wire is in KV (GetHTTPFlowBare, same as MITM bare).
-const HTTPFlowTagAutoFixResponse = "[自动修复]"
-
 func httpFlowBareResponseKey(flowID uint) string {
 	return strconv.FormatUint(uint64(flowID), 10) + "_response"
 }

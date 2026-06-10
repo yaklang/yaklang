@@ -929,12 +929,12 @@ User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (
 	}()
 	replacer.Hook(true, false, "", requestBytes)
 	replacer.WaitTasks()
-	assert.Equal(t, "[重发]tag1|YAKIT_COLOR_red", tags)
+	assert.Equal(t, yakit.HTTPFlowTagResend+"tag1|YAKIT_COLOR_red", tags)
 	replacer.GetRawRules()[0].ExtraTag = nil
 	replacer.Hook(true, false, "", requestBytes)
 	tags = ""
 	replacer.WaitTasks()
-	assert.Equal(t, "[重发]|YAKIT_COLOR_red", tags)
+	assert.Equal(t, yakit.HTTPFlowTagResend+"|YAKIT_COLOR_red", tags)
 }
 
 func TestGRPCMUSTPASS_HookColorWithNoColorBefore(t *testing.T) {

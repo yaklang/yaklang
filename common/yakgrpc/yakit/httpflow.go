@@ -120,8 +120,9 @@ func RegisterLowHTTPSaveCallback() {
 }
 
 type TagAndStatusCode struct {
-	Value string
-	Count int
+	Value   string
+	Count   int
+	Builtin bool
 }
 
 type CreateHTTPFlowConfig struct {
@@ -1314,8 +1315,9 @@ func HTTPFlowTags(refreshRequest bool) ([]*TagAndStatusCode, error) {
 	for k, v := range tagCounts {
 		if !strings.HasPrefix(k, schema.COLORPREFIX) {
 			tags = append(tags, &TagAndStatusCode{
-				Value: k,
-				Count: v,
+				Value:   k,
+				Count:   v,
+				Builtin: IsHTTPFlowBuiltinTag(k),
 			})
 		}
 	}
@@ -1338,7 +1340,8 @@ func QueryHTTPFlowTags() ([]*TagAndStatusCode, error) {
 	tags := make([]*TagAndStatusCode, 0)
 	for tag := range tagSet {
 		tags = append(tags, &TagAndStatusCode{
-			Value: tag,
+			Value:   tag,
+			Builtin: IsHTTPFlowBuiltinTag(tag),
 		})
 	}
 	return tags, nil
