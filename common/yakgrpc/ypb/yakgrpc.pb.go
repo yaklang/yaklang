@@ -37782,12 +37782,13 @@ func (x *ExportYakScriptRequest) GetAll() bool {
 }
 
 type ExportYakScriptStreamRequest struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	Filter         *QueryYakScriptRequest `protobuf:"bytes,1,opt,name=Filter,proto3" json:"Filter,omitempty"`
-	OutputFilename string                 `protobuf:"bytes,2,opt,name=OutputFilename,proto3" json:"OutputFilename,omitempty"`
-	Password       string                 `protobuf:"bytes,3,opt,name=Password,proto3" json:"Password,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Filter          *QueryYakScriptRequest `protobuf:"bytes,1,opt,name=Filter,proto3" json:"Filter,omitempty"`
+	OutputFilename  string                 `protobuf:"bytes,2,opt,name=OutputFilename,proto3" json:"OutputFilename,omitempty"`
+	Password        string                 `protobuf:"bytes,3,opt,name=Password,proto3" json:"Password,omitempty"`
+	OutputPluginDir string                 `protobuf:"bytes,4,opt,name=OutputPluginDir,proto3" json:"OutputPluginDir,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *ExportYakScriptStreamRequest) Reset() {
@@ -37837,6 +37838,13 @@ func (x *ExportYakScriptStreamRequest) GetOutputFilename() string {
 func (x *ExportYakScriptStreamRequest) GetPassword() string {
 	if x != nil {
 		return x.Password
+	}
+	return ""
+}
+
+func (x *ExportYakScriptStreamRequest) GetOutputPluginDir() string {
+	if x != nil {
+		return x.OutputPluginDir
 	}
 	return ""
 }
@@ -72925,11 +72933,12 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\tOutputDir\x18\x02 \x01(\tR\tOutputDir\x12(\n" +
 	"\x0fOutputPluginDir\x18\x03 \x01(\tR\x0fOutputPluginDir\x12\"\n" +
 	"\fYakScriptIds\x18\x04 \x03(\x03R\fYakScriptIds\x12\x10\n" +
-	"\x03All\x18\x05 \x01(\bR\x03All\"\x96\x01\n" +
+	"\x03All\x18\x05 \x01(\bR\x03All\"\xc0\x01\n" +
 	"\x1cExportYakScriptStreamRequest\x122\n" +
 	"\x06Filter\x18\x01 \x01(\v2\x1a.ypb.QueryYakScriptRequestR\x06Filter\x12&\n" +
 	"\x0eOutputFilename\x18\x02 \x01(\tR\x0eOutputFilename\x12\x1a\n" +
-	"\bPassword\x18\x03 \x01(\tR\bPassword\"j\n" +
+	"\bPassword\x18\x03 \x01(\tR\bPassword\x12(\n" +
+	"\x0fOutputPluginDir\x18\x04 \x01(\tR\x0fOutputPluginDir\"j\n" +
 	"\x1cImportYakScriptStreamRequest\x12\x12\n" +
 	"\x04Data\x18\x01 \x01(\fR\x04Data\x12\x1a\n" +
 	"\bPassword\x18\x02 \x01(\tR\bPassword\x12\x1a\n" +

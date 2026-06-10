@@ -101,7 +101,10 @@ func (s *Server) ExportYakScriptStream(
 	req *ypb.ExportYakScriptStreamRequest,
 	stream ypb.Yak_ExportYakScriptStreamServer,
 ) error {
-	projectsDir := consts.GetDefaultYakitProjectsDir()
+	outputDir := req.GetOutputPluginDir()
+	if outputDir == "" {
+		outputDir = consts.GetDefaultYakitProjectsDir()
+	}
 	tempFilename := req.GetOutputFilename()
 	if utils.StringContainsAnyOfSubString(tempFilename, []string{
 		"\\", "|", "/",
@@ -201,7 +204,7 @@ func (s *Server) ExportYakScriptStream(
 		}
 	}
 
-	finalFilename := filepath.Join(projectsDir, req.OutputFilename)
+	finalFilename := filepath.Join(outputDir, req.OutputFilename)
 	fp, err := os.Create(finalFilename)
 	if err != nil {
 		return err

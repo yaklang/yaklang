@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path"
 	"testing"
 
 	"github.com/google/uuid"
@@ -87,6 +88,55 @@ func TestServerExportsPlugins(t *testing.T) {
 
 	yakit.DeleteYakScriptByName(consts.GetGormProfileDatabase(), name1)
 	yakit.DeleteYakScriptByName(consts.GetGormProfileDatabase(), name2)
+}
+
+func TestServerExportsPlugins_CustomDir(t *testing.T) {
+	client, _ := NewLocalClient()
+	uid := uuid.New().String()
+
+	_, clearFunc, err := yakit.CreateAndClearTemporaryYakScript("yak", "hello 1; "+uid, uid)
+	require.NoError(t, err)
+	defer clearFunc()
+	tmpdir := t.TempDir()
+	fileName := uuid.New().String()
+	stream, err := client.ExportYakScriptStream(
+		context.Background(),
+		&ypb.ExportYakScriptStreamRequest{
+			Filter: &ypb.QueryYakScriptRequest{
+				Keyword:  uid,
+				IsIgnore: true,
+			},
+			OutputFilename:  fileName,
+			Password:        "",
+			OutputPluginDir: tmpdir,
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	outputFile := ""
+	for {
+		client, err := stream.Recv()
+		if err != nil {
+			break
+		}
+		if client.IsMessage {
+			data := gjson.ParseBytes(client.Message).Get("content").Get("data")
+			pathName := gjson.Parse(data.Str).Get("path").Str
+			if pathName != "" {
+				outputFile = pathName
+			}
+		}
+	}
+	if outputFile == "" {
+		t.Fatal("output file is empty")
+	}
+	if utils.GetFirstExistedFile(outputFile) == "" {
+		t.Fatal("output file not found")
+	}
+	require.Equal(t, path.Join(tmpdir, fileName)+".zip", outputFile)
+	require.FileExists(t, outputFile)
 }
 
 func TestServerExportsPlugins_Enc(t *testing.T) {
