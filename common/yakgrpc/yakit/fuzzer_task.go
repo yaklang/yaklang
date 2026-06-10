@@ -234,6 +234,7 @@ func SaveWebFuzzerResponse(db *gorm.DB, taskId int, hiddenIndex string, rsp *ypb
 	r := &schema.WebFuzzerResponse{
 		WebFuzzerTaskId: taskId,
 		OK:              rsp.Ok,
+		MatchFail:       rsp.MatcherMarkFail,
 		Request:         string(rsp.RequestRaw),
 		Content:         string(raw),
 		Payload:         strings.Join(rsp.Payloads, ","),

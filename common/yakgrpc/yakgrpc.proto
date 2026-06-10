@@ -6654,6 +6654,7 @@ message FuzzerResponse {
   bool MatchedByMatcher = 46;
   string HitColor = 47;
   repeated RedirectHTTPFlow RedirectFlows = 48;
+  bool MatcherMarkFail = 63;
 
   // too large file operators
   bool IsTooLargeResponse = 49;

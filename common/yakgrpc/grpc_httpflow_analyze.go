@@ -610,15 +610,15 @@ func (m *HTTPFlowAnalyzeManger) executeMatchers(flow *schema.HTTPFlow) (discard 
 	}
 	reqRaw := flow.GetRequest()
 
-	matched, hitColors, discard, _ := MatchColor(m.matchers, &httptpl.RespForMatch{RawPacket: []byte(rspRaw), RequestPacket: []byte(reqRaw)}, nil)
+	matchResult := ProcessYakMatch(m.matchers, &httptpl.RespForMatch{RawPacket: []byte(rspRaw), RequestPacket: []byte(reqRaw)}, nil)
 
-	if matched && len(hitColors) > 0 {
-		flow.AddTag(hitColors...)
+	if matchResult.Matched && len(matchResult.HitColor) > 0 {
+		flow.AddTag(matchResult.HitColor...)
 		err := yakit.UpdateHTTPFlowTags(consts.GetGormProjectDatabase(), flow)
 		if err != nil {
 			log.Errorf("update http flow tags failed: %s", err)
 		}
 	}
 
-	return discard
+	return matchResult.Discard
 }
