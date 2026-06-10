@@ -596,7 +596,14 @@ func (m *mockInvokerForMemoryTest) ForceReviewExecutePlan(ctx context.Context, i
 	return input, nil
 }
 
+func (m *mockInvokerForMemoryTest) BeginPlanCoordinatorSession(ctx context.Context, input *aicommon.ExecutePlanInput, forceManualReview bool) (aicommon.PlanCoordinatorSession, error) {
+	return nil, nil
+}
+
 func (m *mockInvokerForMemoryTest) AsyncExecutePlan(ctx context.Context, input *aicommon.ExecutePlanInput, onFinish func(error)) {
+}
+
+func (m *mockInvokerForMemoryTest) AsyncExecuteCod(ctx context.Context, coordinatorID string, onFinish func(error)) {
 }
 
 func (m *mockInvokerForMemoryTest) AddToTimeline(entry, content string) {

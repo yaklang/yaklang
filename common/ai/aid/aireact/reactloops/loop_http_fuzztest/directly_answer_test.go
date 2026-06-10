@@ -122,8 +122,16 @@ func (i *httpFuzztestTestInvoker) ForceReviewExecutePlan(ctx context.Context, in
 	return i.base.ForceReviewExecutePlan(ctx, input)
 }
 
+func (i *httpFuzztestTestInvoker) BeginPlanCoordinatorSession(ctx context.Context, input *aicommon.ExecutePlanInput, forceManualReview bool) (aicommon.PlanCoordinatorSession, error) {
+	return i.base.BeginPlanCoordinatorSession(ctx, input, forceManualReview)
+}
+
 func (i *httpFuzztestTestInvoker) AsyncExecutePlan(ctx context.Context, input *aicommon.ExecutePlanInput, onFinish func(error)) {
 	i.base.AsyncExecutePlan(ctx, input, onFinish)
+}
+
+func (i *httpFuzztestTestInvoker) AsyncExecuteCod(ctx context.Context, coordinatorID string, onFinish func(error)) {
+	i.base.AsyncExecuteCod(ctx, coordinatorID, onFinish)
 }
 
 func (i *httpFuzztestTestInvoker) InvokeLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption) (*aicommon.Action, error) {

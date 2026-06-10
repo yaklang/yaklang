@@ -447,7 +447,14 @@ func (r *testRuntime) ForceReviewExecutePlan(ctx context.Context, input *aicommo
 	return input, nil
 }
 
+func (r *testRuntime) BeginPlanCoordinatorSession(ctx context.Context, input *aicommon.ExecutePlanInput, forceManualReview bool) (aicommon.PlanCoordinatorSession, error) {
+	return nil, nil
+}
+
 func (r *testRuntime) AsyncExecutePlan(ctx context.Context, input *aicommon.ExecutePlanInput, onFinish func(error)) {
+}
+
+func (r *testRuntime) AsyncExecuteCod(ctx context.Context, coordinatorID string, onFinish func(error)) {
 }
 
 func (r *testRuntime) InvokeLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption) (*aicommon.Action, error) {

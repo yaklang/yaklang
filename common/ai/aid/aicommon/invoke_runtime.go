@@ -261,6 +261,14 @@ type ExecutePlanInput struct {
 	PlanDocument string
 }
 
+// PlanCoordinatorSession keeps a plan-exec coordinator alive across review and async execution.
+type PlanCoordinatorSession interface {
+	CoordinatorID() string
+	ReviewPlan(ctx context.Context) error
+	ApprovedPlanInput() *ExecutePlanInput
+	Close()
+}
+
 type AIInvokeRuntime interface {
 	GetBasicPromptInfo(tools []*aitool.Tool) (string, map[string]any, error)
 	AssembleLoopPrompt(tools []*aitool.Tool, input *LoopPromptAssemblyInput) (*LoopPromptAssemblyResult, error)
@@ -288,7 +296,9 @@ type AIInvokeRuntime interface {
 	AsyncPlanAndExecute(ctx context.Context, planPayload string, onFinish func(error))
 	ReviewExecutePlan(ctx context.Context, input *ExecutePlanInput) (*ExecutePlanInput, error)
 	ForceReviewExecutePlan(ctx context.Context, input *ExecutePlanInput) (*ExecutePlanInput, error)
+	BeginPlanCoordinatorSession(ctx context.Context, input *ExecutePlanInput, forceManualReview bool) (PlanCoordinatorSession, error)
 	AsyncExecutePlan(ctx context.Context, input *ExecutePlanInput, onFinish func(error))
+	AsyncExecuteCod(ctx context.Context, coordinatorID string, onFinish func(error))
 	InvokeLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...GeneralKVConfigOption) (*Action, error)
 	InvokeSpeedPriorityLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...GeneralKVConfigOption) (*Action, error)
 	InvokeQualityPriorityLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...GeneralKVConfigOption) (*Action, error)

@@ -460,8 +460,24 @@ func (m *MockInvoker) ForceReviewExecutePlan(ctx context.Context, input *aicommo
 	return input, nil
 }
 
+func (m *MockInvoker) BeginPlanCoordinatorSession(ctx context.Context, input *aicommon.ExecutePlanInput, forceManualReview bool) (aicommon.PlanCoordinatorSession, error) {
+	return &mockPlanCoordinatorSession{input: input}, nil
+}
+
 func (m *MockInvoker) AsyncExecutePlan(ctx context.Context, input *aicommon.ExecutePlanInput, onFinish func(error)) {
 }
+
+func (m *MockInvoker) AsyncExecuteCod(ctx context.Context, coordinatorID string, onFinish func(error)) {
+}
+
+type mockPlanCoordinatorSession struct {
+	input *aicommon.ExecutePlanInput
+}
+
+func (m *mockPlanCoordinatorSession) CoordinatorID() string { return "mock-coordinator-id" }
+func (m *mockPlanCoordinatorSession) ReviewPlan(ctx context.Context) error { return nil }
+func (m *mockPlanCoordinatorSession) ApprovedPlanInput() *aicommon.ExecutePlanInput { return m.input }
+func (m *mockPlanCoordinatorSession) Close() {}
 
 func (m *MockInvoker) AddToTimeline(entry, content string) {
 }
