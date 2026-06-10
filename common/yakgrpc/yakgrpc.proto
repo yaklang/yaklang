@@ -5359,6 +5359,7 @@ message ExportYakScriptStreamRequest {
   QueryYakScriptRequest Filter = 1;
   string OutputFilename = 2;
   string Password = 3;
+  string OutputPluginDir = 4;
 }
 
 message ImportYakScriptStreamRequest {
