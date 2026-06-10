@@ -15,6 +15,23 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
+// legacyMCPToolSetOptions builds enable/disable options for legacy MCP tool sets.
+// When toolSets is empty, all registered tool sets are enabled (historical CLI default).
+func legacyMCPToolSetOptions(toolSets, disableToolSets []string) ([]McpServerOption, error) {
+	opts := make([]McpServerOption, 0, len(toolSets)+len(disableToolSets)+1)
+	if len(toolSets) == 0 {
+		opts = append(opts, WithEnableAllToolSets())
+	} else {
+		for _, toolSet := range toolSets {
+			opts = append(opts, WithEnableToolSet(toolSet))
+		}
+	}
+	for _, toolSet := range disableToolSets {
+		opts = append(opts, WithDisableToolSet(toolSet))
+	}
+	return opts, nil
+}
+
 var MCPCommandUsage = `Start a mcp server for providing mcp service.
 
 Available ToolSets: codec, cve, httpflow, hybrid_scan, payload, port_scan, yak_document, yak_script, reverse_shell, http_fuzzer, brute, subdomain, crawler, dynamic, ssa, project_database, global_hotpatch, system_proxy
@@ -67,13 +84,12 @@ var MCPCommand = &cli.Command{
 			return item, item != ""
 		})
 
-		opts := make([]McpServerOption, 0, len(toolSets)+len(disableToolSets)+len(resourceSets)+len(disableResourceSets))
-		for _, toolSet := range toolSets {
-			opts = append(opts, WithEnableToolSet(toolSet))
+		opts := make([]McpServerOption, 0, len(toolSets)+len(disableToolSets)+len(resourceSets)+len(disableResourceSets)+1)
+		legacyOpts, legacyErr := legacyMCPToolSetOptions(toolSets, disableToolSets)
+		if legacyErr != nil {
+			return legacyErr
 		}
-		for _, toolSet := range disableToolSets {
-			opts = append(opts, WithDisableToolSet(toolSet))
-		}
+		opts = append(opts, legacyOpts...)
 		for _, resourceSet := range resourceSets {
 			opts = append(opts, WithEnableResourceSet(resourceSet))
 		}
