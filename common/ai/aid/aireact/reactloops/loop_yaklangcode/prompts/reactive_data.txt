@@ -438,7 +438,7 @@ When you receive a request, first understand the user's goal. Then, structure yo
 * 如果要对已有代码进行修改，请使用 'modify_code' 工具，精确到行；
 * 如果代码内容过大，系统会将代码保存到临时文件中，你可以使用 'read_file' 或者 'grep' 等工具来查看；
 * 代码运行结束的时候，可以使用系统命令 'yak your-script.yak' 来运行脚本，并查看输出结果，是否符合预期；
-* 如果代码报错，或者执行结果不符合日期，你可以使用 'modify_code' 工具来修正代码，或者使用 'query_document' 来查询文档，修正代码错误；
+* 如果代码报错，或者执行结果不符合预期，你可以使用 'modify_code' 工具来修正代码，API 错误用 'yakdoc_*' 查文档，语法/样例用 'grep_yaklang_samples'；
 
 {{ end }}
 
@@ -448,8 +448,8 @@ When you receive a request, first understand the user's goal. Then, structure yo
 * 代码内容过大，会保存到临时文件中，你可以使用 'read_file' 或者 'grep' 等工具来查看
 * 下面的代码块儿为了方便展示，将会展示行列号，你需要正确读取并区分
 * 如果你要修改代码，请你使用 'modify_code' 工具来进行，精确修改到具体行
-* 如果是库使用问题，需要可以使用 'query_document' 来搜索修正
-* 如果出现了语法错误，你可以使用 'query_document' 来搜索相似的代码片段来参考
+* 如果是库/API 使用问题，必须使用 'yakdoc_library_details' / 'yakdoc_function_details' 查询标准库文档
+* 如果出现了语法错误，使用 'grep_yaklang_samples' 搜索相似代码片段来参考
 * 调试时，你可以使用 `desc(instance)` 来查看变量的类型和属性
 * 你可以在必要的地方使用 `log.Info("Hello %v", name)` 来打印日志到标准输出以辅助调试
 
@@ -473,7 +473,8 @@ When you receive a request, first understand the user's goal. Then, structure yo
 
 ### [重要] 错误处理强制规则 - 必须立即 grep
 
-**如果上述错误包含以下任何一种，你必须立即使用 grep_yaklang_samples 或 query_document：**
+**如果上述错误包含 ExternLib API 错误，你必须立即使用 yakdoc_library_details / yakdoc_function_details。**
+**如果是 SyntaxError 或语法/D DSL 问题，你必须立即使用 grep_yaklang_samples：**
 
 #### 错误类型1：API 不存在
 ```
@@ -481,16 +482,21 @@ ExternLib [xxx] don't has [yyy]
 ```
 **含义**：你猜错了 API 名称，该库没有这个函数/选项
 
-**强制行动**：立即使用 `grep_yaklang_samples`
+**强制行动**：立即使用 `yakdoc_library_details` + `yakdoc_function_details`
 ```json
-{"@action": "grep_yaklang_samples",
- "pattern": "xxx\\.",
- "context_lines": 20,
- "human_readable_thought": "API 错误，需要搜索 xxx 库的真实可用函数"}
+{"@action": "yakdoc_library_details",
+ "library": ["xxx"],
+ "human_readable_thought": "API 错误，列出 xxx 库真实可用函数"}
+```
+```json
+{"@action": "yakdoc_function_details",
+ "library": "xxx",
+ "function": ["yyy"],
+ "human_readable_thought": "查询正确函数签名"}
 ```
 
 **禁止**：[X] 继续猜测其他 API 名称（如 timeout → setTimeout → withTimeout → ...）
-**正确**：[O] 立即 grep 搜索该库的真实 API
+**正确**：[O] 先 yakdoc 查文档，必要时再 grep 看样例
 
 #### 错误类型2：语法错误
 ```
@@ -639,7 +645,7 @@ undefined: xxx
 ### 下一步行动
 
 * [首选] 使用 `grep_yaklang_samples` 搜索代码样例（快速、直接）
-* [备选] 使用 `query_document` 搜索相关文档（更全面但较慢）
+* [备选] 使用 `yakdoc_function_details` 查询标准库 API 文档
 * [最后] 使用 `modify_code` 基于搜索结果修改代码
 * [禁止] 在没有 grep 的情况下猜测性修改代码
 

@@ -153,10 +153,10 @@ func init() {
 					}
 					return utils.RenderTemplate(reactiveData, renderMap)
 				}),
-				// queryDocumentAction(r, docSearcher), // DEPRECATED: 已被 grepYaklangSamplesAction 替代
 				grepYaklangSamplesAction(r, docSearcher),                // 快速 grep 代码样例（精确文本搜索）
 				semanticSearchYaklangSamplesAction(r, docSearcherByRag), // 语义搜索 Yaklang 代码样例（基于向量相似度）
 			}
+			preset = append(preset, yakdocActions(r)...)
 			// 添加工厂生成的 actions (write_code, modify_code, insert_code, delete_code)
 			preset = append(preset, modSuite.GetActions()...)
 			preset = append(preset, opts...)
@@ -165,7 +165,7 @@ func init() {
 		// Register metadata for better AI understanding
 		reactloops.WithLoopDescription("Enter focused mode for Yaklang code generation and modification with access to code samples and syntax checking"),
 		reactloops.WithLoopDescriptionZh("Yaklang 代码生成模式：用于编写或修改 Yaklang 代码，支持样例检索与语法检查。"),
-		reactloops.WithLoopUsagePrompt("Use when user requests to write, modify, or debug Yaklang code. Provides specialized tools: grep_yaklang_samples, write_code, modify_code, insert_code, delete_code with real-time syntax validation"),
+		reactloops.WithLoopUsagePrompt("Use when user requests to write, modify, or debug Yaklang code. Provides specialized tools: grep_yaklang_samples, semantic_search_yaklang_samples, yakdoc_get_all_library_names, yakdoc_library_details, yakdoc_function_details, yakdoc_variable_details, write_code, modify_code, insert_code, delete_code with real-time syntax validation"),
 		reactloops.WithLoopOutputExample(`
 * When user requests to write Yaklang code:
   {"@action": "write_yaklang_code", "human_readable_thought": "I need to write Yaklang code with proper syntax and access to code examples"}

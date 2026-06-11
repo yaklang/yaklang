@@ -163,6 +163,11 @@ var yaklangErrorPatterns = []ErrorPattern{
 		},
 	},
 	{
+		Name:       "ExternLibMissingMember",
+		ErrorGlobs: []string{"*ExternLib*don't has*", "*don't has*"},
+		Hint:       "该库不存在此 API。请立即使用 yakdoc_library_details 列出可用函数，再用 yakdoc_function_details 查询正确签名。禁止继续猜测 API 名称。",
+	},
+	{
 		Name:       "IncompleteStructure",
 		ErrorGlobs: []string{"*mismatched input*", "*expecting <EOF>*"},
 		Hint:       "语法结构不完整，可能缺少匹配的括号、花括号或分号。请检查代码块的完整性。",
