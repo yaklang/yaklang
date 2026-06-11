@@ -8,6 +8,7 @@ import (
 	"github.com/segmentio/ksuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func newYakScriptTestDB(t *testing.T) *gorm.DB {
@@ -249,4 +250,38 @@ func TestCreateOrUpdateYakScript_MapUpdateOnlyTouchesSpecifiedFields(t *testing.
 	require.Equal(t, "print('before')", got.Content)
 	require.Equal(t, "keep me", got.Help)
 	require.True(t, got.Ignored)
+}
+
+func TestQueryYakScript_FilterEnableForAI(t *testing.T) {
+	db := newYakScriptTestDB(t)
+
+	enabledName := newYakScriptTestName("enable-for-ai")
+	disabledName := newYakScriptTestName("disable-for-ai")
+	require.NoError(t, CreateOrUpdateYakScriptByName(db, enabledName, &schema.YakScript{
+		ScriptName:  enabledName,
+		Type:        "yak",
+		Content:     "print('ai')",
+		EnableForAI: true,
+	}))
+	require.NoError(t, CreateOrUpdateYakScriptByName(db, disabledName, &schema.YakScript{
+		ScriptName:  disabledName,
+		Type:        "yak",
+		Content:     "print('no-ai')",
+		EnableForAI: false,
+	}))
+
+	_, allScripts, err := QueryYakScript(db, &ypb.QueryYakScriptRequest{
+		Pagination: &ypb.Paging{Page: 1, Limit: 100},
+	})
+	require.NoError(t, err)
+	require.Len(t, allScripts, 2)
+
+	_, aiScripts, err := QueryYakScript(db, &ypb.QueryYakScriptRequest{
+		Pagination:  &ypb.Paging{Page: 1, Limit: 100},
+		EnableForAI: true,
+	})
+	require.NoError(t, err)
+	require.Len(t, aiScripts, 1)
+	require.Equal(t, enabledName, aiScripts[0].ScriptName)
+	require.True(t, aiScripts[0].EnableForAI)
 }
