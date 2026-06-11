@@ -245,6 +245,19 @@ func LoadSSAProjectByNameAndURL(projectName, url string) (*SSAProject, error) {
 	return loadSSAProjectBySchema(&project)
 }
 
+func LoadSSAProjectByURL(url string) (*SSAProject, error) {
+	if url == "" {
+		return nil, utils.Errorf("load SSA project failed: url is required")
+	}
+	db := consts.GetGormProfileDatabase()
+	var project schema.SSAProject
+	err := db.Where("url = ?", url).First(&project).Error
+	if err != nil {
+		return nil, utils.Errorf("load SSA project failed: %s", err)
+	}
+	return loadSSAProjectBySchema(&project)
+}
+
 func (s *SSAProject) GetConfig() (*ssaconfig.Config, error) {
 	if s == nil {
 		return nil, utils.Errorf("get SSA project config failed: ssa project builder is nil")

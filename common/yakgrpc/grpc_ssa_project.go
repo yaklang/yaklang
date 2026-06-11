@@ -5,6 +5,7 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaproject"
@@ -117,6 +118,34 @@ func SSAProjectToGRPCModel(p *schema.SSAProject) *ypb.SSAProject {
 	return project
 }
 
+func resolveMigrationProjectName(programName string, config *ssaconfig.Config) string {
+	if config != nil {
+		if name := strings.TrimSpace(config.GetProjectName()); name != "" {
+			return name
+		}
+	}
+	return ssaproject.BaseProjectNameFromProgramName(programName)
+}
+
+func findExistingSSAProjectForMigration(projectName, baseProjectName, codeSourceURL string) (*ssaproject.SSAProject, error) {
+	if codeSourceURL != "" {
+		if project, err := ssaproject.LoadSSAProjectByURL(codeSourceURL); err == nil && project != nil {
+			return project, nil
+		}
+		if baseProjectName != "" {
+			if project, err := ssaproject.LoadSSAProjectByNameAndURL(baseProjectName, codeSourceURL); err == nil && project != nil {
+				return project, nil
+			}
+		}
+		if projectName != baseProjectName {
+			if project, err := ssaproject.LoadSSAProjectByNameAndURL(projectName, codeSourceURL); err == nil && project != nil {
+				return project, nil
+			}
+		}
+	}
+	return nil, utils.Errorf("existing SSA project not found")
+}
+
 func (s *Server) MigrateSSAProject(req *ypb.MigrateSSAProjectRequest, stream ypb.Yak_MigrateSSAProjectServer) error {
 	ssaDB := consts.GetGormSSAProjectDataBase()
 
@@ -149,30 +178,31 @@ func (s *Server) MigrateSSAProject(req *ypb.MigrateSSAProjectRequest, stream ypb
 		info := prog.ConfigInput
 		var codeSourceURL string
 		var codeSource *ssaconfig.CodeSourceInfo
+		var compileConfig *ssaconfig.Config
 		if info != "" {
 			config, err := ssaconfig.New(ssaconfig.ModeAll, ssaconfig.WithJsonRawConfig([]byte(info)))
 			if err != nil {
 				return utils.Errorf("new config failed: %s", err)
 			}
+			compileConfig = config
 			codeSourceURL = config.GetCodeSourceLocalFileOrURL()
 			codeSource = config.GetCodeSource()
 		}
-		// 查询是否存在相同的项目（只有在有 URL 时才查询）
-		var project *ssaproject.SSAProject
-		var existingProject *ssaproject.SSAProject
+		baseProjectName := resolveMigrationProjectName(programName, compileConfig)
 
-		existingProject, _ = ssaproject.LoadSSAProjectByNameAndURL(programName, codeSourceURL)
+		var project *ssaproject.SSAProject
+		var err error
+
+		existingProject, _ := findExistingSSAProjectForMigration(programName, baseProjectName, codeSourceURL)
 		if existingProject != nil {
-			// 如果项目已存在，直接复用
 			project = existingProject
 			sendProgress(
 				float64(i+1)/float64(totalCount),
 				fmt.Sprintf("[%d/%d] 程序 '%s' 的 SSA 项目已存在（ID：%d），直接复用...", i+1, totalCount, programName, project.ID),
 			)
 		} else {
-			// 创建新项目
 			project, err = ssaproject.NewSSAProject(
-				ssaconfig.WithProjectName(programName),
+				ssaconfig.WithProjectName(baseProjectName),
 				ssaconfig.WithProjectLanguage(language),
 				ssaconfig.WithProgramDescription(description),
 				ssaconfig.WithCodeSourceInfo(codeSource),
