@@ -297,6 +297,7 @@ type AIInvokeRuntime interface {
 	ReviewExecutePlan(ctx context.Context, input *ExecutePlanInput) (*ExecutePlanInput, error)
 	ForceReviewExecutePlan(ctx context.Context, input *ExecutePlanInput) (*ExecutePlanInput, error)
 	BeginPlanCoordinatorSession(ctx context.Context, input *ExecutePlanInput, forceManualReview bool) (PlanCoordinatorSession, error)
+	PublishDetachedPlan(ctx context.Context, input *ExecutePlanInput, reactTaskID string) (coordinatorID string, err error)
 	AsyncExecutePlan(ctx context.Context, input *ExecutePlanInput, onFinish func(error))
 	AsyncExecuteCod(ctx context.Context, coordinatorID string, onFinish func(error))
 	InvokeLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...GeneralKVConfigOption) (*Action, error)

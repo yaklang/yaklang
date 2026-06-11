@@ -13,5 +13,5 @@ func TestRequestPlanAction_IsRegistered(t *testing.T) {
 	require.True(t, ok)
 	require.NotNil(t, action)
 	require.Equal(t, schema.AI_REACT_LOOP_ACTION_REQUEST_PLAN, action.ActionType)
-	require.True(t, action.AsyncMode)
+	require.False(t, action.AsyncMode)
 }

@@ -82,8 +82,9 @@ func (m *midtermQueryTestTask) GetAttachedDatas() []*aicommon.AttachedResource {
 func (m *midtermQueryTestTask) GetStatus() aicommon.AITaskState {
 	return aicommon.AITaskState_Processing
 }
-func (m *midtermQueryTestTask) SetStatus(aicommon.AITaskState)     {}
-func (m *midtermQueryTestTask) AppendErrorToResult(error)          {}
+func (m *midtermQueryTestTask) SetStatus(aicommon.AITaskState)      {}
+func (m *midtermQueryTestTask) ForceSetStatus(aicommon.AITaskState) {}
+func (m *midtermQueryTestTask) AppendErrorToResult(error)           {}
 func (m *midtermQueryTestTask) GetCreatedAt() time.Time            { return time.Now() }
 func (m *midtermQueryTestTask) Finish(error)                       {}
 func (m *midtermQueryTestTask) SetAsyncMode(bool)                  {}

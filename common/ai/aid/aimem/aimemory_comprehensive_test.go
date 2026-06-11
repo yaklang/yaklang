@@ -228,6 +228,10 @@ func (m *AdvancedMockInvoker) BeginPlanCoordinatorSession(ctx context.Context, i
 	return nil, nil
 }
 
+func (m *AdvancedMockInvoker) PublishDetachedPlan(ctx context.Context, input *aicommon.ExecutePlanInput, reactTaskID string) (string, error) {
+	return "", nil
+}
+
 func (m *AdvancedMockInvoker) AsyncExecutePlan(ctx context.Context, input *aicommon.ExecutePlanInput, onFinish func(error)) {
 }
 

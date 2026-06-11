@@ -78,6 +78,7 @@ type AIStatefulTask interface {
 	GetAttachedDatas() []*AttachedResource
 	GetStatus() AITaskState
 	SetStatus(state AITaskState)
+	ForceSetStatus(state AITaskState)
 	AppendErrorToResult(i error)
 	GetCreatedAt() time.Time
 	Finish(i error)

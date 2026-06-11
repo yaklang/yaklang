@@ -600,6 +600,10 @@ func (m *mockInvokerForMemoryTest) BeginPlanCoordinatorSession(ctx context.Conte
 	return nil, nil
 }
 
+func (m *mockInvokerForMemoryTest) PublishDetachedPlan(ctx context.Context, input *aicommon.ExecutePlanInput, reactTaskID string) (string, error) {
+	return "", nil
+}
+
 func (m *mockInvokerForMemoryTest) AsyncExecutePlan(ctx context.Context, input *aicommon.ExecutePlanInput, onFinish func(error)) {
 }
 

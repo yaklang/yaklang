@@ -34,6 +34,8 @@ func (r *ReAct) handleSyncMessage(event *ypb.AIInputEvent) error {
 		return r.HandleSyncTypeReactClearTaskEvent(event)
 	case SYNC_TYPE_RECOVERY_PLAN_AND_EXEC:
 		return r.HandleSyncTypeRecoveryPlanAndExecEvent(event)
+	case SYNC_TYPE_EXECUTE_DETACHED_PLAN:
+		return r.HandleSyncTypeExecuteDetachedPlanEvent(event)
 	case aicommon.SYNC_TYPE_CAPABILITY_INVENTORY:
 		return r.HandleSyncTypeCapabilityInventoryEvent(event)
 	case aicommon.SYNC_TYPE_PERCEPTION:
@@ -54,6 +56,7 @@ func (r *ReAct) RegisterReActSyncEvent() {
 	r.config.InputEventManager.RegisterSyncCallback(SYNC_TYPE_REACT_CLEAR_TASK, r.HandleSyncTypeReactClearTaskEvent)
 	r.config.InputEventManager.RegisterSyncCallback(SYNC_TYPE_REACT_CANCEL_TASK, r.HandleSyncTypeCancelTaskEvent)
 	r.config.InputEventManager.RegisterSyncCallback(SYNC_TYPE_RECOVERY_PLAN_AND_EXEC, r.HandleSyncTypeRecoveryPlanAndExecEvent)
+	r.config.InputEventManager.RegisterSyncCallback(SYNC_TYPE_EXECUTE_DETACHED_PLAN, r.HandleSyncTypeExecuteDetachedPlanEvent)
 	r.config.InputEventManager.RegisterSyncCallback(aicommon.SYNC_TYPE_CAPABILITY_INVENTORY, r.HandleSyncTypeCapabilityInventoryEvent)
 	r.config.InputEventManager.RegisterSyncCallback(aicommon.SYNC_TYPE_PERCEPTION, r.HandleSyncTypePerceptionEvent)
 	r.config.InputEventManager.RegisterSyncCallback(aicommon.SYNC_TYPE_SESSION_SNAPSHOT, r.HandleSyncTypeSessionSnapshotEvent)
@@ -68,6 +71,7 @@ func (r *ReAct) UnRegisterReActSyncEvent() {
 	r.config.InputEventManager.UnregisterMirrorOfAIInputEvent(SYNC_TYPE_REACT_CLEAR_TASK)
 	r.config.InputEventManager.UnRegisterSyncCallback(SYNC_TYPE_REACT_CANCEL_TASK)
 	r.config.InputEventManager.UnRegisterSyncCallback(SYNC_TYPE_RECOVERY_PLAN_AND_EXEC)
+	r.config.InputEventManager.UnRegisterSyncCallback(SYNC_TYPE_EXECUTE_DETACHED_PLAN)
 	r.config.InputEventManager.UnRegisterSyncCallback(aicommon.SYNC_TYPE_CAPABILITY_INVENTORY)
 	r.config.InputEventManager.UnRegisterSyncCallback(aicommon.SYNC_TYPE_PERCEPTION)
 	r.config.InputEventManager.UnRegisterSyncCallback(aicommon.SYNC_TYPE_SESSION_SNAPSHOT)

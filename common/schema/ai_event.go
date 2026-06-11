@@ -154,6 +154,7 @@ const (
 	EVENT_TYPE_PERMISSION_REQUIRE          EventType = "permission_require"
 	EVENT_TYPE_TASK_REVIEW_REQUIRE         EventType = "task_review_require"
 	EVENT_TYPE_PLAN_REVIEW_REQUIRE         EventType = "plan_review_require"
+	EVENT_TYPE_DETACHED_PLAN_REQUIRE       EventType = "detached_plan_require"
 	EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE     EventType = "tool_use_review_require"
 	EVENT_TYPE_EXEC_AIFORGE_REVIEW_REQUIRE EventType = "exec_aiforge_review_require"
 
