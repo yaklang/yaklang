@@ -58,6 +58,7 @@ func callAITransaction(
 	}
 	var postHandlerErr error
 	var lastErr error
+	var lastCallAiErr error // 保留 API 调用错误，防止被 postHandler 错误覆盖
 	var lastRsp *AIResponse
 	var lastReq *AIRequest
 
@@ -100,6 +101,7 @@ func callAITransaction(
 		rsp, err := callAi(aiReq)
 		if err != nil {
 			lastErr = err
+			lastCallAiErr = err
 			lastRsp = rsp
 			rspEmitter := bindEmitter(rsp)
 
@@ -185,8 +187,12 @@ func callAITransaction(
 	}
 	EmitAICallFailureIfApplicable(c, tier, lastRsp, lastErr, failureExtra)
 
+	// 优先返回 API 调用错误（如 401、网络错误），而不是被 postHandler 错误覆盖
+	if lastCallAiErr != nil {
+		return utils.Wrap(lastCallAiErr, fmt.Sprintf("max retry count[%v] reached in transaction", trcRetry))
+	}
 	if lastErr != nil {
-		return utils.Errorf("max retry count[%v] reached in transaction, last error: %v", trcRetry, lastErr)
+		return utils.Wrap(lastErr, fmt.Sprintf("max retry count[%v] reached in transaction", trcRetry))
 	}
 	return utils.Errorf("max retry count[%v] reached in transaction", trcRetry)
 }
