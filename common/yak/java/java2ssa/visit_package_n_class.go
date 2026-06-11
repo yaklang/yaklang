@@ -108,8 +108,7 @@ func (y *singleFileBuilder) VisitClassDeclaration(raw javaparser.IClassDeclarati
 	if i.EXTENDS() != nil {
 		if extend := i.TypeType(); extend != nil {
 			extendName = extend.GetText()
-			extend = ssa.DetachAST(extend)
-			tokenMap[extendName] = extend
+			tokenMap[extendName] = ssa.NewTextRangeToken(extend)
 		}
 		parents = append(parents, extendName)
 	}
@@ -117,7 +116,7 @@ func (y *singleFileBuilder) VisitClassDeclaration(raw javaparser.IClassDeclarati
 	if i.IMPLEMENTS() != nil {
 		for _, val := range i.AllTypeList() {
 			implNames = append(implNames, val.GetText())
-			tokenMap[val.GetText()] = ssa.DetachAST(val)
+			tokenMap[val.GetText()] = ssa.NewTextRangeToken(val)
 		}
 	}
 

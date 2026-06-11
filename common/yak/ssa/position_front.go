@@ -231,3 +231,44 @@ func (t *Token) GetText() string {
 }
 
 var _ CanStartStopToken = (*Token)(nil)
+
+type TextRangeToken struct {
+	start antlr.Token
+	end   antlr.Token
+	text  string
+}
+
+func NewTextRangeToken(token CanStartStopToken) *TextRangeToken {
+	if utils.IsNil(token) {
+		return nil
+	}
+	text := token.GetText()
+	return &TextRangeToken{
+		start: antlr4util.SlimToken(token.GetStart()),
+		end:   antlr4util.SlimToken(token.GetStop()),
+		text:  text,
+	}
+}
+
+func (t *TextRangeToken) GetStart() antlr.Token {
+	if t == nil {
+		return nil
+	}
+	return t.start
+}
+
+func (t *TextRangeToken) GetStop() antlr.Token {
+	if t == nil {
+		return nil
+	}
+	return t.end
+}
+
+func (t *TextRangeToken) GetText() string {
+	if t == nil {
+		return ""
+	}
+	return t.text
+}
+
+var _ CanStartStopToken = (*TextRangeToken)(nil)

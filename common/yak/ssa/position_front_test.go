@@ -87,3 +87,30 @@ func TestGetRangeAfterSlimParserTree(t *testing.T) {
 	require.Equal(t, before.GetEnd().String(), after.GetEnd().String())
 	require.Equal(t, before.GetText(), after.GetText())
 }
+
+func TestNewTextRangeTokenKeepsRangeWithoutParserTree(t *testing.T) {
+	source := "class A extends Base { }"
+	lexer := javaparser.NewJavaLexer(antlr.NewInputStream(source))
+	tokenStream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
+	parser := javaparser.NewJavaParser(tokenStream)
+	cu := parser.CompilationUnit().(*javaparser.CompilationUnitContext)
+	classDecl := cu.TypeDeclaration(0).(*javaparser.TypeDeclarationContext).ClassDeclaration().(*javaparser.ClassDeclarationContext)
+	baseType := classDecl.TypeType().(*javaparser.TypeTypeContext)
+	editor := memedit.NewMemEditor(source)
+
+	token := NewTextRangeToken(baseType)
+	require.NotNil(t, token)
+	require.Equal(t, "Base", token.GetText())
+	_, isTree := any(token).(antlr.Tree)
+	require.False(t, isTree, "lightweight range token must not retain the parser tree")
+	require.Nil(t, token.GetStart().GetInputStream())
+	require.Nil(t, token.GetStart().GetTokenSource())
+	require.Nil(t, token.GetStop().GetInputStream())
+	require.Nil(t, token.GetStop().GetTokenSource())
+
+	ReleaseASTRoot(cu)
+
+	rng := GetRange(editor, token)
+	require.NotNil(t, rng)
+	require.Equal(t, "Base", rng.GetText())
+}
