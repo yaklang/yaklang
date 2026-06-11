@@ -473,6 +473,16 @@ var legacyToolIntegrationCases = map[string][]legacyToolCase{
 	},
 	"query_hotpatch_template_list": {
 		{
+			name: "list_without_filter",
+			args: map[string]any{},
+			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+				var payload map[string]any
+				decodeToolResultJSON(t, text, &payload)
+				_, ok := payload["Name"]
+				require.True(t, ok, "expected Name field in response")
+			},
+		},
+		{
 			name: "list_global_templates",
 			args: map[string]any{"type": "global"},
 			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
@@ -911,8 +921,8 @@ func TestLegacyBuiltinToolSetsRegistered(t *testing.T) {
 	expectedSets := []string{
 		"codec", "cve", "httpflow", "hybrid_scan", "payload", "port_scan",
 		"yak_document", "yak_script", "reverse_shell", "http_fuzzer", "brute",
-		"subdomain", "crawler", "dynamic", "ssa", "project_database", "system_proxy",
-		"global_hotpatch",
+		"subdomain", "crawler", "dynamic", "ssa", "project_database", "global_hotpatch",
+		"system_proxy",
 	}
 	registered := mcp.GlobalToolSetList()
 	for _, setName := range expectedSets {
