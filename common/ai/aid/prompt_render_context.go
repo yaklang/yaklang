@@ -33,6 +33,13 @@ func getTaskRoot(task *AiTask) *AiTask {
 	return root
 }
 
+func (m *PromptContextProvider) RenderContextForTask(task *AiTask) *PromptContextProvider {
+	return clonePromptContextForTask(m, task)
+}
+
+func (m *PromptContextProvider) RenderCurrentTaskInfo(task *AiTask) string {
+	return clonePromptContextForTask(m, task).CurrentTaskInfo()
+}
 
 func (t *AiTask) taskPromptContext() *PromptContextProvider {
 	if t == nil {
@@ -44,7 +51,7 @@ func (t *AiTask) taskPromptContext() *PromptContextProvider {
 	if t.Coordinator != nil && t.Coordinator.ContextProvider != nil {
 		return t.Coordinator.ContextProvider.RenderContextForTask(t)
 	}
-	return NewPromptRenderContext(clonePromptContextForTask(nil, t), t)
+	return clonePromptContextForTask(nil, t)
 }
 
 func (t *AiTask) quickBuildTaskPrompt(tmp string, data map[string]any) (string, error) {
