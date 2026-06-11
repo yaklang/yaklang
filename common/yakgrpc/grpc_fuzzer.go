@@ -800,6 +800,12 @@ func (r *httpFuzzerRun) handleReMatch(oldIDs []uint, historyID int32) error {
 	if err != nil {
 		return utils.Errorf("save to web fuzzer to database failed: %s", err)
 	}
+	defer func() {
+		if db := r.server.GetProjectDatabase().Save(task); db.Error != nil {
+			log.Errorf("update web fuzzer task failed: %s", db.Error)
+		}
+	}()
+	task.RetryRootID = task.ID
 	if len(oldIDs) == 0 { // 尝试修复
 		oldIDs = []uint{uint(historyID)}
 	}
@@ -981,6 +987,10 @@ func (r *httpFuzzerRun) handleExecutionMode() error {
 		retryRootID, err = yakit.GetWebFuzzerRetryRootID(s.GetProjectDatabase(), uint(req.RetryTaskID))
 		if err != nil {
 			return err
+		}
+		if retryRootID == 0 {
+			log.Warnf("retry root id is zero, auto fix to retry task id: %d", req.RetryTaskID)
+			retryRootID = uint(req.RetryTaskID)
 		}
 		task.RetryRootID = retryRootID
 	}
