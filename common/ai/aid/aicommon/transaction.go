@@ -130,6 +130,14 @@ func callAITransaction(
 		}
 		lastRsp = rsp
 		postHandlerErr = postHandler(rsp)
+		// 检查 rsp 的 error（由 AIChatToAICallbackType 等设置），合并错误
+		if rspErr := rsp.GetError(); rspErr != nil {
+			if postHandlerErr != nil {
+				postHandlerErr = utils.Errorf("post handler: %v; ai callback: %v", postHandlerErr, rspErr)
+			} else {
+				postHandlerErr = rspErr
+			}
+		}
 		if postHandlerErr != nil {
 			lastErr = postHandlerErr
 			i++

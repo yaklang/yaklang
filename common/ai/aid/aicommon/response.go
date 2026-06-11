@@ -67,6 +67,25 @@ type AIResponse struct {
 
 	onReasonChunk   func([]byte)
 	onReasonChunkMu sync.Mutex
+
+	setErrorFunc func(error)   // 设置错误的函数，支持 TeeAIResponse 拷贝
+	getErrorFunc func() error  // 获取错误的函数，支持 TeeAIResponse 拷贝
+}
+
+// SetError 设置 AI 调用过程中的错误
+func (a *AIResponse) SetError(err error) {
+	if a == nil || a.setErrorFunc == nil {
+		return
+	}
+	a.setErrorFunc(err)
+}
+
+// GetError 获取 AI 调用过程中的错误
+func (a *AIResponse) GetError() error {
+	if a == nil || a.getErrorFunc == nil {
+		return nil
+	}
+	return a.getErrorFunc()
 }
 
 // SetOnReasonChunk registers a callback invoked for each completed reason/thinking
@@ -576,6 +595,8 @@ func (r *AIResponse) Close() {
 }
 
 func NewAIResponse(caller AICallerConfigIf) *AIResponse {
+	var errMu sync.RWMutex
+	var err error
 	return &AIResponse{
 		ch: chanx.NewUnlimitedChan[*AIResponseOutputStream](context.TODO(), 2),
 		consumptionCallback: func(current int) {
@@ -591,6 +612,16 @@ func NewAIResponse(caller AICallerConfigIf) *AIResponse {
 			caller.CallAIResponseOutputFinishedCallback(s)
 		},
 		httpHeaderReady: make(chan struct{}),
+		setErrorFunc: func(e error) {
+			errMu.Lock()
+			err = e
+			errMu.Unlock()
+		},
+		getErrorFunc: func() error {
+			errMu.RLock()
+			defer errMu.RUnlock()
+			return err
+		},
 	}
 }
 
@@ -610,6 +641,12 @@ func TeeAIResponse(
 	second.SetTaskIndex(src.GetTaskIndex())
 	secondReasonReader, secondReasonWriter := utils.NewPipe()
 	secondOutputReader, secondOutputWriter := utils.NewPipe()
+
+	// 拷贝错误函数，确保 TeeAIResponse 能获取到 src 的错误
+	first.setErrorFunc = src.setErrorFunc
+	first.getErrorFunc = src.getErrorFunc
+	second.setErrorFunc = src.setErrorFunc
+	second.getErrorFunc = src.getErrorFunc
 
 	refreshFromSrc := func() {
 		first.SetModelInfo(src.GetProviderName(), src.GetModelName())
