@@ -203,6 +203,10 @@ type ReActLoop struct {
 
 	noEndLoadingStatus bool
 
+	// disableTodoSnapshot 为 true 时, loop prompt 的 timeline-open 段不注入
+	// TodoSnapshot 数据块 (plan / intent 等轻量子循环使用).
+	disableTodoSnapshot bool
+
 	// scenarioToolWhitelist 是这个 loop 对 "VisibilityScenario 工具" 的拉回
 	// 名单, 由 focus mode 的 __SCENARIO_TOOLS__ dunder 或代码侧 WithScenarioToolWhitelist
 	// 显式声明. 默认 nil/空, 即不把任何 scenario 工具拉回 Tool Inventory.

@@ -86,6 +86,7 @@ func init() {
 				allowedActions = append(allowedActions, schema.AI_REACT_LOOP_ACTION_ASK_FOR_CLARIFICATION)
 			}
 			preset := []reactloops.ReActLoopOption{
+				reactloops.WithDisableTodoSnapshot(true),
 				reactloops.WithAllowRAG(false),
 				reactloops.WithAllowToolCall(false),
 				reactloops.WithAllowAIForge(false),
