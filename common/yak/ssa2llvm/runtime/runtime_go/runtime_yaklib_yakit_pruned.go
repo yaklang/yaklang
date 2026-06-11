@@ -1,4 +1,4 @@
-//go:build ssa2llvm_pruned_runtime
+//go:build ssa2llvm_pruned_runtime && ssa2llvm_runtime_yakit
 
 package main
 

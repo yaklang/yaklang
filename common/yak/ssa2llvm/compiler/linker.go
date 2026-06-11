@@ -55,7 +55,7 @@ func CompileLLVMToBinary(llFile, binFile string, linkRuntime bool, runtimeArchiv
 			"-ldl",
 		)
 	}
-	args = append(args, "-o", binFile)
+	args = append(args, "-s", "-o", binFile)
 
 	cmd := exec.Command(clangPath, args...)
 	trace.PrintCmd(cmd)

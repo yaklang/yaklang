@@ -3,6 +3,7 @@ package compiler
 import (
 	"sort"
 
+	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/abi"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/embed"
 )
 
@@ -30,4 +31,21 @@ func runtimeYaklibDepsFromCompiler(comp *Compiler) []embed.YaklibDependency {
 		})
 	}
 	return out
+}
+
+func runtimeDepsFromCompiler(comp *Compiler) embed.PrunedRuntimeDependencies {
+	if comp == nil {
+		return embed.PrunedRuntimeDependencies{}
+	}
+	return embed.PrunedRuntimeDependencies{
+		Yaklib:          runtimeYaklibDepsFromCompiler(comp),
+		RuntimeDispatch: runtimeDispatchDepsFromCompiler(comp),
+	}
+}
+
+func runtimeDispatchDepsFromCompiler(comp *Compiler) []abi.FuncID {
+	if comp == nil {
+		return nil
+	}
+	return comp.RuntimeDispatchDependencies()
 }

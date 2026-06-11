@@ -43,6 +43,18 @@ func TestYaklibDispatch_BuiltinsDoNotRecordRuntimeDependencies(t *testing.T) {
 	require.Empty(t, deps)
 }
 
+func TestRuntimeDispatchDependencies_RecordPocDispatcher(t *testing.T) {
+	deps := compileRuntimeDispatchDependencies(t, `check = () => { poc.timeout(2); return 0 }`)
+	require.Contains(t, deps, abi.IDPocTimeout)
+}
+
+func TestRuntimeDispatchDependencies_PrintlnDoesNotRecordPocDispatcher(t *testing.T) {
+	deps := compileRuntimeDispatchDependencies(t, `check = () => { println("yak"); return 0 }`)
+	require.NotContains(t, deps, abi.IDPocTimeout)
+	require.NotContains(t, deps, abi.IDPocGet)
+	require.NotContains(t, deps, abi.IDPocGetHTTPPacketBody)
+}
+
 func TestYaklibExtern_ModeAllConstantDoesNotRecordRuntimeDependency(t *testing.T) {
 	deps := compileYaklibDependencies(t, `check = () => { if ssa.ModeAll == 0 { return -1 }; return ssa.ModeAll }`)
 	require.Empty(t, deps)
@@ -122,6 +134,15 @@ func compileYaklibDependencies(t *testing.T, code string) map[string][]string {
 	require.NotNil(t, comp)
 	defer comp.Dispose()
 	return comp.YaklibDependencies()
+}
+
+func compileRuntimeDispatchDependencies(t *testing.T, code string) []abi.FuncID {
+	t.Helper()
+	_, comp, _, err := compileInput("", code, "yak", nil, "", nil)
+	require.NoError(t, err)
+	require.NotNil(t, comp)
+	defer comp.Dispose()
+	return comp.RuntimeDispatchDependencies()
 }
 
 func TestYaklibExtern_ModeAllConstantInIR(t *testing.T) {

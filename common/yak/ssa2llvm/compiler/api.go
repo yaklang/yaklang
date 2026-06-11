@@ -736,10 +736,10 @@ func compileWithConfig(cfg *CompileConfig) (CompileResult, error) {
 
 	linkingNative := !cfg.SkipRuntimeLink
 	if linkingNative && strings.TrimSpace(cfg.RuntimeArchive) == "" && cfg.StdlibCompile {
-		deps := runtimeYaklibDepsFromCompiler(comp)
-		archivePath, gcLibDir, buildErr := embed.BuildPrunedRuntimeArchiveFromEmbeddedSource(cfg.WorkDir, deps)
+		deps := runtimeDepsFromCompiler(comp)
+		archivePath, gcLibDir, buildErr := embed.BuildPrunedRuntimeArchiveFromEmbeddedSourceWithDeps(cfg.WorkDir, deps)
 		if errors.Is(buildErr, embed.ErrNoEmbeddedRuntimeSource) {
-			archivePath, gcLibDir, buildErr = embed.BuildPrunedRuntimeArchiveFromLocalSource(cfg.WorkDir, deps)
+			archivePath, gcLibDir, buildErr = embed.BuildPrunedRuntimeArchiveFromLocalSourceWithDeps(cfg.WorkDir, deps)
 		}
 		if buildErr == nil {
 			runtimeArchive = archivePath
