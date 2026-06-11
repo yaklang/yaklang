@@ -20,7 +20,6 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/yaklang/yaklang/common/utils/orderedmap"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/abi"
 )
 
@@ -88,7 +87,7 @@ func yak_internal_malloc(size int64) (ret uintptr) {
 //export yak_runtime_make_object
 func yak_runtime_make_object() int64 {
 	defer recoverRuntimePanic()
-	return int64(uintptr(newStdlibShadow(orderedmap.New())))
+	return int64(uintptr(newStdlibShadow(newRuntimeOrderedMap())))
 }
 
 //export yak_runtime_make_callable
@@ -205,7 +204,7 @@ func handleFromShadow(objPtr unsafe.Pointer) (cgo.Handle, bool) {
 }
 
 func resolveField(obj any, name string) (reflect.Value, error) {
-	if om, ok := obj.(*orderedmap.OrderedMap); ok {
+	if om, ok := obj.(runtimeStringMap); ok {
 		value, exists := om.Get(name)
 		if !exists {
 			return reflect.Value{}, fmt.Errorf("ordered map key %q not found", name)
@@ -479,7 +478,7 @@ func setRuntimeField(obj any, name string, val int64, flags ...uint64) error {
 	if len(flags) > 0 {
 		fieldFlags = flags[0]
 	}
-	if om, ok := obj.(*orderedmap.OrderedMap); ok {
+	if om, ok := obj.(runtimeStringMap); ok {
 		mapVal, ok := orderedMapValueForSet(val, fieldFlags)
 		if !ok {
 			return fmt.Errorf("ordered map value for key %q is not assignable", name)

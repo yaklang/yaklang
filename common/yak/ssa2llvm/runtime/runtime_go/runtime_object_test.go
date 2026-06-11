@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"reflect"
 	"testing"
@@ -180,7 +181,7 @@ func TestRuntimeDecodeCallableArgAcceptsClosureShadow(t *testing.T) {
 }
 
 func TestSetRuntimeFieldOrderedMapDecodesValues(t *testing.T) {
-	om := orderedmap.New()
+	om := newRuntimeOrderedMap()
 	if err := setRuntimeField(om, "enabled", 1); err != nil {
 		t.Fatalf("set bool-like value: %v", err)
 	}
@@ -207,7 +208,7 @@ func TestSetRuntimeFieldOrderedMapDecodesValues(t *testing.T) {
 }
 
 func TestSetRuntimeFieldOrderedMapStringFlagDoesNotReadInvalidTaggedPointer(t *testing.T) {
-	om := orderedmap.New()
+	om := newRuntimeOrderedMap()
 	nonCanonicalRaw := (uint64(2) << 48) | 0x1234
 	tagged := int64(nonCanonicalRaw | yakTaggedPointerMask)
 	if err := setRuntimeField(om, "description", tagged, abi.FlagFieldString); err != nil {
@@ -220,6 +221,50 @@ func TestSetRuntimeFieldOrderedMapStringFlagDoesNotReadInvalidTaggedPointer(t *t
 	}
 	if _, ok := got.(string); !ok {
 		t.Fatalf("description should be stored as string, got %T %#v", got, got)
+	}
+}
+
+func TestSetRuntimeFieldYaklibOrderedMapDecodesValues(t *testing.T) {
+	om := orderedmap.New(map[string]any{"existing": "ok"})
+	if err := setRuntimeField(om, "compile_immediately", 1, abi.FlagFieldBool); err != nil {
+		t.Fatalf("set yaklib ordered map bool: %v", err)
+	}
+	if got, ok := om.Get("compile_immediately"); !ok || got != true {
+		t.Fatalf("compile_immediately = %#v, ok=%v", got, ok)
+	}
+
+	raw := int64(uintptr(newRuntimeShadow("local")))
+	raw |= int64(yakTaggedPointerMask)
+	if err := setRuntimeField(om, "kind", raw); err != nil {
+		t.Fatalf("set yaklib ordered map shadow string: %v", err)
+	}
+	if got, ok := om.Get("kind"); !ok || got != "local" {
+		t.Fatalf("kind = %#v, ok=%v", got, ok)
+	}
+
+	value, err := resolveField(om, "existing")
+	if err != nil {
+		t.Fatalf("resolve yaklib ordered map field: %v", err)
+	}
+	if got := value.Interface(); got != "ok" {
+		t.Fatalf("existing = %#v", got)
+	}
+}
+
+func TestRuntimeOrderedMapMarshalJSON(t *testing.T) {
+	om := newRuntimeOrderedMap()
+	om.Set("project_exists", "aa")
+	nested := newRuntimeOrderedMap()
+	nested.Set("kind", "local")
+	om.Set("info", nested)
+
+	data, err := json.Marshal(om)
+	if err != nil {
+		t.Fatalf("marshal runtime ordered map: %v", err)
+	}
+	got := string(data)
+	if got != `{"project_exists":"aa","info":{"kind":"local"}}` {
+		t.Fatalf("unexpected json: %s", got)
 	}
 }
 
@@ -274,7 +319,7 @@ func TestRuntimeMakeObjectCreatesOrderedMapShadow(t *testing.T) {
 	if !ok {
 		t.Fatal("invalid object shadow")
 	}
-	om, ok := h.Value().(*orderedmap.OrderedMap)
+	om, ok := h.Value().(*runtimeOrderedMap)
 	if !ok {
 		t.Fatalf("want ordered map, got %T", h.Value())
 	}

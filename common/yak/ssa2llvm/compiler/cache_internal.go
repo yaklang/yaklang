@@ -18,7 +18,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/embed"
 )
 
-const cachedCompileVersion = "ssa2llvm-cache-v2"
+const cachedCompileVersion = "ssa2llvm-cache-v3"
 
 var toolVersionMemo sync.Map // map[string]string
 

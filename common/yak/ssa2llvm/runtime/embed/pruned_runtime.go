@@ -8,17 +8,26 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/abi"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/trace"
 )
 
 var ErrUnsupportedPrunedRuntime = errors.New("unsupported pruned ssa2llvm runtime dependency")
 
+const yaklangModulePath = "github.com/yaklang/yaklang"
+
 type YaklibDependency struct {
 	Module  string
 	Methods []string
+}
+
+type PrunedRuntimeDependencies struct {
+	Yaklib          []YaklibDependency
+	RuntimeDispatch []abi.FuncID
 }
 
 func ValidatePrunedRuntimeDependencies(deps []YaklibDependency) error {
@@ -55,14 +64,22 @@ func UnsupportedPrunedRuntimeDependencies(deps []YaklibDependency) []YaklibDepen
 }
 
 func BuildPrunedRuntimeArchiveFromEmbeddedSource(buildDir string, deps []YaklibDependency) (archivePath string, gcLibDir string, err error) {
+	return BuildPrunedRuntimeArchiveFromEmbeddedSourceWithDeps(buildDir, PrunedRuntimeDependencies{Yaklib: deps})
+}
+
+func BuildPrunedRuntimeArchiveFromEmbeddedSourceWithDeps(buildDir string, deps PrunedRuntimeDependencies) (archivePath string, gcLibDir string, err error) {
 	srcDir := filepath.Join(buildDir, "ssa2llvm-stdlib-src")
 	if _, err := ExtractRuntimeSourceToDir(srcDir); err != nil {
 		return "", "", err
 	}
-	return BuildPrunedRuntimeArchiveFromSourceTree(buildDir, srcDir, deps)
+	return BuildPrunedRuntimeArchiveFromSourceTreeWithDeps(buildDir, srcDir, deps)
 }
 
 func BuildPrunedRuntimeArchiveFromLocalSource(buildDir string, deps []YaklibDependency) (archivePath string, gcLibDir string, err error) {
+	return BuildPrunedRuntimeArchiveFromLocalSourceWithDeps(buildDir, PrunedRuntimeDependencies{Yaklib: deps})
+}
+
+func BuildPrunedRuntimeArchiveFromLocalSourceWithDeps(buildDir string, deps PrunedRuntimeDependencies) (archivePath string, gcLibDir string, err error) {
 	buildDir = strings.TrimSpace(buildDir)
 	if buildDir == "" {
 		return "", "", fmt.Errorf("build pruned runtime archive failed: empty buildDir")
@@ -94,10 +111,14 @@ func BuildPrunedRuntimeArchiveFromLocalSource(buildDir string, deps []YaklibDepe
 	if err := copyPrunedRuntimeBuildTagSources(root, srcDir); err != nil {
 		return "", "", err
 	}
-	return BuildPrunedRuntimeArchiveFromSourceTree(buildDir, srcDir, deps)
+	return BuildPrunedRuntimeArchiveFromSourceTreeWithDeps(buildDir, srcDir, deps)
 }
 
 func BuildPrunedRuntimeArchiveFromSourceTree(buildDir, srcDir string, deps []YaklibDependency) (archivePath string, gcLibDir string, err error) {
+	return BuildPrunedRuntimeArchiveFromSourceTreeWithDeps(buildDir, srcDir, PrunedRuntimeDependencies{Yaklib: deps})
+}
+
+func BuildPrunedRuntimeArchiveFromSourceTreeWithDeps(buildDir, srcDir string, deps PrunedRuntimeDependencies) (archivePath string, gcLibDir string, err error) {
 	buildDir = strings.TrimSpace(buildDir)
 	srcDir = strings.TrimSpace(srcDir)
 	if buildDir == "" {
@@ -113,7 +134,7 @@ func BuildPrunedRuntimeArchiveFromSourceTree(buildDir, srcDir string, deps []Yak
 	}
 
 	runtimeDir := filepath.Join(srcDir, "common", "yak", "ssa2llvm", "runtime", "runtime_go")
-	if err := writePrunedRuntimeImports(runtimeDir, deps); err != nil {
+	if err := writePrunedRuntimeImports(runtimeDir, deps.Yaklib); err != nil {
 		return "", "", err
 	}
 
@@ -123,9 +144,10 @@ func BuildPrunedRuntimeArchiveFromSourceTree(buildDir, srcDir string, deps []Yak
 	}
 
 	archivePath = filepath.Join(buildDir, "libyak.a")
+	buildTags := prunedRuntimeBuildTags(deps)
 	cmd := exec.Command(goPath, "build",
 		"-trimpath",
-		"-tags=ssa2llvm_pruned_runtime",
+		"-tags="+strings.Join(buildTags, ","),
 		"-ldflags=-s -w",
 		"-buildmode=c-archive",
 		"-o", archivePath,
@@ -144,27 +166,108 @@ func BuildPrunedRuntimeArchiveFromSourceTree(buildDir, srcDir string, deps []Yak
 	if _, err := os.Stat(archivePath); err != nil {
 		return "", "", fmt.Errorf("build pruned runtime archive failed: output libyak.a missing: %v", err)
 	}
-	if _, err := writeRuntimeLinkArgsFileWithTags(buildDir, srcDir, "ssa2llvm_pruned_runtime"); err != nil {
+	if _, err := writeRuntimeLinkArgsFileWithTags(buildDir, srcDir, buildTags...); err != nil {
 		return "", "", err
 	}
 	return archivePath, gcLibDir, nil
 }
 
+func prunedRuntimeBuildTags(deps PrunedRuntimeDependencies) []string {
+	tags := []string{"ssa2llvm_pruned_runtime"}
+	if prunedRuntimeNeedsModule(deps.Yaklib, "cli") {
+		tags = append(tags, "ssa2llvm_runtime_cli")
+	}
+	if prunedRuntimeNeedsPoc(deps.RuntimeDispatch) {
+		tags = append(tags, "ssa2llvm_runtime_poc")
+	}
+	if prunedRuntimeNeedsModule(deps.Yaklib, "yakit") {
+		tags = append(tags, "ssa2llvm_runtime_yakit")
+	}
+	return tags
+}
+
+func prunedRuntimeNeedsPoc(ids []abi.FuncID) bool {
+	for _, id := range ids {
+		switch id {
+		case abi.IDPocTimeout, abi.IDPocGet, abi.IDPocGetHTTPPacketBody:
+			return true
+		}
+	}
+	return false
+}
+
+func prunedRuntimeNeedsModule(deps []YaklibDependency, module string) bool {
+	module = strings.TrimSpace(module)
+	if module == "" {
+		return false
+	}
+	for _, dep := range deps {
+		if strings.TrimSpace(dep.Module) == module {
+			return true
+		}
+	}
+	return false
+}
+
 func localGoModuleRoot() (string, error) {
-	goPath, err := exec.LookPath("go")
+	var candidates []string
+	if root := strings.TrimSpace(os.Getenv("YAKLANG_SOURCE_ROOT")); root != "" {
+		candidates = append(candidates, root)
+	}
+	if wd, err := os.Getwd(); err == nil {
+		candidates = append(candidates, wd)
+	}
+	if _, file, _, ok := runtime.Caller(0); ok && filepath.IsAbs(file) {
+		candidates = append(candidates, filepath.Dir(file))
+	}
+
+	seen := make(map[string]struct{}, len(candidates))
+	for _, candidate := range candidates {
+		candidate = strings.TrimSpace(candidate)
+		if candidate == "" {
+			continue
+		}
+		abs, err := filepath.Abs(candidate)
+		if err != nil {
+			continue
+		}
+		if _, ok := seen[abs]; ok {
+			continue
+		}
+		seen[abs] = struct{}{}
+		if root, err := findYaklangModuleRoot(abs); err == nil {
+			return root, nil
+		}
+	}
+	return "", fmt.Errorf("build pruned runtime archive failed: current directory is not inside a Go module")
+}
+
+func findYaklangModuleRoot(start string) (string, error) {
+	dir, err := filepath.Abs(start)
 	if err != nil {
-		return "", fmt.Errorf("go toolchain not found in PATH: %w", err)
+		return "", err
 	}
-	cmd := exec.Command(goPath, "env", "GOMOD")
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("build pruned runtime archive failed: go env GOMOD: %v\n%s", err, out)
+	if info, statErr := os.Stat(dir); statErr == nil && !info.IsDir() {
+		dir = filepath.Dir(dir)
 	}
-	modPath := strings.TrimSpace(string(out))
-	if modPath == "" || modPath == os.DevNull {
-		return "", fmt.Errorf("build pruned runtime archive failed: current directory is not inside a Go module")
+	for {
+		modPath := filepath.Join(dir, "go.mod")
+		data, err := os.ReadFile(modPath)
+		if err == nil {
+			if strings.Contains(string(data), "module "+yaklangModulePath) {
+				return dir, nil
+			}
+			return "", fmt.Errorf("go.mod at %s is not %s", modPath, yaklangModulePath)
+		}
+		if !os.IsNotExist(err) {
+			return "", fmt.Errorf("read %s: %w", modPath, err)
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return "", fmt.Errorf("go.mod not found above %s", start)
+		}
+		dir = parent
 	}
-	return filepath.Dir(modPath), nil
 }
 
 func copyLocalLibgc(srcDir string) error {

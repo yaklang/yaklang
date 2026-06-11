@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/go-llvm"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/obfuscation"
+	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/abi"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/types"
 )
 
@@ -54,6 +55,10 @@ type Compiler struct {
 	// yaklibDeps tracks module.method pairs that were actually lowered to
 	// runtime yaklib dispatch. It drives pruned runtime source generation.
 	yaklibDeps map[string]map[string]struct{}
+
+	// runtimeDispatchDeps tracks dispatch-table entries that must be present in
+	// optional pruned runtime files.
+	runtimeDispatchDeps map[abi.FuncID]struct{}
 
 	initialMemberValueIDs      map[int64]struct{}
 	initializingMemberValueIDs map[int64]int
@@ -132,6 +137,7 @@ func NewCompiler(ctx context.Context, prog *ssa.Program, opts ...CompilerOption)
 		TypeConverter:             types.NewTypeConverter(c),
 		ExternBindings:            cloneExternBindings(defaultExternBindings),
 		yaklibDeps:                make(map[string]map[string]struct{}),
+		runtimeDispatchDeps:       make(map[abi.FuncID]struct{}),
 		initialMemberValueIDs:     make(map[int64]struct{}),
 		emittedMemberVariableSets: make(map[string]struct{}),
 		materializingCallableIDs:  make(map[int64]int),
@@ -161,6 +167,16 @@ func (c *Compiler) recordYaklibDependency(module, method string) {
 	methods[method] = struct{}{}
 }
 
+func (c *Compiler) recordRuntimeDispatchDependency(id abi.FuncID) {
+	if c == nil || id == 0 {
+		return
+	}
+	if c.runtimeDispatchDeps == nil {
+		c.runtimeDispatchDeps = make(map[abi.FuncID]struct{})
+	}
+	c.runtimeDispatchDeps[id] = struct{}{}
+}
+
 func (c *Compiler) YaklibDependencies() map[string][]string {
 	out := make(map[string][]string)
 	if c == nil || len(c.yaklibDeps) == 0 {
@@ -174,6 +190,18 @@ func (c *Compiler) YaklibDependencies() map[string][]string {
 		sort.Strings(list)
 		out[module] = list
 	}
+	return out
+}
+
+func (c *Compiler) RuntimeDispatchDependencies() []abi.FuncID {
+	if c == nil || len(c.runtimeDispatchDeps) == 0 {
+		return nil
+	}
+	out := make([]abi.FuncID, 0, len(c.runtimeDispatchDeps))
+	for id := range c.runtimeDispatchDeps {
+		out = append(out, id)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
 	return out
 }
 

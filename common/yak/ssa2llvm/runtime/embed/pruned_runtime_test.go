@@ -7,6 +7,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/abi"
 )
 
 func TestWritePrunedRuntimeImports_CodecDependency(t *testing.T) {
@@ -140,6 +142,29 @@ func TestScriptEngineLibRegistry(t *testing.T) {
 	}
 }
 
+func TestLocalGoModuleRootFromSourcePathWhenOutsideModule(t *testing.T) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("get cwd: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(cwd)
+	})
+	if err := os.Chdir(t.TempDir()); err != nil {
+		t.Fatalf("chdir temp: %v", err)
+	}
+
+	root, err := localGoModuleRoot()
+	if err != nil {
+		t.Fatalf("localGoModuleRoot outside module failed: %v", err)
+	}
+	data, err := os.ReadFile(filepath.Join(root, "go.mod"))
+	if err != nil {
+		t.Fatalf("read go.mod from resolved root: %v", err)
+	}
+	assertContains(t, string(data), "module "+yaklangModulePath)
+}
+
 func TestWritePrunedRuntimeImports_ScriptEngineModuleDependencies(t *testing.T) {
 	dir := t.TempDir()
 
@@ -200,6 +225,43 @@ func TestWritePrunedRuntimeImports_YakitDependencyUsesRuntimeClient(t *testing.T
 	assertNotContains(t, got, `yaklib "github.com/yaklang/yaklang/common/yak/yaklib"`)
 }
 
+func TestPrunedRuntimeBuildTags_ExcludePocByDefault(t *testing.T) {
+	tags := prunedRuntimeBuildTags(PrunedRuntimeDependencies{})
+	if !containsString(tags, "ssa2llvm_pruned_runtime") {
+		t.Fatalf("expected base pruned runtime tag in %#v", tags)
+	}
+	if containsString(tags, "ssa2llvm_runtime_poc") {
+		t.Fatalf("did not expect POC runtime tag by default: %#v", tags)
+	}
+}
+
+func TestPrunedRuntimeBuildTags_IncludePocForPocDispatch(t *testing.T) {
+	tags := prunedRuntimeBuildTags(PrunedRuntimeDependencies{
+		RuntimeDispatch: []abi.FuncID{abi.IDPrintln, abi.IDPocGet},
+	})
+	if !containsString(tags, "ssa2llvm_runtime_poc") {
+		t.Fatalf("expected POC runtime tag for POC dispatch: %#v", tags)
+	}
+}
+
+func TestPrunedRuntimeBuildTags_IncludeCliForCliModule(t *testing.T) {
+	tags := prunedRuntimeBuildTags(PrunedRuntimeDependencies{
+		Yaklib: []YaklibDependency{{Module: "cli", Methods: []string{"String"}}},
+	})
+	if !containsString(tags, "ssa2llvm_runtime_cli") {
+		t.Fatalf("expected cli runtime tag for cli module: %#v", tags)
+	}
+}
+
+func TestPrunedRuntimeBuildTags_IncludeYakitForYakitModule(t *testing.T) {
+	tags := prunedRuntimeBuildTags(PrunedRuntimeDependencies{
+		Yaklib: []YaklibDependency{{Module: "yakit", Methods: []string{"Code"}}},
+	})
+	if !containsString(tags, "ssa2llvm_runtime_yakit") {
+		t.Fatalf("expected yakit runtime tag for yakit module: %#v", tags)
+	}
+}
+
 func TestUnsupportedPrunedRuntimeDependencies(t *testing.T) {
 	got := UnsupportedPrunedRuntimeDependencies([]YaklibDependency{
 		{Module: "codec", Methods: []string{"EncodeBase64", "Missing"}},
@@ -247,4 +309,13 @@ func assertNotContains(t *testing.T, s, substr string) {
 	if strings.Contains(s, substr) {
 		t.Fatalf("expected generated imports not to contain %q:\n%s", substr, s)
 	}
+}
+
+func containsString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }

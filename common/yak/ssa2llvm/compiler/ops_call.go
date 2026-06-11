@@ -63,6 +63,7 @@ func (c *Compiler) newDispatchContextCallSpec(inst *ssa.Call, binding ExternBind
 		return contextCallSpec{}, fmt.Errorf("newDispatchContextCallSpec: missing dispatch id for call %d", inst.GetId())
 	}
 
+	c.recordRuntimeDispatchDependency(binding.DispatchID)
 	return contextCallSpec{
 		inst:      inst,
 		kind:      abi.KindDispatch,
