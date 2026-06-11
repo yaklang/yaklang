@@ -45,6 +45,7 @@ const (
 	SYNC_TYPE_REACT_REMOVE_TASK         = "react_remove_task"
 	SYNC_TYPE_REACT_CLEAR_TASK          = "react_clear_task"
 	SYNC_TYPE_RECOVERY_PLAN_AND_EXEC    = "recovery_plan_and_exec"
+	SYNC_TYPE_EXECUTE_DETACHED_PLAN     = "execute_detached_plan"
 )
 
 // ReactTaskItem 表示ReAct任务队列中的单个任务

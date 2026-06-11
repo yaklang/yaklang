@@ -451,6 +451,10 @@ func (r *testRuntime) BeginPlanCoordinatorSession(ctx context.Context, input *ai
 	return nil, nil
 }
 
+func (r *testRuntime) PublishDetachedPlan(ctx context.Context, input *aicommon.ExecutePlanInput, reactTaskID string) (string, error) {
+	return "", nil
+}
+
 func (r *testRuntime) AsyncExecutePlan(ctx context.Context, input *aicommon.ExecutePlanInput, onFinish func(error)) {
 }
 

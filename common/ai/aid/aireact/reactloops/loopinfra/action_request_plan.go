@@ -1,8 +1,7 @@
 package loopinfra
 
 import (
-	"context"
-	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -14,7 +13,7 @@ import (
 var loopAction_RequestPlan = &reactloops.LoopAction{
 	AsyncMode:   false,
 	ActionType:  schema.AI_REACT_LOOP_ACTION_REQUEST_PLAN,
-	Description: `Request a detailed plan for a complex task. After user review approves the plan, execution starts asynchronously.`,
+	Description: `Request a detailed plan for a complex task. The plan is published as a detached review panel and persisted to session storage. Execution starts only after the user approves via sync request.`,
 	Options:     loopAction_RequestPlanAndExecution.Options,
 	StreamFields: []*reactloops.LoopStreamField{
 		{FieldName: `plan_request_payload`, AINodeId: "plan"},
@@ -31,7 +30,7 @@ var loopAction_RequestPlan = &reactloops.LoopAction{
 			rewriteQuery = task.GetUserInput()
 		}
 
-		// TODO(debug): restore plan loop execution after review/execute flow debugging.
+		// TODO(debug): restore plan loop execution after detached plan flow debugging.
 		/*
 			planTask := aicommon.NewStatefulTaskBase(
 				task.GetId()+"_plan",
@@ -99,54 +98,24 @@ var loopAction_RequestPlan = &reactloops.LoopAction{
 		*/
 		planInput := mockRequestPlanInputForDebug(rewriteQuery)
 
-		planCtx := task.GetContext()
-		session, err := invoker.BeginPlanCoordinatorSession(planCtx, planInput, true)
+		coordinatorID, err := invoker.PublishDetachedPlan(task.GetContext(), planInput, task.GetId())
 		if err != nil {
 			operator.Fail(err)
 			return
 		}
-		defer session.Close()
 
-		if err := session.ReviewPlan(planCtx); err != nil {
-			if isPlanReviewUserCancelled(err, planCtx, task.GetContext()) {
-				operator.Exit()
-				return
-			}
-			operator.Fail(err)
-			return
-		}
-
-		operator.RequestAsyncMode()
-		task.SetAsyncMode(true)
-		invoker.AsyncExecuteCod(planCtx, session.CoordinatorID(), func(err error) {
-			loop.FinishAsyncTask(task, err)
-		})
+		invoker.AddToTimeline("[REQUEST_PLAN_DETACHED]",
+			fmt.Sprintf("detached plan published: coordinator=%s", coordinatorID))
+		operator.Exit()
 	},
 	OutputExamples: loopAction_RequestPlanAndExecution.OutputExamples,
-}
-
-func isPlanReviewUserCancelled(err error, contexts ...context.Context) bool {
-	if err == nil {
-		return false
-	}
-	for _, ctx := range contexts {
-		if ctx != nil && errors.Is(ctx.Err(), context.Canceled) {
-			return true
-		}
-	}
-	if errors.Is(err, context.Canceled) {
-		return true
-	}
-	msg := strings.ToLower(err.Error())
-	return strings.Contains(msg, "user review params is nil") ||
-		strings.Contains(msg, "user review failed")
 }
 
 func mockRequestPlanInputForDebug(planPayload string) *aicommon.ExecutePlanInput {
 	planData := string(utils.Jsonify(map[string]any{
 		"@action":        "plan",
 		"main_task":      "调试计划",
-		"main_task_goal": "验证 request_plan 的 review 与异步执行流程",
+		"main_task_goal": "验证 request_plan detached plan 流程",
 		"tasks": []map[string]any{
 			{
 				"subtask_name": "收集目标信息",

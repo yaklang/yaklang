@@ -464,6 +464,10 @@ func (m *MockInvoker) BeginPlanCoordinatorSession(ctx context.Context, input *ai
 	return &mockPlanCoordinatorSession{input: input}, nil
 }
 
+func (m *MockInvoker) PublishDetachedPlan(ctx context.Context, input *aicommon.ExecutePlanInput, reactTaskID string) (string, error) {
+	return "mock-detached-coordinator-id", nil
+}
+
 func (m *MockInvoker) AsyncExecutePlan(ctx context.Context, input *aicommon.ExecutePlanInput, onFinish func(error)) {
 }
 

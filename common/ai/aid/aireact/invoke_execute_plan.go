@@ -85,7 +85,10 @@ func (r *ReAct) invokeExecutePlan(doneChannel chan struct{}, ctx context.Context
 		}
 	}()
 
-	uid := uuid.New().String()
+	uid := cfg.coordinatorID
+	if uid == "" {
+		uid = uuid.New().String()
+	}
 	reactTaskID := ""
 	if task != nil {
 		reactTaskID = task.GetId()

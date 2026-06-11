@@ -126,6 +126,10 @@ func (i *httpFuzztestTestInvoker) BeginPlanCoordinatorSession(ctx context.Contex
 	return i.base.BeginPlanCoordinatorSession(ctx, input, forceManualReview)
 }
 
+func (i *httpFuzztestTestInvoker) PublishDetachedPlan(ctx context.Context, input *aicommon.ExecutePlanInput, reactTaskID string) (string, error) {
+	return i.base.PublishDetachedPlan(ctx, input, reactTaskID)
+}
+
 func (i *httpFuzztestTestInvoker) AsyncExecutePlan(ctx context.Context, input *aicommon.ExecutePlanInput, onFinish func(error)) {
 	i.base.AsyncExecutePlan(ctx, input, onFinish)
 }
