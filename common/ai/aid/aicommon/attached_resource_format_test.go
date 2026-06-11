@@ -13,29 +13,44 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func TestIsAttachedHTTPFlowResource(t *testing.T) {
-	require.True(t, IsAttachedHTTPFlowResource(NewAttachedResource(AttachedResourceTypeHTTPFlowID, AttachedResourceKeyID, "1")))
-	require.True(t, IsAttachedHTTPFlowResource(NewAttachedResource("HTTPFlowID", AttachedResourceKeyID, "1")))
-	require.False(t, IsAttachedHTTPFlowResource(NewAttachedResource(CONTEXT_PROVIDER_TYPE_FILE, CONTEXT_PROVIDER_KEY_FILE_PATH, "/tmp/a.txt")))
+func TestParseAttachedResourceDataByType(t *testing.T) {
+	resource, err := ParseAttachedResourceData(NewAttachedResource(AttachedResourceTypeHTTPFlowID, AttachedResourceKeyID, `[1]`))
+	require.NoError(t, err)
+	require.IsType(t, &AttachedHTTPFlowResourceData{}, resource)
+	require.Equal(t, AttachedResourceTypeHTTPFlowID, resource.Type())
+
+	resource, err = ParseAttachedResourceData(NewAttachedResource("HTTPFlowID", AttachedResourceKeyID, `[1]`))
+	require.NoError(t, err)
+	require.IsType(t, &AttachedHTTPFlowResourceData{}, resource)
+
+	resource, err = ParseAttachedResourceData(NewAttachedResource("httppacket", AttachedResourceKeyContent, "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n"))
+	require.NoError(t, err)
+	require.IsType(t, &AttachedHTTPFuzzRequestData{}, resource)
+
+	_, err = ParseAttachedResourceData(NewAttachedResource(CONTEXT_PROVIDER_TYPE_FILE, CONTEXT_PROVIDER_KEY_FILE_PATH, "/tmp/a.txt"))
+	require.Error(t, err)
 }
 
 func TestAttachedHTTPFlowIDsFromResourceJSON(t *testing.T) {
-	ids, err := attachedHTTPFlowIDsFromResource(NewAttachedResource(AttachedResourceTypeHTTPFlowID, AttachedResourceKeyID, `[1,2,2,3]`))
+	resource := &AttachedHTTPFlowResourceData{}
+	err := resource.Unmarshal(`[1,2,2,3]`)
 	require.NoError(t, err)
-	require.Equal(t, []int64{1, 2, 3}, ids)
+	require.Equal(t, []int64{1, 2, 3}, resource.IDs)
 
-	ids, err = attachedHTTPFlowIDsFromResource(NewAttachedResource(AttachedResourceTypeHTTPFlowID, AttachedResourceKeyID, `{"ids":[4,5]}`))
+	resource = &AttachedHTTPFlowResourceData{}
+	err = resource.Unmarshal(`{"ids":[4,5]}`)
 	require.NoError(t, err)
-	require.Equal(t, []int64{4, 5}, ids)
+	require.Equal(t, []int64{4, 5}, resource.IDs)
 
-	ids, err = attachedHTTPFlowIDsFromResource(NewAttachedResource(AttachedResourceTypeHTTPFlowID, AttachedResourceKeyID, `{"ids":["7895","7894","7896"]}`))
+	resource = &AttachedHTTPFlowResourceData{}
+	err = resource.Unmarshal(`{"ids":["7895","7894","7896"]}`)
 	require.NoError(t, err)
-	require.Equal(t, []int64{7895, 7894, 7896}, ids)
+	require.Equal(t, []int64{7895, 7894, 7896}, resource.IDs)
 
-	_, err = attachedHTTPFlowIDsFromResource(NewAttachedResource(AttachedResourceTypeHTTPFlowID, AttachedResourceKeyID, `not-json`))
+	err = (&AttachedHTTPFlowResourceData{}).Unmarshal(`not-json`)
 	require.Error(t, err)
 
-	_, err = attachedHTTPFlowIDsFromResource(NewAttachedResource(AttachedResourceTypeHTTPFlowID, AttachedResourceKeyID, `[]`))
+	err = (&AttachedHTTPFlowResourceData{}).Unmarshal(`[]`)
 	require.Error(t, err)
 }
 
@@ -119,7 +134,9 @@ func TestFormatAttachedSelectedTextInlineAndSpill(t *testing.T) {
 
 func TestFormatAttachedCodeSelectionJSON(t *testing.T) {
 	payload := `{"path":"/tmp/foo.yak","startLine":10,"endLine":20,"language":"yak","content":"println(\"hi\")"}`
-	out := RenderAttachedSelectedResource(NewAttachedResource(AttachedResourceTypeSelected, AttachedResourceKeyContent, payload), nil)
+	resource, err := ParseAttachedResourceData(NewAttachedResource(AttachedResourceTypeSelected, AttachedResourceKeyContent, payload))
+	require.NoError(t, err)
+	out := resource.ToAttachData(nil)
 	require.Contains(t, out, "Attached Code Selection")
 	require.Contains(t, out, "/tmp/foo.yak")
 	require.Contains(t, out, "Lines: 10-20")
@@ -129,11 +146,31 @@ func TestFormatAttachedCodeSelectionJSON(t *testing.T) {
 
 func TestAttachedSelectedTextFromResourceJSON(t *testing.T) {
 	payload := `{"path":"/tmp/a.yak","startLine":1,"endLine":2,"language":"yak","content":"x=1"}`
-	text := attachedSelectedTextFromResource(NewAttachedResource(AttachedResourceTypeSelected, AttachedResourceKeyContent, payload))
-	require.Equal(t, "x=1", text)
+	resource, err := ParseAttachedResourceData(NewAttachedResource(AttachedResourceTypeSelected, AttachedResourceKeyContent, payload))
+	require.NoError(t, err)
+	selected := resource.(*AttachedSelectedResourceData)
+	require.Equal(t, "x=1", selected.PlainText)
+	require.NotNil(t, selected.Selected)
 }
 
-func TestRenderAttachedHTTPFlowResourceFromDB(t *testing.T) {
+func TestAttachedHTTPFuzzRequestData(t *testing.T) {
+	packet := "POST /login HTTP/1.1\r\nHost: example.com\r\nContent-Type: application/json\r\n\r\n{\"user\":\"admin\"}"
+	payload := fmt.Sprintf(`{"http_packet":%q,"is_https":"true"}`, packet)
+	resource, err := ParseAttachedResourceData(NewAttachedResource(AttachedResourceTypeHTTPFuzzRequest, AttachedResourceKeyContent, payload))
+	require.NoError(t, err)
+	packetData := resource.(*AttachedHTTPFuzzRequestData)
+	require.Equal(t, packet, packetData.Packet)
+	require.True(t, packetData.IsHTTPS)
+
+	out := resource.ToAttachData(nil)
+	require.Contains(t, out, "Attached HTTP Fuzz Request")
+	require.Contains(t, out, "Resource Type: http_fuzz_request")
+	require.Contains(t, out, "IsHTTPS: true")
+	require.Contains(t, out, "POST /login HTTP/1.1")
+	require.Contains(t, out, "Use this raw HTTP packet as the current target request")
+}
+
+func TestAttachedHTTPFlowResourceDataFromDB(t *testing.T) {
 	db := consts.GetGormProjectDatabase()
 	if db == nil {
 		t.Skip("project database unavailable")
@@ -156,14 +193,17 @@ func TestRenderAttachedHTTPFlowResourceFromDB(t *testing.T) {
 		_ = yakit.DeleteHTTPFlow(db, &ypb.DeleteHTTPFlowRequest{Id: []int64{int64(flow.ID)}})
 	})
 
-	_, err := RenderAttachedHTTPFlowResource(db, NewAttachedResource(AttachedResourceTypeHTTPFlowID, AttachedResourceKeyID, `not-json`), nil)
+	_, err := ParseAttachedResourceData(NewAttachedResource(AttachedResourceTypeHTTPFlowID, AttachedResourceKeyID, `not-json`))
 	require.Error(t, err)
 
-	_, err = RenderAttachedHTTPFlowResource(db, NewAttachedResource(AttachedResourceTypeHTTPFlowID, AttachedResourceKeyID, `{"ids":[999999999]}`), nil)
+	missingResource := &AttachedHTTPFlowResourceData{}
+	err = missingResource.Unmarshal(`{"ids":[999999999]}`)
 	require.NoError(t, err)
+	require.Contains(t, missingResource.render(db, nil), "Load Errors")
 
-	rendered, err := RenderAttachedHTTPFlowResource(db, NewAttachedResource(AttachedResourceTypeHTTPFlowID, AttachedResourceKeyID, fmt.Sprintf(`{"ids":[%d]}`, flow.ID)), nil)
+	resource, err := ParseAttachedResourceData(NewAttachedResource(AttachedResourceTypeHTTPFlowID, AttachedResourceKeyID, fmt.Sprintf(`{"ids":[%d]}`, flow.ID)))
 	require.NoError(t, err)
+	rendered := resource.(*AttachedHTTPFlowResourceData).render(db, nil)
 	require.Contains(t, rendered, token)
 	require.Contains(t, rendered, fmt.Sprintf("HTTP Flow #%d", flow.ID))
 	require.Contains(t, rendered, "Requested IDs:")

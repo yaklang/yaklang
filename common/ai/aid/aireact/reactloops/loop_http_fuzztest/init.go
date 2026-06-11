@@ -129,13 +129,14 @@ var urlPattern = regexp.MustCompile(`https?://[^\s"'<>]+`)
 // buildInitTask creates the initialization task handler
 func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
 	return func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
-		reactloops.RunAttachedExtraResourcesInit(r, loop, task.GetAttachedDatas())
+		attachedResources := reactloops.RunAttachedExtraResourcesInit(r, loop, task.GetAttachedDatas())
 
 		emitter := r.GetConfig().GetEmitter()
 		config := r.GetConfig()
 
 		invoker := loop.GetInvoker()
 		bootstrapLoopHTTPFuzzFuzztagContext(loop, config.GetDB())
+		bindAttachedHTTPFuzzRequestToLoop(loop, r, task, attachedResources)
 
 		// TBD: 检查是否已经有 fuzz_request 了（可能是用户之前的交互设置的），如果有就直接继续
 		haveReq := loop.Get("fuzz_request") // Just to ensure the key exists in the loop state
