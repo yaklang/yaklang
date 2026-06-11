@@ -13,6 +13,7 @@
 #   YAK_SSA_HEAP_LOG=1                           print retained heap by SSA compile phase
 #   YAK_SSA_HEAP_PROFILE_DIR=<dir>               write phase heap profiles
 #   YAK_SSA_AST_IN_FLIGHT_FILES=32               cap source files queued before AST parse
+#   YAK_SSA_AST_BUILD_WINDOW_FILES=2             cap parsed ASTs awaiting pass1 build cleanup
 #   YAK_SSA_ORDERED_AST_MAX_FILES=1024           downgrade ordered AST mode above this count
 #   YAK_SSA_LARGE_PROJECT_CONCURRENCY=2          cap large-project AST parse concurrency
 #   YAK_ANTLR_CACHE_RESET_FILES=25               reset ANTLR runtime caches by file count
@@ -57,6 +58,7 @@ export YAK_SSA_DIAGNOSTICS="${YAK_SSA_DIAGNOSTICS:-1}"
 export YAK_SSA_HEAP_LOG="${YAK_SSA_HEAP_LOG:-1}"
 export YAK_SSA_HEAP_PROFILE_DIR="${YAK_SSA_HEAP_PROFILE_DIR:-$OUT_DIR/heap-profiles}"
 export YAK_SSA_AST_IN_FLIGHT_FILES="${YAK_SSA_AST_IN_FLIGHT_FILES:-32}"
+export YAK_SSA_AST_BUILD_WINDOW_FILES="${YAK_SSA_AST_BUILD_WINDOW_FILES:-2}"
 export YAK_SSA_ORDERED_AST_MAX_FILES="${YAK_SSA_ORDERED_AST_MAX_FILES:-1024}"
 export YAK_SSA_LARGE_PROJECT_CONCURRENCY="${YAK_SSA_LARGE_PROJECT_CONCURRENCY:-2}"
 export YAK_ANTLR_CACHE_RESET_FILES="${YAK_ANTLR_CACHE_RESET_FILES:-25}"
@@ -93,7 +95,7 @@ CLI_ARGS+=("$@")
   echo "[measure] target=$TARGET"
   echo "[measure] program=$PROGRAM language=$LANGUAGE out_dir=$OUT_DIR"
   echo "[measure] heap_profiles=$YAK_SSA_HEAP_PROFILE_DIR monitor_pprof=$PPROF_FILE"
-  echo "[measure] ast_in_flight=$YAK_SSA_AST_IN_FLIGHT_FILES ordered_ast_limit=$YAK_SSA_ORDERED_AST_MAX_FILES large_project_concurrency=$YAK_SSA_LARGE_PROJECT_CONCURRENCY"
+  echo "[measure] ast_in_flight=$YAK_SSA_AST_IN_FLIGHT_FILES ast_build_window=$YAK_SSA_AST_BUILD_WINDOW_FILES ordered_ast_limit=$YAK_SSA_ORDERED_AST_MAX_FILES large_project_concurrency=$YAK_SSA_LARGE_PROJECT_CONCURRENCY"
   echo "[measure] antlr_reset_files=$YAK_ANTLR_CACHE_RESET_FILES antlr_reset_bytes=$YAK_ANTLR_CACHE_RESET_BYTES"
   echo "[measure] yakit_home=$YAKIT_HOME diagnostics=$YAK_DIAGNOSTICS_LOG_LEVEL ssa_diagnostics=$YAK_SSA_DIAGNOSTICS"
 } | tee "$LOG_FILE"

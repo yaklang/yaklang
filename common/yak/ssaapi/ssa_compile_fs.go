@@ -316,94 +316,100 @@ func (c *Config) parseProjectWithFS(
 			filesystem, preHandlerFiles, handlerFilesMap,
 		)
 		for fileContent := range ch {
-			fileASTStart := time.Now()
-			if fileContent.Status == ssareducer.FileStatusFsError {
-				log.Errorf("skip file: %s with fs error: %v", fileContent.Path, fileContent.Err)
-				prog.ProcessInfof("skip  file: %s with fs error: %v", fileContent.Path, fileContent.Err)
+			if fileContent == nil {
 				continue
 			}
-
-			if fileContent.Status == ssareducer.FileParseASTError {
-				if astParseErrLogged < maxAstParseErrLogs {
-					log.Warnf("parse Ast file: %s error: %s", fileContent.Path, fileContent.Err)
-					astParseErrLogged++
-				} else if !astParseErrSuppressed {
-					astParseErrSuppressed = true
-					log.Warnf("too many AST parse errors; suppressing further per-file logs (limit=%d)", maxAstParseErrLogs)
+			func(fileContent *ssareducer.FileContent) {
+				defer fileContent.Release()
+				fileASTStart := time.Now()
+				if fileContent.Status == ssareducer.FileStatusFsError {
+					log.Errorf("skip file: %s with fs error: %v", fileContent.Path, fileContent.Err)
+					prog.ProcessInfof("skip  file: %s with fs error: %v", fileContent.Path, fileContent.Err)
+					return
 				}
-				AstErr = utils.Errorf("parse Ast file: %s error: %s", fileContent.Path, fileContent.Err)
-				// continue
-			}
 
-			editor := prog.CreateEditor(fileContent.Content, fileContent.Path)
-			// editor := prog.CreateEditor([]byte{}, fileContent.Path)
-
-			fileContent.Editor = editor
-			fileContent.Content = nil
-
-			if fileContent.Err != nil {
-				prog.ProcessInfof("file %s parse ast error: %v", fileContent.Path, fileContent.Err)
-				AstErr = utils.JoinErrors(AstErr,
-					utils.Errorf("pre-handler parse file %s error: %v", fileContent.Path, fileContent.Err),
-				)
-			}
-
-			preHandlerProcess() // notify the process
-			// handler
-			if language := c.LanguageBuilder; language != nil {
-				func() {
-					defer func() {
-						if r := recover(); r != nil {
-							log.Errorf("pre-handler parse [%s] error %v  ", fileContent.Path, r)
-							utils.PrintCurrentGoroutineRuntimeStack()
-						}
-					}()
-					language.InitHandler(builder)
-					err = language.PreHandlerProject(filesystem, fileContent.AST, builder, editor)
-					if err != nil {
-						log.Errorf("pre-handler parse [%s] error %v", fileContent.Path, err)
+				if fileContent.Status == ssareducer.FileParseASTError {
+					if astParseErrLogged < maxAstParseErrLogs {
+						log.Warnf("parse Ast file: %s error: %s", fileContent.Path, fileContent.Err)
+						astParseErrLogged++
+					} else if !astParseErrSuppressed {
+						astParseErrSuppressed = true
+						log.Warnf("too many AST parse errors; suppressing further per-file logs (limit=%d)", maxAstParseErrLogs)
 					}
-				}()
-			}
-			if preHandlerBuildsFiles {
-				ssa.ReleaseASTRoot(fileContent.AST)
-			}
-			if _, needBuild := handlerFilesMap[fileContent.Path]; needBuild {
-				_, needsCompile := handlerFileSet[fileContent.Path]
-				switch {
-				case needsCompile && fileContent.AST != nil && !preHandlerBuildsFiles:
-					ast := fileContent.AST
-					path := fileContent.Path
-					prog.RegisterFileBuild(path, editor, builder, func(fileBuilder *ssa.FunctionBuilder) {
-						fileBuildStart := time.Now()
+					AstErr = utils.Errorf("parse Ast file: %s error: %s", fileContent.Path, fileContent.Err)
+					// continue
+				}
+
+				editor := prog.CreateEditor(fileContent.Content, fileContent.Path)
+				// editor := prog.CreateEditor([]byte{}, fileContent.Path)
+
+				fileContent.Editor = editor
+				fileContent.Content = nil
+
+				if fileContent.Err != nil {
+					prog.ProcessInfof("file %s parse ast error: %v", fileContent.Path, fileContent.Err)
+					AstErr = utils.JoinErrors(AstErr,
+						utils.Errorf("pre-handler parse file %s error: %v", fileContent.Path, fileContent.Err),
+					)
+				}
+
+				preHandlerProcess() // notify the process
+				// handler
+				if language := c.LanguageBuilder; language != nil {
+					func() {
 						defer func() {
-							if enableFilePerfLog && filePerfRecorder != nil {
-								fileBuildTime := time.Since(fileBuildStart)
-								filePerfRecorder.RecordDuration(fmt.Sprintf("Build[%s]", path), fileBuildTime)
-								if fileBuildTime > 100*time.Millisecond {
-									log.Infof("[File Performance] Build: %s, time: %v", path, fileBuildTime)
-								}
+							if r := recover(); r != nil {
+								log.Errorf("pre-handler parse [%s] error %v  ", fileContent.Path, r)
+								utils.PrintCurrentGoroutineRuntimeStack()
 							}
 						}()
-						if err := c.LanguageBuilder.BuildFromAST(ast, fileBuilder); err != nil {
-							log.Errorf("file build [%s] failed: %v", path, err)
+						language.InitHandler(builder)
+						err = language.PreHandlerProject(filesystem, fileContent.AST, builder, editor)
+						if err != nil {
+							log.Errorf("pre-handler parse [%s] error %v", fileContent.Path, err)
 						}
-					})
-				case !needsCompile && fileContent.Editor != nil:
-					rootEditor := fileContent.Editor
-					prog.RegisterDeferredBuild(ssa.DeferredBuildKindHelper, "extra-file:"+rootEditor.GetUrl(), func() {
-						prog.PushEditor(rootEditor)
-						prog.PopEditor(true)
-					})
+					}()
 				}
-			}
-			// Once skeleton + deferred tasks are registered (pass1), drop the file
-			// AST root reference. For self-registering languages the body subtrees
-			// are detached, so the rest of the parse tree becomes collectable here.
-			fileContent.AST = nil
-			if enableFilePerfLog {
-				recordFilePerformance(filePerfRecorder, "AST", "AST parse", fileContent.Path, time.Since(fileASTStart))
-			}
+				if preHandlerBuildsFiles {
+					ssa.ReleaseASTRoot(fileContent.AST)
+				}
+				if _, needBuild := handlerFilesMap[fileContent.Path]; needBuild {
+					_, needsCompile := handlerFileSet[fileContent.Path]
+					switch {
+					case needsCompile && fileContent.AST != nil && !preHandlerBuildsFiles:
+						ast := fileContent.AST
+						path := fileContent.Path
+						prog.RegisterFileBuild(path, editor, builder, func(fileBuilder *ssa.FunctionBuilder) {
+							fileBuildStart := time.Now()
+							defer func() {
+								if enableFilePerfLog && filePerfRecorder != nil {
+									fileBuildTime := time.Since(fileBuildStart)
+									filePerfRecorder.RecordDuration(fmt.Sprintf("Build[%s]", path), fileBuildTime)
+									if fileBuildTime > 100*time.Millisecond {
+										log.Infof("[File Performance] Build: %s, time: %v", path, fileBuildTime)
+									}
+								}
+							}()
+							if err := c.LanguageBuilder.BuildFromAST(ast, fileBuilder); err != nil {
+								log.Errorf("file build [%s] failed: %v", path, err)
+							}
+						})
+					case !needsCompile && fileContent.Editor != nil:
+						rootEditor := fileContent.Editor
+						prog.RegisterDeferredBuild(ssa.DeferredBuildKindHelper, "extra-file:"+rootEditor.GetUrl(), func() {
+							prog.PushEditor(rootEditor)
+							prog.PopEditor(true)
+						})
+					}
+				}
+				// Once skeleton + deferred tasks are registered (pass1), drop the file
+				// AST root reference. For self-registering languages the body subtrees
+				// are detached, so the rest of the parse tree becomes collectable here.
+				fileContent.AST = nil
+				if enableFilePerfLog {
+					recordFilePerformance(filePerfRecorder, "AST", "AST parse", fileContent.Path, time.Since(fileASTStart))
+				}
+			}(fileContent)
 		}
 		preHandlerTime = time.Since(start)
 		if AstErr != nil && c.GetCompileStrictMode() {

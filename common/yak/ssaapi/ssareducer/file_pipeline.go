@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -31,8 +32,7 @@ const (
 const maxFileSize = 5 * 1024 * 1024 // 5MB
 
 // pipeInitBufSize caps source-content queue capacity before AST parse. Parsed
-// AST output is unbuffered in OutOfOrder mode, so trees cannot queue ahead of
-// the pre-handler consumer by total project file count.
+// AST retention is separately bounded by astBuildWindowSize in OutOfOrder mode.
 func pipeInitBufSize(pathCount, compileConcurrency int) int {
 	if pathCount < 1 {
 		pathCount = 1
@@ -79,6 +79,19 @@ func orderedASTBufferFileLimit() int {
 	return limit
 }
 
+func astBuildWindowSize(compileConcurrency int) int {
+	window := effectivePipeConcurrency(compileConcurrency)
+	if raw := strings.TrimSpace(os.Getenv("YAK_SSA_AST_BUILD_WINDOW_FILES")); raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil {
+			window = v
+		}
+	}
+	if window < 1 {
+		return 1
+	}
+	return window
+}
+
 type FileHandler func(path string, content []byte)
 
 type FileStatus int
@@ -92,13 +105,29 @@ const (
 )
 
 type FileContent struct {
-	Path     string
-	Content  []byte
-	AST      ssa.FrontAST
-	Status   FileStatus
-	Err      error
-	Editor   *memedit.MemEditor
-	Duration time.Duration
+	Path        string
+	Content     []byte
+	AST         ssa.FrontAST
+	Status      FileStatus
+	Err         error
+	Editor      *memedit.MemEditor
+	Duration    time.Duration
+	releaseOnce sync.Once
+	release     func()
+}
+
+func (f *FileContent) setRelease(release func()) {
+	if f == nil {
+		return
+	}
+	f.release = release
+}
+
+func (f *FileContent) Release() {
+	if f == nil || f.release == nil {
+		return
+	}
+	f.releaseOnce.Do(f.release)
 }
 
 func FilesHandler(
@@ -183,17 +212,33 @@ func FilesHandler(
 	)
 	readPipe.FeedSlice(paths)
 
-	parsePipe := pipeline.NewBoundedPipeWithStore[*FileContent, *FileContent](
-		ctx,
-		parsedASTQueueSize,
-		func(fileContent *FileContent, store *utils.SafeMap[any]) (*FileContent, error) {
-			return parseFile(fileContent, store), nil
-		},
-		initWorker,
-		concurrency,
-	)
-	parsePipe.FeedChannel(readPipe.Out())
-	parseOut := parsePipe.Out()
+	var parseOut <-chan *FileContent
+	if orderType == OutOfOrder {
+		parsePipe := pipeline.NewSlotPipeWithStore[*FileContent, *FileContent](
+			ctx,
+			parsedASTQueueSize,
+			astBuildWindowSize(concurrency),
+			func(fileContent *FileContent, store *utils.SafeMap[any]) (*FileContent, error) {
+				return parseFile(fileContent, store), nil
+			},
+			initWorker,
+			concurrency,
+		)
+		parsePipe.FeedChannel(readPipe.Out())
+		parseOut = releaseTrackedFileContents(ctx, parsePipe.Out())
+	} else {
+		parsePipe := pipeline.NewBoundedPipeWithStore[*FileContent, *FileContent](
+			ctx,
+			parsedASTQueueSize,
+			func(fileContent *FileContent, store *utils.SafeMap[any]) (*FileContent, error) {
+				return parseFile(fileContent, store), nil
+			},
+			initWorker,
+			concurrency,
+		)
+		parsePipe.FeedChannel(readPipe.Out())
+		parseOut = parsePipe.Out()
+	}
 
 	sort := func(index int) <-chan *FileContent {
 		out := make([]*FileContent, 0, len(paths))
@@ -237,6 +282,31 @@ func FilesHandler(
 	}
 
 	return parseOut
+}
+
+func releaseTrackedFileContents(ctx context.Context, slots <-chan *pipeline.SlotResult[*FileContent]) <-chan *FileContent {
+	out := make(chan *FileContent)
+	go func() {
+		defer close(out)
+		for slot := range slots {
+			if slot == nil {
+				continue
+			}
+			fileContent := slot.Value
+			if fileContent == nil {
+				slot.Release()
+				continue
+			}
+			fileContent.setRelease(slot.Release)
+			select {
+			case <-ctx.Done():
+				fileContent.Release()
+				return
+			case out <- fileContent:
+			}
+		}
+	}()
+	return out
 }
 
 func effectiveASTSequence(orderType ASTSequenceType, pathCount int) ASTSequenceType {
