@@ -136,7 +136,14 @@ func (t ToolInputSchema) MarshalJSON() ([]byte, error) {
 
 	if t.Properties != nil {
 		t.Properties.ForEach(func(k string, v any) bool {
-			temp.Properties[k] = normalizeSchemaValue(v)
+			normalized := normalizeSchemaValue(v)
+			if m, ok := normalized.(map[string]any); ok {
+				if _, isBool := m["required"].(bool); isBool {
+					delete(m, "required")
+				}
+				normalized = m
+			}
+			temp.Properties[k] = normalized
 			return true
 		})
 	}
@@ -512,13 +519,15 @@ func WithRaw(name string, object map[string]any, opts ...PropertyOption) ToolOpt
 			opt(object)
 		}
 
-		// Remove required from property schema and add to InputSchema.required
-		if required, ok := object["required"].(bool); ok && required {
+		// Bool required is internal metadata; promote true to InputSchema.required and never export false.
+		if required, ok := object["required"].(bool); ok {
 			delete(object, "required")
-			if t.InputSchema.Required == nil {
-				t.InputSchema.Required = []string{name}
-			} else {
-				t.InputSchema.Required = append(t.InputSchema.Required, name)
+			if required {
+				if t.InputSchema.Required == nil {
+					t.InputSchema.Required = []string{name}
+				} else {
+					t.InputSchema.Required = append(t.InputSchema.Required, name)
+				}
 			}
 		}
 
