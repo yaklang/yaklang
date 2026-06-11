@@ -155,6 +155,12 @@ func callAITransaction(
 		return nil
 	}
 
+	// 确定最终错误：优先使用 API 调用错误，保留错误链
+	finalErr := lastErr
+	if lastCallAiErr != nil {
+		finalErr = lastCallAiErr
+	}
+
 	var modelInfo string
 	if lastRsp != nil {
 		provider := lastRsp.GetProviderName()
@@ -171,7 +177,7 @@ func callAITransaction(
 			"2. Try switching to a different AI model\n"+
 			"3. Simplify the task or reduce the prompt complexity\n"+
 			"4. Check network connectivity and API rate limits",
-		trcRetry, modelInfo, lastErr,
+		trcRetry, modelInfo, finalErr,
 	)
 	if lastRsp != nil {
 		rawDump := lastRsp.GetRawHTTPResponseDump()
@@ -185,14 +191,10 @@ func callAITransaction(
 	if lastReq != nil {
 		tier = consts.ModelTier(lastReq.GetModelTier())
 	}
-	EmitAICallFailureIfApplicable(c, tier, lastRsp, lastErr, failureExtra)
+	EmitAICallFailureIfApplicable(c, tier, lastRsp, finalErr, failureExtra)
 
-	// 优先返回 API 调用错误（如 401、网络错误），而不是被 postHandler 错误覆盖
-	if lastCallAiErr != nil {
-		return utils.Wrap(lastCallAiErr, fmt.Sprintf("max retry count[%v] reached in transaction", trcRetry))
-	}
-	if lastErr != nil {
-		return utils.Wrap(lastErr, fmt.Sprintf("max retry count[%v] reached in transaction", trcRetry))
+	if finalErr != nil {
+		return utils.Wrap(finalErr, fmt.Sprintf("max retry count[%v] reached in transaction", trcRetry))
 	}
 	return utils.Errorf("max retry count[%v] reached in transaction", trcRetry)
 }
