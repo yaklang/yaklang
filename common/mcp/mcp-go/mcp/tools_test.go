@@ -298,6 +298,29 @@ func TestWithPagingSchema_NilFieldNamesOmitsEnum(t *testing.T) {
 	require.False(t, hasOrderByEnum, "orderby.enum should be omitted when fieldNames is nil")
 }
 
+func TestMarshalInputSchema_OmitsBoolRequiredOnProperties(t *testing.T) {
+	tool := NewTool("optional_probe",
+		WithString("timezone", Description("optional timezone"), func(schema map[string]any) {
+			schema["required"] = false
+		}),
+	)
+
+	raw, err := json.Marshal(tool.InputSchema)
+	require.NoError(t, err)
+	require.NotContains(t, string(raw), `"required":false`)
+
+	var parsed map[string]any
+	require.NoError(t, json.Unmarshal(raw, &parsed))
+
+	props, ok := parsed["properties"].(map[string]any)
+	require.True(t, ok, "properties should be object")
+
+	tz, ok := props["timezone"].(map[string]any)
+	require.True(t, ok, "timezone property should exist")
+	_, hasRequired := tz["required"]
+	require.False(t, hasRequired, "property-level required must be omitted")
+}
+
 func TestWithPagingSchema_EmptyFieldNamesOmitsEnum(t *testing.T) {
 	tool := NewTool("query_test",
 		WithPaging("pagination", []string{}),

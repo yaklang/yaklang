@@ -448,14 +448,15 @@ func WithStructParam(name string, opts []PropertyOption, itemsOpt ...ToolOption)
 			schema["required"] = nestedRequired
 		}
 
-		// Handle top-level required (whether this struct parameter itself is required)
-		if required, ok := schema["required"].(bool); ok && required {
-			// If PropertyOptions set required=true, this struct param is required at top level
+		// Handle top-level required (whether this struct parameter itself is required).
+		if required, ok := schema["required"].(bool); ok {
 			delete(schema, "required")
-			if t.InputSchema.Required == nil {
-				t.InputSchema.Required = []string{name}
-			} else {
-				t.InputSchema.Required = append(t.InputSchema.Required, name)
+			if required {
+				if t.InputSchema.Required == nil {
+					t.InputSchema.Required = []string{name}
+				} else {
+					t.InputSchema.Required = append(t.InputSchema.Required, name)
+				}
 			}
 			// Re-add nested required array if it exists
 			if len(nestedRequired) > 0 {
@@ -569,15 +570,18 @@ func WithRawParam(name string, object map[string]any, opts ...PropertyOption) To
 			opt(merged)
 		}
 
-		// Handle required field - can be bool (for simple params) or []string (for nested structs)
+		// Handle required field - can be bool (for simple params) or []string (for nested structs).
+		// Bool required is internal metadata only; it must not appear in exported JSON Schema
+		// (JSON Schema "required" is an array of property names on objects, not a per-field bool).
 		if requiredVal, exists := merged["required"]; exists {
-			// Check if it's a bool (simple parameter)
-			if required, ok := requiredVal.(bool); ok && required {
+			if required, ok := requiredVal.(bool); ok {
 				delete(merged, "required")
-				if t.InputSchema.Required == nil {
-					t.InputSchema.Required = []string{name}
-				} else {
-					t.InputSchema.Required = append(t.InputSchema.Required, name)
+				if required {
+					if t.InputSchema.Required == nil {
+						t.InputSchema.Required = []string{name}
+					} else {
+						t.InputSchema.Required = append(t.InputSchema.Required, name)
+					}
 				}
 			}
 			// If it's a []string (nested struct), keep it in the schema

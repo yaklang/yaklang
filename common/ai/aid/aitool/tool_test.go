@@ -777,3 +777,38 @@ func TestJSONSchemaValidity(t *testing.T) {
 		}
 	}
 }
+
+// TestWithParam_RequiredFalse_OmitsPropertyRequired ensures optional params marked with
+// WithParam_Required(false) do not emit invalid per-property "required": false in JSON Schema.
+func TestWithParam_RequiredFalse_OmitsPropertyRequired(t *testing.T) {
+	tool := NewWithoutCallback("optional_param_probe",
+		WithStringParam("timezone",
+			WithParam_Required(false),
+			WithParam_Description("optional timezone"),
+		),
+	)
+
+	raw, err := json.Marshal(tool.InputSchema)
+	if err != nil {
+		t.Fatalf("marshal input schema: %v", err)
+	}
+	if strings.Contains(string(raw), `"required":false`) {
+		t.Fatalf("optional param must not export required:false, got: %s", string(raw))
+	}
+
+	var parsed map[string]any
+	if err := json.Unmarshal(raw, &parsed); err != nil {
+		t.Fatalf("unmarshal schema: %v", err)
+	}
+	props, ok := parsed["properties"].(map[string]any)
+	if !ok {
+		t.Fatalf("properties missing: %s", string(raw))
+	}
+	tz, ok := props["timezone"].(map[string]any)
+	if !ok {
+		t.Fatalf("timezone property missing: %s", string(raw))
+	}
+	if _, hasRequired := tz["required"]; hasRequired {
+		t.Fatalf("timezone property must not carry required key, got: %v", tz["required"])
+	}
+}
