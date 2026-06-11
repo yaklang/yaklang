@@ -121,6 +121,7 @@ func AIChatToAICallbackType(cb func(prompt string, opts ...aispec.AIConfigOption
 			)
 			if err != nil {
 				log.Errorf("chat error: %v", err)
+				resp.SetError(err)
 			}
 			if !isStream {
 				resp.EmitOutputStream(strings.NewReader(output))
