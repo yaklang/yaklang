@@ -249,6 +249,7 @@ func TestQueryMCPClientToolConfigs(t *testing.T) {
 	}{
 		{"port_scan_start", schema.MCPClientToolSourceBuiltin, "", "Start port scan"},
 		{"codec_base64", schema.MCPClientToolSourceBuiltin, "", "Base64 codec"},
+		{"tree", schema.MCPClientToolSourceAITool, "", "Tree tree"},
 		{"mcp_MyServer_foo", schema.MCPClientToolSourceBridge, "MyServer", "Foo tool from MyServer"},
 		{"mcp_MyServer_bar", schema.MCPClientToolSourceBridge, "MyServer", "Bar tool from MyServer"},
 		{"mcp_OtherSrv_baz", schema.MCPClientToolSourceBridge, "OtherSrv", "Baz tool"},
@@ -264,8 +265,8 @@ func TestQueryMCPClientToolConfigs(t *testing.T) {
 			Pagination: &ypb.Paging{Page: 1, Limit: 20},
 		})
 		require.NoError(t, err)
-		assert.Equal(t, 5, p.TotalRecord)
-		assert.Len(t, cfgs, 5)
+		assert.Equal(t, 6, p.TotalRecord)
+		assert.Len(t, cfgs, 6)
 	})
 
 	t.Run("filters by source=builtin", func(t *testing.T) {
@@ -283,7 +284,7 @@ func TestQueryMCPClientToolConfigs(t *testing.T) {
 			Pagination: &ypb.Paging{Page: 1, Limit: 20},
 		})
 		require.NoError(t, err)
-		assert.Len(t, cfgs, 4)
+		assert.Len(t, cfgs, 5)
 		for _, cfg := range cfgs {
 			assert.Contains(t, []string{schema.MCPClientToolSourceBuiltin, schema.MCPClientToolSourceBridge}, cfg.Source)
 		}
@@ -308,7 +309,7 @@ func TestQueryMCPClientToolConfigs(t *testing.T) {
 		for _, c := range cfgs {
 			assert.True(t, c.Enable)
 		}
-		assert.Len(t, cfgs, 4, "disabled codec_base64 should be excluded")
+		assert.Len(t, cfgs, 5, "disabled codec_base64 should be excluded")
 	})
 
 	t.Run("keyword matches tool_name", func(t *testing.T) {
@@ -336,7 +337,7 @@ func TestQueryMCPClientToolConfigs(t *testing.T) {
 		})
 		require.NoError(t, err)
 		assert.Len(t, cfgs1, 2)
-		assert.Equal(t, 5, p1.TotalRecord)
+		assert.Equal(t, 6, p1.TotalRecord)
 
 		_, cfgs2, err := QueryMCPClientToolConfigs(db, &ypb.GetMCPToolListRequest{
 			Pagination: &ypb.Paging{Page: 2, Limit: 2},
