@@ -388,6 +388,10 @@ func (m *mockSimpleTask) SetStatus(status aicommon.AITaskState) {
 	m.status = status
 }
 
+func (m *mockSimpleTask) ForceSetStatus(status aicommon.AITaskState) {
+	m.status = status
+}
+
 func (m *mockSimpleTask) SetAsyncDeferCallback(func(err error)) {
 }
 
