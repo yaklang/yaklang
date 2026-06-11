@@ -164,8 +164,8 @@ var yaklangErrorPatterns = []ErrorPattern{
 	},
 	{
 		Name:       "ExternLibMissingMember",
-		ErrorGlobs: []string{"*ExternLib*don't has*", "*don't has*"},
-		Hint:       "该库不存在此 API。请立即使用 yakdoc_library_details 列出可用函数，再用 yakdoc_function_details 查询正确签名。禁止继续猜测 API 名称。",
+		ErrorGlobs: []string{"*ExternLib*don't has*", "*ExternType*don't has*"},
+		Hint:       "该库不存在此 API。下方应已自动附加相近成员与建议签名；若无附加信息，再用 yakdoc_search 按功能词搜索。禁止继续猜测 API 名称。",
 	},
 	{
 		Name:       "IncompleteStructure",
@@ -244,6 +244,10 @@ func getIntelligentErrorHint(msg *resultSpec.StaticAnalyzeResult, me *memedit.Me
 	}
 
 	errorMessage := msg.Message
+
+	if enriched := EnrichExternFieldError(errorMessage); enriched != "" {
+		return enriched
+	}
 
 	// Check each pattern
 	for _, pattern := range yaklangErrorPatterns {

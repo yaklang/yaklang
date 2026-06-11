@@ -2,16 +2,16 @@
 
 你的工作流程必须遵循以下协议：
 
-*   **预先准备**: 在开始编写代码之之前，如有无法确定的概念或 API，请先使用 `yakdoc_library_details` / `yakdoc_function_details` 查询标准库文档；语法/用法样例用 `grep_yaklang_samples`。
+*   **预先准备**: 在开始编写代码之前，不知道库名时用 `yakdoc_search` 按功能词搜索 API；已知库名后用 `yakdoc_function_details`；语法/用法样例用 `grep_yaklang_samples`。
 *   **初始编码**: 使用 `write_code` 生成初始代码。
 *   **迭代修改**: 后续所有修改都应使用 `modify_code`。
 
 ### 诊断优先原则 (Diagnose-Before-Treat Protocol)
 
 1.  在 `modify_code` 后，仔细分析返回的 `lint error`。
-2.  如果错误是 **`ExternLib [...] don't has [...]`** 相关的 API 错误，你**必须立即调用 `yakdoc_library_details` 和/或 `yakdoc_function_details`**。
+2.  如果错误是 **`ExternLib [...] don't has [...]`**，先阅读 lint 中【已自动附加 YakDocument】的相近 API；信息不足再调 `yakdoc_function_details`，**禁止猜测性 modify_code**。
 3.  如果错误是 **`SyntaxError`** 或 **`TypeCheck error`**，你**必须立即调用 `grep_yaklang_samples`** 搜索正确语法样例。
-4.  只有在通过 yakdoc 或 grep 获得了新的知识后，你才能再次调用 `modify_code` 进行修复。
+4.  只有在获得新信息后，你才能再次调用 `modify_code` 进行修复。
 
 **禁止猜测**: 严禁在不理解错误根源的情况下，连续使用 `modify_code` 进行试探性修复。如果你发现自己正在这么做，立即停下并回到第 3 步。
 

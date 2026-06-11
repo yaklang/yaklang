@@ -148,6 +148,7 @@ func TestWriteYaklangLoopPromptContainsYakdocActions(t *testing.T) {
 	ins, err := aireact.NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := r.GetPrompt()
+			require.Contains(t, prompt, "yakdoc_search")
 			require.Contains(t, prompt, "yakdoc_get_all_library_names")
 			require.Contains(t, prompt, "yakdoc_library_details")
 			require.Contains(t, prompt, "yakdoc_function_details")

@@ -41,6 +41,37 @@ func TestQueryFunctionDetails_NotFound(t *testing.T) {
 	require.Contains(t, err.Error(), "not found")
 }
 
+func TestSearchYakDocument_ByKeyword(t *testing.T) {
+	hits, err := SearchYakDocument("Split", 10, "str")
+	require.NoError(t, err)
+	require.NotEmpty(t, hits)
+	found := false
+	for _, hit := range hits {
+		if hit.Name == "Split" {
+			found = true
+			break
+		}
+	}
+	require.True(t, found, "expected str.Split in search results")
+}
+
+func TestSearchYakDocument_EmptyQuery(t *testing.T) {
+	_, err := SearchYakDocument("", 10, "")
+	require.Error(t, err)
+}
+
+func TestEnrichExternFieldError_KnownCase(t *testing.T) {
+	msg := `ExternLib [poc] don't has [appendHeade], maybe you meant appendHeader ?`
+	enriched := EnrichExternFieldError(msg)
+	require.Contains(t, enriched, "已自动附加 YakDocument")
+	require.Contains(t, enriched, "appendHeader")
+	require.Contains(t, enriched, "相近函数")
+}
+
+func TestEnrichExternFieldError_NonMatching(t *testing.T) {
+	require.Empty(t, EnrichExternFieldError("syntax error at line 1"))
+}
+
 func TestFormatLibraryDetails_Truncation(t *testing.T) {
 	names := make([]string, yakdocMaxNameListItems+5)
 	for i := range names {
