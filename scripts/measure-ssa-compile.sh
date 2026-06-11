@@ -9,6 +9,7 @@
 #   OUT_DIR=build/ssa-measure/run1               where logs and pprof summaries are written
 #   YAKIT_HOME="$PWD/.db"                        worktree-local SSA database
 #   YAK_DIAGNOSTICS_LOG_LEVEL=trace              diagnostics trace level
+#   YAK_SSA_DIAGNOSTICS=1                        enable nested SSA diagnostics TRACE
 #   YAK_SSA_HEAP_LOG=1                           print retained heap by SSA compile phase
 #   YAK_SSA_HEAP_PROFILE_DIR=<dir>               write phase heap profiles
 #   YAK_SSA_AST_IN_FLIGHT_FILES=32               cap source files queued before AST parse
@@ -52,6 +53,7 @@ PPROF_FILE="${YAK_SSA_MONITOR_PPROF:-$OUT_DIR/heap-monitor.pprof}"
 
 export YAKIT_HOME="${YAKIT_HOME:-$PWD/.db}"
 export YAK_DIAGNOSTICS_LOG_LEVEL="${YAK_DIAGNOSTICS_LOG_LEVEL:-trace}"
+export YAK_SSA_DIAGNOSTICS="${YAK_SSA_DIAGNOSTICS:-1}"
 export YAK_SSA_HEAP_LOG="${YAK_SSA_HEAP_LOG:-1}"
 export YAK_SSA_HEAP_PROFILE_DIR="${YAK_SSA_HEAP_PROFILE_DIR:-$OUT_DIR/heap-profiles}"
 export YAK_SSA_AST_IN_FLIGHT_FILES="${YAK_SSA_AST_IN_FLIGHT_FILES:-32}"
@@ -82,6 +84,9 @@ CLI_ARGS=(
   --pprof "$PPROF_FILE"
   --log "$LOG_LEVEL"
 )
+if [[ "$YAK_SSA_DIAGNOSTICS" != "0" ]]; then
+  CLI_ARGS+=(--diagnostics)
+fi
 CLI_ARGS+=("$@")
 
 {
@@ -90,7 +95,7 @@ CLI_ARGS+=("$@")
   echo "[measure] heap_profiles=$YAK_SSA_HEAP_PROFILE_DIR monitor_pprof=$PPROF_FILE"
   echo "[measure] ast_in_flight=$YAK_SSA_AST_IN_FLIGHT_FILES ordered_ast_limit=$YAK_SSA_ORDERED_AST_MAX_FILES large_project_concurrency=$YAK_SSA_LARGE_PROJECT_CONCURRENCY"
   echo "[measure] antlr_reset_files=$YAK_ANTLR_CACHE_RESET_FILES antlr_reset_bytes=$YAK_ANTLR_CACHE_RESET_BYTES"
-  echo "[measure] yakit_home=$YAKIT_HOME diagnostics=$YAK_DIAGNOSTICS_LOG_LEVEL"
+  echo "[measure] yakit_home=$YAKIT_HOME diagnostics=$YAK_DIAGNOSTICS_LOG_LEVEL ssa_diagnostics=$YAK_SSA_DIAGNOSTICS"
 } | tee "$LOG_FILE"
 
 if command -v /usr/bin/time >/dev/null 2>&1 && [[ "${YAK_MEASURE_TIME:-1}" != "0" ]]; then

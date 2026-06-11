@@ -42,6 +42,8 @@ type ssaCliConfig struct {
 	// preferConfigCompile 为 true 时，编译阶段直接使用 Config 走 script 编译链路。
 	// 为 false 时，优先走 target + detect + script 链路。
 	preferConfigCompile bool
+	// diagnosticsEnabled enables SSA compile diagnostics and nested TRACE output.
+	diagnosticsEnabled bool
 	// forceProgramName 为 true 时，编译阶段显式固定 program_name（例如 CLI 指定 --program）。
 	forceProgramName bool
 
@@ -216,12 +218,13 @@ func logCompileStageMessage(command string, config *ssaCliConfig) {
 	}
 
 	log.Infof(
-		"[%s] compile options: re-compile=%v entry-files=%d exclude-files=%d file-perf-log=%v compile-memory=%v scan-memory=%v",
+		"[%s] compile options: re-compile=%v entry-files=%d exclude-files=%d file-perf-log=%v diagnostics=%v compile-memory=%v scan-memory=%v",
 		command,
 		config.GetCompileReCompile(),
 		len(config.GetCompileEntryFiles()),
 		len(config.GetCompileExcludeFiles()),
 		config.GetCompileFilePerformanceLog(),
+		config.diagnosticsEnabled,
 		config.GetCompileMemory(),
 		config.GetSyntaxFlowMemory(),
 	)
@@ -257,6 +260,9 @@ func getProgram(ctx context.Context, config *ssaCliConfig) ([]*ssaapi.Program, e
 			req.Target = targetPath
 			req.Language = string(config.GetLanguage())
 			req.Options = buildCompileOptionsForDetect(config.Config)
+			if config.diagnosticsEnabled {
+				req.Options = append(req.Options, ssaapi.WithDiagnostics(true))
+			}
 		}
 
 		res, err := ssa_compile.ParseProjectWithAutoDetective(ctx, req)
@@ -314,6 +320,13 @@ func parseConfigFileWithCliFlagOverride(cliCtx *cli.Context) (res *ssaCliConfig,
 	if err := applyCompileCliOverrides(cfg, cliCtx); err != nil {
 		return nil, err
 	}
+	diagnosticsEnabled := cfg.GetCompileDiagnostics()
+	if cliCtx.Bool("diagnostics") {
+		if err := cfg.Update(ssaapi.WithDiagnostics(true)); err != nil {
+			return nil, utils.Errorf("enable diagnostics failed: %v", err)
+		}
+		diagnosticsEnabled = true
+	}
 
 	// 调试日志
 	log.Infof("Config loaded: programName=%s, language=%s, targetPath=%s, outputFile=%s, outputFormat=%s",
@@ -331,6 +344,7 @@ func parseConfigFileWithCliFlagOverride(cliCtx *cli.Context) (res *ssaCliConfig,
 	config := &ssaCliConfig{
 		Config:              cfg,
 		preferConfigCompile: true,
+		diagnosticsEnabled:  diagnosticsEnabled,
 		forceProgramName:    strings.TrimSpace(cfg.GetProgramName()) != "",
 	}
 
@@ -414,6 +428,10 @@ func parseCompileConfigFromCli(c *cli.Context) (res *ssaCliConfig, err error) {
 	if c.Bool("file-perf-log") {
 		opts = append(opts, ssaconfig.WithCompileFilePerformanceLog(true))
 	}
+	diagnosticsEnabled := c.Bool("diagnostics")
+	if diagnosticsEnabled {
+		opts = append(opts, ssaapi.WithDiagnostics(true))
+	}
 
 	cfg, err := ssaconfig.NewCLIScanConfig(opts...)
 	if err != nil {
@@ -426,6 +444,7 @@ func parseCompileConfigFromCli(c *cli.Context) (res *ssaCliConfig, err error) {
 	return &ssaCliConfig{
 		Config:              cfg,
 		preferConfigCompile: false,
+		diagnosticsEnabled:  diagnosticsEnabled,
 		forceProgramName:    c.IsSet("program") && strings.TrimSpace(c.String("program")) != "",
 	}, nil
 }
@@ -453,6 +472,9 @@ func buildCompileOptionsForDetect(cfg *ssaconfig.Config) []ssaconfig.Option {
 	}
 	if cfg.GetCompileFilePerformanceLog() {
 		opts = append(opts, ssaconfig.WithCompileFilePerformanceLog(true))
+	}
+	if cfg.GetCompileDiagnostics() {
+		opts = append(opts, ssaconfig.WithCompileDiagnostics(true))
 	}
 	if cfg.GetCompileStrictMode() {
 		opts = append(opts, ssaconfig.WithCompileStrictMode(true))

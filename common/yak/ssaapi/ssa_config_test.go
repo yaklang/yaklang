@@ -41,6 +41,24 @@ func TestDefaultConfigUsesSerializableASTOrder(t *testing.T) {
 	require.Equal(t, ssaconfig.ReverseOrder, config.GetCompileASTSequence())
 }
 
+func TestDefaultConfigUsesSerializableDiagnostics(t *testing.T) {
+	config, err := DefaultConfig(
+		WithFileSystem(filesys.NewLocalFs()),
+		WithLanguage(ssaconfig.JAVA),
+		WithDiagnostics(true),
+	)
+	require.NoError(t, err)
+	require.True(t, config.DiagnosticsEnabled())
+	require.True(t, config.GetCompileDiagnostics())
+
+	raw, err := config.ToJSONRaw()
+	require.NoError(t, err)
+
+	cloned, err := ssaconfig.NewCLIScanConfig(ssaconfig.WithJsonRawConfig(raw))
+	require.NoError(t, err)
+	require.True(t, cloned.GetCompileDiagnostics())
+}
+
 // TestUnifiedFsWithFileSystem 测试使用 WithFileSystem 选项时，fs 被正确转换为 UnifiedFileSys
 // 这个测试覆盖所有文件系统类型，确保在不同平台（Windows/Linux/Mac）下都能正确工作
 func TestUnifiedFsWithFileSystem(t *testing.T) {

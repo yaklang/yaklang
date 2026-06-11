@@ -156,6 +156,7 @@ func defaultSSACompileConfig() *SSACompileConfig {
 		CompileIrCacheTTL:        time.Second,
 		CompileIrCacheMax:        5000,
 		FilePerformanceLog:       false,
+		Diagnostics:              false,
 		StopOnCliCheck:           false,
 		EnableIncrementalCompile: false,
 		BaseProgramName:          "",

@@ -128,6 +128,22 @@ func TestCompileASTSequenceJSONRoundTrip(t *testing.T) {
 	require.Equal(t, Order, cloned.GetCompileASTSequence())
 }
 
+func TestCompileDiagnosticsJSONRoundTrip(t *testing.T) {
+	cfg, err := New(
+		ModeAll,
+		WithProjectLanguage(JAVA),
+		WithCompileDiagnostics(true),
+	)
+	require.NoError(t, err)
+
+	raw, err := cfg.ToJSONRaw()
+	require.NoError(t, err)
+
+	cloned, err := NewCLIScanConfig(WithJsonRawConfig(raw))
+	require.NoError(t, err)
+	require.True(t, cloned.GetCompileDiagnostics())
+}
+
 func TestWithScanRaw(t *testing.T) {
 	cfg, err := New(ModeSyntaxFlowScan)
 	require.NoError(t, err)
@@ -334,6 +350,7 @@ func TestDefaultFactoryFunctions(t *testing.T) {
 		require.Equal(t, defaultCompileConcurrency(), config.Concurrency)
 		require.Equal(t, time.Second, config.CompileIrCacheTTL)
 		require.Equal(t, 5000, config.CompileIrCacheMax)
+		require.False(t, config.Diagnostics)
 	})
 
 	t.Run("defaultSyntaxFlowConfig", func(t *testing.T) {
