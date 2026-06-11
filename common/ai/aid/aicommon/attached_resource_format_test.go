@@ -27,8 +27,48 @@ func TestParseAttachedResourceDataByType(t *testing.T) {
 	require.NoError(t, err)
 	require.IsType(t, &AttachedHTTPFuzzRequestData{}, resource)
 
-	_, err = ParseAttachedResourceData(NewAttachedResource(CONTEXT_PROVIDER_TYPE_FILE, CONTEXT_PROVIDER_KEY_FILE_PATH, "/tmp/a.txt"))
-	require.Error(t, err)
+	textPath := t.TempDir() + "/a.txt"
+	require.NoError(t, os.WriteFile(textPath, []byte("hello attached file"), 0600))
+	resource, err = ParseAttachedResourceData(NewAttachedResource(CONTEXT_PROVIDER_TYPE_FILE, CONTEXT_PROVIDER_KEY_FILE_PATH, textPath))
+	require.NoError(t, err)
+	require.IsType(t, &AttachedFileResourceData{}, resource)
+	require.Equal(t, AttachedResourceTypeFile, resource.Type())
+	fileResource := resource.(*AttachedFileResourceData)
+	require.Equal(t, AttachedFileKindText, fileResource.Kind)
+	require.Contains(t, resource.ToAttachData(nil), "hello attached file")
+
+	resource, err = ParseAttachedResourceData(NewAttachedResource(CONTEXT_PROVIDER_KEY_FILE_PATH, "", textPath))
+	require.NoError(t, err)
+	require.IsType(t, &AttachedFileResourceData{}, resource)
+	require.Equal(t, AttachedResourceTypeFile, resource.Type())
+
+	dirPath := t.TempDir()
+	require.NoError(t, os.WriteFile(dirPath+"/child.txt", []byte("child"), 0600))
+	resource, err = ParseAttachedResourceData(NewAttachedResource(CONTEXT_PROVIDER_TYPE_FILE, CONTEXT_PROVIDER_KEY_FILE_PATH, dirPath))
+	require.NoError(t, err)
+	require.IsType(t, &AttachedFileResourceData{}, resource)
+	require.Equal(t, AttachedFileKindDirectory, resource.(*AttachedFileResourceData).Kind)
+	require.Contains(t, resource.ToAttachData(nil), "Directory Glance")
+
+	imagePath := t.TempDir() + "/a.png"
+	require.NoError(t, os.WriteFile(imagePath, []byte("png"), 0600))
+	resource, err = ParseAttachedResourceData(NewAttachedResource(CONTEXT_PROVIDER_TYPE_FILE, CONTEXT_PROVIDER_KEY_FILE_PATH, imagePath))
+	require.NoError(t, err)
+	require.IsType(t, &AttachedFileResourceData{}, resource)
+	require.Equal(t, AttachedFileKindImage, resource.(*AttachedFileResourceData).Kind)
+	require.Contains(t, resource.ToAttachData(nil), "Content dump skipped for image file")
+
+	resource, err = ParseAttachedResourceData(NewAttachedResource(CONTEXT_PROVIDER_TYPE_KNOWLEDGE_BASE, CONTEXT_PROVIDER_KEY_NAME, "kb"))
+	require.NoError(t, err)
+	require.IsType(t, &AttachedKnowledgeBaseResourceData{}, resource)
+	require.Equal(t, AttachedResourceTypeKnowledgeBase, resource.Type())
+	require.Empty(t, resource.ToAttachData(nil))
+
+	resource, err = ParseAttachedResourceData(NewAttachedResource("unknown_type", "custom_key", "hello"))
+	require.NoError(t, err)
+	require.IsType(t, &DefaultAttachedResourceData{}, resource)
+	require.Equal(t, "unknown_type", resource.Type())
+	require.Contains(t, resource.ToAttachData(nil), "no structured attached-resource parser")
 }
 
 func TestAttachedHTTPFlowIDsFromResourceJSON(t *testing.T) {

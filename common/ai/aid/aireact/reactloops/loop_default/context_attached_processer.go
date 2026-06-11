@@ -10,8 +10,12 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func ProcessAttachedData(r aicommon.AIInvokeRuntime, loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) error {
+func ProcessAttachedData(r aicommon.AIInvokeRuntime, loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator, attachedResources []aicommon.AttachedResourceData) error {
 	// 新建任务 让 ai 根据用户输入和提及信息进行增强知识回答
+	if !hasAttachedKnowledgeBaseResource(attachedResources) {
+		operator.Continue()
+		return nil
+	}
 
 	newTask := aicommon.NewStatefulTaskBase(
 		task.GetId(),
@@ -28,47 +32,49 @@ func ProcessAttachedData(r aicommon.AIInvokeRuntime, loop *reactloops.ReActLoop,
 		opts = append(opts, option)
 	}
 
-	haveKnowledgeBase := false
-	attachedResult := task.GetAttachedDatas()
-	for _, data := range attachedResult {
-		if data.Type == aicommon.CONTEXT_PROVIDER_TYPE_KNOWLEDGE_BASE {
-			haveKnowledgeBase = true
-			break
-		}
-	}
+	var knowledgeEnhanceLoop *reactloops.ReActLoop
+	opts = append(opts, reactloops.WithActionFactoryFromLoop(schema.AI_REACT_LOOP_NAME_KNOWLEDGE_ENHANCE), reactloops.WithOnLoopInstanceCreated(func(loop *reactloops.ReActLoop) {
+		knowledgeEnhanceLoop = loop
+	}))
 
-	if haveKnowledgeBase {
-		var knowledgeEnhanceLoop *reactloops.ReActLoop
-		opts = append(opts, reactloops.WithActionFactoryFromLoop(schema.AI_REACT_LOOP_NAME_KNOWLEDGE_ENHANCE), reactloops.WithOnLoopInstanceCreated(func(loop *reactloops.ReActLoop) {
-			knowledgeEnhanceLoop = loop
-		}))
+	_, err := r.ExecuteLoopTaskIF(schema.AI_REACT_LOOP_NAME_KNOWLEDGE_ENHANCE, newTask, opts...)
 
-		_, err := r.ExecuteLoopTaskIF(schema.AI_REACT_LOOP_NAME_KNOWLEDGE_ENHANCE, newTask, opts...)
+	log.Infof("knowledge enhance loop completed: err=%v, exit next loop", err)
+	operator.Done()
 
-		log.Infof("knowledge enhance loop completed: err=%v, exit next loop", err)
-		operator.Done()
-
-		var searchResultsSummary string
+	var searchResultsSummary string
+	if knowledgeEnhanceLoop != nil {
 		finalSummary := knowledgeEnhanceLoop.Get("final_summary")
 		if finalSummary != "" {
 			searchResultsSummary = finalSummary
 		} else {
 			searchResultsSummary = knowledgeEnhanceLoop.Get("search_results_summary")
 		}
-
-		if searchResultsSummary != "" {
-			loop.GetInvoker().AddToTimeline("knowledge_search_result_summary", searchResultsSummary)
-			loop.GetInvoker().AddToTimeline("import notice", "knowledge_search_result_summary has been set, no need to search the knowledge base again as it has already been queried")
-		}
-
-		if err != nil {
-			return utils.Wrap(err, "failed to execute loop task")
-		}
-
-		return nil
 	}
 
-	operator.Continue()
+	if searchResultsSummary != "" {
+		loop.GetInvoker().AddToTimeline("knowledge_search_result_summary", searchResultsSummary)
+		loop.GetInvoker().AddToTimeline("import notice", "knowledge_search_result_summary has been set, no need to search the knowledge base again as it has already been queried")
+	}
+
+	if err != nil {
+		return utils.Wrap(err, "failed to execute loop task")
+	}
 	return nil
 
+}
+
+func hasAttachedKnowledgeBaseResource(resources []aicommon.AttachedResourceData) bool {
+	for _, resource := range resources {
+		if resource == nil {
+			continue
+		}
+		if _, ok := resource.(*aicommon.AttachedKnowledgeBaseResourceData); ok {
+			return true
+		}
+		if resource.Type() == aicommon.AttachedResourceTypeKnowledgeBase {
+			return true
+		}
+	}
+	return false
 }

@@ -48,7 +48,11 @@ func ParseAttachedResourceData(data *AttachedResource) (AttachedResourceData, er
 	factory := attachedResourceDataFactories.items[normalizeAttachedResourceType(data.Type)]
 	attachedResourceDataFactories.RUnlock()
 	if factory == nil {
-		return nil, utils.Errorf("unsupported attached resource type: %s", strings.TrimSpace(data.Type))
+		resource := NewDefaultAttachedResourceData(data.Type, data.Key)
+		if err := resource.Unmarshal(data.Value); err != nil {
+			return nil, err
+		}
+		return resource, nil
 	}
 
 	resource := factory()
