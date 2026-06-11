@@ -166,6 +166,44 @@ if err != nil {
 
 ---
 
+## YakDocument 标准库文档查询（yakdoc_*）
+
+**文档查签名，grep 查样例** — 两者互补，不要混用职责。
+
+| 场景 | 优先工具 |
+|------|----------|
+| `ExternLib [...] don't has [...]` API 不存在 | `yakdoc_library_details` → `yakdoc_function_details` |
+| 不确定库名 | `yakdoc_get_all_library_names` |
+| 语法错误 / DSL 写法 / 完整实现样例 | `grep_yaklang_samples` 或 `semantic_search_yaklang_samples` |
+
+### 四个 YakDocument 工具
+
+1. **`yakdoc_get_all_library_names`** — 列出全部标准库名
+2. **`yakdoc_library_details`** — 列出某库的 functions/variables 名称
+3. **`yakdoc_function_details`** — 查询函数签名、参数、返回值、说明
+4. **`yakdoc_variable_details`** — 查询变量/实例说明
+
+**API 错误强制流程：**
+```
+ExternLib 报错
+  ↓
+yakdoc_library_details(library=["xxx"])  列出真实 API
+  ↓
+yakdoc_function_details(library="xxx", function=["yyy"])  查详情
+  ↓
+modify_code 基于文档修复
+```
+
+**示例：**
+```json
+{"@action": "yakdoc_library_details", "library": ["synscan"], "human_readable_thought": "API 报错，先列出 synscan 库可用函数"}
+```
+```json
+{"@action": "yakdoc_function_details", "library": "synscan", "function": ["Scan"], "human_readable_thought": "确认 Scan 函数签名与参数"}
+```
+
+---
+
 ## semantic_search_yaklang_samples - 语义搜索工具
 
 ### 什么时候使用 semantic_search_yaklang_samples？

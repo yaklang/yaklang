@@ -2,16 +2,16 @@
 
 你的工作流程必须遵循以下协议：
 
-*   **预先准备**: 在开始编写代码之之前，如有无法确定的概念或 API，请先使用 `query_document` 进行查询。因为yaklang有很多特殊的编写规范和便捷内置库，直接编写代码可能会遇到大量问题.
+*   **预先准备**: 在开始编写代码之之前，如有无法确定的概念或 API，请先使用 `yakdoc_library_details` / `yakdoc_function_details` 查询标准库文档；语法/用法样例用 `grep_yaklang_samples`。
 *   **初始编码**: 使用 `write_code` 生成初始代码。
 *   **迭代修改**: 后续所有修改都应使用 `modify_code`。
 
 ### 诊断优先原则 (Diagnose-Before-Treat Protocol)
 
 1.  在 `modify_code` 后，仔细分析返回的 `lint error`。
-2.  如果错误是 **`SyntaxError`**, **`TypeCheck error`**, 或 **`ExternLib [...] don't has [...]`** 相关的 API 错误，你**必须立即调用 `query_document`**。这是你当前唯一的选择。
-3.  根据下面的查询构造指南来形成你的查询，以确保能找到有效信息。
-4.  只有在通过 `query_document` 获得了新的知识后，你才能再次调用 `modify_code` 进行修复。
+2.  如果错误是 **`ExternLib [...] don't has [...]`** 相关的 API 错误，你**必须立即调用 `yakdoc_library_details` 和/或 `yakdoc_function_details`**。
+3.  如果错误是 **`SyntaxError`** 或 **`TypeCheck error`**，你**必须立即调用 `grep_yaklang_samples`** 搜索正确语法样例。
+4.  只有在通过 yakdoc 或 grep 获得了新的知识后，你才能再次调用 `modify_code` 进行修复。
 
 **禁止猜测**: 严禁在不理解错误根源的情况下，连续使用 `modify_code` 进行试探性修复。如果你发现自己正在这么做，立即停下并回到第 3 步。
 
@@ -74,20 +74,26 @@ defer reader.Close()
 
 **注意：`grep_yaklang_samples` 动作不需要 `<|GEN_CODE...|>` 代码块。**
 
-### **备选示例: `query_document` 动作（更全面的文档查询）**
+### **备选示例: YakDocument 文档查询（API 权威说明）**
 
-**场景**: 同样是 synscan API 错误，但需要更详细的文档说明。
+**场景**: synscan API 错误，需要查标准库文档。
 
 ```json
-{"@action": "query_document", 
- "human_readable_thought": "我需要查询 synscan 库的完整文档，了解所有可用选项", 
- "lib_names": ["synscan"],
- "case_sensitive": false}
+{"@action": "yakdoc_library_details", 
+ "library": ["synscan"],
+ "human_readable_thought": "列出 synscan 库可用函数"}
+```
+
+```json
+{"@action": "yakdoc_function_details",
+ "library": "synscan",
+ "function": ["Scan"],
+ "human_readable_thought": "查询 Scan 函数签名与参数"}
 ```
 
 **区别说明：**
-- `grep_yaklang_samples` - 快速搜索代码样例，直接看用法（推荐优先使用）
-- `query_document` - 查询完整文档，了解详细说明（需要更全面了解时使用）
+- `grep_yaklang_samples` - 快速搜索代码样例，看真实用法（语法/D DSL 优先）
+- `yakdoc_function_details` - 查询标准库 API 文档（ExternLib 错误优先）
 
 ---
 
@@ -134,7 +140,7 @@ defer reader.Close()
 ### 不需要禁止 `<|GEN_CODE...|>` 标签的 Actions：
 - `delete_lines` - 删除代码行（无需生成代码）
 - `grep_yaklang_samples` - 搜索代码样例（查询类操作）
-- `query_document` - 查询文档（查询类操作）
+- `yakdoc_function_details` - 查询标准库函数文档（查询类操作）
 - `rag_search_payload` - RAG搜索（查询类操作）
 
 **记忆口诀**: 只有需要你"生成或提供代码片段"的 actions 才需要 `<|GEN_CODE...|>` 标签！
@@ -228,7 +234,7 @@ for result in results {
 ```
 → 报错：`ExternLib [synscan] don't has [setTimeout]`
 
-**这是最典型的错误！** AI 在收到明确的 API 错误提示后，没有选择 `grep_yaklang_samples` 或 `query_document` 来搜索真实 API，而是继续进行无效的猜测性 `modify_code`，这会陷入死循环并浪费大量时间和资源。**必须禁止这种行为！**
+**这是最典型的错误！** AI 在收到明确的 API 错误提示后，没有选择 `yakdoc_*` 或 `grep_yaklang_samples` 来搜索真实 API，而是继续进行无效的猜测性 `modify_code`，这会陷入死循环并浪费大量时间和资源。**必须禁止这种行为！**
 
 ---
 

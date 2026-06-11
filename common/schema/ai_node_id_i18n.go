@@ -540,6 +540,22 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "查询文档",
 		En: "Query Document",
 	},
+	"yakdoc_get_all_library_names": {
+		Zh: "列出标准库",
+		En: "List Yak Libraries",
+	},
+	"yakdoc_library_details": {
+		Zh: "查询库概览",
+		En: "Yakdoc Library Details",
+	},
+	"yakdoc_function_details": {
+		Zh: "查询函数文档",
+		En: "Yakdoc Function Details",
+	},
+	"yakdoc_variable_details": {
+		Zh: "查询变量文档",
+		En: "Yakdoc Variable Details",
+	},
 	"focus-on": {
 		Zh: "专注",
 		En: "Focus On",
