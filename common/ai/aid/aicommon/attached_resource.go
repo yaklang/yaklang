@@ -1,7 +1,10 @@
 package aicommon
 
 const (
+	AttachedResourceTypeDefault         = "default"
+	AttachedResourceTypeFile            = CONTEXT_PROVIDER_TYPE_FILE
 	AttachedResourceTypeHTTPFlowID      = "http_flow_id"
+	AttachedResourceTypeKnowledgeBase   = "knowledge_base"
 	AttachedResourceTypeSelected        = "selected"
 	AttachedResourceTypeHTTPFuzzRequest = "http_fuzz_request"
 
@@ -14,6 +17,8 @@ const (
 	AttachedHTTPFlowListInlineLimit     = 30 * 1024
 	AttachedSelectedTextInlineLimit     = 5 * 1024
 	AttachedHTTPPacketInlineLimit       = 8 * 1024
+	AttachedDefaultResourceInlineLimit  = 8 * 1024
+	AttachedFilePreviewLimit            = 1024
 )
 
 // AttachedCodeSelection is the JSON payload for Type=selected, Key=content from Yak Runner code chips.

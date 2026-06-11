@@ -1,4 +1,4 @@
-package loop_default
+package attachedresourcehandlers
 
 import (
 	"context"
@@ -13,54 +13,28 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func collectAttachedImagePaths(attachedDatas []*aicommon.AttachedResource) []string {
-	var paths []string
-	for _, data := range attachedDatas {
-		if data == nil {
-			continue
-		}
-		if data.Type != aicommon.CONTEXT_PROVIDER_TYPE_FILE || data.Key != aicommon.CONTEXT_PROVIDER_KEY_FILE_PATH {
-			continue
-		}
-		p := strings.TrimSpace(data.Value)
-		if p == "" || !aicommon.IsImageContextAttachmentPath(p) {
-			continue
-		}
-		paths = append(paths, p)
-	}
-	return dedupStringSlice(paths)
+func init() {
+	reactloops.RegisterAttachedFileResourceHandler(runAttachedImageVisionInit)
 }
 
-func dedupStringSlice(values []string) []string {
-	seen := make(map[string]struct{}, len(values))
-	out := make([]string, 0, len(values))
-	for _, v := range values {
-		v = strings.TrimSpace(v)
-		if v == "" {
-			continue
-		}
-		if _, ok := seen[v]; ok {
-			continue
-		}
-		seen[v] = struct{}{}
-		out = append(out, v)
-	}
-	return out
-}
-
-// RunAttachedImageVisionInDefaultInit runs LiteForge vision on each attached image path
-// and injects the aggregated text into the invoker timeline for the main ReAct loop.
-func RunAttachedImageVisionInDefaultInit(
+func runAttachedImageVisionInit(
 	r aicommon.AIInvokeRuntime,
 	loop *reactloops.ReActLoop,
-	task aicommon.AIStatefulTask,
-	imagePaths []string,
+	resources []*aicommon.AttachedFileResourceData,
 ) {
-	if len(imagePaths) == 0 || r == nil {
+	imagePaths := collectAttachedImagePathsFromResources(resources)
+	if len(imagePaths) == 0 || r == nil || loop == nil {
 		return
 	}
 
-	userQuery := strings.TrimSpace(task.GetUserInput())
+	task := loop.GetCurrentTask()
+	if task == nil {
+		task = r.GetCurrentTask()
+	}
+	userQuery := ""
+	if task != nil {
+		userQuery = strings.TrimSpace(task.GetUserInput())
+	}
 	extra := fmt.Sprintf(`
 **Supplementary Information (User task / question — must be integrated into your analysis):**
 %s
@@ -71,7 +45,10 @@ In cumulative_summary, besides an objective description of the image, explicitly
 (3) anything that cannot be determined from the image alone and may need user clarification.
 `, userQuery)
 
-	runCtx := loop.GetConfig().GetContext()
+	var runCtx context.Context
+	if cfg := loop.GetConfig(); cfg != nil {
+		runCtx = cfg.GetContext()
+	}
 	if task != nil && !utils.IsNil(task.GetContext()) {
 		runCtx = task.GetContext()
 	}
@@ -94,7 +71,7 @@ In cumulative_summary, besides an objective description of the image, explicitly
 			loop.LoadingStatus(msg)
 		}
 
-		log.Infof("loop_default: vision analyze attached image %q (%d/%d)", imagePath, i+1, len(imagePaths))
+		log.Infof("attached extra resources: vision analyze attached image %q (%d/%d)", imagePath, i+1, len(imagePaths))
 		analysis, err := aiforge.AnalyzeImageFile(imagePath,
 			aiforge.WithAnalyzeContext(runCtx),
 			aiforge.WithExtraPrompt(extra),
@@ -104,7 +81,7 @@ In cumulative_summary, besides an objective description of the image, explicitly
 		buf.WriteString(fmt.Sprintf("### %s\n\n", imagePath))
 		if err != nil {
 			buf.WriteString(fmt.Sprintf("_视觉解析失败 / vision analysis failed: %v_\n\n", err))
-			log.Warnf("loop_default: vision failed for %q: %v", imagePath, err)
+			log.Warnf("attached extra resources: vision failed for %q: %v", imagePath, err)
 			continue
 		}
 		if analysis == nil {
@@ -135,5 +112,37 @@ In cumulative_summary, besides an objective description of the image, explicitly
 		return
 	}
 	r.AddToTimeline("attached_image_vision", payload)
-	r.AddToTimeline("import notice", "attached_image_vision has been recorded from default-loop init; use it when reasoning about the user's images.")
+	r.AddToTimeline("import notice", "attached_image_vision has been recorded from attached-resource init; use it when reasoning about the user's images.")
+}
+
+func collectAttachedImagePathsFromResources(resources []*aicommon.AttachedFileResourceData) []string {
+	var paths []string
+	for _, resource := range resources {
+		if resource == nil || !resource.IsImage() {
+			continue
+		}
+		p := strings.TrimSpace(resource.Path)
+		if p == "" {
+			continue
+		}
+		paths = append(paths, p)
+	}
+	return dedupAttachedResourceStrings(paths)
+}
+
+func dedupAttachedResourceStrings(values []string) []string {
+	seen := make(map[string]struct{}, len(values))
+	out := make([]string, 0, len(values))
+	for _, v := range values {
+		v = strings.TrimSpace(v)
+		if v == "" {
+			continue
+		}
+		if _, ok := seen[v]; ok {
+			continue
+		}
+		seen[v] = struct{}{}
+		out = append(out, v)
+	}
+	return out
 }

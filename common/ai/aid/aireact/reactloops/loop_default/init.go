@@ -13,16 +13,13 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 		config := r.GetConfig()
 
 		attachedDatas := task.GetAttachedDatas()
-		if imagePaths := collectAttachedImagePaths(attachedDatas); len(imagePaths) > 0 {
-			RunAttachedImageVisionInDefaultInit(r, loop, task, imagePaths)
-		}
-		reactloops.RunAttachedExtraResourcesInit(r, loop, attachedDatas)
+		attachedResources := reactloops.RunAttachedExtraResourcesInit(r, loop, attachedDatas)
 
 		// Original logic: process attached data (knowledge bases, files, etc.)
 		mustProcessMentionedInfo := config.GetConfigBool("MustProcessAttachedData")
-		if mustProcessMentionedInfo && len(attachedDatas) > 0 {
+		if mustProcessMentionedInfo && hasAttachedKnowledgeBaseResource(attachedResources) {
 			loop.LoadingStatus("开始处理用户提及的数据（@ Mentionup） / Start to process user-mentioned data (@ Mentionup)")
-			err := ProcessAttachedData(r, loop, task, operator)
+			err := ProcessAttachedData(r, loop, task, operator, attachedResources)
 			if err != nil {
 				log.Errorf("failed to process attached data: %v", err)
 				loop.GetInvoker().AddToTimeline("error", fmt.Sprintf("failed to process attached data: %v", err))

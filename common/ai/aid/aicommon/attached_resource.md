@@ -10,6 +10,7 @@ Attached Resource 用于把前端或上层任务传入的附加材料转成 ReAc
 - `attached_resource.go`：资源 type/key 常量、`AttachedResource` 传输壳。
 - `attached_resource_data.go`：`AttachedResourceData` 接口、factory 注册表、统一解析入口。
 - `attached_resource_format.go`：跨资源共享的格式化 helper。
+- `attached_resource_builtin.go`：轻量内置资源实现，包括 `default`、`file/file_path`、`knowledge_base`。
 - `attached_resource_http_flow.go`：`http_flow_id` 资源实现。
 - `attached_resource_http_fuzz_request.go`：`http_fuzz_request` 资源实现。
 - `attached_resource_selected.go`：`selected` 资源实现。
@@ -41,9 +42,19 @@ type AttachedResourceData interface {
 5. `ParseAttachedResourceData` 根据 `Type` 查 factory，构造结构体并调用 `Unmarshal`。
 6. 通用入口依次调用 `BindLoopData`、`ToAttachData`。
 7. 渲染结果按 `resource.Type()` 聚合，写入 timeline：`attached_<type>`。
-8. `RunAttachedExtraResourcesInit` 返回已解析的 `[]AttachedResourceData`，具体 focus loop 可以按需做二次转移。
+8. `file` 资源在聚合阶段会额外交给 loop 注册的 file handler。图片等非文本文件可以由 handler 解析，例如写入 `attached_image_vision`。
+9. `RunAttachedExtraResourcesInit` 返回已解析的 `[]AttachedResourceData`，具体 focus loop 可以按需做二次转移。
 
 注意：资源结构应保持通用。比如 `http_fuzz_request` 是通用的 HTTP 请求包资源，不是 httpfuzz 专用类型；httpfuzz 只是额外把它转移成 `fuzz_request`、`original_request` 等本 loop 需要的字段。
+
+## 内置兜底与特殊内置类型
+
+- `default`：当 `Type` 没有命中任何注册 factory 时，解析为 `DefaultAttachedResourceData`。它保留原始 `Type/Key/Value`，并把 raw value 渲染为普通附加上下文。
+- `file`：`Type=file` 解析为 `AttachedFileResourceData`，并识别 `Kind`。`file_path`、`filepath`、`file-path` 只是兼容别名，也会解析为同一结构。
+  - `text`：`ToAttachData` 直接读取前 1024 字节作为内容预览。
+  - `directory`：`ToAttachData` 调用 `filesys.Glance` 生成目录树，并裁剪到 1024 字节。
+  - `image` / `binary`：`ToAttachData` 只输出文件元信息，不 dump 内容；通用入口会把 file resources 交给 loop 注册的 file handler 进一步解析。
+- `knowledge_base`：解析为 `AttachedKnowledgeBaseResourceData`，但 `ToAttachData` 返回空，不 dump 内容。default loop 只根据返回的资源列表判断是否需要启动 knowledge enhance loop，具体查询仍由 knowledge enhance 内部处理。
 
 ## 新增资源步骤
 
