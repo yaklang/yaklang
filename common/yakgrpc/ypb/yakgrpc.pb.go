@@ -9256,9 +9256,12 @@ type AIStartParams struct {
 	PlanExecTaskConcurrency int64                  `protobuf:"varint,45,opt,name=PlanExecTaskConcurrency,proto3" json:"PlanExecTaskConcurrency,omitempty"` // 计划执行任务的并发度
 	// 为 true 时 StartAIReAct 不新建 ReAct，最多等待 1 分钟直到同 TimelineSessionID 的会话
 	// 在进程内注册后再将 gRPC 输入流 attach 到该运行中会话。
-	Attach        bool `protobuf:"varint,46,opt,name=Attach,proto3" json:"Attach,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Attach bool `protobuf:"varint,46,opt,name=Attach,proto3" json:"Attach,omitempty"`
+	// 为 true 时 request_plan 走 detached plan 审阅流程；默认 false 时走旧版异步 plan-and-execute。
+	// 需配合 EnablePlan=true 才会暴露 request_plan 动作。
+	EnableDetachedPlan bool `protobuf:"varint,47,opt,name=EnableDetachedPlan,proto3" json:"EnableDetachedPlan,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *AIStartParams) Reset() {
@@ -9588,6 +9591,13 @@ func (x *AIStartParams) GetPlanExecTaskConcurrency() int64 {
 func (x *AIStartParams) GetAttach() bool {
 	if x != nil {
 		return x.Attach
+	}
+	return false
+}
+
+func (x *AIStartParams) GetEnableDetachedPlan() bool {
+	if x != nil {
+		return x.EnableDetachedPlan
 	}
 	return false
 }
@@ -71014,7 +71024,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x03Url\x18\x03 \x01(\tR\x03Url\"=\n" +
 	"\x13AIEnabledCapability\x12\x12\n" +
 	"\x04Name\x18\x01 \x01(\tR\x04Name\x12\x12\n" +
-	"\x04Type\x18\x02 \x01(\tR\x04Type\"\xa5\x10\n" +
+	"\x04Type\x18\x02 \x01(\tR\x04Type\"\xd5\x10\n" +
 	"\rAIStartParams\x12$\n" +
 	"\rCoordinatorId\x18\x11 \x01(\tR\rCoordinatorId\x12\x1a\n" +
 	"\bSequence\x18\x12 \x01(\x03R\bSequence\x12.\n" +
@@ -71063,7 +71073,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x06Source\x18) \x01(\tR\x06Source\x12J\n" +
 	"\x13EnabledCapabilities\x18* \x03(\v2\x18.ypb.AIEnabledCapabilityR\x13EnabledCapabilities\x128\n" +
 	"\x17PlanExecTaskConcurrency\x18- \x01(\x03R\x17PlanExecTaskConcurrency\x12\x16\n" +
-	"\x06Attach\x18. \x01(\bR\x06Attach\"\x9e\x01\n" +
+	"\x06Attach\x18. \x01(\bR\x06Attach\x12.\n" +
+	"\x12EnableDetachedPlan\x18/ \x01(\bR\x12EnableDetachedPlan\"\x9e\x01\n" +
 	"\fAITaskFilter\x12\x12\n" +
 	"\x04Name\x18\x01 \x03(\tR\x04Name\x12\x18\n" +
 	"\aKeyword\x18\x02 \x03(\tR\aKeyword\x12\x1c\n" +

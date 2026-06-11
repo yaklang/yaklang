@@ -65,8 +65,9 @@ func TestReAct_PlanLoop_Basic(t *testing.T) {
 
 		// 验证 prompt 不应该包含这些 action
 		prohibitedActions := []string{
-			schema.AI_REACT_LOOP_ACTION_REQUIRE_AI_BLUEPRINT,   // "require_ai_blueprint"
-			schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL,           // "require_tool"
+			schema.AI_REACT_LOOP_ACTION_REQUIRE_AI_BLUEPRINT, // "require_ai_blueprint"
+			schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL,         // "require_tool"
+			schema.AI_REACT_LOOP_ACTION_REQUEST_PLAN,         // "request_plan"
 			schema.AI_REACT_LOOP_ACTION_REQUEST_PLAN_EXECUTION, // "request_plan_and_execution"
 		}
 

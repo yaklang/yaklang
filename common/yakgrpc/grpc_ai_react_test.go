@@ -35,6 +35,7 @@ func TestConvertYPBAIStartParamsToReActConfig(t *testing.T) {
 	userPlanPrompt := uuid.New().String()
 	disableToolIntervalReview := rand.Intn(2) == 1
 	syncPerceptionTrigger := rand.Intn(2) == 1
+	enableDetachedPlan := rand.Intn(2) == 1
 
 	start := &ypb.AIStartParams{
 		DisallowRequireForUserPrompt: disallowRequire,
@@ -52,7 +53,8 @@ func TestConvertYPBAIStartParamsToReActConfig(t *testing.T) {
 		UserPresetPrompt:             presetPrompt,
 		UserPlanPrompt:               userPlanPrompt,
 		DisableToolIntervalReview:    disableToolIntervalReview,
-		SyncPerceptionTrigger: syncPerceptionTrigger,
+		SyncPerceptionTrigger:  syncPerceptionTrigger,
+		EnableDetachedPlan:     enableDetachedPlan,
 		EnabledCapabilities: []*ypb.AIEnabledCapability{
 			{Name: "read_file", Type: "tool"},
 		},
@@ -82,6 +84,7 @@ func TestConvertYPBAIStartParamsToReActConfig(t *testing.T) {
 	require.Equal(t, start.DisableToolIntervalReview, cfg.DisableIntervalReview)
 	require.Equal(t, start.SyncPerceptionTrigger, cfg.GetSyncPerceptionTrigger())
 	require.Equal(t, start.GetEnablePlan(), cfg.GetEnablePlanAndExec())
+	require.Equal(t, start.GetEnableDetachedPlan(), cfg.GetEnableDetachedPlan())
 	require.Equal(t, []aicommon.EnabledCapability{
 		{Name: "read_file", Type: aicommon.EnabledCapabilityTypeTool},
 	}, cfg.GetEnabledCapabilities())

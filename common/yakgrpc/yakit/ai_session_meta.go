@@ -359,6 +359,9 @@ func OverlayAISessionStartParams(base, patch *ypb.AIStartParams) *ypb.AIStartPar
 	if patch.GetEnablePlan() {
 		next.EnablePlan = true
 	}
+	if patch.GetEnableDetachedPlan() {
+		next.EnableDetachedPlan = true
+	}
 	if patch.GetPreferSessionCachedConfig() {
 		next.PreferSessionCachedConfig = true
 	}

@@ -88,6 +88,10 @@ func (c *Config) GetEnablePlanAndExec() bool {
 	return c.EnablePlanAndExec
 }
 
+func (c *Config) GetEnableDetachedPlan() bool {
+	return c.EnableDetachedPlan
+}
+
 func (c *Config) GetEnableUserInteract() bool {
 	return c.AllowRequireForUserInteract
 }
