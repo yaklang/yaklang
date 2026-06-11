@@ -13,6 +13,7 @@ import (
 
 func yakdocActions(r aicommon.AIInvokeRuntime) []reactloops.ReActLoopOption {
 	return []reactloops.ReActLoopOption{
+		yakdocSearchAction(r),
 		yakdocGetAllLibraryNamesAction(r),
 		yakdocLibraryDetailsAction(r),
 		yakdocFunctionDetailsAction(r),
@@ -64,6 +65,71 @@ func yakdocCheckDuplicate(loop *reactloops.ReActLoop, op *reactloops.LoopActionH
 	op.Feedback(msg)
 	op.Continue()
 	return true
+}
+
+func yakdocSearchAction(_ aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
+	return reactloops.WithRegisterLoopActionWithStreamField(
+		"yakdoc_search",
+		`按关键词模糊搜索 Yaklang 标准库 API（YakDocument）
+
+【使用场景】：
+- 不知道库名，但知道功能意图（如 "HTTP POST"、"端口扫描"、"JSON 解析"）
+- 编写代码前按功能词探索可用 API
+- yakdoc_get_all_library_names 列表太长时的替代方案
+
+【参数】：
+- query (string, 必需) - 搜索关键词，支持中英文与函数名片段
+- library (string, 可选) - 限定在某个库内搜索
+- limit (int, 可选) - 返回条数，默认 20，最大 64
+
+【与 grep 分工】：
+- yakdoc_search：查权威 API 名与签名线索
+- grep_yaklang_samples：查完整代码样例
+
+【示例】：
+yakdoc_search(query="HTTP POST 请求")
+yakdoc_search(query="Split", library="str")`,
+		[]aitool.ToolOption{
+			aitool.WithStringParam(
+				"query",
+				aitool.WithParam_Required(true),
+				aitool.WithParam_Description("Keywords describing the desired API or functionality"),
+			),
+			aitool.WithStringParam(
+				"library",
+				aitool.WithParam_Description("Optional library name scope"),
+			),
+			aitool.WithIntegerParam(
+				"limit",
+				aitool.WithParam_Description("Max results, default 20"),
+			),
+		},
+		nil,
+		func(_ *reactloops.ReActLoop, action *aicommon.Action) error {
+			if strings.TrimSpace(action.GetString("query")) == "" {
+				return utils.Error("yakdoc_search requires 'query' parameter")
+			}
+			return nil
+		},
+		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
+			query := strings.TrimSpace(action.GetString("query"))
+			library := strings.TrimSpace(action.GetString("library"))
+			limit := int(action.GetInt("limit"))
+			currentQuery := fmt.Sprintf("search:%s:%s:%d", query, library, limit)
+			const queryKey = "last_yakdoc_query"
+			if yakdocCheckDuplicate(loop, op, queryKey, currentQuery) {
+				return
+			}
+			loop.Set(queryKey, currentQuery)
+
+			hits, err := SearchYakDocument(query, limit, library)
+			if err != nil {
+				yakdocHandleError(loop, op, "yakdoc_search", queryKey, err)
+				return
+			}
+			yakdocHandleSuccess(loop, op, "yakdoc_search", "yakdoc_search", "yakdoc_search_result", FormatSearchResults(query, hits))
+		},
+	)
 }
 
 func yakdocGetAllLibraryNamesAction(_ aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {

@@ -172,34 +172,45 @@ if err != nil {
 
 | 场景 | 优先工具 |
 |------|----------|
-| `ExternLib [...] don't has [...]` API 不存在 | `yakdoc_library_details` → `yakdoc_function_details` |
-| 不确定库名 | `yakdoc_get_all_library_names` |
+| 不知道库名，知道功能（如 HTTP POST、发包） | **`yakdoc_search`** |
+| `ExternLib [...] don't has [...]` API 不存在 | 先看 lint 自动附加的文档；不够再 `yakdoc_function_details` |
+| 已知库名，需列全部成员 | `yakdoc_library_details` |
 | 语法错误 / DSL 写法 / 完整实现样例 | `grep_yaklang_samples` 或 `semantic_search_yaklang_samples` |
 
-### 四个 YakDocument 工具
+### YakDocument 工具
 
-1. **`yakdoc_get_all_library_names`** — 列出全部标准库名
-2. **`yakdoc_library_details`** — 列出某库的 functions/variables 名称
-3. **`yakdoc_function_details`** — 查询函数签名、参数、返回值、说明
-4. **`yakdoc_variable_details`** — 查询变量/实例说明
+1. **`yakdoc_search`** — 按关键词模糊搜索 API（不知道库名时首选）
+2. **`yakdoc_get_all_library_names`** — 列出全部标准库名
+3. **`yakdoc_library_details`** — 列出某库的 functions/variables 名称
+4. **`yakdoc_function_details`** — 查询函数签名、参数、返回值、说明
+5. **`yakdoc_variable_details`** — 查询变量/实例说明
 
-**API 错误强制流程：**
+**不知道库名时的流程：**
+```
+功能意图（如 "发 POST 请求"）
+  ↓
+yakdoc_search(query="HTTP POST")
+  ↓
+yakdoc_function_details(library="poc", function=["Post"])
+  ↓
+write_code / modify_code
+```
+
+**ExternLib 报错流程：**
 ```
 ExternLib 报错
   ↓
-yakdoc_library_details(library=["xxx"])  列出真实 API
+阅读 lint 反馈中【已自动附加 YakDocument】的相近 API 与建议签名
   ↓
-yakdoc_function_details(library="xxx", function=["yyy"])  查详情
-  ↓
-modify_code 基于文档修复
+直接 modify_code；信息不足时再 yakdoc_function_details
 ```
 
 **示例：**
 ```json
-{"@action": "yakdoc_library_details", "library": ["synscan"], "human_readable_thought": "API 报错，先列出 synscan 库可用函数"}
+{"@action": "yakdoc_search", "query": "HTTP POST 请求", "human_readable_thought": "不知道用哪个库发包，先按功能搜索 API"}
 ```
 ```json
-{"@action": "yakdoc_function_details", "library": "synscan", "function": ["Scan"], "human_readable_thought": "确认 Scan 函数签名与参数"}
+{"@action": "yakdoc_function_details", "library": "poc", "function": ["Post"], "human_readable_thought": "确认 Post 函数签名与参数"}
 ```
 
 ---

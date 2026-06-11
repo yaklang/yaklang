@@ -34,7 +34,7 @@ var semanticSearchYaklangSamplesAction = func(r aicommon.AIInvokeRuntime, ragSys
 
 【强制使用场景】：
 1. 编写任何代码前，先语义搜索相关函数用法
-2. 遇到 API 错误（ExternLib don't has）时 - 必须立即语义搜索
+2. 遇到 API 错误（ExternLib don't has）时 - 先读 lint 自动附加的 YakDocument；需要完整样例再语义搜索
 3. 遇到语法错误（SyntaxError）时 - 必须立即语义搜索
 4. 不确定函数参数或返回值时
 

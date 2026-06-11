@@ -473,7 +473,7 @@ When you receive a request, first understand the user's goal. Then, structure yo
 
 ### [重要] 错误处理强制规则 - 必须立即 grep
 
-**如果上述错误包含 ExternLib API 错误，你必须立即使用 yakdoc_library_details / yakdoc_function_details。**
+**如果上述错误包含 ExternLib API 错误，优先阅读【已自动附加 YakDocument】中的相近 API 与建议签名，直接 modify_code；信息不足再用 yakdoc_function_details。**
 **如果是 SyntaxError 或语法/D DSL 问题，你必须立即使用 grep_yaklang_samples：**
 
 #### 错误类型1：API 不存在
@@ -482,21 +482,14 @@ ExternLib [xxx] don't has [yyy]
 ```
 **含义**：你猜错了 API 名称，该库没有这个函数/选项
 
-**强制行动**：立即使用 `yakdoc_library_details` + `yakdoc_function_details`
+**强制行动**：阅读 lint 中【已自动附加 YakDocument】的相近 API 与建议签名，然后直接 `modify_code`
 ```json
-{"@action": "yakdoc_library_details",
- "library": ["xxx"],
- "human_readable_thought": "API 错误，列出 xxx 库真实可用函数"}
-```
-```json
-{"@action": "yakdoc_function_details",
- "library": "xxx",
- "function": ["yyy"],
- "human_readable_thought": "查询正确函数签名"}
+{"@action": "modify_code",
+ "human_readable_thought": "根据已附加的正确 API 签名修复代码"}
 ```
 
 **禁止**：[X] 继续猜测其他 API 名称（如 timeout → setTimeout → withTimeout → ...）
-**正确**：[O] 先 yakdoc 查文档，必要时再 grep 看样例
+**正确**：[O] 使用自动附加文档修复；不知道库名时用 yakdoc_search；必要时 grep 看样例
 
 #### 错误类型2：语法错误
 ```
