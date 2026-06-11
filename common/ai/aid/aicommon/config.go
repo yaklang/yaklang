@@ -318,8 +318,9 @@ type Config struct {
 		Re-Act Mode special config
 	*/
 	// Call PE
-	EnablePlanAndExec bool // Enable plan and execution action
-	HijackPERequest   func(ctx context.Context, planPayload string) error
+	EnablePlanAndExec  bool // Enable plan and execution action
+	EnableDetachedPlan bool // Use detached plan review instead of legacy async plan-and-execute
+	HijackPERequest    func(ctx context.Context, planPayload string) error
 
 	// default Task for call tool directly
 	DefaultTask AIStatefulTask
@@ -2007,6 +2008,18 @@ func WithEnablePlanAndExec(enable bool) ConfigOption {
 	}
 }
 
+func WithEnableDetachedPlan(enable bool) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		c.EnableDetachedPlan = enable
+		c.m.Unlock()
+		return nil
+	}
+}
+
 // WithDisableToolCallerIntervalReview disables interval review during tool execution.
 // By default, interval review is ENABLED for long-running tool calls.
 // AI will periodically review tool execution progress and decide whether to continue.
@@ -3564,6 +3577,7 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 	opts = append(opts, WithAllowRequireForUserInteract(i.AllowRequireForUserInteract))
 	opts = append(opts, WithAllowPlanUserInteract(i.AllowPlanUserInteract))
 	opts = append(opts, WithEnablePlanAndExec(i.EnablePlanAndExec))
+	opts = append(opts, WithEnableDetachedPlan(i.EnableDetachedPlan))
 	opts = append(opts, WithGenerateReport(i.GenerateReport))
 
 	// Retry / limits

@@ -60,7 +60,7 @@ func init() {
 				reactloops.WithAllowToolCall(true),
 				reactloops.WithAllowAIForge(true),
 				reactloops.WithAllowPlanAndExec(true),
-				reactloops.WithPlanExecActionType(schema.AI_REACT_LOOP_ACTION_REQUEST_PLAN),
+				reactloops.WithPlanExecActionType(schema.AI_REACT_LOOP_ACTION_REQUEST_PLAN_EXECUTION),
 				reactloops.WithInitTask(buildInitTask(r)),
 				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
 				reactloops.WithMaxIterations(int(r.GetConfig().GetMaxIterationCount())),
