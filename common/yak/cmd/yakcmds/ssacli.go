@@ -286,6 +286,10 @@ use log=info for [ssa.compile.summary] and log=debug for per-phase timings (ssa.
 			Name:  "file-perf-log",
 			Usage: "enable file-level compile performance log output",
 		},
+		cli.BoolFlag{
+			Name:  "diagnostics",
+			Usage: "enable SSA compile diagnostics and nested TRACE output",
+		},
 		cli.StringFlag{
 			Name:  "pprof",
 			Usage: `enable pprof and save pprof file to the given path`,
