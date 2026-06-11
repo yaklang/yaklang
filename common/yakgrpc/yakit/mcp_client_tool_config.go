@@ -10,6 +10,24 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+// parseMCPClientToolSources splits the Source filter into one or more source values.
+// A single source is passed as-is; multiple sources use comma separation (e.g. "builtin,aitool").
+func parseMCPClientToolSources(source string) []string {
+	source = strings.TrimSpace(source)
+	if source == "" {
+		return nil
+	}
+	parts := strings.Split(source, ",")
+	result := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			result = append(result, part)
+		}
+	}
+	return result
+}
+
 // MCPBridgeToolCanonicalName is the tool_name stored in mcp_client_tool_configs for
 // bridge tools (same convention as MCPServerToolFullName / aitool loader).
 func MCPBridgeToolCanonicalName(serverName, remoteToolName string) string {
@@ -252,8 +270,12 @@ func GetMCPClientToolConfigByName(db *gorm.DB, toolName string) (*schema.MCPClie
 func QueryMCPClientToolConfigs(db *gorm.DB, req *ypb.GetMCPToolListRequest) (*bizhelper.Paginator, []*schema.MCPClientToolConfig, error) {
 	db = db.Model(&schema.MCPClientToolConfig{})
 
-	if req.GetSource() != "" {
-		db = db.Where("source = ?", req.GetSource())
+	if sources := parseMCPClientToolSources(req.GetSource()); len(sources) > 0 {
+		if len(sources) == 1 {
+			db = db.Where("source = ?", sources[0])
+		} else {
+			db = db.Where("source IN (?)", sources)
+		}
 	}
 	if req.GetServerName() != "" {
 		db = db.Where("server_name = ?", req.GetServerName())

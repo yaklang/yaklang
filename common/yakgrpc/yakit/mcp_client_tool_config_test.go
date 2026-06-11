@@ -277,6 +277,18 @@ func TestQueryMCPClientToolConfigs(t *testing.T) {
 		assert.Len(t, cfgs, 2)
 	})
 
+	t.Run("filters by comma-separated sources", func(t *testing.T) {
+		_, cfgs, err := QueryMCPClientToolConfigs(db, &ypb.GetMCPToolListRequest{
+			Source:     schema.MCPClientToolSourceBuiltin + "," + schema.MCPClientToolSourceBridge,
+			Pagination: &ypb.Paging{Page: 1, Limit: 20},
+		})
+		require.NoError(t, err)
+		assert.Len(t, cfgs, 4)
+		for _, cfg := range cfgs {
+			assert.Contains(t, []string{schema.MCPClientToolSourceBuiltin, schema.MCPClientToolSourceBridge}, cfg.Source)
+		}
+	})
+
 	t.Run("filters by source=bridge + server_name", func(t *testing.T) {
 		_, cfgs, err := QueryMCPClientToolConfigs(db, &ypb.GetMCPToolListRequest{
 			Source:     schema.MCPClientToolSourceBridge,
