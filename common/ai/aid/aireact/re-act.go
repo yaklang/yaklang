@@ -315,6 +315,36 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 		}
 	})
 
+	cfg.SetSkillUnloadHandler(func(skillNames []string) {
+		if len(skillNames) == 0 {
+			return
+		}
+		if loop := react.GetCurrentLoop(); loop != nil {
+			if mgr := loop.GetSkillsContextManager(); mgr != nil {
+				for _, name := range skillNames {
+					if mgr.UnloadSkill(name) {
+						log.Infof("hot-unload skill %q from context", name)
+					}
+				}
+			}
+		}
+	})
+
+	cfg.SetForgeUnloadHandler(func(forgeNames []string) {
+		if len(forgeNames) == 0 {
+			return
+		}
+		if loop := react.GetCurrentLoop(); loop != nil {
+			if ecm := loop.GetExtraCapabilities(); ecm != nil {
+				for _, name := range forgeNames {
+					if ecm.RemoveForgeByName(name) {
+						log.Infof("hot-unload forge %q from extra capabilities", name)
+					}
+				}
+			}
+		}
+	})
+
 	// Register pending context providers
 	react.promptManager.cpm = cfg.ContextProviderManager
 	react.installRunningSessionRegistry()

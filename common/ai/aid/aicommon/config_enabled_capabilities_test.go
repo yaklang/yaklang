@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -86,6 +87,95 @@ func TestProcessHotPatchMessage_EnabledCapabilitiesMerge(t *testing.T) {
 
 	caps := cfg.GetEnabledCapabilities()
 	require.Len(t, caps, 2)
+}
+
+func TestSubtractEnabledCapabilitiesHotpatch(t *testing.T) {
+	base := &ypb.AIStartParams{
+		EnabledCapabilities: []*ypb.AIEnabledCapability{
+			{Name: "read_file", Type: "tool"},
+			{Name: "recon", Type: "skill"},
+		},
+	}
+	patch := &ypb.AIStartParams{
+		EnabledCapabilities: []*ypb.AIEnabledCapability{
+			{Name: "read_file", Type: "tool"},
+		},
+	}
+
+	remaining := SubtractEnabledCapabilitiesHotpatch(base, patch)
+	require.Len(t, remaining, 1)
+	require.Equal(t, "recon", remaining[0].GetName())
+}
+
+func TestProcessHotPatchMessage_DisabledCapabilities(t *testing.T) {
+	cfg := NewConfig(context.Background(), WithDisableAutoSkills(true))
+	require.NoError(t, WithEnabledCapabilities(
+		EnabledCapability{Name: "read_file", Type: EnabledCapabilityTypeTool},
+		EnabledCapability{Name: "grep", Type: EnabledCapabilityTypeTool},
+	)(cfg))
+
+	opts := cfg.ProcessHotPatchMessage(&ypb.AIInputEvent{
+		IsConfigHotpatch: true,
+		HotpatchType:     HotPatchType_DisabledCapabilities,
+		Params: &ypb.AIStartParams{
+			EnabledCapabilities: []*ypb.AIEnabledCapability{
+				{Name: "read_file", Type: "tool"},
+			},
+		},
+	})
+	require.Len(t, opts, 1)
+	require.NoError(t, opts[0](cfg))
+
+	caps := cfg.GetEnabledCapabilities()
+	require.Len(t, caps, 1)
+	require.Equal(t, "grep", caps[0].Name)
+}
+
+func TestWithDisabledCapabilities_RemovesTool(t *testing.T) {
+	cfg := NewConfig(context.Background(), WithDisableAutoSkills(true))
+	toolName := "ls"
+	require.NoError(t, WithEnabledCapabilities(
+		EnabledCapability{Name: toolName, Type: EnabledCapabilityTypeTool},
+	)(cfg))
+	enabledBefore, err := cfg.AiToolManager.GetEnableTools()
+	require.NoError(t, err)
+	require.Contains(t, toolNames(enabledBefore), toolName)
+
+	require.NoError(t, WithDisabledCapabilities(
+		EnabledCapability{Name: toolName, Type: EnabledCapabilityTypeTool},
+	)(cfg))
+	enabledAfter, err := cfg.AiToolManager.GetEnableTools()
+	require.NoError(t, err)
+	require.NotContains(t, toolNames(enabledAfter), toolName)
+	require.Empty(t, cfg.GetEnabledCapabilities())
+}
+
+func TestWithDisabledCapabilities_RemovesAppendedPlugin(t *testing.T) {
+	cfg := NewConfig(context.Background(), WithDisableAutoSkills(true))
+	pluginTool := aitool.NewWithoutCallback("runtime_plugin_demo", aitool.WithDescription("test plugin"))
+	require.NoError(t, cfg.AiToolManager.AppendTools(pluginTool))
+	require.NoError(t, WithEnabledCapabilities(
+		EnabledCapability{Name: "runtime_plugin_demo", Type: EnabledCapabilityTypePlugin},
+	)(cfg))
+
+	_, err := cfg.AiToolManager.GetToolByName("runtime_plugin_demo")
+	require.NoError(t, err)
+
+	require.NoError(t, WithDisabledCapabilities(
+		EnabledCapability{Name: "runtime_plugin_demo", Type: EnabledCapabilityTypePlugin},
+	)(cfg))
+	_, err = cfg.AiToolManager.GetToolByName("runtime_plugin_demo")
+	require.Error(t, err)
+}
+
+func toolNames(tools []*aitool.Tool) []string {
+	names := make([]string, 0, len(tools))
+	for _, tool := range tools {
+		if tool != nil {
+			names = append(names, tool.Name)
+		}
+	}
+	return names
 }
 
 func TestGetEnabledCapabilityNamesByType(t *testing.T) {

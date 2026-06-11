@@ -398,11 +398,18 @@ func (m *AiToolManager) SearchTools(method string, query string) ([]*aitool.Tool
 // EnableTool 开启单个工具
 func (m *AiToolManager) EnableTool(name string) {
 	m.toolEnabled[name] = true
+	if m.disableTools != nil {
+		delete(m.disableTools, name)
+	}
 }
 
 // DisableTool 关闭单个工具
 func (m *AiToolManager) DisableTool(name string) {
 	m.toolEnabled[name] = false
+	if m.disableTools == nil {
+		m.disableTools = make(map[string]struct{})
+	}
+	m.disableTools[name] = struct{}{}
 }
 
 func (m *AiToolManager) AppendTools(tools ...*aitool.Tool) error {

@@ -152,6 +152,21 @@ func (ecm *ExtraCapabilitiesManager) AddTools(tools ...*aitool.Tool) {
 	}
 }
 
+// RemoveForgeByName drops a forge from the extra capabilities by name.
+func (ecm *ExtraCapabilitiesManager) RemoveForgeByName(name string) bool {
+	if name == "" {
+		return false
+	}
+	ecm.mu.Lock()
+	defer ecm.mu.Unlock()
+	idx := indexForgeByName(ecm.forges, name)
+	if idx < 0 {
+		return false
+	}
+	ecm.forges = append(ecm.forges[:idx], ecm.forges[idx+1:]...)
+	return true
+}
+
 // AddForges adds forges to the extra capabilities, keeping the newest items and
 // moving duplicate names to the newest position.
 func (ecm *ExtraCapabilitiesManager) AddForges(forges ...ExtraForgeInfo) {

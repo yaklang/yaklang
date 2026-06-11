@@ -20,7 +20,8 @@ const (
 	EnabledCapabilityTypeForge   = "forge"
 	EnabledCapabilityTypeMCPTool = "mcp_tool"
 
-	HotPatchType_EnabledCapabilities = "EnabledCapabilities"
+	HotPatchType_EnabledCapabilities  = "EnabledCapabilities"
+	HotPatchType_DisabledCapabilities = "DisabledCapabilities"
 )
 
 // EnabledCapability describes a capability to preload at startup or via hot patch.
@@ -31,6 +32,8 @@ type EnabledCapability struct {
 
 type skillHotloadHandler func(skillNames []string)
 type forgeHotloadHandler func(forgeNames []string)
+type skillUnloadHandler func(skillNames []string)
+type forgeUnloadHandler func(forgeNames []string)
 
 func normalizeEnabledCapabilityType(raw string) string {
 	switch strings.ToLower(strings.TrimSpace(raw)) {
@@ -185,6 +188,81 @@ func diffNames(prev, next []string) []string {
 	return added
 }
 
+func subtractEnabledCapabilities(current, toRemove []EnabledCapability) []EnabledCapability {
+	if len(toRemove) == 0 {
+		return current
+	}
+	removeSet := make(map[string]struct{}, len(toRemove))
+	for _, cap := range normalizeEnabledCapabilities(toRemove) {
+		removeSet[cap.Type+":"+cap.Name] = struct{}{}
+	}
+	result := make([]EnabledCapability, 0, len(current))
+	for _, cap := range current {
+		if _, ok := removeSet[cap.Type+":"+cap.Name]; !ok {
+			result = append(result, cap)
+		}
+	}
+	return result
+}
+
+// WithDisabledCapabilities removes capabilities from the session registry and
+// unloads runtime tool/plugin/mcp/skill/forge entries when applicable.
+func WithDisabledCapabilities(caps ...EnabledCapability) ConfigOption {
+	return func(c *Config) error {
+		if c == nil || len(caps) == 0 {
+			return nil
+		}
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		removed := normalizeEnabledCapabilities(caps)
+		c.setEnabledCapabilitiesLocked(subtractEnabledCapabilities(c.enabledCapabilities, removed))
+		tmReady := c.AiToolManager != nil
+		c.m.Unlock()
+
+		if tmReady {
+			if err := c.applyDisabledImmediateCapabilities(removed); err != nil {
+				return err
+			}
+		}
+		c.notifySkillUnload(capabilityNamesByType(removed, EnabledCapabilityTypeSkill))
+		c.notifyForgeUnload(capabilityNamesByType(removed, EnabledCapabilityTypeForge))
+		return nil
+	}
+}
+
+func (c *Config) applyDisabledImmediateCapabilities(caps []EnabledCapability) error {
+	if c == nil || len(caps) == 0 {
+		return nil
+	}
+	tm := c.GetAiToolManager()
+	if tm == nil {
+		return utils.Error("ai tool manager is nil")
+	}
+
+	for _, cap := range caps {
+		switch cap.Type {
+		case EnabledCapabilityTypeTool:
+			tm.DisableTool(cap.Name)
+		case EnabledCapabilityTypePlugin:
+			tm.RemoveToolByName(cap.Name)
+		case EnabledCapabilityTypeMCPTool:
+			tools, err := aitool.LoadAIToolsFromMCPCapability(consts.GetGormProfileDatabase(), c.Ctx, cap.Name)
+			if err != nil {
+				log.Warnf("disabled capability mcp_tool %q resolve failed: %v", cap.Name, err)
+				continue
+			}
+			for _, tool := range tools {
+				if tool != nil {
+					tm.RemoveToolByName(tool.Name)
+				}
+			}
+		}
+	}
+	return nil
+}
+
 func (c *Config) applyEnabledImmediateCapabilities() error {
 	if c == nil {
 		return nil
@@ -307,6 +385,65 @@ func (c *Config) notifyForgeHotload(forgeNames []string) {
 	if handler != nil {
 		handler(forgeNames)
 	}
+}
+
+func (c *Config) SetSkillUnloadHandler(handler skillUnloadHandler) {
+	if c == nil {
+		return
+	}
+	if c.m == nil {
+		c.m = &sync.Mutex{}
+	}
+	c.m.Lock()
+	defer c.m.Unlock()
+	c.skillUnloadHandler = handler
+}
+
+func (c *Config) SetForgeUnloadHandler(handler forgeUnloadHandler) {
+	if c == nil {
+		return
+	}
+	if c.m == nil {
+		c.m = &sync.Mutex{}
+	}
+	c.m.Lock()
+	defer c.m.Unlock()
+	c.forgeUnloadHandler = handler
+}
+
+func (c *Config) notifySkillUnload(skillNames []string) {
+	if c == nil || len(skillNames) == 0 {
+		return
+	}
+	c.m.Lock()
+	handler := c.skillUnloadHandler
+	c.m.Unlock()
+	if handler != nil {
+		handler(skillNames)
+	}
+}
+
+func (c *Config) notifyForgeUnload(forgeNames []string) {
+	if c == nil || len(forgeNames) == 0 {
+		return
+	}
+	c.m.Lock()
+	handler := c.forgeUnloadHandler
+	c.m.Unlock()
+	if handler != nil {
+		handler(forgeNames)
+	}
+}
+
+// SubtractEnabledCapabilitiesHotpatch removes patch capabilities from base start params.
+func SubtractEnabledCapabilitiesHotpatch(base *ypb.AIStartParams, patch *ypb.AIStartParams) []*ypb.AIEnabledCapability {
+	if patch == nil || len(patch.GetEnabledCapabilities()) == 0 {
+		return nil
+	}
+	current := ParseEnabledCapabilitiesFromProto(base)
+	toRemove := ParseEnabledCapabilitiesFromProto(patch)
+	remaining := subtractEnabledCapabilities(current, toRemove)
+	return enabledCapabilitiesToProto(remaining)
 }
 
 // MergeEnabledCapabilitiesHotpatch merges enabled capabilities from base and patch start params.

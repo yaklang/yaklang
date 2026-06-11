@@ -281,6 +281,23 @@ func (m *SkillsContextManager) LoadSkill(skillName string) error {
 	return nil
 }
 
+// UnloadSkill removes a loaded skill from the context manager.
+func (m *SkillsContextManager) UnloadSkill(skillName string) bool {
+	skillName = strings.TrimSpace(skillName)
+	if skillName == "" {
+		return false
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if !m.loadedSkills.Have(skillName) {
+		return false
+	}
+	m.loadedSkills.Delete(skillName)
+	m.contextSizeDirty = true
+	log.Infof("unloaded skill %q from context", skillName)
+	return true
+}
+
 // LoadSkills loads multiple skills into the context manager in batch.
 // Returns a map of skill name to error (nil error means success).
 func (m *SkillsContextManager) LoadSkills(names []string) map[string]error {

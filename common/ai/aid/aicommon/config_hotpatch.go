@@ -183,6 +183,13 @@ func (c *Config) ProcessHotPatchMessage(e *ypb.AIInputEvent) []ConfigOption {
 		}
 	}
 
+	if e.HotpatchType == HotPatchType_DisabledCapabilities {
+		incoming := ParseEnabledCapabilitiesFromProto(hotPatchParams)
+		if len(incoming) > 0 {
+			aiOption = append(aiOption, WithDisabledCapabilities(incoming...))
+		}
+	}
+
 	if e.HotpatchType == HotPatchType_ModelName {
 		serviceName := c.AiServerName
 		modelName := hotPatchParams.GetAIModelName()
@@ -243,6 +250,11 @@ func mergeHotpatchSessionStartParams(base *ypb.AIStartParams, e *ypb.AIInputEven
 			return base, false
 		}
 		next.EnabledCapabilities = MergeEnabledCapabilitiesHotpatch(base, p)
+	case HotPatchType_DisabledCapabilities:
+		if len(p.GetEnabledCapabilities()) == 0 {
+			return base, false
+		}
+		next.EnabledCapabilities = SubtractEnabledCapabilitiesHotpatch(base, p)
 	case HotPatchType_AllowPlanUserInteract:
 		next.AllowPlanUserInteract = p.GetAllowPlanUserInteract()
 	case HotPatchType_AllowRequireForUserInteract:
