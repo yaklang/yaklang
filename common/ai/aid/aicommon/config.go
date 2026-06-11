@@ -402,6 +402,8 @@ type Config struct {
 	enabledCapabilities []EnabledCapability
 	skillHotloadHandler skillHotloadHandler
 	forgeHotloadHandler forgeHotloadHandler
+	skillUnloadHandler  skillUnloadHandler
+	forgeUnloadHandler  forgeUnloadHandler
 
 	/*
 		Lazy WorkDir for semantic artifact directory naming
