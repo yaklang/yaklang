@@ -517,6 +517,18 @@ func WithExtraCapabilities(ecm *ExtraCapabilitiesManager) ReActLoopOption {
 	}
 }
 
+// WithDisableTodoSnapshot disables the global TODO list block in loop prompts
+// for this loop instance. Plan and intent sub-loops should opt out so they do
+// not inherit the session todo snapshot from the main execution loop.
+func WithDisableTodoSnapshot(disable ...bool) ReActLoopOption {
+	return func(r *ReActLoop) {
+		if len(disable) > 0 && !disable[0] {
+			return
+		}
+		r.disableTodoSnapshot = true
+	}
+}
+
 // WithDisableLoopPerception disables the perception layer for this specific loop instance.
 // This is used by lightweight sub-loops (e.g. loop_intent) that should never run
 // perception evaluations regardless of the config-level setting.

@@ -15,6 +15,13 @@ import (
 
 const directlyCallToolParamsNodeID = "directly_call_tool_params"
 
+func (r *ReActLoop) shouldRenderTodoSnapshot() bool {
+	if r == nil || r.disableTodoSnapshot {
+		return false
+	}
+	return true
+}
+
 // renderRecentToolRoutingHint 渲染"快速工具路由提示", 整体使用占位符字面量
 // nonce (aicommon.RecentToolCacheStableNonce, "[current-nonce]"), 跨 turn
 // 字节稳定, 让该段进入 prefix cache. 占位符语义可让 LLM 自然把它关联到
@@ -234,14 +241,16 @@ func (r *ReActLoop) generateLoopPrompt(
 	// VerifyUserSatisfaction 通过 ApplyVerificationTodoOps 增量写入.
 	// 关键词: TodoSnapshot 渲染, timeline-open 全局可见, SessionPromptState
 	var todoSnapshot string
-	if todoContent := r.config.GetVerificationTodoRendered(aicommon.BuildVerificationTodoScope(r.GetCurrentTask())); todoContent != "" {
-		todoSnapshot, err = utils.RenderTemplate(todoListTemplate, map[string]any{
-			"Nonce": nonce,
-			"Todo":  todoContent,
-		})
-		if err != nil {
-			log.Warnf("render todo list template failed: %v", err)
-			todoSnapshot = ""
+	if r.shouldRenderTodoSnapshot() {
+		if todoContent := r.config.GetVerificationTodoRendered(aicommon.BuildVerificationTodoScope(r.GetCurrentTask())); todoContent != "" {
+			todoSnapshot, err = utils.RenderTemplate(todoListTemplate, map[string]any{
+				"Nonce": nonce,
+				"Todo":  todoContent,
+			})
+			if err != nil {
+				log.Warnf("render todo list template failed: %v", err)
+				todoSnapshot = ""
+			}
 		}
 	}
 
