@@ -5,67 +5,61 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 )
 
-// RunAttachedExtraResourcesInit renders http_flow_id and selected attachments into the
-// invoker timeline so specialized loops (default, http flow analyze, http fuzztest, etc.)
-// can consume the same attached-resource payload.
+// RunAttachedExtraResourcesInit parses attached resources through the structured
+// resource registry, lets each resource bind loop-specific data, then groups
+// rendered attachment content by resource type into the invoker timeline.
 func RunAttachedExtraResourcesInit(
 	r aicommon.AIInvokeRuntime,
 	loop *ReActLoop,
 	attachedDatas []*aicommon.AttachedResource,
-) {
+) []aicommon.AttachedResourceData {
 	if len(attachedDatas) == 0 || r == nil || loop == nil {
-		return
+		return nil
 	}
 
-	var httpFlowSections []string
-	var selectedSections []string
-	db := consts.GetGormProjectDatabase()
-	emitter := loop.GetEmitter()
+	sectionsByType := make(map[string][]string)
+	var resources []aicommon.AttachedResourceData
 
 	for idx, data := range attachedDatas {
 		if data == nil {
 			continue
 		}
-		switch {
-		case aicommon.IsAttachedHTTPFlowResource(data):
-			loop.LoadingStatus(fmt.Sprintf(
-				"正在加载附加 HTTP 流量 (%d) / Loading attached HTTP flow (%d)",
-				idx+1, idx+1,
-			))
-			rendered, err := aicommon.RenderAttachedHTTPFlowResource(db, data, emitter)
-			if err != nil {
-				msg := fmt.Sprintf("failed to load attached HTTP flow %q: %v", strings.TrimSpace(data.Value), err)
-				log.Warnf("attached extra resources: %s", msg)
-				httpFlowSections = append(httpFlowSections, fmt.Sprintf("## Attached HTTP Flow\n\n_Error: %s_", msg))
-				continue
-			}
-			httpFlowSections = append(httpFlowSections, rendered)
-		case aicommon.IsAttachedSelectedResource(data):
-			loop.LoadingStatus(fmt.Sprintf(
-				"正在加载用户选中文本 (%d) / Loading attached selected text (%d)",
-				idx+1, idx+1,
-			))
-			selectedSections = append(selectedSections, aicommon.RenderAttachedSelectedResource(data, emitter))
+		loop.LoadingStatus(fmt.Sprintf(
+			"正在加载附加资源 (%d) / Loading attached resource (%d)",
+			idx+1, idx+1,
+		))
+
+		resource, err := aicommon.ParseAttachedResourceData(data)
+		if err != nil {
+			log.Warnf("attached extra resources: failed to parse type=%q value=%q: %v", strings.TrimSpace(data.Type), strings.TrimSpace(data.Value), err)
+			continue
 		}
+		resources = append(resources, resource)
+		if err := resource.BindLoopData(loop); err != nil {
+			log.Warnf("attached extra resources: failed to bind type=%q: %v", resource.Type(), err)
+			continue
+		}
+		rendered := strings.TrimSpace(resource.ToAttachData(loop))
+		if rendered == "" {
+			continue
+		}
+		sectionsByType[resource.Type()] = append(sectionsByType[resource.Type()], rendered)
 	}
 
-	if len(httpFlowSections) > 0 {
-		payload := strings.Join(httpFlowSections, "\n\n---\n\n")
-		r.AddToTimeline("attached_http_flow", payload)
-		r.AddToTimeline("import notice", "attached_http_flow has been recorded; use it when reasoning about the user's HTTP traffic.")
+	for typ, sections := range sectionsByType {
+		if len(sections) == 0 {
+			continue
+		}
+		timelineKey := "attached_" + strings.ReplaceAll(typ, "-", "_")
+		r.AddToTimeline(timelineKey, strings.Join(sections, "\n\n---\n\n"))
+		r.AddToTimeline("import notice", fmt.Sprintf("%s has been recorded; use it when reasoning about the user's attached resources.", timelineKey))
 	}
 
-	if len(selectedSections) > 0 {
-		payload := strings.Join(selectedSections, "\n\n---\n\n")
-		r.AddToTimeline("attached_selected_text", payload)
-		r.AddToTimeline("import notice", "attached_selected_text has been recorded; use it when reasoning about the user's UI selection.")
+	if len(sectionsByType) > 0 {
+		loop.LoadingStatus("附加资源处理完成 / Finished loading attached resources")
 	}
-
-	if len(httpFlowSections) > 0 || len(selectedSections) > 0 {
-		loop.LoadingStatus("附加 HTTP 流量与用户选中文本处理完成 / Finished loading attached HTTP flows and selected text")
-	}
+	return resources
 }
