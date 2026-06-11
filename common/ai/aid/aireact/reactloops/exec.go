@@ -765,7 +765,7 @@ LOOP:
 		// 关键词: 主循环 tick, lastIterationTickAt
 		r.recordIterationTick()
 		if iterationCount > maxIterations {
-			maxIterErr := utils.Errorf("reached max iterations (%d), stopping code generation loop", maxIterations)
+			maxIterErr := utils.Errorf("reached max iterations (%d), stopping %s loop", maxIterations, r.loopName)
 			postOp := r.finishIterationLoopWithError(iterationCount, task, maxIterErr)
 
 			// 检查 Hook 是否要求忽略错误
@@ -775,7 +775,7 @@ LOOP:
 				break LOOP // 正常退出，不返回错误
 			}
 
-			log.Warnf("Reached max iterations (%d), stopping code generation loop", maxIterations)
+			log.Warnf("Reached max iterations (%d), stopping %s loop", maxIterations, r.loopName)
 			needSummary.SetTo(true)
 			break LOOP
 		}
