@@ -445,6 +445,10 @@ func FilterYakScript(db *gorm.DB, params *ypb.QueryYakScriptRequest) *gorm.DB {
 	if params.GetIsBatch() {
 		db = bizhelper.QueryByBool(db, "is_batch_script", true)
 	}
+	// 仅返回允许 AI 调用的插件
+	if params.GetEnableForAI() {
+		db = bizhelper.QueryByBool(db, "enable_for_ai", true)
+	}
 	switch params.IsMITMParamPlugins {
 	case 1:
 		db = db.Where(mitmHasParamsCondition("params"))

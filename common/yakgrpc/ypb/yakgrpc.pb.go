@@ -42009,8 +42009,10 @@ type QueryYakScriptRequest struct {
 	IsMITMParamPlugins       int64                  `protobuf:"varint,20,opt,name=IsMITMParamPlugins,proto3" json:"IsMITMParamPlugins,omitempty"` //0->默认全部 1->是mitm带参数插件 2->mitm不带参数
 	FieldKeywords            string                 `protobuf:"bytes,21,opt,name=FieldKeywords,proto3" json:"FieldKeywords,omitempty"`
 	VectorSearchContent      string                 `protobuf:"bytes,22,opt,name=VectorSearchContent,proto3" json:"VectorSearchContent,omitempty"`
-	unknownFields            protoimpl.UnknownFields
-	sizeCache                protoimpl.SizeCache
+	// 为 true 时仅返回 enable_for_ai=true 的插件
+	EnableForAI   bool `protobuf:"varint,23,opt,name=EnableForAI,proto3" json:"EnableForAI,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *QueryYakScriptRequest) Reset() {
@@ -42195,6 +42197,13 @@ func (x *QueryYakScriptRequest) GetVectorSearchContent() string {
 		return x.VectorSearchContent
 	}
 	return ""
+}
+
+func (x *QueryYakScriptRequest) GetEnableForAI() bool {
+	if x != nil {
+		return x.EnableForAI
+	}
+	return false
 }
 
 type PluginGroup struct {
@@ -73295,7 +73304,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\bProgress\x18\x02 \x01(\x01R\bProgress\"O\n" +
 	"\x1dGetAllPayloadFromFileResponse\x12\x1a\n" +
 	"\bProgress\x18\x01 \x01(\x01R\bProgress\x12\x12\n" +
-	"\x04Data\x18\x02 \x01(\fR\x04Data\"\xb2\x06\n" +
+	"\x04Data\x18\x02 \x01(\fR\x04Data\"\xd4\x06\n" +
 	"\x15QueryYakScriptRequest\x12+\n" +
 	"\n" +
 	"Pagination\x18\x01 \x01(\v2\v.ypb.PagingR\n" +
@@ -73321,7 +73330,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\fExcludeTypes\x18\x13 \x03(\tR\fExcludeTypes\x12.\n" +
 	"\x12IsMITMParamPlugins\x18\x14 \x01(\x03R\x12IsMITMParamPlugins\x12$\n" +
 	"\rFieldKeywords\x18\x15 \x01(\tR\rFieldKeywords\x120\n" +
-	"\x13VectorSearchContent\x18\x16 \x01(\tR\x13VectorSearchContent\"g\n" +
+	"\x13VectorSearchContent\x18\x16 \x01(\tR\x13VectorSearchContent\x12 \n" +
+	"\vEnableForAI\x18\x17 \x01(\bR\vEnableForAI\"g\n" +
 	"\vPluginGroup\x12\x1e\n" +
 	"\n" +
 	"UnSetGroup\x18\x01 \x01(\bR\n" +
