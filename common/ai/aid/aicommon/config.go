@@ -400,10 +400,11 @@ type Config struct {
 
 	// enabledCapabilities holds startup/hotpatch pre-enabled capabilities.
 	enabledCapabilities []EnabledCapability
-	skillHotloadHandler skillHotloadHandler
-	forgeHotloadHandler forgeHotloadHandler
-	skillUnloadHandler  skillUnloadHandler
-	forgeUnloadHandler  forgeUnloadHandler
+	skillHotloadHandler            skillHotloadHandler
+	forgeHotloadHandler            forgeHotloadHandler
+	skillUnloadHandler             skillUnloadHandler
+	forgeUnloadHandler             forgeUnloadHandler
+	capabilityInventoryEmitHandler capabilityInventoryEmitHandler
 
 	/*
 		Lazy WorkDir for semantic artifact directory naming

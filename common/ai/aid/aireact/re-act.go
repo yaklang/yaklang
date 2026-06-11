@@ -345,6 +345,10 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 		}
 	})
 
+	cfg.SetCapabilityInventoryEmitHandler(func() {
+		reactloops.EmitCapabilityInventorySnapshot(react.config, react.GetCurrentLoop())
+	})
+
 	// Register pending context providers
 	react.promptManager.cpm = cfg.ContextProviderManager
 	react.installRunningSessionRegistry()
