@@ -178,6 +178,33 @@ func toolNames(tools []*aitool.Tool) []string {
 	return names
 }
 
+func TestWithEnabledCapabilities_EmitsCapabilityInventory(t *testing.T) {
+	emitted := false
+	cfg := NewConfig(context.Background(), WithDisableAutoSkills(true))
+	cfg.SetCapabilityInventoryEmitHandler(func() {
+		emitted = true
+	})
+	require.NoError(t, WithEnabledCapabilities(
+		EnabledCapability{Name: "ls", Type: EnabledCapabilityTypeTool},
+	)(cfg))
+	require.True(t, emitted)
+}
+
+func TestWithDisabledCapabilities_EmitsCapabilityInventory(t *testing.T) {
+	emitted := false
+	cfg := NewConfig(context.Background(), WithDisableAutoSkills(true))
+	require.NoError(t, WithEnabledCapabilities(
+		EnabledCapability{Name: "ls", Type: EnabledCapabilityTypeTool},
+	)(cfg))
+	cfg.SetCapabilityInventoryEmitHandler(func() {
+		emitted = true
+	})
+	require.NoError(t, WithDisabledCapabilities(
+		EnabledCapability{Name: "ls", Type: EnabledCapabilityTypeTool},
+	)(cfg))
+	require.True(t, emitted)
+}
+
 func TestGetEnabledCapabilityNamesByType(t *testing.T) {
 	cfg := NewConfig(context.Background(), WithDisableAutoSkills(true))
 	require.NoError(t, WithEnabledCapabilities(

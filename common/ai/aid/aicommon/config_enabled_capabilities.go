@@ -34,6 +34,7 @@ type skillHotloadHandler func(skillNames []string)
 type forgeHotloadHandler func(forgeNames []string)
 type skillUnloadHandler func(skillNames []string)
 type forgeUnloadHandler func(forgeNames []string)
+type capabilityInventoryEmitHandler func()
 
 func normalizeEnabledCapabilityType(raw string) string {
 	switch strings.ToLower(strings.TrimSpace(raw)) {
@@ -167,6 +168,7 @@ func WithEnabledCapabilities(caps ...EnabledCapability) ConfigOption {
 		}
 		c.notifySkillHotload(diffNames(prevSkillNames, nextSkillNames))
 		c.notifyForgeHotload(diffNames(prevForgeNames, nextForgeNames))
+		c.notifyCapabilityInventoryEmit()
 		return nil
 	}
 }
@@ -228,6 +230,7 @@ func WithDisabledCapabilities(caps ...EnabledCapability) ConfigOption {
 		}
 		c.notifySkillUnload(capabilityNamesByType(removed, EnabledCapabilityTypeSkill))
 		c.notifyForgeUnload(capabilityNamesByType(removed, EnabledCapabilityTypeForge))
+		c.notifyCapabilityInventoryEmit()
 		return nil
 	}
 }
@@ -432,6 +435,30 @@ func (c *Config) notifyForgeUnload(forgeNames []string) {
 	c.m.Unlock()
 	if handler != nil {
 		handler(forgeNames)
+	}
+}
+
+func (c *Config) SetCapabilityInventoryEmitHandler(handler capabilityInventoryEmitHandler) {
+	if c == nil {
+		return
+	}
+	if c.m == nil {
+		c.m = &sync.Mutex{}
+	}
+	c.m.Lock()
+	defer c.m.Unlock()
+	c.capabilityInventoryEmitHandler = handler
+}
+
+func (c *Config) notifyCapabilityInventoryEmit() {
+	if c == nil {
+		return
+	}
+	c.m.Lock()
+	handler := c.capabilityInventoryEmitHandler
+	c.m.Unlock()
+	if handler != nil {
+		handler()
 	}
 }
 
