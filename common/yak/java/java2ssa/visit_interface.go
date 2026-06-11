@@ -27,7 +27,7 @@ func (y *singleFileBuilder) VisitInterfaceDeclaration(raw javaparser.IInterfaceD
 		for _, extend := range i.AllTypeList() {
 			extendName := extend.GetText()
 			extendNames = append(extendNames, extendName)
-			tokenMap[extendName] = ssa.DetachAST(extend)
+			tokenMap[extendName] = ssa.NewTextRangeToken(extend)
 		}
 	}
 
