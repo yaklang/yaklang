@@ -97,15 +97,8 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, ast ssa.FrontAS
 			return utils.Errorf("convert jsp to java error: %v", err)
 		}
 		prog.SetTemplate(path, info)
-		ast, err := s.ParseAST(info.GetContent(), s.GetAntlrCache())
-		if err != nil {
+		if err := s.buildGeneratedTemplateJava(prog, fb, path, info); err != nil {
 			log.Debugf("parse jsp file %s error: %v", path, err)
-			return err
-		}
-		editor := prog.CreateEditor([]byte(info.GetContent()), path)
-		// editor := memedit.NewMemEditor(info.GetContent())
-		err = prog.Build(ast, editor, fb)
-		if err != nil {
 			return err
 		}
 	default:
@@ -117,14 +110,7 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, ast ssa.FrontAS
 			}
 			prog.SetTemplate(path, info)
 			saveExtraFile(path)
-			ast, err := s.ParseAST(info.GetContent(), s.GetAntlrCache())
-			if err != nil {
-				return err
-			}
-
-			templateEditor := prog.CreateEditor([]byte(info.GetContent()), path)
-			err = prog.Build(ast, templateEditor, fb)
-			if err != nil {
+			if err := s.buildGeneratedTemplateJava(prog, fb, path, info); err != nil {
 				return err
 			}
 			return nil
@@ -132,4 +118,16 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, ast ssa.FrontAS
 		saveExtraFile(path)
 	}
 	return nil
+}
+
+func (s *SSABuilder) buildGeneratedTemplateJava(prog *ssa.Program, fb *ssa.FunctionBuilder, path string, info tl.TemplateGeneratedInfo) error {
+	content := info.GetContent()
+	ast, err := s.ParseAST(content, s.GetAntlrCache())
+	if err != nil {
+		return err
+	}
+	defer ssa.ReleaseASTRoot(ast)
+
+	templateEditor := prog.CreateEditor([]byte(content), path)
+	return prog.Build(ast, templateEditor, fb)
 }
