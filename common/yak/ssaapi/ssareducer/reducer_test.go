@@ -253,3 +253,54 @@ func TestFilesHandler_OutOfOrderBackpressuresParsedAST(t *testing.T) {
 	for range out {
 	}
 }
+
+func TestFilesHandler_OutOfOrderWaitsForReleaseBeforeParsingNextAST(t *testing.T) {
+	t.Setenv("YAK_SSA_AST_BUILD_WINDOW_FILES", "1")
+
+	vfs := filesys.NewVirtualFs()
+	var paths []string
+	for i := 0; i < 4; i++ {
+		path := fmt.Sprintf("src/%02d.go", i)
+		paths = append(paths, path)
+		vfs.AddFile(path, "package main")
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var parsed int64
+	out := FilesHandler(
+		ctx,
+		vfs,
+		paths,
+		func(path string, content []byte, store *utils.SafeMap[any]) (ssa.FrontAST, error) {
+			atomic.AddInt64(&parsed, 1)
+			return path, nil
+		},
+		nil,
+		OutOfOrder,
+		4,
+	)
+
+	first := <-out
+	require.NotNil(t, first)
+	require.Eventually(t, func() bool {
+		return atomic.LoadInt64(&parsed) == 1
+	}, time.Second, time.Millisecond)
+
+	time.Sleep(50 * time.Millisecond)
+	require.Equal(t, int64(1), atomic.LoadInt64(&parsed), "parser should wait for the consumer to release the AST slot")
+
+	first.Release()
+	second := <-out
+	require.NotNil(t, second)
+	require.Eventually(t, func() bool {
+		return atomic.LoadInt64(&parsed) == 2
+	}, time.Second, time.Millisecond)
+
+	second.Release()
+	for fc := range out {
+		fc.Release()
+	}
+	require.Equal(t, int64(4), atomic.LoadInt64(&parsed))
+}
