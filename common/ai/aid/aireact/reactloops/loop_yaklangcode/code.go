@@ -162,6 +162,7 @@ func init() {
 			preset = append(preset, yakdocActions(r)...)
 			// 添加工厂生成的 actions (write_code, modify_code, insert_code, delete_code)
 			preset = append(preset, modSuite.GetActions()...)
+			preset = append(preset, withYaklangDeferredEditorSync())
 			preset = append(preset, opts...)
 			return reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_WRITE_YAKLANG, r, preset...)
 		},

@@ -178,6 +178,9 @@ func (i *Emitter) emit(e *schema.AiOutputEvent) (finalEvent *schema.AiOutputEven
 	if i.eventProcesserStack != nil {
 		e = i.callEventBeforeSave(e)
 	}
+	if e == nil {
+		return nil, nil
+	}
 	if i.baseEmitter != nil {
 		var err error
 		if e, err = i.baseEmitter(e); err != nil {
