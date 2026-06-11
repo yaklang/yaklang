@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -525,4 +527,289 @@ func TestGRPCMUSTPASS_SSAProjectMigrateSSAProject(t *testing.T) {
 		})
 	}
 
+}
+
+// TestGRPCMUSTPASS_SSAProjectRenameKeepsCompileHistory 验证项目重命名后：
+// 1. ssa_projects 仍只有一条记录；
+// 2. 带时间戳的 program_name 不会作为独立项目出现在 QuerySSAProject 中；
+// 3. 编译历史仍通过 project_id 关联到同一项目。
+func TestGRPCMUSTPASS_SSAProjectRenameKeepsCompileHistory(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	ctx := context.Background()
+
+	tempDir, err := os.MkdirTemp("", "ssa-rename-compile-history-*")
+	require.NoError(t, err)
+	defer os.RemoveAll(tempDir)
+
+	testFile := filepath.Join(tempDir, "main.yak")
+	require.NoError(t, os.WriteFile(testFile, []byte(`println("compile-history-rename-test")`), 0o644))
+
+	codeSourceConfig := &ssaconfig.CodeSourceInfo{
+		Kind:      ssaconfig.CodeSourceLocal,
+		LocalFile: tempDir,
+	}
+	configBytes, err := json.Marshal(codeSourceConfig)
+	require.NoError(t, err)
+	configJSON := string(configBytes)
+
+	originalName := fmt.Sprintf("ssa-rename-%s", uuid.NewString())
+	newName := fmt.Sprintf("ssa-renamed-%s", uuid.NewString())
+
+	createResp, err := client.CreateSSAProject(ctx, &ypb.CreateSSAProjectRequest{
+		Project: &ypb.SSAProject{
+			ProjectName:      originalName,
+			CodeSourceConfig: configJSON,
+			Description:      "rename compile history test",
+			Language:         string(ssaconfig.Yak),
+		},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, createResp.Project)
+
+	projectID := createResp.Project.ID
+	require.NotZero(t, projectID)
+
+	defer func() {
+		_, _ = client.DeleteSSAProject(ctx, &ypb.DeleteSSAProjectRequest{
+			DeleteMode: string(yakit.SSAProjectDeleteAll),
+			Filter: &ypb.SSAProjectFilter{
+				IDs: []int64{projectID},
+			},
+		})
+	}()
+
+	// 模拟 SSA 编译脚本生成的 program_name：项目名 + 时间戳
+	compiledProgramName := fmt.Sprintf("%s(2026-06-11 16:43:50)", originalName)
+	_, err = ssaapi.Parse(`println("compile-history-rename-test")`,
+		ssaapi.WithSetProgramName(compiledProgramName),
+		ssaapi.WithLanguage(ssaconfig.Yak),
+		ssaconfig.WithProjectID(uint64(projectID)),
+	)
+	require.NoError(t, err)
+	defer ssadb.DeleteProgram(ssadb.GetDB(), compiledProgramName)
+
+	programsBeforeRename, err := client.QuerySSAPrograms(ctx, &ypb.QuerySSAProgramRequest{
+		Filter: &ypb.SSAProgramFilter{
+			ProjectIds: []uint64{uint64(projectID)},
+		},
+	})
+	require.NoError(t, err)
+	require.Len(t, programsBeforeRename.Data, 1)
+	require.Equal(t, compiledProgramName, programsBeforeRename.Data[0].Name)
+	require.Equal(t, uint64(projectID), programsBeforeRename.Data[0].SSAProjectID)
+
+	updateResp, err := client.UpdateSSAProject(ctx, &ypb.UpdateSSAProjectRequest{
+		Project: &ypb.SSAProject{
+			ID:               projectID,
+			ProjectName:      newName,
+			CodeSourceConfig: configJSON,
+			Description:      "renamed project",
+			Language:         string(ssaconfig.Yak),
+		},
+	})
+	require.NoError(t, err)
+	require.Equal(t, newName, updateResp.Project.ProjectName)
+
+	byIDResp, err := client.QuerySSAProject(ctx, &ypb.QuerySSAProjectRequest{
+		Filter: &ypb.SSAProjectFilter{
+			IDs: []int64{projectID},
+		},
+	})
+	require.NoError(t, err)
+	require.Len(t, byIDResp.Projects, 1, "rename should not create duplicate SSAProject")
+	require.Equal(t, newName, byIDResp.Projects[0].ProjectName)
+	require.Equal(t, int64(1), byIDResp.Projects[0].CompileTimes)
+
+	byOldNameResp, err := client.QuerySSAProject(ctx, &ypb.QuerySSAProjectRequest{
+		Filter: &ypb.SSAProjectFilter{
+			ProjectNames: []string{originalName},
+		},
+	})
+	require.NoError(t, err)
+	require.Len(t, byOldNameResp.Projects, 0, "old project name should not match any SSAProject after rename")
+
+	byProgramNameResp, err := client.QuerySSAProject(ctx, &ypb.QuerySSAProjectRequest{
+		Filter: &ypb.SSAProjectFilter{
+			ProjectNames: []string{compiledProgramName},
+		},
+	})
+	require.NoError(t, err)
+	require.Len(t, byProgramNameResp.Projects, 0, "timestamped program_name must not appear as SSAProject row")
+
+	programsAfterRename, err := client.QuerySSAPrograms(ctx, &ypb.QuerySSAProgramRequest{
+		Filter: &ypb.SSAProgramFilter{
+			ProjectIds: []uint64{uint64(projectID)},
+		},
+	})
+	require.NoError(t, err)
+	require.Len(t, programsAfterRename.Data, 1, "compile history should remain under the same project_id")
+	require.Equal(t, compiledProgramName, programsAfterRename.Data[0].Name)
+	require.Equal(t, uint64(projectID), programsAfterRename.Data[0].SSAProjectID)
+	require.Contains(t, programsAfterRename.Data[0].Name, originalName)
+	require.NotContains(t, programsAfterRename.Data[0].Name, newName)
+}
+
+func runMigrateSSAProject(t *testing.T, client ypb.YakClient, ctx context.Context) {
+	t.Helper()
+	stream, err := client.MigrateSSAProject(ctx, &ypb.MigrateSSAProjectRequest{})
+	require.NoError(t, err)
+	for {
+		resp, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		require.NoError(t, err)
+		t.Logf("migrate progress: %.2f%% - %s", resp.Percent, resp.Message)
+	}
+}
+
+func TestGRPCMUSTPASS_SSAProjectMigrateReusesExistingProjectByURL(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	ctx := context.Background()
+
+	tempDir, err := os.MkdirTemp("", "ssa-migrate-reuse-url-*")
+	require.NoError(t, err)
+	defer os.RemoveAll(tempDir)
+
+	codeSourceConfig := &ssaconfig.CodeSourceInfo{
+		Kind:      ssaconfig.CodeSourceLocal,
+		LocalFile: tempDir,
+	}
+	configBytes, err := json.Marshal(codeSourceConfig)
+	require.NoError(t, err)
+	configJSON := string(configBytes)
+
+	renamedProjectName := fmt.Sprintf("ssa-migrate-renamed-%s", uuid.NewString())
+	createResp, err := client.CreateSSAProject(ctx, &ypb.CreateSSAProjectRequest{
+		Project: &ypb.SSAProject{
+			ProjectName:      renamedProjectName,
+			CodeSourceConfig: configJSON,
+			Description:      "existing project before migration",
+			Language:         string(ssaconfig.Yak),
+		},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, createResp.Project)
+	existingProjectID := createResp.Project.ID
+
+	defer func() {
+		_, _ = client.DeleteSSAProject(ctx, &ypb.DeleteSSAProjectRequest{
+			DeleteMode: string(yakit.SSAProjectDeleteAll),
+			Filter: &ypb.SSAProjectFilter{IDs: []int64{existingProjectID}},
+		})
+	}()
+
+	orphanProgramName := fmt.Sprintf("111111(2026-06-11 16:43:50)-%s", uuid.NewString())
+	configWithPath, err := ssaconfig.New(
+		ssaconfig.ModeCodeSource,
+		ssaconfig.WithCodeSourceInfo(codeSourceConfig),
+	)
+	require.NoError(t, err)
+	configInput, err := configWithPath.ToJSONString()
+	require.NoError(t, err)
+
+	ssaDB := consts.GetGormSSAProjectDataBase()
+	_, err = ssaapi.Parse(`println("orphan migrate test")`,
+		ssaapi.WithSetProgramName(orphanProgramName),
+		ssaapi.WithLanguage(ssaconfig.Yak),
+	)
+	require.NoError(t, err)
+	defer ssadb.DeleteProgram(ssaDB, orphanProgramName)
+
+	err = ssaDB.Model(&ssadb.IrProgram{}).
+		Where("program_name = ?", orphanProgramName).
+		Updates(map[string]any{
+			"config_input": configInput,
+			"project_id":   0,
+		}).Error
+	require.NoError(t, err)
+
+	runMigrateSSAProject(t, client, ctx)
+
+	irProg, err := yakit.GetSSAProgramByName(ssaDB, orphanProgramName)
+	require.NoError(t, err)
+	require.Equal(t, uint64(existingProjectID), irProg.ProjectID)
+
+	byIDResp, err := client.QuerySSAProject(ctx, &ypb.QuerySSAProjectRequest{
+		Filter: &ypb.SSAProjectFilter{IDs: []int64{existingProjectID}},
+	})
+	require.NoError(t, err)
+	require.Len(t, byIDResp.Projects, 1)
+	require.Equal(t, renamedProjectName, byIDResp.Projects[0].ProjectName)
+
+	byTimestampNameResp, err := client.QuerySSAProject(ctx, &ypb.QuerySSAProjectRequest{
+		Filter: &ypb.SSAProjectFilter{ProjectNames: []string{orphanProgramName}},
+	})
+	require.NoError(t, err)
+	require.Len(t, byTimestampNameResp.Projects, 0, "timestamped program_name must not become SSAProject row")
+}
+
+func TestGRPCMUSTPASS_SSAProjectMigrateUsesBaseProjectName(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	ctx := context.Background()
+
+	tempDir, err := os.MkdirTemp("", "ssa-migrate-base-name-*")
+	require.NoError(t, err)
+	defer os.RemoveAll(tempDir)
+
+	codeSourceConfig := &ssaconfig.CodeSourceInfo{
+		Kind:      ssaconfig.CodeSourceLocal,
+		LocalFile: tempDir,
+	}
+	configWithPath, err := ssaconfig.New(
+		ssaconfig.ModeCodeSource,
+		ssaconfig.WithCodeSourceInfo(codeSourceConfig),
+	)
+	require.NoError(t, err)
+	configInput, err := configWithPath.ToJSONString()
+	require.NoError(t, err)
+
+	baseName := fmt.Sprintf("ssa-base-%s", uuid.NewString())
+	orphanProgramName := fmt.Sprintf("%s(2026-06-11 16:43:50)", baseName)
+
+	ssaDB := consts.GetGormSSAProjectDataBase()
+	_, err = ssaapi.Parse(`println("orphan base name migrate test")`,
+		ssaapi.WithSetProgramName(orphanProgramName),
+		ssaapi.WithLanguage(ssaconfig.Yak),
+	)
+	require.NoError(t, err)
+	defer ssadb.DeleteProgram(ssaDB, orphanProgramName)
+
+	err = ssaDB.Model(&ssadb.IrProgram{}).
+		Where("program_name = ?", orphanProgramName).
+		Updates(map[string]any{
+			"config_input": configInput,
+			"project_id":   0,
+		}).Error
+	require.NoError(t, err)
+
+	runMigrateSSAProject(t, client, ctx)
+
+	irProg, err := yakit.GetSSAProgramByName(ssaDB, orphanProgramName)
+	require.NoError(t, err)
+	require.NotZero(t, irProg.ProjectID)
+
+	defer func() {
+		_, _ = client.DeleteSSAProject(ctx, &ypb.DeleteSSAProjectRequest{
+			DeleteMode: string(yakit.SSAProjectDeleteAll),
+			Filter: &ypb.SSAProjectFilter{IDs: []int64{int64(irProg.ProjectID)}},
+		})
+	}()
+
+	byBaseNameResp, err := client.QuerySSAProject(ctx, &ypb.QuerySSAProjectRequest{
+		Filter: &ypb.SSAProjectFilter{ProjectNames: []string{baseName}},
+	})
+	require.NoError(t, err)
+	require.Len(t, byBaseNameResp.Projects, 1)
+	require.Equal(t, baseName, byBaseNameResp.Projects[0].ProjectName)
+
+	byTimestampNameResp, err := client.QuerySSAProject(ctx, &ypb.QuerySSAProjectRequest{
+		Filter: &ypb.SSAProjectFilter{ProjectNames: []string{orphanProgramName}},
+	})
+	require.NoError(t, err)
+	require.Len(t, byTimestampNameResp.Projects, 0)
 }
