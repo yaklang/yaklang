@@ -349,6 +349,17 @@ func WithOnLoopRelease(fn func()) ReActLoopOption {
 	}
 }
 
+// WithLoopEmitterProcesser pushes an event processor onto this loop's emitter only.
+// Returning nil from the processor drops the event before it reaches the global handler.
+func WithLoopEmitterProcesser(fn aicommon.EventProcesser) ReActLoopOption {
+	return func(r *ReActLoop) {
+		if r == nil || r.emitter == nil || fn == nil {
+			return
+		}
+		r.emitter = r.emitter.PushEventProcesser(fn)
+	}
+}
+
 // WithOnPostIteraction sets a callback function that is called after each iteration of the ReAct loop.
 // The operator parameter allows the callback to control whether the loop should end by calling operator.EndIteration().
 func WithOnPostIteraction(fn ...func(loop *ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any, operator *OnPostIterationOperator)) ReActLoopOption {
