@@ -175,6 +175,13 @@ func (s *sourceStore) Close() {
 		return
 	}
 	defer s.releaseEditors()
+	s.Flush()
+}
+
+func (s *sourceStore) Flush() {
+	if s == nil || s.mode != ProgramCacheDBWrite || s.db == nil {
+		return
+	}
 
 	sources, hashes := s.collectRegisteredSources()
 	if len(sources) == 0 {

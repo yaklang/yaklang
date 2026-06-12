@@ -92,6 +92,18 @@ func (s *indexStore) Close() {
 	}
 }
 
+func (s *indexStore) Flush() {
+	if s == nil {
+		return
+	}
+	if s.indexSaver != nil {
+		s.indexSaver.Flush()
+	}
+	if s.offsetSaver != nil {
+		s.offsetSaver.Flush()
+	}
+}
+
 func (s *indexStore) AddInstructionOffsets(inst Instruction) {
 	if s == nil || s.offsetSaver == nil || utils.IsNil(inst) {
 		return

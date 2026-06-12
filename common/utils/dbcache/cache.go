@@ -5,7 +5,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -78,10 +77,7 @@ func (c *ResidencyCacheWithKey[K, T]) Set(key K, memValue T) {
 	if c == nil {
 		return
 	}
-	if c.closed.Load() {
-		log.Errorf("dbcache is closed, can't set key: %v", key)
-		return
-	}
+	closed := c.closed.Load()
 
 	c.mu.Lock()
 	if item, ok := c.data[key]; ok {
@@ -96,7 +92,7 @@ func (c *ResidencyCacheWithKey[K, T]) Set(key K, memValue T) {
 	}
 	c.mu.Unlock()
 
-	if c.evictionCache == nil || c.IsSaveDisabled() {
+	if closed || c.evictionCache == nil || c.IsSaveDisabled() {
 		return
 	}
 
