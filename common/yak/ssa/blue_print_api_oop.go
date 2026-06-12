@@ -67,6 +67,7 @@ func (b *FunctionBuilder) CreateBlueprintWithPkgName(name string, tokenizers ...
 	}
 
 	blueprint := NewBlueprint(name)
+	blueprint.LazyBuilder.SetUnitProvider(prog.CurrentCompileUnit)
 
 	blueprint.Range = codeRange
 

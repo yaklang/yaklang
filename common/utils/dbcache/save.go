@@ -18,6 +18,7 @@ type Save[T any] struct {
 	saveToDB func([]T) // Function to save items to the database
 
 	buffer *chanx.UnlimitedChan[T] // Channel for buffering items
+	flush  chan chan struct{}
 
 	config *config
 
@@ -159,6 +160,7 @@ func NewSaveWithConfig[T any](
 	s := &Save[T]{
 		saveToDB: saveToDB,
 		buffer:   chanx.NewUnlimitedChan[T](ctx, cfg.bufferSize),
+		flush:    make(chan chan struct{}),
 		ctx:      ctx,
 		cancel:   cancel,
 		config:   cfg,
@@ -202,6 +204,12 @@ func (s *Save[T]) processBuffer() {
 		case <-s.ctx.Done():
 			save(items)
 			return
+		case done := <-s.flush:
+			save(items)
+			items = make([]T, 0, saveSize)
+			resetTimer(timer, saveTime)
+			s.saveWG.Wait()
+			close(done)
 		case item, ok := <-s.buffer.OutputChannel():
 			if !ok {
 				save(items)
@@ -263,6 +271,27 @@ func (s *Save[T]) Save(item T) {
 				s.config.name, item, blockCost,
 			)
 		}
+	}
+}
+
+// Flush synchronously saves all currently queued items without closing the
+// saver. Items added concurrently after the flush request may be saved by a
+// later batch.
+func (s *Save[T]) Flush() {
+	if s == nil {
+		return
+	}
+	done := make(chan struct{})
+	defer func() {
+		if r := recover(); r != nil {
+			log.Errorf("dbcache flush panic: %v", r)
+			utils.PrintCurrentGoroutineRuntimeStack()
+		}
+	}()
+	select {
+	case s.flush <- done:
+		<-done
+	case <-s.ctx.Done():
 	}
 }
 

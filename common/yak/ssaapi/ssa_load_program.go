@@ -36,18 +36,28 @@ func SetProgramCache(program *Program, ttls ...time.Duration) {
 // ```
 func FromDatabase(programName string) (p *Program, err error) {
 	if prog, ok := ProgramCache.Get(programName); ok && prog != nil {
-		irProg, err := ssadb.GetProgram(programName, ssadb.Application)
-		if err == nil && irProg != nil && irProg.IsOverlay && len(irProg.OverlayLayers) > 0 {
-			if prog.GetOverlay() == nil {
-				overlay, err := loadOverlayFromDatabase(irProg.OverlayLayers, make(map[string]bool))
-				if err != nil {
-					log.Warnf("failed to load overlay from cache: %v", err)
-				} else {
-					prog.overlay = overlay
+		if prog.Program != nil &&
+			prog.Program.DatabaseKind == ssa.ProgramCacheDBWrite &&
+			prog.Program.Cache != nil &&
+			prog.Program.Cache.IsClosed() {
+			ProgramCache.Remove(programName)
+		} else {
+			irProg, err := ssadb.GetProgram(programName, ssadb.Application)
+			if err == nil && irProg != nil {
+				prog.irProgram = irProg
+				if irProg.IsOverlay && len(irProg.OverlayLayers) > 0 {
+					if prog.GetOverlay() == nil {
+						overlay, err := loadOverlayFromDatabase(irProg.OverlayLayers, make(map[string]bool))
+						if err != nil {
+							log.Warnf("failed to load overlay from cache: %v", err)
+						} else {
+							prog.overlay = overlay
+						}
+					}
 				}
 			}
+			return prog, nil
 		}
-		return prog, nil
 	}
 	defer func() {
 		if err != nil {
