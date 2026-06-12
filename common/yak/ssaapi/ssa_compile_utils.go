@@ -114,11 +114,21 @@ func newAntlrASTParseWorker(c *Config) *antlrASTParseWorker {
 	if c == nil {
 		return &antlrASTParseWorker{}
 	}
+	resetEveryFiles := antlrCacheResetEveryFiles()
+	resetEveryBytes := antlrCacheResetEveryBytes()
+	if c.GetCompileProjectBytes() >= largeProjectByteCap {
+		if _, ok := os.LookupEnv("YAK_ANTLR_CACHE_RESET_FILES"); !ok {
+			resetEveryFiles = 1
+		}
+		if _, ok := os.LookupEnv("YAK_ANTLR_CACHE_RESET_BYTES"); !ok {
+			resetEveryBytes = 2 * 1024 * 1024
+		}
+	}
 	return &antlrASTParseWorker{
 		language:        c.LanguageBuilder,
 		languageName:    string(c.GetLanguage()),
-		resetEveryFiles: antlrCacheResetEveryFiles(),
-		resetEveryBytes: antlrCacheResetEveryBytes(),
+		resetEveryFiles: resetEveryFiles,
+		resetEveryBytes: resetEveryBytes,
 	}
 }
 
@@ -214,7 +224,12 @@ func (c *Config) GetFileHandler(
 		return parser.initWorker()
 	}
 	concurrency := int(c.GetCompileConcurrency())
-	if c.GetCompileProjectBytes() >= largeProjectByteCap && concurrency > largeProjectCompileConcurrency() {
+	largeProject := c.GetCompileProjectBytes() >= largeProjectByteCap
+	astBuildWindowOverride := 0
+	if largeProject {
+		astBuildWindowOverride = 1
+	}
+	if largeProject && concurrency > largeProjectCompileConcurrency() {
 		capped := largeProjectCompileConcurrency()
 		log.Infof(
 			"[ssa-compile] large project detected (%s), cap AST parse concurrency: %d -> %d",
@@ -224,11 +239,19 @@ func (c *Config) GetFileHandler(
 		)
 		concurrency = capped
 	}
+	if largeProject {
+		log.Infof(
+			"[ssa-compile] large project detected (%s), tighten AST build window to %d and ANTLR cache reset (files=1, bytes=2MB unless env override)",
+			formatFileSize(int(c.GetCompileProjectBytes())),
+			astBuildWindowOverride,
+		)
+	}
 	return ssareducer.FilesHandler(
 		c.ctx, filesystem, preHandlerFiles,
 		parse, initWorker,
 		c.GetCompileASTSequence(),
 		concurrency,
+		astBuildWindowOverride,
 	)
 }
 

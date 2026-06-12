@@ -574,6 +574,9 @@ func (y *builder) VisitChainLeft(raw phpparser.IChainContext) *ssa.Variable {
 		return y.VisitLeftVariable(i.FlexiVariable())
 	}
 	member, s := y.VisitStaticClassExprVariableMember(i.StaticClassExprVariableMember())
+	if member == nil {
+		return y.CreateVariable(raw.GetText())
+	}
 	return y.GetStaticMember(member, s)
 }
 
@@ -634,6 +637,9 @@ func (y *builder) VisitAssignableChainLeft(raw phpparser.IAssignableChainContext
 	}
 	if i.StaticClassExprVariableMember() != nil {
 		member, s := y.VisitStaticClassExprVariableMember(i.StaticClassExprVariableMember())
+		if member == nil {
+			return y.CreateVariable(raw.GetText())
+		}
 		return y.GetStaticMember(member, s)
 	}
 

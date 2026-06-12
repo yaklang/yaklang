@@ -79,13 +79,19 @@ func orderedASTBufferFileLimit() int {
 	return limit
 }
 
-func astBuildWindowSize(compileConcurrency int) int {
-	window := effectivePipeConcurrency(compileConcurrency)
+func astBuildWindowSize(compileConcurrency int, override int) int {
 	if raw := strings.TrimSpace(os.Getenv("YAK_SSA_AST_BUILD_WINDOW_FILES")); raw != "" {
 		if v, err := strconv.Atoi(raw); err == nil {
-			window = v
+			if v < 1 {
+				return 1
+			}
+			return v
 		}
 	}
+	if override > 0 {
+		return override
+	}
+	window := effectivePipeConcurrency(compileConcurrency)
 	if window < 1 {
 		return 1
 	}
@@ -138,6 +144,7 @@ func FilesHandler(
 	initWorker func() *utils.SafeMap[any],
 	orderType ASTSequenceType,
 	concurrency int,
+	astBuildWindowOverride int,
 ) <-chan *FileContent {
 	if ctx == nil {
 		ctx = context.Background()
@@ -217,7 +224,7 @@ func FilesHandler(
 		parsePipe := pipeline.NewSlotPipeWithStore[*FileContent, *FileContent](
 			ctx,
 			parsedASTQueueSize,
-			astBuildWindowSize(concurrency),
+			astBuildWindowSize(concurrency, astBuildWindowOverride),
 			func(fileContent *FileContent, store *utils.SafeMap[any]) (*FileContent, error) {
 				return parseFile(fileContent, store), nil
 			},
