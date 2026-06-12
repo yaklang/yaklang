@@ -97,6 +97,13 @@ type Config struct {
 
 	DebugLog bool
 
+	// OpenPortGuardLimit 控制 servicescan 的单主机开放端口数熔断阈值.
+	// 0 表示使用默认值.
+	OpenPortGuardLimit int
+
+	// DisableOpenPortGuard 禁用 servicescan 的单主机开放端口数熔断保护.
+	DisableOpenPortGuard bool
+
 	OpenPortSyncMap    *sync.Map
 	OnPortOpenCallback func(*MatchResult)
 	OnFinishedCallback func(*MatchResult)
@@ -269,6 +276,48 @@ func WithPoolSize(size int) ConfigOption {
 		config.PoolSize = size
 		if config.PoolSize <= 0 {
 			config.PoolSize = 50
+		}
+	}
+}
+
+// openPortGuardLimit servicescan 的配置选项, 设置单主机开放端口数熔断阈值.
+// @param {int} limit 熔断阈值; 小于等于 0 时使用默认值
+// @return {ConfigOption} 返回配置项
+// Example:
+// ```
+// result, err = servicescan.Scan("127.0.0.1", "1-65535", servicescan.openPortGuardLimit(1000))
+// die(err)
+//
+//	for v := range result {
+//	    println(v.String())
+//	}
+//
+// ```
+func WithOpenPortGuardLimit(limit int) ConfigOption {
+	return func(config *Config) {
+		config.OpenPortGuardLimit = limit
+	}
+}
+
+// disableOpenPortGuard servicescan 的配置选项, 禁用单主机开放端口数保护.
+// @param {bool} b 是否禁用, 默认 true
+// @return {ConfigOption} 返回配置项
+// Example:
+// ```
+// result, err = servicescan.Scan("127.0.0.1", "1-65535", servicescan.disableOpenPortGuard())
+// die(err)
+//
+//	for v := range result {
+//	    println(v.String())
+//	}
+//
+// ```
+func WithDisableOpenPortGuard(b ...bool) ConfigOption {
+	return func(config *Config) {
+		if len(b) == 0 {
+			config.DisableOpenPortGuard = true
+		} else {
+			config.DisableOpenPortGuard = b[0]
 		}
 	}
 }

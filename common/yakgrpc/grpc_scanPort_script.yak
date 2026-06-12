@@ -9,6 +9,8 @@ proxies = cli.String("proxy", cli.setDefault("no"))
 probeTimeoutFloat = cli.Float("probe-timeout", cli.setDefault(5.0), cli.setRequired(false))
 probeMax = cli.Int("probe-max", cli.setRequired(false), cli.setDefault(4))
 fingerprintFiles = cli.String("fingerprint-files", cli.setRequired(false), cli.setDefault(""))
+openPortGuardLimit = cli.Int("open-port-guard-limit", cli.setRequired(false), cli.setDefault(0))
+disableOpenPortGuard = cli.Bool("disable-open-port-guard", cli.setDefault(false), cli.setRequired(false))
 
 // host alive scan
 skippedHostAliveScan = cli.Bool("skipped-host-alive-scan")
@@ -120,6 +122,12 @@ if fingerprintFiles != ""{
 
 if concurrent > 0 {
     opts = append(opts, servicescan.concurrent(concurrent))
+}
+
+if disableOpenPortGuard || openPortGuardLimit <= 0 {
+    opts = append(opts, servicescan.disableOpenPortGuard())
+} else {
+    opts = append(opts, servicescan.openPortGuardLimit(openPortGuardLimit))
 }
 
 if protos != "" {

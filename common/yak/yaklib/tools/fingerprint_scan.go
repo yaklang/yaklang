@@ -93,6 +93,16 @@ func (g *hostPortGuard) observe(host string) bool {
 	return false
 }
 
+func openPortGuardLimit(config *fp.Config) int {
+	if config != nil && config.DisableOpenPortGuard {
+		return 0
+	}
+	if config != nil && config.OpenPortGuardLimit > 0 {
+		return config.OpenPortGuardLimit
+	}
+	return maxOpenPortsPerHost
+}
+
 // sendMatchResultOrDrop 把 fingerprint 结果送入 outC. 当 ctx 已 cancel
 // 时主动放弃, 防止下游已停止消费时 inner goroutine 永久阻塞 (chan send hang).
 //
@@ -203,12 +213,15 @@ func _scanFingerprint(ctx context.Context, config *fp.Config, concurrent int, ho
 	// 误杀. 所以 guard.observe 放在 inner goroutine 判定 result.IsOpen() 之后.
 	// 关键词: _scanFingerprint ctx 短路, TCP 扫描按开放端口熔断
 	scanCtx, scanCancel := context.WithCancel(ctx)
-	guard := newHostPortGuard(maxOpenPortsPerHost)
+	guardLimit := openPortGuardLimit(config)
+	guard := newHostPortGuard(guardLimit)
 
 	// tripGuard 在 inner goroutine 判定端口开放后调用, 命中阈值则强制停止整条流.
+	// 调用方可通过 servicescan.openPortGuardLimit() 调整阈值, 或通过
+	// servicescan.disableOpenPortGuard() 显式关闭该保护.
 	tripGuard := func(h string) {
 		if guard.observe(h) {
-			log.Errorf("host [%s] reached scan-port safety threshold (%d open ports in one scan); likely a tarpit/firewall responding on all ports, force stopping the scan to keep the system healthy", h, maxOpenPortsPerHost)
+			log.Errorf("host [%s] reached scan-port safety threshold (%d open ports in one scan); likely a tarpit/firewall responding on all ports, force stopping the scan to keep the system healthy", h, guardLimit)
 			scanCancel()
 		}
 	}
@@ -510,7 +523,8 @@ func _scanFromTargetStream(res interface{}, opts ...fp.ConfigOption) (chan *fp.M
 	// guard 单主机端口数熔断器. 这里 synResults 中的每个元素都是"已开放端口"
 	// (synscan 只投递开放端口, SpaceEngine/Ping 等输入也都是已确认的目标),
 	// 因此在派发处计数即等价于"单主机开放端口数", 语义正确.
-	guard := newHostPortGuard(maxOpenPortsPerHost)
+	guardLimit := openPortGuardLimit(config)
+	guard := newHostPortGuard(guardLimit)
 
 	go func() {
 		// 注意: 不能在这里 defer scanCancel(). 派发循环结束时仍有最多 concurrent 个
@@ -527,9 +541,11 @@ func _scanFromTargetStream(res interface{}, opts ...fp.ConfigOption) (chan *fp.M
 				break
 			}
 			// 单主机端口数熔断: 命中阈值视为异常目标 (tarpit/防火墙全端口响应),
-			// 强制停止整条扫描流, 保护系统健康.
+			// 强制停止整条扫描流, 保护系统健康. 调用方可通过
+			// servicescan.openPortGuardLimit() 调整阈值, 或通过
+			// servicescan.disableOpenPortGuard() 显式关闭该保护.
 			if guard.observe(synRes.Host) {
-				log.Errorf("host [%s] reached scan-port safety threshold (%d open ports in one scan); likely a tarpit/firewall responding on all ports, force stopping the scan to keep the system healthy", synRes.Host, maxOpenPortsPerHost)
+				log.Errorf("host [%s] reached scan-port safety threshold (%d open ports in one scan); likely a tarpit/firewall responding on all ports, force stopping the scan to keep the system healthy", synRes.Host, guardLimit)
 				scanCancel()
 				break
 			}
@@ -697,6 +713,10 @@ var FingerprintScanExports = map[string]interface{}{
 
 	// 整体扫描并发
 	"concurrent": fp.WithPoolSize,
+
+	// 单主机开放端口数熔断保护. 默认阈值为 150, 默认保护启用.
+	"openPortGuardLimit":   fp.WithOpenPortGuardLimit,
+	"disableOpenPortGuard": fp.WithDisableOpenPortGuard,
 
 	"excludePorts": fp.WithExcludePorts,
 	"excludeHosts": fp.WithExcludeHosts,

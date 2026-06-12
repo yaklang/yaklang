@@ -200,6 +200,16 @@ func (s *Server) PortScan(req *ypb.PortScanRequest, stream ypb.Yak_PortScanServe
 		reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{Key: "probe-max", Value: "3"})
 	}
 
+	if req.GetOpenPortGuardLimit() > 0 {
+		reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{
+			Key:   "open-port-guard-limit",
+			Value: fmt.Sprint(req.GetOpenPortGuardLimit()),
+		})
+	}
+	if req.GetDisableOpenPortGuard() {
+		reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{Key: "disable-open-port-guard"})
+	}
+
 	switch req.GetFingerprintMode() {
 	case "service":
 		reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{

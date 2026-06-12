@@ -35908,13 +35908,13 @@ type StartBruteParams struct {
 	Concurrent int64 `protobuf:"varint,8,opt,name=Concurrent,proto3" json:"Concurrent,omitempty"`
 	Retry      int64 `protobuf:"varint,9,opt,name=Retry,proto3" json:"Retry,omitempty"`
 	// 目标任务内并发
-	TargetTaskConcurrent int64 `protobuf:"varint,10,opt,name=TargetTaskConcurrent,proto3" json:"TargetTaskConcurrent,omitempty"`
-	OkToStop         bool   `protobuf:"varint,11,opt,name=OkToStop,proto3" json:"OkToStop,omitempty"`
-	DelayMin         int64  `protobuf:"varint,12,opt,name=DelayMin,proto3" json:"DelayMin,omitempty"`
-	DelayMax         int64  `protobuf:"varint,13,opt,name=DelayMax,proto3" json:"DelayMax,omitempty"`
-	PluginScriptName string `protobuf:"bytes,14,opt,name=PluginScriptName,proto3" json:"PluginScriptName,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	TargetTaskConcurrent int64  `protobuf:"varint,10,opt,name=TargetTaskConcurrent,proto3" json:"TargetTaskConcurrent,omitempty"`
+	OkToStop             bool   `protobuf:"varint,11,opt,name=OkToStop,proto3" json:"OkToStop,omitempty"`
+	DelayMin             int64  `protobuf:"varint,12,opt,name=DelayMin,proto3" json:"DelayMin,omitempty"`
+	DelayMax             int64  `protobuf:"varint,13,opt,name=DelayMax,proto3" json:"DelayMax,omitempty"`
+	PluginScriptName     string `protobuf:"bytes,14,opt,name=PluginScriptName,proto3" json:"PluginScriptName,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *StartBruteParams) Reset() {
@@ -39824,8 +39824,11 @@ type PortScanRequest struct {
 	// 指纹规则组
 	EnableFingerprintGroup bool     `protobuf:"varint,32,opt,name=EnableFingerprintGroup,proto3" json:"EnableFingerprintGroup,omitempty"`
 	FingerprintGroup       []string `protobuf:"bytes,33,rep,name=FingerprintGroup,proto3" json:"FingerprintGroup,omitempty"`
-	unknownFields          protoimpl.UnknownFields
-	sizeCache              protoimpl.SizeCache
+	// servicescan 单主机开放端口数熔断配置
+	OpenPortGuardLimit   int64 `protobuf:"varint,34,opt,name=OpenPortGuardLimit,proto3" json:"OpenPortGuardLimit,omitempty"`
+	DisableOpenPortGuard bool  `protobuf:"varint,35,opt,name=DisableOpenPortGuard,proto3" json:"DisableOpenPortGuard,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *PortScanRequest) Reset() {
@@ -40087,6 +40090,20 @@ func (x *PortScanRequest) GetFingerprintGroup() []string {
 		return x.FingerprintGroup
 	}
 	return nil
+}
+
+func (x *PortScanRequest) GetOpenPortGuardLimit() int64 {
+	if x != nil {
+		return x.OpenPortGuardLimit
+	}
+	return 0
+}
+
+func (x *PortScanRequest) GetDisableOpenPortGuard() bool {
+	if x != nil {
+		return x.DisableOpenPortGuard
+	}
+	return false
 }
 
 type DeletePortsRequest struct {
@@ -45512,8 +45529,8 @@ type ExecHistoryRecord struct {
 	// Uid
 	Id string `protobuf:"bytes,9,opt,name=Id,proto3" json:"Id,omitempty"`
 	// 展示界面内容
-	Stdout []byte `protobuf:"bytes,10,opt,name=Stdout,proto3" json:"Stdout,omitempty"`
-	Stderr []byte `protobuf:"bytes,11,opt,name=Stderr,proto3" json:"Stderr,omitempty"`
+	Stdout        []byte `protobuf:"bytes,10,opt,name=Stdout,proto3" json:"Stdout,omitempty"`
+	Stderr        []byte `protobuf:"bytes,11,opt,name=Stderr,proto3" json:"Stderr,omitempty"`
 	RuntimeId     string `protobuf:"bytes,12,opt,name=RuntimeId,proto3" json:"RuntimeId,omitempty"`
 	FromYakModule string `protobuf:"bytes,13,opt,name=FromYakModule,proto3" json:"FromYakModule,omitempty"`
 	StdoutLen     int64  `protobuf:"varint,14,opt,name=StdoutLen,proto3" json:"StdoutLen,omitempty"`
@@ -73114,8 +73131,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\n" +
 	"ReportName\x18\x01 \x01(\tR\n" +
 	"ReportName\x12\x1c\n" +
-	"\tRuntimeId\x18\x02 \x01(\tR\tRuntimeId\"\xa4\n" +
-	"\n" +
+	"\tRuntimeId\x18\x02 \x01(\tR\tRuntimeId\"\x88\v\n" +
 	"\x0fPortScanRequest\x12\x18\n" +
 	"\aTargets\x18\x01 \x01(\tR\aTargets\x12\x14\n" +
 	"\x05Ports\x18\x02 \x01(\tR\x05Ports\x12\x12\n" +
@@ -73152,7 +73168,9 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x14UserFingerprintFiles\x18\x1e \x03(\tR\x14UserFingerprintFiles\x12(\n" +
 	"\x0fSkipCveBaseLine\x18\x1f \x01(\bR\x0fSkipCveBaseLine\x126\n" +
 	"\x16EnableFingerprintGroup\x18  \x01(\bR\x16EnableFingerprintGroup\x12*\n" +
-	"\x10FingerprintGroup\x18! \x03(\tR\x10FingerprintGroup\"\xc2\x01\n" +
+	"\x10FingerprintGroup\x18! \x03(\tR\x10FingerprintGroup\x12.\n" +
+	"\x12OpenPortGuardLimit\x18\" \x01(\x03R\x12OpenPortGuardLimit\x122\n" +
+	"\x14DisableOpenPortGuard\x18# \x01(\bR\x14DisableOpenPortGuard\"\xc2\x01\n" +
 	"\x12DeletePortsRequest\x12\x14\n" +
 	"\x05Hosts\x18\x01 \x01(\tR\x05Hosts\x12\x14\n" +
 	"\x05Ports\x18\x02 \x01(\tR\x05Ports\x12\x0e\n" +
