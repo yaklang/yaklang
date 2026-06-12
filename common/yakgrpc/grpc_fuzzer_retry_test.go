@@ -280,6 +280,178 @@ func TestGRPCMUSTPASS_HTTPFuzzer_MatcherActionFailRetry(t *testing.T) {
 	require.Equal(t, 3, retryCount)
 }
 
+func TestGRPCMUSTPASS_HTTPFuzzer_ReMatchSkipsOldRetryFailedResponses(t *testing.T) {
+	c, err := NewLocalClient()
+	require.NoError(t, err)
+
+	marker := "rematch-skip-" + uuid.NewString()[:8]
+	retryToken := "retry-" + marker
+	okToken := "ok-" + marker
+	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		index, _ := strconv.Atoi(lowhttp.GetHTTPRequestQueryParam(req, "a"))
+		body := okToken
+		if index%2 == 1 {
+			body = retryToken
+		}
+		return []byte("HTTP/1.1 200 OK\r\nContent-Length: " + strconv.Itoa(len(body)) + "\r\n\r\n" + body)
+	})
+	target := utils.HostPort(host, port)
+	newFailMatcher := func() []*ypb.HTTPResponseMatcher {
+		return []*ypb.HTTPResponseMatcher{
+			{
+				MatcherType: "word",
+				Scope:       "body",
+				Condition:   "and",
+				Group:       []string{retryToken},
+				ExprType:    "nuclei-dsl",
+				Action:      Action_Fail,
+				HitColor:    "orange",
+			},
+		}
+	}
+
+	historyStream, err := c.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
+		ForceFuzz: true,
+		Request:   "GET /?marker=" + marker + "&a={{i(0-5)}} HTTP/1.1\r\nHost: " + target + "\r\n\r\n",
+		Matchers:  newFailMatcher(),
+	})
+	require.NoError(t, err)
+
+	var historyTaskID int64
+	historyCount := 0
+	historyFailedIndexes := make([]int, 0, 3)
+	for {
+		rsp, err := historyStream.Recv()
+		if err != nil {
+			break
+		}
+		historyCount++
+		historyTaskID = rsp.GetTaskId()
+		index, _ := strconv.Atoi(lowhttp.GetHTTPRequestQueryParam(rsp.GetRequestRaw(), "a"))
+		if strings.Contains(string(rsp.GetResponseRaw()), retryToken) {
+			require.False(t, rsp.Ok)
+			require.Equal(t, matcherActionFailReason, rsp.Reason)
+			historyFailedIndexes = append(historyFailedIndexes, index)
+			continue
+		}
+		require.True(t, rsp.Ok)
+	}
+	require.Equal(t, 6, historyCount)
+	require.ElementsMatch(t, []int{1, 3, 5}, historyFailedIndexes)
+	require.NotZero(t, historyTaskID)
+
+	require.NoError(t, utils.AttemptWithDelay(10, 200*time.Millisecond, func() error {
+		taskRespCount, err := yakit.CountWebFuzzerResponses(consts.GetGormProjectDatabase(), int(historyTaskID))
+		if err != nil {
+			return err
+		}
+		if taskRespCount != 6 {
+			return utils.Errorf("want 6 history task resp, but got %d", taskRespCount)
+		}
+		return nil
+	}))
+
+	retryStream, err := c.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
+		RetryTaskID: historyTaskID,
+		Matchers:    newFailMatcher(),
+	})
+	require.NoError(t, err)
+
+	var retryTaskID int64
+	replayedIndexes := make([]int, 0, 3)
+	retryFailedIndexes := make([]int, 0, 3)
+	for {
+		rsp, err := retryStream.Recv()
+		if err != nil {
+			break
+		}
+		if len(rsp.GetRequestRaw()) == 0 {
+			continue
+		}
+		require.Equal(t, marker, lowhttp.GetHTTPRequestQueryParam(rsp.GetRequestRaw(), "marker"))
+		index, _ := strconv.Atoi(lowhttp.GetHTTPRequestQueryParam(rsp.GetRequestRaw(), "a"))
+		if rsp.GetTaskId() == historyTaskID {
+			require.True(t, rsp.Ok)
+			replayedIndexes = append(replayedIndexes, index)
+			continue
+		}
+
+		require.NotZero(t, rsp.GetTaskId())
+		if retryTaskID == 0 {
+			retryTaskID = rsp.GetTaskId()
+		} else {
+			require.Equal(t, retryTaskID, rsp.GetTaskId())
+		}
+		require.False(t, rsp.Ok)
+		require.Equal(t, matcherActionFailReason, rsp.Reason)
+		retryFailedIndexes = append(retryFailedIndexes, index)
+	}
+	require.ElementsMatch(t, []int{0, 2, 4}, replayedIndexes)
+	require.ElementsMatch(t, []int{1, 3, 5}, retryFailedIndexes)
+	require.NotZero(t, retryTaskID)
+	require.NotEqual(t, historyTaskID, retryTaskID)
+
+	require.NoError(t, utils.AttemptWithDelay(10, 200*time.Millisecond, func() error {
+		taskRespCount, err := yakit.CountWebFuzzerResponses(consts.GetGormProjectDatabase(), int(retryTaskID))
+		if err != nil {
+			return err
+		}
+		if taskRespCount != 3 {
+			return utils.Errorf("want 3 retry task resp, but got %d", taskRespCount)
+		}
+		return nil
+	}))
+
+	rematchStream, err := c.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
+		Matchers:           newFailMatcher(),
+		HistoryWebFuzzerId: int32(historyTaskID),
+		ReMatch:            true,
+	})
+	require.NoError(t, err)
+
+	var rematchTaskID int64
+	rematchCount := 0
+	rematchFailedIndexes := make([]int, 0, 3)
+	for {
+		rsp, err := rematchStream.Recv()
+		if err != nil {
+			break
+		}
+		rematchCount++
+		require.NotZero(t, rsp.GetTaskId())
+		if rematchTaskID == 0 {
+			rematchTaskID = rsp.GetTaskId()
+		} else {
+			require.Equal(t, rematchTaskID, rsp.GetTaskId())
+		}
+		require.Equal(t, marker, lowhttp.GetHTTPRequestQueryParam(rsp.GetRequestRaw(), "marker"))
+		index, _ := strconv.Atoi(lowhttp.GetHTTPRequestQueryParam(rsp.GetRequestRaw(), "a"))
+		if strings.Contains(string(rsp.GetResponseRaw()), retryToken) {
+			require.False(t, rsp.Ok)
+			require.Equal(t, matcherActionFailReason, rsp.Reason)
+			rematchFailedIndexes = append(rematchFailedIndexes, index)
+			continue
+		}
+		require.True(t, rsp.Ok)
+	}
+	require.Equal(t, 6, rematchCount)
+	require.ElementsMatch(t, []int{1, 3, 5}, rematchFailedIndexes)
+	require.NotZero(t, rematchTaskID)
+	require.NotEqual(t, historyTaskID, rematchTaskID)
+	require.NotEqual(t, retryTaskID, rematchTaskID)
+
+	require.NoError(t, utils.AttemptWithDelay(10, 200*time.Millisecond, func() error {
+		taskRespCount, err := yakit.CountWebFuzzerResponses(consts.GetGormProjectDatabase(), int(rematchTaskID))
+		if err != nil {
+			return err
+		}
+		if taskRespCount != 6 {
+			return utils.Errorf("want 6 rematch task resp, but got %d", taskRespCount)
+		}
+		return nil
+	}))
+}
+
 func TestGRPCMUSTPASS_HTTPFuzzer_RetryReMatchTaskOnlyRetriesFailedResponses(t *testing.T) {
 	c, err := NewLocalClient()
 	require.NoError(t, err)
