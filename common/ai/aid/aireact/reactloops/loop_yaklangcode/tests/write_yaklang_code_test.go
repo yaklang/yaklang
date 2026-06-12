@@ -17,6 +17,66 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+func focusModeWriteYaklangTestTimeout() time.Duration {
+	if utils.InGithubActions() {
+		return 15 * time.Second
+	}
+	return 10 * time.Second
+}
+
+type yaklangDeferredEditorSyncWaitResult struct {
+	codeChangeEvents []*ypb.AIOutputEvent
+	filenames        []string
+	taskFailed       bool
+}
+
+// waitForYaklangDeferredEditorSync collects output until the loop finishes and emits
+// the single deferred yaklang_code_change (or the task reaches a terminal status).
+func waitForYaklangDeferredEditorSync(out <-chan *ypb.AIOutputEvent, timeout time.Duration) yaklangDeferredEditorSyncWaitResult {
+	deadline := time.After(timeout)
+	var result yaklangDeferredEditorSyncWaitResult
+	for {
+		select {
+		case e := <-out:
+			if e == nil {
+				continue
+			}
+			if e.Type == string(schema.EVENT_TYPE_FILESYSTEM_PIN_FILENAME) {
+				content := string(e.GetContent())
+				filename := utils.InterfaceToString(jsonpath.FindFirst(content, "$.path"))
+				result.filenames = append(result.filenames, filename)
+			}
+			if e.Type == string(schema.EVENT_TYPE_YAKLANG_CODE_CHANGE) {
+				result.codeChangeEvents = append(result.codeChangeEvents, e)
+			}
+			if e.GetNodeId() == "react_task_status_changed" {
+				content := string(e.GetContent())
+				if strings.Contains(content, "Aborted") || strings.Contains(content, "Failed") {
+					result.taskFailed = true
+					return result
+				}
+				if strings.Contains(content, "Completed") {
+					return result
+				}
+			}
+			if len(result.codeChangeEvents) > 0 {
+				return result
+			}
+		case <-deadline:
+			return result
+		}
+	}
+}
+
+func findGenCodeFilename(filenames []string) string {
+	for _, name := range filenames {
+		if strings.Contains(name, "gen_code_") {
+			return name
+		}
+	}
+	return ""
+}
+
 func mockedYaklangWriting(t *testing.T, i aicommon.AICallerConfigIf, req *aicommon.AIRequest, code string) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
 
@@ -57,7 +117,7 @@ func mockedYaklangWriting(t *testing.T, i aicommon.AICallerConfigIf, req *aicomm
 		rsp.EmitOutputStream(bytes.NewBufferString(utils.MustRenderTemplate(`{"@action": "write_code"}
 
 <|GEN_CODE_{{ .nonce }}|>
-println("a")
+// hello yak
 <|GEN_CODE_END_{{ .nonce }}|>`, map[string]any{
 			"nonce": nonceStr,
 		})))
@@ -103,24 +163,19 @@ func TestFocusMode_WriteYaklangCode(t *testing.T) {
 		}
 	}()
 
-	du := time.Duration(3)
-	if utils.InGithubActions() {
-		du = time.Duration(2)
-	}
-	after := time.After(du * time.Second)
-
-LOOP:
-	for {
-		select {
-		case e := <-out:
-			if e.Type == string(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR) {
-				break LOOP
-			}
-		case <-after:
-			break LOOP
-		}
-	}
+	waitResult := waitForYaklangDeferredEditorSync(out, focusModeWriteYaklangTestTimeout())
 	close(in)
+	ins.Wait()
+
+	if waitResult.taskFailed {
+		t.Fatal("write_yaklang_code task failed")
+	}
+	if len(waitResult.codeChangeEvents) == 0 {
+		t.Fatal("deferred yaklang_code_change event not received after loop finished")
+	}
+	if len(waitResult.codeChangeEvents) != 1 {
+		t.Fatalf("expected exactly 1 deferred yaklang_code_change, got %d", len(waitResult.codeChangeEvents))
+	}
 
 	fmt.Println("--------------------------------------")
 	tl := ins.DumpTimeline()
@@ -130,6 +185,7 @@ LOOP:
 
 type mockStats_forWriteAndModify struct {
 	writeDone    bool
+	modifyDone   bool
 	verifyCalled bool
 }
 
@@ -186,21 +242,22 @@ func mockedYaklangWritingAndModify(t *testing.T, i aicommon.AICallerConfigIf, re
 			rsp.EmitOutputStream(bytes.NewBufferString(utils.MustRenderTemplate(`{"@action": "write_code"}
 
 <|GEN_CODE_{{ .nonce }}|>
-println("a")
-println("b")
-println("c")
+// line a
+for for for
+// line c
 <|GEN_CODE_END_{{ .nonce }}|>`, map[string]any{
 				"nonce": nonceStr,
 			})))
 			stat.writeDone = true
 		} else {
-			rsp.EmitOutputStream(bytes.NewBufferString(utils.MustRenderTemplate(`{"@action": "modify_code", "modify_start_line": 2, "modify_end_line": 2}
+			rsp.EmitOutputStream(bytes.NewBufferString(utils.MustRenderTemplate(`{"@action": "modify_code", "modify_start_line": 2, "modify_end_line": 2, "modify_code_reason": "replace line b"}
 
 <|GEN_CODE_{{ .nonce }}|>
-println("modifiedcodecodecode")
+// modifiedcodecodecode
 <|GEN_CODE_END_{{ .nonce }}|>`, map[string]any{
 				"nonce": nonceStr,
 			})))
+			stat.modifyDone = true
 		}
 
 		rsp.Close()
@@ -222,7 +279,7 @@ func TestFocusMode_WriteYaklangCodeAndThenModify(t *testing.T) {
 	flag := ksuid.New().String()
 	_ = flag
 	in := make(chan *ypb.AIInputEvent, 10)
-	out := make(chan *ypb.AIOutputEvent, 10)
+	out := make(chan *ypb.AIOutputEvent, 100)
 
 	stat := &mockStats_forWriteAndModify{
 		writeDone: false,
@@ -248,46 +305,37 @@ func TestFocusMode_WriteYaklangCodeAndThenModify(t *testing.T) {
 		}
 	}()
 
-	du := time.Duration(3)
-	if utils.InGithubActions() {
-		du = time.Duration(2)
-	}
-	after := time.After(du * time.Second)
-
-	var filenames []string
-	var writeCodeReceived bool
-LOOP:
-	for {
-		select {
-		case e := <-out:
-			if e.Type == string(schema.EVENT_TYPE_FILESYSTEM_PIN_FILENAME) {
-				content := string(e.GetContent())
-				filename := utils.InterfaceToString(jsonpath.FindFirst(content, "$.path"))
-				filenames = append(filenames, filename)
-			}
-			if e.Type == string(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR) {
-				if e.GetNodeId() == "write_code" {
-					writeCodeReceived = true
-					break LOOP
-				}
-			}
-		case <-after:
-			break LOOP
-		}
-	}
+	waitResult := waitForYaklangDeferredEditorSync(out, focusModeWriteYaklangTestTimeout())
 	close(in)
+	ins.Wait()
 
-	if !writeCodeReceived {
-		t.Fatal("write_code event not received")
+	if !stat.writeDone {
+		t.Fatal("mock write_code was not invoked")
+	}
+	if !stat.modifyDone {
+		t.Fatal("mock modify_code was not invoked")
+	}
+	if waitResult.taskFailed {
+		t.Fatal("write_yaklang_code task failed")
+	}
+	if len(waitResult.codeChangeEvents) == 0 {
+		t.Fatal("deferred yaklang_code_change event not received after loop finished")
+	}
+	if len(waitResult.codeChangeEvents) != 1 {
+		t.Fatalf("expected exactly 1 deferred yaklang_code_change, got %d", len(waitResult.codeChangeEvents))
 	}
 
-	var filename string
-	for _, name := range filenames {
-		if strings.Contains(name, "gen_code_") {
-			filename = name
-			break
-		}
+	lastChange := waitResult.codeChangeEvents[0]
+	sourceAction := utils.InterfaceToString(jsonpath.FindFirst(string(lastChange.GetContent()), "$.source_action"))
+	if sourceAction != "modify_code" {
+		t.Fatalf("expected final source_action modify_code, got %q", sourceAction)
 	}
+	finalContent := utils.InterfaceToString(jsonpath.FindFirst(string(lastChange.GetContent()), "$.code.content"))
+	if !strings.Contains(finalContent, "modifiedcodecodecode") {
+		t.Fatalf("deferred yaklang_code_change content mismatch: %q", finalContent)
+	}
+
+	filename := findGenCodeFilename(waitResult.filenames)
 	if filename == "" {
 		t.Fatal("gen_code_ filename not found")
 	}
@@ -301,14 +349,13 @@ LOOP:
 		t.Fatal(err)
 	}
 	fmt.Println(string(result))
-	expectedCode := `println("a")
-println("b")
-println("c")`
-	if !strings.Contains(string(result), "println") {
+	if !strings.Contains(string(result), "// line a") {
 		t.Fatal("code not written correctly")
+	}
+	if !strings.Contains(string(result), "modifiedcodecodecode") {
+		t.Fatal("modified code not match")
 	}
 	if strings.Contains(string(result), "for for for") {
 		t.Fatal("code should not contain syntax errors")
 	}
-	_ = expectedCode
 }

@@ -86,6 +86,7 @@ println("modifiedcodecodecode")
 <|GEN_CODE_END_{{ .nonce }}|>`, map[string]any{
 				"nonce": nonceStr,
 			})))
+			stat.modifyDone = true
 		}
 
 		rsp.Close()
@@ -107,7 +108,7 @@ func TestFocusMode_WriteYaklangCodeCauseErrorAndThenModify(t *testing.T) {
 	flag := ksuid.New().String()
 	_ = flag
 	in := make(chan *ypb.AIInputEvent, 10)
-	out := make(chan *ypb.AIOutputEvent, 10)
+	out := make(chan *ypb.AIOutputEvent, 100)
 
 	var haveError bool
 
@@ -141,14 +142,11 @@ func TestFocusMode_WriteYaklangCodeCauseErrorAndThenModify(t *testing.T) {
 		}
 	}()
 
-	du := time.Duration(3)
-	if utils.InGithubActions() {
-		du = time.Duration(2)
-	}
-	after := time.After(du * time.Second)
-
+	// Syntax-error scenario may never finish the loop; wait until modify is persisted to disk.
+	deadline := time.After(focusModeWriteYaklangTestTimeout())
 	var filenames []string
-LOOP:
+	var fileContent string
+waitModify:
 	for {
 		select {
 		case e := <-out:
@@ -156,26 +154,37 @@ LOOP:
 				content := string(e.GetContent())
 				filenames = append(filenames, utils.InterfaceToString(jsonpath.FindFirst(content, "$.path")))
 			}
-			if e.Type == string(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR) {
-				if e.GetNodeId() == "modify_code" {
-					break LOOP
+		case <-deadline:
+			break waitModify
+		default:
+			if name := findGenCodeFilename(filenames); name != "" {
+				if data, err := os.ReadFile(name); err == nil {
+					fileContent = string(data)
+					if strings.Contains(fileContent, "modifiedcodecodecode") {
+						break waitModify
+					}
 				}
 			}
-		case <-after:
-			break LOOP
+			time.Sleep(50 * time.Millisecond)
 		}
 	}
 	close(in)
+	ins.Wait()
 
-	var filename string
-	for _, name := range filenames {
-		if strings.Contains(name, "gen_code_") {
-			filename = name
-			break
-		}
+	if !stat.modifyDone {
+		t.Fatal("mock modify_code was not invoked before timeout")
 	}
+
+	filename := findGenCodeFilename(filenames)
 	if filename == "" {
 		t.Fatal("gen_code_ filename not found")
+	}
+	if fileContent == "" {
+		data, err := os.ReadFile(filename)
+		if err != nil {
+			t.Fatal(err)
+		}
+		fileContent = string(data)
 	}
 
 	fmt.Println("--------------------------------------")
@@ -183,12 +192,8 @@ LOOP:
 	fmt.Println(tl)
 	fmt.Println("--------------------------------------")
 
-	result, err := os.ReadFile(filename)
-	if err != nil {
-		t.Fatal(err)
-	}
-	fmt.Println(string(result))
-	if !strings.Contains(string(result), "modifiedcodecodecode") {
+	fmt.Println(fileContent)
+	if !strings.Contains(fileContent, "modifiedcodecodecode") {
 		t.Fatal("modified code not match")
 	}
 	if !haveError {
