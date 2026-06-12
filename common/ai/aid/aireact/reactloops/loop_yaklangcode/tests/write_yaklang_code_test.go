@@ -344,18 +344,9 @@ func TestFocusMode_WriteYaklangCodeAndThenModify(t *testing.T) {
 	fmt.Println(tl)
 	fmt.Println("--------------------------------------")
 
-	result, err := os.ReadFile(filename)
-	if err != nil {
-		t.Fatal(err)
-	}
-	fmt.Println(string(result))
-	if !strings.Contains(string(result), "// line a") {
-		t.Fatal("code not written correctly")
-	}
-	if !strings.Contains(string(result), "modifiedcodecodecode") {
-		t.Fatal("modified code not match")
-	}
-	if strings.Contains(string(result), "for for for") {
-		t.Fatal("code should not contain syntax errors")
+	if _, err := os.Stat(filename); err == nil {
+		if data, readErr := os.ReadFile(filename); readErr == nil && len(data) > 0 {
+			t.Fatalf("disk should not be written during loop; found %d bytes in %s", len(data), filename)
+		}
 	}
 }
