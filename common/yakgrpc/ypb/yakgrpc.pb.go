@@ -35908,13 +35908,13 @@ type StartBruteParams struct {
 	Concurrent int64 `protobuf:"varint,8,opt,name=Concurrent,proto3" json:"Concurrent,omitempty"`
 	Retry      int64 `protobuf:"varint,9,opt,name=Retry,proto3" json:"Retry,omitempty"`
 	// 目标任务内并发
-	TargetTaskConcurrent int64 `protobuf:"varint,10,opt,name=TargetTaskConcurrent,proto3" json:"TargetTaskConcurrent,omitempty"`
-	OkToStop         bool   `protobuf:"varint,11,opt,name=OkToStop,proto3" json:"OkToStop,omitempty"`
-	DelayMin         int64  `protobuf:"varint,12,opt,name=DelayMin,proto3" json:"DelayMin,omitempty"`
-	DelayMax         int64  `protobuf:"varint,13,opt,name=DelayMax,proto3" json:"DelayMax,omitempty"`
-	PluginScriptName string `protobuf:"bytes,14,opt,name=PluginScriptName,proto3" json:"PluginScriptName,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	TargetTaskConcurrent int64  `protobuf:"varint,10,opt,name=TargetTaskConcurrent,proto3" json:"TargetTaskConcurrent,omitempty"`
+	OkToStop             bool   `protobuf:"varint,11,opt,name=OkToStop,proto3" json:"OkToStop,omitempty"`
+	DelayMin             int64  `protobuf:"varint,12,opt,name=DelayMin,proto3" json:"DelayMin,omitempty"`
+	DelayMax             int64  `protobuf:"varint,13,opt,name=DelayMax,proto3" json:"DelayMax,omitempty"`
+	PluginScriptName     string `protobuf:"bytes,14,opt,name=PluginScriptName,proto3" json:"PluginScriptName,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *StartBruteParams) Reset() {
@@ -45512,8 +45512,8 @@ type ExecHistoryRecord struct {
 	// Uid
 	Id string `protobuf:"bytes,9,opt,name=Id,proto3" json:"Id,omitempty"`
 	// 展示界面内容
-	Stdout []byte `protobuf:"bytes,10,opt,name=Stdout,proto3" json:"Stdout,omitempty"`
-	Stderr []byte `protobuf:"bytes,11,opt,name=Stderr,proto3" json:"Stderr,omitempty"`
+	Stdout        []byte `protobuf:"bytes,10,opt,name=Stdout,proto3" json:"Stdout,omitempty"`
+	Stderr        []byte `protobuf:"bytes,11,opt,name=Stderr,proto3" json:"Stderr,omitempty"`
 	RuntimeId     string `protobuf:"bytes,12,opt,name=RuntimeId,proto3" json:"RuntimeId,omitempty"`
 	FromYakModule string `protobuf:"bytes,13,opt,name=FromYakModule,proto3" json:"FromYakModule,omitempty"`
 	StdoutLen     int64  `protobuf:"varint,14,opt,name=StdoutLen,proto3" json:"StdoutLen,omitempty"`
@@ -70052,6 +70052,7 @@ type SSAWorkbenchRecentProject struct {
 	HighestRiskVerbose  string                 `protobuf:"bytes,5,opt,name=HighestRiskVerbose,proto3" json:"HighestRiskVerbose,omitempty"`
 	RiskCount           int64                  `protobuf:"varint,6,opt,name=RiskCount,proto3" json:"RiskCount,omitempty"`
 	UpdatedAt           int64                  `protobuf:"varint,7,opt,name=UpdatedAt,proto3" json:"UpdatedAt,omitempty"`
+	JSONStringConfig    string                 `protobuf:"bytes,8,opt,name=JSONStringConfig,proto3" json:"JSONStringConfig,omitempty"`
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
@@ -70133,6 +70134,13 @@ func (x *SSAWorkbenchRecentProject) GetUpdatedAt() int64 {
 		return x.UpdatedAt
 	}
 	return 0
+}
+
+func (x *SSAWorkbenchRecentProject) GetJSONStringConfig() string {
+	if x != nil {
+		return x.JSONStringConfig
+	}
+	return ""
 }
 
 type GetSSAWorkbenchDashboardResponse struct {
@@ -76339,7 +76347,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x17SSAWorkbenchRuleHitItem\x12\x1a\n" +
 	"\bRuleName\x18\x01 \x01(\tR\bRuleName\x12\"\n" +
 	"\fTitleVerbose\x18\x02 \x01(\tR\fTitleVerbose\x12\x1a\n" +
-	"\bHitCount\x18\x03 \x01(\x03R\bHitCount\"\x87\x02\n" +
+	"\bHitCount\x18\x03 \x01(\x03R\bHitCount\"\xb3\x02\n" +
 	"\x19SSAWorkbenchRecentProject\x12\x0e\n" +
 	"\x02ID\x18\x01 \x01(\x03R\x02ID\x12 \n" +
 	"\vProjectName\x18\x02 \x01(\tR\vProjectName\x12\x1a\n" +
@@ -76347,7 +76355,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x13HighestRiskSeverity\x18\x04 \x01(\tR\x13HighestRiskSeverity\x12.\n" +
 	"\x12HighestRiskVerbose\x18\x05 \x01(\tR\x12HighestRiskVerbose\x12\x1c\n" +
 	"\tRiskCount\x18\x06 \x01(\x03R\tRiskCount\x12\x1c\n" +
-	"\tUpdatedAt\x18\a \x01(\x03R\tUpdatedAt\"\x95\x03\n" +
+	"\tUpdatedAt\x18\a \x01(\x03R\tUpdatedAt\x12*\n" +
+	"\x10JSONStringConfig\x18\b \x01(\tR\x10JSONStringConfig\"\x95\x03\n" +
 	" GetSSAWorkbenchDashboardResponse\x122\n" +
 	"\aSummary\x18\x01 \x01(\v2\x18.ypb.SSAWorkbenchSummaryR\aSummary\x12&\n" +
 	"\x0eTotalRiskCount\x18\x02 \x01(\x03R\x0eTotalRiskCount\x12B\n" +
