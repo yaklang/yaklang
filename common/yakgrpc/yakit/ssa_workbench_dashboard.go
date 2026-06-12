@@ -243,6 +243,12 @@ func BuildSSAWorkbenchRecentProjects(
 			Language:    string(project.Language),
 			UpdatedAt:   project.UpdatedAt.Unix(),
 		}
+		// 填充 JSONStringConfig，供前端编译按钮使用
+		if config, err := project.GetConfig(); err == nil {
+			if jsonStr, err := config.ToJSONString(); err == nil {
+				item.JSONStringConfig = jsonStr
+			}
+		}
 		if stat := riskStats[uint64(project.ID)]; stat != nil {
 			item.RiskCount = stat.RiskCount
 			item.HighestRiskSeverity = stat.Severity
