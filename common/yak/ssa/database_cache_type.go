@@ -249,7 +249,7 @@ func saveIrType(prog *Program, db *gorm.DB) func([]*ssadb.IrType) error {
 					if irType == nil {
 						continue
 					}
-					if err := tx.Save(irType).Error; err != nil {
+					if err := ssadb.UpsertIrType(tx, irType); err != nil {
 						return err
 					}
 				}

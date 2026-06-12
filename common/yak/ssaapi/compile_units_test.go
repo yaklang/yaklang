@@ -37,6 +37,63 @@ func TestCompileUnitPlanMergesCycles(t *testing.T) {
 	require.Equal(t, "java:b", plan.Order[0][1].Key)
 }
 
+func TestCompileUnitExecutionBatchesMergeSmallSCCs(t *testing.T) {
+	order := [][]*CompileUnit{
+		{testCompileUnit("unit:a", 2, 200)},
+		{testCompileUnit("unit:b", 3, 300)},
+		{testCompileUnit("unit:c", 10, 1000)},
+	}
+
+	batches := buildCompileUnitExecutionBatches(order, 5, 0)
+
+	require.Len(t, batches, 2)
+	require.Equal(t, []string{"unit:a", "unit:b"}, batches[0].unitKeys)
+	require.Equal(t, 0, batches[0].startSCC)
+	require.Equal(t, 1, batches[0].endSCC)
+	require.Equal(t, 5, batches[0].files)
+	require.Equal(t, int64(500), batches[0].bytes)
+	require.Equal(t, []string{"unit:c"}, batches[1].unitKeys)
+	require.Equal(t, 2, batches[1].startSCC)
+	require.Equal(t, 2, batches[1].endSCC)
+}
+
+func TestCompileUnitExecutionBatchesCanKeepSCCGranularity(t *testing.T) {
+	order := [][]*CompileUnit{
+		{testCompileUnit("unit:a", 2, 200)},
+		{testCompileUnit("unit:b", 3, 300)},
+		{testCompileUnit("unit:c", 10, 1000)},
+	}
+
+	batches := buildCompileUnitExecutionBatches(order, 1, 0)
+
+	require.Len(t, batches, 3)
+	require.Equal(t, []string{"unit:a"}, batches[0].unitKeys)
+	require.Equal(t, []string{"unit:b"}, batches[1].unitKeys)
+	require.Equal(t, []string{"unit:c"}, batches[2].unitKeys)
+}
+
+func TestCompileUnitWriterCacheDisabledForSingleSmallBatch(t *testing.T) {
+	batches := []compileUnitExecutionBatch{
+		{unitKeys: []string{"unit:a"}, files: 2, bytes: 200},
+	}
+
+	require.False(t, compileUnitWriterCacheEnabled(false, batches, compileUnitResidentFastPathMaxBytes/2))
+	require.False(t, compileUnitWriterCacheEnabled(true, batches, compileUnitResidentFastPathMaxBytes/2))
+}
+
+func TestCompileUnitWriterCacheEnabledForMultiBatchOrLargeProject(t *testing.T) {
+	multiBatch := []compileUnitExecutionBatch{
+		{unitKeys: []string{"unit:a"}, files: 2, bytes: 200},
+		{unitKeys: []string{"unit:b"}, files: 2, bytes: 200},
+	}
+	singleLargeBatch := []compileUnitExecutionBatch{
+		{unitKeys: []string{"unit:a"}, files: 2, bytes: compileUnitResidentFastPathMaxBytes + 1},
+	}
+
+	require.True(t, compileUnitWriterCacheEnabled(true, multiBatch, compileUnitResidentFastPathMaxBytes/2))
+	require.True(t, compileUnitWriterCacheEnabled(true, singleLargeBatch, compileUnitResidentFastPathMaxBytes+1))
+}
+
 func TestCompileUnitPlanJavaTemplateResourceMergesWithServletUnit(t *testing.T) {
 	vf := filesys.NewVirtualFs()
 	vf.AddFile("src/main/java/com/example/DemoServlet.java", `package com.example;
@@ -122,6 +179,24 @@ func TestCompileUnitPlanDynamicLanguageStillBuildsDirectoryUnits(t *testing.T) {
 	require.Len(t, plan.Units, 2)
 	require.Empty(t, plan.Edges)
 	require.Len(t, plan.Order, 2)
+}
+
+func TestCompileUnitPlanPythonModuleFileImportTopoOrder(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("helper/__init__.py", "")
+	vf.AddFile("helper/db_manager.py", "class DBManager:\n    pass\n")
+	vf.AddFile("sqli_app.py", "from helper.db_manager import DBManager\nDBManager()\n")
+
+	plan := buildCompileUnitPlan(ssaconfig.PYTHON, vf, []string{
+		"helper/__init__.py",
+		"helper/db_manager.py",
+		"sqli_app.py",
+	})
+
+	require.Contains(t, plan.Units, "dir:helper")
+	require.Contains(t, plan.Units, "dir:.")
+	require.Contains(t, plan.Edges, UnitRef{From: "dir:.", To: "dir:helper", Kind: "import", Raw: "helper.db_manager"})
+	requireUnitBefore(t, plan, "dir:helper", "dir:.")
 }
 
 func TestCompileUnitPlanTypeScriptRelativeImportTopoOrder(t *testing.T) {
@@ -226,4 +301,17 @@ func requireUnitBefore(t *testing.T, plan *UnitPlan, before string, after string
 	afterIndex, ok := positions[after]
 	require.Truef(t, ok, "missing unit %s in order", after)
 	require.Less(t, beforeIndex, afterIndex)
+}
+
+func testCompileUnit(key string, fileCount int, bytes int64) *CompileUnit {
+	files := make([]string, 0, fileCount)
+	for i := 0; i < fileCount; i++ {
+		files = append(files, key)
+	}
+	return &CompileUnit{
+		Key:   key,
+		Path:  key,
+		Files: files,
+		Bytes: bytes,
+	}
 }
