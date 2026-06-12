@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sync"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/sca"
 	"github.com/yaklang/yaklang/common/utils/filesys"
+	"go.uber.org/atomic"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -244,11 +244,23 @@ func registerPHPFileBuild(ast phpparser.IHtmlDocumentContext, b *ssa.FunctionBui
 	capturedBuilder := b
 	childProgram := app.GetSubProgram(sourceHash)
 	functionBuilder := childProgram.GetAndCreateFunctionBuilder("", string(ssa.MainFunctionName))
-	var buildOnce sync.Once
+	var pass2Built atomic.Bool
+	var pass2Building atomic.Bool
 	buildCapturedChildren := func(callbackBuilder *ssa.FunctionBuilder) {
-		buildOnce.Do(func() {
-			visitPHPFilePass2Capture(functionBuilder, callbackBuilder, pass2Capture)
-		})
+		if pass2Built.Load() {
+			return
+		}
+		// Include cycles can re-enter the same file while pass2 is still running;
+		// sync.Once deadlocks on same-goroutine re-entry.
+		if pass2Building.Load() {
+			return
+		}
+		if !pass2Building.CAS(false, true) {
+			return
+		}
+		defer pass2Building.Store(false)
+		visitPHPFilePass2Capture(functionBuilder, callbackBuilder, pass2Capture)
+		pass2Built.Store(true)
 	}
 	functionBuilder.AddLazyBuilder(func() {
 		buildCapturedChildren(capturedBuilder)
