@@ -79,6 +79,10 @@ func (s *typeStore) get(id int64) (Type, bool) {
 }
 
 func (s *typeStore) close() {
+	s.flush()
+}
+
+func (s *typeStore) flush() {
 	if s == nil || s.mode != ProgramCacheDBWrite || s.db == nil {
 		return
 	}

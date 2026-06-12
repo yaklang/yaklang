@@ -81,3 +81,19 @@ func (p *Program) runLazyBuilder(lb *LazyBuilder, rng *memedit.Range) {
 		return nil
 	})
 }
+
+func (p *Program) runLazyBuilderForUnits(lb *LazyBuilder, rng *memedit.Range, units map[string]struct{}) bool {
+	if lb == nil || len(units) == 0 {
+		return false
+	}
+	rec := p.diagnosticsRecorderForChild()
+	if rec == nil {
+		return lb.BuildForUnits(units)
+	}
+	built := false
+	_ = rec.TraceLab(lazyBuildLab(lb, p, rng), func() error {
+		built = lb.BuildForUnits(units)
+		return nil
+	})
+	return built
+}

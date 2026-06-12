@@ -436,7 +436,7 @@ func TestCacheCloseReportsMarshalError(t *testing.T) {
 	require.Contains(t, err.Error(), "dbcache: 1 resident items were not persisted on close")
 }
 
-func TestCacheCloseFlushesRejectingLateSet(t *testing.T) {
+func TestCacheCloseFlushesLateSetDuringMarshal(t *testing.T) {
 	saved := 0
 	var cache *dbcache.Cache[*closeFlushItem, int]
 
@@ -472,7 +472,37 @@ func TestCacheCloseFlushesRejectingLateSet(t *testing.T) {
 		t.Fatal("cache.Close hung on stale pending request")
 	}
 
-	require.Equal(t, 2, saved)
+	require.Equal(t, 3, saved)
+}
+
+func TestCacheSetAfterCloseKeepsResidentWithoutPersisting(t *testing.T) {
+	database := utils.NewSafeMapWithKey[int64, int64]()
+	cache := dbcache.NewCache[*closeFlushItem, int64](
+		0,
+		0,
+		func(item *closeFlushItem, _ utils.EvictionReason) (int64, error) {
+			return item.id, nil
+		},
+		func(items []int64) error {
+			for _, item := range items {
+				database.Set(item, item)
+			}
+			return nil
+		},
+		func(id int64) (*closeFlushItem, error) {
+			return &closeFlushItem{id: id}, nil
+		},
+		dbcache.WithSaveSize(1),
+	)
+
+	require.NoError(t, cache.Close())
+	cache.Set(&closeFlushItem{id: 9})
+
+	item, ok := cache.Get(9)
+	require.True(t, ok)
+	require.Equal(t, int64(9), item.id)
+	_, persisted := database.Get(9)
+	require.False(t, persisted, "set after close should only repopulate memory")
 }
 
 func TestCacheCloseFlushesAllItemsWithPersistLimit(t *testing.T) {

@@ -204,6 +204,40 @@ func (c *Cache[T, D]) Evict(ids []int64, reason utils.EvictionReason) {
 	c.resident.QueueKeys(ids, reason)
 }
 
+// Flush persists and evicts all currently resident items without closing the
+// cache. It is intended for compile-unit boundaries where callers want DB
+// backed data durable before moving to the next unit.
+func (c *Cache[T, D]) Flush(reason utils.EvictionReason) {
+	if c == nil || c.resident == nil {
+		return
+	}
+	keys := c.resident.Keys()
+	if len(keys) == 0 {
+		if c.saver != nil {
+			c.saver.Flush()
+		}
+		return
+	}
+	c.resident.QueueKeys(keys, reason)
+	done := make(chan struct{})
+	go func() {
+		c.resident.Wait()
+		close(done)
+	}()
+	ticker := time.NewTicker(10 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		if c.saver != nil {
+			c.saver.Flush()
+		}
+		select {
+		case <-done:
+			return
+		case <-ticker.C:
+		}
+	}
+}
+
 func (c *Cache[T, D]) CoolDown(ids []int64, ttl time.Duration) {
 	if c == nil || c.resident == nil || len(ids) == 0 || ttl <= 0 {
 		return
@@ -238,14 +272,14 @@ func (c *Cache[T, D]) Close() error {
 	}
 	var closeErr error
 
+	c.closing.Store(true)
 	if c.resident != nil {
+		c.drainResidentForClose()
 		c.resident.MarkClosed()
 		c.resident.DisableSave()
 	}
-	c.closing.Store(true)
 
 	if c.marshalPipe != nil {
-		c.enqueueCloseRequests()
 		c.marshalPipe.Close()
 		closeErr = utils.JoinErrors(closeErr, c.marshalPipe.Error())
 	}
@@ -266,6 +300,32 @@ func (c *Cache[T, D]) Close() error {
 		closeErr = utils.JoinErrors(closeErr, utils.Errorf("dbcache: %d resident items were not persisted on close", remaining))
 	}
 	return closeErr
+}
+
+func (c *Cache[T, D]) IsClosed() bool {
+	if c == nil {
+		return false
+	}
+	if c.closing.Load() {
+		return true
+	}
+	return c.resident != nil && c.resident.IsClosed()
+}
+
+func (c *Cache[T, D]) drainResidentForClose() {
+	if c == nil || c.resident == nil {
+		return
+	}
+	const maxPasses = 8
+	for pass := 0; pass < maxPasses; pass++ {
+		if c.resident.Count() == 0 {
+			return
+		}
+		c.Flush(utils.EvictionReasonDeleted)
+		if c.resident.Count() == 0 {
+			return
+		}
+	}
 }
 
 func (c *Cache[T, D]) enqueueCloseRequests() {

@@ -9,7 +9,10 @@ import (
 )
 
 // lazyTask 将任务逻辑和任务数据分离开
-type lazyTask func()
+type lazyTask struct {
+	work    func()
+	unitKey string
+}
 
 // LazyBuilder 是一个并发安全、内存安全的延迟执行器
 type LazyBuilder struct {
@@ -17,6 +20,7 @@ type LazyBuilder struct {
 	tasks           []lazyTask
 	mu              sync.RWMutex
 	build           atomic.Bool
+	unitProvider    func() string
 }
 
 // NewLazyBuilder 创建一个新的 LazyBuilder 实例
@@ -26,6 +30,22 @@ func NewLazyBuilder(name string) *LazyBuilder {
 		tasks:           make([]lazyTask, 0),
 	}
 	return lz
+}
+
+func (l *LazyBuilder) SetUnitProvider(provider func() string) {
+	if l == nil {
+		return
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.unitProvider = provider
+}
+
+func (l *LazyBuilder) currentUnitKey() string {
+	if l == nil || l.unitProvider == nil {
+		return ""
+	}
+	return l.unitProvider()
 }
 
 // Add 添加一个延迟执行的任务。
@@ -38,7 +58,7 @@ func (l *LazyBuilder) AddLazyBuilder(work func(), async ...bool) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	l.tasks = append(l.tasks, lazyTask(work))
+	l.tasks = append(l.tasks, lazyTask{work: work, unitKey: l.currentUnitKey()})
 }
 
 // Build 执行所有已添加的任务，该方法在整个生命周期中只会有效执行一次。
@@ -71,10 +91,50 @@ func (l *LazyBuilder) Build() {
 
 	// // 依次执行所有任务
 	for _, task := range tasksToRun {
-		if task != nil {
-			task()
+		if task.work != nil {
+			task.work()
 		}
 	}
+}
+
+func (l *LazyBuilder) BuildForUnits(units map[string]struct{}) bool {
+	if l == nil || len(units) == 0 {
+		return false
+	}
+	if l.build.Load() {
+		return false
+	}
+
+	l.mu.Lock()
+	var tasksToRun []lazyTask
+	remaining := make([]lazyTask, 0, len(l.tasks))
+	for _, task := range l.tasks {
+		if _, ok := units[task.unitKey]; ok {
+			tasksToRun = append(tasksToRun, task)
+			continue
+		}
+		remaining = append(remaining, task)
+	}
+	if len(tasksToRun) == 0 {
+		l.mu.Unlock()
+		return false
+	}
+	l.tasks = remaining
+	l.mu.Unlock()
+
+	defer func() {
+		if r := recover(); r != nil {
+			log.Errorf("lazy builder panic: name=%s panic=%v", l._lazybuild_name, r)
+			utils.PrintCurrentGoroutineRuntimeStack()
+		}
+	}()
+
+	for _, task := range tasksToRun {
+		if task.work != nil {
+			task.work()
+		}
+	}
+	return true
 }
 
 func (p *Program) LazyBuild() {
@@ -144,6 +204,80 @@ func (p *Program) LazyBuild() {
 		}
 		log.Errorf("main function is not found and virtual function is not found")
 		return
+	}
+}
+
+func (p *Program) LazyBuildForUnits(unitKeys []string) {
+	if p == nil || len(unitKeys) == 0 {
+		return
+	}
+	units := make(map[string]struct{}, len(unitKeys))
+	for _, unitKey := range unitKeys {
+		if unitKey != "" {
+			units[unitKey] = struct{}{}
+		}
+	}
+	if len(units) == 0 {
+		return
+	}
+	p.lazyBuildForUnits(units, make(map[*Program]struct{}))
+}
+
+func (p *Program) lazyBuildForUnits(units map[string]struct{}, visitedPrograms map[*Program]struct{}) {
+	if p == nil || len(units) == 0 {
+		return
+	}
+	if _, ok := visitedPrograms[p]; ok {
+		return
+	}
+	visitedPrograms[p] = struct{}{}
+
+	for _, key := range p.Blueprint.Keys() {
+		blueprint, ok := p.Blueprint.Get(key)
+		if !ok || blueprint == nil {
+			continue
+		}
+		p.runLazyBuilderForUnits(blueprint.LazyBuilder, blueprint.Range, units)
+	}
+	visited := make(map[*Function]struct{})
+	var stack []*Function
+	for _, key := range p.Funcs.Keys() {
+		fun, ok := p.Funcs.Get(key)
+		if !ok || fun == nil {
+			continue
+		}
+		stack = append(stack, fun)
+	}
+	for len(stack) > 0 {
+		fun := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+		if fun == nil {
+			continue
+		}
+		if _, ok := visited[fun]; ok {
+			continue
+		}
+		visited[fun] = struct{}{}
+		p.runLazyBuilderForUnits(fun.LazyBuilder, fun.GetRange(), units)
+		for _, childID := range fun.ChildFuncs {
+			childValue, ok := fun.GetValueById(childID)
+			if !ok || childValue == nil {
+				continue
+			}
+			if childFunc, ok := ToFunction(childValue); ok && childFunc != nil {
+				stack = append(stack, childFunc)
+			}
+		}
+	}
+	children := make([]*Program, 0, p.UpStream.Len())
+	p.UpStream.ForEach(func(_ string, child *Program) bool {
+		if child != nil {
+			children = append(children, child)
+		}
+		return true
+	})
+	for _, child := range children {
+		child.lazyBuildForUnits(units, visitedPrograms)
 	}
 }
 
