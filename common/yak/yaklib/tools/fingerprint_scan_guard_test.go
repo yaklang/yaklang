@@ -3,6 +3,8 @@ package tools
 import (
 	"sync"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/fp"
 )
 
 // fingerprint_scan_guard_test 验证 hostPortGuard 单主机端口数熔断器的行为.
@@ -77,5 +79,20 @@ func TestMUSTPASS_HostPortGuard_ConcurrentSafe(t *testing.T) {
 	wg.Wait()
 	if !g.observe("same-host") {
 		t.Fatal("guard should be tripped after 200 concurrent observes on one host with limit=50")
+	}
+}
+
+func TestMUSTPASS_OpenPortGuardLimit_DisabledByConfig(t *testing.T) {
+	if got := openPortGuardLimit(fp.NewConfig()); got != maxOpenPortsPerHost {
+		t.Fatalf("default guard limit = %d, want %d", got, maxOpenPortsPerHost)
+	}
+	if got := openPortGuardLimit(fp.NewConfig(fp.WithOpenPortGuardLimit(42))); got != 42 {
+		t.Fatalf("custom guard limit = %d, want 42", got)
+	}
+	if got := openPortGuardLimit(fp.NewConfig(fp.WithDisableOpenPortGuard())); got != 0 {
+		t.Fatalf("disabled guard limit = %d, want 0", got)
+	}
+	if got := openPortGuardLimit(fp.NewConfig(fp.WithOpenPortGuardLimit(42), fp.WithDisableOpenPortGuard())); got != 0 {
+		t.Fatalf("disabled guard should override custom limit, got %d", got)
 	}
 }

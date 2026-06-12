@@ -39824,8 +39824,11 @@ type PortScanRequest struct {
 	// 指纹规则组
 	EnableFingerprintGroup bool     `protobuf:"varint,32,opt,name=EnableFingerprintGroup,proto3" json:"EnableFingerprintGroup,omitempty"`
 	FingerprintGroup       []string `protobuf:"bytes,33,rep,name=FingerprintGroup,proto3" json:"FingerprintGroup,omitempty"`
-	unknownFields          protoimpl.UnknownFields
-	sizeCache              protoimpl.SizeCache
+	// servicescan 单主机开放端口数熔断配置
+	OpenPortGuardLimit   int64 `protobuf:"varint,34,opt,name=OpenPortGuardLimit,proto3" json:"OpenPortGuardLimit,omitempty"`
+	DisableOpenPortGuard bool  `protobuf:"varint,35,opt,name=DisableOpenPortGuard,proto3" json:"DisableOpenPortGuard,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *PortScanRequest) Reset() {
@@ -40087,6 +40090,20 @@ func (x *PortScanRequest) GetFingerprintGroup() []string {
 		return x.FingerprintGroup
 	}
 	return nil
+}
+
+func (x *PortScanRequest) GetOpenPortGuardLimit() int64 {
+	if x != nil {
+		return x.OpenPortGuardLimit
+	}
+	return 0
+}
+
+func (x *PortScanRequest) GetDisableOpenPortGuard() bool {
+	if x != nil {
+		return x.DisableOpenPortGuard
+	}
+	return false
 }
 
 type DeletePortsRequest struct {
@@ -73636,8 +73653,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\n" +
 	"ReportName\x18\x01 \x01(\tR\n" +
 	"ReportName\x12\x1c\n" +
-	"\tRuntimeId\x18\x02 \x01(\tR\tRuntimeId\"\xa4\n" +
-	"\n" +
+	"\tRuntimeId\x18\x02 \x01(\tR\tRuntimeId\"\x88\v\n" +
 	"\x0fPortScanRequest\x12\x18\n" +
 	"\aTargets\x18\x01 \x01(\tR\aTargets\x12\x14\n" +
 	"\x05Ports\x18\x02 \x01(\tR\x05Ports\x12\x12\n" +
@@ -73674,7 +73690,9 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x14UserFingerprintFiles\x18\x1e \x03(\tR\x14UserFingerprintFiles\x12(\n" +
 	"\x0fSkipCveBaseLine\x18\x1f \x01(\bR\x0fSkipCveBaseLine\x126\n" +
 	"\x16EnableFingerprintGroup\x18  \x01(\bR\x16EnableFingerprintGroup\x12*\n" +
-	"\x10FingerprintGroup\x18! \x03(\tR\x10FingerprintGroup\"\xc2\x01\n" +
+	"\x10FingerprintGroup\x18! \x03(\tR\x10FingerprintGroup\x12.\n" +
+	"\x12OpenPortGuardLimit\x18\" \x01(\x03R\x12OpenPortGuardLimit\x122\n" +
+	"\x14DisableOpenPortGuard\x18# \x01(\bR\x14DisableOpenPortGuard\"\xc2\x01\n" +
 	"\x12DeletePortsRequest\x12\x14\n" +
 	"\x05Hosts\x18\x01 \x01(\tR\x05Hosts\x12\x14\n" +
 	"\x05Ports\x18\x02 \x01(\tR\x05Ports\x12\x0e\n" +
