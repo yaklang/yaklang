@@ -124,10 +124,13 @@ if concurrent > 0 {
     opts = append(opts, servicescan.concurrent(concurrent))
 }
 
-if disableOpenPortGuard || openPortGuardLimit <= 0 {
-    opts = append(opts, servicescan.disableOpenPortGuard())
-} else {
+opts = append(opts, servicescan.disableOpenPortGuard())
+if openPortGuardLimit > 0 {
+    opts = append(opts, servicescan.disableOpenPortGuard(false))
     opts = append(opts, servicescan.openPortGuardLimit(openPortGuardLimit))
+}
+if disableOpenPortGuard {
+    opts = append(opts, servicescan.disableOpenPortGuard())
 }
 
 if protos != "" {
