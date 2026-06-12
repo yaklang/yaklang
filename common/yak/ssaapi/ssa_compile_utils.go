@@ -79,6 +79,17 @@ func antlrCacheResetEveryBytes() int64 {
 	return antlrCacheResetEveryBytesCached
 }
 
+// languagePreHandlerBuildsFiles 返回该语言在 preHandler 阶段是否构建文件体。
+// 编译单元粒度流式编译依赖此判断决定单元内是否走“骨架+体 lazy”两阶段。
+func languagePreHandlerBuildsFiles(language ssaconfig.Language) bool {
+	switch language {
+	case ssaconfig.C, ssaconfig.GO, ssaconfig.JAVA, ssaconfig.PHP, ssaconfig.JS, ssaconfig.TS, ssaconfig.PYTHON:
+		return true
+	default:
+		return false
+	}
+}
+
 type astBuildWindowDecision struct {
 	window           int
 	budgetBytes      int64

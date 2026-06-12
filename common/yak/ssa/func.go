@@ -37,6 +37,7 @@ func (p *Program) NewFunctionWithParent(name string, parent *Function) *Function
 		SideEffects: make([]*FunctionSideEffect, 0),
 		builder:     nil,
 	}
+	f.LazyBuilder.SetUnitProvider(p.CurrentCompileUnit)
 	f.SetName(name)
 	f.SetProgram(p)
 	p.SetVirtualRegister(f)

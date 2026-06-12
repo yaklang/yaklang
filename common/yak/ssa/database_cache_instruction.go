@@ -225,6 +225,20 @@ func (s *instructionStore) TrackFunctionFinish(function *Function) {
 	s.writer.Track(ids)
 }
 
+func (s *instructionStore) Flush() {
+	if s == nil || s.mode != ProgramCacheDBWrite {
+		return
+	}
+	switch {
+	case s.writer != nil:
+		s.writer.Flush(utils.EvictionReasonCapacityReached)
+	case s.flushResidentOnClose && s.resident != nil:
+		if err := s.flushResidentOnCloseOnly(); err != nil {
+			log.Errorf("flush resident instructions failed: %v", err)
+		}
+	}
+}
+
 func (s *instructionStore) GetAllResident() map[int64]Instruction {
 	if s == nil {
 		return nil
@@ -260,6 +274,20 @@ func (s *instructionStore) IsSpillDisabled() bool {
 		return false
 	}
 	return s.writer.IsSaveDisabled()
+}
+
+func (s *instructionStore) IsClosed() bool {
+	if s == nil {
+		return false
+	}
+	switch {
+	case s.writer != nil:
+		return s.writer.IsClosed()
+	case s.reader != nil:
+		return s.reader.IsClosed()
+	default:
+		return false
+	}
 }
 
 func (s *instructionStore) Stats() dbcache.CacheStats {

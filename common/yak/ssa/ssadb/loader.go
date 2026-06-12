@@ -17,8 +17,8 @@ func YieldIrCode(DB *gorm.DB, ctx context.Context, progName string) <-chan *IrCo
 	if query == nil {
 		query = GetDB()
 	}
-	query = query.Model(&IrCode{}).Where("program_name = ?", progName)
-	if err := query.Pluck("code_id", &ids).Error; err != nil {
+	query = query.Model(&IrCode{}).Where(TableIrCodes+".program_name = ?", progName)
+	if err := query.Pluck(TableIrCodes+".code_id", &ids).Error; err != nil {
 		log.Errorf("failed to get ids: %v", err)
 		return emptyIrCodeChan()
 	}
@@ -27,7 +27,7 @@ func YieldIrCode(DB *gorm.DB, ctx context.Context, progName string) <-chan *IrCo
 
 func yieldFromIrIndex(DB *gorm.DB, ctx context.Context, progName string) <-chan *IrCode {
 	var ids []int64
-	if err := DB.Model(&IrIndex{}).Where("program_name = ?", progName).Pluck("DISTINCT value_id", &ids).Error; err != nil {
+	if err := DB.Model(&IrIndex{}).Where(TableIrIndices+".program_name = ?", progName).Pluck("DISTINCT "+TableIrIndices+".value_id", &ids).Error; err != nil {
 		log.Errorf("failed to get ids from index: %v", err)
 		return emptyIrCodeChan()
 	}

@@ -90,6 +90,13 @@ func (c *ProgramCache) IsInstructionSpillDisabled() bool {
 	return c.instructions.IsSpillDisabled()
 }
 
+func (c *ProgramCache) IsClosed() bool {
+	if c == nil || c.instructions == nil {
+		return false
+	}
+	return c.instructions.IsClosed()
+}
+
 func (c *ProgramCache) SetInstruction(inst Instruction) {
 	if utils.IsNil(inst) {
 		log.Errorf("BUG: SetInstruction called with nil instruction")
@@ -199,6 +206,42 @@ func (c *ProgramCache) SaveToDatabase(cb ...func(int)) error {
 		},
 	}
 	return c.diagnosticsTrackErr("ssa.ProgramCache.SaveToDatabase", steps...)
+}
+
+func (c *ProgramCache) FlushCompileUnit(unitKey string) {
+	if c == nil || !c.HaveDatabaseBackend() {
+		return
+	}
+	c.diagnosticsTrack("ssa.ProgramCache.FlushCompileUnit",
+		func() error {
+			if c.instructions != nil {
+				c.instructions.Flush()
+			}
+			return nil
+		},
+		func() error {
+			if c.indexes != nil {
+				c.indexes.Flush()
+			}
+			return nil
+		},
+		func() error {
+			if c.types != nil {
+				c.types.flush()
+			}
+			return nil
+		},
+		func() error {
+			if c.sources != nil {
+				c.sources.Flush()
+			}
+			return nil
+		},
+	)
+	if instructionCacheDebugEnabled() {
+		log.Debugf("[ssa-ir-cache-flush] program=%s unit=%s resident=%d persisted=%d",
+			c.program.GetProgramName(), unitKey, c.CountInstruction(), c.InstructionPersistedCount())
+	}
 }
 
 func (c *ProgramCache) CountInstruction() int {

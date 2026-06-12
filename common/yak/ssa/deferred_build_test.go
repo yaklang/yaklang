@@ -56,6 +56,29 @@ func TestRunDeferredBuildsDrainsTasksRegisteredDuringBuild(t *testing.T) {
 	require.Equal(t, []string{"first", "second"}, ran)
 }
 
+func TestRunDeferredBuildsForUnitsOnlyDrainsMatchingUnit(t *testing.T) {
+	prog := newDeferredBuildTestProgram(t, "deferred-build-unit-drain")
+
+	var ran []string
+	prog.BeginCompileUnit("unit-a")
+	prog.RegisterDeferredBuild(DeferredBuildKindFile, "a", func() {
+		ran = append(ran, "a")
+	})
+	prog.EndCompileUnit()
+
+	prog.BeginCompileUnit("unit-b")
+	prog.RegisterDeferredBuild(DeferredBuildKindFile, "b", func() {
+		ran = append(ran, "b")
+	})
+	prog.EndCompileUnit()
+
+	require.True(t, prog.RunDeferredBuildsForUnits([]string{"unit-a"}, nil))
+	require.Equal(t, []string{"a"}, ran)
+
+	prog.RunDeferredBuilds()
+	require.Equal(t, []string{"a", "b"}, ran)
+}
+
 func TestFinishAllowsLazyLibraryExpansion(t *testing.T) {
 	prog := newDeferredBuildTestProgram(t, "finish-expansion")
 	editor := prog.CreateEditor([]byte("package main"), "/tmp/project/main.go")
@@ -95,4 +118,90 @@ func TestFinishAllowsLazyLibraryExpansion(t *testing.T) {
 		require.NoError(t, err)
 	default:
 	}
+}
+
+func TestLazyBuildForUnitsOnlyRunsMatchingLazyTasks(t *testing.T) {
+	prog := newDeferredBuildTestProgram(t, "lazy-build-unit-drain")
+	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
+
+	var ran []string
+	prog.BeginCompileUnit("unit-a")
+	builder.Function.AddLazyBuilder(func() {
+		ran = append(ran, "a")
+	})
+	prog.EndCompileUnit()
+
+	prog.BeginCompileUnit("unit-b")
+	builder.Function.AddLazyBuilder(func() {
+		ran = append(ran, "b")
+	})
+	prog.EndCompileUnit()
+
+	prog.LazyBuildForUnits([]string{"unit-a"})
+	require.Equal(t, []string{"a"}, ran)
+
+	prog.LazyBuild()
+	require.Equal(t, []string{"a", "b"}, ran)
+}
+
+func TestLazyBuildForUnitsKeepsBuilderOpenForLaterUnits(t *testing.T) {
+	prog := newDeferredBuildTestProgram(t, "lazy-build-unit-keeps-builder-open")
+	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
+
+	var ran []string
+	prog.BeginCompileUnit("unit-a")
+	builder.Function.AddLazyBuilder(func() {
+		ran = append(ran, "a")
+	})
+	prog.EndCompileUnit()
+
+	prog.LazyBuildForUnits([]string{"unit-a"})
+	require.Equal(t, []string{"a"}, ran)
+
+	prog.BeginCompileUnit("unit-b")
+	builder.Function.AddLazyBuilder(func() {
+		ran = append(ran, "b")
+	})
+	prog.EndCompileUnit()
+
+	prog.LazyBuildForUnits([]string{"unit-b"})
+	require.Equal(t, []string{"a", "b"}, ran)
+}
+
+func TestLazyBuildForUnitsSkipsProgramCycles(t *testing.T) {
+	progA := newDeferredBuildTestProgram(t, "lazy-build-unit-cycle-a")
+	progB := newDeferredBuildTestProgram(t, "lazy-build-unit-cycle-b")
+	builderA := progA.GetAndCreateFunctionBuilder("", string(MainFunctionName))
+	builderB := progB.GetAndCreateFunctionBuilder("", string(MainFunctionName))
+
+	var ran []string
+	progA.BeginCompileUnit("unit-a")
+	builderA.Function.AddLazyBuilder(func() {
+		ran = append(ran, "a")
+	})
+	progA.EndCompileUnit()
+
+	progB.BeginCompileUnit("unit-a")
+	builderB.Function.AddLazyBuilder(func() {
+		ran = append(ran, "b")
+	})
+	progB.EndCompileUnit()
+
+	progA.AddUpStream(progB)
+	progB.AddUpStream(progA)
+
+	done := make(chan struct{})
+	go func() {
+		progA.LazyBuildForUnits([]string{"unit-a"})
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("lazy build for units did not finish across cyclic program graph")
+	}
+	require.ElementsMatch(t, []string{"a", "b"}, ran)
+
+	progA.LazyBuildForUnits([]string{"unit-a"})
+	require.ElementsMatch(t, []string{"a", "b"}, ran)
 }

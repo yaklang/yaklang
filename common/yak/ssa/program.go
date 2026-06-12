@@ -60,6 +60,7 @@ func NewProgram(
 	}
 
 	prog.GlobalVariablesBlueprint = NewBlueprint("__GlobalVariables__")
+	prog.GlobalVariablesBlueprint.LazyBuilder.SetUnitProvider(prog.CurrentCompileUnit)
 	prog.GlobalVariablesBlueprint.SetKind(BlueprintClass)
 	prog.Blueprint.Set("__GlobalVariables__", prog.GlobalVariablesBlueprint)
 
@@ -75,6 +76,39 @@ func NewProgram(
 	)
 	prog.ctx = cfg.GetContext()
 	return prog
+}
+
+func (prog *Program) BeginCompileUnit(unitKey string) {
+	if prog == nil {
+		return
+	}
+	app := prog.GetApplication()
+	if app == nil {
+		app = prog
+	}
+	app.currentCompileUnit = unitKey
+}
+
+func (prog *Program) EndCompileUnit() {
+	if prog == nil {
+		return
+	}
+	app := prog.GetApplication()
+	if app == nil {
+		app = prog
+	}
+	app.currentCompileUnit = ""
+}
+
+func (prog *Program) CurrentCompileUnit() string {
+	if prog == nil {
+		return ""
+	}
+	app := prog.GetApplication()
+	if app == nil {
+		app = prog
+	}
+	return app.currentCompileUnit
 }
 
 func NewTmpProgram(ProgramName string) *Program {
