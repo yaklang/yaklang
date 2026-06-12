@@ -79,6 +79,28 @@ func TestRunDeferredBuildsForUnitsOnlyDrainsMatchingUnit(t *testing.T) {
 	require.Equal(t, []string{"a", "b"}, ran)
 }
 
+func TestRunDeferredBuildsForUnitsRestoresUnitDuringTask(t *testing.T) {
+	prog := newDeferredBuildTestProgram(t, "deferred-build-unit-context")
+	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
+
+	var ran []string
+	prog.BeginCompileUnit("unit-a")
+	prog.RegisterDeferredBuild(DeferredBuildKindFile, "a", func() {
+		require.Equal(t, "unit-a", prog.CurrentCompileUnit())
+		builder.Function.AddLazyBuilder(func() {
+			ran = append(ran, "nested")
+		})
+	})
+	prog.EndCompileUnit()
+
+	require.True(t, prog.RunDeferredBuildsForUnits([]string{"unit-a"}, nil))
+	require.Equal(t, "", prog.CurrentCompileUnit())
+	require.Empty(t, ran)
+
+	prog.LazyBuildForUnits([]string{"unit-a"})
+	require.Equal(t, []string{"nested"}, ran)
+}
+
 func TestFinishAllowsLazyLibraryExpansion(t *testing.T) {
 	prog := newDeferredBuildTestProgram(t, "finish-expansion")
 	editor := prog.CreateEditor([]byte("package main"), "/tmp/project/main.go")
@@ -166,6 +188,50 @@ func TestLazyBuildForUnitsKeepsBuilderOpenForLaterUnits(t *testing.T) {
 
 	prog.LazyBuildForUnits([]string{"unit-b"})
 	require.Equal(t, []string{"a", "b"}, ran)
+}
+
+func TestLazyBuildForUnitsClearsOnlyIndexedUnitBuilders(t *testing.T) {
+	prog := newDeferredBuildTestProgram(t, "lazy-build-unit-index-clears-unit")
+	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
+
+	prog.BeginCompileUnit("unit-a")
+	builder.Function.AddLazyBuilder(func() {})
+	prog.EndCompileUnit()
+
+	prog.BeginCompileUnit("unit-b")
+	builder.Function.AddLazyBuilder(func() {})
+	prog.EndCompileUnit()
+
+	require.Contains(t, prog.lazyBuildersByUnit, "unit-a")
+	require.Contains(t, prog.lazyBuildersByUnit, "unit-b")
+
+	prog.LazyBuildForUnits([]string{"unit-a"})
+
+	require.NotContains(t, prog.lazyBuildersByUnit, "unit-a")
+	require.Contains(t, prog.lazyBuildersByUnit, "unit-b")
+}
+
+func TestLazyBuildForUnitsDrainsIndexedBuildersRegisteredDuringBuild(t *testing.T) {
+	prog := newDeferredBuildTestProgram(t, "lazy-build-unit-index-drains-new-builders")
+	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
+
+	var ran []string
+	prog.BeginCompileUnit("unit-a")
+	builder.Function.AddLazyBuilder(func() {
+		require.Equal(t, "unit-a", prog.CurrentCompileUnit())
+		ran = append(ran, "first")
+		builder.Function.AddLazyBuilder(func() {
+			require.Equal(t, "unit-a", prog.CurrentCompileUnit())
+			ran = append(ran, "second")
+		})
+	})
+	prog.EndCompileUnit()
+
+	prog.LazyBuildForUnits([]string{"unit-a"})
+
+	require.Equal(t, "", prog.CurrentCompileUnit())
+	require.Equal(t, []string{"first", "second"}, ran)
+	require.NotContains(t, prog.lazyBuildersByUnit, "unit-a")
 }
 
 func TestLazyBuildForUnitsSkipsProgramCycles(t *testing.T) {

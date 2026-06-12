@@ -234,13 +234,14 @@ func (c *ProgramCache) FlushCompileUnit(unitKey string) {
 		func() error {
 			if c.sources != nil {
 				c.sources.Flush()
+				c.sources.ReleasePersistedEditors()
 			}
 			return nil
 		},
 	)
 	if instructionCacheDebugEnabled() {
-		log.Debugf("[ssa-ir-cache-flush] program=%s unit=%s resident=%d persisted=%d",
-			c.program.GetProgramName(), unitKey, c.CountInstruction(), c.InstructionPersistedCount())
+		log.Debugf("[ssa-ir-cache-flush] program=%s unit=%s mode=%s resident=%d persisted=%d",
+			c.program.GetProgramName(), unitKey, c.InstructionCacheMode(), c.CountInstruction(), c.InstructionPersistedCount())
 	}
 }
 

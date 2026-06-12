@@ -212,6 +212,13 @@ func (c *Cache[T, D]) Flush(reason utils.EvictionReason) {
 		return
 	}
 	keys := c.resident.Keys()
+	c.FlushKeys(keys, reason)
+}
+
+func (c *Cache[T, D]) FlushKeys(keys []int64, reason utils.EvictionReason) {
+	if c == nil || c.resident == nil {
+		return
+	}
 	if len(keys) == 0 {
 		if c.saver != nil {
 			c.saver.Flush()
