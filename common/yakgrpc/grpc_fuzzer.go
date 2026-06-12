@@ -817,6 +817,9 @@ func (r *httpFuzzerRun) handleReMatch(oldIDs []uint, historyID int32) error {
 			log.Errorf("convert web fuzzer response to grpc model failed: %s", err)
 			continue
 		}
+		if respModel.TaskId != int64(historyID) && !respModel.Ok { // 不处理 retry 系列任务中，老任务失败的包，避免出现多包重发
+			continue
+		}
 		ResetFuzzerResponseMatcherStateForRematch(respModel, resp)
 
 		if r.haveHTTPTplExtractor { // 提取器提取参数
