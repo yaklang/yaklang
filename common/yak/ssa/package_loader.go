@@ -7,6 +7,21 @@ import (
 	"github.com/yaklang/yaklang/common/utils/memedit"
 )
 
+func (b *FunctionBuilder) includeProgramInStack(prog *Program) bool {
+	if b == nil || prog == nil {
+		return false
+	}
+	found := false
+	b.includeStack.ForeachStack(func(p *Program) bool {
+		if p == prog {
+			found = true
+			return false
+		}
+		return true
+	})
+	return found
+}
+
 func (b *FunctionBuilder) AddIncludePath(path string) {
 	p := b.GetProgram()
 	p.Loader.AddIncludePath(path)
@@ -39,6 +54,10 @@ func (b *FunctionBuilder) BuildFilePackage(filename string, once bool) error {
 	subProg, exist := mainProgram.UpStream.Get(fileHash)
 	if exist {
 		log.Debugf("[INCLUDE] ✓ 缓存命中! 文件: %s (hash: %s) 从缓存读取，跳过编译", filename, fileHash)
+		if b.includeProgramInStack(subProg) {
+			log.Debugf("[INCLUDE] cycle detected for %s (hash: %s), skip LazyBuild", filename, fileHash)
+			return nil
+		}
 		subProg.LazyBuild()
 		b.includeStack.Push(subProg)
 		return nil
