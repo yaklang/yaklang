@@ -42,7 +42,7 @@ func SpinHandle(name string, phiValue, header, latch Value) map[string]Value {
 	func() {
 		// step 1
 		// this  value not change in this loop, should replace phi-value to header value
-		if phiValue == latch {
+		if phiValue == latch || header == latch {
 			ReplaceAllValue(phiValue, header)
 			DeleteInst(phiValue)
 

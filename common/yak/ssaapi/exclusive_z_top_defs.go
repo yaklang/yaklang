@@ -175,7 +175,7 @@ func isDestructorLikeValue(value *Value) bool {
 	}
 	if raw := value.getValue(); raw != nil {
 		for _, pair := range ssa.GetObjectKeyPairs(raw) {
-			if strings.Contains(strings.ToLower(ssa.GetKeyString(pair.Key)), "destructor") {
+			if strings.Contains(strings.ToLower(pair.KeyString()), "destructor") {
 				return true
 			}
 		}
@@ -202,6 +202,129 @@ func shouldFallbackToObjectTopDefs(value *Value) bool {
 	default:
 		return true
 	}
+}
+
+func traceTopDefsAndKeepEdge(source *Value, values Values, actx *AnalyzeContext, opt ...OperationOption) Values {
+	ret := make(Values, 0, len(values))
+	for _, item := range values {
+		if item == nil {
+			continue
+		}
+		defs := item.getTopDefs(actx, opt...)
+		if len(defs) == 0 {
+			if source != nil {
+				source.AppendDependOn(item)
+			}
+			ret = append(ret, item)
+			continue
+		}
+		for _, def := range defs {
+			if source != nil {
+				source.AppendDependOn(def)
+			}
+			ret = append(ret, def)
+		}
+	}
+	return MergeValues(ret)
+}
+
+func appendCallReturnedDefEdges(callValue *Value, defs Values) {
+	if callValue == nil || callValue.getValue() == nil || len(defs) == 0 {
+		return
+	}
+	call, ok := ssa.ToCall(callValue.getValue())
+	if !ok || call == nil || call.Method <= 0 {
+		return
+	}
+	calleeInst, ok := call.GetValueById(call.Method)
+	if !ok || utils.IsNil(calleeInst) {
+		return
+	}
+	fun, ok := ssa.ToFunction(calleeInst)
+	if !ok && calleeInst.GetReference() != nil {
+		fun, ok = ssa.ToFunction(calleeInst.GetReference())
+	}
+	if !ok {
+		if param, ok := ssa.ToParameter(calleeInst); ok && param.IsFreeValue && !utils.IsNil(param.GetDefault()) {
+			fun, ok = ssa.ToFunction(param.GetDefault())
+		}
+	}
+	if !ok || fun == nil || fun.IsExtern() {
+		return
+	}
+	callee := callValue.NewValue(fun)
+	if callee == nil {
+		return
+	}
+	callValue.AppendDependOn(callee)
+	for _, def := range defs {
+		if def != nil {
+			callee.AppendDependOn(def)
+		}
+	}
+}
+
+func traceReturnedArgMembers(callValue *Value, call *ssa.Call, fun *ssa.Function, actx *AnalyzeContext, opt ...OperationOption) Values {
+	if callValue == nil || call == nil || fun == nil || len(call.ArgMember) == 0 {
+		return nil
+	}
+	memberIndex := make(map[int64]int, len(fun.ParameterMembers))
+	for index, memberID := range fun.ParameterMembers {
+		memberIndex[memberID] = index
+	}
+
+	resolveIndex := func(member *ssa.ParameterMember) (int, bool) {
+		if member == nil {
+			return 0, false
+		}
+		if index, ok := memberIndex[member.GetId()]; ok {
+			return index, true
+		}
+		if member.FormalParameterIndex >= 0 {
+			return member.FormalParameterIndex, true
+		}
+		return 0, false
+	}
+
+	ret := make(Values, 0)
+	for _, returnID := range fun.Return {
+		returnInst, ok := fun.GetValueById(returnID)
+		if !ok || utils.IsNil(returnInst) {
+			continue
+		}
+		returnValue, ok := ssa.ToReturn(returnInst)
+		if !ok || returnValue == nil {
+			continue
+		}
+		for _, resultID := range returnValue.Results {
+			result, ok := fun.GetValueById(resultID)
+			if !ok || utils.IsNil(result) {
+				continue
+			}
+			member, ok := ssa.ToParameterMember(result)
+			if !ok || member == nil {
+				continue
+			}
+			index, ok := resolveIndex(member)
+			if !ok || index < 0 || index >= len(call.ArgMember) {
+				continue
+			}
+			actual, ok := call.GetValueById(call.ArgMember[index])
+			if !ok || utils.IsNil(actual) {
+				continue
+			}
+			actualValue := callValue.NewValue(actual)
+			if actualValue == nil {
+				continue
+			}
+			defs := actualValue.getTopDefs(actx, opt...)
+			if len(defs) == 0 {
+				defs = Values{actualValue}
+			}
+			ret = append(ret, defs...)
+		}
+	}
+	return MergeValues(ret)
 }
 
 func (i *Value) visitedDefs(actx *AnalyzeContext, opt ...OperationOption) (result Values) {
@@ -381,6 +504,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 						objResults := actx.withObject(obj, key, i, func() Values {
 							return obj.getTopDefs(actx, opt...)
 						})
+						appendCallReturnedDefEdges(obj, objResults)
 						results = append(results, filterStaticPropertyCarrier(objResults, obj, key)...)
 					}
 					if len(results) == 0 {
@@ -411,6 +535,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 							continue
 						}
 						objResults := filterOutMember(obj.getTopDefs(actx, opt...), i)
+						appendCallReturnedDefEdges(obj, objResults)
 						results = append(results, filterStaticPropertyCarrier(objResults, obj, key)...)
 					}
 					results = filterOutDestructor(filterOutMember(MergeValues(results), i))
@@ -427,6 +552,11 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 	case *ssa.Undefined:
 		if inst.Kind == ssa.UndefinedValueReturn {
 			return Values{}
+		}
+		if len(inst.GetMask()) > 0 {
+			if vals := i.visitedDefs(actx, opt...); len(vals) > 0 {
+				return vals
+			}
 		}
 		result := getMemberCall(i, inst, actx)
 		if len(result) > 0 {
@@ -486,7 +616,11 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 
 		switch {
 		case isFunc && !fun.IsExtern():
+			if returnedArgMembers := traceReturnedArgMembers(i, inst, fun, actx, opt...); len(returnedArgMembers) > 0 {
+				return returnedArgMembers
+			}
 			callee := i.NewValue(fun)
+			i.AppendDependOn(callee)
 			callee.SetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY, i)
 			if objectContext := actx.CurrentObjectStack(); objectContext != nil && ValueCompare(objectContext.object, i) {
 				callee.SetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY_TRACE_INDEX, objectContext.key)
@@ -627,9 +761,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 						}
 					}
 				}
-				return lo.FlatMap(traceRets, func(item *Value, index int) []*Value {
-					return item.getTopDefs(actx, opt...)
-				})
+				return traceTopDefsAndKeepEdge(i, traceRets, actx, opt...)
 			} else {
 				// string literal member
 				var traceRets Values
@@ -670,9 +802,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 						}
 					}
 				}
-				return lo.FlatMap(traceRets, func(item *Value, index int) []*Value {
-					return item.getTopDefs(actx, opt...)
-				})
+				return traceTopDefsAndKeepEdge(i, traceRets, actx, opt...)
 			}
 		}
 
@@ -735,10 +865,71 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 		}
 		memberKeyValue := i.NewValue(memberKey)
 
+		resolveActualObjectMember := func(actualParam ssa.Value) Values {
+			if utils.IsNil(actualParam) || memberKeyValue == nil {
+				return nil
+			}
+			actualObj := i.NewValue(actualParam)
+			if actualObj == nil {
+				return nil
+			}
+			matched := resolveMembersForKey(actx, actualObj, memberKeyValue, i, true)
+			ret := make(Values, 0, len(matched))
+			for _, member := range matched {
+				ret = append(ret, member.getTopDefs(actx, opt...)...)
+			}
+			return MergeValues(ret)
+		}
+		resolveParameterDefault := func(value *Value) Values {
+			if value == nil || utils.IsNil(value.getValue()) {
+				return nil
+			}
+			param, ok := ssa.ToParameter(value.getValue())
+			if !ok || param == nil || utils.IsNil(param.GetDefault()) {
+				return nil
+			}
+			def := param.GetDefault()
+			traced := i.NewValue(def)
+			if traced == nil {
+				return nil
+			}
+			if memberKeyValue != nil {
+				if ret := resolveActualObjectMember(def); len(ret) > 0 {
+					return ret
+				}
+				if ret := actx.withObject(traced, memberKeyValue, i, func() Values {
+					return filterOutMember(traced.getTopDefs(actx, opt...), i)
+				}); len(ret) > 0 {
+					return ret
+				}
+			}
+			return filterOutMember(traced.getTopDefs(actx, opt...), i)
+		}
 		getParameter := func() Values {
 			paraValue := i.NewValue(para)
 			if paraValue == nil {
 				return Values{}
+			}
+			getDefaultValue := func() Values {
+				def := para.GetDefault()
+				if utils.IsNil(def) {
+					return nil
+				}
+				traced := i.NewValue(def)
+				if traced == nil {
+					return nil
+				}
+				if memberKeyValue != nil {
+					if ret := resolveActualObjectMember(def); len(ret) > 0 {
+						return ret
+					}
+					if ret := actx.withObject(traced, memberKeyValue, i, func() Values {
+						return filterOutMember(traced.getTopDefs(actx, opt...), i)
+					}); len(ret) > 0 {
+						return ret
+					}
+				}
+				return filterOutMember(traced.getTopDefs(actx, opt...), i)
 			}
 			if memberKeyValue != nil {
 				if ret := actx.withObject(paraValue, memberKeyValue, i, func() Values {
@@ -755,23 +946,14 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 						return item.getTopDefs(actx, opt...)
 					})
 				}
+				if ret := getDefaultValue(); len(ret) > 0 {
+					return ret
+				}
+			}
+			if ret := getDefaultValue(); len(ret) > 0 {
+				return ret
 			}
 			return paraValue.getTopDefs(actx, opt...)
-		}
-		resolveActualObjectMember := func(actualParam ssa.Value) Values {
-			if utils.IsNil(actualParam) || memberKeyValue == nil {
-				return nil
-			}
-			actualObj := i.NewValue(actualParam)
-			if actualObj == nil {
-				return nil
-			}
-			matched := resolveMembersForKey(actx, actualObj, memberKeyValue, i, true)
-			ret := make(Values, 0, len(matched))
-			for _, member := range matched {
-				ret = append(ret, member.getTopDefs(actx, opt...)...)
-			}
-			return MergeValues(ret)
 		}
 		getActualValueByCall := func(called *Value) Values {
 			if called == nil {
@@ -783,11 +965,53 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 				return Values{}
 			}
 
+			allMembers := func(values Values) bool {
+				if len(values) == 0 {
+					return false
+				}
+				for _, value := range values {
+					if value == nil || !value.IsMember() {
+						return false
+					}
+				}
+				return true
+			}
+			appendActualParamBaseEdges := func(from *Value) Values {
+				if from == nil {
+					return nil
+				}
+				actualParam, ok := inst.GetActualParam(calledInstance)
+				if !ok || utils.IsNil(actualParam) {
+					return nil
+				}
+				actualValue := i.NewValue(actualParam)
+				if actualValue == nil || ValueCompare(from, actualValue) {
+					return nil
+				}
+				defs := actualValue.getTopDefs(actx, opt...)
+				if len(defs) == 0 {
+					defs = Values{actualValue}
+				}
+				for _, def := range defs {
+					from.AppendDependOn(def)
+				}
+				return defs
+			}
 			if actualMember, ok := inst.GetActualCallParam(calledInstance); ok {
 				traced := i.NewValue(actualMember)
 				if traced != nil && actx.needCrossProcess(i, traced) {
-					if ret := traced.getTopDefs(actx, opt...); len(ret) > 0 {
-						return ret
+					i.AppendDependOn(traced)
+					if raw := traced.getTopDefs(actx, opt...); len(raw) > 0 {
+						for _, def := range raw {
+							traced.AppendDependOn(def)
+						}
+						if ret := filterOutMember(raw, traced); len(ret) > 0 {
+							if !allMembers(ret) {
+								return ret
+							}
+						}
+						appendActualParamBaseEdges(traced)
+						return raw
 					}
 				}
 			}
@@ -808,11 +1032,24 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 					if ret := actx.withObject(traced, memberKeyValue, i, func() Values {
 						return traced.getTopDefs(actx, opt...)
 					}); len(ret) > 0 {
-						return ret
+						if !allMembers(ret) {
+							return ret
+						}
+						if fallback := resolveParameterDefault(traced); len(fallback) > 0 {
+							return fallback
+						}
 					}
 				}
 				if ret := filterOutMember(traced.getTopDefs(actx, opt...), i); len(ret) > 0 {
-					return ret
+					if !allMembers(ret) {
+						return ret
+					}
+					if fallback := resolveParameterDefault(traced); len(fallback) > 0 {
+						return fallback
+					}
+				}
+				if fallback := resolveParameterDefault(traced); len(fallback) > 0 {
+					return fallback
 				}
 			}
 			return Values{}
@@ -940,7 +1177,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 		}
 
 		if len(vals) == 0 {
-			if i.IsFreeValue() && inst.GetDefault() != nil {
+			if inst.GetDefault() != nil {
 				vals = append(vals, i.NewValue(inst.GetDefault()))
 			} else {
 				vals = append(vals, i)

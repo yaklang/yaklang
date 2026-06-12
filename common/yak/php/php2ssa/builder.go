@@ -192,6 +192,27 @@ type builder struct {
 	callback       func(str string, filename string)
 	fetchDollarId  func() int
 	currentInclude map[string]struct{}
+
+	dynamicVariableSources map[string][]ssa.Value
+}
+
+func (b *builder) recordDynamicVariableSource(name string, source ssa.Value) {
+	if b == nil || name == "" || utils.IsNil(source) {
+		return
+	}
+	if b.dynamicVariableSources == nil {
+		b.dynamicVariableSources = make(map[string][]ssa.Value)
+	}
+	b.dynamicVariableSources[name] = append(b.dynamicVariableSources[name], source)
+}
+
+func (b *builder) consumeDynamicVariableSources(name string) []ssa.Value {
+	if b == nil || b.dynamicVariableSources == nil || name == "" {
+		return nil
+	}
+	sources := b.dynamicVariableSources[name]
+	delete(b.dynamicVariableSources, name)
+	return sources
 }
 
 func Frontend(src string, caches ...*ssa.AntlrCache) (phpparser.IHtmlDocumentContext, error) {

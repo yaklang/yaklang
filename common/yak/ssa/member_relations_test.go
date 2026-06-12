@@ -65,6 +65,23 @@ func TestMemberRelations_SharedMemberAcrossObjects(t *testing.T) {
 	}
 }
 
+func TestMemberRelations_KeyString(t *testing.T) {
+	_, builder := newTestBuilder(t)
+
+	obj := builder.EmitEmptyContainer()
+	key := builder.EmitConstInst("cmd")
+	member := builder.EmitUndefined("member")
+	setMemberCallRelationship(obj, key, member)
+
+	memberPairs := GetMemberPairs(obj)
+	require.Len(t, memberPairs, 1)
+	require.Equal(t, "cmd", memberPairs[0].KeyString())
+
+	ownerPairs := GetObjectKeyPairs(member)
+	require.Len(t, ownerPairs, 1)
+	require.Equal(t, "cmd", ownerPairs[0].KeyString())
+}
+
 func TestMemberRelations_ReadLegacyObjectMembers(t *testing.T) {
 	prog, builder := newTestBuilder(t)
 

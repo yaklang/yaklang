@@ -16,6 +16,14 @@ func applicationProgramName(prog *Program) string {
 	return prog.Name
 }
 
+func (pair MemberPair) KeyString() string {
+	return GetKeyString(pair.Key)
+}
+
+func (pair ObjectKeyPair) KeyString() string {
+	return GetKeyString(pair.Key)
+}
+
 func AddObjectKeyPair(member, object, key Value) {
 	if utils.IsNil(member) || utils.IsNil(object) || utils.IsNil(key) {
 		return

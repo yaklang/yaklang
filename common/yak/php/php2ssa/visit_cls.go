@@ -554,12 +554,10 @@ func (y *builder) VisitClassConstant(raw phpparser.IClassConstantContext) ssa.Va
 	switch {
 	case i.Parent_() != nil:
 		display = "parent"
-		if y.MarkedThisClassBlueprint != nil {
-			blueprint = y.MarkedThisClassBlueprint.GetSuperBlueprint()
-		}
+		blueprint = y.currentParentBlueprint()
 	case i.Class() != nil:
 		display = "self"
-		blueprint = y.MarkedThisClassBlueprint
+		blueprint = y.currentClassBlueprint()
 	case i.QualifiedStaticTypeRef() != nil:
 		display = strings.TrimPrefix(i.QualifiedStaticTypeRef().GetText(), `\`)
 		blueprint = y.VisitQualifiedStaticTypeRef(i.QualifiedStaticTypeRef())
@@ -611,6 +609,11 @@ func (y *builder) VisitClassConstant(raw phpparser.IClassConstantContext) ssa.Va
 		if value := y.PeekValueByVariable(member); !utils.IsNil(value) {
 			return value
 		}
+		if i.Parent_() != nil {
+			if value := y.readParentClassMember(blueprint, key); !utils.IsNil(value) {
+				return value
+			}
+		}
 		if method := blueprint.GetStaticMethod(key); !utils.IsNil(method) {
 			return method
 		}
@@ -655,10 +658,7 @@ func (y *builder) VisitStaticClass(raw phpparser.IStaticClassContext) *ssa.Bluep
 	} else if i.Identifier() != nil {
 		className = i.Identifier().GetText()
 		if className == "parent" {
-			parentClass := y.MarkedThisClassBlueprint.GetSuperBlueprint()
-			if parentClass != nil {
-				return parentClass
-			}
+			return y.currentParentBlueprint()
 		} else {
 			blueprint := y.GetBluePrint(className)
 			if blueprint != nil {
@@ -725,6 +725,53 @@ func (y *builder) findBlueprint(name string) *ssa.Blueprint {
 	return found
 }
 
+func (y *builder) currentClassBlueprint() *ssa.Blueprint {
+	if y == nil {
+		return nil
+	}
+	if y.Function != nil {
+		if bp := y.Function.GetCurrentBlueprint(); bp != nil {
+			return bp
+		}
+	}
+	return y.MarkedThisClassBlueprint
+}
+
+func (y *builder) currentParentBlueprint() *ssa.Blueprint {
+	blueprint := y.currentClassBlueprint()
+	if blueprint == nil {
+		return nil
+	}
+	blueprint.Build()
+	parent := blueprint.GetSuperBlueprint()
+	if parent != nil {
+		parent.Build()
+	}
+	return parent
+}
+
+func (y *builder) readParentClassMember(parent *ssa.Blueprint, key string) ssa.Value {
+	if parent == nil || key == "" {
+		return nil
+	}
+	parent.Build()
+	if member := parent.GetStaticMember(key); !utils.IsNil(member) {
+		return member
+	}
+	if member := parent.GetConstMember(key); !utils.IsNil(member) {
+		return member
+	}
+	return parent.GetNormalMember(key)
+}
+
+func (y *builder) readParentClassStaticMethod(parent *ssa.Blueprint, key string) ssa.Value {
+	if parent == nil || key == "" {
+		return nil
+	}
+	parent.Build()
+	return parent.GetStaticMethod(key)
+}
+
 func (y *builder) VisitStaticClassExprFunctionMember(raw phpparser.IStaticClassExprFunctionMemberContext) (*ssa.Blueprint, string) {
 	if y == nil || raw == nil {
 		return nil, ""
@@ -745,7 +792,7 @@ func (y *builder) VisitStaticClassExprFunctionMember(raw phpparser.IStaticClassE
 		}
 	}
 	if i.StaticClass().GetText() == "self" {
-		return y.MarkedThisClassBlueprint, key
+		return y.currentClassBlueprint(), key
 	}
 	bluePrint := y.VisitStaticClass(i.StaticClass())
 	return bluePrint, key

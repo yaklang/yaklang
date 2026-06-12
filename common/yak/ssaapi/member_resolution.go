@@ -53,7 +53,39 @@ func memberMatchesKeyName(member *Value, keyName string) bool {
 		return false
 	}
 	for _, pair := range ssa.GetObjectKeyPairs(member.getValue()) {
-		if ssa.GetKeyString(pair.Key) == keyName {
+		if pair.KeyString() == keyName {
+			return true
+		}
+	}
+	return false
+}
+
+func isInterfaceBlueprintCarrier(value *Value) bool {
+	if value == nil || value.getValue() == nil {
+		return false
+	}
+	bp, ok := ssa.ToBluePrintType(value.getValue().GetType())
+	if !ok || bp == nil || !bp.IsInterface() {
+		return false
+	}
+	container := bp.Container()
+	return !utils.IsNil(container) && container.GetId() == value.GetId()
+}
+
+func isMemberOwnedByInterfaceBlueprint(member *Value) bool {
+	if member == nil || member.getValue() == nil || !member.IsMember() {
+		return false
+	}
+	for _, pair := range ssa.GetObjectKeyPairs(member.getValue()) {
+		if utils.IsNil(pair.Object) {
+			continue
+		}
+		bp, ok := ssa.ToBluePrintType(pair.Object.GetType())
+		if !ok || bp == nil || !bp.IsInterface() {
+			continue
+		}
+		container := bp.Container()
+		if !utils.IsNil(container) && container.GetId() == pair.Object.GetId() {
 			return true
 		}
 	}
@@ -78,6 +110,9 @@ func (v *Value) lookupMembersByIndexedKey(key *Value) Values {
 		}
 		item := v.NewValue(candidate)
 		if item == nil || !item.IsMember() || !memberMatchesKeyName(item, keyName) {
+			continue
+		}
+		if isMemberOwnedByInterfaceBlueprint(item) {
 			continue
 		}
 		if currentType != nil {
@@ -130,6 +165,9 @@ func (v *Value) lookupObjectsByTypeName() Values {
 	add := func(values Values) {
 		for _, item := range values {
 			if item == nil || item.getValue() == nil {
+				continue
+			}
+			if isInterfaceBlueprintCarrier(item) {
 				continue
 			}
 			if _, ok := seen[item.GetId()]; ok {
@@ -288,8 +326,11 @@ func filterMembersByKeyString(values Values, keyName string) Values {
 			continue
 		}
 		if item.IsMember() {
+			if isMemberOwnedByInterfaceBlueprint(item) {
+				continue
+			}
 			for _, pair := range ssa.GetObjectKeyPairs(item.getValue()) {
-				if ssa.GetKeyString(pair.Key) == keyName {
+				if pair.KeyString() == keyName {
 					ret = append(ret, item)
 					break
 				}
@@ -297,6 +338,9 @@ func filterMembersByKeyString(values Values, keyName string) Values {
 			continue
 		}
 		if !item.IsObject() {
+			continue
+		}
+		if isInterfaceBlueprintCarrier(item) {
 			continue
 		}
 		ret = append(ret, item.lookupMembersOnObject(item.NewValue(ssa.NewConst(keyName)))...)

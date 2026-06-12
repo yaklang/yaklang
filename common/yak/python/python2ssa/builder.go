@@ -503,7 +503,7 @@ func (b *singleFileBuilder) preRegisterInheritedBlueprintMembers(child, parent *
 		}
 		if _, exists := child.NormalMember[name]; !exists {
 			for _, member := range value {
-				if member != nil {
+				if !utils.IsNil(member) {
 					child.RegisterNormalMember(name, member, false)
 				}
 			}
@@ -515,7 +515,7 @@ func (b *singleFileBuilder) preRegisterInheritedBlueprintMembers(child, parent *
 		}
 		if _, exists := child.StaticMember[name]; !exists {
 			for _, member := range value {
-				if member != nil {
+				if !utils.IsNil(member) {
 					child.RegisterStaticMember(name, member, false)
 				}
 			}

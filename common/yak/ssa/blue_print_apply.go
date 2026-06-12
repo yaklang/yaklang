@@ -15,25 +15,24 @@ func ParseClassBluePrint(this Value, objectTyp *ObjectType) (ret Type) {
 	blue := NewBlueprint(objectTyp.Name)
 
 	for _, pair := range GetLastWinsMemberPairs(this) {
-		key := pair.Key
+		keyName := pair.KeyString()
 		member := pair.Member
 		// if not function , just append this field to normal field
 		typ := member.GetType()
 		if typ.GetTypeKind() != FunctionTypeKind {
-			// blue.NormalMember[key.String()] = member
-			blue.RegisterNormalMember(key.String(), member)
+			blue.RegisterNormalMember(keyName, member)
 			continue
 		}
 
 		funTyp := typ.(*FunctionType)
 		if len(funTyp.ParameterValue) > 0 {
 			if para := funTyp.ParameterValue[0]; para != nil && (para.IsObject() || para.HasUsers()) {
-				blue.AddMethod(key.String(), funTyp.This)
+				blue.AddMethod(keyName, funTyp.This)
 				continue
 			}
 		}
 
-		blue.RegisterNormalMember(key.String(), member)
+		blue.RegisterNormalMember(keyName, member)
 	}
 
 	if len(blue.GetMethod()) != 0 {

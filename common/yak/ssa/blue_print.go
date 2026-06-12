@@ -209,54 +209,37 @@ func (c *Blueprint) addParentBlueprintEx(parent *Blueprint, relation BlueprintRe
 		return
 	}
 
-	containsValue := func(values []Value, target Value) bool {
-		if target == nil {
-			for _, existed := range values {
-				if existed == nil {
-					return true
-				}
-			}
-			return false
-		}
-		targetID := target.GetId()
-		for _, existed := range values {
-			if existed != nil && existed.GetId() == targetID {
-				return true
-			}
-		}
-		return false
-	}
 	for name, f := range parent.NormalMethod {
 		c.RegisterNormalMethod(name, f, false)
 	}
 	for name, f := range parent.StaticMethod {
-		c.RegisterStaticMethod(name, f)
+		c.RegisterStaticMethod(name, f, false)
 	}
 	for name, f := range parent.MagicMethod {
 		c.RegisterMagicMethod(name, f)
 	}
 	for name, values := range parent.NormalMember {
+		if len(c.NormalMember[name]) > 0 {
+			continue
+		}
 		for _, value := range values {
-			if containsValue(c.NormalMember[name], value) {
-				continue
-			}
-			c.RegisterNormalMember(name, value)
+			c.RegisterNormalMember(name, value, false)
 		}
 	}
 	for name, values := range parent.StaticMember {
+		if len(c.StaticMember[name]) > 0 {
+			continue
+		}
 		for _, value := range values {
-			if containsValue(c.StaticMember[name], value) {
-				continue
-			}
-			c.RegisterStaticMember(name, value)
+			c.RegisterStaticMember(name, value, false)
 		}
 	}
 	for name, values := range parent.ConstValue {
+		if len(c.ConstValue[name]) > 0 {
+			continue
+		}
 		for _, value := range values {
-			if containsValue(c.ConstValue[name], value) {
-				continue
-			}
-			c.RegisterConstMember(name, value)
+			c.RegisterConstMember(name, value, false)
 		}
 	}
 }

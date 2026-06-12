@@ -825,7 +825,7 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) {
 			prog.GlobalVariablesBlueprint.Build()
 			if c := prog.GlobalVariablesBlueprint.Container(); c != nil {
 				for _, pair := range ssa.GetLastWinsMemberPairs(c) {
-					name := pair.Key.String()
+					name := pair.KeyString()
 					if name == "" {
 						continue
 					}

@@ -22,7 +22,7 @@ func searchMembersWithOverlay(value *Value, overlay *ProgramOverLay) map[string]
 	currentInst := value.getValue()
 	if currentInst != nil {
 		for _, pair := range ssa.GetLastWinsMemberPairs(currentInst) {
-			keyName := ssa.GetKeyString(pair.Key)
+			keyName := pair.KeyString()
 			if keyName == "" {
 				continue
 			}
@@ -74,7 +74,7 @@ func searchMembersWithOverlay(value *Value, overlay *ProgramOverLay) map[string]
 		}
 
 		for _, pair := range ssa.GetLastWinsMemberPairs(layerInst) {
-			keyName := ssa.GetKeyString(pair.Key)
+			keyName := pair.KeyString()
 			if keyName == "" {
 				continue
 			}
@@ -229,7 +229,7 @@ func SearchWithValue(value *Value, mod ssadb.MatchMode, compare func(string) boo
 
 		if raw := value.getValue(); raw != nil {
 			for _, pair := range ssa.GetObjectKeyPairs(raw) {
-				keyName := ssa.GetKeyString(pair.Key)
+				keyName := pair.KeyString()
 				if keyName != "" && compare(keyName) {
 					return true
 				}

@@ -3,8 +3,12 @@ package ssa
 import "github.com/yaklang/yaklang/common/utils"
 
 func memberKeyNameForGlobal(key Value) string {
-	if lit, ok := ToConstInst(key); ok && lit.Const != nil {
-		return lit.Const.str
+	if utils.IsNil(key) {
+		return ""
+	}
+	keyName := GetKeyString(key)
+	if keyName != "" {
+		return keyName
 	}
 	return key.String()
 }
@@ -87,7 +91,7 @@ func (b *FunctionBuilder) GetGlobalVariables() map[string]Value {
 	}
 
 	for _, pair := range GetLastWinsMemberPairs(globalVarsContainer) {
-		variables[pair.Key.String()] = pair.Member
+		variables[pair.KeyString()] = pair.Member
 	}
 	return variables
 }
@@ -115,7 +119,7 @@ func (b *FunctionBuilder) LoadGlobalVariable() {
 
 	globalVarsContainer := prog.GlobalVariablesBlueprint.Container()
 	for _, pair := range GetLastWinsMemberPairs(globalVarsContainer) {
-		variable := b.CreateVariableCross(pair.Key.String())
+		variable := b.CreateVariableCross(pair.KeyString())
 		if variable == nil {
 			continue
 		}

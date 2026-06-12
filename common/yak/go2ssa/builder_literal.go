@@ -369,7 +369,7 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 			}
 			isFind := false
 			for _, pair := range ssa.GetLastWinsMemberPairs(rvalue) {
-				if ssa.GetKeyString(pair.Key) == n {
+				if pair.KeyString() == n {
 					isFind = true
 					break
 				}

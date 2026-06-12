@@ -25,13 +25,17 @@ func (b *FunctionBuilder) getStaticFieldValue(object, key Value, wantFunction bo
 	}
 	// get member or method
 	getValueFromClass := func(class *Blueprint) Value {
+		keyName := GetKeyString(key)
+		if keyName == "" {
+			keyName = key.String()
+		}
 		var get func(string) Value
 		if wantFunction {
 			get = class.GetStaticMethod
 		} else {
 			get = class.GetStaticMember
 		}
-		return get(key.String())
+		return get(keyName)
 	}
 	// className.Key
 	if un, ok := ToUndefined(object); ok && un.Kind == UndefinedValueInValid {
@@ -44,8 +48,10 @@ func (b *FunctionBuilder) getStaticFieldValue(object, key Value, wantFunction bo
 
 	// classInstance.Key
 	if blueprint, ok := object.GetType().(*Blueprint); ok {
-		if ret := getValueFromClass(blueprint); ret != nil {
-			return ret
+		if isBlueprintStaticAccessValue(object, blueprint) || b.allowStaticMemberAccessByInstance() {
+			if ret := getValueFromClass(blueprint); ret != nil {
+				return ret
+			}
 		}
 	}
 	return nil
@@ -89,12 +95,16 @@ func (b *FunctionBuilder) getDefaultMemberOrMethodByClass(object, key Value, met
 	if !ok {
 		return nil
 	}
+	keyName := GetKeyString(key)
+	if keyName == "" {
+		keyName = key.String()
+	}
 	if method {
-		if normalMethod := bluePrint.GetNormalMethod(key.String()); !utils.IsNil(normalMethod) {
+		if normalMethod := bluePrint.GetNormalMethod(keyName); !utils.IsNil(normalMethod) {
 			return normalMethod
 		}
 	}
-	if member := bluePrint.GetNormalMember(key.String()); !utils.IsNil(member) {
+	if member := bluePrint.GetNormalMember(keyName); !utils.IsNil(member) {
 		return member
 	}
 	return nil
@@ -107,7 +117,11 @@ func (b *FunctionBuilder) createDefaultMember(res checkMemberResult, object, key
 	typ := res.typ
 	if wantFunction {
 		// this get will call function Builder, then should refresh the typ
-		if fun := GetMethod(object.GetType(), key.String()); fun != nil {
+		keyName := GetKeyString(key)
+		if keyName == "" {
+			keyName = key.String()
+		}
+		if fun := GetMethod(object.GetType(), keyName); fun != nil {
 			typ = fun.GetType()
 		}
 	}
@@ -137,7 +151,13 @@ func (b *FunctionBuilder) createDefaultMember(res checkMemberResult, object, key
 	}
 	writeUndefined := func() *Undefined {
 		recoverScope := b.SetCurrent(object, true)
-		un := b.writeUndefine(name)
+		displayName := name
+		if _, ok := ToConstInst(key); !ok {
+			if memberName := getMemberVerboseName(object, key); memberName != "" {
+				displayName = memberName
+			}
+		}
+		un := b.writeUndefine(name, displayName)
 		recoverScope()
 		if res.exist {
 			un.Kind = UndefinedMemberValid

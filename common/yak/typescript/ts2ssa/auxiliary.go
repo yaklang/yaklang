@@ -426,7 +426,7 @@ func (b *builder) createLocalNamespaceObject(modulePath string, localName string
 		container := moduleProgram.GlobalVariablesBlueprint.Container()
 		if container != nil {
 			for _, pair := range ssa.GetLastWinsMemberPairs(container) {
-				namespaceObj.RegisterStaticMember(ssa.GetKeyString(pair.Key), pair.Member)
+				namespaceObj.RegisterStaticMember(pair.KeyString(), pair.Member)
 				cnt++
 			}
 		}

@@ -302,26 +302,6 @@ func (s *instructionStore) flushResidentOnCloseOnly() error {
 		return nil
 	}
 
-	relationIDs := make(map[int64]struct{})
-	s.resident.ForEach(func(_ int64, inst Instruction) bool {
-		ir, err := marshalIrCode(inst)
-		if err != nil || ir == nil {
-			return true
-		}
-		for _, id := range relationInstructionIDs(ir) {
-			relationIDs[id] = struct{}{}
-		}
-		return true
-	})
-	for id := range relationIDs {
-		if _, ok := s.resident.Get(id); ok {
-			continue
-		}
-		if inst, err := s.loadInstruction(id); err == nil && inst != nil {
-			s.resident.Set(id, inst)
-		}
-	}
-
 	saveBatch := saveInstructionIrCodesFast(s.program, s.db, s.notifyProgress)
 	batch := make([]*ssadb.IrCode, 0, s.saveSize)
 	var flushErr error
@@ -447,6 +427,7 @@ func (s *instructionStore) expandRelationPersistRecords(records []*instructionPe
 	if s == nil || s.program == nil || s.program.Cache == nil || len(records) == 0 {
 		return records
 	}
+	resident := s.GetAllResident()
 	expanded := make([]*instructionPersistRecord, 0, len(records)*2)
 	queued := make(map[int64]struct{}, len(records)*2)
 	appendRecord := func(record *instructionPersistRecord) {
@@ -469,7 +450,7 @@ func (s *instructionStore) expandRelationPersistRecords(records []*instructionPe
 			if _, ok := queued[id]; ok {
 				continue
 			}
-			linked := s.program.Cache.GetInstruction(id)
+			linked := resident[id]
 			if linked == nil {
 				continue
 			}
@@ -625,10 +606,8 @@ func instructionLocationIDs(inst Instruction) (funcID, blockID int64) {
 		}
 		if inner := inst.getAnInstruction(); inner != nil {
 			funcID = inner.funcId
-		}
-		if funcID <= 0 {
-			if fn := inst.GetFunc(); fn != nil {
-				funcID = fn.GetId()
+			if funcID <= 0 && inner.fun != nil {
+				funcID = inner.fun.GetId()
 			}
 		}
 		return funcID, inst.GetId()

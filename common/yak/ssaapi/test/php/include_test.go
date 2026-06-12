@@ -60,6 +60,46 @@ include('files/'.$action.'.php'); //载入相应文件
 	})
 }
 
+func TestPHPIncludeUnknownCallKeepsMiddleDataflow(t *testing.T) {
+	code := `<?php
+$a = $_GET['a'] ?: "aaaa";
+include(xxx($a));
+`
+	ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+		results, err := prog.SyntaxFlowWithError(`
+<include('php-param')> as $params;
+<include('php-tp-all-extern-variable-param-source')> as $params
+<include('php-filter-function')> as $filter;
+
+include(* as $allParams);
+$allParams?{<self> #{include:<<<CODE
+* & $params
+CODE
+}->} as $sink
+
+$sink<dataflow(include=<<<CODE
+* & $params as $__next__
+CODE,exclude=<<<CODE
+*?{opcode: call} as $__next__
+CODE)> as $high
+
+$sink<dataflow(include=<<<CODE
+* & $params as $__next__
+CODE,exclude=<<<CODE
+*?{opcode: call && <self><getCallee> & $filter} as $__next__
+CODE)> as $highAndMid
+
+$highAndMid - $high as $middle
+`)
+		require.NoError(t, err)
+		require.Empty(t, results.GetValues("high"))
+		middle := results.GetValues("middle")
+		require.NotEmpty(t, middle)
+		require.Contains(t, middle.String(), "Undefined-xxx")
+		return nil
+	}, ssaapi.WithLanguage(ssaconfig.PHP))
+}
+
 func TestPHPIncludeOtherFile(t *testing.T) {
 	tmpDir := t.TempDir()
 

@@ -78,14 +78,22 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) (v ssa.Value
 		if parent == nil {
 			parent = y.EmitConstInstPlaceholder(text)
 		}
-		currentBlueprint := y.Function.GetCurrentBlueprint()
-		if currentBlueprint != nil {
-			parentBlueprint := currentBlueprint.GetSuperBlueprint()
-			if parentBlueprint != nil {
-				parent.SetType(parentBlueprint)
-				key := y.VisitMemberCallKey(ret.MemberCallKey())
+		if parentBlueprint := y.currentParentBlueprint(); parentBlueprint != nil {
+			parent.SetType(parentBlueprint)
+			key := y.VisitMemberCallKey(ret.MemberCallKey())
+			keyText := ssa.GetKeyString(key)
+			if keyText == "" && !utils.IsNil(key) {
+				keyText = key.String()
+			}
+			if keyText != "" {
 				if y.isFunction {
+					if method := y.readParentClassStaticMethod(parentBlueprint, keyText); !utils.IsNil(method) {
+						return method
+					}
 					return y.ReadMemberCallMethod(parent, key)
+				}
+				if member := y.readParentClassMember(parentBlueprint, keyText); !utils.IsNil(member) {
+					return member
 				}
 				return y.ReadMemberCallValue(parent, key)
 			}
@@ -1180,15 +1188,46 @@ func (y *builder) VisitFunctionCall(raw phpparser.IFunctionCallContext) ssa.Valu
 	v := y.VisitFunctionCallName(i.FunctionCallName())
 	var c *ssa.Call
 	args, ellipsis := y.VisitActualArguments(i.ActualArguments())
+	unresolvedCall := false
 	if utils.IsNil(v) {
 		v = y.EmitUndefined(i.GetText())
+		unresolvedCall = true
+	} else if v.GetOpcode() == ssa.SSAOpcodeUndefined {
+		unresolvedCall = true
 	}
 	if _, exit := y.GetProgram().ExternInstance[strings.ToLower(v.String())]; exit {
+		unresolvedCall = false
 		c = y.NewCall(y.EmitConstInstPlaceholder(strings.ToLower(v.String())), args)
 	} else {
 		c = y.NewCall(v, args)
 	}
 	c.IsEllipsis = ellipsis
+	if unresolvedCall {
+		seen := make(map[int64]struct{})
+		var addMaskSource func(ssa.Value, int)
+		addMaskSource = func(value ssa.Value, depth int) {
+			if utils.IsNil(value) {
+				return
+			}
+			id := value.GetId()
+			if id > 0 {
+				if _, ok := seen[id]; ok {
+					return
+				}
+				seen[id] = struct{}{}
+			}
+			c.AddMask(value)
+			if depth <= 0 {
+				return
+			}
+			for _, subValue := range value.GetValues() {
+				addMaskSource(subValue, depth-1)
+			}
+		}
+		for _, arg := range args {
+			addMaskSource(arg, 2)
+		}
+	}
 	return y.EmitCall(c)
 }
 
@@ -1245,9 +1284,10 @@ func (y *builder) VisitFunctionCallName(raw phpparser.IFunctionCallNameContext) 
 			}
 			if key != "" {
 				parent := y.EmitConstInstPlaceholder("parent")
-				if y.MarkedThisClassBlueprint != nil {
-					if bp := y.MarkedThisClassBlueprint.GetSuperBlueprint(); bp != nil {
-						parent.SetType(bp)
+				if bp := y.currentParentBlueprint(); bp != nil {
+					parent.SetType(bp)
+					if method := y.readParentClassStaticMethod(bp, key); !utils.IsNil(method) {
+						return method
 					}
 				}
 				return y.ReadMemberCallMethod(parent, y.EmitConstInstPlaceholder(key))
@@ -1769,6 +1809,9 @@ func (y *builder) VisitRightValue(raw phpparser.IFlexiVariableContext) ssa.Value
 		} else if force_create != "" {
 			createVariable := y.CreateVariable(force_create)
 			val := y.EmitUndefined(force_create)
+			for _, source := range y.consumeDynamicVariableSources(variable) {
+				val.AddMask(source)
+			}
 			y.AssignVariable(createVariable, val)
 			return applyVariableSquareCurly(val, i.Variable())
 		}
@@ -1809,18 +1852,32 @@ func (y *builder) VisitVariable(raw phpparser.IVariableContext) string {
 	case *phpparser.DynamicVariableContext:
 		id := ret.VarName().GetText()
 		var value ssa.Value
+		dynamicVariableName := func(value ssa.Value) string {
+			if constInst, ok := ssa.ToConstInst(value); ok {
+				if raw, ok := constInst.GetRawValue().(string); ok {
+					return raw
+				}
+			}
+			return yakunquote.TryUnquote(strings.TrimPrefix(value.String(), "$"))
+		}
 		for i := range ret.AllDollar() {
 			_ = i
 			value = y.ReadValue(id)
+			if utils.IsNil(value) {
+				value = y.EmitUndefined(id)
+			}
 			if value.IsUndefined() {
 				var varName = fmt.Sprintf("dollar%v", y.fetchDollarId())
+				dynamic := y.EmitUndefined(varName)
+				dynamic.AddMask(value)
 				variable := y.CreateVariable(varName)
-				y.AssignVariable(variable, value)
+				y.AssignVariable(variable, dynamic)
 				return varName
 			}
-			id = "$" + value.String()
+			id = "$" + dynamicVariableName(value)
+			y.recordDynamicVariableSource(id, value)
 		}
-		return "$" + value.String()
+		return id
 	case *phpparser.MemberCallVariableContext:
 		value := y.VisitExpression(ret.Expression())
 		// TODO: handler this
