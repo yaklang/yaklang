@@ -218,7 +218,8 @@ func TestYakRunnerProtocol_3_FullFreeInputModifyWithAllAttachments(t *testing.T)
 
 	disk, readErr := os.ReadFile(yakPath)
 	require.NoError(t, readErr)
-	require.Contains(t, string(disk), `// timeout was 60`)
+	require.Contains(t, string(disk), `// timeout was 30`, "disk must stay unchanged until frontend accepts")
+	require.NotContains(t, string(disk), `// timeout was 60`)
 
 	require.GreaterOrEqual(t, len(result.codeChangeEvents), 1, "should emit yaklang_code_change when loop finishes")
 }

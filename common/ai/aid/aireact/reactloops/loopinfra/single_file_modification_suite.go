@@ -45,8 +45,9 @@ type SingleFileModificationSuiteFactory struct {
 	eventType string
 
 	// Behavior flags
-	exitAfterWrite        bool // whether to call operator.Exit() after successful write (default: true)
-	exitWhenSyntaxClean   bool // whether to call operator.Exit() after modify/insert/delete when syntax check passes
+	exitAfterWrite      bool // whether to call operator.Exit() after successful write (default: true)
+	exitWhenSyntaxClean bool // whether to call operator.Exit() after modify/insert/delete when syntax check passes
+	deferDiskWrite      bool // keep code in loop memory only; frontend writes disk after user accepts diff
 }
 
 // SingleFileModificationOption is an option for configuring the factory
@@ -170,6 +171,18 @@ func WithExitWhenSyntaxClean(exit bool) SingleFileModificationOption {
 
 func (f *SingleFileModificationSuiteFactory) ShouldExitWhenSyntaxClean() bool {
 	return f.exitWhenSyntaxClean
+}
+
+// WithDeferDiskWrite skips os.WriteFile in write/modify/insert/delete actions.
+// Loop state and yaklang_code_change events still update; the frontend applies to disk after review.
+func WithDeferDiskWrite(deferWrite bool) SingleFileModificationOption {
+	return func(f *SingleFileModificationSuiteFactory) {
+		f.deferDiskWrite = deferWrite
+	}
+}
+
+func (f *SingleFileModificationSuiteFactory) ShouldDeferDiskWrite() bool {
+	return f.deferDiskWrite
 }
 
 func (f *SingleFileModificationSuiteFactory) applySyntaxLintResult(

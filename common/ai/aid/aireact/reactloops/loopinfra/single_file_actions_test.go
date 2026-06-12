@@ -546,3 +546,62 @@ func TestDeleteAction_DeleteRangeAndErrorTimeline(t *testing.T) {
 	})
 }
 
+func TestWriteAction_DeferDiskWrite_SkipsFileCreation(t *testing.T) {
+	runtime := newTestRuntimeForSingleFile(t)
+	loop, factory, task := newLoopAndFactory(t, runtime,
+		WithActionSuffix("code"),
+		WithFileExtension(".yak"),
+		WithDeferDiskWrite(true),
+	)
+	actionName := factory.GetActionName("write")
+	codeVar := factory.GetCodeVariableName()
+	filenameVar := factory.GetFilenameVariableName()
+	loop.Set(codeVar, "println(\"ok\")")
+
+	action := mustBuildAction(t, actionName, nil)
+	ac, err := loop.GetActionHandler(actionName)
+	require.NoError(t, err)
+	op := reactloops.NewActionHandlerOperator(task)
+	ac.ActionHandler(loop, action, op)
+
+	filename := loop.Get(filenameVar)
+	require.NotEmpty(t, filename)
+	assert.Equal(t, "println(\"ok\")", loop.Get(factory.GetFullCodeVariableName()))
+	if _, statErr := os.Stat(filename); statErr == nil {
+		data, readErr := os.ReadFile(filename)
+		require.NoError(t, readErr)
+		assert.Empty(t, data)
+	}
+	assert.True(t, runtime.timelineContains("write_success"))
+	assert.True(t, runtime.timelineContentContains("write_success", "disk write deferred"))
+}
+
+func TestModifyAction_DeferDiskWrite_PreservesExistingFile(t *testing.T) {
+	runtime := newTestRuntimeForSingleFile(t)
+	filename := filepath.Join(runtime.tmpDir, "existing.yak")
+	require.NoError(t, os.WriteFile(filename, []byte("a\nold\nc"), 0644))
+
+	loop, factory, task := newLoopAndFactory(t, runtime,
+		WithActionSuffix("code"),
+		WithDeferDiskWrite(true),
+	)
+	loop.Set(factory.GetFilenameVariableName(), filename)
+	loop.Set(factory.GetFullCodeVariableName(), "a\nold\nc")
+	loop.Set(factory.GetCodeVariableName(), "new")
+
+	ac, err := loop.GetActionHandler(factory.GetActionName("modify"))
+	require.NoError(t, err)
+	action := mustBuildAction(t, factory.GetActionName("modify"), map[string]any{
+		"modify_start_line": 2,
+		"modify_end_line":   2,
+	})
+	op := reactloops.NewActionHandlerOperator(task)
+	ac.ActionHandler(loop, action, op)
+
+	diskContent, readErr := os.ReadFile(filename)
+	require.NoError(t, readErr)
+	assert.Equal(t, "a\nold\nc", string(diskContent))
+	assert.Contains(t, loop.Get(factory.GetFullCodeVariableName()), "new")
+	assert.True(t, runtime.timelineContentContains("modify_success", "disk write deferred"))
+}
+

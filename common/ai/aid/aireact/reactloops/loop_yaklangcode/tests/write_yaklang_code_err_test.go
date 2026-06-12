@@ -6,7 +6,6 @@ import (
 	"os"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -142,32 +141,8 @@ func TestFocusMode_WriteYaklangCodeCauseErrorAndThenModify(t *testing.T) {
 		}
 	}()
 
-	// Syntax-error scenario may never finish the loop; wait until modify is persisted to disk.
-	deadline := time.After(focusModeWriteYaklangTestTimeout())
-	var filenames []string
-	var fileContent string
-waitModify:
-	for {
-		select {
-		case e := <-out:
-			if e.Type == string(schema.EVENT_TYPE_FILESYSTEM_PIN_FILENAME) {
-				content := string(e.GetContent())
-				filenames = append(filenames, utils.InterfaceToString(jsonpath.FindFirst(content, "$.path")))
-			}
-		case <-deadline:
-			break waitModify
-		default:
-			if name := findGenCodeFilename(filenames); name != "" {
-				if data, err := os.ReadFile(name); err == nil {
-					fileContent = string(data)
-					if strings.Contains(fileContent, "modifiedcodecodecode") {
-						break waitModify
-					}
-				}
-			}
-			time.Sleep(50 * time.Millisecond)
-		}
-	}
+	// Syntax-error scenario may never finish the loop; wait for deferred yaklang_code_change instead of disk.
+	waitResult := waitForYaklangDeferredEditorSync(out, focusModeWriteYaklangTestTimeout())
 	close(in)
 	ins.Wait()
 
@@ -175,16 +150,22 @@ waitModify:
 		t.Fatal("mock modify_code was not invoked before timeout")
 	}
 
-	filename := findGenCodeFilename(filenames)
+	if len(waitResult.codeChangeEvents) > 0 {
+		lastChange := waitResult.codeChangeEvents[len(waitResult.codeChangeEvents)-1]
+		finalContent := utils.InterfaceToString(jsonpath.FindFirst(string(lastChange.GetContent()), "$.code.content"))
+		if !strings.Contains(finalContent, "modifiedcodecodecode") {
+			t.Fatalf("deferred yaklang_code_change content mismatch: %q", finalContent)
+		}
+	}
+
+	filename := findGenCodeFilename(waitResult.filenames)
 	if filename == "" {
 		t.Fatal("gen_code_ filename not found")
 	}
-	if fileContent == "" {
-		data, err := os.ReadFile(filename)
-		if err != nil {
-			t.Fatal(err)
+	if _, err := os.Stat(filename); err == nil {
+		if data, readErr := os.ReadFile(filename); readErr == nil && len(data) > 0 {
+			t.Fatalf("disk should not be written during loop; found %d bytes in %s", len(data), filename)
 		}
-		fileContent = string(data)
 	}
 
 	fmt.Println("--------------------------------------")
@@ -192,10 +173,6 @@ waitModify:
 	fmt.Println(tl)
 	fmt.Println("--------------------------------------")
 
-	fmt.Println(fileContent)
-	if !strings.Contains(fileContent, "modifiedcodecodecode") {
-		t.Fatal("modified code not match")
-	}
 	if !haveError {
 		t.Fatal("should have error, but not found, maybe the write_code then check syntax not work?")
 	}

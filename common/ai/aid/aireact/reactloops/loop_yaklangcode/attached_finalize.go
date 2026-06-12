@@ -57,14 +57,7 @@ func finalizeYaklangInitFileTarget(
 		log.Infof("identified target path: %s (attached=%v, attached_code=%v)", targetPath, fromAttached, hasAttachedCode)
 		filename := utils.GetFirstExistedFile(targetPath)
 		if filename == "" {
-			seed := []byte("")
-			if hasAttachedCode {
-				seed = []byte(attachedCode)
-			}
-			if createFileErr := os.WriteFile(targetPath, seed, 0644); createFileErr != nil {
-				operator.Failed(utils.Errorf("cannot create file to disk, failed: %v", createFileErr))
-				return
-			}
+			// Target file may not exist yet; keep edits in loop memory until the user accepts in the editor.
 			filename = targetPath
 		}
 
