@@ -36,6 +36,25 @@ func (ir *IrType) Save(db *gorm.DB) error {
 	return db.Save(ir).Error
 }
 
+func UpsertIrType(db *gorm.DB, ir *IrType) error {
+	if db == nil || ir == nil {
+		return nil
+	}
+	record := &IrType{
+		ProgramName: ir.ProgramName,
+		TypeId:      ir.TypeId,
+	}
+	if err := db.Where("program_name = ? AND type_id = ?", ir.ProgramName, ir.TypeId).
+		Assign(ir).
+		FirstOrCreate(record).Error; err != nil {
+		return err
+	}
+	if cache := GetIrTypeCache(ir.ProgramName); cache != nil {
+		cache.Set(int64(ir.TypeId), ir)
+	}
+	return nil
+}
+
 func EmptyIrType(progName string, id uint64) *IrType {
 	return &IrType{
 		ProgramName: progName,

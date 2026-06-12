@@ -16,11 +16,13 @@ type lazyTask struct {
 
 // LazyBuilder 是一个并发安全、内存安全的延迟执行器
 type LazyBuilder struct {
-	_lazybuild_name string
-	tasks           []lazyTask
-	mu              sync.RWMutex
-	build           atomic.Bool
-	unitProvider    func() string
+	_lazybuild_name  string
+	tasks            []lazyTask
+	mu               sync.RWMutex
+	build            atomic.Bool
+	unitProvider     func() string
+	unitTaskObserver func(string, *LazyBuilder)
+	unitTaskRunner   func(string, func())
 }
 
 // NewLazyBuilder 创建一个新的 LazyBuilder 实例
@@ -41,6 +43,24 @@ func (l *LazyBuilder) SetUnitProvider(provider func() string) {
 	l.unitProvider = provider
 }
 
+func (l *LazyBuilder) SetUnitTaskObserver(observer func(string, *LazyBuilder)) {
+	if l == nil {
+		return
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.unitTaskObserver = observer
+}
+
+func (l *LazyBuilder) SetUnitTaskRunner(runner func(string, func())) {
+	if l == nil {
+		return
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.unitTaskRunner = runner
+}
+
 func (l *LazyBuilder) currentUnitKey() string {
 	if l == nil || l.unitProvider == nil {
 		return ""
@@ -55,10 +75,14 @@ func (l *LazyBuilder) AddLazyBuilder(work func(), async ...bool) {
 		log.Errorf("LazyBuilder is nil")
 		return
 	}
+	unitKey := l.currentUnitKey()
 	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	l.tasks = append(l.tasks, lazyTask{work: work, unitKey: l.currentUnitKey()})
+	l.tasks = append(l.tasks, lazyTask{work: work, unitKey: unitKey})
+	observer := l.unitTaskObserver
+	l.mu.Unlock()
+	if observer != nil {
+		observer(unitKey, l)
+	}
 }
 
 // Build 执行所有已添加的任务，该方法在整个生命周期中只会有效执行一次。
@@ -120,6 +144,7 @@ func (l *LazyBuilder) BuildForUnits(units map[string]struct{}) bool {
 		return false
 	}
 	l.tasks = remaining
+	runner := l.unitTaskRunner
 	l.mu.Unlock()
 
 	defer func() {
@@ -131,7 +156,11 @@ func (l *LazyBuilder) BuildForUnits(units map[string]struct{}) bool {
 
 	for _, task := range tasksToRun {
 		if task.work != nil {
-			task.work()
+			if runner != nil {
+				runner(task.unitKey, task.work)
+			} else {
+				task.work()
+			}
 		}
 	}
 	return true
@@ -212,18 +241,24 @@ func (p *Program) LazyBuildForUnits(unitKeys []string) {
 		return
 	}
 	units := make(map[string]struct{}, len(unitKeys))
+	unitOrder := make([]string, 0, len(unitKeys))
 	for _, unitKey := range unitKeys {
-		if unitKey != "" {
-			units[unitKey] = struct{}{}
+		if unitKey == "" {
+			continue
 		}
+		if _, ok := units[unitKey]; ok {
+			continue
+		}
+		units[unitKey] = struct{}{}
+		unitOrder = append(unitOrder, unitKey)
 	}
 	if len(units) == 0 {
 		return
 	}
-	p.lazyBuildForUnits(units, make(map[*Program]struct{}))
+	p.lazyBuildForUnits(unitOrder, units, make(map[*Program]struct{}))
 }
 
-func (p *Program) lazyBuildForUnits(units map[string]struct{}, visitedPrograms map[*Program]struct{}) {
+func (p *Program) lazyBuildForUnits(unitOrder []string, units map[string]struct{}, visitedPrograms map[*Program]struct{}) {
 	if p == nil || len(units) == 0 {
 		return
 	}
@@ -232,40 +267,58 @@ func (p *Program) lazyBuildForUnits(units map[string]struct{}, visitedPrograms m
 	}
 	visitedPrograms[p] = struct{}{}
 
-	for _, key := range p.Blueprint.Keys() {
-		blueprint, ok := p.Blueprint.Get(key)
-		if !ok || blueprint == nil {
-			continue
+	if builders, indexed := p.lazyBuildersForUnitSet(unitOrder, units); indexed {
+		for {
+			if len(builders) == 0 {
+				break
+			}
+			built := false
+			for _, builder := range builders {
+				if p.runLazyBuilderForUnits(builder, nil, units) {
+					built = true
+				}
+			}
+			if !built {
+				break
+			}
+			builders, _ = p.lazyBuildersForUnitSet(unitOrder, units)
 		}
-		p.runLazyBuilderForUnits(blueprint.LazyBuilder, blueprint.Range, units)
-	}
-	visited := make(map[*Function]struct{})
-	var stack []*Function
-	for _, key := range p.Funcs.Keys() {
-		fun, ok := p.Funcs.Get(key)
-		if !ok || fun == nil {
-			continue
-		}
-		stack = append(stack, fun)
-	}
-	for len(stack) > 0 {
-		fun := stack[len(stack)-1]
-		stack = stack[:len(stack)-1]
-		if fun == nil {
-			continue
-		}
-		if _, ok := visited[fun]; ok {
-			continue
-		}
-		visited[fun] = struct{}{}
-		p.runLazyBuilderForUnits(fun.LazyBuilder, fun.GetRange(), units)
-		for _, childID := range fun.ChildFuncs {
-			childValue, ok := fun.GetValueById(childID)
-			if !ok || childValue == nil {
+	} else {
+		for _, key := range p.Blueprint.Keys() {
+			blueprint, ok := p.Blueprint.Get(key)
+			if !ok || blueprint == nil {
 				continue
 			}
-			if childFunc, ok := ToFunction(childValue); ok && childFunc != nil {
-				stack = append(stack, childFunc)
+			p.runLazyBuilderForUnits(blueprint.LazyBuilder, blueprint.Range, units)
+		}
+		visited := make(map[*Function]struct{})
+		var stack []*Function
+		for _, key := range p.Funcs.Keys() {
+			fun, ok := p.Funcs.Get(key)
+			if !ok || fun == nil {
+				continue
+			}
+			stack = append(stack, fun)
+		}
+		for len(stack) > 0 {
+			fun := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+			if fun == nil {
+				continue
+			}
+			if _, ok := visited[fun]; ok {
+				continue
+			}
+			visited[fun] = struct{}{}
+			p.runLazyBuilderForUnits(fun.LazyBuilder, fun.GetRange(), units)
+			for _, childID := range fun.ChildFuncs {
+				childValue, ok := fun.GetValueById(childID)
+				if !ok || childValue == nil {
+					continue
+				}
+				if childFunc, ok := ToFunction(childValue); ok && childFunc != nil {
+					stack = append(stack, childFunc)
+				}
 			}
 		}
 	}
@@ -277,7 +330,7 @@ func (p *Program) lazyBuildForUnits(units map[string]struct{}, visitedPrograms m
 		return true
 	})
 	for _, child := range children {
-		child.lazyBuildForUnits(units, visitedPrograms)
+		child.lazyBuildForUnits(unitOrder, units, visitedPrograms)
 	}
 }
 

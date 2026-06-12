@@ -22,8 +22,8 @@ const (
 	// Persist limit stays >= 4x batch so dbcache eviction backpressure matches writer.
 	largeProjectInstructionSave = 4096
 	largeProjectPersistLimit    = 32768
-	largeProjectAuxiliarySave    = 512
-	largeProjectTypeSave         = 256
+	largeProjectAuxiliarySave   = 512
+	largeProjectTypeSave        = 256
 )
 
 var hotInstructionOpcodeBlacklist = map[Opcode]struct{}{
@@ -54,6 +54,23 @@ func shouldKeepInstructionResident(inst Instruction) bool {
 	return ok
 }
 
+func shouldKeepCompileUnitBoundaryResident(inst Instruction) bool {
+	if utils.IsNil(inst) {
+		return false
+	}
+	switch inst.GetOpcode() {
+	case SSAOpcodeFunction,
+		SSAOpcodeParameter,
+		SSAOpcodeFreeValue,
+		SSAOpcodeParameterMember,
+		SSAOpcodeSideEffect,
+		SSAOpcodeExternLib:
+		return true
+	default:
+		return false
+	}
+}
+
 func shouldDelayInstructionEviction(inst Instruction) bool {
 	if utils.IsNil(inst) {
 		return true
@@ -67,6 +84,9 @@ func shouldDelayInstructionEviction(inst Instruction) bool {
 
 func useAdaptiveInstructionFastPath(cfg *ssaconfig.Config) bool {
 	cfg = ensureProgramConfig(cfg)
+	if cfg.GetCompileUnitSplit() {
+		return false
+	}
 	ttl, maxEntries := resolveInstructionCacheSettings(cfg)
 	return ttl == 0 &&
 		maxEntries == 0 &&
@@ -107,7 +127,7 @@ func resolveInstructionCacheSettings(cfg *ssaconfig.Config) (time.Duration, int)
 	cfg = ensureProgramConfig(cfg)
 	ttl := cfg.GetCompileIrCacheTTL()
 	maxEntries := cfg.GetCompileIrCacheMax()
-	if ttl == time.Second && maxEntries == 5000 && cfg.GetCompileProjectBytes() > 0 && cfg.GetCompileProjectBytes() <= fastPathProjectByteThreshold {
+	if ttl == time.Second && maxEntries == 5000 && !cfg.GetCompileUnitSplit() && cfg.GetCompileProjectBytes() > 0 && cfg.GetCompileProjectBytes() <= fastPathProjectByteThreshold {
 		return 0, 0
 	}
 	if ttl == time.Second && maxEntries == 5000 && cfg.GetCompileProjectBytes() >= largeProjectByteThreshold {

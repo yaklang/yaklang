@@ -60,7 +60,7 @@ func NewProgram(
 	}
 
 	prog.GlobalVariablesBlueprint = NewBlueprint("__GlobalVariables__")
-	prog.GlobalVariablesBlueprint.LazyBuilder.SetUnitProvider(prog.CurrentCompileUnit)
+	prog.BindLazyBuilderUnit(prog.GlobalVariablesBlueprint.LazyBuilder)
 	prog.GlobalVariablesBlueprint.SetKind(BlueprintClass)
 	prog.Blueprint.Set("__GlobalVariables__", prog.GlobalVariablesBlueprint)
 
@@ -109,6 +109,106 @@ func (prog *Program) CurrentCompileUnit() string {
 		app = prog
 	}
 	return app.currentCompileUnit
+}
+
+func (prog *Program) BindLazyBuilderUnit(lb *LazyBuilder) {
+	if prog == nil || lb == nil {
+		return
+	}
+	lb.SetUnitProvider(prog.CurrentCompileUnit)
+	lb.SetUnitTaskObserver(func(unitKey string, builder *LazyBuilder) {
+		prog.registerLazyBuilderForUnit(unitKey, builder)
+	})
+	lb.SetUnitTaskRunner(func(unitKey string, work func()) {
+		prog.runWithCompileUnit(unitKey, work)
+	})
+}
+
+func (prog *Program) runWithCompileUnit(unitKey string, work func()) {
+	if prog == nil || work == nil {
+		return
+	}
+	if unitKey == "" {
+		work()
+		return
+	}
+	app := prog.GetApplication()
+	if app == nil {
+		app = prog
+	}
+	previousUnit := app.currentCompileUnit
+	app.currentCompileUnit = unitKey
+	defer func() {
+		app.currentCompileUnit = previousUnit
+	}()
+	work()
+}
+
+func (prog *Program) registerLazyBuilderForUnit(unitKey string, lb *LazyBuilder) {
+	if prog == nil || lb == nil || unitKey == "" {
+		return
+	}
+	app := prog.GetApplication()
+	if app == nil {
+		app = prog
+	}
+	app.lazyUnitMu.Lock()
+	defer app.lazyUnitMu.Unlock()
+	if app.lazyBuildersByUnit == nil {
+		app.lazyBuildersByUnit = make(map[string][]*LazyBuilder)
+	}
+	if app.lazyBuilderUnitSet == nil {
+		app.lazyBuilderUnitSet = make(map[string]map[*LazyBuilder]struct{})
+	}
+	builders := app.lazyBuilderUnitSet[unitKey]
+	if builders == nil {
+		builders = make(map[*LazyBuilder]struct{})
+		app.lazyBuilderUnitSet[unitKey] = builders
+	}
+	if _, exists := builders[lb]; exists {
+		return
+	}
+	builders[lb] = struct{}{}
+	app.lazyBuildersByUnit[unitKey] = append(app.lazyBuildersByUnit[unitKey], lb)
+}
+
+func (prog *Program) lazyBuildersForUnitSet(unitOrder []string, units map[string]struct{}) ([]*LazyBuilder, bool) {
+	if prog == nil || len(units) == 0 {
+		return nil, false
+	}
+	app := prog.GetApplication()
+	if app == nil {
+		app = prog
+	}
+	app.lazyUnitMu.Lock()
+	defer app.lazyUnitMu.Unlock()
+	if app.lazyBuildersByUnit == nil {
+		return nil, false
+	}
+	seen := make(map[*LazyBuilder]struct{})
+	builders := make([]*LazyBuilder, 0)
+	for _, unitKey := range unitOrder {
+		if unitKey == "" {
+			continue
+		}
+		if _, ok := units[unitKey]; !ok {
+			continue
+		}
+		for _, builder := range app.lazyBuildersByUnit[unitKey] {
+			if builder != nil {
+				if _, ok := seen[builder]; ok {
+					continue
+				}
+				seen[builder] = struct{}{}
+				builders = append(builders, builder)
+			}
+		}
+		delete(app.lazyBuildersByUnit, unitKey)
+		if app.lazyBuilderUnitSet != nil {
+			delete(app.lazyBuilderUnitSet, unitKey)
+		}
+	}
+	return builders, true
 }
 
 func NewTmpProgram(ProgramName string) *Program {
@@ -218,6 +318,7 @@ func cloneProgramConfig(base *ssaconfig.Config, programName string) *ssaconfig.C
 	}
 	if base != nil {
 		ret.SetCompileProjectBytes(base.GetCompileProjectBytes())
+		ret.SetCompileUnitSplit(base.GetCompileUnitSplit())
 	}
 	return ret
 }

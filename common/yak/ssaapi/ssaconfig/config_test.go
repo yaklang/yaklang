@@ -351,6 +351,7 @@ func TestDefaultFactoryFunctions(t *testing.T) {
 		require.Equal(t, time.Second, config.CompileIrCacheTTL)
 		require.Equal(t, 5000, config.CompileIrCacheMax)
 		require.False(t, config.Diagnostics)
+		require.False(t, config.CompileUnitSplit)
 	})
 
 	t.Run("defaultSyntaxFlowConfig", func(t *testing.T) {

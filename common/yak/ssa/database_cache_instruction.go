@@ -34,11 +34,15 @@ type instructionStore struct {
 
 	flushResidentOnClose bool
 	saveSize             int
+	residentFlushMu      sync.Mutex
+	residentPersisted    map[int64]struct{}
 
 	persistedCount atomic.Int64
 
 	progressMu sync.RWMutex
 	progressFn func(int)
+
+	compileUnitSplit bool
 }
 
 // instructionPersistRecord is the persisted form of a single instruction save
@@ -67,6 +71,8 @@ func newInstructionStore(
 		db:         db,
 		nextID:     atomic.NewInt64(0),
 		progressFn: func(int) {},
+
+		compileUnitSplit: cfg.GetCompileUnitSplit(),
 	}
 
 	switch mode {
@@ -93,6 +99,7 @@ func newInstructionStore(
 			store.resident = utils.NewSafeMapWithKey[int64, Instruction]()
 			store.flushResidentOnClose = true
 			store.saveSize = min(max(saveSize*20, 5000), maxSaveSize)
+			store.residentPersisted = make(map[int64]struct{})
 			return store
 		}
 
@@ -110,7 +117,9 @@ func newInstructionStore(
 			dbcache.WithSaveTimeout(saveTime),
 			dbcache.WithName("Instruction"),
 			dbcache.WithSkipEviction(func(inst Instruction) bool {
-				return shouldKeepInstructionResident(inst) || shouldDelayInstructionEviction(inst)
+				return shouldKeepInstructionResident(inst) ||
+					(store.compileUnitSplit && shouldKeepCompileUnitBoundaryResident(inst)) ||
+					shouldDelayInstructionEviction(inst)
 			}),
 		)
 	}
@@ -231,12 +240,31 @@ func (s *instructionStore) Flush() {
 	}
 	switch {
 	case s.writer != nil:
-		s.writer.Flush(utils.EvictionReasonCapacityReached)
+		if s.compileUnitSplit {
+			s.flushCompileUnitWriter()
+		} else {
+			s.writer.Flush(utils.EvictionReasonCapacityReached)
+		}
 	case s.flushResidentOnClose && s.resident != nil:
-		if err := s.flushResidentOnCloseOnly(); err != nil {
+		if err := s.flushResident(false); err != nil {
 			log.Errorf("flush resident instructions failed: %v", err)
 		}
 	}
+}
+
+func (s *instructionStore) flushCompileUnitWriter() {
+	if s == nil || s.writer == nil {
+		return
+	}
+	items := s.writer.GetAll()
+	ids := make([]int64, 0, len(items))
+	for id, inst := range items {
+		if shouldKeepCompileUnitBoundaryResident(inst) {
+			continue
+		}
+		ids = append(ids, id)
+	}
+	s.writer.FlushKeys(ids, utils.EvictionReasonCapacityReached)
 }
 
 func (s *instructionStore) GetAllResident() map[int64]Instruction {
@@ -306,6 +334,24 @@ func (s *instructionStore) Stats() dbcache.CacheStats {
 	}
 }
 
+func (s *instructionStore) ModeName() string {
+	if s == nil {
+		return "none"
+	}
+	switch {
+	case s.writer != nil:
+		return "writer"
+	case s.reader != nil:
+		return "reader"
+	case s.flushResidentOnClose:
+		return "resident-fast-path"
+	case s.resident != nil:
+		return "resident"
+	default:
+		return "none"
+	}
+}
+
 func (s *instructionStore) Close(progress func(int)) error {
 	if s == nil {
 		return nil
@@ -318,7 +364,13 @@ func (s *instructionStore) Close(progress func(int)) error {
 			return err
 		}
 	case s.flushResidentOnClose:
-		if err := s.flushResidentOnCloseOnly(); err != nil {
+		if len(s.residentPersisted) == 0 {
+			if err := s.flushResidentOnCloseOnly(); err != nil {
+				return err
+			}
+			break
+		}
+		if err := s.flushResident(true); err != nil {
 			return err
 		}
 	}
@@ -355,6 +407,75 @@ func (s *instructionStore) flushResidentOnCloseOnly() error {
 			return true
 		}
 		batch = append(batch, irCode)
+		if len(batch) >= s.saveSize {
+			flush()
+		}
+		return true
+	})
+	flush()
+	return flushErr
+}
+
+func (s *instructionStore) flushResident(final bool) error {
+	if s == nil || s.resident == nil || s.db == nil {
+		return nil
+	}
+	s.residentFlushMu.Lock()
+	defer s.residentFlushMu.Unlock()
+	if s.residentPersisted == nil {
+		s.residentPersisted = make(map[int64]struct{})
+	}
+
+	batch := make([]*instructionPersistRecord, 0, s.saveSize)
+	batchIDs := make([]int64, 0, s.saveSize)
+	var flushErr error
+	flush := func() {
+		if len(batch) == 0 {
+			return
+		}
+		if err := s.saveInstructionPersistRecords(batch); err != nil {
+			log.Errorf("save ir code batch fast path failed: %v", err)
+			flushErr = utils.JoinErrors(flushErr, err)
+		} else {
+			for _, id := range batchIDs {
+				if id > 0 {
+					s.residentPersisted[id] = struct{}{}
+				}
+			}
+		}
+		batch = make([]*instructionPersistRecord, 0, s.saveSize)
+		batchIDs = make([]int64, 0, s.saveSize)
+	}
+
+	s.resident.ForEach(func(id int64, inst Instruction) bool {
+		if utils.IsNil(inst) {
+			return true
+		}
+		codeID := inst.GetId()
+		if codeID <= 0 {
+			codeID = id
+		}
+		_, alreadyPersisted := s.residentPersisted[codeID]
+		if alreadyPersisted && !final {
+			return true
+		}
+		irCode, err := s.marshalIrCodeWithReason(inst, utils.EvictionReasonDeleted)
+		if err != nil {
+			log.Errorf("marshal ir code failed: %v", err)
+			flushErr = utils.JoinErrors(flushErr, err)
+			return true
+		}
+		if irCode == nil {
+			return true
+		}
+		batch = append(batch, &instructionPersistRecord{
+			IrCode:         irCode,
+			Opcode:         inst.GetOpcode(),
+			Reason:         utils.EvictionReasonDeleted,
+			UpdateExisting: final || alreadyPersisted,
+			CodeID:         codeID,
+		})
+		batchIDs = append(batchIDs, codeID)
 		if len(batch) >= s.saveSize {
 			flush()
 		}
@@ -645,4 +766,11 @@ func (c *ProgramCache) InstructionPersistedCount() int {
 		return 0
 	}
 	return int(c.instructions.PersistedCount())
+}
+
+func (c *ProgramCache) InstructionCacheMode() string {
+	if c == nil || c.instructions == nil {
+		return "none"
+	}
+	return c.instructions.ModeName()
 }

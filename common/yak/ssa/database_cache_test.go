@@ -41,6 +41,14 @@ func TestResolveInstructionCacheSettings(t *testing.T) {
 	ttl, maxEntries := resolveInstructionCacheSettings(cfg)
 	require.Equal(t, time.Duration(0), ttl)
 	require.Equal(t, 0, maxEntries)
+	require.True(t, useAdaptiveInstructionFastPath(cfg))
+
+	cfg.SetCompileUnitSplit(true)
+	ttl, maxEntries = resolveInstructionCacheSettings(cfg)
+	require.Equal(t, time.Second, ttl)
+	require.Equal(t, 5000, maxEntries)
+	require.False(t, useAdaptiveInstructionFastPath(cfg))
+	cfg.SetCompileUnitSplit(false)
 
 	cfg.SetCompileProjectBytes(8 * 1024 * 1024)
 	ttl, maxEntries = resolveInstructionCacheSettings(cfg)
@@ -79,13 +87,138 @@ func TestCloneProgramConfigKeepsCompileProjectBytes(t *testing.T) {
 	)
 	require.NoError(t, err)
 	cfg.SetCompileProjectBytes(largeProjectByteThreshold + 1024)
+	cfg.SetCompileUnitSplit(true)
 
 	cloned := cloneProgramConfig(cfg, "child")
 	require.NotNil(t, cloned)
 	require.Equal(t, cfg.GetCompileIrCacheTTL(), cloned.GetCompileIrCacheTTL())
 	require.Equal(t, cfg.GetCompileIrCacheMax(), cloned.GetCompileIrCacheMax())
 	require.Equal(t, cfg.GetCompileProjectBytes(), cloned.GetCompileProjectBytes())
+	require.Equal(t, cfg.GetCompileUnitSplit(), cloned.GetCompileUnitSplit())
 	require.Equal(t, "child", cloned.GetProgramName())
+}
+
+func TestCompileUnitWriterCacheSmallProjectUsesWriterCache(t *testing.T) {
+	fastProgramName := uuid.NewString()
+	defer ssadb.DeleteProgram(ssadb.GetDB(), fastProgramName)
+
+	fastCfg, err := ssaconfig.New(ssaconfig.ModeSSACompile, ssaconfig.WithSetProgramName(fastProgramName))
+	require.NoError(t, err)
+	fastCfg.SetCompileProjectBytes(fastPathProjectByteThreshold / 2)
+	fastProg := NewProgram(fastCfg, ProgramCacheDBWrite, Application, filesys.NewVirtualFs(), "", 1)
+	require.Equal(t, "resident-fast-path", fastProg.Cache.InstructionCacheMode())
+	require.True(t, fastProg.Cache.instructions.flushResidentOnClose)
+
+	splitProgramName := uuid.NewString()
+	defer ssadb.DeleteProgram(ssadb.GetDB(), splitProgramName)
+
+	splitCfg, err := ssaconfig.New(ssaconfig.ModeSSACompile, ssaconfig.WithSetProgramName(splitProgramName))
+	require.NoError(t, err)
+	splitCfg.SetCompileProjectBytes(fastPathProjectByteThreshold / 2)
+	splitCfg.SetCompileUnitSplit(true)
+	splitProg := NewProgram(splitCfg, ProgramCacheDBWrite, Application, filesys.NewVirtualFs(), "", 1)
+	require.Equal(t, "writer", splitProg.Cache.InstructionCacheMode())
+	require.False(t, splitProg.Cache.instructions.flushResidentOnClose)
+}
+
+func TestCompileUnitWriterFlushKeepsFunctionBoundaryResident(t *testing.T) {
+	programName := uuid.NewString()
+	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
+
+	cfg, err := ssaconfig.New(ssaconfig.ModeSSACompile, ssaconfig.WithSetProgramName(programName))
+	require.NoError(t, err)
+	cfg.SetCompileProjectBytes(fastPathProjectByteThreshold / 2)
+	cfg.SetCompileUnitSplit(true)
+
+	prog := NewProgram(cfg, ProgramCacheDBWrite, Application, filesys.NewVirtualFs(), "", 1)
+	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
+	param := builder.NewParam("arg")
+	left := builder.EmitUndefined("left")
+	right := builder.EmitUndefined("right")
+	bin := builder.EmitBinOp(OpAdd, left, right)
+	builder.Finish()
+
+	prog.Cache.FlushCompileUnit("unit-a")
+
+	require.True(t, prog.Cache.hasResidentInstruction(builder.Function.GetId()), "compile-unit function metadata must stay resident for later cross-unit calls")
+	require.True(t, prog.Cache.hasResidentInstruction(param.GetId()), "compile-unit parameters must stay resident for later cross-unit call argument binding")
+	require.False(t, prog.Cache.hasResidentInstruction(bin.GetId()), "ordinary expression instructions should still be flushed and released at unit boundary")
+
+	require.NoError(t, prog.Cache.SaveToDatabase())
+	require.NotNil(t, ssadb.GetIrCodeItemById(ssadb.GetDB(), programName, builder.Function.GetId()))
+	require.NotNil(t, ssadb.GetIrCodeItemById(ssadb.GetDB(), programName, param.GetId()))
+	require.NotNil(t, ssadb.GetIrCodeItemById(ssadb.GetDB(), programName, bin.GetId()))
+}
+
+func TestTypeFlushUpsertsExistingTypeRows(t *testing.T) {
+	programName := uuid.NewString()
+	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
+
+	cfg, err := ssaconfig.New(ssaconfig.ModeSSACompile, ssaconfig.WithSetProgramName(programName))
+	require.NoError(t, err)
+	cfg.SetCompileUnitSplit(true)
+
+	prog := NewProgram(cfg, ProgramCacheDBWrite, Application, filesys.NewVirtualFs(), "", 1)
+	typ := CreateStringType()
+	typ.AddFullTypeName("string")
+	prog.Cache.rememberType(typ)
+	prog.Cache.types.flush()
+
+	typ.AddFullTypeName("java.lang.String")
+	prog.Cache.types.flush()
+
+	var count int
+	err = ssadb.GetDB().
+		Model(&ssadb.IrType{}).
+		Where("program_name = ? AND type_id = ?", programName, typ.GetId()).
+		Count(&count).Error
+	require.NoError(t, err)
+	require.Equal(t, 1, count)
+
+	loaded := ssadb.GetIrTypeItemById(ssadb.GetDB(), programName, typ.GetId())
+	require.NotNil(t, loaded)
+	require.Contains(t, loaded.ExtraInformation, "string")
+	require.Contains(t, loaded.ExtraInformation, "java.lang.String")
+}
+
+func TestFastPathFlushCompileUnitDoesNotDuplicateIrRows(t *testing.T) {
+	programName := uuid.NewString()
+	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
+
+	cfg, err := ssaconfig.New(ssaconfig.ModeSSACompile, ssaconfig.WithSetProgramName(programName))
+	require.NoError(t, err)
+	cfg.SetCompileProjectBytes(fastPathProjectByteThreshold / 2)
+
+	prog := NewProgram(cfg, ProgramCacheDBWrite, Application, filesys.NewVirtualFs(), "", 1)
+	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
+	inst := builder.EmitUndefined("unit_flush")
+	instID := inst.GetId()
+	require.Greater(t, instID, int64(0))
+	require.True(t, prog.Cache.instructions.flushResidentOnClose, "fixture must exercise resident fast path")
+
+	prog.Cache.FlushCompileUnit("unit-a")
+	prog.Cache.FlushCompileUnit("unit-b")
+
+	countRows := func() int {
+		var count int
+		err := ssadb.GetDB().Model(&ssadb.IrCode{}).
+			Where("program_name = ? AND code_id = ?", programName, instID).
+			Count(&count).Error
+		require.NoError(t, err)
+		return count
+	}
+	require.Equal(t, 1, countRows(), "incremental compile-unit flush should not insert the same instruction twice")
+
+	inst.SetExtern(true)
+	require.NoError(t, prog.Cache.SaveToDatabase())
+	require.Equal(t, 1, countRows(), "final cache close should update the existing row instead of inserting another copy")
+
+	var ir ssadb.IrCode
+	err = ssadb.GetDB().Model(&ssadb.IrCode{}).
+		Where("program_name = ? AND code_id = ?", programName, instID).
+		First(&ir).Error
+	require.NoError(t, err)
+	require.True(t, ir.IsExternal, "final close should refresh rows saved by an earlier compile-unit flush")
 }
 
 func TestSaveEditorRegistersEditorBeforeClose(t *testing.T) {
@@ -142,6 +275,26 @@ func TestSourceStoreCloseDoesNotDuplicateRows(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, int64(1), count, "close should not duplicate an explicitly persisted source")
 	require.Equal(t, 0, prog.Cache.sources.EditorCount(), "close should release resident editors even when the row already exists")
+}
+
+func TestFlushCompileUnitReleasesPersistedEditors(t *testing.T) {
+	programName := uuid.NewString()
+	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
+
+	vf := filesys.NewVirtualFs()
+	prog := newProgramWithTTL(programName, 0, ProgramCacheDBWrite, vf)
+	editor := prog.CreateEditor([]byte("class Demo {}"), "/src/Demo.java", false)
+	hash := editor.GetIrSourceHash()
+	prog.SaveEditor(editor)
+
+	require.Equal(t, 1, prog.Cache.sources.EditorCount())
+	prog.Cache.FlushCompileUnit("unit-a")
+	require.Equal(t, 0, prog.Cache.sources.EditorCount(), "compile-unit source flush should release resident source text")
+
+	got, ok := prog.GetEditorByHash(hash)
+	require.True(t, ok, "flushed editors should reload from the persisted source row")
+	require.NotNil(t, got)
+	require.Equal(t, editor.GetSourceCode(), got.GetSourceCode())
 }
 
 func TestLazyInstructionSaveAgain(t *testing.T) {

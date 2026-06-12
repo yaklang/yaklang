@@ -1,11 +1,14 @@
 package ssaapi
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
 	"runtime/pprof"
+	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -20,7 +23,26 @@ import (
 // heapLogEnabled gates retained-heap phase logging. Set YAK_SSA_HEAP_LOG=1 to print
 // GC'd HeapInuse after each compile phase. Set YAK_SSA_HEAP_PROFILE_DIR=<dir> to write
 // a heap profile (pprof) after each phase (GC first).
-var heapLogEnabled = os.Getenv("YAK_SSA_HEAP_LOG") != ""
+var heapLogEnabled = envFlagEnabled("YAK_SSA_HEAP_LOG")
+
+const compileUnitWriterCacheEnv = "YAK_SSA_COMPILE_UNIT_WRITER_CACHE"
+const compileUnitHoldSCCIREnv = "YAK_SSA_COMPILE_UNIT_HOLD_SCC_IR"
+const compileUnitBatchMinFilesEnv = "YAK_SSA_COMPILE_UNIT_BATCH_MIN_FILES"
+const compileUnitBatchMinBytesEnv = "YAK_SSA_COMPILE_UNIT_BATCH_MIN_BYTES"
+
+const (
+	defaultCompileUnitBatchMinFiles = 512
+	defaultCompileUnitBatchMinBytes = 4 * 1024 * 1024
+	// Keep this in sync with the SSA IR cache resident fast-path threshold.
+	// Below this size, a single compile-unit batch is cheaper in resident mode
+	// than forcing the async writer cache.
+	compileUnitResidentFastPathMaxBytes = 2 * 1024 * 1024
+)
+
+func envFlagEnabled(name string) bool {
+	value := strings.ToLower(strings.TrimSpace(os.Getenv(name)))
+	return value != "" && value != "0" && value != "false" && value != "off"
+}
 
 func logPhaseHeap(tag string) {
 	if !heapLogEnabled && os.Getenv("YAK_SSA_HEAP_PROFILE_DIR") == "" {
@@ -53,6 +75,306 @@ func logPhaseHeap(tag string) {
 func normalizeHeapProfileName(tag string) string {
 	replacer := strings.NewReplacer("/", "_", " ", "_", ".", "_")
 	return replacer.Replace(tag)
+}
+
+func compileUnitLogEnabled() bool {
+	return envFlagEnabled("YAK_SSA_COMPILE_UNIT_LOG")
+}
+
+type compileUnitPlanLog struct {
+	Program       string                    `json:"program"`
+	Language      string                    `json:"language"`
+	SpillMode     string                    `json:"spill_mode"`
+	CacheMode     string                    `json:"cache_mode"`
+	WriterRequest bool                      `json:"writer_cache_requested"`
+	WriterEnabled bool                      `json:"writer_cache_enabled"`
+	Units         []compileUnitPlanUnitLog  `json:"units"`
+	Edges         []UnitRef                 `json:"edges"`
+	SCCOrder      [][]string                `json:"scc_order"`
+	Batches       []compileUnitPlanBatchLog `json:"batches"`
+	UnitCount     int                       `json:"unit_count"`
+	EdgeCount     int                       `json:"edge_count"`
+	SCCCount      int                       `json:"scc_count"`
+	BatchCount    int                       `json:"batch_count"`
+	BatchMinFiles int                       `json:"batch_min_files"`
+	BatchMinBytes int64                     `json:"batch_min_bytes"`
+}
+
+type compileUnitPlanUnitLog struct {
+	Key       string   `json:"key"`
+	Path      string   `json:"path"`
+	Language  string   `json:"language"`
+	Files     []string `json:"files"`
+	FileCount int      `json:"file_count"`
+	Bytes     int64    `json:"bytes"`
+}
+
+type compileUnitPlanBatchLog struct {
+	Index     int      `json:"index"`
+	SCCStart  int      `json:"scc_start"`
+	SCCEnd    int      `json:"scc_end"`
+	Units     []string `json:"units"`
+	UnitCount int      `json:"unit_count"`
+	FileCount int      `json:"file_count"`
+	Bytes     int64    `json:"bytes"`
+}
+
+type compileUnitExecutionBatch struct {
+	startSCC int
+	endSCC   int
+	units    []*CompileUnit
+	unitKeys []string
+	files    int
+	bytes    int64
+}
+
+func logCompileUnitPlan(
+	prog *ssa.Program,
+	language string,
+	plan *UnitPlan,
+	batches []compileUnitExecutionBatch,
+	batchMinFiles int,
+	batchMinBytes int64,
+	spillMode string,
+	cacheMode string,
+	writerRequested bool,
+	writerEnabled bool,
+) {
+	if prog == nil || plan == nil {
+		return
+	}
+	if !compileUnitLogEnabled() && os.Getenv("YAK_SSA_COMPILE_UNIT_LOG_DIR") == "" {
+		return
+	}
+	payload := buildCompileUnitPlanLog(prog.Name, language, plan, batches, batchMinFiles, batchMinBytes, spillMode, cacheMode, writerRequested, writerEnabled)
+	prog.ProcessInfof("[SSA/unit-plan] program=%s language=%s spill=%s cache=%s writer_requested=%v writer_enabled=%v units=%d edges=%d scc=%d batches=%d batch_min_files=%d batch_min_bytes=%d",
+		payload.Program, payload.Language, payload.SpillMode, payload.CacheMode, payload.WriterRequest, payload.WriterEnabled, payload.UnitCount, payload.EdgeCount, payload.SCCCount, payload.BatchCount, payload.BatchMinFiles, payload.BatchMinBytes)
+	if compileUnitLogEnabled() {
+		for _, unit := range payload.Units {
+			firstFile, lastFile := "", ""
+			if len(unit.Files) > 0 {
+				firstFile = unit.Files[0]
+				lastFile = unit.Files[len(unit.Files)-1]
+			}
+			prog.ProcessInfof("[SSA/unit-plan] unit key=%s path=%s files=%d bytes=%d first=%s last=%s",
+				unit.Key, unit.Path, unit.FileCount, unit.Bytes, firstFile, lastFile)
+		}
+		for _, edge := range payload.Edges {
+			prog.ProcessInfof("[SSA/unit-plan] edge from=%s to=%s kind=%s raw=%s", edge.From, edge.To, edge.Kind, edge.Raw)
+		}
+		for index, scc := range payload.SCCOrder {
+			prog.ProcessInfof("[SSA/unit-plan] scc(%d/%d) units=%s", index+1, len(payload.SCCOrder), strings.Join(scc, ","))
+		}
+		for _, batch := range payload.Batches {
+			prog.ProcessInfof("[SSA/unit-plan] batch(%d/%d) scc=%d-%d units=%d files=%d bytes=%d keys=%s",
+				batch.Index, payload.BatchCount, batch.SCCStart, batch.SCCEnd, batch.UnitCount, batch.FileCount, batch.Bytes, strings.Join(batch.Units, ","))
+		}
+	}
+	if dir := os.Getenv("YAK_SSA_COMPILE_UNIT_LOG_DIR"); dir != "" {
+		target, err := writeCompileUnitPlanLogFile(dir, payload)
+		if err != nil {
+			prog.ProcessInfof("[SSA/unit-plan] write failed file=%s error=%v", target, err)
+			return
+		}
+		prog.ProcessInfof("[SSA/unit-plan] wrote plan file=%s", target)
+	}
+}
+
+func writeCompileUnitPlanLogFile(dir string, payload compileUnitPlanLog) (string, error) {
+	if dir == "" {
+		return "", nil
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "", err
+	}
+	data, err := json.MarshalIndent(payload, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	target := filepath.Join(dir, normalizeHeapProfileName(payload.Program)+"-compile-unit-plan.json")
+	if err := os.WriteFile(target, data, 0o644); err != nil {
+		return target, err
+	}
+	return target, nil
+}
+
+func buildCompileUnitPlanLog(
+	program string,
+	language string,
+	plan *UnitPlan,
+	batches []compileUnitExecutionBatch,
+	batchMinFiles int,
+	batchMinBytes int64,
+	spillMode string,
+	cacheMode string,
+	writerRequested bool,
+	writerEnabled bool,
+) compileUnitPlanLog {
+	unitKeys := make([]string, 0, len(plan.Units))
+	for key := range plan.Units {
+		unitKeys = append(unitKeys, key)
+	}
+	sort.Strings(unitKeys)
+	units := make([]compileUnitPlanUnitLog, 0, len(unitKeys))
+	for _, key := range unitKeys {
+		unit := plan.Units[key]
+		if unit == nil {
+			continue
+		}
+		files := append([]string(nil), unit.Files...)
+		sort.Strings(files)
+		units = append(units, compileUnitPlanUnitLog{
+			Key:       unit.Key,
+			Path:      unit.Path,
+			Language:  fmt.Sprintf("%v", unit.Language),
+			Files:     files,
+			FileCount: len(files),
+			Bytes:     unit.Bytes,
+		})
+	}
+	order := make([][]string, 0, len(plan.Order))
+	for _, scc := range plan.Order {
+		keys := make([]string, 0, len(scc))
+		for _, unit := range scc {
+			if unit == nil {
+				continue
+			}
+			keys = append(keys, unit.Key)
+		}
+		sort.Strings(keys)
+		order = append(order, keys)
+	}
+	batchLogs := make([]compileUnitPlanBatchLog, 0, len(batches))
+	for index, batch := range batches {
+		keys := append([]string(nil), batch.unitKeys...)
+		batchLogs = append(batchLogs, compileUnitPlanBatchLog{
+			Index:     index + 1,
+			SCCStart:  batch.startSCC + 1,
+			SCCEnd:    batch.endSCC + 1,
+			Units:     keys,
+			UnitCount: len(keys),
+			FileCount: batch.files,
+			Bytes:     batch.bytes,
+		})
+	}
+	return compileUnitPlanLog{
+		Program:       program,
+		Language:      language,
+		SpillMode:     spillMode,
+		CacheMode:     cacheMode,
+		WriterRequest: writerRequested,
+		WriterEnabled: writerEnabled,
+		Units:         units,
+		Edges:         append([]UnitRef(nil), plan.Edges...),
+		SCCOrder:      order,
+		Batches:       batchLogs,
+		UnitCount:     len(plan.Units),
+		EdgeCount:     len(plan.Edges),
+		SCCCount:      len(plan.Order),
+		BatchCount:    len(batchLogs),
+		BatchMinFiles: batchMinFiles,
+		BatchMinBytes: batchMinBytes,
+	}
+}
+
+func compileUnitBatchThresholds() (int, int64) {
+	minFiles := defaultCompileUnitBatchMinFiles
+	if raw := strings.TrimSpace(os.Getenv(compileUnitBatchMinFilesEnv)); raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil {
+			minFiles = v
+		}
+	}
+	if minFiles <= 0 {
+		minFiles = 1
+	}
+
+	minBytes := int64(defaultCompileUnitBatchMinBytes)
+	if raw := strings.TrimSpace(os.Getenv(compileUnitBatchMinBytesEnv)); raw != "" {
+		switch strings.ToLower(raw) {
+		case "0", "false", "no", "off", "disable", "disabled":
+			minBytes = 0
+		default:
+			if v, err := utils.ToBytes(raw); err == nil {
+				minBytes = int64(v)
+			} else if v, err := strconv.ParseInt(raw, 10, 64); err == nil {
+				minBytes = v
+			}
+		}
+	}
+	if minBytes < 0 {
+		minBytes = 0
+	}
+	return minFiles, minBytes
+}
+
+func buildCompileUnitExecutionBatches(order [][]*CompileUnit, minFiles int, minBytes int64) []compileUnitExecutionBatch {
+	if len(order) == 0 {
+		return nil
+	}
+	if minFiles <= 0 {
+		minFiles = 1
+	}
+	if minBytes < 0 {
+		minBytes = 0
+	}
+
+	batches := make([]compileUnitExecutionBatch, 0, len(order))
+	current := compileUnitExecutionBatch{startSCC: -1, endSCC: -1}
+	flush := func() {
+		if len(current.units) == 0 {
+			current = compileUnitExecutionBatch{startSCC: -1, endSCC: -1}
+			return
+		}
+		batches = append(batches, current)
+		current = compileUnitExecutionBatch{startSCC: -1, endSCC: -1}
+	}
+
+	for sccIndex, scc := range order {
+		if current.startSCC < 0 {
+			current.startSCC = sccIndex
+		}
+		current.endSCC = sccIndex
+		for _, unit := range scc {
+			if unit == nil {
+				continue
+			}
+			current.units = append(current.units, unit)
+			current.unitKeys = append(current.unitKeys, unit.Key)
+			current.files += len(unit.Files)
+			current.bytes += unit.Bytes
+		}
+		if compileUnitBatchReady(current, minFiles, minBytes) {
+			flush()
+		}
+	}
+	flush()
+	return batches
+}
+
+func compileUnitBatchReady(batch compileUnitExecutionBatch, minFiles int, minBytes int64) bool {
+	if len(batch.units) == 0 {
+		return false
+	}
+	if minFiles <= 1 && minBytes <= 0 {
+		return true
+	}
+	if minFiles > 0 && batch.files >= minFiles {
+		return true
+	}
+	if minBytes > 0 && batch.bytes >= minBytes {
+		return true
+	}
+	return false
+}
+
+func compileUnitWriterCacheEnabled(requested bool, batches []compileUnitExecutionBatch, projectBytes int64) bool {
+	if !requested {
+		return false
+	}
+	if len(batches) > 1 {
+		return true
+	}
+	return projectBytes > compileUnitResidentFastPathMaxBytes
 }
 
 type SaveFolder struct {
@@ -182,6 +504,7 @@ func (c *Config) parseProjectWithFSUnits(
 		folder2Save = append(folder2Save, []string{"/", programName})
 	}
 
+	sourceFilesystem := filesystem
 	filesystem = c.swapLanguageFs(filesystem)
 	scanResult, err := ScanProjectFiles(ScanConfig{
 		ProgramName:     programName,
@@ -211,6 +534,39 @@ func (c *Config) parseProjectWithFSUnits(
 	}
 	calculateTime = time.Since(start)
 	c.Config.SetCompileProjectBytes(scanResult.HandlerBytes)
+
+	plan := buildCompileUnitPlan(c.GetLanguage(), filesystem, preHandlerFiles)
+	if len(plan.Order) == 0 {
+		unit := &CompileUnit{Key: "unit:all", Path: ".", Files: append([]string(nil), preHandlerFiles...), Language: c.GetLanguage()}
+		plan = &UnitPlan{Units: map[string]*CompileUnit{unit.Key: unit}, Order: [][]*CompileUnit{{unit}}}
+	}
+	batchMinFiles, batchMinBytes := compileUnitBatchThresholds()
+	batches := buildCompileUnitExecutionBatches(plan.Order, batchMinFiles, batchMinBytes)
+	writerCacheRequested := envFlagEnabled(compileUnitWriterCacheEnv)
+	writerCacheEnabled := compileUnitWriterCacheEnabled(writerCacheRequested, batches, scanResult.HandlerBytes)
+	c.Config.SetCompileUnitSplit(writerCacheEnabled)
+	if writerCacheRequested && !writerCacheEnabled && len(batches) <= 1 {
+		payload := buildCompileUnitPlanLog(
+			programName,
+			fmt.Sprintf("%v", c.GetLanguage()),
+			plan,
+			batches,
+			batchMinFiles,
+			batchMinBytes,
+			"legacy-fallback",
+			"resident-fast-path",
+			writerCacheRequested,
+			writerCacheEnabled,
+		)
+		if target, err := writeCompileUnitPlanLogFile(os.Getenv("YAK_SSA_COMPILE_UNIT_LOG_DIR"), payload); err != nil {
+			processCallback(0, "[f0_scan] compile unit single-batch fallback plan write failed: %v", err)
+		} else if target != "" {
+			processCallback(0, "[f0_scan] compile unit single-batch fallback wrote plan: %s", target)
+		}
+		processCallback(0, "[f0_scan] compile unit graph built units=%d edges=%d scc=%d batches=%d; fallback to legacy compile because writer cache is not needed",
+			len(plan.Units), len(plan.Edges), len(plan.Order), len(batches))
+		return c.parseProjectWithFSLegacy(sourceFilesystem, processCallback)
+	}
 
 	prog, builder, err := c.init(filesystem, handlerTotal)
 	if err != nil {
@@ -246,12 +602,19 @@ func (c *Config) parseProjectWithFSUnits(
 	prog.ProcessInfof("calculate total size of project finish preHandler(len:%d) build(len:%d)", preHandlerTotal, handlerTotal)
 	defer c.LanguageBuilder.Clearup()
 
-	plan := buildCompileUnitPlan(c.GetLanguage(), filesystem, preHandlerFiles)
-	if len(plan.Order) == 0 {
-		unit := &CompileUnit{Key: "unit:all", Path: ".", Files: append([]string(nil), preHandlerFiles...), Language: c.GetLanguage()}
-		plan = &UnitPlan{Units: map[string]*CompileUnit{unit.Key: unit}, Order: [][]*CompileUnit{{unit}}}
-	}
 	prog.ProcessInfof("compile unit graph built units=%d edges=%d scc=%d", len(plan.Units), len(plan.Edges), len(plan.Order))
+	holdSCCIR := envFlagEnabled(compileUnitHoldSCCIREnv)
+	spillMode := "auto"
+	if holdSCCIR {
+		spillMode = "held"
+	}
+	cacheMode := "none"
+	if prog.Cache != nil {
+		cacheMode = prog.Cache.InstructionCacheMode()
+	}
+	prog.ProcessInfof("compile unit execution batches built batches=%d min_files=%d min_bytes=%d writer_requested=%v writer_enabled=%v cache=%s",
+		len(batches), batchMinFiles, batchMinBytes, writerCacheRequested, writerCacheEnabled, cacheMode)
+	logCompileUnitPlan(prog, fmt.Sprintf("%v", c.GetLanguage()), plan, batches, batchMinFiles, batchMinBytes, spillMode, cacheMode, writerCacheRequested, writerCacheEnabled)
 
 	var astErr error
 	astParseErrLogged := 0
@@ -276,22 +639,23 @@ func (c *Config) parseProjectWithFSUnits(
 	log.Debugf("ssa.compile.phase enter %s", compilePhase)
 	unitStart := time.Now()
 	prog.SetPreHandler(true)
-	prog.ProcessInfof("unit compile start units=%d", len(plan.Order))
-	for sccIndex, scc := range plan.Order {
+	prog.ProcessInfof("unit compile start scc=%d batches=%d", len(plan.Order), len(batches))
+	for batchIndex, batch := range batches {
 		if c.isStop() {
 			return nil, ErrContextCancel
 		}
-		unitKeys := make([]string, 0, len(scc))
-		sccFiles := 0
-		for _, unit := range scc {
-			if unit == nil {
-				continue
-			}
-			unitKeys = append(unitKeys, unit.Key)
-			sccFiles += len(unit.Files)
+		if holdSCCIR && prog.Cache != nil {
+			prog.Cache.DisableInstructionSpill()
 		}
-		prog.ProcessInfof("compile unit scc(%d/%d) units=%d files=%d", sccIndex+1, len(plan.Order), len(scc), sccFiles)
-		for _, unit := range scc {
+		unitKeys := batch.unitKeys
+		if compileUnitLogEnabled() {
+			prog.ProcessInfof("compile unit batch(%d/%d) scc=%d-%d units=%d files=%d bytes=%d spill=%s keys=%s",
+				batchIndex+1, len(batches), batch.startSCC+1, batch.endSCC+1, len(batch.units), batch.files, batch.bytes, spillMode, strings.Join(unitKeys, ","))
+		} else {
+			prog.ProcessInfof("compile unit batch(%d/%d) scc=%d-%d units=%d files=%d bytes=%d spill=%s",
+				batchIndex+1, len(batches), batch.startSCC+1, batch.endSCC+1, len(batch.units), batch.files, batch.bytes, spillMode)
+		}
+		for _, unit := range batch.units {
 			if unit == nil {
 				continue
 			}
@@ -400,7 +764,7 @@ func (c *Config) parseProjectWithFSUnits(
 			language.Clearup()
 		}
 		prog.SetPreHandler(false)
-		if prog.Cache != nil {
+		if holdSCCIR && prog.Cache != nil {
 			prog.Cache.EnableInstructionSpill()
 		}
 		compilePhase = "f3_unit_build"
@@ -417,11 +781,45 @@ func (c *Config) parseProjectWithFSUnits(
 		if c.isStop() {
 			return nil, ErrContextCancel
 		}
-		if prog.Cache != nil {
+		if prog.Cache != nil && writerCacheEnabled {
 			prog.Cache.FlushCompileUnit(strings.Join(unitKeys, ","))
+			prog.ProcessInfof(
+				"compile unit batch(%d/%d) cache flushed scc=%d-%d units=%s mode=%s resident_ir=%d persisted_ir=%d funcs=%d blueprints=%d upstreams=%d cost=%v",
+				batchIndex+1,
+				len(batches),
+				batch.startSCC+1,
+				batch.endSCC+1,
+				strings.Join(unitKeys, ","),
+				prog.Cache.InstructionCacheMode(),
+				prog.Cache.CountInstruction(),
+				prog.Cache.InstructionPersistedCount(),
+				prog.Funcs.Len(),
+				prog.Blueprint.Len(),
+				prog.UpStream.Len(),
+				time.Since(unitBuildStart),
+			)
+		} else if prog.Cache != nil {
+			prog.ProcessInfof(
+				"compile unit batch(%d/%d) cache flush skipped scc=%d-%d units=%s mode=%s writer_enabled=%v resident_ir=%d funcs=%d blueprints=%d upstreams=%d cost=%v",
+				batchIndex+1,
+				len(batches),
+				batch.startSCC+1,
+				batch.endSCC+1,
+				strings.Join(unitKeys, ","),
+				prog.Cache.InstructionCacheMode(),
+				writerCacheEnabled,
+				prog.Cache.CountInstruction(),
+				prog.Funcs.Len(),
+				prog.Blueprint.Len(),
+				prog.UpStream.Len(),
+				time.Since(unitBuildStart),
+			)
+		}
+		if compileUnitLogEnabled() {
+			prog.ProcessInfof("compile unit batch(%d/%d) build+flush finished units=%s cost=%v", batchIndex+1, len(batches), strings.Join(unitKeys, ","), time.Since(unitBuildStart))
 		}
 		parseTime += time.Since(unitBuildStart)
-		logPhaseHeap(fmt.Sprintf("unit_%03d", sccIndex+1))
+		logPhaseHeap(fmt.Sprintf("unit_batch_%03d", batchIndex+1))
 		prog.SetPreHandler(true)
 		compilePhase = "f1_units"
 	}
@@ -605,6 +1003,7 @@ func (c *Config) parseProjectWithFSLegacy(
 	if restoreGC := c.applyLargeProjectGCPercent(); restoreGC != nil {
 		defer restoreGC()
 	}
+	c.Config.SetCompileUnitSplit(false)
 
 	prog, builder, err := c.init(filesystem, handlerTotal)
 	if err != nil {

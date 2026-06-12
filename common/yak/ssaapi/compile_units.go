@@ -360,7 +360,7 @@ func scanGoModulePath(src string) string {
 }
 
 func pythonUnitDependencies(fs filesys_interface.FileSystem, units map[string]*CompileUnit) []UnitRef {
-	pathToKey := unitPathIndex(units)
+	pathToKey := pythonImportPathIndex(fs, units)
 	var edges []UnitRef
 	for _, unit := range units {
 		for _, file := range unit.Files {
@@ -381,6 +381,34 @@ func pythonUnitDependencies(fs filesys_interface.FileSystem, units map[string]*C
 	}
 	// TODO: handle relative imports and runtime importlib precisely.
 	return dedupeEdges(edges)
+}
+
+func pythonImportPathIndex(fs filesys_interface.FileSystem, units map[string]*CompileUnit) map[string]string {
+	index := newUniqueStringIndex()
+	for _, unit := range units {
+		if unit == nil {
+			continue
+		}
+		unitPath := cleanUnitPath(fs, unit.Path)
+		if unitPath != "" && unitPath != "." {
+			index.Add(unitPath, unit.Key)
+		}
+		for _, file := range unit.Files {
+			if !strings.EqualFold(fs.Ext(file), ".py") {
+				continue
+			}
+			normalized := normalizeUnitPath(fs, file)
+			stem := strings.TrimSuffix(normalized, fs.Ext(normalized))
+			if stem == "" {
+				continue
+			}
+			index.Add(stem, unit.Key)
+			if base := unitBase(fs, stem); base != "" && base != "." && base != "__init__" {
+				index.Add(base, unit.Key)
+			}
+		}
+	}
+	return index.Values()
 }
 
 func cUnitDependencies(fs filesys_interface.FileSystem, units map[string]*CompileUnit) []UnitRef {
