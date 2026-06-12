@@ -217,16 +217,8 @@ func registerPHPFileBuild(ast phpparser.IHtmlDocumentContext, b *ssa.FunctionBui
 	if ast == nil || b == nil || !ssa.SkeletonTopLevelEnabled() {
 		return
 	}
-	html, ok := ast.(*phpparser.HtmlDocumentContext)
-	if !ok || html == nil {
-		return
-	}
-	children := html.GetChildren()
-	capturedChildren := make([]antlr.Tree, 0, len(children))
-	for _, child := range children {
-		capturedChildren = append(capturedChildren, ssa.DetachAST(child))
-	}
-	if len(capturedChildren) == 0 {
+	pass2Capture := collectPHPFilePass2Capture(ast)
+	if pass2Capture == nil || pass2Capture.empty() {
 		return
 	}
 	prog := b.GetProgram()
@@ -255,7 +247,7 @@ func registerPHPFileBuild(ast phpparser.IHtmlDocumentContext, b *ssa.FunctionBui
 	var buildOnce sync.Once
 	buildCapturedChildren := func(callbackBuilder *ssa.FunctionBuilder) {
 		buildOnce.Do(func() {
-			startParsePHPDocumentChildren(functionBuilder, callbackBuilder, capturedChildren)
+			visitPHPFilePass2Capture(functionBuilder, callbackBuilder, pass2Capture)
 		})
 	}
 	functionBuilder.AddLazyBuilder(func() {

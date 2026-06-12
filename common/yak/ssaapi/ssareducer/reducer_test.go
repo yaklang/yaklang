@@ -240,6 +240,7 @@ func TestFilesHandler_OutOfOrderBackpressuresParsedAST(t *testing.T) {
 		nil,
 		OutOfOrder,
 		2,
+		0,
 	)
 
 	require.Eventually(t, func() bool {
@@ -280,6 +281,7 @@ func TestFilesHandler_OutOfOrderWaitsForReleaseBeforeParsingNextAST(t *testing.T
 		nil,
 		OutOfOrder,
 		4,
+		0,
 	)
 
 	first := <-out
