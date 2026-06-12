@@ -336,7 +336,7 @@ var loopAction_directlyCallTool = &reactloops.LoopAction{
 		if emitter := loop.GetEmitter(); emitter != nil && operator.GetTask() != nil {
 			pr, pw := utils.NewPipe()
 			progressWriter = pw
-			event, _ := emitter.EmitDefaultStreamEvent(directlyCallToolParamsNodeID, pr, operator.GetTask().GetId())
+			event, _ := emitter.EmitDefaultStreamEvent(directlyCallToolParamsNodeID, pr, operator.GetTask().GetIndex())
 			if event != nil {
 				progressEventID = event.GetStreamEventWriterId()
 				aicommon.EmitAIRequestAndResponseReferenceMaterials(

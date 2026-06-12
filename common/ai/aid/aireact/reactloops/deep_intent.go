@@ -33,8 +33,8 @@ func ExecuteDeepIntentRecognition(r aicommon.AIInvokeRuntime, loop *ReActLoop, t
 	intentTask := aicommon.NewStatefulTaskBase(
 		task.GetId()+"_intent",
 		userInput,
-		r.GetConfig().GetContext(),
-		r.GetConfig().GetEmitter(),
+		loop.GetConfig().GetContext(),
+		loop.GetEmitter(),
 		true,
 	)
 

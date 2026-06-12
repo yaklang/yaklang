@@ -294,11 +294,11 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 			resp.SetOnReasonChunk(func(b []byte) {
 				r.appendModelThinkingChunk(b)
 			})
-			boundEmitter := resp.BindEmitter(r.config.GetEmitter())
+			boundEmitter := resp.BindEmitter(r.GetEmitter())
 			stream := resp.GetOutputStreamReader(
 				r.loopName,
 				true,
-				r.config.GetEmitter(),
+				r.GetEmitter(),
 			)
 
 			buf := bytes.NewBuffer(make([]byte, 0))
@@ -557,6 +557,13 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) (finalE
 	}
 	if r.taskMutex == nil {
 		return errors.New("re-act loop taskMutex is nil")
+	}
+	if task.GetEmitter() != nil {
+		loopEmitter := r.emitter // bind current task emitter to loop, restore after loop finished
+		r.emitter = task.GetEmitter()
+		defer func() {
+			r.emitter = loopEmitter
+		}()
 	}
 
 	select {
