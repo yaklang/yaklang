@@ -119,6 +119,7 @@ func (pr *planRequest) handleReviewPlanResponse(rsp *PlanResponse, param aitool.
 			return newPlan, nil
 		}
 		pr.cod.CallAfterReview(ep.GetSeq(), reviewQuestion, params)
+		pr.cod.SubmitReviewValueFeedbackFromEndpoint(ep, aicommon.ReviewFocusModePlan, reviewQuestion)
 		return pr.handleReviewPlanResponse(newPlan, params)
 	case "incomplete":
 		pr.cod.EmitInfo("plan is incomplete")
@@ -145,6 +146,7 @@ func (pr *planRequest) handleReviewPlanResponse(rsp *PlanResponse, param aitool.
 			return newPlan, nil
 		}
 		pr.cod.CallAfterReview(ep.GetSeq(), reviewQuestion, params)
+		pr.cod.SubmitReviewValueFeedbackFromEndpoint(ep, aicommon.ReviewFocusModePlan, reviewQuestion)
 		return pr.handleReviewPlanResponse(newPlan, params)
 	case "create-subtask":
 		pr.cod.EmitError("create-subtask required via user suggestion")
@@ -177,6 +179,7 @@ func (pr *planRequest) handleReviewPlanResponse(rsp *PlanResponse, param aitool.
 			return newPlan, nil
 		}
 		pr.cod.CallAfterReview(ep.GetSeq(), reviewQuestion, params)
+		pr.cod.SubmitReviewValueFeedbackFromEndpoint(ep, aicommon.ReviewFocusModePlan, reviewQuestion)
 		return pr.handleReviewPlanResponse(newPlan, params)
 	case "freedom-review":
 		pr.cod.EmitInfo("user uses freedom review mode to review the plan")
@@ -205,6 +208,7 @@ func (pr *planRequest) handleReviewPlanResponse(rsp *PlanResponse, param aitool.
 			return newPlan, nil
 		}
 		pr.cod.CallAfterReview(ep.GetSeq(), reviewQuestion, params)
+		pr.cod.SubmitReviewValueFeedbackFromEndpoint(ep, aicommon.ReviewFocusModePlan, reviewQuestion)
 		return pr.handleReviewPlanResponse(newPlan, params)
 	default:
 		pr.cod.EmitError("unknown review suggestion: %s", suggestion)
