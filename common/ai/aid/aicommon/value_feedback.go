@@ -174,20 +174,49 @@ func SubmitValueFeedback(cfg *Config, record *ValueFeedbackRecord) {
 	submitter(cfg, record)
 }
 
+// ReviewFocusMode_* 标注审批发生在哪条 review 通路 (写入 record.FocusMode), 便于
+// 下游按通路过滤监控. 所有走 DoWaitAgree 的审批通路都应被监控.
+const (
+	ReviewFocusModeTool    = "tool_review"
+	ReviewFocusModePlan    = "plan_review"
+	ReviewFocusModeTask    = "task_review"
+	ReviewFocusModeAIForge = "aiforge_review"
+	ReviewFocusModeGeneric = "review"
+)
+
 // SubmitToolReviewValueFeedback 在工具审批路径 (review_decision) 记录一次审批决策,
-// 这是最高价值的人工纠正信号. 生产侧只记录"事实": execution_policy (配置策略) 与
-// approval (本次决定来源/结果/原始与最终参数/是否改动) 解耦, 不预先下训练标签.
-// 判断是否人工反馈的依据是 approval.source=human, 而非 execution_policy.
-//
-// originalParams 为审批前的原始提议参数, finalParams 为审批后 (review 应用) 的最终
-// 参数; changed 由二者比对得出. 全程 recover + 非阻塞.
+// 这是最高价值的人工纠正信号. originalParams 为审批前提议参数, finalParams 为审批后
+// (review 应用) 的最终参数, changed 精确由二者比对得出.
 func (c *Config) SubmitToolReviewValueFeedback(ep *Endpoint, reviewQuestion string, originalParams, finalParams aitool.InvokeParams) {
+	c.submitReviewValueFeedback(ep, ReviewFocusModeTool, reviewQuestion, originalParams, finalParams, true)
+}
+
+// SubmitReviewValueFeedbackFromEndpoint 是通用审批监控入口 (plan/task/aiforge 等),
+// 直接从 endpoint 取 review materials 作为 original_value、取最终 params 作为
+// final_value. 这些通路无法精确判定参数是否被编辑, 故不下 changed/approve_with_edit
+// 结论, 仍记录 source/required/decision 以区分人工与策略自动放行.
+//
+// 关键: 监控的判定依据是 approval.source (谁做的决定), 与 execution_policy 解耦.
+func (c *Config) SubmitReviewValueFeedbackFromEndpoint(ep *Endpoint, focusMode string, reviewQuestion string) {
+	if c == nil || ep == nil {
+		return
+	}
+	original := aitool.InvokeParams(ep.GetReviewMaterials())
+	final := ep.GetParams()
+	c.submitReviewValueFeedback(ep, focusMode, reviewQuestion, original, final, false)
+}
+
+// submitReviewValueFeedback 是审批价值评估的统一装配逻辑. 生产侧只记录"事实":
+// execution_policy (配置策略) 与 approval (本次决定来源/结果/原始与最终参数) 解耦,
+// 不预先下训练标签. trackChanged=true 时才精确比对参数是否被编辑 (仅工具审批可靠).
+// 全程 recover + 非阻塞, 绝不影响主流程.
+func (c *Config) submitReviewValueFeedback(ep *Endpoint, focusMode, reviewQuestion string, originalParams, finalParams aitool.InvokeParams, trackChanged bool) {
 	if c == nil || ep == nil {
 		return
 	}
 	defer func() {
 		if r := recover(); r != nil {
-			log.Warnf("SubmitToolReviewValueFeedback recovered panic: %v", r)
+			log.Warnf("submitReviewValueFeedback recovered panic: %v", r)
 		}
 	}()
 
@@ -208,7 +237,10 @@ func (c *Config) SubmitToolReviewValueFeedback(ep *Endpoint, reviewQuestion stri
 		}
 	}
 
-	changed := !invokeParamsEqual(originalParams, finalParams)
+	changed := false
+	if trackChanged {
+		changed = !invokeParamsEqual(originalParams, finalParams)
+	}
 
 	decision := ApprovalDecisionApprove
 	switch {
@@ -217,10 +249,14 @@ func (c *Config) SubmitToolReviewValueFeedback(ep *Endpoint, reviewQuestion stri
 		decision = ApprovalDecisionNotRequired
 	case len(finalParams) == 0:
 		decision = ApprovalDecisionCancel
-	case changed:
+	case trackChanged && changed:
 		decision = ApprovalDecisionApproveWithEdit
 	default:
 		decision = ApprovalDecisionApprove
+	}
+
+	if focusMode == "" {
+		focusMode = ReviewFocusModeGeneric
 	}
 
 	approval := &ValueFeedbackApproval{
@@ -246,7 +282,7 @@ func (c *Config) SubmitToolReviewValueFeedback(ep *Endpoint, reviewQuestion stri
 			ModelName:  c.AiModelName,
 			ServerName: c.AiServerName,
 		},
-		FocusMode:        "review",
+		FocusMode:        focusMode,
 		TriggerCondition: ValueFeedbackTriggerReviewDecision,
 		ExecutionPolicy:  c.AgreePolicy,
 		Approval:         approval,

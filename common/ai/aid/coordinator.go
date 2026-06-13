@@ -443,6 +443,8 @@ func (c *Coordinator) Run() error {
 		c.DoWaitAgree(c.GetContext(), ep)
 		params := ep.GetParams()
 		c.ReleaseInteractiveEvent(ep.GetId(), params)
+		// 价值评估 (review_decision): 监控计划审批通路, 区分人工与策略自动放行.
+		c.SubmitReviewValueFeedbackFromEndpoint(ep, aicommon.ReviewFocusModePlan, "请审查任务规划")
 		if params == nil {
 			c.planLoadingStatus("用户审查失败 / User Review Failed")
 			c.EmitError("user review params is nil, plan failed")

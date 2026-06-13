@@ -318,6 +318,8 @@ func (t *AiTask) executeTask() error {
 		t.EmitInfo("start to handle review task event: %v", ep.GetId())
 		err := t.handleReviewResult(reviewResult)
 		t.CallAfterReview(ep.GetSeq(), "请审查当前任务的执行结果", reviewResult)
+		// 价值评估 (review_decision): 监控任务审批通路, 区分人工与策略自动放行.
+		t.SubmitReviewValueFeedbackFromEndpoint(ep, aicommon.ReviewFocusModeTask, "请审查当前任务的执行结果")
 		if err != nil {
 			log.Warnf("error handling review result: %v", err)
 		}

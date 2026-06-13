@@ -88,6 +88,11 @@ func (r *ReAct) reviewAIForge(
 				"determite aiforge[%v]'s params is proper? why?",
 				ins.ForgeName,
 			), reviewParams)
+			// 价值评估 (review_decision): 监控 aiforge 执行审批通路.
+			r.config.SubmitReviewValueFeedbackFromEndpoint(ep, aicommon.ReviewFocusModeAIForge, fmt.Sprintf(
+				"determite aiforge[%v]'s params is proper? why?",
+				ins.ForgeName,
+			))
 		})
 	}
 	defer func() {
