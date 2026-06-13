@@ -2773,6 +2773,8 @@ func (c *Config) CallAfterReview(seq int64, reviewQuestion string, userInput ait
 	if c.Timeline != nil {
 		c.Timeline.PushUserInteraction(UserInteractionStage_Review, seq, reviewQuestion, string(utils.Jsonify(userInput)))
 	}
+	// 价值评估 (review_decision 触发) 改由工具审批路径调用 SubmitToolReviewValueFeedback,
+	// 以便拿到原始/最终参数与审批运行时来源 (见 toolcall.go).
 }
 
 func (c *Config) AcquireId() int64 {

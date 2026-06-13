@@ -453,6 +453,9 @@ func (r *ReActLoop) fillReflectionFromAction(action *aicommon.Action, reflection
 
 		r.addSpinWarningToTimeline(reflection)
 		r.IncrementSpinWarning()
+		// 价值评估额外触发: 仅在 SPIN 被判定为 true (且任务未推进) 时才提交,
+		// 此时是高价值的负样本信号; 非 SPIN 不提交.
+		r.submitValueFeedbackSignal(aicommon.ValueFeedbackTriggerSpinDetected)
 	} else if !reflection.IsTaskProgressing {
 		r.ResetSpinWarning()
 	}

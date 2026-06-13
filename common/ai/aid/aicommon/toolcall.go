@@ -866,6 +866,13 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 		}
 		t.emitter.EmitInteractiveJSON(ep.GetId(), schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE, "review-require", reqs)
 
+		// 审批前快照原始提议参数 (original_value), 供价值评估比对是否被改动.
+		originalReviewParams := make(aitool.InvokeParams, len(invokeParams))
+		for k, v := range invokeParams {
+			originalReviewParams[k] = v
+		}
+		reviewQuestion := fmt.Sprintf("determite tool[%v]'s params is proper? what should I do?", tool.Name)
+
 		// wait for agree
 		config.DoWaitAgree(t.ctx, ep)
 		params := ep.GetParams()
@@ -873,7 +880,7 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 		config.CallAfterInteractiveEventReleased(ep.GetId(), params)
 		config.CallAfterReview(
 			ep.GetSeq(),
-			fmt.Sprintf("determite tool[%v]'s params is proper? what should I do?", tool.Name),
+			reviewQuestion,
 			params,
 		)
 		if params == nil {
@@ -890,6 +897,12 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 			t.emitter.EmitError("error handling tool use review: %v", err)
 			handleError(fmt.Sprintf("error handling tool use review: %v", err))
 			return nil, false, err
+		}
+
+		// 价值评估 (review_decision): 记录审批事实 (original/final 参数 + 运行时来源),
+		// invokeParams 此时已是 review 应用后的最终参数. 非阻塞, 绝不影响主流程.
+		if cfg, ok := config.(*Config); ok {
+			cfg.SubmitToolReviewValueFeedback(ep, reviewQuestion, originalReviewParams, invokeParams)
 		}
 
 		switch next {

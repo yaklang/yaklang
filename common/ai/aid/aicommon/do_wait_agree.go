@@ -36,6 +36,7 @@ func (c *Config) DoWaitAgreeWithPolicy(ctx context.Context, policy AgreePolicyTy
 			case schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE:
 				if c.AiPlanReviewControl != nil {
 					if result, err := c.AiPlanReviewControl(ctx, c, endpoint); err == nil {
+						endpoint.SetApprovalMeta(ApprovalSourceModelJudge, false, "dynamic_planning_plan_auto_review")
 						endpoint.SetParams(result)
 						endpoint.Release()
 						return
@@ -46,6 +47,7 @@ func (c *Config) DoWaitAgreeWithPolicy(ctx context.Context, policy AgreePolicyTy
 			case schema.EVENT_TYPE_TASK_REVIEW_REQUIRE:
 				if c.AiTaskReviewControl != nil {
 					if result, err := c.AiTaskReviewControl(ctx, c, endpoint); err == nil {
+						endpoint.SetApprovalMeta(ApprovalSourceModelJudge, false, "dynamic_planning_task_auto_review")
 						endpoint.SetParams(result)
 						endpoint.Release()
 						return
@@ -57,6 +59,7 @@ func (c *Config) DoWaitAgreeWithPolicy(ctx context.Context, policy AgreePolicyTy
 		}
 		c.Emitter.EmitInfo("yolo policy auto agree all")
 		log.Infof("Auto-approving tool usage (non-interactive mode)")
+		endpoint.SetApprovalMeta(ApprovalSourcePolicy, false, "auto_approve_by_"+string(policy)+"_policy")
 		endpoint.SetParams(aitool.InvokeParams{"suggestion": "continue"})
 		endpoint.Release()
 		return
@@ -89,6 +92,7 @@ func (c *Config) DoWaitAgreeWithPolicy(ctx context.Context, policy AgreePolicyTy
 				if err != nil {
 					endNormally(1, "high", "review failed: "+err.Error())
 					log.Errorf("error during auto-review: %v", err)
+					endpoint.SetApprovalMeta(ApprovalSourceTimeoutFallback, false, "ai_review_error_auto_continue")
 					endpoint.SetParams(aitool.InvokeParams{"suggestion": "continue"})
 					endpoint.Release()
 					return
@@ -105,6 +109,7 @@ func (c *Config) DoWaitAgreeWithPolicy(ctx context.Context, policy AgreePolicyTy
 					c.Emitter.EmitInfo("Auto-review score is low, suggesting to continue in " + fmt.Sprint(int(duSec)) + " seconds...")
 					endNormally(score, "low", "")
 					time.Sleep(duSec * time.Second)
+					endpoint.SetApprovalMeta(ApprovalSourceModelJudge, false, "ai_low_risk_auto_continue")
 					endpoint.SetParams(aitool.InvokeParams{"suggestion": "continue"})
 					endpoint.Release()
 				} else if score > c.AgreeAIScoreLow && score <= c.AgreeAIScoreMiddle {
@@ -118,11 +123,14 @@ func (c *Config) DoWaitAgreeWithPolicy(ctx context.Context, policy AgreePolicyTy
 					endNormally(score, "middle", "")
 					c.Emitter.EmitInfo("Auto-review score is middle, suggesting to continue in " + fmt.Sprint(int(duSec)) + " seconds...")
 					time.Sleep(duSec * time.Second)
+					endpoint.SetApprovalMeta(ApprovalSourceModelJudge, false, "ai_middle_risk_auto_continue")
 					endpoint.SetParams(aitool.InvokeParams{"suggestion": "continue"})
 					endpoint.Release()
 				} else {
 					c.Emitter.EmitInfo("Auto-review score is high, suggesting to handled by user")
 					reason := riskResult.GetString("reason")
+					// 高风险升级人工: 此后由外部 (用户 Feed) 释放, 视为真人工决定.
+					endpoint.SetApprovalMeta(ApprovalSourceHuman, true, "ai_high_risk_escalated_to_human")
 					endNormally(score, "high", reason)
 				}
 			}()
@@ -133,12 +141,15 @@ func (c *Config) DoWaitAgreeWithPolicy(ctx context.Context, policy AgreePolicyTy
 	default:
 		manualCtx, cancel := context.WithCancel(ctx)
 		defer cancel()
+		// 默认 manual 视为真人工审批; 若配了 assistant 回调则在回调成功时改记 model_judge.
+		endpoint.SetApprovalMeta(ApprovalSourceHuman, true, "manual_human_review")
 		if c.AgreeManualCallback != nil { // if agreeManualCallback is not nil, use it help manual agree
 			go func() {
 				res, err := c.AgreeManualCallback(manualCtx, c)
 				if err != nil {
 					log.Errorf("agree assistant callback error: %v", err)
 				} else {
+					endpoint.SetApprovalMeta(ApprovalSourceModelJudge, false, "manual_assistant_auto_review")
 					endpoint.SetParams(res)
 					for i := 0; i < 3; i++ {
 						endpoint.Release()
