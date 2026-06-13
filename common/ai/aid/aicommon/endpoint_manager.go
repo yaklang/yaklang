@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"sync"
+	"time"
 )
 
 type EndpointManager struct {
@@ -79,6 +80,7 @@ func (e *EndpointManager) CreateEndpointWithEventType(typeName schema.EventType)
 		reviewType:      typeName,
 		activeParams:    make(aitool.InvokeParams),
 		reviewMaterials: make(aitool.InvokeParams),
+		createdAtMs:     time.Now().UnixMilli(),
 	}
 	e.results.Store(id, endpoint)
 	if c := e.config; c != nil {

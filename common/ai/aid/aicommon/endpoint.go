@@ -16,9 +16,47 @@ type Endpoint struct {
 	activeParams    aitool.InvokeParams
 	reviewMaterials aitool.InvokeParams
 
+	// createdAtMs 是端点创建 (发起审批) 的毫秒时间戳, 用于计算审批时延.
+	createdAtMs int64
+	// approvalMeta 记录本次审批"运行时真相": 谁做的决定 (source)、是否真的需要
+	// 人工/模型介入 (required)、原因 (reason). 由 DoWaitAgreeWithPolicy 在各释放
+	// 分支就地写入, 供价值评估区分 policy 与 source (例如 YOLO 下仍人工审批).
+	approvalMeta *ApprovalDecisionMeta
+
 	// seq and checkpoint for recovering
 	seq        int64
 	checkpoint *schema.AiCheckpoint
+}
+
+// ApprovalDecisionMeta 描述一次审批决定的运行时来源信息.
+type ApprovalDecisionMeta struct {
+	// Source 取 human / policy / model_judge / rule / timeout_fallback.
+	Source string
+	// Required 表示这次是否真的需要人工或模型判定 (manual / ai 高风险=true;
+	// yolo / auto / ai 低中风险 自动放行=false).
+	Required bool
+	// Reason 是机器可读的决定原因 (如 auto_approve_by_yolo_policy).
+	Reason string
+	// DecidedAtMs 是做出决定的毫秒时间戳.
+	DecidedAtMs int64
+}
+
+func (e *Endpoint) GetCreatedAtMs() int64 {
+	return e.createdAtMs
+}
+
+// SetApprovalMeta 由审批链路在确定决定来源时调用 (就地记录运行时真相).
+func (e *Endpoint) SetApprovalMeta(source string, required bool, reason string) {
+	e.approvalMeta = &ApprovalDecisionMeta{
+		Source:      source,
+		Required:    required,
+		Reason:      reason,
+		DecidedAtMs: time.Now().UnixMilli(),
+	}
+}
+
+func (e *Endpoint) GetApprovalMeta() *ApprovalDecisionMeta {
+	return e.approvalMeta
 }
 
 func (e *Endpoint) GetSeq() int64 {

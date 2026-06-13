@@ -334,6 +334,8 @@ func (r *ReActLoop) PushSatisfactionRecord(satisfactory bool, reason string) {
 		Satisfactory: satisfactory,
 		Reason:       reason,
 	})
+	// 价值评估额外触发: verification 满意度裁决是关键的客观结局信号.
+	r.submitValueFeedbackSignal(aicommon.ValueFeedbackTriggerVerification)
 }
 
 // PushSatisfactionRecordWithCompletedTaskIndex 推送满意度记录，并同时记录已完成的任务索引和下一步行动计划
@@ -350,6 +352,8 @@ func (r *ReActLoop) PushSatisfactionRecordWithCompletedTaskIndex(satisfactory bo
 		record.EvidenceOps = evidenceOps[0]
 	}
 	r.historySatisfactionReasons = append(r.historySatisfactionReasons, record)
+	// 价值评估额外触发: verification 满意度裁决是关键的客观结局信号.
+	r.submitValueFeedbackSignal(aicommon.ValueFeedbackTriggerVerification)
 }
 
 func (r *ReActLoop) GetLastSatisfactionRecord() (bool, string) {
@@ -606,6 +610,12 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 	for _, opt := range options {
 		opt(r)
 	}
+
+	// 自动注入价值评估埋点 (默认开启, 暂无关闭开关). 该钩子在每轮结束
+	// (iteration_end) 与整循环结束 (loop_end) 组装 ValueFeedbackRecord 并经
+	// aicommon 注册缝交给 aive; 全程非阻塞 + recover, 不影响主循环.
+	// 关键词: 价值评估埋点注入, onPostIteration, SubmitValueFeedback
+	r.onPostIteration = append(r.onPostIteration, buildValueFeedbackPostIteration())
 
 	// Config-level perception disable (e.g. test environments via WithDisablePerception)
 	if config.GetConfigBool("DisablePerception") {

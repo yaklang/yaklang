@@ -8,6 +8,9 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	// blank-import aive 触发价值评估 submitter 的 init() 注册 (默认开启).
+	// 关键词: aive blank import, RegisterValueFeedbackSubmitter 触发
+	_ "github.com/yaklang/yaklang/common/ai/aid/aive"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools/metadata/genmetadata"
 	"github.com/yaklang/yaklang/common/aiforge"
 
