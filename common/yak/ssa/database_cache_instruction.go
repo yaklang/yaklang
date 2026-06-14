@@ -264,7 +264,14 @@ func (s *instructionStore) flushCompileUnitWriter() {
 		}
 		ids = append(ids, id)
 	}
+	// Flush to DB - this already evicts from cache internally during async save
+	// The FlushKeys operation will remove entries from the writer cache as they're persisted
 	s.writer.FlushKeys(ids, utils.EvictionReasonCapacityReached)
+
+	// Note: We don't explicitly Delete after FlushKeys because:
+	// 1. FlushKeys already evicts entries during its async save process
+	// 2. Calling Delete immediately after can cause WaitGroup reuse panic
+	// 3. The writer cache's async save mechanism handles memory release
 }
 
 func (s *instructionStore) GetAllResident() map[int64]Instruction {
