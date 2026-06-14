@@ -884,6 +884,10 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 			params,
 		)
 		if params == nil {
+			// 价值评估: 用户取消工具审批 (空响应释放) 是高价值的人工否决信号, 不能漏采.
+			if cfg, ok := config.(*Config); ok {
+				cfg.SubmitToolReviewValueFeedback(ep, reviewQuestion, originalReviewParams, nil)
+			}
 			t.emitter.EmitError("tool use [%v] review params is nil, user may cancel the review", tool.Name)
 			handleError(fmt.Sprintf("tool use [%v] review params is nil, user may cancel the review", tool.Name))
 			return nil, false, fmt.Errorf("tool use [%v] review params is nil", tool.Name)

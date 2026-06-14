@@ -2,6 +2,7 @@ package aicommon
 
 import (
 	"encoding/json"
+	"strings"
 	"sync"
 	"time"
 
@@ -77,6 +78,10 @@ type ValueFeedbackApproval struct {
 	Source string `json:"source"`
 	// Decision 取 approve/approve_with_edit/reject/cancel/timeout/not_required.
 	Decision string `json:"decision"`
+	// Suggestion 是审批响应里用户/AI 选择的原始建议项 (如 continue / wrong_tool /
+	// wrong_params / direct_answer / incomplete / adjust_plan / cancel), 保留原始
+	// 取值以便下游不丢失语义 (Decision 是它归一化后的结论).
+	Suggestion string `json:"suggestion,omitempty"`
 	// Reason 是机器可读的决定原因 (如 auto_approve_by_yolo_policy).
 	Reason string `json:"reason,omitempty"`
 	// Question 是审批问题摘要.
@@ -237,22 +242,34 @@ func (c *Config) submitReviewValueFeedback(ep *Endpoint, focusMode, reviewQuesti
 		}
 	}
 
-	changed := false
-	if trackChanged {
-		changed = !invokeParamsEqual(originalParams, finalParams)
+	// 审批响应 (含用户/AI 选择的 suggestion) 始终在 endpoint.GetParams() 上, 无论
+	// 工具/计划/任务通路; 工具通路的 finalParams 是 review 应用后的工具参数, 不含
+	// suggestion, 故 suggestion 必须单独从这里取.
+	reviewResp := ep.GetParams()
+	suggestion := ""
+	if reviewResp != nil {
+		suggestion = reviewResp.GetString("suggestion")
+	}
+	decisionFromSuggestion, suggestionChange := classifyReviewSuggestion(suggestion)
+
+	changed := suggestionChange
+	if trackChanged && !invokeParamsEqual(originalParams, finalParams) {
+		changed = true
 	}
 
-	decision := ApprovalDecisionApprove
+	// decision 归一化: 优先反映真实人工/AI 决定 (suggestion), 再被"无需审批"与
+	// "取消 (空响应)"覆盖.
+	decision := decisionFromSuggestion
 	switch {
 	case !required:
 		// 策略/低风险自动放行: 无需审批.
 		decision = ApprovalDecisionNotRequired
-	case len(finalParams) == 0:
+	case len(reviewResp) == 0:
+		// 需要审批但响应为空 (endpoint 被无参释放): 视为用户取消.
 		decision = ApprovalDecisionCancel
-	case trackChanged && changed:
+	case changed && decision == ApprovalDecisionApprove:
+		// suggestion 未显式表达编辑, 但参数确被改动 (工具通路精确比对得出).
 		decision = ApprovalDecisionApproveWithEdit
-	default:
-		decision = ApprovalDecisionApprove
 	}
 
 	if focusMode == "" {
@@ -263,6 +280,7 @@ func (c *Config) submitReviewValueFeedback(ep *Endpoint, focusMode, reviewQuesti
 		Required:      required,
 		Source:        source,
 		Decision:      decision,
+		Suggestion:    suggestion,
 		Reason:        reason,
 		Question:      reviewQuestion,
 		OriginalValue: map[string]any(originalParams),
@@ -270,7 +288,8 @@ func (c *Config) submitReviewValueFeedback(ep *Endpoint, focusMode, reviewQuesti
 		Changed:       changed,
 		DecidedAtMs:   decidedAtMs,
 	}
-	if cmt := extractApprovalComment(finalParams); cmt != "" {
+	// 备注/纠偏文本 (extra_prompt 等) 在审批响应里, 用 reviewResp 抽取.
+	if cmt := extractApprovalComment(reviewResp); cmt != "" {
 		approval.Comment = cmt
 	}
 	if createdAt := ep.GetCreatedAtMs(); createdAt > 0 && decidedAtMs >= createdAt {
@@ -292,6 +311,33 @@ func (c *Config) submitReviewValueFeedback(ep *Endpoint, focusMode, reviewQuesti
 		record.TimelineDump = c.Timeline.Dump()
 	}
 	SubmitValueFeedback(c, record)
+}
+
+// classifyReviewSuggestion 把审批响应里的原始 suggestion 归一化为 decision, 并给出
+// 该 suggestion 是否隐含"修改了产出" (impliesChange). 这是最高价值的人工纠正信号:
+// 工具通路的 wrong_tool/wrong_params/direct_answer, 计划/任务通路的 incomplete/
+// adjust_plan/deeply_think 等, 都代表人工对 AI 产出的否定或修正, 不能被笼统记成 approve.
+func classifyReviewSuggestion(suggestion string) (decision string, impliesChange bool) {
+	s := strings.ToLower(strings.TrimSpace(suggestion))
+	switch s {
+	case "", "continue", "agree", "approve", "yes", "ok", "finish":
+		return ApprovalDecisionApprove, false
+	case "cancel", "enough-cancel", "abort", "stop":
+		return ApprovalDecisionCancel, false
+	case "reject", "no", "deny", "wrong_tool", "direct_answer":
+		// 工具被否决 (换工具 / 改为直接回答): 对 AI 选择的强负向信号.
+		return ApprovalDecisionReject, true
+	case "wrong_params":
+		// 参数被纠正: 同意用工具但人工改了参数.
+		return ApprovalDecisionApproveWithEdit, true
+	case "incomplete", "adjust_plan", "deeply_think", "create-subtask",
+		"create_subtask", "freedom-review", "redo", "retry":
+		// 计划/任务被要求修订: 人工驱动的纠偏.
+		return ApprovalDecisionApproveWithEdit, true
+	default:
+		// 未知 suggestion: 保守按 approve, 但原始值已存入 approval.suggestion 不丢失.
+		return ApprovalDecisionApprove, false
+	}
 }
 
 // extractApprovalComment 从审批最终参数里尽力抽取一条人类备注 (如有).

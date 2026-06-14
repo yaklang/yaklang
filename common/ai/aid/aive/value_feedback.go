@@ -316,8 +316,8 @@ func buildValueFeedbackPrompt(record *aicommon.ValueFeedbackRecord) string {
 	}
 	if record.Approval != nil {
 		ap := record.Approval
-		sb.WriteString(fmt.Sprintf("approval: required=%v source=%s decision=%s changed=%v latency_ms=%d\n",
-			ap.Required, ap.Source, ap.Decision, ap.Changed, ap.ReviewLatencyMs))
+		sb.WriteString(fmt.Sprintf("approval: required=%v source=%s decision=%s suggestion=%s changed=%v latency_ms=%d\n",
+			ap.Required, ap.Source, ap.Decision, emptyTo(ap.Suggestion, "-"), ap.Changed, ap.ReviewLatencyMs))
 		// 价值评估权重指引: 监督信号的价值取决于"谁做的决定", 而非配置策略.
 		// source=policy (YOLO/Auto 自动放行, 尤其低 latency 的快速放行) 几乎都是 AI
 		// 自己拍板, 几乎不含人工纠正价值, 作为训练样本应给低分.
