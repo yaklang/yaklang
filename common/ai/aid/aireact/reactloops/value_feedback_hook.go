@@ -14,14 +14,16 @@ import (
 // 调 aicommon.SubmitValueFeedback 交给已注册的 aive 实现 (未注册时安全 no-op).
 // reactloops 不直接依赖 aive, 只走 aicommon 注册缝, 因此无 import 环.
 //
-// 触发条件:
-//   - 每轮结束 (isDone=false): trigger=iteration_end
-//   - 整循环结束 (isDone=true): trigger=loop_end
+// 触发条件 (专注高价值数据, 避免逐轮刷量):
+//   - 整循环结束 (isDone=true): trigger=loop_end —— 整段轨迹的终态信号, 始终提交.
+//   - 每轮结束 (isDone=false): trigger=iteration_end —— 默认不提交; 仅当本轮真正
+//     执行了工具 (客观成败=高价值) 时才补一条. 纯思考/直接回答等低价值迭代不触发,
+//     其内容会被 loop_end 的完整轨迹覆盖.
 //
 // 全程 recover + 非阻塞投递, 绝不影响主循环.
 //
 // 关键词: 价值评估埋点, reactloops onPostIteration, SubmitValueFeedback,
-//        iteration_end, loop_end, FocusMode ActionRecord timeline diff
+//        iteration_end 高价值门控, loop_end, FocusMode ActionRecord timeline diff
 
 // buildValueFeedbackPostIteration 返回一个注入到所有 loop 的 onPostIteration 钩子.
 func buildValueFeedbackPostIteration() func(loop *ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any, operator *OnPostIterationOperator) {
@@ -36,13 +38,31 @@ func buildValueFeedbackPostIteration() func(loop *ReActLoop, iteration int, task
 	}
 }
 
-// submitValueFeedbackRecord 在 iteration_end / loop_end 组装并提交记录.
+// submitValueFeedbackRecord 在 loop_end 始终提交, 在 iteration_end 仅当本轮执行了
+// 工具 (高价值客观信号) 时才提交, 减弱逐轮提交带来的低价值噪声与额外开销.
 func (r *ReActLoop) submitValueFeedbackRecord(iteration int, task aicommon.AIStatefulTask, isDone bool, reason any) {
-	trigger := aicommon.ValueFeedbackTriggerIterationEnd
 	if isDone {
-		trigger = aicommon.ValueFeedbackTriggerLoopEnd
+		r.submitValueFeedbackWithTrigger(aicommon.ValueFeedbackTriggerLoopEnd, task)
+		return
 	}
-	r.submitValueFeedbackWithTrigger(trigger, task)
+	if r.iterationExecutedTool(iteration) {
+		r.submitValueFeedbackWithTrigger(aicommon.ValueFeedbackTriggerIterationEnd, task)
+	}
+}
+
+// iterationExecutedTool 判断指定迭代是否真正执行了工具 (ActionRecord.ToolName 非空).
+// 工具执行的客观成败是高价值训练信号; 纯思考 / 直接回答 / 规划等迭代不在此触发,
+// 留给 loop_end 汇总, 从而专注高价值数据.
+func (r *ReActLoop) iterationExecutedTool(iteration int) bool {
+	for _, a := range r.GetAllExistedActionRecord() {
+		if a == nil {
+			continue
+		}
+		if a.IterationIndex == iteration && a.ToolName != "" {
+			return true
+		}
+	}
+	return false
 }
 
 // submitValueFeedbackSignal 在过程信号节点 (SPIN / 反思 / verification) 作为额外
