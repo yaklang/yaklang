@@ -181,7 +181,11 @@ func TestReAct_RequestPlanAndExecution_PreservesQualityModelInsideAid(t *testing
 		sawFastAfterPlanStarted  bool
 	)
 
-	timeout := time.After(20 * time.Second)
+	// 这是一条完整 plan-and-execute 集成链路 (外层 ReAct -> 进入 aid -> 计划生成 ->
+	// 子任务循环 -> 工具调用 -> 审查 -> 总结 -> 满意度校验), 本地约需 10s. CI 共享 runner
+	// 速度约为本地的一半且并行跑多个测试二进制, 20s 余量不足会偶发超时. 放宽到 60s 以
+	// 留出足够裕度, 不改变任何断言语义.
+	timeout := time.After(60 * time.Second)
 LOOP:
 	for {
 		select {
