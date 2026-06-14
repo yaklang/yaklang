@@ -36,6 +36,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/aiforge"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -61,6 +62,10 @@ const (
 	valueFeedbackQueueSize   = 1024
 	valueFeedbackWorkerNum   = 2
 	valueFeedbackCallTimeout = 30 * time.Second
+	// valueFeedbackEmitTimeout 是单次结果回吐 (EmitJSON -> 宿主 EventHandler) 的兜底
+	// 上限. 正常消费者会立即接收; 一旦消费者消失导致 emit 阻塞, 超时后放弃本次回吐并
+	// 释放 worker, 避免固定 worker pool 被永久卡死/泄漏.
+	valueFeedbackEmitTimeout = 5 * time.Second
 )
 
 // valueFeedbackJob 是一次价值评估提交任务.
@@ -140,7 +145,23 @@ func (p *valueFeedbackPool) tryEnqueue(cfg *aicommon.Config, record *aicommon.Va
 }
 
 // submitValueFeedback 是注册进 aicommon 的 submitter 入口 (非阻塞投递).
+//
+// 硬约束: 价值评估只能走 lightweight tier (aibalance 的 memfit-light-free), 绝不
+// 回退到 legacy ai.Chat. 当宿主没有启用 tiered/lightweight 模型时 (离线 / 测试 /
+// 未接入 aibalance), 直接 no-op 丢弃, 不入队、不发起任何真实网络调用.
+//
+// 关键: 这里只能用 consts.IsTieredAIModelConfigEnabled() 这种"纯读"探针来判定, 绝不
+// 能调用 aicommon.GetLightweightAIModelCallback() / aiconfig.IsTieredAIConfig() —— 后
+// 两者会触发 EnsureConfigLoaded() 把"内建默认 tiered 配置 (aibalance)"懒加载并写入全
+// 局 consts, 从而把全局 tiered 开关由 false 翻成 true. 一旦在宿主线程 (尤其测试进程)
+// 里发生这种副作用, 后续所有依赖 WithAutoTieredAICallback 的逻辑都会绕过 mock 回调直
+// 连真实模型, 既污染单测又会发起真实网络调用. 价值评估只应"搭车"宿主已经启用的 tiered
+// 配置, 绝不能成为那个启用全局配置的人.
 func submitValueFeedback(cfg *aicommon.Config, record *aicommon.ValueFeedbackRecord) {
+	if !consts.IsTieredAIModelConfigEnabled() {
+		// 宿主尚未启用 tiered 配置: 价值评估直接放弃, 不入队、不触发任何全局副作用.
+		return
+	}
 	globalValueFeedbackPool.enqueue(cfg, record)
 }
 
@@ -195,7 +216,13 @@ func submitValueFeedbackInternal(ctx context.Context, cfg *aicommon.Config, reco
 	outputSchema := aitool.NewObjectSchemaWithActionName(valueFeedbackActionName, buildValueFeedbackOutputs()...)
 
 	// 硬编码 lightweight 回调 (memfit-light-free), 不暴露任何模型 option.
-	cb := aicommon.MustGetLightweightAIModelCallback()
+	// 严格只用 lightweight tier: 拿不到就放弃, 绝不回退到 legacy ai.Chat (那会违反
+	// "只能用 memfit-light-free" 的硬约束, 并在无后端环境里发起真实请求).
+	cb, cbErr := aicommon.GetLightweightAIModelCallback()
+	if cbErr != nil {
+		log.Debugf("aive skip value feedback: lightweight model callback unavailable: %v", cbErr)
+		return
+	}
 
 	forge, err := aiforge.NewLiteForge(
 		valueFeedbackActionName,
@@ -229,12 +256,12 @@ func submitValueFeedbackInternal(ctx context.Context, cfg *aicommon.Config, reco
 		return
 	}
 
-	emitValueFeedbackResult(cfg, record, result.Action)
+	emitValueFeedbackResult(ctx, cfg, record, result.Action)
 }
 
 // emitValueFeedbackResult 把小模型给出的单个价值评估结果回吐用户一次,
 // 携带 ID/Signature; 不写任何本地存储 (该事件类型在 schema 黑名单中).
-func emitValueFeedbackResult(cfg *aicommon.Config, record *aicommon.ValueFeedbackRecord, action *aicommon.Action) {
+func emitValueFeedbackResult(ctx context.Context, cfg *aicommon.Config, record *aicommon.ValueFeedbackRecord, action *aicommon.Action) {
 	emitter := cfg.GetEmitter()
 	if emitter == nil {
 		log.Warnf("aive value feedback no emitter, drop result: id=%s", record.ID)
@@ -263,8 +290,32 @@ func emitValueFeedbackResult(cfg *aicommon.Config, record *aicommon.ValueFeedbac
 		},
 		"timestamp": time.Now().Unix(),
 	}
-	if _, err := emitter.EmitJSON(schema.EVENT_TYPE_VALUE_FEEDBACK, "ai_value_feedback", payload); err != nil {
-		log.Warnf("aive emit value feedback event failed: id=%s err=%v", record.ID, err)
+	// 非阻塞回吐: emitter 最终会同步调用宿主的 EventHandler (例如 channel send).
+	// 若下游消费者已经消失 (典型如测试结束后没人再 drain 事件 channel, 而其 config
+	// 用的是 context.Background 永不取消), 同步 emit 会永久阻塞, 进而把固定大小的
+	// 价值评估 worker pool 全部卡死并泄漏. 因此这里把 emit 放进独立 goroutine, 用单
+	// 次调用上下文兜底: 超时即放弃本次回吐, 释放 worker. 生产环境消费者持续 drain,
+	// emit 立即返回, 不会产生悬挂 goroutine.
+	emitDone := make(chan struct{})
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Warnf("aive emit value feedback panic recovered: id=%s err=%v", record.ID, r)
+			}
+			close(emitDone)
+		}()
+		if _, err := emitter.EmitJSON(schema.EVENT_TYPE_VALUE_FEEDBACK, "ai_value_feedback", payload); err != nil {
+			log.Warnf("aive emit value feedback event failed: id=%s err=%v", record.ID, err)
+		}
+	}()
+	emitTimer := time.NewTimer(valueFeedbackEmitTimeout)
+	defer emitTimer.Stop()
+	select {
+	case <-emitDone:
+	case <-ctx.Done():
+		log.Warnf("aive value feedback emit abandoned (ctx done): id=%s", record.ID)
+	case <-emitTimer.C:
+		log.Warnf("aive value feedback emit abandoned (consumer gone, emit timeout): id=%s", record.ID)
 	}
 }
 
