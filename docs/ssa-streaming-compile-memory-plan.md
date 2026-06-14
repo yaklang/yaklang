@@ -46,6 +46,59 @@ peak_AST ≈ Σ_over_all_functions_methods_toplevel ( body_subtree_i )
 
 C/C++、Go、Rust、Java 都**不把整个项目 AST 同时拿在手里**：以**包/模块/翻译单元**为粒度、**按依赖拓扑序逐个编译**；依赖单元以**紧凑导出信息**（export data / .class / crate metadata / 头文件）可见，而非重新加载 AST；**编完一个单元就释放它的 AST**。
 
+外部资料核验时间：`2026-06-15T11:20:45+08:00`（HKT）。参考来源：
+
+- GCC Internals：`https://gcc.gnu.org/onlinedocs/gccint/Passes.html`、`https://gcc.gnu.org/onlinedocs/gccint/Parsing-pass.html`
+- Clang Internals / PCH：`https://clang.llvm.org/docs/InternalsManual.html`、`https://clang.llvm.org/docs/PCHInternals.html`
+- Go command：`https://pkg.go.dev/cmd/go`
+- javac manual：`https://docs.oracle.com/en/java/javase/21/docs/specs/man/javac.html`
+- rustc dev guide：`https://rustc-dev-guide.rust-lang.org/backend/libs-and-metadata.html`
+
+### 3.1 传统实现模式
+
+| 编译器 / 工具链 | 编译粒度 | 跨单元依赖形态 | 对内存上界的启发 |
+|---|---|---|---|
+| GCC | 前端解析输入后进入 gimplification / IPA / Tree-SSA / RTL 等 pass；C 前端可在看到顶层函数/声明后把它交给 middle-end | 顶层 declaration / function / type definition 进入 middle-end，middle-end 可立即处理或排队 | 不要求“全项目体 AST 同时存在”；函数体可被交给后续阶段后释放前端结构 |
+| Clang / C/C++ | translation unit；PCH / module 是已序列化的 AST 文件 | PCH / module AST 文件按 identifier、decl、type、source location 等索引 lazy deserialize；Clang 文档明确初始加载成本不随 AST 文件大小增长 | 依赖应以可索引、可 lazy 读取的导出/摘要形式存在；引用到哪个符号才加载哪个符号，而不是把依赖 AST 整体拉进内存 |
+| Go | package；`go build` 编译 import path 指定的 packages 及其 dependencies | package export data / build cache；依赖按 package graph 编译 | package 是天然 compile unit；内存峰值应接近当前 package + 依赖摘要，而不是 module 全量源码 |
+| javac | 一组 source files 可作为 group 编译；通过 classpath / sourcepath / module-path 查找依赖声明 | 已编译 `.class`、source path、module path；编译环境与运行环境分离 | 小工程可以 group 编译，依赖解析不需要把整个仓库作为一个 AST；大工程需要明确 source/class/module 边界 |
+| rustc / Cargo | crate；crate 之间由 Cargo 调度，可 pipelining | `rlib` / `dylib` / `rmeta` 带 rustc metadata；`rmeta` 可先于 codegen 产出供下游 crate 开始编译 | 先产出依赖摘要，再编译/保存 body IR；下游只等 metadata，不等完整 codegen，是我们“导出骨架先可见”的直接参考 |
+
+### 3.2 可直接迁移的原则
+
+1. **小项目 resident 是正常快路径，不是错误模式。** `javac` 可以把一组 source files 一起编译；Clang 对单个 translation unit 也会持有完整 AST。我们的 `resident-fast-path` 应保留，但要命名为策略，而不是“legacy 残留”。
+2. **大项目 split 必须以真实 compile unit 为边界。** Java package、Go package、Rust crate、C/C++ translation unit 都有清晰边界；我们的单元也必须有路径、文件集合、依赖边、SCC/topological order。
+3. **跨单元只保留接口/摘要，不保留完整体。** 传统工具链保留 `.class`、export data、crate metadata、PCH/module 索引；对应到 SSA，只能保留导出函数/类/变量/类型摘要、import/export 边、必要符号索引和可 reload 的 IR。
+4. **依赖摘要要可 lazy 读取。** Clang PCH 的关键不是“把 AST 序列化”本身，而是按 identifier/decl/type/source location 建索引后 lazy deserialize。我们的 writer cache / DB reload 也应该以符号或 unit 为索引，避免 flush 后又整批 reload。
+5. **pipeline 可以先产出 metadata，再产出 body。** Rust `rmeta` 的启发是：依赖单元可见不必等待完整 codegen。我们的 split 编译也应该先让导出骨架进入 library/upstream，再构建 body IR 并按 unit flush。
+6. **LTO / 全程序优化是显式重模式。** 传统编译器也有更吃内存的 whole-program / LTO 路径，但那是可选择的高成本模式。我们的全工程 resident/legacy 也应只作为小项目快路径、兼容兜底或诊断对照，不作为大工程默认路径。
+
+### 3.3 对当前性能问题的直接要求
+
+当前 `split` 如果没有明显降内存，不能归因于“分离编译不成立”，而要检查它是否满足传统编译器的三个必要条件：
+
+1. **batch 必须明显小于项目总量。** 如果第一个 batch 接近全项目，理论峰值仍接近全项目；planner 需要按源码字节、预计 AST 放大系数、文件数、SCC 大小共同切 batch，而不是允许一个 batch 吃掉主要项目。
+2. **batch 后必须验证释放。** 每个 batch 在 parse / prehandler / lazy build / `FlushCompileUnit` / GC 后记录 heap、RSS、AST/editor 数、lazy/deferred 队列数、resident IR/function/block 数。flush 后这些指标不下降，就不算真正 streaming。
+3. **writer cache 不能把依赖重新放大。** flush 后依赖只能以骨架/导出摘要/索引形式可见；如果 reload 把上一批 body IR 或整单元状态重新常驻，峰值会变成“当前 batch + 历史 batch 残留”。
+
+因此本分支后续策略应明确为：
+
+```text
+auto:
+  small / one-batch / graph-uncertain -> resident-fast-path
+  large and plan has real reduction   -> split
+  near OOM or user-forced large run    -> strict-split
+
+resident-fast-path:
+  保留全量常驻，追求速度；用于小项目、回归对照、语言依赖图不可靠时兜底。
+
+split:
+  单元拓扑序编译；每批只保留当前批 AST/body IR，批后 flush + release + telemetry 校验。
+
+strict-split:
+  更小 batch、更强 cache spill、更积极 GC；允许牺牲 CPU，目标是避免 OOM。
+```
+
 惊喜：**本项目架构已具备一半条件**。
 
 | 传统编译器 | 本项目现状（已存在） |

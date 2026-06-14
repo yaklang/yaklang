@@ -1,6 +1,9 @@
 package ssa
 
 import (
+	"fmt"
+	"runtime"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -28,6 +31,9 @@ type ProgramCache struct {
 	types        *typeStore
 	sources      *sourceStore
 	indexes      *indexStore
+
+	// Track last flush statistics for telemetry
+	lastReleasedEditors int
 }
 
 func NewDBCache(cfg *ssaconfig.Config, prog *Program, databaseKind ProgramCacheKind, fileSize int) *ProgramCache {
@@ -212,6 +218,11 @@ func (c *ProgramCache) FlushCompileUnit(unitKey string) {
 	if c == nil || !c.HaveDatabaseBackend() {
 		return
 	}
+
+	// ALWAYS log to verify this function is called
+	log.Infof("[FLUSH-DEBUG] FlushCompileUnit called: unitKey=%s", unitKey)
+
+	releasedEditors := 0
 	c.diagnosticsTrack("ssa.ProgramCache.FlushCompileUnit",
 		func() error {
 			if c.instructions != nil {
@@ -234,15 +245,69 @@ func (c *ProgramCache) FlushCompileUnit(unitKey string) {
 		func() error {
 			if c.sources != nil {
 				c.sources.Flush()
-				c.sources.ReleasePersistedEditors()
+				releasedEditors = c.sources.ReleasePersistedEditors()
 			}
 			return nil
 		},
 	)
-	if instructionCacheDebugEnabled() {
-		log.Debugf("[ssa-ir-cache-flush] program=%s unit=%s mode=%s resident=%d persisted=%d",
-			c.program.GetProgramName(), unitKey, c.InstructionCacheMode(), c.CountInstruction(), c.InstructionPersistedCount())
+	c.lastReleasedEditors = releasedEditors
+
+	// CRITICAL FIX: Release function bodies for completed units
+	// This is the key to preventing memory accumulation across batches
+	// unitKey is a comma-separated string like "java:com.foo,java:com.bar"
+	unitKeys := strings.Split(unitKey, ",")
+	releasedFuncs := 0
+
+	fmt.Printf("\n[CRITICAL-DEBUG] FlushCompileUnit: c.program=%v, units=%d\n", c.program != nil, len(unitKeys))
+
+	if c.program != nil {
+		fmt.Printf("[CRITICAL-DEBUG] Calling ReleaseCompletedUnitMemory...\n")
+		releasedFuncs = c.program.ReleaseCompletedUnitMemory(unitKeys)
+		fmt.Printf("[CRITICAL-DEBUG] ReleaseCompletedUnitMemory returned: released=%d\n", releasedFuncs)
+	} else {
+		fmt.Printf("[CRITICAL-DEBUG] c.program is NIL! Cannot release memory\n")
 	}
+
+	// AGGRESSIVE MEMORY RELEASE STRATEGY
+	// Since Program.Funcs is empty in writer mode, we need to clear other structures
+
+	// 1. Clear cache references
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+	heapBeforeMB := float64(m.HeapInuse) / (1024 * 1024)
+
+	// 2. Force GC multiple times to clean up all generations
+	runtime.GC()
+	runtime.GC()
+	runtime.GC()
+
+	runtime.ReadMemStats(&m)
+	heapAfterMB := float64(m.HeapInuse) / (1024 * 1024)
+
+	fmt.Printf("[MEMORY-RELEASE] Triple GC: heap %.1fMB → %.1fMB (freed %.1fMB)\n",
+		heapBeforeMB, heapAfterMB, heapBeforeMB-heapAfterMB)
+
+	// 3. Try to release memory back to OS
+	if heapBeforeMB > 500 {
+		// Only try to release if heap is substantial
+		debug.FreeOSMemory()
+		runtime.ReadMemStats(&m)
+		heapAfterFreeMB := float64(m.HeapInuse) / (1024 * 1024)
+		fmt.Printf("[MEMORY-RELEASE] After FreeOSMemory: heap %.1fMB → %.1fMB\n",
+			heapAfterMB, heapAfterFreeMB)
+	}
+
+	if instructionCacheDebugEnabled() {
+		log.Debugf("[ssa-ir-cache-flush] program=%s unit=%s mode=%s resident=%d persisted=%d released_editors=%d released_funcs=%d",
+			c.program.GetProgramName(), unitKey, c.InstructionCacheMode(), c.CountInstruction(), c.InstructionPersistedCount(), releasedEditors, releasedFuncs)
+	}
+}
+
+func (c *ProgramCache) CountReleasedEditors() int {
+	if c == nil {
+		return 0
+	}
+	return c.lastReleasedEditors
 }
 
 func (c *ProgramCache) CountInstruction() int {

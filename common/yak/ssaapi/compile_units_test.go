@@ -94,6 +94,54 @@ func TestCompileUnitWriterCacheEnabledForMultiBatchOrLargeProject(t *testing.T) 
 	require.True(t, compileUnitWriterCacheEnabled(true, singleLargeBatch, compileUnitResidentFastPathMaxBytes+1))
 }
 
+func TestSSACompileAdaptiveGCPolicyDefaultsAndOverrides(t *testing.T) {
+	t.Setenv("GOGC", "")
+	t.Setenv("GOMEMLIMIT", "")
+	t.Setenv(ssaCompileGOGCEnv, "")
+	t.Setenv(ssaCompileMemLimitEnv, "")
+
+	gcPercent, setGC := ssaCompileGCPercent()
+	memLimit, setMemLimit := ssaCompileMemoryLimit()
+	require.True(t, setGC)
+	require.Equal(t, defaultSSACompileGOGC, gcPercent)
+	require.True(t, setMemLimit)
+	require.Equal(t, int64(defaultSSACompileMemLimit), memLimit)
+
+	t.Setenv(ssaCompileGOGCEnv, "120")
+	t.Setenv(ssaCompileMemLimitEnv, "512MiB")
+	gcPercent, setGC = ssaCompileGCPercent()
+	memLimit, setMemLimit = ssaCompileMemoryLimit()
+	require.True(t, setGC)
+	require.Equal(t, 120, gcPercent)
+	require.True(t, setMemLimit)
+	require.Equal(t, int64(512*1024*1024), memLimit)
+
+	t.Setenv(ssaCompileGOGCEnv, "off")
+	t.Setenv(ssaCompileMemLimitEnv, "disabled")
+	_, setGC = ssaCompileGCPercent()
+	_, setMemLimit = ssaCompileMemoryLimit()
+	require.False(t, setGC)
+	require.False(t, setMemLimit)
+}
+
+func TestEnvFlagEnabledFalseSpellings(t *testing.T) {
+	t.Setenv("YAK_TEST_FLAG", "no")
+	require.False(t, envFlagEnabled("YAK_TEST_FLAG"))
+	t.Setenv("YAK_TEST_FLAG", "disabled")
+	require.False(t, envFlagEnabled("YAK_TEST_FLAG"))
+	t.Setenv("YAK_TEST_FLAG", "1")
+	require.True(t, envFlagEnabled("YAK_TEST_FLAG"))
+}
+
+func TestHeapProfileDirDisabledSpellings(t *testing.T) {
+	t.Setenv("YAK_SSA_HEAP_PROFILE_DIR", "off")
+	require.Empty(t, heapProfileDir())
+	t.Setenv("YAK_SSA_HEAP_PROFILE_DIR", "none")
+	require.Empty(t, heapProfileDir())
+	t.Setenv("YAK_SSA_HEAP_PROFILE_DIR", "build/heap")
+	require.Equal(t, "build/heap", heapProfileDir())
+}
+
 func TestCompileUnitPlanJavaTemplateResourceMergesWithServletUnit(t *testing.T) {
 	vf := filesys.NewVirtualFs()
 	vf.AddFile("src/main/java/com/example/DemoServlet.java", `package com.example;
