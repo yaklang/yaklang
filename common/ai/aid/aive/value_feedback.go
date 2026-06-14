@@ -213,6 +213,10 @@ func submitValueFeedbackInternal(ctx context.Context, cfg *aicommon.Config, reco
 		aicommon.WithAgreeYOLO(),
 		aicommon.WithFastAICallback(cb),
 		aicommon.WithDisableCreateDBRuntime(true),
+		// 价值评估是尽力而为的旁路采集: 单次尝试即可, 失败直接丢弃. 绝不为一条
+		// 训练样本做 5 次事务重试, 既省主模型/小模型开销, 也避免后台重试风暴拖慢
+		// 宿主 (含测试环境) 的整体节拍.
+		aicommon.WithAITransactionAutoRetry(1),
 	}
 
 	result, err := forge.Execute(ctx, nil, execOpts...)
