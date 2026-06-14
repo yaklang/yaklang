@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"runtime/debug"
 	"runtime/pprof"
 	"sort"
 	"strconv"
@@ -29,23 +30,41 @@ const compileUnitWriterCacheEnv = "YAK_SSA_COMPILE_UNIT_WRITER_CACHE"
 const compileUnitHoldSCCIREnv = "YAK_SSA_COMPILE_UNIT_HOLD_SCC_IR"
 const compileUnitBatchMinFilesEnv = "YAK_SSA_COMPILE_UNIT_BATCH_MIN_FILES"
 const compileUnitBatchMinBytesEnv = "YAK_SSA_COMPILE_UNIT_BATCH_MIN_BYTES"
+const ssaCompileAdaptiveGCEnv = "YAK_SSA_COMPILE_ADAPTIVE_GC"
+const ssaCompileGOGCEnv = "YAK_SSA_COMPILE_GOGC"
+const ssaCompileMemLimitEnv = "YAK_SSA_COMPILE_MEM_LIMIT"
 
 const (
-	defaultCompileUnitBatchMinFiles = 512
-	defaultCompileUnitBatchMinBytes = 4 * 1024 * 1024
+	// Compile-unit split thresholds: even smaller batches to prevent OOM
+	// Previous: 512 files / 4MB (OOM at 12.6GB)
+	// First reduction: 128 files / 1MB (OOM at 11.7GB, batch 11 jumped to 750MB)
+	// Current: 64 files / 512KB for maximum memory control
+	defaultCompileUnitBatchMinFiles = 64
+	defaultCompileUnitBatchMinBytes = 512 * 1024
+	defaultSSACompileGOGC           = 1000
+	defaultSSACompileMemLimit       = 680 * 1024 * 1024
 	// Keep this in sync with the SSA IR cache resident fast-path threshold.
 	// Below this size, a single compile-unit batch is cheaper in resident mode
 	// than forcing the async writer cache.
 	compileUnitResidentFastPathMaxBytes = 2 * 1024 * 1024
 )
 
+var ssaCompileGCMu sync.Mutex
+
 func envFlagEnabled(name string) bool {
 	value := strings.ToLower(strings.TrimSpace(os.Getenv(name)))
-	return value != "" && value != "0" && value != "false" && value != "off"
+	return value != "" && value != "0" && value != "false" && value != "no" && value != "off" && value != "disable" && value != "disabled"
+}
+
+func captureHeapMetrics() float64 {
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+	return float64(m.HeapInuse) / (1024 * 1024)
 }
 
 func logPhaseHeap(tag string) {
-	if !heapLogEnabled && os.Getenv("YAK_SSA_HEAP_PROFILE_DIR") == "" {
+	profileDir := heapProfileDir()
+	if !heapLogEnabled && profileDir == "" {
 		return
 	}
 	runtime.GC()
@@ -54,9 +73,9 @@ func logPhaseHeap(tag string) {
 	if heapLogEnabled {
 		fmt.Fprintf(os.Stderr, "[ssa.heap] %-16s retained_HeapInuse=%7.1fMB HeapObjects=%d\n", tag, float64(m.HeapInuse)/(1024*1024), m.HeapObjects)
 	}
-	if dir := os.Getenv("YAK_SSA_HEAP_PROFILE_DIR"); dir != "" {
-		_ = os.MkdirAll(dir, 0o755)
-		target := filepath.Join(dir, normalizeHeapProfileName(tag)+".heap.pb.gz")
+	if profileDir != "" {
+		_ = os.MkdirAll(profileDir, 0o755)
+		target := filepath.Join(profileDir, normalizeHeapProfileName(tag)+".heap.pb.gz")
 		f, err := os.Create(target)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "[ssa.heap] profile write failed %s: %v\n", target, err)
@@ -72,9 +91,134 @@ func logPhaseHeap(tag string) {
 	}
 }
 
+func heapProfileDir() string {
+	raw := strings.TrimSpace(os.Getenv("YAK_SSA_HEAP_PROFILE_DIR"))
+	switch strings.ToLower(raw) {
+	case "", "0", "false", "no", "off", "none", "disable", "disabled":
+		return ""
+	default:
+		return raw
+	}
+}
+
 func normalizeHeapProfileName(tag string) string {
 	replacer := strings.NewReplacer("/", "_", " ", "_", ".", "_")
 	return replacer.Replace(tag)
+}
+
+func startSSACompileCPUProfile() func() {
+	target := strings.TrimSpace(os.Getenv("YAK_SSA_CPU_PROFILE"))
+	if target == "" {
+		return nil
+	}
+	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+		fmt.Fprintf(os.Stderr, "[ssa.cpu] profile mkdir failed %s: %v\n", filepath.Dir(target), err)
+		return nil
+	}
+	f, err := os.Create(target)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[ssa.cpu] profile create failed %s: %v\n", target, err)
+		return nil
+	}
+	if err := pprof.StartCPUProfile(f); err != nil {
+		fmt.Fprintf(os.Stderr, "[ssa.cpu] profile start failed %s: %v\n", target, err)
+		_ = f.Close()
+		return nil
+	}
+	fmt.Fprintf(os.Stderr, "[ssa.cpu] profile started %s\n", target)
+	return func() {
+		pprof.StopCPUProfile()
+		if err := f.Close(); err != nil {
+			fmt.Fprintf(os.Stderr, "[ssa.cpu] profile close failed %s: %v\n", target, err)
+			return
+		}
+		fmt.Fprintf(os.Stderr, "[ssa.cpu] profile saved %s\n", target)
+	}
+}
+
+func startSSACompileAdaptiveGC(logf func(string, ...any)) func() {
+	if raw := strings.TrimSpace(os.Getenv(ssaCompileAdaptiveGCEnv)); raw != "" && !envFlagEnabled(ssaCompileAdaptiveGCEnv) {
+		return nil
+	}
+
+	gcPercent, setGC := ssaCompileGCPercent()
+	memLimit, setMemLimit := ssaCompileMemoryLimit()
+	if !setGC && !setMemLimit {
+		return nil
+	}
+
+	ssaCompileGCMu.Lock()
+	var oldGC int
+	var oldMemLimit int64
+	if setGC {
+		oldGC = debug.SetGCPercent(gcPercent)
+	}
+	if setMemLimit {
+		oldMemLimit = debug.SetMemoryLimit(memLimit)
+	}
+	if logf != nil {
+		logf("ssa compile adaptive GC enabled gogc=%s mem_limit=%s", gcPolicyValue(setGC, gcPercent), gcPolicyBytesValue(setMemLimit, memLimit))
+	}
+	return func() {
+		if setMemLimit {
+			debug.SetMemoryLimit(oldMemLimit)
+		}
+		if setGC {
+			debug.SetGCPercent(oldGC)
+		}
+		ssaCompileGCMu.Unlock()
+	}
+}
+
+func ssaCompileGCPercent() (int, bool) {
+	if raw := strings.TrimSpace(os.Getenv(ssaCompileGOGCEnv)); raw != "" {
+		switch strings.ToLower(raw) {
+		case "0", "false", "no", "off", "disable", "disabled":
+			return 0, false
+		default:
+			if v, err := strconv.Atoi(raw); err == nil && v >= 0 {
+				return v, true
+			}
+		}
+	}
+	if strings.TrimSpace(os.Getenv("GOGC")) != "" {
+		return 0, false
+	}
+	return defaultSSACompileGOGC, true
+}
+
+func ssaCompileMemoryLimit() (int64, bool) {
+	if raw := strings.TrimSpace(os.Getenv(ssaCompileMemLimitEnv)); raw != "" {
+		switch strings.ToLower(raw) {
+		case "0", "false", "no", "off", "disable", "disabled":
+			return 0, false
+		default:
+			if v, err := utils.ToBytes(raw); err == nil && v > 0 {
+				return int64(v), true
+			}
+			if v, err := strconv.ParseInt(raw, 10, 64); err == nil && v > 0 {
+				return v, true
+			}
+		}
+	}
+	if strings.TrimSpace(os.Getenv("GOMEMLIMIT")) != "" {
+		return 0, false
+	}
+	return defaultSSACompileMemLimit, true
+}
+
+func gcPolicyValue(enabled bool, value int) string {
+	if !enabled {
+		return "unchanged"
+	}
+	return strconv.Itoa(value)
+}
+
+func gcPolicyBytesValue(enabled bool, value int64) string {
+	if !enabled {
+		return "unchanged"
+	}
+	return utils.ByteSize(uint64(value))
 }
 
 func compileUnitLogEnabled() bool {
@@ -318,7 +462,43 @@ func buildCompileUnitExecutionBatches(order [][]*CompileUnit, minFiles int, minB
 		minBytes = 0
 	}
 
-	batches := make([]compileUnitExecutionBatch, 0, len(order))
+	// Calculate total project size
+	totalFiles := 0
+	totalBytes := int64(0)
+	for _, scc := range order {
+		for _, unit := range scc {
+			if unit != nil {
+				totalFiles += len(unit.Files)
+				totalBytes += unit.Bytes
+			}
+		}
+	}
+
+	// Estimate desired batch count based on both dimensions
+	var estimatedBatchCount int
+	if minFiles > 0 && totalFiles > minFiles {
+		estimatedBatchCount = max(estimatedBatchCount, (totalFiles+minFiles-1)/minFiles)
+	}
+	if minBytes > 0 && totalBytes > minBytes {
+		estimatedBatchCount = max(estimatedBatchCount, int((totalBytes+minBytes-1)/minBytes))
+	}
+	if estimatedBatchCount <= 1 {
+		// Single batch - take everything
+		return []compileUnitExecutionBatch{buildSingleBatch(order)}
+	}
+
+	// Adaptive target: aim for balanced batches
+	targetFilesPerBatch := (totalFiles + estimatedBatchCount - 1) / estimatedBatchCount
+	targetBytesPerBatch := (totalBytes + int64(estimatedBatchCount) - 1) / int64(estimatedBatchCount)
+
+	// Use 80% of target as the threshold to allow some headroom for the last batch
+	softMinFiles := int(float64(targetFilesPerBatch) * 0.8)
+	softMinBytes := int64(float64(targetBytesPerBatch) * 0.8)
+	if softMinFiles < 1 {
+		softMinFiles = 1
+	}
+
+	batches := make([]compileUnitExecutionBatch, 0, estimatedBatchCount)
 	current := compileUnitExecutionBatch{startSCC: -1, endSCC: -1}
 	flush := func() {
 		if len(current.units) == 0 {
@@ -343,12 +523,62 @@ func buildCompileUnitExecutionBatches(order [][]*CompileUnit, minFiles int, minB
 			current.files += len(unit.Files)
 			current.bytes += unit.Bytes
 		}
-		if compileUnitBatchReady(current, minFiles, minBytes) {
+
+		// Check if we should flush this batch
+		remainingSCCs := len(order) - sccIndex - 1
+		remainingBatches := estimatedBatchCount - len(batches) - 1
+
+		shouldFlush := false
+		if remainingSCCs == 0 {
+			// Last SCC - always flush to close the final batch
+			shouldFlush = true
+		} else if remainingBatches <= 0 {
+			// No more batches planned - continue accumulating
+			shouldFlush = false
+		} else if compileUnitBatchReadyAdaptive(current, softMinFiles, softMinBytes) {
+			// Reached soft threshold - flush
+			shouldFlush = true
+		}
+
+		if shouldFlush {
 			flush()
 		}
 	}
 	flush()
 	return batches
+}
+
+func buildSingleBatch(order [][]*CompileUnit) compileUnitExecutionBatch {
+	batch := compileUnitExecutionBatch{startSCC: 0, endSCC: len(order) - 1}
+	for _, scc := range order {
+		for _, unit := range scc {
+			if unit == nil {
+				continue
+			}
+			batch.units = append(batch.units, unit)
+			batch.unitKeys = append(batch.unitKeys, unit.Key)
+			batch.files += len(unit.Files)
+			batch.bytes += unit.Bytes
+		}
+	}
+	return batch
+}
+
+func compileUnitBatchReadyAdaptive(batch compileUnitExecutionBatch, softMinFiles int, softMinBytes int64) bool {
+	if len(batch.units) == 0 {
+		return false
+	}
+	// Both dimensions must reach threshold (AND logic for better balance)
+	filesReady := softMinFiles <= 1 || batch.files >= softMinFiles
+	bytesReady := softMinBytes <= 0 || batch.bytes >= softMinBytes
+	return filesReady && bytesReady
+}
+
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }
 
 func compileUnitBatchReady(batch compileUnitExecutionBatch, minFiles int, minBytes int64) bool {
@@ -358,6 +588,7 @@ func compileUnitBatchReady(batch compileUnitExecutionBatch, minFiles int, minByt
 	if minFiles <= 1 && minBytes <= 0 {
 		return true
 	}
+	// Use OR logic for backward compatibility (deprecated path)
 	if minFiles > 0 && batch.files >= minFiles {
 		return true
 	}
@@ -585,6 +816,9 @@ func (c *Config) parseProjectWithFSUnits(
 		}
 		processCallback(process, msg)
 	}
+	if stopAdaptiveGC := startSSACompileAdaptiveGC(prog.ProcessInfof); stopAdaptiveGC != nil {
+		defer stopAdaptiveGC()
+	}
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -781,20 +1015,57 @@ func (c *Config) parseProjectWithFSUnits(
 		if c.isStop() {
 			return nil, ErrContextCancel
 		}
+		// Capture pre-flush metrics for comparison
+		preFlushIR := 0
+		preFlushPersisted := 0
+		preFlushFuncs := 0
+		preFlushBlueprints := 0
+		if prog.Cache != nil {
+			preFlushIR = prog.Cache.CountInstruction()
+			preFlushPersisted = prog.Cache.InstructionPersistedCount()
+		}
+		if prog.Funcs != nil {
+			preFlushFuncs = prog.Funcs.Len()
+		}
+		if prog.Blueprint != nil {
+			preFlushBlueprints = prog.Blueprint.Len()
+		}
+		preFlushHeap := captureHeapMetrics()
+
 		if prog.Cache != nil && writerCacheEnabled {
 			prog.Cache.FlushCompileUnit(strings.Join(unitKeys, ","))
+
+			// Check memory pressure after flush
+			prog.CheckMemoryPressure(batchIndex+1, len(batches))
+
+			// Measure post-flush to verify release
+			postFlushIR := prog.Cache.CountInstruction()
+			postFlushPersisted := prog.Cache.InstructionPersistedCount()
+			postFlushFuncs := 0
+			postFlushBlueprints := 0
+			if prog.Funcs != nil {
+				postFlushFuncs = prog.Funcs.Len()
+			}
+			if prog.Blueprint != nil {
+				postFlushBlueprints = prog.Blueprint.Len()
+			}
+			postFlushHeap := captureHeapMetrics()
+			releasedEditors := prog.Cache.CountReleasedEditors()
+
 			prog.ProcessInfof(
-				"compile unit batch(%d/%d) cache flushed scc=%d-%d units=%s mode=%s resident_ir=%d persisted_ir=%d funcs=%d blueprints=%d upstreams=%d cost=%v",
+				"compile unit batch(%d/%d) cache flushed scc=%d-%d units=%s mode=%s resident_ir=%d→%d(Δ%+d) persisted_ir=%d→%d(Δ%+d) heap_mb=%.1f→%.1f(Δ%+.1f) funcs=%d→%d(Δ%+d) blueprints=%d→%d(Δ%+d) editors_released=%d upstreams=%d cost=%v",
 				batchIndex+1,
 				len(batches),
 				batch.startSCC+1,
 				batch.endSCC+1,
 				strings.Join(unitKeys, ","),
 				prog.Cache.InstructionCacheMode(),
-				prog.Cache.CountInstruction(),
-				prog.Cache.InstructionPersistedCount(),
-				prog.Funcs.Len(),
-				prog.Blueprint.Len(),
+				preFlushIR, postFlushIR, postFlushIR-preFlushIR,
+				preFlushPersisted, postFlushPersisted, postFlushPersisted-preFlushPersisted,
+				preFlushHeap, postFlushHeap, postFlushHeap-preFlushHeap,
+				preFlushFuncs, postFlushFuncs, postFlushFuncs-preFlushFuncs,
+				preFlushBlueprints, postFlushBlueprints, postFlushBlueprints-preFlushBlueprints,
+				releasedEditors,
 				prog.UpStream.Len(),
 				time.Since(unitBuildStart),
 			)
@@ -916,6 +1187,9 @@ func (c *Config) parseProjectWithFS(
 	filesystem filesys_interface.FileSystem,
 	processCallback func(float64, string, ...any),
 ) (*Program, error) {
+	if stopCPUProfile := startSSACompileCPUProfile(); stopCPUProfile != nil {
+		defer stopCPUProfile()
+	}
 	if os.Getenv("YAK_SSA_LEGACY_PROJECT_COMPILE") != "" {
 		return c.parseProjectWithFSLegacy(filesystem, processCallback)
 	}
@@ -1032,6 +1306,9 @@ func (c *Config) parseProjectWithFSLegacy(
 			msg = fmt.Sprintf("[%s] %s", compilePhase, msg)
 		}
 		processCallback(process, msg)
+	}
+	if stopAdaptiveGC := startSSACompileAdaptiveGC(prog.ProcessInfof); stopAdaptiveGC != nil {
+		defer stopAdaptiveGC()
 	}
 
 	if c.isStop() {
