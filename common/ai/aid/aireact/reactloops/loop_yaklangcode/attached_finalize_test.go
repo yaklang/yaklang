@@ -61,21 +61,36 @@ func TestBuildYaklangAnalyzeRequirementPromptWithAttachedPath(t *testing.T) {
 func TestBuildYaklangAnalyzeRequirementPromptWithoutAttachedPath(t *testing.T) {
 	out := buildYaklangAnalyzeRequirementPrompt(yaklangAnalyzeRequirementOptions{
 		userInput:       "write port scan",
-		hasAttachedPath: false,
+		codePreviewOnly: true,
 		hasGrepSearcher: true,
 	})
-	require.Contains(t, out, "判断文件操作类型")
+	require.Contains(t, out, "代码预览模式")
+	require.NotContains(t, out, "判断文件操作类型")
+}
+
+func TestBuildYaklangAnalyzeRequirementPromptCodePreviewWithWorkspace(t *testing.T) {
+	out := buildYaklangAnalyzeRequirementPrompt(yaklangAnalyzeRequirementOptions{
+		userInput:       "write port scan",
+		codePreviewOnly: true,
+		workspacePath:   "/tmp/project",
+		hasGrepSearcher: true,
+	})
+	require.Contains(t, out, "代码预览模式")
+	require.Contains(t, out, "/tmp/project")
+	require.NotContains(t, out, "判断文件操作类型")
 }
 
 func TestBuildYaklangAnalyzeRequirementToolOptionsSkipsFileDetectWhenAttached(t *testing.T) {
 	opts := yaklangAnalyzeRequirementOptions{
 		hasAttachedPath: true,
+		codePreviewOnly: false,
 		hasGrepSearcher: true,
 	}
 	attachedOpts := buildYaklangAnalyzeRequirementToolOptions(opts, true)
 	require.NotEmpty(t, attachedOpts)
 
 	opts.hasAttachedPath = false
-	defaultOpts := buildYaklangAnalyzeRequirementToolOptions(opts, true)
-	require.Greater(t, len(defaultOpts), len(attachedOpts))
+	opts.codePreviewOnly = true
+	previewOpts := buildYaklangAnalyzeRequirementToolOptions(opts, true)
+	require.Greater(t, len(attachedOpts), len(previewOpts))
 }

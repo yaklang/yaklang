@@ -5,6 +5,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 )
 
@@ -74,6 +75,15 @@ func flushYaklangDeferredEditorSync(loop *reactloops.ReActLoop) {
 	}
 
 	path := strings.TrimSpace(loop.Get("filename"))
+	if isYaklangCodePreviewOnly(loop) {
+		writtenPath, err := persistYaklangPreviewCode(loop, content)
+		if err != nil {
+			log.Errorf("preview mode: failed to persist generated code: %v", err)
+			return
+		}
+		path = writtenPath
+		_, _ = loop.GetEmitter().EmitPinFilename(path)
+	}
 	version := loop.GetInt(yaklangCodeVersionLoopKey)
 	if version <= 0 {
 		version = 1

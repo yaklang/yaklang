@@ -21,6 +21,11 @@ func buildInitTask(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearc
 		reactloops.RunAttachedExtraResourcesInit(r, loop, attachedDatas)
 		editorCtx := initYaklangEditorContextFromAttached(r, loop, attachedDatas)
 		hasAttachedPath := editorCtx != nil && editorCtx.HasEditorFile()
+		codePreviewOnly := !hasAttachedPath
+		setYaklangCodePreviewOnly(loop, codePreviewOnly)
+		if codePreviewOnly {
+			log.Infof("code preview mode: no editor target file; generated code will not bind to disk paths")
+		}
 		attachedPath := ""
 		workspacePath := ""
 		if editorCtx != nil {
@@ -41,12 +46,13 @@ func buildInitTask(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearc
 		needLiteforge := hasSearcher || !hasAttachedPath
 
 		analyzeOpts := yaklangAnalyzeRequirementOptions{
-			userInput:       task.GetUserInput(),
-			hasAttachedPath: hasAttachedPath,
-			attachedPath:    attachedPath,
-			workspacePath:   workspacePath,
-			hasGrepSearcher: hasGrepSearcher,
-			hasRAGSearcher:  hasRAGSearcher,
+			userInput:        task.GetUserInput(),
+			hasAttachedPath:  hasAttachedPath,
+			codePreviewOnly:  codePreviewOnly,
+			attachedPath:     attachedPath,
+			workspacePath:    workspacePath,
+			hasGrepSearcher:  hasGrepSearcher,
+			hasRAGSearcher:   hasRAGSearcher,
 		}
 
 		var (
@@ -79,7 +85,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearc
 				return
 			}
 
-			if !hasAttachedPath {
+			if hasAttachedPath {
 				existed = step1Result.GetString("existed_filepath")
 			}
 			reason = step1Result.GetString("reason")

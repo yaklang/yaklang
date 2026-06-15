@@ -69,6 +69,8 @@ func TestYaklangDeferredEditorSync_SuppressesUntilLoopDone(t *testing.T) {
 
 	filename := filepath.Join(t.TempDir(), "demo.yak")
 	require.NoError(t, os.WriteFile(filename, []byte("a\nold\nc\n"), 0o644))
+	setYaklangCodePreviewOnly(loop, false)
+	loop.Set("editor_file_path", filename)
 	loop.Set("filename", filename)
 	loop.Set("full_code", "a\nold\nc\n")
 	loop.Set("yak_code", "new")
@@ -94,6 +96,46 @@ func TestYaklangDeferredEditorSync_SuppressesUntilLoopDone(t *testing.T) {
 	assert.Equal(t, "a\nnew\nc", payload.Code.Content)
 	assert.Equal(t, filename, payload.Code.Path)
 	assert.Equal(t, "modify_code", payload.SourceAction)
+}
+
+func TestYaklangDeferredEditorSync_PreviewModePersistsToCodeDir(t *testing.T) {
+	base := t.TempDir()
+	t.Setenv("YAKIT_HOME", base)
+
+	capture := &editorSyncCapturedEvents{}
+	runtime := mock.NewMockInvoker(context.Background())
+	cfg := runtime.GetConfig().(*mock.MockedAIConfig)
+	cfg.Emitter = aicommon.NewEmitter("yaklang-editor-sync-preview-test", func(e *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
+		capture.appendEvent(e)
+		return e, nil
+	})
+
+	loop, err := reactloops.NewReActLoop("yaklang-editor-sync-preview-test", runtime)
+	require.NoError(t, err)
+
+	task := aicommon.NewStatefulTaskBase("task", "test", context.Background(), cfg.Emitter, true)
+	loop.SetCurrentTask(task)
+	setYaklangCodePreviewOnly(loop, true)
+
+	previewPath, err := newYaklangPreviewCodePath()
+	require.NoError(t, err)
+	loop.Set("filename", previewPath)
+	loop.Set("full_code", "println(\"preview\")")
+	loop.Set(yaklangEditorSyncPendingLoopKey, true)
+
+	flushYaklangDeferredEditorSync(loop)
+
+	events := capture.byType(schema.EVENT_TYPE_YAKLANG_CODE_CHANGE)
+	require.Len(t, events, 1)
+
+	var payload yaklangCodeChangeEvent
+	require.NoError(t, json.Unmarshal(events[0].Content, &payload))
+	assert.Equal(t, "println(\"preview\")", payload.Code.Content)
+	assert.Equal(t, previewPath, payload.Code.Path)
+
+	data, readErr := os.ReadFile(previewPath)
+	require.NoError(t, readErr)
+	assert.Equal(t, "println(\"preview\")", string(data))
 }
 
 func mustBuildYaklangAction(t *testing.T, actionName string, fields map[string]any) *aicommon.Action {

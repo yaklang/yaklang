@@ -3,7 +3,7 @@ package yaklangcodetests
 import (
 	"bytes"
 	"fmt"
-	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -162,10 +162,8 @@ func TestFocusMode_WriteYaklangCodeCauseErrorAndThenModify(t *testing.T) {
 	if filename == "" {
 		t.Fatal("gen_code_ filename not found")
 	}
-	if _, err := os.Stat(filename); err == nil {
-		if data, readErr := os.ReadFile(filename); readErr == nil && len(data) > 0 {
-			t.Fatalf("disk should not be written during loop; found %d bytes in %s", len(data), filename)
-		}
+	if !strings.Contains(filename, string(filepath.Separator)+"code"+string(filepath.Separator)) {
+		t.Fatalf("preview artifact should live under code dir, got %s", filename)
 	}
 
 	fmt.Println("--------------------------------------")
