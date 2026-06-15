@@ -115,14 +115,10 @@ var filterAndMatchHTTPFlowsAction = func(r aicommon.AIInvokeRuntime) reactloops.
 				return
 			}
 
-			emitter := loop.GetEmitter()
-			taskID := ""
-			if task := loop.GetCurrentTask(); task != nil {
-				taskID = task.GetId()
-			}
-
 			paramSummary := buildSearchParamSummary(action)
-			emitter.EmitThoughtStream(taskID, "[filter_and_match_http_flows] search params: %s", paramSummary)
+			log.Infof("[filter_and_match_http_flows] search params: %s", paramSummary)
+
+			emitStatus(loop, "查询流量中 / Querying Flows...")
 
 			req := buildQueryRequestFromAction(action, 30)
 			paging, flows, err := yakit.QueryHTTPFlow(db, req)
@@ -138,6 +134,8 @@ var filterAndMatchHTTPFlowsAction = func(r aicommon.AIInvokeRuntime) reactloops.
 			} else {
 				total = len(flows)
 			}
+
+			emitStatus(loop, fmt.Sprintf("查询完成，找到 %d 条流量 / Query Complete, Found %d Flows", total, total))
 
 			var (
 				matchedCount  int
@@ -161,12 +159,12 @@ var filterAndMatchHTTPFlowsAction = func(r aicommon.AIInvokeRuntime) reactloops.
 			matcherDesc := ""
 			if len(localMatchers) > 0 {
 				matcherDesc = describeMatchers(localMatchers)
-				emitter.EmitThoughtStream(taskID,
-					"[filter_and_match_http_flows] DB returned %d flows (showing %d), applying %d matcher(s): %s",
+				log.Infof("[filter_and_match_http_flows] DB returned %d flows (showing %d), applying %d matcher(s): %s",
 					total, len(flows), len(localMatchers), matcherDesc)
+
+				emitStatus(loop, "应用匹配器中 / Applying Matchers...")
 			} else {
-				emitter.EmitThoughtStream(taskID,
-					"[filter_and_match_http_flows] DB returned %d flows (showing %d), no matchers to apply",
+				log.Infof("[filter_and_match_http_flows] DB returned %d flows (showing %d), no matchers to apply",
 					total, len(flows))
 			}
 
@@ -177,7 +175,12 @@ var filterAndMatchHTTPFlowsAction = func(r aicommon.AIInvokeRuntime) reactloops.
 				builder.WriteString("\n")
 			}
 
+			// 输出简洁的累积流（最多2行）
+			line1 := fmt.Sprintf("查询: %s", paramSummary)
+
+			var line2 string
 			if len(localMatchers) == 0 {
+				// 无匹配器，直接构建结果
 				for idx, f := range flows {
 					builder.WriteString(fmt.Sprintf("%d) ID: %d, URL: %s, Method: %s, Status: %d, Tags: %s, Source: %s\n",
 						idx+1,
@@ -190,7 +193,13 @@ var filterAndMatchHTTPFlowsAction = func(r aicommon.AIInvokeRuntime) reactloops.
 					))
 				}
 			} else {
-				for _, flow := range flows {
+				// 有匹配器，执行匹配
+				for idx, flow := range flows {
+					// 更新进度
+					if len(flows) > 10 && idx%(len(flows)/10) == 0 && idx > 0 {
+						emitProgress(loop, idx, len(flows), "匹配进度", "Matching")
+					}
+
 					matched, err := executeMatchers(
 						localMatchers,
 						&httptpl.RespForMatch{
@@ -219,19 +228,11 @@ var filterAndMatchHTTPFlowsAction = func(r aicommon.AIInvokeRuntime) reactloops.
 					))
 				}
 
+				emitStatus(loop, "匹配完成 / Matching Complete")
 				builder.WriteString(fmt.Sprintf("\nMatched %d flow(s); discarded %d after matcher filter.", matchedCount, discardCount))
 			}
 
-			resultSummaryStr := ""
-			if len(localMatchers) > 0 {
-				resultSummaryStr = fmt.Sprintf("total=%d, matched=%d, discarded=%d", total, matchedCount, discardCount)
-				emitter.EmitThoughtStream(taskID,
-					"[filter_and_match_http_flows] result: %d matched, %d discarded (total %d flows, matchers: %s)",
-					matchedCount, discardCount, len(flows), matcherDesc)
-			} else {
-				resultSummaryStr = fmt.Sprintf("total=%d, showing=%d", total, len(flows))
-			}
-
+			// 构建 line2：结果摘要
 			invoker := loop.GetInvoker()
 			fullSummary := builder.String()
 			summary := fullSummary
@@ -247,14 +248,16 @@ var filterAndMatchHTTPFlowsAction = func(r aicommon.AIInvokeRuntime) reactloops.
 				loop.GetEmitter().EmitPinFilename(filename)
 			}
 
-			if len(fullSummary) > maxHTTPFlowSummaryBytes && filename != "" {
-				preview := utils.ShrinkTextBlock(fullSummary, 2000)
-				summary = fmt.Sprintf("Summary length %d exceeded %d; saved to file: %s\nUse `read_reference_file` (or other file-reading tool) to load the full content.\n\nPreview:\n%s",
-					len(fullSummary), maxHTTPFlowSummaryBytes, filename, preview)
+			if len(localMatchers) > 0 {
+				line2 = fmt.Sprintf("结果: %d条 -> 匹配%d条 -> %s", total, matchedCount, filepath.Base(filename))
+			} else {
+				line2 = fmt.Sprintf("结果: %d条 -> %s", total, filepath.Base(filename))
 			}
 
-			invoker.AddToTimeline("filter_and_match_http_flows", summary)
-			loop.Set("last_query_summary", summary)
+			// 输出2行累积流
+			emitActionLog(loop, "http-flow-query-result", line1, line2)
+
+			resultSummaryStr := ""
 			if len(localMatchers) > 0 {
 				loop.Set("last_match_summary", summary)
 			}

@@ -80,8 +80,7 @@ var matchHTTPFlowsWithSimpleMatcherAction = func(r aicommon.AIInvokeRuntime) rea
 			if matcherNegative {
 				matcherInfo += ", negative=true"
 			}
-			emitter.EmitThoughtStream(taskID,
-				"[match_http_flows_with_matcher] search params: %s | matcher: %s",
+			log.Infof("[match_http_flows_with_matcher] search params: %s | matcher: %s",
 				paramSummary, matcherInfo)
 
 			req := buildQueryRequestFromAction(action, 30)
@@ -127,9 +126,10 @@ var matchHTTPFlowsWithSimpleMatcherAction = func(r aicommon.AIInvokeRuntime) rea
 			localMatchers := []*simpleMatcher{localMatcher}
 			matcherDesc := describeMatchers(localMatchers)
 
-			emitter.EmitThoughtStream(taskID,
-				"[match_http_flows_with_matcher] DB returned %d flows (showing %d), applying matcher: %s",
+			log.Infof("[match_http_flows_with_matcher] DB returned %d flows (showing %d), applying matcher: %s",
 				total, len(flows), matcherDesc)
+
+			emitStatus(loop, "匹配流量中 / Matching Flows...")
 
 			builder.WriteString(fmt.Sprintf("HTTP flow query returned %d items (showing %d); applying matcher (type=%s, scope=%s)\n",
 				total, len(flows), matcher.MatcherType, matcher.Scope))
@@ -179,7 +179,7 @@ var matchHTTPFlowsWithSimpleMatcherAction = func(r aicommon.AIInvokeRuntime) rea
 
 			builder.WriteString(fmt.Sprintf("\nMatched %d flow(s); discarded %d after matcher filter.", matchedCount, discardCount))
 
-			pw.WriteString(fmt.Sprintf(" Done: matched=%d, discarded=%d", matchedCount, discardCount))
+			emitStatus(loop, "匹配完成 / Matching Complete")
 
 			invoker := loop.GetInvoker()
 			fullSummary := builder.String()

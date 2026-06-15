@@ -156,6 +156,8 @@ User's original query: {{ .UserQuery }}
 
 	log.Infof("http_flow_analyze finalize: generating forced AI answer, prompt length: %d", len(summaryPrompt))
 
+	emitStatus(loop, "生成分析报告 / Generating Report...")
+
 	taskID := ""
 	if task := loop.GetCurrentTask(); task != nil {
 		taskID = task.GetId()
