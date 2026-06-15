@@ -176,7 +176,15 @@ var filterAndMatchHTTPFlowsAction = func(r aicommon.AIInvokeRuntime) reactloops.
 			}
 
 			// 输出简洁的累积流（最多2行）
-			line1 := fmt.Sprintf("查询: %s", paramSummary)
+			// 如果有 human_readable_thought，融入到第一行
+			thought := action.GetString("human_readable_thought")
+			var line1 string
+			if thought != "" {
+				line1 = fmt.Sprintf("查询 %s | %s", paramSummary, thought)
+			} else {
+				line1 = fmt.Sprintf("查询 %s", paramSummary)
+			}
+			emitActionLog(loop, "http-flow-query", line1)
 
 			var line2 string
 			if len(localMatchers) == 0 {
@@ -249,13 +257,12 @@ var filterAndMatchHTTPFlowsAction = func(r aicommon.AIInvokeRuntime) reactloops.
 			}
 
 			if len(localMatchers) > 0 {
-				line2 = fmt.Sprintf("结果: %d条 -> 匹配%d条 -> %s", total, matchedCount, filepath.Base(filename))
+				line2 = fmt.Sprintf("查询流量共 %d条 -> 匹配%d条 -> %s", total, matchedCount, filepath.Base(filename))
 			} else {
-				line2 = fmt.Sprintf("结果: %d条 -> %s", total, filepath.Base(filename))
+				line2 = fmt.Sprintf("查询流量共 %d条 -> %s", total, filepath.Base(filename))
 			}
-
+			emitActionLog(loop, "http-flow-query", line2)
 			// 输出2行累积流
-			emitActionLog(loop, "http-flow-query-result", line1, line2)
 
 			resultSummaryStr := ""
 			if len(localMatchers) > 0 {
