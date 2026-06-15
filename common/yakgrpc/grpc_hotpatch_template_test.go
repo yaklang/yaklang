@@ -215,6 +215,51 @@ func TestQueryHotPatchTemplateList_GlobalSortedByNewestCreatedFirst(t *testing.T
 	require.Equal(t, []string{names[2], names[1], names[0]}, listResp.GetName())
 }
 
+func TestGetHotPatchTemplateTags(t *testing.T) {
+	client, _, err := NewLocalClientAndServerWithTempDatabase(t)
+	require.NoError(t, err)
+
+	ctx := utils.TimeoutContextSeconds(8)
+	templates := []*ypb.HotPatchTemplate{
+		{
+			Name:    "template-a",
+			Content: "content-a",
+			Type:    "test",
+			Tags:    []string{"shared", "alpha", "shared", ""},
+		},
+		{
+			Name:    "template-b",
+			Content: "content-b",
+			Type:    "test",
+			Tags:    []string{"shared", "beta"},
+		},
+		{
+			Name:    "template-c",
+			Content: "content-c",
+			Type:    "test",
+			Tags:    []string{"beta"},
+		},
+		{
+			Name:    "template-d",
+			Content: "content-d",
+			Type:    "test",
+		},
+	}
+	for _, template := range templates {
+		_, err = client.CreateHotPatchTemplate(ctx, template)
+		require.NoError(t, err)
+	}
+
+	resp, err := client.GetHotPatchTemplateTags(ctx, &ypb.Empty{})
+	require.NoError(t, err)
+
+	require.Equal(t, []*ypb.Tags{
+		{Value: "beta", Total: 2},
+		{Value: "shared", Total: 2},
+		{Value: "alpha", Total: 1},
+	}, resp.GetTags())
+}
+
 type TestServerWrapper struct {
 	*Server
 	onlineClient yaklib.OnlineClient

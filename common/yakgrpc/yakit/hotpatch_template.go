@@ -1,6 +1,9 @@
 package yakit
 
 import (
+	"context"
+	"sort"
+
 	"github.com/jinzhu/gorm"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/schema"
@@ -143,6 +146,36 @@ func QueryHotPatchTemplateList(db *gorm.DB, filter *ypb.HotPatchTemplateRequest,
 	})
 
 	return paging, names, nil
+}
+
+func CountHotPatchTemplateTags(ctx context.Context, db *gorm.DB) ([]*ypb.Tags, error) {
+	if db == nil {
+		return nil, utils.Errorf("database not initialized")
+	}
+
+	tagCount := make(map[string]int)
+	db = db.Model(&schema.HotPatchTemplate{})
+	for template := range bizhelper.YieldModel[*schema.HotPatchTemplate](ctx, db) {
+		for _, tag := range normalizeHotPatchTemplateTags(template.Tags) {
+			tagCount[tag]++
+		}
+	}
+
+	tags := make([]*ypb.Tags, 0, len(tagCount))
+	for tag, count := range tagCount {
+		tags = append(tags, &ypb.Tags{
+			Value: tag,
+			Total: int32(count),
+		})
+	}
+
+	sort.Slice(tags, func(i, j int) bool {
+		if tags[i].Total == tags[j].Total {
+			return tags[i].Value < tags[j].Value
+		}
+		return tags[i].Total > tags[j].Total
+	})
+	return tags, nil
 }
 
 func GetHotPatchTemplate(db *gorm.DB, req *ypb.UploadHotPatchTemplateToOnlineRequest) (*schema.HotPatchTemplate, error) {

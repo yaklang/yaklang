@@ -514,6 +514,7 @@ const (
 	Yak_UpdateHotPatchTemplate_FullMethodName                     = "/ypb.Yak/UpdateHotPatchTemplate"
 	Yak_QueryHotPatchTemplate_FullMethodName                      = "/ypb.Yak/QueryHotPatchTemplate"
 	Yak_QueryHotPatchTemplateList_FullMethodName                  = "/ypb.Yak/QueryHotPatchTemplateList"
+	Yak_GetHotPatchTemplateTags_FullMethodName                    = "/ypb.Yak/GetHotPatchTemplateTags"
 	Yak_GetGlobalHotPatchConfig_FullMethodName                    = "/ypb.Yak/GetGlobalHotPatchConfig"
 	Yak_SetGlobalHotPatchConfig_FullMethodName                    = "/ypb.Yak/SetGlobalHotPatchConfig"
 	Yak_ResetGlobalHotPatchConfig_FullMethodName                  = "/ypb.Yak/ResetGlobalHotPatchConfig"
@@ -1273,6 +1274,7 @@ type YakClient interface {
 	UpdateHotPatchTemplate(ctx context.Context, in *UpdateHotPatchTemplateRequest, opts ...grpc.CallOption) (*UpdateHotPatchTemplateResponse, error)
 	QueryHotPatchTemplate(ctx context.Context, in *HotPatchTemplateRequest, opts ...grpc.CallOption) (*QueryHotPatchTemplateResponse, error)
 	QueryHotPatchTemplateList(ctx context.Context, in *QueryHotPatchTemplateListRequest, opts ...grpc.CallOption) (*QueryHotPatchTemplateListResponse, error)
+	GetHotPatchTemplateTags(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GetHotPatchTemplateTagsResponse, error)
 	// global hot-patch config (Global HotPatch)
 	GetGlobalHotPatchConfig(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GlobalHotPatchConfig, error)
 	SetGlobalHotPatchConfig(ctx context.Context, in *SetGlobalHotPatchConfigRequest, opts ...grpc.CallOption) (*GlobalHotPatchConfig, error)
@@ -7097,6 +7099,16 @@ func (c *yakClient) QueryHotPatchTemplateList(ctx context.Context, in *QueryHotP
 	return out, nil
 }
 
+func (c *yakClient) GetHotPatchTemplateTags(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GetHotPatchTemplateTagsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetHotPatchTemplateTagsResponse)
+	err := c.cc.Invoke(ctx, Yak_GetHotPatchTemplateTags_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) GetGlobalHotPatchConfig(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GlobalHotPatchConfig, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GlobalHotPatchConfig)
@@ -9135,6 +9147,7 @@ type YakServer interface {
 	UpdateHotPatchTemplate(context.Context, *UpdateHotPatchTemplateRequest) (*UpdateHotPatchTemplateResponse, error)
 	QueryHotPatchTemplate(context.Context, *HotPatchTemplateRequest) (*QueryHotPatchTemplateResponse, error)
 	QueryHotPatchTemplateList(context.Context, *QueryHotPatchTemplateListRequest) (*QueryHotPatchTemplateListResponse, error)
+	GetHotPatchTemplateTags(context.Context, *Empty) (*GetHotPatchTemplateTagsResponse, error)
 	// global hot-patch config (Global HotPatch)
 	GetGlobalHotPatchConfig(context.Context, *Empty) (*GlobalHotPatchConfig, error)
 	SetGlobalHotPatchConfig(context.Context, *SetGlobalHotPatchConfigRequest) (*GlobalHotPatchConfig, error)
@@ -10770,6 +10783,9 @@ func (UnimplementedYakServer) QueryHotPatchTemplate(context.Context, *HotPatchTe
 }
 func (UnimplementedYakServer) QueryHotPatchTemplateList(context.Context, *QueryHotPatchTemplateListRequest) (*QueryHotPatchTemplateListResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method QueryHotPatchTemplateList not implemented")
+}
+func (UnimplementedYakServer) GetHotPatchTemplateTags(context.Context, *Empty) (*GetHotPatchTemplateTagsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetHotPatchTemplateTags not implemented")
 }
 func (UnimplementedYakServer) GetGlobalHotPatchConfig(context.Context, *Empty) (*GlobalHotPatchConfig, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetGlobalHotPatchConfig not implemented")
@@ -19387,6 +19403,24 @@ func _Yak_QueryHotPatchTemplateList_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_GetHotPatchTemplateTags_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).GetHotPatchTemplateTags(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_GetHotPatchTemplateTags_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).GetHotPatchTemplateTags(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_GetGlobalHotPatchConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Empty)
 	if err := dec(in); err != nil {
@@ -22986,6 +23020,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "QueryHotPatchTemplateList",
 			Handler:    _Yak_QueryHotPatchTemplateList_Handler,
+		},
+		{
+			MethodName: "GetHotPatchTemplateTags",
+			Handler:    _Yak_GetHotPatchTemplateTags_Handler,
 		},
 		{
 			MethodName: "GetGlobalHotPatchConfig",
