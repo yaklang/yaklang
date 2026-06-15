@@ -59,8 +59,9 @@ func seedMCPServer(t *testing.T, name, toolListURL string) func() {
 	}
 	require.NoError(t, yakit.CreateOrUpdateMCPServer(db, srv))
 	return func() {
-		db.Unscoped().Where("name = ?", name).Delete(&schema.MCPServer{})
+		_ = yakit.DeleteMCPServerToolConfigs(db, name)
 		db.Unscoped().Where("server_name = ?", name).Delete(&schema.MCPClientToolConfig{})
+		db.Unscoped().Where("name = ?", name).Delete(&schema.MCPServer{})
 	}
 }
 
@@ -68,6 +69,33 @@ func seedMCPServer(t *testing.T, name, toolListURL string) func() {
 func cleanupClientToolConfigs(toolNames ...string) {
 	db := consts.GetGormProfileDatabase()
 	db.Unscoped().Where("tool_name IN (?)", toolNames).Delete(&schema.MCPClientToolConfig{})
+}
+
+func TestSeedMCPServer_CleanupRemovesMCPServerToolConfigs(t *testing.T) {
+	const srvName = "grpc-test-cleanup-srv"
+	db := consts.GetGormProfileDatabase()
+
+	cleanup := seedMCPServer(t, srvName, "http://unused.example/mcp")
+	require.NoError(t, yakit.SyncAndCacheMCPServerTools(db, srvName, []yakit.MCPToolEntry{
+		{
+			ToolName:    "cleanup_tool",
+			FullName:    buildBridgeToolName(srvName, "cleanup_tool"),
+			Description: "leftover test row",
+			ParamsJSON:  "[]",
+		},
+	}))
+
+	var before int
+	require.NoError(t, db.Model(&schema.MCPServerToolConfig{}).
+		Where("server_name = ?", srvName).Count(&before).Error)
+	require.Equal(t, 1, before)
+
+	cleanup()
+
+	var after int
+	require.NoError(t, db.Model(&schema.MCPServerToolConfig{}).
+		Where("server_name = ?", srvName).Count(&after).Error)
+	assert.Equal(t, 0, after)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -77,6 +77,7 @@ func TestReAct_MCPToolUse(t *testing.T) {
 	}
 
 	// Clean up any existing test server
+	_ = yakit.DeleteMCPServerToolConfigs(db, serverName)
 	var oldServer schema.MCPServer
 	if err := db.Where("name = ?", serverName).First(&oldServer).Error; err == nil {
 		db.Unscoped().Delete(&oldServer)
@@ -84,6 +85,7 @@ func TestReAct_MCPToolUse(t *testing.T) {
 	}
 
 	defer func() {
+		_ = yakit.DeleteMCPServerToolConfigs(db, serverName)
 		var server schema.MCPServer
 		if err := db.Where("name = ?", serverName).First(&server).Error; err == nil {
 			db.Unscoped().Delete(&server)
