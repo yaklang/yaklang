@@ -33,7 +33,7 @@ func CreateBuilder() ssa.Builder {
 	return builder
 }
 
-func (s *SSABuilder) WrapWithPreprocessedFS(fs fi.FileSystem) fi.FileSystem {
+func (s *SSABuilder) WrapWithPreprocessedFS(fs fi.FileSystem, _ bool) fi.FileSystem {
 	return newCPreprocessFS(fs)
 }
 

@@ -2,9 +2,7 @@ package java2ssa
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
-	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -76,66 +74,25 @@ func (*SSABuilder) BuildFromAST(raw ssa.FrontAST, b *ssa.FunctionBuilder) error 
 	return nil
 }
 
-// extractZipFSFromUnderlying 从文件系统中提取底层的 ZipFS
-// 支持递归提取，处理 HookFS 包装的情况
-func extractZipFSFromUnderlying(underlying fi.FileSystem) *filesys.ZipFS {
-	unifiedFs, ok := underlying.(*filesys.UnifiedFS)
-	if !ok {
-		// 在测试中
-		return nil
+func (s *SSABuilder) WrapWithPreprocessedFS(fs fi.FileSystem, jarRecursiveParse bool) fi.FileSystem {
+	if fs == nil || !jarRecursiveParse {
+		return fs
 	}
-
-	if zfs, ok := unifiedFs.GetFileSystem().(*filesys.ZipFS); ok {
-		return zfs
-	}
-	// 如果是 HookFS，使用反射递归检查 underlying
-	if hookFS, ok := underlying.(*filesys.HookFS); ok {
-		// 使用反射访问私有字段
-		v := reflect.ValueOf(hookFS).Elem()
-		underlyingField := v.FieldByName("underlying")
-		if underlyingField.IsValid() && underlyingField.CanInterface() {
-			if underlyingFS, ok := underlyingField.Interface().(fi.FileSystem); ok {
-				return extractZipFSFromUnderlying(underlyingFS)
-			}
-		}
-	}
-	return nil
-}
-
-func (s *SSABuilder) WrapWithPreprocessedFS(fs fi.FileSystem) fi.FileSystem {
-	// 文件系统可能有两种类型：
-	// 1. CodeSourceCompression: ZipFS (压缩文件，.zip 后缀)
-	// 2. CodeSourceJar: UnifiedFS -> JarFS -> ZipFS (JAR 文件，.jar 后缀，已配置扩展名映射 .class -> .java)
-	//
-	// 如果文件系统包含嵌套的 JAR/ZIP 文件，使用 ExpandedZipFS 来展开：
-	// - ExpandedZipFS 将 JAR/ZIP 文件视为目录，自动展开其内容
-	// - 实现了完整的嵌套归档处理（ReadDir、Stat、ReadFile）
-	// - 支持多层嵌套（ZIP 中包含 JAR，JAR 中包含 ZIP 等）
-	//
-
-	zipFS := extractZipFSFromUnderlying(fs)
-	if zipFS == nil {
+	if _, ok := fs.(*javaclassparser.ExpandedZipFS); ok {
 		return fs
 	}
 
-	var hasNestedArchive bool
-	filesys.Recursive(".", filesys.WithFileSystem(fs), filesys.WithFileStat(func(path string, info os.FileInfo) error {
-		if !info.IsDir() && (strings.HasSuffix(strings.ToLower(path), ".jar") ||
-			strings.HasSuffix(strings.ToLower(path), ".war") ||
-			strings.HasSuffix(strings.ToLower(path), ".zip")) {
-			hasNestedArchive = true
-			return filepath.SkipAll // skip all other file // break
-		}
-		return nil
-	}))
-
-	if !hasNestedArchive {
+	wrapped := javaclassparser.MaybeWrapExpandedArchiveFS(fs, jarRecursiveParse)
+	if wrapped == fs {
 		return fs
 	}
-
-	expandedFS := javaclassparser.NewExpandedZipFS(fs, zipFS)
-
-	return expandedFS
+	// Jar/zip roots from parseFSFromInfo may already be UnifiedFS(.class -> .java).
+	if _, ok := fs.(*filesys.UnifiedFS); !ok {
+		wrapped = filesys.NewUnifiedFS(wrapped,
+			filesys.WithUnifiedFsExtMap(".class", ".java"),
+		)
+	}
+	return wrapped
 }
 
 func (*SSABuilder) FilterFile(path string) bool {

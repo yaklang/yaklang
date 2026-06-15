@@ -231,7 +231,7 @@ func (c *Config) checkLanguageEx(path string, handler func(ssa.Builder) bool) er
 
 func (c *Config) swapLanguageFs(fs fi.FileSystem) fi.FileSystem {
 	if c.LanguageBuilder != nil {
-		return c.LanguageBuilder.WrapWithPreprocessedFS(fs)
+		return c.LanguageBuilder.WrapWithPreprocessedFS(fs, c.GetCodeSourceJarRecursiveParse())
 	}
-	return c.fs
+	return fs
 }

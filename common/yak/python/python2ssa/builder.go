@@ -82,7 +82,7 @@ func (*SSABuilder) BuildFromAST(raw ssa.FrontAST, b *ssa.FunctionBuilder) error 
 
 // WrapWithPreprocessedFS wraps the filesystem with preprocessing if needed.
 // For Python, this is a no-op currently as Python doesn't need template preprocessing like Java.
-func (s *SSABuilder) WrapWithPreprocessedFS(fs fi.FileSystem) fi.FileSystem {
+func (s *SSABuilder) WrapWithPreprocessedFS(fs fi.FileSystem, _ bool) fi.FileSystem {
 	// Python doesn't need special filesystem preprocessing like Java's template files (JSP, Freemarker, etc.)
 	return fs
 }

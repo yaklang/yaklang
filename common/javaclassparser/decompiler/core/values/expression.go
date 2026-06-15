@@ -43,9 +43,16 @@ func (n *NewExpression) Type() types.JavaType {
 
 func (n *NewExpression) String(funcCtx *class_context.ClassContext) string {
 	if n.IsArray() {
-		s := fmt.Sprintf("new %s", n.ElementType().String(funcCtx))
+		base := n.JavaType
+		for base.IsArray() {
+			base = base.ElementType()
+		}
+		s := fmt.Sprintf("new %s", base.String(funcCtx))
 		for _, l := range n.Length {
 			s += fmt.Sprintf("[%v]", l.(JavaValue).String(funcCtx))
+		}
+		for i := len(n.Length); i < n.JavaType.ArrayDim(); i++ {
+			s += "[]"
 		}
 		if len(n.Initializer) != 0 {
 			vsStr := []string{}
