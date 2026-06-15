@@ -152,6 +152,10 @@ func TestFocusMode_WriteYaklangCodeCauseErrorAndThenModify(t *testing.T) {
 
 	if len(waitResult.codeChangeEvents) > 0 {
 		lastChange := waitResult.codeChangeEvents[len(waitResult.codeChangeEvents)-1]
+		op := utils.InterfaceToString(jsonpath.FindFirst(string(lastChange.GetContent()), "$.op"))
+		if op != "create" {
+			t.Fatalf("preview mode deferred yaklang_code_change should use op create, got %q", op)
+		}
 		finalContent := utils.InterfaceToString(jsonpath.FindFirst(string(lastChange.GetContent()), "$.code.content"))
 		if !strings.Contains(finalContent, "modifiedcodecodecode") {
 			t.Fatalf("deferred yaklang_code_change content mismatch: %q", finalContent)

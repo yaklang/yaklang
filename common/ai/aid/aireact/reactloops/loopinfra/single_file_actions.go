@@ -97,7 +97,7 @@ func (f *SingleFileModificationSuiteFactory) buildWriteAction() reactloops.ReAct
 				Content:      code,
 				Path:         filename,
 				SourceAction: actionName,
-				EventOp:      loopYaklangCodeEventOpReplace,
+				EventOp:      loopYaklangCodeEventOpCreate,
 				EmitEvent:    true,
 			})
 			loop.GetEmitter().EmitJSON(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR, "write_code", code)

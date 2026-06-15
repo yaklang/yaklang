@@ -448,11 +448,10 @@ func TestWriteAction_Yaklang_CodeChangeEventMatchesDiskOverwrite(t *testing.T) {
 	events := capture.byType(schema.EVENT_TYPE_YAKLANG_CODE_CHANGE)
 	require.Len(t, events, 1)
 	payload := parseYaklangCodeChangeEvent(t, events[0])
-	assert.Equal(t, loopYaklangCodeEventOpReplace, payload.Op)
+	assert.Equal(t, loopYaklangCodeEventOpCreate, payload.Op)
 	assert.Equal(t, code, payload.Code.Content)
 	assert.Equal(t, filename, payload.Code.Path)
 	assert.Equal(t, actionName, payload.SourceAction)
-	assert.Equal(t, code, payload.Code.Content)
 	assert.Equal(t, string(diskContent), payload.Code.Content)
 }
 

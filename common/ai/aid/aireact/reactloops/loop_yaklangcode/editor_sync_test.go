@@ -92,7 +92,7 @@ func TestYaklangDeferredEditorSync_SuppressesUntilLoopDone(t *testing.T) {
 
 	var payload yaklangCodeChangeEvent
 	require.NoError(t, json.Unmarshal(events[0].Content, &payload))
-	assert.Equal(t, "replace", payload.Op)
+	assert.Equal(t, loopinfra.LoopYaklangCodeEventOpReplace, payload.Op)
 	assert.Equal(t, "a\nnew\nc", payload.Code.Content)
 	assert.Equal(t, filename, payload.Code.Path)
 	assert.Equal(t, "modify_code", payload.SourceAction)
@@ -130,6 +130,7 @@ func TestYaklangDeferredEditorSync_PreviewModePersistsToCodeDir(t *testing.T) {
 
 	var payload yaklangCodeChangeEvent
 	require.NoError(t, json.Unmarshal(events[0].Content, &payload))
+	assert.Equal(t, loopinfra.LoopYaklangCodeEventOpCreate, payload.Op)
 	assert.Equal(t, "println(\"preview\")", payload.Code.Content)
 	assert.Equal(t, previewPath, payload.Code.Path)
 

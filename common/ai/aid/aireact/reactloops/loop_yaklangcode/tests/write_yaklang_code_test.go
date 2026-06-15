@@ -178,6 +178,12 @@ func TestFocusMode_WriteYaklangCode(t *testing.T) {
 		t.Fatalf("expected exactly 1 deferred yaklang_code_change, got %d", len(waitResult.codeChangeEvents))
 	}
 
+	lastChange := waitResult.codeChangeEvents[0]
+	op := utils.InterfaceToString(jsonpath.FindFirst(string(lastChange.GetContent()), "$.op"))
+	if op != "create" {
+		t.Fatalf("preview mode deferred yaklang_code_change should use op create, got %q", op)
+	}
+
 	fmt.Println("--------------------------------------")
 	tl := ins.DumpTimeline()
 	fmt.Println(tl)
@@ -327,6 +333,10 @@ func TestFocusMode_WriteYaklangCodeAndThenModify(t *testing.T) {
 	}
 
 	lastChange := waitResult.codeChangeEvents[0]
+	op := utils.InterfaceToString(jsonpath.FindFirst(string(lastChange.GetContent()), "$.op"))
+	if op != "create" {
+		t.Fatalf("preview mode deferred yaklang_code_change should use op create, got %q", op)
+	}
 	sourceAction := utils.InterfaceToString(jsonpath.FindFirst(string(lastChange.GetContent()), "$.source_action"))
 	if sourceAction != "modify_code" {
 		t.Fatalf("expected final source_action modify_code, got %q", sourceAction)

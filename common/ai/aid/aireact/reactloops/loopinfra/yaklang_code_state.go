@@ -14,8 +14,14 @@ const (
 	loopYaklangCodeSourceActionKey = "current_yaklang_code_source_action"
 	loopYaklangCodeChangeReasonKey = "current_yaklang_code_change_reason"
 	loopYaklangCodeChangeEventNode = "yaklang_code_change"
-	loopYaklangCodeEventOpReplace  = "replace"
-	loopYaklangCodeEventOpSnapshot = "snapshot"
+
+	LoopYaklangCodeEventOpReplace  = "replace"
+	LoopYaklangCodeEventOpSnapshot = "snapshot"
+	LoopYaklangCodeEventOpCreate   = "create"
+
+	loopYaklangCodeEventOpReplace  = LoopYaklangCodeEventOpReplace
+	loopYaklangCodeEventOpSnapshot = LoopYaklangCodeEventOpSnapshot
+	loopYaklangCodeEventOpCreate   = LoopYaklangCodeEventOpCreate
 )
 
 type loopYaklangCodeState struct {
@@ -112,6 +118,20 @@ func firstNonEmptyYaklangString(values ...string) string {
 	return ""
 }
 
+func resolveLoopYaklangCodeEventOp(explicitOp string, previousState *loopYaklangCodeState) (string, error) {
+	switch strings.TrimSpace(explicitOp) {
+	case "":
+		if previousState == nil {
+			return loopYaklangCodeEventOpCreate, nil
+		}
+		return loopYaklangCodeEventOpReplace, nil
+	case loopYaklangCodeEventOpReplace, loopYaklangCodeEventOpCreate, loopYaklangCodeEventOpSnapshot:
+		return strings.TrimSpace(explicitOp), nil
+	default:
+		return "", fmt.Errorf("unsupported yaklang code event op: %s", explicitOp)
+	}
+}
+
 // applyLoopYaklangCodeChange updates loop file state and optionally emits yaklang_code_change (same pattern as http_fuzz_request_change).
 func (f *SingleFileModificationSuiteFactory) applyLoopYaklangCodeChange(loop *reactloops.ReActLoop, input *loopYaklangCodeChange) (*loopYaklangCodeChangeResult, error) {
 	if f.contentType != "code/yaklang" {
@@ -130,19 +150,14 @@ func (f *SingleFileModificationSuiteFactory) applyLoopYaklangCodeChange(loop *re
 		return nil, fmt.Errorf("source action cannot be empty")
 	}
 
-	eventOp := strings.TrimSpace(input.EventOp)
-	switch eventOp {
-	case "", loopYaklangCodeEventOpReplace:
-		eventOp = loopYaklangCodeEventOpReplace
-	case loopYaklangCodeEventOpSnapshot:
-	default:
-		return nil, fmt.Errorf("unsupported yaklang code event op: %s", eventOp)
-	}
-
 	fullCodeVar := f.GetFullCodeVariableName()
 	filenameVar := f.GetFilenameVariableName()
 
 	previousState := getLoopYaklangCodeState(loop, fullCodeVar, filenameVar)
+	eventOp, err := resolveLoopYaklangCodeEventOp(input.EventOp, previousState)
+	if err != nil {
+		return nil, err
+	}
 	version := input.Version
 	if version <= 0 {
 		if previousState != nil {

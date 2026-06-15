@@ -32,6 +32,27 @@ func TestIsYaklangCodePreviewOnly(t *testing.T) {
 	require.True(t, isYaklangCodePreviewOnly(loop2))
 }
 
+func TestResolveYaklangCodePreviewOnly(t *testing.T) {
+	t.Run("nil attachments", func(t *testing.T) {
+		require.True(t, resolveYaklangCodePreviewOnly(nil))
+	})
+	t.Run("directory_path only", func(t *testing.T) {
+		ctx := &YaklangEditorContext{WorkspacePath: "/tmp/workspace"}
+		require.True(t, resolveYaklangCodePreviewOnly(ctx))
+	})
+	t.Run("file_path attached", func(t *testing.T) {
+		ctx := &YaklangEditorContext{EditorFile: "/tmp/demo.yak"}
+		require.False(t, resolveYaklangCodePreviewOnly(ctx))
+	})
+	t.Run("workspace and file_path", func(t *testing.T) {
+		ctx := &YaklangEditorContext{
+			WorkspacePath: "/tmp/workspace",
+			EditorFile:    "/tmp/workspace/demo.yak",
+		}
+		require.False(t, resolveYaklangCodePreviewOnly(ctx))
+	})
+}
+
 func TestNewYaklangPreviewCodePath(t *testing.T) {
 	base := t.TempDir()
 	t.Setenv("YAKIT_HOME", base)
