@@ -2,6 +2,7 @@ package javaclassparser
 
 import (
 	"bytes"
+	"fmt"
 	"io/fs"
 	"os"
 	"path"
@@ -45,6 +46,21 @@ func NewJarFSWithOptions(zipFs *filesys.ZipFS, recursiveParse bool) *JarFS {
 	}
 }
 
+func decompileClassBytes(name string, data []byte) []byte {
+	if !strings.HasSuffix(strings.ToLower(name), ".class") {
+		return data
+	}
+	cf, err := Parse(data)
+	if err != nil {
+		return []byte(fmt.Sprintf("// decompile parse failed for %s: %v\n", name, err))
+	}
+	source, err := cf.Dump()
+	if err != nil {
+		return []byte(fmt.Sprintf("// decompile dump failed for %s: %v\n", name, err))
+	}
+	return []byte(source)
+}
+
 func (z *JarFS) ReadFile(name string) ([]byte, error) {
 	if isArchivePath(name) {
 		return z.readFileFromJar(name)
@@ -53,15 +69,7 @@ func (z *JarFS) ReadFile(name string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	cf, err := Parse(data)
-	if err != nil {
-		return data, nil
-	}
-	source, err := cf.Dump()
-	if err != nil {
-		return data, nil
-	}
-	return []byte(source), nil
+	return decompileClassBytes(name, data), nil
 }
 
 func (f *JarFS) OpenFile(name string, flag int, perm os.FileMode) (fs.File, error) {
@@ -73,15 +81,7 @@ func (z *JarFS) Open(name string) (fs.File, error) {
 	if err != nil {
 		return nil, err
 	}
-	cf, err := Parse(raw)
-	if err != nil {
-		return memfile.New(raw), nil
-	}
-	source, err := cf.Dump()
-	if err != nil {
-		return memfile.New(raw), nil
-	}
-	return memfile.New([]byte(source)), nil
+	return memfile.New(decompileClassBytes(name, raw)), nil
 }
 
 func (z *JarFS) Stat(name string) (fs.FileInfo, error) {
@@ -110,31 +110,54 @@ func (z *JarFS) Stat(name string) (fs.FileInfo, error) {
 	}, nil
 }
 
+var (
+	archiveFileSuffixes   = []string{".jar", ".war", ".ear", ".par", ".zip"}
+	jarLikeArchiveSuffixes = []string{".jar", ".war", ".ear", ".par"}
+)
+
 func isArchiveFile(path string) bool {
 	path = normalizeArchivePath(path)
 	lowerPath := strings.ToLower(path)
-	return strings.HasSuffix(lowerPath, ".jar") ||
-		strings.HasSuffix(lowerPath, ".war") ||
-		strings.HasSuffix(lowerPath, ".zip")
+	for _, ext := range archiveFileSuffixes {
+		if strings.HasSuffix(lowerPath, ext) {
+			return true
+		}
+	}
+	return false
 }
 
 func isArchivePath(name string) bool {
 	name = normalizeArchivePath(name)
-	return strings.Contains(name, ".jar/") || strings.Contains(name, ".jar!") ||
-		strings.Contains(name, ".zip/") || strings.Contains(name, ".zip!")
+	lowerPath := strings.ToLower(name)
+	for _, ext := range archiveFileSuffixes {
+		if strings.Contains(lowerPath, ext+"/") || strings.Contains(lowerPath, ext+"!") {
+			return true
+		}
+	}
+	return false
 }
 
 func parseArchivePath(fullPath string) (archivePath, internalPath string, ok bool) {
 	fullPath = normalizeArchivePath(fullPath)
 	lowerPath := strings.ToLower(fullPath)
 
-	if strings.Contains(lowerPath, ".jar/") || strings.Contains(lowerPath, ".jar!") {
-		return parseJarOrZipPath(fullPath, ".jar")
-	}
-	if strings.Contains(lowerPath, ".zip/") || strings.Contains(lowerPath, ".zip!") {
-		return parseJarOrZipPath(fullPath, ".zip")
+	for _, ext := range archiveFileSuffixes {
+		if strings.Contains(lowerPath, ext+"/") || strings.Contains(lowerPath, ext+"!") {
+			return parseJarOrZipPath(fullPath, ext)
+		}
 	}
 	return "", "", false
+}
+
+func isJarLikeArchivePath(path string) bool {
+	path = normalizeArchivePath(path)
+	lowerPath := strings.ToLower(path)
+	for _, ext := range jarLikeArchiveSuffixes {
+		if strings.HasSuffix(lowerPath, ext) {
+			return true
+		}
+	}
+	return false
 }
 
 func parseJarOrZipPath(fullPath, ext string) (archivePath, internalPath string, ok bool) {
@@ -143,17 +166,17 @@ func parseJarOrZipPath(fullPath, ext string) (archivePath, internalPath string, 
 
 	idx := strings.Index(fullPath, extWithSlash)
 	if idx == -1 {
-		idx = strings.Index(fullPath, extWithBang)
-		if idx == -1 {
+		bangIdx := strings.Index(fullPath, extWithBang)
+		if bangIdx == -1 {
 			return "", "", false
 		}
-		idx += len(ext)
-	} else {
-		idx += len(extWithSlash)
+		archivePath = fullPath[:bangIdx+len(ext)]
+		internalPath = strings.TrimPrefix(fullPath[bangIdx+len(extWithBang):], "/")
+		return archivePath, internalPath, true
 	}
 
-	archivePath = fullPath[:idx]
-	internalPath = strings.TrimPrefix(fullPath[idx:], "/")
+	archivePath = fullPath[:idx+len(ext)]
+	internalPath = strings.TrimPrefix(fullPath[idx+len(extWithSlash):], "/")
 	return archivePath, internalPath, true
 }
 
@@ -278,30 +301,34 @@ func (z *JarFS) ReadDir(name string) ([]fs.DirEntry, error) {
 }
 
 type ExpandedZipFS struct {
-	underlying fi.FileSystem
-	zipFS      *filesys.ZipFS
-	jarCache   *utils.SafeMapWithKey[string, *filesys.UnifiedFS]
-	zipCache   *utils.SafeMapWithKey[string, *filesys.ZipFS]
+	underlying       fi.FileSystem
+	zipFS            *filesys.ZipFS // optional container (zip root); nil for local directories
+	recursiveParse   bool
+	jarCache         *utils.SafeMapWithKey[string, *filesys.UnifiedFS]
+	zipCache         *utils.SafeMapWithKey[string, *filesys.ZipFS]
 }
 
 var _ fi.FileSystem = (*ExpandedZipFS)(nil)
 
 func NewExpandedZipFS(underlying fi.FileSystem, zipFS *filesys.ZipFS) *ExpandedZipFS {
+	return NewExpandedZipFSWithOptions(underlying, zipFS, true)
+}
+
+func NewExpandedZipFSWithOptions(underlying fi.FileSystem, zipFS *filesys.ZipFS, recursiveParse bool) *ExpandedZipFS {
 	return &ExpandedZipFS{
-		underlying: underlying,
-		zipFS:      zipFS,
-		jarCache:   utils.NewSafeMapWithKey[string, *filesys.UnifiedFS](),
-		zipCache:   utils.NewSafeMapWithKey[string, *filesys.ZipFS](),
+		underlying:       underlying,
+		zipFS:            zipFS,
+		recursiveParse:   recursiveParse,
+		jarCache:         utils.NewSafeMapWithKey[string, *filesys.UnifiedFS](),
+		zipCache:         utils.NewSafeMapWithKey[string, *filesys.ZipFS](),
 	}
 }
 
 func (e *ExpandedZipFS) getArchiveFS(archivePath string) (fi.FileSystem, error) {
-	lowerPath := strings.ToLower(archivePath)
-
-	if strings.Contains(lowerPath, ".jar") || strings.Contains(lowerPath, ".war") {
+	if isJarLikeArchivePath(archivePath) {
 		return e.GetJarFS(archivePath)
 	}
-	if strings.Contains(lowerPath, ".zip") {
+	if strings.HasSuffix(strings.ToLower(normalizeArchivePath(archivePath)), ".zip") {
 		return e.getZipFS(archivePath)
 	}
 	return nil, os.ErrNotExist
@@ -312,9 +339,9 @@ func (e *ExpandedZipFS) GetJarFS(jarPath string) (*filesys.UnifiedFS, error) {
 		return jarFS, nil
 	}
 
-	jarContent, err := e.zipFS.ReadFile(jarPath)
+	jarContent, err := e.readArchiveBytes(jarPath)
 	if err != nil {
-		return nil, utils.Wrapf(err, "failed to read jar file from zip: %s", jarPath)
+		return nil, utils.Wrapf(err, "failed to read jar file: %s", jarPath)
 	}
 
 	zipFS, err := filesys.NewZipFSRaw(bytes.NewReader(jarContent), int64(len(jarContent)))
@@ -322,8 +349,7 @@ func (e *ExpandedZipFS) GetJarFS(jarPath string) (*filesys.UnifiedFS, error) {
 		return nil, utils.Wrapf(err, "failed to create zip filesystem for jar: %s", jarPath)
 	}
 
-	// ExpandedZipFS 默认启用递归解析（保持向后兼容）
-	jarFS := NewJarFSWithOptions(zipFS, true)
+	jarFS := NewJarFSWithOptions(zipFS, e.recursiveParse)
 	undiFS := filesys.NewUnifiedFS(jarFS,
 		filesys.WithUnifiedFsExtMap(".class", ".java"),
 	)
@@ -336,9 +362,9 @@ func (e *ExpandedZipFS) getZipFS(zipPath string) (*filesys.ZipFS, error) {
 		return zipFS, nil
 	}
 
-	zipContent, err := e.zipFS.ReadFile(zipPath)
+	zipContent, err := e.readArchiveBytes(zipPath)
 	if err != nil {
-		return nil, utils.Wrapf(err, "failed to read zip file from zip: %s", zipPath)
+		return nil, utils.Wrapf(err, "failed to read zip file: %s", zipPath)
 	}
 
 	nestedZipFS, err := filesys.NewZipFSRaw(bytes.NewReader(zipContent), int64(len(zipContent)))
@@ -541,10 +567,20 @@ func (e *ExpandedZipFS) Ext(s string) string {
 }
 
 func (e *ExpandedZipFS) Open(name string) (fs.File, error) {
+	if isArchivePath(name) {
+		data, err := e.readFileFromArchive(name)
+		if err != nil {
+			return nil, err
+		}
+		return memfile.New(data), nil
+	}
 	return e.underlying.Open(name)
 }
 
 func (e *ExpandedZipFS) OpenFile(name string, flag int, perm os.FileMode) (fs.File, error) {
+	if isArchivePath(name) {
+		return e.Open(name)
+	}
 	return e.underlying.OpenFile(name, flag, perm)
 }
 

@@ -12,7 +12,7 @@ import (
 )
 
 type PreHandlerAnalyzer interface {
-	WrapWithPreprocessedFS(fi.FileSystem) fi.FileSystem
+	WrapWithPreprocessedFS(fi.FileSystem, bool) fi.FileSystem
 
 	InitHandler(builder *FunctionBuilder)
 	FilterPreHandlerFile(string) bool
