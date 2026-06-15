@@ -486,6 +486,20 @@ func TestMCPServerPagination(t *testing.T) {
 }
 
 func TestMCPServerToolsRetrieval(t *testing.T) {
+	// getMCPServerTools writes tool metadata into mcp_server_tool_configs even when
+	// the MCPServer row is only passed in-memory.
+	t.Cleanup(func() {
+		db := consts.GetGormProfileDatabase()
+		for _, name := range []string{
+			"test-sse-server-for-tools",
+			"test-sse-server-with-header",
+			"test-streamable-http-server-for-tools",
+			"test-stdio-server-for-tools",
+		} {
+			_ = yakit.DeleteMCPServerToolConfigs(db, name)
+		}
+	})
+
 	// 设置日志级别以减少输出
 	log.SetLevel(log.ErrorLevel)
 

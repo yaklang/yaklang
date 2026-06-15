@@ -18,30 +18,29 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
+func cleanupTestMCPServerFromProfileDB(serverNames ...string) {
+	db := consts.GetGormProfileDatabase()
+	if db == nil {
+		return
+	}
+	for _, name := range serverNames {
+		_ = yakit.DeleteMCPServerToolConfigs(db, name)
+		var server schema.MCPServer
+		if err := db.Where("name = ?", name).First(&server).Error; err == nil {
+			db.Unscoped().Delete(&server)
+		}
+	}
+}
+
 func TestLoadAIToolFromMCPServers(t *testing.T) {
 	// 测试服务器名称
 	serverName := "test_sse_server"
 
 	// 测试初始化：清理可能存在的旧数据
-	db := consts.GetGormProfileDatabase()
-	require.NotNil(t, db, "profile database is nil")
-	var oldServer schema.MCPServer
-	if err := db.Where("name = ?", serverName).First(&oldServer).Error; err == nil {
-		db.Unscoped().Delete(&oldServer)
-		log.Infof("cleaned up old test mcp server: %s", serverName)
-	}
+	cleanupTestMCPServerFromProfileDB(serverName)
 
 	// 清理函数：测试结束后删除数据库记录
-	defer func() {
-		db := consts.GetGormProfileDatabase()
-		if db != nil {
-			var server schema.MCPServer
-			if err := db.Where("name = ?", serverName).First(&server).Error; err == nil {
-				db.Unscoped().Delete(&server)
-				log.Infof("cleaned up test mcp server: %s", serverName)
-			}
-		}
-	}()
+	defer cleanupTestMCPServerFromProfileDB(serverName)
 
 	// Step 1: 启动一个真实的 SSE MCP 服务器
 	t.Run("UseSSEMCPServer", func(t *testing.T) {
@@ -259,15 +258,7 @@ func TestLoadAIToolFromMCPServers_Disabled(t *testing.T) {
 	serverName := "test_disabled_server"
 
 	// 清理函数
-	defer func() {
-		db := consts.GetGormProfileDatabase()
-		if db != nil {
-			var server schema.MCPServer
-			if err := db.Where("name = ?", serverName).First(&server).Error; err == nil {
-				db.Unscoped().Delete(&server)
-			}
-		}
-	}()
+	defer cleanupTestMCPServerFromProfileDB(serverName)
 
 	// 创建一个禁用的服务器配置
 	db := consts.GetGormProfileDatabase()
@@ -301,18 +292,7 @@ func TestLoadAllEnabledAIToolsFromMCPServers(t *testing.T) {
 	require.NotNil(t, db, "profile database is nil")
 
 	// 清理函数
-	defer func() {
-		db := consts.GetGormProfileDatabase()
-		if db != nil {
-			for _, name := range []string{serverName1, serverName2, serverName3} {
-				var server schema.MCPServer
-				if err := db.Where("name = ?", name).First(&server).Error; err == nil {
-					db.Unscoped().Delete(&server)
-					log.Infof("cleaned up test mcp server: %s", name)
-				}
-			}
-		}
-	}()
+	defer cleanupTestMCPServerFromProfileDB(serverName1, serverName2, serverName3)
 
 	// 启动两个 SSE MCP 服务器
 	var sseURL1, sseURL2 string
@@ -481,12 +461,7 @@ func TestLoadAllEnabledAIToolsFromMCPServers_Empty(t *testing.T) {
 
 	// 创建一个临时的禁用服务器
 	serverName := "test_empty_disabled_server"
-	defer func() {
-		var server schema.MCPServer
-		if err := db.Where("name = ?", serverName).First(&server).Error; err == nil {
-			db.Unscoped().Delete(&server)
-		}
-	}()
+	defer cleanupTestMCPServerFromProfileDB(serverName)
 
 	mcpServerConfig := &schema.MCPServer{
 		Name:   serverName,
