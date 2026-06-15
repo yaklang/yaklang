@@ -13,6 +13,10 @@
 #   MONITOR_PPROF_INTERVAL=600    periodic goroutine+heap snapshots
 #   YAK_MEASURE_TIME=0            skip /usr/bin/time wrapper (recommended with YAK_BIN)
 #   YAK_SSA_HEAP_LOG=1, YAK_SSA_HEAP_PROFILE_DIR
+#   YAK_SSA_AST_MEMORY_BUDGET     optional compiler-side AST memory budget, e.g. 10GiB
+#   YAK_SSA_AST_BUILD_WINDOW_FILES optional manual AST build window override
+#   YAK_SSA_GC_PERCENT            optional compiler-side large-project GC percent; GOGC wins
+#   GOGC / GOMEMLIMIT             optional Go runtime GC and soft memory limit controls
 set -euo pipefail
 
 usage() {
@@ -70,11 +74,6 @@ if [[ "$MODE" == "code-scan" ]]; then
 else
   export YAK_SSA_DIAGNOSTICS="${YAK_SSA_DIAGNOSTICS:-1}"
   export YAK_DIAGNOSTICS_LOG_LEVEL="${YAK_DIAGNOSTICS_LOG_LEVEL:-trace}"
-  export YAK_SSA_AST_IN_FLIGHT_FILES="${YAK_SSA_AST_IN_FLIGHT_FILES:-32}"
-  export YAK_SSA_AST_BUILD_WINDOW_FILES="${YAK_SSA_AST_BUILD_WINDOW_FILES:-2}"
-  export YAK_SSA_ORDERED_AST_MAX_FILES="${YAK_SSA_ORDERED_AST_MAX_FILES:-1024}"
-  export YAK_ANTLR_CACHE_RESET_FILES="${YAK_ANTLR_CACHE_RESET_FILES:-25}"
-  export YAK_ANTLR_CACHE_RESET_BYTES="${YAK_ANTLR_CACHE_RESET_BYTES:-8MiB}"
 fi
 
 mkdir -p "$OUT_DIR" "$YAKIT_HOME" "$YAK_SSA_HEAP_PROFILE_DIR" "$SNAPSHOT_DIR"
@@ -113,7 +112,11 @@ pick_yak_pid() {
     cmd=$(ps -p "$p" -o args= 2>/dev/null || true)
     [[ -z "$cmd" ]] && continue
     [[ "$cmd" == *"/usr/bin/time"* ]] && continue
-    [[ "$cmd" != *"yak-test"* && "$cmd" != *"/yak "* && "$cmd" != *"yak code-scan"* && "$cmd" != *"yak ssa-compile"* ]] && continue
+    if [[ -n "${YAK_BIN:-}" ]]; then
+      [[ "$cmd" != *"$YAK_BIN"* ]] && continue
+    else
+      [[ "$cmd" != *"yak-test"* && "$cmd" != *"/yak "* && "$cmd" != *"yak code-scan"* && "$cmd" != *"yak ssa-compile"* ]] && continue
+    fi
     rss=$(ps -p "$p" -o rss= 2>/dev/null | tr -d ' '); rss=${rss:-0}
     [[ "$rss" -ge "$best_rss" ]] && { best_rss=$rss; best=$p; }
   done < <(pgrep -f "$pattern" 2>/dev/null || true)
@@ -196,7 +199,7 @@ monitor_loop() {
   echo "[measure] mode=$MODE target=$TARGET out_dir=$OUT_DIR"
   echo "[measure] heap_profiles=$YAK_SSA_HEAP_PROFILE_DIR monitor=$MONITOR_LOG snapshots=$SNAPSHOT_DIR"
   echo "[measure] monitor_interval=${MONITOR_INTERVAL}s pid_pattern=$PID_PATTERN sarif=${SARIF_OUT:-<none>}"
-  echo "[measure] yakit_home=$YAKIT_HOME go_gc=${GOGC:-<unset>} use_time=$YAK_MEASURE_TIME"
+  echo "[measure] yakit_home=$YAKIT_HOME go_gc=${GOGC:-<unset>} go_memlimit=${GOMEMLIMIT:-<unset>} ssa_gc=${YAK_SSA_GC_PERCENT:-<auto>} use_time=$YAK_MEASURE_TIME"
   echo "[measure] cmd=${YAK_CMD[*]} ${CLI_ARGS[*]}"
 } | tee "$LOG_FILE"
 
