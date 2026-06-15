@@ -450,6 +450,22 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "AI 响应",
 		En: "AI Response",
 	},
+	"http-flow-analysis-evidence": {
+		Zh: "HTTP 流量分析证据",
+		En: "HTTP Flow Analysis Evidence",
+	},
+	"http-flow-query-result": {
+		Zh: "流量查询结果",
+		En: "Flow Query Result",
+	},
+	"http-flow-detail": {
+		Zh: "流量详情",
+		En: "Flow Detail",
+	},
+	"fuzz-test-result": {
+		Zh: "Fuzz 测试结果",
+		En: "Fuzz Test Result",
+	},
 	"enhance-query": {
 		Zh: "知识增强",
 		En: "Knowledge Enhancement",

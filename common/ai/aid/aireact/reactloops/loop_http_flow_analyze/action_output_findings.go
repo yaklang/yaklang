@@ -40,17 +40,12 @@ var recordHTTPFlowEvidenceAction = func(r aicommon.AIInvokeRuntime) reactloops.R
 			incoming := normalizeHTTPFlowEvidence(action.GetString(httpFlowEvidenceFieldName))
 			_, changed := appendHTTPFlowEvidence(loop, incoming)
 			if changed {
-				log.Infof("http_flow_analyze: record_http_flow_evidence merged, length=%d", len(incoming))
+				log.Infof("[record_http_flow_evidence] merged evidence, length=%d", len(incoming))
 			} else {
-				log.Infof("http_flow_analyze: record_http_flow_evidence received no new evidence")
+				log.Infof("[record_http_flow_evidence] received no new evidence")
 			}
 
-			emitter := loop.GetEmitter()
-			taskID := ""
-			if task := loop.GetCurrentTask(); task != nil {
-				taskID = task.GetId()
-			}
-			emitter.EmitThoughtStream(taskID, "Recorded HTTP flow evidence (%d chars)", len(incoming))
+			log.Infof("[record_http_flow_evidence] recorded HTTP flow evidence (%d chars)", len(incoming))
 
 			recordMetaAction(loop, httpFlowEvidenceActionName,
 				"recorded HTTP flow evidence",

@@ -2,6 +2,7 @@ package loop_http_flow_analyze
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/log"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -57,7 +58,6 @@ var dispatchFuzzTestAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 				return
 			}
 
-			emitter := loop.GetEmitter()
 			invoker := loop.GetInvoker()
 			task := loop.GetCurrentTask()
 			taskID := ""
@@ -69,8 +69,8 @@ var dispatchFuzzTestAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 			taskDesc := action.GetString("task_description")
 			locatorDesc := buildLocatorDesc(action)
 
-			emitter.EmitThoughtStream(taskID,
-				"[dispatch_fuzz_test] 正在加载目标 flow: %s，漏洞类型: %s", locatorDesc, vulnType)
+			log.Infof("[dispatch_fuzz_test] loading target flow: %s, vulnerability type: %s", locatorDesc, vulnType)
+			emitStatus(loop, "准备 Fuzz 测试 / Preparing Fuzz Test...")
 
 			// Step 1: Load flow
 			var flow *schema.HTTPFlow
@@ -85,7 +85,7 @@ var dispatchFuzzTestAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 			}
 
 			if err != nil || flow == nil {
-				emitter.EmitThoughtStream(taskID, "[dispatch_fuzz_test] flow 加载失败: %v", err)
+				log.Errorf("[dispatch_fuzz_test] flow load failed (%s): %v", locatorDesc, err)
 				recordMetaAction(loop, "dispatch_fuzz_test",
 					"flow load failed: "+locatorDesc, utils.InterfaceToString(err))
 				operator.Continue()
@@ -94,7 +94,7 @@ var dispatchFuzzTestAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 
 			rawRequest := flowRequest(flow)
 			if strings.TrimSpace(rawRequest) == "" {
-				emitter.EmitThoughtStream(taskID, "[dispatch_fuzz_test] flow 无可用 raw request: %s", locatorDesc)
+				log.Warnf("[dispatch_fuzz_test] flow has no raw request: %s", locatorDesc)
 				recordMetaAction(loop, "dispatch_fuzz_test",
 					"no raw request: "+locatorDesc, "skipped")
 				operator.Continue()
@@ -112,33 +112,51 @@ var dispatchFuzzTestAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 				sanitizeIDSegment(vulnType))
 
 			// Step 4: Create fuzztest sub-loop
+			emitStatus(loop, "启动 Fuzz 测试 / Launching Fuzz Test...")
+
 			fuzzLoop, err := reactloops.CreateLoopByName(
 				loop_http_fuzztest.LoopHTTPFuzztestName,
 				r,
 				reactloops.WithMaxIterations(8),
 			)
 			if err != nil {
-				emitter.EmitThoughtStream(taskID,
-					"[dispatch_fuzz_test] 创建 fuzztest 子循环失败: %v", err)
+				log.Errorf("[dispatch_fuzz_test] failed to create fuzztest sub-loop: %v", err)
 				operator.Fail(fmt.Errorf("dispatch_fuzz_test: failed to create fuzztest loop: %w", err))
 				return
 			}
 
 			// Step 5: Create and execute sub-task
 			subTask := aicommon.NewSubTaskBase(task, subTaskId, subTaskUserInput)
-			emitter.EmitThoughtStream(taskID,
-				"[dispatch_fuzz_test] 启动 fuzztest 子循环: %s", subTaskId)
+			log.Infof("[dispatch_fuzz_test] launching fuzztest sub-loop: %s", subTaskId)
 			invoker.AddToTimeline("dispatch_fuzz_test",
 				fmt.Sprintf("启动 fuzztest 子循环 [%s]，目标: %s，漏洞类型: %s", subTaskId, locatorDesc, vulnType))
+
+			emitStatus(loop, "Fuzz 测试执行中 / Fuzz Test Running...")
 
 			execErr := fuzzLoop.ExecuteWithExistedTask(subTask)
 
 			// Step 6: Collect results and write to HTTP flow evidence
+			emitStatus(loop, "收集测试结果 / Collecting Results...")
+
 			fuzzResult := collectFuzzSubLoopResult(fuzzLoop, locatorDesc, vulnType, flow)
 			if _, changed := appendHTTPFlowEvidence(loop, fuzzResult); changed {
-				emitter.EmitThoughtStream(taskID,
-					"[dispatch_fuzz_test] fuzztest 结果已合并到 HTTP_FLOW_EVIDENCE")
+				log.Infof("[dispatch_fuzz_test] fuzztest results merged to HTTP_FLOW_EVIDENCE")
 			}
+
+			emitStatus(loop, "Fuzz 测试完成 / Fuzz Test Complete")
+
+			// 输出简洁的累积流（2行）
+			line1 := fmt.Sprintf("启动: %s, 漏洞类型=%s", locatorDesc, vulnType)
+
+			// 提取关键发现
+			resultBrief := "未发现明显漏洞"
+			if strings.Contains(fuzzResult, "发现漏洞") || strings.Contains(fuzzResult, "vulnerability") ||
+				strings.Contains(fuzzResult, "可能存在") || strings.Contains(fuzzResult, "suspected") {
+				resultBrief = fmt.Sprintf("发现%s漏洞", vulnType)
+			}
+			line2 := fmt.Sprintf("完成: %s, 结果已合并到Evidence", resultBrief)
+
+			emitActionLog(loop, "fuzz-test-result", line1, line2)
 
 			// Record to dispatched_fuzz_tasks for reactive_data rendering
 			appendDispatchedFuzzTask(loop, dispatchedFuzzTask{
