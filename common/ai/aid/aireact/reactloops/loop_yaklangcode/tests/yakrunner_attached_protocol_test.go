@@ -104,10 +104,12 @@ type yakRunnerScenarioResult struct {
 	modifyAttempts   int
 }
 
+type yakRunnerAICallback func(t *testing.T, i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error)
+
 func runYakRunnerProtocolScenario(
 	t *testing.T,
-	mock *yakRunnerModifyMock,
-	yakPath, userQuery string,
+	callback yakRunnerAICallback,
+	userQuery string,
 	attached []*ypb.AttachedResourceInfo,
 ) yakRunnerScenarioResult {
 	t.Helper()
@@ -117,7 +119,7 @@ func runYakRunnerProtocolScenario(
 
 	ins, err := aireact.NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			return mock.callback(t, i, r)
+			return callback(t, i, r)
 		}),
 		aicommon.WithEventInputChan(in),
 		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
@@ -169,8 +171,17 @@ taskLoop:
 	ins.Wait()
 
 	result.timeline = ins.DumpTimeline()
-	result.modifyAttempts = mock.modifyAttempts
 	return result
+}
+
+func yakRunnerDirectoryOnlyAttachments(dir string) []*ypb.AttachedResourceInfo {
+	return []*ypb.AttachedResourceInfo{
+		{Type: "file", Key: "directory_path", Value: dir},
+	}
+}
+
+func yakRunnerPreviewWriteCallback(t *testing.T, i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+	return mockedYaklangWriting(t, i, req, "hello")
 }
 
 func parseYaklangCodeChangeResponse(t *testing.T, e *ypb.AIOutputEvent) yaklangCodeChangeResponse {
@@ -206,12 +217,12 @@ func TestYakRunnerProtocol_3_FullFreeInputModifyWithAllAttachments(t *testing.T)
 	userQuery := fmt.Sprintf(":codeBlockTag[%s (1-4)] 修正 synscan 超时参数", filepath.Base(yakPath))
 
 	result := runYakRunnerProtocolScenario(
-		t, mock, yakPath, userQuery,
+		t, mock.callback, userQuery,
 		yakRunnerFullAttachments(dir, yakPath, string(selection)),
 	)
 	t.Log("timeline:\n", result.timeline)
 
-	require.Greater(t, result.modifyAttempts, 0, "AI should attempt modify_code")
+	require.Greater(t, mock.modifyAttempts, 0, "AI should attempt modify_code")
 	require.False(t, result.taskFailed, "task should complete when attachment seeds full_code")
 	require.NotContains(t, result.timeline, "line number out of range")
 	require.Contains(t, result.timeline, "modify_success")
@@ -242,7 +253,7 @@ func TestYakRunnerProtocol_4_YaklangCodeChangeResponseShape(t *testing.T) {
 	userQuery := fmt.Sprintf(":codeBlockTag[%s (1-4)] 修正 synscan 超时参数", filepath.Base(yakPath))
 
 	result := runYakRunnerProtocolScenario(
-		t, mock, yakPath, userQuery,
+		t, mock.callback, userQuery,
 		yakRunnerFullAttachments(dir, yakPath, string(selection)),
 	)
 	require.NotEmpty(t, result.codeChangeEvents)
@@ -260,4 +271,43 @@ func TestYakRunnerProtocol_4_YaklangCodeChangeResponseShape(t *testing.T) {
 
 	// Deferred editor sync: only one final yaklang_code_change after the loop completes.
 	assert.Len(t, result.codeChangeEvents, 1)
+}
+
+// TestYakRunnerProtocol_5_NoAttachmentsEmitsCreateOp verifies preview mode when
+// AttachedResourceInfo is completely absent: final yaklang_code_change uses op create.
+func TestYakRunnerProtocol_5_NoAttachmentsEmitsCreateOp(t *testing.T) {
+	base := t.TempDir()
+	t.Setenv("YAKIT_HOME", base)
+
+	result := runYakRunnerProtocolScenario(
+		t, yakRunnerPreviewWriteCallback, "写一个 hello yak 脚本", nil,
+	)
+	require.False(t, result.taskFailed, "preview task should complete")
+	require.NotEmpty(t, result.codeChangeEvents)
+
+	payload := parseYaklangCodeChangeResponse(t, result.codeChangeEvents[len(result.codeChangeEvents)-1])
+	assert.Equal(t, "create", payload.Op)
+	assert.Contains(t, payload.Code.Content, "hello yak")
+	assert.Contains(t, filepath.Clean(payload.Code.Path), filepath.Join("code", "gen_code_"))
+}
+
+// TestYakRunnerProtocol_6_DirectoryPathOnlyEmitsCreateOp verifies preview mode when
+// only directory_path is attached (no open file): final yaklang_code_change uses op create.
+func TestYakRunnerProtocol_6_DirectoryPathOnlyEmitsCreateOp(t *testing.T) {
+	base := t.TempDir()
+	t.Setenv("YAKIT_HOME", base)
+	dir := filepath.Join(base, "workspace")
+	require.NoError(t, os.MkdirAll(dir, 0o755))
+
+	result := runYakRunnerProtocolScenario(
+		t, yakRunnerPreviewWriteCallback, "写一个 hello yak 脚本",
+		yakRunnerDirectoryOnlyAttachments(dir),
+	)
+	require.False(t, result.taskFailed, "directory-only preview task should complete")
+	require.NotEmpty(t, result.codeChangeEvents)
+
+	payload := parseYaklangCodeChangeResponse(t, result.codeChangeEvents[len(result.codeChangeEvents)-1])
+	assert.Equal(t, "create", payload.Op)
+	assert.Contains(t, payload.Code.Content, "hello yak")
+	assert.Contains(t, filepath.Clean(payload.Code.Path), filepath.Join("code", "gen_code_"))
 }

@@ -20,12 +20,12 @@ func buildInitTask(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearc
 		attachedDatas := task.GetAttachedDatas()
 		reactloops.RunAttachedExtraResourcesInit(r, loop, attachedDatas)
 		editorCtx := initYaklangEditorContextFromAttached(r, loop, attachedDatas)
-		hasAttachedPath := editorCtx != nil && editorCtx.HasEditorFile()
-		codePreviewOnly := !hasAttachedPath
+		codePreviewOnly := resolveYaklangCodePreviewOnly(editorCtx)
 		setYaklangCodePreviewOnly(loop, codePreviewOnly)
 		if codePreviewOnly {
 			log.Infof("code preview mode: no editor target file; generated code will not bind to disk paths")
 		}
+		hasAttachedPath := editorCtx != nil && editorCtx.HasEditorFile()
 		attachedPath := ""
 		workspacePath := ""
 		if editorCtx != nil {

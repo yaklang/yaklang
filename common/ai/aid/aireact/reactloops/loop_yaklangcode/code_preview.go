@@ -36,6 +36,13 @@ func isYaklangCodePreviewOnly(loop *reactloops.ReActLoop) bool {
 	}
 }
 
+// resolveYaklangCodePreviewOnly is true when no editor target file is attached
+// (nil attachments, directory_path only, or selection without resolvable file path).
+func resolveYaklangCodePreviewOnly(editorCtx *YaklangEditorContext) bool {
+	hasAttachedPath := editorCtx != nil && editorCtx.HasEditorFile()
+	return !hasAttachedPath
+}
+
 func yaklangPreviewCodeDir() string {
 	return filepath.Join(consts.GetDefaultYakitBaseDir(), "code")
 }

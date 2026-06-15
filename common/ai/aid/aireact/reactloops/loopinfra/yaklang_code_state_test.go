@@ -110,7 +110,7 @@ func TestApplyLoopYaklangCodeChange_UpdatesLoopStateAndVersion(t *testing.T) {
 		Path:         filename,
 		SourceAction: "write_code",
 		ChangeReason: "initial write",
-		EventOp:      loopYaklangCodeEventOpReplace,
+		EventOp:      loopYaklangCodeEventOpCreate,
 		EmitEvent:    true,
 	})
 	require.NoError(t, err)
@@ -126,7 +126,7 @@ func TestApplyLoopYaklangCodeChange_UpdatesLoopStateAndVersion(t *testing.T) {
 	events := capture.byType(schema.EVENT_TYPE_YAKLANG_CODE_CHANGE)
 	require.Len(t, events, 1)
 	payload := parseYaklangCodeChangeEvent(t, events[0])
-	assert.Equal(t, loopYaklangCodeEventOpReplace, payload.Op)
+	assert.Equal(t, loopYaklangCodeEventOpCreate, payload.Op)
 	assert.Equal(t, content, payload.Code.Content)
 	assert.Equal(t, filename, payload.Code.Path)
 	assert.Equal(t, 1, payload.Code.Version)
@@ -207,4 +207,72 @@ func TestApplyLoopYaklangCodeChange_InvalidInput(t *testing.T) {
 		Content: "x", SourceAction: "write_code", EventOp: "merge",
 	})
 	assert.Error(t, err)
+}
+
+func TestApplyLoopYaklangCodeChange_AutoInferCreateWhenNoPreviousState(t *testing.T) {
+	runtime := newTestRuntimeForSingleFile(t)
+	factory := newYaklangFactory(t, runtime)
+	loop, capture, _ := newLoopWithCapturedEvents(t, runtime, factory)
+
+	_, err := factory.applyLoopYaklangCodeChange(loop, &loopYaklangCodeChange{
+		Content:      "println(\"new\")",
+		Path:         "/tmp/new.yak",
+		SourceAction: "write_code",
+		EmitEvent:    true,
+	})
+	require.NoError(t, err)
+
+	events := capture.byType(schema.EVENT_TYPE_YAKLANG_CODE_CHANGE)
+	require.Len(t, events, 1)
+	payload := parseYaklangCodeChangeEvent(t, events[0])
+	assert.Equal(t, loopYaklangCodeEventOpCreate, payload.Op)
+}
+
+func TestApplyLoopYaklangCodeChange_ReplaceAfterPreviousState(t *testing.T) {
+	runtime := newTestRuntimeForSingleFile(t)
+	factory := newYaklangFactory(t, runtime)
+	loop, capture, _ := newLoopWithCapturedEvents(t, runtime, factory)
+
+	_, err := factory.applyLoopYaklangCodeChange(loop, &loopYaklangCodeChange{
+		Content:      "v1",
+		Path:         "/tmp/v.yak",
+		SourceAction: "write_code",
+		EmitEvent:    false,
+	})
+	require.NoError(t, err)
+
+	_, err = factory.applyLoopYaklangCodeChange(loop, &loopYaklangCodeChange{
+		Content:      "v2",
+		Path:         "/tmp/v.yak",
+		SourceAction: "modify_code",
+		EventOp:      loopYaklangCodeEventOpReplace,
+		EmitEvent:    true,
+	})
+	require.NoError(t, err)
+
+	events := capture.byType(schema.EVENT_TYPE_YAKLANG_CODE_CHANGE)
+	require.Len(t, events, 1)
+	payload := parseYaklangCodeChangeEvent(t, events[0])
+	assert.Equal(t, loopYaklangCodeEventOpReplace, payload.Op)
+	assert.Equal(t, "v2", payload.Code.Content)
+}
+
+func TestApplyLoopYaklangCodeChange_ExplicitCreateOp(t *testing.T) {
+	runtime := newTestRuntimeForSingleFile(t)
+	factory := newYaklangFactory(t, runtime)
+	loop, capture, _ := newLoopWithCapturedEvents(t, runtime, factory)
+
+	_, err := factory.applyLoopYaklangCodeChange(loop, &loopYaklangCodeChange{
+		Content:      "println(\"create\")",
+		Path:         "/tmp/create.yak",
+		SourceAction: "write_code",
+		EventOp:      loopYaklangCodeEventOpCreate,
+		EmitEvent:    true,
+	})
+	require.NoError(t, err)
+
+	events := capture.byType(schema.EVENT_TYPE_YAKLANG_CODE_CHANGE)
+	require.Len(t, events, 1)
+	payload := parseYaklangCodeChangeEvent(t, events[0])
+	assert.Equal(t, loopYaklangCodeEventOpCreate, payload.Op)
 }

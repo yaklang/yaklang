@@ -5,6 +5,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loopinfra"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 )
@@ -89,8 +90,13 @@ func flushYaklangDeferredEditorSync(loop *reactloops.ReActLoop) {
 		version = 1
 	}
 
+	eventOp := loopinfra.LoopYaklangCodeEventOpReplace
+	if isYaklangCodePreviewOnly(loop) {
+		eventOp = loopinfra.LoopYaklangCodeEventOpCreate
+	}
+
 	emitYaklangDeferredEditorSync(loop, yaklangCodeChangeEvent{
-		Op: "replace",
+		Op: eventOp,
 		Code: yaklangCodeChangeEventCode{
 			Content: content,
 			Path:    path,
