@@ -295,10 +295,14 @@ case "open":
     }
 
     isHeadless = str.ToLower(headless) != "no"
+    // 显式开启 leakless: 当 yak 进程退出(含 Ctrl+C/被 kill)时由守护进程强制回收浏览器,
+    // 避免 AI 打开的 Chromium 在 yak 结束后变成孤儿进程无法关闭
+    // 关键词: browser.leakless, 浏览器进程泄漏回收
     b, err = browser.Open(
         browser.id(session),
         browser.headless(isHeadless),
         browser.timeout(float64(timeoutSeconds)),
+        browser.leakless(true),
     )
     if err != nil {
         yakit.Error("failed to open browser: %v", err)
