@@ -50,6 +50,11 @@ func finalizeYaklangInitFileTarget(
 	editorCtx *YaklangEditorContext,
 	liteforgePath string,
 ) {
+	if isYaklangCodePreviewOnly(loop) {
+		finalizeYaklangPreviewArtifact(r, loop, emitter, operator)
+		return
+	}
+
 	targetPath, fromAttached := resolveYaklangInitTargetPath(editorCtx, liteforgePath)
 	attachedCode, hasAttachedCode := attachedInitialCode(editorCtx)
 
@@ -76,12 +81,28 @@ func finalizeYaklangInitFileTarget(
 		return
 	}
 
-	filename := r.EmitFileArtifactWithExt("gen_code", ".yak", "")
+	finalizeYaklangPreviewArtifact(r, loop, emitter, operator)
 	if hasAttachedCode {
 		loop.Set("full_code", attachedCode)
 		log.Infof("seeded new artifact full_code from attached selection, size: %d bytes", len(attachedCode))
 	}
+}
+
+func finalizeYaklangPreviewArtifact(
+	r aicommon.AIInvokeRuntime,
+	loop *reactloops.ReActLoop,
+	emitter *aicommon.Emitter,
+	operator *reactloops.InitTaskOperator,
+) {
+	_ = r
+	filename, err := newYaklangPreviewCodePath()
+	if err != nil {
+		log.Errorf("code preview mode: failed to reserve artifact path: %v", err)
+		operator.Failed(err)
+		return
+	}
 	emitter.EmitPinFilename(filename)
 	loop.Set("filename", filename)
+	log.Infof("code preview mode: reserved %s (content written on loop completion)", filename)
 	operator.Continue()
 }
