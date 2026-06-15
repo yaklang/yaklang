@@ -96,7 +96,14 @@ var getHTTPFlowDetailAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActL
 			loop.Set("current_flow", summary)
 
 			// 输出简洁的累积流（2行）
-			line1 := fmt.Sprintf("加载: %s", locatorDesc)
+			// 如果有 human_readable_thought，融入到第一行
+			thought := action.GetString("human_readable_thought")
+			var line1 string
+			if thought != "" {
+				line1 = fmt.Sprintf("加载 %s | %s", locatorDesc, thought)
+			} else {
+				line1 = fmt.Sprintf("加载 %s", locatorDesc)
+			}
 
 			reqSize := len(req)
 			rspSize := len(rsp)
@@ -104,7 +111,7 @@ var getHTTPFlowDetailAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActL
 			if flow.Tags != "" {
 				tagsStr = fmt.Sprintf(", tags=%s", shrinkTags(flow.Tags))
 			}
-			line2 := fmt.Sprintf("信息: %s %s %d %s (%s req, %s rsp)%s",
+			line2 := fmt.Sprintf("成功加载 %s %s %d %s (%s req, %s rsp)%s",
 				flow.Method,
 				utils.ShrinkString(flow.Url, 80),
 				flow.StatusCode,

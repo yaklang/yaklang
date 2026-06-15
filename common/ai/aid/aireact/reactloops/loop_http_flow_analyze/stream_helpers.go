@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
-	"github.com/yaklang/yaklang/common/utils"
 )
 
 // emitStatus 发送瞬时状态（状态栏覆盖显示）
@@ -40,7 +39,7 @@ func emitProgress(loop *reactloops.ReActLoop, current, total int, actionZh, acti
 
 // emitActionLog 输出 Action 的累积日志
 // 每个 action 最多输出 2 条，格式简洁
-// nodeId: action 专属的 NodeId (如 "http-flow-query-result")
+// nodeId: action 专属的 NodeId (如 "http-flow-query")
 // lines: 要输出的行（1-2行）
 func emitActionLog(loop *reactloops.ReActLoop, nodeId string, lines ...string) {
 	if loop == nil || nodeId == "" || len(lines) == 0 {
@@ -57,23 +56,7 @@ func emitActionLog(loop *reactloops.ReActLoop, nodeId string, lines ...string) {
 		taskID = task.GetId()
 	}
 
-	// 合并所有行，每行一个换行符
-	var builder strings.Builder
 	for _, line := range lines {
-		if line != "" {
-			builder.WriteString(line)
-			builder.WriteString("\n")
-		}
-	}
-
-	content := builder.String()
-	if content != "" {
-		pr, pw := utils.NewPipe()
-		emitter.EmitDefaultStreamEvent(nodeId, pr, taskID)
-
-		go func() {
-			defer pw.Close()
-			pw.WriteString(content)
-		}()
+		emitter.EmitDefaultStreamEvent(nodeId, strings.NewReader(line), taskID)
 	}
 }

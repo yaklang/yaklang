@@ -69,6 +69,17 @@ var dispatchFuzzTestAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 			taskDesc := action.GetString("task_description")
 			locatorDesc := buildLocatorDesc(action)
 
+			// 输出简洁的累积流（2行）
+			// 如果有 human_readable_thought，融入到第一行
+			thought := action.GetString("human_readable_thought")
+			var line1 string
+			if thought != "" {
+				line1 = fmt.Sprintf("%s, 漏洞类型=%s | %s", locatorDesc, vulnType, thought)
+			} else {
+				line1 = fmt.Sprintf("%s, 漏洞类型=%s", locatorDesc, vulnType)
+			}
+			emitActionLog(loop, "fuzz-test", line1)
+
 			log.Infof("[dispatch_fuzz_test] loading target flow: %s, vulnerability type: %s", locatorDesc, vulnType)
 			emitStatus(loop, "准备 Fuzz 测试 / Preparing Fuzz Test...")
 
@@ -145,9 +156,6 @@ var dispatchFuzzTestAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 
 			emitStatus(loop, "Fuzz 测试完成 / Fuzz Test Complete")
 
-			// 输出简洁的累积流（2行）
-			line1 := fmt.Sprintf("启动: %s, 漏洞类型=%s", locatorDesc, vulnType)
-
 			// 提取关键发现
 			resultBrief := "未发现明显漏洞"
 			if strings.Contains(fuzzResult, "发现漏洞") || strings.Contains(fuzzResult, "vulnerability") ||
@@ -156,7 +164,7 @@ var dispatchFuzzTestAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 			}
 			line2 := fmt.Sprintf("完成: %s, 结果已合并到Evidence", resultBrief)
 
-			emitActionLog(loop, "fuzz-test-result", line1, line2)
+			emitActionLog(loop, "fuzz-test", line2)
 
 			// Record to dispatched_fuzz_tasks for reactive_data rendering
 			appendDispatchedFuzzTask(loop, dispatchedFuzzTask{

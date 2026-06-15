@@ -60,12 +60,6 @@ var matchHTTPFlowsWithSimpleMatcherAction = func(r aicommon.AIInvokeRuntime) rea
 				return
 			}
 
-			emitter := loop.GetEmitter()
-			taskID := ""
-			if task := loop.GetCurrentTask(); task != nil {
-				taskID = task.GetId()
-			}
-
 			paramSummary := buildSearchParamSummary(action)
 			matcherType := action.GetString("matcher_type")
 			matcherScope := action.GetString("scope")
@@ -80,6 +74,17 @@ var matchHTTPFlowsWithSimpleMatcherAction = func(r aicommon.AIInvokeRuntime) rea
 			if matcherNegative {
 				matcherInfo += ", negative=true"
 			}
+			// 输出简洁的累积流（2行）
+			// 如果有 human_readable_thought，融入到第一行
+			thought := action.GetString("human_readable_thought")
+			var line1 string
+			if thought != "" {
+				line1 = fmt.Sprintf("查询 %s | 匹配 %s | %s", paramSummary, matcherInfo, thought)
+			} else {
+				line1 = fmt.Sprintf("查询 %s | 匹配 %s", paramSummary, matcherInfo)
+			}
+			emitActionLog(loop, "http-flow-query", line1)
+
 			log.Infof("[match_http_flows_with_matcher] search params: %s | matcher: %s",
 				paramSummary, matcherInfo)
 
@@ -134,20 +139,6 @@ var matchHTTPFlowsWithSimpleMatcherAction = func(r aicommon.AIInvokeRuntime) rea
 			builder.WriteString(fmt.Sprintf("HTTP flow query returned %d items (showing %d); applying matcher (type=%s, scope=%s)\n",
 				total, len(flows), matcher.MatcherType, matcher.Scope))
 
-			pr, pw := utils.NewPipe()
-			defer pw.Close()
-
-			var streamId string
-			if event, _ := emitter.EmitDefaultStreamEvent("thought", pr, taskID); event != nil {
-				streamId = event.GetStreamEventWriterId()
-			}
-
-			pw.WriteString(fmt.Sprintf("Matching [%v] HTTP flows with %s matcher...", len(flows), matcher.MatcherType))
-
-			if len(flows) <= 0 {
-				pw.WriteString("[DONE] No flows to match.")
-			}
-
 			for _, flow := range flows {
 				matched, err := executeMatchers(
 					localMatchers,
@@ -185,10 +176,6 @@ var matchHTTPFlowsWithSimpleMatcherAction = func(r aicommon.AIInvokeRuntime) rea
 			fullSummary := builder.String()
 			summary := fullSummary
 
-			if streamId != "" {
-				emitter.EmitTextReferenceMaterial(streamId, fullSummary)
-			}
-
 			var filename string
 			if invoker != nil {
 				loopDataDir := loop.GetLoopContentDir("data")
@@ -196,6 +183,8 @@ var matchHTTPFlowsWithSimpleMatcherAction = func(r aicommon.AIInvokeRuntime) rea
 				loop.Set("last_match_summary_file", filename)
 				loop.GetEmitter().EmitPinFilename(filename)
 			}
+
+			emitActionLog(loop, "http-flow-query", fmt.Sprintf("查询流量共%d条 -> 匹配%d条 -> %s", total, matchedCount, filepath.Base(filename)))
 
 			if len(fullSummary) > maxHTTPFlowSummaryBytes && filename != "" {
 				preview := utils.ShrinkTextBlock(fullSummary, 2000)
