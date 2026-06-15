@@ -7,9 +7,11 @@ import (
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/stretchr/testify/require"
 
+	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 type fakeAntlrAnalyzer struct {
@@ -130,4 +132,145 @@ func TestAntlrASTParseWorker_ResetRuntimeCachesBySourceBytes(t *testing.T) {
 	_, err = parser.parseFileAST("b.test", "34", store)
 	require.NoError(t, err)
 	require.NotSame(t, firstDFA, cache.ParserDfaCache[0])
+}
+
+func newASTWindowTestConfig(t *testing.T, language ssaconfig.Language, concurrency int, projectBytes int64, diag bool) *Config {
+	t.Helper()
+
+	cfg, err := ssaconfig.NewCLIScanConfig(
+		ssaconfig.WithProjectLanguage(language),
+		ssaconfig.WithCompileConcurrency(concurrency),
+		ssaconfig.WithCompileDiagnostics(diag),
+	)
+	require.NoError(t, err)
+	cfg.SetCompileProjectBytes(projectBytes)
+	return &Config{Config: cfg}
+}
+
+func TestResolveASTBuildWindow_PHPTraceKeepsBalancedWindow(t *testing.T) {
+	oldLevel := diagnostics.GetLevel()
+	diagnostics.SetLevel(diagnostics.LevelLow)
+	t.Cleanup(func() {
+		diagnostics.SetLevel(oldLevel)
+	})
+	t.Setenv("YAK_SSA_AST_MEMORY_BUDGET", "10GiB")
+
+	cfg := newASTWindowTestConfig(t, ssaconfig.PHP, 12, 60*1024*1024, true)
+	decision := cfg.resolveASTBuildWindow(cfg.GetCompileConcurrency())
+
+	require.True(t, decision.largeProject)
+	require.True(t, decision.diagnosticsHeavy)
+	require.Equal(t, 2, decision.window)
+	require.Equal(t, int64(10*1024*1024*1024), decision.budgetBytes)
+	require.Equal(t, int64(4*1024*1024*1024), decision.slotCostBytes)
+}
+
+func TestResolveASTBuildWindow_PHPWithoutTraceAllowsMoreCPU(t *testing.T) {
+	oldLevel := diagnostics.GetLevel()
+	diagnostics.SetLevel(diagnostics.LevelNormal)
+	t.Cleanup(func() {
+		diagnostics.SetLevel(oldLevel)
+	})
+	t.Setenv("YAK_SSA_AST_MEMORY_BUDGET", "10GiB")
+
+	cfg := newASTWindowTestConfig(t, ssaconfig.PHP, 12, 60*1024*1024, false)
+	decision := cfg.resolveASTBuildWindow(cfg.GetCompileConcurrency())
+
+	require.True(t, decision.largeProject)
+	require.False(t, decision.diagnosticsHeavy)
+	require.Equal(t, 2, decision.window)
+	require.Equal(t, int64(4*1024*1024*1024), decision.slotCostBytes)
+}
+
+func TestResolveASTBuildWindow_PHPLowBudgetFallsBackToOne(t *testing.T) {
+	t.Setenv("YAK_SSA_AST_MEMORY_BUDGET", "6GiB")
+
+	cfg := newASTWindowTestConfig(t, ssaconfig.PHP, 12, 60*1024*1024, true)
+	decision := cfg.resolveASTBuildWindow(cfg.GetCompileConcurrency())
+
+	require.True(t, decision.largeProject)
+	require.Equal(t, 1, decision.window)
+	require.Equal(t, int64(4*1024*1024*1024), decision.slotCostBytes)
+}
+
+func TestResolveASTBuildWindow_ManualWindowEnvWins(t *testing.T) {
+	t.Setenv("YAK_SSA_AST_MEMORY_BUDGET", "10GiB")
+	t.Setenv("YAK_SSA_AST_BUILD_WINDOW_FILES", "6")
+
+	cfg := newASTWindowTestConfig(t, ssaconfig.PHP, 12, 60*1024*1024, true)
+	decision := cfg.resolveASTBuildWindow(cfg.GetCompileConcurrency())
+
+	require.True(t, decision.largeProject)
+	require.True(t, decision.manualOverride)
+	require.Zero(t, decision.window)
+}
+
+func TestResolveASTBuildWindow_SkipsSmallProjects(t *testing.T) {
+	t.Setenv("YAK_SSA_AST_MEMORY_BUDGET", "10GiB")
+
+	cfg := newASTWindowTestConfig(t, ssaconfig.PHP, 12, 4*1024*1024, true)
+	decision := cfg.resolveASTBuildWindow(cfg.GetCompileConcurrency())
+
+	require.False(t, decision.largeProject)
+	require.Zero(t, decision.window)
+}
+
+func TestResolveLargeProjectGCPercent_AutoForLargePreHandlerProject(t *testing.T) {
+	t.Setenv("GOGC", "")
+	cfg := newASTWindowTestConfig(t, ssaconfig.PHP, 12, 60*1024*1024, true)
+
+	decision := cfg.resolveLargeProjectGCPercent()
+
+	require.True(t, decision.largeProject)
+	require.False(t, decision.manualOverride)
+	require.Equal(t, defaultLargeProjectGC, decision.percent)
+	require.Equal(t, "auto:large-project", decision.source)
+}
+
+func TestResolveLargeProjectGCPercent_RespectsGOGC(t *testing.T) {
+	t.Setenv("GOGC", "50")
+	cfg := newASTWindowTestConfig(t, ssaconfig.PHP, 12, 60*1024*1024, true)
+
+	decision := cfg.resolveLargeProjectGCPercent()
+
+	require.True(t, decision.largeProject)
+	require.True(t, decision.manualOverride)
+	require.Zero(t, decision.percent)
+	require.Equal(t, "env:GOGC", decision.source)
+}
+
+func TestResolveLargeProjectGCPercent_EnvOverride(t *testing.T) {
+	t.Setenv("GOGC", "")
+	t.Setenv("YAK_SSA_GC_PERCENT", "150")
+	cfg := newASTWindowTestConfig(t, ssaconfig.PHP, 12, 60*1024*1024, true)
+
+	decision := cfg.resolveLargeProjectGCPercent()
+
+	require.True(t, decision.largeProject)
+	require.False(t, decision.manualOverride)
+	require.Equal(t, 150, decision.percent)
+	require.Equal(t, "env:YAK_SSA_GC_PERCENT", decision.source)
+}
+
+func TestResolveLargeProjectGCPercent_DisabledByEnv(t *testing.T) {
+	t.Setenv("GOGC", "")
+	t.Setenv("YAK_SSA_GC_PERCENT", "off")
+	cfg := newASTWindowTestConfig(t, ssaconfig.PHP, 12, 60*1024*1024, true)
+
+	decision := cfg.resolveLargeProjectGCPercent()
+
+	require.True(t, decision.largeProject)
+	require.True(t, decision.manualOverride)
+	require.Zero(t, decision.percent)
+	require.Equal(t, "env:YAK_SSA_GC_PERCENT", decision.source)
+}
+
+func TestResolveLargeProjectGCPercent_SkipsSmallProjects(t *testing.T) {
+	t.Setenv("GOGC", "")
+	cfg := newASTWindowTestConfig(t, ssaconfig.PHP, 12, 4*1024*1024, true)
+
+	decision := cfg.resolveLargeProjectGCPercent()
+
+	require.False(t, decision.largeProject)
+	require.Zero(t, decision.percent)
 }
