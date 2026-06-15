@@ -134,6 +134,16 @@ func (s *Server) QueryHotPatchTemplateList(ctx context.Context, req *ypb.QueryHo
 
 }
 
+func (s *Server) GetHotPatchTemplateTags(ctx context.Context, req *ypb.Empty) (*ypb.GetHotPatchTemplateTagsResponse, error) {
+	tags, err := yakit.CountHotPatchTemplateTags(ctx, s.GetProfileDatabase())
+	if err != nil {
+		return nil, err
+	}
+	return &ypb.GetHotPatchTemplateTagsResponse{
+		Tags: tags,
+	}, nil
+}
+
 func (s *Server) UploadHotPatchTemplateToOnline(ctx context.Context, req *ypb.UploadHotPatchTemplateToOnlineRequest) (*ypb.Empty, error) {
 	if req.Token == "" || req.Type == "" || req.Name == "" {
 		return nil, utils.Errorf("params is empty")
