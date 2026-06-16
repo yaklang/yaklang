@@ -31,6 +31,7 @@ var queryHTTPFlowsAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoop
 			aitool.WithStringParam("source_type", aitool.WithParam_Description("Filter by source type, e.g. mitm/crawler/scan")),
 			aitool.WithIntegerParam("limit", aitool.WithParam_Description("Max result count (default 30, max 500)")),
 			aitool.WithStringParam("query_name", aitool.WithParam_Description("Optional name for this query result, used for later reference. Auto-generated if not provided.")),
+			aitool.WithBoolParam("search_beyond_selected", aitool.WithParam_Description("Set to true to search all flows in database. If false (default), only search within user-selected flows when available.")),
 		},
 		func(l *reactloops.ReActLoop, action *aicommon.Action) error {
 			limit := action.GetInt("limit")
@@ -65,7 +66,7 @@ var queryHTTPFlowsAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoop
 
 			log.Infof("[query_http_flows] search params: %s", paramSummary)
 
-			req := buildQueryRequestFromAction(action, 30)
+			req := buildQueryRequestFromActionWithLoop(action, 30, loop)
 			paging, flows, err := yakit.QueryHTTPFlow(db, req)
 			if err != nil {
 				log.Errorf("[query_http_flows] query failed: %v", err)

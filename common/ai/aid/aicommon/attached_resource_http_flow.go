@@ -124,6 +124,21 @@ func parseAttachedHTTPFlowIDsJSON(raw string) ([]int64, error) {
 		}
 	}
 
+	// Try parsing as a single ID (number or string)
+	var singleID int64
+	if err := json.Unmarshal([]byte(raw), &singleID); err == nil {
+		return []int64{singleID}, nil
+	}
+
+	var singleIDStr string
+	if err := json.Unmarshal([]byte(raw), &singleIDStr); err == nil {
+		parsed, err := strconv.ParseInt(strings.TrimSpace(singleIDStr), 10, 64)
+		if err != nil {
+			return nil, utils.Errorf("invalid http flow id string: %q", singleIDStr)
+		}
+		return []int64{parsed}, nil
+	}
+
 	return nil, utils.Errorf("invalid http flow id list json: %q", raw)
 }
 

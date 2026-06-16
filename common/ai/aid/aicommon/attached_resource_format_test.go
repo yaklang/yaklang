@@ -87,11 +87,34 @@ func TestAttachedHTTPFlowIDsFromResourceJSON(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []int64{7895, 7894, 7896}, resource.IDs)
 
+	// Test single number
+	resource = &AttachedHTTPFlowResourceData{}
+	err = resource.Unmarshal(`21`)
+	require.NoError(t, err)
+	require.Equal(t, []int64{21}, resource.IDs)
+
+	// Test single number string
+	resource = &AttachedHTTPFlowResourceData{}
+	err = resource.Unmarshal(`"42"`)
+	require.NoError(t, err)
+	require.Equal(t, []int64{42}, resource.IDs)
+
+	// Test single number string with whitespace
+	resource = &AttachedHTTPFlowResourceData{}
+	err = resource.Unmarshal(`"  99  "`)
+	require.NoError(t, err)
+	require.Equal(t, []int64{99}, resource.IDs)
+
 	err = (&AttachedHTTPFlowResourceData{}).Unmarshal(`not-json`)
 	require.Error(t, err)
 
 	err = (&AttachedHTTPFlowResourceData{}).Unmarshal(`[]`)
 	require.Error(t, err)
+
+	// Test invalid single string
+	err = (&AttachedHTTPFlowResourceData{}).Unmarshal(`"not-a-number"`)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "invalid http flow id string")
 }
 
 func TestFormatAttachedHTTPFlowListSpillToFile(t *testing.T) {

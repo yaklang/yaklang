@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -51,6 +52,10 @@ func buildSearchParamSummary(action *aicommon.Action) string {
 }
 
 func buildQueryRequestFromAction(action *aicommon.Action, defaultLimit int) *ypb.QueryHTTPFlowRequest {
+	return buildQueryRequestFromActionWithLoop(action, defaultLimit, nil)
+}
+
+func buildQueryRequestFromActionWithLoop(action *aicommon.Action, defaultLimit int, loop *reactloops.ReActLoop) *ypb.QueryHTTPFlowRequest {
 	limit := action.GetInt("limit", defaultLimit)
 	if limit <= 0 {
 		limit = defaultLimit
@@ -85,6 +90,17 @@ func buildQueryRequestFromAction(action *aicommon.Action, defaultLimit int) *ypb
 
 	if req.SearchURL == "" {
 		req.SearchURL = action.GetString("url_contains")
+	}
+
+	// Check if we should limit to attached flows
+	searchBeyondSelected := action.GetBool("search_beyond_selected", false)
+	if !searchBeyondSelected && loop != nil {
+		// Try to get attached flow IDs from loop state
+		if attachedIDsRaw := loop.GetVariable(attachedHTTPFlowIDsKey); attachedIDsRaw != nil {
+			if attachedIDs, ok := attachedIDsRaw.([]int64); ok && len(attachedIDs) > 0 {
+				req.IncludeId = attachedIDs
+			}
+		}
 	}
 
 	return req
