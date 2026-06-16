@@ -358,7 +358,7 @@ func WithRedirect(i func(current *http.Request, vias []*http.Request) bool) PocC
 	}
 }
 
-// stream 是一个请求选项参数，可以设置一个回调函数，如果 body 读取了，将会复制一份给这个流，在这个流中处理 body 是不会影响最终结果的，一般用于处理较长的 chunk 数据
+// bodyStreamHandler 是一个请求选项参数，可以设置一个回调函数，如果 body 读取了，将会复制一份给这个流，在这个流中处理 body 是不会影响最终结果的，一般用于处理较长的 chunk 数据
 func WithBodyStreamReaderHandler(i func(r []byte, closer io.ReadCloser)) PocConfigOption {
 	return func(c *PocConfig) {
 		c.BodyStreamHandler = i
@@ -432,7 +432,7 @@ func WithRetryWaitTime(f float64) PocConfigOption {
 // retryMaxWaitTime 是一个请求选项参数，用于指定重试时最大等待时间，需要搭配 retryTimes 使用，默认为2秒
 // Example:
 // ```
-// poc.HTTP(poc.BasicRequest(), poc.retryTimes(5), poc.retryNotInStatusCode(200), poc.retryWaitTime(2)) // 向 example.com 发起请求，如果响应状态码不等于200则进行重试，最多进行5次重试，重试时最多等待2秒
+// poc.HTTP(poc.BasicRequest(), poc.retryTimes(5), poc.retryNotInStatusCode(200), poc.retryMaxWaitTime(2)) // 向 example.com 发起请求，如果响应状态码不等于200则进行重试，最多进行5次重试，重试时最多等待2秒
 // ```
 func WithRetryMaxWaitTime(f float64) PocConfigOption {
 	return func(c *PocConfig) {
@@ -558,7 +558,7 @@ func WithTimeout(f float64) PocConfigOption {
 // connectTimeout 是一个请求选项参数，用于指定连接超时时间，默认为15秒
 // Example:
 // ```
-// poc.Get("https://www.example.com", poc.timeout(15)) // 向 www.baidu.com 发起请求，读取超时时间为15秒
+// poc.Get("https://www.example.com", poc.connectTimeout(15)) // 向 www.example.com 发起请求，连接超时时间为15秒
 // ```
 func WithConnectTimeout(f float64) PocConfigOption {
 	return func(c *PocConfig) {
@@ -883,10 +883,10 @@ func WithAfterSaveHandler(f ...func(flow *schema.HTTPFlow)) PocConfigOption {
 	}
 }
 
-// mitmRule 是一个请求选项参数，用于指定是否使用MITM规则，默认为false即不会使用MITM规则，使用规则可以完成流量染色，附加tag与提取数据的功能
+// useMitmRule 是一个请求选项参数，用于指定是否使用MITM规则，默认为false即不会使用MITM规则，使用规则可以完成流量染色，附加tag与提取数据的功能
 // Example:
 // ```
-// poc.Get("https://exmaple.com", poc.save(true), poc.mitmReplacer(true))
+// poc.Get("https://exmaple.com", poc.save(true), poc.useMitmRule(true))
 // ```
 func WithMITMRule(b bool) PocConfigOption {
 	return func(c *PocConfig) {
@@ -935,7 +935,7 @@ func WithConnPool(b bool) PocConfigOption {
 // Example:
 // ```
 // ctx = context.New()
-// poc.Get("https://exmaple.com", poc.withContext(ctx)) // 向 example.com 发起请求，使用指定的上下文
+// poc.Get("https://exmaple.com", poc.context(ctx)) // 向 example.com 发起请求，使用指定的上下文
 // ```
 func WithContext(ctx context.Context) PocConfigOption {
 	return func(c *PocConfig) {
@@ -1012,7 +1012,7 @@ func WithReplaceHttpPacketHeader(key, value string) PocConfigOption {
 // replaceAllHeaders 是一个请求选项参数，用于改变请求报文，修改修改所有请求头
 // Example:
 // ```
-// poc.Get("https://pie.dev/get", poc.replaceHeader("AAA", "BBB")) // 向 pie.dev 发起请求，修改AAA请求头的值为BBB，这里没有AAA请求头，所以会增加该请求头
+// poc.Get("https://pie.dev/get", poc.replaceAllHeaders({"AAA": "BBB", "CCC": "DDD"})) // 向 pie.dev 发起请求，修改所有请求头
 // ```
 func WithReplaceAllHttpPacketHeaders(headers map[string]string) PocConfigOption {
 	return func(c *PocConfig) {
@@ -1073,10 +1073,10 @@ func WithReplaceHttpPacketCookie(key, value string) PocConfigOption {
 	}
 }
 
-// replaceAllCookies 是一个请求选项参数，用于改变请求报文，修改所有Cookie请求头中的值
+// replaceCookies 是一个请求选项参数，用于改变请求报文，修改所有Cookie请求头中的值
 // Example:
 // ```
-// poc.Get("https://pie.dev/get", poc.replaceAllCookies({"aaa":"bbb", "ccc":"ddd"})) // 向 pie.dev 发起请求，修改aaa的cookie值为bbb，修改ccc的cookie值为ddd
+// poc.Get("https://pie.dev/get", poc.replaceCookies({"aaa":"bbb", "ccc":"ddd"})) // 向 pie.dev 发起请求，修改aaa的cookie值为bbb，修改ccc的cookie值为ddd
 // ```
 func WithReplaceHttpPacketCookies(cookies any) PocConfigOption {
 	return func(c *PocConfig) {
@@ -2546,6 +2546,7 @@ var PoCExports = map[string]interface{}{
 	"replaceFirstLine":                   WithReplaceHttpPacketFirstLine,
 	"replaceMethod":                      WithReplaceHttpPacketMethod,
 	"replaceHeader":                      WithReplaceHttpPacketHeader,
+	"replaceAllHeaders":                  WithReplaceAllHttpPacketHeaders,
 	"replaceHost":                        WithReplaceHttpPacketHost,
 	"replaceBasicAuth":                   WithReplaceHttpPacketBasicAuth,
 	"replaceUserAgent":                   WithReplaceHttpPacketUserAgent,
