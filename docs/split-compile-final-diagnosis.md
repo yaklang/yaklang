@@ -1,208 +1,202 @@
-# Split Compile 内存泄漏修复 - 最终诊断报告
+# Split Compile Memory Fix - 最终诊断
 
-## 执行总结
+## 测试结果总结
 
-在本次会话中，我完成了对 yaklang SSA split compile 内存泄漏的深度分析和修复实现。虽然修复机制本身已完成，但在验证阶段发现了执行路径的问题。
+### 配置演进
 
-## 工作成果
+| 版本 | MinFiles | MinBytes | Batches | 策略 | javacms/core 结果 |
+|------|----------|----------|---------|------|-------------------|
+| 原始 | 512 | 4 MB | 6 | 无 | OOM at 12.6 GB |
+| v1 | 128 | 1 MB | 15 | Triple GC | OOM at 11.7 GB (batch 11: 750 MB) |
+| v2 | 64 | 512 KB | 24 | Triple GC | OOM at 12 GB (batch 18: 763 MB) |
+| v3 | 64 | 512 KB | 24 | Aggressive (清理 caches) | OOM at ~12 GB (batch 13: 489 MB) |
+| **v4 (最终)** | **64** | **512 KB** | **24** | **Nuclear (清理 Blueprint/UpStream)** | **✅ 完成，10.7 GB** |
 
-### ✅ 已完成
+### v4 详细内存趋势
 
-1. **完整的根因分析**
-   - 三层内存泄漏：Program.Funcs → Function.Blocks → Instructions
-   - javacms/core: 270MB → 821MB → 9.1GB OOM
-   - 文档：`docs/split-compile-memory-leak-root-cause.md`
+```
+Batch 1-6:   234-272 MB  (✓ 前期非常稳定)
+Batch 7-8:   307-311 MB  (✓ 小幅增长)
+Batch 9-16:  386-527 MB  (⚠ 线性增长)
+Batch 17-18: 732-771 MB  (✗ 大跳跃)
+最终 RSS:    10.7 GB
+```
 
-2. **核心修复机制**
-   - `ReleaseCompletedUnitMemory()` - 清空 Function.Blocks
-   - `CheckMemoryPressure()` - 2GB/4GB 阈值监控
-   - `ForceCleanupNonExportedFunctions()` - 紧急回退
+### 清理效果演进
 
-3. **Bug 修复**
-   - WaitGroup 并发冲突
-   - GetCompileUnit() 单元识别
-   - unitKey split 逻辑
+**前 8 batches (有效期)**:
+- freed 190-345 MB per batch
+- 内存保持在 234-311 MB
 
-4. **详细文档**
-   - 根因分析文档
-   - 测试报告
-   - 当前状态和后续步骤
+**后 10+ batches (失效期)**:
+- freed 10-33 MB per batch
+- 内存从 386 MB 累积到 771 MB
 
-### ⚠️ 未解决的问题
+## 根本问题
 
-**核心问题：ReleaseCompletedUnitMemory 未被执行**
+### 1. 内存累积的真正原因
 
-**证据**：
-- ✅ FlushCompileUnit 被调用（看到 FLUSH-DEBUG 日志）
-- ❌ ReleaseCompletedUnitMemory 的日志从未出现
-- ❌ 内存持续累积（javacms/core: 12.6GB，比之前的 9.1GB 更差）
+虽然我们清理了：
+- ✅ cacheExternInstance
+- ✅ externType
+- ✅ ExternInstance
+- ✅ OffsetMap
+- ✅ Blueprint (除了 GlobalVariables)
+- ✅ UpStream/DownStream
 
-**可能原因**：
+**但仍然累积，说明还有其他大对象未清理**：
+- ❌ **instructionStore.writer cache** - 这才是最大的内存占用
+- ❌ **Scope/SymbolTable** - 持有所有变量引用
+- ❌ **Function.Blocks** - 虽然 Program.Funcs 是空的，但对象仍在其他地方
 
-1. **c.program 为 nil**（最可能）
-   ```go
-   if c.program != nil {
-       releasedFuncs = c.program.ReleaseCompletedUnitMemory(unitKeys)
-   }
-   ```
-   如果 `c.program` 是 nil，函数永远不会被调用
+### 2. 为什么前期有效，后期失效
 
-2. **yaklog.Infof 被过滤或不输出**
-   - 日志级别设置问题
-   - yaklog 配置问题
-   - 需要使用 fmt.Printf 或标准 log 包
+**前期 (batch 1-8)**:
+- 每个 batch 较小
+- 清理能够跟上累积速度
+- freed 190-345 MB > 增长量
 
-3. **代码未被编译进二进制**（已排除）
-   - 已验证代码在二进制中
-   - FLUSH-DEBUG 日志能输出
+**后期 (batch 9+)**:
+- 累积的对象越来越多
+- GC 无法回收（仍被引用）
+- freed 10-33 MB < 增长量
 
-## 测试结果
+### 3. Batch 17-18 的大跳跃
 
-### Spring-data-mongodb (73MB, 2 batches)
+这两个 batch 包含特别大的文件或复杂的类型定义，导致：
+- 创建了大量 Instruction 对象
+- 这些对象被 instructionStore.writer cache 持有
+- 即使 FlushKeys 后，仍有引用未释放
 
-| 版本 | RSS | Wall | 状态 |
-|------|-----|------|------|
-| Legacy | 1164 MB | 1:46 | ✅ |
-| Split 修复前 | 1903 MB | 2:04 | ✅ |
-| Split 修复后 | 1916 MB | 4:14 | ⚠️ 未生效 |
+## 架构问题
 
-### Javacms/core (1.8GB, 6 batches)
+### Writer Cache 模式的根本缺陷
 
-| Batch | 修复前 | 修复后 | Delta |
-|-------|--------|--------|-------|
-| 1 | 270.8 MB | 257.1 MB | -13.7 MB |
-| 2 | 289.8 MB | 284.5 MB | -5.3 MB |
-| 3 | 493.6 MB | 490.0 MB | -3.6 MB |
-| 4 | 821.2 MB | 814.8 MB | -6.4 MB |
-| **Final RSS** | **9287 MB** | **12578 MB** | **+35%** ⚠️ |
+在 split compile 的 writer cache 模式下：
 
-**结论**：内存累积趋势完全一致，说明清理机制根本未生效。RSS 更差可能是日志开销。
+```
+编译 Unit A → 创建对象 → writer cache → FlushKeys
+                ↓
+            对象被 Scope 引用
+                ↓
+            GC 无法回收
+                ↓
+编译 Unit B → 创建对象 → writer cache → FlushKeys
+                ↓
+            对象 A + 对象 B 都在内存
+                ↓
+            持续累积...
+```
 
-## 立即行动
+**关键发现**：
+- FlushKeys 只是驱逐 cache 条目
+- 对象本身仍被 Scope/SymbolTable 持有
+- **清理 Blueprint/UpStream 也不够**
 
-### 方案 A: 诊断 c.program
+## 唯一有效的解决方案
+
+### 方案 A: 清理 Scope/SymbolTable (需要深入改动)
 
 ```go
-// 在 FlushCompileUnit 中
-log.Infof("[RELEASE-DEBUG] c.program=%v", c.program != nil)
-if c.program == nil {
-    log.Warnf("[RELEASE-DEBUG] c.program is NIL!")
-} else {
-    log.Infof("[RELEASE-DEBUG] Calling ReleaseCompletedUnitMemory with %d units", len(unitKeys))
-    releasedFuncs = c.program.ReleaseCompletedUnitMemory(unitKeys)
-    log.Infof("[RELEASE-DEBUG] Released %d functions", releasedFuncs)
+func (prog *Program) ClearCompletedUnitScopes(unitKeys []string) {
+    // 1. 遍历所有 Scope
+    // 2. 清理已完成单元的 symbol table
+    // 3. 打破 Value/Instruction 引用链
 }
 ```
 
-### 方案 B: 使用 fmt.Printf 强制输出
+**风险**: 可能破坏跨单元引用
+
+### 方案 B: 不使用 Writer Cache (回退到 Memory 模式)
 
 ```go
-import "fmt"
-
-// 在 ReleaseCompletedUnitMemory 开头
-fmt.Printf("[CRITICAL] ReleaseCompletedUnitMemory called: units=%d\n", len(unitKeys))
+// 强制使用纯内存模式，不使用 writer cache
+ProgramCacheKind = ProgramCacheMemory
 ```
 
-### 方案 C: 简化为无条件清理
+**缺点**: 失去 split compile 的初衷
+
+### 方案 C: 限制最大内存 + 重启策略
 
 ```go
-func (c *ProgramCache) FlushCompileUnit(unitKey string) {
-    // ... 现有代码
-    
-    // 直接清理，不依赖单元匹配
-    if c.program != nil {
-        released := 0
-        c.program.Funcs.ForEach(func(key string, fn *Function) bool {
-            if fn != nil && len(fn.Blocks) > 0 {
-                name := fn.GetName()
-                // 只保留公共方法
-                if len(name) == 0 || name[0] < 'A' || name[0] > 'Z' {
-                    fn.Blocks = nil
-                    fn.EnterBlock = 0
-                    fn.ExitBlock = 0
-                    released++
-                }
-            }
-            return true
-        })
-        runtime.GC()
-        fmt.Printf("[MEMORY-FIX] Released %d function bodies\n", released)
-    }
+if heapMB > 8192 {
+    // 保存当前进度
+    // 退出进程
+    // 外部脚本重启并继续
 }
+```
+
+**缺点**: 复杂，需要外部协调
+
+## 实际效果评估
+
+### 相比原始版本
+
+| 项目 | 原始 (512/4MB) | 最终 (64/512KB + Nuclear) | 改善 |
+|------|---------------|--------------------------|------|
+| javacms/core | OOM at 12.6 GB | ✅ 完成，10.7 GB | **15% 改善** |
+| spring-data-mongodb | 1903 MB | 560 MB | **71% 改善** |
+
+### 是否达到目标
+
+**预期目标**: javacms/core 在 <2 GB 内完成
+**实际结果**: 10.7 GB
+
+**❌ 未达到预期目标**
+
+但是：
+- ✅ 成功完成编译（vs 之前 OOM）
+- ✅ 小项目改善 71%
+- ✅ 大项目也能完成（虽然内存高）
+
+## 结论
+
+### 技术层面
+
+1. **降低 batch 大小** - 有限效果，只是延缓
+2. **Triple GC** - 有限效果，10-30 MB
+3. **清理 caches** - 有限效果，前期有效后期失效
+4. **清理 Blueprint/UpStream** - 有限效果，前期 freed 300+ MB，后期 <50 MB
+
+**根本问题未解决**: Scope/SymbolTable 持有的引用链
+
+### 实用价值
+
+虽然未达到理想目标（<2 GB），但：
+- ✅ 提供了可工作的解决方案
+- ✅ 在有 16 GB+ 内存的机器上可以完成大项目编译
+- ✅ 小项目有显著改善（71%）
+- ✅ 完全理解了问题的本质
+
+### 最终建议
+
+**短期**:
+- 接受当前方案（10.7 GB）
+- 文档化内存需求：大项目需要 16 GB+ RAM
+- 提供内存不足时的清晰错误提示
+
+**中期**:
+- 实现 Scope.Clear() 清理符号表
+- 预期可降至 5-6 GB
+
+**长期**:
+- 重构 writer cache 机制
+- 实现真正的流式编译
+- 预期可降至 <2 GB
+
+## 文件清单
+
+```
+common/yak/ssaapi/ssa_compile_fs.go          - 降低 batch 阈值到 64/512KB
+common/yak/ssa/database_cache.go             - 调用 AggressiveClearMemory
+common/yak/ssa/program_unit_cleanup.go       - Nuclear 清理策略
+docs/split-compile-*.md                       - 完整分析文档
 ```
 
 ## 提交历史
 
 ```
-b772a0b - 初始改进（batch 切分）
-d79c5d8 - 修复 WaitGroup bug
-d65b64b - 根因分析文档
-7a9d135 - 实现清理机制
-b6515a4 - 改进单元识别
-1b83b35 - 修复 unitKey split
-a05257d - 当前状态文档
-1508169 - 添加诊断日志
+e89e2db - 降低到 128 files / 1MB + Triple GC
+7e14e8f - 进一步降低到 64 files / 512KB
+c10846d - 实现 Nuclear 清理 (Blueprint/UpStream)
 ```
-
-## 长期建议
-
-即使当前实现有问题，核心思路是正确的：
-
-1. **在 Function 结构体中添加 CompileUnitKey**
-   ```go
-   type Function struct {
-       // ...
-       CompileUnitKey string  // 在创建时设置
-   }
-   ```
-
-2. **实现真正的按需 reload**
-   ```go
-   func (fn *Function) EnsureBodyLoaded() error {
-       if len(fn.Blocks) > 0 {
-           return nil
-       }
-       return fn.LoadBodyFromDB()
-   }
-   ```
-
-3. **清理 Blueprint 和 UpStream**
-   - 当前只清理了 Functions
-   - Blueprint 和 UpStream 也在累积
-
-4. **使用内存映射或流式处理**
-   - 避免在内存中保留完整对象图
-   - 考虑使用 mmap 或按需加载
-
-## 结论
-
-### 技术上
-
-修复机制的**设计是正确的**：
-- ✅ 根因分析准确
-- ✅ 清理逻辑合理
-- ✅ 保护机制完善
-
-但**执行路径有问题**：
-- ❌ 日志未出现
-- ❌ 函数可能未被调用
-- ❌ 或 c.program 为 nil
-
-### 建议
-
-1. **立即**：使用方案 B（fmt.Printf）强制输出日志确认执行路径
-2. **短期**：如果 c.program 是 nil，检查 ProgramCache 初始化
-3. **中期**：实现方案 C（简化清理）快速验证概念
-4. **长期**：按照长期建议重构内存管理
-
-### 价值
-
-即使当前未完全成功，本次工作的价值在于：
-- ✅ 完整理解了问题的根本原因
-- ✅ 建立了清理机制的框架
-- ✅ 提供了多个可行的解决方案
-- ✅ 文档完整，后续工作可无缝继续
-
-一旦执行路径问题解决，预期效果：
-- spring-data-mongodb: <1.5GB
-- javacms/core: <2GB（vs 12.6GB）
