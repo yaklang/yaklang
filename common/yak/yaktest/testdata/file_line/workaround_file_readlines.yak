@@ -1,0 +1,4 @@
+a = file.ReadLines("__PAYLOAD_FILE__")
+println("workaround_file_readlines.len:", len(a))
+dump(a)
+result = a

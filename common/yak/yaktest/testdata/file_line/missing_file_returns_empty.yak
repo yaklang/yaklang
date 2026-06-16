@@ -1,0 +1,4 @@
+a = x"{{file:line(__MISSING_FILE__)}}"
+println("missing_file_returns_empty.len:", len(a))
+dump(a)
+result = a

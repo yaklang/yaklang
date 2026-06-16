@@ -1,0 +1,4 @@
+a = x"{{file:line::(__PAYLOAD_FILE__)}}"
+println("double_colon_file_line.len:", len(a))
+dump(a)
+result = a

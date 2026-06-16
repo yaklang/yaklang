@@ -1,0 +1,24 @@
+{
+  "cve_id": "CVE-2024-EXAMPLE",
+  "project_url": "https://github.com/example/vuln-project",
+  "commit_hash": "abc1234",
+  "description": "Example ground truth template. Replace with real CVE data.",
+  "vulns": [
+    {
+      "id": "VULN-001",
+      "type": "sqli",
+      "file": "src/main/java/com/example/UserDao.java",
+      "line": 42,
+      "description": "SQL injection in user search parameter",
+      "keywords": ["sql injection", "UserDao", "PreparedStatement", "concatenat"]
+    },
+    {
+      "id": "VULN-002",
+      "type": "xss",
+      "file": "src/main/webapp/search.jsp",
+      "line": 15,
+      "description": "Reflected XSS in search results page",
+      "keywords": ["xss", "cross-site scripting", "search.jsp", "escapeHTML"]
+    }
+  ]
+}

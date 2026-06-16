@@ -1,0 +1,41 @@
+{
+  "cve_id": "GHSA-w5fm-68j4-fpc4",
+  "project_url": "https://github.com/filebrowser/filebrowser",
+  "commit_hash": "a1e442ef9e4a14719184bf02c50dbc981ecf8665",
+  "language": "golang",
+  "description": "Unauthenticated DoS via arbitrarily large password in /api/login. The login handler reads the full JSON request body without a size cap and passes the password to bcrypt, causing excessive CPU and memory consumption. Fixed in v2.63.6 by capping request bodies with http.MaxBytesReader.",
+  "vulns": [
+    {
+      "id": "VULN-001",
+      "type": "dos",
+      "file": "http/auth.go",
+      "line": 121,
+      "description": "loginHandler passes the incoming request directly to auther.Auth without limiting request body size, allowing an unauthenticated attacker to send a multi-gigabyte JSON payload.",
+      "keywords": ["loginHandler", "MaxBytesReader", "r.Body", "Auth", "api/login"]
+    },
+    {
+      "id": "VULN-002",
+      "type": "dos",
+      "file": "auth/json.go",
+      "line": 40,
+      "description": "JSONAuth decodes the entire request body into jsonCred without size validation, so an oversized password is loaded into memory before authentication.",
+      "keywords": ["jsonCred", "NewDecoder", "Decode", "r.Body", "password"]
+    },
+    {
+      "id": "VULN-003",
+      "type": "dos",
+      "file": "auth/json.go",
+      "line": 65,
+      "description": "CheckPwd is called with the user-supplied password of unbounded length. bcrypt operations scale with password length, causing CPU/memory exhaustion.",
+      "keywords": ["CheckPwd", "bcrypt", "CompareHashAndPassword", "password", "unbounded"]
+    },
+    {
+      "id": "VULN-004",
+      "type": "dos",
+      "file": "users/password.go",
+      "line": 32,
+      "description": "CheckPwd performs bcrypt comparison without enforcing a maximum password length, enabling unauthenticated DoS when called with a huge password.",
+      "keywords": ["CheckPwd", "bcrypt", "CompareHashAndPassword", "maximum", "length"]
+    }
+  ]
+}

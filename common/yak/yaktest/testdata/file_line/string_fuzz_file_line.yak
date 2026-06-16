@@ -1,0 +1,5 @@
+tpl = "{{file:line(__PAYLOAD_FILE__)}}"
+a = tpl.Fuzz()
+println("string_fuzz_file_line.len:", len(a))
+dump(a)
+result = a

@@ -1,0 +1,56 @@
+desc(
+    title: "Ghost Bits Unicode Truncation"
+    title_zh: "Ghost Bits Unicode 截断"
+    type: audit
+    risk: "Ghost Bits 截断绕过"
+    desc: <<<DESC
+Ghost Bits 截断审计规则。
+
+原理：Java 字节流 write(int) 内部实现为 (byte) b，只保留低 8 位。
+当用户可控的 Unicode 字符串经过此类截断后，高字节被丢弃，
+语义可能发生改变。例如 %u002e%u002e 截断后变成 ".."，
+可用于路径遍历等绕过攻击。
+
+典型截断模式：
+  - ByteArrayOutputStream.write(int)
+  - OutputStream.write(int)
+  - DataOutputStream.write(int) / writeBytes(String)
+  - FileOutputStream.write(int)
+  - BufferedOutputStream.write(int)
+  - (byte) ch 强制转换
+  - ch & 0xff 掩码
+
+参考：CVE-2025-41242 (Spring StringUtils.uriDecode)
+DESC
+    rule_id: "ghostbits-unicode-truncation-001"
+)
+
+// ========== Source：用户输入入口 ==========
+<include('java-spring-mvc-param')> as $source;
+<include('java-servlet-param')> as $source;
+
+// ========== Truncation：字节流截断点 ==========
+// 这些 write() 方法在实现时都会将 int 截断为 byte（只保留低 8 位）
+ByteArrayOutputStream.write(*?{!opcode: const} as $sink);
+OutputStream.write(*?{!opcode: const} as $sink);
+DataOutputStream.write(*?{!opcode: const} as $sink);
+DataOutputStream.writeBytes(*?{!opcode: const} as $sink);
+FileOutputStream.write(*?{!opcode: const} as $sink);
+BufferedOutputStream.write(*?{!opcode: const} as $sink);
+PipedOutputStream.write(*?{!opcode: const} as $sink);
+
+// ========== Data Flow：截断点 ← Source ==========
+$sink #{
+    until: `* & $source`,
+}-> as $result;
+
+// ========== Alert ==========
+alert $result for {
+    desc: "用户输入可达截断点，高字节可能被丢弃导致语义改变",
+    level: "mid",
+    type: "audit",
+    message: "Ghost Bits Unicode 截断：用户输入可达字节流 write() 截断点",
+    title: "Ghost Bits Unicode Truncation",
+    title_zh: "Ghost Bits Unicode 截断",
+    risk: "Ghost Bits 截断绕过",
+}

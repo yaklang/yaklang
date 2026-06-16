@@ -1,0 +1,15 @@
+outfile = "__OUTPUT_FILE__"
+file.Rm(outfile)
+
+a = x"{{file:line(__PAYLOAD_FILE__)}}"
+ff, err := file.Open(outfile)
+die(err)
+
+for b in a {
+    ff.WriteLine(b)
+}
+ff.Close()
+
+content = string(file.ReadFile(outfile)~)
+println("write_output_file_line.content:", content)
+result = content
