@@ -11,6 +11,20 @@ import (
 )
 
 const CapabilityInventoryNodeID = "capability_inventory"
+const CapabilityInventoryItemsNodeID = "capability_inventory_items"
+
+// CapabilityInventoryItem is a flattened inventory record for UI consumption.
+// It does not replace CapabilityInventoryPayload; it is emitted separately.
+type CapabilityInventoryItem struct {
+	Name        string `json:"name"`
+	VerboseName string `json:"verbose_name,omitempty"`
+	Description string `json:"description,omitempty"`
+	Type        string `json:"type"`           // mcp | aitool | plugin | skill | forge
+	Stage       string `json:"stage"`          // loaded | metadata | schema | description
+	Position    string `json:"position"`       // FrozenBlock | Dynamic | SemiDynamic
+	IsFixed     bool   `json:"is_fixed"`       // fixed inventory, cannot be changed by hotpatch
+	Data        any    `json:"data,omitempty"` // extra arbitrary payload
+}
 
 type CapabilityInventoryToolItem struct {
 	Name        string `json:"name"`
@@ -63,9 +77,9 @@ type CapabilityInventoryLoopContext interface {
 type ConfigPromptCapabilityLoopContext struct{}
 
 func (ConfigPromptCapabilityLoopContext) PromptCandidateTools() []*aitool.Tool { return nil }
-func (ConfigPromptCapabilityLoopContext) ScenarioToolWhitelist() []string     { return nil }
-func (ConfigPromptCapabilityLoopContext) AllowToolCall() bool                 { return true }
-func (ConfigPromptCapabilityLoopContext) DynamicExtraTools() []*aitool.Tool   { return nil }
+func (ConfigPromptCapabilityLoopContext) ScenarioToolWhitelist() []string      { return nil }
+func (ConfigPromptCapabilityLoopContext) AllowToolCall() bool                  { return true }
+func (ConfigPromptCapabilityLoopContext) DynamicExtraTools() []*aitool.Tool    { return nil }
 func (ConfigPromptCapabilityLoopContext) DynamicForges() []CapabilityInventoryNamedItem {
 	return nil
 }

@@ -152,6 +152,21 @@ func (ecm *ExtraCapabilitiesManager) AddTools(tools ...*aitool.Tool) {
 	}
 }
 
+func (ecm *ExtraCapabilitiesManager) RemoveToolByName(name string) bool {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return false
+	}
+	ecm.mu.Lock()
+	defer ecm.mu.Unlock()
+	idx := indexToolByName(ecm.tools, name)
+	if idx < 0 {
+		return false
+	}
+	ecm.tools = append(ecm.tools[:idx], ecm.tools[idx+1:]...)
+	return true
+}
+
 // RemoveForgeByName drops a forge from the extra capabilities by name.
 func (ecm *ExtraCapabilitiesManager) RemoveForgeByName(name string) bool {
 	if name == "" {
@@ -164,6 +179,36 @@ func (ecm *ExtraCapabilitiesManager) RemoveForgeByName(name string) bool {
 		return false
 	}
 	ecm.forges = append(ecm.forges[:idx], ecm.forges[idx+1:]...)
+	return true
+}
+
+func (ecm *ExtraCapabilitiesManager) RemoveSkillByName(name string) bool {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return false
+	}
+	ecm.mu.Lock()
+	defer ecm.mu.Unlock()
+	idx := indexSkillByName(ecm.skills, name)
+	if idx < 0 {
+		return false
+	}
+	ecm.skills = append(ecm.skills[:idx], ecm.skills[idx+1:]...)
+	return true
+}
+
+func (ecm *ExtraCapabilitiesManager) RemoveFocusModeByName(name string) bool {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return false
+	}
+	ecm.mu.Lock()
+	defer ecm.mu.Unlock()
+	idx := indexFocusModeByName(ecm.focusModes, name)
+	if idx < 0 {
+		return false
+	}
+	ecm.focusModes = append(ecm.focusModes[:idx], ecm.focusModes[idx+1:]...)
 	return true
 }
 

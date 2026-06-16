@@ -35,6 +35,7 @@ type forgeHotloadHandler func(forgeNames []string)
 type skillUnloadHandler func(skillNames []string)
 type forgeUnloadHandler func(forgeNames []string)
 type capabilityInventoryEmitHandler func()
+type capabilityHotpatchHandler func(enable bool, caps []EnabledCapability)
 
 func normalizeEnabledCapabilityType(raw string) string {
 	switch strings.ToLower(strings.TrimSpace(raw)) {
@@ -459,6 +460,66 @@ func (c *Config) notifyCapabilityInventoryEmit() {
 	c.m.Unlock()
 	if handler != nil {
 		handler()
+	}
+}
+
+func (c *Config) SetCapabilityHotpatchHandler(handler capabilityHotpatchHandler) {
+	if c == nil {
+		return
+	}
+	if c.m == nil {
+		c.m = &sync.Mutex{}
+	}
+	c.m.Lock()
+	defer c.m.Unlock()
+	c.capabilityHotpatchHandler = handler
+}
+
+func (c *Config) notifyCapabilityHotpatch(enable bool, caps []EnabledCapability) {
+	if c == nil || len(caps) == 0 {
+		return
+	}
+	c.m.Lock()
+	handler := c.capabilityHotpatchHandler
+	c.m.Unlock()
+	if handler != nil {
+		handler(enable, caps)
+	}
+}
+
+// WithHotpatchEnabledCapabilities applies enabled capabilities for hotpatch events.
+// Unlike WithEnabledCapabilities (startup/session config), this ONLY affects prompt-level
+// extra capabilities (ExtraCapabilitiesManager) and inventory emission, and MUST NOT
+// mutate AiToolManager state.
+func WithHotpatchEnabledCapabilities(caps ...EnabledCapability) ConfigOption {
+	return func(c *Config) error {
+		if c == nil {
+			return nil
+		}
+		incoming := normalizeEnabledCapabilities(caps)
+		if len(incoming) == 0 {
+			return nil
+		}
+		c.notifyCapabilityHotpatch(true, incoming)
+		c.notifyCapabilityInventoryEmit()
+		return nil
+	}
+}
+
+// WithHotpatchDisabledCapabilities applies disabled capabilities for hotpatch events.
+// It ONLY affects prompt-level extra capabilities (ExtraCapabilitiesManager) and inventory emission.
+func WithHotpatchDisabledCapabilities(caps ...EnabledCapability) ConfigOption {
+	return func(c *Config) error {
+		if c == nil {
+			return nil
+		}
+		incoming := normalizeEnabledCapabilities(caps)
+		if len(incoming) == 0 {
+			return nil
+		}
+		c.notifyCapabilityHotpatch(false, incoming)
+		c.notifyCapabilityInventoryEmit()
+		return nil
 	}
 }
 

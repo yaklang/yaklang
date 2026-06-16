@@ -19,10 +19,10 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
+	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/aiforge"
 )
 
 func (r *ReAct) persistTaskUserInput(task aicommon.AIStatefulTask) {
@@ -608,8 +608,8 @@ func (r *ReAct) ensureSessionTitle(userInput string) {
 }
 
 func BuildReActInvoker(ctx context.Context, options ...aicommon.ConfigOption) (aicommon.AITaskInvokeRuntime, error) {
-	options = append(options,aicommon.WithAIBlueprintManager(aiforge.NewForgeFactory()))
-	
+	options = append(options, aicommon.WithAIBlueprintManager(aiforge.NewForgeFactory()))
+
 	cfg := aicommon.NewConfig(ctx, options...)
 	// artifacts directory is lazily created when user input arrives (ensureWorkDirectory)
 	invoker := &ReAct{
@@ -658,6 +658,46 @@ func BuildReActInvoker(ctx context.Context, options ...aicommon.ConfigOption) (a
 
 	cfg.SetHotpatchCurrentTaskIdResolver(func() string {
 		return invoker.GetCurrentTaskId()
+	})
+
+	cfg.SetCapabilityHotpatchHandler(func(enable bool, caps []aicommon.EnabledCapability) {
+		loop := invoker.GetCurrentLoop()
+		if loop == nil {
+			return
+		}
+		ecm := loop.GetExtraCapabilities()
+		if ecm == nil {
+			return
+		}
+		toolMgr := invoker.config.GetAiToolManager()
+
+		for _, cap := range caps {
+			switch cap.Type {
+			case aicommon.EnabledCapabilityTypeTool, aicommon.EnabledCapabilityTypePlugin, aicommon.EnabledCapabilityTypeMCPTool:
+				if toolMgr == nil {
+					continue
+				}
+				if enable {
+					if tool, err := toolMgr.GetToolByName(cap.Name); err == nil && tool != nil {
+						ecm.AddTools(tool)
+					}
+				} else {
+					ecm.RemoveToolByName(cap.Name)
+				}
+			case aicommon.EnabledCapabilityTypeForge:
+				if enable {
+					reactloops.LoadEnabledForges(invoker.config, loop, []string{cap.Name})
+				} else {
+					ecm.RemoveForgeByName(cap.Name)
+				}
+			case aicommon.EnabledCapabilityTypeSkill:
+				if enable {
+					ecm.AddSkills(reactloops.ExtraSkillInfo{Name: cap.Name})
+				} else {
+					ecm.RemoveSkillByName(cap.Name)
+				}
+			}
+		}
 	})
 
 	// Register pending context providers
@@ -722,6 +762,7 @@ func BuildReActInvoker(ctx context.Context, options ...aicommon.ConfigOption) (a
 	// so child invokers do not inherit the parent's react reference.
 	cfg.SetCapabilityInventoryEmitHandler(func() {
 		reactloops.EmitCapabilityInventorySnapshot(invoker.config, invoker.GetCurrentLoop())
+		reactloops.EmitCapabilityInventoryItemsSnapshot(invoker.config, invoker.GetCurrentLoop())
 	})
 
 	// EmitPinDirectory is deferred to ensureWorkDirectory when user input arrives

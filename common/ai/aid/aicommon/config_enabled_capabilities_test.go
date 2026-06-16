@@ -222,6 +222,10 @@ func TestProcessHotPatchMessage_CapabilityHotpatch_RespectsTaskId(t *testing.T) 
 	cfgB := NewConfig(context.Background(), WithDisableAutoSkills(true))
 	cfgA.SetHotpatchCurrentTaskIdResolver(func() string { return "task-a" })
 	cfgB.SetHotpatchCurrentTaskIdResolver(func() string { return "task-b" })
+	cfgA.SetCapabilityHotpatchHandler(func(enable bool, caps []EnabledCapability) {
+		require.True(t, enable)
+		require.Len(t, caps, 1)
+	})
 
 	opts := cfgA.ProcessHotPatchMessage(&ypb.AIInputEvent{
 		IsConfigHotpatch: true,
@@ -236,8 +240,8 @@ func TestProcessHotPatchMessage_CapabilityHotpatch_RespectsTaskId(t *testing.T) 
 	require.Len(t, opts, 1)
 
 	require.NoError(t, opts[0](cfgA))
-	require.Len(t, cfgA.GetEnabledCapabilities(), 1)
-	require.Equal(t, "grep", cfgA.GetEnabledCapabilities()[0].Name)
+	// Hotpatch should NOT mutate enabledCapabilities registry; it is prompt-level only.
+	require.Empty(t, cfgA.GetEnabledCapabilities())
 
 	require.NoError(t, opts[0](cfgB))
 	require.Empty(t, cfgB.GetEnabledCapabilities())
@@ -248,6 +252,9 @@ func TestProcessHotPatchMessage_CapabilityHotpatch_EmptyTaskIdAppliesToAll(t *te
 	cfgB := NewConfig(context.Background(), WithDisableAutoSkills(true))
 	cfgA.SetHotpatchCurrentTaskIdResolver(func() string { return "task-a" })
 	cfgB.SetHotpatchCurrentTaskIdResolver(func() string { return "task-b" })
+	var calledA, calledB bool
+	cfgA.SetCapabilityHotpatchHandler(func(enable bool, caps []EnabledCapability) { calledA = true })
+	cfgB.SetCapabilityHotpatchHandler(func(enable bool, caps []EnabledCapability) { calledB = true })
 
 	opts := cfgA.ProcessHotPatchMessage(&ypb.AIInputEvent{
 		IsConfigHotpatch: true,
@@ -262,6 +269,6 @@ func TestProcessHotPatchMessage_CapabilityHotpatch_EmptyTaskIdAppliesToAll(t *te
 
 	require.NoError(t, opts[0](cfgA))
 	require.NoError(t, opts[0](cfgB))
-	require.Len(t, cfgA.GetEnabledCapabilities(), 1)
-	require.Len(t, cfgB.GetEnabledCapabilities(), 1)
+	require.True(t, calledA)
+	require.True(t, calledB)
 }
