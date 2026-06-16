@@ -181,7 +181,11 @@ var matchHTTPFlowsWithSimpleMatcherAction = func(r aicommon.AIInvokeRuntime) rea
 				loopDataDir := loop.GetLoopContentDir("data")
 				filename = filepath.Join(loopDataDir, fmt.Sprintf("http_flow_simple_match_summary_%d_%s.txt", loop.GetCurrentIterationIndex(), utils.DatetimePretty2()))
 				loop.Set("last_match_summary_file", filename)
-				loop.GetEmitter().EmitPinFilename(filename)
+
+				// 保存文件并 pin 到前端
+				if err := reactloops.SaveAndPinFile(loop, filename, []byte(fullSummary)); err != nil {
+					log.Warnf("failed to save and pin summary file: %v", err)
+				}
 			}
 
 			reactloops.EmitActionLog(loop, "http-flow-query", fmt.Sprintf("查询流量%d条 -> 匹配%d条 -> %s", total, matchedCount, filepath.Base(filename)))

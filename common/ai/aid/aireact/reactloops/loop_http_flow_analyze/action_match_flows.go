@@ -253,7 +253,11 @@ var filterAndMatchHTTPFlowsAction = func(r aicommon.AIInvokeRuntime) reactloops.
 				if len(localMatchers) > 0 {
 					loop.Set("last_match_summary_file", filename)
 				}
-				loop.GetEmitter().EmitPinFilename(filename)
+
+				// 保存文件并 pin 到前端
+				if err := reactloops.SaveAndPinFile(loop, filename, []byte(fullSummary)); err != nil {
+					log.Warnf("failed to save and pin summary file: %v", err)
+				}
 			}
 
 			if len(localMatchers) > 0 {

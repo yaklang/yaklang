@@ -2,7 +2,10 @@ package reactloops
 
 import (
 	"fmt"
+	"os"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/log"
 )
 
 // EmitStatus 发送瞬时状态（状态栏覆盖显示）
@@ -56,4 +59,34 @@ func EmitActionLog(loop *ReActLoop, nodeId string, lines ...string) {
 	for _, line := range lines {
 		emitter.EmitDefaultStreamEvent(nodeId, strings.NewReader(line), taskID)
 	}
+}
+
+// SaveAndPinFile 保存文件内容并 pin 到前端
+// filename: 文件路径
+// content: 文件内容
+// loop: ReActLoop 实例
+// 返回：保存成功返回 nil，失败返回 error
+func SaveAndPinFile(loop *ReActLoop, filename string, content []byte) error {
+	if loop == nil {
+		return fmt.Errorf("loop is nil")
+	}
+	if filename == "" {
+		return fmt.Errorf("filename is empty")
+	}
+
+	// 保存文件
+	if err := os.WriteFile(filename, content, 0644); err != nil {
+		log.Errorf("failed to write file %s: %v", filename, err)
+		return fmt.Errorf("failed to write file: %w", err)
+	}
+
+	log.Infof("file saved: %s (%d bytes)", filename, len(content))
+
+	// Pin 文件到前端
+	emitter := loop.GetEmitter()
+	if emitter != nil {
+		emitter.EmitPinFilename(filename)
+	}
+
+	return nil
 }
