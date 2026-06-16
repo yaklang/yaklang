@@ -118,7 +118,7 @@ var filterAndMatchHTTPFlowsAction = func(r aicommon.AIInvokeRuntime) reactloops.
 			paramSummary := buildSearchParamSummary(action)
 			log.Infof("[filter_and_match_http_flows] search params: %s", paramSummary)
 
-			emitStatus(loop, "查询流量中 / Querying Flows...")
+			reactloops.EmitActionLog(loop, "查询流量中 / Querying Flows...")
 
 			req := buildQueryRequestFromAction(action, 30)
 			paging, flows, err := yakit.QueryHTTPFlow(db, req)
@@ -135,7 +135,7 @@ var filterAndMatchHTTPFlowsAction = func(r aicommon.AIInvokeRuntime) reactloops.
 				total = len(flows)
 			}
 
-			emitStatus(loop, fmt.Sprintf("查询完成，找到 %d 条流量 / Query Complete, Found %d Flows", total, total))
+			reactloops.EmitActionLog(loop, fmt.Sprintf("查询完成，找到 %d 条流量 / Query Complete, Found %d Flows", total, total))
 
 			var (
 				matchedCount  int
@@ -162,7 +162,7 @@ var filterAndMatchHTTPFlowsAction = func(r aicommon.AIInvokeRuntime) reactloops.
 				log.Infof("[filter_and_match_http_flows] DB returned %d flows (showing %d), applying %d matcher(s): %s",
 					total, len(flows), len(localMatchers), matcherDesc)
 
-				emitStatus(loop, "应用匹配器中 / Applying Matchers...")
+				reactloops.EmitActionLog(loop, "应用匹配器中 / Applying Matchers...")
 			} else {
 				log.Infof("[filter_and_match_http_flows] DB returned %d flows (showing %d), no matchers to apply",
 					total, len(flows))
@@ -184,7 +184,7 @@ var filterAndMatchHTTPFlowsAction = func(r aicommon.AIInvokeRuntime) reactloops.
 			} else {
 				line1 = fmt.Sprintf("查询 %s", paramSummary)
 			}
-			emitActionLog(loop, "http-flow-query", line1)
+			reactloops.EmitActionLog(loop, "http-flow-query", line1)
 
 			var line2 string
 			if len(localMatchers) == 0 {
@@ -205,7 +205,7 @@ var filterAndMatchHTTPFlowsAction = func(r aicommon.AIInvokeRuntime) reactloops.
 				for idx, flow := range flows {
 					// 更新进度
 					if len(flows) > 10 && idx%(len(flows)/10) == 0 && idx > 0 {
-						emitProgress(loop, idx, len(flows), "匹配进度", "Matching")
+						reactloops.emitProgress(loop, idx, len(flows), "匹配进度", "Matching")
 					}
 
 					matched, err := executeMatchers(
@@ -236,7 +236,7 @@ var filterAndMatchHTTPFlowsAction = func(r aicommon.AIInvokeRuntime) reactloops.
 					))
 				}
 
-				emitStatus(loop, "匹配完成 / Matching Complete")
+				reactloops.EmitActionLog(loop, "匹配完成 / Matching Complete")
 				builder.WriteString(fmt.Sprintf("\nMatched %d flow(s); discarded %d after matcher filter.", matchedCount, discardCount))
 			}
 
@@ -261,7 +261,7 @@ var filterAndMatchHTTPFlowsAction = func(r aicommon.AIInvokeRuntime) reactloops.
 			} else {
 				line2 = fmt.Sprintf("查询流量共 %d条 -> %s", total, filepath.Base(filename))
 			}
-			emitActionLog(loop, "http-flow-query", line2)
+			reactloops.EmitActionLog(loop, "http-flow-query", line2)
 			// 输出2行累积流
 
 			resultSummaryStr := ""
