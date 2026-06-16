@@ -1,6 +1,7 @@
 package loop_http_flow_analyze
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -8,6 +9,46 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
+
+const maxHTTPFlowSummaryBytes = 1024 * 5
+
+func buildSearchParamSummary(action *aicommon.Action) string {
+	var parts []string
+	if v := action.GetString("keyword"); v != "" {
+		parts = append(parts, fmt.Sprintf("keyword=%q", v))
+	}
+	if v := action.GetString("keyword_type"); v != "" {
+		parts = append(parts, fmt.Sprintf("keyword_type=%s", v))
+	}
+	if v := action.GetString("methods"); v != "" {
+		parts = append(parts, fmt.Sprintf("methods=%s", v))
+	}
+	if v := action.GetString("status_code"); v != "" {
+		parts = append(parts, fmt.Sprintf("status=%s", v))
+	}
+	if v := action.GetString("url_contains"); v != "" {
+		parts = append(parts, fmt.Sprintf("url=%q", v))
+	}
+	if v := action.GetString("tags"); v != "" {
+		parts = append(parts, fmt.Sprintf("tags=%s", v))
+	}
+	if v := action.GetString("exclude_keywords"); v != "" {
+		parts = append(parts, fmt.Sprintf("exclude=%q", v))
+	}
+	if v := action.GetString("source_type"); v != "" {
+		parts = append(parts, fmt.Sprintf("source=%s", v))
+	}
+	if v := action.GetString("runtime_id"); v != "" {
+		parts = append(parts, fmt.Sprintf("runtime=%s", v))
+	}
+	if v := action.GetInt("limit"); v > 0 {
+		parts = append(parts, fmt.Sprintf("limit=%d", v))
+	}
+	if len(parts) == 0 {
+		return "(no filters)"
+	}
+	return strings.Join(parts, ", ")
+}
 
 func buildQueryRequestFromAction(action *aicommon.Action, defaultLimit int) *ypb.QueryHTTPFlowRequest {
 	limit := action.GetInt("limit", defaultLimit)

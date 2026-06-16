@@ -53,12 +53,15 @@ func init() {
 						"FeedbackMessages":     feedbacker.String(),
 						"IsLastIteration":      isLastIteration,
 						"DispatchedFuzzTasks":  buildDispatchedFuzzTasksPrompt(loop),
+						"SavedQueries":         buildSavedQueriesPrompt(loop),
+						"SavedMatches":         buildSavedMatchesPrompt(loop),
 					}
 					return utils.RenderTemplate(reactiveData, renderMap)
 				}),
+				queryHTTPFlowsAction(r),
+				matchFlowsSimpleAction(r),
+				matchFlowsAction(r),
 				getHTTPFlowDetailAction(r),
-				filterAndMatchHTTPFlowsAction(r),
-				matchHTTPFlowsWithSimpleMatcherAction(r),
 				recordHTTPFlowEvidenceAction(r),
 				dispatchFuzzTestAction(r),
 				buildPostIterationHook(r),
@@ -68,7 +71,7 @@ func init() {
 		},
 		reactloops.WithLoopDescription("Analyze captured HTTP flows from Yakit by querying, inspecting details, and applying matchers to highlight interesting traffic."),
 		reactloops.WithLoopDescriptionZh("HTTP 流量分析模式：查询和检查 Yakit 捕获的 HTTP 流量，结合匹配器高亮可疑或关键信息。"),
-		reactloops.WithLoopUsagePrompt("Use when you need to investigate HTTP traffic. Start with filter_and_match_http_flows to narrow data, use get_http_flow_detail for specific packets."),
+		reactloops.WithLoopUsagePrompt("Use when you need to investigate HTTP traffic. Start with query_http_flows to get flows, then use match_flows_simple or match_flows to filter."),
 		reactloops.WithLoopOutputExample(`
 * When the user asks to investigate captured HTTP traffic:
   {"@action": "http_flow_analyze", "human_readable_thought": "I should inspect and filter captured HTTP flows to identify suspicious traffic patterns"}

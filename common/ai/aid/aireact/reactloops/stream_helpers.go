@@ -40,8 +40,7 @@ func EmitProgress(loop *ReActLoop, current, total int, actionZh, actionEn string
 
 // EmitActionLog 输出 Action 的累积日志
 // nodeId: action 专属的 NodeId (如 "http-flow-query")
-// lines: 要输出的行
-func EmitActionLog(loop *ReActLoop, nodeId string, lines ...string) {
+func EmitActionLog(loop *ReActLoop, nodeId string, lines string, reference ...string) {
 	if loop == nil || nodeId == "" || len(lines) == 0 {
 		return
 	}
@@ -56,8 +55,17 @@ func EmitActionLog(loop *ReActLoop, nodeId string, lines ...string) {
 		taskID = task.GetId()
 	}
 
-	for _, line := range lines {
-		emitter.EmitDefaultStreamEvent(nodeId, strings.NewReader(line), taskID)
+	streamEvent, err := emitter.EmitDefaultStreamEvent(nodeId, strings.NewReader(lines), taskID)
+	if err != nil {
+		log.Warnf("EmitActionLog: failed to emit stream event for nodeId %s: %v", nodeId, err)
+		return
+	}
+
+	if len(reference) > 0 {
+		streamId := streamEvent.GetStreamEventWriterId()
+		for _, ref := range reference {
+			emitter.EmitTextReferenceMaterial(streamId, ref)
+		}
 	}
 }
 

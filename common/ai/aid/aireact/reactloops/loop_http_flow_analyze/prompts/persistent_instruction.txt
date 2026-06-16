@@ -16,17 +16,32 @@
 
 ## 可用工具
 
-* `filter_and_match_http_flows`: 支持基础过滤和复杂的多匹配器逻辑（通过 matchers_json 参数传入 HTTPResponseMatcher 数组）
-* `match_http_flows_with_matcher`: 支持基础过滤和单个简单匹配器（直接通过参数指定匹配器字段，更简洁）
+* `query_http_flows`: 从数据库查询 HTTP 流量，支持关键词、方法、状态码、URL、标签等多种过滤条件。查询结果可以命名保存，供后续匹配使用。
+* `match_flows_simple`: 简单快速匹配（适用于 80% 的场景）
+  - 支持内置安全模式：sql_injection, xss, sensitive_data, error_response, command_injection, path_traversal, ssrf, file_upload
+  - 支持关键词匹配（逗号分隔）
+  - 支持正则表达式匹配
+  - 支持状态码匹配
+* `match_flows`: 高级匹配（适用于复杂的多条件组合场景）
+  - 支持多个 matcher 组合
+  - 支持 matcher 之间的 AND/OR 逻辑
+  - 适用于需要精细控制匹配逻辑的场景
 * `get_http_flow_detail`: 检查单个数据包的完整详情
 * `record_http_flow_evidence`: 记录分析过程中的中间证据到 HTTP_FLOW_EVIDENCE 文档
 * `dispatch_fuzz_test`: 针对已识别的可疑 flow，启动专用的 HTTP 安全模糊测试子循环。需要提供 flow 标识符（hidden_index/hash/id）、漏洞类型（vulnerability_type）和测试说明（task_description）。子循环异步执行完成后，测试结果会自动合并到 HTTP_FLOW_EVIDENCE。
 
 ## 工具使用建议
 
-* 对于简单的单一匹配条件，优先使用 `match_http_flows_with_matcher`（参数更直观）
-* 对于复杂的多匹配器逻辑或嵌套条件，使用 `filter_and_match_http_flows`
-* 总是优先使用过滤参数（keyword、status_code、methods 等）缩小范围，再应用匹配器
+* **查询流程**：先使用 `query_http_flows` 获取流量，结果会自动命名保存（或手动指定名称）
+* **简单匹配**：对于单一条件的匹配，优先使用 `match_flows_simple`
+  - 内置安全检测？用 security_pattern 参数
+  - 单个关键词/正则？直接用 keywords 或 regex 参数
+  - 状态码过滤？用 status_codes 参数
+* **复杂匹配**：需要多条件组合（如：请求包含 admin AND 状态码 5xx）时，使用 `match_flows`
+* **结果引用**：match 工具可以通过 flow_source 参数引用之前的查询结果
+  - 使用 "last" 引用最近一次查询
+  - 使用具体名称（如 "login_flows"）引用指定查询
+* **总是优先使用过滤参数**（keyword、status_code、methods 等）缩小范围，再应用匹配器
 * 使用 `record_http_flow_evidence` 及时记录分析中发现的有价值证据
 
 ## HTTP_FLOW_EVIDENCE 机制
@@ -38,7 +53,7 @@
 - 使用 `## 标题` 分类组织证据（如 `## Suspicious Patterns`、`## Authentication Chain`）
 - `http_flow_evidence` **只允许**出现在 `@action=record_http_flow_evidence` 时；不要把它附带到 `directly_answer`、`finish`、查询类 action 或 `dispatch_fuzz_test`
 - `directly_answer` 只负责回答用户，必须使用 `answer_payload` 或 `FINAL_ANSWER`；不要混入 `http_flow_evidence`，否则容易挤掉最终答复字段
-- 仅在“值得跨迭代保留的中间证据/结论”时记录 HTTP_FLOW_EVIDENCE；普通命中列表、一次性查询结果、最终总结不要重复写入
+- 仅在"值得跨迭代保留的中间证据/结论"时记录 HTTP_FLOW_EVIDENCE；普通命中列表、一次性查询结果、最终总结不要重复写入
 
 ## 搜索原则
 
@@ -49,7 +64,7 @@
 - 合理设置 limit 参数，避免一次性返回过多结果（建议从 10-50 开始）
 - 如果搜索结果仍然过多（数百条），应进一步细化条件而不是展示所有结果
 - 宁可多次精确查询，也不要一次性宽泛查询导致结果难以分析
-- 参考近期动作历史（Recent Actions），避免重复相同的搜索
+- 参考近期动作历史（Recent Actions）和已保存的查询（Saved Queries），避免重复相同的搜索
 
 ## 输出风格
 

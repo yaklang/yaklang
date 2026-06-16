@@ -2,30 +2,41 @@
 
 - 发现：总结匹配的流量（id、url、原因、hit_color）和关键异常。
 - 缺口：注明缺失的证据或需要收紧的过滤器。
-- 下一步：列出要调用的下一个操作（filter_and_match_http_flows/match_http_flows_with_matcher/get_http_flow_detail）及具体参数。
+- 下一步：列出要调用的下一个操作（query_http_flows/match_flows_simple/match_flows/get_http_flow_detail）及具体参数。
 
 ## http_flow_evidence 字段使用约束
 
 - `http_flow_evidence` 只允许出现在 `@action` 为 `record_http_flow_evidence` 的输出中；它是这个 action 的专用 payload。
-- `http_flow_evidence` **绝不能**附带到 `directly_answer`、`finish`、`filter_and_match_http_flows`、`match_http_flows_with_matcher`、`get_http_flow_detail`、`dispatch_fuzz_test`。
+- `http_flow_evidence` **绝不能**附带到 `directly_answer`、`finish`、`query_http_flows`、`match_flows_simple`、`match_flows`、`get_http_flow_detail`、`dispatch_fuzz_test`。
 - `directly_answer` 只能使用 `answer_payload` 或 `FINAL_ANSWER`；不要混入 `http_flow_evidence`，否则容易让最终答复字段丢失。
-- 只有当内容属于“值得跨迭代保留的中间证据/结论”时，才调用 `record_http_flow_evidence`。普通查询结果、一次性命中列表、临时推测、最终总结不要重复写入 HTTP_FLOW_EVIDENCE。
+- 只有当内容属于"值得跨迭代保留的中间证据/结论"时，才调用 `record_http_flow_evidence`。普通查询结果、一次性命中列表、临时推测、最终总结不要重复写入 HTTP_FLOW_EVIDENCE。
 
 ## 克制使用 http_flow_evidence 的范例
 
 ### 示例 A - 普通查询，不带 http_flow_evidence
 ```json
 {
-  "@action": "filter_and_match_http_flows",
+  "@action": "query_http_flows",
   "human_readable_thought": "先缩小到登录流量",
   "methods": "POST",
   "url_contains": "/login,/auth",
   "status_code": "200,302",
-  "limit": 20
+  "limit": 20,
+  "query_name": "login_flows"
 }
 ```
 
-### 示例 B - 发现可复用证据时，单独调用 record_http_flow_evidence
+### 示例 B - 简单匹配，使用内置安全模式
+```json
+{
+  "@action": "match_flows_simple",
+  "human_readable_thought": "检测 SQL 注入特征",
+  "flow_source": "login_flows",
+  "security_pattern": "sql_injection"
+}
+```
+
+### 示例 C - 发现可复用证据时，单独调用 record_http_flow_evidence
 ```json
 {
   "@action": "record_http_flow_evidence",
@@ -34,7 +45,7 @@
 }
 ```
 
-### 示例 C - http_flow_evidence 内容较长时，用 HTTP_FLOW_EVIDENCE AITag，不再内联字段
+### 示例 D - http_flow_evidence 内容较长时，用 HTTP_FLOW_EVIDENCE AITag，不再内联字段
 ```json
 {
   "@action": "record_http_flow_evidence",
@@ -52,7 +63,7 @@
 - 证据缺口: 需要进一步确认 refresh 是否续签同一 token、logout 是否真正失效服务端会话。
 <|HTTP_FLOW_EVIDENCE_END_CURRENT_NONCE|>
 
-### 示例 D - 最终答复时必须给 answer_payload，不带 http_flow_evidence
+### 示例 E - 最终答复时必须给 answer_payload，不带 http_flow_evidence
 ```json
 {
   "@action": "directly_answer",
@@ -60,7 +71,7 @@
 }
 ```
 
-### 示例 E - 最终答复较长时，用 FINAL_ANSWER AITag，不带 http_flow_evidence
+### 示例 F - 最终答复较长时，用 FINAL_ANSWER AITag，不带 http_flow_evidence
 ```json
 {
   "@action": "directly_answer"
@@ -84,17 +95,35 @@
 
 ## 工具选择建议
 
-### filter_and_match_http_flows
-- 用于：复杂的多匹配器逻辑、嵌套条件、需要同时使用多个 HTTPResponseMatcher
-- 参数：通过 `matchers_json` 传入 JSON 格式的匹配器数组或单个匹配器
-- 优势：功能强大，支持复杂逻辑
-- 劣势：需要构造 JSON 字符串，参数复杂
+### query_http_flows
+- 用于：从数据库获取 HTTP 流量列表
+- 参数：keyword, methods, status_code, tags, url_contains, limit, query_name 等
+- 优势：结果可以命名保存，供后续匹配使用
+- 示例：查询所有登录相关的 POST 请求
 
-### match_http_flows_with_matcher（推荐用于简单场景）
-- 用于：单一简单的匹配条件
-- 参数：直接使用字段参数（matcher_type、scope、group 等），无需构造 JSON
-- 优势：参数直观，易于使用
-- 劣势：仅支持单个匹配器
+### match_flows_simple（推荐用于简单场景）
+- 用于：单一简单的匹配条件（覆盖 80% 的场景）
+- 参数：
+  - flow_source: 引用查询结果（"last", "login_flows" 等）
+  - security_pattern: 内置安全模式（sql_injection, xss, sensitive_data 等）
+  - keywords: 关键词匹配（逗号分隔）
+  - regex: 正则表达式
+  - status_codes: 状态码（逗号分隔）
+  - scope: 匹配范围（request/response/all）
+  - negative: 反向匹配
+- 优势：参数直观，易于使用，内置安全检测模式
+- 劣势：仅支持单个匹配条件
+- 示例：使用内置模式检测 SQL 注入，或搜索包含特定关键词的响应
+
+### match_flows（用于复杂场景）
+- 用于：复杂的多匹配器逻辑、需要 AND/OR 组合的场景
+- 参数：
+  - flow_source: 引用查询结果
+  - matchers: JSON 数组，每个 matcher 包含 type, patterns, scope, match_all, negative
+  - matcher_condition: 多个 matcher 之间的逻辑（"or" 或 "and"）
+- 优势：功能强大，支持复杂逻辑组合
+- 劣势：需要构造 JSON，参数较复杂
+- 示例：查找（请求包含 admin OR root）AND（状态码是 5xx）的流量
 
 ### get_http_flow_detail
 - 用于：查看特定流量的完整请求和响应详情
