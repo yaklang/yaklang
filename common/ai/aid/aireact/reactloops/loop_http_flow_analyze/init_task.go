@@ -41,6 +41,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 			if db != nil {
 				detailedInfo := formatAttachedHTTPFlowsDetailed(db, flowIds, loop)
 				loop.Set(attachedHTTPFlowDetailsKey, detailedInfo)
+				r.AddToTimeline("Attached HTTP Flows Detail", detailedInfo)
 			} else {
 				log.Warn("database not available for formatting HTTP flow details")
 			}

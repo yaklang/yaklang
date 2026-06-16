@@ -69,9 +69,7 @@ func (d *AttachedHTTPFlowResourceData) renderSummary(db *gorm.DB) string {
 	}
 
 	var builder strings.Builder
-	builder.WriteString("## Attached HTTP Flows\n\n")
-	builder.WriteString(fmt.Sprintf("Requested IDs: %s\n\n", FormatAttachedHTTPFlowIDsSummary(d.Raw)))
-
+	builder.WriteString("## Attached HTTP Flows\n")
 	var loadErrors []string
 	var summaries []string
 	for _, flowID := range d.IDs {
@@ -97,7 +95,6 @@ func (d *AttachedHTTPFlowResourceData) renderSummary(db *gorm.DB) string {
 		return strings.TrimSpace(builder.String())
 	}
 
-	builder.WriteString("### Flow Summaries\n\n")
 	for i, summary := range summaries {
 		if i > 0 {
 			builder.WriteString("\n")
