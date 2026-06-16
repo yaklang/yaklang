@@ -83,7 +83,7 @@ var matchHTTPFlowsWithSimpleMatcherAction = func(r aicommon.AIInvokeRuntime) rea
 			} else {
 				line1 = fmt.Sprintf("查询 %s | 匹配 %s", paramSummary, matcherInfo)
 			}
-			emitActionLog(loop, "http-flow-query", line1)
+			reactloops.EmitActionLog(loop, "http-flow-query", line1)
 
 			log.Infof("[match_http_flows_with_matcher] search params: %s | matcher: %s",
 				paramSummary, matcherInfo)
@@ -134,7 +134,7 @@ var matchHTTPFlowsWithSimpleMatcherAction = func(r aicommon.AIInvokeRuntime) rea
 			log.Infof("[match_http_flows_with_matcher] DB returned %d flows (showing %d), applying matcher: %s",
 				total, len(flows), matcherDesc)
 
-			emitStatus(loop, "匹配流量中 / Matching Flows...")
+			reactloops.EmitActionLog(loop, "匹配流量中 / Matching Flows...")
 
 			builder.WriteString(fmt.Sprintf("HTTP flow query returned %d items (showing %d); applying matcher (type=%s, scope=%s)\n",
 				total, len(flows), matcher.MatcherType, matcher.Scope))
@@ -170,7 +170,7 @@ var matchHTTPFlowsWithSimpleMatcherAction = func(r aicommon.AIInvokeRuntime) rea
 
 			builder.WriteString(fmt.Sprintf("\nMatched %d flow(s); discarded %d after matcher filter.", matchedCount, discardCount))
 
-			emitStatus(loop, "匹配完成 / Matching Complete")
+			reactloops.EmitActionLog(loop, "匹配完成 / Matching Complete")
 
 			invoker := loop.GetInvoker()
 			fullSummary := builder.String()
@@ -184,7 +184,7 @@ var matchHTTPFlowsWithSimpleMatcherAction = func(r aicommon.AIInvokeRuntime) rea
 				loop.GetEmitter().EmitPinFilename(filename)
 			}
 
-			emitActionLog(loop, "http-flow-query", fmt.Sprintf("查询流量共%d条 -> 匹配%d条 -> %s", total, matchedCount, filepath.Base(filename)))
+			reactloops.EmitActionLog(loop, "http-flow-query", fmt.Sprintf("查询流量共%d条 -> 匹配%d条 -> %s", total, matchedCount, filepath.Base(filename)))
 
 			if len(fullSummary) > maxHTTPFlowSummaryBytes && filename != "" {
 				preview := utils.ShrinkTextBlock(fullSummary, 2000)
