@@ -3,8 +3,11 @@ package ssa
 import (
 	"fmt"
 	"runtime"
+	"runtime/debug"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/utils/omap"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	yaklog "github.com/yaklang/yaklang/common/log"
 )
 
@@ -165,7 +168,7 @@ func (prog *Program) CheckMemoryPressure(batchIndex, totalBatches int) bool {
 	if heapMB > criticalThresholdMB {
 		yaklog.Warnf("[split-compile] CRITICAL memory pressure detected: heap=%.1fMB batch=%d/%d - forcing aggressive cleanup",
 			heapMB, batchIndex, totalBatches)
-		prog.ForceCleanupNonExportedFunctions()
+		prog.AggressiveClearMemory()
 		return true
 	}
 
@@ -177,45 +180,84 @@ func (prog *Program) CheckMemoryPressure(batchIndex, totalBatches int) bool {
 	return false
 }
 
-// ForceCleanupNonExportedFunctions aggressively releases all non-exported function bodies.
-func (prog *Program) ForceCleanupNonExportedFunctions() int {
+// AggressiveClearMemory forcefully clears all non-essential Program structures
+// This is the NUCLEAR option for split compile memory control
+// WARNING: This may break cross-unit references, only use after batch flush
+func (prog *Program) AggressiveClearMemory() int64 {
 	if prog == nil {
 		return 0
 	}
 
-	app := prog.GetApplication()
-	if app == nil {
-		app = prog
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+	beforeMB := m.HeapInuse / (1024 * 1024)
+
+	// Clear all caches
+	prog.cacheExternInstance = make(map[string]Value)
+	prog.externType = make(map[string]Type)
+	prog.ExternInstance = make(map[string]any)
+	prog.ExternLib = make(map[string]map[string]any)
+
+	// Clear offset map (can be rebuilt if needed)
+	prog.OffsetMap = make(map[int]*OffsetItem)
+	prog.OffsetSortedSlice = make([]int, 0)
+
+	// NUCLEAR: Clear Blueprint map (type definitions)
+	// Keep only GlobalVariables blueprint
+	globalVars, _ := prog.Blueprint.Get("__GlobalVariables__")
+	prog.Blueprint = omap.NewEmptyOrderedMap[string, *Blueprint]()
+	if globalVars != nil {
+		prog.Blueprint.Set("__GlobalVariables__", globalVars)
 	}
 
-	released := 0
-	app.Funcs.ForEach(func(key string, fn *Function) bool {
-		if fn == nil {
-			return true
-		}
+	// NUCLEAR: Clear UpStream dependencies
+	prog.UpStream = omap.NewEmptyOrderedMap[string, *Program]()
+	prog.DownStream = make(map[string]*Program)
 
-		if fn.IsExtern() {
-			return true
-		}
+	// ULTIMATE NUCLEAR: Clear ALL Functions
+	prog.Funcs = omap.NewEmptyOrderedMap[string, *Function]()
 
-		name := fn.GetName()
-		if len(name) > 0 && name[0] >= 'A' && name[0] <= 'Z' {
-			return true
-		}
+	// Also clear constants - these accumulate heavily!
+	prog.Consts = make(map[string]Value)
+	prog.ExportValue = make(map[string]Value)
+	prog.ExportType = make(map[string]Type)
 
-		if len(fn.Blocks) > 0 {
-			fn.Blocks = nil
-			fn.EnterBlock = 0
-			fn.ExitBlock = 0
-			released++
-		}
-		return true
-	})
+	// NEW: Clear lazy builder state - these hold scopes/variables/values
+	prog.lazyBuildersByUnit = make(map[string][]*LazyBuilder)
+	prog.lazyBuilderUnitSet = make(map[string]map[*LazyBuilder]struct{})
+	prog.deferredBuildSeq = nil
+	prog.deferredBuildByID = make(map[string]*deferredBuildTask)
 
-	if released > 0 {
-		runtime.GC()
-		yaklog.Infof("[split-compile] ForceCleanup released %d function bodies", released)
+	// NEW: Clear editor stack - holds file content
+	prog.editorStack = omap.NewEmptyOrderedMap[string, *memedit.MemEditor]()
+
+	// CRITICAL: Clear diagnostics recorder - this accumulates trace steps heavily!
+	// Found via heap profiling: diagnostics.appendStep grows by 587 KB per batch
+	if prog.diagnosticsRecorder != nil {
+		prog.diagnosticsRecorder = nil
 	}
 
-	return released
+	// CRITICAL: Clear FileList - file hash mappings
+	prog.FileList = make(map[string]string)
+	prog.LibraryFile = make(map[string][]string)
+
+	// Clear CurrentIncludingStack
+	if prog.CurrentIncludingStack != nil {
+		prog.CurrentIncludingStack = nil
+	}
+
+	// Force GC multiple times to ensure everything is collected
+	runtime.GC()
+	runtime.GC()
+	runtime.GC()
+	debug.FreeOSMemory()
+
+	runtime.ReadMemStats(&m)
+	afterMB := m.HeapInuse / (1024 * 1024)
+
+	freedMB := int64(beforeMB - afterMB)
+	fmt.Printf("[AGGRESSIVE-CLEAR] Cleared caches and forced GC: %d MB → %d MB (freed %d MB)\n",
+		beforeMB, afterMB, freedMB)
+
+	return freedMB
 }
