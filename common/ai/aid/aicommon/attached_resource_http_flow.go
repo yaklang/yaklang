@@ -3,10 +3,8 @@ package aicommon
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
@@ -57,55 +55,73 @@ func (d *AttachedHTTPFlowResourceData) BindLoopData(reactloop ReActLoopIF) error
 
 func (d *AttachedHTTPFlowResourceData) ToAttachData(reactloop ReActLoopIF) string {
 	db := consts.GetGormProjectDatabase()
-	var emitter *Emitter
 	if reactloop != nil {
-		emitter = reactloop.GetEmitter()
 		if cfg := reactloop.GetConfig(); cfg != nil && cfg.GetDB() != nil {
 			db = cfg.GetDB()
 		}
 	}
-	return d.render(db, emitter)
+	return d.renderSummary(db)
 }
 
-func (d *AttachedHTTPFlowResourceData) render(db *gorm.DB, emitter *Emitter) string {
+func (d *AttachedHTTPFlowResourceData) renderSummary(db *gorm.DB) string {
 	if db == nil {
 		return "## Attached HTTP Flows\n\n_Error: project database is not available_"
 	}
 
-	var sections []string
+	var builder strings.Builder
+	builder.WriteString("## Attached HTTP Flows\n\n")
+	builder.WriteString(fmt.Sprintf("Requested IDs: %s\n\n", FormatAttachedHTTPFlowIDsSummary(d.Raw)))
+
 	var loadErrors []string
+	var summaries []string
 	for _, flowID := range d.IDs {
 		flow, loadErr := yakit.GetHTTPFlow(db, flowID)
 		if loadErr != nil {
 			loadErrors = append(loadErrors, fmt.Sprintf("- ID %d: load failed: %v", flowID, loadErr))
 			continue
 		}
-		sections = append(sections, FormatAttachedHTTPFlow(flow, emitter))
+		summaries = append(summaries, formatHTTPFlowSummary(flow))
 	}
 
-	var builder strings.Builder
-	builder.WriteString("## Attached HTTP Flows\n\n")
-	builder.WriteString(fmt.Sprintf("Requested IDs: %s\n\n", FormatAttachedHTTPFlowIDsSummary(d.Raw)))
 	if len(loadErrors) > 0 {
 		builder.WriteString("### Load Errors\n")
 		builder.WriteString(strings.Join(loadErrors, "\n"))
 		builder.WriteString("\n\n")
 	}
-	if len(sections) == 0 {
+
+	if len(summaries) == 0 {
 		if len(loadErrors) > 0 {
 			return strings.TrimSpace(builder.String())
 		}
 		builder.WriteString("_Error: no attached HTTP flows could be loaded_")
 		return strings.TrimSpace(builder.String())
 	}
-	builder.WriteString(strings.Join(sections, "\n\n---\n\n"))
 
-	full := strings.TrimSpace(builder.String())
-	inline, spillNote := inlineOrSpillAttachedText("attached_http_flow_list", full, AttachedHTTPFlowListInlineLimit, emitter)
-	if spillNote != "" {
-		return strings.TrimSpace(spillNote + "\n\nInline preview:\n" + inline)
+	builder.WriteString("### Flow Summaries\n\n")
+	for i, summary := range summaries {
+		if i > 0 {
+			builder.WriteString("\n")
+		}
+		builder.WriteString(summary)
 	}
-	return full
+
+	return strings.TrimSpace(builder.String())
+}
+
+func formatHTTPFlowSummary(flow *schema.HTTPFlow) string {
+	if flow == nil {
+		return "Flow not found"
+	}
+
+	var b strings.Builder
+	b.WriteString(fmt.Sprintf("**ID %d**: ", flow.ID))
+	b.WriteString(fmt.Sprintf("%s %s ", formatAttachedNullableString(flow.Method), formatAttachedNullableString(flow.Url)))
+	b.WriteString(fmt.Sprintf("→ %d ", flow.StatusCode))
+	b.WriteString(fmt.Sprintf("(Req: %d bytes, Resp: %d bytes)", flow.RequestLength, flow.BodyLength))
+	if flow.Tags != "" {
+		b.WriteString(fmt.Sprintf(" [%s]", formatAttachedNullableString(flow.Tags)))
+	}
+	return b.String()
 }
 
 func parseAttachedHTTPFlowIDsJSON(raw string) ([]int64, error) {
@@ -205,138 +221,10 @@ func FormatAttachedHTTPFlowIDsSummary(value string) string {
 	return strings.Join(parts, ", ")
 }
 
-func attachedHTTPFlowRequest(flow *schema.HTTPFlow) string {
-	if flow == nil {
-		return ""
-	}
-	if req := flow.GetRequest(); req != "" {
-		return req
-	}
-	return flow.Request
-}
-
-func attachedHTTPFlowResponse(flow *schema.HTTPFlow) string {
-	if flow == nil {
-		return ""
-	}
-	if rsp := flow.GetResponse(); rsp != "" {
-		return rsp
-	}
-	if flow.TooLargeResponseHeaderFile != "" || flow.TooLargeResponseBodyFile != "" {
-		var parts []string
-		if flow.TooLargeResponseHeaderFile != "" {
-			if data, err := os.ReadFile(flow.TooLargeResponseHeaderFile); err == nil && len(data) > 0 {
-				parts = append(parts, string(data))
-			}
-		}
-		if flow.TooLargeResponseBodyFile != "" {
-			if data, err := os.ReadFile(flow.TooLargeResponseBodyFile); err == nil && len(data) > 0 {
-				parts = append(parts, string(data))
-			}
-		}
-		return strings.Join(parts, "")
-	}
-	return flow.Response
-}
-
 func formatAttachedNullableString(v string) string {
 	v = strings.TrimSpace(v)
 	if v == "" {
 		return "-"
 	}
 	return v
-}
-
-func formatAttachedProcessName(flow *schema.HTTPFlow) string {
-	if flow == nil || !flow.ProcessName.Valid {
-		return "-"
-	}
-	return formatAttachedNullableString(flow.ProcessName.String)
-}
-
-func formatAttachedHTTPFlowMetadata(flow *schema.HTTPFlow) string {
-	if flow == nil {
-		return ""
-	}
-	var b strings.Builder
-	b.WriteString("### Metadata\n")
-	b.WriteString(fmt.Sprintf("- ID: %d\n", flow.ID))
-	b.WriteString(fmt.Sprintf("- HiddenIndex: %s\n", formatAttachedNullableString(flow.HiddenIndex)))
-	b.WriteString(fmt.Sprintf("- Hash: %s\n", formatAttachedNullableString(flow.Hash)))
-	b.WriteString(fmt.Sprintf("- IsHTTPS: %t\n", flow.IsHTTPS))
-	b.WriteString(fmt.Sprintf("- URL: %s\n", formatAttachedNullableString(flow.Url)))
-	b.WriteString(fmt.Sprintf("- Path: %s\n", formatAttachedNullableString(flow.Path)))
-	b.WriteString(fmt.Sprintf("- PathSuffix: %s\n", formatAttachedNullableString(flow.PathSuffix)))
-	b.WriteString(fmt.Sprintf("- Method: %s\n", formatAttachedNullableString(flow.Method)))
-	b.WriteString(fmt.Sprintf("- RequestLength: %d\n", flow.RequestLength))
-	b.WriteString(fmt.Sprintf("- BodyLength: %d\n", flow.BodyLength))
-	b.WriteString(fmt.Sprintf("- ContentType: %s\n", formatAttachedNullableString(flow.ContentType)))
-	b.WriteString(fmt.Sprintf("- StatusCode: %d\n", flow.StatusCode))
-	b.WriteString(fmt.Sprintf("- SourceType: %s\n", formatAttachedNullableString(flow.SourceType)))
-	b.WriteString(fmt.Sprintf("- DurationMs: %d\n", flow.Duration/int64(time.Millisecond)))
-	b.WriteString(fmt.Sprintf("- GetParamsTotal: %d\n", flow.GetParamsTotal))
-	b.WriteString(fmt.Sprintf("- PostParamsTotal: %d\n", flow.PostParamsTotal))
-	b.WriteString(fmt.Sprintf("- CookieParamsTotal: %d\n", flow.CookieParamsTotal))
-	b.WriteString(fmt.Sprintf("- IPAddress: %s\n", formatAttachedNullableString(flow.IPAddress)))
-	b.WriteString(fmt.Sprintf("- RemoteAddr: %s\n", formatAttachedNullableString(flow.RemoteAddr)))
-	b.WriteString(fmt.Sprintf("- Host: %s\n", formatAttachedNullableString(flow.Host)))
-	b.WriteString(fmt.Sprintf("- Tags: %s\n", formatAttachedNullableString(flow.Tags)))
-	b.WriteString(fmt.Sprintf("- Payload: %s\n", formatAttachedNullableString(flow.Payload)))
-	b.WriteString(fmt.Sprintf("- IsWebsocket: %t\n", flow.IsWebsocket))
-	b.WriteString(fmt.Sprintf("- WebsocketHash: %s\n", formatAttachedNullableString(flow.WebsocketHash)))
-	b.WriteString(fmt.Sprintf("- RuntimeId: %s\n", formatAttachedNullableString(flow.RuntimeId)))
-	b.WriteString(fmt.Sprintf("- FromPlugin: %s\n", formatAttachedNullableString(flow.FromPlugin)))
-	b.WriteString(fmt.Sprintf("- ProcessName: %s\n", formatAttachedProcessName(flow)))
-	b.WriteString(fmt.Sprintf("- IsTooLargeResponse: %t\n", flow.IsTooLargeResponse))
-	b.WriteString(fmt.Sprintf("- IsReadTooSlowResponse: %t\n", flow.IsReadTooSlowResponse))
-	b.WriteString(fmt.Sprintf("- TooLargeResponseHeaderFile: %s\n", formatAttachedNullableString(flow.TooLargeResponseHeaderFile)))
-	b.WriteString(fmt.Sprintf("- TooLargeResponseBodyFile: %s\n", formatAttachedNullableString(flow.TooLargeResponseBodyFile)))
-	if !flow.CreatedAt.IsZero() {
-		b.WriteString(fmt.Sprintf("- CreatedAt: %s\n", flow.CreatedAt.Format(time.RFC3339)))
-	}
-	if !flow.UpdatedAt.IsZero() {
-		b.WriteString(fmt.Sprintf("- UpdatedAt: %s\n", flow.UpdatedAt.Format(time.RFC3339)))
-	}
-	return b.String()
-}
-
-func FormatAttachedHTTPFlow(flow *schema.HTTPFlow, emitter *Emitter) string {
-	if flow == nil {
-		return "HTTP flow not found"
-	}
-
-	var b strings.Builder
-	b.WriteString(fmt.Sprintf("## Attached HTTP Flow #%d\n\n", flow.ID))
-	b.WriteString(formatAttachedHTTPFlowMetadata(flow))
-	b.WriteString("\n")
-
-	req := attachedHTTPFlowRequest(flow)
-	inlineReq, reqSpill := inlineOrSpillAttachedText("request", req, AttachedHTTPFlowRequestInlineLimit, emitter)
-	b.WriteString("### Request\n")
-	if reqSpill != "" {
-		b.WriteString(reqSpill)
-		b.WriteString("\n\nInline preview:\n```\n")
-		b.WriteString(inlineReq)
-		b.WriteString("\n```\n\n")
-	} else {
-		b.WriteString("```\n")
-		b.WriteString(inlineReq)
-		b.WriteString("\n```\n\n")
-	}
-
-	rsp := attachedHTTPFlowResponse(flow)
-	inlineRsp, rspSpill := inlineOrSpillAttachedText("response", rsp, AttachedHTTPFlowResponseInlineLimit, emitter)
-	b.WriteString("### Response\n")
-	if rspSpill != "" {
-		b.WriteString(rspSpill)
-		b.WriteString("\n\nInline preview:\n```\n")
-		b.WriteString(inlineRsp)
-		b.WriteString("\n```\n")
-	} else {
-		b.WriteString("```\n")
-		b.WriteString(inlineRsp)
-		b.WriteString("\n```\n")
-	}
-
-	return strings.TrimSpace(b.String())
 }

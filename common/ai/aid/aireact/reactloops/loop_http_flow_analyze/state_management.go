@@ -20,8 +20,9 @@ const (
 	matchResultsMapKey = "match_results_map" // map[string]*MatchResult
 	lastMatchNameKey   = "last_match_name"   // string
 
-	// Attached HTTP Flow id
-	attachedHTTPFlowIDsKey = "attached_http_flow_ids" // []int64
+	// Attached HTTP Flow id and details
+	attachedHTTPFlowIDsKey     = "attached_http_flow_ids"     // []int64
+	attachedHTTPFlowDetailsKey = "attached_http_flow_details" // string - detailed formatted content
 )
 
 // QueryResult 存储查询结果
@@ -74,7 +75,15 @@ func getQueryResult(loop *reactloops.ReActLoop, name string) *QueryResult {
 
 	// 特殊值：last/last_query
 	if name == "last" || name == "last_query" {
-		name = loop.Get(lastQueryNameKey)
+		lastNameRaw := loop.GetVariable(lastQueryNameKey)
+		if lastNameRaw == nil {
+			return nil
+		}
+		if lastNameStr, ok := lastNameRaw.(string); ok {
+			name = lastNameStr
+		} else {
+			return nil
+		}
 		if name == "" {
 			return nil
 		}
@@ -140,7 +149,15 @@ func getMatchResult(loop *reactloops.ReActLoop, name string) *MatchResult {
 
 	// 特殊值：last/last_match
 	if name == "last" || name == "last_match" {
-		name = loop.Get(lastMatchNameKey)
+		lastNameRaw := loop.GetVariable(lastMatchNameKey)
+		if lastNameRaw == nil {
+			return nil
+		}
+		if lastNameStr, ok := lastNameRaw.(string); ok {
+			name = lastNameStr
+		} else {
+			return nil
+		}
 		if name == "" {
 			return nil
 		}
