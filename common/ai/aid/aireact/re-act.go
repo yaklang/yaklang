@@ -290,6 +290,10 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 	}
 	react.promptManager = NewPromptManager(react, workdir)
 
+	cfg.SetHotpatchCurrentTaskIdResolver(func() string {
+		return react.GetCurrentTaskId()
+	})
+
 	cfg.SetSkillHotloadHandler(func(skillNames []string) {
 		if len(skillNames) == 0 {
 			return

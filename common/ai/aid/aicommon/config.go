@@ -404,7 +404,8 @@ type Config struct {
 	forgeHotloadHandler            forgeHotloadHandler
 	skillUnloadHandler             skillUnloadHandler
 	forgeUnloadHandler             forgeUnloadHandler
-	capabilityInventoryEmitHandler capabilityInventoryEmitHandler
+	capabilityInventoryEmitHandler   capabilityInventoryEmitHandler
+	hotpatchCurrentTaskIdResolver    func() string
 
 	/*
 		Lazy WorkDir for semantic artifact directory naming
@@ -3258,6 +3259,14 @@ func (c *Config) UpdateAIModelInfo(provider, model string) {
 func (c *Config) EventFormat(e *schema.AiOutputEvent) *schema.AiOutputEvent {
 	if c.PersistentSessionId != "" {
 		e.SessionId = c.PersistentSessionId
+	}
+	// Fill TaskId from the current-task resolver when not explicitly set.
+	// This is critical for plan-tree events (Type=plan, NodeId=system) that are
+	// emitted from config/coordinator-level code paths.
+	if strings.TrimSpace(e.TaskId) == "" {
+		if taskId := c.resolveHotpatchCurrentTaskId(); taskId != "" {
+			e.TaskId = taskId
+		}
 	}
 	return e
 }

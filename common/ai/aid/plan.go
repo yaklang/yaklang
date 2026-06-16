@@ -415,10 +415,15 @@ func (c *Coordinator) ensureTaskTreeInitialized(task *AiTask) {
 	// Ensure Coordinator is set
 	task.Coordinator = c
 
+	// Ensure stable TaskId is set (used by frontend & hotpatch scoping)
+	if strings.TrimSpace(task.TaskId) == "" {
+		task.TaskId = uuid.NewString()
+	}
+
 	// Ensure AIStatefulTaskBase is initialized
 	if task.AIStatefulTaskBase == nil {
 		taskBase := aicommon.NewStatefulTaskBase(
-			"plan-task"+uuid.NewString(),
+			task.TaskId,
 			fmt.Sprintf("任务名称: %s\n任务目标: %s", task.Name, task.Goal),
 			c.Ctx,
 			c.Emitter,
@@ -426,6 +431,11 @@ func (c *Coordinator) ensureTaskTreeInitialized(task *AiTask) {
 		)
 		task.AIStatefulTaskBase = taskBase
 		taskBase.SetName(task.Name)
+	} else {
+		// Keep AIStatefulTaskBase id aligned with TaskId if possible
+		if strings.TrimSpace(task.GetId()) == "" || task.GetId() != task.TaskId {
+			task.SetID(task.TaskId)
+		}
 	}
 
 	// Ensure SemanticIdentifier is set

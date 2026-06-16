@@ -216,3 +216,52 @@ func TestGetEnabledCapabilityNamesByType(t *testing.T) {
 	require.Equal(t, []string{"recon"}, cfg.GetEnabledSkillNames())
 	require.Equal(t, []string{"code-review"}, cfg.GetEnabledForgeNames())
 }
+
+func TestProcessHotPatchMessage_CapabilityHotpatch_RespectsTaskId(t *testing.T) {
+	cfgA := NewConfig(context.Background(), WithDisableAutoSkills(true))
+	cfgB := NewConfig(context.Background(), WithDisableAutoSkills(true))
+	cfgA.SetHotpatchCurrentTaskIdResolver(func() string { return "task-a" })
+	cfgB.SetHotpatchCurrentTaskIdResolver(func() string { return "task-b" })
+
+	opts := cfgA.ProcessHotPatchMessage(&ypb.AIInputEvent{
+		IsConfigHotpatch: true,
+		HotpatchType:     HotPatchType_EnabledCapabilities,
+		TaskId:           "task-a",
+		Params: &ypb.AIStartParams{
+			EnabledCapabilities: []*ypb.AIEnabledCapability{
+				{Name: "grep", Type: "tool"},
+			},
+		},
+	})
+	require.Len(t, opts, 1)
+
+	require.NoError(t, opts[0](cfgA))
+	require.Len(t, cfgA.GetEnabledCapabilities(), 1)
+	require.Equal(t, "grep", cfgA.GetEnabledCapabilities()[0].Name)
+
+	require.NoError(t, opts[0](cfgB))
+	require.Empty(t, cfgB.GetEnabledCapabilities())
+}
+
+func TestProcessHotPatchMessage_CapabilityHotpatch_EmptyTaskIdAppliesToAll(t *testing.T) {
+	cfgA := NewConfig(context.Background(), WithDisableAutoSkills(true))
+	cfgB := NewConfig(context.Background(), WithDisableAutoSkills(true))
+	cfgA.SetHotpatchCurrentTaskIdResolver(func() string { return "task-a" })
+	cfgB.SetHotpatchCurrentTaskIdResolver(func() string { return "task-b" })
+
+	opts := cfgA.ProcessHotPatchMessage(&ypb.AIInputEvent{
+		IsConfigHotpatch: true,
+		HotpatchType:     HotPatchType_EnabledCapabilities,
+		Params: &ypb.AIStartParams{
+			EnabledCapabilities: []*ypb.AIEnabledCapability{
+				{Name: "grep", Type: "tool"},
+			},
+		},
+	})
+	require.Len(t, opts, 1)
+
+	require.NoError(t, opts[0](cfgA))
+	require.NoError(t, opts[0](cfgB))
+	require.Len(t, cfgA.GetEnabledCapabilities(), 1)
+	require.Len(t, cfgB.GetEnabledCapabilities(), 1)
+}

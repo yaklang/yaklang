@@ -106,9 +106,8 @@ func (c *Coordinator) buildRecoveredTaskTree(src *recoveredTask, parent *AiTask)
 	if task.TaskSummary == "" && task.ShortSummary == "" && task.LongSummary == "" && task.StatusSummary == "" && src.Summary != "" {
 		task.TaskSummary = src.Summary
 	}
-	if task.Index != "" {
-		task.SetID(task.Index)
-	}
+	// NOTE: Do not overwrite task ID with Index. Index is positional ("1-2-3"),
+	// while TaskId is the stable logical identifier for this plan task.
 
 	switch strings.ToLower(strings.TrimSpace(src.Progress)) {
 	case string(aicommon.AITaskState_Completed):
