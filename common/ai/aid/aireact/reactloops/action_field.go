@@ -10,6 +10,7 @@ type LoopStreamField struct {
 	Prefix        string
 	ContentType   string
 	StreamHandler LoopStreamFieldHandler
+	IsSystem      bool
 }
 
 // LoopAITagField 描述一个被注册到 ActionMaker 的 AITAG 字段.
@@ -32,7 +33,8 @@ type LoopStreamField struct {
 // 仍然只走 turn nonce).
 //
 // 关键词: LoopAITagField ExtraNonces, 双注册兜底, [current-nonce] 占位符,
-//        精准覆盖工具缓存, prefix cache 字节稳定
+//
+//	精准覆盖工具缓存, prefix cache 字节稳定
 type LoopAITagField struct {
 	TagName      string
 	VariableName string

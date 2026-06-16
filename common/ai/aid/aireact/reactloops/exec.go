@@ -382,11 +382,12 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 							defaultNodeId = fieldIns.AINodeId
 						}
 
-						event, emitErr := boundEmitter.EmitStreamEventWithContentType(
+						event, emitErr := boundEmitter.EmitStreamEventWithContentTypeEx(
 							defaultNodeId,
 							pr,
 							resp.GetTaskIndex(),
 							fieldIns.ContentType,
+							fieldIns.IsSystem,
 							func() {
 								log.Debugf("stream emit callback for field [%s] triggered", key)
 								done()

@@ -184,7 +184,7 @@ var matchHTTPFlowsWithSimpleMatcherAction = func(r aicommon.AIInvokeRuntime) rea
 				loop.GetEmitter().EmitPinFilename(filename)
 			}
 
-			reactloops.EmitActionLog(loop, "http-flow-query", fmt.Sprintf("查询流量共%d条 -> 匹配%d条 -> %s", total, matchedCount, filepath.Base(filename)))
+			reactloops.EmitActionLog(loop, "http-flow-query", fmt.Sprintf("查询流量%d条 -> 匹配%d条 -> %s", total, matchedCount, filepath.Base(filename)))
 
 			if len(fullSummary) > maxHTTPFlowSummaryBytes && filename != "" {
 				preview := utils.ShrinkTextBlock(fullSummary, 2000)
