@@ -414,7 +414,7 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 			r.loadingStatus("解析 AI 响应中 / Parsing AI Response...")
 			extractStart := time.Now()
 			action, actionErr = aicommon.ExtractActionFromStream(
-				r.currentTask.GetContext(),
+				r.GetCurrentTask().GetContext(),
 				stream,
 				"object",
 				options...,
@@ -591,8 +591,15 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) (finalE
 			fmt.Println("================================================")
 		})
 
+		// Save current task before initHandler, as it may execute sub-loops
+		// (e.g. intent recognition) that will call SetCurrentTask with different tasks
+		savedTask := r.GetCurrentTask()
 		initOperator = newInitTaskOperator()
 		r.initHandler(r, task, initOperator)
+		// Restore the original task after initHandler
+		if savedTask != nil {
+			r.SetCurrentTask(savedTask)
+		}
 
 		// Check operator status
 		if initOperator.IsDone() {
@@ -674,7 +681,7 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) (finalE
 		}
 		done.Do(func() {
 			if task.GetStatus() == aicommon.AITaskState_Skipped {
-				log.Infof("re-act loop [%v] task[%v] skipped", r.loopName, r.currentTask.GetId())
+				log.Infof("re-act loop [%v] task[%v] skipped", r.loopName, task.GetId())
 			} else {
 				task.SetStatus(aicommon.AITaskState_Completed)
 			}

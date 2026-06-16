@@ -22,6 +22,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/aiforge"
 )
 
 func (r *ReAct) persistTaskUserInput(task aicommon.AIStatefulTask) {
@@ -607,6 +608,8 @@ func (r *ReAct) ensureSessionTitle(userInput string) {
 }
 
 func BuildReActInvoker(ctx context.Context, options ...aicommon.ConfigOption) (aicommon.AITaskInvokeRuntime, error) {
+	options = append(options,aicommon.WithAIBlueprintManager(aiforge.NewForgeFactory()))
+	
 	cfg := aicommon.NewConfig(ctx, options...)
 	// artifacts directory is lazily created when user input arrives (ensureWorkDirectory)
 	invoker := &ReAct{
@@ -655,6 +658,67 @@ func BuildReActInvoker(ctx context.Context, options ...aicommon.ConfigOption) (a
 
 	// Register pending context providers
 	invoker.promptManager.cpm = cfg.ContextProviderManager
+
+	cfg.SetSkillHotloadHandler(func(skillNames []string) {
+		if len(skillNames) == 0 {
+			return
+		}
+		if loop := invoker.GetCurrentLoop(); loop != nil {
+			if mgr := loop.GetSkillsContextManager(); mgr != nil {
+				results := mgr.LoadSkills(skillNames)
+				for name, err := range results {
+					if err != nil {
+						log.Warnf("hotload skill %q failed: %v", name, err)
+					}
+				}
+			}
+		}
+	})
+
+	cfg.SetForgeHotloadHandler(func(forgeNames []string) {
+		if len(forgeNames) == 0 {
+			return
+		}
+		if loop := invoker.GetCurrentLoop(); loop != nil {
+			reactloops.LoadEnabledForges(invoker.config, loop, forgeNames)
+		}
+	})
+
+	cfg.SetSkillUnloadHandler(func(skillNames []string) {
+		if len(skillNames) == 0 {
+			return
+		}
+		if loop := invoker.GetCurrentLoop(); loop != nil {
+			if mgr := loop.GetSkillsContextManager(); mgr != nil {
+				for _, name := range skillNames {
+					if mgr.UnloadSkill(name) {
+						log.Infof("hot-unload skill %q from context", name)
+					}
+				}
+			}
+		}
+	})
+
+	cfg.SetForgeUnloadHandler(func(forgeNames []string) {
+		if len(forgeNames) == 0 {
+			return
+		}
+		if loop := invoker.GetCurrentLoop(); loop != nil {
+			if ecm := loop.GetExtraCapabilities(); ecm != nil {
+				for _, name := range forgeNames {
+					if ecm.RemoveForgeByName(name) {
+						log.Infof("hot-unload forge %q from extra capabilities", name)
+					}
+				}
+			}
+		}
+	})
+
+	// Register capability inventory emit handler using this invoker's own loop,
+	// so child invokers do not inherit the parent's react reference.
+	cfg.SetCapabilityInventoryEmitHandler(func() {
+		reactloops.EmitCapabilityInventorySnapshot(invoker.config, invoker.GetCurrentLoop())
+	})
 
 	// EmitPinDirectory is deferred to ensureWorkDirectory when user input arrives
 
