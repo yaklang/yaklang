@@ -35,12 +35,12 @@ const ssaCompileGOGCEnv = "YAK_SSA_COMPILE_GOGC"
 const ssaCompileMemLimitEnv = "YAK_SSA_COMPILE_MEM_LIMIT"
 
 const (
-	// Compile-unit split thresholds: even smaller batches to prevent OOM
-	// Previous: 512 files / 4MB (OOM at 12.6GB)
-	// First reduction: 128 files / 1MB (OOM at 11.7GB, batch 11 jumped to 750MB)
-	// Current: 64 files / 512KB for maximum memory control
-	defaultCompileUnitBatchMinFiles = 64
-	defaultCompileUnitBatchMinBytes = 512 * 1024
+	// Compile-unit split thresholds: ULTRA-SMALL batches
+	// Since we can't fully clear memory between batches (Instruction objects
+	// hold references to Function/Block/Program), we minimize each batch's
+	// footprint so even with accumulation we stay under OOM threshold.
+	defaultCompileUnitBatchMinFiles = 32
+	defaultCompileUnitBatchMinBytes = 256 * 1024
 	defaultSSACompileGOGC           = 1000
 	defaultSSACompileMemLimit       = 680 * 1024 * 1024
 	// Keep this in sync with the SSA IR cache resident fast-path threshold.
@@ -1070,8 +1070,28 @@ func (c *Config) parseProjectWithFSUnits(
 				time.Since(unitBuildStart),
 			)
 		} else if prog.Cache != nil {
+			// Writer cache not enabled, but we still need to clear memory!
+			// This is the fix for non-writer mode memory accumulation
+			preFlushIR := prog.Cache.CountInstruction()
+			preFlushHeap := captureHeapMetrics()
+
+			// Clear all stores even in non-writer mode
+			clearedItems := prog.Cache.AggressiveClearAllStores()
+
+			// Clear Program structures
+			releasedFuncs := prog.ReleaseCompletedUnitMemory(unitKeys)
+			prog.AggressiveClearMemory()
+
+			// Force GC
+			runtime.GC()
+			runtime.GC()
+			runtime.GC()
+			debug.FreeOSMemory()
+
+			postFlushHeap := captureHeapMetrics()
+
 			prog.ProcessInfof(
-				"compile unit batch(%d/%d) cache flush skipped scc=%d-%d units=%s mode=%s writer_enabled=%v resident_ir=%d funcs=%d blueprints=%d upstreams=%d cost=%v",
+				"compile unit batch(%d/%d) non-writer cleared scc=%d-%d units=%s mode=%s writer_enabled=%v cleared=%d released_funcs=%d resident_ir=%d funcs=%d blueprints=%d heap_mb=%.1f→%.1f(Δ%+.1f) upstreams=%d cost=%v",
 				batchIndex+1,
 				len(batches),
 				batch.startSCC+1,
@@ -1079,9 +1099,14 @@ func (c *Config) parseProjectWithFSUnits(
 				strings.Join(unitKeys, ","),
 				prog.Cache.InstructionCacheMode(),
 				writerCacheEnabled,
-				prog.Cache.CountInstruction(),
+				clearedItems,
+				releasedFuncs,
+				preFlushIR,
 				prog.Funcs.Len(),
 				prog.Blueprint.Len(),
+				preFlushHeap,
+				postFlushHeap,
+				postFlushHeap-preFlushHeap,
 				prog.UpStream.Len(),
 				time.Since(unitBuildStart),
 			)
