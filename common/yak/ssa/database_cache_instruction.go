@@ -304,6 +304,35 @@ func (s *instructionStore) EnableSpill() {
 	s.writer.EnableSave()
 }
 
+// AggressiveClearInstructions drops ALL cached instructions from memory.
+// In writer mode, this clears the writer cache after DB flush.
+// In memory mode, this clears the resident map.
+// In reader mode, this clears the reader cache.
+func (s *instructionStore) AggressiveClearInstructions() int {
+	if s == nil {
+		return 0
+	}
+	cleared := 0
+	switch {
+	case s.writer != nil:
+		cleared = s.writer.AggressiveClear()
+	case s.reader != nil:
+		cleared = s.reader.AggressiveClear()
+	case s.resident != nil:
+		// Create a new safe map to release memory
+		oldCount := s.resident.Count()
+		s.resident = utils.NewSafeMapWithKey[int64, Instruction]()
+		cleared = oldCount
+	}
+
+	// Also clear residentPersisted map to release memory
+	s.residentFlushMu.Lock()
+	s.residentPersisted = make(map[int64]struct{})
+	s.residentFlushMu.Unlock()
+
+	return cleared
+}
+
 func (s *instructionStore) IsSpillDisabled() bool {
 	if s == nil || s.writer == nil {
 		return false
