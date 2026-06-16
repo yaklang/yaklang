@@ -11,13 +11,15 @@ import (
 
 var loopActionDirectlyAnswerHTTPFlowAnalyze = &reactloops.LoopAction{
 	ActionType: "directly_answer",
-	Description: "Answer the user's HTTP traffic analysis question or summarize collected HTTP flow evidence. Use answer_payload for short answers; use FINAL_ANSWER AITAG for longer Markdown reports with tables, lists, or structured content. " +
-		"IMPORTANT: directly_answer ONLY delivers the answer; the loop CONTINUES afterwards and this action does NOT end the task. Use the 'finish' action to terminate. " +
-		"OPTIONAL: carry a non-empty 'next_movements' delta alongside the answer to schedule follow-up TODO updates.",
+	Description: "Answer the user's HTTP traffic analysis question or summarize collected HTTP flow evidence. " +
+		"Use answer_payload for short plain text answers (< 200 chars). For longer reports with Markdown formatting, use the <|FINAL_ANSWER_...|> tag OUTSIDE this action JSON. " +
+		"CRITICAL: answer_payload and FINAL_ANSWER tag are MUTUALLY EXCLUSIVE - choose ONE, never both. NEVER put <|FINAL_ANSWER_...|> text inside answer_payload field. " +
+		"IMPORTANT: directly_answer ONLY delivers the answer; the loop CONTINUES afterwards. Use 'finish' action to terminate. " +
+		"OPTIONAL: carry 'next_movements' delta alongside the answer for follow-up TODO updates.",
 	Options: []aitool.ToolOption{
 		aitool.WithStringParam(
 			"answer_payload",
-			aitool.WithParam_Description(`Short answer text. For longer Markdown content with multiple sections, lists or tables, leave this empty and use the <|FINAL_ANSWER_...|> tag instead. answer_payload and <|FINAL_ANSWER_...|> are mutually exclusive.`),
+			aitool.WithParam_Description(`Short plain text answer (< 200 chars). For longer Markdown reports, leave this field EMPTY and use <|FINAL_ANSWER_...|> tag OUTSIDE the action JSON instead. NEVER include <|FINAL_ANSWER_...|> markers or tag content inside this field.`),
 		),
 	},
 	AITagStreamFields: []*reactloops.LoopAITagField{
