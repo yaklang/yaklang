@@ -81,7 +81,7 @@ var dispatchFuzzTestAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 			reactloops.EmitActionLog(loop, "fuzz-test", line1)
 
 			log.Infof("[dispatch_fuzz_test] loading target flow: %s, vulnerability type: %s", locatorDesc, vulnType)
-			reactloops.EmitActionLog(loop, "准备 Fuzz 测试 / Preparing Fuzz Test...")
+			reactloops.EmitStatus(loop, "准备 Fuzz 测试 / Preparing Fuzz Test...")
 
 			// Step 1: Load flow
 			var flow *schema.HTTPFlow
@@ -123,7 +123,7 @@ var dispatchFuzzTestAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 				sanitizeIDSegment(vulnType))
 
 			// Step 4: Create fuzztest sub-loop
-			reactloops.EmitActionLog(loop, "启动 Fuzz 测试 / Launching Fuzz Test...")
+			reactloops.EmitStatus(loop, "启动 Fuzz 测试 / Launching Fuzz Test...")
 
 			fuzzLoop, err := reactloops.CreateLoopByName(
 				loop_http_fuzztest.LoopHTTPFuzztestName,
@@ -142,19 +142,19 @@ var dispatchFuzzTestAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 			invoker.AddToTimeline("dispatch_fuzz_test",
 				fmt.Sprintf("启动 fuzztest 子循环 [%s]，目标: %s，漏洞类型: %s", subTaskId, locatorDesc, vulnType))
 
-			reactloops.EmitActionLog(loop, "Fuzz 测试执行中 / Fuzz Test Running...")
+			reactloops.EmitStatus(loop, "Fuzz 测试执行中 / Fuzz Test Running...")
 
 			execErr := fuzzLoop.ExecuteWithExistedTask(subTask)
 
 			// Step 6: Collect results and write to HTTP flow evidence
-			reactloops.EmitActionLog(loop, "收集测试结果 / Collecting Results...")
+			reactloops.EmitStatus(loop, "收集测试结果 / Collecting Results...")
 
 			fuzzResult := collectFuzzSubLoopResult(fuzzLoop, locatorDesc, vulnType, flow)
 			if _, changed := appendHTTPFlowEvidence(loop, fuzzResult); changed {
 				log.Infof("[dispatch_fuzz_test] fuzztest results merged to HTTP_FLOW_EVIDENCE")
 			}
 
-			reactloops.EmitActionLog(loop, "Fuzz 测试完成 / Fuzz Test Complete")
+			reactloops.EmitStatus(loop, "Fuzz 测试完成 / Fuzz Test Complete")
 
 			// 提取关键发现
 			resultBrief := "未发现明显漏洞"
@@ -164,7 +164,7 @@ var dispatchFuzzTestAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 			}
 			line2 := fmt.Sprintf("完成: %s, 结果已合并到Evidence", resultBrief)
 
-			reactloops.EmitActionLog(loop, "fuzz-test", line2)
+			reactloops.EmitActionLog(loop, "fuzz-test", line2, fuzzResult)
 
 			// Record to dispatched_fuzz_tasks for reactive_data rendering
 			appendDispatchedFuzzTask(loop, dispatchedFuzzTask{

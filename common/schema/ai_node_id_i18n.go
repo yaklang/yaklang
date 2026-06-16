@@ -462,6 +462,10 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "流量详情",
 		En: "Flow Detail",
 	},
+	"http-flow-match": {
+		Zh: "流量匹配",
+		En: "Flow Match",
+	},
 	"fuzz-test": {
 		Zh: "Fuzz 测试",
 		En: "Fuzz Test",

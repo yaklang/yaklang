@@ -5,282 +5,358 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/httptpl"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-const maxHTTPFlowSummaryBytes = 1024 * 5
-
-type matcherPayload struct {
-	Matchers []*ypb.HTTPResponseMatcher `json:"matchers"`
-}
-
-func parseMatchers(raw string) ([]*ypb.HTTPResponseMatcher, error) {
-	if strings.TrimSpace(raw) == "" {
-		return nil, utils.Error("matchers_json is empty")
-	}
-
-	var wrapper matcherPayload
-	if err := json.Unmarshal([]byte(raw), &wrapper); err == nil && len(wrapper.Matchers) > 0 {
-		return wrapper.Matchers, nil
-	}
-
-	var arr []*ypb.HTTPResponseMatcher
-	if err := json.Unmarshal([]byte(raw), &arr); err == nil && len(arr) > 0 {
-		return arr, nil
-	}
-
-	var single ypb.HTTPResponseMatcher
-	if err := json.Unmarshal([]byte(raw), &single); err == nil && single.MatcherType != "" {
-		return []*ypb.HTTPResponseMatcher{&single}, nil
-	}
-
-	return nil, utils.Errorf("failed to parse matchers_json, expected HTTPResponseMatcher array or object")
-}
-
-func buildSearchParamSummary(action *aicommon.Action) string {
-	var parts []string
-	if v := action.GetString("keyword"); v != "" {
-		parts = append(parts, fmt.Sprintf("keyword=%q", v))
-	}
-	if v := action.GetString("keyword_type"); v != "" {
-		parts = append(parts, fmt.Sprintf("keyword_type=%s", v))
-	}
-	if v := action.GetString("methods"); v != "" {
-		parts = append(parts, fmt.Sprintf("methods=%s", v))
-	}
-	if v := action.GetString("status_code"); v != "" {
-		parts = append(parts, fmt.Sprintf("status=%s", v))
-	}
-	if v := action.GetString("url_contains"); v != "" {
-		parts = append(parts, fmt.Sprintf("url=%q", v))
-	}
-	if v := action.GetString("tags"); v != "" {
-		parts = append(parts, fmt.Sprintf("tags=%s", v))
-	}
-	if v := action.GetString("exclude_keywords"); v != "" {
-		parts = append(parts, fmt.Sprintf("exclude=%q", v))
-	}
-	if v := action.GetString("source_type"); v != "" {
-		parts = append(parts, fmt.Sprintf("source=%s", v))
-	}
-	if v := action.GetString("runtime_id"); v != "" {
-		parts = append(parts, fmt.Sprintf("runtime=%s", v))
-	}
-	if v := action.GetInt("limit"); v > 0 {
-		parts = append(parts, fmt.Sprintf("limit=%d", v))
-	}
-	if len(parts) == 0 {
-		return "(no filters)"
-	}
-	return strings.Join(parts, ", ")
-}
-
-var filterAndMatchHTTPFlowsAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
+var matchFlowsAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 	return reactloops.WithRegisterLoopAction(
-		"filter_and_match_http_flows",
-		"Filter HTTP flows by keyword/keyword_type/methods/status_code/tags/exclude_keywords/url_contains/runtime_id/source_type/limit first; only add matchers_json if filters cannot narrow the set. If the summary exceeds 20k chars it will be saved to a file—use the file reading tool to load the full content.",
+		"match_flows",
+		`Advanced matching with multiple matchers and complex logic (for 20% complex scenarios).
+
+Use this when you need:
+- Multiple matchers with AND/OR logic between them
+- Complex nested conditions
+- Fine-grained control over matching behavior
+
+**Matcher Structure Definition:**
+
+{
+  "type": "word" | "regex" | "status" | "binary" | "dsl",
+  "patterns": ["pattern1", "pattern2"],  // Required: list of patterns to match
+  "scope": "request" | "response" | "all",  // Optional, default "all"
+  "match_all": false,  // Optional: patterns logic (false=OR, true=AND), default false
+  "negative": false,   // Optional: invert match, default false
+  "encoding": "hex" | "base64",  // Optional: only for type=binary
+  "expr_type": "nuclei-dsl"      // Optional: only for type=dsl
+}
+
+**Parameters:**
+
+- matchers: Array of Matcher objects (see structure above)
+- matcher_condition: "or" | "and" (default "or")
+  - "or": ANY matcher matches → flow matches
+  - "and": ALL matchers match → flow matches
+
+**Logic Explanation:**
+
+1. Within each Matcher: patterns are combined by "match_all"
+   - match_all=false (OR): pattern1 OR pattern2 OR ...
+   - match_all=true (AND): pattern1 AND pattern2 AND ...
+
+2. Between Matchers: combined by "matcher_condition"
+   - matcher_condition="or": matcher1 OR matcher2 OR ...
+   - matcher_condition="and": matcher1 AND matcher2 AND ...
+
+**Examples:**
+
+1. Find flows with (admin OR root in request) AND (5xx status):
+{
+  "matchers": [
+    {"type": "word", "patterns": ["admin", "root"], "scope": "request", "match_all": false},
+    {"type": "status", "patterns": ["500", "502", "503"]}
+  ],
+  "matcher_condition": "and"
+}
+
+2. Find flows containing BOTH "error" AND "exception" in response:
+{
+  "matchers": [
+    {"type": "word", "patterns": ["error", "exception"], "scope": "response", "match_all": true}
+  ]
+}
+
+3. Exclude successful responses (NOT 2xx):
+{
+  "matchers": [
+    {"type": "status", "patterns": ["200", "201", "204"], "negative": true}
+  ]
+}
+
+For simple single-condition matching, use match_flows_simple instead.`,
 		[]aitool.ToolOption{
-			aitool.WithStringParam("keyword", aitool.WithParam_Description("Fuzzy search keyword across request/response/url")),
-			aitool.WithStringParam("keyword_type", aitool.WithParam_Description("Limit keyword scope: request/response or leave empty for all")),
-			aitool.WithStringParam("methods", aitool.WithParam_Description("Comma separated HTTP methods to include, e.g. GET,POST")),
-			aitool.WithStringParam("status_code", aitool.WithParam_Description("Status codes or ranges, e.g. 200,404,5xx")),
-			aitool.WithStringParam("tags", aitool.WithParam_Description("Comma or pipe separated tags to match")),
-			aitool.WithStringParam("exclude_keywords", aitool.WithParam_Description("Keywords to exclude from request/response/url")),
-			aitool.WithStringParam("url_contains", aitool.WithParam_Description("URL substring filter; multiple values separated by comma")),
-			aitool.WithStringParam("runtime_id", aitool.WithParam_Description("Filter flows by runtime/session id")),
-			aitool.WithStringParam("source_type", aitool.WithParam_Description("Filter by source type, e.g. mitm/crawler/scan")),
-			aitool.WithIntegerParam("limit", aitool.WithParam_Description("Max result count (default 30, max 500)")),
-			aitool.WithStringParam("matchers_json", aitool.WithParam_Description("Optional HTTPResponseMatcher definitions in JSON (single object, array, or {\"matchers\":[...]}). Prefer filters first; only use this when filters cannot isolate results. Enums must use allowed values only.")),
+			// 流量来源
+			aitool.WithStringParam("flow_source", aitool.WithParam_Description("Query result name to match against (e.g. 'login_flows', 'last'). Leave empty to use flow_ids or last query.")),
+			aitool.WithStringParam("flow_ids", aitool.WithParam_Description("Comma-separated flow IDs, e.g. '123,456,789'. Use this OR flow_source, not both.")),
+
+			// 高级匹配参数
+			aitool.WithStringParam("matchers", aitool.WithParam_Description("JSON array of Matcher objects. Each Matcher has: type (word/regex/status/binary/dsl), patterns (array), scope (request/response/all), match_all (bool), negative (bool). See action description for full structure definition.")),
+			aitool.WithStringParam("matcher_condition", aitool.WithParam_Description("Logic between multiple matchers: 'or' (any matcher matches, default) or 'and' (all matchers must match)")),
+
+			// 结果命名
+			aitool.WithStringParam("match_name", aitool.WithParam_Description("Optional name for this match result. Auto-generated if not provided.")),
 		},
 		func(l *reactloops.ReActLoop, action *aicommon.Action) error {
-			limit := action.GetInt("limit")
-			if limit < 0 {
-				return utils.Errorf("limit must be non-negative")
+			// 验证 matchers 参数
+			matchersJSON := action.GetString("matchers")
+			if matchersJSON == "" {
+				return utils.Errorf("matchers parameter is required. For simple matching, use match_flows_simple instead")
 			}
+
+			// 验证 JSON 格式
+			var matchers []SimplifiedMatcher
+			if err := json.Unmarshal([]byte(matchersJSON), &matchers); err != nil {
+				return utils.Errorf("failed to parse matchers JSON: %v", err)
+			}
+
+			if len(matchers) == 0 {
+				return utils.Errorf("matchers array cannot be empty")
+			}
+
 			return nil
 		},
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, operator *reactloops.LoopActionHandlerOperator) {
+			// === 1. 获取流量来源 ===
+			nodeId := "http-flow-match"
+			reactloops.EmitStatus(loop, "准备匹配流量 / Preparing to Match Flows...")
+
 			db := consts.GetGormProjectDatabase()
 			if db == nil {
-				operator.Fail("project database is not available for matching HTTP flows")
+				operator.Fail("project database is not available")
 				return
 			}
 
-			paramSummary := buildSearchParamSummary(action)
-			log.Infof("[filter_and_match_http_flows] search params: %s", paramSummary)
+			var sourceFlows []*schema.HTTPFlow
+			var sourceQuery string
+			var sourceFlowIDs []int64
 
-			reactloops.EmitActionLog(loop, "查询流量中 / Querying Flows...")
+			flowSource := action.GetString("flow_source")
+			flowIDsStr := action.GetString("flow_ids")
 
-			req := buildQueryRequestFromAction(action, 30)
-			paging, flows, err := yakit.QueryHTTPFlow(db, req)
-			if err != nil {
-				log.Errorf("filter_and_match_http_flows query failed: %v", err)
-				operator.Fail(fmt.Sprintf("query http flows failed: %v", err))
-				return
-			}
-
-			total := 0
-			if paging != nil {
-				total = paging.TotalRecord
-			} else {
-				total = len(flows)
-			}
-
-			reactloops.EmitActionLog(loop, fmt.Sprintf("查询完成，找到 %d 条流量 / Query Complete, Found %d Flows", total, total))
-
-			var (
-				matchedCount  int
-				discardCount  int
-				localMatchers []*simpleMatcher
-				builder       strings.Builder
-			)
-
-			rawMatchers := strings.TrimSpace(action.GetString("matchers_json"))
-			if rawMatchers != "" {
-				parsed, err := parseMatchers(rawMatchers)
-				if err != nil {
-					operator.Fail(err)
+			if flowSource != "" {
+				queryResult := getQueryResult(loop, flowSource)
+				if queryResult == nil {
+					operator.Fail(fmt.Sprintf("query result '%s' not found. Use query_http_flows first.", flowSource))
 					return
 				}
-				for _, m := range parsed {
-					localMatchers = append(localMatchers, newSimpleMatcherFromGRPC(m))
+				sourceFlowIDs = queryResult.FlowIDs
+				sourceQuery = queryResult.Name
+			} else if flowIDsStr != "" {
+				sourceFlowIDs = parseFlowIDs(flowIDsStr)
+				sourceQuery = "direct_ids"
+			} else {
+				queryResult := getQueryResult(loop, "last")
+				if queryResult == nil {
+					operator.Fail("no query result available. Please run query_http_flows first or specify flow_ids.")
+					return
 				}
+				sourceFlowIDs = queryResult.FlowIDs
+				sourceQuery = queryResult.Name
 			}
 
-			matcherDesc := ""
-			if len(localMatchers) > 0 {
-				matcherDesc = describeMatchers(localMatchers)
-				log.Infof("[filter_and_match_http_flows] DB returned %d flows (showing %d), applying %d matcher(s): %s",
-					total, len(flows), len(localMatchers), matcherDesc)
-
-				reactloops.EmitActionLog(loop, "应用匹配器中 / Applying Matchers...")
-			} else {
-				log.Infof("[filter_and_match_http_flows] DB returned %d flows (showing %d), no matchers to apply",
-					total, len(flows))
+			if len(sourceFlowIDs) == 0 {
+				operator.Feedback(fmt.Sprintf("Source '%s' has no flows to match.", sourceQuery))
+				return
 			}
 
-			builder.WriteString(fmt.Sprintf("HTTP flow query returned %d items (showing %d)", total, len(flows)))
-			if len(localMatchers) > 0 {
-				builder.WriteString(fmt.Sprintf("; applying %d matcher(s)\n", len(localMatchers)))
-			} else {
-				builder.WriteString("\n")
+			log.Infof("[match_flows] loading %d flows from source '%s'", len(sourceFlowIDs), sourceQuery)
+
+			// 加载流量
+			for _, id := range sourceFlowIDs {
+				flow, err := yakit.GetHTTPFlow(db, int64(id))
+				if err != nil {
+					log.Warnf("failed to load flow %d: %v", id, err)
+					continue
+				}
+				sourceFlows = append(sourceFlows, flow)
 			}
 
-			// 输出简洁的累积流（最多2行）
-			// 如果有 human_readable_thought，融入到第一行
+			if len(sourceFlows) == 0 {
+				operator.Fail(fmt.Sprintf("failed to load any flows from source '%s'", sourceQuery))
+				return
+			}
+
+			// === 2. 解析 matchers ===
+			matchersJSON := action.GetString("matchers")
+			var matchers []SimplifiedMatcher
+			if err := json.Unmarshal([]byte(matchersJSON), &matchers); err != nil {
+				operator.Fail(fmt.Sprintf("failed to parse matchers JSON: %v", err))
+				return
+			}
+
+			matcherCondition := strings.ToLower(action.GetString("matcher_condition", "or"))
+			if matcherCondition != "or" && matcherCondition != "and" {
+				matcherCondition = "or"
+			}
+
+			matcherDesc := describeSimplifiedMatchers(matchers)
+			if len(matchers) > 1 {
+				matcherDesc += fmt.Sprintf(" (condition=%s)", matcherCondition)
+			}
+
+			// === 3. 构建并发送第1行累积流（参数摘要 + 可选思考）===
 			thought := action.GetString("human_readable_thought")
 			var line1 string
 			if thought != "" {
-				line1 = fmt.Sprintf("查询 %s | %s", paramSummary, thought)
+				line1 = fmt.Sprintf("匹配 source=%s, %s | %s", sourceQuery, matcherDesc, thought)
 			} else {
-				line1 = fmt.Sprintf("查询 %s", paramSummary)
+				line1 = fmt.Sprintf("匹配 source=%s, %s", sourceQuery, matcherDesc)
 			}
-			reactloops.EmitActionLog(loop, "http-flow-query", line1)
+			reactloops.EmitActionLog(loop, nodeId, line1)
 
-			var line2 string
-			if len(localMatchers) == 0 {
-				// 无匹配器，直接构建结果
-				for idx, f := range flows {
-					builder.WriteString(fmt.Sprintf("%d) ID: %d, URL: %s, Method: %s, Status: %d, Tags: %s, Source: %s\n",
-						idx+1,
-						f.ID,
-						f.Url,
-						f.Method,
-						f.StatusCode,
-						shrinkTags(f.Tags),
-						f.SourceType,
-					))
+			// === 4. 执行匹配 ===
+			reactloops.EmitStatus(loop, "匹配流量中 / Matching Flows...")
+
+			var matchedFlows []*schema.HTTPFlow
+			var discardCount int
+			var builder strings.Builder
+
+			log.Infof("[match_flows] matching %d flows with %d matcher(s): %s", len(sourceFlows), len(matchers), matcherDesc)
+
+			builder.WriteString(fmt.Sprintf("Matching %d flows from source '%s' with %d matcher(s) (condition=%s)\n",
+				len(sourceFlows), sourceQuery, len(matchers), matcherCondition))
+			builder.WriteString(fmt.Sprintf("Matchers: %s\n\n", matcherDesc))
+
+			// 转换为 YakMatcher
+			yakMatchers := make([]*httptpl.YakMatcher, len(matchers))
+			for i, m := range matchers {
+				yakMatchers[i] = convertSimplifiedToYakMatcher(&m)
+			}
+
+			for idx, flow := range sourceFlows {
+				if len(sourceFlows) > 10 && idx%(len(sourceFlows)/10) == 0 && idx > 0 {
+					reactloops.EmitProgress(loop, idx, len(sourceFlows), "匹配进度", "Matching")
 				}
-			} else {
-				// 有匹配器，执行匹配
-				for idx, flow := range flows {
-					// 更新进度
-					if len(flows) > 10 && idx%(len(flows)/10) == 0 && idx > 0 {
-						reactloops.EmitProgress(loop, idx, len(flows), "匹配进度", "Matching")
-					}
 
-					matched, err := executeMatchers(
-						localMatchers,
-						&httptpl.RespForMatch{
-							RawPacket:     []byte(flowResponse(flow)),
-							RequestPacket: []byte(flowRequest(flow)),
-						},
-					)
+				// 执行匹配逻辑
+				respForMatch := &httptpl.RespForMatch{
+					RawPacket:     []byte(flowResponse(flow)),
+					RequestPacket: []byte(flowRequest(flow)),
+				}
 
+				var matchResults []bool
+				var matchErr error
+
+				for _, yakMatcher := range yakMatchers {
+					matched, err := yakMatcher.Execute(respForMatch, nil)
 					if err != nil {
-						builder.WriteString(fmt.Sprintf(" - #%d [error] %v\n", flow.ID, err))
+						matchErr = err
+						break
 					}
-					if !matched {
-						discardCount++
-						continue
+					matchResults = append(matchResults, matched)
+				}
+
+				if matchErr != nil {
+					builder.WriteString(fmt.Sprintf(" - #%d [error] %v\n", flow.ID, matchErr))
+					discardCount++
+					continue
+				}
+
+				// 根据 matcher_condition 判断最终结果
+				finalMatched := false
+				if matcherCondition == "and" {
+					// AND: 所有 matcher 都必须匹配
+					finalMatched = true
+					for _, m := range matchResults {
+						if !m {
+							finalMatched = false
+							break
+						}
 					}
-
-					matchedCount++
-					builder.WriteString(fmt.Sprintf("%d) #%d [%s] %d %s | tags=%s | src=%s\n",
-						matchedCount,
-						flow.ID,
-						flow.Method,
-						flow.StatusCode,
-						utils.ShrinkString(flow.Url, 160),
-						shrinkTags(flow.Tags),
-						flow.SourceType,
-					))
+				} else {
+					// OR: 任一 matcher 匹配即可
+					for _, m := range matchResults {
+						if m {
+							finalMatched = true
+							break
+						}
+					}
 				}
 
-				reactloops.EmitActionLog(loop, "匹配完成 / Matching Complete")
-				builder.WriteString(fmt.Sprintf("\nMatched %d flow(s); discarded %d after matcher filter.", matchedCount, discardCount))
-			}
-
-			// 构建 line2：结果摘要
-			invoker := loop.GetInvoker()
-			fullSummary := builder.String()
-			summary := fullSummary
-
-			var filename string
-			if invoker != nil {
-				loopDataDir := loop.GetLoopContentDir("data")
-				filename = filepath.Join(loopDataDir, fmt.Sprintf("http_flow_match_summary_%d_%s.txt", loop.GetCurrentIterationIndex(), utils.DatetimePretty2()))
-				loop.Set("last_query_summary_file", filename)
-				if len(localMatchers) > 0 {
-					loop.Set("last_match_summary_file", filename)
+				if !finalMatched {
+					discardCount++
+					continue
 				}
 
-				// 保存文件并 pin 到前端
-				if err := reactloops.SaveAndPinFile(loop, filename, []byte(fullSummary)); err != nil {
-					log.Warnf("failed to save and pin summary file: %v", err)
-				}
+				matchedFlows = append(matchedFlows, flow)
+				builder.WriteString(fmt.Sprintf("%d) #%d [%s] %d %s | tags=%s | src=%s\n",
+					len(matchedFlows),
+					flow.ID,
+					flow.Method,
+					flow.StatusCode,
+					utils.ShrinkString(flow.Url, 160),
+					shrinkTags(flow.Tags),
+					flow.SourceType,
+				))
 			}
 
-			if len(localMatchers) > 0 {
-				line2 = fmt.Sprintf("查询流量 %d条 -> 匹配%d条 -> %s", total, matchedCount, filepath.Base(filename))
-			} else {
-				line2 = fmt.Sprintf("查询流量 %d条 -> %s", total, filepath.Base(filename))
-			}
-			reactloops.EmitActionLog(loop, "http-flow-query", line2)
-			// 输出2行累积流
+			builder.WriteString(fmt.Sprintf("\nMatched %d flow(s); discarded %d.",
+				len(matchedFlows), discardCount))
 
-			resultSummaryStr := ""
-			if len(localMatchers) > 0 {
-				loop.Set("last_match_summary", summary)
+			summary := builder.String()
+
+			// === 4. 保存结果 ===
+			matchName := action.GetString("match_name")
+			if matchName == "" {
+				matchName = fmt.Sprintf("match_%d", loop.GetCurrentIterationIndex())
 			}
 
+			loopDataDir := loop.GetLoopContentDir("data")
+			filename := filepath.Join(loopDataDir,
+				fmt.Sprintf("match_advanced_%s_%s.txt", matchName, utils.DatetimePretty2()))
+
+			fullSummary := summary
+			if len(fullSummary) > maxHTTPFlowSummaryBytes {
+				preview := utils.ShrinkTextBlock(fullSummary, 2000)
+				summary = fmt.Sprintf("Summary length %d exceeded %d; saved to file: %s\nUse file reading tool to load full content.\n\nPreview:\n%s",
+					len(fullSummary), maxHTTPFlowSummaryBytes, filename, preview)
+			}
+
+			if err := reactloops.SaveAndPinFile(loop, filename, []byte(fullSummary)); err != nil {
+				log.Warnf("failed to save file: %v", err)
+			}
+
+			// === 5. 保存状态 ===
+			matchedFlowIDs := make([]int64, len(matchedFlows))
+			for i, f := range matchedFlows {
+				matchedFlowIDs[i] = int64(f.ID)
+			}
+
+			matchResult := &MatchResult{
+				Name:         matchName,
+				SourceQuery:  sourceQuery,
+				FlowIDs:      matchedFlowIDs,
+				MatchedCount: len(matchedFlows),
+				MatcherDesc:  matcherDesc,
+				SummaryFile:  filename,
+				CreatedAt:    time.Now(),
+			}
+			saveMatchResult(loop, matchResult)
+
+			// === 6. 发送完成状态 ===
+			reactloops.EmitStatus(loop, fmt.Sprintf("匹配完成，找到 %d 条 / Match Complete, Found %d Flows", len(matchedFlows), len(matchedFlows)))
+
+			// === 7. 构建并发送第2行累积流（结果摘要）===
+			line2 := fmt.Sprintf("完成: 匹配 %d/%d 条流量",
+				len(matchedFlows), len(sourceFlows))
+			reactloops.EmitActionLog(loop, nodeId, line2, summary)
+
+			// === 8. 记录历史 ===
 			recordAction(loop,
-				"filter_and_match_http_flows",
-				paramSummary,
-				resultSummaryStr,
-				matcherDesc,
-			)
+				"match_flows",
+				fmt.Sprintf("source=%s, %s", sourceQuery, matcherDesc),
+				fmt.Sprintf("matched %d/%d flows, saved as '%s'", len(matchedFlows), len(sourceFlows), matchName),
+				matcherDesc)
 
-			operator.Feedback(summary)
+			// === 8. 返回结果 ===
+			feedbackMsg := fmt.Sprintf("Match '%s' completed: matched %d flows from source '%s' (%d total)\n\nFile: %s\n\n%s",
+				matchName, len(matchedFlows), sourceQuery, len(sourceFlows), filename, summary)
+
+			invoker := loop.GetInvoker()
+			if invoker != nil {
+				invoker.AddToTimeline("match_flows", feedbackMsg)
+			}
+
+			operator.Feedback(feedbackMsg)
 		},
 	)
 }

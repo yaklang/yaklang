@@ -58,6 +58,24 @@ Review these to avoid repeating searches with identical parameters. Each entry s
 <|DISPATCHED_FUZZ_TASKS_END_{{ .Nonce }}|>
 {{ end }}
 
+{{ if .SavedQueries }}
+### Saved Query Results
+
+You can reference these by name in match_flows_simple or match_flows using "flow_source" parameter.
+
+<|SAVED_QUERIES_{{ .Nonce }}|>
+{{ .SavedQueries }}
+<|SAVED_QUERIES_END_{{ .Nonce }}|>
+{{ end }}
+
+{{ if .SavedMatches }}
+### Saved Match Results
+
+<|SAVED_MATCHES_{{ .Nonce }}|>
+{{ .SavedMatches }}
+<|SAVED_MATCHES_END_{{ .Nonce }}|>
+{{ end }}
+
 {{ if .FeedbackMessages }}
 ### Feedback Messages
 

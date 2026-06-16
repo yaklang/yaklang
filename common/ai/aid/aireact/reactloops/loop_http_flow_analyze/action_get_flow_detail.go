@@ -40,7 +40,18 @@ var getHTTPFlowDetailAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActL
 			locatorDesc := buildLocatorDesc(action)
 			log.Infof("[get_http_flow_detail] loading flow: %s", locatorDesc)
 
-			reactloops.EmitActionLog(loop, "加载流详情中 / Loading Flow Detail...")
+			// 输出简洁的累积流（2行）
+			// 如果有 human_readable_thought，融入到第一行
+			thought := action.GetString("human_readable_thought")
+			var line1 string
+			if thought != "" {
+				line1 = fmt.Sprintf("加载 %s | %s", locatorDesc, thought)
+			} else {
+				line1 = fmt.Sprintf("加载 %s", locatorDesc)
+			}
+			reactloops.EmitActionLog(loop, "http-flow-detail", line1)
+
+			reactloops.EmitStatus(loop, "加载流详情中 / Loading Flow Detail...")
 
 			var flow *schema.HTTPFlow
 			var err error
@@ -57,7 +68,7 @@ var getHTTPFlowDetailAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActL
 			}
 
 			if err != nil || flow == nil {
-				reactloops.EmitActionLog(loop, "加载失败：未找到流 / Load Failed: Flow Not Found")
+				reactloops.EmitStatus(loop, "加载失败：未找到流 / Load Failed: Flow Not Found")
 				invoker.AddToTimeline("get_http_flow_detail", fmt.Sprintf("Failed to load HTTP flow: %v", err))
 				log.Errorf("[get_http_flow_detail] failed to load (%s): %v", locatorDesc, err)
 				recordAction(loop, "get_http_flow_detail", locatorDesc, "failed: flow not found", "")
@@ -65,7 +76,7 @@ var getHTTPFlowDetailAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActL
 				return
 			}
 
-			reactloops.EmitActionLog(loop, "加载完成 / Load Complete")
+			reactloops.EmitStatus(loop, "加载完成 / Load Complete")
 
 			req := flowRequest(flow)
 			rsp := flowResponse(flow)
@@ -95,16 +106,6 @@ var getHTTPFlowDetailAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActL
 			invoker.AddToTimeline("get_http_flow_detail", summary)
 			loop.Set("current_flow", summary)
 
-			// 输出简洁的累积流（2行）
-			// 如果有 human_readable_thought，融入到第一行
-			thought := action.GetString("human_readable_thought")
-			var line1 string
-			if thought != "" {
-				line1 = fmt.Sprintf("加载 %s | %s", locatorDesc, thought)
-			} else {
-				line1 = fmt.Sprintf("加载 %s", locatorDesc)
-			}
-
 			reqSize := len(req)
 			rspSize := len(rsp)
 			tagsStr := ""
@@ -120,7 +121,7 @@ var getHTTPFlowDetailAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActL
 				humanizeSize(rspSize),
 				tagsStr)
 
-			reactloops.EmitActionLog(loop, "http-flow-detail", line1, line2)
+			reactloops.EmitActionLog(loop, "http-flow-detail", line2, summary)
 
 			flowBrief := fmt.Sprintf("#%d %s %d %s", flow.ID, flow.Method, flow.StatusCode, utils.ShrinkString(flow.Url, 80))
 			log.Infof("[get_http_flow_detail] loaded: %s (req=%d bytes, rsp=%d bytes, tags=%s, source=%s)",

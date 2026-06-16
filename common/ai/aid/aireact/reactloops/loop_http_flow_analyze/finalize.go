@@ -156,7 +156,7 @@ User's original query: {{ .UserQuery }}
 
 	log.Infof("http_flow_analyze finalize: generating forced AI answer, prompt length: %d", len(summaryPrompt))
 
-	reactloops.EmitActionLog(loop, "生成分析报告 / Generating Report...")
+	reactloops.EmitStatus(loop, "生成分析报告 / Generating Report...")
 
 	taskID := ""
 	if task := loop.GetCurrentTask(); task != nil {
