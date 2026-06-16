@@ -860,7 +860,7 @@ func WithSave(b bool) PocConfigOption {
 // Example:
 // ```
 //
-//	poc.Get("https://exmaple.com", poc.save(func(resp){
+//	poc.Get("https://exmaple.com", poc.saveHandler(func(resp){
 //		resp.Tags = append(resp.Tags,"test")
 //	})) // 向 example.com 发起请求，添加test tag
 //
