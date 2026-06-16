@@ -19,6 +19,9 @@ const (
 	// Match 结果映射
 	matchResultsMapKey = "match_results_map" // map[string]*MatchResult
 	lastMatchNameKey   = "last_match_name"   // string
+
+	// Attached HTTP Flow id
+	attachedHTTPFlowIDsKey = "attached_http_flow_ids" // []int64
 )
 
 // QueryResult 存储查询结果
