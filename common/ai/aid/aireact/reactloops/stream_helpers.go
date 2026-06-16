@@ -18,7 +18,7 @@ func EmitStatus(loop *ReActLoop, message string) {
 // emitProgress 发送进度状态（带百分比和计数）
 // actionZh: 中文动作描述，如 "匹配进度"
 // actionEn: 英文动作描述，如 "Matching"
-func emitProgress(loop *ReActLoop, current, total int, actionZh, actionEn string) {
+func EmitProgress(loop *ReActLoop, current, total int, actionZh, actionEn string) {
 	if loop == nil || total <= 0 {
 		return
 	}

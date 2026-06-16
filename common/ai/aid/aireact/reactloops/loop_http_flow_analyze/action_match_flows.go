@@ -205,7 +205,7 @@ var filterAndMatchHTTPFlowsAction = func(r aicommon.AIInvokeRuntime) reactloops.
 				for idx, flow := range flows {
 					// 更新进度
 					if len(flows) > 10 && idx%(len(flows)/10) == 0 && idx > 0 {
-						reactloops.emitProgress(loop, idx, len(flows), "匹配进度", "Matching")
+						reactloops.EmitProgress(loop, idx, len(flows), "匹配进度", "Matching")
 					}
 
 					matched, err := executeMatchers(
@@ -257,9 +257,9 @@ var filterAndMatchHTTPFlowsAction = func(r aicommon.AIInvokeRuntime) reactloops.
 			}
 
 			if len(localMatchers) > 0 {
-				line2 = fmt.Sprintf("查询流量共 %d条 -> 匹配%d条 -> %s", total, matchedCount, filepath.Base(filename))
+				line2 = fmt.Sprintf("查询流量 %d条 -> 匹配%d条 -> %s", total, matchedCount, filepath.Base(filename))
 			} else {
-				line2 = fmt.Sprintf("查询流量共 %d条 -> %s", total, filepath.Base(filename))
+				line2 = fmt.Sprintf("查询流量 %d条 -> %s", total, filepath.Base(filename))
 			}
 			reactloops.EmitActionLog(loop, "http-flow-query", line2)
 			// 输出2行累积流
