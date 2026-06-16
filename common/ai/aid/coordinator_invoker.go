@@ -47,13 +47,35 @@ func (c *Coordinator) ExecuteLoopTask(taskTypeName string, task aicommon.AIState
 		aicommon.WithEnablePlanAndExec(false),
 		aicommon.WithHotPatchOptionChan(hotpatchChan),
 	)
-	if taskEmitter := task.GetEmitter(); taskEmitter != nil {
+	taskEmitter := task.GetEmitter()
+	if taskEmitter == nil && c.Config != nil && c.Config.GetEmitter() != nil {
+		taskEmitter = c.Config.GetEmitter().PushEventProcesser(func(e *schema.AiOutputEvent) *schema.AiOutputEvent {
+			if e != nil {
+				e.TaskUUID = task.GetUUID()
+				e.TaskId = task.GetId()
+			}
+			return e
+		})
+		task.SetEmitter(taskEmitter)
+	}
+	if taskEmitter != nil {
 		baseOpts = append(baseOpts, aicommon.WithEmitter(taskEmitter))
 	}
 
 	invoker, err := aicommon.AIRuntimeInvokerGetter(c.GetContext(), baseOpts...)
 	if err != nil {
 		return fmt.Errorf("创建 AI 调用运行时失败: %v", err)
+	}
+	invoker.SetCurrentTask(task)
+	if cfg := invoker.GetConfig(); cfg != nil {
+		if typedCfg, ok := cfg.(*aicommon.Config); ok {
+			typedCfg.SetHotpatchCurrentTaskIdResolver(func() string {
+				if current := invoker.GetCurrentTask(); current != nil {
+					return current.GetId()
+				}
+				return ""
+			})
+		}
 	}
 
 	defaultOptions := reactloops.BasicAICommonConfigOption(c.Config)
@@ -129,7 +151,6 @@ func (c *Coordinator) ExecuteLoopTask(taskTypeName string, task aicommon.AIState
 	mainloop.RemoveAction(schema.AI_REACT_LOOP_ACTION_REQUEST_PLAN_EXECUTION)
 	mainloop.RemoveAction(schema.AI_REACT_LOOP_ACTION_REQUIRE_AI_BLUEPRINT)
 	task.SetAsyncMode(false)
-	invoker.SetCurrentTask(task)
 	err = mainloop.ExecuteWithExistedTask(task)
 	if err != nil {
 		return err

@@ -36,6 +36,10 @@ type AiTask struct {
 	*Coordinator
 
 	*aicommon.AIStatefulTaskBase
+	// TaskId is a stable logical identifier for this plan task.
+	// It is generated when the plan tree is created and persists across index regeneration.
+	// NOTE: This is different from Index (hierarchical position like "1-2-3").
+	TaskId             string    `json:"task_id"`
 	Index              string    `json:"index"`
 	Name               string    `json:"name"`
 	Goal               string    `json:"goal"`
@@ -354,6 +358,7 @@ func (t *AiTask) MarshalJSON() ([]byte, error) {
 func (t *AiTask) UnmarshalJSON(data []byte) error {
 	// 创建一个临时结构体，不包含AICallback
 	aux := struct {
+		TaskId   string    `json:"task_id,omitempty"`
 		Index    string    `json:"index"`
 		Name     string    `json:"name"`
 		Goal     string    `json:"goal"`
@@ -364,15 +369,17 @@ func (t *AiTask) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
+	t.TaskId = strings.TrimSpace(aux.TaskId)
 	t.Index = aux.Index
 	t.Name = aux.Name
 	t.Goal = aux.Goal
 	t.Subtasks = aux.Subtasks
-	t.AIStatefulTaskBase = aicommon.NewStatefulTaskBase(
-		fmt.Sprintf("pe-task-%s", t.Index),
-		aux.Goal,
-		t.Ctx,
-		nil)
+	if t.TaskId == "" {
+		// Backward compatibility for older persisted trees without task_id.
+		// Will be re-stabilized by Coordinator.ensureTaskTreeInitialized().
+		t.TaskId = fmt.Sprintf("pe-task-%s", t.Index)
+	}
+	t.AIStatefulTaskBase = aicommon.NewStatefulTaskBase(t.TaskId, aux.Goal, t.Ctx, nil)
 	return nil
 }
 
@@ -408,7 +415,6 @@ func _assignHierarchicalIndicesRecursive(currentTask *AiTask, currentIndex strin
 		return
 	}
 	currentTask.Index = currentIndex
-	currentTask.SetID(currentIndex)
 
 	for i, subTask := range currentTask.Subtasks {
 		// 子任务的索引是父任务索引加上自己的序号 (1-based)

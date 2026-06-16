@@ -549,6 +549,7 @@ func NewStatefulTaskBase(
 		base.Emitter = base.Emitter.PushEventProcesser(func(event *schema.AiOutputEvent) *schema.AiOutputEvent {
 			if event != nil {
 				event.TaskUUID = base.GetUUID()
+				event.TaskId = base.GetId()
 			}
 			return event
 		})

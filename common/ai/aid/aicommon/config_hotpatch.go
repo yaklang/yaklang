@@ -3,6 +3,7 @@ package aicommon
 import (
 	"context"
 	"strings"
+	"sync"
 
 	"github.com/yaklang/yaklang/common/consts"
 
@@ -179,14 +180,14 @@ func (c *Config) ProcessHotPatchMessage(e *ypb.AIInputEvent) []ConfigOption {
 		incoming := ParseEnabledCapabilitiesFromProto(hotPatchParams)
 		if len(incoming) > 0 {
 			merged := append(c.GetEnabledCapabilities(), incoming...)
-			aiOption = append(aiOption, WithEnabledCapabilities(merged...))
+			aiOption = append(aiOption, wrapHotpatchOptionForTask(e.GetTaskId(), WithEnabledCapabilities(merged...)))
 		}
 	}
 
 	if e.HotpatchType == HotPatchType_DisabledCapabilities {
 		incoming := ParseEnabledCapabilitiesFromProto(hotPatchParams)
 		if len(incoming) > 0 {
-			aiOption = append(aiOption, WithDisabledCapabilities(incoming...))
+			aiOption = append(aiOption, wrapHotpatchOptionForTask(e.GetTaskId(), WithDisabledCapabilities(incoming...)))
 		}
 	}
 
@@ -285,8 +286,75 @@ func mergeHotpatchSessionStartParams(base *ypb.AIStartParams, e *ypb.AIInputEven
 	return next, true
 }
 
+func (c *Config) SetHotpatchCurrentTaskIdResolver(resolver func() string) {
+	if c == nil {
+		return
+	}
+	if c.m == nil {
+		c.m = new(sync.Mutex)
+	}
+	c.m.Lock()
+	defer c.m.Unlock()
+	c.hotpatchCurrentTaskIdResolver = resolver
+}
+
+func (c *Config) resolveHotpatchCurrentTaskId() string {
+	if c == nil {
+		return ""
+	}
+	c.m.Lock()
+	resolver := c.hotpatchCurrentTaskIdResolver
+	c.m.Unlock()
+	if resolver == nil {
+		return ""
+	}
+	return strings.TrimSpace(resolver())
+}
+
+func isTaskScopedCapabilityHotpatch(e *ypb.AIInputEvent) bool {
+	if e == nil {
+		return false
+	}
+	if strings.TrimSpace(e.GetTaskId()) == "" {
+		return false
+	}
+	switch strings.TrimSpace(e.GetHotpatchType()) {
+	case HotPatchType_EnabledCapabilities, HotPatchType_DisabledCapabilities:
+		return true
+	default:
+		return false
+	}
+}
+
+func wrapHotpatchOptionForTask(targetTaskId string, opt ConfigOption) ConfigOption {
+	targetTaskId = strings.TrimSpace(targetTaskId)
+	if opt == nil {
+		return func(*Config) error { return nil }
+	}
+	if targetTaskId == "" {
+		return opt
+	}
+	return func(c *Config) error {
+		if c == nil {
+			return nil
+		}
+		currentTaskId := c.resolveHotpatchCurrentTaskId()
+		if currentTaskId != targetTaskId {
+			if c.DebugEvent {
+				log.Infof("skip hotpatch for task %q on config %s (current task: %q)",
+					targetTaskId, c.Id, currentTaskId)
+			}
+			return nil
+		}
+		return opt(c)
+	}
+}
+
 func (c *Config) PersistSessionStartParamsFromHotpatch(e *ypb.AIInputEvent) {
 	if c == nil || e == nil || !e.IsConfigHotpatch {
+		return
+	}
+	if isTaskScopedCapabilityHotpatch(e) {
 		return
 	}
 	sessionID := strings.TrimSpace(c.PersistentSessionId)

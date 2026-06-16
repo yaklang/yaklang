@@ -656,6 +656,10 @@ func BuildReActInvoker(ctx context.Context, options ...aicommon.ConfigOption) (a
 	}
 	invoker.promptManager = NewPromptManager(invoker, workdir)
 
+	cfg.SetHotpatchCurrentTaskIdResolver(func() string {
+		return invoker.GetCurrentTaskId()
+	})
+
 	// Register pending context providers
 	invoker.promptManager.cpm = cfg.ContextProviderManager
 

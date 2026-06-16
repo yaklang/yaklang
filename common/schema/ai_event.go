@@ -284,6 +284,9 @@ type AiOutputEvent struct {
 	// task index
 	TaskIndex string `gorm:"index"`
 
+	// task id (AIStatefulTask.GetId)
+	TaskId string `gorm:"index"`
+
 	// task uuid
 	TaskUUID string `gorm:"index"`
 	// disable markdown render
@@ -572,6 +575,7 @@ func (e *AiOutputEvent) ToGRPC() *ypb.AIOutputEvent {
 		Content:            e.Content,
 		Timestamp:          e.Timestamp,
 		TaskIndex:          e.TaskIndex,
+		TaskId:             e.TaskId,
 		DisableMarkdown:    e.DisableMarkdown,
 		SyncID:             e.SyncID,
 		EventUUID:          e.EventUUID,
