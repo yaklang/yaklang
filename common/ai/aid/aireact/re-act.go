@@ -294,6 +294,48 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 		return react.GetCurrentTaskId()
 	})
 
+	cfg.SetCapabilityHotpatchHandler(func(enable bool, caps []aicommon.EnabledCapability) {
+		loop := react.GetCurrentLoop()
+		if loop == nil {
+			return
+		}
+		ecm := loop.GetExtraCapabilities()
+		if ecm == nil {
+			return
+		}
+		toolMgr := react.config.GetAiToolManager()
+
+		for _, cap := range caps {
+			switch cap.Type {
+			case aicommon.EnabledCapabilityTypeTool, aicommon.EnabledCapabilityTypePlugin, aicommon.EnabledCapabilityTypeMCPTool:
+				if toolMgr == nil {
+					continue
+				}
+				// Hotpatch affects prompt-level suggestions only: resolve tool object from current manager snapshot.
+				if enable {
+					if tool, err := toolMgr.GetToolByName(cap.Name); err == nil && tool != nil {
+						ecm.AddTools(tool)
+					}
+				} else {
+					ecm.RemoveToolByName(cap.Name)
+				}
+			case aicommon.EnabledCapabilityTypeForge:
+				if enable {
+					reactloops.LoadEnabledForges(react.config, loop, []string{cap.Name})
+				} else {
+					ecm.RemoveForgeByName(cap.Name)
+				}
+			case aicommon.EnabledCapabilityTypeSkill:
+				// Hotpatch skill is inventory-only. We do NOT load/unload SKILLS_CONTEXT here.
+				if enable {
+					ecm.AddSkills(reactloops.ExtraSkillInfo{Name: cap.Name})
+				} else {
+					ecm.RemoveSkillByName(cap.Name)
+				}
+			}
+		}
+	})
+
 	cfg.SetSkillHotloadHandler(func(skillNames []string) {
 		if len(skillNames) == 0 {
 			return
@@ -351,6 +393,7 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 
 	cfg.SetCapabilityInventoryEmitHandler(func() {
 		reactloops.EmitCapabilityInventorySnapshot(react.config, react.GetCurrentLoop())
+		reactloops.EmitCapabilityInventoryItemsSnapshot(react.config, react.GetCurrentLoop())
 	})
 
 	// Register pending context providers

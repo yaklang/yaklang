@@ -179,15 +179,14 @@ func (c *Config) ProcessHotPatchMessage(e *ypb.AIInputEvent) []ConfigOption {
 	if e.HotpatchType == HotPatchType_EnabledCapabilities {
 		incoming := ParseEnabledCapabilitiesFromProto(hotPatchParams)
 		if len(incoming) > 0 {
-			merged := append(c.GetEnabledCapabilities(), incoming...)
-			aiOption = append(aiOption, wrapHotpatchOptionForTask(e.GetTaskId(), WithEnabledCapabilities(merged...)))
+			aiOption = append(aiOption, wrapHotpatchOptionForTask(e.GetTaskId(), WithHotpatchEnabledCapabilities(incoming...)))
 		}
 	}
 
 	if e.HotpatchType == HotPatchType_DisabledCapabilities {
 		incoming := ParseEnabledCapabilitiesFromProto(hotPatchParams)
 		if len(incoming) > 0 {
-			aiOption = append(aiOption, wrapHotpatchOptionForTask(e.GetTaskId(), WithDisabledCapabilities(incoming...)))
+			aiOption = append(aiOption, wrapHotpatchOptionForTask(e.GetTaskId(), WithHotpatchDisabledCapabilities(incoming...)))
 		}
 	}
 
