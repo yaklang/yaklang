@@ -117,72 +117,6 @@ func TestAttachedHTTPFlowIDsFromResourceJSON(t *testing.T) {
 	require.Contains(t, err.Error(), "invalid http flow id string")
 }
 
-func TestFormatAttachedHTTPFlowListSpillToFile(t *testing.T) {
-	var sections []string
-	for i := 0; i < 8; i++ {
-		flow := &schema.HTTPFlow{
-			Url:        fmt.Sprintf("https://example.com/%d", i),
-			Method:     "GET",
-			StatusCode: 200,
-		}
-		flow.ID = uint(i + 1)
-		flow.SetRequest(strings.Repeat("R", AttachedHTTPFlowRequestInlineLimit))
-		flow.SetResponse(strings.Repeat("S", AttachedHTTPFlowResponseInlineLimit))
-		sections = append(sections, FormatAttachedHTTPFlow(flow, nil))
-	}
-
-	full := strings.Join(sections, "\n\n---\n\n")
-	require.Greater(t, len(full), AttachedHTTPFlowListInlineLimit)
-
-	inline, note := inlineOrSpillAttachedText("attached_http_flow_list", full, AttachedHTTPFlowListInlineLimit, nil)
-	require.Contains(t, note, "attached_http_flow_list length")
-	require.Contains(t, note, "full content saved to file")
-	require.Len(t, inline, AttachedHTTPFlowListInlineLimit)
-}
-
-func TestFormatAttachedHTTPFlowInline(t *testing.T) {
-	flow := &schema.HTTPFlow{
-		Url:        "https://example.com/api",
-		Method:     "GET",
-		StatusCode: 200,
-		SourceType: schema.HTTPFlow_SourceType_MITM,
-		Tags:       "test|demo",
-	}
-	flow.ID = 42
-	flow.SetRequest("GET /api HTTP/1.1\r\nHost: example.com\r\n\r\n")
-	flow.SetResponse("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\nok")
-
-	out := FormatAttachedHTTPFlow(flow, nil)
-	require.Contains(t, out, "HTTP Flow #42")
-	require.Contains(t, out, "Method: GET")
-	require.Contains(t, out, "StatusCode: 200")
-	require.Contains(t, out, "Tags: test|demo")
-	require.Contains(t, out, "GET /api HTTP/1.1")
-	require.Contains(t, out, "HTTP/1.1 200 OK")
-	require.NotContains(t, out, "exceeds inline limit")
-}
-
-func TestFormatAttachedHTTPFlowSpillToFile(t *testing.T) {
-	largeReq := strings.Repeat("R", AttachedHTTPFlowRequestInlineLimit+128)
-	largeRsp := strings.Repeat("S", AttachedHTTPFlowResponseInlineLimit+256)
-
-	flow := &schema.HTTPFlow{
-		Url:        "https://example.com/large",
-		Method:     "POST",
-		StatusCode: 500,
-	}
-	flow.ID = 99
-	flow.SetRequest(largeReq)
-	flow.SetResponse(largeRsp)
-
-	out := FormatAttachedHTTPFlow(flow, nil)
-	require.Contains(t, out, "request length")
-	require.Contains(t, out, "response length")
-	require.Contains(t, out, "full content saved to file")
-	require.Contains(t, out, strings.Repeat("R", 64))
-	require.Contains(t, out, strings.Repeat("S", 64))
-}
-
 func TestFormatAttachedSelectedTextInlineAndSpill(t *testing.T) {
 	inline := FormatAttachedSelectedText("hello selection", nil)
 	require.Contains(t, inline, "hello selection")
@@ -262,13 +196,13 @@ func TestAttachedHTTPFlowResourceDataFromDB(t *testing.T) {
 	missingResource := &AttachedHTTPFlowResourceData{}
 	err = missingResource.Unmarshal(`{"ids":[999999999]}`)
 	require.NoError(t, err)
-	require.Contains(t, missingResource.render(db, nil), "Load Errors")
+	require.Contains(t, missingResource.renderSummary(db), "Load Errors")
 
 	resource, err := ParseAttachedResourceData(NewAttachedResource(AttachedResourceTypeHTTPFlowID, AttachedResourceKeyID, fmt.Sprintf(`{"ids":[%d]}`, flow.ID)))
 	require.NoError(t, err)
-	rendered := resource.(*AttachedHTTPFlowResourceData).render(db, nil)
+	rendered := resource.(*AttachedHTTPFlowResourceData).renderSummary(db)
 	require.Contains(t, rendered, token)
-	require.Contains(t, rendered, fmt.Sprintf("HTTP Flow #%d", flow.ID))
+	require.Contains(t, rendered, fmt.Sprintf("ID %d", flow.ID))
 	require.Contains(t, rendered, "Requested IDs:")
 }
 
