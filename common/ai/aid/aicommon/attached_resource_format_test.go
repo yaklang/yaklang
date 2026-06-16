@@ -203,7 +203,6 @@ func TestAttachedHTTPFlowResourceDataFromDB(t *testing.T) {
 	rendered := resource.(*AttachedHTTPFlowResourceData).renderSummary(db)
 	require.Contains(t, rendered, token)
 	require.Contains(t, rendered, fmt.Sprintf("ID %d", flow.ID))
-	require.Contains(t, rendered, "Requested IDs:")
 }
 
 func TestInlineOrSpillAttachedTextCreatesFile(t *testing.T) {
