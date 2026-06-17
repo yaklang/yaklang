@@ -34,7 +34,7 @@ func (y *builder) VisitReturnStatement(raw phpparser.IReturnStatementContext) in
 	if i == nil {
 		return nil
 	}
-	if y.GetProgram().CurrentIncludingStack.Len() > 0 {
+	if y.GetProgram().CurrentIncludingStack != nil && y.GetProgram().CurrentIncludingStack.Len() > 0 {
 		log.Info("include stack length > 0,no emit return")
 		return nil
 	}

@@ -57,6 +57,9 @@ func NewUndefined(name string) *Undefined {
 }
 
 func NewBinOp(op BinaryOpcode, x, y Value) *BinOp {
+	if x == nil || y == nil {
+		return nil
+	}
 	b := &BinOp{
 		anValue: NewValue(),
 		Op:      op,
@@ -107,6 +110,9 @@ func NewReturn(vs Values) *Return {
 }
 
 func NewTypeCast(typ Type, v Value) *TypeCast {
+	if v == nil {
+		return nil
+	}
 	t := &TypeCast{
 		anValue: NewValue(),
 		Value:   v.GetId(),

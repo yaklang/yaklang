@@ -129,7 +129,7 @@ func (s *SSABuilder) BuildFromAST(raw ssa.FrontAST, b *ssa.FunctionBuilder) erro
 	b.WithExternValue(phpBuildIn)
 	startParse := func(functionBuilder *ssa.FunctionBuilder) { startParsePHPDocument(functionBuilder, b, ast) }
 	mainApp := b.GetProgram().GetApplication()
-	if mainApp.CurrentIncludingStack.Len() <= 0 {
+	if mainApp.CurrentIncludingStack == nil || mainApp.CurrentIncludingStack.Len() <= 0 {
 		childProgram := b.GetProgram().GetSubProgram(b.GetEditor().GetPureSourceHash())
 		functionBuilder := childProgram.GetAndCreateFunctionBuilder("", string(ssa.MainFunctionName))
 		if b.PreHandler() {

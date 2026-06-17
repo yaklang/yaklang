@@ -48,7 +48,9 @@ func DeleteInst(i Instruction) {
 	}
 	if user, ok := ToUser(i); ok {
 		for _, value := range user.GetValues() {
-			value.RemoveUser(user)
+			if value != nil && !isValueNil(value) {
+				value.RemoveUser(user)
+			}
 		}
 	}
 	i.GetProgram().DeleteInstruction(i)
@@ -211,6 +213,7 @@ func (f *FunctionBuilder) emitAroundInstruction(i, other Instruction, insert fun
 func (f *FunctionBuilder) emit(i Instruction) {
 	if utils.IsNil(i) {
 		log.Errorf("this block [%s] is finish, instruction[%s] can't insert!", f.CurrentBlock, i)
+		return
 	}
 	f.emitEx(i, f.EmitOnly)
 }
@@ -259,6 +262,9 @@ func (f *FunctionBuilder) EmitUnOp(op UnaryOpcode, v Value) Value {
 
 func (f *FunctionBuilder) EmitBinOp(op BinaryOpcode, x, y Value) Value {
 	if f.CurrentBlock.finish {
+		return nil
+	}
+	if x == nil || y == nil {
 		return nil
 	}
 	binOp := NewBinOp(op, x, y)
@@ -497,10 +503,13 @@ func (f *FunctionBuilder) emitConstInst(i any, isPlaceholder bool) *ConstInst {
 }
 
 func (f *FunctionBuilder) EmitTypeCast(v Value, typ Type) *TypeCast {
-	if f.CurrentBlock.finish {
+	if f.CurrentBlock.finish || v == nil {
 		return nil
 	}
 	t := NewTypeCast(typ, v)
+	if t == nil {
+		return nil
+	}
 	f.emit(t)
 	return t
 }

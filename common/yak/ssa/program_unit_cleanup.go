@@ -214,8 +214,8 @@ func (prog *Program) AggressiveClearMemory() int64 {
 	prog.UpStream = omap.NewEmptyOrderedMap[string, *Program]()
 	prog.DownStream = make(map[string]*Program)
 
-	// ULTIMATE NUCLEAR: Clear ALL Functions
-	prog.Funcs = omap.NewEmptyOrderedMap[string, *Function]()
+	// Note: Do NOT clear Funcs here - lazy builders need access to functions
+	// defined in earlier batches. Only clear constants and exports.
 
 	// Also clear constants - these accumulate heavily!
 	prog.Consts = make(map[string]Value)
@@ -225,8 +225,7 @@ func (prog *Program) AggressiveClearMemory() int64 {
 	// NEW: Clear lazy builder state - these hold scopes/variables/values
 	prog.lazyBuildersByUnit = make(map[string][]*LazyBuilder)
 	prog.lazyBuilderUnitSet = make(map[string]map[*LazyBuilder]struct{})
-	prog.deferredBuildSeq = nil
-	prog.deferredBuildByID = make(map[string]*deferredBuildTask)
+	prog.deferredBuilds = omap.NewEmptyOrderedMap[string, *deferredBuildTask]()
 
 	// NEW: Clear editor stack - holds file content
 	prog.editorStack = omap.NewEmptyOrderedMap[string, *memedit.MemEditor]()
@@ -241,10 +240,8 @@ func (prog *Program) AggressiveClearMemory() int64 {
 	prog.FileList = make(map[string]string)
 	prog.LibraryFile = make(map[string][]string)
 
-	// Clear CurrentIncludingStack
-	if prog.CurrentIncludingStack != nil {
-		prog.CurrentIncludingStack = nil
-	}
+	// Note: Do NOT clear CurrentIncludingStack here - it's needed by lazy builders
+	// that may run after this cleanup
 
 	// Force GC multiple times to ensure everything is collected
 	runtime.GC()

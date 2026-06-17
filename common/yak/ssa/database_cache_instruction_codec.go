@@ -134,10 +134,12 @@ func instruction2IrCode(inst Instruction, ir *ssadb.IrCode) {
 	}
 
 	if codeRange == nil {
-		if ret := inst.GetFunc().GetRange(); ret != nil {
-			log.Debugf("Fallback, the %v is not set range, use its function instance' ", inst.GetName())
-			inst.SetRange(ret)
-			codeRange = ret
+		if fn := inst.GetFunc(); fn != nil {
+			if ret := fn.GetRange(); ret != nil {
+				log.Debugf("Fallback, the %v is not set range, use its function instance' ", inst.GetName())
+				inst.SetRange(ret)
+				codeRange = ret
+			}
 		}
 	}
 

@@ -15,7 +15,7 @@ func (y *builder) VisitPhpBlock(raw phpparser.IPhpBlockContext) interface{} {
 	if i == nil {
 		return nil
 	}
-	if y.GetProgram().CurrentIncludingStack.Len() <= 0 {
+	if y.GetProgram().CurrentIncludingStack == nil || y.GetProgram().CurrentIncludingStack.Len() <= 0 {
 		if !y.PreHandler() {
 			for _, context := range i.AllNamespaceDeclaration() {
 				y.VisitNamespaceOnlyUse(context)

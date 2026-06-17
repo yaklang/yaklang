@@ -192,7 +192,14 @@ func (prog *Program) RunDeferredBuildsForUnits(unitKeys []string, afterEach func
 		if _, match := units[task.unitKey]; !match {
 			continue
 		}
+		// 执行 task 期间恢复其所属编译单元上下文，task 内通过 CurrentCompileUnit()
+		// 取到的 unitKey 与注册时一致；执行完恢复原值。
+		previousUnit := app.currentCompileUnit
+		if task.unitKey != "" {
+			app.currentCompileUnit = task.unitKey
+		}
 		task.Build()
+		app.currentCompileUnit = previousUnit
 		task.release()
 		app.deferredBuilds.Delete(id)
 		completed++
