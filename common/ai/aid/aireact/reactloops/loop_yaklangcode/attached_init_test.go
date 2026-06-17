@@ -14,6 +14,24 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loopinfra"
 )
 
+func TestClearYaklangLoopFileState(t *testing.T) {
+	runtime := mock.NewMockInvoker(context.Background())
+	loop, err := reactloops.NewReActLoop("test", runtime)
+	require.NoError(t, err)
+
+	loop.Set("full_code", "println(1)")
+	loop.Set("editor_file_path", "/tmp/foo.yak")
+	loop.Set("filename", "/tmp/staging.yak")
+	loop.Set(loopinfra.LoopVarCodeLineBase, 27)
+
+	clearYaklangLoopFileState(loop)
+
+	assert.Empty(t, loop.Get("full_code"))
+	assert.Empty(t, loop.Get("editor_file_path"))
+	assert.Empty(t, loop.Get("filename"))
+	assert.Equal(t, 0, loop.GetInt(loopinfra.LoopVarCodeLineBase))
+}
+
 func TestSeedYaklangLoopFullCode_PrefersDiskInEditMode(t *testing.T) {
 	dir := t.TempDir()
 	yakPath := filepath.Join(dir, "demo.yak")

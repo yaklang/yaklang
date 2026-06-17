@@ -26,6 +26,8 @@ func initYaklangEditorContextFromAttached(
 	}
 	if ctx.HasEditorFile() {
 		loop.Set("editor_file_path", ctx.EditorFile)
+	} else {
+		loop.Set("editor_file_path", "")
 	}
 
 	payload := aicommon.FormatYaklangEditorContextMarkdown(ctx)
@@ -52,6 +54,7 @@ func finalizeYaklangInitFileTarget(
 ) {
 	_ = emitter
 	if !hasYaklangEditorDeliveryTarget(loop) {
+		clearYaklangLoopFileState(loop)
 		seedYaklangLoopFullCode(loop, editorCtx, "")
 		log.Infof("create mode: no editor target file; delivery path deferred until loop flush")
 		operator.Continue()
@@ -60,6 +63,7 @@ func finalizeYaklangInitFileTarget(
 
 	targetPath, fromAttached := aicommon.ResolveYaklangInitTargetPath(editorCtx, liteforgePath)
 	if targetPath == "" {
+		clearYaklangLoopFileState(loop)
 		seedYaklangLoopFullCode(loop, editorCtx, "")
 		log.Infof("create mode: no resolvable target path; delivery deferred until loop flush")
 		operator.Continue()
@@ -78,6 +82,17 @@ func finalizeYaklangInitFileTarget(
 
 	ensureYaklangLoopStagingFilename(loop, r)
 	operator.Continue()
+}
+
+func clearYaklangLoopFileState(loop *reactloops.ReActLoop) {
+	if loop == nil {
+		return
+	}
+	loop.Set("full_code", "")
+	loop.Set("editor_file_path", "")
+	loop.Set("filename", "")
+	loop.Set(loopinfra.LoopVarCodeLineBase, 0)
+	log.Infof("cleared yaklang loop file state (full_code, editor_file_path, filename, code_line_base)")
 }
 
 func seedYaklangLoopFullCode(loop *reactloops.ReActLoop, editorCtx *aicommon.YaklangEditorContext, diskContent string) {

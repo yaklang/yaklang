@@ -144,16 +144,20 @@ func init() {
 					yakCode := loop.Get("full_code")
 					lineBase := loop.GetInt(loopinfra.LoopVarCodeLineBase)
 					codeWithLine := utils.PrefixLinesWithLineNumbersFrom(lineBase+1, yakCode)
+					editorFilePath := strings.TrimSpace(loop.Get("editor_file_path"))
+					hasCode := strings.TrimSpace(yakCode) != ""
 
 					feedbacks := feedbacker.String()
 					feedbacks = strings.TrimSpace(feedbacks)
 					renderMap := map[string]any{
-						"Code":                      yakCode,
-						"CurrentCodeWithLineNumber": codeWithLine,
-						"WorkspacePath":             loop.Get("workspace_path"),
-						"EditorFilePath":            loop.Get("editor_file_path"),
-						"Nonce":                     nonce,
-						"FeedbackMessages":          feedbacks,
+						"Code":                        yakCode,
+						"CurrentCodeWithLineNumber":   codeWithLine,
+						"WorkspacePath":               loop.Get("workspace_path"),
+						"EditorFilePath":              editorFilePath,
+						"EditorFilePathWithoutCode":   editorFilePath != "" && !hasCode,
+						"IsCreateMode":                editorFilePath == "",
+						"Nonce":                       nonce,
+						"FeedbackMessages":            feedbacks,
 					}
 					return utils.RenderTemplate(reactiveData, renderMap)
 				}),

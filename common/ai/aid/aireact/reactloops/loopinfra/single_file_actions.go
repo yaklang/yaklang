@@ -53,8 +53,9 @@ func (f *SingleFileModificationSuiteFactory) buildWriteAction() reactloops.ReAct
 			log.Infof("write_code: extracted code length=%d", len(code))
 			loop.Set(fullCodeVar, code)
 			if code == "" {
-				runtime.AddToTimeline("error", "No code generated in write_code action. The AI must use AI tags to wrap the code.")
-				operator.Fail("No code generated in 'write_code' action. Please use AI tags to wrap your code. Do NOT use markdown code blocks.")
+				failMsg := f.DiagnoseMissingWriteCode(loop)
+				runtime.AddToTimeline("error", failMsg)
+				operator.Fail(failMsg)
 				return
 			}
 			err := f.persistLoopFileContent(
