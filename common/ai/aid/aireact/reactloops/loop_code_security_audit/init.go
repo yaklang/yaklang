@@ -25,6 +25,10 @@ func init() {
 			if c, ok := cfg.(interface{ GetOrCreateWorkDir() string }); ok {
 				state.WorkDir = c.GetOrCreateWorkDir()
 				log.Infof("[CodeAudit] workdir=%s", state.WorkDir)
+				if loaded, ok := TryLoadAuditStateFromWorkDir(state.WorkDir); ok {
+					state = loaded
+					log.Infof("[CodeAudit] restored completed audit state from workdir (phase=%s)", state.GetPhase())
+				}
 			}
 
 			preset := []reactloops.ReActLoopOption{
@@ -118,8 +122,25 @@ func newSubTask(parent aicommon.AIStatefulTask, name string) aicommon.AIStateful
 // buildOrchestratorInitTask 编排四个子 Loop 的 initTask
 func buildOrchestratorInitTask(r aicommon.AIInvokeRuntime, state *AuditState) func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, op *reactloops.InitTaskOperator) {
 	return func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, op *reactloops.InitTaskOperator) {
-		log.Infof("[CodeAudit] Orchestrator started. workdir=%s", state.WorkDir)
+		log.Infof("[CodeAudit] Orchestrator started. workdir=%s phase=%s", state.WorkDir, state.GetPhase())
 		userInput := task.GetUserInput()
+
+		// 审计已完成：同一 session 内前端仍保持 code_security_audit 专注模式时，走追问子 loop。
+		if state.GetPhase() == AuditPhaseDone {
+			r.AddToTimeline("[AUDIT_FOLLOWUP]", "审计已完成，进入追问模式。用户输入: "+utils.ShrinkTextBlock(userInput, 300))
+			followLoop, err := buildFollowUpLoop(r, state)
+			if err != nil {
+				log.Errorf("[CodeAudit] Failed to build follow-up loop: %v", err)
+				op.Failed(err)
+				return
+			}
+			if err := followLoop.ExecuteWithExistedTask(task); err != nil {
+				log.Warnf("[CodeAudit] Follow-up loop returned error: %v", err)
+			}
+			op.Done()
+			return
+		}
+
 		r.AddToTimeline("[AUDIT_START]", "代码安全审计开始，用户输入: "+utils.ShrinkTextBlock(userInput, 300))
 
 		// 提前创建 audit 输出目录
@@ -312,6 +333,12 @@ func buildOrchestratorInitTask(r aicommon.AIInvokeRuntime, state *AuditState) fu
 		finalReport := state.GetFinalReport()
 		r.AddToTimeline("[AUDIT_DONE]", "代码安全审计全部完成。报告预览:\n"+utils.ShrinkTextBlock(finalReport, 200))
 		log.Infof("[CodeAudit] All phases complete. Report length: %d bytes", len(finalReport))
+
+		if err := state.PersistToAuditDir(auditDirPath); err != nil {
+			log.Warnf("[CodeAudit] Failed to persist audit state: %v", err)
+		} else {
+			log.Infof("[CodeAudit] Audit state persisted to %s", filepath.Join(auditDirPath, auditStateFileName))
+		}
 
 		op.Done()
 	}
