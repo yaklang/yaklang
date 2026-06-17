@@ -1,6 +1,7 @@
 package loop_http_flow_analyze
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"path/filepath"
@@ -16,6 +17,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/httptpl"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 var matchFlowsAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
@@ -115,7 +117,7 @@ For simple single-condition matching, use match_flows_simple instead.`,
 			return nil
 		},
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, operator *reactloops.LoopActionHandlerOperator) {
-			// === 1. 获取流量来源 ===
+			// === 1. 获取流量来源 (使用 fallback 逻辑) ===
 			nodeId := "http-flow-match"
 			reactloops.EmitStatus(loop, "准备匹配流量 / Preparing to Match Flows...")
 
@@ -125,55 +127,48 @@ For simple single-condition matching, use match_flows_simple instead.`,
 				return
 			}
 
-			var sourceFlows []*schema.HTTPFlow
-			var sourceQuery string
 			var sourceFlowIDs []int64
+			var sourceQuery string
 
 			flowSource := action.GetString("flow_source")
 			flowIDsStr := action.GetString("flow_ids")
 
+			// Fallback 逻辑: 参数输入 -> attached IDs -> 无条件全流量
 			if flowSource != "" {
+				// 尝试从查询结果获取
 				queryResult := getQueryResult(loop, flowSource)
-				if queryResult == nil {
-					operator.Fail(fmt.Sprintf("query result '%s' not found. Use query_http_flows first.", flowSource))
-					return
+				if queryResult != nil && len(queryResult.FlowIDs) > 0 {
+					sourceFlowIDs = queryResult.FlowIDs
+					sourceQuery = queryResult.Name
+				} else {
+					log.Warnf("query result '%s' not found or empty, falling back to attached flows", flowSource)
 				}
-				sourceFlowIDs = queryResult.FlowIDs
-				sourceQuery = queryResult.Name
 			} else if flowIDsStr != "" {
+				// 直接提供的 flow IDs
 				sourceFlowIDs = parseFlowIDs(flowIDsStr)
-				sourceQuery = "direct_ids"
-			} else {
-				queryResult := getQueryResult(loop, "last")
-				if queryResult == nil {
-					operator.Fail("no query result available. Please run query_http_flows first or specify flow_ids.")
-					return
+				if len(sourceFlowIDs) > 0 {
+					sourceQuery = "direct_ids"
 				}
-				sourceFlowIDs = queryResult.FlowIDs
-				sourceQuery = queryResult.Name
 			}
 
+			// Fallback to attached flows
 			if len(sourceFlowIDs) == 0 {
-				operator.Feedback(fmt.Sprintf("Source '%s' has no flows to match.", sourceQuery))
-				return
-			}
-
-			log.Infof("[match_flows] loading %d flows from source '%s'", len(sourceFlowIDs), sourceQuery)
-
-			// 加载流量
-			for _, id := range sourceFlowIDs {
-				flow, err := yakit.GetHTTPFlow(db, int64(id))
-				if err != nil {
-					log.Warnf("failed to load flow %d: %v", id, err)
-					continue
+				if attachedIDsRaw := loop.GetVariable(attachedHTTPFlowIDsKey); attachedIDsRaw != nil {
+					if attachedIDs, ok := attachedIDsRaw.([]int64); ok && len(attachedIDs) > 0 {
+						sourceFlowIDs = attachedIDs
+						sourceQuery = "attached"
+						log.Infof("[match_flows] using attached flow IDs: %d flows", len(sourceFlowIDs))
+					}
 				}
-				sourceFlows = append(sourceFlows, flow)
 			}
 
-			if len(sourceFlows) == 0 {
-				operator.Fail(fmt.Sprintf("failed to load any flows from source '%s'", sourceQuery))
-				return
+			// Fallback to all flows (empty IDs means no filter)
+			if len(sourceFlowIDs) == 0 {
+				sourceQuery = "all"
+				log.Infof("[match_flows] no flow IDs specified, matching all flows in database")
 			}
+
+			log.Infof("[match_flows] source: '%s', flow count: %d", sourceQuery, len(sourceFlowIDs))
 
 			// === 2. 解析 matchers ===
 			matchersJSON := action.GetString("matchers")
@@ -203,17 +198,18 @@ For simple single-condition matching, use match_flows_simple instead.`,
 			}
 			reactloops.EmitActionLog(loop, nodeId, line1)
 
-			// === 4. 执行匹配 ===
+			// === 4. 执行匹配（流式处理）===
 			reactloops.EmitStatus(loop, "匹配流量中 / Matching Flows...")
 
 			var matchedFlows []*schema.HTTPFlow
+			var totalCount int
 			var discardCount int
 			var builder strings.Builder
 
-			log.Infof("[match_flows] matching %d flows with %d matcher(s): %s", len(sourceFlows), len(matchers), matcherDesc)
+			log.Infof("[match_flows] matching flows from source '%s' with %d matcher(s): %s", sourceQuery, len(matchers), matcherDesc)
 
-			builder.WriteString(fmt.Sprintf("Matching %d flows from source '%s' with %d matcher(s) (condition=%s)\n",
-				len(sourceFlows), sourceQuery, len(matchers), matcherCondition))
+			builder.WriteString(fmt.Sprintf("Matching flows from source '%s' with %d matcher(s) (condition=%s)\n",
+				sourceQuery, len(matchers), matcherCondition))
 			builder.WriteString(fmt.Sprintf("Matchers: %s\n\n", matcherDesc))
 
 			// 转换为 YakMatcher
@@ -222,9 +218,17 @@ For simple single-condition matching, use match_flows_simple instead.`,
 				yakMatchers[i] = convertSimplifiedToYakMatcher(&m)
 			}
 
-			for idx, flow := range sourceFlows {
-				if len(sourceFlows) > 10 && idx%(len(sourceFlows)/10) == 0 && idx > 0 {
-					reactloops.EmitProgress(loop, idx, len(sourceFlows), "匹配进度", "Matching")
+			// 使用流式处理代替循环加载
+			ctx := context.Background()
+			filter := &ypb.QueryHTTPFlowRequest{}
+			if len(sourceFlowIDs) > 0 {
+				filter.IncludeId = sourceFlowIDs
+			}
+
+			for flow := range yakit.YieldHTTPFlowsByFilter(db, ctx, filter) {
+				totalCount++
+				if totalCount > 10 && totalCount%100 == 0 {
+					reactloops.EmitProgress(loop, totalCount, 0, "匹配进度", "Matching")
 				}
 
 				// 执行匹配逻辑
@@ -289,8 +293,8 @@ For simple single-condition matching, use match_flows_simple instead.`,
 				))
 			}
 
-			builder.WriteString(fmt.Sprintf("\nMatched %d flow(s); discarded %d.",
-				len(matchedFlows), discardCount))
+			builder.WriteString(fmt.Sprintf("\nMatched %d flow(s) from %d total; discarded %d.",
+				len(matchedFlows), totalCount, discardCount))
 
 			summary := builder.String()
 
@@ -337,19 +341,19 @@ For simple single-condition matching, use match_flows_simple instead.`,
 
 			// === 7. 构建并发送第2行累积流（结果摘要）===
 			line2 := fmt.Sprintf("完成: 匹配 %d/%d 条流量",
-				len(matchedFlows), len(sourceFlows))
+				len(matchedFlows), totalCount)
 			reactloops.EmitActionLog(loop, nodeId, line2, summary)
 
 			// === 8. 记录历史 ===
 			recordAction(loop,
 				"match_flows",
 				fmt.Sprintf("source=%s, %s", sourceQuery, matcherDesc),
-				fmt.Sprintf("matched %d/%d flows, saved as '%s'", len(matchedFlows), len(sourceFlows), matchName),
+				fmt.Sprintf("matched %d/%d flows, saved as '%s'", len(matchedFlows), totalCount, matchName),
 				matcherDesc)
 
 			// === 8. 返回结果 ===
 			feedbackMsg := fmt.Sprintf("Match '%s' completed: matched %d flows from source '%s' (%d total)\n\nFile: %s\n\n%s",
-				matchName, len(matchedFlows), sourceQuery, len(sourceFlows), filename, summary)
+				matchName, len(matchedFlows), sourceQuery, totalCount, filename, summary)
 
 			invoker := loop.GetInvoker()
 			if invoker != nil {

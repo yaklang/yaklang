@@ -1,6 +1,7 @@
 package loop_http_flow_analyze
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -15,6 +16,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/httptpl"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 var matchFlowsSimpleAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
@@ -37,6 +39,18 @@ Built-in security patterns:
 - "path_traversal" - path traversal attempts
 - "ssrf" - SSRF attempts
 - "file_upload" - dangerous file upload attempts
+- "xxe" - XML External Entity injection
+- "ldap_injection" - LDAP injection attempts
+- "nosql_injection" - NoSQL injection attempts
+- "template_injection" - Server-Side Template Injection (SSTI)
+- "open_redirect" - Open redirect attempts
+- "crlf_injection" - CRLF injection attempts
+- "debug_info" - Debug information disclosure
+- "backup_files" - Backup file access attempts
+- "jwt_token" - JWT token detection in responses
+- "api_keys" - API keys and tokens exposure (AWS, Stripe, Google, GitHub, Slack)
+- "database_error" - Database error messages
+- "cors_misconfiguration" - CORS misconfiguration detection
 
 Examples:
 1. Security check: {"flow_source": "last", "security_pattern": "sql_injection"}
@@ -49,13 +63,37 @@ Examples:
 			aitool.WithStringParam("flow_ids", aitool.WithParam_Description("Comma-separated flow IDs, e.g. '123,456,789'. Use this OR flow_source, not both.")),
 
 			// 匹配模式（四选一）
-			aitool.WithStringParam("security_pattern", aitool.WithParam_Description("Built-in security pattern: sql_injection, xss, sensitive_data, error_response, command_injection, path_traversal, ssrf, file_upload")),
+			aitool.WithStringParam("security_pattern",
+				aitool.WithParam_Description("Built-in security pattern for common vulnerability detection"),
+				aitool.WithParam_Enum(
+					"sql_injection",
+					"xss",
+					"sensitive_data",
+					"error_response",
+					"command_injection",
+					"path_traversal",
+					"ssrf",
+					"file_upload",
+					"xxe",
+					"ldap_injection",
+					"nosql_injection",
+					"template_injection",
+					"open_redirect",
+					"crlf_injection",
+					"debug_info",
+					"backup_files",
+					"jwt_token",
+					"api_keys",
+					"database_error",
+					"cors_misconfiguration",
+				),
+			),
 			aitool.WithStringParam("keywords", aitool.WithParam_Description("Comma-separated keywords for word matching")),
 			aitool.WithStringParam("regex", aitool.WithParam_Description("Regular expression pattern")),
 			aitool.WithStringParam("status_codes", aitool.WithParam_Description("Comma-separated status codes, e.g. '200,404,5xx'")),
 
 			// 通用参数
-			aitool.WithStringParam("scope", aitool.WithParam_Description("Matching scope: request/response/all (default: all)")),
+			aitool.WithStringParam("scope", aitool.WithParam_Description("Matching scope: request/response/all (default: all)"), aitool.WithParam_Enum("request", "response", "all")),
 			aitool.WithBoolParam("negative", aitool.WithParam_Description("Invert match result to exclude matched flows (default: false)")),
 
 			// 结果命名
@@ -87,7 +125,7 @@ Examples:
 			return nil
 		},
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, operator *reactloops.LoopActionHandlerOperator) {
-			// === 1. 获取流量来源 ===
+			// === 1. 获取流量来源 (使用 fallback 逻辑) ===
 			nodeId := "http-flow-match"
 			reactloops.EmitStatus(loop, "准备匹配流量 / Preparing to Match Flows...")
 
@@ -97,55 +135,48 @@ Examples:
 				return
 			}
 
-			var sourceFlows []*schema.HTTPFlow
-			var sourceQuery string
 			var sourceFlowIDs []int64
+			var sourceQuery string
 
 			flowSource := action.GetString("flow_source")
 			flowIDsStr := action.GetString("flow_ids")
 
+			// Fallback 逻辑: 参数输入 -> attached IDs -> 无条件全流量
 			if flowSource != "" {
+				// 尝试从查询结果获取
 				queryResult := getQueryResult(loop, flowSource)
-				if queryResult == nil {
-					operator.Fail(fmt.Sprintf("query result '%s' not found. Use query_http_flows first.", flowSource))
-					return
+				if queryResult != nil && len(queryResult.FlowIDs) > 0 {
+					sourceFlowIDs = queryResult.FlowIDs
+					sourceQuery = queryResult.Name
+				} else {
+					log.Warnf("query result '%s' not found or empty, falling back to attached flows", flowSource)
 				}
-				sourceFlowIDs = queryResult.FlowIDs
-				sourceQuery = queryResult.Name
 			} else if flowIDsStr != "" {
+				// 直接提供的 flow IDs
 				sourceFlowIDs = parseFlowIDs(flowIDsStr)
-				sourceQuery = "direct_ids"
-			} else {
-				queryResult := getQueryResult(loop, "last")
-				if queryResult == nil {
-					operator.Fail("no query result available. Please run query_http_flows first or specify flow_ids.")
-					return
+				if len(sourceFlowIDs) > 0 {
+					sourceQuery = "direct_ids"
 				}
-				sourceFlowIDs = queryResult.FlowIDs
-				sourceQuery = queryResult.Name
 			}
 
+			// Fallback to attached flows
 			if len(sourceFlowIDs) == 0 {
-				operator.Feedback(fmt.Sprintf("Source '%s' has no flows to match.", sourceQuery))
-				return
-			}
-
-			log.Infof("[match_flows_simple] loading %d flows from source '%s'", len(sourceFlowIDs), sourceQuery)
-
-			// 加载流量
-			for _, id := range sourceFlowIDs {
-				flow, err := yakit.GetHTTPFlow(db, int64(id))
-				if err != nil {
-					log.Warnf("failed to load flow %d: %v", id, err)
-					continue
+				if attachedIDsRaw := loop.GetVariable(attachedHTTPFlowIDsKey); attachedIDsRaw != nil {
+					if attachedIDs, ok := attachedIDsRaw.([]int64); ok && len(attachedIDs) > 0 {
+						sourceFlowIDs = attachedIDs
+						sourceQuery = "attached"
+						log.Infof("[match_flows_simple] using attached flow IDs: %d flows", len(sourceFlowIDs))
+					}
 				}
-				sourceFlows = append(sourceFlows, flow)
 			}
 
-			if len(sourceFlows) == 0 {
-				operator.Fail(fmt.Sprintf("failed to load any flows from source '%s'", sourceQuery))
-				return
+			// Fallback to all flows (empty IDs means no filter)
+			if len(sourceFlowIDs) == 0 {
+				sourceQuery = "all"
+				log.Infof("[match_flows_simple] no flow IDs specified, matching all flows in database")
 			}
+
+			log.Infof("[match_flows_simple] source: '%s', flow count: %d", sourceQuery, len(sourceFlowIDs))
 
 			// === 2. 构建 matcher ===
 			var matcher SimplifiedMatcher
@@ -208,23 +239,31 @@ Examples:
 			}
 			reactloops.EmitActionLog(loop, nodeId, line1)
 
-			// === 3. 执行匹配 ===
+			// === 3. 执行匹配（流式处理）===
 			reactloops.EmitStatus(loop, "匹配流量中 / Matching Flows...")
 
 			var matchedFlows []*schema.HTTPFlow
+			var totalCount int
 			var discardCount int
 			var builder strings.Builder
 
-			log.Infof("[match_flows_simple] matching %d flows with: %s", len(sourceFlows), matcherDesc)
+			log.Infof("[match_flows_simple] matching flows from source '%s' with: %s", sourceQuery, matcherDesc)
 
-			builder.WriteString(fmt.Sprintf("Matching %d flows from source '%s' with: %s\n\n",
-				len(sourceFlows), sourceQuery, matcherDesc))
+			builder.WriteString(fmt.Sprintf("Matching flows from source '%s' with: %s\n\n", sourceQuery, matcherDesc))
 
 			yakMatcher := convertSimplifiedToYakMatcher(&matcher)
 
-			for idx, flow := range sourceFlows {
-				if len(sourceFlows) > 10 && idx%(len(sourceFlows)/10) == 0 && idx > 0 {
-					reactloops.EmitProgress(loop, idx, len(sourceFlows), "匹配进度", "Matching")
+			// 使用流式处理代替循环加载
+			ctx := context.Background()
+			filter := &ypb.QueryHTTPFlowRequest{}
+			if len(sourceFlowIDs) > 0 {
+				filter.IncludeId = sourceFlowIDs
+			}
+
+			for flow := range yakit.YieldHTTPFlowsByFilter(db, ctx, filter) {
+				totalCount++
+				if totalCount > 10 && totalCount%100 == 0 {
+					reactloops.EmitProgress(loop, totalCount, 0, "匹配进度", "Matching")
 				}
 
 				matched, err := yakMatcher.Execute(&httptpl.RespForMatch{
@@ -255,8 +294,8 @@ Examples:
 				))
 			}
 
-			builder.WriteString(fmt.Sprintf("\nMatched %d flow(s); discarded %d.",
-				len(matchedFlows), discardCount))
+			builder.WriteString(fmt.Sprintf("\nMatched %d flow(s) from %d total; discarded %d.",
+				len(matchedFlows), totalCount, discardCount))
 
 			summary := builder.String()
 
@@ -303,19 +342,19 @@ Examples:
 
 			// === 6.5. 构建并发送第2行累积流（结果摘要）===
 			line2 := fmt.Sprintf("完成: 匹配 %d/%d 条流量",
-				len(matchedFlows), len(sourceFlows))
+				len(matchedFlows), totalCount)
 			reactloops.EmitActionLog(loop, nodeId, line2, summary)
 
 			// === 7. 记录历史 ===
 			recordAction(loop,
 				"match_flows_simple",
 				fmt.Sprintf("source=%s, %s", sourceQuery, matcherDesc),
-				fmt.Sprintf("matched %d/%d flows, saved as '%s'", len(matchedFlows), len(sourceFlows), matchName),
+				fmt.Sprintf("matched %d/%d flows, saved as '%s'", len(matchedFlows), totalCount, matchName),
 				matcherDesc)
 
 			// === 8. 返回结果 ===
 			feedbackMsg := fmt.Sprintf("Match '%s' completed: matched %d flows from source '%s' (%d total)\n\nFile: %s\n\n%s",
-				matchName, len(matchedFlows), sourceQuery, len(sourceFlows), filename, summary)
+				matchName, len(matchedFlows), sourceQuery, totalCount, filename, summary)
 
 			invoker := loop.GetInvoker()
 			if invoker != nil {

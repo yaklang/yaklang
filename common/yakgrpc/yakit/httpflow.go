@@ -328,13 +328,13 @@ func CreateHTTPFlow(opts ...CreateHTTPFlowOptions) (*schema.HTTPFlow, error) {
 	}
 
 	var (
-		isHttps             = c.isHttps
-		reqRaw              = c.reqRaw
-		rspRaw              = c.rspRaw
+		isHttps            = c.isHttps
+		reqRaw             = c.reqRaw
+		rspRaw             = c.rspRaw
 		bareRspRaw         = c.bareRspRaw
 		fixRspRaw          = c.fixRspRaw
 		noFixContentLength = c.noFixContentLength
-		source              = c.source
+		source             = c.source
 		url                = c.url
 		remoteAddr         = c.remoteAddr
 		reqIns             = c.reqIns
@@ -1247,6 +1247,13 @@ func YieldHTTPFlows(db *gorm.DB, ctx context.Context) chan *schema.HTTPFlow {
 
 func YieldHTTPFlowsEx(db *gorm.DB, ctx context.Context, countCallback func(int)) chan *schema.HTTPFlow {
 	return bizhelper.YieldModel[*schema.HTTPFlow](ctx, db, bizhelper.WithYieldModel_CountCallback(countCallback))
+}
+
+// YieldHTTPFlowsByFilter 根据过滤条件流式返回HTTPFlow
+// 如果filter为nil，则返回所有流量
+func YieldHTTPFlowsByFilter(db *gorm.DB, ctx context.Context, filter *ypb.QueryHTTPFlowRequest) chan *schema.HTTPFlow {
+	query := FilterHTTPFlow(db, filter)
+	return YieldHTTPFlows(query, ctx)
 }
 
 const (
