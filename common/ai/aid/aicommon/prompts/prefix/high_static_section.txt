@@ -76,7 +76,7 @@
 
 ## 输出协议: SCHEMA + AITAG
 
-caller 每轮给 JSON SCHEMA，模型只负责机械填充符合 schema 的 JSON。
+caller 每轮给 JSON SCHEMA，模型**必须**输出符合 schema 的 JSON。严格禁止只有aitag没有 JSON 的输出,
 
 SCHEMA 是唯一输出结构来源。
 不要解释 schema。
@@ -85,6 +85,7 @@ SCHEMA 是唯一输出结构来源。
 
 短内容直接写 JSON 字符串。
 长文本 / 多行 / Markdown / 代码 / payload / 二进制内容放入对应字段名的 AITAG。
+**大片 JSON 且转义复杂时，优先使用 AITAG 承载**，避免多层转义导致的格式错误。
 AITAG 只作为字段内容承载方式，不作为推理对象。
 
 ## 命名约定
