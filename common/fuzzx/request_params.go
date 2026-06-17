@@ -355,14 +355,23 @@ func (f *FuzzRequest) GetCookieParams() []*FuzzParam {
 }
 
 func (f *FuzzRequest) GetPostCommonParams() []*FuzzParam {
-	postParams := f.GetPostJsonParams()
-	if len(postParams) <= 0 {
-		postParams = f.GetPostXMLParams()
+	if f.bodyIsJSONObjectOrArray() {
+		return f.GetPostJsonParams()
 	}
+	postParams := f.GetPostXMLParams()
 	if len(postParams) <= 0 {
 		postParams = f.GetPostParams()
 	}
 	return postParams
+}
+
+func (f *FuzzRequest) bodyIsJSONObjectOrArray() bool {
+	bodyRaw := lowhttp.GetHTTPPacketBody(f.origin)
+	if bodyRaw == nil || len(bodyRaw) == 0 {
+		return false
+	}
+	_, ok := utils.IsJSON(string(bytes.TrimSpace(bodyRaw)))
+	return ok
 }
 
 func (f *FuzzRequest) GetPostJsonParams() []*FuzzParam {

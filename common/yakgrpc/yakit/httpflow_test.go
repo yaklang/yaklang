@@ -21,6 +21,21 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+func TestCreateHTTPFlowEmptyJSONBodyPostParamsTotal(t *testing.T) {
+	test := assert.New(t)
+	reqInst, err := lowhttp.ParseBytesToHttpRequest(lowhttp.FixHTTPRequest([]byte(`POST /bbs/api/follow/list HTTP/1.1
+Content-Type: application/json
+Host: www.example.com
+Content-Length: 2
+
+{}`)))
+	test.NoError(err)
+	flow, err := CreateHTTPFlowFromHTTPWithNoRspSaved(true, reqInst, "mitm", "https://www.example.com/bbs/api/follow/list", "127.0.0.1")
+	test.NoError(err)
+	test.Equal(0, flow.PostParamsTotal)
+	test.Equal(0, flow.GetParamsTotal)
+}
+
 func TestHTTPFlowToGRPCModelBase64(t *testing.T) {
 	test := assert.New(t)
 	reqInst, err := lowhttp.ParseBytesToHttpRequest(lowhttp.FixHTTPRequest([]byte(`POST / HTTP/1.1
