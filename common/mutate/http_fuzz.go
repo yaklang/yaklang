@@ -638,14 +638,24 @@ func (f *FuzzHTTPRequest) GetGetQueryParams() []*FuzzHTTPRequestParam {
 }
 
 func (f *FuzzHTTPRequest) GetPostCommonParams() []*FuzzHTTPRequestParam {
-	postParams := f.GetPostJsonParams()
-	if len(postParams) <= 0 {
-		postParams = f.GetPostXMLParams()
+	req, err := f.GetOriginHTTPRequest()
+	if err == nil && httpRequestBodyIsJSONObjectOrArray(req) {
+		return f.GetPostJsonParams()
 	}
+	postParams := f.GetPostXMLParams()
 	if len(postParams) <= 0 {
 		postParams = f.GetPostParams()
 	}
 	return postParams
+}
+
+func httpRequestBodyIsJSONObjectOrArray(r *http.Request) bool {
+	bodyRaw := httpRequestReadBody(r)
+	if bodyRaw == nil || len(bodyRaw) == 0 {
+		return false
+	}
+	_, ok := utils.IsJSON(string(bytes.TrimSpace(bodyRaw)))
+	return ok
 }
 
 func httpRequestReadBody(r *http.Request) []byte {

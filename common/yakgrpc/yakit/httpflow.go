@@ -447,14 +447,7 @@ func CreateHTTPFlow(opts ...CreateHTTPFlowOptions) (*schema.HTTPFlow, error) {
 	if fReq != nil {
 		flow.GetParamsTotal = len(fReq.GetGetQueryParams())
 
-		postParams := fReq.GetPostJsonParams()
-		if len(postParams) <= 0 {
-			postParams = fReq.GetPostXMLParams()
-		}
-		if len(postParams) <= 0 {
-			postParams = fReq.GetPostParams()
-		}
-		flow.PostParamsTotal = len(postParams)
+		flow.PostParamsTotal = len(fReq.GetPostCommonParams())
 
 		flow.CookieParamsTotal = len(fReq.GetCookieParams())
 	}

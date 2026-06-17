@@ -336,6 +336,30 @@ Host: www.baidu.com
 	}
 }
 
+func TestFuzzHTTPRequest_GetPostCommonParamsEmptyJSONBody(t *testing.T) {
+	test := assert.New(t)
+	cases := []struct {
+		name string
+		body string
+	}{
+		{name: "empty object", body: `{}`},
+		{name: "spaced empty object", body: `{ }`},
+		{name: "empty array", body: `[]`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			req, err := NewFuzzHTTPRequest(fmt.Sprintf(`POST / HTTP/1.1
+Host: www.example.com
+Content-Type: application/json
+Content-Length: %d
+
+%s`, len(tc.body), tc.body))
+			test.NoError(err)
+			test.Empty(req.GetPostCommonParams(), "empty JSON body should not produce post params")
+		})
+	}
+}
+
 func TestFuzzHTTPRequest_GetCommonParamsWithPOSTJSON(t *testing.T) {
 	test := assert.New(t)
 	req, err := NewFuzzHTTPRequest(`
