@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/jinzhu/gorm"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -54,13 +53,13 @@ func (d *AttachedHTTPFlowResourceData) BindLoopData(reactloop ReActLoopIF) error
 }
 
 func (d *AttachedHTTPFlowResourceData) ToAttachData(reactloop ReActLoopIF) string {
-	db := consts.GetGormProjectDatabase()
-	if reactloop != nil {
-		if cfg := reactloop.GetConfig(); cfg != nil && cfg.GetDB() != nil {
-			db = cfg.GetDB()
-		}
-	}
-	return d.renderSummary(db)
+	//db := consts.GetGormProjectDatabase()
+	//if reactloop != nil {
+	//	if cfg := reactloop.GetConfig(); cfg != nil && cfg.GetDB() != nil {
+	//		db = cfg.GetDB()
+	//	}
+	//}
+	return ""
 }
 
 func (d *AttachedHTTPFlowResourceData) renderSummary(db *gorm.DB) string {
