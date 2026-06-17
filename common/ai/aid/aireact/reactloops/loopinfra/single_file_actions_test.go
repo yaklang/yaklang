@@ -309,6 +309,41 @@ func TestModifyAction_Success_ReplacesLines(t *testing.T) {
 	assert.True(t, runtime.timelineContains("modify_success"))
 }
 
+func TestModifyAction_CodeLineBase_AbsoluteLineNumbers(t *testing.T) {
+	runtime := newTestRuntimeForSingleFile(t)
+	loop, factory, task := newLoopAndFactory(t, runtime, WithActionSuffix("code"), WithExitAfterWrite(false))
+	filename := filepath.Join(runtime.tmpDir, "sel.yak")
+	loop.Set(factory.GetFilenameVariableName(), filename)
+	loop.Set(factory.GetFullCodeVariableName(), "urlDecoded, err := codec.DecodeUrl(urlEncoded)\ndie(err)\nyakit.Info(\"old\")")
+	loop.Set(LoopVarCodeLineBase, 27)
+	loop.Set(factory.GetCodeVariableName(), "urlDecoded, err := codec.DecodeUrl(urlEncoded)\ndie(err)\nyakit.Info(\"new\")")
+
+	ac, err := loop.GetActionHandler(factory.GetActionName("modify"))
+	require.NoError(t, err)
+	op := reactloops.NewActionHandlerOperator(task)
+	ac.ActionHandler(loop, mustBuildAction(t, factory.GetActionName("modify"), map[string]any{
+		"modify_start_line": 28,
+		"modify_end_line":   30,
+	}), op)
+
+	require.False(t, op.IsContinued())
+	assert.Contains(t, loop.Get(factory.GetFullCodeVariableName()), `yakit.Info("new")`)
+	assert.True(t, runtime.timelineContains("modify_success"))
+}
+
+func TestNormalizeActionLineNumber(t *testing.T) {
+	runtime := newTestRuntimeForSingleFile(t)
+	loop, factory, _ := newLoopAndFactory(t, runtime, WithActionSuffix("code"))
+	fullCodeVar := factory.GetFullCodeVariableName()
+	loop.Set(fullCodeVar, "a\nb\nc\nd")
+	loop.Set(LoopVarCodeLineBase, 27)
+
+	assert.Equal(t, 1, NormalizeActionLineNumber(loop, fullCodeVar, 28))
+	assert.Equal(t, 3, NormalizeActionLineNumber(loop, fullCodeVar, 30))
+	assert.Equal(t, 2, NormalizeActionLineNumber(loop, fullCodeVar, 2))
+	assert.Equal(t, 99, NormalizeActionLineNumber(loop, fullCodeVar, 99))
+}
+
 func TestModifyAction_PrettifyMismatch_ContinueAndTimeline(t *testing.T) {
 	runtime := newTestRuntimeForSingleFile(t)
 	loop, factory, task := newLoopAndFactory(t, runtime,
@@ -470,8 +505,8 @@ func TestModifyAction_Yaklang_CodeChangeEventMatchesDiskOverwrite(t *testing.T) 
 	require.NoError(t, err)
 	op := reactloops.NewActionHandlerOperator(task)
 	ac.ActionHandler(loop, mustBuildAction(t, actionName, map[string]any{
-		"modify_start_line": 2,
-		"modify_end_line":   2,
+		"modify_start_line":  2,
+		"modify_end_line":    2,
 		"modify_code_reason": "replace middle line",
 	}), op)
 
@@ -603,4 +638,3 @@ func TestModifyAction_DeferDiskWrite_PreservesExistingFile(t *testing.T) {
 	assert.Contains(t, loop.Get(factory.GetFullCodeVariableName()), "new")
 	assert.True(t, runtime.timelineContentContains("modify_success", "disk write deferred"))
 }
-

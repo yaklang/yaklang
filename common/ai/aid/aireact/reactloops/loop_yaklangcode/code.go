@@ -142,7 +142,8 @@ func init() {
 				reactloops.WithReflectionOutputExample(outputExample),
 				reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer, nonce string) (string, error) {
 					yakCode := loop.Get("full_code")
-					codeWithLine := utils.PrefixLinesWithLineNumbers(yakCode)
+					lineBase := loop.GetInt(loopinfra.LoopVarCodeLineBase)
+					codeWithLine := utils.PrefixLinesWithLineNumbersFrom(lineBase+1, yakCode)
 
 					feedbacks := feedbacker.String()
 					feedbacks = strings.TrimSpace(feedbacks)

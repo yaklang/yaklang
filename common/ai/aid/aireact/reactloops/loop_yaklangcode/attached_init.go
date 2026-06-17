@@ -2,9 +2,11 @@ package loop_yaklangcode
 
 import (
 	"os"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loopinfra"
 	"github.com/yaklang/yaklang/common/log"
 )
 
@@ -49,13 +51,8 @@ func finalizeYaklangInitFileTarget(
 	liteforgePath string,
 ) {
 	_ = emitter
-	attachedCode, hasAttachedCode := aicommon.YaklangAttachedInitialCode(editorCtx)
-
 	if !hasYaklangEditorDeliveryTarget(loop) {
-		if hasAttachedCode {
-			loop.Set("full_code", attachedCode)
-			log.Infof("create mode: seeded full_code from attached selection, size: %d bytes", len(attachedCode))
-		}
+		seedYaklangLoopFullCode(loop, editorCtx, "")
 		log.Infof("create mode: no editor target file; delivery path deferred until loop flush")
 		operator.Continue()
 		return
@@ -63,24 +60,33 @@ func finalizeYaklangInitFileTarget(
 
 	targetPath, fromAttached := aicommon.ResolveYaklangInitTargetPath(editorCtx, liteforgePath)
 	if targetPath == "" {
-		if hasAttachedCode {
-			loop.Set("full_code", attachedCode)
-		}
+		seedYaklangLoopFullCode(loop, editorCtx, "")
 		log.Infof("create mode: no resolvable target path; delivery deferred until loop flush")
 		operator.Continue()
 		return
 	}
 
+	_, hasAttachedCode := aicommon.YaklangAttachedInitialCode(editorCtx)
 	log.Infof("edit mode: target path %s (attached=%v, attached_code=%v)", targetPath, fromAttached, hasAttachedCode)
-	if hasAttachedCode {
-		loop.Set("full_code", attachedCode)
-		log.Infof("seeded full_code from attached selection, size: %d bytes", len(attachedCode))
-	} else if content, readErr := os.ReadFile(targetPath); readErr == nil && len(content) > 0 {
-		seedCode, _ := aicommon.ResolveYaklangInitFullCode(editorCtx, string(content))
-		log.Infof("seeded full_code from disk file %s, size: %d bytes", targetPath, len(content))
-		loop.Set("full_code", seedCode)
+	diskContent := ""
+	if content, readErr := os.ReadFile(targetPath); readErr == nil {
+		diskContent = string(content)
+	} else if readErr != nil {
+		log.Warnf("edit mode: failed to read target file %s: %v", targetPath, readErr)
 	}
+	seedYaklangLoopFullCode(loop, editorCtx, diskContent)
 
 	ensureYaklangLoopStagingFilename(loop, r)
 	operator.Continue()
+}
+
+func seedYaklangLoopFullCode(loop *reactloops.ReActLoop, editorCtx *aicommon.YaklangEditorContext, diskContent string) {
+	seedCode, fromSelection := aicommon.ResolveYaklangInitFullCode(editorCtx, diskContent)
+	if strings.TrimSpace(seedCode) == "" {
+		return
+	}
+	lineBase := aicommon.YaklangCodeLineBase(editorCtx, fromSelection)
+	loop.Set("full_code", seedCode)
+	loop.Set(loopinfra.LoopVarCodeLineBase, lineBase)
+	log.Infof("seeded full_code (%d bytes, from_selection=%v, code_line_base=%d)", len(seedCode), fromSelection, lineBase)
 }
