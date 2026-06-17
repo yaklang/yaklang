@@ -75,11 +75,21 @@ func shouldDelayInstructionEviction(inst Instruction) bool {
 	if utils.IsNil(inst) {
 		return true
 	}
-	fn := inst.GetFunc()
-	if utils.IsNil(fn) {
-		return true
+	// Check if instruction has a cached function pointer (fast path, no cache access).
+	// We MUST NOT call GetFunc() here because this runs inside the cache eviction callback
+	// which holds the cache mutex. Calling GetFunc() -> resolveFunctionByID() -> GetInstruction()
+	// would try to re-acquire the same mutex, causing a deadlock.
+	type funGetter interface {
+		GetCachedFunc() *Function
 	}
-	return !fn.IsFinished()
+	if fg, ok := inst.(funGetter); ok {
+		if fn := fg.GetCachedFunc(); fn != nil {
+			return !fn.IsFinished()
+		}
+	}
+	// If we can't get the function pointer without cache access, assume not finished
+	// (conservative: delay eviction to be safe)
+	return true
 }
 
 func useAdaptiveInstructionFastPath(cfg *ssaconfig.Config) bool {
