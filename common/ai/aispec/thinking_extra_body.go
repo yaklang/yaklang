@@ -52,6 +52,14 @@ func allThinkingMatchers() []ThinkingBodyMatcher {
 //  3) every matcher’s MatchModel(modelName)；
 // 若仍无命中，默认 {"thinking":{"type":"enabled"|"disabled"}}。
 func ThinkingExtraBodyForProvider(typeName, modelName, baseURL, domain string, enabled bool) map[string]any {
+	// MiniMax 系模型（百炼直供 / 稀宇科技直供）忽略 enable_thinking，仅通过 thinking.type 控制思考。
+	// 由于 type=tongyi 会在 MatchType 阶段被 qwenThinkingMatcher 先命中（注入 enable_thinking），
+	// 基于模型名的判定无法走到 MatchModel 阶段，因此在此先行短路处理。
+	// 注意：MiniMax 仅允许 thinking.type 为 adaptive / disabled，不接受 enabled。
+	if strings.Contains(strings.ToLower(modelName), "minimax") {
+		return minimaxThinkingExtraBody(enabled)
+	}
+
 	ms := allThinkingMatchers()
 	typ := strings.ToLower(strings.TrimSpace(typeName))
 	for _, m := range ms {
@@ -73,6 +81,18 @@ func ThinkingExtraBodyForProvider(typeName, modelName, baseURL, domain string, e
 		}
 	}
 	return defaultThinkingExtraBody(enabled)
+}
+
+// minimaxThinkingExtraBody 返回 MiniMax 系模型的思考控制字段。
+// 关闭思考使用 disabled；开启时使用 adaptive（MiniMax 不支持 enabled 取值）。
+func minimaxThinkingExtraBody(enabled bool) map[string]any {
+	t := "disabled"
+	if enabled {
+		t = "adaptive"
+	}
+	return map[string]any{
+		"thinking": map[string]any{"type": t},
+	}
 }
 
 func defaultThinkingExtraBody(enabled bool) map[string]any {

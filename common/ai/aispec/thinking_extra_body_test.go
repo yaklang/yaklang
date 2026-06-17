@@ -72,6 +72,22 @@ func TestThinkingExtraBodyForProvider_VolcengineTypeUsesThinkingMap(t *testing.T
 	assert.Equal(t, "enabled", inner["type"])
 }
 
+func TestThinkingExtraBodyForProvider_MiniMaxUnderTongyi(t *testing.T) {
+	// MiniMax 经百炼(tongyi)代理时，必须用 thinking.type，而非 enable_thinking。
+	mOff := ThinkingExtraBodyForProvider("tongyi", "MiniMax/MiniMax-M3", "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", "", false)
+	_, hasEnableThinking := mOff["enable_thinking"]
+	assert.False(t, hasEnableThinking, "MiniMax 不应注入 enable_thinking")
+	innerOff, ok := mOff["thinking"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "disabled", innerOff["type"])
+
+	// 开启思考使用 adaptive（MiniMax 不接受 enabled）。
+	mOn := ThinkingExtraBodyForProvider("tongyi", "MiniMax/MiniMax-M3", "", "", true)
+	innerOn, ok := mOn["thinking"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "adaptive", innerOn["type"])
+}
+
 func TestThinkingExtraBodyForProvider_OpenAITypeBeforeModel(t *testing.T) {
 	m := ThinkingExtraBodyForProvider("openai", "non-gpt-id", "https://other.example", "", true)
 	inner, ok := m["reasoning"].(map[string]any)
