@@ -19,9 +19,7 @@ var fuzzHeaderAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpti
 			aitool.WithStringParam("reason", aitool.WithParam_Description("请用中文说明为什么要测试这个请求头、怀疑的漏洞类型以及安全测试边界。")),
 		},
 		[]*reactloops.LoopStreamField{
-			{FieldName: "fuzz_header", AINodeId: "thought"},
-			{FieldName: "reason", AINodeId: "thought"},
-			{FieldName: "header_values", AINodeId: "thought"},
+			{FieldName: "reason", AINodeId: "thought", IsSystem: true},
 		},
 		func(l *reactloops.ReActLoop, action *aicommon.Action) error {
 			headerName := action.GetString("header_name")

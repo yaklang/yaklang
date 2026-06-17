@@ -18,9 +18,7 @@ var fuzzMethodAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpti
 			aitool.WithStringParam("reason", aitool.WithParam_Description("请用中文说明为什么要测试这些 HTTP 方法、关注的漏洞类型以及安全测试边界。")),
 		},
 		[]*reactloops.LoopStreamField{
-			{FieldName: "fuzz_method", AINodeId: "thought"},
-			{FieldName: "reason", AINodeId: "thought"},
-			{FieldName: "methods", AINodeId: "thought"},
+			{FieldName: "reason", AINodeId: "thought", IsSystem: true},
 		},
 		func(l *reactloops.ReActLoop, action *aicommon.Action) error {
 			methods := action.GetStringSlice("methods")

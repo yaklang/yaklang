@@ -470,6 +470,18 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "Fuzz 测试",
 		En: "Fuzz Test",
 	},
+	"set-http-request": {
+		Zh: "设置 HTTP 请求",
+		En: "Set HTTP Request",
+	},
+	"modify-http-request": {
+		Zh: "修改 HTTP 请求",
+		En: "Modify HTTP Request",
+	},
+	"generate-risk": {
+		Zh: "生成漏洞风险",
+		En: "Generate Risk",
+	},
 	"enhance-query": {
 		Zh: "知识增强",
 		En: "Knowledge Enhancement",

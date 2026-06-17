@@ -105,7 +105,7 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 					reader = io.TeeReader(utils.JSONStringReader(utils.UTF8Reader(reader)), &out)
 					var event *schema.AiOutputEvent
 					var err error
-					event, err = boundEmitter.EmitDefaultStreamEvent(
+					event, err = boundEmitter.EmitDefaultSystemStreamEvent(
 						"re-act-verify",
 						reader,
 						rsp.GetTaskIndex(),
@@ -178,7 +178,7 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 						var out bytes.Buffer
 						var outputReader = io.TeeReader(displayReader, &out)
 						var event *schema.AiOutputEvent
-						event, err = boundEmitter.EmitDefaultStreamEvent(
+						event, err = boundEmitter.EmitDefaultSystemStreamEvent(
 							"plan-evidence",
 							outputReader,
 							rsp.GetTaskIndex(),
@@ -583,4 +583,3 @@ func normalizeEvidenceOperations(action *aicommon.Action) []aicommon.EvidenceOpe
 func normalizeVerifyNextMovements(action *aicommon.Action) []aicommon.VerifyNextMovement {
 	return aicommon.NormalizeVerifyNextMovements(action)
 }
-

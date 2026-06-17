@@ -22,8 +22,7 @@ var modifyHTTPRequestAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActL
 			aitool.WithBoolParam("require_manual_review", aitool.WithParam_Description("是否要求在应用新数据包前先进行人工审核。")),
 		},
 		[]*reactloops.LoopStreamField{
-			{FieldName: "modification_target", AINodeId: "thought"},
-			{FieldName: "modification_reason", AINodeId: "thought"},
+			{FieldName: "modification_reason", AINodeId: "thought", IsSystem: true},
 		},
 		func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
 			if strings.TrimSpace(getCurrentRequestRaw(loop)) == "" {
@@ -112,8 +111,14 @@ var modifyHTTPRequestAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActL
 				utils.ShrinkTextBlock(result.Diff, 240),
 			)
 			log.Infof("modify_http_request action: target=%s, reason=%s, review=%v", modificationTarget, modificationReason, requireManualReview)
+
+			reactloops.EmitActionLog(loop, loopHTTPFuzzActionLogNodeModifyRequest, fmt.Sprintf("修改请求: %s", modificationTarget))
+			reactloops.EmitStatus(loop, "修改请求中 / Modifying Request...")
 			r.AddToTimeline("modify_http_request", fmt.Sprintf("Modified current HTTP request: %s\n%s", modificationTarget, buildFuzzTimelineSummary(feedback)))
-			operator.Feedback(buildLoopHTTPFuzzActionFeedback(record) + "\n\n" + feedback)
+			feedbackMsg := buildLoopHTTPFuzzActionFeedback(record) + "\n\n" + feedback
+			reactloops.EmitStatus(loop, "完成 / Complete")
+			reactloops.EmitActionLog(loop, loopHTTPFuzzActionLogNodeModifyRequest, "HTTP 请求已修改 / HTTP Request Modified", utils.ShrinkTextBlock(result.Diff, 2000))
+			operator.Feedback(feedbackMsg)
 		},
 	)
 }

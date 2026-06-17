@@ -21,11 +21,7 @@ var fuzzBodyAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption
 			aitool.WithStringParam("reason", aitool.WithParam_Description("请用中文说明为什么要测试这些 Body 值、怀疑的漏洞类型以及安全测试边界。")),
 		},
 		[]*reactloops.LoopStreamField{
-			{FieldName: "fuzz_body", AINodeId: "thought"},
-			{FieldName: "body_type", AINodeId: "thought"},
-			{FieldName: "param_name", AINodeId: "thought"},
-			{FieldName: "reason", AINodeId: "thought"},
-			{FieldName: "param_values", AINodeId: "thought"},
+			{FieldName: "reason", AINodeId: "thought", IsSystem: true},
 		},
 		func(l *reactloops.ReActLoop, action *aicommon.Action) error {
 			bodyType := action.GetString("body_type")

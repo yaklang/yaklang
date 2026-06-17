@@ -21,10 +21,7 @@ var fuzzGetParamsAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopO
 			aitool.WithStringParam("reason", aitool.WithParam_Description("请用中文说明为什么要测试这些参数值、怀疑的漏洞类型以及安全测试边界。")),
 		},
 		[]*reactloops.LoopStreamField{
-			{FieldName: "fuzz_get_params", AINodeId: "thought"},
-			{FieldName: "param_name", AINodeId: "thought"},
-			{FieldName: "reason", AINodeId: "thought"},
-			{FieldName: "param_values", AINodeId: "thought"},
+			{FieldName: "reason", AINodeId: "thought", IsSystem: true},
 		},
 		func(l *reactloops.ReActLoop, action *aicommon.Action) error {
 			paramName := action.GetString("param_name")
