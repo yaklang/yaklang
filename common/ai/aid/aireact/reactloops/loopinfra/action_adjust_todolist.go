@@ -89,6 +89,7 @@ var loopAction_AdjustTodolist = &reactloops.LoopAction{
 			FieldName:     "next_movements",
 			AINodeId:      "adjust_todolist",
 			StreamHandler: adjustTodolistNextMovementsStreamHandler,
+			IsSystem:      true,
 		},
 	},
 	ActionVerifier: func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
