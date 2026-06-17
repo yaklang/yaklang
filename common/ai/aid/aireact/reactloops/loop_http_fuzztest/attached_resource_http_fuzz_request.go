@@ -45,12 +45,10 @@ func bindAttachedHTTPFuzzRequestToLoop(
 			return false
 		}
 
-		if task != nil && loop.GetEmitter() != nil {
-			loop.GetEmitter().EmitThoughtStream(task.GetIndex(), "Loaded the attached HTTP packet as the current fuzz target.")
-		}
 		if loop.GetInvoker() != nil {
 			loop.GetInvoker().AddToTimeline("http_request_bootstrap", "Initialized from attached HTTP packet resource.")
 		}
+		reactloops.EmitStatus(loop, "已加载附加 HTTP 数据包 / Loaded Attached HTTP Packet")
 		return true
 	}
 	return false

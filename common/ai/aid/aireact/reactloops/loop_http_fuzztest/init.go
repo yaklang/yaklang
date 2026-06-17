@@ -131,7 +131,6 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 	return func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
 		attachedResources := reactloops.RunAttachedExtraResourcesInit(r, loop, task.GetAttachedDatas())
 
-		emitter := r.GetConfig().GetEmitter()
 		config := r.GetConfig()
 
 		invoker := loop.GetInvoker()
@@ -146,17 +145,16 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 			switch bootstrapResult {
 			case "raw":
 				loop.Set("bootstrap_source", "user_input_raw")
-				emitter.EmitThoughtStream(task.GetIndex(), "Reused the raw HTTP packet provided in user input as the current fuzz target. Skipped re-emitting the packet to avoid duplication.")
+				reactloops.EmitStatus(loop, "已复用用户输入的 HTTP 数据包 / Reused HTTP Packet from User Input")
 			case "url":
 				loop.Set("bootstrap_source", "user_input_url")
-				emitter.EmitThoughtStream(task.GetIndex(), "Constructed the current fuzz target HTTP packet from the URL provided in user input.")
+				reactloops.EmitStatus(loop, "已从 URL 构造 HTTP 数据包 / Constructed HTTP Packet from URL")
 			default:
 				if restoreLoopHTTPFuzzSessionContext(loop, r) {
-					emitter.EmitThoughtStream(task.GetIndex(), "Restored the original HTTP packet and latest vulnerability analysis from the current session.")
+					reactloops.EmitStatus(loop, "已恢复会话上下文 / Restored Session Context")
 					invoker.AddToTimeline("http_fuzztest_restore", "Restored HTTP fuzz session context from persistent session history")
 				} else {
-					// TBD: 不知道怎么测试，也不知道数据包
-					emitter.EmitThoughtStream(task.GetIndex(), "No valid HTTP packet/URL extracted from user input, and no previous packet was restored from this session. Please call set_http_request or provide a URL/raw packet before fuzz actions.")
+					reactloops.EmitStatus(loop, "未找到有效 HTTP 数据包 / No Valid HTTP Packet Found")
 					operator.Done()
 					return
 				}
@@ -302,27 +300,7 @@ func initFuzzRequestFromURL(loop *reactloops.ReActLoop, runtime aicommon.AIInvok
 	}
 
 	// 这是"第一次构造数据包"的场景：用户没有给出完整 HTTP 数据包，
-	// 系统根据 URL 生成了新的请求。先发一段来源说明，再 emit 完整包，
-	// 让用户清楚这个数据包从哪儿来。
-	// 关键词: bootstrap, EmitEditablePacket, url_to_packet, 来源说明
-	if loop != nil && loop.GetEmitter() != nil {
-		task := loop.GetCurrentTask()
-		taskID := ""
-		if task != nil {
-			taskID = task.GetIndex()
-		}
-		if taskID != "" {
-			methodLabel := strings.TrimSpace(method)
-			if methodLabel == "" {
-				methodLabel = "GET"
-			}
-			loop.GetEmitter().EmitThoughtStream(
-				taskID,
-				fmt.Sprintf("Constructed the current fuzz target HTTP packet from URL: %s (method=%s).", strings.TrimSpace(urlStr), methodLabel),
-			)
-		}
-	}
-
+	// 系统根据 URL 生成了新的请求，通过 EmitEditablePacket 展示完整包。
 	_, err = applyLoopHTTPFuzzRequestChange(loop, runtime, &loopHTTPFuzzRequestChange{
 		RawRequest:          string(packet),
 		IsHTTPS:             isHTTPS,

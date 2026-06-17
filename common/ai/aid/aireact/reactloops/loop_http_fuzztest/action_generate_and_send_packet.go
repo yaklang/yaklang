@@ -23,9 +23,7 @@ var generateAndSendPacketAction = func(r aicommon.AIInvokeRuntime) reactloops.Re
 			aitool.WithStringParam("reason", aitool.WithParam_Description("请用中文说明为何要发送这个完整数据包、怀疑的漏洞类型、以及必须遵守的安全边界。"), aitool.WithParam_Required(true)),
 		},
 		[]*reactloops.LoopStreamField{
-			{FieldName: "packet_type", AINodeId: "thought"},
-			{FieldName: "target_purpose", AINodeId: "thought"},
-			{FieldName: "reason", AINodeId: "thought"},
+			{FieldName: "reason", AINodeId: "thought", IsSystem: true},
 		},
 		func(l *reactloops.ReActLoop, action *aicommon.Action) error {
 			action.WaitStream(l.GetCurrentTask().GetContext())

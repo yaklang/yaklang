@@ -50,14 +50,7 @@ var generateRiskAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 			aitool.WithStringParam("details", aitool.WithParam_Description("Risk details as JSON object string when possible. Plain text is accepted and stored as summary.")),
 			aitool.WithStringParam("payload", aitool.WithParam_Description("Representative payload or mutated value that triggered the signal.")),
 		},
-		[]*reactloops.LoopStreamField{
-			{FieldName: "target", AINodeId: "thought"},
-			{FieldName: "title", AINodeId: "thought"},
-			{FieldName: "risk_type", AINodeId: "thought"},
-			{FieldName: "severity", AINodeId: "thought"},
-			{FieldName: "description", AINodeId: "thought"},
-			{FieldName: "payload", AINodeId: "thought"},
-		},
+		[]*reactloops.LoopStreamField{},
 		func(l *reactloops.ReActLoop, action *aicommon.Action) error {
 			specs := collectGenerateRiskSpecs(action)
 			if len(specs) == 0 {
@@ -93,6 +86,8 @@ var generateRiskAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 			loop.Set("generated_risk_ids", strings.Join(riskIDs, ","))
 			loop.Set("generated_risk_summary", summary)
 			recordLoopHTTPFuzzMetaAction(loop, "generate_risk", fmt.Sprintf("count=%d; risk_ids=%s", len(riskIDs), strings.Join(riskIDs, ",")), summary)
+			reactloops.EmitActionLog(loop, loopHTTPFuzzActionLogNodeGenerateRisk, fmt.Sprintf("生成 %d 个 Risk / Generated %d Risks", len(riskIDs), len(riskIDs)), summary)
+			reactloops.EmitStatus(loop, "完成 / Complete")
 			r.AddToTimeline("generate_risk", summary)
 			operator.Feedback(summary)
 			operator.Continue()

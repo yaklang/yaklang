@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 )
 
 func TestBuildLoopHTTPFuzzOverviewReport_SummarizesLargeRuns(t *testing.T) {
@@ -233,4 +235,29 @@ func TestBuildLoopHTTPFuzzDetailedPacketReport_RendersStoredResults(t *testing.T
 	require.Contains(t, report, "Saved HTTPFlow: flow-2")
 	require.Contains(t, report, "Request Packet:")
 	require.Contains(t, report, "Response Packet:")
+}
+
+func TestBuildLoopHTTPFuzzActionLogStartLine_FormatsFuzzHeader(t *testing.T) {
+	action := aicommon.NewSimpleAction("fuzz_header", aitool.InvokeParams{
+		"header_name":   "X-Forwarded-For",
+		"header_values": []string{"127.0.0.1", "8.8.8.8", "{{payload(sqli)}}", "evil", "more"},
+		"reason":        "测试请求头注入漏洞，需要覆盖多种伪造来源 IP 的 payload 组合",
+	})
+	line := buildLoopHTTPFuzzActionLogStartLine("fuzz_header", "", action)
+	require.Contains(t, line, "X-Forwarded-For")
+	require.Contains(t, line, "5 个载荷")
+	require.NotContains(t, line, "reason=")
+	require.NotContains(t, line, "测试请求头注入")
+}
+
+func TestBuildLoopHTTPFuzzActionLogStartLine_FallbackShrinksParamSummary(t *testing.T) {
+	longValues := make([]string, 0, 20)
+	for i := 0; i < 20; i++ {
+		longValues = append(longValues, strings.Repeat("x", 20))
+	}
+	paramSummary := "header_name=X-Test; header_values=" + strings.Join(longValues, " ") + "; reason=很长的原因说明"
+	line := buildLoopHTTPFuzzActionLogStartLine("fuzz_header", paramSummary, nil)
+	require.Contains(t, line, "header_name=X-Test")
+	require.NotContains(t, line, "reason=")
+	require.Less(t, len(line), len(paramSummary))
 }

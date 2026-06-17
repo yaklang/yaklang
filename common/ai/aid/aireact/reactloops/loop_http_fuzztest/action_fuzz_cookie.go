@@ -21,10 +21,7 @@ var fuzzCookieAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpti
 			aitool.WithStringParam("reason", aitool.WithParam_Description("请用中文说明为什么要测试这些 Cookie 值、怀疑的漏洞类型以及安全测试边界。")),
 		},
 		[]*reactloops.LoopStreamField{
-			{FieldName: "fuzz_cookie", AINodeId: "thought"},
-			{FieldName: "cookie_name", AINodeId: "thought"},
-			{FieldName: "reason", AINodeId: "thought"},
-			{FieldName: "cookie_values", AINodeId: "thought"},
+			{FieldName: "reason", AINodeId: "thought", IsSystem: true},
 		},
 		func(l *reactloops.ReActLoop, action *aicommon.Action) error {
 			cookieValues := action.GetStringSlice("cookie_values")

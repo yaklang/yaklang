@@ -34,6 +34,9 @@ var setHTTPRequestAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoop
 
 			log.Infof("set_http_request action: setting HTTP request, is_https: %v, reason: %s", isHttps, reason)
 
+			reactloops.EmitActionLog(loop, loopHTTPFuzzActionLogNodeSetRequest, fmt.Sprintf("设置 HTTP 请求: is_https=%v", isHttps))
+			reactloops.EmitStatus(loop, "设置请求中 / Setting Request...")
+
 			result, err := applyLoopHTTPFuzzRequestChange(loop, r, &loopHTTPFuzzRequestChange{
 				RawRequest:          httpRequest,
 				IsHTTPS:             isHttps,
@@ -65,7 +68,10 @@ var setHTTPRequestAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoop
 			feedback.WriteString("The request will be executed with HTTP flow persistence enabled, so each fuzz result can be traced in the system by runtime and task context.\n\n")
 			feedback.WriteString("You can now use fuzz actions (fuzz_method, fuzz_path, fuzz_header, fuzz_get_params, fuzz_body, fuzz_cookie) to test this request.")
 
-			operator.Feedback(buildLoopHTTPFuzzActionFeedback(record) + "\n\n" + feedback.String())
+			feedbackMsg := buildLoopHTTPFuzzActionFeedback(record) + "\n\n" + feedback.String()
+			reactloops.EmitStatus(loop, "完成 / Complete")
+			reactloops.EmitActionLog(loop, loopHTTPFuzzActionLogNodeSetRequest, "HTTP 请求已设置 / HTTP Request Set")
+			operator.Feedback(feedbackMsg)
 			log.Infof("set_http_request done: request set successfully")
 		},
 	)
