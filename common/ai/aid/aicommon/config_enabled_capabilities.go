@@ -443,6 +443,7 @@ func (c *Config) SetCapabilityInventoryEmitHandler(handler capabilityInventoryEm
 	if c == nil {
 		return
 	}
+	c.SetSessionSnapshotEmitHandler(sessionSnapshotEmitHandler(handler))
 	if c.m == nil {
 		c.m = &sync.Mutex{}
 	}
@@ -452,15 +453,11 @@ func (c *Config) SetCapabilityInventoryEmitHandler(handler capabilityInventoryEm
 }
 
 func (c *Config) notifyCapabilityInventoryEmit() {
-	if c == nil {
-		return
-	}
-	c.m.Lock()
-	handler := c.capabilityInventoryEmitHandler
-	c.m.Unlock()
-	if handler != nil {
-		handler()
-	}
+	c.NotifySessionSnapshotEmit(true)
+}
+
+func (c *Config) notifySessionSnapshotEmitImmediate() {
+	c.NotifySessionSnapshotEmit(true)
 }
 
 func (c *Config) SetCapabilityHotpatchHandler(handler capabilityHotpatchHandler) {

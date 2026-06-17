@@ -662,8 +662,13 @@ func (r *ReActLoop) applyPerceptionKnowledgeSearchResult(query string, knowledge
 	}
 	r.Set("perception_knowledge_context", content)
 
-	if emitter := r.GetEmitter(); emitter != nil {
-		_, _ = emitter.EmitPerceptionKnowledge("perception-knowledge", query, knowledgeBases, content)
+	if cfg := r.config; cfg != nil {
+		aicommon.SetSessionSnapshotPerceptionKnowledge(cfg, &aicommon.SessionSnapshotPerceptionKnowledge{
+			Query:          query,
+			KnowledgeBases: knowledgeBases,
+			Content:        content,
+		})
+		aicommon.NotifySessionSnapshotEmit(cfg)
 	}
 }
 
@@ -780,16 +785,16 @@ func (r *ReActLoop) refreshCapabilitiesFromPerception(state *PerceptionState) {
 				state.Epoch, len(searchResult.MatchedToolNames), len(searchResult.MatchedForgeNames), len(searchResult.MatchedSkillNames), len(searchResult.MatchedFocusModeNames)))
 	}
 
-	if emitter := r.GetEmitter(); emitter != nil {
-		_, _ = emitter.EmitPerceptionCapabilities(
-			"perception-capabilities",
-			input.Query,
-			searchResult.MatchedToolNames,
-			searchResult.MatchedForgeNames,
-			searchResult.MatchedSkillNames,
-			searchResult.MatchedFocusModeNames,
-			searchResult.RecommendedCapabilities,
-		)
+	if cfg := r.config; cfg != nil {
+		aicommon.SetSessionSnapshotPerceptionCapabilityMatches(cfg, &aicommon.SessionSnapshotPerceptionCapabilityMatches{
+			Query:                   input.Query,
+			MatchedToolNames:        searchResult.MatchedToolNames,
+			MatchedForgeNames:       searchResult.MatchedForgeNames,
+			MatchedSkillNames:       searchResult.MatchedSkillNames,
+			MatchedFocusModeNames:   searchResult.MatchedFocusModeNames,
+			RecommendedCapabilities: searchResult.RecommendedCapabilities,
+		})
+		aicommon.NotifySessionSnapshotEmit(cfg)
 	}
 }
 
@@ -930,18 +935,8 @@ func (r *ReActLoop) TriggerPerception(reason string, force bool) *PerceptionStat
 		}
 	}
 
-	if emitter := r.GetEmitter(); emitter != nil && currentState != nil {
-		_, _ = emitter.EmitPerception(
-			"perception",
-			currentState.OneLinerSummary,
-			currentState.Topics,
-			currentState.Keywords,
-			currentState.Changed,
-			currentState.ConfidenceLevel,
-			currentState.LastTrigger,
-			currentState.Epoch,
-			currentState.IntentShift,
-		)
+	if cfg := r.config; cfg != nil && currentState != nil {
+		aicommon.NotifySessionSnapshotEmit(cfg)
 	}
 
 	invoker.AddToTimeline("perception",

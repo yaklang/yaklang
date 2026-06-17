@@ -405,6 +405,7 @@ type Config struct {
 	skillUnloadHandler             skillUnloadHandler
 	forgeUnloadHandler             forgeUnloadHandler
 	capabilityInventoryEmitHandler   capabilityInventoryEmitHandler
+	sessionSnapshot                  *sessionSnapshotState
 	hotpatchCurrentTaskIdResolver    func() string
 	capabilityHotpatchHandler        func(enable bool, caps []EnabledCapability)
 

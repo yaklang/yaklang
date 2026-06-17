@@ -29,6 +29,7 @@ const (
 	SYNC_TYPE_RECOVERY_HISTORY            = "recovery_history"
 	SYNC_TYPE_CAPABILITY_INVENTORY        = "capability_inventory_sync"
 	SYNC_TYPE_PERCEPTION                  = "perception_sync"
+	SYNC_TYPE_SESSION_SNAPSHOT            = "session_snapshot_sync"
 
 	ProcessID           string = "process_id"
 	SyncProcessEeventID        = "sync_process_event_id"

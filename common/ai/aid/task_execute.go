@@ -37,6 +37,10 @@ func (t *AiTask) execute() error {
 
 	// Record task start time for duration calculation
 	t.taskStartTime = time.Now()
+	if t.Config != nil {
+		t.Config.ResetSessionSnapshotExecution(t.Name, "processing", t.taskStartTime)
+		t.Config.NotifySessionSnapshotEmit(true)
+	}
 
 	// Record timeline baseline before task execution starts
 	// We use the global timeline differ to track changes during task execution
@@ -55,6 +59,23 @@ func (t *AiTask) execute() error {
 
 	// Emit task execution start status
 	t.planLoadingStatus(fmt.Sprintf("执行子任务 [%s] / Executing Subtask [%s]: %s", t.Index, t.Index, t.Name))
+
+	defer func() {
+		if t.Config == nil {
+			return
+		}
+		status := "processing"
+		switch {
+		case t.executed():
+			status = "completed"
+		case t.GetStatus() == aicommon.AITaskState_Aborted:
+			status = "aborted"
+		case t.skiped():
+			status = "skipped"
+		}
+		t.Config.FinalizeSessionSnapshotExecution(status, time.Now())
+		t.Config.NotifySessionSnapshotEmit(true)
+	}()
 
 	err := t.ExecuteLoopTask(
 		schema.AI_REACT_LOOP_NAME_PE_TASK,

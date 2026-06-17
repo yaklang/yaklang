@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/consts"
 	"io"
+	"strings"
 	"sync"
 	"time"
 
@@ -279,6 +280,7 @@ func (a *ToolCaller) invoke(
 		unsubscribe()
 		refreshHTTPFlowCount()
 		refreshRiskCount()
+		NotifySessionSnapshotRuntimeRefresh(a.config, a.callToolId)
 	}()
 
 	var browserTracker interface{ TrackBrowserSession(id string) }
@@ -298,6 +300,9 @@ func (a *ToolCaller) invoke(
 				if httpFlow != nil {
 					e.EmitYakitHTTPFlow(httpFlow.RuntimeId, httpFlow.HiddenIndex)
 					return nil
+				}
+				if path, ok := handleFileWriteMessage(result); ok {
+					NotifySessionSnapshotFileWrite(a.config, path)
 				}
 				// 过滤文件 Stat/Read 等高频消息，避免对前端造成压力
 				if shouldIgnoreExecResultForEmit(result) {
@@ -337,48 +342,57 @@ func (a *ToolCaller) invoke(
 // to reduce gRPC pressure on the frontend.
 // It filters out high-frequency file STATUS (Stat) messages.
 func shouldIgnoreExecResultForEmit(result *ypb.ExecResult) bool {
-	if result == nil || !result.IsMessage || len(result.Message) == 0 {
+	fileData, ok := parseYakitFileExecResult(result)
+	if !ok {
 		return false
+	}
+	action := utils.InterfaceToString(fileData["action"])
+	return action == yaklib.Status_Action || action == "STATUS"
+}
+
+func parseYakitFileExecResult(result *ypb.ExecResult) (map[string]any, bool) {
+	if result == nil || !result.IsMessage || len(result.Message) == 0 {
+		return nil, false
 	}
 
 	var yakitMsg yaklib.YakitMessage
 	if err := json.Unmarshal(result.Message, &yakitMsg); err != nil {
-		return false
+		return nil, false
 	}
-
-	if yakitMsg.Type != "log" {
-		return false
-	}
-
-	if len(yakitMsg.Content) == 0 {
-		return false
+	if yakitMsg.Type != "log" || len(yakitMsg.Content) == 0 {
+		return nil, false
 	}
 
 	var logInfo yaklib.YakitLog
 	if err := json.Unmarshal(yakitMsg.Content, &logInfo); err != nil {
-		return false
+		return nil, false
+	}
+	if logInfo.Level != "file" || strings.TrimSpace(logInfo.Data) == "" {
+		return nil, false
 	}
 
-	// filter out file level logs with STATUS action (yakit.fileStatusAction)
-	// STATUS is called for every file during traversal in find_file.yak, grep.yak etc.
-	// This causes massive gRPC messages when scanning large directories
-	//
-	// Message structure (from YakitClient.YakitDraw -> YakitFile):
-	// YakitMessage{Type: "log", Content: YakitLog{Level: "file", Data: `{"action":"STATUS",...}`}}
-	if logInfo.Level == "file" && logInfo.Data != "" {
-		var fileData = make(map[string]any)
-		if err := json.Unmarshal([]byte(logInfo.Data), &fileData); err != nil {
-			// cannot parse Data as JSON, don't filter (safe default)
-			return false
-		}
-
-		action := utils.InterfaceToString(fileData["action"])
-		if action == "STATUS" {
-			return true
-		}
+	var fileData map[string]any
+	if err := json.Unmarshal([]byte(logInfo.Data), &fileData); err != nil {
+		return nil, false
 	}
+	return fileData, true
+}
 
-	return false
+// handleFileWriteMessage detects yakit.File fileWriteAction telemetry (action=WRITE).
+func handleFileWriteMessage(result *ypb.ExecResult) (path string, ok bool) {
+	fileData, parsed := parseYakitFileExecResult(result)
+	if !parsed {
+		return "", false
+	}
+	action := strings.ToUpper(strings.TrimSpace(utils.InterfaceToString(fileData["action"])))
+	if action != yaklib.Write_Action {
+		return "", false
+	}
+	path = strings.TrimSpace(utils.InterfaceToString(fileData["path"]))
+	if path == "" {
+		return "", false
+	}
+	return path, true
 }
 
 func handleRiskMessage(result *ypb.ExecResult) (*schema.Risk, error) {

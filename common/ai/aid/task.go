@@ -320,6 +320,7 @@ func (t *AiTask) MarshalJSON() ([]byte, error) {
 
 	// 创建一个不包含AICallback的结构体
 	return json.Marshal(struct {
+		TaskId               string    `json:"task_id,omitempty"`
 		Index                string    `json:"index"`
 		Name                 string    `json:"name"`
 		Goal                 string    `json:"goal"`
@@ -336,6 +337,7 @@ func (t *AiTask) MarshalJSON() ([]byte, error) {
 		SuccessToolCallCount int       `json:"success_tool_call_count"`
 		FailToolCallCount    int       `json:"fail_tool_call_count"`
 	}{
+		TaskId:               t.TaskId,
 		Index:                t.Index,
 		Name:                 t.Name,
 		Goal:                 t.Goal,

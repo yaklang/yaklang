@@ -11,7 +11,6 @@ import (
 )
 
 const CapabilityInventoryNodeID = "capability_inventory"
-const CapabilityInventoryItemsNodeID = "capability_inventory_items"
 
 // CapabilityInventoryItem is a flattened inventory record for UI consumption.
 // It does not replace CapabilityInventoryPayload; it is emitted separately.

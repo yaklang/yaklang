@@ -391,9 +391,8 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 		}
 	})
 
-	cfg.SetCapabilityInventoryEmitHandler(func() {
-		reactloops.EmitCapabilityInventorySnapshot(react.config, react.GetCurrentLoop())
-		reactloops.EmitCapabilityInventoryItemsSnapshot(react.config, react.GetCurrentLoop())
+	cfg.SetSessionSnapshotEmitHandler(func() {
+		reactloops.EmitSessionSnapshot(react.config, react.GetCurrentLoop(), react.GetCurrentTask())
 	})
 
 	// Register pending context providers

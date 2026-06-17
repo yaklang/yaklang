@@ -83,17 +83,3 @@ func EmitCapabilityInventorySnapshot(cfg *aicommon.Config, loop *ReActLoop) {
 	)
 }
 
-func EmitCapabilityInventoryItemsSnapshot(cfg *aicommon.Config, loop *ReActLoop) {
-	if cfg == nil {
-		return
-	}
-	emitter := cfg.GetEmitter()
-	if loop != nil && loop.GetEmitter() != nil {
-		emitter = loop.GetEmitter()
-	}
-	if emitter == nil {
-		return
-	}
-	items := aicommon.BuildCapabilityInventoryItems(cfg, loop.capabilityInventoryContext())
-	_, _ = emitter.EmitSystemStructured(aicommon.CapabilityInventoryItemsNodeID, items)
-}
