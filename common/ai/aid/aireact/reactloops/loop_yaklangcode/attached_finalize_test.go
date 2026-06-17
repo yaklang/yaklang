@@ -4,46 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 )
-
-func TestAttachedInitialCode(t *testing.T) {
-	payload := `{"path":"/tmp/foo.yak","startLine":1,"endLine":2,"language":"yak","content":"println(1)"}`
-	ctx := yaklangEditorContextFromAttached([]*aicommon.AttachedResource{
-		aicommon.NewAttachedResource(aicommon.AttachedResourceTypeSelected, aicommon.AttachedResourceKeyContent, payload),
-	})
-	code, ok := attachedInitialCode(ctx)
-	require.True(t, ok)
-	require.Equal(t, "println(1)", code)
-
-	_, ok = attachedInitialCode(&YaklangEditorContext{EditorFile: "/tmp/foo.yak"})
-	require.False(t, ok)
-}
-
-func TestResolveYaklangInitTargetPath(t *testing.T) {
-	ctx := &YaklangEditorContext{EditorFile: "/tmp/attached.yak"}
-	path, fromAttached := resolveYaklangInitTargetPath(ctx, "/tmp/liteforge.yak")
-	require.True(t, fromAttached)
-	require.Equal(t, "/tmp/attached.yak", path)
-
-	path, fromAttached = resolveYaklangInitTargetPath(nil, "/tmp/liteforge.yak")
-	require.False(t, fromAttached)
-	require.Equal(t, "/tmp/liteforge.yak", path)
-}
-
-func TestResolveYaklangInitFullCodePrefersAttachedSelection(t *testing.T) {
-	payload := `{"path":"/tmp/foo.yak","startLine":1,"endLine":2,"language":"yak","content":"attached content"}`
-	ctx := yaklangEditorContextFromAttached([]*aicommon.AttachedResource{
-		aicommon.NewAttachedResource(aicommon.AttachedResourceTypeSelected, aicommon.AttachedResourceKeyContent, payload),
-	})
-	code, fromAttached := resolveYaklangInitFullCode(ctx, "disk content")
-	require.True(t, fromAttached)
-	require.Equal(t, "attached content", code)
-
-	code, fromAttached = resolveYaklangInitFullCode(nil, "disk content")
-	require.False(t, fromAttached)
-	require.Equal(t, "disk content", code)
-}
 
 func TestBuildYaklangAnalyzeRequirementPromptWithAttachedPath(t *testing.T) {
 	out := buildYaklangAnalyzeRequirementPrompt(yaklangAnalyzeRequirementOptions{
@@ -58,24 +19,24 @@ func TestBuildYaklangAnalyzeRequirementPromptWithAttachedPath(t *testing.T) {
 	require.NotContains(t, out, "判断文件操作类型")
 }
 
-func TestBuildYaklangAnalyzeRequirementPromptWithoutAttachedPath(t *testing.T) {
+func TestBuildYaklangAnalyzeRequirementPromptCreateMode(t *testing.T) {
 	out := buildYaklangAnalyzeRequirementPrompt(yaklangAnalyzeRequirementOptions{
 		userInput:       "write port scan",
-		codePreviewOnly: true,
+		createMode:      true,
 		hasGrepSearcher: true,
 	})
-	require.Contains(t, out, "代码预览模式")
+	require.Contains(t, out, "新建文件模式")
 	require.NotContains(t, out, "判断文件操作类型")
 }
 
-func TestBuildYaklangAnalyzeRequirementPromptCodePreviewWithWorkspace(t *testing.T) {
+func TestBuildYaklangAnalyzeRequirementPromptCreateModeWithWorkspace(t *testing.T) {
 	out := buildYaklangAnalyzeRequirementPrompt(yaklangAnalyzeRequirementOptions{
 		userInput:       "write port scan",
-		codePreviewOnly: true,
+		createMode:      true,
 		workspacePath:   "/tmp/project",
 		hasGrepSearcher: true,
 	})
-	require.Contains(t, out, "代码预览模式")
+	require.Contains(t, out, "新建文件模式")
 	require.Contains(t, out, "/tmp/project")
 	require.NotContains(t, out, "判断文件操作类型")
 }
@@ -83,14 +44,14 @@ func TestBuildYaklangAnalyzeRequirementPromptCodePreviewWithWorkspace(t *testing
 func TestBuildYaklangAnalyzeRequirementToolOptionsSkipsFileDetectWhenAttached(t *testing.T) {
 	opts := yaklangAnalyzeRequirementOptions{
 		hasAttachedPath: true,
-		codePreviewOnly: false,
+		createMode:      false,
 		hasGrepSearcher: true,
 	}
 	attachedOpts := buildYaklangAnalyzeRequirementToolOptions(opts, true)
 	require.NotEmpty(t, attachedOpts)
 
 	opts.hasAttachedPath = false
-	opts.codePreviewOnly = true
-	previewOpts := buildYaklangAnalyzeRequirementToolOptions(opts, true)
-	require.Greater(t, len(attachedOpts), len(previewOpts))
+	opts.createMode = true
+	createOpts := buildYaklangAnalyzeRequirementToolOptions(opts, true)
+	require.Greater(t, len(attachedOpts), len(createOpts))
 }

@@ -19,6 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact"
+	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -100,7 +101,9 @@ func (m *yakRunnerModifyMock) callback(t *testing.T, i aicommon.AICallerConfigIf
 type yakRunnerScenarioResult struct {
 	timeline         string
 	taskFailed       bool
+	taskCompleted    bool
 	codeChangeEvents []*ypb.AIOutputEvent
+	pinFilenameEvents []*ypb.AIOutputEvent
 	modifyAttempts   int
 }
 
@@ -151,7 +154,9 @@ taskLoop:
 		case e := <-out:
 			if e.Type == string(schema.EVENT_TYPE_YAKLANG_CODE_CHANGE) {
 				result.codeChangeEvents = append(result.codeChangeEvents, e)
-				break taskLoop
+			}
+			if e.Type == string(schema.EVENT_TYPE_FILESYSTEM_PIN_FILENAME) {
+				result.pinFilenameEvents = append(result.pinFilenameEvents, e)
 			}
 			if e.GetNodeId() == "react_task_status_changed" {
 				content := string(e.GetContent())
@@ -159,9 +164,14 @@ taskLoop:
 					result.taskFailed = true
 					break taskLoop
 				}
-				if strings.Contains(content, "Completed") {
+				if strings.Contains(content, `"react_task_now_status":"completed"`) ||
+					strings.Contains(content, `"react_task_now_status": "completed"`) {
+					result.taskCompleted = true
 					break taskLoop
 				}
+			}
+			if len(result.codeChangeEvents) > 0 {
+				break taskLoop
 			}
 		case <-deadline:
 			break taskLoop
@@ -182,6 +192,37 @@ func yakRunnerDirectoryOnlyAttachments(dir string) []*ypb.AttachedResourceInfo {
 
 func yakRunnerPreviewWriteCallback(t *testing.T, i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 	return mockedYaklangWriting(t, i, req, "hello")
+}
+
+// isYakRunnerIntermediatePinPath reports aispace staging/work files that may be pinned
+// while write_code/modify_code runs; they are not the user-facing delivery target.
+func isYakRunnerIntermediatePinPath(path string) bool {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return false
+	}
+	base := strings.ToLower(filepath.Base(path))
+	if strings.HasPrefix(base, "yaklang_code_staging_") && strings.HasSuffix(base, ".yak") {
+		return true
+	}
+	aispace := string(filepath.Separator) + "aispace" + string(filepath.Separator)
+	if strings.Contains(path, aispace) && strings.Contains(base, "gen_code_") && strings.HasSuffix(base, ".yak") {
+		return true
+	}
+	return false
+}
+
+func assertYakRunnerNoYakPinFilenameEvents(t *testing.T, events []*ypb.AIOutputEvent) {
+	t.Helper()
+	for _, e := range events {
+		path := utils.InterfaceToString(jsonpath.FindFirst(string(e.GetContent()), "$.path"))
+		if isYakRunnerIntermediatePinPath(path) {
+			continue
+		}
+		if strings.HasSuffix(strings.ToLower(path), ".yak") || strings.Contains(path, "gen_code_") {
+			t.Fatalf("unexpected yak pin_filename before loop finished: %s", path)
+		}
+	}
 }
 
 func parseYaklangCodeChangeResponse(t *testing.T, e *ypb.AIOutputEvent) yaklangCodeChangeResponse {
@@ -229,10 +270,12 @@ func TestYakRunnerProtocol_3_FullFreeInputModifyWithAllAttachments(t *testing.T)
 
 	disk, readErr := os.ReadFile(yakPath)
 	require.NoError(t, readErr)
-	require.Contains(t, string(disk), `// timeout was 30`, "disk must stay unchanged until frontend accepts")
-	require.NotContains(t, string(disk), `// timeout was 60`)
+	require.Contains(t, string(disk), `// timeout was 60`, "delivery file should be updated after loop finishes")
+	require.NotContains(t, string(disk), `// timeout was 30`)
 
 	require.GreaterOrEqual(t, len(result.codeChangeEvents), 1, "should emit yaklang_code_change when loop finishes")
+	assert.Len(t, result.codeChangeEvents, 1, "exactly one yaklang_code_change per conversation")
+	assertYakRunnerNoYakPinFilenameEvents(t, result.pinFilenameEvents)
 }
 
 // TestYakRunnerProtocol_4_YaklangCodeChangeResponseShape verifies the「返回数据」协议字段。
@@ -283,12 +326,14 @@ func TestYakRunnerProtocol_5_NoAttachmentsEmitsCreateOp(t *testing.T) {
 		t, yakRunnerPreviewWriteCallback, "写一个 hello yak 脚本", nil,
 	)
 	require.False(t, result.taskFailed, "preview task should complete")
-	require.NotEmpty(t, result.codeChangeEvents)
+	require.Len(t, result.codeChangeEvents, 1, "exactly one yaklang_code_change per conversation")
+	assertYakRunnerNoYakPinFilenameEvents(t, result.pinFilenameEvents)
 
-	payload := parseYaklangCodeChangeResponse(t, result.codeChangeEvents[len(result.codeChangeEvents)-1])
+	payload := parseYaklangCodeChangeResponse(t, result.codeChangeEvents[0])
 	assert.Equal(t, "create", payload.Op)
 	assert.Contains(t, payload.Code.Content, "hello yak")
-	assert.Contains(t, filepath.Clean(payload.Code.Path), filepath.Join("code", "gen_code_"))
+	assert.Contains(t, filepath.Base(payload.Code.Path), "gen_code_")
+	assert.True(t, strings.HasSuffix(strings.ToLower(payload.Code.Path), ".yak"))
 }
 
 // TestYakRunnerProtocol_6_DirectoryPathOnlyEmitsCreateOp verifies preview mode when
@@ -304,10 +349,35 @@ func TestYakRunnerProtocol_6_DirectoryPathOnlyEmitsCreateOp(t *testing.T) {
 		yakRunnerDirectoryOnlyAttachments(dir),
 	)
 	require.False(t, result.taskFailed, "directory-only preview task should complete")
-	require.NotEmpty(t, result.codeChangeEvents)
+	require.Len(t, result.codeChangeEvents, 1, "exactly one yaklang_code_change per conversation")
+	assertYakRunnerNoYakPinFilenameEvents(t, result.pinFilenameEvents)
 
-	payload := parseYaklangCodeChangeResponse(t, result.codeChangeEvents[len(result.codeChangeEvents)-1])
+	payload := parseYaklangCodeChangeResponse(t, result.codeChangeEvents[0])
 	assert.Equal(t, "create", payload.Op)
 	assert.Contains(t, payload.Code.Content, "hello yak")
-	assert.Contains(t, filepath.Clean(payload.Code.Path), filepath.Join("code", "gen_code_"))
+	assert.Contains(t, filepath.Base(payload.Code.Path), "gen_code_")
+	assert.True(t, strings.HasSuffix(strings.ToLower(payload.Code.Path), ".yak"))
+}
+
+// TestYakRunnerProtocol_7_DirectoryAndNamedFileInQuery writes directly to the file named in FreeInput.
+func TestYakRunnerProtocol_7_DirectoryAndNamedFileInQuery(t *testing.T) {
+	dir := t.TempDir()
+	yakPath := filepath.Join(dir, "123.yak")
+	require.NoError(t, os.WriteFile(yakPath, []byte(""), 0o644))
+
+	result := runYakRunnerProtocolScenario(
+		t, yakRunnerPreviewWriteCallback, "在当前打开的123.yak文件里生成一份端口扫描的yak代码",
+		yakRunnerDirectoryOnlyAttachments(dir),
+	)
+	require.False(t, result.taskFailed, "named-file task should complete")
+	require.Len(t, result.codeChangeEvents, 1, "exactly one yaklang_code_change per conversation")
+
+	payload := parseYaklangCodeChangeResponse(t, result.codeChangeEvents[0])
+	assert.Equal(t, "replace", payload.Op)
+	assert.Equal(t, filepath.Clean(yakPath), filepath.Clean(payload.Code.Path))
+	assert.Contains(t, payload.Code.Content, "hello")
+
+	disk, readErr := os.ReadFile(yakPath)
+	require.NoError(t, readErr)
+	assert.Contains(t, string(disk), "hello")
 }

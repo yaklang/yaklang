@@ -3,6 +3,7 @@ package yaklangcodetests
 import (
 	"bytes"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -102,43 +103,23 @@ func TestFocusMode_YakdocThenWriteCode(t *testing.T) {
 		}
 	}()
 
-	du := 5 * time.Second
-	if utils.InGithubActions() {
-		du = 3 * time.Second
-	}
-	after := time.After(du)
-
-	var editorSeen bool
-	var yakdocTimelineSeen bool
-LOOP:
-	for {
-		select {
-		case e := <-out:
-			if e.Type == string(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR) {
-				editorSeen = true
-			}
-			// EmitThoughtStream uses nodeId "re-act-loop-thought"; stream key is in TaskIndex.
-			if e.GetTaskIndex() == "yakdoc_function_details_result" ||
-				utils.MatchAllOfSubString(e.GetTaskIndex(), "yakdoc_function_details") {
-				yakdocTimelineSeen = true
-			}
-			if stat.codeWritten && editorSeen {
-				break LOOP
-			}
-		case <-after:
-			break LOOP
-		}
-	}
+	waitResult := waitForYaklangDeferredEditorSync(out, focusModeWriteYaklangTestTimeout())
 	close(in)
+	ins.Wait()
 
 	require.True(t, stat.yakdocDone, "yakdoc_function_details should be invoked")
 	require.True(t, stat.codeWritten, "write_code should be invoked after yakdoc")
-	require.True(t, editorSeen, "code editor event should be emitted")
-	require.True(t, yakdocTimelineSeen, "yakdoc timeline node should be present")
+	require.NotEmpty(t, waitResult.codeChangeEvents, "deferred yaklang_code_change should be emitted after write_code")
 
+	var yakdocTimelineSeen bool
 	tl := ins.DumpTimeline()
 	require.Contains(t, tl, "yakdoc_function_details")
 	require.Contains(t, tl, "str.Split")
+	if strings.Contains(tl, "yakdoc_function_details_result") ||
+		strings.Contains(tl, "yakdoc_function_details") {
+		yakdocTimelineSeen = true
+	}
+	require.True(t, yakdocTimelineSeen, "yakdoc timeline node should be present")
 }
 
 func TestWriteYaklangLoopPromptContainsYakdocActions(t *testing.T) {

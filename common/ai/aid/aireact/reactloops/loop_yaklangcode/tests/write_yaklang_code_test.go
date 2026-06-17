@@ -56,7 +56,8 @@ func waitForYaklangDeferredEditorSync(out <-chan *ypb.AIOutputEvent, timeout tim
 					result.taskFailed = true
 					return result
 				}
-				if strings.Contains(content, "Completed") {
+				if strings.Contains(content, `"react_task_now_status":"completed"`) ||
+					strings.Contains(content, `"react_task_now_status": "completed"`) {
 					return result
 				}
 			}
@@ -76,6 +77,29 @@ func findGenCodeFilename(filenames []string) string {
 		}
 	}
 	return ""
+}
+
+func previewGenCodeArtifactPath(pinFilenames []string, codeChangeEvents []*ypb.AIOutputEvent) string {
+	for i := len(codeChangeEvents) - 1; i >= 0; i-- {
+		path := utils.InterfaceToString(jsonpath.FindFirst(string(codeChangeEvents[i].GetContent()), "$.code.path"))
+		if strings.Contains(filepath.Base(path), "gen_code_") {
+			return path
+		}
+	}
+	return findGenCodeFilename(pinFilenames)
+}
+
+func assertPreviewGenCodeArtifactPath(t *testing.T, pinFilenames []string, codeChangeEvents []*ypb.AIOutputEvent) string {
+	t.Helper()
+	path := previewGenCodeArtifactPath(pinFilenames, codeChangeEvents)
+	if path == "" {
+		t.Fatal("gen_code_ artifact path not found")
+	}
+	base := strings.ToLower(filepath.Base(path))
+	if !strings.Contains(base, "gen_code_") || !strings.HasSuffix(base, ".yak") {
+		t.Fatalf("preview artifact should be gen_code_*.yak, got %s", path)
+	}
+	return path
 }
 
 func mockedYaklangWriting(t *testing.T, i aicommon.AICallerConfigIf, req *aicommon.AIRequest, code string) (*aicommon.AIResponse, error) {
@@ -346,13 +370,7 @@ func TestFocusMode_WriteYaklangCodeAndThenModify(t *testing.T) {
 		t.Fatalf("deferred yaklang_code_change content mismatch: %q", finalContent)
 	}
 
-	filename := findGenCodeFilename(waitResult.filenames)
-	if filename == "" {
-		t.Fatal("gen_code_ filename not found")
-	}
-	if !strings.Contains(filename, string(filepath.Separator)+"code"+string(filepath.Separator)) {
-		t.Fatalf("preview artifact should live under code dir, got %s", filename)
-	}
+	filename := assertPreviewGenCodeArtifactPath(t, waitResult.filenames, waitResult.codeChangeEvents)
 	fmt.Println("--------------------------------------")
 	tl := ins.DumpTimeline()
 	fmt.Println(tl)
