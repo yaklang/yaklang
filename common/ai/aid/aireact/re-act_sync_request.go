@@ -38,6 +38,8 @@ func (r *ReAct) handleSyncMessage(event *ypb.AIInputEvent) error {
 		return r.HandleSyncTypeCapabilityInventoryEvent(event)
 	case aicommon.SYNC_TYPE_PERCEPTION:
 		return r.HandleSyncTypePerceptionEvent(event)
+	case aicommon.SYNC_TYPE_SESSION_SNAPSHOT:
+		return r.HandleSyncTypeSessionSnapshotEvent(event)
 	default:
 		return fmt.Errorf("unsupported sync type: %s", event.SyncType)
 	}
@@ -54,6 +56,7 @@ func (r *ReAct) RegisterReActSyncEvent() {
 	r.config.InputEventManager.RegisterSyncCallback(SYNC_TYPE_RECOVERY_PLAN_AND_EXEC, r.HandleSyncTypeRecoveryPlanAndExecEvent)
 	r.config.InputEventManager.RegisterSyncCallback(aicommon.SYNC_TYPE_CAPABILITY_INVENTORY, r.HandleSyncTypeCapabilityInventoryEvent)
 	r.config.InputEventManager.RegisterSyncCallback(aicommon.SYNC_TYPE_PERCEPTION, r.HandleSyncTypePerceptionEvent)
+	r.config.InputEventManager.RegisterSyncCallback(aicommon.SYNC_TYPE_SESSION_SNAPSHOT, r.HandleSyncTypeSessionSnapshotEvent)
 }
 
 func (r *ReAct) UnRegisterReActSyncEvent() {
@@ -67,6 +70,7 @@ func (r *ReAct) UnRegisterReActSyncEvent() {
 	r.config.InputEventManager.UnRegisterSyncCallback(SYNC_TYPE_RECOVERY_PLAN_AND_EXEC)
 	r.config.InputEventManager.UnRegisterSyncCallback(aicommon.SYNC_TYPE_CAPABILITY_INVENTORY)
 	r.config.InputEventManager.UnRegisterSyncCallback(aicommon.SYNC_TYPE_PERCEPTION)
+	r.config.InputEventManager.UnRegisterSyncCallback(aicommon.SYNC_TYPE_SESSION_SNAPSHOT)
 }
 
 func (r *ReAct) HandleSyncTypeQueueInfoEvent(event *ypb.AIInputEvent) error {
@@ -371,6 +375,13 @@ func (r *ReAct) HandleSyncTypePerceptionEvent(event *ypb.AIInputEvent) error {
 		state = loop.GetPerceptionState()
 	}
 	_, _ = r.EmitSyncJSON(schema.EVENT_TYPE_PERCEPTION, "perception", perceptionStateToSyncPayload(state), event.SyncID)
+	return nil
+}
+
+func (r *ReAct) HandleSyncTypeSessionSnapshotEvent(event *ypb.AIInputEvent) error {
+	snapshot := reactloops.BuildSessionSnapshot(r.config, r.GetCurrentLoop(), r.GetCurrentTask())
+	taskIndex := aicommon.BuildVerificationTodoScope(r.GetCurrentTask()).TaskIndex
+	_, _ = r.EmitSyncJSONWithTaskIndex(schema.EVENT_TYPE_STRUCTURED, aicommon.SessionSnapshotNodeID, snapshot, event.SyncID, taskIndex)
 	return nil
 }
 

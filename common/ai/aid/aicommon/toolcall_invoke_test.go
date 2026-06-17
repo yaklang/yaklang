@@ -34,6 +34,33 @@ func TestHandleHTTPFlowMessage_IgnoreOtherLevels(t *testing.T) {
 	require.Nil(t, flow)
 }
 
+func TestHandleFileWriteMessage(t *testing.T) {
+	exec := yaklib.NewYakitLogExecResult("file", `{"action":"WRITE","path":"/tmp/demo.txt","action_message":{"mode":"modify"}}`)
+	path, ok := handleFileWriteMessage(exec)
+	require.True(t, ok)
+	require.Equal(t, "/tmp/demo.txt", path)
+}
+
+func TestHandleFileWriteMessage_IgnoreNonWrite(t *testing.T) {
+	exec := yaklib.NewYakitLogExecResult("file", `{"action":"READ","path":"/tmp/demo.txt"}`)
+	path, ok := handleFileWriteMessage(exec)
+	require.False(t, ok)
+	require.Empty(t, path)
+
+	statusExec := yaklib.NewYakitLogExecResult("file", `{"action":"STATUS","path":"/tmp/demo.txt"}`)
+	path, ok = handleFileWriteMessage(statusExec)
+	require.False(t, ok)
+	require.Empty(t, path)
+}
+
+func TestShouldIgnoreExecResultForEmit_FileStatusOnly(t *testing.T) {
+	statusExec := yaklib.NewYakitLogExecResult("file", `{"action":"STATUS","path":"/tmp/demo.txt"}`)
+	require.True(t, shouldIgnoreExecResultForEmit(statusExec))
+
+	writeExec := yaklib.NewYakitLogExecResult("file", `{"action":"WRITE","path":"/tmp/demo.txt"}`)
+	require.False(t, shouldIgnoreExecResultForEmit(writeExec))
+}
+
 func TestToolCallerInvoke_HTTPFlowCountRefresh(t *testing.T) {
 	db := setupToolCallInvokeTestProjectDB(t)
 	callToolID := "toolcall-httpflow-" + ksuid.New().String()

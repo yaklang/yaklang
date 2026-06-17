@@ -1018,6 +1018,8 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 		}
 	}
 
+	NotifySessionSnapshotToolCall(t.config, toolResult)
+
 	return toolResult, false, nil
 }
 

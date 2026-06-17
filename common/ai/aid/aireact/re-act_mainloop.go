@@ -760,9 +760,8 @@ func BuildReActInvoker(ctx context.Context, options ...aicommon.ConfigOption) (a
 
 	// Register capability inventory emit handler using this invoker's own loop,
 	// so child invokers do not inherit the parent's react reference.
-	cfg.SetCapabilityInventoryEmitHandler(func() {
-		reactloops.EmitCapabilityInventorySnapshot(invoker.config, invoker.GetCurrentLoop())
-		reactloops.EmitCapabilityInventoryItemsSnapshot(invoker.config, invoker.GetCurrentLoop())
+	cfg.SetSessionSnapshotEmitHandler(func() {
+		reactloops.EmitSessionSnapshot(invoker.config, invoker.GetCurrentLoop(), invoker.GetCurrentTask())
 	})
 
 	// EmitPinDirectory is deferred to ensureWorkDirectory when user input arrives
