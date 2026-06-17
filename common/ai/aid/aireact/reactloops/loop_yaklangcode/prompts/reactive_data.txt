@@ -5,6 +5,13 @@
 {{ end }}
 优先在上述路径范围内读写 Yaklang 脚本；不要臆造其他文件路径。
 
+{{ end }}{{ if .EditorFilePathWithoutCode }}## 编辑器路径与代码缓冲不一致
+
+上下文里记录了打开文件 `{{ .EditorFilePath }}`，但本次任务内存中**尚未加载任何代码**（`full_code` 为空）。
+
+- 若用户要**修改该文件**：应使用 `modify_code`（不要用 `write_code` 覆盖）；若确实需要文件内容，请依赖附件选区或磁盘上的文件，而不是臆造代码。
+- 若用户要**新建独立脚本**（create 模式）：忽略上述「打开文件」提示，使用 `@action: write_code`，并在 JSON 后**必须**附带 `<|GEN_CODE_{{ .Nonce }}|>...<|GEN_CODE_END_{{ .Nonce }}|>`；最终会交付新的 `gen_code_*.yak`，不会写入该打开文件路径。
+
 {{ end }}{{ if .Code }}{{ else }}## Yaklang 脚本编写规则说明
 <|YAKLANG_CODER_RULE_{{ .Nonce }}|>
 
@@ -465,9 +472,17 @@ When you receive a request, first understand the user's goal. Then, structure yo
 <|CURRENT_CODE_{{ .Nonce }}|>
 {{ .CurrentCodeWithLineNumber }}
 <|CURRENT_CODE_END_{{ .Nonce }}|>
-{{ else }}## 当前没有代码块
+{{ else }}## 当前没有代码块（create 模式）
 
-当前操作并不是对代码的修改，直接生成代码即可。{{ end }}
+当前内存中没有已有代码。若要**新建** Yak 脚本，使用 `@action: write_code`，并**必须**在 JSON 后附带：
+
+```
+<|GEN_CODE_{{ .Nonce }}|>
+...你的 Yaklang 代码...
+<|GEN_CODE_END_{{ .Nonce }}|>
+```
+
+**禁止**只写 markdown 的 ```yak 代码块（系统无法解析）。{{ end }}
 {{ if .FeedbackMessages }}
 ## 反馈/警告/待评估
 

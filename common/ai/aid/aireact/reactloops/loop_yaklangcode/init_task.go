@@ -26,6 +26,8 @@ func buildInitTask(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearc
 		aicommon.EnrichYaklangEditorContextFromUserInput(editorCtx, task.GetUserInput())
 		if editorCtx.HasEditorFile() {
 			loop.Set("editor_file_path", editorCtx.EditorFile)
+		} else {
+			loop.Set("editor_file_path", "")
 		}
 		createMode := editorCtx.IsCreateMode()
 		if createMode {
