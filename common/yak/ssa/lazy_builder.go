@@ -147,10 +147,16 @@ func (l *LazyBuilder) BuildForUnits(units map[string]struct{}) bool {
 	runner := l.unitTaskRunner
 	l.mu.Unlock()
 
+	panicked := false
 	defer func() {
 		if r := recover(); r != nil {
+			panicked = true
 			log.Errorf("lazy builder panic: name=%s panic=%v", l._lazybuild_name, r)
 			utils.PrintCurrentGoroutineRuntimeStack()
+		}
+		// If we panicked, mark as built so caller won't retry forever
+		if panicked {
+			l.build.Store(true)
 		}
 	}()
 
