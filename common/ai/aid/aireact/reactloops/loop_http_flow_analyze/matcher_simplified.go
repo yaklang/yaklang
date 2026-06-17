@@ -180,6 +180,212 @@ var builtinSecurityPatterns = map[string]*SecurityPattern{
 			},
 		},
 	},
+
+	"xxe": {
+		Name:        "XML External Entity (XXE)",
+		Description: "Detect XXE injection attempts",
+		Matchers: []SimplifiedMatcher{
+			{
+				Type:     "word",
+				Patterns: []string{"<!ENTITY", "<!DOCTYPE", "SYSTEM", "PUBLIC", "file://", "php://"},
+				Scope:    "request",
+				MatchAll: false,
+			},
+			{
+				Type:     "regex",
+				Patterns: []string{`<!ENTITY\s+\w+\s+SYSTEM`, `<!DOCTYPE.*\[`, `php://filter`},
+				Scope:    "request",
+				MatchAll: false,
+			},
+		},
+	},
+
+	"ldap_injection": {
+		Name:        "LDAP Injection",
+		Description: "Detect LDAP injection attempts",
+		Matchers: []SimplifiedMatcher{
+			{
+				Type:     "word",
+				Patterns: []string{"*)(", "*)(&", "*)(|", "*()|", "*))%00"},
+				Scope:    "request",
+				MatchAll: false,
+			},
+			{
+				Type:     "regex",
+				Patterns: []string{`\*\)\(`, `\*\)\(&`, `\*\)\(\|`},
+				Scope:    "request",
+				MatchAll: false,
+			},
+		},
+	},
+
+	"nosql_injection": {
+		Name:        "NoSQL Injection",
+		Description: "Detect NoSQL injection attempts",
+		Matchers: []SimplifiedMatcher{
+			{
+				Type:     "word",
+				Patterns: []string{"$ne", "$gt", "$lt", "$where", "$regex", "$or", "$and", "[$ne]", "[$gt]"},
+				Scope:    "request",
+				MatchAll: false,
+			},
+			{
+				Type:     "regex",
+				Patterns: []string{`\$ne\b`, `\$gt\b`, `\$where\b`, `\[\$\w+\]`},
+				Scope:    "request",
+				MatchAll: false,
+			},
+		},
+	},
+
+	"template_injection": {
+		Name:        "Server-Side Template Injection (SSTI)",
+		Description: "Detect SSTI attempts",
+		Matchers: []SimplifiedMatcher{
+			{
+				Type:     "word",
+				Patterns: []string{"{{", "}}", "${", "<%", "%>", "#{", "<#"},
+				Scope:    "request",
+				MatchAll: false,
+			},
+			{
+				Type:     "regex",
+				Patterns: []string{`\{\{.*\}\}`, `\$\{.*\}`, `<%.*%>`, `<#.*#>`},
+				Scope:    "request",
+				MatchAll: false,
+			},
+		},
+	},
+
+	"open_redirect": {
+		Name:        "Open Redirect",
+		Description: "Detect open redirect attempts",
+		Matchers: []SimplifiedMatcher{
+			{
+				Type:     "regex",
+				Patterns: []string{`https?://`, `//[^/]`, `redirect=https?://`, `url=https?://`, `next=https?://`},
+				Scope:    "request",
+				MatchAll: false,
+			},
+		},
+	},
+
+	"crlf_injection": {
+		Name:        "CRLF Injection",
+		Description: "Detect CRLF injection attempts",
+		Matchers: []SimplifiedMatcher{
+			{
+				Type:     "word",
+				Patterns: []string{"%0d%0a", "%0D%0A", "\\r\\n", "%0a", "%0d"},
+				Scope:    "request",
+				MatchAll: false,
+			},
+			{
+				Type:     "regex",
+				Patterns: []string{`%0[dD]%0[aA]`, `\\r\\n`, `\r\n`},
+				Scope:    "request",
+				MatchAll: false,
+			},
+		},
+	},
+
+	"debug_info": {
+		Name:        "Debug Information Disclosure",
+		Description: "Detect debug information in responses",
+		Matchers: []SimplifiedMatcher{
+			{
+				Type: "word",
+				Patterns: []string{
+					"DEBUG", "TRACE", "Debugging",
+					"phpinfo", "var_dump", "print_r",
+					"console.log", "console.error",
+					"__FILE__", "__LINE__",
+				},
+				Scope:    "response",
+				MatchAll: false,
+			},
+		},
+	},
+
+	"backup_files": {
+		Name:        "Backup Files",
+		Description: "Detect backup file access attempts",
+		Matchers: []SimplifiedMatcher{
+			{
+				Type: "word",
+				Patterns: []string{
+					".bak", ".backup", ".old", ".orig", ".save",
+					".swp", ".swo", ".tmp", "~",
+					".zip", ".tar", ".gz", ".rar",
+				},
+				Scope:    "request",
+				MatchAll: false,
+			},
+		},
+	},
+
+	"jwt_token": {
+		Name:        "JWT Token Detection",
+		Description: "Detect JWT tokens in responses",
+		Matchers: []SimplifiedMatcher{
+			{
+				Type:     "regex",
+				Patterns: []string{`eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+`},
+				Scope:    "response",
+				MatchAll: false,
+			},
+		},
+	},
+
+	"api_keys": {
+		Name:        "API Keys Exposure",
+		Description: "Detect exposed API keys and tokens",
+		Matchers: []SimplifiedMatcher{
+			{
+				Type: "regex",
+				Patterns: []string{
+					`AKIA[0-9A-Z]{16}`,                        // AWS Access Key
+					`sk_live_[0-9a-zA-Z]{24,}`,                // Stripe API Key
+					`AIza[0-9A-Za-z_-]{35}`,                   // Google API Key
+					`ghp_[0-9a-zA-Z]{36}`,                     // GitHub Personal Access Token
+					`xox[baprs]-[0-9]{10,12}-[0-9a-zA-Z]{24}`, // Slack Token
+				},
+				Scope:    "response",
+				MatchAll: false,
+			},
+		},
+	},
+
+	"database_error": {
+		Name:        "Database Error",
+		Description: "Detect database error messages",
+		Matchers: []SimplifiedMatcher{
+			{
+				Type: "word",
+				Patterns: []string{
+					"MySQL", "PostgreSQL", "Oracle", "MSSQL", "SQLite",
+					"ORA-", "SQL syntax", "mysql_fetch", "pg_query",
+					"sqlite_query", "SQLSTATE", "SQLException",
+					"Unclosed quotation mark", "Syntax error",
+				},
+				Scope:    "response",
+				MatchAll: false,
+			},
+		},
+	},
+
+	"cors_misconfiguration": {
+		Name:        "CORS Misconfiguration",
+		Description: "Detect potential CORS misconfigurations",
+		Matchers: []SimplifiedMatcher{
+			{
+				Type:     "word",
+				Patterns: []string{"Access-Control-Allow-Origin: *", "Access-Control-Allow-Credentials: true"},
+				Scope:    "response",
+				MatchAll: false,
+			},
+		},
+	},
 }
 
 // getSecurityPattern 获取内置安全模式
