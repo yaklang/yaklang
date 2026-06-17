@@ -14,6 +14,9 @@ type CompileExcludeFunc func(path string) bool
 // DefaultCompileExcludeDirNames are directory base names skipped during recursive scan.
 // Each name is also expanded into glob patterns in DefaultCompileExcludePatterns().
 var DefaultCompileExcludeDirNames = []string{
+	".claude",
+	".codex",
+	".cursor",
 	".gradle",
 	".git",
 	".hg",
