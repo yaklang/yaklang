@@ -352,6 +352,21 @@ func (lz *LazyInstruction) GetFunc() *Function {
 	return lz.Instruction.GetFunc()
 }
 
+// GetCachedFunc returns the cached function pointer without accessing the instruction cache.
+// Used by shouldDelayInstructionEviction to avoid deadlock (cache mutex reentrance).
+func (lz *LazyInstruction) GetCachedFunc() *Function {
+	if utils.IsNil(lz.Instruction) {
+		return nil
+	}
+	type funGetter interface {
+		GetCachedFunc() *Function
+	}
+	if fg, ok := lz.Instruction.(funGetter); ok {
+		return fg.GetCachedFunc()
+	}
+	return nil
+}
+
 func (lz *LazyInstruction) SetFunc(f *Function) {
 	if lz.ir != nil {
 		if f != nil {
@@ -730,7 +745,7 @@ func (lz *LazyInstruction) GetType() Type {
 func (lz *LazyInstruction) GetUsers() Users {
 	lz.check()
 	if utils.IsNil(lz.Value) {
-		return nil
+		return Users{}
 	}
 	return lz.Value.GetUsers()
 }
@@ -738,7 +753,7 @@ func (lz *LazyInstruction) GetUsers() Users {
 func (lz *LazyInstruction) GetValues() Values {
 	lz.check()
 	if utils.IsNil(lz.Value) {
-		return nil
+		return Values{}
 	}
 	return lz.Value.GetValues()
 }

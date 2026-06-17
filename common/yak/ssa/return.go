@@ -183,6 +183,9 @@ func handlerReturnType(rs []*Return, functionType *FunctionType) Type {
 				if result.GetType().GetTypeKind() == ClassBluePrintTypeKind {
 					for key, value := range result.GetAllMember() {
 						variable := value.GetLastVariable()
+						if variable == nil {
+							continue
+						}
 						functionType.SideEffects = append(functionType.SideEffects, &FunctionSideEffect{
 							Name:        variable.GetName(),
 							VerboseName: getMemberVerboseName(result, key),

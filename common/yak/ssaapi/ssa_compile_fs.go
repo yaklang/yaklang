@@ -30,6 +30,7 @@ const compileUnitWriterCacheEnv = "YAK_SSA_COMPILE_UNIT_WRITER_CACHE"
 const compileUnitHoldSCCIREnv = "YAK_SSA_COMPILE_UNIT_HOLD_SCC_IR"
 const compileUnitBatchMinFilesEnv = "YAK_SSA_COMPILE_UNIT_BATCH_MIN_FILES"
 const compileUnitBatchMinBytesEnv = "YAK_SSA_COMPILE_UNIT_BATCH_MIN_BYTES"
+const compileUnitBatchMaxFilesEnv = "YAK_SSA_COMPILE_UNIT_BATCH_MAX_FILES"
 const ssaCompileAdaptiveGCEnv = "YAK_SSA_COMPILE_ADAPTIVE_GC"
 const ssaCompileGOGCEnv = "YAK_SSA_COMPILE_GOGC"
 const ssaCompileMemLimitEnv = "YAK_SSA_COMPILE_MEM_LIMIT"
@@ -41,6 +42,7 @@ const (
 	// footprint so even with accumulation we stay under OOM threshold.
 	defaultCompileUnitBatchMinFiles = 32
 	defaultCompileUnitBatchMinBytes = 256 * 1024
+	defaultCompileUnitBatchMaxFiles = 100
 	defaultSSACompileGOGC           = 1000
 	defaultSSACompileMemLimit       = 680 * 1024 * 1024
 	// Keep this in sync with the SSA IR cache resident fast-path threshold.
@@ -451,6 +453,21 @@ func compileUnitBatchThresholds() (int, int64) {
 	return minFiles, minBytes
 }
 
+func compileUnitBatchMaxFiles() int {
+	maxFiles := defaultCompileUnitBatchMaxFiles
+	if raw := strings.TrimSpace(os.Getenv(compileUnitBatchMaxFilesEnv)); raw != "" {
+		switch strings.ToLower(raw) {
+		case "0", "false", "no", "off", "disable", "disabled":
+			return 0
+		default:
+			if v, err := strconv.Atoi(raw); err == nil && v > 0 {
+				maxFiles = v
+			}
+		}
+	}
+	return maxFiles
+}
+
 func buildCompileUnitExecutionBatches(order [][]*CompileUnit, minFiles int, minBytes int64) []compileUnitExecutionBatch {
 	if len(order) == 0 {
 		return nil
@@ -461,6 +478,7 @@ func buildCompileUnitExecutionBatches(order [][]*CompileUnit, minFiles int, minB
 	if minBytes < 0 {
 		minBytes = 0
 	}
+	maxFiles := compileUnitBatchMaxFiles()
 
 	// Calculate total project size
 	totalFiles := 0
@@ -481,6 +499,9 @@ func buildCompileUnitExecutionBatches(order [][]*CompileUnit, minFiles int, minB
 	}
 	if minBytes > 0 && totalBytes > minBytes {
 		estimatedBatchCount = max(estimatedBatchCount, int((totalBytes+minBytes-1)/minBytes))
+	}
+	if maxFiles > 0 && totalFiles > maxFiles {
+		estimatedBatchCount = max(estimatedBatchCount, (totalFiles+maxFiles-1)/maxFiles)
 	}
 	if estimatedBatchCount <= 1 {
 		// Single batch - take everything
@@ -517,6 +538,12 @@ func buildCompileUnitExecutionBatches(order [][]*CompileUnit, minFiles int, minB
 		for _, unit := range scc {
 			if unit == nil {
 				continue
+			}
+			// Check max files limit before adding unit
+			if maxFiles > 0 && current.files+len(unit.Files) > maxFiles && len(current.units) > 0 {
+				flush()
+				current.startSCC = sccIndex
+				current.endSCC = sccIndex
 			}
 			current.units = append(current.units, unit)
 			current.unitKeys = append(current.unitKeys, unit.Key)
@@ -1116,6 +1143,7 @@ func (c *Config) parseProjectWithFSUnits(
 		}
 		parseTime += time.Since(unitBuildStart)
 		logPhaseHeap(fmt.Sprintf("unit_batch_%03d", batchIndex+1))
+		runtime.GC()
 		prog.SetPreHandler(true)
 		compilePhase = "f1_units"
 	}
