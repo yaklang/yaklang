@@ -101,6 +101,52 @@ func TestPlanExecTaskTreeRecoveryRoundTripPreservesDependsOnAndSemanticIdentifie
 	require.Equal(t, aicommon.AITaskState_Processing, recRoot.Subtasks[0].GetStatus())
 }
 
+func TestPlanExecTaskTreeRecoveryRoundTripPreservesTaskId(t *testing.T) {
+	c := newTestCoordinator(t)
+
+	root := newStateTask(c, "root")
+	child := newStateTask(c, "child")
+	child.ParentTask = root
+	root.Subtasks = []*AiTask{child}
+	c.standardizeTaskTree(root)
+
+	rootTaskID := root.TaskId
+	childTaskID := child.TaskId
+	require.NotEmpty(t, rootTaskID)
+	require.NotEmpty(t, childTaskID)
+
+	var recovered recoveredTask
+	raw := utils.Jsonify(root)
+	require.NoError(t, json.Unmarshal(raw, &recovered))
+	require.Equal(t, rootTaskID, recovered.TaskId)
+	require.Equal(t, childTaskID, recovered.Subtasks[0].TaskId)
+
+	recRoot := c.buildRecoveredTaskTree(&recovered, nil)
+	require.NotNil(t, recRoot)
+	c.standardizeTaskTree(recRoot)
+	require.Equal(t, rootTaskID, recRoot.TaskId)
+	require.Equal(t, rootTaskID, recRoot.GetId())
+	require.Len(t, recRoot.Subtasks, 1)
+	require.Equal(t, childTaskID, recRoot.Subtasks[0].TaskId)
+	require.Equal(t, childTaskID, recRoot.Subtasks[0].GetId())
+}
+
+func TestPlanExecTaskTreeRecoveryLegacyTaskIdFallbackUsesIndex(t *testing.T) {
+	c := newTestCoordinator(t)
+
+	recovered := &recoveredTask{
+		Index:    "1-2",
+		Name:     "legacy-child",
+		Goal:     "legacy goal",
+		Progress: string(aicommon.AITaskState_Created),
+	}
+
+	recRoot := c.buildRecoveredTaskTree(recovered, nil)
+	require.NotNil(t, recRoot)
+	require.Equal(t, "pe-task-1-2", recRoot.TaskId)
+	require.Equal(t, "pe-task-1-2", recRoot.GetId())
+}
+
 func TestPlanExecTaskSummaryRoundTrip(t *testing.T) {
 	c := newTestCoordinator(t)
 
