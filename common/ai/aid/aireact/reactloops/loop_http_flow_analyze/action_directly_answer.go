@@ -11,15 +11,25 @@ import (
 
 var loopActionDirectlyAnswerHTTPFlowAnalyze = &reactloops.LoopAction{
 	ActionType: "directly_answer",
-	Description: "Answer the user's HTTP traffic analysis question or summarize collected HTTP flow evidence. " +
-		"Use answer_payload for short plain text answers (< 200 chars). For longer reports with Markdown formatting, use the <|FINAL_ANSWER_...|> tag OUTSIDE this action JSON. " +
-		"CRITICAL: answer_payload and FINAL_ANSWER tag are MUTUALLY EXCLUSIVE - choose ONE, never both. NEVER put <|FINAL_ANSWER_...|> text inside answer_payload field. " +
-		"IMPORTANT: directly_answer ONLY delivers the answer; the loop CONTINUES afterwards. Use 'finish' action to terminate. " +
-		"OPTIONAL: carry 'next_movements' delta alongside the answer for follow-up TODO updates.",
+	Description: `Answer the user's HTTP traffic analysis question or summarize collected HTTP flow evidence.
+[OUTPUT FORMAT OPTIONS]
+* For short plain text answers (< 200 chars):
+Use the answer_payload field inside the Action JSON.
+* For longer reports with Markdown formatting:
+Use the <|FINAL_ANSWER_...|> tag OUTSIDE the Action JSON.
+NOTE: Even when using the external tag, a foundational Action JSON structure is still REQUIRED, but the answer_payload field must be left empty.
+[CRITICAL RULES]
+* You MUST use EXACTLY ONE of either answer_payload or the external FINAL_ANSWER tag.
+* They are strictly mutually exclusive, and at least one is required.
+* NEVER nest the <|FINAL_ANSWER_...|> tag inside the answer_payload field.
+[PROCESS CONTROL]
+* The directly_answer action ONLY delivers the answer; the execution loop CONTINUES afterward.
+* You MUST explicitly invoke the finish action to terminate the process.`,
 	Options: []aitool.ToolOption{
 		aitool.WithStringParam(
 			"answer_payload",
 			aitool.WithParam_Description(`Short plain text answer (< 200 chars). For longer Markdown reports, leave this field EMPTY and use <|FINAL_ANSWER_...|> tag OUTSIDE the action JSON instead. NEVER include <|FINAL_ANSWER_...|> markers or tag content inside this field.`),
+			aitool.WithParam_Required(true),
 		),
 	},
 	AITagStreamFields: []*reactloops.LoopAITagField{
@@ -43,7 +53,7 @@ var loopActionDirectlyAnswerHTTPFlowAnalyze = &reactloops.LoopAction{
 			payload = strings.TrimSpace(action.GetInvokeParams("next_action").GetString("answer_payload"))
 		}
 		tagPayload := strings.TrimSpace(loop.Get("tag_final_answer"))
-		if payload != "" && tagPayload != "" {
+		if payload != "" && tagPayload != "" && payload != tagPayload {
 			return utils.Error("directly_answer requires exactly one of answer_payload or FINAL_ANSWER tag, but both were provided")
 		}
 		if payload == "" {
@@ -75,7 +85,7 @@ var loopActionDirectlyAnswerHTTPFlowAnalyze = &reactloops.LoopAction{
 		markDirectlyAnswered(loop)
 		invoker.EmitFileArtifactWithExt("directly_answer", ".md", payload)
 		invoker.EmitResultAfterStream(payload)
-		invoker.AddToTimeline("directly_answer", "HTTP flow analysis directly answered: "+utils.ShrinkTextBlock(payload, 400))
+		invoker.AddToTimeline("directly_answer", "HTTP flow analysis directly answered: "+payload)
 
 		// directly_answer 绝不 Exit: emit 完答复后统一交给 DirectlyAnswerContinue
 		// 追加 timeline + 续跑, 终结只能由显式 finish action 完成. 与 buildin 对齐.
