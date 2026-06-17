@@ -3,7 +3,6 @@ package yaklangcodetests
 import (
 	"bytes"
 	"fmt"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -162,13 +161,7 @@ func TestFocusMode_WriteYaklangCodeCauseErrorAndThenModify(t *testing.T) {
 		}
 	}
 
-	filename := findGenCodeFilename(waitResult.filenames)
-	if filename == "" {
-		t.Fatal("gen_code_ filename not found")
-	}
-	if !strings.Contains(filename, string(filepath.Separator)+"code"+string(filepath.Separator)) {
-		t.Fatalf("preview artifact should live under code dir, got %s", filename)
-	}
+	_ = assertPreviewGenCodeArtifactPath(t, waitResult.filenames, waitResult.codeChangeEvents)
 
 	fmt.Println("--------------------------------------")
 	tl := ins.DumpTimeline()

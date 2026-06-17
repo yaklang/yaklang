@@ -133,6 +133,24 @@ func (i *Emitter) PushEventProcesser(newHandler EventProcesser) *Emitter {
 	return copyEmitter
 }
 
+// PushEventProcessersFrom returns an emitter that runs all processors registered on other,
+// then this emitter's own processors and handler. Used when binding a task-level emitter
+// while preserving loop-scoped event filters (e.g. deferred yaklang editor sync).
+func (i *Emitter) PushEventProcessersFrom(other *Emitter) *Emitter {
+	if i == nil {
+		return other
+	}
+	if other == nil || other.eventProcesserStack == nil || other.eventProcesserStack.Len() == 0 {
+		return i
+	}
+	result := i
+	other.eventProcesserStack.ForeachStack(func(f EventProcesser) bool {
+		result = result.PushEventProcesser(f)
+		return true
+	})
+	return result
+}
+
 func (i *Emitter) PopEventProcesser() *Emitter {
 	var copyEmitter = new(Emitter)
 	*copyEmitter = *i

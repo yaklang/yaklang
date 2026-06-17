@@ -8,7 +8,7 @@ import (
 type yaklangAnalyzeRequirementOptions struct {
 	userInput       string
 	hasAttachedPath bool
-	codePreviewOnly bool
+	createMode      bool
 	attachedPath    string
 	workspacePath   string
 	hasGrepSearcher bool
@@ -17,14 +17,14 @@ type yaklangAnalyzeRequirementOptions struct {
 
 func buildYaklangAnalyzeRequirementPrompt(opts yaklangAnalyzeRequirementOptions) string {
 	nonce := utils.RandStringBytes(4)
-	if opts.codePreviewOnly {
+	if opts.createMode {
 		return utils.MustRenderTemplate(`
 你的目标是分析用户需求，完成以下任务：
 
-【代码预览模式】
+【新建文件模式】
 {{ if .workspacePath }}用户工作区目录：{{ .workspacePath }}
 {{ else }}用户未指定目标文件。
-{{ end }}本次任务只生成预览代码供前端展示，不会绑定或写入任何磁盘文件；无需判断 create_new_file / existed_filepath，请专注生成代码搜索关键字。
+{{ end }}本次任务将生成新 Yak 脚本（任务结束时由系统创建 gen_code_*.yak）；无需判断 create_new_file / existed_filepath，请专注生成代码搜索关键字。
 
 {{ if .hasGrepSearcher }}【任务1：生成精确代码搜索关键字(Grep模式)】
 根据用户需求，生成 2-4 个搜索模式（search_patterns），用于在 Yaklang 代码样例库中进行精确文本搜索：
@@ -124,7 +124,7 @@ Bad: "端口扫描" - 不完整句式
 
 func buildYaklangAnalyzeRequirementToolOptions(opts yaklangAnalyzeRequirementOptions, hasSearcher bool) []aitool.ToolOption {
 	var toolOptions []aitool.ToolOption
-	if !opts.codePreviewOnly {
+	if !opts.createMode {
 		toolOptions = append(toolOptions,
 			aitool.WithBoolParam("create_new_file", aitool.WithParam_Description("Is this task to create a new file or modify an existing file? If user mentions specific file path, set to false."), aitool.WithParam_Required(true)),
 			aitool.WithStringParam("existed_filepath", aitool.WithParam_Description("Only when create_new_file is false. The file path to modify.")),

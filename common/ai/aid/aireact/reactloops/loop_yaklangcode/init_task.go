@@ -20,12 +20,18 @@ func buildInitTask(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearc
 		attachedDatas := task.GetAttachedDatas()
 		reactloops.RunAttachedExtraResourcesInit(r, loop, attachedDatas)
 		editorCtx := initYaklangEditorContextFromAttached(r, loop, attachedDatas)
-		codePreviewOnly := resolveYaklangCodePreviewOnly(editorCtx)
-		setYaklangCodePreviewOnly(loop, codePreviewOnly)
-		if codePreviewOnly {
-			log.Infof("code preview mode: no editor target file; generated code will not bind to disk paths")
+		if editorCtx == nil {
+			editorCtx = &aicommon.YaklangEditorContext{}
 		}
-		hasAttachedPath := editorCtx != nil && editorCtx.HasEditorFile()
+		aicommon.EnrichYaklangEditorContextFromUserInput(editorCtx, task.GetUserInput())
+		if editorCtx.HasEditorFile() {
+			loop.Set("editor_file_path", editorCtx.EditorFile)
+		}
+		createMode := editorCtx.IsCreateMode()
+		if createMode {
+			log.Infof("create mode: no editor target file; will emit op=create at loop end")
+		}
+		hasAttachedPath := editorCtx.HasEditorFile()
 		attachedPath := ""
 		workspacePath := ""
 		if editorCtx != nil {
@@ -48,7 +54,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearc
 		analyzeOpts := yaklangAnalyzeRequirementOptions{
 			userInput:        task.GetUserInput(),
 			hasAttachedPath:  hasAttachedPath,
-			codePreviewOnly:  codePreviewOnly,
+			createMode:       createMode,
 			attachedPath:     attachedPath,
 			workspacePath:    workspacePath,
 			hasGrepSearcher:  hasGrepSearcher,

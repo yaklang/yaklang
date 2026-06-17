@@ -3,6 +3,7 @@ package loopinfra
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 )
@@ -18,6 +19,12 @@ func (f *SingleFileModificationSuiteFactory) persistLoopFileContent(
 		return nil
 	}
 
+	if dir := filepath.Dir(filename); dir != "" && dir != "." {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			runtime.AddToTimeline(failEntry, fmt.Sprintf("FAILED to create parent dir for file: %s, error: %s", filename, err.Error()))
+			return err
+		}
+	}
 	if err := os.WriteFile(filename, []byte(content), 0644); err != nil {
 		runtime.AddToTimeline(failEntry, fmt.Sprintf("FAILED to write file: %s, error: %s", filename, err.Error()))
 		return err

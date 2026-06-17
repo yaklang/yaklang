@@ -559,9 +559,13 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) (finalE
 	if r.taskMutex == nil {
 		return errors.New("re-act loop taskMutex is nil")
 	}
-	if task.GetEmitter() != nil {
-		loopEmitter := r.emitter // bind current task emitter to loop, restore after loop finished
-		r.emitter = task.GetEmitter()
+	if taskEmitter := task.GetEmitter(); taskEmitter != nil {
+		loopEmitter := r.emitter
+		if loopEmitter != nil && loopEmitter != taskEmitter {
+			r.emitter = taskEmitter.PushEventProcessersFrom(loopEmitter)
+		} else {
+			r.emitter = taskEmitter
+		}
 		defer func() {
 			r.emitter = loopEmitter
 		}()

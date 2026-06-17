@@ -56,13 +56,13 @@ type SingleFileModificationOption func(*SingleFileModificationSuiteFactory)
 // NewSingleFileModificationSuiteFactory creates a new factory with the given options
 func NewSingleFileModificationSuiteFactory(runtime aicommon.AIInvokeRuntime, opts ...SingleFileModificationOption) *SingleFileModificationSuiteFactory {
 	f := &SingleFileModificationSuiteFactory{
-		prefix:        "content",
-		actionSuffix:  "content", // default suffix: write_content, modify_content, etc.
-		fileExtension: ".txt",
-		aiTagName:     "GEN_CONTENT",
-		aiTagVariable: "content",
-		aiNodeId:      "content",
-		contentType:   "text/plain",
+		prefix:         "content",
+		actionSuffix:   "content", // default suffix: write_content, modify_content, etc.
+		fileExtension:  ".txt",
+		aiTagName:      "GEN_CONTENT",
+		aiTagVariable:  "content",
+		aiNodeId:       "content",
+		contentType:    "text/plain",
 		eventType:      "yaklang_code_editor",
 		exitAfterWrite: true,
 		runtime:        runtime,

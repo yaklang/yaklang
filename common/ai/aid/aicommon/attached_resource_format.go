@@ -15,29 +15,6 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
-func normalizeAttachedResourceType(typ string) string {
-	return strings.ToLower(strings.TrimSpace(typ))
-}
-
-func IsAttachedHTTPFlowResource(data *AttachedResource) bool {
-	if data == nil {
-		return false
-	}
-	switch normalizeAttachedResourceType(data.Type) {
-	case AttachedResourceTypeHTTPFlowID, "httpflowid", "http_flow":
-		return true
-	default:
-		return false
-	}
-}
-
-func IsAttachedSelectedResource(data *AttachedResource) bool {
-	if data == nil {
-		return false
-	}
-	return normalizeAttachedResourceType(data.Type) == AttachedResourceTypeSelected
-}
-
 func attachedHTTPFlowIDsFromResource(data *AttachedResource) ([]int64, error) {
 	if data == nil {
 		return nil, utils.Error("attached resource is nil")

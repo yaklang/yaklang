@@ -69,7 +69,6 @@ func TestYaklangDeferredEditorSync_SuppressesUntilLoopDone(t *testing.T) {
 
 	filename := filepath.Join(t.TempDir(), "demo.yak")
 	require.NoError(t, os.WriteFile(filename, []byte("a\nold\nc\n"), 0o644))
-	setYaklangCodePreviewOnly(loop, false)
 	loop.Set("editor_file_path", filename)
 	loop.Set("filename", filename)
 	loop.Set("full_code", "a\nold\nc\n")
@@ -85,6 +84,7 @@ func TestYaklangDeferredEditorSync_SuppressesUntilLoopDone(t *testing.T) {
 	}), op)
 
 	assert.Empty(t, capture.byType(schema.EVENT_TYPE_YAKLANG_CODE_CHANGE))
+	assert.Empty(t, capture.byType(schema.EVENT_TYPE_FILESYSTEM_PIN_FILENAME))
 	flushYaklangDeferredEditorSync(loop)
 
 	events := capture.byType(schema.EVENT_TYPE_YAKLANG_CODE_CHANGE)
@@ -98,29 +98,28 @@ func TestYaklangDeferredEditorSync_SuppressesUntilLoopDone(t *testing.T) {
 	assert.Equal(t, "modify_code", payload.SourceAction)
 }
 
-func TestYaklangDeferredEditorSync_PreviewModePersistsToCodeDir(t *testing.T) {
+func TestYaklangDeferredEditorSync_CreateModePersistsToCodeDir(t *testing.T) {
 	base := t.TempDir()
 	t.Setenv("YAKIT_HOME", base)
 
 	capture := &editorSyncCapturedEvents{}
 	runtime := mock.NewMockInvoker(context.Background())
 	cfg := runtime.GetConfig().(*mock.MockedAIConfig)
-	cfg.Emitter = aicommon.NewEmitter("yaklang-editor-sync-preview-test", func(e *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
+	cfg.Emitter = aicommon.NewEmitter("yaklang-editor-sync-create-test", func(e *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
 		capture.appendEvent(e)
 		return e, nil
 	})
 
-	loop, err := reactloops.NewReActLoop("yaklang-editor-sync-preview-test", runtime)
+	loop, err := reactloops.NewReActLoop("yaklang-editor-sync-create-test", runtime)
 	require.NoError(t, err)
 
 	task := aicommon.NewStatefulTaskBase("task", "test", context.Background(), cfg.Emitter, true)
 	loop.SetCurrentTask(task)
-	setYaklangCodePreviewOnly(loop, true)
 
-	previewPath, err := newYaklangPreviewCodePath()
+	genPath, err := newYaklangGenCodePath()
 	require.NoError(t, err)
-	loop.Set("filename", previewPath)
-	loop.Set("full_code", "println(\"preview\")")
+	loop.Set("filename", genPath)
+	loop.Set("full_code", "println(\"create\")")
 	loop.Set(yaklangEditorSyncPendingLoopKey, true)
 
 	flushYaklangDeferredEditorSync(loop)
@@ -131,12 +130,54 @@ func TestYaklangDeferredEditorSync_PreviewModePersistsToCodeDir(t *testing.T) {
 	var payload yaklangCodeChangeEvent
 	require.NoError(t, json.Unmarshal(events[0].Content, &payload))
 	assert.Equal(t, loopinfra.LoopYaklangCodeEventOpCreate, payload.Op)
-	assert.Equal(t, "println(\"preview\")", payload.Code.Content)
-	assert.Equal(t, previewPath, payload.Code.Path)
+	assert.Equal(t, "println(\"create\")", payload.Code.Content)
+	assert.Equal(t, genPath, payload.Code.Path)
 
-	data, readErr := os.ReadFile(previewPath)
+	data, readErr := os.ReadFile(genPath)
 	require.NoError(t, readErr)
-	assert.Equal(t, "println(\"preview\")", string(data))
+	assert.Equal(t, "println(\"create\")", string(data))
+}
+
+func TestYaklangDeferredEditorSync_EditorFileWinsOverGenCodePath(t *testing.T) {
+	base := t.TempDir()
+	t.Setenv("YAKIT_HOME", base)
+
+	capture := &editorSyncCapturedEvents{}
+	runtime := mock.NewMockInvoker(context.Background())
+	cfg := runtime.GetConfig().(*mock.MockedAIConfig)
+	cfg.Emitter = aicommon.NewEmitter("yaklang-editor-sync-target-test", func(e *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
+		capture.appendEvent(e)
+		return e, nil
+	})
+
+	loop, err := reactloops.NewReActLoop("yaklang-editor-sync-target-test", runtime)
+	require.NoError(t, err)
+
+	task := aicommon.NewStatefulTaskBase("task", "test", context.Background(), cfg.Emitter, true)
+	loop.SetCurrentTask(task)
+
+	editorFile := filepath.Join(base, "123.yak")
+	genCodePath, err := newYaklangGenCodePath()
+	require.NoError(t, err)
+
+	loop.Set("editor_file_path", editorFile)
+	loop.Set("filename", genCodePath)
+	loop.Set("full_code", "println(\"target\")")
+	loop.Set(yaklangEditorSyncPendingLoopKey, true)
+
+	flushYaklangDeferredEditorSync(loop)
+
+	events := capture.byType(schema.EVENT_TYPE_YAKLANG_CODE_CHANGE)
+	require.Len(t, events, 1)
+
+	var payload yaklangCodeChangeEvent
+	require.NoError(t, json.Unmarshal(events[0].Content, &payload))
+	assert.Equal(t, loopinfra.LoopYaklangCodeEventOpReplace, payload.Op)
+	assert.Equal(t, filepath.Clean(editorFile), filepath.Clean(payload.Code.Path))
+
+	data, readErr := os.ReadFile(editorFile)
+	require.NoError(t, readErr)
+	assert.Equal(t, "println(\"target\")", string(data))
 }
 
 func mustBuildYaklangAction(t *testing.T, actionName string, fields map[string]any) *aicommon.Action {

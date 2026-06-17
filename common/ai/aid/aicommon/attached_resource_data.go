@@ -30,12 +30,12 @@ func RegisterAttachedResourceDataFactory(typ string, factory AttachedResourceDat
 	attachedResourceDataFactories.Lock()
 	defer attachedResourceDataFactories.Unlock()
 
-	attachedResourceDataFactories.items[normalizeAttachedResourceType(typ)] = factory
+	attachedResourceDataFactories.items[NormalizeAttachedResourceType(typ)] = factory
 	for _, alias := range aliases {
 		if strings.TrimSpace(alias) == "" {
 			continue
 		}
-		attachedResourceDataFactories.items[normalizeAttachedResourceType(alias)] = factory
+		attachedResourceDataFactories.items[NormalizeAttachedResourceType(alias)] = factory
 	}
 }
 
@@ -45,7 +45,7 @@ func ParseAttachedResourceData(data *AttachedResource) (AttachedResourceData, er
 	}
 
 	attachedResourceDataFactories.RLock()
-	factory := attachedResourceDataFactories.items[normalizeAttachedResourceType(data.Type)]
+	factory := attachedResourceDataFactories.items[data.NormalizedType()]
 	attachedResourceDataFactories.RUnlock()
 	if factory == nil {
 		resource := NewDefaultAttachedResourceData(data.Type, data.Key)

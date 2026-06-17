@@ -68,8 +68,8 @@ type AIResponse struct {
 	onReasonChunk   func([]byte)
 	onReasonChunkMu sync.Mutex
 
-	setErrorFunc func(error)   // 设置错误的函数，支持 TeeAIResponse 拷贝
-	getErrorFunc func() error  // 获取错误的函数，支持 TeeAIResponse 拷贝
+	setErrorFunc func(error)  // 设置错误的函数，支持 TeeAIResponse 拷贝
+	getErrorFunc func() error // 获取错误的函数，支持 TeeAIResponse 拷贝
 }
 
 // SetError 设置 AI 调用过程中的错误

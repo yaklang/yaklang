@@ -26,17 +26,17 @@ func TestYakRunnerProtocol_1_WorkspaceAndFilePathAttachments(t *testing.T) {
 	editorFile := filepath.Join(workspace, "scan.yak")
 
 	attached := []*aicommon.AttachedResource{
-		aicommon.NewAttachedResource(AttachedResourceTypeFile, AttachedResourceKeyWorkspaceDirectory, workspace),
-		aicommon.NewAttachedResource(AttachedResourceTypeFile, AttachedResourceKeyEditorFile, editorFile),
+		aicommon.NewAttachedResource(aicommon.AttachedResourceTypeFile, aicommon.YaklangAttachedResourceKeyWorkspaceDirectory, workspace),
+		aicommon.NewAttachedResource(aicommon.AttachedResourceTypeFile, aicommon.YaklangAttachedResourceKeyEditorFile, editorFile),
 	}
 
-	ctx := yaklangEditorContextFromAttached(attached)
+	ctx := aicommon.ParseYaklangEditorContextFromAttached(attached)
 	require.NotNil(t, ctx)
 	assert.Equal(t, filepath.Clean(workspace), ctx.WorkspacePath)
 	assert.Equal(t, filepath.Clean(editorFile), ctx.EditorFile)
 	assert.False(t, ctx.HasSelection())
 
-	md := formatYaklangEditorContextMarkdown(ctx)
+	md := aicommon.FormatYaklangEditorContextMarkdown(ctx)
 	assert.Contains(t, md, "Workspace:")
 	assert.Contains(t, md, "yakit-projects")
 	assert.Contains(t, md, "scan.yak")
@@ -60,12 +60,12 @@ func TestYakRunnerProtocol_2_SelectedContentAttachment(t *testing.T) {
 	selectionJSON := `{"path":"/Users/me/yakit-projects/demo/scan.yak","startLine":10,"endLine":18,"language":"yak","content":"println(\"hi\")"}`
 
 	attached := []*aicommon.AttachedResource{
-		aicommon.NewAttachedResource(AttachedResourceTypeFile, AttachedResourceKeyWorkspaceDirectory, workspace),
-		aicommon.NewAttachedResource(AttachedResourceTypeFile, AttachedResourceKeyEditorFile, editorFile),
+		aicommon.NewAttachedResource(aicommon.AttachedResourceTypeFile, aicommon.YaklangAttachedResourceKeyWorkspaceDirectory, workspace),
+		aicommon.NewAttachedResource(aicommon.AttachedResourceTypeFile, aicommon.YaklangAttachedResourceKeyEditorFile, editorFile),
 		aicommon.NewAttachedResource(aicommon.AttachedResourceTypeSelected, aicommon.AttachedResourceKeyContent, selectionJSON),
 	}
 
-	ctx := yaklangEditorContextFromAttached(attached)
+	ctx := aicommon.ParseYaklangEditorContextFromAttached(attached)
 	require.NotNil(t, ctx)
 	require.NotNil(t, ctx.Selection)
 	assert.Equal(t, 10, ctx.Selection.StartLine)
@@ -74,11 +74,11 @@ func TestYakRunnerProtocol_2_SelectedContentAttachment(t *testing.T) {
 	assert.Equal(t, `println("hi")`, ctx.Selection.Content)
 	assert.Equal(t, filepath.Clean(editorFile), ctx.EditorFile)
 
-	code, ok := attachedInitialCode(ctx)
+	code, ok := aicommon.YaklangAttachedInitialCode(ctx)
 	require.True(t, ok)
 	assert.Equal(t, `println("hi")`, code)
 
-	md := formatYaklangEditorContextMarkdown(ctx)
+	md := aicommon.FormatYaklangEditorContextMarkdown(ctx)
 	assert.Contains(t, md, "Selection Lines: 10-18")
 	assert.Contains(t, md, "Selection Language: yak")
 }
