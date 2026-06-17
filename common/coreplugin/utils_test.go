@@ -57,6 +57,14 @@ var (
 	vulAddr  string
 	server   VulServerInfo
 	mockOnce sync.Once
+
+	// mock DNSLog state must live at package level. mockOnce.Do only runs once
+	// for the whole package, so capturing per-call local maps inside the Once
+	// closure would freeze the mock onto the very first caller's maps and make
+	// later callers (including SSRF retries) share stale state. Keeping the
+	// state here makes every CoreMitmPlugTest call reuse the same live maps.
+	mockDNSLogMutex        sync.Mutex
+	mockDNSLogTokenResults = make(map[string]*tpb.DNSLogEvent)
 )
 
 func init() {
@@ -74,44 +82,38 @@ func init() {
 func CoreMitmPlugTest(pluginName string, vulServer VulServerInfo, vulInfo VulInfo, client ypb.YakClient, t *testing.T) bool {
 	coreplugin.InitDBForTest()
 
-	// mock DNSLog server
-	var mockMutex sync.Mutex
-	mockDomainToTokenMap := make(map[string]string, 0)
-	mockTokenToResultMapLock := sync.Mutex{}
-	mockTokenToResultMap := make(map[string]*tpb.DNSLogEvent, 0)
-
+	// mock DNSLog server.
+	// NOTE: the mock must NEVER fall back to the real implementation. Previously
+	// CheckDNSLogByToken used .When(token recorded) which, on a lost race (the
+	// vulinbox failing to reach the local mock domain in time under CI load),
+	// fell through to the real function and dialed the public reverse server
+	// (ns1.cybertunnel.run). On CI that real call is slow/unreachable and, with
+	// retries and no overall deadline, accumulated into the 6m test timeout.
+	// Returning mock results unconditionally keeps the plugin fully deterministic:
+	// token recorded -> DNSLog hit; otherwise -> empty (a transient miss is then
+	// covered by the test-level retries instead of a real network call).
 	mockOnce.Do(func() {
 		Mock(yakit.NewDNSLogDomain).To(func() (domain string, token string, _ error) {
 			mockToken := utils.RandStringBytes(16)
 			host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
-				mockTokenToResultMapLock.Lock()
-				defer mockTokenToResultMapLock.Unlock()
-				mockTokenToResultMap[mockToken] = &tpb.DNSLogEvent{Domain: ""}
+				mockDNSLogMutex.Lock()
+				defer mockDNSLogMutex.Unlock()
+				mockDNSLogTokenResults[mockToken] = &tpb.DNSLogEvent{Domain: ""}
 				return []byte("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n")
 			})
 			mockDomain := utils.HostPort(host, port)
-
-			mockMutex.Lock()
-			defer mockMutex.Unlock()
-			mockDomainToTokenMap[mockDomain] = mockToken
 			log.Infof("mock domain: %v, token: %v", mockDomain, mockToken)
 			return mockDomain, mockToken, nil
 		}).Build()
 
-		Mock(yakit.CheckDNSLogByToken).When(func(token string, yakitInfo yakit.YakitPluginInfo, timeout ...float64) bool {
-			mockTokenToResultMapLock.Lock()
-			_, ok := mockTokenToResultMap[token]
-			mockTokenToResultMapLock.Unlock()
-			return ok
-		}).To(func(token string, yakitInfo yakit.YakitPluginInfo, timeout ...float64) ([]*tpb.DNSLogEvent, error) {
-			mockTokenToResultMapLock.Lock()
-			events, ok := mockTokenToResultMap[token]
-			mockTokenToResultMapLock.Unlock()
+		Mock(yakit.CheckDNSLogByToken).To(func(token string, yakitInfo yakit.YakitPluginInfo, timeout ...float64) ([]*tpb.DNSLogEvent, error) {
+			mockDNSLogMutex.Lock()
+			events, ok := mockDNSLogTokenResults[token]
+			mockDNSLogMutex.Unlock()
 			if !ok {
 				return nil, nil
-			} else {
-				return []*tpb.DNSLogEvent{events}, nil
 			}
+			return []*tpb.DNSLogEvent{events}, nil
 		}).Build()
 	})
 
@@ -131,7 +133,12 @@ func CoreMitmPlugTest(pluginName string, vulServer VulServerInfo, vulInfo VulInf
 	}
 
 	for i := 0; i < maxRetries; i++ {
-		stream, err := client.DebugPlugin(context.Background(), &ypb.DebugPluginRequest{
+		// Bound every single DebugPlugin run with a deadline. Without it a stalled
+		// plugin execution can only be killed by the global test timeout (6m),
+		// which defeats the retry logic. On timeout the stream returns an error,
+		// we treat the attempt as a failure and let the retry loop handle it.
+		ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+		stream, err := client.DebugPlugin(ctx, &ypb.DebugPluginRequest{
 			Code:       string(codeBytes),
 			PluginType: "mitm",
 			Input:      utils.HostPort(host, port),
@@ -146,6 +153,7 @@ func CoreMitmPlugTest(pluginName string, vulServer VulServerInfo, vulInfo VulInf
 			},
 		})
 		if err != nil {
+			cancel()
 			if i < maxRetries-1 {
 				continue
 			}
@@ -156,15 +164,19 @@ func CoreMitmPlugTest(pluginName string, vulServer VulServerInfo, vulInfo VulInf
 		for {
 			exec, err := stream.Recv()
 			if err != nil {
-				if err == io.EOF {
-					break
+				// EOF means finished; any other error (incl. context deadline)
+				// means this attempt is aborted. Break out either way; never
+				// dereference exec when err != nil.
+				if err != io.EOF {
+					log.Warn(err)
 				}
-				log.Warn(err)
+				break
 			}
 			if runtimeId == "" {
 				runtimeId = exec.RuntimeID
 			}
 		}
+		cancel()
 
 		if runtimeId == "" {
 			if i < maxRetries-1 {
