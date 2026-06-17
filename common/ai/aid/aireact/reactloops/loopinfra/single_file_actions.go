@@ -157,8 +157,8 @@ func (f *SingleFileModificationSuiteFactory) buildModifyAction() reactloops.ReAc
 		partialCode := loop.Get(codeVar)
 
 		editor := memedit.NewMemEditor(fullCode)
-			modifyStartLine := action.GetInt("modify_start_line")
-			modifyEndLine := action.GetInt("modify_end_line")
+			modifyStartLine := NormalizeActionLineNumber(loop, fullCodeVar, action.GetInt("modify_start_line"))
+			modifyEndLine := NormalizeActionLineNumber(loop, fullCodeVar, action.GetInt("modify_end_line"))
 
 			msg := fmt.Sprintf("decided to modify code file, from start_line[%v] to end_line:[%v]", modifyStartLine, modifyEndLine)
 			invoker.AddToTimeline("modify_code", msg)
@@ -171,6 +171,8 @@ func (f *SingleFileModificationSuiteFactory) buildModifyAction() reactloops.ReAc
 			// Prettify the code (extract line numbers if present)
 			start, end, codeSegment, fixedCode := f.PrettifyCode(partialCode)
 			if fixedCode {
+				start = NormalizeActionLineNumber(loop, fullCodeVar, start)
+				end = NormalizeActionLineNumber(loop, fullCodeVar, end)
 				if start == modifyStartLine && end == modifyEndLine {
 					log.Infof("use prettified code segment for 'modify_code' action, fix range %d to %d", start, end)
 					partialCode = codeSegment
@@ -292,7 +294,7 @@ func (f *SingleFileModificationSuiteFactory) buildInsertAction() reactloops.ReAc
 			fullCode := loop.Get(fullCodeVar)
 			partialCode := loop.Get(codeVar)
 			editor := memedit.NewMemEditor(fullCode)
-			insertLine := action.GetInt("insert_line")
+			insertLine := NormalizeActionLineNumber(loop, fullCodeVar, action.GetInt("insert_line"))
 
 			msg := fmt.Sprintf("decided to insert lines at line[%v]", insertLine)
 			invoker.AddToTimeline("insert_lines", msg)
@@ -412,8 +414,8 @@ func (f *SingleFileModificationSuiteFactory) buildDeleteAction() reactloops.ReAc
 
 			fullCode := loop.Get(fullCodeVar)
 			editor := memedit.NewMemEditor(fullCode)
-			deleteStartLine := action.GetInt("delete_start_line")
-			deleteEndLine := action.GetInt("delete_end_line")
+			deleteStartLine := NormalizeActionLineNumber(loop, fullCodeVar, action.GetInt("delete_start_line"))
+			deleteEndLine := NormalizeActionLineNumber(loop, fullCodeVar, action.GetInt("delete_end_line"))
 
 			var msg string
 			var err error

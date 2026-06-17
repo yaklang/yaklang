@@ -1812,6 +1812,27 @@ func PrefixLinesWithLineNumbers(input interface{}) string {
 	return strings.Join(result, "\n")
 }
 
+// PrefixLinesWithLineNumbersFrom prefixes each line with a line number starting at startLine (1-based).
+// When startLine <= 1, behavior matches PrefixLinesWithLineNumbers.
+func PrefixLinesWithLineNumbersFrom(startLine int, input interface{}) string {
+	if startLine <= 1 {
+		return PrefixLinesWithLineNumbers(input)
+	}
+	var content string
+	switch v := input.(type) {
+	case string:
+		content = v
+	default:
+		content = InterfaceToString(input)
+	}
+	lines := strings.Split(content, "\n")
+	result := make([]string, 0, len(lines))
+	for i, line := range lines {
+		result = append(result, fmt.Sprintf("%d | %s", startLine+i, line))
+	}
+	return strings.Join(result, "\n")
+}
+
 // PrefixLinesReader 为文本的每一行添加指定前缀，输入和输出都是 io.Reader
 // 对所有输入（包括单行和多行）都添加前缀，适合处理大文件或流式数据
 // Example:

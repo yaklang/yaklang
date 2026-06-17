@@ -205,12 +205,31 @@ func YaklangAttachedInitialCode(ctx *YaklangEditorContext) (code string, ok bool
 	return code, code != ""
 }
 
-// ResolveYaklangInitFullCode prefers attached selection content over on-disk file bytes.
-func ResolveYaklangInitFullCode(editorCtx *YaklangEditorContext, diskContent string) (code string, fromAttached bool) {
+// ResolveYaklangInitFullCode picks the in-memory buffer for modify_code / delete_code / insert_code.
+// When an editor file is attached and diskContent is non-empty, disk wins so line numbers match the
+// on-disk file. Otherwise attached selection content is used when present (e.g. unsaved buffer).
+func ResolveYaklangInitFullCode(editorCtx *YaklangEditorContext, diskContent string) (code string, fromAttachedSelection bool) {
+	if editorCtx != nil && editorCtx.HasEditorFile() {
+		if trimmed := strings.TrimSpace(diskContent); trimmed != "" {
+			return trimmed, false
+		}
+	}
 	if attachedCode, ok := YaklangAttachedInitialCode(editorCtx); ok {
 		return attachedCode, true
 	}
 	return diskContent, false
+}
+
+// YaklangCodeLineBase returns the 0-based offset between full_code line indices and absolute editor
+// file line numbers. Non-zero only when full_code is a selection snippet (not the whole file).
+func YaklangCodeLineBase(editorCtx *YaklangEditorContext, fullCodeFromSelection bool) int {
+	if !fullCodeFromSelection || editorCtx == nil || !editorCtx.HasSelection() {
+		return 0
+	}
+	if editorCtx.Selection.StartLine > 0 {
+		return editorCtx.Selection.StartLine - 1
+	}
+	return 0
 }
 
 // ResolveYaklangInitTargetPath picks the init target file path (attachment beats liteforge).

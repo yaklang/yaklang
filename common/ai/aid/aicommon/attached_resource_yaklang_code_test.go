@@ -89,16 +89,43 @@ func TestResolveYaklangInitTargetPath(t *testing.T) {
 	require.Equal(t, "/tmp/liteforge.yak", path)
 }
 
-func TestResolveYaklangInitFullCodePrefersAttachedSelection(t *testing.T) {
+func TestResolveYaklangInitFullCodePrefersDiskWhenEditorFile(t *testing.T) {
 	payload := `{"path":"/tmp/foo.yak","startLine":1,"endLine":2,"language":"yak","content":"attached content"}`
+	ctx := ParseYaklangEditorContextFromAttached([]*AttachedResource{
+		NewAttachedResource(AttachedResourceTypeFile, YaklangAttachedResourceKeyEditorFile, "/tmp/foo.yak"),
+		NewAttachedResource(AttachedResourceTypeSelected, AttachedResourceKeyContent, payload),
+	})
+	code, fromSelection := ResolveYaklangInitFullCode(ctx, "disk content")
+	require.False(t, fromSelection)
+	require.Equal(t, "disk content", code)
+}
+
+func TestResolveYaklangInitFullCodeUsesAttachedWhenDiskEmpty(t *testing.T) {
+	payload := `{"path":"/tmp/foo.yak","startLine":28,"endLine":31,"language":"yak","content":"println(1)"}`
+	ctx := ParseYaklangEditorContextFromAttached([]*AttachedResource{
+		NewAttachedResource(AttachedResourceTypeFile, YaklangAttachedResourceKeyEditorFile, "/tmp/foo.yak"),
+		NewAttachedResource(AttachedResourceTypeSelected, AttachedResourceKeyContent, payload),
+	})
+	code, fromSelection := ResolveYaklangInitFullCode(ctx, "")
+	require.True(t, fromSelection)
+	require.Equal(t, "println(1)", code)
+}
+
+func TestYaklangCodeLineBase(t *testing.T) {
+	ctx := &YaklangEditorContext{
+		Selection: &AttachedCodeSelection{StartLine: 28, EndLine: 31, Content: "x"},
+	}
+	require.Equal(t, 27, YaklangCodeLineBase(ctx, true))
+	require.Equal(t, 0, YaklangCodeLineBase(ctx, false))
+	require.Equal(t, 0, YaklangCodeLineBase(nil, true))
+}
+
+func TestResolveYaklangInitFullCodeSelectionOnlyCreateMode(t *testing.T) {
+	payload := `{"startLine":1,"endLine":2,"language":"yak","content":"attached content"}`
 	ctx := ParseYaklangEditorContextFromAttached([]*AttachedResource{
 		NewAttachedResource(AttachedResourceTypeSelected, AttachedResourceKeyContent, payload),
 	})
-	code, fromAttached := ResolveYaklangInitFullCode(ctx, "disk content")
-	require.True(t, fromAttached)
+	code, fromSelection := ResolveYaklangInitFullCode(ctx, "disk content")
+	require.True(t, fromSelection)
 	require.Equal(t, "attached content", code)
-
-	code, fromAttached = ResolveYaklangInitFullCode(nil, "disk content")
-	require.False(t, fromAttached)
-	require.Equal(t, "disk content", code)
 }
