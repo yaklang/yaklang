@@ -2,6 +2,7 @@ package aid
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -12,6 +13,7 @@ import (
 )
 
 type recoveredTask struct {
+	TaskId             string           `json:"task_id,omitempty"`
 	Index              string           `json:"index"`
 	Name               string           `json:"name"`
 	Goal               string           `json:"goal"`
@@ -67,6 +69,7 @@ func (c *Coordinator) tryRecoverPlanAndExec(startTaskIndex string) (*AiTask, *Pl
 	if root == nil {
 		return nil, &progress, false, nil
 	}
+	c.standardizeTaskTree(root)
 	effectiveStartTaskIndex := strings.TrimSpace(startTaskIndex)
 	if effectiveStartTaskIndex == "" {
 		effectiveStartTaskIndex = strings.TrimSpace(progress.CurrentTaskIndex)
@@ -106,8 +109,7 @@ func (c *Coordinator) buildRecoveredTaskTree(src *recoveredTask, parent *AiTask)
 	if task.TaskSummary == "" && task.ShortSummary == "" && task.LongSummary == "" && task.StatusSummary == "" && src.Summary != "" {
 		task.TaskSummary = src.Summary
 	}
-	// NOTE: Do not overwrite task ID with Index. Index is positional ("1-2-3"),
-	// while TaskId is the stable logical identifier for this plan task.
+	restoreRecoveredTaskID(task, src)
 
 	switch strings.ToLower(strings.TrimSpace(src.Progress)) {
 	case string(aicommon.AITaskState_Completed):
@@ -127,6 +129,24 @@ func (c *Coordinator) buildRecoveredTaskTree(src *recoveredTask, parent *AiTask)
 		}
 	}
 	return task
+}
+
+func restoreRecoveredTaskID(task *AiTask, src *recoveredTask) {
+	if task == nil || src == nil {
+		return
+	}
+	taskID := strings.TrimSpace(src.TaskId)
+	if taskID == "" && strings.TrimSpace(src.Index) != "" {
+		// Backward compatibility for task trees persisted before task_id was saved.
+		taskID = fmt.Sprintf("pe-task-%s", src.Index)
+	}
+	if taskID == "" {
+		return
+	}
+	task.TaskId = taskID
+	if task.AIStatefulTaskBase != nil {
+		task.SetID(taskID)
+	}
 }
 
 func prepareRecoveryStartTask(root *AiTask, startTaskIndex string) error {
