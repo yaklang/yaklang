@@ -143,11 +143,13 @@ func (c *Blueprint) GetNormalMethod(key string) Value {
 }
 
 // static method
-func (c *Blueprint) RegisterStaticMethod(name string, val *Function) {
+func (c *Blueprint) RegisterStaticMethod(name string, val *Function, store ...bool) {
 	if method := c.StaticMethod[name]; !utils.IsNil(method) {
 		Point(method, val)
 	} else {
-		c.storeField(name, val, BluePrintStaticMember)
+		if len(store) == 0 || store[0] {
+			c.storeField(name, val, BluePrintStaticMember)
+		}
 		c.StaticMethod[name] = val
 	}
 }

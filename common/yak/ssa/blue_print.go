@@ -73,9 +73,9 @@ type Blueprint struct {
 	StaticMethod map[string]*Function
 	MagicMethod  map[BlueprintMagicMethodKind]Value
 
-	NormalMember map[string]Value
-	StaticMember map[string]Value
-	ConstValue   map[string]Value
+	NormalMember map[string][]Value
+	StaticMember map[string][]Value
+	ConstValue   map[string][]Value
 
 	CallBack []func()
 
@@ -109,9 +109,9 @@ func NewBlueprint(name string) *Blueprint {
 		id:           -1,
 		Name:         name,
 		Kind:         BlueprintNone,
-		NormalMember: make(map[string]Value),
-		StaticMember: make(map[string]Value),
-		ConstValue:   make(map[string]Value),
+		NormalMember: make(map[string][]Value),
+		StaticMember: make(map[string][]Value),
+		ConstValue:   make(map[string][]Value),
 
 		NormalMethod: make(map[string]*Function),
 		StaticMethod: make(map[string]*Function),
@@ -205,24 +205,42 @@ func (c *Blueprint) addParentBlueprintEx(parent *Blueprint, relation BlueprintRe
 		return
 	}
 
-	c.setBlueprintRelation(parent, relation)
+	if !c.setBlueprintRelation(parent, relation) {
+		return
+	}
+
 	for name, f := range parent.NormalMethod {
 		c.RegisterNormalMethod(name, f, false)
 	}
 	for name, f := range parent.StaticMethod {
-		c.RegisterStaticMethod(name, f)
+		c.RegisterStaticMethod(name, f, false)
 	}
 	for name, f := range parent.MagicMethod {
 		c.RegisterMagicMethod(name, f)
 	}
-	for name, value := range parent.NormalMember {
-		c.RegisterNormalMember(name, value)
+	for name, values := range parent.NormalMember {
+		if len(c.NormalMember[name]) > 0 {
+			continue
+		}
+		for _, value := range values {
+			c.RegisterNormalMember(name, value, false)
+		}
 	}
-	for name, value := range parent.StaticMember {
-		c.RegisterStaticMember(name, value)
+	for name, values := range parent.StaticMember {
+		if len(c.StaticMember[name]) > 0 {
+			continue
+		}
+		for _, value := range values {
+			c.RegisterStaticMember(name, value, false)
+		}
 	}
-	for name, value := range parent.ConstValue {
-		c.RegisterConstMember(name, value)
+	for name, values := range parent.ConstValue {
+		if len(c.ConstValue[name]) > 0 {
+			continue
+		}
+		for _, value := range values {
+			c.RegisterConstMember(name, value, false)
+		}
 	}
 }
 

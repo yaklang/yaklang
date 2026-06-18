@@ -165,11 +165,9 @@ func NewErrorCatch(try *ErrorHandler, catch *BasicBlock, exception Value) *Error
 
 func NewExternLib(variable string, builder *FunctionBuilder, table map[string]any) *ExternLib {
 	e := &ExternLib{
-		anValue:   NewValue(),
-		table:     table,
-		builder:   builder,
-		MemberMap: make(map[string]int64),
-		Member:    make([]int64, 0),
+		anValue: NewValue(),
+		table:   table,
+		builder: builder,
 	}
 	e.SetName(variable)
 	e.SetFunc(builder.Function)
