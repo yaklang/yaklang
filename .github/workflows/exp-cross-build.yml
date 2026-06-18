@@ -191,25 +191,21 @@ jobs:
           
           echo "Will try versions: ${VERSIONS_TO_TRY[*]}"
           
+          YAK_OSS_BASE="https://yaklang.oss-accelerate.aliyuncs.com"
+          
           # 依次尝试下载每个二进制名称和版本
           for BINARY_NAME in "${BINARY_NAMES[@]}"; do
             for VERSION in "${VERSIONS_TO_TRY[@]}"; do
-              DOWNLOAD_URL="https://aliyun-oss.yaklang.com/yak/${VERSION}/${BINARY_NAME}"
+              DOWNLOAD_URL="${YAK_OSS_BASE}/yak/${VERSION}/${BINARY_NAME}"
               echo "Trying to download from: $DOWNLOAD_URL"
               
-              # 下载文件并捕获 HTTP 状态码和错误
-              TEMP_STDERR=$(mktemp)
-              HTTP_CODE=$(curl -w "%{http_code}" -sS -L "$DOWNLOAD_URL" -o yak 2>"$TEMP_STDERR")
-              CURL_ERROR=$(cat "$TEMP_STDERR")
-              rm -f "$TEMP_STDERR"
+              # -# 输出进度条；stderr 保留在 CI 日志中便于排查
+              HTTP_CODE=$(curl -w "%{http_code}" -# -L "$DOWNLOAD_URL" -o yak)
               CURL_EXIT=$?
               
               # 检查 curl 是否成功
               if [ $CURL_EXIT -ne 0 ]; then
                 echo "❌ curl failed with exit code: $CURL_EXIT"
-                if [ -n "$CURL_ERROR" ]; then
-                  echo "Error: $CURL_ERROR"
-                fi
                 rm -f yak
                 continue
               fi
@@ -217,9 +213,6 @@ jobs:
               # 检查 HTTP 状态码
               if [ "$HTTP_CODE" != "200" ]; then
                 echo "❌ HTTP error: $HTTP_CODE"
-                if [ -n "$CURL_ERROR" ]; then
-                  echo "Response: $CURL_ERROR"
-                fi
                 rm -f yak
                 continue
               fi
