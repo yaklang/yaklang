@@ -134,11 +134,15 @@ type MemberCall interface {
 	GetMemberPairs() []MemberPair
 	GetMembersByExactKey(Value) []Value
 	GetMembersByKeyString(string) []Value
+	GetAllMember() map[Value]Value
+	GetStringMember(string) (Value, bool)
 
 	// member owner pairs
 	IsMember() bool
 	AddObjectKeyPair(Value, Value)
 	GetObjectKeyPairs() []ObjectKeyPair
+	GetObject() Value
+	GetKey() Value
 }
 
 type AssignAble interface {
