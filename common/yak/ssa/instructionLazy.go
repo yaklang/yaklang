@@ -703,6 +703,38 @@ func (lz *LazyInstruction) GetObjectKeyPairs() []ObjectKeyPair {
 	return lz.Value.GetObjectKeyPairs()
 }
 
+func (lz *LazyInstruction) GetObject() Value {
+	lz.check()
+	if utils.IsNil(lz.Value) {
+		return nil
+	}
+	return lz.Value.GetObject()
+}
+
+func (lz *LazyInstruction) GetKey() Value {
+	lz.check()
+	if utils.IsNil(lz.Value) {
+		return nil
+	}
+	return lz.Value.GetKey()
+}
+
+func (lz *LazyInstruction) GetAllMember() map[Value]Value {
+	lz.check()
+	if utils.IsNil(lz.Value) {
+		return nil
+	}
+	return lz.Value.GetAllMember()
+}
+
+func (lz *LazyInstruction) GetStringMember(key string) (Value, bool) {
+	lz.check()
+	if utils.IsNil(lz.Value) {
+		return nil, false
+	}
+	return lz.Value.GetStringMember(key)
+}
+
 func (lz *LazyInstruction) GetType() Type {
 	lz.check()
 	if utils.IsNil(lz.Value) {
