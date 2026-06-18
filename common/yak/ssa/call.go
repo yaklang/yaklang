@@ -261,7 +261,7 @@ func (c *Call) handlerObjectMethod() {
 	switch t := target.GetType().(type) {
 	case *FunctionType:
 		if t.IsMethod {
-			if obj := target.GetObject(); obj != nil {
+			if obj := GetLatestObject(target); obj != nil {
 				AddThis(obj)
 			} else {
 				//  is method but not object

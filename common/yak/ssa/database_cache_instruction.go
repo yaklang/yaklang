@@ -423,10 +423,64 @@ func (s *instructionStore) acknowledgeCloseFlushIfPersisted(inst Instruction) bo
 	return true
 }
 
+func (s *instructionStore) expandRelationPersistRecords(records []*instructionPersistRecord) []*instructionPersistRecord {
+	if s == nil || s.program == nil || s.program.Cache == nil || len(records) == 0 {
+		return records
+	}
+	resident := s.GetAllResident()
+	expanded := make([]*instructionPersistRecord, 0, len(records)*2)
+	queued := make(map[int64]struct{}, len(records)*2)
+	appendRecord := func(record *instructionPersistRecord) {
+		if record == nil || record.IrCode == nil {
+			return
+		}
+		if _, ok := queued[record.CodeID]; ok {
+			return
+		}
+		queued[record.CodeID] = struct{}{}
+		expanded = append(expanded, record)
+	}
+	var walk func(record *instructionPersistRecord)
+	walk = func(record *instructionPersistRecord) {
+		appendRecord(record)
+		if record == nil || record.IrCode == nil {
+			return
+		}
+		for _, id := range relationInstructionIDs(record.IrCode) {
+			if _, ok := queued[id]; ok {
+				continue
+			}
+			linked := resident[id]
+			if linked == nil {
+				continue
+			}
+			linkedIr, err := marshalIrCode(linked)
+			if err != nil || linkedIr == nil {
+				continue
+			}
+			if progName := applicationProgramName(s.program); progName != "" {
+				linkedIr.ProgramName = progName
+			}
+			relRecord := &instructionPersistRecord{
+				IrCode: linkedIr,
+				Opcode: linked.GetOpcode(),
+				Reason: record.Reason,
+				CodeID: linked.GetId(),
+			}
+			walk(relRecord)
+		}
+	}
+	for _, record := range records {
+		walk(record)
+	}
+	return expanded
+}
+
 func (s *instructionStore) saveInstructionPersistRecords(records []*instructionPersistRecord) error {
 	if len(records) == 0 {
 		return nil
 	}
+	records = s.expandRelationPersistRecords(records)
 
 	start := time.Now()
 	var saveErr error
@@ -552,10 +606,8 @@ func instructionLocationIDs(inst Instruction) (funcID, blockID int64) {
 		}
 		if inner := inst.getAnInstruction(); inner != nil {
 			funcID = inner.funcId
-		}
-		if funcID <= 0 {
-			if fn := inst.GetFunc(); fn != nil {
-				funcID = fn.GetId()
+			if funcID <= 0 && inner.fun != nil {
+				funcID = inner.fun.GetId()
 			}
 		}
 		return funcID, inst.GetId()

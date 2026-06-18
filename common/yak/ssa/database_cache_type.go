@@ -334,7 +334,7 @@ func typeFromIrType(store *typeStore, irType *ssadb.IrType) Type {
 		parents, ok := params["parentBlueprints"].([]interface{})
 		if ok {
 			for _, typeID := range parents {
-				blueprint, isBlueprint := ToClassBluePrintType(GetTypeFromDB(cacheView, int64(utils.InterfaceToInt(typeID))))
+				blueprint, isBlueprint := ToBluePrintType(GetTypeFromDB(cacheView, int64(utils.InterfaceToInt(typeID))))
 				if isBlueprint {
 					typ.ParentBlueprints = append(typ.ParentBlueprints, blueprint)
 				}
@@ -343,7 +343,7 @@ func typeFromIrType(store *typeStore, irType *ssadb.IrType) Type {
 		interfaces, ok := params["interfaceBlueprints"].([]interface{})
 		if ok {
 			for _, typeID := range interfaces {
-				blueprint, isBlueprint := ToClassBluePrintType(GetTypeFromDB(cacheView, int64(utils.InterfaceToInt(typeID))))
+				blueprint, isBlueprint := ToBluePrintType(GetTypeFromDB(cacheView, int64(utils.InterfaceToInt(typeID))))
 				if isBlueprint {
 					typ.InterfaceBlueprints = append(typ.InterfaceBlueprints, blueprint)
 				}

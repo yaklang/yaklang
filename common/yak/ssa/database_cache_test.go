@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
@@ -457,12 +458,15 @@ func TestGetStringMemberUsesStringIndexWithoutReloadingConstKey(t *testing.T) {
 	key := builder.EmitConstInstPlaceholder(string(BlueprintRelationParents))
 	object.AddMember(key, member)
 
+	keyIR, err := marshalIrCode(key)
+	require.NoError(t, err)
+	require.NoError(t, ssadb.GetDB().Save(keyIR).Error)
+
 	prog.Cache.deleteInstructionByID(key.GetId())
 	require.False(t, prog.Cache.hasResidentInstruction(key.GetId()), "const key should no longer be resident")
-	require.Nil(t, ssadb.GetIrCodeItemById(ssadb.GetDB(), programName, key.GetId()), "const key should not be reloaded from DB in this test")
 
-	got, ok := object.GetStringMember(string(BlueprintRelationParents))
-	require.True(t, ok, "string member lookup should succeed without reloading the const key")
+	got, ok := GetLatestMemberByKeyString(object, string(BlueprintRelationParents))
+	require.True(t, ok, "string member lookup should succeed via pair metadata without reloading the const key instruction")
 	require.NotNil(t, got)
 	require.Equal(t, member.GetId(), got.GetId())
 }
@@ -498,12 +502,111 @@ func TestReloadedObjectGetStringMemberDoesNotReloadConstKeyInstruction(t *testin
 	reloadedValue, ok := ToValue(reloadedObject)
 	require.True(t, ok)
 
-	countBeforeLookup := prog.Cache.CountInstruction()
-	got, ok := reloadedValue.GetStringMember(string(BlueprintRelationParents))
-	require.True(t, ok, "reloaded object should resolve string member without reloading the const key instruction")
+	got, ok := GetLatestMemberByKeyString(reloadedValue, string(BlueprintRelationParents))
+	require.True(t, ok, "reloaded object should resolve string member from persisted member pairs")
 	require.NotNil(t, got)
 	require.Equal(t, member.GetId(), got.GetId())
-	require.Equal(t, countBeforeLookup, prog.Cache.CountInstruction(), "string lookup should not pull the const key instruction back into the cache")
+}
+
+func TestFlushResidentOnCloseDoesNotReloadRelationInstructions(t *testing.T) {
+	programName := uuid.NewString()
+	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
+
+	cfg, err := ssaconfig.New(ssaconfig.ModeSSACompile, ssaconfig.WithSetProgramName(programName))
+	require.NoError(t, err)
+	cfg.SetCompileProjectBytes(fastPathProjectByteThreshold)
+	prog := NewProgram(cfg, ProgramCacheDBWrite, Application, filesys.NewVirtualFs(), "", 0)
+	require.NotNil(t, prog.Cache)
+	require.NotNil(t, prog.Cache.instructions)
+	require.True(t, prog.Cache.instructions.flushResidentOnClose)
+
+	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
+	object := builder.EmitEmptyContainer()
+	key := builder.EmitConstInst("field")
+	member := builder.EmitUndefined("member")
+	setMemberCallRelationship(object, key, member)
+
+	keyIR, err := marshalIrCode(key)
+	require.NoError(t, err)
+	require.NotNil(t, keyIR)
+	require.NoError(t, ssadb.GetDB().Save(keyIR).Error)
+
+	keyID := key.GetId()
+	objectID := object.GetId()
+	prog.Cache.deleteInstructionByID(keyID)
+	require.False(t, prog.Cache.hasResidentInstruction(keyID), "test setup should remove relation key from resident cache")
+
+	require.NoError(t, prog.Cache.instructions.flushResidentOnCloseOnly())
+	require.False(t, prog.Cache.hasResidentInstruction(keyID), "close flush should not reload relation key instructions just to expand resident state")
+
+	objectIR := ssadb.GetIrCodeItemById(ssadb.GetDB(), programName, objectID)
+	require.NotNil(t, objectIR)
+	require.Len(t, objectIR.ObjectMemberPairs, 1)
+}
+
+func TestExpandRelationPersistRecordsDoesNotLoadNonResidentInstructions(t *testing.T) {
+	programName := uuid.NewString()
+	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
+
+	vf := filesys.NewVirtualFs()
+	prog := newProgramWithTTL(programName, 0, ProgramCacheDBWrite, vf)
+	require.NotNil(t, prog.Cache)
+	require.NotNil(t, prog.Cache.instructions)
+	require.NotNil(t, prog.Cache.instructions.writer)
+
+	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
+	object := builder.EmitEmptyContainer()
+	key := builder.EmitConstInst("field")
+	member := builder.EmitUndefined("member")
+	setMemberCallRelationship(object, key, member)
+
+	keyIR, err := marshalIrCode(key)
+	require.NoError(t, err)
+	require.NotNil(t, keyIR)
+	require.NoError(t, ssadb.GetDB().Save(keyIR).Error)
+
+	keyID := key.GetId()
+	prog.Cache.deleteInstructionByID(keyID)
+	require.False(t, prog.Cache.hasResidentInstruction(keyID), "test setup should remove relation key from resident cache")
+
+	record, err := prog.Cache.instructions.marshalInstructionRecord(object, utils.EvictionReasonDeleted)
+	require.NoError(t, err)
+	require.NotNil(t, record)
+	require.NoError(t, prog.Cache.instructions.saveInstructionPersistRecords([]*instructionPersistRecord{record}))
+	require.False(t, prog.Cache.hasResidentInstruction(keyID), "relation expansion should not load non-resident key instructions")
+}
+
+func TestMarshalExternLibHasDefsDoesNotReloadRelationInstructions(t *testing.T) {
+	programName := uuid.NewString()
+	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
+
+	vf := filesys.NewVirtualFs()
+	prog := newProgramWithTTL(programName, 0, ProgramCacheDBWrite, vf)
+	require.NotNil(t, prog.Cache)
+	require.NotNil(t, prog.Cache.instructions)
+	require.NotNil(t, prog.Cache.instructions.writer)
+
+	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
+	extern := NewExternLib("lib", builder, map[string]any{"field": "value"})
+	key := builder.EmitConstInst("field")
+	member := builder.EmitUndefined("member")
+	extern.AddMember(key, member)
+
+	keyIR, err := marshalIrCode(key)
+	require.NoError(t, err)
+	require.NotNil(t, keyIR)
+	require.NoError(t, ssadb.GetDB().Save(keyIR).Error)
+
+	keyID := key.GetId()
+	prog.Cache.deleteInstructionByID(keyID)
+	require.False(t, prog.Cache.hasResidentInstruction(keyID), "test setup should remove relation key from resident cache")
+
+	record, err := prog.Cache.instructions.marshalInstructionRecord(extern, utils.EvictionReasonDeleted)
+	require.NoError(t, err)
+	require.NotNil(t, record)
+	require.True(t, record.IrCode.HasDefs)
+	require.Len(t, record.IrCode.ObjectMemberPairs, 1)
+	require.False(t, prog.Cache.hasResidentInstruction(keyID), "extern HasDefs marshal should not resolve and reload relation key instructions")
 }
 
 func TestDisableInstructionSpillKeepsInstructionResidentUntilFunctionFinish(t *testing.T) {

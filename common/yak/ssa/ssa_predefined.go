@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/utils/omap"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"golang.org/x/exp/slices"
 )
 
@@ -341,18 +342,24 @@ func (a *anInstruction) String() string {
 
 var _ Instruction = (*anInstruction)(nil)
 
+type memberPairRecord struct {
+	key    int64
+	member int64
+}
+
+type ownerPairRecord struct {
+	object int64
+	key    int64
+}
+
 type anValue struct {
 	*anInstruction
 
 	typId    int64
 	userList []int64
 
-	object             int64
-	key                int64
-	member             *omap.OrderedMap[int64, int64] // map[Value]Value
-	memberOnce         sync.Once
-	memberByString     map[string][]int64
-	memberByStringOnce sync.Once
+	memberPairs []memberPairRecord
+	ownerPairs  []ownerPairRecord
 
 	variables     *omap.OrderedMap[string, *Variable] // map[string]*Variable
 	variablesOnce sync.Once
@@ -381,270 +388,194 @@ func NewValue() *anValue {
 	return ret
 }
 
+func (n *anValue) appendMemberPairIDs(keyID, memberID int64) {
+	if keyID <= 0 || memberID <= 0 {
+		return
+	}
+	pair := memberPairRecord{key: keyID, member: memberID}
+	if len(n.memberPairs) > 0 && n.memberPairs[len(n.memberPairs)-1] == pair {
+		return
+	}
+	n.memberPairs = append(n.memberPairs, pair)
+}
+
+func (n *anValue) appendOwnerPairIDs(objectID, keyID int64) {
+	if objectID <= 0 || keyID <= 0 {
+		return
+	}
+	pair := ownerPairRecord{object: objectID, key: keyID}
+	if len(n.ownerPairs) > 0 && n.ownerPairs[len(n.ownerPairs)-1] == pair {
+		return
+	}
+	for _, existed := range n.ownerPairs {
+		if existed == pair {
+			return
+		}
+	}
+	n.ownerPairs = append(n.ownerPairs, pair)
+}
+
+func (n *anValue) memberPairMatchesKey(pair memberPairRecord, key Value) bool {
+	if key == nil {
+		return false
+	}
+	if pair.key == key.GetId() {
+		return true
+	}
+	pairKey, ok := n.GetValueById(pair.key)
+	if !ok {
+		return false
+	}
+	return sameConstKeyValue(pairKey, key)
+}
+
 func (n *anValue) IsMember() bool {
-	return n.object > 0 && n.key > 0
-}
-
-func (n *anValue) SetObject(v Value) {
-	n.object = v.GetId()
-}
-
-func (n *anValue) GetObject() Value {
-	obj, _ := n.GetValueById(n.object)
-	return obj
-}
-
-func (n *anValue) SetKey(k Value) {
-	n.key = k.GetId()
-}
-
-func (n *anValue) GetKey() Value {
-	key, _ := n.GetValueById(n.key)
-	return key
-}
-
-func (n *anValue) getMemberMap(create ...bool) *omap.OrderedMap[int64, int64] {
-	shouldCreate := false
-	if len(create) > 0 {
-		shouldCreate = create[0]
-	}
-	if n.member == nil && shouldCreate {
-		n.memberOnce.Do(func() {
-			n.member = omap.NewOrderedMap(map[int64]int64{})
-		})
-	}
-	return n.member
-}
-
-func (n *anValue) getMemberStringIndex(create ...bool) map[string][]int64 {
-	shouldCreate := false
-	if len(create) > 0 {
-		shouldCreate = create[0]
-	}
-	if n.memberByString == nil && shouldCreate {
-		n.memberByStringOnce.Do(func() {
-			n.memberByString = make(map[string][]int64)
-		})
-	}
-	return n.memberByString
-}
-
-func memberStringKey(v Value) (string, bool) {
-	lit, ok := ToConstInst(v)
-	if !ok || lit == nil {
-		return "", false
-	}
-	key, ok := lit.value.(string)
-	return key, ok
-}
-
-func (n *anValue) rememberStringMemberID(key string, id int64) {
-	index := n.getMemberStringIndex(true)
-	ids := index[key]
-	filtered := ids[:0]
-	for _, currentID := range ids {
-		if currentID != id {
-			filtered = append(filtered, currentID)
-		}
-	}
-	index[key] = append(filtered, id)
-}
-
-func (n *anValue) rememberStringMemberKey(k Value) {
-	key, ok := memberStringKey(k)
-	if !ok {
-		return
-	}
-	n.rememberStringMemberID(key, k.GetId())
-}
-
-func (n *anValue) forgetStringMemberKey(k Value) {
-	key, ok := memberStringKey(k)
-	if !ok {
-		return
-	}
-	index := n.getMemberStringIndex()
-	if index == nil {
-		return
-	}
-	ids := index[key]
-	if len(ids) == 0 {
-		return
-	}
-	filtered := ids[:0]
-	for _, id := range ids {
-		if id != k.GetId() {
-			filtered = append(filtered, id)
-		}
-	}
-	if len(filtered) == 0 {
-		delete(index, key)
-		return
-	}
-	index[key] = filtered
-}
-
-func (n *anValue) getMemberByKeyID(keyID int64) (Value, bool) {
-	memberMap := n.getMemberMap()
-	if memberMap == nil {
-		return nil, false
-	}
-	ret, ok := memberMap.Get(keyID)
-	if !ok {
-		return nil, false
-	}
-	val, ok := n.GetValueById(ret)
-	return val, ok
+	return len(n.ownerPairs) > 0
 }
 
 func (n *anValue) IsObject() bool {
-	memberMap := n.getMemberMap()
-	if memberMap == nil {
-		return false
-	}
-	return memberMap.Len() != 0
+	return len(n.memberPairs) > 0
 }
 
 func (n *anValue) AddMember(k, v Value) {
-	n.getMemberMap(true).Set(k.GetId(), v.GetId())
-	n.rememberStringMemberKey(k)
+	if k == nil || v == nil {
+		return
+	}
+	n.appendMemberPairIDs(k.GetId(), v.GetId())
 }
 
 func (n *anValue) DeleteMember(k Value) {
-	memberMap := n.getMemberMap()
-	if memberMap != nil {
-		memberMap.Delete(k.GetId())
+	if k == nil {
+		return
 	}
-	n.forgetStringMemberKey(k)
+	n.memberPairs = slices.DeleteFunc(n.memberPairs, func(pair memberPairRecord) bool {
+		return n.memberPairMatchesKey(pair, k)
+	})
 }
 
-func (n *anValue) GetMember(key Value) (Value, bool) {
-	memberMap := n.getMemberMap()
-	if memberMap == nil {
-		return nil, false
+func sameConstKeyValue(lhs, rhs Value) bool {
+	if lhs == nil || rhs == nil {
+		return false
 	}
-	ret, ok := memberMap.Get(key.GetId())
-	if !ok {
-		return nil, false
+	leftConst, leftOK := ToConstInst(lhs)
+	rightConst, rightOK := ToConstInst(rhs)
+	if !leftOK || !rightOK {
+		return false
 	}
-	val, ok := n.GetValueById(ret)
-	return val, ok
+	return fmt.Sprint(leftConst.value) == fmt.Sprint(rightConst.value)
 }
 
-func (n *anValue) GetIndexMember(i int) (Value, bool) {
-	memberMap := n.getMemberMap()
-	if memberMap == nil {
-		return nil, false
+func (n *anValue) AddObjectKeyPair(obj, key Value) {
+	if obj == nil || key == nil {
+		return
 	}
-	id, ok := memberMap.GetByIndex(i)
-	if !ok {
-		return nil, false
-	}
-	val, ok := n.GetValueById(id)
-	return val, ok
+	n.appendOwnerPairIDs(obj.GetId(), key.GetId())
 }
 
-func (n *anValue) GetStringMember(key string) (Value, bool) {
-	memberMap := n.getMemberMap()
-	if memberMap == nil {
+func (n *anValue) resolveLinkedValue(id int64) (Value, bool) {
+	if id <= 0 {
 		return nil, false
 	}
-	if index := n.getMemberStringIndex(); index != nil {
-		if ids := index[key]; len(ids) > 0 {
-			for idx := len(ids) - 1; idx >= 0; idx-- {
-				if member, ok := n.getMemberByKeyID(ids[idx]); ok {
-					return member, true
-				}
+	if val, ok := n.GetValueById(id); ok {
+		return val, true
+	}
+	prog := n.GetProgram()
+	if prog == nil {
+		return nil, false
+	}
+	app := prog.GetApplication()
+	if app == nil {
+		app = prog
+	}
+	progName := applicationProgramName(prog)
+	if progName != "" {
+		ir := ssadb.GetIrCodeByIdFast(ssadb.GetDB(), progName, id)
+		if ir != nil && ir.Opcode == int64(SSAOpcodeConstInst) && ir.String != "" {
+			return NewConst(ir.String), true
+		}
+	}
+	cache := n.getProgramCache()
+	if cache != nil {
+		if loaded := cache.GetInstruction(id); loaded != nil {
+			if val, ok := ToValue(loaded); ok {
+				return val, true
 			}
-			return nil, false
 		}
 	}
-	keys := memberMap.Keys()
-	for index := len(keys) - 1; index >= 0; index-- {
-		i, ok := n.GetValueById(keys[index])
-		if !ok {
-			continue
+	if inst, err := NewLazyInstruction(app, id); err == nil && inst != nil {
+		if val, ok := ToValue(inst); ok {
+			return val, true
 		}
-		lit, ok := ToConstInst(i)
-		if !ok || lit.Const == nil || lit.Const.str != key {
-			continue
-		}
-		valID, ok := memberMap.Get(keys[index])
-		if !ok {
-			return nil, false
-		}
-		if lit.value == key {
-			n.rememberStringMemberKey(i)
-		}
-		return n.GetValueById(valID)
 	}
 	return nil, false
 }
 
-func (n *anValue) SetStringMember(key string, v Value) {
-	memberMap := n.getMemberMap(true)
-	if memberMap == nil {
-		return
-	}
-	if index := n.getMemberStringIndex(); index != nil {
-		if ids := index[key]; len(ids) > 0 {
-			for idx := len(ids) - 1; idx >= 0; idx-- {
-				if _, ok := memberMap.Get(ids[idx]); ok {
-					memberMap.Set(ids[idx], v.GetId())
-					return
-				}
-			}
-		}
-	}
-	var lastMatch Value
-	for _, id := range memberMap.Keys() {
-		i, ok := n.GetValueById(id)
-		if !ok {
+func (n *anValue) GetObjectKeyPairs() []ObjectKeyPair {
+	ret := make([]ObjectKeyPair, 0, len(n.ownerPairs))
+	for _, pair := range n.ownerPairs {
+		if pair.object <= 0 || pair.key <= 0 {
 			continue
 		}
-		lit, ok := ToConstInst(i)
-		if !ok || lit.Const == nil || lit.Const.str != key {
-			continue
-		}
-		lastMatch = i
-	}
-	if lastMatch != nil {
-		n.rememberStringMemberKey(lastMatch)
-		n.AddMember(lastMatch, v)
-	}
-}
-
-func (n *anValue) GetAllMember() map[Value]Value {
-	m := n.getMemberMap()
-	if m == nil {
-		return make(map[Value]Value)
-	}
-	ret := make(map[Value]Value, m.Len())
-	for key, value := range m.GetMap() {
-		k, ok1 := n.GetValueById(key)
-		v, ok2 := n.GetValueById(value)
+		obj, ok1 := n.resolveLinkedValue(pair.object)
+		key, ok2 := n.resolveLinkedValue(pair.key)
 		if !ok1 || !ok2 {
-			log.Warnf("BUG in anValue.GetAllMember(), is nil key[%d](%v) member[%d](%v)", key, k, value, v)
 			continue
 		}
-		ret[k] = v
+		ret = append(ret, ObjectKeyPair{Object: obj, Key: key})
 	}
 	return ret
 }
 
-func (n *anValue) ForEachMember(fn func(Value, Value) bool) {
-	memberMap := n.getMemberMap()
-	if memberMap == nil {
-		return
+func (n *anValue) GetMembersByExactKey(key Value) []Value {
+	if key == nil {
+		return nil
 	}
-	memberMap.ForEach(func(i, v int64) bool {
-		val1, ok1 := n.GetValueById(i)
-		val2, ok2 := n.GetValueById(v)
-		if !ok1 || !ok2 {
-			return true
+	ret := make([]Value, 0)
+	for index := len(n.memberPairs) - 1; index >= 0; index-- {
+		pair := n.memberPairs[index]
+		if !n.memberPairMatchesKey(pair, key) {
+			continue
 		}
-		return fn(val1, val2)
-	})
+		member, ok := n.resolveLinkedValue(pair.member)
+		if ok {
+			ret = append(ret, member)
+		}
+	}
+	return ret
+}
+
+func (n *anValue) GetMembersByKeyString(key string) []Value {
+	if key == "" {
+		return nil
+	}
+	ret := make([]Value, 0)
+	for index := len(n.memberPairs) - 1; index >= 0; index-- {
+		pair := n.memberPairs[index]
+		keyVal, ok1 := n.resolveLinkedValue(pair.key)
+		member, ok2 := n.resolveLinkedValue(pair.member)
+		if !ok1 || !ok2 {
+			continue
+		}
+		lit, ok := ToConstInst(keyVal)
+		if !ok || fmt.Sprint(lit.value) != key {
+			continue
+		}
+		ret = append(ret, member)
+	}
+	return ret
+}
+
+func (n *anValue) GetMemberPairs() []MemberPair {
+	ret := make([]MemberPair, 0, len(n.memberPairs))
+	for _, pair := range n.memberPairs {
+		key, ok1 := n.resolveLinkedValue(pair.key)
+		member, ok2 := n.resolveLinkedValue(pair.member)
+		if !ok1 || !ok2 {
+			continue
+		}
+		ret = append(ret, MemberPair{Key: key, Member: member})
+	}
+	return ret
 }
 
 func (n *anValue) String() string { return "" }

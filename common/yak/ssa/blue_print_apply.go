@@ -14,24 +14,25 @@ func ParseClassBluePrint(this Value, objectTyp *ObjectType) (ret Type) {
 	}
 	blue := NewBlueprint(objectTyp.Name)
 
-	for key, member := range this.GetAllMember() {
+	for _, pair := range GetLastWinsMemberPairs(this) {
+		keyName := pair.KeyString()
+		member := pair.Member
 		// if not function , just append this field to normal field
 		typ := member.GetType()
 		if typ.GetTypeKind() != FunctionTypeKind {
-			// blue.NormalMember[key.String()] = member
-			blue.RegisterNormalMember(key.String(), member)
+			blue.RegisterNormalMember(keyName, member)
 			continue
 		}
 
 		funTyp := typ.(*FunctionType)
 		if len(funTyp.ParameterValue) > 0 {
 			if para := funTyp.ParameterValue[0]; para != nil && (para.IsObject() || para.HasUsers()) {
-				blue.AddMethod(key.String(), funTyp.This)
+				blue.AddMethod(keyName, funTyp.This)
 				continue
 			}
 		}
 
-		blue.RegisterNormalMember(key.String(), member)
+		blue.RegisterNormalMember(keyName, member)
 	}
 
 	if len(blue.GetMethod()) != 0 {
@@ -109,7 +110,11 @@ func (c *Blueprint) Apply(obj Value) Type {
 		parent.Apply(obj)
 	}
 
-	for rawKey, member := range c.NormalMember {
+	for rawKey, members := range c.NormalMember {
+		if len(members) == 0 {
+			continue
+		}
+		member := members[len(members)-1]
 		typ := member.GetType()
 		value := member
 		key := builder.EmitConstInstPlaceholder(rawKey)

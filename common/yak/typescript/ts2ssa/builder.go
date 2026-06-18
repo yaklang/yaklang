@@ -57,6 +57,7 @@ type builder struct {
 	reExports map[string]map[string]string // re-exported name -> (path -> exportName)
 	importTbl map[string]map[string]string // libName -> (importItemName -> aliasName)
 
+	forInKeySources map[string]string
 }
 
 func Frontend(src string) (*ast.SourceFile, error) {
@@ -113,6 +114,7 @@ func (*SSABuilder) BuildFromAST(raw ssa.FrontAST, b *ssa.FunctionBuilder) error 
 		namedTypeExports:  make(map[string]ssa.Type),
 		reExports:         make(map[string]map[string]string),
 		importTbl:         make(map[string]map[string]string),
+		forInKeySources:   make(map[string]string),
 	}
 	build.VisitSourceFile(jsAST)
 	return nil

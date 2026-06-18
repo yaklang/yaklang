@@ -638,11 +638,15 @@ func (b *builder) VisitForInOrOfStatement(node *ast.ForInOrOfStatement) interfac
 
 	// 创建循环构建器
 	loop := b.CreateLoopBuilder()
+	var registeredForInKey string
+	var previousForInSource string
+	var hadPreviousForInSource bool
 
 	// 设置循环条件
 	loop.SetCondition(func() ssa.Value {
 		var lv *ssa.Variable
 		var iterableValue ssa.Value
+		var loopVariableName string
 
 		// 处理循环变量（左侧）
 		if node.Initializer != nil {
@@ -655,6 +659,7 @@ func (b *builder) VisitForInOrOfStatement(node *ast.ForInOrOfStatement) interfac
 					varDecl := declList.Declarations.Nodes[0].AsVariableDeclaration()
 					if varDecl != nil && varDecl.Name() != nil && ast.IsIdentifier(varDecl.Name()) {
 						varName := varDecl.Name().AsIdentifier().Text
+						loopVariableName = varName
 						// 创建循环变量，但暂不赋值（值将在迭代中设置）
 						if node.AsNode().Kind == ast.KindForInStatement {
 							// for-in循环变量通常是块级作用域
@@ -667,6 +672,9 @@ func (b *builder) VisitForInOrOfStatement(node *ast.ForInOrOfStatement) interfac
 				}
 			default:
 				// 直接表达式形式：for(x in/of obj)
+				if ast.IsIdentifier(node.Initializer) {
+					loopVariableName = node.Initializer.AsIdentifier().Text
+				}
 				lval, _ := b.VisitExpression(node.Initializer, true)
 				lv = lval
 			}
@@ -682,6 +690,28 @@ func (b *builder) VisitForInOrOfStatement(node *ast.ForInOrOfStatement) interfac
 			if node.AsNode().Kind == ast.KindForInStatement {
 				// for-in 循环获取对象的键
 				key, _, ok := b.EmitNext(iterableValue, false)
+				iterableName := b.expressionSourceText(node.Expression)
+				if loopVariableName != "" && iterableName != "" {
+					previousForInSource, hadPreviousForInSource = b.forInKeySources[loopVariableName]
+					b.forInKeySources[loopVariableName] = iterableName
+					registeredForInKey = loopVariableName
+				}
+				if key != nil {
+					if iterableName == "" {
+						iterableName = iterableValue.GetVerboseName()
+					}
+					if iterableName != "" {
+						keyName := ssa.GetKeyString(key)
+						if keyName == "" {
+							keyName = key.GetVerboseName()
+						}
+						if keyName != "" && !strings.HasPrefix(keyName, iterableName+".") {
+							keyDisplayName := iterableName + "." + keyName
+							key.SetName(keyDisplayName)
+							key.SetVerboseName(keyDisplayName)
+						}
+					}
+				}
 				b.AssignVariable(lv, key)
 				return ok
 			} else {
@@ -705,6 +735,13 @@ func (b *builder) VisitForInOrOfStatement(node *ast.ForInOrOfStatement) interfac
 
 	// 完成循环构建
 	loop.Finish()
+	if registeredForInKey != "" {
+		if hadPreviousForInSource {
+			b.forInKeySources[registeredForInKey] = previousForInSource
+		} else {
+			delete(b.forInKeySources, registeredForInKey)
+		}
+	}
 
 	return nil
 }
@@ -1171,6 +1208,9 @@ func (b *builder) VisitVariableDeclaration(decl *ast.VariableDeclaration, declTy
 			variable = b.CreateLocalVariable(identifier)
 		} else {
 			variable = b.CreateJSVariable(identifier)
+		}
+		if decl.Initializer != nil && decl.Initializer.Kind == ast.KindObjectLiteralExpression {
+			initValue.SetVerboseName(identifier)
 		}
 		b.AssignVariable(variable, initValue)
 		if isExport {
@@ -1679,7 +1719,7 @@ func (b *builder) VisitNamedExports(namedExports *ast.NamedExports) interface{} 
 		// later set value to chain use-def
 		runtimeValue := b.VisitRightValueExpression(element.AsExportSpecifier().Name())
 		if !utils.IsNil(runtimeValue) {
-			if bp, ok := ssa.ToClassBluePrintType(runtimeValue.GetType()); ok {
+			if bp, ok := ssa.ToBluePrintType(runtimeValue.GetType()); ok {
 				b.GetProgram().ExportType[exportName] = bp
 			}
 			ssa.ReplaceAllValue(b.GetProgram().ExportValue[exportName], runtimeValue)
@@ -2175,7 +2215,7 @@ func (b *builder) VisitBinaryExpression(node *ast.BinaryExpression) ssa.Value {
 		return right
 	case ast.KindInKeyword:
 		if b.IsListLike(right) || b.IsMapLike(right) || b.IsObjectLike(right) {
-			_, ok := right.GetMember(left)
+			_, ok := ssa.GetLatestMemberByKey(right, left)
 			return b.EmitConstInst(ok)
 		}
 		return b.EmitUndefined("")
@@ -2229,11 +2269,16 @@ func (b *builder) VisitCallExpression(node *ast.CallExpression) ssa.Value {
 			methodName := b.ProcessMemberName(propAccess.Name())
 			if methodName == "then" || methodName == "catch" || methodName == "finally" {
 				// 检查调用对象是否返回 Promise 类型
-				if b.IsPromiseType(callee.GetType()) {
+				if promiseReceiver := b.getPromiseMethodReceiver(callee, methodName); promiseReceiver != nil {
 					// 确认是 Promise 类型，进行特殊处理
-					return b.HandlePromiseMethod(callee, methodName, args)
+					return b.HandlePromiseMethod(promiseReceiver, methodName, args)
 				}
 				// 如果不是 Promise 类型，按普通方法调用处理
+			}
+			if len(args) == 0 && isSourcePreservingStringMethod(methodName) {
+				if receiver := getMemberMethodReceiver(callee, methodName); receiver != nil {
+					return receiver
+				}
 			}
 		}
 	}
@@ -2699,7 +2744,6 @@ func (b *builder) VisitPropertyAccessExpressionRight(node *ast.PropertyAccessExp
 		b.NewErrorWithPos(ssa.Error, TAG, b.CurrentRange, UnexpectedRightValueForObjectPropertyAccess())
 		return nil
 	}
-
 	if b.IsPromiseType(obj.GetType()) && (propName == "then" || propName == "catch" || propName == "finally") {
 		return obj // let call handle async call for Promise with Promise<T>.then()
 	}
@@ -2747,9 +2791,27 @@ func (b *builder) VisitElementAccessExpression(node *ast.ElementAccessExpression
 	var argument ssa.Value
 	if node.ArgumentExpression != nil {
 		argument = b.VisitRightValueExpression(node.ArgumentExpression)
+		if argument != nil && ast.IsIdentifier(node.ArgumentExpression) {
+			keyName := node.ArgumentExpression.AsIdentifier().Text
+			if sourceName := b.forInKeySources[keyName]; sourceName != "" && sourceName == b.expressionSourceText(node.Expression) {
+				displayName := sourceName + "." + keyName
+				argument.SetName(displayName)
+				argument.SetVerboseName(displayName)
+			}
+		}
 	}
 
 	return obj, argument
+}
+
+func (b *builder) expressionSourceText(node *ast.Expression) string {
+	if node == nil {
+		return ""
+	}
+	if ast.IsIdentifier(node) {
+		return node.AsIdentifier().Text
+	}
+	return strings.TrimSpace(scanner.GetSourceTextOfNodeFromSourceFile(b.sourceFile, node.AsNode(), false))
 }
 
 // VisitNewExpression 访问new表达式
@@ -2831,7 +2893,11 @@ func (b *builder) VisitNewExpression(node *ast.NewExpression) ssa.Value {
 
 		}
 	}
-	return b.ClassConstructorWithoutDeferDestructor(class, args)
+	instance := b.ClassConstructorWithoutDeferDestructor(class, args)
+	if instance != nil {
+		instance.SetType(class)
+	}
+	return instance
 }
 
 // VisitParenthesizedExpression 访问带括号的表达式
@@ -5069,6 +5135,49 @@ func (b *builder) VisitQualifiedName(name *ast.QualifiedName) string {
 	return leftName + rightName
 }
 
+func (b *builder) getPromiseMethodReceiver(callee ssa.Value, methodName string) ssa.Value {
+	if callee == nil {
+		return nil
+	}
+	if b.IsPromiseType(callee.GetType()) {
+		return callee
+	}
+	for _, pair := range ssa.GetObjectKeyPairs(callee) {
+		if pair.Object == nil {
+			continue
+		}
+		if pair.KeyString() != methodName {
+			continue
+		}
+		if b.IsPromiseType(pair.Object.GetType()) {
+			return pair.Object
+		}
+	}
+	return nil
+}
+
+func getMemberMethodReceiver(callee ssa.Value, methodName string) ssa.Value {
+	if callee == nil {
+		return nil
+	}
+	for _, pair := range ssa.GetObjectKeyPairs(callee) {
+		if pair.Object == nil || pair.KeyString() != methodName {
+			continue
+		}
+		return pair.Object
+	}
+	return nil
+}
+
+func isSourcePreservingStringMethod(methodName string) bool {
+	switch methodName {
+	case "toUpperCase", "toLowerCase", "trim", "trimStart", "trimEnd":
+		return true
+	default:
+		return false
+	}
+}
+
 // HandlePromiseMethod 处理 Promise 的 then, catch, finally 方法
 // 这些方法的特点是接收一个回调函数，并将 Promise 的值作为参数传递给回调
 func (b *builder) HandlePromiseMethod(promiseValue ssa.Value, methodName string, args []ssa.Value) ssa.Value {
@@ -5130,6 +5239,16 @@ func (b *builder) HandlePromiseThen(promiseValue ssa.Value, callback ssa.Value) 
 	// 从 Promise<T> 中提取 T 类型，并创建一个具有该类型的值
 	// 这个值代表 Promise 完成后传递给回调的实际数据
 	resolvedValue := b.ExtractPromiseResolvedValue(promiseValue)
+	if callbackFunc, ok := ssa.ToFunction(callback); ok {
+		callbackFunc.Build()
+		if len(callbackFunc.Params) > 0 {
+			if paramValue, ok := callbackFunc.GetValueById(callbackFunc.Params[0]); ok {
+				if param, ok := ssa.ToParameter(paramValue); ok {
+					param.SetDefault(resolvedValue)
+				}
+			}
+		}
+	}
 
 	// 调用回调函数，将解析的值作为参数
 	// 注意：这里我们在编译时模拟回调的调用，实际运行时这是异步的
@@ -5203,6 +5322,9 @@ func (b *builder) ExtractPromiseResolvedValue(promiseValue ssa.Value) ssa.Value 
 	if promiseValue == nil {
 		return b.EmitUndefined("")
 	}
+	if resolvedValue := b.extractSingleCallReturnValue(promiseValue); resolvedValue != nil {
+		return resolvedValue
+	}
 
 	// 获取 Promise 的类型
 	promiseType := promiseValue.GetType()
@@ -5214,10 +5336,46 @@ func (b *builder) ExtractPromiseResolvedValue(promiseValue ssa.Value) ssa.Value 
 	resolvedType := b.ExtractPromiseResolvedType(promiseType)
 
 	// 创建一个具有解析类型的值（代表 Promise 的解析结果）
-	resolvedValue := promiseValue
+	resolvedValue := b.EmitUndefined("")
 	resolvedValue.SetType(resolvedType)
 
 	return resolvedValue
+}
+
+func (b *builder) extractSingleCallReturnValue(value ssa.Value) ssa.Value {
+	call, ok := ssa.ToCall(value)
+	if !ok || call == nil || call.Method <= 0 {
+		return nil
+	}
+	callee, ok := call.GetValueById(call.Method)
+	if !ok || callee == nil {
+		return nil
+	}
+	fun, ok := ssa.ToFunction(callee)
+	if !ok && callee.GetReference() != nil {
+		fun, ok = ssa.ToFunction(callee.GetReference())
+	}
+	if !ok || fun == nil || fun.IsExtern() {
+		return nil
+	}
+	fun.Build()
+
+	var returns []ssa.Value
+	for _, retID := range fun.Return {
+		retInst, ok := fun.GetValueById(retID)
+		if !ok || retInst == nil {
+			continue
+		}
+		for _, retValue := range retInst.GetValues() {
+			if !utils.IsNil(retValue) {
+				returns = append(returns, retValue)
+			}
+		}
+	}
+	if len(returns) != 1 {
+		return nil
+	}
+	return returns[0]
 }
 
 // WrapInPromise 将一个值包装成 Promise 类型
