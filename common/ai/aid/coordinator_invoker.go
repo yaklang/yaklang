@@ -3,6 +3,7 @@ package aid
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -155,7 +156,9 @@ func (c *Coordinator) ExecuteLoopTask(taskTypeName string, task aicommon.AIState
 	mainloop.RemoveAction(schema.AI_REACT_LOOP_ACTION_REQUEST_PLAN_EXECUTION)
 	mainloop.RemoveAction(schema.AI_REACT_LOOP_ACTION_REQUIRE_AI_BLUEPRINT)
 	task.SetAsyncMode(false)
+	resetPlanTaskSessionSnapshot(invoker, task, time.Now())
 	err = mainloop.ExecuteWithExistedTask(task)
+	finalizeAndEmitPlanTaskSessionSnapshot(invoker, mainloop, task)
 	if err != nil {
 		return err
 	}
@@ -169,4 +172,21 @@ func (c *Coordinator) timelineDifferForTask(task aicommon.AIStatefulTask) *aicom
 		return differ
 	}
 	return c.TimelineDiffer
+}
+
+func resetPlanTaskSessionSnapshot(invoker aicommon.AITaskInvokeRuntime, task aicommon.AIStatefulTask, startedAt time.Time) {
+	childCfg := aicommon.ConfigFromAICaller(invoker.GetConfig())
+	if childCfg == nil {
+		return
+	}
+	aicommon.BeginSessionSnapshotExecutionForTask(childCfg, task, startedAt)
+}
+
+func finalizeAndEmitPlanTaskSessionSnapshot(invoker aicommon.AITaskInvokeRuntime, mainloop *reactloops.ReActLoop, task aicommon.AIStatefulTask) {
+	childCfg := aicommon.ConfigFromAICaller(invoker.GetConfig())
+	if childCfg == nil || task == nil {
+		return
+	}
+	aicommon.FinalizeSessionSnapshotExecutionForTask(childCfg, task, time.Now())
+	reactloops.EmitSessionSnapshot(childCfg, mainloop, task)
 }

@@ -54,3 +54,22 @@ func TestNotifySessionSnapshotEmit_Debounced(t *testing.T) {
 	time.Sleep(1100 * time.Millisecond)
 	require.Equal(t, 1, emitted)
 }
+
+func TestNormalizeSessionSnapshot_FullPayload(t *testing.T) {
+	snapshot := &SessionSnapshot{
+		Revision:  1,
+		UpdatedAt: time.Now().Unix(),
+	}
+	NormalizeSessionSnapshot(snapshot)
+	require.NotNil(t, snapshot.Execution)
+	require.NotNil(t, snapshot.Perception)
+	require.NotNil(t, snapshot.Capabilities)
+	require.Equal(t, "processing", snapshot.Execution.Status)
+}
+
+func TestBuildSessionSnapshotExecution_NilTaskReturnsNonNil(t *testing.T) {
+	cfg := NewConfig(context.Background(), WithDisableAutoSkills(true))
+	exec := cfg.BuildSessionSnapshotExecution(nil)
+	require.NotNil(t, exec)
+	require.Equal(t, "processing", exec.Status)
+}

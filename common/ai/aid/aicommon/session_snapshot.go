@@ -23,11 +23,11 @@ type sessionSnapshotEmitHandler func()
 // SessionSnapshot is the unified real-time sidebar payload for frontend consumption.
 // TaskId / TaskIndex are carried on the outer AIOutputEvent envelope, not duplicated here.
 type SessionSnapshot struct {
-	Revision     int64                      `json:"revision"`
-	UpdatedAt    int64                      `json:"updated_at"`
-	Execution    *SessionSnapshotExecution    `json:"execution,omitempty"`
-	Perception   *SessionSnapshotPerception   `json:"perception,omitempty"`
-	Capabilities []CapabilityInventoryItem    `json:"capabilities"`
+	Revision     int64                    `json:"revision"`
+	UpdatedAt    int64                    `json:"updated_at"`
+	Execution    *SessionSnapshotExecution  `json:"execution"`
+	Perception   *SessionSnapshotPerception `json:"perception"`
+	Capabilities []CapabilityInventoryItem  `json:"capabilities"`
 }
 
 type SessionSnapshotExecution struct {
@@ -361,6 +361,29 @@ func (c *Config) RefreshSessionSnapshotRuntimeCounts(callToolID string) {
 	c.refreshSessionSnapshotDurationLocked(state)
 }
 
+func emptySessionSnapshotExecution() *SessionSnapshotExecution {
+	return &SessionSnapshotExecution{
+		Status: "processing",
+	}
+}
+
+// NormalizeSessionSnapshot ensures every emit carries a full payload so the
+// frontend can replace planDetails sections without merging missing keys.
+func NormalizeSessionSnapshot(snapshot *SessionSnapshot) {
+	if snapshot == nil {
+		return
+	}
+	if snapshot.Execution == nil {
+		snapshot.Execution = emptySessionSnapshotExecution()
+	}
+	if snapshot.Perception == nil {
+		snapshot.Perception = &SessionSnapshotPerception{}
+	}
+	if snapshot.Capabilities == nil {
+		snapshot.Capabilities = []CapabilityInventoryItem{}
+	}
+}
+
 func (c *Config) BuildSessionSnapshotExecution(task AIStatefulTask) *SessionSnapshotExecution {
 	if c == nil {
 		return buildSessionSnapshotExecutionFromTask(task)
@@ -380,6 +403,9 @@ func (c *Config) BuildSessionSnapshotExecution(task AIStatefulTask) *SessionSnap
 	c.refreshSessionSnapshotDurationLocked(state)
 
 	copied := state.execution.stats
+	if strings.TrimSpace(copied.Status) == "" {
+		copied.Status = SessionSnapshotStatusFromTask(task)
+	}
 	return &copied
 }
 
@@ -444,11 +470,11 @@ func (c *Config) syncExecutionToolCountsLocked(state *sessionSnapshotState, task
 
 func buildSessionSnapshotExecutionFromTask(task AIStatefulTask) *SessionSnapshotExecution {
 	if task == nil {
-		return nil
+		return emptySessionSnapshotExecution()
 	}
 	stats := &SessionSnapshotExecution{
 		TaskName: strings.TrimSpace(task.GetName()),
-		Status:   "processing",
+		Status:   SessionSnapshotStatusFromTask(task),
 	}
 	for _, result := range task.GetAllToolCallResults() {
 		if result == nil {
@@ -461,9 +487,6 @@ func buildSessionSnapshotExecutionFromTask(task AIStatefulTask) *SessionSnapshot
 		}
 	}
 	stats.ToolCallTotal = stats.ToolCallSuccess + stats.ToolCallFailed
-	if stats.ToolCallTotal == 0 && stats.TaskName == "" {
-		return nil
-	}
 	return stats
 }
 
@@ -514,4 +537,42 @@ func SetSessionSnapshotPerceptionKnowledge(cfg AICallerConfigIf, knowledge *Sess
 	if c := ConfigFromAICaller(cfg); c != nil {
 		c.SetSessionSnapshotPerceptionKnowledge(knowledge)
 	}
+}
+
+// SessionSnapshotStatusFromTask maps task runtime status to session_snapshot execution status.
+func SessionSnapshotStatusFromTask(task AIStatefulTask) string {
+	if task == nil {
+		return "processing"
+	}
+	switch task.GetStatus() {
+	case AITaskState_Completed:
+		return "completed"
+	case AITaskState_Aborted:
+		return "aborted"
+	case AITaskState_Skipped:
+		return "skipped"
+	default:
+		return "processing"
+	}
+}
+
+// BeginSessionSnapshotExecutionForTask resets execution stats and emits an immediate snapshot.
+func BeginSessionSnapshotExecutionForTask(c *Config, task AIStatefulTask, startedAt time.Time) {
+	if c == nil || task == nil {
+		return
+	}
+	taskName := strings.TrimSpace(task.GetName())
+	if taskName == "" {
+		taskName = "task"
+	}
+	c.ResetSessionSnapshotExecution(taskName, "processing", startedAt)
+	c.NotifySessionSnapshotEmit(true)
+}
+
+// FinalizeSessionSnapshotExecutionForTask marks execution ended and refreshes duration fields.
+func FinalizeSessionSnapshotExecutionForTask(c *Config, task AIStatefulTask, endedAt time.Time) {
+	if c == nil || task == nil {
+		return
+	}
+	c.FinalizeSessionSnapshotExecution(SessionSnapshotStatusFromTask(task), endedAt)
 }
