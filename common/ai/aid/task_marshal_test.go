@@ -41,3 +41,16 @@ func TestAiTask_MarshalJSON_IncludesTaskId(t *testing.T) {
 	require.True(t, ok)
 	require.Equal(t, "sub-id", sub["task_id"])
 }
+
+func TestAiTask_GetIndex_ReturnsHierarchicalIndexNotTaskId(t *testing.T) {
+	task := &AiTask{
+		TaskId: "0112fcab-9d4b-4ffc-84b2-4f7afac135c4",
+		Index:  "1-1",
+		Name:   "获取操作系统类型",
+		Goal:   "detect os",
+	}
+	task.AIStatefulTaskBase = aicommon.NewStatefulTaskBase(task.TaskId, task.Goal, nil, nil, true)
+
+	require.Equal(t, "1-1", task.GetIndex())
+	require.Equal(t, task.TaskId, task.GetId())
+}

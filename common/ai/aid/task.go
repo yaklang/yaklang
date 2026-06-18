@@ -252,6 +252,21 @@ func (t *AiTask) SetID(id string) {
 	}
 }
 
+// GetIndex returns the hierarchical plan position (e.g. "1-2-3") for UI grouping and prompts.
+// Stable logical identity is exposed via GetId()/TaskId instead.
+func (t *AiTask) GetIndex() string {
+	if t == nil {
+		return ""
+	}
+	if idx := strings.TrimSpace(t.Index); idx != "" {
+		return idx
+	}
+	if t.AIStatefulTaskBase != nil {
+		return t.AIStatefulTaskBase.GetIndex()
+	}
+	return ""
+}
+
 func (t *AiTask) GetSummary() string {
 	if t.TaskSummary != "" {
 		return t.TaskSummary
