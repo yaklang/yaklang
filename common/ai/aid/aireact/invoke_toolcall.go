@@ -35,10 +35,10 @@ func (r *ReAct) executeToolCallInternal(ctx context.Context, toolName string, pa
 	}
 
 	// Setup task-aware event emitter
-	var taskId string
+	var taskIndex string
 	currentTask := r.GetCurrentTask()
 	if !utils.IsNil(r.GetCurrentTask()) {
-		taskId = r.GetCurrentTask().GetId()
+		taskIndex = r.GetCurrentTask().GetIndex()
 	}
 	if currentTask == nil {
 		currentTask = r.config.DefaultTask
@@ -46,7 +46,7 @@ func (r *ReAct) executeToolCallInternal(ctx context.Context, toolName string, pa
 	currentTask.SetEmitter(
 		currentTask.GetEmitter().PushEventProcesser(func(event *schema.AiOutputEvent) *schema.AiOutputEvent {
 			if event != nil && event.TaskIndex == "" {
-				event.TaskIndex = taskId
+				event.TaskIndex = taskIndex
 			}
 			return event
 		}),
