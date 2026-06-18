@@ -221,6 +221,7 @@ func handleSwitchCurrentProjectDatabase(s *MCPServer) server.ToolHandlerFunc {
 		if err != nil {
 			return nil, utils.Wrap(err, "failed to switch current project database")
 		}
+		yakit.BroadcastProjectChanged(yakit.ProjectPushActionAutoEnter, args.ID, "", projectType)
 		return NewCommonCallToolResult(buildCurrentDatabaseContext(ctx, s, projectType))
 	}
 }
@@ -272,6 +273,9 @@ func handleCreateProjectDatabase(s *MCPServer) server.ToolHandlerFunc {
 			if err != nil {
 				return nil, utils.Wrap(err, "project created but failed to switch current project")
 			}
+			yakit.BroadcastProjectChanged(yakit.ProjectPushActionAutoEnter, resp.GetId(), resp.GetProjectName(), projectType)
+		} else {
+			yakit.BroadcastProjectChanged(yakit.ProjectPushActionPromptEnter, resp.GetId(), resp.GetProjectName(), projectType)
 		}
 
 		project, err := s.grpcClient.GetCurrentProjectEx(ctx, &ypb.GetCurrentProjectExRequest{Type: projectType})
