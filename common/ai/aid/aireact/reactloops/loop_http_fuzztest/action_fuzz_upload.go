@@ -25,10 +25,9 @@ var fuzzUploadAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpti
 			aitool.WithStringParam("content_profile", aitool.WithParam_Description("Built-in small content profile for file_content: empty, text, svg_xss, php_probe, polyglot_jpeg_php.")),
 			aitool.WithStringParam("file_resource_id", aitool.WithParam_Description("Reuse an externalized upload file resource ID from upload_request_summary instead of generating new content.")),
 			aitool.WithStringArrayParam("content_type_values", aitool.WithParam_Description("Content-Type values for file_content_type (phase 1: prefer patch_http_request).")),
-			aitool.WithStringParam("reason", aitool.WithParam_Description("请用中文说明测试目的、怀疑漏洞和安全边界。不要上传 webshell 或破坏性 payload。")),
 		},
 		[]*reactloops.LoopStreamField{
-			{FieldName: "reason", AINodeId: "thought", IsSystem: true},
+			{FieldName: "reason", AINodeId: "thought"},
 		},
 		func(l *reactloops.ReActLoop, action *aicommon.Action) error {
 			uploadType := strings.TrimSpace(action.GetString("upload_type"))

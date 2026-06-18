@@ -18,11 +18,10 @@ var modifyHTTPRequestAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActL
 		"修改当前生效的 HTTP 数据包，并把 merge 变化、审核结果和当前生效包明确展示给用户。",
 		[]aitool.ToolOption{
 			aitool.WithStringParam("modification_target", aitool.WithParam_Description("请用中文描述要修改哪个位置、希望变成什么样，例如“把 id 参数改成时间盲注探测载荷”。"), aitool.WithParam_Required(true)),
-			aitool.WithStringParam("modification_reason", aitool.WithParam_Description("请用中文说明为什么要改这个数据包、怀疑的漏洞类型、以及必须遵守的安全边界。"), aitool.WithParam_Required(true)),
 			aitool.WithBoolParam("require_manual_review", aitool.WithParam_Description("是否要求在应用新数据包前先进行人工审核。")),
 		},
 		[]*reactloops.LoopStreamField{
-			{FieldName: "modification_reason", AINodeId: "thought", IsSystem: true},
+			{FieldName: "modification_reason", AINodeId: "thought"},
 		},
 		func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
 			if strings.TrimSpace(getCurrentRequestRaw(loop)) == "" {
