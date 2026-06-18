@@ -41,17 +41,10 @@ var queryHTTPFlowsAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoop
 			return nil
 		},
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, operator *reactloops.LoopActionHandlerOperator) {
-			// === 1. 提取 thought 和构建参数摘要 ===
-			thought := action.GetString("human_readable_thought")
+			// === 1. 构建参数摘要 ===
 			paramSummary := buildSearchParamSummary(action)
 
-			// 构建第一行累积流（操作摘要 + 可选思考）
-			var line1 string
-			if thought != "" {
-				line1 = fmt.Sprintf("查询 %s | %s", paramSummary, thought)
-			} else {
-				line1 = fmt.Sprintf("查询 %s", paramSummary)
-			}
+			line1 := fmt.Sprintf("查询 %s", paramSummary)
 			reactloops.EmitActionLog(loop, "http-flow-query", line1)
 
 			// === 2. 发送瞬时状态 ===

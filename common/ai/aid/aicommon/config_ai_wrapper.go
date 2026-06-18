@@ -154,7 +154,7 @@ func (c *Config) handle429RateLimit(rsp *AIResponse) (is429 bool, ctxDone bool) 
 			limitYi)
 		sleepSec := 5 + rand.Intn(11)
 		waitDuration = time.Duration(sleepSec) * time.Second
-		c.EmitDefaultStreamEvent("daily-token-exceeded", strings.NewReader(msg), "")
+		c.EmitDefaultSystemStreamEvent("daily-token-exceeded", strings.NewReader(msg), "")
 		c.EmitNotify("daily-token-exceeded", msg, waitDuration)
 		log.Infof("daily token quota exceeded (used=%d, limit=%d), retrying in %ds",
 			tokensUsed, tokensLimit, sleepSec)

@@ -686,6 +686,20 @@ func (r *Emitter) EmitHTTPRequestStreamEvent(nodeId string, reader io.Reader, ta
 	return r.EmitStreamEventWithContentType(nodeId, reader, taskIndex, TypeCodeHTTPRequest, finishCallback...)
 }
 
+func (r *Emitter) EmitDefaultSystemStreamEvent(nodeId string, reader io.Reader, taskIndex string, finishCallback ...func()) (*schema.AiOutputEvent, error) {
+	return r.emitStreamEvent(&streamEvent{
+		disableMarkdown:    true,
+		startTime:          time.Now(),
+		isSystem:           true,
+		isReason:           false,
+		reader:             utils.UTF8Reader(reader),
+		nodeId:             nodeId,
+		contentType:        "",
+		taskIndex:          taskIndex,
+		emitFinishCallback: finishCallback,
+	})
+}
+
 func (r *Emitter) EmitDefaultStreamEvent(nodeId string, reader io.Reader, taskIndex string, finishCallback ...func()) (*schema.AiOutputEvent, error) {
 	return r.emitStreamEvent(&streamEvent{
 		disableMarkdown:    true,

@@ -70,14 +70,7 @@ var dispatchFuzzTestAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 			locatorDesc := buildLocatorDesc(action)
 
 			// 输出简洁的累积流（2行）
-			// 如果有 human_readable_thought，融入到第一行
-			thought := action.GetString("human_readable_thought")
-			var line1 string
-			if thought != "" {
-				line1 = fmt.Sprintf("%s, 漏洞类型=%s | %s", locatorDesc, vulnType, thought)
-			} else {
-				line1 = fmt.Sprintf("%s, 漏洞类型=%s", locatorDesc, vulnType)
-			}
+			line1 := fmt.Sprintf("%s, 漏洞类型=%s", locatorDesc, vulnType)
 			reactloops.EmitActionLog(loop, "fuzz-test", line1)
 
 			log.Infof("[dispatch_fuzz_test] loading target flow: %s, vulnerability type: %s", locatorDesc, vulnType)
