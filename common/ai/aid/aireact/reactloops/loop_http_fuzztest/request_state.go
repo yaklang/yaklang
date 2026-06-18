@@ -167,7 +167,7 @@ func applyLoopHTTPFuzzRequestChange(loop *reactloops.ReActLoop, runtime aicommon
 
 	diffSummary := ""
 	if previousState != nil && strings.TrimSpace(previousState.RawRequest) != "" && !input.ResetBaseline {
-		diffSummary = compareRequests(previousState.RawRequest, currentState.RawRequest)
+		diffSummary = compareRequestsForPrompt(previousState.RawRequest, currentState.RawRequest)
 	}
 
 	loop.Set("fuzz_request", fuzzReq)
@@ -214,6 +214,9 @@ func applyLoopHTTPFuzzRequestChange(loop *reactloops.ReActLoop, runtime aicommon
 		persistSource := firstNonEmptyString(input.PersistSource, input.SourceAction)
 		persistLoopHTTPFuzzSessionContext(loop, persistSource)
 	}
+
+	resetBaseline := input.ResetBaseline || strings.TrimSpace(loop.Get("original_request")) == ""
+	syncLoopHTTPUploadContext(loop, fixedPacket, input.IsHTTPS, resetBaseline)
 
 	return &loopHTTPFuzzRequestChangeResult{
 		PreviousState: previousState,
@@ -286,6 +289,7 @@ func resetLoopHTTPFuzzExecutionState(loop *reactloops.ReActLoop) {
 	loop.Set("diff_result_analysis", "")
 	loop.Set("diff_result_compressed", "")
 	loop.Set("verification_result", "")
+	loop.Set(loopHTTPUploadRepresentativeSafeKey, "")
 }
 
 func firstNonEmptyString(values ...string) string {
@@ -295,4 +299,13 @@ func firstNonEmptyString(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func firstNonEmptyStringSlice(slices ...[]string) []string {
+	for _, slice := range slices {
+		if len(slice) > 0 {
+			return slice
+		}
+	}
+	return nil
 }

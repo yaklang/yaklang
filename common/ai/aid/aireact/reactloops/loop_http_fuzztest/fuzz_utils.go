@@ -451,7 +451,7 @@ func appendLoopHTTPFuzzRenderedDetailedResult(out *strings.Builder, resultIndex 
 	out.WriteString(fmt.Sprintf("Request Changes:\n%s\n", processed.RequestDiff))
 	out.WriteString(fmt.Sprintf("Response Summary:\n%s\n", processed.ResponsePreview))
 	out.WriteString("Request Packet:\n")
-	out.WriteString(processed.RequestRaw)
+	out.WriteString(sanitizeRequestTextForPrompt(processed.RequestRaw))
 	out.WriteString("\nResponse Packet:\n")
 	out.WriteString(processed.ResponseRaw)
 	out.WriteRune('\n')
@@ -707,7 +707,7 @@ func buildLoopHTTPFuzzProcessedResult(resultIndex int, result *mutate.HttpResult
 	responseRaw := string(result.ResponseRaw)
 	requestURL, requestSummary := buildHTTPRequestStreamSummary(requestRaw, result.Request.TLS != nil)
 	responseSummary := buildHTTPResponseStreamSummary(responseRaw, requestURL)
-	requestDiff := compareRequests(originalRequest, requestRaw)
+	requestDiff := compareRequestsForPrompt(originalRequest, requestRaw)
 	responsePreview := summarizeResponse(responseRaw)
 	statusCode := getStatusFromResponse(responseRaw)
 	_, responseBody := lowhttp.SplitHTTPPacketFast([]byte(responseRaw))
@@ -820,6 +820,7 @@ func storeLoopFuzzRequestState(loop *reactloops.ReActLoop, fuzzReq *mutate.FuzzH
 	loop.Set("is_https", utils.InterfaceToString(isHTTPS))
 	loop.Set("bootstrap_source", "")
 	resetLoopHTTPFuzzExecutionState(loop)
+	syncLoopHTTPUploadContext(loop, requestRaw, isHTTPS, true)
 }
 
 func getCurrentRequestRaw(loop *reactloops.ReActLoop) string {
@@ -905,10 +906,10 @@ func buildRequestModificationFeedback(previousRequest, modifiedRequest []byte, i
 	out.WriteString(modifiedSummary)
 	out.WriteString("\n\n")
 	out.WriteString("=== Merge 变化 ===\n")
-	out.WriteString(compareRequests(string(previousRequest), string(modifiedRequest)))
+	out.WriteString(compareRequestsForPrompt(string(previousRequest), string(modifiedRequest)))
 	out.WriteString("\n")
 	out.WriteString("\n=== 当前生效数据包 ===\n")
-	out.WriteString(string(modifiedRequest))
+	out.WriteString(sanitizeRequestTextForPrompt(string(modifiedRequest)))
 	out.WriteString("\n")
 	return out.String()
 }
@@ -1084,6 +1085,7 @@ func executeFuzzAndCompare(loop *reactloops.ReActLoop, fuzzResult mutate.FuzzHTT
 		loop.Set("representative_request", representativeRequest)
 		loop.Set("representative_response", representativeResponse)
 		loop.Set("representative_httpflow_hidden_index", representativeHiddenIndex)
+		loop.Set(loopHTTPUploadRepresentativeSafeKey, sanitizeRequestTextForPrompt(representativeRequest))
 	}
 
 	overviewReport := buildLoopHTTPFuzzOverviewReport(actionName, paramSummary, overview)
@@ -1184,7 +1186,7 @@ func buildCompressedAnalysisSection(compressed, representativeRequest, represent
 		}
 		if representativeRequest != "" {
 			out.WriteString("Request:\n")
-			out.WriteString(representativeRequest)
+			out.WriteString(sanitizeRequestTextForPrompt(representativeRequest))
 			out.WriteRune('\n')
 		}
 		if representativeResponse != "" {
@@ -1284,6 +1286,11 @@ func buildLoopHTTPFuzzOperatorFeedback(actionFeedback, displaySummary, verificat
 }
 
 func buildHTTPRequestStreamSummary(requestRaw string, isHTTPS bool) (string, string) {
+	if lowhttp.IsMultipartFormDataRequest([]byte(requestRaw)) {
+		if summary, err := parseMultipartUploadSummary([]byte(requestRaw)); err == nil && summary != nil && summary.IsMultipart {
+			return buildUploadAwareHTTPRequestStreamSummary(requestRaw, isHTTPS, summary)
+		}
+	}
 	requestURL := extractRequestURL(requestRaw, isHTTPS)
 	_, body := lowhttp.SplitHTTPPacketFast([]byte(requestRaw))
 	return requestURL, fmt.Sprintf("URL: %s BODY: [(%d) bytes]", requestURL, len(body))
@@ -1347,6 +1354,13 @@ func buildLoopHTTPFuzzActionLogStartLineFromAction(actionName string, action *ai
 		return formatLoopHTTPFuzzValuesOnlyLine("HTTP 方法", "HTTP method", action.GetStringSlice("methods"))
 	case "fuzz_path":
 		return formatLoopHTTPFuzzValuesOnlyLine("路径", "Path", action.GetStringSlice("paths"))
+	case "fuzz_upload":
+		return formatLoopHTTPFuzzNamedValuesLine(
+			fmt.Sprintf("上传 %s", action.GetString("upload_type")),
+			fmt.Sprintf("Upload %s", action.GetString("upload_type")),
+			action.GetString("field_name"),
+			firstNonEmptyStringSlice(action.GetStringSlice("file_names"), action.GetStringSlice("field_values")),
+		)
 	case "generate_and_send_packet":
 		target := strings.TrimSpace(action.GetString("target_purpose"))
 		if target == "" {
