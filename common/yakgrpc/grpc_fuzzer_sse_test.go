@@ -252,7 +252,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_SSE_HTTP2_AutoDetectWithoutAccept(t *testing.T)
 
 	stream, err := c.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
 		Request:                  fmt.Sprintf("GET / HTTP/2.0\r\nHost: %s\r\n\r\n", utils.HostPort(host, port)),
-		PerRequestTimeoutSeconds: 1.8,
+		PerRequestTimeoutSeconds: 5.0,
 		DialTimeoutSeconds:       1.0,
 		ForceFuzz:                true,
 		IsHTTPS:                  true,

@@ -73,6 +73,12 @@ func TestProcessHotPatchMessage_EnabledCapabilitiesMerge(t *testing.T) {
 		EnabledCapability{Name: "read_file", Type: EnabledCapabilityTypeTool},
 	)(cfg))
 
+	var hotpatched []EnabledCapability
+	cfg.SetCapabilityHotpatchHandler(func(enable bool, caps []EnabledCapability) {
+		require.True(t, enable)
+		hotpatched = append(hotpatched, caps...)
+	})
+
 	opts := cfg.ProcessHotPatchMessage(&ypb.AIInputEvent{
 		IsConfigHotpatch: true,
 		HotpatchType:     HotPatchType_EnabledCapabilities,
@@ -85,8 +91,12 @@ func TestProcessHotPatchMessage_EnabledCapabilitiesMerge(t *testing.T) {
 	require.Len(t, opts, 1)
 	require.NoError(t, opts[0](cfg))
 
+	require.Len(t, hotpatched, 1)
+	require.Equal(t, "grep", hotpatched[0].Name)
+	// Hotpatch is prompt-level only; startup registry stays unchanged.
 	caps := cfg.GetEnabledCapabilities()
-	require.Len(t, caps, 2)
+	require.Len(t, caps, 1)
+	require.Equal(t, "read_file", caps[0].Name)
 }
 
 func TestSubtractEnabledCapabilitiesHotpatch(t *testing.T) {
@@ -114,6 +124,12 @@ func TestProcessHotPatchMessage_DisabledCapabilities(t *testing.T) {
 		EnabledCapability{Name: "grep", Type: EnabledCapabilityTypeTool},
 	)(cfg))
 
+	var hotpatched []EnabledCapability
+	cfg.SetCapabilityHotpatchHandler(func(enable bool, caps []EnabledCapability) {
+		require.False(t, enable)
+		hotpatched = append(hotpatched, caps...)
+	})
+
 	opts := cfg.ProcessHotPatchMessage(&ypb.AIInputEvent{
 		IsConfigHotpatch: true,
 		HotpatchType:     HotPatchType_DisabledCapabilities,
@@ -126,9 +142,11 @@ func TestProcessHotPatchMessage_DisabledCapabilities(t *testing.T) {
 	require.Len(t, opts, 1)
 	require.NoError(t, opts[0](cfg))
 
+	require.Len(t, hotpatched, 1)
+	require.Equal(t, "read_file", hotpatched[0].Name)
+	// Hotpatch is prompt-level only; startup registry stays unchanged.
 	caps := cfg.GetEnabledCapabilities()
-	require.Len(t, caps, 1)
-	require.Equal(t, "grep", caps[0].Name)
+	require.Len(t, caps, 2)
 }
 
 func TestWithDisabledCapabilities_RemovesTool(t *testing.T) {
