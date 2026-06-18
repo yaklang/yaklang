@@ -33,6 +33,7 @@ func CreateBuilder() ssa.Builder {
 		ssa.WithLanguageConfigBind(true),
 		ssa.WithLanguageConfigSupportClass(true),
 		ssa.WithLanguageConfigIsSupportClassStaticModifier(true),
+		ssa.WithLanguageConfigAllowStaticMemberAccessByInstance(true),
 		ssa.WithLanguageConfigVirtualImport(true),
 		ssa.WithLanguageBuilder(builder),
 	)
