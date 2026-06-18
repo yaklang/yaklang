@@ -15,10 +15,9 @@ var fuzzMethodAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpti
 		"Fuzz the HTTP request method. Use this to test different HTTP methods (GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD, etc.) and observe response differences.",
 		[]aitool.ToolOption{
 			aitool.WithStringArrayParam("methods", aitool.WithParam_Description("HTTP methods to test, e.g., ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'HEAD']"), aitool.WithParam_Required(true)),
-			aitool.WithStringParam("reason", aitool.WithParam_Description("请用中文说明为什么要测试这些 HTTP 方法、关注的漏洞类型以及安全测试边界。")),
 		},
 		[]*reactloops.LoopStreamField{
-			{FieldName: "reason", AINodeId: "thought", IsSystem: true},
+			{FieldName: "reason", AINodeId: "thought"},
 		},
 		func(l *reactloops.ReActLoop, action *aicommon.Action) error {
 			methods := action.GetStringSlice("methods")

@@ -18,7 +18,7 @@ var setHTTPRequestAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoop
 		[]aitool.ToolOption{
 			aitool.WithStringParam("http_request", aitool.WithParam_Description("The raw HTTP request packet to test. Must be a valid HTTP request format."), aitool.WithParam_Required(true)),
 			aitool.WithBoolParam("is_https", aitool.WithParam_Description("Whether the request should use HTTPS. Default is false.")),
-			aitool.WithStringParam("reason", aitool.WithParam_Description("请用中文说明为什么要测试这个 HTTP 数据包、怀疑的漏洞点，以及必须遵守的安全边界。")),
+			aitool.WithStringParam("reason", aitool.WithParam_Description("请用中文说明为什么要执行这个Action、为什么要测试/修改这个 HTTP 数据包、怀疑的漏洞点，以及必须遵守的安全边界。")),
 		},
 		func(l *reactloops.ReActLoop, action *aicommon.Action) error {
 			httpRequest := action.GetString("http_request")

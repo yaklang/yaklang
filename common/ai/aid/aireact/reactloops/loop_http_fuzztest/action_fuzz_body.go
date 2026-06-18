@@ -18,10 +18,9 @@ var fuzzBodyAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption
 			aitool.WithStringParam("body_type", aitool.WithParam_Description("Type of body fuzzing: 'raw' (replace entire body), 'post_params' (fuzz form parameters), 'json_params' (fuzz only top-level simple JSON object fields). Use raw with fuzztag when the body contains arrays, nested JSON objects, or you need to preserve/replace complex JSON structure."), aitool.WithParam_Required(true)),
 			aitool.WithStringParam("param_name", aitool.WithParam_Description("Parameter name to fuzz (required for post_params and json_params types). For json_params this must be a top-level simple JSON object field, not a JSONPath, nested key, or array element.")),
 			aitool.WithStringArrayParam("param_values", aitool.WithParam_Description("Values to test. Supports arbitrary fuzztag; see the FUZZTAG_REFERENCE and AVAILABLE_PAYLOAD_GROUPS context blocks for the current full tag manual and payload dictionary groups. For brute-force or dictionary-style testing, prefer concise fuzztag rules over long handwritten lists."), aitool.WithParam_Required(true)),
-			aitool.WithStringParam("reason", aitool.WithParam_Description("请用中文说明为什么要测试这些 Body 值、怀疑的漏洞类型以及安全测试边界。")),
 		},
 		[]*reactloops.LoopStreamField{
-			{FieldName: "reason", AINodeId: "thought", IsSystem: true},
+			{FieldName: "reason", AINodeId: "thought"},
 		},
 		func(l *reactloops.ReActLoop, action *aicommon.Action) error {
 			bodyType := action.GetString("body_type")

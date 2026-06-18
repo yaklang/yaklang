@@ -30,11 +30,10 @@ var patchHTTPRequestAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 			aitool.WithStringParam("operation", aitool.WithParam_Description("补丁动作：add / replace / remove / repair / transform")),
 			aitool.WithStringParam("field_name", aitool.WithParam_Description("字段名。header/query/cookie/body.form/body.json 场景常用；body.format 可用作 XML 根节点；auth.basic 可用作 username。")),
 			aitool.WithStringParam("field_value", aitool.WithParam_Description("字段值。body.json 支持 JSON 字面量；body.format 用于目标格式；auth.basic 可传 password 或 {\"username\":\"...\",\"password\":\"...\"}；auth.bearer.jwt 可传 claims JSON。")),
-			aitool.WithStringParam("reason", aitool.WithParam_Description("请用中文说明为什么要这样改包、希望验证什么，以及需要遵守的安全边界。"), aitool.WithParam_Required(true)),
 			aitool.WithStringParam("repair_profile", aitool.WithParam_Description("仅 operation=repair 时使用。可选 basic 或 browser_like，默认 basic。")),
 		},
 		[]*reactloops.LoopStreamField{
-			{FieldName: "reason", AINodeId: "thought", IsSystem: true},
+			{FieldName: "reason", AINodeId: "thought"},
 		},
 		func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
 			if strings.TrimSpace(getCurrentRequestRaw(loop)) == "" {
