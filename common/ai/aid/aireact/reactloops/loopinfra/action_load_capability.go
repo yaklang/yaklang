@@ -282,7 +282,7 @@ func handleLoadSkill(
 	persistLoadedSkillNames(loop, invoker)
 	emitSkillReferenceMaterial(invoker, identifier, mgr)
 	if cfg, ok := invoker.GetConfig().(*aicommon.Config); ok {
-		reactloops.EmitCapabilityInventorySnapshot(cfg, loop)
+		aicommon.NotifySessionSnapshotEmit(cfg, true)
 	}
 	recommendationSummary := recommendCapabilitiesFromSkillContent(loop, invoker, identifier, "Skill "+identifier)
 

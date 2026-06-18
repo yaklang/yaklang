@@ -230,7 +230,7 @@ func PopulateExtraCapabilitiesFromCapabilitySearchResult(r aicommon.AIInvokeRunt
 	}
 
 	if cfg, ok := r.GetConfig().(*aicommon.Config); ok {
-		EmitCapabilityInventorySnapshot(cfg, loop)
+		aicommon.NotifySessionSnapshotEmit(cfg, true)
 	}
 }
 

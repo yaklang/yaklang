@@ -109,3 +109,20 @@ type AIForgeFactory interface {
 	GenerateAIForgeListForPrompt(forges []*schema.AIForge) (string, error)
 	GenerateAIJSONSchemaFromSchemaAIForge(forge *schema.AIForge) (string, error)
 }
+
+var defaultAIForgeFactoryProvider func() AIForgeFactory
+
+// RegisterDefaultAIForgeFactoryProvider registers the factory used when a Config
+// has no AiForgeManager after options are applied (e.g. standalone NewConfig).
+func RegisterDefaultAIForgeFactoryProvider(provider func() AIForgeFactory) {
+	defaultAIForgeFactoryProvider = provider
+}
+
+func ensureCapabilityManagers(config *Config) {
+	if config == nil {
+		return
+	}
+	if config.AiForgeManager == nil && defaultAIForgeFactoryProvider != nil {
+		config.AiForgeManager = defaultAIForgeFactoryProvider()
+	}
+}

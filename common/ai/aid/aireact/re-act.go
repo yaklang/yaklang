@@ -19,7 +19,6 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/ai/rag/rag_search_tool"
-	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -195,7 +194,6 @@ func (r *ReAct) UnregisterMirrorOfAIInputEvent(id string) {
 
 func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 	configLoadingStart := time.Now()
-	opts = append(opts, aicommon.WithAIBlueprintManager(aiforge.NewForgeFactory()))
 	cfg := aicommon.NewConfig(context.Background(), opts...)
 
 	// Extract built-in skills to ~/yakit-projects/ai-skills/ only when auto-skills

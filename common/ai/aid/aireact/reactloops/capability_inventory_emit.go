@@ -69,17 +69,10 @@ func BuildCapabilityInventoryPayload(cfg *aicommon.Config, loop *ReActLoop) aico
 	return aicommon.BuildCapabilityInventoryPayload(cfg, loop.capabilityInventoryContext())
 }
 
-func EmitCapabilityInventorySnapshot(cfg *aicommon.Config, loop *ReActLoop) {
-	emitter := cfg.GetEmitter()
-	if loop != nil && loop.GetEmitter() != nil {
-		emitter = loop.GetEmitter()
+func BuildCapabilityInventoryPayloadFromSnapshot(snapshot *aicommon.SessionSnapshot, cfg *aicommon.Config) aicommon.CapabilityInventoryPayload {
+	if snapshot == nil {
+		return aicommon.CapabilityInventoryPayload{}
 	}
-	if emitter == nil {
-		return
-	}
-	_, _ = emitter.EmitSystemStructured(
-		aicommon.CapabilityInventoryNodeID,
-		BuildCapabilityInventoryPayload(cfg, loop),
-	)
+	return aicommon.CapabilityInventoryPayloadFromItems(snapshot.Capabilities, cfg)
 }
 

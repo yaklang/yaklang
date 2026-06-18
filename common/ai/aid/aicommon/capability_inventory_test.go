@@ -48,16 +48,13 @@ func TestBuildCapabilityInventoryPayload_SplitsFixedAndDynamicTools(t *testing.T
 
 	payload := BuildCapabilityInventoryPayload(cfg, nil)
 
-	require.NotEmpty(t, payload.Fixed.Tools)
-	require.Equal(t, "grep", payload.Fixed.Tools[0].Name)
-
-	foundRuntimeInDynamic := false
-	for _, item := range payload.Dynamic.Tools {
-		if item.Name == "runtime_only" {
-			foundRuntimeInDynamic = true
-		}
+	fixedNames := make(map[string]struct{})
+	for _, tool := range payload.Fixed.Tools {
+		fixedNames[tool.Name] = struct{}{}
 	}
-	require.True(t, foundRuntimeInDynamic, "runtime-only tool should appear in dynamic section")
+	require.Contains(t, fixedNames, "grep")
+	require.Contains(t, fixedNames, "runtime_only")
+	require.Empty(t, payload.Dynamic.Tools, "display tools stay in fixed section (FrozenBlock prompt position)")
 }
 
 func TestBuildCapabilityInventoryPayload_IncludesExtraCapabilitiesTools(t *testing.T) {
@@ -193,11 +190,12 @@ func TestBuildCapabilityInventoryPayload_IncludesInventorySkills(t *testing.T) {
 		inventorySkills: BuildInventorySkillsFromLoader(loader, nil),
 	})
 
-	require.Len(t, payload.Dynamic.Skills, 2)
-	for _, skill := range payload.Dynamic.Skills {
+	require.Len(t, payload.Fixed.Skills, 2)
+	for _, skill := range payload.Fixed.Skills {
 		require.Equal(t, "skill", skill.Category)
 		require.Equal(t, CapabilityInventorySkillLoadMetadata, skill.SkillLoadState)
 	}
+	require.Empty(t, payload.Dynamic.Skills)
 }
 
 func TestSelectToolInventoryTools_MoreToolsCount(t *testing.T) {
@@ -211,4 +209,28 @@ func TestSelectToolInventoryTools_MoreToolsCount(t *testing.T) {
 	require.Len(t, selection.VisibleTools, 2)
 	require.GreaterOrEqual(t, len(selection.DisplayTools), 1)
 	require.Equal(t, len(selection.VisibleTools)-len(selection.DisplayTools), selection.MoreToolsCount())
+}
+
+func TestCapabilityInventoryPayloadFromItems_SplitsByPromptPosition(t *testing.T) {
+	items := []CapabilityInventoryItem{
+		{Name: "grep", Type: "aitool", Position: CapabilityInventoryPositionFrozenBlock},
+		{Name: "extra_tool", Type: "aitool", Position: CapabilityInventoryPositionDynamic},
+		{Name: "deploy-app", Type: "skill", Stage: CapabilityInventoryStageMetadata, Position: CapabilityInventoryPositionSemiDynamic},
+		{Name: "intent-skill", Type: "skill", Stage: CapabilityInventoryStageMetadata, Position: CapabilityInventoryPositionDynamic},
+		{Name: "my-forge", Type: "forge", Position: CapabilityInventoryPositionDynamic},
+	}
+	payload := CapabilityInventoryPayloadFromItems(items, nil)
+
+	require.Len(t, payload.Fixed.Tools, 1)
+	require.Equal(t, "grep", payload.Fixed.Tools[0].Name)
+	require.Len(t, payload.Dynamic.Tools, 1)
+	require.Equal(t, "extra_tool", payload.Dynamic.Tools[0].Name)
+
+	require.Len(t, payload.Fixed.Skills, 1)
+	require.Equal(t, "deploy-app", payload.Fixed.Skills[0].Name)
+	require.Len(t, payload.Dynamic.Skills, 1)
+	require.Equal(t, "intent-skill", payload.Dynamic.Skills[0].Name)
+
+	require.Len(t, payload.Dynamic.Forges, 1)
+	require.Equal(t, "my-forge", payload.Dynamic.Forges[0].Name)
 }
