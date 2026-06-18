@@ -2,6 +2,7 @@ package aireact
 
 import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/aiforge"
 )
 
 func init() {
@@ -13,4 +14,8 @@ func init() {
 
 	// Register WithBuiltinTools option
 	aicommon.RegisterBuiltinToolsOption(WithBuiltinTools())
+
+	aicommon.RegisterDefaultAIForgeFactoryProvider(func() aicommon.AIForgeFactory {
+		return aiforge.NewForgeFactory()
+	})
 }

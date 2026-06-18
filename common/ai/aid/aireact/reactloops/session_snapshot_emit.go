@@ -91,23 +91,20 @@ func EmitSessionSnapshot(cfg *aicommon.Config, loop *ReActLoop, task aicommon.AI
 	if !cfg.EmitLegacySessionSnapshotEvents() {
 		return
 	}
-	emitLegacySessionSnapshotEvents(cfg, loop, snapshot)
+	emitCapabilityInventorySnapshot(cfg, emitter, snapshot)
+	emitLegacyPerceptionEvents(cfg, emitter, snapshot)
 }
 
-func emitLegacySessionSnapshotEvents(cfg *aicommon.Config, loop *ReActLoop, snapshot *aicommon.SessionSnapshot) {
-	EmitCapabilityInventorySnapshot(cfg, loop)
-	emitLegacyPerceptionEvents(cfg, loop, snapshot)
-}
-
-func emitLegacyPerceptionEvents(cfg *aicommon.Config, loop *ReActLoop, snapshot *aicommon.SessionSnapshot) {
-	if cfg == nil || snapshot == nil || snapshot.Perception == nil {
+func emitCapabilityInventorySnapshot(cfg *aicommon.Config, emitter *aicommon.Emitter, snapshot *aicommon.SessionSnapshot) {
+	if cfg == nil || emitter == nil || snapshot == nil {
 		return
 	}
-	emitter := cfg.GetEmitter()
-	if loop != nil && loop.GetEmitter() != nil {
-		emitter = loop.GetEmitter()
-	}
-	if emitter == nil {
+	payload := aicommon.CapabilityInventoryPayloadFromItems(snapshot.Capabilities, cfg)
+	_, _ = emitter.EmitSystemStructured(aicommon.CapabilityInventoryNodeID, payload)
+}
+
+func emitLegacyPerceptionEvents(cfg *aicommon.Config, emitter *aicommon.Emitter, snapshot *aicommon.SessionSnapshot) {
+	if cfg == nil || snapshot == nil || snapshot.Perception == nil || emitter == nil {
 		return
 	}
 

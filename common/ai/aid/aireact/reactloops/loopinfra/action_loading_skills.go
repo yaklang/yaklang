@@ -211,7 +211,7 @@ var loopAction_LoadingSkills = &reactloops.LoopAction{
 				emitSkillReferenceMaterial(invoker, name, mgr)
 			}
 			if cfg, ok := invoker.GetConfig().(*aicommon.Config); ok {
-				reactloops.EmitCapabilityInventorySnapshot(cfg, loop)
+				aicommon.NotifySessionSnapshotEmit(cfg, true)
 			}
 
 			var recommendationLines []string
@@ -426,7 +426,7 @@ var loopAction_LoadingSkills = &reactloops.LoopAction{
 		persistLoadedSkillNames(loop, invoker)
 		emitSkillReferenceMaterial(invoker, skillName, mgr)
 		if cfg, ok := invoker.GetConfig().(*aicommon.Config); ok {
-			reactloops.EmitCapabilityInventorySnapshot(cfg, loop)
+			aicommon.NotifySessionSnapshotEmit(cfg, true)
 		}
 		recommendationSummary := recommendCapabilitiesFromSkillContent(loop, invoker, skillName, "Skill "+skillName)
 

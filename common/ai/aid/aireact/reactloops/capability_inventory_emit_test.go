@@ -9,10 +9,12 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 )
 
-func TestEmitCapabilityInventorySnapshot_InheritsTaskIndexFromEmitter(t *testing.T) {
+func TestEmitSessionSnapshot_EmitsLegacyCapabilityInventoryWithTaskIndex(t *testing.T) {
 	var captured *schema.AiOutputEvent
 	base := aicommon.NewEmitter("coordinator", func(e *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
-		captured = e
+		if e != nil && e.NodeId == aicommon.CapabilityInventoryNodeID {
+			captured = e
+		}
 		return e, nil
 	})
 	taskEmitter := base.PushEventProcesser(func(event *schema.AiOutputEvent) *schema.AiOutputEvent {
@@ -22,10 +24,13 @@ func TestEmitCapabilityInventorySnapshot_InheritsTaskIndexFromEmitter(t *testing
 		return event
 	})
 
-	cfg := aicommon.NewConfig(context.Background(), aicommon.WithEmitter(taskEmitter))
+	cfg := aicommon.NewConfig(context.Background(),
+		aicommon.WithEmitter(taskEmitter),
+		aicommon.WithDisableAutoSkills(true),
+	)
 	loop := NewMinimalReActLoop(cfg, nil)
 
-	EmitCapabilityInventorySnapshot(cfg, loop)
+	EmitSessionSnapshot(cfg, loop, nil)
 
 	require.NotNil(t, captured)
 	require.Equal(t, aicommon.CapabilityInventoryNodeID, captured.NodeId)

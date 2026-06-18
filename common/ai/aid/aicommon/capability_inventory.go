@@ -110,18 +110,6 @@ func classifyToolCategory(tool *aitool.Tool) string {
 	}
 }
 
-func convertToolItem(tool *aitool.Tool) CapabilityInventoryToolItem {
-	if tool == nil {
-		return CapabilityInventoryToolItem{}
-	}
-	return CapabilityInventoryToolItem{
-		Name:        tool.Name,
-		VerboseName: tool.VerboseName,
-		Description: tool.Description,
-		Category:    classifyToolCategory(tool),
-	}
-}
-
 func collectEnabledMCPServers(disallow bool) []CapabilityInventoryNamedItem {
 	if disallow {
 		return nil
@@ -156,54 +144,108 @@ func loopPromptCandidateTools(loop CapabilityInventoryLoopContext) []*aitool.Too
 	return loop.PromptCandidateTools()
 }
 
-// BuildCapabilityInventoryPayload 与 loop prompt 构建使用同一套 Tool Inventory
-// 候选工具解析与筛选逻辑; loop 为 nil 时 fallback 到 ConfigPromptCapabilityLoopContext
-// (等价于 toolsGetter 为空时的 generateLoopPrompt 路径).
+// BuildCapabilityInventoryPayload builds the legacy capability_inventory payload
+// by flattening session_snapshot capabilities and supplementing MCP servers.
 func BuildCapabilityInventoryPayload(cfg *Config, loop CapabilityInventoryLoopContext) CapabilityInventoryPayload {
-	payload := CapabilityInventoryPayload{}
 	if cfg == nil {
-		return payload
+		return CapabilityInventoryPayload{}
+	}
+	items := BuildCapabilityInventoryItems(cfg, loop)
+	return CapabilityInventoryPayloadFromItems(items, cfg)
+}
+
+// CapabilityInventoryPayloadFromItems maps flattened session_snapshot capabilities
+// into the legacy fixed/dynamic sections. Items in Dynamic prompt position go to
+// Dynamic; FrozenBlock and SemiDynamic go to Fixed.
+func CapabilityInventoryPayloadFromItems(items []CapabilityInventoryItem, cfg *Config) CapabilityInventoryPayload {
+	payload := CapabilityInventoryPayload{}
+	seenMCPServers := make(map[string]struct{})
+
+	for _, item := range items {
+		if strings.TrimSpace(item.Name) == "" {
+			continue
+		}
+		dynamic := item.Position == CapabilityInventoryPositionDynamic
+		switch item.Type {
+		case "skill":
+			named := capabilityInventoryItemToNamed(item, "skill")
+			named.SkillLoadState = skillLoadStateFromItem(item)
+			if dynamic {
+				payload.Dynamic.Skills = append(payload.Dynamic.Skills, named)
+			} else {
+				payload.Fixed.Skills = append(payload.Fixed.Skills, named)
+			}
+		case "forge":
+			named := capabilityInventoryItemToNamed(item, "forge")
+			if dynamic {
+				payload.Dynamic.Forges = append(payload.Dynamic.Forges, named)
+			} else {
+				payload.Fixed.Forges = append(payload.Fixed.Forges, named)
+			}
+		case "mcp_server":
+			named := capabilityInventoryItemToNamed(item, "mcp_server")
+			payload.Fixed.MCPServers = append(payload.Fixed.MCPServers, named)
+			seenMCPServers[item.Name] = struct{}{}
+		default:
+			tool := capabilityInventoryItemToTool(item)
+			if dynamic {
+				payload.Dynamic.Tools = append(payload.Dynamic.Tools, tool)
+			} else {
+				payload.Fixed.Tools = append(payload.Fixed.Tools, tool)
+			}
+		}
 	}
 
-	loop = resolveCapabilityInventoryLoopContext(loop)
-	tools := ResolveLoopPromptCandidateTools(cfg, loop)
-	selection := ResolvePromptToolInventory(cfg, tools, loop.ScenarioToolWhitelist(), loop.AllowToolCall())
-	inventoryTools := selection.DisplayTools
-
-	fixedTools := make([]CapabilityInventoryToolItem, 0, len(inventoryTools))
-	dynamicTools := make([]CapabilityInventoryToolItem, 0)
-	seenDynamic := make(map[string]struct{})
-
-	for _, tool := range inventoryTools {
-		item := convertToolItem(tool)
-		if IsFixedInventoryTool(tool.Name) {
-			fixedTools = append(fixedTools, item)
-			continue
+	if cfg != nil {
+		for _, server := range collectEnabledMCPServers(cfg.DisallowMCPServers) {
+			if _, ok := seenMCPServers[server.Name]; ok {
+				continue
+			}
+			payload.Fixed.MCPServers = append(payload.Fixed.MCPServers, server)
 		}
-		dynamicTools = append(dynamicTools, item)
-		seenDynamic[tool.Name] = struct{}{}
 	}
-
-	for _, tool := range loop.DynamicExtraTools() {
-		if tool == nil || strings.TrimSpace(tool.Name) == "" {
-			continue
-		}
-		if IsFixedInventoryTool(tool.Name) {
-			continue
-		}
-		if _, ok := seenDynamic[tool.Name]; ok {
-			continue
-		}
-		dynamicTools = append(dynamicTools, convertToolItem(tool))
-		seenDynamic[tool.Name] = struct{}{}
-	}
-
-	payload.Fixed.Tools = fixedTools
-	payload.Fixed.MCPServers = collectEnabledMCPServers(cfg.DisallowMCPServers)
-	payload.Dynamic.Tools = dynamicTools
-	payload.Dynamic.Forges = loop.DynamicForges()
-	payload.Dynamic.Skills = resolveCapabilityInventorySkills(cfg, loop)
 	return payload
+}
+
+func capabilityInventoryItemToTool(item CapabilityInventoryItem) CapabilityInventoryToolItem {
+	return CapabilityInventoryToolItem{
+		Name:        item.Name,
+		VerboseName: item.VerboseName,
+		Description: item.Description,
+		Category:    inventoryItemTypeToToolCategory(item.Type),
+	}
+}
+
+func capabilityInventoryItemToNamed(item CapabilityInventoryItem, category string) CapabilityInventoryNamedItem {
+	return CapabilityInventoryNamedItem{
+		Name:        item.Name,
+		VerboseName: item.VerboseName,
+		Description: item.Description,
+		Category:    category,
+	}
+}
+
+func inventoryItemTypeToToolCategory(typ string) string {
+	switch typ {
+	case "mcp":
+		return "mcp"
+	case "plugin":
+		return "yak_plugin"
+	default:
+		return "tool"
+	}
+}
+
+func skillLoadStateFromItem(item CapabilityInventoryItem) string {
+	if item.Stage == CapabilityInventoryStageLoaded {
+		return CapabilityInventorySkillLoadLoaded
+	}
+	if data, ok := item.Data.(map[string]any); ok {
+		if state, ok := data["skill_load_state"].(string); ok && strings.TrimSpace(state) != "" {
+			return state
+		}
+	}
+	return CapabilityInventorySkillLoadMetadata
 }
 
 func resolveCapabilityInventorySkills(cfg *Config, loop CapabilityInventoryLoopContext) []CapabilityInventoryNamedItem {

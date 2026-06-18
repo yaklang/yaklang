@@ -602,6 +602,8 @@ func NewConfig(ctx context.Context, opts ...ConfigOption) *Config {
 		}
 	}
 
+	ensureCapabilityManagers(config)
+
 	return config
 }
 
@@ -3496,12 +3498,21 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 	// Disable tool use flag
 	opts = append(opts, WithDisableToolUse(i.DisableToolUse))
 
-	// Tool manager options
+	// Capability managers: child configs reuse parent instances when present.
 	if i.AiToolManager != nil {
 		opts = append(opts, WithAiToolManager(i.AiToolManager))
 	}
 	if len(i.AiToolManagerOption) > 0 {
 		opts = append(opts, WithAiToolManagerOptions(i.AiToolManagerOption...))
+	}
+	if i.AiForgeManager != nil {
+		opts = append(opts, WithAIBlueprintManager(i.AiForgeManager))
+	}
+	if i.skillLoader != nil {
+		opts = append(opts, WithSkillLoader(i.skillLoader))
+	}
+	if i.disableAutoSkills {
+		opts = append(opts, WithDisableAutoSkills(true))
 	}
 
 	// Agree policy mapping

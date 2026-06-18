@@ -19,7 +19,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
-	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -608,8 +607,6 @@ func (r *ReAct) ensureSessionTitle(userInput string) {
 }
 
 func BuildReActInvoker(ctx context.Context, options ...aicommon.ConfigOption) (aicommon.AITaskInvokeRuntime, error) {
-	options = append(options, aicommon.WithAIBlueprintManager(aiforge.NewForgeFactory()))
-
 	cfg := aicommon.NewConfig(ctx, options...)
 	// artifacts directory is lazily created when user input arrives (ensureWorkDirectory)
 	invoker := &ReAct{

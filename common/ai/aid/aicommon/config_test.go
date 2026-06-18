@@ -13,6 +13,12 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
+func init() {
+	RegisterDefaultAIForgeFactoryProvider(func() AIForgeFactory {
+		return &mockForgeFactory{forges: map[string]*schema.AIForge{}}
+	})
+}
+
 func TestConfig_Smoking(t *testing.T) {
 	originalTiered := consts.GetTieredAIConfig()
 	consts.SetTieredAIConfig(nil)
@@ -140,6 +146,25 @@ func TestConfig_ToolManagerPropagation(t *testing.T) {
 
 	require.Same(t, parent.GetAiToolManager(), child.GetAiToolManager())
 	require.True(t, child.GetAiToolManager().IsRecentlyUsedTool("now"))
+}
+
+func TestConfig_AiForgeManagerPropagation(t *testing.T) {
+	parent := NewConfig(context.Background())
+	require.NotNil(t, parent.GetAIForgeManager())
+
+	custom := &mockForgeFactory{forges: map[string]*schema.AIForge{"demo": {ForgeName: "demo"}}}
+	parent.AiForgeManager = custom
+
+	child := NewConfig(context.Background(), ConvertConfigToOptions(parent)...)
+	require.Same(t, custom, child.GetAIForgeManager())
+}
+
+func TestConfig_SkillLoaderPropagation(t *testing.T) {
+	parent := NewConfig(context.Background())
+	require.NotNil(t, parent.GetSkillLoader())
+
+	child := NewConfig(context.Background(), ConvertConfigToOptions(parent)...)
+	require.Same(t, parent.GetSkillLoader(), child.GetSkillLoader())
 }
 
 func TestConfig_SessionPromptStatePropagation(t *testing.T) {

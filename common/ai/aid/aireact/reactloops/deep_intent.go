@@ -212,7 +212,7 @@ func PopulateExtraCapabilitiesFromDeepIntent(r aicommon.AIInvokeRuntime, loop *R
 
 	if ecm.HasCapabilities() {
 		if cfg, ok := r.GetConfig().(*aicommon.Config); ok {
-			EmitCapabilityInventorySnapshot(cfg, loop)
+			aicommon.NotifySessionSnapshotEmit(cfg, true)
 		}
 		log.Infof("extra capabilities populated from deep intent: %d tools, %d forges, %d skills",
 			ecm.ToolCount(), len(ecm.ListForges()), len(ecm.ListSkills()))
