@@ -124,20 +124,20 @@ func instruction2IrCode(inst Instruction, ir *ssadb.IrCode) {
 	var codeRange *memedit.Range
 	if ret := inst.GetRange(); ret != nil {
 		codeRange = ret
-	} else if ret := inst.GetBlock(); ret != nil {
-		// TODO(ir-cache): avoid block/function materialization in range fallback when only source metadata is needed.
-		block, ok := ToBasicBlock(ret)
-		if ok && block != nil && block.GetRange() != nil {
+	} else if inner := inst.getAnInstruction(); inner != nil {
+		if block := inner.block; block != nil && block.GetRange() != nil {
 			codeRange = block.GetRange()
-			log.Debugf("Fallback, the %v is not set range, use its basic_block instance' ", inst.GetName())
+			log.Debugf("Fallback, the %v is not set range, use its resident basic_block instance' ", inst.GetName())
 		}
 	}
 
 	if codeRange == nil {
-		if ret := inst.GetFunc().GetRange(); ret != nil {
-			log.Debugf("Fallback, the %v is not set range, use its function instance' ", inst.GetName())
-			inst.SetRange(ret)
-			codeRange = ret
+		if inner := inst.getAnInstruction(); inner != nil {
+			if fun := inner.fun; fun != nil && fun.GetRange() != nil {
+				log.Debugf("Fallback, the %v is not set range, use its resident function instance' ", inst.GetName())
+				inst.SetRange(fun.GetRange())
+				codeRange = fun.GetRange()
+			}
 		}
 	}
 
@@ -233,7 +233,7 @@ func value2IrCode(inst Instruction, ir *ssadb.IrCode) {
 	if utils.IsNil(value) {
 		return
 	}
-	var anValue *anValue
+	anValue := value.getAnValue()
 
 	// BasicBlock doesn't have a meaningful type (GetType() always returns nil by design)
 	// Skip type processing for BasicBlock to avoid false warnings
@@ -262,9 +262,7 @@ func value2IrCode(inst Instruction, ir *ssadb.IrCode) {
 		// log.Errorf("marshal instruction (%s)[%v] type id: %v", value.String(), value.GetOpcode().String(), ir.TypeID)
 	}
 	// ir.String = value.String()
-	ir.HasDefs = value.HasValues()
-
-	anValue = value.getAnValue()
+	ir.HasDefs = hasValuesForIrCode(value, anValue)
 
 	// user
 	ir.Users = anValue.userList
@@ -274,19 +272,29 @@ func value2IrCode(inst Instruction, ir *ssadb.IrCode) {
 	// object
 	ir.IsObject = anValue.IsObject()
 	if ir.IsObject {
-		member := anValue.getMemberMap()
-		ir.ObjectMembers = make(ssadb.Int64Map, 0, member.Len())
-		member.ForEach(func(i, v int64) bool {
-			ir.ObjectMembers.Append(i, v)
-			return true
-		})
+		if len(anValue.memberPairs) > 0 {
+			ir.ObjectMemberPairs = make(ssadb.Int64Map, 0, len(anValue.memberPairs))
+			for _, pair := range anValue.memberPairs {
+				if pair.key <= 0 || pair.member <= 0 {
+					continue
+				}
+				ir.ObjectMemberPairs.Append(pair.key, pair.member)
+			}
+		}
 	}
 
 	// member
 	ir.IsObjectMember = anValue.IsMember()
 	if ir.IsObjectMember {
-		ir.ObjectParent = anValue.object
-		ir.ObjectKey = anValue.key
+		if len(anValue.ownerPairs) > 0 {
+			ir.ObjectOwnerPairs = make(ssadb.Int64Map, 0, len(anValue.ownerPairs))
+			for _, pair := range anValue.ownerPairs {
+				if pair.object <= 0 || pair.key <= 0 {
+					continue
+				}
+				ir.ObjectOwnerPairs.Append(pair.object, pair.key)
+			}
+		}
 	}
 	// variable
 
@@ -317,6 +325,53 @@ func value2IrCode(inst Instruction, ir *ssadb.IrCode) {
 	}
 }
 
+func hasValuesForIrCode(value Value, anValue *anValue) bool {
+	if utils.IsNil(value) {
+		return false
+	}
+	if _, ok := ToExternLib(value); ok {
+		return anValue != nil && len(anValue.memberPairs) > 0
+	}
+	return value.HasValues()
+}
+
+func relationInstructionIDs(ir *ssadb.IrCode) []int64 {
+	if ir == nil {
+		return nil
+	}
+	ids := make([]int64, 0, 8)
+	appendID := func(id int64) {
+		if id > 0 {
+			ids = append(ids, id)
+		}
+	}
+	ir.ObjectMemberPairs.ForEach(func(key, member int64) {
+		appendID(key)
+		appendID(member)
+	})
+	ir.ObjectMembers.ForEach(func(key, member int64) {
+		appendID(key)
+		appendID(member)
+	})
+	ir.ObjectOwnerPairs.ForEach(func(object, key int64) {
+		appendID(object)
+		appendID(key)
+	})
+	appendID(ir.ObjectParent)
+	appendID(ir.ObjectKey)
+	return ids
+}
+
+func preloadRelationInstructionIDs(cache *ProgramCache, ir *ssadb.IrCode) {
+	if cache == nil || ir == nil {
+		return
+	}
+	ids := relationInstructionIDs(ir)
+	if len(ids) > 0 {
+		cache.PreloadInstructionsByIDsFast(ids)
+	}
+}
+
 func (c *ProgramCache) valueFromIrCode(cache *ProgramCache, inst Instruction, ir *ssadb.IrCode) {
 	value, ok := ToValue(inst)
 	if !ok {
@@ -332,29 +387,31 @@ func (c *ProgramCache) valueFromIrCode(cache *ProgramCache, inst Instruction, ir
 	anValue.occultation = ir.Occulatation
 
 	// object
-	ir.ObjectMembers.ForEach(func(key, value int64) {
-		anValue.getMemberMap(true).Set(key, value)
-		if cache == nil || cache.program == nil {
-			return
-		}
-		irCode := ssadb.GetIrCodeByIdFast(ssadb.GetDB(), cache.program.Name, key)
-		if irCode == nil || irCode.Opcode != int64(SSAOpcodeConstInst) || irCode.String == "" {
-			return
-		}
-		anValue.rememberStringMemberID(irCode.String, key)
-	})
+	if len(ir.ObjectMemberPairs) > 0 {
+		ir.ObjectMemberPairs.ForEach(func(key, value int64) {
+			anValue.appendMemberPairIDs(key, value)
+		})
+	} else {
+		ir.ObjectMembers.ForEach(func(key, value int64) {
+			anValue.appendMemberPairIDs(key, value)
+		})
+	}
 
 	// object member
-	if ir.IsObjectMember {
-		anValue.object = ir.ObjectParent
-		anValue.key = ir.ObjectKey
+	if len(ir.ObjectOwnerPairs) > 0 {
+		ir.ObjectOwnerPairs.ForEach(func(object, key int64) {
+			anValue.appendOwnerPairIDs(object, key)
+		})
+	} else if ir.ObjectParent > 0 && ir.ObjectKey > 0 {
+		anValue.appendOwnerPairIDs(ir.ObjectParent, ir.ObjectKey)
 	}
+	preloadRelationInstructionIDs(cache, ir)
 
 	// variable
 	for _, name := range ir.Variable {
 		progName := ""
 		if cache != nil && cache.program != nil {
-			progName = cache.program.GetProgramName()
+			progName = applicationProgramName(cache.program)
 		}
 		value.AddVariable(GetVariableFromDB(ir.GetIdInt64(), name, progName))
 	}
