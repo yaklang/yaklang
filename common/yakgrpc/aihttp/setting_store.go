@@ -89,7 +89,7 @@ func defaultAIAgentChatSettingPayload() aiAgentChatSettingPayload {
 		PlanUserInteractMaxCount:       3,
 		AIService:                      "",
 		AIModelName:                    "",
-		ReActMaxIteration:              50,
+		ReActMaxIteration:              100,
 		TimelineItemLimit:              100,
 		TimelineContentSizeLimit:       20,
 		UserInteractLimit:              0,

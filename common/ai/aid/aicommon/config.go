@@ -399,7 +399,7 @@ type Config struct {
 	restoredSkillNames []string
 
 	// enabledCapabilities holds startup/hotpatch pre-enabled capabilities.
-	enabledCapabilities []EnabledCapability
+	enabledCapabilities            []EnabledCapability
 	skillHotloadHandler            skillHotloadHandler
 	forgeHotloadHandler            forgeHotloadHandler
 	skillUnloadHandler             skillUnloadHandler
@@ -634,7 +634,7 @@ func newConfig(ctx context.Context) *Config {
 		AiAgreeRiskControl:                 DefaultAIAssistantRiskControl,
 		AiPlanReviewControl:                DefaultAIPlanReviewControl,
 		AiTaskReviewControl:                DefaultAITaskReviewControl,
-		MaxIterationCount:                  50,
+		MaxIterationCount:                  100,
 		Language:                           "zh", // Default to Chinese
 		TopToolsCount:                      100,
 		ContextProviderManager:             NewContextProviderManager(),
