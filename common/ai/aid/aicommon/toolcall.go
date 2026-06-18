@@ -509,7 +509,7 @@ func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) 
 			log.Debugf("registered AITAG handlers for tool[%s] params: %v with nonce: %s", tool.Name, promptMeta.ParamNames, promptMeta.Nonce)
 		}
 
-		event, err := boundEmitter.EmitDefaultSystemStreamEvent("generating-tool-call-params", pr, t.task.GetIndex())
+		event, err := boundEmitter.EmitDefaultStreamEvent("generating-tool-call-params", pr, t.task.GetIndex())
 		if err != nil {
 			boundEmitter.EmitError("error emit default stream event for tool[%s] params: %v", tool.Name, err)
 		}
