@@ -120,7 +120,7 @@ func normalizeTopDefReachSymbol(raw string) string {
 	return s
 }
 
-// parseTopDefReachSymbolFromItem reads the value from a RecursiveConfigItem (plain identifier or `` `$cfg` `` filter text).
+// parseTopDefReachSymbolFromItem reads the value from a RecursiveConfigItem (plain identifier or “ `$cfg` “ filter text).
 func parseTopDefReachSymbolFromItem(item *sf.RecursiveConfigItem) string {
 	if item == nil {
 		return ""
@@ -443,6 +443,7 @@ var nativeCallDataFlow sfvm.NativeCallFunc = func(v sfvm.Values, frame *sfvm.SFF
 	if err != nil {
 		return false, nil, err
 	}
+	vmConfig := frame.GetVM().GetConfig()
 
 	include := params.GetString(0, NativeCall_DataflowParamCode, NativeCall_DataflowParamInclude)
 	exclude := params.GetString(NativeCall_DataflowParamExclude)
@@ -491,6 +492,7 @@ var nativeCallDataFlow sfvm.NativeCallFunc = func(v sfvm.Values, frame *sfvm.SFF
 	reachOpt := dataflowNativeReachOpts(params)
 
 	inputProg, inputProgErr := fetchProgram(ToSFVMValues(vs))
+	ensureTopDefPathsForNativeDataflow(vs, vmConfig)
 
 	var pathReach *dataflowPathReachFilter
 	var reachMergeHook func(parent *sf.SFFrameResult, child *sf.SFFrameResult)
@@ -505,7 +507,7 @@ var nativeCallDataFlow sfvm.NativeCallFunc = func(v sfvm.Values, frame *sfvm.SFF
 		}
 	}
 
-	ret = dataFlowFilter(ret, contextResult, frame.GetVM().GetConfig(), end, pathReach, reachMergeHook, condition...)
+	ret = dataFlowFilter(ret, contextResult, vmConfig, end, pathReach, reachMergeHook, condition...)
 
 	// Post-mode: same anchor pipeline as # { only_reachable: `$cfg` } -> (resolveTopDefReachAnchors + filterTopDefResultsByReachAnchors).
 	if len(reachSym) > 0 && reachMode == "post" {
@@ -521,6 +523,39 @@ var nativeCallDataFlow sfvm.NativeCallFunc = func(v sfvm.Values, frame *sfvm.SFF
 		return true, ToSFVMValues(ret), nil
 	}
 	return false, sfvm.NewEmptyValues(), nil
+}
+
+func ensureTopDefPathsForNativeDataflow(vs Values, config *sf.Config) {
+	if len(vs) == 0 {
+		return
+	}
+	options := make([]OperationOption, 0, 1)
+	if config != nil {
+		options = append(options, WithExclusiveContext(config.GetContext()))
+	}
+	for _, value := range vs {
+		if value == nil {
+			continue
+		}
+		masks := value.GetMask()
+		if len(masks) == 0 {
+			continue
+		}
+		_ = value.GetTopDefs(options...)
+		appendNativeDataflowMaskDependencies(value, masks)
+	}
+}
+
+func appendNativeDataflowMaskDependencies(value *Value, masks Values) {
+	if value == nil || value.IsNil() {
+		return
+	}
+	for _, mask := range masks {
+		if mask == nil || mask.IsNil() || ValueCompare(value, mask) {
+			continue
+		}
+		value.AppendDependOn(mask)
+	}
 }
 
 type filterCondition struct {

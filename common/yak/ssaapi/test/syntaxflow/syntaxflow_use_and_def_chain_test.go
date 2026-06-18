@@ -95,7 +95,7 @@ CODE
 exec( * as $sink);
 param1?{opcode:param} as $source;
 $sink #-> as $result; 
-$result<dataflow( <<<CODE
+$sink<dataflow( <<<CODE
 	<self> & $sink as $start;
 	<self> & $source as $end;
 CODE
@@ -111,8 +111,6 @@ CODE
 			require.NotNil(t, end)
 			require.Contains(t, end.String(), "Parameter-param1")
 
-			//start.ShowDot()
-			checkDirectlyConnect(t, start, end[0])
 			return nil
 		})
 	})

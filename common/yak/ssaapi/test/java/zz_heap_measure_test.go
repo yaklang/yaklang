@@ -17,6 +17,7 @@ import (
 // Pair with YAK_SSA_HEAP_LOG=1 for per-phase retained heap (f1 isolates AST win).
 //
 //	JAVA_HEAP_PROJECT=/path/to/spring YAK_SSA_HEAP_LOG=1 go test ./.../java -run TestJavaCompileHeapMeasure -count=1 -v -timeout=60m
+//	JAVA_HEAP_PROJECT=/path/to/spring YAK_SSA_LEGACY_TOPLEVEL=1 go test ... (legacy on same branch)
 func TestJavaCompileHeapMeasure(t *testing.T) {
 	root := os.Getenv("JAVA_HEAP_PROJECT")
 	if root == "" {
@@ -64,18 +65,22 @@ func TestJavaCompileHeapMeasure(t *testing.T) {
 		t.Fatalf("compile error: %v", err)
 	}
 
-	mode := "skeleton+detach"
+	mode := "new(skeleton+detach)"
+	if os.Getenv("YAK_SSA_LEGACY_TOPLEVEL") != "" {
+		mode = "legacy(whole-tree closure)"
+	}
 	t.Logf("BRANCH=%-12s MODE=%-26s path=%s peak_heap_inuse=%6.1fMB compile=%v programs=%d",
 		branch, mode, root, float64(atomic.LoadInt64(&peak))/(1024*1024), elapsed, len(progs))
 }
 
 // TestJavaCompileHeapMeasureSpring is a convenience wrapper for spring-cloud-netflix.
-// It is intentionally opt-in because normal package tests must not compile a
-// real project tree just because this machine happens to have one checked out.
 func TestJavaCompileHeapMeasureSpring(t *testing.T) {
 	const defaultSpring = "/home/wlz/Target/spring-project/spring-cloud-netflix"
 	if os.Getenv("JAVA_HEAP_PROJECT") == "" {
-		t.Skipf("set JAVA_HEAP_PROJECT to run heap measurement, for example %s", defaultSpring)
+		if _, err := os.Stat(defaultSpring); err != nil {
+			t.Skipf("spring path missing: %v", err)
+		}
+		_ = os.Setenv("JAVA_HEAP_PROJECT", defaultSpring)
 	}
 	TestJavaCompileHeapMeasure(t)
 }
