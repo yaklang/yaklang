@@ -242,27 +242,30 @@ func (c *Compiler) resolveParameterMemberParentID(fn *ssa.Function, inst *ssa.Pa
 
 // compileMemberCall handles generic member access (MemberCall interface)
 func (c *Compiler) compileMemberCall(contextInst ssa.Instruction, val ssa.Value, mc ssa.MemberCall) error {
-	obj := mc.GetObject()
-	key := mc.GetKey()
+	_ = mc
+	obj := ssa.GetLatestObject(val)
+	key := ssa.GetLatestKey(val)
 	keyStr := c.resolveMemberKeyString(key)
 
-	if extern, ok := ssa.ToExternLib(obj); ok && extern != nil {
-		if err := c.compileExternLibMember(contextInst, val, extern, key, keyStr); err != nil {
-			return err
-		}
-		return nil
-	}
-
-	var fn *ssa.Function
-	if contextInst != nil {
-		fn = contextInst.GetFunc()
-	}
-	if pkg := c.resolveMemberObjectName(fn, obj); pkg != "" && keyStr != "" {
-		if err := c.compileYaklibExportMember(contextInst, val, pkg, keyStr); err != nil {
-			return err
-		}
-		if _, ok := c.getCachedValue(contextInst, val.GetId()); ok {
+	if obj != nil {
+		if extern, ok := ssa.ToExternLib(obj); ok && extern != nil {
+			if err := c.compileExternLibMember(contextInst, val, extern, key, keyStr); err != nil {
+				return err
+			}
 			return nil
+		}
+
+		var fn *ssa.Function
+		if contextInst != nil {
+			fn = contextInst.GetFunc()
+		}
+		if pkg := c.resolveMemberObjectName(fn, obj); pkg != "" && keyStr != "" {
+			if err := c.compileYaklibExportMember(contextInst, val, pkg, keyStr); err != nil {
+				return err
+			}
+			if _, ok := c.getCachedValue(contextInst, val.GetId()); ok {
+				return nil
+			}
 		}
 	}
 
@@ -736,7 +739,8 @@ func (c *Compiler) emitAssignedMemberVariableSets(contextInst ssa.Instruction, v
 		if variable == nil || !variable.IsMemberCall() {
 			continue
 		}
-		obj, key := variable.GetMemberCall()
+		obj := ssa.GetLatestObject(variable)
+		key := ssa.GetLatestKey(variable)
 		if obj == nil || key == nil {
 			continue
 		}

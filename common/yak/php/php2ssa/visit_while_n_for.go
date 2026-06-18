@@ -1,6 +1,8 @@
 package php2ssa
 
 import (
+	"strings"
+
 	"github.com/yaklang/yaklang/common/utils"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -172,6 +174,7 @@ func (y *builder) VisitForeachStatement(raw phpparser.IForeachStatementContext) 
 	} else {
 		value = y.VisitChain(i.Chain(0))
 	}
+	staticKey, staticField := y.foreachSingleStaticPair(value)
 	loop.SetFirst(func() []ssa.Value {
 		return []ssa.Value{value}
 	})
@@ -190,6 +193,10 @@ func (y *builder) VisitForeachStatement(raw phpparser.IForeachStatementContext) 
 		}
 		//todo: more variable
 		key, field, ok := y.EmitNext(value, false)
+		if !utils.IsNil(staticKey) && !utils.IsNil(staticField) {
+			key = staticKey
+			field = staticField
+		}
 		if len(lefts) > 0 {
 			if valueLeft == nil {
 				y.AssignVariable(lefts[0], field)
@@ -215,6 +222,33 @@ func (y *builder) VisitForeachStatement(raw phpparser.IForeachStatementContext) 
 	loop.Finish()
 	return nil
 }
+
+func (y *builder) foreachSingleStaticPair(value ssa.Value) (ssa.Value, ssa.Value) {
+	if utils.IsNil(value) {
+		return nil, nil
+	}
+	pairs := ssa.GetMemberPairs(value)
+	if len(pairs) != 1 {
+		if call, ok := ssa.ToCall(value); ok && len(call.Args) == 1 {
+			callee, ok := call.GetValueById(call.Method)
+			if !ok || utils.IsNil(callee) {
+				return nil, nil
+			}
+			if !strings.EqualFold(callee.GetName(), "array") && !strings.EqualFold(callee.String(), "array") && !strings.EqualFold(callee.String(), "Function-array") {
+				return nil, nil
+			}
+			arg, ok := call.GetValueById(call.Args[0])
+			if !ok || utils.IsNil(arg) {
+				return nil, nil
+			}
+			arg.AddMask(value)
+			return y.EmitConstInstPlaceholder(0), arg
+		}
+		return nil, nil
+	}
+	return pairs[0].Key, pairs[0].Member
+}
+
 func (y *builder) VisitASsignVariable(raw phpparser.IAssignableContext) []*ssa.Variable {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil

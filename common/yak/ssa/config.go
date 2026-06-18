@@ -50,6 +50,11 @@ func WithLanguageConfigIsSupportClassStaticModifier(support bool) LanguageConfig
 		config.isSupportClassStaticModifier = support
 	}
 }
+func WithLanguageConfigAllowStaticMemberAccessByInstance(allow bool) LanguageConfigOpt {
+	return func(config *LanguageConfig) {
+		config.allowStaticMemberAccessByInstance = allow
+	}
+}
 
 func (b *FunctionBuilder) isBindLanguage() bool {
 	config := b.GetProgram().Application.config
@@ -93,13 +98,22 @@ func (b *FunctionBuilder) isSupportClassStaticModifier() bool {
 	}
 	return config.isSupportClassStaticModifier
 }
+func (b *FunctionBuilder) allowStaticMemberAccessByInstance() bool {
+	config := b.GetProgram().Application.config
+	if config == nil {
+		log.Errorf("[BUG]AllowStaticMemberAccessByInstance config is not init")
+		return false
+	}
+	return config.allowStaticMemberAccessByInstance
+}
 
 type LanguageConfig struct {
 	isBindLanguage  bool
 	isTryBuildValue bool
 	// Support obtaining static members and static method, even if the class is not instantiated.
-	isSupportClass               bool
-	isSupportClassStaticModifier bool
+	isSupportClass                    bool
+	isSupportClassStaticModifier      bool
+	allowStaticMemberAccessByInstance bool
 
 	//script Language need to handle call method
 	isSupportConstMethod bool
@@ -112,11 +126,12 @@ type LanguageConfig struct {
 
 func NewLanguageConfig() *LanguageConfig {
 	return &LanguageConfig{
-		isBindLanguage:               false,
-		isTryBuildValue:              false,
-		isSupportClass:               false,
-		isSupportClassStaticModifier: false,
-		isSupportConstMethod:         false,
+		isBindLanguage:                    false,
+		isTryBuildValue:                   false,
+		isSupportClass:                    false,
+		isSupportClassStaticModifier:      false,
+		allowStaticMemberAccessByInstance: false,
+		isSupportConstMethod:              false,
 		ShouldBuild: func(fileName string) bool {
 			return false
 		},
