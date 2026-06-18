@@ -62,7 +62,7 @@ var modifyHTTPRequestAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActL
 			reviewDecision := "auto_applied"
 
 			if requireManualReview && loop.GetConfig().GetAllowUserInteraction() {
-				question := fmt.Sprintf("请审核这次数据包修改是否应用。目标：%s\n修改原因：%s\n%s", modificationTarget, modificationReason, utils.ShrinkTextBlock(compareRequests(previousRequest, string(fixedPacket)), 600))
+				question := fmt.Sprintf("请审核这次数据包修改是否应用。目标：%s\n修改原因：%s\n%s", modificationTarget, modificationReason, utils.ShrinkTextBlock(compareRequestsForPrompt(previousRequest, string(fixedPacket)), 600))
 				suggestion := r.AskForClarification(getLoopTaskContext(loop), question, []string{"接受修改并继续使用新数据包", "拒绝修改并保留旧数据包"})
 				if reviewSuggestionApproved(suggestion) {
 					reviewDecision = "approved_by_user"
@@ -71,7 +71,7 @@ var modifyHTTPRequestAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActL
 					loop.Set("request_review_decision", buildReviewDecisionLabel(reviewDecision))
 					feedback := "HTTP 数据包修改已生成人工审核请求，但用户未批准应用，当前仍保留旧数据包。\n\n"
 					feedback += "=== 候选 Merge 变化 ===\n"
-					feedback += compareRequests(previousRequest, string(fixedPacket))
+					feedback += compareRequestsForPrompt(previousRequest, string(fixedPacket))
 					feedback += "\n审核结果："
 					feedback += buildReviewDecisionLabel(reviewDecision)
 					record := recordLoopHTTPFuzzMetaAction(

@@ -26,6 +26,12 @@
 {{ .PreviousRequestSummary }}
 {{ end }}
 
+{{ if .UploadRequestSummary }}
+### Multipart Upload Summary
+{{ .UploadRequestSummary }}
+文件内容若已省略或外置，请基于摘要规划 fuzz_upload；需要测试文件内容时使用 content_profile 或 file_resource_id，不要手写大内容。
+{{ end }}
+
 <|ORIGINAL_REQUEST_{{ .Nonce }}|>
 {{ .OriginalRequest }}
 <|ORIGINAL_REQUEST_END_{{ .Nonce }}|>

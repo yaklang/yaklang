@@ -223,6 +223,7 @@ func applyLoopHTTPFuzzSessionContext(loop *reactloops.ReActLoop, runtime aicommo
 		loop.Set("last_httpflow_hidden_index", ctx.RepresentativeHiddenIndex)
 	}
 	loop.Set("restored_session_context", "true")
+	syncLoopHTTPUploadContext(loop, originalRaw, ctx.IsHTTPS, false)
 	return true
 }
 
