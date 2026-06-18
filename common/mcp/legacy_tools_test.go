@@ -873,6 +873,16 @@ var legacyToolIntegrationCases = map[string][]legacyToolCase{
 			},
 		},
 	},
+	"create_web_fuzzer_tab": {
+		{
+			name: "reject_missing_request",
+			args: map[string]any{
+				"isHttps": false,
+			},
+			wantErr:     true,
+			errContains: []string{"request is required"},
+		},
+	},
 	"hybrid_scan": {
 		{
 			name:    "empty_args_should_not_panic",
