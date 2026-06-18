@@ -56,7 +56,7 @@ var loopAction_toolRequireAndCall = &reactloops.LoopAction{
 				pw.Close()
 			})
 		}
-		loop.GetEmitter().EmitDefaultStreamEvent("load_tool", pr, operator.GetTask().GetId())
+		loop.GetEmitter().EmitDefaultSystemStreamEvent("load_tool", pr, operator.GetTask().GetId())
 		defer closeStatusPipe()
 
 		toolIns, err := loop.GetConfig().GetAiToolManager().GetToolByName(toolPayload)

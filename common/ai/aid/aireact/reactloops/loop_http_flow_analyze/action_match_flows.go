@@ -188,14 +188,8 @@ For simple single-condition matching, use match_flows_simple instead.`,
 				matcherDesc += fmt.Sprintf(" (condition=%s)", matcherCondition)
 			}
 
-			// === 3. 构建并发送第1行累积流（参数摘要 + 可选思考）===
-			thought := action.GetString("human_readable_thought")
-			var line1 string
-			if thought != "" {
-				line1 = fmt.Sprintf("匹配 source=%s, %s | %s", sourceQuery, matcherDesc, thought)
-			} else {
-				line1 = fmt.Sprintf("匹配 source=%s, %s", sourceQuery, matcherDesc)
-			}
+			// === 3. 构建并发送第1行累积流（参数摘要）===
+			line1 := fmt.Sprintf("匹配 source=%s, %s", sourceQuery, matcherDesc)
 			reactloops.EmitActionLog(loop, nodeId, line1)
 
 			// === 4. 执行匹配（流式处理）===

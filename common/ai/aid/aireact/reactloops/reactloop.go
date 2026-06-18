@@ -602,7 +602,6 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		{
 			FieldName: "human_readable_thought",
 			AINodeId:  "re-act-loop-thought",
-			IsSystem:  true,
 		},
 	} {
 		r.streamFields.Set(streamField.FieldName, streamField)

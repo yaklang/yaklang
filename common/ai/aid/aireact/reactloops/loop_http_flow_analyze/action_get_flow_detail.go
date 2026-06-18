@@ -41,14 +41,7 @@ var getHTTPFlowDetailAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActL
 			log.Infof("[get_http_flow_detail] loading flow: %s", locatorDesc)
 
 			// 输出简洁的累积流（2行）
-			// 如果有 human_readable_thought，融入到第一行
-			thought := action.GetString("human_readable_thought")
-			var line1 string
-			if thought != "" {
-				line1 = fmt.Sprintf("加载 %s | %s", locatorDesc, thought)
-			} else {
-				line1 = fmt.Sprintf("加载 %s", locatorDesc)
-			}
+			line1 := fmt.Sprintf("加载 %s", locatorDesc)
 			reactloops.EmitActionLog(loop, "http-flow-detail", line1)
 
 			reactloops.EmitStatus(loop, "加载流详情中 / Loading Flow Detail...")
