@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/cdp"
+	"github.com/go-rod/rod/lib/defaults"
 	"github.com/go-rod/rod/lib/launcher"
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/yaklang/yaklang/common/log"
@@ -51,9 +52,30 @@ func (inst *BrowserInstance) launch() error {
 func (inst *BrowserInstance) launchLocal() error {
 	l := launcher.New()
 
-	if inst.config.exePath != "" {
-		l = l.Bin(inst.config.exePath)
+	// 解析浏览器二进制路径:
+	//   1. 用户显式指定 exePath -> 直接使用(不打品牌图标, 不动用户的浏览器)
+	//   2. rod 默认 bin(环境变量等) -> 使用但不打标
+	//   3. 否则由 rod 自动下载并返回受管 Chromium 路径 -> 使用并打品牌图标
+	binPath := inst.config.exePath
+	managed := false
+	if binPath == "" {
+		if defaults.Bin != "" {
+			binPath = defaults.Bin
+		} else if resolved, err := launcher.NewBrowser().Get(); err == nil {
+			binPath = resolved
+			managed = true
+		} else {
+			log.Warnf("resolve rod-managed browser binary failed: %v", err)
+		}
 	}
+	if binPath != "" {
+		l = l.Bin(binPath)
+	}
+	// 仅对 rod 自己下载的 Chromium 替换图标(macOS), 避免修改用户系统浏览器
+	if managed {
+		applyBrandedIcon(binPath)
+	}
+
 	if inst.config.proxyAddress != "" {
 		l.Proxy(inst.config.proxyAddress)
 	}

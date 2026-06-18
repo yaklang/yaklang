@@ -1,8 +1,19 @@
 package browser
 
-import "time"
+import (
+	"runtime"
+	"time"
+)
 
 const defaultBrowserID = "default"
+
+// defaultLeakless 决定是否默认开启 go-rod 的 leakless 守护进程。
+// leakless 会拉起一个监视进程，在父进程(yak)退出时强制 kill 浏览器，
+// 从而避免 yak 退出后 Chromium 变成孤儿进程无法回收。
+// Windows 上 leakless 的辅助二进制经常被杀软误报，因此与 crawlerx 保持一致，仅在非 Windows 默认开启。
+func defaultLeakless() bool {
+	return runtime.GOOS != "windows"
+}
 
 type BrowserConfig struct {
 	id string
@@ -26,7 +37,7 @@ func newDefaultConfig() *BrowserConfig {
 		id:        defaultBrowserID,
 		noSandBox: true,
 		headless:  true,
-		leakless:  false,
+		leakless:  defaultLeakless(),
 		timeout:   30 * time.Second,
 	}
 }
