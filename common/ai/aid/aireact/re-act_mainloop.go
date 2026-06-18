@@ -340,7 +340,10 @@ func (r *ReAct) ExecuteLoopTask(taskTypeName string, task aicommon.AIStatefulTas
 		mainloop.RemoveAction(schema.AI_REACT_LOOP_ACTION_REQUEST_PLAN_EXECUTION)
 		mainloop.RemoveAction(schema.AI_REACT_LOOP_ACTION_REQUIRE_AI_BLUEPRINT)
 	}
+	aicommon.BeginSessionSnapshotExecutionForTask(r.config, task, time.Now())
 	err = mainloop.ExecuteWithExistedTask(task)
+	aicommon.FinalizeSessionSnapshotExecutionForTask(r.config, task, time.Now())
+	reactloops.EmitSessionSnapshot(r.config, mainloop, task)
 	if err != nil {
 		return false, err
 	}

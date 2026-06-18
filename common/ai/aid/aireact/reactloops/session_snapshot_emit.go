@@ -15,11 +15,10 @@ func BuildSessionSnapshot(cfg *aicommon.Config, loop *ReActLoop, task aicommon.A
 		Revision:     cfg.NextSessionSnapshotRevision(),
 		UpdatedAt:    time.Now().Unix(),
 		Capabilities: aicommon.BuildCapabilityInventoryItems(cfg, loopCapabilityContext(loop)),
+		Perception:   buildSessionSnapshotPerception(loop, cfg),
+		Execution:    cfg.BuildSessionSnapshotExecution(task),
 	}
-	if loop != nil {
-		snapshot.Perception = buildSessionSnapshotPerception(loop, cfg)
-	}
-	snapshot.Execution = cfg.BuildSessionSnapshotExecution(task)
+	aicommon.NormalizeSessionSnapshot(snapshot)
 	return snapshot
 }
 
@@ -31,41 +30,30 @@ func loopCapabilityContext(loop *ReActLoop) aicommon.CapabilityInventoryLoopCont
 }
 
 func buildSessionSnapshotPerception(loop *ReActLoop, cfg *aicommon.Config) *aicommon.SessionSnapshotPerception {
-	if loop == nil && cfg == nil {
-		return nil
+	perception := &aicommon.SessionSnapshotPerception{}
+	if cfg == nil {
+		return perception
 	}
 	var state *PerceptionState
 	if loop != nil {
 		state = loop.GetPerceptionState()
 	}
 	capabilityMatches, knowledge := cfg.GetSessionSnapshotPerceptionExtras()
-	if state == nil && capabilityMatches == nil && knowledge == nil {
-		return nil
+	perception.CapabilityMatches = capabilityMatches
+	perception.Knowledge = knowledge
+	if state == nil {
+		return perception
 	}
-
-	perception := &aicommon.SessionSnapshotPerception{
-		CapabilityMatches: capabilityMatches,
-		Knowledge:         knowledge,
-	}
-	if state != nil {
-		perception.Summary = state.OneLinerSummary
-		perception.Topics = append([]string(nil), state.Topics...)
-		perception.Keywords = append([]string(nil), state.Keywords...)
-		perception.Confidence = state.ConfidenceLevel
-		perception.Changed = state.Changed
-		perception.Epoch = state.Epoch
-		perception.LastTrigger = state.LastTrigger
-		perception.IntentShift = state.IntentShift
-		if !state.LastUpdateAt.IsZero() {
-			perception.LastUpdateAt = state.LastUpdateAt.Unix()
-		}
-	}
-	if strings.TrimSpace(perception.Summary) == "" &&
-		len(perception.Topics) == 0 &&
-		len(perception.Keywords) == 0 &&
-		perception.CapabilityMatches == nil &&
-		perception.Knowledge == nil {
-		return nil
+	perception.Summary = state.OneLinerSummary
+	perception.Topics = append([]string(nil), state.Topics...)
+	perception.Keywords = append([]string(nil), state.Keywords...)
+	perception.Confidence = state.ConfidenceLevel
+	perception.Changed = state.Changed
+	perception.Epoch = state.Epoch
+	perception.LastTrigger = state.LastTrigger
+	perception.IntentShift = state.IntentShift
+	if !state.LastUpdateAt.IsZero() {
+		perception.LastUpdateAt = state.LastUpdateAt.Unix()
 	}
 	return perception
 }

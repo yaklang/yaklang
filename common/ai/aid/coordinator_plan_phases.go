@@ -1,6 +1,10 @@
 package aid
 
 import (
+	"time"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -85,6 +89,19 @@ func (c *Coordinator) runPlanPhaseThroughReview() error {
 func (c *Coordinator) runExecuteRoot(startTaskIndex string) error {
 	c.planLoadingStatus("执行任务中 / Executing Tasks...")
 	c.EmitInfo("start to create runtime")
+	c.ensureSessionSnapshotEmitHandler()
+	if c.rootTask != nil {
+		c.Config.SetHotpatchCurrentTaskIdResolver(func() string {
+			return c.rootTask.GetId()
+		})
+		aicommon.BeginSessionSnapshotExecutionForTask(c.Config, c.rootTask, time.Now())
+	}
+	defer func() {
+		if c.rootTask != nil {
+			aicommon.FinalizeSessionSnapshotExecutionForTask(c.Config, c.rootTask, time.Now())
+			reactloops.EmitSessionSnapshot(c.Config, nil, c.rootTask)
+		}
+	}()
 	rt := c.createRuntime()
 	c.runtime = rt
 	if err := rt.Invoke(c.rootTask, startTaskIndex); err != nil {
@@ -92,6 +109,15 @@ func (c *Coordinator) runExecuteRoot(startTaskIndex string) error {
 		return err
 	}
 	return nil
+}
+
+func (c *Coordinator) ensureSessionSnapshotEmitHandler() {
+	if c == nil || c.Config == nil {
+		return
+	}
+	c.Config.SetSessionSnapshotEmitHandler(func() {
+		reactloops.EmitSessionSnapshot(c.Config, nil, c.rootTask)
+	})
 }
 
 func (c *Coordinator) tryRecoverAndExecute(startTaskIndex string) (bool, error) {
