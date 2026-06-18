@@ -263,6 +263,22 @@ func (s *VulinServer) mallUserRoute() {
 }
 
 func TestMutiReturn_TopDef_Syntaxflow(t *testing.T) {
+	t.Run("field sensitive struct", func(t *testing.T) {
+		ssatest.CheckSyntaxFlowContain(t, `package main
+
+type T struct { b int; c int }
+
+func main(){
+	a := T{}
+	a.b = 1
+	a.c = 999
+	println(a.b)
+}
+		`, `println(* #-> as $target)`, map[string][]string{
+			"target": {"1"},
+		}, ssaapi.WithLanguage(ssaconfig.GO))
+	})
+
 	t.Run("muti return topdef", func(t *testing.T) {
 		ssatest.CheckSyntaxFlowContain(t, `
 package main
@@ -292,4 +308,35 @@ $entry.Create(* #-> as $sink)
 			ssaapi.WithLanguage(ssaconfig.GO),
 		)
 	})
+}
+
+func TestFieldSensitive_SharedValueAcrossObjects(t *testing.T) {
+	ssatest.CheckSyntaxFlowContain(t, `package main
+
+type Box struct {
+	cmd string
+	safe string
+}
+
+func sink(any) {}
+
+func test(cmd string) {
+	a := &Box{}
+	b := &Box{}
+	a.cmd = cmd
+	a.safe = "safe-a"
+	b.cmd = cmd
+	b.safe = "safe-b"
+	x := a.cmd
+	y := b.cmd
+	sink(x)
+	sink(y)
+}
+`, `
+	x #-> as $x
+	y #-> as $y
+`, map[string][]string{
+		"x": {"Parameter-cmd"},
+		"y": {"Parameter-cmd"},
+	}, ssaapi.WithLanguage(ssaconfig.GO))
 }

@@ -564,21 +564,22 @@ alert $high for {
 		},
 		ShowDiffRisk: true,
 		ExpectedTasks: []TaskResultConfig{
-			// 当前 QuerySyntaxFlowScanTask 的项目级查询会返回同项目下的 base/diff 两个任务，
-			// 但这里不会把 diff 相对 base 的新增风险单独计入 New*Count。
+			// 这个 helper 会分别扫描 base program 和 diff program，用来验证按 diff program
+			// 查询时能展开同一 project 下的 base/diff 两个任务。聚合扫描下的新增风险统计
+			// 由 TestGRPCMUSTPASS_SyntaxFlow_Scan_With_IncrementalCompile 覆盖。
 			{
 				Programs:     []string{diffProgID},
 				Status:       "done",
-				RiskCount:    7,
-				HighCount:    7,
+				RiskCount:    4,
+				HighCount:    4,
 				NewRiskCount: 0,
 				NewHighCount: 0,
 			},
 			{
 				Programs:     []string{baseProgID},
 				Status:       "done",
-				RiskCount:    7,
-				HighCount:    7,
+				RiskCount:    4,
+				HighCount:    4,
 				NewRiskCount: 0,
 				NewHighCount: 0,
 			},
