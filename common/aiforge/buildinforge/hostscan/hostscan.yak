@@ -173,8 +173,19 @@ func generateSummaryMessage(security_issues) {
 forgeHandle = func(params,opts...) {
     result,err = __DEFAULT_FORGE_HANDLE__(params,opts...)
     if err != nil {
+		log.error("hostscan default forge handle failed: %v", err)
 		return nil
 	}
+    // 当 AI 未能产出合法的 hostscan_result action 时，result 或 result.Action 可能为 nil
+    // 直接访问 result.Action 会触发空指针 panic，这里提前拦截并安全返回
+    if result == nil {
+        log.error("hostscan forge handle got nil result")
+        return nil
+    }
+    if result.Action == nil {
+        log.error("hostscan forge handle got nil action, ai may not return a valid hostscan_result action")
+        return result
+    }
     scan_summary := result.Action.GetInvokeParams("scan_summary")
 	system_info := result.Action.GetInvokeParams("system_info")
 	resource_status := result.Action.GetInvokeParams("resource_status")
