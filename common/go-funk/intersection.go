@@ -75,7 +75,24 @@ func IntersectString(x []string, y []string) []string {
 	return set
 }
 
-// Difference returns the difference between two collections.
+// Difference 返回两个集合的差异，分别是仅属于 x 的元素和仅属于 y 的元素
+// 参数:
+//   - x: 第一个集合
+//   - y: 第二个集合
+//
+// 返回值:
+//   - 仅属于 x 的元素集合
+//   - 仅属于 y 的元素集合
+//
+// Example:
+// ```
+// // VARS: 求双向差异
+// left, right = x.Difference([1, 2, 3, 4], [2, 4])
+// // STDOUT: 打印仅属于第一个集合的元素
+// println(left)   // OUT: [1 3]
+// // assert: 第二个集合没有独有元素
+// assert len(right) == 0, "no element is unique to the second set"
+// ```
 func Difference(x interface{}, y interface{}) (interface{}, interface{}) {
 	if !IsCollection(x) {
 		panic("First parameter must be a collection")

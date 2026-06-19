@@ -228,15 +228,21 @@ func NewPartDescriptor(dataType BinaryTypeVerbose, size uint64) *PartDescriptor 
 }
 
 // toList 创建一个列表类型描述符，用于从二进制数据中按顺序读取多个相同格式的元素
-// @param {PartDescriptor} builder 列表中的元素描述符
-// @return {PartDescriptor} 返回列表类型描述符对象
+// 参数:
+//   - builder: 列表中的元素描述符（一个或多个）
+//
+// 返回值:
+//   - 列表类型描述符对象
+//
 // Example:
 // ```
-// // 读取两个uint16构成的列表
+// // 读取两个 uint16 构成的列表
+// data = codec.DecodeHex("00010002")~
 // result = bin.Read(data, bin.toList(bin.toUint16("item"), bin.toUint16("item")))~
 // list = result[0]
-// item1 = list.Result[0].AsUint16()
-// item2 = list.Result[1].AsUint16()
+// println(list.Result[0].AsUint16())   // OUT: 1
+// assert list.Result[0].AsUint16() == 1, "first list item should be 1"
+// assert list.Result[1].AsUint16() == 2, "second list item should be 2"
 // ```
 func NewListDescriptor(builder ...*PartDescriptor) *PartDescriptor {
 	var descriptor = NewDefaultNetworkPartDescriptor()
@@ -246,20 +252,21 @@ func NewListDescriptor(builder ...*PartDescriptor) *PartDescriptor {
 }
 
 // toStruct 创建一个结构体类型描述符，用于从二进制数据中读取不同类型字段组成的结构
-// @param {PartDescriptor} builder 结构体中的字段描述符
-// @return {PartDescriptor} 返回结构体类型描述符对象
+// 参数:
+//   - builder: 结构体中的字段描述符（一个或多个）
+//
+// 返回值:
+//   - 结构体类型描述符对象
+//
 // Example:
 // ```
-// // 读取包含magic(uint16)和version(uint8)的结构体
-// result = bin.Read(data, bin.toStruct(
-//
-//	bin.toUint16("magic"),
-//	bin.toUint8("version")
-//
-// ))~
+// // 读取包含 magic(uint16) 和 version(uint8) 的结构体
+// data = codec.DecodeHex("123405")~
+// result = bin.Read(data, bin.toStruct(bin.toUint16("magic"), bin.toUint8("version")))~
 // structResult = result[0]
-// magic = structResult.Result[0].AsUint16()
-// version = structResult.Result[1].AsUint8()
+// println(structResult.Result[0].AsUint16())   // OUT: 4660
+// assert structResult.Result[0].AsUint16() == 4660, "struct magic should be 0x1234"
+// assert structResult.Result[1].AsUint8() == 5, "struct version should be 5"
 // ```
 func NewStructDescriptor(builder ...*PartDescriptor) *PartDescriptor {
 	var descriptor = NewDefaultNetworkPartDescriptor()
@@ -269,9 +276,20 @@ func NewStructDescriptor(builder ...*PartDescriptor) *PartDescriptor {
 }
 
 // toUint8 创建一个8位无符号整数类型描述符，用于从二进制数据中读取uint8值
-// @param {string} name 字段名称，用于之后通过Find函数查找
-// @param {string} values 可选的详细描述
-// @return {PartDescriptor} 返回类型描述符对象
+// 参数:
+//   - name: 字段名称，用于之后通过 Find 函数查找
+//   - values: 可选的详细描述
+//
+// 返回值:
+//   - 类型描述符对象
+//
+// Example:
+// ```
+// data = codec.DecodeHex("ff")~
+// result = bin.Read(data, bin.toUint8("b"))~
+// println(result[0].AsUint8())   // OUT: 255
+// assert result[0].AsUint8() == 255, "0xff should be parsed as uint8 255"
+// ```
 func NewUint8(name string, values ...string) *PartDescriptor {
 	var descriptor = NewDefaultNetworkPartDescriptor()
 	descriptor.size = 1
@@ -288,9 +306,21 @@ func NewByte(name string, values ...string) *PartDescriptor {
 }
 
 // toUint16 创建一个16位无符号整数类型描述符，用于从二进制数据中读取uint16值
-// @param {string} name 字段名称，用于之后通过Find函数查找
-// @param {string} values 可选的详细描述
-// @return {PartDescriptor} 返回类型描述符对象
+// 参数:
+//   - name: 字段名称，用于之后通过 Find 函数查找
+//   - values: 可选的详细描述
+//
+// 返回值:
+//   - 类型描述符对象
+//
+// Example:
+// ```
+// // 默认按大端序解析两个字节
+// data = codec.DecodeHex("1234")~
+// result = bin.Read(data, bin.toUint16("magic"))~
+// println(result[0].AsUint16())   // OUT: 4660
+// assert result[0].AsUint16() == 4660, "0x1234 should be parsed as uint16 4660"
+// ```
 func NewUint16(name string, values ...string) *PartDescriptor {
 	var descriptor = NewDefaultNetworkPartDescriptor()
 	descriptor.size = 2
@@ -299,9 +329,20 @@ func NewUint16(name string, values ...string) *PartDescriptor {
 }
 
 // toUint32 创建一个32位无符号整数类型描述符，用于从二进制数据中读取uint32值
-// @param {string} name 字段名称，用于之后通过Find函数查找
-// @param {string} values 可选的详细描述
-// @return {PartDescriptor} 返回类型描述符对象
+// 参数:
+//   - name: 字段名称，用于之后通过 Find 函数查找
+//   - values: 可选的详细描述
+//
+// 返回值:
+//   - 类型描述符对象
+//
+// Example:
+// ```
+// data = codec.DecodeHex("0000ffff")~
+// result = bin.Read(data, bin.toUint32("v"))~
+// println(result[0].AsUint32())   // OUT: 65535
+// assert result[0].AsUint32() == 65535, "0x0000ffff should be parsed as uint32 65535"
+// ```
 func NewUint32(name string, values ...string) *PartDescriptor {
 	var descriptor = NewDefaultNetworkPartDescriptor()
 	descriptor.size = 4
@@ -310,9 +351,20 @@ func NewUint32(name string, values ...string) *PartDescriptor {
 }
 
 // toUint64 创建一个64位无符号整数类型描述符，用于从二进制数据中读取uint64值
-// @param {string} name 字段名称，用于之后通过Find函数查找
-// @param {string} values 可选的详细描述
-// @return {PartDescriptor} 返回类型描述符对象
+// 参数:
+//   - name: 字段名称，用于之后通过 Find 函数查找
+//   - values: 可选的详细描述
+//
+// 返回值:
+//   - 类型描述符对象
+//
+// Example:
+// ```
+// data = codec.DecodeHex("0000000000000100")~
+// result = bin.Read(data, bin.toUint64("v"))~
+// println(result[0].AsUint64())   // OUT: 256
+// assert result[0].AsUint64() == 256, "0x...0100 should be parsed as uint64 256"
+// ```
 func NewUint64(name string, values ...string) *PartDescriptor {
 	var descriptor = NewDefaultNetworkPartDescriptor()
 	descriptor.size = 8
@@ -321,9 +373,21 @@ func NewUint64(name string, values ...string) *PartDescriptor {
 }
 
 // toInt8 创建一个8位整数类型描述符，用于从二进制数据中读取int8值
-// @param {string} name 字段名称，用于之后通过Find函数查找
-// @param {string} values 可选的详细描述
-// @return {PartDescriptor} 返回类型描述符对象
+// 参数:
+//   - name: 字段名称，用于之后通过 Find 函数查找
+//   - values: 可选的详细描述
+//
+// 返回值:
+//   - 类型描述符对象
+//
+// Example:
+// ```
+// // 0xff 作为有符号 int8 解析为 -1
+// data = codec.DecodeHex("ff")~
+// result = bin.Read(data, bin.toInt8("b"))~
+// println(result[0].AsInt8())   // OUT: -1
+// assert result[0].AsInt8() == -1, "0xff should be parsed as int8 -1"
+// ```
 func NewInt8(name string, values ...string) *PartDescriptor {
 	var descriptor = NewDefaultNetworkPartDescriptor()
 	descriptor.size = 1
@@ -332,9 +396,20 @@ func NewInt8(name string, values ...string) *PartDescriptor {
 }
 
 // toInt16 创建一个16位整数类型描述符，用于从二进制数据中读取int16值
-// @param {string} name 字段名称，用于之后通过Find函数查找
-// @param {string} values 可选的详细描述
-// @return {PartDescriptor} 返回类型描述符对象
+// 参数:
+//   - name: 字段名称，用于之后通过 Find 函数查找
+//   - values: 可选的详细描述
+//
+// 返回值:
+//   - 类型描述符对象
+//
+// Example:
+// ```
+// data = codec.DecodeHex("ffff")~
+// result = bin.Read(data, bin.toInt16("v"))~
+// println(result[0].AsInt16())   // OUT: -1
+// assert result[0].AsInt16() == -1, "0xffff should be parsed as int16 -1"
+// ```
 func NewInt16(name string, values ...string) *PartDescriptor {
 	var descriptor = NewDefaultNetworkPartDescriptor()
 	descriptor.size = 2
@@ -343,9 +418,20 @@ func NewInt16(name string, values ...string) *PartDescriptor {
 }
 
 // toInt32 创建一个32位整数类型描述符，用于从二进制数据中读取int32值
-// @param {string} name 字段名称，用于之后通过Find函数查找
-// @param {string} values 可选的详细描述
-// @return {PartDescriptor} 返回类型描述符对象
+// 参数:
+//   - name: 字段名称，用于之后通过 Find 函数查找
+//   - values: 可选的详细描述
+//
+// 返回值:
+//   - 类型描述符对象
+//
+// Example:
+// ```
+// data = codec.DecodeHex("0000ffff")~
+// result = bin.Read(data, bin.toInt32("v"))~
+// println(result[0].AsInt32())   // OUT: 65535
+// assert result[0].AsInt32() == 65535, "0x0000ffff should be parsed as int32 65535"
+// ```
 func NewInt32(name string, values ...string) *PartDescriptor {
 	var descriptor = NewDefaultNetworkPartDescriptor()
 	descriptor.size = 4
@@ -354,9 +440,20 @@ func NewInt32(name string, values ...string) *PartDescriptor {
 }
 
 // toInt64 创建一个64位整数类型描述符，用于从二进制数据中读取int64值
-// @param {string} name 字段名称，用于之后通过Find函数查找
-// @param {string} values 可选的详细描述
-// @return {PartDescriptor} 返回类型描述符对象
+// 参数:
+//   - name: 字段名称，用于之后通过 Find 函数查找
+//   - values: 可选的详细描述
+//
+// 返回值:
+//   - 类型描述符对象
+//
+// Example:
+// ```
+// data = codec.DecodeHex("0000000000000100")~
+// result = bin.Read(data, bin.toInt64("v"))~
+// println(result[0].AsInt64())   // OUT: 256
+// assert result[0].AsInt64() == 256, "0x...0100 should be parsed as int64 256"
+// ```
 func NewInt64(name string, values ...string) *PartDescriptor {
 	var descriptor = NewDefaultNetworkPartDescriptor()
 	descriptor.size = 8
@@ -365,16 +462,20 @@ func NewInt64(name string, values ...string) *PartDescriptor {
 }
 
 // toRaw 创建一个字节数组类型描述符，用于从二进制数据中读取字节序列
-// @param {string} name 字段名称，用于之后通过Find函数查找
-// @param {number|string} size 字节长度或引用其他字段名称作为长度值
-// @return {PartDescriptor} 返回类型描述符对象
+// 参数:
+//   - name: 字段名称，用于之后通过 Find 函数查找
+//   - size: 字节长度（数字），或引用其他字段名称（字符串）作为长度值
+//
+// 返回值:
+//   - 类型描述符对象
+//
 // Example:
 // ```
-// // 读取长度为5的字节数组
-// bin.Read(data, bin.toBytes("content", 5))
-//
-// // 读取长度由另一个字段决定的字节数组
-// bin.Read(data, bin.toUint8("length"), bin.toBytes("content", "length"))
+// // 读取长度为 2 的字节数组（0x41 0x42 即 "AB"）
+// data = codec.DecodeHex("4142")~
+// result = bin.Read(data, bin.toBytes("content", 2))~
+// println(result[0].AsString())   // OUT: AB
+// assert result[0].AsString() == "AB", "toBytes should read the fixed-length byte sequence"
 // ```
 func NewBytes(name string, size any) *PartDescriptor {
 	var descriptor = NewDefaultNetworkPartDescriptor()
@@ -397,9 +498,21 @@ func NewBuffer(name string, size any) *PartDescriptor {
 }
 
 // toBool 创建一个布尔类型描述符，用于从二进制数据中读取布尔值（非零为true）
-// @param {string} name 字段名称，用于之后通过Find函数查找
-// @param {string} verbose 可选的详细描述
-// @return {PartDescriptor} 返回类型描述符对象
+// 参数:
+//   - name: 字段名称，用于之后通过 Find 函数查找
+//   - verbose: 可选的详细描述
+//
+// 返回值:
+//   - 类型描述符对象
+//
+// Example:
+// ```
+// // 读取一个字节，非零即为 true
+// data = codec.DecodeHex("ff")~
+// result = bin.Read(data, bin.toBool("ok"))~
+// println(result[0].AsBool())   // OUT: true
+// assert result[0].AsBool() == true, "non-zero byte should be parsed as true"
+// ```
 func NewBool(name string, verbose ...string) *PartDescriptor {
 	var descriptor = NewDefaultNetworkPartDescriptor()
 	descriptor.size = 1

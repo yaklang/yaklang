@@ -33,6 +33,19 @@ type udpClientConfig struct {
 
 type udpClientOption func(i *udpClientConfig)
 
+// clientLocalAddr 是一个 UDP 客户端配置选项，用于指定本地绑定地址
+// 参数:
+//   - target: 本地地址，格式为 host:port
+//
+// 返回值:
+//   - 一个 UDP 客户端配置选项，作为可变参数传入 udp.Connect
+//
+// Example:
+// ```
+// // 指定本地端口建立 UDP 连接，此处仅作示意
+// conn = udp.Connect("8.8.8.8", 53, udp.clientLocalAddr("0.0.0.0:0"), udp.clientTimeout(5))~
+// println(conn)
+// ```
 func clientLocalAddr(target string) udpClientOption {
 	return func(i *udpClientConfig) {
 		addr, err := net.ResolveUDPAddr("udp", target)
@@ -44,12 +57,41 @@ func clientLocalAddr(target string) udpClientOption {
 	}
 }
 
+// clientTimeout 是一个 UDP 客户端配置选项，用于设置读写超时时间（单位：秒）
+// 参数:
+//   - target: 超时时间，单位为秒，支持小数
+//
+// 返回值:
+//   - 一个 UDP 客户端配置选项，作为可变参数传入 udp.Connect
+//
+// Example:
+// ```
+// // 设置 5 秒超时建立 UDP 连接，此处仅作示意
+// conn = udp.Connect("8.8.8.8", 53, udp.clientTimeout(5))~
+// println(conn)
+// ```
 func clientTimeout(target float64) udpClientOption {
 	return func(i *udpClientConfig) {
 		i.timeoutSeconds = utils.FloatSecondDuration(target)
 	}
 }
 
+// Connect 建立一个 UDP 连接，返回一个可收发数据的 UDP 连接对象
+// 参数:
+//   - target: 目标主机，可包含端口（如 "8.8.8.8" 或 "8.8.8.8:53"）
+//   - portRaw: 目标端口，当 target 中未指定端口时使用
+//   - opts: 可选配置，例如 udp.clientTimeout、udp.clientLocalAddr
+//
+// 返回值:
+//   - UDP 连接对象，可调用 Send/Recv 等方法
+//   - 错误信息，连接失败时返回非空
+//
+// Example:
+// ```
+// // 建立 UDP 连接并发送数据，依赖网络，此处仅作示意
+// conn = udp.Connect("8.8.8.8", 53, udp.clientTimeout(5))~
+// conn.Send("hello")~
+// ```
 func connectUdp(target string, portRaw any, opts ...udpClientOption) (*udpConnection, error) {
 	config := &udpClientConfig{timeoutSeconds: 5 * time.Second}
 	for _, opt := range opts {
@@ -234,6 +276,24 @@ type udpServerConfig struct {
 
 type UdpServerOpt func(config *udpServerConfig)
 
+// Serve 启动一个 UDP 服务器，监听指定地址并通过回调处理收到的数据报
+// 参数:
+//   - host: 监听的主机地址
+//   - port: 监听的端口
+//   - opts: 可选配置，例如 udp.serverCallback、udp.serverTimeout、udp.serverContext
+//
+// 返回值:
+//   - 错误信息，监听失败或服务结束时返回
+//
+// Example:
+// ```
+// // 启动 UDP 服务器并处理收到的数据，此处仅作示意
+//
+//	udp.Serve("0.0.0.0", 53531, udp.serverCallback(func(conn, msg) {
+//	    println(string(msg))
+//	}))~
+//
+// ```
 func udpServe(host string, port interface{}, opts ...UdpServerOpt) error {
 	config := &udpServerConfig{timeout: 5 * time.Second}
 	for _, opt := range opts {
@@ -320,18 +380,60 @@ var UDPExport = map[string]interface{}{
 	"serverCallback": UdpWithCallback,
 }
 
+// serverCallback 是一个 UDP 服务器配置选项，用于设置收到数据报时的回调函数
+// 参数:
+//   - cb: 回调函数，接收连接对象与收到的数据字节
+//
+// 返回值:
+//   - 一个 UDP 服务器配置选项，作为可变参数传入 udp.Serve
+//
+// Example:
+// ```
+// // 设置 UDP 服务器收到数据时的处理回调，此处仅作示意
+//
+//	udp.Serve("0.0.0.0", 53531, udp.serverCallback(func(conn, msg) {
+//	    conn.Send("ack")
+//	}))~
+//
+// ```
 func UdpWithCallback(cb func(*udpConnection, []byte)) UdpServerOpt {
 	return func(config *udpServerConfig) {
 		config.callback = cb
 	}
 }
 
+// serverTimeout 是一个 UDP 服务器配置选项，用于设置读取超时时间（单位：秒）
+// 参数:
+//   - f: 超时时间，单位为秒，支持小数
+//
+// 返回值:
+//   - 一个 UDP 服务器配置选项，作为可变参数传入 udp.Serve
+//
+// Example:
+// ```
+// // 设置 UDP 服务器读取超时，此处仅作示意
+// udp.Serve("0.0.0.0", 53531, udp.serverTimeout(10))~
+// ```
 func UdpWithTimeout(f float64) UdpServerOpt {
 	return func(config *udpServerConfig) {
 		config.timeout = utils.FloatSecondDuration(f)
 	}
 }
 
+// serverContext 是一个 UDP 服务器配置选项，用于设置上下文以控制服务的生命周期
+// 参数:
+//   - ctx: 上下文对象，取消该上下文会停止服务器
+//
+// 返回值:
+//   - 一个 UDP 服务器配置选项，作为可变参数传入 udp.Serve
+//
+// Example:
+// ```
+// // 通过 context 控制 UDP 服务器的关闭，此处仅作示意
+// ctx, cancel = context.WithCancel(context.Background())
+// defer cancel()
+// go udp.Serve("0.0.0.0", 53531, udp.serverContext(ctx))
+// ```
 func UdpWithContext(ctx context.Context) UdpServerOpt {
 	return func(config *udpServerConfig) {
 		config.ctx = ctx
@@ -342,6 +444,20 @@ func DebugMockUDP(rsp []byte) (string, int) {
 	return DebugMockUDPWithTimeout(1*time.Minute, rsp)
 }
 
+// MockUDPProtocol 启动一个模拟指定协议指纹的 UDP 服务，用于测试，返回监听的主机与端口
+// 参数:
+//   - name: 要模拟的服务名称（指纹规则名）
+//
+// 返回值:
+//   - 模拟服务监听的主机地址
+//   - 模拟服务监听的端口
+//
+// Example:
+// ```
+// // 启动一个模拟 UDP 协议的本地服务用于测试，此处仅作示意
+// host, port = udp.MockUDPProtocol("dns")
+// println(host, port)
+// ```
 func DebugMockUDPProtocol(name string) (string, int) {
 	cfg := fp.NewConfig(fp.WithTransportProtos(fp.ParseStringToProto([]interface{}{"udp"}...)...))
 	blocks := fp.GetRuleBlockByServiceName(name, cfg)

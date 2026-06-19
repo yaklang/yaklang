@@ -22,6 +22,20 @@ func init() {
 
 type EthernetOption func(config *layers.Ethernet) error
 
+// ethernet_srcMac 设置以太网帧的源 MAC 地址
+// 在 yak 中通过 pcapx.ethernet_srcMac 调用，配合 pcapx.PacketBuilder 使用
+// 参数:
+//   - srcMac: 源 MAC，可为 "00:11:22:33:44:55" 字符串或 net.HardwareAddr
+//
+// 返回值:
+//   - 一个 pcapx.PacketBuilder 可接收的以太网层配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：构造带源 MAC 的以太网帧
+// raw = pcapx.PacketBuilder(pcapx.ethernet_srcMac("00:11:22:33:44:55"))~
+// println(len(raw))
+// ```
 func WithEthernet_SrcMac(srcMac any) EthernetOption {
 	return func(config *layers.Ethernet) error {
 		switch ret := srcMac.(type) {
@@ -39,6 +53,20 @@ func WithEthernet_SrcMac(srcMac any) EthernetOption {
 	}
 }
 
+// ethernet_dstMac 设置以太网帧的目的 MAC 地址
+// 在 yak 中通过 pcapx.ethernet_dstMac 调用，配合 pcapx.PacketBuilder 使用
+// 参数:
+//   - dstMac: 目的 MAC，可为 "00:11:22:33:44:55" 字符串或 net.HardwareAddr
+//
+// 返回值:
+//   - 一个 pcapx.PacketBuilder 可接收的以太网层配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：构造带目的 MAC 的以太网帧
+// raw = pcapx.PacketBuilder(pcapx.ethernet_dstMac("ff:ff:ff:ff:ff:ff"))~
+// println(len(raw))
+// ```
 func WithEthernet_DstMac(dstMac any) EthernetOption {
 	return func(config *layers.Ethernet) error {
 		switch ret := dstMac.(type) {
@@ -56,6 +84,20 @@ func WithEthernet_DstMac(dstMac any) EthernetOption {
 	}
 }
 
+// ethernet_nextLayerType 设置以太网帧的上层协议类型(EtherType)
+// 在 yak 中通过 pcapx.ethernet_nextLayerType 调用，配合 pcapx.PacketBuilder 使用
+// 参数:
+//   - i: 上层协议类型，如 "ipv4"、"ipv6"、"arp"、"mpls"、"pppoe" 或数字
+//
+// 返回值:
+//   - 一个 pcapx.PacketBuilder 可接收的以太网层配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：指定以太网上层为 ARP
+// raw = pcapx.PacketBuilder(pcapx.ethernet_nextLayerType("arp"))~
+// println(len(raw))
+// ```
 func WithEthernet_NextLayerType(i any) EthernetOption {
 	return func(config *layers.Ethernet) error {
 		switch ret := strings.ToLower(utils.InterfaceToString(i)); ret {

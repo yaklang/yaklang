@@ -2,7 +2,6 @@ package ja3
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -91,65 +90,21 @@ func ParseEllipticCurvePointFormats(pointFormat string) []*EllipticCurvePointFor
 	return ellipticCurvePointFormats
 }
 
-func ParseJA3(ja3FullString string) (*JA3, error) {
-	fields := strings.Split(ja3FullString, ",")
-	fieldLen := len(fields)
-	if fieldLen != 5 {
-		if fieldLen == 3 {
-			return nil, errors.New("not a valid JA3 full string is it JA3S")
-		}
-		return nil, errors.New("not a valid JA3 full string")
-	}
-	ja3 := &JA3{}
-	ja3.JA3FullStr = ja3FullString
-	for index, field := range fields {
-		if index == 0 { // TLS version field
-			ja3.TLSVersion = ParseTLSVersion(field)
-			continue
-		}
-		if index == 1 { // CipherSuites
-			ja3.CipherSuites = ParseCipherSuites(field)
-		}
-		if index == 2 { // Extension Types
-			ja3.ExtensionsTypes = ParseExtensionsTypes(field)
-		}
-		if index == 3 { // EllipticCurves
-			ja3.EllipticCurves = ParseEllipticCurves(field)
-		}
-		if index == 4 { // EllipticCurvePointFormats
-			ja3.EllipticCurvePointFormats = ParseEllipticCurvePointFormats(field)
-		}
-	}
-	return ja3, nil
-}
-
-func ParseJA3S(ja3sFullString string) (*JA3S, error) {
-	fields := strings.Split(ja3sFullString, ",")
-	fieldLen := len(fields)
-	if fieldLen != 3 {
-		if fieldLen == 5 {
-			return nil, errors.New("not a valid JA3S full string is it JA3")
-		}
-		return nil, errors.New("not a valid JA3S full string")
-	}
-	ja3s := &JA3S{}
-	ja3s.JA3SFullStr = ja3sFullString
-	for index, field := range fields {
-		if index == 0 { // TLS version field
-			ja3s.TLSVersion = ParseTLSVersion(field)
-			continue
-		}
-		if index == 1 { // Accepted Cipher
-			ja3s.AcceptedCipher = ParseCipherSuites(field)[0]
-		}
-		if index == 2 { // Extension Types
-			ja3s.ExtensionsTypes = ParseExtensionsTypes(field)
-		}
-
-	}
-	return ja3s, nil
-}
-
+// ParseJA3ToClientHelloSpec 将 JA3 全字符串转换为 uTLS 的 ClientHelloSpec，用于模拟特定 TLS 客户端指纹
+// 参数:
+//   - str: JA3 全字符串，形如 "771,4865-4866-4867,0-23-65281,29-23-24,0"
+//
+// 返回值:
+//   - 构造出的 *tls.ClientHelloSpec，可用于自定义 TLS 握手
+//   - 错误信息，解析失败时非 nil
+//
+// Example:
+// ```
+// ja3str = "771,4865-4866-4867,0-23-65281,29-23-24,0"
+// spec, err = ja3.ParseJA3ToClientHelloSpec(ja3str)
+// assert err == nil, "should build client hello spec"
+// assert spec != nil, "spec should not be nil"
+// ```
 func ParseJA3ToClientHelloSpec(str string) (*tls.ClientHelloSpec, error) {
 	var (
 		extensions string
@@ -258,6 +213,21 @@ func ParseJA3ToClientHelloSpec(str string) (*tls.ClientHelloSpec, error) {
 	return &spec, nil
 }
 
+// GetTransportByClientHelloSpec 根据给定的 ClientHelloSpec 构造一个使用该 TLS 指纹的 http.Transport
+// 配合 ParseJA3ToClientHelloSpec 可让 HTTP 请求伪装成特定客户端的 TLS 指纹
+// 参数:
+//   - spec: TLS ClientHelloSpec，通常由 ja3.ParseJA3ToClientHelloSpec 生成
+//
+// 返回值:
+//   - 使用指定 TLS 指纹的 *http.Transport
+//
+// Example:
+// ```
+// // 该示例为示意性用法：用 JA3 指纹构造可发起真实请求的 transport
+// spec = ja3.ParseJA3ToClientHelloSpec("771,4865-4866-4867,0-23-65281,29-23-24,0")~
+// transport = ja3.GetTransportByClientHelloSpec(spec)
+// println(transport != nil)
+// ```
 func GetTransportByClientHelloSpec(spec *tls.ClientHelloSpec) *http.Transport {
 	return &http.Transport{
 		DialTLSContext: func(ctx context.Context, network, addr string) (net.Conn, error) {

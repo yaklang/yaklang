@@ -117,6 +117,21 @@ func RegenerateTCPTraffic(raw []byte, localIPAddress string, opt ...ConfigOption
 	return
 }
 
+// InjectRaw 将一个原始数据包(自链路层起的完整字节)直接注入到网卡发送
+// 在 yak 中通过 pcapx.InjectRaw 调用，需要相应的网卡发包权限
+// 参数:
+//   - raw: 完整的原始数据包字节
+//   - opt: 可选配置项，如指定网卡等
+//
+// 返回值:
+//   - 无
+//
+// Example:
+// ```
+// // 该示例为示意性用法：注入一个原始数据包(需要发包权限)
+// raw = pcapx.PacketBuilder(pcapx.ipv4_srcIp("1.1.1.1"), pcapx.ipv4_dstOp("2.2.2.2"), pcapx.tcp_srcPort(12345), pcapx.tcp_dstPort(80), pcapx.tcp_flag("syn"))~
+// pcapx.InjectRaw(raw)
+// ```
 func InjectRaw(raw []byte, opt ...ConfigOption) {
 	c := &Config{}
 	for _, o := range opt {
@@ -159,6 +174,21 @@ func InjectTCPPayload(payload []byte, opt ...ConfigOption) {
 	}
 }
 
+// InjectHTTPRequest 将一个 HTTP 请求按 TCP/IP 流量注入到网络
+// 在 yak 中通过 pcapx.InjectHTTPRequest 调用，会自动从请求中解析目标地址
+// 参数:
+//   - raw: 原始 HTTP 请求字节
+//   - opt: 可选配置项
+//
+// 返回值:
+//   - 无
+//
+// Example:
+// ```
+// // 该示例为示意性用法：注入一个 HTTP 请求(需要发包权限)
+// req = "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n"
+// pcapx.InjectHTTPRequest([]byte(req))
+// ```
 func InjectHTTPRequest(raw []byte, opt ...ConfigOption) {
 	c := &Config{}
 	for _, o := range opt {
@@ -202,6 +232,21 @@ func InjectTCPIPInstance(raw *TCPIPFrame, opt ...ConfigOption) {
 	InjectTCPIP(buf.Bytes(), opt...)
 }
 
+// InjectTCPIP 解析并注入一个 TCP/IP 数据包(在 yak 中对应 pcapx.InjectTCP 和 pcapx.InjectIP)
+// 需要通过配置项指定流量方向(发往服务端或客户端)
+// 参数:
+//   - raw: TCP/IP 层数据包字节
+//   - opt: 可选配置项，需指定 pcapx.WithToServer 或 pcapx.WithToClient
+//
+// 返回值:
+//   - 无
+//
+// Example:
+// ```
+// // 该示例为示意性用法：注入 TCP/IP 数据包(需要发包权限)
+// raw = pcapx.PacketBuilder(pcapx.ipv4_srcIp("1.1.1.1"), pcapx.ipv4_dstOp("2.2.2.2"), pcapx.tcp_srcPort(12345), pcapx.tcp_dstPort(80))~
+// pcapx.InjectTCP(raw)
+// ```
 func InjectTCPIP(raw []byte, opt ...ConfigOption) {
 	ip, tcp, payload, err := ParseTCPIPv4(raw)
 	if err != nil {
@@ -365,10 +410,21 @@ func InjectICMPIP(raw []byte, opt ...ConfigOption) {
 	InjectRaw(rawData, opt...)
 }
 
-func getStatistics() *Statistics {
-	return globalStatistics
-}
-
+// InjectChaosTraffic 根据 ChaosTraffic 结构中携带的各类负载，自动注入对应的混合流量
+// 在 yak 中通过 pcapx.InjectChaosTraffic 调用，支持 HTTP、TCP/IP、UDP/IP、ICMP/IP 等多种负载
+// 参数:
+//   - t: ChaosTraffic 对象，包含待注入的各类负载
+//   - opts: 可选配置项
+//
+// 返回值:
+//   - 无
+//
+// Example:
+// ```
+// // 该示例为示意性用法：注入混合流量(需要发包权限)
+// t = &pcapx.ChaosTraffic{HttpRequest: []byte("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")}
+// pcapx.InjectChaosTraffic(t)
+// ```
 func InjectChaosTraffic(t *ChaosTraffic, opts ...ConfigOption) {
 	if t.HttpRequest != nil {
 		InjectHTTPRequest(t.HttpRequest, opts...)

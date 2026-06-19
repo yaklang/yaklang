@@ -29,7 +29,6 @@ type T3Paylaod struct {
 
 	proxy string
 }
-type OptionFun func(*T3Paylaod)
 
 func NewT3Payload(o ...OptionFun) *T3Paylaod {
 	t := &T3Paylaod{sendedHeader: false, showHeader: func() {}, handler: func(s string) {}}

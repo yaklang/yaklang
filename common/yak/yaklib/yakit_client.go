@@ -73,6 +73,18 @@ type YakitClient struct {
 	runtimeID string
 }
 
+// NewYakitClient 基于 webhook 地址创建一个 Yakit 客户端（导出名为 yakit.NewClient）
+// 参数:
+//   - addr: Yakit webhook 地址，为空时输出回退到日志
+//
+// 返回值:
+//   - Yakit 客户端对象
+//
+// Example:
+// ```
+// client = yakit.NewClient("http://127.0.0.1:8080/webhook")
+// yakit.InitYakit(client)
+// ```
 func NewYakitClient(addr string) *YakitClient {
 	logger := CreateYakLogger()
 	client := &YakitClient{
@@ -173,6 +185,21 @@ func (c *YakitClient) YakitDraw(level string, data interface{}) {
 		log.Error(err)
 	}
 }
+
+// Output 向 Yakit 输出任意可识别对象（自动按类型选择输出通道，导出名为 yakit.Output）
+// 支持的对象包括风险、HTTP 流量、表格、图表、状态卡片等
+// 参数:
+//   - i: 要输出的对象
+//
+// 返回值:
+//   - 错误信息
+//
+// Example:
+// ```
+// table = yakit.NewTable("a", "b")
+// table.Append("1", "2")
+// yakit.Output(table)
+// ```
 func (c *YakitClient) Output(i interface{}) error {
 	level, msg := MarshalYakitOutput(i)
 	return c.YakitLog(level, msg)

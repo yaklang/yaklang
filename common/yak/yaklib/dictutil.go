@@ -25,6 +25,29 @@ func _dictParams(i ...interface{}) [][]string {
 	return ret
 }
 
+// Mix 对多个字典做笛卡尔积组合，按字典序流式产出每一种组合
+// 参数:
+//   - raw: 一个或多个字典，每个可为字符串(按行拆分)、[]string、[]byte 或 [][]byte
+//
+// 返回值:
+//   - 输出组合结果的通道，每个元素是各字典各取一个值组成的 []string
+//   - 创建混合器失败时返回的错误
+//
+// Example:
+// ```
+// // VARS: 把两个字典做笛卡尔积
+// ch = dictutil.Mix(["a", "b"], ["1", "2"])~
+// all = []
+//
+//	for v = range ch {
+//	    all = append(all, v)
+//	}
+//
+// // STDOUT: 打印第一种组合
+// println(all[0])   // OUT: [a 1]
+// // assert: 2x2 共四种组合
+// assert len(all) == 4, "mix of two 2-item dicts should produce 4 combinations"
+// ```
 func _dictMix(raw ...interface{}) (chan []string, error) {
 	var arrays = _dictParams(raw...)
 	m, err := mixer.NewMixer(arrays...)

@@ -102,20 +102,20 @@ var YakitExports = map[string]interface{}{
 	},
 
 	// dummy
-	"Info":          emptyVirtualClient.YakitInfo,
-	"Warn":          emptyVirtualClient.YakitWarn,
-	"Debug":         emptyVirtualClient.YakitDebug,
-	"Error":         emptyVirtualClient.YakitError,
-	"Text":          emptyVirtualClient.YakitTextBlock,
-	"Success":       emptyVirtualClient.YakitSuccess,
-	"Code":          emptyVirtualClient.YakitCode,
-	"Markdown":      emptyVirtualClient.YakitMarkdown,
-	"Report":        emptyVirtualClient.YakitReport,
-	"File":          emptyVirtualClient.YakitFile,
-	"Stream":        emptyVirtualClient.Stream,
-	"Output":        emptyVirtualClient.Output,
-	"SetProgress":   emptyVirtualClient.YakitSetProgress,
-	"SetProgressEx": emptyVirtualClient.YakitSetProgressEx,
+	"Info":           emptyVirtualClient.YakitInfo,
+	"Warn":           emptyVirtualClient.YakitWarn,
+	"Debug":          emptyVirtualClient.YakitDebug,
+	"Error":          emptyVirtualClient.YakitError,
+	"Text":           emptyVirtualClient.YakitTextBlock,
+	"Success":        emptyVirtualClient.YakitSuccess,
+	"Code":           emptyVirtualClient.YakitCode,
+	"Markdown":       emptyVirtualClient.YakitMarkdown,
+	"Report":         emptyVirtualClient.YakitReport,
+	"File":           emptyVirtualClient.YakitFile,
+	"Stream":         emptyVirtualClient.Stream,
+	"Output":         emptyVirtualClient.Output,
+	"SetProgress":    emptyVirtualClient.YakitSetProgress,
+	"SetProgressEx":  emptyVirtualClient.YakitSetProgressEx,
 	"AIAgentSession": emptyVirtualClient.AIAgentSession,
 }
 
@@ -182,21 +182,21 @@ func GetExtYakitLibByOutput(Output func(d any) error) map[string]interface{} {
 
 func GetExtYakitLibByClient(client *YakitClient) map[string]interface{} {
 	YakitExports := map[string]interface{}{
-		"Info":          client.YakitInfo,
-		"Warn":          client.YakitWarn,
-		"Error":         client.YakitError,
-		"Text":          client.YakitTextBlock,
-		"Success":       client.YakitSuccess,
-		"Code":          client.YakitCode,
-		"Markdown":      client.YakitMarkdown,
-		"Report":        client.YakitReport,
-		"File":          client.YakitFile,
-		"Output":        client.Output,
+		"Info":           client.YakitInfo,
+		"Warn":           client.YakitWarn,
+		"Error":          client.YakitError,
+		"Text":           client.YakitTextBlock,
+		"Success":        client.YakitSuccess,
+		"Code":           client.YakitCode,
+		"Markdown":       client.YakitMarkdown,
+		"Report":         client.YakitReport,
+		"File":           client.YakitFile,
+		"Output":         client.Output,
 		"AIOutput":       client.AIOutput,
 		"AIAgentSession": client.AIAgentSession,
 		"SetProgress":    client.YakitSetProgress,
-		"SetProgressEx": client.YakitSetProgressEx,
-		"Stream":        client.Stream,
+		"SetProgressEx":  client.YakitSetProgressEx,
+		"Stream":         client.Stream,
 		// SSA stream events: a dedicated channel that ScanNode can hook to, avoiding
 		// "risk.NewRisk(type=ssa-risk)" as a transport hack.
 		//
@@ -564,6 +564,19 @@ type YakitTable struct {
 	Data [][]string `json:"data"`
 }
 
+// NewTable 创建一个 Yakit 表格对象（导出名为 yakit.NewTable）
+// 参数:
+//   - head: 表头列名
+//
+// 返回值:
+//   - 表格对象
+//
+// Example:
+// ```
+// table = yakit.NewTable("name", "age")
+// table.Append("alice", 18)
+// dump(table)
+// ```
 func NewTable(head ...string) *YakitTable {
 	return &YakitTable{
 		Head: head,
@@ -736,6 +749,19 @@ func (y *YakitGraph) Add(k string, v interface{}, id ...string) {
 
 var graphBaseName = "数据图表"
 
+// NewLineGraph 创建一个折线图对象（导出名为 yakit.NewLineGraph）
+// 参数:
+//   - graphName: 可选的图表名称
+//
+// 返回值:
+//   - 图表对象
+//
+// Example:
+// ```
+// graph = yakit.NewLineGraph("trend")
+// graph.Add("day1", 10)
+// dump(graph)
+// ```
 func NewLineGraph(graphName ...string) *YakitGraph {
 	name := graphBaseName
 	if len(graphName) > 0 {
@@ -747,6 +773,19 @@ func NewLineGraph(graphName ...string) *YakitGraph {
 	}
 }
 
+// NewBarGraph 创建一个柱状图对象（导出名为 yakit.NewBarGraph）
+// 参数:
+//   - graphName: 可选的图表名称
+//
+// 返回值:
+//   - 图表对象
+//
+// Example:
+// ```
+// graph = yakit.NewBarGraph("count")
+// graph.Add("a", 3)
+// dump(graph)
+// ```
 func NewBarGraph(graphName ...string) *YakitGraph {
 	name := graphBaseName
 	if len(graphName) > 0 {
@@ -758,6 +797,19 @@ func NewBarGraph(graphName ...string) *YakitGraph {
 	}
 }
 
+// NewPieGraph 创建一个饼图对象（导出名为 yakit.NewPieGraph）
+// 参数:
+//   - graphName: 可选的图表名称
+//
+// 返回值:
+//   - 图表对象
+//
+// Example:
+// ```
+// graph = yakit.NewPieGraph("ratio")
+// graph.Add("a", 30)
+// dump(graph)
+// ```
 func NewPieGraph(graphName ...string) *YakitGraph {
 	name := graphBaseName
 	if len(graphName) > 0 {
@@ -769,6 +821,19 @@ func NewPieGraph(graphName ...string) *YakitGraph {
 	}
 }
 
+// NewWordCloud 创建一个词云图对象（导出名为 yakit.NewWordCloud）
+// 参数:
+//   - graphName: 可选的图表名称
+//
+// 返回值:
+//   - 图表对象
+//
+// Example:
+// ```
+// graph = yakit.NewWordCloud("words")
+// graph.Add("security", 100)
+// dump(graph)
+// ```
 func NewWordCloud(graphName ...string) *YakitGraph {
 	name := graphBaseName
 	if len(graphName) > 0 {
@@ -789,26 +854,93 @@ func GetYakitClientInstance() *YakitClient {
 	return yakitClientInstance
 }
 
+// YakitTextBlock 向 Yakit 输出一个文本块（导出名为 yakit.Text）
+// 参数:
+//   - tmp: 文本内容
+//
+// 返回值:
+//   - 无
+//
+// Example:
+// ```
+// yakit.Text("scan finished")
+// ```
 func (c *YakitClient) YakitTextBlock(tmp interface{}) {
 	c.YakitDraw("text", tmp)
 }
 
+// YakitSuccess 向 Yakit 输出一条成功信息（导出名为 yakit.Success）
+// 参数:
+//   - tmp: 成功信息内容
+//
+// 返回值:
+//   - 无
+//
+// Example:
+// ```
+// yakit.Success("task done")
+// ```
 func (c *YakitClient) YakitSuccess(tmp interface{}) {
 	c.YakitDraw("success", tmp)
 }
 
+// YakitCode 向 Yakit 输出一段代码块（导出名为 yakit.Code）
+// 参数:
+//   - tmp: 代码内容
+//
+// 返回值:
+//   - 无
+//
+// Example:
+// ```
+// yakit.Code("println(\"hello\")")
+// ```
 func (c *YakitClient) YakitCode(tmp interface{}) {
 	c.YakitDraw("code", tmp)
 }
 
+// YakitMarkdown 向 Yakit 输出一段 Markdown（导出名为 yakit.Markdown）
+// 参数:
+//   - tmp: Markdown 内容
+//
+// 返回值:
+//   - 无
+//
+// Example:
+// ```
+// yakit.Markdown("# Title\nsome content")
+// ```
 func (c *YakitClient) YakitMarkdown(tmp interface{}) {
 	c.YakitDraw("markdown", tmp)
 }
 
+// YakitReport 向 Yakit 输出一个报告引用（按报告 ID，导出名为 yakit.Report）
+// 参数:
+//   - i: 报告 ID
+//
+// 返回值:
+//   - 无
+//
+// Example:
+// ```
+// yakit.Report(1)
+// ```
 func (c *YakitClient) YakitReport(i int) {
 	c.YakitDraw("report", fmt.Sprint(i))
 }
 
+// YakitFile 向 Yakit 输出一个文件信息卡片或文件操作记录（导出名为 yakit.File）
+// 参数:
+//   - fileName: 文件路径
+//   - option: 可选项，可为标题/描述字符串或 YakitFileAction 文件操作
+//
+// 返回值:
+//   - 无
+//
+// Example:
+// ```
+// yakit.File("/tmp/result.txt", "Scan Result", "the result of this scan")
+// ```
 func (c *YakitClient) YakitFile(fileName string, option ...interface{}) {
 	var rawDesc []string
 	var yakitFileAction []*YakitFileAction
@@ -881,22 +1013,82 @@ func (c *YakitClient) YakitFile(fileName string, option ...interface{}) {
 
 }
 
+// YakitError 向 Yakit 输出一条 error 级别日志（导出名为 yakit.Error）
+// 参数:
+//   - tmp: 日志格式字符串
+//   - items: 格式化参数
+//
+// 返回值:
+//   - 无
+//
+// Example:
+// ```
+// yakit.Error("scan failed: %v", "timeout")
+// ```
 func (c *YakitClient) YakitError(tmp string, items ...interface{}) {
 	c.YakitLog("error", tmp, items...)
 }
 
+// YakitInfo 向 Yakit 输出一条 info 级别日志（导出名为 yakit.Info）
+// 参数:
+//   - tmp: 日志格式字符串
+//   - items: 格式化参数
+//
+// 返回值:
+//   - 无
+//
+// Example:
+// ```
+// yakit.Info("scanning target: %s", "example.com")
+// ```
 func (c *YakitClient) YakitInfo(tmp string, items ...interface{}) {
 	c.YakitLog("info", tmp, items...)
 }
 
+// YakitDebug 向 Yakit 输出一条 debug 级别日志（导出名为 yakit.Debug）
+// 参数:
+//   - tmp: 日志格式字符串
+//   - items: 格式化参数
+//
+// 返回值:
+//   - 无
+//
+// Example:
+// ```
+// yakit.Debug("debug value: %v", 123)
+// ```
 func (c *YakitClient) YakitDebug(tmp string, items ...interface{}) {
 	c.YakitLog("debug", tmp, items...)
 }
 
+// YakitWarn 向 Yakit 输出一条 warn 级别日志（导出名为 yakit.Warn）
+// 参数:
+//   - tmp: 日志格式字符串
+//   - items: 格式化参数
+//
+// 返回值:
+//   - 无
+//
+// Example:
+// ```
+// yakit.Warn("deprecated option: %s", "old-flag")
+// ```
 func (c *YakitClient) YakitWarn(tmp string, items ...interface{}) {
 	c.YakitLog("warn", tmp, items...)
 }
 
+// AIAgentSession 向 Yakit 输出并注册一个 AI Agent 会话 ID（导出名为 yakit.AIAgentSession）
+// 参数:
+//   - sessionID: 会话 ID
+//   - source: 可选的会话来源标识
+//
+// 返回值:
+//   - 无
+//
+// Example:
+// ```
+// yakit.AIAgentSession("my-session-id")
+// ```
 func (c *YakitClient) AIAgentSession(sessionID string, source ...string) {
 	sessionID = strings.TrimSpace(sessionID)
 	if sessionID == "" {
@@ -910,8 +1102,20 @@ func (c *YakitClient) AIAgentSession(sessionID string, source ...string) {
 	}
 }
 
+// AIOutput 向 Yakit 输出可被 AI 工具 stdout 过滤的 AI 专用输出（导出名为 yakit.AIOutput）
 // AIOutput writes AI-focused output that can be filtered for AI tool stdout.
 // aiLevel is an optional category for downstream consumers.
+// 参数:
+//   - tmp: 输出格式字符串
+//   - items: 格式化参数
+//
+// 返回值:
+//   - 无
+//
+// Example:
+// ```
+// yakit.AIOutput("analysis result: %s", "ok")
+// ```
 func (c *YakitClient) AIOutput(tmp string, items ...interface{}) {
 	var data = tmp
 	if len(items) > 0 {
@@ -928,6 +1132,18 @@ func init() {
 	AutoInitYakit()
 }
 
+// InitYakit 初始化全局 Yakit 客户端实例（导出名为 yakit.InitYakit）
+// 参数:
+//   - y: Yakit 客户端对象
+//
+// 返回值:
+//   - 无
+//
+// Example:
+// ```
+// client = yakit.NewClient("http://127.0.0.1:8080/webhook")
+// yakit.InitYakit(client)
+// ```
 func InitYakit(y *YakitClient) {
 	*yakitClientInstanceP = y
 }
@@ -947,6 +1163,18 @@ func AutoInitYakit() *YakitClient {
 	}
 }
 
+// updateYakitStore 从本地数据库更新 Yakit 插件商店（导出名为 yakit.UpdateYakitStore）
+// 参数:
+//   - 无
+//
+// 返回值:
+//   - 错误信息
+//
+// Example:
+// ```
+// // 依赖本地数据库（示意性示例）
+// yakit.UpdateYakitStore()~
+// ```
 func updateYakitStore() error {
 	db := consts.GetGormProfileDatabase()
 	if db == nil {
@@ -956,6 +1184,18 @@ func updateYakitStore() error {
 	return yakit.UpdateYakitStore(db, "")
 }
 
+// YakitSetProgressEx 设置指定 ID 的进度条进度（导出名为 yakit.SetProgressEx）
+// 参数:
+//   - id: 进度条 ID
+//   - f: 进度值（0.0-1.0）
+//
+// 返回值:
+//   - 无
+//
+// Example:
+// ```
+// yakit.SetProgressEx("download", 0.5)
+// ```
 func (c *YakitClient) YakitSetProgressEx(id string, f float64) {
 	c.send(&YakitProgress{
 		Id:       id,
@@ -963,6 +1203,17 @@ func (c *YakitClient) YakitSetProgressEx(id string, f float64) {
 	})
 }
 
+// YakitSetProgress 设置主进度条进度（导出名为 yakit.SetProgress）
+// 参数:
+//   - f: 进度值（0.0-1.0）
+//
+// 返回值:
+//   - 无
+//
+// Example:
+// ```
+// yakit.SetProgress(0.5)
+// ```
 func (c *YakitClient) YakitSetProgress(f float64) {
 	c.send(&YakitProgress{
 		Id:       "main",
@@ -1007,6 +1258,23 @@ func (y *YakitHTTPFlowRisk) SetLevel(l string) {
 	}
 }
 
+// NewHTTPFlowRisk 创建一个 HTTP 流量风险对象（导出名为 yakit.NewHTTPFlowRisk）
+// 参数:
+//   - riskName: 风险名称
+//   - isHttps: 是否为 HTTPS
+//   - url: 关联 URL
+//   - req: 原始请求字节
+//   - rsp: 原始响应字节
+//
+// 返回值:
+//   - HTTP 流量风险对象
+//
+// Example:
+// ```
+// risk = yakit.NewHTTPFlowRisk("XSS", true, "https://example.com", reqBytes, rspBytes)
+// risk.SetLevel("high")
+// dump(risk)
+// ```
 func NewHTTPFlowRisk(
 	riskName string,
 	isHttps bool, url string,
@@ -1022,6 +1290,18 @@ func NewHTTPFlowRisk(
 	}
 }
 
+// updateOnlineYakitStore 从在线商店下载并保存全部 Yakit 插件（导出名为 yakit.UpdateOnlineYakitStore）
+// 参数:
+//   - 无
+//
+// 返回值:
+//   - 错误信息
+//
+// Example:
+// ```
+// // 需要联网及本地数据库（示意性示例）
+// yakit.UpdateOnlineYakitStore()~
+// ```
 func updateOnlineYakitStore() error {
 	client := NewOnlineClient(consts.GetOnlineBaseUrl())
 	stream := client.DownloadYakitPluginAll(context.Background())
@@ -1046,6 +1326,22 @@ func updateOnlineYakitStore() error {
 	return nil
 }
 
+// generateYakitMITMHookParams 发起一次 HTTP 请求并生成可传给 MITM hook 的参数列表（导出名为 yakit.GenerateYakitMITMHooksParams）
+// 参数:
+//   - method: HTTP 方法
+//   - url: 请求 URL
+//   - opts: HTTP 请求可选项
+//
+// 返回值:
+//   - 参数列表（isHttps, url, reqRaw, rspRaw, body）
+//   - 错误信息
+//
+// Example:
+// ```
+// // 需要联网（示意性示例）
+// params = yakit.GenerateYakitMITMHooksParams("GET", "http://example.com")~
+// dump(params)
+// ```
 func generateYakitMITMHookParams(method string, url string, opts ...http_struct.HttpOption) ([]interface{}, error) {
 	isHttps := false
 	if strings.HasPrefix(url, "https://") {

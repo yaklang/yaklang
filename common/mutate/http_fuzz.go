@@ -264,27 +264,73 @@ type buildFuzzHTTPRequestConfig struct {
 
 type BuildFuzzHTTPRequestOption func(config *buildFuzzHTTPRequestConfig)
 
+// proxy 是一个 HTTP Fuzz 请求构造选项，用于设置发包时使用的代理地址
+// 参数:
+//   - i: 代理地址，支持 http、https、socks5 协议
+//
+// 返回值:
+//   - 一个 Fuzz 请求构造选项，作为可变参数传入 fuzz.HTTPRequest 等
+//
+// Example:
+// ```
+// // 通过代理构造并发包，依赖网络，此处仅作示意
+// freq = fuzz.HTTPRequest(raw, fuzz.proxy("http://127.0.0.1:8083"))~
+// ```
 func OptProxy(i string) BuildFuzzHTTPRequestOption {
 	return func(config *buildFuzzHTTPRequestConfig) {
 		config.Proxy = i
 	}
 }
 
+// noEncode 是一个 HTTP Fuzz 请求构造选项，用于设置是否禁用对 fuzz 结果的自动编码
+// 参数:
+//   - i: 是否禁用自动编码
+//
+// 返回值:
+//   - 一个 Fuzz 请求构造选项，作为可变参数传入 fuzz.HTTPRequest 等
+//
+// Example:
+// ```
+// // 禁用自动编码，依赖网络，此处仅作示意
+// freq = fuzz.HTTPRequest(raw, fuzz.noEncode(true))~
+// ```
 func OptDisableAutoEncode(i bool) BuildFuzzHTTPRequestOption {
 	return func(config *buildFuzzHTTPRequestConfig) {
 		config.NoAutoEncode = i
 	}
 }
 
+// noEscapeHTML 是一个 HTTP Fuzz 请求构造选项，用于设置是否禁用对内容的 HTML 转义
+// 参数:
+//   - i: 是否禁用 HTML 转义
+//
+// 返回值:
+//   - 一个 Fuzz 请求构造选项，作为可变参数传入 fuzz.HTTPRequest 等
+//
+// Example:
+// ```
+// // 禁用 HTML 转义，依赖网络，此处仅作示意
+// freq = fuzz.HTTPRequest(raw, fuzz.noEscapeHTML(true))~
+// ```
 func OptNoEscapeHTML(i bool) BuildFuzzHTTPRequestOption {
 	return func(config *buildFuzzHTTPRequestConfig) {
 		config.NoEscapeHTML = i
 	}
 }
 
+// showTag 是一个 HTTP Fuzz 请求构造选项，用于以更友好的方式展示 fuzztag（便于阅读与调试）
+// 返回值:
+//   - 一个 Fuzz 请求构造选项，作为可变参数传入 fuzz.HTTPRequest 等
+//
+// Example:
+// ```
+// // 友好展示 fuzztag，依赖网络，此处仅作示意
+// freq = fuzz.HTTPRequest(raw, fuzz.showTag())~
+// ```
 func OptFriendlyDisplay() BuildFuzzHTTPRequestOption {
+	enabled := true
 	return func(config *buildFuzzHTTPRequestConfig) {
-		config.FriendlyDisplay = true
+		config.FriendlyDisplay = enabled
 	}
 }
 
@@ -294,6 +340,18 @@ func OptQueryParams(i *lowhttp.QueryParams) BuildFuzzHTTPRequestOption {
 	}
 }
 
+// https 是一个 HTTP Fuzz 请求构造选项，用于设置该请求是否以 HTTPS 协议发送
+// 参数:
+//   - i: 是否使用 HTTPS
+//
+// 返回值:
+//   - 一个 Fuzz 请求构造选项，作为可变参数传入 fuzz.HTTPRequest 等
+//
+// Example:
+// ```
+// // 以 HTTPS 构造请求，依赖网络，此处仅作示意
+// freq = fuzz.HTTPRequest(raw, fuzz.https(true))~
+// ```
 func OptHTTPS(i bool) BuildFuzzHTTPRequestOption {
 	return func(config *buildFuzzHTTPRequestConfig) {
 		config.IsHttps = i
@@ -318,54 +376,23 @@ func OptFromPlugin(i string) BuildFuzzHTTPRequestOption {
 	}
 }
 
+// context 是一个 HTTP Fuzz 请求构造选项，用于传入上下文以便外部取消变形与发包任务
+// 参数:
+//   - ctx: 上下文对象
+//
+// 返回值:
+//   - 一个 Fuzz 请求构造选项，作为可变参数传入 fuzz.HTTPRequest 等
+//
+// Example:
+// ```
+// // 传入可取消上下文，依赖网络，此处仅作示意
+// ctx = context.New()
+// freq = fuzz.HTTPRequest(raw, fuzz.context(ctx))~
+// ```
 func OptContext(ctx context.Context) BuildFuzzHTTPRequestOption {
 	return func(config *buildFuzzHTTPRequestConfig) {
 		config.Ctx = ctx
 	}
-}
-
-func UrlsToHTTPRequests(target ...interface{}) (*FuzzHTTPRequestBatch, error) {
-	var reqs []*http.Request
-	for _, urlBase := range InterfaceToFuzzResults(target) {
-		for _, u := range utils.ParseStringToUrlsWith3W(urlBase) {
-			_req, err := http.NewRequest("GET", u, nil)
-			if err != nil {
-				log.Error(err)
-				continue
-			}
-			reqs = append(reqs, _req)
-		}
-	}
-
-	var reqIf []FuzzHTTPRequestIf
-	var firstReq *FuzzHTTPRequest
-	for _, req := range reqs {
-		isHttps := false
-		if req.URL.Scheme == "https" {
-			isHttps = true
-		}
-		fuzzReq, err := NewFuzzHTTPRequest(req, OptHTTPS(isHttps))
-		if err != nil {
-			log.Errorf("build fuzz http request failed: %s", err)
-			continue
-		}
-
-		if firstReq == nil {
-			firstReq = fuzzReq
-		}
-		reqIf = append(reqIf, fuzzReq)
-
-	}
-
-	if len(reqIf) <= 0 {
-		return nil, utils.Errorf("fuzz http requests EMPTY!")
-	}
-	batch := &FuzzHTTPRequestBatch{
-		fallback:         nil,
-		nextFuzzRequests: reqIf,
-		originRequest:    firstReq,
-	}
-	return batch, nil
 }
 
 func _fixHttpsPorts(r *http.Request) {
@@ -433,6 +460,23 @@ func getPostJsonFuzzParams(jsonPathPrefix string, params map[string]interface{},
 	return fuzzParams
 }
 
+// MustHTTPRequest 根据原始请求报文构造一个 HTTP Fuzz 请求对象，构造失败时不返回错误（仅记录日志），便于链式调用
+// 参数:
+//   - i: 原始 HTTP 请求报文（字符串、字节数组或 *http.Request）
+//   - opts: 可选构造选项，例如 fuzz.https、fuzz.proxy
+//
+// 返回值:
+//   - 构造好的 HTTP Fuzz 请求对象（失败时可能为 nil）
+//
+// Example:
+// ```
+// raw = `GET / HTTP/1.1
+// Host: www.example.com
+//
+// `
+// freq = fuzz.MustHTTPRequest(raw)
+// freq.Show()
+// ```
 func NewMustFuzzHTTPRequest(i interface{}, opts ...BuildFuzzHTTPRequestOption) *FuzzHTTPRequest {
 	req, err := NewFuzzHTTPRequest(i, opts...)
 	if err != nil {
@@ -441,6 +485,24 @@ func NewMustFuzzHTTPRequest(i interface{}, opts ...BuildFuzzHTTPRequestOption) *
 	return req
 }
 
+// HTTPRequest 根据原始请求报文构造一个 HTTP Fuzz 请求对象，用于对请求各部分进行参数变形与发包
+// 参数:
+//   - i: 原始 HTTP 请求报文（字符串、字节数组或 *http.Request）
+//   - opts: 可选构造选项，例如 fuzz.https、fuzz.proxy、fuzz.noEncode
+//
+// 返回值:
+//   - 构造好的 HTTP Fuzz 请求对象
+//   - 错误信息，报文解析失败时返回非空
+//
+// Example:
+// ```
+// raw = `GET /?a=1 HTTP/1.1
+// Host: www.example.com
+//
+// `
+// freq = fuzz.HTTPRequest(raw)~
+// freq.Show()
+// ```
 func NewFuzzHTTPRequest(i interface{}, opts ...BuildFuzzHTTPRequestOption) (*FuzzHTTPRequest, error) {
 	var originHttpRequest []byte
 	switch ret := i.(type) {

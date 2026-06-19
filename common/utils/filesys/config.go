@@ -101,6 +101,18 @@ func WithOnStart(f func(basename string, isDir bool) error) Option {
 	}
 }
 
+// dir 为匹配指定 glob 目录的子树设置一组单独的遍历选项
+// 参数:
+//   - globDir: 目录匹配的 glob 模式
+//   - opts: 对匹配到的子目录生效的遍历选项
+//
+// 返回值:
+//   - 一个遍历配置选项
+//
+// Example:
+// ```
+// filesys.Recursive("testdata", filesys.dir("cc", filesys.onFileStat((name, info) => {})))~
+// ```
 func WithDir(globDir string, opts ...Option) Option {
 	return func(c *Config) {
 		if c.fileSystem == nil {
@@ -183,7 +195,17 @@ func WithExcludeExts(exts ...string) Option {
 	}
 }
 
-// onReady will be called when the walker is ready to start walking.
+// onReady 设置遍历开始（准备就绪）时调用的回调
+// 参数:
+//   - h: 回调函数，参数为 (名称, 是否为目录)
+//
+// 返回值:
+//   - 一个遍历配置选项
+//
+// Example:
+// ```
+// filesys.Recursive("testdata", filesys.onReady((name, isDir) => { println(name) }))~
+// ```
 func withYaklangOnStart(h func(name string, isDir bool)) Option {
 	return WithOnStart(func(basename string, isDir bool) (err error) {
 		defer func() {
@@ -196,11 +218,33 @@ func withYaklangOnStart(h func(name string, isDir bool)) Option {
 	})
 }
 
+// onFS 设置遍历所使用的文件系统对象（如 zip 文件系统、内存文件系统等）
+// 参数:
+//   - f: 待遍历的文件系统对象
+//
+// 返回值:
+//   - 一个遍历配置选项
+//
+// Example:
+// ```
+// zfs = filesys.NewZipFSFromLocal("/tmp/abc.zip")~
+// filesys.Recursive(".", filesys.onFS(zfs), filesys.onFileStat((name, info) => { println(name) }))~
+// ```
 func withYaklangFileSystem(f fi.FileSystem) Option {
 	return WithFileSystem(f)
 }
 
-// onStat will be called when the walker met one file description.
+// onStat 设置遍历到每个条目（文件或目录）时调用的回调
+// 参数:
+//   - h: 回调函数，参数为 (是否为目录, 路径, 文件信息)
+//
+// 返回值:
+//   - 一个遍历配置选项
+//
+// Example:
+// ```
+// filesys.Recursive("testdata", filesys.onStat((isDir, pathname, info) => { println(pathname) }))~
+// ```
 func withYaklangStat(h func(isDir bool, pathname string, info os.FileInfo)) Option {
 	return WithStat(func(isDir bool, pathname string, info os.FileInfo) (err error) {
 		defer func() {
@@ -213,7 +257,17 @@ func withYaklangStat(h func(isDir bool, pathname string, info os.FileInfo)) Opti
 	})
 }
 
-// onStatEx will be called when the walker met one file description.
+// onStatEx 设置遍历到每个条目时调用的回调，并提供一个 stop 函数用于提前终止遍历
+// 参数:
+//   - h: 回调函数，参数为 (是否为目录, 路径, 文件信息, stop 终止函数)
+//
+// 返回值:
+//   - 一个遍历配置选项
+//
+// Example:
+// ```
+// filesys.Recursive("testdata", filesys.onStatEx((isDir, pathname, info, stop) => { stop() }))~
+// ```
 func withYaklangStatEx(h func(isDir bool, pathname string, info os.FileInfo, stop func())) Option {
 	return WithStat(func(isDir bool, pathname string, info os.FileInfo) (err error) {
 		defer func() {
@@ -232,7 +286,17 @@ func withYaklangStatEx(h func(isDir bool, pathname string, info os.FileInfo, sto
 	})
 }
 
-// onFileStat will be called when the walker met one file.
+// onFileStat 设置遍历到每个文件（不含目录）时调用的回调
+// 参数:
+//   - h: 回调函数，参数为 (文件路径, 文件信息)
+//
+// 返回值:
+//   - 一个遍历配置选项
+//
+// Example:
+// ```
+// filesys.Recursive("testdata", filesys.onFileStat((pathname, info) => { println(pathname) }))~
+// ```
 func withYaklangFileStat(h func(pathname string, info os.FileInfo)) Option {
 	return WithFileStat(func(pathname string, info fs.FileInfo) (err error) {
 		defer func() {
@@ -245,7 +309,17 @@ func withYaklangFileStat(h func(pathname string, info os.FileInfo)) Option {
 	})
 }
 
-// onFileStatEx will be called when the walker met one file and control stop
+// onFileStatEx 设置遍历到每个文件时调用的回调，并提供一个 stop 函数用于提前终止遍历
+// 参数:
+//   - h: 回调函数，参数为 (文件路径, 文件信息, stop 终止函数)
+//
+// 返回值:
+//   - 一个遍历配置选项
+//
+// Example:
+// ```
+// filesys.Recursive("testdata", filesys.onFileStatEx((pathname, info, stop) => { stop() }))~
+// ```
 func withYaklangFileStatEx(h func(pathname string, info os.FileInfo, stop func())) Option {
 	return WithFileStat(func(pathname string, info fs.FileInfo) (err error) {
 		defer func() {
@@ -264,7 +338,17 @@ func withYaklangFileStatEx(h func(pathname string, info os.FileInfo, stop func()
 	})
 }
 
-// onDirStat will be called when the walker met one directory.
+// onDirStat 设置遍历到每个目录时调用的回调
+// 参数:
+//   - h: 回调函数，参数为 (目录路径, 文件信息)
+//
+// 返回值:
+//   - 一个遍历配置选项
+//
+// Example:
+// ```
+// filesys.Recursive("testdata", filesys.onDirStat((pathname, info) => { println(pathname) }))~
+// ```
 func withYaklangDirStat(h func(pathname string, info os.FileInfo)) Option {
 	return WithDirStat(func(pathname string, info fs.FileInfo) (err error) {
 		defer func() {

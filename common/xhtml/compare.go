@@ -49,9 +49,20 @@ func node2str(node *html.Node) string {
 }
 
 // CompareHtml 比较两段 HTML 代码的差异，返回差异的节点信息结构体引用切片与错误
+// 参数:
+//   - htmlRaw1: 第一段 HTML 内容，会被转换为字符串
+//   - htmlRaw2: 第二段 HTML 内容，会被转换为字符串
+//
+// 返回值:
+//   - 差异信息引用切片，每个元素描述一处结构/属性/文本差异
+//   - 解析 HTML 失败时返回的错误
+//
 // Example:
 // ```
-// diff, err = xhtml.CompareHtml(html1, html2)
+// // VARS: 比较两段不同的 HTML
+// diff = xhtml.CompareHtml("<div>a</div>", "<div>b</div>")~
+// // assert: 不同内容应产生差异
+// assert len(diff) > 0, "different html should produce diffs"
 // ```
 func CompareHtml(htmlRaw1 interface{}, htmlRaw2 interface{}) ([]*DiffInfo, error) {
 	// diff := []([]*html.Node){}

@@ -173,8 +173,18 @@ func WithCallback(callback InvokeCallback) ToolOption {
 	}
 }
 
-// WithParam_Description adds a description to a property in the JSON Schema.
-// The description should explain the purpose and expected values of the property.
+// WithParam_Description 为属性添加描述信息（导出名为 jsonschema.description）
+// 参数:
+//   - desc: 属性描述文本
+//
+// 返回值:
+//   - 属性可选项
+//
+// Example:
+// ```
+// schema = jsonschema.Object(jsonschema.paramString("name", jsonschema.description("the user name")))
+// assert str.Contains(schema, "the user name"), "schema should contain the description"
+// ```
 func WithParam_Description(desc string) PropertyOption {
 	return func(schema map[string]any) {
 		schema["description"] = desc
@@ -202,8 +212,18 @@ func WithParam_Default(desc any) PropertyOption {
 	}
 }
 
-// WithParam_Required marks a property as required in the tool's input schema.
-// WithParam_Required properties must be provided when using the tool.
+// WithParam_Required 将属性标记为必填（导出名为 jsonschema.required）
+// 参数:
+//   - required: 是否必填，缺省为 true
+//
+// 返回值:
+//   - 属性可选项
+//
+// Example:
+// ```
+// schema = jsonschema.Object(jsonschema.paramString("name", jsonschema.required(true)))
+// assert str.Contains(schema, "required"), "schema should mark name as required"
+// ```
 func WithParam_Required(required ...bool) PropertyOption {
 	return func(schema map[string]any) {
 		if len(required) > 0 {
@@ -214,22 +234,55 @@ func WithParam_Required(required ...bool) PropertyOption {
 	}
 }
 
-// WithParam_Title adds a display-friendly title to a property in the JSON Schema.
-// This title can be used by UI components to show a more readable property name.
+// WithParam_Title 为属性添加便于展示的标题（导出名为 jsonschema.title）
+// 参数:
+//   - title: 属性标题
+//
+// 返回值:
+//   - 属性可选项
+//
+// Example:
+// ```
+// schema = jsonschema.Object(jsonschema.paramString("name", jsonschema.title("User Name")))
+// assert str.Contains(schema, "User Name"), "schema should contain the title"
+// ```
 func WithParam_Title(title string) PropertyOption {
 	return func(schema map[string]any) {
 		schema["title"] = title
 	}
 }
 
-// WithParam_Example adds an example value for a property in the JSON Schema.
+// WithParam_Example 为属性添加示例值（导出名为 jsonschema.example）
+// 参数:
+//   - i: 示例值
+//
+// 返回值:
+//   - 属性可选项
+//
+// Example:
+// ```
+// schema = jsonschema.Object(jsonschema.paramString("name", jsonschema.example("yak")))
+// assert str.Contains(schema, "example"), "schema should contain the example"
+// ```
 func WithParam_Example(i any) PropertyOption {
 	return func(schema map[string]any) {
 		schema["example"] = i
 	}
 }
 
-// WithParam_Raw adds a raw JSON schema object to the tool's input schema.
+// WithParam_Raw 向属性写入原始的 JSON Schema 键值（导出名为 jsonschema.raw）
+// 参数:
+//   - name: 键名
+//   - v: 键值
+//
+// 返回值:
+//   - 属性可选项
+//
+// Example:
+// ```
+// schema = jsonschema.Object(jsonschema.paramString("status", jsonschema.raw("format", "email")))
+// assert str.Contains(schema, "format"), "schema should contain the raw key"
+// ```
 func WithParam_Raw(name string, v any) PropertyOption {
 	return func(m map[string]any) {
 		m[name] = v
@@ -240,16 +293,36 @@ func WithParam_Raw(name string, v any) PropertyOption {
 // String Property Options
 //
 
-// WithParam_Enum specifies a list of allowed values for a string property.
-// The property value must be one of the specified enum values.
+// WithParam_Enum 指定属性的可选枚举值列表（导出名为 jsonschema.enum）
+// 参数:
+//   - values: 允许的取值列表
+//
+// 返回值:
+//   - 属性可选项
+//
+// Example:
+// ```
+// schema = jsonschema.Object(jsonschema.paramString("level", jsonschema.enum("low", "high")))
+// assert str.Contains(schema, "enum"), "schema should contain enum values"
+// ```
 func WithParam_Enum(values ...any) PropertyOption {
 	return func(schema map[string]any) {
 		schema["enum"] = values
 	}
 }
 
-// WithParam_Enum specifies a list of allowed values for a string property.
-// The property value must be one of the specified enum values.
+// WithParam_Const 指定属性的常量取值（导出名为 jsonschema.const）
+// 参数:
+//   - values: 常量值
+//
+// 返回值:
+//   - 属性可选项
+//
+// Example:
+// ```
+// schema = jsonschema.Object(jsonschema.paramString("type", jsonschema.const("user")))
+// assert str.Contains(schema, "const"), "schema should contain const value"
+// ```
 func WithParam_Const(values ...any) PropertyOption {
 	return func(schema map[string]any) {
 		schema["const"] = values
@@ -262,16 +335,36 @@ func WithParam_EnumString(values ...string) PropertyOption {
 	}
 }
 
-// WithParam_MaxLength sets the maximum length for a string property.
-// The string value must not exceed this length.
+// WithParam_MaxLength 设置字符串属性的最大长度（导出名为 jsonschema.maxLength）
+// 参数:
+//   - max: 最大长度
+//
+// 返回值:
+//   - 属性可选项
+//
+// Example:
+// ```
+// schema = jsonschema.Object(jsonschema.paramString("name", jsonschema.maxLength(20)))
+// assert str.Contains(schema, "maxLength"), "schema should contain maxLength"
+// ```
 func WithParam_MaxLength(max int) PropertyOption {
 	return func(schema map[string]any) {
 		schema["maxLength"] = max
 	}
 }
 
-// WithParam_MinLength sets the minimum length for a string property.
-// The string value must be at least this length.
+// WithParam_MinLength 设置字符串属性的最小长度（导出名为 jsonschema.minLength）
+// 参数:
+//   - min: 最小长度
+//
+// 返回值:
+//   - 属性可选项
+//
+// Example:
+// ```
+// schema = jsonschema.Object(jsonschema.paramString("name", jsonschema.minLength(2)))
+// assert str.Contains(schema, "minLength"), "schema should contain minLength"
+// ```
 func WithParam_MinLength(min int) PropertyOption {
 	return func(schema map[string]any) {
 		schema["minLength"] = min
@@ -290,16 +383,36 @@ func WithParam_Pattern(pattern string) PropertyOption {
 // Number Property Options
 //
 
-// WithParam_Max sets the maximum value for a number property.
-// The number value must not exceed this maximum.
+// WithParam_Max 设置数值属性的最大值（导出名为 jsonschema.max）
+// 参数:
+//   - max: 最大值
+//
+// 返回值:
+//   - 属性可选项
+//
+// Example:
+// ```
+// schema = jsonschema.Object(jsonschema.paramNumber("age", jsonschema.max(120)))
+// assert str.Contains(schema, "maximum"), "schema should contain maximum"
+// ```
 func WithParam_Max(max float64) PropertyOption {
 	return func(schema map[string]any) {
 		schema["maximum"] = max
 	}
 }
 
-// WithParam_Min sets the minimum value for a number property.
-// The number value must not be less than this minimum.
+// WithParam_Min 设置数值属性的最小值（导出名为 jsonschema.min）
+// 参数:
+//   - min: 最小值
+//
+// 返回值:
+//   - 属性可选项
+//
+// Example:
+// ```
+// schema = jsonschema.Object(jsonschema.paramNumber("age", jsonschema.min(0)))
+// assert str.Contains(schema, "minimum"), "schema should contain minimum"
+// ```
 func WithParam_Min(min float64) PropertyOption {
 	return func(schema map[string]any) {
 		schema["minimum"] = min
@@ -318,8 +431,19 @@ func WithParam_MultipleOf(value float64) PropertyOption {
 // Property Type Helpers
 //
 
-// WithBoolParam adds a boolean property to the tool schema.
-// It accepts property options to configure the boolean property's behavior and constraints.
+// WithBoolParam 向 schema 添加一个布尔类型属性（导出名为 jsonschema.paramBool）
+// 参数:
+//   - name: 属性名
+//   - opts: 属性可选项，如 jsonschema.description / jsonschema.required
+//
+// 返回值:
+//   - schema 构建可选项
+//
+// Example:
+// ```
+// schema = jsonschema.Object(jsonschema.paramBool("enabled"))
+// assert str.Contains(schema, "boolean"), "schema should contain a boolean property"
+// ```
 func WithBoolParam(name string, opts ...PropertyOption) ToolOption {
 	schema := map[string]any{
 		"type": "boolean",
@@ -327,8 +451,19 @@ func WithBoolParam(name string, opts ...PropertyOption) ToolOption {
 	return WithRawParam(name, schema, opts...)
 }
 
-// WithIntegerParam adds a integer property to the tool schema.
-// It accepts property options to configure the integer property's behavior and constraints.
+// WithIntegerParam 向 schema 添加一个整数类型属性（导出名为 jsonschema.paramInt）
+// 参数:
+//   - name: 属性名
+//   - opts: 属性可选项，如 jsonschema.description / jsonschema.required
+//
+// 返回值:
+//   - schema 构建可选项
+//
+// Example:
+// ```
+// schema = jsonschema.Object(jsonschema.paramInt("age"))
+// assert str.Contains(schema, "integer"), "schema should contain an integer property"
+// ```
 func WithIntegerParam(name string, opts ...PropertyOption) ToolOption {
 	schema := map[string]any{
 		"type": "integer",
@@ -336,8 +471,19 @@ func WithIntegerParam(name string, opts ...PropertyOption) ToolOption {
 	return WithRawParam(name, schema, opts...)
 }
 
-// WithNumberParam adds a number property to the tool schema.
-// It accepts property options to configure the number property's behavior and constraints.
+// WithNumberParam 向 schema 添加一个数值类型属性（导出名为 jsonschema.paramNumber）
+// 参数:
+//   - name: 属性名
+//   - opts: 属性可选项，如 jsonschema.min / jsonschema.max
+//
+// 返回值:
+//   - schema 构建可选项
+//
+// Example:
+// ```
+// schema = jsonschema.Object(jsonschema.paramNumber("score"))
+// assert str.Contains(schema, "number"), "schema should contain a number property"
+// ```
 func WithNumberParam(name string, opts ...PropertyOption) ToolOption {
 	schema := map[string]any{
 		"type": "number",
@@ -345,8 +491,19 @@ func WithNumberParam(name string, opts ...PropertyOption) ToolOption {
 	return WithRawParam(name, schema, opts...)
 }
 
-// WithStringParam adds a string property to the tool schema.
-// It accepts property options to configure the string property's behavior and constraints.
+// WithStringParam 向 schema 添加一个字符串类型属性（导出名为 jsonschema.paramString）
+// 参数:
+//   - name: 属性名
+//   - opts: 属性可选项，如 jsonschema.description / jsonschema.enum
+//
+// 返回值:
+//   - schema 构建可选项
+//
+// Example:
+// ```
+// schema = jsonschema.Object(jsonschema.paramString("name"))
+// assert str.Contains(schema, "string"), "schema should contain a string property"
+// ```
 func WithStringParam(name string, opts ...PropertyOption) ToolOption {
 	schema := map[string]any{
 		"type": "string",
@@ -354,8 +511,19 @@ func WithStringParam(name string, opts ...PropertyOption) ToolOption {
 	return WithRawParam(name, schema, opts...)
 }
 
-// WithStringArrayParam adds a string array property to the tool schema.
-// It accepts property options to configure the string-array property's behavior and constraints.
+// WithStringArrayParam 向 schema 添加一个字符串数组类型属性（导出名为 jsonschema.paramStringArray）
+// 参数:
+//   - name: 属性名
+//   - opts: 属性可选项
+//
+// 返回值:
+//   - schema 构建可选项
+//
+// Example:
+// ```
+// schema = jsonschema.Object(jsonschema.paramStringArray("tags"))
+// assert str.Contains(schema, "array"), "schema should contain a string array property"
+// ```
 func WithStringArrayParam(name string, opts ...PropertyOption) ToolOption {
 	return WithSimpleArrayParam(name, "string", opts...)
 }
@@ -364,8 +532,19 @@ func WithStringArrayParamEx(name string, opts []PropertyOption, itemsOpt ...Prop
 	return WithArrayParam(name, "string", opts, itemsOpt...)
 }
 
-// WithNumberArrayParam adds a number array property to the tool schema.
-// It accepts property options to configure the number-array property's behavior and constraints.
+// WithNumberArrayParam 向 schema 添加一个数值数组类型属性（导出名为 jsonschema.paramNumberArray）
+// 参数:
+//   - name: 属性名
+//   - opts: 属性可选项
+//
+// 返回值:
+//   - schema 构建可选项
+//
+// Example:
+// ```
+// schema = jsonschema.Object(jsonschema.paramNumberArray("scores"))
+// assert str.Contains(schema, "array"), "schema should contain a number array property"
+// ```
 func WithNumberArrayParam(name string, opts ...PropertyOption) ToolOption {
 	return WithSimpleArrayParam(name, "number", opts...)
 }
@@ -533,6 +712,20 @@ func WithPagingParam(name string, fieldNames []string, opts ...PropertyOption) T
 	return WithRawParam(name, schema, opts...)
 }
 
+// WithKVPairsParam 向 schema 添加一个键值对数组类型属性（导出名为 jsonschema.paramKeyValuePairsArray）
+// 适合表达 HTTP headers、查询参数等 key/value 列表结构
+// 参数:
+//   - name: 属性名
+//   - opts: 属性可选项
+//
+// 返回值:
+//   - schema 构建可选项
+//
+// Example:
+// ```
+// schema = jsonschema.Object(jsonschema.paramKeyValuePairsArray("headers"))
+// assert str.Contains(schema, "array"), "schema should contain a kv-pairs array property"
+// ```
 func WithKVPairsParam(name string, opts ...PropertyOption) ToolOption {
 	schema := map[string]any{
 		"type": "array",
@@ -551,8 +744,20 @@ func WithKVPairsParam(name string, opts ...PropertyOption) ToolOption {
 	return WithRawParam(name, schema, opts...)
 }
 
-// WithRawParam adds a custom object property to the tool schema.
-// It accepts property options to configure the object property's behavior and constraints.
+// WithRawParam 以原始 schema 对象的方式向 schema 添加一个属性（导出名为 jsonschema.paramRaw）
+// 参数:
+//   - name: 属性名
+//   - object: 该属性的原始 JSON Schema 对象
+//   - opts: 属性可选项
+//
+// 返回值:
+//   - schema 构建可选项
+//
+// Example:
+// ```
+// schema = jsonschema.Object(jsonschema.paramRaw("ip", {"type": "string", "format": "ipv4"}))
+// assert str.Contains(schema, "ipv4"), "schema should contain the raw object property"
+// ```
 func WithRawParam(name string, object map[string]any, opts ...PropertyOption) ToolOption {
 	return func(t *Tool) {
 		// 关键: 绝对不能直接修改传入/闭包捕获的 object map. 同一个 ToolOption 闭包会被

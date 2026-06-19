@@ -193,6 +193,13 @@ jobs:
         run: |
           go build -o "$RUNNER_TEMP/yak" common/yak/cmd/yak.go
 
+      - name: Guard yak must not import aibalance
+        env:
+          GOCACHE: ${{ env.GOCACHE }}
+          GOMODCACHE: ${{ env.GOMODCACHE }}
+        run: |
+          bash ./scripts/ci/check-yak-no-aibalance.sh
+
       - name: Package yak artifact
         run: |
           ARTIFACT_COPY_LIST="$RUNNER_TEMP/yak|yak" \

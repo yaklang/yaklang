@@ -161,7 +161,18 @@ func WithSyntaxFlowMemory(memory bool) Option {
 	}
 }
 
-// WithScanConcurrency 设置扫描并发数
+// WithScanConcurrency 设置扫描并发数（导出名为 syntaxflow.withScanConcurrency）
+// 参数:
+//   - concurrency: 并发执行的规则数量
+//
+// 返回值:
+//   - 扫描配置可选项
+//
+// Example:
+// ```
+// opt = syntaxflow.withScanConcurrency(10)
+// println(opt)
+// ```
 func WithScanConcurrency(concurrency uint32) Option {
 	return func(c *Config) error {
 		if err := c.ensureSyntaxFlowScan("Scan Concurrency"); err != nil {
@@ -252,7 +263,7 @@ func WithScanRaw(req *ypb.SyntaxFlowScanRequest) Option {
 				c.SyntaxFlowRule.RuleFilter = req.GetFilter()
 			}
 			if req.RuleInput != nil {
-				c.SyntaxFlowRule.RuleInput = append(c.SyntaxFlowRule.RuleInput,  req.GetRuleInput())
+				c.SyntaxFlowRule.RuleInput = append(c.SyntaxFlowRule.RuleInput, req.GetRuleInput())
 			}
 		}
 

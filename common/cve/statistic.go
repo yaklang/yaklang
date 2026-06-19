@@ -17,6 +17,19 @@ type KVPair struct {
 	Data       interface{} `json:"data"`
 }
 
+// NewStatistics 创建一个 CVE 统计对象，用于汇总指定来源的漏洞统计信息（导出名为 cve.NewStatistics）
+// 参数:
+//   - source: 统计数据来源标识
+//
+// 返回值:
+//   - CVE 统计对象
+//
+// Example:
+// ```
+// // 示意性示例，需要本地 CVE 数据库
+// stat = cve.NewStatistics("my-scan")
+// dump(stat)
+// ```
 func NewStatistics(source string) *Statistics {
 	s := &Statistics{Source: source}
 	s.init()

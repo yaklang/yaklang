@@ -662,17 +662,59 @@ func TieredChatWithTier(tier ModelTier, msg string, opts ...aispec.AIConfigOptio
 	return chatWithConfigs(msg, configs, opts...)
 }
 
-// IntelligentChat uses the intelligent (high-quality) model
+// IntelligentChat 使用智能（高质量）模型分层进行对话（导出名为 ai.IntelligentChat）
+// 参数:
+//   - msg: 要发送给 AI 的消息内容
+//   - opts: AI 配置选项，如 ai.apiKey、ai.model 等
+//
+// 返回值:
+//   - AI 返回的回复内容
+//   - 错误信息
+//
+// Example:
+// ```
+// // 需要配置可用的 AI 服务（示意性示例）
+// response = ai.IntelligentChat("分析这条漏洞利用链")~
+// println(response)
+// ```
 func IntelligentChat(msg string, opts ...aispec.AIConfigOption) (string, error) {
 	return TieredChatWithTier(TierIntelligent, msg, opts...)
 }
 
-// LightweightChat uses the lightweight (fast) model
+// LightweightChat 使用轻量（快速）模型分层进行对话（导出名为 ai.LightweightChat）
+// 参数:
+//   - msg: 要发送给 AI 的消息内容
+//   - opts: AI 配置选项，如 ai.apiKey、ai.model 等
+//
+// 返回值:
+//   - AI 返回的回复内容
+//   - 错误信息
+//
+// Example:
+// ```
+// // 需要配置可用的 AI 服务（示意性示例）
+// response = ai.LightweightChat("用一句话总结这段文本")~
+// println(response)
+// ```
 func LightweightChat(msg string, opts ...aispec.AIConfigOption) (string, error) {
 	return TieredChatWithTier(TierLightweight, msg, opts...)
 }
 
-// VisionChat uses the vision model
+// VisionChat 使用视觉模型分层进行对话，可结合图片输入（导出名为 ai.VisionChat）
+// 参数:
+//   - msg: 要发送给 AI 的消息内容
+//   - opts: AI 配置选项，通常配合 ai.imageFile、ai.imageBase64 等使用
+//
+// 返回值:
+//   - AI 返回的回复内容
+//   - 错误信息
+//
+// Example:
+// ```
+// // 需要配置可用的视觉 AI 服务（示意性示例）
+// response = ai.VisionChat("描述这张截图", ai.imageFile("/tmp/demo.png"))~
+// println(response)
+// ```
 func VisionChat(msg string, opts ...aispec.AIConfigOption) (string, error) {
 	return TieredChatWithTier(TierVision, msg, opts...)
 }
@@ -808,14 +850,65 @@ func TieredFunctionCallWithTier(tier ModelTier, input string, funcs any, opts ..
 	return functionCallWithConfigs(input, funcs, configs, opts...)
 }
 
+// IntelligentFunctionCall 使用智能（高质量）模型进行函数调用（导出名为 ai.IntelligentFunctionCall）
+// 参数:
+//   - input: 用户输入的自然语言指令
+//   - funcs: 函数定义（支持结构体或函数列表）
+//   - opts: AI 配置选项
+//
+// 返回值:
+//   - 函数调用结果
+//   - 错误信息
+//
+// Example:
+// ```
+// // 需要配置可用的 AI 服务（示意性示例）
+// funcs = { "scan": func(target) { return {"target": target} } }
+// result = ai.IntelligentFunctionCall("扫描 example.com", funcs)~
+// dump(result)
+// ```
 func IntelligentFunctionCall(input string, funcs any, opts ...aispec.AIConfigOption) (map[string]any, error) {
 	return TieredFunctionCallWithTier(TierIntelligent, input, funcs, opts...)
 }
 
+// LightweightFunctionCall 使用轻量（快速）模型进行函数调用（导出名为 ai.LightweightFunctionCall）
+// 参数:
+//   - input: 用户输入的自然语言指令
+//   - funcs: 函数定义（支持结构体或函数列表）
+//   - opts: AI 配置选项
+//
+// 返回值:
+//   - 函数调用结果
+//   - 错误信息
+//
+// Example:
+// ```
+// // 需要配置可用的 AI 服务（示意性示例）
+// funcs = { "scan": func(target) { return {"target": target} } }
+// result = ai.LightweightFunctionCall("快速提取目标", funcs)~
+// dump(result)
+// ```
 func LightweightFunctionCall(input string, funcs any, opts ...aispec.AIConfigOption) (map[string]any, error) {
 	return TieredFunctionCallWithTier(TierLightweight, input, funcs, opts...)
 }
 
+// VisionFunctionCall 使用视觉模型进行函数调用，可结合图片输入（导出名为 ai.VisionFunctionCall）
+// 参数:
+//   - input: 用户输入的自然语言指令
+//   - funcs: 函数定义（支持结构体或函数列表）
+//   - opts: AI 配置选项，通常配合 ai.imageFile 等使用
+//
+// 返回值:
+//   - 函数调用结果
+//   - 错误信息
+//
+// Example:
+// ```
+// // 需要配置可用的视觉 AI 服务（示意性示例）
+// funcs = { "describe": func(text) { return {"text": text} } }
+// result = ai.VisionFunctionCall("识别图片内容", funcs, ai.imageFile("/tmp/demo.png"))~
+// dump(result)
+// ```
 func VisionFunctionCall(input string, funcs any, opts ...aispec.AIConfigOption) (map[string]any, error) {
 	return TieredFunctionCallWithTier(TierVision, input, funcs, opts...)
 }

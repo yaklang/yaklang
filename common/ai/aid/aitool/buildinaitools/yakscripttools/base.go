@@ -149,6 +149,21 @@ func loadAllYakScriptFromEmbedFS() ([]*schema.AIYakTool, error) {
 	return aiTools, err
 }
 
+// LoadYakScriptToAiTools 将一段 Yak 插件源码解析为 AI 工具描述（导出名为 aiagent.ParseYakScriptToAiTools）
+// 会从源码中提取元数据（名称、描述、关键词等）以及 CLI 参数并转换为工具输入 schema
+// 参数:
+//   - name: 工具名称
+//   - content: Yak 插件源码
+//
+// 返回值:
+//   - AI 工具描述对象（解析失败时返回 nil）
+//
+// Example:
+// ```
+// code = `cli.String("target"); cli.check()`
+// tool = aiagent.ParseYakScriptToAiTools("demo", code)
+// dump(tool)
+// ```
 func LoadYakScriptToAiTools(name string, content string) *schema.AIYakTool {
 	// Parse once and reuse the program for both metadata and CLI parameter conversion
 	prog, err := static_analyzer.SSAParse(content, "yak")
@@ -207,6 +222,19 @@ func ConvertTools(tools []*schema.AIYakTool) []*aitool.Tool {
 	return covertTools(tools)
 }
 
+// GetAllYakScriptAiTools 获取数据库中保存的全部 Yak 脚本 AI 工具（导出名为 aiagent.AllYakScriptAiTools）
+// 参数:
+//   - 无
+//
+// 返回值:
+//   - AI 工具列表
+//
+// Example:
+// ```
+// // 依赖本地 profile 数据库（示意性示例）
+// tools = aiagent.AllYakScriptAiTools()
+// dump(tools)
+// ```
 func GetAllYakScriptAiTools() []*aitool.Tool {
 	db := consts.GetGormProfileDatabase()
 	allAiTools, err := yakit.SearchAIYakTool(db, "")

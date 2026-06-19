@@ -71,6 +71,19 @@ func init() {
 	require.RegisterCoreModule(console.ModuleName, console.RequireWithPrinter(defaultStdPrinter))
 }
 
+// GetStatementType 返回 JS AST 节点的类型名（去掉 *ast. 前缀，导出名为 js.GetSTType）
+// 参数:
+//   - st: JS AST 节点（如 js.Parse 的返回值或其子节点）
+//
+// 返回值:
+//   - 节点类型名字符串
+//
+// Example:
+// ```
+// tree = js.Parse("function add(a, b) { return a + b; }")~
+// println(js.GetSTType(tree))   // OUT: Program
+// assert js.GetSTType(tree) == "Program", "parsed root node should be Program"
+// ```
 func GetStatementType(st interface{}) string {
 	typ := strings.Replace(reflect.TypeOf(st).String(), "*ast.", "", 1)
 	return typ
@@ -101,12 +114,39 @@ func jsRunWithLibs(libs ...*jsLibrary) jsRunOpts {
 	}
 }
 
+// withVariable 为 JS 运行设置单个全局变量（导出名为 js.withVariable）
+// 参数:
+//   - name: 变量名
+//   - value: 变量值
+//
+// 返回值:
+//   - JS 运行选项
+//
+// Example:
+// ```
+// _, value = js.Run("a + b", js.withVariable("a", 1), js.withVariable("b", 2))~
+// println(value.ToInteger())   // OUT: 3
+// assert value.ToInteger() == 3, "a + b with injected variables should be 3"
+// ```
 func _withVariable(name string, value any) jsRunOpts {
 	return func(c *JsRunConfig) {
 		c.variables[name] = value
 	}
 }
 
+// withVariables 为 JS 运行批量设置多个全局变量（导出名为 js.withVariables）
+// 参数:
+//   - vars: 变量名到变量值的映射
+//
+// 返回值:
+//   - JS 运行选项
+//
+// Example:
+// ```
+// _, value = js.Run("a + b", js.withVariables({"a": 10, "b": 5}))~
+// println(value.ToInteger())   // OUT: 15
+// assert value.ToInteger() == 15, "a + b with injected variables should be 15"
+// ```
 func _withVariables(vars map[string]any) jsRunOpts {
 	return func(c *JsRunConfig) {
 		for k, v := range vars {
@@ -117,11 +157,14 @@ func _withVariables(vars map[string]any) jsRunOpts {
 
 var jsRunOptsCache = utils.NewTTLCache[jsRunOpts]()
 
-// libCryptoJSV3 是一个JS运行选项参数，用于在运行JS代码时嵌入CryptoJS 3.3.0库
+// libCryptoJSV3 是一个 JS 运行选项参数，用于在运行 JS 代码时嵌入 CryptoJS 3.3.0 库
+// 返回值:
+//   - JS 运行选项
+//
 // Example:
 // ```
 // _, value = js.Run(`CryptoJS.HmacSHA256("Message", "secret").toString();`, js.libCryptoJSV3())~
-// println(value.String())
+// assert value.String() == "aa747c502a898200f9e4fa21bac68136f886a0e27aec70ba06daf2e2a5cb5597", "HmacSHA256 should be deterministic"
 // ```
 func _libCryptoJSV3() jsRunOpts {
 	var (
@@ -138,11 +181,14 @@ func _libCryptoJSV3() jsRunOpts {
 	return opt
 }
 
-// libCryptoJSV4 是一个JS运行选项参数，用于在运行JS代码时嵌入CryptoJS 4.2.0库
+// libCryptoJSV4 是一个 JS 运行选项参数，用于在运行 JS 代码时嵌入 CryptoJS 4.2.0 库
+// 返回值:
+//   - JS 运行选项
+//
 // Example:
 // ```
 // _, value = js.Run(`CryptoJS.HmacSHA256("Message", "secret").toString();`, js.libCryptoJSV4())~
-// println(value.String())
+// assert value.String() == "aa747c502a898200f9e4fa21bac68136f886a0e27aec70ba06daf2e2a5cb5597", "HmacSHA256 should be deterministic"
 // ```
 func _libCryptoJSV4() jsRunOpts {
 	var (
@@ -159,9 +205,13 @@ func _libCryptoJSV4() jsRunOpts {
 	return opt
 }
 
-// libJSRSASign 是一个JS运行选项参数，用于在运行JS代码时嵌入jsrsasign 10.8.6库
+// libJSRSASign 是一个 JS 运行选项参数，用于在运行 JS 代码时嵌入 jsrsasign 10.8.6 库
+// 返回值:
+//   - JS 运行选项
+//
 // Example:
 // ```
+// // 示意性示例，需要有效的 PEM 公钥
 // _, value = js.Run(`KEYUTIL.getKey(pemPublicKey).encrypt("yaklang")`, js.libJSRSASign())~
 // println(value.String())
 // ```
@@ -180,11 +230,14 @@ func _libJSRSASign() jsRunOpts {
 	return opt
 }
 
-// _libJsEncrypt 是一个JS运行选项参数，用于在运行JS代码时嵌入JsEncrypt 3.3.2库
+// libJsEncrypt 是一个 JS 运行选项参数，用于在运行 JS 代码时嵌入 JSEncrypt 3.3.2 库
+// 返回值:
+//   - JS 运行选项
+//
 // Example:
 // ```
-// _, value = js.Run("var encrypt = new JSEncrypt();", js._libJsEncrypt())~
-// println(value.String())
+// _, value = js.Run("var encrypt = new JSEncrypt(); 'ok';", js.libJsEncrypt())~
+// assert value.String() == "ok", "JSEncrypt lib should be embedded successfully"
 // ```
 func _libJsEncrypt() jsRunOpts {
 	var (
@@ -200,12 +253,19 @@ func _libJsEncrypt() jsRunOpts {
 	return opt
 }
 
-// Parse 对传入的JS代码进行解析并返回解析后的AST树和错误
+// Parse 对传入的 JS 代码进行解析并返回 AST 语法树
+// 参数:
+//   - code: JS 源代码字符串
+//
+// 返回值:
+//   - 解析得到的 AST 程序节点
+//   - 错误信息
+//
 // Example:
 // ```
-// code = `function add(a, b) { return a + b; }`
-// tree = js.Parse(code)~
-// dump(tree)
+// tree = js.Parse(`function add(a, b) { return a + b; }`)~
+// assert tree != nil, "parse should return a non-nil AST"
+// println(js.GetSTType(tree))   // OUT: Program
 // ```
 func _Parse(code string) (*ast.Program, error) {
 	JSast, err := parser.ParseFile(nil, "", code, 0)
@@ -215,12 +275,19 @@ func _Parse(code string) (*ast.Program, error) {
 	return JSast, nil
 }
 
-// New 创建新的JS引擎并返回
+// New 创建一个新的 JS 引擎（goja Runtime）并返回
+// 参数:
+//   - opts: 零个或多个运行选项，如嵌入第三方库或预置变量
+//
+// 返回值:
+//   - JS 引擎对象，可调用 RunString 执行 JS 代码
+//
 // Example:
 // ```
 // engine = js.New()
-// val = engine.RunString("1+1")~.ToInteger()~
-// println(val)
+// val = engine.RunString("1+1")~.ToInteger()
+// println(val)   // OUT: 2
+// assert val == 2, "js engine should evaluate 1+1 to 2"
 // ```
 func _jsNewEngine(opts ...jsRunOpts) *goja.Runtime {
 	config := newJsRunConfig()
@@ -256,14 +323,22 @@ func _jsNewEngine(opts ...jsRunOpts) *goja.Runtime {
 	return vm
 }
 
-// Run 创建新的JS引擎并运行传入的代码并返回JS引擎结构体引用，运行值和错误
-// 第一个参数为运行的代码字符串
-// 后续参数为零个到多个运行选项，用于对此次运行进行配置，例如嵌入常用的JS第三方库等
-// 现在会尝试自动导入代码中使用到的库, CryptoJS会导入V4版本
+// Run 创建新的 JS 引擎并运行传入代码，返回引擎、运行结果值和错误
+// 会尝试自动导入代码中用到的库（CryptoJS 默认导入 V4 版本）
+// 参数:
+//   - src: 要运行的 JS 代码字符串
+//   - opts: 零个或多个运行选项，如嵌入第三方库或预置变量
+//
+// 返回值:
+//   - JS 引擎对象
+//   - 运行结果值
+//   - 错误信息
+//
 // Example:
 // ```
-// _, value = js.Run(`CryptoJS.HmacSHA256("Message", "secret").toString();`, js.libCryptoJSV3())~
-// println(value.String())
+// _, value = js.Run("1+1")~
+// println(value.ToInteger())   // OUT: 2
+// assert value.ToInteger() == 2, "js.Run should evaluate 1+1 to 2"
 // ```
 func _run(src any, opts ...jsRunOpts) (*goja.Runtime, goja.Value, error) {
 	code := utils.InterfaceToString(src)
@@ -274,14 +349,21 @@ func _run(src any, opts ...jsRunOpts) (*goja.Runtime, goja.Value, error) {
 	return vm, value, err
 }
 
-// CallFunctionFromCode 从传入的代码中调用指定的JS函数并返回调用结果
-// 第一个参数为包含JS代码的字符串
-// 第二个参数为要调用的JS函数名
-// 后续参数为零个到多个函数参数
+// CallFunctionFromCode 从传入代码中调用指定的 JS 函数并返回结果
+// 参数:
+//   - src: 包含 JS 代码的字符串
+//   - funcName: 要调用的 JS 函数名
+//   - params: 零个或多个函数参数
+//
+// 返回值:
+//   - 函数调用的返回值
+//   - 错误信息
+//
 // Example:
 // ```
 // value = js.CallFunctionFromCode(`function add(a, b) { return a + b; }`, "add", 1, 2)~
-// println(value.String())
+// println(value.ToInteger())   // OUT: 3
+// assert value.ToInteger() == 3, "add(1,2) should be 3"
 // ```
 func _jsCallFuncFromCode(src any, funcName string, params ...interface{}) (goja.Value, error) {
 	vm := _jsNewEngine()
@@ -306,20 +388,22 @@ func _jsCallFuncFromCode(src any, funcName string, params ...interface{}) (goja.
 	}
 }
 
-// GetObjectFunction 将传入的Value转换为可以调用的对象(Object)函数
-// 第一个参数为JS引擎
-// 第二个参数为Object名字
-// 第三个参数为方法名字
+// GetObjectFunction 从 JS 引擎中取出某个对象的方法并转换为可调用函数
+// 参数:
+//   - vm: JS 引擎
+//   - thisName: 对象名
+//   - funcName: 方法名
+//
+// 返回值:
+//   - 可调用的 JS 函数
+//   - 是否成功获取
+//
 // Example:
 // ```
-// vm, _ = js.Run(`a = {
-// d: 3,
-// add(a) {return this.d+a},
-// }`)~
+// vm, _ = js.Run(`a = { d: 3, add(a) {return this.d+a} }`)~
 // add, ok = js.GetObjectFunction(vm, "a", "add")
-// if ok {
-// println(add(1).ToInteger()) // 4
-// }
+// assert ok, "should get object method add"
+// assert add(1)~.ToInteger() == 4, "a.add(1) should be 4"
 // ```
 func _getObjectFunction(vm *goja.Runtime, thisName, funcName string) (jsFunction, bool) {
 	this := vm.Get(thisName)
@@ -335,16 +419,21 @@ func _getObjectFunction(vm *goja.Runtime, thisName, funcName string) (jsFunction
 	return _toObjectFunction(vm, this, value)
 }
 
-// GetFunction 将传入的Value转换为可以调用的对象(Object)函数
-// 第一个参数为JS引擎
-// 第二个参数为函数名字
+// GetFunction 从 JS 引擎中取出某个全局函数并转换为可调用函数
+// 参数:
+//   - vm: JS 引擎
+//   - funcName: 函数名
+//
+// 返回值:
+//   - 可调用的 JS 函数
+//   - 是否成功获取
+//
 // Example:
 // ```
 // vm, _ = js.Run(`function sum(a, b) {return a+b;}`)~
-// sum, ok = js.GetFunction(vm,"sum")
-// if ok {
-// println(sum(2,3).ToInteger()) // 5
-// }
+// sum, ok = js.GetFunction(vm, "sum")
+// assert ok, "should get function sum"
+// assert sum(2, 3)~.ToInteger() == 5, "sum(2,3) should be 5"
 // ```
 func _getFunction(vm *goja.Runtime, funcName string) (jsFunction, bool) {
 	return _toObjectFunction(vm, goja.Undefined(), vm.Get(funcName))

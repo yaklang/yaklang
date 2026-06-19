@@ -17,6 +17,24 @@ type FileReader interface {
 	Stat() (fs.FileInfo, error)
 }
 
+// IsUTF8 判断输入数据是否为合法的 UTF-8 编码
+// 参数:
+//   - i: 待检测的数据，可为 string、[]byte、io.Reader 等
+//
+// 返回值:
+//   - bool: 是合法 UTF-8 返回 true，否则 false
+//   - error: 读取数据失败时返回的错误
+//
+// Example:
+// ```
+// // VARS: 检测合法 UTF-8，波浪号自动解包 error
+// result = codec.IsUTF8("hello")~
+// // STDOUT: 打印可观察输出
+// println(result)   // OUT: true
+// // assert: 锁定结论(ASCII 与中文均为合法 UTF-8)
+// assert result == true, "ascii should be valid utf8"
+// assert codec.IsUTF8("中文")~ == true, "chinese should be valid utf8"
+// ```
 func IsUTF8(i any) (bool, error) {
 	switch ret := i.(type) {
 	case FileReader:
@@ -38,11 +56,27 @@ func IsUTF8(i any) (bool, error) {
 	}
 }
 
-// IsUTF8File checks if a file is UTF-8 encoded using sampling strategy
-// For files < 0.5K: check entire content
-// For files 0.5K-1K: check one 0.5K sample
-// For files > 1K: check 4+ samples (256 runes each), up to 8 samples max
-// If sampling cuts into UTF-8 character, look forward/backward to find valid boundaries
+// IsUTF8File 使用采样策略判断文件内容是否为合法 UTF-8 编码
+// 小于 0.5K 的文件检查全部内容；0.5K-1K 检查一个 0.5K 采样；大于 1K 采样 4-8 段(每段约 256 个字符)。
+// 参数:
+//   - filename: 待检测的文件路径
+//
+// 返回值:
+//   - bool: 文件内容为合法 UTF-8 返回 true，否则 false
+//   - error: 打开或读取文件失败时返回的错误
+//
+// Example:
+// ```
+// // VARS: 写入一个 UTF-8 文件再检测
+// fp = "/tmp/codec-isutf8-demo.txt"
+// file.Save(fp, "hello utf8 content")~
+// defer file.Rm(fp)
+// result = codec.IsUTF8File(fp)~
+// // STDOUT: 打印可观察输出
+// println(result)   // OUT: true
+// // assert: 锁定结论(UTF-8 文件检测为 true)
+// assert result == true, "utf8 file should be detected as utf8"
+// ```
 func IsUTF8File(filename string) (bool, error) {
 	file, err := os.Open(filename)
 	if err != nil {

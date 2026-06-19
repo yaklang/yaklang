@@ -69,6 +69,19 @@ func WithDeviceAdapter(devices ...*DeviceAdapter) CaptureOption {
 
 }
 
+// pcap_everyPacket 注册一个回调，对抓包过程中捕获到的每一个数据包执行处理
+// 在 yak 中通过 pcapx.pcap_everyPacket 调用，配合 pcapx.StartSniff/OpenPcapFile 使用
+// 参数:
+//   - h: 回调函数，参数为捕获到的单个数据包
+//
+// 返回值:
+//   - 一个抓包配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：处理每个捕获到的数据包
+// pcapx.StartSniff("eth0", pcapx.pcap_everyPacket(func(packet) { println("got a packet") }))~
+// ```
 func WithEveryPacket(h func(packet gopacket.Packet)) CaptureOption {
 	return func(c *CaptureConfig) error {
 		if c.onEveryPacket == nil {
@@ -100,6 +113,19 @@ func WithEnableCache(b bool) CaptureOption {
 	}
 }
 
+// pcap_disableAssembly 设置是否禁用 TCP 流重组
+// 在 yak 中通过 pcapx.pcap_disableAssembly 调用，配合 pcapx.StartSniff/OpenPcapFile 使用
+// 参数:
+//   - b: 为 true 时禁用流重组
+//
+// 返回值:
+//   - 一个抓包配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：禁用 TCP 流重组
+// pcapx.StartSniff("eth0", pcapx.pcap_disableAssembly(true))~
+// ```
 func WithDisableAssembly(b bool) CaptureOption {
 	return func(c *CaptureConfig) error {
 		c.DisableAssembly = b
@@ -114,6 +140,19 @@ func WithOverrideCacheId(id string) CaptureOption {
 	}
 }
 
+// pcap_bpfFilter 设置 BPF 过滤表达式，仅捕获匹配的流量
+// 在 yak 中通过 pcapx.pcap_bpfFilter 调用，配合 pcapx.StartSniff/OpenPcapFile 使用
+// 参数:
+//   - bpf: BPF 过滤表达式，如 "tcp port 80"
+//
+// 返回值:
+//   - 一个抓包配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：仅抓取 80 端口的 TCP 流量
+// pcapx.StartSniff("eth0", pcapx.pcap_bpfFilter("tcp port 80"))~
+// ```
 func WithBPFFilter(bpf string) CaptureOption {
 	return func(c *CaptureConfig) error {
 		c.BPFFilter = bpf
@@ -121,6 +160,19 @@ func WithBPFFilter(bpf string) CaptureOption {
 	}
 }
 
+// pcap_onFlowCreated 注册一个回调，当有新的流量会话(Flow)创建时触发
+// 在 yak 中通过 pcapx.pcap_onFlowCreated 调用，配合 pcapx.StartSniff/OpenPcapFile 使用
+// 参数:
+//   - h: 回调函数，参数为新创建的流量会话
+//
+// 返回值:
+//   - 一个抓包配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：监听新流量会话创建
+// pcapx.StartSniff("eth0", pcapx.pcap_onFlowCreated(func(flow) { println("new flow created") }))~
+// ```
 func WithOnTrafficFlowCreated(h func(flow *TrafficFlow)) CaptureOption {
 	return func(capturer *CaptureConfig) error {
 		capturer.onPoolCreated = append(capturer.onPoolCreated, func(pool *TrafficPool) {
@@ -130,18 +182,57 @@ func WithOnTrafficFlowCreated(h func(flow *TrafficFlow)) CaptureOption {
 	}
 }
 
+// pcap_onFlowClosed 注册一个回调，当某个流量会话(Flow)关闭时触发
+// 在 yak 中通过 pcapx.pcap_onFlowClosed 调用，配合 pcapx.StartSniff/OpenPcapFile 使用
+// 参数:
+//   - h: 回调函数，参数为关闭原因和对应的流量会话
+//
+// 返回值:
+//   - 一个抓包配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：监听流量会话关闭
+// pcapx.StartSniff("eth0", pcapx.pcap_onFlowClosed(func(reason, flow) { println("flow closed") }))~
+// ```
 func WithOnTrafficFlowClosed(h func(reason TrafficFlowCloseReason, flow *TrafficFlow)) CaptureOption {
 	return withPool(func(pool *TrafficPool) {
 		pool.onFlowClosed = h
 	})
 }
 
+// pcap_onFlowDataFrameNoReassembled 注册一个回调，当数据帧到达(未经流重组)时触发
+// 在 yak 中通过 pcapx.pcap_onFlowDataFrameNoReassembled 调用，配合 pcapx.StartSniff/OpenPcapFile 使用
+// 参数:
+//   - h: 回调函数，参数为流量会话、连接和原始数据帧
+//
+// 返回值:
+//   - 一个抓包配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：处理未重组的数据帧
+// pcapx.StartSniff("eth0", pcapx.pcap_onFlowDataFrameNoReassembled(func(flow, conn, frame) { println("data frame arrived") }))~
+// ```
 func WithOnTrafficFlowOnDataFrameArrived(h func(flow *TrafficFlow, conn *TrafficConnection, frame *TrafficFrame)) CaptureOption {
 	return withPool(func(pool *TrafficPool) {
 		pool.onFlowFrameDataFrameArrived = append(pool.onFlowFrameDataFrameArrived, h)
 	})
 }
 
+// pcap_onFlowDataFrame 注册一个回调，当数据帧经过流重组后触发
+// 在 yak 中通过 pcapx.pcap_onFlowDataFrame 调用，配合 pcapx.StartSniff/OpenPcapFile 使用
+// 参数:
+//   - h: 回调函数，参数为流量会话、连接和重组后的数据帧
+//
+// 返回值:
+//   - 一个抓包配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：处理重组后的数据帧
+// pcapx.StartSniff("eth0", pcapx.pcap_onFlowDataFrame(func(flow, conn, frame) { println("reassembled data frame") }))~
+// ```
 func WithOnTrafficFlowOnDataFrameReassembled(h func(flow *TrafficFlow, conn *TrafficConnection, frame *TrafficFrame)) CaptureOption {
 	return withPool(func(pool *TrafficPool) {
 		pool.onFlowFrameDataFrameReassembled = append(pool.onFlowFrameDataFrameReassembled, h)
@@ -171,6 +262,19 @@ func WithContext(ctx context.Context) CaptureOption {
 	}
 }
 
+// pcap_debug 设置是否开启抓包调试模式(输出更详细的调试日志)
+// 在 yak 中通过 pcapx.pcap_debug 调用，配合 pcapx.StartSniff/OpenPcapFile 使用
+// 参数:
+//   - b: 为 true 时开启调试模式
+//
+// 返回值:
+//   - 一个抓包配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：开启抓包调试模式
+// pcapx.StartSniff("eth0", pcapx.pcap_debug(true))~
+// ```
 func WithDebug(b bool) CaptureOption {
 	return func(c *CaptureConfig) error {
 		c.Debug = b
@@ -212,6 +316,19 @@ func (c *CaptureConfig) Save(pk gopacket.Packet) {
 	}
 }
 
+// pcap_onTLSClientHello 注册一个回调，当捕获到 TLS ClientHello 报文时触发
+// 在 yak 中通过 pcapx.pcap_onTLSClientHello 调用，配合 pcapx.StartSniff/OpenPcapFile 使用
+// 参数:
+//   - h: 回调函数，参数为流量会话和解析出的 ClientHello
+//
+// 返回值:
+//   - 一个抓包配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：监听 TLS ClientHello
+// pcapx.StartSniff("eth0", pcapx.pcap_onTLSClientHello(func(flow, hello) { println("got tls client hello") }))~
+// ```
 func WithTLSClientHello(h func(flow *TrafficFlow, hello *tlsutils.HandshakeClientHello)) CaptureOption {
 	return withPool(func(pool *TrafficPool) {
 		pool.onFlowFrameDataFrameReassembled = append(pool.onFlowFrameDataFrameReassembled, func(flow *TrafficFlow, conn *TrafficConnection, frame *TrafficFrame) {
@@ -226,6 +343,19 @@ func WithTLSClientHello(h func(flow *TrafficFlow, hello *tlsutils.HandshakeClien
 	})
 }
 
+// pcap_onHTTPRequest 注册一个回调，当从流量中解析出 HTTP 请求时触发
+// 在 yak 中通过 pcapx.pcap_onHTTPRequest 调用，配合 pcapx.StartSniff/OpenPcapFile 使用
+// 参数:
+//   - h: 回调函数，参数为流量会话和解析出的 HTTP 请求
+//
+// 返回值:
+//   - 一个抓包配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：监听 HTTP 请求
+// pcapx.StartSniff("eth0", pcapx.pcap_onHTTPRequest(func(flow, req) { println("got http request") }))~
+// ```
 func WithHTTPRequest(h func(flow *TrafficFlow, req *http.Request)) CaptureOption {
 	return withPool(func(pool *TrafficPool) {
 		pool.onFlowFrameDataFrameReassembled = append(pool.onFlowFrameDataFrameReassembled, func(flow *TrafficFlow, conn *TrafficConnection, frame *TrafficFrame) {
@@ -240,6 +370,19 @@ func WithHTTPRequest(h func(flow *TrafficFlow, req *http.Request)) CaptureOption
 	})
 }
 
+// pcap_onHTTPFlow 注册一个回调，当从流量中解析出完整的 HTTP 请求-响应对时触发
+// 在 yak 中通过 pcapx.pcap_onHTTPFlow 调用，配合 pcapx.StartSniff/OpenPcapFile 使用
+// 参数:
+//   - h: 回调函数，参数为流量会话、HTTP 请求与 HTTP 响应
+//
+// 返回值:
+//   - 一个抓包配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：监听完整 HTTP 流量
+// pcapx.StartSniff("eth0", pcapx.pcap_onHTTPFlow(func(flow, req, rsp) { println("got http flow") }))~
+// ```
 func WithHTTPFlow(h func(flow *TrafficFlow, req *http.Request, rsp *http.Response)) CaptureOption {
 	runner := omap.NewOrderedMap(make(map[string]*sync.Once))
 	return withPool(func(pool *TrafficPool) {

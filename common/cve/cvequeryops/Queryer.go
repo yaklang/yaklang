@@ -33,6 +33,25 @@ type CVEQueryInfo struct {
 	SkipUnboundedWildcard bool
 }
 
+// QueryCVEYields 在 CVE 数据库上按条件流式查询 CVE 记录（导出名为 cve.Query）
+// 需要本地 CVE 数据库，通过 cve.cve/cve.vendor/cve.product 等可选项组合过滤条件
+// 参数:
+//   - db: CVE 数据库连接
+//   - opts: 查询可选项
+//
+// 返回值:
+//   - CVE 记录的流式通道
+//
+// Example:
+// ```
+// // 示意性示例，需要本地 CVE 数据库
+// db = cve.GetCVEDatabase()
+//
+//	for c in cve.Query(db, cve.vendor("apache"), cve.severity("high")) {
+//	    println(c.CVE)
+//	}
+//
+// ```
 func QueryCVEYields(db *gorm.DB, opts ...CVEOption) chan *cveresources.CVE {
 	db, queryConfig := Filter(db, opts...)
 	if queryConfig != nil && len(queryConfig.CPE) > 0 {
@@ -168,18 +187,70 @@ func FixCVEProduct(cveQuery *CVEQueryInfo, db *gorm.DB) *CVEQueryInfo {
 	return cveQuery
 }
 
+// CVE 按 CVE 编号过滤查询（导出名为 cve.cve）
+// 参数:
+//   - id: CVE 编号，如 CVE-2021-44228
+//
+// 返回值:
+//   - CVE 查询可选项
+//
+// Example:
+// ```
+// // 示意性示例，需要本地 CVE 数据库
+// db = cve.GetCVEDatabase()
+//
+//	for c in cve.Query(db, cve.cve("CVE-2021-44228")) {
+//	    println(c.CVE)
+//	}
+//
+// ```
 func CVE(id string) CVEOption {
 	return func(info *CVEQueryInfo) {
 		info.CVE = id
 	}
 }
 
+// CWE 按 CWE 编号过滤 CVE 查询（导出名为 cve.cwe）
+// 参数:
+//   - cwe: CWE 编号
+//
+// 返回值:
+//   - CVE 查询可选项
+//
+// Example:
+// ```
+// // 示意性示例，需要本地 CVE 数据库
+// db = cve.GetCVEDatabase()
+//
+//	for c in cve.Query(db, cve.cwe("CWE-79")) {
+//	    println(c.CVE)
+//	}
+//
+// ```
 func CWE(cwe string) CVEOption {
 	return func(info *CVEQueryInfo) {
 		info.CWE = append(info.CWE, cwe)
 	}
 }
 
+// After 过滤指定日期之后发布的 CVE（导出名为 cve.after）
+// 参数:
+//   - year: 年份
+//   - data: 可选的月、日
+//
+// 返回值:
+//   - CVE 查询可选项
+//
+// Example:
+// ```
+// // 示意性示例，需要本地 CVE 数据库
+// db = cve.GetCVEDatabase()
+//
+//	for c in cve.Query(db, cve.after(2021, 1, 1)) {
+//	    println(c.CVE)
+//	}
+//
+// ```
 func After(year int, data ...int) CVEOption {
 	dataStringFormat := "%d-%02d-%02d"
 	dataString := ""
@@ -211,6 +282,24 @@ func AfterByTimeStamp(timeStamp int64) CVEOption {
 
 }
 
+// Before 过滤指定日期之前发布的 CVE（导出名为 cve.before）
+// 参数:
+//   - year: 年份
+//   - data: 可选的月、日
+//
+// 返回值:
+//   - CVE 查询可选项
+//
+// Example:
+// ```
+// // 示意性示例，需要本地 CVE 数据库
+// db = cve.GetCVEDatabase()
+//
+//	for c in cve.Query(db, cve.before(2020, 12, 31)) {
+//	    println(c.CVE)
+//	}
+//
+// ```
 func Before(year int, data ...int) CVEOption {
 	dataStringFormat := "%d-%02d-%02d"
 	dataString := ""
@@ -242,12 +331,46 @@ func BeforeByTimeStamp(timeStamp int64) CVEOption {
 
 }
 
+// Score 按最低利用评分（CVSS）过滤 CVE（导出名为 cve.score）
+// 参数:
+//   - score: 最低评分阈值
+//
+// 返回值:
+//   - CVE 查询可选项
+//
+// Example:
+// ```
+// // 示意性示例，需要本地 CVE 数据库
+// db = cve.GetCVEDatabase()
+//
+//	for c in cve.Query(db, cve.score(9.0)) {
+//	    println(c.CVE)
+//	}
+//
+// ```
 func Score(score float64) CVEOption {
 	return func(info *CVEQueryInfo) {
 		info.ExploitScore = score
 	}
 }
 
+// Severity 按危害等级过滤 CVE（导出名为 cve.severity，支持 high/medium/low）
+// 参数:
+//   - level: 危害等级关键字，如 "high"、"medium"、"low"
+//
+// 返回值:
+//   - CVE 查询可选项
+//
+// Example:
+// ```
+// // 示意性示例，需要本地 CVE 数据库
+// db = cve.GetCVEDatabase()
+//
+//	for c in cve.Query(db, cve.severity("high")) {
+//	    println(c.CVE)
+//	}
+//
+// ```
 func Severity(level string) CVEOption {
 	formatLevel := strings.ToUpper(level)
 	if strings.Contains(formatLevel, "HIGH") || strings.Contains(formatLevel, "HIG") {
@@ -266,6 +389,23 @@ func Severity(level string) CVEOption {
 	}
 }
 
+// Vendor 按厂商名称过滤 CVE（导出名为 cve.vendor）
+// 参数:
+//   - v: 厂商名称
+//
+// 返回值:
+//   - CVE 查询可选项
+//
+// Example:
+// ```
+// // 示意性示例，需要本地 CVE 数据库
+// db = cve.GetCVEDatabase()
+//
+//	for c in cve.Query(db, cve.vendor("apache")) {
+//	    println(c.CVE)
+//	}
+//
+// ```
 func Vendor(v string) CVEOption {
 	return func(info *CVEQueryInfo) {
 		info.Vendors = append(info.Vendors, v)
@@ -278,6 +418,24 @@ func Product(p string) CVEOption {
 	}
 }
 
+// ProductWithVersion 按产品名（可选版本）过滤 CVE（导出名为 cve.product）
+// 参数:
+//   - p: 产品名称
+//   - v: 可选的产品版本
+//
+// 返回值:
+//   - CVE 查询可选项
+//
+// Example:
+// ```
+// // 示意性示例，需要本地 CVE 数据库
+// db = cve.GetCVEDatabase()
+//
+//	for c in cve.Query(db, cve.product("log4j", "2.14.1")) {
+//	    println(c.CVE)
+//	}
+//
+// ```
 func ProductWithVersion(p string, v ...string) CVEOption {
 	if len(v) == 0 {
 		return Product(p)
@@ -298,6 +456,23 @@ func ProductWithVersion(p string, v ...string) CVEOption {
 	}
 }
 
+// CPE 按 CPE 字符串过滤 CVE，支持版本区间写法（导出名为 cve.cpe）
+// 参数:
+//   - c: CPE 字符串，版本可使用 [start-end] 区间写法
+//
+// 返回值:
+//   - CVE 查询可选项
+//
+// Example:
+// ```
+// // 示意性示例，需要本地 CVE 数据库
+// db = cve.GetCVEDatabase()
+//
+//	for c in cve.Query(db, cve.cpe("cpe:/a:apache:log4j:2.14.1")) {
+//	    println(c.CVE)
+//	}
+//
+// ```
 func CPE(c string) CVEOption {
 	return func(info *CVEQueryInfo) {
 		rule, err := regexp.Compile("\\[(\\d+)-(\\d+)]")
@@ -370,6 +545,23 @@ func Strict(flag bool) CVEOption {
 	}
 }
 
+// SkipUnboundedWildcard 设置是否跳过无边界通配的 CPE 匹配（导出名为 cve.skipAnyVersion）
+// 参数:
+//   - flag: 为 true 时跳过任意版本（无边界）匹配，减少误报
+//
+// 返回值:
+//   - CVE 查询可选项
+//
+// Example:
+// ```
+// // 示意性示例，需要本地 CVE 数据库
+// db = cve.GetCVEDatabase()
+//
+//	for c in cve.Query(db, cve.product("nginx"), cve.skipAnyVersion(true)) {
+//	    println(c.CVE)
+//	}
+//
+// ```
 func SkipUnboundedWildcard(flag bool) CVEOption {
 	return func(info *CVEQueryInfo) {
 		info.SkipUnboundedWildcard = flag

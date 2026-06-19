@@ -18,10 +18,21 @@ var defaultLimit uint32 = 3072
 // readLimit is the maximum number of bytes from the input used when detecting.
 var readLimit uint32 = defaultLimit
 
-// Detect returns the MIME type found from the provided byte slice.
+// DetectMIMETypeFromRaw 通过字节内容（魔数）识别 MIME 类型
+// 参数:
+//   - raw: 待识别的字节内容
 //
-// The result is always a valid MIME type, with application/octet-stream
-// returned when identification failed.
+// 返回值:
+//   - MIME 类型对象，识别失败时为 application/octet-stream
+//
+// Example:
+// ```
+// // PNG 文件头魔数应被识别为 image/png
+// pngHeader = codec.DecodeHex("89504e470d0a1a0a")~
+// mime = file.DetectMIMETypeFromRaw(pngHeader)
+// println(mime.String())   // OUT: image/png
+// assert mime.String() == "image/png", "PNG magic should be detected as image/png"
+// ```
 func Detect(raw []byte) *MIME {
 	// Using atomic because readLimit can be written at the same time in other goroutine.
 	l := atomic.LoadUint32(&readLimit)
@@ -112,11 +123,24 @@ func DetectReader(r io.Reader) (*MIME, error) {
 	return root.match(in, l), nil
 }
 
-// DetectFile returns the MIME type of the provided file.
+// DetectMIMETypeFromFile 读取文件并通过魔数识别其 MIME 类型
+// 参数:
+//   - path: 待识别的文件路径
 //
-// The result is always a valid MIME type, with application/octet-stream
-// returned when identification failed with or without an error.
-// Any error returned is related to the opening and reading from the input file.
+// 返回值:
+//   - MIME 类型对象，识别失败时为 application/octet-stream
+//   - 错误信息（与打开/读取文件相关）
+//
+// Example:
+// ```
+// // 写入 PNG 文件头后识别文件类型
+// p = file.Join(os.TempDir(), "yak-mime-example.png")
+// file.Save(p, codec.DecodeHex("89504e470d0a1a0a")~)~
+// mime, err = file.DetectMIMETypeFromFile(p)
+// assert err == nil, "DetectMIMETypeFromFile should not fail on readable file"
+// assert mime.String() == "image/png", "PNG file should be detected as image/png"
+// file.Remove(p)
+// ```
 func DetectFile(path string) (*MIME, error) {
 	f, err := os.Open(path)
 	if err != nil {

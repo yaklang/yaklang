@@ -186,6 +186,12 @@ func parseFloat(s string) float64 {
 }
 
 // help 用于输出命令行程序的帮助信息
+// 参数:
+//   - w: 可选的输出 writer，默认为标准输出
+//
+// 返回值:
+//   - 无
+//
 // Example:
 // ```
 // cli.help()
@@ -242,6 +248,12 @@ func (c *CliApp) CliCheckFactory(callback func()) func() {
 }
 
 // check 用于检查命令行参数是否合法，这主要检查必要参数是否传入与传入值是否合法
+// 参数:
+//   - 无
+//
+// 返回值:
+//   - 无
+//
 // Example:
 // ```
 // target = cli.String("target", cli.SetRequired(true))
@@ -253,6 +265,12 @@ func (c *CliApp) Check() {
 
 // SetCliName 设置此命令行程序的名称
 // 这会在命令行输入 --help 或执行`cli.check()`后参数非法时显示
+// 参数:
+//   - name: 命令行程序名称
+//
+// 返回值:
+//   - 无
+//
 // Example:
 // ```
 // cli.SetCliName("example-tools")
@@ -263,6 +281,12 @@ func (c *CliApp) SetCliName(name string) {
 
 // SetDoc 设置此命令行程序的文档
 // 这会在命令行输入 --help 或执行`cli.check()`后参数非法时显示
+// 参数:
+//   - document: 程序文档说明
+//
+// 返回值:
+//   - 无
+//
 // Example:
 // ```
 // cli.SetDoc("example-tools is a tool for example")
@@ -272,6 +296,12 @@ func (c *CliApp) SetDoc(document string) {
 }
 
 // setDefault 是一个选项函数，设置参数的默认值
+// 参数:
+//   - i: 参数默认值
+//
+// 返回值:
+//   - 参数选项函数
+//
 // Example:
 // ```
 // cli.String("target", cli.SetDefault("yaklang.com"))
@@ -284,6 +314,12 @@ func (c *CliApp) SetDefault(i interface{}) SetCliExtraParam {
 
 // setHelp 是一个选项函数，设置参数的帮助信息
 // 这会在命令行输入 --help 或执行`cli.check()`后参数非法时显示
+// 参数:
+//   - i: 参数帮助信息
+//
+// 返回值:
+//   - 参数选项函数
+//
 // Example:
 // ```
 // cli.String("target", cli.SetHelp("target host or ip"))
@@ -301,6 +337,12 @@ func SetTempArgs(args []string) SetCliExtraParam {
 }
 
 // setRequired 是一个选项函数，设置参数是否必须
+// 参数:
+//   - t: 是否为必填参数
+//
+// 返回值:
+//   - 参数选项函数
+//
 // Example:
 // ```
 // cli.String("target", cli.SetRequired(true))
@@ -349,6 +391,12 @@ func _getAvailableParams(optName, optShortName string) []string {
 }
 
 // Args 获取命令行参数
+// 参数:
+//   - 无
+//
+// 返回值:
+//   - 命令行参数列表
+//
 // Example:
 // ```
 // Args = cli.Args()
@@ -382,6 +430,13 @@ func (c *CliApp) _cliFromString(name string, opts ...SetCliExtraParam) (string, 
 }
 
 // Bool 获取对应名称的命令行参数，并将其转换为 bool 类型返回
+// 参数:
+//   - name: 参数名
+//   - opts: 参数选项，如 cli.setHelp 等
+//
+// 返回值:
+//   - 参数对应的 bool 值（传入该 flag 时为 true）
+//
 // Example:
 // ```
 // verbose = cli.Bool("verbose") // --verbose 则为true
@@ -399,6 +454,13 @@ func (c *CliApp) Bool(name string, opts ...SetCliExtraParam) bool {
 }
 
 // Have 获取对应名称的命令行参数，并将其转换为 bool 类型返回
+// 参数:
+//   - name: 参数名
+//   - opts: 参数选项，如 cli.setHelp 等
+//
+// 返回值:
+//   - 参数对应的 bool 值（传入该 flag 时为 true）
+//
 // Example:
 // ```
 // verbose = cli.Have("verbose") // --verbose 则为true
@@ -408,6 +470,13 @@ func (c *CliApp) Have(name string, opts ...SetCliExtraParam) bool {
 }
 
 // String 获取对应名称的命令行参数，并将其转换为 string 类型返回
+// 参数:
+//   - name: 参数名
+//   - opts: 参数选项，如 cli.setRequired、cli.setDefault 等
+//
+// 返回值:
+//   - 参数对应的字符串值
+//
 // Example:
 // ```
 // target = cli.String("target") // --target yaklang.com 则 target 为 yaklang.com
@@ -420,6 +489,13 @@ func (c *CliApp) String(name string, opts ...SetCliExtraParam) string {
 
 // HTTPPacket 获取对应名称的命令行参数，并将其转换为 string 类型返回
 // 其作为一个独立脚本运行时与 cli.String 没有区别，仅在 Yakit 图形化中展示为 HTTP 报文形式
+// 参数:
+//   - name: 参数名
+//   - opts: 参数选项
+//
+// 返回值:
+//   - 参数对应的字符串值
+//
 // Example:
 // ```
 // target = cli.HTTPPacket("target") // --target yaklang.com 则 target 为 yaklang.com
@@ -430,6 +506,13 @@ func (c *CliApp) HTTPPacket(name string, opts ...SetCliExtraParam) string {
 
 // YakCode 获取对应名称的命令行参数，并将其转换为 string 类型返回
 // 其作为一个独立脚本运行时与 cli.String 没有区别，仅在 Yakit 图形化中展示为 Yak 代码形式
+// 参数:
+//   - name: 参数名
+//   - opts: 参数选项
+//
+// 返回值:
+//   - 参数对应的字符串值
+//
 // Example:
 // ```
 // target = cli.YakCode("target") // --target yaklang.com 则 target 为 yaklang.com
@@ -440,6 +523,13 @@ func (c *CliApp) YakCode(name string, opts ...SetCliExtraParam) string {
 
 // Text 获取对应名称的命令行参数，并将其转换为 string 类型返回
 // 其作为一个独立脚本运行时与 cli.String 没有区别，仅在 Yakit 图形化中展示为文本框形式
+// 参数:
+//   - name: 参数名
+//   - opts: 参数选项
+//
+// 返回值:
+//   - 参数对应的字符串值
+//
 // Example:
 // ```
 // target = cli.Text("target") // --target yaklang.com 则 target 为 yaklang.com
@@ -449,6 +539,13 @@ func (c *CliApp) Text(name string, opts ...SetCliExtraParam) string {
 }
 
 // Int 获取对应名称的命令行参数，并将其转换为 int 类型返回
+// 参数:
+//   - name: 参数名
+//   - opts: 参数选项
+//
+// 返回值:
+//   - 参数对应的整数值
+//
 // Example:
 // ```
 // port = cli.Int("port") // --port 80 则 port 为 80
@@ -463,6 +560,13 @@ func (c *CliApp) Int(name string, opts ...SetCliExtraParam) int {
 }
 
 // Integer 获取对应名称的命令行参数，并将其转换为 int 类型返回
+// 参数:
+//   - name: 参数名
+//   - opts: 参数选项
+//
+// 返回值:
+//   - 参数对应的整数值
+//
 // Example:
 // ```
 // port = cli.Integer("port") // --port 80 则 port 为 80
@@ -472,6 +576,13 @@ func (c *CliApp) Integer(name string, opts ...SetCliExtraParam) int {
 }
 
 // Float 获取对应名称的命令行参数，并将其转换为 float 类型返回
+// 参数:
+//   - name: 参数名
+//   - opts: 参数选项
+//
+// 返回值:
+//   - 参数对应的浮点值
+//
 // Example:
 // ```
 // percent = cli.Float("percent") // --percent 0.5 则 percent 为 0.5
@@ -486,6 +597,13 @@ func (c *CliApp) Float(name string, opts ...SetCliExtraParam) float64 {
 }
 
 // Double 获取对应名称的命令行参数，并将其转换为 float 类型返回
+// 参数:
+//   - name: 参数名
+//   - opts: 参数选项
+//
+// 返回值:
+//   - 参数对应的浮点值
+//
 // Example:
 // ```
 // percent = cli.Double("percent") // --percent 0.5 则 percent 为 0.5
@@ -495,6 +613,13 @@ func (c *CliApp) Double(name string, opts ...SetCliExtraParam) float64 {
 }
 
 // Urls 获取对应名称的命令行参数，根据","切割并尝试将其转换为符合URL格式并返回 []string 类型
+// 参数:
+//   - name: 参数名
+//   - opts: 参数选项
+//
+// 返回值:
+//   - 解析后的 URL 列表
+//
 // Example:
 // ```
 // urls = cli.Urls("urls")
@@ -511,6 +636,13 @@ func (c *CliApp) Urls(name string, opts ...SetCliExtraParam) []string {
 }
 
 // Url 获取对应名称的命令行参数，根据","切割并尝试将其转换为符合URL格式并返回 []string 类型
+// 参数:
+//   - name: 参数名
+//   - opts: 参数选项
+//
+// 返回值:
+//   - 解析后的 URL 列表
+//
 // Example:
 // ```
 // urls = cli.Url("urls")
@@ -521,6 +653,13 @@ func (c *CliApp) Url(name string, opts ...SetCliExtraParam) []string {
 }
 
 // Ports 获取对应名称的命令行参数，根据","与"-"切割并尝试解析端口并返回 []int 类型
+// 参数:
+//   - name: 参数名
+//   - opts: 参数选项
+//
+// 返回值:
+//   - 解析后的端口列表
+//
 // Example:
 // ```
 // ports = cli.Ports("ports")
@@ -537,6 +676,13 @@ func (c *CliApp) Ports(name string, opts ...SetCliExtraParam) []int {
 }
 
 // Port 获取对应名称的命令行参数，根据","与"-"切割并尝试解析端口并返回 []int 类型
+// 参数:
+//   - name: 参数名
+//   - opts: 参数选项
+//
+// 返回值:
+//   - 解析后的端口列表
+//
 // Example:
 // ```
 // ports = cli.Port("ports")
@@ -547,6 +693,13 @@ func (c *CliApp) Port(name string, opts ...SetCliExtraParam) []int {
 }
 
 // Hosts 获取对应名称的命令行参数，根据","切割并尝试解析CIDR网段并返回 []string 类型
+// 参数:
+//   - name: 参数名
+//   - opts: 参数选项
+//
+// 返回值:
+//   - 解析后的主机 IP 列表
+//
 // Example:
 // ```
 // hosts = cli.Hosts("hosts")
@@ -565,6 +718,13 @@ func (c *CliApp) Hosts(name string, opts ...SetCliExtraParam) []string {
 }
 
 // Host 获取对应名称的命令行参数，根据","切割并尝试解析CIDR网段并返回 []string 类型
+// 参数:
+//   - name: 参数名
+//   - opts: 参数选项
+//
+// 返回值:
+//   - 解析后的主机 IP 列表
+//
 // Example:
 // ```
 // hosts = cli.Host("hosts")
@@ -575,6 +735,13 @@ func (c *CliApp) Host(name string, opts ...SetCliExtraParam) []string {
 }
 
 // NetWork 获取对应名称的命令行参数，根据","切割并尝试解析CIDR网段并返回 []string 类型
+// 参数:
+//   - name: 参数名
+//   - opts: 参数选项
+//
+// 返回值:
+//   - 解析后的主机 IP 列表
+//
 // Example:
 // ```
 // hosts = cli.NetWork("hosts")
@@ -585,6 +752,13 @@ func (c *CliApp) Network(name string, opts ...SetCliExtraParam) []string {
 }
 
 // Net 获取对应名称的命令行参数，根据","切割并尝试解析CIDR网段并返回 []string 类型
+// 参数:
+//   - name: 参数名
+//   - opts: 参数选项
+//
+// 返回值:
+//   - 解析后的主机 IP 列表
+//
 // Example:
 // ```
 // hosts = cli.Net("hosts")
@@ -595,6 +769,13 @@ func (c *CliApp) Net(name string, opts ...SetCliExtraParam) []string {
 }
 
 // File 获取对应名称的命令行参数，根据其传入的值读取其对应文件内容并返回 []byte 类型
+// 参数:
+//   - name: 参数名
+//   - opts: 参数选项
+//
+// 返回值:
+//   - 文件内容字节
+//
 // Example:
 // ```
 // file = cli.File("file")
@@ -624,6 +805,13 @@ func (c *CliApp) File(name string, opts ...SetCliExtraParam) []byte {
 }
 
 // FileNames 获取对应名称的命令行参数，获得选中的所有文件路径，并返回 []string 类型
+// 参数:
+//   - name: 参数名
+//   - opts: 参数选项
+//
+// 返回值:
+//   - 文件路径列表
+//
 // Example:
 // ```
 // file = cli.FileNames("file")
@@ -641,6 +829,13 @@ func (c *CliApp) FileNames(name string, opts ...SetCliExtraParam) []string {
 }
 
 // FolderName 获取对应名称的命令行参数，获得选中的文件夹路径，并返回 string 类型
+// 参数:
+//   - name: 参数名
+//   - opts: 参数选项
+//
+// 返回值:
+//   - 文件夹路径
+//
 // Example:
 // ```
 // folder = cli.FolderName("folder")
@@ -657,6 +852,13 @@ func (c *CliApp) FolderName(name string, opts ...SetCliExtraParam) string {
 
 // FileOrContent 获取对应名称的命令行参数
 // 根据其传入的值尝试读取其对应文件内容，如果无法读取则直接返回，最后返回 []byte 类型
+// 参数:
+//   - name: 参数名
+//   - opts: 参数选项
+//
+// 返回值:
+//   - 文件内容或原始内容字节
+//
 // Example:
 // ```
 // foc = cli.FileOrContent("foc")
@@ -677,6 +879,13 @@ func (c *CliApp) FileOrContent(name string, opts ...SetCliExtraParam) []byte {
 
 // LineDict 获取对应名称的命令行参数
 // 根据其传入的值尝试读取其对应文件内容，如果无法读取则作为字符串，最后根据换行符切割，返回 []string 类型
+// 参数:
+//   - name: 参数名
+//   - opts: 参数选项
+//
+// 返回值:
+//   - 按行切割后的字符串列表
+//
 // Example:
 // ```
 // dict = cli.LineDict("dict")
@@ -710,6 +919,13 @@ func (c *CliApp) LineDict(name string, opts ...SetCliExtraParam) []string {
 // )
 // cli.check()
 // ```
+//
+// 参数:
+//   - name: 参数名
+//   - opts: 参数选项，通常配合 cli.setJsonSchema 使用
+//
+// 返回值:
+//   - 解析后的 JSON 对象（map）
 func (c *CliApp) Json(name string, opts ...SetCliExtraParam) map[string]any {
 	s, p := c._cliFromString(name, opts...)
 	p._type = "json"
@@ -725,6 +941,12 @@ func (c *CliApp) Json(name string, opts ...SetCliExtraParam) map[string]any {
 
 // YakitPlugin 获取名称为 yakit-plugin-file 的命令行参数
 // 根据其传入的值读取其对应文件内容并根据"|"切割并返回 []string 类型，表示各个插件名
+// 参数:
+//   - options: 参数选项
+//
+// 返回值:
+//   - 插件名列表
+//
 // Example:
 // ```
 // plugins = cli.YakitPlugin()
@@ -754,6 +976,13 @@ func (c *CliApp) YakitPlugin(options ...SetCliExtraParam) []string {
 }
 
 // StringSlice 获取对应名称的命令行参数，将其字符串根据","切割返回 []string 类型
+// 参数:
+//   - name: 参数名
+//   - options: 参数选项
+//
+// 返回值:
+//   - 字符串列表
+//
 // Example:
 // ```
 // targets = cli.StringSlice("targets")
@@ -771,6 +1000,13 @@ func (c *CliApp) StringSlice(name string, options ...SetCliExtraParam) []string 
 }
 
 // IntSlice 获取对应名称的命令行参数，将其字符串根据","切割并尝试转换为 int 类型返回 []int 类型
+// 参数:
+//   - name: 参数名
+//   - options: 参数选项
+//
+// 返回值:
+//   - 整数列表
+//
 // Example:
 // ```
 // ports = cli.IntSlice("ports")
@@ -792,6 +1028,12 @@ func (c *CliApp) IntSlice(name string, options ...SetCliExtraParam) []int {
 }
 
 // setVerboseName 是一个选项函数，设置参数的中文名
+// 参数:
+//   - verboseName: 参数中文名
+//
+// 返回值:
+//   - 参数选项函数
+//
 // Example:
 // ```
 // cli.String("target", cli.setVerboseName("目标"))
@@ -808,11 +1050,23 @@ func (c *CliApp) SetVerboseName(verboseName string) SetCliExtraParam {
 // cli.Int("threads", cli.setCliGroup("request"))
 // cli.Int("retryTimes", cli.setCliGroup("request"))
 // ```
+//
+// 参数:
+//   - group: 参数分组名
+//
+// 返回值:
+//   - 参数选项函数
 func (c *CliApp) SetCliGroup(group string) SetCliExtraParam {
 	return func(cep *cliExtraParams) {}
 }
 
 // setYakitPayload 是一个选项函数，设置参数建议值为Yakit payload的字典名列表
+// 参数:
+//   - b: 是否启用 Yakit payload 建议值
+//
+// 返回值:
+//   - 参数选项函数
+//
 // Example:
 // ```
 // cli.String("dictName", cli.setYakitPayload(true))
@@ -828,6 +1082,12 @@ func (c *CliApp) SetYakitPayload(b bool) SetCliExtraParam {
 // cli.String("target", cli.setShortName("t"))
 // ```
 // 在命令行可以使用`-t`代替`--target`
+//
+// 参数:
+//   - shortName: 参数短名称
+//
+// 返回值:
+//   - 参数选项函数
 func (c *CliApp) SetShortName(shortName string) SetCliExtraParam {
 	return func(c *cliExtraParams) {
 		c.optShortName = shortName
@@ -836,6 +1096,12 @@ func (c *CliApp) SetShortName(shortName string) SetCliExtraParam {
 
 // SetMultipleSelect 是一个选项函数，设置参数是否可以多选
 // 此选项仅在`cli.StringSlice`中生效
+// 参数:
+//   - multiSelect: 是否允许多选
+//
+// 返回值:
+//   - 参数选项函数
+//
 // Example:
 // ```
 // cli.StringSlice("targets", cli.SetMultipleSelect(true))
@@ -846,6 +1112,13 @@ func (c *CliApp) SetMultipleSelect(multiSelect bool) SetCliExtraParam {
 
 // setSelectOption 是一个选项函数，设置参数的下拉框选项
 // 此选项仅在`cli.StringSlice`中生效
+// 参数:
+//   - name: 下拉框选项显示名
+//   - value: 下拉框选项值
+//
+// 返回值:
+//   - 参数选项函数
+//
 // Example:
 // ```
 // cli.StringSlice("targets", cli.setSelectOption("下拉框选项", "下拉框值"))
@@ -868,11 +1141,24 @@ func (c *CliApp) SetSelectOption(name, value string) SetCliExtraParam {
 // )
 // cli.check()
 // ```
+//
+// 参数:
+//   - schema: JSON Schema 字符串
+//   - uis: 可选的 UI Schema
+//
+// 返回值:
+//   - 参数选项函数
 func (c *CliApp) SetJsonSchema(schema string, uis ...*UISchema) SetCliExtraParam {
 	return func(c *cliExtraParams) {}
 }
 
 // setPluginEnv 是一个选项函数，设置参数从插件环境中取值
+// 参数:
+//   - key: 插件环境变量的键
+//
+// 返回值:
+//   - 参数选项函数
+//
 // Example:
 // ```
 // cli.String("key", cli.setPluginEnv("api-key"))
@@ -887,45 +1173,168 @@ func (c *CliApp) SetPluginEnv(key string) SetCliExtraParam {
 	}
 }
 
+// UI 用于组合一组 UI 联动规则，仅在 Yakit 图形化中生效（导出名为 cli.UI）
+// 参数:
+//   - opts: 一个或多个 UI 联动规则，如 cli.showGroup、cli.whenTrue 等
+//
+// 返回值:
+//   - 无
+//
+// Example:
+// ```
+// cli.UI(cli.showGroup("advanced"), cli.whenTrue("enableAdvanced"))
+// ```
 func (c *CliApp) UI(opts ...UIParams) {
 }
 
+// showGroup 当条件满足时显示指定参数分组的 UI 规则（导出名为 cli.showGroup）
+// 参数:
+//   - group: 参数分组名
+//
+// 返回值:
+//   - UI 联动规则
+//
+// Example:
+// ```
+// cli.UI(cli.whenTrue("adv"), cli.showGroup("advanced"))
+// ```
 func (c *CliApp) showGroup(group string) UIParams {
 	return defaultUIParams
 }
 
+// showParams 当条件满足时显示指定参数的 UI 规则（导出名为 cli.showParams）
+// 参数:
+//   - params: 一个或多个参数名
+//
+// 返回值:
+//   - UI 联动规则
+//
+// Example:
+// ```
+// cli.UI(cli.whenTrue("adv"), cli.showParams("threads", "timeout"))
+// ```
 func (c *CliApp) showParams(params ...string) UIParams {
 	return defaultUIParams
 }
 
+// hideGroup 当条件满足时隐藏指定参数分组的 UI 规则（导出名为 cli.hideGroup）
+// 参数:
+//   - group: 参数分组名
+//
+// 返回值:
+//   - UI 联动规则
+//
+// Example:
+// ```
+// cli.UI(cli.whenFalse("adv"), cli.hideGroup("advanced"))
+// ```
 func (c *CliApp) hideGroup(group string) UIParams {
 	return defaultUIParams
 }
 
+// hideParams 当条件满足时隐藏指定参数的 UI 规则（导出名为 cli.hideParams）
+// 参数:
+//   - params: 一个或多个参数名
+//
+// 返回值:
+//   - UI 联动规则
+//
+// Example:
+// ```
+// cli.UI(cli.whenFalse("adv"), cli.hideParams("threads"))
+// ```
 func (c *CliApp) hideParams(params ...string) UIParams {
 	return defaultUIParams
 }
 
+// whenTrue 构造一个“当指定布尔参数为真时”的 UI 联动条件（导出名为 cli.whenTrue）
+// 参数:
+//   - param: 参数名
+//
+// 返回值:
+//   - UI 联动规则
+//
+// Example:
+// ```
+// cli.UI(cli.whenTrue("adv"), cli.showGroup("advanced"))
+// ```
 func (c *CliApp) whenTrue(param string) UIParams {
 	return defaultUIParams
 }
 
+// whenFalse 构造一个“当指定布尔参数为假时”的 UI 联动条件（导出名为 cli.whenFalse）
+// 参数:
+//   - param: 参数名
+//
+// 返回值:
+//   - UI 联动规则
+//
+// Example:
+// ```
+// cli.UI(cli.whenFalse("adv"), cli.hideGroup("advanced"))
+// ```
 func (c *CliApp) whenFalse(param string) UIParams {
 	return defaultUIParams
 }
 
+// whenEqual 构造一个“当指定参数等于某值时”的 UI 联动条件（导出名为 cli.whenEqual）
+// 参数:
+//   - param: 参数名
+//   - value: 比较值
+//
+// 返回值:
+//   - UI 联动规则
+//
+// Example:
+// ```
+// cli.UI(cli.whenEqual("mode", "advanced"), cli.showGroup("advanced"))
+// ```
 func (c *CliApp) whenEqual(param string, value string) UIParams {
 	return defaultUIParams
 }
 
+// whenNotEqual 构造一个“当指定参数不等于某值时”的 UI 联动条件（导出名为 cli.whenNotEqual）
+// 参数:
+//   - param: 参数名
+//   - value: 比较值
+//
+// 返回值:
+//   - UI 联动规则
+//
+// Example:
+// ```
+// cli.UI(cli.whenNotEqual("mode", "simple"), cli.showGroup("advanced"))
+// ```
 func (c *CliApp) whenNotEqual(param string, value string) UIParams {
 	return defaultUIParams
 }
 
+// when 构造一个基于表达式的 UI 联动条件（导出名为 cli.when）
+// 参数:
+//   - expression: 条件表达式
+//
+// 返回值:
+//   - UI 联动规则
+//
+// Example:
+// ```
+// cli.UI(cli.when("threads > 10"), cli.showParams("warning"))
+// ```
 func (c *CliApp) when(expression string) UIParams {
 	return defaultUIParams
 }
 
+// whenDefault 构造一个默认（兜底）UI 联动条件（导出名为 cli.whenDefault）
+// 参数:
+//   - 无
+//
+// 返回值:
+//   - UI 联动规则
+//
+// Example:
+// ```
+// cli.UI(cli.whenDefault(), cli.hideGroup("advanced"))
+// ```
 func (c *CliApp) whenDefault() UIParams {
 	return defaultUIParams
 }

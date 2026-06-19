@@ -19,6 +19,23 @@ func NewCustomAnalyzer(matchFunc func(info MatchInfo) int, analyzeFunc func(fi *
 	}
 }
 
+// NewAnalyzerResult 创建一个自定义分析结果(软件包)，用于在自定义 SCA 分析器中返回识别到的组件
+// 在 yak 中通过 sca.NewAnalyzerResult 调用
+// 参数:
+//   - name: 软件包名称
+//   - version: 软件包版本号
+//
+// 返回值:
+//   - 包含名称与版本的自定义软件包对象
+//
+// Example:
+// ```
+// pkg = sca.NewAnalyzerResult("openssl", "1.1.1w")
+// println(pkg.Name)      // OUT: openssl
+// println(pkg.Version)   // OUT: 1.1.1w
+// assert pkg.Name == "openssl", "package name should be set"
+// assert pkg.Version == "1.1.1w", "package version should be set"
+// ```
 func NewAnalyzerResult(name, version string) *CustomPackage {
 	return &CustomPackage{
 		Name:    name,

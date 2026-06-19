@@ -149,6 +149,14 @@ func PemPkcs1v15Encrypt(pemBytes []byte, data interface{}) ([]byte, error) {
 
 // EncryptWithPkcs1v15/RSAEncryptWithPKCS1v15 使用 RSA 公钥和 PKCS#1 v1.5 填充方式对给定数据进行加密。
 //
+// 参数:
+//   - raw: RSA 公钥（支持 DER/PEM/Base64 等格式）
+//   - data: 要加密的明文数据（[]byte、string 等）
+//
+// 返回值:
+//   - 加密后的密文字节数组
+//   - 错误信息，加密失败时返回非空
+//
 // 参数 raw 表示 RSA 公钥，支持以下格式：
 //   - DER 编码的公钥（raw ASN.1 DER 字节流）
 //   - Base64 编码的 DER 格式（自动解码）
@@ -435,6 +443,14 @@ func PemPkcs1v15Decrypt(pemPriBytes []byte, data interface{}) ([]byte, error) {
 //
 // 参数 data 是被加密后的数据（密文）
 // 返回值是解密得到的原始明文，如果失败则返回错误。
+//
+// 参数:
+//   - raw: RSA 私钥（支持 DER/PEM/Base64 等格式）
+//   - data: 要解密的密文数据（[]byte、string 等）
+//
+// 返回值:
+//   - 解密得到的明文字节数组
+//   - 错误信息，解密失败时返回非空
 //
 // Example:
 // ```

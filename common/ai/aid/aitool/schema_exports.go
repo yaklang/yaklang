@@ -11,6 +11,24 @@ import (
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/information"
 )
 
+// _withParamObject 向 schema 添加一个对象类型属性（导出名为 jsonschema.paramObject）
+// 参数:
+//   - objectName: 对象属性名
+//   - opts: 子属性可选项与对象配置项
+//
+// 返回值:
+//   - schema 构建可选项
+//
+// Example:
+// ```
+// schema = jsonschema.Object(jsonschema.paramObject("user",
+//
+//	jsonschema.paramString("name"),
+//	jsonschema.paramInt("age"),
+//
+// ))
+// assert str.Contains(schema, "user"), "schema should contain the object property"
+// ```
 func _withParamObject(objectName string, opts ...any) ToolOption {
 	var params []ToolOption
 	var currentProperties []PropertyOption
@@ -27,6 +45,19 @@ func _withParamObject(objectName string, opts ...any) ToolOption {
 	return WithStructParam(objectName, currentProperties, params...)
 }
 
+// NewObjectSchemaWithAction 生成带默认 @action 字段的对象 JSON Schema（导出名为 jsonschema.ActionObject）
+// @action 字段用于帮助 AI 识别输出的 JSON 对象类型，默认 action 名为 "object"
+// 参数:
+//   - opts: schema 构建可选项，如 jsonschema.paramString 等
+//
+// 返回值:
+//   - JSON Schema 字符串
+//
+// Example:
+// ```
+// schema = jsonschema.ActionObject(jsonschema.paramString("name"))
+// assert str.Contains(schema, "@action"), "ActionObject should contain @action field"
+// ```
 func NewObjectSchemaWithAction(opts ...any) string {
 	return NewObjectSchemaWithActionName("object", opts...)
 }
@@ -84,12 +115,48 @@ func NewObjectSchemaFrameOmap(opts ...any) *omap.OrderedMap[string, any] {
 	return baseFrame
 }
 
+// NewObjectSchema 生成 object 类型的 JSON Schema 字符串（导出名为 jsonschema.Object / jsonschema.NewObjectSchema）
+// 参数:
+//   - opts: schema 构建可选项，如 jsonschema.paramString / jsonschema.paramInt 等
+//
+// 返回值:
+//   - JSON Schema 字符串（draft-07）
+//
+// Example:
+// ```
+// schema = jsonschema.Object(
+//
+//	jsonschema.paramString("name", jsonschema.description("user name")),
+//	jsonschema.paramInt("age", jsonschema.required(true)),
+//
+// )
+// assert str.Contains(schema, "\"type\": \"object\""), "should generate an object schema"
+// assert str.Contains(schema, "name"), "schema should contain name property"
+// ```
 func NewObjectSchema(opts ...any) string {
 	baseFrame := NewObjectSchemaFrameOmap(opts...)
 	results, _ := json.MarshalIndent(baseFrame, "", "  ")
 	return string(results)
 }
 
+// newObjectArraySchema 生成 array 类型（元素为 object）的 JSON Schema 字符串
+// 导出名为 jsonschema.ObjectArray / jsonschema.NewObjectArraySchema
+// 参数:
+//   - opts: schema 构建可选项，描述数组中每个对象元素的属性
+//
+// 返回值:
+//   - JSON Schema 字符串（draft-07）
+//
+// Example:
+// ```
+// schema = jsonschema.ObjectArray(
+//
+//	jsonschema.paramString("name"),
+//	jsonschema.paramInt("age"),
+//
+// )
+// assert str.Contains(schema, "\"type\": \"array\""), "should generate an array schema"
+// ```
 func newObjectArraySchema(opts ...any) string {
 	var params []ToolOption
 	var props []PropertyOption
@@ -144,6 +211,19 @@ func newObjectArraySchema(opts ...any) string {
 	return string(results)
 }
 
+// WithAction 向 schema 添加一个常量 @action 字段（导出名为 jsonschema.action）
+// @action 字段帮助 AI 识别输出 JSON 对象的类型
+// 参数:
+//   - action: action 名称（作为该字段的 const 值）
+//
+// 返回值:
+//   - schema 构建可选项
+//
+// Example:
+// ```
+// schema = jsonschema.Object(jsonschema.action("create_user"), jsonschema.paramString("name"))
+// assert str.Contains(schema, "@action"), "schema should contain @action field"
+// ```
 func WithAction(action string) ToolOption {
 	return WithStringParam(
 		"@action",
@@ -153,6 +233,24 @@ func WithAction(action string) ToolOption {
 	)
 }
 
+// _withObjectArrayEx 向 schema 添加对象数组属性，并可单独指定数组级属性（导出名为 jsonschema.paramObjectArrayEx）
+// 参数:
+//   - name: 属性名
+//   - arrayPropsRaw: 作用于数组本身的属性可选项
+//   - opts: 作用于数组中对象元素的属性可选项
+//
+// 返回值:
+//   - schema 构建可选项
+//
+// Example:
+// ```
+// schema = jsonschema.Object(jsonschema.paramObjectArrayEx("users", [jsonschema.description("user list")],
+//
+//	jsonschema.paramString("name"),
+//
+// ))
+// assert str.Contains(schema, "users"), "schema should contain the object array property"
+// ```
 func _withObjectArrayEx(name string, arrayPropsRaw []any, opts ...any) ToolOption {
 	var params []ToolOption
 
@@ -180,6 +278,24 @@ func _withObjectArrayEx(name string, arrayPropsRaw []any, opts ...any) ToolOptio
 	return WithStructArrayParam(name, arrayProps, currentProperties, params...)
 }
 
+// _withObjectArray 向 schema 添加一个对象数组类型属性（导出名为 jsonschema.paramObjectArray）
+// 参数:
+//   - name: 属性名
+//   - opts: 作用于数组中对象元素的属性可选项
+//
+// 返回值:
+//   - schema 构建可选项
+//
+// Example:
+// ```
+// schema = jsonschema.Object(jsonschema.paramObjectArray("users",
+//
+//	jsonschema.paramString("name"),
+//	jsonschema.paramInt("age"),
+//
+// ))
+// assert str.Contains(schema, "users"), "schema should contain the object array property"
+// ```
 func _withObjectArray(name string, opts ...any) ToolOption {
 	var params []ToolOption
 	var currentProperties []PropertyOption

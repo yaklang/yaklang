@@ -70,6 +70,12 @@ func (wg *WaitGroupProxy) Done() {
 // wg.Wait()
 // println("所有任务完成")
 // ```
+//
+// 参数:
+//   - ctxs: 可选的 context，任一 context 结束会把等待组计数清零
+//
+// 返回值:
+//   - 新建的 WaitGroup 引用
 func NewWaitGroup(ctxs ...context.Context) *WaitGroupProxy {
 	wg := &WaitGroupProxy{}
 	for _, ctx := range ctxs {
@@ -94,6 +100,13 @@ func NewWaitGroup(ctxs ...context.Context) *WaitGroupProxy {
 // wg.Wait()
 // println("所有任务完成")
 // ```
+//
+// 参数:
+//   - size: 允许的最大并发任务数
+//   - ctxs: 可选的 context，任一 context 结束会终止等待
+//
+// 返回值:
+//   - 新建的 SizedWaitGroup 引用
 func NewSizedWaitGroup(size int, ctxs ...context.Context) *utils.SizedWaitGroup {
 	return utils.NewSizedWaitGroup(size, ctxs...)
 }
@@ -114,6 +127,9 @@ func NewSizedWaitGroup(size int, ctxs ...context.Context) *utils.SizedWaitGroup 
 // println(newMap["key"])
 // }
 // ```
+//
+// 返回值:
+//   - 新建的互斥锁引用
 func NewMutex() *sync.Mutex {
 	return new(sync.Mutex)
 }
@@ -136,6 +152,9 @@ func NewMutex() *sync.Mutex {
 // println(newMap["key"])
 // }
 // ```
+//
+// 返回值:
+//   - 新建的读写锁引用
 func NewRWMutex() *sync.RWMutex {
 	return new(sync.RWMutex)
 }
@@ -157,26 +176,27 @@ func NewRWMutex() *sync.RWMutex {
 // println(newMap["key"])
 // }
 // ```
+//
+// 返回值:
+//   - 新建的互斥锁引用
 func NewLock() *sync.Mutex {
 	return new(sync.Mutex)
 }
 
 // NewMap 创建一个 Map 结构体引用，这个 Map 是并发安全的
+// 返回值:
+//   - 新建的并发安全 Map 引用
+//
 // Example:
 // ```
+// // VARS: 并发安全 map 的基本存取
 // m = sync.NewMap()
-// go func {
-// for {
-// m.Store("key", "value2")
-// }
-// }
-// for {
 // m.Store("key", "value")
 // v, ok = m.Load("key")
-// if ok {
-// println(v)
-// }
-// }
+// // STDOUT: 打印读取到的值
+// println(v)   // OUT: value
+// // assert: 键存在且值正确
+// assert ok == true, "stored key should be loadable"
 // ```
 func NewMap() *sync.Map {
 	return new(sync.Map)
@@ -190,6 +210,9 @@ func NewMap() *sync.Map {
 // o.Do(func() { println("this message will only print once") })
 // }
 // ```
+//
+// 返回值:
+//   - 新建的 Once 引用
 func NewOnce() *sync.Once {
 	return new(sync.Once)
 }
@@ -208,6 +231,12 @@ func NewOnce() *sync.Once {
 // m2 = p.Get() // 从 Pool 中获取，实际上我们获取到的是刚 Put 进去的 m
 // println(m2) // {"1": "2"}
 // ```
+//
+// 参数:
+//   - newFunc: 可选的对象构造函数，当 Pool 为空时用于创建新对象
+//
+// 返回值:
+//   - 新建的对象池引用
 func NewPool(newFunc ...func() any) *sync.Pool {
 	if len(newFunc) > 0 {
 		return &sync.Pool{
@@ -248,6 +277,9 @@ func NewPool(newFunc ...func() any) *sync.Pool {
 // write("writer")
 // time.sleep(3)
 // ```
+//
+// 返回值:
+//   - 新建的条件变量引用
 func NewCond() *sync.Cond {
 	return sync.NewCond(new(sync.Mutex))
 }

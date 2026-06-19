@@ -99,6 +99,14 @@ var (
 
 // GitHack 是一个用于利用 Git 源码泄露漏洞的函数
 // Git源码泄露漏洞是指：由于网站服务器的错误配置，可以通过 HTTP / HTTPS 直接访问到网站 .git 目录下的文件，从而导致源码泄露
+// 参数:
+//   - remoteRepoURL: 存在 .git 泄露的目标地址
+//   - localPath: 本地保存还原结果的路径
+//   - opts: 可选项，如 git.threads、git.context、git.httpOpts 等
+//
+// 返回值:
+//   - 错误信息
+//
 // Example:
 // ```
 // git.GitHack("http://127.0.0.1:8787/git/website", "C:/Users/xxx/Desktop/githack-test", git.threads(8))

@@ -27,7 +27,15 @@ type MaliciousFileMatcher struct {
 	byCategory map[string][]string            // 按分类索引特征名称
 }
 
-// NewMaliciousFileMatcher 创建恶意文件特征匹配器
+// NewMaliciousFileMatcher 创建一个恶意文件特征匹配器，内置常见 webshell/恶意代码特征
+// 返回值:
+//   - 恶意文件特征匹配器对象
+//
+// Example:
+// ```
+// matcher = file.NewMaliciousFileMatcher()
+// matches, err = matcher.MatchContent([]byte("<?php eval($_POST[1]);?>"))
+// ```
 func NewMaliciousFileMatcher() *MaliciousFileMatcher {
 	matcher := &MaliciousFileMatcher{
 		signatures: make(map[string]*MaliciousSignature),

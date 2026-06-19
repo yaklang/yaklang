@@ -21,6 +21,22 @@ func init() {
 
 type ArpConfig func(arp *layers.ARP) error
 
+// arp_requestEx 构造一个完整指定源信息的 ARP 请求层
+// 在 yak 中通过 pcapx.arp_requestEx 调用，配合 pcapx.PacketBuilder 使用
+// 参数:
+//   - selfIP: 本机(源) IP 地址
+//   - selfMac: 本机(源) MAC 地址
+//   - remoteIP: 要查询的目标 IP 地址
+//
+// 返回值:
+//   - 一个 pcapx.PacketBuilder 可接收的 ARP 层配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：构造 ARP 请求
+// raw = pcapx.PacketBuilder(pcapx.arp_requestEx("192.168.1.2", "00:11:22:33:44:55", "192.168.1.1"))~
+// println(len(raw))
+// ```
 func WithArp_RequestEx(selfIP, selfMac string, remoteIP string) ArpConfig {
 	local := []byte(net.ParseIP(selfIP).To4())
 	srcMac, _ := net.ParseMAC(selfMac)
@@ -43,6 +59,20 @@ func WithArp_RequestEx(selfIP, selfMac string, remoteIP string) ArpConfig {
 	}
 }
 
+// arp_request 构造一个 ARP 请求层，自动使用本机默认网卡的 IP 与 MAC 作为源
+// 在 yak 中通过 pcapx.arp_request 调用，配合 pcapx.PacketBuilder 使用
+// 参数:
+//   - ip: 要查询的目标 IP 地址
+//
+// 返回值:
+//   - 一个 pcapx.PacketBuilder 可接收的 ARP 层配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：自动构造 ARP 请求
+// raw = pcapx.PacketBuilder(pcapx.arp_request("192.168.1.1"))~
+// println(len(raw))
+// ```
 func WithArp_RequestAuto(ip string) ArpConfig {
 	// where is ip?
 	return func(arp *layers.ARP) error {
@@ -55,6 +85,23 @@ func WithArp_RequestAuto(ip string) ArpConfig {
 	}
 }
 
+// arp_replyEx 构造一个完整指定源与目的信息的 ARP 应答层
+// 在 yak 中通过 pcapx.arp_replyEx 调用，配合 pcapx.PacketBuilder 使用
+// 参数:
+//   - srcTarget: 应答中声明的源 IP 地址
+//   - srcMac: 应答中声明的源 MAC 地址
+//   - targetIp: 目标(接收方) IP 地址
+//   - targetMac: 目标(接收方) MAC 地址
+//
+// 返回值:
+//   - 一个 pcapx.PacketBuilder 可接收的 ARP 层配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：构造 ARP 应答
+// raw = pcapx.PacketBuilder(pcapx.arp_replyEx("192.168.1.1", "00:11:22:33:44:55", "192.168.1.2", "66:77:88:99:aa:bb"))~
+// println(len(raw))
+// ```
 func WithArp_ReplyToEx(srcTarget, srcMac, targetIp, targetMac string) ArpConfig {
 	return func(arp *layers.ARP) error {
 		arp.Operation = layers.ARPReply
@@ -72,6 +119,21 @@ func WithArp_ReplyToEx(srcTarget, srcMac, targetIp, targetMac string) ArpConfig 
 	}
 }
 
+// arp_reply 构造一个 ARP 应答层，自动使用本机默认网卡的 IP 与 MAC 作为源
+// 在 yak 中通过 pcapx.arp_reply 调用，配合 pcapx.PacketBuilder 使用
+// 参数:
+//   - targetIp: 目标(接收方) IP 地址
+//   - targetMac: 目标(接收方) MAC 地址
+//
+// 返回值:
+//   - 一个 pcapx.PacketBuilder 可接收的 ARP 层配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：自动构造 ARP 应答
+// raw = pcapx.PacketBuilder(pcapx.arp_reply("192.168.1.2", "66:77:88:99:aa:bb"))~
+// println(len(raw))
+// ```
 func WithArp_ReplyTo(targetIp, targetMac string) ArpConfig {
 	iface, _, local, err := getPublicRoute()
 	if err != nil {

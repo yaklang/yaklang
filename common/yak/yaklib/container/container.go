@@ -11,10 +11,21 @@ type Set struct {
 	mapset.Set[any]
 }
 
-// NewSet creates a new set
+// NewSet 创建一个线程安全的集合(Set)，自动去重
+// 参数:
+//   - vals: 初始放入集合的元素，可为零个或多个
+//
+// 返回值:
+//   - 创建出的集合对象
+//
 // Example:
 // ```
-// s = container.NewSet("1", "2")
+// // VARS: 创建集合，重复元素会被去重
+// s = container.NewSet("1", "2", "2")
+// // STDOUT: 打印去重后的元素个数
+// println(s.Len())   // OUT: 2
+// // assert: 包含判断正确
+// assert s.Contains("1") == true, "set should contain inserted element"
 // ```
 func NewSet(vals ...any) (s *Set) {
 	defer func() {
@@ -29,10 +40,21 @@ func NewSet(vals ...any) (s *Set) {
 	}
 }
 
-// NewUnsafeSet creates a new set that is not thread-safe
+// NewUnsafeSet 创建一个非线程安全的集合(Set)，性能更高但不可并发使用
+// 参数:
+//   - vals: 初始放入集合的元素，可为零个或多个
+//
+// 返回值:
+//   - 创建出的非线程安全集合对象
+//
 // Example:
 // ```
+// // VARS: 创建非线程安全集合
 // s = container.NewUnsafeSet("1", "2")
+// // STDOUT: 打印元素个数
+// println(s.Len())   // OUT: 2
+// // assert: 包含判断正确
+// assert s.Contains("2") == true, "unsafe set should contain inserted element"
 // ```
 func NewUnsafeSet(vals ...any) (s *Set) {
 	defer func() {
@@ -368,6 +390,21 @@ type LinkedList struct {
 	*list.List
 }
 
+// NewLinkedList 创建一个空的双向链表
+// 返回值:
+//   - 创建出的双向链表对象，可使用 PushBack/PushFront/ToSlice 等方法
+//
+// Example:
+// ```
+// // VARS: 创建链表并依次尾插元素
+// l = container.NewLinkedList()
+// l.PushBack("a")
+// l.PushBack("b")
+// // STDOUT: 转为切片后按插入顺序排列
+// println(l.ToSlice())   // OUT: [a b]
+// // assert: 长度为 2
+// assert l.Len() == 2, "linked list should hold two elements"
+// ```
 func NewLinkedList() *LinkedList {
 	return &LinkedList{List: list.New()}
 }

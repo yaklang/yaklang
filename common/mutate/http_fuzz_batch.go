@@ -14,6 +14,63 @@ type FuzzHTTPRequestBatch struct {
 	nextFuzzRequests []FuzzHTTPRequestIf
 }
 
+// UrlsToHTTPRequests 将一个或多个 URL 转换成可批量变形发包的 HTTP Fuzz 请求批次对象
+// 参数:
+//   - target: 一个或多个 URL（字符串），支持 fuzztag 展开
+//
+// 返回值:
+//   - HTTP Fuzz 请求批次对象，可对其统一做参数变形与批量发包
+//   - 错误信息，无有效请求时返回非空
+//
+// Example:
+// ```
+// batch = fuzz.UrlsToHTTPRequests("https://www.example.com/", "https://www.example.com/login")~
+// batch.Show()
+// ```
+func UrlsToHTTPRequests(target ...interface{}) (*FuzzHTTPRequestBatch, error) {
+	var reqs []*http.Request
+	for _, urlBase := range InterfaceToFuzzResults(target) {
+		for _, u := range utils.ParseStringToUrlsWith3W(urlBase) {
+			_req, err := http.NewRequest("GET", u, nil)
+			if err != nil {
+				log.Error(err)
+				continue
+			}
+			reqs = append(reqs, _req)
+		}
+	}
+
+	var reqIf []FuzzHTTPRequestIf
+	var firstReq *FuzzHTTPRequest
+	for _, req := range reqs {
+		isHttps := false
+		if req.URL.Scheme == "https" {
+			isHttps = true
+		}
+		fuzzReq, err := NewFuzzHTTPRequest(req, OptHTTPS(isHttps))
+		if err != nil {
+			log.Errorf("build fuzz http request failed: %s", err)
+			continue
+		}
+
+		if firstReq == nil {
+			firstReq = fuzzReq
+		}
+		reqIf = append(reqIf, fuzzReq)
+
+	}
+
+	if len(reqIf) <= 0 {
+		return nil, utils.Errorf("fuzz http requests EMPTY!")
+	}
+	batch := &FuzzHTTPRequestBatch{
+		fallback:         nil,
+		nextFuzzRequests: reqIf,
+		originRequest:    firstReq,
+	}
+	return batch, nil
+}
+
 func NewFuzzHTTPRequestBatch(f *FuzzHTTPRequest, reqs ...*http.Request) *FuzzHTTPRequestBatch {
 	var fReqs []FuzzHTTPRequestIf
 	for _, r := range reqs {

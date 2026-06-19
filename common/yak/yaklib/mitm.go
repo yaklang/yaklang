@@ -50,14 +50,19 @@ var MitmExports = map[string]interface{}{
 	"QuickVerifyMITMRootCert":        crep.QuickVerifyMITMRootCert,
 	"TestCertificateOperations":      crep.TestCertificateOperations,
 
-	"grpcMitmKey": DefaultGRPCMitmKey,
-	"GetDefaultExtraConnManager": func() *MitmExtraConnManager {
-		return DefaultMitmExtraConnManager
-	},
+	"grpcMitmKey":                DefaultGRPCMitmKey,
+	"GetDefaultExtraConnManager": getDefaultExtraConnManager,
 }
 
-// Start 启动一个 MITM (中间人)代理服务器，它的第一个参数是端口，接下来可以接收零个到多个选项函数，用于影响中间人代理服务器的行为
+// Start 启动一个 MITM (中间人)代理服务器，可接收零个到多个选项函数影响其行为
 // 如果没有指定 CA 证书和私钥，那么将使用内置的证书和私钥
+// 参数:
+//   - port: 代理服务器监听端口
+//   - opts: 可选配置，例如 mitm.host、mitm.callback、mitm.hijackHTTPRequest
+//
+// 返回值:
+//   - 错误信息，启动失败或服务异常退出时返回非空
+//
 // Example:
 // ```
 // mitm.Start(8080, mitm.host("127.0.0.1"), mitm.callback(func(isHttps, urlStr, req, rsp) { http.dump(req); http.dump(rsp)  })) // 启动一个中间人代理服务器，并将请求和响应打印到标准输出
@@ -105,6 +110,12 @@ type MitmConfigOpt func(config *mitmConfig)
 
 // isTransparent 是一个选项函数，用于指定中间人代理服务器是否开启透明劫持模式，默认为false
 // 在开启透明模式下，所有流量都会被默认转发，所有的回调函数都会被忽略
+// 参数:
+//   - b: 是否开启透明劫持
+//
+// 返回值:
+//   - 一个 MITM 配置选项，作为可变参数传入 mitm.Start / mitm.Bridge
+//
 // Example:
 // ```
 // mitm.Start(8080, mitm.isTransparent(true))
@@ -117,6 +128,12 @@ func mitmConfigIsTransparent(b bool) MitmConfigOpt {
 
 // gmtls 是一个选项参数，用于指定中间人代理服务器是否开启 GMTLS 劫持模式，默认为false
 // 在开启 GMTLS 劫持模式下，中间人代理服务器会劫持所有的 GMTLS 流量
+// 参数:
+//   - b: 是否开启 GMTLS 劫持模式
+//
+// 返回值:
+//   - 一个 MITM 配置选项，作为可变参数传入 mitm.Start / mitm.Bridge
+//
 // Example:
 // ```
 // mitm.Start(8080, mitm.gmtls(true))
@@ -129,6 +146,12 @@ func mitmConfigGMTLS(b bool) MitmConfigOpt {
 
 // gmtlsPrefer 是一个选项参数，用于指定中间人代理服务器是否优先使用 GMTLS 劫持模式，默认为false
 // 在开启 GMTLS 劫持模式下，中间人代理服务器会优先使用 GMTLS 劫持模式
+// 参数:
+//   - b: 是否优先使用 GMTLS 劫持模式
+//
+// 返回值:
+//   - 一个 MITM 配置选项，作为可变参数传入 mitm.Start / mitm.Bridge
+//
 // Example:
 // ```
 // mitm.Start(8080, mitm.gmtlsPrefer(true))
@@ -141,6 +164,12 @@ func mitmConfigGMTLSPrefer(b bool) MitmConfigOpt {
 
 // gmtlsOnly 是一个选项参数，用于指定中间人代理服务器是否只使用 GMTLS 劫持模式，默认为false
 // 在开启 GMTLS 劫持模式下，中间人代理服务器只会使用 GMTLS 劫持模式
+// 参数:
+//   - b: 是否只使用 GMTLS 劫持模式
+//
+// 返回值:
+//   - 一个 MITM 配置选项，作为可变参数传入 mitm.Start / mitm.Bridge
+//
 // Example:
 // ```
 // mitm.Start(8080, mitm.gmtlsOnly(true))
@@ -153,7 +182,13 @@ func mitmConfigGMTLSOnly(b bool) MitmConfigOpt {
 
 var MitmConfigContext = mitmConfigContext
 
-// context 是一个选项函数，用于指定中间人代理服务器的上下文
+// context 是一个选项函数，用于指定中间人代理服务器的上下文，可通过取消上下文来停止服务
+// 参数:
+//   - ctx: 上下文对象
+//
+// 返回值:
+//   - 一个 MITM 配置选项，作为可变参数传入 mitm.Start / mitm.Bridge
+//
 // Example:
 // ```
 // mitm.Start(8080, mitm.context(context.Background()))
@@ -166,6 +201,12 @@ func mitmConfigContext(ctx context.Context) MitmConfigOpt {
 
 // useDefaultCA 是一个选项函数，用于指定中间人代理服务器是否使用内置的证书和私钥，默认为true
 // 默认的证书与私钥路径：~/yakit-projects/yak-mitm-ca.crt 和 ~/yakit-projects/yak-mitm-ca.key
+// 参数:
+//   - t: 是否使用内置证书和私钥
+//
+// 返回值:
+//   - 一个 MITM 配置选项，作为可变参数传入 mitm.Start / mitm.Bridge
+//
 // Example:
 // ```
 // mitm.Start(8080, mitm.useDefaultCA(true))
@@ -177,6 +218,12 @@ func mitmConfigUseDefault(t bool) MitmConfigOpt {
 }
 
 // host 是一个选项函数，用于指定中间人代理服务器的监听地址，默认为空，即监听所有网卡
+// 参数:
+//   - host: 监听地址
+//
+// 返回值:
+//   - 一个 MITM 配置选项，作为可变参数传入 mitm.Start / mitm.Bridge
+//
 // Example:
 // ```
 // mitm.Start(8080, mitm.host("127.0.0.1"))
@@ -187,7 +234,13 @@ func mitmConfigHost(host string) MitmConfigOpt {
 	}
 }
 
-// callback 是一个选项函数，用于指定中间人代理服务器的回调函数，当接收到请求和响应后，会调用该回调函数
+// callback 是一个选项函数，用于指定中间人代理服务器的回调函数，当接收到请求和响应后会调用该回调函数
+// 参数:
+//   - f: 回调函数，参数依次为是否 HTTPS、URL、请求对象、响应对象
+//
+// 返回值:
+//   - 一个 MITM 配置选项，作为可变参数传入 mitm.Start / mitm.Bridge
+//
 // Example:
 // ```
 // mitm.Start(8080, mitm.callback(func(isHttps, urlStr, req, rsp) { http.dump(req); http.dump(rsp)  }))
@@ -200,6 +253,12 @@ func mitmConfigCallback(f func(bool, string, *http.Request, *http.Response)) Mit
 
 // hijackHTTPRequest 是一个选项函数，用于指定中间人代理服务器的请求劫持函数，当接收到请求后，会调用该回调函数
 // 通过调用该回调函数的第四个参数，可以修改请求内容，通过调用该回调函数的第五个参数，可以丢弃请求
+// 参数:
+//   - h: 请求劫持回调，参数依次为是否 HTTPS、URL、请求报文、修改函数、丢弃函数
+//
+// 返回值:
+//   - 一个 MITM 配置选项，作为可变参数传入 mitm.Start / mitm.Bridge
+//
 // Example:
 // ```
 // mitm.Start(8080, mitm.hijackHTTPRequest(func(isHttps, urlStr, req, modified, dropped) {
@@ -219,6 +278,12 @@ var MITMConfigHijackHTTPResponse = mitmConfigHijackHTTPResponse
 
 // hijackHTTPResponse 是一个选项函数，用于指定中间人代理服务器的响应劫持函数，当接收到响应后，会调用该回调函数
 // 通过调用该回调函数的第四个参数，可以修改响应内容，通过调用该回调函数的第五个参数，可以丢弃响应
+// 参数:
+//   - h: 响应劫持回调，参数依次为是否 HTTPS、URL、响应报文、修改函数、丢弃函数
+//
+// 返回值:
+//   - 一个 MITM 配置选项，作为可变参数传入 mitm.Start / mitm.Bridge
+//
 // Example:
 // ```
 // mitm.Start(8080, mitm.hijackHTTPResponse(func(isHttps, urlStr, rsp, modified, dropped) {
@@ -237,6 +302,12 @@ func mitmConfigHijackHTTPResponse(h func(isHttps bool, u string, rsp []byte, mod
 // hijackHTTPResponseEx 是一个选项函数，用于指定中间人代理服务器的响应劫持函数，当接收到响应后，会调用该回调函数
 // 通过调用该回调函数的第五个参数，可以修改响应内容，通过调用该回调函数的第六个参数，可以丢弃响应
 // 它与 hijackHTTPResponse 的区别在于，它可以获取到原始请求报文
+// 参数:
+//   - h: 响应劫持回调，参数依次为是否 HTTPS、URL、请求报文、响应报文、修改函数、丢弃函数
+//
+// 返回值:
+//   - 一个 MITM 配置选项，作为可变参数传入 mitm.Start / mitm.Bridge
+//
 // Example:
 // ```
 // mitm.Start(8080, mitm.hijackHTTPResponseEx(func(isHttps, urlStr, req, rsp, modified, dropped) {
@@ -255,6 +326,12 @@ func mitmConfigHijackHTTPResponseEx(h func(bool, string, []byte, []byte, func([]
 // mockHTTPRequest 是一个选项函数，用于指定中间人代理服务器的请求 mock 函数
 // 当接收到请求后，会调用该回调函数，通过调用 mockResponse 函数可以直接返回自定义响应，跳过真实的网络请求
 // mockResponse 接受一个响应（字符串或字节数组），会自动修复响应格式，如果修复失败则返回 502 Bad Gateway
+// 参数:
+//   - h: 请求 mock 回调，参数依次为是否 HTTPS、URL、请求报文、mockResponse 函数
+//
+// 返回值:
+//   - 一个 MITM 配置选项，作为可变参数传入 mitm.Start / mitm.Bridge
+//
 // Example:
 // ```
 // mitm.Start(8080, mitm.mockHTTPRequest(func(isHttps, urlStr, req, mockResponse) {
@@ -271,8 +348,14 @@ func mitmConfigMockHTTPRequest(h func(isHttps bool, urlStr string, req []byte, m
 	}
 }
 
-// wsforcetext 是一个选项函数，用于强制指定中间人代理服务器的 websocket 劫持的数据帧转换为文本帧，默认为false
+// wsforcetext 是一个选项函数，用于强制将 websocket 劫持的数据帧转换为文本帧，默认为 false
 // ! 已弃用
+// 参数:
+//   - b: 是否强制转换为文本帧
+//
+// 返回值:
+//   - 一个 MITM 配置选项，作为可变参数传入 mitm.Start / mitm.Bridge
+//
 // Example:
 // ```
 // mitm.Start(8080, mitm.wsforcetext(true))
@@ -287,6 +370,12 @@ func mitmConfigWSForceTextFrame(b bool) MitmConfigOpt {
 // 该回调函数的第一个参数是请求或响应的内容
 // 第二个参数是一个布尔值，用于指示该内容是请求还是响应，true 表示请求，false 表示响应
 // 通过该回调函数的返回值，可以修改请求或响应的内容
+// 参数:
+//   - f: websocket 劫持回调，第一个参数为数据内容，第二个参数为是否为请求，返回修改后的内容
+//
+// 返回值:
+//   - 一个 MITM 配置选项，作为可变参数传入 mitm.Start / mitm.Bridge
+//
 // Example:
 // ```
 // mitm.Start(8080, mitm.wscallback(func(data, isRequest) { println(data); return data }))
@@ -298,6 +387,13 @@ func mitmConfigWSCallback(f func([]byte, bool) interface{}) MitmConfigOpt {
 }
 
 // rootCA 是一个选项函数，用于指定中间人代理服务器的根证书和私钥
+// 参数:
+//   - cert: PEM 格式的根证书
+//   - key: PEM 格式的私钥
+//
+// 返回值:
+//   - 一个 MITM 配置选项，作为可变参数传入 mitm.Start / mitm.Bridge
+//
 // Example:
 // ```
 // mitm.Start(8080, mitm.rootCA(cert, key))
@@ -310,6 +406,13 @@ func mitmConfigCertAndKey(cert, key []byte) MitmConfigOpt {
 }
 
 // gmRootCA 是一个选项函数，用于指定中间人代理服务器的国密根证书和私钥
+// 参数:
+//   - cert: PEM 格式的国密根证书
+//   - key: PEM 格式的国密私钥
+//
+// 返回值:
+//   - 一个 MITM 配置选项，作为可变参数传入 mitm.Start / mitm.Bridge
+//
 // Example:
 // ```
 // mitm.Start(8080, mitm.gmRootCA(cert, key))
@@ -321,7 +424,13 @@ func mitmConfigGMCertAndKey(cert, key []byte) MitmConfigOpt {
 	}
 }
 
-// maxContentLength 是一个选项函数，用于指定中间人代理服务器的最大的请求和响应内容长度，默认为10MB
+// maxContentLength 是一个选项函数，用于指定中间人代理服务器的最大请求和响应内容长度，默认为 10MB
+// 参数:
+//   - i: 最大内容长度，单位为字节
+//
+// 返回值:
+//   - 一个 MITM 配置选项，作为可变参数传入 mitm.Start / mitm.Bridge
+//
 // Example:
 // ```
 // mitm.Start(8080, mitm.maxContentLength(100 * 1000 * 1000))
@@ -332,7 +441,13 @@ func mitmMaxContentLength(i int) MitmConfigOpt {
 	}
 }
 
-// randomJA3 是一个选项函数，用于指定中间人代理服务器是否开启随机 JA3 劫持模式，默认为false
+// randomJA3 是一个选项函数，用于指定中间人代理服务器是否开启随机 JA3 指纹模式，默认为 false
+// 参数:
+//   - b: 是否开启随机 JA3 指纹
+//
+// 返回值:
+//   - 一个 MITM 配置选项，作为可变参数传入 mitm.Start / mitm.Bridge
+//
 // Example:
 // ```
 // mitm.Start(8080, mitm.randomJA3(true))
@@ -350,6 +465,13 @@ func mitmConfigRandomJA3(b bool) MitmConfigOpt {
 // 1. 自动模式（默认）：不调用此函数，根据请求的 Host 自动推断 SNI
 // 2. 强制模式：mitm.sni("custom.domain.com", true)，总是使用指定的 SNI
 // 3. 清空模式：mitm.sni("", true)，不发送 SNI
+//
+// 参数:
+//   - sni: 要使用的 SNI 域名
+//   - overwrite: 是否强制覆盖（true 时总是使用指定 SNI，false 时为自动模式）
+//
+// 返回值:
+//   - 一个 MITM 配置选项，作为可变参数传入 mitm.Start / mitm.Bridge
 //
 // Example:
 // ```
@@ -371,6 +493,12 @@ func mitmConfigSNI(sni string, overwrite bool) MitmConfigOpt {
 
 // extraIncomingConn 是一个选项函数，用于指定中间人代理服务器接受外部传入的连接通道
 // 通过该选项，可以将外部的 net.Conn 连接注入到 MITM 服务器中进行劫持处理
+// 参数:
+//   - ch: 连接通道（chan net.Conn 或 chan interface{}）
+//
+// 返回值:
+//   - 一个 MITM 配置选项，作为可变参数传入 mitm.Start / mitm.Bridge
+//
 // Example:
 // ```
 // connChan = make(chan net.Conn)
@@ -404,6 +532,14 @@ func mitmConfigExtraIncomingConn(ch interface{}) MitmConfigOpt {
 
 // extraIncomingConnChanWithStrongLocalHost 是一个选项函数，用于指定中间人代理服务器接受外部传入的连接通道
 // 强制要求设置强主机模式的本地地址，用于透明劫持 TUN 生成的流量
+// 参数:
+//   - localAddr: 强主机模式的本地地址
+//   - ch: 连接通道（chan net.Conn、chan interface{} 或 chan *WrapperedConn）
+//   - kv: 可选的元数据键值对
+//
+// 返回值:
+//   - 一个 MITM 配置选项，作为可变参数传入 mitm.Start / mitm.Bridge
+//
 // Example:
 // ```
 // connChan = make(chan net.Conn)
@@ -511,9 +647,16 @@ func NewMITMServer(
 	return server, nil
 }
 
-// Bridge 启动一个 MITM (中间人)代理服务器，它的第一个参数是端口，第二个参数是下游代理服务器地址，接下来可以接收零个到多个选项函数，用于影响中间人代理服务器的行为
-// Bridge 与 Start 类似，但略有不同，Bridge可以指定下游代理服务器地址，同时默认会在接收到请求和响应时打印到标准输出
+// Bridge 启动一个 MITM (中间人)代理服务器，与 Start 类似但可指定下游代理服务器地址，并默认在收到请求和响应时打印到标准输出
 // 如果没有指定 CA 证书和私钥，那么将使用内置的证书和私钥
+// 参数:
+//   - port: 代理服务器监听端口
+//   - downstreamProxy: 下游代理服务器地址，多个用逗号分隔，可为空字符串
+//   - opts: 可选配置，例如 mitm.host、mitm.callback
+//
+// 返回值:
+//   - 错误信息，启动失败或服务异常退出时返回非空
+//
 // Example:
 // ```
 // mitm.Bridge(8080, "", mitm.host("127.0.0.1"), mitm.callback(func(isHttps, urlStr, req, rsp) { http.dump(req); http.dump(rsp)  })) // 启动一个中间人代理服务器，并将请求和响应打印到标准输出

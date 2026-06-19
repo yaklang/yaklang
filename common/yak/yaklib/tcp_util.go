@@ -10,6 +10,20 @@ import (
 type portForward struct {
 }
 
+// Forward 启动一个 TCP 端口转发，将本地端口的流量转发到远端主机端口
+// 参数:
+//   - localPort: 本地监听端口
+//   - remoteHost: 远端目标主机地址
+//   - remotePort: 远端目标端口
+//
+// 返回值:
+//   - 错误信息，监听失败或转发结束时返回
+//
+// Example:
+// ```
+// // 把本地 8080 端口的流量转发到 example.com:80，此处仅作示意
+// tcp.Forward(8080, "www.example.com", 80)~
+// ```
 func _tcpPortForward(localPort int, remoteHost string, remotePort int) error {
 	return tcpServe("127.0.0.1", localPort, _tcpServeCallback(func(connection *tcpConnection) {
 		log.Infof("recv local connection from: %v", connection.RemoteAddr())

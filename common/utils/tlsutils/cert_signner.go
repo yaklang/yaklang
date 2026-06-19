@@ -50,32 +50,85 @@ type CertOption func(*CertConfig)
 // Section: Certificate Configuration Options (With... functions)
 // -----------------------------------------------------------------------------
 
-// WithCommonName 设置证书的通用名称 (Common Name)。
+// commonName 是一个证书选项，用于设置证书的通用名称 (Common Name)
+// 参数:
+//   - cn: 通用名称
+//
+// 返回值:
+//   - 一个证书选项，作为可变参数传入 tls.GenerateRootCA / tls.GenerateServerCert 等
+//
+// Example:
+// ```
+// cert, key = tls.GenerateRootCA("ca", tls.commonName("example.com"))~
+// ```
 func WithCommonName(cn string) CertOption {
 	return func(c *CertConfig) {
 		c.CommonName = cn
 	}
 }
 
-// WithOrganization 设置证书的组织 (Organization)。
+// organization 是一个证书选项，用于设置证书的组织 (Organization)
+// 参数:
+//   - org: 组织名称
+//
+// 返回值:
+//   - 一个证书选项，作为可变参数传入 tls.GenerateRootCA / tls.GenerateServerCert 等
+//
+// Example:
+// ```
+// cert, key = tls.GenerateRootCA("ca", tls.organization("YakOrg"))~
+// ```
 func WithOrganization(org string) CertOption {
 	return func(c *CertConfig) {
 		c.Organization = org
 	}
 }
 
+// country 是一个证书选项，用于设置证书的国家 (Country)
+// 参数:
+//   - country: 国家代码或名称
+//
+// 返回值:
+//   - 一个证书选项，作为可变参数传入 tls.GenerateRootCA / tls.GenerateServerCert 等
+//
+// Example:
+// ```
+// cert, key = tls.GenerateRootCA("ca", tls.country("CN"))~
+// ```
 func WithCountry(country string) CertOption {
 	return func(c *CertConfig) {
 		c.Country = country
 	}
 }
 
+// province 是一个证书选项，用于设置证书的省/州 (Province)
+// 参数:
+//   - province: 省/州名称
+//
+// 返回值:
+//   - 一个证书选项，作为可变参数传入 tls.GenerateRootCA / tls.GenerateServerCert 等
+//
+// Example:
+// ```
+// cert, key = tls.GenerateRootCA("ca", tls.province("Beijing"))~
+// ```
 func WithProvince(province string) CertOption {
 	return func(c *CertConfig) {
 		c.Province = province
 	}
 }
 
+// locality 是一个证书选项，用于设置证书的城市/地区 (Locality)
+// 参数:
+//   - locality: 城市/地区名称
+//
+// 返回值:
+//   - 一个证书选项，作为可变参数传入 tls.GenerateRootCA / tls.GenerateServerCert 等
+//
+// Example:
+// ```
+// cert, key = tls.GenerateRootCA("ca", tls.locality("Beijing"))~
+// ```
 func WithLocality(locality string) CertOption {
 	return func(c *CertConfig) {
 		c.Locality = locality
@@ -88,7 +141,17 @@ func WithOrganizationalUnit(ou string) CertOption {
 	}
 }
 
-// WithValidity 设置证书的有效期（从现在开始，持续时间为 duration）。
+// validity 是一个证书选项，用于设置证书的有效期（从现在开始，持续时间为 duration）
+// 参数:
+//   - duration: 有效期时长
+//
+// 返回值:
+//   - 一个证书选项，作为可变参数传入 tls.GenerateRootCA / tls.GenerateServerCert 等
+//
+// Example:
+// ```
+// cert, key = tls.GenerateRootCA("ca", tls.validity(time.Hour * 24 * 365))~
+// ```
 func WithValidity(duration time.Duration) CertOption {
 	return func(c *CertConfig) {
 		c.NotBefore = time.Now().Add(-5 * time.Minute) // 提前5分钟生效以避免时间同步问题
@@ -96,21 +159,51 @@ func WithValidity(duration time.Duration) CertOption {
 	}
 }
 
-// WithNotAfter 设置证书的过期时间。
+// notAfter 是一个证书选项，用于设置证书的过期时间
+// 参数:
+//   - t: 过期时间点
+//
+// 返回值:
+//   - 一个证书选项，作为可变参数传入 tls.GenerateRootCA / tls.GenerateServerCert 等
+//
+// Example:
+// ```
+// cert, key = tls.GenerateRootCA("ca", tls.notAfter(time.Now().Add(time.Hour)))~
+// ```
 func WithNotAfter(t time.Time) CertOption {
 	return func(c *CertConfig) {
 		c.NotAfter = t
 	}
 }
 
-// WithNotBefore 设置证书的生效时间。
+// notBefore 是一个证书选项，用于设置证书的生效时间
+// 参数:
+//   - t: 生效时间点
+//
+// 返回值:
+//   - 一个证书选项，作为可变参数传入 tls.GenerateRootCA / tls.GenerateServerCert 等
+//
+// Example:
+// ```
+// cert, key = tls.GenerateRootCA("ca", tls.notBefore(time.Now()))~
+// ```
 func WithNotBefore(t time.Time) CertOption {
 	return func(c *CertConfig) {
 		c.NotBefore = t
 	}
 }
 
-// WithAlternativeDNS 添加一个或多个 DNS 备用名称 (SAN)。
+// alternativeDNS 是一个证书选项，用于添加一个或多个 DNS 备用名称 (SAN)
+// 参数:
+//   - dnsNames: 一个或多个 DNS 名称
+//
+// 返回值:
+//   - 一个证书选项，作为可变参数传入 tls.GenerateRootCA / tls.GenerateServerCert 等
+//
+// Example:
+// ```
+// cert, key = tls.GenerateRootCA("ca", tls.alternativeDNS("example.com", "www.example.com"))~
+// ```
 func WithAlternativeDNS(dnsNames ...string) CertOption {
 	return func(c *CertConfig) {
 		c.AlternativeDNS = append(c.AlternativeDNS, dnsNames...)
@@ -124,8 +217,17 @@ func WithAlternativeIPs(ips ...net.IP) CertOption {
 	}
 }
 
-// WithAlternativeIPStrings 添加一个或多个字符串格式的 IP 备用名称 (SAN)。
-// 无效的 IP 字符串将被忽略。
+// alternativeIP 是一个证书选项，用于添加一个或多个字符串格式的 IP 备用名称 (SAN)，无效的 IP 字符串将被忽略
+// 参数:
+//   - ipStrings: 一个或多个 IP 地址字符串
+//
+// 返回值:
+//   - 一个证书选项，作为可变参数传入 tls.GenerateRootCA / tls.GenerateServerCert 等
+//
+// Example:
+// ```
+// cert, key = tls.GenerateRootCA("ca", tls.alternativeIP("127.0.0.1", "192.168.1.1"))~
+// ```
 func WithAlternativeIPStrings(ipStrings ...string) CertOption {
 	return func(c *CertConfig) {
 		for _, ipStr := range ipStrings {
@@ -158,6 +260,17 @@ func WithExtKeyUsage(usage ...x509.ExtKeyUsage) CertOption {
 	}
 }
 
+// privateKeyFromFile 是一个证书选项，用于从文件加载已有的私钥来签发证书，而不是自动生成新私钥
+// 参数:
+//   - path: 私钥文件路径
+//
+// 返回值:
+//   - 一个证书选项，作为可变参数传入 tls.GenerateServerCert / tls.GenerateClientCert 等
+//
+// Example:
+// ```
+// cert, key = tls.GenerateServerCert(ca, caKey, tls.privateKeyFromFile("/tmp/server.key"))~
+// ```
 func WithPrivateKeyFromFile(path string) CertOption {
 	return func(c *CertConfig) {
 		keyData, err := os.ReadFile(path)
@@ -173,6 +286,17 @@ func WithPrivateKeyFromFile(path string) CertOption {
 	}
 }
 
+// privateKeyFromRaw 是一个证书选项，用于从内存中的字节数据加载已有的私钥来签发证书，而不是自动生成新私钥
+// 参数:
+//   - key: PEM 格式的私钥字节数组
+//
+// 返回值:
+//   - 一个证书选项，作为可变参数传入 tls.GenerateServerCert / tls.GenerateClientCert 等
+//
+// Example:
+// ```
+// cert, key = tls.GenerateServerCert(ca, caKey, tls.privateKeyFromRaw(keyBytes))~
+// ```
 func WithPrivateKeyFromBytes(key []byte) CertOption {
 	return func(c *CertConfig) {
 		privateKey, err := ParsePrivateKey(key)
@@ -210,8 +334,22 @@ func GenerateCA(opts ...CertOption) ([]byte, []byte, error) {
 	return createCertificate(template, template, config.PrivateKey.Public(), config.PrivateKey)
 }
 
-// GenerateServerCert 使用给定的 CA 签发一个服务器证书。
-// caCertPEM 和 caKeyPEM 是 PEM 编码的 CA 证书和私钥。
+// GenerateServerCert 使用给定的 CA 签发一个服务器证书
+// 参数:
+//   - caCertPEM: PEM 编码的 CA 证书
+//   - caKeyPEM: PEM 编码的 CA 私钥
+//   - opts: 可选证书选项，例如 tls.commonName、tls.alternativeDNS
+//
+// 返回值:
+//   - PEM 编码的服务器证书
+//   - PEM 编码的服务器私钥
+//   - 错误信息，签发失败时返回非空
+//
+// Example:
+// ```
+// ca, caKey = tls.GenerateRootCA("ca")~
+// cert, key = tls.GenerateServerCert(ca, caKey, tls.commonName("example.com"))~
+// ```
 func GenerateServerCert(caCertPEM, caKeyPEM []byte, opts ...CertOption) ([]byte, []byte, error) {
 	// 为服务器证书设置默认的 KeyUsage 和 ExtKeyUsage
 	defaultOpts := []CertOption{
@@ -223,8 +361,22 @@ func GenerateServerCert(caCertPEM, caKeyPEM []byte, opts ...CertOption) ([]byte,
 	return generateSignedCert(caCertPEM, caKeyPEM, false, opts...) // isCA = false
 }
 
-// GenerateClientCert 使用给定的 CA 签发一个客户端证书。
-// caCertPEM 和 caKeyPEM 是 PEM 编码的 CA 证书和私钥。
+// GenerateClientCert 使用给定的 CA 签发一个客户端证书
+// 参数:
+//   - caCertPEM: PEM 编码的 CA 证书
+//   - caKeyPEM: PEM 编码的 CA 私钥
+//   - opts: 可选证书选项，例如 tls.commonName
+//
+// 返回值:
+//   - PEM 编码的客户端证书
+//   - PEM 编码的客户端私钥
+//   - 错误信息，签发失败时返回非空
+//
+// Example:
+// ```
+// ca, caKey = tls.GenerateRootCA("ca")~
+// cert, key = tls.GenerateClientCert(ca, caKey, tls.commonName("client"))~
+// ```
 func GenerateClientCert(caCertPEM, caKeyPEM []byte, opts ...CertOption) ([]byte, []byte, error) {
 	// 为客户端证书设置默认的 KeyUsage 和 ExtKeyUsage
 	defaultOpts := []CertOption{

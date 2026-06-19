@@ -166,6 +166,24 @@ func CreateOrUpdateYakScriptByName(db *gorm.DB, scriptName string, script *schem
 	return nil
 }
 
+// CreateTemporaryYakScript 创建一个临时插件并保存到数据库，返回插件名称（导出名为 db.CreateTemporaryYakScript）
+// 临时插件常用于测试，使用后可通过 db.DeleteYakScriptByName 清理
+// 参数:
+//   - t: 插件类型，如 "yak"、"mitm"
+//   - code: 插件源码
+//   - suffix: 可选的名称后缀
+//
+// 返回值:
+//   - 生成的临时插件名称
+//   - 错误信息
+//
+// Example:
+// ```
+// // 依赖本地插件数据库（示意性示例）
+// name = db.CreateTemporaryYakScript("yak", "yakit.Info(\"hello\")")~
+// defer db.DeleteYakScriptByName(name)
+// println(name)
+// ```
 func CreateTemporaryYakScript(t string, code string, suffix ...string) (string, error) {
 	script, err := NewTemporaryYakScript(t, code, suffix...)
 	if err != nil {

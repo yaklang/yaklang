@@ -120,6 +120,24 @@ type _tcpDialer struct {
 
 type dialerOpt func(d *_tcpDialer)
 
+// Connect 建立一个 TCP 连接，返回一个可收发数据的 TCP 连接对象
+// 参数:
+//   - host: 目标主机地址
+//   - port: 目标端口
+//   - opts: 可选配置，例如 tcp.clientTimeout、tcp.clientProxy、tcp.clientTls、tcp.clientLocal
+//
+// 返回值:
+//   - TCP 连接对象，可调用 Send/Recv 等方法
+//   - 错误信息，连接失败时返回非空
+//
+// Example:
+// ```
+// // 建立 TCP 连接并收发数据，依赖网络，此处仅作示意
+// conn = tcp.Connect("www.example.com", 80, tcp.clientTimeout(5))~
+// conn.Send("GET / HTTP/1.1\r\nHost: www.example.com\r\n\r\n")~
+// rsp = conn.Recv()~
+// println(string(rsp))
+// ```
 func _tcpConnect(host string, port interface{}, opts ...dialerOpt) (*tcpConnection, error) {
 	tcpDialer := &_tcpDialer{}
 	for _, opt := range opts {
@@ -162,12 +180,38 @@ func _tcpConnect(host string, port interface{}, opts ...dialerOpt) (*tcpConnecti
 	return &tcpConnection{Conn: conn}, nil
 }
 
+// clientTimeout 是一个 TCP 客户端配置选项，用于设置连接与读写的超时时间（单位：秒）
+// 参数:
+//   - i: 超时时间，单位为秒，支持小数
+//
+// 返回值:
+//   - 一个 TCP 客户端配置选项，作为可变参数传入 tcp.Connect
+//
+// Example:
+// ```
+// // 设置 5 秒超时建立 TCP 连接，此处仅作示意
+// conn = tcp.Connect("www.example.com", 80, tcp.clientTimeout(5))~
+// println(conn)
+// ```
 func _tcpTimeout(i float64) dialerOpt {
 	return func(d *_tcpDialer) {
 		d.timeout = _floatSeconds(i)
 	}
 }
 
+// clientLocal 是一个 TCP 客户端配置选项，用于指定本地绑定的 IP 地址（不允许使用域名）
+// 参数:
+//   - i: 本地 IP 地址，可为 "192.168.0.1" 或 "192.168.0.1:0" 形式
+//
+// 返回值:
+//   - 一个 TCP 客户端配置选项，作为可变参数传入 tcp.Connect
+//
+// Example:
+// ```
+// // 指定本地出口 IP 建立 TCP 连接，此处仅作示意
+// conn = tcp.Connect("www.example.com", 80, tcp.clientLocal("0.0.0.0:0"), tcp.clientTimeout(5))~
+// println(conn)
+// ```
 func _tcpLocalAddr(i interface{}) dialerOpt {
 	addrStr := fmt.Sprint(i)
 
@@ -202,6 +246,21 @@ func _tcpLocalAddr(i interface{}) dialerOpt {
 	}
 }
 
+// clientTls 是一个 TCP 客户端配置选项，用于以 TLS（含国密 GMTLS）方式建立连接
+// 参数:
+//   - crt: 客户端证书（PEM 格式内容或文件路径）
+//   - key: 客户端私钥（PEM 格式内容或文件路径）
+//   - caCerts: 可选的 CA 证书列表，用于校验服务端证书
+//
+// 返回值:
+//   - 一个 TCP 客户端配置选项，作为可变参数传入 tcp.Connect
+//
+// Example:
+// ```
+// // 以双向 TLS 建立 TCP 连接，此处仅作示意
+// conn = tcp.Connect("www.example.com", 443, tcp.clientTls(cert, key), tcp.clientTimeout(5))~
+// println(conn)
+// ```
 func _tcpClientTls(crt, key interface{}, caCerts ...interface{}) dialerOpt {
 	tlcConfig := BuildGmTlsConfig(crt, key, caCerts...)
 	return func(d *_tcpDialer) {
@@ -209,6 +268,19 @@ func _tcpClientTls(crt, key interface{}, caCerts ...interface{}) dialerOpt {
 	}
 }
 
+// clientProxy 是一个 TCP 客户端配置选项，用于通过代理建立连接
+// 参数:
+//   - proxy: 代理地址，支持 http、https、socks4、socks5 协议
+//
+// 返回值:
+//   - 一个 TCP 客户端配置选项，作为可变参数传入 tcp.Connect
+//
+// Example:
+// ```
+// // 通过本地 socks5 代理建立 TCP 连接，此处仅作示意
+// conn = tcp.Connect("www.example.com", 80, tcp.clientProxy("socks5://127.0.0.1:1080"), tcp.clientTimeout(5))~
+// println(conn)
+// ```
 func _tcpClientProxy(proxy string) dialerOpt {
 	return func(d *_tcpDialer) {
 		d.proxy = proxy
@@ -243,6 +315,20 @@ var (
 	Tcp_Server_Tls      = _tcpServerTls
 )
 
+// MockTCPProtocol 启动一个模拟指定协议指纹的 TCP 服务，用于测试，返回监听的主机与端口
+// 参数:
+//   - name: 要模拟的服务名称（指纹规则名）
+//
+// 返回值:
+//   - 模拟服务监听的主机地址
+//   - 模拟服务监听的端口
+//
+// Example:
+// ```
+// // 启动一个模拟 TCP 协议的本地服务用于测试，此处仅作示意
+// host, port = tcp.MockTCPProtocol("http")
+// println(host, port)
+// ```
 func DebugMockTCPProtocol(name string) (string, int) {
 	cfg := fp.NewConfig(fp.WithTransportProtos(fp.ParseStringToProto([]interface{}{"tcp"}...)...))
 	blocks := fp.GetRuleBlockByServiceName(name, cfg)

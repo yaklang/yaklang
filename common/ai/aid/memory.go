@@ -86,6 +86,19 @@ func (m *PromptContextProvider) CopyReducibleMemory() *PromptContextProvider {
 	return mem
 }
 
+// GetDefaultContextProvider 返回默认的 Prompt 上下文提供器（导出名为 aiagent.GetDefaultContextProvider）
+// 上下文提供器持有计划历史、持久化数据、交互历史以及工具列表
+// 参数:
+//   - 无
+//
+// 返回值:
+//   - 默认上下文提供器对象
+//
+// Example:
+// ```
+// provider = aiagent.GetDefaultContextProvider()
+// dump(provider)
+// ```
 func GetDefaultContextProvider() *PromptContextProvider {
 	mem := &PromptContextProvider{
 		PlanHistory:        make([]*PlanRecord, 0),

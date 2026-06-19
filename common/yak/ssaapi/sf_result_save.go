@@ -22,6 +22,21 @@ func LoadResultByRuleContent(programName, ruleContent string, kind schema.Syntax
 	return loadResult(result)
 }
 
+// LoadResultByID 根据结果 ID 从数据库加载已保存的 SyntaxFlow 查询结果（导出名为 ssa.NewResultFromDB）
+// 参数:
+//   - resultID: 已保存结果的数据库 ID
+//   - force: 是否强制跳过缓存重新加载，缺省为 false
+//
+// 返回值:
+//   - SyntaxFlow 查询结果对象
+//   - 错误信息
+//
+// Example:
+// ```
+// // 加载某次已保存的查询结果（示意性示例，需要数据库中已有该结果）
+// result = ssa.NewResultFromDB(1)~
+// dump(result)
+// ```
 func LoadResultByID(resultID uint, force ...bool) (*SyntaxFlowResult, error) {
 	// if set force=true not use cache
 	if len(force) > 0 && force[0] {

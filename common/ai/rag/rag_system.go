@@ -263,6 +263,21 @@ func LoadRAGSystem(name string, opts ...RAGSystemConfigOption) (*RAGSystem, erro
 	return NewRAGSystem(options...)
 }
 
+// GetRagSystem 获取（或按需创建）指定名称的 RAG 系统（导出名为 rag.Get / rag.GetCollection）
+// 参数:
+//   - name: RAG 系统/集合名称
+//   - opts: 可选配置（嵌入模型、维度、描述等）
+//
+// 返回值:
+//   - RAG 系统对象
+//   - 错误信息
+//
+// Example:
+// ```
+// // 依赖本地数据库与嵌入服务（示意性示例）
+// db = rag.Get("my-collection")~
+// results = db.Query("hello", 5)~
+// ```
 func GetRagSystem(name string, opts ...RAGSystemConfigOption) (*RAGSystem, error) {
 	defaultOptions := []RAGSystemConfigOption{
 		WithName(name),

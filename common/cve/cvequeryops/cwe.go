@@ -43,22 +43,55 @@ type CWEUpdateConfig struct {
 // CWEUpdateOption is a function type for configuring CWE update
 type CWEUpdateOption func(*CWEUpdateConfig)
 
-// WithCWEProxy sets the proxy for CWE download
+// WithCWEProxy 设置下载 CWE 数据时使用的代理（导出名为 cwe.proxy）
+// 参数:
+//   - proxy: 代理地址，如 http://127.0.0.1:8080
+//
+// 返回值:
+//   - CWE 更新可选项
+//
+// Example:
+// ```
+// // 示意性示例，需要网络下载 CWE 数据
+// err = cwe.Update(cwe.proxy("http://127.0.0.1:8080"))
+// ```
 func WithCWEProxy(proxy string) CWEUpdateOption {
 	return func(c *CWEUpdateConfig) {
 		c.Proxy = proxy
 	}
 }
 
-// WithCWEURL sets the URL for CWE download
+// WithCWEURL 设置 CWE 数据的下载地址（导出名为 cwe.url）
+// 参数:
+//   - url: CWE 数据下载 URL
+//
+// 返回值:
+//   - CWE 更新可选项
+//
+// Example:
+// ```
+// // 示意性示例，需要网络下载 CWE 数据
+// err = cwe.Update(cwe.url("https://custom-url.com/cwe.zip"))
+// ```
 func WithCWEURL(url string) CWEUpdateOption {
 	return func(c *CWEUpdateConfig) {
 		c.URL = url
 	}
 }
 
-// CWEUpdate downloads and updates the CWE database
-// Usage: cwe.Update() or cwe.Update(cwe.proxy("http://127.0.0.1:8080"), cwe.url("https://custom-url.com/cwe.zip"))
+// CWEUpdate 下载并更新本地 CWE 数据库（导出名为 cwe.Update）
+// 参数:
+//   - opts: 更新可选项，如 cwe.proxy / cwe.url
+//
+// 返回值:
+//   - 错误信息
+//
+// Example:
+// ```
+// // 示意性示例，需要网络下载 CWE 数据
+// err = cwe.Update()
+// if err != nil { die(err) }
+// ```
 func CWEUpdate(opts ...CWEUpdateOption) error {
 	config := &CWEUpdateConfig{
 		URL: DefaultCWEURL,
@@ -188,7 +221,18 @@ type CWEAICompleteConfig struct {
 // CWEAICompleteOption is a function type for configuring AI completion
 type CWEAICompleteOption func(*CWEAICompleteConfig)
 
-// WithAIConcurrent sets the number of concurrent workers for AI completion
+// WithAIConcurrent 设置 AI 补全 CWE 字段时的并发数（导出名为 cwe.aiConcurrent）
+// 参数:
+//   - n: 并发工作协程数
+//
+// 返回值:
+//   - CWE AI 补全可选项
+//
+// Example:
+// ```
+// // 示意性示例，需要 AI 配置与 CWE 数据库
+// err = cwe.AICompleteFields(cwe.aiConcurrent(5))
+// ```
 func WithAIConcurrent(n int) CWEAICompleteOption {
 	return func(c *CWEAICompleteConfig) {
 		if n > 0 {
@@ -197,7 +241,18 @@ func WithAIConcurrent(n int) CWEAICompleteOption {
 	}
 }
 
-// WithTestLimit sets the maximum number of CWEs to process (for testing)
+// WithTestLimit 限制 AI 补全处理的 CWE 数量，常用于测试（导出名为 cwe.testLimit）
+// 参数:
+//   - n: 最大处理数量，0 表示不限制
+//
+// 返回值:
+//   - CWE AI 补全可选项
+//
+// Example:
+// ```
+// // 示意性示例，需要 AI 配置与 CWE 数据库
+// err = cwe.AICompleteFields(cwe.testLimit(10))
+// ```
 func WithTestLimit(n int) CWEAICompleteOption {
 	return func(c *CWEAICompleteConfig) {
 		if n > 0 {
@@ -221,13 +276,19 @@ type cweTranslationResult struct {
 	err     error
 }
 
-// AICompleteFields uses AI to complete missing CWE fields like translations
-// Usage:
-//   - cwe.AICompleteFields() - use default settings
-//   - cwe.AICompleteFields(ai.type("openai")) - specify AI type
-//   - cwe.AICompleteFields(cwe.aiConcurrent(10)) - use 10 concurrent workers
-//   - cwe.AICompleteFields(cwe.testLimit(5)) - only process 5 CWEs for testing
-//   - cwe.AICompleteFields(cwe.aiConcurrent(10), cwe.testLimit(5), ai.type("openai"))
+// AICompleteFields 使用 AI 补全 CWE 缺失字段（如中文翻译，导出名为 cwe.AICompleteFields）
+// 参数:
+//   - opts: 可选项，如 cwe.aiConcurrent、cwe.testLimit 或 ai.type 等 AI 配置
+//
+// 返回值:
+//   - 错误信息
+//
+// Example:
+// ```
+// // 示意性示例，需要 AI 配置与 CWE 数据库
+// err = cwe.AICompleteFields(cwe.aiConcurrent(10), cwe.testLimit(5))
+// if err != nil { die(err) }
+// ```
 func AICompleteFields(opts ...any) error {
 	// Parse options
 	config := &CWEAICompleteConfig{
@@ -467,7 +528,19 @@ func generateCWETranslationPrompt(cwe *cveresources.CWE) string {
 	return prompt.String()
 }
 
-// ListAllCWE returns a channel that yields all CWE entries from the database
+// ListAllCWE 流式返回数据库中所有 CWE 条目（导出名为 cwe.ListAll）
+// 返回值:
+//   - CWE 条目的流式通道
+//
+// Example:
+// ```
+// // 示意性示例，需要本地 CWE 数据库
+//
+//	for c in cwe.ListAll() {
+//	    println(c.CWEString())
+//	}
+//
+// ```
 func ListAllCWE() chan *cveresources.CWE {
 	db := consts.GetGormCVEDatabase()
 	if db == nil {
@@ -570,8 +643,20 @@ func hasImportantFieldsChanged(existing, new *cveresources.CWE) bool {
 	return false
 }
 
-// ExportCWE exports all CWE entries to a JSONL file
-// Each line is a JSON object representing a CWE entry
+// ExportCWE 将所有 CWE 条目导出为 JSONL 文件（导出名为 cwe.Export）
+// 每行是一个表示 CWE 条目的 JSON 对象
+// 参数:
+//   - filename: 导出目标文件路径
+//
+// 返回值:
+//   - 错误信息
+//
+// Example:
+// ```
+// // 示意性示例，需要本地 CWE 数据库
+// err = cwe.Export("/tmp/cwe.jsonl")
+// if err != nil { die(err) }
+// ```
 func ExportCWE(filename string) error {
 	db := consts.GetGormCVEDatabase()
 	if db == nil {
@@ -603,8 +688,20 @@ func ExportCWE(filename string) error {
 	return nil
 }
 
-// ImportCWE imports CWE entries from a JSONL file
-// Each line should be a JSON object representing a CWE entry
+// ImportCWE 从 JSONL 文件导入 CWE 条目（导出名为 cwe.Import）
+// 每行应为一个表示 CWE 条目的 JSON 对象
+// 参数:
+//   - filename: 导入源文件路径
+//
+// 返回值:
+//   - 错误信息
+//
+// Example:
+// ```
+// // 示意性示例，需要本地 CWE 数据库
+// err = cwe.Import("/tmp/cwe.jsonl")
+// if err != nil { die(err) }
+// ```
 func ImportCWE(filename string) error {
 	db := consts.GetGormCVEDatabase()
 	if db == nil {

@@ -328,6 +328,18 @@ func LoadPackage(typeStr string, basePath string) (*schema.YakScript, *schema.Ma
 	return script, nil, nil
 }
 
+// LoadYakitFromLocalDir 从本地目录加载 Yakit 插件与文档并写入本地数据库（导出名为 yakit.UpdateYakitStoreLocal）
+// 参数:
+//   - f: 本地资源目录路径
+//
+// 返回值:
+//   - 错误信息
+//
+// Example:
+// ```
+// // 依赖本地数据库（示意性示例）
+// yakit.UpdateYakitStoreLocal("/tmp/yakit-store")~
+// ```
 func LoadYakitFromLocalDir(f string) error {
 	db := consts.GetGormProfileDatabase()
 	if db == nil {
@@ -362,6 +374,21 @@ func LoadYakitFromLocalDir(f string) error {
 	return nil
 }
 
+// LoadYakitThirdpartySourceScripts 从第三方 Git 源拉取并导入 Yakit 插件（导出名为 yakit.UpdateYakitStoreFromGit）
+// 参数:
+//   - ctx: 上下文，用于控制取消与超时
+//   - ghUrl: 第三方 Git 仓库地址
+//   - proxy: 可选的代理地址
+//
+// 返回值:
+//   - 错误信息
+//
+// Example:
+// ```
+// // 需要联网及本地数据库（示意性示例）
+// ctx = context.Background()
+// yakit.UpdateYakitStoreFromGit(ctx, "https://github.com/example/yakit-store")~
+// ```
 func LoadYakitThirdpartySourceScripts(
 	ctx context.Context, ghUrl string,
 	proxy ...string,

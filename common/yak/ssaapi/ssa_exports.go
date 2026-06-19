@@ -54,7 +54,22 @@ func ClearCache() {
 	ttlSSAParseCache.Purge()
 }
 
-// Parse parse code to ssa.Program
+// Parse 将一段源码编译为 SSA 程序对象，用于后续的 SyntaxFlow 查询与静态分析
+// 导出名为 ssa.Parse
+// 参数:
+//   - code: 待编译的源码字符串
+//   - opts: 编译可选项，如 ssa.withLanguage(ssa.Yak)、ssa.withProgramName 等
+//
+// 返回值:
+//   - 编译得到的 SSA 程序对象
+//   - 错误信息
+//
+// Example:
+// ```
+// prog = ssa.Parse("a = 1; b = a + 1; println(b)", ssa.withLanguage(ssa.Yak))~
+// result = prog.SyntaxFlowWithError("println(* as $arg)")~
+// assert result != nil, "syntaxflow result should not be nil"
+// ```
 func Parse(code string, opts ...ssaconfig.Option) (*Program, error) {
 	input := strings.NewReader(code)
 	return ParseFromReader(input, opts...)

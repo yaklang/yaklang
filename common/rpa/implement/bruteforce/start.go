@@ -2,6 +2,29 @@ package bruteforce
 
 import "github.com/yaklang/yaklang/common/rpa/captcha"
 
+// BruteForceStart 对目标登录页面进行基于浏览器的自动化登录爆破（导出名为 rpa.Bruteforce）
+// 参数:
+//   - url: 目标登录页面 URL
+//   - opts: 可选项，如 rpa.bruteUsername、rpa.brutePassword、rpa.bruteUserElement 等
+//
+// 返回值:
+//   - 爆破成功的用户名
+//   - 爆破成功的密码
+//
+// Example:
+// ```
+// // 对登录页面进行爆破（示意性示例，需要本地已安装浏览器）
+// username, password = rpa.Bruteforce("http://example.com/login",
+//
+//	rpa.bruteUsername("admin"),
+//	rpa.brutePassword("admin", "123456"),
+//	rpa.bruteUserElement("#username"),
+//	rpa.brutePassElement("#password"),
+//	rpa.bruteButtonElement("#login"),
+//
+// )
+// println(username, password)
+// ```
 func BruteForceStart(url string, opts ...ConfigOpt) (string, string) {
 	config := &Config{
 		webNavigateWait: 1,

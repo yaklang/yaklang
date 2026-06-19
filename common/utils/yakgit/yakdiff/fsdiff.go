@@ -125,7 +125,26 @@ func FileSystemDiffToStringContext(ctx context.Context, fs1, fs2 fi.FileSystem) 
 	return result, err
 }
 
-// FileSystemDiff 比较两个文件系统并返回diff字符串（为了向后兼容，现在返回字符串）
+// FileSystemDiff 比较两个文件系统并返回 git 风格的 diff 文本
+// 常用于比较两个目录树或压缩包的内容差异（导出名为 diff.DiffFromFileSystem）
+// 参数:
+//   - fs1: 第一个（旧）文件系统
+//   - fs2: 第二个（新）文件系统
+//   - handler: 可选的差异回调处理器；提供后将逐个变更回调且返回空字符串
+//
+// 返回值:
+//   - diff 文本（未提供 handler 时）；内容相同时为空字符串
+//   - 错误信息
+//
+// Example:
+// ```
+// // 比较两个目录（示意性示例，需替换为真实路径）
+// fs1 = filesys.NewRelLocalFs("/tmp/dir-old")
+// fs2 = filesys.NewRelLocalFs("/tmp/dir-new")
+// result, err = diff.DiffFromFileSystem(fs1, fs2)
+// if err != nil { die(err) }
+// println(result)
+// ```
 func FileSystemDiff(fs1, fs2 fi.FileSystem, handler ...DiffHandler) (string, error) {
 	if len(handler) > 0 {
 		// 如果提供了处理器，保持原有行为但返回空字符串

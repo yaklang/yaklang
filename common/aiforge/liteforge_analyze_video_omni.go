@@ -215,16 +215,108 @@ func NewDefaultVideoOmniConfig() *VideoOmniConfig {
 
 // 关键词: VideoOmniOption, omni 视频选项
 
-func WithVideoOmniType(t string) VideoOmniOption       { return func(c *VideoOmniConfig) { c.AIType = t } }
-func WithVideoOmniModel(m string) VideoOmniOption      { return func(c *VideoOmniConfig) { c.Model = m } }
-func WithVideoOmniAPIKey(k string) VideoOmniOption     { return func(c *VideoOmniConfig) { c.APIKey = k } }
-func WithVideoOmniBaseURL(u string) VideoOmniOption    { return func(c *VideoOmniConfig) { c.BaseURL = u } }
+// WithVideoOmniType 设置 omni 视频分析使用的 AI 类型（导出名为 liteforge.omniType）
+// 参数:
+//   - t: AI 类型
+//
+// 返回值:
+//   - omni 视频可选项
+//
+// Example:
+// ```
+// opt = liteforge.omniType("openai")
+// println(opt)
+// ```
+func WithVideoOmniType(t string) VideoOmniOption { return func(c *VideoOmniConfig) { c.AIType = t } }
+
+// WithVideoOmniModel 设置 omni 视频分析使用的模型（导出名为 liteforge.omniModel）
+// 参数:
+//   - m: 模型名
+//
+// 返回值:
+//   - omni 视频可选项
+//
+// Example:
+// ```
+// opt = liteforge.omniModel("qwen-omni-turbo")
+// println(opt)
+// ```
+func WithVideoOmniModel(m string) VideoOmniOption { return func(c *VideoOmniConfig) { c.Model = m } }
+
+// WithVideoOmniAPIKey 设置 omni 视频分析使用的 API Key（导出名为 liteforge.omniAPIKey）
+// 参数:
+//   - k: API Key
+//
+// 返回值:
+//   - omni 视频可选项
+//
+// Example:
+// ```
+// opt = liteforge.omniAPIKey("your-key")
+// println(opt)
+// ```
+func WithVideoOmniAPIKey(k string) VideoOmniOption { return func(c *VideoOmniConfig) { c.APIKey = k } }
+
+// WithVideoOmniBaseURL 设置 omni 视频分析使用的 API 基础地址（导出名为 liteforge.omniBaseURL）
+// 参数:
+//   - u: API 基础地址
+//
+// 返回值:
+//   - omni 视频可选项
+//
+// Example:
+// ```
+// opt = liteforge.omniBaseURL("https://dashscope.aliyuncs.com")
+// println(opt)
+// ```
+func WithVideoOmniBaseURL(u string) VideoOmniOption {
+	return func(c *VideoOmniConfig) { c.BaseURL = u }
+}
+
+// WithVideoOmniSystemPrompt 设置 omni 视频分析的系统提示词（导出名为 liteforge.omniSystemPrompt）
+// 参数:
+//   - p: 系统提示词
+//
+// 返回值:
+//   - omni 视频可选项
+//
+// Example:
+// ```
+// opt = liteforge.omniSystemPrompt("you are a video knowledge extractor")
+// println(opt)
+// ```
 func WithVideoOmniSystemPrompt(p string) VideoOmniOption {
 	return func(c *VideoOmniConfig) { c.SystemPrompt = p }
 }
+
+// WithVideoOmniQueryPrompt 设置 omni 视频分析的查询提示词（导出名为 liteforge.omniQueryPrompt）
+// 参数:
+//   - q: 查询提示词
+//
+// 返回值:
+//   - omni 视频可选项
+//
+// Example:
+// ```
+// opt = liteforge.omniQueryPrompt("summarize this video segment")
+// println(opt)
+// ```
 func WithVideoOmniQueryPrompt(q string) VideoOmniOption {
 	return func(c *VideoOmniConfig) { c.QueryPrompt = q }
 }
+
+// WithVideoOmniContext 设置 omni 视频分析的上下文（导出名为 liteforge.omniContext）
+// 参数:
+//   - ctx: 上下文对象
+//
+// 返回值:
+//   - omni 视频可选项
+//
+// Example:
+// ```
+// opt = liteforge.omniContext(context.Background())
+// println(opt)
+// ```
 func WithVideoOmniContext(ctx context.Context) VideoOmniOption {
 	return func(c *VideoOmniConfig) {
 		if ctx != nil {
@@ -232,6 +324,19 @@ func WithVideoOmniContext(ctx context.Context) VideoOmniOption {
 		}
 	}
 }
+
+// WithVideoOmniTimeout 设置 omni 视频分析的超时时间（导出名为 liteforge.omniTimeout）
+// 参数:
+//   - d: 超时时间（time.Duration）
+//
+// 返回值:
+//   - omni 视频可选项
+//
+// Example:
+// ```
+// opt = liteforge.omniTimeout(300 * time.Second)
+// println(opt)
+// ```
 func WithVideoOmniTimeout(d time.Duration) VideoOmniOption {
 	return func(c *VideoOmniConfig) {
 		if d > 0 {
@@ -239,6 +344,19 @@ func WithVideoOmniTimeout(d time.Duration) VideoOmniOption {
 		}
 	}
 }
+
+// WithVideoOmniSegmentSeconds 设置 omni 视频切片的时长（秒，导出名为 liteforge.omniSegmentSeconds）
+// 参数:
+//   - s: 每段视频时长（秒）
+//
+// 返回值:
+//   - omni 视频可选项
+//
+// Example:
+// ```
+// opt = liteforge.omniSegmentSeconds(10)
+// println(opt)
+// ```
 func WithVideoOmniSegmentSeconds(s float64) VideoOmniOption {
 	return func(c *VideoOmniConfig) {
 		if s > 0 {
@@ -246,21 +364,117 @@ func WithVideoOmniSegmentSeconds(s float64) VideoOmniOption {
 		}
 	}
 }
-func WithVideoOmniReencode(b bool) VideoOmniOption    { return func(c *VideoOmniConfig) { c.Reencode = b } }
-func WithVideoOmniMaxHeight(h int) VideoOmniOption    { return func(c *VideoOmniConfig) { c.MaxHeight = h } }
-func WithVideoOmniTargetFPS(f float64) VideoOmniOption { return func(c *VideoOmniConfig) { c.TargetFPS = f } }
+
+// WithVideoOmniReencode 设置是否对视频切片重新编码（导出名为 liteforge.omniReencode）
+// 参数:
+//   - b: 是否重新编码
+//
+// 返回值:
+//   - omni 视频可选项
+//
+// Example:
+// ```
+// opt = liteforge.omniReencode(true)
+// println(opt)
+// ```
+func WithVideoOmniReencode(b bool) VideoOmniOption {
+	return func(c *VideoOmniConfig) { c.Reencode = b }
+}
+
+// WithVideoOmniMaxHeight 设置视频切片的最大高度（导出名为 liteforge.omniMaxHeight）
+// 参数:
+//   - h: 最大高度（像素）
+//
+// 返回值:
+//   - omni 视频可选项
+//
+// Example:
+// ```
+// opt = liteforge.omniMaxHeight(720)
+// println(opt)
+// ```
+func WithVideoOmniMaxHeight(h int) VideoOmniOption {
+	return func(c *VideoOmniConfig) { c.MaxHeight = h }
+}
+
+// WithVideoOmniTargetFPS 设置视频切片的目标帧率（导出名为 liteforge.omniTargetFPS）
+// 参数:
+//   - f: 目标帧率
+//
+// 返回值:
+//   - omni 视频可选项
+//
+// Example:
+// ```
+// opt = liteforge.omniTargetFPS(1.0)
+// println(opt)
+// ```
+func WithVideoOmniTargetFPS(f float64) VideoOmniOption {
+	return func(c *VideoOmniConfig) { c.TargetFPS = f }
+}
+
+// WithVideoOmniMaxBase64Bytes 设置每段视频 base64 编码后的字节上限（导出名为 liteforge.omniMaxBase64Bytes）
+// 参数:
+//   - n: 字节上限
+//
+// 返回值:
+//   - omni 视频可选项
+//
+// Example:
+// ```
+// opt = liteforge.omniMaxBase64Bytes(7 * 1024 * 1024)
+// println(opt)
+// ```
 func WithVideoOmniMaxBase64Bytes(n int64) VideoOmniOption {
 	return func(c *VideoOmniConfig) { c.MaxBase64Bytes = n }
 }
+
+// WithVideoOmniMaxSegments 设置最多分析的视频段数（导出名为 liteforge.omniMaxSegments）
+// 参数:
+//   - n: 最大段数
+//
+// 返回值:
+//   - omni 视频可选项
+//
+// Example:
+// ```
+// opt = liteforge.omniMaxSegments(10)
+// println(opt)
+// ```
 func WithVideoOmniMaxSegments(n int) VideoOmniOption {
 	return func(c *VideoOmniConfig) { c.MaxSegments = n }
 }
+
+// WithVideoOmniProgressCallback 设置 omni 视频分析的进度回调（导出名为 liteforge.omniProgressCallback）
+// 参数:
+//   - cb: 进度回调，参数为每段的分析结果
+//
+// 返回值:
+//   - omni 视频可选项
+//
+// Example:
+// ```
+// opt = liteforge.omniProgressCallback(func(seg) { dump(seg) })
+// println(opt)
+// ```
 func WithVideoOmniProgressCallback(cb func(*VideoOmniSegmentResult)) VideoOmniOption {
 	return func(c *VideoOmniConfig) { c.ProgressCallback = cb }
 }
 
 // WithVideoOmniRateLimitRetry 设定 429 / 限速退避重试次数与基数。
 // 关键词: WithVideoOmniRateLimitRetry, omni 视频限速重试
+// 参数:
+//   - maxAttempts: 最大重试次数
+//   - backoffBase: 退避基数（time.Duration）
+//
+// 返回值:
+//   - omni 视频可选项
+//
+// Example:
+// ```
+// opt = liteforge.omniRateLimitRetry(3, time.Second)
+// println(opt)
+// ```
 func WithVideoOmniRateLimitRetry(maxAttempts int, backoffBase time.Duration) VideoOmniOption {
 	return func(c *VideoOmniConfig) {
 		if maxAttempts > 0 {
@@ -274,6 +488,17 @@ func WithVideoOmniRateLimitRetry(maxAttempts int, backoffBase time.Duration) Vid
 
 // WithVideoOmniSegmentInterval 设置段间静默节流，<=0 表示不节流。
 // 关键词: WithVideoOmniSegmentInterval, omni 视频段间节流
+// 参数:
+//   - d: 段间间隔（time.Duration）
+//
+// 返回值:
+//   - omni 视频可选项
+//
+// Example:
+// ```
+// opt = liteforge.omniSegmentInterval(time.Second)
+// println(opt)
+// ```
 func WithVideoOmniSegmentInterval(d time.Duration) VideoOmniOption {
 	return func(c *VideoOmniConfig) {
 		if d > 0 {
@@ -286,12 +511,34 @@ func WithVideoOmniSegmentInterval(d time.Duration) VideoOmniOption {
 
 // WithVideoOmniZipFile 指定 zip 文件完整输出路径。
 // 设置后会忽略 WithVideoOmniZipDir。
+// 参数:
+//   - p: zip 文件输出路径
+//
+// 返回值:
+//   - omni 视频可选项
+//
+// Example:
+// ```
+// opt = liteforge.omniZipFile("/tmp/omni-result.zip")
+// println(opt)
+// ```
 func WithVideoOmniZipFile(p string) VideoOmniOption {
 	return func(c *VideoOmniConfig) { c.ZipFile = p }
 }
 
 // WithVideoOmniZipDir 指定 zip 输出目录，运行时自动按
 // {kbName|video-omni}-{model}-{ts}.zip 命名落盘。
+// 参数:
+//   - dir: zip 输出目录
+//
+// 返回值:
+//   - omni 视频可选项
+//
+// Example:
+// ```
+// opt = liteforge.omniZipDir("/tmp")
+// println(opt)
+// ```
 func WithVideoOmniZipDir(dir string) VideoOmniOption {
 	return func(c *VideoOmniConfig) { c.ZipDir = dir }
 }
@@ -305,18 +552,56 @@ func withVideoOmniKBName(name string) VideoOmniOption {
 // VideoOmniPresetTurbo / Flash / Plus 提供 forge 友好的预设
 // 关键词: omniPresetTurbo, omniPresetFlash, omniPresetPlus
 // 预设会强制覆盖 Preset 与 Model；若需要再覆盖 Model 请在 preset 之后再调用 WithVideoOmniModel
+// VideoOmniPresetTurbo 使用 turbo 预设（qwen-omni-turbo 模型，导出名为 liteforge.omniPresetTurbo）
+// 参数:
+//   - 无
+//
+// 返回值:
+//   - omni 视频可选项
+//
+// Example:
+// ```
+// opt = liteforge.omniPresetTurbo()
+// println(opt)
+// ```
 func VideoOmniPresetTurbo() VideoOmniOption {
 	return func(c *VideoOmniConfig) {
 		c.Preset = "turbo"
 		c.Model = "qwen-omni-turbo"
 	}
 }
+
+// VideoOmniPresetFlash 使用 flash 预设（qwen3-omni-flash 模型，导出名为 liteforge.omniPresetFlash）
+// 参数:
+//   - 无
+//
+// 返回值:
+//   - omni 视频可选项
+//
+// Example:
+// ```
+// opt = liteforge.omniPresetFlash()
+// println(opt)
+// ```
 func VideoOmniPresetFlash() VideoOmniOption {
 	return func(c *VideoOmniConfig) {
 		c.Preset = "flash"
 		c.Model = "qwen3-omni-flash"
 	}
 }
+
+// VideoOmniPresetPlus 使用 plus 预设（qwen3.5-omni-plus 模型，导出名为 liteforge.omniPresetPlus）
+// 参数:
+//   - 无
+//
+// 返回值:
+//   - omni 视频可选项
+//
+// Example:
+// ```
+// opt = liteforge.omniPresetPlus()
+// println(opt)
+// ```
 func VideoOmniPresetPlus() VideoOmniOption {
 	return func(c *VideoOmniConfig) {
 		c.Preset = "plus"
@@ -353,6 +638,24 @@ const defaultOmniVideoQueryPrompt = `请按下面 JSON Schema 严格输出该视
 //	)
 //
 // 关键词: AnalyzeVideoOmni, omni 视频端到端
+// 参数:
+//   - video: 视频文件路径
+//   - options: omni 视频可选项，如 liteforge.omniPresetFlash、liteforge.omniAPIKey 等
+//
+// 返回值:
+//   - 按段返回的分析结果 channel
+//   - 错误信息
+//
+// Example:
+// ```
+// // 需要可用的 omni 模型与 API Key（示意性示例）
+// ch = aiforge.AnalyzeVideoOmni("/tmp/demo.mp4", liteforge.omniPresetFlash(), liteforge.omniAPIKey("your-key"))~
+//
+//	for result := range ch {
+//	    dump(result)
+//	}
+//
+// ```
 func AnalyzeVideoOmni(video string, options ...any) (<-chan AnalysisResult, error) {
 	cfg := NewDefaultVideoOmniConfig()
 	for _, opt := range options {

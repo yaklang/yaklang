@@ -37,6 +37,16 @@ func init() {
 	yaklib.FuzzExports["FuzzCalcExprInt64Safe"] = FuzzCalcExpr3
 }
 
+// FuzzCalcExprInt64Safe 生成一组用于表达式注入(SSTI/计算型)探测的随机变量，保证减法结果在 int64 安全范围内
+// 返回值:
+//   - 包含 num1、num2、expr、result 等键的变量表，用于构造与校验计算型注入 payload
+//
+// Example:
+// ```
+// // 生成 int64 安全的计算型注入变量，此处仅作示意
+// vars = fuzz.FuzzCalcExprInt64Safe()
+// println(vars["expr"])
+// ```
 func FuzzCalcExpr3() map[string]any {
 	vars := NewVars()
 	// int32 max: 2147483647               (10位)
@@ -51,6 +61,16 @@ func FuzzCalcExpr3() map[string]any {
 	return vars.ToMap()
 }
 
+// FuzzCalcExprInt32Safe 生成一组用于表达式注入(SSTI/计算型)探测的随机变量，保证减法结果在 int32 安全范围内
+// 返回值:
+//   - 包含 num1、num2、expr、result 等键的变量表，用于构造与校验计算型注入 payload
+//
+// Example:
+// ```
+// // 生成 int32 安全的计算型注入变量，此处仅作示意
+// vars = fuzz.FuzzCalcExprInt32Safe()
+// println(vars["expr"])
+// ```
 func FuzzCalcExpr2() map[string]any {
 	vars := NewVars()
 	// int32 max: 2147483647               (10位)
@@ -65,6 +85,16 @@ func FuzzCalcExpr2() map[string]any {
 	return vars.ToMap()
 }
 
+// FuzzCalcExpr 生成一组用于表达式注入(SSTI/计算型)探测的随机日期相关变量与计算表达式
+// 返回值:
+//   - 包含 year、month、day、expr、result 等键的变量表，用于构造与校验计算型注入 payload
+//
+// Example:
+// ```
+// // 生成计算型注入变量，此处仅作示意
+// vars = fuzz.FuzzCalcExpr()
+// println(vars["expr"])
+// ```
 func FuzzCalcExpr() map[string]any {
 	vars := NewVars()
 	var day string

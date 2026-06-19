@@ -1,10 +1,107 @@
 package yserx
 
+import (
+	"bufio"
+	"bytes"
+	"encoding/json"
+	"io/ioutil"
+
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+)
+
 type JavaSerializable interface {
 	//String() string
 	//SDumper(indent int) string
 	Marshal(*MarshalContext) []byte
 }
+
+// ParseJavaObjectStream 解析 Java 序列化字节流，返回其中包含的 Java 序列化对象列表
+// 在 yak 中通过 java.ParseJavaObjectStream 调用，是 java.MarshalJavaObjects 的逆操作
+// 参数:
+//   - raw: Java 序列化字节流
+//
+// 返回值:
+//   - 解析得到的 Java 序列化对象列表
+//   - 错误信息，失败时非 nil
+//
+// Example:
+// ```
+// s = java.NewJavaString("hello")
+// b = java.MarshalJavaObjects(s)
+// objs = java.ParseJavaObjectStream(b)~
+// assert len(objs) == 1, "should parse exactly one object"
+// ```
+func ParseJavaSerialized(raw []byte) ([]JavaSerializable, error) {
+	r := bufio.NewReader(bytes.NewBuffer(raw))
+	return ParseJavaSerializedEx(r, ioutil.Discard)
+}
+
+// ParseHexJavaObjectStream 解析十六进制编码的 Java 序列化字节流，返回 Java 序列化对象列表
+// 在 yak 中通过 java.ParseHexJavaObjectStream 调用，适用于已被 hex 编码的序列化数据
+// 参数:
+//   - raw: 十六进制编码的 Java 序列化字节流
+//
+// 返回值:
+//   - 解析得到的 Java 序列化对象列表
+//   - 错误信息，失败时非 nil
+//
+// Example:
+// ```
+// s = java.NewJavaString("hello")
+// h = codec.EncodeToHex(java.MarshalJavaObjects(s))
+// objs = java.ParseHexJavaObjectStream(h)~
+// assert len(objs) == 1, "should parse exactly one object"
+// ```
+func ParseHexJavaSerialized(raw string) ([]JavaSerializable, error) {
+	decoded, err := codec.DecodeHex(raw)
+	if err != nil {
+		return nil, err
+	}
+	return ParseJavaSerialized(decoded)
+}
+
+// FromJson 将 java.ToJson 生成的 JSON 还原为 Java 序列化对象列表
+// 在 yak 中通过 java.FromJson 调用，是 java.ToJson 的逆操作
+// 参数:
+//   - raw: java.ToJson 生成的 JSON 字节数组
+//
+// 返回值:
+//   - 还原出的 Java 序列化对象列表
+//   - 错误信息，失败时非 nil
+//
+// Example:
+// ```
+// s = java.NewJavaString("hello")
+// b = java.MarshalJavaObjects(s)
+// objs = java.ParseJavaObjectStream(b)~
+// j = java.ToJson(objs)~
+// restored = java.FromJson(j)~
+// assert len(restored) == len(objs), "restored object count should match"
+// ```
+func FromJson(raw []byte) ([]JavaSerializable, error) {
+	var objs []json.RawMessage
+	_ = json.Unmarshal(raw, &objs)
+	if len(objs) > 0 {
+		var serls []JavaSerializable
+		for _, raw := range objs {
+			o, err := _rawIdentToJavaSerializable(raw)
+			if err != nil {
+				return nil, err
+			}
+			initTCType(o)
+			serls = append(serls, o)
+		}
+		return serls, nil
+	}
+
+	o, err := _rawIdentToJavaSerializable(raw)
+	if err != nil {
+		return nil, err
+	}
+	initTCType(o)
+	return []JavaSerializable{o}, nil
+}
+
 type JavaMarshaler interface {
 	ObjectMarshaler(obj *JavaObject, ctx *MarshalContext) []byte
 	ClassDescMarshaler(obj *JavaClassDetails, ctx *MarshalContext) []byte

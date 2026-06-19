@@ -74,64 +74,153 @@ func WithAIOptions(options ...aicommon.ConfigOption) Option {
 	}
 }
 
-// WithPlanMocker 设置AI助手的计划生成器
+// WithPlanMocker 设置AI助手的计划生成器（导出名为 aiagent.forgePlanMocker）
+// 参数:
+//   - plan: 计划生成函数，参数为协调器，返回计划响应
+//
+// 返回值:
+//   - Forge 可选项
+//
+// Example:
+// ```
+// opt = aiagent.forgePlanMocker(func(coordinator) { return nil })
+// println(opt)
+// ```
 func WithPlanMocker(plan func(config *aid.Coordinator) *aid.PlanResponse) Option {
 	return func(f *ForgeBlueprint) {
 		f.PlanMocker = plan
 	}
 }
 
-// WithInitializePrompt 设置AI助手的初始化提示词
+// WithInitializePrompt 设置AI助手的初始化提示词（导出名为 aiagent.initPrompt）
 // 这个提示词会在AI助手启动时被使用，用于定义AI的初始状态和行为
+// 参数:
+//   - prompt: 初始化提示词
+//
+// 返回值:
+//   - Forge 可选项
+//
+// Example:
+// ```
+// opt = aiagent.initPrompt("you are a security expert")
+// println(opt)
+// ```
 func WithInitializePrompt(prompt string) Option {
 	return func(f *ForgeBlueprint) {
 		f.InitializePrompt = prompt
 	}
 }
 
-// WithResultPrompt 设置AI助手的生成结果提示词
+// WithResultPrompt 设置AI助手的生成结果提示词（导出名为 aiagent.resultPrompt）
 // 这个提示词会在AI助手生成结果时被使用，用于定义AI的输出格式和内容
+// 参数:
+//   - prompt: 结果提示词
+//
+// 返回值:
+//   - Forge 可选项
+//
+// Example:
+// ```
+// opt = aiagent.resultPrompt("summarize the findings in markdown")
+// println(opt)
+// ```
 func WithResultPrompt(prompt string) Option {
 	return func(f *ForgeBlueprint) {
 		f.ResultPrompt = prompt
 	}
 }
 
-// WithResultHandler 设置AI助手的结果处理函数
+// WithResultHandler 设置AI助手的结果处理函数（导出名为 aiagent.resultHandlerForge）
 // 这个函数会在AI助手生成结果后被调用，用于处理AI的输出
+// 参数:
+//   - handler: 结果处理函数，参数为 (result, err)
+//
+// 返回值:
+//   - Forge 可选项
+//
+// Example:
+// ```
+// opt = aiagent.resultHandlerForge(func(result, err) { println(result) })
+// println(opt)
+// ```
 func WithResultHandler(handler func(string, error)) Option {
 	return func(f *ForgeBlueprint) {
 		f.ResultHandler = handler
 	}
 }
 
-// WithPersistentPrompt 设置AI助手的持久提示词
+// WithPersistentPrompt 设置AI助手的持久提示词（导出名为 aiagent.persistentPrompt）
 // 这个提示词会在整个会话过程中持续存在，确保AI行为的一致性
+// 参数:
+//   - persistentPrompt: 持久提示词
+//
+// 返回值:
+//   - Forge 可选项
+//
+// Example:
+// ```
+// opt = aiagent.persistentPrompt("always respond in english")
+// println(opt)
+// ```
 func WithPersistentPrompt(persistentPrompt string) Option {
 	return func(f *ForgeBlueprint) {
 		f.PersistentPrompt = persistentPrompt
 	}
 }
 
-// WithToolKeywords 设置AI助手的工具关键词
+// WithToolKeywords 设置AI助手的工具关键词（导出名为 aiagent.toolKeywords）
 // 这些关键词可以扩展AI的能力，使其能够执行特定的任务
+// 参数:
+//   - keywords: 工具关键词列表
+//
+// 返回值:
+//   - Forge 可选项
+//
+// Example:
+// ```
+// opt = aiagent.toolKeywords(["scan", "vuln"])
+// println(opt)
+// ```
 func WithToolKeywords(keywords []string) Option {
 	return func(f *ForgeBlueprint) {
 		f.ToolKeywords = append(f.ToolKeywords, keywords...)
 	}
 }
 
-// WithTools 为AI助手添加可用的工具
+// WithTools 为AI助手添加可用的工具（导出名为 aiagent.forgeTools）
 // 这些工具可以扩展AI的能力，使其能够执行特定的任务
+// 参数:
+//   - tools: 一个或多个 AI 工具对象
+//
+// 返回值:
+//   - Forge 可选项
+//
+// Example:
+// ```
+// // tool 由 aitool 构造（示意性示例）
+// opt = aiagent.forgeTools(tool)
+// println(opt)
+// ```
 func WithTools(tools ...*aitool.Tool) Option {
 	return func(f *ForgeBlueprint) {
 		f.Tools = append(f.Tools, tools...)
 	}
 }
 
-// WithOriginYaklangCliCode 设置原始的Yaklang CLI代码
+// WithOriginYaklangCliCode 设置原始的Yaklang CLI代码（导出名为 aiagent.originYaklangCliCode）
 // 这个结构需要 Yak 引擎根据 CLI 代码构建出正确的用户需要输入的工具
 // 这个结构是表单构建的核心依据，可以使用 Yak 原声插件基础设施直接构建表单
+// 参数:
+//   - originYaklangCliCode: 原始 Yaklang CLI 代码
+//
+// 返回值:
+//   - Forge 可选项
+//
+// Example:
+// ```
+// opt = aiagent.originYaklangCliCode(`cli.String("target")`)
+// println(opt)
+// ```
 func WithOriginYaklangCliCode(originYaklangCliCode string) Option {
 	return func(f *ForgeBlueprint) {
 		f.ParameterRuleYaklangCode = originYaklangCliCode

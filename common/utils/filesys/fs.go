@@ -37,19 +37,25 @@ func SimpleRecursive(opts ...Option) error {
 	return recursive(start, *c, opts...)
 }
 
-// Recursive recursively walk through the file system
-// raw: the root path
-// opts: options
-// return: error
+// Recursive 递归遍历指定路径下的所有文件和目录，对每个条目按配置的回调进行处理
+// 参数:
+//   - raw: 起始遍历的根路径
+//   - opts: 遍历选项（如 filesys.onFileStat、filesys.onDirStat、filesys.dir 等）
+//
+// 返回值:
+//   - 错误信息
 //
 // Example:
 // ```
-// err := filesys.Recursive( //
-//
-//	"testdata",
-//	filesys.dir(["cc", "dd"], filesys.onFileStat((name, info) => {})),
-//
-// )
+// // 在临时目录创建两个文件，递归统计文件数量
+// root = file.Join(os.TempDir(), "yak-filesys-recursive")
+// file.MkdirAll(root)
+// file.Save(file.Join(root, "a.txt"), "A")~
+// file.Save(file.Join(root, "b.txt"), "B")~
+// count = 0
+// filesys.Recursive(root, filesys.onFileStat((name, info) => { count++ }))~
+// assert count == 2, "Recursive should visit both files"
+// file.Remove(root)
 // ```
 func Recursive(raw string, opts ...Option) error {
 	c := NewConfig()
@@ -132,7 +138,23 @@ func glance(i filesys_interface.FileSystem) string {
 	return buf.String()
 }
 
-// Glance is for quickly viewing the basic info in fs
+// Glance 快速查看一个文件系统或本地目录的概览信息（统计与树形结构）
+// 参数:
+//   - localfile: 本地目录路径，或一个 FileSystem 对象
+//
+// 返回值:
+//   - 包含目录统计与树形视图的概览字符串
+//
+// Example:
+// ```
+// // 在临时目录创建文件后查看概览，输出应包含统计信息
+// root = file.Join(os.TempDir(), "yak-filesys-glance")
+// file.MkdirAll(root)
+// file.Save(file.Join(root, "a.txt"), "A")~
+// summary = filesys.Glance(root)
+// assert str.Contains(summary, "total:"), "Glance output should contain a total summary"
+// file.Remove(root)
+// ```
 func Glance(localfile any) string {
 	switch ret := localfile.(type) {
 	case filesys_interface.FileSystem:

@@ -67,7 +67,7 @@ func StartScan(ctx context.Context, opts ...ssaconfig.Option) error {
 // 参数:
 //   - ctx: 上下文，用于控制扫描任务的生命周期
 //   - taskId: 要恢复的任务ID
-//   - callback: 回调函数，用于处理扫描结果
+//   - opts: 可变数量的选项函数，用于配置扫描参数，如 syntaxflow.withScanResultCallback
 //
 // 返回值:
 //   - error: 如果恢复失败则返回错误信息

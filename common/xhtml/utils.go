@@ -80,9 +80,24 @@ func AddElement2Set(arr *[]string, e string) {
 
 // MatchBetween 从字符串中匹配两个字符串之间的内容，最多匹配 n 个字符，n 为 -1 时不限制
 // 返回匹配到的内容的起始位置与匹配到的内容
+// 参数:
+//   - srcBody: 源内容，会被转换为字符串
+//   - start: 起始定界字符串
+//   - end: 结束定界字符串
+//   - n: 内容长度上限，-1 表示不限制
+//
+// 返回值:
+//   - 匹配内容在源字符串中的起始下标，未匹配时为 -1
+//   - 两个定界字符串之间的内容，未匹配时为空字符串
+//
 // Example:
 // ```
-// xhtml.MatchBetween("123456789", "2", "6", -1) // 2, "345"
+// // VARS: 取出 2 和 6 之间的内容
+// idx, content = xhtml.MatchBetween("123456789", "2", "6", -1)
+// // STDOUT: 打印匹配内容
+// println(content)   // OUT: 345
+// // assert: 锁定结论
+// assert content == "345", "should extract the text between 2 and 6"
 // ```
 func MatchBetween(srcBody interface{}, start string, end string, n int) (int, string) {
 	src := utils.InterfaceToString(srcBody)
@@ -105,10 +120,19 @@ func MatchBetween(srcBody interface{}, start string, end string, n int) (int, st
 	}
 }
 
-// RandomUpperAndLower 返回一个随机大小写的字符串
+// RandomUpperAndLower 返回一个随机大小写的字符串，常用于绕过大小写敏感的过滤
+// 参数:
+//   - s: 原始字符串
+//
+// 返回值:
+//   - 随机翻转字母大小写后的字符串(字母构成不变)
+//
 // Example:
 // ```
-// xhtml.RandomUpperAndLower("target") // TArGeT
+// // VARS: 随机大小写变形(每次结果不同)
+// r = xhtml.RandomUpperAndLower("target")
+// // assert: 忽略大小写后仍等于原串
+// assert str.ToLower(r) == "target", "random case should preserve the letters case-insensitively"
 // ```
 func RandomUpperAndLower(s string) string {
 	last := _RandomUpperAndLower(s)

@@ -90,10 +90,24 @@ func newDefaultCsrfConfig() *_csrfConfig {
 
 type csrfConfig func(c *_csrfConfig)
 
-// Generate 根据传入的原始请求报文生成跨站请求伪造(CSRF)类型的漏洞验证(POC)，返回生成的POC HTML字符串与错误
+// Generate 根据传入的原始请求报文生成跨站请求伪造(CSRF)类型的漏洞验证(POC) HTML 页面
+// 在 yak 中通过 csrf.Generate 调用，自动从请求中提取 URL、方法与表单参数构造自动提交表单
+// 参数:
+//   - raw: 原始 HTTP 请求报文，可以是字符串或字节数组
+//   - opts: 可选配置项，如 csrf.https、csrf.multipartDefaultValue、csrf.autoSubmit
+//
+// 返回值:
+//   - 生成的 CSRF POC HTML 字符串
+//   - 错误信息，成功时为 nil
+//
 // Example:
 // ```
-// csrfPoc, err = csrf.Generate("POST / HTTP/1.1\r\nHost:example.com\r\nContent-Type:application/x-www-form-urlencoded\r\n\r\nname=1&age=2")
+// raw = "POST /submit HTTP/1.1\r\nHost: example.com\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\nname=admin&age=2"
+// poc, err = csrf.Generate(raw)
+// assert err == nil, "generate should succeed"
+// // 生成的 HTML 中应包含目标地址与表单字段
+// assert str.Contains(poc, `action="http://example.com/submit"`), "poc should target the request url"
+// assert str.Contains(poc, `name="name"`), "poc should carry the form field"
 // ```
 func GenerateCSRFPoc(raw interface{}, opts ...csrfConfig) (string, error) {
 	var (
@@ -209,11 +223,20 @@ func GenerateCSRFPoc(raw interface{}, opts ...csrfConfig) (string, error) {
 	return builder.String(), nil
 }
 
-// multipartDefaultValue 手动设置请求报文是否为multipart/form-data类型
-// 如果设置为true，则会生成使用JavaScript提交的漏洞验证(POC)
+// multipartDefaultValue 设置请求报文是否按 multipart/form-data 类型处理
+// 当设置为 true 时，会改用基于 JavaScript(XHR) 提交的 POC 模板
+// 在 yak 中通过 csrf.multipartDefaultValue 调用
+// 参数:
+//   - b: 是否启用 multipart/form-data 提交模式
+//
+// 返回值:
+//   - 一个 csrf.Generate 可接收的配置选项
+//
 // Example:
 // ```
-// csrfPoc, err = csrf.Generate("POST / HTTP/1.1\r\nHost:example.com\r\nContent-Type:application/x-www-form-urlencoded\r\n\r\nname=1&age=2", csrf.MultipartDefaultValue(true))
+// // 该示例为示意性用法：生成基于 JS 提交的 CSRF POC
+// raw = "POST / HTTP/1.1\r\nHost: example.com\r\nContent-Type: multipart/form-data; boundary=x\r\n\r\n"
+// poc = csrf.Generate(raw, csrf.multipartDefaultValue(true))~
 // ```
 func CsrfOptWithMultipartDefaultValue(b bool) csrfConfig {
 	return func(c *_csrfConfig) {
@@ -221,10 +244,20 @@ func CsrfOptWithMultipartDefaultValue(b bool) csrfConfig {
 	}
 }
 
-// https 手动设置请求报文是否为HTTPS类型
+// https 设置目标请求报文是否使用 HTTPS，从而决定生成 POC 中目标 URL 的协议
+// 在 yak 中通过 csrf.https 调用
+// 参数:
+//   - b: 是否使用 HTTPS 协议
+//
+// 返回值:
+//   - 一个 csrf.Generate 可接收的配置选项
+//
 // Example:
 // ```
-// csrfPoc, err = csrf.Generate("POST / HTTP/1.1\r\nHost:example.com\r\nContent-Type:application/x-www-form-urlencoded\r\n\r\nname=1&age=2", csrf.HTTPS(true))
+// raw = "POST /submit HTTP/1.1\r\nHost: example.com\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\nname=admin"
+// // 启用 https 后，生成的目标地址应为 https 协议
+// poc = csrf.Generate(raw, csrf.https(true))~
+// assert str.Contains(poc, "https://example.com/submit"), "poc should use https scheme"
 // ```
 func CsrfOptWithHTTPS(b bool) csrfConfig {
 	return func(c *_csrfConfig) {
@@ -232,8 +265,20 @@ func CsrfOptWithHTTPS(b bool) csrfConfig {
 	}
 }
 
-// CsrfOptWithAutoSubmit 在生成的 HTML 中注入自动提交脚本（页面加载后自动提交表单）
-// 当 b 为 true 时，在第一个 form 渲染完成后自动调用 submit
+// autoSubmit 设置是否在生成的 HTML 中注入自动提交脚本，使页面加载后自动提交表单
+// 在 yak 中通过 csrf.autoSubmit 调用
+// 参数:
+//   - b: 是否注入自动提交脚本
+//
+// 返回值:
+//   - 一个 csrf.Generate 可接收的配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：生成加载后自动提交的 CSRF POC
+// raw = "POST /submit HTTP/1.1\r\nHost: example.com\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\nname=admin"
+// poc = csrf.Generate(raw, csrf.autoSubmit(true))~
+// ```
 func CsrfOptWithAutoSubmit(b bool) csrfConfig {
 	return func(c *_csrfConfig) {
 		c.autoSubmit = b

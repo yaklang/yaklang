@@ -24,6 +24,23 @@ func addPrefixToLine(r string, indent int) string {
 	return strings.Join(lines, "\n") + "\n"
 }
 
+// ToJson 将解析得到的 Java 序列化对象转换为可读的 JSON 字节数组
+// 在 yak 中通过 java.ToJson 调用，便于查看序列化对象的内部结构
+// 参数:
+//   - i: 已解析的 Java 序列化对象(或其切片)
+//
+// 返回值:
+//   - JSON 字节数组
+//   - 错误信息，失败时非 nil
+//
+// Example:
+// ```
+// s = java.NewJavaString("hello")
+// b = java.MarshalJavaObjects(s)
+// objs = java.ParseJavaObjectStream(b)~
+// j = java.ToJson(objs)~
+// assert len(j) > 0, "json output should not be empty"
+// ```
 func ToJson(i interface{}) ([]byte, error) {
 	return json.MarshalIndent(i, "", "  ")
 }
@@ -562,30 +579,6 @@ func _rawIdentToJavaSerializable(raw []byte) (JavaSerializable, error) {
 		log.Infof("parse bytes to JavaSerializable failed: %v", string(raw))
 		return nil, utils.Errorf("unsupported type: %v", mj.TypeVerbose)
 	}
-}
-
-func FromJson(raw []byte) ([]JavaSerializable, error) {
-	var objs []json.RawMessage
-	_ = json.Unmarshal(raw, &objs)
-	if len(objs) > 0 {
-		var serls []JavaSerializable
-		for _, raw := range objs {
-			o, err := _rawIdentToJavaSerializable(raw)
-			if err != nil {
-				return nil, err
-			}
-			initTCType(o)
-			serls = append(serls, o)
-		}
-		return serls, nil
-	}
-
-	o, err := _rawIdentToJavaSerializable(raw)
-	if err != nil {
-		return nil, err
-	}
-	initTCType(o)
-	return []JavaSerializable{o}, nil
 }
 
 func initTCType(j JavaSerializable) {

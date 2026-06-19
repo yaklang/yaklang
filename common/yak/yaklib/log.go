@@ -12,11 +12,15 @@ import (
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 )
 
-// loglevel 根据传入的字符串设置日志级别
+// setLevel 根据传入的字符串设置日志级别
 // disable: 禁用所有日志, fatal: 致命错误, error: 错误, warning: 警告, info: 信息, debug: 调试
+// 参数:
+//   - i: 日志级别名称，如 "info"、"warning"、"error"、"debug"、"fatal"、"disable"
+//
 // Example:
 // ```
-// loglevel("fatal")
+// // 把全局日志级别设置为 fatal(仅副作用，无返回值)
+// log.setLevel("fatal")
 // ```
 func setLogLevel(i interface{}) {
 	l, err := log.ParseLevel(fmt.Sprint(i))
@@ -82,16 +86,72 @@ func (y *YakLogger) SetEngine(engine *antlr4yak.Engine) {
 	})
 }
 
-var LogExports = map[string]interface{}{
-	"info":     log.Infof,
-	"setLevel": setLogLevel,
-	"debug":    log.Debugf,
-	"warn":     log.Warningf,
-	"error":    log.Errorf,
+// Info 以 info(信息)级别格式化输出一条日志，日志内容应使用英文
+// 参数:
+//   - format: 格式化字符串
+//   - args: 与格式化字符串对应的参数
+//
+// Example:
+// ```
+// // 输出一条 info 日志(仅副作用，无返回值)
+// log.Info("server started on port %d", 8080)
+// ```
+func _logInfo(format string, args ...interface{}) {
+	log.Infof(format, args...)
+}
 
-	"Info":     log.Infof,
+// Debug 以 debug(调试)级别格式化输出一条日志，日志内容应使用英文
+// 参数:
+//   - format: 格式化字符串
+//   - args: 与格式化字符串对应的参数
+//
+// Example:
+// ```
+// // 输出一条 debug 日志(仅副作用，无返回值)
+// log.Debug("current value is %v", 123)
+// ```
+func _logDebug(format string, args ...interface{}) {
+	log.Debugf(format, args...)
+}
+
+// Warn 以 warning(警告)级别格式化输出一条日志，日志内容应使用英文
+// 参数:
+//   - format: 格式化字符串
+//   - args: 与格式化字符串对应的参数
+//
+// Example:
+// ```
+// // 输出一条 warning 日志(仅副作用，无返回值)
+// log.Warn("disk usage is high: %d%%", 90)
+// ```
+func _logWarn(format string, args ...interface{}) {
+	log.Warningf(format, args...)
+}
+
+// Error 以 error(错误)级别格式化输出一条日志，日志内容应使用英文
+// 参数:
+//   - format: 格式化字符串
+//   - args: 与格式化字符串对应的参数
+//
+// Example:
+// ```
+// // 输出一条 error 日志(仅副作用，无返回值)
+// log.Error("failed to connect: %s", "timeout")
+// ```
+func _logError(format string, args ...interface{}) {
+	log.Errorf(format, args...)
+}
+
+var LogExports = map[string]interface{}{
+	"info":     _logInfo,
+	"setLevel": setLogLevel,
+	"debug":    _logDebug,
+	"warn":     _logWarn,
+	"error":    _logError,
+
+	"Info":     _logInfo,
 	"SetLevel": setLogLevel,
-	"Debug":    log.Debugf,
-	"Warn":     log.Warningf,
-	"Error":    log.Errorf,
+	"Debug":    _logDebug,
+	"Warn":     _logWarn,
+	"Error":    _logError,
 }

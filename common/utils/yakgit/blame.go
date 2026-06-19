@@ -45,6 +45,22 @@ func (b BlameLines) String() string {
 	return buf.String()
 }
 
+// BlameWithCommit 在指定 commit 下对某个文件做 blame，逐行追踪最后修改信息（导出名为 git.BlameCommit）
+// 参数:
+//   - repos: 本地仓库路径
+//   - fileName: 仓库内的文件路径
+//   - rev: 目标 commit/引用
+//
+// 返回值:
+//   - blame 结果（逐行的提交信息）
+//   - 错误信息
+//
+// Example:
+// ```
+// // 在指定提交下对文件做 blame（示意性示例，需替换为真实仓库路径）
+// lines = git.BlameCommit("/path/to/repo", "README.md", "HEAD")~
+// println(lines.String())
+// ```
 func BlameWithCommit(repos string, fileName string, rev string) (BlameLines, error) {
 	var absRepo = repos
 	if !filepath.IsAbs(repos) {
@@ -113,6 +129,21 @@ func BlameWithCommit(repos string, fileName string, rev string) (BlameLines, err
 	return lines, nil
 }
 
+// Blame 对某个文件在 HEAD 下做 blame，逐行追踪最后修改信息（导出名为 git.Blame）
+// 参数:
+//   - repos: 本地仓库路径
+//   - fileName: 仓库内的文件路径
+//
+// 返回值:
+//   - blame 结果（逐行的提交信息）
+//   - 错误信息
+//
+// Example:
+// ```
+// // 对文件做 blame（示意性示例，需替换为真实仓库路径）
+// lines = git.Blame("/path/to/repo", "README.md")~
+// println(lines.String())
+// ```
 func Blame(repos string, fileName string) (BlameLines, error) {
 	return BlameWithCommit(repos, fileName, "HEAD")
 }

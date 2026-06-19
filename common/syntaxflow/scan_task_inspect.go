@@ -98,7 +98,23 @@ type SyntaxFlowProjectScanCheckResult struct {
 	ReportMarkdown string                       `json:"report_markdown"`
 }
 
-// RunSyntaxFlowProjectScanCheck performs one query and returns both report and latest task id.
+// RunSyntaxFlowProjectScanCheck 查询某个程序的 SyntaxFlow 扫描任务并汇总核对结果
+// 导出名为 syntaxflow.RunSyntaxFlowProjectScanCheck
+// 参数:
+//   - programHint: 程序名提示（用于匹配扫描任务关联的程序）
+//   - scanOnly: 是否仅统计扫描类型任务
+//   - limit: 返回任务数量上限
+//
+// 返回值:
+//   - 项目扫描核对结果（含最近任务 ID、任务列表、Markdown 报告等）
+//   - 错误信息
+//
+// Example:
+// ```
+// // 查询某程序最近的扫描任务核对结果（示意性示例，需要已有扫描任务）
+// result = syntaxflow.RunSyntaxFlowProjectScanCheck("my-program", false, 10)~
+// dump(result)
+// ```
 func RunSyntaxFlowProjectScanCheck(programHint string, scanOnly bool, limit int) (*SyntaxFlowProjectScanCheckResult, error) {
 	tasks, err := QuerySyntaxFlowScanTasksByProgramsContains(programHint, scanOnly, limit)
 	if err != nil {

@@ -6,10 +6,49 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
 
+// ConvertSingleResultToJSON 将单个 SyntaxFlow 扫描结果转换为 JSON 报告字符串
+// 导出名为 sfreport.ConvertSingleResultToJSON
+// 参数:
+//   - result: SyntaxFlow 扫描结果对象
+//   - showDataflow: 是否在报告中展示数据流路径
+//
+// 返回值:
+//   - JSON 报告字符串（无风险时为空字符串）
+//   - 错误信息
+//
+// Example:
+// ```
+// // result 来自 ssa/syntaxflow 的扫描结果（示意性示例）
+// prog = ssa.Parse(code)~
+// result = prog.SyntaxFlowWithError("sink* as $sink")~
+// jsonStr = sfreport.ConvertSingleResultToJSON(result, true)~
+// println(jsonStr)
+// ```
 func ConvertSingleResultToJSON(result *ssaapi.SyntaxFlowResult, showDataflowPath bool) (string, error) {
 	return ConvertSingleResultToJSONWithOptions(result, IRifyFullReportType, showDataflowPath, true, true)
 }
 
+// ConvertSingleResultToJSONWithOptions 将单个 SyntaxFlow 扫描结果按指定选项转换为 JSON 报告
+// 导出名为 sfreport.ConvertSingleResultToJSONWithOptions
+// 参数:
+//   - result: SyntaxFlow 扫描结果对象
+//   - reportType: 报告类型
+//   - showDataflow: 是否展示数据流路径
+//   - showFileContent: 是否展示文件内容
+//   - withFile: 是否携带文件数据
+//
+// 返回值:
+//   - JSON 报告字符串（无风险时为空字符串）
+//   - 错误信息
+//
+// Example:
+// ```
+// // result 来自 ssa/syntaxflow 的扫描结果（示意性示例）
+// prog = ssa.Parse(code)~
+// result = prog.SyntaxFlowWithError("sink* as $sink")~
+// jsonStr = sfreport.ConvertSingleResultToJSONWithOptions(result, sfreport.IRifyFullReportType, true, true, true)~
+// println(jsonStr)
+// ```
 func ConvertSingleResultToJSONWithOptions(result *ssaapi.SyntaxFlowResult, reportType ReportType, showDataflowPath bool, showFileContent bool, withFile bool) (string, error) {
 	if result == nil {
 		return "", nil

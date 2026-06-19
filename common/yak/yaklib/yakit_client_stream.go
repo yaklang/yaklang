@@ -10,6 +10,21 @@ import (
 	"time"
 )
 
+// Stream 向 Yakit 持续输出一个流（如实时日志、命令输出，导出名为 yakit.Stream）
+// 参数:
+//   - streamType: 流类型标识
+//   - streamId: 流 ID
+//   - stream: 数据源 reader
+//   - extra: 可选的额外信息
+//
+// 返回值:
+//   - 无
+//
+// Example:
+// ```
+// // reader 为任意 io.Reader（示意性示例）
+// yakit.Stream("exec", "task-1", reader)
+// ```
 func (c *YakitClient) Stream(streamType string, streamId string, stream io.Reader, extra ...any) {
 	defer func() {
 		if err := recover(); err != nil {

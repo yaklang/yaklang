@@ -52,30 +52,96 @@ func NewConfig() *ScanConfig {
 	}
 }
 
+// customAnalyzer 注册一个自定义 SCA 分析器，通过 matchFunc 决定是否处理某文件、analyzeFunc 产出软件包结果
+// 在 yak 中通过 sca.customAnalyzer 调用
+// 参数:
+//   - matchFunc: 文件匹配函数，返回非 0 表示该文件由本分析器处理
+//   - analyzeFunc: 分析函数，返回识别到的自定义软件包列表
+//
+// 返回值:
+//   - 一个扫描配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：注册一个自定义分析器
+// opt = sca.customAnalyzer(func(info) { return 0 }, func(fi, others) { return [] })
+// ```
 func _withCustomAnalyzer(matchFunc func(info analyzer.MatchInfo) int, analyzeFunc func(fi *analyzer.FileInfo, otherFi map[string]*analyzer.FileInfo) []*analyzer.CustomPackage) ScanOption {
 	return func(c *ScanConfig) {
 		c.customAnalyzers = append(c.customAnalyzers, analyzer.NewCustomAnalyzer(matchFunc, analyzeFunc))
 	}
 }
 
+// endpoint 设置扫描 Docker 镜像/容器时使用的 Docker Endpoint 地址
+// 在 yak 中通过 sca.endpoint 调用
+// 参数:
+//   - endpoint: Docker Endpoint 地址，如 unix:///var/run/docker.sock
+//
+// 返回值:
+//   - 一个扫描配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：指定 Docker Endpoint
+// pkgs = sca.ScanImageFromContext("nginx:latest", sca.endpoint("unix:///var/run/docker.sock"))~
+// ```
 func _withEndPoint(endpoint string) ScanOption {
 	return func(c *ScanConfig) {
 		c.endpoint = endpoint
 	}
 }
 
+// scanMode 设置扫描模式，控制识别全部成分、仅系统包或仅语言依赖
+// 在 yak 中通过 sca.scanMode 调用，取值如 sca.MODE_ALL、sca.MODE_PKG、sca.MODE_LANGUAGE
+// 参数:
+//   - mode: 扫描模式
+//
+// 返回值:
+//   - 一个扫描配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：仅扫描语言依赖
+// pkgs = sca.ScanLocalFilesystem("/path/to/project", sca.scanMode(sca.MODE_LANGUAGE))~
+// ```
 func _withScanMode(mode analyzer.ScanMode) ScanOption {
 	return func(c *ScanConfig) {
 		c.scanMode |= mode
 	}
 }
 
+// concurrent 设置扫描时的并发 worker 数量
+// 在 yak 中通过 sca.concurrent 调用
+// 参数:
+//   - n: 并发 worker 数量
+//
+// 返回值:
+//   - 一个扫描配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：以 10 并发扫描本地目录
+// pkgs = sca.ScanLocalFilesystem("/path/to/project", sca.concurrent(10))~
+// ```
 func _withConcurrent(n int) ScanOption {
 	return func(c *ScanConfig) {
 		c.numWorkers = n
 	}
 }
 
+// analyzers 指定本次扫描启用的分析器类型，仅运行所列分析器
+// 在 yak 中通过 sca.analyzers 调用，取值如 sca.ANALYZER_TYPE_JAVA_POM、sca.ANALYZER_TYPE_NODE_NPM
+// 参数:
+//   - a: 一个或多个分析器类型
+//
+// 返回值:
+//   - 一个扫描配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：仅启用 Java POM 分析器
+// pkgs = sca.ScanLocalFilesystem("/path/to/project", sca.analyzers(sca.ANALYZER_TYPE_JAVA_POM))~
+// ```
 func _withAnalayzers(a ...analyzer.TypAnalyzer) ScanOption {
 	return func(c *ScanConfig) {
 		c.usedAnalyzers = append(c.usedAnalyzers, a...)
@@ -374,6 +440,26 @@ func scanFS(fsPath string, config *ScanConfig) ([]*dxtypes.Package, error) {
 	return ag.Packages(), nil
 }
 
+// ScanLocalFilesystem 扫描本地文件系统目录，识别其中的软件成分(SCA)，返回检测到的软件包列表
+// 在 yak 中通过 sca.ScanLocalFilesystem 调用，会根据各类包管理器清单(如 package.json、go.mod 等)解析依赖
+// 参数:
+//   - p: 待扫描的本地目录路径
+//   - opts: 可选配置项，如 sca.concurrent、sca.scanMode、sca.analyzers
+//
+// 返回值:
+//   - 检测到的软件包列表
+//   - 错误信息，扫描失败时非 nil
+//
+// Example:
+// ```
+// // 该示例为示意性用法：扫描本地项目目录的软件成分
+// pkgs = sca.ScanLocalFilesystem("/path/to/project")~
+//
+//	for pkg = range pkgs {
+//	    println(pkg.Name, pkg.Version)
+//	}
+//
+// ```
 func ScanLocalFilesystem(p string, opts ...ScanOption) ([]*dxtypes.Package, error) {
 	config := NewConfig()
 	for _, opt := range opts {
@@ -383,6 +469,23 @@ func ScanLocalFilesystem(p string, opts ...ScanOption) ([]*dxtypes.Package, erro
 	return scanFS(p, config)
 }
 
+// ScanFilesystem 扫描给定的文件系统接口对象，识别其中的软件成分(SCA)，返回检测到的软件包列表
+// 在 yak 中通过 sca.ScanFilesystem 调用，可配合 filesys 包构造的各类文件系统使用
+// 参数:
+//   - p: 实现 FileSystem 接口的文件系统对象(如 filesys.NewLocalFs() 等)
+//   - opts: 可选配置项
+//
+// 返回值:
+//   - 检测到的软件包列表
+//   - 错误信息，输入文件系统为空或扫描失败时非 nil
+//
+// Example:
+// ```
+// // 该示例为示意性用法：扫描任意文件系统接口对象
+// fs = filesys.NewLocalFs()
+// pkgs = sca.ScanFilesystem(fs)~
+// println("packages:", len(pkgs))
+// ```
 func ScanFilesystem(p fi.FileSystem, opts ...ScanOption) ([]*dxtypes.Package, error) {
 	config := NewConfig()
 	config.fs = p
@@ -395,6 +498,22 @@ func ScanFilesystem(p fi.FileSystem, opts ...ScanOption) ([]*dxtypes.Package, er
 	return scanFS(".", config)
 }
 
+// ScanGitRepo 遍历本地 Git 仓库的全部提交历史，识别各历史版本中的软件成分(SCA)
+// 在 yak 中通过 sca.ScanGitRepo 调用
+// 参数:
+//   - repoDir: 本地 Git 仓库目录路径
+//   - opts: 可选配置项
+//
+// 返回值:
+//   - 检测到的软件包列表
+//   - 错误信息，扫描失败时非 nil
+//
+// Example:
+// ```
+// // 该示例为示意性用法：扫描本地 Git 仓库历史中的软件成分
+// pkgs = sca.ScanGitRepo("/path/to/repo")~
+// println("packages:", len(pkgs))
+// ```
 func ScanGitRepo(repoDir string, opts ...ScanOption) ([]*dxtypes.Package, error) {
 	config := NewConfig()
 	for _, opt := range opts {
@@ -403,6 +522,22 @@ func ScanGitRepo(repoDir string, opts ...ScanOption) ([]*dxtypes.Package, error)
 	return scanGitRepo(repoDir, config)
 }
 
+// ScanDockerContainerFromContext 通过 Docker API 导出指定容器(包括其挂载卷)，识别其中的软件成分(SCA)
+// 在 yak 中通过 sca.ScanContainerFromContext 调用，依赖本地或远程 Docker 环境
+// 参数:
+//   - containerID: 目标容器 ID 或名称
+//   - opts: 可选配置项，如 sca.endpoint 指定 Docker Endpoint
+//
+// 返回值:
+//   - 检测到的软件包列表
+//   - 错误信息，连接 Docker 或扫描失败时非 nil
+//
+// Example:
+// ```
+// // 该示例为示意性用法：依赖 Docker 环境，扫描运行中的容器
+// pkgs = sca.ScanContainerFromContext("my-container", sca.endpoint("unix:///var/run/docker.sock"))~
+// println("packages:", len(pkgs))
+// ```
 func ScanDockerContainerFromContext(containerID string, opts ...ScanOption) (pkgs []*dxtypes.Package, err error) {
 	config := NewConfig()
 	for _, opt := range opts {
@@ -442,6 +577,22 @@ func ScanDockerContainerFromContext(containerID string, opts ...ScanOption) (pkg
 	return analyzer.MergePackages(pkgs), nil
 }
 
+// ScanDockerImageFromContext 通过 Docker API 拉取/导出指定镜像，识别其中的软件成分(SCA)
+// 在 yak 中通过 sca.ScanImageFromContext 调用，依赖本地或远程 Docker 环境
+// 参数:
+//   - imageID: 目标镜像 ID 或名称
+//   - opts: 可选配置项，如 sca.endpoint 指定 Docker Endpoint
+//
+// 返回值:
+//   - 检测到的软件包列表
+//   - 错误信息，连接 Docker 或扫描失败时非 nil
+//
+// Example:
+// ```
+// // 该示例为示意性用法：依赖 Docker 环境，扫描镜像
+// pkgs = sca.ScanImageFromContext("nginx:latest")~
+// println("packages:", len(pkgs))
+// ```
 func ScanDockerImageFromContext(imageID string, opts ...ScanOption) ([]*dxtypes.Package, error) {
 	config := NewConfig()
 	for _, opt := range opts {
@@ -475,6 +626,22 @@ func ScanDockerImageFromContext(imageID string, opts ...ScanOption) ([]*dxtypes.
 	return analyzer.MergePackages(pkgs), nil
 }
 
+// ScanDockerImageFromFile 扫描本地保存的 Docker 镜像 tar 文件，识别其中的软件成分(SCA)
+// 在 yak 中通过 sca.ScanImageFromFile 调用，无需连接 Docker 守护进程
+// 参数:
+//   - path: 本地镜像 tar 文件路径(通常由 docker save 导出)
+//   - opts: 可选配置项
+//
+// 返回值:
+//   - 检测到的软件包列表
+//   - 错误信息，文件打开或扫描失败时非 nil
+//
+// Example:
+// ```
+// // 该示例为示意性用法：扫描 docker save 导出的镜像文件
+// pkgs = sca.ScanImageFromFile("/path/to/image.tar")~
+// println("packages:", len(pkgs))
+// ```
 func ScanDockerImageFromFile(path string, opts ...ScanOption) ([]*dxtypes.Package, error) {
 	config := NewConfig()
 	for _, opt := range opts {

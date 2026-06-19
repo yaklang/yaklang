@@ -165,45 +165,99 @@ import (
 //	return DESCBCDecEx(key, data, iv, true)
 //}
 
-// DESECBEncrypt 是一个便捷函数，用于使用 DES 算法，在 ECB 模式下，使用 零填充来加密数据。
-// 它接受一个密钥（key）、需要加密的数据（data to encrypt）（ecb 模式下 iv 无用）
-// 密钥的长度必须是 8 个字节。
-// example:
+// DESECBEnc 使用 DES 算法在 ECB 模式下用零填充加密数据(ECB 模式下无 iv 参数)
+// 密钥长度必须是 8 字节。
+// 参数:
+//   - key: 密钥(8 字节)
+//   - data: 待加密的数据字节
+//
+// 返回值:
+//   - []byte: 加密后的密文字节
+//   - error: 加密失败时返回的错误
+//
+// Example:
 // ```
-// codec.DESECBEncrypt([]byte("12345678"), "hello world")
+// // VARS: DES-ECB 加解密(8 字节密钥)
+// key = "12345678"
+// ct = codec.DESECBEncrypt(key, "Secret Message")~
+// // STDOUT: 去零填充解密后打印
+// println(string(codec.ZeroUnPadding(codec.DESECBDecrypt(key, ct)~)))   // OUT: Secret Message
+// // assert: 锁定结论(DES-ECB 加解密往返一致)
+// assert string(codec.ZeroUnPadding(codec.DESECBDecrypt(key, ct)~)) == "Secret Message", "DES-ECB should round-trip"
 // ```
 func DESECBEnc(key []byte, data []byte) ([]byte, error) {
 	return DESEncryptECBWithZeroPadding(key, data, nil)
 }
 
-// TripleDESECBEncrypt 是一个便捷函数，用于使用 Triple DES 算法，在 ECB 模式下，使用 零填充来加密数据。
-// 它接受一个密钥（key）、需要加密的数据（data to encrypt）（ecb 模式下 iv 无用）
-// 密钥的长度必须是 24 个字节（即 3 * 8 字节）。
-// example:
+// TripleDES_ECBEnc 使用 3DES(Triple DES) 算法在 ECB 模式下用零填充加密数据(ECB 模式下无 iv 参数)
+// 密钥长度必须是 24 字节(即 3 * 8 字节)。
+// 参数:
+//   - key: 密钥(24 字节)
+//   - data: 待加密的数据字节
+//
+// 返回值:
+//   - []byte: 加密后的密文字节
+//   - error: 加密失败时返回的错误
+//
+// Example:
 // ```
-// codec.TripleDESECBEncrypt([]byte("123456789012345678901234"), "hello world")
+// // VARS: 3DES-ECB 加解密(24 字节密钥)
+// key = "123456781234567812345678"
+// ct = codec.TripleDESECBEncrypt(key, "Secret Message")~
+// // STDOUT: 去零填充解密后打印
+// println(string(codec.ZeroUnPadding(codec.TripleDESECBDecrypt(key, ct)~)))   // OUT: Secret Message
+// // assert: 锁定结论(3DES-ECB 加解密往返一致)
+// assert string(codec.ZeroUnPadding(codec.TripleDESECBDecrypt(key, ct)~)) == "Secret Message", "3DES-ECB should round-trip"
 // ```
 func TripleDES_ECBEnc(key []byte, data []byte) ([]byte, error) {
 	return TripleDESEncryptECBWithZeroPadding(key, data, nil)
 }
 
-// DESECBDecrypt 是一个便捷函数，用于使用 DES 算法，在 ECB 模式下，使用 零填充来解密数据。
-// 它接受一个密钥（key）、需要解密的数据（data to decrypt）（ecb 模式下 iv 无用）
-// 密钥的长度必须是 8 个字节。
-// example:
+// DESECBDec 使用 DES 算法在 ECB 模式下用零填充解密数据(ECB 模式下无 iv 参数)
+// 密钥长度必须是 8 字节。
+// 参数:
+//   - key: 密钥(8 字节)
+//   - data: 待解密的密文字节
+//
+// 返回值:
+//   - []byte: 解密还原后的明文字节
+//   - error: 解密失败时返回的错误
+//
+// Example:
 // ```
-// codec.DESECBDecrypt([]byte("12345678"), ciphertext)
+// // VARS: 先加密再解密(DES-ECB)
+// key = "12345678"
+// ct = codec.DESECBEncrypt(key, "Secret Message")~
+// pt = codec.DESECBDecrypt(key, ct)~
+// // STDOUT: 去零填充后打印
+// println(string(codec.ZeroUnPadding(pt)))   // OUT: Secret Message
+// // assert: 锁定结论(DES-ECB 解密还原一致)
+// assert string(codec.ZeroUnPadding(pt)) == "Secret Message", "DES-ECB decrypt should recover plaintext"
 // ```
 func DESECBDec(key []byte, data []byte) ([]byte, error) {
 	return DESDecryptECBWithZeroPadding(key, data, nil)
 }
 
-// TripleDESECBDecrypt 是一个便捷函数，用于使用 Triple DES 算法，在 ECB 模式下，使用 零填充来解密数据。
-// 它接受一个密钥（key）、需要解密的数据（data to decrypt）（ecb 模式下 iv 无用）
-// 密钥的长度必须是 24 个字节（即 3 * 8 字节）。
-// example:
+// TripleDES_ECBDec 使用 3DES(Triple DES) 算法在 ECB 模式下用零填充解密数据(ECB 模式下无 iv 参数)
+// 密钥长度必须是 24 字节(即 3 * 8 字节)。
+// 参数:
+//   - key: 密钥(24 字节)
+//   - data: 待解密的密文字节
+//
+// 返回值:
+//   - []byte: 解密还原后的明文字节
+//   - error: 解密失败时返回的错误
+//
+// Example:
 // ```
-// codec.TripleDESECBDecrypt([]byte("123456789012345678901234"), ciphertext)
+// // VARS: 先加密再解密(3DES-ECB)
+// key = "123456781234567812345678"
+// ct = codec.TripleDESECBEncrypt(key, "Secret Message")~
+// pt = codec.TripleDESECBDecrypt(key, ct)~
+// // STDOUT: 去零填充后打印
+// println(string(codec.ZeroUnPadding(pt)))   // OUT: Secret Message
+// // assert: 锁定结论(3DES-ECB 解密还原一致)
+// assert string(codec.ZeroUnPadding(pt)) == "Secret Message", "3DES-ECB decrypt should recover plaintext"
 // ```
 func TripleDES_ECBDec(key []byte, data []byte) ([]byte, error) {
 	return TripleDESDecryptECBWithZeroPadding(key, data, nil)
@@ -212,16 +266,28 @@ func TripleDES_ECBDec(key []byte, data []byte) ([]byte, error) {
 // Des
 var DESEncryptCBCWithPKCSPadding = DESEncFactory(PKCS5Padding, CBC)
 
-// DESCBCEncrypt 是一个便捷函数，用于使用 DES 算法，在 CBC 模式下，使用零填充来加密数据。
-// 它接受一个密钥（key）、需要加密的数据（data to encrypt）和一个初始化向量（iv）。
-// 密钥的长度必须是 8 个字节，并且 iv 可以是 nil 或者 8 个字节长。
-// 如果 iv 为 nil，它将被固定为密钥，或者用零填充到 8 个字节。
-// 加密数据长度需要是8的倍数。默认使用零填充方式进行填充。
-// 如果希望使用其他填充方式，请使用 codec.PKCS7PaddingForDES 进行填充后，再调用此函数进行加密。
-// DESCBCEncrypt DESEncrypt 是同一个函数。
-// example:
+// DESEncryptCBCWithZeroPadding 使用 DES 算法在 CBC 模式下用零填充加密数据
+// 密钥长度必须是 8 字节，iv 可为 nil 或 8 字节；iv 为 nil 时固定为密钥或零填充到 8 字节。
+// 注意：DESCBCEncrypt、DESEncrypt 和本函数是同一个函数的别名；如需其他填充，先用 codec.PKCS7PaddingForDES 填充再调用。
+// 参数:
+//   - key: 密钥(8 字节)
+//   - i: 待加密的数据，可为 string、[]byte 等
+//   - iv: 初始化向量(8 字节)，可为 nil
+//
+// 返回值:
+//   - []byte: 加密后的密文字节
+//   - error: 加密失败时返回的错误
+//
+// Example:
 // ```
-// codec.DESCBCEncrypt([]byte("12345678"), "hello world", "12345678")
+// // VARS: DES-CBC 加解密(8 字节密钥与 IV)
+// key = "12345678"
+// iv = "abcdefgh"
+// ct = codec.DESCBCEncrypt(key, "Secret Message", iv)~
+// // STDOUT: 解密还原后打印
+// println(string(codec.DESCBCDecrypt(key, ct, iv)~))   // OUT: Secret Message
+// // assert: 锁定结论(DES-CBC 加解密往返一致)
+// assert string(codec.DESCBCDecrypt(key, ct, iv)~) == "Secret Message", "DES-CBC should round-trip"
 // ```
 func DESEncryptCBCWithZeroPadding(key []byte, i interface{}, iv []byte) ([]byte, error) {
 	return DESEncFactory(ZeroPadding, CBC)(key, i, iv)
@@ -229,14 +295,29 @@ func DESEncryptCBCWithZeroPadding(key []byte, i interface{}, iv []byte) ([]byte,
 
 var DESDecryptCBCWithPKCSPadding = DESDecFactory(PKCS5UnPadding, CBC)
 
-// DESCBCDecrypt 是一个便捷函数，用于使用 DES 算法，在 CBC 模式下，使用零填充来解密数据。
-// 它接受一个密钥（key）、需要解密的数据（data to decrypt）和一个初始化向量（iv）。
-// 密钥的长度必须是 8 个字节，并且 iv 可以是 nil 或者 8 个字节长。
-// 如果 iv 为 nil，它将被固定为密钥，或者用零填充到 8 个字节。
-// DESCBCDecrypt DESDecrypt 是同一个函数。
-// example:
+// DESDecryptCBCWithZeroPadding 使用 DES 算法在 CBC 模式下用零填充解密数据
+// 密钥长度必须是 8 字节，iv 可为 nil 或 8 字节；iv 为 nil 时固定为密钥或零填充到 8 字节。
+// 注意：DESCBCDecrypt、DESDecrypt 和本函数是同一个函数的别名
+// 参数:
+//   - key: 密钥(8 字节)
+//   - i: 待解密的密文，可为 []byte 等
+//   - iv: 初始化向量(8 字节)，可为 nil
+//
+// 返回值:
+//   - []byte: 解密还原后的明文字节
+//   - error: 解密失败时返回的错误
+//
+// Example:
 // ```
-// codec.DESCBCEncrypt([]byte("12345678"), ciphertext, "12345678")
+// // VARS: 先加密再解密(DES-CBC)
+// key = "12345678"
+// iv = "abcdefgh"
+// ct = codec.DESCBCEncrypt(key, "Secret Message", iv)~
+// pt = codec.DESCBCDecrypt(key, ct, iv)~
+// // STDOUT: 打印还原后的明文
+// println(string(pt))   // OUT: Secret Message
+// // assert: 锁定结论(DES-CBC 解密还原一致)
+// assert string(pt) == "Secret Message", "DES-CBC decrypt should recover plaintext"
 // ```
 func DESDecryptCBCWithZeroPadding(key []byte, i interface{}, iv []byte) ([]byte, error) {
 	return DESDecFactory(ZeroUnPadding, CBC)(key, i, iv)
@@ -244,13 +325,26 @@ func DESDecryptCBCWithZeroPadding(key []byte, i interface{}, iv []byte) ([]byte,
 
 var DESEncryptECBWithPKCSPadding = DESEncFactory(PKCS5Padding, ECB)
 
-// DESECBEncrypt 是一个便捷函数，用于使用 DES 算法，在 ECB 模式下，使用 零填充来加密数据。
-// 它接受一个密钥（key）、需要加密的数据（data to encrypt）。
-// ecb 模式下 iv 无用。
-// 密钥的长度必须是 8 个字节。
-// example:
+// DESEncryptECBWithZeroPadding 使用 DES 算法在 ECB 模式下用零填充加密数据(ECB 模式下 iv 无用)
+// 密钥长度必须是 8 字节。
+// 参数:
+//   - key: 密钥(8 字节)
+//   - i: 待加密的数据，可为 string、[]byte 等
+//   - iv: ECB 模式下无用，传 nil 即可
+//
+// 返回值:
+//   - []byte: 加密后的密文字节
+//   - error: 加密失败时返回的错误
+//
+// Example:
 // ```
-// codec.DESECBEncrypt([]byte("12345678"), "hello world", nil)
+// // VARS: DES-ECB 底层加密(iv 传 nil)
+// key = "12345678"
+// ct = codec.DESEncryptECBWithZeroPadding(key, "Secret Message", nil)~
+// // STDOUT: 去零填充解密后打印
+// println(string(codec.ZeroUnPadding(codec.DESDecryptECBWithZeroPadding(key, ct, nil)~)))   // OUT: Secret Message
+// // assert: 锁定结论(DES-ECB 零填充往返一致)
+// assert string(codec.ZeroUnPadding(codec.DESDecryptECBWithZeroPadding(key, ct, nil)~)) == "Secret Message", "DES-ECB zero-padding should round-trip"
 // ```
 func DESEncryptECBWithZeroPadding(key []byte, i interface{}, iv []byte) ([]byte, error) {
 	return DESEncFactory(ZeroPadding, ECB)(key, i, iv)
@@ -262,14 +356,28 @@ var DESDecryptECBWithZeroPadding = DESDecFactory(ZeroUnPadding, ECB)
 // TripleDes
 var TripleDESEncryptCBCWithPKCSPadding = TripleDESEncFactory(PKCS5Padding, CBC)
 
-// TripleDESCBCEncrypt 是一个便捷函数，用于使用 Triple DES 算法，在 CBC 模式下，使用 零填充来加密数据。
-// 它接受一个密钥（key）、需要加密的数据（data to encrypt）和一个初始化向量（iv）。
-// 密钥的长度必须是 24 个字节（即 3 * 8 字节），并且 iv 可以是 nil 或者 8 个字节长。
-// 如果 iv 为 nil，它将被固定为密钥.
-// TripleDESCBCDecrypt TripleDESEncrypt 是同一个函数。
-// example:
+// TripleDESEncryptCBCWithZeroPadding 使用 3DES(Triple DES) 算法在 CBC 模式下用零填充加密数据
+// 密钥长度必须是 24 字节(即 3 * 8 字节)，iv 可为 nil 或 8 字节；iv 为 nil 时固定为密钥。
+// 注意：TripleDESCBCEncrypt、TripleDESEncrypt 和本函数是同一个函数的别名
+// 参数:
+//   - key: 密钥(24 字节)
+//   - i: 待加密的数据，可为 string、[]byte 等
+//   - iv: 初始化向量(8 字节)，可为 nil
+//
+// 返回值:
+//   - []byte: 加密后的密文字节
+//   - error: 加密失败时返回的错误
+//
+// Example:
 // ```
-// codec.TripleDESCBCEncrypt([]byte("123456789012345678901234"), "hello world", "12345678")
+// // VARS: 3DES-CBC 加解密(24 字节密钥，8 字节 IV)
+// key = "123456781234567812345678"
+// iv = "abcdefgh"
+// ct = codec.TripleDESCBCEncrypt(key, "Secret Message", iv)~
+// // STDOUT: 解密还原后打印
+// println(string(codec.TripleDESCBCDecrypt(key, ct, iv)~))   // OUT: Secret Message
+// // assert: 锁定结论(3DES-CBC 加解密往返一致)
+// assert string(codec.TripleDESCBCDecrypt(key, ct, iv)~) == "Secret Message", "3DES-CBC should round-trip"
 // ```
 func TripleDESEncryptCBCWithZeroPadding(key []byte, i interface{}, iv []byte) ([]byte, error) {
 	return TripleDESEncFactory(ZeroPadding, CBC)(key, i, iv)
@@ -277,14 +385,29 @@ func TripleDESEncryptCBCWithZeroPadding(key []byte, i interface{}, iv []byte) ([
 
 var TripleDESDecryptCBCWithPKCSPadding = TripleDESDecFactory(PKCS5UnPadding, CBC)
 
-// TripleDESCBCDecrypt 是一个便捷函数，用于使用 Triple DES 算法，在 CBC 模式下，使用 零填充来解密数据。
-// 它接受一个密钥（key）、需要解密的数据（data to decrypt）和一个初始化向量（iv）。
-// 密钥的长度必须是 24 个字节（即 3 * 8 字节），并且 iv 可以是 nil 或者 8 个字节长。
-// 如果 iv 为 nil，它将被固定为密钥，或者用零填充到 8 个字节。
-// TripleDESCBCDecrypt TripleDESDecrypt 是同一个函数。
-// example:
+// TripleDESDecryptCBCWithZeroPadding 使用 3DES(Triple DES) 算法在 CBC 模式下用零填充解密数据
+// 密钥长度必须是 24 字节(即 3 * 8 字节)，iv 可为 nil 或 8 字节；iv 为 nil 时固定为密钥或零填充到 8 字节。
+// 注意：TripleDESCBCDecrypt、TripleDESDecrypt 和本函数是同一个函数的别名
+// 参数:
+//   - key: 密钥(24 字节)
+//   - i: 待解密的密文，可为 []byte 等
+//   - iv: 初始化向量(8 字节)，可为 nil
+//
+// 返回值:
+//   - []byte: 解密还原后的明文字节
+//   - error: 解密失败时返回的错误
+//
+// Example:
 // ```
-// codec.TripleDESCBCDecrypt([]byte("123456789012345678901234"), ciphertext, "12345678")
+// // VARS: 先加密再解密(3DES-CBC)
+// key = "123456781234567812345678"
+// iv = "abcdefgh"
+// ct = codec.TripleDESCBCEncrypt(key, "Secret Message", iv)~
+// pt = codec.TripleDESCBCDecrypt(key, ct, iv)~
+// // STDOUT: 打印还原后的明文
+// println(string(pt))   // OUT: Secret Message
+// // assert: 锁定结论(3DES-CBC 解密还原一致)
+// assert string(pt) == "Secret Message", "3DES-CBC decrypt should recover plaintext"
 // ```
 func TripleDESDecryptCBCWithZeroPadding(key []byte, i interface{}, iv []byte) ([]byte, error) {
 	return TripleDESDecFactory(ZeroUnPadding, CBC)(key, i, iv)

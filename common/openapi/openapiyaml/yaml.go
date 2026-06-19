@@ -80,7 +80,20 @@ func jsonUnmarshal(r io.Reader, o interface{}, opts ...JSONOpt) error {
 	return nil
 }
 
-// JSONToYAML converts JSON to YAML.
+// JSONToYAML 将 JSON 字节转换为 YAML 字节（导出名为 openapi.ConvertJsonToYaml）
+// 转换过程会尽量保留数字类型（int/float），而非统一转为 float
+// 参数:
+//   - j: JSON 内容（字符串或字节）
+//
+// 返回值:
+//   - 转换后的 YAML 内容
+//   - 错误信息
+//
+// Example:
+// ```
+// y = openapi.ConvertJsonToYaml(`{"name":"yak","version":1}`)~
+// assert str.Contains(string(y), "name: yak"), "json should be converted to yaml"
+// ```
 func JSONToYAML(j []byte) ([]byte, error) {
 	// Convert the JSON to an object.
 	var jsonObj interface{}
@@ -98,16 +111,20 @@ func JSONToYAML(j []byte) ([]byte, error) {
 	return yaml.Marshal(jsonObj)
 }
 
-// YAMLToJSON converts YAML to JSON. Since JSON is a subset of YAML,
-// passing JSON through this method should be a no-op.
+// YAMLToJSON 将 YAML 字节转换为 JSON 字节（导出名为 openapi.ConvertYamlToJson）
+// 由于 JSON 是 YAML 的子集，对 JSON 输入做转换基本是无操作
+// 参数:
+//   - y: YAML 内容（字符串或字节）
 //
-// Things YAML can do that are not supported by JSON:
-//   - In YAML you can have binary and null keys in your maps. These are invalid
-//     in JSON. (int and float keys are converted to strings.)
-//   - Binary data in YAML with the !!binary tag is not supported. If you want to
-//     use binary data with this library, encode the data as base64 as usual but do
-//     not use the !!binary tag in your YAML. This will ensure the original base64
-//     encoded data makes it all the way through to the JSON.
+// 返回值:
+//   - 转换后的 JSON 内容
+//   - 错误信息
+//
+// Example:
+// ```
+// j = openapi.ConvertYamlToJson("name: yak\nversion: 1\n")~
+// assert str.Contains(string(j), "\"name\":\"yak\""), "yaml should be converted to json"
+// ```
 func YAMLToJSON(y []byte) ([]byte, error) { //nolint:revive
 	dec := yaml.NewDecoder(bytes.NewReader(y))
 	return yamlToJSON(dec, nil)

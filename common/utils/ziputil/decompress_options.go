@@ -16,8 +16,20 @@ import (
 // 带密码的 zip 解压入口
 // 关键词: zip 解压, 密码 zip 读取
 
-// DeCompressWithOptions 解压 zip 文件，支持 DecompressOption（含密码）。
+// DecompressWithOptions 解压 zip 文件到目标目录，支持 DecompressOption（如密码）。
 // 关键词: zip 解压密码, DeCompress
+// 参数:
+//   - zipFile: 待解压的 zip 文件路径
+//   - dest: 解压输出的目标目录
+//   - opts: 可选的解压选项（如 decompressPassword）
+//
+// 返回值:
+//   - 错误信息
+//
+// Example:
+// ```
+// zip.DecompressWithOptions("/tmp/enc.zip", "/tmp/dest", zip.decompressPassword("123456"))~
+// ```
 func DeCompressWithOptions(zipFile, dest string, opts ...DecompressOption) error {
 	raw, err := ioutil.ReadFile(zipFile)
 	if err != nil {
@@ -26,8 +38,26 @@ func DeCompressWithOptions(zipFile, dest string, opts ...DecompressOption) error
 	return DeCompressFromRawWithOptions(raw, dest, opts...)
 }
 
-// DeCompressFromRawWithOptions 从原始字节解压 zip，支持 DecompressOption（含密码）。
+// DecompressFromRawWithOptions 从内存 zip 原始字节解压到目标目录，支持 DecompressOption（如密码）。
 // 关键词: zip 内存解压, DeCompressFromRaw, 密码 zip 解压
+// 参数:
+//   - raw: zip 文件的原始字节内容
+//   - dest: 解压输出的目标目录
+//   - opts: 可选的解压选项（如 decompressPassword）
+//
+// 返回值:
+//   - 错误信息
+//
+// Example:
+// ```
+// // 内存加密压缩后解压到临时目录，再读回验证
+// zipBytes = zip.CompressRawWithPassword({"a.txt": "AAA"}, "123456")~
+// dest = file.Join(os.TempDir(), "yak-zip-decompress")
+// zip.DecompressFromRawWithOptions(zipBytes, dest, zip.decompressPassword("123456"))~
+// content = file.ReadFile(file.Join(dest, "a.txt"))~
+// assert string(content) == "AAA", "DecompressFromRawWithOptions should restore the entry"
+// file.Remove(dest)
+// ```
 func DeCompressFromRawWithOptions(raw []byte, dest string, opts ...DecompressOption) error {
 	cfg := newDecompressConfig(opts...)
 

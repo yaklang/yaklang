@@ -24,7 +24,24 @@ type ConnectionsWatcher struct {
 	pollInterval time.Duration // 轮询连接的频率
 }
 
-// NewWatcher 创建一个新的进程监控器实例
+// NewConnectionsWatcher 针对单个进程创建一个网络连接监控器，发现新的远程 IP 时回调通知
+// 参数:
+//   - pid: 待监控的进程 ID
+//   - cb: 发现新远程 IP 时的回调函数，签名为 func(pid, remoteIP)
+//   - interval: 轮询连接的时间间隔
+//
+// 返回值:
+//   - 连接监控器对象
+//   - 错误信息（进程不存在时非空）
+//
+// Example:
+// ```
+//
+//	w = os.NewConnectionsWatcher(os.Getpid(), (pid, ip) => {
+//	    log.info("process %v connects to %v", pid, ip)
+//	}, 1 * time.Second)~
+//
+// ```
 func NewWatcher(pid int32, cb NewRemoteIPCallback, interval time.Duration) (*ConnectionsWatcher, error) {
 	proc, err := process.NewProcess(pid)
 	if err != nil {

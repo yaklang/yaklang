@@ -167,6 +167,12 @@ func NewBruteConfig() *BruteConfig {
 
 // wsAddress 是一个请求选项 用于输入浏览器的websocket地址
 //
+// 参数:
+//   - ws: 浏览器的 WebSocket 地址
+//
+// 返回值:
+//   - 请求选项
+//
 // Example:
 // ```
 //
@@ -181,6 +187,12 @@ func WithWsAddress(ws string) BruteConfigOpt {
 
 // exePath 是一个请求选项 用于输入浏览器路径
 //
+// 参数:
+//   - exePath: 浏览器可执行文件路径
+//
+// 返回值:
+//   - 请求选项
+//
 // Example:
 // ```
 //
@@ -194,6 +206,13 @@ func WithExePath(exePath string) BruteConfigOpt {
 }
 
 // proxy 是一个请求选项 用于输入代理服务器地址
+//
+// 参数:
+//   - proxy: 代理服务器地址
+//   - details: 可选的代理认证信息（用户名、密码）
+//
+// 返回值:
+//   - 请求选项
 //
 // Example:
 // ```
@@ -214,6 +233,12 @@ func WithProxy(proxy string, details ...string) BruteConfigOpt {
 
 // usernameList 是一个请求选项 用于输入爆破的用户名的列表
 //
+// 参数:
+//   - username: 用户名列表
+//
+// 返回值:
+//   - 请求选项
+//
 // Example:
 // ```
 //
@@ -229,7 +254,14 @@ func WithUsername(username []string) BruteConfigOpt {
 
 // username 是一个请求选项 用于输入爆破的用户名
 //
-//	Example:
+// 参数:
+//   - username: 一个或多个用户名
+//
+// 返回值:
+//
+//   - 请求选项
+//
+//     Example:
 //
 // ```
 //
@@ -243,6 +275,12 @@ func WithUsernameList(username ...string) BruteConfigOpt {
 }
 
 // passwordList 是一个请求选项 用于输入爆破的密码的列表
+//
+// 参数:
+//   - password: 密码列表
+//
+// 返回值:
+//   - 请求选项
 //
 // Example:
 // ```
@@ -260,6 +298,12 @@ func WithPassword(password []string) BruteConfigOpt {
 
 // password 是一个请求选项 用于输入爆破的密码
 //
+// 参数:
+//   - password: 一个或多个密码
+//
+// 返回值:
+//   - 请求选项
+//
 // Example:
 // ```
 //
@@ -274,6 +318,12 @@ func WithPasswordList(password ...string) BruteConfigOpt {
 
 // captchaUrl 是一个请求选项 用于验证码的url地址
 //
+// 参数:
+//   - url: 验证码识别服务的 URL
+//
+// 返回值:
+//   - 请求选项
+//
 // Example:
 // ```
 //
@@ -287,6 +337,17 @@ func WithCaptchaUrl(url string) BruteConfigOpt {
 }
 
 // captchaMode 特殊选项 如果你不知道怎么用请勿使用
+// 参数:
+//   - mode: 验证码模式
+//
+// 返回值:
+//   - 请求选项
+//
+// Example:
+// ```
+// opt = simulator.captchaMode("default")
+// println(opt)
+// ```
 func WithCaptchaMode(mode string) BruteConfigOpt {
 	return func(config *BruteConfig) {
 		config.captchaMode = mode
@@ -294,6 +355,12 @@ func WithCaptchaMode(mode string) BruteConfigOpt {
 }
 
 // captchaType 是一个请求选项 用于标识使用验证码的种类 其中1 其他（正常请勿使用）2 老版ddddocr server接口（url以/ocr/b64/json结尾） 3 新版ddddocr server接口（url以/ocr结尾）
+//
+// 参数:
+//   - typeEnum: 验证码接口类型
+//
+// 返回值:
+//   - 请求选项
 //
 // Example:
 // ```
@@ -309,6 +376,12 @@ func WithCaptchaType(typeEnum int) BruteConfigOpt {
 
 // usernameSelector 是一个请求选项 用于在用户框位置识别错误时输入用户框对应的selector
 //
+// 参数:
+//   - selector: 用户名输入框的 CSS selector
+//
+// 返回值:
+//   - 请求选项
+//
 // Example:
 // ```
 //
@@ -322,6 +395,12 @@ func WithUsernameSelector(selector string) BruteConfigOpt {
 }
 
 // passwordSelector 是一个请求选项 用于在密码框位置识别错误时输入密码框对应的selector
+//
+// 参数:
+//   - selector: 密码输入框的 CSS selector
+//
+// 返回值:
+//   - 请求选项
 //
 // Example:
 // ```
@@ -337,6 +416,12 @@ func WithPasswordSelector(selector string) BruteConfigOpt {
 
 // captchaInputSelector 是一个请求选项 用于在验证码输入框位置识别错误时输入验证码输入框对应的selector
 //
+// 参数:
+//   - selector: 验证码输入框的 CSS selector
+//
+// 返回值:
+//   - 请求选项
+//
 // Example:
 // ```
 //
@@ -351,6 +436,12 @@ func WithCaptchaSelector(selector string) BruteConfigOpt {
 
 // captchaImgSelector 是一个请求选项 用于在验证码图片位置识别错误时输入验证码图片对应的selector
 //
+// 参数:
+//   - selector: 验证码图片的 CSS selector
+//
+// 返回值:
+//   - 请求选项
+//
 // Example:
 // ```
 //
@@ -364,6 +455,12 @@ func WithCaptchaImgSelector(selector string) BruteConfigOpt {
 }
 
 // submitButtonSelector 是一个请求选项 用于在提交登录按钮位置识别错误时输入提交登录按钮对应的selector
+//
+// 参数:
+//   - selector: 登录提交按钮的 CSS selector
+//
+// 返回值:
+//   - 请求选项
 //
 // Example:
 // ```
@@ -391,6 +488,13 @@ func WithResultChannel(ch chan Result) BruteConfigOpt {
 // simulator.stringMatchMode 表示使用页面内容或变动中的字符串匹配结果判断登录
 // 第二个参数表示检测html变化程度的比例，超过该比例则认为发生变化 默认为0.6
 //
+// 参数:
+//   - mode: 登录检测模式，如 simulator.htmlChangeMode、simulator.urlChangeMode
+//   - degree: 可选的 html 变化比例阈值（默认 0.6）
+//
+// 返回值:
+//   - 请求选项
+//
 // Example:
 // ```
 //
@@ -412,6 +516,12 @@ func WithLoginDetectMode(mode loginDetectMode, degree ...float64) BruteConfigOpt
 // 浏览器自动进程关闭进行在windows下会报病毒 默认在windows下会关闭
 // 当关闭时 如果强制关闭爬虫进程时chrome进程会存在于后台 浏览器进程后台过多时请手动进行关闭
 //
+// 参数:
+//   - leakless: leakless 模式，如 simulator.leaklessOn、simulator.leaklessOff、simulator.leaklessDefault
+//
+// 返回值:
+//   - 请求选项
+//
 // Example:
 // ```
 //
@@ -425,6 +535,12 @@ func WithLeakless(leakless LeaklessMode) BruteConfigOpt {
 }
 
 // extraWaitLoadTime 是一个请求选项 用于选择页面加载的额外页面等待时间 单位毫秒
+//
+// 参数:
+//   - time: 额外等待时间（毫秒）
+//
+// 返回值:
+//   - 请求选项
 //
 // Example:
 // ```
@@ -440,6 +556,12 @@ func WithExtraWaitLoadTime(time int) BruteConfigOpt {
 
 // successMatchers 是一个请求选项 用于在页面变化中匹配指定字符串来判断登录成功
 //
+// 参数:
+//   - matchers: 一个或多个用于判断登录成功的字符串
+//
+// 返回值:
+//   - 请求选项
+//
 // Example:
 // ```
 //
@@ -452,30 +574,91 @@ func WithSuccessMatchers(matchers ...string) BruteConfigOpt {
 	}
 }
 
+// saveToDB 是一个请求选项 用于设置是否将爆破结果保存到数据库（导出名为 simulator.saveToDB）
+// 参数:
+//   - saveToDB: 是否保存到数据库
+//
+// 返回值:
+//   - 请求选项
+//
+// Example:
+// ```
+// opt = simulator.saveToDB(true)
+// println(opt)
+// ```
 func WithSaveToDB(saveToDB bool) BruteConfigOpt {
 	return func(config *BruteConfig) {
 		config.saveToDB = saveToDB
 	}
 }
 
+// sourceType 是一个请求选项 用于标识结果来源类型（导出名为 simulator.sourceType）
+// 参数:
+//   - sourceType: 来源类型，如 "scan"
+//
+// 返回值:
+//   - 请求选项
+//
+// Example:
+// ```
+// opt = simulator.sourceType("scan")
+// println(opt)
+// ```
 func WithSourceType(sourceType string) BruteConfigOpt {
 	return func(config *BruteConfig) {
 		config.sourceType = sourceType
 	}
 }
 
+// fromPlugin 是一个请求选项 用于标识结果来源插件名（导出名为 simulator.fromPlugin）
+// 参数:
+//   - fromPlugin: 来源插件名
+//
+// 返回值:
+//   - 请求选项
+//
+// Example:
+// ```
+// opt = simulator.fromPlugin("my-plugin")
+// println(opt)
+// ```
 func WithFromPlugin(fromPlugin string) BruteConfigOpt {
 	return func(config *BruteConfig) {
 		config.fromPlugin = fromPlugin
 	}
 }
 
+// runtimeID 是一个请求选项 用于绑定运行时 ID（导出名为 simulator.runtimeID）
+// 参数:
+//   - runtimeID: 运行时 ID
+//
+// 返回值:
+//   - 请求选项
+//
+// Example:
+// ```
+// opt = simulator.runtimeID("runtime-uuid")
+// println(opt)
+// ```
 func WithRuntimeID(runtimeID string) BruteConfigOpt {
 	return func(config *BruteConfig) {
 		config.runtimeID = runtimeID
 	}
 }
 
+// preAction 是一个请求选项 用于在登录前执行预置动作（以 JSON 字符串描述，导出名为 simulator.preAction）
+// 参数:
+//   - actionsJs: 预置动作的 JSON 字符串
+//
+// 返回值:
+//   - 请求选项
+//
+// Example:
+// ```
+// // 预置动作 JSON 用于在爆破前执行点击、输入等操作（示意性示例）
+// opt = simulator.preAction(`[]`)
+// println(opt)
+// ```
 func WithPreActions(actionsJs string) BruteConfigOpt {
 	var actions []preaction.PreActionJson
 	err := json.Unmarshal([]byte(actionsJs), &actions)

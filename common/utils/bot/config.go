@@ -31,6 +31,21 @@ type Config struct {
 
 type ConfigOpt func(*Client)
 
+// WithWebhookWithSecret 配置带签名密钥的 webhook（导出名为 bot.webhookWithSecret / bot.ding）
+// 会根据 webhook 域名自动识别钉钉、飞书或企业微信类型
+// 参数:
+//   - webhook: 机器人 webhook 地址
+//   - key: 加签密钥（secret）
+//
+// 返回值:
+//   - 机器人配置可选项
+//
+// Example:
+// ```
+// // 示意性示例，需替换为真实 webhook 与密钥
+// client = bot.New(bot.ding("https://oapi.dingtalk.com/robot/send?access_token=xxx", "SECxxx"))
+// client.SendText("hello with secret")
+// ```
 func WithWebhookWithSecret(webhook string, key string) ConfigOpt {
 	return func(c *Client) {
 		u, err := url.Parse(webhook)
@@ -59,6 +74,20 @@ func WithWebhookWithSecret(webhook string, key string) ConfigOpt {
 	}
 }
 
+// WithWebhook 配置无密钥的 webhook（导出名为 bot.webhook / bot.workwx）
+// 会根据 webhook 域名自动识别钉钉、飞书或企业微信类型
+// 参数:
+//   - webhook: 机器人 webhook 地址
+//
+// 返回值:
+//   - 机器人配置可选项
+//
+// Example:
+// ```
+// // 示意性示例，需替换为真实 webhook 地址
+// client = bot.New(bot.webhook("https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxx"))
+// client.SendText("hello workwx")
+// ```
 func WithWebhook(webhook string) ConfigOpt {
 	return WithWebhookWithSecret(webhook, "")
 }

@@ -55,6 +55,17 @@ func SessionId() string {
 // 供脚本侧（cachebench / 离线分析等）一行直接拿到 dump 目录路径，无需重做 mtime 扫描。
 // 第一次调用时会触发懒初始化（与 SessionId 共享 sync.Once），之后稳定返回同一路径。
 // 关键词: aicache, SessionDir, 脚本可读 dump 路径
+// 参数:
+//   - 无
+//
+// 返回值:
+//   - aicache 调试落盘根目录的绝对路径
+//
+// Example:
+// ```
+// sessionDir = ai.aicacheSession()
+// println(sessionDir)
+// ```
 func SessionDir() string {
 	dir, _ := resolveDumpBaseDir()
 	return dir

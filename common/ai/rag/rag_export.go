@@ -45,6 +45,20 @@ type ExportVectorStoreDocument struct {
 	RelatedEntities string                 `json:"related_entities"`
 }
 
+// ExportRAG 将指定 RAG 集合导出为 .rag 二进制文件（导出名为 rag.Export）
+// 参数:
+//   - collectionName: 要导出的集合名称
+//   - fileName: 导出文件路径
+//   - opts: 可选导出配置（noHNSWGraph、noMetadata、onlyPQCode 等）
+//
+// 返回值:
+//   - 错误信息
+//
+// Example:
+// ```
+// // 依赖本地数据库（示意性示例）
+// rag.Export("my-collection", "/tmp/my-collection.rag")~
+// ```
 func ExportRAG(collectionName string, fileName string, opts ...RAGSystemConfigOption) error {
 	reader, err := ExportRAGToBinary(collectionName, opts...)
 	if err != nil {
@@ -951,6 +965,19 @@ func readHNSWIndexFromStream(reader io.Reader) ([]byte, error) {
 	return hnswIndex, nil
 }
 
+// ImportRAG 从 .rag 二进制文件导入 RAG 集合到数据库（导出名为 rag.Import）
+// 参数:
+//   - inputPath: .rag 文件路径（支持 .gz 压缩）
+//   - optFuncs: 可选导入配置（db、importName、importOverwrite、importRebuildGraph 等）
+//
+// 返回值:
+//   - 错误信息
+//
+// Example:
+// ```
+// // 依赖本地数据库（示意性示例）
+// rag.Import("/tmp/my-collection.rag", rag.importName("imported-collection"))~
+// ```
 func ImportRAG(inputPath string, optFuncs ...RAGSystemConfigOption) error {
 	// 读取二进制文件（支持 .gz）
 	file, err := os.Open(inputPath)

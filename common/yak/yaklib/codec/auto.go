@@ -88,6 +88,22 @@ func EncodeByType(t string, i interface{}) string {
 	return ""
 }
 
+// AutoDecode 自动识别并逐层解码输入数据(依次尝试 URL/HTML 实体/Hex/Unicode/Base32/Base64/JWT/字符集等)
+// 参数:
+//   - i: 待自动解码的数据，可为 string、[]byte 等
+//
+// 返回值:
+//   - 解码过程的结果列表，每个元素含 Type(编码类型)、Origin(本层输入)、Result(本层输出)等字段；无法识别时返回单个 Type 为 No 的结果
+//
+// Example:
+// ```
+// // VARS: 对 Base64 文本自动解码
+// results = codec.AutoDecode(codec.EncodeBase64("hello world"))
+// // STDOUT: 打印是否得到解码步骤
+// println(len(results) > 0)   // OUT: true
+// // assert: 锁定结论(返回非空解码结果列表)
+// assert len(results) > 0, "AutoDecode should return decode steps"
+// ```
 func AutoDecode(i interface{}) []*AutoDecodeResult {
 	rawStr := string(interfaceToBytes(i))
 	origin := rawStr
@@ -305,19 +321,19 @@ func AutoDecode(i interface{}) []*AutoDecodeResult {
 
 	for i := 0; i < 100; i++ {
 		// url
-		if tryDecode(origin, "UrlDecode", "URL编码", urlRegexp.MatchString, url.QueryUnescape) {
+		if tryDecode(origin, "UrlDecode", "URL编砝", urlRegexp.MatchString, url.QueryUnescape) {
 			continue
 		}
 		// html entity
-		if tryDecode(origin, "HTML Entity Decode", "HTML实体编码", htmlEntityRegexp.MatchString, htmlDecode) {
+		if tryDecode(origin, "HTML Entity Decode", "HTML实体编砝", htmlEntityRegexp.MatchString, htmlDecode) {
 			continue
 		}
 		// hex
-		if tryDecode(origin, "Hex Decode", "Hex 解码", hexRegexp.MatchString, hexDecode) {
+		if tryDecode(origin, "Hex Decode", "Hex 解砝", hexRegexp.MatchString, hexDecode) {
 			continue
 		}
 		// unicode
-		if tryDecode(origin, "Unicode Decode", "Unicode 解码", unicodeRegexp.MatchString, unicodeDecode) {
+		if tryDecode(origin, "Unicode Decode", "Unicode 解砝", unicodeRegexp.MatchString, unicodeDecode) {
 			continue
 		}
 		// unescape string
@@ -326,20 +342,20 @@ func AutoDecode(i interface{}) []*AutoDecodeResult {
 		}
 
 		// base32
-		if tryDecode(origin, "Base32 Decode", "Base32 解码", base32Detect, base32Decode) {
+		if tryDecode(origin, "Base32 Decode", "Base32 解砝", base32Detect, base32Decode) {
 			continue
 		}
 		// base64
-		if tryDecode(origin, "Base64 Decode", "Base64 解码", base64Detect, base64Decode) {
+		if tryDecode(origin, "Base64 Decode", "Base64 解砝", base64Detect, base64Decode) {
 			continue
 		}
 		// jwt
-		if tryDecode(origin, "jwt", "JWT 解码", jwtDetect, jwtDecode) {
+		if tryDecode(origin, "jwt", "JWT 解砝", jwtDetect, jwtDecode) {
 			// if jwt decode success, break anymore
 			break
 		}
 		// charset
-		if tryDecode(origin, "Charset Decode", "字符集解码", charsetDetect, charsetDecode) {
+		if tryDecode(origin, "Charset Decode", "字符集解砝", charsetDetect, charsetDecode) {
 			continue
 		}
 		// file type
@@ -353,7 +369,7 @@ func AutoDecode(i interface{}) []*AutoDecodeResult {
 		return []*AutoDecodeResult{
 			{
 				Type:        "No",
-				TypeVerbose: "无编码",
+				TypeVerbose: "无编砝",
 				Origin:      rawStr,
 				Result:      rawStr,
 			},

@@ -21,7 +21,23 @@ var numericZeros = []interface{}{
 	float64(0),
 }
 
-// ToFloat64 converts any numeric value to float64.
+// ToFloat64 将任意数值类型转换为 float64
+// 参数:
+//   - x: 待转换的数值
+//
+// 返回值:
+//   - 转换后的 float64 值
+//   - 是否转换成功
+//
+// Example:
+// ```
+// // VARS: 转换数值
+// v, ok = x.ToFloat64(3)
+// // STDOUT: 打印转换结果
+// println(v)   // OUT: 3
+// // assert: 转换成功
+// assert ok == true, "integer 3 should convert to float64"
+// ```
 func ToFloat64(x interface{}) (float64, bool) {
 	var xf float64
 	xok := true
@@ -109,7 +125,23 @@ func IsPredicate(in interface{}, inTypes ...reflect.Type) bool {
 	return result
 }
 
-// IsEqual returns if the two objects are equal
+// Equal 判断两个对象是否相等(深度比较)
+// 参数:
+//   - expected: 期望值
+//   - actual: 实际值
+//
+// 返回值:
+//   - 两者是否相等
+//
+// Example:
+// ```
+// // VARS: 比较两个切片
+// result = x.Equal([1, 2], [1, 2])
+// // STDOUT: 打印结果
+// println(result)   // OUT: true
+// // assert: 不同内容不相等
+// assert x.Equal([1, 2], [1, 3]) == false, "different slices should not be equal"
+// ```
 func IsEqual(expected interface{}, actual interface{}) bool {
 	if expected == nil || actual == nil {
 		return expected == actual
@@ -181,7 +213,22 @@ func SliceOf(in interface{}) interface{} {
 	return slice.Elem().Interface()
 }
 
-// Any returns true if any element of the iterable is not empty. If the iterable is empty, return False.
+// Any 判断给定的多个值中是否至少有一个非空(真值)
+// 参数:
+//   - objs: 一个或多个待判断的值
+//
+// 返回值:
+//   - 是否至少有一个为非空(真值)
+//
+// Example:
+// ```
+// // VARS: 判断是否存在真值
+// result = x.Any(false, true)
+// // STDOUT: 打印结果
+// println(result)   // OUT: true
+// // assert: 全为假时返回 false
+// assert x.Any(false, false) == false, "all-empty input should be false"
+// ```
 func Any(objs ...interface{}) bool {
 	if len(objs) == 0 {
 		return false
@@ -196,7 +243,22 @@ func Any(objs ...interface{}) bool {
 	return false
 }
 
-// All returns true if all elements of the iterable are not empty (or if the iterable is empty)
+// All 判断给定的多个值是否全部非空(真值)
+// 参数:
+//   - objs: 一个或多个待判断的值
+//
+// 返回值:
+//   - 是否全部为非空(真值)
+//
+// Example:
+// ```
+// // VARS: 判断是否全为真值
+// result = x.All(true, true)
+// // STDOUT: 打印结果
+// println(result)   // OUT: true
+// // assert: 含假值时返回 false
+// assert x.All(true, false) == false, "one empty value makes it false"
+// ```
 func All(objs ...interface{}) bool {
 	if len(objs) == 0 {
 		return true

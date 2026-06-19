@@ -57,11 +57,20 @@ func _visitNode(node *html.Node, depth int, siblingIndex int, handler func(i *ht
 }
 
 // Walker 解析并遍历一段 HTML 代码的每一个节点并回调函数，返回错误
+// 参数:
+//   - h: 待解析的 HTML 内容，会被转换为字节切片
+//   - handler: 对每个节点调用的回调函数
+//
+// 返回值:
+//   - 解析 HTML 失败时返回的错误
+//
 // Example:
 // ```
-// err = xhtml.Walker("<html><body><div>hello</div></body></html>", func(node) {
-// println(node.Data)
-// })
+// // VARS: 遍历所有节点并计数
+// count = 0
+// xhtml.Walker("<html><body><div>x</div></body></html>", func(node) { count++ })
+// // assert: 至少访问到若干节点
+// assert count > 0, "walker should visit nodes"
 // ```
 func Walker(h interface{}, handler func(node *html.Node)) error {
 	raw := utils.InterfaceToBytes(h)

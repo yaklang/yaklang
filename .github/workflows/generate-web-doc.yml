@@ -37,7 +37,15 @@ jobs:
 
     - name: Copy docs
       run: |
-        cp -rf web_doc/* websize/docs/api
+        # Sync generated API docs and remove orphaned docs for libraries that no
+        # longer exist. --delete prunes stale files, but we exclude files that are
+        # NOT produced by generate_web_doc (the Docusaurus category config and the
+        # separately-maintained global manuals) so they are never deleted.
+        rsync -a --delete \
+          --exclude='_category_.json' \
+          --exclude='__global__.md' \
+          --exclude='global_buildin_ops.md' \
+          web_doc/ websize/docs/api/
 
     - name: Add tag and Push
       continue-on-error: true

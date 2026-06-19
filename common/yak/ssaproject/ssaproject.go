@@ -193,6 +193,19 @@ func (s *SSAProject) GetScanConfig() *ssaconfig.SyntaxFlowConfig {
 	return s.Config.SyntaxFlow
 }
 
+// NewSSAProject 根据配置选项创建一个 SSA 项目对象（导出名为 ssa.NewSSAProject）
+// 参数:
+//   - opts: 项目配置可选项，如 ssa.withProjectName、ssa.withCodeSourceLocalFile 等
+//
+// 返回值:
+//   - SSA 项目对象
+//   - 错误信息
+//
+// Example:
+// ```
+// project = ssa.NewSSAProject(ssa.withProjectName("demo"), ssa.withLanguage("java"))~
+// dump(project)
+// ```
 func NewSSAProject(opts ...ssaconfig.Option) (*SSAProject, error) {
 	config, err := ssaconfig.New(ssaconfig.ModeAll, opts...)
 	if err != nil {
@@ -226,6 +239,20 @@ func LoadSSAProjectByName(projectName string) (*SSAProject, error) {
 	return loadSSAProjectBySchema(&project)
 }
 
+// LoadSSAProjectByID 根据项目 ID 从数据库加载 SSA 项目（导出名为 ssa.GetSSAProjectByID）
+// 参数:
+//   - id: 项目的数据库 ID
+//
+// 返回值:
+//   - SSA 项目对象
+//   - 错误信息
+//
+// Example:
+// ```
+// // 加载已保存的项目（示意性示例，需要数据库中已有该项目）
+// project = ssa.GetSSAProjectByID(1)~
+// dump(project)
+// ```
 func LoadSSAProjectByID(id uint) (*SSAProject, error) {
 	db := consts.GetGormProfileDatabase()
 	var project schema.SSAProject
@@ -235,6 +262,21 @@ func LoadSSAProjectByID(id uint) (*SSAProject, error) {
 	return loadSSAProjectBySchema(&project)
 }
 
+// LoadSSAProjectByNameAndURL 根据项目名与代码源 URL 从数据库加载 SSA 项目（导出名为 ssa.GetSSAProjectByNameAndURL）
+// 参数:
+//   - projectName: 项目名
+//   - url: 代码源 URL
+//
+// 返回值:
+//   - SSA 项目对象
+//   - 错误信息
+//
+// Example:
+// ```
+// // 加载已保存的项目（示意性示例，需要数据库中已有该项目）
+// project = ssa.GetSSAProjectByNameAndURL("demo", "https://github.com/yaklang/yaklang.git")~
+// dump(project)
+// ```
 func LoadSSAProjectByNameAndURL(projectName, url string) (*SSAProject, error) {
 	db := consts.GetGormProfileDatabase()
 	var project schema.SSAProject

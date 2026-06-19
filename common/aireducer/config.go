@@ -84,24 +84,72 @@ type Config struct {
 
 type Option func(*Config)
 
+// WithTimeTriggerInterval 设置基于时间的 chunk 触发间隔（导出名为 aireducer.timeTriggerInterval）
+// 参数:
+//   - interval: 触发间隔（time.Duration），为 0 时不按时间触发
+//
+// 返回值:
+//   - 切分可选项
+//
+// Example:
+// ```
+// opt = aireducer.timeTriggerInterval(time.Second)
+// println(opt)
+// ```
 func WithTimeTriggerInterval(interval time.Duration) Option {
 	return func(c *Config) {
 		c.TimeTriggerInterval = interval
 	}
 }
 
+// WithTimeTriggerIntervalSeconds 以秒为单位设置基于时间的 chunk 触发间隔（导出名为 aireducer.timeTriggerIntervalSeconds）
+// 参数:
+//   - seconds: 触发间隔（秒）
+//
+// 返回值:
+//   - 切分可选项
+//
+// Example:
+// ```
+// opt = aireducer.timeTriggerIntervalSeconds(1.5)
+// println(opt)
+// ```
 func WithTimeTriggerIntervalSeconds(seconds float64) Option {
 	return func(c *Config) {
 		c.TimeTriggerInterval = time.Duration(seconds) * time.Second
 	}
 }
 
+// WithContext 设置 reducer 运行的上下文，用于控制取消（导出名为 aireducer.context）
+// 参数:
+//   - ctx: 上下文对象
+//
+// 返回值:
+//   - 切分可选项
+//
+// Example:
+// ```
+// opt = aireducer.context(context.Background())
+// println(opt)
+// ```
 func WithContext(ctx context.Context) Option {
 	return func(c *Config) {
 		c.ctx = ctx
 	}
 }
 
+// WithReducerCallback 设置 chunk 处理回调（导出名为 aireducer.callback / aireducer.reducerCallback）
+// 参数:
+//   - callback: 回调函数，参数为 (config, memory, chunk)
+//
+// 返回值:
+//   - 切分可选项
+//
+// Example:
+// ```
+// opt = aireducer.callback(func(config, memory, chunk) { println(string(chunk.Data())) })
+// println(opt)
+// ```
 func WithReducerCallback(callback ReducerCallbackType) Option {
 	return func(c *Config) {
 		c.callback = callback
@@ -138,18 +186,57 @@ func WithFinishCallback(callback func(config *Config, memory *aid.PromptContextP
 	}
 }
 
+// WithMemory 设置 reducer 使用的记忆/上下文提供者（导出名为 aireducer.memory）
+// 参数:
+//   - memory: 上下文提供者对象
+//
+// 返回值:
+//   - 切分可选项
+//
+// Example:
+// ```
+// // memory 通常由 AI 相关流程提供（示意性示例）
+// opt = aireducer.memory(memory)
+// println(opt)
+// ```
 func WithMemory(memory *aid.PromptContextProvider) Option {
 	return func(c *Config) {
 		c.Memory = memory
 	}
 }
 
+// WithChunkSize 设置每个 chunk 的最大字节数（导出名为 aireducer.chunkSize）
+// 参数:
+//   - size: chunk 最大字节数（默认 1024）
+//
+// 返回值:
+//   - 切分可选项
+//
+// Example:
+// ```
+// count = 0
+// aireducer.String("aaaaabbbbbccccc", func(chunk) { count++ }, aireducer.chunkSize(5))~
+// println(count)   // OUT: 3
+// ```
 func WithChunkSize(size int64) Option {
 	return func(c *Config) {
 		c.ChunkSize = size
 	}
 }
 
+// WithSeparatorTrigger 设置切分分隔符，遇到分隔符即触发一个 chunk（导出名为 aireducer.separator）
+// 参数:
+//   - separator: 分隔符字符串
+//
+// 返回值:
+//   - 切分可选项
+//
+// Example:
+// ```
+// count = 0
+// aireducer.String("a\nb\nc\n", func(chunk) { count++ }, aireducer.separator("\n"))~
+// println(count)   // OUT: 3
+// ```
 func WithSeparatorTrigger(separator string) Option {
 	return func(c *Config) {
 		c.SeparatorTrigger = separator
@@ -161,6 +248,18 @@ func WithSeparatorTrigger(separator string) Option {
 // When true, the reducer fills up to ChunkSize and, inside each chunk, cuts at
 // the LAST separator occurrence in the window so that pre-structured blocks
 // stay intact. Combine with WithSeparatorTrigger(sep) + WithChunkSize(n).
+//
+// 参数:
+//   - asBoundary: 是否将分隔符作为切分边界而非每次触发
+//
+// 返回值:
+//   - 切分可选项
+//
+// Example:
+// ```
+// opt = aireducer.separatorAsBoundary(true)
+// println(opt)
+// ```
 func WithSeparatorAsBoundary(asBoundary bool) Option {
 	return func(c *Config) {
 		c.SeparatorAsBoundary = asBoundary
@@ -180,6 +279,12 @@ func WithSeparatorAsBoundary(asBoundary bool) Option {
 //	// they will be split at 1024 byte boundaries.
 //
 // ```
+//
+// 参数:
+//   - lines: 每隔多少行触发一个 chunk，正数生效
+//
+// 返回值:
+//   - 切分可选项
 func WithLines(lines int) Option {
 	return func(c *Config) {
 		c.LineTrigger = lines
@@ -189,6 +294,18 @@ func WithLines(lines int) Option {
 // WithEnableLineNumber enables line number prefixing for chunk content.
 // When enabled, each line in the chunk will be prefixed with line numbers.
 // This option works with all chunking modes and respects ChunkSize limits.
+//
+// 参数:
+//   - enable: 是否为每行内容添加行号前缀
+//
+// 返回值:
+//   - 切分可选项
+//
+// Example:
+// ```
+// opt = aireducer.lineNumber(true)
+// println(opt)
+// ```
 func WithEnableLineNumber(enable bool) Option {
 	return func(c *Config) {
 		c.EnableLineNumber = enable

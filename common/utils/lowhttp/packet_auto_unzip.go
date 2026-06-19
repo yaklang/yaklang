@@ -76,6 +76,14 @@ type PacketEncodingState struct {
 //
 // 该函数通常与 AutoZipPacketEncoding 配对使用：前端编辑 plain 报文后，服务端可用 state 将其重新压回原始编码形态。
 //
+// 参数:
+//   - raw: 原始 HTTP 报文字节数组
+//
+// 返回值:
+//   - 解开编码后的明文 HTTP 报文字节数组
+//   - 编码状态对象，可用于将明文重新压回原始编码形态
+//   - 是否成功解开编码
+//
 // Example:
 // ```
 // raw := []byte(`HTTP/1.1 200 OK

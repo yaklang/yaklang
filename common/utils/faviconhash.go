@@ -41,12 +41,21 @@ func StandBase64(braw []byte) []byte {
 
 }
 
-// ExtractFaviconURL will receive a site url and html content return the favicon url
-// Example:
+// ExtractFaviconURL 从 HTML 页面内容中解析出 favicon 图标的 URL，并相对站点地址补全为绝对地址
+// 参数:
+//   - siteURL: 页面所在的站点地址，用于补全相对路径
+//   - content: HTML 页面内容
 //
-//	http.ExtractFaviconURL("https://www.baidu.com", []byte(`<link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">`))
-//	http.ExtractFaviconURL("https://www.baidu.com", []byte(`<link rel="icon" href="/favicon.ico" type="image/x-icon">`))
-//	http.ExtractFaviconURL("https://www.baidu.com", []byte(`<link rel="icon" href="/favicon.png" type="image/png">`))
+// 返回值:
+//   - favicon 图标的绝对 URL
+//   - 错误信息，解析失败或未找到图标时返回非空
+//
+// Example:
+// ```
+// html = "<html><head><link rel=\"icon\" href=\"/favicon.ico\"></head></html>"
+// iconURL = http.ExtractFaviconURL("https://example.com", html)~
+// println(iconURL)   // OUT: https://example.com/favicon.ico
+// ```
 func ExtractFaviconURL(siteURL string, content []byte) (string, error) {
 	node, err := htmlquery.Parse(bytes.NewReader(content))
 	if err != nil {

@@ -597,6 +597,20 @@ func IsFloat(v interface{}) bool {
 	return false
 }
 
+// IsGzip 判断给定字节切片是否为 gzip 压缩数据（通过检查魔数头）
+// 参数:
+//   - raw: 待检测的字节切片
+//
+// 返回值:
+//   - 是否为 gzip 数据（以 0x1f 0x8b 0x08 开头则为 true）
+//
+// Example:
+// ```
+// compressed = gzip.Compress("hello yaklang")~
+// println(gzip.IsGzip(compressed))   // OUT: true
+// assert gzip.IsGzip(compressed), "gzip output should be detected as gzip"
+// assert !gzip.IsGzip("plain text"), "plain text should not be detected as gzip"
+// ```
 func IsGzip(raw []byte) bool {
 	return bytes.HasPrefix(raw, []byte{0x1f, 0x8b, 0x08})
 }

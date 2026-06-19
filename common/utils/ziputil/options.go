@@ -45,16 +45,36 @@ func newCompressConfig(opts ...CompressOption) *CompressConfig {
 	return cfg
 }
 
-// WithCompressPassword 为压缩设置密码
+// compressPassword 为 zip 压缩设置加密密码
 // 关键词: zip 压缩密码, 加密 zip 创建
+// 参数:
+//   - password: 加密密码
+//
+// 返回值:
+//   - 一个压缩配置选项
+//
+// Example:
+// ```
+// zip.CompressByNameWithOptions(["/tmp/a.txt"], "/tmp/out.zip", zip.compressPassword("123456"))~
+// ```
 func WithCompressPassword(password string) CompressOption {
 	return func(c *CompressConfig) {
 		c.Password = password
 	}
 }
 
-// WithCompressEncryption 设置加密方法（默认 AES256）
+// compressEncryption 设置 zip 压缩的加密方法（默认 AES256）
 // 关键词: zip 加密方法, AES256
+// 参数:
+//   - method: 加密方法（如 zip.AES256、zip.AES128、zip.StandardEncryption）
+//
+// 返回值:
+//   - 一个压缩配置选项
+//
+// Example:
+// ```
+// zip.CompressByNameWithOptions(["/tmp/a.txt"], "/tmp/out.zip", zip.compressPassword("123456"), zip.compressEncryption(zip.AES256))~
+// ```
 func WithCompressEncryption(method EncryptionMethod) CompressOption {
 	return func(c *CompressConfig) {
 		c.EncryptionMethod = method
@@ -79,8 +99,18 @@ func newDecompressConfig(opts ...DecompressOption) *DecompressConfig {
 	return cfg
 }
 
-// WithDecompressPassword 为解压设置密码
+// decompressPassword 为 zip 解压设置解密密码
 // 关键词: zip 解压密码
+// 参数:
+//   - password: 解密密码
+//
+// 返回值:
+//   - 一个解压配置选项
+//
+// Example:
+// ```
+// zip.DecompressWithOptions("/tmp/enc.zip", "/tmp/dest", zip.decompressPassword("123456"))~
+// ```
 func WithDecompressPassword(password string) DecompressOption {
 	return func(c *DecompressConfig) {
 		c.Password = password
@@ -105,8 +135,20 @@ func newExtractConfig(opts ...ExtractOption) *ExtractConfig {
 	return cfg
 }
 
-// WithExtractPassword 为提取设置密码
+// extractPassword 为 zip 提取设置解密密码
 // 关键词: zip 提取密码
+// 参数:
+//   - password: 解密密码
+//
+// 返回值:
+//   - 一个提取配置选项
+//
+// Example:
+// ```
+// zipBytes = zip.CompressRawWithPassword({"s.txt": "secret"}, "123456")~
+// content = zip.ExtractFileFromRawWithOptions(zipBytes, "s.txt", zip.extractPassword("123456"))~
+// assert string(content) == "secret", "extractPassword should allow decrypting the entry"
+// ```
 func WithExtractPassword(password string) ExtractOption {
 	return func(c *ExtractConfig) {
 		c.Password = password

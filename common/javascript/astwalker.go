@@ -16,11 +16,17 @@ type ASTWalkerResult struct {
 	BadSyntax      []string
 }
 
-// ASTWalk 对传入的JS代码进行AST遍历，返回遍历后的结果(包含字面量，标识符，语法错误)和错误
+// ASTWalk 对传入的 JS 代码进行 AST 遍历，收集字面量、标识符与语法错误（导出名为 js.ASTWalk）
+// 参数:
+//   - code: JS 源代码字符串
+//
+// 返回值:
+//   - 遍历结果（含字符串字面量、标识符、语法错误等）
+//   - 错误信息
+//
 // Example:
 // ```
-// code = `function add(a, b) { return a + b; }`
-// res = js.ASTWalk(code)~
+// res = js.ASTWalk(`var name = "yak"; foo("bar");`)~
 // dump(res)
 // ```
 func BasicJavaScriptASTWalker(code string) (*ASTWalkerResult, error) {

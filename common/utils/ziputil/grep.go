@@ -35,18 +35,51 @@ type GrepConfig struct {
 
 type GrepOption func(*GrepConfig)
 
+// grepLimit 设置 zip grep 搜索返回结果的最大数量
+// 参数:
+//   - limit: 结果数量上限
+//
+// 返回值:
+//   - 一个 grep 配置选项
+//
+// Example:
+// ```
+// results = zip.GrepSubString("/tmp/abc.zip", "password", zip.grepLimit(10))~
+// ```
 func WithGrepLimit(limit int) GrepOption {
 	return func(c *GrepConfig) {
 		c.Limit = limit
 	}
 }
 
+// grepContextLine 设置 zip grep 搜索时匹配行的上下文行数
+// 参数:
+//   - context: 匹配行前后保留的上下文行数
+//
+// 返回值:
+//   - 一个 grep 配置选项
+//
+// Example:
+// ```
+// results = zip.GrepSubString("/tmp/abc.zip", "password", zip.grepContextLine(2))~
+// ```
 func WithContext(context int) GrepOption {
 	return func(c *GrepConfig) {
 		c.Context = context
 	}
 }
 
+// grepCaseSensitive 设置 zip grep 子串搜索是否区分大小写
+// 参数:
+//   - i: 是否区分大小写，不传则默认为 true
+//
+// 返回值:
+//   - 一个 grep 配置选项
+//
+// Example:
+// ```
+// results = zip.GrepSubString("/tmp/abc.zip", "Password", zip.grepCaseSensitive(true))~
+// ```
 func WithGrepCaseSensitive(i ...bool) GrepOption {
 	return func(c *GrepConfig) {
 		if len(i) > 0 {
@@ -57,8 +90,18 @@ func WithGrepCaseSensitive(i ...bool) GrepOption {
 	}
 }
 
-// WithGrepPassword 在 zip 中执行 grep 时设置解密密码
+// grepPassword 在 zip 中执行 grep 时设置加密条目的解密密码
 // 关键词: zip grep 密码, 加密 zip 搜索
+// 参数:
+//   - password: 解密密码
+//
+// 返回值:
+//   - 一个 grep 配置选项
+//
+// Example:
+// ```
+// results = zip.GrepSubString("/tmp/enc.zip", "secret", zip.grepPassword("123456"))~
+// ```
 func WithGrepPassword(password string) GrepOption {
 	return func(c *GrepConfig) {
 		c.Password = password
@@ -67,24 +110,68 @@ func WithGrepPassword(password string) GrepOption {
 
 // 路径过滤选项
 
+// grepIncludePathSubString 仅在路径包含指定子串的条目中搜索（任一匹配即可）
+// 参数:
+//   - patterns: 一个或多个路径子串
+//
+// 返回值:
+//   - 一个 grep 配置选项
+//
+// Example:
+// ```
+// results = zip.GrepSubString("/tmp/abc.zip", "key", zip.grepIncludePathSubString("config/"))~
+// ```
 func WithIncludePathSubString(patterns ...string) GrepOption {
 	return func(c *GrepConfig) {
 		c.IncludePathSubString = append(c.IncludePathSubString, patterns...)
 	}
 }
 
+// grepExcludePathSubString 排除路径包含指定子串的条目（任一匹配即排除）
+// 参数:
+//   - patterns: 一个或多个路径子串
+//
+// 返回值:
+//   - 一个 grep 配置选项
+//
+// Example:
+// ```
+// results = zip.GrepSubString("/tmp/abc.zip", "key", zip.grepExcludePathSubString("test/"))~
+// ```
 func WithExcludePathSubString(patterns ...string) GrepOption {
 	return func(c *GrepConfig) {
 		c.ExcludePathSubString = append(c.ExcludePathSubString, patterns...)
 	}
 }
 
+// grepIncludePathRegexp 仅在路径匹配指定正则的条目中搜索（任一匹配即可）
+// 参数:
+//   - patterns: 一个或多个路径正则表达式
+//
+// 返回值:
+//   - 一个 grep 配置选项
+//
+// Example:
+// ```
+// results = zip.GrepSubString("/tmp/abc.zip", "key", zip.grepIncludePathRegexp(`\.ya?ml$`))~
+// ```
 func WithIncludePathRegexp(patterns ...string) GrepOption {
 	return func(c *GrepConfig) {
 		c.IncludePathRegexp = append(c.IncludePathRegexp, patterns...)
 	}
 }
 
+// grepExcludePathRegexp 排除路径匹配指定正则的条目（任一匹配即排除）
+// 参数:
+//   - patterns: 一个或多个路径正则表达式
+//
+// 返回值:
+//   - 一个 grep 配置选项
+//
+// Example:
+// ```
+// results = zip.GrepSubString("/tmp/abc.zip", "key", zip.grepExcludePathRegexp(`_test\.go$`))~
+// ```
 func WithExcludePathRegexp(patterns ...string) GrepOption {
 	return func(c *GrepConfig) {
 		c.ExcludePathRegexp = append(c.ExcludePathRegexp, patterns...)
@@ -106,7 +193,21 @@ type GrepResult struct {
 	MatchedLines []int // 合并后的所有匹配行号
 }
 
-// GrepRegexp 使用正则表达式在 ZIP 文件中搜索
+// GrepRegexp 使用正则表达式在 ZIP 文件的所有条目内容中搜索
+// 参数:
+//   - zipFile: zip 文件路径
+//   - pattern: 正则表达式
+//   - opts: 可选的 grep 配置选项
+//
+// 返回值:
+//   - 匹配结果列表
+//   - 错误信息
+//
+// Example:
+// ```
+// results = zip.GrepRegexp("/tmp/abc.zip", "password\\s*=")~
+// for r in results { println(r.FileName, r.LineNumber, r.Line) }
+// ```
 func GrepRegexp(zipFile string, pattern string, opts ...GrepOption) ([]*GrepResult, error) {
 	raw, err := ioutil.ReadFile(zipFile)
 	if err != nil {
@@ -115,7 +216,21 @@ func GrepRegexp(zipFile string, pattern string, opts ...GrepOption) ([]*GrepResu
 	return GrepRawRegexp(raw, pattern, opts...)
 }
 
-// GrepSubString 使用子字符串在 ZIP 文件中搜索
+// GrepSubString 使用子字符串在 ZIP 文件的所有条目内容中搜索（默认不区分大小写）
+// 参数:
+//   - zipFile: zip 文件路径
+//   - substring: 待搜索的子字符串
+//   - opts: 可选的 grep 配置选项
+//
+// 返回值:
+//   - 匹配结果列表
+//   - 错误信息
+//
+// Example:
+// ```
+// results = zip.GrepSubString("/tmp/abc.zip", "password")~
+// for r in results { println(r.FileName, r.LineNumber, r.Line) }
+// ```
 func GrepSubString(zipFile string, substring string, opts ...GrepOption) ([]*GrepResult, error) {
 	raw, err := ioutil.ReadFile(zipFile)
 	if err != nil {
@@ -124,7 +239,22 @@ func GrepSubString(zipFile string, substring string, opts ...GrepOption) ([]*Gre
 	return GrepRawSubString(raw, substring, opts...)
 }
 
-// GrepRawRegexp 使用正则表达式在 ZIP 原始数据中搜索
+// GrepRawRegexp 使用正则表达式在内存中的 ZIP 原始数据的条目内容中搜索
+// 参数:
+//   - raw: zip 的原始数据（[]byte、string 或 io.Reader）
+//   - pattern: 正则表达式
+//   - opts: 可选的 grep 配置选项
+//
+// 返回值:
+//   - 匹配结果列表
+//   - 错误信息
+//
+// Example:
+// ```
+// zipBytes = zip.CompressRaw({"a.txt": "hello\nworld"})~
+// results = zip.GrepRawRegexp(zipBytes, "w.rld")~
+// assert len(results) == 1, "GrepRawRegexp should find the matching line"
+// ```
 func GrepRawRegexp(raw interface{}, pattern string, opts ...GrepOption) ([]*GrepResult, error) {
 	config := &GrepConfig{
 		Limit:         -1, // 默认不限制
@@ -145,7 +275,23 @@ func GrepRawRegexp(raw interface{}, pattern string, opts ...GrepOption) ([]*Grep
 	}, config, "regexp:"+pattern)
 }
 
-// GrepRawSubString 使用子字符串在 ZIP 原始数据中搜索
+// GrepRawSubString 使用子字符串在内存中的 ZIP 原始数据的条目内容中搜索（默认不区分大小写）
+// 参数:
+//   - raw: zip 的原始数据（[]byte、string 或 io.Reader）
+//   - substring: 待搜索的子字符串
+//   - opts: 可选的 grep 配置选项
+//
+// 返回值:
+//   - 匹配结果列表
+//   - 错误信息
+//
+// Example:
+// ```
+// zipBytes = zip.CompressRaw({"a.txt": "hello\nworld"})~
+// results = zip.GrepRawSubString(zipBytes, "world")~
+// assert len(results) == 1, "GrepRawSubString should find one match"
+// assert results[0].LineNumber == 2, "match should be on the second line"
+// ```
 func GrepRawSubString(raw interface{}, substring string, opts ...GrepOption) ([]*GrepResult, error) {
 	config := &GrepConfig{
 		Limit:         -1,
@@ -581,7 +727,20 @@ func (g *GrepResult) Merge(other *GrepResult) *GrepResult {
 	return merged
 }
 
-// MergeGrepResults 合并多个 GrepResult，将可以合并的结果合并在一起
+// MergeGrepResults 合并多个 GrepResult，将位于同一文件且上下文相邻的结果合并在一起
+// 参数:
+//   - results: 待合并的 GrepResult 列表
+//
+// 返回值:
+//   - 合并后的 GrepResult 列表
+//
+// Example:
+// ```
+// zipBytes = zip.CompressRaw({"a.txt": "hello\nworld"})~
+// results = zip.GrepRawSubString(zipBytes, "world")~
+// merged = zip.MergeGrepResults(results)
+// assert len(merged) >= 1, "MergeGrepResults should keep at least one result"
+// ```
 func MergeGrepResults(results []*GrepResult) []*GrepResult {
 	if len(results) <= 1 {
 		return results
@@ -617,7 +776,21 @@ func MergeGrepResults(results []*GrepResult) []*GrepResult {
 
 // GrepPath 系列函数 - 搜索文件路径/文件名
 
-// GrepPathRegexp 使用正则表达式搜索文件路径
+// GrepPathRegexp 使用正则表达式在 ZIP 文件的条目路径（文件名）中搜索
+// 参数:
+//   - zipFile: zip 文件路径
+//   - pattern: 路径正则表达式
+//   - opts: 可选的 grep 配置选项
+//
+// 返回值:
+//   - 匹配的路径结果列表
+//   - 错误信息
+//
+// Example:
+// ```
+// results = zip.GrepPathRegexp("/tmp/abc.zip", `\.txt$`)~
+// for r in results { println(r.FileName) }
+// ```
 func GrepPathRegexp(zipFile string, pattern string, opts ...GrepOption) ([]*GrepResult, error) {
 	raw, err := ioutil.ReadFile(zipFile)
 	if err != nil {
@@ -626,7 +799,21 @@ func GrepPathRegexp(zipFile string, pattern string, opts ...GrepOption) ([]*Grep
 	return GrepPathRawRegexp(raw, pattern, opts...)
 }
 
-// GrepPathSubString 使用子字符串搜索文件路径
+// GrepPathSubString 使用子字符串在 ZIP 文件的条目路径（文件名）中搜索
+// 参数:
+//   - zipFile: zip 文件路径
+//   - substring: 待搜索的路径子字符串
+//   - opts: 可选的 grep 配置选项
+//
+// 返回值:
+//   - 匹配的路径结果列表
+//   - 错误信息
+//
+// Example:
+// ```
+// results = zip.GrepPathSubString("/tmp/abc.zip", "config")~
+// for r in results { println(r.FileName) }
+// ```
 func GrepPathSubString(zipFile string, substring string, opts ...GrepOption) ([]*GrepResult, error) {
 	raw, err := ioutil.ReadFile(zipFile)
 	if err != nil {
@@ -635,7 +822,22 @@ func GrepPathSubString(zipFile string, substring string, opts ...GrepOption) ([]
 	return GrepPathRawSubString(raw, substring, opts...)
 }
 
-// GrepPathRawRegexp 使用正则表达式在原始数据中搜索文件路径
+// GrepPathRawRegexp 使用正则表达式在内存 ZIP 原始数据的条目路径（文件名）中搜索
+// 参数:
+//   - raw: zip 的原始数据（[]byte、string 或 io.Reader）
+//   - pattern: 路径正则表达式
+//   - opts: 可选的 grep 配置选项
+//
+// 返回值:
+//   - 匹配的路径结果列表
+//   - 错误信息
+//
+// Example:
+// ```
+// zipBytes = zip.CompressRaw({"dir/a.txt": "x"})~
+// results = zip.GrepPathRawRegexp(zipBytes, `a\.txt`)~
+// assert len(results) == 1, "GrepPathRawRegexp should match the entry path"
+// ```
 func GrepPathRawRegexp(raw interface{}, pattern string, opts ...GrepOption) ([]*GrepResult, error) {
 	config := &GrepConfig{
 		Limit:         -1,
@@ -656,7 +858,23 @@ func GrepPathRawRegexp(raw interface{}, pattern string, opts ...GrepOption) ([]*
 	}, config, "path_regexp:"+pattern)
 }
 
-// GrepPathRawSubString 使用子字符串在原始数据中搜索文件路径
+// GrepPathRawSubString 使用子字符串在内存 ZIP 原始数据的条目路径（文件名）中搜索
+// 参数:
+//   - raw: zip 的原始数据（[]byte、string 或 io.Reader）
+//   - substring: 待搜索的路径子字符串
+//   - opts: 可选的 grep 配置选项
+//
+// 返回值:
+//   - 匹配的路径结果列表
+//   - 错误信息
+//
+// Example:
+// ```
+// zipBytes = zip.CompressRaw({"dir/a.txt": "x"})~
+// results = zip.GrepPathRawSubString(zipBytes, "a.txt")~
+// assert len(results) == 1, "GrepPathRawSubString should match the entry path"
+// assert results[0].FileName == "dir/a.txt", "matched path should be the entry name"
+// ```
 func GrepPathRawSubString(raw interface{}, substring string, opts ...GrepOption) ([]*GrepResult, error) {
 	config := &GrepConfig{
 		Limit:         -1,

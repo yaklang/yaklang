@@ -55,7 +55,21 @@ type AOIBoundaryResultEx struct {
 	PolyPoints []Location // Parsed boundary points
 }
 
-// Geocode converts an address to coordinates
+// Geocode 将地址转换为经纬度坐标（地理编码，导出名为 amap.GetGeocode）
+// 参数:
+//   - address: 结构化地址描述
+//   - options: 可选项，需要 amap.apiKey 提供高德 API Key
+//
+// 返回值:
+//   - 地理编码结果列表
+//   - 错误信息
+//
+// Example:
+// ```
+// // 需要有效的高德 API Key（示意性示例）
+// results = amap.GetGeocode("北京市朝阳区阜通东大街6号", amap.apiKey("your-key"))~
+// dump(results)
+// ```
 func Geocode(address string, options ...AmapConfigOption) ([]*GeocodeResult, error) {
 	config := NewConfig(options...)
 	ctx, cancel := context.WithTimeout(context.Background(), config.Timeout)
@@ -85,7 +99,22 @@ func Geocode(address string, options ...AmapConfigOption) ([]*GeocodeResult, err
 	return resp.Geocodes, nil
 }
 
-// ReverseGeocode converts coordinates to an address
+// ReverseGeocode 将经纬度坐标转换为结构化地址（逆地理编码，导出名为 amap.GetReverseGeocode）
+// 参数:
+//   - longitude: 经度
+//   - latitude: 纬度
+//   - options: 可选项，需要 amap.apiKey 提供高德 API Key
+//
+// 返回值:
+//   - 逆地理编码结果
+//   - 错误信息
+//
+// Example:
+// ```
+// // 需要有效的高德 API Key（示意性示例）
+// result = amap.GetReverseGeocode(116.481488, 39.990464, amap.apiKey("your-key"))~
+// dump(result)
+// ```
 func ReverseGeocode(longitude, latitude float64, options ...AmapConfigOption) (*RegeoCodeResult, error) {
 	config := NewConfig(options...)
 
@@ -118,7 +147,22 @@ func ReverseGeocode(longitude, latitude float64, options ...AmapConfigOption) (*
 	return resp.RegeoCodes, nil
 }
 
-// DrivingDrivingPlan calculates a driving route
+// DrivingPlan 计算两地之间的驾车路径规划（导出名为 amap.GetDrivingPlan）
+// 参数:
+//   - origin: 起点地址
+//   - destination: 终点地址
+//   - options: 可选项，需要 amap.apiKey 提供高德 API Key
+//
+// 返回值:
+//   - 驾车路径规划结果
+//   - 错误信息
+//
+// Example:
+// ```
+// // 需要有效的高德 API Key（示意性示例）
+// plan = amap.GetDrivingPlan("北京站", "北京西站", amap.apiKey("your-key"))~
+// dump(plan)
+// ```
 func DrivingPlan(origin, destination string, options ...AmapConfigOption) (*DirectionResponse, error) {
 	originGeocodes, err := Geocode(origin, options...)
 	if err != nil {
@@ -163,7 +207,22 @@ func DrivingPlan(origin, destination string, options ...AmapConfigOption) (*Dire
 	return client.Driving(ctx, req)
 }
 
-// WalkingPlan calculates a walking route from address strings
+// WalkingPlan 计算两地之间的步行路径规划（导出名为 amap.GetWalkingPlan）
+// 参数:
+//   - origin: 起点地址
+//   - destination: 终点地址
+//   - options: 可选项，需要 amap.apiKey 提供高德 API Key
+//
+// 返回值:
+//   - 步行路径规划结果
+//   - 错误信息
+//
+// Example:
+// ```
+// // 需要有效的高德 API Key（示意性示例）
+// plan = amap.GetWalkingPlan("北京站", "天安门", amap.apiKey("your-key"))~
+// dump(plan)
+// ```
 func WalkingPlan(origin, destination string, options ...AmapConfigOption) (*V5WalkingResponse, error) {
 	originGeocodes, err := Geocode(origin, options...)
 	if err != nil {
@@ -205,7 +264,22 @@ func WalkingPlan(origin, destination string, options ...AmapConfigOption) (*V5Wa
 	return client.V5Walking(ctx, req)
 }
 
-// BicyclingPlan calculates a bicycling route from address strings
+// BicyclingPlan 计算两地之间的骑行路径规划（导出名为 amap.GetBicyclingPlan）
+// 参数:
+//   - origin: 起点地址
+//   - destination: 终点地址
+//   - options: 可选项，需要 amap.apiKey 提供高德 API Key
+//
+// 返回值:
+//   - 骑行路径规划结果
+//   - 错误信息
+//
+// Example:
+// ```
+// // 需要有效的高德 API Key（示意性示例）
+// plan = amap.GetBicyclingPlan("北京站", "天安门", amap.apiKey("your-key"))~
+// dump(plan)
+// ```
 func BicyclingPlan(origin, destination string, options ...AmapConfigOption) (*BicyclingResult, error) {
 	originGeocodes, err := Geocode(origin, options...)
 	if err != nil {
@@ -254,7 +328,22 @@ func BicyclingPlan(origin, destination string, options ...AmapConfigOption) (*Bi
 	return &resp.Data, nil
 }
 
-// TransitPlan calculates a transit route from address strings
+// TransitPlan 计算两地之间的公交路径规划（导出名为 amap.GetTransitPlan）
+// 参数:
+//   - origin: 起点地址
+//   - destination: 终点地址
+//   - options: 可选项，需要 amap.apiKey 提供高德 API Key，公交规划通常还需 amap.city
+//
+// 返回值:
+//   - 公交路径规划结果
+//   - 错误信息
+//
+// Example:
+// ```
+// // 需要有效的高德 API Key（示意性示例）
+// plan = amap.GetTransitPlan("北京站", "北京西站", amap.apiKey("your-key"), amap.city("北京"))~
+// dump(plan)
+// ```
 func TransitPlan(origin, destination string, options ...AmapConfigOption) (*TransitResponse, error) {
 	originGeocodes, err := Geocode(origin, options...)
 	if err != nil {
@@ -300,7 +389,22 @@ func TransitPlan(origin, destination string, options ...AmapConfigOption) (*Tran
 	return client.Transit(ctx, req)
 }
 
-// Distance calculates distance between multiple origins and one destination
+// Distance 计算两地之间的距离（导出名为 amap.GetDistance）
+// 参数:
+//   - origin: 起点地址
+//   - destination: 终点地址
+//   - options: 可选项，需要 amap.apiKey 提供高德 API Key，可用 amap.type 指定测距方式
+//
+// 返回值:
+//   - 距离计算结果
+//   - 错误信息
+//
+// Example:
+// ```
+// // 需要有效的高德 API Key（示意性示例）
+// dist = amap.GetDistance("北京站", "北京西站", amap.apiKey("your-key"))~
+// dump(dist)
+// ```
 func Distance(origin, destination string, options ...AmapConfigOption) (*DistanceResult, error) {
 	config := NewConfig(options...)
 
@@ -346,7 +450,21 @@ func Distance(origin, destination string, options ...AmapConfigOption) (*Distanc
 	return &distance.Results[0], nil
 }
 
-// IPLocation locates an IP address or the requester's IP if ip is empty
+// IPLocation 根据 IP 地址定位其地理位置（ip 为空时定位请求方 IP，导出名为 amap.GetIpLocation）
+// 参数:
+//   - ip: 待定位的 IP 地址，为空时定位请求方 IP
+//   - options: 可选项，需要 amap.apiKey 提供高德 API Key
+//
+// 返回值:
+//   - IP 地理位置结果
+//   - 错误信息
+//
+// Example:
+// ```
+// // 需要有效的高德 API Key（示意性示例）
+// loc = amap.GetIpLocation("114.114.114.114", amap.apiKey("your-key"))~
+// dump(loc)
+// ```
 func IPLocation(ip string, options ...AmapConfigOption) (*IPLocationResultEx, error) {
 	config := NewConfig(options...)
 
@@ -374,7 +492,21 @@ func IPLocation(ip string, options ...AmapConfigOption) (*IPLocationResultEx, er
 	}, nil
 }
 
-// SearchPOI provides simplified keyword-based POI search
+// SearchPOI 基于关键词搜索兴趣点（POI，导出名为 amap.GetPOI）
+// 参数:
+//   - keywords: 搜索关键词
+//   - options: 可选项，需要 amap.apiKey 提供高德 API Key，可用 amap.city、amap.page、amap.pageSize
+//
+// 返回值:
+//   - POI 搜索结果
+//   - 错误信息
+//
+// Example:
+// ```
+// // 需要有效的高德 API Key（示意性示例）
+// pois = amap.GetPOI("咖啡", amap.apiKey("your-key"), amap.city("北京"))~
+// dump(pois)
+// ```
 func SearchPOI(keywords string, options ...AmapConfigOption) (*SearchPOIResultEx, error) {
 	config := NewConfig(options...)
 
@@ -429,7 +561,22 @@ func SearchPOI(keywords string, options ...AmapConfigOption) (*SearchPOIResultEx
 	return result, nil
 }
 
-// SearchNearbyPOI provides simplified location-based POI search
+// SearchNearbyPOI 基于坐标的周边兴趣点搜索（导出名为 amap.GetNearbyPOI）
+// 参数:
+//   - location: 中心点坐标（如 "116.481,39.990"）
+//   - keywords: 搜索关键词
+//   - options: 可选项，需要 amap.apiKey 提供高德 API Key，可用 amap.radius 指定半径
+//
+// 返回值:
+//   - POI 搜索结果
+//   - 错误信息
+//
+// Example:
+// ```
+// // 需要有效的高德 API Key（示意性示例）
+// pois = amap.GetNearbyPOI("116.481488,39.990464", "咖啡", amap.apiKey("your-key"), amap.radius(1000))~
+// dump(pois)
+// ```
 func SearchNearbyPOI(location string, keywords string, options ...AmapConfigOption) (*SearchPOIResultEx, error) {
 	config := NewConfig(options...)
 
@@ -495,7 +642,21 @@ func SearchNearbyPOI(location string, keywords string, options ...AmapConfigOpti
 	return result, nil
 }
 
-// GetPOIDetail provides simplified POI detail lookup by ID
+// GetPOIDetail 根据 POI ID 查询兴趣点详情（导出名为 amap.GetPOIDetail）
+// 参数:
+//   - poiID: 兴趣点 ID
+//   - options: 可选项，需要 amap.apiKey 提供高德 API Key
+//
+// 返回值:
+//   - POI 详情结果
+//   - 错误信息
+//
+// Example:
+// ```
+// // 需要有效的高德 API Key（示意性示例）
+// detail = amap.GetPOIDetail("B000A83M61", amap.apiKey("your-key"))~
+// dump(detail)
+// ```
 func GetPOIDetail(poiID string, options ...AmapConfigOption) (*POIResultEx, error) {
 	config := NewConfig(options...)
 
@@ -614,7 +775,21 @@ type WeatherForecastEx struct {
 	NightWind    string // Night wind direction
 }
 
-// GetWeather retrieves weather information for a city
+// GetWeather 查询指定城市的天气信息（导出名为 amap.GetWeather）
+// 参数:
+//   - cityCode: 城市编码（adcode）
+//   - options: 可选项，需要 amap.apiKey 提供高德 API Key，可用 amap.enableWeatherForecast 返回预报
+//
+// 返回值:
+//   - 天气查询结果
+//   - 错误信息
+//
+// Example:
+// ```
+// // 需要有效的高德 API Key（示意性示例）
+// weather = amap.GetWeather("110000", amap.apiKey("your-key"))~
+// dump(weather)
+// ```
 func GetWeather(cityCode string, options ...AmapConfigOption) (*WeatherResponse, error) {
 	config := NewConfig(options...)
 

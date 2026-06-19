@@ -15,8 +15,21 @@ import (
 // 带密码的 zip 提取入口
 // 关键词: zip 文件提取, 密码 zip 提取
 
-// ExtractFileWithOptions 提取单个文件，支持 ExtractOption（含密码）
+// ExtractFileWithOptions 从 ZIP 文件提取单个文件，支持 ExtractOption（如密码）
 // 关键词: ExtractFile, 密码提取
+// 参数:
+//   - zipFile: zip 文件路径
+//   - targetFile: 待提取的条目名称
+//   - opts: 可选的提取选项（如 extractPassword）
+//
+// 返回值:
+//   - 提取出的文件内容字节
+//   - 错误信息
+//
+// Example:
+// ```
+// content = zip.ExtractFileWithOptions("/tmp/enc.zip", "s.txt", zip.extractPassword("123456"))~
+// ```
 func ExtractFileWithOptions(zipFile, targetFile string, opts ...ExtractOption) ([]byte, error) {
 	raw, err := ioutil.ReadFile(zipFile)
 	if err != nil {
@@ -25,8 +38,23 @@ func ExtractFileWithOptions(zipFile, targetFile string, opts ...ExtractOption) (
 	return ExtractFileFromRawWithOptions(raw, targetFile, opts...)
 }
 
-// ExtractFileFromRawWithOptions 从原始字节提取单个文件
+// ExtractFileFromRawWithOptions 从内存 ZIP 原始字节提取单个文件，支持 ExtractOption（如密码）
 // 关键词: ExtractFileFromRaw, 内存提取, 密码提取
+// 参数:
+//   - raw: zip 的原始数据（[]byte、string 或 io.Reader）
+//   - targetFile: 待提取的条目名称
+//   - opts: 可选的提取选项（如 extractPassword）
+//
+// 返回值:
+//   - 提取出的文件内容字节
+//   - 错误信息
+//
+// Example:
+// ```
+// zipBytes = zip.CompressRawWithPassword({"s.txt": "secret"}, "123456")~
+// content = zip.ExtractFileFromRawWithOptions(zipBytes, "s.txt", zip.extractPassword("123456"))~
+// assert string(content) == "secret", "should extract encrypted entry with password"
+// ```
 func ExtractFileFromRawWithOptions(raw interface{}, targetFile string, opts ...ExtractOption) ([]byte, error) {
 	cfg := newExtractConfig(opts...)
 	data, err := normalizeZipRaw(raw)
@@ -67,8 +95,21 @@ func ExtractFileFromRawWithOptions(raw interface{}, targetFile string, opts ...E
 	return nil, utils.Errorf("file %s not found in zip", targetFile)
 }
 
-// ExtractFilesWithOptions 并发提取多个文件，支持 ExtractOption（含密码）
+// ExtractFilesWithOptions 从 ZIP 文件并发提取多个文件，支持 ExtractOption（如密码）
 // 关键词: ExtractFiles, 并发提取, 密码提取
+// 参数:
+//   - zipFile: zip 文件路径
+//   - targetFiles: 待提取的条目名称列表
+//   - opts: 可选的提取选项（如 extractPassword）
+//
+// 返回值:
+//   - 提取结果列表（每项含 FileName/Content/Error）
+//   - 错误信息
+//
+// Example:
+// ```
+// results = zip.ExtractFilesWithOptions("/tmp/enc.zip", ["a.txt"], zip.extractPassword("123456"))~
+// ```
 func ExtractFilesWithOptions(zipFile string, targetFiles []string, opts ...ExtractOption) ([]*ExtractResult, error) {
 	raw, err := ioutil.ReadFile(zipFile)
 	if err != nil {
@@ -77,8 +118,24 @@ func ExtractFilesWithOptions(zipFile string, targetFiles []string, opts ...Extra
 	return ExtractFilesFromRawWithOptions(raw, targetFiles, opts...)
 }
 
-// ExtractFilesFromRawWithOptions 从原始字节并发提取多个文件
+// ExtractFilesFromRawWithOptions 从内存 ZIP 原始字节并发提取多个文件，支持 ExtractOption（如密码）
 // 关键词: ExtractFilesFromRaw, 并发提取, 密码提取
+// 参数:
+//   - raw: zip 的原始数据（[]byte、string 或 io.Reader）
+//   - targetFiles: 待提取的条目名称列表
+//   - opts: 可选的提取选项（如 extractPassword）
+//
+// 返回值:
+//   - 提取结果列表（每项含 FileName/Content/Error）
+//   - 错误信息
+//
+// Example:
+// ```
+// zipBytes = zip.CompressRawWithPassword({"a.txt": "AAA"}, "123456")~
+// results = zip.ExtractFilesFromRawWithOptions(zipBytes, ["a.txt"], zip.extractPassword("123456"))~
+// assert len(results) == 1, "should extract one encrypted entry"
+// assert string(results[0].Content) == "AAA", "decrypted content should match"
+// ```
 func ExtractFilesFromRawWithOptions(raw interface{}, targetFiles []string, opts ...ExtractOption) ([]*ExtractResult, error) {
 	cfg := newExtractConfig(opts...)
 	data, err := normalizeZipRaw(raw)
@@ -163,8 +220,21 @@ func ExtractFilesFromRawWithOptions(raw interface{}, targetFiles []string, opts 
 	return results, nil
 }
 
-// ExtractByPatternWithOptions 根据通配符提取多个文件
+// ExtractByPatternWithOptions 从 ZIP 文件按通配符提取多个文件，支持 ExtractOption（如密码）
 // 关键词: ExtractByPattern, 通配符提取, 密码提取
+// 参数:
+//   - zipFile: zip 文件路径
+//   - pattern: 文件名匹配模式（如 "*.txt"）
+//   - opts: 可选的提取选项（如 extractPassword）
+//
+// 返回值:
+//   - 提取结果列表（每项含 FileName/Content/Error）
+//   - 错误信息
+//
+// Example:
+// ```
+// results = zip.ExtractByPatternWithOptions("/tmp/enc.zip", "*.txt", zip.extractPassword("123456"))~
+// ```
 func ExtractByPatternWithOptions(zipFile string, pattern string, opts ...ExtractOption) ([]*ExtractResult, error) {
 	raw, err := ioutil.ReadFile(zipFile)
 	if err != nil {
@@ -173,8 +243,23 @@ func ExtractByPatternWithOptions(zipFile string, pattern string, opts ...Extract
 	return ExtractByPatternFromRawWithOptions(raw, pattern, opts...)
 }
 
-// ExtractByPatternFromRawWithOptions 从原始字节按通配符提取
+// ExtractByPatternFromRawWithOptions 从内存 ZIP 原始字节按通配符提取，支持 ExtractOption（如密码）
 // 关键词: ExtractByPatternFromRaw, 内存通配符提取, 密码提取
+// 参数:
+//   - raw: zip 的原始数据（[]byte、string 或 io.Reader）
+//   - pattern: 文件名匹配模式（如 "*.txt"）
+//   - opts: 可选的提取选项（如 extractPassword）
+//
+// 返回值:
+//   - 提取结果列表（每项含 FileName/Content/Error）
+//   - 错误信息
+//
+// Example:
+// ```
+// zipBytes = zip.CompressRawWithPassword({"a.txt": "AAA"}, "123456")~
+// results = zip.ExtractByPatternFromRawWithOptions(zipBytes, "*.txt", zip.extractPassword("123456"))~
+// assert len(results) == 1, "pattern should match one encrypted entry"
+// ```
 func ExtractByPatternFromRawWithOptions(raw interface{}, pattern string, opts ...ExtractOption) ([]*ExtractResult, error) {
 	cfg := newExtractConfig(opts...)
 	data, err := normalizeZipRaw(raw)

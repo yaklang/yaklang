@@ -790,8 +790,20 @@ func WithSessionTitle(title string) ConfigOption {
 	}
 }
 
-// WithAICallback
+// WithAICallback 设置统一的 AI 回调（导出名为 aiagent.aiCallback）
 // WARNING 粗粒度的ai callback 设置，只可在测试或者功能固定单一的ai模块（如知识库蒸馏）使用，其他位置应该用 WithAutoTieredAICallback
+// 参数:
+//   - cb: AI 回调函数
+//
+// 返回值:
+//   - 配置选项
+//
+// Example:
+// ```
+// // cb 由 aicommon 构造（示意性示例）
+// opt = aiagent.aiCallback(cb)
+// println(opt)
+// ```
 func WithAICallback(cb AICallbackType) ConfigOption {
 	return func(c *Config) error {
 		if c.m == nil {
@@ -873,6 +885,19 @@ func WithToolManager(tm *buildinaitools.AiToolManager) ConfigOption {
 	}
 }
 
+// WithQualityPriorityAICallback 设置质量优先档的 AI 回调（导出名为 aiagent.planAICallback / coordinatorAICallback）
+// 参数:
+//   - cb: AI 回调函数
+//
+// 返回值:
+//   - 配置选项
+//
+// Example:
+// ```
+// // cb 由 aicommon 构造（示意性示例）
+// opt = aiagent.planAICallback(cb)
+// println(opt)
+// ```
 func WithQualityPriorityAICallback(cb AICallbackType) ConfigOption {
 	return func(c *Config) error {
 		if c.m == nil {
@@ -885,6 +910,19 @@ func WithQualityPriorityAICallback(cb AICallbackType) ConfigOption {
 	}
 }
 
+// WithSpeedPriorityAICallback 设置速度优先档的 AI 回调（导出名为 aiagent.taskAICallback）
+// 参数:
+//   - cb: AI 回调函数
+//
+// 返回值:
+//   - 配置选项
+//
+// Example:
+// ```
+// // cb 由 aicommon 构造（示意性示例）
+// opt = aiagent.taskAICallback(cb)
+// println(opt)
+// ```
 func WithSpeedPriorityAICallback(cb AICallbackType) ConfigOption {
 	return func(c *Config) error {
 		if c.m == nil {
@@ -1584,6 +1622,18 @@ func WithAiToolManager(manager *buildinaitools.AiToolManager) ConfigOption {
 	}
 }
 
+// WithDisableToolUse 禁用工具调用（导出名为 aiagent.disableToolUse）
+// 参数:
+//   - disable: 是否禁用工具调用
+//
+// 返回值:
+//   - 配置选项
+//
+// Example:
+// ```
+// opt = aiagent.disableToolUse(true)
+// println(opt)
+// ```
 func WithDisableToolUse(disable bool) ConfigOption {
 	return func(c *Config) error {
 		if c.m == nil {
@@ -1688,6 +1738,18 @@ func WithJarOperator() ConfigOption {
 	}
 }
 
+// WithOmniSearchTool 启用全网搜索工具（导出名为 aiagent.omniSearchTool）
+// 参数:
+//   - 无
+//
+// 返回值:
+//   - 配置选项
+//
+// Example:
+// ```
+// opt = aiagent.omniSearchTool()
+// println(opt)
+// ```
 func WithOmniSearchTool() ConfigOption {
 	return func(c *Config) error {
 		return nil
@@ -1700,7 +1762,18 @@ func WithQwenNoThink() ConfigOption {
 	})
 }
 
-// Interactive / review / require_user
+// WithAllowRequireForUserInteract 设置是否允许向用户发起交互请求（导出名为 aiagent.allowRequireForUserInteract）
+// 参数:
+//   - v: 是否允许用户交互
+//
+// 返回值:
+//   - 配置选项
+//
+// Example:
+// ```
+// opt = aiagent.allowRequireForUserInteract(true)
+// println(opt)
+// ```
 func WithAllowRequireForUserInteract(v bool) ConfigOption {
 	return func(c *Config) error {
 		if c.m == nil {
@@ -1713,6 +1786,19 @@ func WithAllowRequireForUserInteract(v bool) ConfigOption {
 	}
 }
 
+// WithAgreePolicy 设置操作审批策略（导出名为 aiagent.agreePolicy）
+// 参数:
+//   - p: 审批策略，如自动、AI、手动等
+//
+// 返回值:
+//   - 配置选项
+//
+// Example:
+// ```
+// // p 由 aicommon 提供（示意性示例）
+// opt = aiagent.agreePolicy(p)
+// println(opt)
+// ```
 func WithAgreePolicy(p AgreePolicyType) ConfigOption {
 	return func(c *Config) error {
 		if c.m == nil {
@@ -1725,6 +1811,18 @@ func WithAgreePolicy(p AgreePolicyType) ConfigOption {
 	}
 }
 
+// WithAIAgree 设置由 AI 自动审批操作（导出名为 aiagent.agreePolicyAI）
+// 参数:
+//   - 无
+//
+// 返回值:
+//   - 配置选项
+//
+// Example:
+// ```
+// opt = aiagent.agreePolicyAI()
+// println(opt)
+// ```
 func WithAIAgree() ConfigOption {
 	return func(c *Config) error {
 		c.m.Lock()
@@ -1734,6 +1832,18 @@ func WithAIAgree() ConfigOption {
 	}
 }
 
+// WithAgreeManual 设置由人工手动审批操作（导出名为 aiagent.agreeManual）
+// 参数:
+//   - 无
+//
+// 返回值:
+//   - 配置选项
+//
+// Example:
+// ```
+// opt = aiagent.agreeManual()
+// println(opt)
+// ```
 func WithAgreeManual() ConfigOption {
 	return func(c *Config) error {
 		c.m.Lock()
@@ -1743,6 +1853,18 @@ func WithAgreeManual() ConfigOption {
 	}
 }
 
+// WithAgreeAuto 设置自动审批通过所有操作（导出名为 aiagent.agreeAuto）
+// 参数:
+//   - 无
+//
+// 返回值:
+//   - 配置选项
+//
+// Example:
+// ```
+// opt = aiagent.agreeAuto()
+// println(opt)
+// ```
 func WithAgreeAuto() ConfigOption {
 	return func(c *Config) error {
 		c.m.Lock()
@@ -1937,6 +2059,18 @@ func WithPlanUserInteractMaxCount(i int64) ConfigOption {
 	}
 }
 
+// WithSystemFileOperator 为 AI 启用系统文件操作工具集（导出名为 aiagent.systemFileOperator）
+// 参数:
+//   - 无
+//
+// 返回值:
+//   - 配置选项
+//
+// Example:
+// ```
+// opt = aiagent.systemFileOperator()
+// println(opt)
+// ```
 func WithSystemFileOperator() ConfigOption {
 	return func(config *Config) error {
 		tools, err := fstools.CreateSystemFSTools()
@@ -1947,6 +2081,19 @@ func WithSystemFileOperator() ConfigOption {
 	}
 }
 
+// WithTools 为 AI 批量添加可用工具（导出名为 aiagent.tools）
+// 参数:
+//   - tool: 一个或多个 AI 工具对象
+//
+// 返回值:
+//   - 配置选项
+//
+// Example:
+// ```
+// // tool 由 aitool 构造（示意性示例）
+// opt = aiagent.tools(tool)
+// println(opt)
+// ```
 func WithTools(tool ...*aitool.Tool) ConfigOption {
 	return func(c *Config) error {
 		return WithAiToolManagerOptions(buildinaitools.WithExtendTools(tool, true))(c)
@@ -2323,7 +2470,18 @@ func WithLanguage(lang string) ConfigOption {
 	}
 }
 
-// Debug flags
+// WithDebugPrompt 开启 prompt 调试输出（导出名为 aiagent.debugPrompt）
+// 参数:
+//   - v: 可选，是否开启（默认 true）
+//
+// 返回值:
+//   - 配置选项
+//
+// Example:
+// ```
+// opt = aiagent.debugPrompt(true)
+// println(opt)
+// ```
 func WithDebugPrompt(v ...bool) ConfigOption {
 	return func(c *Config) error {
 		if c.m == nil {
@@ -2352,6 +2510,18 @@ func WithDebugEvent(v bool) ConfigOption {
 	}
 }
 
+// WithAgreeYOLO 设置 YOLO 模式，自动通过所有审批（导出名为 aiagent.agreeYOLO）
+// 参数:
+//   - b: 可选，是否开启 YOLO（默认 true）
+//
+// 返回值:
+//   - 配置选项
+//
+// Example:
+// ```
+// opt = aiagent.agreeYOLO()
+// println(opt)
+// ```
 func WithAgreeYOLO(b ...bool) ConfigOption {
 	if len(b) > 0 && !b[0] {
 		return func(c *Config) error {
@@ -2363,7 +2533,19 @@ func WithAgreeYOLO(b ...bool) ConfigOption {
 
 // Add new config option helpers to match aid options used elsewhere.
 
+// WithSequence 设置起始序列号并安装自增 id 生成器（导出名为 aiagent.offsetSeq）
 // WithSequence sets the starting sequence/id and installs a simple id generator that increments it.
+// 参数:
+//   - seq: 起始序列号
+//
+// 返回值:
+//   - 配置选项
+//
+// Example:
+// ```
+// opt = aiagent.offsetSeq(1000)
+// println(opt)
+// ```
 func WithSequence(seq int64) ConfigOption {
 	return func(c *Config) error {
 		if c.m == nil {
@@ -2433,7 +2615,20 @@ func WithAIKBResultMaxSize(maxSize int64) ConfigOption {
 	}
 }
 
+// WithTool 添加单个 AI 工具（导出名为 aiagent.tool）
 // WithTool is a convenience wrapper to add a single tool (delegates to WithTools).
+// 参数:
+//   - tool: AI 工具对象
+//
+// 返回值:
+//   - 配置选项
+//
+// Example:
+// ```
+// // tool 由 aitool 构造（示意性示例）
+// opt = aiagent.tool(tool)
+// println(opt)
+// ```
 func WithTool(tool *aitool.Tool) ConfigOption {
 	return func(c *Config) error {
 		return WithTools(tool)(c)
@@ -2457,7 +2652,20 @@ func WithConsumption(input, output *int64, logUUID string, tierStats ...*omap.Or
 	}
 }
 
+// WithExtendedActionCallback 注册扩展 action 回调（导出名为 aiagent.extendedActionCallback）
 // WithExtendedActionCallback sets the ExtendedActionCallback map.
+// 参数:
+//   - name: action 名称
+//   - callback: 回调函数，参数为 (config, action)
+//
+// 返回值:
+//   - 配置选项
+//
+// Example:
+// ```
+// opt = aiagent.extendedActionCallback("custom", func(config, action) { dump(action) })
+// println(opt)
+// ```
 func WithExtendedActionCallback(name string, callback func(config *Config, action *Action)) ConfigOption {
 	return func(c *Config) error {
 		if c.m == nil {
@@ -2473,12 +2681,36 @@ func WithExtendedActionCallback(name string, callback func(config *Config, actio
 	}
 }
 
+// WithDisallowRequireForUserPrompt 禁止向用户发起交互请求（导出名为 aiagent.disallowRequireForUserPrompt）
 // WithDisallowRequireForUserPrompt disables require-for-user-interact.
+// 参数:
+//   - 无
+//
+// 返回值:
+//   - 配置选项
+//
+// Example:
+// ```
+// opt = aiagent.disallowRequireForUserPrompt()
+// println(opt)
+// ```
 func WithDisallowRequireForUserPrompt() ConfigOption {
 	return WithAllowRequireForUserInteract(false)
 }
 
+// WithManualAssistantCallback 设置人工审批回调（导出名为 aiagent.manualAssistantCallback）
 // WithManualAssistantCallback is an alias to the agree/manual callback setter.
+// 参数:
+//   - cb: 回调函数，参数为 (ctx, config)，返回审批参数与错误
+//
+// 返回值:
+//   - 配置选项
+//
+// Example:
+// ```
+// opt = aiagent.manualAssistantCallback(func(ctx, config) { return {"suggestion": "continue"}, nil })
+// println(opt)
+// ```
 func WithManualAssistantCallback(cb func(context.Context, *Config) (aitool.InvokeParams, error)) ConfigOption {
 	return WithAgreeManualCallback(cb)
 }
@@ -2499,7 +2731,19 @@ func WithEventInputChanx(ch *chanx.UnlimitedChan[*ypb.AIInputEvent]) ConfigOptio
 	}
 }
 
+// WithDebug 同时开启 prompt 与 event 调试输出（导出名为 aiagent.debug）
 // WithDebug toggles both prompt and event debug flags.
+// 参数:
+//   - v: 是否开启调试
+//
+// 返回值:
+//   - 配置选项
+//
+// Example:
+// ```
+// opt = aiagent.debug(true)
+// println(opt)
+// ```
 func WithDebug(v bool) ConfigOption {
 	return func(c *Config) error {
 		if c.m == nil {
@@ -2583,7 +2827,19 @@ func WithAppendOtherOption(opts any) ConfigOption {
 	}
 }
 
+// WithAppendPersistentContext 追加持久化记忆的键（导出名为 aiagent.appendPersistentMemory）
 // WithAppendPersistentContext appends keys to PersistentMemory.
+// 参数:
+//   - keys: 一个或多个记忆键
+//
+// 返回值:
+//   - 配置选项
+//
+// Example:
+// ```
+// opt = aiagent.appendPersistentMemory("target", "scope")
+// println(opt)
+// ```
 func WithAppendPersistentContext(keys ...string) ConfigOption {
 	return func(c *Config) error {
 		if len(keys) == 0 {
@@ -2599,7 +2855,19 @@ func WithAppendPersistentContext(keys ...string) ConfigOption {
 	}
 }
 
+// WithAIAutoRetry 设置 AI 调用失败时的自动重试次数（导出名为 aiagent.aiAutoRetry）
 // WithAIAutoRetry sets AiAutoRetry count.
+// 参数:
+//   - n: 重试次数（>= 0）
+//
+// 返回值:
+//   - 配置选项
+//
+// Example:
+// ```
+// opt = aiagent.aiAutoRetry(3)
+// println(opt)
+// ```
 func WithAIAutoRetry(n int64) ConfigOption {
 	return func(c *Config) error {
 		if n < 0 {
@@ -2615,12 +2883,36 @@ func WithAIAutoRetry(n int64) ConfigOption {
 	}
 }
 
+// WithAITransactionRetry 设置 AI 事务（单次交互）的自动重试次数（导出名为 aiagent.aiTransactionRetry）
 // WithAITransactionRetry alias to existing WithAITransactionAutoRetry for naming compatibility.
+// 参数:
+//   - n: 重试次数
+//
+// 返回值:
+//   - 配置选项
+//
+// Example:
+// ```
+// opt = aiagent.aiTransactionRetry(3)
+// println(opt)
+// ```
 func WithAITransactionRetry(n int64) ConfigOption {
 	return WithAITransactionAutoRetry(n)
 }
 
+// WithDisableOutputEvent 禁用指定类型的输出事件（导出名为 aiagent.disableOutputType）
 // WithDisableOutputEvent is a name-compatible wrapper for disabling output event types.
+// 参数:
+//   - types: 一个或多个事件类型
+//
+// 返回值:
+//   - 配置选项
+//
+// Example:
+// ```
+// opt = aiagent.disableOutputType("stream")
+// println(opt)
+// ```
 func WithDisableOutputEvent(types ...string) ConfigOption {
 	return WithDisableOutputEventType(types...)
 }
@@ -2650,7 +2942,19 @@ func WithTimeline(t *Timeline) ConfigOption {
 	}
 }
 
+// WithTimelineContentLimit 设置 timeline 内容大小上限（导出名为 aiagent.timelineContentLimit）
 // WithTimelineContentLimit sets timeline content size limit (keeps naming parity).
+// 参数:
+//   - limit: 内容大小上限
+//
+// 返回值:
+//   - 配置选项
+//
+// Example:
+// ```
+// opt = aiagent.timelineContentLimit(4096)
+// println(opt)
+// ```
 func WithTimelineContentLimit(limit int) ConfigOption {
 	return WithTimelineLimit(limit)
 }

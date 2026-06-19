@@ -2,8 +2,6 @@ package authhack
 
 import (
 	"errors"
-	"fmt"
-	"strings"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/yaklang/yaklang/common/utils"
@@ -151,6 +149,17 @@ func NewJWTHelper(alg string) (*Token, error) {
 	return NewTokenFromJwtToken(jwt.New(algIns)), nil
 }
 
+// AvailableJWTTokensAlgs 返回当前支持的所有 JWT 签名算法名称列表
+// 在 yak 中通过 jwt.AllAlgs 调用
+// 返回值:
+//   - 支持的签名算法名称字符串切片，如 ES256、HS256、RS256 等
+//
+// Example:
+// ```
+// algs = jwt.AllAlgs()
+// println(len(algs))   // OUT: 13
+// assert len(algs) >= 12, "should expose all supported jwt algorithms"
+// ```
 func AvailableJWTTokensAlgs() []string {
 	var res []string
 	for _, i := range JwtAlgs {
@@ -233,84 +242,23 @@ func JwtGenerateEx(alg string, header, claims any, typ string, key []byte) (stri
 	return token.SignedString(key)
 }
 
-func JwtParse(tokenStr string, keys ...string) (*Token, []byte, error) {
-	var jwtErr *jwt.ValidationError
-	claims := NewOMapClaims()
-
-	rawToken, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
-		return nil, nil
-	})
-	token := NewTokenFromJwtToken(rawToken)
-	if err != nil {
-		if !errors.As(err, &jwtErr) {
-			return nil, nil, utils.Wrap(err, "Unexpected error")
-		}
-		if jwtErr.Errors == jwt.ValidationErrorMalformed {
-			return nil, nil, utils.Errorf("malformed token: %v", err)
-		} else if jwtErr.Errors == jwt.ValidationErrorUnverifiable {
-			if token != nil && token.Header.Len() > 0 {
-				alg := strings.ToLower(fmt.Sprint(token.Header.GetExact("alg")))
-				if alg == "none" || alg == "<nil>" {
-					// Parse-only (no keys): return token for display. With keys: reject alg:none for verification.
-					if len(keys) > 0 {
-						return token, nil, ErrAlgNoneNotAllowed
-					}
-					return token, nil, nil
-				}
-			}
-			return token, nil, utils.Errorf("unverifiable token: %v", err)
-		}
-	}
-
-	for _, i := range keys {
-		key := []byte(i)
-		rawToken, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
-			return []byte(i), nil
-		})
-		token := NewTokenFromJwtToken(rawToken)
-		if err != nil {
-			if !errors.As(err, &jwtErr) {
-				return nil, nil, utils.Wrap(err, "Unexpected error")
-			}
-			if jwtErr.Errors == jwt.ValidationErrorMalformed {
-				return nil, nil, utils.Errorf("malformed token: %v", err)
-			} else if jwtErr.Errors == jwt.ValidationErrorUnverifiable {
-				return token, nil, utils.Errorf("unverifiable token: %v", err)
-			} else if jwtErr.Errors&jwt.ValidationErrorSignatureInvalid == jwt.ValidationErrorSignatureInvalid && jwtErr.Inner != nil {
-				continue
-			} else if jwtErr.Errors&jwt.ValidationErrorAudience == jwt.ValidationErrorAudience {
-				return token, key, utils.Errorf("token AUD validation failed: %v", jwtErr.Inner)
-			} else if jwtErr.Errors&jwt.ValidationErrorExpired == jwt.ValidationErrorExpired {
-				return token, key, utils.Errorf("token EXP validation failed: %v", err)
-			} else if jwtErr.Errors&jwt.ValidationErrorIssuedAt == jwt.ValidationErrorIssuedAt {
-				return token, key, utils.Errorf("token IAT validation failed: %v", jwtErr.Inner)
-			} else if jwtErr.Errors&jwt.ValidationErrorIssuer == jwt.ValidationErrorIssuer {
-				return token, key, utils.Errorf("token ISS validation failed: %v", jwtErr.Inner)
-			} else if jwtErr.Errors&jwt.ValidationErrorNotValidYet == jwt.ValidationErrorNotValidYet {
-				return token, key, utils.Errorf("token NBF validation failed: %v", jwtErr.Inner)
-			} else if jwtErr.Errors&jwt.ValidationErrorId == jwt.ValidationErrorId {
-				return token, key, utils.Errorf("token JTI validation failed: %v", jwtErr.Inner)
-			} else if jwtErr.Errors&jwt.ValidationErrorClaimsInvalid == jwt.ValidationErrorClaimsInvalid {
-				return token, nil, utils.Errorf("token claims validation failed: %v", err)
-			} else {
-				return token, nil, jwtErr
-			}
-		}
-
-		if token.Header.Len() <= 0 {
-			continue
-		}
-
-		if !token.Valid {
-			continue
-		}
-
-		return token, []byte(i), nil
-	}
-
-	return token, nil, ErrKeyNotFound
-}
-
+// JwtChangeAlgToNone 把给定 JWT 的签名算法改写为 none(去除签名)，常用于 JWT 安全测试
+// 在 yak 中通过 jwt.RemoveAlg 调用，保留原始头部与载荷，仅去掉签名部分
+// 参数:
+//   - token: 原始 JWT 字符串
+//
+// 返回值:
+//   - 算法被改写为 none 的新 JWT 字符串
+//   - 错误信息，成功时为 nil
+//
+// Example:
+// ```
+// // 把已有 token 改写为 alg:none 形式，验证生成结果可被再次解析出原始 claims
+// token = jwt.JWTGenerate(jwt.ALG_HS256, {"user": "admin"}, []byte("secret123"))~
+// noneToken = jwt.RemoveAlg(token)~
+// tokenObj, _, _ = jwt.Parse(noneToken)
+// assert tokenObj != nil, "alg:none token should still be parseable"
+// ```
 func JwtChangeAlgToNone(token string) (string, error) {
 	t, _, err := JwtParse(token)
 	if err != nil && !errors.Is(err, ErrKeyNotFound) {

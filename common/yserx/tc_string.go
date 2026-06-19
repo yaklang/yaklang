@@ -26,6 +26,19 @@ func (s *JavaString) Marshal(cfg *MarshalContext) []byte {
 	return raw
 }
 
+// NewJavaString 创建一个 Java 序列化的普通字符串对象(TC_STRING)
+// 在 yak 中通过 java.NewJavaString 调用
+// 参数:
+//   - raw: 字符串内容
+//
+// 返回值:
+//   - Java 字符串序列化对象
+//
+// Example:
+// ```
+// s = java.NewJavaString("hello")
+// println(s.Value) // OUT: hello
+// ```
 func NewJavaString(raw string) *JavaString {
 	return &JavaString{
 		Type:        TC_STRING,
@@ -37,6 +50,19 @@ func NewJavaString(raw string) *JavaString {
 	}
 }
 
+// NewJavaLongString 创建一个 Java 序列化的长字符串对象(TC_LONGSTRING)，用于超长字符串
+// 在 yak 中通过 java.NewJavaLongString 调用
+// 参数:
+//   - raw: 字符串内容
+//
+// 返回值:
+//   - Java 长字符串序列化对象
+//
+// Example:
+// ```
+// s = java.NewJavaLongString("hello")
+// println(s.Value) // OUT: hello
+// ```
 func NewJavaLongString(raw string) *JavaString {
 	s := &JavaString{
 		Type:        TC_LONGSTRING,

@@ -69,6 +69,22 @@ func (ret *JavaArray) fixBytescode() {
 	}
 }
 
+// NewJavaArray 创建一个 Java 数组对象(TC_ARRAY)，承载同类型元素的字段值序列
+// 在 yak 中通过 java.NewJavaArray 调用
+// 参数:
+//   - j: 数组的类描述对象(描述元素类型)
+//   - values: 零个或多个数组元素字段值
+//
+// 返回值:
+//   - Java 数组序列化对象
+//
+// Example:
+// ```
+// // 该示例为示意性用法：构造一个 int 数组对象
+// desc = java.NewJavaClassDesc("[I", []byte{0,0,0,0,0,0,0,1}, 0x02, java.NewJavaClassFields(), nil, nil)
+// arr = java.NewJavaArray(desc, java.NewJavaFieldIntValue(1), java.NewJavaFieldIntValue(2))
+// println(arr.TypeVerbose)
+// ```
 func NewJavaArray(j *JavaClassDesc, values ...*JavaFieldValue) *JavaArray {
 	a := &JavaArray{
 		ClassDesc: j,
