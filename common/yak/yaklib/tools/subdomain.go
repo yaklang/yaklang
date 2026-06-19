@@ -9,6 +9,14 @@ import (
 
 // Scan 对域名进行子域名扫描，它的第一个参数可以接收字符串或字符串数组，接下来可以接收零个到多个选项，用于对此次扫描进行配置，例如设置扫描超时时间，是否递归等，返回结果管道与错误
 // 使用 请求(爆破)，查询，域传送技术进行子域名扫描
+// 参数:
+//   - target: 扫描目标，支持字符串、字节数组或字符串数组
+//   - opts: 零个或多个子域名扫描配置选项
+//
+// 返回值:
+//   - chan *subdomain.SubdomainResult: 子域名扫描结果管道
+//   - error: 启动失败时返回错误
+//
 // Example:
 // ```
 // for domain in subdomain.Scan("example.com")~ {
@@ -63,6 +71,12 @@ func _subdomainScan(target interface{}, opts ...subdomain.ConfigOption) (chan *s
 }
 
 // targetTimeout 是一个选项参数，设置每个目标的超时时间，单位为秒，默认为 300s
+// 参数:
+//   - i: 每个目标的超时时间，单位为秒
+//
+// 返回值:
+//   - 一个 subdomain.Scan 可接收的配置选项
+//
 // Example:
 // ```
 // subdomain.Scan("example.com", subdomain.targetTimeout(10))
@@ -72,6 +86,12 @@ func withTargetTimeout(i float64) subdomain.ConfigOption {
 }
 
 // eachQueryTimeout 是一个选项参数，设置每个查询的超时时间，单位为秒，默认为 3s
+// 参数:
+//   - i: 每个查询的超时时间，单位为秒
+//
+// 返回值:
+//   - 一个 subdomain.Scan 可接收的配置选项
+//
 // Example:
 // ```
 // subdomain.Scan("example.com", subdomain.eachQueryTimeout(5))
@@ -80,7 +100,13 @@ func withEachQueryTimeout(i float64) subdomain.ConfigOption {
 	return subdomain.WithTimeoutForEachQuery(utils.FloatSecondDuration(i))
 }
 
-// withEachSearchTimeout 是一个选项参数，设置每个搜索的超时时间，单位为秒，默认为 10s
+// eachSearchTimeout 是一个选项参数，设置每个搜索的超时时间，单位为秒，默认为 10s
+// 参数:
+//   - i: 每个搜索的超时时间，单位为秒
+//
+// 返回值:
+//   - 一个 subdomain.Scan 可接收的配置选项
+//
 // Example:
 // ```
 // subdomain.Scan("example.com", subdomain.withEachSearchTimeout(5))
@@ -90,6 +116,12 @@ func withEachSearchTimeout(i float64) subdomain.ConfigOption {
 }
 
 // mainDict 是一个选项参数，设置子域名爆破主字典，其第一个参数可以是文件名、字符串或字符串数组
+// 参数:
+//   - i: 主字典，可以是文件名、字符串或字符串数组
+//
+// 返回值:
+//   - 一个 subdomain.Scan 可接收的配置选项
+//
 // Example:
 // ```
 // dict = "/tmp/dict.txt"
@@ -100,6 +132,12 @@ func withMainDict(i any) subdomain.ConfigOption {
 }
 
 // recursiveDict 是一个选项参数，设置子域名爆破递归字典，其第一个参数可以是文件名、字符串或字符串数组
+// 参数:
+//   - i: 递归字典，可以是文件名、字符串或字符串数组
+//
+// 返回值:
+//   - 一个 subdomain.Scan 可接收的配置选项
+//
 // Example:
 // ```
 // dict = "/tmp/sub-dict.txt"

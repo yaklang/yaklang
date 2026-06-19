@@ -2,6 +2,12 @@ name: Push web docs
 
 on:
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Generate docs and coverage report only, do NOT push to yaklang.github.io"
+        required: false
+        default: false
+        type: boolean
   push:
     branches:
       - "doc/ci/*"
@@ -25,10 +31,22 @@ jobs:
     - name: Generate docs
       run: |
         echo "Generating docs..."
-        go run -gcflags=all=-l common/yak/yakdoc/generate_web_doc/generate_web_doc.go web_doc/
+        # -coverage-report 产出覆盖率底单(写到 docs/api 之外，不参与同步)，
+        # 既能在 Actions 日志里看到 doc coverage summary，又能作为 artifact 留档。
+        go run -gcflags=all=-l common/yak/yakdoc/generate_web_doc/generate_web_doc.go \
+          -coverage-report web_doc_coverage.md web_doc/
         echo "Generating docs finished"
-        
+
+    - name: Upload coverage report artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: web-doc-coverage
+        path: web_doc_coverage.md
+        if-no-files-found: warn
+
     - name: Checkout yaklang.github.io repo
+      # 手动触发且 dry_run=true 时只生成与留档覆盖率，不检出目标仓库、不推送。
+      if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.dry_run) }}
       uses: actions/checkout@v2
       with:
         repository: yaklang/yaklang.github.io
@@ -36,6 +54,7 @@ jobs:
         path: websize
 
     - name: Copy docs
+      if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.dry_run) }}
       run: |
         # Sync generated API docs and remove orphaned docs for libraries that no
         # longer exist. --delete prunes stale files, but we exclude files that are
@@ -48,6 +67,7 @@ jobs:
           web_doc/ websize/docs/api/
 
     - name: Add tag and Push
+      if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.dry_run) }}
       continue-on-error: true
       run: |
         cd websize

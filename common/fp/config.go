@@ -141,8 +141,12 @@ func (c *Config) IsFiltered(host string, port int) bool {
 }
 
 // debugLog 的配置选项，设置本次扫描是否使用 debugLog
-// @param {bool} b 是否使用 debugLog
-// @return {ConfigOption} 返回配置项
+// 参数:
+//   - b: 可选，是否使用 debugLog，不传时默认为 true
+//
+// 返回值:
+//   - 一个 servicescan.Scan 可接收的配置选项
+//
 // Example:
 // ```
 // result, err = servicescan.Scan("127.0.0.1", "22-80,443,3389,161", servicescan.debugLog(true))
@@ -164,8 +168,12 @@ func WithDebugLog(b ...bool) ConfigOption {
 }
 
 // cache servicescan 的配置选项，设置本次扫描是否使用缓存
-// @param {bool} b 是否使用缓存
-// @return {ConfigOption} 返回配置项
+// 参数:
+//   - b: 是否使用缓存
+//
+// 返回值:
+//   - 一个 servicescan.Scan 可接收的配置选项
+//
 // Example:
 // ```
 // result, err = servicescan.Scan("127.0.0.1", "22-80,443,3389,161", servicescan.cache(true))
@@ -183,8 +191,12 @@ func WithCache(b bool) ConfigOption {
 }
 
 // onOpen servicescan 的配置选项，设置本次扫描端口开放时的回调函数
-// @param {func(*MatchResult)} cb 回调函数
-// @return {ConfigOption} 返回配置项
+// 参数:
+//   - cb: 端口开放时触发的回调函数，入参为匹配结果
+//
+// 返回值:
+//   - 一个 servicescan.Scan 可接收的配置选项
+//
 // Example:
 // ```
 // result, err := servicescan.Scan("127.0.0.1", "22,80,443", servicescan.onOpen(result => dump(result.String())))
@@ -201,9 +213,13 @@ func WithOnPortOpenCallback(cb func(*MatchResult)) ConfigOption {
 	}
 }
 
-// onFinish servicescan 的配置选项，设置本次扫描端口开放时的回调函数
-// @param {func(*MatchResult)} cb 回调函数
-// @return {ConfigOption} 返回配置项
+// onFinish servicescan 的配置选项，设置本次扫描完成单个目标时的回调函数
+// 参数:
+//   - cb: 扫描完成时触发的回调函数，入参为匹配结果
+//
+// 返回值:
+//   - 一个 servicescan.Scan 可接收的配置选项
+//
 // Example:
 // ```
 //
@@ -221,8 +237,12 @@ func WithOnFinished(cb func(*MatchResult)) ConfigOption {
 }
 
 // databaseCache servicescan 的配置选项，设置本次扫描是否使用数据库缓存
-// @param {bool} b 是否使用数据库缓存
-// @return {ConfigOption} 返回配置项
+// 参数:
+//   - b: 是否使用数据库缓存
+//
+// 返回值:
+//   - 一个 servicescan.Scan 可接收的配置选项
+//
 // Example:
 // ```
 // result, err = servicescan.Scan("127.0.0.1", "22-80,443,3389,161", servicescan.databaseCache(true))
@@ -240,8 +260,12 @@ func WithDatabaseCache(b bool) ConfigOption {
 }
 
 // proxy servicescan 的配置选项，设置本次扫描使用的代理
-// @param {string} proxies 代理地址，支持 http 和 socks5
-// @return {ConfigOption} 返回配置项
+// 参数:
+//   - proxies: 一个或多个代理地址，支持 http 和 socks5
+//
+// 返回值:
+//   - 一个 servicescan.Scan 可接收的配置选项
+//
 // Example:
 // ```
 // result, err = servicescan.Scan("127.0.0.1", "22-80,443,3389,161", servicescan.proxy("http://127.0.0.1:1080"))
@@ -259,8 +283,12 @@ func WithProxy(proxies ...string) ConfigOption {
 }
 
 // concurrent servicescan 的配置选项，用于设置整体扫描并发
-// @param {int} size 并发数量
-// @return {ConfigOption} 返回配置项
+// 参数:
+//   - size: 并发数量
+//
+// 返回值:
+//   - 一个 servicescan.Scan 可接收的配置选项
+//
 // Example:
 // ```
 // result, err = servicescan.Scan("127.0.0.1", "22-80,443,3389,161", servicescan.concurrent(100))
@@ -281,8 +309,12 @@ func WithPoolSize(size int) ConfigOption {
 }
 
 // openPortGuardLimit servicescan 的配置选项, 设置单主机开放端口数熔断阈值.
-// @param {int} limit 熔断阈值; 小于等于 0 时使用默认值
-// @return {ConfigOption} 返回配置项
+// 参数:
+//   - limit: 熔断阈值，小于等于 0 时使用默认值
+//
+// 返回值:
+//   - 一个 servicescan.Scan 可接收的配置选项
+//
 // Example:
 // ```
 // result, err = servicescan.Scan("127.0.0.1", "1-65535", servicescan.openPortGuardLimit(1000))
@@ -300,8 +332,12 @@ func WithOpenPortGuardLimit(limit int) ConfigOption {
 }
 
 // disableOpenPortGuard servicescan 的配置选项, 禁用单主机开放端口数保护.
-// @param {bool} b 是否禁用, 默认 true
-// @return {ConfigOption} 返回配置项
+// 参数:
+//   - b: 可选，是否禁用，不传时默认为 true
+//
+// 返回值:
+//   - 一个 servicescan.Scan 可接收的配置选项
+//
 // Example:
 // ```
 // result, err = servicescan.Scan("127.0.0.1", "1-65535", servicescan.disableOpenPortGuard())
@@ -323,8 +359,12 @@ func WithDisableOpenPortGuard(b ...bool) ConfigOption {
 }
 
 // excludeHosts servicescan 的配置选项，设置本次扫描排除的主机
-// @param {string} hosts 主机，支持逗号分割、CIDR、-的格式
-// @return {ConfigOption} 返回配置项
+// 参数:
+//   - hosts: 主机，支持逗号分割、CIDR、- 的格式
+//
+// 返回值:
+//   - 一个 servicescan.Scan 可接收的配置选项
+//
 // Example:
 // ```
 // result, err = servicescan.Scan("192.168.1.1/24", "22-80,443,3389", servicescan.excludeHosts("192.168.1.1"))
@@ -342,8 +382,12 @@ func WithExcludeHosts(hosts string) ConfigOption {
 }
 
 // excludePorts servicescan 的配置选项，设置本次扫描排除的端口
-// @param {string} ports 端口，支持逗号分割、-的格式
-// @return {ConfigOption} 返回配置项
+// 参数:
+//   - ports: 端口，支持逗号分割、- 的格式
+//
+// 返回值:
+//   - 一个 servicescan.Scan 可接收的配置选项
+//
 // Example:
 // ```
 // result, err = servicescan.Scan("127.0.0.1", "22-80,443,3389,161", servicescan.excludePorts("22,80"))
@@ -458,8 +502,12 @@ func (c *Config) GetFingerprintRules() map[*NmapProbe][]*NmapMatch {
 }
 
 // maxProbes servicescan 的配置选项，在主动模式发包的基础上设置本次扫描使用的最大探测包数量，默认值为 5
-// @param {int} m 最大探测包数量
-// @return {ConfigOption} 返回配置项
+// 参数:
+//   - m: 最大探测包数量
+//
+// 返回值:
+//   - 一个 servicescan.Scan 可接收的配置选项
+//
 // Example:
 // ```
 // result, err = servicescan.Scan("127.0.0.1", "22-80,443,3389,161",
@@ -503,8 +551,12 @@ func ParseStringToProto(protos ...interface{}) []TransportProto {
 }
 
 // maxProbesConcurrent servicescan 的配置选项，设置本次扫描发送 Probe 的并发量，默认值为 5
-// @param {int} m 并发量
-// @return {ConfigOption} 返回配置项
+// 参数:
+//   - m: 并发量
+//
+// 返回值:
+//   - 一个 servicescan.Scan 可接收的配置选项
+//
 // Example:
 // ```
 // result, err = servicescan.Scan("127.0.0.1", "22-80,443,3389,161",
@@ -551,8 +603,12 @@ func WithTransportProtos(protos ...TransportProto) ConfigOption {
 
 // nmapRarityMax servicescan 的配置选项，设置本次扫描使用的 Nmap 指纹稀有度，在主动模式发包的基础上进行探测控制
 // 稀有度越大，表示这个服务在现实存在的可能性越小，取值范围为 1-9，默认值为 5
-// @param {int} rarity 稀有度，取值范围为 1-9
-// @return {ConfigOption} 返回配置项
+// 参数:
+//   - rarity: 稀有度，取值范围为 1-9
+//
+// 返回值:
+//   - 一个 servicescan.Scan 可接收的配置选项
+//
 // Example:
 // ```
 // result, err = servicescan.Scan("127.0.0.1", "22-80,443,3389,161",
@@ -603,8 +659,12 @@ func WithProbeTimeout(timeout time.Duration) ConfigOption {
 }
 
 // probeTimeout servicescan 的配置选项，设置每一个探测包的超时时间
-// @param {float64} f 超时时间，单位为秒
-// @return {ConfigOption} 返回配置项
+// 参数:
+//   - f: 超时时间，单位为秒
+//
+// 返回值:
+//   - 一个 servicescan.Scan 可接收的配置选项
+//
 // Example:
 // ```
 // result, err = servicescan.Scan("127.0.0.1", "22-80,443,3389,161", servicescan.probeTimeout(5))
@@ -667,7 +727,22 @@ func WithWebFingerprintUseAllRules(b bool) ConfigOption {
 }
 
 // webRule servicescan 的配置选项，设置本次扫描使用的 Web 指纹规则
-// @param {interface{}} i Web 指纹规则
+// 参数:
+//   - rs: 一个或多个 Web 指纹规则，支持 yaml 规则字符串、规则文件路径或规则对象
+//
+// 返回值:
+//   - 一个 servicescan.Scan 可接收的配置选项
+//
+// Example:
+// ```
+// result, err = servicescan.Scan("127.0.0.1", "80,443", servicescan.web(), servicescan.webRule(yamlRuleContent))
+// die(err)
+//
+//	for v := range result {
+//	    println(v.String())
+//	}
+//
+// ```
 func WithWebFingerprintRule(rs ...any) ConfigOption {
 	var allRules []*rule.FingerPrintRule
 	for _, i := range rs {
@@ -697,8 +772,13 @@ func WithWebFingerprintRule(rs ...any) ConfigOption {
 	}
 }
 
-// service servicescan 的配置选项，用于指定指纹库中的指纹组。
-// @return {ConfigOption} 返回配置选项
+// withRuleGroup servicescan 的配置选项，用于指定指纹库中的指纹组。
+// 参数:
+//   - groups: 一个或多个指纹组名称
+//
+// 返回值:
+//   - 一个 servicescan.Scan 可接收的配置选项
+//
 // Example:
 // ```
 // result,err = servicescan.Scan("127.0.0.1", "22-80,443,3389,161", servicescan.withRuleGroup("group1","group2")) // 使用"group1"和"group2"指纹组的指纹进行扫描
@@ -726,8 +806,10 @@ func WithFingerprintRuleGroup(groups ...string) ConfigOption {
 	}
 }
 
-// service servicescan 的配置选项，用于指定使用指纹组的全部指纹。
-// @return {ConfigOption} 返回配置选项
+// withRuleGroupAll servicescan 的配置选项，用于指定使用指纹组的全部指纹。
+// 返回值:
+//   - 一个 servicescan.Scan 可接收的配置选项
+//
 // Example:
 // ```
 // result,err = servicescan.Scan("127.0.0.1", "22-80,443,3389,161", servicescan.withRuleGroupAll()) // 使用全部指纹组的指纹进行扫描
@@ -756,7 +838,22 @@ func WithFingerprintRuleGroupAll() ConfigOption {
 }
 
 // nmapRule servicescan 的配置选项，设置本次扫描使用的 Nmap 指纹规则
-// @param {interface{}} i Nmap 指纹规则
+// 参数:
+//   - i: Nmap 指纹规则，支持规则字节内容、规则文件路径或规则映射
+//
+// 返回值:
+//   - 一个 servicescan.Scan 可接收的配置选项
+//
+// Example:
+// ```
+// result, err = servicescan.Scan("127.0.0.1", "22,3306", servicescan.service(), servicescan.nmapRule(nmapProbeContent))
+// die(err)
+//
+//	for v := range result {
+//	    println(v.String())
+//	}
+//
+// ```
 func WithNmapRule(i interface{}) ConfigOption {
 	var nmapRules map[*NmapProbe][]*NmapMatch
 	switch ret := i.(type) {

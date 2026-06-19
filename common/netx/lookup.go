@@ -181,6 +181,20 @@ func LookupCallback(host string, h func(dnsType, domain, ip, fromServer string, 
 	return reliableLookupHost(host, opt...)
 }
 
+// LookupFirst 解析域名并返回第一个有效的 IP 地址
+// 参数:
+//   - host: 待解析的域名
+//   - opt: 零个或多个 DNS 解析配置选项，例如超时、DNS 服务器等
+//
+// 返回值:
+//   - string: 第一个解析到的 IP 地址，解析失败时返回空字符串
+//
+// Example:
+// ```
+// // 该示例为示意性用法：解析域名得到首个 IP
+// ip = dnslog.LookupFirst("example.com")
+// println(ip)
+// ```
 func LookupFirst(host string, opt ...DNSOption) string {
 	start := time.Now()
 	defer func() {

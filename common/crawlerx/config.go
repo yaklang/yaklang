@@ -185,8 +185,13 @@ func WithRuntimeID(id string) ConfigOpt {
 }
 
 // browserInfo 是一个请求选项 用于配制浏览器参数
+// 参数:
+//   - data: 浏览器配置 JSON 字符串，包含 ws_address、exe_path、proxy_address 等字段
 //
-// Examples:
+// 返回值:
+//   - 一个 crawlerx.StartCrawler 可接收的配置选项
+//
+// Example:
 // ```
 //
 //	targetUrl = "http://testphp.vulnweb.com/"
@@ -239,8 +244,13 @@ func WithBrowserData(browserConfig *BrowserConfig) ConfigOpt {
 }
 
 // maxUrl 是一个请求选项 用于设置最大爬取url数量
+// 参数:
+//   - maxUrl: 最大爬取 URL 数量
 //
-// Examples:
+// 返回值:
+//   - 一个 crawlerx.StartCrawler 可接收的配置选项
+//
+// Example:
 // ```
 //
 //	targetUrl = "http://testphp.vulnweb.com/"
@@ -255,8 +265,13 @@ func WithMaxUrl(maxUrl int) ConfigOpt {
 }
 
 // maxDepth 是一个请求选项 用于设置网站最大爬取深度
+// 参数:
+//   - depth: 网站最大爬取深度
 //
-// Examples:
+// 返回值:
+//   - 一个 crawlerx.StartCrawler 可接收的配置选项
+//
+// Example:
 // ```
 //
 //	targetUrl = "http://testphp.vulnweb.com/"
@@ -271,8 +286,13 @@ func WithMaxDepth(depth int) ConfigOpt {
 }
 
 // concurrent 是一个请求选项 用于设置浏览器同时打开的最大页面数量
+// 参数:
+//   - concurrent: 浏览器同时打开的最大页面数量
 //
-// Examples:
+// 返回值:
+//   - 一个 crawlerx.StartCrawler 可接收的配置选项
+//
+// Example:
 // ```
 //
 //	targetUrl = "http://testphp.vulnweb.com/"
@@ -287,8 +307,13 @@ func WithConcurrent(concurrent int) ConfigOpt {
 }
 
 // blacklist 是一个请求选项 用于设置不会被访问的url链接包含的关键词
+// 参数:
+//   - keywords: 一个或多个黑名单关键词，URL 中包含这些关键词时不会被访问
 //
-// Examples:
+// 返回值:
+//   - 一个 crawlerx.StartCrawler 可接收的配置选项
+//
+// Example:
 // ```
 //
 //	targetUrl = "http://testphp.vulnweb.com/"
@@ -313,8 +338,13 @@ func WithBlackList(keywords ...string) ConfigOpt {
 }
 
 // whitelist 是一个请求选项 用于设置只会被访问的url链接中包含的关键词
+// 参数:
+//   - keywords: 一个或多个白名单关键词，只有 URL 中包含这些关键词时才会被访问
 //
-// Examples:
+// 返回值:
+//   - 一个 crawlerx.StartCrawler 可接收的配置选项
+//
+// Example:
 // ```
 //
 //	targetUrl = "http://testphp.vulnweb.com/"
@@ -339,8 +369,13 @@ func WithWhiteList(keywords ...string) ConfigOpt {
 }
 
 // pageTimeout 是一个请求选项 用于设置单个页面超时时间
+// 参数:
+//   - timeout: 单个页面超时时间，单位为秒
 //
-// Examples:
+// 返回值:
+//   - 一个 crawlerx.StartCrawler 可接收的配置选项
+//
+// Example:
 // ```
 //
 //	targetUrl = "http://testphp.vulnweb.com/"
@@ -355,8 +390,13 @@ func WithPageTimeout(timeout int) ConfigOpt {
 }
 
 // fullTimeout 是一个请求选项 用于设置爬虫任务总超时时间
+// 参数:
+//   - timeout: 爬虫任务总超时时间，单位为秒
 //
-// Examples:
+// 返回值:
+//   - 一个 crawlerx.StartCrawler 可接收的配置选项
+//
+// Example:
 // ```
 //
 //	targetUrl = "http://testphp.vulnweb.com/"
@@ -374,7 +414,13 @@ func WithFullTimeout(timeout int) ConfigOpt {
 //
 // 防止加载vue网站页面时页面状态为加载完成 实际仍在加载中的情况
 //
-// Examples:
+// 参数:
+//   - extraWaitLoadTime: 页面加载的额外等待时间，单位为毫秒
+//
+// 返回值:
+//   - 一个 crawlerx.StartCrawler 可接收的配置选项
+//
+// Example:
 // ```
 //
 //	targetUrl = "http://testphp.vulnweb.com/"
@@ -389,8 +435,13 @@ func WithExtraWaitLoadTime(extraWaitLoadTime int) ConfigOpt {
 }
 
 // formFill 是一个请求选项 用于设置页面输入框填写内容
+// 参数:
+//   - formFills: 关键词到填写内容的映射，输入框匹配关键词时填写对应内容
 //
-// Examples:
+// 返回值:
+//   - 一个 crawlerx.StartCrawler 可接收的配置选项
+//
+// Example:
 // ```
 //
 //	targetUrl = "http://testphp.vulnweb.com/"
@@ -410,8 +461,13 @@ func WithFormFill(formFills map[string]string) ConfigOpt {
 }
 
 // fileInput 是一个请求选项 用于设置页面遇到input submit时默认上传文件
+// 参数:
+//   - fileInput: 关键词到文件路径的映射，default 键表示默认上传文件
 //
-// Examples:
+// 返回值:
+//   - 一个 crawlerx.StartCrawler 可接收的配置选项
+//
+// Example:
 // ```
 //
 //	targetUrl = "http://testphp.vulnweb.com/"
@@ -430,8 +486,13 @@ func WithFileInput(fileInput map[string]string) ConfigOpt {
 }
 
 // rawHeaders 是一个请求选项 用于设置爬虫发送请求时的headers
+// 参数:
+//   - headerInfo: 原生 headers 字符串，每行一个 header
 //
-// Examples:
+// 返回值:
+//   - 一个 crawlerx.StartCrawler 可接收的配置选项
+//
+// Example:
 // ```
 //
 //	targetUrl = "http://testphp.vulnweb.com/"
@@ -455,8 +516,13 @@ func WithHeaderInfo(headerInfo string) ConfigOpt {
 }
 
 // headers 是一个请求选项 用于设置爬虫发送请求时的headers
+// 参数:
+//   - headersInfo: header 名称到值的映射
 //
-// Examples:
+// 返回值:
+//   - 一个 crawlerx.StartCrawler 可接收的配置选项
+//
+// Example:
 // ```
 //
 //	targetUrl = "http://testphp.vulnweb.com/"
@@ -475,8 +541,14 @@ func WithHeaders(headersInfo map[string]string) ConfigOpt {
 }
 
 // rawCookie 是一个请求选项 用于设置爬虫发送请求时的cookie
+// 参数:
+//   - domain: cookie 所属域名
+//   - cookieInfo: 原生 cookie 字符串
 //
-// Examples:
+// 返回值:
+//   - 一个 crawlerx.StartCrawler 可接收的配置选项
+//
+// Example:
 // ```
 //
 //	targetUrl = "http://testphp.vulnweb.com/"
@@ -492,8 +564,14 @@ func WithCookieInfo(domain, cookieInfo string) ConfigOpt {
 }
 
 // cookies 是一个请求选项 用于设置爬虫发送请求时的cookie
+// 参数:
+//   - domain: cookie 所属域名
+//   - cookiesInfo: cookie 名称到值的映射
 //
-// Examples:
+// 返回值:
+//   - 一个 crawlerx.StartCrawler 可接收的配置选项
+//
+// Example:
 // ```
 //
 //	targetUrl = "http://testphp.vulnweb.com/"
@@ -513,8 +591,13 @@ func WithCookies(domain string, cookiesInfo map[string]string) ConfigOpt {
 }
 
 // scanRangeLevel 是一个请求选项 用于设置爬虫扫描范围
+// 参数:
+//   - scanRange: 扫描范围级别，可选 crawlerx.AllDomainScan、crawlerx.SubMenuScan、crawlerx.UnlimitedDomainScan
 //
-// Examples:
+// 返回值:
+//   - 一个 crawlerx.StartCrawler 可接收的配置选项
+//
+// Example:
 // ```
 //
 //	targetUrl = "http://testphp.vulnweb.com/"
@@ -532,8 +615,13 @@ func WithScanRangeLevel(scanRange scanRangeLevel) ConfigOpt {
 }
 
 // scanRepeatLevel 是一个请求选项 用于设置爬虫去重强度
+// 参数:
+//   - scanRepeat: 去重强度级别，可选 crawlerx.UnLimitRepeat、LowRepeatLevel、MediumRepeatLevel、HighRepeatLevel、ExtremeRepeatLevel
 //
-// Examples:
+// 返回值:
+//   - 一个 crawlerx.StartCrawler 可接收的配置选项
+//
+// Example:
 // ```
 //
 //	targetUrl = "http://testphp.vulnweb.com/"
@@ -553,8 +641,13 @@ func WithScanRepeatLevel(scanRepeat repeatLevel) ConfigOpt {
 }
 
 // ignoreQueryName 是一个请求选项 用于设置url中的query名称去重时忽略
+// 参数:
+//   - names: 一个或多个去重时需要忽略的 query 名称
 //
-// Examples:
+// 返回值:
+//   - 一个 crawlerx.StartCrawler 可接收的配置选项
+//
+// Example:
 // ```
 //
 //	targetUrl = "http://testphp.vulnweb.com/"
@@ -569,8 +662,13 @@ func WithIgnoreQueryName(names ...string) ConfigOpt {
 }
 
 // sensitiveWords 是一个请求选项 用于设置页面按钮点击时的敏感词
+// 参数:
+//   - words: 敏感词列表，按钮所在元素包含这些关键词时不会被点击
 //
-// Examples:
+// 返回值:
+//   - 一个 crawlerx.StartCrawler 可接收的配置选项
+//
+// Example:
 // ```
 //
 //	targetUrl = "http://testphp.vulnweb.com/"
@@ -918,8 +1016,13 @@ func WithFromPlugin(fromPlugin string) ConfigOpt {
 }
 
 // urlCheck 是一个请求选项 用于设置是否在爬虫前进行url存活检测
+// 参数:
+//   - check: 是否在爬虫前进行 URL 存活检测
 //
-// Examples:
+// 返回值:
+//   - 一个 crawlerx.StartCrawler 可接收的配置选项
+//
+// Example:
 // ```
 //
 //	targetUrl = "http://testphp.vulnweb.com/"

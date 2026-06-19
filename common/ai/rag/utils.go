@@ -263,6 +263,15 @@ func autoMigrateRAGSystem(db *gorm.DB) error {
 //
 // 返回值：
 // - r1(aicommon.AICallbackType): Mock AI 服务实例
+//
+// Example:
+// ```
+// cb = ai.MockAIService(func(msg) {
+//     return "mocked response for: " + msg
+// })
+// assert cb != nil, "MockAIService should return a non-nil callback"
+// println("ai.MockAIService created callback successfully")
+// ```
 func MockAIService(handle func(message string) string) aicommon.AICallbackType {
 	return func(config aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		rsp := config.NewAIResponse()

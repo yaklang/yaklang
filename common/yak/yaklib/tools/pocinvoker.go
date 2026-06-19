@@ -334,6 +334,25 @@ func HandleXrayResultChan(r io.Reader) chan *PocVul {
 	return ch
 }
 
+// PocVulToRisk 将一个 PoC 漏洞结果(PocVul)转换为标准的 Risk 风险结构
+// 参数:
+//   - p: PoC 漏洞结果对象
+//
+// 返回值:
+//   - *schema.Risk: 转换后的 Risk 风险对象
+//
+// Example:
+// ```
+// // 该示例为示意性用法：将扫描结果转换为 Risk
+// res, err = nuclei.Scan("http://example.com", nuclei.all(true))
+// die(err)
+//
+//	for vul = range res {
+//	    risk = nuclei.PocVulToRisk(vul)
+//	    println(risk.Title)
+//	}
+//
+// ```
 func PocVulToRisk(p *PocVul) *schema.Risk {
 	var title string
 	if p.CVE != "" {

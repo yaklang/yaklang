@@ -126,10 +126,15 @@ func sendMatchResultOrDrop(ctx context.Context, outC chan<- *fp.MatchResult, res
 }
 
 // Scan servicescan 库使用的端口扫描类型的方式为全连接扫描，用于对连接目标进行精准的扫描，相比 synscan 库的单纯扫描，servicescan 库会尝试获取精确指纹信息以及 CPE 信息
-// @param {string} target 目标地址，支持 CIDR 格式，支持 192.168.1.1-100 格式
-// @param {string} port 端口，支持 1-65535、1,2,3、1-100,200-300 格式
-// @param {ConfigOption} [opts] servicescan 扫描参数
-// @return {chan *MatchResult} 返回结果
+// 参数:
+//   - target: 目标地址，支持 CIDR 格式，支持 192.168.1.1-100 格式
+//   - port: 端口，支持 1-65535、1,2,3、1-100,200-300 格式
+//   - opts: 零个或多个 servicescan 扫描参数
+//
+// 返回值:
+//   - chan *MatchResult: 指纹识别结果管道
+//   - error: 启动失败时返回错误
+//
 // Example:
 // ```
 // ch, err = servicescan.Scan("127.0.0.1", "22-80,443,3389")  // 开始扫描，函数会立即返回一个错误和结果管道
@@ -149,10 +154,15 @@ func scanFingerprint(target string, port string, opts ...fp.ConfigOption) (chan 
 }
 
 // ScanOne servicescan 单体扫描，同步扫描一个目标，主机+端口
-// @param {string} target 目标地址
-// @param {int} port 端口
-// @param {ConfigOption} [opts] servicescan 扫描参数
-// @return {MatchResult} 返回结果
+// 参数:
+//   - target: 目标地址
+//   - port: 端口
+//   - opts: 零个或多个 servicescan 扫描参数
+//
+// 返回值:
+//   - *MatchResult: 单个目标的指纹识别结果
+//   - error: 扫描失败时返回错误
+//
 // Example:
 // ```
 // result, err = servicescan.ScanOne("127.0.0.1", "22-80,443,3389")  // 开始扫描，函数会立即返回一个错误和结果
@@ -328,10 +338,15 @@ func _scanFingerprint(ctx context.Context, config *fp.Config, concurrent int, ho
 }
 
 // ScanFromPing 从 ping.Scan 的结果中进行指纹识别
-// @param {chan *pingutil.PingResult} res ping.Scan 的结果
-// @param {string} ports 端口，支持 1-65535、1,2,3、1-100,200-300 格式
-// @param {ConfigOption} [opts] synscan 扫描参数
-// @return {chan *MatchResult} 返回结果
+// 参数:
+//   - res: ping.Scan 的结果管道
+//   - ports: 端口，支持 1-65535、1,2,3、1-100,200-300 格式
+//   - opts: 零个或多个 servicescan 扫描参数
+//
+// 返回值:
+//   - chan *MatchResult: 指纹识别结果管道
+//   - error: 启动失败时返回错误
+//
 // Example:
 // ```
 // pingResult, err = ping.Scan("192.168.1.1/24") // 先进行存活探测
@@ -373,9 +388,14 @@ func _scanFromPingUtils(res chan *pingutil.PingResult, ports string, opts ...fp.
 }
 
 // ScanFromSynResult / ScanFromSpaceEngine 从 synscan.Scan 或者 spacengine.Query 的结果中进行指纹识别
-// @param {interface{}} res synscan.Scan 或者 spacengine.Query 的结果
-// @param {scanOpt} [opts] synscan 扫描参数
-// @return {chan *MatchResult} 返回结果
+// 参数:
+//   - res: synscan.Scan 或者 spacengine.Query 的结果
+//   - opts: 零个或多个 servicescan 扫描参数
+//
+// 返回值:
+//   - chan *MatchResult: 指纹识别结果管道
+//   - error: 启动失败时返回错误
+//
 // Example:
 // ```
 // ch, err = synscan.Scan("127.0.0.1", "22-80,443,3389")  // 开始扫描，函数会立即返回一个错误和结果管道
@@ -592,8 +612,12 @@ func _scanFromTargetStream(res interface{}, opts ...fp.ConfigOption) (chan *fp.M
 }
 
 // proto servicescan 的配置选项，用于指定扫描协议
-// @param {...interface{}} [proto] 协议，例如：tcp、udp，可选参数，不传入参数默认为 tcp
-// @return {ConfigOption} 返回配置选项
+// 参数:
+//   - proto: 协议，例如 tcp、udp，可选参数，不传入参数默认为 tcp
+//
+// 返回值:
+//   - 一个 servicescan.Scan 可接收的配置选项
+//
 // Example:
 // ```
 // result,err = servicescan.Scan("127.0.0.1", "22-80,443,3389,161", servicescan.proto(["tcp","udp"]...)) // 使用 TCP 和 UDP 进行扫描
@@ -702,8 +726,13 @@ func _disableDefaultFingerprint(b ...bool) fp.ConfigOption {
 }
 
 // disableWebScanConnPool servicescan 的配置选项，用于禁用 web 扫描的连接池
-// @param {bool} b 是否禁用连接池，默认为 false
-// @return {ConfigOption} 返回配置选项
+// 参数:
+//   - b: 是否禁用连接池，默认为 false
+//
+// 返回值:
+//   - 一个 servicescan.Scan 可接收的配置选项
+//
+// Example:
 // ```
 // result,err = servicescan.Scan("127.0.0.1", "22-80,443,3389,161", servicescan.disableWebScanConnPool(true)) // 禁用 web 扫描的连接池
 // die(err) // 如果错误非空则报错

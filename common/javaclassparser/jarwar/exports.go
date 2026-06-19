@@ -10,6 +10,13 @@ import (
 
 // Decompile 反编译一个 jar包或者 class
 // 返回值是反编译后的 java 文件路径
+// 参数:
+//   - from: 待反编译的 jar/war/class 文件路径
+//   - to: 反编译结果输出的目录或文件路径
+//
+// 返回值:
+//   - error: 反编译失败时返回错误
+//
 // Example:
 // ```
 // err = Decompile("test.jar", "test/"); die(err)

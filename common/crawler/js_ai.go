@@ -76,7 +76,17 @@ type AIJSExtractConfig struct {
 // AIJSExtractOption mutates AIJSExtractConfig.
 type AIJSExtractOption func(*AIJSExtractConfig)
 
-// WithAIJS_MaxTokens overrides the per-call token budget.
+// aiJSMaxTokens 设置 AI JS 抽取时每次调用的 token 预算上限
+// 参数:
+//   - n: 每次 AI 调用的最大 token 数
+//
+// 返回值:
+//   - 一个 crawler.aiJSExtract 可接收的 AI JS 抽取配置选项
+//
+// Example:
+// ```
+// crawler.Start("https://example.com", crawler.aiJSExtract(crawler.aiJSMaxTokens(40000)))
+// ```
 func WithAIJS_MaxTokens(n int) AIJSExtractOption {
 	return func(c *AIJSExtractConfig) {
 		if n > 0 {
@@ -85,7 +95,17 @@ func WithAIJS_MaxTokens(n int) AIJSExtractOption {
 	}
 }
 
-// WithAIJS_ChunkBytes overrides the target byte size of each AI call slice.
+// aiJSChunkBytes 设置 AI JS 抽取时每个 AI 调用切片的目标字节大小
+// 参数:
+//   - n: 每个切片的目标字节数
+//
+// 返回值:
+//   - 一个 crawler.aiJSExtract 可接收的 AI JS 抽取配置选项
+//
+// Example:
+// ```
+// crawler.Start("https://example.com", crawler.aiJSExtract(crawler.aiJSChunkBytes(8192)))
+// ```
 func WithAIJS_ChunkBytes(n int64) AIJSExtractOption {
 	return func(c *AIJSExtractConfig) {
 		if n > 0 {
@@ -94,7 +114,17 @@ func WithAIJS_ChunkBytes(n int64) AIJSExtractOption {
 	}
 }
 
-// WithAIJS_OverlapBytes overrides the cross-chunk fold size.
+// aiJSOverlapBytes 设置 AI JS 抽取时跨切片折叠（重叠）的字节大小
+// 参数:
+//   - n: 跨切片重叠的字节数
+//
+// 返回值:
+//   - 一个 crawler.aiJSExtract 可接收的 AI JS 抽取配置选项
+//
+// Example:
+// ```
+// crawler.Start("https://example.com", crawler.aiJSExtract(crawler.aiJSOverlapBytes(256)))
+// ```
 func WithAIJS_OverlapBytes(n int) AIJSExtractOption {
 	return func(c *AIJSExtractConfig) {
 		if n >= 0 {
@@ -103,7 +133,17 @@ func WithAIJS_OverlapBytes(n int) AIJSExtractOption {
 	}
 }
 
-// WithAIJS_ContextBytes overrides the half-window size around each regex hit.
+// aiJSContextBytes 设置 AI JS 抽取时每个正则命中点周围上下文窗口的半宽字节数
+// 参数:
+//   - n: 命中点周围上下文窗口的半宽字节数
+//
+// 返回值:
+//   - 一个 crawler.aiJSExtract 可接收的 AI JS 抽取配置选项
+//
+// Example:
+// ```
+// crawler.Start("https://example.com", crawler.aiJSExtract(crawler.aiJSContextBytes(512)))
+// ```
 func WithAIJS_ContextBytes(n int) AIJSExtractOption {
 	return func(c *AIJSExtractConfig) {
 		if n > 0 {
@@ -112,8 +152,17 @@ func WithAIJS_ContextBytes(n int) AIJSExtractOption {
 	}
 }
 
-// WithAIJS_SkipBelowBytes sets the candidate-stream size below which the AI
-// step is skipped and raw hits are emitted directly.
+// aiJSSkipBelow 设置候选数据流低于该字节阈值时跳过 AI 步骤，直接输出原始命中结果
+// 参数:
+//   - n: 跳过 AI 步骤的候选数据流字节阈值
+//
+// 返回值:
+//   - 一个 crawler.aiJSExtract 可接收的 AI JS 抽取配置选项
+//
+// Example:
+// ```
+// crawler.Start("https://example.com", crawler.aiJSExtract(crawler.aiJSSkipBelow(1024)))
+// ```
 func WithAIJS_SkipBelowBytes(n int) AIJSExtractOption {
 	return func(c *AIJSExtractConfig) {
 		if n >= 0 {
@@ -122,8 +171,17 @@ func WithAIJS_SkipBelowBytes(n int) AIJSExtractOption {
 	}
 }
 
-// WithAIJS_SmallInputBytes sets the raw input byte threshold for the
-// direct-feed fast path. Set to 0 to disable.
+// aiJSSmallInputBytes 设置直接投喂快速通道的原始输入字节阈值，设为 0 表示禁用
+// 参数:
+//   - n: 直接投喂快速通道的原始输入字节阈值，0 表示禁用
+//
+// 返回值:
+//   - 一个 crawler.aiJSExtract 可接收的 AI JS 抽取配置选项
+//
+// Example:
+// ```
+// crawler.Start("https://example.com", crawler.aiJSExtract(crawler.aiJSSmallInputBytes(2048)))
+// ```
 func WithAIJS_SmallInputBytes(n int) AIJSExtractOption {
 	return func(c *AIJSExtractConfig) {
 		if n >= 0 {
@@ -132,8 +190,17 @@ func WithAIJS_SmallInputBytes(n int) AIJSExtractOption {
 	}
 }
 
-// WithAIJS_SmallInputTokens sets the raw input token threshold for the
-// direct-feed fast path. Set to 0 to disable.
+// aiJSSmallInputTokens 设置直接投喂快速通道的原始输入 token 阈值，设为 0 表示禁用
+// 参数:
+//   - n: 直接投喂快速通道的原始输入 token 阈值，0 表示禁用
+//
+// 返回值:
+//   - 一个 crawler.aiJSExtract 可接收的 AI JS 抽取配置选项
+//
+// Example:
+// ```
+// crawler.Start("https://example.com", crawler.aiJSExtract(crawler.aiJSSmallInputTokens(800)))
+// ```
 func WithAIJS_SmallInputTokens(n int) AIJSExtractOption {
 	return func(c *AIJSExtractConfig) {
 		if n >= 0 {
@@ -142,7 +209,17 @@ func WithAIJS_SmallInputTokens(n int) AIJSExtractOption {
 	}
 }
 
-// WithAIJS_Concurrency caps parallel AI calls.
+// aiJSConcurrency 设置 AI JS 抽取时并行 AI 调用的最大并发数
+// 参数:
+//   - n: 并行 AI 调用的最大并发数
+//
+// 返回值:
+//   - 一个 crawler.aiJSExtract 可接收的 AI JS 抽取配置选项
+//
+// Example:
+// ```
+// crawler.Start("https://example.com", crawler.aiJSExtract(crawler.aiJSConcurrency(5)))
+// ```
 func WithAIJS_Concurrency(n int) AIJSExtractOption {
 	return func(c *AIJSExtractConfig) {
 		if n > 0 {
@@ -151,7 +228,17 @@ func WithAIJS_Concurrency(n int) AIJSExtractOption {
 	}
 }
 
-// WithAIJS_AIOptions forwards aicommon.ConfigOption (model, key, ...) to LiteForge.
+// aiJSAIOptions 将底层 AI 配置选项（模型、密钥等）转发给 LiteForge
+// 参数:
+//   - opts: 一个或多个 AI 配置选项，例如模型名称、API 密钥等
+//
+// 返回值:
+//   - 一个 crawler.aiJSExtract 可接收的 AI JS 抽取配置选项
+//
+// Example:
+// ```
+// crawler.Start("https://example.com", crawler.aiJSExtract(crawler.aiJSAIOptions(ai.model("gpt-4"))))
+// ```
 func WithAIJS_AIOptions(opts ...aicommon.ConfigOption) AIJSExtractOption {
 	return func(c *AIJSExtractConfig) {
 		c.AIOptions = append(c.AIOptions, opts...)

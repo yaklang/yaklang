@@ -253,6 +253,16 @@ func toConfig(opts ...interface{}) (*Config, *lowhttp.LowhttpExecConfig, []lowht
 	return config, lowhttpConfig, totalConfig
 }
 
+// ScanAuto 自动识别输入目标类型(原始请求、URL、主机等)并批量执行 nuclei 模板扫描
+// 参数:
+//   - items: 扫描目标，支持字符串、字节数组或可遍历的目标集合
+//   - opt: 零个或多个 nuclei 扫描配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：自动批量扫描多个目标
+// nuclei.ScanAuto(["http://example.com", "http://test.com"], nuclei.all(true))
+// ```
 func ScanAuto(items any, opt ...interface{}) {
 	switch items.(type) {
 	case string, []byte:
@@ -468,6 +478,26 @@ func processVulnerability(target any, filterVul filter.Filterable, vCh chan *too
 	}
 }
 
+// Scan 对目标执行 nuclei 模板扫描，以 channel 形式流式返回扫描发现的漏洞结果
+// 参数:
+//   - target: 扫描目标，支持字符串、字节数组或目标集合
+//   - opt: 零个或多个 nuclei 扫描配置选项
+//
+// 返回值:
+//   - chan *PocVul: 漏洞结果管道，可迭代获取每个命中漏洞
+//   - error: 启动失败时返回错误
+//
+// Example:
+// ```
+// // 该示例为示意性用法：使用全部模板扫描目标
+// res, err = nuclei.Scan("http://example.com", nuclei.all(true))
+// die(err)
+//
+//	for vul = range res {
+//	    println(vul.Target, vul.PocName)
+//	}
+//
+// ```
 func ScanLegacy(target any, opt ...interface{}) (chan *tools.PocVul, error) {
 	opts := make([]ConfigOption, 0, len(opt))
 	lo.Filter(opt, func(item interface{}, index int) bool {
@@ -575,56 +605,36 @@ var Exports = map[string]interface{}{
 	"context":           WithContext,
 }
 
-func WithHttpTplRuntimeId(id string) ConfigOption {
-	return func(config *Config) {
-		config.RuntimeId = id
-	}
-}
-
-func _callback(handler func(i map[string]interface{})) ConfigOption {
-	return WithResultCallback(func(y *YakTemplate, reqBulk *YakRequestBulkConfig, rsp []*lowhttp.LowhttpResponse, result bool, extractor map[string]interface{}) {
-		var runtimeId string
-		if len(rsp) > 0 {
-			runtimeId = rsp[0].RuntimeId
-		}
-		handler(map[string]interface{}{
-			"template":  y,
-			"requests":  reqBulk,
-			"responses": rsp,
-			"response":  rsp,
-			"match":     result,
-			"extractor": extractor,
-			"runtimeId": runtimeId,
-		})
-	})
-}
-
-func _tcpCallback(handler func(i map[string]interface{})) ConfigOption {
-	return WithTCPResultCallback(func(y *YakTemplate, reqBulk *YakNetworkBulkConfig, rsp []*NucleiTcpResponse, result bool, extractor map[string]interface{}) {
-		var runtimeId string
-		if len(rsp) > 0 {
-			runtimeId = rsp[0].RuntimeId
-		}
-		handler(map[string]interface{}{
-			"template":  y,
-			"requests":  reqBulk,
-			"responses": rsp,
-			"response":  rsp,
-			"match":     result,
-			"extractor": extractor,
-			"runtimeId": runtimeId,
-		})
-	})
-}
-
-func noInteractsh(b bool) ConfigOption {
-	return WithEnableReverseConnectionFeature(!b)
-}
-
+// rateLimit 设置 nuclei 扫描的发包速率限制，控制每次请求之间的等待时间
+// 参数:
+//   - i: 请求间等待时间，单位为秒
+//
+// 返回值:
+//   - 一个 nuclei.Scan 可接收的配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：限制发包速率
+// res, err = nuclei.Scan("http://example.com", nuclei.rateLimit(0.5))
+// die(err)
+// ```
 func rateLimit(i float64) lowhttp.LowhttpOpt {
 	return lowhttp.WithRetryWaitTime(utils.FloatSecondDuration(i))
 }
 
+// timeout 设置 nuclei 扫描中单个请求的超时时间
+// 参数:
+//   - i: 超时时间，单位为秒
+//
+// 返回值:
+//   - 一个 nuclei.Scan 可接收的配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：设置请求超时
+// res, err = nuclei.Scan("http://example.com", nuclei.timeout(10))
+// die(err)
+// ```
 func _timeout(i float64) lowhttp.LowhttpOpt {
 	return func(o *lowhttp.LowhttpExecConfig) {
 		o.Timeout = utils.FloatSecondDuration(i)

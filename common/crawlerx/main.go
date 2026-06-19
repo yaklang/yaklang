@@ -145,8 +145,15 @@ func (core *CrawlerCore) Test() {
 }
 
 // StartCrawler 开启一个无头浏览器模拟点击爬虫任务 第一个参数为目标url，后面可以添加零个或多个请求选项，用于对此次请求进行配置 返回值包括channel和错误，从channel中获取爬虫结果
+// 参数:
+//   - url: 目标爬取的 URL
+//   - opts: 零个或多个爬虫请求配置选项
 //
-// Examples:
+// 返回值:
+//   - chan ReqInfo: 爬虫结果管道，可迭代获取每个请求信息
+//   - error: 启动失败时返回错误
+//
+// Example:
 // ```
 //
 //	targetUrl = "http://testphp.vulnweb.com/"

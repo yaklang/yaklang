@@ -51,7 +51,14 @@ type OutputBody struct {
 //
 // 第一个参数为需要存储的结果 第二个参数为保存的本地路径 请确保本地文件可以正常写入
 //
-// Examples:
+// 参数:
+//   - data: 需要存储的爬虫结果列表
+//   - outputFile: 保存的本地文件路径
+//
+// 返回值:
+//   - error: 写入失败时返回错误
+//
+// Example:
 //
 //		```
 //			targetUrl = "http://testphp.vulnweb.com/"

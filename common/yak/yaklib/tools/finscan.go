@@ -93,7 +93,19 @@ func _finScanOptRateLimit(ms int, count int) finScanOpt {
 	}
 }
 
-// 设置 FIN 扫描的并发可以有效控制精准度
+// concurrent 设置 FIN 扫描的并发，可以有效控制精准度
+// 在 yak 中通过 finscan.concurrent 调用
+// 参数:
+//   - count: 并发数
+//
+// 返回值:
+//   - 一个 finscan.Scan 可接收的配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：设置 FIN 扫描并发
+// res = finscan.Scan("192.168.1.1", "1-1000", finscan.concurrent(1000))~
+// ```
 func _finScanOptConcurrent(count int) finScanOpt {
 	return func(config *_yakFinPortScanConfig) {
 		if count <= 0 {
@@ -107,7 +119,19 @@ func _finScanOptConcurrent(count int) finScanOpt {
 	}
 }
 
-// finscan 发出 FIN 包后等待多久？
+// wait 设置 FIN 扫描发出 FIN 包后等待回包的最大时间
+// 在 yak 中通过 finscan.wait 调用
+// 参数:
+//   - sec: 等待时间，单位为秒
+//
+// 返回值:
+//   - 一个 finscan.Scan 可接收的配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：设置等待时间
+// res = finscan.Scan("192.168.1.1", "80,443", finscan.wait(5))~
+// ```
 func _finScanOptWaiting(sec float64) finScanOpt {
 	return func(config *_yakFinPortScanConfig) {
 		config.waiting = utils.FloatSecondDuration(sec)
@@ -184,14 +208,38 @@ func _finScanOptExcludeHosts(hosts string) finScanOpt {
 	}
 }
 
-// 端口开放的结果保存到文件
+// outputFile 设置 FIN 扫描的端口开放结果保存到指定文件
+// 在 yak 中通过 finscan.outputFile 调用
+// 参数:
+//   - file: 结果保存的文件路径
+//
+// 返回值:
+//   - 一个 finscan.Scan 可接收的配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：将结果保存到文件
+// res = finscan.Scan("192.168.1.1", "1-65535", finscan.outputFile("/tmp/open_ports.txt"))~
+// ```
 func _finScanOptOpenPortResult(file string) finScanOpt {
 	return func(config *_yakFinPortScanConfig) {
 		config.outputFile = file
 	}
 }
 
-// 端口开放结果保存文件加个前缀，比如 tcp:// https:// http:// 等
+// outputPrefix 设置 FIN 扫描结果保存到文件时添加自定义前缀，比如 tcp:// https:// http:// 等，需要配合 outputFile 使用
+// 在 yak 中通过 finscan.outputPrefix 调用
+// 参数:
+//   - prefix: 保存到文件时添加的前缀，例如 tcp://
+//
+// 返回值:
+//   - 一个 finscan.Scan 可接收的配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：为结果添加前缀
+// res = finscan.Scan("192.168.1.1", "1-65535", finscan.outputFile("./open_ports.txt"), finscan.outputPrefix("tcp://"))~
+// ```
 func _finScanOptOpenPortResultPrefix(prefix string) finScanOpt {
 	return func(config *_yakFinPortScanConfig) {
 		config.outputFilePrefix = prefix
