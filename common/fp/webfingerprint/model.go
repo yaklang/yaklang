@@ -237,6 +237,25 @@ type ServiceRule struct {
 	Keywords []*KeywordMatcher `yaml:"keywords,omitempty"`
 }
 
+// ParseToCPE 将 CPE 字符串解析为结构化的 CPE 对象（导出名为 cve.parseToCpe）
+// 同时支持 CPE 2.2（cpe:/...）与 CPE 2.3（cpe:2.3:...）两种格式，解析出
+// part/vendor/product/version 等字段
+//
+// 参数:
+//   - cpe: CPE 字符串，如 "cpe:/a:apache:http_server:2.4.49"
+//
+// 返回值:
+//   - 解析得到的 CPE 对象，包含 Part/Vendor/Product/Version 等字段
+//   - 错误信息（输入不是合法 CPE 字符串时返回）
+//
+// Example:
+// ```
+// cpe = cve.parseToCpe("cpe:/a:apache:http_server:2.4.49")~
+// println(cpe.Vendor + " " + cpe.Product + " " + cpe.Version)
+// assert cpe.Vendor == "apache", "vendor should be apache"
+// assert cpe.Product == "http_server", "product should be http_server"
+// assert cpe.Version == "2.4.49", "version should be 2.4.49"
+// ```
 func ParseToCPE(cpe string) (*CPE, error) {
 	if (!strings.HasPrefix(cpe, "cpe:/")) && (!strings.HasPrefix(cpe, "cpe:2.3:")) {
 		return nil, errors.Errorf("raw [%s] is not a valid cpe", cpe)
