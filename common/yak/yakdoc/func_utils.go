@@ -423,18 +423,28 @@ FOUND_FUNCTION_DECLARATION:
 	}
 	lo.Uniq(funcs)
 
+	// nameFileCandidate 记录「同名且同文件、但行号不一致」的候选函数。
+	// 某些 stdlib intrinsic 的包装函数（如 math.Abs/Floor/Round 等）runtime 报告
+	// 的行号与 go/doc 解析的声明行不一致，导致主匹配按行号落空。由于同一文件内
+	// 函数名唯一，可用 name+filename 唯一候选作为安全兜底（仅在主匹配失败时启用）。
+	var nameFileCandidate *doc.Func
+
 	for _, theFunc := range funcs {
 		if !hasFallback {
 			if theFunc.Name != funcName {
 				continue
 			}
 			position := fset.Position(theFunc.Decl.Pos())
-			if position.Line != line && !fixedForInstanceFuncDoc {
-				continue
-			}
 			// 整包解析下同一目录可能存在同名函数（不同文件），需按文件名精确匹配，
 			// 避免取到他文件同名函数的注释。fixedForInstanceFuncDoc 走旧逻辑不限制。
 			if position.Filename != filename && !fixedForInstanceFuncDoc {
+				continue
+			}
+			if position.Line != line && !fixedForInstanceFuncDoc {
+				// 行号不一致：先记为兜底候选，继续寻找精确行号匹配。
+				if nameFileCandidate == nil {
+					nameFileCandidate = theFunc
+				}
 				continue
 			}
 
@@ -465,6 +475,20 @@ FOUND_FUNCTION_DECLARATION:
 		}
 
 		break
+	}
+
+	// 主匹配（name+filename+line）失败时，启用 name+filename 唯一候选兜底，
+	// 修复 stdlib intrinsic 包装函数等 runtime 行号与声明行不一致的情形。
+	if !found && !hasFallback && nameFileCandidate != nil {
+		decl := nameFileCandidate.Decl
+		document = nameFileCandidate.Doc
+		if decl != nil && decl.Type != nil && decl.Type.Params != nil {
+			params = HandleParams(funcRefType, decl.Type, fset)
+		}
+		if decl != nil && decl.Type != nil && decl.Type.Results != nil {
+			results = HandleResults(funcRefType, decl.Type, fset)
+		}
+		found = true
 	}
 
 	// 试图找到map里的
