@@ -188,31 +188,6 @@ func GetWebFuzzerTasksIDByRetryRootID(db *gorm.DB, root_id uint) ([]uint, error)
 	return ids, nil
 }
 
-// GetWebFuzzerLatestTaskIDByRequest 返回给定任务集合内每个请求报文对应的最新(task id 最大)任务 ID。
-// 在 rematch 重试树场景下,同一请求可能在老任务(失败包)与重试任务(新包)中各保存一份,
-// 通过该映射可以只保留最新的一份,避免重复计入导致 rematch 结果抖动。
-func GetWebFuzzerLatestTaskIDByRequest(db *gorm.DB, taskIDs []uint) (map[string]int, error) {
-	result := make(map[string]int)
-	if len(taskIDs) == 0 {
-		return result, nil
-	}
-	int64TaskIDs := lo.Map(taskIDs, func(i uint, _ int) int64 { return int64(i) })
-	type requestLatest struct {
-		Request string
-		TaskID  int
-	}
-	var rows []requestLatest
-	db = db.Model(&schema.WebFuzzerResponse{})
-	db = bizhelper.ExactQueryInt64ArrayOr(db, "web_fuzzer_task_id", int64TaskIDs)
-	if db := db.Select("request, MAX(web_fuzzer_task_id) as task_id").Group("request").Scan(&rows); db.Error != nil {
-		return nil, utils.Errorf("get latest web fuzzer task id by request failed: %s", db.Error)
-	}
-	for _, row := range rows {
-		result[row.Request] = row.TaskID
-	}
-	return result, nil
-}
-
 func DeleteWebFuzzerResponseByTaskID(db *gorm.DB, id int64) error {
 	if db := db.Model(&schema.WebFuzzerResponse{}).Where(
 		"web_fuzzer_task_id = ?", id,
