@@ -83,6 +83,12 @@ type Option func(*config) error
 // git.filterReference((ref) => {return !ref.Name().Contains("ci")}),
 // git.handleReference((ref) => { println(ref.String()) }))
 // ```
+//
+// 参数:
+//   - f: 处理每个引用的回调函数
+//
+// 返回值:
+//   - 选项函数
 func WithHandleGitReference(f func(r *plumbing.Reference) error) Option {
 	return func(c *config) error {
 		c.HandleGitReference = f
@@ -98,6 +104,12 @@ func WithHandleGitReference(f func(r *plumbing.Reference) error) Option {
 // git.filterReference((ref) => {return !ref.Name().Contains("ci")}),
 // git.handleReference((ref) => { println(ref.String()) }))
 // ```
+//
+// 参数:
+//   - f: 过滤引用的回调函数，返回 true 表示保留
+//
+// 返回值:
+//   - 选项函数
 func WithFilterGitReference(f func(r *plumbing.Reference) bool) Option {
 	return func(c *config) error {
 		c.FilterGitReference = f
@@ -111,6 +123,12 @@ func WithFilterGitReference(f func(r *plumbing.Reference) bool) Option {
 // // 遍历提交记录，打印每个提交记录
 // git.IterateCommit("D:/coding/golang/src/yaklang", git.handleCommit((c) => { println(c.String()) }))
 // ```
+//
+// 参数:
+//   - f: 处理每个提交记录的回调函数
+//
+// 返回值:
+//   - 选项函数
 func WithHandleGitCommit(f func(r *object.Commit) error) Option {
 	return func(c *config) error {
 		c.HandleGitCommit = f
@@ -126,6 +144,12 @@ func WithHandleGitCommit(f func(r *object.Commit) error) Option {
 // git.filterCommit((c) => { return c.Author.Name != "xxx" }),
 // git.handleCommit((c) => { println(c.String()) }))
 // ```
+//
+// 参数:
+//   - f: 过滤提交记录的回调函数，返回 true 表示保留
+//
+// 返回值:
+//   - 选项函数
 func WithFilterGitCommit(f func(r *object.Commit) bool) Option {
 	return func(c *config) error {
 		c.FilterGitCommit = f
@@ -138,6 +162,12 @@ func WithFilterGitCommit(f func(r *object.Commit) bool) Option {
 // ```
 // git.Clone("https://github.com/yaklang/yaklang", "C:/Users/xxx/Desktop/yaklang", git.recursive(true), git.verify(false))
 // ```
+//
+// 参数:
+//   - b: 是否验证 TLS 证书
+//
+// 返回值:
+//   - 选项函数
 func WithVerifyTLS(b bool) Option {
 	return func(c *config) error {
 		c.VerifyTLS = b
@@ -150,6 +180,12 @@ func WithVerifyTLS(b bool) Option {
 // ```
 // git.Fetch("C:/Users/xxx/Desktop/yaklang", git.noFetchTags(true)) // 不拉取标签
 // ```
+//
+// 参数:
+//   - b: 是否不拉取标签
+//
+// 返回值:
+//   - 选项函数
 func WithNoFetchTags(b bool) Option {
 	return func(c *config) error {
 		c.NoFetchTags = b
@@ -162,6 +198,12 @@ func WithNoFetchTags(b bool) Option {
 // ```
 // git.Fetch("C:/Users/xxx/Desktop/yaklang", git.fetchAllTags(true)) // 拉取所有标签
 // ```
+//
+// 参数:
+//   - b: 是否拉取所有标签
+//
+// 返回值:
+//   - 选项函数
 func WithFetchAllTags(b bool) Option {
 	return func(c *config) error {
 		c.FetchAllTags = b
@@ -174,6 +216,12 @@ func WithFetchAllTags(b bool) Option {
 // ```
 // git.Checkout("C:/Users/xxx/Desktop/yaklang", "feat/new-branch", git.checkoutCreate(true))
 // ```
+//
+// 参数:
+//   - b: 检出时是否创建新分支
+//
+// 返回值:
+//   - 选项函数
 func WithCheckoutCreate(b bool) Option {
 	return func(c *config) error {
 		c.CheckoutCreate = b
@@ -186,6 +234,12 @@ func WithCheckoutCreate(b bool) Option {
 // ```
 // git.Checkout("C:/Users/xxx/Desktop/yaklang", "old-branch", git.checkoutForce(true))
 // ```
+//
+// 参数:
+//   - b: 检出时是否强制覆盖
+//
+// 返回值:
+//   - 选项函数
 func WithCheckoutForce(b bool) Option {
 	return func(c *config) error {
 		c.CheckoutForce = b
@@ -198,6 +252,12 @@ func WithCheckoutForce(b bool) Option {
 // ```
 // git.Checkout("C:/Users/xxx/Desktop/yaklang", "old-branch", git.checkoutKeep(true))
 // ```
+//
+// 参数:
+//   - b: 检出时是否保留本地更改
+//
+// 返回值:
+//   - 选项函数
 func WithCheckoutKeep(b bool) Option {
 	return func(c *config) error {
 		c.CheckoutKeep = b
@@ -210,6 +270,12 @@ func WithCheckoutKeep(b bool) Option {
 // ```
 // git.Clone("https://github.com/yaklang/yaklang", "C:/Users/xxx/Desktop/yaklang", git.Depth(1))
 // ```
+//
+// 参数:
+//   - depth: 克隆/拉取的最大深度
+//
+// 返回值:
+//   - 选项函数
 func WithDepth(depth int) Option {
 	return func(c *config) error {
 		c.Depth = depth
@@ -222,6 +288,12 @@ func WithDepth(depth int) Option {
 // ```
 // git.Pull("C:/Users/xxx/Desktop/yaklang", git.verify(false), git.force(true))
 // ```
+//
+// 参数:
+//   - b: 是否强制执行
+//
+// 返回值:
+//   - 选项函数
 func WithForce(b bool) Option {
 	return func(c *config) error {
 		c.Force = b
@@ -234,6 +306,12 @@ func WithForce(b bool) Option {
 // ```
 // git.Pull("C:/Users/xxx/Desktop/yaklang", git.verify(false), git.remote("origin"))
 // ```
+//
+// 参数:
+//   - remote: 远程仓库名称
+//
+// 返回值:
+//   - 选项函数
 func WithRemote(remote string) Option {
 	return func(c *config) error {
 		c.Remote = remote
@@ -241,6 +319,17 @@ func WithRemote(remote string) Option {
 	}
 }
 
+// WithBranch 指定其他 Git 操作（例如 Clone）时使用的分支（导出名为 git.branch）
+// 参数:
+//   - branch: 分支名
+//
+// 返回值:
+//   - 选项函数
+//
+// Example:
+// ```
+// git.Clone("https://github.com/yaklang/yaklang", "/tmp/yaklang", git.branch("main"))
+// ```
 func WithBranch(branch string) Option {
 	return func(c *config) error {
 		c.Branch = branch
@@ -253,6 +342,12 @@ func WithBranch(branch string) Option {
 // ```
 // git.Clone("https://github.com/yaklang/yaklang", "C:/Users/xxx/Desktop/yaklang", git.recursive(true))
 // ```
+//
+// 参数:
+//   - b: 是否递归克隆子模块
+//
+// 返回值:
+//   - 选项函数
 func WithRecuriveSubmodule(b bool) Option {
 	return func(c *config) error {
 		c.RecursiveSubmodule = b
@@ -265,6 +360,12 @@ func WithRecuriveSubmodule(b bool) Option {
 // ```
 // git.Clone("https://github.com/yaklang/yaklang", "C:/Users/xxx/Desktop/yaklang", git.context(context.New()))
 // ```
+//
+// 参数:
+//   - ctx: 上下文，用于控制操作的取消
+//
+// 返回值:
+//   - 选项函数
 func WithContext(ctx context.Context) Option {
 	return func(c *config) error {
 		c.Context, c.Cancel = context.WithCancel(ctx)
@@ -277,6 +378,13 @@ func WithContext(ctx context.Context) Option {
 // ```
 // git.Clone("https://github.com/yaklang/yaklang", "C:/Users/xxx/Desktop/yaklang", git.auth("admin", "admin"))
 // ```
+//
+// 参数:
+//   - username: 认证用户名
+//   - password: 认证密码
+//
+// 返回值:
+//   - 选项函数
 func WithUsernamePassword(username, password string) Option {
 	return func(c *config) error {
 		if username != "" && password != "" {
@@ -289,6 +397,19 @@ func WithUsernamePassword(username, password string) Option {
 	}
 }
 
+// WithPrivateKey 使用 SSH 私钥文件进行认证（导出名为 git.withPrivateKey）
+// 参数:
+//   - userName: SSH 用户名（通常为 git）
+//   - keyPath: 私钥文件路径
+//   - password: 私钥口令，无口令时传空字符串
+//
+// 返回值:
+//   - 选项函数
+//
+// Example:
+// ```
+// git.Clone("git@github.com:user/repo.git", "/tmp/repo", git.withPrivateKey("git", "/root/.ssh/id_rsa", ""), git.withInsecureIgnoreHostKey())
+// ```
 func WithPrivateKey(userName, keyPath, password string) Option {
 	return func(c *config) error {
 		auth, err := ssh.NewPublicKeysFromFile(userName, keyPath, password)
@@ -313,6 +434,14 @@ func WithPrivateKey(userName, keyPath, password string) Option {
 //
 // )
 // ```
+//
+// 参数:
+//   - userName: SSH 用户名（通常为 git）
+//   - keyContent: PEM 格式的私钥内容
+//   - password: 私钥口令，无口令时传空字符串
+//
+// 返回值:
+//   - 选项函数
 func WithPrivateKeyContent(userName, keyContent, password string) Option {
 	return func(c *config) error {
 		auth, err := ssh.NewPublicKeys(userName, []byte(keyContent), password)
@@ -336,6 +465,12 @@ func WithPrivateKeyContent(userName, keyContent, password string) Option {
 //
 // )
 // ```
+//
+// 参数:
+//   - 无
+//
+// 返回值:
+//   - 选项函数
 func WithInsecureIgnoreHostKey() Option {
 	return func(c *config) error {
 		c.InsecureIgnoreHostKey = true
@@ -348,6 +483,12 @@ func WithInsecureIgnoreHostKey() Option {
 // ```
 // git.GitHack("http://127.0.0.1:8787/git/website", "C:/Users/xxx/Desktop/githack-test", git.threads(8))
 // ```
+//
+// 参数:
+//   - threads: 并发数
+//
+// 返回值:
+//   - 选项函数
 func WithThreads(threads int) Option {
 	return func(c *config) error {
 		c.Threads = threads
@@ -360,6 +501,12 @@ func WithThreads(threads int) Option {
 // ```
 // git.GitHack("http://127.0.0.1:8787/git/website", "C:/Users/xxx/Desktop/githack-test", git.useLocalGitBinary(true))
 // ```
+//
+// 参数:
+//   - b: 是否使用本地 git 二进制执行 git fsck 以尽量恢复完整仓库
+//
+// 返回值:
+//   - 选项函数
 func WithUseLocalGitBinary(b bool) Option {
 	return func(c *config) error {
 		c.UseLocalGitBinary = b
@@ -372,6 +519,12 @@ func WithUseLocalGitBinary(b bool) Option {
 // ```
 // git.GitHack("http://127.0.0.1:8787/git/website", "C:/Users/xxx/Desktop/githack-test", git.httpOpts(poc.timeout(10), poc.https(true)))
 // ```
+//
+// 参数:
+//   - opts: 零个到多个 poc 请求选项函数
+//
+// 返回值:
+//   - 选项函数
 func WithHTTPOptions(opts ...poc.PocConfigOption) Option {
 	return func(c *config) error {
 		c.HTTPOptions = opts

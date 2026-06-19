@@ -141,6 +141,24 @@ var rdpAuth = &DefaultServiceAuthInfo{
 //	return tmperr
 //}
 
+// Login 尝试登录 RDP（远程桌面）服务，用于验证给定凭据是否有效
+// 参数:
+//   - ip: 目标主机 IP 地址
+//   - domain: 登录所属的域，无域时可传空字符串
+//   - user: 登录用户名
+//   - password: 登录密码
+//   - port: RDP 服务端口，通常为 3389
+//
+// 返回值:
+//   - 登录是否成功
+//   - 错误信息，连接失败或认证失败时返回非空
+//
+// Example:
+// ```
+// // 验证 RDP 凭据，依赖目标服务，此处仅作示意
+// ok, err = rdp.Login("192.168.1.1", "", "administrator", "123456", 3389)
+// println(ok)
+// ```
 func rdpLogin(ip, domain, user, password string, port int) (_ bool, err error) {
 	defer func() {
 		if err1 := recover(); err1 != nil {

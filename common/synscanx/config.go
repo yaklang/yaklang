@@ -97,7 +97,6 @@ func NewDefaultConfig() *SynxConfig {
 
 type SynxConfigOption func(config *SynxConfig)
 
-
 // maxOpenPorts syn scan 的配置选项，设置单个 IP 允许的最大开放端口数
 // @param {int} max 最大开放端口数
 // @return {scanOpt} 返回配置选项
@@ -381,6 +380,26 @@ func WithRuntimeId(id string) SynxConfigOption {
 	}
 }
 
+// context 设置 SYN 扫描使用的 context，用于取消或超时控制
+// 在 yak 中通过 synscan.context 调用；cancel 时 SYN 发包/结果投递循环会立即短路退出
+// 参数:
+//   - ctx: 上下文对象
+//
+// 返回值:
+//   - 一个 synscan.Scan 可接收的配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：使用可取消的 context 控制 SYN 扫描
+// ctx, cancel = context.WithCancel(context.Background())
+// defer cancel()
+// res = synscan.Scan("192.168.1.1", "80,443", synscan.context(ctx))~
+//
+//	for result = range res {
+//	    println(result.String())
+//	}
+//
+// ```
 func WithCtx(ctx context.Context) SynxConfigOption {
 	return func(config *SynxConfig) {
 		config.Ctx = ctx

@@ -104,8 +104,23 @@ func FindKey(arr interface{}, predicate interface{}) (matchKey, matchEle interfa
 	return nil, nil
 }
 
-// IndexOf gets the index at which the first occurrence of value is found in array or return -1
-// if the value cannot be found
+// IndexOf 返回元素在切片中第一次出现的下标，未找到返回 -1
+// 参数:
+//   - in: 源切片
+//   - elem: 要查找的元素
+//
+// 返回值:
+//   - 元素首次出现的下标，未找到为 -1
+//
+// Example:
+// ```
+// // VARS: 查找元素下标
+// result = x.IndexOf([1, 2, 3], 2)
+// // STDOUT: 打印下标
+// println(result)   // OUT: 1
+// // assert: 不存在的元素返回 -1
+// assert x.IndexOf([1, 2, 3], 9) == -1, "missing element should return -1"
+// ```
 func IndexOf(in interface{}, elem interface{}) int {
 	inValue := reflect.ValueOf(in)
 
@@ -156,7 +171,23 @@ func LastIndexOf(in interface{}, elem interface{}) int {
 	return -1
 }
 
-// Contains returns true if an element is present in a iteratee.
+// Contains 判断元素是否存在于集合(切片/数组/map/字符串)中
+// 参数:
+//   - in: 源集合
+//   - elem: 要查找的元素
+//
+// 返回值:
+//   - 元素是否存在
+//
+// Example:
+// ```
+// // VARS: 判断元素是否存在
+// result = x.Contains([1, 2, 3], 2)
+// // STDOUT: 打印结果
+// println(result)   // OUT: true
+// // assert: 不存在的元素返回 false
+// assert x.Contains([1, 2, 3], 9) == false, "9 is not in the slice"
+// ```
 func Contains(in interface{}, elem interface{}) bool {
 	inValue := reflect.ValueOf(in)
 	elemValue := reflect.ValueOf(elem)
@@ -186,7 +217,23 @@ func Contains(in interface{}, elem interface{}) bool {
 	return false
 }
 
-// Every returns true if every element is present in a iteratee.
+// Every 判断给定的所有元素是否都存在于集合中
+// 参数:
+//   - in: 源集合
+//   - elements: 待检查的一个或多个元素
+//
+// 返回值:
+//   - 是否所有元素都存在于集合中
+//
+// Example:
+// ```
+// // VARS: 判断是否全部存在
+// result = x.Every([1, 2, 3], 1, 2)
+// // STDOUT: 打印结果
+// println(result)   // OUT: true
+// // assert: 含缺失元素时返回 false
+// assert x.Every([1, 2, 3], 1, 9) == false, "9 is missing so not every element is present"
+// ```
 func Every(in interface{}, elements ...interface{}) bool {
 	for _, elem := range elements {
 		if !Contains(in, elem) {
@@ -196,7 +243,23 @@ func Every(in interface{}, elements ...interface{}) bool {
 	return true
 }
 
-// Some returns true if atleast one element is present in an iteratee.
+// Some 判断给定的元素中是否至少有一个存在于集合中
+// 参数:
+//   - in: 源集合
+//   - elements: 待检查的一个或多个元素
+//
+// 返回值:
+//   - 是否至少有一个元素存在于集合中
+//
+// Example:
+// ```
+// // VARS: 判断是否存在任意一个
+// result = x.Some([1, 2, 3], 9, 2)
+// // STDOUT: 打印结果
+// println(result)   // OUT: true
+// // assert: 都不存在时返回 false
+// assert x.Some([1, 2, 3], 8, 9) == false, "neither 8 nor 9 is present"
+// ```
 func Some(in interface{}, elements ...interface{}) bool {
 	for _, elem := range elements {
 		if Contains(in, elem) {

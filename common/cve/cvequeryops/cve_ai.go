@@ -33,7 +33,18 @@ type CVEAICompleteConfig struct {
 // CVEAICompleteOption is a function type for configuring CVE AI completion
 type CVEAICompleteOption func(*CVEAICompleteConfig)
 
-// WithCVEAIConcurrent sets the number of concurrent workers for AI completion
+// WithCVEAIConcurrent 设置 AI 补全 CVE 字段时的并发数（导出名为 cve.aiConcurrent）
+// 参数:
+//   - n: 并发工作协程数
+//
+// 返回值:
+//   - CVE AI 补全可选项
+//
+// Example:
+// ```
+// // 示意性示例，需要 AI 配置与 CVE 数据库
+// err = cve.AICompleteFields(cve.aiConcurrent(5))
+// ```
 func WithCVEAIConcurrent(n int) CVEAICompleteOption {
 	return func(c *CVEAICompleteConfig) {
 		if n > 0 {
@@ -42,7 +53,18 @@ func WithCVEAIConcurrent(n int) CVEAICompleteOption {
 	}
 }
 
-// WithCVETestLimit sets the maximum number of CVEs to process (for testing)
+// WithCVETestLimit 限制 AI 补全处理的 CVE 数量，常用于测试（导出名为 cve.testLimit）
+// 参数:
+//   - n: 最大处理数量，0 表示不限制
+//
+// 返回值:
+//   - CVE AI 补全可选项
+//
+// Example:
+// ```
+// // 示意性示例，需要 AI 配置与 CVE 数据库
+// err = cve.AICompleteFields(cve.testLimit(10))
+// ```
 func WithCVETestLimit(n int) CVEAICompleteOption {
 	return func(c *CVEAICompleteConfig) {
 		if n > 0 {
@@ -66,13 +88,19 @@ type cveTranslationResult struct {
 	err     error
 }
 
-// CVEAICompleteFields uses AI to complete missing CVE fields like translations
-// Usage:
-//   - cve.AICompleteFields() - use default settings
-//   - cve.AICompleteFields(ai.type("openai")) - specify AI type
-//   - cve.AICompleteFields(cve.aiConcurrent(10)) - use 10 concurrent workers
-//   - cve.AICompleteFields(cve.testLimit(5)) - only process 5 CVEs for testing
-//   - cve.AICompleteFields(cve.aiConcurrent(10), cve.testLimit(5), ai.type("openai"))
+// CVEAICompleteFields 使用 AI 补全 CVE 缺失字段（如中文翻译，导出名为 cve.AICompleteFields）
+// 参数:
+//   - opts: 可选项，如 cve.aiConcurrent、cve.testLimit 或 ai.type 等 AI 配置
+//
+// 返回值:
+//   - 错误信息
+//
+// Example:
+// ```
+// // 示意性示例，需要 AI 配置与 CVE 数据库
+// err = cve.AICompleteFields(cve.aiConcurrent(10), cve.testLimit(5))
+// if err != nil { die(err) }
+// ```
 func CVEAICompleteFields(opts ...any) error {
 	// Parse options
 	config := &CVEAICompleteConfig{
@@ -322,8 +350,20 @@ func truncateString(s string, maxLen int) string {
 	return s[:maxLen] + "..."
 }
 
-// ExportCVE exports all CVE entries to a JSONL file
-// Each line is a JSON object representing a CVE entry
+// ExportCVE 将所有 CVE 条目导出为 JSONL 文件（导出名为 cve.Export）
+// 每行是一个表示 CVE 条目的 JSON 对象
+// 参数:
+//   - filename: 导出目标文件路径
+//
+// 返回值:
+//   - 错误信息
+//
+// Example:
+// ```
+// // 示意性示例，需要本地 CVE 数据库
+// err = cve.Export("/tmp/cve.jsonl")
+// if err != nil { die(err) }
+// ```
 func ExportCVE(filename string) error {
 	db := consts.GetGormCVEDatabase()
 	if db == nil {
@@ -354,8 +394,20 @@ func ExportCVE(filename string) error {
 	return nil
 }
 
-// ImportCVE imports CVE entries from a JSONL file
-// Each line should be a JSON object representing a CVE entry
+// ImportCVE 从 JSONL 文件导入 CVE 条目（导出名为 cve.Import）
+// 每行应为一个表示 CVE 条目的 JSON 对象
+// 参数:
+//   - filename: 导入源文件路径
+//
+// 返回值:
+//   - 错误信息
+//
+// Example:
+// ```
+// // 示意性示例，需要本地 CVE 数据库
+// err = cve.Import("/tmp/cve.jsonl")
+// if err != nil { die(err) }
+// ```
 func ImportCVE(filename string) error {
 	db := consts.GetGormCVEDatabase()
 	if db == nil {

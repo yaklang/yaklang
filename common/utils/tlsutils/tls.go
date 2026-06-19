@@ -255,7 +255,16 @@ func GenerateSelfSignedCertKeyWithCommonNameEx(commonName, org, host string, alt
 	return SelfSignCACertificateAndPrivateKey(commonName, WithSelfSign_SignTo(hosts...), WithSelfSign_EnableAuth(auth), WithSelfSign_PrivateKey(priv), WithSelfSign_Organization(org))
 }
 
-// SignX509ServerCertAndKey 根据给定的CA证书和私钥，生成服务器证书和密钥，返回PEM格式的服务器证书和密钥与错误
+// SignX509ServerCertAndKey 根据给定的 CA 证书和私钥，生成带客户端认证的服务器证书和密钥
+// 参数:
+//   - ca: PEM 格式的 CA 证书
+//   - key: PEM 格式的 CA 私钥
+//
+// 返回值:
+//   - PEM 格式的服务器证书
+//   - PEM 格式的服务器私钥
+//   - 错误信息，签发失败时返回非空
+//
 // Example:
 // ```
 // ca, key, err = tls.GenerateRootCA("yaklang.io")
@@ -265,7 +274,16 @@ func SignServerCrtNKey(ca []byte, key []byte) (cert []byte, sKey []byte, _ error
 	return SignServerCrtNKeyWithParams(ca, key, "Server", time.Now().Add(time.Hour*24*365*99), true)
 }
 
-// SignServerCertAndKey 根据给定的CA证书和私钥，生成不包含认证的服务器证书和密钥，返回PEM格式的服务器证书和密钥与错误
+// SignServerCertAndKey 根据给定的 CA 证书和私钥，生成不包含客户端认证的服务器证书和密钥
+// 参数:
+//   - ca: PEM 格式的 CA 证书
+//   - key: PEM 格式的 CA 私钥
+//
+// 返回值:
+//   - PEM 格式的服务器证书
+//   - PEM 格式的服务器私钥
+//   - 错误信息，签发失败时返回非空
+//
 // Example:
 // ```
 // ca, key, err = tls.GenerateRootCA("yaklang.io")
@@ -359,7 +377,16 @@ func SignServerCrtNKeyWithParams(ca []byte, key []byte, cn string, notAfter time
 	return certBuffer.Bytes(), keyBuffer.Bytes(), nil
 }
 
-// SignX509ClientCertAndKey 根据给定的CA证书和私钥，生成客户端证书和密钥，返回PEM格式的客户端证书和密钥与错误
+// SignX509ClientCertAndKey 根据给定的 CA 证书和私钥，生成带认证的客户端证书和密钥
+// 参数:
+//   - ca: PEM 格式的 CA 证书
+//   - key: PEM 格式的 CA 私钥
+//
+// 返回值:
+//   - PEM 格式的客户端证书
+//   - PEM 格式的客户端私钥
+//   - 错误信息，签发失败时返回非空
+//
 // Example:
 // ```
 // ca, key, err = tls.GenerateRootCA("yaklang.io")
@@ -369,7 +396,16 @@ func SignClientCrtNKey(ca, key []byte) ([]byte, []byte, error) {
 	return SignClientCrtNKeyWithParams(ca, key, "Client", time.Now().Add(time.Hour*24*365*99), true)
 }
 
-// SignClientCertAndKey 根据给定的CA证书和私钥，生成不包含认证的客户端证书和密钥，返回PEM格式的客户端证书和密钥与错误
+// SignClientCertAndKey 根据给定的 CA 证书和私钥，生成不包含认证的客户端证书和密钥
+// 参数:
+//   - ca: PEM 格式的 CA 证书
+//   - key: PEM 格式的 CA 私钥
+//
+// 返回值:
+//   - PEM 格式的客户端证书
+//   - PEM 格式的客户端私钥
+//   - 错误信息，签发失败时返回非空
+//
 // Example:
 // ```
 // ca, key, err = tls.GenerateRootCA("yaklang.io")
@@ -379,7 +415,12 @@ func SignClientCrtNKeyWithoutAuth(ca, key []byte) ([]byte, []byte, error) {
 	return SignClientCrtNKeyWithParams(ca, key, "Client", time.Now().Add(time.Hour*24*365*99), false)
 }
 
-// GenerateSM2KeyPair 生成SM2公私钥对，返回PEM格式公钥和私钥与错误
+// GenerateSM2KeyPair 生成 SM2 国密公私钥对
+// 返回值:
+//   - PEM 格式的公钥
+//   - PEM 格式的私钥
+//   - 错误信息，生成失败时返回非空
+//
 // Example:
 // ```
 // pub, pri, err := tls.GenerateSM2KeyPair()
@@ -417,7 +458,15 @@ func SM2GenerateKeyPair() ([]byte, []byte, error) {
 	return pubResults.Bytes(), priResult.Bytes(), nil
 }
 
-// GenerateRSAKeyPair 根据给定的bit大小生成RSA公私钥对，返回PEM格式公钥和私钥与错误
+// GenerateRSAKeyPair 根据给定的位大小生成 RSA 公私钥对
+// 参数:
+//   - bitSize: 密钥位数，如 1024、2048、4096
+//
+// 返回值:
+//   - PEM 格式的公钥
+//   - PEM 格式的私钥
+//   - 错误信息，生成失败时返回非空
+//
 // Example:
 // ```
 // pub, pri, err := tls.GenerateRSAKeyPair(2048)

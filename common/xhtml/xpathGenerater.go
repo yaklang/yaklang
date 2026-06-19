@@ -39,11 +39,25 @@ func _genXPATHForSimpleNode(origin *html.Node) string {
 }
 
 // GenerateXPath 根据节点引用生成一个节点的 XPath 路径
+// 参数:
+//   - node: 目标节点
+//
+// 返回值:
+//   - 该节点的 XPath 路径字符串
+//
 // Example:
 // ```
-// xhtml.Walker("<html><body><div>hello</div></body></html>", func(node) {
-// println(xhtml.GenerateXPath(node))
-// })
+// // VARS: 遍历并取出 div 节点的 XPath
+// xp = ""
+//
+//	xhtml.Walker("<html><body><div>x</div></body></html>", func(node) {
+//	    if node.Data == "div" {
+//	        xp = xhtml.GenerateXPath(node)
+//	    }
+//	})
+//
+// // assert: 生成的路径引用了 div 节点
+// assert str.Contains(xp, "div"), "generated xpath should reference the div node"
 // ```
 func GenerateXPath(node *html.Node) string {
 	var xpath string

@@ -297,6 +297,25 @@ func SimpleQuery(db *gorm.DB, query string, limit int, opts ...RAGSystemConfigOp
 	return vectorstore.SimpleQuery(db, query, limit, vectorstoreOptions...)
 }
 
+// QueryYakitProfile 在 Yakit Profile 数据库上执行 RAG 查询（导出名为 rag.Query）
+// 参数:
+//   - query: 查询文本
+//   - opts: 查询配置选项（集合、限制、增强等）
+//
+// 返回值:
+//   - 查询结果 channel
+//   - 错误信息
+//
+// Example:
+// ```
+// // 依赖本地数据库与嵌入服务（示意性示例）
+// results = rag.Query("how to use mitm plugin")~
+//
+//	for r := range results {
+//	    println(r.Document.Content)
+//	}
+//
+// ```
 func QueryYakitProfile(query string, opts ...RAGSystemConfigOption) (<-chan *RAGSearchResult, error) {
 	return Query(consts.GetGormProfileDatabase(), query, opts...)
 }

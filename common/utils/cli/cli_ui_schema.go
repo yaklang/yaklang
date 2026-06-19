@@ -81,6 +81,12 @@ type (
 // )
 // cli.check()
 // ```
+//
+// 参数:
+//   - params: 一个或多个 UISchema 选项，如 cli.uiGroups、cli.uiGlobalFieldPosition
+//
+// 返回值:
+//   - UISchema 对象
 func (c *CliApp) SetUISchema(params ...UISchemaParams) *UISchema {
 	return new(UISchema)
 }
@@ -105,6 +111,12 @@ func (c *CliApp) SetUISchema(params ...UISchemaParams) *UISchema {
 // )
 // cli.check()
 // ```
+//
+// 参数:
+//   - style: 全局字段位置，如 cli.uiPosDefault、cli.uiPosHorizontal
+//
+// 返回值:
+//   - UISchema 选项
 func (c *CliApp) SetUISchemaGlobalFieldPosition(style UISchemaFieldClassName) UISchemaParams {
 	return func(*uiSchemaParams) {}
 }
@@ -135,6 +147,12 @@ func (c *CliApp) SetUISchemaGlobalFieldPosition(style UISchemaFieldClassName) UI
 // )
 // cli.check()
 // ```
+//
+// 参数:
+//   - groups: 一个或多个分组（cli.uiGroup）
+//
+// 返回值:
+//   - UISchema 选项
 func (c *CliApp) SetUISchemaGroups(groups ...uiSchemaGroup) UISchemaParams {
 	return func(*uiSchemaParams) {}
 }
@@ -165,6 +183,12 @@ func (c *CliApp) SetUISchemaGroups(groups ...uiSchemaGroup) UISchemaParams {
 // )
 // cli.check()
 // ```
+//
+// 参数:
+//   - fields: 一个或多个字段（cli.uiField）
+//
+// 返回值:
+//   - 分组对象
 func (c *CliApp) NewUISchemaGroup(fields ...uiSchemaField) *uiSchemaGroup {
 	return new(uiSchemaGroup)
 }
@@ -198,6 +222,14 @@ func (c *CliApp) NewUISchemaGroup(fields ...uiSchemaField) *uiSchemaGroup {
 // )
 // cli.check()
 // ```
+//
+// 参数:
+//   - name: 字段名
+//   - widthPercent: 字段所占宽度比（0.0-1.0）
+//   - opts: 零个或多个字段选项，如 cli.uiFieldWidget、cli.uiFieldGroups
+//
+// 返回值:
+//   - 字段对象
 func (c *CliApp) NewUISchemaField(name string, widthPercent float64, opts ...UISchemaFieldParams) *uiSchemaField {
 	return new(uiSchemaField)
 }
@@ -243,6 +275,14 @@ func (c *CliApp) NewUISchemaField(name string, widthPercent float64, opts ...UIS
 // )
 // cli.check()
 // ```
+//
+// 参数:
+//   - name: 字段名
+//   - width: 字段所占宽度
+//   - opts: 零个或多个字段选项，如 cli.uiFieldWidget、cli.uiFieldGroups
+//
+// 返回值:
+//   - 表格字段对象
 func (c *CliApp) NewUISchemaTableField(name string, width float64, opts ...UISchemaFieldParams) *uiSchemaField {
 	return new(uiSchemaField)
 }
@@ -273,10 +313,27 @@ func (c *CliApp) NewUISchemaTableField(name string, width float64, opts ...UISch
 // )
 // cli.check()
 // ```
+//
+// 参数:
+//   - position: 字段位置，如 cli.uiPosDefault、cli.uiPosHorizontal
+//
+// 返回值:
+//   - 字段选项
 func (c *CliApp) SetUISchemaFieldPosition(position UISchemaFieldClassName) UISchemaFieldParams {
 	return func(*uiSchemaField) {}
 }
 
+// SetUISchemaFieldStyle 设置 UISchema 中某个字段的 CSS 样式
+// 参数:
+//   - css: CSS 样式 map
+//
+// 返回值:
+//   - 字段选项
+//
+// Example:
+// ```
+// cli.uiField("name", 1, cli.SetUISchemaFieldStyle({"width": "50%"}))
+// ```
 func (c *CliApp) SetUISchemaFieldStyle(css map[string]any) UISchemaFieldParams {
 	return func(*uiSchemaField) {}
 }
@@ -311,6 +368,12 @@ func (c *CliApp) SetUISchemaFieldStyle(css map[string]any) UISchemaFieldParams {
 // )
 // cli.check()
 // ```
+//
+// 参数:
+//   - css: CSS 样式 map
+//
+// 返回值:
+//   - 字段选项
 func (c *CliApp) SetUISchemaFieldComponentStyle(css map[string]any) UISchemaFieldParams {
 	return func(*uiSchemaField) {}
 }
@@ -341,6 +404,12 @@ func (c *CliApp) SetUISchemaFieldComponentStyle(css map[string]any) UISchemaFiel
 // )
 // cli.check()
 // ```
+//
+// 参数:
+//   - widget: 组件类型，如 cli.uiWidgetPassword、cli.uiWidgetTable
+//
+// 返回值:
+//   - 字段选项
 func (c *CliApp) SetUISchemaFieldWidget(widget UISchemaWidgetType) UISchemaFieldParams {
 	return func(*uiSchemaField) {}
 }
@@ -380,6 +449,12 @@ func (c *CliApp) SetUISchemaFieldWidget(widget UISchemaWidgetType) UISchemaField
 // )
 // cli.check()
 // ```
+//
+// 参数:
+//   - groups: 一个或多个嵌套分组（cli.uiGroup）
+//
+// 返回值:
+//   - 字段选项
 func (c *CliApp) SetUISchemaInnerGroups(groups ...uiSchemaGroup) UISchemaFieldParams {
 	return func(*uiSchemaField) {}
 }

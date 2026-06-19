@@ -1,12 +1,17 @@
 package utils
 
 import (
+	"sync"
 	"time"
 )
 
 type CacheWithKey[U comparable, T any] struct {
 	*CacheExWithKey[U, T]
-	expireCallback expireCallbackWithoutReason[U, T]
+	// expireCallbackMu protects expireCallback, which is written by
+	// SetExpirationCallback and read by the underlying cache's eviction callback
+	// running on a background goroutine.
+	expireCallbackMu sync.RWMutex
+	expireCallback   expireCallbackWithoutReason[U, T]
 }
 
 type Cache[T any] struct {
@@ -18,7 +23,16 @@ type expireCallbackWithoutReason[U comparable, T any] func(key U, value T)
 
 // SetExpirationCallback sets a callback that will be called when an item expires
 func (cache *CacheWithKey[U, T]) SetExpirationCallback(callback expireCallbackWithoutReason[U, T]) {
+	cache.expireCallbackMu.Lock()
 	cache.expireCallback = callback
+	cache.expireCallbackMu.Unlock()
+}
+
+// getExpireCallback returns the expiration callback in a thread-safe way.
+func (cache *CacheWithKey[U, T]) getExpireCallback() expireCallbackWithoutReason[U, T] {
+	cache.expireCallbackMu.RLock()
+	defer cache.expireCallbackMu.RUnlock()
+	return cache.expireCallback
 }
 
 // GetOrLoad attempts to retrieve data from the cache for the given key.
@@ -46,8 +60,8 @@ func NewTTLCacheWithKey[U comparable, T any](ttls ...time.Duration) *CacheWithKe
 		if reason != EvictionReasonExpired {
 			return
 		}
-		if ret.expireCallback != nil {
-			ret.expireCallback(key, value)
+		if cb := ret.getExpireCallback(); cb != nil {
+			cb(key, value)
 		}
 	})
 	return ret
@@ -67,8 +81,8 @@ func NewLRUCacheWithKey[U comparable, T any](capacity uint64) *CacheWithKey[U, T
 		if reason != EvictionReasonCapacityReached {
 			return
 		}
-		if ret.expireCallback != nil {
-			ret.expireCallback(key, value)
+		if cb := ret.getExpireCallback(); cb != nil {
+			cb(key, value)
 		}
 	})
 

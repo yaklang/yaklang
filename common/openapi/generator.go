@@ -10,13 +10,26 @@ import (
 	"strconv"
 )
 
-// GenerateHTTPFlows means generate yakit.HTTPFlow via openapi2/3 scheme
-// use WithFlowHandler to recv and handle it
-// Example:
+// GenerateHTTPFlows 根据 OpenAPI 2.0/3.0 文档生成对应的 HTTP 请求流
+// 自动尝试按 OpenAPI 2 与 OpenAPI 3 解析，通过 openapi.flowHandler 接收每个生成的流
+// 参数:
+//   - doc: OpenAPI 文档内容（JSON 或 YAML）
+//   - opt: 可选项，如 openapi.flowHandler / openapi.domain / openapi.https
 //
-//	openapi.Generate(fileName, openapi.flowHandler(flow => {
-//		dump(flow.Url)
+// 返回值:
+//   - 错误信息
+//
+// Example:
+// ```
+// // 示意性示例，需提供真实 OpenAPI 文档
+// doc = file.ReadFile("openapi.yaml")~
+//
+//	err = openapi.GenerateHTTPFlows(string(doc), openapi.flowHandler(func(flow) {
+//	    println(flow.Url)
 //	}))
+//
+// if err != nil { die(err) }
+// ```
 func GenerateHTTPFlows(doc string, opt ...Option) error {
 	defer func() {
 		if err := recover(); err != nil {
@@ -37,11 +50,22 @@ func GenerateHTTPFlows(doc string, opt ...Option) error {
 	return nil
 }
 
-// ExtractOpenAPI3Scheme fetch openapi3 scheme from yakit.HTTPFlows
-// Example:
+// ExtractOpenAPI3Scheme 从数据库中已记录的 HTTP 流量提取指定域名的 OpenAPI3 文档
+// 依赖本地项目数据库中已抓取的流量数据
+// 参数:
+//   - domain: 目标域名
 //
-// scheme := openapi.ExtractOpenAPI3Scheme(domain)~
+// 返回值:
+//   - 提取出的 OpenAPI3 文档对象
+//   - 错误信息
+//
+// Example:
+// ```
+// // 示意性示例，需要本地项目数据库中已有该域名的流量
+// scheme = openapi.ExtractOpenAPI3Scheme("example.com")~
 // schemeJSON = scheme.MarshalJSON()~
+// println(string(schemeJSON))
+// ```
 func ExtractOpenAPI3Scheme(domain string) (*openapi3.T, error) {
 	var err error
 	db := consts.GetGormProjectDatabase()

@@ -248,7 +248,8 @@ func WithActionTagToKey(tagName string, key string) ActionMakerOption {
 // tagName, 不会扩散到其他 LoopAITagField (USER_QUERY 等仍只走 m.nonce).
 //
 // 关键词: WithActionTagToKeyAndExtraNonces, ActionMaker 多 nonce 候选,
-//        双注册, [current-nonce] 占位符, 精准覆盖
+//
+//	双注册, [current-nonce] 占位符, 精准覆盖
 func WithActionTagToKeyAndExtraNonces(tagName string, key string, extraNonces ...string) ActionMakerOption {
 	return func(maker *ActionMaker) {
 		if maker.tagToKey == nil {
@@ -552,7 +553,22 @@ func ExtractValidActionFromStream(ctx context.Context, reader io.Reader, actionN
 	return action, nil
 }
 
-// ExtractAction 从字符串中提取指定的 Action 对象，支持别名，这里隐含一个强校验行为，即会等待处理完毕之后检查是否有可用的Action
+// ExtractAction 从字符串中提取指定的 Action 对象，支持别名，这里隐含一个强校验行为，即会等待处理完毕之后检查是否有可用的Action（导出名为 aiagent.ExtractAction）
+// 参数:
+//   - i: 包含 action 的原始文本
+//   - actionName: 期望的 action 名称
+//   - alias: 可选的 action 别名
+//
+// 返回值:
+//   - 解析出的 Action 对象
+//   - 错误信息
+//
+// Example:
+// ```
+// raw = `{"@action": "object", "value": "hello"}`
+// action = aiagent.ExtractAction(raw, "object")~
+// dump(action)
+// ```
 func ExtractAction(i string, actionName string, alias ...string) (*Action, error) {
 	action, err := ExtractActionFromStream(context.Background(), strings.NewReader(i), actionName, WithActionAlias(alias...))
 	if err != nil {

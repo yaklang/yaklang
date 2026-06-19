@@ -32,6 +32,22 @@ func NewSRTManagerFromContent(srtContent string) (*SRTManager, error) {
 }
 
 // NewSRTManagerFromFile creates a new SRT manager from an SRT file
+// NewSRTManagerFromFile 从 SRT 字幕文件创建字幕管理器（导出名为 whisper.CreateSRTManager）
+// 字幕管理器可按时间偏移检索字幕内容、遍历字幕条目等
+// 参数:
+//   - srtFilePath: SRT 字幕文件路径
+//
+// 返回值:
+//   - 字幕管理器对象
+//   - 错误信息
+//
+// Example:
+// ```
+// // 示意性示例，需要真实的 SRT 字幕文件
+// srt = whisper.CreateSRTManager("subtitle.srt")~
+// r = srt.GetSRTContextByOffsetSeconds(30, 10)
+// dump(r)
+// ```
 func NewSRTManagerFromFile(srtFilePath string) (*SRTManager, error) {
 	content, err := os.ReadFile(srtFilePath)
 	if err != nil {

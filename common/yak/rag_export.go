@@ -149,6 +149,20 @@ var RagExports = map[string]interface{}{
 	"dbQueryCtx":         _dbQueryCtx,         // 设置上下文
 }
 
+// BuildIndexKnowledgeFromFile 从文件构建带索引的知识库条目（导出名为 rag.BuildIndexKnowledgeFromFile）
+// 参数:
+//   - kbName: 知识库名称
+//   - path: 文件路径
+//   - option: 可选配置（chunkSize、并发等）
+//
+// 返回值:
+//   - 错误信息
+//
+// Example:
+// ```
+// // 依赖本地数据库与嵌入服务（示意性示例）
+// rag.BuildIndexKnowledgeFromFile("my-kb", "/tmp/doc.txt")~
+// ```
 func BuildIndexKnowledgeFromFile(kbName string, path string, option ...any) error {
 	entries, err := aiforge.BuildIndexKnowledgeFromFile(kbName, path, option...)
 	if err != nil {
@@ -160,6 +174,17 @@ func BuildIndexKnowledgeFromFile(kbName string, path string, option ...any) erro
 	return nil
 }
 
+// _lazyEmbedding 设置是否延迟加载嵌入客户端（导出名为 rag.lazyEmbedding）
+// 参数:
+//   - lazy: 是否延迟加载，缺省为 true
+//
+// 返回值:
+//   - RAG 系统配置选项
+//
+// Example:
+// ```
+// db = rag.Get("my-rag", rag.lazyEmbedding(true))~
+// ```
 func _lazyEmbedding(lazy ...bool) rag.RAGSystemConfigOption {
 	if len(lazy) > 0 {
 		return rag.WithLazyLoadEmbeddingClient(lazy[0])
@@ -171,10 +196,14 @@ func _lazyEmbedding(lazy ...bool) rag.RAGSystemConfigOption {
 // It generates 5-10 search questions that users might ask to find this content,
 // and stores the original content as the knowledge entry.
 //
-// Parameters:
-//   - kbName: the knowledge base name
-//   - text: the content to index (e.g., tool description, usage, parameters)
-//   - options: optional configuration (rag options, AI options, etc.)
+// 参数:
+//   - kbName: 知识库名称
+//   - text: 待索引的内容（如工具描述、用法、参数）
+//   - option: 可选配置（rag 选项、AI 选项等）
+//
+// 返回值:
+//   - 搜索索引结果（含生成的问题列表与 EntryID）
+//   - 错误信息
 //
 // The function will:
 // 1. Use AI to generate 5-10 search questions based on the text
@@ -206,10 +235,14 @@ func BuildSearchIndexKnowledge(kbName string, text string, option ...any) (*aifo
 // BuildSearchIndexKnowledgeFromFile builds a search index from a file.
 // It reads the file content and calls BuildSearchIndexKnowledge.
 //
-// Parameters:
-//   - kbName: the knowledge base name
-//   - filename: the path to the file containing the content to index
-//   - options: optional configuration (rag options, AI options, etc.)
+// 参数:
+//   - kbName: 知识库名称
+//   - filename: 待索引内容所在的文件路径
+//   - option: 可选配置（rag 选项、AI 选项等）
+//
+// 返回值:
+//   - 搜索索引结果（含生成的问题列表与 EntryID）
+//   - 错误信息
 //
 // Example:
 // ```yak
@@ -231,9 +264,12 @@ func BuildSearchIndexKnowledgeFromFile(kbName string, filename string, option ..
 // _setSearchMeta 快捷设置搜索元数据 (search_type 和 search_target)
 // 用于同时设置 search_type 和 search_target 两个元数据字段
 //
-// Parameters:
+// 参数:
 //   - searchType: 搜索类型，例如 "AI工具", "Yak插件", "aiforge/模版/技能" 等
 //   - searchTarget: 搜索目标，例如插件名称、工具名称等
+//
+// 返回值:
+//   - RAG 系统配置选项
 //
 // Example:
 // ```yak
@@ -247,6 +283,12 @@ func _setSearchMeta(searchType string, searchTarget string) rag.RAGSystemConfigO
 }
 
 // _noEntityRepository 禁用实体仓库
+// 参数:
+//   - 无
+//
+// 返回值:
+//   - RAG 系统配置选项
+//
 // Example:
 // ```
 //
@@ -258,6 +300,12 @@ func _noEntityRepository() rag.RAGSystemConfigOption {
 }
 
 // _noKnowledgeBase 禁用知识库
+// 参数:
+//   - 无
+//
+// 返回值:
+//   - RAG 系统配置选项
+//
 // Example:
 // ```
 //
@@ -269,6 +317,12 @@ func _noKnowledgeBase() rag.RAGSystemConfigOption {
 }
 
 // _deleteCollection 删除指定的 RAG 集合
+// 参数:
+//   - name: 集合名称
+//
+// 返回值:
+//   - 错误信息
+//
 // Example:
 // ```
 //
@@ -280,6 +334,12 @@ func _deleteCollection(name string) error {
 }
 
 // _listRAG 列出所有 RAG 系统列表
+// 参数:
+//   - 无
+//
+// 返回值:
+//   - RAG 系统名称列表
+//
 // Example:
 // ```
 //
@@ -291,6 +351,12 @@ func _listRAG() []string {
 }
 
 // _deleteRAG 删除指定的 RAG 系统
+// 参数:
+//   - name: RAG 系统名称
+//
+// 返回值:
+//   - 错误信息
+//
 // Example:
 // ```
 //
@@ -304,6 +370,12 @@ func _deleteRAG(name string) error {
 
 // _deleteKnowledgeBase 删除指定的知识库及其关联的 RAG 内容
 // 包括: RAG 向量库、RAG 集合综述库、知识库条目库、知识库集合、问题索引库等
+// 参数:
+//   - name: 知识库名称
+//
+// 返回值:
+//   - 错误信息
+//
 // Example:
 // ```
 //
@@ -316,6 +388,12 @@ func _deleteKnowledgeBase(name string) error {
 
 // _deleteAllKnowledgeBase 删除所有知识库及其关联的 RAG 内容
 // 清空所有: RAG 向量库、RAG 集合综述库、知识库条目库、知识库集合、问题索引库等
+// 参数:
+//   - 无
+//
+// 返回值:
+//   - 错误信息
+//
 // Example:
 // ```
 //
@@ -327,6 +405,12 @@ func _deleteAllKnowledgeBase() error {
 }
 
 // _embeddingHandle 创建自定义嵌入处理器
+// 参数:
+//   - handle: 文本到向量的转换回调函数
+//
+// 返回值:
+//   - RAG 系统配置选项
+//
 // Example:
 // ```
 //
@@ -351,6 +435,12 @@ func _embeddingHandle(handle func(text string) any) rag.RAGSystemConfigOption {
 }
 
 // _listCollection 获取所有 RAG 集合列表
+// 参数:
+//   - 无
+//
+// 返回值:
+//   - 集合名称列表
+//
 // Example:
 // ```
 //
@@ -362,6 +452,13 @@ func _listCollection() []string {
 }
 
 // _getCollectionInfo 获取指定集合的详细信息
+// 参数:
+//   - name: 集合名称
+//
+// 返回值:
+//   - 集合详细信息对象
+//   - 错误信息
+//
 // Example:
 // ```
 //
@@ -373,6 +470,12 @@ func _getCollectionInfo(name string) (*vectorstore.CollectionInfo, error) {
 }
 
 // _hasCollection 检查指定集合是否存在
+// 参数:
+//   - name: 集合名称
+//
+// 返回值:
+//   - 是否存在
+//
 // Example:
 // ```
 //
@@ -384,6 +487,16 @@ func _hasCollection(name string) bool {
 }
 
 // _addDocument 向指定集合添加文档
+// 参数:
+//   - knowledgeBaseName: 知识库/集合名称
+//   - documentName: 文档名称
+//   - document: 文档内容
+//   - metadata: 文档元数据键值对
+//   - opts: 可选的 RAG 系统配置选项
+//
+// 返回值:
+//   - 错误信息
+//
 // Example:
 // ```
 //
@@ -395,6 +508,14 @@ func _addDocument(knowledgeBaseName, documentName string, document string, metad
 }
 
 // _deleteDocument 从指定集合删除文档
+// 参数:
+//   - knowledgeBaseName: 知识库/集合名称
+//   - documentName: 文档名称
+//   - opts: 可选的 RAG 系统配置选项
+//
+// 返回值:
+//   - 错误信息
+//
 // Example:
 // ```
 //
@@ -406,6 +527,16 @@ func _deleteDocument(knowledgeBaseName, documentName string, opts ...rag.RAGSyst
 }
 
 // _queryDocuments 在指定集合中查询文档
+// 参数:
+//   - knowledgeBaseName: 知识库/集合名称
+//   - query: 查询文本
+//   - limit: 返回结果数量上限
+//   - opts: 可选的 RAG 系统配置选项
+//
+// 返回值:
+//   - 搜索结果列表
+//   - 错误信息
+//
 // Example:
 // ```
 //
@@ -417,6 +548,13 @@ func _queryDocuments(knowledgeBaseName, query string, limit int, opts ...rag.RAG
 }
 
 // _newTempRagDatabase 创建临时 RAG 数据库
+// 参数:
+//   - 无
+//
+// 返回值:
+//   - 数据库连接对象
+//   - 错误信息
+//
 // Example:
 // ```
 //
@@ -428,7 +566,13 @@ func _newTempRagDatabase() (*gorm.DB, error) {
 	return vectorstore.NewVectorStoreDatabase(path)
 }
 
-// _enableMockMode 启用模拟模式
+// _enableMockMode 启用模拟模式（使用 mock 嵌入服务，便于测试）
+// 参数:
+//   - 无
+//
+// 返回值:
+//   - 无
+//
 // Example:
 // ```
 //
@@ -441,6 +585,13 @@ func _enableMockMode() {
 
 // _embedding 生成文本的嵌入向量
 // 使用默认的嵌入服务生成文本的向量表示（优先使用在线服务，回退到本地服务）
+// 参数:
+//   - text: 待嵌入的文本
+//
+// 返回值:
+//   - 嵌入向量（[]float32）
+//   - 错误信息
+//
 // Example:
 // ```
 //
@@ -457,6 +608,13 @@ func _embedding(text string) ([]float32, error) {
 
 // _localEmbedding 使用本地嵌入服务生成文本的向量表示
 // 本地服务需要安装本地模型（如 Qwen3-Embedding-0.6B-Q4_K_M）
+// 参数:
+//   - text: 待嵌入的文本
+//
+// 返回值:
+//   - 嵌入向量（[]float32，维度 1024）
+//   - 错误信息
+//
 // Example:
 // ```
 //
@@ -477,6 +635,13 @@ func _localEmbedding(text string) ([]float32, error) {
 
 // _onlineEmbedding 使用在线嵌入服务生成文本的向量表示
 // 使用 AIBalance 免费在线服务，无需安装本地模型
+// 参数:
+//   - text: 待嵌入的文本
+//
+// 返回值:
+//   - 嵌入向量（[]float32，维度 1024）
+//   - 错误信息
+//
 // Example:
 // ```
 //
@@ -492,6 +657,12 @@ func _onlineEmbedding(text string) ([]float32, error) {
 }
 
 // _queryCollections 指定查询的多个集合名称
+// 参数:
+//   - names: 一个或多个集合名称
+//
+// 返回值:
+//   - RAG 系统配置选项
+//
 // Example:
 // ```
 //
@@ -504,6 +675,12 @@ func _queryCollections(names ...string) rag.RAGSystemConfigOption {
 
 // _queryRAGFilename 从 RAG 文件导入后查询（自动导入）
 // 适合法规条文、技术规范等精确搜索场景
+// 参数:
+//   - filename: RAG 文件路径
+//
+// 返回值:
+//   - RAG 系统配置选项
+//
 // Example:
 // ```
 //
@@ -569,6 +746,14 @@ func _queryRAGFilename(filename string) rag.RAGSystemConfigOption {
 //	)~
 //
 // ```
+//
+// 参数:
+//   - query: 查询文本
+//   - opts: 查询配置选项（集合、限制、增强等）
+//
+// 返回值:
+//   - 查询结果 channel
+//   - 错误信息
 func _query(query string, opts ...rag.RAGSystemConfigOption) (<-chan *rag.RAGSearchResult, error) {
 	return rag.QueryYakitProfile(query, opts...)
 }

@@ -154,6 +154,13 @@ func SetHTTPPacketUrl(packet []byte, rawURL string) []byte {
 }
 
 // ReplaceHTTPPacketFirstLine 是一个辅助，用于改变请求报文，修改第一行（即请求方法，请求路径，协议版本）
+// 参数:
+//   - packet: 原始 HTTP 请求报文字节数组
+//   - firstLine: 新的请求行，如 "GET /test HTTP/1.1"
+//
+// 返回值:
+//   - 修改后的 HTTP 请求报文字节数组
+//
 // Example:
 // ```
 // poc.ReplaceHTTPPacketFirstLine(`GET / HTTP/1.1
@@ -170,6 +177,13 @@ func ReplaceHTTPPacketFirstLine(packet []byte, firstLine string) []byte {
 }
 
 // ReplaceHTTPPacketMethod 是一个辅助函数，用于改变请求报文，修改请求方法
+// 参数:
+//   - packet: 原始 HTTP 请求报文字节数组
+//   - newMethod: 新的请求方法，如 GET、POST
+//
+// 返回值:
+//   - 修改后的 HTTP 请求报文字节数组
+//
 // Example:
 // ```
 // poc.ReplaceHTTPPacketMethod(poc.BasicRequest(), "OPTIONS") // 修改请求方法为OPTIONS
@@ -218,6 +232,13 @@ func ReplaceHTTPPacketMethod(packet []byte, newMethod string) []byte {
 }
 
 // ReplaceHTTPPacketPath 是一个辅助函数，用于改变请求报文，修改请求路径
+// 参数:
+//   - packet: 原始 HTTP 请求报文字节数组
+//   - p: 新的请求路径
+//
+// 返回值:
+//   - 修改后的 HTTP 请求报文字节数组
+//
 // Example:
 // ```
 // poc.ReplaceHTTPPacketPath(poc.BasicRequest(), "/get") // 修改请求路径为/get
@@ -230,6 +251,19 @@ func ReplaceHTTPPacketPathWithoutEncoding(packet []byte, p string) []byte {
 	return handleHTTPPacketPath(packet, true, p)
 }
 
+// ReplaceHTTPPacketPathFunc 是一个辅助函数，使用回调改变请求报文中的请求路径
+// 参数:
+//   - packet: 原始 HTTP 请求报文字节数组
+//   - callback: 路径处理回调函数，参数为原路径，返回新路径
+//
+// 返回值:
+//   - 修改后的 HTTP 请求报文字节数组
+//
+// Example:
+// ```
+// raw = poc.ReplaceHTTPPacketPathFunc(poc.BasicRequest(), func(p) { return "/get" })
+// dump(raw)
+// ```
 func ReplaceHTTPPacketPathFunc(packet []byte, callback func(originPath string) string) []byte {
 	return handleHTTPPacketPathWithCallback(packet, false, callback)
 }
@@ -289,6 +323,13 @@ func handleHTTPPacketPath(packet []byte, noAutoEncode bool, p string) []byte {
 }
 
 // AppendHTTPPacketPath 是一个辅助函数，用于改变请求报文，在现有请求路径后添加请求路径
+// 参数:
+//   - packet: 原始 HTTP 请求报文字节数组
+//   - p: 要追加到现有路径后的路径片段
+//
+// 返回值:
+//   - 修改后的 HTTP 请求报文字节数组
+//
 // Example:
 // ```
 // poc.AppendHTTPPacketPath(`GET /docs HTTP/1.1
@@ -372,6 +413,13 @@ func handleHTTPPacketQueryParam(packet []byte, noAutoEncode bool, callback func(
 }
 
 // ReplaceAllHTTPPacketQueryParams 是一个辅助函数，用于改变请求报文，修改所有 GET 请求参数，如果不存在则会增加，其接收一个 map[string]string 类型的参数，其中 key 为请求参数名，value 为请求参数值
+// 参数:
+//   - packet: 原始 HTTP 请求报文字节数组
+//   - values: GET 请求参数键值对表，会替换所有 GET 参数
+//
+// 返回值:
+//   - 修改后的 HTTP 请求报文字节数组
+//
 // Example:
 // ```
 // poc.ReplaceAllHTTPPacketQueryParams(poc.BasicRequest(), {"a":"b", "c":"d"}) // 添加GET请求参数a，值为b，添加GET请求参数c，值为d
@@ -384,6 +432,13 @@ func ReplaceAllHTTPPacketQueryParams(packet []byte, values map[string]string) []
 
 // ReplaceAllHTTPPacketQueryParamsWithoutEscape 是一个辅助函数，用于改变请求报文，修改所有 GET 请求参数，如果不存在则会增加，其接收一个 map[string]string 类型的参数，其中 key 为请求参数名，value 为请求参数值
 // 与 poc.ReplaceAllHTTPPacketQueryParams 类似，但是不会将参数值进行转义
+// 参数:
+//   - packet: 原始 HTTP 请求报文字节数组
+//   - values: GET 请求参数键值对表（值不做 URL 转义）
+//
+// 返回值:
+//   - 修改后的 HTTP 请求报文字节数组
+//
 // Example:
 // ```
 // poc.ReplaceAllHTTPPacketQueryParamsWithoutEscape(poc.BasicRequest(), {"a":"b", "c":"d"}) // 添加GET请求参数a，值为b，添加GET请求参数c，值为d
@@ -401,6 +456,14 @@ func ReplaceFullHTTPPacketQueryParamsWithoutEscape(packet []byte, values map[str
 }
 
 // ReplaceHTTPPacketQueryParam 是一个辅助函数，用于改变请求报文，修改GET请求参数，如果不存在则会增加
+// 参数:
+//   - packet: 原始 HTTP 请求报文字节数组
+//   - key: GET 请求参数名
+//   - value: GET 请求参数值
+//
+// 返回值:
+//   - 修改后的 HTTP 请求报文字节数组
+//
 // Example:
 // ```
 // _, raw, _ = poc.ParseUrlToHTTPRequestRaw("GET", "https://pie.dev/get")
@@ -414,6 +477,14 @@ func ReplaceHTTPPacketQueryParam(packet []byte, key, value string) []byte {
 
 // ReplaceHTTPPacketQueryParamWithoutEscape 是一个辅助函数，用于改变请求报文，修改所有 GET 请求参数，如果不存在则会增加，其接收一个 map[string]string 类型的参数，其中 key 为请求参数名，value 为请求参数值
 // 与 poc.ReplaceHTTPPacketQueryParam 类似，但是不会将参数值进行转义
+// 参数:
+//   - packet: 原始 HTTP 请求报文字节数组
+//   - key: GET 请求参数名
+//   - value: GET 请求参数值（不做 URL 转义）
+//
+// 返回值:
+//   - 修改后的 HTTP 请求报文字节数组
+//
 // Example:
 // ```
 // poc.ReplaceAllHTTPPacketQueryParamsWithoutEscape(poc.BasicRequest(), "a", "b") // 添加GET请求参数a，值为b
@@ -477,6 +548,14 @@ func ReplaceHTTPPacketQueryParamRaw(packet []byte, rawQuery string) []byte {
 }
 
 // AppendHTTPPacketQueryParam 是一个辅助函数，用于改变请求报文，添加GET请求参数
+// 参数:
+//   - packet: 原始 HTTP 请求报文字节数组
+//   - key: GET 请求参数名
+//   - value: GET 请求参数值
+//
+// 返回值:
+//   - 修改后的 HTTP 请求报文字节数组
+//
 // Example:
 // ```
 // poc.AppendHTTPPacketQueryParam(poc.BasicRequest(), "a", "b") // 添加GET请求参数a，值为b
@@ -502,6 +581,13 @@ func AppendAllHTTPPacketQueryParam(packet []byte, Params map[string][]string) []
 }
 
 // DeleteHTTPPacketQueryParam 是一个辅助函数，用于改变请求报文，删除GET请求参数
+// 参数:
+//   - packet: 原始 HTTP 请求报文字节数组
+//   - key: 要删除的 GET 请求参数名
+//
+// 返回值:
+//   - 修改后的 HTTP 请求报文字节数组
+//
 // Example:
 // ```
 // poc.DeleteHTTPPacketQueryParam(`GET /get?a=b&c=d HTTP/1.1
@@ -606,6 +692,13 @@ func reconstructJSONBody(headersRaw string, u *QueryParams) []byte {
 }
 
 // ReplaceAllHTTPPacketPostParams 是一个辅助函数，用于改变请求报文，修改所有 POST 请求参数，如果不存在则会增加，其接收一个 map[string]string 类型的参数，其中 key 为 POST 请求参数名，value 为 POST 请求参数值
+// 参数:
+//   - packet: 原始 HTTP 请求报文字节数组
+//   - values: POST 请求参数键值对表，会替换所有 POST 参数
+//
+// 返回值:
+//   - 修改后的 HTTP 请求报文字节数组
+//
 // Example:
 // ```
 // _, raw, _ = poc.ParseUrlToHTTPRequestRaw("POST", "https://pie.dev/post")
@@ -619,6 +712,13 @@ func ReplaceAllHTTPPacketPostParams(packet []byte, values map[string]string) []b
 
 // ReplaceAllHTTPPacketPostParamsWithoutEscape 是一个辅助函数，用于改变请求报文，修改所有 POST 请求参数，如果不存在则会增加，其接收一个 map[string]string 类型的参数，其中 key 为 POST 请求参数名，value 为 POST 请求参数值
 // 与 poc.ReplaceAllHTTPPacketPostParams 类似，但是不会将参数值进行转义
+//
+// 参数:
+//   - packet: 原始 HTTP 请求报文字节数组
+//   - values: POST 请求参数键值对表（值不做 URL 转义）
+//
+// 返回值:
+//   - 修改后的 HTTP 请求报文字节数组
 //
 // Example:
 // ```
@@ -638,6 +738,14 @@ func ReplaceFullHTTPPacketPostParamsWithoutEscape(packet []byte, values map[stri
 }
 
 // ReplaceHTTPPacketPostParam 是一个辅助函数，用于改变请求报文，修改POST请求参数，如果不存在则会增加
+// 参数:
+//   - packet: 原始 HTTP 请求报文字节数组
+//   - key: POST 请求参数名
+//   - value: POST 请求参数值
+//
+// 返回值:
+//   - 修改后的 HTTP 请求报文字节数组
+//
 // Example:
 // ```
 // _, raw, _ = poc.ParseUrlToHTTPRequestRaw("POST", "https://pie.dev/post")
@@ -668,6 +776,14 @@ func ReplaceHTTPPacketPostParamWithoutEncoding(packet []byte, key, value string,
 }
 
 // AppendHTTPPacketPostParam 是一个辅助函数，用于改变请求报文，添加POST请求参数
+// 参数:
+//   - packet: 原始 HTTP 请求报文字节数组
+//   - key: POST 请求参数名
+//   - value: POST 请求参数值
+//
+// 返回值:
+//   - 修改后的 HTTP 请求报文字节数组
+//
 // Example:
 // ```
 // poc.AppendHTTPPacketPostParam(poc.BasicRequest(), "a", "b") // 向 pie.dev 发起请求，添加POST请求参数a，值为b
@@ -679,6 +795,13 @@ func AppendHTTPPacketPostParam(packet []byte, key, value string) []byte {
 }
 
 // DeleteHTTPPacketPostParam 是一个辅助函数，用于改变请求报文，删除POST请求参数
+// 参数:
+//   - packet: 原始 HTTP 请求报文字节数组
+//   - key: 要删除的 POST 请求参数名
+//
+// 返回值:
+//   - 修改后的 HTTP 请求报文字节数组
+//
 // Example:
 // ```
 // poc.DeleteHTTPPacketPostParam(`POST /post HTTP/1.1
@@ -703,6 +826,14 @@ func headerKeyEqual(lhs, rhs string, ignoreCase bool) bool {
 
 // ReplaceHTTPPacketHeader 是一个辅助函数，用于改变请求报文，修改请求头，如果不存在则会增加。
 // 默认情况下（ignoreCase=true）会忽略大小写匹配，若需要严格匹配可使用 ReplaceHTTPPacketHeaderStrict。
+// 参数:
+//   - packet: 原始 HTTP 报文字节数组
+//   - headerKey: 请求头名称
+//   - headerValue: 请求头的值
+//
+// 返回值:
+//   - 修改后的 HTTP 报文字节数组
+//
 // Example:
 // ```
 // poc.ReplaceHTTPPacketHeader(poc.BasicRequest(),"AAA", "BBB") // 修改 AAA 请求头，如果不存在则新增（忽略大小写）
@@ -756,6 +887,13 @@ func replaceHTTPPacketHeader(packet []byte, headerKey string, headerValue any, i
 }
 
 // ReplaceAllHTTPPacketHeaders 是一个辅助函数，用于改变请求报文，修改所有请求头
+// 参数:
+//   - packet: 原始 HTTP 报文字节数组
+//   - headers: 请求头键值对表，会替换所有请求头
+//
+// 返回值:
+//   - 修改后的 HTTP 报文字节数组
+//
 // Example:
 // ```
 // poc.ReplaceAllHTTPPacketHeaders(poc.BasicRequest(), {"AAA": "BBB"}) // 修改所有请求头，这里没有AAA请求头，所以会增加该请求头
@@ -800,6 +938,13 @@ func ReplaceAllHTTPPacketHeaders(packet []byte, headers map[string]string) []byt
 }
 
 // ReplaceHTTPPacketHost 是一个辅助函数，用于改变请求报文，修改Host请求头，如果不存在则会增加，实际上是ReplaceHTTPPacketHeader("Host", host)的简写
+// 参数:
+//   - packet: 原始 HTTP 请求报文字节数组
+//   - host: 新的 Host 请求头的值
+//
+// 返回值:
+//   - 修改后的 HTTP 请求报文字节数组
+//
 // Example:
 // ```
 // _, raw, _ = poc.ParseUrlToHTTPRequestRaw("GET", "https://yaklang.com")
@@ -810,6 +955,14 @@ func ReplaceHTTPPacketHost(packet []byte, host string) []byte {
 }
 
 // ReplaceHTTPPacketBasicAuth 是一个辅助函数，用于改变请求报文，修改Authorization请求头为基础认证的密文，如果不存在则会增加，实际上是ReplaceHTTPPacketHeader("Authorization", codec.EncodeBase64(username + ":" + password))的简写
+// 参数:
+//   - packet: 原始 HTTP 请求报文字节数组
+//   - username: 基础认证用户名
+//   - password: 基础认证密码
+//
+// 返回值:
+//   - 修改后的 HTTP 请求报文字节数组
+//
 // Example:
 // ```
 // _, raw, _ = poc.ParseUrlToHTTPRequestRaw("GET", "https://pie.dev/basic-auth/admin/password")
@@ -821,6 +974,14 @@ func ReplaceHTTPPacketBasicAuth(packet []byte, username, password string) []byte
 
 // AppendHTTPPacketHeader 是一个辅助函数，用于改变请求报文，添加请求头。
 // 无论 header 是否已存在都会直接附加（大小写不敏感行为与 Replace 不冲突）。
+// 参数:
+//   - packet: 原始 HTTP 报文字节数组
+//   - headerKey: 请求头名称
+//   - headerValue: 请求头的值
+//
+// 返回值:
+//   - 修改后的 HTTP 报文字节数组
+//
 // Example:
 // ```
 // poc.AppendHTTPPacketHeader(poc.BasicRequest(), "AAA", "BBB") // 添加 AAA 请求头
@@ -852,6 +1013,13 @@ func AppendHTTPPacketHeader(packet []byte, headerKey string, headerValue any) []
 
 // DeleteHTTPPacketHeader 是一个辅助函数，用于改变请求报文，删除请求头。
 // 默认情况下匹配会忽略 Header 名大小写，若需严格匹配可使用 DeleteHTTPPacketHeaderStrict。
+// 参数:
+//   - packet: 原始 HTTP 报文字节数组
+//   - headerKey: 要删除的请求头名称
+//
+// 返回值:
+//   - 修改后的 HTTP 报文字节数组
+//
 // Example:
 // ```
 // poc.DeleteHTTPPacketHeader(`GET /get HTTP/1.1
@@ -905,6 +1073,14 @@ func deleteHTTPPacketHeader(packet []byte, headerKey string, ignoreCase bool) []
 }
 
 // ReplaceHTTPPacketCookie 是一个辅助函数，用于改变请求报文，修改Cookie请求头中的值，如果不存在则会增加
+// 参数:
+//   - packet: 原始 HTTP 报文字节数组
+//   - key: Cookie 名称
+//   - value: Cookie 的值
+//
+// 返回值:
+//   - 修改后的 HTTP 报文字节数组
+//
 // Example:
 // ```
 // poc.ReplaceHTTPPacketCookie(poc.BasicRequest(), "aaa", "bbb") // 修改cookie值，由于这里没有aaa的cookie值，所以会增加
@@ -960,6 +1136,13 @@ func ReplaceHTTPPacketCookie(packet []byte, key string, value any) []byte {
 }
 
 // ReplaceHTTPPacketCookies 是一个辅助函数，用于改变请求报文，修改Cookie请求头
+// 参数:
+//   - packet: 原始 HTTP 报文字节数组
+//   - m: Cookie 键值对表
+//
+// 返回值:
+//   - 修改后的 HTTP 报文字节数组
+//
 // Example:
 // ```
 // poc.ReplaceHTTPPacketCookies(poc.BasicRequest(), {"aaa":"bbb", "ccc":"ddd"}) // 修改cookie值为aaa=bbb;ccc=ddd
@@ -984,6 +1167,14 @@ func ReplaceHTTPPacketCookies(packet []byte, m any) []byte {
 }
 
 // AppendHTTPPacketCookie 是一个辅助函数，用于改变请求报文，添加Cookie请求头中的值
+// 参数:
+//   - packet: 原始 HTTP 报文字节数组
+//   - key: Cookie 名称
+//   - value: Cookie 的值
+//
+// 返回值:
+//   - 修改后的 HTTP 报文字节数组
+//
 // Example:
 // ```
 // poc.AppendHTTPPacketCookie(poc.BasicRequest(), "aaa", "bbb") // 添加cookie键值对aaa:bbb
@@ -1041,6 +1232,13 @@ func AppendHTTPPacketCookie(packet []byte, key string, value any) []byte {
 }
 
 // DeleteHTTPPacketCookie 是一个辅助函数，用于改变请求报文，删除Cookie中的值
+// 参数:
+//   - packet: 原始 HTTP 报文字节数组
+//   - key: 要删除的 Cookie 名称
+//
+// 返回值:
+//   - 修改后的 HTTP 报文字节数组
+//
 // Example:
 // ```
 // poc.DeleteHTTPPacketCookie(`GET /get HTTP/1.1
@@ -1166,6 +1364,14 @@ func handleHTTPRequestForm(packet []byte, fixMethod bool, fixContentType bool, c
 }
 
 // ReplaceHTTPPacketFormEncoded 是一个辅助函数，用于改变请求报文，替换请求体中的表单，如果不存在则会增加
+// 参数:
+//   - packet: 原始 HTTP 请求报文字节数组
+//   - key: 表单字段名
+//   - value: 表单字段值
+//
+// 返回值:
+//   - 修改后的 HTTP 请求报文字节数组
+//
 // Example:
 // ```
 // poc.ReplaceHTTPPacketFormEncoded(`POST /post HTTP/1.1
@@ -1215,6 +1421,14 @@ func ReplaceHTTPPacketFormEncoded(packet []byte, key, value string) []byte {
 }
 
 // AppendHTTPPacketFormEncoded 是一个辅助函数，用于改变请求报文，添加请求体中的表单
+// 参数:
+//   - packet: 原始 HTTP 请求报文字节数组
+//   - key: 表单字段名
+//   - value: 表单字段值
+//
+// 返回值:
+//   - 修改后的 HTTP 请求报文字节数组
+//
 // Example:
 // ```
 // poc.AppendHTTPPacketFormEncoded(`POST /post HTTP/1.1
@@ -1256,6 +1470,16 @@ func AppendHTTPPacketFormEncoded(packet []byte, key, value string) []byte {
 }
 
 // AppendHTTPPacketUploadFile 是一个辅助函数，用于改变请求报文，添加请求体中的上传的文件，其中第一个参数为原始请求报文，第二个参数为表单名，第三个参数为文件名，第四个参数为文件内容，第五个参数是可选参数，为文件类型(Content-Type)
+// 参数:
+//   - packet: 原始 HTTP 请求报文字节数组
+//   - fieldName: 表单字段名
+//   - fileName: 文件名
+//   - fileContent: 文件内容
+//   - contentType: 可选，文件类型(Content-Type)
+//
+// 返回值:
+//   - 修改后的 HTTP 请求报文字节数组
+//
 // Example:
 // ```
 // _, raw, _ = poc.ParseUrlToHTTPRequestRaw("POST", "https://pie.dev/post")
@@ -1327,6 +1551,16 @@ func AppendHTTPPacketUploadFile(packet []byte, fieldName, fileName string, fileC
 }
 
 // ReplaceHTTPPacketUploadFile 是一个辅助函数，用于改变请求报文，替换请求体中的上传的文件，其中第一个参数为原始请求报文，第二个参数为表单名，第三个参数为文件名，第四个参数为文件内容，第五个参数是可选参数，为文件类型(Content-Type)，如果表单名不存在则会增加
+// 参数:
+//   - packet: 原始 HTTP 请求报文字节数组
+//   - fieldName: 表单字段名
+//   - fileName: 文件名
+//   - fileContent: 文件内容
+//   - contentType: 可选，文件类型(Content-Type)
+//
+// 返回值:
+//   - 修改后的 HTTP 请求报文字节数组
+//
 // Example:
 // ```
 // _, raw, _ = poc.ParseUrlToHTTPRequestRaw("POST", "https://pie.dev/post")
@@ -1414,6 +1648,13 @@ func ReplaceHTTPPacketUploadFile(packet []byte, fieldName, fileName string, file
 }
 
 // DeleteHTTPPacketForm 是一个辅助函数，用于改变请求报文，删除POST请求表单
+// 参数:
+//   - packet: 原始 HTTP 请求报文字节数组
+//   - key: 要删除的表单字段名
+//
+// 返回值:
+//   - 修改后的 HTTP 请求报文字节数组
+//
 // Example:
 // ```
 // poc.DeleteHTTPPacketForm(`POST /post HTTP/1.1
@@ -1466,6 +1707,13 @@ func DeleteHTTPPacketForm(packet []byte, key string) []byte {
 }
 
 // ParseMultiPartFormWithCallback 是一个辅助函数，用于尝试解析请求报文体中的表单并进行回调
+// 参数:
+//   - req: 原始 HTTP 请求报文字节数组
+//   - callback: 表单分块回调函数，参数为每个 multipart.Part
+//
+// 返回值:
+//   - 错误信息，解析失败时返回非空
+//
 // Example:
 // ```
 // poc.ParseMultiPartFormWithCallback(`POST /post HTTP/1.1
@@ -1677,6 +1925,13 @@ func appendHTTPPacketHeaderIfNotExist(packet []byte, headerKey string, headerVal
 }
 
 // GetHTTPPacketCookieValues 是一个辅助函数，用于获取请求报文中Cookie值，其返回值为[]string，这是因为Cookie可能存在多个相同键名的值
+// 参数:
+//   - packet: 原始 HTTP 报文字节数组
+//   - key: Cookie 名称
+//
+// 返回值:
+//   - 匹配该名称的所有 Cookie 值列表
+//
 // Example:
 // ```
 // poc.GetHTTPPacketCookieValues(`GET /get HTTP/1.1
@@ -1713,6 +1968,13 @@ func GetHTTPPacketCookieValues(packet []byte, key string) (cookieValues []string
 }
 
 // GetHTTPPacketCookieFirst 是一个辅助函数，用于获取请求报文中Cookie值，其返回值为string
+// 参数:
+//   - packet: 原始 HTTP 报文字节数组
+//   - key: Cookie 名称
+//
+// 返回值:
+//   - 匹配该名称的第一个 Cookie 值
+//
 // Example:
 // ```
 // poc.GetHTTPPacketCookieFirst(`GET /get HTTP/1.1
@@ -1731,6 +1993,13 @@ func GetHTTPPacketCookieFirst(packet []byte, key string) (cookieValue string) {
 }
 
 // GetUrlFromHTTPRequest 是一个辅助函数，用于获取请求报文中的URL，其返回值为string
+// 参数:
+//   - scheme: URL 协议，如 http、https，留空默认为 http
+//   - packet: 原始 HTTP 请求报文字节数组
+//
+// 返回值:
+//   - 拼接后的完整 URL
+//
 // Example:
 // ```
 // poc.GetUrlFromHTTPRequest("https", `GET /get HTTP/1.1
@@ -1752,6 +2021,13 @@ func GetUrlFromHTTPRequest(scheme string, packet []byte) (url string) {
 }
 
 // GetHTTPPacketCookie 是一个辅助函数，用于获取请求报文中Cookie值，其返回值为string
+// 参数:
+//   - packet: 原始 HTTP 报文字节数组
+//   - key: Cookie 名称
+//
+// 返回值:
+//   - 匹配该名称的 Cookie 值
+//
 // Example:
 // ```
 // poc.GetHTTPPacketCookie(`GET /get HTTP/1.1
@@ -1766,6 +2042,12 @@ func GetHTTPPacketCookie(packet []byte, key string) (cookieValue string) {
 }
 
 // GetHTTPPacketContentType 是一个辅助函数，用于获取请求报文中的Content-Type请求头，其返回值为string
+// 参数:
+//   - packet: 原始 HTTP 报文字节数组
+//
+// 返回值:
+//   - Content-Type 请求头的值
+//
 // Example:
 // ```
 // poc.GetHTTPPacketContentType(`POST /post HTTP/1.1
@@ -1792,6 +2074,12 @@ func GetHTTPPacketContentType(packet []byte) (contentType string) {
 }
 
 // GetHTTPPacketCookies 是一个辅助函数，用于获取请求报文中所有Cookie值，其返回值为map[string]string
+// 参数:
+//   - packet: 原始 HTTP 报文字节数组
+//
+// 返回值:
+//   - 所有 Cookie 的键值对映射
+//
 // Example:
 // ```
 // poc.GetHTTPPacketCookies(`GET /get HTTP/1.1
@@ -1824,6 +2112,12 @@ func GetHTTPPacketCookies(packet []byte) (cookies map[string]string) {
 }
 
 // GetHTTPPacketCookiesFull 是一个辅助函数，用于获取请求报文中所有Cookie值，其返回值为map[string][]string，这是因为Cookie可能存在多个相同键名的值
+// 参数:
+//   - packet: 原始 HTTP 报文字节数组
+//
+// 返回值:
+//   - 所有 Cookie 的键到值列表的映射
+//
 // Example:
 // ```
 // poc.GetHTTPPacketCookiesFull(`GET /get HTTP/1.1
@@ -1861,6 +2155,12 @@ func GetHTTPPacketCookiesFull(packet []byte) (cookies map[string][]string) {
 }
 
 // GetHTTPPacketHeaders 是一个辅助函数，用于获取请求报文中所有请求头，其返回值为map[string]string
+// 参数:
+//   - packet: 原始 HTTP 报文字节数组
+//
+// 返回值:
+//   - 所有请求头的键值对映射
+//
 // Example:
 // ```
 // poc.GetHTTPPacketHeaders(`GET /get HTTP/1.1
@@ -1882,6 +2182,12 @@ func GetHTTPPacketHeaders(packet []byte) (headers map[string]string) {
 }
 
 // GetHTTPPacketHeadersFull 是一个辅助函数，用于获取请求报文中所有请求头，其返回值为map[string][]string，这是因为请求头可能存在多个相同键名的值
+// 参数:
+//   - packet: 原始 HTTP 报文字节数组
+//
+// 返回值:
+//   - 所有请求头的键到值列表的映射
+//
 // Example:
 // ```
 // poc.GetHTTPPacketHeadersFull(`GET /get HTTP/1.1
@@ -1907,6 +2213,13 @@ func GetHTTPPacketHeadersFull(packet []byte) (headers map[string][]string) {
 }
 
 // GetHTTPPacketHeader 是一个辅助函数，用于获取请求报文中指定的请求头，其返回值为string
+// 参数:
+//   - packet: 原始 HTTP 报文字节数组
+//   - key: 请求头名称
+//
+// 返回值:
+//   - 匹配该名称的请求头的值
+//
 // Example:
 // ```
 // poc.GetHTTPPacketHeader(`GET /get HTTP/1.1
@@ -1947,6 +2260,13 @@ func getHTTPPacketHeader(packet []byte, key string, ignoreCase bool) (header str
 }
 
 // GetHTTPPacketQueryParam 是一个辅助函数，用于获取请求报文中指定的GET请求参数，其返回值为string
+// 参数:
+//   - packet: 原始 HTTP 请求报文字节数组
+//   - key: GET 请求参数名
+//
+// 返回值:
+//   - 匹配该名称的 GET 请求参数的值
+//
 // Example:
 // ```
 // poc.GetHTTPPacketQueryParam(`GET /get?a=b&c=d HTTP/1.1
@@ -1964,6 +2284,12 @@ func GetHTTPRequestQueryParam(packet []byte, key string) (paramValue string) {
 }
 
 // GetHTTPPacketBody 是一个辅助函数，用于获取请求报文中的请求体，其返回值为bytes
+// 参数:
+//   - packet: 原始 HTTP 报文字节数组
+//
+// 返回值:
+//   - 报文主体内容字节数组
+//
 // Example:
 // ```
 // poc.GetHTTPPacketBody(`POST /post HTTP/1.1
@@ -1979,6 +2305,13 @@ func GetHTTPPacketBody(packet []byte) (body []byte) {
 }
 
 // GetHTTPPacketPostParam 是一个辅助函数，用于获取请求报文中指定的POST请求参数，其返回值为string
+// 参数:
+//   - packet: 原始 HTTP 请求报文字节数组
+//   - key: POST 请求参数名
+//
+// 返回值:
+//   - 匹配该名称的 POST 请求参数的值
+//
 // Example:
 // ```
 // poc.GetHTTPPacketPostParam(`POST /post HTTP/1.1
@@ -2023,6 +2356,12 @@ func GetHTTPRequestQueryParamFull(packet []byte, key string) (ret []string) {
 }
 
 // GetAllHTTPPacketPostParams 是一个辅助函数，用于获取请求报文中的所有POST请求参数，其返回值为map[string]string，其中键为参数名，值为参数值
+// 参数:
+//   - packet: 原始 HTTP 请求报文字节数组
+//
+// 返回值:
+//   - 所有 POST 请求参数的键值对映射
+//
 // Example:
 // ```
 // poc.GetAllHTTPPacketPostParams(`POST /post HTTP/1.1
@@ -2044,6 +2383,12 @@ func GetAllHTTPRequestPostParams(packet []byte) (params map[string]string) {
 }
 
 // GetAllHTTPPacketPostParamsFull 是一个辅助函数，用于获取请求报文中的所有POST请求参数，其返回值为map[string][]string，其中键为参数名，值为参数值切片
+// 参数:
+//   - packet: 原始 HTTP 请求报文字节数组
+//
+// 返回值:
+//   - 所有 POST 请求参数的键到值列表的映射
+//
 // Example:
 // ```
 // poc.GetAllHTTPPacketPostParams(`POST /post HTTP/1.1
@@ -2064,6 +2409,12 @@ func GetFullHTTPRequestPostParams(packet []byte) (params map[string][]string) {
 }
 
 // GetAllHTTPPacketQueryParams 是一个辅助函数，用于获取请求报文中的所有GET请求参数，其返回值为map[string]string，其中键为参数名，值为参数值
+// 参数:
+//   - packet: 原始 HTTP 请求报文字节数组
+//
+// 返回值:
+//   - 所有 GET 请求参数的键值对映射
+//
 // Example:
 // ```
 // poc.GetAllHTTPPacketQueryParams(`GET /get?a=b&c=d HTTP/1.1
@@ -2086,6 +2437,12 @@ func GetAllHTTPRequestQueryParams(packet []byte) (params map[string]string) {
 }
 
 // GetAllHTTPPacketQueryParamsFull 是一个辅助函数，用于获取请求报文中的所有GET请求参数，其返回值为map[string][]string，其中键为参数名，值为参数值切片
+// 参数:
+//   - packet: 原始 HTTP 请求报文字节数组
+//
+// 返回值:
+//   - 所有 GET 请求参数的键到值列表的映射
+//
 // Example:
 // ```
 // poc.GetAllHTTPPacketQueryParamsFull(`GET /get?a=b&a=c HTTP/1.1
@@ -2109,6 +2466,12 @@ func GetFullHTTPRequestQueryParams(packet []byte) (params map[string][]string) {
 }
 
 // GetStatusCodeFromResponse 是一个辅助函数，用于获取响应报文中的状态码，其返回值为int
+// 参数:
+//   - packet: 原始 HTTP 响应报文字节数组
+//
+// 返回值:
+//   - 响应状态码
+//
 // Example:
 // ```
 // poc.GetStatusCodeFromResponse(`HTTP/1.1 200 OK
@@ -2124,7 +2487,13 @@ func GetStatusCodeFromResponse(packet []byte) (statusCode int) {
 	return statusCode
 }
 
-// GetHTTPRequestPathWithoutQuery 是一个辅助函数，用于获取响应报文中的路径，返回值是 string，不包含 query
+// GetHTTPRequestPathWithoutQuery 是一个辅助函数，用于获取请求报文中的路径，返回值是 string，不包含 query
+// 参数:
+//   - packet: 原始 HTTP 请求报文字节数组
+//
+// 返回值:
+//   - 不包含 query 的请求路径
+//
 // Example:
 // ```
 // poc.GetHTTPRequestPathWithoutQuery("GET /a/bc.html?a=1 HTTP/1.1\r\nHost: www.example.com\r\n\r\n") // /a/bc.html
@@ -2133,7 +2502,13 @@ func GetHTTPRequestPathWithoutQuery(packet []byte) (path string) {
 	return strings.Split(GetHTTPRequestPath(packet), "?")[0]
 }
 
-// GetHTTPRequestPath 是一个辅助函数，用于获取响应报文中的路径，返回值是 string，包含 query
+// GetHTTPRequestPath 是一个辅助函数，用于获取请求报文中的路径，返回值是 string，包含 query
+// 参数:
+//   - packet: 原始 HTTP 请求报文字节数组
+//
+// 返回值:
+//   - 包含 query 的请求路径
+//
 // Example:
 // ```
 // poc.GetHTTPRequestPath("GET /a/bc.html?a=1 HTTP/1.1\r\nHost: www.example.com\r\n\r\n") // /a/bc.html?a=1
@@ -2147,6 +2522,12 @@ func GetHTTPRequestPath(packet []byte) (path string) {
 }
 
 // GetHTTPRequestMethod 是一个辅助函数，用于获取请求报文中的请求方法，其返回值为string
+// 参数:
+//   - packet: 原始 HTTP 请求报文字节数组
+//
+// 返回值:
+//   - 请求方法，如 GET、POST
+//
 // Example:
 // ```
 // poc.GetHTTPRequestMethod(`GET /get HTTP/1.1
@@ -2167,6 +2548,14 @@ func GetHTTPRequestMethod(packet []byte) (method string) {
 // GetHTTPPacketFirstLine 是一个辅助函数，用于获取 HTTP 报文中第一行的值，其返回值为string，string，string
 // 在请求报文中，其三个返回值分别为：请求方法，请求URI，协议版本
 // 在响应报文中，其三个返回值分别为：协议版本，状态码，状态码描述
+// 参数:
+//   - packet: 原始 HTTP 报文字节数组
+//
+// 返回值:
+//   - 第一个字段（请求方法 或 协议版本）
+//   - 第二个字段（请求URI 或 状态码）
+//   - 第三个字段（协议版本 或 状态码描述）
+//
 // Example:
 // ```
 // poc.GetHTTPPacketFirstLine(`GET /get HTTP/1.1
@@ -2200,6 +2589,13 @@ func GetHTTPPacketFirstLine(packet []byte) (string, string, string) {
 }
 
 // ReplaceHTTPPacketBody 是一个辅助函数，用于改变 HTTP 报文，修改 HTTP 报文主体内容，第一个参数为原始 HTTP 报文，第二个参数为修改的报文主体内容
+// 参数:
+//   - packet: 原始 HTTP 报文字节数组
+//   - body: 修改后的报文主体内容
+//
+// 返回值:
+//   - 修改后的 HTTP 报文字节数组
+//
 // Example:
 // ```
 // poc.ReplaceHTTPPacketBody(poc.BasicRequest(), "a=b") // 修改请求体内容为a=b
@@ -2215,6 +2611,13 @@ func ReplaceHTTPPacketBodyFast(packet []byte, body []byte) []byte {
 }
 
 // ReplaceHTTPPacketJsonBody 是一个辅助函数，用于改变 HTTP 报文，修改 HTTP 报文主体内容（ json 格式），第一个参数为原始 HTTP 报文，第二个参数为修改的报文主体内容（ map 对象）
+// 参数:
+//   - packet: 原始 HTTP 报文字节数组
+//   - jsonMap: 修改后的报文主体内容（ map 对象，会被序列化为 JSON）
+//
+// 返回值:
+//   - 修改后的 HTTP 报文字节数组
+//
 // Example:
 // ```
 // poc.ReplaceHTTPPacketJsonBody(poc.BasicRequest(), {"a":"b"}) // 修改请求体内容为{"a":"b"}

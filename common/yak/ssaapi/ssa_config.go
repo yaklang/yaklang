@@ -122,6 +122,18 @@ var WithExcludeFunc = ssaconfig.WithCompileExcludeFiles
 // the compile-time exclude files option.
 var WithExcludeFile = ssaconfig.WithCompileExcludeFiles
 
+// WithProcess 设置编译进度回调（导出名为 ssa.withProcess）
+// 参数:
+//   - v: 进度回调函数，参数为 (msg 进度消息, process 进度比例)
+//
+// 返回值:
+//   - 编译配置可选项
+//
+// Example:
+// ```
+// opt = ssa.withProcess(func(msg, process) { println(msg) })
+// println(opt)
+// ```
 var WithProcess = ssaconfig.SetOption("ssa_compile/process", func(c *Config, v ProcessFunc) {
 	c.process = v
 })
@@ -140,6 +152,18 @@ var WithFileSystem = ssaconfig.SetOption("ssa_compile/file_system", func(c *Conf
 var WithRawLanguage = ssaconfig.WithProjectRawLanguage
 var WithLanguage = ssaconfig.WithProjectLanguage
 
+// WithFileSystemEntry 设置编译入口文件（导出名为 ssa.withEntryFile）
+// 参数:
+//   - v: 一个或多个入口文件路径，支持逗号分隔
+//
+// 返回值:
+//   - 编译配置可选项
+//
+// Example:
+// ```
+// opt = ssa.withEntryFile("src/main/java/App.java")
+// println(opt)
+// ```
 func WithFileSystemEntry(v ...string) ssaconfig.Option {
 	return ssaconfig.WithCompileEntryFiles(v...)
 }
@@ -160,6 +184,20 @@ var withExternLib = ssaconfig.SetOption("ssa_compile/extern_lib", func(
 	c.externLib[a.name] = a.table
 })
 
+// WithExternLib 为 SSA 编译注入外部库（导出名为 ssa.withExternLib）
+// 用于让分析器识别自定义的库函数与符号
+// 参数:
+//   - name: 库名
+//   - table: 库的符号表（名称到值的映射）
+//
+// 返回值:
+//   - 编译配置可选项
+//
+// Example:
+// ```
+// opt = ssa.withExternLib("mylib", {"foo": func() { return 1 }})
+// println(opt)
+// ```
 func WithExternLib(name string, table map[string]any) ssaconfig.Option {
 	return func(c *ssaconfig.Config) error {
 		withExternLib(struct {
@@ -173,6 +211,18 @@ func WithExternLib(name string, table map[string]any) ssaconfig.Option {
 	}
 }
 
+// WithExternValue 为 SSA 编译注入外部值符号（导出名为 ssa.withExternValue）
+// 参数:
+//   - table: 外部值的符号表（名称到值的映射）
+//
+// 返回值:
+//   - 编译配置可选项
+//
+// Example:
+// ```
+// opt = ssa.withExternValue({"VERSION": "1.0"})
+// println(opt)
+// ```
 var WithExternValue = ssaconfig.SetOption("ssa_compile/extern_value", func(c *Config, table map[string]any) {
 	for name, value := range table {
 		c.externValue[name] = value

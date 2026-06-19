@@ -29,6 +29,17 @@ func (c *ChaosMaker) SetContext(ctx context.Context) {
 	c.ctx = ctx
 }
 
+// NewChaosMaker 创建一个流量生成器(ChaosMaker)，可根据 Suricata 规则生成对应的模拟攻击流量
+// 在 yak 中通过 suricata.TrafficGenerator 调用
+// 返回值:
+//   - 流量生成器对象
+//
+// Example:
+// ```
+// // 该示例为示意性用法：创建流量生成器
+// maker = suricata.TrafficGenerator()
+// println(maker != nil)
+// ```
 func NewChaosMaker() *ChaosMaker {
 	return &ChaosMaker{LocalIPAddress: utils.GetLocalIPAddress()}
 }

@@ -53,18 +53,33 @@ var Exports = map[string]interface{}{
 	//"NewSubFinder": func() (*SubFinderInstance, error) {
 	//	return NewSubFinderInstance()
 	//},
-	"NewPocInvoker": func() (*PocInvoker, error) {
-		return NewPocInvoker()
-	},
-	"NewBruteUtil": func(t string) (*bruteutils.BruteUtil, error) {
-		res, err := bruteutils.GetBruteFuncByType(t)
-		if err != nil {
-			return nil, err
-		}
-		ut, err := bruteutils.NewMultiTargetBruteUtil(256, 1, 5, res)
-		if err != nil {
-			return nil, utils.Errorf("create brute utils failed: %s", err)
-		}
-		return ut, nil
-	},
+	"NewPocInvoker": NewPocInvoker,
+	"NewBruteUtil":  NewBruteUtil,
+}
+
+// NewBruteUtil 根据指定的服务类型创建一个多目标爆破工具(BruteUtil)
+// 在 yak 中通过 tools.NewBruteUtil 调用，服务类型如 "ssh"、"redis"、"mysql" 等
+// 参数:
+//   - t: 爆破目标的服务类型名称
+//
+// 返回值:
+//   - 爆破工具对象，可用于对多个目标执行口令爆破
+//   - 错误信息，类型不支持或创建失败时非 nil
+//
+// Example:
+// ```
+// // 该示例为示意性用法：创建 ssh 爆破工具
+// util = tools.NewBruteUtil("ssh")~
+// println(util != nil)
+// ```
+func NewBruteUtil(t string) (*bruteutils.BruteUtil, error) {
+	res, err := bruteutils.GetBruteFuncByType(t)
+	if err != nil {
+		return nil, err
+	}
+	ut, err := bruteutils.NewMultiTargetBruteUtil(256, 1, 5, res)
+	if err != nil {
+		return nil, utils.Errorf("create brute utils failed: %s", err)
+	}
+	return ut, nil
 }

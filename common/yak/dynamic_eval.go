@@ -31,6 +31,20 @@ var EvalExports = map[string]interface{}{
 	"recursive":       setYakBatchImportRecursiveParams,
 }
 
+// Eval 动态执行一段 yak 代码
+// 参数:
+//   - i: 要执行的 yak 代码(字符串或字节切片)
+//
+// 返回值:
+//   - 执行过程中产生的错误，成功时为 nil
+//
+// Example:
+// ```
+// // VARS: 动态执行一段代码
+// err = dyn.Eval("a = 1 + 1")
+// // assert: 合法代码执行无错误
+// assert err == nil, "valid code should evaluate without error"
+// ```
 func QuickEvalWithoutContext(i interface{}) error {
 	switch ret := i.(type) {
 	case []byte:
@@ -50,12 +64,36 @@ type yakEvalConfig struct {
 
 type yakEvalConfigOpt func(y *yakEvalConfig)
 
+// params 生成一个 LoadVarFromFile 的配置项，为被加载脚本注入额外参数
+// 参数:
+//   - i: 注入到被加载脚本中的参数键值表
+//
+// 返回值:
+//   - 可传给 dyn.LoadVarFromFile 的配置项
+//
+// Example:
+// ```
+// // 注入参数后加载脚本中的 Exports 变量(作示意)
+// vars, err = dyn.LoadVarFromFile("./mod", "Exports", dyn.params({"key": "value"}))
+// ```
 func setYakEvalParams(i map[string]interface{}) yakEvalConfigOpt {
 	return func(y *yakEvalConfig) {
 		y.params = i
 	}
 }
 
+// recursive 生成一个 LoadVarFromFile 的配置项，控制是否递归遍历子目录加载脚本
+// 参数:
+//   - i: 是否递归加载子目录中的 yak 文件
+//
+// 返回值:
+//   - 可传给 dyn.LoadVarFromFile 的配置项
+//
+// Example:
+// ```
+// // 递归加载目录下所有脚本中的 Exports 变量(作示意)
+// vars, err = dyn.LoadVarFromFile("./mods", "Exports", dyn.recursive(true))
+// ```
 func setYakBatchImportRecursiveParams(i bool) yakEvalConfigOpt {
 	return func(y *yakEvalConfig) {
 		y.recursive = i
@@ -100,6 +138,20 @@ func ImportVarFromScript(engine *antlr4yak.Engine, script string, exportsName st
 	return v, nil
 }
 
+// Import 从指定 yak 文件中加载并导入名为 exportsName 的变量
+// 参数:
+//   - file: yak 文件路径(可省略 .yak 后缀)或包含 main.yak 的目录
+//   - exportsName: 要导入的变量名
+//
+// 返回值:
+//   - 导入的变量值
+//   - 加载失败时返回的错误
+//
+// Example:
+// ```
+// // 从 ./mod.yak 导入名为 Exports 的变量(依赖外部文件，作示意)
+// v, err = dyn.Import("./mod", "Exports")
+// ```
 func ImportVarFromFile(file string, exportsName string) (interface{}, error) {
 	var absFile string
 	yakFile := utils.GetFirstExistedFile(file, fmt.Sprintf("%v.yak", file))
@@ -123,6 +175,21 @@ func ImportVarFromFile(file string, exportsName string) (interface{}, error) {
 	return ImportVarFromYakFile(absFile, exportsName)
 }
 
+// LoadVarFromFile 从指定文件或目录中批量加载脚本，并提取每个脚本中名为 exportsName 的变量
+// 参数:
+//   - path: yak 文件路径或目录(目录会遍历其中的 .yak 文件)
+//   - exportsName: 要从每个脚本中提取的变量名
+//   - opts: 可选配置，如 dyn.params(...)、dyn.recursive(...)
+//
+// 返回值:
+//   - 提取到的变量列表，每个元素包含文件路径、模块名与变量值
+//   - 加载失败时返回的错误
+//
+// Example:
+// ```
+// // 从目录加载所有脚本的 Exports 变量(依赖外部文件，作示意)
+// vars, err = dyn.LoadVarFromFile("./mods", "Exports", dyn.recursive(true))
+// ```
 func LoadingVariableFrom(path string, exportsName string, opts ...yakEvalConfigOpt) ([]*yakVariable, error) {
 	if path == "" {
 		path = "."

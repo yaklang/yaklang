@@ -647,8 +647,9 @@ func SetToBytesJRMPMarshaler() MarshalOptionFun {
 // gadgetBytes,_ = yso.ToBytes(gadgetObj,yso.twoBytesCharString())
 // ```
 func SetToBytesTwoBytesString() MarshalOptionFun {
+	n := 2
 	return func(ctx *yserx.MarshalContext) {
-		ctx.StringCharLength = 2
+		ctx.StringCharLength = n
 	}
 }
 
@@ -658,8 +659,9 @@ func SetToBytesTwoBytesString() MarshalOptionFun {
 // gadgetBytes,_ = yso.ToBytes(gadgetObj,yso.threeBytesCharString())
 // ```
 func SetToBytesThreeBytesString() MarshalOptionFun {
+	n := 3
 	return func(ctx *yserx.MarshalContext) {
-		ctx.StringCharLength = 3
+		ctx.StringCharLength = n
 	}
 }
 

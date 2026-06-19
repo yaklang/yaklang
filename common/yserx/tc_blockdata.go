@@ -21,6 +21,20 @@ func (j *JavaBlockData) Marshal(cfg *MarshalContext) []byte {
 	return header
 }
 
+// NewJavaBlockDataBytes 创建一个 Java 序列化的块数据对象(TC_BLOCKDATA)，承载原始字节
+// 在 yak 中通过 java.NewJavaBlockDataBytes 调用，常用于 writeObject 自定义数据
+// 参数:
+//   - raw: 块数据的原始字节内容
+//
+// 返回值:
+//   - Java 块数据序列化对象
+//
+// Example:
+// ```
+// // 该示例为示意性用法：构造原始块数据
+// block = java.NewJavaBlockDataBytes([]byte("data"))
+// println(block.TypeVerbose)
+// ```
 func NewJavaBlockDataBytes(raw []byte) *JavaBlockData {
 	if len(raw) <= 0xff {
 		d := &JavaBlockData{

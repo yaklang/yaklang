@@ -55,7 +55,17 @@ func init() {
 	}
 }
 
-// LoadCVE 从本地的CVE json数据加载构造数据库
+// LoadCVE 从本地 CVE json 数据文件加载并构建 CVE 数据库（导出名为 cve.LoadCVE）
+// 参数:
+//   - fileDir: 存放 CVE json 数据文件的目录
+//   - DbPath: 构建出的数据库文件路径
+//   - years: 可选的指定年份，缺省时加载全部
+//
+// Example:
+// ```
+// // 示意性示例，需要本地 CVE json 数据
+// cve.LoadCVE("/tmp/cve-data", "/tmp/cve.db", 2021, 2022)
+// ```
 func LoadCVE(fileDir, DbPath string, years ...int) {
 	manager := cveresources.GetManager(DbPath)
 
@@ -117,7 +127,20 @@ func LoadCVEByFileName(fileName string, manager *cveresources.SqliteManager) (sh
 	return false, nil
 }
 
-// DownLoad 从NVD下载CVE json数据到本地
+// DownLoad 从 NVD 下载 CVE json 数据到本地目录（导出名为 cve.Download）
+// 参数:
+//   - dir: 下载数据保存目录
+//   - cached: 为 true 时跳过已存在的文件
+//
+// 返回值:
+//   - 错误信息
+//
+// Example:
+// ```
+// // 示意性示例，需要网络访问 NVD
+// err = cve.Download("/tmp/cve-data", true)
+// if err != nil { die(err) }
+// ```
 func DownLoad(dir string, cached bool) error {
 	for name, url := range CveDataFeed {
 		fileName := filepath.Join(dir, name)

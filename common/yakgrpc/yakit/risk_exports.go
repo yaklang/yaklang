@@ -425,6 +425,18 @@ func WithRiskParam_RuntimeId(i string) RiskParamsOpt {
 	}
 }
 
+// potential 是一个选项参数，用于标记风险记录是否为潜在(疑似)风险
+// 参数:
+//   - i: 是否为潜在风险
+//
+// 返回值:
+//   - 一个 risk.NewRisk/risk.CreateRisk 可接收的选项参数
+//
+// Example:
+// ```
+// // 该示例为示意性用法：标记为潜在风险
+// risk.NewRisk("http://example.com", risk.potential(true))
+// ```
 func WithRiskParam_Potential(i bool) RiskParamsOpt {
 	return func(r *schema.Risk) {
 		r.IsPotential = i
@@ -482,18 +494,54 @@ func WithRiskParam_FromScript(i string) RiskParamsOpt {
 	}
 }
 
+// ignore 是一个选项参数，用于标记风险记录为已忽略状态(忽略后默认查询不展示)
+// 参数:
+//   - i: 是否忽略该风险
+//
+// 返回值:
+//   - 一个 risk.NewRisk/risk.CreateRisk 可接收的选项参数
+//
+// Example:
+// ```
+// // 该示例为示意性用法：将风险标记为忽略
+// risk.NewRisk("http://example.com", risk.ignore(true))
+// ```
 func WithRiskParam_Ignore(i bool) RiskParamsOpt {
 	return func(r *schema.Risk) {
-		r.Ignore = true
+		r.Ignore = i
 	}
 }
 
+// ip 是一个选项参数，用于指定风险记录关联的 IP 地址
+// 参数:
+//   - i: IP 地址字符串
+//
+// 返回值:
+//   - 一个 risk.NewRisk/risk.CreateRisk 可接收的选项参数
+//
+// Example:
+// ```
+// // 该示例为示意性用法：指定风险关联 IP
+// risk.NewRisk("http://example.com", risk.ip("1.2.3.4"))
+// ```
 func WithRiskParam_IP(i string) RiskParamsOpt {
 	return func(r *schema.Risk) {
 		r.IP = i
 	}
 }
 
+// tag 是一个选项参数，用于为风险记录设置标签(多个标签可用分隔符拼接)
+// 参数:
+//   - i: 标签字符串
+//
+// 返回值:
+//   - 一个 risk.NewRisk/risk.CreateRisk 可接收的选项参数
+//
+// Example:
+// ```
+// // 该示例为示意性用法：为风险设置标签
+// risk.NewRisk("http://example.com", risk.tag("sqli,important"))
+// ```
 func WithRiskParam_Tags(i string) RiskParamsOpt {
 	return func(r *schema.Risk) {
 		r.Tags = i
@@ -579,6 +627,23 @@ func SaveRisk(r *schema.Risk) error {
 	return _saveRisk(r)
 }
 
+// NewUnverifiedRisk 创建一条"待验证"风险记录并保存，常用于反连(reverse)类漏洞先记录、后由回连验证
+// 在 yak 中通过 risk.NewUnverifiedRisk 调用，配合反连 token 使用
+// 参数:
+//   - u: 风险目标(URL 或 IP)
+//   - token: 反连验证用的 token
+//   - opts: 零个或多个风险选项参数，如 risk.title、risk.severity 等
+//
+// 返回值:
+//   - 创建的风险记录结构体
+//   - 错误信息，保存失败时非 nil
+//
+// Example:
+// ```
+// // 该示例为示意性用法：创建待验证风险
+// token = risk.NewDNSLogDomain()[1]
+// r, err = risk.NewUnverifiedRisk("http://example.com", token, risk.title("SSRF"), risk.severity("high"))
+// ```
 func NewUnverifiedRisk(u string, token string, opts ...RiskParamsOpt) (*schema.Risk, error) {
 	r := _createRisk(u, opts...)
 	r.WaitingVerified = true
@@ -592,6 +657,20 @@ var (
 	riskSaveMutex       = new(sync.Mutex) // 保护 risk 保存操作，防止并发写入
 )
 
+// RegisterBeforeRiskSave 注册一个在风险记录保存到数据库之前执行的回调钩子，可用于统一改写/丰富风险字段
+// 在 yak 中通过 risk.RegisterBeforeRiskSave 调用
+// 参数:
+//   - f: 回调函数，入参为即将保存的风险记录，可在其中修改该记录
+//
+// Example:
+// ```
+// // 该示例为示意性用法：保存前为所有风险追加标签
+//
+//	risk.RegisterBeforeRiskSave(func(r) {
+//	    r.Tags = "auto-tagged"
+//	})
+//
+// ```
 func RegisterBeforeRiskSave(f func(*schema.Risk)) {
 	beforeRiskSaveMutex.Lock()
 	defer beforeRiskSaveMutex.Unlock()
@@ -725,6 +804,20 @@ func HaveReverseRisk(token string) bool {
 	}
 }
 
+// ExtractTokenFromUrl 从反连(reverse) URL 中提取其中携带的 token 字符串
+// 在 yak 中通过 risk.ExtractTokenFromUrl 调用，常配合 DNSLog/HTTPLog 反连验证使用
+// 参数:
+//   - tokenUrl: 包含 token 的反连 URL
+//
+// 返回值:
+//   - 提取出的 token 字符串，无法解析时返回空字符串
+//
+// Example:
+// ```
+// // 该示例为示意性用法：从反连 URL 提取 token
+// token = risk.ExtractTokenFromUrl("http://abc123.dnslog.cn/")
+// println(token)
+// ```
 func ExtractTokenFromUrl(tokenUrl string) string {
 	u, err := url.Parse(tokenUrl)
 	if err != nil {
@@ -947,6 +1040,21 @@ func NewRandomPortTrigger(opt ...RiskParamsOpt) (token string, addr string, _ er
 	return token, checkAddr, nil
 }
 
+// CheckICMPTriggerByLength 通过特定 ICMP 包长度检查 ICMP 反连事件，返回触发通知与错误
+// 在 yak 中通过 risk.CheckICMPTriggerByLength 调用，依赖公网 Bridge 反连服务
+// 参数:
+//   - i: 用于触发匹配的特定 ICMP 包长度
+//
+// 返回值:
+//   - ICMP 触发通知对象
+//   - 错误信息，失败时非 nil
+//
+// Example:
+// ```
+// // 该示例为示意性用法：通过长度检查 ICMP 反连
+// event = risk.CheckICMPTriggerByLength(1111)~
+// println(event.CurrentRemoteAddr)
+// ```
 func YakitNewCheckICMPTriggerByLength(pluginContext YakitPluginInfo) func(i int) (*tpb.ICMPTriggerNotification, error) {
 	return func(i int) (*tpb.ICMPTriggerNotification, error) {
 		return CheckICMPTriggerByLength(i, pluginContext)

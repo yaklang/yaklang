@@ -57,9 +57,21 @@ func Node2Raw(node *html.Node) string {
 }
 
 // Find 解析并遍历一段 HTML 代码的每一个节点并找到匹配字符串的节点，返回匹配字符串的节点信息的引用切片
+// 参数:
+//   - htmlRaw: 待解析的 HTML 内容，会被转换为字符串
+//   - matchStr: 要匹配的子串(支持 glob 匹配)
+//
+// 返回值:
+//   - 匹配到的节点信息引用切片，每个元素含 Xpath、TagName、MatchText 等字段
+//
 // Example:
 // ```
-// matchInfoRes = xhtml.Find("<html><body><div>hello</div></body></html>", "hello")
+// // VARS: 在 HTML 中查找包含 hello 的节点
+// res = xhtml.Find("<html><body><div>hello</div></body></html>", "hello")
+// // STDOUT: 打印命中数量
+// println(len(res))   // OUT: 1
+// // assert: 命中文本节点
+// assert res[0].MatchText == "hello", "should match the text node"
 // ```
 func FindNodeFromHtml(htmlRaw interface{}, matchStr string) []*MatchNodeInfo {
 	matchInfoRes := []*MatchNodeInfo{}

@@ -28,6 +28,20 @@ type BuilderConfig struct {
 
 type BuilderConfigOption func(config *BuilderConfig)
 
+// WithPayload 为 pcapx.PacketBuilder 设置数据包的负载(Payload)内容
+// 在 yak 中通过 pcapx.WithPayload 调用
+// 参数:
+//   - payload: 负载字节数据
+//
+// 返回值:
+//   - 一个 pcapx.PacketBuilder 可接收的构建配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：构造带负载的数据包
+// raw = pcapx.PacketBuilder(pcapx.ipv4_srcIp("1.1.1.1"), pcapx.ipv4_dstOp("2.2.2.2"), pcapx.tcp_srcPort(12345), pcapx.tcp_dstPort(80), pcapx.WithPayload([]byte("hello")))~
+// println(len(raw))
+// ```
 func WithPayload(payload []byte) BuilderConfigOption {
 	return func(config *BuilderConfig) {
 		config.Payload = payload
@@ -40,6 +54,26 @@ func WithLoopback(b bool) BuilderConfigOption {
 	}
 }
 
+// PacketBuilder 按照传入的各层配置选项组合并序列化出一个完整的数据包字节
+// 在 yak 中通过 pcapx.PacketBuilder 调用，可叠加链路层/网络层/传输层等多种选项
+// 参数:
+//   - opts: 一组数据包构建选项(如 pcapx.ipv4_srcIp、pcapx.tcp_dstPort、pcapx.WithPayload 等)
+//
+// 返回值:
+//   - 序列化后的数据包字节
+//   - 构建过程中的错误
+//
+// Example:
+// ```
+// // 该示例为示意性用法：构建一个 TCP SYN 数据包
+// raw = pcapx.PacketBuilder(
+//
+//	pcapx.ipv4_srcIp("1.1.1.1"), pcapx.ipv4_dstOp("2.2.2.2"),
+//	pcapx.tcp_srcPort(12345), pcapx.tcp_dstPort(80), pcapx.tcp_flag("syn"),
+//
+// )~
+// println(len(raw))
+// ```
 func PacketBuilder(opts ...any) ([]byte, error) {
 	var (
 		baseConfig = &BuilderConfig{}

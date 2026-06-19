@@ -69,6 +69,20 @@ func (d *Discriminator) IsNegativeWithThreshold(raw []byte, threshold float64) b
 	return false
 }
 
+// NewDiscriminator 基于一个原始响应样本创建一个判别器，用于判断其它响应是否与样本相似
+// 参数:
+//   - origin: 作为正样本的原始 HTTP 响应报文
+//
+// 返回值:
+//   - 判别器对象，可调用 IsNegative 等方法进行相似度判别
+//
+// Example:
+// ```
+// // VARS: 基于样本创建判别器
+// d = judge.NewDiscriminator("HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello")
+// // assert: 与负样本(空)相比不相似，IsNegative 返回 false
+// assert d.IsNegative("HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello") == false, "discriminator should be constructed and callable"
+// ```
 func NewDiscriminator(origin []byte) *Discriminator {
 	d := &Discriminator{
 		PositiveSample:           origin,

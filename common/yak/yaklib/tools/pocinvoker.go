@@ -36,6 +36,18 @@ type PocInvoker struct {
 	nucleiPocList []*utils.FileInfo
 }
 
+// NewPocInvoker 创建一个 POC 调用器，用于驱动 xray/nuclei 等外部 POC 引擎执行检测
+// 在 yak 中通过 tools.NewPocInvoker 调用
+// 返回值:
+//   - POC 调用器对象
+//   - 错误信息，初始化失败时非 nil
+//
+// Example:
+// ```
+// // 该示例为示意性用法：创建 POC 调用器
+// invoker = tools.NewPocInvoker()~
+// println(invoker != nil)
+// ```
 func NewPocInvoker() (*PocInvoker, error) {
 	invoker := &PocInvoker{
 		xrayBinary:    "",

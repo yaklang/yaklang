@@ -2,9 +2,11 @@ package yaklib
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/utils/chanx"
 	"net"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/chanx"
 )
 
 type MitmExtraConnManager struct {
@@ -17,6 +19,21 @@ func NewMitmExtraConnManager() *MitmExtraConnManager {
 		extraConnMap: make(map[string]*chanx.UnlimitedChan[net.Conn]),
 		mutex:        sync.Mutex{},
 	}
+}
+
+// GetDefaultExtraConnManager 获取默认的 MITM 额外连接管理器，用于向运行中的 MITM 服务注入外部连接
+// 返回值:
+//   - 默认的额外连接管理器实例
+//
+// Example:
+// ```
+// // 获取默认额外连接管理器，此处仅作示意
+// manager = mitm.GetDefaultExtraConnManager()
+// println(manager)
+// ```
+func getDefaultExtraConnManager() *MitmExtraConnManager {
+	log.Debug("fetching default mitm extra conn manager")
+	return DefaultMitmExtraConnManager
 }
 
 func (m *MitmExtraConnManager) GetExtraConnChan(id string) *chanx.UnlimitedChan[net.Conn] {

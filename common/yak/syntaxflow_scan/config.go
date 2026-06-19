@@ -66,6 +66,18 @@ var WithPauseFunc = ssaconfig.SetOption(pauseFuncKey, func(c *Config, pause func
 	c.pauseCheck = pause
 })
 
+// WithScanResultCallback 设置扫描结果回调（导出名为 syntaxflow.withScanResultCallback）
+// 参数:
+//   - callback: 每产生一个扫描结果时触发的回调函数
+//
+// 返回值:
+//   - 扫描配置可选项
+//
+// Example:
+// ```
+// opt = syntaxflow.withScanResultCallback(func(result) { dump(result) })
+// println(opt)
+// ```
 var WithScanResultCallback = ssaconfig.SetOption(resultCallbackKey, func(c *Config, callback ScanResultCallback) {
 	c.resultCallback = callback
 })
@@ -74,6 +86,22 @@ var WithErrorCallback = ssaconfig.SetOption(errorCallbackKey, func(c *Config, ca
 	c.errorCallback = callback
 })
 
+// WithProcessCallback 设置扫描进度回调（导出名为 syntaxflow.withScanProcessCallback）
+// 参数:
+//   - callback: 扫描进度变化时触发的回调函数，参数含任务 ID、状态、进度等
+//
+// 返回值:
+//   - 扫描配置可选项
+//
+// Example:
+// ```
+//
+//	opt = syntaxflow.withScanProcessCallback(func(taskID, status, progress, info) {
+//	    println(status)
+//	})
+//
+// println(opt)
+// ```
 var WithProcessCallback = ssaconfig.SetOption(processCallbackKey, func(c *Config, callback ProcessCallback) {
 	c.ProcessCallback = callback
 })
@@ -86,6 +114,20 @@ var WithRulePerformanceLog = ssaconfig.SetOption("syntaxflow-scan/enableRulePerf
 	c.EnableRulePerformanceLog = enable
 })
 
+// withPrograms 指定本次扫描要覆盖的程序集合（导出名为 syntaxflow.withScanPrograms）
+// 参数:
+//   - progs: 待扫描的程序集合
+//
+// 返回值:
+//   - 扫描配置可选项
+//
+// Example:
+// ```
+// // 指定扫描某个已编译的程序（示意性示例）
+// prog = ssa.Parse("a = 1")~
+// opt = syntaxflow.withScanPrograms(prog.GetProgramName())
+// println(opt)
+// ```
 var withPrograms = ssaconfig.SetOption("syntaxflow-scan/programs", func(c *Config, progs ssaapi.Programs) {
 	c.ScanTaskCallback.Programs = progs
 })

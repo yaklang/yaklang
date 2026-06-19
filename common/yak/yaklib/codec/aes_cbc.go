@@ -79,55 +79,109 @@ type SymmetricCryptFunc func(key []byte, i interface{}, iv []byte) ([]byte, erro
 var AESCBCEncrypt = AESEncryptCBCWithPKCSPadding
 var AESCBCDecrypt = AESDecryptCBCWithPKCSPadding
 
-// AESCBCEncryptWithPKCS7Padding 使用 AES 算法，在 CBC 模式下，使用 PKCS5 填充来加密数据。
-// 它接受一个密钥（key）、需要加密的数据（data to encrypt）和一个初始化向量（iv）。
-// 密钥的长度必须是 16、24 或 32 字节（分别对应 AES-128、AES-192 或 AES-256）。
-// 如果iv为 nil，则使用key的前16字节作为iv。
-// 注意：AESCBCEncrypt AESEncrypt 和 AESCBCEncryptWithPKCS7Padding 是同一个函数的别名
-// example：
+// AESEncryptCBCWithPKCSPadding 使用 AES 算法在 CBC 模式下用 PKCS7 填充加密数据
+// 密钥长度必须是 16/24/32 字节(分别对应 AES-128/192/256)；iv 为 nil 时使用 key 前 16 字节作为 iv。
+// 注意：AESCBCEncrypt、AESEncrypt 和 AESCBCEncryptWithPKCS7Padding 是同一个函数的别名
+// 参数:
+//   - key: 密钥(16/24/32 字节)
+//   - i: 待加密的数据，可为 string、[]byte 等
+//   - iv: 初始化向量(16 字节)，可为 nil
+//
+// 返回值:
+//   - []byte: 加密后的密文字节
+//   - error: 加密失败(如密钥长度非法)时返回的错误
+//
+// Example:
 // ```
-//
-//	codec.AESCBCEncryptWithPKCS7Padding("1234567890123456", "hello world", "1234567890123456")
-//
+// // VARS: 准备密钥、IV 与明文
+// key = "1234567890123456"
+// iv = "abcdefghijklmnop"
+// ct = codec.AESCBCEncrypt(key, "Secret Message", iv)~
+// // STDOUT: 解密还原后打印
+// println(string(codec.AESCBCDecrypt(key, ct, iv)~))   // OUT: Secret Message
+// // assert: 锁定结论(加解密往返一致)
+// assert string(codec.AESCBCDecrypt(key, ct, iv)~) == "Secret Message", "AES-CBC encrypt/decrypt should round-trip"
 // ```
 func AESEncryptCBCWithPKCSPadding(key []byte, i interface{}, iv []byte) ([]byte, error) {
 	return AESEncFactory(PKCS5Padding, CBC)(key, i, iv)
 }
 
-// AESCBCDecryptWithPKCS7Padding 使用 AES 算法，在 CBC 模式下，使用 PKCS5 填充来解密数据。
-// 它接受一个密钥（key）、需要解密的数据（data to decrypt）和一个初始化向量（iv）。
-// 密钥的长度必须是 16、24 或 32 字节（分别对应 AES-128、AES-192 或 AES-256）。
-// 如果iv为 nil，则使用key的前16字节作为iv。
-// 注意：AESCBCDecrypt AESDecrypt 和 AESCBCDecryptWithPKCS7Padding 是同一个函数的别名
-// example：
+// AESDecryptCBCWithPKCSPadding 使用 AES 算法在 CBC 模式下用 PKCS7 填充解密数据
+// 密钥长度必须是 16/24/32 字节(分别对应 AES-128/192/256)；iv 为 nil 时使用 key 前 16 字节作为 iv。
+// 注意：AESCBCDecrypt、AESDecrypt 和 AESCBCDecryptWithPKCS7Padding 是同一个函数的别名
+// 参数:
+//   - key: 密钥(16/24/32 字节)
+//   - i: 待解密的密文，可为 []byte 等
+//   - iv: 初始化向量(16 字节)，可为 nil
+//
+// 返回值:
+//   - []byte: 解密还原后的明文字节
+//   - error: 解密失败时返回的错误
+//
+// Example:
 // ```
-//
-//	codec.AESCBCDecryptWithPKCS7Padding("1234567890123456", ciphertext, "1234567890123456")
-//
+// // VARS: 先加密再解密
+// key = "1234567890123456"
+// iv = "abcdefghijklmnop"
+// ct = codec.AESCBCEncrypt(key, "Secret Message", iv)~
+// pt = codec.AESCBCDecrypt(key, ct, iv)~
+// // STDOUT: 打印还原后的明文
+// println(string(pt))   // OUT: Secret Message
+// // assert: 锁定结论(解密还原一致)
+// assert string(pt) == "Secret Message", "AES-CBC decrypt should recover plaintext"
 // ```
 func AESDecryptCBCWithPKCSPadding(key []byte, i interface{}, iv []byte) ([]byte, error) {
 	return AESDecFactory(PKCS5Padding, PKCS5UnPadding, CBC)(key, i, iv)
 }
 
-// AESCBCEncryptWithZeroPadding 使用 AES 算法，在 CBC 模式下，使用 Zero 填充来加密数据。
-// 它接受一个密钥（key）、需要加密的数据（data to encrypt）和一个初始化向量（iv）。
-// 密钥的长度必须是 16、24 或 32 字节（分别对应 AES-128、AES-192 或 AES-256）。
-// 如果iv为 nil，则使用key的前16字节作为iv。
-// example：
+// AESEncryptCBCWithZeroPadding 使用 AES 算法在 CBC 模式下用零(Zero)填充加密数据
+// 密钥长度必须是 16/24/32 字节(分别对应 AES-128/192/256)；iv 为 nil 时使用 key 前 16 字节作为 iv。
+// 参数:
+//   - key: 密钥(16/24/32 字节)
+//   - i: 待加密的数据，可为 string、[]byte 等
+//   - iv: 初始化向量(16 字节)，可为 nil
+//
+// 返回值:
+//   - []byte: 加密后的密文字节
+//   - error: 加密失败(如密钥长度非法)时返回的错误
+//
+// Example:
 // ```
-// codec.AESCBCEncryptWithZeroPadding("1234567890123456", "hello world", "1234567890123456")
+// // VARS: 准备密钥、IV 与明文
+// key = "1234567890123456"
+// iv = "abcdefghijklmnop"
+// ct = codec.AESCBCEncryptWithZeroPadding(key, "Secret Message", iv)~
+// // STDOUT: 解密还原后打印
+// println(string(codec.AESCBCDecryptWithZeroPadding(key, ct, iv)~))   // OUT: Secret Message
+// // assert: 锁定结论(零填充加解密往返一致)
+// assert string(codec.AESCBCDecryptWithZeroPadding(key, ct, iv)~) == "Secret Message", "AES-CBC zero-padding should round-trip"
 // ```
 func AESEncryptCBCWithZeroPadding(key []byte, i interface{}, iv []byte) ([]byte, error) {
 	return AESEncFactory(ZeroPadding, CBC)(key, i, iv)
 }
 
-// AESCBCDecryptWithZeroPadding 使用 AES 算法，在 CBC 模式下，使用 Zero 填充来解密数据。
-// 它接受一个密钥（key）、需要解密的数据（data to decrypt）和一个初始化向量（iv）。
-// 密钥的长度必须是 16、24 或 32 字节（分别对应 AES-128、AES-192 或 AES-256）。
-// 如果iv为 nil，则使用key的前16字节作为iv。
-// example：
+// AESDecryptCBCWithZeroPadding 使用 AES 算法在 CBC 模式下用零(Zero)填充解密数据
+// 密钥长度必须是 16/24/32 字节(分别对应 AES-128/192/256)；iv 为 nil 时使用 key 前 16 字节作为 iv。
+// 参数:
+//   - key: 密钥(16/24/32 字节)
+//   - i: 待解密的密文，可为 []byte 等
+//   - iv: 初始化向量(16 字节)，可为 nil
+//
+// 返回值:
+//   - []byte: 解密还原后的明文字节(末尾零字节会被去除)
+//   - error: 解密失败时返回的错误
+//
+// Example:
 // ```
-// codec.AESCBCDecryptWithZeroPadding("1234567890123456", ciphertext, "1234567890123456")
+// // VARS: 先加密再解密
+// key = "1234567890123456"
+// iv = "abcdefghijklmnop"
+// ct = codec.AESCBCEncryptWithZeroPadding(key, "Secret Message", iv)~
+// pt = codec.AESCBCDecryptWithZeroPadding(key, ct, iv)~
+// // STDOUT: 打印还原后的明文
+// println(string(pt))   // OUT: Secret Message
+// // assert: 锁定结论(零填充解密还原一致)
+// assert string(pt) == "Secret Message", "AES-CBC zero-padding decrypt should recover plaintext"
 // ```
 func AESDecryptCBCWithZeroPadding(key []byte, i interface{}, iv []byte) ([]byte, error) {
 	return AESDecFactory(ZeroPadding, ZeroUnPadding, CBC)(key, i, iv)
@@ -178,13 +232,29 @@ func isAESStreamMode(mode string) bool {
 	return mode == CTR || mode == CFB || mode == OFB
 }
 
-// AESEncryptBasic 使用 AES 算法对数据进行加密，支持多种模式（CBC、CFB、ECB、OFB、CTR） 。
-// 注意：此函数是底层的高级用法，需要外部自行处理 padding，key，iv 等问题。
-// example：
+// AESEncryptBasic 使用 AES 算法对数据进行加密，支持多种模式(CBC、CFB、ECB、OFB、CTR)
+// 注意：此函数是底层高级用法，需要外部自行处理 padding、key、iv 等问题。
+// 参数:
+//   - key: 密钥(16/24/32 字节)
+//   - data: 待加密的数据字节
+//   - iv: 初始化向量(块模式需要)
+//   - mode: 加密模式，取 codec.CBC / codec.CFB / codec.ECB / codec.OFB / codec.CTR
+//
+// 返回值:
+//   - []byte: 加密后的密文字节
+//   - error: 加密失败时返回的错误
+//
+// Example:
 // ```
-//
-//	codec.AESEncryptBasic("1234567890123456", codec.PKCS5Padding("hello world",16), "1234567890123456", codec.CBC)
-//
+// // VARS: 底层加密，块模式内部会做零填充
+// key = "1234567890123456"
+// iv = "abcdefghijklmnop"
+// ct = codec.AESEncryptBasic(key, "Secret Message", iv, codec.CBC)~
+// dec = codec.AESDecryptBasic(key, ct, iv, codec.CBC)~
+// // STDOUT: 去零填充后打印
+// println(string(codec.ZeroUnPadding(dec)))   // OUT: Secret Message
+// // assert: 锁定结论(底层加解密往返一致)
+// assert string(codec.ZeroUnPadding(dec)) == "Secret Message", "AESEncryptBasic/AESDecryptBasic should round-trip"
 // ```
 func AESEnc(key []byte, data []byte, iv []byte, mode string) ([]byte, error) {
 	// 只对块模式（CBC、ECB）进行 padding，流模式（CTR、CFB、OFB）不需要 padding
@@ -212,13 +282,29 @@ func AESEnc(key []byte, data []byte, iv []byte, mode string) ([]byte, error) {
 	}
 }
 
-// AESDecryptBasic 使用 AES 算法对数据进行解密，支持多种模式（CBC、CFB、ECB、OFB、CTR）。
-// 注意：此函数是底层的高级用法，需要外部自行处理 padding，key，iv 等问题。
-// example：
+// AESDecryptBasic 使用 AES 算法对数据进行解密，支持多种模式(CBC、CFB、ECB、OFB、CTR)
+// 注意：此函数是底层高级用法，需要外部自行处理 padding、key、iv 等问题。
+// 参数:
+//   - key: 密钥(16/24/32 字节)
+//   - data: 待解密的密文字节
+//   - iv: 初始化向量(块模式需要)
+//   - mode: 解密模式，取 codec.CBC / codec.CFB / codec.ECB / codec.OFB / codec.CTR
+//
+// 返回值:
+//   - []byte: 解密后的明文字节(块模式下可能含零填充)
+//   - error: 解密失败时返回的错误
+//
+// Example:
 // ```
-//
-//	codec.AESDecryptBasic("1234567890123456", cipertext, "1234567890123456", codec.CBC)
-//
+// // VARS: 底层加解密
+// key = "1234567890123456"
+// iv = "abcdefghijklmnop"
+// ct = codec.AESEncryptBasic(key, "Secret Message", iv, codec.CBC)~
+// dec = codec.AESDecryptBasic(key, ct, iv, codec.CBC)~
+// // STDOUT: 去零填充后打印
+// println(string(codec.ZeroUnPadding(dec)))   // OUT: Secret Message
+// // assert: 锁定结论(底层解密还原一致)
+// assert string(codec.ZeroUnPadding(dec)) == "Secret Message", "AESDecryptBasic should recover plaintext"
 // ```
 func AESDec(key []byte, data []byte, iv []byte, mode string) ([]byte, error) {
 	c, err := aes.NewCipher(key)

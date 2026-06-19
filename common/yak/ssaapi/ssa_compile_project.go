@@ -16,6 +16,21 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
+// ParseProjectFromPath 编译本地路径下的整个项目为 SSA 程序集合（导出名为 ssa.ParseLocalProject）
+// 参数:
+//   - path: 项目所在的本地目录路径
+//   - opts: 编译可选项，如 ssa.withLanguage、ssa.withProgramName 等
+//
+// 返回值:
+//   - SSA 程序集合
+//   - 错误信息
+//
+// Example:
+// ```
+// // 编译本地某个 Java 项目（示意性示例，需替换为真实路径）
+// progs = ssa.ParseLocalProject("/tmp/my-java-project", ssa.withLanguage(ssa.Java))~
+// println(len(progs))
+// ```
 func ParseProjectFromPath(path string, opts ...ssaconfig.Option) (Programs, error) {
 	if path != "" {
 		opts = append(opts, WithLocalFs(path))
@@ -184,6 +199,21 @@ func CompileDiffProgramAndSaveToDB(
 	return diffProgram, nil
 }
 
+// ParseProject 根据编译选项编译一个项目为 SSA 程序集合（导出名为 ssa.ParseProject）
+// 与 ParseLocalProject 不同，本函数通过选项指定代码来源（本地文件系统、git 等）
+// 参数:
+//   - opts: 编译可选项，如 ssa.withEntryFile、ssa.withLanguage、ssa.withProgramName 等
+//
+// 返回值:
+//   - SSA 程序集合
+//   - 错误信息
+//
+// Example:
+// ```
+// // 通过选项指定本地代码目录进行编译（示意性示例，需替换为真实路径）
+// progs = ssa.ParseProject(ssa.withLanguage(ssa.Java), ssa.withProgramName("demo"))~
+// println(len(progs))
+// ```
 func ParseProject(opts ...ssaconfig.Option) (prog Programs, err error) {
 	config, err := DefaultConfig(opts...)
 	if err != nil {

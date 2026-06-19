@@ -9,6 +9,13 @@ import (
 )
 
 // IterateCommit 用于指定一个本地仓库，遍历其所有的提交记录(commit)，并对过滤后的每个提交记录执行指定的操作，它还可以接收零个到多个选项函数，用于配置回调函数
+// 参数:
+//   - localRepos: 本地仓库路径
+//   - opt: 可选项，如 git.filterReference、git.filterCommit、git.handleCommit、git.handleReference 等
+//
+// 返回值:
+//   - 错误信息
+//
 // Example:
 // ```
 // // 遍历提交记录，过滤名字中包含ci的引用记录，过滤作者名字为xxx的提交记录，打印剩余的每个提交记录

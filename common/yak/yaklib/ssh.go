@@ -33,42 +33,114 @@ type SSHConfig struct {
 // SSHOption is a function that configures SSHConfig
 type SSHOption func(*SSHConfig)
 
-// WithSSHUsername sets the SSH username
+// username 是一个 SSH 连接配置选项，用于设置登录用户名
+// 参数:
+//   - username: 登录用户名
+//
+// 返回值:
+//   - 一个 SSH 连接配置选项，作为可变参数传入 ssh.Connect
+//
+// Example:
+// ```
+// // 指定用户名密码建立 SSH 连接，此处仅作示意
+// client = ssh.Connect("example.com:22", ssh.username("root"), ssh.password("pass"))~
+// defer client.Close()
+// ```
 func WithSSHUsername(username string) SSHOption {
 	return func(c *SSHConfig) {
 		c.Username = username
 	}
 }
 
-// WithSSHPassword sets the SSH password
+// password 是一个 SSH 连接配置选项，用于设置登录密码
+// 参数:
+//   - password: 登录密码
+//
+// 返回值:
+//   - 一个 SSH 连接配置选项，作为可变参数传入 ssh.Connect
+//
+// Example:
+// ```
+// // 指定用户名密码建立 SSH 连接，此处仅作示意
+// client = ssh.Connect("example.com:22", ssh.username("root"), ssh.password("pass"))~
+// defer client.Close()
+// ```
 func WithSSHPassword(password string) SSHOption {
 	return func(c *SSHConfig) {
 		c.Password = password
 	}
 }
 
-// WithSSHPrivateKey sets the path to SSH private key
+// privateKey 是一个 SSH 连接配置选项，用于设置私钥文件路径以进行密钥认证
+// 参数:
+//   - keyPath: 私钥文件路径
+//
+// 返回值:
+//   - 一个 SSH 连接配置选项，作为可变参数传入 ssh.Connect
+//
+// Example:
+// ```
+// // 使用私钥建立 SSH 连接，此处仅作示意
+// client = ssh.Connect("example.com:22", ssh.username("root"), ssh.privateKey("/path/to/id_rsa"))~
+// defer client.Close()
+// ```
 func WithSSHPrivateKey(keyPath string) SSHOption {
 	return func(c *SSHConfig) {
 		c.PrivateKey = keyPath
 	}
 }
 
-// WithSSHKeyPassphrase sets the passphrase for encrypted private key
+// keyPassphrase 是一个 SSH 连接配置选项，用于设置加密私钥的口令
+// 参数:
+//   - passphrase: 私钥口令
+//
+// 返回值:
+//   - 一个 SSH 连接配置选项，作为可变参数传入 ssh.Connect
+//
+// Example:
+// ```
+// // 使用带口令的私钥建立 SSH 连接，此处仅作示意
+// client = ssh.Connect("example.com:22", ssh.username("root"), ssh.privateKey("/path/to/id_rsa"), ssh.keyPassphrase("secret"))~
+// defer client.Close()
+// ```
 func WithSSHKeyPassphrase(passphrase string) SSHOption {
 	return func(c *SSHConfig) {
 		c.KeyPassphrase = passphrase
 	}
 }
 
-// WithSSHPort sets the SSH port
+// port 是一个 SSH 连接配置选项，用于设置 SSH 服务器端口
+// 参数:
+//   - port: SSH 服务器端口，默认 22
+//
+// 返回值:
+//   - 一个 SSH 连接配置选项，作为可变参数传入 ssh.Connect
+//
+// Example:
+// ```
+// // 指定端口建立 SSH 连接，此处仅作示意
+// client = ssh.Connect("example.com", ssh.port(2222), ssh.username("root"), ssh.password("pass"))~
+// defer client.Close()
+// ```
 func WithSSHPort(port int) SSHOption {
 	return func(c *SSHConfig) {
 		c.Port = port
 	}
 }
 
-// WithSSHTimeout sets the connection timeout in seconds
+// timeout 是一个 SSH 连接配置选项，用于设置连接超时时间（单位：秒）
+// 参数:
+//   - timeout: 超时时间，单位为秒，支持小数
+//
+// 返回值:
+//   - 一个 SSH 连接配置选项，作为可变参数传入 ssh.Connect
+//
+// Example:
+// ```
+// // 设置连接超时建立 SSH 连接，此处仅作示意
+// client = ssh.Connect("example.com:22", ssh.username("root"), ssh.password("pass"), ssh.timeout(5))~
+// defer client.Close()
+// ```
 func WithSSHTimeout(timeout float64) SSHOption {
 	return func(c *SSHConfig) {
 		c.Timeout = timeout
@@ -125,11 +197,23 @@ func (s *SSHClient) Close() error {
 	return s.client.Close()
 }
 
-// SSHConnect establishes an SSH connection with flexible options
-// Example:
+// Connect 使用灵活的配置选项建立一个 SSH 连接，返回可执行命令与传输文件的客户端
+// 参数:
+//   - host: 目标地址，格式为 host 或 host:port，未指定端口时默认 22
+//   - opts: 可选配置，例如 ssh.username、ssh.password、ssh.privateKey、ssh.port、ssh.timeout
 //
-//	client, err = ssh.Connect("example.com:22", ssh.username("root"), ssh.password("pass"))
-//	client, err = ssh.Connect("example.com", ssh.username("admin"), ssh.privateKey("/path/to/key"))
+// 返回值:
+//   - SSH 客户端对象，可调用 Run/RunScript/UploadFile 等方法
+//   - 错误信息，连接或认证失败时返回非空
+//
+// Example:
+// ```
+// // 建立 SSH 连接并执行命令，依赖目标服务，此处仅作示意
+// client = ssh.Connect("example.com:22", ssh.username("root"), ssh.password("pass"), ssh.timeout(5))~
+// defer client.Close()
+// output = client.Run("whoami")~
+// println(output)
+// ```
 func SSHConnect(host string, opts ...SSHOption) (*SSHClient, error) {
 	config := &SSHConfig{
 		Username: "root",
@@ -179,10 +263,24 @@ func SSHConnect(host string, opts ...SSHOption) (*SSHClient, error) {
 	return &SSHClient{client: client}, nil
 }
 
-// SSHConnectWithKey connects to SSH server using private key
-// Example:
+// ConnectWithKey 使用私钥认证连接到 SSH 服务器，返回 SSH 客户端
+// 参数:
+//   - host: 目标地址，格式为 host 或 host:port，未指定端口时默认 22
+//   - username: 登录用户名
+//   - keyPath: 私钥文件路径
 //
-//	client, err = ssh.ConnectWithKey("example.com:22", "root", "/path/to/id_rsa")
+// 返回值:
+//   - SSH 客户端对象，可调用 Run/RunScript/UploadFile 等方法
+//   - 错误信息，连接或认证失败时返回非空
+//
+// Example:
+// ```
+// // 使用私钥连接 SSH 并执行命令，依赖目标服务，此处仅作示意
+// client = ssh.ConnectWithKey("example.com:22", "root", "/path/to/id_rsa")~
+// defer client.Close()
+// output = client.Run("uname -a")~
+// println(output)
+// ```
 func SSHConnectWithKey(host, username, keyPath string) (*SSHClient, error) {
 	parsedHost, parsedPort, err := utils.ParseStringToHostPort(host)
 	if err != nil {
@@ -200,10 +298,24 @@ func SSHConnectWithKey(host, username, keyPath string) (*SSHClient, error) {
 	return &SSHClient{client: client}, nil
 }
 
-// SSHConnectWithPasswd connects to SSH server using password
-// Example:
+// ConnectWithPasswd 使用密码认证连接到 SSH 服务器，返回 SSH 客户端
+// 参数:
+//   - host: 目标地址，格式为 host 或 host:port，未指定端口时默认 22
+//   - username: 登录用户名
+//   - password: 登录密码
 //
-//	client, err = ssh.ConnectWithPasswd("example.com:22", "root", "password")
+// 返回值:
+//   - SSH 客户端对象，可调用 Run/RunScript/UploadFile 等方法
+//   - 错误信息，连接或认证失败时返回非空
+//
+// Example:
+// ```
+// // 使用密码连接 SSH 并执行命令，依赖目标服务，此处仅作示意
+// client = ssh.ConnectWithPasswd("example.com:22", "root", "password")~
+// defer client.Close()
+// output = client.Run("id")~
+// println(output)
+// ```
 func SSHConnectWithPasswd(host, username, password string) (*SSHClient, error) {
 	parsedHost, parsedPort, err := utils.ParseStringToHostPort(host)
 	if err != nil {

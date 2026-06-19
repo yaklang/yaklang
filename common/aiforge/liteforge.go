@@ -131,6 +131,18 @@ func WithLiteForge_SpeedPriority(b ...bool) LiteForgeOption {
 	}
 }
 
+// WithLiteForge_RequireParams 设置 LiteForge 的输入参数 schema（导出名为 aiagent.liteForgedRequireParams）
+// 参数:
+//   - params: 一个或多个 aitool 参数选项
+//
+// 返回值:
+//   - LiteForge 可选项
+//
+// Example:
+// ```
+// opt = aiagent.liteForgedRequireParams(aitool.WithStringParam("target"))
+// println(opt)
+// ```
 func WithLiteForge_RequireParams(params ...aitool.ToolOption) LiteForgeOption {
 	return func(l *LiteForge) error {
 		t := aitool.NewWithoutCallback("", params...)
@@ -142,6 +154,18 @@ func WithLiteForge_RequireParams(params ...aitool.ToolOption) LiteForgeOption {
 	}
 }
 
+// WithLiteForge_OutputSchema 设置 LiteForge 的输出结构 schema（导出名为 aiagent.liteForgeOutputSchema）
+// 参数:
+//   - params: 一个或多个 aitool 参数选项，描述期望的输出字段
+//
+// 返回值:
+//   - LiteForge 可选项
+//
+// Example:
+// ```
+// opt = aiagent.liteForgeOutputSchema(aitool.WithStringParam("title"))
+// println(opt)
+// ```
 func WithLiteForge_OutputSchema(params ...aitool.ToolOption) LiteForgeOption {
 	return func(l *LiteForge) error {
 		t := aitool.NewWithoutCallback(
@@ -152,6 +176,19 @@ func WithLiteForge_OutputSchema(params ...aitool.ToolOption) LiteForgeOption {
 	}
 }
 
+// WithLiteForge_OutputSchemaRaw 通过原始 JSON Schema 字符串设置输出结构（导出名为 aiagent.liteForgeOutputSchemaRaw）
+// 参数:
+//   - actionName: action 名称
+//   - outputSchema: 原始 JSON Schema 字符串
+//
+// 返回值:
+//   - LiteForge 可选项
+//
+// Example:
+// ```
+// opt = aiagent.liteForgeOutputSchemaRaw("call-tool", `{"type":"object"}`)
+// println(opt)
+// ```
 func WithLiteForge_OutputSchemaRaw(actionName string, outputSchema string) LiteForgeOption {
 	return func(l *LiteForge) error {
 		l.OutputActionName = actionName
@@ -204,6 +241,17 @@ func WithExtendLiteForge_AIOption(opts ...aicommon.ConfigOption) LiteForgeOption
 //     NewLiteForge 的 schema 里
 //
 // 关键词: WithLiteForge_Prompt, dynamic 段, 调用方约定
+// 参数:
+//   - i: 动态 prompt 文本
+//
+// 返回值:
+//   - LiteForge 可选项
+//
+// Example:
+// ```
+// opt = aiagent.liteForgePrompt("extract the title from the html")
+// println(opt)
+// ```
 func WithLiteForge_Prompt(i string) LiteForgeOption {
 	return func(forge *LiteForge) error {
 		forge.Prompt = i

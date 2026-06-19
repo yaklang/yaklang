@@ -44,6 +44,22 @@ func (starter *BrowserStarter) targetResponseReplace() error {
 	return nil
 }
 
+// PageScreenShot 使用浏览器访问目标页面并截图，返回截图结果(通常为 base64 编码字符串)
+// 在 yak 中通过 crawlerx.PageScreenShot 调用，依赖本地 Chrome 浏览器环境
+// 参数:
+//   - targetUrl: 需要截图的目标页面 URL
+//   - opts: 可选配置项，如 crawlerx.browserInfo、crawlerx.stealth 等
+//
+// 返回值:
+//   - 截图结果字符串
+//   - 错误信息，失败时非 nil
+//
+// Example:
+// ```
+// // 该示例为示意性用法：对目标页面截图
+// code = crawlerx.PageScreenShot("http://testphp.vulnweb.com/")~
+// println(len(code))
+// ```
 func NewPageScreenShot(targetUrl string, opts ...ConfigOpt) (code string, err error) {
 	config := NewConfig()
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)

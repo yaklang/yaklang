@@ -8,6 +8,13 @@ import (
 )
 
 // HttpBruteForce 进行目标url的页面进行http爆破 第一个参数为目标url，后面可以添加零个或多个请求选项，用于对此次请求进行配置 返回值包括channel和错误，从channel中获取爆破结果
+// 参数:
+//   - targetUrl: 目标登录页面 URL
+//   - opts: 零个到多个请求选项，如 simulator.username、simulator.password 等
+//
+// 返回值:
+//   - 爆破结果的 channel，可使用 for-range 遍历
+//   - 错误信息
 //
 // Example:
 // ```

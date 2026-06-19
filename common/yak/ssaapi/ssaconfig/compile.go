@@ -97,6 +97,18 @@ func (c *Config) SetProgramName(name string) {
 
 // --- 基础信息配置 Options ---
 
+// WithProjectID 设置 SSA 项目 ID（导出名为 ssa.withProjectID）
+// 参数:
+//   - projectId: 项目 ID
+//
+// 返回值:
+//   - 编译/项目配置可选项
+//
+// Example:
+// ```
+// opt = ssa.withProjectID(1)
+// println(opt)
+// ```
 func WithProjectID(projectId uint64) Option {
 	return func(c *Config) error {
 		if err := c.ensureBase("Project ID"); err != nil {
@@ -107,6 +119,18 @@ func WithProjectID(projectId uint64) Option {
 	}
 }
 
+// WithProjectName 设置 SSA 项目名称（导出名为 ssa.withProjectName）
+// 参数:
+//   - name: 项目名称
+//
+// 返回值:
+//   - 编译/项目配置可选项
+//
+// Example:
+// ```
+// opt = ssa.withProjectName("my-project")
+// println(opt)
+// ```
 func WithProjectName(name string) Option {
 	return func(c *Config) error {
 		if err := c.ensureBase("Project Name"); err != nil {
@@ -117,6 +141,18 @@ func WithProjectName(name string) Option {
 	}
 }
 
+// WithProjectTags 设置 SSA 项目标签（导出名为 ssa.withProjectTags）
+// 参数:
+//   - tags: 标签列表
+//
+// 返回值:
+//   - 编译/项目配置可选项
+//
+// Example:
+// ```
+// opt = ssa.withProjectTags(["java", "demo"])
+// println(opt)
+// ```
 func WithProjectTags(tags []string) Option {
 	return func(c *Config) error {
 		if err := c.ensureBase("Project Tags"); err != nil {
@@ -127,6 +163,18 @@ func WithProjectTags(tags []string) Option {
 	}
 }
 
+// WithProjectDescription 设置 SSA 项目描述（导出名为 ssa.withProjectDescription）
+// 参数:
+//   - s: 项目描述
+//
+// 返回值:
+//   - 编译/项目配置可选项
+//
+// Example:
+// ```
+// opt = ssa.withProjectDescription("a demo project")
+// println(opt)
+// ```
 func WithProjectDescription(s string) Option {
 	return func(c *Config) error {
 		if err := c.ensureBase("Project Description"); err != nil {
@@ -137,6 +185,18 @@ func WithProjectDescription(s string) Option {
 	}
 }
 
+// WithProgramNames 追加要编译/加载的程序名（导出名为 ssa.withProgramName）
+// 参数:
+//   - programName: 一个或多个程序名
+//
+// 返回值:
+//   - 编译/项目配置可选项
+//
+// Example:
+// ```
+// opt = ssa.withProgramName("my-program")
+// println(opt)
+// ```
 func WithProgramNames(programName ...string) Option {
 	return func(c *Config) error {
 		if err := c.ensureBase("Program Name"); err != nil {
@@ -147,9 +207,20 @@ func WithProgramNames(programName ...string) Option {
 	}
 }
 
-// WithSetProgramName 设置主 program 名称（替换而非追加）
+// WithSetProgramName 设置主 program 名称（替换而非追加，导出名为 ssa.withSetProgramName）
 // 用于新编译场景：当 config 从项目 JSON 加载时可能包含旧的 program_names，
 // 调用此选项可强制使用新生成的 program 名称，避免复用数据库中的旧 program
+// 参数:
+//   - name: 新的主程序名
+//
+// 返回值:
+//   - 编译/项目配置可选项
+//
+// Example:
+// ```
+// opt = ssa.withSetProgramName("new-program")
+// println(opt)
+// ```
 func WithSetProgramName(name string) Option {
 	return func(c *Config) error {
 		if err := c.ensureBase("Program Name"); err != nil {
@@ -160,6 +231,18 @@ func WithSetProgramName(name string) Option {
 	}
 }
 
+// WithProgramDescription 设置程序描述（导出名为 ssa.withDescription）
+// 参数:
+//   - description: 程序描述
+//
+// 返回值:
+//   - 编译/项目配置可选项
+//
+// Example:
+// ```
+// opt = ssa.withDescription("program description")
+// println(opt)
+// ```
 func WithProgramDescription(description string) Option {
 	return func(c *Config) error {
 		if err := c.ensureBase("Program Description"); err != nil {
@@ -170,6 +253,18 @@ func WithProgramDescription(description string) Option {
 	}
 }
 
+// WithProjectRawLanguage 以字符串形式设置项目编程语言（导出名为 ssa.withLanguage）
+// 参数:
+//   - language: 语言名称，如 "java"、"yak"、"php"、"golang"
+//
+// 返回值:
+//   - 编译/项目配置可选项
+//
+// Example:
+// ```
+// opt = ssa.withLanguage("java")
+// println(opt)
+// ```
 func WithProjectRawLanguage(language string) Option {
 	return func(c *Config) error {
 		if strings.TrimSpace(language) == "" {
@@ -186,6 +281,18 @@ func WithProjectRawLanguage(language string) Option {
 	}
 }
 
+// WithProjectLanguage 以语言枚举形式设置项目编程语言（导出名为 ssa.withProjectLanguage）
+// 参数:
+//   - language: 语言枚举，如 ssa.Java、ssa.Yak、ssa.PHP
+//
+// 返回值:
+//   - 编译/项目配置可选项
+//
+// Example:
+// ```
+// opt = ssa.withProjectLanguage(ssa.Java)
+// println(opt)
+// ```
 func WithProjectLanguage(language Language) Option {
 	return func(c *Config) error {
 		if err := c.ensureBase("Program Language"); err != nil {
@@ -444,7 +551,18 @@ func (c *Config) SetCompileFilePerformanceLog(enable bool) {
 
 // --- 编译配置 Options ---
 
-// WithCompileStrictMode 设置严格模式
+// WithCompileStrictMode 设置编译严格模式（导出名为 ssa.withStrictMode）
+// 参数:
+//   - strictMode: 是否开启严格模式
+//
+// 返回值:
+//   - 编译配置可选项
+//
+// Example:
+// ```
+// opt = ssa.withStrictMode(true)
+// println(opt)
+// ```
 func WithCompileStrictMode(strictMode bool) Option {
 	return func(c *Config) error {
 		if err := c.ensureSSACompile("Compile Strict Mode"); err != nil {
@@ -455,7 +573,18 @@ func WithCompileStrictMode(strictMode bool) Option {
 	}
 }
 
-// WithCompilePeepholeSize 设置窥视孔大小
+// WithCompilePeepholeSize 设置窥视孔大小，用于将虚拟文件系统切分为多个编译块（导出名为 ssa.withPeepholeSize）
+// 参数:
+//   - peepholeSize: 窥视孔大小
+//
+// 返回值:
+//   - 编译配置可选项
+//
+// Example:
+// ```
+// opt = ssa.withPeepholeSize(100)
+// println(opt)
+// ```
 func WithCompilePeepholeSize(peepholeSize int) Option {
 	return func(c *Config) error {
 		if err := c.ensureSSACompile("Compile Peephole Size"); err != nil {
@@ -466,7 +595,18 @@ func WithCompilePeepholeSize(peepholeSize int) Option {
 	}
 }
 
-// WithCompileExcludeFiles 设置排除文件
+// WithCompileExcludeFiles 设置编译时排除的文件（导出名为 ssa.withExcludeFile / ssa.withDefaultExcludeFunc）
+// 参数:
+//   - excludeFiles: 要排除的文件路径模式，支持逗号分隔多个模式
+//
+// 返回值:
+//   - 编译配置可选项
+//
+// Example:
+// ```
+// opt = ssa.withExcludeFile("**/test/**", "**/*.min.js")
+// println(opt)
+// ```
 func WithCompileExcludeFiles(excludeFiles ...string) Option {
 	return func(c *Config) error {
 		if err := c.ensureSSACompile("Compile Exclude Files"); err != nil {
@@ -495,7 +635,18 @@ func WithCompileEntryFiles(entryFiles ...string) Option {
 	}
 }
 
-// WithCompileReCompile 设置重新编译
+// WithCompileReCompile 设置是否强制重新编译（导出名为 ssa.withReCompile）
+// 参数:
+//   - reCompile: 是否忽略缓存重新编译
+//
+// 返回值:
+//   - 编译配置可选项
+//
+// Example:
+// ```
+// opt = ssa.withReCompile(true)
+// println(opt)
+// ```
 func WithCompileReCompile(reCompile bool) Option {
 	return func(c *Config) error {
 		if err := c.ensureSSACompile("Compile Re Compile"); err != nil {
@@ -506,7 +657,18 @@ func WithCompileReCompile(reCompile bool) Option {
 	}
 }
 
-// WithCompileMemoryCompile 设置内存编译
+// WithCompileMemoryCompile 设置是否在内存中编译（不落库，导出名为 ssa.withMemory）
+// 参数:
+//   - memoryCompile: 是否使用内存编译，缺省为 true
+//
+// 返回值:
+//   - 编译配置可选项
+//
+// Example:
+// ```
+// opt = ssa.withMemory(true)
+// println(opt)
+// ```
 func WithCompileMemoryCompile(memoryCompile ...bool) Option {
 	return func(c *Config) error {
 		if err := c.ensureSSACompile("Compile Memory Compile"); err != nil {
@@ -521,7 +683,18 @@ func WithCompileMemoryCompile(memoryCompile ...bool) Option {
 	}
 }
 
-// WithCompileConcurrency 设置编译并发数
+// WithCompileConcurrency 设置编译并发数（导出名为 ssa.withConcurrency）
+// 参数:
+//   - concurrency: 并发数（仅并行化预处理阶段的读取与 AST 解析）
+//
+// 返回值:
+//   - 编译配置可选项
+//
+// Example:
+// ```
+// opt = ssa.withConcurrency(5)
+// println(opt)
+// ```
 func WithCompileConcurrency(concurrency int) Option {
 	return func(c *Config) error {
 		if err := c.ensureSSACompile("Compile Concurrency"); err != nil {
@@ -562,7 +735,18 @@ func WithCompileIrCacheMax(max int) Option {
 	}
 }
 
-// WithCompileFilePerformanceLog 设置文件级别性能日志
+// WithCompileFilePerformanceLog 设置是否记录文件级别性能日志（导出名为 ssa.withFilePerformanceLog）
+// 参数:
+//   - enable: 是否开启文件级别性能日志
+//
+// 返回值:
+//   - 编译配置可选项
+//
+// Example:
+// ```
+// opt = ssa.withFilePerformanceLog(true)
+// println(opt)
+// ```
 func WithCompileFilePerformanceLog(enable bool) Option {
 	return func(c *Config) error {
 		if err := c.ensureSSACompile("Compile File Performance Log"); err != nil {
@@ -626,8 +810,19 @@ func (c *Config) SetBaseProgramName(baseProgramName string) {
 
 // --- 增量编译配置 Options ---
 
-// WithEnableIncrementalCompile 启用增量编译
+// WithEnableIncrementalCompile 启用增量编译（导出名为 ssa.withEnableIncrementalCompile）
 // 如果启用增量编译但 BaseProgramName 为空，表示这是第一次增量编译（base program）
+// 参数:
+//   - enable: 是否启用增量编译
+//
+// 返回值:
+//   - 编译配置可选项
+//
+// Example:
+// ```
+// opt = ssa.withEnableIncrementalCompile(true)
+// println(opt)
+// ```
 func WithEnableIncrementalCompile(enable bool) Option {
 	return func(c *Config) error {
 		if err := c.ensureSSACompile("Enable Incremental Compile"); err != nil {
@@ -638,7 +833,19 @@ func WithEnableIncrementalCompile(enable bool) Option {
 	}
 }
 
-// WithBaseProgramName 设置基础程序名称（用于差量编译）
+// WithBaseProgramName 设置基础程序名称用于差量编译（导出名为 ssa.withBaseProgramName）
+// 设置后会自动启用增量编译
+// 参数:
+//   - baseProgramName: 作为增量编译基线的程序名
+//
+// 返回值:
+//   - 编译配置可选项
+//
+// Example:
+// ```
+// opt = ssa.withBaseProgramName("base-program")
+// println(opt)
+// ```
 func WithBaseProgramName(baseProgramName string) Option {
 	return func(c *Config) error {
 		if err := c.ensureSSACompile("Base Program Name"); err != nil {

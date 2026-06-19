@@ -55,13 +55,37 @@ func WithPromptContextProvider(provider *PromptContextProvider) aicommon.ConfigO
 	}
 }
 
+// WithResultHandler 设置协调器执行结束后的结果处理回调（导出名为 aiagent.resultHandler）
 // cycle import issue
+// 参数:
+//   - h: 结果处理函数，参数为协调器对象
+//
+// 返回值:
+//   - 配置选项
+//
+// Example:
+// ```
+// opt = aiagent.resultHandler(func(coordinator) { println("done") })
+// println(opt)
+// ```
 func WithResultHandler(h func(c *Coordinator)) aicommon.ConfigOption {
 	return func(config *aicommon.Config) error {
 		return aicommon.WithAppendOtherOption(WithCoordinatorResultHandler(h))(config)
 	}
 }
 
+// WithPlanMocker 设置协调器的计划生成器，用于自定义/模拟任务计划（导出名为 aiagent.plan）
+// 参数:
+//   - i: 计划生成函数，参数为协调器，返回计划响应
+//
+// 返回值:
+//   - 配置选项
+//
+// Example:
+// ```
+// opt = aiagent.plan(func(coordinator) { return nil })
+// println(opt)
+// ```
 func WithPlanMocker(i func(coordinator *Coordinator) *PlanResponse) aicommon.ConfigOption {
 	return func(config *aicommon.Config) error {
 		return aicommon.WithAppendOtherOption(WithCoordinatorPlanMocker(i))(config)

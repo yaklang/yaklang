@@ -104,6 +104,21 @@ func readPublicKeyFromBytes(q []byte) (*sm2.PublicKey, error) {
 	return pub, nil
 }
 
+// GenerateSM2PrivateKeyPEM 生成一对国密 SM2 密钥(PEM 文本格式)
+// 返回值:
+//   - []byte: SM2 私钥(PEM 文本)
+//   - []byte: SM2 公钥(PEM 文本)
+//   - error: 生成失败时返回的错误
+//
+// Example:
+// ```
+// // VARS: 生成 PEM 格式 SM2 密钥对(返回顺序: 私钥, 公钥)
+// priv, pub = codec.Sm2GeneratePemKeyPair()~
+// // STDOUT: 打印私钥是否为 PEM 文本
+// println(str.HasPrefix(string(priv), "-----BEGIN"))   // OUT: true
+// // assert: 锁定结论(生成非空密钥对)
+// assert len(priv) > 0 && len(pub) > 0, "Sm2GeneratePemKeyPair should produce keypair"
+// ```
 func GenerateSM2PrivateKeyPEM() ([]byte, []byte, error) {
 	pkey, err := sm2.GenerateKey(cryptoRand.Reader)
 	if err != nil {
@@ -121,6 +136,21 @@ func GenerateSM2PrivateKeyPEM() ([]byte, []byte, error) {
 	return pKeyBytes, pubKeyBytes, nil
 }
 
+// GenerateSM2PrivateKeyHEX 生成一对国密 SM2 密钥(HEX 文本格式)
+// 返回值:
+//   - []byte: SM2 私钥(HEX 文本)
+//   - []byte: SM2 公钥(HEX 文本)
+//   - error: 生成失败时返回的错误
+//
+// Example:
+// ```
+// // VARS: 生成 HEX 格式 SM2 密钥对(返回顺序: 私钥, 公钥)
+// priv, pub = codec.Sm2GenerateHexKeyPair()~
+// // STDOUT: 打印是否生成非空密钥对
+// println(len(priv) > 0 && len(pub) > 0)   // OUT: true
+// // assert: 锁定结论(生成非空密钥对)
+// assert len(priv) > 0 && len(pub) > 0, "Sm2GenerateHexKeyPair should produce keypair"
+// ```
 func GenerateSM2PrivateKeyHEX() ([]byte, []byte, error) {
 	for i := 0; i < 10; i++ {
 		pkey, err := sm2.GenerateKey(cryptoRand.Reader)
@@ -160,6 +190,27 @@ func preprocessCiphertext(data []byte) []byte {
 	return data
 }
 
+// SM2EncryptC1C2C3 使用国密 SM2 公钥按 C1C2C3 密文排列加密数据
+// 注意：Sm2Encrypt 和 Sm2EncryptC1C2C3 是同一个函数的别名
+// 参数:
+//   - pubKey: SM2 公钥(支持 PEM/HEX/原始字节)
+//   - data: 待加密的数据字节
+//
+// 返回值:
+//   - []byte: 加密后的密文字节(每次随机，结果不固定)
+//   - error: 加密失败时返回的错误
+//
+// Example:
+// ```
+// // VARS: 生成密钥对并做 C1C2C3 加解密往返
+// priv, pub = codec.Sm2GenerateHexKeyPair()~
+// ct = codec.Sm2EncryptC1C2C3(pub, "secret")~
+// pt = codec.Sm2DecryptC1C2C3(priv, ct)~
+// // STDOUT: 打印解密还原后的明文
+// println(string(pt))   // OUT: secret
+// // assert: 锁定结论(SM2 C1C2C3 加解密往返一致)
+// assert string(pt) == "secret", "SM2 C1C2C3 should round-trip"
+// ```
 func SM2EncryptC1C2C3(pubKey []byte, data []byte) ([]byte, error) {
 	pub, err := parsePublicKey(pubKey)
 	if err != nil {
@@ -173,10 +224,52 @@ func SM2EncryptC1C2C3(pubKey []byte, data []byte) ([]byte, error) {
 	return results, nil
 }
 
+// SM2DecryptC1C2C3 使用国密 SM2 私钥按 C1C2C3 密文排列解密数据
+// 注意：Sm2Decrypt 和 Sm2DecryptC1C2C3 是同一个函数的别名
+// 参数:
+//   - priKey: SM2 私钥(支持 PEM/HEX/原始字节)
+//   - data: 待解密的密文字节
+//
+// 返回值:
+//   - []byte: 解密还原后的明文字节
+//   - error: 解密失败时返回的错误
+//
+// Example:
+// ```
+// // VARS: 生成密钥对并做 C1C2C3 加解密往返
+// priv, pub = codec.Sm2GenerateHexKeyPair()~
+// ct = codec.Sm2EncryptC1C2C3(pub, "secret")~
+// pt = codec.Sm2DecryptC1C2C3(priv, ct)~
+// // STDOUT: 打印还原后的明文
+// println(string(pt))   // OUT: secret
+// // assert: 锁定结论(SM2 C1C2C3 解密还原一致)
+// assert string(pt) == "secret", "SM2 C1C2C3 decrypt should recover plaintext"
+// ```
 func SM2DecryptC1C2C3(priKey []byte, data []byte) ([]byte, error) {
 	return SM2DecryptC1C2C3WithPassword(priKey, data, nil)
 }
 
+// SM2DecryptC1C2C3WithPassword 使用带密码保护的国密 SM2 私钥按 C1C2C3 密文排列解密数据
+// 参数:
+//   - priKey: SM2 私钥(支持 PEM/HEX/原始字节，可为加密私钥)
+//   - data: 待解密的密文字节
+//   - password: 私钥保护密码，未加密时传 nil
+//
+// 返回值:
+//   - []byte: 解密还原后的明文字节
+//   - error: 解密失败时返回的错误
+//
+// Example:
+// ```
+// // VARS: 未加密私钥时 password 传 nil
+// priv, pub = codec.Sm2GenerateHexKeyPair()~
+// ct = codec.Sm2EncryptC1C2C3(pub, "secret")~
+// pt = codec.Sm2DecryptC1C2C3WithPassword(priv, ct, nil)~
+// // STDOUT: 打印还原后的明文
+// println(string(pt))   // OUT: secret
+// // assert: 锁定结论(带密码接口在 nil 密码下也能解密)
+// assert string(pt) == "secret", "SM2 C1C2C3 with password(nil) should recover plaintext"
+// ```
 func SM2DecryptC1C2C3WithPassword(priKey []byte, data []byte, password []byte) ([]byte, error) {
 	pri, err := parsePrivateKey(priKey, password)
 	if err != nil {
@@ -193,6 +286,26 @@ func SM2DecryptC1C2C3WithPassword(priKey []byte, data []byte, password []byte) (
 	return results, nil
 }
 
+// SM2EncryptC1C3C2 使用国密 SM2 公钥按 C1C3C2 密文排列加密数据
+// 参数:
+//   - pubKey: SM2 公钥(支持 PEM/HEX/原始字节)
+//   - data: 待加密的数据字节
+//
+// 返回值:
+//   - []byte: 加密后的密文字节(每次随机，结果不固定)
+//   - error: 加密失败时返回的错误
+//
+// Example:
+// ```
+// // VARS: 生成密钥对并做 C1C3C2 加解密往返
+// priv, pub = codec.Sm2GenerateHexKeyPair()~
+// ct = codec.Sm2EncryptC1C3C2(pub, "secret")~
+// pt = codec.Sm2DecryptC1C3C2(priv, ct)~
+// // STDOUT: 打印解密还原后的明文
+// println(string(pt))   // OUT: secret
+// // assert: 锁定结论(SM2 C1C3C2 加解密往返一致)
+// assert string(pt) == "secret", "SM2 C1C3C2 should round-trip"
+// ```
 func SM2EncryptC1C3C2(pubKey []byte, data []byte) ([]byte, error) {
 	pub, err := parsePublicKey(pubKey)
 	if err != nil {
@@ -206,10 +319,51 @@ func SM2EncryptC1C3C2(pubKey []byte, data []byte) ([]byte, error) {
 	return results, nil
 }
 
+// SM2DecryptC1C3C2 使用国密 SM2 私钥按 C1C3C2 密文排列解密数据
+// 参数:
+//   - priKey: SM2 私钥(支持 PEM/HEX/原始字节)
+//   - data: 待解密的密文字节
+//
+// 返回值:
+//   - []byte: 解密还原后的明文字节
+//   - error: 解密失败时返回的错误
+//
+// Example:
+// ```
+// // VARS: 生成密钥对并做 C1C3C2 加解密往返
+// priv, pub = codec.Sm2GenerateHexKeyPair()~
+// ct = codec.Sm2EncryptC1C3C2(pub, "secret")~
+// pt = codec.Sm2DecryptC1C3C2(priv, ct)~
+// // STDOUT: 打印还原后的明文
+// println(string(pt))   // OUT: secret
+// // assert: 锁定结论(SM2 C1C3C2 解密还原一致)
+// assert string(pt) == "secret", "SM2 C1C3C2 decrypt should recover plaintext"
+// ```
 func SM2DecryptC1C3C2(priKey []byte, data []byte) ([]byte, error) {
 	return SM2DecryptC1C3C2WithPassword(priKey, data, nil)
 }
 
+// SM2DecryptC1C3C2WithPassword 使用带密码保护的国密 SM2 私钥按 C1C3C2 密文排列解密数据
+// 参数:
+//   - priKey: SM2 私钥(支持 PEM/HEX/原始字节，可为加密私钥)
+//   - data: 待解密的密文字节
+//   - password: 私钥保护密码，未加密时传 nil
+//
+// 返回值:
+//   - []byte: 解密还原后的明文字节
+//   - error: 解密失败时返回的错误
+//
+// Example:
+// ```
+// // VARS: 未加密私钥时 password 传 nil
+// priv, pub = codec.Sm2GenerateHexKeyPair()~
+// ct = codec.Sm2EncryptC1C3C2(pub, "secret")~
+// pt = codec.Sm2DecryptC1C3C2WithPassword(priv, ct, nil)~
+// // STDOUT: 打印还原后的明文
+// println(string(pt))   // OUT: secret
+// // assert: 锁定结论(带密码接口在 nil 密码下也能解密)
+// assert string(pt) == "secret", "SM2 C1C3C2 with password(nil) should recover plaintext"
+// ```
 func SM2DecryptC1C3C2WithPassword(priKey []byte, data []byte, password []byte) ([]byte, error) {
 	pri, err := parsePrivateKey(priKey, password)
 	if err != nil {
@@ -226,6 +380,27 @@ func SM2DecryptC1C3C2WithPassword(priKey []byte, data []byte, password []byte) (
 	return results, nil
 }
 
+// SM2EncryptASN1 使用国密 SM2 公钥按 ASN.1 编码格式加密数据
+// 注意：Sm2EncryptAsn1 是本函数的导出名
+// 参数:
+//   - pubKey: SM2 公钥(支持 PEM/HEX/原始字节)
+//   - data: 待加密的数据字节
+//
+// 返回值:
+//   - []byte: ASN.1 编码的密文字节(每次随机，结果不固定)
+//   - error: 加密失败时返回的错误
+//
+// Example:
+// ```
+// // VARS: 生成密钥对并做 ASN.1 加解密往返
+// priv, pub = codec.Sm2GenerateHexKeyPair()~
+// ct = codec.Sm2EncryptAsn1(pub, "secret")~
+// pt = codec.Sm2DecryptAsn1(priv, ct)~
+// // STDOUT: 打印解密还原后的明文
+// println(string(pt))   // OUT: secret
+// // assert: 锁定结论(SM2 ASN.1 加解密往返一致)
+// assert string(pt) == "secret", "SM2 ASN1 should round-trip"
+// ```
 func SM2EncryptASN1(pubKey []byte, data []byte) ([]byte, error) {
 	pub, err := parsePublicKey(pubKey)
 	if err != nil {
@@ -235,10 +410,53 @@ func SM2EncryptASN1(pubKey []byte, data []byte) ([]byte, error) {
 	return sm2.EncryptAsn1(pub, data, cryptoRand.Reader)
 }
 
+// SM2DecryptASN1 使用国密 SM2 私钥按 ASN.1 编码格式解密数据
+// 注意：Sm2DecryptAsn1 是本函数的导出名
+// 参数:
+//   - priKey: SM2 私钥(支持 PEM/HEX/原始字节)
+//   - data: 待解密的 ASN.1 编码密文字节
+//
+// 返回值:
+//   - []byte: 解密还原后的明文字节
+//   - error: 解密失败时返回的错误
+//
+// Example:
+// ```
+// // VARS: 生成密钥对并做 ASN.1 加解密往返
+// priv, pub = codec.Sm2GenerateHexKeyPair()~
+// ct = codec.Sm2EncryptAsn1(pub, "secret")~
+// pt = codec.Sm2DecryptAsn1(priv, ct)~
+// // STDOUT: 打印还原后的明文
+// println(string(pt))   // OUT: secret
+// // assert: 锁定结论(SM2 ASN.1 解密还原一致)
+// assert string(pt) == "secret", "SM2 ASN1 decrypt should recover plaintext"
+// ```
 func SM2DecryptASN1(priKey []byte, data []byte) ([]byte, error) {
 	return SM2DecryptASN1WithPassword(priKey, data, nil)
 }
 
+// SM2DecryptASN1WithPassword 使用带密码保护的国密 SM2 私钥按 ASN.1 编码格式解密数据
+// 注意：Sm2DecryptAsn1WithPassword 是本函数的导出名
+// 参数:
+//   - priKey: SM2 私钥(支持 PEM/HEX/原始字节，可为加密私钥)
+//   - data: 待解密的 ASN.1 编码密文字节
+//   - password: 私钥保护密码，未加密时传 nil
+//
+// 返回值:
+//   - []byte: 解密还原后的明文字节
+//   - error: 解密失败时返回的错误
+//
+// Example:
+// ```
+// // VARS: 未加密私钥时 password 传 nil
+// priv, pub = codec.Sm2GenerateHexKeyPair()~
+// ct = codec.Sm2EncryptAsn1(pub, "secret")~
+// pt = codec.Sm2DecryptAsn1WithPassword(priv, ct, nil)~
+// // STDOUT: 打印还原后的明文
+// println(string(pt))   // OUT: secret
+// // assert: 锁定结论(带密码接口在 nil 密码下也能解密)
+// assert string(pt) == "secret", "SM2 ASN1 with password(nil) should recover plaintext"
+// ```
 func SM2DecryptASN1WithPassword(priKey []byte, data []byte, password []byte) ([]byte, error) {
 	pri, err := parsePrivateKey(priKey, password)
 	if err != nil {
@@ -248,45 +466,48 @@ func SM2DecryptASN1WithPassword(priKey []byte, data []byte, password []byte) ([]
 	return sm2.DecryptAsn1(pri, data)
 }
 
-// SM2SignWithSM3 使用SM2私钥对数据进行SM3签名，返回签名与错误
+// SM2SignWithSM3 使用国密 SM2 私钥对数据进行 SM3 签名，返回 ASN.1 DER 编码的签名
+// 参数:
+//   - priKeyBytes: SM2 私钥(支持 PEM/HEX/32 字节原始字节)
+//   - data: 待签名的数据，可为 string、[]byte 等
 //
-// 参数 priKeyBytes 表示 SM2 私钥，支持以下格式：
-//   - PEM 编码（例如 "-----BEGIN PRIVATE KEY-----" 块）
-//   - HEX 字符串格式（64位十六进制字符串）
-//   - 原始字节数组（32字节的私钥数据）
-//
-// 参数 data 是要签名的原始数据，可以是 []byte、string 或其他可转换为字节数组的类型。
-// 返回值是SM2签名结果（ASN.1 DER编码），如果签名失败则返回错误。
+// 返回值:
+//   - []byte: ASN.1 DER 编码的 SM2 签名(每次随机，结果不固定)
+//   - error: 签名失败时返回的错误
 //
 // Example:
 // ```
-// priKey, pubKey, _ := codec.Sm2GeneratePemKeyPair()
-// data := "hello world"
-// signature, err := codec.Sm2SignWithSM3(priKey, data)
-// die(err)
-// println("签名成功")
+// // VARS: 生成密钥对，签名后用公钥验签
+// priv, pub = codec.Sm2GenerateHexKeyPair()~
+// sig = codec.Sm2SignWithSM3(priv, "msg")~
+// // STDOUT: 验签返回 error，nil 表示通过
+// println(codec.Sm2VerifyWithSM3(pub, "msg", sig) == nil)   // OUT: true
+// // assert: 锁定结论(签名可被对应公钥验证通过)
+// assert codec.Sm2VerifyWithSM3(pub, "msg", sig) == nil, "SM2 sign should be verifiable"
 // ```
 func SM2SignWithSM3(priKeyBytes []byte, data interface{}) ([]byte, error) {
 	return SM2SignWithSM3WithPassword(priKeyBytes, data, nil)
 }
 
-// SM2SignWithSM3WithPassword 使用带密码保护的SM2私钥对数据进行SM3签名
+// SM2SignWithSM3WithPassword 使用带密码保护的国密 SM2 私钥对数据进行 SM3 签名
+// 参数:
+//   - priKeyBytes: SM2 私钥(支持 PEM/HEX/原始字节，可为加密私钥)
+//   - data: 待签名的数据，可为 string、[]byte 等
+//   - password: 私钥保护密码，未加密时传 nil
 //
-// 参数 priKeyBytes 表示加密的 SM2 私钥（PEM格式）
-// 参数 data 是要签名的原始数据
-// 参数 password 是私钥的保护密码，如果私钥未加密则传入 nil
-// 返回值是SM2签名结果（ASN.1 DER编码），如果签名失败则返回错误。
+// 返回值:
+//   - []byte: ASN.1 DER 编码的 SM2 签名(每次随机，结果不固定)
+//   - error: 签名失败时返回的错误
 //
 // Example:
 // ```
-// encryptedPriKey := []byte(`-----BEGIN ENCRYPTED PRIVATE KEY-----
-// MIGHAgEAMBMGByqGSM49AgEGCCqBHM9VAYItBG0wawIBAQQg...
-// -----END ENCRYPTED PRIVATE KEY-----`)
-// data := "hello world"
-// password := []byte("mypassword")
-// signature, err := codec.Sm2SignWithSM3WithPassword(encryptedPriKey, data, password)
-// die(err)
-// println("加密私钥签名成功")
+// // VARS: 未加密私钥时 password 传 nil
+// priv, pub = codec.Sm2GenerateHexKeyPair()~
+// sig = codec.Sm2SignWithSM3WithPassword(priv, "msg", nil)~
+// // STDOUT: 验签返回 error，nil 表示通过
+// println(codec.Sm2VerifyWithSM3(pub, "msg", sig) == nil)   // OUT: true
+// // assert: 锁定结论(带密码接口在 nil 密码下也能签名并验证)
+// assert codec.Sm2VerifyWithSM3(pub, "msg", sig) == nil, "SM2 sign with password(nil) should be verifiable"
 // ```
 func SM2SignWithSM3WithPassword(priKeyBytes []byte, data interface{}, password []byte) ([]byte, error) {
 	// 检查数据是否为nil，如果是则报错
@@ -310,31 +531,24 @@ func SM2SignWithSM3WithPassword(priKeyBytes []byte, data interface{}, password [
 	return signature, nil
 }
 
-// SM2VerifyWithSM3 使用SM2公钥对数据进行SM3签名验证，返回错误
+// SM2VerifyWithSM3 使用国密 SM2 公钥对数据进行 SM3 签名验证，验证通过返回 nil
+// 参数:
+//   - pubKeyBytes: SM2 公钥(支持 PEM/HEX/64 或 65 字节原始字节)
+//   - originData: 原始签名数据，可为 string、[]byte 等
+//   - sign: 待验证的 ASN.1 DER 编码签名
 //
-// 参数 pubKeyBytes 表示 SM2 公钥，支持以下格式：
-//   - PEM 编码（例如 "-----BEGIN PUBLIC KEY-----" 块）
-//   - HEX 字符串格式（128位或130位十六进制字符串）
-//   - 原始字节数组（64或65字节的公钥数据）
-//
-// 参数 originData 是原始签名数据
-// 参数 sign 是SM2签名结果（ASN.1 DER编码）
-// 如果验证成功返回 nil，验证失败返回错误信息。
+// 返回值:
+//   - error: 验证通过返回 nil，验证失败返回错误信息
 //
 // Example:
 // ```
-// priKey, pubKey, _ := codec.Sm2GeneratePemKeyPair()
-// data := "hello world"
-// signature, _ := codec.Sm2SignWithSM3(priKey, data)
-// err := codec.Sm2VerifyWithSM3(pubKey, data, signature)
-//
-//	if err == nil {
-//	   println("签名验证成功")
-//	}else {
-//
-//	   println("签名验证失败:", err.Error())
-//	}
-//
+// // VARS: 生成密钥对并签名，再验签
+// priv, pub = codec.Sm2GenerateHexKeyPair()~
+// sig = codec.Sm2SignWithSM3(priv, "msg")~
+// // STDOUT: 验签返回 error，nil 表示通过
+// println(codec.Sm2VerifyWithSM3(pub, "msg", sig) == nil)   // OUT: true
+// // assert: 锁定结论(正确签名验证通过)
+// assert codec.Sm2VerifyWithSM3(pub, "msg", sig) == nil, "SM2 verify should pass for valid signature"
 // ```
 func SM2VerifyWithSM3(pubKeyBytes []byte, originData interface{}, sign []byte) error {
 	// 检查数据是否为nil，如果是则报错

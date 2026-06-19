@@ -57,7 +57,23 @@ func DiffToStringContext(ctx context.Context, raw1, raw2 any) (string, error) {
 	return result, err
 }
 
-// Diff 比较两个输入并返回 diff 结果字符串（为了向后兼容，现在返回字符串）
+// Diff 比较两个输入内容并返回 git 风格的 diff 文本
+// 内部通过内存 git 仓库提交两个版本并计算差异，输入可为字符串或字节
+// 参数:
+//   - raw1: 第一个（旧）内容，字符串或字节
+//   - raw2: 第二个（新）内容，字符串或字节
+//   - handler: 可选的差异回调处理器；提供后将逐个变更回调且返回空字符串
+//
+// 返回值:
+//   - diff 文本（未提供 handler 时）；内容相同时为空字符串
+//   - 错误信息
+//
+// Example:
+// ```
+// result = diff.Diff("hello\n", "hello\nworld\n")~
+// assert str.Contains(result, "+world"), "diff should mark the added line"
+// assert str.Contains(result, "hello"), "diff should keep the context line"
+// ```
 func Diff(raw1, raw2 any, handler ...DiffHandler) (string, error) {
 	if len(handler) > 0 {
 		// 如果提供了处理器，保持原有行为但返回空字符串

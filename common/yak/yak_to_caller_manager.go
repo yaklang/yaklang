@@ -326,6 +326,17 @@ type YakToCallerManager struct {
 	longRunningThreshold int
 }
 
+// NewYakToCallerManager 创建一个插件回调管理器（导出名为 hook.NewManager）
+// 管理器用于加载插件、维护 hook 回调表并按需触发插件回调
+// 返回值:
+//   - 插件回调管理器对象
+//
+// Example:
+// ```
+// // 示意性示例，需要本地插件数据库
+// mng = hook.NewManager()
+// err = hook.LoadYakitPlugin(mng, "mitm")
+// ```
 func NewYakToCallerManager() *YakToCallerManager {
 	caller := &YakToCallerManager{
 		table:                new(sync.Map),
@@ -1961,14 +1972,62 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 //	})
 //}
 
+// loadScript 按插件类型批量加载 Yakit 插件到回调管理器（导出名为 hook.LoadYakitPlugin）
+// 参数:
+//   - mng: 插件回调管理器
+//   - scriptType: 插件类型，如 "mitm"、"port-scan"
+//   - hookNames: 可选，仅加载指定的 hook 名称
+//
+// 返回值:
+//   - 错误信息
+//
+// Example:
+// ```
+// // 示意性示例，需要本地插件数据库
+// mng = hook.NewManager()
+// err = hook.LoadYakitPlugin(mng, "mitm")
+// if err != nil { die(err) }
+// ```
 func loadScript(mng *YakToCallerManager, scriptType string, hookNames ...string) error {
 	return loadScriptCtx(mng, context.Background(), scriptType, hookNames...)
 }
 
+// loadScriptByName 按插件名加载 Yakit 插件到回调管理器（导出名为 hook.LoadYakitPluginByName）
+// 参数:
+//   - mng: 插件回调管理器
+//   - scriptName: 插件名称
+//   - hookNames: 可选，仅加载指定的 hook 名称
+//
+// 返回值:
+//   - 错误信息
+//
+// Example:
+// ```
+// // 示意性示例，需要本地插件数据库
+// mng = hook.NewManager()
+// err = hook.LoadYakitPluginByName(mng, "my-plugin")
+// if err != nil { die(err) }
+// ```
 func loadScriptByName(mng *YakToCallerManager, scriptName string, hookNames ...string) error {
 	return loadScriptByNameCtx(mng, context.Background(), scriptName, hookNames...)
 }
 
+// CallYakitPluginFunc 跨插件调用指定插件中导出的函数（导出名为 hook.CallYakitPluginFunc）
+// 仅可在 `yak your-file.yak` 方式运行的脚本中使用，不可在 MITM/WebFuzzer 热加载中使用
+// 参数:
+//   - scriptName: 目标插件名称
+//   - hookName: 插件中要调用的函数/变量名
+//
+// 返回值:
+//   - 被调用函数对应的值
+//   - 错误信息
+//
+// Example:
+// ```
+// // 示意性示例，需要本地插件数据库与预置引擎
+// fn = hook.CallYakitPluginFunc("my-plugin", "analyze")~
+// fn("target")
+// ```
 func CallYakitPluginFunc(scriptName string, hookName string) (interface{}, error) {
 	if currentCoreEngine == nil {
 		return nil, utils.Error("call cross plugin need engine preset(yak your-file.yak only)")
@@ -1995,6 +2054,24 @@ func CallYakitPluginFunc(scriptName string, hookName string) (interface{}, error
 	return value, nil
 }
 
+// loadScriptCtx 按插件类型批量加载插件（带上下文，导出名为 hook.LoadYakitPluginContext）
+// 参数:
+//   - mng: 插件回调管理器
+//   - ctx: 上下文对象，用于控制取消
+//   - scriptType: 插件类型
+//   - hookNames: 可选，仅加载指定的 hook 名称
+//
+// 返回值:
+//   - 错误信息
+//
+// Example:
+// ```
+// // 示意性示例，需要本地插件数据库
+// mng = hook.NewManager()
+// ctx = context.Background()
+// err = hook.LoadYakitPluginContext(mng, ctx, "mitm")
+// if err != nil { die(err) }
+// ```
 func loadScriptCtx(mng *YakToCallerManager, ctx context.Context, scriptType string, hookNames ...string) error {
 	db := consts.GetGormProfileDatabase()
 	if db == nil {
@@ -2018,6 +2095,17 @@ func loadScriptCtx(mng *YakToCallerManager, ctx context.Context, scriptType stri
 	return nil
 }
 
+// removeScriptByNameCtx 从回调管理器中移除指定名称的插件（导出名为 hook.RemoveYakitPluginByName）
+// 参数:
+//   - mng: 插件回调管理器
+//   - scriptNames: 要移除的插件名称列表
+//
+// Example:
+// ```
+// // 示意性示例，需要本地插件数据库
+// mng = hook.NewManager()
+// hook.RemoveYakitPluginByName(mng, "my-plugin")
+// ```
 func removeScriptByNameCtx(mng *YakToCallerManager, scriptNames ...string) {
 	mng.Remove(&ypb.RemoveHookParams{
 		RemoveHookID: scriptNames,
@@ -2047,12 +2135,45 @@ func loadScriptByNameCtx(mng *YakToCallerManager, ctx context.Context, scriptNam
 	return nil
 }
 
-// loadScriptByID loads a plugin by its database ID or UUID
-// Supports various numeric types as database ID, or string as UUID
+// loadScriptByID 按插件数据库 ID 或 UUID 加载插件（导出名为 hook.LoadYakitPluginByID）
+// 支持数值类型的数据库 ID，或字符串类型的 UUID
+// 参数:
+//   - mng: 插件回调管理器
+//   - id: 插件数据库 ID 或 UUID
+//   - hookNames: 可选，仅加载指定的 hook 名称
+//
+// 返回值:
+//   - 错误信息
+//
+// Example:
+// ```
+// // 示意性示例，需要本地插件数据库
+// mng = hook.NewManager()
+// err = hook.LoadYakitPluginByID(mng, 1)
+// if err != nil { die(err) }
+// ```
 func loadScriptByID(mng *YakToCallerManager, id interface{}, hookNames ...string) error {
 	return loadScriptByIDCtx(mng, context.Background(), id, hookNames...)
 }
 
+// loadScriptByIDCtx 按插件 ID/UUID 加载插件（带上下文，导出名为 hook.LoadYakitPluginByIDContext）
+// 参数:
+//   - mng: 插件回调管理器
+//   - ctx: 上下文对象，用于控制取消
+//   - id: 插件数据库 ID 或 UUID
+//   - hookNames: 可选，仅加载指定的 hook 名称
+//
+// 返回值:
+//   - 错误信息
+//
+// Example:
+// ```
+// // 示意性示例，需要本地插件数据库
+// mng = hook.NewManager()
+// ctx = context.Background()
+// err = hook.LoadYakitPluginByIDContext(mng, ctx, 1)
+// if err != nil { die(err) }
+// ```
 func loadScriptByIDCtx(mng *YakToCallerManager, ctx context.Context, id interface{}, hookNames ...string) error {
 	script, err := getYakScriptByID(id)
 	if err != nil {

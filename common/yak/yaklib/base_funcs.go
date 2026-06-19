@@ -96,6 +96,20 @@ func _input(s ...string) string {
 	return input
 }
 
+// IsYakFunc 判断传入的值是否为一个函数(包括 yak 函数与原生函数)
+// 参数:
+//   - i: 待判断的值
+//
+// 返回值:
+//   - 是否为函数
+//
+// Example:
+// ```
+// // STDOUT: 函数返回 true
+// println(dyn.IsYakFunc(func() { return 1 }))   // OUT: true
+// // assert: 非函数返回 false
+// assert dyn.IsYakFunc(123) == false, "an integer is not a function"
+// ```
 func IsYakFunction(i interface{}) bool {
 	return IsNewYakFunction(i)
 }

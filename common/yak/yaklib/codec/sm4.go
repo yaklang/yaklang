@@ -47,11 +47,27 @@ import (
 //		return sm4decBase(data, key, iv, sm4.Sm4OFB)
 //	}
 
-// Sm4GCMEncrypt 使用 SM4 算法，在 GCM 模式下加密数据
-// GCM 模式下需要 IV (初始化向量)，若为空则会使用 key 的前 16 字节作为 IV。
+// SM4GCMEnc 使用国密 SM4 算法在 GCM 模式下加密数据
+// 密钥与 IV 均为 16 字节；IV 为空时使用 key 前 16 字节作为 IV。
+// 参数:
+//   - key: 密钥(16 字节)
+//   - data: 待加密的数据，可为 string、[]byte 等
+//   - iv: 初始化向量(16 字节)，可为 nil
+//
+// 返回值:
+//   - []byte: 加密后的密文字节
+//   - error: 加密失败时返回的错误
+//
 // Example:
 // ```
-// codec.Sm4GCMEncrypt("1234123412341234", "123412341234123456", "1234123412341234")
+// // VARS: SM4-GCM 加解密
+// key = "1234567890123456"
+// iv = "abcdefghijklmnop"
+// ct = codec.Sm4GCMEncrypt(key, "Secret Message", iv)~
+// // STDOUT: 解密还原后打印
+// println(string(codec.Sm4GCMDecrypt(key, ct, iv)~))   // OUT: Secret Message
+// // assert: 锁定结论(SM4-GCM 加解密往返一致)
+// assert string(codec.Sm4GCMDecrypt(key, ct, iv)~) == "Secret Message", "SM4-GCM should round-trip"
 // ```
 func SM4GCMEnc(key []byte, data interface{}, iv []byte) ([]byte, error) {
 	if iv == nil {
@@ -65,11 +81,28 @@ func SM4GCMEnc(key []byte, data interface{}, iv []byte) ([]byte, error) {
 	return result, nil
 }
 
-// Sm4GCMDecrypt 使用 SM4 算法，在 GCM 模式下解密数据
-// GCM 模式下需要 IV (初始化向量)，若为空则会使用 key 的前 16 字节作为 IV。
+// SM4GCMDec 使用国密 SM4 算法在 GCM 模式下解密数据
+// 密钥与 IV 均为 16 字节；IV 为空时使用 key 前 16 字节作为 IV。
+// 参数:
+//   - key: 密钥(16 字节)
+//   - data: 待解密的密文，可为 []byte 等
+//   - iv: 初始化向量(16 字节)，可为 nil
+//
+// 返回值:
+//   - []byte: 解密还原后的明文字节
+//   - error: 解密或认证失败时返回的错误
+//
 // Example:
 // ```
-// codec.Sm4GCMDecrypt("1234123412341234", "123412341234123456", "1234123412341234")
+// // VARS: 先加密再解密(SM4-GCM)
+// key = "1234567890123456"
+// iv = "abcdefghijklmnop"
+// ct = codec.Sm4GCMEncrypt(key, "Secret Message", iv)~
+// pt = codec.Sm4GCMDecrypt(key, ct, iv)~
+// // STDOUT: 打印还原后的明文
+// println(string(pt))   // OUT: Secret Message
+// // assert: 锁定结论(SM4-GCM 解密还原一致)
+// assert string(pt) == "Secret Message", "SM4-GCM decrypt should recover plaintext"
 // ```
 func SM4GCMDec(key []byte, data interface{}, iv []byte) ([]byte, error) {
 	if iv == nil {
@@ -85,101 +118,270 @@ func SM4GCMDec(key []byte, data interface{}, iv []byte) ([]byte, error) {
 
 // Construct functions corresponding to various encryption modes, export func
 
-// SM4EncryptCBCWithPKCSPadding 使用 SM4 算法，在 CBC 模式下，使用 PKCS#7 填充来加密数据
-// CBC 模式下需要 IV (初始化向量)，若为空则会使用 key 的前 16 字节作为 IV。
-// 注意：SM4Encrypt SM4CBCEncrypt 和 SM4EncryptCBCWithPKCSPadding 是同一个函数的别名
+// SM4EncryptCBCWithPKCSPadding 使用国密 SM4 算法在 CBC 模式下用 PKCS7 填充加密数据
+// 密钥与 IV 均为 16 字节；IV 为空时使用 key 前 16 字节作为 IV。
+// 注意：Sm4Encrypt、Sm4CBCEncrypt 和 Sm4CBCEncryptWithPKCSPadding 是同一个函数的别名
+// 参数:
+//   - key: 密钥(16 字节)
+//   - i: 待加密的数据，可为 string、[]byte 等
+//   - iv: 初始化向量(16 字节)，可为 nil
+//
+// 返回值:
+//   - []byte: 加密后的密文字节
+//   - error: 加密失败时返回的错误
+//
 // Example:
 // ```
-// codec.SM4EncryptCBCWithPKCSPadding("1234123412341234", "123412341234123456", "1234123412341234")
+// // VARS: SM4-CBC 加解密
+// key = "1234567890123456"
+// iv = "abcdefghijklmnop"
+// ct = codec.Sm4CBCEncrypt(key, "Secret Message", iv)~
+// // STDOUT: 解密还原后打印
+// println(string(codec.Sm4CBCDecrypt(key, ct, iv)~))   // OUT: Secret Message
+// // assert: 锁定结论(SM4-CBC 加解密往返一致)
+// assert string(codec.Sm4CBCDecrypt(key, ct, iv)~) == "Secret Message", "SM4-CBC should round-trip"
 // ```
 func SM4EncryptCBCWithPKCSPadding(key []byte, i interface{}, iv []byte) ([]byte, error) {
 	return SM4EncFactory(PKCS5Padding, CBC)(key, i, iv)
 }
 
-// SM4DecryptCBCWithPKCSPadding 使用 SM4 算法，在 CBC 模式下，使用 PKCS#7 填充来解密数据
-// CBC 模式下需要 IV (初始化向量)，若为空则会使用 key 的前 16 字节作为 IV。
-// 注意：SM4Decrypt SM4CBCDecrypt 和 SM4DecryptCBCWithPKCSPadding 是同一个函数的别名
+// SM4DecryptCBCWithPKCSPadding 使用国密 SM4 算法在 CBC 模式下用 PKCS7 填充解密数据
+// 密钥与 IV 均为 16 字节；IV 为空时使用 key 前 16 字节作为 IV。
+// 注意：Sm4Decrypt、Sm4CBCDecrypt 和 Sm4CBCDecryptWithPKCSPadding 是同一个函数的别名
+// 参数:
+//   - key: 密钥(16 字节)
+//   - i: 待解密的密文，可为 []byte 等
+//   - iv: 初始化向量(16 字节)，可为 nil
+//
+// 返回值:
+//   - []byte: 解密还原后的明文字节
+//   - error: 解密失败时返回的错误
+//
 // Example:
 // ```
-// codec.SM4DecryptCBCWithPKCSPadding("1234123412341234", "123412341234123456", "1234123412341234")
+// // VARS: 先加密再解密(SM4-CBC)
+// key = "1234567890123456"
+// iv = "abcdefghijklmnop"
+// ct = codec.Sm4CBCEncrypt(key, "Secret Message", iv)~
+// pt = codec.Sm4CBCDecrypt(key, ct, iv)~
+// // STDOUT: 打印还原后的明文
+// println(string(pt))   // OUT: Secret Message
+// // assert: 锁定结论(SM4-CBC 解密还原一致)
+// assert string(pt) == "Secret Message", "SM4-CBC decrypt should recover plaintext"
 // ```
 func SM4DecryptCBCWithPKCSPadding(key []byte, i interface{}, iv []byte) ([]byte, error) {
 	return SM4DecFactory(PKCS5UnPadding, CBC)(key, i, iv)
 }
 
-// SM4EncryptECBWithPKCSPadding 使用 SM4 算法，在 ECB 模式下，使用 PKCS#7 填充来加密数据
-// ECB 模式下不需要 IV (初始化向量)，因此其是一个无用字段。
-// 注意：SM4ECBEncrypt 和 SM4EncryptECBWithPKCSPadding 是同一个函数的别名
+// SM4EncryptECBWithPKCSPadding 使用国密 SM4 算法在 ECB 模式下用 PKCS7 填充加密数据(ECB 模式下 iv 无用，传 nil)
+// 密钥为 16 字节。
+// 注意：Sm4ECBEncrypt 和 Sm4ECBEncryptWithPKCSPadding 是同一个函数的别名
+// 参数:
+//   - key: 密钥(16 字节)
+//   - i: 待加密的数据，可为 string、[]byte 等
+//   - iv: ECB 模式下无用，传 nil 即可
+//
+// 返回值:
+//   - []byte: 加密后的密文字节
+//   - error: 加密失败时返回的错误
+//
 // Example:
 // ```
-// codec.SM4EncryptECBWithPKCSPadding("1234123412341234", "123412341234123456", nil)
+// // VARS: SM4-ECB 加解密(iv 传 nil)
+// key = "1234567890123456"
+// ct = codec.Sm4ECBEncrypt(key, "Secret Message", nil)~
+// // STDOUT: 解密还原后打印
+// println(string(codec.Sm4ECBDecrypt(key, ct, nil)~))   // OUT: Secret Message
+// // assert: 锁定结论(SM4-ECB 加解密往返一致)
+// assert string(codec.Sm4ECBDecrypt(key, ct, nil)~) == "Secret Message", "SM4-ECB should round-trip"
 // ```
 func SM4EncryptECBWithPKCSPadding(key []byte, i interface{}, iv []byte) ([]byte, error) {
 	return SM4EncFactory(PKCS5Padding, ECB)(key, i, iv)
 }
 
-// SM4DecryptECBWithPKCSPadding 使用 SM4 算法，在 ECB 模式下，使用 PKCS#7 填充来解密数据
-// ECB 模式下不需要 IV (初始化向量)，因此其是一个无用字段。
-// 注意：SM4ECBDecrypt 和 SM4DecryptECBWithPKCSPadding 是同一个函数的别名
+// SM4DecryptECBWithPKCSPadding 使用国密 SM4 算法在 ECB 模式下用 PKCS7 填充解密数据(ECB 模式下 iv 无用，传 nil)
+// 密钥为 16 字节。
+// 注意：Sm4ECBDecrypt 和 Sm4ECBDecryptWithPKCSPadding 是同一个函数的别名
+// 参数:
+//   - key: 密钥(16 字节)
+//   - i: 待解密的密文，可为 []byte 等
+//   - iv: ECB 模式下无用，传 nil 即可
+//
+// 返回值:
+//   - []byte: 解密还原后的明文字节
+//   - error: 解密失败时返回的错误
+//
 // Example:
 // ```
-// codec.SM4DecryptECBWithPKCSPadding("1234123412341234", "123412341234123456", nil)
+// // VARS: 先加密再解密(SM4-ECB)
+// key = "1234567890123456"
+// ct = codec.Sm4ECBEncrypt(key, "Secret Message", nil)~
+// pt = codec.Sm4ECBDecrypt(key, ct, nil)~
+// // STDOUT: 打印还原后的明文
+// println(string(pt))   // OUT: Secret Message
+// // assert: 锁定结论(SM4-ECB 解密还原一致)
+// assert string(pt) == "Secret Message", "SM4-ECB decrypt should recover plaintext"
 // ```
 func SM4DecryptECBWithPKCSPadding(key []byte, i interface{}, iv []byte) ([]byte, error) {
 	return SM4DecFactory(PKCS5UnPadding, ECB)(key, i, iv)
 }
 
-// SM4EncryptECBWithPKCSPadding 使用 SM4 算法，在 ECB 模式下，使用 PKCS#7 填充来加密数据
-// Deprecated: 请使用 Sm4ECBEncrypt（EBC 是 ECB 的拼写错误）
+// SM4EncryptEBCWithPKCSPadding 使用国密 SM4 算法在 ECB 模式下用 PKCS7 填充加密数据(为兼容历史拼写错误保留)
+// Deprecated: 请使用 Sm4ECBEncrypt(EBC 是 ECB 的拼写错误)
+// 参数:
+//   - key: 密钥(16 字节)
+//   - i: 待加密的数据，可为 string、[]byte 等
+//   - iv: ECB 模式下无用，传 nil 即可
+//
+// 返回值:
+//   - []byte: 加密后的密文字节
+//   - error: 加密失败时返回的错误
+//
+// Example:
+// ```
+// // VARS: 兼容旧拼写的 SM4-ECB 加解密
+// key = "1234567890123456"
+// ct = codec.Sm4EBCEncrypt(key, "Secret Message", nil)~
+// // STDOUT: 解密还原后打印
+// println(string(codec.Sm4EBCDecrypt(key, ct, nil)~))   // OUT: Secret Message
+// // assert: 锁定结论(加解密往返一致)
+// assert string(codec.Sm4EBCDecrypt(key, ct, nil)~) == "Secret Message", "SM4-EBC(alias) should round-trip"
+// ```
 func SM4EncryptEBCWithPKCSPadding(key []byte, i interface{}, iv []byte) ([]byte, error) {
 	return SM4EncFactory(PKCS5Padding, ECB)(key, i, iv)
 }
 
-// SM4DecryptECBWithPKCSPadding 使用 SM4 算法，在 ECB 模式下，使用 PKCS#7 填充来解密数据
-// Deprecated: 请使用 Sm4ECBDecrypt（EBC 是 ECB 的拼写错误）
+// SM4DecryptEBCWithPKCSPadding 使用国密 SM4 算法在 ECB 模式下用 PKCS7 填充解密数据(为兼容历史拼写错误保留)
+// Deprecated: 请使用 Sm4ECBDecrypt(EBC 是 ECB 的拼写错误)
+// 参数:
+//   - key: 密钥(16 字节)
+//   - i: 待解密的密文，可为 []byte 等
+//   - iv: ECB 模式下无用，传 nil 即可
+//
+// 返回值:
+//   - []byte: 解密还原后的明文字节
+//   - error: 解密失败时返回的错误
+//
+// Example:
+// ```
+// // VARS: 先加密再解密(兼容旧拼写)
+// key = "1234567890123456"
+// ct = codec.Sm4EBCEncrypt(key, "Secret Message", nil)~
+// pt = codec.Sm4EBCDecrypt(key, ct, nil)~
+// // STDOUT: 打印还原后的明文
+// println(string(pt))   // OUT: Secret Message
+// // assert: 锁定结论(解密还原一致)
+// assert string(pt) == "Secret Message", "SM4-EBC(alias) decrypt should recover plaintext"
+// ```
 func SM4DecryptEBCWithPKCSPadding(key []byte, i interface{}, iv []byte) ([]byte, error) {
 	return SM4DecFactory(PKCS5UnPadding, ECB)(key, i, iv)
 }
 
-// SM4EncryptCFBWithPKCSPadding 使用 SM4 算法，在 CFB 模式下，使用 PKCS#7 填充来加密数据
-// CFB 模式下需要 IV (初始化向量)，若为空则会使用 key 的前 16 字节作为 IV。
-// 注意：SM4CFBEncrypt 和 SM4EncryptCFBWithPKCSPadding 是同一个函数的别名
+// SM4EncryptCFBWithPKCSPadding 使用国密 SM4 算法在 CFB 模式下用 PKCS7 填充加密数据
+// 密钥与 IV 均为 16 字节；IV 为空时使用 key 前 16 字节作为 IV。
+// 注意：Sm4CFBEncrypt 和 Sm4CFBEncryptWithPKCSPadding 是同一个函数的别名
+// 参数:
+//   - key: 密钥(16 字节)
+//   - i: 待加密的数据，可为 string、[]byte 等
+//   - iv: 初始化向量(16 字节)，可为 nil
+//
+// 返回值:
+//   - []byte: 加密后的密文字节
+//   - error: 加密失败时返回的错误
+//
 // Example:
 // ```
-// codec.SM4EncryptCFBWithPKCSPadding("1234123412341234", "123412341234123456", "1234123412341234")
+// // VARS: SM4-CFB 加解密
+// key = "1234567890123456"
+// iv = "abcdefghijklmnop"
+// ct = codec.Sm4CFBEncrypt(key, "Secret Message", iv)~
+// // STDOUT: 解密还原后打印
+// println(string(codec.Sm4CFBDecrypt(key, ct, iv)~))   // OUT: Secret Message
+// // assert: 锁定结论(SM4-CFB 加解密往返一致)
+// assert string(codec.Sm4CFBDecrypt(key, ct, iv)~) == "Secret Message", "SM4-CFB should round-trip"
 // ```
 func SM4EncryptCFBWithPKCSPadding(key []byte, i interface{}, iv []byte) ([]byte, error) {
 	return SM4EncFactory(PKCS5Padding, CFB)(key, i, iv)
 }
 
-// SM4DecryptCFBWithPKCSPadding 使用 SM4 算法，在 CFB 模式下，使用 PKCS#7 填充来解密数据
-// CFB 模式下需要 IV (初始化向量)，若为空则会使用 key 的前 16 字节作为 IV。
-// 注意：SM4CFBDecrypt 和 SM4DecryptCFBWithPKCSPadding 是同一个函数的别名
+// SM4DecryptCFBWithPKCSPadding 使用国密 SM4 算法在 CFB 模式下用 PKCS7 填充解密数据
+// 密钥与 IV 均为 16 字节；IV 为空时使用 key 前 16 字节作为 IV。
+// 注意：Sm4CFBDecrypt 和 Sm4CFBDecryptWithPKCSPadding 是同一个函数的别名
+// 参数:
+//   - key: 密钥(16 字节)
+//   - i: 待解密的密文，可为 []byte 等
+//   - iv: 初始化向量(16 字节)，可为 nil
+//
+// 返回值:
+//   - []byte: 解密还原后的明文字节
+//   - error: 解密失败时返回的错误
+//
 // Example:
 // ```
-// codec.SM4DecryptCFBWithPKCSPadding("1234123412341234", "123412341234123456", "1234123412341234")
+// // VARS: 先加密再解密(SM4-CFB)
+// key = "1234567890123456"
+// iv = "abcdefghijklmnop"
+// ct = codec.Sm4CFBEncrypt(key, "Secret Message", iv)~
+// pt = codec.Sm4CFBDecrypt(key, ct, iv)~
+// // STDOUT: 打印还原后的明文
+// println(string(pt))   // OUT: Secret Message
+// // assert: 锁定结论(SM4-CFB 解密还原一致)
+// assert string(pt) == "Secret Message", "SM4-CFB decrypt should recover plaintext"
 // ```
 func SM4DecryptCFBWithPKCSPadding(key []byte, i interface{}, iv []byte) ([]byte, error) {
 	return SM4DecFactory(PKCS5UnPadding, CFB)(key, i, iv)
 }
 
-// SM4EncryptOFBWithPKCSPadding 使用 SM4 算法，在 OFB 模式下，使用 PKCS#7 填充来加密数据
-// OFB 模式下需要 IV (初始化向量)，若为空则会使用 key 的前 16 字节作为 IV。
-// 注意：SM4OFBEncrypt 和 SM4EncryptOFBWithPKCSPadding 是同一个函数的别名
+// SM4EncryptOFBWithPKCSPadding 使用国密 SM4 算法在 OFB 模式下用 PKCS7 填充加密数据
+// 密钥与 IV 均为 16 字节；IV 为空时使用 key 前 16 字节作为 IV。
+// 注意：Sm4OFBEncrypt 和 Sm4OFBEncryptWithPKCSPadding 是同一个函数的别名
+// 参数:
+//   - key: 密钥(16 字节)
+//   - i: 待加密的数据，可为 string、[]byte 等
+//   - iv: 初始化向量(16 字节)，可为 nil
+//
+// 返回值:
+//   - []byte: 加密后的密文字节
+//   - error: 加密失败时返回的错误
+//
 // Example:
 // ```
-// codec.SM4EncryptOFBWithPKCSPadding("1234123412341234", "123412341234123456", "1234123412341234")
+// // VARS: SM4-OFB 加解密
+// key = "1234567890123456"
+// iv = "abcdefghijklmnop"
+// ct = codec.Sm4OFBEncrypt(key, "Secret Message", iv)~
+// // STDOUT: 解密还原后打印
+// println(string(codec.Sm4OFBDecrypt(key, ct, iv)~))   // OUT: Secret Message
+// // assert: 锁定结论(SM4-OFB 加解密往返一致)
+// assert string(codec.Sm4OFBDecrypt(key, ct, iv)~) == "Secret Message", "SM4-OFB should round-trip"
 // ```
 func SM4EncryptOFBWithPKCSPadding(key []byte, i interface{}, iv []byte) ([]byte, error) {
 	return SM4EncFactory(PKCS5Padding, OFB)(key, i, iv)
 }
 
-// SM4DecryptOFBWithPKCSPadding 使用 SM4 算法，在 OFB 模式下，使用 PKCS#7 填充来解密数据
-// OFB 模式下需要 IV (初始化向量)，若为空则会使用 key 的前 16 字节作为 IV。
-// 注意：SM4OFBDecrypt 和 SM4DecryptOFBWithPKCSPadding 是同一个函数的别名
+// SM4DecryptOFBWithPKCSPadding 使用国密 SM4 算法在 OFB 模式下用 PKCS7 填充解密数据
+// 密钥与 IV 均为 16 字节；IV 为空时使用 key 前 16 字节作为 IV。
+// 注意：Sm4OFBDecrypt 和 Sm4OFBDecryptWithPKCSPadding 是同一个函数的别名
+// 参数:
+//   - key: 密钥(16 字节)
+//   - i: 待解密的密文，可为 []byte 等
+//   - iv: 初始化向量(16 字节)，可为 nil
+//
+// 返回值:
+//   - []byte: 解密还原后的明文字节
+//   - error: 解密失败时返回的错误
+//
 // Example:
 // ```
-// codec.SM4DecryptOFBWithPKCSPadding("1234123412341234", "123412341234123456", "1234123412341234")
+// // VARS: 先加密再解密(SM4-OFB)
+// key = "1234567890123456"
+// iv = "abcdefghijklmnop"
+// ct = codec.Sm4OFBEncrypt(key, "Secret Message", iv)~
+// pt = codec.Sm4OFBDecrypt(key, ct, iv)~
+// // STDOUT: 打印还原后的明文
+// println(string(pt))   // OUT: Secret Message
+// // assert: 锁定结论(SM4-OFB 解密还原一致)
+// assert string(pt) == "Secret Message", "SM4-OFB decrypt should recover plaintext"
 // ```
 func SM4DecryptOFBWithPKCSPadding(key []byte, i interface{}, iv []byte) ([]byte, error) {
 	return SM4DecFactory(PKCS5UnPadding, OFB)(key, i, iv)
@@ -198,9 +400,32 @@ var SM4EncryptCTRWithPKCSPadding = SM4EncFactory(PKCS5Padding, CTR)
 var SM4DecryptCTRWithPKCSPadding = SM4DecFactory(PKCS5UnPadding, CTR)
 var SM4EncryptCTRWithZeroPadding = SM4EncFactory(ZeroPadding, CTR)
 var SM4DecryptCTRWithZeroPadding = SM4DecFactory(ZeroUnPadding, CTR)
+
 var SM4GCMEncrypt = SM4GCMEnc
 var SM4GCMDecrypt = SM4GCMDec
 
+// SM4EncFactory 构造国密 SM4 加密函数(用于 CTR 与零填充等模式的 Sm4*Encrypt 系列)
+// 由本工厂生成的 SM4 加密函数统一接受 (key, i, iv) 参数，密钥与 IV 均为 16 字节。
+// 参数:
+//   - key: 密钥(16 字节)
+//   - i: 待加密的数据，可为 string、[]byte 等
+//   - iv: 初始化向量(16 字节)，可为 nil
+//
+// 返回值:
+//   - []byte: 加密后的密文字节
+//   - error: 加密失败时返回的错误
+//
+// Example:
+// ```
+// // VARS: SM4-CTR 加解密(工厂生成的加密函数之一)
+// key = "1234567890123456"
+// iv = "abcdefghijklmnop"
+// ct = codec.Sm4CTREncrypt(key, "Secret Message", iv)~
+// // STDOUT: 解密还原后打印
+// println(string(codec.Sm4CTRDecrypt(key, ct, iv)~))   // OUT: Secret Message
+// // assert: 锁定结论(SM4 工厂加解密往返一致)
+// assert string(codec.Sm4CTRDecrypt(key, ct, iv)~) == "Secret Message", "SM4 factory encrypt should round-trip"
+// ```
 func SM4EncFactory(paddingFunc func([]byte, int) []byte, mode string) SymmetricCryptFunc {
 	return func(key []byte, i interface{}, iv []byte) ([]byte, error) {
 		data := paddingFunc(interfaceToBytes(i), 16)
@@ -209,6 +434,29 @@ func SM4EncFactory(paddingFunc func([]byte, int) []byte, mode string) SymmetricC
 	}
 }
 
+// SM4DecFactory 构造国密 SM4 解密函数(用于 CTR 与零填充等模式的 Sm4*Decrypt 系列)
+// 由本工厂生成的 SM4 解密函数统一接受 (key, i, iv) 参数，密钥与 IV 均为 16 字节。
+// 参数:
+//   - key: 密钥(16 字节)
+//   - i: 待解密的密文，可为 []byte 等
+//   - iv: 初始化向量(16 字节)，可为 nil
+//
+// 返回值:
+//   - []byte: 解密还原后的明文字节
+//   - error: 解密失败时返回的错误
+//
+// Example:
+// ```
+// // VARS: SM4-CTR 先加密再解密(工厂生成的解密函数之一)
+// key = "1234567890123456"
+// iv = "abcdefghijklmnop"
+// ct = codec.Sm4CTREncrypt(key, "Secret Message", iv)~
+// pt = codec.Sm4CTRDecrypt(key, ct, iv)~
+// // STDOUT: 打印还原后的明文
+// println(string(pt))   // OUT: Secret Message
+// // assert: 锁定结论(SM4 工厂解密还原一致)
+// assert string(pt) == "Secret Message", "SM4 factory decrypt should recover plaintext"
+// ```
 func SM4DecFactory(unpaddingFunc func([]byte) []byte, mode string) SymmetricCryptFunc {
 	return func(key []byte, i interface{}, iv []byte) ([]byte, error) {
 		iv = FixIV(iv, key, 16)

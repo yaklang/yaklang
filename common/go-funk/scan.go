@@ -115,7 +115,22 @@ func ForEachRight(arr interface{}, predicate interface{}) {
 	}
 }
 
-// Head gets the first element of array.
+// Head 返回切片的第一个元素
+// 参数:
+//   - arr: 源切片
+//
+// 返回值:
+//   - 切片的第一个元素
+//
+// Example:
+// ```
+// // VARS: 取第一个元素
+// result = x.Head([1, 2, 3])
+// // STDOUT: 打印结果
+// println(result)   // OUT: 1
+// // assert: 锁定结论
+// assert result == 1, "head should return the first element"
+// ```
 func Head(arr interface{}) interface{} {
 	value := redirectValue(reflect.ValueOf(arr))
 	valueType := value.Type()
@@ -171,7 +186,22 @@ func Initial(arr interface{}) interface{} {
 	panic(fmt.Sprintf("Type %s is not supported by Initial", valueType.String()))
 }
 
-// Tail gets all but the first element of array.
+// Tail 返回切片中除第一个元素外的所有元素
+// 参数:
+//   - arr: 源切片
+//
+// 返回值:
+//   - 除首元素外的切片
+//
+// Example:
+// ```
+// // VARS: 取除首元素外的部分
+// result = x.Tail([1, 2, 3])
+// // STDOUT: 打印结果
+// println(result)   // OUT: [2 3]
+// // assert: 锁定结论
+// assert len(result) == 2, "tail should drop the first element"
+// ```
 func Tail(arr interface{}) interface{} {
 	value := redirectValue(reflect.ValueOf(arr))
 	valueType := value.Type()

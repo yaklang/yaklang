@@ -4,7 +4,23 @@ import (
 	"reflect"
 )
 
-// Subtract returns the subtraction between two collections.
+// Subtract 返回集合 x 中存在但集合 y 中不存在的元素
+// 参数:
+//   - x: 源集合
+//   - y: 要排除的集合
+//
+// 返回值:
+//   - 仅属于 x 而不属于 y 的元素集合
+//
+// Example:
+// ```
+// // VARS: 求差集
+// result = x.Subtract([1, 2, 3, 4], [2, 4])
+// // STDOUT: 打印结果
+// println(result)   // OUT: [1 3]
+// // assert: 锁定结论
+// assert len(result) == 2, "Subtract should keep elements only in x"
+// ```
 func Subtract(x interface{}, y interface{}) interface{} {
 	if !IsCollection(x) {
 		panic("First parameter must be a collection")

@@ -36,6 +36,22 @@ func ReducerFast(i any, callback func(chunk chunkmaker.Chunk), options ...Option
 	}
 }
 
+// _reducerReader 从 io.Reader 读取数据并按配置切分为 chunk，对每个 chunk 调用回调（导出名为 aireducer.Reader）
+// 参数:
+//   - i: 数据来源 reader
+//   - callback: 每生成一个 chunk 触发的回调，参数为 chunk 对象
+//   - options: 切分可选项，如 aireducer.chunkSize、aireducer.separator、aireducer.lines 等
+//
+// 返回值:
+//   - 错误信息
+//
+// Example:
+// ```
+// count = 0
+// reader = str.NewReader("aaaaabbbbbccccc")
+// aireducer.Reader(reader, func(chunk) { count++ }, aireducer.chunkSize(5))~
+// println(count)   // OUT: 3
+// ```
 func _reducerReader(i io.Reader, callback func(chunk chunkmaker.Chunk), options ...Option) error {
 	options = append(options, WithSimpleCallback(callback))
 	reducer, err := NewReducerFromReader(i, options...)
@@ -49,6 +65,21 @@ func _reducerReader(i io.Reader, callback func(chunk chunkmaker.Chunk), options 
 	return reducer.Run()
 }
 
+// _reducerString 将字符串按配置切分为 chunk，对每个 chunk 调用回调（导出名为 aireducer.String）
+// 参数:
+//   - s: 输入字符串
+//   - callback: 每生成一个 chunk 触发的回调，参数为 chunk 对象
+//   - options: 切分可选项，如 aireducer.chunkSize、aireducer.separator、aireducer.lines 等
+//
+// 返回值:
+//   - 错误信息
+//
+// Example:
+// ```
+// count = 0
+// aireducer.String("aaaaabbbbbccccc", func(chunk) { count++ }, aireducer.chunkSize(5))~
+// println(count)   // OUT: 3
+// ```
 func _reducerString(s string, callback func(chunk chunkmaker.Chunk), options ...Option) error {
 	options = append(options, WithSimpleCallback(callback))
 	r, err := NewReducerFromString(s, options...)
@@ -61,6 +92,24 @@ func _reducerString(s string, callback func(chunk chunkmaker.Chunk), options ...
 	return r.Run()
 }
 
+// _reducerFile 读取文件内容并按配置切分为 chunk，对每个 chunk 调用回调（导出名为 aireducer.File）
+// 参数:
+//   - filename: 文件路径
+//   - callback: 每生成一个 chunk 触发的回调，参数为 chunk 对象
+//   - options: 切分可选项，如 aireducer.chunkSize、aireducer.lines、aireducer.lineNumber 等
+//
+// 返回值:
+//   - 错误信息
+//
+// Example:
+// ```
+// // 按 1024 字节切分文件并逐块处理（示意性示例，需替换为真实文件路径）
+//
+//	aireducer.File("/tmp/example.txt", func(chunk) {
+//	    println(string(chunk.Data()))
+//	}, aireducer.chunkSize(1024))~
+//
+// ```
 func _reducerFile(filename string, callback func(chunk chunkmaker.Chunk), options ...Option) error {
 	options = append(options, WithSimpleCallback(callback))
 	r, err := NewReducerFromFile(filename, options...)

@@ -366,6 +366,26 @@ func WithRuntimeId(id string) ConfigOption {
 	}
 }
 
+// context 设置服务扫描使用的 context，用于取消或超时控制
+// 在 yak 中通过 servicescan.context 调用；停止遍历结果前应 cancel 对应 ctx
+// 参数:
+//   - ctx: 上下文对象
+//
+// 返回值:
+//   - 一个 servicescan.Scan 可接收的配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：使用可取消的 context 控制扫描
+// ctx, cancel = context.WithCancel(context.Background())
+// defer cancel()
+// result = servicescan.Scan("127.0.0.1", "80,443", servicescan.context(ctx))~
+//
+//	for res = range result {
+//	    println(res.String())
+//	}
+//
+// ```
 func WithCtx(ctx context.Context) ConfigOption {
 	return func(config *Config) {
 		config.Ctx = ctx
@@ -552,6 +572,24 @@ func WithRarityMax(rarity int) ConfigOption {
 	}
 }
 
+// active 设置是否启用主动发包模式，主动向目标发送探测包以提升指纹识别准确率
+// 在 yak 中通过 servicescan.active 调用
+// 参数:
+//   - raw: 是否启用主动发包模式
+//
+// 返回值:
+//   - 一个 servicescan.Scan 可接收的配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：开启主动发包模式扫描
+// result = servicescan.Scan("127.0.0.1", "1-1000", servicescan.active(true))~
+//
+//	for res = range result {
+//	    println(res.String())
+//	}
+//
+// ```
 func WithActiveMode(raw bool) ConfigOption {
 	return func(config *Config) {
 		config.ActiveMode = raw

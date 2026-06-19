@@ -422,6 +422,21 @@ func DebugMockTCPEx(handleFunc handleTCPFunc) (string, int) {
 	return DebugMockTCPHandlerFuncContext(TimeoutContext(time.Minute*5), handleFunc)
 }
 
+// MockServe 启动一个本地 HTTP 模拟服务，对所有请求返回固定的响应报文，常用于测试与示例，返回监听的主机与端口
+// 参数:
+//   - rsp: 服务对每个请求固定返回的原始 HTTP 响应报文
+//
+// 返回值:
+//   - 模拟服务监听的主机地址
+//   - 模拟服务监听的端口
+//
+// Example:
+// ```
+// // 启动一个固定响应的本地 HTTP 服务用于测试，此处仅作示意
+// host, port = tcp.MockServe([]byte("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nhi"))
+// rsp = poc.Get(f"http://${host}:${port}/", poc.timeout(5))~
+// println(string(rsp.RawPacket))
+// ```
 func DebugMockHTTP(rsp []byte) (string, int) {
 	return DebugMockHTTPWithTimeout(time.Minute, rsp)
 }

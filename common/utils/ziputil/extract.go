@@ -19,7 +19,19 @@ type ExtractResult struct {
 	Error    error
 }
 
-// ExtractFile 从 ZIP 文件中提取单个文件
+// ExtractFile 从 ZIP 文件中提取单个文件的内容
+// 参数:
+//   - zipFile: zip 文件路径
+//   - targetFile: 待提取的 zip 内条目名称
+//
+// 返回值:
+//   - 提取出的文件内容字节
+//   - 错误信息
+//
+// Example:
+// ```
+// content = zip.ExtractFile("/tmp/abc.zip", "a.txt")~
+// ```
 func ExtractFile(zipFile string, targetFile string) ([]byte, error) {
 	raw, err := ioutil.ReadFile(zipFile)
 	if err != nil {
@@ -28,7 +40,21 @@ func ExtractFile(zipFile string, targetFile string) ([]byte, error) {
 	return ExtractFileFromRaw(raw, targetFile)
 }
 
-// ExtractFileFromRaw 从 ZIP 原始数据中提取单个文件
+// ExtractFileFromRaw 从内存中的 ZIP 原始数据中提取单个文件的内容
+// 参数:
+//   - raw: zip 的原始数据（[]byte、string 或 io.Reader）
+//   - targetFile: 待提取的 zip 内条目名称
+//
+// 返回值:
+//   - 提取出的文件内容字节
+//   - 错误信息
+//
+// Example:
+// ```
+// zipBytes = zip.CompressRaw({"a.txt": "hello world"})~
+// content = zip.ExtractFileFromRaw(zipBytes, "a.txt")~
+// assert string(content) == "hello world", "ExtractFileFromRaw should return the entry content"
+// ```
 func ExtractFileFromRaw(raw interface{}, targetFile string) ([]byte, error) {
 	var data []byte
 	switch v := raw.(type) {
@@ -73,6 +99,19 @@ func ExtractFileFromRaw(raw interface{}, targetFile string) ([]byte, error) {
 }
 
 // ExtractFiles 从 ZIP 文件中并发提取多个文件
+// 参数:
+//   - zipFile: zip 文件路径
+//   - targetFiles: 待提取的条目名称列表
+//
+// 返回值:
+//   - 提取结果列表（每项含 FileName/Content/Error）
+//   - 错误信息
+//
+// Example:
+// ```
+// results = zip.ExtractFiles("/tmp/abc.zip", ["a.txt", "b.txt"])~
+// for r in results { println(r.FileName) }
+// ```
 func ExtractFiles(zipFile string, targetFiles []string) ([]*ExtractResult, error) {
 	raw, err := ioutil.ReadFile(zipFile)
 	if err != nil {
@@ -81,7 +120,22 @@ func ExtractFiles(zipFile string, targetFiles []string) ([]*ExtractResult, error
 	return ExtractFilesFromRaw(raw, targetFiles)
 }
 
-// ExtractFilesFromRaw 从 ZIP 原始数据中并发提取多个文件
+// ExtractFilesFromRaw 从内存中的 ZIP 原始数据中并发提取多个文件
+// 参数:
+//   - raw: zip 的原始数据（[]byte、string 或 io.Reader）
+//   - targetFiles: 待提取的条目名称列表
+//
+// 返回值:
+//   - 提取结果列表（每项含 FileName/Content/Error）
+//   - 错误信息
+//
+// Example:
+// ```
+// zipBytes = zip.CompressRaw({"a.txt": "AAA", "b.txt": "BBB"})~
+// results = zip.ExtractFilesFromRaw(zipBytes, ["a.txt"])~
+// assert len(results) == 1, "ExtractFilesFromRaw should return one matched file"
+// assert string(results[0].Content) == "AAA", "extracted content should match"
+// ```
 func ExtractFilesFromRaw(raw interface{}, targetFiles []string) ([]*ExtractResult, error) {
 	var data []byte
 	switch v := raw.(type) {
@@ -173,7 +227,20 @@ func ExtractFilesFromRaw(raw interface{}, targetFiles []string) ([]*ExtractResul
 	return results, nil
 }
 
-// ExtractByPattern 根据文件名模式提取文件（支持通配符）
+// ExtractByPattern 根据文件名模式（支持 * 通配符）从 ZIP 文件中提取匹配的文件
+// 参数:
+//   - zipFile: zip 文件路径
+//   - pattern: 文件名匹配模式（如 "*.txt"）
+//
+// 返回值:
+//   - 提取结果列表（每项含 FileName/Content/Error）
+//   - 错误信息
+//
+// Example:
+// ```
+// results = zip.ExtractByPattern("/tmp/abc.zip", "*.txt")~
+// for r in results { println(r.FileName) }
+// ```
 func ExtractByPattern(zipFile string, pattern string) ([]*ExtractResult, error) {
 	raw, err := ioutil.ReadFile(zipFile)
 	if err != nil {
@@ -182,7 +249,21 @@ func ExtractByPattern(zipFile string, pattern string) ([]*ExtractResult, error) 
 	return ExtractByPatternFromRaw(raw, pattern)
 }
 
-// ExtractByPatternFromRaw 从原始数据根据文件名模式提取文件
+// ExtractByPatternFromRaw 从内存中的 ZIP 原始数据按文件名模式（支持 * 通配符）提取匹配的文件
+// 参数:
+//   - raw: zip 的原始数据（[]byte、string 或 io.Reader）
+//   - pattern: 文件名匹配模式（如 "*.txt"）
+//
+// 返回值:
+//   - 提取结果列表（每项含 FileName/Content/Error）
+//   - 错误信息
+//
+// Example:
+// ```
+// zipBytes = zip.CompressRaw({"a.txt": "AAA", "b.log": "BBB"})~
+// results = zip.ExtractByPatternFromRaw(zipBytes, "*.txt")~
+// assert len(results) == 1, "only the .txt entry should match the pattern"
+// ```
 func ExtractByPatternFromRaw(raw interface{}, pattern string) ([]*ExtractResult, error) {
 	var data []byte
 	switch v := raw.(type) {

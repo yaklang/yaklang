@@ -7,6 +7,23 @@ import (
 	"io"
 )
 
+// Compress 使用 gzip 压缩数据，返回压缩后的字节与错误
+// 参数:
+//   - i: 待压缩的数据，支持字符串、字节切片或 io.Reader
+//
+// 返回值:
+//   - 压缩后的字节切片（带 gzip 魔数头）
+//   - 错误信息
+//
+// Example:
+// ```
+// // 压缩后再解压应还原原始数据（round-trip）
+// compressed = gzip.Compress("hello yaklang")~
+// assert gzip.IsGzip(compressed), "compressed output should have gzip magic header"
+// raw = gzip.Decompress(compressed)~
+// assert string(raw) == "hello yaklang", "gzip compress then decompress should round-trip"
+// println("gzip round-trip example passed")
+// ```
 func GzipCompress(i interface{}) ([]byte, error) {
 	var buf bytes.Buffer
 	var w = gzip.NewWriter(&buf)
@@ -51,6 +68,22 @@ func ZlibCompress(i interface{}) ([]byte, error) {
 	}
 }
 
+// Decompress 解压 gzip 数据，返回解压后的字节与错误
+// 参数:
+//   - ret: 经过 gzip 压缩的字节切片
+//
+// 返回值:
+//   - 解压还原后的字节切片
+//   - 错误信息
+//
+// Example:
+// ```
+// // 压缩再解压应还原原始数据（round-trip）
+// compressed = gzip.Compress("hello yaklang")~
+// raw = gzip.Decompress(compressed)~
+// assert string(raw) == "hello yaklang", "gzip decompress should restore original data"
+// println("gzip decompress example passed")
+// ```
 func GzipDeCompress(ret []byte) ([]byte, error) {
 	var reader *gzip.Reader
 	var err error

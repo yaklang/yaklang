@@ -474,18 +474,54 @@ func _httpPool_MutateHookWithYPBStruct(params []*ypb.MutateMethod) HttpPoolConfi
 	}
 }
 
+// source 是一个 HTTP 连接池/批量请求配置选项，用于标记请求的来源（如关联的插件名）
+// 参数:
+//   - i: 来源标识字符串
+//
+// 返回值:
+//   - 一个连接池配置选项，作为可变参数传入 httpool.Pool / fuzzx 等
+//
+// Example:
+// ```
+// // 标记请求来源，依赖网络，此处仅作示意
+// res = httpool.Pool(reqs, fuzzx.source("my-plugin"))~
+// ```
 func _httpPool_Source(i string) HttpPoolConfigOption {
 	return func(config *httpPoolConfig) {
 		config.Source = i
 	}
 }
 
+// runtimeID 是一个 HTTP 连接池/批量请求配置选项，用于设置运行时 ID 以便结果关联与追踪
+// 参数:
+//   - i: 运行时 ID 字符串
+//
+// 返回值:
+//   - 一个连接池配置选项，作为可变参数传入 httpool.Pool / fuzzx 等
+//
+// Example:
+// ```
+// // 设置运行时 ID，依赖网络，此处仅作示意
+// res = httpool.Pool(reqs, fuzzx.runtimeID("task-001"))~
+// ```
 func _httpPool_runtimeId(i string) HttpPoolConfigOption {
 	return func(config *httpPoolConfig) {
 		config.RuntimeId = i
 	}
 }
 
+// fuzzParams 是一个 HTTP 连接池配置选项，用于为 fuzztag 渲染提供额外的参数表
+// 参数:
+//   - i: 额外参数（map 或可转换为 map 的值）
+//
+// 返回值:
+//   - 一个连接池配置选项，作为可变参数传入 httpool.Pool
+//
+// Example:
+// ```
+// // 提供 fuzztag 渲染参数，依赖网络，此处仅作示意
+// res = httpool.Pool(reqs, httpool.fuzz(true), httpool.fuzzParams({"id": ["1", "2"]}))~
+// ```
 func _httpPool_SetFuzzParams(i interface{}) HttpPoolConfigOption {
 	return func(config *httpPoolConfig) {
 		if i != nil {
@@ -494,6 +530,18 @@ func _httpPool_SetFuzzParams(i interface{}) HttpPoolConfigOption {
 	}
 }
 
+// fuzz 是一个 HTTP 连接池配置选项，用于设置是否对请求模板进行 fuzztag 渲染（变形）
+// 参数:
+//   - b: 是否启用 fuzztag 渲染
+//
+// 返回值:
+//   - 一个连接池配置选项，作为可变参数传入 httpool.Pool
+//
+// Example:
+// ```
+// // 启用 fuzztag 渲染，依赖网络，此处仅作示意
+// res = httpool.Pool(reqs, httpool.fuzz(true))~
+// ```
 func _httpPool_SetForceFuzz(b bool) HttpPoolConfigOption {
 	return func(config *httpPoolConfig) {
 		config.ForceFuzz = b
@@ -506,6 +554,18 @@ func _httpPool_SetForceFuzzDangerous(b bool) HttpPoolConfigOption {
 	}
 }
 
+// delay 是一个 HTTP 连接池/批量请求配置选项，用于设置每个请求之间的固定延迟秒数
+// 参数:
+//   - b: 延迟时间，单位为秒，支持小数
+//
+// 返回值:
+//   - 一个连接池配置选项，作为可变参数传入 httpool.Pool / fuzz.Exec / fuzzx 等
+//
+// Example:
+// ```
+// // 设置每个请求间隔 1 秒，依赖网络，此处仅作示意
+// res = httpool.Pool(reqs, fuzzx.delay(1))~
+// ```
 func _httpPool_DelaySeconds(b float64) HttpPoolConfigOption {
 	return func(config *httpPoolConfig) {
 		config.DelayMinSeconds = b
@@ -525,12 +585,37 @@ func _httpPool_DelayMaxSeconds(b float64) HttpPoolConfigOption {
 	}
 }
 
+// context 是一个 HTTP 连接池/批量请求配置选项，用于传入上下文以便外部取消批量任务
+// 参数:
+//   - ctx: 上下文对象
+//
+// 返回值:
+//   - 一个连接池配置选项，作为可变参数传入 httpool.Pool / fuzzx 等
+//
+// Example:
+// ```
+// // 传入可取消的上下文，依赖网络，此处仅作示意
+// ctx = context.New()
+// res = httpool.Pool(reqs, httpool.context(ctx))~
+// ```
 func _httpPool_SetContext(ctx context.Context) HttpPoolConfigOption {
 	return func(config *httpPoolConfig) {
 		config.Ctx = ctx
 	}
 }
 
+// noRedirect 是一个 HTTP 连接池/批量请求配置选项，用于设置是否禁止跟随重定向
+// 参数:
+//   - i: 是否禁止跟随重定向
+//
+// 返回值:
+//   - 一个连接池配置选项，作为可变参数传入 fuzzx / fuzz 等
+//
+// Example:
+// ```
+// // 禁止跟随重定向，依赖网络，此处仅作示意
+// res = httpool.Pool(reqs, fuzzx.noRedirect(true))~
+// ```
 func _httpPool_SetNoFollowRedirect(i bool) HttpPoolConfigOption {
 	return func(config *httpPoolConfig) {
 		config.NoFollowRedirect = i
@@ -543,6 +628,18 @@ func _httpPool_SetFollowJSRedirect(i bool) HttpPoolConfigOption {
 	}
 }
 
+// size 是一个 HTTP 连接池/批量请求配置选项，用于设置并发请求数量（并发上限）
+// 参数:
+//   - i: 并发数量
+//
+// 返回值:
+//   - 一个连接池配置选项，作为可变参数传入 httpool.Pool / fuzz / fuzzx 等
+//
+// Example:
+// ```
+// // 设置 20 并发，依赖网络，此处仅作示意
+// res = httpool.Pool(reqs, httpool.size(20))~
+// ```
 func _httpPool_SetSize(i int) HttpPoolConfigOption {
 	return func(config *httpPoolConfig) {
 		config.Size = i
@@ -556,12 +653,36 @@ func _httpPool_SetSizedWaitGroup(i *utils.SizedWaitGroup) HttpPoolConfigOption {
 	}
 }
 
+// rawMode 是一个 HTTP 连接池配置选项，用于设置是否以原始报文模式发送（不做额外解析处理）
+// 参数:
+//   - b: 是否启用原始报文模式
+//
+// 返回值:
+//   - 一个连接池配置选项，作为可变参数传入 httpool.Pool
+//
+// Example:
+// ```
+// // 以原始报文模式发送，依赖网络，此处仅作示意
+// res = httpool.Pool(reqs, httpool.rawMode(true))~
+// ```
 func _httpPool_RawMode(b bool) HttpPoolConfigOption {
 	return func(config *httpPoolConfig) {
 		config.UseRawMode = b
 	}
 }
 
+// perRequestTimeout 是一个 HTTP 连接池/批量请求配置选项，用于设置单个请求的超时时间（单位：秒）
+// 参数:
+//   - f: 超时时间，单位为秒，支持小数
+//
+// 返回值:
+//   - 一个连接池配置选项，作为可变参数传入 httpool.Pool / fuzz / fuzzx 等
+//
+// Example:
+// ```
+// // 设置单请求超时 5 秒，依赖网络，此处仅作示意
+// res = httpool.Pool(reqs, httpool.perRequestTimeout(5))~
+// ```
 func _httpPool_PerRequestTimeout(f float64) HttpPoolConfigOption {
 	return func(config *httpPoolConfig) {
 		config.PerRequestTimeout = utils.FloatSecondDuration(f)
@@ -574,12 +695,36 @@ func _httpPool_DialTimeout(f float64) HttpPoolConfigOption {
 	}
 }
 
+// noFixContentLength 是一个 HTTP 连接池/批量请求配置选项，用于设置是否不自动修复 Content-Length 头
+// 参数:
+//   - f: 是否禁止自动修复 Content-Length
+//
+// 返回值:
+//   - 一个连接池配置选项，作为可变参数传入 httpool.Pool / fuzzx 等
+//
+// Example:
+// ```
+// // 不自动修复 Content-Length，依赖网络，此处仅作示意
+// res = httpool.Pool(reqs, httpool.noFixContentLength(true))~
+// ```
 func _httpPool_noFixContentLength(f bool) HttpPoolConfigOption {
 	return func(config *httpPoolConfig) {
 		config.NoFixContentLength = f
 	}
 }
 
+// redirectTimes 是一个 HTTP 连接池/批量请求配置选项，用于设置最大重定向跟随次数
+// 参数:
+//   - f: 最大重定向次数
+//
+// 返回值:
+//   - 一个连接池配置选项，作为可变参数传入 httpool.Pool / fuzzx 等
+//
+// Example:
+// ```
+// // 最多跟随 3 次重定向，依赖网络，此处仅作示意
+// res = httpool.Pool(reqs, httpool.redirectTimes(3))~
+// ```
 func _httpPool_redirectTimes(f int) HttpPoolConfigOption {
 	return func(config *httpPoolConfig) {
 		config.RedirectTimes = f
@@ -587,12 +732,37 @@ func _httpPool_redirectTimes(f int) HttpPoolConfigOption {
 	}
 }
 
+// noRedirect 是一个 HTTP 连接池配置选项，用于设置是否禁止跟随重定向
+// 参数:
+//   - i: 是否禁止跟随重定向
+//
+// 返回值:
+//   - 一个连接池配置选项，作为可变参数传入 httpool.Pool
+//
+// Example:
+// ```
+// // 禁止跟随重定向，依赖网络，此处仅作示意
+// res = httpool.Pool(reqs, httpool.noRedirect(true))~
+// ```
 func _httpPool_noRedirects(i bool) HttpPoolConfigOption {
 	return func(config *httpPoolConfig) {
 		config.NoFollowRedirect = i
 	}
 }
 
+// host 是一个 HTTP 连接池/批量请求配置选项，用于强制指定请求实际连接的目标主机（覆盖报文中的 Host）
+// 参数:
+//   - h: 目标主机地址（可包含端口或 scheme）
+//   - isHttps: 当地址未带端口时，是否按 HTTPS 推断默认端口（443/80）
+//
+// 返回值:
+//   - 一个连接池配置选项，作为可变参数传入 httpool.Pool / fuzzx 等
+//
+// Example:
+// ```
+// // 强制连接指定主机，依赖网络，此处仅作示意
+// res = httpool.Pool(reqs, httpool.host("127.0.0.1", false), httpool.port(8080))~
+// ```
 func _httpPool_Host(h string, isHttps bool) HttpPoolConfigOption {
 	return func(c *httpPoolConfig) {
 		lower := strings.ToLower(h)
@@ -614,12 +784,36 @@ func _httpPool_Host(h string, isHttps bool) HttpPoolConfigOption {
 	}
 }
 
+// port 是一个 HTTP 连接池/批量请求配置选项，用于强制指定请求实际连接的目标端口
+// 参数:
+//   - port: 目标端口
+//
+// 返回值:
+//   - 一个连接池配置选项，作为可变参数传入 httpool.Pool / fuzzx 等
+//
+// Example:
+// ```
+// // 强制连接 8080 端口，依赖网络，此处仅作示意
+// res = httpool.Pool(reqs, httpool.host("127.0.0.1", false), httpool.port(8080))~
+// ```
 func _httpPool_Port(port int) HttpPoolConfigOption {
 	return func(c *httpPoolConfig) {
 		c.Port = port
 	}
 }
 
+// https 是一个 HTTP 连接池/批量请求配置选项，用于设置是否以 HTTPS 协议发送请求
+// 参数:
+//   - f: 是否使用 HTTPS
+//
+// 返回值:
+//   - 一个连接池配置选项，作为可变参数传入 httpool.Pool / fuzzx 等
+//
+// Example:
+// ```
+// // 以 HTTPS 发送，依赖网络，此处仅作示意
+// res = httpool.Pool(reqs, httpool.https(true))~
+// ```
 func _httpPool_IsHttps(f bool) HttpPoolConfigOption {
 	return func(config *httpPoolConfig) {
 		config.IsHttps = f
@@ -638,12 +832,36 @@ func _httpPool_RandomJA3(f bool) HttpPoolConfigOption {
 	}
 }
 
+// proxy 是一个 HTTP 连接池/批量请求配置选项，用于设置请求所使用的代理（支持多个，依次尝试）
+// 参数:
+//   - proxies: 一个或多个代理地址，支持 http、https、socks4、socks5 协议
+//
+// 返回值:
+//   - 一个连接池配置选项，作为可变参数传入 httpool.Pool / fuzzx 等
+//
+// Example:
+// ```
+// // 通过本地代理发送，依赖网络，此处仅作示意
+// res = httpool.Pool(reqs, httpool.proxy("http://127.0.0.1:8083"))~
+// ```
 func _httpPool_proxies(proxies ...string) HttpPoolConfigOption {
 	return func(config *httpPoolConfig) {
 		config.Proxies = proxies
 	}
 }
 
+// fromPlugin 是一个 HTTP 连接池/批量请求配置选项，用于标记请求来源的插件名称
+// 参数:
+//   - plugin: 来源插件名称
+//
+// 返回值:
+//   - 一个连接池配置选项，作为可变参数传入 fuzzx 等
+//
+// Example:
+// ```
+// // 标记来源插件，依赖网络，此处仅作示意
+// res = httpool.Pool(reqs, fuzzx.fromPlugin("my-plugin"))~
+// ```
 func _httpPool_fromPlugin(plugin string) HttpPoolConfigOption {
 	return func(config *httpPoolConfig) {
 		config.FromPlugin = plugin
@@ -674,12 +892,36 @@ func _httpPool_inner_payload(m *sync.Map) HttpPoolConfigOption {
 	}
 }
 
+// namingContext 是一个 HTTP 连接池/批量请求配置选项，用于设置命名调用上下文以便对并发任务进行分组限流
+// 参数:
+//   - invokerName: 调用者名称，用于并发分组标识
+//
+// 返回值:
+//   - 一个连接池配置选项，作为可变参数传入 fuzz / fuzzx 等
+//
+// Example:
+// ```
+// // 设置命名调用上下文，依赖网络，此处仅作示意
+// res = httpool.Pool(reqs, fuzzx.namingContext("scan-group-1"))~
+// ```
 func _httpPool_namingContext(invokerName string) HttpPoolConfigOption {
 	return func(config *httpPoolConfig) {
 		config.Ctx = context.WithValue(config.Ctx, "invoker", invokerName)
 	}
 }
 
+// connPool 是一个 HTTP 连接池/批量请求配置选项，用于设置是否复用底层 TCP 连接池以提升性能
+// 参数:
+//   - b: 是否启用连接池复用
+//
+// 返回值:
+//   - 一个连接池配置选项，作为可变参数传入 httpool.Pool / fuzzx 等
+//
+// Example:
+// ```
+// // 启用连接池复用，依赖网络，此处仅作示意
+// res = httpool.Pool(reqs, httpool.connPool(true))~
+// ```
 func _httpPool_withConnPool(b bool) HttpPoolConfigOption {
 	return func(config *httpPoolConfig) {
 		config.WithConnPool = b
@@ -826,6 +1068,25 @@ func NewDefaultHttpPoolConfig(opts ...HttpPoolConfigOption) *httpPoolConfig {
 	return base
 }
 
+// Pool 以并发连接池的方式批量发送 HTTP 请求，输入可以是原始报文、请求列表或 fuzz 对象，返回结果管道
+// 参数:
+//   - i: 待发送的请求源（原始报文 []byte/[][]byte、*http.Request、FuzzHTTPRequest 等）
+//   - opts: 可选配置，例如 httpool.https、httpool.size、httpool.proxy、httpool.perRequestTimeout
+//
+// 返回值:
+//   - HTTP 结果管道，逐个产出每个请求的响应结果
+//   - 错误信息，初始化失败时返回非空
+//
+// Example:
+// ```
+// // 并发批量发包，依赖网络，此处仅作示意
+// raw = `GET / HTTP/1.1
+// Host: www.example.com
+//
+// `
+// ch = httpool.Pool(raw, httpool.https(false), httpool.size(10), httpool.perRequestTimeout(5))~
+// for res = range ch { println(res.Url) }
+// ```
 func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, error) {
 	config := NewDefaultHttpPoolConfig(opts...)
 	externSwitch := config.ExternSwitch

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io"
 	"io/ioutil"
 	"strings"
@@ -68,6 +67,21 @@ func MarshalJavaObjectsWithConfig(cfg *MarshalContext, res ...JavaSerializable) 
 	}
 	return raw
 }
+
+// MarshalJavaObjects 将一个或多个 Java 序列化对象编码为 Java 序列化字节流
+// 在 yak 中通过 java.MarshalJavaObjects 调用，是 java.ParseJavaObjectStream 的逆操作
+// 参数:
+//   - res: 一个或多个 Java 序列化对象
+//
+// 返回值:
+//   - Java 序列化字节流
+//
+// Example:
+// ```
+// s = java.NewJavaString("hello")
+// b = java.MarshalJavaObjects(s)
+// assert len(b) > 0, "marshaled bytes should not be empty"
+// ```
 func MarshalJavaObjects(res ...JavaSerializable) []byte {
 	return MarshalJavaObjectsWithConfig(nil, res...)
 }
@@ -85,10 +99,6 @@ func ParseFromBytes(raw []byte) (*JavaObject, error) {
 	}
 
 	return obj, nil
-}
-func ParseJavaSerialized(raw []byte) ([]JavaSerializable, error) {
-	r := bufio.NewReader(bytes.NewBuffer(raw))
-	return ParseJavaSerializedEx(r, ioutil.Discard)
 }
 
 func JavaSerializedDumper(raw []byte) string {
@@ -172,12 +182,4 @@ func ParseMultiJavaSerializedEx(r io.Reader, writer io.Writer, n int, callback .
 }
 func ParseJavaSerializedEx(r io.Reader, writer io.Writer, callback ...func(j JavaSerializable)) ([]JavaSerializable, error) {
 	return ParseMultiJavaSerializedEx(r, writer, -1, callback...)
-}
-
-func ParseHexJavaSerialized(raw string) ([]JavaSerializable, error) {
-	bytes, err := codec.DecodeHex(raw)
-	if err != nil {
-		return nil, err
-	}
-	return ParseJavaSerialized(bytes)
 }

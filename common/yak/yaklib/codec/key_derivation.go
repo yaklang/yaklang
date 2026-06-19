@@ -66,7 +66,27 @@ func NewPBKDF2Generator(hashFunc func() hash.Hash, iterations int) KeyDerivation
 	}
 }
 
-// PBKDF2SHA1Key derives a key with PBKDF2-HMAC-SHA1 (e.g. WeChat wxapkg V1MMWX decryption).
+// PBKDF2SHA1Key 使用 PBKDF2-HMAC-SHA1 从口令与盐派生固定长度的密钥(如微信 wxapkg V1MMWX 解密)
+// 参数:
+//   - password: 口令，可为 string、[]byte 等
+//   - salt: 盐值，可为 string、[]byte 等
+//   - iterations: 迭代次数，<=0 时使用默认值 10000
+//   - keyLen: 派生密钥长度(字节)，<=0 时使用默认值 32
+//
+// 返回值:
+//   - []byte: 派生出的密钥字节
+//   - error: 派生失败时返回的错误
+//
+// Example:
+// ```
+// // VARS: 从口令与盐派生 16 字节密钥
+// key = codec.PBKDF2SHA1Key("password", "salt", 1000, 16)~
+// // STDOUT: 打印密钥长度
+// println(len(key))   // OUT: 16
+// // assert: 锁定结论(长度符合 + 确定性可复现)
+// assert len(key) == 16, "PBKDF2SHA1Key should produce key of requested length"
+// assert codec.EncodeToHex(key) == codec.EncodeToHex(codec.PBKDF2SHA1Key("password", "salt", 1000, 16)~), "PBKDF2 should be deterministic"
+// ```
 func PBKDF2SHA1Key(password, salt interface{}, iterations, keyLen int) ([]byte, error) {
 	p := interfaceToBytes(password)
 	s := interfaceToBytes(salt)

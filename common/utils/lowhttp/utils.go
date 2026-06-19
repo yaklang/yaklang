@@ -820,6 +820,12 @@ func normalizeHostOnly(host string) string {
 }
 
 // IsResp 判断传入的数据是否为 HTTP 响应报文
+// 参数:
+//   - raw: 待判断的数据，可为字节数组或字符串
+//
+// 返回值:
+//   - 是否为 HTTP 响应报文
+//
 // Example:
 // ```
 // poc.IsResp(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok") // true

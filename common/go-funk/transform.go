@@ -7,9 +7,21 @@ import (
 	"strings"
 )
 
-// Chunk creates an array of elements split into groups with the length of size.
-// If array can't be split evenly, the final chunk will be
-// the remaining element.
+// Chunk 将切片按指定大小分组，最后一组可能不足 size 个元素
+// 参数:
+//   - arr: 待分组的切片
+//   - size: 每组的元素个数
+//
+// 返回值:
+//   - 分组后的二维切片
+//
+// Example:
+// ```
+// // VARS: 按每组 2 个分组
+// result = x.Chunk([1, 2, 3, 4, 5], 2)
+// // assert: 5 个元素分成 3 组
+// assert len(result) == 3, "5 elements in groups of 2 yields 3 chunks"
+// ```
 func Chunk(arr interface{}, size int) interface{} {
 	if !IsIteratee(arr) {
 		panic("First parameter must be neither array nor slice")
@@ -55,8 +67,19 @@ func Chunk(arr interface{}, size int) interface{} {
 	return resultSlice.Interface()
 }
 
-// ToMap transforms a slice of instances to a Map.
-// []*Foo => Map<int, *Foo>
+// ToMap 将一个结构体切片转换为以指定字段值为键的 map
+// 参数:
+//   - in: 结构体切片
+//   - pivot: 作为键的结构体字段名
+//
+// 返回值:
+//   - 以 pivot 字段值为键、结构体为值的 map
+//
+// Example:
+// ```
+// // 将结构体切片按字段转为 map(需结构体切片，作示意)
+// m = x.ToMap(users, "Id")
+// ```
 func ToMap(in interface{}, pivot string) interface{} {
 	value := reflect.ValueOf(in)
 
@@ -300,7 +323,20 @@ func flattenRecursive(value reflect.Value, result reflect.Value) reflect.Value {
 	return result
 }
 
-// Shuffle creates an array of shuffled values
+// Shuffle 随机打乱切片中元素的顺序，返回打乱后的新切片
+// 参数:
+//   - in: 待打乱的切片
+//
+// 返回值:
+//   - 打乱顺序后的切片(元素不变)
+//
+// Example:
+// ```
+// // VARS: 随机打乱(每次顺序不同)
+// result = x.Shuffle([1, 2, 3, 4, 5])
+// // assert: 元素个数不变
+// assert len(result) == 5, "shuffle should preserve length"
+// ```
 func Shuffle(in interface{}) interface{} {
 	value := reflect.ValueOf(in)
 	valueType := value.Type()
@@ -322,8 +358,22 @@ func Shuffle(in interface{}) interface{} {
 	panic(fmt.Sprintf("Type %s is not supported by Shuffle", valueType.String()))
 }
 
-// Reverse transforms an array the first element will become the last,
-// the second element will become the second to last, etc.
+// Reverse 反转切片中元素的顺序，返回反转后的新切片
+// 参数:
+//   - in: 待反转的切片
+//
+// 返回值:
+//   - 反转顺序后的切片
+//
+// Example:
+// ```
+// // VARS: 反转切片
+// result = x.Reverse([1, 2, 3])
+// // STDOUT: 打印结果
+// println(result)   // OUT: [3 2 1]
+// // assert: 首元素变为原末元素
+// assert result[0] == 3, "reverse should put last element first"
+// ```
 func Reverse(in interface{}) interface{} {
 	value := reflect.ValueOf(in)
 	valueType := value.Type()
@@ -351,7 +401,22 @@ func Reverse(in interface{}) interface{} {
 	panic(fmt.Sprintf("Type %s is not supported by Reverse", valueType.String()))
 }
 
-// Uniq creates an array with unique values.
+// RemoveRepeat 对切片去重，返回仅保留首次出现元素的新切片
+// 参数:
+//   - in: 待去重的切片
+//
+// 返回值:
+//   - 去重后的切片
+//
+// Example:
+// ```
+// // VARS: 去除重复元素
+// result = x.RemoveRepeat([1, 1, 2, 3, 3])
+// // STDOUT: 打印结果
+// println(result)   // OUT: [1 2 3]
+// // assert: 去重后剩 3 个
+// assert len(result) == 3, "duplicates should be removed"
+// ```
 func Uniq(in interface{}) interface{} {
 	value := reflect.ValueOf(in)
 	valueType := value.Type()
@@ -418,7 +483,23 @@ func ConvertSlice(in interface{}, out interface{}) {
 	direct.Set(dstValue)
 }
 
-// Drop creates an array/slice with `n` elements dropped from the beginning.
+// Drop 从切片开头丢弃 n 个元素，返回剩余元素组成的新切片
+// 参数:
+//   - in: 源切片
+//   - n: 从开头丢弃的元素个数
+//
+// 返回值:
+//   - 丢弃后剩余的切片
+//
+// Example:
+// ```
+// // VARS: 丢弃开头 2 个元素
+// result = x.Drop([1, 2, 3, 4], 2)
+// // STDOUT: 打印结果
+// println(result)   // OUT: [3 4]
+// // assert: 剩余 2 个元素
+// assert len(result) == 2, "drop should remove the first n elements"
+// ```
 func Drop(in interface{}, n int) interface{} {
 	value := reflect.ValueOf(in)
 	valueType := value.Type()

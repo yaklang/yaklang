@@ -102,91 +102,234 @@ func NewConfig(opts ...AmapConfigOption) *Config {
 	return cfg
 }
 
-// WithLowhttpOptions sets the lowhttp options for the Amap API client.
+// WithLowhttpOptions 设置高德 API 客户端底层 HTTP 请求选项（导出名为 amap.pocOpts）
+// 参数:
+//   - opts: 零个到多个 poc 请求选项函数
+//
+// 返回值:
+//   - 高德 API 配置可选项
+//
+// Example:
+// ```
+// opt = amap.pocOpts(poc.timeout(10))
+// println(opt)
+// ```
 func WithLowhttpOptions(opts ...poc.PocConfigOption) AmapConfigOption {
 	return func(c *Config) {
 		c.lowhttpOptions = append(c.lowhttpOptions, opts...)
 	}
 }
 
-// WithGeocodeFilter sets the geocode filter for the Amap API client.
+// WithGeocodeFilter 设置地理编码结果过滤器，用于从多个候选中选出一个（导出名为 amap.geocodeFilter）
+// 参数:
+//   - filter: 过滤回调，输入候选地理编码结果，返回选中的结果
+//
+// 返回值:
+//   - 高德 API 配置可选项
+//
+// Example:
+// ```
+// opt = amap.geocodeFilter(func(geocodes) { return geocodes[0] })
+// println(opt)
+// ```
 func WithGeocodeFilter(filter func(geocodes []*GeocodeResult) *GeocodeResult) AmapConfigOption {
 	return func(c *Config) {
 		c.GeocodeFilter = filter
 	}
 }
 
-// WithEnableWeatherForecast sets the enable weather forecast in the config.
+// WithEnableWeatherForecast 设置天气查询是否返回预报信息（导出名为 amap.enableWeatherForecast）
+// 参数:
+//   - enable: 是否启用天气预报
+//
+// 返回值:
+//   - 高德 API 配置可选项
+//
+// Example:
+// ```
+// opt = amap.enableWeatherForecast(true)
+// println(opt)
+// ```
 func WithEnableWeatherForecast(enable bool) AmapConfigOption {
 	return func(c *Config) {
 		c.EnableWeatherForecast = enable
 	}
 }
 
-// WithApiKey sets the API key in the config.
+// WithApiKey 设置高德开放平台 API Key（导出名为 amap.apiKey）
+// 参数:
+//   - apiKey: 高德开放平台申请的 API Key
+//
+// 返回值:
+//   - 高德 API 配置可选项
+//
+// Example:
+// ```
+// opt = amap.apiKey("your-amap-api-key")
+// println(opt)
+// ```
 func WithApiKey(apiKey string) AmapConfigOption {
 	return func(c *Config) {
 		c.ApiKey = apiKey
 	}
 }
 
-// WithTimeout sets the HTTP client timeout in the config.
+// WithTimeout 设置 HTTP 请求超时时间（导出名为 amap.timeout）
+// 参数:
+//   - timeout: 超时时间（time.Duration）
+//
+// 返回值:
+//   - 高德 API 配置可选项
+//
+// Example:
+// ```
+// opt = amap.timeout(10 * time.Second)
+// println(opt)
+// ```
 func WithTimeout(timeout time.Duration) AmapConfigOption {
 	return func(c *Config) {
 		c.Timeout = timeout
 	}
 }
 
-// WithBaseURL sets the base URL in the config.
+// WithBaseURL 设置高德 API 的基础 URL（导出名为 amap.baseURL）
+// 参数:
+//   - baseURL: API 基础地址
+//
+// 返回值:
+//   - 高德 API 配置可选项
+//
+// Example:
+// ```
+// opt = amap.baseURL("https://restapi.amap.com")
+// println(opt)
+// ```
 func WithBaseURL(baseURL string) AmapConfigOption {
 	return func(c *Config) {
 		c.BaseURL = baseURL
 	}
 }
 
-// WithCity sets the city for API requests
+// WithCity 设置请求关联的城市（导出名为 amap.city）
+// 参数:
+//   - city: 城市名或 citycode
+//
+// 返回值:
+//   - 高德 API 配置可选项
+//
+// Example:
+// ```
+// opt = amap.city("北京")
+// println(opt)
+// ```
 func WithCity(city string) AmapConfigOption {
 	return func(c *Config) {
 		c.City = city
 	}
 }
 
-// WithExtensions sets the extensions parameter (base or all)
+// WithExtensions 设置返回结果的详细程度（base 或 all，导出名为 amap.extensions）
+// 参数:
+//   - extensions: 取值 base 或 all
+//
+// 返回值:
+//   - 高德 API 配置可选项
+//
+// Example:
+// ```
+// opt = amap.extensions("all")
+// println(opt)
+// ```
 func WithExtensions(extensions string) AmapConfigOption {
 	return func(c *Config) {
 		c.Extensions = extensions
 	}
 }
 
-// WithPage sets the page number for paginated results
+// WithPage 设置分页结果的页码（导出名为 amap.page）
+// 参数:
+//   - page: 页码（从 1 开始）
+//
+// 返回值:
+//   - 高德 API 配置可选项
+//
+// Example:
+// ```
+// opt = amap.page(1)
+// println(opt)
+// ```
 func WithPage(page int) AmapConfigOption {
 	return func(c *Config) {
 		c.Page = page
 	}
 }
 
-// WithPageSize sets the page size for paginated results
+// WithPageSize 设置分页结果的每页数量（导出名为 amap.pageSize）
+// 参数:
+//   - pageSize: 每页数量
+//
+// 返回值:
+//   - 高德 API 配置可选项
+//
+// Example:
+// ```
+// opt = amap.pageSize(20)
+// println(opt)
+// ```
 func WithPageSize(pageSize int) AmapConfigOption {
 	return func(c *Config) {
 		c.PageSize = pageSize
 	}
 }
 
-// WithType sets the type parameter for distance calculations
+// WithType 设置类型参数（如距离计算的类型，导出名为 amap.type）
+// 参数:
+//   - typ: 类型参数
+//
+// 返回值:
+//   - 高德 API 配置可选项
+//
+// Example:
+// ```
+// opt = amap.type("1")
+// println(opt)
+// ```
 func WithType(typ string) AmapConfigOption {
 	return func(c *Config) {
 		c.Type = typ
 	}
 }
 
-// WithRadius sets the radius for nearby searches
+// WithRadius 设置周边搜索的半径（导出名为 amap.radius）
+// 参数:
+//   - radius: 搜索半径（米）
+//
+// 返回值:
+//   - 高德 API 配置可选项
+//
+// Example:
+// ```
+// opt = amap.radius(1000)
+// println(opt)
+// ```
 func WithRadius(radius int) AmapConfigOption {
 	return func(c *Config) {
 		c.Radius = radius
 	}
 }
 
-// WithSortRule sets the sort rule for search results
+// WithSortRule 设置搜索结果的排序规则（导出名为 amap.sortRule）
+// 参数:
+//   - sortRule: 排序规则，如 distance/weight
+//
+// 返回值:
+//   - 高德 API 配置可选项
+//
+// Example:
+// ```
+// opt = amap.sortRule("distance")
+// println(opt)
+// ```
 func WithSortRule(sortRule string) AmapConfigOption {
 	return func(c *Config) {
 		c.SortRule = sortRule

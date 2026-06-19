@@ -109,6 +109,13 @@ func fetchRespos(res *git.Repository, commitHash string) (*filesys.VirtualFS, er
 }
 
 // FileSystemFromCommit 从指定的commit中获取文件系统
+// 参数:
+//   - repos: 本地仓库路径
+//   - commitHash: 目标 commit 的哈希
+//
+// 返回值:
+//   - 该 commit 对应的文件系统
+//   - 错误信息
 //
 // Example:
 // ```
@@ -124,6 +131,13 @@ func FromCommit(repos string, commitHash string) (filesys_interface.FileSystem, 
 }
 
 // FileSystemFromCommits 从多个commit中获取文件系统
+// 参数:
+//   - repos: 本地仓库路径
+//   - commitHashes: 一个或多个 commit 哈希
+//
+// 返回值:
+//   - 合并多个 commit 后的文件系统
+//   - 错误信息
 //
 // Example:
 // ```
@@ -174,6 +188,14 @@ func FromCommits(repos string, commitHashes ...string) (filesys_interface.FileSy
 }
 
 // FileSystemFromCommitRange 从commit范围中获取文件系统
+// 参数:
+//   - repos: 本地仓库路径
+//   - start: 起始 commit（旧）
+//   - end: 结束 commit（新）
+//
+// 返回值:
+//   - 该范围内变更聚合得到的文件系统
+//   - 错误信息
 //
 // Example:
 // ```
@@ -273,6 +295,19 @@ func FromCommitRange(repos string, start, end string) (*filesys.VirtualFS, error
 	return fs, nil
 }
 
+// GetHeadHash 获取本地仓库当前 HEAD 的 commit 哈希（导出名为 git.HeadHash）
+// 参数:
+//   - repos: 本地仓库路径
+//
+// 返回值:
+//   - HEAD 的 commit 哈希字符串，失败时返回空字符串
+//
+// Example:
+// ```
+// // 读取本地仓库 HEAD（示意性示例，需替换为真实仓库路径）
+// hash = git.HeadHash("/path/to/repo")
+// println(hash)
+// ```
 func GetHeadHash(repos string) string {
 	res, err := GitOpenRepositoryWithCache(repos)
 	if err != nil {
@@ -287,6 +322,19 @@ func GetHeadHash(repos string) string {
 	return ref.Hash().String()
 }
 
+// GetHeadBranch 获取本地仓库当前 HEAD 所指向的分支/标签引用名（导出名为 git.HeadBranch）
+// 参数:
+//   - repos: 本地仓库路径
+//
+// 返回值:
+//   - 当前引用名，失败时返回空字符串
+//
+// Example:
+// ```
+// // 读取本地仓库当前分支（示意性示例，需替换为真实仓库路径）
+// branch = git.HeadBranch("/path/to/repo")
+// println(branch)
+// ```
 func GetHeadBranch(repos string) string {
 	res, err := GitOpenRepositoryWithCache(repos)
 	if err != nil {
@@ -333,6 +381,23 @@ func findChildren(res *git.Repository, commitHash plumbing.Hash) ([]*object.Comm
 	return children, nil
 }
 
+// GetBranchRange 获取某个分支的起止 commit 哈希范围（导出名为 git.HeadBranchRange）
+// 参数:
+//   - repos: 本地仓库路径
+//   - branchName: 分支引用名
+//
+// 返回值:
+//   - 起始 commit 哈希
+//   - 结束 commit 哈希
+//   - 错误信息
+//
+// Example:
+// ```
+// // 获取某分支的起止 commit（示意性示例，需替换为真实仓库路径）
+// start, end, err = git.HeadBranchRange("/path/to/repo", "refs/heads/main")
+// if err != nil { die(err) }
+// println(start, end)
+// ```
 func GetBranchRange(repos string, branchName string) (start, end string, err error) {
 	res, err := GitOpenRepositoryWithCache(repos)
 	if err != nil {
@@ -373,6 +438,22 @@ func GetBranchRange(repos string, branchName string) (start, end string, err err
 	return start, end, nil
 }
 
+// GetParentCommitHash 获取指定 commit 的父 commit 哈希（导出名为 git.ParentHash）
+// 参数:
+//   - repos: 本地仓库路径
+//   - commit: 目标 commit（可为短哈希或引用）
+//
+// 返回值:
+//   - 父 commit 哈希
+//   - 错误信息
+//
+// Example:
+// ```
+// // 获取某 commit 的父提交（示意性示例，需替换为真实仓库路径）
+// parent, err = git.ParentHash("/path/to/repo", "HEAD")
+// if err != nil { die(err) }
+// println(parent)
+// ```
 func GetParentCommitHash(repos string, commit string) (string, error) {
 	res, err := GitOpenRepositoryWithCache(repos)
 	if err != nil {
@@ -397,6 +478,19 @@ func GetParentCommitHash(repos string, commit string) (string, error) {
 	return parents[0].String(), nil
 }
 
+// Glance 快速查看本地仓库的概要信息（HEAD 哈希、类型、分支范围等，导出名为 git.Glance）
+// 参数:
+//   - repos: 本地仓库路径
+//
+// 返回值:
+//   - 概要信息文本，失败时返回空字符串
+//
+// Example:
+// ```
+// // 查看本地仓库概要（示意性示例，需替换为真实仓库路径）
+// info = git.Glance("/path/to/repo")
+// println(info)
+// ```
 func Glance(repos string) string {
 	res, err := GitOpenRepositoryWithCache(repos)
 	if err != nil {
@@ -620,6 +714,22 @@ func revParse(repo *git.Repository, rev string) (string, error) {
 	return "", utils.Errorf("cannot parse revision: %s", rev)
 }
 
+// RevParse 将一个引用（分支名、标签、短哈希等）解析为完整的 commit 哈希（导出名为 git.RevParse）
+// 参数:
+//   - repos: 本地仓库路径
+//   - rev: 待解析的引用
+//
+// 返回值:
+//   - 完整的 commit 哈希
+//   - 错误信息
+//
+// Example:
+// ```
+// // 解析 HEAD 的完整哈希（示意性示例，需替换为真实仓库路径）
+// hash, err = git.RevParse("/path/to/repo", "HEAD")
+// if err != nil { die(err) }
+// println(hash)
+// ```
 func RevParse(repos string, rev string) (string, error) {
 	repo, err := GitOpenRepositoryWithCache(repos)
 	if err != nil {

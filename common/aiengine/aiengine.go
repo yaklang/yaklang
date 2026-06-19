@@ -37,7 +37,22 @@ type AIEngine struct {
 	taskEndpoints      map[string]*aicommon.Endpoint   // 任务ID -> 任务完成 endpoint
 }
 
-// NewAIEngine 创建新的 AI 引擎实例
+// NewAIEngine 创建新的 AI 引擎实例（导出名为 aim.NewAIEngine）
+// AI 引擎封装了 ReAct 等能力，可通过 SendMsg/SendMsgAsync 发送任务
+// 参数:
+//   - options: 引擎配置可选项，如 aim.aiCallback、aim.maxIteration、aim.onEvent 等
+//
+// 返回值:
+//   - AI 引擎实例
+//   - 错误信息
+//
+// Example:
+// ```
+// // 需要配置可用的 AI 服务（示意性示例）
+// engine = aim.NewAIEngine(aim.maxIteration(10))~
+// defer engine.Close()
+// engine.SendMsg("list files in current dir")
+// ```
 func NewAIEngine(options ...AIEngineConfigOption) (*AIEngine, error) {
 	config := NewAIEngineConfig(options...)
 	notifySessionID(config)
@@ -606,6 +621,21 @@ func buildReActOptions(ctx context.Context, config *AIEngineConfig, outputChan c
 	return options
 }
 
+// InvokeReAct 以 ReAct 模式执行一次 AI 任务并阻塞至完成（导出名为 aim.InvokeReAct）
+// 内部会创建一个临时 AI 引擎，执行完成后自动关闭
+// 参数:
+//   - input: 任务输入（自然语言指令）
+//   - options: 引擎配置可选项，如 aim.aiCallback、aim.onEvent 等
+//
+// 返回值:
+//   - 错误信息
+//
+// Example:
+// ```
+// // 需要配置可用的 AI 服务（示意性示例）
+// err = aim.InvokeReAct("summarize the README", aim.maxIteration(5))
+// if err != nil { die(err) }
+// ```
 func InvokeReAct(input string, options ...AIEngineConfigOption) error {
 	engine, err := NewAIEngine(options...)
 	if err != nil {
@@ -616,7 +646,22 @@ func InvokeReAct(input string, options ...AIEngineConfigOption) error {
 	return engine.SendMsg(input, options...)
 }
 
-// InvokeReActAsync 异步执行 ReAct 任务，并返回引擎实例
+// InvokeReActAsync 异步执行 ReAct 任务，并返回引擎实例（导出名为 aim.InvokeReActAsync）
+// 参数:
+//   - input: 任务输入（自然语言指令）
+//   - options: 引擎配置可选项
+//
+// 返回值:
+//   - AI 引擎实例（可用于后续交互或等待）
+//   - 错误信息
+//
+// Example:
+// ```
+// // 需要配置可用的 AI 服务（示意性示例）
+// engine = aim.InvokeReActAsync("scan target", aim.onEvent(func(op, e) { dump(e) }))~
+// defer engine.Close()
+// engine.Wait()
+// ```
 func InvokeReActAsync(input string, options ...AIEngineConfigOption) (*AIEngine, error) {
 	engine, err := NewAIEngine(options...)
 	if err != nil {

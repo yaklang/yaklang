@@ -19,6 +19,21 @@ func SetProgramCache(program *Program, ttls ...time.Duration) {
 	ProgramCache.SetWithTTL(program.GetProgramName(), program, ttl)
 }
 
+// FromDatabase 从数据库中按程序名加载已编译的 SSA 程序（导出名为 ssa.NewFromProgramName）
+// 参数:
+//   - programName: 已保存的程序名
+//
+// 返回值:
+//   - SSA 程序对象
+//   - 错误信息
+//
+// Example:
+// ```
+// // 加载此前编译并保存的程序（示意性示例，需要数据库中已有该程序）
+// prog = ssa.NewFromProgramName("my-program")~
+// result = prog.SyntaxFlowWithError("sink* as $sink")~
+// dump(result)
+// ```
 func FromDatabase(programName string) (p *Program, err error) {
 	if prog, ok := ProgramCache.Get(programName); ok && prog != nil {
 		irProg, err := ssadb.GetProgram(programName, ssadb.Application)
@@ -205,9 +220,22 @@ func GetAggregatedFileSystemForProgramName(programName string) filesys_interface
 	return overlay.GetAggregatedFileSystem()
 }
 
-// NewProgramFromDB 从数据库加载程序，返回 SyntaxFlowQueryInstance 接口
-// 如果程序有 overlay（已保存的 overlay 或增量编译的 diff program），返回 *ProgramOverLay
-// 否则返回 *Program
+// NewProgramFromDB 从数据库加载程序并返回 SyntaxFlowQueryInstance 接口（导出名为 ssa.NewProgramFromDB）
+// 如果程序有 overlay（已保存的 overlay 或增量编译的 diff program），返回 *ProgramOverLay，否则返回 *Program
+// 参数:
+//   - programName: 已保存的程序名
+//
+// 返回值:
+//   - 可执行 SyntaxFlow 查询的程序实例
+//   - 错误信息
+//
+// Example:
+// ```
+// // 加载已保存的程序并执行查询（示意性示例，需要数据库中已有该程序）
+// prog = ssa.NewProgramFromDB("my-program")~
+// result = prog.SyntaxFlowWithError("sink* as $sink")~
+// dump(result)
+// ```
 func NewProgramFromDB(programName string) (SyntaxFlowQueryInstance, error) {
 	program, err := FromDatabase(programName)
 	if err != nil {

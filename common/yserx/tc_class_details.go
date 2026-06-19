@@ -57,6 +57,26 @@ func newJavaClassDetails() *JavaClassDetails {
 	}
 }
 
+// NewJavaClassDetails 创建 Java 类描述详情(类名、serialVersionUID、字段、父类等)
+// 在 yak 中通过 java.NewJavaClassDetails 调用，是构造 ClassDesc 的底层结构
+// 参数:
+//   - className: 类的全限定名
+//   - serialVersionUID: 序列化版本号(8 字节)
+//   - Flag: 类描述标志位
+//   - Fields: 字段描述集合
+//   - Annotations: 类注解数据列表
+//   - SuperClass: 父类描述详情，可为 nil
+//
+// 返回值:
+//   - Java 类描述详情对象
+//
+// Example:
+// ```
+// // 该示例为示意性用法：构造类描述详情
+// fields = java.NewJavaClassFields()
+// details = java.NewJavaClassDetails("com.example.Foo", []byte{0,0,0,0,0,0,0,1}, 0x02, fields, nil, nil)
+// println(details.ClassName)
+// ```
 func NewJavaClassDetails(
 	className string,
 	serialVersionUID []byte,

@@ -92,6 +92,19 @@ func (w *WebSocketConn) GetRawRequest() []byte {
 // WebSocketHandler 是 WebSocket 连接处理函数类型
 type WebSocketHandler func(conn *WebSocketConn)
 
+// localFileSystemHandler 是一个 HTTP 服务器配置选项，用于将某个 URL 前缀映射到本地文件系统目录提供静态文件服务
+// 参数:
+//   - prefix: URL 访问路径前缀
+//   - dir: 本地文件系统目录
+//
+// 返回值:
+//   - 一个 HTTP 服务器配置选项，作为可变参数传入 httpserver.Serve
+//
+// Example:
+// ```
+// // 提供本地静态文件服务，依赖网络，此处仅作示意
+// err = httpserver.Serve("127.0.0.1", 8888, httpserver.localFileSystemHandler("/static", "/var/www/static"))
+// ```
 func _httpServerOptLocalFileSystemHandler(prefix, dir string) HttpServerConfigOpt {
 	return func(c *_httpServerConfig) {
 		if c.localFileSystemHandler == nil {
@@ -101,8 +114,14 @@ func _httpServerOptLocalFileSystemHandler(prefix, dir string) HttpServerConfigOp
 	}
 }
 
-// routeHandler 用于设置 HTTP 服务器的路由处理函数，第一个参数为路由路径，第二个参数为处理函数
-// 此函数会根据路由路径自动添加前缀 "/"
+// routeHandler 用于设置 HTTP 服务器的路由处理函数，此函数会根据路由路径自动添加前缀 "/"
+// 参数:
+//   - route: 路由路径
+//   - handler: 命中该路由时的处理函数，参数为响应写入器与请求对象
+//
+// 返回值:
+//   - 一个 HTTP 服务器配置选项，作为可变参数传入 httpserver.Serve
+//
 // Example:
 // ```
 //
@@ -134,8 +153,14 @@ func _httpServerOptRouteHandler(route string, handler http.HandlerFunc) HttpServ
 	}
 }
 
-// wsRouteHandler 用于设置 HTTP 服务器的 WebSocket 路由处理函数，第一个参数为路由路径，第二个参数为 WebSocket 处理函数
-// 此函数会自动处理 WebSocket 握手升级，并在连接建立后调用处理函数
+// wsRouteHandler 用于设置 HTTP 服务器的 WebSocket 路由处理函数，会自动处理 WebSocket 握手升级，并在连接建立后调用处理函数
+// 参数:
+//   - route: 路由路径
+//   - handler: WebSocket 连接处理函数，参数为已升级的连接对象
+//
+// 返回值:
+//   - 一个 HTTP 服务器配置选项，作为可变参数传入 httpserver.Serve
+//
 // Example:
 // ```
 //
@@ -175,8 +200,15 @@ func _httpServerOptWsRouteHandler(route string, handler WebSocketHandler) HttpSe
 	}
 }
 
-// captchaRouteHandler 用于设置 HTTP 服务器的验证码处理函数，第一个参数为路由路径，第二个参数为超时时间，第三个参数为处理函数
-// 此函数会根据路由路径自动添加前缀 "/"
+// captchaRouteHandler 用于设置 HTTP 服务器的验证码保护处理函数，会根据路由路径自动添加前缀 "/"
+// 参数:
+//   - route: 受验证码保护的路由路径
+//   - timeoutSeconds: 验证码有效期（秒），小于等于 0 时使用默认 30 秒
+//   - handler: 通过验证码后的处理函数，参数为响应写入器与请求对象
+//
+// 返回值:
+//   - 一个 HTTP 服务器配置选项，作为可变参数传入 httpserver.Serve
+//
 // Example:
 // ```
 //
@@ -257,8 +289,15 @@ func BuildTlsConfig(crt, key interface{}, cas ...interface{}) *tls.Config {
 	return tlsConfig
 }
 
-// tlsCertAndKey 用于设置 HTTP服务器的 TLS 证书和密钥，第一个参数为证书，第二个参数为密钥，第三个参数为可选的 CA 证书
-// 一般配合tls标准库使用
+// tlsCertAndKey 用于设置 HTTP 服务器的 TLS 证书和密钥，一般配合 tls 标准库使用
+// 参数:
+//   - crt: 服务器证书（PEM 内容或文件路径）
+//   - key: 服务器私钥（PEM 内容或文件路径）
+//   - cas: 可选的 CA 证书，用于双向认证
+//
+// 返回值:
+//   - 一个 HTTP 服务器配置选项，作为可变参数传入 httpserver.Serve
+//
 // Example:
 // ```
 // ca, key, err = tls.GenerateRootCA("yaklang.io")
@@ -272,11 +311,17 @@ func _httpServerOptCaAndKey(crt, key interface{}, cas ...interface{}) HttpServer
 	}
 }
 
-// context 用于设置 HTTP 服务器的上下文
+// context 用于设置 HTTP 服务器的上下文，可通过取消上下文来停止服务
+// 参数:
+//   - ctx: 上下文对象
+//
+// 返回值:
+//   - 一个 HTTP 服务器配置选项，作为可变参数传入 httpserver.Serve
+//
 // Example:
 // ```
 // ctx = context.New()
-// err = httpserver.Serve("127.0.0.1", httpserver, http.context(ctx))
+// err = httpserver.Serve("127.0.0.1", 8888, httpserver.context(ctx))
 // ```
 func _httpServerOptContext(ctx context.Context) HttpServerConfigOpt {
 	return func(c *_httpServerConfig) {
@@ -284,8 +329,13 @@ func _httpServerOptContext(ctx context.Context) HttpServerConfigOpt {
 	}
 }
 
-// handler 用于设置 HTTP 服务器的回调函数，此函数会在每次收到请求时被调用
-// 此函数的第一个参数为响应回复者结构体，第二个参数为 请求结构体，你可以调用第一个参数中的方法来设置响应头，响应体等
+// handler 用于设置 HTTP 服务器的默认回调函数，会在每次收到（未命中其他路由的）请求时被调用
+// 参数:
+//   - cb: 请求处理回调函数，第一个参数为响应写入器，第二个参数为请求对象
+//
+// 返回值:
+//   - 一个 HTTP 服务器配置选项，作为可变参数传入 httpserver.Serve
+//
 // Example:
 // ```
 // err = httpserver.Serve("127.0.0.1", 8888, httpserver.handler(func(rspWriter, req) { rspWriter.Write("Hello world") }))
@@ -330,7 +380,15 @@ func _listen(host string, port int, opts ...HttpServerConfigOpt) (lis net.Listen
 	return lis, config, nil
 }
 
-// Serve 根据给定的 host 和 port 启动一个 http 服务，第一个参数为监听主机，第二个参数为监听端口，接下来可以接收零个到多个选项函数，用于设置上下文，回调函数等
+// Serve 根据给定的 host 和 port 启动一个 HTTP 服务，可接收零个到多个选项函数用于设置上下文、回调函数等
+// 参数:
+//   - host: 监听主机
+//   - port: 监听端口
+//   - opts: 可选配置，例如 httpserver.handler、httpserver.routeHandler、httpserver.context
+//
+// 返回值:
+//   - 错误信息，监听失败或服务异常退出时返回非空
+//
 // Example:
 // ```
 // err = httpserver.Serve("127.0.0.1", 8888, httpserver.handler(func(rspWriter, req) { rspWriter.Write("Hello world") }))
@@ -450,8 +508,17 @@ func _httpServe(host string, port int, opts ...HttpServerConfigOpt) error {
 	}))
 }
 
-// LocalFileSystemServe 根据给定的 host 和 port 启动一个 http 服务用于访问本地文件系统
-// 第一个参数为监听主机，第二个参数为监听端口，第三个参数为访问路径前缀，第四个参数为本地文件系统路径，接下来可以接收零个到多个选项函数，用于设置上下文，回调函数等
+// LocalFileSystemServe 根据给定的 host 和 port 启动一个用于访问本地文件系统的 HTTP 静态文件服务
+// 参数:
+//   - host: 监听主机
+//   - port: 监听端口
+//   - prefix: 访问路径前缀
+//   - localPath: 对外提供服务的本地文件系统目录
+//   - opts: 可选配置，例如 httpserver.context
+//
+// 返回值:
+//   - 错误信息，监听失败或服务异常退出时返回非空
+//
 // Example:
 // ```
 // err = httpserver.LocalFileSystemServe("127.0.0.1", 8888, "/static", "/var/www/static")

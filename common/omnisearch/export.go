@@ -44,6 +44,26 @@ func (c *CustomSearcher) Search(query string, config *ostype.SearchConfig) ([]*o
 
 var _ ostype.SearchClient = &CustomSearcher{}
 
+// Search 使用聚合搜索引擎执行一次综合搜索（默认走 aibalance 聚合层）
+// 依赖外部搜索服务与 API Key，需要网络环境
+// 参数:
+//   - query: 搜索关键词
+//   - options: 搜索可选项，如 omnisearch.apikey / omnisearch.type / omnisearch.page 等
+//
+// 返回值:
+//   - 搜索结果列表，每个结果包含内容与来源
+//   - 错误信息
+//
+// Example:
+// ```
+// // 示意性示例，需要有效的 apikey 与网络
+// results = omnisearch.Search("yaklang", omnisearch.apikey("your-api-key"))~
+//
+//	for r in results {
+//	    println(r.Content)
+//	}
+//
+// ```
 func Search(query string, options ...ostype.SearchOption) ([]*ostype.OmniSearchResult, error) {
 	config := ostype.NewSearchConfig(options...)
 	extra := config.Extra

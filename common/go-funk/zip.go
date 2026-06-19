@@ -10,9 +10,21 @@ type Tuple struct {
 	Element2 interface{}
 }
 
-// Zip returns a list of tuples, where the i-th tuple contains the i-th element
-// from each of the input iterables. The returned list is truncated in length
-// to the length of the shortest input iterable.
+// Zip 将两个切片按下标两两组合成元组列表，长度取较短切片
+// 参数:
+//   - slice1: 第一个切片
+//   - slice2: 第二个切片
+//
+// 返回值:
+//   - 元组列表，每个元组包含两个切片中同下标的元素
+//
+// Example:
+// ```
+// // VARS: 按下标配对
+// result = x.Zip([1, 2], ["a", "b"])
+// // assert: 配对数量为较短切片长度
+// assert len(result) == 2, "zip should pair elements by index"
+// ```
 func Zip(slice1 interface{}, slice2 interface{}) []Tuple {
 	if !IsCollection(slice1) || !IsCollection(slice2) {
 		panic("First parameter must be a collection")

@@ -7,6 +7,22 @@ import (
 	"unicode/utf8"
 )
 
+// JsonUnicodeEncode 将字符串的每个字符编码为 \uXXXX 形式的 Unicode 转义序列
+// 参数:
+//   - i: 待编码的字符串
+//
+// 返回值:
+//   - \uXXXX 形式的 Unicode 转义字符串
+//
+// Example:
+// ```
+// // VARS: 把字符串编码为 \uXXXX
+// result = codec.UnicodeEncode("abc")
+// // STDOUT: 打印可观察输出
+// println(result)   // OUT: \u0061\u0062\u0063
+// // assert: 锁定结论(与 UnicodeDecode 往返一致)
+// assert codec.UnicodeDecode(result) == "abc", "unicode encode/decode should round-trip"
+// ```
 func JsonUnicodeEncode(i string) string {
 	s := []rune(i)
 	var buf bytes.Buffer
@@ -17,6 +33,22 @@ func JsonUnicodeEncode(i string) string {
 	return buf.String()
 }
 
+// JsonUnicodeDecode 将 \uXXXX / \UXXXXXXXX 形式的 Unicode 转义序列解码为原始字符串
+// 参数:
+//   - i: 含 Unicode 转义序列的字符串
+//
+// 返回值:
+//   - 解码后的原始字符串
+//
+// Example:
+// ```
+// // VARS: 解码 \uXXXX 转义序列
+// result = codec.UnicodeDecode("\\u0061\\u0062\\u0063")
+// // STDOUT: 打印可观察输出
+// println(result)   // OUT: abc
+// // assert: 锁定结论
+// assert result == "abc", "UnicodeDecode should decode escape sequences"
+// ```
 func JsonUnicodeDecode(i string) string {
 	if len(i) == 0 {
 		return i

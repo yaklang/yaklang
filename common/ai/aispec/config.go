@@ -665,6 +665,18 @@ func WithType(t string) AIConfigOption {
 	}
 }
 
+// WithPreferredTier 指定优先使用的模型分层（导出名为 ai.preferredTier）
+// 参数:
+//   - tier: 模型分层，如智能、轻量、视觉
+//
+// 返回值:
+//   - AI 配置选项
+//
+// Example:
+// ```
+// opt = ai.preferredTier("lightweight")
+// println(opt)
+// ```
 func WithPreferredTier(tier consts.ModelTier) AIConfigOption {
 	return func(config *AIConfig) {
 		config.PreferredTier = tier
@@ -677,14 +689,50 @@ func WithDisableProviderFallback(disable bool) AIConfigOption {
 	}
 }
 
+// WithSpeedPriority 设置速度优先（使用轻量模型，导出名为 ai.speedPriority）
+// 参数:
+//   - 无
+//
+// 返回值:
+//   - AI 配置选项
+//
+// Example:
+// ```
+// response = ai.Chat("快速总结这段文本", ai.speedPriority())~
+// println(response)
+// ```
 func WithSpeedPriority() AIConfigOption {
 	return WithPreferredTier(consts.TierLightweight)
 }
 
+// WithQualityPriority 设置质量优先（使用智能模型，导出名为 ai.qualityPriority）
+// 参数:
+//   - 无
+//
+// 返回值:
+//   - AI 配置选项
+//
+// Example:
+// ```
+// response = ai.Chat("深入分析这个漏洞", ai.qualityPriority())~
+// println(response)
+// ```
 func WithQualityPriority() AIConfigOption {
 	return WithPreferredTier(consts.TierIntelligent)
 }
 
+// WithVisionPriority 设置视觉优先（使用视觉模型，导出名为 ai.visionPriority / ai.imageAI）
+// 参数:
+//   - 无
+//
+// 返回值:
+//   - AI 配置选项
+//
+// Example:
+// ```
+// response = ai.Chat("分析这张截图", ai.imageFile("/tmp/demo.png"), ai.imageAI())~
+// println(response)
+// ```
 func WithVisionPriority() AIConfigOption {
 	return WithPreferredTier(consts.TierVision)
 }
@@ -953,6 +1001,17 @@ func WithImageRaw(raw []byte) AIConfigOption {
 
 // WithVideoUrl 传入视频 URL（http(s) 或 data:video/...;base64,...），用于 Qwen Omni 类模型。
 // 关键词: ai.videoUrl, omni 视频 URL 输入
+// 参数:
+//   - u: 视频 URL 或 data URI
+//
+// 返回值:
+//   - AI 配置选项
+//
+// Example:
+// ```
+// opt = ai.videoUrl("https://example.com/demo.mp4")
+// println(opt)
+// ```
 func WithVideoUrl(u string) AIConfigOption {
 	return func(config *AIConfig) {
 		if u == "" {
@@ -970,6 +1029,17 @@ func WithVideoUrl(u string) AIConfigOption {
 // omni 模型 video_url 的 base64 要求 data URI 不携带 mime type，
 // 即 data:;base64,xxxx 形式。
 // 关键词: ai.videoBase64, omni base64 视频输入
+// 参数:
+//   - b64: Base64 编码的视频数据（或 data URI）
+//
+// 返回值:
+//   - AI 配置选项
+//
+// Example:
+// ```
+// opt = ai.videoBase64(codec.EncodeBase64(file.ReadFile("/tmp/demo.mp4")~))
+// println(opt)
+// ```
 func WithVideoBase64(b64 string) AIConfigOption {
 	return func(config *AIConfig) {
 		if b64 == "" {
@@ -990,6 +1060,17 @@ func WithVideoBase64(b64 string) AIConfigOption {
 // WithVideoRaw 传入视频原始字节，自动 base64 包装为 data URI。
 // omni 模型 video_url 的 base64 要求 data URI 不携带 mime type。
 // 关键词: ai.videoRaw, omni 视频原始字节输入
+// 参数:
+//   - raw: 视频原始字节
+//
+// 返回值:
+//   - AI 配置选项
+//
+// Example:
+// ```
+// opt = ai.videoRaw(file.ReadFile("/tmp/demo.mp4")~)
+// println(opt)
+// ```
 func WithVideoRaw(raw []byte) AIConfigOption {
 	return func(config *AIConfig) {
 		if len(raw) == 0 {
@@ -1076,6 +1157,12 @@ func WithHTTPErrorHandler(h func(error)) AIConfigOption {
 //
 // 返回值：
 // - r1(aispec.AIConfigOption): AI 配置选项
+//
+// Example:
+// ```
+// opt = ai.toolCallCallback(func(toolCalls) { dump(toolCalls) })
+// println(opt)
+// ```
 func WithToolCallCallback(cb func([]*ToolCall)) AIConfigOption {
 	return func(c *AIConfig) {
 		c.ToolCallCallback = cb
@@ -1097,30 +1184,90 @@ func WithToolChoice(choice any) AIConfigOption {
 	}
 }
 
+// WithModelInfoCallback 在选定模型并开始调用前触发的回调（导出名为 ai.modelInfoCallback）
+// 参数:
+//   - cb: 回调函数，参数为 (provider, model)
+//
+// 返回值:
+//   - AI 配置选项
+//
+// Example:
+// ```
+// opt = ai.modelInfoCallback(func(provider, model) { println(provider, model) })
+// println(opt)
+// ```
 func WithModelInfoCallback(cb func(provider, model string)) AIConfigOption {
 	return func(c *AIConfig) {
 		c.ModelInfoCallback = cb
 	}
 }
 
+// WithModelInfoConfirmCallback 在模型调用成功确认后触发的回调（导出名为 ai.modelInfoConfirmCallback）
+// 参数:
+//   - cb: 回调函数，参数为 (provider, model)
+//
+// 返回值:
+//   - AI 配置选项
+//
+// Example:
+// ```
+// opt = ai.modelInfoConfirmCallback(func(provider, model) { println(provider, model) })
+// println(opt)
+// ```
 func WithModelInfoConfirmCallback(cb func(provider, model string)) AIConfigOption {
 	return func(c *AIConfig) {
 		c.ModelInfoConfirmCallback = cb
 	}
 }
 
+// WithRawHTTPResponseCallback 注册原始 HTTP 响应回调，可获取响应头与响应体预览（导出名为 ai.rawHTTPResponseCallback）
+// 参数:
+//   - cb: 回调函数，参数为 (headerBytes, bodyPreview)
+//
+// 返回值:
+//   - AI 配置选项
+//
+// Example:
+// ```
+// opt = ai.rawHTTPResponseCallback(func(header, body) { println(string(header)) })
+// println(opt)
+// ```
 func WithRawHTTPResponseCallback(cb func(headerBytes []byte, bodyPreview []byte)) AIConfigOption {
 	return func(c *AIConfig) {
 		c.RawHTTPResponseCallback = cb
 	}
 }
 
+// WithRawHTTPResponseHeaderCallback 注册原始 HTTP 响应头回调（导出名为 ai.rawHTTPResponseHeaderCallback）
+// 参数:
+//   - cb: 响应头回调函数
+//
+// 返回值:
+//   - AI 配置选项
+//
+// Example:
+// ```
+// opt = ai.rawHTTPResponseHeaderCallback(func(header) { dump(header) })
+// println(opt)
+// ```
 func WithRawHTTPResponseHeaderCallback(cb RawHTTPResponseHeaderCallback) AIConfigOption {
 	return func(c *AIConfig) {
 		c.RawHTTPResponseHeaderCallback = cb
 	}
 }
 
+// WithRawHTTPRequestResponseCallback 注册原始 HTTP 请求/响应回调（导出名为 ai.rawHTTPRequestResponseCallback）
+// 参数:
+//   - cb: 请求/响应回调函数
+//
+// 返回值:
+//   - AI 配置选项
+//
+// Example:
+// ```
+// opt = ai.rawHTTPRequestResponseCallback(func(req, rsp) { dump(req, rsp) })
+// println(opt)
+// ```
 func WithRawHTTPRequestResponseCallback(cb RawHTTPRequestResponseCallback) AIConfigOption {
 	return func(c *AIConfig) {
 		c.RawHTTPRequestResponseCallback = cb
@@ -1133,6 +1280,17 @@ func WithRawHTTPRequestResponseCallback(cb RawHTTPRequestResponseCallback) AICon
 // did not surface a usage block.
 //
 // 关键词: AIConfig WithUsageCallback, 视频蒸馏 token 用量回调
+// 参数:
+//   - cb: 回调函数，参数为本次对话的 token 用量信息（可能为 nil）
+//
+// 返回值:
+//   - AI 配置选项
+//
+// Example:
+// ```
+// opt = ai.usageCallback(func(usage) { dump(usage) })
+// println(opt)
+// ```
 func WithUsageCallback(cb func(*ChatUsage)) AIConfigOption {
 	return func(c *AIConfig) {
 		c.UsageCallback = cb
@@ -1151,6 +1309,18 @@ func WithUsageCallback(cb func(*ChatUsage)) AIConfigOption {
 // content 结构，最大化上游隐式缓存的前缀命中率。
 //
 // 关键词: WithRawMessages, messages 完整透传, 隐式缓存前缀稳定
+// 参数:
+//   - msgs: 原始 messages 数组（保留 role 顺序与 content 结构）
+//
+// 返回值:
+//   - AI 配置选项
+//
+// Example:
+// ```
+// // msgs 为客户端原始消息列表（示意性示例）
+// opt = ai.rawMessages(msgs)
+// println(opt)
+// ```
 func WithRawMessages(msgs []ChatDetail) AIConfigOption {
 	return func(c *AIConfig) {
 		c.RawMessages = msgs

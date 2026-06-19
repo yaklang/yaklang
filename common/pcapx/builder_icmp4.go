@@ -62,6 +62,21 @@ func init() {
 
 type ICMPOption func(pv4 *layers.ICMPv4) error
 
+// icmp_type 设置 ICMPv4 的类型(Type)与代码(Code)
+// 在 yak 中通过 pcapx.icmp_type 调用，可配合 pcapx.ICMP_TYPE_ECHO_REQUEST 等常量使用
+// 参数:
+//   - icmpType: ICMP 类型
+//   - icmpCode: ICMP 代码，留空则默认为 0
+//
+// 返回值:
+//   - 一个 pcapx.PacketBuilder 可接收的 ICMP 层配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：构造一个 ICMP Echo 请求类型
+// raw = pcapx.PacketBuilder(pcapx.ipv4_srcIp("1.1.1.1"), pcapx.ipv4_dstOp("2.2.2.2"), pcapx.icmp_type(pcapx.ICMP_TYPE_ECHO_REQUEST, 0))~
+// println(len(raw))
+// ```
 func WithICMP_Type(icmpType any, icmpCode any) ICMPOption {
 	return func(pv4 *layers.ICMPv4) error {
 		if funk.IsEmpty(icmpCode) {
@@ -72,6 +87,20 @@ func WithICMP_Type(icmpType any, icmpCode any) ICMPOption {
 	}
 }
 
+// icmp_id 设置 ICMPv4 的标识符(Identifier)字段
+// 在 yak 中通过 pcapx.icmp_id 调用，配合 pcapx.PacketBuilder 使用
+// 参数:
+//   - id: 标识符值(0-65535)
+//
+// 返回值:
+//   - 一个 pcapx.PacketBuilder 可接收的 ICMP 层配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：设置 ICMP 标识符
+// raw = pcapx.PacketBuilder(pcapx.ipv4_srcIp("1.1.1.1"), pcapx.ipv4_dstOp("2.2.2.2"), pcapx.icmp_type(pcapx.ICMP_TYPE_ECHO_REQUEST, 0), pcapx.icmp_id(1))~
+// println(len(raw))
+// ```
 func WithICMP_Id(id any) ICMPOption {
 	return func(pv4 *layers.ICMPv4) error {
 		pv4.Id = uint16(utils.InterfaceToInt(id))
@@ -79,6 +108,20 @@ func WithICMP_Id(id any) ICMPOption {
 	}
 }
 
+// icmp_seq 设置 ICMPv4 的序列号(Sequence)字段
+// 在 yak 中通过 pcapx.icmp_seq 调用，配合 pcapx.PacketBuilder 使用
+// 参数:
+//   - sequence: 序列号(0-65535)
+//
+// 返回值:
+//   - 一个 pcapx.PacketBuilder 可接收的 ICMP 层配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：设置 ICMP 序列号
+// raw = pcapx.PacketBuilder(pcapx.ipv4_srcIp("1.1.1.1"), pcapx.ipv4_dstOp("2.2.2.2"), pcapx.icmp_type(pcapx.ICMP_TYPE_ECHO_REQUEST, 0), pcapx.icmp_seq(1))~
+// println(len(raw))
+// ```
 func WithICMP_Sequence(sequence any) ICMPOption {
 	return func(pv4 *layers.ICMPv4) error {
 		pv4.Seq = uint16(utils.InterfaceToInt(sequence))
@@ -86,6 +129,20 @@ func WithICMP_Sequence(sequence any) ICMPOption {
 	}
 }
 
+// icmp_payload 设置 ICMPv4 的负载(Payload)数据
+// 在 yak 中通过 pcapx.icmp_payload 调用，配合 pcapx.PacketBuilder 使用
+// 参数:
+//   - i: 负载字节数据
+//
+// 返回值:
+//   - 一个 pcapx.PacketBuilder 可接收的 ICMP 层配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：设置 ICMP 负载
+// raw = pcapx.PacketBuilder(pcapx.ipv4_srcIp("1.1.1.1"), pcapx.ipv4_dstOp("2.2.2.2"), pcapx.icmp_type(pcapx.ICMP_TYPE_ECHO_REQUEST, 0), pcapx.icmp_payload([]byte("ping")))~
+// println(len(raw))
+// ```
 func WithICMP_Payload(i []byte) ICMPOption {
 	return func(pv4 *layers.ICMPv4) error {
 		pv4.Payload = i

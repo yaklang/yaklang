@@ -23,10 +23,43 @@ var (
 var PKCS7Padding = sm4.PKCS7Padding
 var PKCS7UnPadding = sm4.PKCS7UnPadding
 
+// PKCS7PaddingFor8ByteBlock 按 8 字节块大小对数据做 PKCS7/PKCS5 填充(常用于 DES)
+// 参数:
+//   - src: 待填充的数据字节
+//
+// 返回值:
+//   - 填充到 8 字节整数倍后的数据字节
+//
+// Example:
+// ```
+// // VARS: 对 3 字节数据按 8 字节块填充
+// padded = codec.PKCS7PaddingForDES("abc")
+// // STDOUT: 打印填充后的长度
+// println(len(padded))   // OUT: 8
+// // assert: 锁定结论(去填充可还原原始数据)
+// assert string(codec.PKCS7UnPaddingForDES(padded)) == "abc", "PKCS7 for DES padding/unpadding should round-trip"
+// ```
 func PKCS7PaddingFor8ByteBlock(src []byte) []byte {
 	return PKCS5Padding(src, 8)
 }
 
+// PKCS7UnPaddingFor8ByteBlock 去除 8 字节块大小的 PKCS7/PKCS5 填充(常用于 DES)
+// 参数:
+//   - src: 含 PKCS7 填充的数据字节
+//
+// 返回值:
+//   - 去除填充后的原始数据字节
+//
+// Example:
+// ```
+// // VARS: 填充后再去填充往返
+// padded = codec.PKCS7PaddingForDES("abc")
+// unpadded = codec.PKCS7UnPaddingForDES(padded)
+// // STDOUT: 打印去填充后的结果
+// println(string(unpadded))   // OUT: abc
+// // assert: 锁定结论(去填充还原原始数据)
+// assert string(unpadded) == "abc", "PKCS7 for DES unpadding should recover original data"
+// ```
 func PKCS7UnPaddingFor8ByteBlock(src []byte) []byte {
 	return PKCS5UnPadding(src)
 }
@@ -171,6 +204,22 @@ func CTRDecode(c cipher.Block, iv, data []byte) ([]byte, error) {
 
 type EncodedFunc func(any) string
 
+// RandBytes 生成 n 个密码学安全的随机字节
+// 参数:
+//   - n: 需要生成的随机字节数量
+//
+// 返回值:
+//   - 长度为 n 的随机字节切片(读取失败时返回 nil)
+//
+// Example:
+// ```
+// // VARS: 生成 16 个随机字节(每次结果不同)
+// result = codec.RandBytes(16)
+// // STDOUT: 打印长度
+// println(len(result))   // OUT: 16
+// // assert: 锁定结论(长度固定为请求值)
+// assert len(result) == 16, "RandBytes should produce requested length"
+// ```
 func RandBytes(n int) []byte {
 	random := make([]byte, n)
 	_, err := io.ReadFull(cryptoRand.Reader, random)

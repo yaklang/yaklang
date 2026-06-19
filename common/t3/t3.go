@@ -421,6 +421,20 @@ func genAuth(name string, password string) []byte {
 	authenticatedUser := yserx.MarshalJavaObjects(serilizable...)
 	return authenticatedUser
 }
+
+// GenerateJavaObjectStreamBytes 根据要执行的命令生成 T3 利用所需的 Java 序列化对象字节流
+// 参数:
+//   - cmd: 要在目标上执行的系统命令
+//
+// 返回值:
+//   - 构造好的 Java 序列化对象字节流，可配合 t3.SendJavaObjectStreamBytes 使用
+//
+// Example:
+// ```
+// // 生成执行命令的 Java 序列化字节流，此处仅作示意
+// payload = t3.GenerateJavaObjectStreamBytes("id")
+// println(len(payload))
+// ```
 func genPayload(cmd string) []byte {
 	payloadTml := `[
   {

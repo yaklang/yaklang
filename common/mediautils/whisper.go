@@ -21,10 +21,18 @@ var WhisperExports = map[string]any{
 	"CreateSRTManager":      whisperutils.NewSRTManagerFromFile,
 }
 
-// whisper.ConvertAudioToSRTFile can convert audio to srt file
+// ConvertAudioToSRTFile 调用本地 whisper 模型把音频文件转写为 SRT 字幕文件
+// 需要在配置中正确设置 whisper 模型路径，转写过程依赖本地模型与外部环境
+// 参数:
+//   - i: 输入音频文件路径
 //
-// example:
+// 返回值:
+//   - 生成的 SRT 字幕文件路径
+//   - 错误信息
+//
+// Example:
 // ```
+// // 示意性示例，需要本地 whisper 模型与真实音频文件
 // srtfilename = whisper.ConvertAudioToSRTFile("audio.mp3")~
 // println(srtfilename)
 // ```

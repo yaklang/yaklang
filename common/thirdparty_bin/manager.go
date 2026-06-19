@@ -568,7 +568,19 @@ func Install(name string, options *InstallOptions) error {
 	return DefaultManager.Install(name, options)
 }
 
-// Uninstall 使用默认管理器卸载二进制文件
+// Uninstall 卸载指定的第三方二进制工具（导出名为 toolbox.Uninstall）
+// 参数:
+//   - name: 工具名称，如 "ffmpeg"
+//
+// 返回值:
+//   - 错误信息
+//
+// Example:
+// ```
+// // 示意性示例
+// err = toolbox.Uninstall("ffmpeg")
+// if err != nil { die(err) }
+// ```
 func Uninstall(name string) error {
 	if DefaultManager == nil {
 		return utils.Error("default manager not initialized")
@@ -668,6 +680,22 @@ func GetDescriptor(name string) (*BinaryDescriptor, error) {
 	}
 	return DefaultManager.GetDescriptor(name)
 }
+
+// GetAllStatus 列出所有已注册第三方工具的安装状态（导出名为 toolbox.List）
+// 返回值:
+//   - 各工具的状态列表（包含名称、是否已安装、版本等）
+//   - 错误信息
+//
+// Example:
+// ```
+// statusList, err = toolbox.List()
+// assert err == nil, "toolbox.List should not fail"
+//
+//	for s in statusList {
+//	    println(s.Name)
+//	}
+//
+// ```
 func GetAllStatus() ([]*BinaryStatus, error) {
 	if DefaultManager == nil {
 		return nil, utils.Error("default manager not initialized")

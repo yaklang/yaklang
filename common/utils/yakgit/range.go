@@ -142,9 +142,22 @@ func getCommitsByDateRange(repos string, startDate, endDate time.Time) ([]*objec
 	return commits, nil
 }
 
-// FileSystemFromCommitDateRange 根据日期范围获取文件系统
-// startDate: 起始日期，支持多种格式和类型
-// endDate: 结束日期，支持多种格式和类型
+// FileSystemFromCommitDateRange 根据日期范围获取文件系统（导出名为 git.FileSystemFromCommitDateRange）
+// 参数:
+//   - repos: 本地仓库路径
+//   - startDate: 起始日期，支持多种格式和类型（字符串、时间戳等）
+//   - endDate: 结束日期，支持多种格式和类型
+//
+// 返回值:
+//   - 该日期范围内变更聚合得到的文件系统
+//   - 错误信息
+//
+// Example:
+// ```
+// // 获取某段日期范围内的变更文件系统（示意性示例，需替换为真实仓库路径）
+// fs = git.FileSystemFromCommitDateRange("/path/to/repo", "2024-01-01", "2024-02-01")~
+// dump(fs)
+// ```
 func FileSystemFromCommitDateRange(repos string, startDate, endDate any) (filesys_interface.FileSystem, error) {
 	log.Infof("start to get filesystem from commit date range: %v to %v", startDate, endDate)
 
@@ -191,7 +204,20 @@ func fromCommitDateRangeTime(repos string, startTime, endTime time.Time) (filesy
 	return FromCommits(repos, commitHashes...)
 }
 
-// FileSystemCurrentWeek 获取当前自然周（周一到周天）的文件系统
+// FileSystemCurrentWeek 获取当前自然周（周一到周天）的文件系统（导出名为 git.FileSystemCurrentWeek）
+// 参数:
+//   - repos: 本地仓库路径
+//
+// 返回值:
+//   - 本周内变更聚合得到的文件系统
+//   - 错误信息
+//
+// Example:
+// ```
+// // 获取本周的变更文件系统（示意性示例，需替换为真实仓库路径）
+// fs = git.FileSystemCurrentWeek("/path/to/repo")~
+// dump(fs)
+// ```
 func FileSystemCurrentWeek(repos string) (filesys_interface.FileSystem, error) {
 	log.Infof("start to get filesystem from current week")
 
@@ -216,7 +242,20 @@ func FileSystemCurrentWeek(repos string) (filesys_interface.FileSystem, error) {
 	return fromCommitDateRangeTime(repos, startTime, endTime)
 }
 
-// FileSystemLastSevenDay 获取最近七天的文件系统
+// FileSystemLastSevenDay 获取最近七天的文件系统（导出名为 git.FileSystemLastSevenDay）
+// 参数:
+//   - repos: 本地仓库路径
+//
+// 返回值:
+//   - 最近七天内变更聚合得到的文件系统
+//   - 错误信息
+//
+// Example:
+// ```
+// // 获取最近七天的变更文件系统（示意性示例，需替换为真实仓库路径）
+// fs = git.FileSystemLastSevenDay("/path/to/repo")~
+// dump(fs)
+// ```
 func FileSystemLastSevenDay(repos string) (filesys_interface.FileSystem, error) {
 	log.Infof("start to get filesystem from last seven days")
 
@@ -234,7 +273,20 @@ func FileSystemLastSevenDay(repos string) (filesys_interface.FileSystem, error) 
 	return fromCommitDateRangeTime(repos, startTime, endTime)
 }
 
-// FileSystemCurrentDay 获取当前自然日的文件系统
+// FileSystemCurrentDay 获取当前自然日的文件系统（导出名为 git.FileSystemCurrentDay）
+// 参数:
+//   - repos: 本地仓库路径
+//
+// 返回值:
+//   - 当天变更聚合得到的文件系统
+//   - 错误信息
+//
+// Example:
+// ```
+// // 获取今天的变更文件系统（示意性示例，需替换为真实仓库路径）
+// fs = git.FileSystemCurrentDay("/path/to/repo")~
+// dump(fs)
+// ```
 func FileSystemCurrentDay(repos string) (filesys_interface.FileSystem, error) {
 	log.Infof("start to get filesystem from current day")
 
@@ -249,7 +301,20 @@ func FileSystemCurrentDay(repos string) (filesys_interface.FileSystem, error) {
 	return fromCommitDateRangeTime(repos, startTime, endTime)
 }
 
-// FileSystemCurrentMonth 获取当前自然月的文件系统
+// FileSystemCurrentMonth 获取当前自然月的文件系统（导出名为 git.FileSystemCurrentMonth）
+// 参数:
+//   - repos: 本地仓库路径
+//
+// 返回值:
+//   - 本月变更聚合得到的文件系统
+//   - 错误信息
+//
+// Example:
+// ```
+// // 获取本月的变更文件系统（示意性示例，需替换为真实仓库路径）
+// fs = git.FileSystemCurrentMonth("/path/to/repo")~
+// dump(fs)
+// ```
 func FileSystemCurrentMonth(repos string) (filesys_interface.FileSystem, error) {
 	log.Infof("start to get filesystem from current month")
 
@@ -267,7 +332,21 @@ func FileSystemCurrentMonth(repos string) (filesys_interface.FileSystem, error) 
 	return fromCommitDateRangeTime(repos, firstDay, lastDay)
 }
 
-// FileSystemFromDate 根据指定日期获取该日的文件系统
+// FileSystemFromDate 根据指定日期获取该日的文件系统（导出名为 git.FileSystemFromDate）
+// 参数:
+//   - repos: 本地仓库路径
+//   - date: 目标日期，支持多种格式和类型
+//
+// 返回值:
+//   - 该日变更聚合得到的文件系统
+//   - 错误信息
+//
+// Example:
+// ```
+// // 获取指定日期的变更文件系统（示意性示例，需替换为真实仓库路径）
+// fs = git.FileSystemFromDate("/path/to/repo", "2024-01-15")~
+// dump(fs)
+// ```
 func FileSystemFromDate(repos string, date any) (filesys_interface.FileSystem, error) {
 	log.Infof("start to get filesystem from date: %v", date)
 
@@ -286,7 +365,22 @@ func FileSystemFromDate(repos string, date any) (filesys_interface.FileSystem, e
 	return fromCommitDateRangeTime(repos, startTime, endTime)
 }
 
-// FileSystemFromMonth 根据指定年月获取该月的文件系统
+// FileSystemFromMonth 根据指定年月获取该月的文件系统（导出名为 git.FileSystemFromMonth）
+// 参数:
+//   - repos: 本地仓库路径
+//   - year: 年份
+//   - month: 月份（1-12）
+//
+// 返回值:
+//   - 该月变更聚合得到的文件系统
+//   - 错误信息
+//
+// Example:
+// ```
+// // 获取指定年月的变更文件系统（示意性示例，需替换为真实仓库路径）
+// fs = git.FileSystemFromMonth("/path/to/repo", 2024, 1)~
+// dump(fs)
+// ```
 func FileSystemFromMonth(repos string, year int, month int) (filesys_interface.FileSystem, error) {
 	log.Infof("start to get filesystem from month: %d-%02d", year, month)
 

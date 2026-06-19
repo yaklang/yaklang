@@ -64,31 +64,97 @@ func NewStreamPartsOptions(opts ...StreamPartsOption) StreamPartsOptions {
 	return o
 }
 
+// WithStreamReportType 设置流式报告的报告类型（导出名为 sfreport.withStreamReportType）
+// 参数:
+//   - v: 报告类型，如 sfreport.IRifyReportType
+//
+// 返回值:
+//   - 流式报告可选项
+//
+// Example:
+// ```
+// opt = sfreport.withStreamReportType(sfreport.IRifyReportType)
+// println(opt)
+// ```
 func WithStreamReportType(v ReportType) StreamPartsOption {
 	return func(o *StreamPartsOptions) {
 		o.ReportType = v
 	}
 }
 
+// WithStreamShowDataflowPath 设置流式报告是否展示数据流路径（导出名为 sfreport.withStreamShowDataflowPath）
+// 参数:
+//   - v: 是否展示数据流路径
+//
+// 返回值:
+//   - 流式报告可选项
+//
+// Example:
+// ```
+// opt = sfreport.withStreamShowDataflowPath(true)
+// println(opt)
+// ```
 func WithStreamShowDataflowPath(v bool) StreamPartsOption {
 	return func(o *StreamPartsOptions) {
 		o.ShowDataflowPath = v
 	}
 }
 
+// WithStreamShowFileContent 设置流式报告是否展示文件内容（导出名为 sfreport.withStreamShowFileContent）
+// 参数:
+//   - v: 是否展示文件内容
+//
+// 返回值:
+//   - 流式报告可选项
+//
+// Example:
+// ```
+// opt = sfreport.withStreamShowFileContent(true)
+// println(opt)
+// ```
 func WithStreamShowFileContent(v bool) StreamPartsOption {
 	return func(o *StreamPartsOptions) {
 		o.ShowFileContent = v
 	}
 }
 
+// WithStreamWithFile 设置流式报告是否携带文件数据（导出名为 sfreport.withStreamWithFile）
+// 参数:
+//   - v: 是否携带文件数据
+//
+// 返回值:
+//   - 流式报告可选项
+//
+// Example:
+// ```
+// opt = sfreport.withStreamWithFile(true)
+// println(opt)
+// ```
 func WithStreamWithFile(v bool) StreamPartsOption {
 	return func(o *StreamPartsOptions) {
 		o.WithFile = v
 	}
 }
 
-// ConvertSingleResultToSSAResultPartsJSON returns raw JSON of SSAResultParts and basic stats.
+// ConvertSingleResultToSSAResultPartsJSON 将单个扫描结果转换为 SSAResultParts 的 JSON 与统计信息
+// 导出名为 sfreport.ConvertSingleResultToSSAResultPartsJSONPayload（返回包含 json/stats/ok 的字典）
+// 参数:
+//   - result: SyntaxFlow 扫描结果对象
+//   - opts: 流式报告可选项
+//
+// 返回值:
+//   - SSAResultParts 的 JSON 字符串
+//   - 基础统计信息字典
+//   - 错误信息
+//
+// Example:
+// ```
+// // result 来自 ssa/syntaxflow 的扫描结果（示意性示例）
+// prog = ssa.Parse(code)~
+// result = prog.SyntaxFlowWithError("sink* as $sink")~
+// payload = sfreport.ConvertSingleResultToSSAResultPartsJSONPayload(result)~
+// dump(payload)
+// ```
 func ConvertSingleResultToSSAResultPartsJSON(result *ssaapi.SyntaxFlowResult, opts StreamPartsOptions) (string, map[string]any, error) {
 	parts, err := ConvertSingleResultToSSAResultParts(result, opts)
 	if err != nil {

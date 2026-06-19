@@ -608,60 +608,89 @@ func _protoOption(proto ...interface{}) fp.ConfigOption {
 	return fp.WithTransportProtos(fp.ParseStringToProto(proto...)...)
 }
 
-// web servicescan 的配置选项，用于指定扫描指纹的类型为 web
-// @return {ConfigOption} 返回配置选项
+// web servicescan 的配置选项，仅启用 Web 指纹识别(只扫描 Web 服务指纹)
+// 在 yak 中通过 servicescan.web 调用
+// 返回值:
+//   - 一个 servicescan.Scan 可接收的配置选项
+//
 // Example:
 // ```
-// result,err = servicescan.Scan("127.0.0.1", "22-80,443,3389,161", servicescan.web()) // 使用 web 指纹进行扫描
-// die(err) // 如果错误非空则报错
-// for res := range result { // 通过遍历管道的形式获取管道中的结果，一旦有结果返回就会执行循环体的代码
+// // 该示例为示意性用法：仅使用 web 指纹进行扫描
+// result, err = servicescan.Scan("127.0.0.1", "22-80,443,3389,161", servicescan.web())
+// die(err)
 //
-//	   println(res.String()) // 输出结果，调用String方法获取可读字符串
+//	for res := range result {
+//	    println(res.String())
 //	}
 //
 // ```
 func _webOption() fp.ConfigOption {
+	v := true
 	return func(config *fp.Config) {
-		config.OnlyEnableWebFingerprint = true
+		config.OnlyEnableWebFingerprint = v
 	}
 }
 
-// service servicescan 的配置选项，用于指定扫描指纹的类型为 service
-// @return {ConfigOption} 返回配置选项
+// service servicescan 的配置选项，仅启用服务(nmap)指纹识别，禁用 Web 指纹
+// 在 yak 中通过 servicescan.service 调用
+// 返回值:
+//   - 一个 servicescan.Scan 可接收的配置选项
+//
 // Example:
 // ```
-// result,err = servicescan.Scan("127.0.0.1", "22-80,443,3389,161", servicescan.service()) // 使用 service 指纹进行扫描
-// die(err) // 如果错误非空则报错
-// for res := range result { // 通过遍历管道的形式获取管道中的结果，一旦有结果返回就会执行循环体的代码
+// // 该示例为示意性用法：仅使用 service 指纹进行扫描
+// result, err = servicescan.Scan("127.0.0.1", "22-80,443,3389,161", servicescan.service())
+// die(err)
 //
-//	   println(res.String()) // 输出结果，调用String方法获取可读字符串
+//	for res := range result {
+//	    println(res.String())
 //	}
 //
 // ```
 func _serviceOption() fp.ConfigOption {
+	v := true
 	return func(config *fp.Config) {
-		config.DisableWebFingerprint = true
+		config.DisableWebFingerprint = v
 	}
 }
 
-// all servicescan 的配置选项，用于指定扫描指纹的类型为 web 和 service
-// @return {ConfigOption} 返回配置选项
+// all servicescan 的配置选项，强制同时启用 Web 与服务(nmap)全部指纹识别
+// 在 yak 中通过 servicescan.all 调用
+// 返回值:
+//   - 一个 servicescan.Scan 可接收的配置选项
+//
 // Example:
 // ```
-// result,err = servicescan.Scan("127.0.0.1", "22-80,443,3389,161", servicescan.all()) // 使用 web 和 service 指纹进行扫描
-// die(err) // 如果错误非空则报错
-// for res := range result { // 通过遍历管道的形式获取管道中的结果，一旦有结果返回就会执行循环体的代码
+// // 该示例为示意性用法：使用全部指纹进行扫描
+// result, err = servicescan.Scan("127.0.0.1", "22-80,443,3389,161", servicescan.all())
+// die(err)
 //
-//	   println(res.String()) // 输出结果，调用String方法获取可读字符串
+//	for res := range result {
+//	    println(res.String())
 //	}
 //
 // ```
 func _allOption() fp.ConfigOption {
+	v := true
 	return func(config *fp.Config) {
-		config.ForceEnableAllFingerprint = true
+		config.ForceEnableAllFingerprint = v
 	}
 }
 
+// disableDefaultRule servicescan 的配置选项，禁用内置默认指纹规则(通常配合自定义规则使用)
+// 在 yak 中通过 servicescan.disableDefaultRule 调用
+// 参数:
+//   - b: 可选，是否禁用默认规则，不传时默认为 true
+//
+// 返回值:
+//   - 一个 servicescan.Scan 可接收的配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：禁用默认规则并使用自定义 web 规则
+// result, err = servicescan.Scan("127.0.0.1", "80", servicescan.disableDefaultRule(true))
+// die(err)
+// ```
 func _disableDefaultFingerprint(b ...bool) fp.ConfigOption {
 	return func(config *fp.Config) {
 		if len(b) == 0 {

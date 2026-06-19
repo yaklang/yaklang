@@ -62,7 +62,15 @@ type ProcessesWatcher struct {
 	supervisor supervisor
 }
 
-// NewProcessesWatcher 创建并初始化一个新的进程监控器
+// NewProcessWatcher 创建并初始化一个新的系统进程监控器，用于监控进程的创建与退出
+// 返回值:
+//   - 进程监控器对象
+//
+// Example:
+// ```
+// w = os.NewProcessWatcher()
+// // 通过 w.Start(...) 启动监控
+// ```
 func NewProcessesWatcher() *ProcessesWatcher {
 	return &ProcessesWatcher{
 		activeProcesses: make(map[int32]*ProcessBasicInfo),

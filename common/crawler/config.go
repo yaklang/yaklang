@@ -279,6 +279,26 @@ func (c *Config) CheckShouldBeHandledURL(u *url.URL) bool {
 
 type ConfigOpt func(c *Config)
 
+// context 设置爬虫使用的 context，用于取消或超时控制
+// 在 yak 中通过 crawler.context 调用；cancel 时爬虫会停止抓取
+// 参数:
+//   - ctx: 上下文对象
+//
+// 返回值:
+//   - 一个 crawler.Start 可接收的配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：使用可取消的 context 控制爬虫
+// ctx, cancel = context.WithCancel(context.Background())
+// defer cancel()
+// res = crawler.Start("https://example.com", crawler.context(ctx))~
+//
+//	for req = range res {
+//	    println(req.Url())
+//	}
+//
+// ```
 func WithContext(ctx context.Context) ConfigOpt {
 	return func(c *Config) {
 		if ctx == nil {
@@ -457,6 +477,24 @@ func WithConnectTimeout(f float64) ConfigOpt {
 	}
 }
 
+// verifyCertificate 设置爬虫在 HTTPS 请求时是否校验服务端证书
+// 在 yak 中通过 crawler.verifyCertificate 调用
+// 参数:
+//   - b: 是否校验证书，false 表示忽略证书错误
+//
+// 返回值:
+//   - 一个 crawler.Start 可接收的配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：抓取自签名证书站点时关闭证书校验
+// res = crawler.Start("https://self-signed.example.com", crawler.verifyCertificate(false))~
+//
+//	for req = range res {
+//	    println(req.Url())
+//	}
+//
+// ```
 func WithVerifyCertificate(b bool) ConfigOpt {
 	return func(c *Config) {
 		c.verifyCertificate = b
@@ -464,21 +502,51 @@ func WithVerifyCertificate(b bool) ConfigOpt {
 	}
 }
 
+// httpsToHttpFallback 设置当 HTTPS 请求失败时是否自动回退为 HTTP 重试
+// 在 yak 中通过 crawler.httpsToHttpFallback 调用
+// 参数:
+//   - enable: 是否启用 HTTPS 到 HTTP 的回退
+//
+// 返回值:
+//   - 一个 crawler.Start 可接收的配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：开启 HTTPS 失败回退 HTTP
+// res = crawler.Start("https://example.com", crawler.httpsToHttpFallback(true))~
+//
+//	for req = range res {
+//	    println(req.Url())
+//	}
+//
+// ```
 func WithHTTPSFallback(enable bool) ConfigOpt {
 	return func(c *Config) {
 		c.httpsToHttpFallback = enable
 	}
 }
 
-// responseTimeout 是一个选项函数，用于指定爬虫时的响应超时时间，默认为10s
-// ! 未实现
+// responseTimeout 设置爬虫的响应超时时间(秒)，默认为 10s
+// 在 yak 中通过 crawler.responseTimeout 调用
+// 参数:
+//   - f: 响应超时时间，单位为秒
+//
+// 返回值:
+//   - 一个 crawler.Start 可接收的配置选项
+//
 // Example:
 // ```
-// crawler.Start("https://example.com", crawler.responseTimeout(5))
+// // 该示例为示意性用法：设置响应超时为 5 秒
+// res = crawler.Start("https://example.com", crawler.responseTimeout(5))~
+//
+//	for req = range res {
+//	    println(req.Url())
+//	}
+//
 // ```
 func WithResponseTimeout(f float64) ConfigOpt {
 	return func(c *Config) {
-		// dummy, ignore it
+		_ = f
 	}
 }
 

@@ -36,16 +36,29 @@ type CacheExWithKey[U comparable, T any] struct {
 	ctx                   context.Context
 	cancel                context.CancelFunc
 	config                *cacheExConfig
-	expireCallback        expireCallback[U, T]
-	newItemCallback       itemCallback[U, T]
-	ttl                   time.Duration
-	skipTTLExtension      bool
 	evictionCallbackClear func()
 	stopOnce              *sync.Once
+
+	// configMu protects the mutable configuration fields below. These fields
+	// are read by the background insertion/eviction callback goroutines (started
+	// inside reset) and by Get/Set, while being written by the Set* methods, so
+	// they must be synchronized to avoid data races and heap corruption.
+	configMu         sync.RWMutex
+	expireCallback   expireCallback[U, T]
+	newItemCallback  itemCallback[U, T]
+	ttl              time.Duration
+	skipTTLExtension bool
 
 	// Single-flight functionality
 	flightEntries map[U]*flightEntry[T]
 	flightMu      sync.RWMutex // Protects access to the 'flightEntries' map
+}
+
+// getTTL returns the currently configured default TTL in a thread-safe way.
+func (cache *CacheExWithKey[U, T]) getTTL() time.Duration {
+	cache.configMu.RLock()
+	defer cache.configMu.RUnlock()
+	return cache.ttl
 }
 
 // flightEntry represents a single-flight loading operation
@@ -73,7 +86,7 @@ func (cache *CacheExWithKey[U, T]) Close() {
 
 // Set is a thread-safe way to add new items to the map
 func (cache *CacheExWithKey[U, T]) Set(key U, value T) {
-	cache.Cache.Set(key, value, cache.ttl)
+	cache.Cache.Set(key, value, cache.getTTL())
 }
 
 // SetWithTTL is a thread-safe way to add new items to the map with individual ttl
@@ -85,7 +98,10 @@ func (cache *CacheExWithKey[U, T]) SetWithTTL(key U, value T, ttl time.Duration)
 // Every lookup, also touches the item, hence extending it's life
 func (cache *CacheExWithKey[U, T]) Get(key U) (value T, exists bool) {
 	var item *ttlcache.Item[U, T]
-	if cache.skipTTLExtension {
+	cache.configMu.RLock()
+	skipTTLExtension := cache.skipTTLExtension
+	cache.configMu.RUnlock()
+	if skipTTLExtension {
 		item = cache.Cache.Get(key, ttlcache.WithDisableTouchOnHit[U, T]())
 	} else {
 		item = cache.Cache.Get(key)
@@ -120,25 +136,33 @@ func (cache *CacheExWithKey[U, T]) Count() int {
 }
 
 func (cache *CacheExWithKey[U, T]) SetTTL(ttl time.Duration) {
+	cache.configMu.Lock()
 	cache.ttl = ttl
+	cache.configMu.Unlock()
 }
 
 // SetExpirationCallback sets a callback that will be called when an item expires
 func (cache *CacheExWithKey[U, T]) SetExpirationCallback(callback expireCallback[U, T]) {
 	// cache.OnEviction(fn func(context.Context, ttlcache.EvictionReason, *ttlcache.Item[U, T]))
+	cache.configMu.Lock()
 	cache.expireCallback = callback
+	cache.configMu.Unlock()
 }
 
 // SetNewItemCallback sets a callback that will be called when a new item is added to the cache
 func (cache *CacheExWithKey[U, T]) SetNewItemCallback(callback itemCallback[U, T]) {
+	cache.configMu.Lock()
 	cache.newItemCallback = callback
+	cache.configMu.Unlock()
 }
 
 // SkipTtlExtensionOnHit allows the user to change the cache behaviour. When this flag is set to true it will
 // no longer extend TTL of items when they are retrieved using Get, or when their expiration condition is evaluated
 // using SetCheckExpirationCallback.
 func (cache *CacheExWithKey[U, T]) SkipTtlExtensionOnHit(value bool) {
+	cache.configMu.Lock()
 	cache.skipTTLExtension = value
+	cache.configMu.Unlock()
 }
 
 // Purge will remove all entries
@@ -188,7 +212,7 @@ func (c *CacheExWithKey[U, T]) GetOrLoad(key U, dataLoader func() (T, error)) (T
 
 		// If successful, store in main cache
 		if err == nil {
-			c.Cache.Set(key, data, c.ttl)
+			c.Cache.Set(key, data, c.getTTL())
 		}
 
 		return data, err
@@ -223,7 +247,7 @@ func (c *CacheExWithKey[U, T]) GetOrLoad(key U, dataLoader func() (T, error)) (T
 
 		// If successful, store in main cache
 		if err == nil {
-			c.Cache.Set(key, data, c.ttl)
+			c.Cache.Set(key, data, c.getTTL())
 		}
 
 		return data, err
@@ -242,7 +266,7 @@ func (c *CacheExWithKey[U, T]) GetOrLoad(key U, dataLoader func() (T, error)) (T
 
 	// If successful, store in main cache
 	if err == nil {
-		c.Cache.Set(key, data, c.ttl)
+		c.Cache.Set(key, data, c.getTTL())
 	}
 
 	// Always clean up the flight entry after processing
@@ -314,8 +338,13 @@ func (c *CacheExWithKey[U, T]) reset() {
 
 	c.evictionCallbackClear = c.Cache.OnEviction(func(ctx context.Context, raw_reason ttlcache.EvictionReason, i *ttlcache.Item[U, T]) {
 		reason := EvictionReason(raw_reason)
-		if c.expireCallback != nil {
-			c.expireCallback(i.Key(), i.Value(), reason)
+		// Read the callback under the lock, then invoke it outside the lock to
+		// avoid holding configMu while user code runs (which could re-enter the cache).
+		c.configMu.RLock()
+		expireCallback := c.expireCallback
+		c.configMu.RUnlock()
+		if expireCallback != nil {
+			expireCallback(i.Key(), i.Value(), reason)
 		}
 
 		// Clean up corresponding flight entry if it exists
@@ -324,8 +353,11 @@ func (c *CacheExWithKey[U, T]) reset() {
 		c.flightMu.Unlock()
 	})
 	c.Cache.OnInsertion(func(ctx context.Context, i *ttlcache.Item[U, T]) {
-		if c.newItemCallback != nil {
-			c.newItemCallback(i.Key(), i.Value())
+		c.configMu.RLock()
+		newItemCallback := c.newItemCallback
+		c.configMu.RUnlock()
+		if newItemCallback != nil {
+			newItemCallback(i.Key(), i.Value())
 		}
 	})
 
@@ -348,7 +380,12 @@ func (c *CacheExWithKey[U, T]) cleanupFlightEntries() {
 			c.flightMu.Lock()
 			cutoff := time.Now().Add(-5 * time.Minute) // Remove entries older than 5 minutes
 			for key, entry := range c.flightEntries {
-				if !entry.preparing && entry.createdAt.Before(cutoff) {
+				// entry.preparing is written under entry.cond.L, so it must be read
+				// under the same lock to avoid a data race with GetOrLoad.
+				entry.cond.L.Lock()
+				preparing := entry.preparing
+				entry.cond.L.Unlock()
+				if !preparing && entry.createdAt.Before(cutoff) {
 					delete(c.flightEntries, key)
 				}
 			}

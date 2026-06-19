@@ -69,6 +69,12 @@ var SystemExports = map[string]interface{}{
 }
 
 // LookupHost 通过DNS服务器，根据域名查找IP
+// 参数:
+//   - i: 待查询的域名
+//
+// 返回值:
+//   - 解析得到的 IP 字符串切片
+//
 // Example:
 // ```
 // os.LookupHost("www.yaklang.com")
@@ -78,6 +84,12 @@ func lookupHost(i string) []string {
 }
 
 // LookupIP 通过DNS服务器，根据域名查找IP
+// 参数:
+//   - i: 待查询的域名
+//
+// 返回值:
+//   - 解析得到的 IP 字符串切片
+//
 // Example:
 // ```
 // os.LookupIP("www.yaklang.com")
@@ -86,7 +98,13 @@ func lookupIP(i string) []string {
 	return netx.LookupAll(i)
 }
 
-// IsTCPPortOpen 检查TCP端口是否开放
+// IsTCPPortOpen 检查本地TCP端口是否开放（被占用）
+// 参数:
+//   - p: 待检查的 TCP 端口号
+//
+// 返回值:
+//   - 端口是否开放（已被监听）
+//
 // Example:
 // ```
 // os.IsTCPPortOpen(80)
@@ -95,7 +113,13 @@ func IsTCPPortOpen(p int) bool {
 	return !utils.IsTCPPortAvailable(p)
 }
 
-// IsUDPPortOpen 检查UDP端口是否开放
+// IsUDPPortOpen 检查本地UDP端口是否开放（被占用）
+// 参数:
+//   - p: 待检查的 UDP 端口号
+//
+// 返回值:
+//   - 端口是否开放（已被占用）
+//
 // Example:
 // ```
 // os.IsUDPPortOpen(80)
@@ -104,7 +128,13 @@ func IsUDPPortOpen(p int) bool {
 	return !utils.IsUDPPortAvailable(p)
 }
 
-// IsTCPPortAvailable 检查TCP端口是否可用
+// IsTCPPortAvailable 检查本地TCP端口是否可用（未被占用）
+// 参数:
+//   - p: 待检查的 TCP 端口号
+//
+// 返回值:
+//   - 端口是否可用（可被监听）
+//
 // Example:
 // ```
 // os.IsTCPPortAvailable(80)
@@ -113,7 +143,13 @@ func IsTCPPortAvailable(p int) bool {
 	return utils.IsTCPPortAvailable(p)
 }
 
-// IsUDPPortAvailable 检查UDP端口是否可用
+// IsUDPPortAvailable 检查本地UDP端口是否可用（未被占用）
+// 参数:
+//   - p: 待检查的 UDP 端口号
+//
+// 返回值:
+//   - 端口是否可用
+//
 // Example:
 // ```
 // os.IsUDPPortAvailable(80)
@@ -122,7 +158,10 @@ func IsUDPPortAvailable(p int) bool {
 	return utils.IsUDPPortAvailable(p)
 }
 
-// GetRandomAvailableTCPPort 获取随机可用的TCP端口
+// GetRandomAvailableTCPPort 获取一个随机可用的TCP端口
+// 返回值:
+//   - 一个当前可用的 TCP 端口号
+//
 // Example:
 // ```
 // tcp.Serve("127.0.0.1", os.GetRandomAvailableTCPPort())
@@ -131,7 +170,10 @@ func GetRandomAvailableTCPPort() int {
 	return utils.GetRandomAvailableTCPPort()
 }
 
-// GetRandomAvailableUDPPort 获取随机可用的UDP端口
+// GetRandomAvailableUDPPort 获取一个随机可用的UDP端口
+// 返回值:
+//   - 一个当前可用的 UDP 端口号
+//
 // Example:
 // ```
 // udp.Serve("127.0.0.1", os.GetRandomAvailableTCPPort())
@@ -140,7 +182,14 @@ func GetRandomAvailableUDPPort() int {
 	return utils.GetRandomAvailableUDPPort()
 }
 
-// IsRemoteTCPPortOpen 检查远程TCP端口是否开放
+// IsRemoteTCPPortOpen 检查远程主机的TCP端口是否开放
+// 参数:
+//   - host: 远程主机地址（域名或 IP）
+//   - p: 待检查的 TCP 端口号
+//
+// 返回值:
+//   - 远程端口是否开放
+//
 // Example:
 // ```
 // os.IsRemoteTCPPortOpen("yaklang.com", 443) // true
@@ -150,6 +199,9 @@ func IsRemoteTCPPortOpen(host string, p int) bool {
 }
 
 // GetMachineID 获取每个机器唯一的标识符
+// 返回值:
+//   - 当前机器的唯一标识字符串
+//
 // Example:
 // ```
 // os.GetMachineID()
@@ -158,7 +210,13 @@ func GetMachineID() string {
 	return utils.GetMachineCode()
 }
 
-// Remove 删除指定的文件或目录
+// Remove 删除指定的文件或空目录
+// 参数:
+//   - name: 待删除的文件或目录路径
+//
+// 返回值:
+//   - 错误信息
+//
 // Example:
 // ```
 // os.Remove("/tmp/test.txt")
@@ -167,7 +225,13 @@ func Remove(name string) error {
 	return os.Remove(name)
 }
 
-// RemoveAll 递归删除指定的路径及其子路径
+// RemoveAll 递归删除指定的路径及其包含的所有子路径
+// 参数:
+//   - name: 待删除的路径
+//
+// 返回值:
+//   - 错误信息
+//
 // Example:
 // ```
 // os.RemoveAll("/tmp")
@@ -177,6 +241,13 @@ func RemoveAll(name string) error {
 }
 
 // Rename 重命名文件或目录，可以用于移动文件或目录
+// 参数:
+//   - oldpath: 原路径
+//   - newpath: 目标路径
+//
+// 返回值:
+//   - 错误信息
+//
 // Example:
 // ```
 // os.Rename("/tmp/test.txt", "/tmp/test2.txt")
@@ -187,15 +258,24 @@ func Rename(oldpath, newpath string) error {
 }
 
 // TempDir 获取用于存放临时文件的默认目录路径
+// 返回值:
+//   - 系统临时目录路径
+//
 // Example:
 // ```
-// os.TempDir()
+// dir = os.TempDir()
+// assert dir != "", "TempDir should return a non-empty path"
+// assert file.IsDir(dir), "TempDir should point to an existing directory"
 // ```
 func TempDir() string {
 	return os.TempDir()
 }
 
 // Getwd 获取当前工作目录路径
+// 返回值:
+//   - 当前工作目录路径
+//   - 错误信息
+//
 // Example:
 // ```
 // cwd, err = os.Getwd()
@@ -205,6 +285,9 @@ func Getwd() (string, error) {
 }
 
 // Getpid 获取当前进程的进程ID
+// 返回值:
+//   - 当前进程 ID
+//
 // Example:
 // ```
 // os.Getpid()
@@ -213,7 +296,10 @@ func Getpid() int {
 	return os.Getpid()
 }
 
-// Getppid  获取当前进程的父进程ID
+// Getppid 获取当前进程的父进程ID
+// 返回值:
+//   - 当前进程的父进程 ID
+//
 // Example:
 // ```
 // os.Getppid()
@@ -223,6 +309,9 @@ func Getppid() int {
 }
 
 // Getuid 获取当前进程的用户ID
+// 返回值:
+//   - 当前进程的用户 ID
+//
 // Example:
 // ```
 // os.Getuid()
@@ -232,6 +321,9 @@ func Getuid() int {
 }
 
 // Geteuid 获取当前进程的有效用户ID
+// 返回值:
+//   - 当前进程的有效用户 ID
+//
 // Example:
 // ```
 // os.Geteuid()
@@ -241,6 +333,9 @@ func Geteuid() int {
 }
 
 // Getgid 获取当前进程的组ID
+// 返回值:
+//   - 当前进程的组 ID
+//
 // Example:
 // ```
 // os.Getgid()
@@ -250,6 +345,9 @@ func Getgid() int {
 }
 
 // Getegid 获取当前进程的有效组ID
+// 返回值:
+//   - 当前进程的有效组 ID
+//
 // Example:
 // ```
 // os.Getegid()
@@ -259,6 +357,9 @@ func Getegid() int {
 }
 
 // Environ 获取表示环境变量的字符串切片，格式为"key=value"
+// 返回值:
+//   - 形如 "key=value" 的环境变量字符串切片
+//
 // Example:
 // ```
 // for env in os.Environ() {
@@ -271,6 +372,9 @@ func Environ() []string {
 }
 
 // GetHomeDir 获取当前用户的家目录
+// 返回值:
+//   - 当前用户的家目录路径
+//
 // Example:
 // ```
 // os.GetHomeDir() // "/Users/yaklang"
@@ -307,6 +411,10 @@ func GetHomeDir() string {
 }
 
 // Hostname 获取主机名
+// 返回值:
+//   - 主机名
+//   - 错误信息
+//
 // Example:
 // ```
 // name, err = os.Hostname()
@@ -316,24 +424,43 @@ func Hostname() (name string, err error) {
 }
 
 // Unsetenv 删除指定的环境变量
+// 参数:
+//   - key: 待删除的环境变量名
+//
+// 返回值:
+//   - 错误信息
+//
 // Example:
 // ```
-// os.Unsetenv("PATH")
+// os.Setenv("YAK_DOC_UNSET", "v")
+// os.Unsetenv("YAK_DOC_UNSET")
+// assert os.Getenv("YAK_DOC_UNSET") == "", "Unsetenv should remove the environment variable"
 // ```
 func Unsetenv(key string) error {
 	return os.Unsetenv(key)
 }
 
-// LookupEnv 获取指定的环境变量的值
+// LookupEnv 获取指定的环境变量的值，并返回该变量是否存在
+// 参数:
+//   - key: 环境变量名
+//
+// 返回值:
+//   - 环境变量的值
+//   - 该环境变量是否存在
+//
 // Example:
 // ```
-// value, ok = os.LookupEnv("PATH")
+// os.Setenv("YAK_DOC_LOOKUP", "hello")
+// value, ok = os.LookupEnv("YAK_DOC_LOOKUP")
+// println(value)   // OUT: hello
+// assert ok, "LookupEnv should report the variable exists"
+// assert value == "hello", "LookupEnv should return the variable value"
 // ```
 func LookupEnv(key string) (string, bool) {
 	return os.LookupEnv(key)
 }
 
-// Clearenv 清空所有环境变量
+// Clearenv 清空当前进程的所有环境变量
 // Example:
 // ```
 // os.Clearenv()
@@ -343,24 +470,45 @@ func Clearenv() {
 }
 
 // Setenv 设置指定的环境变量
+// 参数:
+//   - key: 环境变量名
+//   - value: 环境变量值
+//
+// 返回值:
+//   - 错误信息
+//
 // Example:
 // ```
-// os.Setenv("PATH", "/usr/local/bin:/usr/bin:/bin")
+// os.Setenv("YAK_DOC_SET", "yaklang")
+// println(os.Getenv("YAK_DOC_SET"))   // OUT: yaklang
+// assert os.Getenv("YAK_DOC_SET") == "yaklang", "Setenv then Getenv should round-trip"
 // ```
 func Setenv(key, value string) error {
 	return os.Setenv(key, value)
 }
 
 // Getenv 获取指定的环境变量的值，如果不存在则返回空字符串
+// 参数:
+//   - key: 环境变量名
+//
+// 返回值:
+//   - 环境变量的值，不存在时为空字符串
+//
 // Example:
 // ```
-// value = os.Getenv("PATH")
+// os.Setenv("YAK_DOC_GET", "world")
+// value = os.Getenv("YAK_DOC_GET")
+// println(value)   // OUT: world
+// assert value == "world", "Getenv should return the value set by Setenv"
 // ```
 func Getenv(key string) string {
 	return os.Getenv(key)
 }
 
-// Exit 退出当前进程
+// Exit 以指定状态码退出当前进程
+// 参数:
+//   - code: 进程退出状态码（0 表示成功）
+//
 // Example:
 // ```
 // os.Exit(0)
@@ -381,6 +529,10 @@ func osArgs() []string {
 }
 
 // Executable 获取当前可执行文件的路径
+// 返回值:
+//   - 当前可执行文件的绝对路径
+//   - 错误信息
+//
 // Example:
 // ```
 // path, err = os.Executable()
@@ -389,10 +541,19 @@ func Executable() (string, error) {
 	return os.Executable()
 }
 
-// ExpandEnv  将字符串中的${var}或$var替换为其对应环境变量名的值
+// ExpandEnv 将字符串中的 ${var} 或 $var 替换为其对应环境变量的值
+// 参数:
+//   - s: 含有环境变量引用的字符串
+//
+// 返回值:
+//   - 替换后的字符串
+//
 // Example:
 // ```
-// os.ExpandEnv("PATH = $PATH")
+// os.Setenv("YAK_DOC_EXPAND", "yak")
+// result = os.ExpandEnv("hello $YAK_DOC_EXPAND")
+// println(result)   // OUT: hello yak
+// assert result == "hello yak", "ExpandEnv should substitute the variable value"
 // ```
 func ExpandEnv(s string) string {
 	return os.ExpandEnv(s)
@@ -400,6 +561,11 @@ func ExpandEnv(s string) string {
 
 // Pipe 创建一个管道，返回一个读取端和一个写入端以及错误
 // 它实际是 io.Pipe 的别名
+// 返回值:
+//   - 管道的读取端文件对象
+//   - 管道的写入端文件对象
+//   - 错误信息
+//
 // Example:
 // ```
 // r, w, err = os.Pipe()
@@ -419,6 +585,12 @@ func Pipe() (r *os.File, w *os.File, err error) {
 }
 
 // Chdir 改变当前工作目录
+// 参数:
+//   - dir: 目标工作目录路径
+//
+// 返回值:
+//   - 错误信息
+//
 // Example:
 // ```
 // err = os.Chdir("/tmp")
@@ -428,6 +600,13 @@ func Chdir(dir string) error {
 }
 
 // Chmod 改变指定文件或目录的权限
+// 参数:
+//   - name: 文件或目录路径
+//   - mode: 目标权限（如 0o777）
+//
+// 返回值:
+//   - 错误信息
+//
 // Example:
 // ```
 // err = os.Chmod("/tmp/test.txt", 0777)
@@ -437,6 +616,14 @@ func Chmod(name string, mode os.FileMode) error {
 }
 
 // Chown 改变指定文件或目录的所有者和所属组
+// 参数:
+//   - name: 文件或目录路径
+//   - uid: 新的所有者用户 ID
+//   - gid: 新的所属组 ID
+//
+// 返回值:
+//   - 错误信息
+//
 // Example:
 // ```
 // err = os.Chown("/var/www/html/test.txt", 1000, 1000)
@@ -446,6 +633,9 @@ func Chown(name string, uid, gid int) error {
 }
 
 // GetDefaultDNSServers 获取默认的DNS服务器ip对应的字符串切片
+// 返回值:
+//   - 默认 DNS 服务器 IP 字符串切片
+//
 // Example:
 // ```
 // os.GetDefaultDNSServers()
@@ -454,7 +644,14 @@ func GetDefaultDNSServers() []string {
 	return netx.NewDefaultReliableDNSConfig().SpecificDNSServers
 }
 
-// WaitConnect 等待一个地址的端口开放或指导超时时间，如果超时则返回错误，这通常用于等待并确保一个服务启动
+// WaitConnect 等待一个地址的端口开放，直到超时，如果超时则返回错误，这通常用于等待并确保一个服务启动
+// 参数:
+//   - addr: 目标地址（host:port）
+//   - timeout: 最长等待时间（秒）
+//
+// 返回值:
+//   - 错误信息（超时或连接失败时非空）
+//
 // Example:
 // ```
 // timeout, _ = time.ParseDuration("1m")
@@ -497,6 +694,9 @@ var ARCH = runtime.GOARCH
 var IsPrivileged = privileged.GetIsPrivileged()
 
 // GetLocalAddress 获取本地IP地址
+// 返回值:
+//   - 本地网卡 IP 地址字符串切片
+//
 // Example:
 // ```
 // os.GetLocalAddress() // ["192.168.1.103", "fe80::605a:5ff:fefb:5405"]
@@ -516,6 +716,9 @@ func GetLocalAddress() []string {
 }
 
 // GetLocalIPv4Address 获取本地IPv4地址
+// 返回值:
+//   - 本地非回环 IPv4 地址字符串切片
+//
 // Example:
 // ```
 // os.GetLocalIPv4Address() // ["192.168.3.103"]
@@ -534,6 +737,9 @@ func GetLocalIPv4Address() []string {
 }
 
 // GetLocalIPv6Address 获取本地IPv6地址
+// 返回值:
+//   - 本地非回环 IPv6 地址字符串切片
+//
 // Example:
 // ```
 // os.GetLocalIPv6Address() // ["fe80::605a:5ff:fefb:5405"]

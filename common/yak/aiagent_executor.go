@@ -30,6 +30,23 @@ var DEFAULT_PLAN_PROMPT_NAME = "__PLAN_PROMPT__"
 var DEFAULT_RESULT_PROMPT_NAME = "__RESULT_PROMPT__"
 var DEFAULT_FORGE_HANDLE_NAME = "__DEFAULT_FORGE_HANDLE__"
 
+// ExecuteForge 执行一个已注册的 Forge 并返回结果（导出名为 aiagent.ExecuteForge）
+// 这是 AI Agent 最常用的入口，内部会创建协调器并运行整个 AI 工作流
+// 参数:
+//   - forgeName: Forge 名称
+//   - i: 执行参数（map 或键值对）
+//   - iopts: 可选项，如 aiagent.aiCallback、aiagent.context、aiagent.agreeYOLO 等
+//
+// 返回值:
+//   - Forge 执行结果
+//   - 错误信息
+//
+// Example:
+// ```
+// // 需要配置可用的 AI 服务（示意性示例）
+// result = aiagent.ExecuteForge("my-forge", {"query": "scan example.com"}, aiagent.agreeYOLO())~
+// dump(result)
+// ```
 func ExecuteForge(forgeName string, i any, iopts ...any) (any, error) {
 	ag := NewAgent(iopts...)
 	ag.ForgeName = forgeName

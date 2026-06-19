@@ -90,12 +90,36 @@ func (a *AnalysisConfig) ForgeExecOption(schema string) []any {
 
 type AnalysisOption func(config *AnalysisConfig)
 
+// WithExtraPrompt 为图片/上下文分析追加额外提示词（导出名为 liteforge.imageExtraPrompt）
+// 参数:
+//   - prompt: 额外提示词
+//
+// 返回值:
+//   - 分析可选项
+//
+// Example:
+// ```
+// opt = liteforge.imageExtraPrompt("focus on the error message in the screenshot")
+// println(opt)
+// ```
 func WithExtraPrompt(prompt string) AnalysisOption {
 	return func(config *AnalysisConfig) {
 		config.ExtraPrompt = prompt
 	}
 }
 
+// WithAnalyzeLog 设置分析过程的日志回调（导出名为 liteforge.analyzeLog）
+// 参数:
+//   - handler: 日志回调函数，参数为格式化字符串与参数
+//
+// 返回值:
+//   - 分析可选项
+//
+// Example:
+// ```
+// opt = liteforge.analyzeLog(func(format, args...) { println(sprintf(format, args...)) })
+// println(opt)
+// ```
 func WithAnalyzeLog(handler func(format string, args ...interface{})) AnalysisOption {
 	return func(config *AnalysisConfig) {
 		config.AnalyzeLog = func(format string, args ...interface{}) {
@@ -114,12 +138,36 @@ func WithAllowMultiHopAIRefine(allow ...bool) AnalysisOption {
 	}
 }
 
+// WithAnalyzeContext 设置分析使用的上下文，用于控制取消（导出名为 liteforge.analyzeCtx）
+// 参数:
+//   - ctx: 上下文对象
+//
+// 返回值:
+//   - 分析可选项
+//
+// Example:
+// ```
+// opt = liteforge.analyzeCtx(context.Background())
+// println(opt)
+// ```
 func WithAnalyzeContext(ctx context.Context) AnalysisOption {
 	return func(config *AnalysisConfig) {
 		config.Ctx = ctx
 	}
 }
 
+// WithAnalyzeStatusCard 设置分析过程的状态卡片回调（导出名为 liteforge.analyzeStatusCard）
+// 参数:
+//   - handler: 状态卡片回调，参数为 (id, data, tags...)
+//
+// 返回值:
+//   - 分析可选项
+//
+// Example:
+// ```
+// opt = liteforge.analyzeStatusCard(func(id, data, tags...) { println(id, data) })
+// println(opt)
+// ```
 func WithAnalyzeStatusCard(handler func(id string, data interface{}, tags ...string)) AnalysisOption {
 	return func(config *AnalysisConfig) {
 		config.AnalyzeStatusCard = func(id string, data interface{}, tags ...string) {

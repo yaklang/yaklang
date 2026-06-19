@@ -31,7 +31,19 @@ var MatchOrExtractExports = map[string]interface{}{
 	"vars":                   MatchOrExtractVars,
 }
 
-// MatchOrExtractHTTPS toggles HTTPS awareness when parsing request URLs.
+// MatchOrExtractHTTPS 是一个配置选项，用于在解析请求 URL 时声明是否按 HTTPS 处理
+// 参数:
+//   - enable: 是否按 HTTPS 处理
+//
+// 返回值:
+//   - 一个配置选项，作为可变参数传入 httptpl.MatchOrExtractHTTPFlow
+//
+// Example:
+// ```
+// // 声明按 HTTPS 处理后再执行匹配
+// result = httptpl.MatchOrExtractHTTPFlow(req, rsp, yamlRule, httptpl.https(true))~
+// println(result.IsMatched)
+// ```
 func MatchOrExtractHTTPS(enable bool) MatchOrExtractOption {
 	return func(cfg *matchOrExtractConfig) {
 		cfg.isHTTPS = enable
@@ -39,7 +51,19 @@ func MatchOrExtractHTTPS(enable bool) MatchOrExtractOption {
 	}
 }
 
-// MatchOrExtractVars injects custom nuclei-dsl variables during matcher execution.
+// MatchOrExtractVars 是一个配置选项，用于在匹配/提取执行期间注入自定义的 nuclei-dsl 变量
+// 参数:
+//   - items: 要注入的变量键值对
+//
+// 返回值:
+//   - 一个配置选项，作为可变参数传入 httptpl.MatchOrExtractHTTPFlow
+//
+// Example:
+// ```
+// // 注入自定义变量供 matcher/extractor 使用
+// result = httptpl.MatchOrExtractHTTPFlow(req, rsp, yamlRule, httptpl.vars({"flag": "abc"}))~
+// println(result.IsMatched)
+// ```
 func MatchOrExtractVars(items map[string]any) MatchOrExtractOption {
 	return func(cfg *matchOrExtractConfig) {
 		if cfg.vars == nil {
@@ -51,8 +75,30 @@ func MatchOrExtractVars(items map[string]any) MatchOrExtractOption {
 	}
 }
 
-// MatchOrExtractHTTPFlow evaluates matchers and extractors (defined in yamlString)
-// against a single HTTP request/response pair.
+// MatchOrExtractHTTPFlow 针对单个 HTTP 请求/响应对，执行 yamlString 中定义的 nuclei 风格 matcher 与 extractor
+// 参数:
+//   - req: 请求报文（字符串或字节数组），可为空（将尝试从响应推导）
+//   - rsp: 响应报文（字符串或字节数组）
+//   - yamlString: 定义 matchers/extractors 的 nuclei 风格 YAML 字符串
+//   - opts: 可选配置，例如 httptpl.https、httptpl.vars
+//
+// 返回值:
+//   - 匹配/提取结果，包含是否命中(IsMatched)与提取到的变量(Extracted)
+//   - 错误信息，规则为空或解析失败时返回非空
+//
+// Example:
+// ```
+// rsp = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n<title>Example Domain</title>"
+// rule = `matchers:
+//   - type: word
+//     part: body
+//     words:
+//   - "Example Domain"`
+//
+// result = httptpl.MatchOrExtractHTTPFlow("", rsp, rule)~
+// println(result.IsMatched)   // OUT: true
+// assert result.IsMatched == true, "word matcher should match the response body"
+// ```
 func MatchOrExtractHTTPFlow(req any, rsp any, yamlString string, opts ...MatchOrExtractOption) (*MatchOrExtractResult, error) {
 	if strings.TrimSpace(yamlString) == "" {
 		return nil, utils.Errorf("yamlString is empty")

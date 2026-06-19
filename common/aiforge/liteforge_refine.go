@@ -68,6 +68,26 @@ func Action2RagKnowledgeEntries(
 	return entries, nil
 }
 
+// BuildKnowledgeFromFile 使用 AI 分析文件内容并构建知识库（导出名为 rag.BuildCollectionFromFile）
+// 参数:
+//   - kbName: 知识库名称
+//   - path: 文件路径
+//   - option: 可选配置（并发、chunkSize、disableIndex 等）
+//
+// 返回值:
+//   - 知识条目 channel
+//   - 错误信息
+//
+// Example:
+// ```
+// // 依赖 AI 服务与本地数据库（示意性示例）
+// entries = rag.BuildCollectionFromFile("my-kb", "/tmp/doc.txt")~
+//
+//	for entry := range entries {
+//	    println(entry.KnowledgeTitle)
+//	}
+//
+// ```
 func BuildKnowledgeFromFile(kbName string, path string, option ...any) (<-chan *schema.KnowledgeBaseEntry, error) {
 	analyzeResult, err := AnalyzeFile(path, option...)
 	if err != nil {
@@ -77,10 +97,41 @@ func BuildKnowledgeFromFile(kbName string, path string, option ...any) (<-chan *
 	return _buildKnowledge(analyzeResult, option...)
 }
 
+// BuildKnowledgeFromBytes 使用 AI 分析字节内容并构建知识库（导出名为 rag.BuildCollectionFromRaw）
+// 参数:
+//   - kbName: 知识库名称
+//   - content: 待分析的原始字节内容
+//   - option: 可选配置（并发、chunkSize、disableIndex 等）
+//
+// 返回值:
+//   - 知识条目 channel
+//   - 错误信息
+//
+// Example:
+// ```
+// // 依赖 AI 服务与本地数据库（示意性示例）
+// entries = rag.BuildCollectionFromRaw("my-kb", []byte("some content"))~
+// ```
 func BuildKnowledgeFromBytes(kbName string, content []byte, option ...any) (<-chan *schema.KnowledgeBaseEntry, error) {
 	return BuildKnowledgeFromReader(kbName, bytes.NewReader(content), option...)
 }
 
+// BuildKnowledgeFromReader 使用 AI 分析 reader 内容并构建知识库（导出名为 rag.BuildCollectionFromReader）
+// 参数:
+//   - kbName: 知识库名称
+//   - reader: 数据源 reader
+//   - option: 可选配置（并发、chunkSize、disableIndex 等）
+//
+// 返回值:
+//   - 知识条目 channel
+//   - 错误信息
+//
+// Example:
+// ```
+// // 依赖 AI 服务与本地数据库（示意性示例）
+// f = file.Open("/tmp/doc.txt")~
+// entries = rag.BuildCollectionFromReader("my-kb", f)~
+// ```
 func BuildKnowledgeFromReader(kbName string, reader io.Reader, option ...any) (<-chan *schema.KnowledgeBaseEntry, error) {
 	analyzeResult, err := AnalyzeReader(reader, option...)
 	if err != nil {
@@ -392,6 +443,20 @@ func SaveKnowledgeEntries(ragSystem *rag.RAGSystem, entries []*schema.KnowledgeB
 	return nil
 }
 
+// BuildKnowledgeFromEntityReposByName 基于已有的实体仓库构建知识库（导出名为 rag.BuildKnowledgeFromEntityRepos）
+// 参数:
+//   - name: 实体仓库名称
+//   - option: 可选配置（并发、disableIndex 等）
+//
+// 返回值:
+//   - 知识条目 channel
+//   - 错误信息
+//
+// Example:
+// ```
+// // 依赖 AI 服务与本地数据库（示意性示例）
+// entries = rag.BuildKnowledgeFromEntityRepos("my-entity-repo")~
+// ```
 func BuildKnowledgeFromEntityReposByName(name string, option ...any) (<-chan *schema.KnowledgeBaseEntry, error) {
 	refineConfig := NewRefineConfig(option...)
 	refineConfig.AnalyzeLog("start build knowledge from entity repository use default qc")
@@ -426,6 +491,15 @@ func BuildKnowledgeFromEntityReposByName(name string, option ...any) (<-chan *sc
 //	    aiforge.VideoOmniPresetFlash(),
 //	    aiforge.WithVideoOmniAPIKey(key),
 //	)
+//
+// 参数:
+//   - kbName: 目标知识库名称
+//   - video: 视频文件路径
+//   - options: omni 视频可选项，如 liteforge.omniPresetFlash、liteforge.omniAPIKey 等
+//
+// 返回值:
+//   - 知识库条目 channel
+//   - 错误信息
 func BuildVideoKnowledgeFromOmni(kbName string, video string, options ...any) (<-chan *schema.KnowledgeBaseEntry, error) {
 	// 自动透传 kb 名给 omni 视频管线，配合 zip 归档自动文件名
 	// 关键词: BuildVideoKnowledgeFromOmni 注入 kbName, omni archive auto naming

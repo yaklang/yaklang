@@ -117,6 +117,24 @@ func NewReducerFromInputChunk(chunk *chanx.UnlimitedChan[chunkmaker.Chunk], opts
 	return NewReducerEx(cm, opts...)
 }
 
+// NewReducerFromReader 基于 io.Reader 创建一个 reducer 对象（导出名为 aireducer.NewReducerFromReader）
+// 创建后需通过 Run 启动，通常配合 aireducer.callback 设置 chunk 回调
+// 参数:
+//   - r: 数据来源 reader
+//   - opts: 切分可选项，如 aireducer.chunkSize、aireducer.callback 等
+//
+// 返回值:
+//   - reducer 对象
+//   - 错误信息
+//
+// Example:
+// ```
+// count = 0
+// reader = str.NewReader("aaaaabbbbbccccc")
+// reducer = aireducer.NewReducerFromReader(reader, aireducer.chunkSize(5), aireducer.callback(func(config, memory, chunk) { count++ }))~
+// reducer.Run()
+// println(count)   // OUT: 3
+// ```
 func NewReducerFromReader(r io.Reader, opts ...Option) (*Reducer, error) {
 	config := NewConfig(opts...)
 
@@ -149,10 +167,47 @@ func NewReducerFromReader(r io.Reader, opts ...Option) (*Reducer, error) {
 	return NewReducerEx(cm, opts...)
 }
 
+// NewReducerFromString 基于字符串创建一个 reducer 对象（导出名为 aireducer.NewReducerFromString）
+// 创建后需通过 Run 启动，通常配合 aireducer.callback 设置 chunk 回调
+// 参数:
+//   - i: 输入字符串
+//   - opts: 切分可选项，如 aireducer.chunkSize、aireducer.callback 等
+//
+// 返回值:
+//   - reducer 对象
+//   - 错误信息
+//
+// Example:
+// ```
+// count = 0
+// reducer = aireducer.NewReducerFromString("aaaaabbbbbccccc", aireducer.chunkSize(5), aireducer.callback(func(config, memory, chunk) { count++ }))~
+// reducer.Run()
+// println(count)   // OUT: 3
+// ```
 func NewReducerFromString(i string, opts ...Option) (*Reducer, error) {
 	return NewReducerFromReader(bytes.NewReader([]byte(i)), opts...)
 }
 
+// NewReducerFromFile 基于文件创建一个 reducer 对象（导出名为 aireducer.NewReducerFromFile）
+// 创建后需通过 Run 启动，通常配合 aireducer.callback 设置 chunk 回调
+// 参数:
+//   - filename: 文件路径
+//   - opts: 切分可选项，如 aireducer.chunkSize、aireducer.lines、aireducer.callback 等
+//
+// 返回值:
+//   - reducer 对象
+//   - 错误信息
+//
+// Example:
+// ```
+// // 按行切分文件并逐块处理（示意性示例，需替换为真实文件路径）
+//
+//	reducer = aireducer.NewReducerFromFile("/tmp/example.txt", aireducer.lines(10), aireducer.callback(func(config, memory, chunk) {
+//	    println(string(chunk.Data()))
+//	}))~
+//
+// reducer.Run()
+// ```
 func NewReducerFromFile(filename string, opts ...Option) (*Reducer, error) {
 	config := NewConfig(opts...)
 

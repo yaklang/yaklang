@@ -36,7 +36,19 @@ type fileContent struct {
 	content string
 }
 
-// NewZipGrepSearcher 创建一个新的 ZIP 搜索器（从文件）
+// NewGrepSearcher 从一个 ZIP 文件创建带缓存的搜索器，适合对同一 zip 多次搜索
+// 参数:
+//   - zipFile: zip 文件路径
+//
+// 返回值:
+//   - zip 搜索器对象
+//   - 错误信息
+//
+// Example:
+// ```
+// searcher = zip.NewGrepSearcher("/tmp/abc.zip")~
+// results = searcher.GrepSubString("password")~
+// ```
 func NewZipGrepSearcher(zipFile string) (*ZipGrepSearcher, error) {
 	raw, err := ioutil.ReadFile(zipFile)
 	if err != nil {
@@ -46,7 +58,22 @@ func NewZipGrepSearcher(zipFile string) (*ZipGrepSearcher, error) {
 	return NewZipGrepSearcherFromRaw(raw, zipFile)
 }
 
-// NewZipGrepSearcherFromRaw 创建一个新的 ZIP 搜索器（从原始数据）
+// NewGrepSearcherFromRaw 从内存中的 ZIP 原始数据创建带缓存的搜索器，适合对同一 zip 多次搜索
+// 参数:
+//   - raw: zip 的原始数据（[]byte、string 或 io.Reader）
+//   - filename: 可选的逻辑文件名（仅用于结果展示）
+//
+// 返回值:
+//   - zip 搜索器对象
+//   - 错误信息
+//
+// Example:
+// ```
+// zipBytes = zip.CompressRaw({"a.txt": "hello\nworld"})~
+// searcher = zip.NewGrepSearcherFromRaw(zipBytes)~
+// results = searcher.GrepSubString("world")~
+// assert len(results) == 1, "searcher should find one match"
+// ```
 func NewZipGrepSearcherFromRaw(raw interface{}, filename ...string) (*ZipGrepSearcher, error) {
 	var data []byte
 	switch v := raw.(type) {

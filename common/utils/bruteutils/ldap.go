@@ -44,18 +44,57 @@ type ldapClientConfig struct {
 	Password string
 }
 
+// port 是一个 LDAP 登录配置选项，用于设置 LDAP 服务器端口
+// 参数:
+//   - i: LDAP 服务器端口，默认 389
+//
+// 返回值:
+//   - 一个 LDAP 登录配置选项，作为可变参数传入 ldap.Login
+//
+// Example:
+// ```
+// // 指定端口登录 LDAP，此处仅作示意
+// conn = ldap.Login("192.168.1.1", ldap.port(389), ldap.username("admin"), ldap.password("admin"))~
+// defer conn.Close()
+// ```
 func optLdap_Port(i int) func(config *ldapClientConfig) {
 	return func(config *ldapClientConfig) {
 		config.Port = i
 	}
 }
 
+// username 是一个 LDAP 登录配置选项，用于设置绑定（Bind）用户名
+// 参数:
+//   - i: 绑定用户名，留空或 "anonymous" 时进行匿名绑定
+//
+// 返回值:
+//   - 一个 LDAP 登录配置选项，作为可变参数传入 ldap.Login
+//
+// Example:
+// ```
+// // 指定用户名密码登录 LDAP，此处仅作示意
+// conn = ldap.Login("192.168.1.1", ldap.username("admin"), ldap.password("admin"))~
+// defer conn.Close()
+// ```
 func optLdap_Username(i string) func(config *ldapClientConfig) {
 	return func(config *ldapClientConfig) {
 		config.Username = i
 	}
 }
 
+// password 是一个 LDAP 登录配置选项，用于设置绑定（Bind）密码
+// 参数:
+//   - i: 绑定密码
+//
+// 返回值:
+//   - 一个 LDAP 登录配置选项，作为可变参数传入 ldap.Login
+//
+// Example:
+// ```
+// // 指定用户名密码登录 LDAP，此处仅作示意
+// conn = ldap.Login("192.168.1.1", ldap.username("admin"), ldap.password("admin"))~
+// defer conn.Close()
+// ```
 func optLdap_Password(i string) func(config *ldapClientConfig) {
 	return func(config *ldapClientConfig) {
 		config.Password = i
@@ -67,6 +106,21 @@ var Ldap_Username = optLdap_Username
 var Ldap_Password = optLdap_Password
 var Ldap_Port = optLdap_Port
 
+// Login 连接并绑定（登录）到 LDAP 服务器，返回一个可用的 LDAP 连接对象
+// 参数:
+//   - addr: 目标地址，格式为 host 或 host:port，未指定端口时默认 389
+//   - opts: 可选配置，例如 ldap.username、ldap.password、ldap.port
+//
+// 返回值:
+//   - LDAP 连接对象，可进行搜索、修改等操作
+//   - 错误信息，连接或绑定失败时返回非空
+//
+// Example:
+// ```
+// // 登录 LDAP 服务器，依赖目标服务，此处仅作示意
+// conn = ldap.Login("192.168.1.1", ldap.username("admin"), ldap.password("admin"))~
+// defer conn.Close()
+// ```
 func _login(addr string, opts ...func(config *ldapClientConfig)) (*ldap.Conn, error) {
 	config := &ldapClientConfig{Host: addr}
 	for _, i := range opts {

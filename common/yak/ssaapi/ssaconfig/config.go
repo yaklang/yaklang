@@ -48,6 +48,20 @@ const (
 	ModeAll = ModeProjectBase | modeSSACompile | ModeSyntaxFlow | ModeSyntaxFlowRule | ModeCodeSource | ModeSyntaxFlowScanManager | ModeOutput
 )
 
+// New 创建一个 SSA 配置对象（导出名为 ssa.NewConfig）
+// 参数:
+//   - mode: 配置模式，如 ssa.ModeAll、ssa.ModeProjectCompile
+//   - opts: 配置可选项，如 ssa.withProgramName、ssa.withLanguage 等
+//
+// 返回值:
+//   - 配置对象
+//   - 错误信息
+//
+// Example:
+// ```
+// config = ssa.NewConfig(ssa.ModeProjectCompile, ssa.withLanguage("java"))~
+// dump(config)
+// ```
 func New(mode Mode, opts ...Option) (*Config, error) {
 	cfg := &Config{
 		ctx:       context.Background(),
@@ -178,6 +192,18 @@ func defaultOutputConfig() *OutputConfig {
 
 // --- Context Get/Set 方法 ---
 
+// WithContext 为 SSA 编译/查询设置上下文（导出名为 ssa.withContext）
+// 参数:
+//   - ctx: 上下文，用于控制取消与超时
+//
+// 返回值:
+//   - 配置可选项
+//
+// Example:
+// ```
+// opt = ssa.withContext(context.Background())
+// println(opt)
+// ```
 func WithContext(ctx context.Context) Option {
 	return func(c *Config) error {
 		c.ctx = ctx
@@ -295,6 +321,18 @@ func WithConfigJson(jsonStr string) Option {
 	}
 }
 
+// WithJsonRawConfig 从原始 JSON 字节加载并合并到配置中（导出名为 ssa.withJsonRawConfig）
+// 参数:
+//   - raw: JSON 格式的配置字节
+//
+// 返回值:
+//   - 配置可选项
+//
+// Example:
+// ```
+// opt = ssa.withJsonRawConfig([]byte(`{"base_info":{"program_names":["demo"]}}`))
+// println(opt)
+// ```
 func WithJsonRawConfig(raw []byte) Option {
 	return func(c *Config) error {
 		if raw == nil {

@@ -17,6 +17,27 @@ func GetGlobalStatistics() *Statistics {
 	return globalStatistics
 }
 
+// GetStatistics 获取 pcapx 注入流量过程中累计的统计信息(链路层、网络层、传输层)
+// 在 yak 中通过 pcapx.GetStatistics 调用
+// 参数:
+//   - 无
+//
+// 返回值:
+//   - 一个统计信息对象，包含各层地址命中计数
+//
+// Example:
+// ```
+// // 该示例为示意性用法：读取 pcapx 流量统计
+// stat = pcapx.GetStatistics()
+// println(stat)
+// ```
+func getStatistics() (result *Statistics) {
+	defer func() {
+		result = globalStatistics
+	}()
+	return
+}
+
 func NewStatistics() *Statistics {
 	return &Statistics{
 		LinkLayerStatistics:           make(map[string]int64),

@@ -51,20 +51,22 @@ func SetAny(o *OrderedMap, key any, value any) {
 // New 从零创建一个有序映射或从一个普通映射中创建一个有序映射，其的基本用法与普通映射相同，但内置方法可能不同
 // 值得注意的是，如果传入的是一个普通映射，使用此函数转换为有序映射并不能保证原有的顺序
 // 如果需要保留原有顺序，可以使用 `omap({"a": 1, "b": 2})` 来直接生成一个有序映射
+// 参数:
+//   - maps: 可选的初始映射；为空则创建一个空的有序映射
+//
+// 返回值:
+//   - 创建出的有序映射对象
+//
 // Example:
 // ```
+// // VARS: 创建空的有序映射并按顺序写入
 // om = orderedmap.New()
-// om["a"] = 1
-// om.b = 2
-// println(om.a) // 1
-// println(om["b"]) // 2
-// om.Delete("a")
-// om.Delete("b")
-// println(om.a) // nil
-// for i in 100 { om[string(i)] = i }
-// for k, v in om {
-// println(k, v)
-// }
+// om.Set("a", 1)
+// om.Set("b", 2)
+// // STDOUT: 按写入顺序打印键
+// println(om.Keys())   // OUT: [a b]
+// // assert: 长度与取值正确
+// assert om.Len() == 2, "ordered map should keep two keys"
 // ```
 func New(maps ...any) *OrderedMap {
 	var m map[string]any

@@ -14,10 +14,14 @@ import (
 )
 
 // VerifyMITMRootCertInstalled 验证 MITM 根证书是否已正确安装到系统信任库
-// 验证方法：
-// 1. 使用 MITM 根证书启动一个临时 HTTPS 服务器
-// 2. 使用系统证书池（不跳过验证）连接到该服务器
-// 3. 如果连接成功且 TLS 握手完成，说明证书已正确安装
+// 返回值:
+//   - 错误信息，证书未安装或验证失败时返回非空，安装正确时返回 nil
+//
+// Example:
+// ```
+// // 验证 MITM 根证书是否已安装，此处仅作示意
+// mitm.VerifyMITMRootCertInstalled()~
+// ```
 func VerifyMITMRootCertInstalled() error {
 	log.Debug("verifying MITM root certificate installation...")
 
@@ -172,7 +176,14 @@ func VerifyMITMRootCertInstalled() error {
 }
 
 // VerifyMITMRootCertNotInstalled 验证 MITM 根证书是否已从系统信任库中移除
-// 验证方法：与 VerifyMITMRootCertInstalled 相反，连接应该失败
+// 返回值:
+//   - 错误信息，证书仍被信任或验证异常时返回非空，已移除时返回 nil
+//
+// Example:
+// ```
+// // 验证 MITM 根证书是否已移除，此处仅作示意
+// mitm.VerifyMITMRootCertNotInstalled()~
+// ```
 func VerifyMITMRootCertNotInstalled() error {
 	log.Info("verifying MITM root certificate is NOT installed...")
 
@@ -191,7 +202,17 @@ func VerifyMITMRootCertNotInstalled() error {
 	return utils.Errorf("verification failed with unexpected error: %v", err)
 }
 
-// QuickVerifyMITMRootCert 快速验证证书状态（不启动服务器，只检查系统证书池）
+// QuickVerifyMITMRootCert 快速验证 MITM 根证书状态（不启动服务器，只检查系统证书池）
+// 返回值:
+//   - 证书是否被系统信任
+//   - 错误信息，获取或解析证书失败时返回非空
+//
+// Example:
+// ```
+// // 快速检查 MITM 根证书是否被信任，此处仅作示意
+// trusted, err = mitm.QuickVerifyMITMRootCert()
+// println(trusted)
+// ```
 func QuickVerifyMITMRootCert() (bool, error) {
 	InitMITMCert()
 
@@ -235,7 +256,15 @@ func QuickVerifyMITMRootCert() (bool, error) {
 	return false, nil
 }
 
-// TestCertificateOperations 测试证书的安装、验证和撤销操作
+// TestCertificateOperations 完整测试 MITM 根证书的安装、验证和撤销操作流程（需要管理员权限）
+// 返回值:
+//   - 错误信息，测试流程中任一步骤失败时返回非空
+//
+// Example:
+// ```
+// // 测试证书安装/验证/撤销全流程，需要权限，此处仅作示意
+// mitm.TestCertificateOperations()~
+// ```
 func TestCertificateOperations() error {
 	log.Info("=== Testing Certificate Operations ===")
 

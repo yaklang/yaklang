@@ -5,7 +5,12 @@ import (
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
 )
 
-// GenerateRSA1024KeyPair 生成1024位大小的RSA公私钥对，返回PEM格式公钥和私钥与错误
+// GenerateRSA1024KeyPair 生成 1024 位大小的 RSA 公私钥对
+// 返回值:
+//   - PEM 格式的公钥
+//   - PEM 格式的私钥
+//   - 错误信息，生成失败时返回非空
+//
 // Example:
 // ```
 // pub, pri, err := tls.GenerateRSA1024KeyPair()
@@ -14,7 +19,12 @@ func generateRSA1024KeyPair() ([]byte, []byte, error) {
 	return tlsutils.RSAGenerateKeyPair(1024)
 }
 
-// GenerateRSA2048KeyPair 生成2048位大小的RSA公私钥对，返回PEM格式公钥和私钥与错误
+// GenerateRSA2048KeyPair 生成 2048 位大小的 RSA 公私钥对
+// 返回值:
+//   - PEM 格式的公钥
+//   - PEM 格式的私钥
+//   - 错误信息，生成失败时返回非空
+//
 // Example:
 // ```
 // pub, pri, err := tls.GenerateRSA2048KeyPair()
@@ -23,7 +33,12 @@ func generateRSA2048KeyPair() ([]byte, []byte, error) {
 	return tlsutils.RSAGenerateKeyPair(2048)
 }
 
-// GenerateRSA4096KeyPair 生成4096位大小的RSA公私钥对，返回PEM格式公钥和私钥与错误
+// GenerateRSA4096KeyPair 生成 4096 位大小的 RSA 公私钥对
+// 返回值:
+//   - PEM 格式的公钥
+//   - PEM 格式的私钥
+//   - 错误信息，生成失败时返回非空
+//
 // Example:
 // ```
 // pub, pri, err := tls.GenerateRSA4096KeyPair()
@@ -32,7 +47,16 @@ func generateRSA4096KeyPair() ([]byte, []byte, error) {
 	return tlsutils.RSAGenerateKeyPair(4096)
 }
 
-// GenerateRootCA 根据名字生成根证书和私钥，返回PEM格式证书和私钥与错误
+// GenerateRootCA 根据名字生成根证书和私钥
+// 参数:
+//   - commonName: 证书的通用名称（CN），同时用作组织名
+//   - opts: 可选的证书选项，例如 tls.validity、tls.alternativeDNS
+//
+// 返回值:
+//   - PEM 格式的根证书
+//   - PEM 格式的私钥
+//   - 错误信息，生成失败时返回非空
+//
 // Example:
 // ```
 // cert, key, err := tls.GenerateRootCA("yaklang.io")

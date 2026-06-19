@@ -339,6 +339,19 @@ func (m *MixPluginCaller) SetDividedContext(b bool) {
 	m.callers.SetDividedContext(b)
 }
 
+// NewMixPluginCaller 创建一个混合插件调用器（导出名为 hook.NewMixPluginCaller）
+// 调用器内置网站/路径/参数等过滤器，便于按 MITM 流量统一调度多类插件
+// 返回值:
+//   - 混合插件调用器对象
+//   - 错误信息
+//
+// Example:
+// ```
+// // 示意性示例，需要本地插件数据库
+// caller, err = hook.NewMixPluginCaller()
+// if err != nil { die(err) }
+// caller.LoadPlugin("my-plugin")
+// ```
 func NewMixPluginCaller() (*MixPluginCaller, error) {
 	resetFilterLock.Lock()
 	defer resetFilterLock.Unlock()
@@ -364,6 +377,21 @@ func NewMixPluginCaller() (*MixPluginCaller, error) {
 	return c, nil
 }
 
+// NewMixPluginCallerWithFilter 创建带自定义网站过滤器的混合插件调用器（导出名为 hook.NewMixPluginCallerWithFilter）
+// 参数:
+//   - webFilter: 自定义的网站去重/过滤器
+//
+// 返回值:
+//   - 混合插件调用器对象
+//   - 错误信息
+//
+// Example:
+// ```
+// // 示意性示例，需要本地插件数据库
+// caller, err = hook.NewMixPluginCallerWithFilter(filter.NewFilter())
+// if err != nil { die(err) }
+// caller.LoadPlugin("my-plugin")
+// ```
 func NewMixPluginCallerWithFilter(webFilter filter.Filterable) (*MixPluginCaller, error) {
 	resetFilterLock.Lock()
 	defer resetFilterLock.Unlock()

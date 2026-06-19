@@ -13,11 +13,15 @@ import (
 	"github.com/yaklang/yaklang/common/utils/privileged"
 )
 
-// AddMITMRootCertIntoSystem 将 MITM 根证书添加到 macOS 系统钥匙串并设置为信任
-// 这个函数会：
-// 1. 获取或生成 MITM 根证书
-// 2. 将证书导入到系统钥匙串
-// 3. 设置证书为受信任的根证书
+// AddMITMRootCertIntoSystem 将 MITM 根证书添加到系统信任库并设置为信任（需要管理员权限）
+// 返回值:
+//   - 错误信息，导入或信任设置失败时返回非空
+//
+// Example:
+// ```
+// // 将 MITM 根证书安装到系统，需要权限，此处仅作示意
+// mitm.AddMITMRootCertIntoSystem()~
+// ```
 func AddMITMRootCertIntoSystem() error {
 	ctx := context.Background()
 	executor := privileged.NewExecutor("Install MITM Root Certificate")
@@ -56,7 +60,15 @@ func AddMITMRootCertIntoSystem() error {
 	return nil
 }
 
-// WithdrawMITMRootCertFromSystem 从 macOS 系统钥匙串中移除 MITM 根证书
+// WithdrawMITMRootCertFromSystem 从系统信任库中移除 MITM 根证书（需要管理员权限）
+// 返回值:
+//   - 错误信息，移除失败时返回非空
+//
+// Example:
+// ```
+// // 从系统移除 MITM 根证书，需要权限，此处仅作示意
+// mitm.WithdrawMITMRootCertFromSystem()~
+// ```
 func WithdrawMITMRootCertFromSystem() error {
 	ctx := context.Background()
 	executor := privileged.NewExecutor("Remove MITM Root Certificate")

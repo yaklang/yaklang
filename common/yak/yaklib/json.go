@@ -92,9 +92,19 @@ func _jsonMarshal(v interface{}) ([]byte, error) {
 
 // dumps 将一个对象转换为 JSON 字符串，返回转换后的字符串
 // 它还可以接收零个到多个请求选项函数，用于配置转换过程，控制转换后的缩进，前缀等
+// 参数:
+//   - raw: 要序列化的对象
+//   - opts: 可选的序列化选项（缩进、前缀、是否转义 HTML 等）
+//
+// 返回值:
+//   - 序列化后的 JSON 字符串，失败返回空字符串
+//
 // Example:
 // ```
-// v = json.dumps({"a": "b", "c": "d"})
+// s = json.dumps({"name": "yak"})
+// // dumps 默认输出带缩进的多行 JSON，这里打印是否包含被序列化的值
+// println(str.Contains(s, "yak"))   // OUT: true
+// assert str.Contains(s, "yak"), "dumps output should contain the value"
 // ```
 func _jsonDumps(raw interface{}, opts ...JsonOpt) string {
 	config := NewJsonConfig()
@@ -142,9 +152,19 @@ func _jsonDumps(raw interface{}, opts ...JsonOpt) string {
 }
 
 // loads 将一个 JSON 字符串转换为对象，返回转换后的对象，通常是一个omap
+// 参数:
+//   - raw: JSON 字符串（任意可转为字符串的输入）
+//   - opts: 可选的解析选项（当前预留）
+//
+// 返回值:
+//   - 解析后的对象，通常是有序 map（omap）
+//
 // Example:
 // ```
-// v = json.loads(`{"a": "b", "c": "d"}`)
+// m = json.loads(`{"a": "b", "c": "d"}`)
+// println(m["a"])   // OUT: b
+// assert m["a"] == "b", "loads should parse the first field"
+// assert m["c"] == "d", "loads should parse the second field"
 // ```
 func _jsonLoad(raw interface{}, opts ...JsonOpt) interface{} {
 	// opts 中暂时没有load的选项，所以这里暂时不处理

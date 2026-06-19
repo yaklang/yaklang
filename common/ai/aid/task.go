@@ -400,6 +400,21 @@ func (t *AiTask) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// ExtractPlan 从 AI 原始响应中解析出任务计划（导出名为 aiagent.ExtractPlan）
+// 参数:
+//   - c: 协调器对象
+//   - rawResponse: AI 返回的原始文本
+//
+// 返回值:
+//   - 计划响应对象
+//   - 错误信息
+//
+// Example:
+// ```
+// // 需要可用的协调器与响应（示意性示例）
+// plan = aiagent.ExtractPlan(coordinator, rawResponse)~
+// dump(plan)
+// ```
 func ExtractPlan(c *Coordinator, rawResponse string) (*PlanResponse, error) {
 	at, err := ExtractTaskFromRawResponse(c, rawResponse)
 	if err != nil {

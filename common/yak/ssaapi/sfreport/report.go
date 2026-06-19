@@ -39,6 +39,20 @@ type Report struct {
 	File           []*File             // irsourceHash -> file
 }
 
+// NewReport 创建一个 SyntaxFlow 扫描报告对象（导出名为 sfreport.NewReport）
+// 报告对象用于汇总规则、风险、文件等信息并最终序列化为 JSON 或 Markdown
+// 参数:
+//   - reportType: 报告类型，如 sfreport.IRifyReportType / sfreport.IRifyFullReportType
+//   - opts: 报告配置可选项，如 sfreport.withFileContent / sfreport.withDataflowPath
+//
+// 返回值:
+//   - 新建的报告对象
+//
+// Example:
+// ```
+// report = sfreport.NewReport(sfreport.IRifyReportType)
+// assert report.ReportType == sfreport.IRifyReportType, "report type should match"
+// ```
 func NewReport(reportType ReportType, opts ...Option) *Report {
 	now := time.Now()
 	report := &Report{

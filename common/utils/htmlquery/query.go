@@ -55,12 +55,19 @@ func getQuery(expr string) (*xpath.Expr, error) {
 var _ xpath.NodeNavigator = &NodeNavigator{}
 
 // CreateXPathNavigator 根据传入的节点创建一个新的 XPath 导航器，使用该导航器的方法来遍历该节点及其子节点
+// 参数:
+//   - top: 作为导航起点的节点
+//
+// 返回值:
+//   - 可用于遍历节点树的 XPath 导航器
+//
 // Example:
 // ```
-// doc, err = xpath.LoadHTMLDocument(htmlText)
+// // VARS: 基于文档创建导航器
+// doc = xpath.LoadHTMLDocument(`<div>x</div>`)~
 // nav = xpath.CreateXPathNavigator(doc)
-// nav.MoveToChild()
-// println(nav.String())
+// // assert: 成功创建导航器
+// assert nav != nil, "navigator should be created"
 // ```
 func CreateXPathNavigator(top *html.Node) *NodeNavigator {
 	return &NodeNavigator{curr: top, root: top, attr: -1}
@@ -68,10 +75,22 @@ func CreateXPathNavigator(top *html.Node) *NodeNavigator {
 
 // Find 根据传入的 XPath 表达式从传入的节点开始查找匹配的节点，返回节点数组
 // 如果表达式解析出错会 panic
+// 参数:
+//   - top: 查询的起始节点
+//   - expr: XPath 表达式
+//
+// 返回值:
+//   - 所有匹配节点组成的数组
+//
 // Example:
 // ```
-// doc, err = xpath.LoadHTMLDocument(htmlText)
-// nodes = xpath.Find(doc, "//div[@class='content']/text()")
+// // VARS: 查找所有匹配的 div
+// doc = xpath.LoadHTMLDocument(`<div class="c">a</div><div class="c">b</div>`)~
+// nodes = xpath.Find(doc, "//div[@class='c']")
+// // STDOUT: 打印命中数量
+// println(len(nodes))   // OUT: 2
+// // assert: 锁定结论
+// assert len(nodes) == 2, "should find two div nodes"
 // ```
 func Find(top *html.Node, expr string) []*html.Node {
 	nodes, err := QueryAll(top, expr)
@@ -83,10 +102,22 @@ func Find(top *html.Node, expr string) []*html.Node {
 
 // FindOne 根据传入的 XPath 表达式从传入的节点开始查找第一个匹配的节点
 // 如果表达式解析出错会 panic
+// 参数:
+//   - top: 查询的起始节点
+//   - expr: XPath 表达式
+//
+// 返回值:
+//   - 第一个匹配的节点，未匹配时为 nil
+//
 // Example:
 // ```
-// doc, err = xpath.LoadHTMLDocument(htmlText)
-// node = xpath.FindOne(doc, "//div[@class='content']/text()")
+// // VARS: 查找第一个 div
+// doc = xpath.LoadHTMLDocument(`<div class="c">hello</div>`)~
+// node = xpath.FindOne(doc, "//div[@class='c']")
+// // STDOUT: 打印节点文本
+// println(xpath.InnerText(node))   // OUT: hello
+// // assert: 锁定结论
+// assert xpath.InnerText(node) == "hello", "should find the div text"
 // ```
 func FindOne(top *html.Node, expr string) *html.Node {
 	node, err := Query(top, expr)
@@ -97,10 +128,23 @@ func FindOne(top *html.Node, expr string) *html.Node {
 }
 
 // QueryAll 根据传入的 XPath 表达式从传入的节点开始查找匹配的节点，返回节点数组与错误
+// 参数:
+//   - top: 查询的起始节点
+//   - expr: XPath 表达式
+//
+// 返回值:
+//   - 所有匹配节点组成的数组
+//   - 表达式解析失败时返回的错误
+//
 // Example:
 // ```
-// doc, err = xpath.LoadHTMLDocument(htmlText)
-// nodes, err = xpath.QueryAll(doc, "//div[@class='content']/text()")
+// // VARS: 查询所有 div
+// doc = xpath.LoadHTMLDocument(`<div>a</div><div>b</div>`)~
+// nodes = xpath.QueryAll(doc, "//div")~
+// // STDOUT: 打印命中数量
+// println(len(nodes))   // OUT: 2
+// // assert: 锁定结论
+// assert len(nodes) == 2, "should query two div nodes"
 // ```
 func QueryAll(top *html.Node, expr string) ([]*html.Node, error) {
 	exp, err := getQuery(expr)
@@ -112,10 +156,21 @@ func QueryAll(top *html.Node, expr string) ([]*html.Node, error) {
 }
 
 // Query 根据传入的 XPath 表达式从传入的节点开始查找第一个匹配的节点，返回节点与错误
+// 参数:
+//   - top: 查询的起始节点
+//   - expr: XPath 表达式
+//
+// 返回值:
+//   - 第一个匹配的节点，未匹配时为 nil
+//   - 表达式解析失败时返回的错误
+//
 // Example:
 // ```
-// doc, err = xpath.LoadHTMLDocument(htmlText)
-// node, err = xpath.Query(doc, "//div[@class='content']/text()")
+// // VARS: 查询第一个 div
+// doc = xpath.LoadHTMLDocument(`<div>hello</div>`)~
+// node = xpath.Query(doc, "//div")~
+// // assert: 锁定结论
+// assert xpath.InnerText(node) == "hello", "should query the first div"
 // ```
 func Query(top *html.Node, expr string) (*html.Node, error) {
 	exp, err := getQuery(expr)
@@ -195,11 +250,22 @@ func Parse(r io.Reader) (*html.Node, error) {
 }
 
 // InnerText 返回指定节点及其子节点的字符串
+// 参数:
+//   - n: 要提取文本的节点
+//
+// 返回值:
+//   - 节点及其子节点拼接后的纯文本
+//
 // Example:
 // ```
-// doc, err = xpath.LoadHTMLDocument(htmlText)
-// node = xpath.FindOne(doc, "//div[@class='content']")
+// // VARS: 提取节点文本
+// doc = xpath.LoadHTMLDocument(`<div>hello</div>`)~
+// node = xpath.FindOne(doc, "//div")
 // text = xpath.InnerText(node)
+// // STDOUT: 打印文本
+// println(text)   // OUT: hello
+// // assert: 锁定结论
+// assert text == "hello", "InnerText should extract node text"
 // ```
 func InnerText(n *html.Node) string {
 	var output func(*bytes.Buffer, *html.Node)
@@ -222,11 +288,23 @@ func InnerText(n *html.Node) string {
 }
 
 // SelectAttr 返回传入节点指定名称的属性值
+// 参数:
+//   - n: 目标节点
+//   - name: 属性名
+//
+// 返回值:
+//   - 属性值，不存在时返回空字符串
+//
 // Example:
 // ```
-// doc, err = xpath.LoadHTMLDocument(htmlText)
-// node = xpath.FindOne(doc, "//div[@class='content']")
+// // VARS: 读取 class 属性
+// doc = xpath.LoadHTMLDocument(`<div class="content">x</div>`)~
+// node = xpath.FindOne(doc, "//div")
 // attr = xpath.SelectAttr(node, "class")
+// // STDOUT: 打印属性值
+// println(attr)   // OUT: content
+// // assert: 锁定结论
+// assert attr == "content", "SelectAttr should read the class attribute"
 // ```
 func SelectAttr(n *html.Node, name string) (val string) {
 	if n == nil {
@@ -244,12 +322,23 @@ func SelectAttr(n *html.Node, name string) (val string) {
 	return
 }
 
-// ExistsAttr 判断传入节点是否存在指定名称的属性并返回布尔值
+// ExistedAttr 判断传入节点是否存在指定名称的属性并返回布尔值
+// 参数:
+//   - n: 目标节点
+//   - name: 属性名
+//
+// 返回值:
+//   - 节点是否存在该属性
+//
 // Example:
 // ```
-// doc, err = xpath.LoadHTMLDocument(htmlText)
-// node = xpath.FindOne(doc, "//div[@class='content']")
-// existed = xpath.ExistsAttr(node, "class") // true
+// // VARS: 判断属性是否存在
+// doc = xpath.LoadHTMLDocument(`<div class="content">x</div>`)~
+// node = xpath.FindOne(doc, "//div")
+// // STDOUT: class 属性存在
+// println(xpath.ExistedAttr(node, "class"))   // OUT: true
+// // assert: 不存在的属性返回 false
+// assert xpath.ExistedAttr(node, "id") == false, "missing attribute should report false"
 // ```
 func ExistsAttr(n *html.Node, name string) bool {
 	if n == nil {

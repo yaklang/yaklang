@@ -21,24 +21,76 @@ type redisConfig struct {
 
 type redisConfigOpt func(i *redisConfig)
 
+// host 是一个 Redis 客户端配置选项，用于设置 Redis 服务器主机地址
+// 参数:
+//   - h: Redis 服务器主机地址
+//
+// 返回值:
+//   - 一个 Redis 客户端配置选项，作为可变参数传入 redis.New
+//
+// Example:
+// ```
+// // 指定 Redis 主机与端口创建客户端，此处仅作示意
+// client = redis.New(redis.host("127.0.0.1"), redis.port(6379))
+// defer client.Close()
+// ```
 func redisOpt_Host(h string) redisConfigOpt {
 	return func(i *redisConfig) {
 		i.Host = h
 	}
 }
 
+// port 是一个 Redis 客户端配置选项，用于设置 Redis 服务器端口
+// 参数:
+//   - h: Redis 服务器端口，默认 6379
+//
+// 返回值:
+//   - 一个 Redis 客户端配置选项，作为可变参数传入 redis.New
+//
+// Example:
+// ```
+// // 指定 Redis 端口创建客户端，此处仅作示意
+// client = redis.New(redis.host("127.0.0.1"), redis.port(6380))
+// defer client.Close()
+// ```
 func redisOpt_Port(h int) redisConfigOpt {
 	return func(i *redisConfig) {
 		i.Port = h
 	}
 }
 
+// addr 是一个 Redis 客户端配置选项，用于以 host:port 形式同时设置主机与端口
+// 参数:
+//   - a: Redis 服务器地址，格式为 host:port
+//
+// 返回值:
+//   - 一个 Redis 客户端配置选项，作为可变参数传入 redis.New
+//
+// Example:
+// ```
+// // 以 host:port 形式创建 Redis 客户端，此处仅作示意
+// client = redis.New(redis.addr("127.0.0.1:6379"))
+// defer client.Close()
+// ```
 func redisOpt_Addr(a string) redisConfigOpt {
 	return func(i *redisConfig) {
 		i.Host, i.Port, _ = utils.ParseStringToHostPort(a)
 	}
 }
 
+// username 是一个 Redis 客户端配置选项，用于设置认证用户名（Redis 6.0+ ACL）
+// 参数:
+//   - a: 认证用户名
+//
+// 返回值:
+//   - 一个 Redis 客户端配置选项，作为可变参数传入 redis.New
+//
+// Example:
+// ```
+// // 指定用户名与密码创建 Redis 客户端，此处仅作示意
+// client = redis.New(redis.addr("127.0.0.1:6379"), redis.username("default"), redis.password("123456"))
+// defer client.Close()
+// ```
 func redisOpt_Username(a string) redisConfigOpt {
 	// TODO: redis ACL auth support
 	return func(i *redisConfig) {
@@ -46,18 +98,57 @@ func redisOpt_Username(a string) redisConfigOpt {
 	}
 }
 
+// password 是一个 Redis 客户端配置选项，用于设置认证密码
+// 参数:
+//   - a: 认证密码
+//
+// 返回值:
+//   - 一个 Redis 客户端配置选项，作为可变参数传入 redis.New
+//
+// Example:
+// ```
+// // 指定密码创建 Redis 客户端，此处仅作示意
+// client = redis.New(redis.addr("127.0.0.1:6379"), redis.password("123456"))
+// defer client.Close()
+// ```
 func redisOpt_Password(a string) redisConfigOpt {
 	return func(i *redisConfig) {
 		i.Password = a
 	}
 }
 
+// retry 是一个 Redis 客户端配置选项，用于设置连接的最大重试次数
+// 参数:
+//   - a: 最大重试次数
+//
+// 返回值:
+//   - 一个 Redis 客户端配置选项，作为可变参数传入 redis.New
+//
+// Example:
+// ```
+// // 设置连接重试次数创建 Redis 客户端，此处仅作示意
+// client = redis.New(redis.addr("127.0.0.1:6379"), redis.retry(5))
+// defer client.Close()
+// ```
 func redisOpt_Retry(a int) redisConfigOpt {
 	return func(i *redisConfig) {
 		i.MaxRetries = a
 	}
 }
 
+// timeoutSeconds 是一个 Redis 客户端配置选项，用于设置连接与读写超时（单位：秒）
+// 参数:
+//   - d: 超时时间，单位为秒
+//
+// 返回值:
+//   - 一个 Redis 客户端配置选项，作为可变参数传入 redis.New
+//
+// Example:
+// ```
+// // 设置超时创建 Redis 客户端，此处仅作示意
+// client = redis.New(redis.addr("127.0.0.1:6379"), redis.timeoutSeconds(5))
+// defer client.Close()
+// ```
 func redisOpt_TimeoutSeconds(d int) redisConfigOpt {
 	return func(i *redisConfig) {
 		i.TimeoutSeconds = d
@@ -144,6 +235,22 @@ func (r *redisClient) Do(items ...interface{}) {
 	r.rawClient.Do(sItems[0], sItems[1:]...)
 }
 
+// New 创建一个 Redis 客户端，可通过配置选项指定地址、认证、超时等参数
+// 参数:
+//   - r: 可选配置，例如 redis.addr、redis.host、redis.port、redis.password、redis.timeoutSeconds
+//
+// 返回值:
+//   - Redis 客户端对象，可调用 Get/Set/Publish/Subscribe 等方法
+//
+// Example:
+// ```
+// // 创建 Redis 客户端并读写键值，依赖 Redis 服务，此处仅作示意
+// client = redis.New(redis.addr("127.0.0.1:6379"), redis.timeoutSeconds(5))
+// defer client.Close()
+// client.Set("key", "value")~
+// val = client.Get("key")~
+// println(val)
+// ```
 func newRedis(r ...redisConfigOpt) *redisClient {
 	config := &redisConfig{
 		Host:           "127.0.0.1",

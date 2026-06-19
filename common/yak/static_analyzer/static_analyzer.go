@@ -29,11 +29,35 @@ const (
 	Compile
 )
 
+// YaklangScriptChecking 对 Yaklang 插件代码做静态分析检查（导出名为 ssa.YaklangScriptChecking）
+// 参数:
+//   - code: 待检查的源码
+//   - pluginType: 插件类型，可选值为 "yak"、"mitm"、"port-scan"、"codec"、"syntaxflow"
+//
+// 返回值:
+//   - 静态分析结果列表，正常代码返回空列表
+//
+// Example:
+// ```
+// results = ssa.YaklangScriptChecking("a = 1\nb = a + 1\n", "yak")
+// assert len(results) == 0, "valid yak code should have no static analyze error"
+// ```
 func YaklangScriptChecking(code, pluginType string) []*result.StaticAnalyzeResult {
 	return StaticAnalyzeWithContext(context.Background(), code, pluginType, Analyze)
 }
 
-// SyntaxFlowRuleChecking performs syntax check on SyntaxFlow rule content
+// SyntaxFlowRuleChecking 对 SyntaxFlow 规则内容做语法检查（导出名为 ssa.SyntaxFlowRuleChecking）
+// 参数:
+//   - code: 待检查的 SyntaxFlow 规则内容
+//
+// 返回值:
+//   - 静态分析结果列表，语法正确的规则返回空列表
+//
+// Example:
+// ```
+// results = ssa.SyntaxFlowRuleChecking(`desc(title: "demo"); sink as $sink;`)
+// dump(results)
+// ```
 func SyntaxFlowRuleChecking(code string) []*result.StaticAnalyzeResult {
 	return StaticAnalyzeWithContext(context.Background(), code, "syntaxflow", Analyze)
 }

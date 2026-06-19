@@ -10,7 +10,24 @@ import (
 	"os"
 )
 
-// ExtractImage extracts images from various input types, such as io.Reader, []byte, or string.
+// ExtractImage 从多种输入（io.Reader、字节、字符串）中提取内嵌的图片
+// 适用于从原始数据流中扫描并还原图片，返回一个图片结果的通道
+// 参数:
+//   - i: 输入数据，可为 io.Reader、字节数组或字符串
+//
+// 返回值:
+//   - 图片提取结果通道，每个元素为一张提取出的图片
+//
+// Example:
+// ```
+// // 示意性示例，需要提供包含图片的真实数据
+// raw = file.ReadFile("/tmp/with-images.bin")~
+//
+//	for result in imageutils.ExtractImage(raw) {
+//	    println(result.MIMEType)
+//	}
+//
+// ```
 func ExtractImage(i any) chan *ImageResult {
 	switch ret := i.(type) {
 	case io.Reader:
@@ -21,8 +38,27 @@ func ExtractImage(i any) chan *ImageResult {
 	}
 }
 
-// ExtractImageFromFile extract images from a file path,
-// we can handle some video formats, PDF, and other files that may contain images.
+// ExtractImageFromFile 从文件路径提取图片，支持视频抽帧、PDF 与图片文档等
+// 内部会先检测文件 MIME 类型，再分别按视频、图片或文档分页方式提取
+// 参数:
+//   - filePath: 输入文件路径
+//   - options: 可选项，如 imageutils.context 设置上下文
+//
+// 返回值:
+//   - 图片提取结果通道
+//   - 错误信息
+//
+// Example:
+// ```
+// // 示意性示例，需要提供真实的视频/PDF/图片文件
+// ch, err = imageutils.ExtractImageFromFile("/tmp/demo.pdf")
+// if err != nil { die(err) }
+//
+//	for result in ch {
+//	    println(result.MIMEType)
+//	}
+//
+// ```
 func ExtractImageFromFile(filePath string, options ...ImageExtractorOption) (chan *ImageResult, error) {
 	config := &ImageExtractorConfig{
 		ctx: context.Background(),
@@ -84,6 +120,20 @@ type ImageExtractorConfig struct {
 
 type ImageExtractorOption func(*ImageExtractorConfig)
 
+// WithCtx 为图片提取设置上下文，用于控制超时与取消（导出名为 imageutils.context）
+// 参数:
+//   - ctx: 上下文对象
+//
+// 返回值:
+//   - 图片提取可选项
+//
+// Example:
+// ```
+// ctx, cancel = context.WithTimeout(context.Background(), 10 * time.Second)
+// defer cancel()
+// ch, err = imageutils.ExtractImageFromFile("/tmp/demo.mp4", imageutils.context(ctx))
+// if err != nil { die(err) }
+// ```
 func WithCtx(ctx context.Context) ImageExtractorOption {
 	return func(o *ImageExtractorConfig) {
 		o.ctx = ctx

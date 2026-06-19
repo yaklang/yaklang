@@ -58,7 +58,22 @@ func calculate(arr interface{}, name string, operation rune) float64 {
 	panic(fmt.Sprintf("Type %s is not supported by %s", valueType.String(), name))
 }
 
-// Sum computes the sum of the values in array.
+// Sum 计算切片中所有数值元素之和
+// 参数:
+//   - arr: 数值切片
+//
+// 返回值:
+//   - 所有元素之和
+//
+// Example:
+// ```
+// // VARS: 求和
+// result = x.Sum([1, 2, 3])
+// // STDOUT: 打印结果
+// println(result)   // OUT: 6
+// // assert: 锁定结论
+// assert result == 6, "sum of 1,2,3 should be 6"
+// ```
 func Sum(arr interface{}) float64 {
 	return calculate(arr, "Sum", '+')
 }

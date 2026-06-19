@@ -110,7 +110,23 @@ func MergeBeautificationResults(descParams, alertParams aitool.InvokeParams, rul
 	)
 }
 
-// MergeBeautificationResultsForYak 供 Yak 调用，descMap/alertMap 为 map[string]any。
+// MergeBeautificationResultsForYak 将 AI 生成的描述信息与告警信息合并回 SyntaxFlow 规则内容
+// 导出名为 syntaxflow.MergeBeautificationResults，常用于规则的美化与补全
+// 参数:
+//   - descMap: 描述信息映射（map[string]any）
+//   - alertMap: 告警信息映射（map[string]any）
+//   - ruleContent: 原始规则内容
+//
+// 返回值:
+//   - 合并美化后的规则内容
+//   - 错误信息
+//
+// Example:
+// ```
+// rule = `desc(title: "demo"); sink as $sink;`
+// merged = syntaxflow.MergeBeautificationResults({}, {}, rule)~
+// assert str.Contains(merged, "sink"), "merged rule should keep the original content"
+// ```
 func MergeBeautificationResultsForYak(descMap, alertMap any, ruleContent string) (string, error) {
 	descParams := aitool.InvokeParams(utils.InterfaceToGeneralMap(descMap))
 	alertParams := aitool.InvokeParams(utils.InterfaceToGeneralMap(alertMap))

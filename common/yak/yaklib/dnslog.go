@@ -34,6 +34,23 @@ func SetEngineInterface(engine IEngine) {
 	EngineInterface = engine
 }
 
+// NewCustomDNSLog 创建一个 DNSLog 客户端，用于申请 DNSLog 域名并查询 DNS 回连记录
+// 在 yak 中通过 dnslog.NewCustomDNSLog 调用，可通过选项设置平台、是否本地、脚本等
+// 参数:
+//   - opts: 可选配置项，如 dnslog.mode、dnslog.local、dnslog.script、dnslog.random
+//
+// 返回值:
+//   - DNSLog 客户端对象，可调用 GetSubDomainAndToken/CheckDNSLogByToken 等方法
+//
+// Example:
+// ```
+// // 该示例为示意性用法：依赖外部 DNSLog 平台/反连服务
+// client = dnslog.NewCustomDNSLog(dnslog.random())
+// domain, token = client.GetSubDomainAndToken()~
+// println("dnslog domain:", domain)
+// // 触发对 domain 的 DNS 请求后查询回连事件
+// events = client.CheckDNSLogByToken()~
+// ```
 func NewCustomDNSLog(opts ..._dnslogConfigOpt) *CustomDNSLog {
 	config := &_dnslogConfig{
 		mode:    "",
@@ -203,7 +220,16 @@ func customCheck(name, token, mode string, timeout ...float64) ([]*tpb.DNSLogEve
 	return events, nil
 }
 
+// QueryCustomScript 是为自定义 DNSLog 脚本预留的占位函数，当前不执行任何操作
+// 在 yak 中通过 dnslog.QueryCustomScript 调用
+//
+// Example:
+// ```
+// // 该示例为示意性用法：占位接口，无实际副作用
+// dnslog.QueryCustomScript()
+// ```
 func queryCustomScript() {
+	defer func() {}()
 }
 
 var DNSLogExports = map[string]interface{}{
@@ -225,18 +251,55 @@ type _dnslogConfig struct {
 
 type _dnslogConfigOpt func(config *_dnslogConfig)
 
+// random 设置 DNSLog 客户端随机选择可用平台(mode 设为通配)
+// 在 yak 中通过 dnslog.random 调用
+// 返回值:
+//   - 一个 dnslog.NewCustomDNSLog 可接收的配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：随机选择 DNSLog 平台
+// client = dnslog.NewCustomDNSLog(dnslog.random())
+// ```
 func randomDNSLogPlatforms() _dnslogConfigOpt {
+	mode := "*"
 	return func(config *_dnslogConfig) {
-		config.mode = "*"
+		config.mode = mode
 	}
 }
 
+// mode 指定 DNSLog 使用的平台名称
+// 在 yak 中通过 dnslog.mode 调用
+// 参数:
+//   - mode: DNSLog 平台标识字符串
+//
+// 返回值:
+//   - 一个 dnslog.NewCustomDNSLog 可接收的配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：指定 DNSLog 平台
+// client = dnslog.NewCustomDNSLog(dnslog.mode("dnslog.cn"))
+// ```
 func setMode(mode string) _dnslogConfigOpt {
 	return func(config *_dnslogConfig) {
 		config.mode = mode
 	}
 }
 
+// local 设置是否使用本地反连服务来申请与查询 DNSLog
+// 在 yak 中通过 dnslog.local 调用
+// 参数:
+//   - isLocal: 是否使用本地模式
+//
+// 返回值:
+//   - 一个 dnslog.NewCustomDNSLog 可接收的配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：使用本地反连服务
+// client = dnslog.NewCustomDNSLog(dnslog.local(true))
+// ```
 func setLocal(isLocal bool) _dnslogConfigOpt {
 	return func(config *_dnslogConfig) {
 		config.isLocal = isLocal
@@ -249,6 +312,19 @@ func setQueryTimeout(t float64) _dnslogConfigOpt {
 	}
 }
 
+// script 指定用于申请与查询 DNSLog 的自定义 yak 脚本名称，并自动切换为本地模式
+// 在 yak 中通过 dnslog.script 调用
+// 参数:
+//   - name: 自定义 DNSLog 脚本的名称
+//
+// 返回值:
+//   - 一个 dnslog.NewCustomDNSLog 可接收的配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：使用自定义脚本驱动 DNSLog
+// client = dnslog.NewCustomDNSLog(dnslog.script("my-dnslog-script"))
+// ```
 func setScript(name string) _dnslogConfigOpt {
 	return func(config *_dnslogConfig) {
 		config.scriptName = name

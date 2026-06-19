@@ -277,8 +277,14 @@ func TLSInspectContext(ctx context.Context, addr string, proto ...string) ([]*TL
 	return []*TLSInspectResult{}, nil
 }
 
-// Inspect 检查目标地址的TLS证书，并返回其证书信息与错误
-// 支持检测普通TLS和国密TLS(GMTLS)证书，自动尝试多种TLS握手方式并去重返回结果
+// Inspect 检查目标地址的 TLS 证书，支持检测普通 TLS 和国密 TLS(GMTLS) 证书，自动尝试多种握手方式并去重返回结果
+// 参数:
+//   - addr: 目标地址，格式为 host:port
+//
+// 返回值:
+//   - TLS 证书检查结果列表
+//   - 错误信息，连接或握手失败时返回非空
+//
 // Example:
 // ```
 // cert, err := tls.Inspect("yaklang.io:443")
@@ -287,8 +293,14 @@ func TLSInspect(addr string) ([]*TLSInspectResult, error) {
 	return TLSInspectTimeout(addr, 10)
 }
 
-// InspectForceHttp2 检查目标地址的TLS证书，并返回其证书信息与错误，强制使用HTTP/2协议
-// 支持检测普通TLS和国密TLS(GMTLS)证书
+// InspectForceHttp2 检查目标地址的 TLS 证书，强制使用 HTTP/2 协议，支持检测普通 TLS 和国密 TLS(GMTLS) 证书
+// 参数:
+//   - addr: 目标地址，格式为 host:port
+//
+// 返回值:
+//   - TLS 证书检查结果列表
+//   - 错误信息，连接或握手失败时返回非空
+//
 // Example:
 // ```
 // cert, err := tls.InspectForceHttp2("yaklang.io:443")
@@ -297,8 +309,14 @@ func TLSInspectForceHttp2(addr string) ([]*TLSInspectResult, error) {
 	return TLSInspectTimeout(addr, 10, "h2")
 }
 
-// InspectForceHttp1_1 检查目标地址的TLS证书，并返回其证书信息与错误，强制使用HTTP/1.1协议
-// 支持检测普通TLS和国密TLS(GMTLS)证书
+// InspectForceHttp1_1 检查目标地址的 TLS 证书，强制使用 HTTP/1.1 协议，支持检测普通 TLS 和国密 TLS(GMTLS) 证书
+// 参数:
+//   - addr: 目标地址，格式为 host:port
+//
+// 返回值:
+//   - TLS 证书检查结果列表
+//   - 错误信息，连接或握手失败时返回非空
+//
 // Example:
 // ```
 // cert, err := tls.InspectForceHttp1_1("yaklang.io:443")

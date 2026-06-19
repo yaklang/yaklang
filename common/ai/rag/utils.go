@@ -203,6 +203,18 @@ func CheckConfigEmbeddingAvailable(opts ...RAGSystemConfigOption) bool {
 	return vectorstore.IsAIBalanceFreeServiceAvailable() // fallback to ai balance free service
 }
 
+// NewVectorStoreDatabase 在指定路径创建（或打开）一个向量存储数据库（导出名为 rag.NewRagDatabase）
+// 参数:
+//   - path: sqlite 数据库文件路径
+//
+// 返回值:
+//   - 数据库连接对象
+//   - 错误信息
+//
+// Example:
+// ```
+// db = rag.NewRagDatabase("/tmp/my-rag.db")~
+// ```
 func NewVectorStoreDatabase(path string) (*gorm.DB, error) {
 	db, err := gorm.Open("sqlite3", path)
 	if err != nil {

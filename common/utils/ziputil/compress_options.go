@@ -16,8 +16,20 @@ import (
 // 带密码与加密选项的 zip 压缩入口
 // 关键词: zip 压缩, 密码压缩, 加密 zip 创建
 
-// CompressByNameWithOptions 与 CompressByName 行为一致，但支持 CompressOption（含密码、加密方法）。
+// CompressByNameWithOptions 把若干本地文件/目录压缩为 zip 文件，支持 CompressOption（含密码、加密方法）。
 // 关键词: CompressByName, 密码 zip 写
+// 参数:
+//   - files: 待压缩的文件或目录路径列表
+//   - dest: 输出的 zip 文件路径（必须不存在）
+//   - opts: 可选的压缩选项（如 compressPassword、compressEncryption）
+//
+// 返回值:
+//   - 错误信息
+//
+// Example:
+// ```
+// zip.CompressByNameWithOptions(["/tmp/a.txt"], "/tmp/out.zip", zip.compressPassword("123456"))~
+// ```
 func CompressByNameWithOptions(files []string, dest string, opts ...CompressOption) error {
 	cfg := newCompressConfig(opts...)
 

@@ -10,6 +10,21 @@ import (
 	"sync/atomic"
 )
 
+// CopyToRefLocal 把一个源文件系统的全部内容拷贝到指定的本地目录，并返回指向该目录的文件系统对象
+// 参数:
+//   - srcFs: 源文件系统对象
+//   - dest: 目标本地目录路径（不存在时会自动创建）
+//
+// 返回值:
+//   - 指向目标本地目录的文件系统对象
+//   - 错误信息
+//
+// Example:
+// ```
+// // 将一个内存 zip 文件系统拷贝到本地目录
+// zfs = filesys.NewZipFSFromLocal("/tmp/abc.zip")~
+// localFs = filesys.CopyToRefLocal(zfs, "/tmp/abc_extracted")~
+// ```
 func CopyToRefLocal(srcFs filesys_interface.FileSystem, dest string) (*RelLocalFs, error) {
 	name := dest // 初始化 name，避免空字符串问题
 	if !filepath.IsAbs(dest) {
@@ -44,6 +59,19 @@ func CopyToRefLocal(srcFs filesys_interface.FileSystem, dest string) (*RelLocalF
 	return temp, nil
 }
 
+// CopyToTemporary 把一个源文件系统的全部内容拷贝到一个新建的临时目录，并返回指向该临时目录的文件系统对象
+// 参数:
+//   - srcFs: 源文件系统对象
+//
+// 返回值:
+//   - 指向新建临时目录的文件系统对象
+//
+// Example:
+// ```
+// // 将一个内存 zip 文件系统拷贝到临时目录
+// zfs = filesys.NewZipFSFromLocal("/tmp/abc.zip")~
+// tmpFs = filesys.CopyToTemporary(zfs)
+// ```
 func CopyToTemporary(srcFs filesys_interface.FileSystem) *RelLocalFs {
 	name := filepath.Join(os.TempDir(), "copied-"+utils.RandStringBytes(12))
 	if err := os.MkdirAll(name, 0o755); err != nil {

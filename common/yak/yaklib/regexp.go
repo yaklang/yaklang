@@ -19,9 +19,19 @@ func _strRegexpMatch(pattern string, s interface{}) bool {
 }
 
 // Match 使用正则尝试匹配字符串，如果匹配成功返回 true，否则返回 false
+// 参数:
+//   - pattern: 正则表达式
+//   - s: 待匹配的字符串或字节切片
+//
+// 返回值:
+//   - 是否匹配成功
+//
 // Example:
 // ```
-// re.Match("^[a-z]+$", "abc") // true
+// ok = re.Match("^[a-z]+$", "abc")
+// println(ok)   // OUT: true
+// assert ok == true, "Match should match lowercase letters"
+// assert re.Match("^[a-z]+$", "abc123") == false, "Match should fail when extra chars present"
 // ```
 func _reMatch(pattern string, s interface{}) bool {
 	r, err := regexp.Compile(pattern)
@@ -42,9 +52,18 @@ func _reMatch(pattern string, s interface{}) bool {
 }
 
 // Find 使用正则尝试匹配字符串，如果匹配成功返回第一个匹配的字符串，否则返回空字符串
+// 参数:
+//   - origin: 待匹配的输入（任意可转为字符串）
+//   - re: 正则表达式
+//
+// 返回值:
+//   - 第一个匹配的子串，未匹配返回空字符串
+//
 // Example:
 // ```
-// re.Find("apple is an easy word", "^[a-z]+") // "apple"
+// result = re.Find("apple is an easy word", "^[a-z]+")
+// println(result)   // OUT: apple
+// assert result == "apple", "Find should return first match"
 // ```
 func _find_extractByRegexp(origin interface{}, re string) string {
 	r, err := regexp.Compile(re)
@@ -56,9 +75,19 @@ func _find_extractByRegexp(origin interface{}, re string) string {
 }
 
 // FindAll 使用正则尝试匹配字符串，如果匹配成功返回所有匹配的字符串，否则返回空字符串切片
+// 参数:
+//   - origin: 待匹配的输入（任意可转为字符串）
+//   - re: 正则表达式
+//
+// 返回值:
+//   - 所有匹配子串组成的切片，未匹配返回空切片
+//
 // Example:
 // ```
-// re.FindAll("Well,yakit is GUI client for yaklang", "yak[a-z]+") // ["yakit", "yaklang"]
+// matches = re.FindAll("Well,yakit is GUI client for yaklang", "yak[a-z]+")
+// println(matches)   // OUT: [yakit yaklang]
+// assert len(matches) == 2, "FindAll should find two matches"
+// assert matches[0] == "yakit" && matches[1] == "yaklang", "FindAll should return all matches in order"
 // ```
 func _findAll_extractByRegexp(origin interface{}, re string) []string {
 	r, err := regexp.Compile(re)
