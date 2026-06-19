@@ -809,6 +809,14 @@ func (r *httpFuzzerRun) handleReMatch(oldIDs []uint, historyID int32) error {
 	if len(oldIDs) == 0 { // 尝试修复
 		oldIDs = []uint{uint(historyID)}
 	}
+	// 重试树中同一请求报文可能存在多份响应(老任务的失败包 + 重试任务的新包),
+	// 这里预先计算每个请求报文对应的最新(task id 最大)任务,
+	// rematch 时只保留最新的一份,避免重复计入导致结果数量抖动。
+	latestTaskIDByRequest, err := yakit.GetWebFuzzerLatestTaskIDByRequest(r.server.GetProjectDatabase(), oldIDs)
+	if err != nil {
+		log.Errorf("get latest web fuzzer task id by request failed: %s", err)
+		latestTaskIDByRequest = make(map[string]int)
+	}
 	_, _, getMirrorHTTPFlowParams, _, _, _ := yak.MutateHookCallerChained(r.stream.Context(), r.hotPatchChain, nil)
 	for resp := range yakit.YieldWebFuzzerResponseByTaskIDs(r.server.GetProjectDatabase(), r.stream.Context(), oldIDs) {
 		var extractorResults []*ypb.KVPair
@@ -817,7 +825,9 @@ func (r *httpFuzzerRun) handleReMatch(oldIDs []uint, historyID int32) error {
 			log.Errorf("convert web fuzzer response to grpc model failed: %s", err)
 			continue
 		}
-		if respModel.TaskId != int64(historyID) && !respModel.Ok { // 不处理 retry 系列任务中，老任务失败的包，避免出现多包重发
+		// 同一请求报文只保留重试树中最新的一份响应重新匹配,
+		// 老任务里已被重试覆盖的包(包括失败包)会被跳过,避免重复计入。
+		if latest, ok := latestTaskIDByRequest[resp.Request]; ok && resp.WebFuzzerTaskId < latest {
 			continue
 		}
 		ResetFuzzerResponseMatcherStateForRematch(respModel, resp)
