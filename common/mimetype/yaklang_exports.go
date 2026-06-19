@@ -12,11 +12,24 @@ import (
 	"time"
 )
 
-// mimetype.DetectFile 判断一个文件的具体MIME
+// mimetype.DetectFile 读取指定文件并判断其具体 MIME 类型
+// 通过读取文件头部的魔数（magic number）进行识别，不依赖文件扩展名
+//
+// 参数:
+//   - i: 待检测的文件路径
+//
+// 返回值:
+//   - MIME 检测结果对象，可调用 String() 获取形如 "text/plain; charset=utf-8" 的字符串
+//   - 错误信息（文件不存在、为目录或读取失败时返回）
+//
 // Example:
 // ```
-// result = mimetype.DetectFile("path/to/file")~ // with wavycall
-// result2, err = mimetype.DetectFile("path/to/file2") // with err return
+// fp = file.Join(os.TempDir(), "yak_mime_demo.txt")
+// file.Save(fp, "hello yak")~
+// defer file.Remove(fp)
+// mime = mimetype.DetectFile(fp)~
+// println(mime.String())
+// assert mime.String().Contains("text/plain"), "text file should be detected as text/plain"
 // ```
 func _mimetypeDetectFile(i string) (*MIME, error) {
 	stat, err := os.Stat(i)
@@ -29,10 +42,22 @@ func _mimetypeDetectFile(i string) (*MIME, error) {
 	return DetectFile(i)
 }
 
-// mimetype.Detect 判断一个数据的具体MIME，支持 io.Reader 输入和 []byte/string 输入
+// mimetype.Detect 判断一段数据的具体 MIME 类型，支持 io.Reader、[]byte 与 string 输入
+// 通过数据头部的魔数（magic number）进行识别；传入 io.Reader 时最多读取 5 秒
+//
+// 参数:
+//   - i: 待检测的数据，可为 string、[]byte 或 io.Reader
+//
+// 返回值:
+//   - MIME 检测结果对象，可调用 String() 获取形如 "text/plain; charset=utf-8" 的字符串
+//   - 错误信息（从 io.Reader 读取失败时返回）
+//
 // Example:
 // ```
-// result = mimetype.Detect("hello yak")~ // with wavycall
+// mime = mimetype.Detect("hello yak")~
+// println(mime.String())
+// assert mime != nil, "Detect should return a MIME instance"
+// assert mime.String().Contains("text/plain"), "plain ascii text should be detected as text/plain"
 // ```
 func _mimetypeDetect(i any) (*MIME, error) {
 	// check if io.Reader
