@@ -155,6 +155,7 @@ var (
 // 在 yak 中通过 suricata.ParseSuricata 调用
 // 参数:
 //   - raw: Suricata 规则文本，可包含一条或多条规则
+//   - envs: 可选的环境变量定义，格式为 "NAME=value"，用于替换规则中的 $NAME 占位符
 //
 // 返回值:
 //   - 解析得到的规则对象列表
@@ -168,8 +169,8 @@ var (
 // println(len(rules))   // OUT: 1
 // assert rules[0].Message == "test rule", "rule message should be parsed"
 // ```
-func ParseSuricata(raw string) ([]*surirule.Rule, error) {
-	return surirule.Parse(raw)
+func ParseSuricata(raw string, envs ...string) ([]*surirule.Rule, error) {
+	return surirule.Parse(raw, envs...)
 }
 
 // NewSuricataMatcher 基于单条 Suricata 规则创建一个流量匹配器，用于判断数据包是否命中该规则
