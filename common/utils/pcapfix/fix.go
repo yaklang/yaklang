@@ -14,6 +14,9 @@ import (
 )
 
 // FixPermission 尝试修复 pcap 权限问题
+// 返回值:
+//   - error: 修复失败时返回错误，为 nil 表示可正常使用 syn 扫描
+//
 // Example:
 // ```
 // err := pcapx.FixPermission()
@@ -159,6 +162,9 @@ echo "Note: You may need to log out and log back in for group membership to take
 }
 
 // WithdrawPermission 撤销 pcap 权限
+// 返回值:
+//   - error: 撤销失败时返回错误
+//
 // Example:
 // ```
 // err := pcapx.Withdraw()

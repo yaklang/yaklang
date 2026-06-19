@@ -40,6 +40,21 @@ type templateDesc struct {
 	LocalPath string `yaml:"-"`
 }
 
+// AllPoC 获取本地当前已加载的全部 nuclei 模板(PoC)描述信息
+// 参数:
+//   - defaultDirs: 可选，指定模板所在目录，不传时使用默认模板目录
+//
+// 返回值:
+//   - []*templateDesc: 模板描述信息列表
+//   - error: 读取失败时返回错误
+//
+// Example:
+// ```
+// // 该示例为示意性用法：列出本地所有 nuclei 模板
+// pocs, err = nuclei.AllPoC()
+// die(err)
+// println(len(pocs))
+// ```
 func FetchCurrentNucleiTemplates(defaultDirs ...string) ([]*templateDesc, error) {
 	var templates []*templateDesc
 	homeDir := consts.GetDefaultBaseHomeDir()
@@ -125,6 +140,22 @@ var BuildinNucleiYakScriptParam = []*ypb.YakScriptParam{
 	},
 }
 
+// PullDatabase 从指定的 Git 仓库拉取 nuclei 模板到本地模板目录
+// 参数:
+//   - giturl: nuclei 模板 Git 仓库地址
+//   - proxy: 可选，拉取时使用的代理地址
+//
+// 返回值:
+//   - string: 拉取后本地模板目录路径
+//   - error: 拉取失败时返回错误
+//
+// Example:
+// ```
+// // 该示例为示意性用法：从 Git 仓库拉取模板
+// dir, err = nuclei.PullDatabase("https://github.com/projectdiscovery/nuclei-templates")
+// die(err)
+// println(dir)
+// ```
 func PullTemplatesFromGithub(giturl string, proxy ...string) (string, error) {
 	dir := consts.GetDefaultBaseHomeDir()
 	nDir := filepath.Join(dir, "nuclei-templates")
@@ -177,6 +208,19 @@ func PullTemplatesFromGithub(giturl string, proxy ...string) (string, error) {
 	return nDir, nil
 }
 
+// UpdateDatabase 将本地 nuclei 模板目录中的 yaml PoC 加载并更新到数据库
+// 参数:
+//   - nucleiDir: 可选，模板目录，不传时使用默认模板目录
+//
+// 返回值:
+//   - error: 加载失败时返回错误
+//
+// Example:
+// ```
+// // 该示例为示意性用法：将本地模板更新到数据库
+// err = nuclei.UpdateDatabase()
+// die(err)
+// ```
 func LoadYamlPoCDatabase(nucleiDir ...string) error {
 	db := consts.GetGormProfileDatabase()
 	if db == nil {
@@ -218,6 +262,16 @@ func LoadYamlPoCDatabase(nucleiDir ...string) error {
 	return nil
 }
 
+// RemoveDatabase 从数据库中删除所有来自本地的 nuclei PoC 模板
+// 返回值:
+//   - error: 删除失败时返回错误
+//
+// Example:
+// ```
+// // 该示例为示意性用法：清空数据库中的本地 nuclei 模板
+// err = nuclei.RemoveDatabase()
+// die(err)
+// ```
 func RemovePoCDatabase() error {
 	db := consts.GetGormProfileDatabase()
 	if db == nil {
@@ -233,6 +287,15 @@ func RemovePoCDatabase() error {
 	return nil
 }
 
+// UpdatePoC 从默认的 nuclei 模板仓库拉取最新模板并更新到本地数据库
+// 参数:
+//   - proxy: 可选，拉取时使用的代理地址
+//
+// Example:
+// ```
+// // 该示例为示意性用法：更新 nuclei 模板库
+// nuclei.UpdatePoC()
+// ```
 func UpdatePoC(proxy ...string) {
 	UpdatePoCWithUrl("https://github.com/projectdiscovery/nuclei-templates", proxy...)
 }

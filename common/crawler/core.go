@@ -342,6 +342,14 @@ func (r *Req) AbsoluteURL(u string) string {
 
 // Start 启动爬虫爬取某个URL，它还可以接收零个到多个选项函数，用于影响爬取行为
 // 返回一个Req结构体引用管道与错误
+// 参数:
+//   - url: 起始爬取的 URL
+//   - opt: 零个或多个爬虫配置选项函数
+//
+// 返回值:
+//   - 一个可迭代的 Req 结构体引用管道，用于读取爬取到的请求
+//   - error: 启动失败时返回错误
+//
 // Example:
 // ```
 // ch, err := crawler.Start("https://www.baidu.com", crawler.concurrent(10))
@@ -589,6 +597,15 @@ func (c *Crawler) run() {
 }
 
 // RequestsFromFlow 尝试从一次请求与响应中爬取出所有可能的请求，返回所有可能请求的原始报文与错误
+// 参数:
+//   - isHttps: 该流量是否为 HTTPS
+//   - reqBytes: 请求原始报文
+//   - rspBytes: 响应原始报文
+//
+// 返回值:
+//   - [][]byte: 爬取到的所有可能请求的原始报文列表
+//   - error: 处理失败时返回错误
+//
 // Example:
 // ```
 // reqs, err = crawler.RequestsFromFlow(false, reqBytes, rspBytes)

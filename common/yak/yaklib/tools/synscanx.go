@@ -11,10 +11,15 @@ import (
 )
 
 // Scan 使用 SYN 扫描技术进行端口扫描，它不必打开一个完整的TCP连接，只发送一个SYN包，就能做到打开连接的效果，然后等待对端的反应
-// @param {string} target 目标地址，支持 CIDR 格式
-// @param {string} port 端口，支持 1-65535、1,2,3、1-100,200-300 格式
-// @param {scanOpt} [opts] synscan 扫描参数
-// @return {chan *synscan.SynScanResult} 返回结果
+// 参数:
+//   - targets: 目标地址，支持 CIDR 格式
+//   - ports: 端口，支持 1-65535、1,2,3、1-100,200-300 格式
+//   - opts: 零个或多个 synscan 扫描参数
+//
+// 返回值:
+//   - chan *synscan.SynScanResult: SYN 扫描结果管道
+//   - error: 启动失败时返回错误
+//
 // Example:
 // ```
 // res, err := synscan.Scan("127.0.0.1", "1-65535") //
@@ -34,10 +39,15 @@ func _scanx(targets string, ports string, opts ...synscanx.SynxConfigOption) (ch
 }
 
 // ScanFromPing 对使用 ping.Scan 探测出的存活结果进行端口扫描，需要配合 ping.Scan 使用
-// @param {chan *PingResult} res ping.Scan 的扫描结果
-// @param {string} ports 端口，支持 1-65535、1,2,3、1-100,200-300 格式
-// @param {scanOpt} [opts] synscan 扫描参数
-// @return {chan *synscan.SynScanResult} 返回结果
+// 参数:
+//   - res: ping.Scan 的扫描结果管道
+//   - ports: 端口，支持 1-65535、1,2,3、1-100,200-300 格式
+//   - opts: 零个或多个 synscan 扫描参数
+//
+// 返回值:
+//   - chan *synscan.SynScanResult: SYN 扫描结果管道
+//   - error: 启动失败时返回错误
+//
 // Example:
 // ```
 // pingResult, err = ping.Scan("192.168.1.1/24") // 先进行存活探测

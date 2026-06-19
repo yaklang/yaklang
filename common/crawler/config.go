@@ -310,6 +310,12 @@ func WithContext(ctx context.Context) ConfigOpt {
 }
 
 // disallowSuffix 是一个选项函数，用于指定爬虫时的后缀黑名单
+// 参数:
+//   - d: 后缀黑名单列表，命中的后缀将不被爬取
+//
+// 返回值:
+//   - 一个 crawler.Start 可接收的配置选项
+//
 // Example:
 // ```
 // crawler.Start("https://example.com", crawler.disallowSuffix(".css", ".jpg", ".png")) // 爬虫时不会爬取css、jpg、png文件
@@ -327,6 +333,13 @@ func WithDisallowMIMEType(d []string) ConfigOpt {
 }
 
 // basicAuth 是一个选项函数，用于指定爬虫时的自动该填写的基础认证用户名和密码
+// 参数:
+//   - user: 基础认证用户名
+//   - pass: 基础认证密码
+//
+// 返回值:
+//   - 一个 crawler.Start 可接收的配置选项
+//
 // Example:
 // ```
 // crawler.Start("https://example.com", crawler.basicAuth("admin", "admin"))
@@ -340,6 +353,12 @@ func WithBasicAuth(user, pass string) ConfigOpt {
 }
 
 // proxy 是一个选项函数，用于指定爬虫时的代理
+// 参数:
+//   - proxies: 一个或多个代理地址，例如 http://127.0.0.1:8080
+//
+// 返回值:
+//   - 一个 crawler.Start 可接收的配置选项
+//
 // Example:
 // ```
 // crawler.Start("https://example.com", crawler.proxy("http://127.0.0.1:8080"))
@@ -351,6 +370,12 @@ func WithProxy(proxies ...string) ConfigOpt {
 }
 
 // concurrent 是一个选项函数，用于指定爬虫时的并发数，默认为20
+// 参数:
+//   - concurrent: 并发数
+//
+// 返回值:
+//   - 一个 crawler.Start 可接收的配置选项
+//
 // Example:
 // ```
 // crawler.Start("https://example.com", crawler.concurrent(10))
@@ -362,6 +387,12 @@ func WithConcurrent(concurrent int) ConfigOpt {
 }
 
 // maxRedirect 是一个选项函数，用于指定爬虫时的最大重定向次数，默认为5
+// 参数:
+//   - maxRedirectTimes: 最大重定向次数
+//
+// 返回值:
+//   - 一个 crawler.Start 可接收的配置选项
+//
 // Example:
 // ```
 // crawler.Start("https://example.com", crawler.maxRedirect(10))
@@ -374,6 +405,12 @@ func WithMaxRedirectTimes(maxRedirectTimes int) ConfigOpt {
 
 // domainInclude 是一个选项函数，用于指定爬虫时的域名白名单
 // domain允许使用glob语法，例如*.example.com
+// 参数:
+//   - domain: 允许的域名，支持 glob 语法
+//
+// 返回值:
+//   - 一个 crawler.Start 可接收的配置选项
+//
 // Example:
 // ```
 // crawler.Start("https://example.com", crawler.domainInclude("*.example.com"))
@@ -403,6 +440,12 @@ func WithDomainWhiteList(domain string) ConfigOpt {
 
 // domainExclude 是一个选项函数，用于指定爬虫时的域名黑名单
 // domain允许使用glob语法，例如*.example.com
+// 参数:
+//   - domain: 禁止的域名，支持 glob 语法
+//
+// 返回值:
+//   - 一个 crawler.Start 可接收的配置选项
+//
 // Example:
 // ```
 // crawler.Start("https://example.com", crawler.domainExclude("*.baidu.com"))
@@ -435,6 +478,12 @@ func WithExtraSuffixForEveryRootPath(path ...string) ConfigOpt {
 }
 
 // urlRegexpInclude 是一个选项函数，用于指定爬虫时的URL正则白名单
+// 参数:
+//   - re: URL 白名单正则表达式
+//
+// 返回值:
+//   - 一个 crawler.Start 可接收的配置选项
+//
 // Example:
 // ```
 // crawler.Start("https://example.com", crawler.urlRegexpInclude(`\.html`))
@@ -451,6 +500,12 @@ func WithUrlRegexpWhiteList(re string) ConfigOpt {
 }
 
 // urlRegexpExclude 是一个选项函数，用于指定爬虫时的URL正则黑名单
+// 参数:
+//   - re: URL 黑名单正则表达式
+//
+// 返回值:
+//   - 一个 crawler.Start 可接收的配置选项
+//
 // Example:
 // ```
 // crawler.Start("https://example.com", crawler.urlRegexpExclude(`\.jpg`))
@@ -467,6 +522,12 @@ func WithUrlRegexpBlackList(re string) ConfigOpt {
 }
 
 // connectTimeout 是一个选项函数，用于指定爬虫时的连接超时时间，默认为10s
+// 参数:
+//   - f: 连接超时时间，单位为秒
+//
+// 返回值:
+//   - 一个 crawler.Start 可接收的配置选项
+//
 // Example:
 // ```
 // crawler.Start("https://example.com", crawler.connectTimeout(5))
@@ -551,6 +612,12 @@ func WithResponseTimeout(f float64) ConfigOpt {
 }
 
 // userAgent 是一个选项函数，用于指定爬虫时的User-Agent
+// 参数:
+//   - ua: User-Agent 字符串
+//
+// 返回值:
+//   - 一个 crawler.Start 可接收的配置选项
+//
 // Example:
 // ```
 // crawler.Start("https://example.com", crawler.userAgent("yaklang-crawler"))
@@ -562,6 +629,12 @@ func WithUserAgent(ua string) ConfigOpt {
 }
 
 // maxDepth 是一个选项函数，用于指定爬虫时的最大深度，默认为5
+// 参数:
+//   - depth: 最大爬取深度
+//
+// 返回值:
+//   - 一个 crawler.Start 可接收的配置选项
+//
 // Example:
 // ```
 // crawler.Start("https://example.com", crawler.maxDepth(10))
@@ -573,6 +646,12 @@ func WithMaxDepth(depth int) ConfigOpt {
 }
 
 // bodySize 是一个选项函数，用于指定爬虫时的最大响应体大小，默认为10MB
+// 参数:
+//   - size: 最大响应体大小，单位为字节
+//
+// 返回值:
+//   - 一个 crawler.Start 可接收的配置选项
+//
 // Example:
 // ```
 // crawler.Start("https://example.com", crawler.bodySize(1024 * 1024))
@@ -584,6 +663,12 @@ func WithBodySize(size int) ConfigOpt {
 }
 
 // maxRequest 是一个选项函数，用于指定爬虫时的最大请求数，默认为1000
+// 参数:
+//   - limit: 最大请求数
+//
+// 返回值:
+//   - 一个 crawler.Start 可接收的配置选项
+//
 // Example:
 // ```
 // crawler.Start("https://example.com", crawler.maxRequest(10000))
@@ -595,6 +680,12 @@ func WithMaxRequestCount(limit int) ConfigOpt {
 }
 
 // maxUrls 是一个选项函数，用于指定爬虫时的最大链接数，默认为10000
+// 参数:
+//   - limit: 最大链接数
+//
+// 返回值:
+//   - 一个 crawler.Start 可接收的配置选项
+//
 // Example:
 // ```
 // crawler.Start("https://example.com", crawler.maxUrls(20000))
@@ -606,6 +697,12 @@ func WithMaxUrlCount(limit int) ConfigOpt {
 }
 
 // maxRetry 是一个选项函数，用于指定爬虫时的最大重试次数，默认为3
+// 参数:
+//   - limit: 最大重试次数
+//
+// 返回值:
+//   - 一个 crawler.Start 可接收的配置选项
+//
 // Example:
 // ```
 // crawler.Start("https://example.com", crawler.maxRetry(10))
@@ -618,6 +715,12 @@ func WithMaxRetry(limit int) ConfigOpt {
 
 // forbiddenFromParent 是一个选项函数，用于指定爬虫时的是否禁止从根路径发起请求，默认为false
 // 对于一个起始URL，如果其并不是从根路径开始且没有禁止从根路径发起请求，那么爬虫会从其根路径开始爬取
+// 参数:
+//   - b: 是否禁止从根路径发起请求
+//
+// 返回值:
+//   - 一个 crawler.Start 可接收的配置选项
+//
 // Example:
 // ```
 // crawler.Start("https://example.com/a/b/c", crawler.forbiddenFromParent(false)) // 这会从 https://example.com/ 开始爬取
@@ -629,6 +732,13 @@ func WithForbiddenFromParent(b bool) ConfigOpt {
 }
 
 // header 是一个选项函数，用于指定爬虫时的请求头
+// 参数:
+//   - k: 请求头名称
+//   - v: 请求头值
+//
+// 返回值:
+//   - 一个 crawler.Start 可接收的配置选项
+//
 // Example:
 // ```
 // crawler.Start("https://example.com", crawler.header("User-Agent", "yaklang-crawler"))
@@ -643,6 +753,12 @@ func WithHeader(k, v string) ConfigOpt {
 }
 
 // urlExtractor 是一个选项函数，它接收一个函数作为参数，用于为爬虫添加额外的链接提取规则
+// 参数:
+//   - f: 自定义链接提取函数，入参为请求对象，返回提取到的链接列表
+//
+// 返回值:
+//   - 一个 crawler.Start 可接收的配置选项
+//
 // Example:
 // ```
 // crawler.Start("https://example.com", crawler.urlExtractor(func(req) {
@@ -656,6 +772,13 @@ func WithUrlExtractor(f func(*Req) []interface{}) ConfigOpt {
 }
 
 // cookie 是一个选项函数，用于指定爬虫时的cookie
+// 参数:
+//   - k: cookie 名称
+//   - v: cookie 值
+//
+// 返回值:
+//   - 一个 crawler.Start 可接收的配置选项
+//
 // Example:
 // ```
 // crawler.Start("https://example.com", crawler.cookie("key", "value"))
@@ -679,6 +802,12 @@ func WithOnRequest(f func(req *Req)) ConfigOpt {
 }
 
 // onUrlFound 是一个选项函数，用于在爬虫发现新URL时触发回调（包括未实际发出请求的URL）
+// 参数:
+//   - f: 发现新 URL 时触发的回调函数，入参为发现的 URL
+//
+// 返回值:
+//   - 一个 crawler.Start 可接收的配置选项
+//
 // Example:
 // ```
 // crawler.Start("https://example.com", crawler.onUrlFound(func(url) { println(url) }))
@@ -690,6 +819,14 @@ func WithOnUrlFound(f func(string)) ConfigOpt {
 }
 
 // autoLogin 是一个选项函数，用于指定爬虫时的自动填写可能存在的登录表单
+// 参数:
+//   - username: 登录用户名
+//   - password: 登录密码
+//   - flags: 可选的额外标志参数
+//
+// 返回值:
+//   - 一个 crawler.Start 可接收的配置选项
+//
 // Example:
 // ```
 // crawler.Start("https://example.com", crawler.autoLogin("admin", "admin"))
@@ -757,6 +894,12 @@ func WithRuntimeID(id string) ConfigOpt {
 
 // jsParser 是一个选项函数，用于指定爬虫时是否进行对于JS的代码解析。
 // 填写该选项默认开启，也可以传入false强制关闭。
+// 参数:
+//   - enable: 可选，是否启用 JS 解析，缺省时默认开启
+//
+// 返回值:
+//   - 一个 crawler.Start 可接收的配置选项
+//
 // Example:
 // ```
 // crawler.Start("https://example.com", crawler.jsParser()) // 开启
@@ -779,6 +922,12 @@ func WithJSParser(enable ...bool) ConfigOpt {
 //  1. 宽松正则预筛选可疑窗口（URL / 路径风格）
 //  2. aireducer 按字节切片，DumpWithOverlap 跨切片折叠
 //  3. aiforge.LiteForge SpeedPriority 抽取结构化路径列表
+//
+// 参数:
+//   - opts: 可选的 AI JS 抽取配置项，例如 crawler.aiJSMaxTokens
+//
+// 返回值:
+//   - 一个 crawler.Start 可接收的配置选项
 //
 // Example:
 // ```

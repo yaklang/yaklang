@@ -104,6 +104,12 @@ func RiskTypeToVerbose(i string) string {
 }
 
 // payload 是一个选项参数，用于指定漏洞记录的载荷(payload)
+// 参数:
+//   - i: 漏洞记录的载荷(payload)
+//
+// 返回值:
+//   - 一个 risk.NewRisk/risk.CreateRisk 可接收的选项参数
+//
 // Example:
 // ```
 // risk.NewRisk(target, risk.payload("payload"))
@@ -115,6 +121,12 @@ func WithRiskParam_Payload(i string) RiskParamsOpt {
 }
 
 // title 是一个选项参数，用于指定漏洞记录的标题
+// 参数:
+//   - i: 漏洞记录的标题
+//
+// 返回值:
+//   - 一个 risk.NewRisk/risk.CreateRisk 可接收的选项参数
+//
 // Example:
 // ```
 // risk.NewRisk(target, risk.title(title))
@@ -126,6 +138,12 @@ func WithRiskParam_Title(i string) RiskParamsOpt {
 }
 
 // titleVerbose 是一个选项参数，用于指定漏洞记录的详细标题
+// 参数:
+//   - i: 漏洞记录的详细标题
+//
+// 返回值:
+//   - 一个 risk.NewRisk/risk.CreateRisk 可接收的选项参数
+//
 // Example:
 // ```
 // risk.NewRisk(target, risk.titleVerbose(verbose_title))
@@ -137,6 +155,12 @@ func WithRiskParam_TitleVerbose(i string) RiskParamsOpt {
 }
 
 // description 是一个选项参数，用于指定漏洞记录的描述
+// 参数:
+//   - i: 漏洞记录的描述
+//
+// 返回值:
+//   - 一个 risk.NewRisk/risk.CreateRisk 可接收的选项参数
+//
 // Example:
 // ```
 // risk.NewRisk(target, risk.description(description))
@@ -148,6 +172,12 @@ func WithRiskParam_Description(i string) RiskParamsOpt {
 }
 
 // solution 是一个选项参数，用于指定漏洞记录的解决方案
+// 参数:
+//   - i: 漏洞记录的解决方案
+//
+// 返回值:
+//   - 一个 risk.NewRisk/risk.CreateRisk 可接收的选项参数
+//
 // Example:
 // ```
 // risk.NewRisk(target, risk.description(description), risk.solution(solution))
@@ -174,6 +204,12 @@ func WithRiskParam_Solution(i string) RiskParamsOpt {
 // 服务端请求伪造: ssrf​
 // 跨站请求伪造 : csrf​
 // 反连检测: random-port-trigger[tcp]​,random-port-trigger[udp]​,reverse​,reverse-​,reverse-tcp​,reverse-tls​,reverse-rmi​,reverse-rmi-handshake​,reverse-http​,reverse-https​,reverse-dns​,reverse-ldap
+// 参数:
+//   - i: 风险类型字符串，见上方可用类型列表
+//
+// 返回值:
+//   - 一个 risk.NewRisk/risk.CreateRisk 可接收的选项参数
+//
 // Example:
 // ```
 // risk.NewRisk(
@@ -193,6 +229,12 @@ func WithRiskParam_RiskType(i string) RiskParamsOpt {
 }
 
 // typeVerbose 是一个选项参数，用于指定风险类型的详细描述
+// 参数:
+//   - i: 风险类型的详细描述
+//
+// 返回值:
+//   - 一个 risk.NewRisk/risk.CreateRisk 可接收的选项参数
+//
 // Example:
 // ```
 // risk.NewRisk(target, risk.typeVerbose("SQL注入漏洞"))
@@ -204,6 +246,12 @@ func WithRiskParam_RiskVerbose(i string) RiskParamsOpt {
 }
 
 // parameter 是一个选项参数，用于指定风险记录的参数
+// 参数:
+//   - i: 风险记录的参数
+//
+// 返回值:
+//   - 一个 risk.NewRisk/risk.CreateRisk 可接收的选项参数
+//
 // Example:
 // ```
 // risk.NewRisk(target, risk.parameter("param"))
@@ -215,6 +263,12 @@ func WithRiskParam_Parameter(i string) RiskParamsOpt {
 }
 
 // token 是一个选项参数，用于指定风险记录的反连 token
+// 参数:
+//   - i: 风险记录的反连 token
+//
+// 返回值:
+//   - 一个 risk.NewRisk/risk.CreateRisk 可接收的选项参数
+//
 // Example:
 // ```
 // risk.NewRisk(target, risk.token("token"))
@@ -252,6 +306,12 @@ func limitSize(s string, maxSize int) string {
 }
 
 // request 是一个选项参数，用于指定风险记录的原始请求报文
+// 参数:
+//   - i: 原始请求报文，支持 string / []byte / 任意可转成字符串的类型
+//
+// 返回值:
+//   - 一个 risk.NewRisk/risk.CreateRisk 可接收的选项参数
+//
 // Example:
 // ```
 // risk.NewRisk(target, risk.request(req))
@@ -265,6 +325,12 @@ func WithRiskParam_Request(i interface{}) RiskParamsOpt {
 }
 
 // response 是一个选项参数，用于指定风险记录的原始响应报文
+// 参数:
+//   - i: 原始响应报文，支持 string / []byte / 任意可转成字符串的类型
+//
+// 返回值:
+//   - 一个 risk.NewRisk/risk.CreateRisk 可接收的选项参数
+//
 // Example:
 // ```
 // risk.NewRisk(target, risk.response(resp))
@@ -281,6 +347,13 @@ func WithRiskParam_Response(i interface{}) RiskParamsOpt {
 // 会将报文保存为 HTTPFlow，并在 PacketPairs 中记录 httpflow_id、url 以及请求/响应快照，
 // 前端可优先按 id 查询详情；HTTPFlow 被删除后仍可使用 PacketPairs 中的快照展示流量。
 // 支持 string / []byte / 任意可转成字符串的类型
+// 参数:
+//   - req: 请求报文，支持 string / []byte / 任意可转成字符串的类型
+//   - resp: 响应报文，支持 string / []byte / 任意可转成字符串的类型
+//
+// 返回值:
+//   - 一个 risk.NewRisk/risk.CreateRisk 可接收的选项参数
+//
 // Example:
 // ```
 // risk.NewRisk(target,
@@ -335,6 +408,12 @@ func WithRiskParam_AppendPacketPairs(req, resp interface{}) RiskParamsOpt {
 }
 
 // details 是一个选项参数，用于指定风险记录的详细信息
+// 参数:
+//   - i: 详细信息，通常为 map 或可转换为 map 的值
+//
+// 返回值:
+//   - 一个 risk.NewRisk/risk.CreateRisk 可接收的选项参数
+//
 // Example:
 // ```
 // risk.NewRisk(target, risk.details({"message": message, "ohter_message": message}))
@@ -415,6 +494,12 @@ func WithRiskParam_Details(i interface{}) RiskParamsOpt {
 }
 
 // runtimeId 是一个选项参数，用于指定风险记录的运行时 ID
+// 参数:
+//   - i: 风险记录的运行时 ID
+//
+// 返回值:
+//   - 一个 risk.NewRisk/risk.CreateRisk 可接收的选项参数
+//
 // Example:
 // ```
 // risk.NewRisk(target, risk.runtimeId(runtime_id))
@@ -444,6 +529,12 @@ func WithRiskParam_Potential(i bool) RiskParamsOpt {
 }
 
 // cve 是一个选项参数，用于指定风险记录的 CVE 编号
+// 参数:
+//   - s: CVE 编号，例如 "CVE-2021-22145"
+//
+// 返回值:
+//   - 一个 risk.NewRisk/risk.CreateRisk 可接收的选项参数
+//
 // Example:
 // ```
 // risk.NewRisk(target, risk.cve("CVE-2021-22145"))
@@ -456,6 +547,12 @@ func WithRiskParam_CVE(s string) RiskParamsOpt {
 
 // severity 是一个选项参数，用于指定风险记录的严重程度
 // 可用的严重程度有: critical, high, warning, info, low
+// 参数:
+//   - i: 严重程度，可选 critical / high / warning / info / low
+//
+// 返回值:
+//   - 一个 risk.NewRisk/risk.CreateRisk 可接收的选项参数
+//
 // Example:
 // ```
 // risk.NewRisk(target, risk.severity("high"))
@@ -484,6 +581,12 @@ func WithRiskParam_YakScriptUUID(i string) RiskParamsOpt {
 }
 
 // fromScript 是一个选项参数，用于指定风险记录的来源插件名
+// 参数:
+//   - i: 风险记录的来源插件名
+//
+// 返回值:
+//   - 一个 risk.NewRisk/risk.CreateRisk 可接收的选项参数
+//
 // Example:
 // ```
 // risk.NewRisk(target, risk.fromScript("plugin_name"))
@@ -549,6 +652,13 @@ func WithRiskParam_Tags(i string) RiskParamsOpt {
 }
 
 // CreateRisk 创建漏洞记录结构体，但是并不会保存到数据库，第一个参数是目标URL，后面可以传入零个或多个选项参数，用于指定 risk 的结构，其通常与 Save 一起使用
+// 参数:
+//   - u: 目标 URL 或 IP
+//   - opts: 零个或多个风险选项参数，如 risk.title、risk.type、risk.severity 等
+//
+// 返回值:
+//   - 创建的风险记录结构体
+//
 // Example:
 // ```
 // r = risk.CreateRisk("http://example.com", risk.title("SQL注入漏洞"), risk.type("sqli"), risk.severity("high"), risk.description(""), risk.solution(""))
@@ -771,6 +881,12 @@ func NewLocalReverseProtoUrl(proto string) func(opts ...RiskParamsOpt) string {
 }
 
 // HaveReverseRisk 通过轮询检查是否存在对应token的反连记录，重试最多5次，每次等待1秒， 如果存在返回true，否则返回false
+// 参数:
+//   - token: 反连验证用的 token
+//
+// 返回值:
+//   - 是否存在对应 token 的反连记录
+//
 // Example:
 // ```
 // if risk.HaveReverseRisk("token") { // 轮询检查是否存在反连风险，会阻塞
@@ -861,6 +977,12 @@ func NewDNSLogDomainWithContext(ctx context.Context) (domain string, token strin
 }
 
 // NewDNSLogDomain 返回一个公网 Bridge 的 DNSLog 域名，返回的第一个值是域名，第二个值是 token，第三个值是错误
+//
+// 返回值:
+//   - DNSLog 域名
+//   - 反连验证用的 token
+//   - 错误信息，失败时非 nil
+//
 // Example:
 // ```
 // domain, token = risk.NewDNSLogDomain()~
@@ -882,6 +1004,14 @@ func NewDNSLogDomain() (domain string, token string, _ error) {
 }
 
 // NewHTTPLog 返回一个公网 Bridge 的 HTTPLog 域名，返回的第一个值是域名，第二个值是 token，第三个值是错误
+// 参数:
+//   - i: 可选参数，用于定制 HTTPLog 域名申请的行为
+//
+// 返回值:
+//   - HTTPLog 域名
+//   - 反连验证用的 token
+//   - 错误信息，失败时非 nil
+//
 // Example:
 // ```
 // domain, token = risk.NewHTTPLog()~
@@ -1014,6 +1144,14 @@ func YakitNewCheckDNSLogByToken(pluginContext YakitPluginInfo) func(token string
 }
 
 // NewRandomPortTrigger 返回一个公网 Bridge 的随机端口反连检测地址，返回的第一个值是 token，第二个值是检测地址，第三个值是错误
+// 参数:
+//   - opt: 零个或多个风险选项参数，如 risk.title、risk.severity 等
+//
+// 返回值:
+//   - 反连验证用的 token
+//   - 随机端口反连检测地址
+//   - 错误信息，失败时非 nil
+//
 // Example:
 // ```
 // token, addr = risk.NewRandomPortTrigger()~
@@ -1143,6 +1281,15 @@ func CheckRandomTriggerByToken(t string, pluginContext YakitPluginInfo) (*tpb.Ra
 }
 
 // CheckServerReachable 通过 Bridge 检查目标是否可达，第一个参数为上下文，第二个参数为目标地址，第三个参数为是否进行 http 检测，返回的第一个值是 CheckServerReachableResponse，第二个值是错误
+// 参数:
+//   - ctx: 上下文，用于控制超时与取消
+//   - target: 待检测的目标地址
+//   - httpCheck: 是否进行 http 检测
+//
+// 返回值:
+//   - 检测结果 CheckServerReachableResponse 对象
+//   - 错误信息，失败时非 nil
+//
 // Example:
 // ```
 // resp = risk.CheckServerReachable(context.Background(), "example.com", false)~
