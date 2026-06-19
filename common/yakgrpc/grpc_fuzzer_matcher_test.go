@@ -340,6 +340,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_ReMatcher(t *testing.T) {
 		})
 		require.NoError(t, err)
 
+		var retryTaskID int64
 		retriedIndexes := make(map[int]int)
 		for {
 			resp, err := retryStream.Recv()
@@ -355,11 +356,28 @@ func TestGRPCMUSTPASS_HTTPFuzzer_ReMatcher(t *testing.T) {
 				require.True(t, resp.Ok)
 				continue
 			}
+			if resp.GetTaskId() != 0 {
+				retryTaskID = resp.GetTaskId()
+			}
 			retriedIndexes[index]++
 			require.True(t, resp.Ok)
 			require.Contains(t, string(resp.GetResponseRaw()), retryToken)
 		}
 		require.Equal(t, map[int]int{1: 1, 3: 1, 5: 1}, retriedIndexes)
+		require.NotZero(t, retryTaskID)
+
+		// 重试响应是异步落库的, rematch 依赖最新重试任务的结果,
+		// 这里先等待重试任务的 3 个响应全部写入数据库, 避免 rematch 读到不完整数据导致计数抖动。
+		require.NoError(t, utils.AttemptWithDelay(10, 200*time.Millisecond, func() error {
+			taskRespCount, err := yakit.CountWebFuzzerResponses(consts.GetGormProjectDatabase(), int(retryTaskID))
+			if err != nil {
+				return err
+			}
+			if taskRespCount != 3 {
+				return utils.Errorf("want 3 retry task resp, but got %d", taskRespCount)
+			}
+			return nil
+		}))
 
 		clearMatcher := &ypb.HTTPResponseMatcher{
 			MatcherType: "word",
