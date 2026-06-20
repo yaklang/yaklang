@@ -1,0 +1,193 @@
+__DESC__ = "基于 Radare2 (r2) 的二进制静态分析工具，用于恶意软件（木马/后门/C2/病毒/勒索）研判。对 PE/ELF/Mach-O 等二进制执行静态分析：提取文件信息（架构/编译器/入口点）、字符串（找 C2 地址/域名/URL/凭证/命令）、导入函数（找进程注入/网络/注册表等危险 API）、函数列表、节区（找加壳）、反汇编指定函数。支持 filter 过滤与原始 r2 命令。需要本地已安装 radare2 (r2)。"
+__VERBOSE_NAME__ = "Radare2 二进制分析工具"
+__KEYWORDS__ = "radare2,r2,malware,reverse engineering,二进制分析,恶意软件,逆向工程,木马,病毒,trojan,virus,backdoor,C2,勒索,ransomware,disasm,反汇编,PE,ELF,mach-o,static analysis,静态分析,malware analysis,IOC,加壳,packer,entropy"
+
+__USAGE__ = <<<USAGE_BLOCK
+Radare2 Binary Analysis Tool - Parameter Description for JSON Tool Calls
+
+Required Parameters:
+  file            (string)  Binary file path to analyze (PE .exe/.dll, ELF, Mach-O, etc.).
+  action          (string)  Analysis action. One of:
+                  - "info":      file info (arch, bintype, compiler, entrypoints)
+                  - "strings":   extracted strings (look for C2 URLs/IPs/domains/creds/commands)
+                  - "imports":   imported functions (look for dangerous APIs)
+                  - "functions": function list (needs analysis, slower)
+                  - "sections":  sections (look for packing / high-entropy)
+                  - "disasm":    disassemble a function/address (needs --addr, needs analysis)
+                  - "raw":       run raw r2 command(s) (use --cmd)
+
+Optional Parameters:
+  addr            (string)  Address or symbol for action=disasm, e.g. "sym.main", "main", "0x401000".
+  cmd             (string)  Raw r2 command(s) for action=raw, e.g. "aaa; pdf @main".
+  filter          (string)  Optional r2 internal filter (appended as ~suffix), e.g.
+                            action=strings & filter="http" shows only strings containing http.
+                            Useful to hunt C2 indicators: filter="http|https|\.com|\.exe|cmd".
+  timeout         (int)     Timeout in seconds. Default 120. Set higher (300+) for
+                            functions/disasm on large binaries (analysis is slow).
+
+Notes:
+  - functions/disasm run "aaa" (full analysis) first, which is slow on large binaries.
+  - For C2 hunting: action=strings, then filter by http|url|ip patterns, or grep the output.
+  - Use action=raw for advanced r2 commands (e.g. cross-references "axt @sym.VirtualAlloc").
+USAGE_BLOCK
+
+yakit.AutoInitYakit()
+
+filePath := cli.String("file", cli.setRequired(true), cli.setHelp("binary file path to analyze"))
+action := cli.String("action", cli.setRequired(true), cli.setHelp("analysis action: info|strings|imports|functions|sections|disasm|raw"))
+addr := cli.String("addr", cli.setHelp("address or symbol for disasm action, e.g. sym.main or 0x401000"))
+rawCmd := cli.String("cmd", cli.setHelp("raw r2 command(s) for action=raw, e.g. 'aaa; pdf @main'"))
+filter := cli.String("filter", cli.setHelp("optional r2 internal filter (~suffix), e.g. 'http' to filter strings containing http"))
+timeoutSec := cli.Int("timeout", cli.setDefault(120), cli.setHelp("timeout seconds, default 120. Set higher for functions/disasm on large binaries"))
+
+cli.check()
+
+if !file.IsExisted(filePath) {
+    yakit.Error("binary file does not exist: %v", filePath)
+    return
+}
+
+// 根据 action 构造 r2 基础命令（变量首次声明用 :=）
+baseCmd := ""
+needAnalyze := false
+
+switch action {
+case "info":
+    baseCmd = "iI; iE; ie"
+case "strings":
+    baseCmd = "iz"
+case "imports":
+    baseCmd = "ii"
+case "functions":
+    baseCmd = "afl"
+    needAnalyze = true
+case "sections":
+    baseCmd = "iS"
+case "disasm":
+    if addr == "" {
+        yakit.Error("disasm action requires --addr (e.g. sym.main, main, or 0x401000)")
+        return
+    }
+    baseCmd = "pdf @" + addr
+    needAnalyze = true
+case "raw":
+    if rawCmd == "" {
+        yakit.Error("raw action requires --cmd (e.g. 'aaa; pdf @main')")
+        return
+    }
+    baseCmd = rawCmd
+default:
+    yakit.Error("unknown action: %v. Supported: info|strings|imports|functions|sections|disasm|raw", action)
+    return
+}
+
+// 追加 r2 内置过滤（~suffix）
+if filter != "" {
+    baseCmd = baseCmd + "~" + filter
+}
+
+// 需要分析的 action 前置 aaa
+fullCmd := baseCmd
+if needAnalyze {
+    fullCmd = "aaa; " + baseCmd
+}
+
+// quoteForExec: 单引号包裹含空格/特殊字符的参数（参考 bash.yak）
+quoteForExec := func(s) {
+    if s == "" {
+        return "''"
+    }
+    return "'" + str.ReplaceAll(s, "'", "'\\''") + "'"
+}
+
+// 构造 r2 命令行：-q 退出模式，-e bin.cache=true 消除 relocs 警告，-e scr.color=0 禁用颜色码
+cmdline := "r2 -q -e bin.cache=true -e scr.color=0 -c " + quoteForExec(fullCmd) + " " + quoteForExec(filePath)
+
+if timeoutSec <= 0 {
+    timeoutSec = 120
+}
+
+ctx, cancel := context.WithTimeout(context.Background(), time.ParseDuration(sprint(timeoutSec) + "s")~)
+defer cancel()
+
+yakit.Info("================== Radare2 二进制分析 ==================")
+yakit.Info("文件: %v", filePath)
+yakit.Info("动作: %v", action)
+if filter != "" {
+    yakit.Info("过滤: ~%v", filter)
+}
+yakit.Info("r2 命令: %v", fullCmd)
+yakit.Info("超时: %vs", timeoutSec)
+
+cmd, cmdErr := exec.CommandContext(ctx, cmdline)
+if cmdErr != nil {
+    yakit.Error("create r2 command failed: %v", cmdErr)
+    return
+}
+
+stdoutPipe, stdoutPipeErr := cmd.StdoutPipe()
+if stdoutPipeErr != nil {
+    yakit.Error("failed to create stdout pipe: %v", stdoutPipeErr)
+    return
+}
+stderrPipe, stderrPipeErr := cmd.StderrPipe()
+if stderrPipeErr != nil {
+    yakit.Error("failed to create stderr pipe: %v", stderrPipeErr)
+    return
+}
+
+// 流式读取输出（参考 bash.yak），避免大二进制字符串表爆内存
+streamWg := sync.NewWaitGroup()
+streamWg.Add(2)
+totalOutLen := 0
+totalErrLen := 0
+
+go func() {
+    defer streamWg.Done()
+    io.ReadEvery1s(context.Background(), stdoutPipe, func(raw) {
+        rawLen := len(raw)
+        if rawLen <= totalOutLen {
+            return true
+        }
+        delta := raw[totalOutLen:]
+        totalOutLen = rawLen
+        yakit.Info("%v", codec.FixUTF8(string(delta)))
+        return true
+    })
+}()
+
+go func() {
+    defer streamWg.Done()
+    io.ReadEvery1s(context.Background(), stderrPipe, func(raw) {
+        rawLen := len(raw)
+        if rawLen <= totalErrLen {
+            return true
+        }
+        delta := raw[totalErrLen:]
+        totalErrLen = rawLen
+        // r2 的 stderr 通常是分析提示/警告，低优先级输出
+        yakit.Info("[stderr] %v", codec.FixUTF8(string(delta)))
+        return true
+    })
+}()
+
+startTime := time.Now()
+runErr := cmd.Run()
+streamWg.Wait()
+elapsedSec := int(time.Since(startTime).Seconds())
+
+if runErr != nil {
+    errStr := sprint(runErr)
+    if str.Contains(errStr, "killed") || str.Contains(errStr, "context deadline exceeded") {
+        yakit.Error("R2 TIMEOUT: 分析在 %vs 后被终止。对大二进制的 functions/disasm 请增大 --timeout（如 300）或改用 action=raw 手动指定更轻量的分析（如 aa 而非 aaa）。", timeoutSec)
+    } else {
+        yakit.Error("r2 execution failed: %v", runErr)
+    }
+    return
+}
+
+if totalOutLen <= 0 && totalErrLen <= 0 {
+    yakit.Info("（无输出。可能该 action 对此二进制无结果，或命令需调整。）")
+}
+
+yakit.Info("================== 分析完成（耗时 %vs）==================", elapsedSec)
