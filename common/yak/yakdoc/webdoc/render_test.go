@@ -285,8 +285,8 @@ func TestRenderLibMarkdownOptionLinkage(t *testing.T) {
 	if strings.Contains(md, "### WithX {#withx}") {
 		t.Fatalf("option producer WithX should not get a top-level detail heading:\n%s", md)
 	}
-	// 主函数 Do 详情应出现"必填参数"与"可选参数 / 选项"，并引用 WithX
-	for _, want := range []string{"### Do {#do}", "**必填参数**", "**可选参数 / 选项**", "`demo.WithX`", "...DemoOption"} {
+	// 主函数 Do 详情应出现"必填参数"与"可选参数"，并引用 WithX
+	for _, want := range []string{"### Do {#do}", "**必填参数**", "**可选参数**", "`demo.WithX`", "...DemoOption"} {
 		if !strings.Contains(md, want) {
 			t.Fatalf("consumer detail missing %q:\n%s", want, md)
 		}
@@ -305,6 +305,54 @@ func TestRenderLibMarkdownOptionLinkage(t *testing.T) {
 	}
 	if !strings.Contains(md2, "**参数**") {
 		t.Fatalf("core-only lib should contain 参数 section:\n%s", md2)
+	}
+}
+
+// TestRenderLibMarkdownPlainVariadicSplit 校验普通可变参数(...T，非选项)也拆分到"可选参数"。
+func TestRenderLibMarkdownPlainVariadicSplit(t *testing.T) {
+	lib := mkLib("yakit", nil,
+		fn("yakit", "Info", "Info(tmp string, items ...any)",
+			"输出日志\n参数:\n- tmp: 格式字符串\n- items: 格式化参数",
+			[]*yakdoc.Field{field("tmp", "string"), field("items", "...any")}, nil),
+	)
+	md := RenderLibMarkdown(lib, "", nil)
+	if !strings.Contains(md, "**必填参数**") || !strings.Contains(md, "**可选参数**") {
+		t.Fatalf("plain variadic should split required/optional:\n%s", md)
+	}
+	// tmp 在必填，items 在可选；items 的可变类型应原样展示
+	reqIdx := strings.Index(md, "**必填参数**")
+	optIdx := strings.Index(md, "**可选参数**")
+	tmpIdx := strings.Index(md, "| tmp |")
+	itemsIdx := strings.Index(md, "| items |")
+	if !(reqIdx < tmpIdx && tmpIdx < optIdx && optIdx < itemsIdx) {
+		t.Fatalf("tmp must be under 必填参数 and items under 可选参数:\n%s", md)
+	}
+	if !strings.Contains(md, "`...any`") {
+		t.Fatalf("variadic type should be shown:\n%s", md)
+	}
+	if err := CheckMarkdownInvariants(md); err != nil {
+		t.Fatalf("invariants failed:\n%v\n%s", err, md)
+	}
+}
+
+// TestStripLeadingFuncName 校验描述前导函数名清洗(等名/内部名后缀)，且不误删正文。
+func TestStripLeadingFuncName(t *testing.T) {
+	cases := []struct{ in, method, want string }{
+		{"YakitInfo 向 Yakit 输出日志", "Info", "向 Yakit 输出日志"},
+		{"SetKey 写入键值", "SetKey", "写入键值"},
+		{"saveHTTPFlowFromRawWithOption 保存流量", "SaveHTTPFlowFromRawWithOption", "保存流量"},
+		{"yakitStatusCard 输出卡片", "StatusCard", "输出卡片"},
+		// 不应误删：首词是中文
+		{"向数据库写入", "SetKey", "向数据库写入"},
+		// 不应误删：小写正文词且非导出名后缀(区分大小写)
+		{"widget does get things", "Get", "widget does get things"},
+		// 多行：只动第一行
+		{"Info 第一行\n第二行 Info", "Info", "第一行\n第二行 Info"},
+	}
+	for _, c := range cases {
+		if got := stripLeadingFuncName(c.in, c.method); got != c.want {
+			t.Errorf("stripLeadingFuncName(%q,%q)=%q want %q", c.in, c.method, got, c.want)
+		}
 	}
 }
 

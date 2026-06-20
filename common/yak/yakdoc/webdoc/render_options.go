@@ -2,6 +2,7 @@ package webdoc
 
 import (
 	"fmt"
+	"html"
 	"sort"
 	"strings"
 
@@ -109,31 +110,34 @@ func buildOptionIndex(funcs []*yakdoc.FuncDecl) *OptionIndex {
 	return oi
 }
 
-// renderOptionSection 为某主函数渲染"可选参数 / 选项"小节：列出它消费的全部选项类型对应的选项函数。
-// 内联展示(无独立锚点，可在多个主函数下重复出现)。返回空串表示该函数无可关联选项。
-// 关键词: renderOptionSection, 可选参数, 选项重复渲染
-func (oi *OptionIndex) renderOptionSection(fun *yakdoc.FuncDecl) string {
-	types := oi.optionTypesOf(fun)
-	if len(types) == 0 {
+// renderOptionTypeBlock 为某个"选项型可变参数"渲染其全部选项函数(内联展示，无独立锚点，
+// 可在多个主函数下重复出现)。调用方负责在外层先写好"**可选参数**"小节标签。
+// 关键词: renderOptionTypeBlock, 可选参数, 选项重复渲染
+func (oi *OptionIndex) renderOptionTypeBlock(p *yakdoc.Field) string {
+	typ := variadicElemType(p.Type)
+	producers := oi.producers[typ]
+	if len(producers) == 0 {
 		return ""
 	}
 	var b strings.Builder
-	b.WriteString("**可选参数 / 选项**\n\n")
-	for _, typ := range types {
-		b.WriteString(fmt.Sprintf("可作为可变参数 `...%s` 传入：\n\n", typ))
-		for _, opt := range oi.producers[typ] {
-			parsed := parseCommentDetails(opt.Document)
-			desc := strings.TrimSpace(parsed.Description)
-			line := fmt.Sprintf("- `%s.%s` — %s\n", opt.LibName, opt.MethodName, escapeInlineLabel(stripExportSuffix(desc)))
-			if desc == "" {
-				line = fmt.Sprintf("- `%s.%s`\n", opt.LibName, opt.MethodName)
-			}
-			b.WriteString(line)
-			// 选项签名(内联代码块外的 go 围栏会过重，这里用行内代码展示完整签名)
-			b.WriteString(fmt.Sprintf("  - 签名：`%s`\n", inlineSignature(opt.Decl)))
-		}
-		b.WriteString("\n")
+	name := strings.TrimSpace(p.Name)
+	if name != "" {
+		b.WriteString(fmt.Sprintf("可作为可变参数 `%s ...%s` 传入以下选项：\n\n", html.EscapeString(name), typ))
+	} else {
+		b.WriteString(fmt.Sprintf("可作为可变参数 `...%s` 传入以下选项：\n\n", typ))
 	}
+	for _, opt := range producers {
+		parsed := parseCommentDetails(opt.Document)
+		desc := stripLeadingFuncName(strings.TrimSpace(parsed.Description), opt.MethodName)
+		if desc == "" {
+			b.WriteString(fmt.Sprintf("- `%s.%s`\n", opt.LibName, opt.MethodName))
+		} else {
+			b.WriteString(fmt.Sprintf("- `%s.%s` — %s\n", opt.LibName, opt.MethodName, escapeInlineLabel(stripExportSuffix(desc))))
+		}
+		// 选项签名用行内代码展示完整签名(围栏内不转义，<&安全)
+		b.WriteString(fmt.Sprintf("  - 签名：`%s`\n", inlineSignature(opt.Decl)))
+	}
+	b.WriteString("\n")
 	return b.String()
 }
 
