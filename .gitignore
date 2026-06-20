@@ -62,6 +62,7 @@ common/xlic/*.gzip
 
 # gzip_embed generated archives (built by scripts/workflows, do not commit)
 common/ai/aid/aitool/buildinaitools/yakscripttools/*.tar.gz
+common/ai/aid/aireact/*.tar.gz
 common/aiforge/*.tar.gz
 common/coreplugin/*.tar.gz
 common/syntaxflow/sfbuildin/*.tar.gz

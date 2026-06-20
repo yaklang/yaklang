@@ -32,6 +32,12 @@ var allBuiltinSkills = []struct {
 	{"pentest-task-design", "skills/pentest-task-design/SKILL.md", []string{"scan_port", "do_http_request", "OWASP", "Phase"}},
 	{"how-to-use-browser", "skills/how-to-use-browser/SKILL.md", []string{"snapshot", "click", "fill", "screenshot", "CDP"}},
 	{"authorization-bypass", "skills/authorization-bypass/SKILL.md", []string{"IDOR", "WSTG-ATHZ-02", "Horizontal", "Vertical", "do_http_request"}},
+	{"web-log-analysis", "skills/web-log-analysis/SKILL.md", []string{"grep", "Nginx", "Webshell", "beacon", "SQLi"}},
+	{"incident-response", "skills/incident-response/SKILL.md", []string{"grep", "NIST", "crontab", "LSASS", "mimikatz"}},
+	{"threat-hunting", "skills/threat-hunting/SKILL.md", []string{"ATT&CK", "IOC", "T1053", "beacon"}},
+	{"detection-rule-engineering", "skills/detection-rule-engineering/SKILL.md", []string{"Sigma", "Yara", "Suricata", "ModSecurity"}},
+	{"network-config-audit", "skills/network-config-audit/SKILL.md", []string{"Cisco", "iptables", "SNMP", "Telnet"}},
+	{"blue-team-task-design", "skills/blue-team-task-design/SKILL.md", []string{"incident-response", "threat-hunting", "web-log-analysis", "cybersecurity-risk"}},
 }
 
 func useTempBuiltinSkillReleaseDB(t *testing.T) {
