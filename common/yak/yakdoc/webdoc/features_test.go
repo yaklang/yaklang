@@ -108,9 +108,10 @@ func TestBuildOptionIndex(t *testing.T) {
 	if oi.isOptionParam(funcs[2].Params[0]) {
 		t.Fatalf("...string param should not be option param")
 	}
-	sec := oi.renderOptionSection(funcs[0])
-	if !strings.Contains(sec, "**可选参数 / 选项**") || !strings.Contains(sec, "`db.WithTags`") {
-		t.Fatalf("option section wrong:\n%s", sec)
+	// 选项参数是 Save 的第二个入参 o ...yakit.CreateHTTPFlowOptions
+	sec := oi.renderOptionTypeBlock(funcs[0].Params[1])
+	if !strings.Contains(sec, "可作为可变参数") || !strings.Contains(sec, "`db.WithTags`") {
+		t.Fatalf("option block wrong:\n%s", sec)
 	}
 }
 

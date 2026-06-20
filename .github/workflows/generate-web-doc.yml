@@ -31,8 +31,11 @@ jobs:
         echo "Generating docs..."
         # -coverage-report 产出覆盖率底单(写到 web_doc 之外，不参与归档)，
         # 既能在 Actions 日志里看到 doc coverage summary，又能作为 artifact 留档。
+        # -overviews 指定按库的模块总览目录(overviews/<lib>.md)，注入到各库文档标题之后。
         go run -gcflags=all=-l common/yak/yakdoc/generate_web_doc/generate_web_doc.go \
-          -coverage-report web_doc_coverage.md web_doc/
+          -coverage-report web_doc_coverage.md \
+          -overviews common/yak/yakdoc/generate_web_doc/overviews \
+          web_doc/
         echo "Generating docs finished"
 
     - name: Upload coverage report artifact

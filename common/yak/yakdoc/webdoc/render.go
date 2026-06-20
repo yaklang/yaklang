@@ -309,6 +309,38 @@ func firstStructuralMarker(doc string) int {
 	return best
 }
 
+var bareIdentRe = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+
+// stripLeadingFuncName 去掉描述第一行开头的"函数名"前导词(Go doc 约定注释以声明名开头)。
+// 仅当首词是裸标识符且与导出方法名相等(忽略大小写)、或以导出方法名为后缀(区分大小写，
+// 命中如 YakitInfo→Info、yakitStatusCard→StatusCard 这类内部名)时才剥离，避免误删正文。
+// 关键词: 描述清洗, 去前导函数名
+func stripLeadingFuncName(s, methodName string) string {
+	if methodName == "" || s == "" {
+		return s
+	}
+	nl := strings.IndexByte(s, '\n')
+	first, rest := s, ""
+	if nl >= 0 {
+		first, rest = s[:nl], s[nl:]
+	}
+	body := strings.TrimLeft(first, " \t")
+	sp := strings.IndexAny(body, " \t")
+	if sp <= 0 {
+		return s
+	}
+	token := body[:sp]
+	if !bareIdentRe.MatchString(token) {
+		return s
+	}
+	match := strings.EqualFold(token, methodName) ||
+		(len(token) > len(methodName) && strings.HasSuffix(token, methodName))
+	if !match {
+		return s
+	}
+	return strings.TrimLeft(body[sp:], " \t") + rest
+}
+
 // leadingProse 取函数文档里"参数/返回值/示例"之前的描述正文，做 HTML 转义(保留代码块)、
 // 折叠多余空行并去首尾空白。用于"详细描述"区块，避免把参数/返回值列表重复 dump。
 // 关键词: leadingProse, 描述去重
@@ -479,7 +511,7 @@ func RenderLibMarkdown(lib *yakdoc.ScriptLib, overview string, formatExample fun
 			html.EscapeString(fun.LibName),
 			html.EscapeString(fun.MethodName),
 			anchors[fun],
-			escapeTableCell(parsed.Description),
+			escapeTableCell(stripLeadingFuncName(parsed.Description, fun.MethodName)),
 		))
 	}
 	b.WriteString("\n")
@@ -493,10 +525,9 @@ func RenderLibMarkdown(lib *yakdoc.ScriptLib, overview string, formatExample fun
 	return b.String()
 }
 
-// renderParamTable 渲染参数表(label 如"参数"/"必填参数")。
-func renderParamTable(label string, params []*yakdoc.Field, parsed *YakDocParsed) string {
+// renderParamRows 渲染参数表(仅表格，不含加粗小节标签)。
+func renderParamRows(params []*yakdoc.Field, parsed *YakDocParsed) string {
 	var b strings.Builder
-	b.WriteString("**" + label + "**\n\n")
 	b.WriteString("|参数名|类型|说明|\n")
 	b.WriteString("|:--|:--|:--|\n")
 	for _, param := range params {
@@ -505,6 +536,11 @@ func renderParamTable(label string, params []*yakdoc.Field, parsed *YakDocParsed
 	}
 	b.WriteString("\n")
 	return b.String()
+}
+
+// renderParamTable 渲染参数表(label 如"参数"/"必填参数") = 加粗标签 + 表格。
+func renderParamTable(label string, params []*yakdoc.Field, parsed *YakDocParsed) string {
+	return "**" + label + "**\n\n" + renderParamRows(params, parsed)
 }
 
 // renderResultTable 渲染返回值表。
@@ -538,26 +574,38 @@ func renderFuncDetail(fun *yakdoc.FuncDecl, anchor string, oi *OptionIndex, form
 	b.WriteString("```go\n" + fun.Decl + "\n```\n\n")
 
 	prose := leadingProse(fun.Document)
+	prose = stripLeadingFuncName(prose, fun.MethodName)
 	if strings.TrimSpace(prose) == "" {
 		prose = "暂无描述"
 	}
 	b.WriteString(prose + "\n\n")
 
-	optionTypes := oi.optionTypesOf(fun)
-	hasOptions := len(optionTypes) > 0
-
-	if hasOptions {
-		// 必填/普通参数 = 非选项参数；选项可变参数交给"可选参数 / 选项"小节。
-		required := make([]*yakdoc.Field, 0, len(fun.Params))
-		for _, p := range fun.Params {
-			if !oi.isOptionParam(p) {
-				required = append(required, p)
-			}
+	// 参数按"必填(非可变) / 可选(可变参数，含选项)"拆分，对齐主函数叙事脉络：
+	// 功能 - 必填参数 - 可选参数 - 返回值 - 示例。
+	var required, plainVar, optionVar []*yakdoc.Field
+	for _, p := range fun.Params {
+		switch {
+		case variadicElemType(p.Type) == "":
+			required = append(required, p)
+		case oi.isOptionParam(p):
+			optionVar = append(optionVar, p)
+		default:
+			plainVar = append(plainVar, p)
 		}
+	}
+	hasOptional := len(plainVar) > 0 || len(optionVar) > 0
+
+	if hasOptional {
 		if len(required) > 0 {
 			b.WriteString(renderParamTable("必填参数", required, parsed))
 		}
-		b.WriteString(oi.renderOptionSection(fun))
+		b.WriteString("**可选参数**\n\n")
+		if len(plainVar) > 0 {
+			b.WriteString(renderParamRows(plainVar, parsed))
+		}
+		for _, p := range optionVar {
+			b.WriteString(oi.renderOptionTypeBlock(p))
+		}
 	} else if len(fun.Params) > 0 {
 		b.WriteString(renderParamTable("参数", fun.Params, parsed))
 	}
