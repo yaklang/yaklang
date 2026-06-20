@@ -159,16 +159,42 @@ func Func(...) ... { ... }
 
 度量指标：**全库示例语法失败数必须为 0**。新增/修改示例后跑该测试即可量化（失败会打印库名、示例序号与报错代码）。
 
-### 7.3 本地检查清单（每次补/改文档前后执行）
+### 7.3 示例执行校验 + 本地 MOCK + "无法本地验证"标注
+
+语法正确只是下限，**能跑通**才是更强的质量保证。执行校验位于 `example_exec_test.go`：
+
+- `TestSafeLibsExampleExecution`（强约束，失败即红）：对"安全执行白名单 `safeExecLibs`"里的库，把每条示例用 `yaklang.New().SafeEval`（带 8s 超时、panic 恢复）真实执行。白名单只放**纯计算/本地解析、不出网、不执行命令、不写删文件、不需特权**的库（如 `codec/str/re/json/yaml/xml/regen/jwt/diff/xpath/java/jsonstream/env/log/memeditor/xhtml/sandbox` 等）。执行前 `setupLocalExecEnv` 会用**临时数据库**（`consts.InitializeYakitDatabase` 指向 `t.TempDir()`）隔离，杜绝读写用户真实 Yakit 数据；并起一个**本地 mock HTTP 服务**，地址写入环境变量 `YAK_DOC_MOCK_HTTP` 供示例联调。
+- `TestAllLibsExampleVerifiabilityReport`（静态分类，不执行、不出网）：对全部库统计示例的"本地可验证性"，产出 `/tmp/doc_unverified.txt`（既不在白名单、也未标注的示例清单），用于持续推进覆盖。
+
+**为什么不对所有库直接执行**：非纯计算库的示例会真实出网（已观测到 `bot` webhook 真的发出去）、可能执行命令/写删文件，甚至调用 `os.Exit`/`log.Fatal` 直接把测试进程打崩，违背"尽量不出网、无副作用"。因此对它们只做静态分类，把清单交给人逐个 mock 或标注。
+
+**MOCK 优先，做不到再标注（强制要求）**：
+
+- **能本地 mock 的，必须 mock**：涉及网络 IO 的示例应写成**自给自足、不出网**的形式——用 `tcp.MockServe(rsp)` / `httpserver.Serve(...)` 在示例内起本地服务，再请求它；或用 harness 预置的临时 DB / `YAK_DOC_MOCK_HTTP`。这样示例可纳入执行校验、可复制即跑。
+- **确实无法本地验证的，必须显式标注**：在示例代码里写一行注释，包含短语 **`无法本地验证`** 并说明原因，例如：
+
+```yak
+// 无法本地验证: 需要真实可达的外部 HTTP 目标
+rsp = poc.Get("http://example.com")~
+```
+
+  该短语既是给人读的说明，也是给执行校验用的机器标记：执行校验会**跳过**这类示例并计入"已标注"，便于后续单独处理（真机/真服务）。适用场景：真实外部目标/凭据、磁盘上需预置的真实文件（jar/zip/目录）、root 特权（如 syn 扫描）、第三方在线服务（AI/dnslog）等。
+
+**度量指标**：(1) 白名单库执行失败数必须为 0；(2) 全库未验证示例数（`/tmp/doc_unverified.txt` 行数）持续下降——途径是把更多纯库纳入白名单、把网络示例改写成本地 mock、把确实跑不了的标注 `无法本地验证`。
+
+### 7.4 本地检查清单（每次补/改文档前后执行）
 
 ```bash
-# 1. 单元 + 边界 + 不变量 + 全库示例语法强校验
+# 1. 单元 + 边界 + 不变量 + 全库示例语法强校验 + 白名单库示例执行强校验
 go test ./common/yak/yakdoc/...
 
-# 2. 全量重生成（可选，确认所有库都过不变量自检，观察是否有 error log）
+# 2. 全库本地可验证性度量(静态, 不出网), 产出 /tmp/doc_unverified.txt
+go test ./common/yak/yakdoc/generate_web_doc/ -run TestAllLibsExampleVerifiabilityReport -v
+
+# 3. 全量重生成（可选，确认所有库都过不变量自检，观察是否有 error log）
 go run -gcflags=all=-l ./common/yak/yakdoc/generate_web_doc /tmp/webdoc_out
 
-# 3. 抽查目标库产物
+# 4. 抽查目标库产物
 #   - 索引/详情结构、必填参数/可选参数(选项)/返回值/示例 是否符合预期
 #   - 模块总览是否注入
 ```

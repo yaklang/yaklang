@@ -161,10 +161,10 @@ func _timeAfter(d time.Duration) <-chan time.Time {
 //
 // Example:
 // ```
-// // 5 秒后执行回调(作示意)
-// d = time.ParseDuration("5s")~
-// timer = time.AfterFunc(d, () => println("after 5s"))
-// time.sleep(10)
+// // 0.1 秒后执行回调
+// d = time.ParseDuration("100ms")~
+// timer = time.AfterFunc(d, () => println("fired"))
+// time.sleep(0.3) // 等回调执行完
 // ```
 func _timeAfterFunc(d time.Duration, f func()) *time.Timer {
 	return time.AfterFunc(d, f)
@@ -181,9 +181,9 @@ func _timeAfterFunc(d time.Duration, f func()) *time.Timer {
 //
 // Example:
 // ```
-// // 5 秒定时器(作示意)
-// timer = time.NewTimer(5)
-// <-timer.C
+// // 0.2 秒定时器
+// timer = time.NewTimer(0.2)
+// <-timer.C // 等待到期
 // ```
 func _timeNewTimer(d float64) *time.Timer {
 	return time.NewTimer(utils.FloatSecondDuration(d))
@@ -200,13 +200,13 @@ func _timeNewTimer(d float64) *time.Timer {
 //
 // Example:
 // ```
-// // 每 1 秒触发一次(作示意)
-// ticker = time.NewTicker(1)
-//
-//	for t in ticker.C {
-//	    println("tick")
-//	}
-//
+// // 每 0.1 秒触发一次, 取 3 次后停止
+// ticker = time.NewTicker(0.1)
+// count = 0
+// for t in ticker.C {
+//     count++
+//     if count >= 3 { ticker.Stop(); break }
+// }
 // ```
 func _timeNewTicker(d float64) *time.Ticker {
 	return time.NewTicker(utils.FloatSecondDuration(d))

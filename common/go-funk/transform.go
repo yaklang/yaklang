@@ -77,8 +77,10 @@ func Chunk(arr interface{}, size int) interface{} {
 //
 // Example:
 // ```
-// // 将结构体切片按字段转为 map(需结构体切片，作示意)
-// m = x.ToMap(users, "Id")
+// // 无法本地验证: ToMap 需要结构体切片作为输入, yak 无法内联构造结构体, 需用真实数据
+// // 将结构体切片按指定字段转为 map(键为该字段的值, 值为对应结构体)
+// users = getUsersFromSomewhere() // 假设返回结构体切片, 每个元素含 Id 字段
+// m = x.ToMap(users, "Id") // map: Id 值 -> 结构体
 // ```
 func ToMap(in interface{}, pivot string) interface{} {
 	value := reflect.ValueOf(in)
