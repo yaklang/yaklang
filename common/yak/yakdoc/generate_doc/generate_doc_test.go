@@ -118,13 +118,13 @@ func TestGenerateDoc(t *testing.T) {
 	if err := encoder.Encode(&helper); err != nil {
 		t.Fatal(err)
 	}
-	newBuf, err := utils.GzipCompress(buf.Bytes())
+	newBuf, err := utils.ZstdCompress(buf.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	var newHelper *yakdoc.DocumentHelper
-	newBuf2, err := utils.GzipDeCompress(newBuf)
+	newBuf2, err := utils.ZstdDeCompress(newBuf)
 	if err != nil {
 		t.Fatal(err)
 	}

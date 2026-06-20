@@ -106,10 +106,10 @@ jobs:
         run: go mod download
 
       - name: Generate Document
-        run: go run -gcflags=all="-N -l" common/yak/yakdoc/generate_doc/generate_doc.go common/yak/yakdoc/doc/doc.gob.gzip
+        run: go run -gcflags=all="-N -l" common/yak/yakdoc/generate_doc/generate_doc.go common/yak/yakdoc/doc/doc.gob.zst
 
       - name: Codec Methods Document
-        run: go run -gcflags=all="-N -l" common/yak/yaklib/codec/codegrpc/doc/codec_doc.go common/yak/yaklib/codec/codegrpc/codec.gob.gzip
+        run: go run -gcflags=all="-N -l" common/yak/yaklib/codec/codegrpc/doc/codec_doc.go common/yak/yaklib/codec/codegrpc/codec.gob.zst
 
       - name: Sync Embed FS Hash to Code
         run: go run common/yak/cmd/yak.go embed-fs-hash --override --all

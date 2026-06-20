@@ -49,7 +49,7 @@ import (
 	"github.com/yaklang/yaklang/common/yserx"
 )
 
-//go:embed codec.gob.gzip
+//go:embed codec.gob.zst
 var codecDoc []byte
 
 var (
@@ -66,7 +66,7 @@ var (
 )
 
 func init() {
-	buf, err := utils.GzipDeCompress(codecDoc)
+	buf, err := utils.ZstdDeCompress(codecDoc)
 	if err != nil {
 		log.Warnf("load embed yak document error: %v", err)
 	}
