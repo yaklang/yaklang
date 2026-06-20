@@ -68,7 +68,24 @@ func QueryUnescape(s string) (string, error) {
 	return url.QueryUnescape(UrlUnicodeDecode(s))
 }
 
-var PathEscape = url.PathEscape
+// PathEscape 对字符串做 URL 路径转义，将空格、斜杠等特殊字符转为百分号编码（导出名为 codec.EscapePathUrl）
+// 与 query 转义不同，路径转义会把空格编码为 %20（而非 +）
+//
+// 参数:
+//   - s: 待转义的字符串
+//
+// 返回值:
+//   - 路径转义后的字符串
+//
+// Example:
+// ```
+// result = codec.EscapePathUrl("a b/c")
+// println(result)   // OUT: a%20b%2Fc
+// assert result == "a%20b%2Fc", "EscapePathUrl should escape space to %20 and slash to %2F"
+// ```
+func PathEscape(s string) string {
+	return url.PathEscape(s)
+}
 
 // PathUnescape 对 URL 路径转义的字符串做解码，同时兼容 %uXXXX 形式
 // 参数:
@@ -123,12 +140,81 @@ func QueryEscape(s string) string {
 	return url.QueryEscape(s)
 }
 
-var (
-	EscapeHtmlString   = html.EscapeString
-	UnescapeHtmlString = html.UnescapeString
-	StrConvUnquote     = strconv.Unquote
-	StrConvQuote       = strconv.Quote
-)
+// EscapeHtmlString 对字符串做 HTML 实体转义，将 < > & ' " 等转为对应的 HTML 实体（导出名为 codec.EscapeHtml）
+// 用于把用户输入安全地嵌入 HTML 文本，防止 XSS
+//
+// 参数:
+//   - s: 待转义的字符串
+//
+// 返回值:
+//   - HTML 实体转义后的字符串
+//
+// Example:
+// ```
+// result = codec.EscapeHtml("<a href='x'>")
+// println(result)   // OUT: &lt;a href=&#39;x&#39;&gt;
+// assert result == "&lt;a href=&#39;x&#39;&gt;", "EscapeHtml should escape angle brackets and quotes"
+// ```
+func EscapeHtmlString(s string) string {
+	return html.EscapeString(s)
+}
+
+// UnescapeHtmlString 将 HTML 实体还原为原始字符，与 codec.EscapeHtml 配对使用（导出名为 codec.DecodeHtml）
+//
+// 参数:
+//   - s: 含 HTML 实体的字符串
+//
+// 返回值:
+//   - 还原后的原始字符串
+//
+// Example:
+// ```
+// result = codec.DecodeHtml("&lt;a&gt;")
+// println(result)   // OUT: <a>
+// assert result == "<a>", "DecodeHtml should unescape HTML entities"
+// ```
+func UnescapeHtmlString(s string) string {
+	return html.UnescapeString(s)
+}
+
+// StrConvUnquote 解析带引号的 Go 字面量字符串，去掉外层引号并处理转义序列（导出名为 codec.StrconvUnquote / codec.DecodeASCII）
+// 与 codec.StrconvQuote 配对使用，输入必须是带双引号包裹的字符串
+//
+// 参数:
+//   - s: 带引号的字符串字面量，如 "\"hi\""
+//
+// 返回值:
+//   - 去引号并解转义后的字符串
+//   - 错误信息（输入不是合法的带引号字面量时返回）
+//
+// Example:
+// ```
+// result = codec.StrconvUnquote("\"a\\nb\"")~
+// println(len(result))   // OUT: 3
+// assert result == "a\nb", "StrconvUnquote should unquote and unescape \\n"
+// ```
+func StrConvUnquote(s string) (string, error) {
+	return strconv.Unquote(s)
+}
+
+// StrConvQuote 将字符串转换为带双引号的 Go 字面量形式，特殊字符转义为 \n \t \xNN 等（导出名为 codec.StrconvQuote）
+// 与 codec.StrconvUnquote 配对使用
+//
+// 参数:
+//   - s: 待转换的字符串
+//
+// 返回值:
+//   - 带双引号、特殊字符已转义的字面量字符串
+//
+// Example:
+// ```
+// result = codec.StrconvQuote("a\nb")
+// println(result)   // OUT: "a\nb"
+// assert result == "\"a\\nb\"", "StrconvQuote should quote string and escape newline"
+// ```
+func StrConvQuote(s string) string {
+	return strconv.Quote(s)
+}
 
 // StrConvQuoteHex 将字符串转换为带双引号的可打印形式，非字母数字字节统一转义为 \xNN
 // 参数:
@@ -196,11 +282,44 @@ func UnescapeString(s string) (string, error) {
 	return yakunquote.UnquoteInner(s, 0)
 }
 
-var DoubleEncodeUrl = func(i interface{}) string {
+// DoubleEncodeUrl 对输入做两次 URL 编码（导出名为 codec.DoubleEncodeUrl）
+// 常用于绕过仅做一次 URL 解码的过滤器；与 codec.DoubleDecodeUrl 配对使用
+//
+// 参数:
+//   - i: 待编码的数据，可为 string、[]byte 等
+//
+// 返回值:
+//   - 经两次 URL 编码后的字符串
+//
+// Example:
+// ```
+// encoded = codec.DoubleEncodeUrl("a b&c")
+// decoded = codec.DoubleDecodeUrl(encoded)~
+// println(decoded)   // OUT: a b&c
+// assert decoded == "a b&c", "double encode then double decode should round-trip"
+// ```
+func DoubleEncodeUrl(i interface{}) string {
 	return url.QueryEscape(EncodeUrlCode(i))
 }
 
-var DoubleDecodeUrl = func(i string) (string, error) {
+// DoubleDecodeUrl 对输入做两次 URL 解码（导出名为 codec.DoubleDecodeUrl）
+// 与 codec.DoubleEncodeUrl 配对使用，用于还原被两次编码的数据
+//
+// 参数:
+//   - i: 被两次 URL 编码的字符串
+//
+// 返回值:
+//   - 两次解码后的原始字符串
+//   - 错误信息（解码失败时返回）
+//
+// Example:
+// ```
+// encoded = codec.DoubleEncodeUrl("a b&c")
+// decoded = codec.DoubleDecodeUrl(encoded)~
+// println(decoded)   // OUT: a b&c
+// assert decoded == "a b&c", "double decode should recover original plaintext"
+// ```
+func DoubleDecodeUrl(i string) (string, error) {
 	raw, err := url.QueryUnescape(i)
 	if err != nil {
 		return "", err

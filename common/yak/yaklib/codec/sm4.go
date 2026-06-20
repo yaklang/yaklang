@@ -388,18 +388,292 @@ func SM4DecryptOFBWithPKCSPadding(key []byte, i interface{}, iv []byte) ([]byte,
 }
 
 // other func
-var SM4EncryptCBCWithZeroPadding = SM4EncFactory(ZeroPadding, CBC)
-var SM4DecryptCBCWithZeroPadding = SM4DecFactory(ZeroUnPadding, CBC)
-var SM4EncryptCFBWithZeroPadding = SM4EncFactory(ZeroPadding, CFB)
-var SM4DecryptCFBWithZeroPadding = SM4DecFactory(ZeroUnPadding, CFB)
-var SM4EncryptECBWithZeroPadding = SM4EncFactory(ZeroPadding, ECB)
-var SM4DecryptECBWithZeroPadding = SM4DecFactory(ZeroUnPadding, ECB)
-var SM4EncryptOFBWithZeroPadding = SM4EncFactory(ZeroPadding, OFB)
-var SM4DecryptOFBWithZeroPadding = SM4DecFactory(ZeroUnPadding, OFB)
-var SM4EncryptCTRWithPKCSPadding = SM4EncFactory(PKCS5Padding, CTR)
-var SM4DecryptCTRWithPKCSPadding = SM4DecFactory(PKCS5UnPadding, CTR)
-var SM4EncryptCTRWithZeroPadding = SM4EncFactory(ZeroPadding, CTR)
-var SM4DecryptCTRWithZeroPadding = SM4DecFactory(ZeroUnPadding, CTR)
+
+// SM4EncryptCBCWithZeroPadding 使用国密 SM4 算法在 CBC 模式下用零填充(ZeroPadding)加密数据（导出名为 codec.Sm4CBCEncryptWithZeroPadding）
+// 密钥与 IV 均为 16 字节；IV 为空时使用 key 前 16 字节作为 IV。
+// 参数:
+//   - key: 密钥(16 字节)
+//   - i: 待加密的数据，可为 string、[]byte 等
+//   - iv: 初始化向量(16 字节)，可为 nil
+//
+// 返回值:
+//   - []byte: 加密后的密文字节
+//   - error: 加密失败时返回的错误
+//
+// Example:
+// ```
+// key = "1234567890123456"
+// iv = "abcdefghijklmnop"
+// ct = codec.Sm4CBCEncryptWithZeroPadding(key, "Secret Message", iv)~
+// pt = codec.Sm4CBCDecryptWithZeroPadding(key, ct, iv)~
+// println(string(pt))   // OUT: Secret Message
+// assert string(pt) == "Secret Message", "SM4-CBC zero padding should round-trip"
+// ```
+func SM4EncryptCBCWithZeroPadding(key []byte, i interface{}, iv []byte) ([]byte, error) {
+	return SM4EncFactory(ZeroPadding, CBC)(key, i, iv)
+}
+
+// SM4DecryptCBCWithZeroPadding 使用国密 SM4 算法在 CBC 模式下用零填充(ZeroPadding)解密数据（导出名为 codec.Sm4CBCDecryptWithZeroPadding）
+// 与 codec.Sm4CBCEncryptWithZeroPadding 配对使用，密钥与 IV 均为 16 字节。
+// 参数:
+//   - key: 密钥(16 字节)
+//   - i: 待解密的密文，可为 []byte 等
+//   - iv: 初始化向量(16 字节)，可为 nil
+//
+// 返回值:
+//   - []byte: 解密还原后的明文字节
+//   - error: 解密失败时返回的错误
+//
+// Example:
+// ```
+// key = "1234567890123456"
+// iv = "abcdefghijklmnop"
+// ct = codec.Sm4CBCEncryptWithZeroPadding(key, "Secret Message", iv)~
+// pt = codec.Sm4CBCDecryptWithZeroPadding(key, ct, iv)~
+// println(string(pt))   // OUT: Secret Message
+// assert string(pt) == "Secret Message", "SM4-CBC zero padding decrypt should recover plaintext"
+// ```
+func SM4DecryptCBCWithZeroPadding(key []byte, i interface{}, iv []byte) ([]byte, error) {
+	return SM4DecFactory(ZeroUnPadding, CBC)(key, i, iv)
+}
+
+// SM4EncryptCFBWithZeroPadding 使用国密 SM4 算法在 CFB 模式下用零填充(ZeroPadding)加密数据（导出名为 codec.Sm4CFBEncryptWithZeroPadding）
+// 密钥与 IV 均为 16 字节；IV 为空时使用 key 前 16 字节作为 IV。
+// 参数:
+//   - key: 密钥(16 字节)
+//   - i: 待加密的数据，可为 string、[]byte 等
+//   - iv: 初始化向量(16 字节)，可为 nil
+//
+// 返回值:
+//   - []byte: 加密后的密文字节
+//   - error: 加密失败时返回的错误
+//
+// Example:
+// ```
+// key = "1234567890123456"
+// iv = "abcdefghijklmnop"
+// ct = codec.Sm4CFBEncryptWithZeroPadding(key, "Secret Message", iv)~
+// pt = codec.Sm4CFBDecryptWithZeroPadding(key, ct, iv)~
+// println(string(pt))   // OUT: Secret Message
+// assert string(pt) == "Secret Message", "SM4-CFB zero padding should round-trip"
+// ```
+func SM4EncryptCFBWithZeroPadding(key []byte, i interface{}, iv []byte) ([]byte, error) {
+	return SM4EncFactory(ZeroPadding, CFB)(key, i, iv)
+}
+
+// SM4DecryptCFBWithZeroPadding 使用国密 SM4 算法在 CFB 模式下用零填充(ZeroPadding)解密数据（导出名为 codec.Sm4CFBDecryptWithZeroPadding）
+// 与 codec.Sm4CFBEncryptWithZeroPadding 配对使用，密钥与 IV 均为 16 字节。
+// 参数:
+//   - key: 密钥(16 字节)
+//   - i: 待解密的密文，可为 []byte 等
+//   - iv: 初始化向量(16 字节)，可为 nil
+//
+// 返回值:
+//   - []byte: 解密还原后的明文字节
+//   - error: 解密失败时返回的错误
+//
+// Example:
+// ```
+// key = "1234567890123456"
+// iv = "abcdefghijklmnop"
+// ct = codec.Sm4CFBEncryptWithZeroPadding(key, "Secret Message", iv)~
+// pt = codec.Sm4CFBDecryptWithZeroPadding(key, ct, iv)~
+// println(string(pt))   // OUT: Secret Message
+// assert string(pt) == "Secret Message", "SM4-CFB zero padding decrypt should recover plaintext"
+// ```
+func SM4DecryptCFBWithZeroPadding(key []byte, i interface{}, iv []byte) ([]byte, error) {
+	return SM4DecFactory(ZeroUnPadding, CFB)(key, i, iv)
+}
+
+// SM4EncryptECBWithZeroPadding 使用国密 SM4 算法在 ECB 模式下用零填充(ZeroPadding)加密数据(ECB 模式下 iv 无用，传 nil)（导出名为 codec.Sm4ECBEncryptWithZeroPadding）
+// 密钥为 16 字节。
+// 参数:
+//   - key: 密钥(16 字节)
+//   - i: 待加密的数据，可为 string、[]byte 等
+//   - iv: ECB 模式下无用，传 nil 即可
+//
+// 返回值:
+//   - []byte: 加密后的密文字节
+//   - error: 加密失败时返回的错误
+//
+// Example:
+// ```
+// key = "1234567890123456"
+// ct = codec.Sm4ECBEncryptWithZeroPadding(key, "Secret Message", nil)~
+// pt = codec.Sm4ECBDecryptWithZeroPadding(key, ct, nil)~
+// println(string(pt))   // OUT: Secret Message
+// assert string(pt) == "Secret Message", "SM4-ECB zero padding should round-trip"
+// ```
+func SM4EncryptECBWithZeroPadding(key []byte, i interface{}, iv []byte) ([]byte, error) {
+	return SM4EncFactory(ZeroPadding, ECB)(key, i, iv)
+}
+
+// SM4DecryptECBWithZeroPadding 使用国密 SM4 算法在 ECB 模式下用零填充(ZeroPadding)解密数据(ECB 模式下 iv 无用，传 nil)（导出名为 codec.Sm4ECBDecryptWithZeroPadding）
+// 与 codec.Sm4ECBEncryptWithZeroPadding 配对使用，密钥为 16 字节。
+// 参数:
+//   - key: 密钥(16 字节)
+//   - i: 待解密的密文，可为 []byte 等
+//   - iv: ECB 模式下无用，传 nil 即可
+//
+// 返回值:
+//   - []byte: 解密还原后的明文字节
+//   - error: 解密失败时返回的错误
+//
+// Example:
+// ```
+// key = "1234567890123456"
+// ct = codec.Sm4ECBEncryptWithZeroPadding(key, "Secret Message", nil)~
+// pt = codec.Sm4ECBDecryptWithZeroPadding(key, ct, nil)~
+// println(string(pt))   // OUT: Secret Message
+// assert string(pt) == "Secret Message", "SM4-ECB zero padding decrypt should recover plaintext"
+// ```
+func SM4DecryptECBWithZeroPadding(key []byte, i interface{}, iv []byte) ([]byte, error) {
+	return SM4DecFactory(ZeroUnPadding, ECB)(key, i, iv)
+}
+
+// SM4EncryptOFBWithZeroPadding 使用国密 SM4 算法在 OFB 模式下用零填充(ZeroPadding)加密数据（导出名为 codec.Sm4OFBEncryptWithZeroPadding）
+// 密钥与 IV 均为 16 字节；IV 为空时使用 key 前 16 字节作为 IV。
+// 参数:
+//   - key: 密钥(16 字节)
+//   - i: 待加密的数据，可为 string、[]byte 等
+//   - iv: 初始化向量(16 字节)，可为 nil
+//
+// 返回值:
+//   - []byte: 加密后的密文字节
+//   - error: 加密失败时返回的错误
+//
+// Example:
+// ```
+// key = "1234567890123456"
+// iv = "abcdefghijklmnop"
+// ct = codec.Sm4OFBEncryptWithZeroPadding(key, "Secret Message", iv)~
+// pt = codec.Sm4OFBDecryptWithZeroPadding(key, ct, iv)~
+// println(string(pt))   // OUT: Secret Message
+// assert string(pt) == "Secret Message", "SM4-OFB zero padding should round-trip"
+// ```
+func SM4EncryptOFBWithZeroPadding(key []byte, i interface{}, iv []byte) ([]byte, error) {
+	return SM4EncFactory(ZeroPadding, OFB)(key, i, iv)
+}
+
+// SM4DecryptOFBWithZeroPadding 使用国密 SM4 算法在 OFB 模式下用零填充(ZeroPadding)解密数据（导出名为 codec.Sm4OFBDecryptWithZeroPadding）
+// 与 codec.Sm4OFBEncryptWithZeroPadding 配对使用，密钥与 IV 均为 16 字节。
+// 参数:
+//   - key: 密钥(16 字节)
+//   - i: 待解密的密文，可为 []byte 等
+//   - iv: 初始化向量(16 字节)，可为 nil
+//
+// 返回值:
+//   - []byte: 解密还原后的明文字节
+//   - error: 解密失败时返回的错误
+//
+// Example:
+// ```
+// key = "1234567890123456"
+// iv = "abcdefghijklmnop"
+// ct = codec.Sm4OFBEncryptWithZeroPadding(key, "Secret Message", iv)~
+// pt = codec.Sm4OFBDecryptWithZeroPadding(key, ct, iv)~
+// println(string(pt))   // OUT: Secret Message
+// assert string(pt) == "Secret Message", "SM4-OFB zero padding decrypt should recover plaintext"
+// ```
+func SM4DecryptOFBWithZeroPadding(key []byte, i interface{}, iv []byte) ([]byte, error) {
+	return SM4DecFactory(ZeroUnPadding, OFB)(key, i, iv)
+}
+
+// SM4EncryptCTRWithPKCSPadding 使用国密 SM4 算法在 CTR 模式下用 PKCS7 填充加密数据（导出名为 codec.Sm4CTREncrypt / codec.Sm4CTREncryptWithPKCSPadding）
+// 密钥与 IV 均为 16 字节；IV 为空时使用 key 前 16 字节作为 IV。
+// 参数:
+//   - key: 密钥(16 字节)
+//   - i: 待加密的数据，可为 string、[]byte 等
+//   - iv: 初始化向量(16 字节)，可为 nil
+//
+// 返回值:
+//   - []byte: 加密后的密文字节
+//   - error: 加密失败时返回的错误
+//
+// Example:
+// ```
+// key = "1234567890123456"
+// iv = "abcdefghijklmnop"
+// ct = codec.Sm4CTREncrypt(key, "Secret Message", iv)~
+// pt = codec.Sm4CTRDecrypt(key, ct, iv)~
+// println(string(pt))   // OUT: Secret Message
+// assert string(pt) == "Secret Message", "SM4-CTR pkcs padding should round-trip"
+// ```
+func SM4EncryptCTRWithPKCSPadding(key []byte, i interface{}, iv []byte) ([]byte, error) {
+	return SM4EncFactory(PKCS5Padding, CTR)(key, i, iv)
+}
+
+// SM4DecryptCTRWithPKCSPadding 使用国密 SM4 算法在 CTR 模式下用 PKCS7 填充解密数据（导出名为 codec.Sm4CTRDecrypt / codec.Sm4CTRDecryptWithPKCSPadding）
+// 与 codec.Sm4CTREncryptWithPKCSPadding 配对使用，密钥与 IV 均为 16 字节。
+// 参数:
+//   - key: 密钥(16 字节)
+//   - i: 待解密的密文，可为 []byte 等
+//   - iv: 初始化向量(16 字节)，可为 nil
+//
+// 返回值:
+//   - []byte: 解密还原后的明文字节
+//   - error: 解密失败时返回的错误
+//
+// Example:
+// ```
+// key = "1234567890123456"
+// iv = "abcdefghijklmnop"
+// ct = codec.Sm4CTREncrypt(key, "Secret Message", iv)~
+// pt = codec.Sm4CTRDecrypt(key, ct, iv)~
+// println(string(pt))   // OUT: Secret Message
+// assert string(pt) == "Secret Message", "SM4-CTR pkcs padding decrypt should recover plaintext"
+// ```
+func SM4DecryptCTRWithPKCSPadding(key []byte, i interface{}, iv []byte) ([]byte, error) {
+	return SM4DecFactory(PKCS5UnPadding, CTR)(key, i, iv)
+}
+
+// SM4EncryptCTRWithZeroPadding 使用国密 SM4 算法在 CTR 模式下用零填充(ZeroPadding)加密数据（导出名为 codec.Sm4CTREncryptWithZeroPadding）
+// 密钥与 IV 均为 16 字节；IV 为空时使用 key 前 16 字节作为 IV。
+// 参数:
+//   - key: 密钥(16 字节)
+//   - i: 待加密的数据，可为 string、[]byte 等
+//   - iv: 初始化向量(16 字节)，可为 nil
+//
+// 返回值:
+//   - []byte: 加密后的密文字节
+//   - error: 加密失败时返回的错误
+//
+// Example:
+// ```
+// key = "1234567890123456"
+// iv = "abcdefghijklmnop"
+// ct = codec.Sm4CTREncryptWithZeroPadding(key, "Secret Message", iv)~
+// pt = codec.Sm4CTRDecryptWithZeroPadding(key, ct, iv)~
+// println(string(pt))   // OUT: Secret Message
+// assert string(pt) == "Secret Message", "SM4-CTR zero padding should round-trip"
+// ```
+func SM4EncryptCTRWithZeroPadding(key []byte, i interface{}, iv []byte) ([]byte, error) {
+	return SM4EncFactory(ZeroPadding, CTR)(key, i, iv)
+}
+
+// SM4DecryptCTRWithZeroPadding 使用国密 SM4 算法在 CTR 模式下用零填充(ZeroPadding)解密数据（导出名为 codec.Sm4CTRDecryptWithZeroPadding）
+// 与 codec.Sm4CTREncryptWithZeroPadding 配对使用，密钥与 IV 均为 16 字节。
+// 参数:
+//   - key: 密钥(16 字节)
+//   - i: 待解密的密文，可为 []byte 等
+//   - iv: 初始化向量(16 字节)，可为 nil
+//
+// 返回值:
+//   - []byte: 解密还原后的明文字节
+//   - error: 解密失败时返回的错误
+//
+// Example:
+// ```
+// key = "1234567890123456"
+// iv = "abcdefghijklmnop"
+// ct = codec.Sm4CTREncryptWithZeroPadding(key, "Secret Message", iv)~
+// pt = codec.Sm4CTRDecryptWithZeroPadding(key, ct, iv)~
+// println(string(pt))   // OUT: Secret Message
+// assert string(pt) == "Secret Message", "SM4-CTR zero padding decrypt should recover plaintext"
+// ```
+func SM4DecryptCTRWithZeroPadding(key []byte, i interface{}, iv []byte) ([]byte, error) {
+	return SM4DecFactory(ZeroUnPadding, CTR)(key, i, iv)
+}
 
 var SM4GCMEncrypt = SM4GCMEnc
 var SM4GCMDecrypt = SM4GCMDec
