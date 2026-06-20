@@ -128,6 +128,43 @@ func renderDetailDoc(doc string) string {
 	return prose + "\nExample:\n\n" + fenceExampleYak(code) + "\n"
 }
 
+// bareURLSchemeRe 匹配 URL 协议头 "http://" / "https://"。
+// 关键词: 裸URL autolink, MDX 构建崩溃, 协议分隔符转义
+var bareURLSchemeRe = regexp.MustCompile(`https?://`)
+
+// neutralizeBareURLAutolinks 把正文/表格里的"裸 URL"协议分隔符 "://" 替换为实体
+// "&#58;//"，阻断 gfm autolink。否则形如 "http://127.0.0.1:8080"） 的文本会被
+// gfm autolink 把后续的引号/全角标点一并并入 URL，生成 http://127.0.0.1:8080"）
+// 这种非法 URL，导致文档站 MDX 构建崩溃。
+//
+// 转义后浏览器仍会把实体还原显示为 http:// ，只是该 URL 不再被识别为可点击链接（对参数
+// 说明里的示例地址而言这正是期望行为）。唯一需要保留可点击的是 markdown 链接
+// "[text](http://...)"，因此这里跳过紧跟在 "](" 之后的 URL。
+// 注意：必须在 html.EscapeString 之后调用——此时字面引号已变为 "&#34;" 实体，无法再靠
+// "前导字符是引号" 来识别裸 URL，故改为"除 markdown 链接外一律转义"的稳健策略。
+// 关键词: neutralizeBareURLAutolinks, 阻断 autolink, 跳过 markdown 链接
+func neutralizeBareURLAutolinks(s string) string {
+	locs := bareURLSchemeRe.FindAllStringIndex(s, -1)
+	if len(locs) == 0 {
+		return s
+	}
+	var b strings.Builder
+	prev := 0
+	for _, loc := range locs {
+		start, end := loc[0], loc[1]
+		b.WriteString(s[prev:start])
+		if start >= 2 && s[start-2:start] == "](" {
+			// markdown 链接目标，保持可点击
+			b.WriteString(s[start:end])
+		} else {
+			b.WriteString(strings.Replace(s[start:end], "://", "&#58;//", 1))
+		}
+		prev = end
+	}
+	b.WriteString(s[prev:])
+	return b.String()
+}
+
 // summarizeDocument 从原始文档生成函数索引表格用的单行摘要：
 // 去除代码块与示例段、归一化空白、截断 150 runes、仅 HTML 转义一次并转义表格分隔符。
 // 关键词: 文档摘要, 避免二次转义, 避免代码块漏进表格
@@ -142,6 +179,7 @@ func summarizeDocument(raw string) string {
 		s = string(runes[:150]) + "..."
 	}
 	s = html.EscapeString(s)
+	s = neutralizeBareURLAutolinks(s)
 	s = strings.ReplaceAll(s, "|", "\\|")
 	return s
 }
@@ -159,7 +197,7 @@ func escapeProseKeepCode(s string) string {
 		if inFence {
 			continue
 		}
-		lines[i] = html.EscapeString(line)
+		lines[i] = neutralizeBareURLAutolinks(html.EscapeString(line))
 	}
 	return strings.Join(lines, "\n")
 }
@@ -170,6 +208,7 @@ func escapeTableCell(s string) string {
 	s = strings.ReplaceAll(s, "\n", " ")
 	s = strings.TrimSpace(s)
 	s = html.EscapeString(s)
+	s = neutralizeBareURLAutolinks(s)
 	s = strings.ReplaceAll(s, "|", "\\|")
 	return s
 }
