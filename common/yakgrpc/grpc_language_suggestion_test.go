@@ -919,7 +919,7 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_Generic(t *testing.T) {
 				EndLine:     1,
 				EndColumn:   8,
 			},
-			_markdownWrapper(`Find(i []T|map[U]T, fc (T) -> boolean) T`),
+			_getFuncDescFromLabelAndDoc(`Find(i []T|map[U]T, fc (T) -> boolean) T`, getFuncDeclByName("x", "Find").Document),
 		)
 	})
 }
@@ -1215,7 +1215,7 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_FixFunctionParams(t *testing.T) {
 		EndColumn:   21,
 	}
 	// 标准库函数
-	check(t, code, "yak", ssaParseRange, _markdownWrapper(`Find(i []T|map[U]T, fc (T) -> boolean) T`))
+	check(t, code, "yak", ssaParseRange, _getFuncDescFromLabelAndDoc(`Find(i []T|map[U]T, fc (T) -> boolean) T`, getFuncDeclByName("x", "Find").Document))
 }
 
 func TestGRPCMUSTPASS_LANGUAGE_SuggestionSignature(t *testing.T) {
@@ -1316,7 +1316,7 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionSignature_Generic(t *testing.T) {
 				EndColumn:   8,
 			},
 			"Find(i []T|map[U]T, fc (T) -> boolean) T",
-			"",
+			getFuncDeclByName("x", "Find").Document,
 		)
 	})
 }
@@ -1337,7 +1337,7 @@ x.Find()`,
 				EndColumn:   8,
 			},
 			"Find(i []T|map[U]T, fc (T) -> boolean) T",
-			"",
+			getFuncDeclByName("x", "Find").Document,
 		)
 	})
 }
