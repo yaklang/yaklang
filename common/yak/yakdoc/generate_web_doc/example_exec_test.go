@@ -40,6 +40,9 @@ var safeExecLibs = map[string]bool{
 	"env": true, "log": true, "memeditor": true, "xhtml": true, "sandbox": true,
 	// 批次4: 时间/时区/本地 JS 引擎(均不出网、不需外部资源)
 	"time": true, "timezone": true, "js": true,
+	// 批次5(高频, 探针中): fuzz 纯本地; risk 写临时DB(已隔离)
+	// 注: cli 不可盲跑 —— 其 cli.check()/help 会 os.Exit 直接崩进程, 需逐例特殊处理。
+	"fuzz": true, "risk": true,
 }
 
 func setupLocalExecEnv(t *testing.T) {

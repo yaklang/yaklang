@@ -589,7 +589,8 @@ func WithRiskParam_YakScriptUUID(i string) RiskParamsOpt {
 //
 // Example:
 // ```
-// risk.NewRisk(target, risk.fromScript("plugin_name"))
+// // 记录一条风险到数据库, 并标注来源插件名(便于在风险管理中追溯是哪个插件发现的)
+// risk.NewRisk("http://example.com/vuln", risk.fromYakScript("my-plugin"), risk.severity("high"))
 // ```
 func WithRiskParam_FromScript(i string) RiskParamsOpt {
 	return func(r *schema.Risk) {
@@ -1101,8 +1102,9 @@ func CheckHTTPLogByToken(token string, pluginContext YakitPluginInfo, timeout ..
 //
 // Example:
 // ```
+// // 无法本地验证: 依赖带外(HTTPLog)平台与公网 Bridge
 // domain, token = risk.NewHTTPLog()~
-// // 触发目标访问 domain 后查询（需要网络与带外平台，示意性示例）
+// // 触发目标访问 domain 后查询是否收到带外回连记录
 // notifications = risk.CheckHTTPLogByToken(token, 5)~
 // for n in notifications { println(n.Url) }
 // ```
@@ -1176,7 +1178,8 @@ func YakitNewCheckDNSLogByToken(pluginContext YakitPluginInfo) func(token string
 //
 // Example:
 // ```
-// token, addr = risk.NewRandomPortTrigger()~
+// // 无法本地验证: 依赖公网 Bridge 反连服务(需配置 yak bridge 地址)
+// token, addr = risk.NewRandomPortTrigger()~ // 申请一个随机端口反连检测地址
 // ```
 func NewRandomPortTrigger(opt ...RiskParamsOpt) (token string, addr string, _ error) {
 	token = utils.RandStringBytes(8)
@@ -1211,7 +1214,8 @@ func NewRandomPortTrigger(opt ...RiskParamsOpt) (token string, addr string, _ er
 //
 // Example:
 // ```
-// // 该示例为示意性用法：通过长度检查 ICMP 反连
+// // 无法本地验证: 依赖公网 Bridge 反连服务(需配置 yak bridge 地址)
+// // 通过特定 ICMP 包长度查询是否收到 ICMP 反连
 // event = risk.CheckICMPTriggerByLength(1111)~
 // println(event.CurrentRemoteAddr)
 // ```
@@ -1262,8 +1266,9 @@ func CheckICMPTriggerByLength(i int, pluginContext YakitPluginInfo) (*tpb.ICMPTr
 //
 // Example:
 // ```
+// // 无法本地验证: 依赖公网 Bridge 反连服务(需配置 yak bridge 地址)
 // token, addr = risk.NewRandomPortTrigger()~
-// // 触发目标连接 addr 后查询（需要网络与 Bridge 反连服务，示意性示例）
+// // 触发目标连接 addr 后查询是否收到反连事件
 // event = risk.CheckRandomTriggerByToken(token)~
 // println(event.RemoteAddr)
 // ```
