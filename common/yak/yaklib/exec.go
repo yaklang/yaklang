@@ -14,12 +14,23 @@ import (
 	"github.com/yaklang/yaklang/common/utils/shlex"
 )
 
-// CommandContext 创建一个受上下文控制的命令结构体，其第一个参数是上下文，第二个参数是要执行的命令
+// CommandContext 创建一个受上下文控制的命令对象（导出名为 exec.CommandContext）
+// 命令字符串会按 shell 规则切分参数；上下文取消时会终止整个进程组
+//
+// 参数:
+//   - ctx: 控制命令生命周期的上下文
+//   - s: 完整命令字符串（如 "echo hello"）
+//
+// 返回值:
+//   - 命令对象（可调用 CombinedOutput/Run 等方法）
+//   - 错误信息（命令解析失败时返回）
+//
 // Example:
 // ```
-// cmd = exec.CommandContext(context.New(), "ls -al")
-// output = cmd.CombineOutput()~
-// dump(output)
+// cmd = exec.CommandContext(context.Background(), "echo ctx")~
+// output = cmd.CombinedOutput()~
+// println(string(output))   // OUT: ctx
+// assert str.Contains(string(output), "ctx"), "CommandContext output should contain the echoed text"
 // ```
 func commandContext(ctx context.Context, s string) (*exec.Cmd, error) {
 	cmds, err := shlex.Split(s)
@@ -45,22 +56,43 @@ func commandContext(ctx context.Context, s string) (*exec.Cmd, error) {
 	return cmd, nil
 }
 
-// Command 创建一个命令结构体
+// Command 创建一个命令对象（导出名为 exec.Command）
+// 等价于使用 context.Background() 的 CommandContext
+//
+// 参数:
+//   - s: 完整命令字符串（如 "echo hello"）
+//
+// 返回值:
+//   - 命令对象（可调用 CombinedOutput/Run 等方法）
+//   - 错误信息（命令解析失败时返回）
+//
 // Example:
 // ```
-// cmd = exec.Command("ls -al")
-// output = cmd.CombineOutput()~
-// dump(output)
+// cmd = exec.Command("echo hello")~
+// output = cmd.CombinedOutput()~
+// println(string(output))   // OUT: hello
+// assert str.Contains(string(output), "hello"), "Command output should contain the echoed text"
 // ```
 func command(s string) (*exec.Cmd, error) {
 	return commandContext(context.Background(), s)
 }
 
-// SystemContext 创建受上下文控制的命令结构体并执行，返回结果与错误
+// SystemContext 在指定上下文下执行命令并返回合并的输出（导出名为 exec.SystemContext）
+// 同时收集标准输出与标准错误
+//
+// 参数:
+//   - ctx: 控制命令生命周期的上下文
+//   - i: 完整命令字符串
+//
+// 返回值:
+//   - 命令的合并输出（stdout+stderr）
+//   - 错误信息（命令执行失败时返回）
+//
 // Example:
 // ```
-// output, err = exec.SystemContext(context.New(),"ls -al")~
-// dump(output)
+// output = exec.SystemContext(context.Background(), "echo sysctx")~
+// println(string(output))   // OUT: sysctx
+// assert str.Contains(string(output), "sysctx"), "SystemContext output should contain the echoed text"
 // ```
 func systemContext(ctx context.Context, i string) ([]byte, error) {
 	s, err := commandContext(ctx, i)
@@ -74,25 +106,46 @@ func systemContext(ctx context.Context, i string) ([]byte, error) {
 	return raw, err
 }
 
-// System 创建命令结构体并执行，返回结果与错误
+// System 执行命令并返回合并的输出（导出名为 exec.System）
+// 等价于使用 context.Background() 的 SystemContext，同时收集 stdout 与 stderr
+//
+// 参数:
+//   - i: 完整命令字符串
+//
+// 返回值:
+//   - 命令的合并输出（stdout+stderr）
+//   - 错误信息（命令执行失败时返回）
+//
 // Example:
 // ```
-// output, err = exec.System("ls -al")~
-// dump(output)
+// output = exec.System("echo systest")~
+// println(string(output))   // OUT: systest
+// assert str.Contains(string(output), "systest"), "System output should contain the echoed text"
 // ```
 func system(i string) ([]byte, error) {
 	return systemContext(context.Background(), i)
 }
 
-// SystemBatch 批量执行命令，它的第一个参数为要批量执行的命令(支持 fuzztag )，接下来可以接收零个到多个选项，用于对批量命令执行进行配置，例如设置超时时间，回调函数等
+// SystemBatch 批量并发执行命令（导出名为 exec.SystemBatch）
+// 第一个参数为命令模板，支持 fuzztag 展开为多条命令；其余为可选项，用于配置并发数、超时与结果回调
+//
+// 参数:
+//   - i: 命令模板（支持 fuzztag，如 "echo {{int(1-3)}}"）
+//   - opts: 可选项，如 exec.concurrent / exec.timeout / exec.callback
+//
 // Example:
 // ```
-// exec.SystemBatch("ping 192.168.1.{{int(1-100)}}",
-// exec.timeout(10),
-// exec.concurrent(20),
-// exec.callback(func(cmd, result) {
-// log.Infof("exec[%v] result: %v", cmd, string(result))
-// })
+// results = make([]string, 0)
+// lock = sync.NewMutex()
+// exec.SystemBatch("echo batch{{int(1-3)}}",
+//     exec.timeout(10),
+//     exec.concurrent(5),
+//     exec.callback(func(cmd, result) {
+//         lock.Lock(); results = append(results, string(result)); lock.Unlock()
+//     }),
+// )
+// println(len(results))   // OUT: 3
+// assert len(results) == 3, "SystemBatch should run the three expanded commands"
 // ```
 func systemBatch(i string, opts ...execPoolOpt) {
 	config := &_execPoolConfig{
@@ -134,14 +187,23 @@ func systemBatch(i string, opts ...execPoolOpt) {
 	}
 }
 
-// CheckCrash 检查命令执行是否发生了崩溃，不支持 Windows 系统，返回值为是否崩溃和错误信息
+// CheckCrash 检查一个已执行完成的命令是否因崩溃信号（SIGSEGV/SIGABRT）而终止（导出名为 exec.CheckCrash）
+// 不支持 Windows 系统；需在命令 Run/Wait 之后调用
+//
+// 参数:
+//   - c: 已执行完成的命令对象
+//
+// 返回值:
+//   - 是否检测到崩溃
+//   - 错误信息（如在 Windows 上调用）
+//
 // Example:
 // ```
-// cmd = exec.Command("ls -al")~
+// cmd = exec.Command("echo done")~
+// cmd.Run()
 // isCrash = exec.CheckCrash(cmd)~
-// if isCrash {
-// // ...
-// }
+// println(isCrash)   // OUT: false
+// assert isCrash == false, "a normally exited command should not be reported as crashed"
 // ```
 func checkCrash(c *exec.Cmd) (bool, error) {
 	sysType := runtime.GOOS
@@ -174,15 +236,25 @@ type _execPoolConfig struct {
 
 type execPoolOpt func(c *_execPoolConfig)
 
-// concurrent 是一个选项参数，用于设置批量命令执行的并发数，默认为 20
+// concurrent 设置 exec.SystemBatch 的并发执行数，默认为 20（导出名为 exec.concurrent）
+// 作为 exec.SystemBatch 的可选项使用
+//
+// 参数:
+//   - i: 并发数
+//
+// 返回值:
+//   - 可传入 exec.SystemBatch 的选项
+//
 // Example:
 // ```
-// exec.SystemBatch("ping 192.168.1.{{int(1-100)}}",
-// exec.timeout(10),
-// exec.concurrent(20),
-// exec.callback(func(cmd, result) {
-// log.Infof("exec[%v] result: %v", cmd, string(result))
-// })
+// results = make([]string, 0)
+// lock = sync.NewMutex()
+// exec.SystemBatch("echo c{{int(1-3)}}",
+//     exec.concurrent(2),
+//     exec.callback(func(cmd, result) { lock.Lock(); results = append(results, string(result)); lock.Unlock() }),
+// )
+// println(len(results))   // OUT: 3
+// assert len(results) == 3, "concurrent option should still run all expanded commands"
 // ```
 func _execConcurrent(i int) execPoolOpt {
 	return func(c *_execPoolConfig) {
@@ -190,15 +262,25 @@ func _execConcurrent(i int) execPoolOpt {
 	}
 }
 
-// timeout 是一个选项参数，用于设置批量命令执行的超时时间，单位为秒
+// timeout 设置 exec.SystemBatch 中每条命令的超时时间，单位为秒（导出名为 exec.timeout）
+// 作为 exec.SystemBatch 的可选项使用；超时后该命令被终止
+//
+// 参数:
+//   - i: 超时秒数（支持小数）
+//
+// 返回值:
+//   - 可传入 exec.SystemBatch 的选项
+//
 // Example:
 // ```
-// exec.SystemBatch("ping 192.168.1.{{int(1-100)}}",
-// exec.timeout(10),
-// exec.concurrent(20),
-// exec.callback(func(cmd, result) {
-// log.Infof("exec[%v] result: %v", cmd, string(result))
-// })
+// results = make([]string, 0)
+// lock = sync.NewMutex()
+// exec.SystemBatch("echo t{{int(1-2)}}",
+//     exec.timeout(10),
+//     exec.callback(func(cmd, result) { lock.Lock(); results = append(results, string(result)); lock.Unlock() }),
+// )
+// println(len(results))   // OUT: 2
+// assert len(results) == 2, "timeout option should not affect fast commands"
 // ```
 func _execTimeout(i float64) execPoolOpt {
 	return func(c *_execPoolConfig) {
@@ -206,15 +288,24 @@ func _execTimeout(i float64) execPoolOpt {
 	}
 }
 
-// callback 是一个选项参数，用于设置批量命令执行的回调函数，回调函数的第一个参数为执行的命令，第二个参数为执行的结果，在回调函数中可以对命令执行结果进行处理
+// callback 设置 exec.SystemBatch 每条命令执行完成后的回调（导出名为 exec.callback）
+// 回调第一个参数为执行的命令，第二个参数为该命令的输出结果；作为 exec.SystemBatch 的可选项使用
+//
+// 参数:
+//   - f: 回调函数 func(cmd, result)
+//
+// 返回值:
+//   - 可传入 exec.SystemBatch 的选项
+//
 // Example:
 // ```
-// exec.SystemBatch("ping 192.168.1.{{int(1-100)}}",
-// exec.timeout(10),
-// exec.concurrent(20),
-// exec.callback(func(cmd, result) {
-// log.Infof("exec[%v] result: %v", cmd, string(result))
-// })
+// outputs = make([]string, 0)
+// lock = sync.NewMutex()
+// exec.SystemBatch("echo cb{{int(1-3)}}",
+//     exec.callback(func(cmd, result) { lock.Lock(); outputs = append(outputs, string(result)); lock.Unlock() }),
+// )
+// println(len(outputs))   // OUT: 3
+// assert len(outputs) == 3, "callback should be invoked once per expanded command"
 // ```
 func _execSetCallback(f func(string, []byte)) execPoolOpt {
 	return func(c *_execPoolConfig) {
@@ -222,13 +313,23 @@ func _execSetCallback(f func(string, []byte)) execPoolOpt {
 	}
 }
 
-// WatchStdout 执行命令并监控标准输出，当标准输出有数据时，会调用回调函数处理数据，回调函数的参数为标准输出的原始数据，返回值为是否继续监控
+// WatchStdout 执行命令并实时监控其标准输出（导出名为 exec.WatchStdout，exec.WatchOutput 为其别名）
+// 每当有新输出时调用回调，回调返回 false 可停止监控；适合监控长时间运行命令的输出流
+//
+// 参数:
+//   - i: 完整命令字符串
+//   - timeout: 监控超时时间，单位秒
+//   - f: 回调函数 func(raw)，返回是否继续监控
+//
+// 返回值:
+//   - 错误信息（命令创建或执行失败时返回）
+//
 // Example:
 // ```
-// exec.WatchStdout("tail -f /tmp/log", 60, func(raw) {
-// log.Infof("stdout: %v", string(raw))
-// return true
-// }
+// got = bufio.NewBuffer()
+// exec.WatchStdout(`sh -c "echo watchme; sleep 1"`, 8, func(raw) { got.Write(raw); return true })~
+// println(str.Contains(got.String(), "watchme"))   // OUT: true
+// assert str.Contains(got.String(), "watchme"), "WatchStdout should deliver stdout to the callback"
 // ```
 func execWatchStdout(i string, timeout float64, f func(raw []byte) bool) error {
 	defer func() {
@@ -267,13 +368,23 @@ func execWatchStdout(i string, timeout float64, f func(raw []byte) bool) error {
 	return nil
 }
 
-// WatchStderr 执行命令并监控标准错误，当标准错误有数据时，会调用回调函数处理数据，回调函数的参数为标准错误的原始数据，返回值为是否继续监控
+// WatchStderr 执行命令并实时监控其标准错误（导出名为 exec.WatchStderr）
+// 每当有新错误输出时调用回调，回调返回 false 可停止监控
+//
+// 参数:
+//   - i: 完整命令字符串
+//   - timeout: 监控超时时间，单位秒
+//   - f: 回调函数 func(raw)，返回是否继续监控
+//
+// 返回值:
+//   - 错误信息（命令创建或执行失败时返回）
+//
 // Example:
 // ```
-// exec.WatchStderr("tail -f /tmp/log", 60, func(raw) {
-// log.Infof("stderr: %v", string(raw))
-// return true
-// }
+// gotErr = bufio.NewBuffer()
+// exec.WatchStderr(`sh -c "echo errmsg 1>&2; sleep 1"`, 8, func(raw) { gotErr.Write(raw); return true })
+// println(str.Contains(gotErr.String(), "errmsg"))   // OUT: true
+// assert str.Contains(gotErr.String(), "errmsg"), "WatchStderr should deliver stderr to the callback"
 // ```
 func execWatchStderr(i string, timeout float64, f func(raw []byte) bool) error {
 	defer func() {
