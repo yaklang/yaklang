@@ -197,7 +197,42 @@ func extractExampleCode(doc string) string {
 	} else {
 		return ""
 	}
-	return cleanExampleBlock(strings.Split(rest, "\n"))
+	lines := strings.Split(rest, "\n")
+
+	// 只取 Example 标记后"第一个 ``` 围栏块"的内部。否则 cleanExampleBlock 仅删围栏行、
+	// 会把围栏闭合之后的散文(参数:/返回值:/关键词:/补充说明)一并并入示例代码，导致中文
+	// 进入 yak 代码块、语法检查失败。
+	// 关键词: 示例抽取围栏边界, 防止参数/返回值散文混入示例
+	start := -1
+	for i, line := range lines {
+		if strings.HasPrefix(strings.TrimSpace(line), "```") {
+			start = i
+			break
+		}
+	}
+	if start >= 0 {
+		var block []string
+		for j := start + 1; j < len(lines); j++ {
+			if strings.HasPrefix(strings.TrimSpace(lines[j]), "```") {
+				break // 命中闭合围栏
+			}
+			block = append(block, lines[j])
+		}
+		return cleanExampleBlock(block)
+	}
+
+	// 无围栏：取到下一个结构标记(参数/返回值/关键词/Returns/示例标记)为止。
+	var block []string
+	for _, line := range lines {
+		t := strings.TrimSpace(line)
+		if strings.HasPrefix(t, "参数") || strings.HasPrefix(t, "返回值") ||
+			strings.HasPrefix(t, "关键词") || strings.HasPrefix(t, "Returns") ||
+			strings.HasPrefix(t, "Return Values") || strings.Contains(t, exampleStartMarker) {
+			break
+		}
+		block = append(block, line)
+	}
+	return cleanExampleBlock(block)
 }
 
 // fenceExampleYak 用 14 反引号 yak 围栏包裹示例代码（MANUAL_EXAMPLE_SPEC §2），
