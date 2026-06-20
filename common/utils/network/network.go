@@ -10,6 +10,13 @@ import (
 )
 
 // ParseStringToCClassHosts 尝试从给定的字符串中解析Host，再将其转为 C 类网段，用,分隔
+//
+// 参数:
+//   - targets: 主机字符串（支持范围、CIDR 等）
+//
+// 返回值:
+//   - 以逗号分隔的 C 类网段字符串
+//
 // Example:
 // ```
 // str.ParseStringToCClassHosts("192.168.0.1-255") // 192.168.0.0/24

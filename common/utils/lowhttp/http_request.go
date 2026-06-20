@@ -267,6 +267,13 @@ func FixHTTPPacketQueryEscape(raw []byte) []byte {
 }
 
 // FixHTTPRequest 尝试对传入的HTTP请求报文进行修复，并返回修复后的请求
+//
+// 参数:
+//   - raw: 原始 HTTP 请求报文字节
+//
+// 返回值:
+//   - 修复后的 HTTP 请求报文字节
+//
 // Example:
 // ```
 // str.FixHTTPRequest(b"GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
@@ -460,6 +467,14 @@ func ToUnquoteFuzzTag(i []byte) string {
 //}
 
 // ParseStringToHTTPRequest 将字符串解析为 HTTP 请求
+//
+// 参数:
+//   - raw: HTTP 请求报文字符串
+//
+// 返回值:
+//   - 解析出的 HTTP 请求结构体
+//   - 错误信息
+//
 // Example:
 // ```
 // req, err = str.ParseStringToHTTPRequest("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")

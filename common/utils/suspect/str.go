@@ -129,6 +129,19 @@ func IsBase64(s string) bool {
 	return utils.IsBase64(s)
 }
 
+// IsAllVisibleASCII 判断字符串是否全部由可见的 ASCII 字符（0x20~0x7E）组成
+//
+// 参数:
+//   - s: 待判断的字符串
+//
+// 返回值:
+//   - 是否全部为可见 ASCII 字符
+//
+// Example:
+// ```
+// str.IsAllVisibleASCII("hello") // true
+// str.IsAllVisibleASCII("你好")    // false
+// ```
 func isAllVisibleASCII(s string) bool {
 	for _, r := range s {
 		if !unicode.IsPrint(r) || r < 32 || r > 126 {

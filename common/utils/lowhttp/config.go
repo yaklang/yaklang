@@ -518,6 +518,20 @@ func WithDNSNoCache(b bool) LowhttpOpt {
 	}
 }
 
+// dnsResolver 指定 nuclei 扫描时使用的自定义 DNS 服务器列表，用于解析目标域名
+//
+// 参数:
+//   - servers: DNS 服务器地址列表（如 ["8.8.8.8", "1.1.1.1"]）
+//
+// 返回值:
+//   - 一个 nuclei.Scan 可接收的配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：使用指定 DNS 服务器解析目标
+// res, err = nuclei.Scan("http://example.com", nuclei.dnsResolver(["8.8.8.8", "1.1.1.1"]))
+// die(err)
+// ```
 func WithDNSServers(servers []string) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.DNSServers = servers
@@ -530,6 +544,20 @@ func WithRuntimeId(runtimeId string) LowhttpOpt {
 	}
 }
 
+// fromPlugin 标记本次 nuclei 扫描请求的来源插件名称，便于在结果中追踪请求出处
+//
+// 参数:
+//   - fromPlugin: 来源插件名称
+//
+// 返回值:
+//   - 一个 nuclei.Scan 可接收的配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：标记扫描请求来源插件
+// res, err = nuclei.Scan("http://example.com", nuclei.fromPlugin("my-plugin"))
+// die(err)
+// ```
 func WithFromPlugin(fromPlugin string) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.FromPlugin = fromPlugin
@@ -619,18 +647,60 @@ func WithBeforeDoRequest(h func([]byte) []byte) LowhttpOpt {
 	}
 }
 
+// https 设置 nuclei 扫描是否使用 HTTPS 协议访问目标
+//
+// 参数:
+//   - https: 为 true 时使用 HTTPS 访问目标
+//
+// 返回值:
+//   - 一个 nuclei.Scan 可接收的配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：强制使用 HTTPS 扫描目标
+// res, err = nuclei.Scan("example.com", nuclei.https(true))
+// die(err)
+// ```
 func WithHttps(https bool) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.Https = https
 	}
 }
 
+// http2 设置 nuclei 扫描是否启用 HTTP/2 协议发送请求
+//
+// 参数:
+//   - Http2: 为 true 时启用 HTTP/2
+//
+// 返回值:
+//   - 一个 nuclei.Scan 可接收的配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：使用 HTTP/2 扫描目标
+// res, err = nuclei.Scan("https://example.com", nuclei.http2(true))
+// die(err)
+// ```
 func WithHttp2(Http2 bool) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.Http2 = Http2
 	}
 }
 
+// http3 设置 nuclei 扫描是否启用 HTTP/3 协议发送请求
+//
+// 参数:
+//   - http3: 为 true 时启用 HTTP/3
+//
+// 返回值:
+//   - 一个 nuclei.Scan 可接收的配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：使用 HTTP/3 扫描目标
+// res, err = nuclei.Scan("https://example.com", nuclei.http3(true))
+// die(err)
+// ```
 func WithHttp3(http3 bool) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.Http3 = http3
@@ -661,6 +731,20 @@ func WithTimeoutFloat(i float64) LowhttpOpt {
 	}
 }
 
+// retry 设置 nuclei 扫描中单个请求失败后的最大重试次数
+//
+// 参数:
+//   - retryTimes: 最大重试次数
+//
+// 返回值:
+//   - 一个 nuclei.Scan 可接收的配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：请求失败时最多重试 3 次
+// res, err = nuclei.Scan("http://example.com", nuclei.retry(3))
+// die(err)
+// ```
 func WithRetryTimes(retryTimes int) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.RetryTimes = retryTimes
@@ -744,6 +828,20 @@ func WithContext(ctx context.Context) LowhttpOpt {
 	}
 }
 
+// proxy 设置 nuclei 扫描时使用的代理服务器，可传入多个代理（依次尝试）
+//
+// 参数:
+//   - proxy: 一个或多个代理地址（如 "http://127.0.0.1:8080"）
+//
+// 返回值:
+//   - 一个 nuclei.Scan 可接收的配置选项
+//
+// Example:
+// ```
+// // 该示例为示意性用法：通过本地代理扫描目标
+// res, err = nuclei.Scan("http://example.com", nuclei.proxy("http://127.0.0.1:8080"))
+// die(err)
+// ```
 func WithProxy(proxy ...string) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.Proxy = utils.StringArrayFilterEmpty(proxy)

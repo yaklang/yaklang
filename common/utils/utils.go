@@ -36,6 +36,13 @@ import (
 )
 
 // LowerAndTrimSpace 将字符串raw转换为小写并去除前后空白字符
+//
+// 参数:
+//   - raw: 原始字符串
+//
+// 返回值:
+//   - 转为小写并去除前后空白后的字符串
+//
 // Example:
 // ```
 // str.LowerAndTrimSpace("  Hello  ") // "hello"

@@ -48,6 +48,10 @@ func GetGlobalHealthManager() *healthinfo.Manager {
 }
 
 // SetMonitorInterval 设置全局健康管理器的监控间隔(单位：秒)，如果在全局健康管理器运行时调用，会重置全局健康管理器
+//
+// 参数:
+//   - i: 监控间隔，单位为秒
+//
 // Example:
 // ```
 // hids.SetMonitorInterval(1)

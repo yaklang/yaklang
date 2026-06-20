@@ -25,7 +25,20 @@ func NewTextSplitter() *TextSplitter {
 	}
 }
 
-// 核心分割方法
+// TextSplit 将文本按照分隔符与块大小递归切分为多个文本块
+//
+// 参数:
+//   - ctx: 上下文，可用于取消操作
+//   - text: 待切分的文本
+//
+// 返回值:
+//   - 切分后的文本块列表
+//
+// Example:
+// ```
+// chunks = str.TextSplit(context.Background(), "段落一。段落二。段落三。")
+// assert len(chunks) > 0, "TextSplit should produce chunks"
+// ```
 func (ts *TextSplitter) Split(ctx context.Context, text string) []string {
 	var chunks []string
 	reader := strings.NewReader(text)
@@ -36,6 +49,20 @@ func (ts *TextSplitter) Split(ctx context.Context, text string) []string {
 	return chunks
 }
 
+// TextReaderSplit 从 io.Reader 流式读取文本，并按分隔符与块大小递归切分，通过 channel 返回文本块
+//
+// 参数:
+//   - ctx: 上下文，可用于取消操作
+//   - reader: 提供文本数据的 io.Reader
+//
+// 返回值:
+//   - 一个不断产出文本块的 channel
+//
+// Example:
+// ```
+// ch = str.TextReaderSplit(context.Background(), str.NewReader("段落一。段落二。"))
+// for chunk = range ch { println(chunk) }
+// ```
 func (ts *TextSplitter) SplitReader(ctx context.Context, reader io.Reader) chan string {
 	return ts.recursiveSplit(ctx, reader)
 }

@@ -1,5 +1,28 @@
 package systemd
 
+// Create 根据给定的服务名与选项生成 systemd 单元文件
+// 返回单元文件名与文件内容；未配置 timer 相关选项时文件名为 name.service，配置后为 name.timer
+//
+// 参数:
+//   - name: 服务名称（用于单元文件名与标识）
+//   - opt: 可选项，如 systemd.unit_description / systemd.service_exec_start / systemd.install_wanted_by 等
+//
+// 返回值:
+//   - 单元文件名（如 myapp.service 或 myapp.timer）
+//   - 单元文件内容
+//
+// Example:
+// ```
+// // 生成一个最简单的 systemd 服务单元
+// fileName, content = systemd.Create("myapp",
+//     systemd.unit_description("My Application"),
+//     systemd.service_exec_start("/usr/bin/myapp --serve"),
+//     systemd.install_wanted_by("multi-user.target"),
+// )
+// assert fileName == "myapp.service"
+// assert str.Contains(content, "ExecStart=/usr/bin/myapp --serve")
+// assert str.Contains(content, "Description=My Application")
+// ```
 func Create(name string, opt ...ConfigOption) (string, string) {
 	return NewSystemServiceConfig(name, opt...).ToServiceFile()
 }

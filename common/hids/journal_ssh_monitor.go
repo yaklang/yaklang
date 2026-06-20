@@ -102,6 +102,9 @@ func buildJournalArgs(m *JournalSSHMonitor) []string {
 // 如果权限不足，journalctl 会静默返回空结果而不报错，导致监控无法捕获任何事件。
 // 本函数通过不带 -q 执行 journalctl，捕获其向 stderr 输出的权限提示来判断。
 //
+// 返回值:
+//   - 错误信息（journalctl 不存在或当前用户无权读取系统级日志时返回，nil 表示可用）
+//
 // Example:
 // ```
 // err = hids.CheckJournalAvailable()
@@ -146,6 +149,13 @@ func CheckJournalAvailable() error {
 //   - 不需要 root 权限（用户属于 systemd-journal 组即可）
 //   - 不依赖 audit 子系统安装和启用
 //   - 直接解析 sshd 的认证日志，信息直观
+//
+// 参数:
+//   - opts: 可选配置项，如 hids.journalSSHOnLoginSuccess / hids.journalSSHFilterUsers 等
+//
+// 返回值:
+//   - SSH journal 监控器对象，调用 Start() 开始监控、Stop() 停止
+//   - 错误信息
 //
 // Example:
 // ```
@@ -415,6 +425,15 @@ func (m *JournalSSHMonitor) dispatchEvent(event *JournalSSHEvent) {
 
 // WatchJournalSSHEvents 简化的 SSH journal 监控函数
 // 使用 context 控制生命周期，onSuccess 和 onFailed 可以为 nil
+//
+// 参数:
+//   - ctx: 上下文，取消时停止监控
+//   - onSuccess: 登录成功事件回调（可为 nil）
+//   - onFailed: 登录失败事件回调（可为 nil）
+//
+// 返回值:
+//   - 错误信息
+//
 // Example:
 // ```
 // ctx, cancel = context.WithTimeout(context.Background(), 60)

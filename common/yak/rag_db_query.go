@@ -52,6 +52,13 @@ func NewDBQueryConfig(opts ...DBQueryOption) *DBQueryConfig {
 // =============================================================================
 
 // _dbQueryCollection 指定查询的集合名称（单个）
+//
+// 参数:
+//   - name: 集合名称
+//
+// 返回值:
+//   - 数据库查询选项
+//
 // Example:
 // ```
 //
@@ -65,6 +72,13 @@ func _dbQueryCollection(name string) DBQueryOption {
 }
 
 // _dbQueryCollections 指定查询的多个集合名称
+//
+// 参数:
+//   - names: 一个或多个集合名称
+//
+// 返回值:
+//   - 数据库查询选项
+//
 // Example:
 // ```
 //
@@ -78,6 +92,13 @@ func _dbQueryCollections(names ...string) DBQueryOption {
 }
 
 // _dbQueryLimit 设置查询结果数量限制
+//
+// 参数:
+//   - limit: 返回结果数量上限
+//
+// 返回值:
+//   - 数据库查询选项
+//
 // Example:
 // ```
 //
@@ -91,6 +112,13 @@ func _dbQueryLimit(limit int) DBQueryOption {
 }
 
 // _dbQueryOffset 设置查询偏移量（用于分页）
+//
+// 参数:
+//   - offset: 偏移量（跳过的记录数）
+//
+// 返回值:
+//   - 数据库查询选项
+//
 // Example:
 // ```
 //
@@ -105,6 +133,13 @@ func _dbQueryOffset(offset int) DBQueryOption {
 
 // _dbQueryRAGFilename 从 RAG 文件导入后查询
 // 自动导入 RAG 文件到临时集合，然后在该集合上执行查询
+//
+// 参数:
+//   - filename: RAG 文件路径
+//
+// 返回值:
+//   - 数据库查询选项
+//
 // Example:
 // ```
 //
@@ -118,6 +153,13 @@ func _dbQueryRAGFilename(filename string) DBQueryOption {
 }
 
 // _dbQueryDB 指定数据库连接
+//
+// 参数:
+//   - db: 数据库连接对象（由 rag.NewRagDatabase 等创建）
+//
+// 返回值:
+//   - 数据库查询选项
+//
 // Example:
 // ```
 //
@@ -132,6 +174,13 @@ func _dbQueryDB(db *gorm.DB) DBQueryOption {
 }
 
 // _dbQueryCtx 设置查询上下文
+//
+// 参数:
+//   - ctx: 上下文，可用于超时/取消控制
+//
+// 返回值:
+//   - 数据库查询选项
+//
 // Example:
 // ```
 //
@@ -277,12 +326,13 @@ type DBQueryKnowledgeExistsResult struct {
 // 这个函数用于增量更新时的去重检查
 // 只有当知识条目存在且有对应的向量文档时，才认为该条目已被完整索引
 //
-// Parameters:
+// 参数:
 //   - keyword: 搜索关键词（通常是工具/插件名称）
 //   - opts: 查询选项
 //
-// Returns:
-//   - *DBQueryKnowledgeExistsResult: 检查结果，包含是否存在、知识条目、向量数量等
+// 返回值:
+//   - 检查结果，包含是否存在、知识条目、向量数量等
+//   - 错误信息
 //
 // Example:
 // ```yak
@@ -413,9 +463,13 @@ func _dbQueryKnowledgeExists(keyword string, opts ...DBQueryOption) (*DBQueryKno
 // _dbQueryCountVectorsByEntryID 根据 entry_id 计算向量文档数量
 // 用于检查某个知识条目有多少向量索引
 //
-// Parameters:
+// 参数:
 //   - entryID: 知识条目的 HiddenIndex
 //   - opts: 查询选项
+//
+// 返回值:
+//   - 向量文档数量
+//   - 错误信息
 //
 // Example:
 // ```yak
@@ -478,9 +532,13 @@ func _dbQueryCountVectorsByEntryID(entryID string, opts ...DBQueryOption) (int, 
 // 使用 SQL 模糊搜索，不使用语义搜索，速度非常快（~2ms）
 // 适合去重检查、快速验证等场景
 //
-// Parameters:
+// 参数:
 //   - keyword: 搜索关键词
 //   - opts: 查询选项（集合、限制、偏移等）
+//
+// 返回值:
+//   - 知识库条目列表
+//   - 错误信息
 //
 // Example:
 // ```yak
@@ -573,11 +631,12 @@ func _dbQueryKnowledge(keyword string, opts ...DBQueryOption) ([]*schema.Knowled
 // 使用 SQL DISTINCT 查询，返回不重复的 KnowledgeTitle 列表
 // 适合增量更新时的快速去重检查
 //
-// Parameters:
+// 参数:
 //   - opts: 查询选项（集合、限制等）
 //
-// Returns:
-//   - []string: 唯一的知识标题列表
+// 返回值:
+//   - 唯一的知识标题列表
+//   - 错误信息
 //
 // Example:
 // ```yak
@@ -650,9 +709,13 @@ func _dbQueryUniqueKnowledgeTitles(opts ...DBQueryOption) ([]string, error) {
 // 使用 SQL 模糊搜索，不使用语义搜索，速度非常快
 // 适合去重检查、快速验证等场景
 //
-// Parameters:
+// 参数:
 //   - keyword: 搜索关键词
 //   - opts: 查询选项（集合、限制、偏移等）
+//
+// 返回值:
+//   - 实体列表
+//   - 错误信息
 //
 // Example:
 // ```yak
@@ -723,9 +786,13 @@ func _dbQueryEntity(keyword string, opts ...DBQueryOption) ([]*schema.ERModelEnt
 // 使用 SQL 模糊搜索，不使用语义搜索，速度非常快
 // 适合去重检查、快速验证等场景
 //
-// Parameters:
+// 参数:
 //   - keyword: 搜索关键词
 //   - opts: 查询选项（集合、限制、偏移等）
+//
+// 返回值:
+//   - 向量文档列表
+//   - 错误信息
 //
 // Example:
 // ```yak

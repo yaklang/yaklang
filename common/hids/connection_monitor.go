@@ -43,6 +43,10 @@ type ConnectionFilter struct {
 }
 
 // NewConnectionFilter 创建新的连接过滤器
+//
+// 返回值:
+//   - 连接过滤器对象，可设置 Protocol/Status/LocalPort 等字段后传给 hids.Netstat
+//
 // Example:
 // ```
 // filter = hids.NewConnectionFilter()
@@ -202,6 +206,14 @@ func filterConnection(conn *ConnectionInfo, filter *ConnectionFilter) bool {
 }
 
 // Netstat 获取网络连接列表（类似netstat命令）
+//
+// 参数:
+//   - filters: 可选的连接过滤器（由 hids.NewConnectionFilter 创建），不传则返回全部连接
+//
+// 返回值:
+//   - 连接信息列表
+//   - 错误信息
+//
 // Example:
 // ```
 // // 获取所有连接
@@ -239,6 +251,11 @@ func Netstat(filters ...*ConnectionFilter) ([]*ConnectionInfo, error) {
 }
 
 // GetTCPConnections 获取TCP连接列表
+//
+// 返回值:
+//   - TCP 连接信息列表
+//   - 错误信息
+//
 // Example:
 // ```
 // conns, err = hids.GetTCPConnections()
@@ -250,6 +267,11 @@ func GetTCPConnections() ([]*ConnectionInfo, error) {
 }
 
 // GetUDPConnections 获取UDP连接列表
+//
+// 返回值:
+//   - UDP 连接信息列表
+//   - 错误信息
+//
 // Example:
 // ```
 // conns, err = hids.GetUDPConnections()
@@ -261,6 +283,11 @@ func GetUDPConnections() ([]*ConnectionInfo, error) {
 }
 
 // GetListeningPorts 获取所有监听端口
+//
+// 返回值:
+//   - 处于 LISTEN 状态的连接信息列表
+//   - 错误信息
+//
 // Example:
 // ```
 // conns, err = hids.GetListeningPorts()
@@ -277,6 +304,11 @@ func GetListeningPorts() ([]*ConnectionInfo, error) {
 }
 
 // GetEstablishedConnections 获取已建立的连接
+//
+// 返回值:
+//   - 处于 ESTABLISHED 状态的连接信息列表
+//   - 错误信息
+//
 // Example:
 // ```
 // conns, err = hids.GetEstablishedConnections()
@@ -288,6 +320,14 @@ func GetEstablishedConnections() ([]*ConnectionInfo, error) {
 }
 
 // GetConnectionsByPid 获取指定进程的连接
+//
+// 参数:
+//   - pid: 进程 PID
+//
+// 返回值:
+//   - 该进程的连接信息列表
+//   - 错误信息
+//
 // Example:
 // ```
 // conns, err = hids.GetConnectionsByPid(1234)
@@ -299,6 +339,14 @@ func GetConnectionsByPid(pid int32) ([]*ConnectionInfo, error) {
 }
 
 // GetConnectionsByPort 获取指定端口的连接
+//
+// 参数:
+//   - port: 端口号（匹配本地端口或远程端口）
+//
+// 返回值:
+//   - 匹配该端口的连接信息列表
+//   - 错误信息
+//
 // Example:
 // ```
 // conns, err = hids.GetConnectionsByPort(80)
@@ -356,35 +404,98 @@ type ConnectionMonitor struct {
 // ConnectionMonitorOption 连接监控器配置选项
 type ConnectionMonitorOption func(*ConnectionMonitor)
 
-// WithConnectionMonitorInterval 设置监控间隔
+// WithConnectionMonitorInterval 设置连接监控的轮询间隔
+//
+// 参数:
+//   - seconds: 轮询间隔，单位为秒
+//
+// 返回值:
+//   - 可传入 hids.NewConnectionMonitor 的配置选项
+//
+// Example:
+// ```
+// monitor = hids.NewConnectionMonitor(hids.WithConnectionMonitorInterval(1))
+// monitor.Start()
+// ```
 func WithConnectionMonitorInterval(seconds float64) ConnectionMonitorOption {
 	return func(m *ConnectionMonitor) {
 		m.interval = time.Duration(seconds * float64(time.Second))
 	}
 }
 
-// WithConnectionFilter 设置连接过滤器
+// WithConnectionFilter 设置连接监控的过滤器，仅监控匹配的连接
+//
+// 参数:
+//   - filter: 连接过滤器（由 hids.NewConnectionFilter 创建）
+//
+// 返回值:
+//   - 可传入 hids.NewConnectionMonitor 的配置选项
+//
+// Example:
+// ```
+// f = hids.NewConnectionFilter()
+// f.Status = "ESTABLISHED"
+// monitor = hids.NewConnectionMonitor(hids.WithConnectionFilter(f))
+// ```
 func WithConnectionFilter(filter *ConnectionFilter) ConnectionMonitorOption {
 	return func(m *ConnectionMonitor) {
 		m.filter = filter
 	}
 }
 
-// WithOnNewConnection 设置新连接回调
+// WithOnNewConnection 设置发现新连接时的回调
+//
+// 参数:
+//   - callback: 回调函数，入参为连接事件
+//
+// 返回值:
+//   - 可传入 hids.NewConnectionMonitor 的配置选项
+//
+// Example:
+// ```
+// monitor = hids.NewConnectionMonitor(hids.WithOnNewConnection(func(event) {
+//     println("new connection:", event.Connection.LocalAddr, "->", event.Connection.RemoteAddr)
+// }))
+// ```
 func WithOnNewConnection(callback func(event *ConnectionEvent)) ConnectionMonitorOption {
 	return func(m *ConnectionMonitor) {
 		m.onNewConn = callback
 	}
 }
 
-// WithOnConnectionDisappear 设置连接消失回调
+// WithOnConnectionDisappear 设置连接消失时的回调
+//
+// 参数:
+//   - callback: 回调函数，入参为连接事件
+//
+// 返回值:
+//   - 可传入 hids.NewConnectionMonitor 的配置选项
+//
+// Example:
+// ```
+// monitor = hids.NewConnectionMonitor(hids.WithOnConnectionDisappear(func(event) {
+//     println("connection closed:", event.Connection.LocalAddr)
+// }))
+// ```
 func WithOnConnectionDisappear(callback func(event *ConnectionEvent)) ConnectionMonitorOption {
 	return func(m *ConnectionMonitor) {
 		m.onConnDisappear = callback
 	}
 }
 
-// WithConnectionHistory 启用历史记录
+// WithConnectionHistory 启用连接事件历史记录，并设置最大保留条数
+//
+// 参数:
+//   - maxHistory: 最大历史记录条数（小于等于 0 时使用默认 1000）
+//
+// 返回值:
+//   - 可传入 hids.NewConnectionMonitor 的配置选项
+//
+// Example:
+// ```
+// monitor = hids.NewConnectionMonitor(hids.WithConnectionHistory(500))
+// // 之后可用 monitor.GetHistory() 获取历史事件
+// ```
 func WithConnectionHistory(maxHistory int) ConnectionMonitorOption {
 	return func(m *ConnectionMonitor) {
 		m.historyEnabled = true
@@ -396,6 +507,13 @@ func WithConnectionHistory(maxHistory int) ConnectionMonitorOption {
 }
 
 // NewConnectionMonitor 创建连接监控器
+//
+// 参数:
+//   - opts: 可选配置项，如 hids.WithConnectionMonitorInterval / hids.WithOnNewConnection 等
+//
+// 返回值:
+//   - 连接监控器对象，调用 Start() 开始监控、Stop() 停止
+//
 // Example:
 // ```
 // monitor = hids.NewConnectionMonitor(
@@ -589,6 +707,14 @@ func (m *ConnectionMonitor) ClearHistory() {
 }
 
 // WatchConnections 简单的连接监控函数，监控指定时长后返回事件列表
+//
+// 参数:
+//   - durationSeconds: 监控时长，单位为秒
+//
+// 返回值:
+//   - 监控期间产生的连接事件列表
+//   - 错误信息
+//
 // Example:
 // ```
 // events, err = hids.WatchConnections(5) // 监控5秒
@@ -637,6 +763,11 @@ type ConnectionStats struct {
 }
 
 // GetConnectionStats 获取连接统计信息
+//
+// 返回值:
+//   - 连接统计信息（总数、按状态/协议分类计数等）
+//   - 错误信息
+//
 // Example:
 // ```
 // stats, err = hids.GetConnectionStats()

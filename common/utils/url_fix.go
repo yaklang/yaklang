@@ -6,6 +6,13 @@ import (
 )
 
 // ParseStringToUrlsWith3W 尝试从给定的字符串(ip,域名)中解析出 URL 列表，补全协议和端口，还会补全域名前的 www 前缀
+//
+// 参数:
+//   - sub: 一个或多个目标字符串（IP、域名或 host:port）
+//
+// 返回值:
+//   - 补全协议、端口与 www 前缀后的 URL 列表
+//
 // Example:
 // ```
 // str.ParseStringToUrlsWith3W("yaklang.com:443", "https://yaklang.io") // [https://yaklang.com, https://www.yaklang.com, https://yaklang.io, https://www.yaklang.io]

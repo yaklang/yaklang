@@ -97,6 +97,18 @@ func NewConfig(opts ...Option) *Config {
 	return c
 }
 
+// chunkSize 设置文本分块的大小（在 rag 中导出名为 rag.chunkSize），单位为字符数
+//
+// 参数:
+//   - size: 每个分块的目标大小
+//
+// 返回值:
+//   - 分块器配置选项
+//
+// Example:
+// ```
+// rag.BuildCollectionFromDocuments("my-rag", docs, rag.chunkSize(1024))~
+// ```
 func WithChunkSize(size int64) Option {
 	return func(c *Config) {
 		c.chunkSize = size

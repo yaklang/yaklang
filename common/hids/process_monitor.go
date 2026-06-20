@@ -65,7 +65,14 @@ type ProcessMonitor struct {
 // ProcessMonitorOption 进程监控器配置选项
 type ProcessMonitorOption func(*ProcessMonitor)
 
-// WithProcessMonitorInterval 设置监控间隔
+// WithProcessMonitorInterval 设置进程监控的轮询间隔
+//
+// 参数:
+//   - seconds: 轮询间隔，单位为秒
+//
+// 返回值:
+//   - 可传入 hids.NewProcessMonitor 的配置选项
+//
 // Example:
 // ```
 // monitor = hids.NewProcessMonitor(hids.WithProcessMonitorInterval(2))
@@ -77,6 +84,13 @@ func WithProcessMonitorInterval(seconds float64) ProcessMonitorOption {
 }
 
 // WithOnProcessCreate 设置进程创建回调
+//
+// 参数:
+//   - callback: 回调函数，入参为进程事件
+//
+// 返回值:
+//   - 可传入 hids.NewProcessMonitor 的配置选项
+//
 // Example:
 // ```
 //
@@ -92,6 +106,13 @@ func WithOnProcessCreate(callback func(event *ProcessEvent)) ProcessMonitorOptio
 }
 
 // WithOnProcessExit 设置进程退出回调
+//
+// 参数:
+//   - callback: 回调函数，入参为进程事件
+//
+// 返回值:
+//   - 可传入 hids.NewProcessMonitor 的配置选项
+//
 // Example:
 // ```
 //
@@ -107,6 +128,13 @@ func WithOnProcessExit(callback func(event *ProcessEvent)) ProcessMonitorOption 
 }
 
 // WithWhitelist 设置进程白名单规则
+//
+// 参数:
+//   - rules: 白名单规则列表（由 hids.NewWhitelistRule 创建）
+//
+// 返回值:
+//   - 可传入 hids.NewProcessMonitor 的配置选项
+//
 // Example:
 // ```
 // rules = [hids.NewWhitelistRule()]
@@ -120,6 +148,10 @@ func WithWhitelist(rules []*ProcessWhitelistRule) ProcessMonitorOption {
 }
 
 // NewWhitelistRule 创建新的白名单规则
+//
+// 返回值:
+//   - 进程白名单规则对象，可设置 Name/ExePath/ExeHash 等字段
+//
 // Example:
 // ```
 // rule = hids.NewWhitelistRule()
@@ -131,6 +163,13 @@ func NewWhitelistRule() *ProcessWhitelistRule {
 }
 
 // NewProcessMonitor 创建进程监控器
+//
+// 参数:
+//   - opts: 可选配置项，如 hids.WithProcessMonitorInterval / hids.WithOnProcessCreate 等
+//
+// 返回值:
+//   - 进程监控器对象，调用 Start() 开始监控、Stop() 停止
+//
 // Example:
 // ```
 // monitor = hids.NewProcessMonitor(
@@ -401,6 +440,14 @@ func getFileHash(path string) string {
 }
 
 // GetFileHashMD5 获取文件MD5哈希
+//
+// 参数:
+//   - path: 文件路径
+//
+// 返回值:
+//   - 文件 MD5 哈希（十六进制字符串）
+//   - 错误信息
+//
 // Example:
 // ```
 // hash = hids.GetFileHashMD5("/usr/bin/nginx")
@@ -421,6 +468,14 @@ func GetFileHashMD5(path string) (string, error) {
 }
 
 // GetFileHashSHA256 获取文件SHA256哈希
+//
+// 参数:
+//   - path: 文件路径
+//
+// 返回值:
+//   - 文件 SHA256 哈希（十六进制字符串）
+//   - 错误信息
+//
 // Example:
 // ```
 // hash = hids.GetFileHashSHA256("/usr/bin/nginx")
@@ -441,6 +496,14 @@ func GetFileHashSHA256(path string) (string, error) {
 }
 
 // WatchProcess 简单的进程监控函数，监控指定时长后返回事件列表
+//
+// 参数:
+//   - durationSeconds: 监控时长，单位为秒
+//
+// 返回值:
+//   - 监控期间产生的进程事件列表
+//   - 错误信息
+//
 // Example:
 // ```
 // events, err = hids.WatchProcess(5) // 监控5秒
@@ -479,6 +542,13 @@ func WatchProcess(durationSeconds float64) ([]*ProcessEvent, error) {
 }
 
 // ProcessExists 检查指定PID的进程是否存在
+//
+// 参数:
+//   - pid: 进程 PID
+//
+// 返回值:
+//   - 进程是否存在
+//
 // Example:
 // ```
 // exists = hids.ProcessExists(1234)

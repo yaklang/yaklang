@@ -57,6 +57,13 @@ type JournalSSHMonitor struct {
 type JournalSSHMonitorOption func(*JournalSSHMonitor)
 
 // journalSSHOnLoginSuccess 设置登录成功事件回调
+//
+// 参数:
+//   - callback: 回调函数，入参为 SSH 事件
+//
+// 返回值:
+//   - 可传入 hids.NewJournalSSHMonitor 的配置选项
+//
 // Example:
 // ```
 // monitor, err = hids.NewJournalSSHMonitor(
@@ -74,6 +81,13 @@ func WithJournalSSHOnLoginSuccess(callback func(*JournalSSHEvent)) JournalSSHMon
 }
 
 // journalSSHOnLoginFailed 设置登录失败事件回调
+//
+// 参数:
+//   - callback: 回调函数，入参为 SSH 事件
+//
+// 返回值:
+//   - 可传入 hids.NewJournalSSHMonitor 的配置选项
+//
 // Example:
 // ```
 // monitor, err = hids.NewJournalSSHMonitor(
@@ -91,6 +105,13 @@ func WithJournalSSHOnLoginFailed(callback func(*JournalSSHEvent)) JournalSSHMoni
 }
 
 // journalSSHOnDisconnected 设置会话断开事件回调
+//
+// 参数:
+//   - callback: 回调函数，入参为 SSH 事件
+//
+// 返回值:
+//   - 可传入 hids.NewJournalSSHMonitor 的配置选项
+//
 // Example:
 // ```
 // monitor, err = hids.NewJournalSSHMonitor(
@@ -108,6 +129,13 @@ func WithJournalSSHOnDisconnected(callback func(*JournalSSHEvent)) JournalSSHMon
 }
 
 // journalSSHOnAnyEvent 设置任意 SSH 事件回调（成功/失败/断开均触发）
+//
+// 参数:
+//   - callback: 回调函数，入参为 SSH 事件
+//
+// 返回值:
+//   - 可传入 hids.NewJournalSSHMonitor 的配置选项
+//
 // Example:
 // ```
 // monitor, err = hids.NewJournalSSHMonitor(
@@ -125,6 +153,13 @@ func WithJournalSSHOnAnyEvent(callback func(*JournalSSHEvent)) JournalSSHMonitor
 }
 
 // journalSSHFilterUsers 只监控指定用户名的 SSH 登录事件
+//
+// 参数:
+//   - users: 允许的用户名列表，可传多个
+//
+// 返回值:
+//   - 可传入 hids.NewJournalSSHMonitor 的配置选项
+//
 // Example:
 // ```
 // monitor, err = hids.NewJournalSSHMonitor(
@@ -140,6 +175,13 @@ func WithJournalSSHFilterUsers(users ...string) JournalSSHMonitorOption {
 }
 
 // journalSSHFilterRemoteIPs 只监控来自指定 IP 的 SSH 登录事件
+//
+// 参数:
+//   - ips: 允许的远程 IP 列表，可传多个
+//
+// 返回值:
+//   - 可传入 hids.NewJournalSSHMonitor 的配置选项
+//
 // Example:
 // ```
 // monitor, err = hids.NewJournalSSHMonitor(
@@ -155,6 +197,13 @@ func WithJournalSSHFilterRemoteIPs(ips ...string) JournalSSHMonitorOption {
 }
 
 // journalSSHUnits 设置要监听的 systemd unit 名称（默认自动检测 sshd/ssh）
+//
+// 参数:
+//   - units: systemd unit 名称列表，可传多个
+//
+// 返回值:
+//   - 可传入 hids.NewJournalSSHMonitor 的配置选项
+//
 // Example:
 // ```
 // monitor, err = hids.NewJournalSSHMonitor(
@@ -171,6 +220,13 @@ func WithJournalSSHUnits(units ...string) JournalSSHMonitorOption {
 
 // journalSSHSince 设置从何时开始读取日志（journalctl --since 参数格式）
 // 默认为 "now"，即只读取启动后的新日志
+//
+// 参数:
+//   - since: 起始时间，格式同 journalctl --since（如 "1 hour ago"、"2024-01-01 00:00:00"）
+//
+// 返回值:
+//   - 可传入 hids.NewJournalSSHMonitor 的配置选项
+//
 // Example:
 // ```
 // // 读取最近1小时的历史日志并持续监控

@@ -2,10 +2,21 @@ package netutil
 
 import "github.com/yaklang/yaklang/common/utils"
 
-// AddIPRouteToNetInterface 添加IP路由到网络接口
-// 支持单个IP（string）或多个IP（[]string 或任何可转换的切片类型）
-// ipOrIPAddrs: IP地址，支持 string、[]string 或通过 InterfaceToStringSlice 转换的类型
-// ifaceName: 网络接口名称
+// AddIPRouteToNetInterface 添加 IP 主机路由到指定网络接口（导出名为 netutils.AddIPRouteToNetInterface）
+// 需要管理员/root 权限；支持单个 IP(string) 或多个 IP([]string 等可转换切片)，会为每个 IP 添加 /32 主机路由
+//
+// 参数:
+//   - ipOrIPAddrs: IP 地址，支持 string、[]string 或可被 InterfaceToStringSlice 转换的类型
+//   - ifaceName: 目标网络接口名称（如 "en0"、"eth0"）
+//
+// 返回值:
+//   - 错误信息（权限不足、接口不存在或添加失败时返回）
+//
+// Example:
+// ```
+// // 真实功能示例：把若干 IP 的流量定向到指定网卡（需要 root 权限，示意性用法）
+// netutils.AddIPRouteToNetInterface(["1.1.1.1", "8.8.8.8"], "en0")~
+// ```
 func AddIPRouteToNetInterface(ipOrIPAddrs any, ifaceName string) error {
 	// 类型断言处理
 	switch v := ipOrIPAddrs.(type) {
@@ -42,9 +53,20 @@ func AddIPRouteToNetInterface(ipOrIPAddrs any, ifaceName string) error {
 	}
 }
 
-// DeleteIPRoute 删除IP路由
-// 支持单个IP（string）或多个IP（[]string 或任何可转换的切片类型）
-// ipOrIPAddrs: IP地址，支持 string、[]string 或通过 InterfaceToStringSlice 转换的类型
+// DeleteIPRoute 删除此前添加的 IP 主机路由（导出名为 netutils.DeleteIPRoute）
+// 需要管理员/root 权限；支持单个 IP(string) 或多个 IP([]string 等可转换切片)
+//
+// 参数:
+//   - ipOrIPAddrs: IP 地址，支持 string、[]string 或可被 InterfaceToStringSlice 转换的类型
+//
+// 返回值:
+//   - 错误信息（权限不足或删除失败时返回）
+//
+// Example:
+// ```
+// // 真实功能示例：删除之前添加的主机路由（需要 root 权限，示意性用法）
+// netutils.DeleteIPRoute(["1.1.1.1", "8.8.8.8"])~
+// ```
 func DeleteIPRoute(ipOrIPAddrs any) error {
 	// 类型断言处理
 	switch v := ipOrIPAddrs.(type) {
@@ -81,8 +103,20 @@ func DeleteIPRoute(ipOrIPAddrs any) error {
 	}
 }
 
-// DeleteIPRouteFromNetInterface 删除网络接口的所有/32主机路由
-// ifaceName: 网络接口名称
+// DeleteIPRouteFromNetInterface 删除指定网络接口上的所有 /32 主机路由（导出名为 netutils.DeleteIPRouteFromNetInterface）
+// 需要管理员/root 权限；常用于清理之前通过 AddIPRouteToNetInterface 添加到该接口的所有路由
+//
+// 参数:
+//   - ifaceName: 网络接口名称（如 "en0"、"eth0"）
+//
+// 返回值:
+//   - 错误信息（权限不足、接口不存在或删除失败时返回）
+//
+// Example:
+// ```
+// // 真实功能示例：清理某网卡上所有由本程序添加的主机路由（需要 root 权限，示意性用法）
+// netutils.DeleteIPRouteFromNetInterface("en0")~
+// ```
 func DeleteIPRouteFromNetInterface(ifaceName string) error {
 	success, failed, err := DeleteAllRoutesForInterface(ifaceName)
 	if err != nil {

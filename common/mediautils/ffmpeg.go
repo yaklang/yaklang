@@ -12,7 +12,15 @@ import (
 	"github.com/yaklang/yaklang/common/utils/ffmpegutils"
 )
 
-// ffmpeg.ExtractAudioFromVideo can extract audio from video
+// ExtractAudioFromVideo 从视频中提取音频（导出名为 ffmpeg.ExtractAudioFromVideo）
+//
+// 参数:
+//   - i: 输入视频文件路径
+//   - opts: 可选项，如 ffmpeg.withOutputFile / ffmpeg.withStartEnd / ffmpeg.withDebug 等
+//
+// 返回值:
+//   - 音频提取结果对象（含输出文件路径等信息）
+//   - 错误信息（提取失败时返回）
 //
 // example:
 // ```
@@ -27,7 +35,16 @@ func _extractAudioFromVideo(i string, opts ...ffmpegutils.Option) (*ffmpegutils.
 	return ffmpegutils.ExtractAudioFromVideo(i, opts...)
 }
 
-// ffmpeg.ExtractFineGrainedFramesFromVideo can extract fine-grained frames from video
+// ExtractFineGrainedFramesFromVideo 以细粒度（低场景阈值）从视频中提取关键帧（导出名为 ffmpeg.ExtractFineGrainedFramesFromVideo）
+// 默认启用时间戳叠加与智能场景检测，适合需要较密集采样的场景
+//
+// 参数:
+//   - i: 输入视频文件路径
+//   - opts: 可选项，如 ffmpeg.withStartEnd / ffmpeg.withTimestampOverlay 等
+//
+// 返回值:
+//   - 帧结果管道，可用 for range 逐帧消费（每帧可 SaveToFile）
+//   - 错误信息（提取失败时返回）
 //
 // example:
 // ```
@@ -48,7 +65,16 @@ func _extractFineGrainedFramesFromVideo(i string, opts ...ffmpegutils.Option) (<
 	return ffmpegutils.ExtractImageFramesFromVideo(i, opts...)
 }
 
-// ffmpeg.ExtractBroadGrainedFramesFromVideo can extract fine-grained frames from video
+// ExtractBroadGrainedFramesFromVideo 以粗粒度（较高场景阈值）从视频中提取关键帧（导出名为 ffmpeg.ExtractBroadGrainedFramesFromVideo）
+// 相比细粒度采样更稀疏，适合快速概览视频内容
+//
+// 参数:
+//   - i: 输入视频文件路径
+//   - opts: 可选项，如 ffmpeg.withStartEnd / ffmpeg.withTimestampOverlay 等
+//
+// 返回值:
+//   - 帧结果管道，可用 for range 逐帧消费（每帧可 SaveToFile）
+//   - 错误信息（提取失败时返回）
 //
 // example:
 // ```
@@ -68,7 +94,17 @@ func _extractBroadGrainedFramesFromVideo(i string, opts ...ffmpegutils.Option) (
 	return ffmpegutils.ExtractImageFramesFromVideo(i, opts...)
 }
 
-// BurnSRTIntoVideo can burn subtitles into a video
+// BurnSRTIntoVideo 将 SRT 字幕烧录进视频（导出名为 ffmpeg.BurnSRTIntoVideo）
+// 默认启用字幕内边距与时间戳，输出为新的 mp4 文件并返回其路径
+//
+// 参数:
+//   - inputVideo: 输入视频文件路径
+//   - srtFile: SRT 字幕文件路径
+//   - opts: 可选项，如 ffmpeg.withOutputFile / ffmpeg.withSubtitlePadding 等
+//
+// 返回值:
+//   - 输出视频文件路径
+//   - 错误信息（烧录失败或输出无效时返回）
 //
 // example:
 // ```
@@ -130,7 +166,14 @@ func _burnInSubtitles(inputVideo string, srtFile string, opts ...ffmpegutils.Opt
 	return outputPath, nil
 }
 
-// ffmpeg.ExtractUserScreenshot can capture user screen screenshots with multi-monitor support
+// ExtractUserScreenshot 截取用户屏幕截图，支持多显示器自动拼接（导出名为 ffmpeg.ExtractUserScreenshot）
+//
+// 参数:
+//   - opts: 可选项，如 ffmpeg.withScreenCaptureDebug / ffmpeg.withScreenCaptureQuality 等
+//
+// 返回值:
+//   - 截图结果对象（可调用 SaveToFile 保存）
+//   - 错误信息（截图失败时返回）
 //
 // example:
 // ```
@@ -157,9 +200,17 @@ func _extractUserScreenShot(opts ...ffmpegutils.Option) (*ffmpegutils.FfmpegStre
 	return ffmpegutils.ExtractUserScreenShot(opts...)
 }
 
-// ffmpeg.ExtractVideoSliceFromVideo can split a long video into time-based mp4 slices.
+// ExtractVideoSliceFromVideo 将长视频按时间切分为多个 mp4 切片（导出名为 ffmpeg.ExtractVideoSliceFromVideo）
 // 默认流复制（不重编码、保持源分辨率与 FPS）；通过 ffmpeg.withSliceReencode(true) 启用重编码。
 // 切片实时通过 channel 与可选回调 ffmpeg.withSliceCallback(cb) 下发。
+//
+// 参数:
+//   - i: 输入视频文件路径
+//   - opts: 可选项，如 ffmpeg.withSliceDurationSeconds / ffmpeg.withSlicePresetForOmni / ffmpeg.withSliceCallback 等
+//
+// 返回值:
+//   - 视频切片结果管道，可用 for range 逐个消费（每个含 FilePath/Error 等）
+//   - 错误信息（启动切片失败时返回）
 //
 // example:
 // ```

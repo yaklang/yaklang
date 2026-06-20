@@ -114,7 +114,20 @@ func WithContext(ctx context.Context) Option {
 	}
 }
 
-// WithDebug enables verbose logging for the ffmpeg command.
+// withDebug 启用 ffmpeg 命令的详细日志输出（导出名为 ffmpeg.withDebug）
+// 作为各 ffmpeg.Extract*/Burn* 接口的可选项使用，便于排查问题
+//
+// 参数:
+//   - debug: 是否启用详细日志
+//
+// 返回值:
+//   - 可传入 ffmpeg 各接口的选项
+//
+// Example:
+// ```
+// // 开启调试日志提取音频（需要真实视频文件，示意性示例）
+// result = ffmpeg.ExtractAudioFromVideo("video.mp4", ffmpeg.withDebug(true))~
+// ```
 func WithDebug(debug bool) Option {
 	return func(o *options) {
 		o.debug = debug
@@ -191,7 +204,21 @@ func WithStartEnd(start, end time.Duration) Option {
 	}
 }
 
-// WithStartEndSeconds specifies the time range for extraction in seconds.
+// withStartEnd 以秒为单位指定提取/处理的时间区间（导出名为 ffmpeg.withStartEnd）
+// 作为各 ffmpeg.Extract* 接口的可选项使用，仅处理 [start, end] 区间内的内容
+//
+// 参数:
+//   - start: 起始时间（秒）
+//   - end: 结束时间（秒）
+//
+// 返回值:
+//   - 可传入 ffmpeg 各接口的选项
+//
+// Example:
+// ```
+// // 仅提取 10 到 20.5 秒之间的帧（需要真实视频文件，示意性示例）
+// result = ffmpeg.ExtractFineGrainedFramesFromVideo("video.mp4", ffmpeg.withStartEnd(10, 20.5))~
+// ```
 func WithStartEndSeconds(start, end float64) Option {
 	return func(o *options) {
 		o.startTime = time.Duration(start * float64(time.Second))
@@ -267,7 +294,20 @@ func WithSubtitleFile(filepath string) Option {
 	}
 }
 
-// WithOutputVideoFile specifies the path for the final output video.
+// withOutputFile 指定最终输出文件的路径（导出名为 ffmpeg.withOutputFile）
+// 作为 ffmpeg.BurnSRTIntoVideo / ffmpeg.ExtractAudioFromVideo 等接口的可选项；不设置时使用临时文件
+//
+// 参数:
+//   - filepath: 输出文件路径
+//
+// 返回值:
+//   - 可传入 ffmpeg 各接口的选项
+//
+// Example:
+// ```
+// // 指定输出路径烧录字幕（需要真实视频与字幕文件，示意性示例）
+// out = ffmpeg.BurnSRTIntoVideo("video.mp4", "subtitles.srt", ffmpeg.withOutputFile("/tmp/out.mp4"))~
+// ```
 func WithOutputVideoFile(filepath string) Option {
 	return func(o *options) {
 		o.outputVideoFile = filepath
@@ -281,26 +321,63 @@ func WithFontFile(filepath string) Option {
 	}
 }
 
-// WithTimestampOverlay enables or disables timestamp overlay on extracted frames.
-// When enabled, a black bar will be added at the bottom of each frame displaying the timestamp.
+// withTimestampOverlay 设置是否在提取的帧上叠加时间戳（导出名为 ffmpeg.withTimestampOverlay）
+// 启用后会在每帧底部加一条黑条显示时间戳；作为 ffmpeg.Extract*Frames* 接口的可选项使用
+//
+// 参数:
+//   - show: 是否叠加时间戳
+//
+// 返回值:
+//   - 可传入 ffmpeg 各接口的选项
+//
+// Example:
+// ```
+// // 提取帧并叠加时间戳（需要真实视频文件，示意性示例）
+// result = ffmpeg.ExtractBroadGrainedFramesFromVideo("video.mp4", ffmpeg.withTimestampOverlay(true))~
+// ```
 func WithTimestampOverlay(show bool) Option {
 	return func(o *options) {
 		o.showTimestamp = show
 	}
 }
 
-// WithSubtitlePadding enables or disables adding black padding for subtitles.
-// When enabled, black padding will be added to the bottom of the video where subtitles are displayed,
-// ensuring subtitles don't cover the original video content.
+// withSubtitlePadding 设置烧录字幕时是否在底部添加黑色内边距（导出名为 ffmpeg.withSubtitlePadding）
+// 启用后会在视频底部加黑边用于显示字幕，避免字幕遮挡原始画面；作为 ffmpeg.BurnSRTIntoVideo 的可选项使用
+//
+// 参数:
+//   - enable: 是否添加字幕内边距
+//
+// 返回值:
+//   - 可传入 ffmpeg 各接口的选项
+//
+// Example:
+// ```
+// // 烧录字幕并添加底部黑边（需要真实视频与字幕文件，示意性示例）
+// out = ffmpeg.BurnSRTIntoVideo("video.mp4", "subtitles.srt", ffmpeg.withSubtitlePadding(true))~
+// ```
 func WithSubtitlePadding(enable bool) Option {
 	return func(o *options) {
 		o.subtitlePadding = enable
 	}
 }
 
-// WithIgnoreBottomPaddingInSceneDetection controls whether scene detection should ignore the bottom padding area.
-// When enabled, scene detection will only analyze the original video content, ignoring changes in timestamp/subtitle areas.
-// This is particularly useful when extracting frames with timestamps or subtitles to avoid false scene changes.
+// withIgnoreBottomPaddingInSceneDetection 设置场景检测时是否忽略底部内边距区域（导出名为 ffmpeg.withIgnoreBottomPaddingInSceneDetection）
+// 启用后场景检测只分析原始画面，忽略时间戳/字幕区域的变化，避免误判场景切换
+//
+// 参数:
+//   - enable: 是否在场景检测中忽略底部内边距
+//
+// 返回值:
+//   - 可传入 ffmpeg 各接口的选项
+//
+// Example:
+// ```
+// // 叠加时间戳的同时避免其干扰场景检测（需要真实视频文件，示意性示例）
+// result = ffmpeg.ExtractFineGrainedFramesFromVideo("video.mp4",
+//     ffmpeg.withTimestampOverlay(true),
+//     ffmpeg.withIgnoreBottomPaddingInSceneDetection(true),
+// )~
+// ```
 func WithIgnoreBottomPaddingInSceneDetection(enable bool) Option {
 	return func(o *options) {
 		o.ignoreBottomPaddingInSceneDetection = enable
@@ -377,14 +454,40 @@ func WithScreenCaptureMode(mode ScreenCaptureMode) Option {
 	}
 }
 
-// WithScreenCaptureDebug 启用屏幕截图调试信息
+// withScreenCaptureDebug 启用屏幕截图的调试信息（导出名为 ffmpeg.withScreenCaptureDebug）
+// 作为 ffmpeg.ExtractUserScreenshot 的可选项使用
+//
+// 参数:
+//   - enable: 是否启用调试信息
+//
+// 返回值:
+//   - 可传入 ffmpeg.ExtractUserScreenshot 的选项
+//
+// Example:
+// ```
+// // 以调试模式截屏（需要桌面环境，示意性示例）
+// result = ffmpeg.ExtractUserScreenshot(ffmpeg.withScreenCaptureDebug(true))~
+// ```
 func WithScreenCaptureDebug(enable bool) Option {
 	return func(o *options) {
 		o.debug = enable
 	}
 }
 
-// WithScreenCaptureQuality 设置屏幕截图质量
+// withScreenCaptureQuality 设置屏幕截图质量（导出名为 ffmpeg.withScreenCaptureQuality）
+// 作为 ffmpeg.ExtractUserScreenshot 的可选项使用；可选 ffmpeg.QualityLow/QualityNormal/QualityHigh
+//
+// 参数:
+//   - quality: 质量级别（QualityLow 快速小文件 / QualityNormal 平衡 / QualityHigh 无损）
+//
+// 返回值:
+//   - 可传入 ffmpeg.ExtractUserScreenshot 的选项
+//
+// Example:
+// ```
+// // 以高质量（无损）截屏（需要桌面环境，示意性示例）
+// result = ffmpeg.ExtractUserScreenshot(ffmpeg.withScreenCaptureQuality(ffmpeg.QualityHigh))~
+// ```
 func WithScreenCaptureQuality(quality ScreenCaptureQuality) Option {
 	return func(o *options) {
 		// 根据质量级别设置对应的frameQuality值
@@ -404,8 +507,21 @@ func WithScreenCaptureQuality(quality ScreenCaptureQuality) Option {
 // --- Video Slicing Options ---
 // 视频切片关键词: ExtractVideoSliceFromVideo, segment muxer, omni preset
 
-// WithSliceDurationSeconds 设置每段切片时长（秒），默认 120 秒。
+// withSliceDurationSeconds 设置每段切片的时长（秒），默认 120 秒（导出名为 ffmpeg.withSliceDurationSeconds）
+// 作为 ffmpeg.ExtractVideoSliceFromVideo 的可选项使用
 // 关键词: 切片段长, segment_time
+//
+// 参数:
+//   - seconds: 每段切片时长（秒）
+//
+// 返回值:
+//   - 可传入 ffmpeg.ExtractVideoSliceFromVideo 的选项
+//
+// Example:
+// ```
+// // 每 30 秒切一段（需要真实视频文件，示意性示例）
+// ch = ffmpeg.ExtractVideoSliceFromVideo("video.mp4", ffmpeg.withSliceDurationSeconds(30))~
+// ```
 func WithSliceDurationSeconds(seconds float64) Option {
 	return func(o *options) {
 		if seconds > 0 {
@@ -414,18 +530,47 @@ func WithSliceDurationSeconds(seconds float64) Option {
 	}
 }
 
-// WithSliceReencode 切换是否重编码模式。
-// false（默认）：使用 -c copy 做流复制，速度极快，分辨率与 FPS 保持源；
-// true：重编码到指定分辨率与 FPS（适合统一 base64 体积/控制 token 开销）。
+// withSliceReencode 设置切片是否重编码（导出名为 ffmpeg.withSliceReencode）
+// false（默认）使用 -c copy 流复制，速度极快、保持源分辨率与 FPS；true 则重编码到指定分辨率与 FPS
+// 作为 ffmpeg.ExtractVideoSliceFromVideo 的可选项使用
 // 关键词: 流复制 stream copy, 重编码 reencode
+//
+// 参数:
+//   - enable: 是否启用重编码
+//
+// 返回值:
+//   - 可传入 ffmpeg.ExtractVideoSliceFromVideo 的选项
+//
+// Example:
+// ```
+// // 启用重编码切片以统一分辨率/帧率（需要真实视频文件，示意性示例）
+// ch = ffmpeg.ExtractVideoSliceFromVideo("video.mp4",
+//     ffmpeg.withSliceReencode(true),
+//     ffmpeg.withSliceMaxHeight(720),
+//     ffmpeg.withSliceTargetFPS(2),
+// )~
+// ```
 func WithSliceReencode(enable bool) Option {
 	return func(o *options) {
 		o.sliceReencode = enable
 	}
 }
 
-// WithSliceMaxHeight 重编码模式下设置最大高度（保持宽高比），默认 720。
+// withSliceMaxHeight 重编码模式下设置切片最大高度（保持宽高比），默认 720（导出名为 ffmpeg.withSliceMaxHeight）
+// 仅在启用 ffmpeg.withSliceReencode(true) 时生效；作为 ffmpeg.ExtractVideoSliceFromVideo 的可选项使用
 // 关键词: 切片分辨率, scale
+//
+// 参数:
+//   - h: 最大高度（像素）
+//
+// 返回值:
+//   - 可传入 ffmpeg.ExtractVideoSliceFromVideo 的选项
+//
+// Example:
+// ```
+// // 重编码并限制高度为 480（需要真实视频文件，示意性示例）
+// ch = ffmpeg.ExtractVideoSliceFromVideo("video.mp4", ffmpeg.withSliceReencode(true), ffmpeg.withSliceMaxHeight(480))~
+// ```
 func WithSliceMaxHeight(h int) Option {
 	return func(o *options) {
 		if h > 0 {
@@ -434,8 +579,22 @@ func WithSliceMaxHeight(h int) Option {
 	}
 }
 
-// WithSliceTargetFPS 重编码模式下设置目标 FPS，默认 2（贴合 omni 默认抽样率）。
+// withSliceTargetFPS 重编码模式下设置切片目标 FPS，默认 2（导出名为 ffmpeg.withSliceTargetFPS）
+// 仅在启用 ffmpeg.withSliceReencode(true) 时生效；默认值贴合 omni 默认抽样率
+// 作为 ffmpeg.ExtractVideoSliceFromVideo 的可选项使用
 // 关键词: 切片帧率, target fps
+//
+// 参数:
+//   - fps: 目标帧率
+//
+// 返回值:
+//   - 可传入 ffmpeg.ExtractVideoSliceFromVideo 的选项
+//
+// Example:
+// ```
+// // 重编码并设置目标帧率为 1（需要真实视频文件，示意性示例）
+// ch = ffmpeg.ExtractVideoSliceFromVideo("video.mp4", ffmpeg.withSliceReencode(true), ffmpeg.withSliceTargetFPS(1))~
+// ```
 func WithSliceTargetFPS(fps float64) Option {
 	return func(o *options) {
 		if fps > 0 {
@@ -444,36 +603,88 @@ func WithSliceTargetFPS(fps float64) Option {
 	}
 }
 
-// WithSliceLoadRawData 控制是否在 channel 中携带分片字节，默认 false（仅返回路径）。
-// 启用会显著增加内存与 IO 开销，建议在确实需要 base64 推送时再开启。
+// withSliceLoadRawData 设置是否在切片结果 channel 中携带分片原始字节，默认 false（导出名为 ffmpeg.withSliceLoadRawData）
+// 默认仅返回文件路径；启用会显著增加内存与 IO 开销，建议确需 base64 推送时再开启
+// 作为 ffmpeg.ExtractVideoSliceFromVideo 的可选项使用
 // 关键词: 携带原始字节, raw data
+//
+// 参数:
+//   - enable: 是否在结果中携带原始字节
+//
+// 返回值:
+//   - 可传入 ffmpeg.ExtractVideoSliceFromVideo 的选项
+//
+// Example:
+// ```
+// // 切片并携带原始字节用于直接上传（需要真实视频文件，示意性示例）
+// ch = ffmpeg.ExtractVideoSliceFromVideo("video.mp4", ffmpeg.withSliceLoadRawData(true))~
+// ```
 func WithSliceLoadRawData(enable bool) Option {
 	return func(o *options) {
 		o.sliceLoadRawData = enable
 	}
 }
 
-// WithSliceCallback 注册实时回调，每个分片落盘后立即触发，与 channel 同时发送。
+// withSliceCallback 注册切片实时回调，每段切片落盘后立即触发（与 channel 同时发送）（导出名为 ffmpeg.withSliceCallback）
+// 作为 ffmpeg.ExtractVideoSliceFromVideo 的可选项使用，便于边切片边处理（如上传到模型）
 // 关键词: 切片回调, slice callback
+//
+// 参数:
+//   - cb: 回调函数 func(result)，每段切片就绪时调用
+//
+// 返回值:
+//   - 可传入 ffmpeg.ExtractVideoSliceFromVideo 的选项
+//
+// Example:
+// ```
+// // 边切片边记录路径（需要真实视频文件，示意性示例）
+// ch = ffmpeg.ExtractVideoSliceFromVideo("video.mp4",
+//     ffmpeg.withSliceCallback(func(r) { log.info("slice ready: %v", r.FilePath) }),
+// )~
+// ```
 func WithSliceCallback(cb func(*VideoSliceResult)) Option {
 	return func(o *options) {
 		o.sliceCallback = cb
 	}
 }
 
-// WithSliceOutputDir 指定切片输出目录，不指定则使用临时目录。
+// withSliceOutputDir 指定切片输出目录，不指定则使用临时目录（导出名为 ffmpeg.withSliceOutputDir）
+// 作为 ffmpeg.ExtractVideoSliceFromVideo 的可选项使用
 // 关键词: 切片输出目录, slice output dir
+//
+// 参数:
+//   - dir: 切片文件输出目录
+//
+// 返回值:
+//   - 可传入 ffmpeg.ExtractVideoSliceFromVideo 的选项
+//
+// Example:
+// ```
+// // 将切片输出到指定目录（需要真实视频文件，示意性示例）
+// ch = ffmpeg.ExtractVideoSliceFromVideo("video.mp4", ffmpeg.withSliceOutputDir("/tmp/slices"))~
+// ```
 func WithSliceOutputDir(dir string) Option {
 	return func(o *options) {
 		o.sliceOutputDir = dir
 	}
 }
 
-// WithSlicePresetForOmni 一键预设：根据目标 omni 模型设定段长。
-// turbo => 30 秒（模型上限 40s），flash => 120 秒（上限 150s），plus => 120 秒
-// （文档上限 1h，但 base64 实测 300s 会触发 "video file is too long"，
-// 故保守设为 120 秒；如需要更长可手动 WithSliceDurationSeconds）。
+// withSlicePresetForOmni 按目标 omni 模型一键预设切片段长（导出名为 ffmpeg.withSlicePresetForOmni）
+// turbo => 30 秒、flash => 120 秒、plus => 120 秒（保守值，避免触发 "video file is too long"；
+// 如需更长可改用 ffmpeg.withSliceDurationSeconds）。作为 ffmpeg.ExtractVideoSliceFromVideo 的可选项使用
 // 关键词: omni 预设, slice preset
+//
+// 参数:
+//   - preset: 预设名称（turbo / flash / plus）
+//
+// 返回值:
+//   - 可传入 ffmpeg.ExtractVideoSliceFromVideo 的选项
+//
+// Example:
+// ```
+// // 使用 flash 预设切片（需要真实视频文件，示意性示例）
+// ch = ffmpeg.ExtractVideoSliceFromVideo("video.mp4", ffmpeg.withSlicePresetForOmni("flash"))~
+// ```
 func WithSlicePresetForOmni(preset string) Option {
 	return func(o *options) {
 		switch preset {

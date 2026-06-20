@@ -10,6 +10,14 @@ import (
 )
 
 // RegexpMatch 使用正则尝试匹配字符串，如果匹配成功返回 true，否则返回 false
+//
+// 参数:
+//   - pattern: 正则表达式
+//   - s: 待匹配的对象，会被转换为字符串
+//
+// 返回值:
+//   - 是否匹配成功
+//
 // Example:
 // ```
 // str.RegexpMatch("^[a-z]+$", "abc") // true
@@ -98,10 +106,20 @@ func _findAll_extractByRegexp(origin interface{}, re string) []string {
 	return r.FindAllString(utils.InterfaceToString(origin), -1)
 }
 
-// FindAllIndex 使用正则尝试匹配字符串，如果匹配成功返回所有匹配的字符串的起始位置和结束位置，否则返回空整数的二维切片
+// FindAllIndex 使用正则匹配字符串，返回所有匹配子串的起止位置（导出名为 re.FindAllIndex）
+// 参数:
+//   - origin: 待匹配的输入（任意可转为字符串）
+//   - re: 正则表达式
+//
+// 返回值:
+//   - 二维整数切片，每项为 [起始位置, 结束位置]，未匹配返回空切片
+//
 // Example:
 // ```
-// re.FindAllIndex("Well,yakit is GUI client for yaklang", "yak[a-z]+") // [[5, 10], [29, 36]]
+// idx = re.FindAllIndex("Well,yakit is GUI client for yaklang", "yak[a-z]+")
+// println(idx)   // OUT: [[5 10] [29 36]]
+// assert len(idx) == 2, "FindAllIndex should locate two matches"
+// assert idx[0][0] == 5 && idx[0][1] == 10, "first match index should be [5,10]"
 // ```
 func _findAllIndex_extractByRegexp(origin interface{}, re string) [][]int {
 	r, err := regexp.Compile(re)
@@ -112,10 +130,19 @@ func _findAllIndex_extractByRegexp(origin interface{}, re string) [][]int {
 	return r.FindAllStringIndex(utils.InterfaceToString(origin), -1)
 }
 
-// FindIndex 使用正则尝试匹配字符串，如果匹配成功返回一个长度为2的整数切片，第一个元素为起始位置，第二个元素为结束位置，否则返回空整数切片
+// FindIndex 使用正则匹配字符串，返回第一个匹配子串的起止位置（导出名为 re.FindIndex）
+// 参数:
+//   - origin: 待匹配的输入（任意可转为字符串）
+//   - re: 正则表达式
+//
+// 返回值:
+//   - 长度为 2 的整数切片 [起始位置, 结束位置]，未匹配返回空切片
+//
 // Example:
 // ```
-// re.FindIndex("Well,yakit is GUI client for yaklang", "yak[a-z]+") // [5, 10]
+// idx = re.FindIndex("Well,yakit is GUI client for yaklang", "yak[a-z]+")
+// println(idx)   // OUT: [5 10]
+// assert idx[0] == 5 && idx[1] == 10, "FindIndex should return [5,10]"
 // ```
 func _findIndex_extractByRegexp(origin interface{}, re string) []int {
 	r, err := regexp.Compile(re)
@@ -126,10 +153,19 @@ func _findIndex_extractByRegexp(origin interface{}, re string) []int {
 	return r.FindStringIndex(utils.InterfaceToString(origin))
 }
 
-// FindSubmatch 使用正则尝试匹配字符串，如果匹配成功返回第一个匹配的字符串以及子匹配的字符串，否则返回空字符串切片
+// FindSubmatch 使用正则匹配字符串，返回第一个匹配及其子匹配（导出名为 re.FindSubmatch）
+// 参数:
+//   - origin: 待匹配的输入（任意可转为字符串）
+//   - re: 含捕获组的正则表达式
+//
+// 返回值:
+//   - 字符串切片，第 0 项为整体匹配，其余为各捕获组，未匹配返回空切片
+//
 // Example:
 // ```
-// re.FindSubmatch("Well,yakit is GUI client for yaklang", "yak([a-z]+)") // ["yakit", "it"]
+// m = re.FindSubmatch("Well,yakit is GUI client for yaklang", "yak([a-z]+)")
+// println(m)   // OUT: [yakit it]
+// assert m[0] == "yakit" && m[1] == "it", "FindSubmatch should return whole match and group"
 // ```
 func _findSubmatch_extractByRegexp(origin interface{}, re string) []string {
 	r, err := regexp.Compile(re)
@@ -140,10 +176,19 @@ func _findSubmatch_extractByRegexp(origin interface{}, re string) []string {
 	return r.FindStringSubmatch(utils.InterfaceToString(origin))
 }
 
-// FindSubmatchIndex 使用正则尝试匹配字符串，如果匹配成功返回第一个匹配的字符串以及子匹配的字符串的起始位置和结束位置，否则返回空整数切片
+// FindSubmatchIndex 使用正则匹配字符串，返回第一个匹配及子匹配的位置（导出名为 re.FindSubmatchIndex）
+// 参数:
+//   - origin: 待匹配的输入（任意可转为字符串）
+//   - re: 含捕获组的正则表达式
+//
+// 返回值:
+//   - 整数切片，每两个一组依次为整体匹配与各捕获组的 [起始, 结束]，未匹配返回空切片
+//
 // Example:
 // ```
-// re.FindSubmatchIndex("Well,yakit is GUI client for yaklang", "yak([a-z]+)") // [5, 10, 8, 10]
+// idx = re.FindSubmatchIndex("Well,yakit is GUI client for yaklang", "yak([a-z]+)")
+// println(idx)   // OUT: [5 10 8 10]
+// assert idx[0] == 5 && idx[1] == 10, "FindSubmatchIndex should locate whole match at [5,10]"
 // ```
 func _findSubmatchIndex_extractByRegexp(origin interface{}, re string) []int {
 	r, err := regexp.Compile(re)
@@ -154,11 +199,20 @@ func _findSubmatchIndex_extractByRegexp(origin interface{}, re string) []int {
 	return r.FindStringSubmatchIndex(utils.InterfaceToString(origin))
 }
 
-// FindSubmatchAll 使用正则尝试匹配字符串，如果匹配成功返回所有匹配的字符串以及子匹配的字符串，否则返回空字符串切片的二维切片
+// FindSubmatchAll 使用正则匹配字符串，返回所有匹配及其子匹配（导出名为 re.FindSubmatchAll）
+// 参数:
+//   - origin: 待匹配的输入（任意可转为字符串）
+//   - re: 含捕获组的正则表达式
+//
+// 返回值:
+//   - 二维字符串切片，每项为 [整体匹配, 捕获组...]，未匹配返回空切片
+//
 // Example:
 // ```
-// // [["yakit", "it"], ["yaklang", "lang"]]
-// re.FindSubmatchAll("Well,yakit is GUI client for yaklang", "yak([a-z]+)")
+// all = re.FindSubmatchAll("Well,yakit is GUI client for yaklang", "yak([a-z]+)")
+// println(all)   // OUT: [[yakit it] [yaklang lang]]
+// assert len(all) == 2, "FindSubmatchAll should find two matches"
+// assert all[1][1] == "lang", "second group should be lang"
 // ```
 func _findSubmatchAll_extractByRegexp(origin interface{}, re string) [][]string {
 	r, err := regexp.Compile(re)
@@ -169,11 +223,19 @@ func _findSubmatchAll_extractByRegexp(origin interface{}, re string) [][]string 
 	return r.FindAllStringSubmatch(utils.InterfaceToString(origin), -1)
 }
 
-// FindSubmatchAllIndex 使用正则尝试匹配字符串，如果匹配成功返回所有匹配的字符串以及子匹配的字符串的起始位置和结束位置，否则返回空整数切片的二维切片
+// FindSubmatchAllIndex 使用正则匹配字符串，返回所有匹配及子匹配的位置（导出名为 re.FindSubmatchAllIndex）
+// 参数:
+//   - origin: 待匹配的输入（任意可转为字符串）
+//   - re: 含捕获组的正则表达式
+//
+// 返回值:
+//   - 二维整数切片，每项每两个一组依次为整体匹配与各捕获组的 [起始, 结束]，未匹配返回空切片
+//
 // Example:
 // ```
-// // [[5, 10, 8, 10], [29, 36, 32, 36]]
-// re.FindSubmatchAllIndex("Well,yakit is GUI client for yaklang", "yak([a-z]+)")
+// idx = re.FindSubmatchAllIndex("Well,yakit is GUI client for yaklang", "yak([a-z]+)")
+// println(idx)   // OUT: [[5 10 8 10] [29 36 32 36]]
+// assert len(idx) == 2, "FindSubmatchAllIndex should find two matches"
 // ```
 func _findSubmatchAllIndex_extractByRegexp(origin interface{}, re string) [][]int {
 	r, err := regexp.Compile(re)
@@ -184,13 +246,22 @@ func _findSubmatchAllIndex_extractByRegexp(origin interface{}, re string) [][]in
 	return r.FindAllStringSubmatchIndex(utils.InterfaceToString(origin), -1)
 }
 
-// ReplaceAllWithFunc 使用正则表达式匹配并使用自定义的函数替换字符串，并返回替换后的字符串
+// ReplaceAllWithFunc 使用正则匹配并用回调函数生成替换内容（导出名为 re.ReplaceAllWithFunc）
+// 参数:
+//   - origin: 原始输入（任意可转为字符串）
+//   - re: 正则表达式
+//   - newStr: 回调函数 func(matched string) string，入参为每个匹配，返回替换后的内容
+//
+// 返回值:
+//   - 替换完成后的字符串
+//
 // Example:
 // ```
-// // "yaklang is a programming language"
-// re.ReplaceAllWithFunc("yakit is programming language", "yak([a-z]+)", func(s) {
-// return "yaklang"
+// result = re.ReplaceAllWithFunc("yakit is programming language", "yak([a-z]+)", func(s) {
+//     return "yaklang"
 // })
+// println(result)   // OUT: yaklang is programming language
+// assert result == "yaklang is programming language", "ReplaceAllWithFunc should replace matched token"
 // ```
 func _replaceAllFunc_extractByRegexp(origin interface{}, re string, newStr func(string) string) string {
 	r, err := regexp.Compile(re)
@@ -201,11 +272,21 @@ func _replaceAllFunc_extractByRegexp(origin interface{}, re string, newStr func(
 	return r.ReplaceAllStringFunc(utils.InterfaceToString(origin), newStr)
 }
 
-// ReplaceAll 使用正则表达式匹配并替换字符串，并返回替换后的字符串
+// ReplaceAll 使用正则匹配并替换为指定字符串（导出名为 re.ReplaceAll）
+// 替换字符串支持 $1、${name} 等引用捕获组
+// 参数:
+//   - origin: 原始输入（任意可转为字符串）
+//   - re: 正则表达式
+//   - newStr: 替换字符串（支持 $1 等捕获组引用）
+//
+// 返回值:
+//   - 替换完成后的字符串
+//
 // Example:
 // ```
-// // "yaklang is a programming language"
-// re.ReplaceAll("yakit is programming language", "yak([a-z]+)", "yaklang")
+// result = re.ReplaceAll("yakit is programming language", "yak([a-z]+)", "yaklang")
+// println(result)   // OUT: yaklang is programming language
+// assert result == "yaklang is programming language", "ReplaceAll should replace matched token"
 // ```
 func _replaceAll_extractByRegexp(origin interface{}, re string, newStr interface{}) string {
 	r, err := regexp.Compile(re)
@@ -216,11 +297,21 @@ func _replaceAll_extractByRegexp(origin interface{}, re string, newStr interface
 	return r.ReplaceAllString(utils.InterfaceToString(origin), utils.InterfaceToString(newStr))
 }
 
-// FindGroup 使用正则表达式匹配字符串，如果匹配成功返回一个映射，其键名为正则表达式中的命名捕获组，键值为匹配到的字符串，否则返回空映射
+// FindGroup 使用正则匹配并按命名捕获组返回结果映射（导出名为 re.FindGroup）
+// 键为捕获组名（未命名组用其序号字符串），值为匹配内容；键 "0" 表示整体匹配
+// 参数:
+//   - i: 待匹配的输入（任意可转为字符串）
+//   - re: 含命名捕获组的正则表达式
+//
+// 返回值:
+//   - 命名捕获组到匹配内容的映射，未匹配返回空映射
+//
 // Example:
 // ```
-// // {"0": "yakit", "other": "it"}
-// re.FindGroup("Well,yakit is GUI client for yaklang", "yak(?P<other>[a-z]+)")
+// g = re.FindGroup("Well,yakit is GUI client for yaklang", "yak(?P<other>[a-z]+)")
+// println(g["other"])   // OUT: it
+// assert g["0"] == "yakit", "group 0 should be whole match"
+// assert g["other"] == "it", "named group other should be it"
 // ```
 func reExtractGroups(i interface{}, re string) map[string]string {
 	r, err := regexp.Compile(re)
@@ -244,11 +335,20 @@ func reExtractGroups(i interface{}, re string) map[string]string {
 	return result
 }
 
-// FindGroupAll 使用正则表达式匹配字符串，如果匹配成功返回一个映射切片，其键名为正则表达式中的命名捕获组，键值为匹配到的字符串，否则返回空映射切片
+// FindGroupAll 使用正则匹配并按命名捕获组返回所有结果映射（导出名为 re.FindGroupAll）
+// 每个匹配对应一个映射，键为捕获组名（未命名组用序号），键 "0" 为整体匹配
+// 参数:
+//   - i: 待匹配的输入（任意可转为字符串）
+//   - raw: 含命名捕获组的正则表达式
+//
+// 返回值:
+//   - 映射切片，每项对应一个匹配，未匹配返回空切片
+//
 // Example:
 // ```
-// // [{"0": "yakit", "other": "it"}, {"0": "yaklang", "other": "lang"}]
-// re.FindGroupAll("Well,yakit is GUI client for yaklang", "yak(?P<other>[a-z]+)")
+// gs = re.FindGroupAll("Well,yakit is GUI client for yaklang", "yak(?P<other>[a-z]+)")
+// println(len(gs))   // OUT: 2
+// assert gs[0]["other"] == "it" && gs[1]["other"] == "lang", "FindGroupAll should capture both named groups"
 // ```
 func reExtractGroupsAll(i interface{}, raw string) []map[string]string {
 	re, err := regexp.Compile(raw)
@@ -276,46 +376,89 @@ func reExtractGroupsAll(i interface{}, raw string) []map[string]string {
 	return results
 }
 
-// QuoteMeta 返回一个字符串，该字符串是将 s 中所有正则表达式元字符进行转义后的结果
+// QuoteMeta 转义字符串中所有正则元字符，使其可作为普通文本参与匹配（导出名为 re.QuoteMeta）
+// 参数:
+//   - s: 原始字符串
+//
+// 返回值:
+//   - 转义后的字符串
+//
 // Example:
 // ```
-// str.QuoteMeta("^[a-z]+$") // "\^\\[a-z\]\\+$"
+// q = re.QuoteMeta("a.b+c")
+// println(q)   // OUT: a\.b\+c
+// assert q == "a\\.b\\+c", "QuoteMeta should escape . and +"
 // ```
 func _quoteMeta(s string) string {
 	return regexp.QuoteMeta(s)
 }
 
-// Compile 将正则表达式解析为一个正则表达式结构体引用
+// Compile 将正则表达式编译为正则对象（导出名为 re.Compile）
+// 参数:
+//   - expr: 正则表达式字符串
+//
+// 返回值:
+//   - 编译得到的正则对象，可调用 MatchString/FindString 等方法
+//   - 错误信息（正则语法非法时返回）
+//
 // Example:
 // ```
-// re.Compile("^[a-z]+$")
+// r = re.Compile("^[a-z]+$")~
+// println(r.MatchString("abc"))   // OUT: true
+// assert r.MatchString("abc") == true, "Compile result should match lowercase letters"
 // ```
 func _compile(expr string) (*regexp.Regexp, error) {
 	return regexp.Compile(expr)
 }
 
-// CompilePOSIX 将正则表达式解析为一个符合 POSIX ERE(egrep) 语法的正则表达式结构体引用，并且匹配语义改为左最长匹配
+// CompilePOSIX 按 POSIX ERE(egrep) 语法编译正则，匹配语义为左最长匹配（导出名为 re.CompilePOSIX）
+// 参数:
+//   - expr: 正则表达式字符串
+//
+// 返回值:
+//   - 编译得到的 POSIX 正则对象
+//   - 错误信息（正则语法非法时返回）
+//
 // Example:
 // ```
-// re.CompilePOSIX("^[a-z]+$")
+// r = re.CompilePOSIX("^[a-z]+$")~
+// println(r.MatchString("abc"))   // OUT: true
+// assert r.MatchString("abc") == true, "CompilePOSIX result should match lowercase letters"
 // ```
 func _compilePOSIX(expr string) (*regexp.Regexp, error) {
 	return regexp.CompilePOSIX(expr)
 }
 
-// MustCompile 将正则表达式解析为一个正则表达式对象结构体引用，如果解析失败则会引发崩溃
+// MustCompile 编译正则表达式，语法非法时直接 panic（导出名为 re.MustCompile）
+// 适用于编译期可确定合法的常量正则
+// 参数:
+//   - str: 正则表达式字符串
+//
+// 返回值:
+//   - 编译得到的正则对象
+//
 // Example:
 // ```
-// re.MustCompile("^[a-z]+$")
+// r = re.MustCompile("^[a-z]+$")
+// println(r.MatchString("abc"))   // OUT: true
+// assert r.MatchString("abc") == true, "MustCompile result should match lowercase letters"
 // ```
 func _mustCompile(str string) *regexp.Regexp {
 	return regexp.MustCompile(str)
 }
 
-// MustCompilePOSIX 将正则表达式解析为一个POSIX正则表达式结构体引用，如果解析失败则会引发崩溃
+// MustCompilePOSIX 按 POSIX 语法编译正则，语法非法时直接 panic（导出名为 re.MustCompilePOSIX）
+// 参数:
+//   - str: 正则表达式字符串
+//
+// 返回值:
+//   - 编译得到的 POSIX 正则对象
+//
 // Example:
 // ```
-// re.MustCompilePOSIX("^[a-z]+$")
+// r = re.MustCompilePOSIX("^[a-z]+$")
+// println(r.MatchString("abc"))   // OUT: true
+// assert r.MatchString("abc") == true, "MustCompilePOSIX result should match lowercase letters"
 // ```
 func _mustCompilePOSIX(str string) *regexp.Regexp {
 	return regexp.MustCompilePOSIX(str)

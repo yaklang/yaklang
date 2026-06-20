@@ -807,6 +807,167 @@ func randomUpperAndLower(s string) string {
 	return xhtml.RandomUpperAndLower(s)
 }
 
+// Cut 在 s 中查找第一个 sep，并以其为界把 s 切分为前后两部分。如果找到 sep，则 found 为 true。
+// 参数:
+//   - s: 原始字符串
+//   - sep: 分隔符
+//
+// 返回值:
+//   - before: sep 之前的部分
+//   - after: sep 之后的部分
+//   - found: 是否找到了 sep
+//
+// Example:
+// ```
+// before, after, found = str.Cut("key=value", "=")
+// println(before, after, found)   // OUT: key value true
+// assert before == "key" && after == "value" && found, "Cut should split on the separator"
+// ```
+func cutString(s, sep string) (before, after string, found bool) {
+	return strings.Cut(s, sep)
+}
+
+// CutPrefix 如果 s 以 prefix 开头，则返回去除该前缀后的字符串与 true，否则返回原字符串与 false。
+// 参数:
+//   - s: 原始字符串
+//   - prefix: 要去除的前缀
+//
+// 返回值:
+//   - after: 去除前缀后的字符串（未命中前缀时为原字符串）
+//   - found: 是否命中前缀
+//
+// Example:
+// ```
+// after, found = str.CutPrefix("https://example.com", "https://")
+// println(after, found)   // OUT: example.com true
+// assert after == "example.com" && found, "CutPrefix should strip the prefix"
+// ```
+func cutPrefixString(s, prefix string) (after string, found bool) {
+	return strings.CutPrefix(s, prefix)
+}
+
+// CutSuffix 如果 s 以 suffix 结尾，则返回去除该后缀后的字符串与 true，否则返回原字符串与 false。
+// 参数:
+//   - s: 原始字符串
+//   - suffix: 要去除的后缀
+//
+// 返回值:
+//   - before: 去除后缀后的字符串（未命中后缀时为原字符串）
+//   - found: 是否命中后缀
+//
+// Example:
+// ```
+// before, found = str.CutSuffix("file.txt", ".txt")
+// println(before, found)   // OUT: file true
+// assert before == "file" && found, "CutSuffix should strip the suffix"
+// ```
+func cutSuffixString(s, suffix string) (before string, found bool) {
+	return strings.CutSuffix(s, suffix)
+}
+
+// Quote 给字符串 s 加上双引号并转义其中的特殊字符，返回 Go 语法风格的带引号字符串。
+// 参数:
+//   - s: 原始字符串
+//
+// 返回值:
+//   - 带双引号并完成转义的字符串
+//
+// Example:
+// ```
+// q = str.Quote("hello\nworld")
+// // 换行被转义为 \n，并加上首尾双引号
+// println(q)   // OUT: "hello\nworld"
+// assert q == "\"hello\\nworld\"", "Quote should escape special chars"
+// ```
+func quoteString(s string) string {
+	return strconv.Quote(s)
+}
+
+// Unquote 把一个带引号的字符串（双引号、单引号或反引号）还原为原始字符串，失败时返回错误。
+// 参数:
+//   - s: 带引号的字符串
+//
+// 返回值:
+//   - 去除引号并反转义后的字符串
+//   - 错误信息
+//
+// Example:
+// ```
+// raw = str.Unquote("\"hello\\nworld\"")~
+// assert raw == "hello\nworld", "Unquote should unescape quoted string"
+// ```
+func unquoteString(s string) (string, error) {
+	return strconv.Unquote(s)
+}
+
+// ToUpperSpecial 使用指定的字符大小写映射规则 c，把字符串 s 中的所有字符转换为大写。
+// 参数:
+//   - c: 特殊大小写规则（如 unicode.TurkishCase）
+//   - s: 原始字符串
+//
+// 返回值:
+//   - 按指定规则转换为大写后的字符串
+//
+// Example:
+// ```
+// out = str.ToUpperSpecial(unicode.TurkishCase, "abc")
+// assert str.Contains(out, "A"), "ToUpperSpecial should uppercase with special case rules"
+// ```
+func toUpperSpecial(c unicode.SpecialCase, s string) string {
+	return strings.ToUpperSpecial(c, s)
+}
+
+// ToLowerSpecial 使用指定的字符大小写映射规则 c，把字符串 s 中的所有字符转换为小写。
+// 参数:
+//   - c: 特殊大小写规则（如 unicode.TurkishCase）
+//   - s: 原始字符串
+//
+// 返回值:
+//   - 按指定规则转换为小写后的字符串
+//
+// Example:
+// ```
+// out = str.ToLowerSpecial(unicode.TurkishCase, "ABC")
+// assert str.Contains(out, "a"), "ToLowerSpecial should lowercase with special case rules"
+// ```
+func toLowerSpecial(c unicode.SpecialCase, s string) string {
+	return strings.ToLowerSpecial(c, s)
+}
+
+// ToTitleSpecial 使用指定的字符大小写映射规则 c，把字符串 s 中的所有字符转换为标题形式（Title Case）。
+// 参数:
+//   - c: 特殊大小写规则（如 unicode.TurkishCase）
+//   - s: 原始字符串
+//
+// 返回值:
+//   - 按指定规则转换为标题形式后的字符串
+//
+// Example:
+// ```
+// out = str.ToTitleSpecial(unicode.TurkishCase, "abc")
+// assert str.Contains(out, "A"), "ToTitleSpecial should title-case with special case rules"
+// ```
+func toTitleSpecial(c unicode.SpecialCase, s string) string {
+	return strings.ToTitleSpecial(c, s)
+}
+
+// NewReader 基于字符串 s 创建一个只读的 io.Reader，可用于需要 reader 的接口。
+// 参数:
+//   - s: 原始字符串
+//
+// 返回值:
+//   - 一个从 s 读取数据的 *strings.Reader
+//
+// Example:
+// ```
+// reader = str.NewReader("hello")
+// data = io.ReadAll(reader)~
+// assert string(data) == "hello", "NewReader should provide a reader over the string"
+// ```
+func newStringReader(s string) *strings.Reader {
+	return strings.NewReader(s)
+}
+
 var StringsExport = map[string]interface{}{
 	// 基础字符串工具
 	"IndexAny":       IndexAny,
@@ -829,12 +990,12 @@ var StringsExport = map[string]interface{}{
 	"HasPrefix":      StartsWith,
 	"HasSuffix":      EndsWith,
 	"Repeat":         Repeat,
-	"ToTitleSpecial": strings.ToTitleSpecial,
+	"ToTitleSpecial": toTitleSpecial,
 	"ToTitle":        ToTitle,
 	"Contains":       Contains,
 	"ReplaceAll":     ReplaceAll,
 	"Replace":        Replace,
-	"NewReader":      strings.NewReader,
+	"NewReader":      newStringReader,
 	"Index":          Index,
 	"Count":          Count,
 	"Compare":        Compare,
@@ -845,11 +1006,11 @@ var StringsExport = map[string]interface{}{
 	"LastIndex":      LastIndex,
 	"LastIndexAny":   LastIndexAny,
 	"LastIndexByte":  LastIndexByte,
-	"ToLowerSpecial": strings.ToLowerSpecial,
-	"ToUpperSpecial": strings.ToUpperSpecial,
+	"ToLowerSpecial": toLowerSpecial,
+	"ToUpperSpecial": toUpperSpecial,
 	"ToValidUTF8":    ToValidUTF8,
-	"Quote":          strconv.Quote,
-	"Unquote":        strconv.Unquote,
+	"Quote":          quoteString,
+	"Unquote":        unquoteString,
 
 	// 特有的
 	"RandStr":             utils.RandStringBytes,
@@ -941,9 +1102,9 @@ var StringsExport = map[string]interface{}{
 	"VersionLessEqual":    utils.VersionLessEqual,
 	"VersionLess":         utils.VersionLess,
 	"VersionCompare":      utils.VersionCompare,
-	"Cut":                 strings.Cut,
-	"CutPrefix":           strings.CutPrefix,
-	"CutSuffix":           strings.CutSuffix,
+	"Cut":                 cutString,
+	"CutPrefix":           cutPrefixString,
+	"CutSuffix":           cutSuffixString,
 
 	"TextReaderSplit": utils.DefaultTextSplitter.SplitReader,
 	"TextSplit":       utils.DefaultTextSplitter.Split,
@@ -966,6 +1127,20 @@ var StringsExport = map[string]interface{}{
 	"DecodeTokens":           DecodeTokens,
 }
 
+// RenderTemplate 使用 m 中的数据渲染模板字符串 i（基于 Go text/template 语法），渲染失败时返回原始模板。
+// 参数:
+//   - i: 模板字符串，例如 "hello {{ .name }}"
+//   - m: 模板数据，通常是一个 map
+//
+// 返回值:
+//   - 渲染后的字符串（失败时回退为原模板内容）
+//
+// Example:
+// ```
+// out = str.RenderTemplate("hello {{ .name }}", {"name": "yak"})
+// println(out)   // OUT: hello yak
+// assert out == "hello yak", "RenderTemplate should fill template variables"
+// ```
 func RenderTemplate(i string, m any) string {
 	result, err := utils.RenderTemplate(i, m)
 	if err != nil {
@@ -978,6 +1153,19 @@ func RenderTemplate(i string, m any) string {
 	return result
 }
 
+// AddPrefixLineNumberToReader 读取 i（字符串或 io.Reader）中的文本，为每一行加上行号前缀，并返回一个新的 io.Reader。
+// 参数:
+//   - i: 输入内容，可以是字符串，也可以是 io.Reader
+//
+// 返回值:
+//   - 每行带行号前缀的 io.Reader
+//
+// Example:
+// ```
+// reader = str.AddPrefixLineNumberToReader("a\nb")
+// data = io.ReadAll(reader)~
+// assert str.Contains(string(data), "1"), "AddPrefixLineNumberToReader should add line numbers"
+// ```
 func prefixLineNumberReader(i any) io.Reader {
 	switch ret := i.(type) {
 	case io.Reader:
@@ -987,11 +1175,30 @@ func prefixLineNumberReader(i any) io.Reader {
 	return utils.PrefixLinesWithLineNumbersReader(strings.NewReader(result))
 }
 
+// AddPrefixLineNumber 为输入文本 i 的每一行加上行号前缀，并返回处理后的字符串。
+// 参数:
+//   - i: 输入内容，会被转换为字符串
+//
+// 返回值:
+//   - 每行带行号前缀的字符串
+//
+// Example:
+// ```
+// out = str.AddPrefixLineNumber("a\nb\nc")
+// assert str.Contains(out, "1") && str.Contains(out, "3"), "AddPrefixLineNumber should number every line"
+// ```
 func prefixLineNumber(i any) string {
 	return utils.PrefixLinesWithLineNumbers(i)
 }
 
 // str.ShrinkString 将会把一个字符串压缩成一个设定一个长度下的较短的字符串
+// 参数:
+//   - i: 输入内容，会被转换为字符串
+//   - size: 压缩后字符串的目标最大长度
+//
+// 返回值:
+//   - 压缩后的字符串，过长部分会用省略号替代
+//
 // Example:
 // ```
 // result = str.ShrinkString("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", 20)

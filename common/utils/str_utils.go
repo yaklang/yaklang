@@ -29,6 +29,14 @@ import (
 )
 
 // ExtractStrContext 从字符串raw中提取一组关键字res上下文的内容，上下文的长度是512个字符确定。
+//
+// 参数:
+//   - raw: 原始字符串
+//   - res: 关键词列表
+//
+// 返回值:
+//   - 每个命中关键词周围的上下文文本切片（已去重）
+//
 // Example:
 // ```
 // str.ExtractStrContext("hello yak", ["hello"]) // ["hello yak"]
@@ -83,6 +91,14 @@ func StringAfter(value string, a string) string {
 }
 
 // StringSliceContainsAll 判断字符串切片s中是否完全包含elements中的所有元素，对于非字符串的切片，会尝试将其元素转换为字符串再判断是否包含
+//
+// 参数:
+//   - s: 字符串切片
+//   - elements: 待检查的一个或多个元素
+//
+// 返回值:
+//   - 切片是否包含所有给定元素
+//
 // Example:
 // ```
 // str.StringSliceContainsAll(["hello", "yak"], "hello", "yak") // true
@@ -98,6 +114,13 @@ func StringSliceContainsAll(s []string, elements ...string) bool {
 }
 
 // RemoveRepeat 移除字符串切片slc中的重复元素
+//
+// 参数:
+//   - slc: 原始字符串切片
+//
+// 返回值:
+//   - 去除重复元素后的字符串切片（保持原有顺序）
+//
 // Example:
 // ```
 // str.RemoveRepeat(["hello", "yak", "hello"]) // ["hello", "yak"]
@@ -490,6 +513,13 @@ func IntSliceToInt64Slice(i []int) []int64 {
 }
 
 // ToStringSlice 将任意类型的数据转换为字符串切片
+//
+// 参数:
+//   - i: 任意类型的数据
+//
+// 返回值:
+//   - 转换得到的字符串切片
+//
 // Example:
 // ```
 // str.ToStringSlice("hello") // ["hello"]
@@ -648,6 +678,13 @@ func InterfaceToMap(i interface{}) map[string][]string {
 }
 
 // ParseStringUrlToWebsiteRootPath 将字符串 url 解析为其根路径的URL
+//
+// 参数:
+//   - url: 原始 URL 字符串
+//
+// 返回值:
+//   - 仅保留根路径（去除路径与查询参数）后的 URL 字符串
+//
 // Example:
 // ```
 // str.ParseStringUrlToWebsiteRootPath("https://yaklang.com/abc?a=1") // https://yaklang.com/
@@ -665,6 +702,14 @@ func ParseStringUrlToWebsiteRootPath(url string) (newURL string) {
 }
 
 // ParseStringUrlToUrlInstance 将字符串 url 解析为 URL 结构体并返回错误
+//
+// 参数:
+//   - s: 原始 URL 字符串
+//
+// 返回值:
+//   - 解析后的 URL 实例
+//   - 错误信息
+//
 // Example:
 // ```
 // str.ParseStringUrlToUrlInstance("https://yaklang.com/abc?a=1")
@@ -717,6 +762,15 @@ func ParseStringToHttpsAndHostname(res string) (bool, string) {
 }
 
 // ParseStringToHostPort 尝试从字符串中解析出host和port，并与错误一起返回
+//
+// 参数:
+//   - raw: 形如 host:port 或 URL 的字符串
+//
+// 返回值:
+//   - host: 解析出的主机
+//   - port: 解析出的端口
+//   - err: 错误信息
+//
 // Example:
 // ```
 // host, port, err = str.ParseStringToHostPort("127.0.0.1:8888") // host = "127.0.0.1", port = 8888, err = nil
@@ -769,6 +823,15 @@ func ParseStringToHostPort(raw string) (host string, port int, err error) {
 }
 
 // UrlJoin 将 字符串 origin 和 字符串数组 paths 拼接成一个新的 URL 字符串，并返回错误
+//
+// 参数:
+//   - origin: 基础 URL
+//   - paths: 一个或多个待拼接的路径片段
+//
+// 返回值:
+//   - newURL: 拼接后的新 URL
+//   - err: 错误信息
+//
 // Example:
 // ```
 // newURL, err = str.UrlJoin("https://yaklang.com", "asd", "qwe") // newURL = "https://yaklang.com/asd/qwe", err = nil
@@ -997,6 +1060,13 @@ func ToNsServer(server string) string {
 }
 
 // RandStringBytes 返回在大小写字母表中随机挑选 n 个字符组成的字符串
+//
+// 参数:
+//   - n: 生成字符串的长度
+//
+// 返回值:
+//   - 随机字母组成的字符串
+//
 // Example:
 // ```
 // str.RandStr(10)
@@ -1041,6 +1111,13 @@ const (
 )
 
 // IsStrongPassword 判断字符串是否为强密码，强密码的定义为：长度大于8，同时包含特殊字符、小写字母、大写字母、数字
+//
+// 参数:
+//   - s: 待检测的密码字符串
+//
+// 返回值:
+//   - 是否满足强密码要求
+//
 // Example:
 // ```
 // str.IsStrongPassword("12345678") // false
@@ -1077,6 +1154,13 @@ func IsStrongPassword(s string) bool {
 }
 
 // RandSecret 返回在所有可见ascii字符表中随机挑选 n 个字符组成的密码字符串，这个密码经过str.IsStrongPassword验证，即为强密码
+//
+// 参数:
+//   - n: 生成密码的长度（应大于 8 以满足强密码要求）
+//
+// 返回值:
+//   - 满足强密码要求的随机字符串
+//
 // Example:
 // ```
 // str.RandSecret(10)
@@ -1145,6 +1229,13 @@ func ExtractRawPath(target string) string {
 }
 
 // ParseStringToUrls 尝试从给定的字符串(ip,域名)中解析出 URL 列表，补全协议和端口
+//
+// 参数:
+//   - targets: 一个或多个目标字符串（IP、域名或 host:port）
+//
+// 返回值:
+//   - 补全协议与端口后的 URL 列表
+//
 // Example:
 // ```
 // str.ParseStringToUrls("yaklang.com:443", "https://yaklang.io") // [https://yaklang.com, https://yaklang.io]
@@ -1252,6 +1343,13 @@ func DumpFileWithTextAndFiles(raw string, divider string, files ...string) (stri
 }
 
 // ParseStringToLines 将字符串按换行符(\n)分割成字符串数组，并去除BOM头和空行
+//
+// 参数:
+//   - raw: 原始多行字符串
+//
+// 返回值:
+//   - 去除 BOM 头与空行后的行字符串数组
+//
 // Example:
 // ```
 // str.ParseStringToLines("Hello World\nHello Yak") // ["Hello World", "Hello Yak"]
