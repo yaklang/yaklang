@@ -499,30 +499,94 @@ func RenderLibMarkdown(lib *yakdoc.ScriptLib, overview string, formatExample fun
 		mainFuncs = append(mainFuncs, fun)
 	}
 
-	anchors := assignAnchors(mainFuncs)
-
-	// 函数索引
-	b.WriteString("## 函数索引\n\n")
-	b.WriteString("|函数|说明|\n")
-	b.WriteString("|:--|:--|\n")
+	// 按"是否含可变参数"分组：普通函数 与 可变参数函数 各成一块。
+	// 锚点在合并顺序(普通在前、可变在后)上统一分配，保证全页唯一且与索引链接一致。
+	var regular, variadic []*yakdoc.FuncDecl
 	for _, fun := range mainFuncs {
-		parsed := parseCommentDetails(fun.Document)
-		b.WriteString(fmt.Sprintf("| [%s.%s](#%s) | %s |\n",
-			html.EscapeString(fun.LibName),
-			html.EscapeString(fun.MethodName),
-			anchors[fun],
-			escapeTableCell(stripLeadingFuncName(parsed.Description, fun.MethodName)),
-		))
+		if hasVariadicParam(fun) {
+			variadic = append(variadic, fun)
+		} else {
+			regular = append(regular, fun)
+		}
 	}
-	b.WriteString("\n")
+	order := append(append([]*yakdoc.FuncDecl{}, regular...), variadic...)
+	anchors := assignAnchors(order)
 
-	// 函数详情
-	b.WriteString("## 函数详情\n\n")
-	for _, fun := range mainFuncs {
-		b.WriteString(renderFuncDetail(fun, anchors[fun], oi, formatExample))
+	writeIndex := func(title string, funcs []*yakdoc.FuncDecl) {
+		if len(funcs) == 0 {
+			return
+		}
+		b.WriteString("## " + title + "\n\n")
+		b.WriteString("|函数|参数|返回值|说明|\n")
+		b.WriteString("|:--|:--|:--|:--|\n")
+		for _, fun := range funcs {
+			parsed := parseCommentDetails(fun.Document)
+			b.WriteString(fmt.Sprintf("| [%s.%s](#%s) | %s | %s | %s |\n",
+				html.EscapeString(fun.LibName),
+				html.EscapeString(fun.MethodName),
+				anchors[fun],
+				funcParamCell(fun),
+				funcReturnCell(fun),
+				escapeTableCell(stripLeadingFuncName(parsed.Description, fun.MethodName)),
+			))
+		}
+		b.WriteString("\n")
 	}
+	writeDetails := func(title string, funcs []*yakdoc.FuncDecl) {
+		if len(funcs) == 0 {
+			return
+		}
+		b.WriteString("## " + title + "\n\n")
+		for _, fun := range funcs {
+			b.WriteString(renderFuncDetail(fun, anchors[fun], oi, formatExample))
+		}
+	}
+
+	writeIndex("函数索引", regular)
+	writeIndex("可变参数函数索引", variadic)
+	writeDetails("函数详情", regular)
+	writeDetails("可变参数函数详情", variadic)
 
 	return b.String()
+}
+
+// hasVariadicParam 判断函数是否至少有一个可变参数(...T)。
+func hasVariadicParam(fun *yakdoc.FuncDecl) bool {
+	for _, p := range fun.Params {
+		if variadicElemType(p.Type) != "" {
+			return true
+		}
+	}
+	return false
+}
+
+// funcParamCell 渲染索引/选项表里的"参数"列：把全部参数压成单个行内代码("name type" 逗号分隔)。
+// 类型里可能含 < / | 等字符，统一裹进行内代码，既不破坏表格列数也不触发 MDX 裸 < 风险。无参数为 "-"。
+func funcParamCell(fun *yakdoc.FuncDecl) string {
+	if len(fun.Params) == 0 {
+		return "-"
+	}
+	parts := make([]string, 0, len(fun.Params))
+	for _, p := range fun.Params {
+		if n := strings.TrimSpace(p.Name); n != "" {
+			parts = append(parts, n+" "+p.Type)
+		} else {
+			parts = append(parts, p.Type)
+		}
+	}
+	return "`" + strings.Join(parts, ", ") + "`"
+}
+
+// funcReturnCell 渲染索引/选项表里的"返回值"列：把返回值类型压成单个行内代码。无返回值为 "-"。
+func funcReturnCell(fun *yakdoc.FuncDecl) string {
+	if len(fun.Results) == 0 {
+		return "-"
+	}
+	parts := make([]string, 0, len(fun.Results))
+	for _, r := range fun.Results {
+		parts = append(parts, r.Type)
+	}
+	return "`" + strings.Join(parts, ", ") + "`"
 }
 
 // renderParamRows 渲染参数表(仅表格，不含加粗小节标签)。

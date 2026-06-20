@@ -235,7 +235,7 @@ func yakitStatusCard(id string, data interface{}, tags ...string) {
 //   - data: 卡片展示的数据（任意类型，会转为字符串展示）
 //   - tags: 可选的分组标签（可变参数）
 //
-// <|EXAMPLE_START|> 基础卡片
+// <|EXAMPLE_START|> 输出一张基础状态卡片
 // ```
 // // 输出一张关键指标卡片
 // yakit.StatusCard("Open Ports", 12, "stats")

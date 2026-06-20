@@ -17,8 +17,8 @@ import (
 //
 // 渲染策略(对齐需求：选项只在对应主函数下出现，不在开头单列；多个主函数共享同一选项则重复展示)：
 //   - 选项函数从顶层"函数索引/函数详情"中剔除；
-//   - 在每个消费该选项类型的主函数详情里，渲染"可选参数 / 选项"小节，逐条列出选项函数
-//     (内联签名 + 一句话描述)，多个主函数共享则重复渲染。
+//   - 在每个消费该选项类型的主函数详情里，渲染"可选参数 / 选项"小节，用与"函数索引"同款
+//     表格(函数 | 参数 | 返回值 | 说明)列出全部选项函数，多个主函数共享则重复渲染。
 
 // isOptionTypeName 判定一个类型名是否"看起来像选项类型"：以 Option 或 Options 结尾。
 // 仅据此从可变参数里识别选项类型，避免把 ...string / ...interface{} 误判为选项。
@@ -34,6 +34,18 @@ func variadicElemType(typ string) string {
 	return ""
 }
 
+// baseTypeName 取类型名的"裸基名"：去掉前导 * 与包限定前缀(pkg.)。
+// 用于跨包选项匹配：消费侧形参类型常带包名(如 ...fp.ConfigOption)，而生产侧函数
+// 定义在该包内、其返回类型记录为裸名(ConfigOption)，二者本是同一类型，按基名比较才能关联。
+func baseTypeName(typ string) string {
+	t := strings.TrimSpace(typ)
+	t = strings.TrimPrefix(t, "*")
+	if i := strings.LastIndex(t, "."); i >= 0 {
+		t = t[i+1:]
+	}
+	return t
+}
+
 // OptionIndex 记录库内的选项关联关系。
 type OptionIndex struct {
 	// producers: 选项类型 -> 生产该类型的选项函数(已按方法名排序)
@@ -45,10 +57,10 @@ type OptionIndex struct {
 // isOptionParam 判定某参数是否为"可关联选项"的可变参数(...Option/...Options 且库内有生产者)。
 func (oi *OptionIndex) isOptionParam(p *yakdoc.Field) bool {
 	elem := variadicElemType(p.Type)
-	return elem != "" && isOptionTypeName(elem) && len(oi.producers[elem]) > 0
+	return elem != "" && isOptionTypeName(elem) && len(oi.producers[baseTypeName(elem)]) > 0
 }
 
-// optionTypesOf 返回某函数作为"主函数"所消费的选项类型列表(其可变参数中以 Option/Options 结尾者)。
+// optionTypesOf 返回某函数作为"主函数"所消费的选项类型基名列表(其可变参数中以 Option/Options 结尾者)。
 func (oi *OptionIndex) optionTypesOf(fun *yakdoc.FuncDecl) []string {
 	var types []string
 	seen := map[string]bool{}
@@ -57,12 +69,13 @@ func (oi *OptionIndex) optionTypesOf(fun *yakdoc.FuncDecl) []string {
 		if elem == "" || !isOptionTypeName(elem) {
 			continue
 		}
-		if len(oi.producers[elem]) == 0 {
+		base := baseTypeName(elem)
+		if len(oi.producers[base]) == 0 {
 			continue // 没有任何生产者则不算可关联的选项
 		}
-		if !seen[elem] {
-			seen[elem] = true
-			types = append(types, elem)
+		if !seen[base] {
+			seen[base] = true
+			types = append(types, base)
 		}
 	}
 	return types
@@ -76,13 +89,13 @@ func buildOptionIndex(funcs []*yakdoc.FuncDecl) *OptionIndex {
 		isProducer: map[*yakdoc.FuncDecl]bool{},
 	}
 
-	// 第一步：收集所有"被作为可变参数消费、且形如 Option/Options"的选项类型
+	// 第一步：收集所有"被作为可变参数消费、且形如 Option/Options"的选项类型(按基名归一)
 	consumed := map[string]bool{}
 	for _, fun := range funcs {
 		for _, p := range fun.Params {
 			elem := variadicElemType(p.Type)
 			if elem != "" && isOptionTypeName(elem) {
-				consumed[elem] = true
+				consumed[baseTypeName(elem)] = true
 			}
 		}
 	}
@@ -90,14 +103,15 @@ func buildOptionIndex(funcs []*yakdoc.FuncDecl) *OptionIndex {
 		return oi
 	}
 
-	// 第二步：把"唯一返回值类型属于已消费选项类型"的函数登记为该类型的生产者
+	// 第二步：把"唯一返回值基名属于已消费选项类型"的函数登记为该类型的生产者。
+	// 按基名比较以兼容跨包限定差异(如消费 ...fp.ConfigOption、生产 ConfigOption)。
 	for _, fun := range funcs {
 		if len(fun.Results) != 1 {
 			continue
 		}
-		retType := fun.Results[0].Type
-		if consumed[retType] {
-			oi.producers[retType] = append(oi.producers[retType], fun)
+		base := baseTypeName(fun.Results[0].Type)
+		if consumed[base] {
+			oi.producers[base] = append(oi.producers[base], fun)
 			oi.isProducer[fun] = true
 		}
 	}
@@ -115,7 +129,7 @@ func buildOptionIndex(funcs []*yakdoc.FuncDecl) *OptionIndex {
 // 关键词: renderOptionTypeBlock, 可选参数, 选项重复渲染
 func (oi *OptionIndex) renderOptionTypeBlock(p *yakdoc.Field) string {
 	typ := variadicElemType(p.Type)
-	producers := oi.producers[typ]
+	producers := oi.producers[baseTypeName(typ)]
 	if len(producers) == 0 {
 		return ""
 	}
@@ -126,24 +140,22 @@ func (oi *OptionIndex) renderOptionTypeBlock(p *yakdoc.Field) string {
 	} else {
 		b.WriteString(fmt.Sprintf("可作为可变参数 `...%s` 传入以下选项：\n\n", typ))
 	}
+	// 与"函数索引"同款表格：函数 | 参数 | 返回值 | 说明。选项函数无独立锚点，故函数名用行内代码而非链接。
+	b.WriteString("|选项函数|参数|返回值|说明|\n")
+	b.WriteString("|:--|:--|:--|:--|\n")
 	for _, opt := range producers {
 		parsed := parseCommentDetails(opt.Document)
-		desc := stripLeadingFuncName(strings.TrimSpace(parsed.Description), opt.MethodName)
-		if desc == "" {
-			b.WriteString(fmt.Sprintf("- `%s.%s`\n", opt.LibName, opt.MethodName))
-		} else {
-			b.WriteString(fmt.Sprintf("- `%s.%s` — %s\n", opt.LibName, opt.MethodName, escapeInlineLabel(stripExportSuffix(desc))))
-		}
-		// 选项签名用行内代码展示完整签名(围栏内不转义，<&安全)
-		b.WriteString(fmt.Sprintf("  - 签名：`%s`\n", inlineSignature(opt.Decl)))
+		desc := stripExportSuffix(stripLeadingFuncName(strings.TrimSpace(parsed.Description), opt.MethodName))
+		b.WriteString(fmt.Sprintf("| `%s.%s` | %s | %s | %s |\n",
+			html.EscapeString(opt.LibName),
+			html.EscapeString(opt.MethodName),
+			funcParamCell(opt),
+			funcReturnCell(opt),
+			escapeTableCell(desc),
+		))
 	}
 	b.WriteString("\n")
 	return b.String()
-}
-
-// inlineSignature 把签名压成单行(去多余空白/换行)，用于行内代码展示。
-func inlineSignature(decl string) string {
-	return strings.Join(strings.Fields(strings.ReplaceAll(decl, "\n", " ")), " ")
 }
 
 // stripExportSuffix 去掉描述末尾的"（导出名为 xxx）"括注，避免在选项条目里冗长。

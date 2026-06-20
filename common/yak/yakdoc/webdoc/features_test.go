@@ -101,8 +101,9 @@ func TestBuildOptionIndex(t *testing.T) {
 	if oi.isProducer[funcs[3]] {
 		t.Fatalf("Other should NOT be a producer (no consumer for SomeOption)")
 	}
+	// optionTypesOf 返回"基名"(去包限定)，以兼容跨包限定差异
 	types := oi.optionTypesOf(funcs[0])
-	if len(types) != 1 || types[0] != "yakit.CreateHTTPFlowOptions" {
+	if len(types) != 1 || types[0] != "CreateHTTPFlowOptions" {
 		t.Fatalf("Save option types=%v", types)
 	}
 	if oi.isOptionParam(funcs[2].Params[0]) {
@@ -112,6 +113,28 @@ func TestBuildOptionIndex(t *testing.T) {
 	sec := oi.renderOptionTypeBlock(funcs[0].Params[1])
 	if !strings.Contains(sec, "可作为可变参数") || !strings.Contains(sec, "`db.WithTags`") {
 		t.Fatalf("option block wrong:\n%s", sec)
+	}
+}
+
+// TestBuildOptionIndexCrossPackageQualifier 校验跨包限定差异下的选项关联：
+// 消费侧形参为 ...fp.ConfigOption(带包名)，生产侧函数返回 ConfigOption(裸名)，
+// 二者本是同一类型，应按基名关联——生产者被识别并从顶层剔除、列在主函数下。
+func TestBuildOptionIndexCrossPackageQualifier(t *testing.T) {
+	funcs := []*yakdoc.FuncDecl{
+		fn("servicescan", "Scan", "Scan(t string, opts ...fp.ConfigOption) error", "scan",
+			[]*yakdoc.Field{field("t", "string"), field("opts", "...fp.ConfigOption")},
+			[]*yakdoc.Field{field("", "error")}),
+		// 生产者返回裸名 ConfigOption(定义在 fp 包内)
+		fn("servicescan", "proxy", "proxy(p ...string) ConfigOption", "set proxy",
+			[]*yakdoc.Field{field("p", "...string")}, []*yakdoc.Field{field("", "ConfigOption")}),
+	}
+	oi := buildOptionIndex(funcs)
+	if !oi.isProducer[funcs[1]] {
+		t.Fatalf("proxy(ConfigOption) should be a producer for ...fp.ConfigOption consumer")
+	}
+	sec := oi.renderOptionTypeBlock(funcs[0].Params[1])
+	if !strings.Contains(sec, "`servicescan.proxy`") {
+		t.Fatalf("cross-package option not linked:\n%s", sec)
 	}
 }
 
