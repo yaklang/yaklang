@@ -192,11 +192,29 @@ var Exports = map[string]any{
 	"NewSSAProject":             ssaproject.NewSSAProject,
 
 	// Query latest program name by project name
-	"GetLatestProgramNameByProjectName": func(projectName string) (string, error) {
-		if projectName == "" {
-			return "", utils.Errorf("project name is empty")
-		}
-		db := consts.GetGormProfileDatabase()
-		return yakit.QueryLatestSSAProgramNameByProjectName(db, projectName)
-	},
+	"GetLatestProgramNameByProjectName": getLatestProgramNameByProjectName,
+}
+
+// getLatestProgramNameByProjectName 根据 SSA 项目名查询其最新编译产物（program）的名称（导出名为 ssa.GetLatestProgramNameByProjectName）
+// 一个项目可能多次编译产生多个 program，本函数返回最近一次的 program 名称
+//
+// 参数:
+//   - projectName: SSA 项目名
+//
+// 返回值:
+//   - 最新的 program 名称
+//   - 错误信息（项目名为空或查询失败时返回）
+//
+// Example:
+// ```
+// // 该示例依赖数据库中已存在的 SSA 项目，仅作用法示意
+// name = ssa.GetLatestProgramNameByProjectName("my-project")~
+// println(name)
+// ```
+func getLatestProgramNameByProjectName(projectName string) (string, error) {
+	if projectName == "" {
+		return "", utils.Errorf("project name is empty")
+	}
+	db := consts.GetGormProfileDatabase()
+	return yakit.QueryLatestSSAProgramNameByProjectName(db, projectName)
 }
