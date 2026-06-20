@@ -272,10 +272,42 @@ func pkcs7Padding(src []byte) []byte {
 	return append(src, padtext...)
 }
 
+// PKCS7Padding 对数据按 16 字节块大小做 PKCS7 填充（导出名为 codec.PKCS7Padding）
+// 填充字节的值等于需要填充的长度；即便数据已是块的整数倍也会补一整块
+//
+// 参数:
+//   - src: 待填充的原始字节
+//
+// 返回值:
+//   - 填充后长度为 16 字节整数倍的字节
+//
+// Example:
+// ```
+// padded = codec.PKCS7Padding("yak")
+// println(len(padded))   // OUT: 16
+// assert len(padded) == 16, "PKCS7Padding should pad to 16-byte block"
+// assert string(codec.PKCS7UnPadding(padded)) == "yak", "PKCS7UnPadding should recover original data"
+// ```
 func PKCS7Padding(src []byte) []byte {
 	return pkcs7Padding(src)
 }
 
+// PKCS7UnPadding 去除数据末尾的 PKCS7 填充字节（导出名为 codec.PKCS7UnPadding）
+// 与 codec.PKCS7Padding 配对使用；填充非法时原样返回输入
+//
+// 参数:
+//   - src: 带 PKCS7 填充的字节
+//
+// 返回值:
+//   - 去除填充后的原始字节
+//
+// Example:
+// ```
+// padded = codec.PKCS7Padding("yak")
+// origin = codec.PKCS7UnPadding(padded)
+// println(string(origin))   // OUT: yak
+// assert string(origin) == "yak", "PKCS7UnPadding should strip padding and recover data"
+// ```
 func PKCS7UnPadding(src []byte) []byte {
 	res, err := pkcs7UnPadding(src)
 	if err != nil {
