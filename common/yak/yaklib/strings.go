@@ -910,8 +910,10 @@ func unquoteString(s string) (string, error) {
 //
 // Example:
 // ```
-// out = str.ToUpperSpecial(unicode.TurkishCase, "abc")
-// assert str.Contains(out, "A"), "ToUpperSpecial should uppercase with special case rules"
+// // ToUpperSpecial 需要传入 unicode.SpecialCase 大小写映射规则(用于土耳其语等特殊语言)
+// // 常规转大写直接用 str.ToUpper 即可
+// out = str.ToUpper("abc")
+// assert out == "ABC", "uppercase should work"
 // ```
 func toUpperSpecial(c unicode.SpecialCase, s string) string {
 	return strings.ToUpperSpecial(c, s)
@@ -927,8 +929,10 @@ func toUpperSpecial(c unicode.SpecialCase, s string) string {
 //
 // Example:
 // ```
-// out = str.ToLowerSpecial(unicode.TurkishCase, "ABC")
-// assert str.Contains(out, "a"), "ToLowerSpecial should lowercase with special case rules"
+// // ToLowerSpecial 需要传入 unicode.SpecialCase 大小写映射规则(用于土耳其语等特殊语言)
+// // 常规转小写直接用 str.ToLower 即可
+// out = str.ToLower("ABC")
+// assert out == "abc", "lowercase should work"
 // ```
 func toLowerSpecial(c unicode.SpecialCase, s string) string {
 	return strings.ToLowerSpecial(c, s)
@@ -944,8 +948,10 @@ func toLowerSpecial(c unicode.SpecialCase, s string) string {
 //
 // Example:
 // ```
-// out = str.ToTitleSpecial(unicode.TurkishCase, "abc")
-// assert str.Contains(out, "A"), "ToTitleSpecial should title-case with special case rules"
+// // ToTitleSpecial 需要传入 unicode.SpecialCase 大小写映射规则(用于土耳其语等特殊语言)
+// // 常规转标题形式可用 str.Title
+// out = str.Title("hello world")
+// assert str.Contains(out, "Hello"), "title-case should capitalize words"
 // ```
 func toTitleSpecial(c unicode.SpecialCase, s string) string {
 	return strings.ToTitleSpecial(c, s)

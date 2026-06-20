@@ -19,9 +19,10 @@ import (
 //
 // Example:
 // ```
-// err = Decompile("test.jar", "test/"); die(err)
-// err = Decompile("test.war", "test/"); die(err)
-// Decompile("a.class", "a.java"); die(err)
+// // 无法本地验证: 需要磁盘上真实存在的 jar/war/class 文件(请替换为真实路径)
+// err = java.Decompile("test.jar", "test/"); die(err)   // 反编译 jar 到目录
+// err = java.Decompile("test.war", "test/"); die(err)   // 反编译 war 到目录
+// err = java.Decompile("a.class", "a.java"); die(err)   // 反编译单个 class 到文件
 // ```
 func AutoDecompile(from, to string) error {
 	// check from suffix
