@@ -11,11 +11,34 @@ import (
 	zip "github.com/yaklang/yaklang/common/utils/zipx"
 )
 
+// zipCompress 将一个或多个文件压缩打包为 zip 文件（导出名为 zip.Compress）
+// 按给定文件名读取文件内容并写入目标 zip 包
+//
+// 参数:
+//   - zipName: 输出的 zip 文件路径
+//   - filenames: 一个或多个待压缩的文件路径
+//
+// 返回值:
+//   - 错误信息（读取文件或写入 zip 失败时返回）
+//
+// Example:
+// ```
+// dir = os.TempDir()
+// src = file.Join(dir, "zip_demo_src.txt")
+// file.Save(src, "hello zip world")~
+// zipPath = file.Join(dir, "zip_demo.zip")
+// zip.Compress(zipPath, src)~
+// println(file.IsExisted(zipPath))   // OUT: true
+// assert file.IsExisted(zipPath), "zip archive should be created"
+// assert len(file.ReadFile(zipPath)~) > 0, "zip archive should be non-empty"
+// ```
+func zipCompress(zipName string, filenames ...string) error {
+	return ziputil.CompressByName(filenames, zipName)
+}
+
 var ZipExports = map[string]interface{}{
-	"Decompress": ziputil.DeCompress,
-	"Compress": func(zipName string, filenames ...string) error {
-		return ziputil.CompressByName(filenames, zipName)
-	},
+	"Decompress":       ziputil.DeCompress,
+	"Compress":         zipCompress,
 	"CompressRaw":      CompressRaw,
 	"Recursive":        Recursive,
 	"RecursiveFromRaw": RecursiveFromRaw,

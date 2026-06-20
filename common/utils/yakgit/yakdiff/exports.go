@@ -48,17 +48,41 @@ func DiffZIPFile(zipFile1, zipFile2 string, handler ...DiffHandler) (string, err
 	return FileSystemDiff(fs1, fs2, handler...)
 }
 
+// diffDir 比较两个本地目录的内容并返回 git 风格的 diff 文本（导出名为 diff.DiffDir）
+// 递归对比两个目录下的同名文件，输出新增、删除与修改
+//
+// 参数:
+//   - i: 第一个（旧）目录路径
+//   - j: 第二个（新）目录路径
+//
+// 返回值:
+//   - git 风格的 diff 文本
+//   - 错误信息（目录不存在或比较失败时返回）
+//
+// Example:
+// ```
+// base = os.TempDir()
+// d1 = file.Join(base, "diff_a"); d2 = file.Join(base, "diff_b")
+// file.MkdirAll(d1)~; file.MkdirAll(d2)~
+// file.Save(file.Join(d1, "f.txt"), "hello")~
+// file.Save(file.Join(d2, "f.txt"), "hello world")~
+// result = diff.DiffDir(d1, d2)~
+// println(result)
+// assert result.Contains("hello world"), "diff should contain the changed content"
+// ```
+func diffDir(i string, j string) (string, error) {
+	if ok, _ := utils.PathExists(i); !ok {
+		return "", errors.Errorf("path %s not existed", i)
+	}
+	if ok, _ := utils.PathExists(j); !ok {
+		return "", errors.Errorf("path %s not existed", j)
+	}
+	return FileSystemDiff(filesys.NewRelLocalFs(i), filesys.NewRelLocalFs(j))
+}
+
 var Exports = map[string]any{
 	"Diff":               Diff,
 	"DiffFromFileSystem": FileSystemDiff,
-	"DiffDir": func(i string, j string) (string, error) {
-		if ok, _ := utils.PathExists(i); !ok {
-			return "", errors.Errorf("path %s not existed", i)
-		}
-		if ok, _ := utils.PathExists(j); !ok {
-			return "", errors.Errorf("path %s not existed", j)
-		}
-		return FileSystemDiff(filesys.NewRelLocalFs(i), filesys.NewRelLocalFs(j))
-	},
-	"DiffZIPFile": DiffZIPFile,
+	"DiffDir":            diffDir,
+	"DiffZIPFile":        DiffZIPFile,
 }

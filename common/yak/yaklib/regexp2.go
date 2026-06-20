@@ -356,8 +356,30 @@ func re2CompileWithOption(rule string, opt int) (*regexp2.Regexp, error) {
 	return pattern, err
 }
 
+// re2QuoteMeta 转义字符串中的正则元字符，使其可作为字面量安全嵌入正则表达式（导出名为 re2.QuoteMeta）
+// 会把 . * + ? ( ) [ ] 等元字符前加反斜杠
+//
+// 参数:
+//   - input: 待转义的字符串
+//
+// 返回值:
+//   - 转义后的字符串，可直接拼入正则表达式
+//
+// Example:
+// ```
+// escaped = re2.QuoteMeta("a.b*c")
+// println(escaped)   // OUT: a\.b\*c
+// assert escaped == "a\\.b\\*c", "QuoteMeta should escape regex metacharacters"
+// p = re2.Compile("^" + escaped + "$")~
+// assert p.MatchString("a.b*c")~ == true, "escaped literal should match the literal string"
+// assert p.MatchString("aXbYYc")~ == false, "escaped dot/star should not act as metachar"
+// ```
+func re2QuoteMeta(input string) string {
+	return regexp2.Escape(input)
+}
+
 var Regexp2Export = map[string]interface{}{
-	"QuoteMeta":                   regexp2.Escape,
+	"QuoteMeta":                   re2QuoteMeta,
 	"Compile":                     re2Compile,
 	"CompileWithOption":           re2CompileWithOption,
 	"OPT_None":                    regexp2.None,
