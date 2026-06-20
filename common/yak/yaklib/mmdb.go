@@ -162,6 +162,22 @@ var MmdbExports = map[string]interface{}{
 	"QueryIPCity": mmdbQueryIPCity,
 }
 
+// QueryIPCity 查询一个 IP 的地理位置信息（导出名为 db.QueryIPCity）
+// 依赖本地 GeoIP 数据库，可先用 db.DownloadGeoIP 下载
+//
+// 参数:
+//   - ip: 要查询的 IP 地址
+//
+// 返回值:
+//   - 地理位置信息对象（City）
+//   - 错误信息（数据库缺失或查询失败时返回）
+//
+// Example:
+// ```
+// // 需先准备本地 GeoIP 数据库（示意性示例）
+// city = db.QueryIPCity("1.1.1.1")~
+// println(city.Country.Names["en"])
+// ```
 func QueryIP(ip string) (*geo.City, error) {
 	var err error
 	if mmdbReader == nil {
@@ -179,6 +195,22 @@ func QueryIP(ip string) (*geo.City, error) {
 	return &c, nil
 }
 
+// QueryIPForIPS 查询一个 IP 的 ISP（运营商）信息（导出名为 db.QueryIPForIPS）
+// 依赖本地 GeoIP ISP 数据库，可先用 db.DownloadGeoIP 下载
+//
+// 参数:
+//   - ip: 要查询的 IP 地址
+//
+// 返回值:
+//   - ISP 信息对象
+//   - 错误信息（数据库缺失或查询失败时返回）
+//
+// Example:
+// ```
+// // 需先准备本地 GeoIP ISP 数据库（示意性示例）
+// isp = db.QueryIPForIPS("1.1.1.1")~
+// println(isp.ISP)
+// ```
 func QueryIPForISP(ip string) (*geo.ISP, error) {
 	var err error
 	if mmdbISPReader == nil {
@@ -196,6 +228,19 @@ func QueryIPForISP(ip string) (*geo.ISP, error) {
 	return &isp, nil
 }
 
+// DownloadGeoIP 下载 GeoIP 数据库到本地（导出名为 db.DownloadGeoIP）
+// 下载后即可使用 db.QueryIPCity / db.QueryIPForIPS 进行离线 IP 归属查询
+//
+// 返回值:
+//   - 错误信息（下载或解压失败时返回）
+//
+// Example:
+// ```
+// // 需要网络访问以下载数据库（示意性示例）
+// db.DownloadGeoIP()~
+// city = db.QueryIPCity("1.1.1.1")~
+// println(city.Country.Names["en"])
+// ```
 func DownloadMMDB() error {
 	base := consts.GetDefaultYakitBaseDir()
 	geoipZip := filepath.Join(base, "geoip.zip")
