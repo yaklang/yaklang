@@ -31,7 +31,7 @@ func makeLib(name string, funcs ...*yakdoc.FuncDecl) *yakdoc.ScriptLib {
 func genAndRead(t *testing.T, lib *yakdoc.ScriptLib) string {
 	t.Helper()
 	dir := t.TempDir()
-	GenerateSingleFile(dir, lib)
+	GenerateSingleFile(dir, lib, "")
 	raw, err := os.ReadFile(filepath.Join(dir, lib.Name+".md"))
 	if err != nil {
 		t.Fatalf("read generated file failed: %v", err)

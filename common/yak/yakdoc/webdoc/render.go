@@ -197,14 +197,7 @@ func extractExampleCode(doc string) string {
 	} else {
 		return ""
 	}
-	kept := make([]string, 0)
-	for _, line := range strings.Split(rest, "\n") {
-		if strings.HasPrefix(strings.TrimSpace(line), "```") {
-			continue
-		}
-		kept = append(kept, line)
-	}
-	return strings.TrimSpace(dedent(strings.Join(kept, "\n")))
+	return cleanExampleBlock(strings.Split(rest, "\n"))
 }
 
 // fenceExampleYak 用 14 反引号 yak 围栏包裹示例代码（MANUAL_EXAMPLE_SPEC §2），
@@ -236,7 +229,11 @@ func parseCommentDetails(doc string) *YakDocParsed {
 		line := cleanLines[i]
 		lowerLine := strings.ToLower(line)
 
-		if strings.HasPrefix(line, "参数") {
+		if strings.Contains(line, exampleStartMarker) {
+			// 命中多 example 标记后，后续内容交给 extractExamples 处理，这里停止小节解析
+			currentSection = "example"
+			continue
+		} else if strings.HasPrefix(line, "参数") {
 			currentSection = "params"
 			continue
 		} else if strings.HasPrefix(line, "返回值") {
@@ -295,6 +292,9 @@ func firstStructuralMarker(doc string) int {
 		}
 	}
 	consider(indexOfExampleMarker(doc))
+	if i := strings.Index(doc, exampleStartMarker); i >= 0 {
+		consider(i)
+	}
 
 	offset := 0
 	for _, line := range strings.Split(doc, "\n") {
@@ -399,11 +399,15 @@ func assignAnchors(order []*yakdoc.FuncDecl) map[*yakdoc.FuncDecl]string {
 	return res
 }
 
-// RenderLibMarkdown 把一个库渲染为增强版 Markdown：分组索引 + 分组详情、签名代码块、
-// 加粗小节标签、去重描述、显式唯一锚点、函数间分隔线。formatExample 为示例代码格式化器，
+// RenderLibMarkdown 把一个库渲染为增强版 Markdown：可选模块总览 + 函数索引 + 函数详情、
+// 签名代码块、加粗小节标签、去重描述、显式唯一锚点、函数间分隔线。
+// overview 为模块总览正文(取自 overviews/<lib>.md，可空)；formatExample 为示例代码格式化器，
 // 传 nil 表示不格式化(保持注释原样)。
-// 关键词: RenderLibMarkdown, 分组索引, 显式锚点, 签名代码块
-func RenderLibMarkdown(lib *yakdoc.ScriptLib, formatExample func(string) string) string {
+//
+// 选项关联：识别"...XxxOption(s)"可变参数与其生产者函数，把生产者从顶层索引/详情剔除，
+// 改为在每个消费它的主函数详情里以"可选参数 / 选项"小节重复展示(对齐"选项只在对应函数下出现")。
+// 关键词: RenderLibMarkdown, 模块总览, 选项关联, 显式锚点, 签名代码块
+func RenderLibMarkdown(lib *yakdoc.ScriptLib, overview string, formatExample func(string) string) string {
 	if formatExample == nil {
 		formatExample = func(s string) string { return s }
 	}
@@ -411,6 +415,11 @@ func RenderLibMarkdown(lib *yakdoc.ScriptLib, formatExample func(string) string)
 
 	// 库 H1 用显式且不与函数锚点冲突的 id(library- 前缀),规避库名与同名函数抢 slug。
 	b.WriteString(fmt.Sprintf("# %s {#library-%s}\n\n", html.EscapeString(lib.Name), lib.Name))
+
+	// 模块总览(若提供)：注入在 H1 之后、概览统计行之前。
+	if ov := strings.TrimSpace(overview); ov != "" {
+		b.WriteString(collapseBlankLines(ov) + "\n\n")
+	}
 
 	funcList := sortedFuncs(lib)
 
@@ -448,66 +457,78 @@ func RenderLibMarkdown(lib *yakdoc.ScriptLib, formatExample func(string) string)
 		return b.String()
 	}
 
-	core, options := classifyFunctions(funcList)
-	grouped := len(core) > 0 && len(options) > 0
-
-	var order []*yakdoc.FuncDecl
-	if grouped {
-		order = append(order, core...)
-		order = append(order, options...)
-	} else {
-		order = funcList
+	// 选项索引：把选项生产者函数从顶层主索引/详情中剔除，改在主函数下重复展示。
+	oi := buildOptionIndex(funcList)
+	mainFuncs := make([]*yakdoc.FuncDecl, 0, len(funcList))
+	for _, fun := range funcList {
+		if oi.isProducer[fun] {
+			continue
+		}
+		mainFuncs = append(mainFuncs, fun)
 	}
-	anchors := assignAnchors(order)
+
+	anchors := assignAnchors(mainFuncs)
 
 	// 函数索引
 	b.WriteString("## 函数索引\n\n")
-	writeIndex := func(funcs []*yakdoc.FuncDecl) {
-		b.WriteString("|函数|说明|\n")
-		b.WriteString("|:--|:--|\n")
-		for _, fun := range funcs {
-			parsed := parseCommentDetails(fun.Document)
-			b.WriteString(fmt.Sprintf("| [%s.%s](#%s) | %s |\n",
-				html.EscapeString(fun.LibName),
-				html.EscapeString(fun.MethodName),
-				anchors[fun],
-				escapeTableCell(parsed.Description),
-			))
-		}
-		b.WriteString("\n")
+	b.WriteString("|函数|说明|\n")
+	b.WriteString("|:--|:--|\n")
+	for _, fun := range mainFuncs {
+		parsed := parseCommentDetails(fun.Document)
+		b.WriteString(fmt.Sprintf("| [%s.%s](#%s) | %s |\n",
+			html.EscapeString(fun.LibName),
+			html.EscapeString(fun.MethodName),
+			anchors[fun],
+			escapeTableCell(parsed.Description),
+		))
 	}
-	if grouped {
-		b.WriteString("**主要函数**\n\n")
-		writeIndex(core)
-		b.WriteString("**配置选项**\n\n")
-		writeIndex(options)
-	} else {
-		writeIndex(funcList)
-	}
+	b.WriteString("\n")
 
 	// 函数详情
 	b.WriteString("## 函数详情\n\n")
-	writeDetails := func(funcs []*yakdoc.FuncDecl) {
-		for _, fun := range funcs {
-			b.WriteString(renderFuncDetail(fun, anchors[fun], formatExample))
-		}
-	}
-	if grouped {
-		b.WriteString("**主要函数**\n\n")
-		writeDetails(core)
-		b.WriteString("**配置选项**\n\n")
-		writeDetails(options)
-	} else {
-		writeDetails(funcList)
+	for _, fun := range mainFuncs {
+		b.WriteString(renderFuncDetail(fun, anchors[fun], oi, formatExample))
 	}
 
 	return b.String()
 }
 
-// renderFuncDetail 渲染单个函数的详情块：标题(显式锚点) + 签名代码块 + 去重描述 +
-// 参数表 + 返回值表 + 示例 + 分隔线。
-// 关键词: renderFuncDetail, 签名代码块, 加粗小节
-func renderFuncDetail(fun *yakdoc.FuncDecl, anchor string, formatExample func(string) string) string {
+// renderParamTable 渲染参数表(label 如"参数"/"必填参数")。
+func renderParamTable(label string, params []*yakdoc.Field, parsed *YakDocParsed) string {
+	var b strings.Builder
+	b.WriteString("**" + label + "**\n\n")
+	b.WriteString("|参数名|类型|说明|\n")
+	b.WriteString("|:--|:--|:--|\n")
+	for _, param := range params {
+		b.WriteString(fmt.Sprintf("| %s | `%s` | %s |\n",
+			html.EscapeString(param.Name), param.Type, escapeTableCell(parsed.Params[param.Name])))
+	}
+	b.WriteString("\n")
+	return b.String()
+}
+
+// renderResultTable 渲染返回值表。
+func renderResultTable(results []*yakdoc.Field, parsed *YakDocParsed) string {
+	var b strings.Builder
+	b.WriteString("**返回值**\n\n")
+	b.WriteString("|序号|类型|说明|\n")
+	b.WriteString("|:--|:--|:--|\n")
+	for i, result := range results {
+		explanation := ""
+		if i < len(parsed.Returns) {
+			explanation = parsed.Returns[i]
+		}
+		b.WriteString(fmt.Sprintf("| %s | `%s` | %s |\n",
+			html.EscapeString(result.Name), result.Type, escapeTableCell(explanation)))
+	}
+	b.WriteString("\n")
+	return b.String()
+}
+
+// renderFuncDetail 渲染单个主函数的详情块。叙事顺序固定(便于核心稳定)：
+// 标题(显式锚点) - 签名代码块 - 功能描述 - 必填参数/参数 - 可选参数/选项 - 返回值 - 示例 - 分隔线。
+// 关键词: renderFuncDetail, 主函数叙事, 必填参数, 可选参数选项, 多示例
+func renderFuncDetail(fun *yakdoc.FuncDecl, anchor string, oi *OptionIndex, formatExample func(string) string) string {
 	parsed := parseCommentDetails(fun.Document)
 	var b strings.Builder
 
@@ -522,36 +543,30 @@ func renderFuncDetail(fun *yakdoc.FuncDecl, anchor string, formatExample func(st
 	}
 	b.WriteString(prose + "\n\n")
 
-	if len(fun.Params) > 0 {
-		b.WriteString("**参数**\n\n")
-		b.WriteString("|参数名|类型|说明|\n")
-		b.WriteString("|:--|:--|:--|\n")
-		for _, param := range fun.Params {
-			b.WriteString(fmt.Sprintf("| %s | `%s` | %s |\n",
-				html.EscapeString(param.Name), param.Type, escapeTableCell(parsed.Params[param.Name])))
+	optionTypes := oi.optionTypesOf(fun)
+	hasOptions := len(optionTypes) > 0
+
+	if hasOptions {
+		// 必填/普通参数 = 非选项参数；选项可变参数交给"可选参数 / 选项"小节。
+		required := make([]*yakdoc.Field, 0, len(fun.Params))
+		for _, p := range fun.Params {
+			if !oi.isOptionParam(p) {
+				required = append(required, p)
+			}
 		}
-		b.WriteString("\n")
+		if len(required) > 0 {
+			b.WriteString(renderParamTable("必填参数", required, parsed))
+		}
+		b.WriteString(oi.renderOptionSection(fun))
+	} else if len(fun.Params) > 0 {
+		b.WriteString(renderParamTable("参数", fun.Params, parsed))
 	}
 
 	if len(fun.Results) > 0 {
-		b.WriteString("**返回值**\n\n")
-		b.WriteString("|序号|类型|说明|\n")
-		b.WriteString("|:--|:--|:--|\n")
-		for i, result := range fun.Results {
-			explanation := ""
-			if i < len(parsed.Returns) {
-				explanation = parsed.Returns[i]
-			}
-			b.WriteString(fmt.Sprintf("| %s | `%s` | %s |\n",
-				html.EscapeString(result.Name), result.Type, escapeTableCell(explanation)))
-		}
-		b.WriteString("\n")
+		b.WriteString(renderResultTable(fun.Results, parsed))
 	}
 
-	if code := extractExampleCode(fun.Document); code != "" {
-		b.WriteString("**示例**\n\n")
-		b.WriteString(fenceExampleYak(formatExample(code)) + "\n\n")
-	}
+	b.WriteString(renderExamples(extractExamples(fun.Document), formatExample))
 
 	b.WriteString("---\n\n")
 	return b.String()

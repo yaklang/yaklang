@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 	"runtime/debug"
 	"strings"
 
@@ -15,6 +16,45 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yakdoc/webdoc"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 )
+
+// aiOverviewFallback 在未提供 overviews 目录或缺失 ai.md 时，作为 ai 库 MDX 的兜底描述。
+const aiOverviewFallback = "AI 模块提供了与多种大语言模型集成的能力，支持 OpenAI、ChatGLM、Moonshot 等主流 AI 服务。通过统一的接口调用不同的 AI 服务，支持对话、函数调用、流式输出等功能。"
+
+// loadOverviews 读取 overviews 目录下的所有 <lib>.md，返回 库名 -> 总览正文 的映射。
+// 目录不存在或为空时返回空映射(模块总览为可选增强)。
+// 关键词: 模块总览加载, overviews 目录
+func loadOverviews(dir string) map[string]string {
+	res := map[string]string{}
+	if strings.TrimSpace(dir) == "" {
+		return res
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		log.Warnf("read overviews dir %s failed: %v", dir, err)
+		return res
+	}
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".md") {
+			continue
+		}
+		name := strings.TrimSuffix(e.Name(), ".md")
+		content, err := os.ReadFile(filepath.Join(dir, e.Name()))
+		if err != nil {
+			log.Warnf("read overview %s failed: %v", e.Name(), err)
+			continue
+		}
+		res[name] = strings.TrimSpace(string(content))
+	}
+	if len(res) > 0 {
+		log.Infof("loaded %d module overview(s) from %s", len(res), dir)
+	}
+	return res
+}
+
+// collapseToSingleLine 把多行文本压成单行(用于 MDX frontmatter 的 description 字段，避免破坏 YAML)。
+func collapseToSingleLine(s string) string {
+	return strings.Join(strings.Fields(s), " ")
+}
 
 // 本程序为 web 文档生成器的"薄壳"：负责从引擎取数(EngineToDocumentHelper)、写文件、跑
 // 覆盖率与产物不变量校验。所有纯渲染逻辑都在无引擎依赖的 common/yak/yakdoc/webdoc 包中，
@@ -55,9 +95,10 @@ func CheckDocCodeBlockMatched() {
 }
 
 // GenerateSingleFile 渲染并写出一个库的 .md，写后跑 CheckMarkdownInvariants 做产物自检。
-func GenerateSingleFile(basepath string, lib *yakdoc.ScriptLib) {
+// overview 为模块总览正文(可空)，注入到库标题之后。
+func GenerateSingleFile(basepath string, lib *yakdoc.ScriptLib, overview string) {
 	// 示例代码不做格式化(保持注释原样)，传 nil。
-	md := webdoc.RenderLibMarkdown(lib, nil)
+	md := webdoc.RenderLibMarkdown(lib, overview, nil)
 	outPath := path.Join(basepath, lib.Name+".md")
 	if err := os.WriteFile(outPath, []byte(md), 0o644); err != nil {
 		log.Errorf("create file error: %v", err)
@@ -88,9 +129,12 @@ func main() {
 	var (
 		strict         bool
 		coverageReport string
+		overviewsDir   string
 	)
+	defaultOverviews := filepath.Join(yakdoc.GetProjectPath(), "common", "yak", "yakdoc", "generate_web_doc", "overviews")
 	flag.BoolVar(&strict, "strict", false, "exit non-zero if any doc coverage gap is found (local use only, never enable in CI)")
 	flag.StringVar(&coverageReport, "coverage-report", "", "write a markdown coverage baseline to this path (must be outside docs/api so it is not synced)")
+	flag.StringVar(&overviewsDir, "overviews", defaultOverviews, "directory of per-library module overview markdown files (<lib>.md), injected after the H1")
 	flag.Parse()
 
 	args := flag.Args()
@@ -106,17 +150,23 @@ func main() {
 	}
 
 	CheckDocCodeBlockMatched()
-	// 需要生成 MDX 的库及对应描述
-	mdxLibs := map[string]string{
-		"ai": "AI 模块提供了与多种大语言模型集成的能力，支持 OpenAI、ChatGLM、Moonshot 等主流 AI 服务。通过统一的接口调用不同的 AI 服务，支持对话、函数调用、流式输出等功能。",
-	}
+
+	// 模块总览：按库读取 overviews/<lib>.md，渲染时注入到库标题之后。
+	overviews := loadOverviews(overviewsDir)
+
+	// 需要生成 MDX 的库(含 Tabs)。其描述优先取自 overviews/<lib>.md，缺失则用兜底文案。
+	mdxLibs := map[string]bool{"ai": true}
 
 	helper := yak.EngineToDocumentHelperWithVerboseInfo(yaklang.New())
 	for _, lib := range helper.Libs {
-		if desc, ok := mdxLibs[lib.Name]; ok {
-			GenerateSingleFileMDX(basepath, lib, desc)
+		if mdxLibs[lib.Name] {
+			desc := overviews[lib.Name]
+			if strings.TrimSpace(desc) == "" {
+				desc = aiOverviewFallback
+			}
+			GenerateSingleFileMDX(basepath, lib, collapseToSingleLine(desc))
 		} else {
-			GenerateSingleFile(basepath, lib)
+			GenerateSingleFile(basepath, lib, overviews[lib.Name])
 		}
 	}
 

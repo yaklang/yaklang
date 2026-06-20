@@ -257,7 +257,7 @@ func TestRenderLibMarkdownInvariants(t *testing.T) {
 
 	for _, lib := range libs {
 		t.Run(lib.Name, func(t *testing.T) {
-			md := RenderLibMarkdown(lib, nil)
+			md := RenderLibMarkdown(lib, "", nil)
 			if err := CheckMarkdownInvariants(md); err != nil {
 				t.Fatalf("invariants failed for lib %s:\n%v\n---rendered---\n%s", lib.Name, err, md)
 			}
@@ -265,22 +265,63 @@ func TestRenderLibMarkdownInvariants(t *testing.T) {
 	}
 }
 
-func TestRenderLibMarkdownGrouping(t *testing.T) {
+// TestRenderLibMarkdownOptionLinkage 校验"选项随主函数渲染"：被消费的选项函数从顶层索引剔除，
+// 改在消费它的主函数详情下以"可选参数 / 选项"小节展示。
+func TestRenderLibMarkdownOptionLinkage(t *testing.T) {
+	// Do 消费 ...DemoOption；WithX 生产 DemoOption，应被识别为选项函数。
 	mixed := mkLib("demo", nil,
-		fn("demo", "Do", "Do() error", "do", nil, []*yakdoc.Field{field("", "error")}),
-		fn("demo", "WithX", "WithX() DemoOption", "x", nil, []*yakdoc.Field{field("", "DemoOption")}),
+		fn("demo", "Do", "Do(a int, opts ...DemoOption) error", "do a thing\n参数:\n- a: the input",
+			[]*yakdoc.Field{field("a", "int"), field("opts", "...DemoOption")},
+			[]*yakdoc.Field{field("", "error")}),
+		fn("demo", "WithX", "WithX(v int) DemoOption", "set x value",
+			[]*yakdoc.Field{field("v", "int")}, []*yakdoc.Field{field("", "DemoOption")}),
 	)
-	md := RenderLibMarkdown(mixed, nil)
-	if !strings.Contains(md, "**主要函数**") || !strings.Contains(md, "**配置选项**") {
-		t.Fatalf("mixed lib should show both group labels:\n%s", md)
+	md := RenderLibMarkdown(mixed, "", nil)
+
+	// WithX 不应作为顶层索引/详情条目出现
+	if strings.Contains(md, "[demo.WithX](#withx)") {
+		t.Fatalf("option producer WithX should be removed from top-level index:\n%s", md)
+	}
+	if strings.Contains(md, "### WithX {#withx}") {
+		t.Fatalf("option producer WithX should not get a top-level detail heading:\n%s", md)
+	}
+	// 主函数 Do 详情应出现"必填参数"与"可选参数 / 选项"，并引用 WithX
+	for _, want := range []string{"### Do {#do}", "**必填参数**", "**可选参数 / 选项**", "`demo.WithX`", "...DemoOption"} {
+		if !strings.Contains(md, want) {
+			t.Fatalf("consumer detail missing %q:\n%s", want, md)
+		}
+	}
+	if err := CheckMarkdownInvariants(md); err != nil {
+		t.Fatalf("invariants failed:\n%v\n%s", err, md)
 	}
 
+	// 无选项的库：保持单一"参数"小节，无"必填参数/可选参数"
 	coreOnly := mkLib("core", nil,
-		fn("core", "Do", "Do() error", "do", nil, []*yakdoc.Field{field("", "error")}),
+		fn("core", "Do", "Do(a int) error", "do\n参数:\n- a: x", []*yakdoc.Field{field("a", "int")}, []*yakdoc.Field{field("", "error")}),
 	)
-	md2 := RenderLibMarkdown(coreOnly, nil)
-	if strings.Contains(md2, "**配置选项**") {
-		t.Fatalf("core-only lib should NOT show option group:\n%s", md2)
+	md2 := RenderLibMarkdown(coreOnly, "", nil)
+	if strings.Contains(md2, "**可选参数 / 选项**") || strings.Contains(md2, "**必填参数**") {
+		t.Fatalf("core-only lib should use plain 参数 section:\n%s", md2)
+	}
+	if !strings.Contains(md2, "**参数**") {
+		t.Fatalf("core-only lib should contain 参数 section:\n%s", md2)
+	}
+}
+
+// TestRenderLibMarkdownOverview 校验模块总览被注入到 H1 之后、概览统计行之前。
+func TestRenderLibMarkdownOverview(t *testing.T) {
+	lib := mkLib("demo", nil,
+		fn("demo", "Do", "Do() error", "do", nil, []*yakdoc.Field{field("", "error")}),
+	)
+	md := RenderLibMarkdown(lib, "这是模块总览正文。", nil)
+	h1 := strings.Index(md, "# demo {#library-demo}")
+	ov := strings.Index(md, "这是模块总览正文。")
+	stat := strings.Index(md, "> 共 ")
+	if h1 < 0 || ov < 0 || stat < 0 || !(h1 < ov && ov < stat) {
+		t.Fatalf("overview should sit between H1 and stats line:\n%s", md)
+	}
+	if err := CheckMarkdownInvariants(md); err != nil {
+		t.Fatalf("invariants failed:\n%v\n%s", err, md)
 	}
 }
 
@@ -289,7 +330,7 @@ func TestRenderLibMarkdownStructure(t *testing.T) {
 		fn("demo", "Do", "Do(a int) error", "do a thing\n参数:\n- a: the input\n返回值:\n- e: error",
 			[]*yakdoc.Field{field("a", "int")}, []*yakdoc.Field{field("e", "error")}),
 	)
-	md := RenderLibMarkdown(lib, nil)
+	md := RenderLibMarkdown(lib, "", nil)
 	wantContains := []string{
 		"# demo {#library-demo}",
 		"## 函数索引",
