@@ -10,7 +10,7 @@ import (
 // 导出名为 sfreport.ConvertSingleResultToJSON
 // 参数:
 //   - result: SyntaxFlow 扫描结果对象
-//   - showDataflow: 是否在报告中展示数据流路径
+//   - showDataflowPath: 是否在报告中展示数据流路径
 //
 // 返回值:
 //   - JSON 报告字符串（无风险时为空字符串）
@@ -33,7 +33,7 @@ func ConvertSingleResultToJSON(result *ssaapi.SyntaxFlowResult, showDataflowPath
 // 参数:
 //   - result: SyntaxFlow 扫描结果对象
 //   - reportType: 报告类型
-//   - showDataflow: 是否展示数据流路径
+//   - showDataflowPath: 是否展示数据流路径
 //   - showFileContent: 是否展示文件内容
 //   - withFile: 是否携带文件数据
 //
