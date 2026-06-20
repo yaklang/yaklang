@@ -323,7 +323,7 @@ var DatabaseExports = map[string]interface{}{
 // 返回值:
 //   - 错误信息（数据库不可用或写入失败时返回）
 //
-// <|EXAMPLE_START|> 基础读写
+// <|EXAMPLE_START|> SetKey 的基础读写
 // ```
 // // 保存与读取扫描目标，用完即清理
 // db.SetKey("myscan-target", "192.168.1.0/24")

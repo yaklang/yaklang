@@ -285,11 +285,21 @@ func TestRenderLibMarkdownOptionLinkage(t *testing.T) {
 	if strings.Contains(md, "### WithX {#withx}") {
 		t.Fatalf("option producer WithX should not get a top-level detail heading:\n%s", md)
 	}
-	// 主函数 Do 详情应出现"必填参数"与"可选参数"，并引用 WithX
-	for _, want := range []string{"### Do {#do}", "**必填参数**", "**可选参数**", "`demo.WithX`", "...DemoOption"} {
+	// 主函数 Do 详情应出现"必填参数"与"可选参数"，可选参数用"函数索引同款表格"列出选项 WithX
+	for _, want := range []string{
+		"### Do {#do}", "**必填参数**", "**可选参数**", "...DemoOption",
+		"|选项函数|参数|返回值|说明|", // 选项表头与索引同款(含参数/返回值)
+		"| `demo.WithX` |",         // 选项函数以行内代码(非链接)展示
+		"| `v int` |",             // 选项参数列
+		"| `DemoOption` |",        // 选项返回值列
+	} {
 		if !strings.Contains(md, want) {
 			t.Fatalf("consumer detail missing %q:\n%s", want, md)
 		}
+	}
+	// 选项函数无独立锚点，故不应出现成链接形式
+	if strings.Contains(md, "[demo.WithX]") {
+		t.Fatalf("option function should be inline code, not a link:\n%s", md)
 	}
 	if err := CheckMarkdownInvariants(md); err != nil {
 		t.Fatalf("invariants failed:\n%v\n%s", err, md)
@@ -353,6 +363,49 @@ func TestStripLeadingFuncName(t *testing.T) {
 		if got := stripLeadingFuncName(c.in, c.method); got != c.want {
 			t.Errorf("stripLeadingFuncName(%q,%q)=%q want %q", c.in, c.method, got, c.want)
 		}
+	}
+}
+
+// TestRenderLibMarkdownVariadicIndexSplit 校验函数索引/详情按"是否含可变参数"拆成两块。
+func TestRenderLibMarkdownVariadicIndexSplit(t *testing.T) {
+	lib := mkLib("demo", nil,
+		fn("demo", "Plain", "Plain(a int) error", "plain func",
+			[]*yakdoc.Field{field("a", "int")}, []*yakdoc.Field{field("", "error")}),
+		fn("demo", "Vari", "Vari(a int, rest ...string) error", "variadic func",
+			[]*yakdoc.Field{field("a", "int"), field("rest", "...string")}, []*yakdoc.Field{field("", "error")}),
+	)
+	md := RenderLibMarkdown(lib, "", nil)
+	for _, want := range []string{
+		"## 函数索引", "## 可变参数函数索引", "## 函数详情", "## 可变参数函数详情",
+		"|函数|参数|返回值|说明|", // 索引表必须含 参数/返回值 两列
+		"| `a int` |",            // 参数列内容
+		"| `error` |",            // 返回值列内容
+	} {
+		if !strings.Contains(md, want) {
+			t.Fatalf("missing section %q:\n%s", want, md)
+		}
+	}
+	// Plain 在普通索引、Vari 在可变参数索引：普通索引段应含 Plain、不含 Vari
+	regIdx := strings.Index(md, "## 函数索引")
+	variIdx := strings.Index(md, "## 可变参数函数索引")
+	detIdx := strings.Index(md, "## 函数详情")
+	plainLink := strings.Index(md, "[demo.Plain](#plain)")
+	variLink := strings.Index(md, "[demo.Vari](#vari)")
+	if !(regIdx < plainLink && plainLink < variIdx) {
+		t.Fatalf("Plain should be under 函数索引:\n%s", md)
+	}
+	if !(variIdx < variLink && variLink < detIdx) {
+		t.Fatalf("Vari should be under 可变参数函数索引:\n%s", md)
+	}
+	if err := CheckMarkdownInvariants(md); err != nil {
+		t.Fatalf("invariants failed:\n%v\n%s", err, md)
+	}
+
+	// 仅普通函数的库不应出现"可变参数"段
+	onlyPlain := mkLib("p", nil, fn("p", "A", "A() error", "a", nil, []*yakdoc.Field{field("", "error")}))
+	md2 := RenderLibMarkdown(onlyPlain, "", nil)
+	if strings.Contains(md2, "可变参数函数索引") {
+		t.Fatalf("plain-only lib should not show variadic section:\n%s", md2)
 	}
 }
 

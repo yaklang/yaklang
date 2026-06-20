@@ -132,22 +132,51 @@ func sendMatchResultOrDrop(ctx context.Context, outC chan<- *fp.MatchResult, res
 //   - opts: 零个或多个 servicescan 扫描参数
 //
 // 返回值:
-//   - chan *MatchResult: 指纹识别结果管道
+//   - chan *MatchResult: 指纹识别结果管道，逐个产出扫描结果
 //   - error: 启动失败时返回错误
 //
-// Example:
+// <|EXAMPLE_START|> servicescan.Scan 的基础全连接扫描
 // ```
-// ch, err = servicescan.Scan("127.0.0.1", "22-80,443,3389")  // 开始扫描，函数会立即返回一个错误和结果管道
-// die(err) // 如果错误非空则报错
-// for result := range ch { // 通过遍历管道的形式获取管道中的结果
-//
-//	   if result.IsOpen() { // 获取到的结果是一个结构体，可以调用IsOpen方法判断该端口是否打开
-//	       println(result.String()) // 输出结果，调用String方法获取可读字符串
-//	       println(result.GetCPEs()) // 查看 CPE 结果
-//	   }
-//	}
-//
+// // 全连接扫描本机常见端口，对开放端口打印指纹与 CPE 信息
+// ch, err = servicescan.Scan("127.0.0.1", "22,80,443,3306")
+// die(err) // 启动失败时停止脚本
+// for result := range ch {
+//     if result.IsOpen() { // IsOpen 判断端口是否开放
+//         println(result.String())  // 可读摘要，含服务名与版本
+//         println(result.GetCPEs()) // CPE 列表
+//     }
+// }
 // ```
+// <|EXAMPLE_END|>
+//
+// <|EXAMPLE_START|> 控制并发与探测超时
+// ```
+// // 目标端口较多时调大并发，并设置单个探测包超时
+// ch, err = servicescan.Scan("192.168.1.1/24", "1-1000",
+//     servicescan.concurrent(50),   // 50 个并发
+//     servicescan.probeTimeout(5),  // 单个探测包 5 秒超时
+// )
+// die(err)
+// for result := range ch {
+//     if result.IsOpen() {
+//         println(result.String())
+//     }
+// }
+// ```
+// <|EXAMPLE_END|>
+//
+// <|EXAMPLE_START|> 仅识别 Web 指纹
+// ```
+// // 只跑 Web 指纹规则，扫描常见 Web 端口
+// ch, err = servicescan.Scan("127.0.0.1", "80,443,8080,8443", servicescan.web())
+// die(err)
+// for result := range ch {
+//     if result.IsOpen() {
+//         println(result.String())
+//     }
+// }
+// ```
+// <|EXAMPLE_END|>
 func scanFingerprint(target string, port string, opts ...fp.ConfigOption) (chan *fp.MatchResult, error) {
 	config := fp.NewConfig(opts...)
 	return _scanFingerprint(config.Ctx, config, 50, target, port)
@@ -163,17 +192,17 @@ func scanFingerprint(target string, port string, opts ...fp.ConfigOption) (chan 
 //   - *MatchResult: 单个目标的指纹识别结果
 //   - error: 扫描失败时返回错误
 //
-// Example:
+// <|EXAMPLE_START|> servicescan.ScanOne 同步扫描单个目标
 // ```
-// result, err = servicescan.ScanOne("127.0.0.1", "22-80,443,3389")  // 开始扫描，函数会立即返回一个错误和结果
-// die(err) // 如果错误非空则报错
-// if result.IsOpen() { // 获取到的结果是一个结构体，可以调用IsOpen方法判断该端口是否打开
-//
-//	    println(result.String()) // 输出结果，调用String方法获取可读字符串
-//	    println(result.GetCPEs()) // 查看 CPE 结果
-//	}
-//
+// // 同步扫描单个 host:port，直接拿到一个结果(端口关闭也会返回结果、不报错)
+// result, err = servicescan.ScanOne("127.0.0.1", 80, servicescan.probeTimeout(5))
+// die(err)
+// if result.IsOpen() {
+//     println(result.String())  // 可读摘要
+//     println(result.GetCPEs()) // CPE 列表
+// }
 // ```
+// <|EXAMPLE_END|>
 func scanOneFingerprint(target string, port int, opts ...fp.ConfigOption) (*fp.MatchResult, error) {
 	config := fp.NewConfig(opts...)
 	matcher, err := fp.NewFingerprintMatcher(nil, config)
@@ -344,21 +373,23 @@ func _scanFingerprint(ctx context.Context, config *fp.Config, concurrent int, ho
 //   - opts: 零个或多个 servicescan 扫描参数
 //
 // 返回值:
-//   - chan *MatchResult: 指纹识别结果管道
+//   - chan *MatchResult: 指纹识别结果管道，逐个产出扫描结果
 //   - error: 启动失败时返回错误
 //
-// Example:
+// <|EXAMPLE_START|> 先 ping 探活再做指纹识别
 // ```
-// pingResult, err = ping.Scan("192.168.1.1/24") // 先进行存活探测
+// // 先用 ping 探活，再只对存活主机做服务指纹识别，省去对死主机的探测
+// pingResult, err = ping.Scan("192.168.1.1/24")
 // die(err)
-// fpResults, err := servicescan.ScanFromPing(pingResult, "22-80,443,3389") // 将ping中拿到的结果传入servicescan中进行指纹扫描
-// die(err) // 如果错误非空则报错
-// for result := range fpResults { // 通过遍历管道的形式获取管道中的结果，一旦有结果返回就会执行循环体的代码
-//
-//	   println(result.String()) // 输出结果，调用String方法获取可读字符串
-//	}
-//
+// fpResults, err = servicescan.ScanFromPing(pingResult, "22,80,443,3389")
+// die(err)
+// for result := range fpResults {
+//     if result.IsOpen() {
+//         println(result.String())
+//     }
+// }
 // ```
+// <|EXAMPLE_END|>
 func _scanFromPingUtils(res chan *pingutil.PingResult, ports string, opts ...fp.ConfigOption) (chan *fp.MatchResult, error) {
 	synResults := make(chan *synscan.SynScanResult, 1000)
 	portsInt := utils.ParseStringToPorts(ports)
@@ -393,30 +424,34 @@ func _scanFromPingUtils(res chan *pingutil.PingResult, ports string, opts ...fp.
 //   - opts: 零个或多个 servicescan 扫描参数
 //
 // 返回值:
-//   - chan *MatchResult: 指纹识别结果管道
+//   - chan *MatchResult: 指纹识别结果管道，逐个产出扫描结果
 //   - error: 启动失败时返回错误
 //
-// Example:
+// <|EXAMPLE_START|> 与 synscan 联动(先快速探活, 再精准识别指纹)
 // ```
-// ch, err = synscan.Scan("127.0.0.1", "22-80,443,3389")  // 开始扫描，函数会立即返回一个错误和结果管道
-// die(err) // 如果错误非空则报错
-// fpResults, err := servicescan.ScanFromSynResult(ch) // 将synscan中拿到的结果传入servicescan中进行指纹扫描
-// die(err) // 如果错误非空则报错
-// for result := range fpResults { // 通过遍历管道的形式获取管道中的结果，一旦有结果返回就会执行循环体的代码
-//
-//	   println(result.String()) // 输出结果，调用String方法获取可读字符串
-//	}
-//
-// res, err := spacengine.ShodanQuery(Apikey,query)
-// die(err) // 如果错误非空则报错
-// fpResults, err := servicescan.ScanFromSpaceEngine(res) // 将spacengine中拿到的结果传入servicescan中进行指纹扫描
-// die(err) // 如果错误非空则报错
-// for result := range fpResults { // 通过遍历管道的形式获取管道中的结果，一旦有结果返回就会执行循环体的代码
-//
-//	   println(result.String()) // 输出结果，调用String方法获取可读字符串
-//	}
-//
+// // 先用 synscan 快速探活开放端口，再交给 servicescan 做精准指纹识别，兼顾速度与精度
+// synResult, err = synscan.Scan("127.0.0.1", "1-65535")
+// die(err)
+// fpResults, err = servicescan.ScanFromSynResult(synResult)
+// die(err)
+// for result := range fpResults {
+//     println(result.String())
+// }
 // ```
+// <|EXAMPLE_END|>
+//
+// <|EXAMPLE_START|> 与网络空间测绘(spacengine)联动复核指纹
+// ```
+// // 把网络空间测绘(如 shodan)查询到的资产交给 servicescan 复核服务指纹
+// res, err = spacengine.ShodanQuery("YOUR_API_KEY", "apache")
+// die(err)
+// fpResults, err = servicescan.ScanFromSpaceEngine(res)
+// die(err)
+// for result := range fpResults {
+//     println(result.String())
+// }
+// ```
+// <|EXAMPLE_END|>
 //
 // Context 契约 (重要):
 //   - 通过 servicescan.ctx() 注入的 ctx 会被本函数下游 inner goroutine 用作

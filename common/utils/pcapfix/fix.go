@@ -13,16 +13,21 @@ import (
 	"github.com/yaklang/yaklang/common/utils/privileged"
 )
 
-// FixPermission 尝试修复 pcap 权限问题
+// FixPermission 尝试修复 pcap 权限问题(SYN 扫描依赖原始套接字，需要相应权限)
 // 返回值:
 //   - error: 修复失败时返回错误，为 nil 表示可正常使用 syn 扫描
 //
-// Example:
+// <|EXAMPLE_START|> 扫描前修复 pcap 权限
 // ```
-// err := pcapx.FixPermission()
-// die(err) // 没有错误，即可正常使用 syn 扫描
-// ...
+// // SYN 扫描需要原始套接字权限，扫描前先修复一次
+// err = synscan.FixPermission()
+// if err != nil {
+//     log.error("fix pcap permission failed: %v", err)
+//     return
+// }
+// log.info("pcap permission is ready for syn scan")
 // ```
+// <|EXAMPLE_END|>
 func Fix() error {
 	switch runtime.GOOS {
 	case "linux":
