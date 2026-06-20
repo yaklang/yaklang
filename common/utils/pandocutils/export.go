@@ -67,13 +67,39 @@ func _simpleConvertMarkdownFileToDocx(md string) (string, error) {
 
 var deprecatedWarning = new(sync.Once)
 
+// simpleCoverMD2Word 将 Markdown 文件转换为 Word(.docx) 文件（导出名为 pandoc.SimpleCoverMD2Word）
+// 依赖底层 pandoc 程序完成转换
+//
+// Deprecated: 这是 alpha 阶段接口，建议改用 pandoc.SimpleConvertMarkdownFileToDocxContext 或
+// pandoc.SimpleConvertMarkdownFileToDocx 以获得更好的体验
+//
+// 参数:
+//   - ctx: 上下文，用于控制转换过程的取消与超时
+//   - inputFile: 输入的 Markdown 文件路径
+//   - outputFile: 输出的 Word(.docx) 文件路径
+//
+// 返回值:
+//   - 错误信息（pandoc 不可用或转换失败时返回）
+//
+// Example:
+// ```
+// // 该示例依赖底层 pandoc 程序，仅作用法示意
+// dir = os.TempDir()
+// md = file.Join(dir, "demo.md")
+// out = file.Join(dir, "demo.docx")
+// file.Save(md, "# Title\n\nhello pandoc")~
+// err = pandoc.SimpleCoverMD2Word(context.Background(), md, out)
+// if err != nil { log.error("convert failed: %v", err) }
+// ```
+func simpleCoverMD2Word(ctx context.Context, inputFile string, outputFile string) error {
+	deprecatedWarning.Do(func() {
+		log.Warn("pandoc.SimpleCoverMD2Word is an alpha pandoc api, please use pandoc.SimpleConvertMarkdownToDocxContext or SimpleConvertMarkdownTo instead for best experience.")
+	})
+	return SimpleCovertMarkdownToDocx(ctx, inputFile, outputFile)
+}
+
 var Exports = map[string]any{
 	"SimpleConvertMarkdownFileToDocxContext": _simpleConvertMarkdownFileToDocxContext,
 	"SimpleConvertMarkdownFileToDocx":        _simpleConvertMarkdownFileToDocx,
-	"SimpleCoverMD2Word": func(ctx context.Context, inputFile string, outputFile string) error {
-		deprecatedWarning.Do(func() {
-			log.Warn("pandoc.SimpleCoverMD2Word is an alpha pandoc api, please use pandoc.SimpleConvertMarkdownToDocxContext or SimpleConvertMarkdownTo instead for best experience.")
-		})
-		return SimpleCovertMarkdownToDocx(ctx, inputFile, outputFile)
-	},
+	"SimpleCoverMD2Word":                     simpleCoverMD2Word,
 }

@@ -56,6 +56,23 @@ type WebsiteForest struct {
 	Uuid string `json:"uuid"`
 }
 
+// NewWebsiteForest 创建一个网站森林（导出名为 webforest.New）
+// 网站森林以"域名为根、路径为枝"的树形结构组织 URL，常用于爬虫结果的站点结构归并与展示
+//
+// 参数:
+//   - size: 森林容纳的最大节点规模
+//
+// 返回值:
+//   - 网站森林对象，可调用 AddNode 添加 URL、CountUrls 统计、Output 输出树形结构
+//
+// Example:
+// ```
+// forest = webforest.New(100)
+// forest.AddNode("https://example.com/a")~
+// forest.AddNode("https://example.com/b/c")~
+// println(forest.CountUrls())   // OUT: 2
+// assert forest.CountUrls() == 2, "forest should count the two added urls"
+// ```
 func NewWebsiteForest(size int) *WebsiteForest {
 	return &WebsiteForest{
 		MaxSize: size,

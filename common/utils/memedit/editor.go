@@ -54,6 +54,23 @@ func NewMemEditorByBytes(bs []byte) *MemEditor {
 	return editor
 }
 
+// NewMemEditor 基于源代码字符串创建内存编辑器（导出名为 memeditor.New）
+// 提供按行/按偏移读取、查找、范围定位等文本操作能力，常用于源码分析与代码切片
+//
+// 参数:
+//   - sourceCode: 待编辑/分析的源代码文本
+//
+// 返回值:
+//   - 内存编辑器对象，可调用 GetLineCount / GetLine / GetSourceCode 等方法
+//
+// Example:
+// ```
+// editor = memeditor.New("line1\nline2\nline3")
+// println(editor.GetLineCount())   // OUT: 3
+// assert editor.GetLineCount() == 3, "editor should report 3 lines"
+// line2 = editor.GetLine(2)~
+// assert line2 == "line2", "GetLine(2) should return the second line"
+// ```
 func NewMemEditor(sourceCode string) *MemEditor {
 	editor := &MemEditor{
 		safeSourceCode: NewSafeString(sourceCode),

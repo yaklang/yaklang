@@ -405,6 +405,19 @@ func (c *CliApp) GetArgs() []string {
 	return c.args
 }
 
+// Args 返回传给当前脚本的命令行参数列表（导出名为 cli.Args）
+// 即运行 yak 脚本时跟在脚本名之后的原始位置参数
+//
+// 返回值:
+//   - 命令行参数字符串切片
+//
+// Example:
+// ```
+// args = cli.Args()
+// println(typeof(args).String())   // OUT: []string
+// assert typeof(args).String() == "[]string", "cli.Args should return a string slice"
+// assert len(args) >= 0, "args length should be non-negative"
+// ```
 func (c *CliApp) Args() []string {
 	return c.args
 }
