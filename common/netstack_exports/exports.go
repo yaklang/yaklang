@@ -23,7 +23,21 @@ var Exports = map[string]interface{}{
 	"FastKillTCP":                     netstackvm.FastKillTCP,
 }
 
-// _createPrivilegedDevice creates a privileged TUN device with default MTU (1500)
+// CreatePrivilegedDevice 创建一个使用默认 MTU(1500) 的特权 TUN 虚拟网卡（导出名为 netstack.CreatePrivilegedDevice）
+// 需要管理员/root 权限；返回的设备可交给 netstack.NewVMFromDevice 构建网络栈虚拟机
+//
+// 返回值:
+//   - TUN 设备对象
+//   - 错误信息（权限不足或创建失败时返回）
+//
+// Example:
+// ```
+// // 真实功能示例：创建 TUN 设备并构建网络栈虚拟机（需要 root 权限，示意性用法）
+// device = netstack.CreatePrivilegedDevice()~
+// vm = netstack.NewVMFromDevice(device)~
+// println("tunnel:", vm.GetTunnelName())
+// defer vm.Close()
+// ```
 func _createPrivilegedDevice() (lowtun.Device, error) {
 	device, _, err := lowtun.CreatePrivilegedDevice(1500)
 	if err != nil {
@@ -32,7 +46,23 @@ func _createPrivilegedDevice() (lowtun.Device, error) {
 	return device, nil
 }
 
-// _createPrivilegedDeviceWithMTU creates a privileged TUN device with specified MTU
+// CreatePrivilegedDeviceWithMTU 创建一个使用指定 MTU 的特权 TUN 虚拟网卡（导出名为 netstack.CreatePrivilegedDeviceWithMTU）
+// 需要管理员/root 权限；MTU 取值范围为 1 到 9000
+//
+// 参数:
+//   - mtu: 最大传输单元，常用 1500，巨帧场景可设更大（不超过 9000）
+//
+// 返回值:
+//   - TUN 设备对象
+//   - 错误信息（MTU 非法、权限不足或创建失败时返回）
+//
+// Example:
+// ```
+// // 真实功能示例：以 1400 的 MTU 创建 TUN 设备（需要 root 权限，示意性用法）
+// device = netstack.CreatePrivilegedDeviceWithMTU(1400)~
+// vm = netstack.NewVMFromDevice(device)~
+// defer vm.Close()
+// ```
 func _createPrivilegedDeviceWithMTU(mtu int) (lowtun.Device, error) {
 	if mtu <= 0 || mtu > 9000 {
 		return nil, utils.Errorf("invalid MTU value: %d (must be between 1 and 9000)", mtu)
@@ -232,12 +262,48 @@ func (vm *NetstackVM) GetTunnelName() string {
 	return ""
 }
 
-// _newVMFromDevice creates a network stack virtual machine from a TUN device
-// The VM will hijack TCP connections and make them available via GetTCPConnChan()
+// NewVMFromDevice 基于一个 TUN 设备创建网络栈虚拟机（导出名为 netstack.NewVMFromDevice）
+// 该虚拟机会劫持流经 TUN 设备的 TCP 连接，可通过 StartForwarding 把连接转发到通道，进而交给 tcpmitm 处理
+//
+// 参数:
+//   - device: 由 netstack.CreatePrivilegedDevice 等创建的 TUN 设备
+//
+// 返回值:
+//   - 网络栈虚拟机对象（使用完毕需调用 Close 释放）
+//   - 错误信息（设备为空或初始化失败时返回）
+//
+// Example:
+// ```
+// // 真实功能示例：劫持 TCP 连接并转发到通道供后续处理（需要 root 权限，示意性用法）
+// device = netstack.CreatePrivilegedDevice()~
+// vm = netstack.NewVMFromDevice(device)~
+// defer vm.Close()
+// connChan = make(chan any, 16)
+// vm.StartForwarding(connChan)~
+// ```
 func _newVMFromDevice(device lowtun.Device) (*NetstackVM, error) {
 	return _newVMFromDeviceWithContext(context.Background(), device)
 }
 
+// NewVMFromDeviceWithContext 基于 TUN 设备与自定义上下文创建网络栈虚拟机（导出名为 netstack.NewVMFromDeviceWithContext）
+// 与 netstack.NewVMFromDevice 类似，但可通过上下文统一控制虚拟机生命周期（上下文取消即停止）
+//
+// 参数:
+//   - ctx: 控制虚拟机生命周期的上下文
+//   - device: 由 netstack.CreatePrivilegedDevice 等创建的 TUN 设备
+//
+// 返回值:
+//   - 网络栈虚拟机对象（使用完毕需调用 Close 释放）
+//   - 错误信息（设备为空或初始化失败时返回）
+//
+// Example:
+// ```
+// // 真实功能示例：用带超时的上下文限制虚拟机运行时长（需要 root 权限，示意性用法）
+// ctx = context.WithTimeout(context.Background(), 60 * time.Second)
+// device = netstack.CreatePrivilegedDevice()~
+// vm = netstack.NewVMFromDeviceWithContext(ctx, device)~
+// defer vm.Close()
+// ```
 func _newVMFromDeviceWithContext(ctx context.Context, device lowtun.Device) (*NetstackVM, error) {
 	if device == nil {
 		return nil, utils.Errorf("device cannot be nil")

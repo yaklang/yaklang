@@ -47,6 +47,10 @@ type ProcessFilter struct {
 }
 
 // NewProcessFilter 创建新的进程过滤器
+//
+// 返回值:
+//   - 进程过滤器对象，可设置 Name/Pid/Username 等字段后传给 hids.PS
+//
 // Example:
 // ```
 // filter = hids.NewProcessFilter()
@@ -160,6 +164,14 @@ func filterProcess(info *ProcessInfo, filter *ProcessFilter) bool {
 }
 
 // PS 获取进程列表，可选择使用过滤器
+//
+// 参数:
+//   - filters: 可选的进程过滤器（由 hids.NewProcessFilter 创建），不传则返回全部进程
+//
+// 返回值:
+//   - 进程信息列表
+//   - 错误信息
+//
 // Example:
 // ```
 // // 获取所有进程
@@ -199,6 +211,14 @@ func PS(filters ...*ProcessFilter) ([]*ProcessInfo, error) {
 }
 
 // GetProcessByPid 根据PID获取进程详细信息
+//
+// 参数:
+//   - pid: 进程 PID
+//
+// 返回值:
+//   - 进程信息
+//   - 错误信息
+//
 // Example:
 // ```
 // info, err = hids.GetProcessByPid(1234)
@@ -218,6 +238,14 @@ func GetProcessByPid(pid int32) (*ProcessInfo, error) {
 }
 
 // GetProcessChildren 获取进程的所有子进程
+//
+// 参数:
+//   - pid: 进程 PID
+//
+// 返回值:
+//   - 子进程信息列表
+//   - 错误信息
+//
 // Example:
 // ```
 // children, err = hids.GetProcessChildren(1234)
@@ -251,6 +279,14 @@ func GetProcessChildren(pid int32) ([]*ProcessInfo, error) {
 }
 
 // GetProcessParent 获取进程的父进程信息
+//
+// 参数:
+//   - pid: 进程 PID
+//
+// 返回值:
+//   - 父进程信息
+//   - 错误信息
+//
 // Example:
 // ```
 // parent, err = hids.GetProcessParent(1234)
@@ -281,6 +317,14 @@ type ProcessTreeNode struct {
 }
 
 // GetProcessTree 获取进程树（从指定PID开始，或从init进程开始）
+//
+// 参数:
+//   - rootPid: 进程树的根 PID（传 1 可获取整个系统进程树）
+//
+// 返回值:
+//   - 进程树根节点
+//   - 错误信息
+//
 // Example:
 // ```
 // // 获取指定进程的进程树
@@ -331,6 +375,14 @@ func GetProcessTree(rootPid int32) (*ProcessTreeNode, error) {
 }
 
 // GetProcessAncestors 获取进程的所有祖先进程（父进程链）
+//
+// 参数:
+//   - pid: 进程 PID
+//
+// 返回值:
+//   - 祖先进程信息列表（由近到远）
+//   - 错误信息
+//
 // Example:
 // ```
 // ancestors, err = hids.GetProcessAncestors(1234)
@@ -379,6 +431,13 @@ func GetProcessAncestors(pid int32) ([]*ProcessInfo, error) {
 }
 
 // KillProcess 终止进程
+//
+// 参数:
+//   - pid: 要终止的进程 PID
+//
+// 返回值:
+//   - 错误信息
+//
 // Example:
 // ```
 // err = hids.KillProcess(1234)
@@ -392,6 +451,11 @@ func KillProcess(pid int32) error {
 }
 
 // GetCurrentProcessInfo 获取当前进程信息
+//
+// 返回值:
+//   - 当前进程信息
+//   - 错误信息
+//
 // Example:
 // ```
 // info, err = hids.GetCurrentProcessInfo()

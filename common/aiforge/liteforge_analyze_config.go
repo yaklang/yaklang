@@ -180,6 +180,18 @@ func WithAnalyzeStatusCard(handler func(id string, data interface{}, tags ...str
 	}
 }
 
+// analyzeConcurrency 控制知识构建分析的并发数（在 rag 中导出名为 rag.analyzeConcurrency）
+//
+// 参数:
+//   - concurrency: 分析并发数（同时处理的分块数量）
+//
+// 返回值:
+//   - 分析配置选项
+//
+// Example:
+// ```
+// rag.BuildCollectionFromDocuments("my-rag", docs, rag.analyzeConcurrency(4))~
+// ```
 func WithAnalyzeConcurrency(concurrency int) AnalysisOption {
 	return func(config *AnalysisConfig) {
 		config.AnalyzeConcurrency = concurrency

@@ -37,7 +37,18 @@ var (
 	systemRouteManagerOnce     sync.Once
 )
 
-// GetSystemRouteManager 获取系统路由管理器的单例实例
+// GetSystemRouteManager 获取系统路由管理器的单例实例（导出名为 netstack.GetSystemRouteManager）
+// 路由管理器用于记录与管理由本程序添加的系统路由，单例会在首次获取时从数据库加载已有记录
+//
+// 返回值:
+//   - 系统路由管理器单例对象
+//
+// Example:
+// ```
+// // 真实功能示例：获取路由管理器并查看已记录的路由（需要相应权限，示意性用法）
+// rm = netstack.GetSystemRouteManager()
+// println(rm)
+// ```
 func GetSystemRouteManager() *SystemRouteManager {
 	systemRouteManagerOnce.Do(func() {
 		systemRouteManagerInstance = &SystemRouteManager{
@@ -49,6 +60,19 @@ func GetSystemRouteManager() *SystemRouteManager {
 	return systemRouteManagerInstance
 }
 
+// GetPrivilegedSystemRouteManager 创建一个带特权路由设备的系统路由管理器（导出名为 netstack.GetPrivilegedSystemRouteManager）
+// 需要管理员/root 权限；相比 GetSystemRouteManager，它会额外创建一个特权路由设备，可实际下发路由
+//
+// 返回值:
+//   - 系统路由管理器对象
+//   - 错误信息（权限不足或创建路由设备失败时返回）
+//
+// Example:
+// ```
+// // 真实功能示例：获取带特权设备的路由管理器（需要 root 权限，示意性用法）
+// rm = netstack.GetPrivilegedSystemRouteManager()~
+// println(rm)
+// ```
 func GetPrivilegedSystemRouteManager() (*SystemRouteManager, error) {
 	var rm = &SystemRouteManager{
 		records: make(map[string]*Record),

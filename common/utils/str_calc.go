@@ -14,6 +14,13 @@ import (
 )
 
 // CalcSimHash 计算并返回一段文本的 SimHash 值
+//
+// 参数:
+//   - raw: 待计算的文本字节
+//
+// 返回值:
+//   - SimHash 值
+//
 // Example:
 // ```
 // str.CalcSimHash("hello")
@@ -23,6 +30,13 @@ func SimHash(raw []byte) uint64 {
 }
 
 // CalcSSDeep 计算并返回一段文本的模糊哈希值
+//
+// 参数:
+//   - raw: 待计算的文本字节
+//
+// 返回值:
+//   - 模糊哈希字符串，失败返回空字符串
+//
 // Example:
 // ```
 // str.CalcSSDeep("hello")
@@ -41,6 +55,13 @@ func SSDeepHash(raw []byte) string {
 // 如果最长的文本长度小于等于 2000，使用文本子串匹配算法
 // 如果最短的文本长度大于等于 30000，使用模糊哈希算法
 // 如果上述算法出现错误，则使用 SimHash 算法
+//
+// 参数:
+//   - raw: 两段或多段待比较的文本字节
+//
+// 返回值:
+//   - 相似度，取值范围 0~1
+//
 // Example:
 // ```
 // str.CalcSimilarity("hello", "hello world") // 0.625
@@ -85,6 +106,14 @@ func CalcSimilarity(raw ...[]byte) float64 {
 }
 
 // CalcTextMaxSubStrStability 使用文本子串匹配算法计算多段文本之间的相似度，返回相似度与错误
+//
+// 参数:
+//   - raw: 两段或多段待比较的文本字节
+//
+// 返回值:
+//   - 相似度，取值范围 0~1
+//   - 错误信息
+//
 // Example:
 // ```
 // p, err = str.CalcTextMaxSubStrStability("hello", "hello world") // p = 0.625
@@ -122,6 +151,14 @@ func CalcTextSubStringStability(raw ...[]byte) (float64, error) {
 }
 
 // CalcSSDeepStability 使用模糊哈希算法计算多段文本之间的相似度，返回相似度与错误。传入的文本应该为大文本，即长度大于 30 kb。
+//
+// 参数:
+//   - req: 两段或多段待比较的大文本字节
+//
+// 返回值:
+//   - 相似度，取值范围 0~1
+//   - 错误信息
+//
 // Example:
 // ```
 // p, err = str.CalcSSDeepStability(str.RandStr(100000), str.RandStr(100000))
@@ -166,6 +203,14 @@ func CalcSSDeepStability(req ...[]byte) (float64, error) {
 }
 
 // CalcSimHashStability 使用 SimHash 算法计算多段文本之间的相似度，返回相似度与错误。
+//
+// 参数:
+//   - req: 两段或多段待比较的文本字节
+//
+// 返回值:
+//   - 相似度，取值范围 0~1
+//   - 错误信息
+//
 // Example:
 // ```
 // p, err = str.CalcSimHashStability("hello", "hello world") // p = 0.96484375

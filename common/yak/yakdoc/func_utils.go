@@ -382,6 +382,13 @@ func FuncToFuncDecl(f interface{}, libName string, overideName string) (*FuncDec
 		results     []*Field
 	)
 
+	// fixedDoc 保存「实例/闭包返回函数」按 name 兜底匹配到的 builder 注释。
+	// 这类函数（如各 builder 返回的闭包：risk.NewRisk/risk.Save/risk.CheckXxx 等）
+	// 在第一趟匹配时只设置 document 并 continue（不置 found），随后会走字符串 fallback
+	// 第二趟，把 document 覆盖为合成源码的空注释，导致已写好的 builder 文档丢失。
+	// 用独立变量保存，最终若 document 为空则回填，避免被 fallback 清空。
+	var fixedDoc string
+
 	filename, line := function.FileLine(0)
 	splitFuncName := strings.Split(function.Name(), ".")
 	funcName := splitFuncName[len(splitFuncName)-1]
@@ -451,6 +458,7 @@ FOUND_FUNCTION_DECLARATION:
 			// only fix for doc
 			if fixedForInstanceFuncDoc {
 				document = theFunc.Doc
+				fixedDoc = theFunc.Doc
 				continue
 			}
 		}
@@ -740,6 +748,11 @@ FOUND_FUNCTION_DECLARATION:
 
 	// 特殊处理params和results
 	// params, results = customHandleParamsAndResults(libName, overideName, params, results)
+
+	// 回填 builder 注释：若 document 被字符串 fallback 清空，但此前命中过 builder 文档，则恢复。
+	if document == "" && fixedDoc != "" {
+		document = fixedDoc
+	}
 
 	declaration, completion = GetDeclAndCompletion(finalName, params, results, funcRefType)
 

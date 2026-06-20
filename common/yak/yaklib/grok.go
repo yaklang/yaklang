@@ -96,10 +96,21 @@ func (g GrokResult) GetOr(key string, value string) string {
 	return g.Get(key)
 }
 
-// Grok 用于将字符串 line 使用 Grok 以规则 rule 进行解析，并返回解析结果(map)，参考 https://doc.yonyoucloud.com/doc/logstash-best-practice-cn/filter/grok.html 获取更多信息。
+// Grok 使用 Grok 规则解析字符串并返回解析结果（导出名为 re.Grok）
+// 结果为字段名到取值的映射，可用 .Get(key) 取第一个值；参考 logstash grok 语法
+// 参数:
+//   - line: 待解析的原始字符串
+//   - rule: Grok 规则（如 "%{MONTHNUM:month}/%{MONTHDAY:day}-%{TIME:time}"）
+//
+// 返回值:
+//   - Grok 解析结果对象，解析失败返回空结果，可用 .Get(name) 取值
+//
 // Example:
 // ```
-// str.Grok("04/18-00:59:45.385191", "%{MONTHNUM:month}/%{MONTHDAY:day}-%{TIME:time}") // map[HOUR:[00] MINUTE:[59] SECOND:[45.385191] day:[18] month:[04] time:[00:59:45.385191]]
+// result = re.Grok("04/18-00:59:45.385191", "%{MONTHNUM:month}/%{MONTHDAY:day}-%{TIME:time}")
+// println(result.Get("month"))   // OUT: 04
+// assert result.Get("day") == "18", "Grok should capture the day field"
+// assert result.Get("time") == "00:59:45.385191", "Grok should capture the time field"
 // ```
 func Grok(line string, rule string) GrokResult {
 	results, err := grokParser.ParseToMultiMap(rule, line)
@@ -174,6 +185,13 @@ func JsonStreamToMapList(reader io.Reader) []map[string]interface{} {
 }
 
 // JsonToMapList 将 json 字符串 line 解析为 map 列表，保留嵌套结构（对象/数组不会被转为字符串）
+//
+// 参数:
+//   - line: 包含一个或多个 JSON 对象的字符串
+//
+// 返回值:
+//   - 解析出的 map 列表
+//
 // Example:
 // ```
 // str.JsonToMapList(`{"a":1,"b":2} {"c":3, "d":4}`) // [map[a:1 b:2] map[c:3 d:4]]
@@ -201,6 +219,13 @@ func JsonToMapList(line string) []map[string]any {
 
 // JsonToMap 将 json 字符串 line 解析为 map，保留嵌套结构（对象/数组不会被转为字符串）
 // 单对象时优先用 json.Unmarshal 确保嵌套正确；多对象（如 `{} {}`）时回退到 jstream。
+//
+// 参数:
+//   - line: JSON 字符串
+//
+// 返回值:
+//   - 解析出的 map，解析失败返回 nil
+//
 // Example:
 // ```
 // str.JsonToMap(`{"a":1,"b":2}`)           // map[a:1 b:2]
@@ -225,6 +250,15 @@ func JsonToMap(line string) map[string]any {
 }
 
 // ParamsGetOr 从 map 中获取 key 对应的值，如果不存在则返回 defaultValue。支持 map[string]string 与 map[string]any。
+//
+// 参数:
+//   - i: 源 map（map[string]string 或 map[string]any）
+//   - key: 要获取的键
+//   - defaultValue: 键不存在时返回的默认值
+//
+// 返回值:
+//   - 键对应的字符串值，不存在时返回 defaultValue
+//
 // Example:
 // ```
 // str.ParamsGetOr({"a": "1"}, "a", "2") // 1

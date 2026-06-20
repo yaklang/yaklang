@@ -1088,12 +1088,23 @@ func CheckHTTPLogByToken(token string, pluginContext YakitPluginInfo, timeout ..
 	}
 }
 
-// CheckHTTPLogByToken 通过 token 检查 HTTPLog 事件，返回的第一个值是 HTTPLogEvent 列表，第二个值是错误
+// CheckHTTPLogByToken 通过 token 查询是否收到对应的 HTTP 带外请求（导出名为 risk.CheckHTTPLogByToken）
+// 常用于带外（OOB）漏洞验证，配合 risk.NewHTTPLog 生成的 token 使用
+//
+// 参数:
+//   - token: HTTPLog token
+//   - timeout: 可选的查询超时时间（秒）
+//
+// 返回值:
+//   - 收到的 HTTP 触发通知列表
+//   - 错误信息（查询失败时返回）
+//
 // Example:
 // ```
 // domain, token = risk.NewHTTPLog()~
-// ...
-// events = risk.CheckHTTPLogByToken(token)~
+// // 触发目标访问 domain 后查询（需要网络与带外平台，示意性示例）
+// notifications = risk.CheckHTTPLogByToken(token, 5)~
+// for n in notifications { println(n.Url) }
 // ```
 func YakitNewCheckHTTPLogByToken(pluginContext YakitPluginInfo) func(token string, timeout ...float64) ([]*tpb.HTTPRequestTriggerNotification, error) {
 	return func(token string, timeout ...float64) ([]*tpb.HTTPRequestTriggerNotification, error) {
@@ -1130,12 +1141,23 @@ func CheckDNSLogByToken(token string, pluginContext YakitPluginInfo, timeout ...
 	return events, nil
 }
 
-// CheckDNSLogByToken 通过 token 检查 DNSLog 事件，返回的第一个值是 DNSLogEvent 列表，第二个值是错误
+// CheckDNSLogByToken 通过 token 查询 DNSLog 平台上是否收到对应的 DNS 解析触发（导出名为 risk.CheckDNSLogByToken）
+// 常用于带外（OOB）漏洞验证，配合 risk.NewDNSLogDomain 生成的 token 使用
+//
+// 参数:
+//   - token: DNSLog token
+//   - timeout: 可选的查询超时时间（秒）
+//
+// 返回值:
+//   - 收到的 DNSLog 事件列表
+//   - 错误信息（查询失败时返回）
+//
 // Example:
 // ```
 // domain, token = risk.NewDNSLogDomain()~
-// ...
-// events = risk.CheckDNSLogByToken(token)~
+// // 触发目标解析 domain 后查询（需要网络与 DNSLog 平台，示意性示例）
+// events = risk.CheckDNSLogByToken(token, 5)~
+// for e in events { println(e.Domain) }
 // ```
 func YakitNewCheckDNSLogByToken(pluginContext YakitPluginInfo) func(token string, timeout ...float64) ([]*tpb.DNSLogEvent, error) {
 	return func(token string, timeout ...float64) ([]*tpb.DNSLogEvent, error) {
@@ -1228,12 +1250,22 @@ func CheckICMPTriggerByLength(i int, pluginContext YakitPluginInfo) (*tpb.ICMPTr
 	return event, nil
 }
 
-// CheckRandomTriggerByToken 通过 token 检查端口反连事件，返回的第一个值是 RandomPortTriggerEvent，第二个值是错误
+// CheckRandomTriggerByToken 通过 token 查询是否收到随机端口反连事件（导出名为 risk.CheckRandomTriggerByToken）
+// 常用于带外（OOB）漏洞验证，配合 risk.NewRandomPortTrigger 生成的 token 使用
+//
+// 参数:
+//   - t: 随机端口反连 token
+//
+// 返回值:
+//   - 随机端口反连事件对象
+//   - 错误信息（查询失败时返回）
+//
 // Example:
 // ```
 // token, addr = risk.NewRandomPortTrigger()~
-// ...
+// // 触发目标连接 addr 后查询（需要网络与 Bridge 反连服务，示意性示例）
 // event = risk.CheckRandomTriggerByToken(token)~
+// println(event.RemoteAddr)
 // ```
 func YakitNewCheckRandomTriggerByToken(pluginContext YakitPluginInfo) func(t string) (*tpb.RandomPortTriggerEvent, error) {
 	return func(t string) (*tpb.RandomPortTriggerEvent, error) {

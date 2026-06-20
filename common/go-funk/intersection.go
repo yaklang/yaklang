@@ -49,6 +49,14 @@ func Intersect(x interface{}, y interface{}) interface{} {
 }
 
 // Intersect / IntersectString 返回两个字符串切片之间的交集
+//
+// 参数:
+//   - x: 第一个字符串切片
+//   - y: 第二个字符串切片
+//
+// 返回值:
+//   - 同时存在于 x 和 y 中的元素组成的切片
+//
 // Example:
 // ```
 // str.Intersect(["1", "2", "3"], ["3", "4", "5"]) // ["3"]

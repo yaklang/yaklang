@@ -10,6 +10,10 @@ import (
 const LASTCPUPERCENT_KEY = "LastCPUPercent"
 
 // CPUPercentCallback 当 CPU 使用率发生变化时，调用 callback 函数
+//
+// 参数:
+//   - callback: 回调函数，入参为当前 CPU 使用率（百分比）
+//
 // Example:
 // ```
 // hids.Init()
@@ -21,7 +25,11 @@ func CPUPercentCallback(callback func(i float64)) {
 	GetGlobalHealthManager().RegisterCPUPercentCallback(callback)
 }
 
-// CPUPercentCallback 当 CPU 使用率平均值发生变化时，调用 callback 函数
+// CPUAverageCallback 当 CPU 使用率平均值发生变化时，调用 callback 函数
+//
+// 参数:
+//   - callback: 回调函数，入参为当前 CPU 使用率平均值（百分比）
+//
 // Example:
 // ```
 // hids.Init()
@@ -34,6 +42,10 @@ func CPUAverageCallback(callback func(i float64)) {
 }
 
 // CPUPercent 获取当前系统的 CPU 使用率
+//
+// 返回值:
+//   - CPU 使用率（百分比，0-100）
+//
 // Example:
 // ```
 // printf("%f%%\n", hids.CPUPercent())
@@ -48,6 +60,10 @@ func CPUPercent() float64 {
 }
 
 // CPUAverage 获取当前系统的 CPU 使用率平均值
+//
+// 返回值:
+//   - CPU 使用率平均值（百分比，0-100）
+//
 // Example:
 // ```
 // printf("%f%%\n", hids.CPUAverage())

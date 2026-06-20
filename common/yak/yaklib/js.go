@@ -58,7 +58,7 @@ var JSExports = map[string]interface{}{
 	"NullValue":      goja.Null(),
 	"UndefinedValue": goja.Undefined(),
 	"FalseValue":     defaultJSRuntime.ToValue(false),
-	"ToValue":        defaultJSRuntime.ToValue,
+	"ToValue":        _jsToValue,
 	"NaNValue":       goja.NaN(),
 	"TrueValue":      defaultJSRuntime.ToValue(true),
 
@@ -87,6 +87,23 @@ func init() {
 func GetStatementType(st interface{}) string {
 	typ := strings.Replace(reflect.TypeOf(st).String(), "*ast.", "", 1)
 	return typ
+}
+
+// ToValue 将一个 Go 值转换为 JS 运行时中的值(JS Value)，便于作为变量注入 JS 环境或与执行结果交互（导出名为 js.ToValue）
+//
+// 参数:
+//   - i: 任意 Go 值（数字、字符串、布尔、map、slice 等）
+//
+// 返回值:
+//   - 转换后的 JS 值
+//
+// Example:
+// ```
+// v = js.ToValue("hello")
+// assert v != nil, "ToValue should convert a go value to a js value"
+// ```
+func _jsToValue(i interface{}) goja.Value {
+	return defaultJSRuntime.ToValue(i)
 }
 
 type jsLibrary struct {

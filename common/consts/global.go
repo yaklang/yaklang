@@ -154,10 +154,31 @@ func GetExtraDNSServers() []string {
 	return utils.RemoveRepeatStringSlice(utils.PrettifyListFromStringSplited(os.Getenv(CONST_YAK_EXTRA_DNS_SERVERS), ","))
 }
 
+// GetOnlineBaseUrl 获取当前配置的在线服务（Yakit 商店等）基础 URL（导出名为 yakit.GetOnlineBaseUrl）
+//
+// 返回值:
+//   - 当前在线服务的基础 URL
+//
+// Example:
+// ```
+// url = yakit.GetOnlineBaseUrl()
+// println(url)
+// assert url != "", "GetOnlineBaseUrl should return a non-empty base url"
+// ```
 func GetOnlineBaseUrl() string {
 	return YAK_ONLINE_BASEURL
 }
 
+// SetOnlineBaseUrl 设置在线服务（Yakit 商店等）的基础 URL（导出名为 yakit.SetOnlineBaseUrl）
+//
+// 参数:
+//   - u: 新的在线服务基础 URL
+//
+// Example:
+// ```
+// yakit.SetOnlineBaseUrl("https://www.yaklang.com")
+// assert yakit.GetOnlineBaseUrl() == "https://www.yaklang.com", "SetOnlineBaseUrl should update the base url"
+// ```
 func SetOnlineBaseUrl(u string) {
 	YAK_ONLINE_BASEURL = u
 }
@@ -265,6 +286,18 @@ func SetDefaultYakitProfileDatabaseName(i string) {
 	YAK_PROFILE_PLUGIN_DB_NAME = i
 }
 
+// GetDefaultYakitBaseDir 获取 Yakit 的主工作目录（导出名为 yakit.GetHomeDir）
+// 优先使用环境变量 YAKIT_HOME，否则默认为用户主目录下的 yakit-projects
+//
+// 返回值:
+//   - Yakit 主工作目录的绝对路径
+//
+// Example:
+// ```
+// dir = yakit.GetHomeDir()
+// println(dir)
+// assert dir != "", "GetHomeDir should return a non-empty path"
+// ```
 func GetDefaultYakitBaseDir() string {
 	OnceYakitHome.Do(GetRegistryYakitHome)
 	// 这个检测默认数据库
@@ -275,6 +308,18 @@ func GetDefaultYakitBaseDir() string {
 	return filepath.Join(utils.GetHomeDirDefault("."), "yakit-projects")
 }
 
+// GetDefaultYakitBaseTempDir 获取 Yakit 的临时目录（导出名为 yakit.GetHomeTempDir）
+// 该目录位于 Yakit 主工作目录下的 temp 子目录，不存在时会自动创建
+//
+// 返回值:
+//   - Yakit 临时目录的绝对路径
+//
+// Example:
+// ```
+// tmp = yakit.GetHomeTempDir()
+// println(tmp)
+// assert tmp != "", "GetHomeTempDir should return a non-empty path"
+// ```
 func GetDefaultYakitBaseTempDir() string {
 	OnceYakitHome.Do(GetRegistryYakitHome)
 

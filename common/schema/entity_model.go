@@ -311,6 +311,23 @@ func init() {
 
 }
 
+// getEntityFilter 构建一个实体过滤器（在 rag 中导出名为 rag.getEntityFilter），用于 k-hop 查询等场景
+//
+// 参数:
+//   - reposName: 实体仓库名称
+//   - entityTypes: 实体类型列表
+//   - names: 实体名称列表
+//   - HiddenIndex: 实体的 HiddenIndex 列表
+//   - keywords: 关键词列表
+//
+// 返回值:
+//   - 实体过滤器对象
+//
+// Example:
+// ```
+// filter = rag.getEntityFilter("my-repos", ["person"], ["张三"], [], ["登录"])
+// paths = rag.KHopQuery("my-rag", rag.buildFilter(filter))~
+// ```
 func SimpleBuildEntityFilter(reposName string, entityTypes, names, HiddenIndex, keywords []string) *ypb.EntityFilter {
 	filter := &ypb.EntityFilter{
 		ReposName:   reposName,

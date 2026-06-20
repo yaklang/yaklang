@@ -174,6 +174,21 @@ func (driver *PCAPEndpoint) generateRSTFromPacket(pkt gopacket.Packet) (bool, er
 	return true, nil
 }
 
+// FastKillTCP 在指定时间窗口内快速切断匹配目标的 TCP 连接（导出名为 netstack.FastKillTCP）
+// 需要相应的网络权限；通过在公网出口接管并发送 RST 等方式，干扰/切断到目标的现有 TCP 连接
+//
+// 参数:
+//   - killDuration: 持续切断的时间窗口（time.Duration）
+//   - target: 可选的目标过滤（如 IP 或 IP:Port），不传则按默认策略处理
+//
+// 返回值:
+//   - 错误信息（获取路由失败或执行失败时返回）
+//
+// Example:
+// ```
+// // 真实功能示例：在 5 秒内切断到指定目标的 TCP 连接（需要相应权限，示意性用法）
+// netstack.FastKillTCP(5 * time.Second, "1.2.3.4:443")~
+// ```
 func FastKillTCP(killDuration time.Duration, target ...string) error {
 	route, gateway, srcIP, err := netutil.GetPublicRoute()
 	if err != nil {

@@ -64,12 +64,36 @@ func RefineWithCustomizeDatabase(db *gorm.DB) RefineOption {
 	}
 }
 
+// disableIndex 是否禁用知识索引构建（在 rag 中导出名为 rag.disableIndex）
+//
+// 参数:
+//   - disable: 为 true 时不构建知识索引（仅做内容精炼）
+//
+// 返回值:
+//   - 精炼配置选项
+//
+// Example:
+// ```
+// rag.BuildCollectionFromDocuments("my-rag", docs, rag.disableIndex(true))~
+// ```
 func RefineWithDisableBuildIndex(disable bool) RefineOption {
 	return func(cfg *RefineConfig) {
 		cfg.DisableBuildIndex = disable
 	}
 }
 
+// disableERM 是否禁用实体关系模型（ERM）构建（在 rag 中导出名为 rag.disableERM）
+//
+// 参数:
+//   - disable: 为 true 时不构建实体仓库/关系图谱
+//
+// 返回值:
+//   - 精炼配置选项
+//
+// Example:
+// ```
+// rag.BuildCollectionFromDocuments("my-rag", docs, rag.disableERM(true))~
+// ```
 func RefineWithDisableERMBuild(disable bool) RefineOption {
 	return func(cfg *RefineConfig) {
 		cfg.DisableERMBuild = disable

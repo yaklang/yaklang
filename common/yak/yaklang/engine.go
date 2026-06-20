@@ -74,14 +74,28 @@ func NewAntlrEngine() *antlr4yak.Engine {
 	engine.ImportLibs(yaklangLibs)
 	engine.OverrideRuntimeGlobalVariables(map[string]any{
 		"yakit": map[string]interface{}{
-			"AutoInitYakit": func() {
-				if client := yaklib.AutoInitYakit(); client != nil {
-					yaklib.SetEngineClient(engine, client)
-				}
-			},
+			"AutoInitYakit": engineAutoInitYakitOverride(engine),
 		}})
 	yaklib.SetEngineClient(engine, yaklib.GetYakitClientInstance())
 	return engine
+}
+
+// AutoInitYakit 根据命令行参数自动初始化 Yakit 客户端，并将其绑定到当前脚本引擎（导出名为 yakit.AutoInitYakit）
+// 当脚本以 Yakit 方式运行（提供了 --yakit-webhook 等参数）时会创建真实客户端，否则使用空客户端
+// 初始化完成后，yakit.Info/yakit.Warn/yakit.StatusCard 等输出会被正确路由到当前引擎对应的客户端
+//
+// Example:
+// ```
+// // 在脚本起始处自动初始化 Yakit 客户端（在 Yakit 引擎环境下生效）
+// yakit.AutoInitYakit()
+// yakit.Info("yakit client is ready")
+// ```
+func engineAutoInitYakitOverride(engine *antlr4yak.Engine) func() {
+	return func() {
+		if client := yaklib.AutoInitYakit(); client != nil {
+			yaklib.SetEngineClient(engine, client)
+		}
+	}
 }
 func New() *antlr4yak.Engine {
 	return NewAntlrEngine()

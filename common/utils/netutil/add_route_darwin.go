@@ -289,8 +289,21 @@ func batchDeleteSpecificIPRoute(ipList []string, isSingle bool) (success []strin
 	return success, failed
 }
 
-// AddSpecificIPRouteToNetInterface 添加单个IP到特定网络接口的路由
-// 底层调用批量操作，但提示信息更简洁
+// AddSpecificIPRouteToNetInterface 为单个 IP 向指定网络接口添加 /32 主机路由（导出名为 netutils.AddSpecificIPRouteToNetInterface）
+// 需要管理员/root 权限，是 AddIPRouteToNetInterface 的底层单 IP 版本
+//
+// 参数:
+//   - ipStr: 单个 IP 地址
+//   - interfaceName: 目标网络接口名称（如 "en0"）
+//
+// 返回值:
+//   - 错误信息（权限不足、接口不存在或添加失败时返回）
+//
+// Example:
+// ```
+// // 真实功能示例：为单个 IP 添加主机路由（需要 root 权限，示意性用法）
+// netutils.AddSpecificIPRouteToNetInterface("1.1.1.1", "en0")~
+// ```
 func AddSpecificIPRouteToNetInterface(ipStr string, interfaceName string) error {
 	success, failed := batchAddSpecificIPRouteToNetInterface([]string{ipStr}, interfaceName, true)
 	if len(failed) > 0 {
@@ -304,8 +317,20 @@ func AddSpecificIPRouteToNetInterface(ipStr string, interfaceName string) error 
 	return nil
 }
 
-// DeleteSpecificIPRoute 删除单个IP的路由
-// 底层调用批量操作，但提示信息更简洁
+// DeleteSpecificIPRoute 删除单个 IP 的 /32 主机路由（导出名为 netutils.DeleteSpecificIPRoute）
+// 需要管理员/root 权限，是 DeleteIPRoute 的底层单 IP 版本
+//
+// 参数:
+//   - ipStr: 单个 IP 地址
+//
+// 返回值:
+//   - 错误信息（权限不足或删除失败时返回）
+//
+// Example:
+// ```
+// // 真实功能示例：删除单个 IP 的主机路由（需要 root 权限，示意性用法）
+// netutils.DeleteSpecificIPRoute("1.1.1.1")~
+// ```
 func DeleteSpecificIPRoute(ipStr string) error {
 	success, failed := batchDeleteSpecificIPRoute([]string{ipStr}, true)
 	if len(failed) > 0 {
@@ -319,20 +344,64 @@ func DeleteSpecificIPRoute(ipStr string) error {
 	return nil
 }
 
-// BatchAddSpecificIPRouteToNetInterface 批量添加多个IP到特定网络接口的路由
-// 只需要用户输入一次密码，提高效率
+// BatchAddSpecificIPRouteToNetInterface 批量为多个 IP 向指定接口添加 /32 主机路由（导出名为 netutils.BatchAddSpecificIPRouteToNetInterface）
+// 需要管理员/root 权限；批量操作只需一次提权，效率更高
+//
+// 参数:
+//   - ipList: 多个 IP 地址组成的列表
+//   - interfaceName: 目标网络接口名称（如 "en0"）
+//
+// 返回值:
+//   - 添加成功的 IP 列表
+//   - 添加失败的 IP 到错误的映射
+//
+// Example:
+// ```
+// // 真实功能示例：批量添加主机路由并查看成功数（需要 root 权限，示意性用法）
+// success, failed = netutils.BatchAddSpecificIPRouteToNetInterface(["1.1.1.1", "8.8.8.8"], "en0")
+// println("ok:", len(success), "fail:", len(failed))
+// ```
 func BatchAddSpecificIPRouteToNetInterface(ipList []string, interfaceName string) (success []string, failed map[string]error) {
 	return batchAddSpecificIPRouteToNetInterface(ipList, interfaceName, false)
 }
 
-// BatchDeleteSpecificIPRoute 批量删除多个IP的路由
-// 只需要用户输入一次密码
+// BatchDeleteSpecificIPRoute 批量删除多个 IP 的 /32 主机路由（导出名为 netutils.BatchDeleteSpecificIPRoute）
+// 需要管理员/root 权限；批量操作只需一次提权
+//
+// 参数:
+//   - ipList: 多个 IP 地址组成的列表
+//
+// 返回值:
+//   - 删除成功的 IP 列表
+//   - 删除失败的 IP 到错误的映射
+//
+// Example:
+// ```
+// // 真实功能示例：批量删除主机路由（需要 root 权限，示意性用法）
+// success, failed = netutils.BatchDeleteSpecificIPRoute(["1.1.1.1", "8.8.8.8"])
+// println("ok:", len(success), "fail:", len(failed))
+// ```
 func BatchDeleteSpecificIPRoute(ipList []string) (success []string, failed map[string]error) {
 	return batchDeleteSpecificIPRoute(ipList, false)
 }
 
-// DeleteAllRoutesForInterface 删除特定网络接口的所有/32主机路由
-// 只删除掩码位为32的特定IP路由（非default、非网段路由）
+// DeleteAllRoutesForInterface 删除指定网络接口上的所有 /32 主机路由（导出名为 netutils.DeleteAllRoutesForInterface）
+// 需要管理员/root 权限；只删除掩码为 /32 的特定 IP 路由，不影响 default 与网段路由
+//
+// 参数:
+//   - interfaceName: 网络接口名称（如 "en0"）
+//
+// 返回值:
+//   - 删除成功的 IP 列表
+//   - 删除失败的 IP 到错误的映射
+//   - 错误信息（接口名非法等情况返回）
+//
+// Example:
+// ```
+// // 真实功能示例：清理某网卡上所有 /32 主机路由（需要 root 权限，示意性用法）
+// success, failed, err = netutils.DeleteAllRoutesForInterface("en0")
+// println("ok:", len(success))
+// ```
 func DeleteAllRoutesForInterface(interfaceName string) (success []string, failed map[string]error, err error) {
 	failed = make(map[string]error)
 

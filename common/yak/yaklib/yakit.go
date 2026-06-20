@@ -64,42 +64,9 @@ var YakitExports = map[string]interface{}{
 	"GetOnlineBaseUrl":             consts.GetOnlineBaseUrl,
 	"SetOnlineBaseUrl":             consts.SetOnlineBaseUrl,
 
-	"MockHTTPFlowSlowSQL": func(seconds ...float64) {
-		// 如果没有传入参数，默认使用3秒
-		var duration float64 = 3.0
-		if len(seconds) > 0 {
-			duration = seconds[0]
-		}
-		// 如果传入的秒数小于2秒，设置为2.1秒，确保超过慢SQL阈值
-		if duration < 2.0 {
-			duration = 2.1
-		}
-		dur := time.Duration(float64(time.Second) * duration)
-		// 同时触发慢插入和慢查询的模拟
-		yakit.MockHTTPFlowSlowInsertSQL(dur)
-		yakit.MockHTTPFlowSlowQuerySQL(dur)
-	},
+	"MockHTTPFlowSlowSQL": mockHTTPFlowSlowSQL,
 
-	"MockMITMSlowRuleHook": func(seconds ...float64) {
-		// 如果没有传入参数，默认使用1秒（1000ms），确保超过300ms阈值
-		var duration float64 = 1.0
-		if len(seconds) > 0 {
-			duration = seconds[0]
-		}
-		// 如果传入的秒数小于0.3秒，设置为0.4秒，确保超过300ms阈值
-		if duration < 0.3 {
-			duration = 0.4
-		}
-		dur := time.Duration(float64(time.Second) * duration)
-		ruleCount := 10 // 默认规则数量
-		if len(seconds) > 1 {
-			ruleCount = int(seconds[1])
-		}
-		// 一次触发所有三种规则类型
-		yakit.MockMITMSlowRuleHook(dur, "hook_color", ruleCount)
-		yakit.MockMITMSlowRuleHook(dur, "hook_request", ruleCount)
-		yakit.MockMITMSlowRuleHook(dur, "hook_response", ruleCount)
-	},
+	"MockMITMSlowRuleHook": mockMITMSlowRuleHook,
 
 	// dummy
 	"Info":           emptyVirtualClient.YakitInfo,
@@ -117,6 +84,65 @@ var YakitExports = map[string]interface{}{
 	"SetProgress":    emptyVirtualClient.YakitSetProgress,
 	"SetProgressEx":  emptyVirtualClient.YakitSetProgressEx,
 	"AIAgentSession": emptyVirtualClient.AIAgentSession,
+}
+
+// MockHTTPFlowSlowSQL 模拟 HTTP 流量入库时的慢 SQL（导出名为 yakit.MockHTTPFlowSlowSQL）
+// 用于测试/演示慢 SQL 监控：会同时触发慢插入与慢查询，持续时间确保超过慢 SQL 阈值
+//
+// 参数:
+//   - seconds: 可选的持续秒数，默认 3 秒；小于 2 秒会被提升到 2.1 秒以确保越过阈值
+//
+// Example:
+// ```
+// // 触发一次约 3 秒的慢 SQL 模拟（用于验证慢 SQL 监控，示意性示例）
+// yakit.MockHTTPFlowSlowSQL(3)
+// ```
+func mockHTTPFlowSlowSQL(seconds ...float64) {
+	// 如果没有传入参数，默认使用3秒
+	var duration float64 = 3.0
+	if len(seconds) > 0 {
+		duration = seconds[0]
+	}
+	// 如果传入的秒数小于2秒，设置为2.1秒，确保超过慢SQL阈值
+	if duration < 2.0 {
+		duration = 2.1
+	}
+	dur := time.Duration(float64(time.Second) * duration)
+	// 同时触发慢插入和慢查询的模拟
+	yakit.MockHTTPFlowSlowInsertSQL(dur)
+	yakit.MockHTTPFlowSlowQuerySQL(dur)
+}
+
+// MockMITMSlowRuleHook 模拟 MITM 规则 Hook 的慢执行（导出名为 yakit.MockMITMSlowRuleHook）
+// 用于测试/演示慢 Hook 监控：会一次性触发 hook_color/hook_request/hook_response 三类规则
+//
+// 参数:
+//   - seconds: 可选参数，第一个为持续秒数（默认 1 秒，小于 0.3 秒会提升到 0.4 秒以越过 300ms 阈值），第二个为规则数量（默认 10）
+//
+// Example:
+// ```
+// // 触发一次约 1 秒、每类 10 条规则的慢 Hook 模拟（用于验证慢 Hook 监控，示意性示例）
+// yakit.MockMITMSlowRuleHook(1, 10)
+// ```
+func mockMITMSlowRuleHook(seconds ...float64) {
+	// 如果没有传入参数，默认使用1秒（1000ms），确保超过300ms阈值
+	var duration float64 = 1.0
+	if len(seconds) > 0 {
+		duration = seconds[0]
+	}
+	// 如果传入的秒数小于0.3秒，设置为0.4秒，确保超过300ms阈值
+	if duration < 0.3 {
+		duration = 0.4
+	}
+	dur := time.Duration(float64(time.Second) * duration)
+	ruleCount := 10 // 默认规则数量
+	if len(seconds) > 1 {
+		ruleCount = int(seconds[1])
+	}
+	// 一次触发所有三种规则类型
+	yakit.MockMITMSlowRuleHook(dur, "hook_color", ruleCount)
+	yakit.MockMITMSlowRuleHook(dur, "hook_request", ruleCount)
+	yakit.MockMITMSlowRuleHook(dur, "hook_response", ruleCount)
 }
 
 func GetExtYakitLibByOutput(Output func(d any) error) map[string]interface{} {
@@ -197,43 +223,8 @@ func GetExtYakitLibByClient(client *YakitClient) map[string]interface{} {
 		"SetProgress":    client.YakitSetProgress,
 		"SetProgressEx":  client.YakitSetProgressEx,
 		"Stream":         client.Stream,
-		// SSA stream events: a dedicated channel that ScanNode can hook to, avoiding
-		// "risk.NewRisk(type=ssa-risk)" as a transport hack.
-		//
-		// Expect raw JSON string of sfreport.SSAResultParts.
-		// Keep it as "raw JSON" to avoid extra marshal/unmarshal cycles in yak runtime.
-		"SSAStream": func(partsJSON string) {
-			_ = client.YakitLog("ssa-stream", string(partsJSON))
-		},
-		// EmitSSAResult converts one SyntaxFlowResult to SSA stream payload
-		// and sends it through the internal "ssa-stream" channel.
-		//
-		// Returns (riskCount, fileCount, flowCount, error).
-		// Dedup state is kept in current yak process memory (not global package state).
-		"EmitSSAResult": func(result *ssaapi.SyntaxFlowResult) (int, int, int, error) {
-			opts := sfreport.NewStreamPartsOptions(
-				sfreport.WithStreamReportType(sfreport.IRifyFullReportType),
-				sfreport.WithStreamShowDataflowPath(true),
-				sfreport.WithStreamShowFileContent(true),
-				sfreport.WithStreamWithFile(true),
-			)
-			parts, err := sfreport.ConvertSingleResultToSSAResultParts(result, opts)
-			if err != nil {
-				return 0, 0, 0, err
-			}
-			if parts == nil {
-				return 0, 0, 0, nil
-			}
-			if len(parts.Risks) == 0 && len(parts.Files) == 0 && len(parts.Dataflows) == 0 {
-				return 0, 0, 0, nil
-			}
-			partsJSON, err := json.Marshal(parts)
-			if err != nil {
-				return 0, 0, 0, err
-			}
-			_ = client.YakitLog("ssa-stream", string(partsJSON))
-			return len(parts.Risks), len(parts.Files), len(parts.Dataflows), nil
-		},
+		"SSAStream":     client.SSAStream,
+		"EmitSSAResult": client.EmitSSAResult,
 	}
 	if os.Getenv("YAK_DISABLE") == "output" {
 		// YakitExports["Info"] = func(a string, b ...interface{}) {}
@@ -246,7 +237,205 @@ func GetExtYakitLibByClient(client *YakitClient) map[string]interface{} {
 	for k, v := range exports {
 		YakitExports[k] = v
 	}
+	// 用带文档的具名方法覆盖上面来自闭包的同名导出，便于文档生成器提取参数/返回值说明
+	YakitExports["EnableWebsiteTrees"] = client.EnableWebsiteTrees
+	YakitExports["EnableTable"] = client.EnableTable
+	YakitExports["TableData"] = client.TableData
+	YakitExports["EnableDotGraphTab"] = client.EnableDotGraphTab
+	YakitExports["OutputDotGraph"] = client.OutputDotGraph
+	YakitExports["StatusCard"] = client.StatusCard
 	return YakitExports
+}
+
+// EnableWebsiteTrees 在 Yakit UI 中启用「网站树」展示标签（导出名为 yakit.EnableWebsiteTrees）
+// 用于在插件运行时让 Yakit 展示指定目标的网站结构树
+//
+// 参数:
+//   - targets: 目标（如域名/URL），多个可用逗号等分隔
+//
+// Example:
+// ```
+// // 在 Yakit 中启用网站树展示（需在 Yakit 引擎环境下生效，示意性示例）
+// yakit.EnableWebsiteTrees("example.com")
+// ```
+func (c *YakitClient) EnableWebsiteTrees(targets string) {
+	c.Output(&YakitFeature{
+		Feature: "website-trees",
+		Params: map[string]interface{}{
+			"targets":          targets,
+			"refresh_interval": 3,
+		},
+	})
+}
+
+// EnableTable 在 Yakit UI 中启用一个动态固定表格用于实时展示数据（导出名为 yakit.EnableTable）
+//
+// 与 yakit.NewTable（静态、一次性输出）不同：EnableTable 先声明一张“持续可写”的表格，
+// 之后在扫描过程中用 yakit.TableData 不断往里增量加行，界面实时刷新。适合“边扫边出结果”的体验。
+// 用法：EnableTable 声明列 -> 循环中多次调用 TableData 写行（每行需有唯一 uuid，TableData 会自动补全）。
+//
+// 参数:
+//   - tableName: 表格名称（后续 TableData 用同名表格写入）
+//   - columns: 表格列名列表
+//
+// Example:
+// ```
+// // 实时端口扫描结果表：声明表 -> 边扫边写行（需在 Yakit 引擎环境下展示）
+// yakit.EnableTable("Port Result", ["host", "port", "service"])
+// findings = [["10.0.0.1", "80", "http"], ["10.0.0.1", "443", "https"], ["10.0.0.2", "22", "ssh"]]
+// for f in findings {
+//     yakit.TableData("Port Result", {"host": f[0], "port": f[1], "service": f[2]})
+//     yakit.Info("found %s:%s", f[0], f[1])
+// }
+// ```
+func (c *YakitClient) EnableTable(tableName string, columns []string) {
+	c.Output(&YakitFeature{
+		Feature: "fixed-table",
+		Params: map[string]interface{}{
+			"table_name": tableName,
+			"columns":    columns,
+		},
+	})
+}
+
+// TableData 向 Yakit UI 中已启用的固定表格写入一行数据（导出名为 yakit.TableData）
+//
+// 与 yakit.EnableTable 配对使用：先 EnableTable 声明表格，再用本函数逐行写入。data 是一个 map，
+// 其键应与 EnableTable 声明的列名对应。每行需要一个唯一标识 "uuid"，若 data 中未提供会自动生成；
+// 用相同 uuid 再次写入可“更新”同一行（例如先写“扫描中”，拿到结果后用同 uuid 更新为“完成”）。
+//
+// 参数:
+//   - tableName: 目标表格名称（需与 EnableTable 一致）
+//   - data: 行数据 map，键为列名；可含 "uuid" 控制行标识
+//
+// 返回值:
+//   - 始终返回 nil（数据通过 Yakit 输出通道异步发送）
+//
+// Example:
+// ```
+// // 用固定 uuid 实现“同一行”的状态更新：扫描中 -> 完成
+// yakit.EnableTable("Task", ["target", "status"])
+// rowId = "row-10.0.0.1"
+// yakit.TableData("Task", {"uuid": rowId, "target": "10.0.0.1", "status": "scanning"})
+// sleep(0.1)
+// yakit.TableData("Task", {"uuid": rowId, "target": "10.0.0.1", "status": "done"})   // 更新同一行
+// ```
+func (c *YakitClient) TableData(tableName string, data any) *YakitFixedTableData {
+	tableData := &YakitFixedTableData{
+		TableName: tableName,
+		Data:      utils.InterfaceToGeneralMap(data),
+	}
+	if tableData.Data == nil {
+		tableData.Data = map[string]interface{}{}
+	}
+	if tableData.Data["uuid"] == nil {
+		tableData.Data["uuid"] = uuid.New().String()
+	}
+	c.Output(tableData)
+	return nil
+}
+
+// EnableDotGraphTab 在 Yakit UI 中启用一个 DOT 图标签页（导出名为 yakit.EnableDotGraphTab）
+// 启用后可配合 yakit.OutputDotGraph 向该标签页输出 Graphviz DOT 图
+//
+// 参数:
+//   - tabName: 标签页名称
+//
+// Example:
+// ```
+// // 启用 DOT 图标签页并输出一张图（需在 Yakit 引擎环境下生效，示意性示例）
+// yakit.EnableDotGraphTab("Graph")
+// yakit.OutputDotGraph("Graph", "digraph G { a -> b }")
+// ```
+func (c *YakitClient) EnableDotGraphTab(tabName string) {
+	c.Output(&YakitFeature{
+		Feature: "dot-graph-tab",
+		Params: map[string]interface{}{
+			"tab_name": tabName,
+		},
+	})
+}
+
+// OutputDotGraph 向 Yakit UI 中已启用的 DOT 图标签页输出一张 Graphviz DOT 图（导出名为 yakit.OutputDotGraph）
+// 需先通过 yakit.EnableDotGraphTab 启用同名标签页
+//
+// 参数:
+//   - tabName: 目标标签页名称（需与 EnableDotGraphTab 一致）
+//   - data: Graphviz DOT 图字符串
+//
+// 返回值:
+//   - 本次输出的 DOT 图数据对象
+//
+// Example:
+// ```
+// // 输出一张简单的 DOT 图（需在 Yakit 引擎环境下生效，示意性示例）
+// yakit.EnableDotGraphTab("Graph")
+// yakit.OutputDotGraph("Graph", "digraph G { a -> b }")
+// ```
+func (c *YakitClient) OutputDotGraph(tabName string, data string) *YakitDotGraphData {
+	tabData := &YakitDotGraphData{
+		TabName: tabName,
+		Data:    data,
+	}
+	c.Output(tabData)
+	return tabData
+}
+
+// SSAStream 通过内部 "ssa-stream" 通道发送一段原始 JSON 字符串（导出名为 yakit.SSAStream）
+// 供 ScanNode 等订阅 SSA 扫描事件，避免使用 risk.NewRisk(type=ssa-risk) 作为传输 hack
+//
+// 参数:
+//   - partsJSON: sfreport.SSAResultParts 的原始 JSON 字符串
+//
+// Example:
+// ```
+// // 发送一段 SSA 结果 JSON（需在 Yakit 引擎环境下生效，示意性示例）
+// yakit.SSAStream("{}")
+// ```
+func (c *YakitClient) SSAStream(partsJSON string) {
+	_ = c.YakitLog("ssa-stream", string(partsJSON))
+}
+
+// EmitSSAResult 将单个 SyntaxFlowResult 转换为 SSA 流式负载，并通过内部 "ssa-stream" 通道发送（导出名为 yakit.EmitSSAResult）
+// 去重状态保存在当前 yak 进程内存中（非全局包状态）
+//
+// 参数:
+//   - result: 一个 SyntaxFlow 查询结果
+//
+// 返回值:
+//   - 风险数量
+//   - 文件数量
+//   - 数据流数量
+//   - 错误信息
+//
+// Example:
+// ```
+// // 发送一个 SyntaxFlow 结果（需在 Yakit 引擎环境下生效，示意性示例）
+// riskCount, fileCount, flowCount, err = yakit.EmitSSAResult(result)
+// ```
+func (c *YakitClient) EmitSSAResult(result *ssaapi.SyntaxFlowResult) (int, int, int, error) {
+	opts := sfreport.NewStreamPartsOptions(
+		sfreport.WithStreamReportType(sfreport.IRifyFullReportType),
+		sfreport.WithStreamShowDataflowPath(true),
+		sfreport.WithStreamShowFileContent(true),
+		sfreport.WithStreamWithFile(true),
+	)
+	parts, err := sfreport.ConvertSingleResultToSSAResultParts(result, opts)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+	if parts == nil {
+		return 0, 0, 0, nil
+	}
+	if len(parts.Risks) == 0 && len(parts.Files) == 0 && len(parts.Dataflows) == 0 {
+		return 0, 0, 0, nil
+	}
+	partsJSON, err := json.Marshal(parts)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+	_ = c.YakitLog("ssa-stream", string(partsJSON))
+	return len(parts.Risks), len(parts.Files), len(parts.Dataflows), nil
 }
 
 // var yakitClientInstance YakitClient
@@ -564,18 +753,28 @@ type YakitTable struct {
 	Data [][]string `json:"data"`
 }
 
-// NewTable 创建一个 Yakit 表格对象（导出名为 yakit.NewTable）
+// NewTable 创建一个 Yakit 静态表格对象（导出名为 yakit.NewTable）
+//
+// 用于一次性汇总展示结构化数据：先用表头创建表格，再用 table.Append(列1, 列2, ...) 逐行追加，
+// 最后用 yakit.Output(table) 推送到 Yakit 界面渲染。适合“收集完再统一展示”的场景。
+// 若需要在扫描过程中实时往同一张表里增量加行，用 yakit.EnableTable + yakit.TableData。
+//
 // 参数:
-//   - head: 表头列名
+//   - head: 表头列名（可变参数），Append 的列数应与表头一致
 //
 // 返回值:
-//   - 表格对象
+//   - 表格对象，支持 .Append(...) 追加行、.SetHead(...) 重设表头
 //
 // Example:
 // ```
-// table = yakit.NewTable("name", "age")
-// table.Append("alice", 18)
-// dump(table)
+// // 把一批端口扫描结果汇总成一张表并展示（建表->逐行追加->输出 联动）
+// table = yakit.NewTable("Host", "Port", "Service")
+// rows = [["10.0.0.1", "80", "http"], ["10.0.0.1", "443", "https"], ["10.0.0.2", "22", "ssh"]]
+// for r in rows {
+//     table.Append(r[0], r[1], r[2])
+// }
+// yakit.Output(table)
+// yakit.Info("rendered %d rows", len(rows))
 // ```
 func NewTable(head ...string) *YakitTable {
 	return &YakitTable{
@@ -750,17 +949,25 @@ func (y *YakitGraph) Add(k string, v interface{}, id ...string) {
 var graphBaseName = "数据图表"
 
 // NewLineGraph 创建一个折线图对象（导出名为 yakit.NewLineGraph）
+//
+// 折线图适合展示“随时间/序列变化的趋势”。用 graph.Add(键, 值) 逐点添加数据，再用 yakit.Output(graph) 渲染。
+// 四种图表构造器（NewLineGraph/NewBarGraph/NewPieGraph/NewWordCloud）用法完全一致，仅展示形态不同。
+//
 // 参数:
-//   - graphName: 可选的图表名称
+//   - graphName: 可选的图表名称（不传则使用默认名）
 //
 // 返回值:
-//   - 图表对象
+//   - 图表对象，支持 .Add(key, value) 添加数据点
 //
 // Example:
 // ```
-// graph = yakit.NewLineGraph("trend")
-// graph.Add("day1", 10)
-// dump(graph)
+// // 展示一天中各时段发现的开放端口数量趋势
+// graph = yakit.NewLineGraph("open ports by hour")
+// graph.Add("00:00", 120)
+// graph.Add("06:00", 98)
+// graph.Add("12:00", 203)
+// graph.Add("18:00", 156)
+// yakit.Output(graph)
 // ```
 func NewLineGraph(graphName ...string) *YakitGraph {
 	name := graphBaseName
@@ -774,17 +981,26 @@ func NewLineGraph(graphName ...string) *YakitGraph {
 }
 
 // NewBarGraph 创建一个柱状图对象（导出名为 yakit.NewBarGraph）
+//
+// 柱状图适合“分类对比”：比较各类别的数量大小。用 graph.Add(类别, 数量) 添加，再用 yakit.Output(graph) 渲染。
+//
 // 参数:
 //   - graphName: 可选的图表名称
 //
 // 返回值:
-//   - 图表对象
+//   - 图表对象，支持 .Add(key, value) 添加数据点
 //
 // Example:
 // ```
-// graph = yakit.NewBarGraph("count")
-// graph.Add("a", 3)
-// dump(graph)
+// // 联动：统计一批端口结果里各端口出现的次数，用柱状图对比
+// scanned = ["80", "443", "80", "22", "80", "443"]
+// counter = {}
+// for port in scanned {
+//     if port in counter { counter[port] = counter[port] + 1 } else { counter[port] = 1 }
+// }
+// graph = yakit.NewBarGraph("ports distribution")
+// for p, c in counter { graph.Add(p, c) }
+// yakit.Output(graph)
 // ```
 func NewBarGraph(graphName ...string) *YakitGraph {
 	name := graphBaseName
@@ -798,17 +1014,24 @@ func NewBarGraph(graphName ...string) *YakitGraph {
 }
 
 // NewPieGraph 创建一个饼图对象（导出名为 yakit.NewPieGraph）
+//
+// 饼图适合展示“占比/构成”：各部分在总量中所占比例。用 graph.Add(类别, 数量) 添加，再用 yakit.Output(graph) 渲染。
+//
 // 参数:
 //   - graphName: 可选的图表名称
 //
 // 返回值:
-//   - 图表对象
+//   - 图表对象，支持 .Add(key, value) 添加数据点
 //
 // Example:
 // ```
-// graph = yakit.NewPieGraph("ratio")
-// graph.Add("a", 30)
-// dump(graph)
+// // 展示漏洞按危险等级的构成占比
+// graph = yakit.NewPieGraph("vuln severity")
+// graph.Add("critical", 2)
+// graph.Add("high", 5)
+// graph.Add("medium", 12)
+// graph.Add("low", 30)
+// yakit.Output(graph)
 // ```
 func NewPieGraph(graphName ...string) *YakitGraph {
 	name := graphBaseName
@@ -822,17 +1045,25 @@ func NewPieGraph(graphName ...string) *YakitGraph {
 }
 
 // NewWordCloud 创建一个词云图对象（导出名为 yakit.NewWordCloud）
+//
+// 词云适合展示“关键词频率”：词的大小正比于其权重值。用 graph.Add(词, 权重) 添加，再用 yakit.Output(graph) 渲染。
+// 常用于展示漏洞类型分布、指纹关键词、高频参数名等。
+//
 // 参数:
 //   - graphName: 可选的图表名称
 //
 // 返回值:
-//   - 图表对象
+//   - 图表对象，支持 .Add(key, value) 添加数据点
 //
 // Example:
 // ```
-// graph = yakit.NewWordCloud("words")
-// graph.Add("security", 100)
-// dump(graph)
+// // 展示漏洞类型关键词云，词越大代表出现次数越多
+// graph = yakit.NewWordCloud("vuln keywords")
+// graph.Add("SQL Injection", 35)
+// graph.Add("XSS", 28)
+// graph.Add("Weak Password", 30)
+// graph.Add("SSRF", 15)
+// yakit.Output(graph)
 // ```
 func NewWordCloud(graphName ...string) *YakitGraph {
 	name := graphBaseName
@@ -855,60 +1086,102 @@ func GetYakitClientInstance() *YakitClient {
 }
 
 // YakitTextBlock 向 Yakit 输出一个文本块（导出名为 yakit.Text）
+//
+// 与 yakit.Info 的区别：Info 是“一行日志”，Text 是“一整块文本”，适合输出多行内容（如汇总报告、配置清单、
+// banner 抓取结果）。注意 Text 接收已拼好的字符串，不做 printf 格式化（需格式化请先用 sprintf/f-string 拼好）。
+// 输出代码用 yakit.Code，输出 Markdown 用 yakit.Markdown。
+//
 // 参数:
-//   - tmp: 文本内容
+//   - tmp: 要展示的文本内容（可多行）
 //
 // 返回值:
 //   - 无
 //
 // Example:
 // ```
-// yakit.Text("scan finished")
+// // 把一段多行的扫描小结作为整块文本输出
+// summary = sprintf("Scan Summary\n  targets: %d\n  open ports: %d\n  vulns: %d", 10, 23, 2)
+// yakit.Text(summary)
 // ```
 func (c *YakitClient) YakitTextBlock(tmp interface{}) {
 	c.YakitDraw("text", tmp)
 }
 
 // YakitSuccess 向 Yakit 输出一条成功信息（导出名为 yakit.Success）
+//
+// 用于标记关键步骤成功完成，在 Yakit 中以成功样式（绿色）展示，比普通 Info 更醒目。
+// 常用于“发现漏洞”“爆破命中”“任务完成”等正向结果。注意：本函数接收已拼好的字符串，不做 printf 格式化。
+//
 // 参数:
-//   - tmp: 成功信息内容
+//   - tmp: 成功信息内容（如需格式化请先用 sprintf/f-string 拼好）
 //
 // 返回值:
 //   - 无
 //
 // Example:
 // ```
-// yakit.Success("task done")
+// // 在命中结果时给出醒目的成功提示
+// user = "admin"; pass = "admin123"
+// yakit.Success(sprintf("credential hit: %s / %s", user, pass))
+// yakit.Success("all 5 tasks finished")
 // ```
 func (c *YakitClient) YakitSuccess(tmp interface{}) {
 	c.YakitDraw("success", tmp)
 }
 
 // YakitCode 向 Yakit 输出一段代码块（导出名为 yakit.Code）
+//
+// 在 Yakit 中以代码块样式（等宽字体、保留缩进）展示，适合输出原始 HTTP 报文、PoC 片段、配置文件、payload 等
+// 需要保留格式的内容，比 yakit.Text 更适合展示“代码/报文”这类结构化文本。
+//
 // 参数:
-//   - tmp: 代码内容
+//   - tmp: 代码或报文内容
 //
 // 返回值:
 //   - 无
 //
 // Example:
 // ```
-// yakit.Code("println(\"hello\")")
+// // 把一个用于复现的原始 HTTP 请求作为代码块展示，方便使用者复制
+// poc = `POST /login HTTP/1.1
+// Host: target.example.com
+// Content-Type: application/x-www-form-urlencoded
+//
+// username=admin&password=' OR '1'='1`
+// yakit.Code(poc)
 // ```
 func (c *YakitClient) YakitCode(tmp interface{}) {
 	c.YakitDraw("code", tmp)
 }
 
 // YakitMarkdown 向 Yakit 输出一段 Markdown（导出名为 yakit.Markdown）
+//
+// 在 Yakit 中渲染 Markdown，支持标题、列表、表格、加粗等，适合输出结构化的扫描报告/结论。
+// 是把统计结果做成“可读报告”的常用方式，常与 db 查询统计、yakit 图表配合，形成图文并茂的输出。
+//
 // 参数:
-//   - tmp: Markdown 内容
+//   - tmp: Markdown 文本内容
 //
 // 返回值:
 //   - 无
 //
 // Example:
 // ```
-// yakit.Markdown("# Title\nsome content")
+// // 把扫描结论拼成 Markdown 报告输出（带标题、列表与表格）
+// report = `# Scan Report
+//
+// ## Overview
+// - hosts: 10
+// - open ports: 23
+// - findings: 2
+//
+// ## Findings
+// | severity | title |
+// |----------|-------|
+// | high     | SQL Injection |
+// | medium   | Reflected XSS |
+// `
+// yakit.Markdown(report)
 // ```
 func (c *YakitClient) YakitMarkdown(tmp interface{}) {
 	c.YakitDraw("markdown", tmp)
@@ -1014,32 +1287,59 @@ func (c *YakitClient) YakitFile(fileName string, option ...interface{}) {
 }
 
 // YakitError 向 Yakit 输出一条 error 级别日志（导出名为 yakit.Error）
+//
+// 用于输出错误信息，在 Yakit 中以错误样式（红色）展示。用法与 yakit.Info 一致，支持格式化。
+// 常与 try-catch 或带错误返回的调用配合，把失败原因清晰反馈给使用者。
+//
 // 参数:
-//   - tmp: 日志格式字符串
-//   - items: 格式化参数
+//   - tmp: 日志内容或 printf 风格的格式字符串
+//   - items: 与格式字符串对应的格式化参数（可变参数）
 //
 // 返回值:
 //   - 无
 //
 // Example:
 // ```
-// yakit.Error("scan failed: %v", "timeout")
+// // 捕获异常并把错误信息上报到 Yakit
+// try {
+//     rsp, req = poc.Get("http://127.0.0.1:1/", poc.timeout(1))~   // 故意失败
+//     yakit.Info("status: %v", rsp.RawPacket)
+// } catch err {
+//     yakit.Error("request failed: %v", err)
+// }
 // ```
 func (c *YakitClient) YakitError(tmp string, items ...interface{}) {
 	c.YakitLog("error", tmp, items...)
 }
 
 // YakitInfo 向 Yakit 输出一条 info 级别日志（导出名为 yakit.Info）
+//
+// 这是插件向 Yakit 界面输出运行信息的主力函数：在 Yakit 中以 info 级别日志展示，命令行运行时打印到控制台。
+// 支持 printf 风格的格式化（%s/%d/%v 等），第一个参数为格式字符串、其余为对应参数。
+// 配套的还有 yakit.Warn（警告）、yakit.Error（错误）、yakit.Success（成功）、yakit.Debug（调试），
+// 它们仅日志级别/颜色不同，用法一致。按照规范，日志内容统一用英文输出。
+//
 // 参数:
-//   - tmp: 日志格式字符串
-//   - items: 格式化参数
+//   - tmp: 日志内容或 printf 风格的格式字符串
+//   - items: 与格式字符串对应的格式化参数（可变参数）
 //
 // 返回值:
 //   - 无
 //
 // Example:
 // ```
-// yakit.Info("scanning target: %s", "example.com")
+// // 普通输出与格式化输出
+// yakit.Info("scanner started")
+// target = "example.com"; port = 443
+// yakit.Info("scanning target: %s:%d", target, port)
+//
+// // 联动：边查询资产边输出进度信息，是插件里最常见的写法
+// total = 0
+// for u in db.QueryUrlsByKeyword("example.com") {
+//     total++
+//     yakit.Info("found url: %s", u)
+// }
+// yakit.Info("collected %d urls in total", total)
 // ```
 func (c *YakitClient) YakitInfo(tmp string, items ...interface{}) {
 	c.YakitLog("info", tmp, items...)
@@ -1062,16 +1362,27 @@ func (c *YakitClient) YakitDebug(tmp string, items ...interface{}) {
 }
 
 // YakitWarn 向 Yakit 输出一条 warn 级别日志（导出名为 yakit.Warn）
+//
+// 用于输出“需要注意但不致命”的信息，在 Yakit 中以警告样式展示。用法与 yakit.Info 完全一致，支持格式化。
+// 典型场景：某个目标不可达而跳过、命中可疑特征、使用了不推荐的配置等。
+//
 // 参数:
-//   - tmp: 日志格式字符串
-//   - items: 格式化参数
+//   - tmp: 日志内容或 printf 风格的格式字符串
+//   - items: 与格式字符串对应的格式化参数（可变参数）
 //
 // 返回值:
 //   - 无
 //
 // Example:
 // ```
-// yakit.Warn("deprecated option: %s", "old-flag")
+// // 对单个目标做容错时，用 Warn 记录被跳过的原因而不中断整体流程
+// for host in ["10.0.0.1", "10.0.0.2"] {
+//     if host == "10.0.0.2" {
+//         yakit.Warn("target %s unreachable, skipped", host)
+//         continue
+//     }
+//     yakit.Info("processing %s", host)
+// }
 // ```
 func (c *YakitClient) YakitWarn(tmp string, items ...interface{}) {
 	c.YakitLog("warn", tmp, items...)
@@ -1148,6 +1459,19 @@ func InitYakit(y *YakitClient) {
 	*yakitClientInstanceP = y
 }
 
+// AutoInitYakit 根据命令行参数自动初始化 Yakit 客户端（导出名为 yakit.AutoInitYakit）
+// 若已初始化则直接返回 nil；否则读取 --yakit-webhook 参数：有地址则创建 webhook 客户端，
+// 无地址则使用一个空的虚拟客户端（输出被丢弃），便于脚本在有无 Yakit 环境下都能运行
+//
+// 返回值:
+//   - 初始化得到的 Yakit 客户端；若此前已初始化则返回 nil
+//
+// Example:
+// ```
+// // 自动初始化 Yakit 客户端（无 --yakit-webhook 时使用空客户端，示意性示例）
+// client = yakit.AutoInitYakit()
+// yakit.Info("hello from yak")
+// ```
 func AutoInitYakit() *YakitClient {
 	if yakitClientInstance != nil {
 		return nil
@@ -1185,16 +1509,26 @@ func updateYakitStore() error {
 }
 
 // YakitSetProgressEx 设置指定 ID 的进度条进度（导出名为 yakit.SetProgressEx）
+//
+// 与 yakit.SetProgress 的区别：本函数带一个 id，可同时维护“多条独立进度条”，每个 id 对应一条。
+// 适合并发/多阶段任务（如同时跑端口扫描和指纹识别，各自一条进度条）。相同 id 的后续调用会更新同一条进度条。
+//
 // 参数:
-//   - id: 进度条 ID
-//   - f: 进度值（0.0-1.0）
+//   - id: 进度条 ID（不同 id 对应不同进度条）
+//   - f: 进度值，取值范围 0.0~1.0
 //
 // 返回值:
 //   - 无
 //
 // Example:
 // ```
-// yakit.SetProgressEx("download", 0.5)
+// // 维护两条独立进度条，分别表示两个阶段的进度
+// for i = 0; i < 5; i++ {
+//     yakit.SetProgressEx("port-scan",   float(i + 1) / 5.0)
+//     yakit.SetProgressEx("fingerprint", float(i + 1) / 10.0)
+//     sleep(0.05)
+// }
+// yakit.SetProgressEx("port-scan", 1.0)
 // ```
 func (c *YakitClient) YakitSetProgressEx(id string, f float64) {
 	c.send(&YakitProgress{
@@ -1204,15 +1538,26 @@ func (c *YakitClient) YakitSetProgressEx(id string, f float64) {
 }
 
 // YakitSetProgress 设置主进度条进度（导出名为 yakit.SetProgress）
+//
+// 在 Yakit 任务界面更新主进度条。进度值是 0.0~1.0 的小数（0.0 表示 0%，1.0 表示 100%）。
+// 典型用法：在遍历目标的循环里用 已完成数/总数 实时刷新进度。多任务并行时用 yakit.SetProgressEx 区分不同进度条。
+//
 // 参数:
-//   - f: 进度值（0.0-1.0）
+//   - f: 进度值，取值范围 0.0~1.0
 //
 // 返回值:
 //   - 无
 //
 // Example:
 // ```
-// yakit.SetProgress(0.5)
+// // 在循环中按 已完成/总数 刷新主进度条，结束时置满
+// targets = ["10.0.0.1", "10.0.0.2", "10.0.0.3", "10.0.0.4"]
+// for i = 0; i < len(targets); i++ {
+//     yakit.Info("scanning %s", targets[i])
+//     yakit.SetProgress(float(i + 1) / float(len(targets)))
+// }
+// yakit.SetProgress(1.0)
+// yakit.Success("scan completed")
 // ```
 func (c *YakitClient) YakitSetProgress(f float64) {
 	c.send(&YakitProgress{

@@ -69,6 +69,14 @@ func Subtract(x interface{}, y interface{}) interface{} {
 }
 
 // Subtract 返回两个字符串切片的差集
+//
+// 参数:
+//   - x: 被减字符串切片
+//   - y: 要减去的字符串切片
+//
+// 返回值:
+//   - 存在于 x 但不存在于 y 的元素组成的切片
+//
 // Example:
 // ```
 // str.Subtract(["1", "2", "3"], ["3", "4", "5"]) // ["1", "2"]

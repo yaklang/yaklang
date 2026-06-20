@@ -81,6 +81,13 @@ type AuditMonitor struct {
 type AuditMonitorOption func(*AuditMonitor)
 
 // auditMonitorLogin 设置是否监控登录事件
+//
+// 参数:
+//   - enable: 是否监控登录事件
+//
+// 返回值:
+//   - 可传入 hids.NewAuditMonitor 的配置选项
+//
 // Example:
 // ```
 // monitor = hids.NewAuditMonitor(hids.auditMonitorLogin(true))
@@ -92,6 +99,13 @@ func WithAuditMonitorLogin(enable bool) AuditMonitorOption {
 }
 
 // auditMonitorCommand 设置是否监控命令执行事件
+//
+// 参数:
+//   - enable: 是否监控命令执行事件
+//
+// 返回值:
+//   - 可传入 hids.NewAuditMonitor 的配置选项
+//
 // Example:
 // ```
 // monitor = hids.NewAuditMonitor(hids.auditMonitorCommand(true))
@@ -103,6 +117,13 @@ func WithAuditMonitorCommand(enable bool) AuditMonitorOption {
 }
 
 // auditOnLoginEvent 设置登录事件回调
+//
+// 参数:
+//   - callback: 回调函数，入参为登录事件
+//
+// 返回值:
+//   - 可传入 hids.NewAuditMonitor 的配置选项
+//
 // Example:
 // ```
 // monitor = hids.NewAuditMonitor(hids.auditOnLoginEvent(fn(event) {
@@ -118,6 +139,13 @@ func WithOnLoginEvent(callback func(*LoginEvent)) AuditMonitorOption {
 }
 
 // auditOnCommandEvent 设置命令执行事件回调
+//
+// 参数:
+//   - callback: 回调函数，入参为命令执行事件
+//
+// 返回值:
+//   - 可传入 hids.NewAuditMonitor 的配置选项
+//
 // Example:
 // ```
 // monitor = hids.NewAuditMonitor(hids.auditOnCommandEvent(fn(event) {
@@ -134,6 +162,13 @@ func WithOnCommandEvent(callback func(*CommandEvent)) AuditMonitorOption {
 
 // auditFilterUsers 设置当前用户过滤器（按 Username 过滤）
 // 过滤当前执行操作的用户（例如 su 后的用户）
+//
+// 参数:
+//   - users: 允许的当前用户名列表，可传多个
+//
+// 返回值:
+//   - 可传入 hids.NewAuditMonitor 的配置选项
+//
 // Example:
 // ```
 // // 只监控 matrix 用户执行的命令
@@ -147,6 +182,13 @@ func WithAuditFilterUsers(users ...string) AuditMonitorOption {
 
 // auditFilterLoginUsers 设置原始登录用户过滤器（按 LoginUser 过滤）
 // 过滤原始登录的用户（例如 SSH 登录的用户，即使后来 su 到其他用户）
+//
+// 参数:
+//   - users: 允许的原始登录用户名列表，可传多个
+//
+// 返回值:
+//   - 可传入 hids.NewAuditMonitor 的配置选项
+//
 // Example:
 // ```
 // // 只监控原始登录用户为 root 的会话中的操作
@@ -159,6 +201,13 @@ func WithAuditFilterLoginUsers(users ...string) AuditMonitorOption {
 }
 
 // auditFilterCommands 设置命令过滤器（支持正则）
+//
+// 参数:
+//   - commands: 命令匹配正则列表，可传多个，命中任一即处理
+//
+// 返回值:
+//   - 可传入 hids.NewAuditMonitor 的配置选项
+//
 // Example:
 // ```
 // monitor = hids.NewAuditMonitor(hids.auditFilterCommands(".*ssh.*", "sudo"))

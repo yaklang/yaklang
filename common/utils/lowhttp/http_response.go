@@ -118,6 +118,15 @@ func IsHtmlOrXmlMIMEType(s string) bool {
 }
 
 // FixHTTPResponse 尝试对传入的响应进行修复，并返回修复后的响应，响应体和错误
+//
+// 参数:
+//   - raw: 原始 HTTP 响应报文字节
+//
+// 返回值:
+//   - rsp: 修复后的完整响应报文
+//   - body: 修复后的响应体
+//   - err: 错误信息
+//
 // Example:
 // ```
 // fixedResponse, body, err = str.FixHTTPResponse(b"HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=gbk\r\n\r\n<html>你好</html>")

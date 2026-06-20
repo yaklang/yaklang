@@ -162,48 +162,145 @@ func NewRAGSystemConfig(options ...RAGSystemConfigOption) *RAGSystemConfig {
 
 type RAGSystemConfigOption func(*RAGSystemConfig)
 
+// noHNSWGraph 导出 RAG 时是否不导出 HNSW 索引（导出名为 rag.noHNSWGraph）
+//
+// 参数:
+//   - noHNSWGraph: 为 true 时导出包不含 HNSW 索引（导入时可重建）
+//
+// 返回值:
+//   - RAG 系统配置选项
+//
+// Example:
+// ```
+// rag.Export("my-rag", "/tmp/my.rag", rag.noHNSWGraph(true))~
+// ```
 func WithExportNoHNSWIndex(noHNSWGraph bool) RAGSystemConfigOption {
 	return func(config *RAGSystemConfig) {
 		config.noHNSWGraph = noHNSWGraph
 	}
 }
 
+// ragImportFile 指定导入所用的 RAG 文件路径（导出名为 rag.ragImportFile）
+//
+// 参数:
+//   - importFile: RAG 文件路径
+//
+// 返回值:
+//   - RAG 系统配置选项
+//
+// Example:
+// ```
+// rag.Import("my-rag", rag.ragImportFile("/tmp/my.rag"))~
+// ```
 func WithImportFile(importFile string) RAGSystemConfigOption {
 	return func(config *RAGSystemConfig) {
 		config.importFile = importFile
 	}
 }
 
+// onlyPQCode 导出 RAG 时是否仅导出 PQ 编码（导出名为 rag.onlyPQCode）
+//
+// 参数:
+//   - onlyPQCode: 为 true 时仅导出 PQ 编码以减小体积
+//
+// 返回值:
+//   - RAG 系统配置选项
+//
+// Example:
+// ```
+// rag.Export("my-rag", "/tmp/my.rag", rag.onlyPQCode(true))~
+// ```
 func WithExportOnlyPQCode(onlyPQCode bool) RAGSystemConfigOption {
 	return func(config *RAGSystemConfig) {
 		config.onlyPQCode = onlyPQCode
 	}
 }
 
+// noMetadata 导出 RAG 时是否不导出元数据（导出名为 rag.noMetadata）
+//
+// 参数:
+//   - noMetadata: 为 true 时导出包不含文档元数据
+//
+// 返回值:
+//   - RAG 系统配置选项
+//
+// Example:
+// ```
+// rag.Export("my-rag", "/tmp/my.rag", rag.noMetadata(true))~
+// ```
 func WithExportNoMetadata(noMetadata bool) RAGSystemConfigOption {
 	return func(config *RAGSystemConfig) {
 		config.noMetadata = noMetadata
 	}
 }
 
+// importOverwrite 导入 RAG 时是否覆盖已存在的同名集合（导出名为 rag.importOverwrite）
+//
+// 参数:
+//   - overwriteExisting: 为 true 时覆盖已存在的集合
+//
+// 返回值:
+//   - RAG 系统配置选项
+//
+// Example:
+// ```
+// rag.Import("my-rag", rag.ragImportFile("/tmp/my.rag"), rag.importOverwrite(true))~
+// ```
 func WithExportOverwriteExisting(overwriteExisting bool) RAGSystemConfigOption {
 	return func(config *RAGSystemConfig) {
 		config.overwriteExisting = overwriteExisting
 	}
 }
 
+// noOriginInput 导出 RAG 时是否不导出原始输入内容（导出名为 rag.noOriginInput）
+//
+// 参数:
+//   - noOriginInput: 为 true 时导出包不含原始输入文本
+//
+// 返回值:
+//   - RAG 系统配置选项
+//
+// Example:
+// ```
+// rag.Export("my-rag", "/tmp/my.rag", rag.noOriginInput(true))~
+// ```
 func WithExportNoOriginInput(noOriginInput bool) RAGSystemConfigOption {
 	return func(config *RAGSystemConfig) {
 		config.noOriginInput = noOriginInput
 	}
 }
 
+// importRebuildGraph 导入 RAG 时是否重建 HNSW 索引（导出名为 rag.importRebuildGraph）
+//
+// 参数:
+//   - rebuildHNSWIndex: 为 true 时在导入后重建 HNSW 索引
+//
+// 返回值:
+//   - RAG 系统配置选项
+//
+// Example:
+// ```
+// rag.Import("my-rag", rag.ragImportFile("/tmp/my.rag"), rag.importRebuildGraph(true))~
+// ```
 func WithImportRebuildHNSWIndex(rebuildHNSWIndex bool) RAGSystemConfigOption {
 	return func(config *RAGSystemConfig) {
 		config.rebuildHNSWIndex = rebuildHNSWIndex
 	}
 }
 
+// aiServiceType 按名称与配置指定 RAG 使用的 AI 服务（导出名为 rag.aiServiceType）
+//
+// 参数:
+//   - aiServiceName: AI 服务名称（如 openai、ollama 等）
+//   - aiServiceConfig: 可选的 AI 配置项（如 ai.apiKey、ai.model 等）
+//
+// 返回值:
+//   - RAG 系统配置选项
+//
+// Example:
+// ```
+// db = rag.Get("my-rag", rag.aiServiceType("openai", ai.model("gpt-4o-mini")))~
+// ```
 func WithAIServiceType(aiServiceName string, aiServiceConfig ...aispec.AIConfigOption) RAGSystemConfigOption {
 	return func(config *RAGSystemConfig) {
 		chatter, err := ai.LoadChater(aiServiceName, aiServiceConfig...)
@@ -219,6 +316,19 @@ func (config *RAGSystemConfig) GetAIService() aicommon.AICallbackType {
 	return config.aiService
 }
 
+// aiService 直接指定 RAG 使用的 AI 回调服务（导出名为 rag.aiService）
+//
+// 参数:
+//   - aiService: AI 回调函数，用于实体抽取、问题生成等增强能力
+//
+// 返回值:
+//   - RAG 系统配置选项
+//
+// Example:
+// ```
+// cb = func(config, msg) { return ai.Chat(msg.GetPrompt())~ }
+// db = rag.Get("my-rag", rag.aiService(cb))~
+// ```
 func WithAIService(aiService aicommon.AICallbackType) RAGSystemConfigOption {
 	return func(config *RAGSystemConfig) {
 		config.aiService = aiService
@@ -231,12 +341,38 @@ func WithRAGID(ragID string) RAGSystemConfigOption {
 	}
 }
 
+// documentHandler 导出 RAG 时对每个文档进行处理的回调（导出名为 rag.documentHandler）
+//
+// 参数:
+//   - documentHandler: 处理函数，接收一个文档并返回处理后的文档与错误
+//
+// 返回值:
+//   - RAG 系统配置选项
+//
+// Example:
+// ```
+// handler = func(doc) { return doc, nil }
+// rag.Export("my-rag", "/tmp/my.rag", rag.documentHandler(handler))~
+// ```
 func WithExportDocumentHandler(documentHandler func(doc schema.VectorStoreDocument) (schema.VectorStoreDocument, error)) RAGSystemConfigOption {
 	return func(config *RAGSystemConfig) {
 		config.documentHandler = documentHandler
 	}
 }
 
+// progressHandler 导出 RAG 时的进度回调（导出名为 rag.progressHandler）
+//
+// 参数:
+//   - progressHandler: 进度回调，接收百分比、消息文本与消息类型
+//
+// 返回值:
+//   - RAG 系统配置选项
+//
+// Example:
+// ```
+// onProgress = func(percent, message, messageType) { println(percent, message) }
+// rag.Export("my-rag", "/tmp/my.rag", rag.progressHandler(onProgress))~
+// ```
 func WithExportOnProgressHandler(progressHandler func(percent float64, message string, messageType string)) RAGSystemConfigOption {
 	return func(config *RAGSystemConfig) {
 		config.progressHandler = progressHandler
@@ -285,6 +421,18 @@ func WithEmbeddingClient(client aispec.EmbeddingCaller) RAGSystemConfigOption {
 	}
 }
 
+// ragDescription 设置 RAG 集合的描述信息（导出名为 rag.ragDescription）
+//
+// 参数:
+//   - description: 集合描述文本
+//
+// 返回值:
+//   - RAG 系统配置选项
+//
+// Example:
+// ```
+// db = rag.Get("my-rag", rag.ragDescription("安全知识库"))~
+// ```
 func WithDescription(description string) RAGSystemConfigOption {
 	return func(config *RAGSystemConfig) {
 		config.description = description
@@ -303,12 +451,36 @@ func WithVectorStore(store *vectorstore.SQLiteVectorStoreHNSW) RAGSystemConfigOp
 	}
 }
 
+// ragEmbeddingModel 设置 RAG 使用的 embedding 模型名称（导出名为 rag.ragEmbeddingModel）
+//
+// 参数:
+//   - model: embedding 模型名称（如 text-embedding-3-small）
+//
+// 返回值:
+//   - RAG 系统配置选项
+//
+// Example:
+// ```
+// db = rag.Get("my-rag", rag.ragEmbeddingModel("text-embedding-3-small"))~
+// ```
 func WithEmbeddingModel(model string) RAGSystemConfigOption {
 	return func(config *RAGSystemConfig) {
 		config.embeddingModel = model
 	}
 }
 
+// db 指定 RAG 使用的数据库连接（导出名为 rag.db）
+//
+// 参数:
+//   - db: 数据库连接对象
+//
+// 返回值:
+//   - RAG 系统配置选项
+//
+// Example:
+// ```
+// db = rag.Get("my-rag", rag.db(myDatabaseConn))~
+// ```
 func WithDB(db *gorm.DB) RAGSystemConfigOption {
 	return func(config *RAGSystemConfig) {
 		config.db = db
@@ -387,6 +559,20 @@ func WithName(name string) RAGSystemConfigOption {
 	}
 }
 
+// enableQuestionIndex 是否启用文档潜在问题索引（导出名为 rag.enableQuestionIndex）
+//
+// 开启后会为文档生成潜在问题并建立索引，提升问答类查询的召回效果。
+//
+// 参数:
+//   - enable: 为 true 时启用文档问题索引
+//
+// 返回值:
+//   - RAG 系统配置选项
+//
+// Example:
+// ```
+// db = rag.Get("my-rag", rag.enableQuestionIndex(true))~
+// ```
 func WithEnableDocumentQuestionIndex(enable bool) RAGSystemConfigOption {
 	return func(config *RAGSystemConfig) {
 		config.enableDocumentQuestionIndex = enable
@@ -706,14 +892,37 @@ func WithAIOptions(options ...aispec.AIConfigOption) RAGSystemConfigOption {
 
 // Query configuration options for RAGSystemConfig
 
-// WithRAGCtx sets the context for RAG query operations
+// queryCtx 设置 RAG 查询操作的上下文（导出名为 rag.queryCtx），可用于超时/取消控制
+//
+// 参数:
+//   - ctx: 上下文对象
+//
+// 返回值:
+//   - RAG 系统配置选项
+//
+// Example:
+// ```
+// ctx = context.WithTimeout(context.Background(), 10*time.Second)
+// results = rag.Query("my-rag", "关键词", rag.queryCtx(ctx))~
+// ```
 func WithRAGCtx(ctx context.Context) RAGSystemConfigOption {
 	return func(config *RAGSystemConfig) {
 		config.ctx = ctx
 	}
 }
 
-// WithRAGLimit sets the maximum number of results to return
+// queryLimit 设置查询返回结果的最大数量（导出名为 rag.queryLimit）
+//
+// 参数:
+//   - limit: 返回结果数量上限
+//
+// 返回值:
+//   - RAG 系统配置选项
+//
+// Example:
+// ```
+// results = rag.Query("my-rag", "关键词", rag.queryLimit(5))~
+// ```
 func WithRAGLimit(limit int) RAGSystemConfigOption {
 	return func(config *RAGSystemConfig) {
 		config.limit = limit
@@ -727,7 +936,18 @@ func WithRAGCollectionLimit(collectionLimit int) RAGSystemConfigOption {
 	}
 }
 
-// WithRAGEnhance sets the enhancement strategies to apply
+// queryEnhance 设置查询增强策略（导出名为 rag.queryEnhance），用于扩展或改写查询以提升召回
+//
+// 参数:
+//   - enhance: 一个或多个增强策略名称
+//
+// 返回值:
+//   - RAG 系统配置选项
+//
+// Example:
+// ```
+// results = rag.Query("my-rag", "关键词", rag.queryEnhance("hyde"))~
+// ```
 func WithRAGEnhance(enhance ...string) RAGSystemConfigOption {
 	return func(config *RAGSystemConfig) {
 		config.enhance = enhance
@@ -741,7 +961,18 @@ func WithRAGEnhanceSearchHandler(handler enhancesearch.SearchHandler) RAGSystemC
 	}
 }
 
-// WithRAGSimilarityThreshold sets the minimum similarity threshold for results
+// querySimilarityThreshold 设置结果的最小相似度阈值（导出名为 rag.querySimilarityThreshold）
+//
+// 参数:
+//   - threshold: 相似度阈值（0~1），低于该值的结果将被过滤
+//
+// 返回值:
+//   - RAG 系统配置选项
+//
+// Example:
+// ```
+// results = rag.Query("my-rag", "关键词", rag.querySimilarityThreshold(0.7))~
+// ```
 func WithRAGSimilarityThreshold(threshold float64) RAGSystemConfigOption {
 	return func(config *RAGSystemConfig) {
 		config.similarityThreshold = threshold
@@ -787,7 +1018,18 @@ func WithRAGOnQueryFinish(callback func([]*vectorstore.ScoredResult)) RAGSystemC
 	}
 }
 
-// WithRAGConcurrent sets the concurrency level for query operations
+// queryConcurrent 设置查询操作的并发数（导出名为 rag.queryConcurrent）
+//
+// 参数:
+//   - concurrent: 并发数（同时检索的子查询数量）
+//
+// 返回值:
+//   - RAG 系统配置选项
+//
+// Example:
+// ```
+// results = rag.Query("my-rag", "关键词", rag.queryConcurrent(4))~
+// ```
 func WithRAGConcurrent(concurrent int) RAGSystemConfigOption {
 	return func(config *RAGSystemConfig) {
 		config.concurrent = concurrent
@@ -801,7 +1043,18 @@ func WithRAGOnlyResults(onlyResults bool) RAGSystemConfigOption {
 	}
 }
 
-// WithRAGCollectionName sets the specific collection name to query
+// queryCollection 指定要查询的集合名称（导出名为 rag.queryCollection，导入时别名 rag.importName）
+//
+// 参数:
+//   - collectionName: 集合名称
+//
+// 返回值:
+//   - RAG 系统配置选项
+//
+// Example:
+// ```
+// results = rag.Query("my-rag", "关键词", rag.queryCollection("my-collection"))~
+// ```
 func WithRAGCollectionName(collectionName string) RAGSystemConfigOption {
 	return func(config *RAGSystemConfig) {
 		config.Name = collectionName
@@ -815,14 +1068,37 @@ func WithRAGCollectionNames(collectionNames ...string) RAGSystemConfigOption {
 	}
 }
 
-// WithRAGCollectionScoreLimit sets the score limit for collection filtering
+// queryScoreLimit 设置集合过滤的分数阈值（导出名为 rag.queryScoreLimit）
+//
+// 参数:
+//   - scoreLimit: 集合分数阈值，低于该值的集合将被跳过
+//
+// 返回值:
+//   - RAG 系统配置选项
+//
+// Example:
+// ```
+// results = rag.Query("my-rag", "关键词", rag.queryScoreLimit(0.5))~
+// ```
 func WithRAGCollectionScoreLimit(scoreLimit float64) RAGSystemConfigOption {
 	return func(config *RAGSystemConfig) {
 		config.collectionScoreLimit = scoreLimit
 	}
 }
 
-// WithRAGQueryStatus sets the query status callback function
+// queryStatus 设置查询状态回调函数（导出名为 rag.queryStatus），用于接收查询过程中的状态信息
+//
+// 参数:
+//   - callback: 状态回调，接收标签、任意数据与可选标签列表
+//
+// 返回值:
+//   - RAG 系统配置选项
+//
+// Example:
+// ```
+// onStatus = func(label, data, tags...) { println(label) }
+// results = rag.Query("my-rag", "关键词", rag.queryStatus(onStatus))~
+// ```
 func WithRAGQueryStatus(callback func(label string, i any, tags ...string)) RAGSystemConfigOption {
 	return func(config *RAGSystemConfig) {
 		config.queryStatusCallback = callback
@@ -836,7 +1112,18 @@ func WithRAGFilter(filter func(key string, getDoc func() *vectorstore.Document) 
 	}
 }
 
-// WithRAGDocumentType sets the document type filter
+// queryType 设置文档类型过滤（导出名为 rag.queryType），仅查询指定类型的文档
+//
+// 参数:
+//   - documentType: 一个或多个文档类型
+//
+// 返回值:
+//   - RAG 系统配置选项
+//
+// Example:
+// ```
+// results = rag.Query("my-rag", "关键词", rag.queryType("knowledge"))~
+// ```
 func WithRAGDocumentType(documentType ...string) RAGSystemConfigOption {
 	return func(config *RAGSystemConfig) {
 		config.documentTypes = documentType
@@ -845,7 +1132,19 @@ func WithRAGDocumentType(documentType ...string) RAGSystemConfigOption {
 
 // Document and import/export configuration functions
 
-// WithDocumentMetadataKeyValue sets document metadata key-value pairs
+// docMetadata 为文档添加一个元数据键值对（导出名为 rag.docMetadata），可多次调用累加
+//
+// 参数:
+//   - key: 元数据键
+//   - value: 元数据值（任意类型）
+//
+// 返回值:
+//   - RAG 系统配置选项
+//
+// Example:
+// ```
+// db.Add("doc-id", "content", rag.docMetadata("source", "manual"))~
+// ```
 func WithDocumentMetadataKeyValue(key string, value any) RAGSystemConfigOption {
 	return func(config *RAGSystemConfig) {
 		if config.documentMetadataKeyValue == nil {
@@ -855,7 +1154,18 @@ func WithDocumentMetadataKeyValue(key string, value any) RAGSystemConfigOption {
 	}
 }
 
-// WithDocumentRawMetadata sets raw document metadata
+// docRawMetadata 直接设置文档的原始元数据 map（导出名为 rag.docRawMetadata）
+//
+// 参数:
+//   - metadata: 元数据键值映射
+//
+// 返回值:
+//   - RAG 系统配置选项
+//
+// Example:
+// ```
+// db.Add("doc-id", "content", rag.docRawMetadata({"source": "manual", "lang": "zh"}))~
+// ```
 func WithDocumentRawMetadata(metadata map[string]any) RAGSystemConfigOption {
 	return func(config *RAGSystemConfig) {
 		config.documentRawMetadata = metadata
@@ -869,8 +1179,17 @@ func WithNoPotentialQuestions(noPQ bool) RAGSystemConfigOption {
 	}
 }
 
-// NoPotentialQuestions returns a RAGSystemConfigOption that excludes potential_questions from metadata
-// This is a convenient shortcut for WithNoPotentialQuestions(true)
+// noPotentialQuestions 返回一个不在元数据中保存潜在问题的配置选项（导出名为 rag.noPotentialQuestions）
+//
+// 等价于 WithNoPotentialQuestions(true)，可减少存储开销。
+//
+// 返回值:
+//   - RAG 系统配置选项
+//
+// Example:
+// ```
+// db.Add("doc-id", "content", rag.noPotentialQuestions())~
+// ```
 func NoPotentialQuestions() RAGSystemConfigOption {
 	return WithNoPotentialQuestions(true)
 }
@@ -903,7 +1222,18 @@ func WithDocumentRuntimeID(runtimeID string) RAGSystemConfigOption {
 	}
 }
 
-// WithModelDimension sets the model dimension
+// ragModelDimension 设置 embedding 模型的向量维度（导出名为 rag.ragModelDimension）
+//
+// 参数:
+//   - dimension: 向量维度（需与所用 embedding 模型一致）
+//
+// 返回值:
+//   - RAG 系统配置选项
+//
+// Example:
+// ```
+// db = rag.Get("my-rag", rag.ragModelDimension(1536))~
+// ```
 func WithModelDimension(dimension int) RAGSystemConfigOption {
 	return func(config *RAGSystemConfig) {
 		config.modelDimension = dimension
@@ -917,14 +1247,36 @@ func WithModelName(name string) RAGSystemConfigOption {
 	}
 }
 
-// WithCosineDistance sets whether to use cosine distance
+// ragCosineDistance 使用余弦距离作为向量相似度度量（导出名为 rag.ragCosineDistance）
+//
+// 返回值:
+//   - RAG 系统配置选项
+//
+// Example:
+// ```
+// db = rag.Get("my-rag", rag.ragCosineDistance())~
+// ```
 func WithCosineDistance() RAGSystemConfigOption {
 	return func(config *RAGSystemConfig) {
 		config.cosineDistance = true
 	}
 }
 
-// WithHNSWParameters sets HNSW parameters
+// ragHNSWParameters 设置 HNSW 索引参数（导出名为 rag.ragHNSWParameters）
+//
+// 参数:
+//   - m: 每个节点的最大连接数
+//   - ml: 层级生成因子
+//   - efSearch: 查询时的候选集大小（影响召回与速度）
+//   - efConstruct: 构建索引时的候选集大小
+//
+// 返回值:
+//   - RAG 系统配置选项
+//
+// Example:
+// ```
+// db = rag.Get("my-rag", rag.ragHNSWParameters(16, 0.25, 64, 200))~
+// ```
 func WithHNSWParameters(m int, ml float64, efSearch, efConstruct int) RAGSystemConfigOption {
 	return func(config *RAGSystemConfig) {
 		config.hnswM = m
@@ -934,7 +1286,18 @@ func WithHNSWParameters(m int, ml float64, efSearch, efConstruct int) RAGSystemC
 	}
 }
 
-// WithForceNew sets whether to force creation of new collection
+// ragForceNew 是否强制创建新集合（导出名为 rag.ragForceNew），为 true 时会覆盖同名集合
+//
+// 参数:
+//   - force: 为 true 时强制新建集合
+//
+// 返回值:
+//   - RAG 系统配置选项
+//
+// Example:
+// ```
+// db = rag.Get("my-rag", rag.ragForceNew(true))~
+// ```
 func WithForceNew(force bool) RAGSystemConfigOption {
 	return func(config *RAGSystemConfig) {
 		config.forceNew = force
@@ -957,7 +1320,18 @@ func WithLazyLoadEmbeddingClient(lazy bool) RAGSystemConfigOption {
 
 // KHop configuration functions
 
-// WithKHopK 设置k-hop的跳数，k>=2时返回k-hop路径，k=0返回所有路径
+// khopk 设置 k-hop 的跳数（导出名为 rag.khopk），k>=2 时返回 k-hop 路径，k=0 返回所有路径
+//
+// 参数:
+//   - k: 跳数，负数会被归一为 0
+//
+// 返回值:
+//   - RAG 系统配置选项
+//
+// Example:
+// ```
+// paths = rag.KHopQuery("my-rag", rag.khopk(2))~
+// ```
 func WithKHopK(k int) RAGSystemConfigOption {
 	return func(config *RAGSystemConfig) {
 		if k < 0 {
@@ -967,7 +1341,18 @@ func WithKHopK(k int) RAGSystemConfigOption {
 	}
 }
 
-// WithKHopKMin 设置最小路径长度，最小值为2
+// khopkMin 设置最小路径长度（导出名为 rag.khopkMin），最小值为 2
+//
+// 参数:
+//   - kMin: 最小路径长度，小于 2 时会被归一为 2
+//
+// 返回值:
+//   - RAG 系统配置选项
+//
+// Example:
+// ```
+// paths = rag.KHopQuery("my-rag", rag.khopkMin(2), rag.khopkMax(4))~
+// ```
 func WithKHopKMin(kMin int) RAGSystemConfigOption {
 	return func(config *RAGSystemConfig) {
 		if kMin < 2 {
@@ -977,13 +1362,36 @@ func WithKHopKMin(kMin int) RAGSystemConfigOption {
 	}
 }
 
-// WithKHopKMax 设置最大路径长度，最小值为2
+// khopkMax 设置最大路径长度（导出名为 rag.khopkMax）
+//
+// 参数:
+//   - kMax: 最大路径长度
+//
+// 返回值:
+//   - RAG 系统配置选项
+//
+// Example:
+// ```
+// paths = rag.KHopQuery("my-rag", rag.khopkMin(2), rag.khopkMax(4))~
+// ```
 func WithKHopKMax(kMax int) RAGSystemConfigOption {
 	return func(config *RAGSystemConfig) {
 		config.kHopKMax = kMax
 	}
 }
 
+// khopLimit 设置 k-hop 查询返回的路径数量上限（导出名为 rag.khopLimit）
+//
+// 参数:
+//   - k: 路径数量上限，负数会被归一为 0
+//
+// 返回值:
+//   - RAG 系统配置选项
+//
+// Example:
+// ```
+// paths = rag.KHopQuery("my-rag", rag.khopLimit(10))~
+// ```
 func WithKHopLimit(k int) RAGSystemConfigOption {
 	return func(config *RAGSystemConfig) {
 		if k < 0 {
@@ -993,6 +1401,18 @@ func WithKHopLimit(k int) RAGSystemConfigOption {
 	}
 }
 
+// pathDepth 设置 k-hop 查询的路径深度（导出名为 rag.pathDepth），至少为 1
+//
+// 参数:
+//   - deep: 路径深度，小于 1 时会被归一为 1
+//
+// 返回值:
+//   - RAG 系统配置选项
+//
+// Example:
+// ```
+// paths = rag.KHopQuery("my-rag", rag.pathDepth(3))~
+// ```
 func WithKHopPathDepth(deep int) RAGSystemConfigOption {
 	return func(config *RAGSystemConfig) {
 		if deep < 1 { // 至少1层
@@ -1002,12 +1422,37 @@ func WithKHopPathDepth(deep int) RAGSystemConfigOption {
 	}
 }
 
+// buildFilter 设置 k-hop 查询的起始实体过滤条件（导出名为 rag.buildFilter）
+//
+// 参数:
+//   - filter: 实体过滤器，用于确定路径搜索的起点实体
+//
+// 返回值:
+//   - RAG 系统配置选项
+//
+// Example:
+// ```
+// filter = rag.getEntityFilter("name", "用户登录")
+// paths = rag.KHopQuery("my-rag", rag.buildFilter(filter))~
+// ```
 func WithKHopStartFilter(filter *ypb.EntityFilter) RAGSystemConfigOption {
 	return func(config *RAGSystemConfig) {
 		config.kHopStartFilter = filter
 	}
 }
 
+// buildQuery 设置 k-hop 查询所用的 RAG 检索语句（导出名为 rag.buildQuery），用于定位起始实体
+//
+// 参数:
+//   - query: 检索关键词或语句
+//
+// 返回值:
+//   - RAG 系统配置选项
+//
+// Example:
+// ```
+// paths = rag.KHopQuery("my-rag", rag.buildQuery("用户登录流程"))~
+// ```
 func WithKHopRagQuery(query string) RAGSystemConfigOption {
 	return func(config *RAGSystemConfig) {
 		config.kHopRagQuery = query
@@ -1026,6 +1471,18 @@ func WithTryRebuildHNSWIndex(tryRebuildHNSWIndex bool) RAGSystemConfigOption {
 	}
 }
 
+// serialVersionUID 设置 RAG 序列化版本标识（导出名为 rag.serialVersionUID），用于导入导出时的兼容性校验
+//
+// 参数:
+//   - serialVersionUID: 序列化版本号字符串
+//
+// 返回值:
+//   - RAG 系统配置选项
+//
+// Example:
+// ```
+// rag.Export("my-rag", "/tmp/my.rag", rag.serialVersionUID("v1"))~
+// ```
 func WithRAGSerialVersionUID(serialVersionUID string) RAGSystemConfigOption {
 	return func(config *RAGSystemConfig) {
 		config.serialVersionUID = serialVersionUID

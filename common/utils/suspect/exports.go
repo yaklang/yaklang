@@ -11,6 +11,13 @@ import (
 )
 
 // IsAlpha 尝试将传入的参数转换为字符串，然后判断其是否都由英文字母组成
+//
+// 参数:
+//   - i: 待判断的对象，会被转换为字符串
+//
+// 返回值:
+//   - 是否全部由英文字母组成
+//
 // Example:
 // ```
 // str.IsAlpha("abc") // true
@@ -21,6 +28,13 @@ func isAlpha(i interface{}) bool {
 }
 
 // IsDigit 尝试将传入的参数转换为字符串，然后判断其是否都由数字组成
+//
+// 参数:
+//   - i: 待判断的对象，会被转换为字符串
+//
+// 返回值:
+//   - 是否全部由数字组成
+//
 // Example:
 // ```
 // str.IsDigit("123") // true
@@ -31,6 +45,13 @@ func isDigit(i interface{}) bool {
 }
 
 // IsAlphaNum / IsAlNum 尝试将传入的参数转换为字符串，然后判断其是否都由英文字母和数字组成
+//
+// 参数:
+//   - i: 待判断的对象，会被转换为字符串
+//
+// 返回值:
+//   - 是否全部由英文字母和数字组成
+//
 // Example:
 // ```
 // str.IsAlphaNum("abc123") // true
@@ -41,6 +62,14 @@ func isAlphaNum(i interface{}) bool {
 }
 
 // IsTLSServer 尝试访问传入的host，然后判断其是否为 TLS 服务。第一个参数为 host，后面可以传入零个或多个参数，为代理地址
+//
+// 参数:
+//   - addr: 目标地址（host:port）
+//   - proxies: 可选的一个或多个代理地址
+//
+// 返回值:
+//   - 目标是否为 TLS 服务
+//
 // Example:
 // ```
 // str.IsTLSServer("www.yaklang.com:443") // true
@@ -51,6 +80,13 @@ func isTLSServer(addr string, proxies ...string) bool {
 }
 
 // IsHttpURL 尝试将传入的参数转换为字符串，然后猜测其是否为 http(s) 协议的 URL
+//
+// 参数:
+//   - i: 待判断的对象，会被转换为字符串
+//
+// 返回值:
+//   - 是否为 http(s) 协议的完整 URL
+//
 // Example:
 // ```
 // str.IsHttpURL("http://www.yaklang.com") // true
@@ -72,6 +108,13 @@ func isUrlPath(i interface{}) bool {
 }
 
 // IsHtmlResponse 猜测传入的参数是否为原始 HTTP 响应报文
+//
+// 参数:
+//   - i: 原始 HTTP 响应（string、[]byte 或 *http.Response）
+//
+// 返回值:
+//   - 是否为 HTML 响应
+//
 // Example:
 // ```
 // str.IsHtmlResponse("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n<html></html>") // true
@@ -103,6 +146,13 @@ func isHtmlResponse(i interface{}) bool {
 }
 
 // IsServerError 猜测传入的参数是否为服务器错误
+//
+// 参数:
+//   - i: 待判断的内容（string 或 []byte）
+//
+// 返回值:
+//   - 是否包含服务器错误特征
+//
 // Example:
 // ```
 // str.IsServerError(`Fatal error: Uncaught Error: Call to undefined function sum() in F:\xampp\htdocs\test.php:7 Stack trace: #0 {main} thrown in <path> on line 7`) // true，这是PHP报错信息
@@ -119,6 +169,13 @@ func isServerError(i interface{}) bool {
 }
 
 // ExtractChineseIDCards 尝试将传入的参数转换为字符串，然后提取字符串中的身份证号
+//
+// 参数:
+//   - i: 待提取的内容（string 或 []byte）
+//
+// 返回值:
+//   - 提取到的身份证号列表
+//
 // Example:
 // ```
 // str.ExtractChineseIDCards("Your ChineseID is: 110101202008027420?") // ["110101202008027420"]
@@ -135,6 +192,13 @@ func extractChineseIDCards(i interface{}) []string {
 }
 
 // IsJsonResponse 尝试将传入的参数转换为字符串，然后猜测传入的参数是否为 JSON 格式的原始 HTTP 响应报文，这是通过判断Content-Type请求头实现的
+//
+// 参数:
+//   - i: 原始 HTTP 响应（string、[]byte 或 *http.Response）
+//
+// 返回值:
+//   - 是否为 JSON 响应
+//
 // Example:
 // ```
 // str.IsJsonResponse("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n{\"code\": 0}") // true
@@ -165,6 +229,14 @@ func isJsonResponse(i interface{}) bool {
 }
 
 // IsRedirectParam 根据传入的参数名和参数值猜测是否为重定向参数
+//
+// 参数:
+//   - key: 参数名
+//   - value: 参数值
+//
+// 返回值:
+//   - 是否为重定向参数
+//
 // Example:
 // ```
 // str.IsRedirectParam("to","http://www.yaklang.com") // true，因为参数值为完整的 URL
@@ -176,6 +248,14 @@ func isRedirectParam(key, value string) bool {
 }
 
 // IsJSONPParam 根据传入的参数名和参数值猜测是否为 JSONP 参数
+//
+// 参数:
+//   - key: 参数名
+//   - value: 参数值
+//
+// 返回值:
+//   - 是否为 JSONP 参数
+//
 // Example:
 // ```
 // str.IsJSONPParam("callback","jquery1.0.min.js") // true，因为参数名为常见的 JSONP 参数名，且参数值为常见的JS文件名
@@ -187,6 +267,14 @@ func isJSONPParam(key, value string) bool {
 }
 
 // IsUrlParam 根据传入的参数名和参数值猜测是否为 URL 参数
+//
+// 参数:
+//   - key: 参数名
+//   - value: 参数值
+//
+// 返回值:
+//   - 是否为 URL 参数
+//
 // Example:
 // ```
 // str.IsUrlParam("url","http://www.yaklang.com") // true，因为参数名为常见的 URL 参数名，且参数值为完整的URL
@@ -197,6 +285,14 @@ func isURLParam(key, value string) bool {
 }
 
 // IsXmlParam 根据传入的参数名和参数值猜测是否为 XML 参数
+//
+// 参数:
+//   - key: 参数名
+//   - value: 参数值
+//
+// 返回值:
+//   - 是否为 XML 参数
+//
 // Example:
 // ```
 // str.IsXmlParam("xml","<xml></xml>") // true，因为参数名为常见的 XML 参数名，且参数值为 XML 格式的字符串
@@ -208,6 +304,13 @@ func isXMLParam(key, value string) bool {
 }
 
 // IsSensitiveJson  尝试将传入的参数转换为字符串，然后猜测其是否为敏感的 JSON 数据
+//
+// 参数:
+//   - i: 待判断的内容（string 或 []byte）
+//
+// 返回值:
+//   - 是否为敏感 JSON 数据
+//
 // Example:
 // ```
 // str.IsSensitiveJson(`{"password":"123456"}`) // true
@@ -226,6 +329,13 @@ func isSensitiveJson(i interface{}) bool {
 }
 
 // IsSensitiveTokenField 尝试将传入的参数转换为字符串，然后猜测其是否是 token 字段
+//
+// 参数:
+//   - i: 待判断的字段名（string 或 []byte）
+//
+// 返回值:
+//   - 是否为 token 字段
+//
 // Example:
 // ```
 // str.IsSensitiveTokenField("token") // true
@@ -244,6 +354,13 @@ func isSensitiveTokenField(i interface{}) bool {
 }
 
 // IsPasswordField 尝试将传入的参数转换为字符串，然后猜测其是否是 password 字段
+//
+// 参数:
+//   - i: 待判断的字段名（string 或 []byte）
+//
+// 返回值:
+//   - 是否为 password 字段
+//
 // Example:
 // ```
 // str.IsPasswordField("password") // true
@@ -262,6 +379,13 @@ func isPasswordField(i interface{}) bool {
 }
 
 // IsUsernameField 尝试将传入的参数转换为字符串，然后猜测其是否是 username 字段
+//
+// 参数:
+//   - i: 待判断的字段名（string 或 []byte）
+//
+// 返回值:
+//   - 是否为 username 字段
+//
 // Example:
 // ```
 // str.IsUsernameField("username") // true
@@ -280,6 +404,13 @@ func isUsernameField(i interface{}) bool {
 }
 
 // IsSQLColumnField 尝试将传入的参数转换为字符串，然后猜测其是否是 SQL 查询字段
+//
+// 参数:
+//   - i: 待判断的字段名（string 或 []byte）
+//
+// 返回值:
+//   - 是否为 SQL 查询字段
+//
 // Example:
 // ```
 // str.IsSQLColumnField("sort") // true
@@ -298,6 +429,13 @@ func isSQLColumnField(i interface{}) bool {
 }
 
 // IsCaptchaField 尝试将传入的参数转换为字符串，然后猜测其是否是验证码字段
+//
+// 参数:
+//   - i: 待判断的字段名（string 或 []byte）
+//
+// 返回值:
+//   - 是否为验证码字段
+//
 // Example:
 // ```
 // str.IsCaptchaField("captcha") // true
@@ -316,6 +454,13 @@ func isCaptchaField(i interface{}) bool {
 }
 
 // IsBase64Value 尝试将传入的参数转换为字符串，然后猜测其是否是 Base64 编码的数据
+//
+// 参数:
+//   - i: 待判断的内容（string 或 []byte）
+//
+// 返回值:
+//   - 是否为 Base64 编码数据
+//
 // Example:
 // ```
 // str.IsBase64Value("MTI=") // true
@@ -333,6 +478,13 @@ func isBase64Value(i interface{}) bool {
 }
 
 // IsPlainBase64Value 尝试将传入的参数转换为字符串，然后猜测其是否是 Base64 编码的数据，它相比于 IsBase64Value 多了一层判断，即判断 base64 解码后的数据是否为可见字符串
+//
+// 参数:
+//   - i: 待判断的内容（string 或 []byte）
+//
+// 返回值:
+//   - 是否为可解码为可见字符串的 Base64 数据
+//
 // Example:
 // ```
 // str.IsPlainBase64Value("MTI=") // true
@@ -350,6 +502,13 @@ func isPlainBase64Value(i interface{}) bool {
 }
 
 // IsMD5Value 尝试将传入的参数转换为字符串，然后猜测其是否是 MD5 编码的数据
+//
+// 参数:
+//   - i: 待判断的内容（string 或 []byte）
+//
+// 返回值:
+//   - 是否为 MD5 值
+//
 // Example:
 // ```
 // str.IsMD5Value("202cb962ac59075b964b07152d234b70") // true
@@ -367,6 +526,13 @@ func isMD5Value(i interface{}) bool {
 }
 
 // IsSha256Value 尝试将传入的参数转换为字符串，然后猜测其是否是 SHA256 编码的数据
+//
+// 参数:
+//   - i: 待判断的内容（string 或 []byte）
+//
+// 返回值:
+//   - 是否为 SHA256 值
+//
 // Example:
 // ```
 // str.IsSha256Value("a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3") // true
@@ -384,6 +550,13 @@ func isSha256Value(i interface{}) bool {
 }
 
 // IsXmlRequest 猜测传入的参数是否为请求头是 XML 格式的原始 HTTP 请求报文
+//
+// 参数:
+//   - i: 原始 HTTP 请求（string、[]byte 或 *http.Request）
+//
+// 返回值:
+//   - 是否为 XML 请求
+//
 // Example:
 // ```
 // str.IsXmlRequest("POST / HTTP/1.1\r\nContent-Type: application/xml\r\n\r\n<xml></xml>") // true
@@ -404,6 +577,13 @@ func isXMLRequest(i interface{}) bool {
 }
 
 // IsXmlValue 尝试将传入的参数转换为字符串，然后猜测其是否是 XML 格式的数据
+//
+// 参数:
+//   - i: 待判断的内容（string 或 []byte）
+//
+// 返回值:
+//   - 是否为 XML 格式数据
+//
 // Example:
 // ```
 // str.IsXmlValue("<xml></xml>") // true

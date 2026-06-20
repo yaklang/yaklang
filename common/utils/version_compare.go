@@ -35,6 +35,14 @@ type versionPart struct {
 }
 
 // VersionGreater 使用版本比较算法比较版本 v1 与版本 v2，如果 v1 大于 v2 返回 true，否则返回 false
+//
+// 参数:
+//   - v1: 第一个版本号字符串
+//   - v2: 第二个版本号字符串
+//
+// 返回值:
+//   - v1 是否大于 v2
+//
 // Example:
 // ```
 // str.VersionGreater("1.0.0", "0.9.9") // true
@@ -56,6 +64,14 @@ func VersionGreater(v1, v2 string) bool {
 }
 
 // VersionGreaterEqual 使用版本比较算法比较版本 v1 与版本 v2，如果 v1 大于等于 v2 返回 true，否则返回 false
+//
+// 参数:
+//   - v1: 第一个版本号字符串
+//   - v2: 第二个版本号字符串
+//
+// 返回值:
+//   - v1 是否大于等于 v2
+//
 // Example:
 // ```
 // str.VersionGreaterEqual("1.0.0", "0.9.9") // true
@@ -76,6 +92,14 @@ func VersionGreaterEqual(v1, v2 string) bool {
 }
 
 // VersionEqual 使用版本比较算法比较版本 v1 与版本 v2，如果 v1 等于 v2 返回 true，否则返回 false
+//
+// 参数:
+//   - v1: 第一个版本号字符串
+//   - v2: 第二个版本号字符串
+//
+// 返回值:
+//   - v1 是否等于 v2
+//
 // Example:
 // ```
 // str.VersionEqual("3.0", "3.0") // true
@@ -95,6 +119,14 @@ func VersionEqual(v1, v2 string) bool {
 }
 
 // VersionLessEqual 使用版本比较算法比较版本 v1 与版本 v2，如果 v1 小于等于 v2 返回 true，否则返回 false
+//
+// 参数:
+//   - v1: 第一个版本号字符串
+//   - v2: 第二个版本号字符串
+//
+// 返回值:
+//   - v1 是否小于等于 v2
+//
 // Example:
 // ```
 // str.VersionLessEqual("0.9.9", "1.0.0") // true
@@ -116,6 +148,14 @@ func VersionLessEqual(v1, v2 string) bool {
 }
 
 // VersionLess 使用版本比较算法比较版本 v1 与版本 v2，如果 v1 小于 v2 返回 true，否则返回 false
+//
+// 参数:
+//   - v1: 第一个版本号字符串
+//   - v2: 第二个版本号字符串
+//
+// 返回值:
+//   - v1 是否小于 v2
+//
 // Example:
 // ```
 // str.VersionLess("0.9.9", "1.0.0") // true
@@ -136,6 +176,19 @@ func VersionLess(v1, v2 string) bool {
 }
 
 // VersionCompare 泛用形的版本比较,传入(p1,p2 string), p1>p2返回1,nil, p1<p2返回-1,nil, p1==p2返回0,nil, 比较失败返回 -2,err
+//
+// 参数:
+//   - v1: 第一个版本号字符串
+//   - v2: 第二个版本号字符串
+//
+// 返回值:
+//   - 比较结果：v1>v2 返回 1，v1<v2 返回 -1，相等返回 0，比较失败返回 -2
+//   - 错误信息
+//
+// Example:
+// ```
+// res, err = str.VersionCompare("1.2.0", "1.1.9") // res = 1
+// ```
 func VersionCompare(v1, v2 string) (int, error) {
 	v1 = VersionClean(v1)
 	v2 = VersionClean(v2)
