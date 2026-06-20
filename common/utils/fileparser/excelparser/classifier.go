@@ -22,7 +22,28 @@ type ExcelNodeClassifier struct {
 	CondRules    []CondRuleContent    // 条件规则
 }
 
-// ClassifyNodes 将解析结果分类
+// ClassifyNodes 将 excel.Parse 等解析得到的节点按类型分类（导出名为 excel.ClassifyNodes）
+// 返回的分类器按表格、文本、URL、公式、批注、隐藏表等分别归类，便于后续提取
+//
+// 参数:
+//   - nodes: 由 excel.Parse / ParseTableOnly / ParseTableFast 返回的节点切片
+//
+// 返回值:
+//   - 分类器对象，包含 Tables/Texts/URLs/Formulas/Comments/HiddenSheets 等字段
+//
+// Example:
+// ```
+// path = file.Join(os.TempDir(), "excel_classify_demo.xlsx")
+// f = excel.NewFile()
+// excel.WriteCell(f, "Sheet1", "A1", "Name")~
+// excel.WriteCell(f, "Sheet1", "A2", "yak")~
+// excel.Save(f, path)~
+// nodes = excel.Parse(path)~
+// cls = excel.ClassifyNodes(nodes)
+// println(cls.Tables[0].Headers[0])   // OUT: Name
+// assert cls.Tables[0].Headers[0] == "Name", "ClassifyNodes should group rows into tables with headers"
+// file.Remove(path)
+// ```
 func ClassifyNodes(nodes []ExcelNode) *ExcelNodeClassifier {
 	classifier := &ExcelNodeClassifier{
 		Tables:       make([]TableContent, 0),

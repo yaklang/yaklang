@@ -10,6 +10,23 @@ import (
 	"runtime/pprof"
 )
 
+// StartMemoryProfile 在采样时长结束后写入一次堆内存 profile（导出名为 pprof.StartMemoryProfile）
+// 该调用会阻塞直到采样时长结束（由 pprof.timeout 或 pprof.ctx 控制，默认 15 秒）
+//
+// 参数:
+//   - opts: 可选项，如 pprof.memProfilePath / pprof.timeout / pprof.ctx / pprof.onMemProfileStarted / pprof.onMemProfileFinished
+//
+// 返回值:
+//   - 错误信息
+//
+// Example:
+// ```
+// prof = file.Join(os.TempDir(), "mem_demo.prof")
+// pprof.StartMemoryProfile(pprof.memProfilePath(prof), pprof.timeout(1))
+// println(file.IsExisted(prof))   // OUT: true
+// assert file.IsExisted(prof), "StartMemoryProfile should write a memory profile file"
+// file.Remove(prof)
+// ```
 func StartMemoryProfile(opts ...Option) error {
 	c := NewConfig()
 	for _, opt := range opts {

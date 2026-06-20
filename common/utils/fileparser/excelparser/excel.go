@@ -9,7 +9,28 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 )
 
-// ParseExcelFile 解析 Excel 文件，返回所有工作表中的内容
+// Parse 解析 Excel 文件，返回所有工作表中的内容节点（导出名为 excel.Parse）
+// 返回的节点包含表格、文本、URL、公式、批注等多种类型，可用 excel.ClassifyNodes 进行分类
+//
+// 参数:
+//   - filePath: Excel 文件路径
+//
+// 返回值:
+//   - 解析出的内容节点切片
+//   - 错误信息（文件不存在或解析失败时返回）
+//
+// Example:
+// ```
+// path = file.Join(os.TempDir(), "excel_parse_demo.xlsx")
+// f = excel.NewFile()
+// excel.WriteCell(f, "Sheet1", "A1", "Name")~
+// excel.WriteCell(f, "Sheet1", "A2", "yak")~
+// excel.Save(f, path)~
+// nodes = excel.Parse(path)~
+// println(len(nodes) > 0)   // OUT: true
+// assert len(nodes) > 0, "Parse should return content nodes"
+// file.Remove(path)
+// ```
 func ParseExcelFile(filePath string) ([]ExcelNode, error) {
 	f, err := excelize.OpenFile(filePath)
 	if err != nil {
@@ -332,20 +353,57 @@ func ParseExcelFile(filePath string) ([]ExcelNode, error) {
 	return nodes, nil
 }
 
-// ParseExcelTableOnly parses an Excel file and returns only TableNode and HiddenSheetNode entries.
-// It skips per-cell processing (TextNode, URLNode, FormulaNode, etc.) for much better performance
-// on large files. The returned nodes are fully compatible with ClassifyNodes.
+// ParseTableOnly 仅解析 Excel 文件中的表格与隐藏工作表节点（导出名为 excel.ParseTableOnly）
+// 跳过逐单元格处理（文本、URL、公式等），在大文件上性能更好；返回结果可直接用于 excel.ClassifyNodes
+//
+// 参数:
+//   - filePath: Excel 文件路径
+//
+// 返回值:
+//   - 仅含表格/隐藏表的节点切片
+//   - 错误信息（文件不存在或解析失败时返回）
+//
+// Example:
+// ```
+// path = file.Join(os.TempDir(), "excel_tableonly_demo.xlsx")
+// f = excel.NewFile()
+// excel.WriteCell(f, "Sheet1", "A1", "Name")~
+// excel.WriteCell(f, "Sheet1", "A2", "yak")~
+// excel.Save(f, path)~
+// nodes = excel.ParseTableOnly(path)~
+// println(len(nodes) > 0)   // OUT: true
+// assert len(nodes) > 0, "ParseTableOnly should return table nodes"
+// file.Remove(path)
+// ```
 func ParseExcelTableOnly(filePath string) ([]ExcelNode, error) {
 	return ParseExcelTableFast(filePath, 0)
 }
 
-// ParseExcelTableFast parses an Excel file using streaming API for optimal performance on large files.
-// maxDataRows controls how many data rows to store per sheet:
-//   - maxDataRows <= 0: reads ALL rows (same as ParseExcelTableOnly)
-//   - maxDataRows > 0: stores only the first maxDataRows rows, but counts all rows accurately.
-//     The total count is available via Metadata["total_data_rows"].
-//     Rows beyond maxDataRows are iterated with Next() only (no Columns() call),
-//     which skips shared string resolution and avoids memory allocation.
+// ParseTableFast 使用流式 API 高性能解析大型 Excel 文件中的表格（导出名为 excel.ParseTableFast）
+// maxDataRows 控制每个工作表最多存储的数据行数：
+//   - maxDataRows <= 0: 读取全部行（等价于 excel.ParseTableOnly）
+//   - maxDataRows > 0: 仅存储前 maxDataRows 行，但仍准确统计总行数（可在 Metadata 的 total_data_rows 中获取）
+//
+// 参数:
+//   - filePath: Excel 文件路径
+//   - maxDataRows: 每个工作表最多存储的数据行数
+//
+// 返回值:
+//   - 表格节点切片
+//   - 错误信息（文件不存在或解析失败时返回）
+//
+// Example:
+// ```
+// path = file.Join(os.TempDir(), "excel_tablefast_demo.xlsx")
+// f = excel.NewFile()
+// excel.WriteCell(f, "Sheet1", "A1", "Name")~
+// excel.WriteCell(f, "Sheet1", "A2", "yak")~
+// excel.Save(f, path)~
+// nodes = excel.ParseTableFast(path, 100)~
+// println(len(nodes) > 0)   // OUT: true
+// assert len(nodes) > 0, "ParseTableFast should return table nodes"
+// file.Remove(path)
+// ```
 func ParseExcelTableFast(filePath string, maxDataRows int) ([]ExcelNode, error) {
 	f, err := excelize.OpenFile(filePath)
 	if err != nil {
