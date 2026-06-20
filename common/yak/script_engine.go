@@ -60,6 +60,7 @@ import (
 	"github.com/yaklang/yaklang/common/chaosmaker"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/crawler"
+	"github.com/yaklang/yaklang/common/mail"
 	"github.com/yaklang/yaklang/common/crawlerx"
 	"github.com/yaklang/yaklang/common/utils/webforest"
 	"github.com/yaklang/yaklang/common/cve"
@@ -162,6 +163,7 @@ func initYaklangLib() {
 	yaklang.Import("time", yaklib.TimeExports)
 	yaklang.Import("timezone", yaklib.TimeZoneExports)
 	yaklang.Import("codec", yaklib.CodecExports) // 编码解码
+	yaklang.Import("mail", mail.Exports)         // 邮件解析/发送/收件
 	yaklang.Import("log", yaklib.LogExports)
 	// yaklang.Import("net", yaklib.Ne)
 	yaklang.Import("hids", hids.Exports)

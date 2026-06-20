@@ -1,0 +1,89 @@
+__DESC__ = "邮件（.eml / RFC 5322 + MIME）解析与钓鱼研判工具。解析邮件头（发件人/收件人/主题）、正文（纯文本+HTML）、附件、内嵌 URL，提取并解读发件人认证结果（SPF/DKIM/DMARC）、Received 链源 IP、附件 SHA256，并自动给出可疑指标（认证失败/Reply-To 不一致/显示名欺骗/危险附件/裸 IP URL/紧迫词标题）。适用于钓鱼邮件研判、社工邮件分析、邮件取证。"
+__VERBOSE_NAME__ = "邮件解析研判工具"
+__KEYWORDS__ = "email,phishing,eml,mime,邮件,钓鱼,spoofing,dmarc,spf,dkim,邮件分析,钓鱼邮件,邮件解析,social engineering,spear phishing,鱼叉钓鱼,邮件取证,邮件头,Authentication-Results"
+
+__USAGE__ = <<<USAGE_BLOCK
+Email Parser & Phishing Analysis Tool - Parameter Description for JSON Tool Calls
+
+Required Parameters:
+  file            (string)  Email file path to analyze (.eml or raw RFC 5322 MIME text).
+
+Output:
+  Structured analysis: sender (display/address), SPF/DKIM/DMARC auth results,
+  received source IPs, body (text/html), attachments (filename/type/size/sha256),
+  extracted URLs, and automatic suspicious indicators for phishing triage.
+USAGE_BLOCK
+
+/*
+邮件解析研判工具
+
+功能：
+1. 解析 MIME 邮件结构（multipart 嵌套、附件、text/plain + text/html）
+2. 解码 RFC 2047 编码头（=?UTF-8?B?...?=）与 quoted-printable / base64 正文
+3. 自动字符集转换（gbk/gb2312/iso-8859-1/shift_jis 等 → UTF-8）
+4. 提取发件人认证结果（Authentication-Results 头中的 SPF/DKIM/DMARC）
+5. 从 Received 头链溯源发件源 IP
+6. 提取正文与 HTML 中的所有 URL（去重）
+7. 计算附件 SHA256（便于威胁情报查询）
+8. 给出初步可疑指标，辅助钓鱼研判
+
+使用示例：
+  yak parse_email.yak --file phishing.eml
+*/
+
+yakit.AutoInitYakit()
+
+filePath := cli.String("file", cli.setRequired(true), cli.setHelp("email file path to analyze (.eml or raw MIME)"))
+cli.check()
+
+if !file.IsExisted(filePath) {
+    yakit.Error("email file does not exist: %v", filePath)
+    return
+}
+
+result, err = mail.ParseFile(filePath)
+if err != nil {
+    yakit.Error("parse email failed: %v", err)
+    return
+}
+
+if result["error"] != nil {
+    yakit.Error("parse email error: %v", result["error"])
+    return
+}
+
+// ===== 摘要：高价值字段，便于快速研判 =====
+yakit.Info("================== 邮件解析摘要 ==================")
+yakit.Info("Subject:    %v", result["subject"])
+yakit.Info("From:       %v", result["from"])
+yakit.Info("Reply-To:   %v", result["reply_to"])
+yakit.Info("To:         %v", result["to"])
+yakit.Info("Date:       %v", result["date"])
+yakit.Info("Message-ID: %v", result["message_id"])
+yakit.Info("认证结果:   SPF/DKIM/DMARC = %v", result["auth_results"])
+yakit.Info("源 IP 链:   %v", result["received_ips"])
+
+urls := result["urls"]
+attachments := result["attachments"]
+yakit.Info("提取 URL:   %v 条", len(urls))
+yakit.Info("附件:       %v 个", len(attachments))
+for a in attachments {
+    yakit.Info("  - %v  | type=%v  | size=%v  | sha256=%v", a["filename"], a["content_type"], a["size"], a["sha256"])
+}
+for u in urls {
+    yakit.Info("  URL: %v", u)
+}
+
+suspicious := result["suspicious"]
+if len(suspicious) > 0 {
+    yakit.Info("------------------ 可疑指标（重点排查）------------------")
+    for s in suspicious {
+        yakit.Info("  [%v] %v", s["indicator"], s["detail"])
+    }
+} else {
+    yakit.Info("可疑指标:   （未自动命中，仍需人工研判）")
+}
+
+// ===== 完整结构化结果（JSON，供深入分析）=====
+yakit.Info("================== 完整解析结果（JSON）==================")
+yakit.Info("%s", json.dumps(result, json.withIndent("  ")))

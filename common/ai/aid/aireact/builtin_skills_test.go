@@ -38,6 +38,7 @@ var allBuiltinSkills = []struct {
 	{"detection-rule-engineering", "skills/detection-rule-engineering/SKILL.md", []string{"Sigma", "Yara", "Suricata", "ModSecurity"}},
 	{"network-config-audit", "skills/network-config-audit/SKILL.md", []string{"Cisco", "iptables", "SNMP", "Telnet"}},
 	{"blue-team-task-design", "skills/blue-team-task-design/SKILL.md", []string{"incident-response", "threat-hunting", "web-log-analysis", "cybersecurity-risk"}},
+	{"email-phishing-analysis", "skills/email-phishing-analysis/SKILL.md", []string{"parse_email", "SPF", "DMARC", "Reply-To", "钓鱼"}},
 }
 
 func useTempBuiltinSkillReleaseDB(t *testing.T) {
