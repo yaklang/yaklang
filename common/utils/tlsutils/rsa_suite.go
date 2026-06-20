@@ -9,7 +9,25 @@ import (
 	cryptorand "crypto/rand"
 )
 
-// RSAEncryptWithPKCS1v15Block encrypts plaintext with PKCS#1 v1.5 and automatically chunks long plaintext.
+// RSAEncryptWithPKCS1v15Block 使用 RSA PKCS#1 v1.5 公钥加密数据（导出名为 codec.RSAEncryptWithPKCS1v15Block）
+// 自动按公钥长度对超长明文分块加密，可处理任意长度的输入
+//
+// 参数:
+//   - pubKeyPem: PEM 格式的 RSA 公钥
+//   - data: 待加密的明文字节
+//
+// 返回值:
+//   - 密文字节
+//   - 错误信息（公钥解析失败或加密失败时返回）
+//
+// Example:
+// ```
+// pub, pri = tls.GenerateRSA2048KeyPair()~
+// ciphertext = codec.RSAEncryptWithPKCS1v15Block(pub, "hello yak")~
+// plaintext = codec.RSADecryptWithPKCS1v15Block(pri, ciphertext)~
+// println(string(plaintext))
+// assert string(plaintext) == "hello yak", "PKCS1v15 block roundtrip should recover plaintext"
+// ```
 func RSAEncryptWithPKCS1v15Block(pubKeyPem string, data []byte) ([]byte, error) {
 	pub, err := GetRSAPubKey([]byte(pubKeyPem))
 	if err != nil {
@@ -41,7 +59,25 @@ func RSAEncryptWithPKCS1v15Block(pubKeyPem string, data []byte) ([]byte, error) 
 	return encrypted.Bytes(), nil
 }
 
-// RSADecryptWithPKCS1v15Block decrypts ciphertext with PKCS#1 v1.5 and automatically chunks by key size.
+// RSADecryptWithPKCS1v15Block 使用 RSA PKCS#1 v1.5 私钥解密数据（导出名为 codec.RSADecryptWithPKCS1v15Block）
+// 自动按私钥长度对密文分块解密，与 codec.RSAEncryptWithPKCS1v15Block 配对使用
+//
+// 参数:
+//   - privKeyPem: PEM 格式的 RSA 私钥
+//   - ciphertext: 待解密的密文字节
+//
+// 返回值:
+//   - 解密得到的明文字节
+//   - 错误信息（私钥解析失败、密文长度非法或解密失败时返回）
+//
+// Example:
+// ```
+// pub, pri = tls.GenerateRSA2048KeyPair()~
+// ciphertext = codec.RSAEncryptWithPKCS1v15Block(pub, "hello yak")~
+// plaintext = codec.RSADecryptWithPKCS1v15Block(pri, ciphertext)~
+// println(string(plaintext))
+// assert string(plaintext) == "hello yak", "PKCS1v15 block roundtrip should recover plaintext"
+// ```
 func RSADecryptWithPKCS1v15Block(privKeyPem string, ciphertext []byte) ([]byte, error) {
 	pri, err := GetRSAPrivateKey([]byte(privKeyPem))
 	if err != nil {
@@ -71,7 +107,26 @@ func RSADecryptWithPKCS1v15Block(privKeyPem string, ciphertext []byte) ([]byte, 
 	return plaintext.Bytes(), nil
 }
 
-// RSASignWithPKCS1v15Digest signs data using PKCS#1 v1.5 with sha256/sha512.
+// RSASignWithPKCS1v15Digest 使用 RSA PKCS#1 v1.5 私钥对数据做摘要签名（导出名为 codec.RSASignWithPKCS1v15Digest）
+// 支持 sha256 与 sha512 两种摘要算法
+//
+// 参数:
+//   - privKeyPem: PEM 格式的 RSA 私钥
+//   - data: 待签名的原始数据
+//   - algo: 摘要算法名，支持 "sha256"、"sha512"（大小写与写法不敏感）
+//
+// 返回值:
+//   - 签名字节
+//   - 错误信息（算法不支持或签名失败时返回）
+//
+// Example:
+// ```
+// pub, pri = tls.GenerateRSA2048KeyPair()~
+// signature = codec.RSASignWithPKCS1v15Digest(pri, "hello yak", "sha256")~
+// valid = codec.RSAVerifyWithPKCS1v15Digest(pub, "hello yak", signature, "sha256")~
+// println(valid)
+// assert valid == true, "signature should be verified as valid"
+// ```
 func RSASignWithPKCS1v15Digest(privKeyPem string, data []byte, algo string) ([]byte, error) {
 	switch normalizeRSASignAlgo(algo) {
 	case "sha256":
@@ -83,7 +138,27 @@ func RSASignWithPKCS1v15Digest(privKeyPem string, data []byte, algo string) ([]b
 	}
 }
 
-// RSAVerifyWithPKCS1v15Digest verifies RSA signature using PKCS#1 v1.5 with sha256/sha512.
+// RSAVerifyWithPKCS1v15Digest 使用 RSA PKCS#1 v1.5 公钥验证摘要签名（导出名为 codec.RSAVerifyWithPKCS1v15Digest）
+// 与 codec.RSASignWithPKCS1v15Digest 配对使用，支持 sha256 与 sha512
+//
+// 参数:
+//   - pubKeyPem: PEM 格式的 RSA 公钥
+//   - data: 被签名的原始数据
+//   - signature: 待验证的签名字节
+//   - algo: 摘要算法名，支持 "sha256"、"sha512"
+//
+// 返回值:
+//   - 验证是否通过（true 表示签名有效）
+//   - 错误信息（算法不支持或验证出错时返回）
+//
+// Example:
+// ```
+// pub, pri = tls.GenerateRSA2048KeyPair()~
+// signature = codec.RSASignWithPKCS1v15Digest(pri, "hello yak", "sha256")~
+// valid = codec.RSAVerifyWithPKCS1v15Digest(pub, "hello yak", signature, "sha256")~
+// println(valid)
+// assert valid == true, "signature should be verified as valid"
+// ```
 func RSAVerifyWithPKCS1v15Digest(pubKeyPem string, data []byte, signature []byte, algo string) (bool, error) {
 	var err error
 	switch normalizeRSASignAlgo(algo) {
@@ -100,12 +175,48 @@ func RSAVerifyWithPKCS1v15Digest(pubKeyPem string, data []byte, signature []byte
 	return true, nil
 }
 
-// RSAEncryptWithJSEncryptStyle is an alias for PKCS#1 v1.5 block encryption compatibility.
+// RSAEncryptWithJSEncryptStyle 以兼容前端 JSEncrypt 库的方式做 RSA 加密（导出名为 codec.RSAEncryptWithJSEncryptStyle）
+// 等价于 PKCS#1 v1.5 分块加密，便于与使用 JSEncrypt 的前端互通
+//
+// 参数:
+//   - pubKeyPem: PEM 格式的 RSA 公钥
+//   - data: 待加密的明文字节
+//
+// 返回值:
+//   - 密文字节
+//   - 错误信息（公钥解析失败或加密失败时返回）
+//
+// Example:
+// ```
+// pub, pri = tls.GenerateRSA2048KeyPair()~
+// ciphertext = codec.RSAEncryptWithJSEncryptStyle(pub, "hello yak")~
+// plaintext = codec.RSADecryptWithJSEncryptStyle(pri, ciphertext)~
+// println(string(plaintext))
+// assert string(plaintext) == "hello yak", "JSEncrypt-style roundtrip should recover plaintext"
+// ```
 func RSAEncryptWithJSEncryptStyle(pubKeyPem string, data []byte) ([]byte, error) {
 	return RSAEncryptWithPKCS1v15Block(pubKeyPem, data)
 }
 
-// RSADecryptWithJSEncryptStyle is an alias for PKCS#1 v1.5 block decryption compatibility.
+// RSADecryptWithJSEncryptStyle 以兼容前端 JSEncrypt 库的方式做 RSA 解密（导出名为 codec.RSADecryptWithJSEncryptStyle）
+// 等价于 PKCS#1 v1.5 分块解密，与 codec.RSAEncryptWithJSEncryptStyle 配对使用
+//
+// 参数:
+//   - privKeyPem: PEM 格式的 RSA 私钥
+//   - ciphertext: 待解密的密文字节
+//
+// 返回值:
+//   - 解密得到的明文字节
+//   - 错误信息（私钥解析失败或解密失败时返回）
+//
+// Example:
+// ```
+// pub, pri = tls.GenerateRSA2048KeyPair()~
+// ciphertext = codec.RSAEncryptWithJSEncryptStyle(pub, "hello yak")~
+// plaintext = codec.RSADecryptWithJSEncryptStyle(pri, ciphertext)~
+// println(string(plaintext))
+// assert string(plaintext) == "hello yak", "JSEncrypt-style roundtrip should recover plaintext"
+// ```
 func RSADecryptWithJSEncryptStyle(privKeyPem string, ciphertext []byte) ([]byte, error) {
 	return RSADecryptWithPKCS1v15Block(privKeyPem, ciphertext)
 }
