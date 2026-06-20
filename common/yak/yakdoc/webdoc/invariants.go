@@ -72,6 +72,7 @@ func CheckMarkdownInvariants(md string) error {
 	}
 
 	fenceToggles := 0
+	exampleFenceLines := 0
 	inFence := false
 	h1 := 0
 	explicitIDs := map[string]int{}
@@ -83,6 +84,9 @@ func CheckMarkdownInvariants(md string) error {
 
 		if strings.HasPrefix(trimmed, "```") {
 			fenceToggles++
+			if strings.HasPrefix(trimmed, exampleFence) {
+				exampleFenceLines++
+			}
 			inFence = !inFence
 			tableCols = -1
 			continue
@@ -136,6 +140,9 @@ func CheckMarkdownInvariants(md string) error {
 
 	if inFence || fenceToggles%2 != 0 {
 		add("unbalanced code fence: %d fence lines", fenceToggles)
+	}
+	if exampleFenceLines%2 != 0 {
+		add("unbalanced 14-backtick example fence: %d fence lines", exampleFenceLines)
 	}
 	if h1 != 1 {
 		add("expected exactly 1 H1, got %d", h1)

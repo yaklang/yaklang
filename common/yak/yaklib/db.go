@@ -166,7 +166,21 @@ func saveHTTPFlowFromRawWithType(url string, req, rsp []byte, typeStr string) er
 // 返回值:
 //   - 错误信息（项目数据库不可用或保存失败时返回）
 //
-// Example:
+// <|EXAMPLE_START|> 基础入库（不带选项）
+// ```
+// // 不传任何选项，等价于最朴素的流量入库
+// host = "doc-demo-plain.example.com"
+// req = []byte(f"GET / HTTP/1.1\r\nHost: ${host}\r\n\r\n")
+// rsp = []byte("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok")
+// db.SaveHTTPFlowFromRawWithOption("http://"+host+"/", req, rsp)~
+//
+// found = 0
+// for flow in db.QueryHTTPFlowsByKeyword(host) { found++; break }
+// assert found == 1, "flow should be saved and retrievable"
+// ```
+// <|EXAMPLE_END|>
+//
+// <|EXAMPLE_START|> 带标签入库（使用选项 db.saveHTTPFlowWithTags）
 // ```
 // // 给入库的流量打上标签，便于后续在历史流量中筛选
 // host = "doc-demo-tagged.example.com"
@@ -181,6 +195,7 @@ func saveHTTPFlowFromRawWithType(url string, req, rsp []byte, typeStr string) er
 // for flow in db.QueryHTTPFlowsByKeyword(host) { found++; break }
 // assert found == 1, "tagged flow should be saved and retrievable"
 // ```
+// <|EXAMPLE_END|>
 func saveHTTPFlowFromRawWithOption(url string, req, rsp []byte, exOption ...yakit.CreateHTTPFlowOptions) error {
 	db := consts.GetGormProjectDatabase()
 	if db == nil {
@@ -308,25 +323,29 @@ var DatabaseExports = map[string]interface{}{
 // 返回值:
 //   - 错误信息（数据库不可用或写入失败时返回）
 //
-// Example:
+// <|EXAMPLE_START|> 基础读写
 // ```
-// // 1) 基础读写：保存与读取扫描目标
+// // 保存与读取扫描目标，用完即清理
 // db.SetKey("myscan-target", "192.168.1.0/24")
 // db.SetKey("myscan-ports", "22,80,443,3306,8080")
 // target = db.GetKey("myscan-target")
 // ports = db.GetKey("myscan-ports")
 // println(target)   // OUT: 192.168.1.0/24
 // assert target == "192.168.1.0/24" && ports == "22,80,443,3306,8080", "SetKey should persist the values"
+// db.DelKey("myscan-target"); db.DelKey("myscan-ports")
+// ```
+// <|EXAMPLE_END|>
 //
-// // 2) 联动 json：用键值存储保存结构化的扫描配置
+// <|EXAMPLE_START|> 联动 json 保存结构化配置
+// ```
+// // 值会被转成字符串，结构化数据需先序列化，读取时再反序列化
 // scanConfig = {"concurrent": 50, "timeout": 5, "excludes": [22, 3389]}
 // db.SetKey("myscan-config", json.dumps(scanConfig))
 // loaded = json.loads(db.GetKey("myscan-config"))
 // assert loaded["concurrent"] == 50 && len(loaded["excludes"]) == 2, "config should round-trip via json"
-//
-// // 3) 清理
-// db.DelKey("myscan-target"); db.DelKey("myscan-ports"); db.DelKey("myscan-config")
+// db.DelKey("myscan-config")
 // ```
+// <|EXAMPLE_END|>
 func dbSetKey(k, v interface{}) error {
 	return yakit.SetKey(consts.GetGormProfileDatabase(), k, v)
 }

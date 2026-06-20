@@ -235,7 +235,14 @@ func yakitStatusCard(id string, data interface{}, tags ...string) {
 //   - data: 卡片展示的数据（任意类型，会转为字符串展示）
 //   - tags: 可选的分组标签（可变参数）
 //
-// Example:
+// <|EXAMPLE_START|> 基础卡片
+// ```
+// // 输出一张关键指标卡片
+// yakit.StatusCard("Open Ports", 12, "stats")
+// ```
+// <|EXAMPLE_END|>
+//
+// <|EXAMPLE_START|> 循环中实时刷新（相同 id 原地更新）
 // ```
 // // 在扫描循环中实时更新统计卡片，并用 tags 把卡片分组
 // total = 8; openPorts = 0; vulns = 0
@@ -248,6 +255,7 @@ func yakitStatusCard(id string, data interface{}, tags ...string) {
 //     sleep(0.02)
 // }
 // ```
+// <|EXAMPLE_END|>
 func (c *YakitClient) StatusCard(id string, data interface{}, tags ...string) {
 	// yakitStatusCard(id, data, tags...)
 	c.Output(&YakitStatusCard{
