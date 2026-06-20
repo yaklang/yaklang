@@ -1,12 +1,14 @@
 package yaklib
 
 import (
+	"context"
 	"fmt"
 	"github.com/yaklang/yaklang/common/utils/reducer"
 	"reflect"
 	"runtime"
 	"runtime/debug"
 	"sort"
+	"time"
 
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/utils"
@@ -73,8 +75,106 @@ type (
 	funkGeneralReduceFuncType func(interface{}, interface{}) interface{}
 )
 
+// funkRetry 反复调用 handler，直到 handler 返回 false 或达到最大次数（导出名为 x.Retry）
+// handler 返回 true 表示"继续重试"，返回 false 表示"停止"
+//
+// 参数:
+//   - i: 最大重试次数
+//   - handler: 每次重试调用的函数，返回 true 继续、false 停止
+//
+// Example:
+// ```
+// count = 0
+// x.Retry(10, () => { count++; return count < 3 })
+// println(count)   // OUT: 3
+// assert count == 3, "Retry keeps calling while handler returns true"
+// ```
+func funkRetry(i int, handler func() bool) {
+	utils.Retry2(i, handler)
+}
+
+// funkSort 使用自定义的 less 比较函数对切片做稳定原地排序（导出名为 x.Sort）
+// less(i, j) 返回 true 表示下标 i 的元素应排在下标 j 之前
+//
+// 参数:
+//   - x: 待排序的切片(原地修改)
+//   - less: 比较函数，接收两个下标，返回是否 i 应排在 j 前
+//
+// Example:
+// ```
+// arr = [3, 1, 2]
+// x.Sort(arr, (i, j) => arr[i] < arr[j])
+// println(arr)   // OUT: [1 2 3]
+// assert arr[0] == 1 && arr[2] == 3, "Sort should sort the slice ascending in place"
+// ```
+func funkSort(x any, less func(i, j int) bool) {
+	sort.SliceStable(x, less)
+}
+
+// funkGCPercent 设置 GC 触发阈值百分比并返回旧值（导出名为 x.GCPercent）
+// percent 表示相对上次 GC 后存活堆的增长百分比，越小 GC 越频繁；负值可关闭 GC
+//
+// 参数:
+//   - percent: 新的 GC 阈值百分比
+//
+// 返回值:
+//   - 设置前的旧阈值百分比
+//
+// Example:
+// ```
+// old = x.GCPercent(150)
+// println(typeof(old).String())   // OUT: int
+// assert typeof(old).String() == "int", "GCPercent should return the previous percent as int"
+// x.GCPercent(old)
+// ```
+func funkGCPercent(percent int) int {
+	return debug.SetGCPercent(percent)
+}
+
+// funkNewReducer 创建一个归并器，超过 reduceLimit 条数据时用 handle 把较旧的数据合并（导出名为 x.NewReducer）
+// 常用于把无限增长的历史数据压缩到有限规模
+//
+// 参数:
+//   - reduceLimit: 触发归并的数据条数阈值
+//   - handle: 归并函数，接收一组字符串并返回合并后的单条字符串
+//
+// 返回值:
+//   - 归并器对象，可调用 Push 推入数据、GetData 获取当前数据
+//
+// Example:
+// ```
+// r = x.NewReducer(2, items => str.Join(items, ","))
+// r.Push("a"); r.Push("b"); r.Push("c")
+// data = r.GetData()
+// println(data)
+// assert len(data) >= 1, "reducer should keep reduced data"
+// ```
+func funkNewReducer(reduceLimit int, handle reducer.ReduceFunction) *reducer.Reducer {
+	return reducer.NewReducer(reduceLimit, handle)
+}
+
+// funkNewEventWatcher 创建一个事件观察器，按时间间隔或累计事件数触发回调（导出名为 x.NewEventWatcher）
+//
+// 参数:
+//   - ctx: 上下文，用于控制观察器生命周期
+//   - triggerTime: 触发的时间间隔
+//   - triggerCount: 触发的累计事件数阈值
+//
+// 返回值:
+//   - 事件观察器管理对象
+//
+// Example:
+// ```
+// d = time.ParseDuration("1s")~
+// w = x.NewEventWatcher(context.Background(), d, 10)
+// assert w != nil, "event watcher should be created"
+// ```
+func funkNewEventWatcher(ctx context.Context, triggerTime time.Duration, triggerCount int) *utils.EventWatcherManager {
+	return utils.NewEntityWatcher(ctx, triggerTime, triggerCount)
+}
+
 var FunkExports = map[string]interface{}{
-	"Retry":           utils.Retry2,
+	"Retry":           funkRetry,
 	"WaitConnect":     WaitConnect,
 	"Map":             funkMap,
 	"ToMap":           funk.ToMap,
@@ -109,14 +209,14 @@ var FunkExports = map[string]interface{}{
 	"Some":            funk.Some,
 	"Every":           funk.Every,
 	"Any":             funk.Any,
-	"Sort":            sort.SliceStable,
+	"Sort":            funkSort,
 	"Range":           funkRange,
 	"If":              funkIf,
 	"ConvertToMap":    funkConvertToMap,
 	"GC":              funkGC,
-	"GCPercent":       debug.SetGCPercent,
-	"NewReducer":      reducer.NewReducer,
-	"NewEventWatcher": utils.NewEntityWatcher,
+	"GCPercent":       funkGCPercent,
+	"NewReducer":      funkNewReducer,
+	"NewEventWatcher": funkNewEventWatcher,
 }
 
 // Map 遍历集合中的每个元素，使用回调函数处理后返回新的切片
