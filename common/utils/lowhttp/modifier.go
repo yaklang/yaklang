@@ -165,7 +165,7 @@ func SetHTTPPacketUrl(packet []byte, rawURL string) []byte {
 // ```
 // poc.ReplaceHTTPPacketFirstLine(`GET / HTTP/1.1
 // Host: Example.com
-// `, "GET /test HTTP/1.1")) // 向 example.com 发起请求，修改请求报文的第一行，请求/test路径
+// `, "GET /test HTTP/1.1") // 向 example.com 发起请求，修改请求报文的第一行，请求/test路径
 // ```
 func ReplaceHTTPPacketFirstLine(packet []byte, firstLine string) []byte {
 	headers := []string{firstLine}
@@ -334,7 +334,7 @@ func handleHTTPPacketPath(packet []byte, noAutoEncode bool, p string) []byte {
 // ```
 // poc.AppendHTTPPacketPath(`GET /docs HTTP/1.1
 // Host: yaklang.com
-// `, "/api/poc")) // 向 example.com 发起请求，实际上请求路径改为/docs/api/poc
+// `, "/api/poc") // 向 example.com 发起请求，实际上请求路径改为/docs/api/poc
 // ```
 func AppendHTTPPacketPath(packet []byte, p string) []byte {
 	var isChunked bool
@@ -1483,7 +1483,7 @@ func AppendHTTPPacketFormEncoded(packet []byte, key, value string) []byte {
 // Example:
 // ```
 // _, raw, _ = poc.ParseUrlToHTTPRequestRaw("POST", "https://pie.dev/post")
-// poc.AppendHTTPPacketUploadFile(raw, "file", "phpinfo.php", "<?php phpinfo(); ?>", "image/jpeg")) // 添加POST请求表单，其文件名为phpinfo.php，内容为<?php phpinfo(); ?>，文件类型为image/jpeg
+// poc.AppendHTTPPacketUploadFile(raw, "file", "phpinfo.php", "<?php phpinfo(); ?>", "image/jpeg") // 添加POST请求表单，其文件名为phpinfo.php，内容为<?php phpinfo(); ?>，文件类型为image/jpeg
 // ```
 func AppendHTTPPacketUploadFile(packet []byte, fieldName, fileName string, fileContent interface{}, contentType ...string) []byte {
 	hasContentType := len(contentType) > 0
@@ -1564,7 +1564,7 @@ func AppendHTTPPacketUploadFile(packet []byte, fieldName, fileName string, fileC
 // Example:
 // ```
 // _, raw, _ = poc.ParseUrlToHTTPRequestRaw("POST", "https://pie.dev/post")
-// poc.ReplaceHTTPPacketUploadFile(raw, "file", "phpinfo.php", "<?php phpinfo(); ?>", "image/jpeg")) // 添加POST请求表单，其文件名为phpinfo.php，内容为<?php phpinfo(); ?>，文件类型为image/jpeg
+// poc.ReplaceHTTPPacketUploadFile(raw, "file", "phpinfo.php", "<?php phpinfo(); ?>", "image/jpeg") // 添加POST请求表单，其文件名为phpinfo.php，内容为<?php phpinfo(); ?>，文件类型为image/jpeg
 // ```
 func ReplaceHTTPPacketUploadFile(packet []byte, fieldName, fileName string, fileContent interface{}, contentType ...string) []byte {
 	var (

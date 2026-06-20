@@ -2025,8 +2025,8 @@ func loadScriptByName(mng *YakToCallerManager, scriptName string, hookNames ...s
 // Example:
 // ```
 // // 示意性示例，需要本地插件数据库与预置引擎
-// fn = hook.CallYakitPluginFunc("my-plugin", "analyze")~
-// fn("target")
+// pluginFn = hook.CallYakitPluginFunc("my-plugin", "analyze")~
+// pluginFn("target")
 // ```
 func CallYakitPluginFunc(scriptName string, hookName string) (interface{}, error) {
 	if currentCoreEngine == nil {

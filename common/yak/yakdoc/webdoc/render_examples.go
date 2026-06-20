@@ -29,12 +29,18 @@ type DocExample struct {
 }
 
 // cleanExampleBlock 把示例原始行清洗为可直接包裹的纯代码：去掉已有的 ``` 围栏行、
+// 去掉单独成行的 "..." 省略占位(作者用来表示"此处省略代码"，并非合法 yak)、
 // 去公共缩进、去首尾空白。
+// 关键词: 示例清洗, 去围栏, 去省略号占位
 func cleanExampleBlock(lines []string) string {
 	kept := make([]string, 0, len(lines))
 	for _, line := range lines {
-		if strings.HasPrefix(strings.TrimSpace(line), "```") {
+		t := strings.TrimSpace(line)
+		if strings.HasPrefix(t, "```") {
 			continue
+		}
+		if t == "..." || t == "…" {
+			continue // 省略占位行，丢弃以免破坏语法
 		}
 		kept = append(kept, line)
 	}

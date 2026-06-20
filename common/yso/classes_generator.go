@@ -1049,10 +1049,12 @@ func GenTcpReverseShellClassObject(host string, port int, options ...GenClassOpt
 //
 // Example:
 // ```
-// body 回显
-// bodyClassObj,_ = yso.GetCommonsBeanutils1JavaObject(yso.useTomcatEchoTemplate(),yso.useEchoBody(),yso.useParam("Body Echo Check"))
-// header 回显
-// headerClassObj,_ = yso.GetCommonsBeanutils1JavaObject(yso.useTomcatEchoTemplate(),yso.useHeaderParam("Echo","Header Echo Check"))
+// <|EXAMPLE_START|> Tomcat 模板的 body 回显
+// bodyClassObj, _ = yso.GetCommonsBeanutils1JavaObject(yso.useTomcatEchoTemplate(), yso.useEchoBody(), yso.useParam("Body Echo Check"))
+// <|EXAMPLE_END|>
+// <|EXAMPLE_START|> Tomcat 模板的 header 回显
+// headerClassObj, _ = yso.GetCommonsBeanutils1JavaObject(yso.useTomcatEchoTemplate(), yso.useHeaderParam("Echo", "Header Echo Check"))
+// <|EXAMPLE_END|>
 // ```
 func SetClassTomcatEchoTemplate() GenClassOptionFun {
 	ct := ClassTomcatEcho
@@ -1070,10 +1072,12 @@ func SetClassTomcatEchoTemplate() GenClassOptionFun {
 //
 // Example:
 // ```
-// body 回显
-// bodyClassObj,_ = yso.GetCommonsBeanutils1JavaObject(yso.useTomcatEchoEvilClass(),yso.useEchoBody(),yso.useParam("Body Echo Check"))
-// header 回显
-// headerClassObj,_ = yso.GetCommonsBeanutils1JavaObject(yso.useTomcatEchoEvilClass(),yso.useHeaderParam("Echo","Header Echo Check"))
+// <|EXAMPLE_START|> Tomcat 恶意类的 body 回显
+// bodyClassObj, _ = yso.GetCommonsBeanutils1JavaObject(yso.useTomcatEchoEvilClass(), yso.useEchoBody(), yso.useParam("Body Echo Check"))
+// <|EXAMPLE_END|>
+// <|EXAMPLE_START|> Tomcat 恶意类的 header 回显
+// headerClassObj, _ = yso.GetCommonsBeanutils1JavaObject(yso.useTomcatEchoEvilClass(), yso.useHeaderParam("Echo", "Header Echo Check"))
+// <|EXAMPLE_END|>
 // ```
 func SetTomcatEchoEvilClass() GenClassOptionFun {
 	ct := ClassTomcatEcho
@@ -1093,10 +1097,12 @@ func SetTomcatEchoEvilClass() GenClassOptionFun {
 //
 // Example:
 // ```
-// body 回显
-// bodyClassObj,_ = yso.GenerateTomcatEchoEvilClassObject(yso.useEchoBody(),yso.useParam("Body Echo Check"))
-// header 回显
-// headerClassObj,_ = yso.GenerateTomcatEchoEvilClassObject(yso.useHeaderParam("Echo","Header Echo Check"))
+// <|EXAMPLE_START|> 生成 Tomcat 回显类对象的 body 回显
+// bodyClassObj, _ = yso.GenerateTomcatEchoEvilClassObject(yso.useEchoBody(), yso.useParam("Body Echo Check"))
+// <|EXAMPLE_END|>
+// <|EXAMPLE_START|> 生成 Tomcat 回显类对象的 header 回显
+// headerClassObj, _ = yso.GenerateTomcatEchoEvilClassObject(yso.useHeaderParam("Echo", "Header Echo Check"))
+// <|EXAMPLE_END|>
 // ```
 func GenTomcatEchoClassObject(options ...GenClassOptionFun) (*javaclassparser.ClassObject, error) {
 	return GenerateClassWithType(ClassTomcatEcho, options...)
@@ -1110,10 +1116,12 @@ func GenTomcatEchoClassObject(options ...GenClassOptionFun) (*javaclassparser.Cl
 //
 // Example:
 // ```
-// body 回显
-// bodyClassObj,_ = yso.GetCommonsBeanutils1JavaObject(yso.useMultiEchoTemplate(),yso.useEchoBody(),yso.useParam("Body Echo Check"))
-// header 回显
-// headerClassObj,_ = yso.GetCommonsBeanutils1JavaObject(yso.useMultiEchoTemplate(),yso.useHeaderParam("Echo","Header Echo Check"))
+// <|EXAMPLE_START|> MultiEcho 模板的 body 回显
+// bodyClassObj, _ = yso.GetCommonsBeanutils1JavaObject(yso.useMultiEchoTemplate(), yso.useEchoBody(), yso.useParam("Body Echo Check"))
+// <|EXAMPLE_END|>
+// <|EXAMPLE_START|> MultiEcho 模板的 header 回显
+// headerClassObj, _ = yso.GetCommonsBeanutils1JavaObject(yso.useMultiEchoTemplate(), yso.useHeaderParam("Echo", "Header Echo Check"))
+// <|EXAMPLE_END|>
 // ```
 func SetClassMultiEchoTemplate() GenClassOptionFun {
 	ct := ClassMultiEcho
@@ -1131,10 +1139,12 @@ func SetClassMultiEchoTemplate() GenClassOptionFun {
 //
 // Example:
 // ```
-// body 回显
-// bodyClassObj,_ =  yso.GetCommonsBeanutils1JavaObject(yso.useMultiEchoEvilClass(),yso.useEchoBody(),yso.useParam("Body Echo Check"))
-// header 回显
-// headerClassObj,_ = yso.GetCommonsBeanutils1JavaObject(yso.useMultiEchoEvilClass(),yso.useHeaderParam("Echo","Header Echo Check"))
+// <|EXAMPLE_START|> MultiEcho 恶意类的 body 回显
+// bodyClassObj, _ = yso.GetCommonsBeanutils1JavaObject(yso.useMultiEchoEvilClass(), yso.useEchoBody(), yso.useParam("Body Echo Check"))
+// <|EXAMPLE_END|>
+// <|EXAMPLE_START|> MultiEcho 恶意类的 header 回显
+// headerClassObj, _ = yso.GetCommonsBeanutils1JavaObject(yso.useMultiEchoEvilClass(), yso.useHeaderParam("Echo", "Header Echo Check"))
+// <|EXAMPLE_END|>
 // ```
 func SetMultiEchoEvilClass() GenClassOptionFun {
 	ct := ClassMultiEcho
@@ -1154,10 +1164,12 @@ func SetMultiEchoEvilClass() GenClassOptionFun {
 //
 // Example:
 // ```
-// body 回显
-// bodyClassObj,_ = yso.GenerateMultiEchoEvilClassObject(yso.useEchoBody(),yso.useParam("Body Echo Check"))
-// header 回显
-// headerClassObj,_ = yso.GenerateMultiEchoEvilClassObject(yso.useHeaderParam("Echo","Header Echo Check"))
+// <|EXAMPLE_START|> 生成 MultiEcho 回显类对象的 body 回显
+// bodyClassObj, _ = yso.GenerateMultiEchoEvilClassObject(yso.useEchoBody(), yso.useParam("Body Echo Check"))
+// <|EXAMPLE_END|>
+// <|EXAMPLE_START|> 生成 MultiEcho 回显类对象的 header 回显
+// headerClassObj, _ = yso.GenerateMultiEchoEvilClassObject(yso.useHeaderParam("Echo", "Header Echo Check"))
+// <|EXAMPLE_END|>
 // ```
 func GenMultiEchoClassObject(options ...GenClassOptionFun) (*javaclassparser.ClassObject, error) {
 	return GenerateClassWithType(ClassMultiEcho, options...)

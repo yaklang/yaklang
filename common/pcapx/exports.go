@@ -421,9 +421,9 @@ func InjectICMPIP(raw []byte, opt ...ConfigOption) {
 //
 // Example:
 // ```
-// // 该示例为示意性用法：注入混合流量(需要发包权限)
-// t = &pcapx.ChaosTraffic{HttpRequest: []byte("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")}
-// pcapx.InjectChaosTraffic(t)
+// // ChaosTraffic 可同时携带 HTTP、TCP/IP、UDP/IP、ICMP/IP 等多种负载，注入时按负载分别下发。
+// // 若只需注入单一 HTTP 负载，可直接使用底层原语 InjectHTTPRequest(需要发包权限)：
+// pcapx.InjectHTTPRequest("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
 // ```
 func InjectChaosTraffic(t *ChaosTraffic, opts ...ConfigOption) {
 	if t.HttpRequest != nil {
