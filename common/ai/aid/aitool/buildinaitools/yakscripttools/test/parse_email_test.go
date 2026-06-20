@@ -70,3 +70,25 @@ func TestParseEmailTool_Execute(t *testing.T) {
 		t.Errorf("output missing auth results, got:\n%s", stdout)
 	}
 }
+
+// TestParseEmailTool_RealEml 用真实 eml 跑工具的回归测试。
+// 设置环境变量 MAIL_TEST_EML=<eml路径> 后运行，否则跳过。
+func TestParseEmailTool_RealEml(t *testing.T) {
+	realPath := os.Getenv("MAIL_TEST_EML")
+	if realPath == "" {
+		t.Skip("set MAIL_TEST_EML=<path> to run real-email regression test")
+	}
+	tool := getParseEmailTool(t)
+	w1, w2 := bytes.NewBuffer(nil), bytes.NewBuffer(nil)
+	_, err := tool.Callback(context.Background(), aitool.InvokeParams{"file": realPath}, nil, w1, w2)
+	t.Logf("callback err: %v", err)
+	stdout, stderr := w1.String(), w2.String()
+	if len(stdout) > 800 {
+		stdout = stdout[:800]
+	}
+	if len(stderr) > 800 {
+		stderr = stderr[:800]
+	}
+	t.Logf("stdout:\n%s", stdout)
+	t.Logf("stderr:\n%s", stderr)
+}

@@ -450,28 +450,29 @@ func (p *parsedEmail) toMap() map[string]interface{} {
 
 // Parse 解析邮件原始内容（RFC 5322 + MIME），返回结构化研判信息。
 // 输入为邮件原始文本。返回 map 包含发件人/收件人/认证结果/正文/附件/URL/可疑指标等。
-func Parse(raw string) map[string]interface{} {
-	errResult := func(errMsg string) map[string]interface{} {
-		return map[string]interface{}{
-			"error":   errMsg,
-			"raw_size": len(raw),
-		}
-	}
-	if strings.TrimSpace(raw) == "" {
-		return errResult("empty email content")
-	}
-
+// 使用命名返回值 + recover：即使解析过程中发生 panic，也保证返回非 nil map
+// （panic 信息写入 error 字段），避免上层反射 nil 触发 "MethodByName on zero Value"。
+func Parse(raw string) (result map[string]interface{}) {
+	result = map[string]interface{}{"raw_size": len(raw)}
 	defer func() {
-		_ = recover()
+		if r := recover(); r != nil {
+			result["error"] = fmt.Sprintf("parse panic recovered: %v", r)
+		}
 	}()
+	if strings.TrimSpace(raw) == "" {
+		result["error"] = "empty email content"
+		return
+	}
 
 	msg, err := mail.ReadMessage(strings.NewReader(raw))
 	if err != nil {
-		return errResult(fmt.Sprintf("mail.ReadMessage failed: %v", err))
+		result["error"] = fmt.Sprintf("mail.ReadMessage failed: %v", err)
+		return
 	}
 	p := newParsedEmail()
 	parseMessageCore(msg, p)
-	return p.toMap()
+	result = p.toMap()
+	return
 }
 
 // ParseFile 读取 .eml 文件并解析。
