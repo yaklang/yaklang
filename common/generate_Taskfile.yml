@@ -7,16 +7,16 @@ tasks:
     silent: true
     dir: yak/yakdoc
     cmds:
-      - go run -gcflags=all="-N -l" ./generate_doc/generate_doc.go ./doc/doc.gob.gzip
+      - go run -gcflags=all="-N -l" ./generate_doc/generate_doc.go ./doc/doc.gob.zst
     generates:
-      - ./doc/doc.gob.gzip
+      - ./doc/doc.gob.zst
   codec_doc:
     silent: true
     dir: yak/yaklib/codec/codegrpc/doc
     cmds:
-      - go run -gcflags=all="-N -l" codec_doc.go ../codec.gob.gzip
+      - go run -gcflags=all="-N -l" codec_doc.go ../codec.gob.zst
     generates:
-      - ../codec.gob.gzip
+      - ../codec.gob.zst
   proto:
     silent: true
     dir: yakgrpc

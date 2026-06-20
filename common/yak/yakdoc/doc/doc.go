@@ -11,7 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yakdoc"
 )
 
-//go:embed doc.gob.gzip
+//go:embed doc.gob.zst
 var embedDocument []byte
 
 var (
@@ -33,7 +33,7 @@ func GetDefaultDocumentHelper() *yakdoc.DocumentHelper {
 			return
 		}
 
-		buf, err := utils.GzipDeCompress(embedDocument)
+		buf, err := utils.ZstdDeCompress(embedDocument)
 		if err != nil {
 			log.Warnf("load embed yak document error: %v, creating empty document helper", err)
 			defaultDocumentHelper = &yakdoc.DocumentHelper{

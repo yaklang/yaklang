@@ -23,7 +23,7 @@ func main() {
 		panic(err)
 	}
 
-	if newBuf, err := utils.GzipCompress(buf.Bytes()); err != nil {
+	if newBuf, err := utils.ZstdCompress(buf.Bytes()); err != nil {
 		panic(err)
 	} else if err = ioutil.WriteFile(os.Args[1], newBuf, 0o666); err != nil {
 		panic(err)
