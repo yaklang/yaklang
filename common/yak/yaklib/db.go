@@ -177,9 +177,7 @@ var DatabaseExports = map[string]interface{}{
 	"QueryUrlsByKeyword":      queryUrlsByKeyword,
 	"QueryUrlsAll":            queryAllUrls,
 	"QueryHTTPFlowsByKeyword": queryHTTPFlowByKeyword,
-	"QueryHTTPFlowsAll": func() chan *schema.HTTPFlow {
-		return queryHTTPFlowByKeyword("")
-	},
+	"QueryHTTPFlowsAll": dbQueryHTTPFlowsAll,
 	"QueryPortsByUpdatedAt":       queryPortsByUpdatedAt,
 	"QueryPortsByTaskName":        queryPortsByTaskName,
 	"QueryPortsByRuntimeId":       queryPortsByRuntimeId,
@@ -195,24 +193,12 @@ var DatabaseExports = map[string]interface{}{
 	"GetAllPayloadGroupsName":     getAllPayloadGroupsName,
 	"DeletePayloadByGroup":        deletePayloadByGroup,
 	"YieldPayload":                YieldPayload,
-	"GetProjectKey": func(k any) string {
-		return yakit.GetProjectKey(consts.GetGormProjectDatabase(), k)
-	},
-	"SetProjectKey": func(k, v any) error {
-		return yakit.SetProjectKey(consts.GetGormProjectDatabase(), k, v)
-	},
-	"SetKey": func(k, v interface{}) error {
-		return yakit.SetKey(consts.GetGormProfileDatabase(), k, v)
-	},
-	"SetKeyWithTTL": func(k, v any, ttl int) error {
-		return yakit.SetKeyWithTTL(consts.GetGormProfileDatabase(), k, v, ttl)
-	},
-	"GetKey": func(k interface{}) string {
-		return yakit.GetKey(consts.GetGormProfileDatabase(), k)
-	},
-	"DelKey": func(k interface{}) {
-		yakit.DelKey(consts.GetGormProfileDatabase(), k)
-	},
+	"GetProjectKey": dbGetProjectKey,
+	"SetProjectKey": dbSetProjectKey,
+	"SetKey":        dbSetKey,
+	"SetKeyWithTTL": dbSetKeyWithTTL,
+	"GetKey":        dbGetKey,
+	"DelKey":        dbDelKey,
 
 	"GetYakitPluginByName": queryYakitPluginByName,
 	"GetYakitPluginByID":   getYakitPluginByID,
@@ -228,12 +214,10 @@ var DatabaseExports = map[string]interface{}{
 	// CreateTemporaryYakScript
 	"CreateTemporaryYakScript": yakit.CreateTemporaryYakScript,
 
-	"NewAliveHost": YakitNewAliveHost,
-	"QueryAliveHost": func(runtimeId string) chan *schema.AliveHost {
-		return yakit.YieldAliveHostRuntimeId(consts.GetGormProjectDatabase(), context.Background(), runtimeId)
-	},
+	"NewAliveHost":   YakitNewAliveHost,
+	"QueryAliveHost": dbQueryAliveHost,
 
-	"saveHTTPFlowWithTags": yakit.CreateHTTPFlowWithTags,
+	"saveHTTPFlowWithTags": dbSaveHTTPFlowWithTags,
 
 	// operate origin database
 	"OpenDatabase":           OpenDatabase,
@@ -242,37 +226,270 @@ var DatabaseExports = map[string]interface{}{
 
 	"ScanResult": ScanResult,
 
-	"SaveAIYakScript": func(tool *schema.AIYakTool) error {
-		db := consts.GetGormProfileDatabase()
-		if db == nil {
-			return utils.Error("empty database connection")
-		}
-		_, err := yakit.SaveAIYakTool(db, tool)
-		return err
-	},
+	"SaveAIYakScript": dbSaveAIYakScript,
 
 	// Yield AI materials
-	"YieldAllAITools": func() chan *schema.AIYakTool {
-		db := consts.GetGormProfileDatabase()
-		if db == nil {
-			return nil
-		}
-		return yakit.YieldAllAITools(context.Background(), db)
-	},
-	"YieldAllAIForges": func() chan *schema.AIForge {
-		db := consts.GetGormProfileDatabase()
-		if db == nil {
-			return nil
-		}
-		return yakit.YieldAllAIForges(context.Background(), db)
-	},
-	"YieldAllMCPServers": func() chan *schema.MCPServer {
-		db := consts.GetGormProfileDatabase()
-		if db == nil {
-			return nil
-		}
-		return yakit.YieldAllMCPServers(context.Background(), db)
-	},
+	"YieldAllAITools":    dbYieldAllAITools,
+	"YieldAllAIForges":   dbYieldAllAIForges,
+	"YieldAllMCPServers": dbYieldAllMCPServers,
+}
+
+// SetKey 向 Profile 数据库写入一个键值对（导出名为 db.SetKey）
+// 键值会持久化保存，可用 db.GetKey 读取、db.DelKey 删除；适合在脚本之间共享配置或中间数据
+//
+// 参数:
+//   - k: 键
+//   - v: 值
+//
+// 返回值:
+//   - 错误信息（写入失败时返回）
+//
+// Example:
+// ```
+// db.SetKey("doc_demo_key", "hello yak")
+// println(db.GetKey("doc_demo_key"))   // OUT: hello yak
+// assert db.GetKey("doc_demo_key") == "hello yak", "SetKey should persist the value"
+// db.DelKey("doc_demo_key")
+// ```
+func dbSetKey(k, v interface{}) error {
+	return yakit.SetKey(consts.GetGormProfileDatabase(), k, v)
+}
+
+// SetKeyWithTTL 向 Profile 数据库写入一个带过期时间的键值对（导出名为 db.SetKeyWithTTL）
+// 在 ttl 秒之后该键自动失效
+//
+// 参数:
+//   - k: 键
+//   - v: 值
+//   - ttl: 过期时间，单位秒
+//
+// 返回值:
+//   - 错误信息（写入失败时返回）
+//
+// Example:
+// ```
+// db.SetKeyWithTTL("doc_demo_ttl", "temp", 60)
+// println(db.GetKey("doc_demo_ttl"))   // OUT: temp
+// assert db.GetKey("doc_demo_ttl") == "temp", "SetKeyWithTTL value should be readable before it expires"
+// db.DelKey("doc_demo_ttl")
+// ```
+func dbSetKeyWithTTL(k, v any, ttl int) error {
+	return yakit.SetKeyWithTTL(consts.GetGormProfileDatabase(), k, v, ttl)
+}
+
+// GetKey 从 Profile 数据库读取一个键对应的值（导出名为 db.GetKey）
+//
+// 参数:
+//   - k: 键
+//
+// 返回值:
+//   - 键对应的值字符串；键不存在时返回空字符串
+//
+// Example:
+// ```
+// db.SetKey("doc_demo_get", "value123")
+// v = db.GetKey("doc_demo_get")
+// println(v)   // OUT: value123
+// assert v == "value123", "GetKey should return the stored value"
+// db.DelKey("doc_demo_get")
+// ```
+func dbGetKey(k interface{}) string {
+	return yakit.GetKey(consts.GetGormProfileDatabase(), k)
+}
+
+// DelKey 从 Profile 数据库删除一个键（导出名为 db.DelKey）
+//
+// 参数:
+//   - k: 要删除的键
+//
+// Example:
+// ```
+// db.SetKey("doc_demo_del", "tobedeleted")
+// db.DelKey("doc_demo_del")
+// println(db.GetKey("doc_demo_del"))   // OUT:
+// assert db.GetKey("doc_demo_del") == "", "DelKey should remove the key"
+// ```
+func dbDelKey(k interface{}) {
+	yakit.DelKey(consts.GetGormProfileDatabase(), k)
+}
+
+// SetProjectKey 向当前项目数据库写入一个键值对（导出名为 db.SetProjectKey）
+// 与 db.SetKey 类似，但作用域为当前项目；可用 db.GetProjectKey 读取
+//
+// 参数:
+//   - k: 键
+//   - v: 值
+//
+// 返回值:
+//   - 错误信息（写入失败时返回）
+//
+// Example:
+// ```
+// db.SetProjectKey("doc_demo_pkey", "pval")
+// println(db.GetProjectKey("doc_demo_pkey"))   // OUT: pval
+// assert db.GetProjectKey("doc_demo_pkey") == "pval", "SetProjectKey should persist the project-scoped value"
+// ```
+func dbSetProjectKey(k, v any) error {
+	return yakit.SetProjectKey(consts.GetGormProjectDatabase(), k, v)
+}
+
+// GetProjectKey 从当前项目数据库读取一个键对应的值（导出名为 db.GetProjectKey）
+//
+// 参数:
+//   - k: 键
+//
+// 返回值:
+//   - 键对应的值字符串；键不存在时返回空字符串
+//
+// Example:
+// ```
+// db.SetProjectKey("doc_demo_pget", "pvalue")
+// v = db.GetProjectKey("doc_demo_pget")
+// println(v)   // OUT: pvalue
+// assert v == "pvalue", "GetProjectKey should return the project-scoped value"
+// ```
+func dbGetProjectKey(k any) string {
+	return yakit.GetProjectKey(consts.GetGormProjectDatabase(), k)
+}
+
+// QueryHTTPFlowsAll 查询数据库中保存的全部 HTTP 流量记录（导出名为 db.QueryHTTPFlowsAll）
+// 以 channel 形式逐条返回，便于流式遍历
+//
+// 返回值:
+//   - 逐条产出 HTTP 流量记录的 channel
+//
+// Example:
+// ```
+// // 遍历数据库中已保存的全部 HTTP 流量
+// count = 0
+// for flow in db.QueryHTTPFlowsAll() {
+//     count++
+//     if count > 5 { break }
+// }
+// println("scanned http flows")
+// ```
+func dbQueryHTTPFlowsAll() chan *schema.HTTPFlow {
+	return queryHTTPFlowByKeyword("")
+}
+
+// QueryAliveHost 按运行时 ID 查询存活主机记录（导出名为 db.QueryAliveHost）
+// 以 channel 形式逐条返回，常配合扫描任务的 runtimeId 使用
+//
+// 参数:
+//   - runtimeId: 扫描任务的运行时 ID
+//
+// 返回值:
+//   - 逐条产出存活主机记录的 channel
+//
+// Example:
+// ```
+// // runtimeId 来自某次扫描任务（示意性示例）
+// for host in db.QueryAliveHost("example-runtime-id") {
+//     println(host.IP)
+// }
+// ```
+func dbQueryAliveHost(runtimeId string) chan *schema.AliveHost {
+	return yakit.YieldAliveHostRuntimeId(consts.GetGormProjectDatabase(), context.Background(), runtimeId)
+}
+
+// saveHTTPFlowWithTags 构造一个为 HTTP 流量附加标签的保存选项（导出名为 db.saveHTTPFlowWithTags）
+// 作为保存 HTTP 流量相关接口的可选项使用，用于在入库时打上指定标签
+//
+// 参数:
+//   - tags: 要附加的标签字符串（多个标签可用分隔符拼接）
+//
+// 返回值:
+//   - HTTP 流量保存选项
+//
+// Example:
+// ```
+// // 作为保存 HTTP 流量的可选项使用（示意性示例）
+// opt = db.saveHTTPFlowWithTags("suspicious")
+// ```
+func dbSaveHTTPFlowWithTags(tags string) yakit.CreateHTTPFlowOptions {
+	return yakit.CreateHTTPFlowWithTags(tags)
+}
+
+// SaveAIYakScript 将一个 AI 工具定义保存到 Profile 数据库（导出名为 db.SaveAIYakScript）
+//
+// 参数:
+//   - tool: AI 工具定义对象
+//
+// 返回值:
+//   - 错误信息（数据库不可用或保存失败时返回）
+//
+// Example:
+// ```
+// // tool 为已构造的 AIYakTool 对象（示意性示例）
+// db.SaveAIYakScript(tool)~
+// ```
+func dbSaveAIYakScript(tool *schema.AIYakTool) error {
+	db := consts.GetGormProfileDatabase()
+	if db == nil {
+		return utils.Error("empty database connection")
+	}
+	_, err := yakit.SaveAIYakTool(db, tool)
+	return err
+}
+
+// YieldAllAITools 遍历 Profile 数据库中保存的全部 AI 工具（导出名为 db.YieldAllAITools）
+// 以 channel 形式逐条返回
+//
+// 返回值:
+//   - 逐条产出 AI 工具的 channel
+//
+// Example:
+// ```
+// for tool in db.YieldAllAITools() {
+//     println(tool.Name)
+// }
+// ```
+func dbYieldAllAITools() chan *schema.AIYakTool {
+	db := consts.GetGormProfileDatabase()
+	if db == nil {
+		return nil
+	}
+	return yakit.YieldAllAITools(context.Background(), db)
+}
+
+// YieldAllAIForges 遍历 Profile 数据库中保存的全部 AI Forge（导出名为 db.YieldAllAIForges）
+// 以 channel 形式逐条返回
+//
+// 返回值:
+//   - 逐条产出 AI Forge 的 channel
+//
+// Example:
+// ```
+// for forge in db.YieldAllAIForges() {
+//     println(forge.ForgeName)
+// }
+// ```
+func dbYieldAllAIForges() chan *schema.AIForge {
+	db := consts.GetGormProfileDatabase()
+	if db == nil {
+		return nil
+	}
+	return yakit.YieldAllAIForges(context.Background(), db)
+}
+
+// YieldAllMCPServers 遍历 Profile 数据库中保存的全部 MCP Server（导出名为 db.YieldAllMCPServers）
+// 以 channel 形式逐条返回
+//
+// 返回值:
+//   - 逐条产出 MCP Server 的 channel
+//
+// Example:
+// ```
+// for server in db.YieldAllMCPServers() {
+//     println(server.Name)
+// }
+// ```
+func dbYieldAllMCPServers() chan *schema.MCPServer {
+	db := consts.GetGormProfileDatabase()
+	if db == nil {
+		return nil
+	}
+	return yakit.YieldAllMCPServers(context.Background(), db)
 }
 
 // OpenDatabase 通过指定方言与连接源打开一个数据库连接（导出名为 db.OpenDatabase）
