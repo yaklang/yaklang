@@ -483,7 +483,7 @@ func _httpPool_MutateHookWithYPBStruct(params []*ypb.MutateMethod) HttpPoolConfi
 //
 // Example:
 // ```
-// // 标记请求来源，依赖网络，此处仅作示意
+// // 标记请求来源，依赖网络，无法本地验证(仅作示意)
 // res = httpool.Pool(reqs, fuzzx.source("my-plugin"))~
 // ```
 func _httpPool_Source(i string) HttpPoolConfigOption {
@@ -501,7 +501,7 @@ func _httpPool_Source(i string) HttpPoolConfigOption {
 //
 // Example:
 // ```
-// // 设置运行时 ID，依赖网络，此处仅作示意
+// // 设置运行时 ID，依赖网络，无法本地验证(仅作示意)
 // res = httpool.Pool(reqs, fuzzx.runtimeID("task-001"))~
 // ```
 func _httpPool_runtimeId(i string) HttpPoolConfigOption {
@@ -519,7 +519,7 @@ func _httpPool_runtimeId(i string) HttpPoolConfigOption {
 //
 // Example:
 // ```
-// // 提供 fuzztag 渲染参数，依赖网络，此处仅作示意
+// // 提供 fuzztag 渲染参数，依赖网络，无法本地验证(仅作示意)
 // res = httpool.Pool(reqs, httpool.fuzz(true), httpool.fuzzParams({"id": ["1", "2"]}))~
 // ```
 func _httpPool_SetFuzzParams(i interface{}) HttpPoolConfigOption {
@@ -539,7 +539,7 @@ func _httpPool_SetFuzzParams(i interface{}) HttpPoolConfigOption {
 //
 // Example:
 // ```
-// // 启用 fuzztag 渲染，依赖网络，此处仅作示意
+// // 启用 fuzztag 渲染，依赖网络，无法本地验证(仅作示意)
 // res = httpool.Pool(reqs, httpool.fuzz(true))~
 // ```
 func _httpPool_SetForceFuzz(b bool) HttpPoolConfigOption {
@@ -563,7 +563,7 @@ func _httpPool_SetForceFuzzDangerous(b bool) HttpPoolConfigOption {
 //
 // Example:
 // ```
-// // 设置每个请求间隔 1 秒，依赖网络，此处仅作示意
+// // 设置每个请求间隔 1 秒，依赖网络，无法本地验证(仅作示意)
 // res = httpool.Pool(reqs, fuzzx.delay(1))~
 // ```
 func _httpPool_DelaySeconds(b float64) HttpPoolConfigOption {
@@ -594,7 +594,7 @@ func _httpPool_DelayMaxSeconds(b float64) HttpPoolConfigOption {
 //
 // Example:
 // ```
-// // 传入可取消的上下文，依赖网络，此处仅作示意
+// // 传入可取消的上下文，依赖网络，无法本地验证(仅作示意)
 // ctx = context.New()
 // res = httpool.Pool(reqs, httpool.context(ctx))~
 // ```
@@ -613,7 +613,7 @@ func _httpPool_SetContext(ctx context.Context) HttpPoolConfigOption {
 //
 // Example:
 // ```
-// // 禁止跟随重定向，依赖网络，此处仅作示意
+// // 禁止跟随重定向，依赖网络，无法本地验证(仅作示意)
 // res = httpool.Pool(reqs, fuzzx.noRedirect(true))~
 // ```
 func _httpPool_SetNoFollowRedirect(i bool) HttpPoolConfigOption {
@@ -637,7 +637,7 @@ func _httpPool_SetFollowJSRedirect(i bool) HttpPoolConfigOption {
 //
 // Example:
 // ```
-// // 设置 20 并发，依赖网络，此处仅作示意
+// // 设置 20 并发，依赖网络，无法本地验证(仅作示意)
 // res = httpool.Pool(reqs, httpool.size(20))~
 // ```
 func _httpPool_SetSize(i int) HttpPoolConfigOption {
@@ -662,7 +662,7 @@ func _httpPool_SetSizedWaitGroup(i *utils.SizedWaitGroup) HttpPoolConfigOption {
 //
 // Example:
 // ```
-// // 以原始报文模式发送，依赖网络，此处仅作示意
+// // 以原始报文模式发送，依赖网络，无法本地验证(仅作示意)
 // res = httpool.Pool(reqs, httpool.rawMode(true))~
 // ```
 func _httpPool_RawMode(b bool) HttpPoolConfigOption {
@@ -680,7 +680,7 @@ func _httpPool_RawMode(b bool) HttpPoolConfigOption {
 //
 // Example:
 // ```
-// // 设置单请求超时 5 秒，依赖网络，此处仅作示意
+// // 设置单请求超时 5 秒，依赖网络，无法本地验证(仅作示意)
 // res = httpool.Pool(reqs, httpool.perRequestTimeout(5))~
 // ```
 func _httpPool_PerRequestTimeout(f float64) HttpPoolConfigOption {
@@ -704,7 +704,7 @@ func _httpPool_DialTimeout(f float64) HttpPoolConfigOption {
 //
 // Example:
 // ```
-// // 不自动修复 Content-Length，依赖网络，此处仅作示意
+// // 不自动修复 Content-Length，依赖网络，无法本地验证(仅作示意)
 // res = httpool.Pool(reqs, httpool.noFixContentLength(true))~
 // ```
 func _httpPool_noFixContentLength(f bool) HttpPoolConfigOption {
@@ -722,7 +722,7 @@ func _httpPool_noFixContentLength(f bool) HttpPoolConfigOption {
 //
 // Example:
 // ```
-// // 最多跟随 3 次重定向，依赖网络，此处仅作示意
+// // 最多跟随 3 次重定向，依赖网络，无法本地验证(仅作示意)
 // res = httpool.Pool(reqs, httpool.redirectTimes(3))~
 // ```
 func _httpPool_redirectTimes(f int) HttpPoolConfigOption {
@@ -741,7 +741,7 @@ func _httpPool_redirectTimes(f int) HttpPoolConfigOption {
 //
 // Example:
 // ```
-// // 禁止跟随重定向，依赖网络，此处仅作示意
+// // 禁止跟随重定向，依赖网络，无法本地验证(仅作示意)
 // res = httpool.Pool(reqs, httpool.noRedirect(true))~
 // ```
 func _httpPool_noRedirects(i bool) HttpPoolConfigOption {
@@ -760,7 +760,7 @@ func _httpPool_noRedirects(i bool) HttpPoolConfigOption {
 //
 // Example:
 // ```
-// // 强制连接指定主机，依赖网络，此处仅作示意
+// // 强制连接指定主机，依赖网络，无法本地验证(仅作示意)
 // res = httpool.Pool(reqs, httpool.host("127.0.0.1", false), httpool.port(8080))~
 // ```
 func _httpPool_Host(h string, isHttps bool) HttpPoolConfigOption {
@@ -793,7 +793,7 @@ func _httpPool_Host(h string, isHttps bool) HttpPoolConfigOption {
 //
 // Example:
 // ```
-// // 强制连接 8080 端口，依赖网络，此处仅作示意
+// // 强制连接 8080 端口，依赖网络，无法本地验证(仅作示意)
 // res = httpool.Pool(reqs, httpool.host("127.0.0.1", false), httpool.port(8080))~
 // ```
 func _httpPool_Port(port int) HttpPoolConfigOption {
@@ -811,7 +811,7 @@ func _httpPool_Port(port int) HttpPoolConfigOption {
 //
 // Example:
 // ```
-// // 以 HTTPS 发送，依赖网络，此处仅作示意
+// // 以 HTTPS 发送，依赖网络，无法本地验证(仅作示意)
 // res = httpool.Pool(reqs, httpool.https(true))~
 // ```
 func _httpPool_IsHttps(f bool) HttpPoolConfigOption {
@@ -841,7 +841,7 @@ func _httpPool_RandomJA3(f bool) HttpPoolConfigOption {
 //
 // Example:
 // ```
-// // 通过本地代理发送，依赖网络，此处仅作示意
+// // 通过本地代理发送，依赖网络，无法本地验证(仅作示意)
 // res = httpool.Pool(reqs, httpool.proxy("http://127.0.0.1:8083"))~
 // ```
 func _httpPool_proxies(proxies ...string) HttpPoolConfigOption {
@@ -859,7 +859,7 @@ func _httpPool_proxies(proxies ...string) HttpPoolConfigOption {
 //
 // Example:
 // ```
-// // 标记来源插件，依赖网络，此处仅作示意
+// // 标记来源插件，依赖网络，无法本地验证(仅作示意)
 // res = httpool.Pool(reqs, fuzzx.fromPlugin("my-plugin"))~
 // ```
 func _httpPool_fromPlugin(plugin string) HttpPoolConfigOption {
@@ -901,7 +901,7 @@ func _httpPool_inner_payload(m *sync.Map) HttpPoolConfigOption {
 //
 // Example:
 // ```
-// // 设置命名调用上下文，依赖网络，此处仅作示意
+// // 设置命名调用上下文，依赖网络，无法本地验证(仅作示意)
 // res = httpool.Pool(reqs, fuzzx.namingContext("scan-group-1"))~
 // ```
 func _httpPool_namingContext(invokerName string) HttpPoolConfigOption {
@@ -919,7 +919,7 @@ func _httpPool_namingContext(invokerName string) HttpPoolConfigOption {
 //
 // Example:
 // ```
-// // 启用连接池复用，依赖网络，此处仅作示意
+// // 启用连接池复用，依赖网络，无法本地验证(仅作示意)
 // res = httpool.Pool(reqs, httpool.connPool(true))~
 // ```
 func _httpPool_withConnPool(b bool) HttpPoolConfigOption {
@@ -1079,7 +1079,7 @@ func NewDefaultHttpPoolConfig(opts ...HttpPoolConfigOption) *httpPoolConfig {
 //
 // Example:
 // ```
-// // 并发批量发包，依赖网络，此处仅作示意
+// // 并发批量发包，依赖网络，无法本地验证(仅作示意)
 // raw = `GET / HTTP/1.1
 // Host: www.example.com
 //
