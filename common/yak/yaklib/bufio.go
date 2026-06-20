@@ -10,14 +10,22 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-// NewBuffer 创建一个新的 Buffer 结构体引用，其帮助我们处理字符串
-// Buffer 也实现了 Reader 和 Writer 接口
-// 常用的 Buffer 方法有：Bytes, String, Read, Write, WriteString, WriteByte, Reset
+// NewBuffer 创建一个新的 Buffer 结构体引用，其帮助我们处理字符串（导出名为 bufio.NewBuffer）
+// Buffer 同时实现了 Reader 和 Writer 接口
+// 常用方法：Bytes, String, Read, Write, WriteString, WriteByte, Reset
+//
+// 参数:
+//   - b: 可选的初始内容字节
+//
+// 返回值:
+//   - 新建的 Buffer 对象
+//
 // Example:
 // ```
-// buffer = bufio.NewBuffer() // 或者你也可以使用 io.NewBuffer("hello yak") 来初始化一个 Buffer
+// buffer = bufio.NewBuffer()
 // buffer.WriteString("hello yak")
-// data, err = io.ReadAll(buffer) // data = b"hello yak", err = nil
+// println(buffer.String())   // OUT: hello yak
+// assert buffer.String() == "hello yak", "NewBuffer should hold written content"
 // ```
 func _newBuffer(b ...[]byte) *bytes.Buffer {
 	buffer := &bytes.Buffer{}
@@ -27,11 +35,22 @@ func _newBuffer(b ...[]byte) *bytes.Buffer {
 	return buffer
 }
 
-// NewReader 根据传入的 Reader 创建一个新的 BufioReader 结构体引用
-// 常用的 BufioReader 方法有：Read, ReadByte, ReadBytes, ReadLine, ReadString, Reset
+// NewReader 根据传入的 Reader 创建一个新的带缓冲 Reader（导出名为 bufio.NewReader）
+// 常用方法：Read, ReadByte, ReadBytes, ReadLine, ReadString, Reset
+//
+// 参数:
+//   - raw: 可选的底层 io.Reader；不传则使用空缓冲
+//
+// 返回值:
+//   - 带缓冲的 Reader 对象
+//   - 错误信息（传入类型非 io.Reader 时返回）
+//
 // Example:
 // ```
-// reader = bufio.NewReader(os.Stdin)
+// reader = bufio.NewReader(bufio.NewBuffer("line1\nline2"))~
+// first = reader.ReadString('\n')~
+// println(first)   // OUT: line1
+// assert first == "line1\n", "NewReader ReadString should read up to and including the delimiter"
 // ```
 func _newReader(raw ...interface{}) (*bufio.Reader, error) {
 	var i any
@@ -47,11 +66,23 @@ func _newReader(raw ...interface{}) (*bufio.Reader, error) {
 	}
 }
 
-// NewReaderSize 根据传入的 Reader 创建一个新的 BufioReader 结构体引用，其的缓存大小为 size
-// 常用的 BufioReader 方法有：Read, ReadByte, ReadBytes, ReadLine, ReadString, Reset
+// NewReaderSize 根据传入的 Reader 创建一个指定缓冲区大小的带缓冲 Reader（导出名为 bufio.NewReaderSize）
+// 常用方法：Read, ReadByte, ReadBytes, ReadLine, ReadString, Reset
+//
+// 参数:
+//   - i: 底层 io.Reader
+//   - size: 缓冲区大小（字节）
+//
+// 返回值:
+//   - 带缓冲的 Reader 对象
+//   - 错误信息（传入类型非 io.Reader 时返回）
+//
 // Example:
 // ```
-// reader = bufio.NewReaderSize(os.Stdin, 1024)
+// reader = bufio.NewReaderSize(bufio.NewBuffer("abcdef"), 1024)~
+// part = reader.ReadString('c')~
+// println(part)   // OUT: abc
+// assert part == "abc", "NewReaderSize ReadString should read up to delimiter c"
 // ```
 func _newReaderSize(i interface{}, size int) (*bufio.Reader, error) {
 	if rd, ok := i.(io.Reader); ok {
@@ -61,13 +92,25 @@ func _newReaderSize(i interface{}, size int) (*bufio.Reader, error) {
 	}
 }
 
-// NewWriter 根据传入的 Writer 创建一个新的 BufioWriter 结构体引用
-// 常用的 BufioWriter 方法有：Write, WriteByte, WriteString, Reset, Flush
+// NewWriter 根据传入的 Writer 创建一个新的带缓冲 Writer（导出名为 bufio.NewWriter）
+// 写入会先进入缓冲区，需调用 Flush 才会真正写到底层 Writer
+// 常用方法：Write, WriteByte, WriteString, Reset, Flush
+//
+// 参数:
+//   - raw: 可选的底层 io.Writer；不传则写入空缓冲
+//
+// 返回值:
+//   - 带缓冲的 Writer 对象
+//   - 错误信息（传入类型非 io.Writer 时返回）
+//
 // Example:
 // ```
-// writer, err = bufio.NewWriter(os.Stdout)
+// sink = bufio.NewBuffer()
+// writer = bufio.NewWriter(sink)~
 // writer.WriteString("hello yak")
 // writer.Flush()
+// println(sink.String())   // OUT: hello yak
+// assert sink.String() == "hello yak", "NewWriter should flush buffered data to the sink"
 // ```
 func _newWriter(raw ...interface{}) (*bufio.Writer, error) {
 	var i any
@@ -83,13 +126,25 @@ func _newWriter(raw ...interface{}) (*bufio.Writer, error) {
 	}
 }
 
-// NewWriterSize 根据传入的 Writer 创建一个新的 BufioWriter 结构体引用，其的缓存大小为 size
-// 常用的 BufioWriter 方法有：Write, WriteByte, WriteString, Reset, Flush
+// NewWriterSize 根据传入的 Writer 创建一个指定缓冲区大小的带缓冲 Writer（导出名为 bufio.NewWriterSize）
+// 常用方法：Write, WriteByte, WriteString, Reset, Flush
+//
+// 参数:
+//   - i: 底层 io.Writer
+//   - size: 缓冲区大小（字节）
+//
+// 返回值:
+//   - 带缓冲的 Writer 对象
+//   - 错误信息（传入类型非 io.Writer 时返回）
+//
 // Example:
 // ```
-// writer, err = bufio.NewWriterSize(os.Stdout, 1024)
+// sink = bufio.NewBuffer()
+// writer = bufio.NewWriterSize(sink, 1024)~
 // writer.WriteString("hello yak")
 // writer.Flush()
+// println(sink.String())   // OUT: hello yak
+// assert sink.String() == "hello yak", "NewWriterSize should flush buffered data to the sink"
 // ```
 func _newWriterSize(i interface{}, size int) (*bufio.Writer, error) {
 	if wd, ok := i.(io.Writer); ok {
@@ -99,11 +154,23 @@ func _newWriterSize(i interface{}, size int) (*bufio.Writer, error) {
 	}
 }
 
-// NewReadWriter 根据传入的 Reader 和 Writer 创建一个新的 BufioReadWriter 结构体引用
-// BufioReadWriter 可以同时调用 BufioReader 和 BufioWriter 的方法
+// NewReadWriter 根据传入的 Reader 和 Writer 创建一个带缓冲的 ReadWriter（导出名为 bufio.NewReadWriter）
+// ReadWriter 可同时调用带缓冲 Reader 与 Writer 的方法
+//
+// 参数:
+//   - i: 底层 io.Reader
+//   - i2: 底层 io.Writer
+//
+// 返回值:
+//   - 带缓冲的 ReadWriter 对象
+//   - 错误信息（任一参数类型不符时返回）
+//
 // Example:
 // ```
-// rw, err = bufio.NewReadWriter(os.Stdin, os.Stdout)
+// rw = bufio.NewReadWriter(bufio.NewBuffer("input"), bufio.NewBuffer())~
+// line = rw.ReadString('t')~
+// println(line)   // OUT: input
+// assert line == "input", "NewReadWriter should read from the underlying reader"
 // ```
 func _newReadWriter(i, i2 interface{}) (*bufio.ReadWriter, error) {
 	var (
@@ -124,15 +191,23 @@ func _newReadWriter(i, i2 interface{}) (*bufio.ReadWriter, error) {
 	return bufio.NewReadWriter(rd, wd), nil
 }
 
-// NewScanner 根据传入的 Reader 创建一个新的 Scanner 结构体引用
-// 常用的 Scanner 方法有：Scan, Text, Err, Split, SplitFunc
+// NewScanner 根据传入的 Reader 创建一个 Scanner（导出名为 bufio.NewScanner）
+// Scanner 默认按行切分输入，常用方法：Scan, Text, Err, Split, SplitFunc
+//
+// 参数:
+//   - i: 底层 io.Reader
+//
+// 返回值:
+//   - Scanner 对象
+//   - 错误信息（传入类型非 io.Reader 时返回）
+//
 // Example:
 // ```
-// buf = bufio.NewBuffer("hello yak\nhello yakit")
-// scanner, err = bufio.NewScanner(buf)
-// for scanner.Scan() {
-// println(scanner.Text())
-// }
+// scanner = bufio.NewScanner(bufio.NewBuffer("a\nb\nc"))~
+// count = 0
+// for scanner.Scan() { count++ }
+// println(count)   // OUT: 3
+// assert count == 3, "NewScanner should iterate over 3 lines"
 // ```
 func _newScanner(i interface{}) (*bufio.Scanner, error) {
 	if rd, ok := i.(io.Reader); ok {
@@ -142,18 +217,20 @@ func _newScanner(i interface{}) (*bufio.Scanner, error) {
 	}
 }
 
-// bufio.NewPipe 创建一个新的管道，返回一个 PipeReader 和 PipeWriter
+// NewPipe 创建一个内存管道，返回配对的 PipeReader 与 PipeWriter（导出名为 bufio.NewPipe）
+// 写入端写入的数据可从读取端读出，常用于在协程间传递流式数据
+//
+// 返回值:
+//   - 管道读取端 PipeReader
+//   - 管道写入端 PipeWriter
+//
 // Example:
 // ```
 // r, w = bufio.NewPipe()
-//
-//	go func{
-//	    w.Write("Hello World");
-//	    w.Close()
-//	}
-//
+// go func() { w.Write("Hello World"); w.Close() }()
 // data = io.ReadAll(r)~
-// println(string(data))
+// println(string(data))   // OUT: Hello World
+// assert string(data) == "Hello World", "NewPipe should transfer data from writer to reader"
 // ```
 func _newPipe() (*bufpipe.PipeReader, *bufpipe.PipeWriter) {
 	r, w := bufpipe.NewPipe()
@@ -168,5 +245,5 @@ var BufioExport = map[string]interface{}{
 	"NewWriterSize": _newWriterSize,
 	"NewReadWriter": _newReadWriter,
 	"NewScanner":    _newScanner,
-	"NewPipe":       bufpipe.NewPipe,
+	"NewPipe":       _newPipe,
 }
