@@ -122,21 +122,30 @@ var WithExcludeFunc = ssaconfig.WithCompileExcludeFiles
 // the compile-time exclude files option.
 var WithExcludeFile = ssaconfig.WithCompileExcludeFiles
 
+var withProcessOption = ssaconfig.SetOption("ssa_compile/process", func(c *Config, v ProcessFunc) {
+	c.process = v
+})
+
 // WithProcess 设置编译进度回调（导出名为 ssa.withProcess）
+// 编译过程中会以 (进度消息, 进度比例) 回调该函数，常用于展示编译进度
+//
 // 参数:
-//   - v: 进度回调函数，参数为 (msg 进度消息, process 进度比例)
+//   - v: 进度回调函数，参数为 (msg 进度消息, process 进度比例 0~1)
 //
 // 返回值:
-//   - 编译配置可选项
+//   - 编译配置可选项，可传入 ssa.Parse
 //
 // Example:
 // ```
-// opt = ssa.withProcess(func(msg, process) { println(msg) })
-// println(opt)
+// called = false
+// prog = ssa.Parse(`a = 1; b = a + 1; println(b)`, ssa.withProcess((msg, process) => { called = true }))~
+// println(called)   // OUT: true
+// assert prog != nil, "parse with withProcess option should succeed"
+// assert called == true, "process callback should be invoked during compilation"
 // ```
-var WithProcess = ssaconfig.SetOption("ssa_compile/process", func(c *Config, v ProcessFunc) {
-	c.process = v
-})
+func WithProcess(v ProcessFunc) ssaconfig.Option {
+	return withProcessOption(v)
+}
 
 var WithReCompile = ssaconfig.WithCompileReCompile
 
@@ -211,23 +220,30 @@ func WithExternLib(name string, table map[string]any) ssaconfig.Option {
 	}
 }
 
-// WithExternValue 为 SSA 编译注入外部值符号（导出名为 ssa.withExternValue）
-// 参数:
-//   - table: 外部值的符号表（名称到值的映射）
-//
-// 返回值:
-//   - 编译配置可选项
-//
-// Example:
-// ```
-// opt = ssa.withExternValue({"VERSION": "1.0"})
-// println(opt)
-// ```
-var WithExternValue = ssaconfig.SetOption("ssa_compile/extern_value", func(c *Config, table map[string]any) {
+var withExternValueOption = ssaconfig.SetOption("ssa_compile/extern_value", func(c *Config, table map[string]any) {
 	for name, value := range table {
 		c.externValue[name] = value
 	}
 })
+
+// WithExternValue 为 SSA 编译注入外部值符号（导出名为 ssa.withExternValue）
+// 让分析器把这些名称识别为已知的外部符号，避免被当作未定义变量
+//
+// 参数:
+//   - table: 外部值的符号表（名称到值的映射）
+//
+// 返回值:
+//   - 编译配置可选项，可传入 ssa.Parse
+//
+// Example:
+// ```
+// prog = ssa.Parse(`x = EXTERN_VAL`, ssa.withExternValue({"EXTERN_VAL": 123}))~
+// println(prog != nil)   // OUT: true
+// assert prog != nil, "parse with withExternValue option should succeed"
+// ```
+func WithExternValue(table map[string]any) ssaconfig.Option {
+	return withExternValueOption(table)
+}
 
 var WithExternMethod = ssaconfig.SetOption("ssa_compile/extern_method", func(c *Config, b ssa.MethodBuilder) {
 	c.externMethod = b

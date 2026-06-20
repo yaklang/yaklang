@@ -115,23 +115,112 @@ func Search(query string, options ...ostype.SearchOption) ([]*ostype.OmniSearchR
 	return res.Results, nil
 }
 
+// omnisearchType 指定本次搜索使用的搜索器类型（导出名为 omnisearch.type）
+// 作为 omnisearch.Search 的可选项使用；配合 omnisearch.customSearcher 可将搜索路由到自定义搜索器
+//
+// 参数:
+//   - name: 搜索器类型名称
+//
+// 返回值:
+//   - 可传入 omnisearch.Search 的搜索选项
+//
+// Example:
+// ```
+// results = omnisearch.Search(
+//     "yaklang",
+//     omnisearch.type("mylocal"),
+//     omnisearch.customSearcher("mylocal", (query, cfg) => { return [f"hit-for-${query}"], nil }),
+// )~
+// println(len(results))   // OUT: 1
+// assert results[0].Content == "hit-for-yaklang", "type option should route to the local searcher"
+// ```
+func omnisearchType(name string) ostype.SearchOption {
+	return ostype.WithSearchType(ostype.SearcherType(name))
+}
+
+// omnisearchCustomSearcher 注册一个自定义搜索器，使 omnisearch.Search 调用本地处理函数（导出名为 omnisearch.customSearcher）
+// 配合 omnisearch.type(同名) 使用，可在不依赖外部搜索服务的情况下完成搜索
+//
+// 参数:
+//   - name: 自定义搜索器名称，需与 omnisearch.type 指定的类型名一致
+//   - handle: 处理函数，接收查询串与搜索配置，返回结果与错误
+//
+// 返回值:
+//   - 可传入 omnisearch.Search 的搜索选项
+//
+// Example:
+// ```
+// results = omnisearch.Search(
+//     "yaklang",
+//     omnisearch.type("mylocal"),
+//     omnisearch.customSearcher("mylocal", (query, cfg) => { return [f"hit-for-${query}"], nil }),
+// )~
+// println(results[0].Source)   // OUT: mylocal
+// assert results[0].Source == "mylocal", "customSearcher should produce results tagged with its name"
+// ```
+func omnisearchCustomSearcher(name string, handle CustomSearcherHandle) ostype.SearchOption {
+	return ostype.WithExtra("customSearcher", NewCustomSearcher(name, handle))
+}
+
+// omnisearchAPIKey 为本次搜索设置一个或多个 API Key（导出名为 omnisearch.apikey）
+// 作为 omnisearch.Search 的可选项；真实联网搜索时用于鉴权，可一次传入多个 key 做轮询
+//
+// 参数:
+//   - keys: 一个或多个 API Key
+//
+// 返回值:
+//   - 可传入 omnisearch.Search 的搜索选项
+//
+// Example:
+// ```
+// // 此处用自定义搜索器离线演示 apikey 选项被正确接收并传入 Search
+// results = omnisearch.Search(
+//     "yaklang",
+//     omnisearch.type("mylocal"),
+//     omnisearch.apikey("demo-key-1", "demo-key-2"),
+//     omnisearch.customSearcher("mylocal", (query, cfg) => { return ["ok"], nil }),
+// )~
+// println(len(results))   // OUT: 1
+// assert len(results) == 1, "apikey option should be accepted by Search"
+// ```
+func omnisearchAPIKey(keys ...string) ostype.SearchOption {
+	return ostype.WithExtra("apikeys", keys)
+}
+
+// omnisearchBackendType 指定聚合层后端使用的实际搜索器类型（导出名为 omnisearch.backendType）
+// 作为 omnisearch.Search 的可选项，用于让 aibalance 等聚合后端选择具体的下游搜索引擎
+//
+// 参数:
+//   - backendType: 后端搜索器类型名称
+//
+// 返回值:
+//   - 可传入 omnisearch.Search 的搜索选项
+//
+// Example:
+// ```
+// // 此处用自定义搜索器离线演示 backendType 选项被正确接收并传入 Search
+// results = omnisearch.Search(
+//     "yaklang",
+//     omnisearch.type("mylocal"),
+//     omnisearch.backendType("custom"),
+//     omnisearch.customSearcher("mylocal", (query, cfg) => { return ["ok"], nil }),
+// )~
+// println(len(results))   // OUT: 1
+// assert len(results) == 1, "backendType option should be accepted by Search"
+// ```
+func omnisearchBackendType(backendType string) ostype.SearchOption {
+	return ostype.WithExtra("backend_searcher_type", backendType)
+}
+
 var Exports = map[string]interface{}{
-	"Search": Search,
-	"type": func(name string) ostype.SearchOption {
-		return ostype.WithSearchType(ostype.SearcherType(name))
-	},
-	"proxy":    ostype.WithProxy,
-	"baseurl":  ostype.WithBaseURL,
-	"timeout":  ostype.WithTimeout,
-	"pagesize": ostype.WithPageSize,
-	"page":     ostype.WithPage,
-	"customSearcher": func(name string, handle CustomSearcherHandle) ostype.SearchOption {
-		return ostype.WithExtra("customSearcher", NewCustomSearcher(name, handle))
-	},
-	"apikey": func(keys ...string) ostype.SearchOption {
-		return ostype.WithExtra("apikeys", keys)
-	},
-	"backendType": func(backendType string) ostype.SearchOption {
-		return ostype.WithExtra("backend_searcher_type", backendType)
-	},
+	"Search":         Search,
+	"type":           omnisearchType,
+	"proxy":          ostype.WithProxy,
+	"baseurl":        ostype.WithBaseURL,
+	"timeout":        ostype.WithTimeout,
+	"pagesize":       ostype.WithPageSize,
+	"page":           ostype.WithPage,
+	"customSearcher": omnisearchCustomSearcher,
+	"apikey":         omnisearchAPIKey,
+	"backendType":    omnisearchBackendType,
 }

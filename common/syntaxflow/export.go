@@ -72,6 +72,36 @@ func QuerySyntaxFlowRules(name string, opts ...QueryRulesOption) chan *schema.Sy
 	return sfdb.YieldSyntaxFlowRules(db, context.Background())
 }
 
+// withSave 让 SyntaxFlow 查询结果以"查询(Query)"类型保存到数据库（导出名为 syntaxflow.withSave）
+// 作为 syntaxflow.ExecRule 等查询接口的可选项，保存后可后续按结果 ID 复查
+//
+// 返回值:
+//   - SyntaxFlow 查询可选项
+//
+// Example:
+// ```
+// opt = syntaxflow.withSave()
+// assert opt != nil, "withSave should return a query option"
+// ```
+func withSave() ssaapi.QueryOption {
+	return ssaapi.QueryWithSave(schema.SFResultKindQuery)
+}
+
+// withSearch 让 SyntaxFlow 查询结果以"搜索(Search)"类型保存到数据库（导出名为 syntaxflow.withSearch）
+// 与 syntaxflow.withSave 类似，但结果归类为搜索场景，便于区分用途
+//
+// 返回值:
+//   - SyntaxFlow 查询可选项
+//
+// Example:
+// ```
+// opt = syntaxflow.withSearch()
+// assert opt != nil, "withSearch should return a query option"
+// ```
+func withSearch() ssaapi.QueryOption {
+	return ssaapi.QueryWithSave(schema.SFResultKindSearch)
+}
+
 var Exports = map[string]any{
 	"ExecRule":       ExecRule,
 	"withExecTaskID": ssaapi.QueryWithTaskID,
@@ -79,12 +109,8 @@ var Exports = map[string]any{
 	"withProcess":    ssaapi.QueryWithProcessCallback,
 	"withContext":    ssaapi.QueryWithContext,
 	"withCache":      ssaapi.QueryWithUseCache,
-	"withSave": func() ssaapi.QueryOption {
-		return ssaapi.QueryWithSave(schema.SFResultKindQuery)
-	},
-	"withSearch": func() ssaapi.QueryOption {
-		return ssaapi.QueryWithSave(schema.SFResultKindSearch)
-	},
+	"withSave":   withSave,
+	"withSearch": withSearch,
 	"QuerySyntaxFlowRules":       QuerySyntaxFlowRules,
 	"MergeBeautificationResults": MergeBeautificationResultsForYak,
 	// 扫描任务 / 项目核对导出统一收敛到高层聚合入口。
