@@ -10,6 +10,23 @@ import (
 	"runtime/pprof"
 )
 
+// StartCPUProfile 开始 CPU 采样并将结果写入 profile 文件（导出名为 pprof.StartCPUProfile）
+// 该调用会阻塞直到采样时长结束（由 pprof.timeout 或 pprof.ctx 控制，默认 15 秒）
+//
+// 参数:
+//   - opts: 可选项，如 pprof.cpuProfilePath / pprof.timeout / pprof.ctx / pprof.onCPUProfileStarted / pprof.onCPUProfileFinished
+//
+// 返回值:
+//   - 错误信息
+//
+// Example:
+// ```
+// prof = file.Join(os.TempDir(), "cpu_demo.prof")
+// pprof.StartCPUProfile(pprof.cpuProfilePath(prof), pprof.timeout(1))
+// println(file.IsExisted(prof))   // OUT: true
+// assert file.IsExisted(prof), "StartCPUProfile should write a CPU profile file"
+// file.Remove(prof)
+// ```
 func StartCPUProfile(opts ...Option) error {
 	c := NewConfig()
 	for _, opt := range opts {
@@ -29,7 +46,10 @@ func StartCPUProfile(opts ...Option) error {
 
 	defer func() {
 		fd.Close()
-		if isStarted.IsSet() && c.onCPUProfileFinished != nil {
+		if c.onCPUProfileFinished == nil {
+			return
+		}
+		if isStarted.IsSet() {
 			c.onCPUProfileFinished(c.cpuProfileFile, nil)
 		} else {
 			c.onCPUProfileFinished(c.cpuProfileFile, utils.Error("cpu profile is not started"))

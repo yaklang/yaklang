@@ -129,6 +129,28 @@ func analyzePprof(prof *profile.Profile) []FunctionStat {
 }
 
 // AutoAnalyzeFile 分析指定的 pprof 文件并返回人类可读的分析结果
+// AutoAnalyzeFile 解析一个 pprof 采样文件并生成可读的性能分析报告（导出名为 pprof.AutoAnalyzeFile）
+// 报告按函数聚合采样数据，便于快速定位热点
+//
+// 参数:
+//   - filename: pprof 采样文件路径（由 pprof.StartCPUProfile 等生成）
+//
+// 返回值:
+//   - 文本格式的分析报告
+//   - 错误信息（文件读取/解析失败或无性能数据时返回）
+//
+// Example:
+// ```
+// prof = file.Join(os.TempDir(), "cpu_analyze_demo.prof")
+// stop = false
+// go func() { n = 0; for !stop { for i in 100000 { n = n + i } } }()
+// pprof.StartCPUProfile(pprof.cpuProfilePath(prof), pprof.timeout(2))
+// stop = true
+// report = pprof.AutoAnalyzeFile(prof)~
+// println(len(report) > 0)   // OUT: true
+// assert len(report) > 0, "AutoAnalyzeFile should produce a non-empty report"
+// file.Remove(prof)
+// ```
 func AutoAnalyzeFile(filename string) (string, error) {
 	data, err := os.ReadFile(filename)
 	if err != nil {
