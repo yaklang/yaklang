@@ -198,6 +198,18 @@ func (t *Tool) InvokeWithParams(params map[string]any, opts ...ToolInvokeOptions
 	for _, opt := range opts {
 		opt(cfg)
 	}
+
+	// Enforce focus-loop filesystem scope when declared.
+	if err := CheckToolScope(t.Name, params); err != nil {
+		return &ToolResult{
+			Param:       params,
+			Name:        t.Name,
+			Description: t.Description,
+			Success:     false,
+			Error:       err.Error(),
+		}, err
+	}
+
 	execResult, err := t.ExecuteToolWithCapture(cfg.ctx, params, cfg)
 	if err != nil {
 		if cb := cfg.GetErrCallback(); cb != nil {

@@ -39,8 +39,13 @@ func main() {
 			current.Enabled, len(current.IntelligentModels), len(current.LightweightModels))
 	}
 
-	// Configure Minimax via aibalance.
-	apiKey := "mf-aef7706d-c5a4-4d3e-8eaf-e53a82d622d2"
+	// Configure Minimax via aibalance. Do not hardcode provider credentials in
+	// source; pass the key through the environment for local eval runs.
+	apiKey := os.Getenv("AIBALANCE_API_KEY")
+	if apiKey == "" {
+		fmt.Fprintln(os.Stderr, "AIBALANCE_API_KEY is required")
+		os.Exit(1)
+	}
 
 	cfg := &ypb.AIGlobalConfig{
 		Enabled:       true,

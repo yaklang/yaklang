@@ -1,0 +1,49 @@
+{
+  "cve_id": "GHSA-v25v-m36w-jp4h",
+  "project_url": "https://github.com/hahwul/dalfox",
+  "commit_hash": "v2.12.0",
+  "language": "golang",
+  "description": "Dalfox REST server mode allows unauthenticated remote code execution because API authentication is optional by default and attacker-controlled FoundAction/FoundActionShell fields from POST /scan are propagated into scan options and executed via exec.Command when a finding is triggered.",
+  "vulns": [
+    {
+      "id": "VULN-001",
+      "type": "missing_authentication",
+      "file": "cmd/server.go",
+      "line": 51,
+      "description": "Server REST API key defaults to an empty string, so operators who start dalfox server without --api-key expose unauthenticated scan endpoints.",
+      "keywords": ["api-key", "StringVar", "cmd/server.go", "empty", "authentication"]
+    },
+    {
+      "id": "VULN-002",
+      "type": "missing_authentication",
+      "file": "pkg/server/server.go",
+      "line": 68,
+      "description": "REST auth middleware is only registered when APIKey is non-empty, leaving POST /scan unauthenticated in the default configuration.",
+      "keywords": ["setupEchoServer", "APIKey", "apiKeyAuth", "pkg/server/server.go"]
+    },
+    {
+      "id": "VULN-003",
+      "type": "command_injection",
+      "file": "pkg/server/server.go",
+      "line": 173,
+      "description": "postScanHandler binds attacker-controlled JSON into model.Options and passes FoundAction/FoundActionShell to ScanFromAPI without stripping execution-control fields.",
+      "keywords": ["postScanHandler", "Bind", "ScanFromAPI", "FoundAction", "FoundActionShell"]
+    },
+    {
+      "id": "VULN-004",
+      "type": "command_injection",
+      "file": "lib/func.go",
+      "line": 118,
+      "description": "Initialize explicitly propagates FoundAction and FoundActionShell from caller options into the final scan options.",
+      "keywords": ["Initialize", "FoundAction", "FoundActionShell", "lib/func.go"]
+    },
+    {
+      "id": "VULN-005",
+      "type": "command_injection",
+      "file": "pkg/scanning/foundaction.go",
+      "line": 17,
+      "description": "foundAction executes options.FoundAction through exec.Command(options.FoundActionShell, \"-c\", afterCmd), allowing arbitrary command execution when a finding is triggered.",
+      "keywords": ["foundAction", "exec.Command", "FoundActionShell", "afterCmd", "pkg/scanning/foundaction.go"]
+    }
+  ]
+}

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -142,6 +143,19 @@ func main() {
 				}
 			}
 
+			// Save per-subtask/phase metrics.
+			if len(taskResult.SubtaskMetrics) > 0 {
+				subtaskPath := filepath.Join(logDir, fmt.Sprintf("%s_%d_subtasks.json", gt.CVEID, i+1))
+				data, err := json.MarshalIndent(taskResult.SubtaskMetrics, "", "  ")
+				if err == nil {
+					if writeErr := os.WriteFile(subtaskPath, data, 0644); writeErr != nil {
+						fmt.Fprintf(os.Stderr, "Warning: save subtask metrics failed: %v\n", writeErr)
+					} else {
+						fmt.Printf("Subtask metrics: %s\n", subtaskPath)
+					}
+				}
+			}
+
 			logPath := filepath.Join(logDir, fmt.Sprintf("%s_%d.zip", gt.CVEID, i+1))
 			zipPath, err := harness.ExportLogs(ctx, client, taskResult.CoordinatorID, logPath)
 			if err != nil {
@@ -151,7 +165,7 @@ func main() {
 			}
 		}
 
-		evalResult := harness.Evaluate(gt, taskResult)
+		evalResult := harness.Evaluate(gt, taskResult, projectDir)
 		evalResult.Model = *model
 		results = append(results, evalResult)
 

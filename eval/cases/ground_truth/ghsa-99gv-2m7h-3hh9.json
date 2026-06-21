@@ -1,0 +1,41 @@
+{
+  "cve_id": "GHSA-99gv-2m7h-3hh9",
+  "project_url": "https://github.com/nezhahq/nezha",
+  "commit_hash": "50dc8e660326b9f22990898142c58b7a5312b42a",
+  "language": "golang",
+  "description": "Nezha dashboard lets RoleMember users create cron tasks through commonHandler and bypass per-server permission checks with Cover=CronCoverAll and an empty Servers list. CronTrigger then fans attacker-controlled commands out to every monitored server and exfiltrates output through notifications.",
+  "vulns": [
+    {
+      "id": "VULN-001",
+      "type": "missing_authorization",
+      "file": "cmd/dashboard/controller/controller.go",
+      "line": 131,
+      "description": "Cron write and trigger routes are wired through commonHandler instead of adminHandler, so any authenticated RoleMember can reach cron creation/update/manual trigger APIs.",
+      "keywords": ["commonHandler(createCron)", "commonHandler(updateCron)", "commonHandler(manualTriggerCron)", "controller.go", "cron"]
+    },
+    {
+      "id": "VULN-002",
+      "type": "missing_authorization",
+      "file": "cmd/dashboard/controller/cron.go",
+      "line": 53,
+      "description": "createCron checks ServerShared.CheckPermission over cf.Servers; an empty server list iterates zero items and returns true, bypassing per-server permissions.",
+      "keywords": ["createCron", "CheckPermission", "cf.Servers", "Servers", "CronCoverAll", "cron.go"]
+    },
+    {
+      "id": "VULN-003",
+      "type": "command_injection",
+      "file": "service/singleton/crontask.go",
+      "line": 133,
+      "description": "CronTrigger iterates every server in global ServerShared and sends TaskTypeCommand with cr.Command without checking that the cron owner may control each server.",
+      "keywords": ["CronTrigger", "ServerShared", "TaskTypeCommand", "cr.Command", "TaskStream.Send", "crontask.go"]
+    },
+    {
+      "id": "VULN-004",
+      "type": "data_exfiltration",
+      "file": "service/rpc/nezha.go",
+      "line": 56,
+      "description": "Task command output result.GetData is sent to the cron NotificationGroup, allowing attacker-controlled webhook exfiltration when PushSuccessful is true.",
+      "keywords": ["TaskTypeCommand", "PushSuccessful", "NotificationGroupID", "SendNotification", "result.GetData", "nezha.go"]
+    }
+  ]
+}

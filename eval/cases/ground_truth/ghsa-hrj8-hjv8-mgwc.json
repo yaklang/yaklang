@@ -1,0 +1,25 @@
+{
+  "cve_id": "GHSA-hrj8-hjv8-mgwc",
+  "project_url": "https://github.com/julien040/anyquery",
+  "commit_hash": "0abd460",
+  "language": "golang",
+  "description": "AppleScript/JXA code injection via unescaped URL in anyquery chrome_tabs plugin. A SQL-controlled url value is interpolated into an AppleScript/JavaScript template and executed via osascript, allowing arbitrary OS command execution on macOS.",
+  "vulns": [
+    {
+      "id": "VULN-001",
+      "type": "code-injection",
+      "file": "plugins/chrome/tabs.go",
+      "line": 141,
+      "description": "Insert path interpolates SQL-supplied url into AppleScript template via fmt.Sprintf(newTabScript, url) and executes with osascript -e without escaping quotes or newlines.",
+      "keywords": ["newTabScript", "osascript", "fmt.Sprintf", "plugins/chrome/tabs.go", "Insert"]
+    },
+    {
+      "id": "VULN-002",
+      "type": "code-injection",
+      "file": "plugins/chrome/tabs.go",
+      "line": 169,
+      "description": "Update path interpolates SQL-supplied url into JXA setURL.js template via fmt.Sprintf(setURLScript, pk, url) and executes with osascript -l JavaScript -e without escaping.",
+      "keywords": ["setURLScript", "osascript", "JavaScript", "fmt.Sprintf", "Update"]
+    }
+  ]
+}

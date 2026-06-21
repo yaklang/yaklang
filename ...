@@ -1,0 +1,3 @@
+<|TOOL_PARAM_content_{nonce}|>
+[long markdown]
+<|TOOL_PARAM_content_END_{nonce}|>

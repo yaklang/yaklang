@@ -8,6 +8,23 @@
 {{ if .EntryPoints }}- **入口点**: {{ .EntryPoints }}{{ end }}
 {{ if .ReconFile }}- **项目背景报告**（包含路由列表、数据访问模式、认证机制等详细信息）: {{ .ReconFile }}（调用 read_recon_notes 读取全文）{{ end }}
 
+{{ if .PreAnalysis }}
+### 安全相关组件（确定性分析）
+
+{{ .PreAnalysis }}
+
+> 以上信息来自确定性预分析，可直接用于指导搜索策略。例如：如果发现使用了 gorm，优先搜索 `.Raw()`、`.Where()` 拼接模式；如果发现使用了 gin，优先搜索 `c.Query()`、`c.PostForm()` 等用户输入获取点。
+{{ end }}
+
+{{ if .SFScanResult }}
+### SyntaxFlow 自动扫描结果（SSA IR 级分析）
+
+{{ .SFScanResult }}
+
+> 以上结果来自 SyntaxFlow 对编译后 SSA IR 的自动扫描。**Source 是已确认的用户输入入口，Sink 是已确认的危险函数调用**。
+> 你可以直接使用这些位置作为审计起点，不需要重新 grep 搜索这些函数。重点验证 Source→Sink 之间是否有数据流连接以及是否有有效过滤。
+{{ end }}
+
 ## 路径规范（必须遵守）
 
 **所有文件路径参数必须使用绝对路径。**

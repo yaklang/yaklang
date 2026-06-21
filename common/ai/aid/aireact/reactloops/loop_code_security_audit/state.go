@@ -107,6 +107,14 @@ type AuditState struct {
 	EntryPoints   string `json:"entry_points,omitempty"`
 	AuthMechanism string `json:"auth_mechanism,omitempty"`
 
+	// Phase 1 产出：确定性预分析结构化数据（不依赖 LLM，由 PreAnalyzeProject 生成）
+	PreAnalysis       *PreAnalysisResult `json:"pre_analysis,omitempty"`
+	PreAnalysisPrompt string             `json:"-"` // 预分析结果的 prompt 文本（不序列化）
+
+	// Phase 1.5 产出：SyntaxFlow lib 规则扫描结果
+	SFScanSummary       *SFScanSummary `json:"sf_scan_summary,omitempty"`
+	SFScanSummaryPrompt string         `json:"-"` // SF 扫描结果的 prompt 文本（不序列化）
+
 	// Phase 1 产出：侦察报告大纲（章节列表摘要，内存常驻，注入 Phase2/3 子 loop）
 	// 让后续 agent 知道报告有哪些章节，便于决策是否需要 read_recon_notes
 	ReconOutline string `json:"recon_outline,omitempty"`
@@ -167,6 +175,40 @@ func (s *AuditState) SetReconResult(techStack, entryPoints, authMechanism string
 	s.EntryPoints = entryPoints
 	s.AuthMechanism = authMechanism
 	s.Phase = AuditPhaseScan
+}
+
+// SetPreAnalysis 记录确定性预分析结果
+func (s *AuditState) SetPreAnalysis(result *PreAnalysisResult) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.PreAnalysis = result
+	if result != nil {
+		s.PreAnalysisPrompt = FormatPreAnalysisForPrompt(result)
+	}
+}
+
+// GetPreAnalysisPrompt 返回预分析结果的 prompt 文本
+func (s *AuditState) GetPreAnalysisPrompt() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.PreAnalysisPrompt
+}
+
+// SetSFScanSummary 记录 SyntaxFlow 扫描结果
+func (s *AuditState) SetSFScanSummary(summary *SFScanSummary) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.SFScanSummary = summary
+	if summary != nil {
+		s.SFScanSummaryPrompt = FormatSFScanSummaryForPrompt(summary)
+	}
+}
+
+// GetSFScanSummaryPrompt 返回 SF 扫描结果的 prompt 文本
+func (s *AuditState) GetSFScanSummaryPrompt() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.SFScanSummaryPrompt
 }
 
 // SetReconOutline 记录侦察报告大纲（章节列表），内存常驻供后续 phase 注入

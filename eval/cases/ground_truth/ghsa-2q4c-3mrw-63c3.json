@@ -1,0 +1,33 @@
+{
+  "cve_id": "GHSA-2q4c-3mrw-63c3",
+  "project_url": "https://github.com/kopia/kopia",
+  "commit_hash": "v0.22.3",
+  "language": "golang",
+  "description": "Kopia HTTP server started without a password exposes UI endpoints, including /api/v1/repo/exists. The handler forwards attacker-controlled SFTP storage configuration into blob.NewStorage; externalSSH with sshArguments containing -oProxyCommand can execute commands through OpenSSH.",
+  "vulns": [
+    {
+      "id": "VULN-001",
+      "type": "missing_authentication",
+      "file": "internal/server/server_authz_checks.go",
+      "line": 61,
+      "description": "When server username/password are not configured, getAuthenticator returns nil and requireUIUser authorizes UI endpoints without credentials.",
+      "keywords": ["getAuthenticator", "requireUIUser", "server_authz_checks.go", "without-password", "nil"]
+    },
+    {
+      "id": "VULN-002",
+      "type": "command_injection",
+      "file": "repo/blob/sftp/sftp_storage.go",
+      "line": 448,
+      "description": "SFTP externalSSH mode appends SSHArguments from user-supplied storage config into ssh command arguments without allowlisting dangerous options such as ProxyCommand.",
+      "keywords": ["SSHArguments", "externalSSH", "exec.CommandContext", "ProxyCommand", "sftp_storage.go"]
+    },
+    {
+      "id": "VULN-003",
+      "type": "command_injection",
+      "file": "internal/server/server_repository.go",
+      "line": 0,
+      "description": "The repo exists endpoint accepts attacker-controlled storage configuration and reaches blob.NewStorage, triggering SFTP backend initialization.",
+      "keywords": ["/api/v1/repo/exists", "repo/exists", "blob.NewStorage", "storage.config", "repository"]
+    }
+  ]
+}

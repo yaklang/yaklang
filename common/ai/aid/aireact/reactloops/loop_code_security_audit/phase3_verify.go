@@ -5,7 +5,6 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
-	"math"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -25,47 +24,33 @@ var phase3OutputExample string
 // phase3ReactiveDataTpl 是每轮注入的动态验证进度状态
 const phase3ReactiveDataTpl = `## 当前验证进度
 <|VERIFY_STATUS_{{ .Nonce }}|>
-**总计 Findings**: {{ .TotalFindings }} 个
-**已验证**: {{ .VerifiedCount }} 个（confirmed: {{ .ConfirmedCount }}，uncertain: {{ .UncertainCount }}，safe: {{ .SafeCount }}）
-**待验证**: {{ .RemainingCount }} 个
-**当前迭代**: {{ .IterationCount }}
+**Findings**: {{ .TotalFindings }} | **已验证**: {{ .VerifiedCount }}（confirmed: {{ .ConfirmedCount }}，uncertain: {{ .UncertainCount }}，safe: {{ .SafeCount }}）| **待验证**: {{ .RemainingCount }}
+**迭代**: {{ .IterationCount }}
 
 **技术栈**: {{ .TechStack }}
-**入口点**: {{ .EntryPoints }}
-{{ if .AuthMechanism }}**认证机制**: {{ .AuthMechanism }}{{ end }}
-
-> [路径规则] 所有工具路径必须使用用户指定的项目绝对路径，且注意各工具参数名不同：
-> - read_file 使用 file 参数（不是 path）
-> - grep 使用 path 参数
-> Finding 中的 file 字段通常是相对路径，调用工具前必须手动拼接用户指定的项目根目录。
-{{ if .ReconOutline }}
-**项目背景报告章节大纲**（报告已持久化，包含以下章节）:
-{{ .ReconOutline }}
-> 验证时如需路由映射、中间件链、数据访问模式等信息，优先调用 read_recon_notes 读取完整报告，比重新 grep 代码更高效。
-{{ else if .ReconFileHint }}
-**项目背景报告**: {{ .ReconFileHint }}（包含路由列表、数据访问模式、认证机制等背景信息）
-> 验证时如需了解路由映射、认证机制等背景，优先调用 read_recon_notes，而非重新扫描代码。
+{{ if .ReconFileHint }}
+**项目背景报告**: {{ .ReconFileHint }}（调用 read_recon_notes 读取）
 {{ end }}
 
 {{ if .PendingFindings }}
-### 待验证的 Findings（按 ID 顺序处理）
+### 待验证 Findings
 {{ .PendingFindings }}
 {{ end }}
 
 {{ if .FeedbackMessages }}
-### 上步操作反馈
+### 反馈
 {{ .FeedbackMessages }}
 {{ end }}
 <|VERIFY_STATUS_END_{{ .Nonce }}|>
 {{ if .ShouldForceConclusion }}
-[警告] 迭代次数已超过 80%。立即对当前正在验证的 Finding 调用 conclude_finding（可用 uncertain），然后依次完成剩余 Finding，最后调用 complete_verify。
+[警告] 迭代次数已超过 80%。立即对当前 Finding 调用 conclude_finding（可用 uncertain），然后依次完成剩余 Finding，最后调用 complete_verify。
 {{ end }}
-请从第一个待验证的 Finding 开始，依次调用 read_file/grep（不超过5次/Finding） → trace_data_flow → note_filter（如有） → conclude_finding。全部完成后调用 complete_verify。`
+请从第一个待验证 Finding 开始，依次调用 read_file/grep → trace_data_flow → conclude_finding。全部完成后调用 complete_verify。`
 
 // buildPhase3VerifyLoop 构建 Phase 3 验证 Loop
 // 目标：遍历所有 findings，逐个读取代码、追踪数据流、确认/排除漏洞
 func buildPhase3VerifyLoop(r aicommon.AIInvokeRuntime, state *AuditState, opts ...reactloops.ReActLoopOption) (*reactloops.ReActLoop, error) {
-	maxIter := math.MaxInt32
+	maxIter := 50 // 验证阶段最多 50 次迭代
 
 	preset := []reactloops.ReActLoopOption{
 		reactloops.WithMaxIterations(maxIter),
@@ -88,6 +73,7 @@ func buildPhase3VerifyLoop(r aicommon.AIInvokeRuntime, state *AuditState, opts .
 				"ReconFile":   state.GetReconFilePath(),
 				"TechStack":   state.TechStack,
 				"EntryPoints": state.EntryPoints,
+				"PreAnalysis": state.GetPreAnalysisPrompt(),
 			})
 		}),
 		reactloops.WithReflectionOutputExample(phase3OutputExample),
@@ -106,12 +92,18 @@ func buildPhase3VerifyLoop(r aicommon.AIInvokeRuntime, state *AuditState, opts .
 				}
 			}
 
-			// 构建待验证 finding 摘要
+			// 构建待验证 finding 摘要（最多显示 10 个）
 			var pendingBuf strings.Builder
+			pendingCount := 0
 			for _, f := range allFindings {
 				if !verifiedIDs[f.ID] {
-					pendingBuf.WriteString(fmt.Sprintf("- %s [%s] %s: %s (%s:%d)\n",
-						f.ID, f.Severity, f.Category, f.Title, f.File, f.Line))
+					pendingBuf.WriteString(fmt.Sprintf("- %s [%s] %s (%s:%d)\n",
+						f.ID, f.Severity, f.Title, f.File, f.Line))
+					pendingCount++
+					if pendingCount >= 10 {
+						pendingBuf.WriteString(fmt.Sprintf("... 还有 %d 个 finding\n", len(allFindings)-len(verifiedVulns)-pendingCount))
+						break
+					}
 				}
 			}
 
@@ -130,11 +122,8 @@ func buildPhase3VerifyLoop(r aicommon.AIInvokeRuntime, state *AuditState, opts .
 				"PendingFindings":       pendingBuf.String(),
 				"FeedbackMessages":      feedbacker.String(),
 				"IterationCount":        iterCount,
-				"ReconOutline":          state.GetReconOutline(),
 				"ReconFileHint":         reconFileHint,
 				"TechStack":             state.TechStack,
-				"EntryPoints":           state.EntryPoints,
-				"AuthMechanism":         state.AuthMechanism,
 				"ShouldForceConclusion": false,
 			})
 		}),

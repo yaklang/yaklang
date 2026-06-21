@@ -51,9 +51,9 @@ func isCJK(r rune) bool {
 
 // TokenUsage tracks estimated input/output token consumption for a task.
 type TokenUsage struct {
-	InputTokens     int `json:"input_tokens"`
-	OutputTokens    int `json:"output_tokens"`
-	TotalTokens     int `json:"total_tokens"`
+	InputTokens  int `json:"input_tokens"`
+	OutputTokens int `json:"output_tokens"`
+	TotalTokens  int `json:"total_tokens"`
 }
 
 // Total returns the sum of input and output tokens.
@@ -67,6 +67,14 @@ func (u TokenUsage) Total() int {
 //   - Input: observation, tool_stdout, tool_stderr, memory_retrieval
 //   - Other: counted as output (model-generated messages)
 func EstimateEventTokens(content, streamDelta []byte, eventType, nodeID string) TokenUsage {
+	switch eventType {
+	case "filesystem_pin_filename", "filesystem_pin_directory", "review_release",
+		"stream_start", "tool_call_watcher", "tool_call_status", "tool_call_log_dir",
+		"tool_call_param", "tool_call_done", "tool_call_summary", "reference_material",
+		"prompt_profile", "yak_exec_result":
+		return TokenUsage{}
+	}
+
 	total := EstimateTokens(content) + EstimateTokens(streamDelta)
 	if total == 0 {
 		return TokenUsage{}

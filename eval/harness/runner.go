@@ -27,6 +27,8 @@ type TaskConfig struct {
 	// SessionID is a unique ID for memory isolation between eval runs.
 	// Each run should use a fresh UUID-based session ID.
 	SessionID string
+	// SkipPhase1 skips Phase 1 (dir_explore) and goes directly to Phase 2 scanning.
+	SkipPhase1 bool
 }
 
 // TaskResult holds the outcome of a single AI Agent evaluation task.
@@ -44,6 +46,7 @@ type TaskResult struct {
 	FinalAnswer   string               `json:"final_answer"`
 	StreamErrors  []string             `json:"stream_errors"`
 	TokenUsage    TokenUsage           `json:"token_usage"`
+	SubtaskMetrics []SubtaskMetrics    `json:"subtask_metrics,omitempty"`
 	// consumptionAccumulated tracks authoritative input/output tokens from aibalance consumption events.
 	consumptionAccumulated TokenUsage
 }
@@ -314,8 +317,14 @@ func RunTask(ctx context.Context, client *Client, cfg TaskConfig) (*TaskResult, 
 		result.TokenUsage = result.consumptionAccumulated
 	}
 
+	// Compute per-subtask/phase metrics for later optimization analysis.
+	result.SubtaskMetrics = ComputeSubtaskMetrics(result.Events)
+
 	fmt.Printf("[harness] Task finished: %d events, %d thoughts, %d tool calls, %d errors, %.1fs, ~%d tokens\n",
 		result.EventCount, result.ThoughtCount, result.ToolCallCount, result.ErrorCount, result.Duration.Seconds(), result.TokenUsage.TotalTokens)
+	for _, sm := range result.SubtaskMetrics {
+		fmt.Printf("[harness] subtask %s: %.1fs, %d events, ~%d tokens\n", sm.Name, sm.DurationSeconds, sm.EventCount, sm.TotalTokens)
+	}
 
 	return result, nil
 }

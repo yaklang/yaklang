@@ -8,6 +8,12 @@
 {{ if .EntryPoints }}- **入口点**: {{ .EntryPoints }}{{ end }}
 {{ if .ReconFile }}- **项目背景报告**（包含路由列表、数据访问模式、认证机制、权限控制等详细信息）: {{ .ReconFile }}（调用 read_recon_notes 读取全文）{{ end }}
 
+{{ if .PreAnalysis }}
+### 安全相关组件（确定性分析）
+
+{{ .PreAnalysis }}
+{{ end }}
+
 ## 路径规范（必须遵守）
 
 **所有文件路径参数必须使用绝对路径。**

@@ -1,8 +1,6 @@
 package loop_dir_explore
 
 import (
-	"math"
-
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/log"
@@ -42,7 +40,7 @@ func generateExploreReport(
 	reportLoop, err := reactloops.CreateLoopByName(
 		schema.AI_REACT_LOOP_NAME_REPORT_GENERATING,
 		r,
-		reactloops.WithMaxIterations(math.MaxInt32),
+		reactloops.WithMaxIterations(maxExploreReportIterations),
 		reactloops.WithAllowUserInteract(false),
 		reactloops.WithInitTask(func(innerLoop *reactloops.ReActLoop, task aicommon.AIStatefulTask, innerOp *reactloops.InitTaskOperator) {
 			innerLoop.Set("report_filename", reportPath)

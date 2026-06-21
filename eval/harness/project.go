@@ -76,24 +76,34 @@ func EnsureProject(projectPath, projectUrl, commitHash, cveID string) (string, e
 
 // getProjectsBaseDir returns the absolute path to eval/projects.
 func getProjectsBaseDir() (string, error) {
-	// Try to locate relative to this source file via working directory.
+	// Prefer stable repository locations. When commands are run from
+	// yaklang_engine via `go run ./eval/cmd/...`, os.Executable points into the
+	// Go build cache, so deriving projects/ from the executable path makes eval
+	// runs non-reproducible.
 	wd, err := os.Getwd()
 	if err != nil {
 		return "", fmt.Errorf("getwd: %w", err)
 	}
-	// When running from yaklang_engine/eval, projects is ./projects.
-	candidate := filepath.Join(wd, "projects")
-	if _, err := os.Stat(candidate); err == nil {
-		abs, err := filepath.Abs(candidate)
-		return abs, err
+
+	candidates := []string{
+		filepath.Join(wd, "eval", "projects"), // running from yaklang_engine
+		filepath.Join(wd, "projects"),         // running from yaklang_engine/eval
+		filepath.Join(filepath.Dir(wd), "eval", "projects"),
 	}
+	for _, candidate := range candidates {
+		parent := filepath.Dir(candidate)
+		if st, err := os.Stat(parent); err == nil && st.IsDir() {
+			return filepath.Abs(candidate)
+		}
+	}
+
 	// Fallback: derive from executable path.
 	ex, err := os.Executable()
 	if err != nil {
 		return "", fmt.Errorf("executable path: %w", err)
 	}
 	exDir := filepath.Dir(ex)
-	candidate = filepath.Join(exDir, "projects")
+	candidate := filepath.Join(exDir, "projects")
 	abs, err := filepath.Abs(candidate)
 	return abs, err
 }

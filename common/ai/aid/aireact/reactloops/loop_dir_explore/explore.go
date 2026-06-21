@@ -17,6 +17,13 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+const (
+	maxExploreIterations       = 8
+	forceWriteNoteAfterIter    = 3
+	forceCompleteAfterIter     = 5
+	maxExploreReportIterations = 4
+)
+
 //go:embed prompts/explore_instruction.txt
 var exploreInstruction string
 
@@ -28,21 +35,21 @@ const exploreReactiveDataTpl = `## 当前探索状态
 [路径规范] 所有工具调用必须使用绝对路径，禁止使用相对路径
 目标目录: {{ .TargetPath }}
 探索进度: 已执行 {{ .IterationCount }} 次操作
-{{ if .NoteFiles }}已写出探索文件（{{ .NoteFileCount }} / 建议至少 3 个）:
-{{ .NoteFiles }}{{ else }}尚未写出任何探索文件（建议至少写出 3 个：dir_structure.md / entry_points.md / tech_stack.md）{{ end }}
+{{ if .NoteFiles }}已写出探索文件（{{ .NoteFileCount }} 个）:
+{{ .NoteFiles }}{{ else }}尚未写出探索文件（请写出 1 个综合探索文件，包含目录结构、入口点、技术栈）{{ end }}
+{{ if .NeedMoreFiles }}
+[收束要求] 你已经进行了多轮探索但还没有写出探索文件。下一步必须优先 write_file 写出 dir_structure.md。
+{{ end }}
+{{ if .ShouldForceComplete }}
+[强制收束] 已经达到探索预算。禁止继续 tree/grep/find_file/read_file；如果已有 dir_structure.md、entry_points.md 或 tech_stack.md，请立即调用 complete_explore。
+{{ end }}
 {{ if .FeedbackMessages }}
 ### 上步操作反馈
 {{ .FeedbackMessages }}
 {{ end }}
 <|EXPLORE_STATUS_END_{{ .Nonce }}|>
-{{ if .NeedMoreFiles }}
-[文件数量不足] 已写出 {{ .NoteFileCount }} 个文件，建议至少写出以下类别后再调用 complete_explore：
-  - 目录结构文件（dir_structure.md）
-  - 入口点文件（entry_points.md）
-  - 技术栈与依赖文件（tech_stack.md）
-{{ end }}
 
-[重要] complete_explore 是本 loop 退出的唯一合法方式。调用前请确保已用 write_file 写出足够的探索文件（建议 3 个以上）。`
+[重要] complete_explore 是本 loop 退出的唯一合法方式。调用前请确保已用 write_file 写出至少 1 个探索文件（综合包含目录结构、入口点、技术栈即可）。`
 
 // ExploreState 保存探索 loop 的共享状态
 type ExploreState struct {
@@ -201,10 +208,12 @@ func BuildDirExploreLoop(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoo
 		reactloops.WithPersistentContextProvider(func(loop *reactloops.ReActLoop, nonce string) (string, error) {
 			// 探索笔记的推荐写入目录：使用 aispace 机制生成，通过 loop var 缓存
 			exploreWorkDir := getOrCreateExploreWorkDir(r, loop)
+			preAnalysisHint := strings.TrimSpace(loop.Get("pre_analysis_hint"))
 			return utils.RenderTemplate(exploreInstruction, map[string]any{
-				"Nonce":          nonce,
-				"TargetPath":     state.TargetPath,
-				"ExploreWorkDir": exploreWorkDir,
+				"Nonce":            nonce,
+				"TargetPath":       state.TargetPath,
+				"ExploreWorkDir":   exploreWorkDir,
+				"PreAnalysisHint":  preAnalysisHint,
 			})
 		}),
 		reactloops.WithReflectionOutputExample(exploreOutputExample),
@@ -218,26 +227,28 @@ func BuildDirExploreLoop(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoo
 			}
 			exploreWorkDir := getOrCreateExploreWorkDir(r, loop)
 			hasFiles := len(noteFileList) > 0
-			needMoreFiles := hasFiles && len(noteFileList) < 3 && iterCount >= 10
+			needMoreFiles := !hasFiles && iterCount >= forceWriteNoteAfterIter
+			shouldForceComplete := hasFiles && iterCount >= forceCompleteAfterIter
 			return utils.RenderTemplate(exploreReactiveDataTpl, map[string]any{
-				"Nonce":            nonce,
-				"TargetPath":       state.TargetPath,
-				"IterationCount":   iterCount,
-				"NoteFiles":        noteFiles,
-				"NoteFileCount":    len(noteFileList),
-				"ExploreWorkDir":   exploreWorkDir,
-				"FeedbackMessages": feedbacker.String(),
-				"NeedMoreFiles":    needMoreFiles,
+				"Nonce":               nonce,
+				"TargetPath":          state.TargetPath,
+				"IterationCount":      iterCount,
+				"NoteFiles":           noteFiles,
+				"NoteFileCount":       len(noteFileList),
+				"ExploreWorkDir":      exploreWorkDir,
+				"FeedbackMessages":    feedbacker.String(),
+				"NeedMoreFiles":       needMoreFiles,
+				"ShouldForceComplete": shouldForceComplete,
 			})
 		}),
 	}
 
 	// 注册文件系统工具
-	preset = append(preset, buildFSToolAction(r, "tree", nil))
-	preset = append(preset, buildFSToolAction(r, "read_file", nil))
-	preset = append(preset, buildFSToolAction(r, "grep", nil))
-	preset = append(preset, buildFSToolAction(r, "find_file", nil))
-	preset = append(preset, buildFSToolAction(r, "write_file", func(action *aicommon.Action) {
+	preset = append(preset, buildFSToolAction(r, state, "tree", nil))
+	preset = append(preset, buildFSToolAction(r, state, "read_file", nil))
+	preset = append(preset, buildFSToolAction(r, state, "grep", nil))
+	preset = append(preset, buildFSToolAction(r, state, "find_file", nil))
+	preset = append(preset, buildFSToolAction(r, state, "write_file", func(action *aicommon.Action) {
 		filePath := action.GetString("file")
 		if filePath != "" {
 			state.addNoteFile(filePath)
@@ -358,6 +369,9 @@ func BuildDirExploreLoop(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoo
 	))
 
 	preset = append(preset, opts...)
+	// Keep the exploration budget local to this sub-loop. Some callers pass a
+	// much larger task-level iteration budget, which should not override Phase 1.
+	preset = append(preset, reactloops.WithMaxIterations(maxExploreIterations))
 	return reactloops.NewReActLoop("dir_explore", r, preset...)
 }
 
@@ -380,7 +394,7 @@ func getOrCreateExploreWorkDir(r aicommon.AIInvokeRuntime, loop *reactloops.ReAc
 // 执行完后直接 op.Continue()，不经过 ConvertAIToolToLoopAction，
 // 因此完全绕开了 VerifyUserSatisfaction 退出逻辑。
 // onAction 是可选的执行后回调，用于记录副作用（如 write_file 记录路径）。
-func buildFSToolAction(r aicommon.AIInvokeRuntime, toolName string, onAction func(action *aicommon.Action)) reactloops.ReActLoopOption {
+func buildFSToolAction(r aicommon.AIInvokeRuntime, state *ExploreState, toolName string, onAction func(action *aicommon.Action)) reactloops.ReActLoopOption {
 	toolMgr := r.GetConfig().GetAiToolManager()
 	if toolMgr == nil {
 		log.Warnf("[DirExplore] tool manager not available, skip %q action", toolName)
@@ -398,6 +412,18 @@ func buildFSToolAction(r aicommon.AIInvokeRuntime, toolName string, onAction fun
 		tool.BuildParamsOptions(),
 		nil,
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
+			noteFiles := state.getNoteFiles()
+			if loop.GetCurrentIterationIndex() >= forceWriteNoteAfterIter && len(noteFiles) == 0 && toolName != "write_file" {
+				op.Feedback("[探索预算即将耗尽] 还没有任何探索文件。禁止继续使用 tree/read_file/grep/find_file；下一步必须调用 write_file 写出 dir_structure.md，内容可基于已获得的目录树。")
+				op.Continue()
+				return
+			}
+			if loop.GetCurrentIterationIndex() >= forceCompleteAfterIter && hasDirStructureNote(noteFiles) && toolName != "write_file" {
+				op.Feedback("[探索预算已用尽] 已写出 dir_structure.md。禁止继续使用文件系统工具，请立即调用 complete_explore 提交技术栈、入口点和模块摘要。")
+				op.Continue()
+				return
+			}
+
 			invoker := loop.GetInvoker()
 			ctx := loop.GetConfig().GetContext()
 			if task := loop.GetCurrentTask(); task != nil && !utils.IsNil(task.GetContext()) {
@@ -456,6 +482,15 @@ func buildFSToolAction(r aicommon.AIInvokeRuntime, toolName string, onAction fun
 	)
 }
 
+func hasDirStructureNote(noteFiles []string) bool {
+	for _, f := range noteFiles {
+		if strings.HasSuffix(f, "/dir_structure.md") || strings.HasSuffix(f, "\\dir_structure.md") {
+			return true
+		}
+	}
+	return false
+}
+
 // isGrepEmptyResult 判断 grep 工具的输出是否为空结果（只有 [info] 头信息，无实际匹配行）。
 // grep 工具有匹配时每行格式为 "filepath:lineNo: content"，无匹配时只输出 [info] 行。
 // 通过 JSON 结构解析 stdout 字段来判断。
@@ -500,11 +535,11 @@ func buildAvailableFilesHint(files []string) string {
 		return "（探索未写出任何文件）"
 	}
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("### 探索文件（共 %d 个，必须全部读取后再开始写报告）\n", len(files)))
+	sb.WriteString(fmt.Sprintf("### 探索文件（共 %d 个，建议优先读取 dir_structure.md 和入口点摘要）\n", len(files)))
 	for i, f := range files {
 		sb.WriteString(fmt.Sprintf("%d. %s\n", i+1, f))
 	}
-	sb.WriteString("\n> [强制] 在调用 write_section 之前，必须对以上每一个文件都调用 read_reference_file。\n")
+	sb.WriteString("\n> 目标是生成审计可用的压缩摘要，不需要复写完整目录树。\n")
 	return sb.String()
 }
 
@@ -517,16 +552,15 @@ func buildExploreReportPrompt(state *ExploreState, outputPath string, noteFiles 
 		for _, f := range noteFiles {
 			lines = append(lines, fmt.Sprintf("- %s", f))
 		}
-		fileHint = fmt.Sprintf("以下 **%d 个**探索文件已就绪，必须全部读取：\n%s",
+		fileHint = fmt.Sprintf("以下 **%d 个**探索文件已就绪，可优先读取其中最关键的目录结构和入口点文件：\n%s",
 			len(noteFiles), strings.Join(lines, "\n"))
 		mustReadAll = fmt.Sprintf(`
-## [强制约束] 必须读完所有 %d 个探索文件
+## [成本约束] 最多读取 %d 个探索文件中的关键文件
 
-在调用 write_section 之前，你必须对上面列出的每一个文件都调用一次 read_reference_file。
-- 禁止在读完全部文件之前开始写作
-- 读取顺序不限，但必须全部读完
-- 如果某个文件读取失败，跳过并继续读其余文件
-- 读完所有文件后，将全部内容整合后一次性写入报告
+在调用 write_section 之前，优先读取 dir_structure.md、entry_points.md 或综合概览文件。
+- 不要重复读取同一个 reference 文件
+- 读取到入口、技术栈、核心目录后即可写报告
+- 如果参考文件很长，只提炼审计相关信息，不要搬运全文
 `, len(noteFiles))
 	}
 
@@ -545,15 +579,15 @@ func buildExploreReportPrompt(state *ExploreState, outputPath string, noteFiles 
 %s
 ## 写作要求
 
-1. **[必须]** 先用 read_reference_file 逐一读取上方列出的**所有**探索文件，不得遗漏
-2. 读完所有文件后，按以下结构整合内容写入报告：
+1. **[必须]** 先用 read_reference_file 读取最关键的探索文件；通常读取 dir_structure.md 或综合概览文件即可
+2. 读取到足够信息后，按以下结构整合内容写入报告：
    - 项目概览（一句话描述项目用途）
-   - 目录结构树：**必须原样保留** dir_structure.md 中的完整目录树，一个目录都不能省略。禁止用 "..." 或 "[多种xxx]" 省略任何目录
+   - 目录结构摘要：只保留顶层目录、入口目录和安全相关目录
    - 技术栈与关键依赖
    - 所有入口点列表（每个入口点单独一节，说明功能、启动方式）
    - 核心模块职责概览（每个顶层包/模块一句话描述）
    - 关键配置文件路径
-3. **目录树完整性是硬性要求**：如果 dir_structure.md 包含 700 行目录树，报告中也必须有 700 行。不允许精简、归纳或省略
+3. **成本硬约束**：报告总长度控制在 200 行内；禁止复写完整目录树和大段源码
 4. 输出文件: %s
 
 报告使用 Markdown 格式，用 write_section 写入。`,
