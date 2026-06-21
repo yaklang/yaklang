@@ -109,10 +109,15 @@ func TestBuildOptionIndex(t *testing.T) {
 	if oi.isOptionParam(funcs[2].Params[0]) {
 		t.Fatalf("...string param should not be option param")
 	}
-	// 选项参数是 Save 的第二个入参 o ...yakit.CreateHTTPFlowOptions
-	sec := oi.renderOptionTypeBlock(funcs[0].Params[1])
-	if !strings.Contains(sec, "可作为可变参数") || !strings.Contains(sec, "`db.WithTags`") {
-		t.Fatalf("option block wrong:\n%s", sec)
+	// 选项参数是 Save 的第二个入参 o ...yakit.CreateHTTPFlowOptions：主函数下渲染锚点引用。
+	ref := oi.renderOptionTypeRef(funcs[0].Params[1])
+	if !strings.Contains(ref, "可作为可变参数") || !strings.Contains(ref, "#option-createhttpflowoptions") {
+		t.Fatalf("option ref wrong:\n%s", ref)
+	}
+	// 页尾统一区按类型聚合，含选项函数表与锚点目标。
+	list := oi.renderVariadicOptionList(funcs, map[*yakdoc.FuncDecl]string{funcs[0]: "save"})
+	if !strings.Contains(list, "{#option-createhttpflowoptions}") || !strings.Contains(list, "`db.WithTags`") {
+		t.Fatalf("variadic option list wrong:\n%s", list)
 	}
 }
 
@@ -132,9 +137,9 @@ func TestBuildOptionIndexCrossPackageQualifier(t *testing.T) {
 	if !oi.isProducer[funcs[1]] {
 		t.Fatalf("proxy(ConfigOption) should be a producer for ...fp.ConfigOption consumer")
 	}
-	sec := oi.renderOptionTypeBlock(funcs[0].Params[1])
-	if !strings.Contains(sec, "`servicescan.proxy`") {
-		t.Fatalf("cross-package option not linked:\n%s", sec)
+	list := oi.renderVariadicOptionList(funcs, map[*yakdoc.FuncDecl]string{funcs[0]: "scan"})
+	if !strings.Contains(list, "`servicescan.proxy`") {
+		t.Fatalf("cross-package option not in consolidated list:\n%s", list)
 	}
 }
 

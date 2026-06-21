@@ -662,8 +662,22 @@ func WithRiskParam_Tags(i string) RiskParamsOpt {
 //
 // Example:
 // ```
-// r = risk.CreateRisk("http://example.com", risk.title("SQL注入漏洞"), risk.type("sqli"), risk.severity("high"), risk.description(""), risk.solution(""))
-// risk.Save(r)
+// // 关键词: risk.CreateRisk, 结构化记录漏洞
+// // CreateRisk 只构造风险结构体, 不入库; 配合 risk.Save 才写入数据库(Yakit 漏洞列表可见)
+// r = risk.CreateRisk("http://example.com",
+//
+//	risk.title("SQL Injection in id param"), // 漏洞标题
+//	risk.type("sqli"),                        // 漏洞类型
+//	risk.severity("high"),                    // 等级: info/low/middle/high/critical
+//	risk.payload("id=1' or '1'='1"),          // 触发用 payload
+//	risk.description("user-controlled id concatenated into SQL"),
+//	risk.solution("use parameterized queries"),
+//
+// )
+// println("title:", r.Title, "severity:", r.Severity) // 预期: title: SQL Injection in id param severity: high
+// assert r.Title == "SQL Injection in id param", "title should be set"
+// assert r.Severity == "high", "severity should be set"
+// risk.Save(r) // 保存到数据库; 也可用 risk.NewRisk(target, ...) 一步创建并保存
 // ```
 func CreateRisk(u string, opts ...RiskParamsOpt) *schema.Risk {
 	return _createRisk(u, opts...)

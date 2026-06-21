@@ -8,3 +8,24 @@
 - 转换修复：`poc.FixHTTPRequest` / `poc.FixHTTPPacketCRLF` 修复报文，`poc.CurlToHTTPRequest` / `poc.HTTPRequestToCurl` 与 curl 互转，`poc.GetUrlFromHTTPRequest` 提取 URL。
 
 与相邻库的关系：`poc` 是 `fuzz`/`fuzzx`（批量变异）、`nuclei`/`httptpl`（模板检测）的底层报文基石；相比 `http`（通用易用客户端）更贴近字节、可控性更强。务必为网络请求设置 `poc.timeout`。
+
+快速上手（本地构造与读取报文，不发包即可验证）：
+
+```yak
+// 用 poc.BuildRequest 在本地拼出请求报文(只应用"改写报文"的选项, 不真正发包)
+raw = poc.BuildRequest(poc.BasicRequest(),
+    poc.replaceHost("yaklang.com"),        // 改 Host
+    poc.replacePath("/docs/api/poc"),      // 改路径
+    poc.replaceMethod("POST"),             // 改方法
+    poc.replaceHeader("X-Token", "abc"),   // 加/改请求头
+)
+println(string(raw))                        // 打印拼好的完整请求报文
+
+// 再用 Get* 家族从报文里精确读取字段
+host = poc.GetHTTPPacketHeader(raw, "Host") // 读取大小写不敏感
+println("Host =", host)                     // 预期输出: Host = yaklang.com
+assert host == "yaklang.com", "host should be replaced"
+assert string(raw).Contains("POST /docs/api/poc"), "first line should be rebuilt"
+
+// 真正发包(需要可达目标, 这里仅示意): rsp, req = poc.HTTP(raw, poc.timeout(10))~
+```
