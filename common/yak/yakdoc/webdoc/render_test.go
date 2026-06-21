@@ -285,21 +285,36 @@ func TestRenderLibMarkdownOptionLinkage(t *testing.T) {
 	if strings.Contains(md, "### WithX {#withx}") {
 		t.Fatalf("option producer WithX should not get a top-level detail heading:\n%s", md)
 	}
-	// 主函数 Do 详情应出现"必填参数"与"可选参数"，可选参数用"函数索引同款表格"列出选项 WithX
+	// 主函数 Do 详情应出现"必填参数"与"可选参数"，可选参数改为锚点引用(跳转页尾统一区)。
 	for _, want := range []string{
 		"### Do {#do}", "**必填参数**", "**可选参数**", "...DemoOption",
-		"|选项函数|参数|返回值|说明|", // 选项表头与索引同款(含参数/返回值)
-		"| `demo.WithX` |",         // 选项函数以行内代码(非链接)展示
-		"| `v int` |",             // 选项参数列
-		"| `DemoOption` |",        // 选项返回值列
+		"[DemoOption 选项列表](#option-demooption)", // 主函数下的锚点引用
 	} {
 		if !strings.Contains(md, want) {
 			t.Fatalf("consumer detail missing %q:\n%s", want, md)
 		}
 	}
+	// 页尾"可变参数选项列表"统一区：按类型分组，含锚点目标、涉及函数链接与选项函数表。
+	for _, want := range []string{
+		"## 可变参数选项列表",
+		"类型：DemoOption {#option-demooption}", // 锚点目标(供主函数引用)
+		"涉及到的函数有：[demo.Do](#do)",             // 涉及到的(消费)函数链接
+		"|选项函数|参数|返回值|说明|",                   // 选项表只在统一区出现一次
+		"| `demo.WithX` |",                   // 选项函数以行内代码(非链接)展示
+		"| `v int` |",                        // 选项参数列
+		"| `DemoOption` |",                   // 选项返回值列
+	} {
+		if !strings.Contains(md, want) {
+			t.Fatalf("variadic option list missing %q:\n%s", want, md)
+		}
+	}
 	// 选项函数无独立锚点，故不应出现成链接形式
 	if strings.Contains(md, "[demo.WithX]") {
 		t.Fatalf("option function should be inline code, not a link:\n%s", md)
+	}
+	// 选项表只应出现一次(收拢到页尾)，主函数详情里不再重复整表。
+	if strings.Count(md, "|选项函数|参数|返回值|说明|") != 1 {
+		t.Fatalf("option table should appear exactly once (consolidated):\n%s", md)
 	}
 	if err := CheckMarkdownInvariants(md); err != nil {
 		t.Fatalf("invariants failed:\n%v\n%s", err, md)
@@ -378,8 +393,8 @@ func TestRenderLibMarkdownVariadicIndexSplit(t *testing.T) {
 	for _, want := range []string{
 		"## 函数索引", "## 可变参数函数索引", "## 函数详情", "## 可变参数函数详情",
 		"|函数|参数|返回值|说明|", // 索引表必须含 参数/返回值 两列
-		"| `a int` |",            // 参数列内容
-		"| `error` |",            // 返回值列内容
+		"| `a int` |",    // 参数列内容
+		"| `error` |",    // 返回值列内容
 	} {
 		if !strings.Contains(md, want) {
 			t.Fatalf("missing section %q:\n%s", want, md)

@@ -582,6 +582,9 @@ func RenderLibMarkdown(lib *yakdoc.ScriptLib, overview string, formatExample fun
 	writeDetails("函数详情", regular)
 	writeDetails("可变参数函数详情", variadic)
 
+	// 页尾统一的"可变参数选项列表"：收拢各主函数下重复的选项表，主函数详情里改为锚点引用跳转至此。
+	b.WriteString(oi.renderVariadicOptionList(mainFuncs, anchors))
+
 	return b.String()
 }
 
@@ -703,7 +706,7 @@ func renderFuncDetail(fun *yakdoc.FuncDecl, anchor string, oi *OptionIndex, form
 			b.WriteString(renderParamRows(plainVar, parsed))
 		}
 		for _, p := range optionVar {
-			b.WriteString(oi.renderOptionTypeBlock(p))
+			b.WriteString(oi.renderOptionTypeRef(p))
 		}
 	} else if len(fun.Params) > 0 {
 		b.WriteString(renderParamTable("参数", fun.Params, parsed))

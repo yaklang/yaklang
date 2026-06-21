@@ -124,23 +124,44 @@ func buildOptionIndex(funcs []*yakdoc.FuncDecl) *OptionIndex {
 	return oi
 }
 
-// renderOptionTypeBlock 为某个"选项型可变参数"渲染其全部选项函数(内联展示，无独立锚点，
-// 可在多个主函数下重复出现)。调用方负责在外层先写好"**可选参数**"小节标签。
-// 关键词: renderOptionTypeBlock, 可选参数, 选项重复渲染
-func (oi *OptionIndex) renderOptionTypeBlock(p *yakdoc.Field) string {
+// optionTypeAnchor 为选项类型基名生成统一的页内锚点 id。"option-" 前缀保证与函数锚点
+// (方法名小写，不含 '-')互不冲突，且同一类型在全页只产生一个锚点。
+// 关键词: optionTypeAnchor, 选项锚点, 唯一 id
+func optionTypeAnchor(base string) string {
+	return "option-" + strings.ToLower(base)
+}
+
+// renderOptionTypeRef 在主函数详情里渲染"选项型可变参数"的锚点引用，替代过去在每个主函数下
+// 重复整张选项表的做法：这里只给一行带锚点的提示，点击跳到页尾"可变参数选项列表"的对应类型。
+// 关键词: renderOptionTypeRef, 选项锚点引用, 去重复表
+func (oi *OptionIndex) renderOptionTypeRef(p *yakdoc.Field) string {
 	typ := variadicElemType(p.Type)
-	producers := oi.producers[baseTypeName(typ)]
+	base := baseTypeName(typ)
+	producers := oi.producers[base]
+	if len(producers) == 0 {
+		return ""
+	}
+	name := strings.TrimSpace(p.Name)
+	var sig string
+	if name != "" {
+		sig = fmt.Sprintf("`%s ...%s`", html.EscapeString(name), typ)
+	} else {
+		sig = fmt.Sprintf("`...%s`", typ)
+	}
+	// 链接文本里的类型基名裹进反引号会影响 mdLink 正则(其要求 ](#id) 紧邻)，故用纯文本基名。
+	return fmt.Sprintf("可作为可变参数 %s 传入选项；共 %d 个可用选项，详见 [%s 选项列表](#%s)。\n\n",
+		sig, len(producers), html.EscapeString(base), optionTypeAnchor(base))
+}
+
+// renderOptionProducersTable 渲染某选项类型基名的全部选项函数表(函数 | 参数 | 返回值 | 说明)。
+// 选项函数无独立锚点，函数名用行内代码展示。
+// 关键词: renderOptionProducersTable, 选项函数表
+func (oi *OptionIndex) renderOptionProducersTable(base string) string {
+	producers := oi.producers[base]
 	if len(producers) == 0 {
 		return ""
 	}
 	var b strings.Builder
-	name := strings.TrimSpace(p.Name)
-	if name != "" {
-		b.WriteString(fmt.Sprintf("可作为可变参数 `%s ...%s` 传入以下选项：\n\n", html.EscapeString(name), typ))
-	} else {
-		b.WriteString(fmt.Sprintf("可作为可变参数 `...%s` 传入以下选项：\n\n", typ))
-	}
-	// 与"函数索引"同款表格：函数 | 参数 | 返回值 | 说明。选项函数无独立锚点，故函数名用行内代码而非链接。
 	b.WriteString("|选项函数|参数|返回值|说明|\n")
 	b.WriteString("|:--|:--|:--|:--|\n")
 	for _, opt := range producers {
@@ -155,6 +176,60 @@ func (oi *OptionIndex) renderOptionTypeBlock(p *yakdoc.Field) string {
 		))
 	}
 	b.WriteString("\n")
+	return b.String()
+}
+
+// renderVariadicOptionList 渲染页尾统一的"可变参数选项列表"：把过去在每个主函数下重复的选项表
+// 收拢到一处，按选项类型分组。每个类型给出页内锚点(供主函数引用跳转)、涉及到的(消费该选项的)
+// 主函数链接，以及该类型下全部选项函数的明细表。
+// 关键词: renderVariadicOptionList, 可变参数选项列表, 选项去重, 锚点目标
+func (oi *OptionIndex) renderVariadicOptionList(mainFuncs []*yakdoc.FuncDecl, anchors map[*yakdoc.FuncDecl]string) string {
+	if len(oi.producers) == 0 {
+		return ""
+	}
+	// 类型基名 -> 消费它的主函数(按出现顺序，去重)
+	consumers := map[string][]*yakdoc.FuncDecl{}
+	consumerSeen := map[string]map[*yakdoc.FuncDecl]bool{}
+	for _, fun := range mainFuncs {
+		for _, base := range oi.optionTypesOf(fun) {
+			if consumerSeen[base] == nil {
+				consumerSeen[base] = map[*yakdoc.FuncDecl]bool{}
+			}
+			if consumerSeen[base][fun] {
+				continue
+			}
+			consumerSeen[base][fun] = true
+			consumers[base] = append(consumers[base], fun)
+		}
+	}
+
+	// 仅列出"有生产者"的类型，按基名排序保证稳定输出。
+	types := make([]string, 0, len(oi.producers))
+	for base, producers := range oi.producers {
+		if len(producers) > 0 {
+			types = append(types, base)
+		}
+	}
+	if len(types) == 0 {
+		return ""
+	}
+	sort.Strings(types)
+
+	var b strings.Builder
+	b.WriteString("## 可变参数选项列表\n\n")
+	b.WriteString("以下按选项类型汇总全部可变参数选项(原先重复在各主函数下的选项表已收拢到此处)：\n\n")
+	for i, base := range types {
+		b.WriteString(fmt.Sprintf("### %d. 类型：%s {#%s}\n\n", i+1, html.EscapeString(base), optionTypeAnchor(base)))
+		if cs := consumers[base]; len(cs) > 0 {
+			refs := make([]string, 0, len(cs))
+			for _, fun := range cs {
+				refs = append(refs, fmt.Sprintf("[%s.%s](#%s)",
+					html.EscapeString(fun.LibName), html.EscapeString(fun.MethodName), anchors[fun]))
+			}
+			b.WriteString("涉及到的函数有：" + strings.Join(refs, "、") + "\n\n")
+		}
+		b.WriteString(oi.renderOptionProducersTable(base))
+	}
 	return b.String()
 }
 

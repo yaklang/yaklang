@@ -41,12 +41,28 @@ func strVisible(key string) bool {
 // 返回值:
 //   - 渲染展开后的字符串列表
 //
-// Example:
+// <|EXAMPLE_START|> 示例：fuzz.Strings 的基本用法(整数范围展开)
 // ```
-// results = fuzz.Strings("{{i(1-3)}}")
-// println(results)   // OUT: [1 2 3]
-// assert len(results) == 3, "i(1-3) should expand to 3 results"
+// // 关键词: fuzz.Strings, fuzztag, 整数范围
+// // {{int(a-b)}} 把闭区间内每个整数都展开成一个结果, 常用于遍历 id/页码等
+// results = fuzz.Strings("id={{int(1-3)}}")
+// println(results)   // 预期输出: [id=1 id=2 id=3]
+// assert len(results) == 3, "int(1-3) should expand to 3 results"
 // ```
+// <|EXAMPLE_END|>
+// <|EXAMPLE_START|> 示例：fuzz.Strings 的列表与笛卡尔组合
+// ```
+// // 关键词: fuzz.Strings, list, 笛卡尔积
+// // {{list(a|b|c)}} 按 | 分隔逐项展开
+// single = fuzz.Strings("{{list(admin|root|guest)}}")
+// println(single)    // 预期输出: [admin root guest]
+// assert len(single) == 3, "list should expand to 3 payloads"
+// // 同一模板里有多个 fuzztag 时, 各标签的结果做笛卡尔积组合
+// combo = fuzz.Strings("{{int(1-2)}}-{{list(x|y)}}") // 2 x 2 = 4 种组合
+// println(combo)     // 预期输出: [1-x 2-x 1-y 2-y]
+// assert len(combo) == 4, "two tags should form a cartesian product"
+// ```
+// <|EXAMPLE_END|>
 func _fuzz(i interface{}) []string {
 	res := mutate.InterfaceToFuzzResults(i)
 	if res != nil {
