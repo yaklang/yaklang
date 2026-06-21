@@ -33,11 +33,11 @@ func init() {
 
 			return reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_CODE_SECURITY_AUDIT, r, append(opts, preset...)...)
 		},
-		reactloops.WithLoopDescription("Code security audit mode: a three-phase pipeline (recon+compile -> SAST scan + LLM logic analysis -> batch check + report)."),
-		reactloops.WithLoopDescriptionZh("代码安全审计模式：三阶段流水线（侦察+编译→SAST扫描+LLM逻辑分析→批量Check+报告）。"),
+		reactloops.WithLoopDescription("Code security audit mode: a three-phase pipeline (recon+compile+SyntaxFlow scan -> concurrent LLM logic analysis -> batch check + report)."),
+		reactloops.WithLoopDescriptionZh("代码安全审计模式：三阶段流水线（侦察+编译+SyntaxFlow扫描→并发LLM逻辑分析→批量Check+报告）。"),
 		reactloops.WithVerboseName("Code Security Audit"),
 		reactloops.WithVerboseNameZh("代码安全审计"),
-		reactloops.WithLoopUsagePrompt(`当用户需要使用 AI 独立对整个代码项目进行安全审计时使用此流程。流程分三阶段：Phase 1 侦察+编译 → Phase 2 SAST扫描+LLM逻辑分析 → Phase 3 批量Check+报告。`),
+		reactloops.WithLoopUsagePrompt(`当用户需要使用 AI 独立对整个代码项目进行安全审计时使用此流程。流程分三阶段：Phase 1 侦察+编译+SyntaxFlow扫描 → Phase 2 并发LLM逻辑分析 → Phase 3 批量Check+报告。`),
 		reactloops.WithLoopOutputExample(`
 * 当需要进行代码安全审计时：
   {"@action": "code_security_audit", "human_readable_thought": "需要对项目进行全面的安全审计"}
@@ -80,11 +80,11 @@ func buildOrchestratorInitTask(r aicommon.AIInvokeRuntime, state *AuditState) fu
 		r.AddToTimeline("[AUDIT_DIR]", "审计输出目录: "+auditDirPath)
 
 		// ═══════════════════════════════════════════════════════════════
-		// Phase 1: 侦察 + 编译配置
-		// 目标：确定语言、依赖、入口点、编译方式
+		// Phase 1: 侦察 + 编译配置 + SyntaxFlow 扫描
+		// 目标：确定语言、依赖、入口点、编译方式，识别 Source/Sink
 		// ═══════════════════════════════════════════════════════════════
-		log.Infof("[CodeAudit] Starting Phase 1 (Recon + Compile Config)")
-		r.AddToTimeline("[PHASE1_START]", "开始 Phase 1：侦察 + 编译配置")
+		log.Infof("[CodeAudit] Starting Phase 1 (Recon + Compile Config + SF Scan)")
+		r.AddToTimeline("[PHASE1_START]", "开始 Phase 1：侦察 + 编译配置 + SyntaxFlow 扫描")
 
 		scanPath := scanTargetPathFromTask(task)
 		if scanPath == "" {
@@ -115,6 +115,27 @@ func buildOrchestratorInitTask(r aicommon.AIInvokeRuntime, state *AuditState) fu
 			)
 		}
 
+		// 1c. SyntaxFlow 扫描 Source/Sink（从 Phase 2a 移到 Phase 1）
+		skipSFScan := strings.Contains(userInput, "[skip-sf-scan]")
+		if !skipSFScan && preResult.Language != "" && preResult.Language != "unknown" {
+			log.Infof("[CodeAudit] Phase 1c: SyntaxFlow lib scan for %s (lang=%s)", scanPath, preResult.Language)
+			r.AddToTimeline("[SF_SCAN_START]", fmt.Sprintf("开始 SyntaxFlow 扫描（语言: %s）", preResult.Language))
+			summary, sfErr := CompileAndScanProject(scanPath, preResult.Language)
+			if sfErr != nil {
+				log.Warnf("[CodeAudit] SyntaxFlow scan failed: %v (continuing with LLM-only)", sfErr)
+				r.AddToTimeline("[SF_SCAN_ERROR]", fmt.Sprintf("SyntaxFlow 扫描失败: %v", sfErr))
+			} else {
+				state.SetSFScanSummary(summary)
+				log.Infof("[CodeAudit] Phase 1c SF scan complete: %d/%d rules hit, %d sources, %d sinks",
+					summary.HitRules, summary.TotalRules, len(summary.Sources), len(summary.Sinks))
+				r.AddToTimeline("[SF_SCAN_DONE]", fmt.Sprintf(
+					"SyntaxFlow 扫描完成: %d/%d 规则命中, %d sources, %d sinks",
+					summary.HitRules, summary.TotalRules, len(summary.Sources), len(summary.Sinks)))
+			}
+		} else {
+			log.Infof("[CodeAudit] Phase 1c: Skipping SyntaxFlow scan")
+		}
+
 		os.Setenv(aitool.EnvAuditTargetPath, scanPath)
 		r.AddToTimeline("[PHASE1_DONE]", fmt.Sprintf(
 			"Phase 1 完成: lang=%s, %d deps, %d entries, %d files, tech=%s",
@@ -122,36 +143,14 @@ func buildOrchestratorInitTask(r aicommon.AIInvokeRuntime, state *AuditState) fu
 			preResult.ProjectScale.TotalFiles, state.TechStack))
 
 		// ═══════════════════════════════════════════════════════════════
-		// Phase 2: SAST 扫描 + LLM 逻辑分析
-		// SAST：SyntaxFlow lib 规则扫描所有 source/sink
-		// LLM：基于 Phase 1 结果分析逻辑漏洞
+		// Phase 2: LLM 逻辑漏洞分析（利用 Phase 1 的 SyntaxFlow 结果）
+		// LLM：基于 Phase 1 结果分析逻辑漏洞，使用 SF 已识别的 Source/Sink
 		// ═══════════════════════════════════════════════════════════════
-		log.Infof("[CodeAudit] Starting Phase 2 (SAST + LLM Logic)")
-		r.AddToTimeline("[PHASE2_START]", "开始 Phase 2：SAST 扫描 + LLM 逻辑分析")
+		log.Infof("[CodeAudit] Starting Phase 2 (LLM Logic Analysis)")
+		r.AddToTimeline("[PHASE2_START]", "开始 Phase 2：LLM 逻辑漏洞分析")
 
-		// 2a. SAST：SyntaxFlow lib 规则扫描
-		skipSFScan := strings.Contains(userInput, "[skip-sf-scan]")
-		if !skipSFScan && preResult.Language != "" && preResult.Language != "unknown" {
-			log.Infof("[CodeAudit] Phase 2a: SyntaxFlow lib scan for %s (lang=%s)", scanPath, preResult.Language)
-			r.AddToTimeline("[SAST_START]", fmt.Sprintf("开始 SAST 扫描（语言: %s）", preResult.Language))
-			summary, sfErr := CompileAndScanProject(scanPath, preResult.Language)
-			if sfErr != nil {
-				log.Warnf("[CodeAudit] SyntaxFlow scan failed: %v (continuing with LLM-only)", sfErr)
-				r.AddToTimeline("[SAST_ERROR]", fmt.Sprintf("SAST 扫描失败: %v", sfErr))
-			} else {
-				state.SetSFScanSummary(summary)
-				log.Infof("[CodeAudit] Phase 2a SAST complete: %d/%d rules hit, %d sources, %d sinks",
-					summary.HitRules, summary.TotalRules, len(summary.Sources), len(summary.Sinks))
-				r.AddToTimeline("[SAST_DONE]", fmt.Sprintf(
-					"SAST 扫描完成: %d/%d 规则命中, %d sources, %d sinks",
-					summary.HitRules, summary.TotalRules, len(summary.Sources), len(summary.Sinks)))
-			}
-		} else {
-			log.Infof("[CodeAudit] Phase 2a: Skipping SAST scan")
-		}
-
-		// 2b. LLM 逻辑漏洞分析
-		log.Infof("[CodeAudit] Phase 2b: LLM logic vulnerability analysis")
+		// 2a. LLM 逻辑漏洞分析
+		log.Infof("[CodeAudit] Phase 2a: LLM logic vulnerability analysis")
 		r.AddToTimeline("[LLM_LOGIC_START]", "开始 LLM 逻辑漏洞分析")
 		runLLMLogicAnalysis(r, task, state, auditDirPath)
 
@@ -245,7 +244,7 @@ func runDirExplore(r aicommon.AIInvokeRuntime, task aicommon.AIStatefulTask, sta
 
 // runLLMLogicAnalysis 运行 Phase 2b 的 LLM 逻辑漏洞分析
 func runLLMLogicAnalysis(r aicommon.AIInvokeRuntime, task aicommon.AIStatefulTask, state *AuditState, auditDirPath string) {
-	logicLoop, err := buildLLMLogicAnalysisLoop(r, state)
+	logicLoop, err := buildPhase2AllCategoriesLoop(r, state, nil)
 	if err != nil {
 		log.Errorf("[CodeAudit] Failed to build LLM logic loop: %v", err)
 		return
@@ -265,7 +264,7 @@ func runLLMLogicAnalysis(r aicommon.AIInvokeRuntime, task aicommon.AIStatefulTas
 
 // runBatchCheckAndReport 运行 Phase 3：批量 Check + 报告生成
 func runBatchCheckAndReport(r aicommon.AIInvokeRuntime, task aicommon.AIStatefulTask, state *AuditState, auditDirPath string) {
-	checkLoop, err := buildBatchCheckLoop(r, state)
+	checkLoop, err := buildPhase3VerifyLoop(r, state)
 	if err != nil {
 		log.Errorf("[CodeAudit] Failed to build batch check loop: %v", err)
 		return

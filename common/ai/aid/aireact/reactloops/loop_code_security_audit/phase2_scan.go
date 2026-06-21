@@ -17,6 +17,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"golang.org/x/sync/errgroup"
 )
 
 //go:embed prompts/phase2_scan_instruction.txt
@@ -840,7 +841,7 @@ selected_category_ids: 从 CWE 类别库中选择的 ID 列表
 extra_categories_json: 如果用户提到库中没有的漏洞类型，格式为 JSON 数组字符串
 `
 
-// buildPhase2AllCategoriesLoop 构建 Phase 2 编排 Loop
+// buildPhase2AllCategoriesLoop 构建 Phase 2 编排 Loop（支持并发扫描）
 func buildPhase2AllCategoriesLoop(r aicommon.AIInvokeRuntime, state *AuditState, overrideCategories []VulnCategory, opts ...reactloops.ReActLoopOption) (*reactloops.ReActLoop, error) {
 	preset := []reactloops.ReActLoopOption{
 		reactloops.WithMaxIterations(math.MaxInt32),
@@ -857,43 +858,45 @@ func buildPhase2AllCategoriesLoop(r aicommon.AIInvokeRuntime, state *AuditState,
 				finalCategories = planScanCategories(r, task, state)
 			}
 
-			log.Infof("[CodeAudit/Phase2] Starting scan of %d categories", len(finalCategories))
+			log.Infof("[CodeAudit/Phase2] Starting concurrent scan of %d categories", len(finalCategories))
 			r.AddToTimeline("[PHASE2_START]",
-				fmt.Sprintf("Phase 2 开始：将串行扫描 %d 个漏洞类别。", len(finalCategories)))
+				fmt.Sprintf("Phase 2 开始：将并发扫描 %d 个漏洞类别。", len(finalCategories)))
 
-			timeline := getTimeline(r)
+			// 并发执行各类别扫描
+			var eg errgroup.Group
+			// 限制并发数为 4，避免过多并发导致资源竞争
+			eg.SetLimit(4)
 
-			for i, category := range finalCategories {
-				log.Infof("[CodeAudit/Phase2] [%d/%d] Starting category: %s (%s)",
-					i+1, len(finalCategories), category.Name, category.ID)
+			for _, category := range finalCategories {
+				cat := category // 捕获循环变量
+				eg.Go(func() error {
+					log.Infof("[CodeAudit/Phase2] Starting category: %s (%s)", cat.Name, cat.ID)
 
-				var checkpoint int64
-				if timeline != nil {
-					checkpoint = timeline.GetMaxID()
-				}
+					catLoop, err := buildSingleCategoryScanLoop(r, state, cat)
+					if err != nil {
+						log.Errorf("[CodeAudit/Phase2] Failed to build loop for category '%s': %v", cat.ID, err)
+						return nil // 不中断其他类别扫描
+					}
 
-				catLoop, err := buildSingleCategoryScanLoop(r, state, category)
-				if err != nil {
-					log.Errorf("[CodeAudit/Phase2] Failed to build loop for category '%s': %v", category.ID, err)
-					continue
-				}
+					obsCountBefore := len(state.GetScanObservations())
+					catSubTask := aicommon.NewSubTaskBase(task, fmt.Sprintf("%s-scan-%s", task.GetId(), cat.ID), task.GetUserInput(), true)
+					if err := catLoop.ExecuteWithExistedTask(catSubTask); err != nil {
+						log.Warnf("[CodeAudit/Phase2] Category '%s' loop error: %v", cat.ID, err)
+					}
 
-				obsCountBefore := len(state.GetScanObservations())
-				catSubTask := aicommon.NewSubTaskBase(task, fmt.Sprintf("%s-scan-%s", task.GetId(), category.ID), task.GetUserInput(), true)
-				if err := catLoop.ExecuteWithExistedTask(catSubTask); err != nil {
-					log.Warnf("[CodeAudit/Phase2] Category '%s' loop error: %v", category.ID, err)
-				}
+					if len(state.GetScanObservations()) == obsCountBefore {
+						log.Warnf("[CodeAudit/Phase2] Category '%s' ended without calling complete_scan.", cat.ID)
+					}
 
-				if len(state.GetScanObservations()) == obsCountBefore {
-					log.Warnf("[CodeAudit/Phase2] Category '%s' ended without calling complete_scan.", category.ID)
-				}
+					log.Infof("[CodeAudit/Phase2] Category '%s' complete. Findings: %d",
+						cat.ID, len(state.GetFindings()))
+					return nil
+				})
+			}
 
-				if timeline != nil {
-					timeline.TruncateAfter(checkpoint)
-				}
-
-				log.Infof("[CodeAudit/Phase2] [%d/%d] Category '%s' complete. Total findings so far: %d",
-					i+1, len(finalCategories), category.ID, len(state.GetFindings()))
+			// 等待所有类别扫描完成
+			if err := eg.Wait(); err != nil {
+				log.Warnf("[CodeAudit/Phase2] Some category scans failed: %v", err)
 			}
 
 			allFindings := state.GetFindings()
