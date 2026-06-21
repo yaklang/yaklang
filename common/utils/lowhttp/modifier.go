@@ -485,10 +485,15 @@ func ReplaceHTTPPacketQueryParam(packet []byte, key, value string) []byte {
 // 返回值:
 //   - 修改后的 HTTP 请求报文字节数组
 //
-// Example:
+// <|EXAMPLE_START|> 示例：设置单个 GET 参数且不做 URL 转义
 // ```
-// poc.ReplaceAllHTTPPacketQueryParamsWithoutEscape(poc.BasicRequest(), "a", "b") // 添加GET请求参数a，值为b
+// // 关键词: poc.ReplaceHTTPPacketQueryParamWithoutEscape, GET参数不转义
+// packet = poc.BasicRequest()
+// modified = poc.ReplaceHTTPPacketQueryParamWithoutEscape(packet, "a", "b c") // 值原样写入, 不会把空格转成 %20
+// println(string(modified))                                                    // first line 出现 ?a=b c
+// assert string(modified).Contains("a=b c"), "value should not be escaped"
 // ```
+// <|EXAMPLE_END|>
 func ReplaceHTTPPacketQueryParamWithoutEscape(packet []byte, key, value string) []byte {
 	return handleHTTPPacketQueryParam(packet, true, func(q *QueryParams) {
 		q.Set(key, value)
@@ -834,11 +839,16 @@ func headerKeyEqual(lhs, rhs string, ignoreCase bool) bool {
 // 返回值:
 //   - 修改后的 HTTP 报文字节数组
 //
-// Example:
+// <|EXAMPLE_START|> 示例：修改请求头(不存在则新增)
 // ```
-// poc.ReplaceHTTPPacketHeader(poc.BasicRequest(),"AAA", "BBB") // 修改 AAA 请求头，如果不存在则新增（忽略大小写）
-// poc.ReplaceHTTPPacketHeaderStrict(poc.BasicRequest(),"AAA", "BBB") // 严格匹配 AAA 的大小写，再进行修改/新增
+// // 关键词: poc.ReplaceHTTPPacketHeader, 修改/新增请求头
+// packet = poc.BasicRequest() // 一个基础 GET 请求模板
+// modified = poc.ReplaceHTTPPacketHeader(packet, "User-Agent", "yak/1.0") // 不存在则新增，忽略大小写
+// println(string(modified))                       // 可直接打印整段报文，肉眼确认 User-Agent 已写入
+// assert poc.GetHTTPPacketHeader(modified, "User-Agent") == "yak/1.0", "header should be set"
+// // poc.ReplaceHTTPPacketHeaderStrict(packet, "AAA", "BBB") // 严格区分大小写的版本
 // ```
+// <|EXAMPLE_END|>
 func ReplaceHTTPPacketHeader(packet []byte, headerKey string, headerValue any) []byte {
 	return replaceHTTPPacketHeader(packet, headerKey, headerValue, true)
 }
@@ -982,10 +992,15 @@ func ReplaceHTTPPacketBasicAuth(packet []byte, username, password string) []byte
 // 返回值:
 //   - 修改后的 HTTP 报文字节数组
 //
-// Example:
+// <|EXAMPLE_START|> 示例：追加一个自定义请求头
 // ```
-// poc.AppendHTTPPacketHeader(poc.BasicRequest(), "AAA", "BBB") // 添加 AAA 请求头
+// // 关键词: poc.AppendHTTPPacketHeader, 追加请求头
+// packet = poc.BasicRequest()
+// modified = poc.AppendHTTPPacketHeader(packet, "X-Trace-Id", "abc-123") // 直接附加，不去重
+// println(string(modified))                       // 打印查看追加结果
+// assert poc.GetHTTPPacketHeader(modified, "X-Trace-Id") == "abc-123", "header should be appended"
 // ```
+// <|EXAMPLE_END|>
 func AppendHTTPPacketHeader(packet []byte, headerKey string, headerValue any) []byte {
 	var firstLine string
 	var header []string
@@ -1020,22 +1035,20 @@ func AppendHTTPPacketHeader(packet []byte, headerKey string, headerValue any) []
 // 返回值:
 //   - 修改后的 HTTP 报文字节数组
 //
-// Example:
+// <|EXAMPLE_START|> 示例：删除指定请求头(忽略大小写)
 // ```
-// poc.DeleteHTTPPacketHeader(`GET /get HTTP/1.1
+// // 关键词: poc.DeleteHTTPPacketHeader, 删除请求头
+// packet = `GET /get HTTP/1.1
 // Content-Type: application/json
 // AAA: BBB
 // Host: pie.dev
 //
-// `, "AAA") // 删除 AAA 请求头（忽略大小写）
-//
-// poc.DeleteHTTPPacketHeaderStrict(`GET /get HTTP/1.1
-// Content-Type: application/json
-// AAA: BBB
-// Host: pie.dev
-//
-// `, "AAA") // 仅当 Header 严格等于 AAA 时才删除
+// `
+// modified = poc.DeleteHTTPPacketHeader(packet, "AAA") // 匹配时忽略大小写
+// println(string(modified))                             // 打印查看, AAA 头已被删除
+// assert poc.GetHTTPPacketHeader(modified, "AAA") == "", "AAA header should be removed"
 // ```
+// <|EXAMPLE_END|>
 func DeleteHTTPPacketHeader(packet []byte, headerKey string) []byte {
 	return deleteHTTPPacketHeader(packet, headerKey, true)
 }
@@ -2220,15 +2233,20 @@ func GetHTTPPacketHeadersFull(packet []byte) (headers map[string][]string) {
 // 返回值:
 //   - 匹配该名称的请求头的值
 //
-// Example:
+// <|EXAMPLE_START|> 示例：从报文中读取指定请求头(大小写不敏感)
 // ```
-// poc.GetHTTPPacketHeader(`GET /get HTTP/1.1
+// // 关键词: poc.GetHTTPPacketHeader, 读取请求头/响应头
+// packet = `GET /get HTTP/1.1
 // Content-Type: application/json
 // Cookie: a=b; a=c; c=d
 // Host: pie.dev
 //
-// `, "Content-Type") // 获取Content-Type请求头，这里会返回"application/json"
+// `
+// ct = poc.GetHTTPPacketHeader(packet, "Content-Type") // 匹配时大小写不敏感
+// println("Content-Type =", ct)                        // 预期输出: Content-Type = application/json
+// assert ct == "application/json", "should read Content-Type header"
 // ```
+// <|EXAMPLE_END|>
 func GetHTTPPacketHeader(packet []byte, key string) (header string) {
 	return getHTTPPacketHeader(packet, key, true)
 }
@@ -2290,15 +2308,20 @@ func GetHTTPRequestQueryParam(packet []byte, key string) (paramValue string) {
 // 返回值:
 //   - 报文主体内容字节数组
 //
-// Example:
+// <|EXAMPLE_START|> 示例：提取报文 body(请求体/响应体通用)
 // ```
-// poc.GetHTTPPacketBody(`POST /post HTTP/1.1
+// // 关键词: poc.GetHTTPPacketBody, 提取请求体/响应体
+// packet = `POST /post HTTP/1.1
 // Content-Type: application/json
-// COntent-Length: 7
+// Content-Length: 7
 // Host: pie.dev
 //
-// a=b&c=d`) // 获取请求头，这里为b"a=b&c=d"
+// a=b&c=d`
+// body = poc.GetHTTPPacketBody(packet) // 返回值是 bytes
+// println("body =", string(body))      // 预期输出: body = a=b&c=d
+// assert string(body) == "a=b&c=d", "should extract packet body"
 // ```
+// <|EXAMPLE_END|>
 func GetHTTPPacketBody(packet []byte) (body []byte) {
 	_, body = SplitHTTPHeadersAndBodyFromPacket(packet)
 	return body
@@ -2472,13 +2495,18 @@ func GetFullHTTPRequestQueryParams(packet []byte) (params map[string][]string) {
 // 返回值:
 //   - 响应状态码
 //
-// Example:
+// <|EXAMPLE_START|> 示例：从响应报文取状态码
 // ```
-// poc.GetStatusCodeFromResponse(`HTTP/1.1 200 OK
+// // 关键词: poc.GetStatusCodeFromResponse, 响应状态码
+// response = `HTTP/1.1 200 OK
 // Content-Length: 5
 //
-// hello`) // 获取响应报文中的状态码，这里会返回200
+// hello`
+// code = poc.GetStatusCodeFromResponse(response) // 返回 int
+// println("status code =", code)                  // 预期输出: status code = 200
+// assert code == 200, "should parse status code 200"
 // ```
+// <|EXAMPLE_END|>
 func GetStatusCodeFromResponse(packet []byte) (statusCode int) {
 	SplitHTTPPacket(packet, nil, func(proto string, code int, codeMsg string) error {
 		statusCode = code
@@ -2596,10 +2624,15 @@ func GetHTTPPacketFirstLine(packet []byte) (string, string, string) {
 // 返回值:
 //   - 修改后的 HTTP 报文字节数组
 //
-// Example:
+// <|EXAMPLE_START|> 示例：替换报文 body 并自动修正 Content-Length
 // ```
-// poc.ReplaceHTTPPacketBody(poc.BasicRequest(), "a=b") // 修改请求体内容为a=b
+// // 关键词: poc.ReplaceHTTPPacketBody, 替换请求体, 自动修正长度
+// packet = poc.ReplaceHTTPPacketMethod(poc.BasicRequest(), "POST") // 先改成 POST
+// modified = poc.ReplaceHTTPPacketBody(packet, "a=b&c=d")           // 替换 body, Content-Length 会自动修正
+// println(string(modified))                                          // 打印查看完整报文
+// assert string(poc.GetHTTPPacketBody(modified)) == "a=b&c=d", "body should be replaced"
 // ```
+// <|EXAMPLE_END|>
 func ReplaceHTTPPacketBodyFast(packet []byte, body []byte) []byte {
 	var isChunked bool
 	SplitHTTPHeadersAndBodyFromPacket(packet, func(line string) {
