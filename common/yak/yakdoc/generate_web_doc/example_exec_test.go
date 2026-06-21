@@ -13,6 +13,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/cli"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/yakdoc/webdoc"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
@@ -41,8 +42,13 @@ var safeExecLibs = map[string]bool{
 	// 批次4: 时间/时区/本地 JS 引擎(均不出网、不需外部资源)
 	"time": true, "timezone": true, "js": true,
 	// 批次5(高频, 探针中): fuzz 纯本地; risk 写临时DB(已隔离)
-	// 注: cli 不可盲跑 —— 其 cli.check()/help 会 os.Exit 直接崩进程, 需逐例特殊处理。
 	"fuzz": true, "risk": true,
+	// 批次6(核心高频): poc 报文处理示例为纯本地(送包/选项类示例已用 mock 或标注无法本地验证)。
+	// file 文件操作示例改为自给自足(用 os.TempDir() 创建->操作->清理), 涉及阻塞监听的(如 TailF)已标注无法本地验证。
+	"poc": true, "file": true,
+	// 批次7(核心高频): cli 示例统一用 setDefault 提供默认值, 读取参数不会触发缺参(paramInvalid),
+	// 因此 cli.check() 不会 os.Exit; cli.help() 仅打印不退出; 依赖插件环境数据库的示例已标注无法本地验证。
+	"cli": true,
 }
 
 func setupLocalExecEnv(t *testing.T) {
@@ -58,6 +64,12 @@ func setupLocalExecEnv(t *testing.T) {
 	// 起一个本地 mock HTTP 服务，地址通过环境变量暴露，便于将来示例以 mock 方式自给自足地联调。
 	host, port := utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 4\r\n\r\nmock"))
 	_ = os.Setenv("YAK_DOC_MOCK_HTTP", utils.HostPort(host, port))
+
+	// cli 库通过全局单例 DefaultCliApp 绑定到引擎，示例间状态会累积；缺省命令行参数时 cli.check() 默认
+	// 会调用 os.Exit(1) 直接终止整个测试进程。这里把校验回调替换为空操作：cli.check() 不再退出进程，
+	// 示例只验证“能跑通”而非命令行参数完整性，符合“示例本地可执行、绝不出网/不崩进程”的原则。
+	// 关键词: cli.check, 避免 os.Exit, 示例执行隔离
+	cli.DefaultCliApp.SetCliCheckCallback(func() {})
 }
 
 // TestSafeLibsExampleExecution 对纯计算库白名单的示例做真实执行，强约束(失败即红)。这是在"语法正确"

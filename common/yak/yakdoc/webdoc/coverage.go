@@ -54,7 +54,7 @@ func CollectDocCoverage(libs map[string]*yakdoc.ScriptLib) *CoverageReport {
 			parsed := parseCommentDetails(fun.Document)
 			cov := &FuncCoverage{Lib: fun.LibName, Method: fun.MethodName}
 			cov.MissingDesc = strings.TrimSpace(parsed.Description) == ""
-			cov.MissingExample = extractExampleCode(fun.Document) == ""
+			cov.MissingExample = len(extractExamples(fun.Document)) == 0
 			for _, param := range fun.Params {
 				if strings.TrimSpace(parsed.Params[param.Name]) == "" {
 					cov.ParamsNoExpl = append(cov.ParamsNoExpl, param.Name)

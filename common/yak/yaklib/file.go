@@ -252,9 +252,13 @@ func (y *_yakFile) ReadLines() []string {
 //
 // Example:
 // ```
-// // 假设 /usr/bin/bash 是一个符号链接，指向 /bin/bash
-// file.IsLink("/usr/bin/bash") // true
-// file.IsLink("/bin/bash") // false
+// // 关键词: file.IsLink, 判断是否为符号链接
+// p = file.Join(os.TempDir(), "yak-islink-demo.txt")
+// file.Save(p, "x")~
+// println("regular file is link:", file.IsLink(p)) // 预期输出: regular file is link: false
+// assert !file.IsLink(p), "a regular file is not a symbolic link"
+// file.Remove(p)
+// // 对真实的符号链接(如某些系统的 /usr/bin/bash)则会返回 true
 // ```
 func _fileIsLink(file string) bool {
 	if _, err := os.Readlink(file); err != nil {
@@ -345,7 +349,12 @@ func _tempFileName(pattern ...string) (string, error) {
 //
 // Example:
 // ```
-// err = file.Mkdir("/tmp/test")
+// // 关键词: file.Mkdir, 创建单层目录
+// dir = file.Join(os.TempDir(), "yak-mkdir-demo")
+// file.Remove(dir)              // 先清理, 保证目录不存在
+// file.Mkdir(dir)~
+// assert file.IsDir(dir), "directory should be created"
+// file.Remove(dir)
 // ```
 func _mkdir(name string) error {
 	return os.Mkdir(name, os.ModePerm)
@@ -360,8 +369,11 @@ func _mkdir(name string) error {
 //
 // Example:
 // ```
-// // 假设存在 /tmp 目录，不存在 /tmp/test 目录
-// err = file.MkdirAll("/tmp/test/test2")
+// // 关键词: file.MkdirAll, 递归创建多层目录
+// dir = file.Join(os.TempDir(), "yak-mkdirall-demo", "a", "b", "c") // 多层不存在的目录
+// file.MkdirAll(dir)~                                                // 会自动逐级创建
+// assert file.IsDir(dir), "nested directories should be created"
+// file.Remove(file.Join(os.TempDir(), "yak-mkdirall-demo"))
 // ```
 func _mkdirAll(name string) error {
 	return os.MkdirAll(name, os.ModePerm)
@@ -378,8 +390,14 @@ func _mkdirAll(name string) error {
 //
 // Example:
 // ```
-// // 假设存在 /tmp/test.txt 文件
-// err = file.Rename("/tmp/test.txt", "/tmp/test2.txt")
+// // 关键词: file.Rename, 重命名/移动文件
+// dir = file.Join(os.TempDir(), "yak-rename-demo"); file.MkdirAll(dir)
+// oldp = file.Join(dir, "old.txt"); newp = file.Join(dir, "new.txt")
+// file.Save(oldp, "hello yak")~
+// file.Rename(oldp, newp)~
+// assert !file.IsExisted(oldp), "old path should be gone"
+// assert string(file.ReadFile(newp)~) == "hello yak", "content should move to new path"
+// file.Remove(dir)
 // ```
 func _rename(oldpath, newpath string) error {
 	return os.Rename(oldpath, newpath)
@@ -396,8 +414,13 @@ func _rename(oldpath, newpath string) error {
 //
 // Example:
 // ```
-// // 假设存在 /tmp/test.txt 文件
-// err = file.Mv("/tmp/test.txt", "/tmp/test2.txt")
+// // 关键词: file.Mv, 移动/重命名文件(Rename 的别名)
+// dir = file.Join(os.TempDir(), "yak-mv-demo"); file.MkdirAll(dir)
+// oldp = file.Join(dir, "a.txt"); newp = file.Join(dir, "b.txt")
+// file.Save(oldp, "hello yak")~
+// file.Mv(oldp, newp)~
+// assert file.IsExisted(newp) && !file.IsExisted(oldp), "file should be moved"
+// file.Remove(dir)
 // ```
 func _mv(oldpath, newpath string) error {
 	return os.Rename(oldpath, newpath)
@@ -412,8 +435,11 @@ func _mv(oldpath, newpath string) error {
 //
 // Example:
 // ```
-// // 假设存在 /tmp/test/test.txt 文件和 /tmp/test/test2.txt 文件
-// err = file.Remove("/tmp/test")
+// // 关键词: file.Remove, 递归删除文件/目录
+// dir = file.Join(os.TempDir(), "yak-remove-demo"); file.MkdirAll(dir)
+// file.Save(file.Join(dir, "a.txt"), "x")~
+// file.Remove(dir)~                            // 会连同子文件一起删除
+// assert !file.IsExisted(dir), "directory should be removed recursively"
 // ```
 func _remove(path string) error {
 	return os.RemoveAll(path)
@@ -428,8 +454,11 @@ func _remove(path string) error {
 //
 // Example:
 // ```
-// // 假设存在 /tmp/test/test.txt 文件和 /tmp/test/test2.txt 文件
-// err = file.Rm("/tmp/test")
+// // 关键词: file.Rm, 递归删除(Remove 的别名)
+// p = file.Join(os.TempDir(), "yak-rm-demo.txt")
+// file.Save(p, "x")~
+// file.Rm(p)~
+// assert !file.IsExisted(p), "file should be removed"
 // ```
 func _rm(path string) error {
 	return os.RemoveAll(path)
@@ -445,7 +474,13 @@ func _rm(path string) error {
 //
 // Example:
 // ```
-// f, err = file.Create("/tmp/test.txt")
+// // 关键词: file.Create, 创建文件并写入
+// p = file.Join(os.TempDir(), "yak-create-demo.txt")
+// f = file.Create(p)~
+// f.WriteString("hello yak")  // 通过文件句柄写入内容
+// f.Close()                   // 记得关闭句柄
+// assert string(file.ReadFile(p)~) == "hello yak", "content should be written"
+// file.Remove(p)
 // ```
 func _create(name string) (*_yakFile, error) {
 	f, err := os.Create(name)
@@ -492,7 +527,16 @@ func _fileReadLines(i interface{}) []string {
 //
 // Example:
 // ```
-// err = file.ReadLinesWithCallback("/tmp/test.txt", func(line) { println(line) })
+// // 关键词: file.ReadLinesWithCallback, 逐行回调读取
+// p = file.Join(os.TempDir(), "yak-readlines-cb.txt")
+// file.Save(p, "line1\nline2\nline3")~
+// count = 0
+// file.ReadLinesWithCallback(p, func(line) {
+//     count++
+//     println("got line:", line) // 每读到一行就回调一次
+// })~
+// assert count == 3, "should read 3 lines"
+// file.Remove(p)
 // ```
 func _fileReadLinesWithCallback(i interface{}, callback func(string)) error {
 	filename := utils.InterfaceToString(i)
@@ -567,7 +611,13 @@ func _filePathSplit(path string) (string, string) {
 //
 // Example:
 // ```
-// file.IsExisted("/usr/bin/bash")
+// // 关键词: file.IsExisted, 判断路径是否存在
+// p = file.Join(os.TempDir(), "yak-exist-demo.txt")
+// file.Save(p, "x")~
+// println("exist:", file.IsExisted(p))                 // 预期输出: exist: true
+// assert file.IsExisted(p), "the file we just created should exist"
+// file.Remove(p)
+// assert !file.IsExisted(p), "the file should not exist after remove"
 // ```
 func _fileIsExisted(path string) bool {
 	ret, _ := utils.PathExists(path)
@@ -583,9 +633,15 @@ func _fileIsExisted(path string) bool {
 //
 // Example:
 // ```
-// // 假设存在 /usr/bin/bash 文件
-// file.IsFile("/usr/bin/bash") // true
-// file.IsFile("/usr/bin") // false
+// // 关键词: file.IsFile, 判断是否为文件
+// dir = file.Join(os.TempDir(), "yak-isfile-demo")
+// file.MkdirAll(dir)
+// p = file.Join(dir, "a.txt")
+// file.Save(p, "x")~
+// println("p is file:", file.IsFile(p), "; dir is file:", file.IsFile(dir))
+// assert file.IsFile(p), "a regular file should be a file"
+// assert !file.IsFile(dir), "a directory should not be a file"
+// file.Remove(dir)
 // ```
 func _fileIsFile(path string) bool {
 	return utils.IsFile(path)
@@ -600,9 +656,15 @@ func _fileIsFile(path string) bool {
 //
 // Example:
 // ```
-// // 假设存在 /usr/bin/bash 文件
-// file.IsDir("/usr/bin") // true
-// file.IsDir("/usr/bin/bash") // false
+// // 关键词: file.IsDir, 判断是否为目录
+// dir = file.Join(os.TempDir(), "yak-isdir-demo")
+// file.MkdirAll(dir)
+// p = file.Join(dir, "a.txt")
+// file.Save(p, "x")~
+// println("dir is dir:", file.IsDir(dir), "; file is dir:", file.IsDir(p))
+// assert file.IsDir(dir), "a directory should be a dir"
+// assert !file.IsDir(p), "a regular file should not be a dir"
+// file.Remove(dir)
 // ```
 func _fileIsDir(path string) bool {
 	return utils.IsDir(path)
@@ -652,8 +714,14 @@ func _fileJoin(path ...string) string {
 //
 // Example:
 // ```
-// f, err = file.Open("/tmp/test.txt")
-// content, err = file.ReadAll(f)
+// // 关键词: file.ReadAll, 从 Reader 读取全部字节
+// p = file.Join(os.TempDir(), "yak-readall-demo.txt")
+// file.Save(p, "hello yak")~
+// f = file.Open(p)~
+// content = file.ReadAll(f)~       // ReadAll 接收任意 Reader, 这里传文件句柄
+// println("content:", string(content)) // 预期输出: content: hello yak
+// assert string(content) == "hello yak", "should read all bytes"
+// f.Close(); file.Remove(p)
 // ```
 func _fileReadAll(r io.Reader) ([]byte, error) {
 	return io.ReadAll(r)
@@ -703,8 +771,16 @@ func _lsDirAll(i string) []*utils.FileInfo {
 //
 // Example:
 // ```
-// file.Cp("/tmp/test.txt", "/tmp/test2.txt")
-// file.Cp("/tmp/test", "/root/tmp/test")
+// // 关键词: file.Cp, 复制文件/目录
+// dir = file.Join(os.TempDir(), "yak-cp-demo")
+// file.MkdirAll(dir)
+// src = file.Join(dir, "src.txt")
+// dst = file.Join(dir, "dst.txt")
+// file.Save(src, "hello yak")~                 // 先准备一个源文件
+// file.Cp(src, dst)~                           // 复制到目标
+// println("dst content:", string(file.ReadFile(dst)~)) // 预期输出: dst content: hello yak
+// assert string(file.ReadFile(dst)~) == "hello yak", "copied content should match source"
+// file.Remove(dir)
 // ```
 func _fileCopy(src, dst string) error {
 	return utils.CopyDirectory(src, dst, false)
@@ -764,8 +840,15 @@ func _dir(i string) []*utils.FileInfo {
 //
 // Example:
 // ```
-// f, err = file.Open("/tmp/test.txt")
-// content, err = file.ReadAll(f)
+// // 关键词: file.Open, file.ReadAll, 打开并读取
+// p = file.Join(os.TempDir(), "yak-open-demo.txt")
+// file.Save(p, "hello yak")~
+// f = file.Open(p)~
+// content = file.ReadAll(f)~
+// println("content:", string(content)) // 预期输出: content: hello yak
+// assert string(content) == "hello yak", "ReadAll should read file content"
+// f.Close()
+// file.Remove(p)
 // ```
 func _fileOpen(name string) (*_yakFile, error) {
 	file, err := os.OpenFile(name, os.O_CREATE|os.O_RDWR, os.ModePerm)
@@ -787,7 +870,14 @@ func _fileOpen(name string) (*_yakFile, error) {
 //
 // Example:
 // ```
-// f = file.OpenFile("/tmp/test.txt", file.O_CREATE|file.O_RDWR, 0o777)~; defer f.Close()
+// // 关键词: file.OpenFile, 按标志位/权限打开文件
+// p = file.Join(os.TempDir(), "yak-openfile-demo.txt")
+// // O_CREATE 不存在则创建, O_RDWR 读写, O_TRUNC 清空原内容
+// f = file.OpenFile(p, file.O_CREATE|file.O_RDWR|file.O_TRUNC, 0o644)~
+// f.WriteString("hello yak")
+// f.Close()
+// assert string(file.ReadFile(p)~) == "hello yak", "content should be written"
+// file.Remove(p)
 // ```
 func _fileOpenWithPerm(name string, flags int, mode os.FileMode) (*_yakFile, error) {
 	file, err := os.OpenFile(name, flags, mode)
@@ -807,8 +897,14 @@ func _fileOpenWithPerm(name string, flags int, mode os.FileMode) (*_yakFile, err
 //
 // Example:
 // ```
-// info, err = file.Stat("/tmp/test.txt")
-// desc(info)
+// // 关键词: file.Stat, 获取文件信息
+// p = file.Join(os.TempDir(), "yak-stat-demo.txt")
+// file.Save(p, "hello yak")~                  // body 共 9 字节
+// info = file.Stat(p)~
+// println("name:", info.Name(), "size:", info.Size(), "isDir:", info.IsDir())
+// assert info.Size() == 9, "size should be 9 bytes"
+// assert !info.IsDir(), "should be a file, not a dir"
+// file.Remove(p)
 // ```
 func _fileStat(name string) (os.FileInfo, error) {
 	return os.Stat(name)
@@ -824,8 +920,13 @@ func _fileStat(name string) (os.FileInfo, error) {
 //
 // Example:
 // ```
-// info, err = file.Lstat("/tmp/test.txt")
-// desc(info)
+// // 关键词: file.Lstat, 获取文件信息(不跟随符号链接)
+// p = file.Join(os.TempDir(), "yak-lstat-demo.txt")
+// file.Save(p, "hello yak")~
+// info = file.Lstat(p)~
+// println("name:", info.Name(), "size:", info.Size())
+// assert info.Name() == "yak-lstat-demo.txt", "name should match"
+// file.Remove(p)
 // ```
 func _fileLstat(name string) (os.FileInfo, error) {
 	return os.Lstat(name)
@@ -837,7 +938,11 @@ func _fileLstat(name string) (os.FileInfo, error) {
 //
 // Example:
 // ```
-// file.Cat("/tmp/test.txt")
+// // 关键词: file.Cat, 打印文件内容
+// p = file.Join(os.TempDir(), "yak-cat-demo.txt")
+// file.Save(p, "hello yak")~          // 先准备一个文件
+// file.Cat(p)                          // 将文件内容打印到标准输出, 这里会打印 hello yak
+// file.Remove(p)
 // ```
 func _cat(i string) {
 	raw, err := ioutil.ReadFile(i)
@@ -853,7 +958,8 @@ func _cat(i string) {
 //
 // Example:
 // ```
-// file.TailF("/tmp/test.txt", func(line) { println(line) })
+// // 无法本地验证: TailF 会持续阻塞监听文件变化, 不适合在示例中同步执行
+// file.TailF("/tmp/test.txt", func(line) { println(line) }) // 类似 tail -f, 有新行就回调
 // ```
 func _tailf(i string, line func(i string)) {
 	t, err := tail.TailFile(i, tail.Config{
@@ -956,12 +1062,19 @@ func _readDirInfoInDirectory(path string) ([]*utils.FileInfo, error) {
 //
 // Example:
 // ```
-// // 假设存在 /tmp/test.txt 文件，内容为 123
-// // 假设存在 /tmp/test2.txt 文件，内容为 456
-// m, err = file.NewMultiFileLineReader("/tmp/test.txt", "/tmp/test2.txt")
+// // 关键词: file.NewMultiFileLineReader, 多文件逐行读取
+// f1 = file.Join(os.TempDir(), "yak-mfr-1.txt")
+// f2 = file.Join(os.TempDir(), "yak-mfr-2.txt")
+// file.Save(f1, "123")~   // 第一个文件
+// file.Save(f2, "456")~   // 第二个文件
+// m = file.NewMultiFileLineReader(f1, f2)~ // 跨多个文件连续按行读取
+// lines = []
 // for m.Next() {
-// println(m.Text())
+//     lines = append(lines, m.Text()) // 依次读到 "123" 和 "456"
 // }
+// println("lines:", lines)
+// assert len(lines) == 2, "should read 2 lines across 2 files"
+// file.Remove(f1); file.Remove(f2)
 // ```
 func _newMultiFileLineReader(files ...string) (*mfreader.MultiFileLineReader, error) {
 	return mfreader.NewMultiFileLineReader(files...)
