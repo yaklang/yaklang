@@ -139,7 +139,7 @@ func javaQualifiedNameParts(raw javaparser.IQualifiedNameContext) []string {
 // registerPostSkeletonImportTask schedules static import type linking for pass2
 // without capturing the whole file AST in the shared pipeline's top-level closure.
 func (y *singleFileBuilder) registerPostSkeletonImportTask(i *javaparser.CompilationUnitContext) {
-	if y == nil || i == nil || !ssa.SkeletonTopLevelEnabled() {
+	if y == nil || i == nil {
 		return
 	}
 	decls := i.AllImportDeclaration()

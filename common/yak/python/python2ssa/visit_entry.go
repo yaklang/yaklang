@@ -25,7 +25,7 @@ func (b *singleFileBuilder) VisitRoot(raw pythonparser.IRootContext) interface{}
 	// For now, we'll handle file_input which is the most common case
 	if fileInput := root.File_input(); fileInput != nil {
 		b.VisitFileInput(fileInput)
-		if b.PreHandler() && ssa.SkeletonTopLevelEnabled() {
+		if b.PreHandler() {
 			b.registerPythonFileBuild(fileInput)
 		}
 	} else if singleInput := root.Single_input(); singleInput != nil {
@@ -97,7 +97,7 @@ func (b *singleFileBuilder) visitFileInputStmtSkeleton(stmt pythonparser.IStmtCo
 }
 
 func (b *singleFileBuilder) registerPythonFileBuild(fileInput pythonparser.IFile_inputContext) {
-	if b == nil || fileInput == nil || !ssa.SkeletonTopLevelEnabled() {
+	if b == nil || fileInput == nil {
 		return
 	}
 	fileInputCtx, ok := fileInput.(*pythonparser.File_inputContext)

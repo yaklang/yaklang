@@ -17,7 +17,6 @@ import (
 // Pair with YAK_SSA_HEAP_LOG=1 for per-phase retained heap (f1 isolates AST win).
 //
 //	JAVA_HEAP_PROJECT=/path/to/spring YAK_SSA_HEAP_LOG=1 go test ./.../java -run TestJavaCompileHeapMeasure -count=1 -v -timeout=60m
-//	JAVA_HEAP_PROJECT=/path/to/spring YAK_SSA_LEGACY_TOPLEVEL=1 go test ... (legacy on same branch)
 func TestJavaCompileHeapMeasure(t *testing.T) {
 	root := os.Getenv("JAVA_HEAP_PROJECT")
 	if root == "" {
@@ -65,10 +64,7 @@ func TestJavaCompileHeapMeasure(t *testing.T) {
 		t.Fatalf("compile error: %v", err)
 	}
 
-	mode := "new(skeleton+detach)"
-	if os.Getenv("YAK_SSA_LEGACY_TOPLEVEL") != "" {
-		mode = "legacy(whole-tree closure)"
-	}
+	mode := "skeleton+detach"
 	t.Logf("BRANCH=%-12s MODE=%-26s path=%s peak_heap_inuse=%6.1fMB compile=%v programs=%d",
 		branch, mode, root, float64(atomic.LoadInt64(&peak))/(1024*1024), elapsed, len(progs))
 }

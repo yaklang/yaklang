@@ -1988,7 +1988,7 @@ func (b *singleFileBuilder) VisitFuncdef(raw pythonparser.IFuncdefContext) inter
 		newFunc = b.NewFunc(funcName)
 	}
 
-	if b.PreHandler() && ssa.SkeletonTopLevelEnabled() {
+	if b.PreHandler() {
 		store := b.StoreFunctionBuilder()
 		params := ssa.DetachAST(funcdef.Typedargslist())
 		bodySuite := ssa.DetachAST(suite)

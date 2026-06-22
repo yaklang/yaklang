@@ -2,7 +2,6 @@ package ssaapi
 
 import (
 	"fmt"
-	"os"
 	"runtime"
 	"strings"
 	"sync"
@@ -20,7 +19,6 @@ import (
 // see retained heap after each phase (the f1 line isolates the AST win). A/B:
 //
 //	YAK_SSA_HEAP_LOG=1 go test ./.../golang -run TestGoCompileHeapMeasure -count=1 -v
-//	YAK_SSA_HEAP_LOG=1 YAK_SSA_LEGACY_TOPLEVEL=1 go test ./.../golang -run TestGoCompileHeapMeasure -count=1 -v
 //
 // Throwaway measurement helper, not a correctness assertion.
 func TestGoCompileHeapMeasure(t *testing.T) {
@@ -83,10 +81,7 @@ func TestGoCompileHeapMeasure(t *testing.T) {
 		t.Fatalf("compile error: %v", err)
 	}
 
-	mode := "new(skeleton+detach)"
-	if os.Getenv("YAK_SSA_LEGACY_TOPLEVEL") != "" {
-		mode = "legacy(whole-tree closure)"
-	}
+	mode := "skeleton+detach"
 	t.Logf("MODE=%-26s files=%d peak_heap_inuse=%6.1fMB compile=%v programs=%d",
 		mode, pkgs, float64(atomic.LoadInt64(&peak))/(1024*1024), elapsed, len(progs))
 }

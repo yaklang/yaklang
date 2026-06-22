@@ -88,9 +88,6 @@ function only_helper() {
 }
 
 func TestVisitPHPFilePass2Capture_doesNotPanicOnTopLevelStatement(t *testing.T) {
-	if !ssa.SkeletonTopLevelEnabled() {
-		t.Skip("skeleton top-level disabled")
-	}
 	src := `<?php
 $top = 1;
 `
