@@ -154,7 +154,7 @@ require (
 	rsc.io/qr v0.2.0
 )
 
-require github.com/dlclark/regexp2 v1.11.0 // indirect
+require github.com/dlclark/regexp2 v1.11.0
 
 require (
 	dario.cat/mergo v1.0.0 // indirect
