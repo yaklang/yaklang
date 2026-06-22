@@ -111,14 +111,14 @@
 
 ## 0. 一个必须先讲清的查证结论（影响架构）
 
-落地"用 re/re2 的语法块构建 unify AST"前，已实地核对 yaklang 依赖（`dlclark/regexp2 v1.11.0`）：
+落地"用 re/re2 的语法块构建 unify AST"前，已实地核对 yaklang 依赖（**注：regexp2 后端已于 2026-06 全局由 `dlclark/regexp2` 切换为 `go-pcre2-lite/regexp2`，API 兼容、PCRE2 内核、线性时间；下列结构封闭性结论对二者同等成立**）：
 
 - **`regexp/syntax`（标准库 RE2）**：AST 类型 `*syntax.Regexp` 及其 `Op / Rune / Sub / Min / Max /
   Flags` 字段**全部公开、可遍历**。是 unify AST 的可靠来源。
-- **`dlclark/regexp2 v1.11.0`**：`RegexTree` 虽导出，但其 `root *regexNode`、`regexNode` 结构、
-  所有字段（`t/children/str/set/ch/m/n`）以及 `nodeType` 常量**全部 unexported**；该 `syntax` 子包
-  对外仅暴露 `Write / RegexTree.Dump() / Prefix / BmPrefix / ReplacerData`。**外部包无法以编程方式
-  遍历 regexp2 的 AST**。
+- **regexp2 后端（原 `dlclark/regexp2 v1.11.0`，现 `go-pcre2-lite/regexp2`）**：`RegexTree` 虽导出，但其
+  `root *regexNode`、`regexNode` 结构、所有字段（`t/children/str/set/ch/m/n`）以及 `nodeType` 常量
+  **全部 unexported**；该 `syntax` 子包对外仅暴露 `Write / RegexTree.Dump() / Prefix / BmPrefix /
+  ReplacerData`。**外部包无法以编程方式遍历 regexp2 的 AST**。
 - 另一个本质事实：regexp2-only 的构造（lookaround / backreference）属于**非正则语言**，即使拿到其
   结构也**无法进入 Glushkov NFA**（数学边界，非实现缺陷）。
 

@@ -174,7 +174,7 @@ func genRE(r *rand.Rand, depth int) string {
 // existsIn 与 stdlib regexp.Match. ASCII 闸保证字节级 NFA 在任意字节上与 RE2 一致.
 func TestMVSNFARandomDifferential(t *testing.T) {
 	r := rand.New(rand.NewSource(0x5EED))
-	const iters = 20000
+	iters := diffIters(t, defaultDiffIters)
 	tested, skipped := 0, 0
 	for it := 0; it < iters; it++ {
 		expr := genRE(r, 2)

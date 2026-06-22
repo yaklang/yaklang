@@ -400,8 +400,10 @@ docker run --rm --platform linux/amd64 -v $PWD:/amalg:ro -v /tmp/mvs_fixture:/fi
 > `runtime.cgocall`(C 内核整段扫)从 ~28% 砍到 ~11%、C `nfaExists` 扫描字节 16.35MB→3.93MB(降 76%)。
 > 此后 profile 的**绝对瓶颈是 regexp2**(`regexp2.execute`/`IsWordChar`/`CharIn` 系列合计 ~40% CPU)。
 
-- **regexp2 前端(最大头,~40% CPU)**:`regexp2.execute` 回溯。下一步独立工作项 = 前端从 `dlclark/regexp2`
-  迁移到 `go-pcre2-lite`(线性时间),**单独 PR 处理**,不在双向锚定本次范围。该迁移落地后双向锚定省下的占比会放大。
+- **regexp2 前端**（原最大头 ~40% CPU，已解决）：`regexp2.execute` 回溯。**【2026-06 已落地】** yaklang 全局已把
+  regexp2 后端从 `dlclark/regexp2`（.NET 回溯）切换为 `go-pcre2-lite/regexp2`（PCRE2，线性时间）。`regexp2Verifier`
+  经 `regexp_utils.YakRegexpUtils.Match()` 自动享有该加速，无需 minirehs 内旁路。迁移落地后，Rose-lite 双向锚定
+  省下的扫描占比被进一步放大。下一档优化见下两条（断言 NFA 合并 / 子串图多跳链）。
 - 断言 NFA always-on(`existsInAssertShared` ~9.5% + `existsInAssertAnchored` ~4%):IMPL 0'.4 #2 的"断言 NFA 合并"。
 - 前向/反向锚定(`existsInAnchored*` ~15% + `existsInReverseAnchored` ~5%):双向锚定本体,已是收窄后的局部扫描。
 
