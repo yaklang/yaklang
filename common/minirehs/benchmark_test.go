@@ -44,6 +44,71 @@ func benchScanRecords(b *testing.B, patterns []Pattern, backend BackendKind, rec
 	_ = hits
 }
 
+// benchScanRecordsOpts 同 benchScanRecords, 但允许追加任意编译选项 (如 WithReportLocation(false)),
+// 用于度量"纯存在性"等不同语义档的吞吐.
+func benchScanRecordsOpts(b *testing.B, patterns []Pattern, records [][]byte, opts ...Option) {
+	b.Helper()
+	allOpts := append([]Option{WithLogger(silentLogger{})}, opts...)
+	db, err := Compile(patterns, allOpts...)
+	if err != nil {
+		b.Fatalf("compile: %v", err)
+	}
+	defer db.Close()
+	sc, err := db.NewScratch()
+	if err != nil {
+		b.Fatalf("scratch: %v", err)
+	}
+	defer sc.Close()
+
+	var total int64
+	for _, r := range records {
+		total += int64(len(r))
+	}
+	b.SetBytes(total)
+	b.ReportAllocs()
+	b.ResetTimer()
+	var hits int64
+	for i := 0; i < b.N; i++ {
+		cnt := 0
+		for _, rec := range records {
+			_ = db.Scan(rec, sc, func(m Match) bool {
+				cnt++
+				return true
+			})
+		}
+		hits += int64(cnt)
+	}
+	b.StopTimer()
+	_ = hits
+}
+
+// BenchmarkMVSExistence 度量"仅判存在性"(WithReportLocation(false), 契合 MITM 打标只需"哪些规则
+// 命中"的场景)下 MVS 的吞吐: 走纯位运算快路径、不做 findAllLoc 定位. 带 -tags minirehs_mvs 时
+// MVS 存在性热路径改由纯 C99 内核执行 (per-pattern + 合并 always-on).
+//
+// 不再跑 StdlibLoop 子基准 (每次重测 stdlib 逐条扫描太慢, 价值低). 加速比以"一次测定的固定参照"
+// 折算: 本机 StdlibLoop ≈ 0.17 MB/s (87 条逐条扫整段), 故 80x 目标 ≈ 13.6 MB/s. 需复测 stdlib
+// 基线时用 BenchmarkMITMRealTraffic/StdlibLoop 单独跑.
+//
+// 关键词: benchmark, MVS, 存在性, WithReportLocation, MITM 打标, 固定参照 0.17MB/s
+func BenchmarkMVSExistence(b *testing.B) {
+	patterns, _ := compilableMITMPatterns(b)
+	records, joined := loadCorpusB(b)
+	b.Logf("rules: %d, records: %d, corpus bytes: %d", len(patterns), len(records), len(joined))
+	b.Run("MVS_Exist", func(b *testing.B) {
+		benchScanRecordsOpts(b, patterns, records, WithBackend(BackendMVS), WithReportLocation(false))
+	})
+	b.Run("MVS_Located", func(b *testing.B) {
+		benchScanRecordsOpts(b, patterns, records, WithBackend(BackendMVS), WithReportLocation(true))
+	})
+	// MVS_Exist_RE2only: 仅取 RE2 可直接编译的子集 (排除 regexp2-origin 的 gate 成员). 与 MVS_Exist
+	// 之差 = Phase 1 后"超集门 + regexp2 复核"的残余成本 (而非旧的 always-on regexp2 全量税).
+	b.Run("MVS_Exist_RE2only", func(b *testing.B) {
+		re2 := re2OnlyMITMPatterns(b)
+		benchScanRecordsOpts(b, re2, records, WithBackend(BackendMVS), WithReportLocation(false))
+	})
+}
+
 // BenchmarkMITMRealTraffic 用 rule4yak 真实规则集 + 本地库真实流量, 对比:
 //   - Engine: minirehs 自研引擎 (一次扫描 + 字面量预过滤)
 //   - StdlibLoop: 现状方案 (N 条正则逐条扫描整段数据), 即 "300 正则一次匹配" 的等价基线

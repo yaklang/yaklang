@@ -36,13 +36,15 @@ const (
 	bStar                // x*
 	bPlus                // x+
 	bQuest               // x?
+	bAssert              // 零宽断言 (^ $ \A \z \b \B / (?m)^$): 不消费输入, acond 记录条件位
 )
 
-// bnode 是 rune 级 AST 节点. 复合节点用 sub; bClass 用 cls.
+// bnode 是 rune 级 AST 节点. 复合节点用 sub; bClass 用 cls; bAssert 用 acond.
 type bnode struct {
-	kind bkind
-	cls  []runeRange
-	sub  []*bnode
+	kind  bkind
+	cls   []runeRange
+	sub   []*bnode
+	acond uint8 // bAssert: 边界条件位 (condBeginText 等, 见 mvs_assert.go)
 }
 
 // synToRune 把 RE2 语法树转换为 rune 级 bnode. 第二返回值 false 表示遇到本核无法处理的构造
@@ -267,6 +269,21 @@ type mvsNFA struct {
 	lastEnd1 uint64
 	follow1  []uint64 // follow1[p] = follow[p][0]
 	reach1   []uint64 // reach1[符号] = reach[符号][0]
+
+	// ---- 零宽断言扩展 (见 mvs_assert.go) ----
+	// hasAssert 为真表示本 NFA 含零宽断言 (\b \B / 行锚 (?m)^$ / 中缀 ^$\A\z), 走 existsInAssert
+	// 执行器 (带边界条件门控的位并行递推), 不走 lean existsIn; 且不进 C 内核 (Go 侧执行).
+	// 此时 anchoredStart/requireEnd/single 不使用; 锚点全部编码为 condFirst/condAccept 的 guard.
+	hasAssert  bool
+	condFirst  []guardedBits   // 起点位置的条件注入: guard 在"消费当前 rune 前的边界"成立才注入 bits
+	condFollow [][]guardedBits // 每位置的条件后继: 同一边界成立才把 bits 并入候选 (与 follow[p] 互补)
+	condAccept []guardedBits   // 接受位置的条件: guard 在"消费当前 rune 后的边界"成立且 active 命中即接受
+}
+
+// guardedBits 是"条件位集": 当 guard (若干边界条件的合取) 在某边界成立时, bits 对应的位置生效.
+type guardedBits struct {
+	g    guard
+	bits []uint64
 }
 
 type glushkovBuilder struct {

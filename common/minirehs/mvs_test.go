@@ -291,10 +291,48 @@ func TestMVSExistenceVsOracleMITM(t *testing.T) {
 	mvsAssertSameIDSet(t, got, ora, "joined-corpus")
 }
 
+// TestMVSExistenceVsOracleMITM_NoLoc 守护"存在性快门档"(WithReportLocation(false)) 的命中集合
+// 与 oracle 一致. 该档启用窗口化 (windowExists) 与 gate 复核等快路径 (默认 reportLoc=true 的
+// 既有差分测试不覆盖这些分支), 故单列护栏: 逐报文 + 整段, MVS(no-loc) 命中 ID 集 == stdlib oracle.
+func TestMVSExistenceVsOracleMITM_NoLoc(t *testing.T) {
+	patterns, _ := compilableMITMPatterns(t)
+	mvs, err := Compile(patterns, WithBackend(BackendMVS), WithReportLocation(false))
+	if err != nil {
+		t.Fatalf("compile mvs: %v", err)
+	}
+	defer mvs.Close()
+	oracle, err := Compile(patterns, WithBackend(BackendStdlib))
+	if err != nil {
+		t.Fatalf("compile oracle: %v", err)
+	}
+	defer oracle.Close()
+
+	records, joined := loadCorpus(t)
+	t.Logf("corpus: %d records, %d bytes joined (existence fast-gate path)", len(records), len(joined))
+	if testing.Short() && len(records) > 200 {
+		records = records[:200]
+	}
+	for i, rec := range records {
+		got := mvsExistIDs(t, mvs, rec)
+		ora := mvsExistIDs(t, oracle, rec)
+		mvsAssertSameIDSet(t, got, ora, fmt.Sprintf("noloc-record#%d(len=%d)", i, len(rec)))
+		if t.Failed() {
+			t.FailNow()
+		}
+	}
+	if testing.Short() {
+		return
+	}
+	got := mvsExistIDs(t, mvs, joined)
+	ora := mvsExistIDs(t, oracle, joined)
+	mvsAssertSameIDSet(t, got, ora, "noloc-joined-corpus")
+}
+
 // TestMVSCoverageMITM 报告 MITM 规则中有多少条能编入 NFA (本核加速), 多少条走兜底.
+// 区分 lean NFA (无断言, 走 C 内核/位并行快路径) 与断言 NFA (零宽断言扩展, Go 门控).
 func TestMVSCoverageMITM(t *testing.T) {
 	patterns, _ := compilableMITMPatterns(t)
-	nfa, fallback := 0, 0
+	lean, assert, fallback := 0, 0, 0
 	for _, p := range patterns {
 		expr := buildExprWithFlags(p)
 		parsed, err := syntax.Parse(expr, syntax.Perl)
@@ -302,14 +340,18 @@ func TestMVSCoverageMITM(t *testing.T) {
 			fallback++
 			continue
 		}
-		if _, ok := compileMVSNFA(parsed.Simplify()); ok {
-			nfa++
+		s := parsed.Simplify()
+		if _, ok := compileMVSNFA(s); ok {
+			lean++
+		} else if _, ok := compileMVSNFAAssert(s); ok {
+			assert++
 		} else {
 			fallback++
 		}
 	}
-	t.Logf("MITM coverage: total=%d nfa=%d (%.1f%%) fallback=%d",
-		len(patterns), nfa, 100*float64(nfa)/float64(max1(len(patterns))), fallback)
+	nfa := lean + assert
+	t.Logf("MITM coverage: total=%d nfa=%d (%.1f%%) [lean=%d assert=%d] fallback=%d",
+		len(patterns), nfa, 100*float64(nfa)/float64(max1(len(patterns))), lean, assert, fallback)
 }
 
 func max1(n int) int {

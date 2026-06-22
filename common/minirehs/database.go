@@ -16,17 +16,37 @@ type Scratch interface {
 
 // scratch 是 Scratch 的内部实现, 持有可复用缓冲区.
 type scratch struct {
-	lower    []byte                // ASCII 小写化数据缓冲 (供大小写无关的字面量预过滤复用)
-	hits     []litHit              // 字面量预过滤命中缓冲 (含位置)
-	cpairs   []int32               // CGO 预过滤输出的 (end,litID) 对缓冲 (NoCGO 不使用)
-	dedup    map[matchKey]struct{} // 邻域窗口验证的去重集合 (跨多次命中)
-	fullDone []bool                // 非窗口候选 pattern 是否已做过整段验证 (按 idx)
+	lower      []byte                // ASCII 小写化数据缓冲 (供大小写无关的字面量预过滤复用)
+	hits       []litHit              // 字面量预过滤命中缓冲 (含位置)
+	cpairs     []int32               // CGO 预过滤输出的 (end,litID) 对缓冲 (NoCGO 不使用)
+	dedup      map[matchKey]struct{} // 邻域窗口验证的去重集合 (跨多次命中)
+	fullDone   []bool                // 非窗口候选 pattern 是否已做过整段验证 (按 idx)
+	mergedHits []int                 // mvs 合并 always-on 自动机单趟命中的成员 idx 缓冲 (复用)
 
-	// Vectorscan 后端复用的批量命中缓冲 (id/from/to), 仅 minirehs_vectorscan 构建使用;
-	// 非该构建时为空闲字段, 不分配、无开销.
-	nativeIDs  []int32
-	nativeFrom []int64
-	nativeTo   []int64
+	// mvs 合并 always-on 单趟扫描的"成员级去重"缓冲 (按成员 idx 去重, 不触碰 fullDone;
+	// 跨步去重由调用方用 fullDone 完成). mergedSeen 供纯 Go 路径, cseen/cmerged 供 C 内核路径.
+	mergedSeen []bool  // 纯 Go scanExist 的成员去重位图 (长度 npat)
+	cseen      []byte  // C 合并 scan 的去重位图 (uint8, 长度 npat)
+	cmerged    []int32 // C 返回命中成员 idx 的 int32 缓冲
+
+	// mvs 存在性快路径"按报文批处理 cgo"缓冲 (Phase 2): batchIdx 收集本报文触发的、可走 C 内核
+	// per-pattern 存在性的 pattern idx (去重), 一次 cgo 调用 nfaExistsMany 后, batchOut[i] 回写
+	// 各 idx 命中 (1/0). 把每报文 cgo 次数从 O(触发数) 降到 O(1), 摊薄跨界开销.
+	batchIdx []int32
+	batchOut []byte
+
+	// mvs 存在性本地化 (Rose-lite) 的每报文窗口累积缓冲 (按 idx): batchSeen 标记该 idx 是否已入批,
+	// winLo/winHi 为其本报文全部字面量命中点窗口的 union (覆盖任一匹配, 见 mvs_window.go). 入批后
+	// 用收窄子切片 data[winLo:winHi] 做一次 C 存在性门控, 把整段 O(record) 降到 O(window).
+	batchSeen []bool
+	winLo     []int32
+	winHi     []int32
+
+	// 断言 NFA 共享边界缓冲: 一个报文内多条零宽断言 NFA (\b \B / 行锚 等) 复用同一份"逐字节
+	// 边界条件" (computeBoundaries 产物), 把 boundaryConds / isWordRune / DecodeRune 的逐 pattern
+	// 重复计算降为每报文一次. assertBoundReady 标记本报文是否已算 (惰性, 无断言触发则不算).
+	assertBound      []uint8
+	assertBoundReady bool
 
 	// 诊断计数 (仅供测试观察热点, 每个 scratch 独占, 无并发竞争).
 	statWindowVerify int64 // 邻域窗口验证次数
@@ -127,9 +147,11 @@ func Compile(patterns []Pattern, opts ...Option) (Database, error) {
 				}
 			}
 		} else {
-			// RE2 不可表达 (lookaround/backref 等), 用 regexp2 验证, 归为 always-on.
+			// RE2 不可表达 (lookaround/backref 等), 用 regexp2 验证.
 			cp.v = &regexp2Verifier{yak: yak}
-			cp.literals = nil
+			// route-B: 在不触碰 regexp2 AST 的前提下, 用"语言超集改写 + RE2 字面量提取"取必需字面量,
+			// 命中才验证, 避免每条记录都跑昂贵的 regexp2. 提不出则保持 always-on. (健全性见 literal_routeb.go)
+			cp.literals = extractRequiredLiteralsApprox(expr, cfg.minLiteralLen)
 		}
 
 		supported = append(supported, cp)
@@ -248,6 +270,10 @@ func effectivePolicy(p, def UnsupportedPolicy) UnsupportedPolicy {
 
 func dispositionOf(cp *compiledPattern) string {
 	if cp.v != nil && !cp.v.exact() {
+		// regexp2-only: route-B 提到必需字面量者改为字面量门控, 否则仍 always-on.
+		if len(cp.literals) > 0 {
+			return "regexp2-gated"
+		}
 		return "regexp2-always-on"
 	}
 	if len(cp.literals) == 0 {

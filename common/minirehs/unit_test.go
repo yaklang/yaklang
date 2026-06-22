@@ -168,38 +168,6 @@ func TestCompileUnknownBackend(t *testing.T) {
 	}
 }
 
-// TestVectorscanBackendCrossBuild 在任意构建下都成立: 请求 BackendVectorscan 永不报错。
-// 带 minirehs_vectorscan 且 libhs 可用时走 Vectorscan, 否则优雅退化为引擎。
-// 无论走哪条路, 功能 (命中) 都必须正确。这是"分发不崩溃 + 及时退化"的跨构建契约。
-func TestVectorscanBackendCrossBuild(t *testing.T) {
-	patterns := []Pattern{{ID: 1, Expr: `foobar`}, {ID: 2, Expr: `[0-9]{3,}`}}
-	db, err := Compile(patterns, WithBackend(BackendVectorscan), WithLogger(silentLogger{}))
-	if err != nil {
-		t.Fatalf("BackendVectorscan must never fail to compile (fallback expected): %v", err)
-	}
-	defer db.Close()
-
-	b := db.Info().Backend
-	if b != BackendVectorscan && b != BackendEngine {
-		t.Fatalf("BackendVectorscan resolved to unexpected backend: %s", b)
-	}
-	t.Logf("BackendVectorscan resolved to: %s", b)
-
-	hit := map[PatternID]bool{}
-	sc, _ := db.NewScratch()
-	defer sc.Close()
-	_ = db.Scan([]byte("see foobar and 12345"), sc, func(m Match) bool { hit[m.ID] = true; return true })
-	if !hit[1] || !hit[2] {
-		t.Errorf("resolved backend %s must match both patterns, got %v", b, hit)
-	}
-}
-
-func TestBackendKindStringVectorscan(t *testing.T) {
-	if BackendVectorscan.String() != "vectorscan" {
-		t.Errorf("BackendVectorscan.String()=%q", BackendVectorscan.String())
-	}
-}
-
 // ---------- database.go: Scan 退化路径 ----------
 
 func TestScanNilHandlerAndNilScratch(t *testing.T) {

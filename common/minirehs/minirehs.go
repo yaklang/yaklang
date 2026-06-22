@@ -52,14 +52,10 @@ const (
 	BackendEngine
 	// BackendStdlib 是 stdlib regexp 逐条匹配后端, 既作正确性兜底, 也用作基线/oracle.
 	BackendStdlib
-	// BackendVectorscan 是基于 Vectorscan/Hyperscan 的高性能"存在性"匹配后端 (可选加速):
-	// 把所有正则编译进单一 SIMD 自动机, 一次扫描判定"哪些规则命中", 适合 MITM 打标等
-	// 以命中存在性为准的场景 (命中以 From/To=-1 上报, 与 regexp2-only 语义一致)。
-	// 仅在 -tags minirehs_vectorscan 构建且运行时能加载到 libhs 时可用; 否则优雅退化为引擎。
-	BackendVectorscan
 	// BackendMVS 是自托管 mvscan 引擎 (字节级 Glushkov 位并行 NFA + 字面量预过滤) 的"存在性"
 	// 匹配后端: 把每条正则编译为字节级位置自动机, 一次扫描判定"哪些规则命中" (From/To=-1)。
-	// 当前为纯 Go 参考实现, 始终可用; 后续以 build tag 接入 SIMD/CGO 加速档并以本实现做差分对照。
+	// 启用 CGO 时自动编入纯 C99 位并行内核 (最强档), 无 CGO 退化纯 Go; 全程零外部依赖、不加载任何
+	// 动态库 (这是本引擎相对 libhs/vectorscan 的核心定位: 自托管、可移植、不崩溃)。
 	BackendMVS
 )
 
@@ -71,8 +67,6 @@ func (b BackendKind) String() string {
 		return "engine"
 	case BackendStdlib:
 		return "stdlib"
-	case BackendVectorscan:
-		return "vectorscan"
 	case BackendMVS:
 		return "mvs"
 	default:

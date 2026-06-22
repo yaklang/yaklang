@@ -67,7 +67,9 @@ func TestSmokeEngineVsStdlib(t *testing.T) {
 }
 
 func TestRegexp2Fallback(t *testing.T) {
-	// 负向先行 (?!...) 是 RE2 不支持、regexp2 支持的构造, 应作为 always-on 被承载.
+	// 负向先行 (?!...) 是 RE2 不支持、regexp2 支持的构造, 由 regexp2 verifier 兜底.
+	// route-B 会从 `foo(?!bar)` 提取必需字面量 "foo" (任一命中必消费 "foo"), 故该 pattern
+	// 不再 always-on, 而是被字面量预过滤门控 (命中 "foo" 才验证), 匹配语义不变.
 	patterns := []Pattern{
 		{ID: 10, Expr: `foo(?!bar)`},
 	}
@@ -78,8 +80,11 @@ func TestRegexp2Fallback(t *testing.T) {
 	defer db.Close()
 
 	info := db.Info()
-	if info.NumAlwaysOn != 1 {
-		t.Fatalf("expected 1 always-on (regexp2), got %d", info.NumAlwaysOn)
+	if info.NumAlwaysOn != 0 {
+		t.Fatalf("expected 0 always-on (route-B gated by literal 'foo'), got %d", info.NumAlwaysOn)
+	}
+	if len(info.Reports) != 1 || info.Reports[0].Disposition != "regexp2-gated" || !info.Reports[0].HasLiteral {
+		t.Fatalf("expected regexp2-gated with literal, got reports=%+v", info.Reports)
 	}
 
 	matched := false

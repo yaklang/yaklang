@@ -16,6 +16,9 @@ import (
 //
 // 关键词: mvscan, bit-parallel NFA, existence scan, rune decode, RuneError
 func (nfa *mvsNFA) existsIn(data []byte) bool {
+	if nfa.hasAssert {
+		return nfa.existsInAssert(data)
+	}
 	if nfa.single {
 		return nfa.existsIn1(data)
 	}
@@ -74,6 +77,188 @@ func (nfa *mvsNFA) existsIn(data []byte) bool {
 		copy(prev, active)
 	}
 	return false
+}
+
+// findAllLoc 在 data 上枚举本 nfa 的所有非重叠匹配, 每个匹配以精确字节区间 [from,to) 回调
+// emit. 语义为 leftmost-longest (POSIX, 等价 regexp.Longest().FindAllIndex): 取最靠左的
+// 起点, 同起点取最长终点; 一个匹配确定后从其终点继续找下一个 (非重叠). emit 返回 false 即停止.
+//
+// 与 existsIn 的区别: existsIn 只判定"是否命中"(布尔, 可提前停); findAllLoc 还要算出"命中在
+// 哪里、内容是什么"(data[from:to]), 用于上报匹配内容与定位. 它由 NFA 自身完成定位, 不依赖
+// stdlib regexp; 正确性由差分测试逐字节对照 regexp.Longest().FindAllIndex 保证.
+//
+// 关键词: mvscan, match location, leftmost-longest, 匹配定位, 匹配内容
+func (nfa *mvsNFA) findAllLoc(data []byte, emit func(from, to int) bool) {
+	pos := 0
+	n := len(data)
+	for pos <= n {
+		from, to, ok := nfa.findLocFrom(data, pos)
+		if !ok {
+			return
+		}
+		if !emit(from, to) {
+			return
+		}
+		if to > pos {
+			pos = to
+		} else {
+			// 防御: 本核拒绝可空根, 不应出现空匹配; 仍兜底推进避免死循环.
+			pos++
+		}
+	}
+}
+
+// findLocFrom 从 data[searchFrom:] 起, 寻找最靠左 (同起点最长) 的一个匹配, 返回其在 data 中的
+// 绝对字节区间 [from,to) 与是否找到. 锚点按 data 的绝对坐标处理 (^ 仅在绝对偏移 0 注入起点,
+// $ 仅在 data 末尾接受), 因此对子区间续扫 (findAllLoc 的非重叠推进) 仍语义正确.
+//
+// 位并行递推在 existsIn 基础上为每个活跃 position 维护一个"起点字节偏移" startOf[p]:
+//   - 后继继承前驱起点; 同一 position 被多路汇聚时保留最小起点 (leftmost 优先).
+//   - 无锚时每步在当前 rune 处注入 first, 其起点为当前 runeStart.
+//   - 命中 (active & accept != 0) 时, 以命中 position 的最小起点与当前终点更新 best;
+//     起点更小则替换, 起点相同则取更大终点 (longest).
+//
+// 当所有"起点 <= best 起点"的活跃线程都消亡时即可停止 (后续注入起点只会更大, 不可能更优).
+func (nfa *mvsNFA) findLocFrom(data []byte, searchFrom int) (int, int, bool) {
+	if searchFrom < 0 {
+		searchFrom = 0
+	}
+	if nfa.anchoredStart && searchFrom > 0 {
+		// ^ 锚定: 匹配只能始于绝对偏移 0, 续扫 (searchFrom>0) 必不命中.
+		return 0, 0, false
+	}
+	const inf = int(^uint(0) >> 1)
+	nword := nfa.nword
+	npos := nfa.npos
+	prevActive := make([]uint64, nword)
+	cand := make([]uint64, nword)
+	candStart := make([]int, npos)
+	prevStart := make([]int, npos)
+	anchored := nfa.anchoredStart
+	requireEnd := nfa.requireEnd
+	n := len(data)
+
+	bestStart, bestEnd := -1, -1
+	hasPrev := false
+
+	i := searchFrom
+	for i < n {
+		runeStart := i
+		r, size := utf8.DecodeRune(data[i:])
+		i += size
+		sym := nfa.symbolOf(r)
+
+		for w := range cand {
+			cand[w] = 0
+		}
+
+		// 后继并集: 继承前驱起点, 汇聚取最小.
+		if hasPrev {
+			for w := 0; w < nword; w++ {
+				pw := prevActive[w]
+				for pw != 0 {
+					p := w*64 + bits.TrailingZeros64(pw)
+					pw &= pw - 1
+					sp := prevStart[p]
+					fp := nfa.follow[p]
+					for fw := 0; fw < nword; fw++ {
+						fb := fp[fw]
+						for fb != 0 {
+							q := fw*64 + bits.TrailingZeros64(fb)
+							fb &= fb - 1
+							bit := uint64(1) << uint(q&63)
+							if cand[fw]&bit == 0 {
+								cand[fw] |= bit
+								candStart[q] = sp
+							} else if sp < candStart[q] {
+								candStart[q] = sp
+							}
+						}
+					}
+				}
+			}
+		}
+
+		// 注入起点 (无锚每步; 有锚仅绝对偏移 0).
+		if !anchored || runeStart == 0 {
+			for w := 0; w < nword; w++ {
+				fb := nfa.first[w]
+				for fb != 0 {
+					q := w*64 + bits.TrailingZeros64(fb)
+					fb &= fb - 1
+					bit := uint64(1) << uint(q&63)
+					if cand[w]&bit == 0 {
+						cand[w] |= bit
+						candStart[q] = runeStart
+					} else if runeStart < candStart[q] {
+						candStart[q] = runeStart
+					}
+				}
+			}
+		}
+
+		rc := nfa.reach[sym]
+		anyActive := false
+		minActiveStart := inf
+		minAcc := inf
+		for w := 0; w < nword; w++ {
+			v := cand[w] & rc[w]
+			prevActive[w] = v
+			if v == 0 {
+				continue
+			}
+			anyActive = true
+			var acc uint64
+			acc = v & nfa.lastAny[w]
+			if requireEnd && i == n {
+				acc |= v & nfa.lastEnd[w]
+			}
+			vv := v
+			for vv != 0 {
+				q := w*64 + bits.TrailingZeros64(vv)
+				vv &= vv - 1
+				s := candStart[q]
+				prevStart[q] = s
+				if s < minActiveStart {
+					minActiveStart = s
+				}
+			}
+			for acc != 0 {
+				q := w*64 + bits.TrailingZeros64(acc)
+				acc &= acc - 1
+				if candStart[q] < minAcc {
+					minAcc = candStart[q]
+				}
+			}
+		}
+		hasPrev = anyActive
+
+		if minAcc != inf {
+			end := i
+			if bestEnd < 0 || minAcc < bestStart || (minAcc == bestStart && end > bestEnd) {
+				bestStart = minAcc
+				bestEnd = end
+			}
+		}
+
+		if !anyActive {
+			if anchored {
+				break // 有锚且活跃集空: 不会再有新起点.
+			}
+			if bestEnd >= 0 {
+				break // 已得匹配且无活跃线程, 后续起点更大不可能更优.
+			}
+			continue
+		}
+		if bestEnd >= 0 && minActiveStart > bestStart {
+			break // 所有"起点<=best 起点"的线程均消亡, best 已是 leftmost-longest.
+		}
+	}
+
+	if bestEnd < 0 {
+		return 0, 0, false
+	}
+	return bestStart, bestEnd, true
 }
 
 // existsIn1 是 nword==1 (位置数 <=64) 的零分配快路径: 活跃集是单个 uint64, 全程寄存器位运算.

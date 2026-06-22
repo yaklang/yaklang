@@ -8,8 +8,69 @@
 > 1. **接受编译期依赖 `regexp/syntax`（RE2）与 `regexp2`（PCRE 系）作为 AST 来源**，不再自写 C parser。
 >    为此设计一个 **Unify Regexp AST** 中间表示承载两种语法树（见第 3 节）。
 > 2. **被丢弃的性能/CPU 相关组件不是永久删除**，而是登记"未来回收触发条件"，需要时再拿回来（见第 5 节）。
-> 3. **bridge 不删**：在 mvscan 通过全部一致性 + 性能验收之前，保留 `vectorscan_bridge.go` /
->    `vectorscan_stub.go` / 相关测试，作为性能与正确性的对照基线。
+> 3. **bridge 已移除（2026-06）**：按"只允许自研、不加载任何动态库"的硬要求，`vectorscan_bridge.go` /
+>    `vectorscan_stub.go` / `vectorscan_test.go` / `bench_vectorscan_test.go` 已全部删除，`BackendVectorscan`
+>    枚举与 `rehs.backend("vectorscan")` 入口同步清除。mvscan 自此是唯一的高性能存在性后端，全程零外部依赖。
+>    历史对照基线（bridge=87x）仅留作文字参照，不再可运行。
+>
+> ## 0'. 实测现状与"阉割校正"（2026-06，必读，凌驾于下文设计稿之上）
+>
+> 下文 1~16 节是**设计稿（蓝图）**；本节是**已落地代码的实测真相**。两者冲突时以本节为准。
+>
+> ### 0'.1 为什么"纯 vectorscan 这么牛逼"——差距的真实来源（已用 profile 验证，非臆测）
+>
+> Hyperscan/Vectorscan 的快**不是单点魔法**，而是两件我们当前"画了图但没接到默认路径"的东西：
+>
+> 1. **Teddy SIMD 多字面量预过滤（最大头）**。HS 用 SSSE3/AVX2 的 `PSHUFB` 一次扫 16/32 字节，给出
+>    "每个位置命中哪些 bucket 指纹"，把"在 GB 级数据里找几百个字面量"做到接近 memchr 的吞吐。本设计稿
+>    第 4/7.4 节把 100x 的主要来源**明确押在 Teddy 上**。
+> 2. **Rose 子串级图分解（第二头）**。HS 把每条正则拆成"字面量链 + 小 FA 片段"挂在图上，命中某字面量后
+>    **只在极小邻域**验证对应的 FA 片段，几乎从不做整段 NFA 扫描。本设计稿第 5 节把 **Rose 完整图分解
+>    明确列为"丢弃项"**（回收条件：编排粒度不足时）。
+>
+> ### 0'.2 我们到底"阉割"了什么（这就是 20x 上不去的根因）
+>
+> 对照设计稿与现有代码，有两处关键能力**画在图里但没真正落到默认热路径**：
+>
+> - **阉割①：默认预过滤不是 Teddy，而是标量 Aho-Corasick。** `prefilter_nocgo.go` 的 `newPrefilter`
+>   恒返回 `newScalarPrefilter`（AC 自动机）；Teddy（`native/teddy.c`）只在特定 CGO 构建 + `prefilter_cgo.go`
+>   路径才接入。即设计稿 7.4 的"100x 主引擎"在默认档**没有点亮**。这是与 HS 吞吐差距的第一大来源。
+> - **阉割②：触发后做的是 per-pattern 整段 NFA 扫描，而非 Rose 邻域验证。** profile 显示 `runtime.cgocall`
+>   （即 C 内核 `nfaExists`/`nfaExistsMany` 的整段扫描）稳定占 ~60% CPU。设计稿第 5 节主动丢掉了 Rose，
+>   所以"命中字面量后只在小窗口验证"这件事**先天缺位**——这正是本轮要补的方向。
+>
+> 结论：**20x 上不去不是 bug，是设计稿亲手登记的两项"暂缓/丢弃"在默认路径生效的必然结果。** 要继续往上，
+> 必须按设计稿第 5 节的"回收触发条件"把 **Rose-lite 邻域验证** 与 **Teddy 默认化** 依次接回主路径。
+>
+> ### 0'.3 本轮（2026-06）已落地的安全优化与实测（macOS/arm64，真实 MITM 规则 + 真实流量）
+>
+> 在不引入任何外部依赖、不破坏存在性语义（差分 oracle + 对抗性测试全过）的前提下，做了两步纯算法优化：
+>
+> 1. **断言路径边界共享**（`mvs_assert.go` + `scratch.assertBound`）：一份报文内多条零宽断言 NFA
+>    （`\b \B`/行锚）原本各自重算 `computeBoundaries`/rune 解码；改为**每报文惰性算一次、全员复用**。
+> 2. **存在性本地化 / Rose-lite 左右截窗**（`mvs_window.go` + `scan` 改造）：对 **RE2-exact、非锚定** 的
+>    字面量门控 pattern，命中字面量后按其 AST 上下文宽度算出 `[head,tail]` 界，把整段 `nfaExists` 收窄到
+>    命中点邻域的 union 窗口再验证（锚定 / 尾部无界者安全退回整段，零假阴）。
+>
+> | 基准 (真实 MITM, 越大越好) | 优化前 | 优化后 | 增益 |
+> |---|---|---|---|
+> | `MVS_Exist`（全规则存在性） | 2.13 MB/s | **2.44 MB/s** | +14.5% |
+> | `MVS_Located`（含精确定位） | 1.52 MB/s | **1.75 MB/s** | +15% |
+> | `MVS_Exist_RE2only`（纯 RE2 子集） | 3.21 MB/s | **3.83 MB/s** | +19.3% |
+> | `MVS_Exist_RE2only` 内存/op | 29.5 MB | **0.45 MB** | **降 65x** |
+>
+> 三档构建（CGO 默认 / `CGO_ENABLED=0` 纯 Go / `-tags minirehs_mvs` amalgamation）回归全绿；新增对抗性
+> 窗口健全性测试 `mvs_window_test.go`（JWT / `token=\w+` / `foo\w+bar` 等 + 长随机填充）防假阴。
+>
+> ### 0'.4 继续往上的路线（按收益/风险排序，尚未落地）
+>
+> 1. **Teddy 默认化（最大头，回收阉割①）**：把 `native/teddy.c` 接为默认 CGO 预过滤（标量孪生兜底
+>    `CGO_ENABLED=0`），替掉 AC。预期吞吐量级提升——这是逼近 HS 的主路径。
+> 2. **断言 NFA 合并（中等，确定性收益）**：现 always-on/触发的断言 NFA 仍逐条整段跑（profile ~18% CPU）。
+>    把带 guard（`condFirst/condFollow/condAccept`）的断言 NFA 仿 `mvs_merged.go` 合并为单趟，预计再削 ~15%。
+>    风险：guard 合并的正确性需专门差分护栏。
+> 3. **真正的 Rose-lite 链分解（回收阉割②的完全体）**：对"尾部无界"（`token=\w+`、`.*foo`）这类目前仍
+>    整段扫描的 pattern，做字面量链 + 片段 FA 的邻域验证，彻底消除整段 forward 扫描。工程量最大、收益最高。
 
 ## 0. 一个必须先讲清的查证结论（影响架构）
 
@@ -350,25 +411,26 @@ handler 返回 false 即整体提前停
 - `compile`：前端把每条 `compiledPattern` 经 Unify AST 编译；`regular` 进 NFA blob，`non-regular`
   （现有 `regexp2Verifier`/`!v.exact()`）标记 regexp2 兜底（复用现路径，不丢规则）。
 - cgo 绑定纯 C 后端（范式同 `prefilter_cgo.go` 调 `teddy.c`：Go 薄封装，C 出力），传 blob + data。
-- 语义存在性，命中 `Match{ID,-1,-1}`，与现有 vectorscan 后端一致，可共用差分测试。
-- **CGO_ENABLED=0 / 未带 tag**：`BackendMVS` 优雅退化为现有纯 Go 引擎（stub + selectBackend，同 vectorscan）。
-- **bridge 保留**：mvscan 通过全部验收前 `vectorscan_bridge.go` 等不动，作对照基线。
+- 语义存在性，命中 `Match{ID,-1,-1}`，与 regexp2-only 兜底路径一致，可共用差分测试。
+- **CGO_ENABLED=0 / 未带 tag**：`BackendMVS` 优雅退化为现有纯 Go 引擎（stub + selectBackend）。
+- **bridge 已移除（见 0'.1）**：mvscan 是唯一高性能存在性后端，不再保留任何 vectorscan 对照件。
 
 ## 11. 正确性保证
 
 1. **三级 oracle**：① stdlib RE2 为最终 oracle；② 前端 Go 内置一个**参考执行器**（按 7.2 在 Go 跑
    bit-NFA），作为"算法规格"与 C 后端逐位对照；③ C 后端各 SIMD 档互相逐位对齐。
 2. **差分一致性**：合成随机正则 + 真实 MITM 规则，逐记录比较命中 ID 集合（复用
-   `consistency_test.go` / `vectorscan_test.go` 框架）。
+   `consistency_test.go` 框架；`vectorscan_test.go` 已随 bridge 移除）。
 3. **fuzz**：复用 `fuzz_test.go` 随机 RE2 生成器差分。
 4. **内存安全**：C 侧 ASan/UBSan + 边界 corpus。
 5. **跨架构 CI**：linux/amd64、linux/arm64、darwin/arm64、windows/amd64 编译+测试；QEMU 兜其它架构标量。
 
 ## 12. 性能目标与验证
 
-- 基准：复用 `BenchmarkMITMRealTraffic` / `BenchmarkEngineVsVectorscan` / `BenchmarkSyntheticScale`，
-  对照 StdlibLoop / 纯 Go 引擎 / **bridge(vectorscan)** / **mvscan**。
+- 基准：复用 `BenchmarkMITMRealTraffic` / `BenchmarkMVSExistence` / `BenchmarkSyntheticScale`，
+  对照 StdlibLoop / 纯 Go 引擎 / **mvscan**（bridge 对照已移除，历史值 87x 仅作文字参照）。
 - 目标：mvscan ≥ **100x**（相对 StdlibLoop）；标量退化档显著快于逐条。
+  实测现状见 0'.3（默认 AC 预过滤档；Teddy 默认化后才逼近该目标）。
 - 每阶段退出标准（见 13）均带可量化性能 + 一致性门槛。
 
 ## 13. 分阶段计划与工时
@@ -420,7 +482,7 @@ common/minirehs/
     dispatch.c        运行期 CPU 特性探测 + 函数指针选择
     mvscan.c          (amalgamation 产物, 由 tools 生成)
   tools/amalgamate/   拼 native/mvscan/*.c -> 单文件 mvscan.c/.h
-  vectorscan_bridge.go / vectorscan_stub.go   ← 移植达标前保留, 作对照基线
+  (vectorscan_bridge.go / vectorscan_stub.go 已删除: 不加载任何动态库, 见 0'.1)
 ```
 
 ## 16. 术语
