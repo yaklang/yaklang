@@ -21,6 +21,9 @@ type QueryHotPatchTemplateConfig struct {
 }
 
 func normalizeHotPatchTemplateTags(tags []string) []string {
+	if len(tags) == 0 {
+		return []string{}
+	}
 	return utils.RemoveRepeatStringSlice(utils.StringArrayFilterEmpty(tags))
 }
 
@@ -90,18 +93,16 @@ func UpdateHotPatchTemplate(db *gorm.DB, name, content, typ string, tags []strin
 	db = FilterHotPatchTemplate(db, filter)
 
 	m := make(map[string]any)
-	if name != "" {
+	if name != "" { // disallow empty name to avoid clearing the name
 		m["name"] = name
 	}
-	if content != "" {
+	if content != "" { // disallow empty content to avoid clearing the content
 		m["content"] = content
 	}
-	if typ != "" {
+	if typ != "" { // disallow empty type to avoid clearing the type
 		m["type"] = typ
 	}
-	if normalizedTags := normalizeHotPatchTemplateTags(tags); len(normalizedTags) > 0 {
-		m["tags"] = schema.StringSlice(normalizedTags)
-	}
+	m["tags"] = schema.StringSlice(normalizeHotPatchTemplateTags(tags)) // allow empty tags to clear the tags
 	db = db.Updates(m)
 	return db.RowsAffected, db.Error
 }

@@ -59,7 +59,7 @@ func TestHotPatchTemplate(t *testing.T) {
 		// one
 		deleteResp, err := local.DeleteHotPatchTemplate(ctx, &ypb.DeleteHotPatchTemplateRequest{
 			Condition: &ypb.HotPatchTemplateRequest{
-				Tags: []string{tagsList[0][0]},
+				Name: []string{names[0]},
 			},
 		})
 		require.NoError(t, err)
@@ -174,6 +174,35 @@ func TestHotPatchTemplate(t *testing.T) {
 	gots = queryResp.GetData()
 	require.Len(t, gots, 1)
 	checkYpbHotPatchTemplate(t, 0, gots[0])
+
+	// clear tags
+	clearedTag := tagsList[0][0]
+	updateResp, err = local.UpdateHotPatchTemplate(ctx, &ypb.UpdateHotPatchTemplateRequest{
+		Condition: &ypb.HotPatchTemplateRequest{
+			Name: []string{names[0]},
+		},
+		Data: &ypb.HotPatchTemplate{
+			Tags: []string{},
+		},
+	})
+	require.NoError(t, err)
+	require.Equal(t, int64(1), updateResp.GetMessage().EffectRows)
+	tagsList[0] = []string{}
+
+	queryResp, err = local.QueryHotPatchTemplate(ctx, &ypb.HotPatchTemplateRequest{
+		Name: []string{names[0]},
+	})
+	require.NoError(t, err)
+
+	gots = queryResp.GetData()
+	require.Len(t, gots, 1)
+	checkYpbHotPatchTemplate(t, 0, gots[0])
+
+	queryResp, err = local.QueryHotPatchTemplate(ctx, &ypb.HotPatchTemplateRequest{
+		Tags: []string{clearedTag},
+	})
+	require.NoError(t, err)
+	require.Empty(t, queryResp.GetData())
 
 }
 
