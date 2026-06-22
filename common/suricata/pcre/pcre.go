@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/suricata/data"
 	"github.com/yaklang/yaklang/common/suricata/data/modifier"
 	"github.com/yaklang/yaklang/common/utils/regen"
+	"regexp"
 	"regexp/syntax"
 	"strings"
 )
@@ -26,6 +27,10 @@ type PCRE struct {
 type Matcher struct {
 	*PCRE
 	matcher *regexp2.Regexp
+	// re2 回退: PCRE2 比 dlclark/.NET 更严格 (如 [\d\w-_] 被判 invalid range), 而 Go RE2 与
+	// 生成器侧 (regen 用 RE2) 一致且更宽松. 当 PCRE2 编译失败但 RE2 能编译时改走 re2, 保住真实
+	// suricata 规则的匹配能力. lookbehind/backref 等 RE2 不支持者 RE2 同样失败, 此时仍返回原错.
+	re2 *regexp.Regexp
 }
 
 type Generator struct {
@@ -140,13 +145,41 @@ func ParsePCREStr(pattern string) (*PCRE, error) {
 
 func (p *PCRE) Matcher() (*Matcher, error) {
 	matcher, err := regexp2.Compile(p.expr, p.opts)
-	if err != nil {
-		return nil, errors.Wrap(err, "invalid pcre pattern")
+	if err == nil {
+		return &Matcher{
+			PCRE:    p,
+			matcher: matcher,
+		}, nil
 	}
-	return &Matcher{
-		PCRE:    p,
-		matcher: matcher,
-	}, nil
+	// PCRE2 编译失败: 尝试 Go RE2 回退 (更宽松, 与生成器一致). RE2 也无法表达者 (lookbehind/
+	// backref) 回退同样失败, 返回原 PCRE2 错误, 保持原有失败语义.
+	if re2, re2Err := compileRE2Fallback(p.expr, p.opts); re2Err == nil {
+		log.Debugf("pcre2 compile failed (%v), fell back to RE2 for: %s", err, p.expr)
+		return &Matcher{
+			PCRE: p,
+			re2:  re2,
+		}, nil
+	}
+	return nil, errors.Wrap(err, "invalid pcre pattern")
+}
+
+// compileRE2Fallback 把 PCRE2 选项翻成 RE2 内联标志后用 Go regexp 编译, 作为 PCRE2 不可编译时的回退.
+func compileRE2Fallback(expr string, opts regexp2.RegexOptions) (*regexp.Regexp, error) {
+	var flags string
+	if opts&regexp2.IgnoreCase != 0 {
+		flags += "i"
+	}
+	if opts&regexp2.Multiline != 0 {
+		flags += "m"
+	}
+	if opts&regexp2.Singleline != 0 {
+		flags += "s"
+	}
+	pattern := expr
+	if flags != "" {
+		pattern = "(?" + flags + ")" + expr
+	}
+	return regexp.Compile(pattern)
 }
 
 func (p *PCRE) Modifier() modifier.Modifier {
@@ -189,6 +222,16 @@ func (p *PCRE) IgnoreCase() bool {
 
 func (p *Matcher) Match(content []byte) []data.Matched {
 	var matches []data.Matched
+	if p.matcher == nil {
+		// RE2 回退路径 (PCRE2 编译失败时启用).
+		for _, loc := range p.re2.FindAllIndex(content, -1) {
+			matches = append(matches, data.Matched{
+				Pos: loc[0],
+				Len: loc[1] - loc[0],
+			})
+		}
+		return matches
+	}
 	match, _ := p.matcher.FindStringMatch(string(content))
 	for match != nil {
 		matches = append(matches, data.Matched{

@@ -20,8 +20,13 @@
 > **已落地(2026-06)**:Teddy SIMD 默认化(替标量 AC)、Rose-lite 双向锚定(前向 ∪ 反向锚定,消除"双无界
 > keyword 类"整段扫;`mvs_reverse.go`/`mvs_bicover.go`,见 IMPL 0'.5)。cgocall 28%→11%、RE2-only 存在性
 > +25%(CGO)/+32.5%(NoCGO)、零假阴(差分 oracle 全 1332 + 反向独立护栏)。
-> 下一步(按收益):前端 regexp2→go-pcre2-lite 迁移(现 ~40% CPU 的绝对瓶颈,**单独 PR**)、断言 NFA 合并单趟、
-> Rose 子串图多跳链(>2 字面量按图边逐跳)。详见 IMPL 第 0'.4 / 0'.5 节。
+> **已落地(2026-06-23)**:regexp2→go-pcre2-lite **全局迁移**(yaklang 整库,原 ~40% CPU 绝对瓶颈消除),
+> `MVS_Exist` 全规则存在性 3.86→**5.79 MB/s(+50%)**;minirehs 测试提速 477s→36s(差分迭代/语料/诊断
+> 分档,见 `diff_iters_test.go` + 环境变量 `MINIREHS_DIFF_ITERS`/`MINIREHS_FULL_CORPUS`/`MINIREHS_DIAG`)。
+> **当前性能(实测,vs Go RE2 逐条 0.18 MB/s 基线)**:存在性 **32x**(全规则)/**42x**(纯 RE2 子集)、定位 **16x**;
+> dlopen 真 hyperscan 历史天花板 87x,故现实目标 = 存在性冲 80x(再 ~2x)。详见第 4' 节倍数评估与路线。
+> 下一步(按收益):**R1 字面量门控合并单趟**(现最大头,结构性)→ R2 断言 NFA 合并 → R3 AVX2 → R5 定位 C 内核。
+> 详见 IMPL 第 0'.4 / 0'.5 节 + 本文件第 4' 节。
 
 ---
 
@@ -398,14 +403,66 @@ docker run --rm --platform linux/amd64 -v $PWD:/amalg:ro -v /tmp/mvs_fixture:/fi
 
 > **2026-06 更新**:Teddy 默认化 + Rose-lite 双向锚定(见 0'.5 节 / `mvs_reverse.go`)已落地。后者把
 > `runtime.cgocall`(C 内核整段扫)从 ~28% 砍到 ~11%、C `nfaExists` 扫描字节 16.35MB→3.93MB(降 76%)。
-> 此后 profile 的**绝对瓶颈是 regexp2**(`regexp2.execute`/`IsWordChar`/`CharIn` 系列合计 ~40% CPU)。
+> **2026-06-23 更新**:regexp2→go-pcre2-lite 全局迁移已落地(原 ~40% CPU 绝对瓶颈消除),`MVS_Exist`
+> 全规则存在性 3.86→**5.79 MB/s(+50%)**。此后瓶颈重新分布如下(见 4' 节实测)。
 
-- **regexp2 前端**（原最大头 ~40% CPU，已解决）：`regexp2.execute` 回溯。**【2026-06 已落地】** yaklang 全局已把
-  regexp2 后端从 `dlclark/regexp2`（.NET 回溯）切换为 `go-pcre2-lite/regexp2`（PCRE2，线性时间）。`regexp2Verifier`
-  经 `regexp_utils.YakRegexpUtils.Match()` 自动享有该加速，无需 minirehs 内旁路。迁移落地后，Rose-lite 双向锚定
-  省下的扫描占比被进一步放大。下一档优化见下两条（断言 NFA 合并 / 子串图多跳链）。
+- **regexp2 前端**(原最大头 ~40% CPU,**已解决**):**【2026-06-23 已落地】** yaklang 全局把 regexp2 后端从
+  `dlclark/regexp2`(.NET 回溯)切换为 `go-pcre2-lite/regexp2`(PCRE2,线性时间)。`regexp2Verifier` 经
+  `regexp_utils.YakRegexpUtils.Match()` 自动享有该加速,无需 minirehs 内旁路。
+- **字面量门控 pattern 逐条 existsIn(现最大头,结构性)**:每条字面量命中的 lean pattern 各自调一次
+  C `nfaExists`/Go `existsIn`。合并 NFA(`mvs_merged.go`)目前只覆盖"无字面量 always-on";门控 pattern
+  尚未合并 ⇒ N 条门控 = N 次 cgo 跨界 + N 趟位递推。这是逼近 80x 的下一个主战场(见 4' 节 R1)。
 - 断言 NFA always-on(`existsInAssertShared` ~9.5% + `existsInAssertAnchored` ~4%):IMPL 0'.4 #2 的"断言 NFA 合并"。
 - 前向/反向锚定(`existsInAnchored*` ~15% + `existsInReverseAnchored` ~5%):双向锚定本体,已是收窄后的局部扫描。
+- **定位档(`findAllLoc`)始终走 Go**:C 内核只加速存在性;`MVS_Located` 16x 的天花板在此(见 4' 节 R5)。
+
+---
+
+## 4'. 性能倍数评估与冲击 80x/100x 的路线(2026-06-23,实测)
+
+> 基线 `StdlibLoop` = Go RE2 逐条扫 = **0.18 MB/s**(即"N 条正则逐条匹配"的等价基线)。
+> 实测条件:全量 5.2MB / 1332 条真实流量 + 87 条真实 MITM 规则,C 内核档(`-tags minirehs_mvs`),
+> `MINIREHS_FULL_CORPUS=1`,`benchtime=3x`。复现:见 0.3 节命令 + 本节脚注。
+
+| 模式 | 吞吐 | vs 基线 | 场景 |
+|---|---|---|---|
+| `MVS_Exist_RE2only`(纯 RE2 子集,存在性) | **7.60 MB/s** | **≈42x** | 最干净对比 |
+| `MVS_Exist`(全 87 规则,存在性) | **5.79 MB/s** | **≈32x** | MITM 打标 |
+| `MVS_Located`(全规则,精确字节偏移) | **2.95 MB/s** | **≈16x** | 替换/标注 |
+
+**诚实结论**:
+- 当前**存在性 32~42x、定位 16x**。这是"纯算法 + 零外部依赖 + 全平台可移植"下的数字。
+- 历史上 dlopen 真 vectorscan 曾测得 **87x**(已移除)——那是本类的**实际天花板参照**。即 "80x ≈ 追平真
+  hyperscan","100x+ 需超越简化移植难以企及","200x 在本语料(平均 ~3.9KB/记录,每记录 Go 侧编译/分发
+  开销占比高)上不现实"。
+- 故现实目标设为 **存在性冲 80x(再 ~2x)**,定位档单独补 C 内核可从 16x 提到 ~30x。
+
+**到 80x 的杠杆(按收益/确定性排序,均未落地)**:
+
+- **R1 — 字面量门控 pattern 合并单趟(最大头,结构性,预期最高收益)**:把所有"字面量门控的 lean NFA"
+  并入一台带 per-position 接受标注的合并自动机(扩 `mvs_merged.go` 现仅覆盖 always-on 的能力),用一次
+  Teddy 预过滤的命中位置集合驱动单趟位递推,消除 N 条门控 = N 次 cgo + N 趟扫的结构性开销。难点:门控
+  语义(命中字面量才激活该成员)要映射成合并自动机的"位置注入掩码";护栏:合并命中集合 == 各成员单独
+  existsIn(仿 `mvs_merged_test.go`)。预期把 `MVS_Exist` 推向 ~10+ MB/s 量级。
+- **R2 — 断言 NFA 合并单趟(中等,确定性)**:IMPL 0'.4 #2。带 guard(`condFirst/condFollow/condAccept`)
+  的断言 NFA 仿合并法收成一趟,削 ~13% 断言路径 CPU。护栏:guard 合并专项差分。
+- **R3 — AVX2 档(纯吞吐,平台相关)**:现 SSE2/NEON 一次 16 字节;AVX2 一次 32 字节,宽扫面预期 +1.5~2x。
+  需新增 AVX2 标量孪生差分 + 运行期 `cpuid` 探测(`mvscan_simd_enabled` 扩展)。
+- **R4 — Rose 子串图多跳链(>2 字面量,工程量大)**:双无界已由双向锚定吃掉;剩"中间子串级编排"(>2
+  必需字面量按图边逐跳验证)压低误触发率。收益视规则膨胀程度。
+- **R5 — 定位档 C 内核(独立收益,把 16x→~30x)**:现 `findAllLoc` 始终走 Go。给 leftmost-longest 定位
+  补一条 C 路径(位递推 + 起点追踪),需与 Go oracle 逐字节差分(`mvs_location_test.go` 已有护栏框架)。
+  仅替换场景受益;打标场景用存在性档即可,无需此项。
+
+**脚注(复现命令)**:
+```bash
+# 存在性三档(C 内核, 全量语料)
+CGO_ENABLED=1 MINIREHS_FULL_CORPUS=1 go test -tags minirehs_mvs ./common/minirehs/ \
+    -run '^$' -bench BenchmarkMVSExistence -benchtime=3x -count=1
+# 基线(StdlibLoop, 全量语料)
+CGO_ENABLED=1 MINIREHS_FULL_CORPUS=1 go test -tags minirehs_mvs ./common/minirehs/ \
+    -run '^$' -bench BenchmarkMITMRealTraffic -benchtime=3x -count=1
+```
 
 ---
 
@@ -491,6 +548,23 @@ docker run --rm --platform linux/amd64 -v $PWD:/amalg:ro -v /tmp/mvs_fixture:/fi
 - 词边界 `\b\B` / 行锚 `(?m)^$` / 中缀 `^$` / `\A\z` 已由守卫式自动机 `mvs_assert.go` 支持,
   覆盖率 88.5%→**96.6%**(兜底 10→3)。余 3 条为 2 条 regexp2-only URL(lookahead/unicode 区间)+
   1 条超大 `\b` 多分支(断言编译仍 bail),保留兜底。
+
+### Phase 6 — regexp2→go-pcre2-lite 全局迁移 ✅ 已落地(2026-06-23)
+- **范围**:yaklang 整库(~20 个 .go 文件)把 `github.com/dlclark/regexp2` 换成
+  `github.com/VillanCh/go-pcre2-lite/regexp2`(PCRE2,线性时间)。`go.mod` 锁 `v0.1.0`(正式 release,无 replace)。
+- **minirehs 受益**:`regexp2Verifier` 经 `regexp_utils.YakRegexpUtils.Match()` 自动享有,无需内部旁路;
+  实验期的 `verifier_pcre2*.go`/`mvs_pcre2_test.go` 已回收。
+- **实测**:`MVS_Exist` 全规则存在性 3.86→**5.79 MB/s(+50%)**,消除原 ~40% CPU 的 regexp2 回溯瓶颈。
+- **行为变化**:PCRE2 支持 POSIX 字符类 `[[:alpha:]]`(dlclark/.NET 不支持),已更新 regexp-utils 相应测试期望。
+- **遗留**:`dlclark/regexp2` 仅作 `dop251/goja`(JS 引擎)传递依赖残留 go.mod `// indirect`,与 yaklang 正则路径无关。
+
+### Phase 7 — 冲击 80x(存在性)路线 — 待落地(按收益/确定性排序,详见第 4' 节)
+- **R1 字面量门控 pattern 合并单趟**(现最大头,结构性,预期最高收益):扩 `mvs_merged.go` 覆盖门控 lean NFA,
+  Teddy 命中位置驱动单趟位递推,消除 N 条门控 = N 次 cgo + N 趟扫。护栏:合并命中集 == 各成员 existsIn。
+- **R2 断言 NFA 合并单趟**(中等,确定性):guard 断言 NFA 仿合并法收一趟,削 ~13% 断言路径 CPU。
+- **R3 AVX2 档**(纯吞吐):一次 32 字节,需 AVX2 标量孪生差分 + 运行期探测。
+- **R4 Rose 子串图多跳链**(>2 字面量,工程量大):中间子串级编排压低误触发率。
+- **R5 定位档 C 内核**(独立,把 `MVS_Located` 16x→~30x):仅替换场景受益,需与 Go oracle 逐字节差分。
 
 ---
 
