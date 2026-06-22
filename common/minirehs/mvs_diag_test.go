@@ -69,6 +69,7 @@ func scanUnsupportedOp(re *syntax.Regexp, top bool) string {
 // TestMVSFallbackReasons 数据驱动: 报告真实 MITM 规则集中每条 fallback 的原因分布,
 // 指导 NFA 覆盖率扩展 (零宽断言等) 的优先级.
 func TestMVSFallbackReasons(t *testing.T) {
+	requireDiag(t)
 	patterns, names := compilableMITMPatterns(t)
 	counts := map[string]int{}
 	byReason := map[string][]string{}

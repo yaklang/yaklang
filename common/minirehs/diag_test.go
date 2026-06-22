@@ -10,9 +10,7 @@ import (
 // TestDiagEngineHotspot 统计引擎在真实语料上的热点: 窗口验证次数 / 触发的整段验证次数 /
 // always-on 整段扫描次数, 以及 always-on 单独耗时, 用于定位真正瓶颈.
 func TestDiagEngineHotspot(t *testing.T) {
-	if testing.Short() {
-		t.Skip("diagnostic test, skipped in -short")
-	}
+	requireDiag(t)
 	patterns := re2OnlyMITMPatternsT(t)
 	records, _ := loadCorpus(t)
 
@@ -83,9 +81,7 @@ func TestDiagEngineHotspot(t *testing.T) {
 
 // TestDiagBottleneck 诊断真实语料上的瓶颈: always-on 数量、平均候选数、最慢的若干 pattern.
 func TestDiagBottleneck(t *testing.T) {
-	if testing.Short() {
-		t.Skip("diagnostic test, skipped in -short")
-	}
+	requireDiag(t)
 	patterns := re2OnlyMITMPatternsT(t)
 	records, _ := loadCorpus(t)
 

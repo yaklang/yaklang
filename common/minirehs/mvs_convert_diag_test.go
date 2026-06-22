@@ -9,6 +9,7 @@ import (
 // "消除 regexp2 税" 的覆盖: 期望 fallback 趋近 0, regexp2 仅在 gate 命中时复核. 仅打印不强断言,
 // 真正的正确性护栏是 TestMVSExistenceVsOracleMITM 等差分测试.
 func TestMVSConvertibility(t *testing.T) {
+	requireDiag(t)
 	patterns, names := compilableMITMPatterns(t)
 
 	db, err := Compile(patterns, WithBackend(BackendMVS), WithLogger(silentLogger{}))

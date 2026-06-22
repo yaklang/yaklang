@@ -103,6 +103,7 @@ func factorsOf(re *syntax.Regexp) [][]string {
 //
 // 仅诊断, 不改任何生产逻辑; 复用内部 mvsDB 结构. 运行: go test -run TestMVSOptDiag -v
 func TestMVSOptDiag(t *testing.T) {
+	requireDiag(t)
 	patterns, names := compilableMITMPatterns(t)
 	records, _ := loadCorpus(t)
 
@@ -255,6 +256,7 @@ func TestMVSOptDiag(t *testing.T) {
 // 当前: 字面量预过滤命中 (单一最长 OR 集) 即对该 pattern 跑窗口 NFA.
 // AND 门控: 仅当该 pattern 的所有必需因子 (concat 各部分) 都在记录中出现, 才跑 NFA.
 func TestMVSANDGatePotential(t *testing.T) {
+	requireDiag(t)
 	patterns, names := compilableMITMPatterns(t)
 	records, _ := loadCorpus(t)
 
@@ -443,6 +445,7 @@ func existsAnchoredSinglePass(nfa *mvsNFA, data []byte, inject []bool, minInject
 // TestMVSAnchoredPotential 量化"锚定验证"(只在 head 有界范围注入 first + 快速失败) 相对当前
 // unanchored 整段窗口的字节削减. 仅对 head 有界的 lean-gated pattern 适用 (tail 无界也能受益).
 func TestMVSAnchoredPotential(t *testing.T) {
+	requireDiag(t)
 	patterns, names := compilableMITMPatterns(t)
 	records, _ := loadCorpus(t)
 	db, err := Compile(patterns, WithBackend(BackendMVS), WithReportLocation(false), WithLogger(silentLogger{}))
@@ -586,6 +589,7 @@ func litLengthOf(d *mvsDB, litID int) int {
 // TestMVSDispositionDump 精确打印每条 pattern 的运行期路径与成本归因 (gate/re2Loc/assert/
 // windowable/batchable + 触发记录数 + 实际全段扫描记录数), 厘清 regexp2 / NFA / assert 各成本来源.
 func TestMVSDispositionDump(t *testing.T) {
+	requireDiag(t)
 	patterns, names := compilableMITMPatterns(t)
 	records, _ := loadCorpus(t)
 	db, err := Compile(patterns, WithBackend(BackendMVS), WithReportLocation(false), WithLogger(silentLogger{}))
@@ -692,6 +696,7 @@ func TestMVSDispositionDump(t *testing.T) {
 // TestMVSAssertWindowDiag 打印每条断言 NFA 的窗口化资格 (windowed/winW/gate/assertWindowable)
 // 与触发记录数, 定位 existsInAssertShared 仍占 15% 的真凶 (是否 always-on / 是否未窗口化).
 func TestMVSAssertWindowDiag(t *testing.T) {
+	requireDiag(t)
 	patterns, names := compilableMITMPatterns(t)
 	records, _ := loadCorpus(t)
 	db, err := Compile(patterns, WithBackend(BackendMVS), WithReportLocation(false), WithLogger(silentLogger{}))
@@ -748,6 +753,7 @@ func TestMVSAssertWindowDiag(t *testing.T) {
 // 与 "data[winLo:] 局部 regexp2" 的耗时, winLo = firstHitEnd - maxHead - 1 (从超集算 head).
 // 这决定左截窗口能省多少: 若首个 :// 普遍靠后, 局部化收益大; 靠前则收益有限.
 func TestMVSGateLocalizeDiag(t *testing.T) {
+	requireDiag(t)
 	patterns, names := compilableMITMPatterns(t)
 	records, _ := loadCorpus(t)
 	db, err := Compile(patterns, WithBackend(BackendMVS), WithReportLocation(false), WithLogger(silentLogger{}))
@@ -915,6 +921,7 @@ func safeRatio(a, b int64) float64 {
 // TestMVSCgoCallDiag 量化 cgo 跨界: 统计一遍语料 nfaExists / mergedScan 的调用次数与扫描字节,
 // 判定 cgocall 瓶颈是 "跨界开销" (调用多/字节少 -> 批处理) 还是 "扫描工作量" (字节多 -> 收窄窗口).
 func TestMVSCgoCallDiag(t *testing.T) {
+	requireDiag(t)
 	patterns, _ := compilableMITMPatterns(t)
 	records, joined := loadCorpus(t)
 	db, err := Compile(patterns, WithBackend(BackendMVS), WithReportLocation(false), WithLogger(silentLogger{}))
@@ -943,6 +950,7 @@ func TestMVSCgoCallDiag(t *testing.T) {
 // TestMVSAssertAlwaysOnDiag 打印断言型 always-on pattern (无可用必需字面量, 每条记录整段
 // existsInAssertShared 扫描) 的名称/表达式/nword, 评估能否补充字面量门控或窗口化以省整段扫.
 func TestMVSAssertAlwaysOnDiag(t *testing.T) {
+	requireDiag(t)
 	patterns, names := compilableMITMPatterns(t)
 	db, err := Compile(patterns, WithBackend(BackendMVS), WithReportLocation(false), WithLogger(silentLogger{}))
 	if err != nil {
@@ -984,6 +992,7 @@ func TestMVSAssertAlwaysOnDiag(t *testing.T) {
 // 当前从 0 整段扫 C 内核), 标注 head/tail 界、是否以 .* / [\s\S]* / (?s) 等 "自由前缀" 开头
 // (此类前缀对存在性免费, 可锚定到字面量), 以及触发记录数. 指导"无界头存在性锚定"优化的取舍.
 func TestMVSUnboundedHeadDiag(t *testing.T) {
+	requireDiag(t)
 	patterns, names := compilableMITMPatterns(t)
 	records, _ := loadCorpus(t)
 	db, err := Compile(patterns, WithBackend(BackendMVS), WithReportLocation(false), WithLogger(silentLogger{}))
