@@ -28,6 +28,7 @@ func BenchmarkMVSBiAnchorAB(b *testing.B) {
 //   - 仍走 C 内核 batch 的 nfaExists 扫描字节 (cgoNfaExistsBytes), 对照旧整段 winBytes
 // 仅诊断. 运行: go test -run TestMVSBiAnchorDispatchDiag -v
 func TestMVSBiAnchorDispatchDiag(t *testing.T) {
+	requireDiag(t)
 	patterns, names := compilableMITMPatterns(t)
 	records, _ := loadCorpus(t)
 

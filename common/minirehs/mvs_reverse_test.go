@@ -39,7 +39,9 @@ func genRevInput(r *rand.Rand, maxLen int) []byte {
 // 此测试必失败 -> 提示改走"正向切分边界反向遍历". 同时校验 nword==1 标量快路径与通用版一致.
 func TestMVSReverseNFADifferential(t *testing.T) {
 	r := rand.New(rand.NewSource(0x5EED9))
-	iters := diffIters(t, defaultDiffIters)
+	// reverse-eligible 通过率较低 (~31%, 额外要求 !hasAssert/!anchoredStart/!requireEnd),
+	// 故需更高迭代数才能稳定达到覆盖下限; 本测试极快 (3000 iter 仅 ~0.03s), 翻倍无感.
+	iters := diffIters(t, 6000)
 	tested, skipped := 0, 0
 	for it := 0; it < iters; it++ {
 		expr := genRE(r, 2)

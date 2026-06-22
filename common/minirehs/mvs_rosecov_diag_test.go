@@ -94,6 +94,7 @@ func litCoverClass(occ []occCov) string {
 // TestMVSRoseCovPotential 在真实 MITM 规则 + 真实流量上量化双向锚定可救的整段扫成本占比.
 // 仅诊断, 不改生产逻辑. 运行: go test -run TestMVSRoseCovPotential -v
 func TestMVSRoseCovPotential(t *testing.T) {
+	requireDiag(t)
 	patterns, names := compilableMITMPatterns(t)
 	records, _ := loadCorpus(t)
 
