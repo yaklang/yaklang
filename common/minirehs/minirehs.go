@@ -57,6 +57,10 @@ const (
 	// 以命中存在性为准的场景 (命中以 From/To=-1 上报, 与 regexp2-only 语义一致)。
 	// 仅在 -tags minirehs_vectorscan 构建且运行时能加载到 libhs 时可用; 否则优雅退化为引擎。
 	BackendVectorscan
+	// BackendMVS 是自托管 mvscan 引擎 (字节级 Glushkov 位并行 NFA + 字面量预过滤) 的"存在性"
+	// 匹配后端: 把每条正则编译为字节级位置自动机, 一次扫描判定"哪些规则命中" (From/To=-1)。
+	// 当前为纯 Go 参考实现, 始终可用; 后续以 build tag 接入 SIMD/CGO 加速档并以本实现做差分对照。
+	BackendMVS
 )
 
 func (b BackendKind) String() string {
@@ -69,6 +73,8 @@ func (b BackendKind) String() string {
 		return "stdlib"
 	case BackendVectorscan:
 		return "vectorscan"
+	case BackendMVS:
+		return "mvs"
 	default:
 		return "unknown"
 	}
